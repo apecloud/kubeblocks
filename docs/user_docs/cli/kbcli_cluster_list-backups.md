@@ -1,6 +1,6 @@
 ## kbcli cluster list-backups
 
-List backup jobs
+List backups
 
 ```
 kbcli cluster list-backups [flags]
@@ -10,7 +10,7 @@ kbcli cluster list-backups [flags]
 
 ```
   # list all backup
-  kbcli cluster list-backup
+  kbcli cluster list-backups
 ```
 
 ### Options
@@ -48,5 +48,5 @@ kbcli cluster list-backups [flags]
 
 ### SEE ALSO
 
-* [kbcli cluster](kbcli_cluster.md)	 - Database cluster operation command
+* [kbcli cluster](kbcli_cluster.md)	 - Cluster operation command
 

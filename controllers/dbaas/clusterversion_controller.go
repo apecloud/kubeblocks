@@ -35,6 +35,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	dbaasconfig "github.com/apecloud/kubeblocks/controllers/dbaas/configuration"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -132,8 +133,17 @@ func (r *ClusterVersionReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		return intctrlutil.Reconciled()
 	}
 
-	if ok, err := checkClusterVersionTemplate(r.Client, reqCtx, clusterVersion); !ok || err != nil {
-		return intctrlutil.RequeueAfter(time.Second, reqCtx.Log, "configMapIsReady")
+	if ok, err := dbaasconfig.CheckCVConfigTemplate(r.Client, reqCtx, clusterVersion); !ok || err != nil {
+		return intctrlutil.RequeueAfter(time.Second, reqCtx.Log, "failed to check config template")
+	}
+
+	if ok, err := dbaasconfig.UpdateCVLabelsWithUsingConfiguration(r.Client, reqCtx, clusterVersion); !ok || err != nil {
+		return intctrlutil.RequeueAfter(time.Second, reqCtx.Log, "failed to update using config template info")
+	}
+
+	// Update configmap Finalizer and set Immutable
+	if err := dbaasconfig.UpdateCVConfigMapFinalizer(r.Client, reqCtx, clusterVersion); err != nil {
+		return intctrlutil.RequeueAfter(time.Second, reqCtx.Log, "failed to UpdateConfigMapFinalizer")
 	}
 
 	clusterdefinition := &dbaasv1alpha1.ClusterDefinition{}
@@ -173,18 +183,6 @@ func (r *ClusterVersionReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	return ctrl.Result{}, nil
 }
 
-func checkClusterVersionTemplate(client client.Client, ctx intctrlutil.RequestCtx, clusterVersion *dbaasv1alpha1.ClusterVersion) (bool, error) {
-	for _, component := range clusterVersion.Spec.Components {
-		if len(component.ConfigTemplateRefs) == 0 {
-			continue
-		}
-		if ok, err := checkValidConfTpls(client, ctx, component.ConfigTemplateRefs); !ok || err != nil {
-			return ok, err
-		}
-	}
-	return true, nil
-}
-
 func validateClusterVersion(clusterVersion *dbaasv1alpha1.ClusterVersion, clusterDef *dbaasv1alpha1.ClusterDefinition) string {
 	notFoundComponentTypes, noContainersComponents := clusterVersion.GetInconsistentComponentsInfo(clusterDef)
 	var statusMsgs []string
@@ -212,10 +210,10 @@ func (r *ClusterVersionReconciler) deleteExternalResources(reqCtx intctrlutil.Re
 	//
 	// Ensure that delete implementation is idempotent and safe to invoke
 	// multiple times for same object.
-	return nil
+	return dbaasconfig.DeleteCVConfigMapFinalizer(r.Client, reqCtx, clusterVersion)
 }
 
-// SyncClusterStatusOperationsWithUpgrade sync cluster status.operations.upgradable when delete or create ClusterVersion
+// SyncClusterStatusOperationsWithUpgrade syncs cluster status.operations.upgradable when delete or create ClusterVersion
 func (r *ClusterVersionReconciler) syncClusterStatusOperationsWithUpgrade(ctx context.Context, clusterVersion *dbaasv1alpha1.ClusterVersion) error {
 	var (
 		clusterList        = &dbaasv1alpha1.ClusterList{}
@@ -237,16 +235,13 @@ func (r *ClusterVersionReconciler) syncClusterStatusOperationsWithUpgrade(ctx co
 		upgradable = true
 	}
 	for _, v := range clusterList.Items {
-		var patch client.Patch
-		if v.Status.Operations != nil {
-			if v.Status.Operations.Upgradable == upgradable {
-				continue
-			}
-			patch = client.MergeFrom(v.DeepCopy())
-		} else {
-			patch = client.MergeFrom(v.DeepCopy())
+		if v.Status.Operations == nil {
 			v.Status.Operations = &dbaasv1alpha1.Operations{}
 		}
+		if v.Status.Operations.Upgradable == upgradable {
+			continue
+		}
+		patch := client.MergeFrom(v.DeepCopy())
 		v.Status.Operations.Upgradable = upgradable
 		if err = r.Client.Status().Patch(ctx, &v, patch); err != nil {
 			return err

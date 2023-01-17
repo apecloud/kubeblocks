@@ -27,15 +27,15 @@ import (
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
+	"github.com/apecloud/kubeblocks/internal/cli/types"
 )
 
 var _ = Describe("helper", func() {
-	It("Get default pod name from cluster", func() {
+	It("Get instance info from cluster", func() {
 		cluster := testing.FakeCluster("test", "test")
 		dynamic := testing.FakeDynamicClient(cluster)
-		name, err := GetDefaultPodName(dynamic, "test", "test")
-		Expect(err).ShouldNot(HaveOccurred())
-		Expect(len(name) > 0).Should(BeTrue())
+		infos := GetSimpleInstanceInfos(dynamic, "test", "test")
+		Expect(len(infos) == 1).Should(BeTrue())
 	})
 
 	It("Get type from pod", func() {
@@ -46,7 +46,7 @@ var _ = Describe("helper", func() {
 					Namespace:       "test",
 					ResourceVersion: "10",
 					Labels: map[string]string{
-						"app.kubernetes.io/name": name,
+						types.NameLabelKey: name,
 					},
 				},
 			}
@@ -96,7 +96,7 @@ var _ = Describe("helper", func() {
 	It("get cluster endpoints", func() {
 		cluster := testing.FakeCluster("test", "test")
 		svcs := testing.FakeServices()
-		internalEPs, externalEPs := GetClusterEndpoints(svcs, &cluster.Spec.Components[0])
+		internalEPs, externalEPs := GetComponentEndpoints(svcs, &cluster.Spec.Components[0])
 		Expect(len(internalEPs)).Should(Equal(3))
 		Expect(len(externalEPs)).Should(Equal(1))
 	})

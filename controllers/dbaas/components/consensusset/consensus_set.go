@@ -20,11 +20,13 @@ import (
 	"context"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	"github.com/apecloud/kubeblocks/controllers/dbaas/components/types"
 	"github.com/apecloud/kubeblocks/controllers/dbaas/components/util"
-	"github.com/apecloud/kubeblocks/controllers/dbaas/operations"
+	opsutil "github.com/apecloud/kubeblocks/controllers/dbaas/operations/util"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -36,7 +38,15 @@ type ConsensusSet struct {
 	Component    *dbaasv1alpha1.ClusterComponent
 }
 
+var _ types.Component = &ConsensusSet{}
+
 func (consensusSet *ConsensusSet) IsRunning(obj client.Object) (bool, error) {
+	// TODO The function name (IsRunning) sounds like it should be side-effect free,
+	// TODO however, a lot of changes are done here, including setting cluster status,
+	// TODO it may even delete some pod. Should be revised.
+	if obj == nil {
+		return false, nil
+	}
 	sts := util.CovertToStatefulSet(obj)
 	if statefulStatusRevisionIsEquals, err := handleConsensusSetUpdate(consensusSet.Ctx, consensusSet.Cli, consensusSet.Cluster, sts); err != nil {
 		return false, err
@@ -46,11 +56,21 @@ func (consensusSet *ConsensusSet) IsRunning(obj client.Object) (bool, error) {
 }
 
 func (consensusSet *ConsensusSet) PodsReady(obj client.Object) (bool, error) {
+	if obj == nil {
+		return false, nil
+	}
 	sts := util.CovertToStatefulSet(obj)
 	return util.StatefulSetPodsIsReady(sts), nil
 }
 
-func (consensusSet *ConsensusSet) HandleProbeTimeoutWhenPodsReady() (bool, error) {
+func (consensusSet *ConsensusSet) PodIsAvailable(pod *corev1.Pod, minReadySeconds int32) bool {
+	if pod == nil {
+		return false
+	}
+	return isReady(*pod)
+}
+
+func (consensusSet *ConsensusSet) HandleProbeTimeoutWhenPodsReady(recorder record.EventRecorder) (bool, error) {
 	var (
 		statusComponent dbaasv1alpha1.ClusterStatusComponent
 		ok              bool
@@ -107,11 +127,14 @@ func (consensusSet *ConsensusSet) HandleProbeTimeoutWhenPodsReady() (bool, error
 	if err = consensusSet.Cli.Status().Patch(consensusSet.Ctx, cluster, patch); err != nil {
 		return true, err
 	}
+	if recorder != nil {
+		recorder.Eventf(cluster, corev1.EventTypeWarning, types.ProbeTimeoutReason, "pod role detection timed out in Component: "+consensusSet.Component.Name)
+	}
 	// when component status changed, mark OpsRequest to reconcile.
-	return false, operations.MarkRunningOpsRequestAnnotation(consensusSet.Ctx, consensusSet.Cli, cluster)
+	return false, opsutil.MarkRunningOpsRequestAnnotation(consensusSet.Ctx, consensusSet.Cli, cluster)
 }
 
-func (consensusSet *ConsensusSet) CalculatePhaseWhenPodsNotReady(componentName string) (dbaasv1alpha1.Phase, error) {
+func (consensusSet *ConsensusSet) GetPhaseWhenPodsNotReady(componentName string) (dbaasv1alpha1.Phase, error) {
 	var (
 		isFailed      = true
 		isAbnormal    bool
@@ -135,8 +158,9 @@ func (consensusSet *ConsensusSet) CalculatePhaseWhenPodsNotReady(componentName s
 			return "", nil
 		}
 		labelValue := v.Labels[intctrlutil.ConsensusSetRoleLabelKey]
-		if labelValue == consensusSet.ComponentDef.ConsensusSpec.Leader.Name {
+		if labelValue == consensusSet.ComponentDef.ConsensusSpec.Leader.Name && intctrlutil.PodIsReady(&v) {
 			isFailed = false
+			continue
 		}
 		// if no role label, the pod is not ready
 		if labelValue == "" {
@@ -147,7 +171,8 @@ func (consensusSet *ConsensusSet) CalculatePhaseWhenPodsNotReady(componentName s
 		}
 	}
 	// check pod count is equals to the component replicas
-	if !consensusSet.podCountEqualsComponentReplicas(consensusSet.ComponentDef, podCount) {
+	componentReplicas := util.GetComponentReplicas(consensusSet.Component, consensusSet.ComponentDef)
+	if componentReplicas != int32(podCount) {
 		isAbnormal = true
 		allPodIsReady = false
 	}
@@ -158,21 +183,14 @@ func (consensusSet *ConsensusSet) CalculatePhaseWhenPodsNotReady(componentName s
 	return util.CalculateComponentPhase(isFailed, isAbnormal), nil
 }
 
-// podCountEqualsComponentReplicas check the pod count is equal to the component replicas
-func (consensusSet *ConsensusSet) podCountEqualsComponentReplicas(componentDef *dbaasv1alpha1.ClusterDefinitionComponent, podCount int) bool {
-	component := consensusSet.Component
-	replicas := componentDef.DefaultReplicas
-	if component.Replicas != nil {
-		replicas = *component.Replicas
-	}
-	return component != nil && replicas == int32(podCount)
-}
-
 func NewConsensusSet(ctx context.Context,
 	cli client.Client,
 	cluster *dbaasv1alpha1.Cluster,
 	component *dbaasv1alpha1.ClusterComponent,
-	componentDef *dbaasv1alpha1.ClusterDefinitionComponent) *ConsensusSet {
+	componentDef *dbaasv1alpha1.ClusterDefinitionComponent) types.Component {
+	if component == nil || componentDef == nil {
+		return nil
+	}
 	return &ConsensusSet{
 		Ctx:          ctx,
 		Cli:          cli,

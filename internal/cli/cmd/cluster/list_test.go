@@ -66,16 +66,14 @@ var _ = Describe("list", func() {
 			GroupVersion:         schema.GroupVersion{Group: types.Group, Version: types.Version},
 			NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
 			Client: clientfake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
-				if req.Method != "GET" {
-					return nil, nil
-				}
 				urlPrefix := "/api/v1/namespaces/" + namespace
 				return map[string]*http.Response{
 					"/namespaces/" + namespace + "/clusters":      httpResp(&dbaasv1alpha1.ClusterList{Items: []dbaasv1alpha1.Cluster{*cluster}}),
 					"/namespaces/" + namespace + "/clusters/test": httpResp(cluster),
+					"/namespaces/" + namespace + "/secrets":       httpResp(testing.FakeSecrets(namespace, clusterName)),
 					"/api/v1/nodes/" + testing.NodeName:           httpResp(testing.FakeNode()),
 					urlPrefix + "/services":                       httpResp(&corev1.ServiceList{}),
-					urlPrefix + "/secrets":                        httpResp(&corev1.SecretList{}),
+					urlPrefix + "/secrets":                        httpResp(testing.FakeSecrets(namespace, clusterName)),
 					urlPrefix + "/pods":                           httpResp(pods),
 					urlPrefix + "/events":                         httpResp(testing.FakeEvents()),
 				}[req.URL.Path], nil
@@ -116,6 +114,14 @@ var _ = Describe("list", func() {
 
 	It("list events", func() {
 		cmd := NewListEventsCmd(tf, streams)
+		Expect(cmd).ShouldNot(BeNil())
+
+		cmd.Run(cmd, []string{"test"})
+		Expect(len(strings.Split(out.String(), "\n")) > 1).Should(BeTrue())
+	})
+
+	It("list users", func() {
+		cmd := NewListUsersCmd(tf, streams)
 		Expect(cmd).ShouldNot(BeNil())
 
 		cmd.Run(cmd, []string{"test"})

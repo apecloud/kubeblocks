@@ -128,7 +128,7 @@ help: ## Display this help.
 	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage:\n  make \033[36m<target>\033[0m\n"} /^[a-zA-Z_0-9-]+:.*?##/ { printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
 
 .PHONY: all
-all: manager kbcli agamotto ## Make all cmd binaries.
+all: manager kbcli agamotto reloader ## Make all cmd binaries.
 
 ##@ Development
 
@@ -194,19 +194,6 @@ ifneq (, $(findstring $(EXISTING_CLUSTER_TYPE), $(CLUSTER_TYPES)))
 ifeq (, $(shell sed -n "/^127.0.0.1[[:space:]]*host.$(EXISTING_CLUSTER_TYPE).internal/p" /etc/hosts))
 	sudo bash -c 'echo "127.0.0.1 host.$(EXISTING_CLUSTER_TYPE).internal" >> /etc/hosts'
 endif
-endif
-
-.PHONY: test-probe
-test-probe:
-	cd ./cmd/probe && $(GO) test ./... -coverprofile cover.out
-
-.PHONY: cover-report-probe
-cover-report-probe: ## Generate cover.html from cmd/probe/cover.out
-	cd ./cmd/probe && $(GO) tool cover -html=cover.out -o cover.html
-ifeq ($(GOOS), darwin)
-	open ./cmd/probe/cover.html
-else
-	echo "open cmd/probe/cover.html with a HTML viewer."
 endif
 
 .PHONY: test-current-ctx
@@ -337,29 +324,61 @@ agamotto: build-checks ## Build agamotto related binaries
 clean-agamotto: ## Clean bin/mysqld_exporter.
 	rm -f bin/agamotto
 
-##@ DAP
+##@ reloader
 
-DAPRD_BUILD_PATH = ./cmd/daprd
-DAPRD_LD_FLAGS = "-s -w"
+RELOADER_LD_FLAGS = "-s -w"
 
-bin/daprd.%: ## Cross build bin/daprd.$(OS).$(ARCH) .
-	cd $(DAPRD_BUILD_PATH) && GOOS=$(word 2,$(subst ., ,$@)) GOARCH=$(word 3,$(subst ., ,$@)) $(GO) build -ldflags=${DAPRD_LD_FLAGS} -o ../../$@  ./main.go
+bin/reloader.%: ## Cross build bin/reloader.$(OS).$(ARCH) .
+	GOOS=$(word 2,$(subst ., ,$@)) GOARCH=$(word 3,$(subst ., ,$@)) $(GO) build -ldflags=${RELOADER_LD_FLAGS} -o $@ ./cmd/reloader/main.go
 
-daprd-mod-vendor:
-	cd $(DAPRD_BUILD_PATH) && $(GO) mod tidy -compat=1.19
-	cd $(DAPRD_BUILD_PATH) && $(GO) mod vendor
-	cd $(DAPRD_BUILD_PATH) && $(GO) mod verify
-
-.PHONY: daprd
-daprd: OS=$(shell $(GO) env GOOS)
-daprd: ARCH=$(shell $(GO) env GOARCH)
-daprd: daprd-mod-vendor # build-checks ## Build daprd related binaries
-	$(MAKE) bin/daprd.${OS}.${ARCH}
-	mv bin/daprd.${OS}.${ARCH} bin/daprd
+.PHONY: reloader
+reloader: OS=$(shell $(GO) env GOOS)
+reloader: ARCH=$(shell $(GO) env GOARCH)
+reloader: build-checks ## Build agamotto related binaries
+	$(MAKE) bin/reloader.${OS}.${ARCH}
+	mv bin/reloader.${OS}.${ARCH} bin/reloader
 
 .PHONY: clean
-clean-daprd: ## Clean bin/mysqld_exporter.
-	rm -f bin/daprd
+clean-reloader: ## Clean bin/mysqld_exporter.
+	rm -f bin/reloader
+
+##@ PROBE
+
+
+PROBE_BUILD_PATH = ./cmd/probe
+PROBE_LD_FLAGS = "-s -w"
+
+bin/probe.%: ## Cross build bin/probe.$(OS).$(ARCH) .
+	cd $(PROBE_BUILD_PATH) && GOOS=$(word 2,$(subst ., ,$@)) GOARCH=$(word 3,$(subst ., ,$@)) $(GO) build -ldflags=${PROBE_LD_FLAGS} -o ../../$@  ./main.go
+
+probe-mod-vendor:
+	cd $(PROBE_BUILD_PATH) && $(GO) mod tidy -compat=1.19
+	cd $(PROBE_BUILD_PATH) && $(GO) mod vendor
+	cd $(PROBE_BUILD_PATH) && $(GO) mod verify
+
+.PHONY: probe
+probe: OS=$(shell $(GO) env GOOS)
+probe: ARCH=$(shell $(GO) env GOARCH)
+probe: probe-mod-vendor # build-checks ## Build probe related binaries
+	$(MAKE) bin/probe.${OS}.${ARCH}
+	mv bin/probe.${OS}.${ARCH} bin/probe
+
+.PHONY: clean
+clean-probe: ## Clean bin/mysqld_exporter.
+	rm -f bin/probe
+
+.PHONY: test-probe
+test-probe:
+	cd ./cmd/probe && $(GO) test ./... -coverprofile cover.out
+
+.PHONY: cover-report-probe
+cover-report-probe: ## Generate cover.html from cmd/probe/cover.out
+	cd ./cmd/probe && $(GO) tool cover -html=cover.out -o cover.html
+ifeq ($(GOOS), darwin)
+	open ./cmd/probe/cover.html
+else
+	echo "open cmd/probe/cover.html with a HTML viewer."
+endif
 
 ##@ Deployment
 

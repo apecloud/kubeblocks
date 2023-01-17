@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
+	"strings"
 	"time"
 
 	"github.com/dapr/components-contrib/bindings"
@@ -37,24 +38,27 @@ const (
 	// CommandSQLKey keys from request's metadata.
 	CommandSQLKey = "sql"
 
-	defaultCheckFailedThreshold   = 10
-	defaultRoleUnchangedThreshold = 60
+	roleEventRecordQPS            = 1. / 60.
+	roleEventRecordFrequency      = int(1 / roleEventRecordQPS)
+	defaultCheckFailedThreshold   = 1800
+	defaultRoleDetectionThreshold = 300
 )
 
 type ProbeBase struct {
 	Operation               ProbeOperation
 	Logger                  logger.Logger
 	oriRole                 string
+	dbRoles                 map[string]AccessMode
 	runningCheckFailedCount int
 	roleCheckFailedCount    int
 	roleUnchangedCount      int
 	checkFailedThreshold    int
-	// roleUnchangedThreshold is used to set the report period of role changed event even role unchanged,
+	// roleDetectionThreshold is used to set the report duration of role event after role changed,
 	// then event controller can always get rolechanged events to maintain pod label accurately
 	// in cases of:
 	// 1 rolechanged event lost;
 	// 2 pod role label deleted or updated incorrectly.
-	roleUnchangedThreshold int
+	roleDetectionThreshold int
 	dbPort                 int
 }
 
@@ -76,27 +80,31 @@ type ProbeOperation interface {
 
 func init() {
 	viper.SetDefault("KB_CHECK_FAILED_THRESHOLD", defaultCheckFailedThreshold)
-	viper.SetDefault("KB_ROLE_UNCHANGED_THRESHOLD", defaultRoleUnchangedThreshold)
+	viper.SetDefault("KB_ROLE_DETECTION_THRESHOLD", defaultRoleDetectionThreshold)
 }
 
 func (p *ProbeBase) Init() {
 	p.dbPort = p.Operation.GetRunningPort()
 	p.checkFailedThreshold = viper.GetInt("KB_CHECK_FAILED_THRESHOLD")
-	if p.checkFailedThreshold < 10 {
-		p.checkFailedThreshold = 10
-	} else if p.checkFailedThreshold > 60 {
-		p.checkFailedThreshold = 60
+	if p.checkFailedThreshold < 300 {
+		p.checkFailedThreshold = 300
+	} else if p.checkFailedThreshold > 3600 {
+		p.checkFailedThreshold = 3600
 	}
 
-	roleUnchangedThreshold := viper.GetInt("KB_ROLE_UNCHANGED_THRESHOLD")
-	if roleUnchangedThreshold < 10 {
-		p.roleUnchangedThreshold = 10
-	} else if roleUnchangedThreshold > 60 {
-		p.roleUnchangedThreshold = 60
-	} else {
-		p.roleUnchangedThreshold = roleUnchangedThreshold
+	p.roleDetectionThreshold = viper.GetInt("KB_ROLE_DETECTION_THRESHOLD")
+	if p.roleDetectionThreshold < 60 {
+		p.roleDetectionThreshold = 60
+	} else if p.roleDetectionThreshold > 300 {
+		p.roleDetectionThreshold = 300
 	}
 
+	val := viper.GetString("KB_SERVICE_ROLES")
+	if val != "" {
+		if err := json.Unmarshal([]byte(val), &p.dbRoles); err != nil {
+			fmt.Println(errors.Wrap(err, "KB_DB_ROLES env format error").Error())
+		}
+	}
 }
 
 func (p *ProbeBase) Operations() []bindings.OperationKind {
@@ -193,6 +201,14 @@ func (p *ProbeBase) roleObserve(ctx context.Context, cmd string, response *bindi
 		return msg, nil
 	}
 
+	p.roleCheckFailedCount = 0
+	if isValid, message := p.roleValidate(role); !isValid {
+		result.Event = "roleInvalid"
+		result.Message = message
+		msg, _ := json.Marshal(result)
+		return msg, nil
+	}
+
 	result.Role = role
 	if p.oriRole != role {
 		result.Event = "roleChanged"
@@ -204,17 +220,41 @@ func (p *ProbeBase) roleObserve(ctx context.Context, cmd string, response *bindi
 	}
 
 	// roleUnchangedCount is the count of consecutive role unchanged checks.
-	// if observed role unchanged consecutively in roleUnchangedThreshold times,
+	// if observed role unchanged consecutively in roleDetectionThreshold times after role changed,
 	// we emit the current role again，then event controller can always get
 	// roleChanged events to maintain pod label accurately in cases of:
 	// 1 roleChanged event loss;
 	// 2 pod role label deleted or updated incorrectly.
-	if p.roleUnchangedCount%p.roleUnchangedThreshold == 0 {
+	if p.roleUnchangedCount < p.roleDetectionThreshold && p.roleUnchangedCount%roleEventRecordFrequency == 0 {
 		response.Metadata[StatusCode] = CheckFailedHTTPCode
 	}
 	msg, _ := json.Marshal(result)
 	p.Logger.Infof(string(msg))
 	return msg, nil
+}
+
+// DB may have some internal roles that need not be exposed to end user,
+// and not configured in cluster definition, eg. wesql's Candidate.
+// roleValidate is used to filter the internal roles and decrease the number
+// of report events to reduce the possibility of event conflictions.
+func (p *ProbeBase) roleValidate(role string) (bool, string) {
+	// do not validate when db roles setting is missing
+	if len(p.dbRoles) == 0 {
+		return true, ""
+	}
+
+	var msg string
+	isValid := false
+	for r := range p.dbRoles {
+		if strings.EqualFold(r, role) {
+			isValid = true
+			break
+		}
+	}
+	if !isValid {
+		msg = fmt.Sprintf("role %s is not configured in cluster definition %v", role, p.dbRoles)
+	}
+	return isValid, msg
 }
 
 // runningCheck checks whether the binding service is in running status:

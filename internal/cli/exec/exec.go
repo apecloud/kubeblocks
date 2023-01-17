@@ -20,10 +20,10 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/spf13/cobra"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	restclient "k8s.io/client-go/rest"
@@ -31,42 +31,16 @@ import (
 	cmdexec "k8s.io/kubectl/pkg/cmd/exec"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/cmd/util/podcmd"
-
-	"github.com/apecloud/kubeblocks/internal/cli/util"
 )
-
-// ExecInput is used to transfer custom Complete & Validate & AddFlags
-type ExecInput struct {
-	// Use cobra command use
-	Use string
-
-	// Short is the short description shown in the 'help' output.
-	Short string
-
-	// Example use example for cluster logs
-	Example string
-
-	// CompleteFunc optional, custom Complete options
-	Complete func(args []string) error
-
-	// ValidateFunc optional, custom Validate func
-	Validate func() error
-
-	// AddFlags Func optional, custom build flags
-	AddFlags func(*cobra.Command)
-
-	// RunFunc optional, custom Run logic and return false or error means no need to exec, conversely return true will continue run exec
-	Run func() (bool, error)
-}
 
 type ExecOptions struct {
 	cmdexec.StreamOptions
 
-	Input     *ExecInput
-	Factory   cmdutil.Factory
-	Executor  cmdexec.RemoteExecutor
-	Config    *restclient.Config
-	ClientSet *kubernetes.Clientset
+	Factory  cmdutil.Factory
+	Executor cmdexec.RemoteExecutor
+	Config   *restclient.Config
+	Client   *kubernetes.Clientset
+	Dynamic  dynamic.Interface
 
 	// Pod target pod to execute command
 	Pod *corev1.Pod
@@ -87,26 +61,8 @@ func NewExecOptions(f cmdutil.Factory, streams genericclioptions.IOStreams) *Exe
 	}
 }
 
-func (o *ExecOptions) Build(input *ExecInput) *cobra.Command {
-	o.Input = input
-	cmd := &cobra.Command{
-		Use:     o.Input.Use,
-		Short:   o.Input.Short,
-		Example: o.Input.Example,
-		Run: func(cmd *cobra.Command, args []string) {
-			util.CheckErr(o.Complete(args))
-			util.CheckErr(o.Validate())
-			util.CheckErr(o.Run())
-		},
-	}
-	if o.Input.AddFlags != nil {
-		o.Input.AddFlags(cmd)
-	}
-	return cmd
-}
-
 // Complete receive exec parameters
-func (o *ExecOptions) Complete(args []string) error {
+func (o *ExecOptions) Complete() error {
 	var err error
 	o.Config, err = o.Factory.ToRESTConfig()
 	if err != nil {
@@ -118,43 +74,29 @@ func (o *ExecOptions) Complete(args []string) error {
 		return err
 	}
 
-	o.ClientSet, err = o.Factory.KubernetesClientSet()
+	o.Dynamic, err = o.Factory.DynamicClient()
 	if err != nil {
 		return err
 	}
 
-	// custom Complete function
-	if o.Input.Complete != nil {
-		if err = o.Input.Complete(args); err != nil {
-			return err
-		}
-	}
-	return nil
+	o.Client, err = o.Factory.KubernetesClientSet()
+	return err
 }
 
-func (o *ExecOptions) Validate() error {
+func (o *ExecOptions) validate() error {
 	var err error
 
-	// custom Validate function
-	if o.Input.Validate != nil {
-		if err = o.Input.Validate(); err != nil {
-			return err
-		}
-	}
-
 	// pod is not get, try to get it by pod name
-	if o.Pod == nil {
-		if len(o.PodName) > 0 {
-			if o.Pod, err = o.ClientSet.CoreV1().Pods(o.Namespace).Get(context.TODO(), o.PodName, metav1.GetOptions{}); err != nil {
-				return err
-			}
+	if o.Pod == nil && len(o.PodName) > 0 {
+		if o.Pod, err = o.Client.CoreV1().Pods(o.Namespace).Get(context.TODO(), o.PodName, metav1.GetOptions{}); err != nil {
+			return err
 		}
 	}
 
 	if o.Pod == nil {
 		return fmt.Errorf("failed to get the pod to execute")
 	}
-	if len(o.Command) == 0 && o.Input.Run == nil {
+	if len(o.Command) == 0 {
 		return fmt.Errorf("you must specify at least one command for the container")
 	}
 	if o.Out == nil || o.ErrOut == nil {
@@ -167,26 +109,22 @@ func (o *ExecOptions) Validate() error {
 	}
 
 	// check and get the container to execute command
-	containerName := o.ContainerName
-	if len(containerName) == 0 {
-		container, err := podcmd.FindOrDefaultContainerByName(o.Pod, containerName, o.Quiet, o.ErrOut)
+	if len(o.ContainerName) == 0 {
+		container, err := podcmd.FindOrDefaultContainerByName(o.Pod, "", o.Quiet, o.ErrOut)
 		if err != nil {
 			return err
 		}
-		containerName = container.Name
+		o.ContainerName = container.Name
 	}
-	o.ContainerName = containerName
 
 	return nil
 }
 
 func (o *ExecOptions) Run() error {
-	// custom run logic and direct return
-	if o.Input.Run != nil {
-		if continueExec, err := o.Input.Run(); err != nil || !continueExec {
-			return err
-		}
+	if err := o.validate(); err != nil {
+		return err
 	}
+
 	// ensure we can recover the terminal while attached
 	t := o.SetupTTY()
 

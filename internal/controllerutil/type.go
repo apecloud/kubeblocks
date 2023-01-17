@@ -24,6 +24,14 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 )
 
+// RequestCtx wrapper for reconcile procedure context parameters
+type RequestCtx struct {
+	Ctx      context.Context
+	Req      ctrl.Request
+	Log      logr.Logger
+	Recorder record.EventRecorder
+}
+
 const (
 	AppName = "kubeblocks"
 	// common label and annotation keys
@@ -46,6 +54,12 @@ const (
 
 	// StorageClassAnnotationKey StorageClass annotation key in Cluster
 	StorageClassAnnotationKey = "kubeblocks.io/storage-class"
+
+	// RestartAnnotationKey the annotation which notices the StatefulSet/DeploySet to restart
+	RestartAnnotationKey = "kubeblocks.io/restart"
+
+	// BackupProtectionLabelKey Backup delete protection policy label
+	BackupProtectionLabelKey = "kubeblocks.io/backup-protection"
 )
 
 const (
@@ -61,6 +75,8 @@ const (
 	ReasonCreatedCR = "CreatedCR"
 	// ReasonRunTaskFailed run task failed
 	ReasonRunTaskFailed = "RunTaskFailed"
+	// ReasonDeleteFailed delete failed
+	ReasonDeleteFailed = "DeleteFailed"
 )
 
 const (
@@ -71,10 +87,13 @@ const (
 	CronJob                   = "CronJob"
 )
 
-// RequestCtx wrapper for reconcile procedure context parameters
-type RequestCtx struct {
-	Ctx      context.Context
-	Req      ctrl.Request
-	Log      logr.Logger
-	Recorder record.EventRecorder
-}
+const (
+	// BackupRetain always retained, unless manually deleted by the user
+	BackupRetain = "Retain"
+
+	// BackupRetainUntilExpired retains backup till it expires
+	BackupRetainUntilExpired = "RetainUntilExpired"
+
+	// BackupDelete (default) deletes backup immediately when cluster's terminationPolicy is WipeOut
+	BackupDelete = "Delete"
+)

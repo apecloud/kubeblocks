@@ -101,7 +101,7 @@ func (o *DeleteOptions) complete() error {
 	if len(names) == 0 {
 		names = o.Names
 	}
-	if err = confirm(names, o.In); err != nil {
+	if err = Confirm(names, o.In); err != nil {
 		return err
 	}
 
@@ -146,11 +146,10 @@ func (o *DeleteOptions) deleteResult(r *resource.Result) error {
 		if o.GracePeriod >= 0 {
 			options = metav1.NewDeleteOptions(int64(o.GracePeriod))
 		}
-		_, err = o.deleteResource(info, options)
-		if err != nil {
+		if _, err = o.deleteResource(info, options); err != nil {
 			return err
 		}
-		fmt.Fprintf(o.Out, "%s \"%s\" deleted\n", info.Mapping.GroupVersionKind.Kind, info.Name)
+		fmt.Fprintf(o.Out, "%s %s deleted\n", info.Mapping.GroupVersionKind.Kind, info.Name)
 		return nil
 	})
 	if err != nil {
@@ -174,8 +173,8 @@ func (o *DeleteOptions) deleteResource(info *resource.Info, deleteOptions *metav
 	return response, nil
 }
 
-// confirm let user double-check what to delete
-func confirm(names []string, in io.Reader) error {
+// Confirm let user double-check what to delete
+func Confirm(names []string, in io.Reader) error {
 	if len(names) == 0 {
 		return nil
 	}

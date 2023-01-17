@@ -1,6 +1,6 @@
 ## kbcli cluster create
 
-Create a database cluster
+Create a cluster
 
 ```
 kbcli cluster create NAME --termination-policy=DoNotTerminate|Halt|Delete|WipeOut --components=file-path [flags]
@@ -92,5 +92,5 @@ kbcli cluster create NAME --termination-policy=DoNotTerminate|Halt|Delete|WipeOu
 
 ### SEE ALSO
 
-* [kbcli cluster](kbcli_cluster.md)	 - Database cluster operation command
+* [kbcli cluster](kbcli_cluster.md)	 - Cluster operation command
 

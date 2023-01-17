@@ -32,34 +32,55 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 )
 
-// GetDefaultPodName get the default pod in the cluster
-func GetDefaultPodName(dynamic dynamic.Interface, name string, namespace string) (string, error) {
+// GetSimpleInstanceInfos return simple instance info that only contains instance name and role, the default
+// instance should be the first element in the returned array.
+func GetSimpleInstanceInfos(dynamic dynamic.Interface, name string, namespace string) []*InstanceInfo {
+	var infos []*InstanceInfo
 	obj, err := dynamic.Resource(types.ClusterGVR()).Namespace(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
-		return "", err
+		return nil
 	}
 
 	cluster := &dbaasv1alpha1.Cluster{}
 	if err = runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, cluster); err != nil {
-		return "", err
+		return nil
 	}
 
 	// travel all components, check type
 	for _, c := range cluster.Status.Components {
+		var info *InstanceInfo
 		if c.ConsensusSetStatus != nil {
-			return c.ConsensusSetStatus.Leader.Pod, nil
+			buildInfoByStatus := func(status *dbaasv1alpha1.ConsensusMemberStatus) {
+				if status == nil {
+					return
+				}
+				info = &InstanceInfo{Role: status.Name, Name: status.Pod}
+				infos = append(infos, info)
+			}
+
+			// leader must be first
+			buildInfoByStatus(&c.ConsensusSetStatus.Leader)
+
+			// followers
+			for _, f := range c.ConsensusSetStatus.Followers {
+				buildInfoByStatus(&f)
+			}
+
+			// learner
+			buildInfoByStatus(c.ConsensusSetStatus.Learner)
 		}
+
 		// TODO: now we only support consensus set
 	}
 
-	return "", fmt.Errorf("failed to find the pod to exec command")
+	return infos
 }
 
 // GetClusterTypeByPod gets the cluster type from pod label
 func GetClusterTypeByPod(pod *corev1.Pod) (string, error) {
 	var clusterType string
 
-	if name, ok := pod.Labels["app.kubernetes.io/name"]; ok {
+	if name, ok := pod.Labels[types.NameLabelKey]; ok {
 		clusterType = strings.Split(name, "-")[0]
 	}
 
@@ -90,8 +111,8 @@ func FindClusterComp(cluster *dbaasv1alpha1.Cluster, typeName string) *dbaasv1al
 	return nil
 }
 
-// GetClusterEndpoints gets cluster internal and external endpoints
-func GetClusterEndpoints(svcList *corev1.ServiceList, c *dbaasv1alpha1.ClusterComponent) ([]string, []string) {
+// GetComponentEndpoints gets component internal and external endpoints
+func GetComponentEndpoints(svcList *corev1.ServiceList, c *dbaasv1alpha1.ClusterComponent) ([]string, []string) {
 	var (
 		internalEndpoints []string
 		externalEndpoints []string
@@ -105,20 +126,11 @@ func GetClusterEndpoints(svcList *corev1.ServiceList, c *dbaasv1alpha1.ClusterCo
 		return result
 	}
 
-	getExternalIP := func(svc *corev1.Service) string {
-		if svc.GetAnnotations()[types.ServiceLBTypeAnnotationKey] != types.ServiceLBTypeAnnotationValue {
-			return ""
-		}
-		return svc.GetAnnotations()[types.ServiceFloatingIPAnnotationKey]
-	}
-
-	for _, svc := range svcList.Items {
-		if svc.GetLabels()[types.ComponentLabelKey] != c.Name {
-			continue
-		}
+	svcs := GetComponentServices(svcList, c)
+	for _, svc := range svcs {
 		var (
 			internalIP = svc.Spec.ClusterIP
-			externalIP = getExternalIP(&svc)
+			externalIP = GetExternalIP(svc)
 		)
 		if internalIP != "" && internalIP != "None" {
 			internalEndpoints = append(internalEndpoints, getEndpoints(internalIP, svc.Spec.Ports)...)
@@ -128,6 +140,26 @@ func GetClusterEndpoints(svcList *corev1.ServiceList, c *dbaasv1alpha1.ClusterCo
 		}
 	}
 	return internalEndpoints, externalEndpoints
+}
+
+// GetComponentServices gets component services
+func GetComponentServices(svcList *corev1.ServiceList, c *dbaasv1alpha1.ClusterComponent) []*corev1.Service {
+	var svcs []*corev1.Service
+	for i, svc := range svcList.Items {
+		if svc.GetLabels()[types.ComponentLabelKey] != c.Name {
+			continue
+		}
+		svcs = append(svcs, &svcList.Items[i])
+	}
+	return svcs
+}
+
+// GetExternalIP get external IP from service annotation
+func GetExternalIP(svc *corev1.Service) string {
+	if svc.GetAnnotations()[types.ServiceLBTypeAnnotationKey] != types.ServiceLBTypeAnnotationValue {
+		return ""
+	}
+	return svc.GetAnnotations()[types.ServiceFloatingIPAnnotationKey]
 }
 
 func GetClusterDefByName(dynamic dynamic.Interface, name string) (*dbaasv1alpha1.ClusterDefinition, error) {

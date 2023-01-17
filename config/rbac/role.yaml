@@ -56,6 +56,31 @@ rules:
 - apiGroups:
   - batch
   resources:
+  - cronjobs
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - batch
+  resources:
+  - cronjobs/finalizers
+  verbs:
+  - patch
+  - update
+- apiGroups:
+  - batch
+  resources:
+  - cronjobs/status
+  verbs:
+  - get
+- apiGroups:
+  - batch
+  resources:
   - jobs
   verbs:
   - create
@@ -65,6 +90,12 @@ rules:
   - patch
   - update
   - watch
+- apiGroups:
+  - batch
+  resources:
+  - jobs/status
+  verbs:
+  - get
 - apiGroups:
   - coordination.k8s.io
   resources:
@@ -79,10 +110,25 @@ rules:
 - apiGroups:
   - ""
   resources:
+  - configmap
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - configmap/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - ""
+  resources:
   - configmaps
-  - resourcequotas
-  - secrets
-  - services
   verbs:
   - create
   - delete
@@ -95,9 +141,6 @@ rules:
   - ""
   resources:
   - configmaps/finalizers
-  - resourcequotas/finalizers
-  - secrets/finalizers
-  - services/finalizers
   verbs:
   - update
 - apiGroups:
@@ -164,14 +207,7 @@ rules:
 - apiGroups:
   - ""
   resources:
-  - resourcequotas/status
-  - services/status
-  verbs:
-  - get
-- apiGroups:
-  - dataprotection.kubeblocks.io
-  resources:
-  - backupjobs
+  - resourcequotas
   verbs:
   - create
   - delete
@@ -181,19 +217,59 @@ rules:
   - update
   - watch
 - apiGroups:
-  - dataprotection.kubeblocks.io
+  - ""
   resources:
-  - backupjobs/finalizers
+  - resourcequotas/finalizers
   verbs:
   - update
 - apiGroups:
-  - dataprotection.kubeblocks.io
+  - ""
   resources:
-  - backupjobs/status
+  - resourcequotas/status
   verbs:
   - get
+- apiGroups:
+  - ""
+  resources:
+  - secrets
+  verbs:
+  - create
+  - delete
+  - get
+  - list
   - patch
   - update
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - secrets/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - ""
+  resources:
+  - services
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - services/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - ""
+  resources:
+  - services/status
+  verbs:
+  - get
 - apiGroups:
   - dataprotection.kubeblocks.io
   resources:
@@ -242,6 +318,32 @@ rules:
   - dataprotection.kubeblocks.io
   resources:
   - backuppolicytemplates/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - dataprotection.kubeblocks.io
+  resources:
+  - backups
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - dataprotection.kubeblocks.io
+  resources:
+  - backups/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - dataprotection.kubeblocks.io
+  resources:
+  - backups/status
   verbs:
   - get
   - patch
@@ -372,6 +474,32 @@ rules:
   - dbaas.kubeblocks.io
   resources:
   - clusterversions/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - dbaas.kubeblocks.io
+  resources:
+  - configconstraint
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - dbaas.kubeblocks.io
+  resources:
+  - configconstraint/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - dbaas.kubeblocks.io
+  resources:
+  - configconstraint/status
   verbs:
   - get
   - patch

@@ -35,9 +35,7 @@ backup_policy: {
 				}
 			}
 			"secret": {
-				"name":        "wesql-cluster"
-				"keyUser":     "username"
-				"keyPassword": "password"
+				"name": "wesql-cluster"
 			}
 		}
 		"remoteVolume": {

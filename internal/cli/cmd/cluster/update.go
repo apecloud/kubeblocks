@@ -65,8 +65,8 @@ type updateOptions struct {
 func NewUpdateCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := &updateOptions{Options: patch.NewOptions(f, streams, types.ClusterGVR())}
 	cmd := &cobra.Command{
-		Use:               "update",
-		Short:             "Update the cluster",
+		Use:               "update NAME",
+		Short:             "Update the cluster settings, such as enable or disable monitor or log",
 		Example:           clusterUpdateExample,
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, o.GVR),
 		Run: func(cmd *cobra.Command, args []string) {
@@ -182,11 +182,11 @@ func (o *updateOptions) buildPatch(flags []*pflag.Flag) error {
 
 func (o *updateOptions) buildComponents(field string, val string) error {
 	if o.cluster == nil {
-		cluster, err := cluster.GetClusterByName(o.dynamic, o.Names[0], o.namespace)
+		c, err := cluster.GetClusterByName(o.dynamic, o.Names[0], o.namespace)
 		if err != nil {
 			return err
 		}
-		o.cluster = cluster
+		o.cluster = c
 	}
 
 	switch field {

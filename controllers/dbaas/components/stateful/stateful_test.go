@@ -24,6 +24,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
@@ -38,9 +39,11 @@ var _ = Describe("Stateful Component", func() {
 		clusterDefName     = "mysql1-clusterdef-" + randomStr
 		clusterVersionName = "mysql1-clusterversion-" + randomStr
 		clusterName        = "mysql1-" + randomStr
+		consensusCompName  = "consensus"
 		timeout            = 10 * time.Second
 		interval           = time.Second
 	)
+	const defaultMinReadySeconds = 10
 	cleanupObjects := func() {
 		err := k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.ClusterDefinition{}, client.HasLabels{testCtx.TestObjLabelKey})
 		Expect(err).NotTo(HaveOccurred())
@@ -68,14 +71,14 @@ var _ = Describe("Stateful Component", func() {
 	Context("Stateful Component test", func() {
 		It("Stateful Component test", func() {
 			By(" init cluster, statefulSet, pods")
-			_, _, cluster := testdbaas.InitConsensusMysql(testCtx, clusterDefName, clusterVersionName, clusterName)
-
-			_ = testdbaas.MockConsensusComponentStatefulSet(testCtx, clusterName)
+			_, _, cluster := testdbaas.InitConsensusMysql(ctx, testCtx, clusterDefName,
+				clusterVersionName, clusterName, consensusCompName)
+			_ = testdbaas.MockConsensusComponentStatefulSet(ctx, testCtx, clusterName, consensusCompName)
 			stsList := &appsv1.StatefulSetList{}
 			Eventually(func() bool {
 				_ = k8sClient.List(ctx, stsList, client.InNamespace(testCtx.DefaultNamespace), client.MatchingLabels{
 					intctrlutil.AppInstanceLabelKey:  clusterName,
-					intctrlutil.AppComponentLabelKey: testdbaas.ConsensusComponentName,
+					intctrlutil.AppComponentLabelKey: consensusCompName,
 				}, client.Limit(1))
 				return len(stsList.Items) > 0
 			}, timeout, interval).Should(BeTrue())
@@ -83,19 +86,36 @@ var _ = Describe("Stateful Component", func() {
 
 			By("test pods are not ready")
 			stateful := NewStateful(ctx, k8sClient, cluster)
-			sts.Status.AvailableReplicas = *sts.Spec.Replicas - 1
+			patch := client.MergeFrom(sts.DeepCopy())
+			availableReplicas := *sts.Spec.Replicas - 1
+			sts.Status.AvailableReplicas = availableReplicas
+			sts.Status.ReadyReplicas = availableReplicas
+			sts.Status.Replicas = availableReplicas
 			podsReady, _ := stateful.PodsReady(sts)
 			Expect(podsReady == false).Should(BeTrue())
-
 			if testCtx.UsingExistingCluster() {
 				Eventually(func() bool {
-					phase, _ := stateful.CalculatePhaseWhenPodsNotReady(testdbaas.ConsensusComponentName)
+					phase, _ := stateful.GetPhaseWhenPodsNotReady(consensusCompName)
 					return phase == ""
 				}, timeout*5, interval).Should(BeTrue())
 			} else {
-				testdbaas.MockConsensusComponentPods(testCtx, clusterName)
-				phase, _ := stateful.CalculatePhaseWhenPodsNotReady(testdbaas.ConsensusComponentName)
+				podList := testdbaas.MockConsensusComponentPods(ctx, testCtx, clusterName, consensusCompName)
+				phase, _ := stateful.GetPhaseWhenPodsNotReady(consensusCompName)
 				Expect(phase == dbaasv1alpha1.FailedPhase).Should(BeTrue())
+				Expect(k8sClient.Status().Patch(ctx, sts, patch)).Should(Succeed())
+				By("test stateful component is abnormal")
+				Eventually(func(g Gomega) bool {
+					tmpSts := &appsv1.StatefulSet{}
+					g.Expect(k8sClient.Get(ctx, client.ObjectKey{Name: sts.Name, Namespace: testCtx.DefaultNamespace}, tmpSts)).Should(Succeed())
+					return tmpSts.Status.AvailableReplicas == availableReplicas
+				}, timeout, interval).Should(BeTrue())
+				phase, _ = stateful.GetPhaseWhenPodsNotReady(consensusCompName)
+				Expect(phase == dbaasv1alpha1.AbnormalPhase).Should(BeTrue())
+
+				By("test pod is ready")
+				lastTransTime := metav1.NewTime(time.Now().Add(-1 * (defaultMinReadySeconds + 1) * time.Second))
+				testk8s.MockPodAvailable(podList[0], lastTransTime)
+				Expect(stateful.PodIsAvailable(podList[0], defaultMinReadySeconds)).Should(BeTrue())
 			}
 
 			By("test pods are ready")
@@ -109,7 +129,7 @@ var _ = Describe("Stateful Component", func() {
 			Expect(isRunning == true).Should(BeTrue())
 
 			By("test handle probe timed out")
-			requeue, _ := stateful.HandleProbeTimeoutWhenPodsReady()
+			requeue, _ := stateful.HandleProbeTimeoutWhenPodsReady(nil)
 			Expect(requeue == false).Should(BeTrue())
 		})
 	})

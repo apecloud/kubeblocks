@@ -54,7 +54,7 @@ resources:
   controller: true
   domain: kubeblocks.io
   group: dataprotection
-  kind: BackupJob
+  kind: Backup
   path: github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1
   version: v1alpha1
 - api:
@@ -88,4 +88,12 @@ resources:
     defaulting: true
     validation: true
     webhookVersion: v1
+- api:
+    crdVersion: v1
+  controller: true
+  domain: kubeblocks.io
+  group: dbaas
+  kind: ConfigConstraint
+  path: github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1
+  version: v1alpha1
 version: "3"

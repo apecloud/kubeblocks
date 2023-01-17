@@ -137,12 +137,12 @@ func setBackup(o *CreateOptions, components []map[string]interface{}) error {
 		return nil
 	}
 
-	gvr := schema.GroupVersionResource{Group: types.DPGroup, Version: types.DPVersion, Resource: types.ResourceBackupJobs}
-	backupJobObj, err := o.Client.Resource(gvr).Namespace(o.Namespace).Get(context.TODO(), backup, metav1.GetOptions{})
+	gvr := schema.GroupVersionResource{Group: types.DPGroup, Version: types.DPVersion, Resource: types.ResourceBackups}
+	backupObj, err := o.Client.Resource(gvr).Namespace(o.Namespace).Get(context.TODO(), backup, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}
-	backupType, _, _ := unstructured.NestedString(backupJobObj.Object, "spec", "backupType")
+	backupType, _, _ := unstructured.NestedString(backupObj.Object, "spec", "backupType")
 	if backupType != "snapshot" {
 		return fmt.Errorf("only support snapshot backup, specified backup type is '%v'", backupType)
 	}
@@ -193,7 +193,7 @@ func (o *CreateOptions) Complete() error {
 	)
 
 	if len(o.ComponentsFilePath) > 0 {
-		if componentByte, err = multipleSourceComponents(o.ComponentsFilePath, o.IOStreams); err != nil {
+		if componentByte, err = MultipleSourceComponents(o.ComponentsFilePath, o.IOStreams.In); err != nil {
 			return err
 		}
 		if componentByte, err = yaml.YAMLToJSON(componentByte); err != nil {
@@ -221,12 +221,12 @@ func (o *CreateOptions) Complete() error {
 	return nil
 }
 
-// multipleSourceComponent get component data from multiple source, such as stdin, URI and local file
-func multipleSourceComponents(fileName string, streams genericclioptions.IOStreams) ([]byte, error) {
+// MultipleSourceComponents get component data from multiple source, such as stdin, URI and local file
+func MultipleSourceComponents(fileName string, in io.Reader) ([]byte, error) {
 	var data io.Reader
 	switch {
 	case fileName == "-":
-		data = streams.In
+		data = in
 	case strings.Index(fileName, "http://") == 0 || strings.Index(fileName, "https://") == 0:
 		resp, err := http.Get(fileName)
 		if err != nil {
@@ -249,7 +249,7 @@ func NewCreateCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 	o := &CreateOptions{BaseOptions: create.BaseOptions{IOStreams: streams}}
 	inputs := create.Inputs{
 		Use:             "create NAME --termination-policy=DoNotTerminate|Halt|Delete|WipeOut --components=file-path",
-		Short:           "Create a database cluster",
+		Short:           "Create a cluster",
 		Example:         clusterCreateExample,
 		CueTemplateName: CueTemplateName,
 		ResourceName:    types.ResourceClusters,

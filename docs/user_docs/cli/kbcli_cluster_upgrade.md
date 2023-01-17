@@ -1,6 +1,6 @@
 ## kbcli cluster upgrade
 
-Upgrade the cluster
+Upgrade the cluster version
 
 ```
 kbcli cluster upgrade [flags]
@@ -40,5 +40,5 @@ kbcli cluster upgrade [flags]
 
 ### SEE ALSO
 
-* [kbcli cluster](kbcli_cluster.md)	 - Database cluster operation command
+* [kbcli cluster](kbcli_cluster.md)	 - Cluster operation command
 

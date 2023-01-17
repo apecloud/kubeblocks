@@ -85,86 +85,14 @@ func (r *RestoreJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	}
 
 	// restore job reconcile logic here
-	if restoreJob.Status.Phase == "" || restoreJob.Status.Phase == dataprotectionv1alpha1.RestoreJobNew {
-		// 1. get stateful service and
-		// 2. set stateful set replicate 0
-		patch := []byte(`{"spec":{"replicas":0}}`)
-		if err := r.patchTargetCluster(reqCtx, restoreJob, patch); err != nil {
-			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-		}
-
-		// get backup tool
-		// get backup job
-		// build a job pod sec
-		jobPodSpec, err := r.getPodSpec(reqCtx, restoreJob)
-		if err != nil {
-			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-		}
-
-		job := &batchv1.Job{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace: restoreJob.Namespace,
-				Name:      restoreJob.Name,
-				Labels:    buildRestoreJobLabels(restoreJob.Name),
-			},
-			Spec: batchv1.JobSpec{
-				Template: corev1.PodTemplateSpec{
-					ObjectMeta: metav1.ObjectMeta{
-						Namespace: restoreJob.Namespace,
-						Name:      restoreJob.Name},
-					Spec: jobPodSpec,
-				},
-			},
-		}
-		reqCtx.Log.Info("create a built-in job from restoreJob", "job", job)
-
-		if err := r.Client.Create(ctx, job); err != nil {
-			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-		}
-
-		// update Phase to InProgress
-		restoreJob.Status.Phase = dataprotectionv1alpha1.RestoreJobInProgressPhy
-		restoreJob.Status.StartTimestamp = &metav1.Time{Time: r.clock.Now()}
-		if err := r.Client.Status().Update(ctx, restoreJob); err != nil {
-			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-		}
-		return intctrlutil.RequeueAfter(5*time.Second, reqCtx.Log, "")
+	switch restoreJob.Status.Phase {
+	case "", dataprotectionv1alpha1.RestoreJobNew:
+		return r.doRestoreNewPhaseAction(reqCtx, restoreJob)
+	case dataprotectionv1alpha1.RestoreJobInProgressPhy:
+		return r.doRestoreInProgressPhyAction(reqCtx, restoreJob)
+	default:
+		return intctrlutil.Reconciled()
 	}
-	if restoreJob.Status.Phase == dataprotectionv1alpha1.RestoreJobInProgressPhy {
-		job, err := r.getBatchV1Job(reqCtx, restoreJob)
-		if err != nil {
-			// not found backup job, retry create job
-			reqCtx.Log.Info(err.Error())
-			restoreJob.Status.Phase = dataprotectionv1alpha1.RestoreJobNew
-		} else {
-			jobStatusConditions := job.Status.Conditions
-			if len(jobStatusConditions) > 0 {
-				if jobStatusConditions[0].Type == batchv1.JobComplete {
-					// update Phase to in Completed
-					restoreJob.Status.Phase = dataprotectionv1alpha1.RestoreJobCompleted
-					restoreJob.Status.CompletionTimestamp = &metav1.Time{Time: r.clock.Now()}
-					// get stateful service and
-					// set stateful set replicate 1
-					patch := []byte(`{"spec":{"replicas":1}}`)
-					if err := r.patchTargetCluster(reqCtx, restoreJob, patch); err != nil {
-						return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-					}
-				} else if jobStatusConditions[0].Type == batchv1.JobFailed {
-					restoreJob.Status.Phase = dataprotectionv1alpha1.RestoreJobFailed
-					restoreJob.Status.FailureReason = job.Status.Conditions[0].Reason
-				}
-			}
-		}
-		// reconcile until status is completed or failed
-		if restoreJob.Status.Phase == dataprotectionv1alpha1.RestoreJobInProgressPhy ||
-			restoreJob.Status.Phase == dataprotectionv1alpha1.RestoreJobNew {
-			return intctrlutil.RequeueAfter(5*time.Second, reqCtx.Log, "")
-		}
-		if err := r.Client.Status().Update(ctx, restoreJob); err != nil {
-			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-		}
-	}
-	return intctrlutil.Reconciled()
 }
 
 // SetupWithManager sets up the controller with the Manager.
@@ -175,6 +103,90 @@ func (r *RestoreJobReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			MaxConcurrentReconciles: viper.GetInt(maxConcurDataProtectionReconKey),
 		}).
 		Complete(r)
+}
+
+func (r *RestoreJobReconciler) doRestoreNewPhaseAction(
+	reqCtx intctrlutil.RequestCtx,
+	restoreJob *dataprotectionv1alpha1.RestoreJob) (ctrl.Result, error) {
+
+	// 1. get stateful service and
+	// 2. set stateful set replicate 0
+	patch := []byte(`{"spec":{"replicas":0}}`)
+	if err := r.patchTargetCluster(reqCtx, restoreJob, patch); err != nil {
+		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+	}
+
+	// get backup tool
+	// get backup job
+	// build a job pod sec
+	jobPodSpec, err := r.buildPodSpec(reqCtx, restoreJob)
+	if err != nil {
+		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+	}
+
+	job := &batchv1.Job{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: restoreJob.Namespace,
+			Name:      restoreJob.Name,
+			Labels:    buildRestoreJobLabels(restoreJob.Name),
+		},
+		Spec: batchv1.JobSpec{
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: restoreJob.Namespace,
+					Name:      restoreJob.Name},
+				Spec: jobPodSpec,
+			},
+		},
+	}
+	reqCtx.Log.Info("create a built-in job from restoreJob", "job", job)
+
+	if err := r.Client.Create(reqCtx.Ctx, job); err != nil {
+		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+	}
+
+	// update Phase to InProgress
+	restoreJob.Status.Phase = dataprotectionv1alpha1.RestoreJobInProgressPhy
+	restoreJob.Status.StartTimestamp = &metav1.Time{Time: r.clock.Now().UTC()}
+	if err := r.Client.Status().Update(reqCtx.Ctx, restoreJob); err != nil {
+		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+	}
+	return intctrlutil.RequeueAfter(5*time.Second, reqCtx.Log, "")
+}
+
+func (r *RestoreJobReconciler) doRestoreInProgressPhyAction(
+	reqCtx intctrlutil.RequestCtx,
+	restoreJob *dataprotectionv1alpha1.RestoreJob) (ctrl.Result, error) {
+	job, err := r.getBatchV1Job(reqCtx, restoreJob)
+	if err != nil {
+		// not found backup job, retry create job
+		reqCtx.Log.Info(err.Error())
+		return intctrlutil.RequeueAfter(5*time.Second, reqCtx.Log, "")
+	}
+	jobStatusConditions := job.Status.Conditions
+	if len(jobStatusConditions) == 0 {
+		return intctrlutil.RequeueAfter(5*time.Second, reqCtx.Log, "")
+	}
+
+	switch jobStatusConditions[0].Type {
+	case batchv1.JobComplete:
+		// update Phase to in Completed
+		restoreJob.Status.Phase = dataprotectionv1alpha1.RestoreJobCompleted
+		restoreJob.Status.CompletionTimestamp = &metav1.Time{Time: r.clock.Now().UTC()}
+		// get stateful service and
+		// set stateful set replicate to 1
+		patch := []byte(`{"spec":{"replicas":1}}`)
+		if err := r.patchTargetCluster(reqCtx, restoreJob, patch); err != nil {
+			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+		}
+	case batchv1.JobFailed:
+		restoreJob.Status.Phase = dataprotectionv1alpha1.RestoreJobFailed
+		restoreJob.Status.FailureReason = job.Status.Conditions[0].Reason
+	}
+	if err := r.Client.Status().Update(reqCtx.Ctx, restoreJob); err != nil {
+		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+	}
+	return intctrlutil.Reconciled()
 }
 
 func (r *RestoreJobReconciler) deleteExternalResources(reqCtx intctrlutil.RequestCtx, restoreJob *dataprotectionv1alpha1.RestoreJob) error {
@@ -205,11 +217,11 @@ func (r *RestoreJobReconciler) deleteExternalResources(reqCtx intctrlutil.Reques
 	return nil
 }
 
-func (r *RestoreJobReconciler) getBatchV1Job(reqCtx intctrlutil.RequestCtx, backupJob *dataprotectionv1alpha1.RestoreJob) (*batchv1.Job, error) {
+func (r *RestoreJobReconciler) getBatchV1Job(reqCtx intctrlutil.RequestCtx, backup *dataprotectionv1alpha1.RestoreJob) (*batchv1.Job, error) {
 	job := &batchv1.Job{}
 	jobNameSpaceName := types.NamespacedName{
 		Namespace: reqCtx.Req.Namespace,
-		Name:      backupJob.Name,
+		Name:      backup.Name,
 	}
 	if err := r.Client.Get(reqCtx.Ctx, jobNameSpaceName, job); err != nil {
 		// not found backup job, do nothing
@@ -219,18 +231,18 @@ func (r *RestoreJobReconciler) getBatchV1Job(reqCtx intctrlutil.RequestCtx, back
 	return job, nil
 }
 
-func (r *RestoreJobReconciler) getPodSpec(reqCtx intctrlutil.RequestCtx, restoreJob *dataprotectionv1alpha1.RestoreJob) (corev1.PodSpec, error) {
+func (r *RestoreJobReconciler) buildPodSpec(reqCtx intctrlutil.RequestCtx, restoreJob *dataprotectionv1alpha1.RestoreJob) (corev1.PodSpec, error) {
 	var podSpec corev1.PodSpec
 	logger := reqCtx.Log
 
 	// get backup job
-	backupJob := &dataprotectionv1alpha1.BackupJob{}
-	backupJobNameSpaceName := types.NamespacedName{
+	backup := &dataprotectionv1alpha1.Backup{}
+	backupNameSpaceName := types.NamespacedName{
 		Namespace: reqCtx.Req.Namespace,
 		Name:      restoreJob.Spec.BackupJobName,
 	}
-	if err := r.Get(reqCtx.Ctx, backupJobNameSpaceName, backupJob); err != nil {
-		logger.Error(err, "Unable to get backupJob for restore.", "backupJob", backupJobNameSpaceName)
+	if err := r.Get(reqCtx.Ctx, backupNameSpaceName, backup); err != nil {
+		logger.Error(err, "Unable to get backup for restore.", "backup", backupNameSpaceName)
 		return podSpec, err
 	}
 
@@ -238,10 +250,10 @@ func (r *RestoreJobReconciler) getPodSpec(reqCtx intctrlutil.RequestCtx, restore
 	backupPolicy := &dataprotectionv1alpha1.BackupPolicy{}
 	backupPolicyNameSpaceName := types.NamespacedName{
 		Namespace: reqCtx.Req.Namespace,
-		Name:      backupJob.Spec.BackupPolicyName,
+		Name:      backup.Spec.BackupPolicyName,
 	}
 	if err := r.Client.Get(reqCtx.Ctx, backupPolicyNameSpaceName, backupPolicy); err != nil {
-		logger.Error(err, "Unable to get backupPolicy for backupJob.", "BackupPolicy", backupPolicyNameSpaceName)
+		logger.Error(err, "Unable to get backupPolicy for backup.", "BackupPolicy", backupPolicyNameSpaceName)
 		return podSpec, err
 	}
 
@@ -252,7 +264,7 @@ func (r *RestoreJobReconciler) getPodSpec(reqCtx intctrlutil.RequestCtx, restore
 		Name:      backupPolicy.Spec.BackupToolName,
 	}
 	if err := r.Client.Get(reqCtx.Ctx, backupToolNameSpaceName, backupTool); err != nil {
-		logger.Error(err, "Unable to get backupTool for backupJob.", "BackupTool", backupToolNameSpaceName)
+		logger.Error(err, "Unable to get backupTool for backup.", "BackupTool", backupToolNameSpaceName)
 		return podSpec, err
 	}
 
@@ -282,7 +294,7 @@ func (r *RestoreJobReconciler) getPodSpec(reqCtx intctrlutil.RequestCtx, restore
 	// build env for restore
 	envBackupName := corev1.EnvVar{
 		Name:  "BACKUP_NAME",
-		Value: backupJob.Name,
+		Value: backup.Name,
 	}
 
 	container.Env = []corev1.EnvVar{envBackupName}

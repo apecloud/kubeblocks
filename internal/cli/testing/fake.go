@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/sethvargo/go-password/password"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -27,6 +28,7 @@ import (
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 const (
@@ -45,6 +47,11 @@ const (
 	KubeBlocksChartURL  = "fake-kubeblocks-chart-url"
 )
 
+func GetRandomStr() string {
+	seq, _ := password.Generate(6, 2, 0, true, true)
+	return seq
+}
+
 func FakeCluster(name string, namespace string) *dbaasv1alpha1.Cluster {
 	return &dbaasv1alpha1.Cluster{
 		ObjectMeta: metav1.ObjectMeta{
@@ -59,7 +66,7 @@ func FakeCluster(name string, namespace string) *dbaasv1alpha1.Cluster {
 						Leader: dbaasv1alpha1.ConsensusMemberStatus{
 							Name:       "leader",
 							AccessMode: dbaasv1alpha1.ReadWrite,
-							Pod:        "leader-pod",
+							Pod:        fmt.Sprintf("%s-pod-0", name),
 						},
 					},
 				},
@@ -120,6 +127,7 @@ func FakePods(replicas int, namespace string, cluster string) *corev1.PodList {
 			types.InstanceLabelKey:         cluster,
 			types.ConsensusSetRoleLabelKey: role,
 			types.ComponentLabelKey:        ComponentName,
+			types.NameLabelKey:             "state.mysql-apecloud-wesql",
 		}
 		pod.Spec.NodeName = NodeName
 		pod.Spec.Containers = []corev1.Container{
@@ -140,12 +148,15 @@ func FakeSecrets(namespace string, cluster string) *corev1.SecretList {
 	secret.Namespace = namespace
 	secret.Type = corev1.SecretTypeServiceAccountToken
 	secret.Labels = map[string]string{
-		types.InstanceLabelKey: cluster,
+		types.InstanceLabelKey:           cluster,
+		intctrlutil.AppManagedByLabelKey: intctrlutil.AppName,
 	}
 
 	secret.Data = map[string][]byte{
 		corev1.ServiceAccountTokenKey: []byte("fake-secret-token"),
 		"fake-secret-key":             []byte("fake-secret-value"),
+		"username":                    []byte("test-user"),
+		"password":                    []byte("test-password"),
 	}
 	return &corev1.SecretList{Items: []corev1.Secret{secret}}
 }
@@ -173,6 +184,7 @@ func FakeClusterDef() *dbaasv1alpha1.ClusterDefinition {
 			DefaultReplicas: 2,
 		},
 	}
+	clusterDef.Spec.Type = "state.mysql"
 	return clusterDef
 }
 

@@ -1,6 +1,6 @@
 ## kbcli cluster delete-backup
 
-Delete a backup job
+Delete a backup
 
 ```
 kbcli cluster delete-backup [flags]
@@ -50,5 +50,5 @@ kbcli cluster delete-backup [flags]
 
 ### SEE ALSO
 
-* [kbcli cluster](kbcli_cluster.md)	 - Database cluster operation command
+* [kbcli cluster](kbcli_cluster.md)	 - Cluster operation command
 

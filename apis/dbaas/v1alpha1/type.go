@@ -44,10 +44,13 @@ const (
 	FailedPhase            Phase = "Failed"
 	UpdatingPhase          Phase = "Updating"
 	VolumeExpandingPhase   Phase = "VolumeExpanding"
+	HorizontalScalingPhase Phase = "HorizontalScaling"
+	VerticalScalingPhase   Phase = "VerticalScaling"
+	RebootingPhase         Phase = "Rebooting"
+	UpgradingPhase         Phase = "Upgrading"
 	SucceedPhase           Phase = "Succeed"
 	AbnormalPhase          Phase = "Abnormal"
 	ConditionsErrorPhase   Phase = "ConditionsError"
-	HorizontalScalingPhase Phase = "HorizontalScaling"
 	ReconfiguringPhase     Phase = "Reconfiguring"
 )
 

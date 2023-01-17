@@ -71,6 +71,9 @@ var _ = Describe("Stateful Component", func() {
 			deploy := testdbaas.MockStatelessComponentDeploy(ctx, testCtx, clusterName, statelessCompName)
 			statelessComponent := NewStateless(ctx, k8sClient, cluster)
 
+			By("test DeploymentSpecIsUpdated function")
+			Expect(DeploymentSpecIsUpdated(deploy)).Should(BeTrue())
+
 			By("test pods are not ready")
 			patch := client.MergeFrom(deploy.DeepCopy())
 			availableReplicas := *deploy.Spec.Replicas - 1

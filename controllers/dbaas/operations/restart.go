@@ -36,7 +36,7 @@ var _ OpsHandler = restartOpsHandler{}
 func init() {
 	restartBehaviour := OpsBehaviour{
 		FromClusterPhases: []dbaasv1alpha1.Phase{dbaasv1alpha1.RunningPhase, dbaasv1alpha1.FailedPhase, dbaasv1alpha1.AbnormalPhase},
-		ToClusterPhase:    dbaasv1alpha1.UpdatingPhase,
+		ToClusterPhase:    dbaasv1alpha1.RebootingPhase,
 		OpsHandler:        restartOpsHandler{},
 	}
 

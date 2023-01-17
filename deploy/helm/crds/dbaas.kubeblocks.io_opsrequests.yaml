@@ -305,6 +305,11 @@ spec:
                       - Deleting
                       - Deleted
                       - VolumeExpanding
+                      - Reconfiguring
+                      - HorizontalScaling
+                      - VerticalScaling
+                      - Upgrading
+                      - Rebooting
                       type: string
                     progressDetails:
                       description: progressDetails describes the progress details

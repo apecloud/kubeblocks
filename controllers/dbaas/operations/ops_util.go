@@ -44,7 +44,8 @@ func ReconcileActionWithComponentOps(opsRes *OpsResource,
 	handleStatusProgress handleStatusProgressWithComponent,
 ) (dbaasv1alpha1.Phase, time.Duration, error) {
 	var (
-		opsRequest               = opsRes.OpsRequest
+		opsRequest = opsRes.OpsRequest
+		// check if all components of the OpsRequest are processed.
 		isCompleted              = true
 		isFailed                 bool
 		opsRequestPhase          = dbaasv1alpha1.RunningPhase
@@ -106,9 +107,13 @@ func ReconcileActionWithComponentOps(opsRes *OpsResource,
 			return opsRequestPhase, 0, err
 		}
 	}
+	// wait for all components to finish processing.
+	if !isCompleted {
+		return opsRequestPhase, 0, nil
+	}
 	if isFailed {
 		opsRequestPhase = dbaasv1alpha1.FailedPhase
-	} else if isCompleted {
+	} else {
 		opsRequestPhase = dbaasv1alpha1.SucceedPhase
 	}
 	return opsRequestPhase, 0, nil

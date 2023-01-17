@@ -34,6 +34,28 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
+type componentContext struct {
+	reqCtx    intctrlutil.RequestCtx
+	cli       client.Client
+	recorder  record.EventRecorder
+	component types.Component
+	obj       client.Object
+}
+
+func newComponentContext(reqCtx intctrlutil.RequestCtx,
+	cli client.Client,
+	recorder record.EventRecorder,
+	component types.Component,
+	obj client.Object) componentContext {
+	return componentContext{
+		reqCtx:    reqCtx,
+		cli:       cli,
+		recorder:  recorder,
+		component: component,
+		obj:       obj,
+	}
+}
+
 // NewComponentByType creates a component object
 func NewComponentByType(
 	ctx context.Context,
@@ -53,20 +75,19 @@ func NewComponentByType(
 }
 
 // handleComponentStatusAndSyncCluster handles component status. if the component status changed, sync cluster.status.components
-func handleComponentStatusAndSyncCluster(reqCtx intctrlutil.RequestCtx,
-	cli client.Client,
-	recorder record.EventRecorder,
-	obj client.Object,
-	cluster *dbaasv1alpha1.Cluster,
-	component types.Component) (time.Duration, error) {
+func handleComponentStatusAndSyncCluster(compCtx componentContext,
+	workloadSpecIsUpdated bool,
+	cluster *dbaasv1alpha1.Cluster) (time.Duration, error) {
 	var (
 		err                  error
-		labels               = obj.GetLabels()
+		obj                  = compCtx.obj
+		component            = compCtx.component
 		requeueAfter         time.Duration
 		podsReady            bool
 		isRunning            bool
 		requeueWhenPodsReady bool
 	)
+
 	if component == nil {
 		return requeueAfter, nil
 	}
@@ -77,13 +98,13 @@ func handleComponentStatusAndSyncCluster(reqCtx intctrlutil.RequestCtx,
 		return requeueAfter, nil
 	}
 	if podsReady {
-		if requeueWhenPodsReady, err = component.HandleProbeTimeoutWhenPodsReady(recorder); err != nil {
+		if requeueWhenPodsReady, err = component.HandleProbeTimeoutWhenPodsReady(compCtx.recorder); err != nil {
 			return requeueAfter, nil
 		}
 	}
 
-	if err = patchClusterComponentStatus(reqCtx, cli, cluster, component,
-		labels[intctrlutil.AppComponentLabelKey], isRunning, podsReady); err != nil {
+	if err = patchClusterComponentStatus(compCtx, cluster, workloadSpecIsUpdated,
+		obj.GetLabels()[intctrlutil.AppComponentLabelKey], isRunning, podsReady); err != nil {
 		return requeueAfter, err
 	}
 
@@ -91,38 +112,40 @@ func handleComponentStatusAndSyncCluster(reqCtx intctrlutil.RequestCtx,
 		requeueAfter = time.Minute
 	}
 
-	return requeueAfter, opsutil.MarkRunningOpsRequestAnnotation(reqCtx.Ctx, cli, cluster)
+	return requeueAfter, opsutil.MarkRunningOpsRequestAnnotation(compCtx.reqCtx.Ctx, compCtx.cli, cluster)
 }
 
 // patchClusterComponentStatus patches Cluster.status.component status
-func patchClusterComponentStatus(reqCtx intctrlutil.RequestCtx,
-	cli client.Client,
+func patchClusterComponentStatus(
+	compCtx componentContext,
 	cluster *dbaasv1alpha1.Cluster,
-	component types.Component,
+	workloadSpecIsUpdated bool,
 	componentName string,
-	componentIsRunning, podsIsReady bool) error {
+	componentIsRunning, podsAreReady bool) error {
 	// when component phase is changed, set needSyncStatusComponent to true, then patch cluster.status
 	patch := client.MergeFrom(cluster.DeepCopy())
-	if ok, err := NeedSyncStatusComponents(cluster, component,
-		componentName, componentIsRunning, podsIsReady); err != nil || !ok {
+	if ok, err := NeedSyncStatusComponents(cluster, compCtx.component,
+		componentName, workloadSpecIsUpdated, componentIsRunning, podsAreReady); err != nil || !ok {
 		return err
 	}
-	reqCtx.Log.Info("component status changed", "componentName", componentName, "phase", cluster.Status.Components[componentName].Phase)
-	return cli.Status().Patch(reqCtx.Ctx, cluster, patch)
+	compCtx.reqCtx.Log.Info("component status changed", "componentName", componentName, "phase", cluster.Status.Components[componentName].Phase)
+	return compCtx.cli.Status().Patch(compCtx.reqCtx.Ctx, cluster, patch)
 }
 
 // NeedSyncStatusComponents Determines whether the component status needs to be modified
 func NeedSyncStatusComponents(cluster *dbaasv1alpha1.Cluster,
 	component types.Component,
 	componentName string,
-	componentIsRunning, podsIsReady bool) (bool, error) {
+	workloadSpecIsUpdated,
+	componentIsRunning,
+	podsAreReady bool) (bool, error) {
 	var (
 		status          = &cluster.Status
 		ok              bool
 		statusComponent dbaasv1alpha1.ClusterStatusComponent
 		podsReadyTime   *metav1.Time
 	)
-	if podsIsReady {
+	if podsAreReady {
 		podsReadyTime = &metav1.Time{Time: time.Now()}
 	}
 	if status.Components == nil {
@@ -132,47 +155,49 @@ func NeedSyncStatusComponents(cluster *dbaasv1alpha1.Cluster,
 		componentType := util.GetComponentTypeName(*cluster, componentName)
 		// TODO is it ok to set component status phase as cluster status phase
 		status.Components[componentName] = dbaasv1alpha1.ClusterStatusComponent{Phase: cluster.Status.Phase,
-			PodsReady: &podsIsReady, PodsReadyTime: podsReadyTime,
+			PodsReady: &podsAreReady, PodsReadyTime: podsReadyTime,
 			Type: componentType,
 		}
 		return true, nil
 	}
 	var needSync bool
+	// when the workload spec of the component is updated and cluster phase is Updating,
+	// change the component phase to Updating.
+	if workloadSpecIsUpdated && cluster.Status.Phase == dbaasv1alpha1.UpdatingPhase {
+		statusComponent.Phase = dbaasv1alpha1.UpdatingPhase
+		needSync = true
+	}
 	if !componentIsRunning {
-		if statusComponent.Phase == dbaasv1alpha1.RunningPhase {
-			// if cluster.status.phase is Updating or OpsRequest of cluster scope is Running,
-			// we sync the cluster phase to component phase.
-			// TODO check cluster status what means cluster scope OpsRequests are running
-			if cluster.Status.Phase == dbaasv1alpha1.UpdatingPhase {
-				statusComponent.Phase = cluster.Status.Phase
+		// if no operation is running in cluster and pods of component are not ready,
+		// means the component is Failed or Abnormal.
+		if util.IsCompleted(cluster.Status.Phase) {
+			if phase, err := component.GetPhaseWhenPodsNotReady(componentName); err != nil {
+				return false, err
+			} else if phase != "" && statusComponent.Phase != phase {
+				statusComponent.Phase = phase
 				needSync = true
-			}
-
-			// if no operation is running in cluster and pods of component are not ready,
-			// means the component is Failed or Abnormal.
-			if util.IsCompleted(cluster.Status.Phase) {
-				if phase, err := component.GetPhaseWhenPodsNotReady(componentName); err != nil {
-					return false, err
-				} else if phase != "" {
-					statusComponent.Phase = phase
-					needSync = true
-				}
 			}
 		}
 	} else {
-		if statusComponent.Phase != dbaasv1alpha1.RunningPhase {
-			// if componentIsRunning is true and component status is not Running.
-			// we should change component phase to Running
+		if statusComponent.Phase != dbaasv1alpha1.RunningPhase &&
+			!clusterHandlingSpecForComponent(cluster, statusComponent.Phase) {
+			// change component phase to Running when workloads of component are running.
 			statusComponent.Phase = dbaasv1alpha1.RunningPhase
 			statusComponent.SetMessage(nil)
 			needSync = true
 		}
 	}
-	if statusComponent.PodsReady == nil || *statusComponent.PodsReady != podsIsReady {
+	if statusComponent.PodsReady == nil || *statusComponent.PodsReady != podsAreReady {
 		statusComponent.PodsReadyTime = podsReadyTime
 		needSync = true
 	}
-	statusComponent.PodsReady = &podsIsReady
+	statusComponent.PodsReady = &podsAreReady
 	status.Components[componentName] = statusComponent
 	return needSync, nil
+}
+
+// clusterHandlingSpecForComponent checks if the cluster is handling spec and this component is Updating or doing operation.
+func clusterHandlingSpecForComponent(cluster *dbaasv1alpha1.Cluster, componentPhase dbaasv1alpha1.Phase) bool {
+	return cluster.Generation != cluster.Status.ObservedGeneration &&
+		!util.IsCompleted(componentPhase)
 }

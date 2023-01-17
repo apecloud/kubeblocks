@@ -94,7 +94,7 @@ var _ = Describe("OpsRequest webhook", func() {
 		By("Test Cluster Phase")
 		OpsRequestBehaviourMapper[UpgradeType] = OpsRequestBehaviour{
 			FromClusterPhases: []Phase{RunningPhase},
-			ToClusterPhase:    UpdatingPhase,
+			ToClusterPhase:    UpgradingPhase,
 		}
 		Expect(testCtx.CreateObj(ctx, opsRequest).Error()).To(ContainSubstring("Upgrade is forbidden"))
 		// update cluster phase to Running
@@ -106,7 +106,7 @@ var _ = Describe("OpsRequest webhook", func() {
 		// update cluster existing operations
 		clusterPatch = client.MergeFrom(cluster.DeepCopy())
 		cluster.Annotations = map[string]string{
-			opsRequestAnnotationKey: `[{"name":"testOpsName","clusterPhase":"Updating"}]`,
+			opsRequestAnnotationKey: `[{"name":"testOpsName","clusterPhase":"Upgrading"}]`,
 		}
 		Expect(k8sClient.Patch(ctx, cluster, clusterPatch)).Should(Succeed())
 		Eventually(func() string {

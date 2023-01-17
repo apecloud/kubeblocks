@@ -35,25 +35,13 @@ image:
 ## Authentication parameters
 ##
 auth:
-  ## @param auth.postgresPassword Password for the "postgres" admin user.
+  ## @param auth.postgresPassword Password for the "postgres" admin user, leave empty 
+  ## for random generated password.
   ##
-  postgresPassword: "postgres"
-  ## @param auth.username Name for a custom user to create
-  ##
-  username: "custom_user"
-  ## @param auth.password Password for the custom user to create. Ignored if `auth.existingSecret` with key `password` is provided
-  ##
-  password: "custom_user"
+  postgresPassword:
   ## @param auth.database Name for a custom database to create
   ##
   database: "custom_db"
-## @param architecture PostgreSQL architecture (`standalone` or `replication`)
-##
-architecture: standalone
-## @param containerPorts.postgresql PostgreSQL container port
-##
-containerPorts:
-  postgresql: 5432
 ## Audit settings
 ## @param audit.logHostname Log client hostnames
 ## @param audit.logConnections Add client log-in operations to the log file
@@ -73,9 +61,8 @@ audit:
   clientMinMessages: error
   logLinePrefix: ""
   logTimezone: ""
-## @param postgresqlDataDir PostgreSQL data dir folder
-##
-postgresqlDataDir: /postgresql/data
+
+## Set PostgreSQL preload extension shared libraries.
 ## @param postgresqlSharedPreloadLibraries Shared preload libraries (comma-separated list)
 ##
 postgresqlSharedPreloadLibraries: "pg_stat_statements, auto_explain"
@@ -201,66 +188,8 @@ primary:
     host     all             all             0.0.0.0/0               md5
     host     all             all             ::/0                    md5
     local    all             all                                     md5
-    host     all             all        127.0.0.1/32                 md5
-    host     all             all        ::1/128                      md5
-
-  ## @param primary.existingConfigmap Name of an existing ConfigMap with PostgreSQL Primary configuration
-  ## NOTE: `primary.configuration` and `primary.pgHbaConfiguration` will be ignored
-  ##
-  existingConfigmap: ""
-  ## @param primary.extendedConfiguration Extended PostgreSQL Primary configuration (appended to main or default configuration)
-  ##
-  extendedConfiguration: ""
-  ## @param primary.existingExtendedConfigmap Name of an existing ConfigMap with PostgreSQL Primary extended configuration
-  ## NOTE: `primary.extendedConfiguration` will be ignored
-  ##
-  existingExtendedConfigmap: ""
-
-  ## PostgreSQL read only service configuration
-  ##
-  service:
-    ## @param readReplicas.service.ports.postgresql PostgreSQL service port
-    ##
-    ports:
-      postgresql: 5432
-
-  ## @param primary.extraEnvVars Array with extra environment variables to add to PostgreSQL Primary nodes
-  ## e.g:
-  ## extraEnvVars:
-  ##   - name: FOO
-  ##     value: "bar"
-  ##
-  extraEnvVars: []
-  ## @param primary.extraEnvVarsCM Name of existing ConfigMap containing extra env vars for PostgreSQL Primary nodes
-  ##
-  extraEnvVarsCM: ""
-  ## @param primary.extraEnvVarsSecret Name of existing Secret containing extra env vars for PostgreSQL Primary nodes
-  ##
-  extraEnvVarsSecret: ""
-  ## @param primary.command Override default container command (useful when using custom images)
-  ##
-  command: []
-  ## @param primary.args Override default container args (useful when using custom images)
-  ##
-  args: []
-
-  ## PostgreSQL Primary resource requests and limits
-  ## @param primary.resources.limits The resources limits for the PostgreSQL Primary containers
-  ## @param primary.resources.requests.memory The requested memory for the PostgreSQL Primary containers
-  ## @param primary.resources.requests.cpu The requested cpu for the PostgreSQL Primary containers
-  ##
-  resources:
-    limits: {}
-    requests:
-      memory: 256Mi
-      cpu: 250m
-  ## PostgreSQL read only persistence configuration
-  ##
-  persistence:
-    ## @param readReplicas.persistence.mountPath The path the volume will be mounted at
-    ## Note: useful when using custom PostgreSQL images
-    ##
-    mountPath: /postgresql
+    host     all             all             127.0.0.1/32            md5
+    host     all             all             ::1/128                 md5
 
 ## @section Metrics Parameters
 metrics:
@@ -285,33 +214,3 @@ metrics:
     ##   - myRegistryKeySecretName
     ##
     pullSecrets: []
-
-  ## @param metrics.containerPorts.metrics PostgreSQL Prometheus exporter metrics container port
-  ##
-  containerPorts:
-    metrics: 9187
-  ## PostgreSQL Prometheus exporter resource requests and limits
-  ## ref: https://kubernetes.io/docs/user-guide/compute-resources/
-  ## @param metrics.resources.limits The resources limits for the PostgreSQL Prometheus exporter container
-  ## @param metrics.resources.requests The requested resources for the PostgreSQL Prometheus exporter container
-  ##
-  resources:
-    limits: {}
-    requests: {}
-  ## Service configuration
-  ##
-  service:
-    ## @param metrics.service.ports.metrics PostgreSQL Prometheus Exporter service port
-    ##
-    ports:
-      metrics: 9187
-    ## @param metrics.service.sessionAffinity Control where client requests go, to the same pod or round-robin
-    ## Values: ClientIP or None
-    ## ref: https://kubernetes.io/docs/user-guide/services/
-    ##
-    sessionAffinity: None
-    ## @param metrics.service.annotations [object] Annotations for Prometheus to auto-discover the metrics endpoint
-    ##
-    annotations:
-      prometheus.io/scrape: "true"
-      prometheus.io/port: "{{ .Values.metrics.service.ports.metrics }}"

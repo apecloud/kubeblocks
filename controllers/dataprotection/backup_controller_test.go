@@ -26,7 +26,7 @@ import (
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	"github.com/sethvargo/go-password/password"
 	"github.com/spf13/viper"
-	appv1 "k8s.io/api/apps/v1"
+	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -48,7 +48,7 @@ var _ = Describe("Backup Controller", func() {
 	BeforeEach(func() {
 		// Add any steup steps that needs to be executed before each test
 
-		err := k8sClient.DeleteAllOf(ctx, &appv1.StatefulSet{}, client.InNamespace(testCtx.DefaultNamespace), client.HasLabels{testCtx.TestObjLabelKey})
+		err := k8sClient.DeleteAllOf(ctx, &appsv1.StatefulSet{}, client.InNamespace(testCtx.DefaultNamespace), client.HasLabels{testCtx.TestObjLabelKey})
 		Expect(err).NotTo(HaveOccurred())
 		err = k8sClient.DeleteAllOf(ctx, &corev1.Pod{}, client.InNamespace(testCtx.DefaultNamespace), client.HasLabels{testCtx.TestObjLabelKey})
 		Expect(err).NotTo(HaveOccurred())
@@ -56,7 +56,7 @@ var _ = Describe("Backup Controller", func() {
 		Expect(err).NotTo(HaveOccurred())
 		err = k8sClient.DeleteAllOf(ctx, &dataprotectionv1alpha1.BackupTool{}, client.HasLabels{testCtx.DefaultNamespace})
 		Expect(err).NotTo(HaveOccurred())
-		err = k8sClient.DeleteAllOf(ctx, &appv1.StatefulSet{},
+		err = k8sClient.DeleteAllOf(ctx, &appsv1.StatefulSet{},
 			client.InNamespace(testCtx.DefaultNamespace),
 			client.HasLabels{testCtx.TestObjLabelKey},
 		)
@@ -282,7 +282,7 @@ spec:
 		return nil
 	}
 
-	assureStatefulSetObj := func() *appv1.StatefulSet {
+	assureStatefulSetObj := func() *appsv1.StatefulSet {
 		By("By assure an stateful obj")
 		statefulYaml := `
 apiVersion: apps/v1
@@ -419,7 +419,7 @@ spec:
   phase: Running
   qosClass: BestEffort
 `
-		statefulSet := &appv1.StatefulSet{}
+		statefulSet := &appsv1.StatefulSet{}
 		Expect(yaml.Unmarshal([]byte(statefulYaml), statefulSet)).Should(Succeed())
 		statefulSet.SetNamespace(testCtx.DefaultNamespace)
 		statefulSet.Spec.Template.GetLabels()[testCtx.TestObjLabelKey] = TRUE

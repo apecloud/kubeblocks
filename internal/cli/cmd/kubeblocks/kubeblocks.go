@@ -79,6 +79,13 @@ var (
 	# Install KubeBlocks with other settings, for example, set replicaCount to 3
 	kbcli kubeblocks install --set replicaCount=3`)
 
+	upgradeExample = templates.Examples(`
+	# Upgrade KubeBlocks to specified version
+	kbcli kubeblocks upgrade --version=0.3.0
+
+	# Upgrade KubeBlocks other settings, for example, set replicaCount to 3
+	kbcli kubeblocks upgrade --set replicaCount=3`)
+
 	uninstallExample = templates.Examples(`
 		# uninstall KubeBlocks
         kbcli kubeblocks uninstall`)
@@ -134,17 +141,11 @@ func (o *Options) preCheck() error {
 
 	preCheckList := []string{
 		"clusters.dbaas.kubeblocks.io",
-		"backuptools.dataprotection.kubeblocks.io",
 	}
 	ctx := context.Background()
 	// delete crds
-	crdGVR := schema.GroupVersionResource{
-		Group:    "apiextensions.k8s.io",
-		Version:  types.VersionV1,
-		Resource: "customresourcedefinitions",
-	}
 	crs := map[string][]string{}
-	crdList, err := o.Dynamic.Resource(crdGVR).List(ctx, metav1.ListOptions{})
+	crdList, err := o.Dynamic.Resource(types.CRDGVR()).List(ctx, metav1.ListOptions{})
 	if err != nil {
 		return err
 	}
@@ -183,7 +184,7 @@ func (o *Options) preCheck() error {
 	return nil
 }
 
-func (o *InstallOptions) Run() error {
+func (o *InstallOptions) Install() error {
 	// check if KubeBlocks has been installed
 	installed, version, err := checkIfKubeBlocksInstalled(o.Client)
 	if err != nil {
@@ -245,7 +246,7 @@ func (o *InstallOptions) checkResource() error {
 
 	objs, err := getKBObjects(o.Client, o.Dynamic, o.Namespace)
 	if err != nil {
-		fmt.Fprintf(o.ErrOut, "Detect whether there are resources left by KubeBlocks before: %s\n", err.Error())
+		fmt.Fprintf(o.ErrOut, "Check whether there are resources left by KubeBlocks before: %s\n", err.Error())
 	}
 
 	if checkIfRemainedResource(objs) {
@@ -348,7 +349,7 @@ Notes: Monitor components(Grafana/Prometheus/AlertManager) is not installed,
 	}
 }
 
-func (o *Options) run() error {
+func (o *Options) uninstall() error {
 	printErr := func(spinner func(result bool), err error) {
 		if err == nil || apierrors.IsNotFound(err) ||
 			strings.Contains(err.Error(), "release: not found") {
@@ -359,18 +360,9 @@ func (o *Options) run() error {
 		fmt.Fprintf(o.Out, "  %s\n", err.Error())
 	}
 
-	_, version, _ := checkIfKubeBlocksInstalled(o.Client)
-	// uninstall helm release
-	chart := helm.InstallOpts{
-		Name:      types.KubeBlocksChartName,
-		Namespace: o.Namespace,
+	newSpinner := func(msg string) func(result bool) {
+		return util.Spinner(o.Out, fmt.Sprintf("%-50s", msg))
 	}
-	spinner := util.Spinner(o.Out, fmt.Sprintf("Uninstall helm release %s %s", types.KubeBlocksChartName, version))
-	printErr(spinner, chart.UnInstall(o.HelmCfg))
-
-	// remove repo
-	spinner = util.Spinner(o.Out, "Remove helm repo "+types.KubeBlocksChartName)
-	printErr(spinner, helm.RemoveRepo(&repo.Entry{Name: types.KubeBlocksChartName, URL: types.KubeBlocksChartURL}))
 
 	// get KubeBlocks objects and try to remove them
 	objs, err := getKBObjects(o.Client, o.Dynamic, o.Namespace)
@@ -379,19 +371,32 @@ func (o *Options) run() error {
 	}
 
 	// remove finalizers
-	spinner = util.Spinner(o.Out, "Remove ClusterDefinition and ClusterVersion")
+	spinner := newSpinner("Remove built-in custom resources")
 	printErr(spinner, removeFinalizers(o.Dynamic, objs))
 
 	// delete CRDs
-	spinner = util.Spinner(o.Out, "Remove CRDs")
+	spinner = newSpinner("Remove custom resource definitions")
 	printErr(spinner, deleteCRDs(o.Dynamic, objs.crds))
 
+	_, version, _ := checkIfKubeBlocksInstalled(o.Client)
+	// uninstall helm release
+	chart := helm.InstallOpts{
+		Name:      types.KubeBlocksChartName,
+		Namespace: o.Namespace,
+	}
+	spinner = newSpinner(fmt.Sprintf("Uninstall helm release %s %s", types.KubeBlocksChartName, version))
+	printErr(spinner, chart.UnInstall(o.HelmCfg))
+
+	// remove repo
+	spinner = newSpinner("Remove helm repo " + types.KubeBlocksChartName)
+	printErr(spinner, helm.RemoveRepo(&repo.Entry{Name: types.KubeBlocksChartName, URL: types.KubeBlocksChartURL}))
+
 	// delete deployments
-	spinner = util.Spinner(o.Out, "Remove deployments")
+	spinner = newSpinner("Remove deployments")
 	printErr(spinner, deleteDeploys(o.Client, objs.deploys))
 
 	// delete services
-	spinner = util.Spinner(o.Out, "Remove services")
+	spinner = newSpinner("Remove services")
 	printErr(spinner, deleteServices(o.Client, objs.svcs))
 	fmt.Fprintln(o.Out, "Uninstall KubeBlocks done")
 	return nil
@@ -411,7 +416,7 @@ func newInstallCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 		Example: installExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			util.CheckErr(o.complete(f, cmd))
-			util.CheckErr(o.Run())
+			util.CheckErr(o.Install())
 		},
 	}
 
@@ -419,7 +424,7 @@ func newInstallCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 	cmd.Flags().StringVar(&o.Version, "version", version.DefaultKubeBlocksVersion, "KubeBlocks version")
 	cmd.Flags().StringArrayVar(&o.Sets, "set", []string{}, "Set values on the command line (can specify multiple or separate values with commas: key1=val1,key2=val2)")
 	cmd.Flags().BoolVar(&o.CreateNamespace, "create-namespace", false, "create the namespace if not present")
-	cmd.Flags().BoolVar(&o.CheckResource, "check-resource", true, "check if there are some resources remained before install")
+	cmd.Flags().BoolVar(&o.CheckResource, "check-resource", true, "check if there are some remained resources before install")
 
 	return cmd
 }
@@ -435,7 +440,7 @@ func newUpgradeCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 		Use:     "upgrade",
 		Short:   "Upgrade KubeBlocks",
 		Args:    cobra.NoArgs,
-		Example: installExample,
+		Example: upgradeExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			util.CheckErr(o.complete(f, cmd))
 			util.CheckErr(o.Upgrade())
@@ -460,7 +465,7 @@ func newUninstallCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *co
 		Run: func(cmd *cobra.Command, args []string) {
 			util.CheckErr(o.complete(f, cmd))
 			util.CheckErr(o.preCheck())
-			util.CheckErr(o.run())
+			util.CheckErr(o.uninstall())
 		},
 	}
 	return cmd
@@ -499,7 +504,7 @@ func confirmUninstall(in io.Reader) error {
 		return err
 	}
 	if entered != confirmStr {
-		return fmt.Errorf("typed string \"%s\" does not match \"%s\"", entered, confirmStr)
+		return fmt.Errorf("typed \"%s\" does not match \"%s\"", entered, confirmStr)
 	}
 	return nil
 }

@@ -79,24 +79,10 @@ Return PostgreSQL service port
 {{- end -}}
 
 {{/*
-Return the name for a custom user to create
-*/}}
-{{- define "postgresql.username" -}}
-{{- .Values.auth.username -}}
-{{- end -}}
-
-{{/*
 Return the name for a custom database to create
 */}}
 {{- define "postgresql.database" -}}
 {{- .Values.auth.database -}}
-{{- end -}}
-
-{{/*
-Get the password secret.
-*/}}
-{{- define "postgresql.secretName" -}}
-{{- printf "%s" (tpl .Values.auth.existingSecret $) -}}
 {{- end -}}
 
 {{/*

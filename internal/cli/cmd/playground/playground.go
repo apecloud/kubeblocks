@@ -323,12 +323,11 @@ func (o *initOptions) installKubeBlocks() error {
 			Client:    client,
 			Dynamic:   dynamic,
 		},
-		Version:       o.kbVersion,
-		Monitor:       true,
-		Quiet:         true,
-		CheckResource: false,
+		Version: o.kbVersion,
+		Monitor: true,
+		Quiet:   true,
 	}
-	return insOpts.Run()
+	return insOpts.Install()
 }
 
 func (o *initOptions) installCluster() error {

@@ -22,6 +22,7 @@ import (
 	kubefakeclient "k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/kubernetes/scheme"
 
+	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 )
 
@@ -31,5 +32,6 @@ func FakeClientSet(objects ...runtime.Object) *kubefakeclient.Clientset {
 
 func FakeDynamicClient(objects ...runtime.Object) *dynamicfakeclient.FakeDynamicClient {
 	_ = dbaasv1alpha1.AddToScheme(scheme.Scheme)
+	_ = dpv1alpha1.AddToScheme(scheme.Scheme)
 	return dynamicfakeclient.NewSimpleDynamicClient(scheme.Scheme, objects...)
 }

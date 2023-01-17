@@ -49,6 +49,8 @@ jobs:
           RELEASE_VERSION="latest"
           if [[ ! -z "${{ github.event.inputs.image_tag }}" ]]; then
             RELEASE_VERSION="${{ github.event.inputs.image_tag }}"
+          elif [[ "${{ env.RELEASE_VERSION }}" == "main" ]]; then
+            RELEASE_VERSION="latest"
           elif [[ ! -z "${{ env.RELEASE_VERSION }}" ]]; then
             RELEASE_VERSION=`bash ${{ github.workspace }}/.github/utils/utils.sh ${{ env.RELEASE_VERSION }} 1`
           fi

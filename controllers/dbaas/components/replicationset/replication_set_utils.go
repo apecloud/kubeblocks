@@ -298,7 +298,7 @@ func GeneratePVCFromVolumeClaimTemplates(sts *appsv1.StatefulSet, vctList []core
 }
 
 // GetPersistentVolumeClaimName gets the name of PersistentVolumeClaim for a replicationSet Pod with an ordinal.
-// claim must be a PersistentVolumeClaim from cluster API VolumeClaimsTemplate.
+// claimTpl must be a PersistentVolumeClaimTemplate from cluster API VolumeClaimsTemplate.
 func GetPersistentVolumeClaimName(sts *appsv1.StatefulSet, claimTpl *corev1.PersistentVolumeClaimTemplate, ordinal int) string {
 	return fmt.Sprintf("%s-%s-%d", claimTpl.Name, sts.Name, ordinal)
 }

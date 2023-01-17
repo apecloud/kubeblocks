@@ -26,21 +26,21 @@ func TestGetAvailableContainerPorts(t *testing.T) {
 	var containers []corev1.Container
 
 	tests := []struct {
-		inputPort int32
+		inputPort  int32
 		outputPort int32
 	}{{
-		inputPort: 80, // 80 is a privileged port
+		inputPort:  80, // 80 is a privileged port
 		outputPort: minAvailPort,
 	}, {
-		inputPort: 65536, // 65536 is an invalid port
+		inputPort:  65536, // 65536 is an invalid port
 		outputPort: minAvailPort,
-	},{
-		inputPort: 3306, // 3306 is a qualified port
+	}, {
+		inputPort:  3306, // 3306 is a qualified port
 		outputPort: 3306,
 	}}
 
 	for _, test := range tests {
-		containerPorts := []int32{int32(test.inputPort)}
+		containerPorts := []int32{test.inputPort}
 		foundPorts, err := getAvailableContainerPorts(containers, containerPorts)
 		if err != nil {
 			t.Error("expect getAvailableContainerPorts success")
@@ -59,7 +59,7 @@ func TestGetAvailableContainerPortsPartlyOccupied(t *testing.T) {
 		containers = append(containers, corev1.Container{Ports: []corev1.ContainerPort{{ContainerPort: int32(p)}}})
 	}
 
-	containerPorts := []int32{minAvailPort+1}
+	containerPorts := []int32{minAvailPort + 1}
 	foundPorts, err := getAvailableContainerPorts(containers, containerPorts)
 	if err != nil {
 		t.Error("expect getAvailableContainerPorts success")

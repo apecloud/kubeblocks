@@ -9,14 +9,11 @@ kbcli kubeblocks upgrade [flags]
 ### Examples
 
 ```
-  # Install KubeBlocks
-  kbcli kubeblocks install
+  # Upgrade KubeBlocks to specified version
+  kbcli kubeblocks upgrade --version=0.3.0
   
-  # Install KubeBlocks with specified version
-  kbcli kubeblocks install --version=0.2.0
-  
-  # Install KubeBlocks with other settings, for example, set replicaCount to 3
-  kbcli kubeblocks install --set replicaCount=3
+  # Upgrade KubeBlocks other settings, for example, set replicaCount to 3
+  kbcli kubeblocks upgrade --set replicaCount=3
 ```
 
 ### Options

@@ -281,3 +281,24 @@ func CheckStsIsPrimary(sts *appsv1.StatefulSet) bool {
 	}
 	return false
 }
+
+// GeneratePVCFromVolumeClaimTemplates generates the required pvc object according to the name of statefulSet and volumeClaimTemplates.
+func GeneratePVCFromVolumeClaimTemplates(sts *appsv1.StatefulSet, vctList []corev1.PersistentVolumeClaimTemplate) map[string]*corev1.PersistentVolumeClaim {
+	claims := make(map[string]*corev1.PersistentVolumeClaim, len(vctList))
+	for index := range vctList {
+		claim := &corev1.PersistentVolumeClaim{
+			Spec: vctList[index].Spec,
+		}
+		// The replica of replicationSet statefulSet defaults to 1, so the ordinal here is 0
+		claim.Name = GetPersistentVolumeClaimName(sts, &vctList[index], 0)
+		claim.Namespace = sts.Namespace
+		claims[vctList[index].Name] = claim
+	}
+	return claims
+}
+
+// GetPersistentVolumeClaimName gets the name of PersistentVolumeClaim for a replicationSet Pod with an ordinal.
+// claim must be a PersistentVolumeClaim from cluster API VolumeClaimsTemplate.
+func GetPersistentVolumeClaimName(sts *appsv1.StatefulSet, claimTpl *corev1.PersistentVolumeClaimTemplate, ordinal int) string {
+	return fmt.Sprintf("%s-%s-%d", claimTpl.Name, sts.Name, ordinal)
+}

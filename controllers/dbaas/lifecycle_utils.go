@@ -607,7 +607,7 @@ func prepareComponentObjs(reqCtx intctrlutil.RequestCtx, cli client.Client, obj 
 		}
 
 		defer func() {
-			// workload object should be append last
+			// workload object should be appended last
 			*params.applyObjs = append(*params.applyObjs, workload)
 		}()
 
@@ -1200,15 +1200,7 @@ func buildSts(reqCtx intctrlutil.RequestCtx, params createParams, envConfigName 
 	// update sts.spec.volumeClaimTemplates[].metadata.labels
 	if len(sts.Spec.VolumeClaimTemplates) > 0 && len(sts.GetLabels()) > 0 {
 		for index, vct := range sts.Spec.VolumeClaimTemplates {
-			if vct.Labels == nil {
-				vct.Labels = make(map[string]string)
-			}
-			vct.Labels[intctrlutil.VolumeClaimTemplateNameLabelKey] = vct.Name
-			for k, v := range sts.Labels {
-				if _, ok := vct.Labels[k]; !ok {
-					vct.Labels[k] = v
-				}
-			}
+			buildPersistentVolumeClaimLabels(&sts, &vct)
 			sts.Spec.VolumeClaimTemplates[index] = vct
 		}
 	}
@@ -1217,6 +1209,18 @@ func buildSts(reqCtx intctrlutil.RequestCtx, params createParams, envConfigName 
 		return nil, err
 	}
 	return &sts, nil
+}
+
+func buildPersistentVolumeClaimLabels(sts *appsv1.StatefulSet, pvc *corev1.PersistentVolumeClaim) {
+	if pvc.Labels == nil {
+		pvc.Labels = make(map[string]string)
+	}
+	pvc.Labels[intctrlutil.VolumeClaimTemplateNameLabelKey] = pvc.Name
+	for k, v := range sts.Labels {
+		if _, ok := pvc.Labels[k]; !ok {
+			pvc.Labels[k] = v
+		}
+	}
 }
 
 func processContainersInjection(reqCtx intctrlutil.RequestCtx,
@@ -1312,7 +1316,44 @@ func buildReplicationSet(reqCtx intctrlutil.RequestCtx,
 		sts.Labels[intctrlutil.RoleLabelKey] = string(replicationset.Primary)
 	}
 	sts.Spec.UpdateStrategy.Type = appsv1.OnDeleteStatefulSetStrategyType
+	// build replicationSet persistentVolumeClaim manually
+	if err := buildReplicationSetPVC(params, sts); err != nil {
+		return sts, err
+	}
 	return sts, nil
+}
+
+// buildReplicationSetPVC build replicationSet persistentVolumeClaim manually,
+// ReplicationSet does not manage pvc through volumeClaimTemplate defined on statefulSet,
+// the purpose is convenient to convert between componentTypes in the future (TODO).
+func buildReplicationSetPVC(params createParams, sts *appsv1.StatefulSet) error {
+	// Generate persistentVolumeClaim objects used by replicationSet's pod from component.VolumeClaimTemplates
+	pvcMap := replicationset.GeneratePVCFromVolumeClaimTemplates(sts, params.component.VolumeClaimTemplates)
+	for _, pvc := range pvcMap {
+		buildPersistentVolumeClaimLabels(sts, pvc)
+		*params.applyObjs = append(*params.applyObjs, pvc)
+	}
+
+	// Binding persistentVolumeClaim to podSpec.Volumes
+	podSpec := &sts.Spec.Template.Spec
+	if podSpec == nil {
+		return nil
+	}
+	podVolumes := podSpec.Volumes
+	for _, pvc := range pvcMap {
+		podVolumes, _ = intctrlutil.CheckAndUpdateVolume(podVolumes, pvc.Name, func(volumeName string) corev1.Volume {
+			return corev1.Volume{
+				Name: volumeName,
+				VolumeSource: corev1.VolumeSource{
+					PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+						ClaimName: pvc.Name,
+					},
+				},
+			}
+		}, nil)
+	}
+	podSpec.Volumes = podVolumes
+	return nil
 }
 
 func injectReplicationSetPodEnvAndLabel(params createParams, sts *appsv1.StatefulSet, index int32) (*appsv1.StatefulSet, error) {

@@ -70,6 +70,8 @@ statefulset: {
 			}
 			spec: component.podSpec
 		}
-		volumeClaimTemplates: component.volumeClaimTemplates
+		if component.type != "replication" {
+			volumeClaimTemplates: component.volumeClaimTemplates
+		}
 	}
 }

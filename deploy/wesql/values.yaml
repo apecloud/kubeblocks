@@ -484,7 +484,7 @@ configTemplate:
       innodb_buffer_pool_load_now?: int & 0 | 1
 
       // The size in bytes of the memory buffer innodb uses to cache data and indexes of its tables
-      innodb_buffer_pool_size?: int & >= 5242880 & <= 18446744073709551615
+      innodb_buffer_pool_size?: int & >= 5242880 & <= 18446744073709551615 @k8sResource(quantity)
 
       // Controls InnoDB change buffering
       innodb_change_buffering?: string & "inserts" | "deletes" | "purges" | "changes" | "all" | "none"

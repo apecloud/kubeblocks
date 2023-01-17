@@ -21,7 +21,6 @@ import (
 	"regexp"
 
 	"github.com/fsnotify/fsnotify"
-	"github.com/spf13/viper"
 	corev1 "k8s.io/api/core/v1"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
@@ -60,7 +59,7 @@ func BuildSignalArgs(configuration dbaasv1alpha1.UnixSignalTrigger, volumeDirs [
 	args = append(args, "--process", configuration.ProcessName)
 	args = append(args, "--signal", string(configuration.Signal))
 	// set grpc port
-	args = append(args, "--tcp", viper.GetString(cfgutil.ConfigManagerGPRCPortEnv))
+	// args = append(args, "--tcp", viper.GetString(cfgutil.ConfigManagerGPRCPortEnv))
 	for _, volume := range volumeDirs {
 		args = append(args, "--volume-dir", volume.MountPath)
 	}

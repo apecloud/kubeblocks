@@ -57,7 +57,7 @@ spec:
               - name: data
                 mountPath: /postgresql
               - name: postgresql-config
-                mountPath: /bitnami/postgresql/conf
+                mountPath: /postgresql/conf
             ports:
               - name: tcp-postgresql
                 containerPort: 5432

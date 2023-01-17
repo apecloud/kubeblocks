@@ -17,13 +17,10 @@ limitations under the License.
 package kubeblocks
 
 import (
-	"bytes"
-
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
 	"github.com/spf13/cobra"
-	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
@@ -270,50 +267,5 @@ var _ = Describe("kubeblocks", func() {
 		client := testing.FakeDynamicClient(&clusterCRD, &clusterDefCRD, &clusterVersionCRD, &backupToolCRD)
 		objs, _ := getKBObjects(testing.FakeClientSet(), client, "")
 		Expect(deleteCRDs(client, objs.crds)).Should(Succeed())
-	})
-
-	It("checkIfKubeBlocksInstalled", func() {
-		By("KubeBlocks is not installed")
-		client := testing.FakeClientSet()
-		installed, version, err := checkIfKubeBlocksInstalled(client)
-		Expect(err).Should(Succeed())
-		Expect(installed).Should(Equal(false))
-		Expect(version).Should(BeEmpty())
-
-		mockDeploy := func(version string) *appsv1.Deployment {
-			deploy := &appsv1.Deployment{}
-			label := map[string]string{
-				"app.kubernetes.io/name": types.KubeBlocksChartName,
-			}
-			if len(version) > 0 {
-				label["app.kubernetes.io/version"] = version
-			}
-			deploy.SetLabels(label)
-			return deploy
-		}
-
-		By("KubeBlocks is installed")
-		client = testing.FakeClientSet(mockDeploy(""))
-		installed, version, err = checkIfKubeBlocksInstalled(client)
-		Expect(err).Should(Succeed())
-		Expect(installed).Should(Equal(true))
-		Expect(version).Should(BeEmpty())
-
-		By("KubeBlocks 0.1.0 is installed")
-		client = testing.FakeClientSet(mockDeploy("0.1.0"))
-		installed, version, err = checkIfKubeBlocksInstalled(client)
-		Expect(err).Should(Succeed())
-		Expect(installed).Should(Equal(true))
-		Expect(version).Should(Equal("0.1.0"))
-	})
-
-	It("confirmUninstall", func() {
-		in := &bytes.Buffer{}
-		_, _ = in.Write([]byte("\n"))
-		Expect(confirmUninstall(in)).Should(HaveOccurred())
-
-		in.Reset()
-		_, _ = in.Write([]byte("uninstall-kubeblocks\n"))
-		Expect(confirmUninstall(in)).Should(Succeed())
 	})
 })

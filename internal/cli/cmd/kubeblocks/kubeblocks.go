@@ -20,7 +20,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"io"
+	"sort"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -29,8 +29,6 @@ import (
 	"helm.sh/helm/v3/pkg/repo"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
@@ -38,10 +36,10 @@ import (
 	"k8s.io/kubectl/pkg/util/templates"
 	"k8s.io/utils/strings/slices"
 
+	"github.com/apecloud/kubeblocks/internal/cli/printer"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 	"github.com/apecloud/kubeblocks/internal/cli/util/helm"
-	"github.com/apecloud/kubeblocks/internal/cli/util/prompt"
 	"github.com/apecloud/kubeblocks/version"
 )
 
@@ -116,12 +114,12 @@ func (o *Options) complete(f cmdutil.Factory, cmd *cobra.Command) error {
 		return err
 	}
 
-	context, err := cmd.Flags().GetString("context")
+	ctx, err := cmd.Flags().GetString("context")
 	if err != nil {
 		return err
 	}
 
-	if o.HelmCfg, err = helm.NewActionConfig(o.Namespace, config, helm.WithContext(context)); err != nil {
+	if o.HelmCfg, err = helm.NewActionConfig(o.Namespace, config, helm.WithContext(ctx)); err != nil {
 		return err
 	}
 
@@ -134,6 +132,8 @@ func (o *Options) complete(f cmdutil.Factory, cmd *cobra.Command) error {
 }
 
 func (o *Options) preCheck() error {
+	fmt.Fprintf(o.Out, "%s uninstall will remove all KubeBlocks resources.\n", printer.BoldYellow("Warning:"))
+
 	// wait user to confirm
 	if err := confirmUninstall(o.In); err != nil {
 		return err
@@ -153,17 +153,12 @@ func (o *Options) preCheck() error {
 		// find kubeblocks crds
 		if strings.Contains(crd.GetName(), "kubeblocks.io") &&
 			slices.Contains(preCheckList, crd.GetName()) {
-			group, _, err := unstructured.NestedString(crd.Object, "spec", "group")
+			gvr, err := getGVRByCRD(&crd)
 			if err != nil {
 				return err
 			}
-			gvr := schema.GroupVersionResource{
-				Group:    group,
-				Version:  types.Version,
-				Resource: strings.Split(crd.GetName(), ".")[0],
-			}
 			// find custom resource
-			objList, err := o.Dynamic.Resource(gvr).List(ctx, metav1.ListOptions{})
+			objList, err := o.Dynamic.Resource(*gvr).List(ctx, metav1.ListOptions{})
 			if err != nil {
 				return err
 			}
@@ -186,13 +181,13 @@ func (o *Options) preCheck() error {
 
 func (o *InstallOptions) Install() error {
 	// check if KubeBlocks has been installed
-	installed, version, err := checkIfKubeBlocksInstalled(o.Client)
+	installed, v, err := checkIfKubeBlocksInstalled(o.Client)
 	if err != nil {
 		return err
 	}
 
 	if installed {
-		fmt.Fprintf(o.Out, "KubeBlocks %s already exists\n", version)
+		fmt.Fprintf(o.Out, "KubeBlocks %s already exists\n", v)
 		// print notes
 		if !o.Quiet {
 			o.printNotes()
@@ -249,10 +244,22 @@ func (o *InstallOptions) checkResource() error {
 		fmt.Fprintf(o.ErrOut, "Check whether there are resources left by KubeBlocks before: %s\n", err.Error())
 	}
 
-	if checkIfRemainedResource(objs) {
-		return fmt.Errorf("there are resources left by KubeBlocks before, try to run \"kbcli kubeblocks uninstall\" to clean up")
+	res := getRemainedResource(objs)
+	if len(res) == 0 {
+		return nil
 	}
-	return nil
+
+	// output remained resource
+	var keys []string
+	for k := range res {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	resStr := &bytes.Buffer{}
+	for _, k := range keys {
+		resStr.WriteString(fmt.Sprintf("  %s: %s\n", k, strings.Join(res[k], ",")))
+	}
+	return fmt.Errorf("there are resources left by KubeBlocks before, try to run \"kbcli kubeblocks uninstall\" to clean up\n%s", resStr.String())
 }
 
 func (o *InstallOptions) Upgrade() error {
@@ -364,6 +371,20 @@ func (o *Options) uninstall() error {
 		return util.Spinner(o.Out, fmt.Sprintf("%-50s", msg))
 	}
 
+	// uninstall helm release that will delete custom resources, but since finalizers is not empty,
+	// custom resources will not be deleted, so we will remove finalizers later.
+	_, v, _ := checkIfKubeBlocksInstalled(o.Client)
+	chart := helm.InstallOpts{
+		Name:      types.KubeBlocksChartName,
+		Namespace: o.Namespace,
+	}
+	spinner := newSpinner(fmt.Sprintf("Uninstall helm release %s %s", types.KubeBlocksChartName, v))
+	printErr(spinner, chart.UnInstall(o.HelmCfg))
+
+	// remove repo
+	spinner = newSpinner("Remove helm repo " + types.KubeBlocksChartName)
+	printErr(spinner, helm.RemoveRepo(&repo.Entry{Name: types.KubeBlocksChartName, URL: types.KubeBlocksChartURL}))
+
 	// get KubeBlocks objects and try to remove them
 	objs, err := getKBObjects(o.Client, o.Dynamic, o.Namespace)
 	if err != nil {
@@ -371,25 +392,12 @@ func (o *Options) uninstall() error {
 	}
 
 	// remove finalizers
-	spinner := newSpinner("Remove built-in custom resources")
+	spinner = newSpinner("Remove built-in custom resources")
 	printErr(spinner, removeFinalizers(o.Dynamic, objs))
 
 	// delete CRDs
 	spinner = newSpinner("Remove custom resource definitions")
 	printErr(spinner, deleteCRDs(o.Dynamic, objs.crds))
-
-	_, version, _ := checkIfKubeBlocksInstalled(o.Client)
-	// uninstall helm release
-	chart := helm.InstallOpts{
-		Name:      types.KubeBlocksChartName,
-		Namespace: o.Namespace,
-	}
-	spinner = newSpinner(fmt.Sprintf("Uninstall helm release %s %s", types.KubeBlocksChartName, version))
-	printErr(spinner, chart.UnInstall(o.HelmCfg))
-
-	// remove repo
-	spinner = newSpinner("Remove helm repo " + types.KubeBlocksChartName)
-	printErr(spinner, helm.RemoveRepo(&repo.Entry{Name: types.KubeBlocksChartName, URL: types.KubeBlocksChartURL}))
 
 	// delete deployments
 	spinner = newSpinner("Remove deployments")
@@ -469,42 +477,4 @@ func newUninstallCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *co
 		},
 	}
 	return cmd
-}
-
-// check if KubeBlocks has been installed
-func checkIfKubeBlocksInstalled(client kubernetes.Interface) (bool, string, error) {
-	kbDeploys, err := client.AppsV1().Deployments(metav1.NamespaceAll).List(context.TODO(),
-		metav1.ListOptions{LabelSelector: "app.kubernetes.io/name=" + types.KubeBlocksChartName})
-	if err != nil {
-		return false, "", err
-	}
-
-	if len(kbDeploys.Items) == 0 {
-		return false, "", nil
-	}
-
-	var versions []string
-	for _, deploy := range kbDeploys.Items {
-		labels := deploy.GetLabels()
-		if labels == nil {
-			continue
-		}
-		if v, ok := labels["app.kubernetes.io/version"]; ok {
-			versions = append(versions, v)
-		}
-	}
-	return true, strings.Join(versions, " "), nil
-}
-
-func confirmUninstall(in io.Reader) error {
-	const confirmStr = "uninstall-kubeblocks"
-	entered, err := prompt.NewPrompt(fmt.Sprintf("You should type \"%s\"", confirmStr),
-		fmt.Sprintf("Please type \"%s\" to confirm:", confirmStr), in).GetInput()
-	if err != nil {
-		return err
-	}
-	if entered != confirmStr {
-		return fmt.Errorf("typed \"%s\" does not match \"%s\"", entered, confirmStr)
-	}
-	return nil
 }

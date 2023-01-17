@@ -22,7 +22,7 @@ kbcli kubeblocks install [flags]
 ### Options
 
 ```
-      --check-resource     check if there are some resources remained before install (default true)
+      --check-resource     check if there are some remained resources before install (default true)
       --create-namespace   create the namespace if not present
   -h, --help               help for install
       --monitor            Set monitor enabled and install Prometheus, AlertManager and Grafana (default true) (default true)

@@ -48,8 +48,12 @@ func findParentPidFromProcessName(processName string) (PID, error) {
 	psGraph := map[PID]int32{}
 	for _, proc := range allProcess {
 		name, err := proc.Name()
+		// OS X getting the name of the system process sometimes fails,
+		// because OS X Process.Name function depends on sysctl,
+		// the function requires elevated permissions.
 		if err != nil {
-			return InvalidPID, cfgutil.WrapError(err, "failed to get process name from pid[%d]", proc.Pid)
+			logger.Error(err, fmt.Sprintf("failed to get process name from pid[%d], and pass", proc.Pid))
+			continue
 		}
 		if name != processName {
 			continue

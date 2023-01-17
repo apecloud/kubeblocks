@@ -80,6 +80,7 @@ const (
 	DPGroup                = "dataprotection.kubeblocks.io"
 	DPVersion              = "v1alpha1"
 	ResourceBackups        = "backups"
+	ResourceBackupTools    = "backuptools"
 	ResourceRestoreJobs    = "restorejobs"
 	ResourceBackupPolicies = "backuppolicies"
 
@@ -144,6 +145,10 @@ func BackupGVR() schema.GroupVersionResource {
 
 func RestoreJobGVR() schema.GroupVersionResource {
 	return schema.GroupVersionResource{Group: DPGroup, Version: DPVersion, Resource: ResourceRestoreJobs}
+}
+
+func BackupToolGVR() schema.GroupVersionResource {
+	return schema.GroupVersionResource{Group: DPGroup, Version: DPVersion, Resource: ResourceBackupTools}
 }
 
 func OpsGVR() schema.GroupVersionResource {

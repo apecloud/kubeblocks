@@ -23,7 +23,7 @@ spec:
         {{- with .limits }}
         limits:
           cpu: {{ .cpu | quote }}
-          memory: {{ .limits.memory | quote }}
+          memory: {{ .memory | quote }}
         {{- end }}
         {{- with .requests }}
         requests:

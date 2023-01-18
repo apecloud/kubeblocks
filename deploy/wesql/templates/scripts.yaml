@@ -28,6 +28,7 @@ data:
       fi
       echo "mysql $host_flag -uroot $password_flag -e \"call dbms_consensus.add_follower('$host:13306');\" > /tmp/setup_error.log 2>&1 & "
       mysql $host_flag -uroot $password_flag -e "call dbms_consensus.add_follower('$host:13306');" > /tmp/setup_error.log 2>&1 & 
+      # wait longer in case there's network issue
       pid=$!; sleep 3;
       ps $pid
       if ! ps $pid > /dev/null; then 

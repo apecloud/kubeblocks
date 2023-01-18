@@ -9,6 +9,6 @@
   export SERVICE_IP=$(kubectl get svc --namespace {{ .Release.Namespace }} {{ include "nyancat.fullname" . }} --template "{{"{{ range (index .status.loadBalancer.ingress 0) }}{{.}}{{ end }}"}}")
   echo http://$SERVICE_IP:{{ .Values.service.port }}
 {{- else if contains "ClusterIP" .Values.service.type }}
-  kubectl port-forward service/nyancat 8087:8087
+  kubectl --namespace {{ .Release.Namespace }} port-forward service/nyancat 8087:8087
   echo "Visit http://127.0.0.1:8087 to use Nyan Cat demo application."
 {{- end }}

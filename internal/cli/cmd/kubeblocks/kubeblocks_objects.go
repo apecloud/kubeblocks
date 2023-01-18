@@ -68,7 +68,7 @@ func getKBObjects(client kubernetes.Interface, dynamic dynamic.Interface, namesp
 	crds, err := dynamic.Resource(types.CRDGVR()).List(ctx, metav1.ListOptions{})
 	appendErr(err)
 	objs.crds = &unstructured.UnstructuredList{}
-	objs.crs = make(map[schema.GroupVersionResource]*unstructured.UnstructuredList)
+	objs.crs = map[schema.GroupVersionResource]*unstructured.UnstructuredList{}
 	for i, crd := range crds.Items {
 		if !strings.Contains(crd.GetName(), "kubeblocks.io") {
 			continue

@@ -242,6 +242,10 @@ func (o *InstallOptions) Install() error {
 }
 
 func (o *InstallOptions) preCheck(versionInfo map[util.AppName]string) error {
+	if !o.check {
+		return nil
+	}
+
 	versionErr := fmt.Errorf("failed to get kubernetes version")
 	k8sVersionStr, ok := versionInfo[util.KubernetesApp]
 	if !ok {
@@ -564,7 +568,7 @@ func newInstallCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 	cmd.Flags().StringVar(&o.Version, "version", version.DefaultKubeBlocksVersion, "KubeBlocks version")
 	cmd.Flags().StringArrayVar(&o.Sets, "set", []string{}, "Set values on the command line (can specify multiple or separate values with commas: key1=val1,key2=val2)")
 	cmd.Flags().BoolVar(&o.CreateNamespace, "create-namespace", false, "create the namespace if not present")
-	cmd.Flags().BoolVar(&o.check, "check-resource", true, "check if there are some remained resources before install")
+	cmd.Flags().BoolVar(&o.check, "check", true, "check kubernetes cluster before install")
 
 	return cmd
 }
@@ -590,6 +594,7 @@ func newUpgradeCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 	cmd.Flags().BoolVar(&o.Monitor, "monitor", true, "Set monitor enabled and install Prometheus, AlertManager and Grafana")
 	cmd.Flags().StringVar(&o.Version, "version", version.DefaultKubeBlocksVersion, "KubeBlocks version")
 	cmd.Flags().StringArrayVar(&o.Sets, "set", []string{}, "Set values on the command line (can specify multiple or separate values with commas: key1=val1,key2=val2)")
+	cmd.Flags().BoolVar(&o.check, "check", true, "check kubernetes cluster before upgrade")
 
 	return cmd
 }

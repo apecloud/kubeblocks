@@ -17,8 +17,14 @@ limitations under the License.
 package kubeblocks
 
 import (
+	"fmt"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
+	appsv1 "k8s.io/api/apps/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/dynamic"
 
 	"github.com/spf13/cobra"
 	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
@@ -100,7 +106,7 @@ var _ = Describe("kubeblocks", func() {
 		}
 		Expect(o.Install()).Should(HaveOccurred())
 		Expect(len(o.Sets)).To(Equal(1))
-		Expect(o.Sets[0]).To(Equal(kMonitorParam))
+		Expect(o.Sets[0]).To(Equal(fmt.Sprintf(kMonitorParam, true)))
 		Expect(o.installChart()).Should(HaveOccurred())
 		o.printNotes()
 	})
@@ -128,18 +134,32 @@ var _ = Describe("kubeblocks", func() {
 	})
 
 	It("run upgrade", func() {
+		mockDeploy := func() *appsv1.Deployment {
+			deploy := &appsv1.Deployment{}
+			deploy.SetLabels(map[string]string{
+				"app.kubernetes.io/name":    types.KubeBlocksChartName,
+				"app.kubernetes.io/version": "0.3.0",
+			})
+			return deploy
+		}
+
 		o := &InstallOptions{
 			Options: Options{
 				IOStreams: streams,
 				HelmCfg:   helm.FakeActionConfig(),
 				Namespace: "default",
+				Client:    testing.FakeClientSet(mockDeploy()),
+				Dynamic:   testing.FakeDynamicClient(),
 			},
 			Version: version.DefaultKubeBlocksVersion,
 			Monitor: true,
+			check:   false,
 		}
-		Expect(o.upgrade(&cobra.Command{})).Should(HaveOccurred())
+		cmd := newUpgradeCmd(tf, streams)
+		_ = cmd.Flags().Set("monitor", "true")
+		Expect(o.upgrade(cmd)).Should(HaveOccurred())
 		Expect(len(o.Sets)).To(Equal(1))
-		Expect(o.Sets[0]).To(Equal(kMonitorParam))
+		Expect(o.Sets[0]).To(Equal(fmt.Sprintf(kMonitorParam, true)))
 		Expect(o.upgradeChart()).Should(HaveOccurred())
 
 		o.printNotes()
@@ -209,7 +229,7 @@ var _ = Describe("kubeblocks", func() {
 		}
 
 		for _, c := range testCases {
-			client := testing.FakeDynamicClient(c.clusterDef, c.clusterVersion, c.backupTool)
+			client := mockDynamicClientWithCRD(c.clusterDef, c.clusterVersion, c.backupTool)
 			objs, _ := getKBObjects(testing.FakeClientSet(), client, "")
 			if c.expected != "" {
 				Expect(removeFinalizers(client, objs)).Should(MatchError(MatchRegexp(c.expected)))
@@ -220,52 +240,7 @@ var _ = Describe("kubeblocks", func() {
 	})
 
 	It("delete crd", func() {
-		clusterCRD := v1.CustomResourceDefinition{
-			TypeMeta: metav1.TypeMeta{
-				Kind:       "CustomResourceDefinition",
-				APIVersion: "apiextensions.k8s.io/v1",
-			},
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "clusters.dbaas.kubeblocks.io",
-			},
-			Spec:   v1.CustomResourceDefinitionSpec{},
-			Status: v1.CustomResourceDefinitionStatus{},
-		}
-		clusterDefCRD := v1.CustomResourceDefinition{
-			TypeMeta: metav1.TypeMeta{
-				Kind:       "CustomResourceDefinition",
-				APIVersion: "apiextensions.k8s.io/v1",
-			},
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "clusterdefinitions.dbaas.kubeblocks.io",
-			},
-			Spec:   v1.CustomResourceDefinitionSpec{},
-			Status: v1.CustomResourceDefinitionStatus{},
-		}
-		clusterVersionCRD := v1.CustomResourceDefinition{
-			TypeMeta: metav1.TypeMeta{
-				Kind:       "CustomResourceDefinition",
-				APIVersion: "apiextensions.k8s.io/v1",
-			},
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "clusterversions.dbaas.kubeblocks.io",
-			},
-			Spec:   v1.CustomResourceDefinitionSpec{},
-			Status: v1.CustomResourceDefinitionStatus{},
-		}
-
-		backupToolCRD := v1.CustomResourceDefinition{
-			TypeMeta: metav1.TypeMeta{
-				Kind:       "CustomResourceDefinition",
-				APIVersion: "apiextensions.k8s.io/v1",
-			},
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "backuptools.dataprotection.kubeblocks.io",
-			},
-			Spec:   v1.CustomResourceDefinitionSpec{},
-			Status: v1.CustomResourceDefinitionStatus{},
-		}
-		client := testing.FakeDynamicClient(&clusterCRD, &clusterDefCRD, &clusterVersionCRD, &backupToolCRD)
+		client := mockDynamicClientWithCRD()
 		objs, _ := getKBObjects(testing.FakeClientSet(), client, "")
 		Expect(deleteCRDs(client, objs.crds)).Should(Succeed())
 	})
@@ -275,6 +250,7 @@ var _ = Describe("kubeblocks", func() {
 			Options: Options{
 				IOStreams: genericclioptions.NewTestIOStreamsDiscard(),
 			},
+			check: true,
 		}
 		By("kubernetes version is empty")
 		versionInfo := map[util.AppName]string{}
@@ -358,3 +334,63 @@ var _ = Describe("kubeblocks", func() {
 		}
 	})
 })
+
+func mockDynamicClientWithCRD(objects ...runtime.Object) dynamic.Interface {
+	clusterCRD := v1.CustomResourceDefinition{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "CustomResourceDefinition",
+			APIVersion: "apiextensions.k8s.io/v1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "clusters.dbaas.kubeblocks.io",
+		},
+		Spec: v1.CustomResourceDefinitionSpec{
+			Group: types.Group,
+		},
+		Status: v1.CustomResourceDefinitionStatus{},
+	}
+	clusterDefCRD := v1.CustomResourceDefinition{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "CustomResourceDefinition",
+			APIVersion: "apiextensions.k8s.io/v1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "clusterdefinitions.dbaas.kubeblocks.io",
+		},
+		Spec: v1.CustomResourceDefinitionSpec{
+			Group: types.Group,
+		},
+		Status: v1.CustomResourceDefinitionStatus{},
+	}
+	clusterVersionCRD := v1.CustomResourceDefinition{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "CustomResourceDefinition",
+			APIVersion: "apiextensions.k8s.io/v1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "clusterversions.dbaas.kubeblocks.io",
+		},
+		Spec: v1.CustomResourceDefinitionSpec{
+			Group: types.Group,
+		},
+		Status: v1.CustomResourceDefinitionStatus{},
+	}
+
+	backupToolCRD := v1.CustomResourceDefinition{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "CustomResourceDefinition",
+			APIVersion: "apiextensions.k8s.io/v1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "backuptools.dataprotection.kubeblocks.io",
+		},
+		Spec: v1.CustomResourceDefinitionSpec{
+			Group: types.DPGroup,
+		},
+		Status: v1.CustomResourceDefinitionStatus{},
+	}
+
+	allObjs := []runtime.Object{&clusterCRD, &clusterDefCRD, &clusterVersionCRD, &backupToolCRD}
+	allObjs = append(allObjs, objects...)
+	return testing.FakeDynamicClient(allObjs...)
+}

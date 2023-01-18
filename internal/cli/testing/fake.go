@@ -47,7 +47,6 @@ const (
 	KubeBlocksChartName = "fake-kubeblocks"
 	KubeBlocksChartURL  = "fake-kubeblocks-chart-url"
 	BackupToolName      = "fake-backup-tool"
-	NyanCatChartName    = "fake-nyan-cat"
 )
 
 func GetRandomStr() string {

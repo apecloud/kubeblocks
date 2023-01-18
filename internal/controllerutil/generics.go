@@ -73,5 +73,3 @@ type PodDisruptionBudgetListWrapper struct{}
 func (w PodDisruptionBudgetListWrapper) GetItems(list *policyv1.PodDisruptionBudgetList) []policyv1.PodDisruptionBudget {
 	return list.Items
 }
-
-

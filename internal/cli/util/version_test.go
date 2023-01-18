@@ -14,15 +14,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package version
+package util
 
 import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-
 	appsv1 "k8s.io/api/apps/v1"
-	"k8s.io/client-go/rest/fake"
-	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
@@ -41,23 +38,33 @@ var mockDeploy = func(version string) *appsv1.Deployment {
 	return deploy
 }
 
-var _ = Describe("version", func() {
-	It("version", func() {
-		tf := cmdtesting.NewTestFactory()
-		tf.Client = &fake.RESTClient{}
-		By("testing version command")
-		cmd := NewVersionCmd(tf)
-		Expect(cmd).ShouldNot(BeNil())
-
-		By("complete")
-		o := &versionOptions{}
-		Expect(o.Complete(tf)).Should(Succeed())
-
-		By("testing run")
+var _ = Describe("version util", func() {
+	It("GetVersionInfo", func() {
 		client := testing.FakeClientSet(mockDeploy(kbVersion))
-		o = &versionOptions{
-			client: client,
-		}
-		o.Run()
+		info, err := GetVersionInfo(client)
+		Expect(err).Should(Succeed())
+		Expect(info).ShouldNot(BeEmpty())
+		Expect(info[KubeBlocksApp]).Should(Equal(kbVersion))
+		Expect(info[KubernetesApp]).ShouldNot(BeEmpty())
+		Expect(info[KBCLIApp]).ShouldNot(BeEmpty())
+	})
+
+	It("getKubeBlocksVersion", func() {
+		client := testing.FakeClientSet(mockDeploy(""))
+		v, err := getKubeBlocksVersion(client)
+		Expect(v).Should(BeEmpty())
+		Expect(err).Should(Succeed())
+
+		client = testing.FakeClientSet(mockDeploy(kbVersion))
+		v, err = getKubeBlocksVersion(client)
+		Expect(v).Should(Equal(kbVersion))
+		Expect(err).Should(Succeed())
+	})
+
+	It("getK8sVersion", func() {
+		client := testing.FakeClientSet()
+		v, err := getK8sVersion(client.Discovery())
+		Expect(v).ShouldNot(BeEmpty())
+		Expect(err).Should(Succeed())
 	})
 })

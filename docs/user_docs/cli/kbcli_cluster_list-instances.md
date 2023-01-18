@@ -13,7 +13,7 @@ kbcli cluster list-instances [flags]
   kbcli cluster list-instances
   
   # list all instances of a specified cluster
-  kbcli cluster list-instances my-cluster
+  kbcli cluster list-instances mycluster
 ```
 
 ### Options

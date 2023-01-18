@@ -10,7 +10,7 @@ kbcli cluster list-users NAME [flags]
 
 ```
   # list all users of a specified cluster
-  kbcli cluster list-users my-cluster
+  kbcli cluster list-users mycluster
 ```
 
 ### Options

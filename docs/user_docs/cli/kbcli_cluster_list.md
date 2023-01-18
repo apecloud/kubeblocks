@@ -13,16 +13,16 @@ kbcli cluster list [NAME] [flags]
   kbcli cluster list
   
   # list a single cluster with specified NAME
-  kbcli cluster list my-cluster
+  kbcli cluster list mycluster
   
   # list a single cluster in YAML output format
-  kbcli cluster list my-cluster -o yaml
+  kbcli cluster list mycluster -o yaml
   
   # list a single cluster in JSON output format
-  kbcli cluster list my-cluster -o json
+  kbcli cluster list mycluster -o json
   
   # list a single cluster in wide output format
-  kbcli cluster list my-cluster -o wide
+  kbcli cluster list mycluster -o wide
 ```
 
 ### Options

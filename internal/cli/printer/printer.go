@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/fatih/color"
 	"github.com/jedib0t/go-pretty/v6/table"
 )
 
@@ -107,4 +108,9 @@ func PrintLineWithTabSeparator(ps ...Pair) {
 func PrintTitle(title string) {
 	titleTpl := fmt.Sprintf("\n%s:", title)
 	fmt.Println(titleTpl)
+}
+
+// BoldYellow returns a string formatted with yellow and bold.
+func BoldYellow(msg interface{}) string {
+	return color.New(color.FgYellow).Add(color.Bold).Sprint(msg)
 }

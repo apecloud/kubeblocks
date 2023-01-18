@@ -390,7 +390,7 @@ func (r *ClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 func (r *ClusterReconciler) deleteExternalResources(reqCtx intctrlutil.RequestCtx, cluster *dbaasv1alpha1.Cluster) (*ctrl.Result, error) {
 	//
-	// delete any external resources associated with the cronJob
+	// delete any external resources
 	//
 	// Ensure that delete implementation is idempotent and safe to invoke
 	// multiple times for same object.
@@ -420,6 +420,7 @@ func (r *ClusterReconciler) deleteExternalResources(reqCtx intctrlutil.RequestCt
 			return &res, err
 		}
 		if cluster.Spec.TerminationPolicy == dbaasv1alpha1.WipeOut {
+			// TODO check whether delete backups together with cluster is allowed
 			// wipe out all backups
 			if err := r.deleteBackups(reqCtx, cluster); err != nil && !apierrors.IsNotFound(err) {
 				res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
@@ -428,18 +429,21 @@ func (r *ClusterReconciler) deleteExternalResources(reqCtx intctrlutil.RequestCt
 		}
 	}
 
-	clusterDef := &dbaasv1alpha1.ClusterDefinition{}
-	if err := r.Get(reqCtx.Ctx, client.ObjectKey{
-		Name: cluster.Spec.ClusterDefRef,
-	}, clusterDef); err != nil && !apierrors.IsNotFound(err) {
-		res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-		return &res, err
+	// it's possible at time of external resource deletion, cluster definition has already been deleted.
+	ml := client.MatchingLabels{
+		intctrlutil.AppInstanceLabelKey: cluster.GetName(),
 	}
+	inNS := client.InNamespace(cluster.Namespace)
 
-	ml, inNS := getListOption(cluster, clusterDef)
+	// all resources created in createCluster should be handled properly
 
 	if ret, err := removeFinalizer[appsv1.StatefulSet, *appsv1.StatefulSet, appsv1.StatefulSetList,
 		*appsv1.StatefulSetList, intctrlutil.StatefulSetListWrapper](r, reqCtx, inNS, ml); err != nil {
+		return ret, err
+	}
+
+	if ret, err := removeFinalizer[appsv1.Deployment, *appsv1.Deployment, appsv1.DeploymentList,
+		*appsv1.DeploymentList, intctrlutil.DeploymentListWrapper](r, reqCtx, inNS, ml); err != nil {
 		return ret, err
 	}
 
@@ -450,6 +454,17 @@ func (r *ClusterReconciler) deleteExternalResources(reqCtx intctrlutil.RequestCt
 
 	if ret, err := removeFinalizer[corev1.Secret, *corev1.Secret, corev1.SecretList,
 		*corev1.SecretList, intctrlutil.SecretListWrapper](r, reqCtx, inNS, ml); err != nil {
+		return ret, err
+	}
+
+	if ret, err := removeFinalizer[corev1.ConfigMap, *corev1.ConfigMap, corev1.ConfigMapList,
+		*corev1.ConfigMapList, intctrlutil.ConfigMapListWrapper](r, reqCtx, inNS, ml); err != nil {
+		return ret, err
+	}
+
+	if ret, err := removeFinalizer[policyv1.PodDisruptionBudget, *policyv1.PodDisruptionBudget,
+		policyv1.PodDisruptionBudgetList, *policyv1.PodDisruptionBudgetList,
+		intctrlutil.PodDisruptionBudgetListWrapper](r, reqCtx, inNS, ml); err != nil {
 		return ret, err
 	}
 
@@ -482,15 +497,12 @@ func removeFinalizer[T intctrlutil.Object, PT intctrlutil.PObject[T],
 }
 
 func (r *ClusterReconciler) deletePVCs(reqCtx intctrlutil.RequestCtx, cluster *dbaasv1alpha1.Cluster) error {
-
-	clusterDef := &dbaasv1alpha1.ClusterDefinition{}
-	if err := r.Get(reqCtx.Ctx, client.ObjectKey{
-		Name: cluster.Spec.ClusterDefRef,
-	}, clusterDef); err != nil {
-		return err
+	// it's possible at time of external resource deletion, cluster definition has already been deleted.
+	ml := client.MatchingLabels{
+		intctrlutil.AppInstanceLabelKey: cluster.GetName(),
 	}
+	inNS := client.InNamespace(cluster.Namespace)
 
-	ml, inNS := getListOption(cluster, clusterDef)
 	pvcList := &corev1.PersistentVolumeClaimList{}
 	if err := r.List(reqCtx.Ctx, pvcList, inNS, ml); err != nil {
 		return err

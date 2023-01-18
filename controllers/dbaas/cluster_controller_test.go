@@ -88,7 +88,7 @@ var _ = Describe("Cluster Controller", func() {
 		err = k8sClient.DeleteAllOf(ctx, &corev1.PersistentVolumeClaim{},
 			client.InNamespace(testCtx.DefaultNamespace),
 			client.MatchingLabels{
-				intctrlutil.AppNameLabelKey: "state.mysql-8-cluster-definition",
+				intctrlutil.AppNameLabelKey: "state.mysql-cluster-definition",
 			})
 		Expect(err).NotTo(HaveOccurred())
 		err = k8sClient.DeleteAllOf(ctx, &corev1.ConfigMap{},
@@ -140,7 +140,7 @@ kind: ClusterDefinition
 metadata:
   name: cluster-definition
 spec:
-  type: state.mysql-8
+  type: state.mysql
   components:
   - typeName: replicasets
     componentType: Stateful
@@ -344,7 +344,7 @@ kind: ClusterDefinition
 metadata:
   name: cluster-definition-consensus
 spec:
-  type: state.mysql-8
+  type: state.mysql
   components:
   - typeName: replicasets
     componentType: Consensus

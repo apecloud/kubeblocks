@@ -405,9 +405,8 @@ func getEngineType(clusterDefType string, compDef dbaasv1alpha1.ClusterDefinitio
 	}
 
 	switch clusterDefType {
-	// clusterDefType define well known cluster types. could be one of
-	// [state.redis, mq.mqtt, mq.kafka, state.mysql-8, state.mysql-5.7, state.mysql-5.6, state-mongodb]
-	case "state.mysql-8", "state.mysql-5.7", "state.mysql-5.6":
+	// clusterDefType define well known cluster types
+	case "state.mysql":
 		return kMysql
 	default:
 		return ""

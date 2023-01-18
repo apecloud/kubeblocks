@@ -287,7 +287,7 @@ kind:       ClusterDefinition
 metadata:
   name:     %s
 spec:
-  type: state.mysql-8
+  type: state.mysql
   components:
   - typeName: replicasets
     componentType: Stateful
@@ -315,7 +315,7 @@ kind:       ClusterDefinition
 metadata:
   name:     %s
 spec:
-  type: state.mysql-8
+  type: state.mysql
   components:
   - typeName: mysql-rafted
     componentType: Consensus
@@ -336,7 +336,7 @@ kind:       ClusterDefinition
 metadata:
   name:     %s
 spec:
-  type: state.mysql-8
+  type: state.mysql
   components:
   - typeName: replicasets
     componentType: Consensus

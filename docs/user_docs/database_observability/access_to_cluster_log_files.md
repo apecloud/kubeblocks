@@ -65,7 +65,7 @@ kind:       ClusterDefinition
 metadata:
   name:     mysql-cluster-definition
 spec:
-  type: state.mysql-8
+  type: state.mysql
   components:
   - typeName: replicasets
     characterType: mysql

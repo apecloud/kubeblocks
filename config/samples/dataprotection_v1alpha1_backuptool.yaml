@@ -1,6 +1,0 @@
-apiVersion: dataprotection.kubeblocks.io/v1alpha1
-kind: BackupTool
-metadata:
-  name: backuptool-sample
-spec:
-  # TODO(user): Add fields here

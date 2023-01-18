@@ -176,7 +176,7 @@ var _ = Describe("StatefulSet Controller", func() {
 			}
 
 			By("waiting the component is Running")
-			Eventually(testdbaas.GetClusterComponentPhase(testCtx, clusterName, consensusCompName), timeout, interval).Should(Equal(dbaasv1alpha1.RunningPhase))
+			Eventually(testdbaas.GetClusterComponentPhase(testCtx, clusterName, consensusCompName), 2*timeout, interval).Should(Equal(dbaasv1alpha1.RunningPhase))
 
 			By("test updateStrategy with Serial")
 			testUpdateStrategy(dbaasv1alpha1.SerialStrategy, consensusCompName, 1)

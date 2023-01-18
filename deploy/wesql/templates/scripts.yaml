@@ -28,18 +28,9 @@ data:
       fi
       echo "mysql $host_flag -uroot $password_flag -e \"call dbms_consensus.add_follower('$host:13306');\" > /tmp/setup_error.log 2>&1 & "
       mysql $host_flag -uroot $password_flag -e "call dbms_consensus.add_follower('$host:13306');" > /tmp/setup_error.log 2>&1 & 
-      pid=$!
-      for i in {1..3}; do
-        sleep 1;
-        echo "wait $i seconds"
-        ps $pid
-        if ! ps $pid > /dev/null; then
-          finished="true"
-          break
-        fi
-      done
-      echo $finished 
-      if [ "$finished" == "true" ]; then 
+      pid=$!; sleep 3;
+      ps $pid
+      if ! ps $pid > /dev/null; then 
         wait $pid; 
         code=$?; 
         cat /tmp/setup_error.log
@@ -51,7 +42,7 @@ data:
           fi
         fi
       else 
-        echo "call dbms_consensus.add_follower wait timeout, skip."
+        echo "call dbms_consensus.add_follower stuck, which is normal during h-scale, skip."
       fi
       rm /tmp/setup_error.log
     fi

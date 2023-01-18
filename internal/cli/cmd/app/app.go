@@ -17,6 +17,7 @@ limitations under the License.
 package app
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
@@ -84,7 +85,7 @@ func newInstallCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 		Short:   "Install the appliaction with the specified name",
 		Example: installExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			util.CheckErr(o.complete(f, cmd, args))
+			util.CheckErr(o.complete(cmd, args))
 			util.CheckErr(o.install())
 		},
 	}
@@ -98,6 +99,7 @@ func newInstallCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 
 func newUninstallCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := &options{
+		Factory:   f,
 		IOStreams: streams,
 	}
 
@@ -106,7 +108,7 @@ func newUninstallCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *co
 		Short:   "Uninstall the appliaction with the specified name",
 		Example: uninstallExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			util.CheckErr(o.complete(f, cmd, args))
+			util.CheckErr(o.complete(cmd, args))
 			util.CheckErr(o.uninstall())
 		},
 	}
@@ -115,7 +117,8 @@ func newUninstallCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *co
 }
 
 func (o *options) install() error {
-	fmt.Fprintf(o.Out, "Installing %s...\n", o.AppName)
+	spinner := util.Spinner(o.Out, "Installing application %s", o.AppName)
+	defer spinner(false)
 
 	if err := helm.AddRepo(&repo.Entry{Name: o.AppName, URL: types.KubeBlocksChartURL}); err != nil {
 		return err
@@ -124,8 +127,12 @@ func (o *options) install() error {
 	if err != nil {
 		return err
 	}
+
+	spinner(true)
+
 	fmt.Fprintf(o.Out, "Install %s SUCCESSFULLY!\n", o.AppName)
 	fmt.Fprintln(o.Out, notes)
+
 	return nil
 }
 
@@ -167,16 +174,18 @@ func (o *options) uninstall() error {
 }
 
 // Complete receive exec parameters
-func (o *options) complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
+func (o *options) complete(cmd *cobra.Command, args []string) error {
 	var err error
 
-	if o.Namespace, _, err = f.ToRawKubeConfigLoader().Namespace(); err != nil {
+	if o.Namespace, _, err = o.Factory.ToRawKubeConfigLoader().Namespace(); err != nil {
 		return err
 	}
 
-	if len(args) > 0 {
-		o.AppName = args[0]
+	if len(args) == 0 {
+		return errors.New("missing application name")
 	}
+	o.AppName = args[0]
+
 	// Add namespace to helm values
 	o.Sets = append(o.Sets, fmt.Sprintf("namespace=%s", o.Namespace))
 
@@ -190,9 +199,7 @@ func (o *options) complete(f cmdutil.Factory, cmd *cobra.Command, args []string)
 		return err
 	}
 
-	if o.HelmCfg, err = helm.NewActionConfig(o.Namespace, kubeconfig, helm.WithContext(kubecontext)); err != nil {
-		return err
-	}
+	o.HelmCfg, err = helm.NewActionConfig(o.Namespace, kubeconfig, helm.WithContext(kubecontext))
 
 	return err
 }

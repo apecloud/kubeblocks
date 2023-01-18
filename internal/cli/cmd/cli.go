@@ -20,8 +20,6 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/apecloud/kubeblocks/internal/cli/cmd/app"
-
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
@@ -30,6 +28,7 @@ import (
 	utilcomp "k8s.io/kubectl/pkg/util/completion"
 	"k8s.io/kubectl/pkg/util/templates"
 
+	"github.com/apecloud/kubeblocks/internal/cli/cmd/app"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/backupconfig"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/bench"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/cluster"

@@ -301,10 +301,8 @@ func (o *InstallOptions) installChart() error {
 		TryTimes:        2,
 		CreateNamespace: o.CreateNamespace,
 	}
-	if _, err := chart.Install(o.HelmCfg); err != nil {
-		return err
-	}
-	return nil
+	_, err := chart.Install(o.HelmCfg)
+	return err
 }
 
 func (o *InstallOptions) upgradeChart() error {

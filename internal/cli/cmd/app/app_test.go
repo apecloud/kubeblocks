@@ -21,6 +21,7 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 
@@ -68,11 +69,12 @@ var _ = Describe("Manage applications related to KubeBlocks", func() {
 			var cfg string
 			o := &options{
 				IOStreams: streams,
+				Factory:   tf,
 				AppName:   testAppName,
 			}
 			installCmd.Flags().StringVar(&cfg, "kubeconfig", "", "Path to the kubeconfig file to use for CLI requests.")
 			installCmd.Flags().StringVar(&cfg, "context", "", "The name of the kubeconfig context to use.")
-			Expect(o.complete(tf, installCmd, []string{})).To(Succeed())
+			Expect(o.complete(installCmd, []string{testAppName})).To(Succeed())
 			Expect(len(o.Sets)).To(Equal(1))
 			Expect(o.Sets[0]).To(Equal(fmt.Sprintf("namespace=%s", testNamespace)))
 			Expect(o.HelmCfg).ShouldNot(BeNil())
@@ -81,9 +83,10 @@ var _ = Describe("Manage applications related to KubeBlocks", func() {
 			By("Checking install helm chart by fake helm action config")
 			o = &options{
 				IOStreams: streams,
+				Factory:   tf,
 				AppName:   testAppName,
 			}
-			Expect(o.complete(tf, installCmd, []string{})).Should(Succeed())
+			Expect(o.complete(installCmd, []string{testAppName})).Should(Succeed())
 			o.HelmCfg = helm.FakeActionConfig()
 			Expect(o.install()).Should(HaveOccurred())
 			notes, err := o.installChart()

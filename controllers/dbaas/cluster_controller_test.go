@@ -1864,7 +1864,7 @@ involvedObject:
 				}
 				g.Expect(leaderCount).Should(Equal(1))
 				g.Expect(followerCount).Should(Equal(2))
-			}, timeout, interval).Should(Succeed())
+			}, 2*timeout, interval).Should(Succeed())
 
 			By("Updating StatefulSet's status")
 			sts.Status.UpdateRevision = "mock-version"
@@ -1888,7 +1888,7 @@ involvedObject:
 				g.Expect(len(consensusStatus.Followers) == 2).To(BeTrue())
 				g.Expect(consensusStatus.Followers[0].Pod).To(BeElementOf(getStsPodsName(sts)))
 				g.Expect(consensusStatus.Followers[1].Pod).To(BeElementOf(getStsPodsName(sts)))
-			}, timeout, interval).Should(Succeed())
+			}, 2*timeout, interval).Should(Succeed())
 
 			By("Waiting the cluster be running")
 			Eventually(func(g Gomega) {

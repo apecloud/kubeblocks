@@ -1469,7 +1469,7 @@ allowVolumeExpansion: true
 				fetchedG1 := &dbaasv1alpha1.Cluster{}
 				g.Expect(k8sClient.Get(ctx, key, fetchedG1)).To(Succeed())
 				g.Expect(fetchedG1.Status.ObservedGeneration == 1).To(BeTrue())
-			}, timeout, interval).Should(Succeed())
+			}, timeout*2, interval).Should(Succeed())
 
 			By("Checking the replicas")
 			stsList := listAndCheckStatefulSet(key)

@@ -119,24 +119,12 @@ func ClusterGVR() schema.GroupVersionResource {
 	return schema.GroupVersionResource{Group: Group, Version: Version, Resource: ResourceClusters}
 }
 
-func ClusterGK() schema.GroupKind {
-	return schema.GroupKind{Group: Group, Kind: KindCluster}
-}
-
 func ClusterDefGVR() schema.GroupVersionResource {
 	return schema.GroupVersionResource{Group: Group, Version: Version, Resource: ResourceClusterDefs}
 }
 
-func ClusterDefGK() schema.GroupKind {
-	return schema.GroupKind{Group: Group, Kind: KindClusterDef}
-}
-
 func ClusterVersionGVR() schema.GroupVersionResource {
 	return schema.GroupVersionResource{Group: Group, Version: Version, Resource: ResourceClusterVersions}
-}
-
-func ClusterVersionGK() schema.GroupKind {
-	return schema.GroupKind{Group: Group, Kind: KindClusterVersion}
 }
 
 func BackupGVR() schema.GroupVersionResource {
@@ -145,10 +133,6 @@ func BackupGVR() schema.GroupVersionResource {
 
 func RestoreJobGVR() schema.GroupVersionResource {
 	return schema.GroupVersionResource{Group: DPGroup, Version: DPVersion, Resource: ResourceRestoreJobs}
-}
-
-func BackupToolGVR() schema.GroupVersionResource {
-	return schema.GroupVersionResource{Group: DPGroup, Version: DPVersion, Resource: ResourceBackupTools}
 }
 
 func OpsGVR() schema.GroupVersionResource {

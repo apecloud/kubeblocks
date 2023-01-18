@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package nyancat
+package app
 
 import (
 	"fmt"
@@ -34,20 +34,20 @@ import (
 
 var (
 	installExample = templates.Examples(`
-	# Install Nyan Cat demo application
-	kbcli nyancat install
-
-	# Install application in namespace "cat" if name "cat" already exists
-	kbcli nyancat install --namespace cat
-
-    # Install application with creating a "LoadBalancer" type "Service" if you're using a cloud K8s service, such as EKS/GKE
-	kbcli nyancat install --set service.type=LoadBalancer
-`)
+    	# Install application named "nyancat"
+    	kbcli app install nyancat
+    
+    	# Install "nyancat" in a specific namespace
+    	kbcli app install nyancat --namespace cat
+    
+        # Install "nyancat" with creating a "LoadBalancer" type "Service" if you're using a cloud K8s service, such as EKS/GKE
+    	kbcli app install nyancat --set service.type=LoadBalancer
+    `)
 
 	uninstallExample = templates.Examples(`
-		# Uninstall Nyan Cat demo application
-        kbcli nyancat uninstall
-`)
+		# Uninstall application named "nyancat"
+        kbcli app uninstall nyancat
+	`)
 )
 
 type options struct {
@@ -57,14 +57,14 @@ type options struct {
 	Sets            []string
 	HelmCfg         *action.Configuration
 	Namespace       string
+	AppName         string
 	CreateNamespace bool
 }
 
-// NewNyancatCmd creates the nyancat command
-func NewNyancatCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewAppCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "nyancat [install | uninstall]",
-		Short: "Nyan Cat demo application operation commands",
+		Use:   "app [install | uninstall] APP_NAME",
+		Short: "Manager external applications related to KubeBlocks",
 	}
 	cmd.AddCommand(
 		newInstallCmd(f, streams),
@@ -81,17 +81,17 @@ func newInstallCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 
 	cmd := &cobra.Command{
 		Use:     "install",
-		Short:   "Install Nyan Cat demo appliaction.",
+		Short:   "Install the appliaction with the specified name",
 		Example: installExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			util.CheckErr(o.complete(f, cmd))
+			util.CheckErr(o.complete(f, cmd, args))
 			util.CheckErr(o.install())
 		},
 	}
 
-	cmd.Flags().StringVar(&o.Version, "version", "", "Nyan Cat application version")
-	cmd.Flags().StringArrayVar(&o.Sets, "set", []string{}, "Set values on the command line (can specify multiple or separate values with commas: key1=val1,key2=val2)")
-	cmd.Flags().BoolVar(&o.CreateNamespace, "create-namespace", false, "create the namespace if not present")
+	cmd.Flags().StringVar(&o.Version, "version", "", "Application version")
+	cmd.Flags().StringArrayVar(&o.Sets, "set", []string{}, "Set values to the application on the command line (can specify multiple or separate values with commas: key1=val1,key2=val2)")
+	cmd.Flags().BoolVar(&o.CreateNamespace, "create-namespace", false, "Create the namespace if not present")
 
 	return cmd
 }
@@ -103,10 +103,10 @@ func newUninstallCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *co
 
 	cmd := &cobra.Command{
 		Use:     "uninstall",
-		Short:   "Uninstall Nyan Cat demo appliaction.",
+		Short:   "Uninstall the appliaction with the specified name",
 		Example: uninstallExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			util.CheckErr(o.complete(f, cmd))
+			util.CheckErr(o.complete(f, cmd, args))
 			util.CheckErr(o.uninstall())
 		},
 	}
@@ -115,20 +115,21 @@ func newUninstallCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *co
 }
 
 func (o *options) install() error {
-	fmt.Fprintf(o.Out, "Install Nyan Cat...\n")
+	fmt.Fprintf(o.Out, "Installing %s...\n", o.AppName)
 
-	if err := helm.AddRepo(&repo.Entry{Name: types.NyanCatChartName, URL: types.KubeBlocksChartURL}); err != nil {
+	if err := helm.AddRepo(&repo.Entry{Name: o.AppName, URL: types.KubeBlocksChartURL}); err != nil {
 		return err
 	}
-	if err := o.installChart(); err != nil {
+	notes, err := o.installChart()
+	if err != nil {
 		return err
 	}
-	o.printNotes()
-
+	fmt.Fprintf(o.Out, "Install %s SUCCESSFULLY!\n", o.AppName)
+	fmt.Fprintln(o.Out, notes)
 	return nil
 }
 
-func (o *options) installChart() error {
+func (o *options) installChart() (string, error) {
 	var sets []string
 	for _, set := range o.Sets {
 		splitSet := strings.Split(set, ",")
@@ -136,8 +137,8 @@ func (o *options) installChart() error {
 	}
 
 	chart := helm.InstallOpts{
-		Name:            types.NyanCatChartName,
-		Chart:           types.KubeBlocksChartName + "/" + types.NyanCatChartName,
+		Name:            o.AppName,
+		Chart:           types.KubeBlocksChartName + "/" + o.AppName,
 		Wait:            true,
 		Version:         o.Version,
 		Namespace:       o.Namespace,
@@ -149,41 +150,32 @@ func (o *options) installChart() error {
 	return chart.Install(o.HelmCfg)
 }
 
-func (o *options) printNotes() {
-	fmt.Fprintf(o.Out, `
-Nyan Cat Install SUCCESSFULLY!
-
--> Visit the demo application:
-    kubectl port-forward service/nyancat 8087:8087 -n %s
-    http://127.0.0.1:8087
-
--> Uninstall Nyan Cat demo application:
-    kbcli nyancat uninstall
-`, o.Namespace)
-}
-
 func (o *options) uninstall() error {
 	chart := helm.InstallOpts{
-		Name:      types.NyanCatChartName,
+		Name:      o.AppName,
 		Namespace: o.Namespace,
 	}
 	if err := chart.UnInstall(o.HelmCfg); err != nil {
 		return err
 	}
 
-	if err := helm.RemoveRepo(&repo.Entry{Name: types.NyanCatChartName, URL: types.KubeBlocksChartURL}); err != nil {
+	if err := helm.RemoveRepo(&repo.Entry{Name: o.AppName, URL: types.KubeBlocksChartURL}); err != nil {
 		return err
 	}
-	fmt.Fprintln(o.Out, "Uninstall Nyan Cat SUCCESSFULLY!")
+	fmt.Fprintf(o.Out, "Uninstall %s SUCCESSFULLY!\n", o.AppName)
 	return nil
 }
 
 // Complete receive exec parameters
-func (o *options) complete(f cmdutil.Factory, cmd *cobra.Command) error {
+func (o *options) complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	var err error
 
 	if o.Namespace, _, err = f.ToRawKubeConfigLoader().Namespace(); err != nil {
 		return err
+	}
+
+	if len(args) > 0 {
+		o.AppName = args[0]
 	}
 	// Add namespace to helm values
 	o.Sets = append(o.Sets, fmt.Sprintf("namespace=%s", o.Namespace))

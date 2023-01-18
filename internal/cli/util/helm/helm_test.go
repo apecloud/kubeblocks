@@ -77,7 +77,8 @@ var _ = Describe("helm util", func() {
 				},
 			})
 			Expect(err).Should(BeNil())
-			Expect(o.Install(cfg).Error()).Should(ContainSubstring("failed to download"))
+			_, err = o.Install(cfg)
+			Expect(err.Error()).Should(ContainSubstring("failed to download"))
 			Expect(o.UnInstall(cfg)).Should(BeNil()) // release exists
 		})
 

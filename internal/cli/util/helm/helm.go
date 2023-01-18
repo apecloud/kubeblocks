@@ -58,12 +58,6 @@ type InstallOpts struct {
 	CreateNamespace bool
 }
 
-type LoginOpts struct {
-	User   string
-	Passwd string
-	URL    string
-}
-
 type Option func(*cli.EnvSettings)
 
 func WithContext(context string) Option {
@@ -156,29 +150,32 @@ func (i *InstallOpts) getInstalled(cfg *action.Configuration) (*release.Release,
 }
 
 // Install will install a Chart
-func (i *InstallOpts) Install(cfg *action.Configuration) error {
+func (i *InstallOpts) Install(cfg *action.Configuration) (string, error) {
 	ctx := context.Background()
 	opts := retry.Options{
 		MaxRetry: 1 + i.TryTimes,
 	}
 
+	var notes string
 	if err := retry.IfNecessary(ctx, func() error {
 		var err1 error
-		if _, err1 = i.tryInstall(cfg); err1 != nil {
+		if notes, err1 = i.tryInstall(cfg); err1 != nil {
 			return err1
 		}
 		return nil
 	}, &opts); err != nil {
-		return err
+		return "", errors.Errorf("install chart %s error: %s", i.Name, err.Error())
 	}
 
-	return nil
+	return notes, nil
 }
 
 func (i *InstallOpts) tryInstall(cfg *action.Configuration) (string, error) {
-	var err error
-
-	if _, err = i.getInstalled(cfg); err != nil && !releaseNotFound(err) {
+	released, err := i.getInstalled(cfg)
+	if released != nil {
+		return released.Info.Notes, nil
+	}
+	if err != nil && !releaseNotFound(err) {
 		return "", err
 	}
 
@@ -236,11 +233,11 @@ func (i *InstallOpts) tryInstall(cfg *action.Configuration) (string, error) {
 		cancel()
 	}()
 
-	release, err := client.RunWithContext(ctx, chartRequested, vals)
-	if err != nil && err.Error() != "cannot re-use a name that is still in use" {
+	released, err = client.RunWithContext(ctx, chartRequested, vals)
+	if err != nil {
 		return "", err
 	}
-	return release.Info.Notes, nil
+	return released.Info.Notes, nil
 }
 
 // UnInstall will uninstall a Chart

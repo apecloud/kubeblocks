@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package nyancat
+package app
 
 import (
 	"fmt"
@@ -29,9 +29,12 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/util/helm"
 )
 
-const testNamespace = "test"
+const (
+	testAppName   = "test-app"
+	testNamespace = "test"
+)
 
-var _ = Describe("nyancat", func() {
+var _ = Describe("Manage applications related to KubeBlocks", func() {
 	var streams genericclioptions.IOStreams
 	var tf *cmdtesting.TestFactory
 
@@ -40,7 +43,7 @@ var _ = Describe("nyancat", func() {
 		tf = cmdtesting.NewTestFactory().WithNamespace(testNamespace)
 
 		// use a fake URL to test
-		types.NyanCatChartName = testing.NyanCatChartName
+		types.KubeBlocksChartName = testing.KubeBlocksChartName
 		types.KubeBlocksChartURL = testing.KubeBlocksChartURL
 	})
 
@@ -48,15 +51,15 @@ var _ = Describe("nyancat", func() {
 		tf.Cleanup()
 	})
 
-	When("Installing Nyan Cat", func() {
+	When("Installing application", func() {
 		It("should install application with default configuration", func() {
 
-			By("Checking Nyan Cat cmd")
-			nyanCatCmd := NewNyancatCmd(tf, streams)
-			Expect(nyanCatCmd).ShouldNot(BeNil())
-			Expect(nyanCatCmd.HasSubCommands()).Should(BeTrue())
+			By("Checking app cmd")
+			appCmd := NewAppCmd(tf, streams)
+			Expect(appCmd).ShouldNot(BeNil())
+			Expect(appCmd.HasSubCommands()).Should(BeTrue())
 
-			By("Checking Nyan Cat install sub-cmd")
+			By("Checking install sub-cmd")
 			installCmd := newInstallCmd(tf, streams)
 			Expect(installCmd).ShouldNot(BeNil())
 			Expect(installCmd.HasSubCommands()).Should(BeFalse())
@@ -65,10 +68,11 @@ var _ = Describe("nyancat", func() {
 			var cfg string
 			o := &options{
 				IOStreams: streams,
+				AppName:   testAppName,
 			}
 			installCmd.Flags().StringVar(&cfg, "kubeconfig", "", "Path to the kubeconfig file to use for CLI requests.")
 			installCmd.Flags().StringVar(&cfg, "context", "", "The name of the kubeconfig context to use.")
-			Expect(o.complete(tf, installCmd)).To(Succeed())
+			Expect(o.complete(tf, installCmd, []string{})).To(Succeed())
 			Expect(len(o.Sets)).To(Equal(1))
 			Expect(o.Sets[0]).To(Equal(fmt.Sprintf("namespace=%s", testNamespace)))
 			Expect(o.HelmCfg).ShouldNot(BeNil())
@@ -77,18 +81,20 @@ var _ = Describe("nyancat", func() {
 			By("Checking install helm chart by fake helm action config")
 			o = &options{
 				IOStreams: streams,
+				AppName:   testAppName,
 			}
-			Expect(o.complete(tf, installCmd)).Should(Succeed())
+			Expect(o.complete(tf, installCmd, []string{})).Should(Succeed())
 			o.HelmCfg = helm.FakeActionConfig()
 			Expect(o.install()).Should(HaveOccurred())
-			Expect(o.installChart()).Should(HaveOccurred())
-			o.printNotes()
+			notes, err := o.installChart()
+			Expect(err).Should(HaveOccurred())
+			Expect(notes).Should(Equal(""))
 		})
 	})
 
-	When("Uninstall Nyan Cat", func() {
+	When("Uninstall application", func() {
 		It("should uninstall application successfully", func() {
-			By("Checking Nyan Cat uninstall sub-cmd")
+			By("Checking application uninstall sub-cmd")
 			uninstallCmd := newUninstallCmd(tf, streams)
 			Expect(uninstallCmd).ShouldNot(BeNil())
 			Expect(uninstallCmd.HasSubCommands()).Should(BeFalse())
@@ -97,6 +103,7 @@ var _ = Describe("nyancat", func() {
 			o := &options{
 				IOStreams: streams,
 				HelmCfg:   helm.FakeActionConfig(),
+				AppName:   testAppName,
 			}
 			Expect(o.uninstall()).Should(HaveOccurred())
 		})

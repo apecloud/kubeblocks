@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/apecloud/kubeblocks/internal/cli/cmd/nyancat"
+	"github.com/apecloud/kubeblocks/internal/cli/cmd/app"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -97,7 +97,7 @@ A Command Line Interface for KubeBlocks`,
 		troubleshoot.NewTroubleshootCmd(f, ioStreams),
 		clusterversion.NewClusterVersionCmd(f, ioStreams),
 		clusterdefinition.NewClusterDefinitionCmd(f, ioStreams),
-		nyancat.NewNyancatCmd(f, ioStreams),
+		app.NewAppCmd(f, ioStreams),
 	)
 
 	filters := []string{"options"}

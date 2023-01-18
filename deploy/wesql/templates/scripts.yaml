@@ -44,7 +44,6 @@ data:
         echo "call dbms_consensus.add_follower not finished, exit 1"
         exit 1
       fi
-      fi
       rm /tmp/setup_error.log
     fi
     cluster_info=""; for (( i=0; i< $KB_MYSQL_N; i++ )); do

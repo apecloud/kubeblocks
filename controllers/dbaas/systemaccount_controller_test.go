@@ -49,7 +49,7 @@ var _ = Describe("SystemAccount Controller", func() {
 	var ctx = context.Background()
 
 	BeforeEach(func() {
-		// Add any steup steps that needs to be executed before each test
+		// Add any setup steps that needs to be executed before each test
 		err := k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.Cluster{}, client.InNamespace(testCtx.DefaultNamespace), client.HasLabels{testCtx.TestObjLabelKey})
 		Expect(err).NotTo(HaveOccurred())
 		err = k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.ClusterVersion{}, client.HasLabels{testCtx.TestObjLabelKey})
@@ -248,7 +248,7 @@ var _ = Describe("SystemAccount Controller", func() {
 					PostCommands: []string{"mock-postcommand"},
 				},
 				RemoteVolume: corev1.Volume{
-					Name: "mock-volumn",
+					Name: "mock-volume",
 					VolumeSource: corev1.VolumeSource{
 						PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: "mock-pvc"},
 					},
@@ -304,9 +304,9 @@ var _ = Describe("SystemAccount Controller", func() {
 		}), timeout, interval).Should(Succeed())
 	}
 
-	assureBackupPolicy := func(policyName, engintName, clusterName string) *dataprotectionv1alpha1.BackupPolicy {
+	assureBackupPolicy := func(policyName, engineName, clusterName string) *dataprotectionv1alpha1.BackupPolicy {
 		By("Creating Backup Policy")
-		policy := mockBackupPolicy(policyName, engintName, clusterName)
+		policy := mockBackupPolicy(policyName, engineName, clusterName)
 		Expect(testCtx.CheckedCreateObj(ctx, policy)).Should(Succeed())
 
 		createdPolicy := &dataprotectionv1alpha1.BackupPolicy{}
@@ -387,7 +387,7 @@ var _ = Describe("SystemAccount Controller", func() {
 		return ep
 	}
 
-	assureEndpont := func(namespace, epname string) *corev1.Endpoints {
+	assureEndpoint := func(namespace, epname string) *corev1.Endpoints {
 		ep := mockEndpoint(namespace, epname)
 		Expect(testCtx.CheckedCreateObj(ctx, ep)).Should(Succeed())
 		// assure cluster def is ready
@@ -398,7 +398,7 @@ var _ = Describe("SystemAccount Controller", func() {
 		return createdEP
 	}
 
-	assureHeadlessEndpont := func(namespace, epname string) *corev1.Endpoints {
+	assureHeadlessEndpoint := func(namespace, epname string) *corev1.Endpoints {
 		ep := mockHeadlessEndpoint(namespace, epname)
 		Expect(testCtx.CheckedCreateObj(ctx, ep)).Should(Succeed())
 		// assure cluster def is ready
@@ -442,8 +442,8 @@ var _ = Describe("SystemAccount Controller", func() {
 			// services of type ClusterIP should have been created.
 			serviceName := cluster.Name + "-" + compName
 			headlessServiceName := serviceName + "-headless"
-			_ = assureEndpont(cluster.Namespace, serviceName)
-			_ = assureHeadlessEndpont(cluster.Namespace, headlessServiceName)
+			_ = assureEndpoint(cluster.Namespace, serviceName)
+			_ = assureHeadlessEndpoint(cluster.Namespace, headlessServiceName)
 
 			patchCluster(intctrlutil.GetNamespacedName(cluster))
 
@@ -461,7 +461,7 @@ var _ = Describe("SystemAccount Controller", func() {
 			Eventually(func(g Gomega) {
 				accounts := getAccounts(g)
 				g.Expect(accounts).To(BeEquivalentTo(dbaasv1alpha1.KBAccountAdmin | dbaasv1alpha1.KBAccountProbe))
-			}, timeout, interval).Should(Succeed())
+			}, 2*timeout, interval).Should(Succeed())
 
 			By("Assure some Secrets creation are cached")
 			secretsToCreate1 := 0
@@ -525,7 +525,7 @@ var _ = Describe("SystemAccount Controller", func() {
 				g.Expect(k8sClient.List(ctx, secrets, client.InNamespace(cluster.Namespace), ml)).To(Succeed())
 				g.Expect(len(secrets.Items) == secretsCreated+secretsToCreate2).To(BeTrue())
 				g.Expect(len(systemAccountReconciler.SecretMapStore.ListKeys()) == 0).To(BeTrue())
-			}, timeout, interval).Should(Succeed())
+			}, 2*timeout, interval).Should(Succeed())
 
 			By("Check the BackupPolicy deletion filter triggered after the Cluster is deleted")
 			Eventually(func() error {

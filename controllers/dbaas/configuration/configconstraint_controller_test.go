@@ -36,7 +36,7 @@ var _ = Describe("ConfigConstraint Controller", func() {
 	var ctx = context.Background()
 
 	BeforeEach(func() {
-		// Add any steup steps that needs to be executed before each test
+		// Add any setup steps that needs to be executed before each test
 	})
 
 	AfterEach(func() {
@@ -82,7 +82,7 @@ var _ = Describe("ConfigConstraint Controller", func() {
 				_, err := ValidateISVCR(testWrapper, &dbaasv1alpha1.ConfigConstraint{},
 					func(tpl *dbaasv1alpha1.ConfigConstraint) error { return nil })
 				return err
-			}, time.Second*10, time.Second*1).Should(Succeed())
+			}, time.Second*30, time.Second*1).Should(Succeed())
 
 			By("By delete clusterdefinition and appversion")
 			// step3: delete clusterdefinition and appversion

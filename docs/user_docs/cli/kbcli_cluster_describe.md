@@ -10,7 +10,7 @@ kbcli cluster describe NAME [flags]
 
 ```
   # describe a specified cluster
-  kbcli cluster describe my-cluster
+  kbcli cluster describe mycluster
 ```
 
 ### Options

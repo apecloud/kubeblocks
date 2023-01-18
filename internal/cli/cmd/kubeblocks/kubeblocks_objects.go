@@ -44,6 +44,8 @@ type kbObjects struct {
 	deploys *appv1.DeploymentList
 	// services
 	svcs *corev1.ServiceList
+	// configMaps
+	cms *corev1.ConfigMapList
 }
 
 func getKBObjects(client kubernetes.Interface, dynamic dynamic.Interface, namespace string) (*kbObjects, error) {
@@ -73,7 +75,7 @@ func getKBObjects(client kubernetes.Interface, dynamic dynamic.Interface, namesp
 		}
 		objs.crds.Items = append(objs.crds.Items, crds.Items[i])
 
-		// get build-in CRs belonging to this CRD
+		// get built-in CRs belonging to this CRD
 		gvr, err := getGVRByCRD(&crd)
 		if err != nil {
 			appendErr(err)
@@ -130,6 +132,13 @@ func getKBObjects(client kubernetes.Interface, dynamic dynamic.Interface, namesp
 
 	// get all services which label matches release=kubeblocks, like prometheus-server
 	getSvcsFn(fmt.Sprintf("release=%s", types.KubeBlocksChartName))
+
+	// get all configmaps that belong to KubeBlocks
+	if objs.cms, err = client.CoreV1().ConfigMaps(namespace).List(ctx, metav1.ListOptions{
+		LabelSelector: "configuration.kubeblocks.io/configuration-template=true",
+	}); err != nil {
+		appendErr(err)
+	}
 
 	return objs, utilerrors.NewAggregate(allErrs)
 }
@@ -191,6 +200,26 @@ func deleteServices(client kubernetes.Interface, svcs *corev1.ServiceList) error
 
 	for _, s := range svcs.Items {
 		if err := client.CoreV1().Services(s.Namespace).Delete(context.TODO(), s.Name, newDeleteOpts()); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func deleteConfigMaps(client kubernetes.Interface, cms *corev1.ConfigMapList) error {
+	if cms == nil {
+		return nil
+	}
+
+	for _, s := range cms.Items {
+		// delete object
+		if err := client.CoreV1().ConfigMaps(s.Namespace).Delete(context.TODO(), s.Name, newDeleteOpts()); err != nil {
+			return err
+		}
+
+		// remove finalizers
+		if _, err := client.CoreV1().ConfigMaps(s.Namespace).Patch(context.TODO(), s.Name, k8sapitypes.JSONPatchType,
+			[]byte("[{\"op\": \"remove\", \"path\": \"/metadata/finalizers\"}]"), metav1.PatchOptions{}); err != nil {
 			return err
 		}
 	}

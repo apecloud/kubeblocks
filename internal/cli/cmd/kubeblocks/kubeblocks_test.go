@@ -31,6 +31,7 @@ import (
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
+	"github.com/apecloud/kubeblocks/internal/cli/util"
 	"github.com/apecloud/kubeblocks/internal/cli/util/helm"
 	"github.com/apecloud/kubeblocks/version"
 )
@@ -136,7 +137,7 @@ var _ = Describe("kubeblocks", func() {
 			Version: version.DefaultKubeBlocksVersion,
 			Monitor: true,
 		}
-		Expect(o.Upgrade()).Should(HaveOccurred())
+		Expect(o.upgrade(&cobra.Command{})).Should(HaveOccurred())
 		Expect(len(o.Sets)).To(Equal(1))
 		Expect(o.Sets[0]).To(Equal(kMonitorParam))
 		Expect(o.upgradeChart()).Should(HaveOccurred())
@@ -267,5 +268,93 @@ var _ = Describe("kubeblocks", func() {
 		client := testing.FakeDynamicClient(&clusterCRD, &clusterDefCRD, &clusterVersionCRD, &backupToolCRD)
 		objs, _ := getKBObjects(testing.FakeClientSet(), client, "")
 		Expect(deleteCRDs(client, objs.crds)).Should(Succeed())
+	})
+
+	It("preCheck", func() {
+		o := &InstallOptions{
+			Options: Options{
+				IOStreams: genericclioptions.NewTestIOStreamsDiscard(),
+			},
+		}
+		By("kubernetes version is empty")
+		versionInfo := map[util.AppName]string{}
+		Expect(o.preCheck(versionInfo).Error()).Should(ContainSubstring("failed to get kubernetes version"))
+
+		versionInfo[util.KubernetesApp] = ""
+		Expect(o.preCheck(versionInfo).Error()).Should(ContainSubstring("failed to get kubernetes version"))
+
+		By("kubernetes version is smaller than required version")
+		versionInfo[util.KubernetesApp] = "v1.20.0"
+		Expect(o.preCheck(versionInfo).Error()).Should(ContainSubstring("should be larger than"))
+
+		By("kubernetes is provided by cloud provider")
+		versionInfo[util.KubernetesApp] = "v1.25.0-eks"
+		Expect(o.preCheck(versionInfo)).Should(Succeed())
+
+		By("kubernetes is not provided by cloud provider")
+		versionInfo[util.KubernetesApp] = "v1.25.0"
+		Expect(o.preCheck(versionInfo)).Should(Succeed())
+	})
+
+	It("disableUnsupportedSets", func() {
+		o := &InstallOptions{
+			Options: Options{
+				IOStreams: genericclioptions.NewTestIOStreamsDiscard(),
+			},
+		}
+		cases := []struct {
+			desc     string
+			sets     []string
+			expected []string
+		}{
+			{
+				"sets is empty", []string{}, []string{},
+			},
+			{
+				"sets is empty", nil, nil,
+			},
+			{
+				"sets without unsupported flag",
+				[]string{"test=false"},
+				[]string{"test=false"},
+			},
+			{
+				"sets with unsupported flag and its value is false",
+				[]string{"test=false", "loadbalancer.enable=false"},
+				[]string{"test=false", "loadbalancer.enable=false"},
+			},
+			{
+				"sets with unsupported flag and its value is true",
+				[]string{"test=false", "loadbalancer.enable=true"},
+				[]string{"test=false"},
+			},
+			{
+				"sets with more unsupported flags and the value is true",
+				[]string{"test=false", "loadbalancer.enable=true", "snapshot-controller.enable=true"},
+				[]string{"test=false"},
+			},
+			{
+				"sets with more unsupported flags and the value is true",
+				[]string{"test=false", "loadbalancer.enable=true, snapshot-controller.enable=true"},
+				[]string{"test=false"},
+			},
+			{
+				"sets with more unsupported flags and some values are true, some values are false",
+				[]string{"test=false", "loadbalancer.enable=false, snapshot-controller.enable=true"},
+				[]string{"test=false", "loadbalancer.enable=false"},
+			},
+			{
+				"sets with more unsupported flags and some values are true, some values are false",
+				[]string{"test=false,loadbalancer.enable=false,snapshot-controller.enable=true"},
+				[]string{"test=false", "loadbalancer.enable=false"},
+			},
+		}
+
+		for _, c := range cases {
+			By(c.desc)
+			o.Sets = c.sets
+			o.disableUnsupportedSets()
+			Expect(o.Sets).Should(Equal(c.expected))
+		}
 	})
 })

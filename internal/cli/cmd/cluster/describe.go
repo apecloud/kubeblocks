@@ -40,7 +40,7 @@ import (
 var (
 	describeExample = templates.Examples(`
 		# describe a specified cluster
-		kbcli cluster describe my-cluster`)
+		kbcli cluster describe mycluster`)
 
 	newTbl = func(out io.Writer, title string, header ...interface{}) *printer.TablePrinter {
 		fmt.Fprintln(out, title)

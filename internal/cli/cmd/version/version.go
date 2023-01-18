@@ -17,30 +17,20 @@ limitations under the License.
 package version
 
 import (
-	"context"
 	"fmt"
 	"runtime"
-	"strings"
 
 	"github.com/spf13/cobra"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/client-go/discovery"
-	"k8s.io/client-go/dynamic"
+	clientset "k8s.io/client-go/kubernetes"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 
-	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 	"github.com/apecloud/kubeblocks/version"
 )
 
 type versionOptions struct {
-	verbose            bool
-	k8sServerVersion   string
-	kubeBlocksVersions []string
-	client             dynamic.Interface
-	discoveryClient    discovery.CachedDiscoveryInterface
+	verbose bool
+	client  clientset.Interface
 }
 
 // NewVersionCmd the version command
@@ -60,60 +50,21 @@ func NewVersionCmd(f cmdutil.Factory) *cobra.Command {
 
 func (o *versionOptions) Complete(f cmdutil.Factory) error {
 	var err error
-	o.kubeBlocksVersions = make([]string, 0)
-	if o.client, err = f.DynamicClient(); err != nil {
+	if o.client, err = f.KubernetesClientSet(); err != nil {
 		return err
 	}
-	o.discoveryClient, err = f.ToDiscoveryClient()
 	return err
 }
 
-// initKubeBlocksVersion init KubeBlocks version
-func (o *versionOptions) initKubeBlocksVersion() {
-	var (
-		err               error
-		kubeBlocksDeploys *unstructured.UnstructuredList
-	)
-	// get KubeBlocks deployments in all namespaces
-	gvr := schema.GroupVersionResource{Group: types.AppsGroup, Version: types.VersionV1, Resource: types.ResourceDeployments}
-	if kubeBlocksDeploys, err = o.client.Resource(gvr).Namespace(metav1.NamespaceAll).List(context.Background(), metav1.ListOptions{
-		LabelSelector: "app.kubernetes.io/name=" + types.KubeBlocksChartName,
-	}); err != nil {
-		return
-	}
-	// get KubeBlocks version
-	for _, deploy := range kubeBlocksDeploys.Items {
-		labels := deploy.GetLabels()
-		if labels == nil {
-			continue
-		}
-		if version, ok := labels["app.kubernetes.io/version"]; ok {
-			o.kubeBlocksVersions = append(o.kubeBlocksVersions, version)
-		}
-	}
-}
-
-// initK8sVersion init k8s server version
-func (o *versionOptions) initK8sVersion() {
-	if o.discoveryClient == nil {
-		return
-	}
-	if serverVersion, _ := o.discoveryClient.ServerVersion(); serverVersion != nil {
-		o.k8sServerVersion = serverVersion.GitVersion
-	}
-}
-
 func (o *versionOptions) Run() {
-	o.initKubeBlocksVersion()
-	o.initK8sVersion()
-
-	if len(o.kubeBlocksVersions) > 0 {
-		fmt.Printf("KubeBlocks: %s\n", strings.Join(o.kubeBlocksVersions, " "))
+	versionInfo, _ := util.GetVersionInfo(o.client)
+	if v, ok := versionInfo[util.KubeBlocksApp]; ok {
+		fmt.Printf("KubeBlocks: %s\n", v)
 	}
-	if len(o.k8sServerVersion) > 0 {
-		fmt.Printf("Kubernetes: %s\n", o.k8sServerVersion)
+	if v, ok := versionInfo[util.KubernetesApp]; ok {
+		fmt.Printf("Kubernetes: %s\n", v)
 	}
-	fmt.Printf("kbcli: %s\n", version.GetVersion())
+	fmt.Printf("kbcli: %s\n", versionInfo[util.KBCLIApp])
 	if o.verbose {
 		fmt.Printf("  BuildDate: %s\n", version.BuildDate)
 		fmt.Printf("  GitCommit: %s\n", version.GitCommit)

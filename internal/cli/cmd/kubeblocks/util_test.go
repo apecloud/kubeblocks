@@ -18,7 +18,6 @@ package kubeblocks
 
 import (
 	"bytes"
-	"fmt"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -73,16 +72,5 @@ var _ = Describe("kubeblocks", func() {
 		in.Reset()
 		_, _ = in.Write([]byte("uninstall-kubeblocks\n"))
 		Expect(confirmUninstall(in)).Should(Succeed())
-	})
-
-	It("test", func() {
-		appendFn := func(in *[]string) {
-			*in = append(*in, "t")
-		}
-
-		in := map[string][]string{}
-		out := in["test"]
-		appendFn(&out)
-		fmt.Println(out)
 	})
 })

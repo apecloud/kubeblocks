@@ -20,6 +20,7 @@ kbcli kubeblocks upgrade [flags]
 
 ```
   -h, --help              help for upgrade
+      --monitor           Set monitor enabled and install Prometheus, AlertManager and Grafana (default true)
       --set stringArray   Set values on the command line (can specify multiple or separate values with commas: key1=val1,key2=val2)
       --version string    KubeBlocks version
 ```

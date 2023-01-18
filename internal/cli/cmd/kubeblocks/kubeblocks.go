@@ -21,10 +21,12 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/repo"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -44,7 +46,8 @@ import (
 )
 
 const (
-	kMonitorParam = "prometheus.enabled=true,grafana.enabled=true,dashboards.enabled=true"
+	kMonitorParam      = "prometheus.enabled=%[1]t,grafana.enabled=%[1]t,dashboards.enabled=%[1]t"
+	requiredK8sVersion = "1.22.0"
 )
 
 type Options struct {
@@ -63,7 +66,7 @@ type InstallOptions struct {
 	Monitor         bool
 	Quiet           bool
 	CreateNamespace bool
-	CheckResource   bool
+	check           bool
 }
 
 var (
@@ -181,12 +184,12 @@ func (o *Options) preCheck() error {
 
 func (o *InstallOptions) Install() error {
 	// check if KubeBlocks has been installed
-	installed, v, err := checkIfKubeBlocksInstalled(o.Client)
+	versionInfo, err := util.GetVersionInfo(o.Client)
 	if err != nil {
 		return err
 	}
 
-	if installed {
+	if v := versionInfo[util.KubeBlocksApp]; len(v) > 0 {
 		fmt.Fprintf(o.Out, "KubeBlocks %s already exists\n", v)
 		// print notes
 		if !o.Quiet {
@@ -202,16 +205,20 @@ func (o *InstallOptions) Install() error {
 		}
 	}
 
-	if err = o.checkResource(); err != nil {
+	// check whether there are remained resource left by previous KubeBlocks installation, if yes,
+	// output the resource name
+	if err = o.checkRemainedResource(); err != nil {
 		return err
 	}
 
-	spinner := util.Spinner(o.Out, "Install KubeBlocks %s", o.Version)
+	if err = o.preCheck(versionInfo); err != nil {
+		return err
+	}
+
+	spinner := util.Spinner(o.Out, "%-40s", "Install KubeBlocks "+o.Version)
 	defer spinner(false)
 
-	if o.Monitor {
-		o.Sets = append(o.Sets, kMonitorParam)
-	}
+	o.Sets = append(o.Sets, fmt.Sprintf(kMonitorParam, o.Monitor))
 
 	// Add repo, if exists, will update it
 	if err = helm.AddRepo(&repo.Entry{Name: types.KubeBlocksChartName, URL: types.KubeBlocksChartURL}); err != nil {
@@ -234,8 +241,104 @@ func (o *InstallOptions) Install() error {
 	return nil
 }
 
-func (o *InstallOptions) checkResource() error {
-	if !o.CheckResource {
+func (o *InstallOptions) preCheck(versionInfo map[util.AppName]string) error {
+	versionErr := fmt.Errorf("failed to get kubernetes version")
+	k8sVersionStr, ok := versionInfo[util.KubernetesApp]
+	if !ok {
+		return versionErr
+	}
+
+	version := util.GetK8sVersion(k8sVersionStr)
+	if len(version) == 0 {
+		return versionErr
+	}
+
+	// check kubernetes version
+	spinner := util.Spinner(o.Out, "%-40s", "Kubernetes version "+version)
+	if version >= requiredK8sVersion {
+		spinner(true)
+	} else {
+		spinner(false)
+		return fmt.Errorf("kubernetes version should be larger than or equal to %s", requiredK8sVersion)
+	}
+
+	// check kbcli version
+	spinner = util.Spinner(o.Out, "%-40s", "kbcli version "+versionInfo[util.KBCLIApp])
+	spinner(true)
+
+	provider := util.GetK8sProvider(k8sVersionStr)
+	if provider.IsCloud() {
+		spinner = util.Spinner(o.Out, "%-40s", "Kubernetes provider "+provider)
+		spinner(true)
+	} else {
+		// check whether user turn on features that only enable on cloud kubernetes cluster,
+		// if yes, turn off these features and output message
+		o.disableUnsupportedSets()
+	}
+	return nil
+}
+
+func (o *InstallOptions) disableUnsupportedSets() {
+	var (
+		newSets      []string
+		disabledSets []string
+	)
+	// unsupported flags in non-cloud kubernetes cluster
+	unsupported := []string{"loadbalancer.enable", "snapshot-controller.enable"}
+
+	var sets []string
+	for _, set := range o.Sets {
+		splitSet := strings.Split(set, ",")
+		sets = append(sets, splitSet...)
+	}
+
+	// check all sets, remove unsupported and output message
+	for _, set := range sets {
+		need := true
+		for _, key := range unsupported {
+			if !strings.Contains(set, key) {
+				continue
+			}
+
+			// found unsupported, parse its value
+			kv := strings.Split(set, "=")
+			if len(kv) <= 1 {
+				break
+			}
+
+			// if value is false, ignore it
+			val, err := strconv.ParseBool(kv[1])
+			if err != nil || !val {
+				break
+			}
+
+			// if value is true, remove it from original sets
+			need = false
+			disabledSets = append(disabledSets, key)
+			break
+		}
+		if need {
+			newSets = append(newSets, set)
+		}
+	}
+
+	if len(disabledSets) == 0 {
+		return
+	}
+
+	msg := "Following flags are not available in current kubernetes cluster, they will be disabled"
+	if len(disabledSets) == 1 {
+		msg = "Following flag is not available in current kubernetes cluster, it will be disabled"
+	}
+	fmt.Fprintf(o.Out, "%s %s\n", printer.BoldYellow("Warning:"), msg)
+	for _, set := range disabledSets {
+		fmt.Fprintf(o.Out, "  · %s\n", set)
+	}
+	o.Sets = newSets
+}
+
+func (o *InstallOptions) checkRemainedResource() error {
+	if !o.check {
 		return nil
 	}
 
@@ -259,24 +362,48 @@ func (o *InstallOptions) checkResource() error {
 	for _, k := range keys {
 		resStr.WriteString(fmt.Sprintf("  %s: %s\n", k, strings.Join(res[k], ",")))
 	}
-	return fmt.Errorf("there are resources left by KubeBlocks before, try to run \"kbcli kubeblocks uninstall\" to clean up\n%s", resStr.String())
+	return fmt.Errorf("there are resources left by previous KubeBlocks version, try to run \"kbcli kubeblocks uninstall\" to clean up\n%s", resStr.String())
 }
 
-func (o *InstallOptions) Upgrade() error {
-	spinner := util.Spinner(o.Out, "Upgrading KubeBlocks to %s", o.Version)
+func (o *InstallOptions) upgrade(cmd *cobra.Command) error {
+	// check if KubeBlocks has been installed
+	versionInfo, err := util.GetVersionInfo(o.Client)
+	if err != nil {
+		return err
+	}
+
+	v := versionInfo[util.KubeBlocksApp]
+	if len(v) > 0 {
+		fmt.Fprintln(o.Out, "Current KubeBlocks version "+v)
+	} else {
+		return errors.New("KubeBlocks does not exits, try to run \"kbcli kubeblocks install\" to install")
+	}
+
+	if err = o.preCheck(versionInfo); err != nil {
+		return err
+	}
+
+	spinner := util.Spinner(o.Out, "%-40s", "Upgrading KubeBlocks to "+o.Version)
 	defer spinner(false)
 
-	if o.Monitor {
-		o.Sets = append(o.Sets, kMonitorParam)
+	// check whether monitor flag is set by user
+	monitorIsSet := false
+	cmd.Flags().Visit(func(flag *pflag.Flag) {
+		if flag.Name == "monitor" {
+			monitorIsSet = true
+		}
+	})
+	if monitorIsSet {
+		o.Sets = append(o.Sets, fmt.Sprintf(kMonitorParam, o.Monitor))
 	}
 
 	// Add repo, if exists, will update it
-	if err := helm.AddRepo(&repo.Entry{Name: types.KubeBlocksChartName, URL: types.KubeBlocksChartURL}); err != nil {
+	if err = helm.AddRepo(&repo.Entry{Name: types.KubeBlocksChartName, URL: types.KubeBlocksChartURL}); err != nil {
 		return err
 	}
 
 	// upgrade KubeBlocks chart
-	if err := o.upgradeChart(); err != nil {
+	if err = o.upgradeChart(); err != nil {
 		return err
 	}
 
@@ -351,7 +478,7 @@ KubeBlocks %s Install SUCCESSFULLY!
 	} else {
 		fmt.Fprint(o.Out, `
 Notes: Monitor components(Grafana/Prometheus/AlertManager) is not installed,
-    use 'kbcli kubeblocks update --monitor=true' to install later.
+    use 'kbcli kubeblocks upgrade --monitor=true' to install later.
 `)
 	}
 }
@@ -373,12 +500,12 @@ func (o *Options) uninstall() error {
 
 	// uninstall helm release that will delete custom resources, but since finalizers is not empty,
 	// custom resources will not be deleted, so we will remove finalizers later.
-	_, v, _ := checkIfKubeBlocksInstalled(o.Client)
+	v, _ := util.GetVersionInfo(o.Client)
 	chart := helm.InstallOpts{
 		Name:      types.KubeBlocksChartName,
 		Namespace: o.Namespace,
 	}
-	spinner := newSpinner(fmt.Sprintf("Uninstall helm release %s %s", types.KubeBlocksChartName, v))
+	spinner := newSpinner(fmt.Sprintf("Uninstall helm release %s %s", types.KubeBlocksChartName, v[util.KubeBlocksApp]))
 	printErr(spinner, chart.UnInstall(o.HelmCfg))
 
 	// remove repo
@@ -406,6 +533,11 @@ func (o *Options) uninstall() error {
 	// delete services
 	spinner = newSpinner("Remove services")
 	printErr(spinner, deleteServices(o.Client, objs.svcs))
+
+	// delete configmaps
+	spinner = newSpinner("Remove configmaps")
+	printErr(spinner, deleteConfigMaps(o.Client, objs.cms))
+
 	fmt.Fprintln(o.Out, "Uninstall KubeBlocks done")
 	return nil
 }
@@ -432,7 +564,7 @@ func newInstallCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 	cmd.Flags().StringVar(&o.Version, "version", version.DefaultKubeBlocksVersion, "KubeBlocks version")
 	cmd.Flags().StringArrayVar(&o.Sets, "set", []string{}, "Set values on the command line (can specify multiple or separate values with commas: key1=val1,key2=val2)")
 	cmd.Flags().BoolVar(&o.CreateNamespace, "create-namespace", false, "create the namespace if not present")
-	cmd.Flags().BoolVar(&o.CheckResource, "check-resource", true, "check if there are some remained resources before install")
+	cmd.Flags().BoolVar(&o.check, "check-resource", true, "check if there are some remained resources before install")
 
 	return cmd
 }
@@ -451,10 +583,11 @@ func newUpgradeCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 		Example: upgradeExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			util.CheckErr(o.complete(f, cmd))
-			util.CheckErr(o.Upgrade())
+			util.CheckErr(o.upgrade(cmd))
 		},
 	}
 
+	cmd.Flags().BoolVar(&o.Monitor, "monitor", true, "Set monitor enabled and install Prometheus, AlertManager and Grafana")
 	cmd.Flags().StringVar(&o.Version, "version", version.DefaultKubeBlocksVersion, "KubeBlocks version")
 	cmd.Flags().StringArrayVar(&o.Sets, "set", []string{}, "Set values on the command line (can specify multiple or separate values with commas: key1=val1,key2=val2)")
 

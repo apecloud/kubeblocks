@@ -35,7 +35,6 @@ data:
         code=$?; 
         cat /tmp/setup_error.log
         if [ $code -ne 0 ]; then
-          cat /tmp/setup_error.log
           substr=`cat /tmp/setup_error.log | grep "Target node already exists"`
           if [ -z "$substr" ]; then
             exit $code; 

@@ -387,7 +387,11 @@ func (o *InstallOptions) upgrade(cmd *cobra.Command) error {
 		return err
 	}
 
-	spinner := util.Spinner(o.Out, "%-40s", "Upgrading KubeBlocks to "+o.Version)
+	msg := ""
+	if len(o.Version) > 0 {
+		msg = "to " + o.Version
+	}
+	spinner := util.Spinner(o.Out, "%-40s", "Upgrading KubeBlocks "+msg)
 	defer spinner(false)
 
 	// check whether monitor flag is set by user
@@ -592,7 +596,7 @@ func newUpgradeCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 	}
 
 	cmd.Flags().BoolVar(&o.Monitor, "monitor", true, "Set monitor enabled and install Prometheus, AlertManager and Grafana")
-	cmd.Flags().StringVar(&o.Version, "version", version.DefaultKubeBlocksVersion, "KubeBlocks version")
+	cmd.Flags().StringVar(&o.Version, "version", "", "KubeBlocks version")
 	cmd.Flags().StringArrayVar(&o.Sets, "set", []string{}, "Set values on the command line (can specify multiple or separate values with commas: key1=val1,key2=val2)")
 	cmd.Flags().BoolVar(&o.check, "check", true, "check kubernetes cluster before upgrade")
 

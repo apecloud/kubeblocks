@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: wesql-cluster-wesql-scripts
+  name: wesql-scripts
   namespace: default
 data:
   setup.sh: |

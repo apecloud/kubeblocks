@@ -4,6 +4,7 @@ metadata:
   name: backup-policy-template-mysql
   labels:
     clusterdefinition.kubeblocks.io/name: apecloud-wesql
+    {{- include "wesqlapp.labels" . | nindent 4 }}
 spec:
   schedule: "0 2 * * *"
 

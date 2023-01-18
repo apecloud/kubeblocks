@@ -41,11 +41,11 @@ func GetVersionInfo(client kubernetes.Interface) (map[AppName]string, error) {
 	var err error
 	versionInfo := map[AppName]string{}
 	if versionInfo[KubernetesApp], err = getK8sVersion(client.Discovery()); err != nil {
-		return nil, err
+		return versionInfo, err
 	}
 
 	if versionInfo[KubeBlocksApp], err = getKubeBlocksVersion(client); err != nil {
-		return nil, err
+		return versionInfo, err
 	}
 
 	versionInfo[KBCLIApp] = version.GetVersion()

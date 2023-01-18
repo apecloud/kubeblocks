@@ -43,41 +43,41 @@ var (
 		kbcli cluster list
 
 		# list a single cluster with specified NAME
-		kbcli cluster list my-cluster
+		kbcli cluster list mycluster
 
 		# list a single cluster in YAML output format
-		kbcli cluster list my-cluster -o yaml
+		kbcli cluster list mycluster -o yaml
 
 		# list a single cluster in JSON output format
-		kbcli cluster list my-cluster -o json
+		kbcli cluster list mycluster -o json
 
 		# list a single cluster in wide output format
-		kbcli cluster list my-cluster -o wide`)
+		kbcli cluster list mycluster -o wide`)
 
 	listInstancesExample = templates.Examples(`
 		# list all instances of all clusters in current namespace
 		kbcli cluster list-instances
 
 		# list all instances of a specified cluster
-		kbcli cluster list-instances my-cluster`)
+		kbcli cluster list-instances mycluster`)
 
 	listComponentsExample = templates.Examples(`
 		# list all components of all clusters in current namespace
 		kbcli cluster list-components
 
 		# list all components of a specified cluster
-		kbcli cluster list-components my-cluster`)
+		kbcli cluster list-components mycluster`)
 
 	listEventsExample = templates.Examples(`
 		# list all events of all clusters in current namespace
 		kbcli cluster list-events
 
 		# list all events of a specified cluster
-		kbcli cluster list-events my-cluster`)
+		kbcli cluster list-events mycluster`)
 
 	listUsersExample = templates.Examples(`
 		# list all users of a specified cluster
-		kbcli cluster list-users my-cluster`)
+		kbcli cluster list-users mycluster`)
 )
 
 func NewListCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {

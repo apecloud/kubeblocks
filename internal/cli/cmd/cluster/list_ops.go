@@ -43,7 +43,7 @@ var listOpsExample = templates.Examples(`
 		kbcli cluster list-ops
 
 		# list all opsRequests of specified cluster
-		kbcli cluster list-ops my-cluster`)
+		kbcli cluster list-ops mycluster`)
 
 type opsListOptions struct {
 	*list.ListOptions

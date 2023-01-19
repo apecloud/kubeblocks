@@ -153,7 +153,7 @@ func getEventInvolvedObject(ctx context.Context, cli client.Client, event *corev
 	return nil, err
 }
 
-// handleClusterAbnormalOrFailedPhase handles the Cluster.status.phase when warning event happened.
+// handleClusterAbnormalOrFailedPhase handles the Cluster.status.phase when components phase of cluster are Abnormal or Failed.
 func handleClusterAbnormalOrFailedPhase(cluster *dbaasv1alpha1.Cluster, componentMap map[string]string, clusterAvailabilityMap map[string]bool) {
 	var (
 		isFailed                       bool

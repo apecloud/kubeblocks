@@ -879,6 +879,21 @@ spec:
 			volumeSnapshot.Status = &volumeSnapshotStatus
 			Expect(k8sClient.Status().Update(ctx, &volumeSnapshot)).Should(Succeed())
 
+			By("Mock PVCs status to bound")
+			for i := 0; i < int(updatedReplicas); i++ {
+				pvcKey := types.NamespacedName{
+					Namespace: key.Namespace,
+					Name:      fmt.Sprintf("%s-%s-%s-%d", volumeName, key.Name, compName, i),
+				}
+				pvc := corev1.PersistentVolumeClaim{}
+				Eventually(func(g Gomega) {
+					g.Expect(k8sClient.Get(ctx, pvcKey, &pvc)).Should(Succeed())
+				}, timeout, interval).Should(Succeed())
+				patch := client.MergeFrom(pvc.DeepCopy())
+				pvc.Status.Phase = corev1.ClaimBound
+				Expect(k8sClient.Status().Patch(ctx, &pvc, patch)).Should(Succeed())
+			}
+
 			By("Checking cluster status and the number of replicas changed")
 			Eventually(func(g Gomega) {
 				fetched := &dbaasv1alpha1.Cluster{}

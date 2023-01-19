@@ -942,7 +942,7 @@ spec:
 		return &vs
 	}
 
-	Context("Backup in real cluster", func() {
+	Context("Backup in cluster with mock", func() {
 		It("doBackup", func() {
 			reqCtx := newReqCtx()
 			cluster, _, _, _ := newAllFieldsClusterObj(nil, nil, false)

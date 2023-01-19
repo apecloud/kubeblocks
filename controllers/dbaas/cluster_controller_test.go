@@ -899,7 +899,7 @@ spec:
 				fetched := &dbaasv1alpha1.Cluster{}
 				g.Expect(k8sClient.Get(ctx, key, fetched)).To(Succeed())
 				g.Expect(fetched.Status.ObservedGeneration == 2).To(BeTrue())
-			}, timeout*10, interval).Should(Succeed())
+			}, timeout, interval).Should(Succeed())
 			stsList = listAndCheckStatefulSet(key)
 			Expect(int(*stsList.Items[0].Spec.Replicas)).To(BeEquivalentTo(updatedReplicas))
 

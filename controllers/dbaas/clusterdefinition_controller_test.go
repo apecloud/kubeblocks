@@ -63,7 +63,7 @@ kind:       ClusterDefinition
 metadata:
   name:     mysql-cluster-definition
 spec:
-  type: state.mysql-8
+  type: state.mysql
   components:
   - typeName: replicasets
     componentType: Stateful
@@ -211,7 +211,7 @@ spec:
 			By("updating clusterDefinition's spec which then mark clusterVersion's status as OutOfSync")
 			Expect(changeSpec(intctrlutil.GetNamespacedName(clusterDefinition),
 				func(cd *dbaasv1alpha1.ClusterDefinition) {
-					cd.Spec.Type = "state.mysql-7"
+					cd.Spec.Type = "state.redis"
 				})).Should(Succeed())
 			// check ClusterVersion.Status.ClusterDefSyncStatus to be OutOfSync
 			Eventually(func(g Gomega) {

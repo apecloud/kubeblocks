@@ -17,10 +17,8 @@ limitations under the License.
 package probe
 
 import (
-	"io"
 	"net/http"
 	"strconv"
-	"strings"
 
 	"github.com/dapr/components-contrib/middleware"
 	"github.com/dapr/kit/logger"

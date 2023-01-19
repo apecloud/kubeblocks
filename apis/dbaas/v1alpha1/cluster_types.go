@@ -83,7 +83,7 @@ type ClusterStatus struct {
 	// Rebooting: restart operation is running.
 	// Reconfiguring: reconfiguration operation is running.
 	// Deleting/Deleted: deleting Cluster/Cluster is deleted.
-	// Failed: Cluster not available.
+	// Failed: Cluster is unavailable.
 	// Abnormal: Cluster is still available, but part of its components are Abnormal.
 	// if the component type is Consensus/Replication, the Leader/Primary pod must be ready in Abnormal phase.
 	// ConditionsError: Cluster and all the components are still healthy, but some update/create API fails due to invalid parameters.
@@ -188,7 +188,7 @@ type ClusterStatusComponent struct {
 	Type string `json:"type,omitempty"`
 
 	// phase describes the phase of the Cluster. the detail information of phase is as follows:
-	// Failed: component is not available, i.e, all pods are not ready for Stateless/Stateful component;
+	// Failed: component is unavailable, i.e, all pods are not ready for Stateless/Stateful component;
 	// Leader/Primary pod is not ready for Consensus/Replication component.
 	// Abnormal: component available but part of its pods are not ready.
 	// If the component type is Consensus/Replication, the Leader/Primary pod must be ready in Abnormal phase.

@@ -72,26 +72,26 @@ type ClusterStatus struct {
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 
-	// phase describe the phase of the cluster. the detail information of phase is as follows:
+	// phase describes the phase of the cluster. the detail information of phase is as follows:
 	// Creating: creating cluster.
-	// Running: cluster is running, all components is available.
+	// Running: cluster is running, all components are available.
 	// Updating: the cluster phase will be 'Updating' when directly updating cluster.spec.
 	// VolumeExpanding: volume expansion operation is running.
 	// HorizontalScaling: horizontal scaling operation is running.
 	// VerticalScaling: vertical scaling operation is running.
 	// VersionUpgrading: upgrade operation is running.
 	// Rebooting: restart operation is running.
-	// Reconfiguring: reconfiguration operations is running.
+	// Reconfiguring: reconfiguration operation is running.
 	// Deleting/Deleted: deleting cluster/cluster is deleted.
 	// Failed: cluster not available.
-	// Abnormal: cluster available but some components are Abnormal.
-	// if the component type is Consensus/Replication, the Leader/Primary pod is must ready in Abnormal phase.
-	// ConditionsError: status.conditions error, but the components are running when cluster api changed.
+	// Abnormal: cluster are serving but some components are Abnormal(some pods of the component are not ready).
+	// if the component type is Consensus/Replication, the Leader/Primary pod must be ready in Abnormal phase.
+	// ConditionsError: status.conditions error, but all components of cluster are running.
 	// +kubebuilder:validation:Enum={Running,Failed,Abnormal,ConditionsError,Creating,Updating,Deleting,Deleted,VolumeExpanding,Reconfiguring,HorizontalScaling,VerticalScaling,VersionUpgrading,Rebooting}
 	// +optional
 	Phase Phase `json:"phase,omitempty"`
 
-	// message describe cluster details message in current phase.
+	// message describes cluster details message in current phase.
 	// +optional
 	Message string `json:"message,omitempty"`
 
@@ -99,7 +99,7 @@ type ClusterStatus struct {
 	// +optional
 	Components map[string]ClusterStatusComponent `json:"components,omitempty"`
 
-	// operations declares which operations the cluster supports.
+	// operations declare what operations the cluster supports.
 	// +optional
 	Operations *Operations `json:"operations,omitempty"`
 

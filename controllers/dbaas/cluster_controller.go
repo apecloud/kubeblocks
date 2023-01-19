@@ -595,7 +595,7 @@ func (r *ClusterReconciler) updateClusterPhaseToCreatingOrUpdating(reqCtx intctr
 		dbaasv1alpha1.FailedPhase,
 		dbaasv1alpha1.AbnormalPhase}, cluster.Status.Phase) != -1 && !r.existsOperations(cluster) {
 		needPatch = true
-		cluster.Status.Phase = dbaasv1alpha1.UpdatingPhase
+		cluster.Status.Phase = dbaasv1alpha1.SpecUpdatingPhase
 	}
 	if !needPatch {
 		return nil
@@ -622,7 +622,7 @@ func (r *ClusterReconciler) updateClusterPhaseWhenConditionsError(cluster *dbaas
 	opsRequestSlice, _ := opsutil.GetOpsRequestSliceFromCluster(cluster)
 	// if no operations in cluster, means user update the cluster.spec directly
 	if len(opsRequestSlice) == 0 {
-		cluster.Status.Phase = dbaasv1alpha1.UpdatingPhase
+		cluster.Status.Phase = dbaasv1alpha1.SpecUpdatingPhase
 		return
 	}
 	// if exits opsRequests are running, set the cluster phase to the early target phase with the OpsRequest

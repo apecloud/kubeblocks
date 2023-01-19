@@ -602,25 +602,25 @@ spec:
                     message:
                       additionalProperties:
                         type: string
-                      description: message record the component details message in
+                      description: message records the component details message in
                         current phase. keys are podName or deployName or statefulSetName,
                         the format is `<ObjectKind>/<Name>`.
                       type: object
                     phase:
-                      description: 'phase describe the phase of the cluster. the detail
-                        information of phase is as follows: Failed: component not
-                        available, i.e, all pod is not ready for Stateless/Stateful
+                      description: 'phase describes the phase of the Cluster. the
+                        detail information of phase is as follows: Failed: component
+                        is not available, i.e, all pods are not ready for Stateless/Stateful
                         component; Leader/Primary pod is not ready for Consensus/Replication
-                        component. Abnormal: component available but some pod is not
-                        ready. If the component type is Consensus/Replication, the
-                        Leader/Primary pod must be ready in Abnormal phase. Other
+                        component. Abnormal: component available but part of its pods
+                        are not ready. If the component type is Consensus/Replication,
+                        the Leader/Primary pod must be ready in Abnormal phase. Other
                         phases behave the same as the cluster phase.'
                       enum:
                       - Running
                       - Failed
                       - Abnormal
                       - Creating
-                      - Updating
+                      - SpecUpdating
                       - Deleting
                       - Deleted
                       - VolumeExpanding
@@ -631,7 +631,8 @@ spec:
                       - Rebooting
                       type: string
                     podsReady:
-                      description: podsReady check all pods of the component are ready.
+                      description: podsReady checks if all pods of the component are
+                        ready.
                       type: boolean
                     podsReadyTime:
                       description: podsReadyTime what time point of all component
@@ -799,27 +800,28 @@ spec:
                     type: array
                 type: object
               phase:
-                description: 'phase describes the phase of the cluster. the detail
-                  information of phase is as follows: Creating: creating cluster.
-                  Running: cluster is running, all components are available. Updating:
-                  the cluster phase will be ''Updating'' when directly updating cluster.spec.
+                description: 'phase describes the phase of the Cluster. the detail
+                  information of phase is as follows: Creating: creating Cluster.
+                  Running: Cluster is running, all components are available. SpecUpdating:
+                  the Cluster phase will be ''Updating'' when directly updating Cluster.spec.
                   VolumeExpanding: volume expansion operation is running. HorizontalScaling:
                   horizontal scaling operation is running. VerticalScaling: vertical
                   scaling operation is running. VersionUpgrading: upgrade operation
                   is running. Rebooting: restart operation is running. Reconfiguring:
                   reconfiguration operation is running. Deleting/Deleted: deleting
-                  cluster/cluster is deleted. Failed: cluster not available. Abnormal:
-                  cluster are serving but some components are Abnormal(some pods of
-                  the component are not ready). if the component type is Consensus/Replication,
-                  the Leader/Primary pod must be ready in Abnormal phase. ConditionsError:
-                  status.conditions error, but all components of cluster are running.'
+                  Cluster/Cluster is deleted. Failed: Cluster not available. Abnormal:
+                  Cluster is still available, but part of its components are Abnormal.
+                  if the component type is Consensus/Replication, the Leader/Primary
+                  pod must be ready in Abnormal phase. ConditionsError: Cluster and
+                  all the components are still healthy, but some update/create API
+                  fails due to invalid parameters.'
                 enum:
                 - Running
                 - Failed
                 - Abnormal
                 - ConditionsError
                 - Creating
-                - Updating
+                - SpecUpdating
                 - Deleting
                 - Deleted
                 - VolumeExpanding

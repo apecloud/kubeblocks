@@ -165,8 +165,8 @@ func NeedSyncStatusComponents(cluster *dbaasv1alpha1.Cluster,
 	var needSync bool
 	// when the workload spec of the component is updated and cluster phase is Updating,
 	// change the component phase to Updating.
-	if workloadSpecIsUpdated && cluster.Status.Phase == dbaasv1alpha1.UpdatingPhase {
-		statusComponent.Phase = dbaasv1alpha1.UpdatingPhase
+	if workloadSpecIsUpdated && cluster.Status.Phase == dbaasv1alpha1.SpecUpdatingPhase {
+		statusComponent.Phase = dbaasv1alpha1.SpecUpdatingPhase
 		needSync = true
 	}
 	if !componentIsRunning {

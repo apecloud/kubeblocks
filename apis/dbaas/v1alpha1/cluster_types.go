@@ -72,22 +72,22 @@ type ClusterStatus struct {
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 
-	// phase describes the phase of the cluster. the detail information of phase is as follows:
-	// Creating: creating cluster.
-	// Running: cluster is running, all components are available.
-	// Updating: the cluster phase will be 'Updating' when directly updating cluster.spec.
+	// phase describes the phase of the Cluster. the detail information of phase is as follows:
+	// Creating: creating Cluster.
+	// Running: Cluster is running, all components are available.
+	// SpecUpdating: the Cluster phase will be 'Updating' when directly updating Cluster.spec.
 	// VolumeExpanding: volume expansion operation is running.
 	// HorizontalScaling: horizontal scaling operation is running.
 	// VerticalScaling: vertical scaling operation is running.
 	// VersionUpgrading: upgrade operation is running.
 	// Rebooting: restart operation is running.
 	// Reconfiguring: reconfiguration operation is running.
-	// Deleting/Deleted: deleting cluster/cluster is deleted.
-	// Failed: cluster not available.
-	// Abnormal: cluster are serving but some components are Abnormal(some pods of the component are not ready).
+	// Deleting/Deleted: deleting Cluster/Cluster is deleted.
+	// Failed: Cluster not available.
+	// Abnormal: Cluster is still available, but part of its components are Abnormal.
 	// if the component type is Consensus/Replication, the Leader/Primary pod must be ready in Abnormal phase.
-	// ConditionsError: status.conditions error, but all components of cluster are running.
-	// +kubebuilder:validation:Enum={Running,Failed,Abnormal,ConditionsError,Creating,Updating,Deleting,Deleted,VolumeExpanding,Reconfiguring,HorizontalScaling,VerticalScaling,VersionUpgrading,Rebooting}
+	// ConditionsError: Cluster and all the components are still healthy, but some update/create API fails due to invalid parameters.
+	// +kubebuilder:validation:Enum={Running,Failed,Abnormal,ConditionsError,Creating,SpecUpdating,Deleting,Deleted,VolumeExpanding,Reconfiguring,HorizontalScaling,VerticalScaling,VersionUpgrading,Rebooting}
 	// +optional
 	Phase Phase `json:"phase,omitempty"`
 
@@ -187,21 +187,21 @@ type ClusterStatusComponent struct {
 	// +optional
 	Type string `json:"type,omitempty"`
 
-	// phase describe the phase of the cluster. the detail information of phase is as follows:
-	// Failed: component not available, i.e, all pod is not ready for Stateless/Stateful component;
+	// phase describes the phase of the Cluster. the detail information of phase is as follows:
+	// Failed: component is not available, i.e, all pods are not ready for Stateless/Stateful component;
 	// Leader/Primary pod is not ready for Consensus/Replication component.
-	// Abnormal: component available but some pod is not ready.
+	// Abnormal: component available but part of its pods are not ready.
 	// If the component type is Consensus/Replication, the Leader/Primary pod must be ready in Abnormal phase.
 	// Other phases behave the same as the cluster phase.
-	// +kubebuilder:validation:Enum={Running,Failed,Abnormal,Creating,Updating,Deleting,Deleted,VolumeExpanding,Reconfiguring,HorizontalScaling,VerticalScaling,VersionUpgrading,Rebooting}
+	// +kubebuilder:validation:Enum={Running,Failed,Abnormal,Creating,SpecUpdating,Deleting,Deleted,VolumeExpanding,Reconfiguring,HorizontalScaling,VerticalScaling,VersionUpgrading,Rebooting}
 	Phase Phase `json:"phase,omitempty"`
 
-	// message record the component details message in current phase.
+	// message records the component details message in current phase.
 	// keys are podName or deployName or statefulSetName, the format is `<ObjectKind>/<Name>`.
 	// +optional
 	Message ComponentMessageMap `json:"message,omitempty"`
 
-	// podsReady check all pods of the component are ready.
+	// podsReady checks if all pods of the component are ready.
 	// +optional
 	PodsReady *bool `json:"podsReady,omitempty"`
 

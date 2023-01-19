@@ -103,7 +103,7 @@ var _ = Describe("StatefulSet Controller", func() {
 
 		By("waiting the component is Updating")
 		Eventually(testdbaas.GetClusterComponentPhase(testCtx, clusterName, componentName),
-			timeout, interval).Should(Equal(dbaasv1alpha1.UpdatingPhase))
+			timeout, interval).Should(Equal(dbaasv1alpha1.SpecUpdatingPhase))
 	}
 
 	testUsingEnvTest := func(sts *appsv1.StatefulSet) {
@@ -158,7 +158,7 @@ var _ = Describe("StatefulSet Controller", func() {
 				clusterVersionName, clusterName, consensusCompName)
 			By("patch cluster to Updating")
 			patch := client.MergeFrom(cluster.DeepCopy())
-			cluster.Status.Phase = dbaasv1alpha1.UpdatingPhase
+			cluster.Status.Phase = dbaasv1alpha1.SpecUpdatingPhase
 			cluster.Status.ObservedGeneration = cluster.Generation
 			cluster.Status.Components = map[string]dbaasv1alpha1.ClusterStatusComponent{
 				consensusCompName: {
@@ -178,7 +178,7 @@ var _ = Describe("StatefulSet Controller", func() {
 			Expect(k8sClient.Patch(ctx, cluster, clusterPatch)).Should(Succeed())
 
 			By("waiting the component is Updating by statefulSet controller")
-			Eventually(testdbaas.GetClusterComponentPhase(testCtx, clusterName, consensusCompName), timeout, interval).Should(Equal(dbaasv1alpha1.UpdatingPhase))
+			Eventually(testdbaas.GetClusterComponentPhase(testCtx, clusterName, consensusCompName), timeout, interval).Should(Equal(dbaasv1alpha1.SpecUpdatingPhase))
 
 			By("mock the StatefulSet and pods are ready")
 			if testCtx.UsingExistingCluster() {

@@ -10,7 +10,7 @@ This guide describes the details of KubeBlocks lifecycle API. KubeBlocks API is 
 
 #### spec.type
 
-`spec.type` is required. You can fill it in as the following examples do: state.redis, mq.mqtt, mq.kafkal, state.mysql-8, state.mysql-7.
+`spec.type` is required, compatible the DAPR component type. You can fill it in as the following examples do: state.redis, mq.mqtt, mq.kafka, state.mysql.
 
 #### spec.componentType
 

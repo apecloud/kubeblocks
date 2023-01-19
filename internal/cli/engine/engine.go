@@ -21,7 +21,7 @@ import "fmt"
 // ClusterDefinition Type Const Define
 const (
 	stateMysql  = "state.mysql"
-	stateMysql8 = "state.mysql-8"
+	stateMysql8 = "state.mysql"
 )
 
 type Interface interface {
@@ -43,8 +43,9 @@ type buildConnectExample func(info *ConnectionInfo) string
 
 func New(typeName string) (Interface, error) {
 	switch typeName {
-	case stateMysql, stateMysql8:
+	case stateMysql:
 		return &mysql{}, nil
+	default:
+		return nil, fmt.Errorf("unsupported engine type: %s", typeName)
 	}
-	return nil, fmt.Errorf("unsupported engine type: %s", typeName)
 }

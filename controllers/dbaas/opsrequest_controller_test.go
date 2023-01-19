@@ -69,7 +69,7 @@ kind: ClusterDefinition
 metadata:
   name: cluster-definition-ops
 spec:
-  type: state.mysql-8
+  type: state.mysql
   connectionCredential:
     password: "$(RANDOM_PASSWD)"
   components:

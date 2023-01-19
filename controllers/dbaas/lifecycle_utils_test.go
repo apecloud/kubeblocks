@@ -314,7 +314,7 @@ kind: ClusterDefinition
 metadata:
   name: cluster-definition
 spec:
-  type: state.mysql-8
+  type: state.mysql
   components:
   - typeName: replicasets
     componentType: Stateful
@@ -642,7 +642,7 @@ metadata:
     app.kubernetes.io/component-name: replicasets
     app.kubernetes.io/instance: mysql-cluster-01
     app.kubernetes.io/managed-by: kubeblocks
-    app.kubernetes.io/name: state.mysql-8-apecloud-wesql
+    app.kubernetes.io/name: state.mysql-apecloud-wesql
   name: mysql-cluster-01-replicasets
   namespace: default
 spec:
@@ -655,7 +655,7 @@ spec:
       app.kubernetes.io/component-name: replicasets
       app.kubernetes.io/instance: mysql-cluster-01
       app.kubernetes.io/managed-by: kubeblocks
-      app.kubernetes.io/name: state.mysql-8-apecloud-wesql
+      app.kubernetes.io/name: state.mysql-apecloud-wesql
   serviceName: mysql-cluster-01-replicasets-headless
   template:
     metadata:
@@ -664,7 +664,7 @@ spec:
         app.kubernetes.io/component-name: replicasets
         app.kubernetes.io/instance: mysql-cluster-01
         app.kubernetes.io/managed-by: kubeblocks
-        app.kubernetes.io/name: state.mysql-8-apecloud-wesql
+        app.kubernetes.io/name: state.mysql-apecloud-wesql
     spec:
       containers:
       - command:
@@ -723,7 +723,7 @@ spec:
         app.kubernetes.io/component-name: replicasets
         app.kubernetes.io/instance: mysql-cluster-01
         app.kubernetes.io/managed-by: kubeblocks
-        app.kubernetes.io/name: state.mysql-8-apecloud-wesql
+        app.kubernetes.io/name: state.mysql-apecloud-wesql
         vct.kubeblocks.io/name: data
       name: data
     spec:
@@ -926,7 +926,7 @@ metadata:
     app.kubernetes.io/created-by: kubeblocks
     app.kubernetes.io/instance: %s
     app.kubernetes.io/managed-by: kubeblocks
-    app.kubernetes.io/name: state.mysql-8-apecloud-wesql
+    app.kubernetes.io/name: state.mysql-apecloud-wesql
     backupjobs.dataprotection.kubeblocks.io/name: wesql-01-replicasets-scaling-qf6cr
     backuppolicies.dataprotection.kubeblocks.io/name: wesql-01-replicasets-scaling-hcxps
     dataprotection.kubeblocks.io/backup-type: snapshot

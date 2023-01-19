@@ -112,7 +112,7 @@ func privateSetup() (*dbaasv1alpha1.ClusterDefinition, *dbaasv1alpha1.Cluster, e
 	var (
 		clusterDefName     = "myclusterdef"
 		ClusterVersionName = "myClusterVersion"
-		clusterType        = " state.mysql-8"
+		clusterType        = " state.mysql"
 		typeName           = "mycomponent"
 		clusterName        = "mycluster"
 	)

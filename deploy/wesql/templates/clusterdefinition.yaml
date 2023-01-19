@@ -5,7 +5,7 @@ metadata:
   labels:
     {{- include "wesqlapp.labels" . | nindent 4 }}
 spec:
-  type: state.mysql-8
+  type: state.mysql
   connectionCredential:
     username: root
     password: "$(RANDOM_PASSWD)"

@@ -213,7 +213,7 @@ func (w *TestWrapper) DeleteAllCR() error {
 		&corev1.PersistentVolumeClaim{},
 		client.InNamespace(testCtx.DefaultNamespace),
 		client.MatchingLabels{
-			"app.kubernetes.io/name": "state.mysql-8-cluster-definition",
+			"app.kubernetes.io/name": "state.mysql-cluster-definition",
 		}); err != nil {
 		return err
 	}

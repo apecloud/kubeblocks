@@ -3,7 +3,7 @@ kind:       ClusterDefinition
 metadata:
   name: apecloud-wesql
 spec:
-  type: state.mysql-8
+  type: state.mysql
   connectionCredential:
     username: root
     password: "$(RANDOM_PASSWD)"

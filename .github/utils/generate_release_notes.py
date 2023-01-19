@@ -97,15 +97,16 @@ for issueOrPR in issueOrPRs:
         continue
     contributor = "@" + str(pr.user.login)
     # Auto generate a release note
-    note = pr.title
+    note = pr.title.strip()
     changeType = "Miscellaneous"
     title = note.split(":")
     if len(title) > 1:
-        if title[0].lower() in ("feat", "feature"):
+        prefix = title[0].strip().lower()
+        if prefix in ("feat", "feature"):
             changeType = "New Features"
-        elif title[0].lower() in ("fix", "bug"):
+        elif prefix in ("fix", "bug"):
             changeType = "Bug Fixes"
-        note = title[1]
+        note = title[1].strip()
     changes.append((changeType, pr, note, contributor, url))
     allContributors.add(contributor)
 

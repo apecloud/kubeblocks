@@ -102,18 +102,18 @@ func (i *installer) uninstall() error {
 	}()
 
 	if playgroundCluster == nil {
-		return fmt.Errorf("no playground cluster")
+		return fmt.Errorf("playground k3d cluster does not exist")
 	}
 
 	// delete playground cluster
 	if err = k3dClient.ClusterDelete(i.ctx, runtimes.SelectedRuntime, playgroundCluster,
 		k3d.ClusterDeleteOpts{SkipRegistryCheck: false}); err != nil {
-		return errors.Wrap(err, "Failed to delete playground cluster.")
+		return errors.Wrap(err, "failed to delete playground cluster")
 	}
 
 	// remove playground cluster kubeconfig
 	if err = util.RemoveConfig(i.clusterName); err != nil {
-		return errors.Wrap(err, "Failed to remove playground kubeconfig file")
+		return errors.Wrap(err, "failed to remove playground kubeconfig file")
 	}
 
 	return nil

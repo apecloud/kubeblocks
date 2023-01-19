@@ -159,7 +159,7 @@ func (conMgr clusterConditionManager) setApplyResourcesFailedCondition(err error
 	return conMgr.updateStatusConditions(condition)
 }
 
-// newApplyResourcesCondition news a condition when applied resources succeed.
+// newApplyResourcesCondition creates a condition when applied resources succeed.
 func newApplyResourcesCondition() metav1.Condition {
 	return metav1.Condition{
 		Type:    ConditionTypeApplyResources,
@@ -169,7 +169,7 @@ func newApplyResourcesCondition() metav1.Condition {
 	}
 }
 
-// newAllReplicasPodsReadyConditions news a condition when all pods of components are ready
+// newAllReplicasPodsReadyConditions creates a condition when all pods of components are ready
 func newAllReplicasPodsReadyConditions() metav1.Condition {
 	return metav1.Condition{
 		Type:    ConditionTypeReplicasReady,
@@ -179,7 +179,7 @@ func newAllReplicasPodsReadyConditions() metav1.Condition {
 	}
 }
 
-// newReplicasNotReadyCondition news a condition when pods of components are not ready
+// newReplicasNotReadyCondition creates a condition when pods of components are not ready
 func newReplicasNotReadyCondition(message string) metav1.Condition {
 	return metav1.Condition{
 		Type:    ConditionTypeReplicasReady,
@@ -189,7 +189,7 @@ func newReplicasNotReadyCondition(message string) metav1.Condition {
 	}
 }
 
-// newClusterReadyCondition news a condition when all components of cluster are running
+// newClusterReadyCondition creates a condition when all components of cluster are running
 func newClusterReadyCondition(clusterName string) metav1.Condition {
 	return metav1.Condition{
 		Type:    ConditionTypeReady,
@@ -199,7 +199,7 @@ func newClusterReadyCondition(clusterName string) metav1.Condition {
 	}
 }
 
-// newComponentsNotReadyCondition news a condition when components of cluster are not ready
+// newComponentsNotReadyCondition creates a condition when components of cluster are not ready
 func newComponentsNotReadyCondition(message string) metav1.Condition {
 	return metav1.Condition{
 		Type:    ConditionTypeReady,

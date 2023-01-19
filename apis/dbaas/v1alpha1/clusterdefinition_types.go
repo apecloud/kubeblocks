@@ -26,10 +26,11 @@ import (
 
 // ClusterDefinitionSpec defines the desired state of ClusterDefinition
 type ClusterDefinitionSpec struct {
-	// Cluster definition type define well known cluster types. The valid will keep consistent
-	// with known DAPR component type (https://docs.dapr.io/reference/components-reference/). For
-	// component that has yet provided by DAPR, then it's suggested the follow and naming scheme
-	// as DAPR componet, i.e., a state store related Cluster starts with "state.<app-name>".
+	// Cluster definition type defines well known application cluster type. This value should
+	// keep consistent with known DAPR component type
+	// (https://docs.dapr.io/reference/components-reference/). For component that has yet been
+	// provided by DAPR, then it's suggested to follow the naming scheme as DAPR component
+	// type name prefix, i.e., a state store related Cluster starts with "state.<app-name>".
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=24
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
@@ -178,11 +179,23 @@ type ClusterDefinitionStatus struct {
 }
 
 type ConfigTemplate struct {
-	// Specify the name of the referenced the configuration template ConfigMap object.
+	// Specify the name of configuration template.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=63
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	Name string `json:"name"`
+
+	// Specify the name of the referenced the configuration template ConfigMap object.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MaxLength=63
+	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
+	ConfigTplRef string `json:"configTplRef"`
+
+	// Specify the name of the referenced the configuration constraints object.
+	// +kubebuilder:validation:MaxLength=63
+	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
+	// +optional
+	ConfigConstraintRef string `json:"configConstraintRef,omitempty"`
 
 	// Specify the namespace of the referenced the configuration template ConfigMap object.
 	// An empty namespace is equivalent to the "default" namespace.
@@ -223,33 +236,44 @@ type ExporterConfig struct {
 }
 
 type MonitorConfig struct {
-	// BuiltIn is a switch to enable KubeBlocks builtIn monitoring.
-	// If BuiltIn is true and CharacterType is wellknown, ExporterConfig and Sidecar container will generate automatically.
-	// Otherwise, provider should set BuiltIn to false and provide ExporterConfig and Sidecar container own.
+	// builtIn is a switch to enable KubeBlocks builtIn monitoring.
+	// If BuiltIn is true and CharacterType is well-known, ExporterConfig and Sidecar container will generate automatically.
+	// Otherwise, provider should set builtIn to false and provide ExporterConfig and Sidecar container own.
 	// +kubebuilder:default=false
 	// +optional
 	BuiltIn bool `json:"builtIn,omitempty"`
 
-	// Exporter provided by provider, which specify necessary information to Time Series Database.
-	// ExporterConfig is valid when BuiltIn is false.
+	// exporterConfig provided by provider, which specify necessary information to Time Series Database.
+	// exporterConfig is valid when builtIn is false.
 	// +optional
 	Exporter *ExporterConfig `json:"exporterConfig,omitempty"`
 }
 
 type LogConfig struct {
-	// Name log type name, such as slow for MySQL slow log file.
+	// name log type name, such as slow for MySQL slow log file.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=128
 	Name string `json:"name"`
 
-	// FilePathPattern log file path pattern which indicate how to find this file
+	// filePathPattern log file path pattern which indicate how to find this file
 	// corresponding to variable (log path) in database kernel. please don't set this casually.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=4096
 	FilePathPattern string `json:"filePathPattern"`
 }
 
-// ClusterDefinitionComponent is a group of pods, pods in one component usually share the same data
+type ConfigurationSpec struct {
+	// The configTemplateRefs field provided by provider, and
+	// finally this configTemplateRefs will be rendered into the user's own configuration file according to the user's cluster.
+	// +optional
+	// +patchMergeKey=name
+	// +patchStrategy=merge,retainKeys
+	// +listType=map
+	// +listMapKey=name
+	ConfigTemplateRefs []ConfigTemplate `json:"configTemplateRefs,omitempty"`
+}
+
+// ClusterDefinitionComponent is a group of pods, pods belong to same component usually share the same data
 type ClusterDefinitionComponent struct {
 	// Type name of the component, it can be any valid string.
 	// +kubebuilder:validation:Required
@@ -264,46 +288,41 @@ type ClusterDefinitionComponent struct {
 	// +kubebuilder:default=Stateless
 	ComponentType ComponentType `json:"componentType"`
 
-	// CharacterType defines well-known database component name, such as mongos(mongodb), proxy(redis), wesql(mysql)
-	// DBaas will generate proper monitor configs for wellknown CharacterType when BuiltIn is true.
+	// characterType defines well-known database component name, such as mongos(mongodb), proxy(redis), mariadb(mysql)
+	// KubeBlocks will generate proper monitor configs for well-known characterType when builtIn is true.
 	// +optional
 	CharacterType string `json:"characterType,omitempty"`
 
-	// MinReplicas minimum replicas for component pod count.
+	// minReplicas minimum replicas for component pod count.
 	// +kubebuilder:default=0
 	// +kubebuilder:validation:Minimum=0
 	// +optional
 	MinReplicas int32 `json:"minReplicas,omitempty"`
 
-	// MaxReplicas maximum replicas pod for component pod count.
+	// maxReplicas maximum replicas pod for component pod count.
 	// +kubebuilder:validation:Minimum=0
 	// +optional
 	MaxReplicas int32 `json:"maxReplicas,omitempty"`
 
-	// DefaultReplicas default replicas in this component if user not specify.
+	// defaultReplicas default replicas in this component when not specified.
 	// +kubebuilder:default=0
 	// +kubebuilder:validation:Minimum=0
 	// +optional
 	DefaultReplicas int32 `json:"defaultReplicas,omitempty"`
 
-	// PDBSpec pod disruption budget spec. This is mutually exclusive with the component type of Consensus.
+	// pdbSpec pod disruption budget spec. This is mutually exclusive with the component type of Consensus.
 	// +optional
 	PDBSpec *policyv1.PodDisruptionBudgetSpec `json:"pdbSpec,omitempty"`
 
-	// The configTemplateRefs field provided by provider, and
-	// finally this configTemplateRefs will be rendered into the user's own configuration file according to the user's cluster.
+	// configSpec defines configuration related spec.
 	// +optional
-	// +patchMergeKey=name
-	// +patchStrategy=merge,retainKeys
-	// +listType=map
-	// +listMapKey=name
-	ConfigTemplateRefs []ConfigTemplate `json:"configTemplateRefs,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
+	ConfigSpec *ConfigurationSpec `json:"configSpec,omitempty"`
 
-	// Monitor is monitoring config which provided by provider.
+	// monitor is monitoring config which provided by provider.
 	// +optional
 	Monitor *MonitorConfig `json:"monitor,omitempty"`
 
-	// LogConfigs is detail log file config which provided by provider.
+	// logConfigs is detail log file config which provided by provider.
 	// +optional
 	// +patchMergeKey=name
 	// +patchStrategy=merge,retainKeys
@@ -311,7 +330,7 @@ type ClusterDefinitionComponent struct {
 	// +listMapKey=name
 	LogConfigs []LogConfig `json:"logConfigs,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
 
-	// antiAffinity defines components should have anti-affinity constraint to same component type.
+	// antiAffinity defines components should have anti-affinity constraint for pods with same component type.
 	// +kubebuilder:default=false
 	// +optional
 	AntiAffinity bool `json:"antiAffinity,omitempty"`
@@ -326,7 +345,7 @@ type ClusterDefinitionComponent struct {
 	// +optional
 	Service *corev1.ServiceSpec `json:"service,omitempty"`
 
-	// Probes setting for db healthy checks.
+	// probes setting for healthy checks.
 	// +optional
 	Probes *ClusterDefinitionProbes `json:"probes,omitempty"`
 
@@ -400,7 +419,7 @@ type ClusterDefinitionProbe struct {
 
 	// Minimum consecutive failures for the probe to be considered failed after having succeeded.
 	// +kubebuilder:default=3
-	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:validation:Minimum=2
 	FailureThreshold int32 `json:"failureThreshold,omitempty"`
 
 	// commands used to execute for probe.

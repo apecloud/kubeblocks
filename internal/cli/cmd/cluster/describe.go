@@ -40,7 +40,7 @@ import (
 var (
 	describeExample = templates.Examples(`
 		# describe a specified cluster
-		kbcli cluster describe my-cluster`)
+		kbcli cluster describe mycluster`)
 
 	newTbl = func(out io.Writer, title string, header ...interface{}) *printer.TablePrinter {
 		fmt.Fprintln(out, title)
@@ -193,7 +193,7 @@ func showImages(comps []*cluster.ComponentInfo, out io.Writer) {
 }
 
 func showEvents(events *corev1.EventList, name string, namespace string, out io.Writer) {
-	objs := util.SortEventsByLastTimestamp(events, "Warning")
+	objs := util.SortEventsByLastTimestamp(events, corev1.EventTypeWarning)
 
 	// print last 5 events
 	title := fmt.Sprintf("\nEvents(last 5 warnings, see more:kbcli cluster list-events -n %s %s):", namespace, name)

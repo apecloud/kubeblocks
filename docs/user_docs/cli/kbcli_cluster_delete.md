@@ -9,8 +9,8 @@ kbcli cluster delete NAME [flags]
 ### Examples
 
 ```
-  # delete a cluster named my-cluster
-  kbcli cluster delete my-cluster
+  # delete a cluster named mycluster
+  kbcli cluster delete mycluster
 ```
 
 ### Options

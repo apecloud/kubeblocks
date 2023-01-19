@@ -3,19 +3,22 @@ kind: ClusterDefinition
 metadata:
   name: apecloud-wesql
 spec:
-  type: state.mysql-8
+  type: state.mysql
   connectionCredential:
     username: root
     password: "$(RANDOM_PASSWD)"
   components:
     - typeName: replicasets
+      minReplicas: 1
       characterType: mysql
       monitor:
         builtIn: false
-      configTemplateRefs:
-        - name: mysql-3node-tpl-8.0
-          namespace: default
-          volumeName: mysql-config
+      configSpec:
+        configTemplateRefs:
+          - name: mysql-tree-node-template-8.0
+            configTplRef: mysql-tree-node-template-8.0
+            configConstraintRef: mysql-tree-node-template-8.0
+            volumeName: mysql-config
       componentType: Consensus
       consensusSpec:
         leader:
@@ -49,7 +52,10 @@ spec:
               - name: MYSQL_ROOT_USER
                 value: root
               - name: MYSQL_ROOT_PASSWORD
-                value: ""
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: password
               - name: MYSQL_ALLOW_EMPTY_PASSWORD
                 value: "yes"
               - name: MYSQL_DATABASE
@@ -87,5 +93,8 @@ spec:
                 name: data
               - mountPath: /opt/mysql
                 name: mysql-config
+<<<<<<< HEAD
+=======
               - name: scripts
                 mountPath: /scripts
+>>>>>>> main

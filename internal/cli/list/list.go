@@ -82,7 +82,7 @@ func (o *ListOptions) AddFlags(cmd *cobra.Command) {
 	printer.AddOutputFlag(cmd, &o.Format)
 }
 
-func (o *ListOptions) complete() error {
+func (o *ListOptions) Complete() error {
 	var err error
 	o.Namespace, _, err = o.Factory.ToRawKubeConfigLoader().Namespace()
 	if err != nil {
@@ -134,7 +134,7 @@ func (o *ListOptions) complete() error {
 }
 
 func (o *ListOptions) Run() (*resource.Result, error) {
-	if err := o.complete(); err != nil {
+	if err := o.Complete(); err != nil {
 		return nil, err
 	}
 

@@ -20,13 +20,16 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/sethvargo/go-password/password"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/pointer"
 
+	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 const (
@@ -43,7 +46,13 @@ const (
 
 	KubeBlocksChartName = "fake-kubeblocks"
 	KubeBlocksChartURL  = "fake-kubeblocks-chart-url"
+	BackupToolName      = "fake-backup-tool"
 )
+
+func GetRandomStr() string {
+	seq, _ := password.Generate(6, 2, 0, true, true)
+	return seq
+}
 
 func FakeCluster(name string, namespace string) *dbaasv1alpha1.Cluster {
 	return &dbaasv1alpha1.Cluster{
@@ -141,7 +150,8 @@ func FakeSecrets(namespace string, cluster string) *corev1.SecretList {
 	secret.Namespace = namespace
 	secret.Type = corev1.SecretTypeServiceAccountToken
 	secret.Labels = map[string]string{
-		types.InstanceLabelKey: cluster,
+		types.InstanceLabelKey:           cluster,
+		intctrlutil.AppManagedByLabelKey: intctrlutil.AppName,
 	}
 
 	secret.Data = map[string][]byte{
@@ -187,6 +197,12 @@ func FakeClusterVersion() *dbaasv1alpha1.ClusterVersion {
 	cv.Spec.ClusterDefinitionRef = ClusterDefName
 	cv.SetCreationTimestamp(metav1.Now())
 	return cv
+}
+
+func FakeBackupTool() *dpv1alpha1.BackupTool {
+	tool := &dpv1alpha1.BackupTool{}
+	tool.Name = BackupToolName
+	return tool
 }
 
 func FakeServices() *corev1.ServiceList {

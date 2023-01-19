@@ -18,6 +18,7 @@ package controllerutil
 
 import (
 	"encoding/json"
+	"strings"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -26,6 +27,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	metautil "k8s.io/apimachinery/pkg/util/intstr"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 )
@@ -206,24 +208,24 @@ var _ = Describe("tpl template", func() {
 	// for test GetVolumeMountName
 	Context("GetPodContainerWithVolumeMount test", func() {
 		It("Should success with no error", func() {
-			mountedContainers := GetPodContainerWithVolumeMount(pod, "config1")
+			mountedContainers := GetPodContainerWithVolumeMount(&pod.Spec, "config1")
 			Expect(len(mountedContainers)).To(Equal(2))
 			Expect(mountedContainers[0].Name).To(Equal("mysql"))
 			Expect(mountedContainers[1].Name).To(Equal("mysql2"))
 
 			//
-			mountedContainers = GetPodContainerWithVolumeMount(pod, "config2")
+			mountedContainers = GetPodContainerWithVolumeMount(&pod.Spec, "config2")
 			Expect(len(mountedContainers)).To(Equal(2))
 			Expect(mountedContainers[0].Name).To(Equal("mysql"))
 			Expect(mountedContainers[1].Name).To(Equal("mysql3"))
 		})
 		It("Should failed", func() {
-			Expect(len(GetPodContainerWithVolumeMount(pod, "not_exist_cm"))).To(Equal(0))
+			Expect(len(GetPodContainerWithVolumeMount(&pod.Spec, "not_exist_cm"))).To(Equal(0))
 
 			emptyPod := corev1.Pod{}
 			emptyPod.ObjectMeta.Name = "empty_test"
 			emptyPod.ObjectMeta.Namespace = "empty_test_ns"
-			Expect(GetPodContainerWithVolumeMount(&emptyPod, "not_exist_cm")).To(BeNil())
+			Expect(GetPodContainerWithVolumeMount(&emptyPod.Spec, "not_exist_cm")).To(BeNil())
 
 		})
 	})
@@ -302,4 +304,147 @@ var _ = Describe("tpl template", func() {
 		})
 	})
 
+	Context("testGetContainerID", func() {
+		It("Should success with no error", func() {
+			pods := []*corev1.Pod{{
+				Status: corev1.PodStatus{
+					ContainerStatuses: []corev1.ContainerStatus{
+						{
+							Name:        "a",
+							ContainerID: "docker://27d1586d53ef9a6af5bd983831d13b6a38128119fadcdc22894d7b2397758eb5",
+						},
+						{
+							Name:        "b",
+							ContainerID: "docker://6f5ca0f22cd151943ba1b70f618591ad482cdbbc019ed58d7adf4c04f6d0ca7a",
+						},
+					},
+				},
+			}, {
+				Status: corev1.PodStatus{
+					ContainerStatuses: []corev1.ContainerStatus{},
+				},
+			}}
+
+			type args struct {
+				pod           *corev1.Pod
+				containerName string
+			}
+			tests := []struct {
+				name string
+				args args
+				want string
+			}{{
+				name: "test1",
+				args: args{
+					pod:           pods[0],
+					containerName: "b",
+				},
+				want: "6f5ca0f22cd151943ba1b70f618591ad482cdbbc019ed58d7adf4c04f6d0ca7a",
+			}, {
+				name: "test2",
+				args: args{
+					pod:           pods[0],
+					containerName: "f",
+				},
+				want: "",
+			}, {
+				name: "test3",
+				args: args{
+					pod:           pods[1],
+					containerName: "a",
+				},
+				want: "",
+			}}
+			for _, tt := range tests {
+				Expect(GetContainerID(tt.args.pod, tt.args.containerName)).Should(BeEquivalentTo(tt.want))
+			}
+
+		})
+	})
+
+	Context("common funcs test", func() {
+		It("GetContainersUsingConfigmap Should success with no error", func() {
+			type args struct {
+				containers []corev1.Container
+				volumeName string
+				filters    []containerNameFilter
+			}
+			tests := []struct {
+				name string
+				args args
+				want []string
+			}{{
+				name: "test1",
+				args: args{
+					containers: pod.Spec.Containers,
+					volumeName: "config1",
+				},
+				want: []string{"mysql", "mysql2"},
+			}, {
+				name: "test1",
+				args: args{
+					containers: pod.Spec.Containers,
+					volumeName: "config1",
+					filters: []containerNameFilter{
+						func(name string) bool {
+							return name != "mysql"
+						},
+					},
+				},
+				want: []string{"mysql"},
+			}, {
+				name: "test1",
+				args: args{
+					containers: pod.Spec.Containers,
+					volumeName: "config2",
+					filters: []containerNameFilter{
+						func(name string) bool {
+							return strings.HasPrefix(name, "mysql")
+						},
+					},
+				},
+				want: []string{},
+			}}
+			for _, tt := range tests {
+				Expect(GetContainersUsingConfigmap(tt.args.containers, tt.args.volumeName, tt.args.filters...)).Should(BeEquivalentTo(tt.want))
+			}
+
+		})
+
+		It("GetIntOrPercentValue Should success with no error", func() {
+			fn := func(v metautil.IntOrString) *metautil.IntOrString { return &v }
+			tests := []struct {
+				name      string
+				args      *metautil.IntOrString
+				want      int
+				isPercent bool
+				wantErr   bool
+			}{{
+				name:      "test",
+				args:      fn(metautil.FromString("10")),
+				want:      0,
+				isPercent: false,
+				wantErr:   true,
+			}, {
+				name:      "test",
+				args:      fn(metautil.FromString("10%")),
+				want:      10,
+				isPercent: true,
+				wantErr:   false,
+			}, {
+				name:      "test",
+				args:      fn(metautil.FromInt(60)),
+				want:      60,
+				isPercent: false,
+				wantErr:   false,
+			}}
+
+			for _, tt := range tests {
+				val, isPercent, err := GetIntOrPercentValue(tt.args)
+				Expect(err != nil).Should(BeEquivalentTo(tt.wantErr))
+				Expect(val).Should(BeEquivalentTo(tt.want))
+				Expect(isPercent).Should(BeEquivalentTo(tt.isPercent))
+			}
+		})
+	})
 })

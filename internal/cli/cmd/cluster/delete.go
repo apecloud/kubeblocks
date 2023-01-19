@@ -30,8 +30,8 @@ import (
 )
 
 var deleteExample = templates.Examples(`
-		# delete a cluster named my-cluster
-		kbcli cluster delete my-cluster
+		# delete a cluster named mycluster
+		kbcli cluster delete mycluster
 `)
 
 func NewDeleteCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {

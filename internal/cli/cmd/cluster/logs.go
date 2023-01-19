@@ -41,31 +41,31 @@ import (
 
 var (
 	logsExample = templates.Examples(`
-		# Return snapshot logs from cluster my-cluster with default primary instance (stdout)
-		kbcli cluster logs my-cluster
+		# Return snapshot logs from cluster mycluster with default primary instance (stdout)
+		kbcli cluster logs mycluster
 
-		# Display only the most recent 20 lines from cluster my-cluster with default primary instance (stdout)
-		kbcli cluster logs --tail=20 my-cluster
+		# Display only the most recent 20 lines from cluster mycluster with default primary instance (stdout)
+		kbcli cluster logs --tail=20 mycluster
 
-		# Return snapshot logs from cluster my-cluster with specify instance my-instance-0 (stdout)
-		kbcli cluster logs my-cluster --instance my-instance-0
+		# Return snapshot logs from cluster mycluster with specify instance my-instance-0 (stdout)
+		kbcli cluster logs mycluster --instance my-instance-0
 
-		# Return snapshot logs from cluster my-cluster with specify instance my-instance-0 and specify container
+		# Return snapshot logs from cluster mycluster with specify instance my-instance-0 and specify container
         # my-container (stdout)
-		kbcli cluster logs my-cluster --instance my-instance-0 -c my-container
+		kbcli cluster logs mycluster --instance my-instance-0 -c my-container
 
-		# Return slow logs from cluster my-cluster with default primary instance
-		kbcli cluster logs my-cluster --file-type=slow
+		# Return slow logs from cluster mycluster with default primary instance
+		kbcli cluster logs mycluster --file-type=slow
 
-		# Begin streaming the slow logs from cluster my-cluster with default primary instance
-		kbcli cluster logs -f my-cluster --file-type=slow
+		# Begin streaming the slow logs from cluster mycluster with default primary instance
+		kbcli cluster logs -f mycluster --file-type=slow
 
-		# Return the specify file logs from cluster my-cluster with specify instance my-instance-0
-		kbcli cluster logs my-cluster --instance my-instance-0 --file-path=/var/log/yum.log
+		# Return the specify file logs from cluster mycluster with specify instance my-instance-0
+		kbcli cluster logs mycluster --instance my-instance-0 --file-path=/var/log/yum.log
 
-		# Return the specify file logs from cluster my-cluster with specify instance my-instance-0 and specify
+		# Return the specify file logs from cluster mycluster with specify instance my-instance-0 and specify
         # container my-container
-		kbcli cluster logs my-cluster --instance my-instance-0 -c my-container --file-path=/var/log/yum.log`)
+		kbcli cluster logs mycluster --instance my-instance-0 -c my-container --file-path=/var/log/yum.log`)
 )
 
 // LogsOptions declares the arguments accepted by the logs command

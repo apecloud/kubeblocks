@@ -1,0 +1,203 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.9.0
+  creationTimestamp: null
+  name: configconstraints.dbaas.kubeblocks.io
+spec:
+  group: dbaas.kubeblocks.io
+  names:
+    categories:
+    - dbaas
+    kind: ConfigConstraint
+    listKind: ConfigConstraintList
+    plural: configconstraints
+    shortNames:
+    - ctpl
+    singular: configconstraint
+  scope: Cluster
+  versions:
+  - additionalPrinterColumns:
+    - description: status phase
+      jsonPath: .status.phase
+      name: PHASE
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: AGE
+      type: date
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: ConfigConstraint is the Schema for the configconstraint API
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: ConfigConstraintSpec defines the desired state of ConfigConstraint
+            properties:
+              cfgSchemaTopLevelName:
+                description: cfgSchemaTopLevelName is cue type name, which generates
+                  openapi schema.
+                type: string
+              configurationSchema:
+                description: configurationSchema imposes restrictions on database
+                  parameter's rule.
+                properties:
+                  cue:
+                    description: cue that to let provider verify user configuration
+                      through cue language.
+                    type: string
+                  schema:
+                    description: schema provides a way for providers to validate the
+                      changed parameters through json.
+                    type: object
+                    x-kubernetes-preserve-unknown-fields: true
+                type: object
+              dynamicParameters:
+                description: dynamicParameters, list of DynamicParameter, modifications
+                  of them trigger a config dynamic reload without process restart.
+                items:
+                  type: string
+                type: array
+              formatterConfig:
+                description: formatterConfig describes the format of the configuration
+                  file, the controller 1. parses configuration file 2. analyzes the
+                  modified parameters 3. applies corresponding policies.
+                properties:
+                  formatter:
+                    description: formatter describes the format of the configuration
+                      file Formatter ConfigurationFormatter `json:"formatter"`
+                    enum:
+                    - xml
+                    - ini
+                    - yaml
+                    - json
+                    type: string
+                  iniConfig:
+                    description: iniConfig represents the ini options.
+                    properties:
+                      sectionName:
+                        description: sectionName describes ini section.
+                        type: string
+                    type: object
+                required:
+                - formatter
+                type: object
+              immutableParameters:
+                description: immutableParameters describes parameters that prohibit
+                  user from modification.
+                items:
+                  type: string
+                type: array
+              reloadOptions:
+                description: reloadOptions indicates whether the process supports
+                  reload. if set, the controller will determine the behavior of the
+                  engine instance based on the configuration templates, restart or
+                  reload depending on whether any parameters in the StaticParameters
+                  have been modified.
+                properties:
+                  shellTrigger:
+                    description: shellTrigger performs the reload command.
+                    properties:
+                      exec:
+                        description: exec used to execute for reload.
+                        type: string
+                    required:
+                    - exec
+                    type: object
+                  unixSignalTrigger:
+                    description: unixSignalTrigger used to reload by sending a signal.
+                    properties:
+                      processName:
+                        description: processName is process name, sends unix signal
+                          to proc.
+                        pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                        type: string
+                      signal:
+                        description: 'signal is valid for unix signal. e.g: SIGHUP
+                          url: ../../internal/configuration/configmap/handler.go:allUnixSignals'
+                        enum:
+                        - SIGHUP
+                        - SIGINT
+                        - SIGQUIT
+                        - SIGILL
+                        - SIGTRAP
+                        - SIGABRT
+                        - SIGBUS
+                        - SIGFPE
+                        - SIGKILL
+                        - SIGUSR1
+                        - SIGSEGV
+                        - SIGUSR2
+                        - SIGPIPE
+                        - SIGALRM
+                        - SIGTERM
+                        - SIGSTKFLT
+                        - SIGCHLD
+                        - SIGCONT
+                        - SIGSTOP
+                        - SIGTSTP
+                        - SIGTTIN
+                        - SIGTTOU
+                        - SIGURG
+                        - SIGXCPU
+                        - SIGXFSZ
+                        - SIGVTALRM
+                        - SIGPROF
+                        - SIGWINCH
+                        - SIGIO
+                        - SIGPWR
+                        - SIGSYS
+                        type: string
+                    required:
+                    - processName
+                    - signal
+                    type: object
+                type: object
+              staticParameters:
+                description: staticParameters, list of StaticParameter, modifications
+                  of them trigger a process restart.
+                items:
+                  type: string
+                type: array
+            required:
+            - formatterConfig
+            type: object
+          status:
+            description: ConfigConstraintStatus defines the observed state of ConfigConstraint.
+            properties:
+              message:
+                description: message field describes the reasons of abnormal status.
+                type: string
+              observedGeneration:
+                description: observedGeneration is the latest generation observed
+                  for this ClusterDefinition. It refers to the ConfigConstraint's
+                  generation, which is updated by the API Server.
+                format: int64
+                type: integer
+              phase:
+                description: phase is status of configuration template, when set to
+                  AvailablePhase, it can be referenced by ClusterDefinition or AppVersion.
+                enum:
+                - Available
+                - Unavailable
+                - Deleting
+                type: string
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}

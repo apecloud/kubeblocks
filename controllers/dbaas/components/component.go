@@ -34,7 +34,7 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
-// NewComponentByType create a new component object by cluster, clusterDefinition and componentName
+// NewComponentByType creates a component object
 func NewComponentByType(
 	ctx context.Context,
 	cli client.Client,
@@ -130,6 +130,7 @@ func NeedSyncStatusComponents(cluster *dbaasv1alpha1.Cluster,
 	}
 	if statusComponent, ok = status.Components[componentName]; !ok {
 		componentType := util.GetComponentTypeName(*cluster, componentName)
+		// TODO is it ok to set component status phase as cluster status phase
 		status.Components[componentName] = dbaasv1alpha1.ClusterStatusComponent{Phase: cluster.Status.Phase,
 			PodsReady: &podsIsReady, PodsReadyTime: podsReadyTime,
 			Type: componentType,
@@ -139,15 +140,15 @@ func NeedSyncStatusComponents(cluster *dbaasv1alpha1.Cluster,
 	var needSync bool
 	if !componentIsRunning {
 		if statusComponent.Phase == dbaasv1alpha1.RunningPhase {
-			// if cluster.status.phase is Updating or OpsRequest of cluster scope is Running.
-			// so we sync the cluster phase to component phase.
+			// if cluster.status.phase is Updating or OpsRequest of cluster scope is Running,
+			// we sync the cluster phase to component phase.
 			// TODO check cluster status what means cluster scope OpsRequests are running
 			if cluster.Status.Phase == dbaasv1alpha1.UpdatingPhase {
 				statusComponent.Phase = cluster.Status.Phase
 				needSync = true
 			}
 
-			// if no operations are running in cluster and pods of component are not ready,
+			// if no operation is running in cluster and pods of component are not ready,
 			// means the component is Failed or Abnormal.
 			if util.IsCompleted(cluster.Status.Phase) {
 				if phase, err := component.GetPhaseWhenPodsNotReady(componentName); err != nil {

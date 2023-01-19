@@ -28,16 +28,10 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 
+	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/create"
+	"github.com/apecloud/kubeblocks/internal/cli/delete"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
-)
-
-const (
-	OpsTypeRestart           = "Restart"
-	OpsTypeUpgrade           = "Upgrade"
-	OpsTypeVerticalScaling   = "VerticalScaling"
-	OpsTypeHorizontalScaling = "HorizontalScaling"
-	OpsTypeVolumeExpansion   = "VolumeExpansion"
 )
 
 type OperationsOptions struct {
@@ -47,7 +41,7 @@ type OperationsOptions struct {
 	TTLSecondsAfterSucceed int      `json:"ttlSecondsAfterSucceed"`
 
 	// OpsType operation type
-	OpsType string `json:"type"`
+	OpsType dbaasv1alpha1.OpsType `json:"type"`
 
 	// OpsTypeLower lower OpsType
 	OpsTypeLower string `json:"typeLower"`
@@ -74,7 +68,7 @@ type OperationsOptions struct {
 func (o *OperationsOptions) buildCommonFlags(cmd *cobra.Command) {
 	cmd.Flags().StringVar(&o.OpsRequestName, "name", "", "OpsRequest name. if not specified, it will be randomly generated ")
 	cmd.Flags().IntVar(&o.TTLSecondsAfterSucceed, "ttlSecondsAfterSucceed", 0, "Time to live after the OpsRequest succeed")
-	if o.OpsType != OpsTypeUpgrade {
+	if o.OpsType != dbaasv1alpha1.UpgradeType {
 		cmd.Flags().StringSliceVar(&o.ComponentNames, "component-names", nil, " Component names to this operations (required)")
 	}
 }
@@ -93,7 +87,7 @@ func (o *OperationsOptions) CompleteRestartOps() error {
 			return err
 		}
 	}
-	return nil
+	return delete.Confirm([]string{o.Name}, o.In)
 }
 
 func (o *OperationsOptions) validateUpgrade() error {
@@ -126,7 +120,7 @@ func (o *OperationsOptions) Validate() error {
 		return fmt.Errorf("missing cluster name")
 	}
 
-	if o.OpsType == OpsTypeUpgrade {
+	if o.OpsType == dbaasv1alpha1.UpgradeType {
 		return o.validateUpgrade()
 	}
 
@@ -136,9 +130,9 @@ func (o *OperationsOptions) Validate() error {
 	}
 
 	switch o.OpsType {
-	case OpsTypeVolumeExpansion:
+	case dbaasv1alpha1.VolumeExpansionType:
 		return o.validateVolumeExpansion()
-	case OpsTypeHorizontalScaling:
+	case dbaasv1alpha1.HorizontalScalingType:
 		return o.validateHorizontalScaling()
 	}
 	return nil
@@ -146,7 +140,7 @@ func (o *OperationsOptions) Validate() error {
 
 // buildOperationsInputs build operations inputs
 func buildOperationsInputs(f cmdutil.Factory, o *OperationsOptions) create.Inputs {
-	o.OpsTypeLower = strings.ToLower(o.OpsType)
+	o.OpsTypeLower = strings.ToLower(string(o.OpsType))
 	return create.Inputs{
 		CueTemplateName: "cluster_operations_template.cue",
 		ResourceName:    types.ResourceOpsRequests,
@@ -159,7 +153,7 @@ func buildOperationsInputs(f cmdutil.Factory, o *OperationsOptions) create.Input
 
 // NewRestartCmd create a restart command
 func NewRestartCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
-	o := &OperationsOptions{BaseOptions: create.BaseOptions{IOStreams: streams}, OpsType: OpsTypeRestart}
+	o := &OperationsOptions{BaseOptions: create.BaseOptions{IOStreams: streams}, OpsType: dbaasv1alpha1.RestartType}
 	inputs := buildOperationsInputs(f, o)
 	inputs.Use = "restart"
 	inputs.Short = "Restart the specified components in the cluster"
@@ -172,7 +166,7 @@ func NewRestartCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 
 // NewUpgradeCmd create a upgrade command
 func NewUpgradeCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
-	o := &OperationsOptions{BaseOptions: create.BaseOptions{IOStreams: streams}, OpsType: OpsTypeUpgrade}
+	o := &OperationsOptions{BaseOptions: create.BaseOptions{IOStreams: streams}, OpsType: dbaasv1alpha1.UpgradeType}
 	inputs := buildOperationsInputs(f, o)
 	inputs.Use = "upgrade"
 	inputs.Short = "Upgrade the cluster version"
@@ -180,15 +174,18 @@ func NewUpgradeCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 		o.buildCommonFlags(cmd)
 		cmd.Flags().StringVar(&o.ClusterVersionRef, "cluster-version", "", "Reference cluster version (required)")
 	}
+	inputs.Complete = func() error {
+		return delete.Confirm([]string{o.Name}, o.In)
+	}
 	return create.BuildCommand(inputs)
 }
 
 // NewVerticalScalingCmd create a vertical scaling command
 func NewVerticalScalingCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
-	o := &OperationsOptions{BaseOptions: create.BaseOptions{IOStreams: streams}, OpsType: OpsTypeVerticalScaling}
+	o := &OperationsOptions{BaseOptions: create.BaseOptions{IOStreams: streams}, OpsType: dbaasv1alpha1.VerticalScalingType}
 	inputs := buildOperationsInputs(f, o)
-	inputs.Use = "vertical-scaling"
-	inputs.Short = "Vertical scaling the specified components in the cluster"
+	inputs.Use = "vertical-scale"
+	inputs.Short = "Vertical scale the specified components in the cluster"
 	inputs.BuildFlags = func(cmd *cobra.Command) {
 		o.buildCommonFlags(cmd)
 		cmd.Flags().StringVar(&o.RequestCPU, "requests.cpu", "", "CPU size requested by the component")
@@ -196,32 +193,41 @@ func NewVerticalScalingCmd(f cmdutil.Factory, streams genericclioptions.IOStream
 		cmd.Flags().StringVar(&o.LimitCPU, "limits.cpu", "", "CPU size limited by the component")
 		cmd.Flags().StringVar(&o.LimitMemory, "limits.memory", "", "Memory size limited by the component")
 	}
+	inputs.Complete = func() error {
+		return delete.Confirm([]string{o.Name}, o.In)
+	}
 	return create.BuildCommand(inputs)
 }
 
 // NewHorizontalScalingCmd create a horizontal scaling command
 func NewHorizontalScalingCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
-	o := &OperationsOptions{BaseOptions: create.BaseOptions{IOStreams: streams}, OpsType: OpsTypeHorizontalScaling}
+	o := &OperationsOptions{BaseOptions: create.BaseOptions{IOStreams: streams}, OpsType: dbaasv1alpha1.HorizontalScalingType}
 	inputs := buildOperationsInputs(f, o)
-	inputs.Use = "horizontal-scaling"
-	inputs.Short = "Horizontal scaling the specified components in the cluster"
+	inputs.Use = "horizontal-scale"
+	inputs.Short = "Horizontal scale the specified components in the cluster"
 	inputs.BuildFlags = func(cmd *cobra.Command) {
 		o.buildCommonFlags(cmd)
 		cmd.Flags().IntVar(&o.Replicas, "replicas", -1, "Replicas with the specified components")
+	}
+	inputs.Complete = func() error {
+		return delete.Confirm([]string{o.Name}, o.In)
 	}
 	return create.BuildCommand(inputs)
 }
 
 // NewVolumeExpansionCmd create a vertical scaling command
 func NewVolumeExpansionCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
-	o := &OperationsOptions{BaseOptions: create.BaseOptions{IOStreams: streams}, OpsType: OpsTypeVolumeExpansion}
+	o := &OperationsOptions{BaseOptions: create.BaseOptions{IOStreams: streams}, OpsType: dbaasv1alpha1.VolumeExpansionType}
 	inputs := buildOperationsInputs(f, o)
-	inputs.Use = "volume-expansion"
+	inputs.Use = "volume-expand"
 	inputs.Short = "Expand volume with the specified components and volumeClaimTemplates in the cluster"
 	inputs.BuildFlags = func(cmd *cobra.Command) {
 		o.buildCommonFlags(cmd)
 		cmd.Flags().StringSliceVar(&o.VCTNames, "volume-claim-template-names", nil, "VolumeClaimTemplate names in components (required)")
 		cmd.Flags().StringVar(&o.Storage, "storage", "", "Volume storage size (required)")
+	}
+	inputs.Complete = func() error {
+		return delete.Confirm([]string{o.Name}, o.In)
 	}
 	return create.BuildCommand(inputs)
 }

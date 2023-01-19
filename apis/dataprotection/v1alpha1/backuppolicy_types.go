@@ -32,6 +32,18 @@ type BackupPolicySpec struct {
 	// +optional
 	Schedule string `json:"schedule,omitempty"`
 
+	// Backup Type. full or incremental or snapshot. if unset, default is snapshot.
+	// +kubebuilder:validation:Enum={full,incremental,snapshot}
+	// +kubebuilder:default=snapshot
+	// +optional
+	BackupType string `json:"backupType,omitempty"`
+
+	// The number of automatic backups to retain. Value must be non-negative integer.
+	// 0 means NO limit on the number of backups.
+	// +kubebuilder:default=7
+	// +optional
+	BackupsHistoryLimit int32 `json:"backupsHistoryLimit,omitempty"`
+
 	// which backup tool to perform database backup, only support one tool.
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	// +optional
@@ -88,15 +100,15 @@ type BackupPolicySecret struct {
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	Name string `json:"name"`
 
-	// which key name for user
+	// UserKeyword the map keyword of the user in the connection credential secret
 	// +kubebuilder:default=username
 	// +optional
-	KeyUser string `json:"keyUser,omitempty"`
+	UserKeyword string `json:"userKeyword,omitempty"`
 
-	// which key name for password
+	// PasswordKeyword the map keyword of the password in the connection credential secret
 	// +kubebuilder:default=password
 	// +optional
-	KeyPassword string `json:"keyPassword,omitempty"`
+	PasswordKeyword string `json:"passwordKeyword,omitempty"`
 }
 
 // BackupPolicyHook defined for the database execute commands before and after backup.
@@ -110,8 +122,7 @@ type BackupPolicyHook struct {
 	PostCommands []string `json:"postCommands,omitempty"`
 
 	// exec command with image
-	// TODO(dsj): use kubeblocks
-	// +kubebuilder:default="rancher/kubectl:v1.23.7"
+	// +kubebuilder:default="docker.io/apecloud/kubeblocks"
 	// +optional
 	Image string `json:"image,omitempty"`
 
@@ -130,11 +141,23 @@ type BackupPolicyStatus struct {
 	// the reason if backup policy check failed.
 	// +optional
 	FailureReason string `json:"failureReason,omitempty"`
+
+	// Information when was the last time the job was successfully scheduled.
+	// +optional
+	LastScheduleTime *metav1.Time `json:"lastScheduleTime,omitempty"`
+
+	// Information when was the last time the job successfully completed.
+	// +optional
+	LastSuccessfulTime *metav1.Time `json:"lastSuccessfulTime,omitempty"`
 }
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:categories={dbaas},scope=Namespaced
+// +kubebuilder:printcolumn:name="STATUS",type=string,JSONPath=`.status.phase`
+// +kubebuilder:printcolumn:name="SCHEDULE",type=string,JSONPath=`.spec.schedule`
+// +kubebuilder:printcolumn:name="LAST SCHEDULE",type=string,JSONPath=`.status.lastScheduleTime`
+// +kubebuilder:printcolumn:name="AGE",type=date,JSONPath=`.metadata.creationTimestamp`
 
 // BackupPolicy is the Schema for the backuppolicies API  (defined by User)
 type BackupPolicy struct {

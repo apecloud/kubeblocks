@@ -1,0 +1,104 @@
+{
+  "type": "object",
+  "properties": {
+    "spec": {
+      "description": "mysql all parameters definition",
+      "type": "object",
+      "required": [
+        "mysqlld"
+      ],
+      "properties": {
+        "client": {
+          "description": "ingore client parameter validate\nmysql client: a set of name/value pairs.",
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "mysqlld": {
+          "description": "mysql config validator",
+          "type": "object",
+          "required": [
+            "automatic_sp_privileges",
+            "auto_increment_increment",
+            "binlog_stmt_cache_size",
+            "flush_time",
+            "group_concat_max_len",
+            "gtid_mode",
+            "port",
+            "KeyPath"
+          ],
+          "properties": {
+            "KeyPath": {
+              "description": "custom format, reference Regular expressions",
+              "type": "string",
+              "pattern": "^[a-z][a-zA-Z0-9]+.pem$"
+            },
+            "auto_increment_increment": {
+              "description": "[1~65535] default ON",
+              "type": "integer",
+              "default": 1,
+              "maximum": 65535,
+              "minimum": 1
+            },
+            "automatic_sp_privileges": {
+              "description": "[OFF|ON] default ON",
+              "type": "string",
+              "default": "ON",
+              "enum": [
+                "ON",
+                "OFF"
+              ]
+            },
+            "binlog_stmt_cache_size": {
+              "type": "integer",
+              "default": 2097152,
+              "maximum": 16777216,
+              "minimum": 4096
+            },
+            "caching_sha2_password_private_key_path": {
+              "$ref": "#/components/schemas/MysqlSchema.mysqlld.KeyPath"
+            },
+            "flush_time": {
+              "type": "integer",
+              "default": 0,
+              "maximum": 31536000,
+              "minimum": 0
+            },
+            "group_concat_max_len": {
+              "type": "integer",
+              "default": 1024
+            },
+            "gtid_mode": {
+              "type": "string",
+              "enum": [
+                "0",
+                "1",
+                "OFF",
+                "ON"
+              ]
+            },
+            "innodb_autoinc_lock_mode": {
+              "description": "[0|1|2] default: 2",
+              "type": "integer",
+              "enum": [
+                2
+              ]
+            },
+            "innodb_buffer_pool_load_now": {
+              "description": "[0|1] default empty",
+              "type": "integer",
+              "enum": [
+                0,
+                1
+              ]
+            },
+            "port": {
+              "type": "integer"
+            }
+          }
+        }
+      }
+    }
+  }
+}

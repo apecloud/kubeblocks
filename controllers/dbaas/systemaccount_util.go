@@ -205,7 +205,7 @@ func newCustomizedEngine(execConfig *dbaasv1alpha1.CmdExecutorConfig, dbcluster 
 	}
 }
 
-func replceNamedVars(namedValues map[string]string, needle string, limits int, matchAll bool) string {
+func replaceNamedVars(namedValues map[string]string, needle string, limits int, matchAll bool) string {
 	for k, v := range namedValues {
 		r := strings.Replace(needle, k, v, limits)
 		// early termination on matching, when matchAll = false
@@ -227,7 +227,7 @@ func replaceEnvsValues(clusterName string, sysAccounts *dbaasv1alpha1.SystemAcco
 				continue
 			}
 			secretRef := e.ValueFrom.SecretKeyRef
-			name := replceNamedVars(namedValues, secretRef.Name, 1, false)
+			name := replaceNamedVars(namedValues, secretRef.Name, 1, false)
 			if name != secretRef.Name {
 				secretRef.Name = name
 			}
@@ -239,7 +239,7 @@ func replaceEnvsValues(clusterName string, sysAccounts *dbaasv1alpha1.SystemAcco
 		if acc.ProvisionPolicy.Type == dbaasv1alpha1.ReferToExisting {
 			// replace systemAccounts.accounts[*].provisionPolciy.secretRef.name variables
 			secretRef := acc.ProvisionPolicy.SecretRef
-			name := replceNamedVars(namedValues, secretRef.Name, 1, false)
+			name := replaceNamedVars(namedValues, secretRef.Name, 1, false)
 			if name != secretRef.Name {
 				secretRef.Name = name
 			}
@@ -359,6 +359,22 @@ func retrieveEndpoints(scope dbaasv1alpha1.ProvisionScope,
 	return endpoints
 }
 
+func getAccountFacts(secrets *corev1.SecretList, jobs *batchv1.JobList) (detectedFacts dbaasv1alpha1.KBAccountType) {
+	// parse account name from secret's label
+	for _, secret := range secrets.Items {
+		if accountName, exists := secret.ObjectMeta.Labels[clusterAccountLabelKey]; exists {
+			updateFacts(dbaasv1alpha1.AccountName(accountName), &detectedFacts)
+		}
+	}
+	// parse account name from job's label
+	for _, job := range jobs.Items {
+		if accountName, exists := job.ObjectMeta.Labels[clusterAccountLabelKey]; exists {
+			updateFacts(dbaasv1alpha1.AccountName(accountName), &detectedFacts)
+		}
+	}
+	return
+}
+
 func updateFacts(accountName dbaasv1alpha1.AccountName, detectedFacts *dbaasv1alpha1.KBAccountType) {
 	switch accountName {
 	case dbaasv1alpha1.AdminAccount:
@@ -389,9 +405,7 @@ func getEngineType(clusterDefType string, compDef dbaasv1alpha1.ClusterDefinitio
 	}
 
 	switch clusterDefType {
-	// clusterDefType define well known cluster types. could be one of
-	// [state.redis, mq.mqtt, mq.kafka, state.mysql-8, state.mysql-5.7, state.mysql-5.6, state-mongodb]
-	case "state.mysql-8", "state.mysql-5.7", "state.mysql-5.6":
+	case "state.mysql":
 		return kMysql
 	default:
 		return ""
@@ -417,11 +431,11 @@ func getCreationStmtForAccount(namespace, clusterName, clusterDefType, clusterDe
 	creationStmt := make([]string, 0)
 	// drop if exists + create if not exists
 	statements := accountConfig.ProvisionPolicy.Statements
-	stmt := replceNamedVars(namedVars, statements.DeletionStatement, -1, true)
 
+	stmt := replaceNamedVars(namedVars, statements.DeletionStatement, -1, true)
 	creationStmt = append(creationStmt, stmt)
-	stmt = replceNamedVars(namedVars, statements.CreationStatement, -1, true)
 
+	stmt = replaceNamedVars(namedVars, statements.CreationStatement, -1, true)
 	creationStmt = append(creationStmt, stmt)
 
 	secret := renderSecretWithPwd(namespace, clusterName, clusterDefType, clusterDefName, compName, userName, passwd)

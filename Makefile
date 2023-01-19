@@ -128,7 +128,7 @@ help: ## Display this help.
 	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage:\n  make \033[36m<target>\033[0m\n"} /^[a-zA-Z_0-9-]+:.*?##/ { printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
 
 .PHONY: all
-all: manager kbcli agamotto ## Make all cmd binaries.
+all: manager kbcli agamotto reloader ## Make all cmd binaries.
 
 ##@ Development
 
@@ -136,6 +136,7 @@ all: manager kbcli agamotto ## Make all cmd binaries.
 manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
 	$(CONTROLLER_GEN) rbac:roleName=manager-role crd:generateEmbeddedObjectMeta=true webhook paths="./apis/...;./controllers/dbaas/...;./controllers/dataprotection/...;./controllers/k8score/...;./cmd/manager/...;./internal/..." output:crd:artifacts:config=config/crd/bases
 	@cp config/crd/bases/* $(CHART_PATH)/crds
+	@cp config/rbac/role.yaml $(CHART_PATH)/config/rbac/role.yaml
 	$(CONTROLLER_GEN) rbac:roleName=loadbalancer-role  paths="./controllers/loadbalancer;./cmd/loadbalancer/controller" output:dir=config/loadbalancer
 
 .PHONY: generate
@@ -179,11 +180,13 @@ mod-download: ## Run go mod download against go modules.
 	$(GO) mod download
 
 .PHONY: mod-vendor
-mod-vendor: ## Run go mod tidy->vendor->verify against go modules.
-	$(GO) mod tidy -compat=1.19
+mod-vendor: module ## Run go mod vendor against go modules.
 	$(GO) mod vendor
-	$(GO) mod verify
 
+.PHONY: module
+module: ## Run go mod tidy->verify against go modules.
+	$(GO) mod tidy -compat=1.19
+	$(GO) mod verify
 
 TEST_PACKAGE=
 
@@ -195,7 +198,6 @@ ifeq (, $(shell sed -n "/^127.0.0.1[[:space:]]*host.$(EXISTING_CLUSTER_TYPE).int
 	sudo bash -c 'echo "127.0.0.1 host.$(EXISTING_CLUSTER_TYPE).internal" >> /etc/hosts'
 endif
 endif
-
 
 .PHONY: test-current-ctx
 test-current-ctx: manifests generate fmt vet add-k8s-host ## Run operator controller tests with current $KUBECONFIG context. if existing k8s cluster is k3d or minikube, specify EXISTING_CLUSTER_TYPE.
@@ -325,32 +327,51 @@ agamotto: build-checks ## Build agamotto related binaries
 clean-agamotto: ## Clean bin/mysqld_exporter.
 	rm -f bin/agamotto
 
-##@ probe cmd
+##@ reloader
+
+RELOADER_LD_FLAGS = "-s -w"
+
+bin/reloader.%: ## Cross build bin/reloader.$(OS).$(ARCH) .
+	GOOS=$(word 2,$(subst ., ,$@)) GOARCH=$(word 3,$(subst ., ,$@)) $(GO) build -ldflags=${RELOADER_LD_FLAGS} -o $@ ./cmd/reloader/main.go
+
+.PHONY: reloader
+reloader: OS=$(shell $(GO) env GOOS)
+reloader: ARCH=$(shell $(GO) env GOARCH)
+reloader: build-checks ## Build agamotto related binaries
+	$(MAKE) bin/reloader.${OS}.${ARCH}
+	mv bin/reloader.${OS}.${ARCH} bin/reloader
+
+.PHONY: clean
+clean-reloader: ## Clean bin/mysqld_exporter.
+	rm -f bin/reloader
+
+##@ PROBE
+
 
 PROBE_BUILD_PATH = ./cmd/probe
 PROBE_LD_FLAGS = "-s -w"
 
-bin/probe.%: ## Cross build bin/daprd.$(OS).$(ARCH) .
+bin/probe.%: ## Cross build bin/probe.$(OS).$(ARCH) .
 	cd $(PROBE_BUILD_PATH) && GOOS=$(word 2,$(subst ., ,$@)) GOARCH=$(word 3,$(subst ., ,$@)) $(GO) build -ldflags=${PROBE_LD_FLAGS} -o ../../$@  ./main.go
 
-# probe-mod-vendor:
-# 	cd $(PROBE_BUILD_PATH) && $(GO) mod tidy -compat=1.19
-# 	cd $(PROBE_BUILD_PATH) && $(GO) mod vendor
-# 	cd $(PROBE_BUILD_PATH) && $(GO) mod verify
+probe-mod-vendor:
+	cd $(PROBE_BUILD_PATH) && $(GO) mod tidy -compat=1.19
+	cd $(PROBE_BUILD_PATH) && $(GO) mod vendor
+	cd $(PROBE_BUILD_PATH) && $(GO) mod verify
 
 .PHONY: probe
 probe: OS=$(shell $(GO) env GOOS)
 probe: ARCH=$(shell $(GO) env GOARCH)
-probe: mod-vendor # build-checks ## Build daprd related binaries
+probe: probe-mod-vendor # build-checks ## Build probe related binaries
 	$(MAKE) bin/probe.${OS}.${ARCH}
 	mv bin/probe.${OS}.${ARCH} bin/probe
 
-.PHONY: clean-probe
-clean-probe: ## Clean bin/probe
+.PHONY: clean
+clean-probe: ## Clean bin/mysqld_exporter.
 	rm -f bin/probe
 
 .PHONY: test-probe
-test-probe: ## Test cmd/probe module.
+test-probe:
 	cd ./cmd/probe && $(GO) test ./... -coverprofile cover.out
 
 .PHONY: cover-report-probe
@@ -361,7 +382,6 @@ ifeq ($(GOOS), darwin)
 else
 	echo "open cmd/probe/cover.html with a HTML viewer."
 endif
-
 
 ##@ Deployment
 

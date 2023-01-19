@@ -3,12 +3,14 @@ kind: ClusterDefinition
 metadata:
   name: mysql-clusterdef-consensus
 spec:
-  type: state.mysql-8
+  type: state.mysql
   components:
   - typeName: replicasets
-    configTemplateRefs:
-    - name: mysql-tree-node-template-8.0
-      volumeName: mysql-config
+    configSpec:
+      configTemplateRefs:
+        - name: mysql-tree-node-template-8.0
+          configTplRef: mysql-tree-node-template-8.0
+          volumeName: mysql-config
     componentType: Consensus
     consensusSpec:
       leader:

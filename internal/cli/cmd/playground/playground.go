@@ -45,8 +45,10 @@ type initOptions struct {
 	genericclioptions.IOStreams
 	helmCfg *action.Configuration
 
-	clusterDef string
-	verbose    bool
+	clusterDef     string
+	verbose        bool
+	kbVersion      string
+	clusterVersion string
 
 	CloudProvider string
 	AccessKey     string
@@ -90,6 +92,8 @@ func newInitCmd(streams genericclioptions.IOStreams) *cobra.Command {
 	}
 
 	cmd.Flags().StringVar(&o.clusterDef, "cluster-definition", defaultClusterDef, "Cluster definition")
+	cmd.Flags().StringVar(&o.clusterVersion, "cluster-version", "", "Cluster definition")
+	cmd.Flags().StringVar(&o.kbVersion, "kubeblocks-version", version.DefaultKubeBlocksVersion, "KubeBlocks version")
 	cmd.Flags().StringVar(&o.CloudProvider, "cloud-provider", defaultCloudProvider, "Cloud provider type")
 	cmd.Flags().StringVar(&o.AccessKey, "access-key", "", "Cloud provider access key")
 	cmd.Flags().StringVar(&o.AccessSecret, "access-secret", "", "Cloud provider access secret")
@@ -184,10 +188,17 @@ func (o *initOptions) local() error {
 	}
 
 	// Install database cluster
-	fmt.Fprintf(o.Out, "Install database cluster %s\n", kbClusterName)
-	if err = o.installCluster(); err != nil {
-		return errors.Wrap(err, "failed to install database cluster")
+	if err = o.getClusterVersion(); err != nil {
+		return err
 	}
+
+	spinner = util.Spinner(o.Out, "Create cluster %s (ClusterDefinition: %s, ClusterVersion: %s)",
+		kbClusterName, o.clusterDef, o.clusterVersion)
+	defer spinner(false)
+	if err = o.installCluster(); err != nil {
+		return err
+	}
+	spinner(true)
 
 	// Print guide information
 	if err = printGuide(defaultCloudProvider, localHost, true); err != nil {
@@ -223,13 +234,13 @@ func (o *initOptions) remote() error {
 }
 
 func (o *destroyOptions) destroyPlayground() error {
-	installer := &installer{
+	ins := &installer{
 		ctx:         context.Background(),
 		clusterName: k8sClusterName,
 	}
 
-	installer.verboseLog(false)
-	spinner := util.Spinner(o.Out, "Destroy playground cluster")
+	ins.verboseLog(false)
+	spinner := util.Spinner(o.Out, "Destroy KubeBlocks playground")
 	defer spinner(false)
 
 	// remote playground, just destroy all cloud resources
@@ -250,14 +261,14 @@ func (o *destroyOptions) destroyPlayground() error {
 		return nil
 	}
 
-	// local playgroundG
-	if err := installer.uninstall(); err != nil {
+	// uninstall k3d cluster
+	if err := ins.uninstall(); err != nil {
 		return err
 	}
 
 	// remove playground directory
 	if dir, err := removePlaygroundDir(); err != nil {
-		fmt.Fprintf(o.ErrOut, "failed to remove playground temporary directory %s, you can remove it munally", dir)
+		fmt.Fprintf(o.ErrOut, "Failed to remove playground temporary directory %s, you can remove it munally", dir)
 	}
 	spinner(true)
 	return nil
@@ -273,7 +284,7 @@ func runGuide() error {
 }
 
 func printGuide(cloudProvider string, hostIP string, init bool) error {
-	var clusterInfo = &clusterInfo{
+	var info = &clusterInfo{
 		HostIP:        hostIP,
 		CloudProvider: cloudProvider,
 		KubeConfig:    util.ConfigPath(k8sClusterName),
@@ -281,7 +292,7 @@ func printGuide(cloudProvider string, hostIP string, init bool) error {
 	}
 
 	// check if config file exists
-	if _, err := os.Stat(clusterInfo.KubeConfig); err != nil && os.IsNotExist(err) {
+	if _, err := os.Stat(info.KubeConfig); err != nil && os.IsNotExist(err) {
 		fmt.Fprintf(os.Stderr, "Try to initialize a playground cluster by running:\n"+
 			"\tkbcli playground init\n")
 		return err
@@ -291,24 +302,56 @@ func printGuide(cloudProvider string, hostIP string, init bool) error {
 		fmt.Fprintf(os.Stdout, "\nKubeBlocks playground init SUCCESSFULLY!\n"+
 			"Cluster \"%s\" has been CREATED!\n", kbClusterName)
 	}
-	return util.PrintGoTemplate(os.Stdout, guideTmpl, clusterInfo)
+	return util.PrintGoTemplate(os.Stdout, guideTmpl, info)
 }
 
 func (o *initOptions) installKubeBlocks() error {
-	installer := kubeblocks.InstallOptions{
+	f := util.NewFactory()
+	client, err := f.KubernetesClientSet()
+	if err != nil {
+		return err
+	}
+	dynamic, err := f.DynamicClient()
+	if err != nil {
+		return err
+	}
+	insOpts := kubeblocks.InstallOptions{
 		Options: kubeblocks.Options{
 			HelmCfg:   o.helmCfg,
 			Namespace: defaultNamespace,
 			IOStreams: o.IOStreams,
+			Client:    client,
+			Dynamic:   dynamic,
 		},
-		Version: version.DefaultKubeBlocksVersion,
+		Version: o.kbVersion,
 		Monitor: true,
 		Quiet:   true,
 	}
-	return installer.Run()
+	return insOpts.Install()
 }
 
 func (o *initOptions) installCluster() error {
+	// construct a cluster create options and run
+	options, err := newCreateOptions(o.clusterDef, o.clusterVersion)
+	if err != nil {
+		return err
+	}
+
+	inputs := create.Inputs{
+		BaseOptionsObj:  &options.BaseOptions,
+		Options:         options,
+		CueTemplateName: cmdcluster.CueTemplateName,
+		ResourceName:    types.ResourceClusters,
+	}
+
+	return options.Run(inputs)
+}
+
+func (o *initOptions) getClusterVersion() error {
+	if len(o.clusterVersion) > 0 {
+		return nil
+	}
+
 	f := util.NewFactory()
 	dynamic, err := f.DynamicClient()
 	if err != nil {
@@ -326,21 +369,8 @@ func (o *initOptions) installCluster() error {
 	if version == nil {
 		return fmt.Errorf("failed to find component version referencing current cluster definition %s", o.clusterDef)
 	}
-
-	// construct a cluster create options and run
-	options, err := newCreateOptions(o.clusterDef, version.Name)
-	if err != nil {
-		return err
-	}
-
-	inputs := create.Inputs{
-		BaseOptionsObj:  &options.BaseOptions,
-		Options:         options,
-		CueTemplateName: cmdcluster.CueTemplateName,
-		ResourceName:    types.ResourceClusters,
-	}
-
-	return options.Run(inputs)
+	o.clusterVersion = version.Name
+	return nil
 }
 
 func newCreateOptions(cd string, version string) (*cmdcluster.CreateOptions, error) {
@@ -350,7 +380,7 @@ func newCreateOptions(cd string, version string) (*cmdcluster.CreateOptions, err
 	}
 	options := &cmdcluster.CreateOptions{
 		BaseOptions: create.BaseOptions{
-			IOStreams: genericclioptions.IOStreams{In: os.Stdin, Out: os.Stdout, ErrOut: os.Stderr},
+			IOStreams: genericclioptions.NewTestIOStreamsDiscard(),
 			Namespace: defaultNamespace,
 			Name:      kbClusterName,
 			Client:    dynamicClient,

@@ -30,8 +30,7 @@ import (
 
 // ClusterDefinition Type Const Define
 const (
-	kStateMysql  = "state.mysql"
-	kStateMysql8 = "state.mysql-8"
+	kStateMysql = "state.mysql"
 )
 
 // ClusterDefinitionComponent CharacterType Const Define

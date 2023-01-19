@@ -208,7 +208,7 @@ var _ = AfterSuite(func() {
 
 // Helper functions to change fields in the desired state and status of resources.
 // Each helper is a wrapper of k8sClient.Patch.
-// Usage:
+// Example:
 // changeSpec(key, func(clusterDef *dbaasv1alpha1.ClusterDefinition) {
 //		// modify clusterDef
 // })
@@ -246,6 +246,10 @@ func changeStatus[T intctrlutil.Object, PT intctrlutil.PObject[T]](namespacedNam
 // Helper functions to check fields of resources when writing unit tests.
 // Each helper returns a Gomega assertion function, which should be passed into
 // Eventually() or Consistently() as the first parameter.
+// Example:
+// Eventually(checkObj(key, func(g Gomega, cluster *dbaasv1alpha1.Cluster) {
+//   g.Expect(..).To(BeTrue()) // do some check
+// })).Should(Succeed())
 
 func checkObj[T intctrlutil.Object, PT intctrlutil.PObject[T]](namespacedName types.NamespacedName,
 	check func(g Gomega, pobj PT)) func(g Gomega) {
@@ -254,21 +258,5 @@ func checkObj[T intctrlutil.Object, PT intctrlutil.PObject[T]](namespacedName ty
 		pobj := PT(&obj)
 		g.Expect(k8sClient.Get(ctx, namespacedName, pobj)).To(Succeed())
 		check(g, pobj)
-	}
-}
-
-func expectClusterStatusPhase(namespacedName types.NamespacedName) func(g Gomega) dbaasv1alpha1.Phase {
-	return func(g Gomega) dbaasv1alpha1.Phase {
-		cluster := &dbaasv1alpha1.Cluster{}
-		g.Expect(k8sClient.Get(ctx, namespacedName, cluster)).To(Succeed())
-		return cluster.Status.Phase
-	}
-}
-
-func expectOpsRequestStatusPhase(namespacedName types.NamespacedName) func(g Gomega) dbaasv1alpha1.Phase {
-	return func(g Gomega) dbaasv1alpha1.Phase {
-		opsRequest := &dbaasv1alpha1.OpsRequest{}
-		g.Expect(k8sClient.Get(ctx, namespacedName, opsRequest)).To(Succeed())
-		return opsRequest.Status.Phase
 	}
 }

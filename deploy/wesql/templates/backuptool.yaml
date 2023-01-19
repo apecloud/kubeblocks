@@ -2,6 +2,8 @@ apiVersion: dataprotection.kubeblocks.io/v1alpha1
 kind: BackupTool
 metadata:
   name: xtrabackup-mysql
+  labels:
+    {{- include "wesqlapp.labels" . | nindent 4 }}
 spec:
   image: percona/percona-xtrabackup
   databaseEngine: mysql

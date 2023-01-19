@@ -29,9 +29,9 @@ type prompt struct {
 	in       io.ReadCloser
 }
 
-func NewPrompt(msg string, label string, in io.Reader) *prompt {
+func NewPrompt(errMsg string, label string, in io.Reader) *prompt {
 	return &prompt{
-		errorMsg: msg,
+		errorMsg: errMsg,
 		label:    label,
 		in:       io.NopCloser(in),
 	}

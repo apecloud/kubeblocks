@@ -73,8 +73,33 @@ $kubeblocks_changes
 
 To upgrade to this release of KubeBlocks, follow the steps here to ensure a smooth upgrade.
 
-TODO: add upgrade steps
-
+Release Notes for `v0.3.0`:
+- Rename CRD name `backupjobs.dataprotection.kubeblocks.io` 
+to `backups.dataprotection.kubeblocks.io`
+  - upgrade kubeblocks following commands:
+      ```
+      helm upgrade --install kubeblocks kubeblocks/kubeblocks --version 0.3.0
+      ```
+  - after you upgrade kubeblocks, check CRD `backupjobs.dataprotection.kubeblocks.io` and delete it
+    ```
+    kubectl delete crd backupjobs.dataprotection.kubeblocks.io
+    ```
+- Rename CRD name `appversions.dbaas.kubeblocks.io` to `clusterversions.dbaas.kubeblocks.io`
+  - before you upgrade kubeblocks, please back up your Cluster CR yaml first.
+    ```
+    kubectl get cluster -oyaml > clusters.yaml
+    ```
+    then we replace all spec.appVersionRef to spec.clusterVersionRef in the clusters.yaml.
+  
+    finally, we handle OpsRequest CR in the same way.
+  - after you upgrade kubeblocks, you can delete the CRD `appversions.dbaas.kubeblocks.io`
+    ```
+    kubectl delete crd appversions.dbaas.kubeblocks.io
+    ```
+    finally, we use the above backup of Clusters and OpsRequests to configure them.
+    ```
+    kubectl apply -f clusters.yaml
+    ```
 ## Breaking Changes
 
 $kubeblocks_breaking_changes

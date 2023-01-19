@@ -66,7 +66,7 @@ kind: ClusterDefinition
 metadata:
   name: %s
 spec:
-  type: state.mysql-8
+  type: state.mysql
   components:
   - typeName: consensus
     componentType: Consensus

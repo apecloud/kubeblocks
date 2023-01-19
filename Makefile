@@ -138,7 +138,7 @@ generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and
 
 .PHONY: go-generate
 go-generate: ## Run go generate against code.
-	# $(GO) generate -x ./...
+	$(GO) generate -x ./...
 
 .PHONY: go-generate
 go-generate: ## Run go generate against code.

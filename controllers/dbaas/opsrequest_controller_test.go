@@ -55,10 +55,14 @@ var _ = Describe("OpsRequest Controller", func() {
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 
-		clearResources(ctx, func(list *dbaasv1alpha1.OpsRequestList) []dbaasv1alpha1.OpsRequest { return list.Items }, inNS, ml)
-		clearResources(ctx, func(list *dbaasv1alpha1.ClusterList) []dbaasv1alpha1.Cluster { return list.Items }, inNS, ml)
-		clearResources(ctx, func(list *dbaasv1alpha1.ClusterVersionList) []dbaasv1alpha1.ClusterVersion { return list.Items }, ml)
-		clearResources(ctx, func(list *dbaasv1alpha1.ClusterDefinitionList) []dbaasv1alpha1.ClusterDefinition { return list.Items }, ml)
+		By("clean opsrequest")
+		clearResources(ctx, intctrlutil.OpsRequestSignature, inNS, ml)
+		By("clean cluster")
+		clearResources(ctx, intctrlutil.ClusterSignature, inNS, ml)
+		By("clean clusterversion")
+		clearResources(ctx, intctrlutil.ClusterVersionSignature, ml)
+		By("clean clusterdefinition")
+		clearResources(ctx, intctrlutil.ClusterDefinitionSignature, ml)
 	}
 
 	BeforeEach(cleanAll)

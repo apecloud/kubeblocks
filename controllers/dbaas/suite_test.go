@@ -269,14 +269,15 @@ func checkObj[T intctrlutil.Object, PT intctrlutil.PObject[T]](namespacedName ty
 }
 
 func clearResources[T intctrlutil.Object, PT intctrlutil.PObject[T],
-	L intctrlutil.ObjList[T], PL intctrlutil.PObjList[T, L]](
-	ctx context.Context, getItems func(plist PL) []T, opts ...client.ListOption) {
+	L intctrlutil.ObjList[T], PL intctrlutil.PObjList[T, L], Traits intctrlutil.ObjListTraits[T, L]](
+	ctx context.Context, _ func(T, L, Traits), opts ...client.ListOption) {
 	const cleanTimeout = time.Second * 60
 	const cleanInterval = time.Second
 
 	var (
 		obj     T
 		objList L
+		traits  Traits
 	)
 	listOptions := &client.ListOptions{}
 	for _, opt := range opts {
@@ -288,6 +289,6 @@ func clearResources[T intctrlutil.Object, PT intctrlutil.PObject[T],
 
 	Eventually(func(g Gomega) {
 		g.Expect(k8sClient.List(ctx, PL(&objList), opts...)).Should(Succeed())
-		g.Expect(len(getItems(PL(&objList)))).Should(BeEquivalentTo(0))
+		g.Expect(len(traits.GetItems(&objList))).Should(BeEquivalentTo(0))
 	}, cleanTimeout, cleanInterval).Should(Succeed())
 }

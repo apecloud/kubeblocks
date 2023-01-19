@@ -437,34 +437,27 @@ func (r *ClusterReconciler) deleteExternalResources(reqCtx intctrlutil.RequestCt
 
 	// all resources created in createCluster should be handled properly
 
-	if ret, err := removeFinalizer[appsv1.StatefulSet, *appsv1.StatefulSet, appsv1.StatefulSetList,
-		*appsv1.StatefulSetList, intctrlutil.StatefulSetListWrapper](r, reqCtx, inNS, ml); err != nil {
+	if ret, err := removeFinalizer(r, reqCtx, intctrlutil.StatefulSetSignature, inNS, ml); err != nil {
 		return ret, err
 	}
 
-	if ret, err := removeFinalizer[appsv1.Deployment, *appsv1.Deployment, appsv1.DeploymentList,
-		*appsv1.DeploymentList, intctrlutil.DeploymentListWrapper](r, reqCtx, inNS, ml); err != nil {
+	if ret, err := removeFinalizer(r, reqCtx, intctrlutil.DeploymentSignature, inNS, ml); err != nil {
 		return ret, err
 	}
 
-	if ret, err := removeFinalizer[corev1.Service, *corev1.Service, corev1.ServiceList,
-		*corev1.ServiceList, intctrlutil.ServiceListWrapper](r, reqCtx, inNS, ml); err != nil {
+	if ret, err := removeFinalizer(r, reqCtx, intctrlutil.ServiceSignature, inNS, ml); err != nil {
 		return ret, err
 	}
 
-	if ret, err := removeFinalizer[corev1.Secret, *corev1.Secret, corev1.SecretList,
-		*corev1.SecretList, intctrlutil.SecretListWrapper](r, reqCtx, inNS, ml); err != nil {
+	if ret, err := removeFinalizer(r, reqCtx, intctrlutil.SecretSignature, inNS, ml); err != nil {
 		return ret, err
 	}
 
-	if ret, err := removeFinalizer[corev1.ConfigMap, *corev1.ConfigMap, corev1.ConfigMapList,
-		*corev1.ConfigMapList, intctrlutil.ConfigMapListWrapper](r, reqCtx, inNS, ml); err != nil {
+	if ret, err := removeFinalizer(r, reqCtx, intctrlutil.ConfigMapSignature, inNS, ml); err != nil {
 		return ret, err
 	}
 
-	if ret, err := removeFinalizer[policyv1.PodDisruptionBudget, *policyv1.PodDisruptionBudget,
-		policyv1.PodDisruptionBudgetList, *policyv1.PodDisruptionBudgetList,
-		intctrlutil.PodDisruptionBudgetListWrapper](r, reqCtx, inNS, ml); err != nil {
+	if ret, err := removeFinalizer(r, reqCtx, intctrlutil.PodDisruptionBudgetSignature, inNS, ml); err != nil {
 		return ret, err
 	}
 
@@ -472,16 +465,17 @@ func (r *ClusterReconciler) deleteExternalResources(reqCtx intctrlutil.RequestCt
 }
 
 func removeFinalizer[T intctrlutil.Object, PT intctrlutil.PObject[T],
-	L intctrlutil.ObjList[T], PL intctrlutil.PObjList[T, L], W intctrlutil.ObjListWrapper[T, L]](
-	r *ClusterReconciler, reqCtx intctrlutil.RequestCtx, inNS client.InNamespace,
-	ml client.MatchingLabels) (*ctrl.Result, error) {
-	var objList L
-	if err := r.List(reqCtx.Ctx, PL(&objList), inNS, ml); err != nil {
+	L intctrlutil.ObjList[T], PL intctrlutil.PObjList[T, L], Traits intctrlutil.ObjListTraits[T, L]](
+	r *ClusterReconciler, reqCtx intctrlutil.RequestCtx, _ func(T, L, Traits), opts ...client.ListOption) (*ctrl.Result, error) {
+	var (
+		objList L
+		traits  Traits
+	)
+	if err := r.List(reqCtx.Ctx, PL(&objList), opts...); err != nil {
 		res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 		return &res, err
 	}
-	var wrapper W
-	for _, obj := range wrapper.GetItems(&objList) {
+	for _, obj := range traits.GetItems(&objList) {
 		pobj := PT(&obj)
 		if !controllerutil.ContainsFinalizer(pobj, dbClusterFinalizerName) {
 			continue

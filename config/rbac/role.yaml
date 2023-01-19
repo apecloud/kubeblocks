@@ -481,7 +481,7 @@ rules:
 - apiGroups:
   - dbaas.kubeblocks.io
   resources:
-  - configconstraint
+  - configconstraints
   verbs:
   - create
   - delete
@@ -493,13 +493,13 @@ rules:
 - apiGroups:
   - dbaas.kubeblocks.io
   resources:
-  - configconstraint/finalizers
+  - configconstraints/finalizers
   verbs:
   - update
 - apiGroups:
   - dbaas.kubeblocks.io
   resources:
-  - configconstraint/status
+  - configconstraints/status
   verbs:
   - get
   - patch

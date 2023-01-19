@@ -33,7 +33,8 @@ RUN go mod download
 # Copy the go source
 COPY cmd/manager/main.go cmd/manager/main.go
 COPY cmd/agamotto/ cmd/agamotto/
-COPY cmd/reloader cmd/reloader
+COPY cmd/reloader/ cmd/reloader/
+COPY cmd/probe/ cmd/probe/
 COPY apis/ apis/
 COPY internal/ internal/
 COPY controllers/ controllers/
@@ -45,21 +46,11 @@ RUN curl -L https://dl.k8s.io/release/v1.24.2/bin/${TARGETOS}/${TARGETARCH}/kube
 RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="${LD_FLAGS}" -a -o agamotto cmd/agamotto/main.go
 RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="${LD_FLAGS}" -a -o reloader cmd/reloader/main.go
 RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="${LD_FLAGS}" -a -o killer cmd/reloader/container_killer/killer.go
+RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="${LD_FLAGS}" -a -o probe cmd/probe/main.go
 ## have manager as last build step due to its volatility
 RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="${LD_FLAGS}" -a -o manager cmd/manager/main.go
 
-# Build the probe binary
-WORKDIR /workspace/cmd/probe
-COPY cmd/probe/go.mod go.mod
-COPY cmd/probe/go.sum go.sum
-COPY cmd/probe/main.go main.go
-COPY cmd/probe/internal internal
-# cache deps before building and copying source so that we don't need to re-download as much
-# and so that source changes don't invalidate our downloaded layer
-RUN go mod download
-
 # Build
-RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="${LD_FLAGS}" -a -o probe ./main.go
 
 FROM --platform=${TARGETPLATFORM} tarampampam/curl:7.85.0 as binary-downloader
 

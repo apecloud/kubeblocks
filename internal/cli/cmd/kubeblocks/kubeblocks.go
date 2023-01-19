@@ -443,7 +443,8 @@ func (o *InstallOptions) installChart() error {
 		TryTimes:        2,
 		CreateNamespace: o.CreateNamespace,
 	}
-	return chart.Install(o.HelmCfg)
+	_, err := chart.Install(o.HelmCfg)
+	return err
 }
 
 func (o *InstallOptions) upgradeChart() error {

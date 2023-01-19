@@ -42,7 +42,7 @@ We would like to extend our appreciation to all contributors who helped make thi
     name: my-cluster-conn-credential
     namespace: my-ns
     labels:
-			"app.kubernetes.io/instance": my-cluster
+      "app.kubernetes.io/instance": my-cluster
   stringData:
     username: "admin"
     admin-password: "<some random 8 characters password>"

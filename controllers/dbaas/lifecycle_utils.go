@@ -1023,9 +1023,6 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 		// The Config is not allowed to be modified.
 		// Once ClusterDefinition provider adjusts the ConfigTemplateRef field of CusterDefinition,
 		// or provider modifies the wrong config file, it may cause the application cluster may fail.
-		//
-		// TODO(zhixu.zt): Check whether the configmap object is a config file of component
-		// Label check: ConfigMap.Labels["app.kubernetes.io/ins-configure"]
 		if cm, ok := obj.(*corev1.ConfigMap); ok {
 			if err := handleConfigMap(cm); err != nil {
 				return false, err

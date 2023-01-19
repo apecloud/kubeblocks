@@ -58,22 +58,27 @@ func isUpdateDynamicParameters(tpl *dbaasv1alpha1.ConfigConstraintSpec, cfg *cfg
 	}
 	updateParams := set.NewLinkedHashSetString(params...)
 
-	// if has StaticParameters, update static parameter
+	// if ConfigConstraint has StaticParameters, check updated parameter
 	if len(tpl.StaticParameters) > 0 {
 		staticParams := set.NewLinkedHashSetString(tpl.StaticParameters...)
 		union := cfgcore.Union(staticParams, updateParams)
 		if union.Length() > 0 {
 			return false, nil
 		}
+		// if no dynamicParameters is configured, reload is the default behavior
+		if len(tpl.DynamicParameters) == 0 {
+			return true, nil
+		}
 	}
 
-	// if has dynamic parameters, all updated param in dynamic params
+	// if ConfigConstraint has DynamicParameter, all updated param in dynamic params
 	if len(tpl.DynamicParameters) > 0 {
 		dynamicParams := set.NewLinkedHashSetString(tpl.DynamicParameters...)
 		union := cfgcore.Difference(updateParams, dynamicParams)
 		return union.Length() == 0, nil
 	}
 
-	// default static parameters
+	// if the updated parameter is not in list of DynamicParameter and in list of StaticParameter,
+	// restart is the default behavior.
 	return false, nil
 }

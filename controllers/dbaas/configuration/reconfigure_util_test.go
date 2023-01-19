@@ -130,7 +130,7 @@ func TestIsUpdateDynamicParameters(t *testing.T) {
 			},
 			diff: newCfgDiffMeta(`{"param4":"b"}`, nil, nil),
 		},
-		want:    false,
+		want:    true,
 		wantErr: false,
 	}, {
 		name: "test",

@@ -1,0 +1,12 @@
+apiVersion: dataprotection.kubeblocks.io/v1alpha1
+kind: BackupPolicyTemplate
+metadata:
+  name: backup-policy-template-mysql
+  labels:
+    clusterdefinition.kubeblocks.io/name: apecloud-wesql
+    {{- include "wesqlapp.labels" . | nindent 4 }}
+spec:
+  schedule: "0 2 * * *"
+
+  # which backup tool to perform database backup, only support one tool.
+  backupToolName: mysql-xtrabackup

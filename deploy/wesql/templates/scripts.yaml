@@ -28,17 +28,21 @@ data:
       fi
       echo "mysql $host_flag -uroot $password_flag -e \"call dbms_consensus.add_follower('$host:13306');\" > /tmp/setup_error.log 2>&1 & "
       mysql $host_flag -uroot $password_flag -e "call dbms_consensus.add_follower('$host:13306');" > /tmp/setup_error.log 2>&1 & 
-      pid=$!; sleep 1; 
+      # wait longer in case there's network issue
+      pid=$!; sleep 3;
+      ps $pid
       if ! ps $pid > /dev/null; then 
         wait $pid; 
         code=$?; 
+        cat /tmp/setup_error.log
         if [ $code -ne 0 ]; then
-          cat /tmp/setup_error.log
           substr=`cat /tmp/setup_error.log | grep "Target node already exists"`
           if [ -z "$substr" ]; then
             exit $code; 
           fi
         fi
+      else 
+        echo "call dbms_consensus.add_follower stuck, which is normal during h-scale, skip."
       fi
       rm /tmp/setup_error.log
     fi

@@ -271,7 +271,10 @@ func (o *CreateRestoreOptions) Complete() error {
 	o.ClusterVersionRef = cluster.Spec.ClusterVersionRef
 	o.ClusterDefRef = cluster.Spec.ClusterDefRef
 	o.TerminationPolicy = string(cluster.Spec.TerminationPolicy)
-	o.PodAntiAffinity = string(cluster.Spec.Affinity.PodAntiAffinity)
+
+	if cluster.Spec.Affinity != nil {
+		o.PodAntiAffinity = string(cluster.Spec.Affinity.PodAntiAffinity)
+	}
 	o.Monitor = cluster.Spec.Components[0].Monitor
 	componentByte, err := json.Marshal(cluster.Spec.Components)
 	if err != nil {

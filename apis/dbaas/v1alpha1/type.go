@@ -47,7 +47,7 @@ const (
 	HorizontalScalingPhase Phase = "HorizontalScaling"
 	VerticalScalingPhase   Phase = "VerticalScaling"
 	RebootingPhase         Phase = "Rebooting"
-	UpgradingPhase         Phase = "Upgrading"
+	VersionUpgradingPhase  Phase = "VersionUpgrading"
 	SucceedPhase           Phase = "Succeed"
 	AbnormalPhase          Phase = "Abnormal"
 	ConditionsErrorPhase   Phase = "ConditionsError"

@@ -638,7 +638,7 @@ func (r *ClusterReconciler) checkAndPatchToRunning(ctx context.Context,
 	}
 	patch := client.MergeFrom(cluster.DeepCopy())
 	// synchronize the latest status of components
-	needSyncComponent, err := r.handleComponentStatus(ctx, cluster, clusterDef)
+	needSyncComponentStatus, err := r.handleComponentStatus(ctx, cluster, clusterDef)
 	if err != nil {
 		return err
 	}
@@ -681,7 +681,8 @@ func (r *ClusterReconciler) checkAndPatchToRunning(ctx context.Context,
 		componentMap, clusterAvailabilityEffectMap, _ := getComponentRelatedInfo(cluster, clusterDef, "")
 		handleClusterAbnormalOrFailedPhase(cluster, componentMap, clusterAvailabilityEffectMap)
 	}
-	if !needSync && !needSyncComponent {
+	// if cluster.status is not changed, return
+	if !needSync && !needSyncComponentStatus {
 		return nil
 	}
 	if err := r.Client.Status().Patch(ctx, cluster, patch); err != nil {
@@ -696,7 +697,7 @@ func (r *ClusterReconciler) checkAndPatchToRunning(ctx context.Context,
 		// send an event when Cluster.status.phase change to Running
 		r.Recorder.Eventf(cluster, corev1.EventTypeNormal, string(dbaasv1alpha1.RunningPhase), "Cluster: %s is ready, current phase is Running.", cluster.Name)
 	}
-	if clusterIsRunning || needSyncComponent {
+	if clusterIsRunning || needSyncComponentStatus {
 		// when cluster phase or component phase changed,
 		// need to mark OpsRequest annotation to reconcile for running OpsRequest.
 		return opsutil.MarkRunningOpsRequestAnnotation(ctx, r.Client, cluster)

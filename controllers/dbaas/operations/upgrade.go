@@ -34,7 +34,7 @@ var _ OpsHandler = upgradeOpsHandler{}
 func init() {
 	upgradeBehaviour := OpsBehaviour{
 		FromClusterPhases: []dbaasv1alpha1.Phase{dbaasv1alpha1.RunningPhase, dbaasv1alpha1.FailedPhase, dbaasv1alpha1.AbnormalPhase},
-		ToClusterPhase:    dbaasv1alpha1.UpgradingPhase,
+		ToClusterPhase:    dbaasv1alpha1.VersionUpgradingPhase,
 		OpsHandler:        upgradeOpsHandler{},
 	}
 
@@ -105,7 +105,7 @@ func (u upgradeOpsHandler) getUpgradeStatusComponents(opsRes *OpsResource) (map[
 			continue
 		}
 		statusComponentMap[k] = dbaasv1alpha1.OpsRequestStatusComponent{
-			Phase: dbaasv1alpha1.UpgradingPhase,
+			Phase: dbaasv1alpha1.VersionUpgradingPhase,
 		}
 	}
 	return statusComponentMap, nil

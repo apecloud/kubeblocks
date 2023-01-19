@@ -94,7 +94,7 @@ var _ = Describe("OpsRequest webhook", func() {
 		By("Test Cluster Phase")
 		OpsRequestBehaviourMapper[UpgradeType] = OpsRequestBehaviour{
 			FromClusterPhases: []Phase{RunningPhase},
-			ToClusterPhase:    UpgradingPhase,
+			ToClusterPhase:    VersionUpgradingPhase,
 		}
 		Expect(testCtx.CreateObj(ctx, opsRequest).Error()).To(ContainSubstring("Upgrade is forbidden"))
 		// update cluster phase to Running

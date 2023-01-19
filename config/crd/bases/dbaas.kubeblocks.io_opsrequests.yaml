@@ -308,7 +308,7 @@ spec:
                       - Reconfiguring
                       - HorizontalScaling
                       - VerticalScaling
-                      - Upgrading
+                      - VersionUpgrading
                       - Rebooting
                       type: string
                     progressDetails:

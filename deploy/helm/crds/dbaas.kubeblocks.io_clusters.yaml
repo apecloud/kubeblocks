@@ -613,7 +613,7 @@ spec:
                         component; Leader/Primary pod is not ready for Consensus/Replication
                         component. Abnormal: component available but some pod is not
                         ready. If the component type is Consensus/Replication, the
-                        Leader/Primary pod is must ready in Abnormal phase. Other
+                        Leader/Primary pod must be ready in Abnormal phase. Other
                         phases behave the same as the cluster phase.'
                       enum:
                       - Running
@@ -627,7 +627,7 @@ spec:
                       - Reconfiguring
                       - HorizontalScaling
                       - VerticalScaling
-                      - Upgrading
+                      - VersionUpgrading
                       - Rebooting
                       type: string
                     podsReady:
@@ -801,17 +801,17 @@ spec:
                 description: 'phase describe the phase of the cluster. the detail
                   information of phase is as follows: Creating: creating cluster.
                   Running: cluster is running, all components is available. Updating:
-                  the cluster phase will go to Updating when directly updating cluster.spec.
+                  the cluster phase will be ''Updating'' when directly updating cluster.spec.
                   VolumeExpanding: volume expansion operation is running. HorizontalScaling:
                   horizontal scaling operation is running. VerticalScaling: vertical
-                  scaling operation is running. Upgrading: upgrade operation is running.
-                  Rebooting: restart operation is running. Reconfiguring: reconfiguration
-                  operations is running. Deleting/Deleted: deleting cluster/cluster
-                  is deleted. Failed: cluster not available. Abnormal: cluster available
-                  but some component is not Abnormal. if the component type is Consensus/Replication,
-                  the Leader/Primary pod is must ready in Abnormal phase. ConditionsError:
-                  status.conditions error, but the components are running when cluster
-                  api changed.'
+                  scaling operation is running. VersionUpgrading: upgrade operation
+                  is running. Rebooting: restart operation is running. Reconfiguring:
+                  reconfiguration operations is running. Deleting/Deleted: deleting
+                  cluster/cluster is deleted. Failed: cluster not available. Abnormal:
+                  cluster available but some components are Abnormal. if the component
+                  type is Consensus/Replication, the Leader/Primary pod is must ready
+                  in Abnormal phase. ConditionsError: status.conditions error, but
+                  the components are running when cluster api changed.'
                 enum:
                 - Running
                 - Failed
@@ -825,7 +825,7 @@ spec:
                 - Reconfiguring
                 - HorizontalScaling
                 - VerticalScaling
-                - Upgrading
+                - VersionUpgrading
                 - Rebooting
                 type: string
             type: object

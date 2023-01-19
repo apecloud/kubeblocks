@@ -75,19 +75,19 @@ type ClusterStatus struct {
 	// phase describe the phase of the cluster. the detail information of phase is as follows:
 	// Creating: creating cluster.
 	// Running: cluster is running, all components is available.
-	// Updating: the cluster phase will go to Updating when directly updating cluster.spec.
+	// Updating: the cluster phase will be 'Updating' when directly updating cluster.spec.
 	// VolumeExpanding: volume expansion operation is running.
 	// HorizontalScaling: horizontal scaling operation is running.
 	// VerticalScaling: vertical scaling operation is running.
-	// Upgrading: upgrade operation is running.
+	// VersionUpgrading: upgrade operation is running.
 	// Rebooting: restart operation is running.
 	// Reconfiguring: reconfiguration operations is running.
 	// Deleting/Deleted: deleting cluster/cluster is deleted.
 	// Failed: cluster not available.
-	// Abnormal: cluster available but some component is not Abnormal.
+	// Abnormal: cluster available but some components are Abnormal.
 	// if the component type is Consensus/Replication, the Leader/Primary pod is must ready in Abnormal phase.
 	// ConditionsError: status.conditions error, but the components are running when cluster api changed.
-	// +kubebuilder:validation:Enum={Running,Failed,Abnormal,ConditionsError,Creating,Updating,Deleting,Deleted,VolumeExpanding,Reconfiguring,HorizontalScaling,VerticalScaling,Upgrading,Rebooting}
+	// +kubebuilder:validation:Enum={Running,Failed,Abnormal,ConditionsError,Creating,Updating,Deleting,Deleted,VolumeExpanding,Reconfiguring,HorizontalScaling,VerticalScaling,VersionUpgrading,Rebooting}
 	// +optional
 	Phase Phase `json:"phase,omitempty"`
 
@@ -191,9 +191,9 @@ type ClusterStatusComponent struct {
 	// Failed: component not available, i.e, all pod is not ready for Stateless/Stateful component;
 	// Leader/Primary pod is not ready for Consensus/Replication component.
 	// Abnormal: component available but some pod is not ready.
-	// If the component type is Consensus/Replication, the Leader/Primary pod is must ready in Abnormal phase.
+	// If the component type is Consensus/Replication, the Leader/Primary pod must be ready in Abnormal phase.
 	// Other phases behave the same as the cluster phase.
-	// +kubebuilder:validation:Enum={Running,Failed,Abnormal,Creating,Updating,Deleting,Deleted,VolumeExpanding,Reconfiguring,HorizontalScaling,VerticalScaling,Upgrading,Rebooting}
+	// +kubebuilder:validation:Enum={Running,Failed,Abnormal,Creating,Updating,Deleting,Deleted,VolumeExpanding,Reconfiguring,HorizontalScaling,VerticalScaling,VersionUpgrading,Rebooting}
 	Phase Phase `json:"phase,omitempty"`
 
 	// message record the component details message in current phase.

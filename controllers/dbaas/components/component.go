@@ -34,6 +34,7 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
+// componentContext wrapper for handling component status procedure context parameters.
 type componentContext struct {
 	reqCtx    intctrlutil.RequestCtx
 	cli       client.Client
@@ -42,6 +43,7 @@ type componentContext struct {
 	obj       client.Object
 }
 
+// newComponentContext creates a componentContext object.
 func newComponentContext(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
 	recorder record.EventRecorder,

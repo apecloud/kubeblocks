@@ -45,6 +45,10 @@ const (
 	builtInGetContainerFunctionName       = "getContainerByName"
 	builtInGetContainerMemoryFunctionName = "getContainerMemory"
 
+	buildInSystemFailedName = "faield"
+	buildInSystemImportName = "import"
+	buildInSystemCallName   = "include"
+
 	// BuiltinMysqlCalBufferFunctionName Mysql Built-in
 	// TODO: This function migrate to configuration template
 	builtInMysqlCalBufferFunctionName = "callBufferSizeByResource"
@@ -128,6 +132,10 @@ func injectBuiltInFunctions(tplBuilder *configTemplateBuilder, component *Compon
 		builtInGetArgFunctionName:             getArgByName,
 		builtInGetContainerFunctionName:       getPodContainerByName,
 		builtInGetContainerMemoryFunctionName: getContainerMemory,
+
+		// support go template libraries
+		buildInSystemFailedName: failed,
+		buildInSystemImportName: cmTemplateImport,
 	}
 	return nil
 }

@@ -21,6 +21,7 @@ import (
 	"go/build"
 	"path/filepath"
 	"testing"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -119,6 +120,12 @@ var _ = BeforeSuite(func() {
 		MetricsBindAddress: "0",
 	})
 	Expect(err).ToNot(HaveOccurred())
+
+	viper.SetDefault("CERT_DIR", "/tmp/k8s-webhook-server/serving-certs")
+	viper.SetDefault("VOLUMESNAPSHOT", false)
+	viper.SetDefault("KUBEBLOCKS_IMAGE", "apecloud/kubeblocks:0.2.0-beta.1")
+	viper.SetDefault("PROBE_SERVICE_PORT", 3501)
+	viper.SetDefault("PROBE_SERVICE_LOG_LEVEL", "info")
 
 	clusterRecorder = k8sManager.GetEventRecorderFor("db-cluster-controller")
 	err = (&ClusterReconciler{
@@ -259,4 +266,28 @@ func checkObj[T intctrlutil.Object, PT intctrlutil.PObject[T]](namespacedName ty
 		g.Expect(k8sClient.Get(ctx, namespacedName, pobj)).To(Succeed())
 		check(g, pobj)
 	}
+}
+
+func clearResources[T intctrlutil.Object, PT intctrlutil.PObject[T],
+	L intctrlutil.ObjList[T], PL intctrlutil.PObjList[T, L]](
+	ctx context.Context, getItems func(plist PL) []T, opts ...client.ListOption) {
+	const cleanTimeout = time.Second * 60
+	const cleanInterval = time.Second
+
+	var (
+		obj     T
+		objList L
+	)
+	listOptions := &client.ListOptions{}
+	for _, opt := range opts {
+		opt.ApplyToList(listOptions)
+	}
+	deleteAllOfOpts := &client.DeleteAllOfOptions{}
+	listOptions.ApplyToList(&deleteAllOfOpts.ListOptions)
+	Expect(k8sClient.DeleteAllOf(ctx, PT(&obj), deleteAllOfOpts)).Should(Succeed())
+
+	Eventually(func(g Gomega) {
+		g.Expect(k8sClient.List(ctx, PL(&objList), opts...)).Should(Succeed())
+		g.Expect(len(getItems(PL(&objList)))).Should(BeEquivalentTo(0))
+	}, cleanTimeout, cleanInterval).Should(Succeed())
 }

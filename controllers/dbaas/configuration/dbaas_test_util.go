@@ -272,8 +272,8 @@ func (w *TestWrapper) CreateCfgOnCluster(cfgFile string, cluster *dbaasv1alpha1.
 		cm.Labels[cfgcore.CMConfigurationTplNameLabelKey] = w.CMName()
 		cm.Labels[cfgcore.CMConfigurationConstraintsNameLabelKey] = w.TPLName()
 		cm.Labels[cfgcore.CMConfigurationISVTplLabelKey] = w.testEnv.CfgTplName
-		cm.Labels[cfgcore.CMInsConfigurationLabelKey] = "true"
-		cm.Labels[cfgcore.CMConfigurationTplLabelKey] = "false"
+		// cm.Labels[cfgcore.CMInsConfigurationLabelKey] = "true"
+		cm.Labels[cfgcore.CMConfigurationTypeLabelKey] = cfgcore.ConfigInstanceType
 	})
 	if err != nil {
 		return nil, err

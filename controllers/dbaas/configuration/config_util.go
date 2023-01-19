@@ -63,7 +63,7 @@ func checkConfigurationLabels(object client.Object, requiredLabs []string) bool 
 	}
 
 	// reconfigure ConfigMap for db instance
-	if ins, ok := labels[cfgcore.CMInsConfigurationLabelKey]; !ok || ins != cfgcore.ConstTrueString {
+	if ins, ok := labels[cfgcore.CMConfigurationTypeLabelKey]; !ok || ins != cfgcore.ConfigInstanceType {
 		return false
 	}
 
@@ -195,7 +195,7 @@ func batchUpdateConfigMapFinalizer(cli client.Client, ctx intctrlutil.RequestCtx
 
 func updateConfigMapFinalizer(cli client.Client, ctx intctrlutil.RequestCtx, tpl dbaasv1alpha1.ConfigTemplate) error {
 	// step1: add finalizer
-	// step2: add labels: CMConfigurationTplLabelKey
+	// step2: add labels: CMConfigurationTypeLabelKey
 	// step3: update immutable
 
 	cmObj, err := getConfigMapByName(cli, ctx, tpl.ConfigTplRef, tpl.Namespace)
@@ -213,7 +213,7 @@ func updateConfigMapFinalizer(cli client.Client, ctx intctrlutil.RequestCtx, tpl
 	if cmObj.ObjectMeta.Labels == nil {
 		cmObj.ObjectMeta.Labels = map[string]string{}
 	}
-	cmObj.ObjectMeta.Labels[cfgcore.CMConfigurationTplLabelKey] = cfgcore.ConstTrueString
+	cmObj.ObjectMeta.Labels[cfgcore.CMConfigurationTypeLabelKey] = cfgcore.ConfigTemplateType
 	controllerutil.AddFinalizer(cmObj, cfgcore.ConfigurationTemplateFinalizerName)
 
 	// cmObj.Immutable = &tpl.Spec.Immutable

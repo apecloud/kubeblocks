@@ -430,6 +430,7 @@ type ClusterDefinitionProbe struct {
 }
 
 type ClusterDefinitionProbes struct {
+
 	// Probe for DB running check.
 	// +optional
 	RunningProbe *ClusterDefinitionProbe `json:"runningProbe,omitempty"`
@@ -441,6 +442,16 @@ type ClusterDefinitionProbes struct {
 	// Probe for DB role changed check.
 	// +optional
 	RoleChangedProbe *ClusterDefinitionProbe `json:"roleChangedProbe,omitempty"`
+
+	// roleProbeTimeoutAfterPodsReady when all pods of the component are ready,
+	// it will detect whether the application is available in the pod.
+	// if pods exceed the InitializationTimeoutSeconds time without a role label,
+	// this component will enter the Failed/Abnormal phase.
+	// Note that this configuration will only take effect if the component supports RoleChangedProbe
+	// and will not affect the life cycle of the pod. default values are 60 seconds.
+	// +optional
+	// +kubebuilder:validation:Minimum=30
+	RoleProbeTimeoutAfterPodsReady int32 `json:"roleProbeTimeoutAfterPodsReady,omitempty"`
 }
 
 type ConsensusSetSpec struct {

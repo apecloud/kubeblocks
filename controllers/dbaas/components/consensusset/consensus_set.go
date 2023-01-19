@@ -86,7 +86,7 @@ func (consensusSet *ConsensusSet) HandleProbeTimeoutWhenPodsReady(recorder recor
 	if statusComponent.PodsReadyTime == nil {
 		return true, nil
 	}
-	if !util.IsProbeTimeout(statusComponent.PodsReadyTime) {
+	if !util.IsProbeTimeout(consensusSet.ComponentDef, statusComponent.PodsReadyTime) {
 		return true, nil
 	}
 
@@ -128,7 +128,7 @@ func (consensusSet *ConsensusSet) HandleProbeTimeoutWhenPodsReady(recorder recor
 		return true, err
 	}
 	if recorder != nil {
-		recorder.Eventf(cluster, corev1.EventTypeWarning, types.ProbeTimeoutReason, "pod role detection timed out in Component: "+consensusSet.Component.Name)
+		recorder.Eventf(cluster, corev1.EventTypeWarning, types.RoleProbeTimeoutReason, "pod role detection timed out in Component: "+consensusSet.Component.Name)
 	}
 	// when component status changed, mark OpsRequest to reconcile.
 	return false, opsutil.MarkRunningOpsRequestAnnotation(consensusSet.Ctx, consensusSet.Cli, cluster)

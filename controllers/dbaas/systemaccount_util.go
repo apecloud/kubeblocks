@@ -405,7 +405,6 @@ func getEngineType(clusterDefType string, compDef dbaasv1alpha1.ClusterDefinitio
 	}
 
 	switch clusterDefType {
-	// clusterDefType define well known cluster types
 	case "state.mysql":
 		return kMysql
 	default:

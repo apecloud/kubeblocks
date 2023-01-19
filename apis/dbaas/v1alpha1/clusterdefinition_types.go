@@ -26,7 +26,7 @@ import (
 
 // ClusterDefinitionSpec defines the desired state of ClusterDefinition
 type ClusterDefinitionSpec struct {
-	// Cluster definition type defines well known application cluster type. The value will
+	// Cluster definition type defines well known application cluster type. This value should
 	// keep consistent with known DAPR component type
 	// (https://docs.dapr.io/reference/components-reference/). For component that has yet
 	// provided by DAPR, then it's suggested to follow the naming scheme as DAPR component

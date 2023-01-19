@@ -34,7 +34,9 @@ main() {
     repo_root=$(git rev-parse --show-toplevel)
     pushd "$repo_root" > /dev/null
 
-    changed_charts=$charts_dir/"helm"
+    echo "Lookup charts..."
+    local changed_charts=()
+    readarray -t changed_charts <<< "$(lookup_changed_charts)"
 
     if [[ -n "${changed_charts[*]}" ]]; then
         install_chart_releaser

@@ -839,7 +839,7 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 			err = nil
 			if component.HorizontalScalePolicy == nil ||
 				component.HorizontalScalePolicy.Type != dbaasv1alpha1.HScaleDataClonePolicyFromSnapshot ||
-				isSnapshotAvailable(cli, ctx) {
+				!isSnapshotAvailable(cli, ctx) {
 				return
 			}
 			allPVCBound, err := isAllPVCBound(cli, ctx, stsObj)

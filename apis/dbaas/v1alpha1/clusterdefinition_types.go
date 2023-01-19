@@ -26,10 +26,11 @@ import (
 
 // ClusterDefinitionSpec defines the desired state of ClusterDefinition
 type ClusterDefinitionSpec struct {
-	// Cluster definition type define well known cluster types. The value will keep consistent
-	// with known DAPR component type (https://docs.dapr.io/reference/components-reference/). For
-	// component that has yet provided by DAPR, then it's suggested to follow and naming scheme
-	// as DAPR component, i.e., a state store related Cluster starts with "state.<app-name>".
+	// Cluster definition type defines well known application cluster type. The value will
+	// keep consistent with known DAPR component type
+	// (https://docs.dapr.io/reference/components-reference/). For component that has yet
+	// provided by DAPR, then it's suggested to follow the naming scheme as DAPR component
+	// type name prefix, i.e., a state store related Cluster starts with "state.<app-name>".
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=24
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`

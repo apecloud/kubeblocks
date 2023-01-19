@@ -169,9 +169,16 @@ var _ = Describe("DataProtection", func() {
 			k8sapitypes.MergePatchType, patchByte, metav1.PatchOptions{})
 
 		// create restore cluster
+		By("run restore cmd")
 		cmdRestore := NewCreateRestoreCmd(tf, streams)
 		Expect(cmdRestore != nil).To(BeTrue())
 		_ = cmdRestore.Flags().Set("backup", backupName)
 		cmdRestore.Run(nil, []string{newClusterName})
+
+		By("run restore cmd with cluster spec.affinity=nil")
+		patchCluster := []byte(`{"spec":{"affinity":null}}`)
+		_, _ = tf.FakeDynamicClient.Resource(types.ClusterGVR()).Namespace(testing.Namespace).Patch(context.TODO(), clusterName,
+			k8sapitypes.MergePatchType, patchCluster, metav1.PatchOptions{})
+		cmdRestore.Run(nil, []string{newClusterName + "-with-nil-affinity"})
 	})
 })

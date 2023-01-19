@@ -106,7 +106,7 @@ var _ = Describe("OpsRequest webhook", func() {
 		// update cluster existing operations
 		clusterPatch = client.MergeFrom(cluster.DeepCopy())
 		cluster.Annotations = map[string]string{
-			opsRequestAnnotationKey: `[{"name":"testOpsName","clusterPhase":"Upgrading"}]`,
+			opsRequestAnnotationKey: `[{"name":"testOpsName","clusterPhase":"VersionUpgrading"}]`,
 		}
 		Expect(k8sClient.Patch(ctx, cluster, clusterPatch)).Should(Succeed())
 		Eventually(func() string {

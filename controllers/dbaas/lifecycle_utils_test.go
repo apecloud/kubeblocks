@@ -968,6 +968,19 @@ spec:
 			shouldRequeue, err := doBackup(reqCtx, k8sClient, cluster, component, sts, &stsProto, snapshotKey)
 			Expect(shouldRequeue).Should(BeFalse())
 			Expect(err).Should(BeNil())
+			By("readyToUse is nil, should requeue normally")
+			patch = client.MergeFrom(vs.DeepCopy())
+			vs.Status = &snapshotv1.VolumeSnapshotStatus{ReadyToUse: nil}
+			Expect(k8sClient.Status().Patch(ctx, vs, patch)).Should(Succeed())
+			Eventually(func() bool {
+				vsList := snapshotv1.VolumeSnapshotList{}
+				ml := getBackupMatchingLabels(cluster.Name, component.Name)
+				Expect(k8sClient.List(ctx, &vsList, ml)).Should(Succeed())
+				return len(vsList.Items) == 1 && vsList.Items[0].Status.ReadyToUse == nil
+			}, 10, 1).Should(BeTrue())
+			shouldRequeue, err = doBackup(reqCtx, k8sClient, cluster, component, sts, &stsProto, snapshotKey)
+			Expect(shouldRequeue).Should(BeTrue())
+			Expect(err).Should(BeNil())
 		})
 	})
 })

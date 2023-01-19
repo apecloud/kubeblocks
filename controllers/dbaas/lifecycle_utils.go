@@ -509,8 +509,8 @@ func reconcileClusterWorkloads(
 		cacheCtx:          &cacheCtx,
 		clusterVersion:    clusterVersion,
 	}
-	clusterDefComp := clusterDefinition.Spec.Components
-	clusterCompTypes := cluster.GetTypeMappingComponents()
+	clusterDefComps := clusterDefinition.Spec.Components
+	clusterCompMap := cluster.GetTypeMappingComponents()
 
 	// add default component if unspecified in Cluster.spec.components
 	for _, c := range clusterDefComps {

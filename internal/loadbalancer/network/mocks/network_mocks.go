@@ -25,9 +25,8 @@ package mock_network
 import (
 	reflect "reflect"
 
-	gomock "github.com/golang/mock/gomock"
-
 	cloud "github.com/apecloud/kubeblocks/internal/loadbalancer/cloud"
+	gomock "github.com/golang/mock/gomock"
 )
 
 // MockClient is a mock of Client interface.

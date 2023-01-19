@@ -7,9 +7,8 @@ package mock_cloud
 import (
 	reflect "reflect"
 
-	gomock "github.com/golang/mock/gomock"
-
 	cloud "github.com/apecloud/kubeblocks/internal/loadbalancer/cloud"
+	gomock "github.com/golang/mock/gomock"
 )
 
 // MockProvider is a mock of Provider interface.

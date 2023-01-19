@@ -181,10 +181,10 @@ func (mr *MockClientMockRecorder) Scheme() *gomock.Call {
 }
 
 // Status mocks base method.
-func (m *MockClient) Status() client.StatusWriter {
+func (m *MockClient) Status() client.SubResourceWriter {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Status")
-	ret0, _ := ret[0].(client.StatusWriter)
+	ret0, _ := ret[0].(client.SubResourceWriter)
 	return ret0
 }
 
@@ -192,6 +192,20 @@ func (m *MockClient) Status() client.StatusWriter {
 func (mr *MockClientMockRecorder) Status() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Status", reflect.TypeOf((*MockClient)(nil).Status))
+}
+
+// SubResource mocks base method.
+func (m *MockClient) SubResource(arg0 string) client.SubResourceClient {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SubResource", arg0)
+	ret0, _ := ret[0].(client.SubResourceClient)
+	return ret0
+}
+
+// SubResource indicates an expected call of SubResource.
+func (mr *MockClientMockRecorder) SubResource(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SubResource", reflect.TypeOf((*MockClient)(nil).SubResource), arg0)
 }
 
 // Update mocks base method.

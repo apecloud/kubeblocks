@@ -142,7 +142,10 @@ manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and Cust
 .PHONY: generate
 generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./apis/..."
-	$(GO) generate -x ./...
+
+.PHONY: go-generate
+go-generate: ## Run go generate against code.
+	# $(GO) generate -x ./...
 
 .PHONY: fmt
 fmt: ## Run go fmt against code.
@@ -268,14 +271,14 @@ kbcli-doc: build-checks ## generate CLI command reference manual.
 ##@ Load Balancer
 
 .PHONY: loadbalancer
-loadbalancer: build-checks ## Build loadbalancer binary.
+loadbalancer: build-checks go-generate ## Build loadbalancer binary.
 	$(GO) build -ldflags=${LD_FLAGS} -o bin/loadbalancer-controller ./cmd/loadbalancer/controller
 	$(GO) build -ldflags=${LD_FLAGS} -o bin/loadbalancer-agent ./cmd/loadbalancer/agent
 
 ##@ Operator Controller Manager
 
 .PHONY: manager
-manager: cue-fmt generate build-checks ## Build manager binary.
+manager: cue-fmt generate build-checks go-generate ## Build manager binary.
 	$(GO) build -ldflags=${LD_FLAGS} -o bin/manager ./cmd/manager/main.go
 
 CERT_ROOT_CA ?= $(WEBHOOK_CERT_DIR)/rootCA.key

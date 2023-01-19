@@ -30,7 +30,7 @@ require (
 	github.com/golang/mock v1.6.0
 	github.com/google/go-cmp v0.5.9
 	github.com/google/uuid v1.3.0
-	github.com/hashicorp/terraform v0.0.0-00010101000000-000000000000
+	github.com/hashicorp/terraform v1.3.0
 	github.com/jedib0t/go-pretty/v6 v6.4.4
 	github.com/k3d-io/k3d/v5 v5.4.6
 	github.com/kubernetes-csi/external-snapshotter/client/v6 v6.2.0
@@ -83,7 +83,7 @@ require (
 	k8s.io/kubectl v0.26.0
 	k8s.io/utils v0.0.0-20221128185143-99ec85e7a448
 	sigs.k8s.io/controller-runtime v0.14.1
-	sigs.k8s.io/kustomize/kyaml v0.13.10
+	sigs.k8s.io/kustomize/kyaml v0.13.9
 )
 
 require (

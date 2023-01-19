@@ -80,4 +80,4 @@ spec:
             statements:        
               creation: CREATE USER IF NOT EXISTS $(USERNAME) IDENTIFIED BY "$(PASSWD)"; GRANT REPLICATION CLIENT, PROCESS ON *.* TO $(USERNAME); GRANT SELECT ON performance_schema.* TO $(USERNAME);
               deletion: DROP USER IF EXISTS $(USERNAME);          
-  type: state.mysql-8
+  type: state.mysql

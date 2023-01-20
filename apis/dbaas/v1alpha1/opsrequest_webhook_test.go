@@ -65,6 +65,14 @@ var _ = Describe("OpsRequest webhook", func() {
 		cleanupObjects()
 	})
 
+	addClusterRequestAnnotation := func(cluster *Cluster, opsName string, toClusterPhase Phase) {
+		clusterPatch := client.MergeFrom(cluster.DeepCopy())
+		cluster.Annotations = map[string]string{
+			opsRequestAnnotationKey: fmt.Sprintf(`[{"name":"%s","clusterPhase":"%s"}]`, opsName, toClusterPhase),
+		}
+		Expect(k8sClient.Patch(ctx, cluster, clusterPatch)).Should(Succeed())
+	}
+
 	testUpgrade := func(cluster *Cluster) {
 		opsRequest := createTestOpsRequest(clusterName, opsRequestName+"-upgrade", UpgradeType)
 		By("By creating a clusterVersion for upgrade")
@@ -104,11 +112,7 @@ var _ = Describe("OpsRequest webhook", func() {
 
 		By("Test existing other operations in cluster")
 		// update cluster existing operations
-		clusterPatch = client.MergeFrom(cluster.DeepCopy())
-		cluster.Annotations = map[string]string{
-			opsRequestAnnotationKey: `[{"name":"testOpsName","clusterPhase":"VersionUpgrading"}]`,
-		}
-		Expect(k8sClient.Patch(ctx, cluster, clusterPatch)).Should(Succeed())
+		addClusterRequestAnnotation(cluster, "testOpsName", VersionUpgradingPhase)
 		Eventually(func() string {
 			err := testCtx.CreateObj(ctx, opsRequest)
 			if err == nil {
@@ -116,11 +120,8 @@ var _ = Describe("OpsRequest webhook", func() {
 			}
 			return err.Error()
 		}, timeout, interval).Should(ContainSubstring("Existing OpsRequest: testOpsName"))
-		// delete annotations cluster phase to Running
-		clusterPatch = client.MergeFrom(cluster.DeepCopy())
-		cluster.Annotations = nil
-		Expect(k8sClient.Patch(ctx, cluster, clusterPatch)).Should(Succeed())
-
+		// test opsRequest reentry
+		addClusterRequestAnnotation(cluster, opsRequest.Name, VersionUpgradingPhase)
 		By("By creating a upgrade opsRequest, it should be succeed")
 		Eventually(func() bool {
 			opsRequest.Spec.Upgrade.ClusterVersionRef = newClusterVersion.Name

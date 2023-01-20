@@ -232,9 +232,8 @@ func patchClusterStatus(opsRes *OpsResource, opsBehaviour OpsBehaviour) error {
 	patch := client.MergeFrom(opsRes.Cluster.DeepCopy())
 	opsRes.Cluster.Status.Phase = toClusterState
 	realChangeCompMap := opsBehaviour.OpsHandler.GetRealAffectedComponentMap(opsRes.OpsRequest)
-	// if the OpsRequest is components scope, we should update the cluster components together.
-	// otherwise, OpsRequest maybe reconcile the status to succeed immediately.
-	if realChangeCompMap != nil && opsRes.Cluster.Status.Components != nil {
+	// update cluster.status.components phase
+	if len(realChangeCompMap) != 0 {
 		for k, v := range opsRes.Cluster.Status.Components {
 			if _, ok := realChangeCompMap[k]; ok {
 				v.Phase = toClusterState

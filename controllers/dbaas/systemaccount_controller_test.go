@@ -28,202 +28,63 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	testdbaas "github.com/apecloud/kubeblocks/internal/testutil/dbaas"
 )
 
 var _ = Describe("SystemAccount Controller", func() {
-	var (
-		timeout            = time.Second * 10
-		interval           = time.Second
-		clusterName        = "cluster-sysaccount"
-		clusterDefName     = "def-sysaccount"
-		typeName           = "mycomponent"
-		clusterEngineType  = "state.mysql"
-		ClusterVersionName = "app-version-sysaccount"
-		backupPolicyName   = "backup-policy-demo"
-		databaseEngine     = "mysql"
+	const (
+		timeout  = time.Second * 10
+		interval = time.Second
 	)
-	var ctx = context.Background()
 
-	BeforeEach(func() {
-		// Add any steup steps that needs to be executed before each test
-		err := k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.Cluster{}, client.InNamespace(testCtx.DefaultNamespace), client.HasLabels{testCtx.TestObjLabelKey})
-		Expect(err).NotTo(HaveOccurred())
-		err = k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.ClusterVersion{}, client.HasLabels{testCtx.TestObjLabelKey})
-		Expect(err).NotTo(HaveOccurred())
-		err = k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.ClusterDefinition{}, client.HasLabels{testCtx.TestObjLabelKey})
-		Expect(err).NotTo(HaveOccurred())
+	var (
+		acctJobsMap = map[dbaasv1alpha1.AccountName]int{
+			dbaasv1alpha1.AdminAccount:          1, // created by stmt + AnyPod
+			dbaasv1alpha1.DataprotectionAccount: 3, // created by stmt + AllPods
+			dbaasv1alpha1.ProbeAccount:          0, // created using ReferToExisting policy (by copying from specified secret)
+		}
+		expectedAcctList       = []dbaasv1alpha1.AccountName{dbaasv1alpha1.AdminAccount, dbaasv1alpha1.ProbeAccount}
+		expectedAccounts       dbaasv1alpha1.KBAccountType
+		expectedJobsPerCluster int
+		expectedAcctNum        int
+		ctx                    = context.Background()
+	)
 
-		err = k8sClient.DeleteAllOf(ctx, &corev1.ConfigMap{}, client.InNamespace(testCtx.DefaultNamespace))
-		Expect(err).NotTo(HaveOccurred())
-		err = k8sClient.DeleteAllOf(ctx, &corev1.Secret{}, client.InNamespace(testCtx.DefaultNamespace))
-		Expect(err).NotTo(HaveOccurred())
-		err = k8sClient.DeleteAllOf(ctx, &corev1.Service{}, client.InNamespace(testCtx.DefaultNamespace))
-		Expect(err).NotTo(HaveOccurred())
-		err = k8sClient.DeleteAllOf(ctx, &corev1.Endpoints{}, client.InNamespace(testCtx.DefaultNamespace))
-		Expect(err).NotTo(HaveOccurred())
-		err = k8sClient.DeleteAllOf(ctx, &batchv1.Job{}, client.InNamespace(testCtx.DefaultNamespace))
-		Expect(err).NotTo(HaveOccurred())
-		err = k8sClient.DeleteAllOf(ctx, &dataprotectionv1alpha1.BackupPolicy{}, client.InNamespace(testCtx.DefaultNamespace))
-		Expect(err).NotTo(HaveOccurred())
-	})
+	cleanResources := func() {
+		nameSpacedObjects := []client.Object{
+			&corev1.ConfigMap{},
+			&corev1.Secret{},
+			&corev1.Endpoints{},
+			&batchv1.Job{},
+			&dbaasv1alpha1.Cluster{},
+			&dataprotectionv1alpha1.BackupPolicy{},
+		}
+
+		globalObjects := []client.Object{
+			&dbaasv1alpha1.ClusterDefinition{},
+			&dbaasv1alpha1.ClusterVersion{},
+		}
+
+		for _, obj := range nameSpacedObjects {
+			Expect(k8sClient.DeleteAllOf(ctx, obj, client.InNamespace(testCtx.DefaultNamespace))).To(Succeed())
+		}
+		for _, obj := range globalObjects {
+			Expect(k8sClient.DeleteAllOf(ctx, obj)).To(Succeed())
+		}
+	}
+
+	BeforeEach((func() {
+		cleanResources()
+	}))
 
 	AfterEach(func() {
+		cleanResources()
 	})
-
-	const (
-		leader   = "leader"
-		follower = "follower"
-	)
-
-	mockContainer := func() corev1.Container {
-		container := corev1.Container{
-			Name:            "mysql",
-			Image:           "apecloud/wesql-server:8.0.30",
-			ImagePullPolicy: corev1.PullIfNotPresent,
-			Command:         []string{"/bin/bash", "-c"},
-			Env: []corev1.EnvVar{
-				{Name: "MYSQL_ROOT_USER", ValueFrom: &corev1.EnvVarSource{
-					SecretKeyRef: &corev1.SecretKeySelector{
-						LocalObjectReference: corev1.LocalObjectReference{Name: "$(CONN_CREDENTIAL_SECRET_NAME)"},
-						Key:                  "username",
-					},
-				}},
-				{Name: "MYSQL_ROOT_PASSWORD", ValueFrom: &corev1.EnvVarSource{
-					SecretKeyRef: &corev1.SecretKeySelector{
-						LocalObjectReference: corev1.LocalObjectReference{Name: "$(CONN_CREDENTIAL_SECRET_NAME)"},
-						Key:                  "password",
-					},
-				}},
-			},
-			Ports: []corev1.ContainerPort{
-				{ContainerPort: 3306, Name: "mysql", Protocol: corev1.ProtocolTCP},
-				{ContainerPort: 13306, Name: "paxos", Protocol: corev1.ProtocolTCP},
-			},
-		}
-		return container
-	}
-
-	mockClusterDefinition := func(clusterDefName string, clusterEngineType string, typeName string) *dbaasv1alpha1.ClusterDefinition {
-		clusterDefinition := &dbaasv1alpha1.ClusterDefinition{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      clusterDefName,
-				Namespace: "default",
-			},
-			Spec: dbaasv1alpha1.ClusterDefinitionSpec{
-				Type: clusterEngineType,
-				Components: []dbaasv1alpha1.ClusterDefinitionComponent{
-					{
-						TypeName:        typeName,
-						DefaultReplicas: 3,
-						MinReplicas:     0,
-						ComponentType:   dbaasv1alpha1.Consensus,
-						ConsensusSpec: &dbaasv1alpha1.ConsensusSetSpec{
-							Leader:    dbaasv1alpha1.ConsensusMember{Name: leader, AccessMode: dbaasv1alpha1.ReadWrite},
-							Followers: []dbaasv1alpha1.ConsensusMember{{Name: follower, AccessMode: dbaasv1alpha1.Readonly}},
-						},
-						Service: &corev1.ServiceSpec{Ports: []corev1.ServicePort{{Protocol: corev1.ProtocolTCP, Port: 3306}}},
-						Probes: &dbaasv1alpha1.ClusterDefinitionProbes{
-							RoleChangedProbe: &dbaasv1alpha1.ClusterDefinitionProbe{PeriodSeconds: 1},
-						},
-						PodSpec: &corev1.PodSpec{
-							Containers: []corev1.Container{mockContainer()},
-						},
-						SystemAccounts: &dbaasv1alpha1.SystemAccountSpec{
-							CmdExecutorConfig: &dbaasv1alpha1.CmdExecutorConfig{
-								Image:   "mysql-8.0.30",
-								Command: []string{"mysql", "-e", "$(KB_ACCOUNT_STATEMENT)"},
-							},
-							PasswordConfig: dbaasv1alpha1.PasswordConfig{
-								Length:     10,
-								NumDigits:  10,
-								NumSymbols: 0,
-								LetterCase: dbaasv1alpha1.MixedCases,
-							},
-							Accounts: []dbaasv1alpha1.SystemAccountConfig{
-								{
-									Name: dbaasv1alpha1.AdminAccount,
-									ProvisionPolicy: dbaasv1alpha1.ProvisionPolicy{
-										Type:  dbaasv1alpha1.CreateByStmt,
-										Scope: dbaasv1alpha1.AnyPods,
-										Statements: &dbaasv1alpha1.ProvisionStatements{
-											CreationStatement: `CREATE USER IF NOT EXISTS $(USERNAME) IDENTIFIED BY "$(PASSWD)"; GRANT ALL PRIVILEGES ON *.* TO $(USERNAME);`,
-											DeletionStatement: `DROP USER IF EXISTS $(USERNAME);`},
-									},
-								},
-								{
-									Name: dbaasv1alpha1.DataprotectionAccount,
-									ProvisionPolicy: dbaasv1alpha1.ProvisionPolicy{
-										Type:  dbaasv1alpha1.CreateByStmt,
-										Scope: dbaasv1alpha1.AllPods,
-										Statements: &dbaasv1alpha1.ProvisionStatements{
-											CreationStatement: `CREATE USER IF NOT EXISTS $(USERNAME) IDENTIFIED BY "$(PASSWD)"; GRANT ALL PRIVILEGES ON *.* TO $(USERNAME);`,
-											DeletionStatement: `DROP USER IF EXISTS $(USERNAME);`},
-									},
-								},
-								{
-									Name: dbaasv1alpha1.ProbeAccount,
-									ProvisionPolicy: dbaasv1alpha1.ProvisionPolicy{
-										Type: dbaasv1alpha1.ReferToExisting,
-										SecretRef: &dbaasv1alpha1.ProvisionSecretRef{
-											Name:      "$(CONN_CREDENTIAL_SECRET_NAME)",
-											Namespace: "default",
-										},
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-		}
-		return clusterDefinition
-	}
-
-	mockClusterVersion := func(appverName string, clusterDefName string, typeName string) *dbaasv1alpha1.ClusterVersion {
-		ClusterVersion := &dbaasv1alpha1.ClusterVersion{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: appverName,
-			},
-			Spec: dbaasv1alpha1.ClusterVersionSpec{
-				ClusterDefinitionRef: clusterDefName,
-				Components: []dbaasv1alpha1.ClusterVersionComponent{
-					{
-						Type: typeName,
-						PodSpec: &corev1.PodSpec{
-							Containers: []corev1.Container{mockContainer()},
-						},
-					},
-				},
-			},
-		}
-		return ClusterVersion
-	}
-
-	mockCluster := func(clusterDefName, appVerName, typeName, clusterName string, replicas int32) *dbaasv1alpha1.Cluster {
-		clusterObj := &dbaasv1alpha1.Cluster{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace: "default",
-				Name:      clusterName,
-			},
-			Spec: dbaasv1alpha1.ClusterSpec{
-				ClusterVersionRef: appVerName,
-				ClusterDefRef:     clusterDefName,
-				Components: []dbaasv1alpha1.ClusterComponent{
-					{
-						Name:     typeName,
-						Type:     typeName,
-						Replicas: &replicas,
-					},
-				},
-				TerminationPolicy: dbaasv1alpha1.WipeOut,
-			},
-		}
-		return clusterObj
-	}
 
 	mockBackupPolicy := func(name string, engineName, clusterName string) *dataprotectionv1alpha1.BackupPolicy {
 		ml := map[string]string{
@@ -233,7 +94,7 @@ var _ = Describe("SystemAccount Controller", func() {
 		policy := &dataprotectionv1alpha1.BackupPolicy{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      name,
-				Namespace: "default",
+				Namespace: testCtx.DefaultNamespace,
 			},
 			Spec: dataprotectionv1alpha1.BackupPolicySpec{
 				Target: dataprotectionv1alpha1.TargetCluster{
@@ -258,42 +119,6 @@ var _ = Describe("SystemAccount Controller", func() {
 		return policy
 	}
 
-	assureClusterDef := func() *dbaasv1alpha1.ClusterDefinition {
-		By("Creating cluster definition")
-		// create cluster def
-		clusterDef := mockClusterDefinition(clusterDefName, clusterEngineType, typeName)
-		Expect(testCtx.CheckedCreateObj(ctx, clusterDef)).Should(Succeed())
-		// assure cluster def is ready
-		createdClusterDef := &dbaasv1alpha1.ClusterDefinition{}
-		Eventually(func() error {
-			return k8sClient.Get(ctx, client.ObjectKey{Name: clusterDefName}, createdClusterDef)
-		}, timeout, interval).Should(Succeed())
-		return createdClusterDef
-	}
-
-	assureClusterVersion := func() *dbaasv1alpha1.ClusterVersion {
-		// create app version
-		ClusterVersion := mockClusterVersion(ClusterVersionName, clusterDefName, typeName)
-		Expect(testCtx.CheckedCreateObj(ctx, ClusterVersion)).Should(Succeed())
-		// assure cluster def is ready
-		createdClusterVersion := &dbaasv1alpha1.ClusterVersion{}
-		Eventually(func() error {
-			return k8sClient.Get(ctx, client.ObjectKey{Name: ClusterVersionName}, createdClusterVersion)
-		}, timeout, interval).Should(Succeed())
-		return createdClusterVersion
-	}
-
-	assureCluster := func(replicas int32) *dbaasv1alpha1.Cluster {
-		By("Creating cluster")
-		cluster := mockCluster(clusterDefName, ClusterVersionName, typeName, clusterName, replicas)
-		Expect(testCtx.CheckedCreateObj(ctx, cluster)).Should(Succeed())
-		createdCluster := &dbaasv1alpha1.Cluster{}
-		Eventually(func() error {
-			return k8sClient.Get(ctx, client.ObjectKey{Name: cluster.Name, Namespace: cluster.Namespace}, createdCluster)
-		}, timeout, interval).Should(Succeed())
-		return createdCluster
-	}
-
 	patchCluster := func(key types.NamespacedName) {
 		By("Patching Cluster to trigger reconcile")
 		Eventually(changeSpec(key, func(cluster *dbaasv1alpha1.Cluster) {
@@ -316,79 +141,41 @@ var _ = Describe("SystemAccount Controller", func() {
 		return createdPolicy
 	}
 
-	mockEndpoint := func(namespace, endpointName string) *corev1.Endpoints {
+	mockEndpoint := func(namespace, endpointName string, ips []string) *corev1.Endpoints {
+		mockAddresses := func(ip, podName string) corev1.EndpointAddress {
+			return corev1.EndpointAddress{
+				IP:       ip,
+				NodeName: nil,
+				TargetRef: &corev1.ObjectReference{
+					Kind:      "Pod",
+					Namespace: testCtx.DefaultNamespace,
+					Name:      podName,
+				},
+			}
+		}
+
+		addresses := make([]corev1.EndpointAddress, 0)
+		for i := 0; i < len(ips); i++ {
+			podName := "pod-" + testCtx.GetRandomStr()
+			addresses = append(addresses, mockAddresses(ips[i], podName))
+		}
+
 		ep := &corev1.Endpoints{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: namespace,
 				Name:      endpointName,
 			},
-			Subsets: []corev1.EndpointSubset{
-				{
-					Addresses: []corev1.EndpointAddress{
-						{
-							IP:       "10.0.0.0",
-							NodeName: nil,
-							TargetRef: &corev1.ObjectReference{
-								Kind:      "Pod",
-								Namespace: namespace,
-								Name:      "pod0",
-							},
-						},
-					},
-				},
+		}
+		ep.Subsets = []corev1.EndpointSubset{
+			{
+				Addresses: addresses,
 			},
 		}
 		return ep
 	}
 
-	mockHeadlessEndpoint := func(namespace, endpointName string) *corev1.Endpoints {
-		ep := &corev1.Endpoints{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace: namespace,
-				Name:      endpointName,
-			},
-			Subsets: []corev1.EndpointSubset{
-				{
-					Addresses: []corev1.EndpointAddress{
-						{
-							IP:       "10.0.0.0",
-							NodeName: nil,
-							Hostname: "pod0",
-							TargetRef: &corev1.ObjectReference{
-								Kind:      "Pod",
-								Namespace: namespace,
-								Name:      "pod0",
-							},
-						},
-						{
-							IP:       "10.0.0.1",
-							NodeName: nil,
-							Hostname: "pod1",
-							TargetRef: &corev1.ObjectReference{
-								Kind:      "Pod",
-								Namespace: namespace,
-								Name:      "pod1",
-							},
-						},
-						{
-							IP:       "10.0.0.2",
-							NodeName: nil,
-							Hostname: "pod2",
-							TargetRef: &corev1.ObjectReference{
-								Kind:      "Pod",
-								Namespace: namespace,
-								Name:      "pod2",
-							},
-						},
-					},
-				},
-			},
-		}
-		return ep
-	}
-
-	assureEndpont := func(namespace, epname string) *corev1.Endpoints {
-		ep := mockEndpoint(namespace, epname)
+	assureEndpoint := func(namespace, epname string, ips []string) *corev1.Endpoints {
+		ep := mockEndpoint(namespace, epname, ips)
 		Expect(testCtx.CheckedCreateObj(ctx, ep)).Should(Succeed())
 		// assure cluster def is ready
 		createdEP := &corev1.Endpoints{}
@@ -398,80 +185,82 @@ var _ = Describe("SystemAccount Controller", func() {
 		return createdEP
 	}
 
-	assureHeadlessEndpont := func(namespace, epname string) *corev1.Endpoints {
-		ep := mockHeadlessEndpoint(namespace, epname)
-		Expect(testCtx.CheckedCreateObj(ctx, ep)).Should(Succeed())
-		// assure cluster def is ready
-		createdEP := &corev1.Endpoints{}
-		Eventually(func() error {
-			return k8sClient.Get(ctx, client.ObjectKey{Name: epname, Namespace: namespace}, createdEP)
-		}, timeout, interval).Should(Succeed())
-		return createdEP
+	getAccounts := func(g Gomega, cluster *dbaasv1alpha1.Cluster, ml client.MatchingLabels) dbaasv1alpha1.KBAccountType {
+		secrets := &corev1.SecretList{}
+		g.Expect(k8sClient.List(ctx, secrets, client.InNamespace(cluster.Namespace), ml)).To(Succeed())
+		jobs := &batchv1.JobList{}
+		g.Expect(k8sClient.List(ctx, jobs, client.InNamespace(cluster.Namespace), ml)).To(Succeed())
+		return getAccountFacts(secrets, jobs)
 	}
 
-	Context("When Creating Consensus Cluster", func() {
+	setupMockEnv := func(clusterDefinitionName, clusterVersionName string) (*dbaasv1alpha1.ClusterDefinition, *dbaasv1alpha1.ClusterVersion) {
+		// setup expected values
+		expectedAcctNum = len(expectedAcctList)
+		expectedAccounts = dbaasv1alpha1.KBAccountInvalid
+		expectedJobsPerCluster = 0
+		for _, acct := range expectedAcctList {
+			expectedJobsPerCluster += acctJobsMap[acct]
+			expectedAccounts |= acct.GetAccountID()
+		}
+		// mock clusterDefinition and clusterVersion objects
+		clusterDef := testdbaas.MockClusterDefinition(ctx, testCtx, clusterDefinitionName, "consensusset/wesql_cd_sysacct.yaml")
+		Expect(clusterDef).ShouldNot(BeNil())
+		clusterVersion := testdbaas.CreateConsensusMysqlClusterVersion(ctx, testCtx, clusterDefinitionName, clusterVersionName)
+		Expect(clusterVersion).ShouldNot(BeNil())
+		return clusterDef, clusterVersion
+	}
+
+	Context("When Creating Cluster", func() {
 		It("Should update system account expectation", func() {
 			if testEnv.UseExistingCluster != nil && *testEnv.UseExistingCluster {
 				Skip("Mocked Cluster is not fully implemented to run in real cluster.")
 			}
-			createdClusterDef := assureClusterDef()
-			ClusterVersion := assureClusterVersion()
 
-			By("Assuring ClusterDef and ClusterVersion are Available")
-			Eventually(func() bool {
-				tmpClusterDef := &dbaasv1alpha1.ClusterDefinition{}
-				err := k8sClient.Get(ctx, client.ObjectKey{Name: createdClusterDef.Name, Namespace: createdClusterDef.Namespace}, tmpClusterDef)
-				if err != nil {
-					return false
-				}
-				return tmpClusterDef.Status.Phase == dbaasv1alpha1.AvailablePhase
-			}, timeout, interval).Should(BeTrue())
+			var (
+				randomStr             = testCtx.GetRandomStr()
+				clusterName           = "cluster-" + randomStr
+				backupPolicyName      = "backup-policy-demo"
+				databaseEngine        = "mysql"
+				clusterDefinitionName = "cluster-definition-" + randomStr
+				clusterVersionName    = "clusterversion-" + randomStr
+				consensusCompName     = "consensus"
+				ips                   = []string{"10.0.0.0", "10.0.0.1", "10.0.0.2"}
+			)
 
-			Eventually(func() bool {
-				tmpClusterVersion := &dbaasv1alpha1.ClusterVersion{}
-				err := k8sClient.Get(ctx, client.ObjectKey{Name: ClusterVersion.Name, Namespace: ClusterVersion.Namespace}, tmpClusterVersion)
-				if err != nil {
-					return false
-				}
-				return tmpClusterVersion.Status.Phase == dbaasv1alpha1.AvailablePhase
-			}, timeout, interval).Should(BeTrue())
+			By("Setup mock env")
+			clusterDef, clusterVersion := setupMockEnv(clusterDefinitionName, clusterVersionName)
 
-			// make sure cluster is under creation
-			cluster := assureCluster(3)
-			compName := cluster.Spec.Components[0].Name
+			By("Mock Cluster")
+			cluster := testdbaas.CreateConsensusMysqlCluster(ctx, testCtx, clusterDef.Name, clusterVersion.Name, clusterName, consensusCompName)
+			Expect(cluster).ShouldNot(BeNil())
+
 			// services of type ClusterIP should have been created.
-			serviceName := cluster.Name + "-" + compName
+			serviceName := clusterName + "-" + consensusCompName
 			headlessServiceName := serviceName + "-headless"
-			_ = assureEndpont(cluster.Namespace, serviceName)
-			_ = assureHeadlessEndpont(cluster.Namespace, headlessServiceName)
+			_ = assureEndpoint(cluster.Namespace, serviceName, ips[0:1])
+			_ = assureEndpoint(cluster.Namespace, headlessServiceName, ips)
 
 			patchCluster(intctrlutil.GetNamespacedName(cluster))
 
-			ml := getLabelsForSecretsAndJobs(cluster.Name, createdClusterDef.Spec.Type, createdClusterDef.Name, compName)
-
-			getAccounts := func(g Gomega) dbaasv1alpha1.KBAccountType {
-				secrets := &corev1.SecretList{}
-				g.Expect(k8sClient.List(ctx, secrets, client.InNamespace(cluster.Namespace), ml)).To(Succeed())
-				jobs := &batchv1.JobList{}
-				g.Expect(k8sClient.List(ctx, jobs, client.InNamespace(cluster.Namespace), ml)).To(Succeed())
-				return getAccountFacts(secrets, jobs)
-			}
-
+			ml := getLabelsForSecretsAndJobs(cluster.Name, clusterDef.Spec.Type, clusterDef.Name, consensusCompName)
 			By("Verify two accounts to be created")
 			Eventually(func(g Gomega) {
-				accounts := getAccounts(g)
-				g.Expect(accounts).To(BeEquivalentTo(dbaasv1alpha1.KBAccountAdmin | dbaasv1alpha1.KBAccountProbe))
+				accounts := getAccounts(g, cluster, ml)
+				g.Expect(accounts).To(BeEquivalentTo(expectedAccounts))
 			}, timeout, interval).Should(Succeed())
 
 			By("Assure some Secrets creation are cached")
 			secretsToCreate1 := 0
-			Eventually(func() bool {
+			Eventually(func() int {
 				secretsToCreate1 = len(systemAccountReconciler.SecretMapStore.ListKeys())
-				return secretsToCreate1 > 0
-			}, timeout, interval).Should(BeTrue())
+				return secretsToCreate1
+			}, timeout, interval).Should(And(BeNumerically(">", 0), BeNumerically("<=", expectedAcctNum)))
 
-			By("Create a Backup Policy")
+			// create backup policy, and update expected values
 			policy := assureBackupPolicy(backupPolicyName, databaseEngine, clusterName)
+			expectedJobsPerCluster += acctJobsMap[dbaasv1alpha1.DataprotectionAccount]
+			expectedAccounts |= dbaasv1alpha1.KBAccountDataprotection
+			expectedAcctNum += 1
 
 			By("Check the BackupPolicy creation filters run")
 			policyKey := expectationKey(policy.Namespace, clusterName, databaseEngine)
@@ -483,28 +272,27 @@ var _ = Describe("SystemAccount Controller", func() {
 
 			By("Verify three accounts have been created in total")
 			Eventually(func(g Gomega) {
-				accounts := getAccounts(g)
-				g.Expect(accounts).To(BeEquivalentTo(dbaasv1alpha1.KBAccountAdmin | dbaasv1alpha1.KBAccountDataprotection | dbaasv1alpha1.KBAccountProbe))
+				accounts := getAccounts(g, cluster, ml)
+				g.Expect(accounts).To(BeEquivalentTo(expectedAccounts))
 			}, timeout, interval).Should(Succeed())
 
 			By("Assure more Secrets creation are cached")
 			secretsToCreate2 := 0
-			Eventually(func() bool {
+			Eventually(func() int {
 				secretsToCreate2 = len(systemAccountReconciler.SecretMapStore.ListKeys())
-				return secretsToCreate2 > secretsToCreate1
-			}, timeout, interval).Should(BeTrue())
+				return secretsToCreate2
+			}, timeout, interval).Should(BeNumerically(">", secretsToCreate1))
 
 			secretsCreated := 0
-			Eventually(func(g Gomega) {
-				secrets := &corev1.SecretList{}
-				g.Expect(k8sClient.List(ctx, secrets, client.InNamespace(cluster.Namespace), ml)).To(Succeed())
-				secretsCreated = len(secrets.Items)
-			}, timeout, interval).Should(Succeed())
+			secrets := &corev1.SecretList{}
+			Expect(k8sClient.List(ctx, secrets, client.InNamespace(cluster.Namespace), ml)).To(Succeed())
+			secretsCreated = len(secrets.Items)
 
 			By("Mock all jobs completed and deleted")
 			Eventually(func(g Gomega) {
 				jobs := &batchv1.JobList{}
 				g.Expect(k8sClient.List(ctx, jobs, client.InNamespace(cluster.Namespace), ml)).To(Succeed())
+				g.Expect(len(jobs.Items)).To(BeEquivalentTo(expectedJobsPerCluster), "there should be 5 jobs created")
 				for _, job := range jobs.Items {
 					g.Expect(changeStatus(intctrlutil.GetNamespacedName(&job), func(job *batchv1.Job) {
 						job.Status.Conditions = []batchv1.JobCondition{{
@@ -513,19 +301,34 @@ var _ = Describe("SystemAccount Controller", func() {
 						}}
 					})).To(Succeed())
 					g.Expect(k8sClient.Delete(ctx, &job)).To(Succeed())
+				}
+			}, timeout, interval).Should(Succeed())
+
+			// remove 'orphan' finalizers to make sure all jobs can be deleted.
+			Eventually(func(g Gomega) {
+				finalizerName := "orphan"
+				jobs := &batchv1.JobList{}
+				g.Expect(k8sClient.List(ctx, jobs, client.InNamespace(cluster.Namespace), ml)).To(Succeed())
+				for _, job := range jobs.Items {
 					g.Expect(changeSpec(intctrlutil.GetNamespacedName(&job), func(job *batchv1.Job) {
-						job.SetFinalizers([]string{})
+						controllerutil.RemoveFinalizer(job, finalizerName)
 					})).To(Succeed())
 				}
+			}, timeout, interval).Should(Succeed())
+
+			Eventually(func(g Gomega) {
+				jobs := &batchv1.JobList{}
+				g.Expect(k8sClient.List(ctx, jobs, client.InNamespace(cluster.Namespace), ml)).To(Succeed())
+				g.Expect(len(jobs.Items)).To(Equal(0))
 			}, timeout, interval).Should(Succeed())
 
 			By("Check all secrets creation are completed")
 			Eventually(func(g Gomega) {
 				secrets := &corev1.SecretList{}
 				g.Expect(k8sClient.List(ctx, secrets, client.InNamespace(cluster.Namespace), ml)).To(Succeed())
-				g.Expect(len(secrets.Items) == secretsCreated+secretsToCreate2).To(BeTrue())
-				g.Expect(len(systemAccountReconciler.SecretMapStore.ListKeys()) == 0).To(BeTrue())
-			}, timeout, interval).Should(Succeed())
+				g.Expect(len(secrets.Items)).To(Equal(secretsCreated + secretsToCreate2))
+				g.Expect(len(systemAccountReconciler.SecretMapStore.ListKeys())).To(BeEquivalentTo(0))
+			}, 2*timeout, interval).Should(Succeed())
 
 			By("Check the BackupPolicy deletion filter triggered after the Cluster is deleted")
 			Eventually(func() error {
@@ -535,6 +338,92 @@ var _ = Describe("SystemAccount Controller", func() {
 			Eventually(func(g Gomega) {
 				_, exists, _ := systemAccountReconciler.ExpectionManager.getExpectation(policyKey)
 				g.Expect(exists).To(BeFalse())
+			}, timeout, interval).Should(Succeed())
+
+			Eventually(func() error {
+				return k8sClient.Delete(ctx, cluster)
+			}, timeout, interval).Should(Succeed())
+		})
+	})
+
+	Context("When Delete Cluster", func() {
+		It("Should clear relevant expectations and secrets after cluster deletion", func() {
+			if testEnv.UseExistingCluster != nil && *testEnv.UseExistingCluster {
+				Skip("Mocked Cluster is not fully implemented to run in real cluster.")
+			}
+			var (
+				randomStr             = testCtx.GetRandomStr()
+				clusterDefinitionName = "cluster-definition-" + randomStr
+				clusterVersionName    = "clusterversion-" + randomStr
+				consensusCompName     = "consensus"
+				ips                   = []string{"10.0.0.0", "10.0.0.1", "10.0.0.2"}
+			)
+
+			By("set up mock env")
+			clusterDef, clusterVersion := setupMockEnv(clusterDefinitionName, clusterVersionName)
+
+			clusterNameList := []string{"cluster-alpha", "cluster-beta"}
+			clusterList := make([]types.NamespacedName, 0)
+
+			for _, clusterName := range clusterNameList {
+				cluster := testdbaas.CreateConsensusMysqlCluster(ctx, testCtx, clusterDef.Name, clusterVersion.Name, clusterName, consensusCompName)
+				Expect(cluster).ShouldNot(BeNil())
+
+				// services of type ClusterIP should have been created.
+				serviceName := cluster.Name + "-" + consensusCompName
+				headlessServiceName := serviceName + "-headless"
+				_ = assureEndpoint(cluster.Namespace, serviceName, ips[0:1])
+				_ = assureEndpoint(cluster.Namespace, headlessServiceName, ips)
+				patchCluster(intctrlutil.GetNamespacedName(cluster))
+
+				clusterList = append(clusterList, intctrlutil.GetNamespacedName(cluster))
+
+				Eventually(func(g Gomega) {
+					rootSecretName := clusterName + "-conn-credential"
+					rootSecret := &corev1.Secret{}
+					g.Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: cluster.Namespace, Name: rootSecretName}, rootSecret)).To(Succeed())
+				}, timeout, interval).Should(Succeed())
+
+				ml := getLabelsForSecretsAndJobs(cluster.Name, clusterDef.Spec.Type, clusterDef.Name, consensusCompName)
+				By("Verify two accounts to be created")
+				Eventually(func(g Gomega) {
+					accounts := getAccounts(g, cluster, ml)
+					g.Expect(accounts).To(BeEquivalentTo(expectedAccounts))
+				}, timeout, interval).Should(Succeed())
+
+				Eventually(func(g Gomega) {
+					secrets := &corev1.SecretList{}
+					g.Expect(k8sClient.List(ctx, secrets, client.InNamespace(cluster.Namespace), ml)).To(Succeed())
+					g.Expect(len(secrets.Items)).To(BeEquivalentTo(1))
+				}, timeout, interval).Should(Succeed())
+
+				Eventually(func(g Gomega) {
+					jobs := &batchv1.JobList{}
+					g.Expect(k8sClient.List(ctx, jobs, client.InNamespace(cluster.Namespace), ml)).To(Succeed())
+					g.Expect(len(jobs.Items)).To(BeEquivalentTo(expectedJobsPerCluster))
+				}, timeout, interval).Should(Succeed())
+			}
+
+			Eventually(func(g Gomega) {
+				g.Expect(len(systemAccountReconciler.SecretMapStore.ListKeys())).To(BeEquivalentTo(expectedJobsPerCluster * expectedAcctNum))
+			}, timeout, interval).Should(Succeed())
+
+			By("Delete Cluster and check SecretMapStore")
+			Eventually(func(g Gomega) {
+				cluster := &dbaasv1alpha1.Cluster{}
+				g.Expect(k8sClient.Get(ctx, clusterList[0], cluster)).To(Succeed())
+				g.Expect(k8sClient.Delete(ctx, cluster)).To(Succeed())
+			}, timeout, interval).Should(Succeed())
+
+			Eventually(func(g Gomega) {
+				g.Expect(len(systemAccountReconciler.SecretMapStore.ListKeys())).To(BeEquivalentTo(expectedJobsPerCluster))
+			}, timeout, interval).Should(Succeed())
+
+			Eventually(func(g Gomega) {
+				cluster := &dbaasv1alpha1.Cluster{}
+				g.Expect(k8sClient.Get(ctx, clusterList[1], cluster)).To(Succeed())
+				g.Expect(k8sClient.Delete(ctx, cluster)).To(Succeed())
+				g.Expect(len(systemAccountReconciler.SecretMapStore.ListKeys())).To(BeEquivalentTo(expectedJobsPerCluster))
 			}, timeout, interval).Should(Succeed())
 		})
 	})

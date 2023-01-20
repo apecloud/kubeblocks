@@ -360,6 +360,7 @@ func retrieveEndpoints(scope dbaasv1alpha1.ProvisionScope,
 }
 
 func getAccountFacts(secrets *corev1.SecretList, jobs *batchv1.JobList) (detectedFacts dbaasv1alpha1.KBAccountType) {
+	detectedFacts = dbaasv1alpha1.KBAccountInvalid
 	// parse account name from secret's label
 	for _, secret := range secrets.Items {
 		if accountName, exists := secret.ObjectMeta.Labels[clusterAccountLabelKey]; exists {
@@ -440,4 +441,14 @@ func getCreationStmtForAccount(namespace, clusterName, clusterDefType, clusterDe
 
 	secret := renderSecretWithPwd(namespace, clusterName, clusterDefType, clusterDefName, compName, userName, passwd)
 	return creationStmt, secret
+}
+
+func getAllSysAccounts() []dbaasv1alpha1.AccountName {
+	return []dbaasv1alpha1.AccountName{
+		dbaasv1alpha1.AdminAccount,
+		dbaasv1alpha1.DataprotectionAccount,
+		dbaasv1alpha1.ProbeAccount,
+		dbaasv1alpha1.MonitorAccount,
+		dbaasv1alpha1.ReplicatorAccount,
+	}
 }

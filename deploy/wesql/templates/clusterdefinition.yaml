@@ -1,7 +1,7 @@
 apiVersion: dbaas.kubeblocks.io/v1alpha1
 kind: ClusterDefinition
 metadata:
-  name: apecloud-wesql
+  name: apecloud-mysql
   labels:
     {{- include "wesqlapp.labels" . | nindent 4 }}
 spec:
@@ -28,11 +28,11 @@ spec:
         configTemplateRefs:
           - name: mysql-3node-tpl
             configTplRef: mysql-3node-tpl-8.0
-            configConstraintRef: wesql-cfg-constraints-8.0
+            configConstraintRef: mysql-cfg-constraints-8.0
             volumeName: mysql-config
             namespace: {{ .Release.Namespace }}
-          - name: wesql-scripts
-            configTplRef: wesql-scripts
+          - name: apecloud-mysql-scripts
+            configTplRef: apecloud-mysql-scripts
             namespace: {{ .Release.Namespace }}
             volumeName: scripts
             defaultMode: 493
@@ -53,7 +53,7 @@ spec:
       horizontalScalePolicy:
         type: Snapshot
         backupTemplateSelector:
-          "clusterdefinition.kubeblocks.io/name": apecloud-wesql
+          "clusterdefinition.kubeblocks.io/name": apecloud-mysql
       podSpec:
         containers:
           - name: mysql

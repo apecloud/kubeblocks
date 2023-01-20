@@ -1,11 +1,11 @@
 apiVersion: dbaas.kubeblocks.io/v1alpha1
 kind: ClusterVersion
 metadata:
-  name: wesql-{{ default .Chart.AppVersion .Values.clusterVersionOverride }}
+  name: ac-mysql-{{ default .Chart.AppVersion .Values.clusterVersionOverride }}
   labels:
     {{- include "wesqlapp.labels" . | nindent 4 }}
 spec:
-  clusterDefinitionRef: apecloud-wesql
+  clusterDefinitionRef: apecloud-mysql
   components:
   - type: mysql
     podSpec:

@@ -4,8 +4,8 @@ metadata:
   name: {{ .Release.Name }}
   labels: {{ include "wesqlcluster.labels" . | nindent 4 }}
 spec:
-  clusterDefinitionRef: apecloud-wesql  # ref clusterdefinition.name
-  clusterVersionRef: wesql-{{ default .Chart.AppVersion .Values.clusterVersionOverride }} # ref clusterversion.name
+  clusterDefinitionRef: apecloud-mysql  # ref clusterdefinition.name
+  clusterVersionRef: ac-mysql-{{ default .Chart.AppVersion .Values.clusterVersionOverride }} # ref clusterversion.name
   terminationPolicy: {{ .Values.terminationPolicy }}
   affinity:
     {{- with .Values.topologyKeys }}
@@ -15,7 +15,7 @@ spec:
   tolerations: {{ . | toYaml | nindent 4 }}
   {{- end }}
   components:
-    - name: wesql # user-defined
+    - name: mysql # user-defined
       type: mysql # ref clusterdefinition components.typename
       monitor: {{ .Values.monitor.enabled | default false }}
       replicas: {{ .Values.replicaCount | default 3 }}

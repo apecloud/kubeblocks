@@ -93,8 +93,5 @@ spec:
                 name: data
               - mountPath: /opt/mysql
                 name: mysql-config
-<<<<<<< HEAD
-=======
               - name: scripts
                 mountPath: /scripts
->>>>>>> main

@@ -129,3 +129,15 @@ func GetClusterPhase(ctx context.Context, testCtx testutil.TestContext, clusterN
 		return cluster.Status.Phase
 	}
 }
+
+// MockClusterDefinition creates a clusterDefinition from file.
+func MockClusterDefinition(ctx context.Context, testCtx testutil.TestContext, clusterDefName string, filePath string) *dbaasv1alpha1.ClusterDefinition {
+	clusterDefBytes, err := testdata.GetTestDataFileContent(filePath)
+	if err != nil {
+		return nil
+	}
+	clusterDefYaml := fmt.Sprintf(string(clusterDefBytes), clusterDefName)
+	clusterDef := &dbaasv1alpha1.ClusterDefinition{}
+	gomega.Expect(yaml.Unmarshal([]byte(clusterDefYaml), clusterDef)).Should(gomega.Succeed())
+	return CreateK8sResource(ctx, testCtx, clusterDef).(*dbaasv1alpha1.ClusterDefinition)
+}

@@ -348,7 +348,12 @@ func retrieveEndpoints(scope dbaasv1alpha1.ProvisionScope,
 	// parse endpoints
 	endpoints := make([]string, 0)
 	if scope == dbaasv1alpha1.AnyPods {
-		endpoints = append(endpoints, svcEP.Subsets[0].Addresses[0].IP)
+		for _, ss := range svcEP.Subsets {
+			for _, add := range ss.Addresses {
+				endpoints = append(endpoints, add.IP)
+				break
+			}
+		}
 	} else {
 		for _, ss := range headlessEP.Subsets {
 			for _, add := range ss.Addresses {

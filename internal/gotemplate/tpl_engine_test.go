@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package controllerutil
+package gotemplate
 
 import (
 	. "github.com/onsi/ginkgo/v2"
@@ -29,7 +29,7 @@ type Friend struct {
 var _ = Describe("tpl engine template", func() {
 
 	emptyTplEngine := func(values *TplValues, funcs *BuiltInObjectsFunc, tpl string) (string, error) {
-		return NewTplEngine(values, funcs, "for_test").Render(tpl)
+		return NewTplEngine(values, funcs, "for_test", nil, nil).Render(tpl)
 	}
 
 	BeforeEach(func() {

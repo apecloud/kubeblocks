@@ -17,11 +17,14 @@ limitations under the License.
 package dbaas
 
 import (
+	"context"
+
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	"github.com/apecloud/kubeblocks/internal/gotemplate"
 )
 
 const (
@@ -102,13 +105,16 @@ type configTemplateBuilder struct {
 
 	// Global Var
 	componentValues  *componentTemplateValues
-	builtInFunctions *intctrlutil.BuiltInObjectsFunc
+	builtInFunctions *gotemplate.BuiltInObjectsFunc
 
 	// DBaas cluster object
 	component      *Component
 	clusterVersion *dbaasv1alpha1.ClusterVersion
 	cluster        *dbaasv1alpha1.Cluster
 	podSpec        *corev1.PodSpec
+
+	ctx context.Context
+	cli client.Client
 }
 
 type envVar struct {

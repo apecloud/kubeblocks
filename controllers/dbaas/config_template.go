@@ -17,13 +17,16 @@ limitations under the License.
 package dbaas
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	"github.com/apecloud/kubeblocks/internal/gotemplate"
 )
 
 // General Built-in objects
@@ -45,22 +48,25 @@ const (
 	builtInGetContainerFunctionName       = "getContainerByName"
 	builtInGetContainerMemoryFunctionName = "getContainerMemory"
 
-	buildInSystemFailedName = "faield"
-	buildInSystemImportName = "import"
-	buildInSystemCallName   = "include"
-
 	// BuiltinMysqlCalBufferFunctionName Mysql Built-in
 	// TODO: This function migrate to configuration template
 	builtInMysqlCalBufferFunctionName = "callBufferSizeByResource"
 )
 
-func newCfgTemplateBuilder(clusterName, namespace string, cluster *dbaasv1alpha1.Cluster, version *dbaasv1alpha1.ClusterVersion) *configTemplateBuilder {
+func newCfgTemplateBuilder(
+	clusterName, namespace string,
+	cluster *dbaasv1alpha1.Cluster,
+	version *dbaasv1alpha1.ClusterVersion,
+	ctx context.Context,
+	cli client.Client) *configTemplateBuilder {
 	return &configTemplateBuilder{
 		namespace:      namespace,
 		clusterName:    clusterName,
 		cluster:        cluster,
 		clusterVersion: version,
-		tplName:        "KBTpl",
+		tplName:        "KBTPL",
+		ctx:            ctx,
+		cli:            cli,
 	}
 }
 
@@ -78,7 +84,7 @@ func (c *configTemplateBuilder) render(configs map[string]string) (map[string]st
 	if err != nil {
 		return nil, err
 	}
-	engine := intctrlutil.NewTplEngine(o, c.builtInFunctions, c.tplName)
+	engine := gotemplate.NewTplEngine(o, c.builtInFunctions, c.tplName, c.cli, c.ctx)
 	for file, configContext := range configs {
 		newContext, err := engine.Render(configContext)
 		if err != nil {
@@ -89,7 +95,7 @@ func (c *configTemplateBuilder) render(configs map[string]string) (map[string]st
 	return rendered, nil
 }
 
-func (c *configTemplateBuilder) builtinObjects() (*intctrlutil.TplValues, error) {
+func (c *configTemplateBuilder) builtinObjects() (*gotemplate.TplValues, error) {
 	bultInObj := map[string]interface{}{
 		builtinClusterObject:           c.cluster,
 		builtinComponentObject:         c.component,
@@ -101,7 +107,7 @@ func (c *configTemplateBuilder) builtinObjects() (*intctrlutil.TplValues, error)
 	if err != nil {
 		return nil, err
 	}
-	var tplValue intctrlutil.TplValues
+	var tplValue gotemplate.TplValues
 	if err = json.Unmarshal(b, &tplValue); err != nil {
 		return nil, err
 	}
@@ -123,7 +129,7 @@ func (c *configTemplateBuilder) injectBuiltInObjectsAndFunctions(
 
 func injectBuiltInFunctions(tplBuilder *configTemplateBuilder, component *Component) error {
 	// TODO add built-in function
-	tplBuilder.builtInFunctions = &intctrlutil.BuiltInObjectsFunc{
+	tplBuilder.builtInFunctions = &gotemplate.BuiltInObjectsFunc{
 		builtInMysqlCalBufferFunctionName:     calDBPoolSize,
 		builtInGetVolumeFunctionName:          getVolumeMountPathByName,
 		builtInGetPvcFunctionName:             getPVCByName,
@@ -132,10 +138,6 @@ func injectBuiltInFunctions(tplBuilder *configTemplateBuilder, component *Compon
 		builtInGetArgFunctionName:             getArgByName,
 		builtInGetContainerFunctionName:       getPodContainerByName,
 		builtInGetContainerMemoryFunctionName: getContainerMemory,
-
-		// support go template libraries
-		buildInSystemFailedName: failed,
-		buildInSystemImportName: cmTemplateImport,
 	}
 	return nil
 }

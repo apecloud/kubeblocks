@@ -263,7 +263,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	if cluster.Status.ObservedGeneration == cluster.GetObjectMeta().GetGeneration() {
-		// check cluster all pods is ready
+		// check if all components of cluster are ready.
 		if err = r.checkAndPatchToRunning(reqCtx.Ctx, cluster, clusterdefinition); err != nil {
 			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 		}
@@ -324,14 +324,13 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return intctrlutil.RequeueAfter(time.Second, reqCtx.Log, "")
 	}
 
-	if err = r.handleClusterStatusAfterApplySucceed(ctx, cluster, clusterdefinition); err != nil {
-		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-	}
-
 	if err = r.patchClusterLabels(ctx, cluster, clusterdefinition, clusterVersion); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 
+	if err = r.handleClusterStatusAfterApplySucceed(ctx, cluster, clusterdefinition); err != nil {
+		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+	}
 	return intctrlutil.Reconciled()
 }
 
@@ -584,12 +583,19 @@ func (r *ClusterReconciler) updateClusterPhaseToCreatingOrUpdating(reqCtx intctr
 	if cluster.Status.Phase == "" {
 		needPatch = true
 		cluster.Status.Phase = dbaasv1alpha1.CreatingPhase
+		cluster.Status.Components = map[string]dbaasv1alpha1.ClusterStatusComponent{}
+		for _, v := range cluster.Spec.Components {
+			cluster.Status.Components[v.Name] = dbaasv1alpha1.ClusterStatusComponent{
+				Phase: dbaasv1alpha1.CreatingPhase,
+				Type:  v.Type,
+			}
+		}
 	} else if slices.Index([]dbaasv1alpha1.Phase{
 		dbaasv1alpha1.RunningPhase,
 		dbaasv1alpha1.FailedPhase,
 		dbaasv1alpha1.AbnormalPhase}, cluster.Status.Phase) != -1 && !r.existsOperations(cluster) {
 		needPatch = true
-		cluster.Status.Phase = dbaasv1alpha1.UpdatingPhase
+		cluster.Status.Phase = dbaasv1alpha1.SpecUpdatingPhase
 	}
 	if !needPatch {
 		return nil
@@ -616,7 +622,7 @@ func (r *ClusterReconciler) updateClusterPhaseWhenConditionsError(cluster *dbaas
 	opsRequestSlice, _ := opsutil.GetOpsRequestSliceFromCluster(cluster)
 	// if no operations in cluster, means user update the cluster.spec directly
 	if len(opsRequestSlice) == 0 {
-		cluster.Status.Phase = dbaasv1alpha1.UpdatingPhase
+		cluster.Status.Phase = dbaasv1alpha1.SpecUpdatingPhase
 		return
 	}
 	// if exits opsRequests are running, set the cluster phase to the early target phase with the OpsRequest
@@ -630,8 +636,10 @@ func (r *ClusterReconciler) checkAndPatchToRunning(ctx context.Context,
 	if !r.needCheckClusterForReady(cluster) {
 		return nil
 	}
+	patch := client.MergeFrom(cluster.DeepCopy())
 	// synchronize the latest status of components
-	if err := r.handleComponentStatus(ctx, cluster, clusterDef); err != nil {
+	needSyncComponentStatus, err := r.handleComponentStatus(ctx, cluster, clusterDef)
+	if err != nil {
 		return err
 	}
 
@@ -657,7 +665,6 @@ func (r *ClusterReconciler) checkAndPatchToRunning(ctx context.Context,
 			clusterIsRunning = false
 		}
 	}
-	patch := client.MergeFrom(cluster.DeepCopy())
 
 	readyCondition := newAllReplicasPodsReadyConditions()
 	if isReady {
@@ -672,9 +679,10 @@ func (r *ClusterReconciler) checkAndPatchToRunning(ctx context.Context,
 		// abnormal or failed components exist
 		needSync = true
 		componentMap, clusterAvailabilityEffectMap, _ := getComponentRelatedInfo(cluster, clusterDef, "")
-		handleClusterStatusPhaseByEvent(cluster, componentMap, clusterAvailabilityEffectMap)
+		handleClusterAbnormalOrFailedPhase(cluster, componentMap, clusterAvailabilityEffectMap)
 	}
-	if !needSync {
+	// if cluster.status is not changed, return
+	if !needSync && !needSyncComponentStatus {
 		return nil
 	}
 	if err := r.Client.Status().Patch(ctx, cluster, patch); err != nil {
@@ -684,10 +692,14 @@ func (r *ClusterReconciler) checkAndPatchToRunning(ctx context.Context,
 		// send an event when all pods of the components are ready
 		r.Recorder.Event(cluster, corev1.EventTypeNormal, readyCondition.Reason, readyCondition.Message)
 	}
+
 	if clusterIsRunning {
 		// send an event when Cluster.status.phase change to Running
 		r.Recorder.Eventf(cluster, corev1.EventTypeNormal, string(dbaasv1alpha1.RunningPhase), "Cluster: %s is ready, current phase is Running.", cluster.Name)
-		// mark OpsRequest annotation to reconcile for cluster scope OpsRequest
+	}
+	if clusterIsRunning || needSyncComponentStatus {
+		// when cluster phase or component phase changed,
+		// need to mark OpsRequest annotation to reconcile for running OpsRequest.
 		return opsutil.MarkRunningOpsRequestAnnotation(ctx, r.Client, cluster)
 	}
 	return nil
@@ -698,31 +710,24 @@ func (r *ClusterReconciler) checkAndPatchToRunning(ctx context.Context,
 // it can prevent the use of expired component status, which may lead to inconsistent cluster status.
 func (r *ClusterReconciler) handleComponentStatus(ctx context.Context,
 	cluster *dbaasv1alpha1.Cluster,
-	clusterDef *dbaasv1alpha1.ClusterDefinition) error {
+	clusterDef *dbaasv1alpha1.ClusterDefinition) (bool, error) {
 	var (
 		needSyncDeploymentStatus  bool
 		needSyncStatefulSetStatus bool
 		err                       error
 	)
-	patch := client.MergeFrom(cluster.DeepCopy())
 	// handle stateless component status
 	if needSyncDeploymentStatus, err = r.handleComponentStatusWithDeployment(ctx, cluster, clusterDef); err != nil {
-		return err
+		return false, err
 	}
 	// handle stateful/consensus component status
 	if needSyncStatefulSetStatus, err = r.handleComponentStatusWithStatefulSet(ctx, cluster, clusterDef); err != nil {
-		return err
+		return false, err
 	}
-	if needSyncDeploymentStatus || needSyncStatefulSetStatus {
-		if err = r.Client.Status().Patch(ctx, cluster, patch); err != nil {
-			return err
-		}
-		return opsutil.MarkRunningOpsRequestAnnotation(ctx, r.Client, cluster)
-	}
-	return nil
+	return needSyncDeploymentStatus || needSyncStatefulSetStatus, nil
 }
 
-// handleComponentStatusWithStatefulSet handles the component status with statefulSet. One statefulSet corresponds to one component.
+// handleComponentStatusWithStatefulSet handles the component status with StatefulSet workloads.
 func (r *ClusterReconciler) handleComponentStatusWithStatefulSet(ctx context.Context,
 	cluster *dbaasv1alpha1.Cluster,
 	clusterDef *dbaasv1alpha1.ClusterDefinition) (bool, error) {
@@ -730,6 +735,7 @@ func (r *ClusterReconciler) handleComponentStatusWithStatefulSet(ctx context.Con
 		needSyncComponentStatus bool
 		statefulSetList         = &appsv1.StatefulSetList{}
 		err                     error
+		handledComponentMap     = map[string]struct{}{}
 	)
 
 	if err = getWorkloadListForCluster(ctx, r.Client, cluster, clusterDef, statefulSetList); err != nil {
@@ -740,6 +746,10 @@ func (r *ClusterReconciler) handleComponentStatusWithStatefulSet(ctx context.Con
 		if len(componentName) == 0 {
 			continue
 		}
+		if _, ok := handledComponentMap[componentName]; ok {
+			continue
+		}
+		handledComponentMap[componentName] = struct{}{}
 		typeName := util.GetComponentTypeName(*cluster, componentName)
 		componentDef := util.GetComponentDefFromClusterDefinition(clusterDef, typeName)
 		component := util.GetComponentByName(cluster, componentName)
@@ -755,7 +765,9 @@ func (r *ClusterReconciler) handleComponentStatusWithStatefulSet(ctx context.Con
 		if err != nil {
 			return false, err
 		}
-		if ok, err := components.NeedSyncStatusComponents(cluster, currComponent, componentName, componentIsRunning, podsIsReady); err != nil {
+		workloadSpecIsUpdated := util.StatefulSetSpecIsUpdated(&sts)
+		if ok, err := components.NeedSyncStatusComponents(cluster, currComponent, componentName,
+			workloadSpecIsUpdated, componentIsRunning, podsIsReady); err != nil {
 			return false, err
 		} else if ok {
 			needSyncComponentStatus = true
@@ -780,8 +792,9 @@ func (r *ClusterReconciler) handleComponentStatusWithDeployment(ctx context.Cont
 		}
 		deployIsReady := stateless.DeploymentIsReady(&deploy)
 		statelessComponent := stateless.NewStateless(ctx, r.Client, cluster)
+		workloadSpecIsUpdated := stateless.DeploymentSpecIsUpdated(&deploy)
 		if ok, err := components.NeedSyncStatusComponents(cluster, statelessComponent,
-			componentName, deployIsReady, deployIsReady); err != nil {
+			componentName, workloadSpecIsUpdated, deployIsReady, deployIsReady); err != nil {
 			return false, err
 		} else if ok {
 			needSyncComponentStatus = true

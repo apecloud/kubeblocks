@@ -716,6 +716,18 @@ func addLeaderSelectorLabels(service *corev1.Service, component *Component) {
 	}
 }
 
+// mergeAnnotations keeps the original annotations.
+// if annotations exist and are replaced, the Deployment/StatefulSet will be updated.
+func mergeAnnotations(originalAnnotations, targetAnnotations map[string]string) map[string]string {
+	if restartAnnotation, ok := originalAnnotations[intctrlutil.RestartAnnotationKey]; ok {
+		if targetAnnotations == nil {
+			targetAnnotations = map[string]string{}
+		}
+		targetAnnotations[intctrlutil.RestartAnnotationKey] = restartAnnotation
+	}
+	return targetAnnotations
+}
+
 func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
 	cluster *dbaasv1alpha1.Cluster,
@@ -888,16 +900,11 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 				*stsObj.Spec.Replicas,
 				*stsProto.Spec.Replicas)
 		}
-		tempAnnotations := stsObj.Spec.Template.Annotations
-		stsObj.Spec.Template = stsProto.Spec.Template
 		// keep the original template annotations.
 		// if annotations exist and are replaced, the statefulSet will be updated.
-		if restartAnnotation, ok := tempAnnotations[intctrlutil.RestartAnnotationKey]; ok {
-			if stsObj.Spec.Template.Annotations == nil {
-				stsObj.Spec.Template.Annotations = map[string]string{}
-			}
-			stsObj.Spec.Template.Annotations[intctrlutil.RestartAnnotationKey] = restartAnnotation
-		}
+		stsProto.Spec.Template.Annotations = mergeAnnotations(stsObj.Spec.Template.Annotations,
+			stsProto.Spec.Template.Annotations)
+		stsObj.Spec.Template = stsProto.Spec.Template
 		stsObj.Spec.Replicas = stsProto.Spec.Replicas
 		stsObj.Spec.UpdateStrategy = stsProto.Spec.UpdateStrategy
 		if err := cli.Update(ctx, stsObj); err != nil {
@@ -976,6 +983,8 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 		if err := cli.Get(ctx, key, deployObj); err != nil {
 			return err
 		}
+		deployProto.Spec.Template.Annotations = mergeAnnotations(deployObj.Spec.Template.Annotations,
+			deployProto.Spec.Template.Annotations)
 		deployObj.Spec = deployProto.Spec
 		if err := cli.Update(ctx, deployObj); err != nil {
 			return err

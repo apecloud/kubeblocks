@@ -303,10 +303,10 @@ spec:
 					g.Expect(ops.Status.Phase == dbaasv1alpha1.RunningPhase).To(BeTrue())
 				}), timeout, interval).Should(Succeed())
 
-			By("check Cluster and changed component updating")
+			By("check Cluster and changed component phase is VerticalScaling")
 			Eventually(checkObj(key, func(g Gomega, cluster *dbaasv1alpha1.Cluster) {
-				g.Expect(cluster.Status.Phase == dbaasv1alpha1.UpdatingPhase).To(BeTrue())
-				g.Expect(cluster.Status.Components[compName].Phase == dbaasv1alpha1.UpdatingPhase).To(BeTrue())
+				g.Expect(cluster.Status.Phase == dbaasv1alpha1.VerticalScalingPhase).To(BeTrue())
+				g.Expect(cluster.Status.Components[compName].Phase == dbaasv1alpha1.VerticalScalingPhase).To(BeTrue())
 			}), timeout, interval).Should(Succeed())
 
 			By("mock bring Cluster and changed component back to running status")

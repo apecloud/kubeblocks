@@ -103,3 +103,12 @@ func TestStatefulSetIsReady(t *testing.T) {
 		t.Errorf("StatefulSet should not be ready")
 	}
 }
+
+func TestStatefulSetSpecIsUpdated(t *testing.T) {
+	sts := testk8s.NewFakeStatefulSet("test", 3)
+	sts.Generation = 1
+	isUpdated := StatefulSetSpecIsUpdated(sts)
+	if !isUpdated {
+		t.Error("StatefulSetSpecIsUpdated function should return true")
+	}
+}

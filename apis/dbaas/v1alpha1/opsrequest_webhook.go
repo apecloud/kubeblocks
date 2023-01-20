@@ -129,7 +129,7 @@ func (r *OpsRequest) validateClusterPhase(cluster *Cluster) error {
 		return nil
 	}
 	for _, v := range opsRecorder {
-		if v.ToClusterPhase == opsBehaviour.ToClusterPhase {
+		if v.Name != r.Name {
 			return newInvalidError(OpsRequestKind, r.Name, "spec.type", fmt.Sprintf("Existing OpsRequest: %s is running in Cluster: %s, handle this OpsRequest first", v.Name, cluster.Name))
 		}
 	}

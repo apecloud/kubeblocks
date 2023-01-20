@@ -42,7 +42,7 @@ func init() {
 			dbaasv1alpha1.FailedPhase,
 			dbaasv1alpha1.AbnormalPhase,
 		},
-		ToClusterPhase: dbaasv1alpha1.UpdatingPhase,
+		ToClusterPhase: dbaasv1alpha1.ReconfiguringPhase,
 		OpsHandler:     &reAction,
 		//ReconcileAction:        reAction.ReconcileAction,
 	}

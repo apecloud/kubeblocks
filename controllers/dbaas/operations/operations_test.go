@@ -238,7 +238,7 @@ var _ = Describe("OpsRequest Controller", func() {
 			testConsensusSetPodUpdating(opsRes, consensusPodList)
 
 			By("mock testing the updates of stateless component")
-			Expect(opsRes.OpsRequest.Status.Components[statelessCompName].Phase).Should(Equal(dbaasv1alpha1.UpdatingPhase))
+			Expect(opsRes.OpsRequest.Status.Components[statelessCompName].Phase).Should(Equal(dbaasv1alpha1.RebootingPhase))
 			testStatelessPodUpdating(opsRes, statelessPod)
 		}
 	}
@@ -301,7 +301,7 @@ var _ = Describe("OpsRequest Controller", func() {
 
 		By("test GetOpsRequestAnnotation function")
 		patch := client.MergeFrom(opsRes.Cluster.DeepCopy())
-		opsAnnotationString := fmt.Sprintf(`[{"name":"%s","clusterPhase":"Updating"},{"name":"test-not-exists-ops","clusterPhase":"VolumeExpanding"}]`,
+		opsAnnotationString := fmt.Sprintf(`[{"name":"%s","clusterPhase":"HorizontalScaling"},{"name":"test-not-exists-ops","clusterPhase":"VolumeExpanding"}]`,
 			opsRes.OpsRequest.Name)
 		opsRes.Cluster.Annotations = map[string]string{
 			intctrlutil.OpsRequestAnnotationKey: opsAnnotationString,
@@ -510,7 +510,7 @@ var _ = Describe("OpsRequest Controller", func() {
 			opsRecorder := []dbaasv1alpha1.OpsRecorder{
 				{
 					Name:           "mysql-restart",
-					ToClusterPhase: dbaasv1alpha1.UpdatingPhase,
+					ToClusterPhase: dbaasv1alpha1.RebootingPhase,
 				},
 			}
 			Expect(patchClusterPhaseWhenExistsOtherOps(opsRes, opsRecorder)).Should(Succeed())

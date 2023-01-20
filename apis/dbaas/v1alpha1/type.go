@@ -42,12 +42,15 @@ const (
 	PendingPhase           Phase = "Pending"
 	RunningPhase           Phase = "Running"
 	FailedPhase            Phase = "Failed"
-	UpdatingPhase          Phase = "Updating"
+	SpecUpdatingPhase      Phase = "SpecUpdating"
 	VolumeExpandingPhase   Phase = "VolumeExpanding"
+	HorizontalScalingPhase Phase = "HorizontalScaling"
+	VerticalScalingPhase   Phase = "VerticalScaling"
+	RebootingPhase         Phase = "Rebooting"
+	VersionUpgradingPhase  Phase = "VersionUpgrading"
 	SucceedPhase           Phase = "Succeed"
 	AbnormalPhase          Phase = "Abnormal"
 	ConditionsErrorPhase   Phase = "ConditionsError"
-	HorizontalScalingPhase Phase = "HorizontalScaling"
 	ReconfiguringPhase     Phase = "Reconfiguring"
 )
 

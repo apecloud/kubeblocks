@@ -318,6 +318,9 @@ func handleNoExistsPVC(reqCtx intctrlutil.RequestCtx, cli client.Client, cluster
 	if err != nil {
 		return false, err
 	}
+	if cluster.Status.Operations == nil {
+		return false, err
+	}
 	// if volumeExpandable changed, do it
 	if !reflect.DeepEqual(cluster.Status.Operations.VolumeExpandable, volumeExpandableComponents) {
 		cluster.Status.Operations.VolumeExpandable = volumeExpandableComponents

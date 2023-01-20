@@ -44,7 +44,8 @@ func ReconcileActionWithComponentOps(opsRes *OpsResource,
 	handleStatusProgress handleStatusProgressWithComponent,
 ) (dbaasv1alpha1.Phase, time.Duration, error) {
 	var (
-		opsRequest               = opsRes.OpsRequest
+		opsRequest = opsRes.OpsRequest
+		// check if all components of the OpsRequest are processed.
 		isCompleted              = true
 		isFailed                 bool
 		opsRequestPhase          = dbaasv1alpha1.RunningPhase
@@ -106,9 +107,13 @@ func ReconcileActionWithComponentOps(opsRes *OpsResource,
 			return opsRequestPhase, 0, err
 		}
 	}
+	// wait for all components to finish processing.
+	if !isCompleted {
+		return opsRequestPhase, 0, nil
+	}
 	if isFailed {
 		opsRequestPhase = dbaasv1alpha1.FailedPhase
-	} else if isCompleted {
+	} else {
 		opsRequestPhase = dbaasv1alpha1.SucceedPhase
 	}
 	return opsRequestPhase, 0, nil
@@ -227,9 +232,8 @@ func patchClusterStatus(opsRes *OpsResource, opsBehaviour OpsBehaviour) error {
 	patch := client.MergeFrom(opsRes.Cluster.DeepCopy())
 	opsRes.Cluster.Status.Phase = toClusterState
 	realChangeCompMap := opsBehaviour.OpsHandler.GetRealAffectedComponentMap(opsRes.OpsRequest)
-	// if the OpsRequest is components scope, we should update the cluster components together.
-	// otherwise, OpsRequest maybe reconcile the status to succeed immediately.
-	if realChangeCompMap != nil && opsRes.Cluster.Status.Components != nil {
+	// update cluster.status.components phase
+	if len(realChangeCompMap) != 0 {
 		for k, v := range opsRes.Cluster.Status.Components {
 			if _, ok := realChangeCompMap[k]; ok {
 				v.Phase = toClusterState

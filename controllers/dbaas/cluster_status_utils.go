@@ -52,11 +52,6 @@ func isTargetKindForEvent(event *corev1.Event) bool {
 	return slices.Index([]string{intctrlutil.PodKind, intctrlutil.DeploymentKind, intctrlutil.StatefulSetKind}, event.InvolvedObject.Kind) != -1
 }
 
-// isOperationsPhaseForCluster determines whether operations are in progress according to the cluster status except volumeExpanding.
-func isOperationsPhaseForCluster(phase dbaasv1alpha1.Phase) bool {
-	return slices.Index([]dbaasv1alpha1.Phase{dbaasv1alpha1.CreatingPhase, dbaasv1alpha1.UpdatingPhase}, phase) != -1
-}
-
 // getFinalEventMessageForRecorder gets final event message by event involved object kind for recorded it
 func getFinalEventMessageForRecorder(event *corev1.Event) string {
 	if event.InvolvedObject.Kind == intctrlutil.PodKind {
@@ -158,8 +153,8 @@ func getEventInvolvedObject(ctx context.Context, cli client.Client, event *corev
 	return nil, err
 }
 
-// handleClusterStatusPhaseByEvent handles the Cluster.status.phase when warning event happened.
-func handleClusterStatusPhaseByEvent(cluster *dbaasv1alpha1.Cluster, componentMap map[string]string, clusterAvailabilityMap map[string]bool) {
+// handleClusterAbnormalOrFailedPhase handles the Cluster.status.phase when components phase of cluster are Abnormal or Failed.
+func handleClusterAbnormalOrFailedPhase(cluster *dbaasv1alpha1.Cluster, componentMap map[string]string, clusterAvailabilityMap map[string]bool) {
 	var (
 		isFailed                       bool
 		needSyncClusterPhase           = true
@@ -175,7 +170,8 @@ func handleClusterStatusPhaseByEvent(cluster *dbaasv1alpha1.Cluster, componentMa
 		}
 		// determine whether other components are still doing operation, i.e., create/restart/scaling.
 		// if exists operations, it will be handled by cluster controller to sync Cluster.status.phase.
-		if isOperationsPhaseForCluster(v.Phase) {
+		// but volumeExpansion operation is ignored, because this operation will not affect cluster availability.
+		if !util.IsCompleted(v.Phase) && v.Phase != dbaasv1alpha1.VolumeExpandingPhase {
 			needSyncClusterPhase = false
 		}
 		if v.PodsReady == nil || !*v.PodsReady {
@@ -281,7 +277,7 @@ func handleClusterStatusByEvent(ctx context.Context, cli client.Client, recorder
 		return nil
 	}
 	// handle Cluster.status.phase
-	handleClusterStatusPhaseByEvent(cluster, componentMap, clusterAvailabilityEffectMap)
+	handleClusterAbnormalOrFailedPhase(cluster, componentMap, clusterAvailabilityEffectMap)
 	if err = cli.Status().Patch(ctx, cluster, patch); err != nil {
 		return err
 	}

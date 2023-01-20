@@ -602,32 +602,37 @@ spec:
                     message:
                       additionalProperties:
                         type: string
-                      description: message record the component details message in
+                      description: message records the component details message in
                         current phase. keys are podName or deployName or statefulSetName,
                         the format is `<ObjectKind>/<Name>`.
                       type: object
                     phase:
-                      description: 'phase describe the phase of the cluster. the detail
-                        information of phase is as follows: Failed: component not
-                        available, i.e, all pod is not ready for Stateless/Stateful
+                      description: 'phase describes the phase of the Cluster. the
+                        detail information of phase is as follows: Failed: component
+                        is unavailable, i.e, all pods are not ready for Stateless/Stateful
                         component; Leader/Primary pod is not ready for Consensus/Replication
-                        component. Abnormal: component available but some pod is not
-                        ready. If the component type is Consensus/Replication, the
-                        Leader/Primary pod is must ready in Abnormal phase. Other
+                        component. Abnormal: component available but part of its pods
+                        are not ready. If the component type is Consensus/Replication,
+                        the Leader/Primary pod must be ready in Abnormal phase. Other
                         phases behave the same as the cluster phase.'
                       enum:
                       - Running
                       - Failed
                       - Abnormal
                       - Creating
-                      - Updating
+                      - SpecUpdating
                       - Deleting
                       - Deleted
                       - VolumeExpanding
+                      - Reconfiguring
                       - HorizontalScaling
+                      - VerticalScaling
+                      - VersionUpgrading
+                      - Rebooting
                       type: string
                     podsReady:
-                      description: podsReady check all pods of the component are ready.
+                      description: podsReady checks if all pods of the component are
+                        ready.
                       type: boolean
                     podsReadyTime:
                       description: podsReadyTime what time point of all component
@@ -713,7 +718,8 @@ spec:
                   type: object
                 type: array
               message:
-                description: message describe cluster details message in current phase.
+                description: message describes cluster details message in current
+                  phase.
                 type: string
               observedGeneration:
                 description: observedGeneration is the most recent generation observed
@@ -722,7 +728,7 @@ spec:
                 format: int64
                 type: integer
               operations:
-                description: operations declares which operations the cluster supports.
+                description: operations declare what operations the cluster supports.
                 properties:
                   horizontalScalable:
                     description: horizontalScalable which components of the cluster
@@ -794,26 +800,36 @@ spec:
                     type: array
                 type: object
               phase:
-                description: 'phase describe the phase of the cluster. the detail
-                  information of phase is as follows: Creating: creating cluster.
-                  Running: cluster is running, all components is available. Updating:
-                  cluster changes, such as horizontal-scaling/vertical-scaling/restart.
-                  VolumeExpanding: volume expansion operation is running. Deleting/Deleted:
-                  deleting cluster/cluster is deleted. Failed: cluster not available.
-                  Abnormal: cluster available but some component is not Abnormal.
+                description: 'phase describes the phase of the Cluster. the detail
+                  information of phase is as follows: Creating: creating Cluster.
+                  Running: Cluster is running, all components are available. SpecUpdating:
+                  the Cluster phase will be ''Updating'' when directly updating Cluster.spec.
+                  VolumeExpanding: volume expansion operation is running. HorizontalScaling:
+                  horizontal scaling operation is running. VerticalScaling: vertical
+                  scaling operation is running. VersionUpgrading: upgrade operation
+                  is running. Rebooting: restart operation is running. Reconfiguring:
+                  reconfiguration operation is running. Deleting/Deleted: deleting
+                  Cluster/Cluster is deleted. Failed: Cluster is unavailable. Abnormal:
+                  Cluster is still available, but part of its components are Abnormal.
                   if the component type is Consensus/Replication, the Leader/Primary
-                  pod is must ready in Abnormal phase. ConditionsError: status.conditions
-                  error, but the components are running when cluster api changed.'
+                  pod must be ready in Abnormal phase. ConditionsError: Cluster and
+                  all the components are still healthy, but some update/create API
+                  fails due to invalid parameters.'
                 enum:
                 - Running
                 - Failed
                 - Abnormal
+                - ConditionsError
                 - Creating
-                - Updating
+                - SpecUpdating
                 - Deleting
                 - Deleted
                 - VolumeExpanding
-                - ConditionsError
+                - Reconfiguring
+                - HorizontalScaling
+                - VerticalScaling
+                - VersionUpgrading
+                - Rebooting
                 type: string
             type: object
         type: object

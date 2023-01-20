@@ -326,8 +326,13 @@ func (r *SystemAccountReconciler) isComponentReady(reqCtx intctrlutil.RequestCtx
 	if headlessSvcErr != nil {
 		return false, nil, nil, headlessSvcErr
 	}
-	// either service or endpoints are not ready.
+	// either service or endpoints is not ready.
 	if len(svcEP.Subsets) == 0 || len(headlessEP.Subsets) == 0 {
+		return false, nil, nil, nil
+	}
+
+	// make sure address exists
+	if len(svcEP.Subsets[0].Addresses) == 0 || len(headlessEP.Subsets[0].Addresses) == 0 {
 		return false, nil, nil, nil
 	}
 

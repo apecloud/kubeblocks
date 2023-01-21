@@ -35,7 +35,7 @@ const (
 )
 
 const (
-	buildInSystemFailedName = "faield"
+	buildInSystemFailedName = "failed"
 	buildInSystemImportName = "import"
 	buildInSystemCallName   = "call"
 )
@@ -43,9 +43,18 @@ const (
 type TplValues map[string]interface{}
 type BuiltInObjectsFunc map[string]interface{}
 
+type tplType struct {
+	namespace string
+	name      string
+	tpl       string
+}
+
 type TplEngine struct {
 	tpl       *template.Template
 	tplValues *TplValues
+
+	importModules *set.LinkedHashSetString
+	importFuncs   map[string]tplType
 
 	cli client.Client
 	ctx context.Context
@@ -63,15 +72,9 @@ func (t *TplEngine) Render(context string) (string, error) {
 }
 
 func (t *TplEngine) initSystemFunMap(funcs template.FuncMap) {
-	importModules := set.NewLinkedHashSetString()
-	importFuncs := make(map[string]struct {
-		namespace string
-		name      string
-		tpl       string
-	})
 	funcs[buildInSystemFailedName] = failed
 	funcs[buildInSystemImportName] = func(namespacedName string) (string, error) {
-		if importModules.InArray(namespacedName) {
+		if t.importModules.InArray(namespacedName) {
 			return "", nil
 		}
 		fields := strings.SplitN(namespacedName, ".", 2)
@@ -91,7 +94,7 @@ func (t *TplEngine) initSystemFunMap(funcs template.FuncMap) {
 			return "", cfgcore.MakeError("cm: %v is not template functions.", client.ObjectKeyFromObject(cm))
 		}
 		for key, value := range cm.Data {
-			if fn, ok := importFuncs[key]; ok {
+			if fn, ok := t.importFuncs[key]; ok {
 				return "", cfgcore.MakeError("failed to import function: %s, from %v, function is ready import: %v",
 					key, client.ObjectKey{
 						Namespace: fields[0],
@@ -102,16 +105,12 @@ func (t *TplEngine) initSystemFunMap(funcs template.FuncMap) {
 						Name:      fn.name,
 					})
 			}
-			importFuncs[key] = struct {
-				namespace string
-				name      string
-				tpl       string
-			}{namespace: fields[0], name: fields[1], tpl: value}
+			t.importFuncs[key] = tplType{namespace: fields[0], name: fields[1], tpl: value}
 		}
 		return "", nil
 	}
 	funcs[buildInSystemCallName] = func(funcName string, args ...interface{}) (string, error) {
-		fn, ok := importFuncs[funcName]
+		fn, ok := t.importFuncs[funcName]
 		if !ok {
 			return "", cfgcore.MakeError("not exist func: %s", funcName)
 		}
@@ -121,11 +120,23 @@ func (t *TplEngine) initSystemFunMap(funcs template.FuncMap) {
 			Name:      fn.name,
 			Namespace: fn.namespace,
 		}.String(), t.cli, t.ctx)
+
+		engine.importSelfModuleFuncs(t.importFuncs, func(tpl tplType) bool {
+			return tpl.namespace == fn.namespace && tpl.name == fn.name
+		})
 		return engine.Render(fn.tpl)
 	}
 
 	t.tpl.Option(DefaultTemplateOps)
 	t.tpl.Funcs(funcs)
+}
+
+func (t *TplEngine) importSelfModuleFuncs(funcs map[string]tplType, fn func(tpl tplType) bool) {
+	for fnName, tpl := range funcs {
+		if fn(tpl) {
+			t.importFuncs[fnName] = tpl
+		}
+	}
 }
 
 func NewTplEngine(values *TplValues, funcs *BuiltInObjectsFunc, tplName string, cli client.Client, ctx context.Context) *TplEngine {
@@ -139,10 +150,12 @@ func NewTplEngine(values *TplValues, funcs *BuiltInObjectsFunc, tplName string, 
 	}
 
 	engine := TplEngine{
-		tpl:       template.New(tplName),
-		tplValues: values,
-		ctx:       ctx,
-		cli:       cli,
+		tpl:           template.New(tplName),
+		tplValues:     values,
+		ctx:           ctx,
+		cli:           cli,
+		importModules: set.NewLinkedHashSetString(),
+		importFuncs:   make(map[string]tplType),
 	}
 
 	engine.initSystemFunMap(coreBuiltinFuncs)

@@ -17,18 +17,25 @@ limitations under the License.
 package dbaas
 
 import (
+	"context"
 	"fmt"
+	"reflect"
 	"strconv"
 	"strings"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	"github.com/golang/mock/gomock"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	mock_client "github.com/apecloud/kubeblocks/controllers/dbaas/configuration/mocks"
+	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
+	"github.com/apecloud/kubeblocks/internal/gotemplate"
 )
 
 type insClassType struct {
@@ -586,6 +593,116 @@ true
 				Expect(ret).Should(Equal(r.bufferSize))
 				Expect(strconv.ParseInt(strings.Trim(ret, "M"), 10, 64)).Should(BeNumerically("<=", r.maxBufferSize))
 			}
+		})
+	})
+
+	// A call funcB.1 in B module
+	// A call funcC.1 in C module
+	// A call funcC.2 in C module
+	// funcB.1 call funcB.2 in B module
+	// funcB.2 call funcB.1 in C module
+	Context("support export function library", func() {
+		It("call function in other module", func() {
+			ctrl, k8sMock := func() (*gomock.Controller, *mock_client.MockClient) {
+				ctrl := gomock.NewController(GinkgoT())
+				cli := mock_client.NewMockClient(ctrl)
+				return ctrl, cli
+			}()
+			defer ctrl.Finish()
+
+			testRenderString := fmt.Sprintf(`
+{{- import "%s.moduleB" }}
+{{- import "%s.moduleC" }}
+{{- $sts := call "getAllStudentMeta" 10 | fromJson }}
+{{- $total := call "calTotalStudent" $sts | int }}
+{{- $mathAvg := call "calMathAvg" $sts }}
+total = {{ $total }}
+mathAvg = {{ $mathAvg -}}
+`, testCtx.DefaultNamespace, testCtx.DefaultNamespace)
+			expectRenderedString := ``
+			moduleB := &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "moduleB",
+					Namespace:   testCtx.DefaultNamespace,
+					Annotations: map[string]string{gotemplate.GoTemplateLibraryAnnotationKey: "true"},
+				},
+				Data: map[string]string{
+					"calMathAvg": fmt.Sprintf(`
+{{- import "%s.moduleC" }}
+{{- $totalMath := call "calTotalMatch" $.arg0 | float64 }}
+{{- $totalCount := call "calTotalStudent" $.arg0 | float64 }}
+{{- divf $totalMath $totalCount -}}
+`, testCtx.DefaultNamespace),
+					"calTotalMatch": `
+{{- $total := 0 }}
+{{- range $k, $v := $.arg0 }}
+	{{- $total = add $total $v.Math }}
+{{- end }}
+{{- $total -}}
+`,
+				},
+			}
+			moduleC := &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "moduleC",
+					Namespace:   testCtx.DefaultNamespace,
+					Annotations: map[string]string{gotemplate.GoTemplateLibraryAnnotationKey: "true"},
+				},
+				Data: map[string]string{
+					"getAllStudentMeta": `
+{{- $sts := dict }}
+{{- range $i, $v := until $.arg0 }}
+  {{- $grade :=  dict "Math" ( randInt 80 100 ) "Science" ( randInt 70 98 ) }}
+  {{- $_ := set $sts (randAlphaNum 10) $grade }}
+{{- end }}
+{{- $sts | toJson -}}
+`,
+					"calTotalStudent": `
+{{- keys $.arg0 | len -}}
+`,
+				},
+			}
+
+			k8sMock.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).
+				DoAndReturn(func(ctx context.Context, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+					var ret client.Object
+					switch key {
+					case client.ObjectKeyFromObject(moduleB):
+						ret = moduleB
+					case client.ObjectKeyFromObject(moduleC):
+						ret = moduleC
+					default:
+						return cfgcore.MakeError("failed to get cm: %v", key)
+
+					}
+					outVal := reflect.ValueOf(obj)
+					objVal := reflect.ValueOf(ret)
+					reflect.Indirect(outVal).Set(reflect.Indirect(objVal))
+					return nil
+				}).AnyTimes()
+
+			cfgBuilder := newCfgTemplateBuilder(
+				"my_test",
+				"default",
+				&dbaasv1alpha1.Cluster{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "my_test",
+						Namespace: "default",
+					},
+				},
+				nil, context.Background(), k8sMock)
+
+			Expect(cfgBuilder.injectBuiltInObjectsAndFunctions(
+				podSpec, cfgTemplate, component)).Should(BeNil())
+			cfgBuilder.setTplName("for_test")
+			rendered, err := cfgBuilder.render(map[string]string{
+				mysqlCfgName: testRenderString,
+			})
+			Expect(err).Should(Succeed())
+			Expect(rendered).Should(BeEquivalentTo(map[string]string{
+				mysqlCfgName: expectRenderedString,
+			}))
+
 		})
 	})
 

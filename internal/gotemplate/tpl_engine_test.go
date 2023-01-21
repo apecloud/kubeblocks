@@ -74,4 +74,10 @@ my friend name is test2
 		})
 	})
 
+	Context("tpl library test", func() {
+		It("Should success with no error", func() {
+
+		})
+	})
+
 })

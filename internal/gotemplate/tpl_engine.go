@@ -43,10 +43,13 @@ const (
 type TplValues map[string]interface{}
 type BuiltInObjectsFunc map[string]interface{}
 
-type tplType struct {
+type functional struct {
+	// cm Namespace
 	namespace string
-	name      string
-	tpl       string
+	// cm Name
+	name string
+	// go template context
+	tpl string
 }
 
 type TplEngine struct {
@@ -54,7 +57,7 @@ type TplEngine struct {
 	tplValues *TplValues
 
 	importModules *set.LinkedHashSetString
-	importFuncs   map[string]tplType
+	importFuncs   map[string]functional
 
 	cli client.Client
 	ctx context.Context
@@ -105,7 +108,7 @@ func (t *TplEngine) initSystemFunMap(funcs template.FuncMap) {
 						Name:      fn.name,
 					})
 			}
-			t.importFuncs[key] = tplType{namespace: fields[0], name: fields[1], tpl: value}
+			t.importFuncs[key] = functional{namespace: fields[0], name: fields[1], tpl: value}
 		}
 		return "", nil
 	}
@@ -121,7 +124,7 @@ func (t *TplEngine) initSystemFunMap(funcs template.FuncMap) {
 			Namespace: fn.namespace,
 		}.String(), t.cli, t.ctx)
 
-		engine.importSelfModuleFuncs(t.importFuncs, func(tpl tplType) bool {
+		engine.importSelfModuleFuncs(t.importFuncs, func(tpl functional) bool {
 			return tpl.namespace == fn.namespace && tpl.name == fn.name
 		})
 		return engine.Render(fn.tpl)
@@ -131,7 +134,7 @@ func (t *TplEngine) initSystemFunMap(funcs template.FuncMap) {
 	t.tpl.Funcs(funcs)
 }
 
-func (t *TplEngine) importSelfModuleFuncs(funcs map[string]tplType, fn func(tpl tplType) bool) {
+func (t *TplEngine) importSelfModuleFuncs(funcs map[string]functional, fn func(tpl functional) bool) {
 	for fnName, tpl := range funcs {
 		if fn(tpl) {
 			t.importFuncs[fnName] = tpl
@@ -155,7 +158,7 @@ func NewTplEngine(values *TplValues, funcs *BuiltInObjectsFunc, tplName string, 
 		ctx:           ctx,
 		cli:           cli,
 		importModules: set.NewLinkedHashSetString(),
-		importFuncs:   make(map[string]tplType),
+		importFuncs:   make(map[string]functional),
 	}
 
 	engine.initSystemFunMap(coreBuiltinFuncs)

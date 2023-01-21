@@ -619,7 +619,9 @@ true
 total = {{ $total }}
 mathAvg = {{ $mathAvg -}}
 `, testCtx.DefaultNamespace, testCtx.DefaultNamespace)
-			expectRenderedString := ``
+			expectRenderedString := `
+total = 10
+mathAvg = [8-9][0-9]\.?\d*`
 			moduleB := &corev1.ConfigMap{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:        "moduleB",
@@ -699,9 +701,7 @@ mathAvg = {{ $mathAvg -}}
 				mysqlCfgName: testRenderString,
 			})
 			Expect(err).Should(Succeed())
-			Expect(rendered).Should(BeEquivalentTo(map[string]string{
-				mysqlCfgName: expectRenderedString,
-			}))
+			Expect(rendered[mysqlCfgName]).Should(MatchRegexp(expectRenderedString))
 
 		})
 	})

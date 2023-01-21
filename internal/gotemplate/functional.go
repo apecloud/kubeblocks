@@ -42,7 +42,7 @@ func isSystemFuncsCM(cm *corev1.ConfigMap) bool {
 	return err == nil && b
 }
 
-func structTplValue(args ...interface{}) TplValues {
+func structTplValues(args ...interface{}) TplValues {
 	values := TplValues{}
 	for i, arg := range args {
 		values[generateArgsValueKey(i)] = arg

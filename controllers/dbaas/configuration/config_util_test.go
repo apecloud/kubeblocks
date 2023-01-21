@@ -29,9 +29,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
-	mock_client "github.com/apecloud/kubeblocks/controllers/dbaas/configuration/mocks"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	testutil "github.com/apecloud/kubeblocks/internal/testutil/k8s"
+	mock_client "github.com/apecloud/kubeblocks/internal/testutil/k8s/mocks"
 	test "github.com/apecloud/kubeblocks/test/testdata"
 )
 
@@ -128,7 +129,7 @@ var _ = Describe("ConfigWrapper util test", func() {
 					tt := tests[index]
 					if tt.err == nil {
 						// mock data
-						setExpectedObject(obj, tt.object)
+						testutil.SetGetReturnedObject(obj, tt.object)
 					}
 					if index < len(tests)-1 {
 						accessCounter[key]++
@@ -227,7 +228,7 @@ var _ = Describe("ConfigWrapper util test", func() {
 					tt := tests[index]
 					if tt.err == nil {
 						// mock data
-						setExpectedObject(obj, tt.object)
+						testutil.SetGetReturnedObject(obj, tt.object)
 					}
 					if index < len(tests)-1 {
 						accessCounter[key]++
@@ -314,7 +315,7 @@ var _ = Describe("ConfigWrapper util test", func() {
 					tt := tests[index]
 					if tt.err == nil {
 						// mock data
-						setExpectedObject(obj, tt.object)
+						testutil.SetGetReturnedObject(obj, tt.object)
 					}
 					if index < len(tests)-1 {
 						accessCounter[key]++
@@ -421,7 +422,7 @@ var _ = Describe("ConfigWrapper util test", func() {
 					if strings.Contains(key.Name, "not_exist") {
 						return cfgcore.MakeError("not exist config!")
 					}
-					setExpectedObject(obj, &mockTpl)
+					testutil.SetGetReturnedObject(obj, &mockTpl)
 					return nil
 				}).
 				MaxTimes(len(tests))
@@ -449,10 +450,4 @@ func updateAVTemplates(wrapper *TestWrapper) {
 
 	// mock cv config templates
 	wrapper.cv.Spec.Components[0].ConfigTemplateRefs = tpls
-}
-
-func setExpectedObject(out client.Object, obj client.Object) {
-	outVal := reflect.ValueOf(out)
-	objVal := reflect.ValueOf(obj)
-	reflect.Indirect(outVal).Set(reflect.Indirect(objVal))
 }

@@ -118,7 +118,7 @@ func (t *TplEngine) initSystemFunMap(funcs template.FuncMap) {
 			return "", cfgcore.MakeError("not exist func: %s", funcName)
 		}
 
-		values := structTplValue(args...)
+		values := structTplValues(args...)
 		engine := NewTplEngine(&values, nil, types.NamespacedName{
 			Name:      fn.name,
 			Namespace: fn.namespace,

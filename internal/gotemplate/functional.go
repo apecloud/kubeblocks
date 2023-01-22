@@ -54,6 +54,6 @@ func generateArgsValueKey(i int) string {
 	return fmt.Sprintf("arg%d", i)
 }
 
-func failed(errMessage string) (string, error) {
-	return "", cfgcore.MakeError(errMessage)
+func failed(errMessage string, args ...interface{}) (string, error) {
+	return "", cfgcore.MakeError(errMessage, args...)
 }

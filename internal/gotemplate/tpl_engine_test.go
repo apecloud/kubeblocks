@@ -182,4 +182,82 @@ mathAvg = [8-9][0-9]\.?\d*`
 		})
 	})
 
+	Context("Failed test", func() {
+		It("failed to include cm", func() {
+			ctrl, k8sMock := testutil.SetupK8sMock()
+			defer ctrl.Finish()
+			//Annotations: map[string]string{GoTemplateLibraryAnnotationKey: "true"},
+
+			mockCM := &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "moduleB",
+					Namespace: defaultNamespace,
+				},
+				Data: map[string]string{
+					"duplicate_fun1": `{{}}`,
+					"duplicate_fun2": `{{}}`,
+				},
+			}
+
+			engine := NewTplEngine(&TplValues{}, nil, "for_test", k8sMock, ctx)
+			k8sMock.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).
+				DoAndReturn(func(ctx context.Context, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+					if mockCM != nil {
+						testutil.SetGetReturnedObject(obj, mockCM)
+						return nil
+					}
+					return cfgcore.MakeError("get cm failed!")
+				}).AnyTimes()
+
+			By("Error cm formatter")
+			// error cm formatter
+			_, err := engine.Render(`{{ import "xxx" }}`)
+			Expect(err).ShouldNot(Succeed())
+			Expect(err.Error()).Should(ContainSubstring("invalid import namespaceName: xxx"))
+
+			By("Error for cm is not func library")
+			_, err = engine.Render(`{{ import "xxx.yyy" }}`)
+			Expect(err).ShouldNot(Succeed())
+			Expect(err.Error()).Should(ContainSubstring("not template functions"))
+
+			By("Error for duplicate function")
+			mockCM.Annotations = map[string]string{
+				GoTemplateLibraryAnnotationKey: "true"}
+			engine.importFuncs["duplicate_fun2"] = functional{}
+			_, err = engine.Render(`{{ import "xxx.yyy" }}`)
+			Expect(err).ShouldNot(Succeed())
+			Expect(err.Error()).Should(ContainSubstring("failed to import function: duplicate_fun2, from xxx/yyy, function is ready import"))
+
+			By("Error for not exist cm")
+			mockCM = nil
+			_, err = engine.Render(`{{ import "xxx.not_exist" }}`)
+			Expect(err).ShouldNot(Succeed())
+			Expect(err.Error()).Should(ContainSubstring("get cm failed"))
+		})
+
+		It("test failed", func() {
+
+			testFaieldFunc := `
+{{ $testBoundary := 1000 }}
+{{- if gt $.testCondition $testBoundary }}
+{{- failed "testCondition require <= %d" $testBoundary }}
+{{- end }}
+`
+			engine := NewTplEngine(&TplValues{
+				"testCondition": 100,
+			}, nil, "for_test", nil, nil)
+
+			_, err := engine.Render(testFaieldFunc)
+			Expect(err).Should(Succeed())
+
+			engine = NewTplEngine(&TplValues{
+				"testCondition": 5000,
+			}, nil, "for_test", nil, nil)
+
+			_, err = engine.Render(testFaieldFunc)
+			Expect(err).ShouldNot(Succeed())
+			Expect(err.Error()).Should(ContainSubstring("testCondition require <= 1000"))
+		})
+	})
+
 })

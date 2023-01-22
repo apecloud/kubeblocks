@@ -217,7 +217,7 @@ func (r *SystemAccountReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 					return err
 				}
 			case dbaasv1alpha1.ReferToExisting:
-				if err := r.createByReferingToExisting(reqCtx, clusterdefinition.Spec.Type, clusterdefinition.Name, compDecl.Name, account); err != nil {
+				if err := r.createByReferingToExisting(reqCtx, cluster, clusterdefinition.Spec.Type, clusterdefinition.Name, compDecl.Name, account); err != nil {
 					return err
 				}
 			}
@@ -311,7 +311,9 @@ func (r *SystemAccountReconciler) createByStmt(reqCtx intctrlutil.RequestCtx,
 	return r.SecretMapStore.addSecret(key, secret)
 }
 
-func (r *SystemAccountReconciler) createByReferingToExisting(reqCtx intctrlutil.RequestCtx, clusterDefType, clusterDefName, compName string, account dbaasv1alpha1.SystemAccountConfig) error {
+func (r *SystemAccountReconciler) createByReferingToExisting(reqCtx intctrlutil.RequestCtx, cluster *dbaasv1alpha1.Cluster, clusterDefType, clusterDefName, compName string, account dbaasv1alpha1.SystemAccountConfig) error {
+	scheme, _ := dbaasv1alpha1.SchemeBuilder.Build()
+
 	// get secret
 	secret := &corev1.Secret{}
 	secretRef := account.ProvisionPolicy.SecretRef
@@ -321,6 +323,11 @@ func (r *SystemAccountReconciler) createByReferingToExisting(reqCtx intctrlutil.
 	}
 	// and make a copy of it
 	newSecret := renderSecretByCopy(reqCtx.Req.Namespace, reqCtx.Req.Name, clusterDefType, clusterDefName, compName, (string)(account.Name), secret)
+	uprefErr := controllerutil.SetOwnerReference(cluster, newSecret, scheme)
+	if uprefErr != nil {
+		return uprefErr
+	}
+
 	if err := r.Client.Create(reqCtx.Ctx, newSecret); err != nil {
 		reqCtx.Log.Error(err, "Failed to find secret", "secret", newSecret.Name)
 		return err

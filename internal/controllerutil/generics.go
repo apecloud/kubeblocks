@@ -1,11 +1,15 @@
 package controllerutil
 
 import (
-	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
+	storagev1 "k8s.io/api/storage/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 )
 
 // Object a generic representation of various resource object types
@@ -88,6 +92,48 @@ func (w PodDisruptionBudgetListTraits) GetItems(list *policyv1.PodDisruptionBudg
 var PodDisruptionBudgetSignature = func(_ policyv1.PodDisruptionBudget, _ policyv1.PodDisruptionBudgetList, _ PodDisruptionBudgetListTraits) {
 }
 
+// PersistentVolumeClaimListTraits ObjListTraits of corev1.PersistentVolumeClaimList
+type PersistentVolumeClaimListTraits struct{}
+
+func (w PersistentVolumeClaimListTraits) GetItems(list *corev1.PersistentVolumeClaimList) []corev1.PersistentVolumeClaim {
+	return list.Items
+}
+
+var PersistentVolumeClaimSignature = func(_ corev1.PersistentVolumeClaim, _ corev1.PersistentVolumeClaimList, _ PersistentVolumeClaimListTraits) {
+}
+
+type StorageClassListTraits struct{}
+
+func (w StorageClassListTraits) GetItems(list *storagev1.StorageClassList) []storagev1.StorageClass {
+	return list.Items
+}
+
+var StorageClassSignature = func(_ storagev1.StorageClass, _ storagev1.StorageClassList, _ StorageClassListTraits) {}
+
+type PodListTraits struct{}
+
+func (w PodListTraits) GetItems(list *corev1.PodList) []corev1.Pod {
+	return list.Items
+}
+
+var PodSignature = func(_ corev1.Pod, _ corev1.PodList, _ PodListTraits) {}
+
+type EndpointsListTraits struct{}
+
+func (w EndpointsListTraits) GetItems(list *corev1.EndpointsList) []corev1.Endpoints {
+	return list.Items
+}
+
+var EndpointsSignature = func(_ corev1.Endpoints, _ corev1.EndpointsList, _ EndpointsListTraits) {}
+
+type JobListTraits struct{}
+
+func (w JobListTraits) GetItems(list *batchv1.JobList) []batchv1.Job {
+	return list.Items
+}
+
+var JobSignature = func(_ batchv1.Job, _ batchv1.JobList, _ JobListTraits) {}
+
 type ClusterListTraits struct{}
 
 func (w ClusterListTraits) GetItems(list *dbaasv1alpha1.ClusterList) []dbaasv1alpha1.Cluster {
@@ -120,3 +166,36 @@ func (w OpsRequestListTraits) GetItems(list *dbaasv1alpha1.OpsRequestList) []dba
 }
 
 var OpsRequestSignature = func(_ dbaasv1alpha1.OpsRequest, _ dbaasv1alpha1.OpsRequestList, _ OpsRequestListTraits) {}
+
+type ConfigConstraintListTraits struct{}
+
+func (w ConfigConstraintListTraits) GetItems(list *dbaasv1alpha1.ConfigConstraintList) []dbaasv1alpha1.ConfigConstraint {
+	return list.Items
+}
+
+var ConfigConstraintSignature = func(_ dbaasv1alpha1.ConfigConstraint, _ dbaasv1alpha1.ConfigConstraintList, _ ConfigConstraintListTraits) {
+}
+
+type BackupPolicyTemplateListTraits struct{}
+
+func (w BackupPolicyTemplateListTraits) GetItems(list *dataprotectionv1alpha1.BackupPolicyTemplateList) []dataprotectionv1alpha1.BackupPolicyTemplate {
+	return list.Items
+}
+
+var BackupPolicyTemplateSignature = func(_ dataprotectionv1alpha1.BackupPolicyTemplate, _ dataprotectionv1alpha1.BackupPolicyTemplateList, _ BackupPolicyTemplateListTraits) {
+}
+
+type BackupPolicyListTraits struct{}
+
+func (w BackupPolicyListTraits) GetItems(list *dataprotectionv1alpha1.BackupPolicyList) []dataprotectionv1alpha1.BackupPolicy {
+	return list.Items
+}
+
+var BackupPolicySignature = func(_ dataprotectionv1alpha1.BackupPolicy, _ dataprotectionv1alpha1.BackupPolicyList, _ BackupPolicyListTraits) {
+}
+
+type BackupListTraits struct{}
+
+func (w BackupListTraits) GetItems(list *dataprotectionv1alpha1.BackupList) []dataprotectionv1alpha1.Backup {
+	return list.Items
+}

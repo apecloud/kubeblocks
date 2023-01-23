@@ -19,6 +19,7 @@ package testutil
 import (
 	"context"
 	"os"
+	"time"
 
 	"github.com/sethvargo/go-password/password"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -26,11 +27,15 @@ import (
 )
 
 type TestContext struct {
-	Cli              client.Client
-	TestObjLabelKey  string
-	DefaultNamespace string
-	CreateObj        func(ctx context.Context, obj client.Object, opts ...client.CreateOption) error
-	CheckedCreateObj func(ctx context.Context, obj client.Object, opts ...client.CreateOption) error
+	Cli                   client.Client
+	TestObjLabelKey       string
+	DefaultNamespace      string
+	DefaultTimeout        time.Duration
+	DefaultInterval       time.Duration
+	ClearResourceTimeout  time.Duration
+	ClearResourceInterval time.Duration
+	CreateObj             func(ctx context.Context, obj client.Object, opts ...client.CreateOption) error
+	CheckedCreateObj      func(ctx context.Context, obj client.Object, opts ...client.CreateOption) error
 }
 
 const (
@@ -41,8 +46,12 @@ const (
 
 func NewDefaultTestContext(cli client.Client) TestContext {
 	t := TestContext{
-		TestObjLabelKey:  "kubeblocks.io/test",
-		DefaultNamespace: "default",
+		TestObjLabelKey:       "kubeblocks.io/test",
+		DefaultNamespace:      "default",
+		DefaultTimeout:        time.Second * 10,
+		DefaultInterval:       time.Second,
+		ClearResourceTimeout:  time.Second * 60,
+		ClearResourceInterval: time.Second,
 	}
 	t.Cli = cli
 	t.CreateObj = func(ctx context.Context, obj client.Object, opts ...client.CreateOption) error {

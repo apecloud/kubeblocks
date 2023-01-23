@@ -21,10 +21,6 @@ import (
 	"go/build"
 	"path/filepath"
 	"testing"
-	"time"
-
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
 
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
@@ -36,12 +32,19 @@ import (
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	//+kubebuilder:scaffold:imports
 
-	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
+
+	"github.com/go-logr/logr"
 	"github.com/spf13/viper"
 	"go.uber.org/zap/zapcore"
+
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
+
+	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/dbaas/components"
@@ -61,9 +64,11 @@ var cancel context.CancelFunc
 var testCtx testutil.TestContext
 var clusterRecorder record.EventRecorder
 var systemAccountReconciler *SystemAccountReconciler
+var logger logr.Logger
 
 func init() {
 	viper.AutomaticEnv()
+	// viper.Set("ENABLE_DEBUG_LOG", "true")
 }
 
 func TestAPIs(t *testing.T) {
@@ -80,6 +85,8 @@ var _ = BeforeSuite(func() {
 	}
 
 	ctx, cancel = context.WithCancel(context.TODO())
+	logger = logf.FromContext(ctx).WithValues()
+	logger.Info("logger start")
 
 	By("bootstrapping test environment")
 	var flag = false
@@ -221,7 +228,7 @@ var _ = AfterSuite(func() {
 // })
 
 func changeSpec[T intctrlutil.Object, PT intctrlutil.PObject[T]](namespacedName types.NamespacedName,
-	action func(pobj PT)) error {
+	action func(PT)) error {
 	var obj T
 	pobj := PT(&obj)
 	if err := k8sClient.Get(ctx, namespacedName, pobj); err != nil {
@@ -236,7 +243,7 @@ func changeSpec[T intctrlutil.Object, PT intctrlutil.PObject[T]](namespacedName 
 }
 
 func changeStatus[T intctrlutil.Object, PT intctrlutil.PObject[T]](namespacedName types.NamespacedName,
-	action func(pobj PT)) error {
+	action func(PT)) error {
 	var obj T
 	pobj := PT(&obj)
 	if err := k8sClient.Get(ctx, namespacedName, pobj); err != nil {
@@ -258,8 +265,19 @@ func changeStatus[T intctrlutil.Object, PT intctrlutil.PObject[T]](namespacedNam
 //   g.Expect(..).To(BeTrue()) // do some check
 // })).Should(Succeed())
 
+func checkExists(namespacedName types.NamespacedName, obj client.Object, expectExisted bool) func(g Gomega) {
+	return func(g Gomega) {
+		err := k8sClient.Get(ctx, namespacedName, obj)
+		if expectExisted {
+			g.Expect(err).To(Not(HaveOccurred()))
+		} else {
+			g.Expect(err).To(Satisfy(apierrors.IsNotFound))
+		}
+	}
+}
+
 func checkObj[T intctrlutil.Object, PT intctrlutil.PObject[T]](namespacedName types.NamespacedName,
-	check func(g Gomega, pobj PT)) func(g Gomega) {
+	check func(Gomega, PT)) func(g Gomega) {
 	return func(g Gomega) {
 		var obj T
 		pobj := PT(&obj)
@@ -268,27 +286,66 @@ func checkObj[T intctrlutil.Object, PT intctrlutil.PObject[T]](namespacedName ty
 	}
 }
 
+// Helper functions to delete a list of resources when writing unit tests.
+
+// clearResources clears all resources of the given type T satisfying the input ListOptions.
 func clearResources[T intctrlutil.Object, PT intctrlutil.PObject[T],
 	L intctrlutil.ObjList[T], PL intctrlutil.PObjList[T, L], Traits intctrlutil.ObjListTraits[T, L]](
-	ctx context.Context, _ func(T, L, Traits), opts ...client.ListOption) {
-	const cleanTimeout = time.Second * 60
-	const cleanInterval = time.Second
-
+	ctx context.Context, signature func(T, L, Traits), opts ...client.ListOption) {
 	var (
-		obj     T
 		objList L
 		traits  Traits
 	)
-	listOptions := &client.ListOptions{}
-	for _, opt := range opts {
-		opt.ApplyToList(listOptions)
+
+	Eventually(func() error {
+		return k8sClient.List(ctx, PL(&objList), opts...)
+	}, testCtx.DefaultTimeout, testCtx.DefaultInterval).Should(Succeed())
+	for _, obj := range traits.GetItems(&objList) {
+		// it's possible deletions are initiated in testcases code but cache is not updated
+		Expect(client.IgnoreNotFound(k8sClient.Delete(ctx, PT(&obj)))).Should(Succeed())
 	}
-	deleteAllOfOpts := &client.DeleteAllOfOptions{}
-	listOptions.ApplyToList(&deleteAllOfOpts.ListOptions)
-	Expect(k8sClient.DeleteAllOf(ctx, PT(&obj), deleteAllOfOpts)).Should(Succeed())
 
 	Eventually(func(g Gomega) {
 		g.Expect(k8sClient.List(ctx, PL(&objList), opts...)).Should(Succeed())
-		g.Expect(len(traits.GetItems(&objList))).Should(BeEquivalentTo(0))
-	}, cleanTimeout, cleanInterval).Should(Succeed())
+		for _, obj := range traits.GetItems(&objList) {
+			pobj := PT(&obj)
+			finalizers := pobj.GetFinalizers()
+			if len(finalizers) > 0 {
+				// PVCs are protected by the "kubernetes.io/pvc-protection" finalizer
+				g.Expect(finalizers[0]).Should(BeElementOf([]string{"orphan", "kubernetes.io/pvc-protection"}))
+				g.Expect(len(finalizers)).Should(Equal(1))
+				pobj.SetFinalizers([]string{})
+				g.Expect(k8sClient.Update(ctx, pobj)).Should(Succeed())
+			}
+		}
+		g.Expect(len(traits.GetItems(&objList))).Should(Equal(0))
+	}, testCtx.ClearResourceTimeout, testCtx.ClearResourceInterval).Should(Succeed())
+}
+
+// clearClusterResources clears all dependent resources belonging existing clusters.
+// The function is intended to be called to clean resources created by cluster controller in envtest
+// environment without UseExistingCluster set, where garbage collection lacks.
+func clearClusterResources(ctx context.Context) {
+	inNS := client.InNamespace(testCtx.DefaultNamespace)
+
+	clearResources(ctx, intctrlutil.ClusterSignature, inNS,
+		client.HasLabels{testCtx.TestObjLabelKey})
+
+	// finalizer of ConfigMap are deleted in ClusterDef&ClusterVersion controller
+	clearResources(ctx, intctrlutil.ClusterVersionSignature,
+		client.HasLabels{testCtx.TestObjLabelKey})
+	clearResources(ctx, intctrlutil.ClusterDefinitionSignature,
+		client.HasLabels{testCtx.TestObjLabelKey})
+
+	// mock behavior of garbage collection inside KCM
+	if testEnv.UseExistingCluster != nil && *testEnv.UseExistingCluster {
+		clearResources(ctx, intctrlutil.StatefulSetSignature, inNS)
+		clearResources(ctx, intctrlutil.DeploymentSignature, inNS)
+		clearResources(ctx, intctrlutil.ConfigMapSignature, inNS)
+		clearResources(ctx, intctrlutil.ServiceSignature, inNS)
+		clearResources(ctx, intctrlutil.SecretSignature, inNS)
+		clearResources(ctx, intctrlutil.PodDisruptionBudgetSignature, inNS)
+		clearResources(ctx, intctrlutil.JobSignature, inNS)
+		clearResources(ctx, intctrlutil.PersistentVolumeClaimSignature, inNS)
+	}
 }

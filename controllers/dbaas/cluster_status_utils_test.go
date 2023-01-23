@@ -46,29 +46,25 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 		timeout            = time.Second * 10
 		interval           = time.Second
 	)
-	cleanupObjects := func() {
-		// Add any setup steps that needs to be executed before each test
-		err := k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.Cluster{}, client.InNamespace(testCtx.DefaultNamespace), client.HasLabels{testCtx.TestObjLabelKey})
-		Expect(err).NotTo(HaveOccurred())
-		err = k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.ClusterVersion{}, client.HasLabels{testCtx.TestObjLabelKey})
-		Expect(err).NotTo(HaveOccurred())
-		err = k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.ClusterDefinition{}, client.HasLabels{testCtx.TestObjLabelKey})
-		Expect(err).NotTo(HaveOccurred())
-		err = k8sClient.DeleteAllOf(ctx, &appsv1.StatefulSet{}, client.InNamespace(testCtx.DefaultNamespace), client.HasLabels{testCtx.TestObjLabelKey})
-		Expect(err).NotTo(HaveOccurred())
-		err = k8sClient.DeleteAllOf(ctx, &appsv1.Deployment{}, client.InNamespace(testCtx.DefaultNamespace), client.HasLabels{testCtx.TestObjLabelKey})
-		Expect(err).NotTo(HaveOccurred())
-		err = k8sClient.DeleteAllOf(ctx, &corev1.Pod{}, client.InNamespace(testCtx.DefaultNamespace), client.HasLabels{testCtx.TestObjLabelKey})
-		Expect(err).NotTo(HaveOccurred())
-	}
-	BeforeEach(func() {
-		cleanupObjects()
-	})
 
-	AfterEach(func() {
-		// Add any teardown steps that needs to be executed after each test
-		cleanupObjects()
-	})
+	cleanEnv := func() {
+		// must wait until resources deleted and no longer exist before testcases start,
+		// otherwise if later it needs to create some new resource objects with the same name,
+		// in race conditions, the existence of old ones shall be found, which causes
+		// new objects fail to create.
+		By("clean resources")
+
+		clearClusterResources(ctx)
+
+		inNS := client.InNamespace(testCtx.DefaultNamespace)
+		ml := client.HasLabels{testCtx.TestObjLabelKey}
+		clearResources(ctx, intctrlutil.StatefulSetSignature, inNS, ml)
+		clearResources(ctx, intctrlutil.DeploymentSignature, inNS, ml)
+		clearResources(ctx, intctrlutil.PodSignature, inNS, ml)
+	}
+	BeforeEach(cleanEnv)
+
+	AfterEach(cleanEnv)
 
 	createClusterDef := func() {
 		clusterDefYaml := fmt.Sprintf(`

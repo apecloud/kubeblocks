@@ -43,19 +43,20 @@ var _ = Describe("ClusterDefinition Controller", func() {
 
 	var ctx = context.Background()
 
-	BeforeEach(func() {
-		// Add any steup steps that needs to be executed before each test
-		err := k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.Cluster{}, client.InNamespace(testCtx.DefaultNamespace), client.HasLabels{testCtx.TestObjLabelKey})
-		Expect(err).NotTo(HaveOccurred())
-		err = k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.ClusterVersion{}, client.HasLabels{testCtx.TestObjLabelKey})
-		Expect(err).NotTo(HaveOccurred())
-		err = k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.ClusterDefinition{}, client.HasLabels{testCtx.TestObjLabelKey})
-		Expect(err).NotTo(HaveOccurred())
-	})
+	cleanEnv := func() {
+		// must wait until resources deleted and no longer exist before testcases start,
+		// otherwise if later it needs to create some new resource objects with the same name,
+		// in race conditions, the existence of old ones shall be found, which causes
+		// new objects fail to create.
+		By("clean resources")
 
-	AfterEach(func() {
-		// Add any teardown steps that needs to be executed after each test
-	})
+		// delete cluster(and all dependent sub-resources), clusterversion and clusterdef
+		clearClusterResources(ctx)
+	}
+
+	BeforeEach(cleanEnv)
+
+	AfterEach(cleanEnv)
 
 	clusterDefYaml := `
 apiVersion: dbaas.kubeblocks.io/v1alpha1
@@ -219,10 +220,6 @@ spec:
 				g.Expect(k8sClient.Get(ctx, intctrlutil.GetNamespacedName(clusterVersion), cv)).To(Succeed())
 				g.Expect(cv.Status.ClusterDefSyncStatus == dbaasv1alpha1.OutOfSyncStatus).To(BeTrue())
 			}, timeout, interval).Should(Succeed())
-
-			By("deleting clusterDefinition")
-			Expect(k8sClient.Delete(ctx, clusterDefinition)).Should(Succeed())
-			Expect(k8sClient.Delete(ctx, clusterVersion)).Should(Succeed())
 		})
 	})
 
@@ -283,9 +280,6 @@ spec:
 				}, cmObj)).Should(Succeed())
 				g.Expect(controllerutil.ContainsFinalizer(cmObj, cfgcore.ConfigurationTemplateFinalizerName)).To(BeTrue())
 			}, timeout, interval).Should(Succeed())
-
-			By("deleting clusterDefinition")
-			Expect(k8sClient.Delete(ctx, clusterDefinition)).Should(Succeed())
 		})
 	})
 

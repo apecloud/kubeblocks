@@ -35,6 +35,7 @@ import (
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	testdbaas "github.com/apecloud/kubeblocks/internal/testutil/dbaas"
 )
 
 var _ = Describe("OpsRequest Controller", func() {
@@ -53,10 +54,10 @@ var _ = Describe("OpsRequest Controller", func() {
 
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
-		clearResources(ctx, intctrlutil.OpsRequestSignature, inNS, ml)
+		testdbaas.ClearResources(&testCtx, intctrlutil.OpsRequestSignature, inNS, ml)
 
 		// delete cluster(and all dependent sub-resources), clusterversion and clusterdef
-		clearClusterResources(ctx)
+		testdbaas.ClearClusterResources(&testCtx)
 	}
 
 	BeforeEach(cleanAll)
@@ -228,7 +229,7 @@ spec:
 	}
 
 	mockSetClusterStatusPhaseToRunning := func(namespacedName types.NamespacedName) error {
-		return changeStatus(namespacedName,
+		return testdbaas.ChangeStatus(&testCtx, namespacedName,
 			func(c *dbaasv1alpha1.Cluster) {
 				c.Status.Phase = dbaasv1alpha1.RunningPhase
 				for componentKey, componentStatus := range c.Status.Components {
@@ -261,7 +262,7 @@ spec:
 				},
 			}
 			Expect(testCtx.CreateObj(ctx, clusterObj)).Should(Succeed())
-			Eventually(checkObj(key, func(g Gomega, cluster *dbaasv1alpha1.Cluster) {
+			Eventually(testdbaas.CheckObj(&testCtx, key, func(g Gomega, cluster *dbaasv1alpha1.Cluster) {
 				g.Expect(cluster.Status.ObservedGeneration == 1).To(BeTrue())
 			}), timeout, interval).Should(Succeed())
 
@@ -286,13 +287,13 @@ spec:
 			Expect(testCtx.CreateObj(ctx, verticalScalingOpsRequest)).Should(Succeed())
 
 			By("check VerticalScalingOpsRequest running")
-			Eventually(checkObj(intctrlutil.GetNamespacedName(verticalScalingOpsRequest),
+			Eventually(testdbaas.CheckObj(&testCtx, intctrlutil.GetNamespacedName(verticalScalingOpsRequest),
 				func(g Gomega, ops *dbaasv1alpha1.OpsRequest) {
 					g.Expect(ops.Status.Phase == dbaasv1alpha1.RunningPhase).To(BeTrue())
 				}), timeout, interval).Should(Succeed())
 
 			By("check Cluster and changed component phase is VerticalScaling")
-			Eventually(checkObj(key, func(g Gomega, cluster *dbaasv1alpha1.Cluster) {
+			Eventually(testdbaas.CheckObj(&testCtx, key, func(g Gomega, cluster *dbaasv1alpha1.Cluster) {
 				g.Expect(cluster.Status.Phase == dbaasv1alpha1.VerticalScalingPhase).To(BeTrue())
 				g.Expect(cluster.Status.Components[compName].Phase == dbaasv1alpha1.VerticalScalingPhase).To(BeTrue())
 			}), timeout, interval).Should(Succeed())
@@ -301,7 +302,7 @@ spec:
 			Expect(mockSetClusterStatusPhaseToRunning(key)).Should(Succeed())
 
 			By("patch opsrequest controller to run")
-			Expect(changeSpec(intctrlutil.GetNamespacedName(verticalScalingOpsRequest),
+			Expect(testdbaas.ChangeSpec(&testCtx, intctrlutil.GetNamespacedName(verticalScalingOpsRequest),
 				func(opsRequest *dbaasv1alpha1.OpsRequest) {
 					if opsRequest.Annotations == nil {
 						opsRequest.Annotations = make(map[string]string, 1)
@@ -310,13 +311,13 @@ spec:
 				})).Should(Succeed())
 
 			By("check VerticalScalingOpsRequest succeed")
-			Eventually(checkObj(intctrlutil.GetNamespacedName(verticalScalingOpsRequest),
+			Eventually(testdbaas.CheckObj(&testCtx, intctrlutil.GetNamespacedName(verticalScalingOpsRequest),
 				func(g Gomega, ops *dbaasv1alpha1.OpsRequest) {
 					g.Expect(ops.Status.Phase == dbaasv1alpha1.SucceedPhase).To(BeTrue())
 				}), timeout*3, interval).Should(Succeed())
 
 			By("check cluster resource requirements changed")
-			Eventually(checkObj(key, func(g Gomega, fetched *dbaasv1alpha1.Cluster) {
+			Eventually(testdbaas.CheckObj(&testCtx, key, func(g Gomega, fetched *dbaasv1alpha1.Cluster) {
 				g.Expect(fetched.Spec.Components[0].Resources.Requests).To(Equal(
 					verticalScalingOpsRequest.Spec.VerticalScalingList[0].Requests))
 			}), timeout, interval).Should(Succeed())
@@ -361,12 +362,12 @@ spec:
 				},
 			}
 			Expect(testCtx.CreateObj(ctx, clusterObj)).Should(Succeed())
-			Eventually(checkObj(key, func(g Gomega, cluster *dbaasv1alpha1.Cluster) {
+			Eventually(testdbaas.CheckObj(&testCtx, key, func(g Gomega, cluster *dbaasv1alpha1.Cluster) {
 				g.Expect(cluster.Status.ObservedGeneration == 1).To(BeTrue())
 			}), timeout, interval).Should(Succeed())
 
 			By("check cluster running")
-			Eventually(checkObj(key, func(g Gomega, cluster *dbaasv1alpha1.Cluster) {
+			Eventually(testdbaas.CheckObj(&testCtx, key, func(g Gomega, cluster *dbaasv1alpha1.Cluster) {
 				g.Expect(cluster.Status.Phase == dbaasv1alpha1.RunningPhase).To(BeTrue())
 			}), timeout*10, interval).Should(Succeed())
 
@@ -387,13 +388,13 @@ spec:
 			Expect(testCtx.CreateObj(ctx, verticalScalingOpsRequest)).Should(Succeed())
 
 			By("check VerticalScalingOpsRequest succeed")
-			Eventually(checkObj(intctrlutil.GetNamespacedName(verticalScalingOpsRequest),
+			Eventually(testdbaas.CheckObj(&testCtx, intctrlutil.GetNamespacedName(verticalScalingOpsRequest),
 				func(g Gomega, ops *dbaasv1alpha1.OpsRequest) {
 					g.Expect(ops.Status.Phase == dbaasv1alpha1.SucceedPhase).To(BeTrue())
 				}), timeout*10, interval).Should(Succeed())
 
 			By("check cluster resource requirements changed")
-			Eventually(checkObj(key, func(g Gomega, fetched *dbaasv1alpha1.Cluster) {
+			Eventually(testdbaas.CheckObj(&testCtx, key, func(g Gomega, fetched *dbaasv1alpha1.Cluster) {
 				g.Expect(fetched.Spec.Components[0].Resources.Requests).To(Equal(
 					verticalScalingOpsRequest.Spec.VerticalScalingList[0].Requests))
 			}), timeout, interval).Should(Succeed())

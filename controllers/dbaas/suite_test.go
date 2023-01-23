@@ -39,8 +39,6 @@ import (
 	"github.com/spf13/viper"
 	"go.uber.org/zap/zapcore"
 
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 
@@ -49,7 +47,6 @@ import (
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/dbaas/components"
 	"github.com/apecloud/kubeblocks/controllers/k8score"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/apecloud/kubeblocks/internal/testutil"
 )
 
@@ -200,7 +197,7 @@ var _ = BeforeSuite(func() {
 	err = systemAccountReconciler.SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 
-	testCtx = testutil.NewDefaultTestContext(k8sManager.GetClient())
+	testCtx = testutil.NewDefaultTestContext(ctx, k8sManager.GetClient(), testEnv)
 
 	go func() {
 		defer GinkgoRecover()
@@ -219,133 +216,3 @@ var _ = AfterSuite(func() {
 	err := testEnv.Stop()
 	Expect(err).NotTo(HaveOccurred())
 })
-
-// Helper functions to change fields in the desired state and status of resources.
-// Each helper is a wrapper of k8sClient.Patch.
-// Example:
-// changeSpec(key, func(clusterDef *dbaasv1alpha1.ClusterDefinition) {
-//		// modify clusterDef
-// })
-
-func changeSpec[T intctrlutil.Object, PT intctrlutil.PObject[T]](namespacedName types.NamespacedName,
-	action func(PT)) error {
-	var obj T
-	pobj := PT(&obj)
-	if err := k8sClient.Get(ctx, namespacedName, pobj); err != nil {
-		return err
-	}
-	patch := client.MergeFrom(PT(pobj.DeepCopy()))
-	action(pobj)
-	if err := k8sClient.Patch(ctx, pobj, patch); err != nil {
-		return err
-	}
-	return nil
-}
-
-func changeStatus[T intctrlutil.Object, PT intctrlutil.PObject[T]](namespacedName types.NamespacedName,
-	action func(PT)) error {
-	var obj T
-	pobj := PT(&obj)
-	if err := k8sClient.Get(ctx, namespacedName, pobj); err != nil {
-		return err
-	}
-	patch := client.MergeFrom(PT(pobj.DeepCopy()))
-	action(pobj)
-	if err := k8sClient.Status().Patch(ctx, pobj, patch); err != nil {
-		return err
-	}
-	return nil
-}
-
-// Helper functions to check fields of resources when writing unit tests.
-// Each helper returns a Gomega assertion function, which should be passed into
-// Eventually() or Consistently() as the first parameter.
-// Example:
-// Eventually(checkObj(key, func(g Gomega, cluster *dbaasv1alpha1.Cluster) {
-//   g.Expect(..).To(BeTrue()) // do some check
-// })).Should(Succeed())
-
-func checkExists(namespacedName types.NamespacedName, obj client.Object, expectExisted bool) func(g Gomega) {
-	return func(g Gomega) {
-		err := k8sClient.Get(ctx, namespacedName, obj)
-		if expectExisted {
-			g.Expect(err).To(Not(HaveOccurred()))
-		} else {
-			g.Expect(err).To(Satisfy(apierrors.IsNotFound))
-		}
-	}
-}
-
-func checkObj[T intctrlutil.Object, PT intctrlutil.PObject[T]](namespacedName types.NamespacedName,
-	check func(Gomega, PT)) func(g Gomega) {
-	return func(g Gomega) {
-		var obj T
-		pobj := PT(&obj)
-		g.Expect(k8sClient.Get(ctx, namespacedName, pobj)).To(Succeed())
-		check(g, pobj)
-	}
-}
-
-// Helper functions to delete a list of resources when writing unit tests.
-
-// clearResources clears all resources of the given type T satisfying the input ListOptions.
-func clearResources[T intctrlutil.Object, PT intctrlutil.PObject[T],
-	L intctrlutil.ObjList[T], PL intctrlutil.PObjList[T, L], Traits intctrlutil.ObjListTraits[T, L]](
-	ctx context.Context, signature func(T, L, Traits), opts ...client.ListOption) {
-	var (
-		objList L
-		traits  Traits
-	)
-
-	Eventually(func() error {
-		return k8sClient.List(ctx, PL(&objList), opts...)
-	}, testCtx.DefaultTimeout, testCtx.DefaultInterval).Should(Succeed())
-	for _, obj := range traits.GetItems(&objList) {
-		// it's possible deletions are initiated in testcases code but cache is not updated
-		Expect(client.IgnoreNotFound(k8sClient.Delete(ctx, PT(&obj)))).Should(Succeed())
-	}
-
-	Eventually(func(g Gomega) {
-		g.Expect(k8sClient.List(ctx, PL(&objList), opts...)).Should(Succeed())
-		for _, obj := range traits.GetItems(&objList) {
-			pobj := PT(&obj)
-			finalizers := pobj.GetFinalizers()
-			if len(finalizers) > 0 {
-				// PVCs are protected by the "kubernetes.io/pvc-protection" finalizer
-				g.Expect(finalizers[0]).Should(BeElementOf([]string{"orphan", "kubernetes.io/pvc-protection"}))
-				g.Expect(len(finalizers)).Should(Equal(1))
-				pobj.SetFinalizers([]string{})
-				g.Expect(k8sClient.Update(ctx, pobj)).Should(Succeed())
-			}
-		}
-		g.Expect(len(traits.GetItems(&objList))).Should(Equal(0))
-	}, testCtx.ClearResourceTimeout, testCtx.ClearResourceInterval).Should(Succeed())
-}
-
-// clearClusterResources clears all dependent resources belonging existing clusters.
-// The function is intended to be called to clean resources created by cluster controller in envtest
-// environment without UseExistingCluster set, where garbage collection lacks.
-func clearClusterResources(ctx context.Context) {
-	inNS := client.InNamespace(testCtx.DefaultNamespace)
-
-	clearResources(ctx, intctrlutil.ClusterSignature, inNS,
-		client.HasLabels{testCtx.TestObjLabelKey})
-
-	// finalizer of ConfigMap are deleted in ClusterDef&ClusterVersion controller
-	clearResources(ctx, intctrlutil.ClusterVersionSignature,
-		client.HasLabels{testCtx.TestObjLabelKey})
-	clearResources(ctx, intctrlutil.ClusterDefinitionSignature,
-		client.HasLabels{testCtx.TestObjLabelKey})
-
-	// mock behavior of garbage collection inside KCM
-	if !(testEnv.UseExistingCluster != nil && *testEnv.UseExistingCluster) {
-		clearResources(ctx, intctrlutil.StatefulSetSignature, inNS)
-		clearResources(ctx, intctrlutil.DeploymentSignature, inNS)
-		clearResources(ctx, intctrlutil.ConfigMapSignature, inNS)
-		clearResources(ctx, intctrlutil.ServiceSignature, inNS)
-		clearResources(ctx, intctrlutil.SecretSignature, inNS)
-		clearResources(ctx, intctrlutil.PodDisruptionBudgetSignature, inNS)
-		clearResources(ctx, intctrlutil.JobSignature, inNS)
-		clearResources(ctx, intctrlutil.PersistentVolumeClaimSignature, inNS)
-	}
-}

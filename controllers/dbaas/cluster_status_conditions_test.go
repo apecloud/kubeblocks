@@ -52,7 +52,7 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 		By("clean resources")
 
 		// delete cluster(and all dependent sub-resources), clusterversion and clusterdef
-		clearClusterResources(ctx)
+		testdbaas.ClearClusterResources(&testCtx)
 	}
 	BeforeEach(cleanEnv)
 

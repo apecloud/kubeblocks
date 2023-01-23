@@ -54,6 +54,7 @@ import (
 	"github.com/apecloud/kubeblocks/controllers/dbaas/components/consensusset"
 	"github.com/apecloud/kubeblocks/controllers/dbaas/components/util"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	testdbaas "github.com/apecloud/kubeblocks/internal/testutil/dbaas"
 	"github.com/apecloud/kubeblocks/test/testdata"
 )
 
@@ -76,18 +77,18 @@ var _ = Describe("Cluster Controller", func() {
 		By("clean resources")
 
 		// delete cluster(and all dependent sub-resources), clusterversion and clusterdef
-		clearClusterResources(ctx)
+		testdbaas.ClearClusterResources(&testCtx)
 
 		// delete rest mocked objects
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 		// namespaced
-		clearResources(ctx, intctrlutil.ConfigMapSignature, inNS, ml)
-		clearResources(ctx, intctrlutil.PodSignature, inNS, ml)
+		testdbaas.ClearResources(&testCtx, intctrlutil.ConfigMapSignature, inNS, ml)
+		testdbaas.ClearResources(&testCtx, intctrlutil.PodSignature, inNS, ml)
 		// non-namespaced
-		clearResources(ctx, intctrlutil.ConfigConstraintSignature, ml)
-		clearResources(ctx, intctrlutil.BackupPolicyTemplateSignature, ml)
-		clearResources(ctx, intctrlutil.StorageClassSignature, ml)
+		testdbaas.ClearResources(&testCtx, intctrlutil.ConfigConstraintSignature, ml)
+		testdbaas.ClearResources(&testCtx, intctrlutil.BackupPolicyTemplateSignature, ml)
+		testdbaas.ClearResources(&testCtx, intctrlutil.StorageClassSignature, ml)
 	}
 
 	BeforeEach(cleanEnv)
@@ -589,7 +590,7 @@ spec:
 			_, _, _, key := createClusterNCheck()
 
 			By("Update the cluster's termination policy to DoNotTerminate")
-			Expect(changeSpec(key, func(cluster *dbaasv1alpha1.Cluster) {
+			Expect(testdbaas.ChangeSpec(&testCtx, key, func(cluster *dbaasv1alpha1.Cluster) {
 				cluster.Spec.TerminationPolicy = dbaasv1alpha1.DoNotTerminate
 			})).Should(Succeed())
 
@@ -610,7 +611,7 @@ spec:
 			Consistently(checkClusterDoNotTerminate, waitDuration, interval).Should(Succeed())
 
 			By("Update the cluster's termination policy to WipeOut")
-			Expect(changeSpec(key, func(cluster *dbaasv1alpha1.Cluster) {
+			Expect(testdbaas.ChangeSpec(&testCtx, key, func(cluster *dbaasv1alpha1.Cluster) {
 				cluster.Spec.TerminationPolicy = dbaasv1alpha1.WipeOut
 			})).Should(Succeed())
 
@@ -623,7 +624,7 @@ spec:
 	})
 
 	changeClusterReplicas := func(clusterName types.NamespacedName, replicas int32) error {
-		return changeSpec(clusterName, func(cluster *dbaasv1alpha1.Cluster) {
+		return testdbaas.ChangeSpec(&testCtx, clusterName, func(cluster *dbaasv1alpha1.Cluster) {
 			if cluster.Spec.Components == nil || len(cluster.Spec.Components) == 0 {
 				cluster.Spec.Components = []dbaasv1alpha1.ClusterComponent{
 					{
@@ -722,7 +723,7 @@ spec:
 			})
 
 			By("Set HorizontalScalePolicy")
-			Expect(changeSpec(intctrlutil.GetNamespacedName(clusterDef),
+			Expect(testdbaas.ChangeSpec(&testCtx, intctrlutil.GetNamespacedName(clusterDef),
 				func(clusterDef *dbaasv1alpha1.ClusterDefinition) {
 					clusterDef.Spec.Components[0].HorizontalScalePolicy =
 						&dbaasv1alpha1.HorizontalScalePolicy{Type: dbaasv1alpha1.HScaleDataClonePolicyFromSnapshot}
@@ -826,8 +827,8 @@ spec:
 					Namespace: key.Namespace,
 					Name:      fmt.Sprintf("%s-%s-%s-%d", volumeName, key.Name, compName, i),
 				}
-				Eventually(checkExists(pvcKey, &corev1.PersistentVolumeClaim{}, true), timeout, interval).Should(Succeed())
-				Expect(changeStatus(pvcKey, func(pvc *corev1.PersistentVolumeClaim) {
+				Eventually(testdbaas.CheckExists(&testCtx, pvcKey, &corev1.PersistentVolumeClaim{}, true), timeout, interval).Should(Succeed())
+				Expect(testdbaas.ChangeStatus(&testCtx, pvcKey, func(pvc *corev1.PersistentVolumeClaim) {
 					pvc.Status.Phase = corev1.ClaimBound
 				})).Should(Succeed())
 			}
@@ -840,10 +841,10 @@ spec:
 				}, client.InNamespace(key.Namespace))).Should(Succeed())
 				return len(backupList.Items) == 0
 			}, timeout, interval).Should(BeTrue())
-			Eventually(checkExists(snapshotKey, &snapshotv1.VolumeSnapshot{}, false), timeout, interval).Should(Succeed())
+			Eventually(testdbaas.CheckExists(&testCtx, snapshotKey, &snapshotv1.VolumeSnapshot{}, false), timeout, interval).Should(Succeed())
 
 			By("Checking cluster status and the number of replicas changed")
-			Eventually(checkObj(key, func(g Gomega, cluster *dbaasv1alpha1.Cluster) {
+			Eventually(testdbaas.CheckObj(&testCtx, key, func(g Gomega, cluster *dbaasv1alpha1.Cluster) {
 				g.Expect(cluster.Status.ObservedGeneration == 2).To(BeTrue())
 			}), timeout, interval).Should(Succeed())
 			stsList = listAndCheckStatefulSet(key)
@@ -1445,7 +1446,7 @@ spec:
 
 			By("Updating the PVC storage size")
 			newStorageValue := resource.MustParse("2Gi")
-			Expect(changeSpec(key, func(cluster *dbaasv1alpha1.Cluster) {
+			Expect(testdbaas.ChangeSpec(&testCtx, key, func(cluster *dbaasv1alpha1.Cluster) {
 				comp := &cluster.Spec.Components[0]
 				comp.VolumeClaimTemplates[0].Spec.Resources.Requests[corev1.ResourceStorage] = newStorageValue
 			})).Should(Succeed())

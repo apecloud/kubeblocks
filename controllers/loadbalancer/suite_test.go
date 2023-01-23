@@ -126,7 +126,7 @@ var _ = BeforeSuite(func() {
 	Expect(err).ToNot(HaveOccurred())
 	Expect(serviceController).NotTo(BeNil())
 
-	testCtx = testutil.NewDefaultTestContext(k8sManager.GetClient())
+	testCtx = testutil.NewDefaultTestContext(ctx, k8sManager.GetClient(), testEnv)
 
 	go func() {
 		defer GinkgoRecover()

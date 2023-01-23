@@ -88,7 +88,7 @@ var _ = BeforeSuite(func() {
 	//+kubebuilder:scaffold:scheme
 
 	k8sClient, err = client.New(cfg, client.Options{Scheme: scheme.Scheme})
-	testCtx = testutil.NewDefaultTestContext(k8sClient)
+	testCtx = testutil.NewDefaultTestContext(ctx, k8sClient, testEnv)
 	Expect(err).NotTo(HaveOccurred())
 	Expect(k8sClient).NotTo(BeNil())
 })

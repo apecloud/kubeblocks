@@ -32,6 +32,7 @@ import (
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	testdbaas "github.com/apecloud/kubeblocks/internal/testutil/dbaas"
 	"github.com/apecloud/kubeblocks/test/testdata"
 )
 
@@ -51,7 +52,7 @@ var _ = Describe("ClusterDefinition Controller", func() {
 		By("clean resources")
 
 		// delete cluster(and all dependent sub-resources), clusterversion and clusterdef
-		clearClusterResources(ctx)
+		testdbaas.ClearClusterResources(&testCtx)
 	}
 
 	BeforeEach(cleanEnv)
@@ -210,7 +211,7 @@ spec:
 			}, timeout, interval).Should(Succeed())
 
 			By("updating clusterDefinition's spec which then mark clusterVersion's status as OutOfSync")
-			Expect(changeSpec(intctrlutil.GetNamespacedName(clusterDefinition),
+			Expect(testdbaas.ChangeSpec(&testCtx, intctrlutil.GetNamespacedName(clusterDefinition),
 				func(cd *dbaasv1alpha1.ClusterDefinition) {
 					cd.Spec.Type = "state.redis"
 				})).Should(Succeed())

@@ -146,7 +146,8 @@ func ClearClusterResources(testCtx *testutil.TestContext) {
 		client.HasLabels{testCtx.TestObjLabelKey})
 
 	// mock behavior of garbage collection inside KCM
-	if testCtx.TestEnv.UseExistingCluster != nil && *testCtx.TestEnv.UseExistingCluster {
+	if !testCtx.UsingExistingCluster() || !(testCtx.TestEnv.UseExistingCluster != nil &&
+		*testCtx.TestEnv.UseExistingCluster) {
 		ClearResources(testCtx, intctrlutil.StatefulSetSignature, inNS)
 		ClearResources(testCtx, intctrlutil.DeploymentSignature, inNS)
 		ClearResources(testCtx, intctrlutil.ConfigMapSignature, inNS)

@@ -296,33 +296,33 @@ var _ = Describe("kubeblocks", func() {
 			},
 			{
 				"sets with unsupported flag and its value is false",
-				[]string{"test=false", "loadbalancer.enable=false"},
-				[]string{"test=false", "loadbalancer.enable=false"},
+				[]string{"test=false", "loadbalancer.enabled=false"},
+				[]string{"test=false", "loadbalancer.enabled=false"},
 			},
 			{
 				"sets with unsupported flag and its value is true",
-				[]string{"test=false", "loadbalancer.enable=true"},
+				[]string{"test=false", "loadbalancer.enabled=true"},
 				[]string{"test=false"},
 			},
 			{
 				"sets with more unsupported flags and the value is true",
-				[]string{"test=false", "loadbalancer.enable=true", "snapshot-controller.enable=true"},
-				[]string{"test=false"},
+				[]string{"test=false", "loadbalancer.enabled=true", "snapshot-controller.enabled=true"},
+				[]string{"test=false", "snapshot-controller.enabled=true"},
 			},
 			{
 				"sets with more unsupported flags and the value is true",
-				[]string{"test=false", "loadbalancer.enable=true, snapshot-controller.enable=true"},
+				[]string{"test=false", "loadbalancer.enabled=true"},
 				[]string{"test=false"},
 			},
 			{
 				"sets with more unsupported flags and some values are true, some values are false",
-				[]string{"test=false", "loadbalancer.enable=false, snapshot-controller.enable=true"},
-				[]string{"test=false", "loadbalancer.enable=false"},
+				[]string{"test=false", "loadbalancer.enabled=false"},
+				[]string{"test=false", "loadbalancer.enabled=false"},
 			},
 			{
 				"sets with more unsupported flags and some values are true, some values are false",
-				[]string{"test=false,loadbalancer.enable=false,snapshot-controller.enable=true"},
-				[]string{"test=false", "loadbalancer.enable=false"},
+				[]string{"test=false,loadbalancer.enabled=false"},
+				[]string{"test=false,loadbalancer.enabled=false"},
 			},
 		}
 

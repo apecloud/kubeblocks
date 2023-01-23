@@ -24,10 +24,13 @@ import (
 	"github.com/sethvargo/go-password/password"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/envtest"
 )
 
 type TestContext struct {
+	Ctx                   context.Context
 	Cli                   client.Client
+	TestEnv               *envtest.Environment
 	TestObjLabelKey       string
 	DefaultNamespace      string
 	DefaultTimeout        time.Duration
@@ -44,7 +47,7 @@ const (
 	envUseExistingCluster = "USE_EXISTING_CLUSTER"
 )
 
-func NewDefaultTestContext(cli client.Client) TestContext {
+func NewDefaultTestContext(ctx context.Context, cli client.Client, testEnv *envtest.Environment) TestContext {
 	t := TestContext{
 		TestObjLabelKey:       "kubeblocks.io/test",
 		DefaultNamespace:      "default",
@@ -53,7 +56,9 @@ func NewDefaultTestContext(cli client.Client) TestContext {
 		ClearResourceTimeout:  time.Second * 60,
 		ClearResourceInterval: time.Second,
 	}
+	t.Ctx = ctx
 	t.Cli = cli
+	t.TestEnv = testEnv
 	t.CreateObj = func(ctx context.Context, obj client.Object, opts ...client.CreateOption) error {
 		l := obj.GetLabels()
 		if l == nil {

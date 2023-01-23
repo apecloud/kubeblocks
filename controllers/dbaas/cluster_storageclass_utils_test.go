@@ -30,6 +30,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 var _ = Describe("Event Controller", func() {
@@ -42,22 +43,22 @@ var _ = Describe("Event Controller", func() {
 		ctx                = context.Background()
 	)
 
-	cleanupObjects := func() {
-		err := k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.Cluster{}, client.InNamespace(testCtx.DefaultNamespace), client.HasLabels{testCtx.TestObjLabelKey})
-		Expect(err).NotTo(HaveOccurred())
+	cleanEnv := func() {
+		// must wait until resources deleted and no longer exist before testcases start,
+		// otherwise if later it needs to create some new resource objects with the same name,
+		// in race conditions, the existence of old ones shall be found, which causes
+		// new objects fail to create.
+		By("clean resources")
 
-		err = k8sClient.DeleteAllOf(ctx, &storagev1.StorageClass{}, client.HasLabels{testCtx.TestObjLabelKey})
-		Expect(err).NotTo(HaveOccurred())
+		// delete cluster(and all dependent sub-resources), clusterversion and clusterdef
+		clearClusterResources(ctx)
+
+		// non-namespaced resources
+		clearResources(ctx, intctrlutil.StorageClassSignature, client.HasLabels{testCtx.TestObjLabelKey})
 	}
-	BeforeEach(func() {
-		// Add any setup steps that needs to be executed before each test
-		cleanupObjects()
-	})
+	BeforeEach(cleanEnv)
 
-	AfterEach(func() {
-		// Add any teardown steps that needs to be executed after each test
-		cleanupObjects()
-	})
+	AfterEach(cleanEnv)
 
 	createClusterDef := func() {
 		clusterDefYaml := fmt.Sprintf(`

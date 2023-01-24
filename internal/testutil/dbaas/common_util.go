@@ -118,7 +118,7 @@ func ClearResources[T intctrlutil.Object, PT intctrlutil.PObject[T],
 		}
 	}
 
-	//ginkgo.By("clear resources " + PL(&objList).GetObjectKind().GroupVersionKind().String())
+	// ginkgo.By("clear resources " + PL(&objList).GetObjectKind().GroupVersionKind().String())
 	gomega.Eventually(func() error {
 		return testCtx.Cli.List(testCtx.Ctx, PL(&objList), listOptions...)
 	}, testCtx.DefaultTimeout, testCtx.DefaultInterval).Should(gomega.Succeed())

@@ -24,7 +24,6 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -54,31 +53,31 @@ var _ = Describe("OpsRequest Controller", func() {
 		statelessCompName     = "stateless"
 	)
 
-	cleanupObjects := func() {
-		err := k8sClient.DeleteAllOf(ctx, &appsv1.StatefulSet{}, client.InNamespace(testCtx.DefaultNamespace), client.HasLabels{testCtx.TestObjLabelKey})
-		Expect(err).NotTo(HaveOccurred())
-		err = k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.Cluster{}, client.InNamespace(testCtx.DefaultNamespace), client.HasLabels{testCtx.TestObjLabelKey})
-		Expect(err).NotTo(HaveOccurred())
-		err = k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.ClusterVersion{}, client.HasLabels{testCtx.TestObjLabelKey})
-		Expect(err).NotTo(HaveOccurred())
-		err = k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.ClusterDefinition{}, client.HasLabels{testCtx.TestObjLabelKey})
-		Expect(err).NotTo(HaveOccurred())
-		err = k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.OpsRequest{}, client.InNamespace(testCtx.DefaultNamespace), client.HasLabels{testCtx.TestObjLabelKey})
-		Expect(err).NotTo(HaveOccurred())
-		err = k8sClient.DeleteAllOf(ctx, &corev1.Pod{}, client.InNamespace(testCtx.DefaultNamespace), client.HasLabels{testCtx.TestObjLabelKey},
-			client.GracePeriodSeconds(0))
-		Expect(err).NotTo(HaveOccurred())
+	cleanEnv := func() {
+		// must wait until resources deleted and no longer exist before testcases start,
+		// otherwise if later it needs to create some new resource objects with the same name,
+		// in race conditions, the existence of old ones shall be found, which causes
+		// new objects fail to create.
+		By("clean resources")
+
+		// delete cluster(and all dependent sub-resources), clusterversion and clusterdef
+		testdbaas.ClearClusterResources(&testCtx)
+
+		// delete rest resources
+		inNS := client.InNamespace(testCtx.DefaultNamespace)
+		ml := client.HasLabels{testCtx.TestObjLabelKey}
+		// namespaced
+		testdbaas.ClearResources(&testCtx, intctrlutil.OpsRequestSignature, inNS, ml)
+		testdbaas.ClearResources(&testCtx, intctrlutil.ConfigMapSignature, inNS, ml)
+		// default GracePeriod is 30s
+		testdbaas.ClearResources(&testCtx, intctrlutil.PodSignature, inNS, ml, client.GracePeriodSeconds(0))
+		// non-namespaced
+		testdbaas.ClearResources(&testCtx, intctrlutil.ConfigConstraintSignature, ml)
 	}
 
-	BeforeEach(func() {
-		// Add any steup steps that needs to be executed before each test
-		cleanupObjects()
-	})
+	BeforeEach(cleanEnv)
 
-	AfterEach(func() {
-		// Add any teardown steps that needs to be executed after each test
-		cleanupObjects()
-	})
+	AfterEach(cleanEnv)
 
 	initClusterForOps := func(opsRes *OpsResource) {
 		Expect(opsutil.PatchClusterOpsAnnotations(ctx, k8sClient, opsRes.Cluster, nil)).Should(Succeed())

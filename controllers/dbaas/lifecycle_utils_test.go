@@ -24,9 +24,9 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	"github.com/leaanthony/debme"
 	"github.com/sethvargo/go-password/password"
+
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -34,9 +34,12 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
+
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	testdbaas "github.com/apecloud/kubeblocks/internal/testutil/dbaas"
 )
 
 const (
@@ -59,13 +62,26 @@ func TestReadCUETplFromEmbeddedFS(t *testing.T) {
 
 var _ = Describe("lifecycle_utils", func() {
 
-	BeforeEach(func() {
-		// Add any steup steps that needs to be executed before each test
-	})
+	cleanAll := func() {
+		// must wait until resources deleted and no longer exist before testcases start,
+		// otherwise if later it needs to create some new resource objects with the same name,
+		// in race conditions, the existence of old ones shall be found, which causes
+		// new objects fail to create.
+		By("clean resources")
 
-	AfterEach(func() {
-		// Add any teardown steps that needs to be executed after each test
-	})
+		// delete cluster(and all dependent sub-resources), clusterversion and clusterdef
+		testdbaas.ClearClusterResources(&testCtx)
+
+		// clear rest resources
+		inNS := client.InNamespace(testCtx.DefaultNamespace)
+		ml := client.HasLabels{testCtx.TestObjLabelKey}
+		// namespaced resources
+		testdbaas.ClearResources(&testCtx, intctrlutil.VolumeSnapshotSignature, inNS, ml)
+	}
+
+	BeforeEach(cleanAll)
+
+	AfterEach(cleanAll)
 
 	Context("mergeMonitorConfig", func() {
 		var component *Component
@@ -749,7 +765,7 @@ spec:
 	newReqCtx := func() intctrlutil.RequestCtx {
 		reqCtx := intctrlutil.RequestCtx{
 			Ctx:      ctx,
-			Log:      tlog,
+			Log:      logger,
 			Recorder: clusterRecorder,
 		}
 		return reqCtx

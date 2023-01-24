@@ -2231,6 +2231,7 @@ func doBackup(reqCtx intctrlutil.RequestCtx,
 				cluster,
 				component,
 				stsObj); err != nil {
+				reqCtx.Log.Error(err, "checkedCreatePVCFromSnapshot failed")
 				return shouldRequeue, err
 			}
 		}

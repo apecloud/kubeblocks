@@ -8,6 +8,8 @@ import (
 	storagev1 "k8s.io/api/storage/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
+
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 )
@@ -133,6 +135,14 @@ func (w JobListTraits) GetItems(list *batchv1.JobList) []batchv1.Job {
 }
 
 var JobSignature = func(_ batchv1.Job, _ batchv1.JobList, _ JobListTraits) {}
+
+type VolumeSnapshotListTraits struct{}
+
+func (w VolumeSnapshotListTraits) GetItems(list *snapshotv1.VolumeSnapshotList) []snapshotv1.VolumeSnapshot {
+	return list.Items
+}
+
+var VolumeSnapshotSignature = func(_ snapshotv1.VolumeSnapshot, _ snapshotv1.VolumeSnapshotList, _ VolumeSnapshotListTraits) {}
 
 type ClusterListTraits struct{}
 

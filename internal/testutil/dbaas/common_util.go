@@ -17,7 +17,9 @@ limitations under the License.
 package dbaas
 
 import (
-	gomega "github.com/onsi/gomega"
+	"reflect"
+
+	"github.com/onsi/gomega"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
@@ -99,22 +101,35 @@ func CheckObj[T intctrlutil.Object, PT intctrlutil.PObject[T]](testCtx *testutil
 // ClearResources clears all resources of the given type T satisfying the input ListOptions.
 func ClearResources[T intctrlutil.Object, PT intctrlutil.PObject[T],
 	L intctrlutil.ObjList[T], PL intctrlutil.PObjList[T, L], Traits intctrlutil.ObjListTraits[T, L]](
-	testCtx *testutil.TestContext, _ func(T, L, Traits), opts ...client.ListOption) {
+	testCtx *testutil.TestContext, _ func(T, L, Traits), opts ...client.DeleteAllOfOption) {
 	var (
 		objList L
 		traits  Traits
 	)
 
+	listOptions := make([]client.ListOption, 0)
+	deleteOptions := make([]client.DeleteOption, 0)
+	for _, opt := range opts {
+		applyToDeleteFunc := reflect.ValueOf(opt).MethodByName("ApplyToDelete")
+		if applyToDeleteFunc.IsValid() {
+			deleteOptions = append(deleteOptions, opt.(client.DeleteOption))
+		} else {
+			listOptions = append(listOptions, opt.(client.ListOption))
+		}
+	}
+
+	//ginkgo.By("clear resources " + PL(&objList).GetObjectKind().GroupVersionKind().String())
 	gomega.Eventually(func() error {
-		return testCtx.Cli.List(testCtx.Ctx, PL(&objList), opts...)
+		return testCtx.Cli.List(testCtx.Ctx, PL(&objList), listOptions...)
 	}, testCtx.DefaultTimeout, testCtx.DefaultInterval).Should(gomega.Succeed())
 	for _, obj := range traits.GetItems(&objList) {
 		// it's possible deletions are initiated in testcases code but cache is not updated
-		gomega.Expect(client.IgnoreNotFound(testCtx.Cli.Delete(testCtx.Ctx, PT(&obj)))).Should(gomega.Succeed())
+		gomega.Expect(client.IgnoreNotFound(testCtx.Cli.Delete(testCtx.Ctx, PT(&obj),
+			deleteOptions...))).Should(gomega.Succeed())
 	}
 
 	gomega.Eventually(func(g gomega.Gomega) {
-		g.Expect(testCtx.Cli.List(testCtx.Ctx, PL(&objList), opts...)).Should(gomega.Succeed())
+		g.Expect(testCtx.Cli.List(testCtx.Ctx, PL(&objList), listOptions...)).Should(gomega.Succeed())
 		for _, obj := range traits.GetItems(&objList) {
 			pobj := PT(&obj)
 			finalizers := pobj.GetFinalizers()
@@ -130,7 +145,7 @@ func ClearResources[T intctrlutil.Object, PT intctrlutil.PObject[T],
 	}, testCtx.ClearResourceTimeout, testCtx.ClearResourceInterval).Should(gomega.Succeed())
 }
 
-// ClearClusterResources clears all dependent resources belonging existing clusters.
+// ClearClusterResources clears all dependent resources belonging to existing clusters.
 // The function is intended to be called to clean resources created by cluster controller in envtest
 // environment without UseExistingCluster set, where garbage collection lacks.
 func ClearClusterResources(testCtx *testutil.TestContext) {
@@ -146,7 +161,7 @@ func ClearClusterResources(testCtx *testutil.TestContext) {
 		client.HasLabels{testCtx.TestObjLabelKey})
 
 	// mock behavior of garbage collection inside KCM
-	if !(testCtx.TestEnv.UseExistingCluster != nil && *testCtx.TestEnv.UseExistingCluster) {
+	if !testCtx.UsingExistingCluster() {
 		ClearResources(testCtx, intctrlutil.StatefulSetSignature, inNS)
 		ClearResources(testCtx, intctrlutil.DeploymentSignature, inNS)
 		ClearResources(testCtx, intctrlutil.ConfigMapSignature, inNS)

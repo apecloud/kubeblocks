@@ -461,6 +461,7 @@ func GetEventObject(e *corev1.Event) string {
 	return fmt.Sprintf("%s/%s", kind, e.InvolvedObject.Name)
 }
 
+// GetConfigTemplateList returns ConfigTemplate list used by the component.
 func GetConfigTemplateList(clusterName string, namespace string, cli dynamic.Interface, componentName string) ([]dbaasv1alpha1.ConfigTemplate, error) {
 	var (
 		clusterObj        = dbaasv1alpha1.Cluster{}
@@ -468,7 +469,7 @@ func GetConfigTemplateList(clusterName string, namespace string, cli dynamic.Int
 		clusterVersionObj = dbaasv1alpha1.ClusterVersion{}
 	)
 
-	if err := GetK8sResourceObjectFromGVR(types.ClusterGVR(), client.ObjectKey{
+	if err := GetResourceObjectFromGVR(types.ClusterGVR(), client.ObjectKey{
 		Namespace: namespace,
 		Name:      clusterName,
 	}, cli, &clusterObj); err != nil {
@@ -477,13 +478,13 @@ func GetConfigTemplateList(clusterName string, namespace string, cli dynamic.Int
 
 	clusterDefName := clusterObj.Spec.ClusterDefRef
 	clusterVersionName := clusterObj.Spec.ClusterVersionRef
-	if err := GetK8sResourceObjectFromGVR(types.ClusterDefGVR(), client.ObjectKey{
+	if err := GetResourceObjectFromGVR(types.ClusterDefGVR(), client.ObjectKey{
 		Namespace: "",
 		Name:      clusterDefName,
 	}, cli, &clusterDefObj); err != nil {
 		return nil, err
 	}
-	if err := GetK8sResourceObjectFromGVR(types.ClusterVersionGVR(), client.ObjectKey{
+	if err := GetResourceObjectFromGVR(types.ClusterVersionGVR(), client.ObjectKey{
 		Namespace: "",
 		Name:      clusterVersionName,
 	}, cli, &clusterVersionObj); err != nil {
@@ -493,8 +494,12 @@ func GetConfigTemplateList(clusterName string, namespace string, cli dynamic.Int
 	return cfgcore.GetConfigTemplatesFromComponent(clusterObj.Spec.Components, clusterDefObj.Spec.Components, clusterVersionObj.Spec.Components, componentName)
 }
 
-func GetK8sResourceObjectFromGVR(gvr schema.GroupVersionResource, key client.ObjectKey, client dynamic.Interface, k8sObj interface{}) error {
-	unstructuredObj, err := client.Resource(gvr).Namespace(key.Namespace).Get(context.TODO(), key.Name, metav1.GetOptions{})
+// GetResourceObjectFromGVR query the resource object using GVR
+func GetResourceObjectFromGVR(gvr schema.GroupVersionResource, key client.ObjectKey, client dynamic.Interface, k8sObj interface{}) error {
+	unstructuredObj, err := client.
+		Resource(gvr).
+		Namespace(key.Namespace).
+		Get(context.TODO(), key.Name, metav1.GetOptions{})
 	if err != nil {
 		return cfgcore.WrapError(err, "failed to get resource[%v]", key)
 	}

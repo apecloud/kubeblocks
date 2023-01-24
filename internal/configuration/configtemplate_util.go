@@ -35,6 +35,7 @@ func filter[T ComponentsType](components []T, f filterFn[T]) *T {
 	return nil
 }
 
+// GetConfigTemplatesFromComponent returns ConfigTemplate list used by the component.
 func GetConfigTemplatesFromComponent(
 	cComponents []dbaasv1alpha1.ClusterComponent,
 	dComponents []dbaasv1alpha1.ClusterDefinitionComponent,

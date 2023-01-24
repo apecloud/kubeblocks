@@ -191,7 +191,7 @@ func (o *OperationsOptions) validateConfigMapKey(tpl *dbaasv1alpha1.ConfigTempla
 		gvr    = schema.GroupVersionResource{Group: corev1.GroupName, Version: "v1", Resource: "configmaps"}
 	)
 
-	if err := util.GetK8sResourceObjectFromGVR(gvr, client.ObjectKey{
+	if err := util.GetResourceObjectFromGVR(gvr, client.ObjectKey{
 		Name:      cmName,
 		Namespace: o.Namespace,
 	}, o.Client, &cmObj); err != nil {

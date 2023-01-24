@@ -31,10 +31,19 @@ import (
 
 // Helper functions to change fields in the desired state and status of resources.
 // Each helper is a wrapper of k8sClient.Patch.
-// Example:
-// changeSpec(testCtx, key, func(clusterDef *dbaasv1alpha1.ClusterDefinition) {
+// Example 1:
+// Expect(changeSpec(testCtx, key, func(clusterDef *dbaasv1alpha1.ClusterDefinition) {
 //		// modify clusterDef
-// })
+// })).Should(Succeed())
+//
+// Example 2:
+// Eventually(func() error {
+// 		return changeSpec(testCtx, key, func(clusterDef *dbaasv1alpha1.ClusterDefinition) {
+//		    // modify clusterDef
+//      })
+// }, timeout, interval).Should(Succeed())
+// Since client.Reader reads from the cache, which may not be updated to the latest.
+// Code snippet shown in Example 2 is preferred.
 
 func ChangeSpec[T intctrlutil.Object, PT intctrlutil.PObject[T]](testCtx *testutil.TestContext,
 	namespacedName types.NamespacedName, action func(PT)) error {
@@ -70,9 +79,13 @@ func ChangeStatus[T intctrlutil.Object, PT intctrlutil.PObject[T]](testCtx *test
 // Each helper returns a Gomega assertion function, which should be passed into
 // Eventually() or Consistently() as the first parameter.
 // Example:
-// Eventually(testCtx, checkObj(key, func(g Gomega, cluster *dbaasv1alpha1.Cluster) {
+// Eventually(checkObj(testCtx, key, func(g Gomega, cluster *dbaasv1alpha1.Cluster) {
 //   g.Expect(..).To(BeTrue()) // do some check
 // })).Should(Succeed())
+// Warning: these functions should NOT be used together with Expect().
+// BAD Example:
+// Expect(checkObj(testCtx, key, ...)).Should(Succeed())
+// Although it compiles, and test may also pass, it makes no sense and doesn't work as you expect.
 
 func CheckExists(testCtx *testutil.TestContext, namespacedName types.NamespacedName,
 	obj client.Object, expectExisted bool) func(g gomega.Gomega) {

@@ -118,12 +118,14 @@ var _ = Describe("SystemAccount Controller", func() {
 
 	patchCluster := func(key types.NamespacedName) {
 		By("Patching Cluster to trigger reconcile")
-		Eventually(testdbaas.ChangeSpec(&testCtx, key, func(cluster *dbaasv1alpha1.Cluster) {
-			if cluster.Annotations == nil {
-				cluster.Annotations = make(map[string]string)
-			}
-			cluster.Annotations["mockmode"] = "testing"
-		}), timeout, interval).Should(Succeed())
+		Eventually(func() error {
+			return testdbaas.ChangeSpec(&testCtx, key, func(cluster *dbaasv1alpha1.Cluster) {
+				if cluster.Annotations == nil {
+					cluster.Annotations = make(map[string]string)
+				}
+				cluster.Annotations["mockmode"] = "testing"
+			})
+		}, timeout, interval).Should(Succeed())
 	}
 
 	assureBackupPolicy := func(policyName, engineName, clusterName string) *dataprotectionv1alpha1.BackupPolicy {
@@ -311,8 +313,8 @@ var _ = Describe("SystemAccount Controller", func() {
 					g.Expect(testdbaas.ChangeSpec(&testCtx, intctrlutil.GetNamespacedName(&job), func(job *batchv1.Job) {
 						controllerutil.RemoveFinalizer(job, finalizerName)
 					})).To(Succeed())
-					g.Expect(testdbaas.CheckExists(&testCtx, intctrlutil.GetNamespacedName(&job), &batchv1.Job{}, false)).To(Succeed())
 				}
+				g.Expect(len(jobs.Items)).To(Equal(0))
 			}, timeout, interval).Should(Succeed())
 
 			Eventually(func(g Gomega) {

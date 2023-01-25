@@ -29,65 +29,77 @@ import (
 	"github.com/apecloud/kubeblocks/internal/testutil"
 )
 
-// Helper functions to change fields in the desired state and status of resources.
+// Helper functions to change object's fields in input closure and then update it.
 // Each helper is a wrapper of k8sClient.Patch.
-// Example 1:
-// Expect(changeSpec(testCtx, key, func(clusterDef *dbaasv1alpha1.ClusterDefinition) {
+// Example:
+// Expect(ChangeObj(testCtx, key, func(clusterDef *dbaasv1alpha1.ClusterDefinition) {
 //		// modify clusterDef
 // })).Should(Succeed())
-//
-// Example 2:
-// Eventually(func() error {
-// 		return changeSpec(testCtx, key, func(clusterDef *dbaasv1alpha1.ClusterDefinition) {
-//		    // modify clusterDef
-//      })
-// }, timeout, interval).Should(Succeed())
-// Since client.Reader reads from the cache, which may not be updated to the latest.
-// Code snippet shown in Example 2 is preferred.
 
-func ChangeSpec[T intctrlutil.Object, PT intctrlutil.PObject[T]](testCtx *testutil.TestContext,
-	namespacedName types.NamespacedName, action func(PT)) error {
-	var obj T
-	pobj := PT(&obj)
-	if err := testCtx.Cli.Get(testCtx.Ctx, namespacedName, pobj); err != nil {
-		return err
-	}
+func ChangeObj[T intctrlutil.Object, PT intctrlutil.PObject[T]](testCtx *testutil.TestContext,
+	pobj PT, action func(PT)) error {
 	patch := client.MergeFrom(PT(pobj.DeepCopy()))
 	action(pobj)
-	if err := testCtx.Cli.Patch(testCtx.Ctx, pobj, patch); err != nil {
-		return err
-	}
-	return nil
+	return testCtx.Cli.Patch(testCtx.Ctx, pobj, patch)
 }
 
-func ChangeStatus[T intctrlutil.Object, PT intctrlutil.PObject[T]](testCtx *testutil.TestContext,
-	namespacedName types.NamespacedName, action func(pobj PT)) error {
-	var obj T
-	pobj := PT(&obj)
-	if err := testCtx.Cli.Get(testCtx.Ctx, namespacedName, pobj); err != nil {
-		return err
-	}
+func ChangeObjStatus[T intctrlutil.Object, PT intctrlutil.PObject[T]](testCtx *testutil.TestContext,
+	pobj PT, action func(PT)) error {
 	patch := client.MergeFrom(PT(pobj.DeepCopy()))
 	action(pobj)
-	if err := testCtx.Cli.Status().Patch(testCtx.Ctx, pobj, patch); err != nil {
-		return err
+	return testCtx.Cli.Status().Patch(testCtx.Ctx, pobj, patch)
+}
+
+// Helper functions to get object, change its fields in input closure and update it.
+// Each helper is a wrapper of client.Get and client.Patch.
+// Each helper returns a Gomega assertion function, which should be passed into
+// Eventually() or Consistently() as the first parameter.
+// Example:
+// Eventually(GetAndChangeObj(testCtx, key, func(fetched *dbaasv1alpha1.ClusterDefinition) {
+//		    // modify clusterDef
+//      })).Should(Succeed())
+// Warning: these functions should NOT be used together with Expect().
+// BAD Example:
+// Expect(GetAndChangeObj(testCtx, key, ...)).Should(Succeed())
+// Although it compiles, and test may also pass, it makes no sense and doesn't work as you expect.
+
+func GetAndChangeObj[T intctrlutil.Object, PT intctrlutil.PObject[T]](testCtx *testutil.TestContext,
+	namespacedName types.NamespacedName, action func(PT)) func() error {
+	return func() error {
+		var obj T
+		pobj := PT(&obj)
+		if err := testCtx.Cli.Get(testCtx.Ctx, namespacedName, pobj); err != nil {
+			return err
+		}
+		return ChangeObj(testCtx, pobj, action)
 	}
-	return nil
+}
+
+func GetAndChangeObjStatus[T intctrlutil.Object, PT intctrlutil.PObject[T]](testCtx *testutil.TestContext,
+	namespacedName types.NamespacedName, action func(pobj PT)) func() error {
+	return func() error {
+		var obj T
+		pobj := PT(&obj)
+		if err := testCtx.Cli.Get(testCtx.Ctx, namespacedName, pobj); err != nil {
+			return err
+		}
+		return ChangeObjStatus(testCtx, pobj, action)
+	}
 }
 
 // Helper functions to check fields of resources when writing unit tests.
 // Each helper returns a Gomega assertion function, which should be passed into
 // Eventually() or Consistently() as the first parameter.
 // Example:
-// Eventually(checkObj(testCtx, key, func(g Gomega, cluster *dbaasv1alpha1.Cluster) {
+// Eventually(CheckObj(testCtx, key, func(g Gomega, fetched *dbaasv1alpha1.Cluster) {
 //   g.Expect(..).To(BeTrue()) // do some check
 // })).Should(Succeed())
 // Warning: these functions should NOT be used together with Expect().
 // BAD Example:
-// Expect(checkObj(testCtx, key, ...)).Should(Succeed())
+// Expect(CheckObj(testCtx, key, ...)).Should(Succeed())
 // Although it compiles, and test may also pass, it makes no sense and doesn't work as you expect.
 
-func CheckExists(testCtx *testutil.TestContext, namespacedName types.NamespacedName,
+func CheckObjExists(testCtx *testutil.TestContext, namespacedName types.NamespacedName,
 	obj client.Object, expectExisted bool) func(g gomega.Gomega) {
 	return func(g gomega.Gomega) {
 		err := testCtx.Cli.Get(testCtx.Ctx, namespacedName, obj)

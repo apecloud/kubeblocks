@@ -590,11 +590,9 @@ spec:
 			_, _, _, key := createClusterNCheck()
 
 			By("Update the cluster's termination policy to DoNotTerminate")
-			Eventually(func() error {
-				return testdbaas.ChangeSpec(&testCtx, key, func(cluster *dbaasv1alpha1.Cluster) {
-					cluster.Spec.TerminationPolicy = dbaasv1alpha1.DoNotTerminate
-				})
-			}, timeout, interval).Should(Succeed())
+			Eventually(testdbaas.GetAndChangeObj(&testCtx, key, func(cluster *dbaasv1alpha1.Cluster) {
+				cluster.Spec.TerminationPolicy = dbaasv1alpha1.DoNotTerminate
+			})).Should(Succeed())
 
 			By("Delete the cluster")
 			Eventually(func(g Gomega) {
@@ -613,11 +611,9 @@ spec:
 			Consistently(checkClusterDoNotTerminate, waitDuration, interval).Should(Succeed())
 
 			By("Update the cluster's termination policy to WipeOut")
-			Eventually(func() error {
-				return testdbaas.ChangeSpec(&testCtx, key, func(cluster *dbaasv1alpha1.Cluster) {
-					cluster.Spec.TerminationPolicy = dbaasv1alpha1.WipeOut
-				})
-			}, timeout, interval).Should(Succeed())
+			Eventually(testdbaas.GetAndChangeObj(&testCtx, key, func(cluster *dbaasv1alpha1.Cluster) {
+				cluster.Spec.TerminationPolicy = dbaasv1alpha1.WipeOut
+			})).Should(Succeed())
 
 			By("Wait for the cluster to terminate")
 			Eventually(func(g Gomega) {
@@ -628,20 +624,18 @@ spec:
 	})
 
 	changeClusterReplicas := func(clusterName types.NamespacedName, replicas int32) {
-		Eventually(func() error {
-			return testdbaas.ChangeSpec(&testCtx, clusterName, func(cluster *dbaasv1alpha1.Cluster) {
-				if cluster.Spec.Components == nil || len(cluster.Spec.Components) == 0 {
-					cluster.Spec.Components = []dbaasv1alpha1.ClusterComponent{
-						{
-							Name:     "replicasets",
-							Type:     "replicasets",
-							Replicas: &replicas,
-						}}
-				} else {
-					*cluster.Spec.Components[0].Replicas = replicas
-				}
-			})
-		}, timeout, interval).Should(Succeed())
+		Eventually(testdbaas.GetAndChangeObj(&testCtx, clusterName, func(cluster *dbaasv1alpha1.Cluster) {
+			if cluster.Spec.Components == nil || len(cluster.Spec.Components) == 0 {
+				cluster.Spec.Components = []dbaasv1alpha1.ClusterComponent{
+					{
+						Name:     "replicasets",
+						Type:     "replicasets",
+						Replicas: &replicas,
+					}}
+			} else {
+				*cluster.Spec.Components[0].Replicas = replicas
+			}
+		})).Should(Succeed())
 	}
 
 	Context("When updating cluster's replica number to a valid value", func() {
@@ -729,13 +723,11 @@ spec:
 			})
 
 			By("Set HorizontalScalePolicy")
-			Eventually(func() error {
-				return testdbaas.ChangeSpec(&testCtx, intctrlutil.GetNamespacedName(clusterDef),
-					func(clusterDef *dbaasv1alpha1.ClusterDefinition) {
-						clusterDef.Spec.Components[0].HorizontalScalePolicy =
-							&dbaasv1alpha1.HorizontalScalePolicy{Type: dbaasv1alpha1.HScaleDataClonePolicyFromSnapshot}
-					})
-			}, timeout, interval).Should(Succeed())
+			Eventually(testdbaas.GetAndChangeObj(&testCtx, intctrlutil.GetNamespacedName(clusterDef),
+				func(clusterDef *dbaasv1alpha1.ClusterDefinition) {
+					clusterDef.Spec.Components[0].HorizontalScalePolicy =
+						&dbaasv1alpha1.HorizontalScalePolicy{Type: dbaasv1alpha1.HScaleDataClonePolicyFromSnapshot}
+				})).Should(Succeed())
 
 			By("Creating a BackupPolicyTemplate")
 			backupPolicyTplKey := types.NamespacedName{Name: "test-backup-policy-template-mysql"}
@@ -835,12 +827,10 @@ spec:
 					Namespace: key.Namespace,
 					Name:      fmt.Sprintf("%s-%s-%s-%d", volumeName, key.Name, compName, i),
 				}
-				Eventually(testdbaas.CheckExists(&testCtx, pvcKey, &corev1.PersistentVolumeClaim{}, true), timeout, interval).Should(Succeed())
-				Eventually(func() error {
-					return testdbaas.ChangeStatus(&testCtx, pvcKey, func(pvc *corev1.PersistentVolumeClaim) {
-						pvc.Status.Phase = corev1.ClaimBound
-					})
-				}, timeout, interval).Should(Succeed())
+				Eventually(testdbaas.CheckObjExists(&testCtx, pvcKey, &corev1.PersistentVolumeClaim{}, true), timeout, interval).Should(Succeed())
+				Eventually(testdbaas.GetAndChangeObjStatus(&testCtx, pvcKey, func(pvc *corev1.PersistentVolumeClaim) {
+					pvc.Status.Phase = corev1.ClaimBound
+				})).Should(Succeed())
 			}
 
 			By("Check backup job cleanup")
@@ -851,7 +841,7 @@ spec:
 				}, client.InNamespace(key.Namespace))).Should(Succeed())
 				return len(backupList.Items) == 0
 			}, timeout, interval).Should(BeTrue())
-			Eventually(testdbaas.CheckExists(&testCtx, snapshotKey, &snapshotv1.VolumeSnapshot{}, false), timeout, interval).Should(Succeed())
+			Eventually(testdbaas.CheckObjExists(&testCtx, snapshotKey, &snapshotv1.VolumeSnapshot{}, false), timeout, interval).Should(Succeed())
 
 			By("Checking cluster status and the number of replicas changed")
 			Eventually(testdbaas.CheckObj(&testCtx, key, func(g Gomega, cluster *dbaasv1alpha1.Cluster) {
@@ -1456,12 +1446,10 @@ spec:
 
 			By("Updating the PVC storage size")
 			newStorageValue := resource.MustParse("2Gi")
-			Eventually(func() error {
-				return testdbaas.ChangeSpec(&testCtx, key, func(cluster *dbaasv1alpha1.Cluster) {
-					comp := &cluster.Spec.Components[0]
-					comp.VolumeClaimTemplates[0].Spec.Resources.Requests[corev1.ResourceStorage] = newStorageValue
-				})
-			}, timeout, interval).Should(Succeed())
+			Eventually(testdbaas.GetAndChangeObj(&testCtx, key, func(cluster *dbaasv1alpha1.Cluster) {
+				comp := &cluster.Spec.Components[0]
+				comp.VolumeClaimTemplates[0].Spec.Resources.Requests[corev1.ResourceStorage] = newStorageValue
+			})).Should(Succeed())
 
 			By("Checking the resize operation finished")
 			Eventually(func(g Gomega) {

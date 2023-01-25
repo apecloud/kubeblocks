@@ -17,6 +17,7 @@ limitations under the License.
 package operations
 
 import (
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -89,6 +90,12 @@ func (r *reconfigureAction) Handle(eventContext cfgcore.ConfigEventContext, last
 		return err
 	}
 
+	if err := patchReconfigureStatus(
+		opsRes, eventContext.TplName, &eventContext.PolicyStatus, phase,
+		createConfigureStatus(eventContext.TplName, eventContext.Meta)); err != nil {
+		return err
+	}
+
 	switch phase {
 	case dbaasv1alpha1.SucceedPhase:
 		return PatchOpsStatus(opsRes, dbaasv1alpha1.RunningPhase,
@@ -109,6 +116,41 @@ func (r *reconfigureAction) Handle(eventContext cfgcore.ConfigEventContext, last
 			dbaasv1alpha1.NewReconfigureRunningCondition(opsRequest,
 				dbaasv1alpha1.ReasonReconfigureRunning,
 				eventContext.TplName))
+	}
+}
+
+func createConfigureStatus(tplName string, difference *cfgcore.ConfigDiffInformation) func(key string) dbaasv1alpha1.ConfigurationStatus {
+	interface2StringMap := func(config map[string]interface{}) map[string]string {
+		if len(config) == 0 {
+			return nil
+		}
+		m := make(map[string]string, len(config))
+		for key, value := range config {
+			data, _ := json.Marshal(value)
+			m[key] = string(data)
+		}
+		return m
+	}
+	byte2StringMap := func(config map[string][]byte) map[string]string {
+		if len(config) == 0 {
+			return nil
+		}
+		m := make(map[string]string, len(config))
+		for key, value := range config {
+			m[key] = string(value)
+		}
+		return m
+	}
+	return func(key string) dbaasv1alpha1.ConfigurationStatus {
+		return dbaasv1alpha1.ConfigurationStatus{
+			Name:   tplName,
+			Status: dbaasv1alpha1.ReasonReconfigureMerged,
+			UpdatedParameters: dbaasv1alpha1.UpdatedParameters{
+				AddedKeys:   interface2StringMap(difference.AddConfig),
+				UpdatedKeys: byte2StringMap(difference.UpdateConfig),
+				DeletedKeys: interface2StringMap(difference.DeleteConfig),
+			},
+		}
 	}
 }
 
@@ -224,6 +266,11 @@ func (r *reconfigureAction) performPersistCfg(clusterName, componentName string,
 		if err := PatchOpsStatus(resource, dbaasv1alpha1.RunningPhase, conditions...); err != nil {
 			return err
 		}
+		if err = patchReconfigureStatus(
+			resource, tpl.Name, nil, "",
+			createConfigureStatus(tpl.Name, difference)); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -242,7 +289,7 @@ func processMergedFailed(resource *OpsResource, isInvalid bool, err error) error
 }
 
 func formatConfigurationDifference(difference *cfgcore.ConfigDiffInformation) string {
-	return fmt.Sprintf("updated: %v, added: %v, deleted:%v",
+	return fmt.Sprintf("updated: %s, added: %s, deleted:%s",
 		difference.UpdateConfig,
 		difference.AddConfig,
 		difference.DeleteConfig)

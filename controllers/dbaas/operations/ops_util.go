@@ -19,6 +19,7 @@ package operations
 import (
 	"context"
 	"fmt"
+	"math"
 	"reflect"
 	"time"
 
@@ -30,6 +31,7 @@ import (
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/dbaas/components/util"
 	opsutil "github.com/apecloud/kubeblocks/controllers/dbaas/operations/util"
+	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 )
 
 type handleStatusProgressWithComponent func(opsRes *OpsResource,
@@ -314,4 +316,78 @@ func patchClusterPhaseWhenExistsOtherOps(opsRes *OpsResource, opsRequestSlice []
 // isOpsRequestFailedPhase checks the OpsRequest phase is Failed
 func isOpsRequestFailedPhase(opsRequestPhase dbaasv1alpha1.Phase) bool {
 	return opsRequestPhase == dbaasv1alpha1.FailedPhase
+}
+
+// patchReconfigureStatus when Reconfigure is running, we should update status to OpsRequest.Status.ConfigurationStatus.
+func patchReconfigureStatus(opsRes *OpsResource,
+	tplName string,
+	execStatus *cfgcore.PolicyExecStatus,
+	phase dbaasv1alpha1.Phase,
+	create func(key string) dbaasv1alpha1.ConfigurationStatus) error {
+	var (
+		opsRequest = opsRes.OpsRequest
+		status     = &opsRequest.Status
+	)
+
+	findAndInitStatus := func(status *dbaasv1alpha1.OpsRequestStatus, key string,
+		create func(key string) dbaasv1alpha1.ConfigurationStatus) *dbaasv1alpha1.ConfigurationStatus {
+		if status.ReconfiguringStatus == nil {
+			status.ReconfiguringStatus = &dbaasv1alpha1.ReconfiguringStatus{
+				ConfigurationStatus: make([]dbaasv1alpha1.ConfigurationStatus, 0),
+			}
+		}
+		cfgStatus := status.ReconfiguringStatus.ConfigurationStatus
+		for i := range cfgStatus {
+			configStatus := &cfgStatus[i]
+			if configStatus.Name == key {
+				return configStatus
+			}
+		}
+		cfgStatus = append(cfgStatus, create(key))
+		status.ReconfiguringStatus.ConfigurationStatus = cfgStatus
+		return &cfgStatus[len(cfgStatus)-1]
+	}
+	updateReconfigureStatus := func(tplStatus *dbaasv1alpha1.ConfigurationStatus, execStatus *cfgcore.PolicyExecStatus,
+		phase dbaasv1alpha1.Phase) {
+		tplStatus.LastAppliedStatus = execStatus.ExecStatus
+		tplStatus.UpdatePolicy = dbaasv1alpha1.UpgradePolicy(execStatus.PolicyName)
+		tplStatus.SucceedCount = execStatus.SucceedCount
+		tplStatus.ExpectedCount = execStatus.ExpectedCount
+		if tplStatus.SucceedCount != cfgcore.Unconfirmed && tplStatus.ExpectedCount != cfgcore.Unconfirmed {
+			status.Progress = calReconfiguringProgress(status.ReconfiguringStatus.ConfigurationStatus)
+		}
+		switch phase {
+		case dbaasv1alpha1.SucceedPhase:
+			tplStatus.Status = dbaasv1alpha1.ReasonReconfigureSucceed
+		case dbaasv1alpha1.FailedPhase:
+			tplStatus.Status = dbaasv1alpha1.ReasonReconfigureFailed
+		default:
+			tplStatus.Status = dbaasv1alpha1.ReasonReconfigureRunning
+		}
+	}
+
+	patch := client.MergeFrom(opsRequest.DeepCopy())
+	tplStatus := findAndInitStatus(status, tplName, create)
+	if execStatus != nil {
+		updateReconfigureStatus(tplStatus, execStatus, phase)
+	}
+	if err := opsRes.Client.Status().Patch(opsRes.Ctx, opsRequest, patch); err != nil {
+		return err
+	}
+	return nil
+}
+
+// calReconfiguringProgress calculate the progress of the reconfiguring operations.
+func calReconfiguringProgress(status []dbaasv1alpha1.ConfigurationStatus) string {
+	slowest := dbaasv1alpha1.ConfigurationStatus{
+		SucceedCount:  math.MaxInt32,
+		ExpectedCount: -1,
+	}
+
+	for _, st := range status {
+		if st.SucceedCount < slowest.SucceedCount {
+			slowest = st
+		}
+	}
+	return fmt.Sprintf("%d/%d", slowest.SucceedCount, slowest.ExpectedCount)
 }

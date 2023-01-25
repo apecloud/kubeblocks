@@ -31,14 +31,14 @@ func init() {
 	RegisterPolicy(dbaasv1alpha1.RestartPolicy, &parallelUpgradePolicy{})
 }
 
-func (p *parallelUpgradePolicy) Upgrade(params reconfigureParams) (ExecStatus, error) {
+func (p *parallelUpgradePolicy) Upgrade(params reconfigureParams) (ReturnedStatus, error) {
 	if finished, err := p.restartPods(params); err != nil {
-		return ESAndRetryFailed, err
+		return MakeReturnedStatus(ESAndRetryFailed), err
 	} else if !finished {
-		return ESRetry, nil
+		return MakeReturnedStatus(ESRetry), nil
 	}
 
-	return ESNone, nil
+	return MakeReturnedStatus(ESNone), nil
 }
 
 func (p *parallelUpgradePolicy) GetPolicyName() string {

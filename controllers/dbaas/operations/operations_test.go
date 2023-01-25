@@ -106,7 +106,7 @@ var _ = Describe("OpsRequest Controller", func() {
 		return cfgCM, cfgTpl
 	}
 
-	assureConfigInstanceObj := func(clusterName, componentName, ns string, cdComponent dbaasv1alpha1.ClusterDefinitionComponent) *corev1.ConfigMap {
+	assureConfigInstanceObj := func(clusterName, componentName, ns string, cdComponent *dbaasv1alpha1.ClusterDefinitionComponent) *corev1.ConfigMap {
 		if cdComponent.ConfigSpec == nil {
 			return nil
 		}
@@ -347,7 +347,8 @@ var _ = Describe("OpsRequest Controller", func() {
 		opsRes *OpsResource,
 		clusterDefObj *dbaasv1alpha1.ClusterDefinition) {
 		var (
-			cfgObj *corev1.ConfigMap
+			cfgObj       *corev1.ConfigMap
+			stsComponent *dbaasv1alpha1.ClusterDefinitionComponent
 		)
 
 		By("Test Reconfigure")
@@ -363,20 +364,29 @@ var _ = Describe("OpsRequest Controller", func() {
 			By("mock config tpl")
 			cmObj, tplObj := assureCfgTplObj("mysql-tpl-test", "mysql-cm-test", testCtx.DefaultNamespace)
 			By("update clusterdefinition tpl")
-			clusterDefObj.Spec.Components[0].ConfigSpec = &dbaasv1alpha1.ConfigurationSpec{
-				ConfigTemplateRefs: []dbaasv1alpha1.ConfigTemplate{
-					{
-						Name:                "mysql-test",
-						ConfigTplRef:        cmObj.Name,
-						ConfigConstraintRef: tplObj.Name,
-						VolumeName:          "mysql-config",
-						Namespace:           testCtx.DefaultNamespace,
+			patch := client.MergeFrom(clusterDefObj.DeepCopy())
+			for i := range clusterDefObj.Spec.Components {
+				component := &clusterDefObj.Spec.Components[i]
+				if component.TypeName != consensusCompName {
+					continue
+				}
+				stsComponent = component
+				component.ConfigSpec = &dbaasv1alpha1.ConfigurationSpec{
+					ConfigTemplateRefs: []dbaasv1alpha1.ConfigTemplate{
+						{
+							Name:                "mysql-test",
+							ConfigTplRef:        cmObj.Name,
+							ConfigConstraintRef: tplObj.Name,
+							VolumeName:          "mysql-config",
+							Namespace:           testCtx.DefaultNamespace,
+						},
 					},
-				},
+				}
 			}
-			Expect(k8sClient.Update(ctx, clusterDefObj)).Should(Succeed())
+
+			Expect(k8sClient.Patch(ctx, clusterDefObj, patch)).Should(Succeed())
 			By("mock config cm object")
-			cfgObj = assureConfigInstanceObj(clusterName, consensusCompName, testCtx.DefaultNamespace, clusterDefObj.Spec.Components[0])
+			cfgObj = assureConfigInstanceObj(clusterName, consensusCompName, testCtx.DefaultNamespace, stsComponent)
 		}
 
 		By("mock event context")
@@ -390,6 +400,17 @@ var _ = Describe("OpsRequest Controller", func() {
 				Recorder: opsRes.Recorder,
 			},
 			Cluster: clusterObject,
+			TplName: "mysql-test",
+			Meta: &cfgcore.ConfigDiffInformation{
+				AddConfig:    map[string]interface{}{},
+				UpdateConfig: map[string][]byte{},
+				DeleteConfig: map[string]interface{}{},
+			},
+			PolicyStatus: cfgcore.PolicyExecStatus{
+				PolicyName:    "simple",
+				SucceedCount:  2,
+				ExpectedCount: 3,
+			},
 		}
 
 		By("mock reconfigure success")

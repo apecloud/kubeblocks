@@ -33,11 +33,18 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
-type ExecStatus int
+type ExecStatus string
+
+type ReturnedStatus struct {
+	Status ExecStatus
+
+	SucceedCount  int32
+	ExpectedCount int32
+}
 
 type reconfigurePolicy interface {
 	// Upgrade is to enable the configuration to take effect.
-	Upgrade(params reconfigureParams) (ExecStatus, error)
+	Upgrade(params reconfigureParams) (ReturnedStatus, error)
 
 	// GetPolicyName return name of policy.
 	GetPolicyName() string
@@ -82,11 +89,11 @@ type reconfigureParams struct {
 }
 
 const (
-	ESNone ExecStatus = iota
-	ESRetry
-	ESFailed
-	ESAndRetryFailed
-	ESNotSupport
+	ESNone           ExecStatus = "None"
+	ESRetry          ExecStatus = "Retry"
+	ESFailed         ExecStatus = "Failed"
+	ESNotSupport     ExecStatus = "NotSupport"
+	ESAndRetryFailed ExecStatus = "FailedAndRetry"
 )
 
 var (
@@ -174,9 +181,9 @@ func RegisterPolicy(policy dbaasv1alpha1.UpgradePolicy, action reconfigurePolicy
 	upgradePolicyMap[policy] = action
 }
 
-func (receiver AutoReloadPolicy) Upgrade(params reconfigureParams) (ExecStatus, error) {
+func (receiver AutoReloadPolicy) Upgrade(params reconfigureParams) (ReturnedStatus, error) {
 	_ = params
-	return ESNone, nil
+	return MakeReturnedStatus(ESNone), nil
 }
 
 func (receiver AutoReloadPolicy) GetPolicyName() string {
@@ -202,4 +209,28 @@ func NewReconfigurePolicy(tpl *dbaasv1alpha1.ConfigConstraintSpec, cfg *cfgcore.
 		return action, nil
 	}
 	return nil, cfgcore.MakeError("not support upgrade policy:[%s]", actionType)
+}
+
+func WithSucceed(succeedCount int32) func(status *ReturnedStatus) {
+	return func(status *ReturnedStatus) {
+		status.SucceedCount = succeedCount
+	}
+}
+
+func WithExpected(expectedCount int32) func(status *ReturnedStatus) {
+	return func(status *ReturnedStatus) {
+		status.SucceedCount = expectedCount
+	}
+}
+
+func MakeReturnedStatus(status ExecStatus, ops ...func(status *ReturnedStatus)) ReturnedStatus {
+	ret := ReturnedStatus{
+		Status:        status,
+		SucceedCount:  cfgcore.Unconfirmed,
+		ExpectedCount: cfgcore.Unconfirmed,
+	}
+	for _, o := range ops {
+		o(&ret)
+	}
+	return ret
 }

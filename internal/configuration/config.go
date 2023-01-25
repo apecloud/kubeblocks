@@ -36,10 +36,27 @@ import (
 
 type ConfigLoaderProvider func(option CfgOption) (*cfgWrapper, error)
 
+type ReconfiguringProgress int32
+
+const (
+	Unconfirmed int32 = -1
+	NotStarted  int32 = 0
+	Finished    int32 = 100
+)
+
 const (
 	cfgKeyDelimiter = "."
 	emptyJSON       = "{}"
 )
+
+type PolicyExecStatus struct {
+	PolicyName string
+	ExecStatus string
+	Status     string
+
+	SucceedCount  int32
+	ExpectedCount int32
+}
 
 type ConfigEventContext struct {
 	Client  client.Client
@@ -54,6 +71,8 @@ type ConfigEventContext struct {
 	Meta    *ConfigDiffInformation
 	Cfg     *corev1.ConfigMap
 	Tpl     *dbaasv1alpha1.ConfigConstraintSpec
+
+	PolicyStatus PolicyExecStatus
 }
 
 type ConfigEventHandler interface {

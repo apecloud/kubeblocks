@@ -249,15 +249,20 @@ func (r *ReconfigureRequestReconciler) performUpgrade(params reconfigureParams) 
 		return intctrlutil.RequeueWithErrorAndRecordEvent(params.Cfg, r.Recorder, err, params.Ctx.Log)
 	}
 
-	execStatus, err := policy.Upgrade(params)
-	if err := r.handleConfigEvent(params, execStatus, err); err != nil {
+	returnedStatus, err := policy.Upgrade(params)
+	if err := r.handleConfigEvent(params, cfgcore.PolicyExecStatus{
+		PolicyName:    policy.GetPolicyName(),
+		ExecStatus:    string(returnedStatus.Status),
+		SucceedCount:  returnedStatus.SucceedCount,
+		ExpectedCount: returnedStatus.ExpectedCount,
+	}, err); err != nil {
 		return intctrlutil.RequeueWithErrorAndRecordEvent(params.Cfg, r.Recorder, err, params.Ctx.Log)
 	}
 	if err != nil {
 		return intctrlutil.RequeueWithErrorAndRecordEvent(params.Cfg, r.Recorder, err, params.Ctx.Log)
 	}
 
-	switch execStatus {
+	switch returnedStatus.Status {
 	case ESRetry, ESAndRetryFailed:
 		return intctrlutil.RequeueAfter(ConfigReconcileInterval, params.Ctx.Log, "")
 	case ESNone:
@@ -272,7 +277,7 @@ func (r *ReconfigureRequestReconciler) performUpgrade(params reconfigureParams) 
 	}
 }
 
-func (r *ReconfigureRequestReconciler) handleConfigEvent(params reconfigureParams, status ExecStatus, err error) error {
+func (r *ReconfigureRequestReconciler) handleConfigEvent(params reconfigureParams, status cfgcore.PolicyExecStatus, err error) error {
 	var (
 		cm             = params.Cfg
 		lastOpsRequest = ""
@@ -292,10 +297,11 @@ func (r *ReconfigureRequestReconciler) handleConfigEvent(params reconfigureParam
 		Tpl:            params.Tpl,
 		Cfg:            params.Cfg,
 		ComponentUnits: params.ComponentUnits,
+		PolicyStatus:   status,
 	}
 
 	for _, handler := range cfgcore.ConfigEventHandlerMap {
-		if err := handler.Handle(eventContext, lastOpsRequest, fromReconfigureStatus(status), err); err != nil {
+		if err := handler.Handle(eventContext, lastOpsRequest, fromReconfigureStatus(ExecStatus(status.ExecStatus)), err); err != nil {
 			return err
 		}
 	}

@@ -193,16 +193,17 @@ func NewReconfigureRunningCondition(ops *OpsRequest, conditionType string, tplNa
 	if conditionType == ReasonReconfigureFailed {
 		status = metav1.ConditionFalse
 	}
-	message := fmt.Sprintf("Reconfiguring in Cluster: %s, Component: %s",
+	message := fmt.Sprintf("Reconfiguring in Cluster: %s, Component: %s, ConfigTpl: %s",
 		ops.Spec.ClusterRef,
-		ops.Spec.Reconfigure.ComponentName)
+		ops.Spec.Reconfigure.ComponentName,
+		tplName)
 	if len(info) > 0 {
 		message = message + ", info: " + info[0]
 	}
 	return &metav1.Condition{
 		Type:               conditionType,
 		Status:             status,
-		Reason:             tplName,
+		Reason:             conditionType,
 		LastTransitionTime: metav1.NewTime(time.Now()),
 		Message:            message,
 	}

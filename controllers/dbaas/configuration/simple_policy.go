@@ -32,7 +32,7 @@ func init() {
 	RegisterPolicy(dbaasv1alpha1.NormalPolicy, &simplePolicy{})
 }
 
-func (s *simplePolicy) Upgrade(params reconfigureParams) (ExecStatus, error) {
+func (s *simplePolicy) Upgrade(params reconfigureParams) (ReturnedStatus, error) {
 	params.Ctx.Log.V(1).Info("simple policy begin....")
 
 	switch params.ComponentType() {
@@ -40,7 +40,7 @@ func (s *simplePolicy) Upgrade(params reconfigureParams) (ExecStatus, error) {
 		return rollingStatefulSets(params)
 		// process consensus
 	default:
-		return ESNotSupport, cfgcore.MakeError("not support component type:[%s]", params.ComponentType())
+		return MakeReturnedStatus(ESNotSupport), cfgcore.MakeError("not support component type:[%s]", params.ComponentType())
 	}
 }
 
@@ -48,25 +48,37 @@ func (s *simplePolicy) GetPolicyName() string {
 	return string(dbaasv1alpha1.NormalPolicy)
 }
 
-func rollingStatefulSets(param reconfigureParams) (ExecStatus, error) {
+func rollingStatefulSets(param reconfigureParams) (ReturnedStatus, error) {
 	var (
 		units      = param.ComponentUnits
 		client     = param.Client
 		newVersion = param.getModifyVersion()
 		configKey  = param.getConfigKey()
+		// progress   = cfgcore.NotStarted
 	)
 
 	if configKey == "" {
-		return ESFailed, cfgcore.MakeError("failed to found config meta. configmap : %s", param.TplName)
+		return MakeReturnedStatus(ESFailed), cfgcore.MakeError("failed to found config meta. configmap : %s", param.TplName)
 	}
 
 	for _, sts := range units {
 		if err := restartStsWithRolling(client, param.Ctx, sts, configKey, newVersion); err != nil {
 			param.Ctx.Log.Error(err, "failed to restart statefulSet.", "stsName", sts.GetName())
-			return ESAndRetryFailed, err
+			return MakeReturnedStatus(ESAndRetryFailed), err
 		}
 	}
-	return ESNone, nil
+
+	// TODO Check whether the restart is complete.
+	// pods, err := GetComponentPods(param)
+	// if err != nil {
+	//	return MakeReturnedStatus(ESAndRetryFailed), err
+	// }
+	// if len(pods) != 0 {
+	//	progress = CheckUpdatedProgress(pods, configKey, newVersion)
+	// }
+	// return MakeReturnedStatus(ESNone, WithExpected(int32(len(pods))), WithSucceed(progress)), nil
+
+	return MakeReturnedStatus(ESNone), nil
 }
 
 func restartStsWithRolling(cli client.Client, ctx intctrlutil.RequestCtx, sts appsv1.StatefulSet, configKey string, newVersion string) error {

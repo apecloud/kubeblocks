@@ -66,6 +66,36 @@ func getReplicationSetPods(params reconfigureParams) ([]corev1.Pod, error) {
 	panic("")
 }
 
+// GetComponentPods get all pods of the component.
+func GetComponentPods(params reconfigureParams) ([]corev1.Pod, error) {
+	componentPods := make([]corev1.Pod, 0)
+	for i := range params.ComponentUnits {
+		stsObj := &params.ComponentUnits[i]
+		pods, err := consensusset.GetPodListByStatefulSet(params.Ctx.Ctx, params.Client, stsObj)
+		if err != nil {
+			return nil, err
+		}
+		componentPods = append(componentPods, pods...)
+	}
+	return componentPods, nil
+}
+
+// CheckUpdatedProgress checks pods of the component is ready.
+func CheckUpdatedProgress(pods []corev1.Pod, configKey, version string) int32 {
+	var (
+		readyPods        int32 = 0
+		cfgAnnotationKey       = cfgcore.GenerateUniqKeyWithConfig(cfgcore.UpgradeRestartAnnotationKey, configKey)
+	)
+
+	for _, pod := range pods {
+		annotations := pod.Annotations
+		if len(annotations) != 0 && annotations[cfgAnnotationKey] == version && intctrlutil.IsReady(&pod) {
+			readyPods++
+		}
+	}
+	return readyPods
+}
+
 func getStatefulSetPods(params reconfigureParams) ([]corev1.Pod, error) {
 	if len(params.ComponentUnits) != 1 {
 		return nil, cfgcore.MakeError("statefulSet component require only one statefulset, actual %d component", len(params.ComponentUnits))

@@ -236,7 +236,7 @@ spec:
 					componentStatus.Phase = dbaasv1alpha1.RunningPhase
 					fetched.Status.Components[componentKey] = componentStatus
 				}
-			})).Should(Succeed())
+			}), timeout, interval).Should(Succeed())
 	}
 
 	Context("with Cluster running", func() {
@@ -308,7 +308,7 @@ spec:
 						opsRequest.Annotations = make(map[string]string, 1)
 					}
 					opsRequest.Annotations[intctrlutil.OpsRequestReconcileAnnotationKey] = time.Now().Format(time.RFC3339Nano)
-				})).Should(Succeed())
+				}), timeout, interval).Should(Succeed())
 
 			By("check VerticalScalingOpsRequest succeed")
 			Eventually(testdbaas.CheckObj(&testCtx, intctrlutil.GetNamespacedName(verticalScalingOpsRequest),

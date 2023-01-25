@@ -123,7 +123,7 @@ var _ = Describe("SystemAccount Controller", func() {
 				cluster.Annotations = make(map[string]string)
 			}
 			cluster.Annotations["mockmode"] = "testing"
-		})).Should(Succeed())
+		}), timeout, interval).Should(Succeed())
 	}
 
 	assureBackupPolicy := func(policyName, engineName, clusterName string) *dataprotectionv1alpha1.BackupPolicy {

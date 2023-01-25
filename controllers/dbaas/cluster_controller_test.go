@@ -592,7 +592,7 @@ spec:
 			By("Update the cluster's termination policy to DoNotTerminate")
 			Eventually(testdbaas.GetAndChangeObj(&testCtx, key, func(cluster *dbaasv1alpha1.Cluster) {
 				cluster.Spec.TerminationPolicy = dbaasv1alpha1.DoNotTerminate
-			})).Should(Succeed())
+			}), timeout, interval).Should(Succeed())
 
 			By("Delete the cluster")
 			Eventually(func(g Gomega) {
@@ -613,7 +613,7 @@ spec:
 			By("Update the cluster's termination policy to WipeOut")
 			Eventually(testdbaas.GetAndChangeObj(&testCtx, key, func(cluster *dbaasv1alpha1.Cluster) {
 				cluster.Spec.TerminationPolicy = dbaasv1alpha1.WipeOut
-			})).Should(Succeed())
+			}), timeout, interval).Should(Succeed())
 
 			By("Wait for the cluster to terminate")
 			Eventually(func(g Gomega) {
@@ -635,7 +635,7 @@ spec:
 			} else {
 				*cluster.Spec.Components[0].Replicas = replicas
 			}
-		})).Should(Succeed())
+		}), timeout, interval).Should(Succeed())
 	}
 
 	Context("When updating cluster's replica number to a valid value", func() {
@@ -727,7 +727,7 @@ spec:
 				func(clusterDef *dbaasv1alpha1.ClusterDefinition) {
 					clusterDef.Spec.Components[0].HorizontalScalePolicy =
 						&dbaasv1alpha1.HorizontalScalePolicy{Type: dbaasv1alpha1.HScaleDataClonePolicyFromSnapshot}
-				})).Should(Succeed())
+				}), timeout, interval).Should(Succeed())
 
 			By("Creating a BackupPolicyTemplate")
 			backupPolicyTplKey := types.NamespacedName{Name: "test-backup-policy-template-mysql"}
@@ -830,7 +830,7 @@ spec:
 				Eventually(testdbaas.CheckObjExists(&testCtx, pvcKey, &corev1.PersistentVolumeClaim{}, true), timeout, interval).Should(Succeed())
 				Eventually(testdbaas.GetAndChangeObjStatus(&testCtx, pvcKey, func(pvc *corev1.PersistentVolumeClaim) {
 					pvc.Status.Phase = corev1.ClaimBound
-				})).Should(Succeed())
+				}), timeout, interval).Should(Succeed())
 			}
 
 			By("Check backup job cleanup")
@@ -1449,7 +1449,7 @@ spec:
 			Eventually(testdbaas.GetAndChangeObj(&testCtx, key, func(cluster *dbaasv1alpha1.Cluster) {
 				comp := &cluster.Spec.Components[0]
 				comp.VolumeClaimTemplates[0].Spec.Resources.Requests[corev1.ResourceStorage] = newStorageValue
-			})).Should(Succeed())
+			}), timeout, interval).Should(Succeed())
 
 			By("Checking the resize operation finished")
 			Eventually(func(g Gomega) {

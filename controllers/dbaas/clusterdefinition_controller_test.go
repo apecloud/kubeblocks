@@ -214,7 +214,7 @@ spec:
 			Eventually(testdbaas.GetAndChangeObj(&testCtx, intctrlutil.GetNamespacedName(clusterDefinition),
 				func(cd *dbaasv1alpha1.ClusterDefinition) {
 					cd.Spec.Type = "state.redis"
-				})).Should(Succeed())
+				}), timeout, interval).Should(Succeed())
 			// check ClusterVersion.Status.ClusterDefSyncStatus to be OutOfSync
 			Eventually(func(g Gomega) {
 				cv := &dbaasv1alpha1.ClusterVersion{}

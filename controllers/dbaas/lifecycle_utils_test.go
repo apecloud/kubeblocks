@@ -984,13 +984,11 @@ spec:
 			By("prepare VolumeSnapshot and set ReadyToUse to true")
 			vs := newVolumeSnapshot(cluster.Name)
 			Expect(testCtx.CreateObj(ctx, vs)).Should(Succeed())
-			Eventually(func() error {
-				return testdbaas.ChangeStatus(&testCtx, intctrlutil.GetNamespacedName(vs),
-					func(vs *snapshotv1.VolumeSnapshot) {
-						t := true
-						vs.Status = &snapshotv1.VolumeSnapshotStatus{ReadyToUse: &t}
-					})
-			}, testCtx.DefaultTimeout, testCtx.DefaultInterval).Should(Succeed())
+			Expect(testdbaas.ChangeObjStatus(&testCtx, vs,
+				func(volumeSnapshot *snapshotv1.VolumeSnapshot) {
+					t := true
+					volumeSnapshot.Status = &snapshotv1.VolumeSnapshotStatus{ReadyToUse: &t}
+				})).Should(Succeed())
 
 			// prepare doBackup input parameters
 			snapshotKey := types.NamespacedName{
@@ -1008,9 +1006,9 @@ spec:
 			Expect(err).ShouldNot(HaveOccurred())
 
 			By("Set ReadyToUse to nil, doBackup should return requeue=true")
-			Expect(testdbaas.ChangeStatus(&testCtx, intctrlutil.GetNamespacedName(vs),
-				func(vs *snapshotv1.VolumeSnapshot) {
-					vs.Status = &snapshotv1.VolumeSnapshotStatus{ReadyToUse: nil}
+			Expect(testdbaas.ChangeObjStatus(&testCtx, vs,
+				func(volumeSnapshot *snapshotv1.VolumeSnapshot) {
+					volumeSnapshot.Status = &snapshotv1.VolumeSnapshotStatus{ReadyToUse: nil}
 				})).Should(Succeed())
 			// wait until cache updated
 			Eventually(testdbaas.CheckObj(&testCtx, intctrlutil.GetNamespacedName(vs),

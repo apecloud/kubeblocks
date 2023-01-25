@@ -229,16 +229,14 @@ spec:
 	}
 
 	mockSetClusterStatusPhaseToRunning := func(namespacedName types.NamespacedName) {
-		Eventually(func() error {
-			return testdbaas.ChangeStatus(&testCtx, namespacedName,
-				func(c *dbaasv1alpha1.Cluster) {
-					c.Status.Phase = dbaasv1alpha1.RunningPhase
-					for componentKey, componentStatus := range c.Status.Components {
-						componentStatus.Phase = dbaasv1alpha1.RunningPhase
-						c.Status.Components[componentKey] = componentStatus
-					}
-				})
-		}, timeout, interval).Should(Succeed())
+		Eventually(testdbaas.GetAndChangeObjStatus(&testCtx, namespacedName,
+			func(fetched *dbaasv1alpha1.Cluster) {
+				fetched.Status.Phase = dbaasv1alpha1.RunningPhase
+				for componentKey, componentStatus := range fetched.Status.Components {
+					componentStatus.Phase = dbaasv1alpha1.RunningPhase
+					fetched.Status.Components[componentKey] = componentStatus
+				}
+			})).Should(Succeed())
 	}
 
 	Context("with Cluster running", func() {
@@ -304,15 +302,13 @@ spec:
 			mockSetClusterStatusPhaseToRunning(key)
 
 			By("patch opsrequest controller to run")
-			Eventually(func() error {
-				return testdbaas.ChangeSpec(&testCtx, intctrlutil.GetNamespacedName(verticalScalingOpsRequest),
-					func(opsRequest *dbaasv1alpha1.OpsRequest) {
-						if opsRequest.Annotations == nil {
-							opsRequest.Annotations = make(map[string]string, 1)
-						}
-						opsRequest.Annotations[intctrlutil.OpsRequestReconcileAnnotationKey] = time.Now().Format(time.RFC3339Nano)
-					})
-			}, timeout, interval).Should(Succeed())
+			Eventually(testdbaas.GetAndChangeObj(&testCtx, intctrlutil.GetNamespacedName(verticalScalingOpsRequest),
+				func(opsRequest *dbaasv1alpha1.OpsRequest) {
+					if opsRequest.Annotations == nil {
+						opsRequest.Annotations = make(map[string]string, 1)
+					}
+					opsRequest.Annotations[intctrlutil.OpsRequestReconcileAnnotationKey] = time.Now().Format(time.RFC3339Nano)
+				})).Should(Succeed())
 
 			By("check VerticalScalingOpsRequest succeed")
 			Eventually(testdbaas.CheckObj(&testCtx, intctrlutil.GetNamespacedName(verticalScalingOpsRequest),

@@ -118,14 +118,12 @@ var _ = Describe("SystemAccount Controller", func() {
 
 	patchCluster := func(key types.NamespacedName) {
 		By("Patching Cluster to trigger reconcile")
-		Eventually(func() error {
-			return testdbaas.ChangeSpec(&testCtx, key, func(cluster *dbaasv1alpha1.Cluster) {
-				if cluster.Annotations == nil {
-					cluster.Annotations = make(map[string]string)
-				}
-				cluster.Annotations["mockmode"] = "testing"
-			})
-		}, timeout, interval).Should(Succeed())
+		Eventually(testdbaas.GetAndChangeObj(&testCtx, key, func(cluster *dbaasv1alpha1.Cluster) {
+			if cluster.Annotations == nil {
+				cluster.Annotations = make(map[string]string)
+			}
+			cluster.Annotations["mockmode"] = "testing"
+		})).Should(Succeed())
 	}
 
 	assureBackupPolicy := func(policyName, engineName, clusterName string) *dataprotectionv1alpha1.BackupPolicy {
@@ -294,7 +292,7 @@ var _ = Describe("SystemAccount Controller", func() {
 				g.Expect(k8sClient.List(ctx, jobs, client.InNamespace(cluster.Namespace), ml)).To(Succeed())
 				g.Expect(len(jobs.Items)).To(BeEquivalentTo(expectedJobsPerCluster), "there should be 5 jobs created")
 				for _, job := range jobs.Items {
-					g.Expect(testdbaas.ChangeStatus(&testCtx, intctrlutil.GetNamespacedName(&job), func(job *batchv1.Job) {
+					g.Expect(testdbaas.ChangeObjStatus(&testCtx, &job, func(job *batchv1.Job) {
 						job.Status.Conditions = []batchv1.JobCondition{{
 							Type:   batchv1.JobComplete,
 							Status: corev1.ConditionTrue,
@@ -310,7 +308,7 @@ var _ = Describe("SystemAccount Controller", func() {
 				jobs := &batchv1.JobList{}
 				g.Expect(k8sClient.List(ctx, jobs, client.InNamespace(cluster.Namespace), ml)).To(Succeed())
 				for _, job := range jobs.Items {
-					g.Expect(testdbaas.ChangeSpec(&testCtx, intctrlutil.GetNamespacedName(&job), func(job *batchv1.Job) {
+					g.Expect(testdbaas.ChangeObj(&testCtx, &job, func(job *batchv1.Job) {
 						controllerutil.RemoveFinalizer(job, finalizerName)
 					})).To(Succeed())
 				}

@@ -146,7 +146,7 @@ func ClearResources[T intctrlutil.Object, PT intctrlutil.PObject[T],
 	// ginkgo.By("clear resources " + PL(&objList).GetObjectKind().GroupVersionKind().String())
 	gomega.Eventually(func() error {
 		return testCtx.Cli.List(testCtx.Ctx, PL(&objList), listOptions...)
-	}, testCtx.DefaultTimeout, testCtx.DefaultInterval).Should(gomega.Succeed())
+	}).Should(gomega.Succeed())
 	for _, obj := range traits.GetItems(&objList) {
 		// it's possible deletions are initiated in testcases code but cache is not updated
 		gomega.Expect(client.IgnoreNotFound(testCtx.Cli.Delete(testCtx.Ctx, PT(&obj),
@@ -167,7 +167,7 @@ func ClearResources[T intctrlutil.Object, PT intctrlutil.PObject[T],
 			}
 		}
 		g.Expect(len(traits.GetItems(&objList))).Should(gomega.Equal(0))
-	}, testCtx.ClearResourceTimeout, testCtx.ClearResourceInterval).Should(gomega.Succeed())
+	}, testCtx.ClearResourceTimeout, testCtx.ClearResourcePollingInterval).Should(gomega.Succeed())
 }
 
 // ClearClusterResources clears all dependent resources belonging to existing clusters.

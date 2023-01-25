@@ -1012,7 +1012,7 @@ spec:
 			Eventually(testdbaas.CheckObj(&testCtx, intctrlutil.GetNamespacedName(vs),
 				func(g Gomega, vs *snapshotv1.VolumeSnapshot) {
 					g.Expect(vs.Status.ReadyToUse).To(BeNil())
-				}), testCtx.DefaultTimeout, testCtx.DefaultInterval).Should(Succeed())
+				})).Should(Succeed())
 			shouldRequeue, err = doBackup(reqCtx, k8sClient, cluster, component, sts, &stsProto, snapshotKey)
 			Expect(shouldRequeue).Should(BeTrue())
 			Expect(err).ShouldNot(HaveOccurred())

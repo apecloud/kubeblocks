@@ -246,7 +246,7 @@ var _ = Describe("lifecycle_utils", func() {
 			Expect(len(ps.Volumes)).To(Equal(2))
 		})
 
-		It("should succeed in normal test case, where two volume are added", func() {
+		It("should succeed in normal test case, where two volumes are added", func() {
 			volumes["my_config"] = dbaasv1alpha1.ConfigTemplate{
 				Name:                "myConfig",
 				ConfigTplRef:        "myConfig",

@@ -435,13 +435,14 @@ func getConfigurationVersion(cfg *corev1.ConfigMap, ctx intctrlutil.RequestCtx, 
 		Log:     ctx.Log,
 	}
 
-	return cfgcore.CreateMergePatch(&cfgcore.K8sConfig{
-		CfgKey:         client.ObjectKeyFromObject(cfg),
-		Configurations: lastConfig,
-	}, &cfgcore.K8sConfig{
-		CfgKey:         client.ObjectKeyFromObject(cfg),
-		Configurations: cfg.Data,
-	}, option)
+	return cfgcore.CreateMergePatch(
+		&cfgcore.K8sConfig{
+			CfgKey:         client.ObjectKeyFromObject(cfg),
+			Configurations: lastConfig,
+		}, &cfgcore.K8sConfig{
+			CfgKey:         client.ObjectKeyFromObject(cfg),
+			Configurations: cfg.Data,
+		}, option)
 }
 
 func updateConfigurationSchema(tpl *dbaasv1alpha1.ConfigConstraintSpec) error {

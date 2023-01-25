@@ -17,6 +17,7 @@ limitations under the License.
 package operations
 
 import (
+	"fmt"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -90,11 +91,24 @@ func (r *reconfigureAction) Handle(eventContext cfgcore.ConfigEventContext, last
 
 	switch phase {
 	case dbaasv1alpha1.SucceedPhase:
-		return PatchOpsStatus(opsRes, dbaasv1alpha1.RunningPhase, dbaasv1alpha1.NewSucceedCondition(opsRequest))
+		return PatchOpsStatus(opsRes, dbaasv1alpha1.RunningPhase,
+			dbaasv1alpha1.NewReconfigureRunningCondition(opsRequest,
+				dbaasv1alpha1.ReasonReconfigureSucceed,
+				eventContext.TplName,
+				formatConfigurationDifference(eventContext.Meta)),
+			dbaasv1alpha1.NewSucceedCondition(opsRequest))
 	case dbaasv1alpha1.FailedPhase:
-		return PatchOpsStatus(opsRes, dbaasv1alpha1.RunningPhase, dbaasv1alpha1.NewFailedCondition(opsRequest, err))
+		return PatchOpsStatus(opsRes, dbaasv1alpha1.RunningPhase,
+			dbaasv1alpha1.NewReconfigureRunningCondition(opsRequest,
+				dbaasv1alpha1.ReasonReconfigureFailed,
+				eventContext.TplName,
+				formatConfigurationDifference(eventContext.Meta)),
+			dbaasv1alpha1.NewFailedCondition(opsRequest, err))
 	default:
-		return PatchOpsStatus(opsRes, dbaasv1alpha1.RunningPhase, dbaasv1alpha1.NewReconfigureRunningCondition(opsRequest, dbaasv1alpha1.ReasonReconfigureRunning))
+		return PatchOpsStatus(opsRes, dbaasv1alpha1.RunningPhase,
+			dbaasv1alpha1.NewReconfigureRunningCondition(opsRequest,
+				dbaasv1alpha1.ReasonReconfigureRunning,
+				eventContext.TplName))
 	}
 }
 
@@ -114,9 +128,9 @@ func (r reconfigureAction) ReconcileAction(opsRes *OpsResource) (dbaasv1alpha1.P
 }
 
 func (r *reconfigureAction) Action(resource *OpsResource) error {
-
 	var (
-		spec              = &resource.OpsRequest.Spec
+		opsRequest        = resource.OpsRequest
+		spec              = &opsRequest.Spec
 		clusterName       = spec.ClusterRef
 		componentName     = spec.Reconfigure.ComponentName
 		cluster           = resource.Cluster
@@ -136,6 +150,10 @@ func (r *reconfigureAction) Action(resource *OpsResource) error {
 		Namespace: cluster.Namespace,
 	}, clusterVersion); err != nil {
 		return cfgcore.WrapError(err, "failed to get clusterversion[%s]", cluster.Spec.ClusterVersionRef)
+	}
+
+	if opsRequest.Status.ObservedGeneration == opsRequest.ObjectMeta.Generation {
+		return nil
 	}
 
 	tpls, err := cfgcore.GetConfigTemplatesFromComponent(
@@ -166,6 +184,7 @@ func (r *reconfigureAction) performPersistCfg(clusterName, componentName string,
 	}
 
 	// Update params to configmap
+	// TODO support multi tpl conditions merge
 	for _, config := range reconfigure.Configurations {
 		tpl := findTpl(config.Name)
 		if tpl == nil {
@@ -177,15 +196,32 @@ func (r *reconfigureAction) performPersistCfg(clusterName, componentName string,
 			return processMergedFailed(resource, true,
 				cfgcore.MakeError("current tpl not support reconfigure, tpl: %v", tpl))
 		}
-		if failed, err := updateCfgParams(config, *tpl, client.ObjectKey{
+		failed, difference, err := updateCfgParams(config, *tpl, client.ObjectKey{
 			Name:      cfgcore.GetComponentCfgName(clusterName, componentName, tpl.VolumeName),
 			Namespace: resource.Cluster.Namespace,
-		}, resource.Ctx, resource.Client, resource.OpsRequest.Name); err != nil {
+		}, resource.Ctx, resource.Client, resource.OpsRequest.Name)
+		if err != nil {
 			return processMergedFailed(resource, failed, err)
 		}
+
+		conditions := make([]*metav1.Condition, 0, 2)
+		if !difference.IsModify {
+			conditions = append(conditions, dbaasv1alpha1.NewReconfigureRunningCondition(
+				resource.OpsRequest,
+				dbaasv1alpha1.ReasonReconfigureInvalidUpdated,
+				tpl.Name,
+				formatConfigurationDifference(difference)),
+				dbaasv1alpha1.NewSucceedCondition(resource.OpsRequest))
+		} else {
+			conditions = append(conditions, dbaasv1alpha1.NewReconfigureRunningCondition(
+				resource.OpsRequest,
+				dbaasv1alpha1.ReasonReconfigureMerged,
+				tpl.Name,
+				formatConfigurationDifference(difference)))
+		}
+
 		// merged successfully
-		if err := PatchOpsStatus(resource, dbaasv1alpha1.RunningPhase,
-			dbaasv1alpha1.NewReconfigureRunningCondition(resource.OpsRequest, dbaasv1alpha1.ReasonReconfigureMerged)); err != nil {
+		if err := PatchOpsStatus(resource, dbaasv1alpha1.RunningPhase, conditions...); err != nil {
 			return err
 		}
 	}
@@ -197,10 +233,17 @@ func processMergedFailed(resource *OpsResource, isInvalid bool, err error) error
 		return cfgcore.WrapError(err, "failed to update param!")
 	}
 
-	// if failed to validate configure
+	// if failed to validate configure, and retry
 	if err := PatchOpsStatus(resource, dbaasv1alpha1.FailedPhase,
 		dbaasv1alpha1.NewFailedCondition(resource.OpsRequest, err)); err != nil {
 		return err
 	}
 	return nil
+}
+
+func formatConfigurationDifference(difference *cfgcore.ConfigDiffInformation) string {
+	return fmt.Sprintf("updated: %v, added: %v, deleted:%v",
+		difference.UpdateConfig,
+		difference.AddConfig,
+		difference.DeleteConfig)
 }

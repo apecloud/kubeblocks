@@ -28,13 +28,12 @@ import (
 )
 
 // updateCfgParams merge parameters of the config into the configmap, and verify final configuration file.
-func updateCfgParams(
-	config dbaasv1alpha1.Configuration,
+func updateCfgParams(config dbaasv1alpha1.Configuration,
 	tpl dbaasv1alpha1.ConfigTemplate,
 	cmKey client.ObjectKey,
 	ctx context.Context,
 	cli client.Client,
-	opsCrName string) (bool, error) {
+	opsCrName string) (bool, *cfgcore.ConfigDiffInformation, error) {
 	var (
 		cm     = &corev1.ConfigMap{}
 		cfgTpl = &dbaasv1alpha1.ConfigConstraint{}
@@ -44,13 +43,13 @@ func updateCfgParams(
 	)
 
 	if err := cli.Get(ctx, cmKey, cm); err != nil {
-		return false, err
+		return false, nil, err
 	}
 	if err := cli.Get(ctx, client.ObjectKey{
 		Namespace: tpl.Namespace,
 		Name:      tpl.ConfigConstraintRef,
 	}, cfgTpl); err != nil {
-		return false, err
+		return false, nil, err
 	}
 	if operator, err = cfgcore.NewConfigLoader(cfgcore.CfgOption{
 		Type:    cfgcore.CfgCmType,
@@ -63,7 +62,7 @@ func updateCfgParams(
 			},
 		},
 	}); err != nil {
-		return false, err
+		return false, nil, err
 	}
 
 	// process special formatter options
@@ -81,21 +80,29 @@ func updateCfgParams(
 	for _, key := range config.Keys {
 		if err := operator.MergeFrom(fromKeyValuePair(key.Parameters),
 			cfgcore.NewCfgOptions(key.Key, options)); err != nil {
-			return false, err
+			return false, nil, err
 		}
 	}
 
 	newCfg, err := operator.ToCfgContent()
 	if err != nil {
-		return false, cfgcore.WrapError(err, "failed to generate config file")
+		return false, nil, cfgcore.WrapError(err, "failed to generate config file")
 	}
 
 	configChecker := cfgcore.NewConfigValidator(&cfgTpl.Spec)
 	if err := configChecker.Validate(newCfg); err != nil {
-		return true, cfgcore.WrapError(err, "failed to validate updated config")
+		return true, nil, cfgcore.WrapError(err, "failed to validate updated config")
 	}
 
-	return false, persistCfgCM(cm, newCfg, cli, ctx, opsCrName)
+	difference, err := generateVersionDifference(client.ObjectKeyFromObject(cm), cm.Data, newCfg, fc.Formatter)
+	if err != nil {
+		return false, nil, err
+	}
+
+	if !difference.IsModify {
+		return false, difference, nil
+	}
+	return false, difference, persistCfgCM(cm, newCfg, cli, ctx, opsCrName)
 }
 
 func persistCfgCM(cmObj *corev1.ConfigMap, newCfg map[string]string, cli client.Client, ctx context.Context, opsCrName string) error {
@@ -118,4 +125,23 @@ func fromKeyValuePair(parameters []dbaasv1alpha1.ParameterPair) map[string]inter
 		}
 	}
 	return m
+}
+
+func generateVersionDifference(cfgKey client.ObjectKey,
+	old, updated map[string]string,
+	formatter dbaasv1alpha1.ConfigurationFormatter) (*cfgcore.ConfigDiffInformation, error) {
+	option := cfgcore.CfgOption{
+		Type:    cfgcore.CfgTplType,
+		CfgType: formatter,
+		Log:     log.Log,
+	}
+
+	return cfgcore.CreateMergePatch(
+		&cfgcore.K8sConfig{
+			CfgKey:         cfgKey,
+			Configurations: old,
+		}, &cfgcore.K8sConfig{
+			CfgKey:         cfgKey,
+			Configurations: updated,
+		}, option)
 }

@@ -283,6 +283,7 @@ func (r *ReconfigureRequestReconciler) handleConfigEvent(params reconfigureParam
 	}
 
 	eventContext := cfgcore.ConfigEventContext{
+		TplName:        params.TplName,
 		Client:         params.Client,
 		ReqCtx:         params.Ctx,
 		Cluster:        params.Cluster,

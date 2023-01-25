@@ -214,6 +214,9 @@ func (o *describeOpsOptions) printOpsCommand(opsRequest *dbaasv1alpha1.OpsReques
 		commands = o.getVerticalScalingCommand(opsRequest.Spec)
 	case dbaasv1alpha1.VolumeExpansionType:
 		commands = o.getVolumeExpansionCommand(opsRequest.Spec)
+	case dbaasv1alpha1.ReconfiguringType:
+		commands = o.getReconfiguringCommand(opsRequest.Spec)
+
 	}
 	if len(commands) == 0 {
 		fmt.Println("\nCommand: " + printer.NoneString)
@@ -324,6 +327,27 @@ func (o *describeOpsOptions) getVolumeExpansionCommand(spec dbaasv1alpha1.OpsReq
 	return commands
 }
 
+// getReconfiguringCommand gets the command of the VolumeExpansion command.
+func (o *describeOpsOptions) getReconfiguringCommand(spec dbaasv1alpha1.OpsRequestSpec) []string {
+	// covertObject := func(v dbaasv1alpha1.OpsRequestVolumeClaimTemplate) any {
+	//	return v.Storage
+	// }
+	// getVCTName := func(v dbaasv1alpha1.OpsRequestVolumeClaimTemplate) string {
+	//	return v.Name
+	// }
+	commands := make([]string, 0)
+	// for _, v := range spec.VolumeExpansionList {
+	//	vctNameSlice, storageSlice := getCommandFlagsSlice[dbaasv1alpha1.OpsRequestVolumeClaimTemplate](
+	//		v.VolumeClaimTemplates, covertObject, getVCTName)
+	//	for i := range vctNameSlice {
+	//		storage := storageSlice[i].(resource.Quantity)
+	//		commands = append(commands, fmt.Sprintf("kbcli cluster volume-expand %s --component-names=%s --volume-claim-template-names=%s --storage=%s",
+	//			spec.ClusterRef, v.ComponentName, strings.Join(vctNameSlice[i], ","), storage.String()))
+	//	}
+	// }
+	return commands
+}
+
 // printOpsRequestStatus prints the OpsRequest status infos.
 func (o *describeOpsOptions) printOpsRequestStatus(opsStatus *dbaasv1alpha1.OpsRequestStatus) {
 	printer.PrintTitle("Status")
@@ -372,6 +396,7 @@ func (o *describeOpsOptions) printLastConfiguration(configuration dbaasv1alpha1.
 		}
 		headers := []interface{}{"COMPONENT", "VOLUME-CLAIM-TEMPLATE", "STORAGE"}
 		o.printLastConfigurationByOpsType(configuration, headers, handleVolumeExpansion)
+	case dbaasv1alpha1.ReconfiguringType:
 	}
 }
 

@@ -233,6 +233,10 @@ type OpsRequestStatus struct {
 	// +optional
 	CompletionTimestamp metav1.Time `json:"completionTimestamp,omitempty"`
 
+	// reconfiguringStatus defines the status information of reconfiguring.
+	// +optional
+	ReconfiguringStatus *ReconfiguringStatus `json:"reconfiguringStatus,omitempty"`
+
 	// conditions describes opsRequest detail status.
 	// +optional
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
@@ -308,6 +312,9 @@ type OpsRequestStatusComponent struct {
 	// componentType references component type of component in ClusterDefinition.
 	// +optional
 	ComponentType ComponentType `json:"componentType,omitempty"`
+}
+
+type ReconfiguringStatus struct {
 }
 
 //+kubebuilder:object:root=true

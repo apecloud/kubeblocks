@@ -130,7 +130,7 @@ func patchClusterComponentStatus(
 		componentName, workloadSpecIsUpdated, componentIsRunning, podsAreReady); err != nil || !ok {
 		return err
 	}
-	compCtx.reqCtx.Log.Info("component status changed", "componentName", componentName, "phase", cluster.Status.Components[componentName].Phase)
+	compCtx.reqCtx.Log.Info("component status changed", "componentName", componentName, "phase", cluster.Status.Components[componentName].Phase, "componentIsRunning", componentIsRunning, "podsAreReady", podsAreReady)
 	return compCtx.cli.Status().Patch(compCtx.reqCtx.Ctx, cluster, patch)
 }
 

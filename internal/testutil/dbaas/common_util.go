@@ -71,7 +71,7 @@ func GetAndChangeObj[T intctrlutil.Object, PT intctrlutil.PObject[T]](
 		if err := testCtx.Cli.Get(testCtx.Ctx, namespacedName, pobj); err != nil {
 			return err
 		}
-		return ChangeObj(testCtx, pobj, func() {action(pobj)})
+		return ChangeObj(testCtx, pobj, func() { action(pobj) })
 	}
 }
 
@@ -83,7 +83,7 @@ func GetAndChangeObjStatus[T intctrlutil.Object, PT intctrlutil.PObject[T]](
 		if err := testCtx.Cli.Get(testCtx.Ctx, namespacedName, pobj); err != nil {
 			return err
 		}
-		return ChangeObjStatus(testCtx, pobj, func() {action(pobj)})
+		return ChangeObjStatus(testCtx, pobj, func() { action(pobj) })
 	}
 }
 

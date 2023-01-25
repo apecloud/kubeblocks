@@ -32,21 +32,21 @@ import (
 // Helper functions to change object's fields in input closure and then update it.
 // Each helper is a wrapper of k8sClient.Patch.
 // Example:
-// Expect(ChangeObj(testCtx, key, func(clusterDef *dbaasv1alpha1.ClusterDefinition) {
-//		// modify clusterDef
+// Expect(ChangeObj(testCtx, obj, func() {
+//		// modify input obj
 // })).Should(Succeed())
 
 func ChangeObj[T intctrlutil.Object, PT intctrlutil.PObject[T]](testCtx *testutil.TestContext,
-	pobj PT, action func(PT)) error {
+	pobj PT, action func()) error {
 	patch := client.MergeFrom(PT(pobj.DeepCopy()))
-	action(pobj)
+	action()
 	return testCtx.Cli.Patch(testCtx.Ctx, pobj, patch)
 }
 
 func ChangeObjStatus[T intctrlutil.Object, PT intctrlutil.PObject[T]](testCtx *testutil.TestContext,
-	pobj PT, action func(PT)) error {
+	pobj PT, action func()) error {
 	patch := client.MergeFrom(PT(pobj.DeepCopy()))
-	action(pobj)
+	action()
 	return testCtx.Cli.Status().Patch(testCtx.Ctx, pobj, patch)
 }
 
@@ -56,34 +56,34 @@ func ChangeObjStatus[T intctrlutil.Object, PT intctrlutil.PObject[T]](testCtx *t
 // Eventually() or Consistently() as the first parameter.
 // Example:
 // Eventually(GetAndChangeObj(testCtx, key, func(fetched *dbaasv1alpha1.ClusterDefinition) {
-//		    // modify clusterDef
+//		    // modify fetched clusterDef
 //      })).Should(Succeed())
 // Warning: these functions should NOT be used together with Expect().
 // BAD Example:
 // Expect(GetAndChangeObj(testCtx, key, ...)).Should(Succeed())
 // Although it compiles, and test may also pass, it makes no sense and doesn't work as you expect.
 
-func GetAndChangeObj[T intctrlutil.Object, PT intctrlutil.PObject[T]](testCtx *testutil.TestContext,
-	namespacedName types.NamespacedName, action func(PT)) func() error {
+func GetAndChangeObj[T intctrlutil.Object, PT intctrlutil.PObject[T]](
+	testCtx *testutil.TestContext, namespacedName types.NamespacedName, action func(PT)) func() error {
 	return func() error {
 		var obj T
 		pobj := PT(&obj)
 		if err := testCtx.Cli.Get(testCtx.Ctx, namespacedName, pobj); err != nil {
 			return err
 		}
-		return ChangeObj(testCtx, pobj, action)
+		return ChangeObj(testCtx, pobj, func() {action(pobj)})
 	}
 }
 
-func GetAndChangeObjStatus[T intctrlutil.Object, PT intctrlutil.PObject[T]](testCtx *testutil.TestContext,
-	namespacedName types.NamespacedName, action func(pobj PT)) func() error {
+func GetAndChangeObjStatus[T intctrlutil.Object, PT intctrlutil.PObject[T]](
+	testCtx *testutil.TestContext, namespacedName types.NamespacedName, action func(pobj PT)) func() error {
 	return func() error {
 		var obj T
 		pobj := PT(&obj)
 		if err := testCtx.Cli.Get(testCtx.Ctx, namespacedName, pobj); err != nil {
 			return err
 		}
-		return ChangeObjStatus(testCtx, pobj, action)
+		return ChangeObjStatus(testCtx, pobj, func() {action(pobj)})
 	}
 }
 

@@ -292,7 +292,7 @@ var _ = Describe("SystemAccount Controller", func() {
 				g.Expect(k8sClient.List(ctx, jobs, client.InNamespace(cluster.Namespace), ml)).To(Succeed())
 				g.Expect(len(jobs.Items)).To(BeEquivalentTo(expectedJobsPerCluster), "there should be 5 jobs created")
 				for _, job := range jobs.Items {
-					g.Expect(testdbaas.ChangeObjStatus(&testCtx, &job, func(job *batchv1.Job) {
+					g.Expect(testdbaas.ChangeObjStatus(&testCtx, &job, func() {
 						job.Status.Conditions = []batchv1.JobCondition{{
 							Type:   batchv1.JobComplete,
 							Status: corev1.ConditionTrue,
@@ -308,8 +308,8 @@ var _ = Describe("SystemAccount Controller", func() {
 				jobs := &batchv1.JobList{}
 				g.Expect(k8sClient.List(ctx, jobs, client.InNamespace(cluster.Namespace), ml)).To(Succeed())
 				for _, job := range jobs.Items {
-					g.Expect(testdbaas.ChangeObj(&testCtx, &job, func(job *batchv1.Job) {
-						controllerutil.RemoveFinalizer(job, finalizerName)
+					g.Expect(testdbaas.ChangeObj(&testCtx, &job, func() {
+						controllerutil.RemoveFinalizer(&job, finalizerName)
 					})).To(Succeed())
 				}
 				g.Expect(len(jobs.Items)).To(Equal(0))

@@ -19,6 +19,7 @@ package dbaas
 import (
 	"context"
 	"fmt"
+	testk8s "github.com/apecloud/kubeblocks/internal/testutil/k8s"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -33,7 +34,6 @@ import (
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	testdbaas "github.com/apecloud/kubeblocks/internal/testutil/dbaas"
-	testk8s "github.com/apecloud/kubeblocks/internal/testutil/k8s"
 )
 
 var _ = Describe("test cluster Failed/Abnormal phase", func() {
@@ -335,6 +335,14 @@ spec:
 			createClusterDef()
 			createClusterVersion()
 			createCluster()
+
+			// wait for cluster's status to become stable so that it won't interfere with later tests
+			Eventually(testdbaas.CheckObj(&testCtx, client.ObjectKey{Name: clusterName, Namespace: namespace},
+				func(g Gomega, fetched *dbaasv1alpha1.Cluster) {
+					g.Expect(fetched.Generation).To(BeEquivalentTo(1))
+					g.Expect(fetched.Status.ObservedGeneration).To(BeEquivalentTo(1))
+					g.Expect(fetched.Status.Phase).To(Equal(dbaasv1alpha1.CreatingPhase))
+				})).Should(Succeed())
 
 			By("watch normal event")
 			event := &corev1.Event{

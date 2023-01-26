@@ -24,7 +24,6 @@ import (
 	. "github.com/onsi/gomega"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
@@ -60,14 +59,9 @@ var _ = Describe("ConfigConstraint Controller", func() {
 
 	AfterEach(cleanEnv)
 
-	validateFinalizerFlag := func(crObj client.Object) bool {
-		return controllerutil.ContainsFinalizer(crObj, cfgcore.ConfigurationTemplateFinalizerName)
-	}
-
 	Context("Create config tpl with cue validate", func() {
 		It("Should ready", func() {
-			By("By creating a ISV resource")
-			// step1: prepare env
+			By("create resources")
 			testWrapper := CreateDBaasFromISV(testCtx, ctx, k8sClient,
 				test.SubTestDataPath("resources"),
 				FakeTest{
@@ -78,7 +72,7 @@ var _ = Describe("ConfigConstraint Controller", func() {
 					CVYaml:    "mysql_av.yaml",
 					CfgCMYaml: "mysql_config_cm.yaml",
 				}, true)
-			Expect(testWrapper.HasError()).Should(Succeed())
+			Expect(testWrapper.HasError()).ShouldNot(HaveOccurred())
 
 			// should ensure clusterdef and clusterversion are in cache before going on
 			// TODO fixme: it seems this is likely a bug in intctrlutil.ValidateReferenceCR,
@@ -91,39 +85,30 @@ var _ = Describe("ConfigConstraint Controller", func() {
 			Eventually(testdbaas.CheckObjExists(&testCtx, client.ObjectKeyFromObject(testWrapper.cv),
 				&dbaasv1alpha1.ClusterVersion{}, true)).Should(Succeed())
 
-			// step2: check configuration template cr status and finalizer
-			By("check ConfigConstraint status")
-			Eventually(func() bool {
-				ok, err := ValidateISVCR(testWrapper, &dbaasv1alpha1.ConfigConstraint{},
-					func(tpl *dbaasv1alpha1.ConfigConstraint) bool {
-						return validateConfTplStatus(tpl.Status) &&
-							validateFinalizerFlag(tpl)
-					})
-				return err == nil && ok
-			}, time.Second*30, time.Second*1).Should(BeTrue())
+			tplKey := client.ObjectKeyFromObject(testWrapper.tpl)
 
-			By("By delete configuration template cr")
+			By("check ConfigConstraint(template) status and finalizer")
+			Eventually(testdbaas.CheckObj(&testCtx, tplKey,
+				func(g Gomega, tpl *dbaasv1alpha1.ConfigConstraint) {
+					g.Expect(tpl.Status.Phase).To(Equal(dbaasv1alpha1.AvailablePhase))
+					g.Expect(tpl.Finalizers).To(ContainElement(cfgcore.ConfigurationTemplateFinalizerName))
+				})).Should(Succeed())
+
+			By("By delete ConfigConstraint")
 			Expect(testWrapper.DeleteTpl()).Should(Succeed())
 			// Configuration template not deleted
-			By("check whether the ConfigConstraint has been deleted")
-			log.Log.Info("expect that ConfigConstraint is not deleted.")
-			Eventually(func() error {
-				_, err := ValidateISVCR(testWrapper, &dbaasv1alpha1.ConfigConstraint{},
-					func(tpl *dbaasv1alpha1.ConfigConstraint) error { return nil })
-				return err
-			}, time.Second*30, time.Second*1).Should(Succeed())
 
-			By("By delete clusterdefinition and appversion")
-			// step3: delete clusterdefinition and appversion
+			By("check ConfigConstraint should not be deleted")
+			log.Log.Info("expect that ConfigConstraint is not deleted.")
+			Eventually(testdbaas.CheckObjExists(&testCtx, tplKey, &dbaasv1alpha1.ConfigConstraint{}, true)).Should(Succeed())
+
+			By("By delete referencing clusterdefinition and appversion")
 			Expect(testWrapper.DeleteCV()).Should(Succeed())
 			Expect(testWrapper.DeleteCD()).Should(Succeed())
 
-			Eventually(func() error {
-				_, err := ValidateISVCR(testWrapper, &dbaasv1alpha1.ConfigConstraint{},
-					func(tpl *dbaasv1alpha1.ConfigConstraint) error { return nil })
-				return err
-			}, time.Second*100, time.Second*1).ShouldNot(Succeed())
-			Expect(testWrapper.DeleteAllCR()).Should(Succeed())
+			By("check ConfigConstraint should be deleted")
+			Eventually(testdbaas.CheckObjExists(&testCtx, tplKey, &dbaasv1alpha1.ConfigConstraint{}, false),
+				60*time.Second, time.Second).Should(Succeed())
 		})
 	})
 

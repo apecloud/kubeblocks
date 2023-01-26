@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
+	"k8s.io/kubectl/pkg/util/templates"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
@@ -75,6 +76,13 @@ type OperationsOptions struct {
 	VCTNames []string `json:"vctNames,omitempty"`
 	Storage  string   `json:"storage"`
 }
+
+var (
+	createReconfigureExample = templates.Examples(`
+		# update component params 
+		kbcli cluster configure cluster-name --component-name=component-name --set max_connections=1000,general_log=OFF
+	`)
+)
 
 // buildCommonFlags build common flags for operations command
 func (o *OperationsOptions) buildCommonFlags(cmd *cobra.Command) {
@@ -188,10 +196,9 @@ func (o *OperationsOptions) validateConfigMapKey(tpl *dbaasv1alpha1.ConfigTempla
 	var (
 		cmObj  = corev1.ConfigMap{}
 		cmName = cfgcore.GetComponentCfgName(o.Name, componentName, tpl.VolumeName)
-		gvr    = schema.GroupVersionResource{Group: corev1.GroupName, Version: "v1", Resource: "configmaps"}
 	)
 
-	if err := util.GetResourceObjectFromGVR(gvr, client.ObjectKey{
+	if err := util.GetResourceObjectFromGVR(types.CMGVR(), client.ObjectKey{
 		Name:      cmName,
 		Namespace: o.Namespace,
 	}, o.Client, &cmObj); err != nil {
@@ -364,11 +371,11 @@ func NewReconfigureCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *
 		o.buildCommonFlags(cmd)
 		cmd.Flags().StringSliceVar(&o.Parameters, "set", nil, "Specify updated parameter list (options)")
 		cmd.Flags().StringVar(&o.URLPath, "configure-url", "", "Specify the configuration file path url (required)")
-		cmd.Flags().StringVar(&o.CfgTemplateName, "config-template-name", "", "Specifies the name of the configuration template to be updated")
+		cmd.Flags().StringVar(&o.CfgTemplateName, "template-name", "", "Specifies the name of the configuration template to be updated")
 		cmd.Flags().StringVar(&o.CfgFile, "config-file", "", "Specifies the name of the configuration file to be updated")
 	}
-	inputs.Complete = func() error {
-		return delete.Confirm([]string{o.Name}, o.In)
-	}
+	// inputs.Complete = func() error {
+	//	return delete.Confirm([]string{o.Name}, o.In)
+	// }
 	return create.BuildCommand(inputs)
 }

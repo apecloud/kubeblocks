@@ -102,7 +102,7 @@ func (o *opsListOptions) printOpsList() error {
 		isAllStatus = o.isAllStatus()
 	)
 	tbl := printer.NewTablePrinter(o.Out)
-	tbl.SetHeader("NAME", "TYPE", "CLUSTER", "STATUS", "PROGRESS", "CREATED-TIME")
+	tbl.SetHeader("NAME", "TYPE", "CLUSTER", "COMPONENT", "STATUS", "PROGRESS", "CREATED-TIME")
 	for _, obj := range opsList.Items {
 		ops := &dbaasv1alpha1.OpsRequest{}
 		if err = runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, ops); err != nil {
@@ -119,7 +119,7 @@ func (o *opsListOptions) printOpsList() error {
 			continue
 		}
 		hasResources = true
-		tbl.AddRow(ops.Name, opsType, ops.Spec.ClusterRef, phase, ops.Status.Progress, util.TimeFormat(&ops.CreationTimestamp))
+		tbl.AddRow(ops.Name, opsType, ops.Spec.ClusterRef, getComponentNameFromOps(ops.Spec), phase, ops.Status.Progress, util.TimeFormat(&ops.CreationTimestamp))
 	}
 	if hasResources {
 		tbl.Print()
@@ -127,6 +127,57 @@ func (o *opsListOptions) printOpsList() error {
 		o.printNoFoundResources()
 	}
 	return nil
+}
+
+func getComponentNameFromOps(ops dbaasv1alpha1.OpsRequestSpec) string {
+	components := make([]string, 0)
+	switch ops.Type {
+	case dbaasv1alpha1.ReconfiguringType:
+		components = append(components, ops.Reconfigure.ComponentName)
+	case dbaasv1alpha1.HorizontalScalingType:
+		for _, item := range ops.HorizontalScalingList {
+			components = append(components, item.ComponentName)
+		}
+	case dbaasv1alpha1.VolumeExpansionType:
+		for _, item := range ops.VolumeExpansionList {
+			components = append(components, item.ComponentName)
+		}
+	case dbaasv1alpha1.RestartType:
+		for _, item := range ops.RestartList {
+			components = append(components, item.ComponentName)
+		}
+	case dbaasv1alpha1.VerticalScalingType:
+		for _, item := range ops.VerticalScalingList {
+			components = append(components, item.ComponentName)
+		}
+	}
+	return strings.Join(components, ",")
+}
+
+func getTemplateNameFromOps(ops dbaasv1alpha1.OpsRequestSpec) string {
+	if ops.Type != dbaasv1alpha1.ReconfiguringType {
+		return ""
+	}
+
+	tpls := make([]string, 0)
+	for _, config := range ops.Reconfigure.Configurations {
+		tpls = append(tpls, config.Name)
+	}
+	return strings.Join(tpls, ",")
+}
+
+func getKeyNameFromOps(ops dbaasv1alpha1.OpsRequestSpec) string {
+	if ops.Type != dbaasv1alpha1.ReconfiguringType {
+		return ""
+	}
+
+	keys := make([]string, 0)
+	for _, config := range ops.Reconfigure.Configurations {
+		for _, key := range config.Keys {
+			keys = append(keys, key.Key)
+		}
+	}
+	return strings.Join(keys, ",")
 }
 
 // printNoFoundResources prints the message when the resources not found.

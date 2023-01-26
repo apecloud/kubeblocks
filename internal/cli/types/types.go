@@ -17,6 +17,7 @@ limitations under the License.
 package types
 
 import (
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
@@ -54,6 +55,8 @@ const (
 	ResourceOpsRequests = "opsrequests"
 	// ResourceDeployments deployment resource
 	ResourceDeployments = "deployments"
+	// ResourceConfigmaps configmap resource
+	ResourceConfigmaps = "configmaps"
 
 	// KindCluster cluster king
 	KindCluster = "Cluster"
@@ -145,4 +148,8 @@ func CRDGVR() schema.GroupVersionResource {
 		Version:  VersionV1,
 		Resource: "customresourcedefinitions",
 	}
+}
+
+func CMGVR() schema.GroupVersionResource {
+	return schema.GroupVersionResource{Group: corev1.GroupName, Version: VersionV1, Resource: ResourceConfigmaps}
 }

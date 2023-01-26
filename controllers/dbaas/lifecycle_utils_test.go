@@ -988,6 +988,11 @@ spec:
 				t := true
 				vs.Status = &snapshotv1.VolumeSnapshotStatus{ReadyToUse: &t}
 			})).Should(Succeed())
+			// ensure cache is up-to-date before calling doBackup
+			Eventually(testdbaas.CheckObj(&testCtx, client.ObjectKeyFromObject(vs),
+				func(g Gomega, fetched *snapshotv1.VolumeSnapshot) {
+					g.Expect(fetched.Status != nil && fetched.Status.ReadyToUse != nil)
+				})).Should(Succeed())
 
 			// prepare doBackup input parameters
 			snapshotKey := types.NamespacedName{
@@ -1008,10 +1013,10 @@ spec:
 			Expect(testdbaas.ChangeObjStatus(&testCtx, vs, func() {
 				vs.Status = &snapshotv1.VolumeSnapshotStatus{ReadyToUse: nil}
 			})).Should(Succeed())
-			// wait until cache updated
-			Eventually(testdbaas.CheckObj(&testCtx, intctrlutil.GetNamespacedName(vs),
-				func(g Gomega, vs *snapshotv1.VolumeSnapshot) {
-					g.Expect(vs.Status.ReadyToUse).To(BeNil())
+			// ensure cache is up-to-date before calling doBackup
+			Eventually(testdbaas.CheckObj(&testCtx, client.ObjectKeyFromObject(vs),
+				func(g Gomega, fetched *snapshotv1.VolumeSnapshot) {
+					g.Expect(fetched.Status.ReadyToUse).To(BeNil())
 				})).Should(Succeed())
 			shouldRequeue, err = doBackup(reqCtx, k8sClient, cluster, component, sts, &stsProto, snapshotKey)
 			Expect(shouldRequeue).Should(BeTrue())

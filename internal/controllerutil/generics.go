@@ -120,6 +120,14 @@ func (w PodListTraits) GetItems(list *corev1.PodList) []corev1.Pod {
 
 var PodSignature = func(_ corev1.Pod, _ corev1.PodList, _ PodListTraits) {}
 
+type EventListTraits struct{}
+
+func (w EventListTraits) GetItems(list *corev1.EventList) []corev1.Event {
+	return list.Items
+}
+
+var EventSignature = func(_ corev1.Event, _ corev1.EventList, _ EventListTraits) {}
+
 type EndpointsListTraits struct{}
 
 func (w EndpointsListTraits) GetItems(list *corev1.EndpointsList) []corev1.Endpoints {
@@ -135,6 +143,14 @@ func (w JobListTraits) GetItems(list *batchv1.JobList) []batchv1.Job {
 }
 
 var JobSignature = func(_ batchv1.Job, _ batchv1.JobList, _ JobListTraits) {}
+
+type CronJobListTraits struct{}
+
+func (w CronJobListTraits) GetItems(list *batchv1.CronJobList) []batchv1.CronJob {
+	return list.Items
+}
+
+var CronJobSignature = func(_ batchv1.CronJob, _ batchv1.CronJobList, _ CronJobListTraits) {}
 
 type VolumeSnapshotListTraits struct{}
 
@@ -208,4 +224,25 @@ type BackupListTraits struct{}
 
 func (w BackupListTraits) GetItems(list *dataprotectionv1alpha1.BackupList) []dataprotectionv1alpha1.Backup {
 	return list.Items
+}
+
+var BackupSignature = func(_ dataprotectionv1alpha1.Backup, _ dataprotectionv1alpha1.BackupList, _ BackupListTraits) {
+}
+
+type BackupToolListTraits struct{}
+
+func (w BackupToolListTraits) GetItems(list *dataprotectionv1alpha1.BackupToolList) []dataprotectionv1alpha1.BackupTool {
+	return list.Items
+}
+
+var BackupToolSignature = func(_ dataprotectionv1alpha1.BackupTool, _ dataprotectionv1alpha1.BackupToolList, _ BackupToolListTraits) {
+}
+
+type RestoreJobListTraits struct{}
+
+func (w RestoreJobListTraits) GetItems(list *dataprotectionv1alpha1.RestoreJobList) []dataprotectionv1alpha1.RestoreJob {
+	return list.Items
+}
+
+var RestoreJobSignature = func(_ dataprotectionv1alpha1.RestoreJob, _ dataprotectionv1alpha1.RestoreJobList, _ RestoreJobListTraits) {
 }

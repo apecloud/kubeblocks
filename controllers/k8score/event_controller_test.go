@@ -31,6 +31,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	testdbaas "github.com/apecloud/kubeblocks/internal/testutil/dbaas"
 )
 
 type roleEventValue struct {
@@ -42,22 +45,27 @@ type roleEventValue struct {
 var _ = Describe("Event Controller", func() {
 	var ctx = context.Background()
 
-	BeforeEach(func() {
-		// Add any setup steps that needs to be executed before each test
-		err := k8sClient.DeleteAllOf(ctx, &corev1.Event{},
-			client.InNamespace(testCtx.DefaultNamespace),
-			client.HasLabels{testCtx.TestObjLabelKey})
-		Expect(err).NotTo(HaveOccurred())
+	cleanEnv := func() {
+		// must wait until resources deleted and no longer exist before the testcases start, otherwise :
+		// - if later it needs to create some new resource objects with the same name,
+		// in race conditions, it will find the existence of old objects, resulting failure to
+		// create the new objects.
+		// - worse, if an async DeleteAll call is issued here, it maybe executed later by the
+		// K8s API server, by which time the testcase may have already created some new test objects,
+		// which shall be accidentally deleted.
+		By("clean resources")
 
-		err = k8sClient.DeleteAllOf(ctx, &corev1.Pod{},
-			client.InNamespace(testCtx.DefaultNamespace),
-			client.HasLabels{testCtx.TestObjLabelKey})
-		Expect(err).NotTo(HaveOccurred())
-	})
+		// delete rest mocked objects
+		inNS := client.InNamespace(testCtx.DefaultNamespace)
+		ml := client.HasLabels{testCtx.TestObjLabelKey}
+		// namespaced
+		testdbaas.ClearResources(&testCtx, intctrlutil.EventSignature, inNS, ml)
+		testdbaas.ClearResources(&testCtx, intctrlutil.PodSignature, inNS, ml)
+	}
 
-	AfterEach(func() {
-		// Add any teardown steps that needs to be executed after each test
-	})
+	BeforeEach(cleanEnv)
+
+	AfterEach(cleanEnv)
 
 	Context("When receiving role changed event", func() {
 		It("should handle it properly", func() {

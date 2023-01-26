@@ -19,7 +19,6 @@ package dbaas
 import (
 	"context"
 	"fmt"
-	testk8s "github.com/apecloud/kubeblocks/internal/testutil/k8s"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -34,6 +33,7 @@ import (
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	testdbaas "github.com/apecloud/kubeblocks/internal/testutil/dbaas"
+	testk8s "github.com/apecloud/kubeblocks/internal/testutil/k8s"
 )
 
 var _ = Describe("test cluster Failed/Abnormal phase", func() {

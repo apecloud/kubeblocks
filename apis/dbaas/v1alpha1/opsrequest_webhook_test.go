@@ -159,12 +159,6 @@ var _ = Describe("OpsRequest webhook", func() {
 		patch := client.MergeFrom(cluster.DeepCopy())
 		cluster.Status.Operations.VerticalScalable = []string{replicaSetComponentName}
 		Expect(k8sClient.Status().Patch(ctx, cluster, patch)).Should(Succeed())
-		// wait until patch succeed
-		Eventually(func() bool {
-			tmpCluster := &Cluster{}
-			_ = k8sClient.Get(context.Background(), client.ObjectKey{Name: cluster.Name, Namespace: cluster.Namespace}, tmpCluster)
-			return len(cluster.Status.Operations.VerticalScalable) > 0
-		}, timeout, interval).Should(BeTrue())
 
 		By("By testing verticalScaling opsRequest components is not consistent")
 		opsRequest := createTestOpsRequest(clusterName, opsRequestName, VerticalScalingType)
@@ -177,10 +171,13 @@ var _ = Describe("OpsRequest webhook", func() {
 			},
 		}
 		opsRequest.Spec.VerticalScalingList = []VerticalScaling{verticalScaling}
-		Expect(testCtx.CreateObj(ctx, opsRequest).Error()).To(ContainSubstring("not supported the VerticalScaling operation"))
+		Eventually(func(g Gomega) {
+			g.Expect(testCtx.CreateObj(ctx, opsRequest).Error()).To(ContainSubstring("not supported the VerticalScaling operation"))
+		}).Should(Succeed())
+
 		Eventually(func() bool {
 			opsRequest.Spec.VerticalScalingList[0].ComponentName = replicaSetComponentName
-			err := testCtx.CheckedCreateObj(ctx, opsRequest)
+			err := testCtx.CreateObj(ctx, opsRequest)
 			return err == nil
 		}, timeout, interval).Should(BeTrue())
 
@@ -201,10 +198,13 @@ var _ = Describe("OpsRequest webhook", func() {
 				},
 			},
 		}
-		Expect(testCtx.CreateObj(ctx, opsRequest).Error()).To(ContainSubstring("must be less than or equal to cpu limit"))
+		Eventually(func(g Gomega) {
+			g.Expect(testCtx.CreateObj(ctx, opsRequest).Error()).To(ContainSubstring("must be less than or equal to cpu limit"))
+		}).Should(Succeed())
+
 		Eventually(func() bool {
 			opsRequest.Spec.VerticalScalingList[0].Requests[corev1.ResourceCPU] = resource.MustParse("100m")
-			err := testCtx.CheckedCreateObj(ctx, opsRequest)
+			err := testCtx.CreateObj(ctx, opsRequest)
 			return err == nil
 		}, timeout, interval).Should(BeTrue())
 	}

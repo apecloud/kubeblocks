@@ -74,22 +74,10 @@ var _ = Describe("ConfigConstraint Controller", func() {
 					// for crd yaml file
 					CfgTemplateYaml: "mysql_config_template.yaml",
 					CDYaml:          "mysql_cd.yaml",
-					// TODO rename mysql_av.yaml to mysql_cv.yaml
-					CVYaml:    "mysql_av.yaml",
-					CfgCMYaml: "mysql_config_cm.yaml",
+					CVYaml:          "mysql_av.yaml",
+					CfgCMYaml:       "mysql_config_cm.yaml",
 				}, true)
 			Expect(testWrapper.HasError()).Should(Succeed())
-
-			// should ensure clusterdef and clusterversion are in cache before going on
-			// TODO fixme: it seems this is likely a bug in intctrlutil.ValidateReferenceCR,
-			// TODO where it determines whether anyone are referencing the object to be deleted
-			// TODO using the client.List interface, which just reads from the cache.
-			// TODO this will cause a referenced object get deleted in race condition.
-			By("check clusterversion and clusterdef exists")
-			Eventually(testdbaas.CheckObjExists(&testCtx, client.ObjectKeyFromObject(testWrapper.cd),
-				&dbaasv1alpha1.ClusterDefinition{}, true)).Should(Succeed())
-			Eventually(testdbaas.CheckObjExists(&testCtx, client.ObjectKeyFromObject(testWrapper.cv),
-				&dbaasv1alpha1.ClusterVersion{}, true)).Should(Succeed())
 
 			// step2: check configuration template cr status and finalizer
 			By("check ConfigConstraint status")

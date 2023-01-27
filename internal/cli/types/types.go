@@ -57,6 +57,8 @@ const (
 	ResourceDeployments = "deployments"
 	// ResourceConfigmaps configmap resource
 	ResourceConfigmaps = "configmaps"
+	// ResourceConfigConstraintVersions clusterVersion resource
+	ResourceConfigConstraintVersions = "configconstraints"
 
 	// KindCluster cluster king
 	KindCluster = "Cluster"
@@ -152,4 +154,8 @@ func CRDGVR() schema.GroupVersionResource {
 
 func CMGVR() schema.GroupVersionResource {
 	return schema.GroupVersionResource{Group: corev1.GroupName, Version: VersionV1, Resource: ResourceConfigmaps}
+}
+
+func ConfigConstraintGVR() schema.GroupVersionResource {
+	return schema.GroupVersionResource{Group: Group, Version: Version, Resource: ResourceConfigConstraintVersions}
 }

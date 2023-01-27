@@ -18,12 +18,17 @@ package cluster
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
 	"sort"
 	"strings"
 
+	"github.com/StudioSol/set"
+
 	"github.com/spf13/cobra"
 	corev1 "k8s.io/api/core/v1"
+	apiext "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
@@ -39,30 +44,40 @@ import (
 )
 
 type reconfigureOptions struct {
+	*describeOpsOptions
+
 	clusterName   string
 	componentName string
 	templateNames []string
-
-	printFn func()
-
+	isExplain     bool
+	truncEnum     bool
+	truncDocument bool
+	// for cache
 	tpls []dbaasv1alpha1.ConfigTemplate
+}
 
-	*describeOpsOptions
+type parameterTemplate struct {
+	name        string
+	valueType   string
+	miniNum     string
+	maxiNum     string
+	enum        []string
+	description string
+	scope       string
 }
 
 var (
 	describeReconfigureExample = templates.Examples(`
 		# describe a specified configure
-		kbcli cluster describe-configure cluster-name mysql-restart-82zxv --component-name=component --template-names=tpl1`)
+		kbcli cluster describe-configure cluster-name --component-name=component --template-names=tpl1,tpl2`)
 	explainReconfigureExample = templates.Examples(`
-		# describe a specified OpsRequest
-		kbcli cluster describe-ops mysql-restart-82zxv`)
+		# describe a specified configure template
+		kbcli cluster explain-configure cluster-name --component-name=component --template-names=tpl1`)
 )
 
 func (r *reconfigureOptions) addCommonFlags(cmd *cobra.Command) {
 	cmd.Flags().StringVar(&r.componentName, "component-name", "", " Component name to this operations (required)")
-	cmd.Flags().StringVar(&r.clusterName, "cluster-name", "", " cluster name to this operations (required)")
-	cmd.Flags().StringSliceVar(&r.templateNames, "template-names", nil, "Specifies the name of the configuration template to be describe")
+	cmd.Flags().StringSliceVar(&r.templateNames, "template-names", nil, "Specifies the name of the configuration template to be describe (options)")
 }
 
 func (r *reconfigureOptions) validate() error {
@@ -76,11 +91,19 @@ func (r *reconfigureOptions) validate() error {
 		return err
 	}
 
+	if r.isExplain && len(r.templateNames) != 1 {
+		return cfgcore.MakeError("explain require one template")
+	}
+
 	for _, tplName := range r.templateNames {
-		_, err := r.findTemplateByName(tplName)
+		tpl, err := r.findTemplateByName(tplName)
 		if err != nil {
 			return err
 		}
+		if r.isExplain && len(tpl.ConfigConstraintRef) == 0 {
+			return cfgcore.MakeError("explain command require template has config constraint options")
+		}
+		// validate config cm
 		// cfgName := cfgcore.GetComponentCfgName(r.clusterName, r.componentName, tpl.VolumeName)
 		// cmObj := &corev1.ConfigMap{}
 		// if err := util.GetResourceObjectFromGVR(types.CMGVR(), client.ObjectKey{
@@ -113,30 +136,40 @@ func (r *reconfigureOptions) complete2(args []string) error {
 		r.clusterName = args[0]
 	}
 
+	if r.componentName == "" {
+		return cfgcore.MakeError("missing component name")
+	}
+
 	if err := r.complete(args); err != nil {
 		return err
 	}
 	if len(r.templateNames) != 0 {
 		return nil
 	}
-
 	if err := r.syncComponentCfgTpl(); err != nil {
 		return err
 	}
-
 	if len(r.tpls) == 0 {
 		return cfgcore.MakeError("not any config template, not support describe")
 	}
 
-	r.templateNames = make([]string, len(r.tpls))
-	for i, tpl := range r.tpls {
-		r.templateNames[i] = tpl.Name
+	if !r.isExplain {
+		templateNames := make([]string, len(r.tpls))
+		for i, tpl := range r.tpls {
+			templateNames[i] = tpl.Name
+		}
+		r.templateNames = templateNames
+		return nil
 	}
-	return nil
-}
 
-func (r *reconfigureOptions) run() error {
-	r.printFn()
+	// for explain
+	for _, tpl := range r.tpls {
+		if len(tpl.ConfigConstraintRef) == 0 {
+			continue
+		}
+		r.templateNames = []string{tpl.Name}
+		break
+	}
 	return nil
 }
 
@@ -163,22 +196,45 @@ func (r *reconfigureOptions) printDescribeReconfigure() error {
 	return r.printConfigureHistory(configs)
 }
 
+func (r *reconfigureOptions) printExplainReconfigure(tplName string) error {
+	tpl, err := r.findTemplateByName(tplName)
+	if err != nil {
+		return err
+	}
+
+	configConstraint := dbaasv1alpha1.ConfigConstraint{}
+	if err := util.GetResourceObjectFromGVR(types.ConfigConstraintGVR(), client.ObjectKey{
+		Namespace: "",
+		Name:      tpl.ConfigConstraintRef,
+	}, r.dynamic, &configConstraint); err != nil {
+		return err
+	}
+
+	confSpec := configConstraint.Spec
+	schema := confSpec.ConfigurationSchema.DeepCopy()
+	if schema.Schema == nil {
+		apiSchema, err := cfgcore.GenerateOpenAPISchema(schema.CUE, "")
+		if err != nil {
+			return cfgcore.WrapError(err, "failed to generate open api schema")
+		}
+		schema.Schema = apiSchema
+	}
+	return r.printConfigConstraint(schema.Schema, set.NewLinkedHashSetString(confSpec.StaticParameters...), set.NewLinkedHashSetString(confSpec.DynamicParameters...))
+}
+
 func (r *reconfigureOptions) getReconfigureMeta() (map[dbaasv1alpha1.ConfigTemplate]*corev1.ConfigMap, error) {
 	configs := make(map[dbaasv1alpha1.ConfigTemplate]*corev1.ConfigMap)
 	for _, tplName := range r.templateNames {
-		tpl, err := r.findTemplateByName(tplName)
-		if err != nil {
-			return nil, err
-		}
-
+		// checked by validate
+		tpl, _ := r.findTemplateByName(tplName)
 		// fetch config configmap
 		cmObj := &corev1.ConfigMap{}
 		cmName := cfgcore.GetComponentCfgName(r.clusterName, r.componentName, tpl.VolumeName)
 		if err := util.GetResourceObjectFromGVR(types.CMGVR(), client.ObjectKey{
 			Name:      cmName,
 			Namespace: r.namespace,
-		}, r.dynamic, &cmObj); err != nil {
-			return nil, err
+		}, r.dynamic, cmObj); err != nil {
+			return nil, cfgcore.WrapError(err, "template config instance is not exist, template name: %s, cfg name: %s", tplName, cmName)
 		}
 		configs[*tpl] = cmObj
 	}
@@ -200,9 +256,9 @@ func (r *reconfigureOptions) printConfigureHistory(configs map[dbaasv1alpha1.Con
 	printer.PrintTitle("History modifications")
 
 	// filter reconfigure
+	// kubernetes not support fieldSelector with CRD: https://github.com/kubernetes/kubernetes/issues/51046
 	listOptions := metav1.ListOptions{
 		LabelSelector: strings.Join([]string{types.InstanceLabelKey, r.clusterName}, "="),
-		FieldSelector: strings.Join([]string{"spec.type", string(dbaasv1alpha1.ReconfiguringType)}, "="),
 		// FieldSelector: strings.Join([]string{
 		//	strings.Join([]string{"spec.type", string(dbaasv1alpha1.ReconfiguringType)}, "="),
 		//	strings.Join([]string{"spec.reconfigure.componentName", r.componentName}, "="),
@@ -238,8 +294,135 @@ func (r *reconfigureOptions) printConfigureHistory(configs map[dbaasv1alpha1.Con
 	return nil
 }
 
+func (r *reconfigureOptions) printConfigConstraint(schema *apiext.JSONSchemaProps, staticParameters *set.LinkedHashSetString, dynamicParameters *set.LinkedHashSetString) error {
+	var (
+		index             = 0
+		maxDocumentLength = 100
+		maxEnumLength     = 20
+		spec              = schema.Properties["spec"]
+		params            = make([]*parameterTemplate, len(spec.Properties))
+	)
+
+	for key, property := range spec.Properties {
+		if property.Type == "object" {
+			continue
+		}
+		pt, err := generateParameterTemplate(key, property)
+		if err != nil {
+			return err
+		}
+		if staticParameters.InArray(pt.name) {
+			pt.scope = "static"
+		} else if dynamicParameters.InArray(pt.name) {
+			pt.scope = "dynamic"
+		}
+		if r.truncDocument && len(pt.description) > maxDocumentLength {
+			pt.description = pt.description[:maxDocumentLength] + "..."
+		}
+		params[index] = pt
+		index++
+	}
+
+	if !r.truncEnum {
+		maxEnumLength = -1
+	}
+	printConfigParameterTemplate(params, r.Out, maxEnumLength)
+	return nil
+}
+
+// printConfigParameterTemplate prints the conditions of resource.
+func printConfigParameterTemplate(paramTemplates []*parameterTemplate, out io.Writer, maxFieldLength int) {
+	const (
+		r          = "-"
+		rangeBegin = "["
+		rangeEnd   = "]"
+	)
+
+	rangeFormatter := func(pt *parameterTemplate) string {
+		if len(pt.maxiNum) == 0 && len(pt.miniNum) == 0 {
+			return ""
+		}
+
+		v := rangeBegin
+		if len(pt.miniNum) != 0 {
+			v += pt.miniNum
+		}
+		if len(pt.maxiNum) != 0 {
+			v += r
+			v += pt.maxiNum
+		} else if len(v) != 0 {
+			v += r
+		}
+		v += rangeEnd
+		return v
+	}
+	enumFormatter := func(pt *parameterTemplate) string {
+		if len(pt.enum) == 0 {
+			return ""
+		}
+		v := strings.Join(pt.enum, ",")
+		if maxFieldLength > 0 && len(v) > maxFieldLength {
+			v = v[:maxFieldLength] + "..."
+		}
+		return v
+	}
+
+	if len(paramTemplates) == 0 {
+		return
+	}
+	tbl := printer.NewTablePrinter(out)
+	tbl.SetStyle(printer.TerminalStyle)
+	printer.PrintTitle("Configure Constraint")
+	tbl.SetHeader("PARAMETER NAME", "RANGE", "ENUM", "SCOPE", "TYPE", "description")
+	for _, pt := range paramTemplates {
+		tbl.AddRow(pt.name, rangeFormatter(pt), enumFormatter(pt), pt.scope, pt.valueType, pt.description)
+	}
+	tbl.Print()
+}
+
+func generateParameterTemplate(paramName string, property apiext.JSONSchemaProps) (*parameterTemplate, error) {
+	toString := func(v interface{}) (string, error) {
+		b, err := json.Marshal(v)
+		if err != nil {
+			return "", err
+		}
+		return string(b), nil
+	}
+	pt := &parameterTemplate{
+		name:        paramName,
+		valueType:   property.Type,
+		description: strings.TrimSpace(property.Description),
+	}
+	if property.Minimum != nil {
+		b, err := toString(property.Minimum)
+		if err != nil {
+			return nil, err
+		}
+		pt.miniNum = b
+	}
+	if property.Maximum != nil {
+		b, err := toString(property.Maximum)
+		if err != nil {
+			return nil, err
+		}
+		pt.maxiNum = b
+	}
+	if property.Enum != nil {
+		pt.enum = make([]string, len(property.Enum))
+		for i, v := range property.Enum {
+			b, err := toString(v)
+			if err != nil {
+				return nil, err
+			}
+			pt.enum[i] = b
+		}
+	}
+	return pt, nil
+}
+
 func NewDescribeReconfigureCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := &reconfigureOptions{
+		isExplain:          false,
 		describeOpsOptions: newDescribeOpsOptions(f, streams),
 	}
 	cmd := &cobra.Command{
@@ -259,6 +442,9 @@ func NewDescribeReconfigureCmd(f cmdutil.Factory, streams genericclioptions.IOSt
 
 func NewExplainReconfigureCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := &reconfigureOptions{
+		isExplain:          true,
+		truncEnum:          true,
+		truncDocument:      false,
 		describeOpsOptions: newDescribeOpsOptions(f, streams),
 	}
 	cmd := &cobra.Command{
@@ -267,10 +453,13 @@ func NewExplainReconfigureCmd(f cmdutil.Factory, streams genericclioptions.IOStr
 		Example:           explainReconfigureExample,
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.ClusterGVR()),
 		Run: func(cmd *cobra.Command, args []string) {
-			util.CheckErr(o.complete(args))
-			util.CheckErr(o.run())
+			util.CheckErr(o.complete2(args))
+			util.CheckErr(o.validate())
+			util.CheckErr(o.printExplainReconfigure(o.templateNames[0]))
 		},
 	}
+	cmd.Flags().BoolVar(&o.truncEnum, "trunc-enum", o.truncEnum, " trunc enum string (options)")
+	cmd.Flags().BoolVar(&o.truncDocument, "trunc-document", o.truncDocument, " trunc document string (options)")
 	o.addCommonFlags(cmd)
 	return cmd
 }

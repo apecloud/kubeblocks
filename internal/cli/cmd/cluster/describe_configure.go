@@ -52,6 +52,8 @@ type reconfigureOptions struct {
 	isExplain     bool
 	truncEnum     bool
 	truncDocument bool
+	keys          []string
+	showDetail    bool
 	// for cache
 	tpls []dbaasv1alpha1.ConfigTemplate
 }
@@ -192,7 +194,9 @@ func (r *reconfigureOptions) printDescribeReconfigure() error {
 	}
 	printer.PrintComponentConfigMeta(configs, r.clusterName, r.componentName, r.Out)
 
-	r.printConfigureContext(configs)
+	if r.showDetail {
+		r.printConfigureContext(configs)
+	}
 	return r.printConfigureHistory(configs)
 }
 
@@ -244,9 +248,13 @@ func (r *reconfigureOptions) getReconfigureMeta() (map[dbaasv1alpha1.ConfigTempl
 func (r *reconfigureOptions) printConfigureContext(configs map[dbaasv1alpha1.ConfigTemplate]*corev1.ConfigMap) {
 	printer.PrintTitle("Configures Context")
 
+	keys := set.NewLinkedHashSetString(r.keys...)
 	for _, cm := range configs {
 		for key, context := range cm.Data {
-			fmt.Fprintf(r.Out, "%s%s\n\n",
+			if keys.Length() != 0 && !keys.InArray(key) {
+				continue
+			}
+			fmt.Fprintf(r.Out, "%s%s\n",
 				printer.BoldYellow(fmt.Sprintf("%s/%s:\n", r.componentName, key)), context)
 		}
 	}
@@ -423,6 +431,7 @@ func generateParameterTemplate(paramName string, property apiext.JSONSchemaProps
 func NewDescribeReconfigureCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := &reconfigureOptions{
 		isExplain:          false,
+		showDetail:         false,
 		describeOpsOptions: newDescribeOpsOptions(f, streams),
 	}
 	cmd := &cobra.Command{
@@ -437,6 +446,8 @@ func NewDescribeReconfigureCmd(f cmdutil.Factory, streams genericclioptions.IOSt
 		},
 	}
 	o.addCommonFlags(cmd)
+	cmd.Flags().BoolVar(&o.showDetail, "show-detail", o.showDetail, " trunc enum string (options)")
+	cmd.Flags().StringSliceVar(&o.keys, "keys", nil, " display keys context (options)")
 	return cmd
 }
 
@@ -458,8 +469,8 @@ func NewExplainReconfigureCmd(f cmdutil.Factory, streams genericclioptions.IOStr
 			util.CheckErr(o.printExplainReconfigure(o.templateNames[0]))
 		},
 	}
+	o.addCommonFlags(cmd)
 	cmd.Flags().BoolVar(&o.truncEnum, "trunc-enum", o.truncEnum, " trunc enum string (options)")
 	cmd.Flags().BoolVar(&o.truncDocument, "trunc-document", o.truncDocument, " trunc document string (options)")
-	o.addCommonFlags(cmd)
 	return cmd
 }

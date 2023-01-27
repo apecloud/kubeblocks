@@ -40,7 +40,7 @@ func (s *simplePolicy) Upgrade(params reconfigureParams) (ReturnedStatus, error)
 		return rollingStatefulSets(params)
 		// process consensus
 	default:
-		return MakeReturnedStatus(ESNotSupport), cfgcore.MakeError("not support component type:[%s]", params.ComponentType())
+		return makeReturnedStatus(ESNotSupport), cfgcore.MakeError("not support component type:[%s]", params.ComponentType())
 	}
 }
 
@@ -58,27 +58,27 @@ func rollingStatefulSets(param reconfigureParams) (ReturnedStatus, error) {
 	)
 
 	if configKey == "" {
-		return MakeReturnedStatus(ESFailed), cfgcore.MakeError("failed to found config meta. configmap : %s", param.TplName)
+		return makeReturnedStatus(ESFailed), cfgcore.MakeError("failed to found config meta. configmap : %s", param.TplName)
 	}
 
 	for _, sts := range units {
 		if err := restartStsWithRolling(client, param.Ctx, sts, configKey, newVersion); err != nil {
 			param.Ctx.Log.Error(err, "failed to restart statefulSet.", "stsName", sts.GetName())
-			return MakeReturnedStatus(ESAndRetryFailed), err
+			return makeReturnedStatus(ESAndRetryFailed), err
 		}
 	}
 
 	// TODO Check whether the restart is complete.
 	// pods, err := GetComponentPods(param)
 	// if err != nil {
-	//	return MakeReturnedStatus(ESAndRetryFailed), err
+	//	return makeReturnedStatus(ESAndRetryFailed), err
 	// }
 	// if len(pods) != 0 {
 	//	progress = CheckUpdatedProgress(pods, configKey, newVersion)
 	// }
-	// return MakeReturnedStatus(ESNone, WithExpected(int32(len(pods))), WithSucceed(progress)), nil
+	// return makeReturnedStatus(ESNone, withExpected(int32(len(pods))), withSucceed(progress)), nil
 
-	return MakeReturnedStatus(ESNone), nil
+	return makeReturnedStatus(ESNone), nil
 }
 
 func restartStsWithRolling(cli client.Client, ctx intctrlutil.RequestCtx, sts appsv1.StatefulSet, configKey string, newVersion string) error {

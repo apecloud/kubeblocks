@@ -183,7 +183,7 @@ func RegisterPolicy(policy dbaasv1alpha1.UpgradePolicy, action reconfigurePolicy
 
 func (receiver AutoReloadPolicy) Upgrade(params reconfigureParams) (ReturnedStatus, error) {
 	_ = params
-	return MakeReturnedStatus(ESNone), nil
+	return makeReturnedStatus(ESNone), nil
 }
 
 func (receiver AutoReloadPolicy) GetPolicyName() string {
@@ -211,19 +211,19 @@ func NewReconfigurePolicy(tpl *dbaasv1alpha1.ConfigConstraintSpec, cfg *cfgcore.
 	return nil, cfgcore.MakeError("not support upgrade policy:[%s]", actionType)
 }
 
-func WithSucceed(succeedCount int32) func(status *ReturnedStatus) {
+func withSucceed(succeedCount int32) func(status *ReturnedStatus) {
 	return func(status *ReturnedStatus) {
 		status.SucceedCount = succeedCount
 	}
 }
 
-func WithExpected(expectedCount int32) func(status *ReturnedStatus) {
+func withExpected(expectedCount int32) func(status *ReturnedStatus) {
 	return func(status *ReturnedStatus) {
 		status.SucceedCount = expectedCount
 	}
 }
 
-func MakeReturnedStatus(status ExecStatus, ops ...func(status *ReturnedStatus)) ReturnedStatus {
+func makeReturnedStatus(status ExecStatus, ops ...func(status *ReturnedStatus)) ReturnedStatus {
 	ret := ReturnedStatus{
 		Status:        status,
 		SucceedCount:  cfgcore.Unconfirmed,

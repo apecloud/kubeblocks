@@ -33,12 +33,12 @@ func init() {
 
 func (p *parallelUpgradePolicy) Upgrade(params reconfigureParams) (ReturnedStatus, error) {
 	if finished, err := p.restartPods(params); err != nil {
-		return MakeReturnedStatus(ESAndRetryFailed), err
+		return makeReturnedStatus(ESAndRetryFailed), err
 	} else if !finished {
-		return MakeReturnedStatus(ESRetry), nil
+		return makeReturnedStatus(ESRetry), nil
 	}
 
-	return MakeReturnedStatus(ESNone), nil
+	return makeReturnedStatus(ESNone), nil
 }
 
 func (p *parallelUpgradePolicy) GetPolicyName() string {

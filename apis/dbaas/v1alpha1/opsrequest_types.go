@@ -240,7 +240,7 @@ type OpsRequestStatus struct {
 	// conditions describes opsRequest detail status.
 	// +optional
 	// +patchMergeKey=type
-	// +patchStrategy=merge,retainKeys
+	// +patchStrategy=merge
 	// +listType=map
 	// +listMapKey=type
 	Conditions []metav1.Condition `json:"conditions,omitempty"`

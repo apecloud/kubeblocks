@@ -39,14 +39,12 @@ func init() {
 
 	reconfigureBehaviour := OpsBehaviour{
 		FromClusterPhases: []dbaasv1alpha1.Phase{
-			// all phase
 			dbaasv1alpha1.RunningPhase,
 			dbaasv1alpha1.FailedPhase,
 			dbaasv1alpha1.AbnormalPhase,
 		},
 		ToClusterPhase: dbaasv1alpha1.ReconfiguringPhase,
 		OpsHandler:     &reAction,
-		//ReconcileAction:        reAction.ReconcileAction,
 	}
 	cfgcore.ConfigEventHandlerMap["ops_status_reconfigure"] = &reAction
 	opsManager.RegisterOps(dbaasv1alpha1.ReconfiguringType, reconfigureBehaviour)
@@ -102,14 +100,14 @@ func (r *reconfigureAction) Handle(eventContext cfgcore.ConfigEventContext, last
 			dbaasv1alpha1.NewReconfigureRunningCondition(opsRequest,
 				dbaasv1alpha1.ReasonReconfigureSucceed,
 				eventContext.TplName,
-				formatConfigurationDifference(eventContext.Meta)),
+				formatConfigurationDifference(eventContext.Meta, &eventContext.PolicyStatus)),
 			dbaasv1alpha1.NewSucceedCondition(opsRequest))
 	case dbaasv1alpha1.FailedPhase:
 		return PatchOpsStatus(opsRes, dbaasv1alpha1.RunningPhase,
 			dbaasv1alpha1.NewReconfigureRunningCondition(opsRequest,
 				dbaasv1alpha1.ReasonReconfigureFailed,
 				eventContext.TplName,
-				formatConfigurationDifference(eventContext.Meta)),
+				formatConfigurationDifference(eventContext.Meta, &eventContext.PolicyStatus)),
 			dbaasv1alpha1.NewFailedCondition(opsRequest, err))
 	default:
 		return PatchOpsStatus(opsRes, dbaasv1alpha1.RunningPhase,
@@ -252,14 +250,14 @@ func (r *reconfigureAction) performPersistCfg(clusterName, componentName string,
 				resource.OpsRequest,
 				dbaasv1alpha1.ReasonReconfigureInvalidUpdated,
 				tpl.Name,
-				formatConfigurationDifference(difference)),
+				formatConfigurationDifference(difference, nil)),
 				dbaasv1alpha1.NewSucceedCondition(resource.OpsRequest))
 		} else {
 			conditions = append(conditions, dbaasv1alpha1.NewReconfigureRunningCondition(
 				resource.OpsRequest,
 				dbaasv1alpha1.ReasonReconfigureMerged,
 				tpl.Name,
-				formatConfigurationDifference(difference)))
+				formatConfigurationDifference(difference, nil)))
 		}
 
 		// merged successfully
@@ -288,8 +286,13 @@ func processMergedFailed(resource *OpsResource, isInvalid bool, err error) error
 	return nil
 }
 
-func formatConfigurationDifference(difference *cfgcore.ConfigDiffInformation) string {
-	return fmt.Sprintf("updated: %s, added: %s, deleted:%s",
+func formatConfigurationDifference(difference *cfgcore.ConfigDiffInformation, execStatus *cfgcore.PolicyExecStatus) string {
+	policyName := ""
+	if execStatus != nil {
+		policyName = fmt.Sprintf("updated policy: <%s>, ", execStatus.PolicyName)
+	}
+	return fmt.Sprintf("%supdated: %s, added: %s, deleted:%s",
+		policyName,
 		difference.UpdateConfig,
 		difference.AddConfig,
 		difference.DeleteConfig)

@@ -192,11 +192,11 @@ func (r *reconfigureOptions) printDescribeReconfigure() error {
 	if err != nil {
 		return err
 	}
-	printer.PrintComponentConfigMeta(configs, r.clusterName, r.componentName, r.Out)
 
 	if r.showDetail {
 		r.printConfigureContext(configs)
 	}
+	printer.PrintComponentConfigMeta(configs, r.clusterName, r.componentName, r.Out)
 	return r.printConfigureHistory(configs)
 }
 
@@ -246,16 +246,16 @@ func (r *reconfigureOptions) getReconfigureMeta() (map[dbaasv1alpha1.ConfigTempl
 }
 
 func (r *reconfigureOptions) printConfigureContext(configs map[dbaasv1alpha1.ConfigTemplate]*corev1.ConfigMap) {
-	printer.PrintTitle("Configures Context")
+	printer.PrintTitle("Configures Context[${component-name}/${template-name}/${file-name}]")
 
 	keys := set.NewLinkedHashSetString(r.keys...)
-	for _, cm := range configs {
+	for tpl, cm := range configs {
 		for key, context := range cm.Data {
 			if keys.Length() != 0 && !keys.InArray(key) {
 				continue
 			}
 			fmt.Fprintf(r.Out, "%s%s\n",
-				printer.BoldYellow(fmt.Sprintf("%s/%s:\n", r.componentName, key)), context)
+				printer.BoldYellow(fmt.Sprintf("%s/%s/%s:\n", r.componentName, tpl.Name, key)), context)
 		}
 	}
 }
@@ -280,7 +280,7 @@ func (r *reconfigureOptions) printConfigureHistory(configs map[dbaasv1alpha1.Con
 	// sort the unstructured objects with the creationTimestamp in positive order
 	sort.Sort(unstructuredList(opsList.Items))
 	tbl := printer.NewTablePrinter(r.Out)
-	tbl.SetHeader("NAME", "CLUSTER", "COMPONENT", "TEMPLATE", "FILES", "STATUS", "PROGRESS", "CREATED-TIME")
+	tbl.SetHeader("NAME", "CLUSTER", "COMPONENT", "TEMPLATE", "FILES", "STATUS", "POLICY", "PROGRESS", "CREATED-TIME", "VALID-UPDATED")
 	for _, obj := range opsList.Items {
 		ops := &dbaasv1alpha1.OpsRequest{}
 		if err = runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, ops); err != nil {
@@ -296,7 +296,16 @@ func (r *reconfigureOptions) printConfigureHistory(configs map[dbaasv1alpha1.Con
 		phase := string(ops.Status.Phase)
 		tplNames := getTemplateNameFromOps(ops.Spec)
 		keyNames := getKeyNameFromOps(ops.Spec)
-		tbl.AddRow(ops.Name, ops.Spec.ClusterRef, components, tplNames, keyNames, phase, ops.Status.Progress, util.TimeFormat(&ops.CreationTimestamp))
+		tbl.AddRow(ops.Name,
+			ops.Spec.ClusterRef,
+			components,
+			tplNames,
+			keyNames,
+			phase,
+			getReconfigurePolicy(ops.Status),
+			ops.Status.Progress,
+			util.TimeFormat(&ops.CreationTimestamp),
+			getValidUpdatedParams(ops.Status))
 	}
 	tbl.Print()
 	return nil
@@ -426,6 +435,40 @@ func generateParameterTemplate(paramName string, property apiext.JSONSchemaProps
 		}
 	}
 	return pt, nil
+}
+
+func getReconfigurePolicy(status dbaasv1alpha1.OpsRequestStatus) string {
+	if status.ReconfiguringStatus == nil || len(status.ReconfiguringStatus.ConfigurationStatus) == 0 {
+		return ""
+	}
+
+	var policy string
+	reStatus := status.ReconfiguringStatus.ConfigurationStatus[0]
+	switch reStatus.UpdatePolicy {
+	case dbaasv1alpha1.AutoReload:
+		policy = "reload"
+	case dbaasv1alpha1.NormalPolicy, dbaasv1alpha1.RestartPolicy, dbaasv1alpha1.RollingPolicy:
+		policy = "restart"
+	default:
+		return ""
+	}
+	return printer.BoldYellow(policy)
+}
+
+func getValidUpdatedParams(status dbaasv1alpha1.OpsRequestStatus) string {
+	if status.ReconfiguringStatus == nil || len(status.ReconfiguringStatus.ConfigurationStatus) == 0 {
+		return ""
+	}
+
+	reStatus := status.ReconfiguringStatus.ConfigurationStatus[0]
+	if len(reStatus.UpdatedParameters.UpdatedKeys) == 0 {
+		return ""
+	}
+	b, err := json.Marshal(reStatus.UpdatedParameters.UpdatedKeys)
+	if err != nil {
+		return err.Error()
+	}
+	return string(b)
 }
 
 func NewDescribeReconfigureCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {

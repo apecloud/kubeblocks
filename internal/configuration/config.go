@@ -41,7 +41,6 @@ type ReconfiguringProgress int32
 const (
 	Unconfirmed int32 = -1
 	NotStarted  int32 = 0
-	Finished    int32 = 100
 )
 
 const (

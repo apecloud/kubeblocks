@@ -54,7 +54,7 @@ func PrintComponentConfigMeta(cfgMap map[dbaasv1alpha1.ConfigTemplate]*corev1.Co
 	}
 	tbl := NewTablePrinter(out)
 	PrintTitle("Configures Meta")
-	tbl.SetHeader("CONFIGURATION FILE", "CONFIGMAP", "COMPONENT", "CLUSTER", "TEMPLATE NAME", "CONFIG TEMPLATE", "CONFIG CONSTRAINT", "NAMESPACE")
+	tbl.SetHeader("CONFIGURATION-FILE", "CONFIGMAP", "COMPONENT", "CLUSTER", "TEMPLATE-NAME", "CONFIG-TEMPLATE", "CONFIG-CONSTRAINT", "NAMESPACE")
 	for key, cfg := range cfgMap {
 		for file := range cfg.Data {
 			tbl.AddRow(file, cfg.Name, componentName, clusterName, key.Name, key.ConfigTplRef, key.ConfigConstraintRef, key.Namespace)

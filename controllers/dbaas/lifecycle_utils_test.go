@@ -991,7 +991,7 @@ spec:
 			// ensure cache is up-to-date before calling doBackup
 			Eventually(testdbaas.CheckObj(&testCtx, client.ObjectKeyFromObject(vs),
 				func(g Gomega, fetched *snapshotv1.VolumeSnapshot) {
-					g.Expect(fetched.Status != nil && fetched.Status.ReadyToUse != nil)
+					g.Expect(fetched.Status != nil && fetched.Status.ReadyToUse != nil).To(BeTrue())
 				})).Should(Succeed())
 
 			// prepare doBackup input parameters

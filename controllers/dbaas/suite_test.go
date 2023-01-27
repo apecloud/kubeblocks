@@ -47,6 +47,7 @@ import (
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/dbaas/components"
 	"github.com/apecloud/kubeblocks/controllers/k8score"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/apecloud/kubeblocks/internal/testutil"
 )
 
@@ -120,8 +121,9 @@ var _ = BeforeSuite(func() {
 
 	// run reconcile
 	k8sManager, err := ctrl.NewManager(cfg, ctrl.Options{
-		Scheme:             scheme.Scheme,
-		MetricsBindAddress: "0",
+		Scheme:                scheme.Scheme,
+		MetricsBindAddress:    "0",
+		ClientDisableCacheFor: intctrlutil.GetUnCacheObjects(),
 	})
 	Expect(err).ToNot(HaveOccurred())
 

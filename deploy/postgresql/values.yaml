@@ -1,0 +1,219 @@
+## @section PostgreSQL common parameters
+##
+
+## Bitnami PostgreSQL image version
+## ref: https://hub.docker.com/r/bitnami/postgresql/tags/
+## @param image.registry PostgreSQL image registry
+## @param image.repository PostgreSQL image repository
+## @param image.tag PostgreSQL image tag (immutable tags are recommended)
+## @param image.digest PostgreSQL image digest in the way sha256:aa.... Please note this parameter, if set, will override the tag
+## @param image.pullPolicy PostgreSQL image pull policy
+## @param image.pullSecrets Specify image pull secrets
+## @param image.debug Specify if debug values should be set
+##
+image:
+  registry: docker.io
+  repository: bitnami/postgresql
+  tag: 14.6.0-debian-11-r22
+  digest: ""
+  ## Specify a imagePullPolicy
+  ## Defaults to 'Always' if image tag is 'latest', else set to 'IfNotPresent'
+  ## ref: https://kubernetes.io/docs/user-guide/images/#pre-pulling-images
+  ##
+  pullPolicy: IfNotPresent
+  ## Optionally specify an array of imagePullSecrets.
+  ## Secrets must be manually created in the namespace.
+  ## ref: https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/
+  ## Example:
+  ## pullSecrets:
+  ##   - myRegistryKeySecretName
+  ##
+  pullSecrets: []
+  ## Set to true if you would like to see extra information on logs
+  ##
+  debug: false
+## Authentication parameters
+##
+auth:
+  ## @param auth.postgresPassword Password for the "postgres" admin user, leave empty 
+  ## for random generated password.
+  ##
+  postgresPassword:
+  ## @param auth.database Name for a custom database to create
+  ##
+  database: "custom_db"
+## Audit settings
+## @param audit.logHostname Log client hostnames
+## @param audit.logConnections Add client log-in operations to the log file
+## @param audit.logDisconnections Add client log-outs operations to the log file
+## @param audit.pgAuditLog Add operations to log using the pgAudit extension
+## @param audit.pgAuditLogCatalog Log catalog using pgAudit
+## @param audit.clientMinMessages Message log level to share with the user
+## @param audit.logLinePrefix Template for log line prefix (default if not set)
+## @param audit.logTimezone Timezone for the log timestamps
+##
+audit:
+  logHostname: false
+  logConnections: false
+  logDisconnections: false
+  pgAuditLog: ""
+  pgAuditLogCatalog: "off"
+  clientMinMessages: error
+  logLinePrefix: ""
+  logTimezone: ""
+
+## Set PostgreSQL preload extension shared libraries.
+## @param postgresqlSharedPreloadLibraries Shared preload libraries (comma-separated list)
+##
+postgresqlSharedPreloadLibraries: "pg_stat_statements, auto_explain"
+## Start PostgreSQL pod(s) without limitations on shm memory.
+## By default docker and containerd (and possibly other container runtimes) limit `/dev/shm` to `64M`
+##
+shmVolume:
+  ## @param shmVolume.enabled Enable emptyDir volume for /dev/shm for PostgreSQL pod(s)
+  ##
+  enabled: true
+  ## @param shmVolume.sizeLimit Set this to enable a size limit on the shm tmpfs
+  ## Note: the size of the tmpfs counts against container's memory limit
+  ## e.g:
+  ## sizeLimit: 1Gi
+  ##
+  sizeLimit: ""
+
+## @section PostgreSQL Primary parameters
+##
+primary:
+  ## @param primary.name Name of the primary database (eg primary, master, leader, ...)
+  ##
+  name: primary
+  ## @param primary.configuration PostgreSQL Primary main configuration to be injected as ConfigMap
+  ##
+  configuration: |-
+    # - Connection Settings -
+    listen_addresses = '*'
+    port = '5432'
+    #archive_command = 'wal_dir=/pg/arcwal; [[ $(date +%H%M) == 1200 ]] && rm -rf ${wal_dir}/$(date -d"yesterday" +%Y%m%d); /bin/mkdir -p ${wal_dir}/$(date +%Y%m%d) && /usr/bin/lz4 -q -z %p > ${wal_dir}/$(date +%Y%m%d)/%f.lz4'
+    #archive_mode = 'True'
+    auto_explain.log_analyze = 'True'
+    auto_explain.log_min_duration = '1s'
+    auto_explain.log_nested_statements = 'True'
+    auto_explain.log_timing = 'True'
+    auto_explain.log_verbose = 'True'
+    autovacuum_analyze_scale_factor = '0.05'
+    autovacuum_freeze_max_age = '100000000'
+    autovacuum_max_workers = '1'
+    autovacuum_naptime = '1min'
+    autovacuum_vacuum_cost_delay = '-1'
+    autovacuum_vacuum_cost_limit = '-1'
+    autovacuum_vacuum_scale_factor = '0.1'
+    bgwriter_delay = '10ms'
+    bgwriter_lru_maxpages = '800'
+    bgwriter_lru_multiplier = '5.0'
+    checkpoint_completion_target = '0.95'
+    checkpoint_timeout = '10min'
+    citus.node_conninfo = 'sslmode=prefer'
+    cluster_name = 'prod-osm-pigsty000'
+    commit_delay = '20'
+    commit_siblings = '10'
+    deadlock_timeout = '50ms'
+    default_statistics_target = '500'
+    effective_cache_size = '12GB'
+    hot_standby = 'on'
+    hot_standby_feedback = 'True'
+    huge_pages = 'try'
+    idle_in_transaction_session_timeout = '1h'
+    listen_addresses = '0.0.0.0'
+    log_autovacuum_min_duration = '1s'
+    log_checkpoints = 'True'
+    log_destination = 'csvlog'
+    log_directory = 'log'
+    log_filename = 'postgresql-%Y-%m-%d.log'
+    log_lock_waits = 'True'
+    log_min_duration_statement = '100'
+    log_replication_commands = 'True'
+    log_statement = 'ddl'
+    logging_collector = 'True'
+    #maintenance_work_mem = '3952MB'
+    max_connections = '10000'
+    max_locks_per_transaction = '128'
+    max_logical_replication_workers = '8'
+    max_parallel_maintenance_workers = '2'
+    max_parallel_workers = '8'
+    max_parallel_workers_per_gather = '0'
+    max_prepared_transactions = '0'
+    max_replication_slots = '16'
+    max_standby_archive_delay = '10min'
+    max_standby_streaming_delay = '3min'
+    max_sync_workers_per_subscription = '6'
+    max_wal_senders = '24'
+    max_wal_size = '100GB'
+    max_worker_processes = '8'
+    min_wal_size = '20GB'
+    password_encryption = 'md5'
+    pg_stat_statements.max = '5000'
+    pg_stat_statements.track = 'all'
+    pg_stat_statements.track_planning = 'False'
+    pg_stat_statements.track_utility = 'False'
+    random_page_cost = '1.1'
+    #auto generated
+    shared_buffers = '1GB'
+    #shared_preload_libraries = 'timescaledb, pg_stat_statements, auto_explain'
+    superuser_reserved_connections = '10'
+    temp_file_limit = '100GB'
+    #timescaledb.max_background_workers = '6'
+    #timescaledb.telemetry_level = 'off'
+    track_activity_query_size = '8192'
+    track_commit_timestamp = 'True'
+    track_functions = 'all'
+    track_io_timing = 'True'
+    vacuum_cost_delay = '2ms'
+    vacuum_cost_limit = '10000'
+    vacuum_defer_cleanup_age = '50000'
+    wal_buffers = '16MB'
+    wal_keep_size = '20GB'
+    wal_level = 'replica'
+    wal_log_hints = 'on'
+    wal_receiver_status_interval = '1s'
+    wal_receiver_timeout = '60s'
+    wal_writer_delay = '20ms'
+    wal_writer_flush_after = '1MB'
+    work_mem = '32MB'
+
+
+  ## @param primary.pgHbaConfiguration PostgreSQL Primary client authentication configuration
+  ## e.g:#
+  ## pgHbaConfiguration: |-
+  ##   local all all trust
+  ##   host all all localhost trust
+  ##   host mydatabase mysuser 192.168.0.0/24 md5
+  ##
+  pgHbaConfiguration: |-
+    host     all             all             0.0.0.0/0               md5
+    host     all             all             ::/0                    md5
+    local    all             all                                     md5
+    host     all             all             127.0.0.1/32            md5
+    host     all             all             ::1/128                 md5
+
+## @section Metrics Parameters
+metrics:
+  ## @param metrics.image.registry PostgreSQL Prometheus Exporter image registry
+  ## @param metrics.image.repository PostgreSQL Prometheus Exporter image repository
+  ## @param metrics.image.tag PostgreSQL Prometheus Exporter image tag (immutable tags are recommended)
+  ## @param metrics.image.digest PostgreSQL image digest in the way sha256:aa.... Please note this parameter, if set, will override the tag
+  ## @param metrics.image.pullPolicy PostgreSQL Prometheus Exporter image pull policy
+  ## @param metrics.image.pullSecrets Specify image pull secrets
+  ##
+  image:
+    registry: docker.io
+    repository: bitnami/postgres-exporter
+    tag: 0.11.1-debian-11-r49
+    digest: ""
+    pullPolicy: IfNotPresent
+    ## Optionally specify an array of imagePullSecrets.
+    ## Secrets must be manually created in the namespace.
+    ## ref: https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/
+    ## Example:
+    ## pullSecrets:
+    ##   - myRegistryKeySecretName
+    ##
+    pullSecrets: []

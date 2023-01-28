@@ -535,6 +535,19 @@ func (o *Options) uninstall() error {
 	spinner = newSpinner("Remove custom resource definitions")
 	printErr(spinner, deleteCRDs(o.Dynamic, objs.crds))
 
+	_, version, _ := checkIfKubeBlocksInstalled(o.Client)
+	// uninstall helm release
+	chart := helm.InstallOpts{
+		Name:      types.KubeBlocksChartName,
+		Namespace: o.Namespace,
+	}
+	spinner = newSpinner(fmt.Sprintf("Uninstall helm release %s %s", types.KubeBlocksChartName, version))
+	printErr(spinner, chart.UnInstall(o.HelmCfg))
+
+	// remove repo
+	spinner = newSpinner("Remove helm repo " + types.KubeBlocksChartName)
+	printErr(spinner, helm.RemoveRepo(&repo.Entry{Name: types.KubeBlocksChartName, URL: types.KubeBlocksChartURL}))
+
 	// delete deployments
 	spinner = newSpinner("Remove deployments")
 	printErr(spinner, deleteDeploys(o.Client, objs.deploys))

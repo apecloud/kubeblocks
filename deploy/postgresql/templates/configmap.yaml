@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgresql-configuration
+data:
+  {{- if .Values.primary.configuration }}
+  postgresql.conf: |-
+    {{- .Values.primary.configuration | nindent 4 }}
+  {{- end }}
+  {{- if .Values.primary.pgHbaConfiguration }}
+  pg_hba.conf: |
+    {{- .Values.primary.pgHbaConfiguration | nindent 4 }}
+  {{- end }}

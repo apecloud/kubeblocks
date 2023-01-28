@@ -33,10 +33,17 @@ func TestNewAllCondition(t *testing.T) {
 	NewSucceedCondition(opsRequest)
 	NewVerticalScalingCondition(opsRequest)
 	NewUpgradingCondition(opsRequest)
-	NewReconfigureCondition(opsRequest)
 	NewValidateFailedCondition(ReasonClusterPhaseMisMatch, "fail")
 	NewFailedCondition(opsRequest, nil)
 	NewFailedCondition(opsRequest, errors.New("opsRequest run failed"))
+
+	opsRequest.Spec.Reconfigure = &Reconfigure{
+		ComponentOps: ComponentOps{
+			ComponentName: "testReconfiguring",
+		},
+	}
+	NewReconfigureCondition(opsRequest)
+	NewReconfigureRunningCondition(opsRequest, ReasonReconfigureRunning, "for_test", "")
 }
 
 func TestSetStatusCondition(t *testing.T) {

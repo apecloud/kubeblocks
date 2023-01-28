@@ -168,9 +168,7 @@ func NewUpgradingCondition(ops *OpsRequest) *metav1.Condition {
 		Status:             metav1.ConditionTrue,
 		Reason:             "UpgradingStarted",
 		LastTransitionTime: metav1.NewTime(time.Now()),
-		Message: fmt.Sprintf("Start to upgrade in Cluster: %s, Component: %s",
-			ops.Spec.ClusterRef,
-			ops.Spec.Reconfigure.ComponentName),
+		Message:            fmt.Sprintf("Start to upgrade in Cluster: %s", ops.Spec.ClusterRef),
 	}
 }
 

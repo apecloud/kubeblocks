@@ -323,8 +323,7 @@ func (r *SystemAccountReconciler) createByReferingToExisting(reqCtx intctrlutil.
 	}
 	// and make a copy of it
 	newSecret := renderSecretByCopy(reqCtx.Req.Namespace, reqCtx.Req.Name, clusterDefType, clusterDefName, compName, (string)(account.Name), secret)
-	uprefErr := controllerutil.SetOwnerReference(cluster, newSecret, scheme)
-	if uprefErr != nil {
+	if uprefErr := controllerutil.SetOwnerReference(cluster, newSecret, scheme); uprefErr != nil {
 		return uprefErr
 	}
 

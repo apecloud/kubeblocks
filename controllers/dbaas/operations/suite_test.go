@@ -100,7 +100,7 @@ var _ = BeforeSuite(func() {
 	k8sManager, err = ctrl.NewManager(cfg, ctrl.Options{
 		Scheme:                scheme.Scheme,
 		MetricsBindAddress:    "0",
-		ClientDisableCacheFor: intctrlutil.GetUnCacheObjects(),
+		ClientDisableCacheFor: intctrlutil.GetUncacheObjects(),
 	})
 	Expect(err).ToNot(HaveOccurred())
 

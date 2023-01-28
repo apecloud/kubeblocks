@@ -21,24 +21,28 @@ import (
 	"os"
 	"time"
 
+	"github.com/onsi/gomega"
 	"github.com/sethvargo/go-password/password"
+
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 )
 
 type TestContext struct {
-	Ctx                   context.Context
-	Cli                   client.Client
-	TestEnv               *envtest.Environment
-	TestObjLabelKey       string
-	DefaultNamespace      string
-	DefaultTimeout        time.Duration
-	DefaultInterval       time.Duration
-	ClearResourceTimeout  time.Duration
-	ClearResourceInterval time.Duration
-	CreateObj             func(ctx context.Context, obj client.Object, opts ...client.CreateOption) error
-	CheckedCreateObj      func(ctx context.Context, obj client.Object, opts ...client.CreateOption) error
+	Ctx                                context.Context
+	Cli                                client.Client
+	TestEnv                            *envtest.Environment
+	TestObjLabelKey                    string
+	DefaultNamespace                   string
+	DefaultEventuallyTimeout           time.Duration
+	DefaultEventuallyPollingInterval   time.Duration
+	DefaultConsistentlyDuration        time.Duration
+	DefaultConsistentlyPollingInterval time.Duration
+	ClearResourceTimeout               time.Duration
+	ClearResourcePollingInterval       time.Duration
+	CreateObj                          func(ctx context.Context, obj client.Object, opts ...client.CreateOption) error
+	CheckedCreateObj                   func(ctx context.Context, obj client.Object, opts ...client.CreateOption) error
 }
 
 const (
@@ -49,12 +53,14 @@ const (
 
 func NewDefaultTestContext(ctx context.Context, cli client.Client, testEnv *envtest.Environment) TestContext {
 	t := TestContext{
-		TestObjLabelKey:       "kubeblocks.io/test",
-		DefaultNamespace:      "default",
-		DefaultTimeout:        time.Second * 10,
-		DefaultInterval:       time.Second,
-		ClearResourceTimeout:  time.Second * 60,
-		ClearResourceInterval: time.Second,
+		TestObjLabelKey:                    "kubeblocks.io/test",
+		DefaultNamespace:                   "default",
+		DefaultEventuallyTimeout:           time.Second * 10,
+		DefaultEventuallyPollingInterval:   time.Second,
+		DefaultConsistentlyDuration:        time.Second * 3,
+		DefaultConsistentlyPollingInterval: time.Second,
+		ClearResourceTimeout:               time.Second * 60,
+		ClearResourcePollingInterval:       time.Second,
 	}
 	t.Ctx = ctx
 	t.Cli = cli
@@ -75,6 +81,12 @@ func NewDefaultTestContext(ctx context.Context, cli client.Client, testEnv *envt
 		}
 		return nil
 	}
+
+	gomega.SetDefaultEventuallyTimeout(t.DefaultEventuallyTimeout)
+	gomega.SetDefaultEventuallyPollingInterval(t.DefaultEventuallyPollingInterval)
+	gomega.SetDefaultConsistentlyDuration(t.DefaultConsistentlyDuration)
+	gomega.SetDefaultConsistentlyPollingInterval(t.DefaultConsistentlyPollingInterval)
+
 	return t
 }
 

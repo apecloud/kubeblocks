@@ -44,23 +44,19 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 		interval           = time.Second
 		consensusCompName  = "consensus"
 	)
-	cleanupObjects := func() {
-		// Add any setup steps that needs to be executed before each test
-		err := k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.Cluster{}, client.InNamespace(testCtx.DefaultNamespace), client.HasLabels{testCtx.TestObjLabelKey})
-		Expect(err).NotTo(HaveOccurred())
-		err = k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.ClusterVersion{}, client.HasLabels{testCtx.TestObjLabelKey})
-		Expect(err).NotTo(HaveOccurred())
-		err = k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.ClusterDefinition{}, client.HasLabels{testCtx.TestObjLabelKey})
-		Expect(err).NotTo(HaveOccurred())
-	}
-	BeforeEach(func() {
-		cleanupObjects()
-	})
+	cleanEnv := func() {
+		// must wait until resources deleted and no longer exist before testcases start,
+		// otherwise if later it needs to create some new resource objects with the same name,
+		// in race conditions, the existence of old ones shall be found, which causes
+		// new objects fail to create.
+		By("clean resources")
 
-	AfterEach(func() {
-		// Add any teardown steps that needs to be executed after each test
-		cleanupObjects()
-	})
+		// delete cluster(and all dependent sub-resources), clusterversion and clusterdef
+		clearClusterResources(ctx)
+	}
+	BeforeEach(cleanEnv)
+
+	AfterEach(cleanEnv)
 
 	updateClusterAnnotation := func(cluster *dbaasv1alpha1.Cluster) {
 		patch := client.MergeFrom(cluster.DeepCopy())

@@ -55,36 +55,33 @@ var _ = Describe("SystemAccount Controller", func() {
 		ctx                    = context.Background()
 	)
 
-	cleanResources := func() {
-		nameSpacedObjects := []client.Object{
-			&corev1.ConfigMap{},
-			&corev1.Secret{},
-			&corev1.Endpoints{},
-			&batchv1.Job{},
-			&dbaasv1alpha1.Cluster{},
-			&dataprotectionv1alpha1.BackupPolicy{},
-		}
+	cleanEnv := func() {
+		// must wait until resources deleted and no longer exist before testcases start,
+		// otherwise if later it needs to create some new resource objects with the same name,
+		// in race conditions, the existence of old ones shall be found, which causes
+		// new objects fail to create.
+		By("clean resources")
 
-		globalObjects := []client.Object{
-			&dbaasv1alpha1.ClusterDefinition{},
-			&dbaasv1alpha1.ClusterVersion{},
-		}
+		clearClusterResources(ctx)
 
-		for _, obj := range nameSpacedObjects {
-			Expect(k8sClient.DeleteAllOf(ctx, obj, client.InNamespace(testCtx.DefaultNamespace))).To(Succeed())
+		// namespaced resources
+		inNS := client.InNamespace(testCtx.DefaultNamespace)
+		ml := client.HasLabels{testCtx.TestObjLabelKey}
+		clearResources(ctx, intctrlutil.EndpointsSignature, inNS, ml)
+		clearResources(ctx, intctrlutil.BackupPolicySignature, inNS, ml)
+
+		// clear internal states
+		for _, key := range systemAccountReconciler.SecretMapStore.ListKeys() {
+			Expect(systemAccountReconciler.SecretMapStore.deleteSecret(key)).Should(Succeed())
 		}
-		for _, obj := range globalObjects {
-			Expect(k8sClient.DeleteAllOf(ctx, obj)).To(Succeed())
+		for _, key := range systemAccountReconciler.ExpectionManager.ListKeys() {
+			Expect(systemAccountReconciler.ExpectionManager.deleteExpectation(key)).Should(Succeed())
 		}
 	}
 
-	BeforeEach((func() {
-		cleanResources()
-	}))
+	BeforeEach(cleanEnv)
 
-	AfterEach(func() {
-		cleanResources()
-	})
+	AfterEach(cleanEnv)
 
 	mockBackupPolicy := func(name string, engineName, clusterName string) *dataprotectionv1alpha1.BackupPolicy {
 		ml := map[string]string{
@@ -314,6 +311,7 @@ var _ = Describe("SystemAccount Controller", func() {
 					g.Expect(changeSpec(intctrlutil.GetNamespacedName(&job), func(job *batchv1.Job) {
 						controllerutil.RemoveFinalizer(job, finalizerName)
 					})).To(Succeed())
+					g.Expect(checkExists(intctrlutil.GetNamespacedName(&job), &batchv1.Job{}, false)).To(Succeed())
 				}
 			}, timeout, interval).Should(Succeed())
 
@@ -339,10 +337,6 @@ var _ = Describe("SystemAccount Controller", func() {
 			Eventually(func(g Gomega) {
 				_, exists, _ := systemAccountReconciler.ExpectionManager.getExpectation(policyKey)
 				g.Expect(exists).To(BeFalse())
-			}, timeout, interval).Should(Succeed())
-
-			Eventually(func() error {
-				return k8sClient.Delete(ctx, cluster)
 			}, timeout, interval).Should(Succeed())
 		})
 	})

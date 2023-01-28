@@ -45,24 +45,18 @@ var _ = Describe("OpsRequest Controller", func() {
 	var ctx = context.Background()
 
 	cleanAll := func() {
-		By("clean all resources")
-
 		// must wait until resources deleted and no longer exist before testcases start,
 		// otherwise if later it needs to create some new resource objects with the same name,
-		// in race conditions, the existence of old ones shall be watched, which causes
+		// in race conditions, the existence of old ones shall be found, which causes
 		// new objects fail to create.
+		By("clean resources")
 
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
-
-		By("clean opsrequest")
 		clearResources(ctx, intctrlutil.OpsRequestSignature, inNS, ml)
-		By("clean cluster")
-		clearResources(ctx, intctrlutil.ClusterSignature, inNS, ml)
-		By("clean clusterversion")
-		clearResources(ctx, intctrlutil.ClusterVersionSignature, ml)
-		By("clean clusterdefinition")
-		clearResources(ctx, intctrlutil.ClusterDefinitionSignature, ml)
+
+		// delete cluster(and all dependent sub-resources), clusterversion and clusterdef
+		clearClusterResources(ctx)
 	}
 
 	BeforeEach(cleanAll)
@@ -273,7 +267,7 @@ spec:
 
 			By("mock cluster status running")
 			// MOCK pods are created and running, so as the cluster
-			Eventually(mockSetClusterStatusPhaseToRunning(key), timeout, interval).Should(Succeed())
+			Expect(mockSetClusterStatusPhaseToRunning(key)).Should(Succeed())
 
 			By("send VerticalScalingOpsRequest successfully")
 			verticalScalingOpsRequest := createOpsRequest("mysql-verticalscaling", clusterObj.Name, dbaasv1alpha1.VerticalScalingType)
@@ -304,16 +298,16 @@ spec:
 			}), timeout, interval).Should(Succeed())
 
 			By("mock bring Cluster and changed component back to running status")
-			Eventually(mockSetClusterStatusPhaseToRunning(key), timeout, interval).Should(Succeed())
+			Expect(mockSetClusterStatusPhaseToRunning(key)).Should(Succeed())
 
 			By("patch opsrequest controller to run")
-			Eventually(changeSpec(intctrlutil.GetNamespacedName(verticalScalingOpsRequest),
+			Expect(changeSpec(intctrlutil.GetNamespacedName(verticalScalingOpsRequest),
 				func(opsRequest *dbaasv1alpha1.OpsRequest) {
 					if opsRequest.Annotations == nil {
 						opsRequest.Annotations = make(map[string]string, 1)
 					}
 					opsRequest.Annotations[intctrlutil.OpsRequestReconcileAnnotationKey] = time.Now().Format(time.RFC3339Nano)
-				}), timeout, interval).Should(Succeed())
+				})).Should(Succeed())
 
 			By("check VerticalScalingOpsRequest succeed")
 			Eventually(checkObj(intctrlutil.GetNamespacedName(verticalScalingOpsRequest),

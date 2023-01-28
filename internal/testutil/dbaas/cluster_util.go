@@ -141,3 +141,14 @@ func MockClusterDefinition(ctx context.Context, testCtx testutil.TestContext, cl
 	gomega.Expect(yaml.Unmarshal([]byte(clusterDefYaml), clusterDef)).Should(gomega.Succeed())
 	return CreateK8sResource(ctx, testCtx, clusterDef).(*dbaasv1alpha1.ClusterDefinition)
 }
+
+func MockClusterVersion(ctx context.Context, testCtx testutil.TestContext, clusterDefName, clusterVersionName string, filePath string) *dbaasv1alpha1.ClusterVersion {
+	clusterVersionBytes, err := testdata.GetTestDataFileContent(filePath)
+	if err != nil {
+		return nil
+	}
+	clusterVersionYAML := fmt.Sprintf(string(clusterVersionBytes), clusterVersionName, clusterDefName)
+	clusterVersion := &dbaasv1alpha1.ClusterVersion{}
+	gomega.Expect(yaml.Unmarshal([]byte(clusterVersionYAML), clusterVersion)).Should(gomega.Succeed())
+	return CreateK8sResource(ctx, testCtx, clusterVersion).(*dbaasv1alpha1.ClusterVersion)
+}

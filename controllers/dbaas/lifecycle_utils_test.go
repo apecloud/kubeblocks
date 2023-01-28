@@ -83,7 +83,7 @@ var _ = Describe("lifecycle_utils", func() {
 
 	AfterEach(cleanAll)
 
-	Context("mergeMonitorConfig", func() {
+	Context("has the mergeMonitorConfig function", func() {
 		var component *Component
 		var cluster *dbaasv1alpha1.Cluster
 		var clusterComp *dbaasv1alpha1.ClusterComponent
@@ -115,7 +115,7 @@ var _ = Describe("lifecycle_utils", func() {
 			clusterDefComp = &clusterDef.Spec.Components[0]
 		})
 
-		It("Monitor disable in ClusterComponent", func() {
+		It("should disable monitor if ClusterComponent.Monitor is false", func() {
 			clusterComp.Monitor = false
 			mergeMonitorConfig(cluster, clusterDef, clusterDefComp, clusterComp, component)
 			monitorConfig := component.Monitor
@@ -127,7 +127,7 @@ var _ = Describe("lifecycle_utils", func() {
 			}
 		})
 
-		It("Disable builtIn monitor in ClusterDefinitionComponent", func() {
+		It("should disable builtin monitor if ClusterDefinitionComponent.Monitor.BuiltIn is false and has valid ExporterConfig", func() {
 			clusterComp.Monitor = true
 			clusterDefComp.CharacterType = kFake
 			clusterDefComp.Monitor.BuiltIn = false
@@ -141,7 +141,7 @@ var _ = Describe("lifecycle_utils", func() {
 			}
 		})
 
-		It("Disable builtIn monitor with wrong monitorConfig in ClusterDefinitionComponent", func() {
+		It("should disable monitor if ClusterDefinitionComponent.Monitor.BuiltIn is false and lacks ExporterConfig", func() {
 			clusterComp.Monitor = true
 			clusterDefComp.CharacterType = kFake
 			clusterDefComp.Monitor.BuiltIn = false
@@ -156,7 +156,7 @@ var _ = Describe("lifecycle_utils", func() {
 			}
 		})
 
-		It("Enable builtIn with wrong CharacterType in ClusterDefinitionComponent", func() {
+		It("should disable monitor if ClusterDefinitionComponent.Monitor.BuiltIn is true and CharacterType isn't recognizable", func() {
 			clusterComp.Monitor = true
 			clusterDefComp.CharacterType = kFake
 			clusterDefComp.Monitor.BuiltIn = true
@@ -171,7 +171,8 @@ var _ = Describe("lifecycle_utils", func() {
 			}
 		})
 
-		It("Enable builtIn with empty CharacterType and wrong clusterType in ClusterDefinitionComponent", func() {
+		It("should disable monitor if ClusterDefinitionComponent's CharacterType is empty", func() {
+			// TODO fixme: seems setting clusterDef.Spec.Type has no effect to mergeMonitorConfig
 			clusterComp.Monitor = true
 			clusterDef.Spec.Type = kFake
 			clusterDefComp.CharacterType = ""
@@ -188,7 +189,7 @@ var _ = Describe("lifecycle_utils", func() {
 		})
 	})
 
-	Context("checkAndUpdatePodVolumes", func() {
+	Context("has the checkAndUpdatePodVolumes function which generates Pod Volumes for mounting ConfigMap objects", func() {
 		var sts appsv1.StatefulSet
 		var volumes map[string]dbaasv1alpha1.ConfigTemplate
 		BeforeEach(func() {
@@ -225,14 +226,14 @@ var _ = Describe("lifecycle_utils", func() {
 
 		})
 
-		It("Corner case volume is nil, and add no volume", func() {
+		It("should succeed in corner case where input volumes is nil, which means no volume is added", func() {
 			ps := &sts.Spec.Template.Spec
 			err := checkAndUpdatePodVolumes(ps, volumes)
 			Expect(err).Should(BeNil())
 			Expect(len(ps.Volumes)).To(Equal(1))
 		})
 
-		It("Normal test case, and add one volume", func() {
+		It("should succeed in normal test case, where one volume is added", func() {
 			volumes["my_config"] = dbaasv1alpha1.ConfigTemplate{
 				Name:                "myConfig",
 				ConfigTplRef:        "myConfig",
@@ -245,7 +246,7 @@ var _ = Describe("lifecycle_utils", func() {
 			Expect(len(ps.Volumes)).To(Equal(2))
 		})
 
-		It("Normal test case, and add two volume", func() {
+		It("should succeed in normal test case, where two volumes are added", func() {
 			volumes["my_config"] = dbaasv1alpha1.ConfigTemplate{
 				Name:                "myConfig",
 				ConfigTplRef:        "myConfig",
@@ -264,7 +265,7 @@ var _ = Describe("lifecycle_utils", func() {
 			Expect(len(ps.Volumes)).To(Equal(3))
 		})
 
-		It("replica configmap volumes test case", func() {
+		It("should fail if updated volume doesn't contain ConfigMap", func() {
 			const (
 				cmName            = "my_config_for_test"
 				replicaVolumeName = "mytest-cm-volume_for_test"
@@ -286,7 +287,7 @@ var _ = Describe("lifecycle_utils", func() {
 			Expect(checkAndUpdatePodVolumes(ps, volumes)).ShouldNot(Succeed())
 		})
 
-		It("ISV config volumes test case", func() {
+		It("should succeed if updated volume contains ConfigMap", func() {
 			const (
 				cmName            = "my_config_for_isv"
 				replicaVolumeName = "mytest-cm-volume_for_isv"
@@ -587,8 +588,8 @@ spec:
 		return cluster, clusterDefObj, clusterVersionObj, key
 	}
 
-	Context("When mergeComponents", func() {
-		It("Should merge with no error", func() {
+	Context("has the mergeComponents function", func() {
+		It("should work as expected with various inputs", func() {
 			cluster, clusterDef, clusterVersion, _ := newAllFieldsClusterObj(nil, nil, true)
 			By("assign every available fields")
 			reqCtx := intctrlutil.RequestCtx{
@@ -603,6 +604,7 @@ spec:
 				&clusterVersion.Spec.Components[0],
 				&cluster.Spec.Components[0])
 			Expect(component).ShouldNot(BeNil())
+
 			By("leave clusterVersion.podSpec nil")
 			clusterVersion.Spec.Components[0].PodSpec = nil
 			component = mergeComponents(
@@ -613,6 +615,7 @@ spec:
 				&clusterVersion.Spec.Components[0],
 				&cluster.Spec.Components[0])
 			Expect(component).ShouldNot(BeNil())
+
 			clusterVersion = allFieldsClusterVersionObj(true)
 			By("new container in clusterVersion not in clusterDefinition")
 			component = mergeComponents(
@@ -623,6 +626,7 @@ spec:
 				&clusterVersion.Spec.Components[1],
 				&cluster.Spec.Components[0])
 			Expect(len(component.PodSpec.Containers)).Should(Equal(2))
+
 			By("leave clusterComp nil")
 			component = mergeComponents(
 				reqCtx,
@@ -632,6 +636,7 @@ spec:
 				&clusterVersion.Spec.Components[0],
 				nil)
 			Expect(component).ShouldNot(BeNil())
+
 			By("leave clusterDefComp nil")
 			component = mergeComponents(
 				reqCtx,
@@ -820,8 +825,8 @@ spec:
 		return &backupPolicyTemplate
 	}
 
-	Context("Build object from cue template", func() {
-		It("Build PVC", func() {
+	Context("has helper function which builds specific object from cue template", func() {
+		It("builds PVC correctly", func() {
 			sts := newStsObj()
 			pvc, err := buildPVCFromSnapshot(sts, pvcKey, snapshotName)
 			Expect(err).Should(BeNil())
@@ -830,21 +835,21 @@ spec:
 			Expect(pvc.Spec.Resources).Should(Equal(sts.Spec.VolumeClaimTemplates[0].Spec.Resources))
 		})
 
-		It("Build Service", func() {
+		It("builds Service correctly", func() {
 			params := newParams()
 			svc, err := buildSvc(*params, true)
 			Expect(err).Should(BeNil())
 			Expect(svc).ShouldNot(BeNil())
 		})
 
-		It("Build ConnCredential", func() {
+		It("builds ConnCredential correctly", func() {
 			params := newParams()
 			credential, err := buildConnCredential(*params)
 			Expect(err).Should(BeNil())
 			Expect(credential).ShouldNot(BeNil())
 		})
 
-		It("Build StatefulSet", func() {
+		It("builds StatefulSet correctly", func() {
 			reqCtx := newReqCtx()
 			params := newParams()
 			envConfigName := "test-env-config-name"
@@ -860,7 +865,7 @@ spec:
 			Expect(sts).ShouldNot(BeNil())
 		})
 
-		It("Build Deploy", func() {
+		It("builds Deploy correctly", func() {
 			reqCtx := newReqCtx()
 			params := newParams()
 			deploy, err := buildDeploy(reqCtx, *params)
@@ -868,14 +873,14 @@ spec:
 			Expect(deploy).ShouldNot(BeNil())
 		})
 
-		It("Build PDB", func() {
+		It("builds PDB correctly", func() {
 			params := newParams()
 			pdb, err := buildPDB(*params)
 			Expect(err).Should(BeNil())
 			Expect(pdb).ShouldNot(BeNil())
 		})
 
-		It("Build Env Config", func() {
+		It("builds Env Config correctly", func() {
 			params := newParams()
 			cfg, err := buildEnvConfig(*params)
 			Expect(err).Should(BeNil())
@@ -883,7 +888,7 @@ spec:
 			Expect(len(cfg.Data) == 2).Should(BeTrue())
 		})
 
-		It("Build BackupPolicy", func() {
+		It("builds BackupPolicy correctly", func() {
 			sts := newStsObj()
 			backupPolicyTemplate := newBackupPolicyTemplate()
 			backupKey := types.NamespacedName{
@@ -895,7 +900,7 @@ spec:
 			Expect(policy).ShouldNot(BeNil())
 		})
 
-		It("Build BackupJob", func() {
+		It("builds BackupJob correctly", func() {
 			sts := newStsObj()
 			backupJobKey := types.NamespacedName{
 				Namespace: "default",
@@ -907,7 +912,7 @@ spec:
 			Expect(backupJob).ShouldNot(BeNil())
 		})
 
-		It("Build VolumeSnapshot", func() {
+		It("builds VolumeSnapshot correctly", func() {
 			sts := newStsObj()
 			snapshotKey := types.NamespacedName{
 				Namespace: "default",
@@ -919,7 +924,7 @@ spec:
 			Expect(vs).ShouldNot(BeNil())
 		})
 
-		It("Build CronJob", func() {
+		It("builds CronJob correctly", func() {
 			sts := newStsObj()
 			pvcKey := types.NamespacedName{
 				Namespace: "default",
@@ -958,45 +963,59 @@ spec:
 		return &vs
 	}
 
-	Context("Backup in cluster with mock", func() {
-		It("doBackup", func() {
+	Context("with HorizontalScalePolicy set to CloneFromSnapshot and VolumeSnapshot exists", func() {
+		It("determines return value of doBackup according to whether VolumeSnapshot is ReadyToUse", func() {
+			By("prepare cluster and construct component")
 			reqCtx := newReqCtx()
-			cluster, _, _, _ := newAllFieldsClusterObj(nil, nil, false)
-			component := newAllFieldsComponent()
-			sts := newStsObj()
-			vs := newVolumeSnapshot(cluster.Name)
-			snapshotKey := types.NamespacedName{
-				Namespace: "default",
-				Name:      "test-snapshot",
-			}
+			cluster, clusterDef, clusterVersion, _ := newAllFieldsClusterObj(nil, nil, false)
+			component := mergeComponents(
+				reqCtx,
+				cluster,
+				clusterDef,
+				&clusterDef.Spec.Components[0],
+				&clusterVersion.Spec.Components[0],
+				&cluster.Spec.Components[0])
+			Expect(component).ShouldNot(BeNil())
 			component.HorizontalScalePolicy = &dbaasv1alpha1.HorizontalScalePolicy{
 				Type:             dbaasv1alpha1.HScaleDataClonePolicyFromSnapshot,
 				VolumeMountsName: "data",
 			}
-			Expect(k8sClient.Create(ctx, vs)).Should(Succeed())
-			patch := client.MergeFrom(vs.DeepCopy())
-			t := true
-			vs.Status = &snapshotv1.VolumeSnapshotStatus{ReadyToUse: &t}
-			Expect(k8sClient.Status().Patch(ctx, vs, patch)).Should(Succeed())
+
+			By("prepare VolumeSnapshot and set ReadyToUse to true")
+			vs := newVolumeSnapshot(cluster.Name)
+			Expect(testCtx.CreateObj(ctx, vs)).Should(Succeed())
+			Expect(testdbaas.ChangeObjStatus(&testCtx, vs, func() {
+				t := true
+				vs.Status = &snapshotv1.VolumeSnapshotStatus{ReadyToUse: &t}
+			})).Should(Succeed())
+
+			// prepare doBackup input parameters
+			snapshotKey := types.NamespacedName{
+				Namespace: "default",
+				Name:      "test-snapshot",
+			}
+			sts := newStsObj()
 			stsProto := *sts.DeepCopy()
 			r := int32(3)
 			stsProto.Spec.Replicas = &r
+
+			By("doBackup should return requeue=false")
 			shouldRequeue, err := doBackup(reqCtx, k8sClient, cluster, component, sts, &stsProto, snapshotKey)
 			Expect(shouldRequeue).Should(BeFalse())
-			Expect(err).Should(BeNil())
-			By("readyToUse is nil, should requeue normally")
-			patch = client.MergeFrom(vs.DeepCopy())
-			vs.Status = &snapshotv1.VolumeSnapshotStatus{ReadyToUse: nil}
-			Expect(k8sClient.Status().Patch(ctx, vs, patch)).Should(Succeed())
-			Eventually(func() bool {
-				vsList := snapshotv1.VolumeSnapshotList{}
-				ml := getBackupMatchingLabels(cluster.Name, component.Name)
-				Expect(k8sClient.List(ctx, &vsList, ml)).Should(Succeed())
-				return len(vsList.Items) == 1 && vsList.Items[0].Status.ReadyToUse == nil
-			}, 10, 1).Should(BeTrue())
+			Expect(err).ShouldNot(HaveOccurred())
+
+			By("Set ReadyToUse to nil, doBackup should return requeue=true")
+			Expect(testdbaas.ChangeObjStatus(&testCtx, vs, func() {
+				vs.Status = &snapshotv1.VolumeSnapshotStatus{ReadyToUse: nil}
+			})).Should(Succeed())
+			// wait until cache updated
+			Eventually(testdbaas.CheckObj(&testCtx, intctrlutil.GetNamespacedName(vs),
+				func(g Gomega, vs *snapshotv1.VolumeSnapshot) {
+					g.Expect(vs.Status.ReadyToUse).To(BeNil())
+				})).Should(Succeed())
 			shouldRequeue, err = doBackup(reqCtx, k8sClient, cluster, component, sts, &stsProto, snapshotKey)
 			Expect(shouldRequeue).Should(BeTrue())
-			Expect(err).Should(BeNil())
+			Expect(err).ShouldNot(HaveOccurred())
 		})
 	})
 })

@@ -465,17 +465,16 @@ func (r *ClusterReconciler) deleteExternalResources(reqCtx intctrlutil.RequestCt
 }
 
 func removeFinalizer[T intctrlutil.Object, PT intctrlutil.PObject[T],
-	L intctrlutil.ObjList[T], PL intctrlutil.PObjList[T, L], Traits intctrlutil.ObjListTraits[T, L]](
-	r *ClusterReconciler, reqCtx intctrlutil.RequestCtx, _ func(T, L, Traits), opts ...client.ListOption) (*ctrl.Result, error) {
+	L intctrlutil.ObjList[T], PL intctrlutil.PObjList[T, L]](
+	r *ClusterReconciler, reqCtx intctrlutil.RequestCtx, _ func(T, L), opts ...client.ListOption) (*ctrl.Result, error) {
 	var (
 		objList L
-		traits  Traits
 	)
 	if err := r.List(reqCtx.Ctx, PL(&objList), opts...); err != nil {
 		res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 		return &res, err
 	}
-	for _, obj := range traits.GetItems(&objList) {
+	for _, obj := range reflect.ValueOf(&objList).Elem().FieldByName("Items").Interface().([]T) {
 		pobj := PT(&obj)
 		if !controllerutil.ContainsFinalizer(pobj, dbClusterFinalizerName) {
 			continue

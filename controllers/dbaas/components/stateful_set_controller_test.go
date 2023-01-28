@@ -109,13 +109,17 @@ var _ = Describe("StatefulSet Controller", func() {
 
 		By("mock restart cluster")
 		sts.Spec.Template.Annotations = map[string]string{
-			"kubeblocks.io/restart": time.Now().Format(time.RFC3339),
+			intctrlutil.RestartAnnotationKey: time.Now().Format(time.RFC3339),
 		}
 		Expect(k8sClient.Update(context.Background(), sts)).Should(Succeed())
 
 		By("mock statefulset is ready")
 		newSts := &appsv1.StatefulSet{}
-		Expect(k8sClient.Get(context.Background(), client.ObjectKey{Name: sts.Name, Namespace: testCtx.DefaultNamespace}, newSts)).Should(Succeed())
+		Eventually(func(g Gomega) {
+			g.Expect(k8sClient.Get(context.Background(), client.ObjectKey{Name: sts.Name, Namespace: testCtx.DefaultNamespace}, newSts)).To(Succeed())
+			// ensure fetched newSts is up-to-date, since client.Get reads from cache
+			g.Expect(newSts.Spec.Template.Annotations).To(HaveKey(intctrlutil.RestartAnnotationKey))
+		}).Should(Succeed())
 		stsPatch := client.MergeFrom(newSts.DeepCopy())
 		updateRevision := fmt.Sprintf("%s-%s-%s", clusterName, consensusCompName, revisionID)
 		newSts.Status.UpdateRevision = updateRevision

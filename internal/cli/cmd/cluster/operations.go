@@ -164,6 +164,17 @@ func (o *OperationsOptions) validateReconfiguring() error {
 	if err := o.validateConfigMapKey(tpl, componentName); err != nil {
 		return err
 	}
+	if err := validateConfigParams(reconfiguringParameter{
+		tpl:           tpl,
+		client:        o.Client,
+		clusterName:   o.Name,
+		componentName: componentName,
+		templateName:  o.CfgTemplateName,
+		keyName:       o.CfgFile,
+		params:        o.KeyValues,
+	}); err != nil {
+		return err
+	}
 	return nil
 }
 

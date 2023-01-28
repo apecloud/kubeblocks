@@ -38,8 +38,8 @@ func updateCfgParams(config dbaasv1alpha1.Configuration,
 		cm     = &corev1.ConfigMap{}
 		cfgTpl = &dbaasv1alpha1.ConfigConstraint{}
 
-		err      error
-		operator cfgcore.ConfigOperator
+		err    error
+		newCfg map[string]string
 	)
 
 	if err := cli.Get(ctx, cmKey, cm); err != nil {
@@ -51,54 +51,25 @@ func updateCfgParams(config dbaasv1alpha1.Configuration,
 	}, cfgTpl); err != nil {
 		return false, nil, err
 	}
-	if operator, err = cfgcore.NewConfigLoader(cfgcore.CfgOption{
-		Type:    cfgcore.CfgCmType,
-		Log:     log.FromContext(ctx),
-		CfgType: cfgTpl.Spec.FormatterConfig.Formatter,
-		K8sKey: &cfgcore.K8sConfig{
-			CfgKey: client.ObjectKeyFromObject(cm),
-			ResourceFn: func(key client.ObjectKey) (map[string]string, error) {
-				return cm.Data, nil
-			},
-		},
-	}); err != nil {
-		return false, nil, err
+
+	params := make([]cfgcore.ParamPairs, len(config.Keys))
+	for i, key := range config.Keys {
+		params[i] = cfgcore.ParamPairs{
+			Key:           key.Key,
+			UpdatedParams: fromKeyValuePair(key.Parameters),
+		}
 	}
 
-	// process special formatter options
 	fc := cfgTpl.Spec.FormatterConfig
-	options := func(ctx *cfgcore.CfgOpOption) {
-		// process special formatter
-		if fc.Formatter == dbaasv1alpha1.INI && fc.IniConfig != nil {
-			ctx.IniContext = &cfgcore.IniContext{
-				SectionName: fc.IniConfig.SectionName,
-			}
-		}
-	}
-
-	// merge param to config file
-	for _, key := range config.Keys {
-		if err := operator.MergeFrom(fromKeyValuePair(key.Parameters),
-			cfgcore.NewCfgOptions(key.Key, options)); err != nil {
-			return false, nil, err
-		}
-	}
-
-	newCfg, err := operator.ToCfgContent()
+	newCfg, err = cfgcore.MergeAndValidateConfiguration(cfgTpl.Spec, cm.Data, params)
 	if err != nil {
-		return false, nil, cfgcore.WrapError(err, "failed to generate config file")
-	}
-
-	configChecker := cfgcore.NewConfigValidator(&cfgTpl.Spec)
-	if err := configChecker.Validate(newCfg); err != nil {
-		return true, nil, cfgcore.WrapError(err, "failed to validate updated config")
+		return false, nil, err
 	}
 
 	difference, err := generateVersionDifference(client.ObjectKeyFromObject(cm), cm.Data, newCfg, fc.Formatter)
 	if err != nil {
 		return false, nil, err
 	}
-
 	if !difference.IsModify {
 		return false, difference, nil
 	}

@@ -25,6 +25,7 @@ import (
 	"strings"
 
 	"github.com/StudioSol/set"
+	"k8s.io/client-go/dynamic"
 
 	"github.com/spf13/cobra"
 	corev1 "k8s.io/api/core/v1"
@@ -69,6 +70,16 @@ type parameterTemplate struct {
 	enum        []string
 	description string
 	scope       string
+}
+
+type reconfiguringParameter struct {
+	client        dynamic.Interface
+	clusterName   string
+	componentName string
+	templateName  string
+	keyName       string
+	params        map[string]string
+	tpl           *dbaasv1alpha1.ConfigTemplate
 }
 
 var (
@@ -521,6 +532,34 @@ func getValidUpdatedParams(status dbaasv1alpha1.OpsRequestStatus) string {
 		return err.Error()
 	}
 	return string(b)
+}
+
+func validateConfigParams(param reconfiguringParameter) error {
+	var (
+		configConstraint = dbaasv1alpha1.ConfigConstraint{}
+		tpl              = param.tpl
+	)
+
+	transKeyPair := func(pts map[string]string) map[string]interface{} {
+		m := make(map[string]interface{}, len(pts))
+		for key, value := range pts {
+			m[key] = value
+		}
+		return m
+	}
+
+	if err := util.GetResourceObjectFromGVR(types.ConfigConstraintGVR(), client.ObjectKey{
+		Namespace: "",
+		Name:      tpl.ConfigConstraintRef,
+	}, param.client, &configConstraint); err != nil {
+		return err
+	}
+
+	_, err := cfgcore.MergeAndValidateConfiguration(configConstraint.Spec, map[string]string{param.keyName: ""}, []cfgcore.ParamPairs{{
+		Key:           param.keyName,
+		UpdatedParams: transKeyPair(param.params),
+	}})
+	return err
 }
 
 func NewDescribeReconfigureCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {

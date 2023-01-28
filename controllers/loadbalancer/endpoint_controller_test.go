@@ -26,6 +26,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	testdbaas "github.com/apecloud/kubeblocks/internal/testutil/dbaas"
 )
 
 var newEndpointsObj = func(svc *corev1.Service) (*corev1.Endpoints, types.NamespacedName) {
@@ -45,25 +48,35 @@ var newEndpointsObj = func(svc *corev1.Service) (*corev1.Endpoints, types.Namesp
 }
 
 var _ = Describe("EndpointController", func() {
-	BeforeEach(func() {
-		// Add any steup steps that needs to be executed before each test
-		var (
-			objs = []client.Object{&corev1.Service{}, &corev1.Endpoints{}, &corev1.Pod{}}
-		)
+	cleanEnv := func() {
+		// must wait until resources deleted and no longer exist before the testcases start, otherwise :
+		// - if later it needs to create some new resource objects with the same name,
+		// in race conditions, it will find the existence of old objects, resulting failure to
+		// create the new objects.
+		// - worse, if an async DeleteAll call is issued here, it maybe executed later by the
+		// K8s API server, by which time the testcase may have already created some new test objects,
+		// which shall be accidentally deleted.
+		By("clean resources")
 
-		for _, obj := range objs {
-			err := k8sClient.DeleteAllOf(context.Background(), obj,
-				client.InNamespace(namespace), client.HasLabels{testCtx.TestObjLabelKey})
-			Expect(err).ShouldNot(HaveOccurred())
-		}
-	})
+		// delete rest mocked objects
+		inNS := client.InNamespace(testCtx.DefaultNamespace)
+		ml := client.HasLabels{testCtx.TestObjLabelKey}
+		// namespaced
+		testdbaas.ClearResources(&testCtx, intctrlutil.ServiceSignature, inNS, ml)
+		testdbaas.ClearResources(&testCtx, intctrlutil.EndpointsSignature, inNS, ml)
+		testdbaas.ClearResources(&testCtx, intctrlutil.PodSignature, inNS, ml)
+	}
+
+	BeforeEach(cleanEnv)
+
+	AfterEach(cleanEnv)
 
 	Context("", func() {
 		It("", func() {
 			svc, svcKey := newSvcObj(false, node1IP)
 			ep, epKey := newEndpointsObj(svc)
 			Expect(testCtx.CreateObj(context.Background(), svc)).Should(Succeed())
-			Expect(testCtx.CheckedCreateObj(context.Background(), ep)).Should(Succeed())
+			Expect(testCtx.CreateObj(context.Background(), ep)).Should(Succeed())
 			Eventually(func() bool {
 				if err := k8sClient.Get(context.Background(), svcKey, svc); err != nil {
 					return false

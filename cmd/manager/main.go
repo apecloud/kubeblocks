@@ -40,6 +40,7 @@ import (
 	"github.com/apecloud/kubeblocks/controllers/dbaas/components"
 	"github.com/apecloud/kubeblocks/controllers/dbaas/configuration"
 	k8scorecontrollers "github.com/apecloud/kubeblocks/controllers/k8score"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/apecloud/kubeblocks/internal/webhook"
 	//+kubebuilder:scaffold:imports
 )
@@ -131,7 +132,8 @@ func main() {
 		// after the manager stops then its usage might be unsafe.
 		LeaderElectionReleaseOnCancel: true,
 
-		CertDir: viper.GetString("cert_dir"),
+		CertDir:               viper.GetString("cert_dir"),
+		ClientDisableCacheFor: intctrlutil.GetUncacheObjects(),
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")

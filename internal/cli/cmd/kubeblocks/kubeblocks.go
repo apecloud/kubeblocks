@@ -288,7 +288,7 @@ func (o *InstallOptions) disableUnsupportedSets() {
 		disabledSets []string
 	)
 	// unsupported flags in non-cloud kubernetes cluster
-	unsupported := []string{"loadbalancer.enable", "snapshot-controller.enable"}
+	unsupported := []string{"loadbalancer.enabled"}
 
 	var sets []string
 	for _, set := range o.Sets {

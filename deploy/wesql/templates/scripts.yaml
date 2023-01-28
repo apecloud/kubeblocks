@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: wesql-scripts
+  name: apecloud-mysql-scripts
 data:
   setup.sh: |
     #!/bin/bash

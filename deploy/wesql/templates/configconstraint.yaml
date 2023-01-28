@@ -1,7 +1,7 @@
 apiVersion: dbaas.kubeblocks.io/v1alpha1
 kind: ConfigConstraint
 metadata:
-  name: wesql-cfg-constraints-8.0
+  name: mysql-cfg-constraints-8.0
   labels:
     {{- include "wesqlapp.labels" . | nindent 4 }}
 spec:

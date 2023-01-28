@@ -17,8 +17,6 @@ limitations under the License.
 package operations
 
 import (
-	"encoding/json"
-	"fmt"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -88,9 +86,12 @@ func (r *reconfigureAction) Handle(eventContext cfgcore.ConfigEventContext, last
 		return err
 	}
 
-	if err := patchReconfigureStatus(
-		opsRes, eventContext.TplName, &eventContext.PolicyStatus, phase,
-		createConfigureStatus(eventContext.TplName, eventContext.Meta)); err != nil {
+	if err := patchReconfiguringStatus(
+		opsRes,
+		eventContext.TplName,
+		&eventContext.PolicyStatus,
+		phase,
+		constructReconfigureStatus(eventContext.TplName, eventContext.ConfigPatch, nil)); err != nil {
 		return err
 	}
 
@@ -100,55 +101,20 @@ func (r *reconfigureAction) Handle(eventContext cfgcore.ConfigEventContext, last
 			dbaasv1alpha1.NewReconfigureRunningCondition(opsRequest,
 				dbaasv1alpha1.ReasonReconfigureSucceed,
 				eventContext.TplName,
-				formatConfigurationDifference(eventContext.Meta, &eventContext.PolicyStatus)),
+				formatConfigPatch(eventContext.ConfigPatch, &eventContext.PolicyStatus)),
 			dbaasv1alpha1.NewSucceedCondition(opsRequest))
 	case dbaasv1alpha1.FailedPhase:
 		return PatchOpsStatus(opsRes, dbaasv1alpha1.RunningPhase,
 			dbaasv1alpha1.NewReconfigureRunningCondition(opsRequest,
 				dbaasv1alpha1.ReasonReconfigureFailed,
 				eventContext.TplName,
-				formatConfigurationDifference(eventContext.Meta, &eventContext.PolicyStatus)),
+				formatConfigPatch(eventContext.ConfigPatch, &eventContext.PolicyStatus)),
 			dbaasv1alpha1.NewFailedCondition(opsRequest, err))
 	default:
 		return PatchOpsStatus(opsRes, dbaasv1alpha1.RunningPhase,
 			dbaasv1alpha1.NewReconfigureRunningCondition(opsRequest,
 				dbaasv1alpha1.ReasonReconfigureRunning,
 				eventContext.TplName))
-	}
-}
-
-func createConfigureStatus(tplName string, difference *cfgcore.ConfigDiffInformation) func(key string) dbaasv1alpha1.ConfigurationStatus {
-	interface2StringMap := func(config map[string]interface{}) map[string]string {
-		if len(config) == 0 {
-			return nil
-		}
-		m := make(map[string]string, len(config))
-		for key, value := range config {
-			data, _ := json.Marshal(value)
-			m[key] = string(data)
-		}
-		return m
-	}
-	byte2StringMap := func(config map[string][]byte) map[string]string {
-		if len(config) == 0 {
-			return nil
-		}
-		m := make(map[string]string, len(config))
-		for key, value := range config {
-			m[key] = string(value)
-		}
-		return m
-	}
-	return func(key string) dbaasv1alpha1.ConfigurationStatus {
-		return dbaasv1alpha1.ConfigurationStatus{
-			Name:   tplName,
-			Status: dbaasv1alpha1.ReasonReconfigureMerged,
-			UpdatedParameters: dbaasv1alpha1.UpdatedParameters{
-				AddedKeys:   interface2StringMap(difference.AddConfig),
-				UpdatedKeys: byte2StringMap(difference.UpdateConfig),
-				DeletedKeys: interface2StringMap(difference.DeleteConfig),
-			},
-		}
 	}
 }
 
@@ -204,10 +170,10 @@ func (r *reconfigureAction) Action(resource *OpsResource) error {
 	if err != nil {
 		return cfgcore.WrapError(err, "failed to get config template[%s]", componentName)
 	}
-	return r.performPersistCfg(clusterName, componentName, spec.Reconfigure, resource, tpls)
+	return r.performPersistConfig(clusterName, componentName, spec.Reconfigure, resource, tpls)
 }
 
-func (r *reconfigureAction) performPersistCfg(clusterName, componentName string,
+func (r *reconfigureAction) performPersistConfig(clusterName, componentName string,
 	reconfigure *dbaasv1alpha1.Reconfigure,
 	resource *OpsResource,
 	tpls []dbaasv1alpha1.ConfigTemplate) error {
@@ -229,71 +195,31 @@ func (r *reconfigureAction) performPersistCfg(clusterName, componentName string,
 		tpl := findTpl(config.Name)
 		if tpl == nil {
 			return processMergedFailed(resource, true,
-				cfgcore.MakeError("failed to reconfigure, not exist config[%s], all configs: %v",
-					config.Name, tpls))
+				cfgcore.MakeError("failed to reconfigure, not exist config[%s], all configs: %v", config.Name, tpls))
 		}
 		if len(tpl.ConfigConstraintRef) == 0 {
 			return processMergedFailed(resource, true,
 				cfgcore.MakeError("current tpl not support reconfigure, tpl: %v", tpl))
 		}
-		failed, difference, err := updateCfgParams(config, *tpl, client.ObjectKey{
+		result := updateCfgParams(config, *tpl, client.ObjectKey{
 			Name:      cfgcore.GetComponentCfgName(clusterName, componentName, tpl.VolumeName),
 			Namespace: resource.Cluster.Namespace,
 		}, resource.Ctx, resource.Client, resource.OpsRequest.Name)
-		if err != nil {
-			return processMergedFailed(resource, failed, err)
-		}
-
-		conditions := make([]*metav1.Condition, 0, 2)
-		if !difference.IsModify {
-			conditions = append(conditions, dbaasv1alpha1.NewReconfigureRunningCondition(
-				resource.OpsRequest,
-				dbaasv1alpha1.ReasonReconfigureInvalidUpdated,
-				tpl.Name,
-				formatConfigurationDifference(difference, nil)),
-				dbaasv1alpha1.NewSucceedCondition(resource.OpsRequest))
-		} else {
-			conditions = append(conditions, dbaasv1alpha1.NewReconfigureRunningCondition(
-				resource.OpsRequest,
-				dbaasv1alpha1.ReasonReconfigureMerged,
-				tpl.Name,
-				formatConfigurationDifference(difference, nil)))
+		if result.err != nil {
+			return processMergedFailed(resource, result.failed, result.err)
 		}
 
 		// merged successfully
+		if err := patchReconfiguringStatus(
+			resource,
+			tpl.Name, nil, "",
+			constructReconfigureStatus(tpl.Name, result.configPatch, result.lastAppliedConfigs)); err != nil {
+			return err
+		}
+		conditions := constructReconfiguringConditions(result, resource, tpl)
 		if err := PatchOpsStatus(resource, dbaasv1alpha1.RunningPhase, conditions...); err != nil {
 			return err
 		}
-		if err = patchReconfigureStatus(
-			resource, tpl.Name, nil, "",
-			createConfigureStatus(tpl.Name, difference)); err != nil {
-			return err
-		}
 	}
 	return nil
-}
-
-func processMergedFailed(resource *OpsResource, isInvalid bool, err error) error {
-	if !isInvalid {
-		return cfgcore.WrapError(err, "failed to update param!")
-	}
-
-	// if failed to validate configure, and retry
-	if err := PatchOpsStatus(resource, dbaasv1alpha1.FailedPhase,
-		dbaasv1alpha1.NewFailedCondition(resource.OpsRequest, err)); err != nil {
-		return err
-	}
-	return nil
-}
-
-func formatConfigurationDifference(difference *cfgcore.ConfigDiffInformation, execStatus *cfgcore.PolicyExecStatus) string {
-	policyName := ""
-	if execStatus != nil {
-		policyName = fmt.Sprintf("updated policy: <%s>, ", execStatus.PolicyName)
-	}
-	return fmt.Sprintf("%supdated: %s, added: %s, deleted:%s",
-		policyName,
-		difference.UpdateConfig,
-		difference.AddConfig,
-		difference.DeleteConfig)
 }

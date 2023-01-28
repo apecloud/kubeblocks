@@ -527,9 +527,15 @@ spec:
                             reconfiguring.
                           format: int32
                           type: integer
+                        lastAppliedConfiguration:
+                          additionalProperties:
+                            type: string
+                          description: LastAppliedConfiguration describes the last
+                            configuration.
+                          type: object
                         lastStatus:
                           description: lastStatus describes the last status for the
-                            reconfigure controller.
+                            reconfiguring controller.
                           type: string
                         name:
                           description: name is a config template name.

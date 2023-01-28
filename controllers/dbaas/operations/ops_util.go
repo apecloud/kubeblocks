@@ -318,17 +318,27 @@ func isOpsRequestFailedPhase(opsRequestPhase dbaasv1alpha1.Phase) bool {
 	return opsRequestPhase == dbaasv1alpha1.FailedPhase
 }
 
-// patchReconfigureStatus when Reconfigure is running, we should update status to OpsRequest.Status.ConfigurationStatus.
-func patchReconfigureStatus(opsRes *OpsResource,
+// patchReconfiguringStatus when Reconfigure is running, we should update status to OpsRequest.Status.ConfigurationStatus.
+func patchReconfiguringStatus(opsRes *OpsResource,
 	tplName string,
 	execStatus *cfgcore.PolicyExecStatus,
 	phase dbaasv1alpha1.Phase,
 	create func(key string) dbaasv1alpha1.ConfigurationStatus) error {
 	var (
+		status     = &opsRes.OpsRequest.Status
 		opsRequest = opsRes.OpsRequest
-		status     = &opsRequest.Status
 	)
 
+	findReconfigureStatus := func(status *dbaasv1alpha1.ReconfiguringStatus, tplName string) *dbaasv1alpha1.ConfigurationStatus {
+		cfgStatus := status.ConfigurationStatus
+		for i := range cfgStatus {
+			configStatus := &cfgStatus[i]
+			if configStatus.Name == tplName {
+				return configStatus
+			}
+		}
+		return nil
+	}
 	findAndInitStatus := func(status *dbaasv1alpha1.OpsRequestStatus, key string,
 		create func(key string) dbaasv1alpha1.ConfigurationStatus) *dbaasv1alpha1.ConfigurationStatus {
 		if status.ReconfiguringStatus == nil {
@@ -336,33 +346,31 @@ func patchReconfigureStatus(opsRes *OpsResource,
 				ConfigurationStatus: make([]dbaasv1alpha1.ConfigurationStatus, 0),
 			}
 		}
-		cfgStatus := status.ReconfiguringStatus.ConfigurationStatus
-		for i := range cfgStatus {
-			configStatus := &cfgStatus[i]
-			if configStatus.Name == key {
-				return configStatus
-			}
+		configsStatus := status.ReconfiguringStatus
+		keyStatus := findReconfigureStatus(configsStatus, key)
+		if keyStatus != nil {
+			return keyStatus
 		}
-		cfgStatus = append(cfgStatus, create(key))
-		status.ReconfiguringStatus.ConfigurationStatus = cfgStatus
-		return &cfgStatus[len(cfgStatus)-1]
+		configCount := len(configsStatus.ConfigurationStatus)
+		configsStatus.ConfigurationStatus = append(configsStatus.ConfigurationStatus, create(key))
+		return &configsStatus.ConfigurationStatus[configCount]
 	}
-	updateReconfigureStatus := func(tplStatus *dbaasv1alpha1.ConfigurationStatus, execStatus *cfgcore.PolicyExecStatus,
+	updateReconfigureStatus := func(configStatus *dbaasv1alpha1.ConfigurationStatus, execStatus *cfgcore.PolicyExecStatus,
 		phase dbaasv1alpha1.Phase) {
-		tplStatus.LastAppliedStatus = execStatus.ExecStatus
-		tplStatus.UpdatePolicy = dbaasv1alpha1.UpgradePolicy(execStatus.PolicyName)
-		tplStatus.SucceedCount = execStatus.SucceedCount
-		tplStatus.ExpectedCount = execStatus.ExpectedCount
-		if tplStatus.SucceedCount != cfgcore.Unconfirmed && tplStatus.ExpectedCount != cfgcore.Unconfirmed {
+		configStatus.LastAppliedStatus = execStatus.ExecStatus
+		configStatus.UpdatePolicy = dbaasv1alpha1.UpgradePolicy(execStatus.PolicyName)
+		configStatus.SucceedCount = execStatus.SucceedCount
+		configStatus.ExpectedCount = execStatus.ExpectedCount
+		if configStatus.SucceedCount != cfgcore.Unconfirmed && configStatus.ExpectedCount != cfgcore.Unconfirmed {
 			status.Progress = calReconfiguringProgress(status.ReconfiguringStatus.ConfigurationStatus)
 		}
 		switch phase {
 		case dbaasv1alpha1.SucceedPhase:
-			tplStatus.Status = dbaasv1alpha1.ReasonReconfigureSucceed
+			configStatus.Status = dbaasv1alpha1.ReasonReconfigureSucceed
 		case dbaasv1alpha1.FailedPhase:
-			tplStatus.Status = dbaasv1alpha1.ReasonReconfigureFailed
+			configStatus.Status = dbaasv1alpha1.ReasonReconfigureFailed
 		default:
-			tplStatus.Status = dbaasv1alpha1.ReasonReconfigureRunning
+			configStatus.Status = dbaasv1alpha1.ReasonReconfigureRunning
 		}
 	}
 
@@ -371,6 +379,18 @@ func patchReconfigureStatus(opsRes *OpsResource,
 	if execStatus != nil {
 		updateReconfigureStatus(tplStatus, execStatus, phase)
 	}
+
+	// if newCfg != nil {
+	//	if opsRequest.Annotations == nil {
+	//		opsRequest.Annotations = make(map[string]string)
+	//	}
+	//	configData, err := json.Marshal(newCfg)
+	//	if err != nil {
+	//		return err
+	//	}
+	//	opsRequest.Annotations[cfgcore.LastAppliedConfigAnnotation] = string(configData)
+	// }
+
 	if err := opsRes.Client.Status().Patch(opsRes.Ctx, opsRequest, patch); err != nil {
 		return err
 	}

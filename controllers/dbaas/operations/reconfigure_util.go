@@ -18,8 +18,11 @@ package operations
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
@@ -27,13 +30,20 @@ import (
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 )
 
+type reconfiguringResult struct {
+	failed             bool
+	configPatch        *cfgcore.ConfigDiffInformation
+	lastAppliedConfigs map[string]string
+	err                error
+}
+
 // updateCfgParams merge parameters of the config into the configmap, and verify final configuration file.
 func updateCfgParams(config dbaasv1alpha1.Configuration,
 	tpl dbaasv1alpha1.ConfigTemplate,
 	cmKey client.ObjectKey,
 	ctx context.Context,
 	cli client.Client,
-	opsCrName string) (bool, *cfgcore.ConfigDiffInformation, error) {
+	opsCrName string) reconfiguringResult {
 	var (
 		cm     = &corev1.ConfigMap{}
 		cfgTpl = &dbaasv1alpha1.ConfigConstraint{}
@@ -43,13 +53,13 @@ func updateCfgParams(config dbaasv1alpha1.Configuration,
 	)
 
 	if err := cli.Get(ctx, cmKey, cm); err != nil {
-		return false, nil, err
+		return makeReconfiguringResult(err)
 	}
 	if err := cli.Get(ctx, client.ObjectKey{
 		Namespace: tpl.Namespace,
 		Name:      tpl.ConfigConstraintRef,
 	}, cfgTpl); err != nil {
-		return false, nil, err
+		return makeReconfiguringResult(err)
 	}
 
 	params := make([]cfgcore.ParamPairs, len(config.Keys))
@@ -63,17 +73,17 @@ func updateCfgParams(config dbaasv1alpha1.Configuration,
 	fc := cfgTpl.Spec.FormatterConfig
 	newCfg, err = cfgcore.MergeAndValidateConfiguration(cfgTpl.Spec, cm.Data, params)
 	if err != nil {
-		return false, nil, err
+		return makeReconfiguringResult(err, withFailed(true))
 	}
 
-	difference, err := generateVersionDifference(client.ObjectKeyFromObject(cm), cm.Data, newCfg, fc.Formatter)
+	configPatch, err := createConfigPatch(client.ObjectKeyFromObject(cm), cm.Data, newCfg, fc.Formatter)
 	if err != nil {
-		return false, nil, err
+		return makeReconfiguringResult(err)
 	}
-	if !difference.IsModify {
-		return false, difference, nil
+	if !configPatch.IsModify {
+		return makeReconfiguringResult(nil, withReturned(newCfg, configPatch))
 	}
-	return false, difference, persistCfgCM(cm, newCfg, cli, ctx, opsCrName)
+	return makeReconfiguringResult(persistCfgCM(cm, newCfg, cli, ctx, opsCrName), withReturned(newCfg, configPatch))
 }
 
 func persistCfgCM(cmObj *corev1.ConfigMap, newCfg map[string]string, cli client.Client, ctx context.Context, opsCrName string) error {
@@ -98,7 +108,7 @@ func fromKeyValuePair(parameters []dbaasv1alpha1.ParameterPair) map[string]inter
 	return m
 }
 
-func generateVersionDifference(cfgKey client.ObjectKey,
+func createConfigPatch(cfgKey client.ObjectKey,
 	old, updated map[string]string,
 	formatter dbaasv1alpha1.ConfigurationFormatter) (*cfgcore.ConfigDiffInformation, error) {
 	option := cfgcore.CfgOption{
@@ -115,4 +125,107 @@ func generateVersionDifference(cfgKey client.ObjectKey,
 			CfgKey:         cfgKey,
 			Configurations: updated,
 		}, option)
+}
+
+func withFailed(failed bool) func(result *reconfiguringResult) {
+	return func(result *reconfiguringResult) {
+		result.failed = failed
+	}
+}
+
+func withReturned(configs map[string]string, patch *cfgcore.ConfigDiffInformation) func(result *reconfiguringResult) {
+	return func(result *reconfiguringResult) {
+		result.lastAppliedConfigs = configs
+		result.configPatch = patch
+	}
+}
+
+func makeReconfiguringResult(err error, ops ...func(*reconfiguringResult)) reconfiguringResult {
+	result := reconfiguringResult{
+		failed: false,
+	}
+	for _, o := range ops {
+		o(&result)
+	}
+	return result
+}
+
+func constructReconfigureStatus(tplName string, configPatch *cfgcore.ConfigDiffInformation, configs map[string]string) func(key string) dbaasv1alpha1.ConfigurationStatus {
+	interface2StringMap := func(config map[string]interface{}) map[string]string {
+		if len(config) == 0 {
+			return nil
+		}
+		m := make(map[string]string, len(config))
+		for key, value := range config {
+			data, _ := json.Marshal(value)
+			m[key] = string(data)
+		}
+		return m
+	}
+	byte2StringMap := func(config map[string][]byte) map[string]string {
+		if len(config) == 0 {
+			return nil
+		}
+		m := make(map[string]string, len(config))
+		for key, value := range config {
+			m[key] = string(value)
+		}
+		return m
+	}
+	return func(key string) dbaasv1alpha1.ConfigurationStatus {
+		return dbaasv1alpha1.ConfigurationStatus{
+			Name:                     tplName,
+			Status:                   dbaasv1alpha1.ReasonReconfigureMerged,
+			LastAppliedConfiguration: configs,
+			UpdatedParameters: dbaasv1alpha1.UpdatedParameters{
+				AddedKeys:   interface2StringMap(configPatch.AddConfig),
+				UpdatedKeys: byte2StringMap(configPatch.UpdateConfig),
+				DeletedKeys: interface2StringMap(configPatch.DeleteConfig),
+			},
+		}
+	}
+}
+
+func constructReconfiguringConditions(result reconfiguringResult, resource *OpsResource, tpl *dbaasv1alpha1.ConfigTemplate) []*metav1.Condition {
+	if result.configPatch.IsModify {
+		return []*metav1.Condition{dbaasv1alpha1.NewReconfigureRunningCondition(
+			resource.OpsRequest,
+			dbaasv1alpha1.ReasonReconfigureMerged,
+			tpl.Name,
+			formatConfigPatch(result.configPatch, nil)),
+		}
+	}
+	return []*metav1.Condition{
+		dbaasv1alpha1.NewReconfigureRunningCondition(
+			resource.OpsRequest,
+			dbaasv1alpha1.ReasonReconfigureInvalidUpdated,
+			tpl.Name,
+			formatConfigPatch(result.configPatch, nil)),
+		dbaasv1alpha1.NewSucceedCondition(resource.OpsRequest),
+	}
+}
+
+func processMergedFailed(resource *OpsResource, isInvalid bool, err error) error {
+	if !isInvalid {
+		return cfgcore.WrapError(err, "failed to update param!")
+	}
+
+	// if failed to validate configure, and retry
+	if err := PatchOpsStatus(resource, dbaasv1alpha1.FailedPhase,
+		dbaasv1alpha1.NewFailedCondition(resource.OpsRequest, err)); err != nil {
+		return err
+	}
+	return nil
+}
+
+func formatConfigPatch(difference *cfgcore.ConfigDiffInformation, execStatus *cfgcore.PolicyExecStatus) string {
+	policyName := ""
+	if execStatus != nil {
+		policyName = fmt.Sprintf("updated policy: <%s>, ", execStatus.PolicyName)
+	}
+	return fmt.Sprintf("%supdated: %s, added: %s, deleted:%s",
+		policyName,
+		difference.UpdateConfig,
+		difference.AddConfig,
+		difference.DeleteConfig)
 }

@@ -355,9 +355,13 @@ type ConfigurationStatus struct {
 	// +optional
 	ExpectedCount int32 `json:"expectedCount"`
 
-	// lastStatus describes the last status for the reconfigure controller.
+	// lastStatus describes the last status for the reconfiguring controller.
 	// +optional
 	LastAppliedStatus string `json:"lastStatus,omitempty"`
+
+	// LastAppliedConfiguration describes the last configuration.
+	// +optional
+	LastAppliedConfiguration map[string]string `json:"lastAppliedConfiguration,omitempty"`
 
 	// updatedParameters describes the updated parameters.
 	// +optional

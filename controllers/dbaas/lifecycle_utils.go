@@ -1722,7 +1722,7 @@ func processConfigMapTemplate(
 	}
 
 	// NOTE: not require checker configuration template status
-	configChecker := cfgcore.NewConfigValidator(&cfgTemplate.Spec)
+	cfgChecker := cfgcore.NewConfigValidator(&cfgTemplate.Spec)
 	cmObj := &corev1.ConfigMap{}
 	//  Require template configmap exist
 	if err := cli.Get(ctx, client.ObjectKey{
@@ -1743,7 +1743,7 @@ func processConfigMapTemplate(
 	}
 
 	// NOTE: It is necessary to verify the correctness of the data
-	if err := configChecker.Validate(renderedCfg); err != nil {
+	if err := cfgChecker.Validate(renderedCfg); err != nil {
 		return nil, cfgcore.WrapError(err, "failed to validate configmap")
 	}
 

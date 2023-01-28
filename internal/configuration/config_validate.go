@@ -73,29 +73,29 @@ func (s schemaValidator) Validate(cfg map[string]string) error {
 type EmptyValidator struct {
 }
 
-func (e EmptyValidator) Validate(cfg map[string]string) error {
+func (e EmptyValidator) Validate(_ map[string]string) error {
 	return nil
 }
 
 func NewConfigValidator(configTemplate *dbaasv1alpha1.ConfigConstraintSpec) ConfigValidator {
 	var (
-		meta      = configTemplate.ConfigurationSchema
-		validator ConfigValidator
+		validator    ConfigValidator
+		configSchema = configTemplate.ConfigurationSchema
 	)
 
 	switch {
-	case meta == nil:
+	case configSchema == nil:
 		validator = &EmptyValidator{}
-	case len(meta.CUE) != 0:
+	case len(configSchema.CUE) != 0:
 		validator = &configCueValidator{
 			cfgType:   configTemplate.FormatterConfig.Formatter,
-			cueScript: meta.CUE,
+			cueScript: configSchema.CUE,
 		}
-	case meta.Schema != nil:
+	case configSchema.Schema != nil:
 		validator = &schemaValidator{
 			typeName: configTemplate.CfgSchemaTopLevelName,
 			cfgType:  configTemplate.FormatterConfig.Formatter,
-			schema:   meta.Schema,
+			schema:   configSchema.Schema,
 		}
 	default:
 		validator = &EmptyValidator{}

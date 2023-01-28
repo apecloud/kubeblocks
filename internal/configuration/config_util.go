@@ -33,14 +33,14 @@ type ParamPairs struct {
 // MergeAndValidateConfiguration does merge configuration files and validate
 func MergeAndValidateConfiguration(configConstraint dbaasv1alpha1.ConfigConstraintSpec, baseCfg map[string]string, updatedParams []ParamPairs) (map[string]string, error) {
 	var (
-		err      error
-		operator ConfigOperator
-		newCfg   map[string]string
+		err            error
+		newCfg         map[string]string
+		configOperator ConfigOperator
 
 		fc = configConstraint.FormatterConfig
 	)
 
-	if operator, err = NewConfigLoader(CfgOption{
+	if configOperator, err = NewConfigLoader(CfgOption{
 		Type:    CfgCmType,
 		Log:     log.FromContext(context.TODO()),
 		CfgType: fc.Formatter,
@@ -54,7 +54,7 @@ func MergeAndValidateConfiguration(configConstraint dbaasv1alpha1.ConfigConstrai
 	}
 
 	// process special formatter options
-	options := func(ctx *CfgOpOption) {
+	mergedOptions := func(ctx *CfgOpOption) {
 		// process special formatter
 		if fc.Formatter == dbaasv1alpha1.INI && fc.IniConfig != nil {
 			ctx.IniContext = &IniContext{
@@ -65,17 +65,15 @@ func MergeAndValidateConfiguration(configConstraint dbaasv1alpha1.ConfigConstrai
 
 	// merge param to config file
 	for _, params := range updatedParams {
-		if err := operator.MergeFrom(params.UpdatedParams, NewCfgOptions(params.Key, options)); err != nil {
+		if err := configOperator.MergeFrom(params.UpdatedParams, NewCfgOptions(params.Key, mergedOptions)); err != nil {
 			return nil, err
 		}
 	}
 
-	if newCfg, err = operator.ToCfgContent(); err != nil {
+	if newCfg, err = configOperator.ToCfgContent(); err != nil {
 		return nil, WrapError(err, "failed to generate config file")
 	}
-
-	configChecker := NewConfigValidator(&configConstraint)
-	if err = configChecker.Validate(newCfg); err != nil {
+	if err = NewConfigValidator(&configConstraint).Validate(newCfg); err != nil {
 		return nil, WrapError(err, "failed to validate updated config")
 	}
 	return newCfg, nil

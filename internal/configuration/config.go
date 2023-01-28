@@ -66,10 +66,10 @@ type ConfigEventContext struct {
 	Component        *dbaasv1alpha1.ClusterDefinitionComponent
 	ComponentUnits   []appv1.StatefulSet
 
-	TplName string
-	Meta    *ConfigDiffInformation
-	Cfg     *corev1.ConfigMap
-	Tpl     *dbaasv1alpha1.ConfigConstraintSpec
+	TplName     string
+	ConfigPatch *ConfigDiffInformation
+	Cfg         *corev1.ConfigMap
+	Tpl         *dbaasv1alpha1.ConfigConstraintSpec
 
 	PolicyStatus PolicyExecStatus
 }

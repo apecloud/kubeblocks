@@ -60,7 +60,7 @@ type reconfigureParams struct {
 	TplName string
 
 	// Configuration files patch.
-	Meta *cfgcore.ConfigDiffInformation
+	configPatch *cfgcore.ConfigDiffInformation
 
 	// Configmap object of the configuration template instance in the component.
 	Cfg *corev1.ConfigMap
@@ -190,15 +190,15 @@ func (receiver AutoReloadPolicy) GetPolicyName() string {
 	return string(dbaasv1alpha1.AutoReload)
 }
 
-func NewReconfigurePolicy(tpl *dbaasv1alpha1.ConfigConstraintSpec, cfg *cfgcore.ConfigDiffInformation, policy dbaasv1alpha1.UpgradePolicy, restart bool) (reconfigurePolicy, error) {
-	if !cfg.IsModify {
+func NewReconfigurePolicy(tpl *dbaasv1alpha1.ConfigConstraintSpec, cfgPatch *cfgcore.ConfigDiffInformation, policy dbaasv1alpha1.UpgradePolicy, restart bool) (reconfigurePolicy, error) {
+	if !cfgPatch.IsModify {
 		// not exec here
-		return nil, cfgcore.MakeError("cfg not modify. [%v]", cfg)
+		return nil, cfgcore.MakeError("cfg not modify. [%v]", cfgPatch)
 	}
 
 	actionType := policy
 	if !restart {
-		if dynamicUpdate, err := isUpdateDynamicParameters(tpl, cfg); err != nil {
+		if dynamicUpdate, err := isUpdateDynamicParameters(tpl, cfgPatch); err != nil {
 			return nil, err
 		} else if dynamicUpdate {
 			actionType = dbaasv1alpha1.AutoReload

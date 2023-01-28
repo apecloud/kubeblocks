@@ -142,19 +142,19 @@ var _ = Describe("Reconfigure RollingPolicy", func() {
 
 			By("CM object failed.")
 			// mock failed
-			_, _, err := updateCfgParams(updatedCfg, tpl, client.ObjectKeyFromObject(cmObj), ctx, mockClient, "test")
-			Expect(err).ShouldNot(Succeed())
-			Expect(err.Error()).Should(ContainSubstring("failed to get cm object"))
+			r := updateCfgParams(updatedCfg, tpl, client.ObjectKeyFromObject(cmObj), ctx, mockClient, "test")
+			Expect(r.err).ShouldNot(Succeed())
+			Expect(r.err.Error()).Should(ContainSubstring("failed to get cm object"))
 
 			By("TPL object failed.")
 			// mock failed
-			_, _, err = updateCfgParams(updatedCfg, tpl, client.ObjectKeyFromObject(cmObj), ctx, mockClient, "test")
-			Expect(err).ShouldNot(Succeed())
-			Expect(err.Error()).Should(ContainSubstring("failed to get tpl object"))
+			r = updateCfgParams(updatedCfg, tpl, client.ObjectKeyFromObject(cmObj), ctx, mockClient, "test")
+			Expect(r.err).ShouldNot(Succeed())
+			Expect(r.err.Error()).Should(ContainSubstring("failed to get tpl object"))
 
 			By("update validate failed.")
 			// check diff
-			failed, _, err := updateCfgParams(dbaasv1alpha1.Configuration{
+			r = updateCfgParams(dbaasv1alpha1.Configuration{
 				Keys: []dbaasv1alpha1.ParameterConfig{{
 					Parameters: []dbaasv1alpha1.ParameterPair{
 						{
@@ -164,9 +164,9 @@ var _ = Describe("Reconfigure RollingPolicy", func() {
 					},
 				}},
 			}, tpl, client.ObjectKeyFromObject(cmObj), ctx, mockClient, "test")
-			Expect(failed).Should(BeTrue())
-			Expect(err).ShouldNot(Succeed())
-			Expect(err.Error()).Should(ContainSubstring(`
+			Expect(r.failed).Should(BeTrue())
+			Expect(r.err).ShouldNot(Succeed())
+			Expect(r.err.Error()).Should(ContainSubstring(`
 mysqld.innodb_autoinc_lock_mode: conflicting values 0 and 100:
     9:36
     12:18
@@ -181,8 +181,8 @@ mysqld.innodb_autoinc_lock_mode: conflicting values 2 and 100:
 			By("normal update.")
 			{
 				oldConfig := cmObj.Data
-				_, _, err := updateCfgParams(updatedCfg, tpl, client.ObjectKeyFromObject(cmObj), ctx, mockClient, "test")
-				Expect(err).Should(Succeed())
+				r := updateCfgParams(updatedCfg, tpl, client.ObjectKeyFromObject(cmObj), ctx, mockClient, "test")
+				Expect(r.err).Should(Succeed())
 				option := cfgcore.CfgOption{
 					Type:    cfgcore.CfgTplType,
 					CfgType: dbaasv1alpha1.INI,

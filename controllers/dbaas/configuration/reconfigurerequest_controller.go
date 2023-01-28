@@ -144,20 +144,20 @@ func (r *ReconfigureRequestReconciler) sync(reqCtx intctrlutil.RequestCtx, confi
 		configTplLabelKey:                config.GetName(),
 	}
 
-	versionMeta, err := getConfigurationVersion(config, reqCtx, &tpl.Spec)
+	configPatch, err := createConfigurePatch(config, reqCtx, &tpl.Spec)
 	if err != nil {
 		return intctrlutil.RequeueWithErrorAndRecordEvent(config, r.Recorder, err, reqCtx.Log)
 	}
 
 	// Not any parameters updated
-	if !versionMeta.IsModify {
+	if !configPatch.IsModify {
 		return r.updateCfgStatus(reqCtx, config, ReconfigureNoChangeType)
 	}
 
 	reqCtx.Log.Info(fmt.Sprintf("reconfigure params: \n\tadd: %s\n\tdelete: %s\n\tupdate: %s",
-		versionMeta.AddConfig,
-		versionMeta.DeleteConfig,
-		versionMeta.UpdateConfig))
+		configPatch.AddConfig,
+		configPatch.DeleteConfig,
+		configPatch.UpdateConfig))
 
 	// Find Cluster CR
 	if err := r.Client.Get(reqCtx.Ctx, clusterKey, &cluster); err != nil {
@@ -215,7 +215,7 @@ func (r *ReconfigureRequestReconciler) sync(reqCtx intctrlutil.RequestCtx, confi
 
 	return r.performUpgrade(reconfigureParams{
 		TplName:                  configTplName,
-		Meta:                     versionMeta,
+		configPatch:              configPatch,
 		Cfg:                      config,
 		Tpl:                      &tpl.Spec,
 		Client:                   r.Client,
@@ -244,7 +244,7 @@ func (r *ReconfigureRequestReconciler) updateCfgStatus(reqCtx intctrlutil.Reques
 }
 
 func (r *ReconfigureRequestReconciler) performUpgrade(params reconfigureParams) (ctrl.Result, error) {
-	policy, err := NewReconfigurePolicy(params.Tpl, params.Meta, getUpgradePolicy(params.Cfg), params.Restart)
+	policy, err := NewReconfigurePolicy(params.Tpl, params.configPatch, getUpgradePolicy(params.Cfg), params.Restart)
 	if err != nil {
 		return intctrlutil.RequeueWithErrorAndRecordEvent(params.Cfg, r.Recorder, err, params.Ctx.Log)
 	}
@@ -293,7 +293,7 @@ func (r *ReconfigureRequestReconciler) handleConfigEvent(params reconfigureParam
 		ReqCtx:         params.Ctx,
 		Cluster:        params.Cluster,
 		Component:      params.Component,
-		Meta:           params.Meta,
+		ConfigPatch:    params.configPatch,
 		Tpl:            params.Tpl,
 		Cfg:            params.Cfg,
 		ComponentUnits: params.ComponentUnits,

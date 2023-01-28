@@ -122,6 +122,13 @@ var _ = BeforeSuite(func() {
 		CertDir:            webhookInstallOptions.LocalServingCertDir,
 		LeaderElection:     false,
 		MetricsBindAddress: "0",
+		ClientDisableCacheFor: []client.Object{
+			&ClusterDefinition{},
+			&Cluster{},
+			&ClusterVersion{},
+			&OpsRequest{},
+			&ConfigConstraint{},
+		},
 	})
 	Expect(err).NotTo(HaveOccurred())
 

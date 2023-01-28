@@ -25,6 +25,7 @@ import (
 
 	"github.com/sethvargo/go-password/password"
 	"github.com/spf13/viper"
+
 	appv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -34,13 +35,14 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	testdbaas "github.com/apecloud/kubeblocks/internal/testutil/dbaas"
 )
 
 var _ = Describe("Backup Policy Controller", func() {
 	type Key = types.NamespacedName
 	const timeout = time.Second * 20
 	const interval = time.Second
-	const waitDuration = time.Second * 3
 	const TRUE = "true"
 
 	var ctx = context.Background()
@@ -48,27 +50,35 @@ var _ = Describe("Backup Policy Controller", func() {
 	viper.SetDefault("DP_BACKUP_SCHEDULE", "0 3 * * *")
 	viper.SetDefault("DP_BACKUP_TTL", "168h0m0s")
 
-	BeforeEach(func() {
-		// Add any setup steps that needs to be executed before each test
+	cleanEnv := func() {
+		// must wait until resources deleted and no longer exist before the testcases start, otherwise :
+		// - if later it needs to create some new resource objects with the same name,
+		// in race conditions, it will find the existence of old objects, resulting failure to
+		// create the new objects.
+		// - worse, if an async DeleteAll call is issued here, it maybe executed later by the
+		// K8s API server, by which time the testcase may have already created some new test objects,
+		// which shall be accidentally deleted.
+		By("clean resources")
 
-		err := k8sClient.DeleteAllOf(ctx, &appv1.StatefulSet{}, client.InNamespace(testCtx.DefaultNamespace), client.HasLabels{testCtx.TestObjLabelKey})
-		Expect(err).NotTo(HaveOccurred())
-		err = k8sClient.DeleteAllOf(ctx, &corev1.Pod{}, client.InNamespace(testCtx.DefaultNamespace), client.HasLabels{testCtx.TestObjLabelKey})
-		Expect(err).NotTo(HaveOccurred())
-		err = k8sClient.DeleteAllOf(ctx, &dpv1alpha1.BackupPolicy{}, client.InNamespace(testCtx.DefaultNamespace), client.HasLabels{testCtx.TestObjLabelKey})
-		Expect(err).NotTo(HaveOccurred())
-		err = k8sClient.DeleteAllOf(ctx, &dpv1alpha1.BackupTool{}, client.HasLabels{testCtx.DefaultNamespace})
-		Expect(err).NotTo(HaveOccurred())
-		err = k8sClient.DeleteAllOf(ctx, &appv1.StatefulSet{},
-			client.InNamespace(testCtx.DefaultNamespace),
-			client.HasLabels{testCtx.TestObjLabelKey},
-		)
-		Expect(err).NotTo(HaveOccurred())
-	})
+		// delete rest mocked objects
+		inNS := client.InNamespace(testCtx.DefaultNamespace)
+		ml := client.HasLabels{testCtx.TestObjLabelKey}
+		// namespaced
+		testdbaas.ClearResources(&testCtx, intctrlutil.StatefulSetSignature, inNS, ml)
+		testdbaas.ClearResources(&testCtx, intctrlutil.PodSignature, inNS, ml)
+		testdbaas.ClearResources(&testCtx, intctrlutil.BackupSignature, inNS, ml)
+		testdbaas.ClearResources(&testCtx, intctrlutil.BackupPolicySignature, inNS, ml)
+		testdbaas.ClearResources(&testCtx, intctrlutil.JobSignature, inNS, ml)
+		testdbaas.ClearResources(&testCtx, intctrlutil.CronJobSignature, inNS, ml)
+		// non-namespaced
+		testdbaas.ClearResources(&testCtx, intctrlutil.BackupToolSignature, ml)
+		testdbaas.ClearResources(&testCtx, intctrlutil.BackupPolicyTemplateSignature, ml)
+	}
 
-	AfterEach(func() {
-		// Add any teardown steps that needs to be executed after each test
-	})
+	BeforeEach(cleanEnv)
+
+	AfterEach(cleanEnv)
+
 	genarateNS := func(prefix string) Key {
 		randomStr, _ := password.Generate(6, 0, 0, true, false)
 		key := Key{
@@ -116,27 +126,8 @@ spec:
 		if nil != ttl {
 			backupPolicy.Spec.TTL = ttl
 		}
-		Expect(testCtx.CheckedCreateObj(ctx, backupPolicy)).Should(Succeed())
+		Expect(testCtx.CreateObj(ctx, backupPolicy)).Should(Succeed())
 		return backupPolicy
-	}
-
-	deleteBackupPolicyNWait := func(key Key) error {
-		Expect(func() error {
-			f := &dpv1alpha1.BackupPolicy{}
-			if err := k8sClient.Get(ctx, key, f); err != nil {
-				return client.IgnoreNotFound(err)
-			}
-			return k8sClient.Delete(ctx, f)
-		}()).Should(Succeed())
-
-		f := &dpv1alpha1.BackupPolicy{}
-		Eventually(func() error {
-			if err := k8sClient.Get(ctx, key, f); err != nil {
-				return client.IgnoreNotFound(err)
-			}
-			return nil
-		}, waitDuration, interval).Should(Succeed())
-		return nil
 	}
 
 	assureBackupToolObj := func(withoutResources ...bool) *dpv1alpha1.BackupTool {
@@ -193,27 +184,8 @@ spec:
 		ns := genarateNS("backup-tool-")
 		backupTool.Name = ns.Name
 		backupTool.Namespace = ns.Namespace
-		Expect(testCtx.CheckedCreateObj(ctx, backupTool)).Should(Succeed())
+		Expect(testCtx.CreateObj(ctx, backupTool)).Should(Succeed())
 		return backupTool
-	}
-
-	deleteBackupToolNWait := func(key Key) error {
-		Expect(func() error {
-			f := &dpv1alpha1.BackupTool{}
-			if err := k8sClient.Get(ctx, key, f); err != nil {
-				return client.IgnoreNotFound(err)
-			}
-			return k8sClient.Delete(ctx, f)
-		}()).Should(Succeed())
-
-		f := &dpv1alpha1.BackupTool{}
-		Eventually(func() error {
-			if err := k8sClient.Get(ctx, key, f); err != nil {
-				return client.IgnoreNotFound(err)
-			}
-			return nil
-		}, waitDuration, interval).Should(Succeed())
-		return nil
 	}
 
 	assureStatefulSetObj := func() *appv1.StatefulSet {
@@ -357,7 +329,7 @@ spec:
 		Expect(yaml.Unmarshal([]byte(statefulYaml), statefulSet)).Should(Succeed())
 		statefulSet.SetNamespace(testCtx.DefaultNamespace)
 		statefulSet.Spec.Template.GetLabels()[testCtx.TestObjLabelKey] = TRUE
-		Expect(testCtx.CheckedCreateObj(ctx, statefulSet)).Should(Succeed())
+		Expect(testCtx.CreateObj(ctx, statefulSet)).Should(Succeed())
 
 		if viper.GetBool("USE_EXISTING_CLUSTER") {
 			return statefulSet
@@ -365,7 +337,7 @@ spec:
 		pod := &corev1.Pod{}
 		Expect(yaml.Unmarshal([]byte(podYaml), pod)).Should(Succeed())
 		pod.GetLabels()[testCtx.TestObjLabelKey] = TRUE
-		Expect(testCtx.CheckedCreateObj(ctx, pod)).Should(Succeed())
+		Expect(testCtx.CreateObj(ctx, pod)).Should(Succeed())
 		return statefulSet
 	}
 
@@ -395,7 +367,7 @@ spec:
 		backup.Spec.BackupPolicyName = backupPolicy
 		backup.Labels[dataProtectionLabelAutoBackupKey] = TRUE
 
-		Expect(testCtx.CheckedCreateObj(ctx, backup)).Should(Succeed())
+		Expect(testCtx.CreateObj(ctx, backup)).Should(Succeed())
 		return backup
 	}
 
@@ -480,21 +452,6 @@ spec:
 			patchBackupStatus(backupStatus, Key{Namespace: backupOutLimit2.Namespace, Name: backupOutLimit2.Name})
 
 			patchCronJobStatus(key)
-
-			By("Deleting the scope")
-
-			Eventually(func() error {
-				key = Key{
-					Name:      backupTool.Name,
-					Namespace: backupTool.Namespace,
-				}
-				_ = deleteBackupToolNWait(key)
-				key = Key{
-					Name:      toCreate.Name,
-					Namespace: toCreate.Namespace,
-				}
-				return deleteBackupPolicyNWait(key)
-			}, timeout, interval).Should(Succeed())
 		})
 		It("Should success without schedule and ttl", func() {
 
@@ -544,21 +501,6 @@ spec:
 					return result.Status.Phase != dpv1alpha1.ConfigAvailable
 				}, timeout, interval).Should(BeTrue())
 				Expect(result.Status.Phase).ShouldNot(Equal(dpv1alpha1.ConfigAvailable))
-
-				By("Deleting the scope")
-
-				Eventually(func() error {
-					key = Key{
-						Name:      backupTool.Name,
-						Namespace: backupTool.Namespace,
-					}
-					_ = deleteBackupToolNWait(key)
-					key = Key{
-						Name:      toCreate.Name,
-						Namespace: toCreate.Namespace,
-					}
-					return deleteBackupPolicyNWait(key)
-				}, timeout, interval).Should(Succeed())
 			})
 		})
 	})

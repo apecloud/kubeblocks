@@ -84,7 +84,10 @@ func (testCtx TestContext) GetRandomStr() string {
 }
 
 func (testCtx TestContext) UsingExistingCluster() bool {
-	return os.Getenv(envUseExistingCluster) == "true"
+	if testCtx.TestEnv == nil || testCtx.TestEnv.UseExistingCluster == nil {
+		return os.Getenv(envUseExistingCluster) == "true"
+	}
+	return *testCtx.TestEnv.UseExistingCluster
 }
 
 func (testCtx TestContext) GetWebhookHostExternalName() string {

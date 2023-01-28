@@ -375,26 +375,11 @@ func patchReconfiguringStatus(opsRes *OpsResource,
 	}
 
 	patch := client.MergeFrom(opsRequest.DeepCopy())
-	tplStatus := findAndInitStatus(status, tplName, create)
+	configStatus := findAndInitStatus(status, tplName, create)
 	if execStatus != nil {
-		updateReconfigureStatus(tplStatus, execStatus, phase)
+		updateReconfigureStatus(configStatus, execStatus, phase)
 	}
-
-	// if newCfg != nil {
-	//	if opsRequest.Annotations == nil {
-	//		opsRequest.Annotations = make(map[string]string)
-	//	}
-	//	configData, err := json.Marshal(newCfg)
-	//	if err != nil {
-	//		return err
-	//	}
-	//	opsRequest.Annotations[cfgcore.LastAppliedConfigAnnotation] = string(configData)
-	// }
-
-	if err := opsRes.Client.Status().Patch(opsRes.Ctx, opsRequest, patch); err != nil {
-		return err
-	}
-	return nil
+	return opsRes.Client.Status().Patch(opsRes.Ctx, opsRequest, patch)
 }
 
 // calReconfiguringProgress calculate the progress of the reconfiguring operations.

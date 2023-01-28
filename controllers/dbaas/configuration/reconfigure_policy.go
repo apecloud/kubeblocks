@@ -60,7 +60,7 @@ type reconfigureParams struct {
 	TplName string
 
 	// Configuration files patch.
-	configPatch *cfgcore.ConfigDiffInformation
+	configPatch *cfgcore.ConfigPatchInfo
 
 	// Configmap object of the configuration template instance in the component.
 	Cfg *corev1.ConfigMap
@@ -190,7 +190,7 @@ func (receiver AutoReloadPolicy) GetPolicyName() string {
 	return string(dbaasv1alpha1.AutoReload)
 }
 
-func NewReconfigurePolicy(tpl *dbaasv1alpha1.ConfigConstraintSpec, cfgPatch *cfgcore.ConfigDiffInformation, policy dbaasv1alpha1.UpgradePolicy, restart bool) (reconfigurePolicy, error) {
+func NewReconfigurePolicy(tpl *dbaasv1alpha1.ConfigConstraintSpec, cfgPatch *cfgcore.ConfigPatchInfo, policy dbaasv1alpha1.UpgradePolicy, restart bool) (reconfigurePolicy, error) {
 	if !cfgPatch.IsModify {
 		// not exec here
 		return nil, cfgcore.MakeError("cfg not modify. [%v]", cfgPatch)

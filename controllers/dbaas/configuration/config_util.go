@@ -423,7 +423,7 @@ func getClusterComponentsByName(components []dbaasv1alpha1.ClusterComponent, com
 	return nil
 }
 
-func createConfigurePatch(cfg *corev1.ConfigMap, ctx intctrlutil.RequestCtx, tpl *dbaasv1alpha1.ConfigConstraintSpec) (*cfgcore.ConfigDiffInformation, error) {
+func createConfigurePatch(cfg *corev1.ConfigMap, ctx intctrlutil.RequestCtx, tpl *dbaasv1alpha1.ConfigConstraintSpec) (*cfgcore.ConfigPatchInfo, error) {
 	lastConfig, err := getLastVersionConfig(cfg)
 	if err != nil {
 		return nil, cfgcore.WrapError(err, "failed to get last version data. config[%v]", client.ObjectKeyFromObject(cfg))

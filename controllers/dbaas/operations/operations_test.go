@@ -401,7 +401,7 @@ var _ = Describe("OpsRequest Controller", func() {
 			},
 			Cluster: clusterObject,
 			TplName: "mysql-test",
-			ConfigPatch: &cfgcore.ConfigDiffInformation{
+			ConfigPatch: &cfgcore.ConfigPatchInfo{
 				AddConfig:    map[string]interface{}{},
 				UpdateConfig: map[string][]byte{},
 				DeleteConfig: map[string]interface{}{},

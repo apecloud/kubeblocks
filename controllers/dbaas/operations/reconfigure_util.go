@@ -32,7 +32,7 @@ import (
 
 type reconfiguringResult struct {
 	failed             bool
-	configPatch        *cfgcore.ConfigDiffInformation
+	configPatch        *cfgcore.ConfigPatchInfo
 	lastAppliedConfigs map[string]string
 	err                error
 }
@@ -110,7 +110,7 @@ func fromKeyValuePair(parameters []dbaasv1alpha1.ParameterPair) map[string]inter
 
 func createConfigPatch(cfgKey client.ObjectKey,
 	old, updated map[string]string,
-	formatter dbaasv1alpha1.ConfigurationFormatter) (*cfgcore.ConfigDiffInformation, error) {
+	formatter dbaasv1alpha1.ConfigurationFormatter) (*cfgcore.ConfigPatchInfo, error) {
 	option := cfgcore.CfgOption{
 		Type:    cfgcore.CfgTplType,
 		CfgType: formatter,
@@ -133,7 +133,7 @@ func withFailed(failed bool) func(result *reconfiguringResult) {
 	}
 }
 
-func withReturned(configs map[string]string, patch *cfgcore.ConfigDiffInformation) func(result *reconfiguringResult) {
+func withReturned(configs map[string]string, patch *cfgcore.ConfigPatchInfo) func(result *reconfiguringResult) {
 	return func(result *reconfiguringResult) {
 		result.lastAppliedConfigs = configs
 		result.configPatch = patch
@@ -151,7 +151,7 @@ func makeReconfiguringResult(err error, ops ...func(*reconfiguringResult)) recon
 	return result
 }
 
-func constructReconfigureStatus(tplName string, configPatch *cfgcore.ConfigDiffInformation, configs map[string]string) func(key string) dbaasv1alpha1.ConfigurationStatus {
+func constructReconfigureStatus(tplName string, configPatch *cfgcore.ConfigPatchInfo, configs map[string]string) func(key string) dbaasv1alpha1.ConfigurationStatus {
 	interface2StringMap := func(config map[string]interface{}) map[string]string {
 		if len(config) == 0 {
 			return nil
@@ -219,7 +219,7 @@ func processMergedFailed(resource *OpsResource, isInvalid bool, err error) error
 	return nil
 }
 
-func formatConfigPatchToMessage(configPatch *cfgcore.ConfigDiffInformation, execStatus *cfgcore.PolicyExecStatus) string {
+func formatConfigPatchToMessage(configPatch *cfgcore.ConfigPatchInfo, execStatus *cfgcore.PolicyExecStatus) string {
 	policyName := ""
 	if execStatus != nil {
 		policyName = fmt.Sprintf("updated policy: <%s>, ", execStatus.PolicyName)

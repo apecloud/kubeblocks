@@ -62,13 +62,13 @@ var _ = Describe("SystemAccount Controller", func() {
 		// new objects fail to create.
 		By("clean resources")
 
-		clearClusterResources(ctx)
+		testdbaas.ClearClusterResources(&testCtx)
 
 		// namespaced resources
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
-		clearResources(ctx, intctrlutil.EndpointsSignature, inNS, ml)
-		clearResources(ctx, intctrlutil.BackupPolicySignature, inNS, ml)
+		testdbaas.ClearResources(&testCtx, intctrlutil.EndpointsSignature, inNS, ml)
+		testdbaas.ClearResources(&testCtx, intctrlutil.BackupPolicySignature, inNS, ml)
 
 		// clear internal states
 		for _, key := range systemAccountReconciler.SecretMapStore.ListKeys() {
@@ -118,7 +118,7 @@ var _ = Describe("SystemAccount Controller", func() {
 
 	patchCluster := func(key types.NamespacedName) {
 		By("Patching Cluster to trigger reconcile")
-		Eventually(changeSpec(key, func(cluster *dbaasv1alpha1.Cluster) {
+		Eventually(testdbaas.ChangeSpec(&testCtx, key, func(cluster *dbaasv1alpha1.Cluster) {
 			if cluster.Annotations == nil {
 				cluster.Annotations = make(map[string]string)
 			}
@@ -292,7 +292,7 @@ var _ = Describe("SystemAccount Controller", func() {
 				g.Expect(k8sClient.List(ctx, jobs, client.InNamespace(cluster.Namespace), ml)).To(Succeed())
 				g.Expect(len(jobs.Items)).To(BeEquivalentTo(expectedJobsPerCluster), "there should be 5 jobs created")
 				for _, job := range jobs.Items {
-					g.Expect(changeStatus(intctrlutil.GetNamespacedName(&job), func(job *batchv1.Job) {
+					g.Expect(testdbaas.ChangeStatus(&testCtx, intctrlutil.GetNamespacedName(&job), func(job *batchv1.Job) {
 						job.Status.Conditions = []batchv1.JobCondition{{
 							Type:   batchv1.JobComplete,
 							Status: corev1.ConditionTrue,
@@ -308,10 +308,10 @@ var _ = Describe("SystemAccount Controller", func() {
 				jobs := &batchv1.JobList{}
 				g.Expect(k8sClient.List(ctx, jobs, client.InNamespace(cluster.Namespace), ml)).To(Succeed())
 				for _, job := range jobs.Items {
-					g.Expect(changeSpec(intctrlutil.GetNamespacedName(&job), func(job *batchv1.Job) {
+					g.Expect(testdbaas.ChangeSpec(&testCtx, intctrlutil.GetNamespacedName(&job), func(job *batchv1.Job) {
 						controllerutil.RemoveFinalizer(job, finalizerName)
 					})).To(Succeed())
-					g.Expect(checkExists(intctrlutil.GetNamespacedName(&job), &batchv1.Job{}, false)).To(Succeed())
+					g.Expect(testdbaas.CheckExists(&testCtx, intctrlutil.GetNamespacedName(&job), &batchv1.Job{}, false)).To(Succeed())
 				}
 			}, timeout, interval).Should(Succeed())
 

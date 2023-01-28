@@ -32,6 +32,7 @@ import (
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	testdbaas "github.com/apecloud/kubeblocks/internal/testutil/dbaas"
 	testk8s "github.com/apecloud/kubeblocks/internal/testutil/k8s"
 )
 
@@ -54,13 +55,13 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 		// new objects fail to create.
 		By("clean resources")
 
-		clearClusterResources(ctx)
+		testdbaas.ClearClusterResources(&testCtx)
 
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
-		clearResources(ctx, intctrlutil.StatefulSetSignature, inNS, ml)
-		clearResources(ctx, intctrlutil.DeploymentSignature, inNS, ml)
-		clearResources(ctx, intctrlutil.PodSignature, inNS, ml)
+		testdbaas.ClearResources(&testCtx, intctrlutil.StatefulSetSignature, inNS, ml)
+		testdbaas.ClearResources(&testCtx, intctrlutil.DeploymentSignature, inNS, ml)
+		testdbaas.ClearResources(&testCtx, intctrlutil.PodSignature, inNS, ml)
 	}
 	BeforeEach(cleanEnv)
 

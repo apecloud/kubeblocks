@@ -31,6 +31,7 @@ import (
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	testdbaas "github.com/apecloud/kubeblocks/internal/testutil/dbaas"
 )
 
 var _ = Describe("Event Controller", func() {
@@ -51,10 +52,10 @@ var _ = Describe("Event Controller", func() {
 		By("clean resources")
 
 		// delete cluster(and all dependent sub-resources), clusterversion and clusterdef
-		clearClusterResources(ctx)
+		testdbaas.ClearClusterResources(&testCtx)
 
 		// non-namespaced resources
-		clearResources(ctx, intctrlutil.StorageClassSignature, client.HasLabels{testCtx.TestObjLabelKey})
+		testdbaas.ClearResources(&testCtx, intctrlutil.StorageClassSignature, client.HasLabels{testCtx.TestObjLabelKey})
 	}
 	BeforeEach(cleanEnv)
 

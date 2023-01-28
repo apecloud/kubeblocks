@@ -102,7 +102,7 @@ var _ = BeforeSuite(func() {
 	}).SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 
-	testCtx = testutil.NewDefaultTestContext(k8sManager.GetClient())
+	testCtx = testutil.NewDefaultTestContext(ctx, k8sManager.GetClient(), testEnv)
 
 	go func() {
 		defer GinkgoRecover()

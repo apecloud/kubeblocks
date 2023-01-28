@@ -141,11 +141,10 @@ func (r *reconfigureOptions) complete2(args []string) error {
 		r.clusterName = args[0]
 	}
 
-	if r.componentName == "" {
-		return cfgcore.MakeError("missing component name")
-	}
-
 	if err := r.complete(args); err != nil {
+		return err
+	}
+	if err := r.syncClusterComponent(); err != nil {
 		return err
 	}
 	if len(r.templateNames) != 0 {
@@ -187,6 +186,27 @@ func (r *reconfigureOptions) syncComponentCfgTpl() error {
 		return err
 	}
 	r.tpls = tplList
+	return nil
+}
+
+func (r *reconfigureOptions) syncClusterComponent() error {
+	if r.componentName != "" {
+		return nil
+	}
+
+	clusterObj := dbaasv1alpha1.Cluster{}
+	if err := util.GetResourceObjectFromGVR(types.ClusterGVR(), client.ObjectKey{
+		Namespace: r.namespace,
+		Name:      r.clusterName,
+	}, r.dynamic, &clusterObj); err != nil {
+		return err
+	}
+
+	if len(clusterObj.Spec.Components) != 1 {
+		return cfgcore.MakeError("when multi component exist, must specify which component to use.")
+	}
+
+	r.componentName = clusterObj.Spec.Components[0].Name
 	return nil
 }
 

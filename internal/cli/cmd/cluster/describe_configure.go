@@ -49,11 +49,14 @@ type reconfigureOptions struct {
 	clusterName   string
 	componentName string
 	templateNames []string
+
 	isExplain     bool
 	truncEnum     bool
 	truncDocument bool
-	keys          []string
-	showDetail    bool
+	paramName     string
+
+	keys       []string
+	showDetail bool
 	// for cache
 	tpls []dbaasv1alpha1.ConfigTemplate
 }
@@ -311,6 +314,14 @@ func (r *reconfigureOptions) printConfigureHistory(configs map[dbaasv1alpha1.Con
 	return nil
 }
 
+func (r *reconfigureOptions) hasSpecificParam() bool {
+	return len(r.paramName) != 0
+}
+
+func (r *reconfigureOptions) isSpecificParam(paramName string) bool {
+	return r.paramName == paramName
+}
+
 func (r *reconfigureOptions) printConfigConstraint(schema *apiext.JSONSchemaProps, staticParameters *set.LinkedHashSetString, dynamicParameters *set.LinkedHashSetString) error {
 	var (
 		index             = 0
@@ -324,6 +335,10 @@ func (r *reconfigureOptions) printConfigConstraint(schema *apiext.JSONSchemaProp
 		if property.Type == "object" {
 			continue
 		}
+		if r.hasSpecificParam() && !r.isSpecificParam(key) {
+			continue
+		}
+
 		pt, err := generateParameterTemplate(key, property)
 		if err != nil {
 			return err
@@ -333,7 +348,11 @@ func (r *reconfigureOptions) printConfigConstraint(schema *apiext.JSONSchemaProp
 		} else if dynamicParameters.InArray(pt.name) {
 			pt.scope = "dynamic"
 		}
-		if r.truncDocument && len(pt.description) > maxDocumentLength {
+		if r.hasSpecificParam() {
+			printSingleParameterTemplate(pt)
+			return nil
+		}
+		if !r.hasSpecificParam() && r.truncDocument && len(pt.description) > maxDocumentLength {
 			pt.description = pt.description[:maxDocumentLength] + "..."
 		}
 		params[index] = pt
@@ -347,52 +366,65 @@ func (r *reconfigureOptions) printConfigConstraint(schema *apiext.JSONSchemaProp
 	return nil
 }
 
-// printConfigParameterTemplate prints the conditions of resource.
-func printConfigParameterTemplate(paramTemplates []*parameterTemplate, out io.Writer, maxFieldLength int) {
+func (pt *parameterTemplate) enumFormatter(maxFieldLength int) string {
+	if len(pt.enum) == 0 {
+		return ""
+	}
+	v := strings.Join(pt.enum, ",")
+	if maxFieldLength > 0 && len(v) > maxFieldLength {
+		v = v[:maxFieldLength] + "..."
+	}
+	return v
+}
+
+func (pt *parameterTemplate) rangeFormatter() string {
 	const (
 		r          = "-"
 		rangeBegin = "["
 		rangeEnd   = "]"
 	)
 
-	rangeFormatter := func(pt *parameterTemplate) string {
-		if len(pt.maxiNum) == 0 && len(pt.miniNum) == 0 {
-			return ""
-		}
-
-		v := rangeBegin
-		if len(pt.miniNum) != 0 {
-			v += pt.miniNum
-		}
-		if len(pt.maxiNum) != 0 {
-			v += r
-			v += pt.maxiNum
-		} else if len(v) != 0 {
-			v += r
-		}
-		v += rangeEnd
-		return v
-	}
-	enumFormatter := func(pt *parameterTemplate) string {
-		if len(pt.enum) == 0 {
-			return ""
-		}
-		v := strings.Join(pt.enum, ",")
-		if maxFieldLength > 0 && len(v) > maxFieldLength {
-			v = v[:maxFieldLength] + "..."
-		}
-		return v
+	if len(pt.maxiNum) == 0 && len(pt.miniNum) == 0 {
+		return ""
 	}
 
+	v := rangeBegin
+	if len(pt.miniNum) != 0 {
+		v += pt.miniNum
+	}
+	if len(pt.maxiNum) != 0 {
+		v += r
+		v += pt.maxiNum
+	} else if len(v) != 0 {
+		v += r
+	}
+	v += rangeEnd
+	return v
+}
+
+func printSingleParameterTemplate(pt *parameterTemplate) {
+	printer.PrintTitle("Configure Constraint")
+	// print column "PARAMETER NAME", "RANGE", "ENUM", "SCOPE", "TYPE", "DESCRIPTION"
+	printer.PrintPairStringToLine("ParameterName", pt.name)
+	printer.PrintPairStringToLine("Range", pt.rangeFormatter())
+	printer.PrintPairStringToLine("Enum", pt.enumFormatter(-1))
+	printer.PrintPairStringToLine("Scope", pt.scope)
+	printer.PrintPairStringToLine("Type", pt.valueType)
+	printer.PrintPairStringToLine("Description", pt.description)
+}
+
+// printConfigParameterTemplate prints the conditions of resource.
+func printConfigParameterTemplate(paramTemplates []*parameterTemplate, out io.Writer, maxFieldLength int) {
 	if len(paramTemplates) == 0 {
 		return
 	}
+
 	tbl := printer.NewTablePrinter(out)
 	tbl.SetStyle(printer.TerminalStyle)
 	printer.PrintTitle("Configure Constraint")
-	tbl.SetHeader("PARAMETER NAME", "RANGE", "ENUM", "SCOPE", "TYPE", "description")
+	tbl.SetHeader("PARAMETER NAME", "RANGE", "ENUM", "SCOPE", "TYPE", "DESCRIPTION")
 	for _, pt := range paramTemplates {
-		tbl.AddRow(pt.name, rangeFormatter(pt), enumFormatter(pt), pt.scope, pt.valueType, pt.description)
+		tbl.AddRow(pt.name, pt.rangeFormatter(), pt.enumFormatter(maxFieldLength), pt.scope, pt.valueType, pt.description)
 	}
 	tbl.Print()
 }
@@ -515,5 +547,6 @@ func NewExplainReconfigureCmd(f cmdutil.Factory, streams genericclioptions.IOStr
 	o.addCommonFlags(cmd)
 	cmd.Flags().BoolVar(&o.truncEnum, "trunc-enum", o.truncEnum, " trunc enum string (options)")
 	cmd.Flags().BoolVar(&o.truncDocument, "trunc-document", o.truncDocument, " trunc document string (options)")
+	cmd.Flags().StringVar(&o.paramName, "param", o.paramName, " specific parameter (options)")
 	return cmd
 }

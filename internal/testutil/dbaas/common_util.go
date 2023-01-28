@@ -18,12 +18,15 @@ package dbaas
 
 import (
 	"reflect"
+	"strings"
 
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/apecloud/kubeblocks/internal/testutil"
@@ -125,11 +128,10 @@ func CheckObj[T intctrlutil.Object, PT intctrlutil.PObject[T]](testCtx *testutil
 
 // ClearResources clears all resources of the given type T satisfying the input ListOptions.
 func ClearResources[T intctrlutil.Object, PT intctrlutil.PObject[T],
-	L intctrlutil.ObjList[T], PL intctrlutil.PObjList[T, L], Traits intctrlutil.ObjListTraits[T, L]](
-	testCtx *testutil.TestContext, _ func(T, L, Traits), opts ...client.DeleteAllOfOption) {
+	L intctrlutil.ObjList[T], PL intctrlutil.PObjList[T, L]](
+	testCtx *testutil.TestContext, _ func(T, L), opts ...client.DeleteAllOfOption) {
 	var (
 		objList L
-		traits  Traits
 	)
 
 	listOptions := make([]client.ListOption, 0)
@@ -143,11 +145,13 @@ func ClearResources[T intctrlutil.Object, PT intctrlutil.PObject[T],
 		}
 	}
 
-	// ginkgo.By("clear resources " + PL(&objList).GetObjectKind().GroupVersionKind().String())
+	gvk, _ := apiutil.GVKForObject(PL(&objList), testCtx.Cli.Scheme())
+	ginkgo.By("clear resources " + strings.TrimSuffix(gvk.Kind, "List"))
+
 	gomega.Eventually(func() error {
 		return testCtx.Cli.List(testCtx.Ctx, PL(&objList), listOptions...)
 	}).Should(gomega.Succeed())
-	for _, obj := range traits.GetItems(&objList) {
+	for _, obj := range reflect.ValueOf(&objList).Elem().FieldByName("Items").Interface().([]T) {
 		// it's possible deletions are initiated in testcases code but cache is not updated
 		gomega.Expect(client.IgnoreNotFound(testCtx.Cli.Delete(testCtx.Ctx, PT(&obj),
 			deleteOptions...))).Should(gomega.Succeed())
@@ -155,7 +159,8 @@ func ClearResources[T intctrlutil.Object, PT intctrlutil.PObject[T],
 
 	gomega.Eventually(func(g gomega.Gomega) {
 		g.Expect(testCtx.Cli.List(testCtx.Ctx, PL(&objList), listOptions...)).Should(gomega.Succeed())
-		for _, obj := range traits.GetItems(&objList) {
+		items := reflect.ValueOf(&objList).Elem().FieldByName("Items").Interface().([]T)
+		for _, obj := range items {
 			pobj := PT(&obj)
 			finalizers := pobj.GetFinalizers()
 			if len(finalizers) > 0 {
@@ -166,7 +171,7 @@ func ClearResources[T intctrlutil.Object, PT intctrlutil.PObject[T],
 				g.Expect(testCtx.Cli.Update(testCtx.Ctx, pobj)).Should(gomega.Succeed())
 			}
 		}
-		g.Expect(len(traits.GetItems(&objList))).Should(gomega.Equal(0))
+		g.Expect(len(items)).Should(gomega.Equal(0))
 	}, testCtx.ClearResourceTimeout, testCtx.ClearResourcePollingInterval).Should(gomega.Succeed())
 }
 

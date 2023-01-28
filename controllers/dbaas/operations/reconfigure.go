@@ -101,14 +101,14 @@ func (r *reconfigureAction) Handle(eventContext cfgcore.ConfigEventContext, last
 			dbaasv1alpha1.NewReconfigureRunningCondition(opsRequest,
 				dbaasv1alpha1.ReasonReconfigureSucceed,
 				eventContext.TplName,
-				formatConfigPatch(eventContext.ConfigPatch, &eventContext.PolicyStatus)),
+				formatConfigPatchToMessage(eventContext.ConfigPatch, &eventContext.PolicyStatus)),
 			dbaasv1alpha1.NewSucceedCondition(opsRequest))
 	case dbaasv1alpha1.FailedPhase:
 		return PatchOpsStatus(opsRes, dbaasv1alpha1.RunningPhase,
 			dbaasv1alpha1.NewReconfigureRunningCondition(opsRequest,
 				dbaasv1alpha1.ReasonReconfigureFailed,
 				eventContext.TplName,
-				formatConfigPatch(eventContext.ConfigPatch, &eventContext.PolicyStatus)),
+				formatConfigPatchToMessage(eventContext.ConfigPatch, &eventContext.PolicyStatus)),
 			dbaasv1alpha1.NewFailedCondition(opsRequest, err))
 	default:
 		return PatchOpsStatus(opsRes, dbaasv1alpha1.RunningPhase,

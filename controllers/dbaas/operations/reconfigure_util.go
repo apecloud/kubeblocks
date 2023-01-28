@@ -143,6 +143,7 @@ func withReturned(configs map[string]string, patch *cfgcore.ConfigDiffInformatio
 func makeReconfiguringResult(err error, ops ...func(*reconfiguringResult)) reconfiguringResult {
 	result := reconfiguringResult{
 		failed: false,
+		err:    err,
 	}
 	for _, o := range ops {
 		o(&result)
@@ -192,7 +193,7 @@ func constructReconfiguringConditions(result reconfiguringResult, resource *OpsR
 			resource.OpsRequest,
 			dbaasv1alpha1.ReasonReconfigureMerged,
 			tpl.Name,
-			formatConfigPatch(result.configPatch, nil)),
+			formatConfigPatchToMessage(result.configPatch, nil)),
 		}
 	}
 	return []*metav1.Condition{
@@ -200,7 +201,7 @@ func constructReconfiguringConditions(result reconfiguringResult, resource *OpsR
 			resource.OpsRequest,
 			dbaasv1alpha1.ReasonReconfigureInvalidUpdated,
 			tpl.Name,
-			formatConfigPatch(result.configPatch, nil)),
+			formatConfigPatchToMessage(result.configPatch, nil)),
 		dbaasv1alpha1.NewSucceedCondition(resource.OpsRequest),
 	}
 }
@@ -218,14 +219,14 @@ func processMergedFailed(resource *OpsResource, isInvalid bool, err error) error
 	return nil
 }
 
-func formatConfigPatch(difference *cfgcore.ConfigDiffInformation, execStatus *cfgcore.PolicyExecStatus) string {
+func formatConfigPatchToMessage(configPatch *cfgcore.ConfigDiffInformation, execStatus *cfgcore.PolicyExecStatus) string {
 	policyName := ""
 	if execStatus != nil {
 		policyName = fmt.Sprintf("updated policy: <%s>, ", execStatus.PolicyName)
 	}
 	return fmt.Sprintf("%supdated: %s, added: %s, deleted:%s",
 		policyName,
-		difference.UpdateConfig,
-		difference.AddConfig,
-		difference.DeleteConfig)
+		configPatch.UpdateConfig,
+		configPatch.AddConfig,
+		configPatch.DeleteConfig)
 }

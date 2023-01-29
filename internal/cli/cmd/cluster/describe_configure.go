@@ -122,16 +122,6 @@ func (r *reconfigureOptions) validate() error {
 		if r.isExplain && len(tpl.ConfigConstraintRef) == 0 {
 			return cfgcore.MakeError("explain command require template has config constraint options")
 		}
-		// validate config cm
-		// cfgName := cfgcore.GetComponentCfgName(r.clusterName, r.componentName, tpl.VolumeName)
-		// cmObj := &corev1.ConfigMap{}
-		// if err := util.GetResourceObjectFromGVR(types.CMGVR(), client.ObjectKey{
-		//	Name:      cfgName,
-		//	Namespace: r.namespace,
-		// }, r.dynamic, &cmObj); err != nil {
-		//	return cfgcore.WrapError(err, "template config instance is not exist, template name: %s, cfg name: %s",
-		//		tplName, cfgName)
-		// }
 	}
 	return nil
 }
@@ -572,6 +562,7 @@ func (o *opsRequestDiffOptions) maybeCompareOps(base *dbaasv1alpha1.OpsRequest, 
 	if len(templateNames) == 0 || !reflect.DeepEqual(templateNames, getTemplateName(diff.Spec)) {
 		return false
 	}
+
 	o.clusterName = clusterName
 	o.componentName = componentName
 	o.templateNames = templateNames
@@ -746,6 +737,7 @@ func findTplByName(tpls []dbaasv1alpha1.ConfigTemplate, tplName string) *dbaasv1
 	return nil
 }
 
+// NewDescribeReconfigureCmd shows details of history modifications or configuration file of reconfiguring operations
 func NewDescribeReconfigureCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := &reconfigureOptions{
 		isExplain:          false,
@@ -769,6 +761,7 @@ func NewDescribeReconfigureCmd(f cmdutil.Factory, streams genericclioptions.IOSt
 	return cmd
 }
 
+// NewExplainReconfigureCmd shows details of modifiable parameters.
 func NewExplainReconfigureCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := &reconfigureOptions{
 		isExplain:          true,
@@ -794,7 +787,8 @@ func NewExplainReconfigureCmd(f cmdutil.Factory, streams genericclioptions.IOStr
 	return cmd
 }
 
-func NewReconfigureDiffCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+// NewDiffConfigureCmd shows the difference between two configuration version.
+func NewDiffConfigureCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := &opsRequestDiffOptions{baseOptions: newDescribeOpsOptions(f, streams)}
 	cmd := &cobra.Command{
 		Use:               "diff-configure",

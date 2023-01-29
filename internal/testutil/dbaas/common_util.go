@@ -131,6 +131,7 @@ func ClearResources[T intctrlutil.Object, PT intctrlutil.PObject[T],
 	L intctrlutil.ObjList[T], PL intctrlutil.PObjList[T, L]](
 	testCtx *testutil.TestContext, _ func(T, L), opts ...client.DeleteAllOfOption) {
 	var (
+		obj     T
 		objList L
 	)
 
@@ -149,13 +150,8 @@ func ClearResources[T intctrlutil.Object, PT intctrlutil.PObject[T],
 	ginkgo.By("clear resources " + strings.TrimSuffix(gvk.Kind, "List"))
 
 	gomega.Eventually(func() error {
-		return testCtx.Cli.List(testCtx.Ctx, PL(&objList), listOptions...)
+		return testCtx.Cli.DeleteAllOf(testCtx.Ctx, PT(&obj), opts...)
 	}).Should(gomega.Succeed())
-	for _, obj := range reflect.ValueOf(&objList).Elem().FieldByName("Items").Interface().([]T) {
-		// it's possible deletions are initiated in testcases code but cache is not updated
-		gomega.Expect(client.IgnoreNotFound(testCtx.Cli.Delete(testCtx.Ctx, PT(&obj),
-			deleteOptions...))).Should(gomega.Succeed())
-	}
 
 	gomega.Eventually(func(g gomega.Gomega) {
 		g.Expect(testCtx.Cli.List(testCtx.Ctx, PL(&objList), listOptions...)).Should(gomega.Succeed())
@@ -167,9 +163,14 @@ func ClearResources[T intctrlutil.Object, PT intctrlutil.PObject[T],
 				// PVCs are protected by the "kubernetes.io/pvc-protection" finalizer
 				g.Expect(finalizers[0]).Should(gomega.BeElementOf([]string{"orphan", "kubernetes.io/pvc-protection"}))
 				g.Expect(len(finalizers)).Should(gomega.Equal(1))
-				pobj.SetFinalizers([]string{})
-				g.Expect(testCtx.Cli.Update(testCtx.Ctx, pobj)).Should(gomega.Succeed())
+				g.Expect(ChangeObj(testCtx, pobj, func() {
+					pobj.SetFinalizers([]string{})
+				})).To(gomega.Succeed())
 			}
+			// it's possible that the object wasn't deleted in previous round in race conditions,
+			// so it's more reliable to delete it in each loop.
+			gomega.Expect(client.IgnoreNotFound(testCtx.Cli.Delete(testCtx.Ctx, PT(&obj),
+				deleteOptions...))).Should(gomega.Succeed())
 		}
 		g.Expect(len(items)).Should(gomega.Equal(0))
 	}, testCtx.ClearResourceTimeout, testCtx.ClearResourcePollingInterval).Should(gomega.Succeed())

@@ -72,6 +72,7 @@ func NewClusterCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 		NewReconfigureCmd(f, streams),
 		NewDescribeReconfigureCmd(f, streams),
 		NewExplainReconfigureCmd(f, streams),
+		NewReconfigureDiffCmd(f, streams),
 	)
 
 	if viper.GetString(EnvExperimentalExpose) == "1" {

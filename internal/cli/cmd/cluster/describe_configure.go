@@ -21,21 +21,22 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"reflect"
 	"sort"
 	"strings"
 
 	"github.com/StudioSol/set"
-	"k8s.io/client-go/dynamic"
-
 	"github.com/spf13/cobra"
 	corev1 "k8s.io/api/core/v1"
 	apiext "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/client-go/dynamic"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
@@ -60,6 +61,16 @@ type reconfigureOptions struct {
 	showDetail bool
 	// for cache
 	tpls []dbaasv1alpha1.ConfigTemplate
+}
+
+type opsRequestDiffOptions struct {
+	baseOptions *describeOpsOptions
+
+	clusterName   string
+	componentName string
+	templateNames []string
+	baseVersion   *dbaasv1alpha1.OpsRequest
+	diffVersion   *dbaasv1alpha1.OpsRequest
 }
 
 type parameterTemplate struct {
@@ -89,6 +100,9 @@ var (
 	explainReconfigureExample = templates.Examples(`
 		# describe a specified configure template
 		kbcli cluster explain-configure cluster-name --component-name=component --template-names=tpl1`)
+	diffConfigureExample = templates.Examples(`
+		# compare config files 
+		kbcli cluster diff-configure opsrequest1 opsrequest2`)
 )
 
 func (r *reconfigureOptions) addCommonFlags(cmd *cobra.Command) {
@@ -138,11 +152,8 @@ func (r *reconfigureOptions) findTemplateByName(tplName string) (*dbaasv1alpha1.
 		return nil, err
 	}
 
-	for i := range r.tpls {
-		tpl := &r.tpls[i]
-		if tpl.Name == tplName {
-			return tpl, nil
-		}
+	if tpl := findTplByName(r.tpls, tplName); tpl != nil {
+		return tpl, nil
 	}
 	return nil, cfgcore.MakeError("not found template: %s", tplName)
 }
@@ -433,6 +444,196 @@ func (pt *parameterTemplate) rangeFormatter() string {
 	return v
 }
 
+func (o *opsRequestDiffOptions) complete(args []string) error {
+	isValidReconfigureOps := func(ops *dbaasv1alpha1.OpsRequest) bool {
+		return ops.Spec.Type == dbaasv1alpha1.ReconfiguringType && ops.Spec.Reconfigure != nil
+	}
+
+	if len(args) != 2 {
+		return cfgcore.MakeError("missing opsrequest name")
+	}
+
+	if err := o.baseOptions.complete(args); err != nil {
+		return err
+	}
+
+	baseVersion := &dbaasv1alpha1.OpsRequest{}
+	diffVersion := &dbaasv1alpha1.OpsRequest{}
+	if err := util.GetResourceObjectFromGVR(types.OpsGVR(), client.ObjectKey{
+		Namespace: o.baseOptions.namespace,
+		Name:      args[0],
+	}, o.baseOptions.dynamic, baseVersion); err != nil {
+		return cfgcore.WrapError(err, "failed to get ops CR [%s]", args[0])
+	}
+	if err := util.GetResourceObjectFromGVR(types.OpsGVR(), client.ObjectKey{
+		Namespace: o.baseOptions.namespace,
+		Name:      args[1],
+	}, o.baseOptions.dynamic, diffVersion); err != nil {
+		return cfgcore.WrapError(err, "failed to get ops CR [%s]", args[1])
+	}
+
+	if !isValidReconfigureOps(baseVersion) {
+		return cfgcore.MakeError("opsrequest is not valid reconfiguring operation [%s]", client.ObjectKeyFromObject(baseVersion))
+	}
+
+	if !isValidReconfigureOps(diffVersion) {
+		return cfgcore.MakeError("opsrequest is not valid reconfiguring operation [%s]", client.ObjectKeyFromObject(diffVersion))
+	}
+
+	if !o.maybeCompareOps(baseVersion, diffVersion) {
+		return cfgcore.MakeError("failed to diff, not same cluster, or same component, or template.")
+	}
+
+	o.baseVersion = baseVersion
+	o.diffVersion = diffVersion
+	return nil
+}
+
+func findTemplateStatusByName(status *dbaasv1alpha1.ReconfiguringStatus, tplName string) *dbaasv1alpha1.ConfigurationStatus {
+	if status == nil {
+		return nil
+	}
+
+	for i := range status.ConfigurationStatus {
+		s := &status.ConfigurationStatus[i]
+		if s.Name == tplName {
+			return s
+		}
+	}
+	return nil
+}
+
+func (o *opsRequestDiffOptions) validate() error {
+	var (
+		baseStatus = o.baseVersion.Status
+		diffStatus = o.diffVersion.Status
+	)
+
+	if baseStatus.Phase != dbaasv1alpha1.SucceedPhase {
+		return cfgcore.MakeError("require reconfiguring phase is success!, name: %s, phase: %s", o.baseVersion.Name, baseStatus.Phase)
+	}
+	if diffStatus.Phase != dbaasv1alpha1.SucceedPhase {
+		return cfgcore.MakeError("require reconfiguring phase is success!, name: %s, phase: %s", o.diffVersion.Name, diffStatus.Phase)
+	}
+
+	for _, tplName := range o.templateNames {
+		s1 := findTemplateStatusByName(baseStatus.ReconfiguringStatus, tplName)
+		s2 := findTemplateStatusByName(diffStatus.ReconfiguringStatus, tplName)
+		if s1 == nil || len(s1.LastAppliedConfiguration) == 0 {
+			return cfgcore.MakeError("invalid reconfiguring status. CR[%v]", client.ObjectKeyFromObject(o.baseVersion))
+		}
+		if s2 == nil || len(s2.LastAppliedConfiguration) == 0 {
+			return cfgcore.MakeError("invalid reconfiguring status. CR[%v]", client.ObjectKeyFromObject(o.diffVersion))
+		}
+	}
+	return nil
+}
+
+func (o *opsRequestDiffOptions) run() error {
+	configDiffs := make(map[string]interface{}, len(o.templateNames))
+	for _, tplName := range o.templateNames {
+		diff, err := o.diffConfig(tplName)
+		if err != nil {
+			return err
+		}
+		configDiffs[tplName] = diff
+	}
+
+	printer.PrintTitle("DIFF-CONFIGURE RESULT")
+	for tplName, diff := range configDiffs {
+		printer.PrintTitle(printer.BoldYellow(tplName))
+		b, err := json.MarshalIndent(diff, "", "  ")
+		if err != nil {
+			return err
+		}
+		fmt.Fprintf(o.baseOptions.Out, "%s\n", string(b))
+	}
+	return nil
+}
+
+func (o *opsRequestDiffOptions) maybeCompareOps(base *dbaasv1alpha1.OpsRequest, diff *dbaasv1alpha1.OpsRequest) bool {
+	getClusterName := func(ops client.Object) string {
+		labels := ops.GetLabels()
+		if len(labels) == 0 {
+			return ""
+		}
+		return labels[types.InstanceLabelKey]
+	}
+	getComponentName := func(ops dbaasv1alpha1.OpsRequestSpec) string {
+		return ops.Reconfigure.ComponentName
+	}
+	getTemplateName := func(ops dbaasv1alpha1.OpsRequestSpec) []string {
+		configs := ops.Reconfigure.Configurations
+		names := make([]string, len(configs))
+		for i, config := range configs {
+			names[i] = config.Name
+		}
+		return names
+	}
+
+	clusterName := getClusterName(base)
+	if len(clusterName) == 0 || clusterName != getClusterName(diff) {
+		return false
+	}
+	componentName := getComponentName(base.Spec)
+	if len(componentName) == 0 || componentName != getComponentName(diff.Spec) {
+		return false
+	}
+	templateNames := getTemplateName(base.Spec)
+	if len(templateNames) == 0 || !reflect.DeepEqual(templateNames, getTemplateName(diff.Spec)) {
+		return false
+	}
+	o.clusterName = clusterName
+	o.componentName = componentName
+	o.templateNames = templateNames
+	return true
+}
+
+func (o *opsRequestDiffOptions) diffConfig(tplName string) (map[string]interface{}, error) {
+	var (
+		tpl              *dbaasv1alpha1.ConfigTemplate
+		configConstraint = &dbaasv1alpha1.ConfigConstraint{}
+	)
+
+	tplList, err := util.GetConfigTemplateList(o.clusterName, o.baseOptions.namespace, o.baseOptions.dynamic, o.componentName)
+	if err != nil {
+		return nil, err
+	}
+	if tpl = findTplByName(tplList, tplName); tpl == nil {
+		return nil, cfgcore.MakeError("not found template: %s", tplName)
+	}
+	if err := util.GetResourceObjectFromGVR(types.ConfigConstraintGVR(), client.ObjectKey{
+		Namespace: "",
+		Name:      tpl.ConfigConstraintRef,
+	}, o.baseOptions.dynamic, configConstraint); err != nil {
+		return nil, err
+	}
+
+	patchOption := cfgcore.CfgOption{
+		Type:    cfgcore.CfgTplType,
+		CfgType: configConstraint.Spec.FormatterConfig.Formatter,
+		Log:     log.FromContext(context.TODO()),
+	}
+
+	base := findTemplateStatusByName(o.baseVersion.Status.ReconfiguringStatus, tplName)
+	diff := findTemplateStatusByName(o.diffVersion.Status.ReconfiguringStatus, tplName)
+
+	patch, err := cfgcore.CreateMergePatch(&cfgcore.K8sConfig{
+		CfgKey:         client.ObjectKeyFromObject(o.baseVersion),
+		Configurations: base.LastAppliedConfiguration,
+	}, &cfgcore.K8sConfig{
+		CfgKey:         client.ObjectKeyFromObject(o.diffVersion),
+		Configurations: diff.LastAppliedConfiguration,
+	}, patchOption)
+	if err != nil {
+		return nil, err
+	}
+	if !patch.IsModify {
+		return map[string]interface{}{}, nil
+	}
+	return byte2InterfaceMap(patch.UpdateConfig)
+}
+
 func printSingleParameterTemplate(pt *parameterTemplate) {
 	printer.PrintTitle("Configure Constraint")
 	// print column "PARAMETER NAME", "RANGE", "ENUM", "SCOPE", "TYPE", "DESCRIPTION"
@@ -562,6 +763,28 @@ func validateConfigParams(param reconfiguringParameter) error {
 	return err
 }
 
+func byte2InterfaceMap(config map[string][]byte) (map[string]interface{}, error) {
+	m := make(map[string]interface{}, len(config))
+	for key, value := range config {
+		var ifv any
+		if err := json.Unmarshal(value, &ifv); err != nil {
+			return nil, err
+		}
+		m[key] = ifv
+	}
+	return m, nil
+}
+
+func findTplByName(tpls []dbaasv1alpha1.ConfigTemplate, tplName string) *dbaasv1alpha1.ConfigTemplate {
+	for i := range tpls {
+		tpl := &tpls[i]
+		if tpl.Name == tplName {
+			return tpl
+		}
+	}
+	return nil
+}
+
 func NewDescribeReconfigureCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := &reconfigureOptions{
 		isExplain:          false,
@@ -607,5 +830,21 @@ func NewExplainReconfigureCmd(f cmdutil.Factory, streams genericclioptions.IOStr
 	cmd.Flags().BoolVar(&o.truncEnum, "trunc-enum", o.truncEnum, " trunc enum string (options)")
 	cmd.Flags().BoolVar(&o.truncDocument, "trunc-document", o.truncDocument, " trunc document string (options)")
 	cmd.Flags().StringVar(&o.paramName, "param", o.paramName, " specific parameter (options)")
+	return cmd
+}
+
+func NewReconfigureDiffCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+	o := &opsRequestDiffOptions{baseOptions: newDescribeOpsOptions(f, streams)}
+	cmd := &cobra.Command{
+		Use:               "diff-configure",
+		Short:             "List the constraint for supported configuration params",
+		Example:           diffConfigureExample,
+		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.ClusterGVR()),
+		Run: func(cmd *cobra.Command, args []string) {
+			util.CheckErr(o.complete(args))
+			util.CheckErr(o.validate())
+			util.CheckErr(o.run())
+		},
+	}
 	return cmd
 }

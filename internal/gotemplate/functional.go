@@ -42,15 +42,15 @@ func isSystemFuncsCM(cm *corev1.ConfigMap) bool {
 	return err == nil && b
 }
 
-func structTplValues(args ...interface{}) TplValues {
+func constructFunctionArgList(args ...interface{}) TplValues {
 	values := TplValues{}
 	for i, arg := range args {
-		values[generateArgsValueKey(i)] = arg
+		values[constructArgsValueKey(i)] = arg
 	}
 	return values
 }
 
-func generateArgsValueKey(i int) string {
+func constructArgsValueKey(i int) string {
 	return fmt.Sprintf("arg%d", i)
 }
 

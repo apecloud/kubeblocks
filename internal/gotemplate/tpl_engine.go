@@ -75,7 +75,12 @@ func (t *TplEngine) Render(context string) (string, error) {
 }
 
 func (t *TplEngine) initSystemFunMap(funcs template.FuncMap) {
+	// Add the 'failed' function here.
+	// When an error occurs, go template engine can detect it and exit early.
 	funcs[buildInSystemFailedName] = failed
+
+	// Add the 'import' function here.
+	// Using it, you can make any function in a configmap object visible in this scope.
 	funcs[buildInSystemImportName] = func(namespacedName string) (string, error) {
 		if t.importModules.InArray(namespacedName) {
 			return "", nil
@@ -112,13 +117,27 @@ func (t *TplEngine) initSystemFunMap(funcs template.FuncMap) {
 		}
 		return "", nil
 	}
+
+	// Add the 'call' function here.
+	// This function simulates a function call in a programming language.
+	// The parameter list of function is similar to function in bash language.
+	// The access parameter uses .arg or $.arg.
+	// e.g: $.arg0, $.arg1, ...
+	//
+	// Node: How to do handle the return type of go template functions?
+	// It is recommended that you serialize it to string and cast it to a specific type in the calling function.
+	// e.g :
+	// The return type of the function is map, the return value is $sts,
+	// {{- $sts | toJson }}
+	// for calling function:
+	// {{- $sts := call "test" 10 | fromJson }}
 	funcs[buildInSystemCallName] = func(funcName string, args ...interface{}) (string, error) {
 		fn, ok := t.importFuncs[funcName]
 		if !ok {
 			return "", cfgcore.MakeError("not exist func: %s", funcName)
 		}
 
-		values := structTplValues(args...)
+		values := constructFunctionArgList(args...)
 		engine := NewTplEngine(&values, nil, types.NamespacedName{
 			Name:      fn.name,
 			Namespace: fn.namespace,
@@ -142,6 +161,11 @@ func (t *TplEngine) importSelfModuleFuncs(funcs map[string]functional, fn func(t
 	}
 }
 
+// NewTplEngine create go template helper
+// To support this caller has a concept of import dependency which is recursive.
+//
+// As it recurses, it also sets the values to be appropriate for the parameters of the called function,
+// it looks like it's calling a local function.
 func NewTplEngine(values *TplValues, funcs *BuiltInObjectsFunc, tplName string, cli client.Client, ctx context.Context) *TplEngine {
 	coreBuiltinFuncs := sprig.TxtFuncMap()
 

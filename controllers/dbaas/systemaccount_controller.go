@@ -155,7 +155,7 @@ func (r *SystemAccountReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 
 	// wait till the cluster is running
 	if cluster.Status.Phase != dbaasv1alpha1.RunningPhase && cluster.Status.Phase != dbaasv1alpha1.CreatingPhase {
-		return intctrlutil.RequeueAfter(time.Second, reqCtx.Log, "Cluster is not ready yet", "cluster", cluster.Name)
+		return intctrlutil.RequeueAfter(time.Second*5, reqCtx.Log, "Cluster is not ready yet", "cluster", cluster.Name)
 	}
 
 	// process accounts per component

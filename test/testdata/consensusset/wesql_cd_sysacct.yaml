@@ -10,6 +10,8 @@ spec:
     logConfigs:
     - filePathPattern: /data/mysql/log/mysqld.err
       name: error
+    monitor:
+      builtIn: true
     podSpec:
       containers:
       - name: mysql

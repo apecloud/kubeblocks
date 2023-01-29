@@ -148,7 +148,7 @@ func (r *SystemAccountReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	}
 
 	clusterdefinition := &dbaasv1alpha1.ClusterDefinition{}
-	clusterDefNS := types.NamespacedName{Namespace: cluster.Namespace, Name: cluster.Spec.ClusterDefRef}
+	clusterDefNS := types.NamespacedName{Name: cluster.Spec.ClusterDefRef}
 	if err := r.Client.Get(reqCtx.Ctx, clusterDefNS, clusterdefinition); err != nil {
 		return intctrlutil.RequeueWithErrorAndRecordEvent(cluster, r.Recorder, err, reqCtx.Log)
 	}

@@ -13,7 +13,7 @@ kbcli kubeblocks install [flags]
   kbcli kubeblocks install
   
   # Install KubeBlocks with specified version
-  kbcli kubeblocks install --version=0.2.0
+  kbcli kubeblocks install --version=0.4.0
   
   # Install KubeBlocks with other settings, for example, set replicaCount to 3
   kbcli kubeblocks install --set replicaCount=3

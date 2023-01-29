@@ -216,7 +216,7 @@ kind:       AppVersion
 metadata:
   name:     wesql-8.0.30
 spec:
-  clusterDefinitionRef: apecloud-wesql
+  clusterDefinitionRef: apecloud-mysql
   components:
     - type: wesql
       podSpec:

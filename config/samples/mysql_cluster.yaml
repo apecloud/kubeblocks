@@ -4,7 +4,7 @@ metadata:
   name: wesql-01
   namespace: default
 spec:
-  clusterDefinitionRef: apecloud-wesql
+  clusterDefinitionRef: apecloud-mysql
   clusterVersionRef: wesql-8.0.30
   components:
   - name: replicasets

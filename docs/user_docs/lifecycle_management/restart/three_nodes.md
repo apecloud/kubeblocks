@@ -20,7 +20,7 @@ This guide shows how to use KubeBlocks to restart a three-node cluster.
   ```
   $ kubectl get cd 
     NAME             PHASE       AGE
-    apecloud-wesql   Available   7m13s
+    apecloud-mysql   Available   7m13s
   $ kubectl get appversion
     NAME           PHASE       AGE
     wesql-8.0.30   Available   7m23s
@@ -45,7 +45,7 @@ metadata:
   name: wesql-3nodes
 spec:
   appVersionRef: wesql-8.0.30
-  clusterDefinitionRef: apecloud-wesql
+  clusterDefinitionRef: apecloud-mysql
   terminationPolicy: WipeOut
   components:
     - name: wesql-demo

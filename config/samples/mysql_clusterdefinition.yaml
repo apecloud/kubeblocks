@@ -1,7 +1,7 @@
 apiVersion: dbaas.kubeblocks.io/v1alpha1
 kind:       ClusterDefinition
 metadata:
-  name: apecloud-wesql
+  name: apecloud-mysql
 spec:
   type: state.mysql
   connectionCredential:
@@ -31,7 +31,7 @@ spec:
       horizontalScalePolicy:
         type: Snapshot
         backupTemplateSelector:
-          "clusterdefinition.kubeblocks.io/name": apecloud-wesql
+          "clusterdefinition.kubeblocks.io/name": apecloud-mysql
       probes:
         roleChangedProbe:
           periodSeconds: 10

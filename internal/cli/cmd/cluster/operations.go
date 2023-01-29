@@ -164,18 +164,37 @@ func (o *OperationsOptions) validateReconfiguring() error {
 	if err := o.validateConfigMapKey(tpl, componentName); err != nil {
 		return err
 	}
-	if err := validateConfigParams(reconfiguringParameter{
-		tpl:           tpl,
-		client:        o.Client,
-		clusterName:   o.Name,
-		componentName: componentName,
-		templateName:  o.CfgTemplateName,
-		keyName:       o.CfgFile,
-		params:        o.KeyValues,
-	}); err != nil {
+	if err := o.validateConfigParams(tpl, componentName); err != nil {
 		return err
 	}
 	return nil
+}
+
+func (o *OperationsOptions) validateConfigParams(tpl *dbaasv1alpha1.ConfigTemplate, componentName string) error {
+	var (
+		configConstraint = dbaasv1alpha1.ConfigConstraint{}
+	)
+
+	transKeyPair := func(pts map[string]string) map[string]interface{} {
+		m := make(map[string]interface{}, len(pts))
+		for key, value := range pts {
+			m[key] = value
+		}
+		return m
+	}
+
+	if err := util.GetResourceObjectFromGVR(types.ConfigConstraintGVR(), client.ObjectKey{
+		Namespace: "",
+		Name:      tpl.ConfigConstraintRef,
+	}, o.Client, &configConstraint); err != nil {
+		return err
+	}
+
+	_, err := cfgcore.MergeAndValidateConfiguration(configConstraint.Spec, map[string]string{o.CfgFile: ""}, []cfgcore.ParamPairs{{
+		Key:           o.CfgFile,
+		UpdatedParams: transKeyPair(o.KeyValues),
+	}})
+	return err
 }
 
 func (o *OperationsOptions) validateTemplateParam(tpls []dbaasv1alpha1.ConfigTemplate) (*dbaasv1alpha1.ConfigTemplate, error) {

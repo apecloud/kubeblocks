@@ -32,7 +32,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/client-go/dynamic"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -81,16 +80,6 @@ type parameterTemplate struct {
 	enum        []string
 	description string
 	scope       string
-}
-
-type reconfiguringParameter struct {
-	client        dynamic.Interface
-	clusterName   string
-	componentName string
-	templateName  string
-	keyName       string
-	params        map[string]string
-	tpl           *dbaasv1alpha1.ConfigTemplate
 }
 
 var (
@@ -733,34 +722,6 @@ func getValidUpdatedParams(status dbaasv1alpha1.OpsRequestStatus) string {
 		return err.Error()
 	}
 	return string(b)
-}
-
-func validateConfigParams(param reconfiguringParameter) error {
-	var (
-		configConstraint = dbaasv1alpha1.ConfigConstraint{}
-		tpl              = param.tpl
-	)
-
-	transKeyPair := func(pts map[string]string) map[string]interface{} {
-		m := make(map[string]interface{}, len(pts))
-		for key, value := range pts {
-			m[key] = value
-		}
-		return m
-	}
-
-	if err := util.GetResourceObjectFromGVR(types.ConfigConstraintGVR(), client.ObjectKey{
-		Namespace: "",
-		Name:      tpl.ConfigConstraintRef,
-	}, param.client, &configConstraint); err != nil {
-		return err
-	}
-
-	_, err := cfgcore.MergeAndValidateConfiguration(configConstraint.Spec, map[string]string{param.keyName: ""}, []cfgcore.ParamPairs{{
-		Key:           param.keyName,
-		UpdatedParams: transKeyPair(param.params),
-	}})
-	return err
 }
 
 func byte2InterfaceMap(config map[string][]byte) (map[string]interface{}, error) {

@@ -31,7 +31,6 @@ import (
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	testdbaas "github.com/apecloud/kubeblocks/internal/testutil/dbaas"
 	"github.com/apecloud/kubeblocks/test/testdata"
 )
@@ -196,7 +195,7 @@ spec:
 			// check reconciled finalizer and status
 			Eventually(func(g Gomega) {
 				cd := &dbaasv1alpha1.ClusterDefinition{}
-				g.Expect(k8sClient.Get(ctx, intctrlutil.GetNamespacedName(clusterDefinition), cd)).To(Succeed())
+				g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(clusterDefinition), cd)).To(Succeed())
 				g.Expect(len(cd.Finalizers) > 0 &&
 					cd.Status.ObservedGeneration == 1).To(BeTrue())
 			}, timeout, interval).Should(Succeed())
@@ -208,20 +207,20 @@ spec:
 			// check reconciled finalizer
 			Eventually(func(g Gomega) {
 				cv := &dbaasv1alpha1.ClusterVersion{}
-				g.Expect(k8sClient.Get(ctx, intctrlutil.GetNamespacedName(clusterVersion), cv)).To(Succeed())
+				g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(clusterVersion), cv)).To(Succeed())
 				g.Expect(len(cv.Finalizers) > 0 &&
 					cv.Status.ObservedGeneration == 1).To(BeTrue())
 			}, timeout, interval).Should(Succeed())
 
 			By("updating clusterDefinition's spec which then mark clusterVersion's status as OutOfSync")
-			Eventually(testdbaas.GetAndChangeObj(&testCtx, intctrlutil.GetNamespacedName(clusterDefinition),
+			Eventually(testdbaas.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(clusterDefinition),
 				func(cd *dbaasv1alpha1.ClusterDefinition) {
 					cd.Spec.Type = "state.redis"
 				}), timeout, interval).Should(Succeed())
 			// check ClusterVersion.Status.ClusterDefSyncStatus to be OutOfSync
 			Eventually(func(g Gomega) {
 				cv := &dbaasv1alpha1.ClusterVersion{}
-				g.Expect(k8sClient.Get(ctx, intctrlutil.GetNamespacedName(clusterVersion), cv)).To(Succeed())
+				g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(clusterVersion), cv)).To(Succeed())
 				g.Expect(cv.Status.ClusterDefSyncStatus == dbaasv1alpha1.OutOfSyncStatus).To(BeTrue())
 			}, timeout, interval).Should(Succeed())
 		})
@@ -254,7 +253,7 @@ spec:
 			Consistently(func(g Gomega) {
 				cd := &dbaasv1alpha1.ClusterDefinition{}
 				g.Eventually(func() error {
-					return k8sClient.Get(ctx, intctrlutil.GetNamespacedName(clusterDefinition), cd)
+					return k8sClient.Get(ctx, client.ObjectKeyFromObject(clusterDefinition), cd)
 				}, timeout, interval).Should(Succeed())
 				g.Expect(cd.Status.ObservedGeneration == 0).To(BeTrue())
 			}, waitDuration, interval).Should(Succeed())
@@ -264,7 +263,7 @@ spec:
 			assureCfgTplConfigMapObj(cmName, testCtx.DefaultNamespace)
 			Eventually(func(g Gomega) {
 				cd := &dbaasv1alpha1.ClusterDefinition{}
-				g.Expect(k8sClient.Get(ctx, intctrlutil.GetNamespacedName(clusterDefinition), cd)).To(Succeed())
+				g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(clusterDefinition), cd)).To(Succeed())
 				g.Expect(cd.Status.ObservedGeneration == 1).To(BeTrue())
 
 				// check labels and finalizers
@@ -315,7 +314,7 @@ spec:
 	//		Consistently(func(g Gomega) {
 	//			cd := &dbaasv1alpha1.ClusterDefinition{}
 	//			g.Eventually(func() error {
-	//				return k8sClient.Get(ctx, intctrlutil.GetNamespacedName(clusterDefinition), cd)
+	//				return k8sClient.Get(ctx, client.ObjectKeyFromObject(clusterDefinition), cd)
 	//			}, timeout, interval).Should(Succeed())
 	//			g.Expect(cd.Status.ObservedGeneration == 0).To(BeTrue())
 	//		}, waitDuration, interval).Should(Succeed())

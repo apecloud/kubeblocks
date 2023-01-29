@@ -391,7 +391,7 @@ var _ = Describe("OpsRequest Controller", func() {
 
 		By("mock event context")
 		eventContext := cfgcore.ConfigEventContext{
-			Cfg:       cfgObj,
+			CfgCM:     cfgObj,
 			Component: &clusterDefObj.Spec.Components[0],
 			Client:    k8sClient,
 			ReqCtx: intctrlutil.RequestCtx{

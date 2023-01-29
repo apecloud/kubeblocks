@@ -36,17 +36,11 @@ import (
 
 type ConfigLoaderProvider func(option CfgOption) (*cfgWrapper, error)
 
+// ReconfiguringProgress defines the progress percentage.
+// range: 0~100
+// Unconfirmed(-1) describes an uncertain progress, e.g: fsm is failed.
+// +enum
 type ReconfiguringProgress int32
-
-const (
-	Unconfirmed int32 = -1
-	NotStarted  int32 = 0
-)
-
-const (
-	cfgKeyDelimiter = "."
-	emptyJSON       = "{}"
-)
 
 type PolicyExecStatus struct {
 	PolicyName string
@@ -66,10 +60,10 @@ type ConfigEventContext struct {
 	Component        *dbaasv1alpha1.ClusterDefinitionComponent
 	ComponentUnits   []appv1.StatefulSet
 
-	TplName     string
-	ConfigPatch *ConfigPatchInfo
-	Cfg         *corev1.ConfigMap
-	Tpl         *dbaasv1alpha1.ConfigConstraintSpec
+	TplName          string
+	ConfigPatch      *ConfigPatchInfo
+	CfgCM            *corev1.ConfigMap
+	ConfigConstraint *dbaasv1alpha1.ConfigConstraintSpec
 
 	PolicyStatus PolicyExecStatus
 }
@@ -77,6 +71,16 @@ type ConfigEventContext struct {
 type ConfigEventHandler interface {
 	Handle(eventContext ConfigEventContext, lastOpsRequest string, phase dbaasv1alpha1.Phase, err error) error
 }
+
+const (
+	Unconfirmed int32 = -1
+	NotStarted  int32 = 0
+)
+
+const (
+	cfgKeyDelimiter = "."
+	emptyJSON       = "{}"
+)
 
 var (
 	loaderProvider        = map[ConfigType]ConfigLoaderProvider{}

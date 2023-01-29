@@ -33,11 +33,25 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
+// ExecStatus defines running result for Reconfiguring policy (fsm).
+// ESNone describes policy has finished and quit.
+// ESRetry describes fsm is running.
+// ESFailed describes fsm is failed and exited.
+// ESNotSupport describes fsm does not support the feature.
+// ESAndRetryFailed describes fsm is failed in current state, but can be retried.
+// +enum
 type ExecStatus string
 
-type ReturnedStatus struct {
-	Status ExecStatus
+const (
+	ESNone           ExecStatus = "None"
+	ESRetry          ExecStatus = "Retry"
+	ESFailed         ExecStatus = "Failed"
+	ESNotSupport     ExecStatus = "NotSupport"
+	ESAndRetryFailed ExecStatus = "FailedAndRetry"
+)
 
+type ReturnedStatus struct {
+	Status        ExecStatus
 	SucceedCount  int32
 	ExpectedCount int32
 }
@@ -60,13 +74,13 @@ type reconfigureParams struct {
 	TplName string
 
 	// Configuration files patch.
-	configPatch *cfgcore.ConfigPatchInfo
+	ConfigPatch *cfgcore.ConfigPatchInfo
 
 	// Configmap object of the configuration template instance in the component.
-	Cfg *corev1.ConfigMap
+	CfgCM *corev1.ConfigMap
 
 	// ConfigConstraint pointer
-	Tpl *dbaasv1alpha1.ConfigConstraintSpec
+	ConfigConstraint *dbaasv1alpha1.ConfigConstraintSpec
 
 	// For grpc factory
 	ReconfigureClientFactory createReconfigureClient
@@ -87,14 +101,6 @@ type reconfigureParams struct {
 	// List of StatefulSet, using this config template.
 	ComponentUnits []appv1.StatefulSet
 }
-
-const (
-	ESNone           ExecStatus = "None"
-	ESRetry          ExecStatus = "Retry"
-	ESFailed         ExecStatus = "Failed"
-	ESNotSupport     ExecStatus = "NotSupport"
-	ESAndRetryFailed ExecStatus = "FailedAndRetry"
-)
 
 var (
 	// lazy create grpc connection
@@ -133,7 +139,7 @@ func (param *reconfigureParams) getConfigKey() string {
 }
 
 func (param *reconfigureParams) getModifyVersion() string {
-	hash, err := cfgcore.ComputeHash(param.Cfg.Data)
+	hash, err := cfgcore.ComputeHash(param.CfgCM.Data)
 	if err != nil {
 		param.Ctx.Log.Error(err, "failed to cal configuration version!")
 		return ""

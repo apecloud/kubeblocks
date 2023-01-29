@@ -396,7 +396,6 @@ func (o *describeOpsOptions) printLastConfiguration(configuration dbaasv1alpha1.
 		}
 		headers := []interface{}{"COMPONENT", "VOLUME-CLAIM-TEMPLATE", "STORAGE"}
 		o.printLastConfigurationByOpsType(configuration, headers, handleVolumeExpansion)
-	case dbaasv1alpha1.ReconfiguringType:
 	}
 }
 

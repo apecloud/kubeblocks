@@ -63,7 +63,7 @@ func (r *reconfigureAction) GetRealAffectedComponentMap(opsRequest *dbaasv1alpha
 func (r *reconfigureAction) Handle(eventContext cfgcore.ConfigEventContext, lastOpsRequest string, phase dbaasv1alpha1.Phase, err error) error {
 	var (
 		opsRequest = &dbaasv1alpha1.OpsRequest{}
-		cm         = eventContext.Cfg
+		cm         = eventContext.CfgCM
 		cli        = eventContext.Client
 		ctx        = eventContext.ReqCtx.Ctx
 	)

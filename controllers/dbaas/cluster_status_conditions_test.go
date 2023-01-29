@@ -86,7 +86,7 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 			By("test conditionsError phase")
 			patch := client.MergeFrom(cluster.DeepCopy())
 			condition := meta.FindStatusCondition(cluster.Status.Conditions, ConditionTypeProvisioningStarted)
-			condition.LastTransitionTime = metav1.Time{Time: time.Now().Add(-31 * time.Second)}
+			condition.LastTransitionTime = metav1.Time{Time: time.Now().Add(-(ClusterControllerErrorDuration + time.Second))}
 			cluster.SetStatusCondition(*condition)
 			Expect(k8sClient.Status().Patch(ctx, cluster, patch)).Should(Succeed())
 

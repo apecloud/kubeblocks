@@ -224,7 +224,7 @@ func (r *reconfigureOptions) printDescribeReconfigure() error {
 	return r.printConfigureHistory(configs)
 }
 
-func (r *reconfigureOptions) printExplainReconfigure(tplName string) error {
+func (r *reconfigureOptions) printExplainConfigure(tplName string) error {
 	tpl, err := r.findTemplateByName(tplName)
 	if err != nil {
 		return err
@@ -343,7 +343,9 @@ func (r *reconfigureOptions) isSpecificParam(paramName string) bool {
 	return r.paramName == paramName
 }
 
-func (r *reconfigureOptions) printConfigConstraint(schema *apiext.JSONSchemaProps, staticParameters *set.LinkedHashSetString, dynamicParameters *set.LinkedHashSetString) error {
+func (r *reconfigureOptions) printConfigConstraint(schema *apiext.JSONSchemaProps,
+	staticParameters *set.LinkedHashSetString,
+	dynamicParameters *set.LinkedHashSetString) error {
 	var (
 		index             = 0
 		maxDocumentLength = 100
@@ -364,11 +366,8 @@ func (r *reconfigureOptions) printConfigConstraint(schema *apiext.JSONSchemaProp
 		if err != nil {
 			return err
 		}
-		if staticParameters.InArray(pt.name) {
-			pt.scope = "static"
-		} else if dynamicParameters.InArray(pt.name) {
-			pt.scope = "dynamic"
-		}
+		pt.scope = getScopeType(pt, staticParameters, dynamicParameters)
+
 		if r.hasSpecificParam() {
 			printSingleParameterTemplate(pt)
 			return nil
@@ -631,6 +630,12 @@ func printConfigParameterTemplate(paramTemplates []*parameterTemplate, out io.Wr
 		return
 	}
 
+	sort.SliceStable(paramTemplates, func(i, j int) bool {
+		x1 := paramTemplates[i]
+		x2 := paramTemplates[j]
+		return strings.Compare(x1.name, x2.name) < 0
+	})
+
 	tbl := printer.NewTablePrinter(out)
 	tbl.SetStyle(printer.TerminalStyle)
 	printer.PrintTitle("Configure Constraint")
@@ -737,6 +742,26 @@ func findTplByName(tpls []dbaasv1alpha1.ConfigTemplate, tplName string) *dbaasv1
 	return nil
 }
 
+func getScopeType(pt *parameterTemplate, staticParameters *set.LinkedHashSetString, dynamicParameters *set.LinkedHashSetString) string {
+	const (
+		staticScope  = "static"
+		dynamicScope = "dynamic"
+	)
+
+	switch {
+	case staticParameters.InArray(pt.name):
+		return staticScope
+	case dynamicParameters.InArray(pt.name):
+		return dynamicScope
+	case dynamicParameters.Length() == 0 && staticParameters.Length() != 0:
+		return dynamicScope
+	case dynamicParameters.Length() != 0 && staticParameters.Length() == 0:
+		return staticScope
+	default:
+		return staticScope
+	}
+}
+
 // NewDescribeReconfigureCmd shows details of history modifications or configuration file of reconfiguring operations
 func NewDescribeReconfigureCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := &reconfigureOptions{
@@ -777,7 +802,7 @@ func NewExplainReconfigureCmd(f cmdutil.Factory, streams genericclioptions.IOStr
 		Run: func(cmd *cobra.Command, args []string) {
 			util.CheckErr(o.complete2(args))
 			util.CheckErr(o.validate())
-			util.CheckErr(o.printExplainReconfigure(o.templateNames[0]))
+			util.CheckErr(o.printExplainConfigure(o.templateNames[0]))
 		},
 	}
 	o.addCommonFlags(cmd)

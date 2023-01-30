@@ -10,10 +10,11 @@ spec:
       defaultReplicas: 1
       configSpec:
         configTemplateRefs:
-         - name: mysql-tree-node-template-8.0
-           volumeName: mysql-config
-           configTplRef: mysql-tree-node-template-8.0
-           configConstraintRef: mysql-tree-node-template-8.0
+          - name: mysql-tree-node-template-8.0
+            volumeName: mysql-config
+            configTplRef: mysql-tree-node-template-8.0
+            configConstraintRef: mysql-tree-node-template-8.0
+            tplType: config
       podSpec:
         containers:
           - name: mysql

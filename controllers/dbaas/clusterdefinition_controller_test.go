@@ -236,6 +236,7 @@ spec:
 						Name:                cmName,
 						ConfigTplRef:        cmName,
 						ConfigConstraintRef: cmName,
+						TplType:             dbaasv1alpha1.ConfigurationType,
 						Namespace:           testCtx.DefaultNamespace,
 						VolumeName:          "xxx",
 					},

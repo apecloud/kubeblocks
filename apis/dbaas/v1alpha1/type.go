@@ -318,6 +318,15 @@ const (
 	SIGSYS    SignalType = "SIGSYS"
 )
 
+// ConfigTplType defines the purpose of the configuration template.
+// +enum
+type ConfigTplType string
+
+const (
+	ConfigurationType ConfigTplType = "config"
+	ScriptType        ConfigTplType = "script"
+)
+
 func RegisterWebhookManager(mgr manager.Manager) {
 	webhookMgr = &webhookManager{mgr.GetClient()}
 }

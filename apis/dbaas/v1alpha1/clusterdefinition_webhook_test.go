@@ -198,12 +198,14 @@ var _ = Describe("clusterDefinition webhook", func() {
 						ConfigTplRef:        "cm1",
 						VolumeName:          "volume1",
 						ConfigConstraintRef: "constraint1",
+						TplType:             ConfigurationType,
 					},
 					{
 						Name:                "tpl2",
 						ConfigTplRef:        "cm1",
 						VolumeName:          "volume2",
 						ConfigConstraintRef: "constraint1",
+						TplType:             ConfigurationType,
 					},
 				},
 				wantErr:            true,
@@ -216,12 +218,14 @@ var _ = Describe("clusterDefinition webhook", func() {
 						ConfigTplRef:        "cm1",
 						VolumeName:          "volume1",
 						ConfigConstraintRef: "constraint1",
+						TplType:             ConfigurationType,
 					},
 					{
 						Name:                "tpl1",
 						ConfigTplRef:        "cm2",
 						VolumeName:          "volume2",
 						ConfigConstraintRef: "constraint2",
+						TplType:             ConfigurationType,
 					},
 				},
 				wantErr:            true,
@@ -234,12 +238,14 @@ var _ = Describe("clusterDefinition webhook", func() {
 						ConfigTplRef:        "cm1",
 						VolumeName:          "volume1",
 						ConfigConstraintRef: "constraint1",
+						TplType:             ConfigurationType,
 					},
 					{
 						Name:                "tpl2",
 						ConfigTplRef:        "cm2",
 						VolumeName:          "volume1",
 						ConfigConstraintRef: "constraint2",
+						TplType:             ConfigurationType,
 					},
 				},
 				wantErr:            true,
@@ -252,12 +258,14 @@ var _ = Describe("clusterDefinition webhook", func() {
 						ConfigTplRef:        "cm1",
 						VolumeName:          "volume1",
 						ConfigConstraintRef: "constraint1",
+						TplType:             ConfigurationType,
 					},
 					{
 						Name:                "tpl2",
 						ConfigTplRef:        "cm2",
 						VolumeName:          "volume2",
 						ConfigConstraintRef: "constraint1",
+						TplType:             ScriptType,
 					},
 				},
 				wantErr: false,
@@ -349,6 +357,7 @@ spec:
       - name: mysql-tree-node-template-8.0
         configTplRef: mysql-tree-node-template-8.0
         volumeName: mysql-config
+        tplType: config
     componentType: Consensus
     consensusSpec:
       leader:

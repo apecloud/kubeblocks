@@ -161,6 +161,7 @@ single_thread_memory = 294912
 				ConfigTplRef:        "mysql-config-8.0.2",
 				ConfigConstraintRef: "mysql-config-8.0.2",
 				VolumeName:          "config1",
+				TplType:             dbaasv1alpha1.ConfigurationType,
 			},
 		}
 	})

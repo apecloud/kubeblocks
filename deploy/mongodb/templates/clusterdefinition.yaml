@@ -14,6 +14,7 @@ spec:
         configTemplateRefs:
           - name: mongodb-scripts
             configTplRef: mongodb-scripts
+            tplType: script
             volumeName: scripts
             namespace: {{ .Release.Namespace }}
             defaultMode: 493
@@ -42,6 +43,7 @@ spec:
         configTemplateRefs:
           - name: mongodb-scripts
             configTplRef: mongodb-scripts
+            tplType: script
             volumeName: scripts
             namespace: {{ .Release.Namespace }}
             defaultMode: 493
@@ -94,6 +96,7 @@ spec:
         configTemplateRefs:
           - name: mongodb-scripts
             configTplRef: mongodb-scripts
+            tplType: script
             volumeName: scripts
             namespace: {{ .Release.Namespace }}
             defaultMode: 493

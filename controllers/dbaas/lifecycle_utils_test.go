@@ -238,6 +238,7 @@ var _ = Describe("lifecycle_utils", func() {
 				Name:                "myConfig",
 				ConfigTplRef:        "myConfig",
 				ConfigConstraintRef: "myConfig",
+				TplType:             dbaasv1alpha1.ConfigurationType,
 				VolumeName:          "myConfigVolume",
 			}
 			ps := &sts.Spec.Template.Spec
@@ -251,12 +252,14 @@ var _ = Describe("lifecycle_utils", func() {
 				Name:                "myConfig",
 				ConfigTplRef:        "myConfig",
 				ConfigConstraintRef: "myConfig",
+				TplType:             dbaasv1alpha1.ConfigurationType,
 				VolumeName:          "myConfigVolume",
 			}
 			volumes["my_config1"] = dbaasv1alpha1.ConfigTemplate{
 				Name:                "myConfig",
 				ConfigTplRef:        "myConfig",
 				ConfigConstraintRef: "myConfig",
+				TplType:             dbaasv1alpha1.ConfigurationType,
 				VolumeName:          "myConfigVolume2",
 			}
 			ps := &sts.Spec.Template.Spec
@@ -281,6 +284,7 @@ var _ = Describe("lifecycle_utils", func() {
 				Name:                "configTplName",
 				ConfigTplRef:        "configTplName",
 				ConfigConstraintRef: "configTplName",
+				TplType:             dbaasv1alpha1.ConfigurationType,
 				VolumeName:          replicaVolumeName,
 			}
 			ps := &sts.Spec.Template.Spec
@@ -308,6 +312,7 @@ var _ = Describe("lifecycle_utils", func() {
 				Name:                "configTplName",
 				ConfigTplRef:        "configTplName",
 				ConfigConstraintRef: "configTplName",
+				TplType:             dbaasv1alpha1.ConfigurationType,
 				VolumeName:          replicaVolumeName,
 			}
 			ps := &sts.Spec.Template.Spec
@@ -340,6 +345,7 @@ spec:
       - name: mysql-tree-node-template-8.0
         configTplRef: mysql-tree-node-template-8.0
         volumeName: mysql-config
+        tplType: config
     defaultReplicas: 1
     podSpec:
       containers:
@@ -421,6 +427,7 @@ spec:
       - name: mysql-tree-node-template-8.0
         configTplRef: mysql-tree-node-template-8.0
         volumeName: mysql-config
+        tplType: config
     podSpec:
       containers:
       - name: mysql

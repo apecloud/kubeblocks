@@ -37,6 +37,7 @@ spec:
         configTemplateRefs:
           - name: clickhouse-tpl
             configTplRef: clickhouse-tpl
+            tplType: config
             volumeName: config
             namespace: {{ .Release.Namespace }}
       service:
@@ -172,6 +173,7 @@ spec:
         configTemplateRefs:
           - name: clickhouse-keeper-tpl
             configTplRef: clickhouse-keeper-tpl
+            tplType: config
             volumeName: config
             namespace: {{ .Release.Namespace }}
       service:
@@ -272,11 +274,13 @@ spec:
         {{- if .Values.zookeeper.configuration }}
           - name: zookeeper-tpl
             configTplRef: zookeeper-tpl
+            tplType: config
             namespace: {{ .Release.Namespace }}
             volumeName: config
         {{- end }}
           - name: zookeeper-scripts-tpl
             configTplRef: zookeeper-scripts-tpl
+            tplType: script
             namespace: {{ .Release.Namespace }}
             volumeName: script
             defaultMode: 493

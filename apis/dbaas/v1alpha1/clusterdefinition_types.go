@@ -210,6 +210,12 @@ type ConfigTemplate struct {
 	// +kubebuilder:validation:MaxLength=32
 	VolumeName string `json:"volumeName"`
 
+	// ConfigTplType defines the purpose of the configuration template.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:Enum={config,script}
+	// +kubebuilder:default="config"
+	TplType ConfigTplType `json:"tplType"`
+
 	// defaultMode is optional: mode bits used to set permissions on created files by default.
 	// Must be an octal value between 0000 and 0777 or a decimal value between 0 and 511.
 	// YAML accepts both octal and decimal values, JSON requires decimal values for mode bits.

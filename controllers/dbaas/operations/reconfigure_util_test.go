@@ -78,11 +78,13 @@ var _ = Describe("Reconfigure RollingPolicy", func() {
 					Name:         "tpl1",
 					ConfigTplRef: "cm1",
 					VolumeName:   "volum1",
+					TplType:      dbaasv1alpha1.ConfigurationType,
 				}
 				tpl2 = dbaasv1alpha1.ConfigTemplate{
 					Name:         "tpl2",
 					ConfigTplRef: "cm2",
 					VolumeName:   "volum2",
+					TplType:      dbaasv1alpha1.ConfigurationType,
 				}
 			)
 
@@ -188,6 +190,7 @@ var _ = Describe("Reconfigure RollingPolicy", func() {
 				Name:                "for_test",
 				ConfigTplRef:        "cm_obj",
 				ConfigConstraintRef: "cfg_constraint_obj",
+				TplType:             dbaasv1alpha1.ConfigurationType,
 			}
 			updatedCfg := dbaasv1alpha1.Configuration{
 				Keys: []dbaasv1alpha1.ParameterConfig{{
@@ -346,11 +349,13 @@ mysqld.innodb_autoinc_lock_mode: conflicting values 2 and 100:
 							Name:         "test1",
 							ConfigTplRef: "tpl1",
 							VolumeName:   "test1",
+							TplType:      dbaasv1alpha1.ConfigurationType,
 						},
 						{
 							Name:         "test2",
 							ConfigTplRef: "tpl2",
 							VolumeName:   "test2",
+							TplType:      dbaasv1alpha1.ConfigurationType,
 						},
 					},
 					cdTpl: nil,
@@ -360,11 +365,13 @@ mysqld.innodb_autoinc_lock_mode: conflicting values 2 and 100:
 						Name:         "test1",
 						ConfigTplRef: "tpl1",
 						VolumeName:   "test1",
+						TplType:      dbaasv1alpha1.ConfigurationType,
 					},
 					{
 						Name:         "test2",
 						ConfigTplRef: "tpl2",
 						VolumeName:   "test2",
+						TplType:      dbaasv1alpha1.ConfigurationType,
 					},
 				},
 			}, {
@@ -376,11 +383,13 @@ mysqld.innodb_autoinc_lock_mode: conflicting values 2 and 100:
 							Name:         "test1",
 							ConfigTplRef: "tpl1",
 							VolumeName:   "test1",
+							TplType:      dbaasv1alpha1.ConfigurationType,
 						},
 						{
 							Name:         "test2",
 							ConfigTplRef: "tpl2",
 							VolumeName:   "test2",
+							TplType:      dbaasv1alpha1.ConfigurationType,
 						},
 					},
 				},
@@ -389,11 +398,13 @@ mysqld.innodb_autoinc_lock_mode: conflicting values 2 and 100:
 						Name:         "test1",
 						ConfigTplRef: "tpl1",
 						VolumeName:   "test1",
+						TplType:      dbaasv1alpha1.ConfigurationType,
 					},
 					{
 						Name:         "test2",
 						ConfigTplRef: "tpl2",
 						VolumeName:   "test2",
+						TplType:      dbaasv1alpha1.ConfigurationType,
 					},
 				},
 			}, {
@@ -405,12 +416,14 @@ mysqld.innodb_autoinc_lock_mode: conflicting values 2 and 100:
 							Name:         "test_new_v1",
 							ConfigTplRef: "tpl_new_v1",
 							VolumeName:   "test1",
+							TplType:      dbaasv1alpha1.ConfigurationType,
 						},
 						// add volume
 						{
 							Name:         "test_new_v2",
 							ConfigTplRef: "tpl_new_v2",
 							VolumeName:   "test2",
+							TplType:      dbaasv1alpha1.ConfigurationType,
 						},
 					},
 					cdTpl: []dbaasv1alpha1.ConfigTemplate{
@@ -418,11 +431,13 @@ mysqld.innodb_autoinc_lock_mode: conflicting values 2 and 100:
 							Name:         "test1",
 							ConfigTplRef: "tpl1",
 							VolumeName:   "test1",
+							TplType:      dbaasv1alpha1.ConfigurationType,
 						},
 						{
 							Name:         "test3",
 							ConfigTplRef: "tpl3",
 							VolumeName:   "test3",
+							TplType:      dbaasv1alpha1.ConfigurationType,
 						},
 					},
 				},
@@ -431,16 +446,19 @@ mysqld.innodb_autoinc_lock_mode: conflicting values 2 and 100:
 						Name:         "test_new_v1",
 						ConfigTplRef: "tpl_new_v1",
 						VolumeName:   "test1",
+						TplType:      dbaasv1alpha1.ConfigurationType,
 					},
 					{
 						Name:         "test_new_v2",
 						ConfigTplRef: "tpl_new_v2",
 						VolumeName:   "test2",
+						TplType:      dbaasv1alpha1.ConfigurationType,
 					},
 					{
 						Name:         "test3",
 						ConfigTplRef: "tpl3",
 						VolumeName:   "test3",
+						TplType:      dbaasv1alpha1.ConfigurationType,
 					},
 				},
 			}}

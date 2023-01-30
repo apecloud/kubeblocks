@@ -385,10 +385,12 @@ var _ = Describe("ConfigWrapper util test", func() {
 				name: "test",
 				tpls: []dbaasv1alpha1.ConfigTemplate{
 					{
-						Name: "for_test",
+						Name:    "for_test",
+						TplType: dbaasv1alpha1.ConfigurationType,
 					},
 					{
-						Name: "for_test2",
+						Name:    "for_test2",
+						TplType: dbaasv1alpha1.ScriptType,
 					},
 				},
 				want:    nil,
@@ -398,8 +400,14 @@ var _ = Describe("ConfigWrapper util test", func() {
 				name: "test",
 				tpls: []dbaasv1alpha1.ConfigTemplate{
 					{
+						Name:                "for_test_script",
+						ConfigConstraintRef: "eg_v2",
+						TplType:             dbaasv1alpha1.ScriptType,
+					},
+					{
 						Name:                "for_test",
 						ConfigConstraintRef: "eg_v1",
+						TplType:             dbaasv1alpha1.ConfigurationType,
 					},
 				},
 				want:    mockTpl.Spec.ReloadOptions,
@@ -411,6 +419,7 @@ var _ = Describe("ConfigWrapper util test", func() {
 					{
 						Name:                "for_test",
 						ConfigConstraintRef: "not_exist",
+						TplType:             dbaasv1alpha1.ConfigurationType,
 					},
 				},
 				want:    nil,

@@ -29,11 +29,13 @@ spec:
           - name: mysql-3node-tpl
             configTplRef: mysql-3node-tpl-8.0
             configConstraintRef: mysql-cfg-constraints-8.0
+            tplType: config
             volumeName: mysql-config
             namespace: {{ .Release.Namespace }}
           - name: apecloud-mysql-scripts
             configTplRef: apecloud-mysql-scripts
             namespace: {{ .Release.Namespace }}
+            tplType: script
             volumeName: scripts
             defaultMode: 493
       defaultReplicas: 3

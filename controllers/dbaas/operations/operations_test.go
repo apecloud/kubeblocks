@@ -366,6 +366,7 @@ var _ = Describe("OpsRequest Controller", func() {
 						Name:                "mysql-test",
 						ConfigTplRef:        cmObj.Name,
 						ConfigConstraintRef: tplObj.Name,
+						TplType:             dbaasv1alpha1.ConfigurationType,
 						VolumeName:          "mysql-config",
 						Namespace:           testCtx.DefaultNamespace,
 					},

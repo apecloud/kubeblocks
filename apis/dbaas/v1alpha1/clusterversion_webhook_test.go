@@ -80,12 +80,14 @@ var _ = Describe("clusterVersion webhook", func() {
 					ConfigTplRef:        "cm1",
 					VolumeName:          "volume1",
 					ConfigConstraintRef: "constraint1",
+					TplType:             ConfigurationType,
 				},
 				{
 					Name:                "tpl2",
 					ConfigTplRef:        "cm2",
 					VolumeName:          "volume1",
 					ConfigConstraintRef: "constraint2",
+					TplType:             ConfigurationType,
 				},
 			}
 			err := testCtx.CreateObj(ctx, clusterVersionDup)

@@ -107,6 +107,14 @@ spec:
                               is equivalent to the "default" namespace.
                             maxLength: 63
                             type: string
+                          tplType:
+                            default: config
+                            description: ConfigTplType defines the purpose of the
+                              configuration template.
+                            enum:
+                            - config
+                            - script
+                            type: string
                           volumeName:
                             description: VolumeName is the volume name of PodTemplate,
                               which the configuration file produced through the configuration
@@ -117,6 +125,7 @@ spec:
                         required:
                         - configTplRef
                         - name
+                        - tplType
                         - volumeName
                         type: object
                       type: array

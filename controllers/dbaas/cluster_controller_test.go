@@ -140,6 +140,7 @@ spec:
       - name: mysql-tree-node-template-8.0
         configTplRef: mysql-tree-node-template-8.0
         configConstraintRef: mysql-tree-node-template-8.0
+        tplType: config
         namespace: default
         volumeName: mysql-config
     defaultReplicas: 1
@@ -221,6 +222,7 @@ spec:
       - name: mysql-tree-node-template-8.0
         configTplRef: mysql-tree-node-template-8.0
         configConstraintRef: mysql-tree-node-template-8.0
+        tplType: config
         namespace: default
         volumeName: mysql-config
     podSpec:
@@ -933,6 +935,7 @@ spec:
       configTemplateRefs:
         - name: %s
           configTplRef: %s
+          tplType: config
           volumeName: mysql-config
       componentType: Consensus
       consensusSpec:

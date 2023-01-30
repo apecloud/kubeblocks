@@ -1,7 +1,7 @@
 apiVersion: dbaas.kubeblocks.io/v1alpha1
-kind:       ClusterVersion
+kind: ClusterVersion
 metadata:
-  name:     cluster-version
+  name: cluster-version
 spec:
   clusterDefinitionRef: cluster-definition
   components:
@@ -11,6 +11,7 @@ spec:
           - name: mysql-tree-node-template-8.0
             configTplRef: mysql-tree-node-template-8.0
             volumeName: mysql-config
+            typeName: config
       podSpec:
         containers:
           - name: mysql

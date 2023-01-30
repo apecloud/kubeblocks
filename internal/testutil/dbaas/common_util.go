@@ -136,12 +136,9 @@ func ClearResources[T intctrlutil.Object, PT intctrlutil.PObject[T],
 	)
 
 	listOptions := make([]client.ListOption, 0)
-	deleteOptions := make([]client.DeleteOption, 0)
 	for _, opt := range opts {
-		applyToDeleteFunc := reflect.ValueOf(opt).MethodByName("ApplyToDelete")
-		if applyToDeleteFunc.IsValid() {
-			deleteOptions = append(deleteOptions, opt.(client.DeleteOption))
-		} else {
+		applyToListFunc := reflect.ValueOf(opt).MethodByName("ApplyToList")
+		if applyToListFunc.IsValid() {
 			listOptions = append(listOptions, opt.(client.ListOption))
 		}
 	}
@@ -167,10 +164,6 @@ func ClearResources[T intctrlutil.Object, PT intctrlutil.PObject[T],
 					pobj.SetFinalizers([]string{})
 				})).To(gomega.Succeed())
 			}
-			// it's possible that the object wasn't deleted in previous round in race conditions,
-			// so it's more reliable to delete it in each loop.
-			gomega.Expect(client.IgnoreNotFound(testCtx.Cli.Delete(testCtx.Ctx, PT(&obj),
-				deleteOptions...))).Should(gomega.Succeed())
 		}
 		g.Expect(len(items)).Should(gomega.Equal(0))
 	}, testCtx.ClearResourceTimeout, testCtx.ClearResourcePollingInterval).Should(gomega.Succeed())

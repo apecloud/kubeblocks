@@ -1,7 +1,7 @@
 apiVersion: dbaas.kubeblocks.io/v1alpha1
 kind:       ClusterDefinition
 metadata:
-  name: apecloud-mysql
+  name: apecloud-wesql
 spec:
   type: state.mysql
   connectionCredential:

@@ -250,12 +250,16 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return *res, err
 	}
 
+	// should patch the label first to prevent the label from being modified by the user.
+	if err = r.patchClusterLabelsIfNotExist(ctx, cluster); err != nil {
+		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+	}
+
 	reqCtx.Log.Info("get clusterDef and clusterVersion")
-	clusterdefinition := &dbaasv1alpha1.ClusterDefinition{}
+	clusterDefinition := &dbaasv1alpha1.ClusterDefinition{}
 	if err := r.Client.Get(reqCtx.Ctx, types.NamespacedName{
-		Namespace: cluster.Namespace,
-		Name:      cluster.Spec.ClusterDefRef,
-	}, clusterdefinition); err != nil {
+		Name: cluster.Spec.ClusterDefRef,
+	}, clusterDefinition); err != nil {
 		// this is a block to handle error.
 		// so when update cluster conditions failed, we can ignore it.
 		_ = clusterConditionMgr.setPreCheckErrorCondition(err)
@@ -264,7 +268,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	if cluster.Status.ObservedGeneration == cluster.GetObjectMeta().GetGeneration() {
 		// check if all components of cluster are ready.
-		if err = r.checkAndPatchToRunning(reqCtx.Ctx, cluster, clusterdefinition); err != nil {
+		if err = r.checkAndPatchToRunning(reqCtx.Ctx, cluster, clusterDefinition); err != nil {
 			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 		}
 		return intctrlutil.Reconciled()
@@ -272,8 +276,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	clusterVersion := &dbaasv1alpha1.ClusterVersion{}
 	if err := r.Client.Get(reqCtx.Ctx, types.NamespacedName{
-		Namespace: cluster.Namespace,
-		Name:      cluster.Spec.ClusterVersionRef,
+		Name: cluster.Spec.ClusterVersionRef,
 	}, clusterVersion); err != nil {
 		// this is a block to handle error.
 		// so when update cluster conditions failed, we can ignore it.
@@ -286,8 +289,8 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return *res, err
 	}
 
-	if res, err = r.checkReferencedCRStatus(reqCtx, clusterConditionMgr, clusterdefinition.Status.Phase,
-		dbaasv1alpha1.ClusterDefinitionKind, clusterdefinition.Name); res != nil {
+	if res, err = r.checkReferencedCRStatus(reqCtx, clusterConditionMgr, clusterDefinition.Status.Phase,
+		dbaasv1alpha1.ClusterDefinitionKind, clusterDefinition.Name); res != nil {
 		return *res, err
 	}
 
@@ -296,14 +299,14 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 
-	if err = r.reconcileStatusOperations(ctx, cluster, clusterdefinition); err != nil {
+	if err = r.reconcileStatusOperations(ctx, cluster, clusterDefinition); err != nil {
 		// this is a block to handle error.
 		// so when update cluster conditions failed, we can ignore it.
 		_ = clusterConditionMgr.setPreCheckErrorCondition(err)
 		return intctrlutil.RequeueWithError(err, reqCtx.Log, "")
 	}
 	// validate config and send warning event log necessarily
-	if err = cluster.ValidateEnabledLogs(clusterdefinition); err != nil {
+	if err = cluster.ValidateEnabledLogs(clusterDefinition); err != nil {
 		_ = clusterConditionMgr.setPreCheckErrorCondition(err)
 		return intctrlutil.RequeueWithError(err, reqCtx.Log, "")
 	}
@@ -313,7 +316,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 
-	shouldRequeue, err := createCluster(reqCtx, r.Client, clusterdefinition, clusterVersion, cluster)
+	shouldRequeue, err := createCluster(reqCtx, r.Client, clusterDefinition, clusterVersion, cluster)
 	if err != nil {
 		// this is a block to handle error.
 		// so when update cluster conditions failed, we can ignore it.
@@ -324,11 +327,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return intctrlutil.RequeueAfter(time.Second, reqCtx.Log, "")
 	}
 
-	if err = r.patchClusterLabels(ctx, cluster, clusterdefinition, clusterVersion); err != nil {
-		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-	}
-
-	if err = r.handleClusterStatusAfterApplySucceed(ctx, cluster, clusterdefinition); err != nil {
+	if err = r.handleClusterStatusAfterApplySucceed(ctx, cluster, clusterDefinition); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 	return intctrlutil.Reconciled()
@@ -355,22 +354,22 @@ func (r *ClusterReconciler) handleClusterStatusAfterApplySucceed(
 	return nil
 }
 
-func (r *ClusterReconciler) patchClusterLabels(
+func (r *ClusterReconciler) patchClusterLabelsIfNotExist(
 	ctx context.Context,
-	cluster *dbaasv1alpha1.Cluster,
-	clusterDef *dbaasv1alpha1.ClusterDefinition,
-	clusterVersion *dbaasv1alpha1.ClusterVersion) error {
-	patch := client.MergeFrom(cluster.DeepCopy())
+	cluster *dbaasv1alpha1.Cluster) error {
 	if cluster.Labels == nil {
 		cluster.Labels = map[string]string{}
 	}
-	_, ok := cluster.Labels[clusterDefLabelKey]
-	if !ok {
-		cluster.Labels[clusterDefLabelKey] = clusterDef.Name
-		cluster.Labels[clusterVersionLabelKey] = clusterVersion.Name
-		return r.Client.Patch(ctx, cluster, patch)
+	cdLabelName := cluster.Labels[clusterDefLabelKey]
+	cvLabelName := cluster.Labels[clusterVersionLabelKey]
+	cdName, cvName := cluster.Spec.ClusterDefRef, cluster.Spec.ClusterVersionRef
+	if cdLabelName == cdName && cvLabelName == cvName {
+		return nil
 	}
-	return nil
+	patch := client.MergeFrom(cluster.DeepCopy())
+	cluster.Labels[clusterDefLabelKey] = cdName
+	cluster.Labels[clusterVersionLabelKey] = cvName
+	return r.Client.Patch(ctx, cluster, patch)
 }
 
 // SetupWithManager sets up the controller with the Manager.

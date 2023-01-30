@@ -266,7 +266,7 @@ var _ = Describe("SystemAccount Controller", func() {
 				g.Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: cluster.Namespace, Name: rootSecretName}, rootSecret)).To(Succeed())
 			}, timeout, interval).Should(Succeed())
 
-			clustersMap[testName] = intctrlutil.GetNamespacedName(cluster)
+			clustersMap[testName] = client.ObjectKeyFromObject(cluster)
 			matchingLabelsMap[testName] = getLabelsForSecretsAndJobs(cluster.Name, clusterDef.Spec.Type, clusterDef.Name, consensusCompName)
 		}
 		return
@@ -846,7 +846,7 @@ var _ = Describe("SystemAccount Controller", func() {
 				}
 
 				jobToDelete := jobs.Items[0]
-				jobKey := intctrlutil.GetNamespacedName(&jobToDelete)
+				jobKey := client.ObjectKeyFromObject(&jobToDelete)
 				Expect(k8sClient.Delete(ctx, &jobToDelete)).To(Succeed())
 				Expect(testdbaas.ChangeObj(&testCtx, &jobToDelete, func() { controllerutil.RemoveFinalizer(&jobToDelete, orphanFinalizerName) })).To(Succeed())
 

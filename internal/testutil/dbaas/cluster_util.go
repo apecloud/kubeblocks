@@ -25,7 +25,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/apecloud/kubeblocks/internal/testutil"
 	"github.com/apecloud/kubeblocks/test/testdata"
 )
@@ -49,7 +48,7 @@ func InitClusterWithHybridComps(ctx context.Context,
 func CreateK8sResource(ctx context.Context, testCtx testutil.TestContext, obj client.Object) client.Object {
 	gomega.Expect(testCtx.CreateObj(context.Background(), obj)).Should(gomega.Succeed())
 	// wait until cluster created
-	gomega.Eventually(CheckObjExists(&testCtx, intctrlutil.GetNamespacedName(obj),
+	gomega.Eventually(CheckObjExists(&testCtx, client.ObjectKeyFromObject(obj),
 		obj, true)).Should(gomega.Succeed())
 	return obj
 }

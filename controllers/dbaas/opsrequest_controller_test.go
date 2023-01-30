@@ -290,7 +290,7 @@ spec:
 			Expect(testCtx.CreateObj(ctx, verticalScalingOpsRequest)).Should(Succeed())
 
 			By("check VerticalScalingOpsRequest running")
-			Eventually(testdbaas.CheckObj(&testCtx, intctrlutil.GetNamespacedName(verticalScalingOpsRequest),
+			Eventually(testdbaas.CheckObj(&testCtx, client.ObjectKeyFromObject(verticalScalingOpsRequest),
 				func(g Gomega, ops *dbaasv1alpha1.OpsRequest) {
 					g.Expect(ops.Status.Phase == dbaasv1alpha1.RunningPhase).To(BeTrue())
 				}), timeout, interval).Should(Succeed())
@@ -305,7 +305,7 @@ spec:
 			mockSetClusterStatusPhaseToRunning(key)
 
 			By("patch opsrequest controller to run")
-			Eventually(testdbaas.GetAndChangeObj(&testCtx, intctrlutil.GetNamespacedName(verticalScalingOpsRequest),
+			Eventually(testdbaas.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(verticalScalingOpsRequest),
 				func(opsRequest *dbaasv1alpha1.OpsRequest) {
 					if opsRequest.Annotations == nil {
 						opsRequest.Annotations = make(map[string]string, 1)
@@ -314,7 +314,7 @@ spec:
 				}), timeout, interval).Should(Succeed())
 
 			By("check VerticalScalingOpsRequest succeed")
-			Eventually(testdbaas.CheckObj(&testCtx, intctrlutil.GetNamespacedName(verticalScalingOpsRequest),
+			Eventually(testdbaas.CheckObj(&testCtx, client.ObjectKeyFromObject(verticalScalingOpsRequest),
 				func(g Gomega, ops *dbaasv1alpha1.OpsRequest) {
 					g.Expect(ops.Status.Phase == dbaasv1alpha1.SucceedPhase).To(BeTrue())
 				}), timeout*3, interval).Should(Succeed())
@@ -331,7 +331,7 @@ spec:
 
 			By("OpsRequest reclaimed after ttl")
 			Eventually(func() error {
-				return k8sClient.Get(ctx, intctrlutil.GetNamespacedName(verticalScalingOpsRequest), verticalScalingOpsRequest)
+				return k8sClient.Get(ctx, client.ObjectKeyFromObject(verticalScalingOpsRequest), verticalScalingOpsRequest)
 			}, timeout, interval).Should(Satisfy(apierrors.IsNotFound))
 
 		})
@@ -391,7 +391,7 @@ spec:
 			Expect(testCtx.CreateObj(ctx, verticalScalingOpsRequest)).Should(Succeed())
 
 			By("check VerticalScalingOpsRequest succeed")
-			Eventually(testdbaas.CheckObj(&testCtx, intctrlutil.GetNamespacedName(verticalScalingOpsRequest),
+			Eventually(testdbaas.CheckObj(&testCtx, client.ObjectKeyFromObject(verticalScalingOpsRequest),
 				func(g Gomega, ops *dbaasv1alpha1.OpsRequest) {
 					g.Expect(ops.Status.Phase == dbaasv1alpha1.SucceedPhase).To(BeTrue())
 				}), timeout*10, interval).Should(Succeed())
@@ -408,7 +408,7 @@ spec:
 
 			By("OpsRequest reclaimed after ttl")
 			Eventually(func() error {
-				return k8sClient.Get(ctx, intctrlutil.GetNamespacedName(verticalScalingOpsRequest), verticalScalingOpsRequest)
+				return k8sClient.Get(ctx, client.ObjectKeyFromObject(verticalScalingOpsRequest), verticalScalingOpsRequest)
 			}, timeout, interval).Should(Satisfy(apierrors.IsNotFound))
 		})
 	})

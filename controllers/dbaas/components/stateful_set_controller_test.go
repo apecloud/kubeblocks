@@ -121,7 +121,7 @@ var _ = Describe("StatefulSet Controller", func() {
 			testk8s.MockStatefulSetReady(sts)
 			sts.Status.ObservedGeneration = 2
 		})).Should(Succeed())
-		Eventually(testdbaas.CheckObj(&testCtx, intctrlutil.GetNamespacedName(sts),
+		Eventually(testdbaas.CheckObj(&testCtx, client.ObjectKeyFromObject(sts),
 			func(g Gomega, fetched *appsv1.StatefulSet) {
 				g.Expect(fetched.Status.UpdateRevision).To(Equal(updateRevision))
 			})).Should(Succeed())

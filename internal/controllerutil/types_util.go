@@ -1,23 +1,10 @@
 package controllerutil
 
 import (
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 )
-
-func GetNamespacedName(obj metav1.Object) types.NamespacedName {
-	if obj == nil {
-		return types.NamespacedName{}
-	}
-
-	return types.NamespacedName{
-		Namespace: obj.GetNamespace(),
-		Name:      obj.GetName(),
-	}
-}
 
 // GetUncacheObjects returns a list of K8s objects, for these object types,
 // and their list types, client.Reader will read directly from the API server instead

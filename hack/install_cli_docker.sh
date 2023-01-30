@@ -144,13 +144,10 @@ installCompleted() {
 # -----------------------------------------------------------------------------
 trap "fail_trap" EXIT
 
-set -e
-
 getSystemInfo
 verifySupported
 checkExistingCli
 checkHttpRequestCLI
-
 
 if [ -z "$1" ]; then
     echo "Getting the latest kbcli..."

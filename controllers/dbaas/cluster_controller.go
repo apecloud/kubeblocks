@@ -251,7 +251,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	// should patch the label first to prevent the label from being modified by the user.
-	if err = r.patchClusterLabels(ctx, cluster); err != nil {
+	if err = r.patchClusterLabelsIfNotExist(ctx, cluster); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 
@@ -354,7 +354,7 @@ func (r *ClusterReconciler) handleClusterStatusAfterApplySucceed(
 	return nil
 }
 
-func (r *ClusterReconciler) patchClusterLabels(
+func (r *ClusterReconciler) patchClusterLabelsIfNotExist(
 	ctx context.Context,
 	cluster *dbaasv1alpha1.Cluster) error {
 	patch := client.MergeFrom(cluster.DeepCopy())
@@ -364,12 +364,12 @@ func (r *ClusterReconciler) patchClusterLabels(
 	cdLabelName := cluster.Labels[clusterDefLabelKey]
 	cvLabelName := cluster.Labels[clusterVersionLabelKey]
 	cdName, cvName := cluster.Spec.ClusterDefRef, cluster.Spec.ClusterVersionRef
-	if cdLabelName != cdName || cvLabelName != cvName {
-		cluster.Labels[clusterDefLabelKey] = cdName
-		cluster.Labels[clusterVersionLabelKey] = cvName
-		return r.Client.Patch(ctx, cluster, patch)
+	if cdLabelName == cdName && cvLabelName == cvName {
+		return nil
 	}
-	return nil
+	cluster.Labels[clusterDefLabelKey] = cdName
+	cluster.Labels[clusterVersionLabelKey] = cvName
+	return r.Client.Patch(ctx, cluster, patch)
 }
 
 // SetupWithManager sets up the controller with the Manager.

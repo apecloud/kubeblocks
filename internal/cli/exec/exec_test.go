@@ -106,7 +106,7 @@ func execPod() *corev1.Pod {
 			Namespace:       "test",
 			ResourceVersion: "10",
 			Labels: map[string]string{
-				"app.kubernetes.io/name": "state.mysql-apecloud-wesql",
+				"app.kubernetes.io/name": "state.mysql-apecloud-mysql",
 			},
 		},
 		Spec: corev1.PodSpec{

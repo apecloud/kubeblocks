@@ -40,14 +40,14 @@ import (
 
 var (
 	logsListExample = templates.Examples(`
-		# Display supported log files in cluster my-cluster with all instance
-		kbcli cluster list-logs my-cluster
+		# Display supported log files in cluster mycluster with all instance
+		kbcli cluster list-logs mycluster
 
-        # Display supported log files in cluster my-cluster with specify component my-component
-		kbcli cluster list-logs my-cluster --component my-component
+		# Display supported log files in cluster mycluster with specify component my-component
+		kbcli cluster list-logs mycluster --component my-component
 
-		# Display supported log files in cluster my-cluster with specify instance my-instance-0
-		kbcli cluster list-logs my-cluster --instance my-instance-0`)
+		# Display supported log files in cluster mycluster with specify instance my-instance-0
+		kbcli cluster list-logs mycluster --instance my-instance-0`)
 )
 
 // ListLogsOptions declares the arguments accepted by the list-logs command

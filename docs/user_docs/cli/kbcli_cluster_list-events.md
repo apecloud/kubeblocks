@@ -13,7 +13,7 @@ kbcli cluster list-events [flags]
   kbcli cluster list-events
   
   # list all events of a specified cluster
-  kbcli cluster list-events my-cluster
+  kbcli cluster list-events mycluster
 ```
 
 ### Options

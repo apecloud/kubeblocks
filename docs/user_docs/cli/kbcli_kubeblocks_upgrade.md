@@ -10,7 +10,7 @@ kbcli kubeblocks upgrade [flags]
 
 ```
   # Upgrade KubeBlocks to specified version
-  kbcli kubeblocks upgrade --version=0.3.0
+  kbcli kubeblocks upgrade --version=0.4.0
   
   # Upgrade KubeBlocks other settings, for example, set replicaCount to 3
   kbcli kubeblocks upgrade --set replicaCount=3
@@ -19,7 +19,9 @@ kbcli kubeblocks upgrade [flags]
 ### Options
 
 ```
+      --check             check kubernetes cluster before upgrade (default true)
   -h, --help              help for upgrade
+      --monitor           Set monitor enabled and install Prometheus, AlertManager and Grafana (default true)
       --set stringArray   Set values on the command line (can specify multiple or separate values with commas: key1=val1,key2=val2)
       --version string    KubeBlocks version
 ```

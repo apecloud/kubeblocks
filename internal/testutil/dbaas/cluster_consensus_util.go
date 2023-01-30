@@ -70,26 +70,12 @@ func CreateConsensusMysqlCluster(ctx context.Context,
 
 // CreateConsensusMysqlClusterDef creates a mysql clusterDefinition with a component of ConsensusSet type.
 func CreateConsensusMysqlClusterDef(ctx context.Context, testCtx testutil.TestContext, clusterDefName string) *dbaasv1alpha1.ClusterDefinition {
-	clusterDefBytes, err := testdata.GetTestDataFileContent("consensusset/wesql_cd.yaml")
-	if err != nil {
-		return nil
-	}
-	clusterDefYaml := fmt.Sprintf(string(clusterDefBytes), clusterDefName)
-	clusterDef := &dbaasv1alpha1.ClusterDefinition{}
-	gomega.Expect(yaml.Unmarshal([]byte(clusterDefYaml), clusterDef)).Should(gomega.Succeed())
-	return CreateK8sResource(ctx, testCtx, clusterDef).(*dbaasv1alpha1.ClusterDefinition)
+	return MockClusterDefinition(ctx, testCtx, clusterDefName, "consensusset/wesql_cd.yaml")
 }
 
 // CreateConsensusMysqlClusterVersion creates a mysql clusterVersion with a component of ConsensusSet type.
 func CreateConsensusMysqlClusterVersion(ctx context.Context, testCtx testutil.TestContext, clusterDefName, clusterVersionName string) *dbaasv1alpha1.ClusterVersion {
-	clusterVersionBytes, err := testdata.GetTestDataFileContent("consensusset/wesql_cv.yaml")
-	if err != nil {
-		return nil
-	}
-	clusterVersionYAML := fmt.Sprintf(string(clusterVersionBytes), clusterVersionName, clusterDefName)
-	clusterVersion := &dbaasv1alpha1.ClusterVersion{}
-	gomega.Expect(yaml.Unmarshal([]byte(clusterVersionYAML), clusterVersion)).Should(gomega.Succeed())
-	return CreateK8sResource(ctx, testCtx, clusterVersion).(*dbaasv1alpha1.ClusterVersion)
+	return MockClusterVersion(ctx, testCtx, clusterDefName, clusterVersionName, "consensusset/wesql_cv.yaml")
 }
 
 // MockConsensusComponentStatefulSet mocks the component statefulSet, just using in envTest

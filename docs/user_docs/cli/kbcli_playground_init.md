@@ -12,7 +12,7 @@ kbcli playground init [flags]
       --access-key string           Cloud provider access key
       --access-secret string        Cloud provider access secret
       --cloud-provider string       Cloud provider type (default "local")
-      --cluster-definition string   Cluster definition (default "apecloud-wesql")
+      --cluster-definition string   Cluster definition (default "apecloud-mysql")
       --cluster-version string      Cluster definition
   -h, --help                        help for init
       --kubeblocks-version string   KubeBlocks version

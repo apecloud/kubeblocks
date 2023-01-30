@@ -27,7 +27,7 @@ cronjob: {
 			serviceAccountName: "kubeblocks"
 			containers: [{
 				name:            "backup-policy"
-				image:           "bitnami/kubectl"
+				image:           "appscode/kubectl:1.25"
 				imagePullPolicy: "IfNotPresent"
 				command: [
 					"sh",

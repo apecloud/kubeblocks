@@ -24,7 +24,6 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -54,31 +53,34 @@ var _ = Describe("OpsRequest Controller", func() {
 		statelessCompName     = "stateless"
 	)
 
-	cleanupObjects := func() {
-		err := k8sClient.DeleteAllOf(ctx, &appsv1.StatefulSet{}, client.InNamespace(testCtx.DefaultNamespace), client.HasLabels{testCtx.TestObjLabelKey})
-		Expect(err).NotTo(HaveOccurred())
-		err = k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.Cluster{}, client.InNamespace(testCtx.DefaultNamespace), client.HasLabels{testCtx.TestObjLabelKey})
-		Expect(err).NotTo(HaveOccurred())
-		err = k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.ClusterVersion{}, client.HasLabels{testCtx.TestObjLabelKey})
-		Expect(err).NotTo(HaveOccurred())
-		err = k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.ClusterDefinition{}, client.HasLabels{testCtx.TestObjLabelKey})
-		Expect(err).NotTo(HaveOccurred())
-		err = k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.OpsRequest{}, client.InNamespace(testCtx.DefaultNamespace), client.HasLabels{testCtx.TestObjLabelKey})
-		Expect(err).NotTo(HaveOccurred())
-		err = k8sClient.DeleteAllOf(ctx, &corev1.Pod{}, client.InNamespace(testCtx.DefaultNamespace), client.HasLabels{testCtx.TestObjLabelKey},
-			client.GracePeriodSeconds(0))
-		Expect(err).NotTo(HaveOccurred())
+	cleanEnv := func() {
+		// must wait until resources deleted and no longer exist before the testcases start, otherwise :
+		// - if later it needs to create some new resource objects with the same name,
+		// in race conditions, it will find the existence of old objects, resulting failure to
+		// create the new objects.
+		// - worse, if an async DeleteAll call is issued here, it maybe executed later by the
+		// K8s API server, by which time the testcase may have already created some new test objects,
+		// which shall be accidentally deleted.
+		By("clean resources")
+
+		// delete cluster(and all dependent sub-resources), clusterversion and clusterdef
+		testdbaas.ClearClusterResources(&testCtx)
+
+		// delete rest resources
+		inNS := client.InNamespace(testCtx.DefaultNamespace)
+		ml := client.HasLabels{testCtx.TestObjLabelKey}
+		// namespaced
+		testdbaas.ClearResources(&testCtx, intctrlutil.OpsRequestSignature, inNS, ml)
+		testdbaas.ClearResources(&testCtx, intctrlutil.ConfigMapSignature, inNS, ml)
+		// default GracePeriod is 30s
+		testdbaas.ClearResources(&testCtx, intctrlutil.PodSignature, inNS, ml, client.GracePeriodSeconds(0))
+		// non-namespaced
+		testdbaas.ClearResources(&testCtx, intctrlutil.ConfigConstraintSignature, ml)
 	}
 
-	BeforeEach(func() {
-		// Add any steup steps that needs to be executed before each test
-		cleanupObjects()
-	})
+	BeforeEach(cleanEnv)
 
-	AfterEach(func() {
-		// Add any teardown steps that needs to be executed after each test
-		cleanupObjects()
-	})
+	AfterEach(cleanEnv)
 
 	initClusterForOps := func(opsRes *OpsResource) {
 		Expect(opsutil.PatchClusterOpsAnnotations(ctx, k8sClient, opsRes.Cluster, nil)).Should(Succeed())
@@ -120,6 +122,7 @@ var _ = Describe("OpsRequest Controller", func() {
 					cfgcore.CMConfigurationTplNameLabelKey, tpl.ConfigTplRef,
 					cfgcore.CMConfigurationConstraintsNameLabelKey, tpl.ConfigConstraintRef,
 					cfgcore.CMConfigurationISVTplLabelKey, tpl.Name,
+					cfgcore.CMConfigurationTypeLabelKey, cfgcore.ConfigInstanceType,
 				),
 			)
 			Expect(err).Should(Succeed())
@@ -237,7 +240,7 @@ var _ = Describe("OpsRequest Controller", func() {
 			testConsensusSetPodUpdating(opsRes, consensusPodList)
 
 			By("mock testing the updates of stateless component")
-			Expect(opsRes.OpsRequest.Status.Components[statelessCompName].Phase).Should(Equal(dbaasv1alpha1.UpdatingPhase))
+			Expect(opsRes.OpsRequest.Status.Components[statelessCompName].Phase).Should(Equal(dbaasv1alpha1.RebootingPhase))
 			testStatelessPodUpdating(opsRes, statelessPod)
 		}
 	}
@@ -300,7 +303,7 @@ var _ = Describe("OpsRequest Controller", func() {
 
 		By("test GetOpsRequestAnnotation function")
 		patch := client.MergeFrom(opsRes.Cluster.DeepCopy())
-		opsAnnotationString := fmt.Sprintf(`[{"name":"%s","clusterPhase":"Updating"},{"name":"test-not-exists-ops","clusterPhase":"VolumeExpanding"}]`,
+		opsAnnotationString := fmt.Sprintf(`[{"name":"%s","clusterPhase":"HorizontalScaling"},{"name":"test-not-exists-ops","clusterPhase":"VolumeExpanding"}]`,
 			opsRes.OpsRequest.Name)
 		opsRes.Cluster.Annotations = map[string]string{
 			intctrlutil.OpsRequestAnnotationKey: opsAnnotationString,
@@ -509,7 +512,7 @@ var _ = Describe("OpsRequest Controller", func() {
 			opsRecorder := []dbaasv1alpha1.OpsRecorder{
 				{
 					Name:           "mysql-restart",
-					ToClusterPhase: dbaasv1alpha1.UpdatingPhase,
+					ToClusterPhase: dbaasv1alpha1.RebootingPhase,
 				},
 			}
 			Expect(patchClusterPhaseWhenExistsOtherOps(opsRes, opsRecorder)).Should(Succeed())

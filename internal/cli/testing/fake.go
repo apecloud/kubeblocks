@@ -46,8 +46,7 @@ const (
 
 	KubeBlocksChartName = "fake-kubeblocks"
 	KubeBlocksChartURL  = "fake-kubeblocks-chart-url"
-
-	BackupToolName = "fake-backup-tool"
+	BackupToolName      = "fake-backup-tool"
 )
 
 func GetRandomStr() string {
@@ -130,7 +129,7 @@ func FakePods(replicas int, namespace string, cluster string) *corev1.PodList {
 			types.InstanceLabelKey:  cluster,
 			types.RoleLabelKey:      role,
 			types.ComponentLabelKey: ComponentName,
-			types.NameLabelKey:      "state.mysql-apecloud-wesql",
+			types.NameLabelKey:      "state.mysql-apecloud-mysql",
 		}
 		pod.Spec.NodeName = NodeName
 		pod.Spec.Containers = []corev1.Container{

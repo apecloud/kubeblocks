@@ -37,8 +37,6 @@ var _ = Describe("StatefulSet Controller", func() {
 
 	var (
 		randomStr          = testCtx.GetRandomStr()
-		timeout            = time.Second * 10
-		interval           = time.Second
 		clusterName        = "mysql-" + randomStr
 		clusterDefName     = "cluster-definition-consensus-" + randomStr
 		clusterVersionName = "cluster-version-operations-" + randomStr
@@ -47,38 +45,38 @@ var _ = Describe("StatefulSet Controller", func() {
 		consensusCompName  = "consensus"
 	)
 
-	cleanupObjects := func() {
-		err := k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.ClusterDefinition{}, client.HasLabels{testCtx.TestObjLabelKey})
-		Expect(err).NotTo(HaveOccurred())
-		err = k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.ClusterVersion{}, client.HasLabels{testCtx.TestObjLabelKey})
-		Expect(err).NotTo(HaveOccurred())
-		err = k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.Cluster{}, client.InNamespace(testCtx.DefaultNamespace), client.HasLabels{testCtx.TestObjLabelKey})
-		Expect(err).NotTo(HaveOccurred())
-		err = k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.OpsRequest{}, client.InNamespace(testCtx.DefaultNamespace), client.HasLabels{testCtx.TestObjLabelKey})
-		Expect(err).NotTo(HaveOccurred())
-		err = k8sClient.DeleteAllOf(ctx, &appsv1.StatefulSet{}, client.InNamespace(testCtx.DefaultNamespace), client.HasLabels{testCtx.TestObjLabelKey})
-		Expect(err).NotTo(HaveOccurred())
-		err = k8sClient.DeleteAllOf(ctx, &corev1.Pod{}, client.InNamespace(testCtx.DefaultNamespace), client.HasLabels{testCtx.TestObjLabelKey},
-			client.GracePeriodSeconds(0))
-		Expect(err).NotTo(HaveOccurred())
+	cleanAll := func() {
+		// must wait until resources deleted and no longer exist before the testcases start, otherwise :
+		// - if later it needs to create some new resource objects with the same name,
+		// in race conditions, it will find the existence of old objects, resulting failure to
+		// create the new objects.
+		// - worse, if an async DeleteAll call is issued here, it maybe executed later by the
+		// K8s API server, by which time the testcase may have already created some new test objects,
+		// which shall be accidentally deleted.
+		By("clean resources")
+
+		// delete cluster(and all dependent sub-resources), clusterversion and clusterdef
+		testdbaas.ClearClusterResources(&testCtx)
+
+		// clear rest resources
+		inNS := client.InNamespace(testCtx.DefaultNamespace)
+		ml := client.HasLabels{testCtx.TestObjLabelKey}
+		// namespaced resources
+		testdbaas.ClearResources(&testCtx, intctrlutil.OpsRequestSignature, inNS, ml)
+		testdbaas.ClearResources(&testCtx, intctrlutil.StatefulSetSignature, inNS, ml)
+		testdbaas.ClearResources(&testCtx, intctrlutil.PodSignature, inNS, ml, client.GracePeriodSeconds(0))
 	}
 
-	BeforeEach(func() {
-		// Add any setup steps that needs to be executed before each test
-		cleanupObjects()
-	})
+	BeforeEach(cleanAll)
 
-	AfterEach(func() {
-		// Add any teardown steps that needs to be executed after each test
-		cleanupObjects()
-	})
+	AfterEach(cleanAll)
 
 	patchPodLabel := func(podName, podRole, accessMode, revision string) {
 		pod := &corev1.Pod{}
 		Eventually(func() bool {
 			err := k8sClient.Get(context.Background(), client.ObjectKey{Name: podName, Namespace: testCtx.DefaultNamespace}, pod)
 			return err == nil
-		}, timeout, interval).Should(BeTrue())
+		}).Should(BeTrue())
 		patch := client.MergeFrom(pod.DeepCopy())
 		pod.Labels[intctrlutil.RoleLabelKey] = podRole
 		pod.Labels[intctrlutil.ConsensusSetAccessModeLabelKey] = accessMode
@@ -98,30 +96,35 @@ var _ = Describe("StatefulSet Controller", func() {
 		stsPatch := client.MergeFrom(newSts.DeepCopy())
 		// mock consensus component is not ready
 		newSts.Status.UpdateRevision = fmt.Sprintf("%s-%s-%dfdd48d8cd", clusterName, componentName, index)
+		newSts.Status.ObservedGeneration = newSts.Generation - 1
 		Expect(k8sClient.Status().Patch(context.Background(), newSts, stsPatch)).Should(Succeed())
 
 		By("waiting the component is Updating")
-		Eventually(testdbaas.GetClusterComponentPhase(testCtx, clusterName, componentName),
-			timeout, interval).Should(Equal(dbaasv1alpha1.UpdatingPhase))
+		Eventually(testdbaas.GetClusterComponentPhase(testCtx, clusterName, componentName)).Should(Equal(dbaasv1alpha1.SpecUpdatingPhase))
 	}
 
 	testUsingEnvTest := func(sts *appsv1.StatefulSet) {
-		By("create pod of statefulset")
+		By("create pods of statefulset")
 		_ = testdbaas.MockConsensusComponentPods(ctx, testCtx, clusterName, consensusCompName)
 
 		By("mock restart cluster")
-		sts.Spec.Template.Annotations = map[string]string{
-			"kubeblocks.io/restart": time.Now().Format(time.RFC3339),
-		}
-		Expect(k8sClient.Update(context.Background(), sts)).Should(Succeed())
+		Expect(testdbaas.ChangeObj(&testCtx, sts, func() {
+			sts.Spec.Template.Annotations = map[string]string{
+				intctrlutil.RestartAnnotationKey: time.Now().Format(time.RFC3339),
+			}
+		})).Should(Succeed())
 
-		By("mock statefulset is ready")
-		newSts := &appsv1.StatefulSet{}
-		Expect(k8sClient.Get(context.Background(), client.ObjectKey{Name: sts.Name, Namespace: testCtx.DefaultNamespace}, newSts)).Should(Succeed())
-		stsPatch := client.MergeFrom(newSts.DeepCopy())
-		newSts.Status.UpdateRevision = fmt.Sprintf("%s-%s-%s", clusterName, consensusCompName, revisionID)
-		testk8s.MockStatefulSetReady(newSts)
-		Expect(k8sClient.Status().Patch(context.Background(), newSts, stsPatch)).Should(Succeed())
+		By("mock statefulset update completed")
+		updateRevision := fmt.Sprintf("%s-%s-%s", clusterName, consensusCompName, revisionID)
+		Expect(testdbaas.ChangeObjStatus(&testCtx, sts, func() {
+			sts.Status.UpdateRevision = updateRevision
+			testk8s.MockStatefulSetReady(sts)
+			sts.Status.ObservedGeneration = 2
+		})).Should(Succeed())
+		Eventually(testdbaas.CheckObj(&testCtx, intctrlutil.GetNamespacedName(sts),
+			func(g Gomega, fetched *appsv1.StatefulSet) {
+				g.Expect(fetched.Status.UpdateRevision).To(Equal(updateRevision))
+			})).Should(Succeed())
 	}
 
 	testUsingRealCluster := func() {
@@ -131,7 +134,7 @@ var _ = Describe("StatefulSet Controller", func() {
 			_ = k8sClient.Get(context.Background(), client.ObjectKey{Name: clusterName + "-" + consensusCompName,
 				Namespace: testCtx.DefaultNamespace}, newSts)
 			return newSts.Status.ObservedGeneration == 1
-		}, timeout, interval).Should(BeTrue())
+		}).Should(BeTrue())
 		By("patch pod label of StatefulSet")
 		for i := 0; i < 3; i++ {
 			podName := fmt.Sprintf("%s-%s-%d", clusterName, consensusCompName, i)
@@ -148,35 +151,46 @@ var _ = Describe("StatefulSet Controller", func() {
 
 	Context("test controller", func() {
 		It("test statefulSet controller", func() {
+			By("mock cluster object")
 			_, _, cluster := testdbaas.InitConsensusMysql(ctx, testCtx, clusterDefName,
 				clusterVersionName, clusterName, consensusCompName)
-			_ = testdbaas.CreateRestartOpsRequest(ctx, testCtx, clusterName, opsRequestName, []string{consensusCompName})
-			sts := testdbaas.MockConsensusComponentStatefulSet(ctx, testCtx, clusterName, consensusCompName)
-			By("patch cluster to Updating")
-			patch := client.MergeFrom(cluster.DeepCopy())
-			cluster.Status.Phase = dbaasv1alpha1.UpdatingPhase
-			cluster.Status.Components = map[string]dbaasv1alpha1.ClusterStatusComponent{
-				consensusCompName: {
-					Phase: dbaasv1alpha1.RunningPhase,
-				},
-			}
-			Expect(k8sClient.Status().Patch(context.Background(), cluster, patch)).Should(Succeed())
 
-			clusterPatch := client.MergeFrom(cluster.DeepCopy())
-			cluster.Annotations = map[string]string{
-				intctrlutil.OpsRequestAnnotationKey: fmt.Sprintf(`[{"name":"%s","clusterPhase":"Updating"}]`, opsRequestName),
-			}
-			Expect(k8sClient.Patch(ctx, cluster, clusterPatch)).Should(Succeed())
+			By("mock cluster object is Updating and component is Running")
+			Expect(testdbaas.ChangeObjStatus(&testCtx, cluster, func() {
+				cluster.Status.Phase = dbaasv1alpha1.SpecUpdatingPhase
+				cluster.Status.ObservedGeneration = 1
+				cluster.Status.Components = map[string]dbaasv1alpha1.ClusterStatusComponent{
+					consensusCompName: {
+						Phase: dbaasv1alpha1.RunningPhase,
+					},
+				}
+			})).Should(Succeed())
+			_ = testdbaas.CreateRestartOpsRequest(ctx, testCtx, clusterName, opsRequestName, []string{consensusCompName})
+			Expect(testdbaas.ChangeObj(&testCtx, cluster, func() {
+				cluster.Annotations = map[string]string{
+					intctrlutil.OpsRequestAnnotationKey: fmt.Sprintf(`[{"name":"%s","clusterPhase":"Updating"}]`, opsRequestName),
+				}
+			})).Should(Succeed())
+
+			Eventually(testdbaas.GetClusterComponentPhase(testCtx, clusterName,
+				consensusCompName)).Should(Equal(dbaasv1alpha1.RunningPhase))
+
+			// trigger statefulset controller Reconcile
+			sts := testdbaas.MockConsensusComponentStatefulSet(ctx, testCtx, clusterName, consensusCompName)
+
+			By("check the component becomes Updating")
+			Eventually(testdbaas.GetClusterComponentPhase(testCtx, clusterName, consensusCompName)).Should(Equal(dbaasv1alpha1.SpecUpdatingPhase))
 
 			By("mock the StatefulSet and pods are ready")
 			if testCtx.UsingExistingCluster() {
 				testUsingRealCluster()
 			} else {
+				// mock statefulSet available and consensusSet component is running
 				testUsingEnvTest(sts)
 			}
 
-			By("waiting the component is Running")
-			Eventually(testdbaas.GetClusterComponentPhase(testCtx, clusterName, consensusCompName), timeout, interval).Should(Equal(dbaasv1alpha1.RunningPhase))
+			By("check the component becomes Running")
+			Eventually(testdbaas.GetClusterComponentPhase(testCtx, clusterName, consensusCompName)).Should(Equal(dbaasv1alpha1.RunningPhase))
 
 			By("test updateStrategy with Serial")
 			testUpdateStrategy(dbaasv1alpha1.SerialStrategy, consensusCompName, 1)

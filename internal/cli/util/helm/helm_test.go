@@ -64,7 +64,8 @@ var _ = Describe("helm util", func() {
 		})
 
 		It("Install", func() {
-			Expect(o.Install(cfg)).Should(HaveOccurred())
+			_, err := o.Install(cfg)
+			Expect(err).Should(HaveOccurred())
 			Expect(o.UnInstall(cfg)).Should(HaveOccurred()) // release not found
 		})
 
@@ -77,7 +78,8 @@ var _ = Describe("helm util", func() {
 				},
 			})
 			Expect(err).Should(BeNil())
-			Expect(o.Install(cfg).Error()).Should(ContainSubstring("failed to download"))
+			_, err = o.Install(cfg)
+			Expect(err).Should(BeNil())
 			Expect(o.UnInstall(cfg)).Should(BeNil()) // release exists
 		})
 
@@ -90,7 +92,8 @@ var _ = Describe("helm util", func() {
 				},
 			})
 			Expect(err).Should(BeNil())
-			Expect(o.Install(cfg)).Should(MatchError(ErrReleaseNotDeployed))
+			_, err = o.Install(cfg)
+			Expect(err.Error()).Should(ContainSubstring(ErrReleaseNotDeployed.Error()))
 		})
 	})
 

@@ -32,6 +32,7 @@ import (
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	testdbaas "github.com/apecloud/kubeblocks/internal/testutil/dbaas"
 	"github.com/apecloud/kubeblocks/test/testdata"
 )
 
@@ -43,19 +44,23 @@ var _ = Describe("ClusterDefinition Controller", func() {
 
 	var ctx = context.Background()
 
-	BeforeEach(func() {
-		// Add any steup steps that needs to be executed before each test
-		err := k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.Cluster{}, client.InNamespace(testCtx.DefaultNamespace), client.HasLabels{testCtx.TestObjLabelKey})
-		Expect(err).NotTo(HaveOccurred())
-		err = k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.ClusterVersion{}, client.HasLabels{testCtx.TestObjLabelKey})
-		Expect(err).NotTo(HaveOccurred())
-		err = k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.ClusterDefinition{}, client.HasLabels{testCtx.TestObjLabelKey})
-		Expect(err).NotTo(HaveOccurred())
-	})
+	cleanEnv := func() {
+		// must wait until resources deleted and no longer exist before the testcases start, otherwise :
+		// - if later it needs to create some new resource objects with the same name,
+		// in race conditions, it will find the existence of old objects, resulting failure to
+		// create the new objects.
+		// - worse, if an async DeleteAll call is issued here, it maybe executed later by the
+		// K8s API server, by which time the testcase may have already created some new test objects,
+		// which shall be accidentally deleted.
+		By("clean resources")
 
-	AfterEach(func() {
-		// Add any teardown steps that needs to be executed after each test
-	})
+		// delete cluster(and all dependent sub-resources), clusterversion and clusterdef
+		testdbaas.ClearClusterResources(&testCtx)
+	}
+
+	BeforeEach(cleanEnv)
+
+	AfterEach(cleanEnv)
 
 	clusterDefYaml := `
 apiVersion: dbaas.kubeblocks.io/v1alpha1
@@ -63,7 +68,7 @@ kind:       ClusterDefinition
 metadata:
   name:     mysql-cluster-definition
 spec:
-  type: state.mysql-8
+  type: state.mysql
   components:
   - typeName: replicasets
     componentType: Stateful
@@ -209,20 +214,16 @@ spec:
 			}, timeout, interval).Should(Succeed())
 
 			By("updating clusterDefinition's spec which then mark clusterVersion's status as OutOfSync")
-			Expect(changeSpec(intctrlutil.GetNamespacedName(clusterDefinition),
+			Eventually(testdbaas.GetAndChangeObj(&testCtx, intctrlutil.GetNamespacedName(clusterDefinition),
 				func(cd *dbaasv1alpha1.ClusterDefinition) {
-					cd.Spec.Type = "state.mysql-7"
-				})).Should(Succeed())
+					cd.Spec.Type = "state.redis"
+				}), timeout, interval).Should(Succeed())
 			// check ClusterVersion.Status.ClusterDefSyncStatus to be OutOfSync
 			Eventually(func(g Gomega) {
 				cv := &dbaasv1alpha1.ClusterVersion{}
 				g.Expect(k8sClient.Get(ctx, intctrlutil.GetNamespacedName(clusterVersion), cv)).To(Succeed())
 				g.Expect(cv.Status.ClusterDefSyncStatus == dbaasv1alpha1.OutOfSyncStatus).To(BeTrue())
 			}, timeout, interval).Should(Succeed())
-
-			By("deleting clusterDefinition")
-			Expect(k8sClient.Delete(ctx, clusterDefinition)).Should(Succeed())
-			Expect(k8sClient.Delete(ctx, clusterVersion)).Should(Succeed())
 		})
 	})
 
@@ -283,9 +284,6 @@ spec:
 				}, cmObj)).Should(Succeed())
 				g.Expect(controllerutil.ContainsFinalizer(cmObj, cfgcore.ConfigurationTemplateFinalizerName)).To(BeTrue())
 			}, timeout, interval).Should(Succeed())
-
-			By("deleting clusterDefinition")
-			Expect(k8sClient.Delete(ctx, clusterDefinition)).Should(Succeed())
 		})
 	})
 

@@ -42,12 +42,15 @@ const (
 	PendingPhase           Phase = "Pending"
 	RunningPhase           Phase = "Running"
 	FailedPhase            Phase = "Failed"
-	UpdatingPhase          Phase = "Updating"
+	SpecUpdatingPhase      Phase = "SpecUpdating"
 	VolumeExpandingPhase   Phase = "VolumeExpanding"
+	HorizontalScalingPhase Phase = "HorizontalScaling"
+	VerticalScalingPhase   Phase = "VerticalScaling"
+	RebootingPhase         Phase = "Rebooting"
+	VersionUpgradingPhase  Phase = "VersionUpgrading"
 	SucceedPhase           Phase = "Succeed"
 	AbnormalPhase          Phase = "Abnormal"
 	ConditionsErrorPhase   Phase = "ConditionsError"
-	HorizontalScalingPhase Phase = "HorizontalScaling"
 	ReconfiguringPhase     Phase = "Reconfiguring"
 )
 
@@ -190,12 +193,13 @@ type KBAccountType uint8
 
 // System accounts represented in bit.
 const (
-	KBAccountAdmin          KBAccountType = 1
+	KBAccountInvalid        KBAccountType = 0
+	KBAccountAdmin                        = 1
 	KBAccountDataprotection               = 1 << 1
 	KBAccountProbe                        = 1 << 2
 	KBAccountMonitor                      = 1 << 3
 	KBAccountReplicator                   = 1 << 4
-	KBAccountInvalid                      = 0
+	KBAccountMAX                          = KBAccountReplicator // KBAccountMAX indicates the max value of KBAccountType, used for validation.
 )
 
 // AccountName defines system account names.

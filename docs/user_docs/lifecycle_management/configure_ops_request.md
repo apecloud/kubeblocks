@@ -107,7 +107,7 @@ spec:
   clusterRef: myMongoscluster
   type: Upgrade
   upgrade:
-    # Upgrade to the specidief appversion
+    # Upgrade to the specidief clusterversion
     clusterVersionRef: 5.0.1
 ```
 

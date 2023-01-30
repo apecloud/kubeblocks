@@ -111,7 +111,7 @@ var _ = BeforeSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 	Expect(k8sClient).NotTo(BeNil())
 
-	testCtx = testutil.NewDefaultTestContext(k8sClient)
+	testCtx = testutil.NewDefaultTestContext(ctx, k8sClient, testEnv)
 
 	// start webhook server using Manager
 	webhookInstallOptions := &testEnv.WebhookInstallOptions
@@ -122,6 +122,13 @@ var _ = BeforeSuite(func() {
 		CertDir:            webhookInstallOptions.LocalServingCertDir,
 		LeaderElection:     false,
 		MetricsBindAddress: "0",
+		ClientDisableCacheFor: []client.Object{
+			&ClusterDefinition{},
+			&Cluster{},
+			&ClusterVersion{},
+			&OpsRequest{},
+			&ConfigConstraint{},
+		},
 	})
 	Expect(err).NotTo(HaveOccurred())
 
@@ -139,7 +146,7 @@ var _ = BeforeSuite(func() {
 
 	RegisterWebhookManager(mgr)
 
-	testCtx = testutil.NewDefaultTestContext(k8sClient)
+	testCtx = testutil.NewDefaultTestContext(ctx, k8sClient, testEnv)
 
 	//+kubebuilder:scaffold:webhook
 

@@ -20,33 +20,48 @@ import (
 	"context"
 	"time"
 
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
+
 	"github.com/sethvargo/go-password/password"
+
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
-
-	. "github.com/onsi/ginkgo/v2"
-
-	. "github.com/onsi/gomega"
 	"k8s.io/apimachinery/pkg/util/yaml"
+
+	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	testdbaas "github.com/apecloud/kubeblocks/internal/testutil/dbaas"
 )
 
 var _ = Describe("BackupPolicyTemplate Controller", func() {
 
-	const timeout = time.Second * 10
-	const interval = time.Second * 1
 	const waitDuration = time.Second * 3
 
 	var ctx = context.Background()
 
-	BeforeEach(func() {
-		// Add any steup steps that needs to be executed before each test
-		err := k8sClient.DeleteAllOf(ctx, &dataprotectionv1alpha1.BackupTool{}, client.HasLabels{testCtx.TestObjLabelKey})
-		Expect(err).NotTo(HaveOccurred())
-		err = k8sClient.DeleteAllOf(ctx, &dataprotectionv1alpha1.BackupPolicyTemplate{}, client.HasLabels{testCtx.TestObjLabelKey})
-		Expect(err).NotTo(HaveOccurred())
-	})
+	cleanEnv := func() {
+		// must wait until resources deleted and no longer exist before the testcases start, otherwise :
+		// - if later it needs to create some new resource objects with the same name,
+		// in race conditions, it will find the existence of old objects, resulting failure to
+		// create the new objects.
+		// - worse, if an async DeleteAll call is issued here, it maybe executed later by the
+		// K8s API server, by which time the testcase may have already created some new test objects,
+		// which shall be accidentally deleted.
+		By("clean resources")
+
+		// delete rest mocked objects
+		ml := client.HasLabels{testCtx.TestObjLabelKey}
+
+		// non-namespaced
+		testdbaas.ClearResources(&testCtx, intctrlutil.BackupToolSignature, ml)
+		testdbaas.ClearResources(&testCtx, intctrlutil.BackupPolicyTemplateSignature, ml)
+	}
+
+	BeforeEach(cleanEnv)
+
+	AfterEach(cleanEnv)
 
 	AfterEach(func() {
 		// Add any teardown steps that needs to be executed after each test
@@ -81,26 +96,8 @@ spec:
 		backupPolicyTemp.Name = ns.Name
 		backupPolicyTemp.Namespace = ns.Namespace
 		backupPolicyTemp.Spec.BackupToolName = backupTool
-		Expect(testCtx.CheckedCreateObj(ctx, backupPolicyTemp)).Should(Succeed())
+		Expect(testCtx.CreateObj(ctx, backupPolicyTemp)).Should(Succeed())
 		return backupPolicyTemp
-	}
-
-	deleteBackupPolicyTemplateNWait := func(key types.NamespacedName) error {
-		Expect(func() error {
-			f := &dataprotectionv1alpha1.BackupPolicyTemplate{}
-			if err := k8sClient.Get(ctx, key, f); err != nil {
-				return client.IgnoreNotFound(err)
-			}
-			return k8sClient.Delete(ctx, f)
-		}()).Should(Succeed())
-
-		var err error
-		f := &dataprotectionv1alpha1.BackupPolicyTemplate{}
-		eta := time.Now().Add(waitDuration)
-		for err = k8sClient.Get(ctx, key, f); err == nil && time.Now().Before(eta); err = k8sClient.Get(ctx, key, f) {
-			f = &dataprotectionv1alpha1.BackupPolicyTemplate{}
-		}
-		return client.IgnoreNotFound(err)
 	}
 
 	assureBackupToolObj := func() *dataprotectionv1alpha1.BackupTool {
@@ -158,26 +155,8 @@ spec:
 		ns := genarateNS("backup-tool-")
 		backupTool.Name = ns.Name
 		backupTool.Namespace = ns.Namespace
-		Expect(testCtx.CheckedCreateObj(ctx, backupTool)).Should(Succeed())
+		Expect(testCtx.CreateObj(ctx, backupTool)).Should(Succeed())
 		return backupTool
-	}
-
-	deleteBackupToolNWait := func(key types.NamespacedName) error {
-		Expect(func() error {
-			f := &dataprotectionv1alpha1.BackupTool{}
-			if err := k8sClient.Get(ctx, key, f); err != nil {
-				return client.IgnoreNotFound(err)
-			}
-			return k8sClient.Delete(ctx, f)
-		}()).Should(Succeed())
-
-		var err error
-		f := &dataprotectionv1alpha1.BackupTool{}
-		eta := time.Now().Add(waitDuration)
-		for err = k8sClient.Get(ctx, key, f); err == nil && time.Now().Before(eta); err = k8sClient.Get(ctx, key, f) {
-			f = &dataprotectionv1alpha1.BackupTool{}
-		}
-		return client.IgnoreNotFound(err)
 	}
 
 	Context("When creating backupPolicyTemplate", func() {
@@ -195,13 +174,6 @@ spec:
 			time.Sleep(waitDuration)
 			result := &dataprotectionv1alpha1.BackupPolicyTemplate{}
 			Expect(k8sClient.Get(ctx, key, result)).Should(Succeed())
-
-			By("Deleting the scope")
-
-			Eventually(func() error {
-				_ = deleteBackupToolNWait(key)
-				return deleteBackupPolicyTemplateNWait(key)
-			}, timeout, interval).Should(Succeed())
 		})
 	})
 

@@ -27,7 +27,7 @@ metadata:
   namespace: default
 spec:
   clusterDefinitionRef: mysql-cluster-definition
-  appVersionRef: appversion-mysql-latest
+  clusterVersionRef: clusterversion-mysql-latest
   components:
   - name: replicasets
     type: replicasets
@@ -65,7 +65,7 @@ kind:       ClusterDefinition
 metadata:
   name:     mysql-cluster-definition
 spec:
-  type: state.mysql-8
+  type: state.mysql
   components:
   - typeName: replicasets
     characterType: mysql

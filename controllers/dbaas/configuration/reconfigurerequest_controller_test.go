@@ -29,19 +29,38 @@ import (
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	testdbaas "github.com/apecloud/kubeblocks/internal/testutil/dbaas"
 	test "github.com/apecloud/kubeblocks/test/testdata"
 )
 
 var _ = Describe("Reconfigure Controller", func() {
 	var ctx = context.Background()
 
-	BeforeEach(func() {
-		// Add any steup steps that needs to be executed before each test
-	})
+	cleanEnv := func() {
+		// must wait until resources deleted and no longer exist before the testcases start, otherwise :
+		// - if later it needs to create some new resource objects with the same name,
+		// in race conditions, it will find the existence of old objects, resulting failure to
+		// create the new objects.
+		// - worse, if an async DeleteAll call is issued here, it maybe executed later by the
+		// K8s API server, by which time the testcase may have already created some new test objects,
+		// which shall be accidentally deleted.
+		By("clean resources")
 
-	AfterEach(func() {
-		// Add any teardown steps that needs to be executed after each test
-	})
+		// delete cluster(and all dependent sub-resources), clusterversion and clusterdef
+		testdbaas.ClearClusterResources(&testCtx)
+
+		// delete rest mocked objects
+		inNS := client.InNamespace(testCtx.DefaultNamespace)
+		ml := client.HasLabels{testCtx.TestObjLabelKey}
+		// namespaced
+		testdbaas.ClearResources(&testCtx, intctrlutil.ConfigMapSignature, inNS, ml)
+		// non-namespaced
+		testdbaas.ClearResources(&testCtx, intctrlutil.ConfigConstraintSignature, ml)
+	}
+
+	BeforeEach(cleanEnv)
+
+	AfterEach(cleanEnv)
 
 	Context("When updating configmap", func() {
 		It("Should rolling upgrade pod", func() {
@@ -54,7 +73,7 @@ var _ = Describe("Reconfigure Controller", func() {
 					// for crd yaml file
 					CfgTemplateYaml: "mysql_config_template.yaml",
 					CDYaml:          "mysql_cd.yaml",
-					CVYaml:          "mysql_av.yaml",
+					CVYaml:          "mysql_cv.yaml",
 					CfgCMYaml:       "mysql_config_cm.yaml",
 					StsYaml:         "mysql_sts.yaml",
 					MockSts:         true,
@@ -93,7 +112,7 @@ var _ = Describe("Reconfigure Controller", func() {
 						configHash = cm.Labels[cfgcore.CMInsConfigurationHashLabelKey]
 						return cm.Labels[intctrlutil.AppInstanceLabelKey] == clusterName &&
 							cm.Labels[cfgcore.CMConfigurationTplNameLabelKey] == testWrapper.CMName() &&
-							cm.Labels[cfgcore.CMInsConfigurationLabelKey] != "" &&
+							cm.Labels[cfgcore.CMConfigurationTypeLabelKey] != "" &&
 							cm.Labels[cfgcore.CMInsLastReconfigureMethodLabelKey] == ReconfigureFirstConfigType &&
 							configHash != ""
 					})

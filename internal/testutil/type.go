@@ -19,18 +19,30 @@ package testutil
 import (
 	"context"
 	"os"
+	"time"
 
+	"github.com/onsi/gomega"
 	"github.com/sethvargo/go-password/password"
+
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/envtest"
 )
 
 type TestContext struct {
-	Cli              client.Client
-	TestObjLabelKey  string
-	DefaultNamespace string
-	CreateObj        func(ctx context.Context, obj client.Object, opts ...client.CreateOption) error
-	CheckedCreateObj func(ctx context.Context, obj client.Object, opts ...client.CreateOption) error
+	Ctx                                context.Context
+	Cli                                client.Client
+	TestEnv                            *envtest.Environment
+	TestObjLabelKey                    string
+	DefaultNamespace                   string
+	DefaultEventuallyTimeout           time.Duration
+	DefaultEventuallyPollingInterval   time.Duration
+	DefaultConsistentlyDuration        time.Duration
+	DefaultConsistentlyPollingInterval time.Duration
+	ClearResourceTimeout               time.Duration
+	ClearResourcePollingInterval       time.Duration
+	CreateObj                          func(ctx context.Context, obj client.Object, opts ...client.CreateOption) error
+	CheckedCreateObj                   func(ctx context.Context, obj client.Object, opts ...client.CreateOption) error
 }
 
 const (
@@ -39,12 +51,20 @@ const (
 	envUseExistingCluster = "USE_EXISTING_CLUSTER"
 )
 
-func NewDefaultTestContext(cli client.Client) TestContext {
+func NewDefaultTestContext(ctx context.Context, cli client.Client, testEnv *envtest.Environment) TestContext {
 	t := TestContext{
-		TestObjLabelKey:  "kubeblocks.io/test",
-		DefaultNamespace: "default",
+		TestObjLabelKey:                    "kubeblocks.io/test",
+		DefaultNamespace:                   "default",
+		DefaultEventuallyTimeout:           time.Second * 10,
+		DefaultEventuallyPollingInterval:   time.Second,
+		DefaultConsistentlyDuration:        time.Second * 3,
+		DefaultConsistentlyPollingInterval: time.Second,
+		ClearResourceTimeout:               time.Second * 60,
+		ClearResourcePollingInterval:       time.Second,
 	}
+	t.Ctx = ctx
 	t.Cli = cli
+	t.TestEnv = testEnv
 	t.CreateObj = func(ctx context.Context, obj client.Object, opts ...client.CreateOption) error {
 		l := obj.GetLabels()
 		if l == nil {
@@ -61,6 +81,12 @@ func NewDefaultTestContext(cli client.Client) TestContext {
 		}
 		return nil
 	}
+
+	gomega.SetDefaultEventuallyTimeout(t.DefaultEventuallyTimeout)
+	gomega.SetDefaultEventuallyPollingInterval(t.DefaultEventuallyPollingInterval)
+	gomega.SetDefaultConsistentlyDuration(t.DefaultConsistentlyDuration)
+	gomega.SetDefaultConsistentlyPollingInterval(t.DefaultConsistentlyPollingInterval)
+
 	return t
 }
 
@@ -70,7 +96,10 @@ func (testCtx TestContext) GetRandomStr() string {
 }
 
 func (testCtx TestContext) UsingExistingCluster() bool {
-	return os.Getenv(envUseExistingCluster) == "true"
+	if testCtx.TestEnv == nil || testCtx.TestEnv.UseExistingCluster == nil {
+		return os.Getenv(envUseExistingCluster) == "true"
+	}
+	return *testCtx.TestEnv.UseExistingCluster
 }
 
 func (testCtx TestContext) GetWebhookHostExternalName() string {

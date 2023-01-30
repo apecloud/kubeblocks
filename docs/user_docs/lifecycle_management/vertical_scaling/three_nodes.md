@@ -19,11 +19,11 @@ This guide shows you how to use KubeBlocks to scale up a three-node cluster.
   - Run the commands below to check whether the cluster-related CR is installed successfully.
   ```
   $ kubectl get cd 
-    NAME             PHASE       AGE
-    apecloud-wesql   Available   7m13s
-  $ kubectl get appversion
-    NAME           PHASE       AGE
-    wesql-8.0.30   Available   7m23s
+    NAME             STATUS       AGE
+    apecloud-mysql   Available   7m13s
+  $ kubectl get clusterversion
+    NAME           STATUS       AGE
+    ac-mysql-8.0.30   Available   7m23s
   $ kubectl get cm
     NAME                  DATA   AGE
     mysql-3node-tpl-8.0   1      7m28s
@@ -44,8 +44,8 @@ kind: Cluster
 metadata:
   name: wesql-3nodes
 spec:
-  appVersionRef: wesql-8.0.30
-  clusterDefinitionRef: apecloud-wesql
+  clusterVersionRef: ac-mysql-8.0.30
+  clusterDefinitionRef: apecloud-mysql
   terminationPolicy: WipeOut
   components:
     - name: wesql-demo
@@ -76,8 +76,8 @@ Wait a few seconds and when the cluster phase changes to  `Running`, the cluster
 
 ```
 $ kubectl get cluster
-NAME                   APP-VERSION    PHASE     AGE
-wesql-3nodes           wesql-8.0.30   Running   20s
+NAME                   VERSION    STATUS     AGE
+wesql-3nodes           ac-mysql-8.0.30   Running   20s
 ```
 
 3. Check the operations this cluster supports:
@@ -143,14 +143,14 @@ opsrequest.dbaas.kubeblocks.io/ops-vertical-scaling-threenodes-demo created
 
 ```
 $ kubectl get ops
-NAME                              PHASE     AGE
+NAME                              STATUS     AGE
 ops-vertical-scaling-threenodes   Running   12s
 ```
 
 ```
 $ kubectl get cluster
-NAME                   APP-VERSION    PHASE      AGE
-wesql-3nodes           wesql-8.0.30   Updating   2m46s
+NAME                   VERSION    STATUS      AGE
+wesql-3nodes           ac-mysql-8.0.30   Updating   2m46s
 ```
 
 ### Results
@@ -159,7 +159,7 @@ When the phase changes to `Succeed`, the `OpsRequest` is applied successfully.
 
 ```
 $ kubectl get ops
-NAME                              PHASE     AGE
+NAME                              STATUS     AGE
 ops-vertical-scaling-threenodes   Succeed   96s
 ```
 
@@ -167,8 +167,8 @@ And the cluster also changes:
 
 ```
 $ kubectl get cluster
-NAME                   APP-VERSION    PHASE      AGE
-wesql-3nodes           wesql-8.0.30   Running  4m25s
+NAME                   VERSION    STATUS      AGE
+wesql-3nodes           ac-mysql-8.0.30   Running  4m25s
 ```
 
 4. View the details of `OpsRequest`.

@@ -32,6 +32,7 @@ import (
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	testdbaas "github.com/apecloud/kubeblocks/internal/testutil/dbaas"
 	testk8s "github.com/apecloud/kubeblocks/internal/testutil/k8s"
 )
 
@@ -46,29 +47,28 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 		timeout            = time.Second * 10
 		interval           = time.Second
 	)
-	cleanupObjects := func() {
-		// Add any setup steps that needs to be executed before each test
-		err := k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.Cluster{}, client.InNamespace(testCtx.DefaultNamespace), client.HasLabels{testCtx.TestObjLabelKey})
-		Expect(err).NotTo(HaveOccurred())
-		err = k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.ClusterVersion{}, client.HasLabels{testCtx.TestObjLabelKey})
-		Expect(err).NotTo(HaveOccurred())
-		err = k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.ClusterDefinition{}, client.HasLabels{testCtx.TestObjLabelKey})
-		Expect(err).NotTo(HaveOccurred())
-		err = k8sClient.DeleteAllOf(ctx, &appsv1.StatefulSet{}, client.InNamespace(testCtx.DefaultNamespace), client.HasLabels{testCtx.TestObjLabelKey})
-		Expect(err).NotTo(HaveOccurred())
-		err = k8sClient.DeleteAllOf(ctx, &appsv1.Deployment{}, client.InNamespace(testCtx.DefaultNamespace), client.HasLabels{testCtx.TestObjLabelKey})
-		Expect(err).NotTo(HaveOccurred())
-		err = k8sClient.DeleteAllOf(ctx, &corev1.Pod{}, client.InNamespace(testCtx.DefaultNamespace), client.HasLabels{testCtx.TestObjLabelKey})
-		Expect(err).NotTo(HaveOccurred())
-	}
-	BeforeEach(func() {
-		cleanupObjects()
-	})
 
-	AfterEach(func() {
-		// Add any teardown steps that needs to be executed after each test
-		cleanupObjects()
-	})
+	cleanEnv := func() {
+		// must wait until resources deleted and no longer exist before the testcases start, otherwise :
+		// - if later it needs to create some new resource objects with the same name,
+		// in race conditions, it will find the existence of old objects, resulting failure to
+		// create the new objects.
+		// - worse, if an async DeleteAll call is issued here, it maybe executed later by the
+		// K8s API server, by which time the testcase may have already created some new test objects,
+		// which shall be accidentally deleted.
+		By("clean resources")
+
+		testdbaas.ClearClusterResources(&testCtx)
+
+		inNS := client.InNamespace(testCtx.DefaultNamespace)
+		ml := client.HasLabels{testCtx.TestObjLabelKey}
+		testdbaas.ClearResources(&testCtx, intctrlutil.StatefulSetSignature, inNS, ml)
+		testdbaas.ClearResources(&testCtx, intctrlutil.DeploymentSignature, inNS, ml)
+		testdbaas.ClearResources(&testCtx, intctrlutil.PodSignature, inNS, ml)
+	}
+	BeforeEach(cleanEnv)
+
+	AfterEach(cleanEnv)
 
 	createClusterDef := func() {
 		clusterDefYaml := fmt.Sprintf(`
@@ -77,7 +77,7 @@ kind:       ClusterDefinition
 metadata:
   name:     %s
 spec:
-  type: state.mysql-8
+  type: state.mysql
   components:
   - typeName: replicasets
     pdbSpec:
@@ -338,6 +338,14 @@ spec:
 			createClusterDef()
 			createClusterVersion()
 			createCluster()
+
+			// wait for cluster's status to become stable so that it won't interfere with later tests
+			Eventually(testdbaas.CheckObj(&testCtx, client.ObjectKey{Name: clusterName, Namespace: namespace},
+				func(g Gomega, fetched *dbaasv1alpha1.Cluster) {
+					g.Expect(fetched.Generation).To(BeEquivalentTo(1))
+					g.Expect(fetched.Status.ObservedGeneration).To(BeEquivalentTo(1))
+					g.Expect(fetched.Status.Phase).To(Equal(dbaasv1alpha1.CreatingPhase))
+				})).Should(Succeed())
 
 			By("watch normal event")
 			event := &corev1.Event{

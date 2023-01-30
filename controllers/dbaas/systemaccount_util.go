@@ -348,7 +348,12 @@ func retrieveEndpoints(scope dbaasv1alpha1.ProvisionScope,
 	// parse endpoints
 	endpoints := make([]string, 0)
 	if scope == dbaasv1alpha1.AnyPods {
-		endpoints = append(endpoints, svcEP.Subsets[0].Addresses[0].IP)
+		for _, ss := range svcEP.Subsets {
+			for _, add := range ss.Addresses {
+				endpoints = append(endpoints, add.IP)
+				break
+			}
+		}
 	} else {
 		for _, ss := range headlessEP.Subsets {
 			for _, add := range ss.Addresses {
@@ -360,6 +365,7 @@ func retrieveEndpoints(scope dbaasv1alpha1.ProvisionScope,
 }
 
 func getAccountFacts(secrets *corev1.SecretList, jobs *batchv1.JobList) (detectedFacts dbaasv1alpha1.KBAccountType) {
+	detectedFacts = dbaasv1alpha1.KBAccountInvalid
 	// parse account name from secret's label
 	for _, secret := range secrets.Items {
 		if accountName, exists := secret.ObjectMeta.Labels[clusterAccountLabelKey]; exists {
@@ -405,9 +411,7 @@ func getEngineType(clusterDefType string, compDef dbaasv1alpha1.ClusterDefinitio
 	}
 
 	switch clusterDefType {
-	// clusterDefType define well known cluster types. could be one of
-	// [state.redis, mq.mqtt, mq.kafka, state.mysql-8, state.mysql-5.7, state.mysql-5.6, state-mongodb]
-	case "state.mysql-8", "state.mysql-5.7", "state.mysql-5.6":
+	case "state.mysql":
 		return kMysql
 	default:
 		return ""
@@ -442,4 +446,14 @@ func getCreationStmtForAccount(namespace, clusterName, clusterDefType, clusterDe
 
 	secret := renderSecretWithPwd(namespace, clusterName, clusterDefType, clusterDefName, compName, userName, passwd)
 	return creationStmt, secret
+}
+
+func getAllSysAccounts() []dbaasv1alpha1.AccountName {
+	return []dbaasv1alpha1.AccountName{
+		dbaasv1alpha1.AdminAccount,
+		dbaasv1alpha1.DataprotectionAccount,
+		dbaasv1alpha1.ProbeAccount,
+		dbaasv1alpha1.MonitorAccount,
+		dbaasv1alpha1.ReplicatorAccount,
+	}
 }

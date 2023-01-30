@@ -13,7 +13,7 @@ kbcli kubeblocks install [flags]
   kbcli kubeblocks install
   
   # Install KubeBlocks with specified version
-  kbcli kubeblocks install --version=0.2.0
+  kbcli kubeblocks install --version=0.4.0
   
   # Install KubeBlocks with other settings, for example, set replicaCount to 3
   kbcli kubeblocks install --set replicaCount=3
@@ -22,7 +22,7 @@ kbcli kubeblocks install [flags]
 ### Options
 
 ```
-      --check-resource     check if there are some remained resources before install (default true)
+      --check              check kubernetes cluster before install (default true)
       --create-namespace   create the namespace if not present
   -h, --help               help for install
       --monitor            Set monitor enabled and install Prometheus, AlertManager and Grafana (default true) (default true)

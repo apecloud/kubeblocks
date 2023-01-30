@@ -23,9 +23,9 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	"github.com/sethvargo/go-password/password"
 	"github.com/spf13/viper"
+
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -33,39 +33,49 @@ import (
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
+
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	testdbaas "github.com/apecloud/kubeblocks/internal/testutil/dbaas"
 )
 
 var _ = Describe("Backup Controller", func() {
 	type Key = types.NamespacedName
 	const timeout = time.Second * 20
 	const interval = time.Second * 1
-	const waitDuration = time.Second * 3
 	const TRUE = "true"
 
 	var ctx = context.Background()
 
-	BeforeEach(func() {
-		// Add any steup steps that needs to be executed before each test
+	cleanEnv := func() {
+		// must wait until resources deleted and no longer exist before the testcases start, otherwise :
+		// - if later it needs to create some new resource objects with the same name,
+		// in race conditions, it will find the existence of old objects, resulting failure to
+		// create the new objects.
+		// - worse, if an async DeleteAll call is issued here, it maybe executed later by the
+		// K8s API server, by which time the testcase may have already created some new test objects,
+		// which shall be accidentally deleted.
+		By("clean resources")
 
-		err := k8sClient.DeleteAllOf(ctx, &appsv1.StatefulSet{}, client.InNamespace(testCtx.DefaultNamespace), client.HasLabels{testCtx.TestObjLabelKey})
-		Expect(err).NotTo(HaveOccurred())
-		err = k8sClient.DeleteAllOf(ctx, &corev1.Pod{}, client.InNamespace(testCtx.DefaultNamespace), client.HasLabels{testCtx.TestObjLabelKey})
-		Expect(err).NotTo(HaveOccurred())
-		err = k8sClient.DeleteAllOf(ctx, &dataprotectionv1alpha1.Backup{}, client.InNamespace(testCtx.DefaultNamespace), client.HasLabels{testCtx.TestObjLabelKey})
-		Expect(err).NotTo(HaveOccurred())
-		err = k8sClient.DeleteAllOf(ctx, &dataprotectionv1alpha1.BackupTool{}, client.HasLabels{testCtx.DefaultNamespace})
-		Expect(err).NotTo(HaveOccurred())
-		err = k8sClient.DeleteAllOf(ctx, &appsv1.StatefulSet{},
-			client.InNamespace(testCtx.DefaultNamespace),
-			client.HasLabels{testCtx.TestObjLabelKey},
-		)
-		Expect(err).NotTo(HaveOccurred())
-	})
+		// delete rest mocked objects
+		inNS := client.InNamespace(testCtx.DefaultNamespace)
+		ml := client.HasLabels{testCtx.TestObjLabelKey}
+		// namespaced
+		testdbaas.ClearResources(&testCtx, intctrlutil.StatefulSetSignature, inNS, ml)
+		testdbaas.ClearResources(&testCtx, intctrlutil.PodSignature, inNS, ml)
+		testdbaas.ClearResources(&testCtx, intctrlutil.BackupSignature, inNS, ml)
+		testdbaas.ClearResources(&testCtx, intctrlutil.BackupPolicySignature, inNS, ml)
+		testdbaas.ClearResources(&testCtx, intctrlutil.JobSignature, inNS, ml)
+		testdbaas.ClearResources(&testCtx, intctrlutil.CronJobSignature, inNS, ml)
+		// non-namespaced
+		testdbaas.ClearResources(&testCtx, intctrlutil.BackupToolSignature, ml)
+		testdbaas.ClearResources(&testCtx, intctrlutil.BackupPolicyTemplateSignature, ml)
+	}
 
-	AfterEach(func() {
-		// Add any teardown steps that needs to be executed after each test
-	})
+	BeforeEach(cleanEnv)
+
+	AfterEach(cleanEnv)
 
 	genarateNS := func(prefix string) types.NamespacedName {
 		randomStr, _ := password.Generate(6, 0, 0, true, false)
@@ -102,7 +112,7 @@ spec:
 		backup.Namespace = ns.Namespace
 		backup.Spec.BackupPolicyName = backupPolicy
 
-		Expect(testCtx.CheckedCreateObj(ctx, backup)).Should(Succeed())
+		Expect(testCtx.CreateObj(ctx, backup)).Should(Succeed())
 		return backup
 	}
 
@@ -126,25 +136,8 @@ spec:
 		backup.Namespace = ns.Namespace
 		backup.Spec.BackupPolicyName = backupPolicy
 
-		Expect(testCtx.CheckedCreateObj(ctx, backup)).Should(Succeed())
+		Expect(testCtx.CreateObj(ctx, backup)).Should(Succeed())
 		return backup
-	}
-
-	deleteBackupNWait := func(key types.NamespacedName) error {
-		Expect(func() error {
-			f := &dataprotectionv1alpha1.Backup{}
-			if err := k8sClient.Get(ctx, key, f); err != nil {
-				return client.IgnoreNotFound(err)
-			}
-			return k8sClient.Delete(ctx, f)
-		}()).Should(Succeed())
-
-		var err error
-		f := &dataprotectionv1alpha1.Backup{}
-		Eventually(func() error {
-			return k8sClient.Get(ctx, key, f)
-		}, waitDuration, interval).Should(Succeed())
-		return client.IgnoreNotFound(err)
 	}
 
 	assureBackupPolicyObj := func(backupTool string) *dataprotectionv1alpha1.BackupPolicy {
@@ -182,27 +175,8 @@ spec:
 		backupPolicy.Name = ns.Name
 		backupPolicy.Namespace = ns.Namespace
 		backupPolicy.Spec.BackupToolName = backupTool
-		Expect(testCtx.CheckedCreateObj(ctx, backupPolicy)).Should(Succeed())
+		Expect(testCtx.CreateObj(ctx, backupPolicy)).Should(Succeed())
 		return backupPolicy
-	}
-
-	deleteBackupPolicyNWait := func(key types.NamespacedName) error {
-		Expect(func() error {
-			f := &dataprotectionv1alpha1.BackupPolicy{}
-			if err := k8sClient.Get(ctx, key, f); err != nil {
-				return client.IgnoreNotFound(err)
-			}
-			return k8sClient.Delete(ctx, f)
-		}()).Should(Succeed())
-
-		f := &dataprotectionv1alpha1.BackupPolicy{}
-		Eventually(func() error {
-			if err := k8sClient.Get(ctx, key, f); err != nil {
-				return client.IgnoreNotFound(err)
-			}
-			return nil
-		}, waitDuration, interval).Should(Succeed())
-		return nil
 	}
 
 	assureBackupToolObj := func(withoutResources ...bool) *dataprotectionv1alpha1.BackupTool {
@@ -259,27 +233,8 @@ spec:
 		ns := genarateNS("backup-tool-")
 		backupTool.Name = ns.Name
 		backupTool.Namespace = ns.Namespace
-		Expect(testCtx.CheckedCreateObj(ctx, backupTool)).Should(Succeed())
+		Expect(testCtx.CreateObj(ctx, backupTool)).Should(Succeed())
 		return backupTool
-	}
-
-	deleteBackupToolNWait := func(key types.NamespacedName) error {
-		Expect(func() error {
-			f := &dataprotectionv1alpha1.BackupTool{}
-			if err := k8sClient.Get(ctx, key, f); err != nil {
-				return client.IgnoreNotFound(err)
-			}
-			return k8sClient.Delete(ctx, f)
-		}()).Should(Succeed())
-
-		f := &dataprotectionv1alpha1.BackupTool{}
-		Eventually(func() error {
-			if err := k8sClient.Get(ctx, key, f); err != nil {
-				return client.IgnoreNotFound(err)
-			}
-			return nil
-		}, waitDuration, interval).Should(Succeed())
-		return nil
 	}
 
 	assureStatefulSetObj := func() *appsv1.StatefulSet {
@@ -423,7 +378,7 @@ spec:
 		Expect(yaml.Unmarshal([]byte(statefulYaml), statefulSet)).Should(Succeed())
 		statefulSet.SetNamespace(testCtx.DefaultNamespace)
 		statefulSet.Spec.Template.GetLabels()[testCtx.TestObjLabelKey] = TRUE
-		Expect(testCtx.CheckedCreateObj(ctx, statefulSet)).Should(Succeed())
+		Expect(testCtx.CreateObj(ctx, statefulSet)).Should(Succeed())
 
 		if viper.GetBool("USE_EXISTING_CLUSTER") {
 			return statefulSet
@@ -431,7 +386,7 @@ spec:
 		pod := &corev1.Pod{}
 		Expect(yaml.Unmarshal([]byte(podYaml), pod)).Should(Succeed())
 		pod.GetLabels()[testCtx.TestObjLabelKey] = TRUE
-		Expect(testCtx.CheckedCreateObj(ctx, pod)).Should(Succeed())
+		Expect(testCtx.CreateObj(ctx, pod)).Should(Succeed())
 		return statefulSet
 	}
 
@@ -490,27 +445,6 @@ spec:
 					result.Status.Phase == dataprotectionv1alpha1.BackupCompleted
 			}, timeout, interval).Should(BeTrue())
 			Expect(result.Status.Phase).Should(Equal(dataprotectionv1alpha1.BackupCompleted))
-
-			By("Deleting the scope")
-
-			Eventually(func() error {
-				key = types.NamespacedName{
-					Name:      backupPolicy.Name,
-					Namespace: backupPolicy.Namespace,
-				}
-				_ = deleteBackupPolicyNWait(key)
-				key = types.NamespacedName{
-					Name:      backupTool.Name,
-					Namespace: backupTool.Namespace,
-				}
-				_ = deleteBackupToolNWait(key)
-
-				key = types.NamespacedName{
-					Name:      toCreate.Name,
-					Namespace: toCreate.Namespace,
-				}
-				return deleteBackupNWait(key)
-			}, timeout, interval).Should(Succeed())
 		})
 
 		It("Without backupTool resources should success with no error", func() {
@@ -541,27 +475,6 @@ spec:
 					result.Status.Phase == dataprotectionv1alpha1.BackupCompleted
 			}, timeout, interval).Should(BeTrue())
 			Expect(result.Status.Phase).Should(Equal(dataprotectionv1alpha1.BackupCompleted))
-
-			By("Deleting the scope")
-
-			Eventually(func() error {
-				key = types.NamespacedName{
-					Name:      backupPolicy.Name,
-					Namespace: backupPolicy.Namespace,
-				}
-				_ = deleteBackupPolicyNWait(key)
-				key = types.NamespacedName{
-					Name:      backupTool.Name,
-					Namespace: backupTool.Namespace,
-				}
-				_ = deleteBackupToolNWait(key)
-
-				key = types.NamespacedName{
-					Name:      toCreate.Name,
-					Namespace: toCreate.Namespace,
-				}
-				return deleteBackupNWait(key)
-			}, timeout, interval).Should(Succeed())
 		})
 	})
 
@@ -595,27 +508,6 @@ spec:
 					result.Status.Phase == dataprotectionv1alpha1.BackupCompleted
 			}, timeout, interval).Should(BeTrue())
 			Expect(result.Status.Phase).Should(Equal(dataprotectionv1alpha1.BackupFailed))
-
-			By("Deleting the scope")
-
-			Eventually(func() error {
-				key = types.NamespacedName{
-					Name:      backupPolicy.Name,
-					Namespace: backupPolicy.Namespace,
-				}
-				_ = deleteBackupPolicyNWait(key)
-				key = types.NamespacedName{
-					Name:      backupTool.Name,
-					Namespace: backupTool.Namespace,
-				}
-				_ = deleteBackupToolNWait(key)
-
-				key = types.NamespacedName{
-					Name:      toCreate.Name,
-					Namespace: toCreate.Namespace,
-				}
-				return deleteBackupNWait(key)
-			}, timeout, interval).Should(Succeed())
 		})
 	})
 
@@ -651,27 +543,6 @@ spec:
 					result.Status.Phase == dataprotectionv1alpha1.BackupCompleted
 			}, timeout, interval).Should(BeTrue())
 			Expect(result.Status.Phase).Should(Equal(dataprotectionv1alpha1.BackupCompleted))
-
-			By("Deleting the scope")
-
-			Eventually(func() error {
-				key = types.NamespacedName{
-					Name:      backupPolicy.Name,
-					Namespace: backupPolicy.Namespace,
-				}
-				_ = deleteBackupPolicyNWait(key)
-				key = types.NamespacedName{
-					Name:      backupTool.Name,
-					Namespace: backupTool.Namespace,
-				}
-				_ = deleteBackupToolNWait(key)
-
-				key = types.NamespacedName{
-					Name:      toCreate.Name,
-					Namespace: toCreate.Namespace,
-				}
-				return deleteBackupNWait(key)
-			}, timeout, interval).Should(Succeed())
 		})
 
 		It("Should failed", func() {
@@ -703,27 +574,6 @@ spec:
 					result.Status.Phase == dataprotectionv1alpha1.BackupCompleted
 			}, timeout, interval).Should(BeTrue())
 			Expect(result.Status.Phase).Should(Equal(dataprotectionv1alpha1.BackupFailed))
-
-			By("Deleting the scope")
-
-			Eventually(func() error {
-				key = types.NamespacedName{
-					Name:      backupPolicy.Name,
-					Namespace: backupPolicy.Namespace,
-				}
-				_ = deleteBackupPolicyNWait(key)
-				key = types.NamespacedName{
-					Name:      backupTool.Name,
-					Namespace: backupTool.Namespace,
-				}
-				_ = deleteBackupToolNWait(key)
-
-				key = types.NamespacedName{
-					Name:      toCreate.Name,
-					Namespace: toCreate.Namespace,
-				}
-				return deleteBackupNWait(key)
-			}, timeout, interval).Should(Succeed())
 		})
 	})
 

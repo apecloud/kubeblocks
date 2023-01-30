@@ -236,7 +236,6 @@ func (r *OpsRequestReconciler) handleSucceedOpsRequest(reqCtx intctrlutil.Reques
 
 func (r *OpsRequestReconciler) patchOpsRequestWithClusterLabel(reqCtx intctrlutil.RequestCtx, opsRequest *dbaasv1alpha1.OpsRequest) error {
 	// add label of clusterDefinitionRef
-	patch := client.MergeFrom(opsRequest.DeepCopy())
 	if opsRequest.Labels == nil {
 		opsRequest.Labels = map[string]string{}
 	}
@@ -244,6 +243,7 @@ func (r *OpsRequestReconciler) patchOpsRequestWithClusterLabel(reqCtx intctrluti
 	if clusterName == opsRequest.Spec.ClusterRef {
 		return nil
 	}
+	patch := client.MergeFrom(opsRequest.DeepCopy())
 	opsRequest.Labels[intctrlutil.AppInstanceLabelKey] = opsRequest.Spec.ClusterRef
 	return r.Client.Patch(reqCtx.Ctx, opsRequest, patch)
 }

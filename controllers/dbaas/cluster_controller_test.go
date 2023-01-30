@@ -53,6 +53,7 @@ import (
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/dbaas/components/util"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	testdbaas "github.com/apecloud/kubeblocks/internal/testutil/dbaas"
 	"github.com/apecloud/kubeblocks/test/testdata"
 )
 
@@ -65,43 +66,36 @@ var _ = Describe("Cluster Controller", func() {
 	const follower = "follower"
 	const volumeName = "data"
 
-	clusterObjKey := types.NamespacedName{
-		Name:      "my-cluster",
-		Namespace: "default",
-	}
-	var deleteClusterNWait func(key types.NamespacedName) error
-	var deleteClusterVersionNWait func(key types.NamespacedName) error
-	var deleteClusterDefNWait func(key types.NamespacedName) error
 	ctx := context.Background()
 
-	BeforeEach(func() {
-		// Add any steup steps that needs to be executed before each test
-		err := k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.Cluster{},
-			client.InNamespace(testCtx.DefaultNamespace),
-			client.HasLabels{testCtx.TestObjLabelKey})
-		Expect(err).NotTo(HaveOccurred())
-		err = k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.ClusterVersion{}, client.HasLabels{testCtx.TestObjLabelKey})
-		Expect(err).NotTo(HaveOccurred())
-		err = k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.ClusterDefinition{}, client.HasLabels{testCtx.TestObjLabelKey})
-		Expect(err).NotTo(HaveOccurred())
-		err = k8sClient.DeleteAllOf(ctx, &corev1.PersistentVolumeClaim{},
-			client.InNamespace(testCtx.DefaultNamespace),
-			client.MatchingLabels{
-				intctrlutil.AppNameLabelKey: "state.mysql-8-cluster-definition",
-			})
-		Expect(err).NotTo(HaveOccurred())
-		err = k8sClient.DeleteAllOf(ctx, &corev1.ConfigMap{},
-			client.InNamespace(testCtx.DefaultNamespace),
-			client.HasLabels{testCtx.TestObjLabelKey})
-		Expect(err).NotTo(HaveOccurred())
-	})
+	cleanEnv := func() {
+		// must wait until resources deleted and no longer exist before the testcases start, otherwise :
+		// - if later it needs to create some new resource objects with the same name,
+		// in race conditions, it will find the existence of old objects, resulting failure to
+		// create the new objects.
+		// - worse, if an async DeleteAll call is issued here, it maybe executed later by the
+		// K8s API server, by which time the testcase may have already created some new test objects,
+		// which shall be accidentally deleted.
+		By("clean resources")
 
-	AfterEach(func() {
-		// Add any teardown steps that needs to be executed after each test
-		Eventually(func() error {
-			return deleteClusterNWait(clusterObjKey)
-		}, timeout, interval).Should(Succeed())
-	})
+		// delete cluster(and all dependent sub-resources), clusterversion and clusterdef
+		testdbaas.ClearClusterResources(&testCtx)
+
+		// delete rest mocked objects
+		inNS := client.InNamespace(testCtx.DefaultNamespace)
+		ml := client.HasLabels{testCtx.TestObjLabelKey}
+		// namespaced
+		testdbaas.ClearResources(&testCtx, intctrlutil.ConfigMapSignature, inNS, ml)
+		testdbaas.ClearResources(&testCtx, intctrlutil.PodSignature, inNS, ml)
+		// non-namespaced
+		testdbaas.ClearResources(&testCtx, intctrlutil.ConfigConstraintSignature, ml)
+		testdbaas.ClearResources(&testCtx, intctrlutil.BackupPolicyTemplateSignature, ml)
+		testdbaas.ClearResources(&testCtx, intctrlutil.StorageClassSignature, ml)
+	}
+
+	BeforeEach(cleanEnv)
+
+	AfterEach(cleanEnv)
 
 	assureDefaultStorageClassObj := func(sc *storagev1.StorageClass) error {
 		By("Assuring an default storageClass")
@@ -139,7 +133,7 @@ kind: ClusterDefinition
 metadata:
   name: cluster-definition
 spec:
-  type: state.mysql-8
+  type: state.mysql
   components:
   - typeName: replicasets
     componentType: Stateful
@@ -279,7 +273,7 @@ spec:
 		}, clusterDefObj, clusterVersionObj, key
 	}
 
-	deleteClusterNWait = func(key types.NamespacedName) error {
+	deleteClusterNWait := func(key types.NamespacedName) error {
 		Expect(func() error {
 			f := &dbaasv1alpha1.Cluster{}
 			if err := k8sClient.Get(ctx, key, f); err != nil {
@@ -297,42 +291,6 @@ spec:
 		return client.IgnoreNotFound(err)
 	}
 
-	deleteClusterVersionNWait = func(key types.NamespacedName) error {
-		Expect(func() error {
-			f := &dbaasv1alpha1.ClusterVersion{}
-			if err := k8sClient.Get(ctx, key, f); err != nil {
-				return client.IgnoreNotFound(err)
-			}
-			return k8sClient.Delete(ctx, f)
-		}()).Should(Succeed())
-
-		var err error
-		f := &dbaasv1alpha1.ClusterVersion{}
-		eta := time.Now().Add(waitDuration)
-		for err = k8sClient.Get(ctx, key, f); err == nil && time.Now().Before(eta); err = k8sClient.Get(ctx, key, f) {
-			f = &dbaasv1alpha1.ClusterVersion{}
-		}
-		return client.IgnoreNotFound(err)
-	}
-
-	deleteClusterDefNWait = func(key types.NamespacedName) error {
-		Expect(func() error {
-			f := &dbaasv1alpha1.ClusterDefinition{}
-			if err := k8sClient.Get(ctx, key, f); err != nil {
-				return client.IgnoreNotFound(err)
-			}
-			return k8sClient.Delete(ctx, f)
-		}()).Should(Succeed())
-
-		var err error
-		f := &dbaasv1alpha1.ClusterDefinition{}
-		eta := time.Now().Add(waitDuration)
-		for err = k8sClient.Get(ctx, key, f); err == nil && time.Now().Before(eta); err = k8sClient.Get(ctx, key, f) {
-			f = &dbaasv1alpha1.ClusterDefinition{}
-		}
-		return client.IgnoreNotFound(err)
-	}
-
 	// Consensus associate objs
 	// ClusterDefinition with componentType = Consensus
 	assureClusterDefWithConsensusObj := func() *dbaasv1alpha1.ClusterDefinition {
@@ -343,7 +301,7 @@ kind: ClusterDefinition
 metadata:
   name: cluster-definition-consensus
 spec:
-  type: state.mysql-8
+  type: state.mysql
   components:
   - typeName: replicasets
     componentType: Consensus
@@ -607,11 +565,6 @@ spec:
 				}, client.InNamespace(key.Namespace))).Should(Succeed())
 				return len(cmList.Items) == 2
 			}, timeout, interval).Should(BeTrue())
-
-			By("Deleting the cluster")
-			Eventually(func() error {
-				return deleteClusterNWait(key)
-			}, timeout, interval).Should(Succeed())
 		})
 	})
 
@@ -639,9 +592,9 @@ spec:
 			_, _, _, key := createClusterNCheck()
 
 			By("Update the cluster's termination policy to DoNotTerminate")
-			Expect(changeSpec(key, func(cluster *dbaasv1alpha1.Cluster) {
+			Eventually(testdbaas.GetAndChangeObj(&testCtx, key, func(cluster *dbaasv1alpha1.Cluster) {
 				cluster.Spec.TerminationPolicy = dbaasv1alpha1.DoNotTerminate
-			})).Should(Succeed())
+			}), timeout, interval).Should(Succeed())
 
 			By("Delete the cluster")
 			Eventually(func(g Gomega) {
@@ -660,9 +613,9 @@ spec:
 			Consistently(checkClusterDoNotTerminate, waitDuration, interval).Should(Succeed())
 
 			By("Update the cluster's termination policy to WipeOut")
-			Expect(changeSpec(key, func(cluster *dbaasv1alpha1.Cluster) {
+			Eventually(testdbaas.GetAndChangeObj(&testCtx, key, func(cluster *dbaasv1alpha1.Cluster) {
 				cluster.Spec.TerminationPolicy = dbaasv1alpha1.WipeOut
-			})).Should(Succeed())
+			}), timeout, interval).Should(Succeed())
 
 			By("Wait for the cluster to terminate")
 			Eventually(func(g Gomega) {
@@ -672,8 +625,8 @@ spec:
 		})
 	})
 
-	changeClusterReplicas := func(clusterName types.NamespacedName, replicas int32) error {
-		return changeSpec(clusterName, func(cluster *dbaasv1alpha1.Cluster) {
+	changeClusterReplicas := func(clusterName types.NamespacedName, replicas int32) {
+		Eventually(testdbaas.GetAndChangeObj(&testCtx, clusterName, func(cluster *dbaasv1alpha1.Cluster) {
 			if cluster.Spec.Components == nil || len(cluster.Spec.Components) == 0 {
 				cluster.Spec.Components = []dbaasv1alpha1.ClusterComponent{
 					{
@@ -684,7 +637,7 @@ spec:
 			} else {
 				*cluster.Spec.Components[0].Replicas = replicas
 			}
-		})
+		}), timeout, interval).Should(Succeed())
 	}
 
 	Context("When updating cluster's replica number to a valid value", func() {
@@ -696,7 +649,7 @@ spec:
 			expectedOG := int64(1)
 			for _, replicas := range replicasSeq {
 				By(fmt.Sprintf("Change replicas to %d", replicas))
-				Expect(changeClusterReplicas(key, replicas)).Should(Succeed())
+				changeClusterReplicas(key, replicas)
 				expectedOG++
 
 				By("Checking cluster status and the number of replicas changed")
@@ -708,11 +661,6 @@ spec:
 				stsList := listAndCheckStatefulSet(key)
 				Expect(int(*stsList.Items[0].Spec.Replicas)).To(BeEquivalentTo(replicas))
 			}
-
-			By("Deleting the cluster")
-			Eventually(func() error {
-				return deleteClusterNWait(key)
-			}, timeout, interval).Should(Succeed())
 		})
 	})
 
@@ -723,7 +671,7 @@ spec:
 
 			invalidReplicas := int32(-1)
 			By(fmt.Sprintf("Change replicas to %d", invalidReplicas))
-			Expect(changeClusterReplicas(key, invalidReplicas)).Should(Succeed())
+			changeClusterReplicas(key, invalidReplicas)
 
 			By("Checking cluster status and the number of replicas unchanged")
 			Consistently(func(g Gomega) {
@@ -733,11 +681,6 @@ spec:
 			}, waitDuration, interval).Should(Succeed())
 			stsList := listAndCheckStatefulSet(key)
 			Expect(int(*stsList.Items[0].Spec.Replicas)).To(BeEquivalentTo(1))
-
-			By("Deleting the cluster")
-			Eventually(func() error {
-				return deleteClusterNWait(key)
-			}, timeout, interval).Should(Succeed())
 		})
 	})
 
@@ -782,11 +725,11 @@ spec:
 			})
 
 			By("Set HorizontalScalePolicy")
-			Expect(changeSpec(intctrlutil.GetNamespacedName(clusterDef),
+			Eventually(testdbaas.GetAndChangeObj(&testCtx, intctrlutil.GetNamespacedName(clusterDef),
 				func(clusterDef *dbaasv1alpha1.ClusterDefinition) {
 					clusterDef.Spec.Components[0].HorizontalScalePolicy =
 						&dbaasv1alpha1.HorizontalScalePolicy{Type: dbaasv1alpha1.HScaleDataClonePolicyFromSnapshot}
-				}))
+				}), timeout, interval).Should(Succeed())
 
 			By("Creating a BackupPolicyTemplate")
 			backupPolicyTplKey := types.NamespacedName{Name: "test-backup-policy-template-mysql"}
@@ -813,7 +756,7 @@ spec:
 			Expect(yaml.Unmarshal([]byte(backupPolicyTemplateYaml), &backupPolicyTemplate)).Should(Succeed())
 			Expect(testCtx.CheckedCreateObj(ctx, &backupPolicyTemplate)).Should(Succeed())
 
-			By("Creating PVC for the first replica")
+			By("Mocking PVC for the first replica")
 			for i := 0; i < int(initialReplicas); i++ {
 				pvcYAML := fmt.Sprintf(`
 apiVersion: v1
@@ -821,6 +764,8 @@ kind: PersistentVolumeClaim
 metadata:
   name: %s-%s-%s-%d
   namespace: default
+  labels:
+    app.kubernetes.io/instance: %s
 spec:
   accessModes:
   - ReadWriteOnce
@@ -830,10 +775,10 @@ spec:
   storageClassName: test-sc
   volumeMode: Filesystem
   volumeName: test-pvc
-`, volumeName, key.Name, compName, i)
+`, volumeName, key.Name, compName, i, key.Name)
 				pvc := corev1.PersistentVolumeClaim{}
 				Expect(yaml.Unmarshal([]byte(pvcYAML), &pvc)).Should(Succeed())
-				Expect(k8sClient.Create(ctx, &pvc)).Should(Succeed())
+				Expect(testCtx.CreateObj(ctx, &pvc)).Should(Succeed())
 			}
 
 			stsList := listAndCheckStatefulSet(key)
@@ -841,13 +786,13 @@ spec:
 
 			updatedReplicas := int32(3)
 			By(fmt.Sprintf("Changing replicas to %d", updatedReplicas))
-			Expect(changeClusterReplicas(key, updatedReplicas)).Should(Succeed())
+			changeClusterReplicas(key, updatedReplicas)
 
 			By("Checking BackupJob created")
 			Eventually(func() bool {
 				backupList := dataprotectionv1alpha1.BackupList{}
 				Expect(k8sClient.List(ctx, &backupList, client.MatchingLabels{
-					"app.kubernetes.io/instance": key.Name,
+					intctrlutil.AppInstanceLabelKey: key.Name,
 				}, client.InNamespace(key.Namespace))).Should(Succeed())
 				return len(backupList.Items) == 1
 			}, timeout, interval).Should(BeTrue())
@@ -878,19 +823,34 @@ spec:
 			volumeSnapshot.Status = &volumeSnapshotStatus
 			Expect(k8sClient.Status().Update(ctx, &volumeSnapshot)).Should(Succeed())
 
+			By("Mock PVCs status to bound")
+			for i := 0; i < int(updatedReplicas); i++ {
+				pvcKey := types.NamespacedName{
+					Namespace: key.Namespace,
+					Name:      fmt.Sprintf("%s-%s-%s-%d", volumeName, key.Name, compName, i),
+				}
+				Eventually(testdbaas.CheckObjExists(&testCtx, pvcKey, &corev1.PersistentVolumeClaim{}, true), timeout, interval).Should(Succeed())
+				Eventually(testdbaas.GetAndChangeObjStatus(&testCtx, pvcKey, func(pvc *corev1.PersistentVolumeClaim) {
+					pvc.Status.Phase = corev1.ClaimBound
+				}), timeout, interval).Should(Succeed())
+			}
+
+			By("Check backup job cleanup")
+			Eventually(func() bool {
+				backupList := dataprotectionv1alpha1.BackupList{}
+				Expect(k8sClient.List(ctx, &backupList, client.MatchingLabels{
+					intctrlutil.AppInstanceLabelKey: key.Name,
+				}, client.InNamespace(key.Namespace))).Should(Succeed())
+				return len(backupList.Items) == 0
+			}, timeout, interval).Should(BeTrue())
+			Eventually(testdbaas.CheckObjExists(&testCtx, snapshotKey, &snapshotv1.VolumeSnapshot{}, false), timeout, interval).Should(Succeed())
+
 			By("Checking cluster status and the number of replicas changed")
-			Eventually(func(g Gomega) {
-				fetched := &dbaasv1alpha1.Cluster{}
-				g.Expect(k8sClient.Get(ctx, key, fetched)).To(Succeed())
-				g.Expect(fetched.Status.ObservedGeneration == 2).To(BeTrue())
-			}, timeout, interval).Should(Succeed())
+			Eventually(testdbaas.CheckObj(&testCtx, key, func(g Gomega, cluster *dbaasv1alpha1.Cluster) {
+				g.Expect(cluster.Status.ObservedGeneration == 2).To(BeTrue())
+			}), timeout, interval).Should(Succeed())
 			stsList = listAndCheckStatefulSet(key)
 			Expect(int(*stsList.Items[0].Spec.Replicas)).To(BeEquivalentTo(updatedReplicas))
-
-			By("Deleting the cluster")
-			Eventually(func() error {
-				return deleteClusterNWait(key)
-			}, timeout, interval).Should(Succeed())
 		})
 	})
 
@@ -959,7 +919,7 @@ data:
 			Expect(testCtx.CheckedCreateObj(ctx, cm)).Should(Succeed())
 
 			By("Create real clusterdefinition")
-			clusterDefKey := types.NamespacedName{Name: "test-apecloud-wesql"}
+			clusterDefKey := types.NamespacedName{Name: "test-apecloud-mysql"}
 			clusterDefYAML := fmt.Sprintf(`
 apiVersion: dbaas.kubeblocks.io/v1alpha1
 kind:       ClusterDefinition
@@ -1108,7 +1068,7 @@ spec:
 			Expect(testCtx.CheckedCreateObj(ctx, clusterDef)).Should(Succeed())
 
 			By("Create real ClusterVersion")
-			clusterVersionKey := types.NamespacedName{Name: "test-wesql-8.0.30"}
+			clusterVersionKey := types.NamespacedName{Name: "test-ac-mysql-8.0.30"}
 			clusterVersionYaml := fmt.Sprintf(`
 apiVersion: dbaas.kubeblocks.io/v1alpha1
 kind: ClusterVersion
@@ -1118,7 +1078,7 @@ metadata:
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/name: wesql
     app.kubernetes.io/version: 8.0.30
-    clusterdefinition.kubeblocks.io/name: apecloud-wesql
+    clusterdefinition.kubeblocks.io/name: apecloud-mysql
     helm.sh/chart: wesql-0.1.1
   name: %s
 spec:
@@ -1205,6 +1165,8 @@ kind: PersistentVolumeClaim
 metadata:
   name: data-%s-replicasets-%d
   namespace: default
+  labels:
+    app.kubernetes.io/instance: %s
 spec:
   accessModes:
   - ReadWriteOnce
@@ -1214,10 +1176,10 @@ spec:
   storageClassName: ebs-sc
   volumeMode: Filesystem
   volumeName: pvc-6302ba88-ac70-4939-ac53-78a4bab00094
-`, key.Name, i)
+`, key.Name, i, key.Name)
 				pvc := corev1.PersistentVolumeClaim{}
 				Expect(yaml.Unmarshal([]byte(pvcYAML), &pvc)).Should(Succeed())
-				Expect(k8sClient.Create(ctx, &pvc)).Should(Succeed())
+				Expect(testCtx.CreateObj(ctx, &pvc)).Should(Succeed())
 			}
 
 			fetchedG1 := &dbaasv1alpha1.Cluster{}
@@ -1253,6 +1215,8 @@ kind: PersistentVolumeClaim
 metadata:
   name: data-%s-replicasets-%d
   namespace: default
+  labels:
+    app.kubernetes.io/instance: %s
 spec:
   accessModes:
   - ReadWriteOnce
@@ -1262,10 +1226,10 @@ spec:
   storageClassName: ebs-sc
   volumeMode: Filesystem
   volumeName: pvc-6302ba88-ac70-4939-ac53-78a4bab00094
-`, key.Name, i)
+`, key.Name, i, key.Name)
 				pvc := corev1.PersistentVolumeClaim{}
 				Expect(yaml.Unmarshal([]byte(pvcYAML), &pvc)).Should(Succeed())
-				Expect(k8sClient.Create(ctx, &pvc)).Should(Succeed())
+				Expect(testCtx.CreateObj(ctx, &pvc)).Should(Succeed())
 			}
 			fetchedG1.Spec.Components[0].Replicas = &updatedReplicas
 			Expect(k8sClient.Update(ctx, fetchedG1)).Should(Succeed())
@@ -1300,6 +1264,8 @@ kind: PersistentVolumeClaim
 metadata:
   name: data-%s-replicasets-%d
   namespace: default
+  labels:
+    app.kubernetes.io/instance: %s
 spec:
   accessModes:
   - ReadWriteOnce
@@ -1309,10 +1275,10 @@ spec:
   storageClassName: ebs-sc
   volumeMode: Filesystem
   volumeName: pvc-6302ba88-ac70-4939-ac53-78a4bab00094
-`, key.Name, i)
+`, key.Name, i, key.Name)
 				pvc := corev1.PersistentVolumeClaim{}
 				Expect(yaml.Unmarshal([]byte(pvcYAML), &pvc)).Should(Succeed())
-				Expect(k8sClient.Create(ctx, &pvc)).Should(Succeed())
+				Expect(testCtx.CreateObj(ctx, &pvc)).Should(Succeed())
 			}
 			fetchedG2.Spec.Components[0].Replicas = &updatedReplicas
 			Expect(k8sClient.Update(ctx, fetchedG2)).Should(Succeed())
@@ -1339,21 +1305,6 @@ spec:
 				Expect(len(stsList.Items) != 0).Should(BeTrue())
 				return *stsList.Items[0].Spec.Replicas == updatedReplicas
 			}, timeout, interval).Should(BeTrue())
-
-			By("Deleting the scope")
-			Eventually(func() error {
-				return deleteClusterNWait(key)
-			}, timeout, interval).Should(Succeed())
-
-			By("Deleting ClusterVersion")
-			Eventually(func() error {
-				return deleteClusterVersionNWait(key)
-			}, timeout, interval).Should(Succeed())
-
-			By("Deleting ClusterDefinition")
-			Eventually(func() error {
-				return deleteClusterDefNWait(key)
-			}, timeout, interval).Should(Succeed())
 		})
 	})
 
@@ -1414,11 +1365,6 @@ spec:
 			Expect(svcList2.Items[0].Spec.ClusterIP == corev1.ClusterIPNone).To(BeTrue())
 			Expect(reflect.DeepEqual(svcList2.Items[0].Spec.Ports,
 				getHeadlessSvcPorts("replicasets"))).Should(BeTrue())
-
-			By("Deleting the cluster")
-			Eventually(func() error {
-				return deleteClusterNWait(key)
-			}, timeout, interval).Should(Succeed())
 		})
 	})
 
@@ -1468,7 +1414,7 @@ allowVolumeExpansion: true
 				fetchedG1 := &dbaasv1alpha1.Cluster{}
 				g.Expect(k8sClient.Get(ctx, key, fetchedG1)).To(Succeed())
 				g.Expect(fetchedG1.Status.ObservedGeneration == 1).To(BeTrue())
-			}, timeout, interval).Should(Succeed())
+			}, timeout*2, interval).Should(Succeed())
 
 			By("Checking the replicas")
 			stsList := listAndCheckStatefulSet(key)
@@ -1483,6 +1429,8 @@ kind: PersistentVolumeClaim
 metadata:
   name: %s-%s-%d
   namespace: default
+  labels:
+    app.kubernetes.io/instance: %s
 spec:
   accessModes:
   - ReadWriteOnce
@@ -1490,20 +1438,20 @@ spec:
     requests:
       storage: 1Gi
   storageClassName: %s
-`, volumeName, sts.Name, i, storageClass.Name)
+`, volumeName, sts.Name, i, key.Name, storageClass.Name)
 				pvc := corev1.PersistentVolumeClaim{}
 				Expect(yaml.Unmarshal([]byte(pvcYAML), &pvc)).Should(Succeed())
-				Expect(k8sClient.Create(ctx, &pvc)).Should(Succeed())
+				Expect(testCtx.CreateObj(ctx, &pvc)).Should(Succeed())
 				pvc.Status.Phase = corev1.ClaimBound // only bound pvc allows resize
 				Expect(k8sClient.Status().Update(ctx, &pvc)).Should(Succeed())
 			}
 
 			By("Updating the PVC storage size")
 			newStorageValue := resource.MustParse("2Gi")
-			Expect(changeSpec(key, func(cluster *dbaasv1alpha1.Cluster) {
+			Eventually(testdbaas.GetAndChangeObj(&testCtx, key, func(cluster *dbaasv1alpha1.Cluster) {
 				comp := &cluster.Spec.Components[0]
 				comp.VolumeClaimTemplates[0].Spec.Resources.Requests[corev1.ResourceStorage] = newStorageValue
-			})).Should(Succeed())
+			}), timeout, interval).Should(Succeed())
 
 			By("Checking the resize operation finished")
 			Eventually(func(g Gomega) {
@@ -1527,11 +1475,6 @@ spec:
 					}
 				}
 			}
-
-			By("Deleting the cluster")
-			Eventually(func() error {
-				return deleteClusterNWait(key)
-			}, timeout*2, interval).Should(Succeed())
 		})
 	})
 
@@ -1666,11 +1609,6 @@ spec:
 					}
 				}
 			}
-
-			By("Deleting the cluster")
-			Eventually(func() error {
-				return deleteClusterNWait(key)
-			}, timeout*2, interval).Should(Succeed())
 		})
 	})
 
@@ -1863,7 +1801,7 @@ involvedObject:
 				}
 				g.Expect(leaderCount).Should(Equal(1))
 				g.Expect(followerCount).Should(Equal(2))
-			}, timeout, interval).Should(Succeed())
+			}, 2*timeout, interval).Should(Succeed())
 
 			By("Updating StatefulSet's status")
 			sts.Status.UpdateRevision = "mock-version"
@@ -1887,7 +1825,7 @@ involvedObject:
 				g.Expect(len(consensusStatus.Followers) == 2).To(BeTrue())
 				g.Expect(consensusStatus.Followers[0].Pod).To(BeElementOf(getStsPodsName(sts)))
 				g.Expect(consensusStatus.Followers[1].Pod).To(BeElementOf(getStsPodsName(sts)))
-			}, timeout, interval).Should(Succeed())
+			}, 2*timeout, interval).Should(Succeed())
 
 			By("Waiting the cluster be running")
 			Eventually(func(g Gomega) {
@@ -1896,10 +1834,6 @@ involvedObject:
 				g.Expect(fetched.Status.Phase == dbaasv1alpha1.RunningPhase).To(BeTrue())
 			}, timeout, interval).Should(Succeed())
 
-			By("Deleting the cluster")
-			Eventually(func() error {
-				return deleteClusterNWait(key)
-			}, timeout, interval).Should(Succeed())
 		})
 	})
 
@@ -2004,11 +1938,6 @@ involvedObject:
 
 			time.Sleep(interval * 2)
 			Expect(observeRoleOfServiceLoop(&svc)).Should(Equal(leader))
-
-			By("Deleting the cluster")
-			Eventually(func() error {
-				return deleteClusterNWait(key)
-			}, timeout, interval).Should(Succeed())
 		})
 	})
 
@@ -2035,11 +1964,6 @@ involvedObject:
 			Expect(podSpec.TopologySpreadConstraints[0].WhenUnsatisfiable).To(Equal(corev1.DoNotSchedule))
 			Expect(podSpec.TopologySpreadConstraints[0].TopologyKey).To(Equal(topologyKey))
 			Expect(podSpec.Affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution[0].TopologyKey).To(Equal(topologyKey))
-
-			By("Deleting the cluster")
-			Eventually(func() error {
-				return deleteClusterNWait(key)
-			}, timeout, interval).Should(Succeed())
 		})
 	})
 
@@ -2070,11 +1994,6 @@ involvedObject:
 			Expect(podSpec.TopologySpreadConstraints[0].WhenUnsatisfiable).To(Equal(corev1.ScheduleAnyway))
 			Expect(podSpec.TopologySpreadConstraints[0].TopologyKey).To(Equal(compTopologyKey))
 			Expect(podSpec.Affinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution[0].Weight).ShouldNot(BeNil())
-
-			By("Deleting the cluster")
-			Eventually(func() error {
-				return deleteClusterNWait(key)
-			}, timeout, interval).Should(Succeed())
 		})
 	})
 
@@ -2102,11 +2021,6 @@ involvedObject:
 				toleration.Value == tolerationValue).Should(BeTrue())
 			Expect(toleration.Operator == corev1.TolerationOpEqual &&
 				toleration.Effect == corev1.TaintEffectNoSchedule).Should(BeTrue())
-
-			By("Deleting the cluster")
-			Eventually(func() error {
-				return deleteClusterNWait(key)
-			}, timeout, interval).Should(Succeed())
 		})
 	})
 
@@ -2149,11 +2063,6 @@ involvedObject:
 				toleration.Value == compTolerationValue).Should(BeTrue())
 			Expect(toleration.Operator == corev1.TolerationOpEqual &&
 				toleration.Effect == corev1.TaintEffectNoSchedule).Should(BeTrue())
-
-			By("Deleting the cluster")
-			Eventually(func() error {
-				return deleteClusterNWait(key)
-			}, timeout, interval).Should(Succeed())
 		})
 	})
 
@@ -2190,11 +2099,6 @@ involvedObject:
 				return fetchedClusterG1.Status.Components["replicasets"].Phase == dbaasv1alpha1.RunningPhase &&
 					fetchedClusterG1.Status.Phase == dbaasv1alpha1.RunningPhase
 			}, timeout, interval).Should(BeTrue())
-
-			By("Deleting the Cluster")
-			Eventually(func() error {
-				return deleteClusterNWait(key)
-			}, timeout, interval).Should(Succeed())
 		})
 	})
 })

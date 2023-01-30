@@ -30,7 +30,7 @@ kind: ClusterDefinition
 metadata:
   name: cluster-definition-consensus
 spec:
-  type: state.mysql-8
+  type: state.mysql
   components:
     - typeName: replicasets
       componentType: Consensus

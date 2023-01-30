@@ -19,7 +19,7 @@ package configuration
 const (
 	ConfigurationTemplateFinalizerName = "configuration.kubeblocks.io/finalizer"
 
-	// ConfigurationTplLabelPrefixKey appVersion or clusterdefinition using tpl
+	// ConfigurationTplLabelPrefixKey clusterVersion or clusterdefinition using tpl
 	ConfigurationTplLabelPrefixKey         = "configuration.kubeblocks.io/cfg-tpl"
 	ConfigurationConstraintsLabelPrefixKey = "configuration.kubeblocks.io/cfg-constraints"
 
@@ -29,15 +29,15 @@ const (
 	UpgradePolicyAnnotationKey                  = "configuration.kubeblocks.io/reconfigure-policy"
 	UpgradeRestartAnnotationKey                 = "configuration.kubeblocks.io/restart"
 
-	// CMConfigurationTplLabelKey configmap is config template
-	CMConfigurationTplLabelKey             = "configuration.kubeblocks.io/configuration-template"
+	// CMConfigurationTypeLabelKey configmap is config template type, e.g: "tpl", "instance"
+	CMConfigurationTypeLabelKey            = "configuration.kubeblocks.io/configuration-type"
 	CMConfigurationTplNameLabelKey         = "configuration.kubeblocks.io/configuration-tpl-name"
 	CMConfigurationConstraintsNameLabelKey = "configuration.kubeblocks.io/configuration-constraints-name"
 	CMInsConfigurationHashLabelKey         = "configuration.kubeblocks.io/configuration-hash"
 	CMConfigurationISVTplLabelKey          = "configuration.kubeblocks.io/configtemplate-name"
 
 	// CMInsConfigurationLabelKey configmap is configuration file for component
-	CMInsConfigurationLabelKey = "configuration.kubeblocks.io/ins-configure"
+	// CMInsConfigurationLabelKey = "configuration.kubeblocks.io/ins-configure"
 
 	CMInsLastReconfigureMethodLabelKey = "configuration.kubeblocks.io/last-applied-reconfigure-policy"
 
@@ -50,6 +50,6 @@ const (
 
 	PodMinReadySecondsEnv = "POD_MIN_READY_SECONDS"
 
-	ConstTrueString  = "true"
-	ConstFalseString = "false"
+	ConfigTemplateType = "tpl"
+	ConfigInstanceType = "instance"
 )

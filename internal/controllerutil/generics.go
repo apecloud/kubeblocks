@@ -2,8 +2,16 @@ package controllerutil
 
 import (
 	appsv1 "k8s.io/api/apps/v1"
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	policyv1 "k8s.io/api/policy/v1"
+	storagev1 "k8s.io/api/storage/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
+
+	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 )
 
 // Object a generic representation of various resource object types
@@ -25,29 +33,44 @@ type PObjList[T Object, L ObjList[T]] interface {
 	client.ObjectList
 }
 
-// ObjListWrapper A wrapper of resource objects, since golang generics currently
-// doesn't support fields access use a workaround mentioned in https://github.com/golang/go/issues/48522
-type ObjListWrapper[T Object, L ObjList[T]] interface {
-	GetItems(l *L) []T
+// signature is used as an argument passed to generic functions for type deduction.
+
+var SecretSignature = func(_ corev1.Secret, _ corev1.SecretList) {}
+var ServiceSignature = func(_ corev1.Service, _ corev1.ServiceList) {}
+var PersistentVolumeClaimSignature = func(_ corev1.PersistentVolumeClaim, _ corev1.PersistentVolumeClaimList) {}
+var PodSignature = func(_ corev1.Pod, _ corev1.PodList) {}
+var EventSignature = func(_ corev1.Event, _ corev1.EventList) {}
+var ConfigMapSignature = func(_ corev1.ConfigMap, _ corev1.ConfigMapList) {}
+var EndpointsSignature = func(_ corev1.Endpoints, _ corev1.EndpointsList) {}
+
+var StatefulSetSignature = func(_ appsv1.StatefulSet, _ appsv1.StatefulSetList) {}
+var DeploymentSignature = func(_ appsv1.Deployment, _ appsv1.DeploymentList) {}
+
+var JobSignature = func(_ batchv1.Job, _ batchv1.JobList) {}
+var CronJobSignature = func(_ batchv1.CronJob, _ batchv1.CronJobList) {}
+
+var PodDisruptionBudgetSignature = func(_ policyv1.PodDisruptionBudget, _ policyv1.PodDisruptionBudgetList) {
 }
 
-// SecretListWrapper ObjListWrapper of corev1.SecretList
-type SecretListWrapper struct{}
+var StorageClassSignature = func(_ storagev1.StorageClass, _ storagev1.StorageClassList) {}
 
-func (w SecretListWrapper) GetItems(list *corev1.SecretList) []corev1.Secret {
-	return list.Items
+var VolumeSnapshotSignature = func(_ snapshotv1.VolumeSnapshot, _ snapshotv1.VolumeSnapshotList) {}
+
+var ClusterSignature = func(_ dbaasv1alpha1.Cluster, _ dbaasv1alpha1.ClusterList) {}
+var ClusterVersionSignature = func(_ dbaasv1alpha1.ClusterVersion, _ dbaasv1alpha1.ClusterVersionList) {}
+var ClusterDefinitionSignature = func(_ dbaasv1alpha1.ClusterDefinition, _ dbaasv1alpha1.ClusterDefinitionList) {
+}
+var OpsRequestSignature = func(_ dbaasv1alpha1.OpsRequest, _ dbaasv1alpha1.OpsRequestList) {}
+var ConfigConstraintSignature = func(_ dbaasv1alpha1.ConfigConstraint, _ dbaasv1alpha1.ConfigConstraintList) {
 }
 
-// ServiceListWrapper ObjListWrapper of corev1.ServiceList
-type ServiceListWrapper struct{}
-
-func (w ServiceListWrapper) GetItems(list *corev1.ServiceList) []corev1.Service {
-	return list.Items
+var BackupPolicyTemplateSignature = func(_ dataprotectionv1alpha1.BackupPolicyTemplate, _ dataprotectionv1alpha1.BackupPolicyTemplateList) {
 }
-
-// StatefulSetListWrapper ObjListWrapper of appsv1.StatefulSetList
-type StatefulSetListWrapper struct{}
-
-func (w StatefulSetListWrapper) GetItems(list *appsv1.StatefulSetList) []appsv1.StatefulSet {
-	return list.Items
+var BackupPolicySignature = func(_ dataprotectionv1alpha1.BackupPolicy, _ dataprotectionv1alpha1.BackupPolicyList) {
+}
+var BackupSignature = func(_ dataprotectionv1alpha1.Backup, _ dataprotectionv1alpha1.BackupList) {
+}
+var BackupToolSignature = func(_ dataprotectionv1alpha1.BackupTool, _ dataprotectionv1alpha1.BackupToolList) {
+}
+var RestoreJobSignature = func(_ dataprotectionv1alpha1.RestoreJob, _ dataprotectionv1alpha1.RestoreJobList) {
 }

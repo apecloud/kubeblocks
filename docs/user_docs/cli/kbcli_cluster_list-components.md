@@ -13,7 +13,7 @@ kbcli cluster list-components [flags]
   kbcli cluster list-components
   
   # list all components of a specified cluster
-  kbcli cluster list-components my-cluster
+  kbcli cluster list-components mycluster
 ```
 
 ### Options

@@ -22,9 +22,6 @@ import (
 	"path/filepath"
 	"testing"
 
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
-
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -35,12 +32,17 @@ import (
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	//+kubebuilder:scaffold:imports
 
-	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
+
+	"github.com/go-logr/logr"
 	"github.com/spf13/viper"
 	"go.uber.org/zap/zapcore"
-	"k8s.io/apimachinery/pkg/types"
+
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
+
+	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/dbaas/components"
@@ -60,9 +62,11 @@ var cancel context.CancelFunc
 var testCtx testutil.TestContext
 var clusterRecorder record.EventRecorder
 var systemAccountReconciler *SystemAccountReconciler
+var logger logr.Logger
 
 func init() {
 	viper.AutomaticEnv()
+	// viper.Set("ENABLE_DEBUG_LOG", "true")
 }
 
 func TestAPIs(t *testing.T) {
@@ -79,9 +83,11 @@ var _ = BeforeSuite(func() {
 	}
 
 	ctx, cancel = context.WithCancel(context.TODO())
+	logger = logf.FromContext(ctx).WithValues()
+	logger.Info("logger start")
 
 	By("bootstrapping test environment")
-	var flag = false
+	// var flag = false
 	testEnv = &envtest.Environment{
 		CRDDirectoryPaths: []string{filepath.Join("..", "..", "config", "crd", "bases"),
 			// use dependent external CRDs.
@@ -89,7 +95,7 @@ var _ = BeforeSuite(func() {
 			filepath.Join(build.Default.GOPATH, "pkg", "mod", "github.com", "kubernetes-csi/external-snapshotter/",
 				"client/v6@v6.0.1", "config", "crd")},
 		ErrorIfCRDPathMissing: true,
-		UseExistingCluster:    &flag,
+		// UseExistingCluster:    &flag,
 	}
 
 	var err error
@@ -115,10 +121,17 @@ var _ = BeforeSuite(func() {
 
 	// run reconcile
 	k8sManager, err := ctrl.NewManager(cfg, ctrl.Options{
-		Scheme:             scheme.Scheme,
-		MetricsBindAddress: "0",
+		Scheme:                scheme.Scheme,
+		MetricsBindAddress:    "0",
+		ClientDisableCacheFor: intctrlutil.GetUncacheObjects(),
 	})
 	Expect(err).ToNot(HaveOccurred())
+
+	viper.SetDefault("CERT_DIR", "/tmp/k8s-webhook-server/serving-certs")
+	viper.SetDefault("VOLUMESNAPSHOT", false)
+	viper.SetDefault("KUBEBLOCKS_IMAGE", "apecloud/kubeblocks:latest")
+	viper.SetDefault("PROBE_SERVICE_PORT", 3501)
+	viper.SetDefault("PROBE_SERVICE_LOG_LEVEL", "info")
 
 	clusterRecorder = k8sManager.GetEventRecorderFor("db-cluster-controller")
 	err = (&ClusterReconciler{
@@ -186,7 +199,7 @@ var _ = BeforeSuite(func() {
 	err = systemAccountReconciler.SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 
-	testCtx = testutil.NewDefaultTestContext(k8sManager.GetClient())
+	testCtx = testutil.NewDefaultTestContext(ctx, k8sManager.GetClient(), testEnv)
 
 	go func() {
 		defer GinkgoRecover()
@@ -205,58 +218,3 @@ var _ = AfterSuite(func() {
 	err := testEnv.Stop()
 	Expect(err).NotTo(HaveOccurred())
 })
-
-// Helper functions to change fields in the desired state and status of resources.
-// Each helper is a wrapper of k8sClient.Patch.
-// Example:
-// changeSpec(key, func(clusterDef *dbaasv1alpha1.ClusterDefinition) {
-//		// modify clusterDef
-// })
-
-func changeSpec[T intctrlutil.Object, PT intctrlutil.PObject[T]](namespacedName types.NamespacedName,
-	action func(pobj PT)) error {
-	var obj T
-	pobj := PT(&obj)
-	if err := k8sClient.Get(ctx, namespacedName, pobj); err != nil {
-		return err
-	}
-	patch := client.MergeFrom(PT(pobj.DeepCopy()))
-	action(pobj)
-	if err := k8sClient.Patch(ctx, pobj, patch); err != nil {
-		return err
-	}
-	return nil
-}
-
-func changeStatus[T intctrlutil.Object, PT intctrlutil.PObject[T]](namespacedName types.NamespacedName,
-	action func(pobj PT)) error {
-	var obj T
-	pobj := PT(&obj)
-	if err := k8sClient.Get(ctx, namespacedName, pobj); err != nil {
-		return err
-	}
-	patch := client.MergeFrom(PT(pobj.DeepCopy()))
-	action(pobj)
-	if err := k8sClient.Status().Patch(ctx, pobj, patch); err != nil {
-		return err
-	}
-	return nil
-}
-
-// Helper functions to check fields of resources when writing unit tests.
-// Each helper returns a Gomega assertion function, which should be passed into
-// Eventually() or Consistently() as the first parameter.
-// Example:
-// Eventually(checkObj(key, func(g Gomega, cluster *dbaasv1alpha1.Cluster) {
-//   g.Expect(..).To(BeTrue()) // do some check
-// })).Should(Succeed())
-
-func checkObj[T intctrlutil.Object, PT intctrlutil.PObject[T]](namespacedName types.NamespacedName,
-	check func(g Gomega, pobj PT)) func(g Gomega) {
-	return func(g Gomega) {
-		var obj T
-		pobj := PT(&obj)
-		g.Expect(k8sClient.Get(ctx, namespacedName, pobj)).To(Succeed())
-		check(g, pobj)
-	}
-}

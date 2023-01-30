@@ -38,6 +38,7 @@ import (
 	"go.uber.org/zap/zapcore"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/apecloud/kubeblocks/internal/testutil"
 )
 
@@ -94,12 +95,13 @@ var _ = BeforeSuite(func() {
 
 	// run reconcile
 	k8sManager, err = ctrl.NewManager(cfg, ctrl.Options{
-		Scheme:             scheme.Scheme,
-		MetricsBindAddress: "0",
+		Scheme:                scheme.Scheme,
+		MetricsBindAddress:    "0",
+		ClientDisableCacheFor: intctrlutil.GetUncacheObjects(),
 	})
 	Expect(err).ToNot(HaveOccurred())
 
-	testCtx = testutil.NewDefaultTestContext(k8sManager.GetClient())
+	testCtx = testutil.NewDefaultTestContext(ctx, k8sManager.GetClient(), testEnv)
 
 	go func() {
 		defer GinkgoRecover()

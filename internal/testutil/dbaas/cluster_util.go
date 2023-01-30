@@ -25,6 +25,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/apecloud/kubeblocks/internal/testutil"
 	"github.com/apecloud/kubeblocks/test/testdata"
 )
@@ -48,9 +49,8 @@ func InitClusterWithHybridComps(ctx context.Context,
 func CreateK8sResource(ctx context.Context, testCtx testutil.TestContext, obj client.Object) client.Object {
 	gomega.Expect(testCtx.CreateObj(context.Background(), obj)).Should(gomega.Succeed())
 	// wait until cluster created
-	gomega.Eventually(func() error {
-		return testCtx.Cli.Get(ctx, client.ObjectKey{Name: obj.GetName(), Namespace: obj.GetNamespace()}, obj)
-	}, timeout, interval).Should(gomega.Succeed())
+	gomega.Eventually(CheckObjExists(&testCtx, intctrlutil.GetNamespacedName(obj),
+		obj, true)).Should(gomega.Succeed())
 	return obj
 }
 
@@ -128,4 +128,27 @@ func GetClusterPhase(ctx context.Context, testCtx testutil.TestContext, clusterN
 			Namespace: testCtx.DefaultNamespace}, cluster)).Should(gomega.Succeed())
 		return cluster.Status.Phase
 	}
+}
+
+// MockClusterDefinition creates a clusterDefinition from file.
+func MockClusterDefinition(ctx context.Context, testCtx testutil.TestContext, clusterDefName string, filePath string) *dbaasv1alpha1.ClusterDefinition {
+	clusterDefBytes, err := testdata.GetTestDataFileContent(filePath)
+	if err != nil {
+		return nil
+	}
+	clusterDefYaml := fmt.Sprintf(string(clusterDefBytes), clusterDefName)
+	clusterDef := &dbaasv1alpha1.ClusterDefinition{}
+	gomega.Expect(yaml.Unmarshal([]byte(clusterDefYaml), clusterDef)).Should(gomega.Succeed())
+	return CreateK8sResource(ctx, testCtx, clusterDef).(*dbaasv1alpha1.ClusterDefinition)
+}
+
+func MockClusterVersion(ctx context.Context, testCtx testutil.TestContext, clusterDefName, clusterVersionName string, filePath string) *dbaasv1alpha1.ClusterVersion {
+	clusterVersionBytes, err := testdata.GetTestDataFileContent(filePath)
+	if err != nil {
+		return nil
+	}
+	clusterVersionYAML := fmt.Sprintf(string(clusterVersionBytes), clusterVersionName, clusterDefName)
+	clusterVersion := &dbaasv1alpha1.ClusterVersion{}
+	gomega.Expect(yaml.Unmarshal([]byte(clusterVersionYAML), clusterVersion)).Should(gomega.Succeed())
+	return CreateK8sResource(ctx, testCtx, clusterVersion).(*dbaasv1alpha1.ClusterVersion)
 }

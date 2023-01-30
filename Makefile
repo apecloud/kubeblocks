@@ -43,7 +43,7 @@ ENABLE_WEBHOOKS ?= false
 APP_NAME = kubeblocks
 
 
-VERSION ?= 0.2.0
+VERSION ?= 0.4.0
 CHART_PATH = deploy/helm
 
 WEBHOOK_CERT_DIR ?= /tmp/k8s-webhook-server/serving-certs
@@ -136,6 +136,7 @@ all: manager kbcli agamotto reloader ## Make all cmd binaries.
 manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
 	$(CONTROLLER_GEN) rbac:roleName=manager-role crd:generateEmbeddedObjectMeta=true webhook paths="./apis/...;./controllers/dbaas/...;./controllers/dataprotection/...;./controllers/k8score/...;./cmd/manager/...;./internal/..." output:crd:artifacts:config=config/crd/bases
 	@cp config/crd/bases/* $(CHART_PATH)/crds
+	@cp config/rbac/role.yaml $(CHART_PATH)/config/rbac/role.yaml
 	$(CONTROLLER_GEN) rbac:roleName=loadbalancer-role  paths="./controllers/loadbalancer;./cmd/loadbalancer/controller" output:dir=config/loadbalancer
 
 .PHONY: generate
@@ -179,11 +180,13 @@ mod-download: ## Run go mod download against go modules.
 	$(GO) mod download
 
 .PHONY: mod-vendor
-mod-vendor: ## Run go mod tidy->vendor->verify against go modules.
-	$(GO) mod tidy -compat=1.19
+mod-vendor: module ## Run go mod vendor against go modules.
 	$(GO) mod vendor
-	$(GO) mod verify
 
+.PHONY: module
+module: ## Run go mod tidy->verify against go modules.
+	$(GO) mod tidy -compat=1.19
+	$(GO) mod verify
 
 TEST_PACKAGE=
 

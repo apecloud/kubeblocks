@@ -740,6 +740,18 @@ func addLeaderSelectorLabels(service *corev1.Service, component *Component) {
 	}
 }
 
+// mergeAnnotations keeps the original annotations.
+// if annotations exist and are replaced, the Deployment/StatefulSet will be updated.
+func mergeAnnotations(originalAnnotations, targetAnnotations map[string]string) map[string]string {
+	if restartAnnotation, ok := originalAnnotations[intctrlutil.RestartAnnotationKey]; ok {
+		if targetAnnotations == nil {
+			targetAnnotations = map[string]string{}
+		}
+		targetAnnotations[intctrlutil.RestartAnnotationKey] = restartAnnotation
+	}
+	return targetAnnotations
+}
+
 func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
 	cluster *dbaasv1alpha1.Cluster,
@@ -863,7 +875,7 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 			err = nil
 			if component.HorizontalScalePolicy == nil ||
 				component.HorizontalScalePolicy.Type != dbaasv1alpha1.HScaleDataClonePolicyFromSnapshot ||
-				isSnapshotAvailable(cli, ctx) {
+				!isSnapshotAvailable(cli, ctx) {
 				return
 			}
 			allPVCBound, err := isAllPVCBound(cli, ctx, stsObj)
@@ -912,16 +924,11 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 				*stsObj.Spec.Replicas,
 				*stsProto.Spec.Replicas)
 		}
-		tempAnnotations := stsObj.Spec.Template.Annotations
-		stsObj.Spec.Template = stsProto.Spec.Template
 		// keep the original template annotations.
 		// if annotations exist and are replaced, the statefulSet will be updated.
-		if restartAnnotation, ok := tempAnnotations[intctrlutil.RestartAnnotationKey]; ok {
-			if stsObj.Spec.Template.Annotations == nil {
-				stsObj.Spec.Template.Annotations = map[string]string{}
-			}
-			stsObj.Spec.Template.Annotations[intctrlutil.RestartAnnotationKey] = restartAnnotation
-		}
+		stsProto.Spec.Template.Annotations = mergeAnnotations(stsObj.Spec.Template.Annotations,
+			stsProto.Spec.Template.Annotations)
+		stsObj.Spec.Template = stsProto.Spec.Template
 		stsObj.Spec.Replicas = stsProto.Spec.Replicas
 		stsObj.Spec.UpdateStrategy = stsProto.Spec.UpdateStrategy
 		if err := cli.Update(ctx, stsObj); err != nil {
@@ -1000,6 +1007,8 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 		if err := cli.Get(ctx, key, deployObj); err != nil {
 			return err
 		}
+		deployProto.Spec.Template.Annotations = mergeAnnotations(deployObj.Spec.Template.Annotations,
+			deployProto.Spec.Template.Annotations)
 		deployObj.Spec = deployProto.Spec
 		if err := cli.Update(ctx, deployObj); err != nil {
 			return err
@@ -1062,9 +1071,6 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 		// The Config is not allowed to be modified.
 		// Once ClusterDefinition provider adjusts the ConfigTemplateRef field of CusterDefinition,
 		// or provider modifies the wrong config file, it may cause the application cluster may fail.
-		//
-		// TODO(zhixu.zt): Check whether the configmap object is a config file of component
-		// Label check: ConfigMap.Labels["app.kubernetes.io/ins-configure"]
 		if cm, ok := obj.(*corev1.ConfigMap); ok {
 			if err := handleConfigMap(cm); err != nil {
 				return false, err
@@ -2105,7 +2111,7 @@ func isVolumeSnapshotReadyToUse(cli client.Client,
 	if err := cli.List(ctx, &vsList, ml); err != nil {
 		return false, client.IgnoreNotFound(err)
 	}
-	if len(vsList.Items) == 0 || vsList.Items[0].Status == nil {
+	if len(vsList.Items) == 0 || vsList.Items[0].Status == nil || vsList.Items[0].Status.ReadyToUse == nil {
 		return false, nil
 	}
 	return *vsList.Items[0].Status.ReadyToUse, nil
@@ -2369,6 +2375,7 @@ func doBackup(reqCtx intctrlutil.RequestCtx,
 				cluster,
 				component,
 				stsObj); err != nil {
+				reqCtx.Log.Error(err, "checkedCreatePVCFromSnapshot failed")
 				return shouldRequeue, err
 			}
 		}

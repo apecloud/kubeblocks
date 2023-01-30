@@ -10,19 +10,19 @@ kbcli cluster connect (NAME | -i INSTANCE-NAME) [flags]
 
 ```
   # connect to a specified cluster, default connect to the leader or primary instance
-  kbcli cluster connect my-cluster
+  kbcli cluster connect mycluster
   
   # connect to a specified instance
-  kbcli cluster connect -i my-cluster-instance-0
+  kbcli cluster connect -i mycluster-instance-0
   
   # show cli connection example
-  kbcli cluster connect my-cluster --show-example --client=cli
+  kbcli cluster connect mycluster --show-example --client=cli
   
   # show java connection example
-  kbcli cluster connect my-cluster --show-example --client=java
+  kbcli cluster connect mycluster --show-example --client=java
   
   # show all connection examples
-  kbcli cluster connect my-cluster --show-example
+  kbcli cluster connect mycluster --show-example
 ```
 
 ### Options

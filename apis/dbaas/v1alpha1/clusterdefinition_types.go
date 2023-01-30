@@ -26,8 +26,11 @@ import (
 
 // ClusterDefinitionSpec defines the desired state of ClusterDefinition
 type ClusterDefinitionSpec struct {
-	// Type define well known cluster types. Valid values are in-list of
-	// [state.redis, mq.mqtt, mq.kafka, state.mysql-8, state.mysql-5.7, state.mysql-5.6, state-mongodb].
+	// Cluster definition type defines well known application cluster type. This value should
+	// keep consistent with known DAPR component type
+	// (https://docs.dapr.io/reference/components-reference/). For component that has yet been
+	// provided by DAPR, then it's suggested to follow the naming scheme as DAPR component
+	// type name prefix, i.e., a state store related Cluster starts with "state.<app-name>".
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=24
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`

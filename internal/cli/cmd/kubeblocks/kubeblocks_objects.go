@@ -36,12 +36,16 @@ import (
 )
 
 type kbObjects struct {
-	clusterDefs     *unstructured.UnstructuredList
-	clusterVersions *unstructured.UnstructuredList
-	backupTools     *unstructured.UnstructuredList
-	crds            *unstructured.UnstructuredList
-	deploys         *appv1.DeploymentList
-	svcs            *corev1.ServiceList
+	// custom resources
+	crs map[schema.GroupVersionResource]*unstructured.UnstructuredList
+	// custom resource definitions
+	crds *unstructured.UnstructuredList
+	// deployments
+	deploys *appv1.DeploymentList
+	// services
+	svcs *corev1.ServiceList
+	// configMaps
+	cms *corev1.ConfigMapList
 }
 
 func getKBObjects(client kubernetes.Interface, dynamic dynamic.Interface, namespace string) (*kbObjects, error) {
@@ -60,27 +64,29 @@ func getKBObjects(client kubernetes.Interface, dynamic dynamic.Interface, namesp
 	objs := &kbObjects{}
 	ctx := context.TODO()
 
-	// get ClusterDefinition
-	objs.clusterDefs, err = dynamic.Resource(types.ClusterDefGVR()).List(ctx, metav1.ListOptions{})
-	appendErr(err)
-
-	// get ClusterVersion
-	objs.clusterVersions, err = dynamic.Resource(types.ClusterVersionGVR()).List(ctx, metav1.ListOptions{})
-	appendErr(err)
-
-	// get BackupTool
-	objs.backupTools, err = dynamic.Resource(types.BackupToolGVR()).List(ctx, metav1.ListOptions{})
-	appendErr(err)
-
 	// get CRDs
 	crds, err := dynamic.Resource(types.CRDGVR()).List(ctx, metav1.ListOptions{})
 	appendErr(err)
 	objs.crds = &unstructured.UnstructuredList{}
+	objs.crs = map[schema.GroupVersionResource]*unstructured.UnstructuredList{}
 	for i, crd := range crds.Items {
 		if !strings.Contains(crd.GetName(), "kubeblocks.io") {
 			continue
 		}
 		objs.crds.Items = append(objs.crds.Items, crds.Items[i])
+
+		// get built-in CRs belonging to this CRD
+		gvr, err := getGVRByCRD(&crd)
+		if err != nil {
+			appendErr(err)
+			continue
+		}
+		if crs, err := dynamic.Resource(*gvr).List(ctx, metav1.ListOptions{}); err != nil {
+			appendErr(err)
+			continue
+		} else {
+			objs.crs[*gvr] = crs
+		}
 	}
 
 	// get deployments
@@ -127,6 +133,13 @@ func getKBObjects(client kubernetes.Interface, dynamic dynamic.Interface, namesp
 	// get all services which label matches release=kubeblocks, like prometheus-server
 	getSvcsFn(fmt.Sprintf("release=%s", types.KubeBlocksChartName))
 
+	// get all configmaps that belong to KubeBlocks
+	if objs.cms, err = client.CoreV1().ConfigMaps(namespace).List(ctx, metav1.ListOptions{
+		LabelSelector: "configuration.kubeblocks.io/configuration-template=true",
+	}); err != nil {
+		appendErr(err)
+	}
+
 	return objs, utilerrors.NewAggregate(allErrs)
 }
 
@@ -144,18 +157,12 @@ func removeFinalizers(client dynamic.Interface, objs *kbObjects) error {
 		return nil
 	}
 
-	// patch ClusterDefinition's finalizer
-	if err := removeFn(types.ClusterDefGVR(), objs.clusterDefs); err != nil {
-		return err
+	for k, v := range objs.crs {
+		if err := removeFn(k, v); err != nil {
+			return err
+		}
 	}
-
-	// patch ClusterVersion's finalizer
-	if err := removeFn(types.ClusterVersionGVR(), objs.clusterVersions); err != nil {
-		return err
-	}
-
-	// patch BackupTool's finalizer
-	return removeFn(types.BackupToolGVR(), objs.backupTools)
+	return nil
 }
 
 func deleteCRDs(cli dynamic.Interface, crds *unstructured.UnstructuredList) error {
@@ -199,28 +206,54 @@ func deleteServices(client kubernetes.Interface, svcs *corev1.ServiceList) error
 	return nil
 }
 
-func checkIfRemainedResource(objs *kbObjects) bool {
-	checkUnstructuredList := func(l *unstructured.UnstructuredList) bool {
-		if l == nil || len(l.Items) == 0 {
-			return false
+func deleteConfigMaps(client kubernetes.Interface, cms *corev1.ConfigMapList) error {
+	if cms == nil {
+		return nil
+	}
+
+	for _, s := range cms.Items {
+		// delete object
+		if err := client.CoreV1().ConfigMaps(s.Namespace).Delete(context.TODO(), s.Name, newDeleteOpts()); err != nil {
+			return err
 		}
-		return true
+
+		// remove finalizers
+		if _, err := client.CoreV1().ConfigMaps(s.Namespace).Patch(context.TODO(), s.Name, k8sapitypes.JSONPatchType,
+			[]byte("[{\"op\": \"remove\", \"path\": \"/metadata/finalizers\"}]"), metav1.PatchOptions{}); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func getRemainedResource(objs *kbObjects) map[string][]string {
+	res := map[string][]string{}
+	appendItems := func(key string, l *unstructured.UnstructuredList) {
+		for _, item := range l.Items {
+			res[key] = append(res[key], item.GetName())
+		}
 	}
 
-	if checkUnstructuredList(objs.crds) ||
-		checkUnstructuredList(objs.clusterDefs) ||
-		checkUnstructuredList(objs.clusterVersions) {
-		return true
+	if objs.crds != nil {
+		appendItems("CRDs", objs.crds)
 	}
 
-	if objs.svcs != nil && len(objs.svcs.Items) > 0 {
-		return true
+	for k, v := range objs.crs {
+		appendItems(k.Resource, v)
 	}
 
-	if objs.deploys != nil && len(objs.svcs.Items) > 0 {
-		return true
+	if objs.svcs != nil {
+		for _, item := range objs.svcs.Items {
+			res["services"] = append(res["services"], item.GetName())
+		}
 	}
-	return false
+
+	if objs.deploys != nil {
+		for _, item := range objs.deploys.Items {
+			res["deployments"] = append(res["deployments"], item.GetName())
+		}
+	}
+	return res
 }
 
 func newDeleteOpts() metav1.DeleteOptions {

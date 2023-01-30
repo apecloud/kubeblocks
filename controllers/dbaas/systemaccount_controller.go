@@ -66,6 +66,14 @@ type jobCompletitionPredicate struct {
 	Log        logr.Logger
 }
 
+// clusterDeletionPredicate implements a default delete predication function on cluster deletion.
+// It is used to clean cached secrets from SystemAccountReconciler.SecretMapStore
+type clusterDeletionPredicate struct {
+	predicate.Funcs
+	reconciler *SystemAccountReconciler
+	clusterLog logr.Logger
+}
+
 // SysAccountDeletion and SysAccountCreation are used as event reasons.
 const (
 	SysAcctDelete      = "SysAcctDelete"
@@ -85,13 +93,25 @@ const (
 	accountPasswdForSecret = "password"
 )
 
-// predicates on Create and Delete events from BackupPolicy CR
+// compile-time assert that the local data object satisfies the phases data interface.
 var _ predicate.Predicate = &backupPolicyChangePredicate{}
 
-// predidates on Delete event from Job CR
+// compile-time assert that the local data object satisfies the phases data interface.
 var _ predicate.Predicate = &jobCompletitionPredicate{}
 
-// SystemAccountController does not a cresponding resource, but wathes the create/delete/update of resource like cluster,
+// compile-time assert that the local data object satisfies the phases data interface.
+var _ predicate.Predicate = &clusterDeletionPredicate{}
+
+var (
+	// systemAccountLog is a logger for use during runtime
+	systemAccountLog logr.Logger
+)
+
+func init() {
+	systemAccountLog = log.Log.WithName("systemAccountRuntime")
+}
+
+// SystemAccountController does not have a custom resource, but wathes the create/delete/update of resource like cluster,
 // clusterdefinition, backuppolicy, jobs, secrets
 //+kubebuilder:rbac:groups=dbaas.kubeblocks.io,resources=clusters,verbs=get;list;watch;
 //+kubebuilder:rbac:groups=dbaas.kubeblocks.io,resources=clusters/status,verbs=get
@@ -128,14 +148,14 @@ func (r *SystemAccountReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	}
 
 	clusterdefinition := &dbaasv1alpha1.ClusterDefinition{}
-	clusterDefNS := types.NamespacedName{Namespace: cluster.Namespace, Name: cluster.Spec.ClusterDefRef}
+	clusterDefNS := types.NamespacedName{Name: cluster.Spec.ClusterDefRef}
 	if err := r.Client.Get(reqCtx.Ctx, clusterDefNS, clusterdefinition); err != nil {
 		return intctrlutil.RequeueWithErrorAndRecordEvent(cluster, r.Recorder, err, reqCtx.Log)
 	}
 
 	// wait till the cluster is running
 	if cluster.Status.Phase != dbaasv1alpha1.RunningPhase && cluster.Status.Phase != dbaasv1alpha1.CreatingPhase {
-		return intctrlutil.RequeueAfter(time.Second, reqCtx.Log, "Cluster is not ready yet", "cluster", cluster.Name)
+		return intctrlutil.RequeueAfter(time.Second*5, reqCtx.Log, "Cluster is not ready yet", "cluster", cluster.Name)
 	}
 
 	// process accounts per component
@@ -179,7 +199,7 @@ func (r *SystemAccountReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		}
 
 		var engine *customizedEngine
-		var engineHasBeenCreated = false
+		replaceEnvsValues(cluster.Name, compDef.SystemAccounts)
 
 		for _, account := range compDef.SystemAccounts.Accounts {
 			accountID := account.Name.GetAccountID()
@@ -189,17 +209,15 @@ func (r *SystemAccountReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 
 			switch account.ProvisionPolicy.Type {
 			case dbaasv1alpha1.CreateByStmt:
-				if !engineHasBeenCreated {
+				if engine == nil {
 					execConfig := compDef.SystemAccounts.CmdExecutorConfig
-					replaceEnvsValues(cluster.Name, compDef.SystemAccounts)
 					engine = newCustomizedEngine(execConfig, cluster, compDecl.Name)
-					engineHasBeenCreated = true
 				}
 				if err := r.createByStmt(reqCtx, cluster, clusterdefinition.Spec.Type, clusterdefinition.Name, compDef, compDecl.Name, engine, account, svcEP, headlessEP); err != nil {
 					return err
 				}
 			case dbaasv1alpha1.ReferToExisting:
-				if err := r.createByReferingToExisting(reqCtx, clusterdefinition.Spec.Type, clusterdefinition.Name, compDecl.Name, account); err != nil {
+				if err := r.createByReferingToExisting(reqCtx, cluster, clusterdefinition.Spec.Type, clusterdefinition.Name, compDecl.Name, account); err != nil {
 					return err
 				}
 			}
@@ -247,7 +265,7 @@ func (r *SystemAccountReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	r.SecretMapStore = newSecretMapStore()
 
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&dbaasv1alpha1.Cluster{}).
+		For(&dbaasv1alpha1.Cluster{}, builder.WithPredicates(&clusterDeletionPredicate{reconciler: r, clusterLog: systemAccountLog.WithName("clusterDeletionPredicate")})).
 		Owns(&corev1.Secret{}).
 		Watches(&source.Kind{Type: &dataprotectionv1alpha1.BackupPolicy{}},
 			handler.EnqueueRequestsFromMapFunc(r.findClusterForBackupPolicy),
@@ -293,7 +311,9 @@ func (r *SystemAccountReconciler) createByStmt(reqCtx intctrlutil.RequestCtx,
 	return r.SecretMapStore.addSecret(key, secret)
 }
 
-func (r *SystemAccountReconciler) createByReferingToExisting(reqCtx intctrlutil.RequestCtx, clusterDefType, clusterDefName, compName string, account dbaasv1alpha1.SystemAccountConfig) error {
+func (r *SystemAccountReconciler) createByReferingToExisting(reqCtx intctrlutil.RequestCtx, cluster *dbaasv1alpha1.Cluster, clusterDefType, clusterDefName, compName string, account dbaasv1alpha1.SystemAccountConfig) error {
+	scheme, _ := dbaasv1alpha1.SchemeBuilder.Build()
+
 	// get secret
 	secret := &corev1.Secret{}
 	secretRef := account.ProvisionPolicy.SecretRef
@@ -303,6 +323,10 @@ func (r *SystemAccountReconciler) createByReferingToExisting(reqCtx intctrlutil.
 	}
 	// and make a copy of it
 	newSecret := renderSecretByCopy(reqCtx.Req.Namespace, reqCtx.Req.Name, clusterDefType, clusterDefName, compName, (string)(account.Name), secret)
+	if uprefErr := controllerutil.SetOwnerReference(cluster, newSecret, scheme); uprefErr != nil {
+		return uprefErr
+	}
+
 	if err := r.Client.Create(reqCtx.Ctx, newSecret); err != nil {
 		reqCtx.Log.Error(err, "Failed to find secret", "secret", newSecret.Name)
 		return err
@@ -326,8 +350,13 @@ func (r *SystemAccountReconciler) isComponentReady(reqCtx intctrlutil.RequestCtx
 	if headlessSvcErr != nil {
 		return false, nil, nil, headlessSvcErr
 	}
-	// either service or endpoints are not ready.
+	// either service or endpoints is not ready.
 	if len(svcEP.Subsets) == 0 || len(headlessEP.Subsets) == 0 {
+		return false, nil, nil, nil
+	}
+
+	// make sure address exists
+	if len(svcEP.Subsets[0].Addresses) == 0 || len(headlessEP.Subsets[0].Addresses) == 0 {
 		return false, nil, nil, nil
 	}
 
@@ -474,28 +503,58 @@ func (r *jobCompletitionPredicate) Delete(e event.DeleteEvent) bool {
 				// create secret for this account
 				key := concatSecretName(job.Namespace, clusterName, componentName, accountName)
 				entry, ok, err := r.reconciler.SecretMapStore.getSecret(key)
-				if err != nil {
-					r.Log.Error(err, "failed to get secret by key", "secret key", key)
-					return false
-				}
-				if !ok {
+				if err != nil || !ok {
 					return false
 				}
 				if err := r.reconciler.Client.Create(context.TODO(), entry.value); err == nil {
 					cluster := &dbaasv1alpha1.Cluster{}
 					err := r.reconciler.Client.Get(context.TODO(), types.NamespacedName{Namespace: job.Namespace, Name: clusterName}, cluster)
-					if err == nil {
-						r.reconciler.Recorder.Eventf(cluster, corev1.EventTypeNormal, SysAcctCreate,
-							"Created Accounts for cluster: %s, component: %s, accounts: %s", cluster.Name, componentName, accountName)
+					if err != nil {
+						r.Log.Error(err, "failed to create secret", "secret key", key)
+						return false
 					}
+					r.reconciler.Recorder.Eventf(cluster, corev1.EventTypeNormal, SysAcctCreate,
+						"Created Accounts for cluster: %s, component: %s, accounts: %s", cluster.Name, componentName, accountName)
 					// delete secret from cache store
 					if err = r.reconciler.SecretMapStore.deleteSecret(key); err != nil {
 						r.Log.Error(err, "failed to delete secret by key", "secret key", key)
 					}
-					break
+					return false
 				}
 			}
 		}
 		return false
 	}
+}
+
+// Delete removes cached entries from SystemAccountReconciler.SecretMapStore
+func (r *clusterDeletionPredicate) Delete(e event.DeleteEvent) bool {
+	if e.Object == nil {
+		return false
+	}
+	cluster, ok := e.Object.(*dbaasv1alpha1.Cluster)
+	if !ok {
+		return false
+	}
+
+	// for each component from the cluster, delete cached secrets
+	for _, comp := range cluster.Spec.Components {
+		for _, accName := range getAllSysAccounts() {
+			key := concatSecretName(cluster.Namespace, cluster.Name, comp.Name, string(accName))
+			// delete left-over secrets, and ignore errors if it has been removed.
+			_, exists, err := r.reconciler.SecretMapStore.getSecret(key)
+			if err != nil {
+				r.clusterLog.Error(err, "failed to get secrets", "secret key", key)
+				continue
+			}
+			if !exists {
+				continue
+			}
+			err = r.reconciler.SecretMapStore.deleteSecret(key)
+			if err != nil {
+				r.clusterLog.Error(err, "failed to delete secrets", "secret key", key)
+			}
+		}
+	}
+	return false
 }

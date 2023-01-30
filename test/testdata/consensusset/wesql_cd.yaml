@@ -22,4 +22,4 @@ spec:
         name: leader
       updateStrategy: BestEffortParallel
     defaultReplicas: 3
-  type: state.mysql-8
+  type: state.mysql

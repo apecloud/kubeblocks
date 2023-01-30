@@ -275,7 +275,7 @@ spec:
 
 			By("send VerticalScalingOpsRequest successfully")
 			verticalScalingOpsRequest := createOpsRequest("mysql-verticalscaling", clusterObj.Name, dbaasv1alpha1.VerticalScalingType)
-			verticalScalingOpsRequest.Spec.TTLSecondsAfterSucceed = 1
+			verticalScalingOpsRequest.Spec.TTLSecondsAfterSucceed = 0
 			verticalScalingOpsRequest.Spec.VerticalScalingList = []dbaasv1alpha1.VerticalScaling{
 				{
 					ComponentOps: dbaasv1alpha1.ComponentOps{ComponentName: compName}, // "wesql"
@@ -305,13 +305,12 @@ spec:
 			mockSetClusterStatusPhaseToRunning(key)
 
 			By("patch opsrequest controller to run")
-			Eventually(testdbaas.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(verticalScalingOpsRequest),
-				func(opsRequest *dbaasv1alpha1.OpsRequest) {
-					if opsRequest.Annotations == nil {
-						opsRequest.Annotations = make(map[string]string, 1)
-					}
-					opsRequest.Annotations[intctrlutil.OpsRequestReconcileAnnotationKey] = time.Now().Format(time.RFC3339Nano)
-				}), timeout, interval).Should(Succeed())
+			Eventually(testdbaas.ChangeObj(&testCtx, verticalScalingOpsRequest, func() {
+				if verticalScalingOpsRequest.Annotations == nil {
+					verticalScalingOpsRequest.Annotations = make(map[string]string, 1)
+				}
+				verticalScalingOpsRequest.Annotations[intctrlutil.OpsRequestReconcileAnnotationKey] = time.Now().Format(time.RFC3339Nano)
+			}), timeout, interval).Should(Succeed())
 
 			By("check VerticalScalingOpsRequest succeed")
 			Eventually(testdbaas.CheckObj(&testCtx, client.ObjectKeyFromObject(verticalScalingOpsRequest),
@@ -325,15 +324,14 @@ spec:
 					verticalScalingOpsRequest.Spec.VerticalScalingList[0].Requests))
 			}), timeout, interval).Should(Succeed())
 
-			By("test deleteClusterOpsRequestAnnotation function")
-			opsReconciler := OpsRequestReconciler{Client: k8sClient}
-			Expect(opsReconciler.deleteClusterOpsRequestAnnotation(intctrlutil.RequestCtx{Ctx: ctx}, verticalScalingOpsRequest)).Should(Succeed())
+			By("check OpsRequest reclaimed after ttl")
+			Expect(testdbaas.ChangeObj(&testCtx, verticalScalingOpsRequest, func() {
+				verticalScalingOpsRequest.Spec.TTLSecondsAfterSucceed = 1
+			})).Should(Succeed())
 
-			By("OpsRequest reclaimed after ttl")
 			Eventually(func() error {
 				return k8sClient.Get(ctx, client.ObjectKeyFromObject(verticalScalingOpsRequest), verticalScalingOpsRequest)
 			}, timeout, interval).Should(Satisfy(apierrors.IsNotFound))
-
 		})
 	})
 
@@ -376,7 +374,7 @@ spec:
 
 			By("send VerticalScalingOpsRequest successfully")
 			verticalScalingOpsRequest := createOpsRequest("mysql-verticalscaling", clusterObj.Name, dbaasv1alpha1.VerticalScalingType)
-			verticalScalingOpsRequest.Spec.TTLSecondsAfterSucceed = 1
+			verticalScalingOpsRequest.Spec.TTLSecondsAfterSucceed = 0
 			verticalScalingOpsRequest.Spec.VerticalScalingList = []dbaasv1alpha1.VerticalScaling{
 				{
 					ComponentOps: dbaasv1alpha1.ComponentOps{ComponentName: compName}, // "wesql"
@@ -402,9 +400,10 @@ spec:
 					verticalScalingOpsRequest.Spec.VerticalScalingList[0].Requests))
 			}), timeout, interval).Should(Succeed())
 
-			By("test deleteClusterOpsRequestAnnotation function")
-			opsReconciler := OpsRequestReconciler{Client: k8sClient}
-			Expect(opsReconciler.deleteClusterOpsRequestAnnotation(intctrlutil.RequestCtx{Ctx: ctx}, verticalScalingOpsRequest)).Should(Succeed())
+			By("check OpsRequest reclaimed after ttl")
+			Expect(testdbaas.ChangeObj(&testCtx, verticalScalingOpsRequest, func() {
+				verticalScalingOpsRequest.Spec.TTLSecondsAfterSucceed = 1
+			})).Should(Succeed())
 
 			By("OpsRequest reclaimed after ttl")
 			Eventually(func() error {

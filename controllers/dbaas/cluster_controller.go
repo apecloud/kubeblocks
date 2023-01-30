@@ -312,7 +312,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	// validate primaryIndex and send warning event log necessarily
-	if err = cluster.ValidatePrimaryIndex(clusterdefinition); err != nil {
+	if err = cluster.ValidatePrimaryIndex(clusterDefinition); err != nil {
 		_ = clusterConditionMgr.setPreCheckErrorCondition(err)
 		return intctrlutil.RequeueWithError(err, reqCtx.Log, "")
 	}

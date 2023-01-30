@@ -131,15 +131,6 @@ func (r *ClusterDefinition) validateComponents(allErrs *field.ErrorList) {
 		}
 	}
 
-	validateConfigSpec := func(component *ClusterDefinitionComponent) {
-		configSpec := component.ConfigSpec
-		if configSpec != nil {
-			if err := r.validateConfigSpec(component.ConfigSpec); err != nil {
-				*allErrs = append(*allErrs, field.Duplicate(field.NewPath("spec.components[*].configSpec.configTemplateRefs"), err))
-			}
-		}
-	}
-
 	validateConsensus := func(component *ClusterDefinitionComponent) {
 		consensusSpec := component.ConsensusSpec
 		// roleObserveQuery and Leader are required
@@ -198,7 +189,7 @@ func (r *ClusterDefinition) validateComponents(allErrs *field.ErrorList) {
 		if component.MinReplicas < 1 {
 			*allErrs = append(*allErrs,
 				field.Invalid(field.NewPath("spec.components[*].MinReplicas"),
-					component.MaxReplicas,
+					component.MinReplicas,
 					"component MinReplicas can not be less than 1 when componentType=Replication"))
 		}
 		if component.MaxReplicas > 16 {
@@ -210,11 +201,13 @@ func (r *ClusterDefinition) validateComponents(allErrs *field.ErrorList) {
 	}
 
 	for _, component := range r.Spec.Components {
+		if err := r.validateConfigSpec(component.ConfigSpec); err != nil {
+			*allErrs = append(*allErrs, field.Duplicate(field.NewPath("spec.components[*].configSpec.configTemplateRefs"), err))
+			continue
+		}
+
 		// validate system account defined in spec.components[].systemAccounts
 		validateSystemAccount(&component)
-
-		// validate config spec
-		validateConfigSpec(&component)
 
 		switch component.ComponentType {
 		case Consensus:

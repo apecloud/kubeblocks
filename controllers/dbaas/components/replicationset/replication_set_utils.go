@@ -40,8 +40,8 @@ const (
 	Secondary ReplicationRole = "secondary"
 )
 
-// HandleReplicationSet Handle changes in the number of replication component replicas and synchronize cluster status.
-// TODO(xingran) if the probe event detects an abnormal replication relationship or unavailable, it needs to be repaired in another process
+// HandleReplicationSet Handles changes in the number of replication component replicas and synchronize cluster status.
+// TODO(xingran) if the probe event detects an abnormal replication relationship or unavailable, it needs to be repaired in another process.
 func HandleReplicationSet(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
 	cluster *dbaasv1alpha1.Cluster,
@@ -90,7 +90,7 @@ func HandleReplicationSet(reqCtx intctrlutil.RequestCtx,
 			return err
 		}
 		if len(targetPodList) != 1 {
-			return fmt.Errorf("pod number in statefulset %s is not equal one", stsObj.Name)
+			return fmt.Errorf("pod number in statefulset %s is not 1", stsObj.Name)
 		}
 		podList = append(podList, &targetPodList[0])
 		if _, ok := compOwnsStsMap[stsObj.Labels[intctrlutil.AppComponentLabelKey]]; !ok {

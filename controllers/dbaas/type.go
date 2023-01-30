@@ -69,7 +69,7 @@ type Component struct {
 	AntiAffinity            bool                                   `json:"antiAffinity,omitempty"`
 	ComponentType           dbaasv1alpha1.ComponentType            `json:"componentType,omitempty"`
 	ConsensusSpec           *dbaasv1alpha1.ConsensusSetSpec        `json:"consensusSpec,omitempty"`
-	PrimaryIndex            int32                                  `json:"primaryIndex,omitempty"`
+	PrimaryIndex            *int32                                 `json:"primaryIndex,omitempty"`
 	PodSpec                 *corev1.PodSpec                        `json:"podSpec,omitempty"`
 	Service                 *corev1.ServiceSpec                    `json:"service,omitempty"`
 	Probes                  *dbaasv1alpha1.ClusterDefinitionProbes `json:"probes,omitempty"`

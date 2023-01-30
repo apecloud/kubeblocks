@@ -31,7 +31,7 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
-// ReplicationSet is a component object by cluster, ClusterDefinitionComponent and ClusterComponent
+// ReplicationSet is a component object used by Cluster, ClusterDefinitionComponent and ClusterComponent
 type ReplicationSet struct {
 	Cli          client.Client
 	Ctx          context.Context
@@ -146,7 +146,7 @@ func (rs *ReplicationSet) GetPhaseWhenPodsNotReady(componentName string) (dbaasv
 	return util.CalculateComponentPhase(isFailed, isAbnormal), nil
 }
 
-// NewReplicationSet create a new ReplicationSet object.
+// NewReplicationSet creates a new ReplicationSet object.
 func NewReplicationSet(ctx context.Context,
 	cli client.Client,
 	cluster *dbaasv1alpha1.Cluster,

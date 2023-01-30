@@ -1318,7 +1318,7 @@ func buildReplicationSet(reqCtx intctrlutil.RequestCtx,
 	// sts.Name rename and add role label.
 	sts.ObjectMeta.Name = fmt.Sprintf("%s-%d", sts.ObjectMeta.Name, stsIndex)
 	sts.Labels[intctrlutil.RoleLabelKey] = string(replicationset.Secondary)
-	if stsIndex == params.component.PrimaryIndex {
+	if stsIndex == *params.component.PrimaryIndex {
 		sts.Labels[intctrlutil.RoleLabelKey] = string(replicationset.Primary)
 	}
 	sts.Spec.UpdateStrategy.Type = appsv1.OnDeleteStatefulSetStrategyType
@@ -1373,7 +1373,7 @@ func injectReplicationSetPodEnvAndLabel(params createParams, sts *appsv1.Statefu
 				ValueFrom: nil,
 			})
 		}
-		if index != comp.PrimaryIndex {
+		if index != *comp.PrimaryIndex {
 			sts.Spec.Template.Labels[intctrlutil.RoleLabelKey] = string(replicationset.Secondary)
 		} else {
 			sts.Spec.Template.Labels[intctrlutil.RoleLabelKey] = string(replicationset.Primary)

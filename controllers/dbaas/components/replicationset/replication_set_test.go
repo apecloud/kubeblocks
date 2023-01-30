@@ -79,7 +79,7 @@ var _ = Describe("Replication Component", func() {
 			podsReady, _ := replicationComponent.PodsReady(sts)
 			Expect(podsReady == false).Should(BeTrue())
 
-			By("test component is running")
+			By("test component is not running")
 			sts.Status.AvailableReplicas = *sts.Spec.Replicas
 			isRunning, _ := replicationComponent.IsRunning(sts)
 			Expect(isRunning == false).Should(BeTrue())

@@ -66,7 +66,7 @@ metadata:
     app.kubernetes.io/component-name: replicasets
     app.kubernetes.io/instance: wesql
     app.kubernetes.io/managed-by: kubeblocks
-    app.kubernetes.io/name: state.mysql-apecloud-wesql
+    app.kubernetes.io/name: state.mysql-apecloud-mysql
     vct.kubeblocks.io/name: data
   name: %s
   namespace: default

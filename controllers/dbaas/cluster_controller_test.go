@@ -975,7 +975,7 @@ data:
 			Expect(testCtx.CheckedCreateObj(ctx, cm)).Should(Succeed())
 
 			By("Create real clusterdefinition")
-			clusterDefKey := types.NamespacedName{Name: "test-apecloud-wesql"}
+			clusterDefKey := types.NamespacedName{Name: "test-apecloud-mysql"}
 			clusterDefYAML := fmt.Sprintf(`
 apiVersion: dbaas.kubeblocks.io/v1alpha1
 kind:       ClusterDefinition
@@ -1134,7 +1134,7 @@ metadata:
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/name: wesql
     app.kubernetes.io/version: 8.0.30
-    clusterdefinition.kubeblocks.io/name: apecloud-wesql
+    clusterdefinition.kubeblocks.io/name: apecloud-mysql
     helm.sh/chart: wesql-0.1.1
   name: %s
 spec:

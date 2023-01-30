@@ -21,7 +21,7 @@ import (
 )
 
 const (
-	defaultClusterDef    = "apecloud-wesql"
+	defaultClusterDef    = "apecloud-mysql"
 	defaultCloudProvider = "local"
 	localHost            = "127.0.0.1"
 

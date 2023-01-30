@@ -71,9 +71,8 @@ var _ = Describe("ConfigConstraint Controller", func() {
 					// for crd yaml file
 					CfgTemplateYaml: "mysql_config_template.yaml",
 					CDYaml:          "mysql_cd.yaml",
-					// TODO rename mysql_av.yaml to mysql_cv.yaml
-					CVYaml:    "mysql_av.yaml",
-					CfgCMYaml: "mysql_config_cm.yaml",
+					CVYaml:          "mysql_cv.yaml",
+					CfgCMYaml:       "mysql_config_cm.yaml",
 				}, true)
 			Expect(testWrapper.HasError()).ShouldNot(HaveOccurred())
 
@@ -126,7 +125,7 @@ var _ = Describe("ConfigConstraint Controller", func() {
 					// for crd yaml file
 					CfgTemplateYaml: "mysql_config_tpl_not_validate.yaml",
 					CDYaml:          "mysql_cd.yaml",
-					CVYaml:          "mysql_av.yaml",
+					CVYaml:          "mysql_cv.yaml",
 					CfgCMYaml:       "mysql_config_cm.yaml",
 				}, true)
 			Expect(testWrapper.HasError()).Should(Succeed())

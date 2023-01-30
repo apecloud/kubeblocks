@@ -19,7 +19,7 @@ package configuration
 const (
 	ConfigurationTemplateFinalizerName = "configuration.kubeblocks.io/finalizer"
 
-	// ConfigurationTplLabelPrefixKey appVersion or clusterdefinition using tpl
+	// ConfigurationTplLabelPrefixKey clusterVersion or clusterdefinition using tpl
 	ConfigurationTplLabelPrefixKey         = "configuration.kubeblocks.io/cfg-tpl"
 	ConfigurationConstraintsLabelPrefixKey = "configuration.kubeblocks.io/cfg-constraints"
 

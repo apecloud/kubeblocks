@@ -121,7 +121,7 @@ func (r *reconfigureAction) Action(resource *OpsResource) error {
 		componentName     = spec.Reconfigure.ComponentName
 		cluster           = resource.Cluster
 		clusterDefinition = &dbaasv1alpha1.ClusterDefinition{}
-		appVersion        = &dbaasv1alpha1.ClusterVersion{}
+		clusterVersion    = &dbaasv1alpha1.ClusterVersion{}
 	)
 
 	if err := resource.Client.Get(resource.Ctx, client.ObjectKey{
@@ -134,14 +134,14 @@ func (r *reconfigureAction) Action(resource *OpsResource) error {
 	if err := resource.Client.Get(resource.Ctx, client.ObjectKey{
 		Name:      cluster.Spec.ClusterVersionRef,
 		Namespace: cluster.Namespace,
-	}, appVersion); err != nil {
-		return cfgcore.WrapError(err, "failed to get appversion[%s]", cluster.Spec.ClusterVersionRef)
+	}, clusterVersion); err != nil {
+		return cfgcore.WrapError(err, "failed to get clusterversion[%s]", cluster.Spec.ClusterVersionRef)
 	}
 
 	tpls, err := getConfigTemplatesFromComponent(
 		cluster.Spec.Components,
 		clusterDefinition.Spec.Components,
-		appVersion.Spec.Components,
+		clusterVersion.Spec.Components,
 		componentName)
 	if err != nil {
 		return cfgcore.WrapError(err, "failed to get config template[%s]", componentName)

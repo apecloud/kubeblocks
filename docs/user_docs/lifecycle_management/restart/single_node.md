@@ -19,11 +19,11 @@ This guide introduces how to use KubeBlocks to restart a single-node cluster.
   - Run the commands below to check whether the cluster-related `CR` is installed successfully.
   ```
   $ kubectl get cd 
-    NAME             PHASE       AGE
+    NAME             STATUS       AGE
     apecloud-mysql   Available   7m13s
-  $ kubectl get appversion
-    NAME           PHASE       AGE
-    wesql-8.0.30   Available   7m23s
+  $ kubectl get clusterversion
+    NAME           STATUS       AGE
+    ac-mysql-8.0.30   Available   7m23s
   $ kubectl get cm
     NAME                  DATA   AGE
     mysql-3node-tpl-8.0   1      7m28s
@@ -44,7 +44,7 @@ kind: Cluster
 metadata:
   name: wesql
 spec:
-  appVersionRef: wesql-8.0.30
+  clusterVersionRef: ac-mysql-8.0.30
   clusterDefinitionRef: apecloud-mysql
   terminationPolicy: WipeOut
   components:
@@ -76,8 +76,8 @@ Wait a few seconds and when the cluster phase changes to  `Running`, the cluster
 
 ```
 $ kubectl get cluster
-NAME            APP-VERSION    PHASE     AGE
-wesql           wesql-8.0.30   Running   22s
+NAME            VERSION    STATUS     AGE
+wesql           ac-mysql-8.0.30   Running   22s
 ```
 
 3. Check the operations this cluster supports:
@@ -138,14 +138,14 @@ opsrequest.dbaas.kubeblocks.io/ops-restart created
 
 ```
 $ kubectl get ops
-NAME                        PHASE     AGE
+NAME                        STATUS     AGE
 ops-restart-demo            Running   12s
 ```
 
 ```
 $ kubectl get cluster
-NAME            APP-VERSION    PHASE      AGE
-wesql           wesql-8.0.30   Updating   11m46s 
+NAME            VERSION    STATUS      AGE
+wesql           ac-mysql-8.0.30   Updating   11m46s 
 ```
 
 ### Results
@@ -153,7 +153,7 @@ When the phase changes to `Succeed`, the `OpsRequest` is applied successfully.
 
 ```
 $ kubectl get ops
-NAME                        PHASE     AGE
+NAME                        STATUS     AGE
 ops-restart-demo            Succeed   52s
 ```
 
@@ -161,8 +161,8 @@ And the cluster also changes:
 
 ```
 $ kubectl get cluster
-NAME            APP-VERSION    PHASE      AGE
-wesql           wesql-8.0.30   Running    12m26s
+NAME            VERSION    STATUS      AGE
+wesql           ac-mysql-8.0.30   Running    12m26s
 ```
 
 4. (Optional) View the details of `OpsRequest`.

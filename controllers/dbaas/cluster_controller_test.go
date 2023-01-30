@@ -1069,7 +1069,7 @@ spec:
 			Expect(testCtx.CheckedCreateObj(ctx, clusterDef)).Should(Succeed())
 
 			By("Create real ClusterVersion")
-			clusterVersionKey := types.NamespacedName{Name: "test-wesql-8.0.30"}
+			clusterVersionKey := types.NamespacedName{Name: "test-ac-mysql-8.0.30"}
 			clusterVersionYaml := fmt.Sprintf(`
 apiVersion: dbaas.kubeblocks.io/v1alpha1
 kind: ClusterVersion

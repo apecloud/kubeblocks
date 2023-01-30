@@ -122,7 +122,7 @@ func GenerateConstraintsUniqLabelKeyWithConfig(configKey string) string {
 	return GenerateUniqKeyWithConfig(ConfigurationConstraintsLabelPrefixKey, configKey)
 }
 
-// GetInstanceCMName  {{statefull.Name}}-{{appVersion.Name}}-{{tpl.Name}}-"config"
+// GetInstanceCMName  {{statefull.Name}}-{{clusterVersion.Name}}-{{tpl.Name}}-"config"
 func GetInstanceCMName(obj client.Object, tpl *dbaasv1alpha1.ConfigTemplate) string {
 	return getInstanceCfgCMName(obj.GetName(), tpl.VolumeName)
 	// return fmt.Sprintf("%s-%s-config", sts.GetName(), tpl.VolumeName)

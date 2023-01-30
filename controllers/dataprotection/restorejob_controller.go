@@ -204,14 +204,7 @@ func (r *RestoreJobReconciler) deleteExternalResources(reqCtx intctrlutil.Reques
 		return nil
 	}
 
-	// delete pod when job deleting.
-	// ref: https://kubernetes.io/blog/2021/05/14/using-finalizers-to-control-deletion/
-	deletePropagation := metav1.DeletePropagationBackground
-	deleteOptions := &client.DeleteOptions{
-		PropagationPolicy: &deletePropagation,
-	}
-	if err := r.Client.Delete(reqCtx.Ctx, job, deleteOptions); err != nil {
-		// failed delete k8s job, return error info.
+	if err := DeleteObjectBackground(r.Client, reqCtx.Ctx, job); err != nil {
 		return err
 	}
 	return nil

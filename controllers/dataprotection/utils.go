@@ -18,8 +18,8 @@ package dataprotection
 
 import (
 	"context"
-	"strings"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -33,12 +33,11 @@ func checkResourceExists(
 	obj client.Object) (bool, error) {
 
 	if err := client.Get(ctx, key, obj); err != nil {
-		// if err is NOT "not found", that means unknown error.
-		if !strings.Contains(err.Error(), "not found") {
-			return false, err
+		if apierrors.IsNotFound(err) {
+			// if not found, returns not exists and nil error.
+			return false, nil
 		}
-		// if not found, return false
-		return false, nil
+		return false, err
 	}
 	// if found, return true
 	return true, nil

@@ -357,7 +357,6 @@ func (r *ClusterReconciler) handleClusterStatusAfterApplySucceed(
 func (r *ClusterReconciler) patchClusterLabelsIfNotExist(
 	ctx context.Context,
 	cluster *dbaasv1alpha1.Cluster) error {
-	patch := client.MergeFrom(cluster.DeepCopy())
 	if cluster.Labels == nil {
 		cluster.Labels = map[string]string{}
 	}
@@ -367,6 +366,7 @@ func (r *ClusterReconciler) patchClusterLabelsIfNotExist(
 	if cdLabelName == cdName && cvLabelName == cvName {
 		return nil
 	}
+	patch := client.MergeFrom(cluster.DeepCopy())
 	cluster.Labels[clusterDefLabelKey] = cdName
 	cluster.Labels[clusterVersionLabelKey] = cvName
 	return r.Client.Patch(ctx, cluster, patch)

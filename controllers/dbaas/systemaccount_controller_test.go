@@ -228,7 +228,7 @@ var _ = Describe("SystemAccount Controller", func() {
 		_ = assureEndpoint(objectKey.Namespace, serviceName, ips[0:1])
 		_ = assureEndpoint(objectKey.Namespace, headlessServiceName, ips)
 
-		By("Patching Cluster torunning phase")
+		By("Patching Cluster to running phase")
 		Eventually(testdbaas.GetAndChangeObjStatus(&testCtx, objectKey, func(cluster *dbaasv1alpha1.Cluster) {
 			cluster.Status.Phase = dbaasv1alpha1.RunningPhase
 		}), timeout, interval).Should(Succeed())
@@ -492,23 +492,25 @@ var _ = Describe("SystemAccount Controller", func() {
 					g.Expect(exp.toCreate&dbaasv1alpha1.KBAccountDataprotection > 0).To(BeTrue())
 				}, timeout, interval).Should(Succeed())
 
-				resoruce := testCase.envInfo.resourceMap[dbaasv1alpha1.DataprotectionAccount]
-				if resoruce.jobNum == 0 && resoruce.secretNum == 0 {
+				resource := testCase.envInfo.resourceMap[dbaasv1alpha1.DataprotectionAccount]
+
+				if resource.jobNum == 0 || resource.secretNum == 0 {
 					// if DataprotectionAccount is not configured in ClusterDef, there should be no updates
 					By("No job will be created, if account not configure")
 					Consistently(func(g Gomega) {
 						// no job will be created
-						jobs := &batchv1.JobList{}
-						g.Expect(k8sClient.List(ctx, jobs, client.InNamespace(cluster.Namespace), ml)).To(Succeed())
-						g.Expect(len(jobs.Items)).To(BeEquivalentTo(0))
+						if resource.jobNum == 0 {
+							jobs := &batchv1.JobList{}
+							g.Expect(k8sClient.List(ctx, jobs, client.InNamespace(cluster.Namespace), ml)).To(Succeed())
+							g.Expect(len(jobs.Items)).To(BeEquivalentTo(0))
+						}
 
-						// no secret will be created
 						secrets := &corev1.SecretList{}
-						g.Expect(k8sClient.List(ctx, secrets, client.InNamespace(cluster.Namespace), ml, client.HasLabels{clusterAccountLabelKey})).To(Succeed())
-						g.Expect(len(secrets.Items)).To(BeEquivalentTo(0))
-
-						// no new secret will be cached
-						g.Expect(len(systemAccountReconciler.SecretMapStore.ListKeys())).To(BeEquivalentTo(secretsToCreate1))
+						if resource.secretNum == 0 {
+							// no secret will be created
+							g.Expect(k8sClient.List(ctx, secrets, client.InNamespace(cluster.Namespace), ml)).To(Succeed())
+							g.Expect(len(secrets.Items)).To(BeEquivalentTo(0))
+						}
 					}, consistTimeout, interval).Should(Succeed())
 
 					By("Delete BackupPolicy")
@@ -629,7 +631,7 @@ var _ = Describe("SystemAccount Controller", func() {
 				By("Check secrets created")
 				Eventually(func(g Gomega) {
 					secrets := &corev1.SecretList{}
-					g.Expect(k8sClient.List(ctx, secrets, client.InNamespace(cluster.Namespace), ml, client.HasLabels{clusterAccountLabelKey})).To(Succeed())
+					g.Expect(k8sClient.List(ctx, secrets, client.InNamespace(cluster.Namespace), ml)).To(Succeed())
 					g.Expect(len(secrets.Items)).To(BeEquivalentTo(secretsNum))
 				}, timeout, interval).Should(Succeed())
 

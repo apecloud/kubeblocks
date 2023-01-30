@@ -189,7 +189,7 @@ spec:
                 type: integer
               phase:
                 description: phase is status of configuration template, when set to
-                  AvailablePhase, it can be referenced by ClusterDefinition or AppVersion.
+                  AvailablePhase, it can be referenced by ClusterDefinition or ClusterVersion.
                 enum:
                 - Available
                 - Unavailable

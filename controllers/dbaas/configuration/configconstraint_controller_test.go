@@ -105,7 +105,7 @@ var _ = Describe("ConfigConstraint Controller", func() {
 			log.Log.Info("expect that ConfigConstraint is not deleted.")
 			Eventually(testdbaas.CheckObjExists(&testCtx, tplKey, &dbaasv1alpha1.ConfigConstraint{}, true)).Should(Succeed())
 
-			By("By delete referencing clusterdefinition and appversion")
+			By("By delete referencing clusterdefinition and clusterversion")
 			Expect(testWrapper.DeleteCV()).Should(Succeed())
 			Expect(testWrapper.DeleteCD()).Should(Succeed())
 

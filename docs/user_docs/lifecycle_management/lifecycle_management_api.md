@@ -1,6 +1,6 @@
 # KubeBlocks Lifecycle API
 
-This guide describes the details of KubeBlocks lifecycle API. KubeBlocks API is declarative and enables providers to describe the database cluster typology and lifecycle by YAML files, thus dynamically generating a management and control task flow to provide users with a consistent database operation experience. KubeBlocks has three APIs, namely `ClusterDefinition`, `AppVersion`, and `Cluster`. `ClusterDefinition` and `AppVersion` are designed for providers and `Cluster` is for end users.
+This guide describes the details of KubeBlocks lifecycle API. KubeBlocks API is declarative and enables providers to describe the database cluster typology and lifecycle by YAML files, thus dynamically generating a management and control task flow to provide users with a consistent database operation experience. KubeBlocks has three APIs, namely `ClusterDefinition`, `ClusterVersion`, and `Cluster`. `ClusterDefinition` and `AppVersion` are designed for providers and `Cluster` is for end users.
 
 ## ClusterDefinition (for providers)
 
@@ -190,11 +190,11 @@ Note:
 - KB_COMP_NAME - Running pod's KubeBlock Cluster API object's .spec.components.name
 - KB_CLUSTER_COMP_NAME - Running pod's KubeBlock Cluster API object's <.metadata.name>-<.spec.components..name>, same name is used for Deployment or StatefulSet workload name, and Service object name
 
-## AppVersion (for providers)
+## ClusterVersion (for providers)
 
-`AppVersion` enables providers to describe the image versions and condition variables of the corresponding database versions.
+`ClusterVersion` enables providers to describe the image versions and condition variables of the corresponding database versions.
 
-### AppVersion `spec`
+### ClusterVersion `spec`
 
 #### spec.clusterDefinitionRef
 
@@ -204,7 +204,7 @@ Note:
 
 `type` should be the same component name as `ClusterDefinition`.
 
-### AppVersion `status`
+### ClusterVersion `status`
 
 You can check `phase` and `message` to view the executing status and result.
 
@@ -212,9 +212,9 @@ You can check `phase` and `message` to view the executing status and result.
 
 ```
 apiVersion: dbaas.kubeblocks.io/v1alpha1
-kind:       AppVersion
+kind:       ClusterVersion
 metadata:
-  name:     wesql-8.0.30
+  name:     ac-mysql-8.0.30
 spec:
   clusterDefinitionRef: apecloud-mysql
   components:
@@ -236,9 +236,9 @@ spec:
 
 `spec.clusterDefinitionRef` refers to `ClusterDefiniton` and its value should be the same as `ClusterDefinition`.
 
-#### spec.appVersionRef
+#### spec.clusterVersionRef
 
-It refers to AppVersion and its value should be the same as `AppVersion`.
+It refers to ClusterVersion and its value should be the same as `ClusterVersion`.
 
 #### spec.components
 
@@ -274,7 +274,7 @@ The following are examples of ApeCloud MySQL three-node clusters.
     name: mysql-a-series-standard
   spec:
       clusterDefinitionRef: wesql
-      appVersionRef: wesql-8.0.30
+      clusterVersionRef: ac-mysql-8.0.30
       components:
         - name: "mysql-a-1"
           type: mysql-a
@@ -290,7 +290,7 @@ The following are examples of ApeCloud MySQL three-node clusters.
       name: mysql-a-series-enterprise
   spec:
       clusterDefinitionRef: wesql
-      appVersionRef: wesql-8.0.30
+      clusterVersionRef: ac-mysql-8.0.30
       components:
         - name: "mysql-a-2"
           type: mysql-a

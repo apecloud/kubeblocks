@@ -98,7 +98,7 @@ downloadDockerImage() {
 
 installFile() {
   local tmp_root_kbcli="$CLI_TMP_ROOT/$CLI_FILENAME"
-  
+
   if [ ! -f "$tmp_root_kbcli" ]; then
       echo "Failed to pull kbcli."
       exit 1
@@ -135,7 +135,7 @@ cleanup() {
 }
 
 installCompleted() {
-    echo -e "\nFor more information on how to started, please visit:"
+    echo -e "\nFor more information on how to get started, please visit:"
     echo "  https://kubeblocks.io"
 }
 
@@ -143,6 +143,8 @@ installCompleted() {
 # main
 # -----------------------------------------------------------------------------
 trap "fail_trap" EXIT
+
+set -e
 
 getSystemInfo
 verifySupported

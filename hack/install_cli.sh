@@ -83,7 +83,6 @@ checkHttpRequestCLI() {
 }
 
 checkExistingCli() {
-
     if [ -f "$CLI_FILE" ]; then
         echo -e "\nkbcli is detected: $CLI_FILE"
         echo -e "\nPlease uninstall first"
@@ -118,10 +117,10 @@ downloadFile() {
 
     echo "Downloading ..."
     DOWNLOAD_ASSET_URL="https://$TOKEN:@api.github.com/repos/$REPO/releases/assets/$asset_id"
-    curl -SL -q --header 'Accept:application/octet-stream' "$DOWNLOAD_ASSET_URL" -o "$ARTIFACT_TMP_FILE"
+    httpstatus=$(curl -SL -q -w "%{http_code}" --header 'Accept:application/octet-stream' "$DOWNLOAD_ASSET_URL" -o "$ARTIFACT_TMP_FILE")
 
-    if [ ! -f "$ARTIFACT_TMP_FILE" ]; then
-        echo "failed to download $CLI_ARTIFACT ..."
+    if [[ "$httpstatus" != "200"  || ! -f "$ARTIFACT_TMP_FILE" ]]; then
+        echo "Failed to download $CLI_ARTIFACT"
         exit 1
     fi
 }
@@ -129,7 +128,7 @@ downloadFile() {
 installFile() {
     tar xf "$ARTIFACT_TMP_FILE" -C "$CLI_TMP_ROOT"
     local tmp_root_kbcli="$CLI_TMP_ROOT/${OS}-${ARCH}/$CLI_FILENAME"
-    
+
     if [ ! -f "$tmp_root_kbcli" ]; then
         echo "Failed to unpack kbcli executable."
         exit 1
@@ -166,7 +165,7 @@ cleanup() {
 }
 
 installCompleted() {
-    echo -e "\nFor more information on how to started, please visit:"
+    echo -e "\nFor more information on how to get started, please visit:"
     echo "  https://kubeblocks.io"
 }
 
@@ -180,9 +179,8 @@ verifySupported
 checkExistingCli
 checkHttpRequestCLI
 
-
 if [ -z "$1" ]; then
-    echo "Getting the latest kbcli..."
+    echo "Getting the latest kbcli ..."
     ret_val="latest"
 elif [[ $1 == v* ]]; then
     ret_val=$1

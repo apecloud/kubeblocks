@@ -54,7 +54,7 @@ var (
 	//  |     |            | TOTAL     |  10000 |                             |
 	//  +-----+------------+-----------+--------+-----------------------------+
 	TerminalStyle = table.Style{
-		Name:    "StyleDefault",
+		Name:    "TerminalStyle",
 		Box:     table.StyleBoxDefault,
 		Color:   table.ColorOptionsDefault,
 		Format:  table.FormatOptionsDefault,

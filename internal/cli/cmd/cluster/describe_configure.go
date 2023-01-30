@@ -291,10 +291,6 @@ func (r *reconfigureOptions) printConfigureHistory(configs map[dbaasv1alpha1.Con
 	// kubernetes not support fieldSelector with CRD: https://github.com/kubernetes/kubernetes/issues/51046
 	listOptions := metav1.ListOptions{
 		LabelSelector: strings.Join([]string{types.InstanceLabelKey, r.clusterName}, "="),
-		// FieldSelector: strings.Join([]string{
-		//	strings.Join([]string{"spec.type", string(dbaasv1alpha1.ReconfiguringType)}, "="),
-		//	strings.Join([]string{"spec.reconfigure.componentName", r.componentName}, "="),
-		// }, ","),
 	}
 
 	opsList, err := r.dynamic.Resource(types.OpsGVR()).Namespace(r.namespace).List(context.TODO(), listOptions)

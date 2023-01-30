@@ -404,8 +404,5 @@ func NewReconfigureCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *
 		cmd.Flags().StringVar(&o.CfgTemplateName, "template-name", "", "Specifies the name of the configuration template to be updated")
 		cmd.Flags().StringVar(&o.CfgFile, "config-file", "", "Specifies the name of the configuration file to be updated")
 	}
-	// inputs.Complete = func() error {
-	//	return delete.Confirm([]string{o.Name}, o.In)
-	// }
 	return create.BuildCommand(inputs)
 }

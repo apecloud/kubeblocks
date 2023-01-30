@@ -2,10 +2,13 @@
 name: Feature request
 about: Suggest an user related feature for this project
 title: "[Features]"
-labels: kind/feature
+labels: area/user-interaction, documentation, kind/feature
 assignees: nayutah
 
 ---
+
+**what is the user interaction of your feature**
+A link of user document, which should be communicated and reviewed by PD
 
 **Is your feature request related to a problem? Please describe.**
 A clear and concise description of what the problem is. Ex. I'm always frustrated when [...]

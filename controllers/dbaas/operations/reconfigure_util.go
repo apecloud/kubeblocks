@@ -172,32 +172,32 @@ func fromKeyValuePair(parameters []dbaasv1alpha1.ParameterPair) map[string]inter
 	return m
 }
 
-// MergeConfigTemplates merge AppVersion.Components[*].ConfigTemplateRefs and ClusterDefinition.Components[*].ConfigTemplateRefs
-func MergeConfigTemplates(appVersionTpl []dbaasv1alpha1.ConfigTemplate,
+// MergeConfigTemplates merge ClusterVersion.Components[*].ConfigTemplateRefs and ClusterDefinition.Components[*].ConfigTemplateRefs
+func MergeConfigTemplates(clusterVersionTpl []dbaasv1alpha1.ConfigTemplate,
 	cdTpl []dbaasv1alpha1.ConfigTemplate) []dbaasv1alpha1.ConfigTemplate {
-	if len(appVersionTpl) == 0 {
+	if len(clusterVersionTpl) == 0 {
 		return cdTpl
 	}
 
 	if len(cdTpl) == 0 {
-		return appVersionTpl
+		return clusterVersionTpl
 	}
 
-	mergedCfgTpl := make([]dbaasv1alpha1.ConfigTemplate, 0, len(appVersionTpl)+len(cdTpl))
+	mergedCfgTpl := make([]dbaasv1alpha1.ConfigTemplate, 0, len(clusterVersionTpl)+len(cdTpl))
 	mergedTplMap := make(map[string]struct{}, cap(mergedCfgTpl))
 
-	for i := range appVersionTpl {
-		volumeName := appVersionTpl[i].VolumeName
+	for i := range clusterVersionTpl {
+		volumeName := clusterVersionTpl[i].VolumeName
 		if _, ok := (mergedTplMap)[volumeName]; ok {
 			// It's been checked in validation webhook
 			continue
 		}
-		mergedCfgTpl = append(mergedCfgTpl, appVersionTpl[i])
+		mergedCfgTpl = append(mergedCfgTpl, clusterVersionTpl[i])
 		mergedTplMap[volumeName] = struct{}{}
 	}
 
 	for i := range cdTpl {
-		// AppVersion replace clusterDefinition
+		// ClusterVersion replace clusterDefinition
 		volumeName := cdTpl[i].VolumeName
 		if _, ok := (mergedTplMap)[volumeName]; ok {
 			continue

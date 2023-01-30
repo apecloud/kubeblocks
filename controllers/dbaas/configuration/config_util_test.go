@@ -69,7 +69,7 @@ var _ = Describe("ConfigWrapper util test", func() {
 					// for crd yaml file
 					CfgTemplateYaml: "mysql_config_template.yaml",
 					CDYaml:          "mysql_cd.yaml",
-					CVYaml:          "mysql_av.yaml",
+					CVYaml:          "mysql_cv.yaml",
 					CfgCMYaml:       "mysql_config_cm.yaml",
 					StsYaml:         "mysql_sts.yaml",
 				}, true)
@@ -172,7 +172,7 @@ var _ = Describe("ConfigWrapper util test", func() {
 					// for crd yaml file
 					CfgTemplateYaml: "mysql_config_template.yaml",
 					CDYaml:          "mysql_cd.yaml",
-					CVYaml:          "mysql_av.yaml",
+					CVYaml:          "mysql_cv.yaml",
 					CfgCMYaml:       "mysql_config_cm.yaml",
 					StsYaml:         "mysql_sts.yaml",
 				}, true)
@@ -253,7 +253,7 @@ var _ = Describe("ConfigWrapper util test", func() {
 					// for crd yaml file
 					CfgTemplateYaml: "mysql_config_template.yaml",
 					CDYaml:          "mysql_cd.yaml",
-					CVYaml:          "mysql_av.yaml",
+					CVYaml:          "mysql_cv.yaml",
 					CfgCMYaml:       "mysql_config_cm.yaml",
 					StsYaml:         "mysql_sts.yaml",
 				}, true)

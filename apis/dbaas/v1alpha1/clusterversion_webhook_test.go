@@ -72,9 +72,9 @@ var _ = Describe("clusterVersion webhook", func() {
 				return err == nil
 			}, timeout, interval).Should(BeTrue())
 
-			By("By testing create a new appVersion with invalid config template")
-			appVersionDup := createTestClusterVersionObj(clusterDefinitionName, clusterVersionName+"-for-config")
-			appVersionDup.Spec.Components[0].ConfigTemplateRefs = []ConfigTemplate{
+			By("By testing create a new clusterVersion with invalid config template")
+			clusterVersionDup := createTestClusterVersionObj(clusterDefinitionName, clusterVersionName+"-for-config")
+			clusterVersionDup.Spec.Components[0].ConfigTemplateRefs = []ConfigTemplate{
 				{
 					Name:                "tpl1",
 					ConfigTplRef:        "cm1",
@@ -88,7 +88,7 @@ var _ = Describe("clusterVersion webhook", func() {
 					ConfigConstraintRef: "constraint2",
 				},
 			}
-			err := testCtx.CreateObj(ctx, appVersionDup)
+			err := testCtx.CreateObj(ctx, clusterVersionDup)
 			Expect(err).ShouldNot(Succeed())
 			Expect(err.Error()).Should(ContainSubstring("volume[volume1] already existed."))
 

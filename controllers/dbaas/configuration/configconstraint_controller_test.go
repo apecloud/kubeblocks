@@ -57,7 +57,7 @@ var _ = Describe("ConfigConstraint Controller", func() {
 					// for crd yaml file
 					CfgTemplateYaml: "mysql_config_template.yaml",
 					CDYaml:          "mysql_cd.yaml",
-					CVYaml:          "mysql_av.yaml",
+					CVYaml:          "mysql_cv.yaml",
 					CfgCMYaml:       "mysql_config_cm.yaml",
 				}, true)
 			Expect(testWrapper.HasError()).Should(Succeed())
@@ -84,8 +84,7 @@ var _ = Describe("ConfigConstraint Controller", func() {
 				return err
 			}, time.Second*10, time.Second*1).Should(Succeed())
 
-			By("By delete clusterdefinition and appversion")
-			// step3: delete clusterdefinition and appversion
+			By("By delete referencing clusterdefinition and clusterversion")
 			Expect(testWrapper.DeleteCV()).Should(Succeed())
 			Expect(testWrapper.DeleteCD()).Should(Succeed())
 
@@ -109,7 +108,7 @@ var _ = Describe("ConfigConstraint Controller", func() {
 					// for crd yaml file
 					CfgTemplateYaml: "mysql_config_tpl_not_validate.yaml",
 					CDYaml:          "mysql_cd.yaml",
-					CVYaml:          "mysql_av.yaml",
+					CVYaml:          "mysql_cv.yaml",
 					CfgCMYaml:       "mysql_config_cm.yaml",
 				}, true)
 			Expect(testWrapper.HasError()).Should(Succeed())

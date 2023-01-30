@@ -394,7 +394,7 @@ spec:
 apiVersion: dbaas.kubeblocks.io/v1alpha1
 kind:       ClusterVersion
 metadata:
-  name:     app-version
+  name:     cluster-version
 spec:
   clusterDefinitionRef: cluster-definition
   components:

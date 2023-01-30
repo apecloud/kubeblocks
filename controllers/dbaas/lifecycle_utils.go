@@ -21,6 +21,7 @@ import (
 	"embed"
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"sort"
 	"strconv"
 	"strings"
@@ -900,6 +901,7 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 				*stsObj.Spec.Replicas,
 				*stsProto.Spec.Replicas)
 		}
+		stsObjCopy := stsObj.DeepCopy()
 		// keep the original template annotations.
 		// if annotations exist and are replaced, the statefulSet will be updated.
 		stsProto.Spec.Template.Annotations = mergeAnnotations(stsObj.Spec.Template.Annotations,
@@ -910,6 +912,11 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 		if err := cli.Update(ctx, stsObj); err != nil {
 			return false, err
 		}
+		if !reflect.DeepEqual(&stsObjCopy.Spec, &stsObj.Spec) {
+			// sync component phase
+			syncComponentPhaseWhenSpecUpdating(cluster, componentName)
+		}
+
 		// check all pvc bound, requeue if not all ready
 		shouldRequeue, err = checkAllPVCBoundIfNeeded()
 		if err != nil {
@@ -983,11 +990,17 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 		if err := cli.Get(ctx, key, deployObj); err != nil {
 			return err
 		}
+		deployObjCopy := deployObj.DeepCopy()
 		deployProto.Spec.Template.Annotations = mergeAnnotations(deployObj.Spec.Template.Annotations,
 			deployProto.Spec.Template.Annotations)
 		deployObj.Spec = deployProto.Spec
 		if err := cli.Update(ctx, deployObj); err != nil {
 			return err
+		}
+		if !reflect.DeepEqual(&deployObjCopy.Spec, &deployObj.Spec) {
+			// sync component phase
+			componentName := deployObj.Labels[intctrlutil.AppComponentLabelKey]
+			syncComponentPhaseWhenSpecUpdating(cluster, componentName)
 		}
 		return nil
 	}

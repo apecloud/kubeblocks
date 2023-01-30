@@ -73,6 +73,10 @@ const (
 	// so if the error lasts more than 5s, the cluster will enter the ConditionsError phase
 	// and prompt the user to repair manually according to the message.
 	ClusterControllerErrorDuration = 5 * time.Second
+
+	// ControllerErrorRequeueTime the requeue time to reconcile the error event of the cluster controller
+	// which need to respond to user repair events timely.
+	ControllerErrorRequeueTime = 5 * time.Second
 )
 
 // updateClusterConditions updates cluster.status condition and records event.
@@ -83,12 +87,12 @@ func (conMgr clusterConditionManager) updateStatusConditions(condition metav1.Co
 	if err := conMgr.Client.Status().Patch(conMgr.ctx, conMgr.cluster, patch); err != nil {
 		return err
 	}
-	eventType := corev1.EventTypeWarning
-	if condition.Status == metav1.ConditionTrue {
-		eventType = corev1.EventTypeNormal
-	}
-	conMgr.Recorder.Event(conMgr.cluster, eventType, condition.Reason, condition.Message)
 	if changed {
+		eventType := corev1.EventTypeWarning
+		if condition.Status == metav1.ConditionTrue {
+			eventType = corev1.EventTypeNormal
+		}
+		conMgr.Recorder.Event(conMgr.cluster, eventType, condition.Reason, condition.Message)
 		// if cluster status changed, do it
 		return opsutil.MarkRunningOpsRequestAnnotation(conMgr.ctx, conMgr.Client, conMgr.cluster)
 	}
@@ -109,7 +113,8 @@ func (conMgr clusterConditionManager) handleConditionForClusterPhase(condition m
 	if time.Now().Before(oldCondition.LastTransitionTime.Add(ClusterControllerErrorDuration)) {
 		return false
 	}
-	if !util.IsFailedOrAbnormal(conMgr.cluster.Status.Phase) {
+	if !util.IsFailedOrAbnormal(conMgr.cluster.Status.Phase) &&
+		conMgr.cluster.Status.Phase != dbaasv1alpha1.ConditionsErrorPhase {
 		// the condition has occurred for more than 30 seconds and cluster status is not Failed/Abnormal, do it
 		conMgr.cluster.Status.Phase = dbaasv1alpha1.ConditionsErrorPhase
 		return true

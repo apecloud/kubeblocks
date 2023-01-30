@@ -78,8 +78,3 @@ func CovertToStatefulSet(obj client.Object) *appsv1.StatefulSet {
 	}
 	return nil
 }
-
-// StatefulSetSpecIsUpdated checks if the statefulSet spec has updated.
-func StatefulSetSpecIsUpdated(sts *appsv1.StatefulSet) bool {
-	return sts.Generation != sts.Status.ObservedGeneration
-}

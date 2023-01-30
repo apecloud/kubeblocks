@@ -301,7 +301,7 @@ spec:
                       - Failed
                       - Abnormal
                       - Creating
-                      - Updating
+                      - SpecUpdating
                       - Deleting
                       - Deleted
                       - VolumeExpanding

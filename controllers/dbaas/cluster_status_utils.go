@@ -427,3 +427,26 @@ func updateComponentStatusPhase(cli client.Client,
 	cluster.Status.Components[componentName] = c
 	return cli.Status().Patch(ctx, cluster, patch)
 }
+
+// syncComponentPhaseWhenSpecUpdating when workload of the component changed
+// and component phase is not the phase of operations, sync component phase to 'SpecUpdating'.
+func syncComponentPhaseWhenSpecUpdating(cluster *dbaasv1alpha1.Cluster,
+	componentName string) {
+	if len(componentName) == 0 {
+		return
+	}
+	if cluster.Status.Components == nil {
+		cluster.Status.Components = map[string]dbaasv1alpha1.ClusterStatusComponent{
+			componentName: {
+				Phase: dbaasv1alpha1.SpecUpdatingPhase,
+			},
+		}
+		return
+	}
+	statusComponent := cluster.Status.Components[componentName]
+	// if component phase is not the phase of operations, sync component phase to 'SpecUpdating'
+	if util.IsCompleted(statusComponent.Phase) {
+		statusComponent.Phase = dbaasv1alpha1.SpecUpdatingPhase
+		cluster.Status.Components[componentName] = statusComponent
+	}
+}

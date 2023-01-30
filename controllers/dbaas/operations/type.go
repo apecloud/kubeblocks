@@ -46,6 +46,9 @@ type OpsHandler interface {
 	// compared current configuration with the last configuration.
 	// we only changed the component status of cluster.status to the ToClusterPhase
 	// of OpsBehaviour, which component name is in the returned componentName map.
+	// Note: if the operation will not modify the Spec struct of the component workload,
+	// GetRealAffectedComponentMap function should return nil unless phase management of cluster and components
+	// is implemented at ReconcileAction function.
 	GetRealAffectedComponentMap(opsRequest *dbaasv1alpha1.OpsRequest) realAffectedComponentMap
 }
 

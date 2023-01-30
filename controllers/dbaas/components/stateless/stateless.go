@@ -147,8 +147,3 @@ func DeploymentIsReady(deploy *appsv1.Deployment) bool {
 func HasProgressDeadline(d *appsv1.Deployment) bool {
 	return d.Spec.ProgressDeadlineSeconds != nil && *d.Spec.ProgressDeadlineSeconds != math.MaxInt32
 }
-
-// DeploymentSpecIsUpdated checks if the deployment spec has updated.
-func DeploymentSpecIsUpdated(deploy *appsv1.Deployment) bool {
-	return deploy.Generation != deploy.Status.ObservedGeneration
-}

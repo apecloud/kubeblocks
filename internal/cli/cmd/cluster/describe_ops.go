@@ -64,7 +64,7 @@ type describeOpsOptions struct {
 
 type opsObject interface {
 	dbaasv1alpha1.VerticalScaling | dbaasv1alpha1.HorizontalScaling |
-	dbaasv1alpha1.OpsRequestVolumeClaimTemplate | dbaasv1alpha1.VolumeExpansion
+		dbaasv1alpha1.OpsRequestVolumeClaimTemplate | dbaasv1alpha1.VolumeExpansion
 }
 
 func newDescribeOpsOptions(f cmdutil.Factory, streams genericclioptions.IOStreams) *describeOpsOptions {

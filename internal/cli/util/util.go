@@ -494,7 +494,7 @@ func GetConfigTemplateList(clusterName string, namespace string, cli dynamic.Int
 	return cfgcore.GetConfigTemplatesFromComponent(clusterObj.Spec.Components, clusterDefObj.Spec.Components, clusterVersionObj.Spec.Components, componentName)
 }
 
-// GetResourceObjectFromGVR query the resource object using GVR
+// GetResourceObjectFromGVR query the resource object using GVR.
 func GetResourceObjectFromGVR(gvr schema.GroupVersionResource, key client.ObjectKey, client dynamic.Interface, k8sObj interface{}) error {
 	unstructuredObj, err := client.
 		Resource(gvr).
@@ -504,4 +504,18 @@ func GetResourceObjectFromGVR(gvr schema.GroupVersionResource, key client.Object
 		return cfgcore.WrapError(err, "failed to get resource[%v]", key)
 	}
 	return apiruntime.DefaultUnstructuredConverter.FromUnstructured(unstructuredObj.Object, k8sObj)
+}
+
+// GetComponentsFromClusterCR returns name of component.
+func GetComponentsFromClusterCR(key client.ObjectKey, client dynamic.Interface) ([]string, error) {
+	clusterObj := dbaasv1alpha1.Cluster{}
+	if err := GetResourceObjectFromGVR(types.ClusterGVR(), key, client, &clusterObj); err != nil {
+		return nil, err
+	}
+
+	componentNames := make([]string, len(clusterObj.Spec.Components))
+	for i, component := range clusterObj.Spec.Components {
+		componentNames[i] = component.Name
+	}
+	return componentNames, nil
 }

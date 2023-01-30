@@ -195,19 +195,17 @@ func (r *reconfigureOptions) syncClusterComponent() error {
 		return nil
 	}
 
-	clusterObj := dbaasv1alpha1.Cluster{}
-	if err := util.GetResourceObjectFromGVR(types.ClusterGVR(), client.ObjectKey{
+	componentNames, err := util.GetComponentsFromClusterCR(client.ObjectKey{
 		Namespace: r.namespace,
 		Name:      r.clusterName,
-	}, r.dynamic, &clusterObj); err != nil {
+	}, r.dynamic)
+	if err != nil {
 		return err
 	}
-
-	if len(clusterObj.Spec.Components) != 1 {
+	if len(componentNames) != 1 {
 		return cfgcore.MakeError("when multi component exist, must specify which component to use.")
 	}
-
-	r.componentName = clusterObj.Spec.Components[0].Name
+	r.componentName = componentNames[0]
 	return nil
 }
 

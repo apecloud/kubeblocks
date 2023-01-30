@@ -296,6 +296,25 @@ func (o *OperationsOptions) Validate() error {
 	return nil
 }
 
+func (o *OperationsOptions) fillComponentNameForReconfiguring() error {
+	if len(o.ComponentNames) != 0 {
+		return nil
+	}
+
+	componentNames, err := util.GetComponentsFromClusterCR(client.ObjectKey{
+		Namespace: o.Namespace,
+		Name:      o.Name,
+	}, o.Client)
+	if err != nil {
+		return err
+	}
+	if len(componentNames) != 1 {
+		return cfgcore.MakeError("when multi component exist, must specify which component to use.")
+	}
+	o.ComponentNames = componentNames
+	return nil
+}
+
 // buildOperationsInputs build operations inputs
 func buildOperationsInputs(f cmdutil.Factory, o *OperationsOptions) create.Inputs {
 	o.OpsTypeLower = strings.ToLower(string(o.OpsType))
@@ -404,5 +423,6 @@ func NewReconfigureCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *
 		cmd.Flags().StringVar(&o.CfgTemplateName, "template-name", "", "Specifies the name of the configuration template to be updated")
 		cmd.Flags().StringVar(&o.CfgFile, "config-file", "", "Specifies the name of the configuration file to be updated")
 	}
+	inputs.Complete = o.fillComponentNameForReconfiguring
 	return create.BuildCommand(inputs)
 }

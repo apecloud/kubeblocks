@@ -10,7 +10,7 @@ kbcli kubeblocks upgrade [flags]
 
 ```
   # Upgrade KubeBlocks to specified version
-  kbcli kubeblocks upgrade --version=0.3.0
+  kbcli kubeblocks upgrade --version=0.4.0
   
   # Upgrade KubeBlocks other settings, for example, set replicaCount to 3
   kbcli kubeblocks upgrade --set replicaCount=3

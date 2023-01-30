@@ -20,7 +20,7 @@ This section shows you how to use KubeBlocks to scale up a cluster.
     ```
     $ kubectl get cd 
       NAME             PHASE       AGE
-      apecloud-wesql   Available   7m13s
+      apecloud-mysql   Available   7m13s
     $ kubectl get appversion
       NAME           PHASE       AGE
       wesql-8.0.30   Available   7m23s
@@ -46,7 +46,7 @@ _Steps_:
     name: wesql
   spec:
     appVersionRef: wesql-8.0.30
-    clusterDefinitionRef: apecloud-wesql
+    clusterDefinitionRef: apecloud-mysql
     terminationPolicy: WipeOut
     components:
       - name: wesql-demo

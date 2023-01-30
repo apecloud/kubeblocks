@@ -53,7 +53,7 @@ var _ = Describe("helper", func() {
 			return pod
 		}
 
-		pod := mockPod("state.mysql-apecloud-wesql")
+		pod := mockPod("state.mysql-apecloud-mysql")
 		typeName, err := GetClusterTypeByPod(pod)
 		Expect(err).ShouldNot(HaveOccurred())
 		Expect(typeName).Should(Equal("state.mysql"))

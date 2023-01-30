@@ -67,6 +67,12 @@ const (
 	ReasonComponentsNotReady = "ComponentsNotReady"
 	// ReasonClusterReady the components of cluster are ready, the component phase are running
 	ReasonClusterReady = "ClusterReady"
+
+	// ClusterControllerErrorDuration if there is an error in the cluster controller,
+	// it will not be automatically repaired unless there is network jitter.
+	// so if the error lasts more than 5s, the cluster will enter the ConditionsError phase
+	// and prompt the user to repair manually according to the message.
+	ClusterControllerErrorDuration = 5 * time.Second
 )
 
 // updateClusterConditions updates cluster.status condition and records event.
@@ -100,7 +106,7 @@ func (conMgr clusterConditionManager) handleConditionForClusterPhase(condition m
 		return false
 	}
 
-	if time.Now().Before(oldCondition.LastTransitionTime.Add(30 * time.Second)) {
+	if time.Now().Before(oldCondition.LastTransitionTime.Add(ClusterControllerErrorDuration)) {
 		return false
 	}
 	if !util.IsFailedOrAbnormal(conMgr.cluster.Status.Phase) {

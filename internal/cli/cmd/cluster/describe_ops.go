@@ -64,7 +64,7 @@ type describeOpsOptions struct {
 
 type opsObject interface {
 	dbaasv1alpha1.VerticalScaling | dbaasv1alpha1.HorizontalScaling |
-		dbaasv1alpha1.OpsRequestVolumeClaimTemplate | dbaasv1alpha1.VolumeExpansion
+	dbaasv1alpha1.OpsRequestVolumeClaimTemplate | dbaasv1alpha1.VolumeExpansion
 }
 
 func newDescribeOpsOptions(f cmdutil.Factory, streams genericclioptions.IOStreams) *describeOpsOptions {
@@ -329,23 +329,37 @@ func (o *describeOpsOptions) getVolumeExpansionCommand(spec dbaasv1alpha1.OpsReq
 
 // getReconfiguringCommand gets the command of the VolumeExpansion command.
 func (o *describeOpsOptions) getReconfiguringCommand(spec dbaasv1alpha1.OpsRequestSpec) []string {
-	// covertObject := func(v dbaasv1alpha1.OpsRequestVolumeClaimTemplate) any {
-	//	return v.Storage
-	// }
-	// getVCTName := func(v dbaasv1alpha1.OpsRequestVolumeClaimTemplate) string {
-	//	return v.Name
-	// }
-	commands := make([]string, 0)
-	// for _, v := range spec.VolumeExpansionList {
-	//	vctNameSlice, storageSlice := getCommandFlagsSlice[dbaasv1alpha1.OpsRequestVolumeClaimTemplate](
-	//		v.VolumeClaimTemplates, covertObject, getVCTName)
-	//	for i := range vctNameSlice {
-	//		storage := storageSlice[i].(resource.Quantity)
-	//		commands = append(commands, fmt.Sprintf("kbcli cluster volume-expand %s --component-names=%s --volume-claim-template-names=%s --storage=%s",
-	//			spec.ClusterRef, v.ComponentName, strings.Join(vctNameSlice[i], ","), storage.String()))
-	//	}
-	// }
-	return commands
+	var (
+		updatedParams = spec.Reconfigure
+		componentName = updatedParams.ComponentName
+	)
+
+	if len(updatedParams.Configurations) == 0 {
+		return nil
+	}
+
+	configuration := updatedParams.Configurations[0]
+	if len(configuration.Keys) == 0 {
+		return nil
+	}
+
+	commandArgs := make([]string, 0)
+	commandArgs = append(commandArgs, "kbcli")
+	commandArgs = append(commandArgs, "cluster")
+	commandArgs = append(commandArgs, "configure")
+	commandArgs = append(commandArgs, spec.ClusterRef)
+	commandArgs = append(commandArgs, fmt.Sprintf("--component-names=%s", componentName))
+	commandArgs = append(commandArgs, fmt.Sprintf("--template-name=%s", configuration.Name))
+
+	config := configuration.Keys[0]
+	commandArgs = append(commandArgs, fmt.Sprintf("--config-file=%s", config.Key))
+	for _, p := range config.Parameters {
+		if p.Value == nil {
+			continue
+		}
+		commandArgs = append(commandArgs, fmt.Sprintf("--set %s=%s", p.Key, *p.Value))
+	}
+	return []string{strings.Join(commandArgs, " ")}
 }
 
 // printOpsRequestStatus prints the OpsRequest status infos.

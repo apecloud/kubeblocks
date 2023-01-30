@@ -1369,7 +1369,7 @@ func injectReplicationSetPodEnvAndLabel(params createParams, sts *appsv1.Statefu
 			c := &sts.Spec.Template.Spec.Containers[i]
 			c.Env = append(c.Env, corev1.EnvVar{
 				Name:      dbaasPrefix + "_PRIMARY_POD_NAME",
-				Value:     fmt.Sprintf("%s-%d-%d.%s", sts.Name, comp.PrimaryIndex, 0, svcName),
+				Value:     fmt.Sprintf("%s-%d-%d.%s", sts.Name, *comp.PrimaryIndex, 0, svcName),
 				ValueFrom: nil,
 			})
 		}

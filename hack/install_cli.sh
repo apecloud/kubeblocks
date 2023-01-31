@@ -19,13 +19,12 @@ TOKEN="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"
 REPO="apecloud/kubeblocks"
 GITHUB="https://api.github.com"
 DOWNLOAD_BASE="https://github.com/${REPO}/releases/download"
-FILE="kbcli-darwin-arm64-v0.3.0.tar.gz"      # the name of your release asset file, e.g. build.tar.gz
-
+FILE="kbcli-darwin-arm64-v0.3.0.tar.gz" # the name of your release asset file, e.g. build.tar.gz
 
 gh_curl() {
-  curl -H "Authorization: token $TOKEN" \
-       -H "Accept: application/vnd.github.v3.raw" \
-       $@
+    curl -H "Authorization: token $TOKEN" \
+         -H "Accept: application/vnd.github.v3.raw" \
+         $@
 }
 
 getSystemInfo() {
@@ -36,7 +35,7 @@ getSystemInfo() {
         x86_64) ARCH="amd64";;
     esac
 
-    OS=$(echo `uname`|tr '[:upper:]' '[:lower:]')
+    OS=$(echo $(uname) | tr '[:upper:]' '[:lower:]')
 
     # Most linux distro needs root permission to copy the file to /usr/local/bin
     if [ "$OS" == "linux" ] || [ "$OS" == "darwin" ]; then
@@ -72,9 +71,9 @@ runAsRoot() {
 }
 
 checkHttpRequestCLI() {
-    if type "curl" > /dev/null; then
+    if type "curl" >/dev/null; then
         HTTP_REQUEST_CLI=curl
-    elif type "wget" > /dev/null; then
+    elif type "wget" >/dev/null; then
         HTTP_REQUEST_CLI=wget
     else
         echo "Either curl or wget is required"
@@ -99,17 +98,17 @@ checkExistingCli() {
 downloadFile() {
     LATEST_RELEASE_TAG=$1
 
-    if [ "$LATEST_RELEASE_TAG" = "latest" ] ; then
-      LATEST_RELEASE_TAG=`gh_curl -s $GITHUB/repos/$REPO/releases/latest | grep '.tag_name'| awk -F: '{print $2}'| sed 's/,//g;s/\"//g;s/ //g'`
-    fi;
+    if [ "$LATEST_RELEASE_TAG" = "latest" ]; then
+        LATEST_RELEASE_TAG=$(gh_curl -s $GITHUB/repos/$REPO/releases/latest | grep '.tag_name' | awk -F: '{print $2}' | sed 's/,//g;s/\"//g;s/ //g')
+    fi
 
     CLI_ARTIFACT="${CLI_FILENAME}-${OS}-${ARCH}-${LATEST_RELEASE_TAG}.tar.gz"
-    asset_id=`gh_curl -s $GITHUB/repos/$REPO/releases/tags/$LATEST_RELEASE_TAG | grep -B 2 "\"name\": \"$CLI_ARTIFACT\"" | grep -w id | awk -F: '{print $2}'| sed 's/,//g;s/\"//g;s/ //g'`
+    asset_id=$(gh_curl -s $GITHUB/repos/$REPO/releases/tags/$LATEST_RELEASE_TAG | grep -B 2 "\"name\": \"$CLI_ARTIFACT\"" | grep -w id | awk -F: '{print $2}' | sed 's/,//g;s/\"//g;s/ //g')
 
     if [ "$asset_id" = "null" ] || [ -z "$asset_id" ]; then
         echo "ERROR: LATEST_RELEASE_TAG not found $LATEST_RELEASE_TAG"
         exit 1
-    fi;
+    fi
 
     # Create the temp directory
     CLI_TMP_ROOT=$(mktemp -dt kbcli-install-XXXXXX)
@@ -119,17 +118,17 @@ downloadFile() {
     DOWNLOAD_ASSET_URL="https://$TOKEN:@api.github.com/repos/$REPO/releases/assets/$asset_id"
     httpstatus=$(curl -SL -q -w "%{http_code}" --header 'Accept:application/octet-stream' "$DOWNLOAD_ASSET_URL" -o "$ARTIFACT_TMP_FILE")
 
-    if [[ "$httpstatus" != "200"  || ! -f "$ARTIFACT_TMP_FILE" ]]; then
+    if [[ "$httpstatus" != "200" || ! -f "$ARTIFACT_TMP_FILE" ]]; then
         echo "Failed to download $CLI_ARTIFACT"
         exit 1
     fi
 }
 
 installFile() {
-    tar xf "$ARTIFACT_TMP_FILE" -C "$CLI_TMP_ROOT"
     local tmp_root_kbcli="$CLI_TMP_ROOT/${OS}-${ARCH}/$CLI_FILENAME"
+    tar xf "$ARTIFACT_TMP_FILE" -C "$CLI_TMP_ROOT"
 
-    if [ ! -f "$tmp_root_kbcli" ]; then
+    if [[ $? -ne 0 || ! -f "$tmp_root_kbcli" ]]; then
         echo "Failed to unpack kbcli executable."
         exit 1
     fi
@@ -160,7 +159,7 @@ fail_trap() {
 
 cleanup() {
     if [[ -d "${CLI_TMP_ROOT:-}" ]]; then
-       rm -rf "$CLI_TMP_ROOT"
+        rm -rf "$CLI_TMP_ROOT"
     fi
 }
 

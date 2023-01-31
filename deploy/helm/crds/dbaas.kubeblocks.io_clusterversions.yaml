@@ -10,7 +10,7 @@ spec:
   group: dbaas.kubeblocks.io
   names:
     categories:
-    - dbaas
+    - kubeblocks
     kind: ClusterVersion
     listKind: ClusterVersionList
     plural: clusterversions

@@ -97,7 +97,7 @@ type BackupToolStatus struct {
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
-// +kubebuilder:resource:categories={dbaas},scope=Cluster
+// +kubebuilder:resource:categories={kubeblocks},scope=Cluster
 
 // BackupTool is the Schema for the backuptools API (defined by provider)
 type BackupTool struct {

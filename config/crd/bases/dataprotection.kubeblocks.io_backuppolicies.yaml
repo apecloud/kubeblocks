@@ -10,7 +10,7 @@ spec:
   group: dataprotection.kubeblocks.io
   names:
     categories:
-    - dbaas
+    - kubeblocks
     kind: BackupPolicy
     listKind: BackupPolicyList
     plural: backuppolicies

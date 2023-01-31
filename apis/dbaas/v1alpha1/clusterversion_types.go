@@ -85,7 +85,7 @@ type ClusterVersionComponent struct {
 
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
-//+kubebuilder:resource:categories={dbaas},scope=Cluster,shortName=cv
+//+kubebuilder:resource:categories={kubeblocks},scope=Cluster,shortName=cv
 //+kubebuilder:printcolumn:name="CLUSTER-DEFINITION",type="string",JSONPath=".spec.clusterDefinitionRef",description="ClusterDefinition referenced by cluster."
 //+kubebuilder:printcolumn:name="STATUS",type="string",JSONPath=".status.phase",description="status phase"
 //+kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"

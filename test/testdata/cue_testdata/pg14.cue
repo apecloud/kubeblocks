@@ -1,4 +1,4 @@
-{
+#PGParameter: {
 
   // Sets the application name to be reported in statistics and logs.
   application_name?: string
@@ -1104,3 +1104,5 @@
 
   ...
 }
+
+$_: #PGParameter

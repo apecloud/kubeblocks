@@ -195,7 +195,7 @@ primary:
     host     all             all             ::1/128                 md5
 
   cue: |-
-    {
+    #PGParameter: {
     
      // Sets the application name to be reported in statistics and logs.
      application_name?: string
@@ -1301,6 +1301,7 @@ primary:
     
      ...
     }
+    $_: #PGParameter
 
   staticParameters:
     - autovacuum_freeze_max_age

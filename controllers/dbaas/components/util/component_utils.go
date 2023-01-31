@@ -262,7 +262,7 @@ func GetComponentWorkloadMinReadySeconds(ctx context.Context,
 	}
 }
 
-// GetComponentDefaultReplicas get component default replicas.
+// GetComponentDefaultReplicas gets component default replicas.
 func GetComponentDefaultReplicas(ctx context.Context,
 	cli client.Client,
 	cluster *dbaasv1alpha1.Cluster,
@@ -273,4 +273,24 @@ func GetComponentDefaultReplicas(ctx context.Context,
 		return -1, err
 	}
 	return component.DefaultReplicas, nil
+}
+
+// GetComponentInfoByPod gets componentName and componentDefinition info by Pod.
+func GetComponentInfoByPod(ctx context.Context,
+	cli client.Client,
+	cluster *dbaasv1alpha1.Cluster,
+	pod *corev1.Pod) (componentName string, componentDef *dbaasv1alpha1.ClusterDefinitionComponent, err error) {
+	if pod == nil || pod.Labels == nil {
+		return "", nil, fmt.Errorf("pod %s or pod's label is nil", pod.Name)
+	}
+	componentName, ok := pod.Labels[intctrlutil.AppComponentLabelKey]
+	if !ok {
+		return "", nil, fmt.Errorf("pod %s component name label %s is nil", pod.Name, intctrlutil.AppComponentLabelKey)
+	}
+	typeName := GetComponentTypeName(*cluster, componentName)
+	componentDef, err = GetComponentDefByCluster(ctx, cli, cluster, typeName)
+	if err != nil {
+		return componentName, componentDef, err
+	}
+	return componentName, componentDef, nil
 }

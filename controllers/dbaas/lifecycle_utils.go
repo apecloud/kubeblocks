@@ -695,9 +695,9 @@ func prepareComponentObjs(reqCtx intctrlutil.RequestCtx, cli client.Client, obj 
 		if err := componentutil.GetObjectListByComponentName(reqCtx.Ctx, cli, params.cluster, existStsList, params.component.Name); err != nil {
 			return err
 		}
-		replicaNum := math.Max(float64(len(existStsList.Items)), float64(params.component.Replicas))
+		replicaCount := math.Max(float64(len(existStsList.Items)), float64(params.component.Replicas))
 
-		for index := int32(0); index < int32(replicaNum); index++ {
+		for index := int32(0); index < int32(replicaCount); index++ {
 			if err := workloadProcessor(
 				func(envConfig *corev1.ConfigMap) (client.Object, error) {
 					return buildReplicationSet(reqCtx, *params, envConfig.Name, index)
@@ -1217,6 +1217,7 @@ func buildSts(reqCtx intctrlutil.RequestCtx, params createParams, envConfigName 
 	return &sts, nil
 }
 
+// buildPersistentVolumeClaimLabels builds a pvc name label, and synchronize the label on the sts to the pvc label.
 func buildPersistentVolumeClaimLabels(sts *appsv1.StatefulSet, pvc *corev1.PersistentVolumeClaim) {
 	if pvc.Labels == nil {
 		pvc.Labels = make(map[string]string)
@@ -1302,7 +1303,7 @@ func injectEnvs(params createParams, envConfigName string, c *corev1.Container) 
 	})
 }
 
-// buildReplicationSet build on stateful set of replication.
+// buildReplicationSet builds a replication component on statefulSet.
 func buildReplicationSet(reqCtx intctrlutil.RequestCtx,
 	params createParams,
 	envConfigName string,
@@ -1329,18 +1330,18 @@ func buildReplicationSet(reqCtx intctrlutil.RequestCtx,
 	return sts, nil
 }
 
-// buildReplicationSetPVC build replicationSet persistentVolumeClaim manually,
-// ReplicationSet does not manage pvc through volumeClaimTemplate defined on statefulSet,
+// buildReplicationSetPVC builds replicationSet persistentVolumeClaim manually,
+// replicationSet does not manage pvc through volumeClaimTemplate defined on statefulSet,
 // the purpose is convenient to convert between componentTypes in the future (TODO).
 func buildReplicationSetPVC(params createParams, sts *appsv1.StatefulSet) error {
-	// Generate persistentVolumeClaim objects used by replicationSet's pod from component.VolumeClaimTemplates
+	// generate persistentVolumeClaim objects used by replicationSet's pod from component.VolumeClaimTemplates
 	pvcMap := replicationset.GeneratePVCFromVolumeClaimTemplates(sts, params.component.VolumeClaimTemplates)
 	for _, pvc := range pvcMap {
 		buildPersistentVolumeClaimLabels(sts, pvc)
 		*params.applyObjs = append(*params.applyObjs, pvc)
 	}
 
-	// Binding persistentVolumeClaim to podSpec.Volumes
+	// binding persistentVolumeClaim to podSpec.Volumes
 	podSpec := &sts.Spec.Template.Spec
 	if podSpec == nil {
 		return nil

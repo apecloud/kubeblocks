@@ -40,7 +40,7 @@ const (
 	Secondary ReplicationRole = "secondary"
 )
 
-// HandleReplicationSet Handles changes in the number of replication component replicas and synchronize cluster status.
+// HandleReplicationSet handles changes of replication component replicas and synchronizes cluster status.
 // TODO(xingran) if the probe event detects an abnormal replication relationship or unavailable, it needs to be repaired in another process.
 func HandleReplicationSet(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
@@ -74,7 +74,6 @@ func HandleReplicationSet(reqCtx intctrlutil.RequestCtx,
 	}
 
 	var podList []*corev1.Pod
-	var componentStsList = &appsv1.StatefulSetList{}
 	compOwnsStsMap := make(map[string]int32)
 	stsToDeleteMap := make(map[string]int32)
 	for _, stsObj := range stsList {
@@ -103,8 +102,9 @@ func HandleReplicationSet(reqCtx intctrlutil.RequestCtx,
 		}
 	}
 
-	for compKey, stsToDelNum := range stsToDeleteMap {
-		if stsToDelNum == 0 {
+	var componentStsList = &appsv1.StatefulSetList{}
+	for compKey, stsToDelCount := range stsToDeleteMap {
+		if stsToDelCount == 0 {
 			break
 		}
 		// list all statefulSets by cluster and componentKey label
@@ -116,7 +116,7 @@ func HandleReplicationSet(reqCtx intctrlutil.RequestCtx,
 			return fmt.Errorf("statefulset total number has changed")
 		}
 		dos := make([]*appsv1.StatefulSet, 0)
-		partition := int32(len(componentStsList.Items)) - stsToDelNum
+		partition := int32(len(componentStsList.Items)) - stsToDelCount
 		for _, sts := range componentStsList.Items {
 			// if current primary statefulSet ordinal is larger than target number replica, return err
 			if int32(util.GetOrdinalSts(&sts)) > partition && CheckStsIsPrimary(&sts) {
@@ -129,10 +129,10 @@ func HandleReplicationSet(reqCtx intctrlutil.RequestCtx,
 		sort.Sort(util.DescendingOrdinalSts(dos))
 
 		// remove cluster status and delete sts
-		if err := RemoveReplicationSetClusterStatus(cli, reqCtx.Ctx, dos[:stsToDelNum]); err != nil {
+		if err := RemoveReplicationSetClusterStatus(cli, reqCtx.Ctx, dos[:stsToDelCount]); err != nil {
 			return err
 		}
-		for i := int32(0); i < stsToDelNum; i++ {
+		for i := int32(0); i < stsToDelCount; i++ {
 			if err := cli.Delete(reqCtx.Ctx, dos[i]); err == nil || apierrors.IsNotFound(err) {
 				continue
 			} else {
@@ -151,7 +151,7 @@ func HandleReplicationSet(reqCtx intctrlutil.RequestCtx,
 	return nil
 }
 
-// SyncReplicationSetClusterStatus Sync replicationSet pod status to cluster.status.component[componentName].ReplicationStatus.
+// SyncReplicationSetClusterStatus syncs replicationSet pod status to cluster.status.component[componentName].ReplicationStatus.
 func SyncReplicationSetClusterStatus(cli client.Client,
 	ctx context.Context,
 	podList []*corev1.Pod) error {
@@ -168,10 +168,7 @@ func SyncReplicationSetClusterStatus(cli client.Client,
 	if err != nil {
 		return err
 	}
-
-	componentName := podList[0].Labels[intctrlutil.AppComponentLabelKey]
-	typeName := util.GetComponentTypeName(*cluster, componentName)
-	componentDef, err := util.GetComponentDefByCluster(ctx, cli, cluster, typeName)
+	componentName, componentDef, err := util.GetComponentInfoByPod(ctx, cli, cluster, podList[0])
 	if err != nil {
 		return err
 	}
@@ -190,7 +187,7 @@ func SyncReplicationSetClusterStatus(cli client.Client,
 	return nil
 }
 
-// RemoveReplicationSetClusterStatus Remove replicationSet pod status from cluster.status.component[componentName].ReplicationStatus.
+// RemoveReplicationSetClusterStatus removes replicationSet pod status from cluster.status.component[componentName].ReplicationStatus.
 func RemoveReplicationSetClusterStatus(cli client.Client, ctx context.Context, stsList []*appsv1.StatefulSet) error {
 	if len(stsList) == 0 {
 		return nil
@@ -226,7 +223,7 @@ func RemoveReplicationSetClusterStatus(cli client.Client, ctx context.Context, s
 	return nil
 }
 
-// needUpdateReplicationSetStatus Check if the target pod node needs to be updated in cluster.status.
+// needUpdateReplicationSetStatus checks if the target pod node needs to be updated in cluster.status.
 func needUpdateReplicationSetStatus(replicationStatus *dbaasv1alpha1.ReplicationSetStatus, podList []*corev1.Pod) bool {
 	needUpdate := false
 	for _, pod := range podList {
@@ -256,7 +253,7 @@ func needUpdateReplicationSetStatus(replicationStatus *dbaasv1alpha1.Replication
 	return needUpdate
 }
 
-// needRemoveReplicationSetStatus Check if the target pod node needs to be removed from cluster.status.
+// needRemoveReplicationSetStatus checks if the target pod node needs to be removed from cluster.status.
 func needRemoveReplicationSetStatus(replicationStatus *dbaasv1alpha1.ReplicationSetStatus, podList []corev1.Pod) (bool, error) {
 	needRemove := false
 	for _, pod := range podList {
@@ -274,7 +271,7 @@ func needRemoveReplicationSetStatus(replicationStatus *dbaasv1alpha1.Replication
 	return needRemove, nil
 }
 
-// CheckStsIsPrimary Check whether it is the primary statefulSet through the label tag on sts.
+// CheckStsIsPrimary checks whether it is the primary statefulSet through the label tag on sts.
 func CheckStsIsPrimary(sts *appsv1.StatefulSet) bool {
 	if sts != nil && sts.Labels != nil {
 		return sts.Labels[intctrlutil.RoleLabelKey] == string(Primary)
@@ -297,8 +294,8 @@ func GeneratePVCFromVolumeClaimTemplates(sts *appsv1.StatefulSet, vctList []core
 	return claims
 }
 
-// GetPersistentVolumeClaimName gets the name of PersistentVolumeClaim for a replicationSet Pod with an ordinal.
-// claimTpl must be a PersistentVolumeClaimTemplate from cluster API VolumeClaimsTemplate.
+// GetPersistentVolumeClaimName gets the name of PersistentVolumeClaim for a replicationSet pod with an ordinal.
+// claimTpl must be a PersistentVolumeClaimTemplate from the VolumeClaimsTemplate in the Cluster API.
 func GetPersistentVolumeClaimName(sts *appsv1.StatefulSet, claimTpl *corev1.PersistentVolumeClaimTemplate, ordinal int) string {
 	return fmt.Sprintf("%s-%s-%d", claimTpl.Name, sts.Name, ordinal)
 }

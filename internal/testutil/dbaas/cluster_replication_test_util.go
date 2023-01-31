@@ -29,6 +29,8 @@ import (
 	"github.com/apecloud/kubeblocks/test/testdata"
 )
 
+// InitReplicationRedis initializes a cluster environment which only contains a component of Replication type for testing,
+// includes ClusterDefinition, ClusterVersion and Cluster resources.
 func InitReplicationRedis(ctx context.Context,
 	testCtx testutil.TestContext,
 	clusterDefName,
@@ -41,6 +43,7 @@ func InitReplicationRedis(ctx context.Context,
 	return clusterDef, clusterVersion, cluster
 }
 
+// CreateReplicationCluster creates a redis cluster with a component of Replication type.
 func CreateReplicationCluster(
 	ctx context.Context,
 	testCtx testutil.TestContext,
@@ -58,6 +61,7 @@ func CreateReplicationCluster(
 	return CreateK8sResource(ctx, testCtx, cluster).(*dbaasv1alpha1.Cluster)
 }
 
+// CreateReplicationRedisClusterDef creates a redis clusterDefinition with a component of Replication type.
 func CreateReplicationRedisClusterDef(ctx context.Context, testCtx testutil.TestContext, clusterDefName string) *dbaasv1alpha1.ClusterDefinition {
 	clusterDefBytes, err := testdata.GetTestDataFileContent("replicationset/redis_cd.yaml")
 	if err != nil {
@@ -69,6 +73,7 @@ func CreateReplicationRedisClusterDef(ctx context.Context, testCtx testutil.Test
 	return CreateK8sResource(ctx, testCtx, clusterDef).(*dbaasv1alpha1.ClusterDefinition)
 }
 
+// CreateReplicationRedisClusterVersion creates a redis clusterVersion with a component of Replication type.
 func CreateReplicationRedisClusterVersion(ctx context.Context, testCtx testutil.TestContext, clusterDefName, clusterVersionName string) *dbaasv1alpha1.ClusterVersion {
 	clusterVersionBytes, err := testdata.GetTestDataFileContent("replicationset/redis_cv.yaml")
 	if err != nil {
@@ -80,7 +85,7 @@ func CreateReplicationRedisClusterVersion(ctx context.Context, testCtx testutil.
 	return CreateK8sResource(ctx, testCtx, clusterVersion).(*dbaasv1alpha1.ClusterVersion)
 }
 
-// MockReplicationComponentStatefulSet mock the component statefulSet, just using in envTest
+// MockReplicationComponentStatefulSet mocks the component statefulSet, just using in envTest
 func MockReplicationComponentStatefulSet(ctx context.Context,
 	testCtx testutil.TestContext,
 	clusterName,

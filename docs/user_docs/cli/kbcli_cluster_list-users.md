@@ -47,5 +47,5 @@ kbcli cluster list-users NAME [flags]
 
 ### SEE ALSO
 
-* [kbcli cluster](kbcli_cluster.md)	 - Cluster operation command
+* [kbcli cluster](kbcli_cluster.md)	 - Cluster command
 

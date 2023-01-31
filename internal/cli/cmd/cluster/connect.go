@@ -64,7 +64,7 @@ func NewConnectCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 	o := &ConnectOptions{ExecOptions: exec.NewExecOptions(f, streams)}
 	cmd := &cobra.Command{
 		Use:               "connect (NAME | -i INSTANCE-NAME)",
-		Short:             "Connect to a database cluster or instance",
+		Short:             "Connect to a cluster or instance",
 		Example:           connectExample,
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.ClusterGVR()),
 		Run: func(cmd *cobra.Command, args []string) {

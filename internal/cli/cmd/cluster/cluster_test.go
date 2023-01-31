@@ -19,6 +19,7 @@ package cluster
 import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	dynamicfakeclient "k8s.io/client-go/dynamic/fake"
 
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
@@ -155,6 +156,39 @@ var _ = Describe("Cluster", func() {
 
 		o.Replicas = 1
 		Expect(o.Validate()).Should(Succeed())
+	})
+
+	It("check params for reconfiguring operations", func() {
+		o := &OperationsOptions{
+			BaseOptions: create.BaseOptions{
+				IOStreams: streams,
+				Name:      "test",
+			},
+			OpsType:                dbaasv1alpha1.ReconfiguringType,
+			TTLSecondsAfterSucceed: 30,
+			ClusterVersionRef:      "test-cluster-version",
+			ComponentNames:         []string{"replicasets", "proxy"},
+		}
+
+		var err error
+
+		By("validate reconfiguring when multi components")
+		Expect(o.Validate()).To(MatchError("reconfiguring only support one component."))
+
+		By("validate reconfiguring parameter")
+		o.ComponentNames = []string{"replicasets"}
+		Expect(o.Validate().Error()).To(ContainSubstring("reconfiguring required configure file or updated parameters"))
+		o.Parameters = []string{"abcd"}
+		Expect(o.Validate().Error()).To(ContainSubstring("updated parameter formatter"))
+		o.Parameters = []string{"abcd=test"}
+
+		//o.Client, err = tf.DynamicClient()
+		//Expect(err).Should(Succeed())
+
+		dynamicfakeclient.NewSimpleDynamicClientWithCustomListKinds()
+
+		tf.
+			Expect(o.Validate().Error()).To(ContainSubstring("updated parameter formatter"))
 	})
 
 	It("list and delete operations", func() {

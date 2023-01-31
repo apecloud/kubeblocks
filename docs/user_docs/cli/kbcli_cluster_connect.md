@@ -1,6 +1,6 @@
 ## kbcli cluster connect
 
-Connect to a database cluster or instance
+Connect to a cluster or instance
 
 ```
 kbcli cluster connect (NAME | -i INSTANCE-NAME) [flags]

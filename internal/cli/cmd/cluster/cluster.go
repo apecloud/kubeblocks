@@ -44,27 +44,28 @@ func NewClusterCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 			Message: "Basic Cluster Commands:",
 			Commands: []*cobra.Command{
 				NewCreateCmd(f, streams),
-				NewDeleteCmd(f, streams),
+				NewConnectCmd(f, streams),
 				NewDescribeCmd(f, streams),
 				NewListCmd(f, streams),
 				NewListInstancesCmd(f, streams),
 				NewListComponentsCmd(f, streams),
 				NewListEventsCmd(f, streams),
 				NewListUsersCmd(f, streams),
+				NewDeleteCmd(f, streams),
 			},
 		},
 		{
 			Message: "Cluster Operation Commands:",
 			Commands: []*cobra.Command{
-				NewListOpsCmd(f, streams),
-				NewDeleteOpsCmd(f, streams),
-				NewDescribeOpsCmd(f, streams),
 				NewUpdateCmd(f, streams),
 				NewRestartCmd(f, streams),
 				NewUpgradeCmd(f, streams),
 				NewVolumeExpansionCmd(f, streams),
 				NewVerticalScalingCmd(f, streams),
 				NewHorizontalScalingCmd(f, streams),
+				NewDescribeOpsCmd(f, streams),
+				NewListOpsCmd(f, streams),
+				NewDeleteOpsCmd(f, streams),
 			},
 		},
 		{
@@ -81,7 +82,6 @@ func NewClusterCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 		{
 			Message: "Trouble shooting Commands:",
 			Commands: []*cobra.Command{
-				NewConnectCmd(f, streams),
 				NewLogsCmd(f, streams),
 				NewListLogsCmd(f, streams),
 			},

@@ -1,6 +1,6 @@
 ## kbcli cluster delete-ops
 
-Delete a OpsRequest
+Delete an OpsRequest
 
 ```
 kbcli cluster delete-ops [flags]

@@ -345,6 +345,25 @@ reloader: build-checks ## Build agamotto related binaries
 clean-reloader: ## Clean bin/mysqld_exporter.
 	rm -f bin/reloader
 
+##@ kbcue-helper
+
+kbcue-helper_LD_FLAGS = "-s -w"cue_helper
+
+bin/kbcue-helper.%: ## Cross build bin/reloader.$(OS).$(ARCH) .
+	GOOS=$(word 2,$(subst ., ,$@)) GOARCH=$(word 3,$(subst ., ,$@)) $(GO) build -ldflags=${RELOADER_LD_FLAGS} -o $@ ./cmd/reloader/tools/cue_auto_generator.go
+
+.PHONY: kbcue-helper
+kbcue-helper: OS=$(shell $(GO) env GOOS)
+kbcue-helper: ARCH=$(shell $(GO) env GOARCH)
+kbcue-helper: build-checks ## Build agamotto related binaries
+	$(MAKE) bin/kbcue-helper.${OS}.${ARCH}
+	mv bin/kbcue-helper.${OS}.${ARCH} bin/kbcue-helper
+
+.PHONY: clean
+clean-kbcue-helper: ## Clean bin/mysqld_exporter.
+	rm -f bin/kbcue-helper
+
+
 ##@ PROBE
 
 

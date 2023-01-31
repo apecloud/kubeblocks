@@ -169,7 +169,10 @@ func processCfgNotStringParam(data interface{}, context *cue.Context, tpl cue.Va
 				return nil
 			}
 			if t, exist := typeTransformer.fieldTypes[cur]; exist {
-				return transNumberOrBoolType(t, obj, fn)
+				err := transNumberOrBoolType(t, obj, fn)
+				if err != nil {
+					return WrapError(err, "failed to type convertor, field[%s]", cur)
+				}
 			}
 			return nil
 		}, false)

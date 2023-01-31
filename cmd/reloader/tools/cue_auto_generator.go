@@ -7,9 +7,12 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"reflect"
 	"regexp"
 	"strconv"
 	"strings"
+
+	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 )
 
 const (
@@ -29,8 +32,11 @@ const (
 )
 
 var (
-	prefixString = ""
-	filePath     = ""
+	prefixString        = ""
+	filePath            = ""
+	typeName            = "MyParameter"
+	ignoreStringDefault = true
+	booleanPromotion    = false
 )
 
 type ValueType string
@@ -49,8 +55,13 @@ func EmptyParser(s string) (interface{}, error) {
 	return s, nil
 }
 
+var numberRegex = regexp.MustCompile(`^\d+$`)
+
 var ValueTypeParserMap = map[ValueType]ValueParser{
 	BooleanTYpe: func(s string) (interface{}, error) {
+		if numberRegex.MatchString(s) {
+			return nil, cfgcore.MakeError("boolean parser failed")
+		}
 		return strconv.ParseBool(s)
 	},
 	IntegerType: func(s string) (interface{}, error) {
@@ -74,6 +85,9 @@ func main() {
 
 	flag.StringVar(&filePath, "file-path", "", "The generate cue scripts from file.")
 	flag.StringVar(&prefixString, "output-prefix", prefixString, "prefix, default: \"\"")
+	flag.StringVar(&typeName, "type-name", typeName, "cue parameter type name. ")
+	flag.BoolVar(&ignoreStringDefault, "ignore-string-default", ignoreStringDefault, "ignore string default. ")
+	flag.BoolVar(&booleanPromotion, "boolean-promotion", booleanPromotion, "enable using OFF or ON. ")
 	flag.Parse()
 
 	f, err := os.Open(filePath)
@@ -82,7 +96,10 @@ func main() {
 		os.Exit(FileNotExist)
 	}
 
+	writer := os.Stdout
+
 	scanner := bufio.NewScanner(f)
+	wrapOutputTypeDefineBegin(typeName, writer)
 	for scanner.Scan() {
 		if err := scanner.Err(); err != nil {
 			fmt.Printf("readline failed. error: %v", err)
@@ -92,12 +109,22 @@ func main() {
 		if len(fields) < RecordMinField {
 			continue
 		}
-
-		wrapOutputCuelang(ConstructParameterType(fields), os.Stdout)
+		wrapOutputCueLang(ConstructParameterType(fields), writer)
 	}
+	wrapOutputTypeDefineEnd(writer)
 }
 
-func wrapOutputCuelang(parameter *ParameterType, writer io.Writer) {
+func wrapOutputTypeDefineEnd(writer io.Writer) int {
+	r, _ := writer.Write([]byte(fmt.Sprintf("\n  %s...\n%s}", prefixString, prefixString)))
+	return r
+}
+
+func wrapOutputTypeDefineBegin(typeName string, writer io.Writer) int {
+	r, _ := writer.Write([]byte(fmt.Sprintf("%s#%s: {\n\n", prefixString, typeName)))
+	return r
+}
+
+func wrapOutputCueLang(parameter *ParameterType, writer io.Writer) {
 	if !validateParameter(parameter) {
 		return
 	}
@@ -117,6 +144,8 @@ func validateParameter(parameter *ParameterType) bool {
 }
 
 func ConstructParameterType(fields []string) *ParameterType {
+	// type promotion
+	types := []ValueType{BooleanTYpe, IntegerType, StringType}
 	param := ParameterType{
 		Name:         fields[NameField],
 		Type:         ValueType(fields[DataTypeField]),
@@ -124,31 +153,70 @@ func ConstructParameterType(fields []string) *ParameterType {
 		IsStatic:     true,
 		Immutable:    false,
 	}
+
 	if len(fields) > RecordMinField {
 		param.Document = fields[DocField]
 	}
-
 	if r, err := strconv.ParseBool(fields[ImmutableField]); err == nil {
 		param.Immutable = r
 	}
-
 	if fields[ValidTYpeField] == "dynamic" {
 		param.IsStatic = false
 	}
-
-	if param.DefaultValue != "" && param.DefaultValue[0] == '{' {
-		param.DefaultValue = ""
-	}
-
-	switch param.Type {
-	case BooleanTYpe:
-		param.Type = IntegerType
-	case ListType:
+	if param.Type == ListType {
 		param.Type = StringType
 	}
+	checkAndUpdateDefaultValue(&param)
 
-	param.ParameterRestrict = parseParameterRestrict(fields[ValueRestrictField], param.Type)
+	if param.Type != BooleanTYpe {
+		pr, _ := parseParameterRestrict(fields[ValueRestrictField], param.Type)
+		param.ParameterRestrict = pr
+		return &param
+	}
+
+	for _, vt := range types {
+		pr, err := parseParameterRestrict(fields[ValueRestrictField], vt)
+		if err != nil {
+			continue
+		}
+		if vt == IntegerType && booleanPromotion && pr.isEnum {
+			fields[ValueRestrictField] += ", OFF, ON"
+			continue
+		}
+		param.Type = vt
+		param.ParameterRestrict = pr
+		break
+	}
 	return &param
+}
+
+func checkAndUpdateDefaultValue(param *ParameterType) {
+	var (
+		defaultValue = param.DefaultValue
+		valueType    = param.Type
+	)
+
+	formatString := func(v interface{}) string {
+		return fmt.Sprintf("%v", v)
+	}
+
+	if defaultValue == "" {
+		return
+	}
+	if defaultValue[0] == '{' {
+		param.DefaultValue = ""
+	}
+	if valueType == StringType && ignoreStringDefault {
+		param.DefaultValue = ""
+		return
+	}
+
+	if valueType != IntegerType && valueType != FloatType {
+		return
+	}
+	if v, err := ValueTypeParserMap[param.Type](param.DefaultValue); err != nil || formatString(v) != defaultValue {
+		param.DefaultValue = ""
+	}
 }
 
 type ParameterRestrict struct {
@@ -198,77 +266,107 @@ func generateElemValue(buffer *bytes.Buffer, value interface{}, valueType ValueT
 	}
 }
 
-func parseValue(s string, valueType ValueType) interface{} {
+func parseValue(s string, valueType ValueType) (interface{}, error) {
 	v, err := ValueTypeParserMap[valueType](s)
 	if err != nil {
-		fmt.Printf("parse type[%s] value[%s] failed!", valueType, s)
-		panic("")
+		return nil, cfgcore.MakeError("parse type[%s] value[%s] failed!", valueType, s)
 	}
-	return v
+	return v, nil
 }
 
-func parseParameterRestrict(s string, valueType ValueType) *ParameterRestrict {
+func parseParameterRestrict(s string, valueType ValueType) (*ParameterRestrict, error) {
 	var (
 		IntegerRangeRegex = regexp.MustCompile(`([\+\-]?\d+)-([\+\-]?\d+)`)
 		FloatRangeRegex   = regexp.MustCompile(`([\+\-]?\d+(\.\d*)?)-([\+\-]?\d+(\.\d*)?)`)
+
+		pr  *ParameterRestrict
+		err error
 	)
 
-	if s == "" {
+	setValueHelper := func(rv reflect.Value, s string, valueType ValueType) error {
+		if rv.Kind() != reflect.Pointer || rv.IsNil() {
+			return cfgcore.MakeError("invalid return type")
+		}
+
+		value, err := parseValue(s, valueType)
+		if err != nil {
+			return err
+		}
+		reflect.Indirect(rv).Set(reflect.Indirect(reflect.ValueOf(value)))
 		return nil
+	}
+	integerTypeHandle := func(s string) (*ParameterRestrict, error) {
+		r := IntegerRangeRegex.FindStringSubmatch(s)
+		if len(r) == 0 {
+			return nil, nil
+		}
+		t := &ParameterRestrict{isEnum: false}
+		if err := setValueHelper(reflect.ValueOf(&t.Min), r[1], valueType); err != nil {
+			return nil, err
+		}
+		if err := setValueHelper(reflect.ValueOf(&t.Max), r[2], valueType); err != nil {
+			return nil, err
+		}
+		return t, nil
+	}
+	floatTypeHandle := func(s string) (*ParameterRestrict, error) {
+		r := FloatRangeRegex.FindStringSubmatch(s)
+		if len(r) == 0 {
+			return nil, nil
+		}
+		t := &ParameterRestrict{isEnum: false}
+		if err := setValueHelper(reflect.ValueOf(&t.Min), r[1], valueType); err != nil {
+			return nil, err
+		}
+		if err := setValueHelper(reflect.ValueOf(&t.Max), r[3], valueType); err != nil {
+			return nil, err
+		}
+		return t, nil
+	}
+
+	if s == "" {
+		return nil, nil
 	}
 
 	switch valueType {
 	case IntegerType:
-		r := IntegerRangeRegex.FindStringSubmatch(s)
-		if len(r) > 0 {
-			t := &ParameterRestrict{
-				isEnum: false,
-				Min:    parseValue(r[1], valueType),
-				Max:    parseValue(r[2], valueType),
-			}
-			return t
-		}
+		pr, err = integerTypeHandle(s)
 	case FloatType:
-		r := FloatRangeRegex.FindStringSubmatch(s)
-		if len(r) > 0 {
-			t := &ParameterRestrict{
-				isEnum: false,
-				Min:    parseValue(r[1], valueType),
-				Max:    parseValue(r[3], valueType),
-			}
-			return t
-		}
+		pr, err = floatTypeHandle(s)
+	}
+
+	if err != nil {
+		return nil, err
+	}
+	if pr != nil {
+		return pr, nil
 	}
 
 	return parseListParameter(s, valueType)
 }
 
-func parseListParameter(s string, valueType ValueType) *ParameterRestrict {
+func parseListParameter(s string, valueType ValueType) (*ParameterRestrict, error) {
 	values := strings.Split(s, ",")
 	if len(values) == 0 {
-		return nil
+		return nil, nil
 	}
 
-	p := &ParameterRestrict{
-		isEnum: true,
-	}
+	p := &ParameterRestrict{isEnum: true}
 	for _, v := range values {
 		v = strings.TrimSpace(v)
 		if len(v) == 0 {
 			continue
 		}
-
 		if typeValue, err := ValueTypeParserMap[valueType](v); err != nil {
-			fmt.Printf("parse failed: [%s] [%s] [%s]\n", s, v, valueType)
-			// panic(fmt.Sprintf("parse failed: [%s] [%s]", s, v))
+			return nil, cfgcore.WrapError(err, "parse failed: [%s] [%s] [%s]\n", s, v, valueType)
 		} else {
 			AddRestrictValue(p, typeValue)
 		}
 	}
 	if len(p.EnumList) == 0 {
-		return nil
+		return nil, nil
 	}
-	return p
+	return p, nil
 }
 
 func AddRestrictValue(p *ParameterRestrict, value interface{}) {
@@ -312,7 +410,7 @@ func (w *CueWrapper) generateCueRestrict(buffer *bytes.Buffer) {
 }
 
 func (w *CueWrapper) generateCueTypeParameter(buffer *bytes.Buffer) {
-	buffer.WriteString(prefixString)
+	buffer.WriteString(prefixString + "  ")
 	if strings.ContainsAny(w.Name, "-.") {
 		buffer.WriteByte('"')
 		buffer.WriteString(w.Name)
@@ -334,7 +432,7 @@ func (w *CueWrapper) generateCueTypeParameter(buffer *bytes.Buffer) {
 
 func (w *CueWrapper) generateCueDocument(buffer *bytes.Buffer) {
 	if w.Document != "" {
-		buffer.WriteString(prefixString)
+		buffer.WriteString(prefixString + "  ")
 		buffer.WriteString("// ")
 		buffer.WriteString(w.Document)
 		buffer.WriteByte('\n')

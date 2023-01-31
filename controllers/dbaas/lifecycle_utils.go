@@ -1135,9 +1135,9 @@ func buildConnCredential(params createParams, reqCtx intctrlutil.RequestCtx, cli
 		// when restoring the cluster, the super credentials also need to be restored from the backup
 		err := restoreConnCredentialFromBackup(params, reqCtx, cli, &connCredential)
 
-		// return connect credential if success build from backup.
-		// if something wrong, it should not block the creation process,
-		// and users can access the data through their own accounts
+		// return connect credential if success restore from backup.
+		// if something is wrong, it should not interrupt the creation process,
+		// and users can access the restored data through their own accounts
 		if err == nil {
 			return &connCredential, nil
 		}

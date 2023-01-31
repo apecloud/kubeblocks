@@ -1,4 +1,4 @@
-super: {
+original_secret: {
 	metadata: {
 		namespace: string
 		name:      string
@@ -15,7 +15,7 @@ backup: {
 
 secret: {
 	apiVersion: "v1"
-	data:       super.data
+	data:       original_secret.data
 	kind:       "Secret"
 	metadata: {
 		name:      "\(backup.metadata.name)-backup-credential"

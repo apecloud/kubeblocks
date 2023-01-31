@@ -23,14 +23,13 @@ import (
 	"fmt"
 	"strings"
 
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
-
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	"github.com/leaanthony/debme"
 	"github.com/spf13/viper"
 	appv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -940,7 +939,7 @@ func (r *BackupReconciler) buildSecret(reqCtx intctrlutil.RequestCtx, backup *da
 	if err != nil {
 		return nil, err
 	}
-	if err = cueValue.Fill("super", secretByte); err != nil {
+	if err = cueValue.Fill("original_secret", secretByte); err != nil {
 		return nil, err
 	}
 

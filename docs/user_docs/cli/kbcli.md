@@ -54,7 +54,7 @@ kbcli [flags]
 * [kbcli app](kbcli_app.md)	 - Manager external applications related to KubeBlocks
 * [kbcli backup-config](kbcli_backup-config.md)	 - KubeBlocks backup config
 * [kbcli bench](kbcli_bench.md)	 - Run a benchmark
-* [kbcli cluster](kbcli_cluster.md)	 - Cluster operation command
+* [kbcli cluster](kbcli_cluster.md)	 - Cluster command
 * [kbcli clusterdefinition](kbcli_clusterdefinition.md)	 - ClusterDefinition command
 * [kbcli clusterversion](kbcli_clusterversion.md)	 - ClusterVersion command
 * [kbcli dashboard](kbcli_dashboard.md)	 - List and open the KubeBlocks dashboards

@@ -10,7 +10,7 @@ spec:
   group: dbaas.kubeblocks.io
   names:
     categories:
-    - dbaas
+    - kubeblocks
     - all
     kind: OpsRequest
     listKind: OpsRequestList

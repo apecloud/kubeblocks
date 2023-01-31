@@ -186,13 +186,16 @@ func ClearClusterResources(testCtx *testutil.TestContext) {
 
 	// mock behavior of garbage collection inside KCM
 	if !testCtx.UsingExistingCluster() {
-		ClearResources(testCtx, intctrlutil.StatefulSetSignature, inNS)
-		ClearResources(testCtx, intctrlutil.DeploymentSignature, inNS)
-		ClearResources(testCtx, intctrlutil.ConfigMapSignature, inNS)
-		ClearResources(testCtx, intctrlutil.ServiceSignature, inNS)
-		ClearResources(testCtx, intctrlutil.SecretSignature, inNS)
-		ClearResources(testCtx, intctrlutil.PodDisruptionBudgetSignature, inNS)
-		ClearResources(testCtx, intctrlutil.JobSignature, inNS)
-		ClearResources(testCtx, intctrlutil.PersistentVolumeClaimSignature, inNS)
+		// only delete internal resources managed by kubeblocks
+		filter := client.MatchingLabels{intctrlutil.AppManagedByLabelKey: intctrlutil.AppName}
+
+		ClearResources(testCtx, intctrlutil.StatefulSetSignature, inNS, filter)
+		ClearResources(testCtx, intctrlutil.DeploymentSignature, inNS, filter)
+		ClearResources(testCtx, intctrlutil.ConfigMapSignature, inNS, filter)
+		ClearResources(testCtx, intctrlutil.ServiceSignature, inNS, filter)
+		ClearResources(testCtx, intctrlutil.SecretSignature, inNS, filter)
+		ClearResources(testCtx, intctrlutil.PodDisruptionBudgetSignature, inNS, filter)
+		ClearResources(testCtx, intctrlutil.JobSignature, inNS, filter)
+		ClearResources(testCtx, intctrlutil.PersistentVolumeClaimSignature, inNS, filter)
 	}
 }

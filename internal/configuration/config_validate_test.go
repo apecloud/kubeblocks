@@ -46,6 +46,11 @@ func TestSchemaValidatorWithCue(t *testing.T) {
 		require.Nil(t, validator.Validate(toMap(loadTestData("./cue_testdata/wesql.cnf"))))
 	}
 
+	{
+		validator := NewConfigValidator(fakeConfigurationTpl("./cue_testdata/pg14.cue", dbaasv1alpha1.DOTENV))
+		require.Nil(t, validator.Validate(toMap(loadTestData("./cue_testdata/pg14.conf"))))
+	}
+
 	// cue validate for ini
 	{
 		validator := NewConfigValidator(fakeConfigurationTpl("./cue_testdata/mysql.cue", dbaasv1alpha1.INI))

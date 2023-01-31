@@ -43,7 +43,7 @@ ENABLE_WEBHOOKS ?= false
 APP_NAME = kubeblocks
 
 
-VERSION ?= 0.3.2
+VERSION ?= 0.3.3
 CHART_PATH = deploy/helm
 
 WEBHOOK_CERT_DIR ?= /tmp/k8s-webhook-server/serving-certs

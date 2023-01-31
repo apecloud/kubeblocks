@@ -68,7 +68,7 @@ func clusterVersionUpdateHandler(cli client.Client, ctx context.Context, cluster
 		return err
 	}
 	for _, item := range list.Items {
-		if item.Status.ClusterDefGeneration != clusterDef.GetObjectMeta().GetGeneration() {
+		if item.Status.ClusterDefGeneration != clusterDef.Generation {
 			patch := client.MergeFrom(item.DeepCopy())
 			if statusMsg := validateClusterVersion(&item, clusterDef); statusMsg != "" {
 				item.Status.Phase = dbaasv1alpha1.UnavailablePhase
@@ -76,9 +76,8 @@ func clusterVersionUpdateHandler(cli client.Client, ctx context.Context, cluster
 			} else {
 				item.Status.Phase = dbaasv1alpha1.AvailablePhase
 				item.Status.Message = ""
+				item.Status.ClusterDefGeneration = clusterDef.Generation
 			}
-			item.Status.ClusterDefGeneration = clusterDef.Generation
-			item.Status.ClusterDefSyncStatus = dbaasv1alpha1.OutOfSyncStatus
 			if err = cli.Status().Patch(ctx, &item, patch); err != nil {
 				return err
 			}
@@ -129,7 +128,7 @@ func (r *ClusterVersionReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		return *res, err
 	}
 
-	if clusterVersion.Status.ObservedGeneration == clusterVersion.GetGeneration() {
+	if clusterVersion.Status.ObservedGeneration == clusterVersion.Generation {
 		return intctrlutil.Reconciled()
 	}
 
@@ -173,9 +172,8 @@ func (r *ClusterVersionReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		clusterVersion.Status.Phase = dbaasv1alpha1.AvailablePhase
 		clusterVersion.Status.Message = ""
 	}
-	clusterVersion.Status.ClusterDefSyncStatus = dbaasv1alpha1.InSyncStatus
-	clusterVersion.Status.ObservedGeneration = clusterVersion.GetGeneration()
-	clusterVersion.Status.ClusterDefGeneration = clusterdefinition.GetGeneration()
+	clusterVersion.Status.ObservedGeneration = clusterVersion.Generation
+	clusterVersion.Status.ClusterDefGeneration = clusterdefinition.Generation
 	if err = r.Client.Status().Patch(ctx, clusterVersion, patch); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}

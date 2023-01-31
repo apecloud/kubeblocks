@@ -180,7 +180,7 @@ func (consensusSet *ConsensusSet) GetPhaseWhenPodsNotReady(componentName string)
 	if allPodIsReady {
 		return "", nil
 	}
-	return util.CalculateComponentPhase(isFailed, isAbnormal), nil
+	return util.GetComponentPhase(isFailed, isAbnormal), nil
 }
 
 func NewConsensusSet(ctx context.Context,

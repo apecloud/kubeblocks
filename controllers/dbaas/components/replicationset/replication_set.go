@@ -143,7 +143,7 @@ func (rs *ReplicationSet) GetPhaseWhenPodsNotReady(componentName string) (dbaasv
 	if allPodIsReady {
 		return "", nil
 	}
-	return util.CalculateComponentPhase(isFailed, isAbnormal), nil
+	return util.GetComponentPhase(isFailed, isAbnormal), nil
 }
 
 // NewReplicationSet creates a new ReplicationSet object.

@@ -94,7 +94,7 @@ func (stateful *Stateful) GetPhaseWhenPodsNotReady(componentName string) (dbaasv
 			isAbnormal = true
 		}
 	}
-	return util.CalculateComponentPhase(isFailed, isAbnormal), nil
+	return util.GetComponentPhase(isFailed, isAbnormal), nil
 }
 
 func NewStateful(ctx context.Context,

@@ -102,7 +102,7 @@ func (stateless *Stateless) GetPhaseWhenPodsNotReady(componentName string) (dbaa
 			isAbnormal = true
 		}
 	}
-	return util.CalculateComponentPhase(isFailed, isAbnormal), nil
+	return util.GetComponentPhase(isFailed, isAbnormal), nil
 }
 
 func NewStateless(ctx context.Context,

@@ -92,9 +92,8 @@ func IsProbeTimeout(podsReadyTime *metav1.Time) bool {
 	return time.Now().After(podsReadyTime.Add(types.ProbeTimeout))
 }
 
-func CalculateComponentPhase(isFailed, isAbnormal bool) dbaasv1alpha1.Phase {
+func GetComponentPhase(isFailed, isAbnormal bool) dbaasv1alpha1.Phase {
 	var componentPhase dbaasv1alpha1.Phase
-	// if leader is ready, set component phase to Abnormal
 	if isFailed {
 		componentPhase = dbaasv1alpha1.FailedPhase
 	} else if isAbnormal {

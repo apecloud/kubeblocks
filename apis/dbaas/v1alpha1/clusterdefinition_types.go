@@ -389,11 +389,6 @@ type ClusterDefinitionStatusGeneration struct {
 	// ClusterDefinition generation number.
 	// +optional
 	ClusterDefGeneration int64 `json:"clusterDefGeneration,omitempty"`
-
-	// ClusterDefinition sync. status.
-	// +kubebuilder:validation:Enum={InSync,OutOfSync}
-	// +optional
-	ClusterDefSyncStatus Status `json:"clusterDefSyncStatus,omitempty"`
 }
 
 type ClusterDefinitionProbeCMDs struct {
@@ -539,4 +534,8 @@ func (r *ClusterDefinition) ValidateEnabledLogConfigs(typeName string, enabledLo
 		}
 	}
 	return invalidLogNames
+}
+
+func (r *ClusterDefinition) GetObjectGeneration() int64 {
+	return r.GetObjectMeta().GetGeneration()
 }

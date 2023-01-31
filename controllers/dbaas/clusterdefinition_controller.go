@@ -90,7 +90,7 @@ func (r *ClusterDefinitionReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		return *res, err
 	}
 
-	if dbClusterDef.Status.ObservedGeneration == dbClusterDef.GetObjectMeta().GetGeneration() {
+	if dbClusterDef.Status.ObservedGeneration == dbClusterDef.GetObjectGeneration() {
 		return intctrlutil.Reconciled()
 	}
 
@@ -114,7 +114,7 @@ func (r *ClusterDefinitionReconciler) Reconcile(ctx context.Context, req ctrl.Re
 	}
 
 	statusPatch := client.MergeFrom(dbClusterDef.DeepCopy())
-	dbClusterDef.Status.ObservedGeneration = dbClusterDef.GetObjectMeta().GetGeneration()
+	dbClusterDef.Status.ObservedGeneration = dbClusterDef.GetObjectGeneration()
 	dbClusterDef.Status.Phase = dbaasv1alpha1.AvailablePhase
 	if err = r.Client.Status().Patch(reqCtx.Ctx, dbClusterDef, statusPatch); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")

@@ -1,6 +1,6 @@
 ## kbcli cluster
 
-Cluster operation command
+Cluster command
 
 ### Options
 

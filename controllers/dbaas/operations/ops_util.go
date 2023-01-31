@@ -184,7 +184,7 @@ func patchOpsHandlerNotSupported(opsRes *OpsResource) error {
 
 // PatchValidateErrorCondition patches ValidateError condition to the OpsRequest.status.conditions.
 func PatchValidateErrorCondition(opsRes *OpsResource, errMessage string) error {
-	condition := dbaasv1alpha1.NewValidateFailedCondition(dbaasv1alpha1.ReasonValidateError, errMessage)
+	condition := dbaasv1alpha1.NewValidateFailedCondition(dbaasv1alpha1.ReasonValidateFailed, errMessage)
 	return PatchOpsStatus(opsRes, dbaasv1alpha1.FailedPhase, condition)
 }
 

@@ -74,7 +74,7 @@ func rollingStatefulSets(param reconfigureParams) (ReturnedStatus, error) {
 	//	return makeReturnedStatus(ESAndRetryFailed), err
 	// }
 	// if len(pods) != 0 {
-	//	progress = CheckUpdatedProgress(pods, configKey, newVersion)
+	//	progress = CheckReconfigureUpdateProgress(pods, configKey, newVersion)
 	// }
 	// return makeReturnedStatus(ESNone, withExpected(int32(len(pods))), withSucceed(progress)), nil
 

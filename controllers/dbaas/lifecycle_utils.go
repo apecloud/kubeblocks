@@ -917,34 +917,7 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 				*stsObj.Spec.Replicas,
 				*stsProto.Spec.Replicas)
 		}
-		volumeExpanded := didVolumeExpanded()
-		if !volumeExpanded {
-			// keep the original template annotations.
-			// if annotations exist and are replaced, the statefulSet will be updated.
-			stsProto.Spec.Template.Annotations = mergeAnnotations(stsObj.Spec.Template.Annotations,
-				stsProto.Spec.Template.Annotations)
-			stsObj.Spec.Template = stsProto.Spec.Template
-			stsObj.Spec.Replicas = stsProto.Spec.Replicas
-			stsObj.Spec.UpdateStrategy = stsProto.Spec.UpdateStrategy
-			if err := cli.Update(ctx, stsObj); err != nil {
-				return false, err
-			}
-			// check all pvc bound, requeue if not all ready
-			shouldRequeue, err = checkAllPVCBoundIfNeeded()
-			if err != nil {
-				return false, err
-			}
-			if shouldRequeue {
-				return true, err
-			}
-			// clean backup resources.
-			// there will not be any backup resources other than scale out.
-			if err := cleanBackupResourcesIfNeeded(); err != nil {
-				return false, err
-			}
-		}
-
-		if volumeExpanded {
+		if didVolumeExpanded() {
 			// if volume expanded, recreate statefulset to update volumeClaimTemplates
 			propagationPolicy := metav1.DeletePropagationOrphan
 			deleteOption := &client.DeleteOptions{
@@ -1001,7 +974,32 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 
 			// requeue to let controller recreate sts
 			return true, nil
+		} else {
+			// keep the original template annotations.
+			// if annotations exist and are replaced, the statefulSet will be updated.
+			stsProto.Spec.Template.Annotations = mergeAnnotations(stsObj.Spec.Template.Annotations,
+				stsProto.Spec.Template.Annotations)
+			stsObj.Spec.Template = stsProto.Spec.Template
+			stsObj.Spec.Replicas = stsProto.Spec.Replicas
+			stsObj.Spec.UpdateStrategy = stsProto.Spec.UpdateStrategy
+			if err := cli.Update(ctx, stsObj); err != nil {
+				return false, err
+			}
+			// check all pvc bound, requeue if not all ready
+			shouldRequeue, err = checkAllPVCBoundIfNeeded()
+			if err != nil {
+				return false, err
+			}
+			if shouldRequeue {
+				return true, err
+			}
+			// clean backup resources.
+			// there will not be any backup resources other than scale out.
+			if err := cleanBackupResourcesIfNeeded(); err != nil {
+				return false, err
+			}
 		}
+
 		return false, nil
 	}
 

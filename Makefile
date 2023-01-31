@@ -732,3 +732,9 @@ minikube-delete: minikube ## Delete minikube cluster.
 
 ##@ Docker containers
 include docker/docker.mk
+
+
+##@ Test E2E
+.PHONY: test-e2e
+test-e2e: ## Test End-to-end.
+	$(MAKE) -e VERSION=$(VERSION) -C test/e2e run

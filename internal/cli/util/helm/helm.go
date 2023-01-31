@@ -134,8 +134,8 @@ func RemoveRepo(r *repo.Entry) error {
 	return nil
 }
 
-// getInstalled get helm package if installed.
-func (i *InstallOpts) getInstalled(cfg *action.Configuration) (*release.Release, error) {
+// GetInstalled get helm package if installed.
+func (i *InstallOpts) GetInstalled(cfg *action.Configuration) (*release.Release, error) {
 	res, err := action.NewGet(cfg).Run(i.Name)
 	if err != nil {
 		return nil, err
@@ -171,7 +171,7 @@ func (i *InstallOpts) Install(cfg *action.Configuration) (string, error) {
 }
 
 func (i *InstallOpts) tryInstall(cfg *action.Configuration) (string, error) {
-	released, err := i.getInstalled(cfg)
+	released, err := i.GetInstalled(cfg)
 	if released != nil {
 		return released.Info.Notes, nil
 	}
@@ -240,15 +240,15 @@ func (i *InstallOpts) tryInstall(cfg *action.Configuration) (string, error) {
 	return released.Info.Notes, nil
 }
 
-// UnInstall will uninstall a Chart
-func (i *InstallOpts) UnInstall(cfg *action.Configuration) error {
+// Uninstall will uninstall a Chart
+func (i *InstallOpts) Uninstall(cfg *action.Configuration) error {
 	ctx := context.Background()
 	opts := retry.Options{
 		MaxRetry: 1 + i.TryTimes,
 	}
 
 	if err := retry.IfNecessary(ctx, func() error {
-		if err := i.tryUnInstall(cfg); err != nil {
+		if err := i.tryUninstall(cfg); err != nil {
 			return err
 		}
 		return nil
@@ -258,7 +258,7 @@ func (i *InstallOpts) UnInstall(cfg *action.Configuration) error {
 	return nil
 }
 
-func (i *InstallOpts) tryUnInstall(cfg *action.Configuration) error {
+func (i *InstallOpts) tryUninstall(cfg *action.Configuration) error {
 	client := action.NewUninstall(cfg)
 	client.Wait = i.Wait
 	client.Timeout = timeOut
@@ -346,7 +346,7 @@ func (i *InstallOpts) Upgrade(cfg *action.Configuration) error {
 }
 
 func (i *InstallOpts) tryUpgrade(cfg *action.Configuration) (string, error) {
-	installed, err := i.getInstalled(cfg)
+	installed, err := i.GetInstalled(cfg)
 	if err != nil {
 		return "", err
 	}

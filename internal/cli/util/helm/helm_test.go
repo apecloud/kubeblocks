@@ -66,7 +66,7 @@ var _ = Describe("helm util", func() {
 		It("Install", func() {
 			_, err := o.Install(cfg)
 			Expect(err).Should(HaveOccurred())
-			Expect(o.UnInstall(cfg)).Should(HaveOccurred()) // release not found
+			Expect(o.Uninstall(cfg)).Should(HaveOccurred()) // release not found
 		})
 
 		It("should ignore when chart is already deployed", func() {
@@ -80,7 +80,7 @@ var _ = Describe("helm util", func() {
 			Expect(err).Should(BeNil())
 			_, err = o.Install(cfg)
 			Expect(err).Should(BeNil())
-			Expect(o.UnInstall(cfg)).Should(BeNil()) // release exists
+			Expect(o.Uninstall(cfg)).Should(BeNil()) // release exists
 		})
 
 		It("should failed when chart is failed installed", func() {
@@ -114,7 +114,7 @@ var _ = Describe("helm util", func() {
 
 		It("should fail when release is not found", func() {
 			Expect(releaseNotFound(o.Upgrade(cfg))).Should(BeTrue())
-			Expect(o.UnInstall(cfg)).Should(HaveOccurred()) // release not found
+			Expect(o.Uninstall(cfg)).Should(HaveOccurred()) // release not found
 		})
 
 		It("should failed at fetching charts when release is already deployed", func() {
@@ -128,7 +128,7 @@ var _ = Describe("helm util", func() {
 			})
 			Expect(err).Should(BeNil())
 			Expect(o.Upgrade(cfg).Error()).Should(ContainSubstring("failed to download")) // failed at fetching charts
-			Expect(o.UnInstall(cfg)).Should(BeNil())                                      // release exists
+			Expect(o.Uninstall(cfg)).Should(BeNil())                                      // release exists
 		})
 
 		It("should fail when chart is already deployed", func() {
@@ -142,7 +142,7 @@ var _ = Describe("helm util", func() {
 			})
 			Expect(err).Should(BeNil())
 			Expect(errors.Is(o.Upgrade(cfg), ErrReleaseNotDeployed)).Should(BeTrue())
-			Expect(o.UnInstall(cfg)).Should(BeNil()) // release exists
+			Expect(o.Uninstall(cfg)).Should(BeNil()) // release exists
 		})
 
 	})

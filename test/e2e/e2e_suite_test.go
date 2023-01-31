@@ -1,0 +1,121 @@
+package e2e_test
+
+import (
+	"context"
+	"fmt"
+	"go/build"
+	"path/filepath"
+	"testing"
+
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
+	. "github.com/vmware-tanzu/velero/test/e2e"
+	. "github.com/vmware-tanzu/velero/test/e2e/util/k8s"
+
+	"github.com/onsi/ginkgo/v2/reporters"
+	"github.com/spf13/viper"
+	"go.uber.org/zap/zapcore"
+
+	"k8s.io/client-go/rest"
+	"sigs.k8s.io/controller-runtime/pkg/envtest"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+
+	. "github.com/apecloud/kubeblocks/test/e2e"
+	. "github.com/apecloud/kubeblocks/test/e2e/envcheck"
+	. "github.com/apecloud/kubeblocks/test/e2e/installation"
+)
+
+var cfg *rest.Config
+var testEnv *envtest.Environment
+var TC *TestClient
+
+func init() {
+	viper.AutomaticEnv()
+}
+
+func TestE2e(t *testing.T) {
+	if err := GetKubeconfigContext(); err != nil {
+		fmt.Println(err)
+		t.FailNow()
+	}
+	RegisterFailHandler(Fail)
+	junitReporter := reporters.NewJUnitReporter("report.xml")
+	RunSpecsWithDefaultAndCustomReporters(t, "E2e Suite", []Reporter{junitReporter})
+}
+
+func GetKubeconfigContext() error {
+	var err error
+	var tcDefault TestClient
+	tcDefault, err = NewTestClient(VeleroCfg.DefaultCluster)
+	VeleroCfg.DefaultClient = &tcDefault
+	VeleroCfg.ClientToInstallVelero = VeleroCfg.DefaultClient
+	if err != nil {
+		return err
+	}
+
+	if VeleroCfg.DefaultCluster != "" {
+		err = KubectlConfigUseContext(context.Background(), VeleroCfg.DefaultCluster)
+		if err != nil {
+			return err
+		}
+	}
+	TC = &tcDefault
+	return nil
+}
+
+var _ = BeforeSuite(func() {
+	if viper.GetBool("ENABLE_DEBUG_LOG") {
+		logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true), func(o *zap.Options) {
+			o.TimeEncoder = zapcore.ISO8601TimeEncoder
+		}))
+	}
+
+	Ctx, Cancel = context.WithCancel(context.TODO())
+	Logger = logf.FromContext(Ctx).WithValues()
+	Logger.Info("logger start")
+
+	K8sClient = TC.Kubebuilder
+	CheckNoKubeBlocksCRDs()
+
+	By("bootstrapping e2e-test environment")
+	var flag = true
+	testEnv = &envtest.Environment{
+		CRDInstallOptions: envtest.CRDInstallOptions{
+			CleanUpAfterUse: true,
+		},
+		CRDDirectoryPaths: []string{filepath.Join("..", "..", "config", "crd", "bases"),
+			// use dependent external CRDs.
+			// resolved by ref: https://github.com/operator-framework/operator-sdk/issues/4434#issuecomment-786794418
+			filepath.Join(build.Default.GOPATH, "pkg", "mod", "github.com", "kubernetes-csi/external-snapshotter/",
+				"client/v6@v6.0.1", "config", "crd")},
+		ErrorIfCRDPathMissing: true,
+		UseExistingCluster:    &flag,
+	}
+
+	var err error
+	// cfg is defined in this file globally.
+	cfg, err = testEnv.Start()
+	Expect(err).NotTo(HaveOccurred())
+	Expect(cfg).NotTo(BeNil())
+})
+
+var _ = AfterSuite(func() {
+	By("delete helm release in e2e-test environment")
+	CheckedUninstallHelmRelease()
+	if testEnv != nil {
+		By("removed installed CRDs in e2e-test environment")
+		err := testEnv.Stop()
+		Expect(err).NotTo(HaveOccurred())
+	}
+	Cancel()
+})
+
+var _ = Describe("Check healthy Kubernetes cluster status", EnvCheckTest)
+
+var _ = Describe("KubeBlocks operator installation", InstallationTest)
+
+// uninstallation tests, should have this in last Describe
+var _ = Describe("KubeBlocks operator uninstallation", UninstallationTest)
+
+// var _ = Describe("Check environment has been cleaned", EnvGotCleanedTest)

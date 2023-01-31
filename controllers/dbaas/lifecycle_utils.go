@@ -21,6 +21,7 @@ import (
 	"embed"
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"sort"
 	"strconv"
 	"strings"
@@ -876,6 +877,22 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 			return deleteSnapshot(cli, reqCtx, snapshotKey, cluster, component)
 		}
 
+		didVolumeExpanded := func() bool {
+			if len(stsObj.Spec.VolumeClaimTemplates) != len(stsProto.Spec.VolumeClaimTemplates) {
+				return true
+			}
+			for _, vct := range stsObj.Spec.VolumeClaimTemplates {
+				for _, protoVct := range stsProto.Spec.VolumeClaimTemplates {
+					if vct.Name == protoVct.Name {
+						if !reflect.DeepEqual(vct.Spec.Resources.Requests, protoVct.Spec.Resources.Requests) {
+							return true
+						}
+					}
+				}
+			}
+			return false
+		}
+
 		// when horizontal scaling up, sometimes db needs backup to sync data from master,
 		// log is not reliable enough since it can be recycled
 		if *stsObj.Spec.Replicas < *stsProto.Spec.Replicas {
@@ -900,66 +917,90 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 				*stsObj.Spec.Replicas,
 				*stsProto.Spec.Replicas)
 		}
-		// keep the original template annotations.
-		// if annotations exist and are replaced, the statefulSet will be updated.
-		stsProto.Spec.Template.Annotations = mergeAnnotations(stsObj.Spec.Template.Annotations,
-			stsProto.Spec.Template.Annotations)
-		stsObj.Spec.Template = stsProto.Spec.Template
-		stsObj.Spec.Replicas = stsProto.Spec.Replicas
-		stsObj.Spec.UpdateStrategy = stsProto.Spec.UpdateStrategy
-		if err := cli.Update(ctx, stsObj); err != nil {
-			return false, err
-		}
-		// check all pvc bound, requeue if not all ready
-		shouldRequeue, err = checkAllPVCBoundIfNeeded()
-		if err != nil {
-			return false, err
-		}
-		if shouldRequeue {
-			return true, err
-		}
-		// clean backup resources.
-		// there will not be any backup resources other than scale out.
-		if err := cleanBackupResourcesIfNeeded(); err != nil {
-			return false, err
+		volumeExpanded := didVolumeExpanded()
+		if !volumeExpanded {
+			// keep the original template annotations.
+			// if annotations exist and are replaced, the statefulSet will be updated.
+			stsProto.Spec.Template.Annotations = mergeAnnotations(stsObj.Spec.Template.Annotations,
+				stsProto.Spec.Template.Annotations)
+			stsObj.Spec.Template = stsProto.Spec.Template
+			stsObj.Spec.Replicas = stsProto.Spec.Replicas
+			stsObj.Spec.UpdateStrategy = stsProto.Spec.UpdateStrategy
+			if err := cli.Update(ctx, stsObj); err != nil {
+				return false, err
+			}
+			// check all pvc bound, requeue if not all ready
+			shouldRequeue, err = checkAllPVCBoundIfNeeded()
+			if err != nil {
+				return false, err
+			}
+			if shouldRequeue {
+				return true, err
+			}
+			// clean backup resources.
+			// there will not be any backup resources other than scale out.
+			if err := cleanBackupResourcesIfNeeded(); err != nil {
+				return false, err
+			}
 		}
 
-		// check stsObj.Spec.VolumeClaimTemplates storage
-		// request size and find attached PVC and patch request
-		// storage size
-		for _, vct := range stsObj.Spec.VolumeClaimTemplates {
-			var vctProto *corev1.PersistentVolumeClaim
-			for _, i := range stsProto.Spec.VolumeClaimTemplates {
-				if i.Name == vct.Name {
-					vctProto = &i
-					break
-				}
+		if volumeExpanded {
+			// if volume expanded, recreate statefulset to update volumeClaimTemplates
+			propagationPolicy := metav1.DeletePropagationOrphan
+			deleteOption := &client.DeleteOptions{
+				PropagationPolicy: &propagationPolicy,
+			}
+			patch := client.MergeFrom(stsObj.DeepCopy())
+			controllerutil.RemoveFinalizer(stsObj, dbClusterFinalizerName)
+			// patch finalizer first
+			if err := cli.Patch(ctx, stsObj, patch); err != nil {
+				return false, err
+			}
+			// then delete sts
+			if err := cli.Delete(ctx, stsObj, deleteOption); client.IgnoreNotFound(err) != nil {
+				return false, err
 			}
 
-			// REVIEW: how could VCT proto is nil?
-			if vctProto == nil {
-				continue
-			}
+			// check stsObj.Spec.VolumeClaimTemplates storage
+			// request size and find attached PVC and patch request
+			// storage size
+			for _, vct := range stsObj.Spec.VolumeClaimTemplates {
+				var vctProto *corev1.PersistentVolumeClaim
+				for _, i := range stsProto.Spec.VolumeClaimTemplates {
+					if i.Name == vct.Name {
+						vctProto = &i
+						break
+					}
+				}
 
-			for i := *stsObj.Spec.Replicas - 1; i >= 0; i-- {
-				pvc := &corev1.PersistentVolumeClaim{}
-				pvcKey := types.NamespacedName{
-					Namespace: key.Namespace,
-					Name:      fmt.Sprintf("%s-%s-%d", vct.Name, stsObj.Name, i),
-				}
-				var err error
-				if err = cli.Get(ctx, pvcKey, pvc); err != nil {
-					return false, err
-				}
-				if pvc.Spec.Resources.Requests[corev1.ResourceStorage] == vctProto.Spec.Resources.Requests[corev1.ResourceStorage] {
+				// REVIEW: how could VCT proto is nil?
+				if vctProto == nil {
 					continue
 				}
-				patch := client.MergeFrom(pvc.DeepCopy())
-				pvc.Spec.Resources.Requests[corev1.ResourceStorage] = vctProto.Spec.Resources.Requests[corev1.ResourceStorage]
-				if err := cli.Patch(ctx, pvc, patch); err != nil {
-					return false, err
+
+				for i := *stsObj.Spec.Replicas - 1; i >= 0; i-- {
+					pvc := &corev1.PersistentVolumeClaim{}
+					pvcKey := types.NamespacedName{
+						Namespace: key.Namespace,
+						Name:      fmt.Sprintf("%s-%s-%d", vct.Name, stsObj.Name, i),
+					}
+					var err error
+					if err = cli.Get(ctx, pvcKey, pvc); err != nil {
+						return false, err
+					}
+					if pvc.Spec.Resources.Requests[corev1.ResourceStorage] == vctProto.Spec.Resources.Requests[corev1.ResourceStorage] {
+						continue
+					}
+					patch := client.MergeFrom(pvc.DeepCopy())
+					pvc.Spec.Resources.Requests[corev1.ResourceStorage] = vctProto.Spec.Resources.Requests[corev1.ResourceStorage]
+					if err := cli.Patch(ctx, pvc, patch); err != nil {
+						return false, err
+					}
 				}
 			}
+
+			// requeue to let controller recreate sts
+			return true, nil
 		}
 		return false, nil
 	}

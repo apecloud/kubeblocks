@@ -88,12 +88,12 @@ func CovertToStatefulSet(obj client.Object) *appsv1.StatefulSet {
 	return nil
 }
 
-// Len is the implementation of the sort.Interface, Calculate the length of the list of DescendingOrdinalSts.
+// Len is the implementation of the sort.Interface, calculate the length of the list of DescendingOrdinalSts.
 func (dos DescendingOrdinalSts) Len() int {
 	return len(dos)
 }
 
-// Swap is the implementation of the sort.Interface, Exchange two items in DescendingOrdinalSts.
+// Swap is the implementation of the sort.Interface, exchange two items in DescendingOrdinalSts.
 func (dos DescendingOrdinalSts) Swap(i, j int) {
 	dos[i], dos[j] = dos[j], dos[i]
 }
@@ -126,7 +126,7 @@ func getParentNameAndOrdinalSts(sts *appsv1.StatefulSet) (string, int) {
 	return parent, ordinal
 }
 
-// GetPodListByStatefulSet get statefulSet pod list.
+// GetPodListByStatefulSet gets statefulSet pod list.
 func GetPodListByStatefulSet(ctx context.Context, cli client.Client, stsObj *appsv1.StatefulSet) ([]corev1.Pod, error) {
 	podList := &corev1.PodList{}
 	if err := cli.List(ctx, podList,

@@ -1217,7 +1217,7 @@ func buildSts(reqCtx intctrlutil.RequestCtx, params createParams, envConfigName 
 	return &sts, nil
 }
 
-// buildPersistentVolumeClaimLabels builds a pvc name label, and synchronize the label on the sts to the pvc label.
+// buildPersistentVolumeClaimLabels builds a pvc name label, and synchronize the labels on the sts to the pvc labels.
 func buildPersistentVolumeClaimLabels(sts *appsv1.StatefulSet, pvc *corev1.PersistentVolumeClaim) {
 	if pvc.Labels == nil {
 		pvc.Labels = make(map[string]string)

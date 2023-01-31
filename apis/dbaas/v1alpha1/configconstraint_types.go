@@ -151,7 +151,7 @@ type IniConfig struct {
 
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
-//+kubebuilder:resource:categories={dbaas},scope=Cluster,shortName=ctpl
+//+kubebuilder:resource:categories={kubeblocks},scope=Cluster,shortName=cc
 //+kubebuilder:printcolumn:name="PHASE",type="string",JSONPath=".status.phase",description="status phase"
 //+kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
 

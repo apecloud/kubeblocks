@@ -153,7 +153,7 @@ type BackupPolicyStatus struct {
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
-// +kubebuilder:resource:categories={dbaas},scope=Namespaced
+// +kubebuilder:resource:categories={kubeblocks},scope=Namespaced
 // +kubebuilder:printcolumn:name="STATUS",type=string,JSONPath=`.status.phase`
 // +kubebuilder:printcolumn:name="SCHEDULE",type=string,JSONPath=`.spec.schedule`
 // +kubebuilder:printcolumn:name="LAST SCHEDULE",type=string,JSONPath=`.status.lastScheduleTime`

@@ -1,4 +1,4 @@
-#!/bin/env python3
+#!/usr/bin/env python
 # -*- coding:utf-8 -*-
 
 # Get release version from git tag and set the parsed version to

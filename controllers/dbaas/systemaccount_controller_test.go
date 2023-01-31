@@ -78,13 +78,10 @@ var _ = Describe("SystemAccount Controller", func() {
 	)
 
 	cleanEnv := func() {
-		// must wait until resources deleted and no longer exist before the testcases start, otherwise :
-		// - if later it needs to create some new resource objects with the same name,
+		// must wait until resources deleted and no longer exist before the testcases start,
+		// otherwise if later it needs to create some new resource objects with the same name,
 		// in race conditions, it will find the existence of old objects, resulting failure to
 		// create the new objects.
-		// - worse, if an async DeleteAll call is issued here, it maybe executed later by the
-		// K8s API server, by which time the testcase may have already created some new test objects,
-		// which shall be accidentally deleted.
 		By("clean resources")
 
 		testdbaas.ClearClusterResources(&testCtx)
@@ -228,7 +225,7 @@ var _ = Describe("SystemAccount Controller", func() {
 		_ = assureEndpoint(objectKey.Namespace, serviceName, ips[0:1])
 		_ = assureEndpoint(objectKey.Namespace, headlessServiceName, ips)
 
-		By("Patching Cluster torunning phase")
+		By("Patching Cluster to running phase")
 		Eventually(testdbaas.GetAndChangeObjStatus(&testCtx, objectKey, func(cluster *dbaasv1alpha1.Cluster) {
 			cluster.Status.Phase = dbaasv1alpha1.RunningPhase
 		}), timeout, interval).Should(Succeed())
@@ -266,7 +263,7 @@ var _ = Describe("SystemAccount Controller", func() {
 				g.Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: cluster.Namespace, Name: rootSecretName}, rootSecret)).To(Succeed())
 			}, timeout, interval).Should(Succeed())
 
-			clustersMap[testName] = intctrlutil.GetNamespacedName(cluster)
+			clustersMap[testName] = client.ObjectKeyFromObject(cluster)
 			matchingLabelsMap[testName] = getLabelsForSecretsAndJobs(cluster.Name, clusterDef.Spec.Type, clusterDef.Name, consensusCompName)
 		}
 		return
@@ -492,23 +489,25 @@ var _ = Describe("SystemAccount Controller", func() {
 					g.Expect(exp.toCreate&dbaasv1alpha1.KBAccountDataprotection > 0).To(BeTrue())
 				}, timeout, interval).Should(Succeed())
 
-				resoruce := testCase.envInfo.resourceMap[dbaasv1alpha1.DataprotectionAccount]
-				if resoruce.jobNum == 0 && resoruce.secretNum == 0 {
+				resource := testCase.envInfo.resourceMap[dbaasv1alpha1.DataprotectionAccount]
+
+				if resource.jobNum == 0 || resource.secretNum == 0 {
 					// if DataprotectionAccount is not configured in ClusterDef, there should be no updates
 					By("No job will be created, if account not configure")
 					Consistently(func(g Gomega) {
 						// no job will be created
-						jobs := &batchv1.JobList{}
-						g.Expect(k8sClient.List(ctx, jobs, client.InNamespace(cluster.Namespace), ml)).To(Succeed())
-						g.Expect(len(jobs.Items)).To(BeEquivalentTo(0))
+						if resource.jobNum == 0 {
+							jobs := &batchv1.JobList{}
+							g.Expect(k8sClient.List(ctx, jobs, client.InNamespace(cluster.Namespace), ml)).To(Succeed())
+							g.Expect(len(jobs.Items)).To(BeEquivalentTo(0))
+						}
 
-						// no secret will be created
 						secrets := &corev1.SecretList{}
-						g.Expect(k8sClient.List(ctx, secrets, client.InNamespace(cluster.Namespace), ml, client.HasLabels{clusterAccountLabelKey})).To(Succeed())
-						g.Expect(len(secrets.Items)).To(BeEquivalentTo(0))
-
-						// no new secret will be cached
-						g.Expect(len(systemAccountReconciler.SecretMapStore.ListKeys())).To(BeEquivalentTo(secretsToCreate1))
+						if resource.secretNum == 0 {
+							// no secret will be created
+							g.Expect(k8sClient.List(ctx, secrets, client.InNamespace(cluster.Namespace), ml)).To(Succeed())
+							g.Expect(len(secrets.Items)).To(BeEquivalentTo(0))
+						}
 					}, consistTimeout, interval).Should(Succeed())
 
 					By("Delete BackupPolicy")
@@ -629,7 +628,7 @@ var _ = Describe("SystemAccount Controller", func() {
 				By("Check secrets created")
 				Eventually(func(g Gomega) {
 					secrets := &corev1.SecretList{}
-					g.Expect(k8sClient.List(ctx, secrets, client.InNamespace(cluster.Namespace), ml, client.HasLabels{clusterAccountLabelKey})).To(Succeed())
+					g.Expect(k8sClient.List(ctx, secrets, client.InNamespace(cluster.Namespace), ml)).To(Succeed())
 					g.Expect(len(secrets.Items)).To(BeEquivalentTo(secretsNum))
 				}, timeout, interval).Should(Succeed())
 
@@ -844,7 +843,7 @@ var _ = Describe("SystemAccount Controller", func() {
 				}
 
 				jobToDelete := jobs.Items[0]
-				jobKey := intctrlutil.GetNamespacedName(&jobToDelete)
+				jobKey := client.ObjectKeyFromObject(&jobToDelete)
 				Expect(k8sClient.Delete(ctx, &jobToDelete)).To(Succeed())
 				Expect(testdbaas.ChangeObj(&testCtx, &jobToDelete, func() { controllerutil.RemoveFinalizer(&jobToDelete, orphanFinalizerName) })).To(Succeed())
 

@@ -69,13 +69,19 @@ func loadConfiguration(cfgType dbaasv1alpha1.ConfigurationFormatter, rawData str
 		}
 		return xmlMap, nil
 	}
-	v := viper.New()
+
+	var v *viper.Viper
+	// TODO hack, viper parse problem
+	if cfgType == dbaasv1alpha1.DOTENV {
+		v = viper.NewWithOptions(viper.KeyDelimiter("#"))
+	} else {
+		v = viper.New()
+	}
 	v.SetConfigType(string(cfgType))
 	v.SetTypeByDefaultValue(true)
 	if err := v.ReadConfig(strings.NewReader(rawData)); err != nil {
 		return nil, err
 	}
-
 	return v.AllSettings(), nil
 }
 

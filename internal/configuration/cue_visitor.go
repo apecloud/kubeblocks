@@ -58,6 +58,8 @@ func (c *cueTypeExtractor) visitValue(x cue.Value, path string) {
 		c.addFieldType(path, NullableType)
 	case k&cue.BytesKind == cue.BytesKind:
 		c.addFieldType(path, StringType)
+	case k&cue.BoolKind == cue.BoolKind:
+		c.addFieldType(path, BoolType)
 	case k&cue.StringKind == cue.StringKind:
 		c.addFieldType(path, StringType)
 	case k&cue.FloatKind == cue.FloatKind:

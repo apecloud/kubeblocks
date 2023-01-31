@@ -59,7 +59,7 @@ var numberRegex = regexp.MustCompile(`^\d+$`)
 
 var ValueTypeParserMap = map[ValueType]ValueParser{
 	BooleanTYpe: func(s string) (interface{}, error) {
-		if numberRegex.MatchString(s) {
+		if booleanPromotion && numberRegex.MatchString(s) {
 			return nil, cfgcore.MakeError("boolean parser failed")
 		}
 		return strconv.ParseBool(s)
@@ -206,17 +206,32 @@ func checkAndUpdateDefaultValue(param *ParameterType) {
 	if defaultValue[0] == '{' {
 		param.DefaultValue = ""
 	}
-	if valueType == StringType && ignoreStringDefault {
-		param.DefaultValue = ""
+
+	switch valueType {
+	case BooleanTYpe:
+		checkAndUpdateBoolDefaultValue(param, formatString)
+	case StringType:
+		if ignoreStringDefault {
+			param.DefaultValue = ""
+		}
+	case IntegerType, FloatType:
+		if v, err := ValueTypeParserMap[param.Type](param.DefaultValue); err != nil || formatString(v) != defaultValue {
+			param.DefaultValue = ""
+		}
+	}
+}
+
+func checkAndUpdateBoolDefaultValue(param *ParameterType, formatString func(v interface{}) string) {
+	if booleanPromotion {
 		return
 	}
 
-	if valueType != IntegerType && valueType != FloatType {
+	v, err := ValueTypeParserMap[BooleanTYpe](param.DefaultValue)
+	if err != nil {
+		param.DefaultValue = ""
 		return
 	}
-	if v, err := ValueTypeParserMap[param.Type](param.DefaultValue); err != nil || formatString(v) != defaultValue {
-		param.DefaultValue = ""
-	}
+	param.DefaultValue = formatString(v)
 }
 
 type ParameterRestrict struct {
@@ -423,9 +438,12 @@ func (w *CueWrapper) generateCueTypeParameter(buffer *bytes.Buffer) {
 		buffer.WriteByte('?')
 	}
 	buffer.WriteString(": ")
-	if w.Type == IntegerType {
+	switch w.Type {
+	case IntegerType:
 		buffer.WriteString("int")
-	} else {
+	case BooleanTYpe:
+		buffer.WriteString("bool")
+	default:
 		buffer.WriteString(string(w.Type))
 	}
 }

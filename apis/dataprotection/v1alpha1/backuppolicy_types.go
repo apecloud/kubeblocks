@@ -122,7 +122,6 @@ type BackupPolicyHook struct {
 	PostCommands []string `json:"postCommands,omitempty"`
 
 	// exec command with image
-	// +kubebuilder:default="docker.io/apecloud/kubeblocks"
 	// +optional
 	Image string `json:"image,omitempty"`
 

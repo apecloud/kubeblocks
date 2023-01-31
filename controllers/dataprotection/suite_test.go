@@ -74,6 +74,7 @@ var _ = BeforeSuite(func() {
 	ctx, cancel = context.WithCancel(context.TODO())
 
 	viper.AutomaticEnv()
+	viper.SetDefault("KUBEBLOCKS_IMAGE", "apecloud/kubeblocks:latest")
 	fmt.Printf("config settings: %v\n", viper.AllSettings())
 
 	By("bootstrapping test environment")

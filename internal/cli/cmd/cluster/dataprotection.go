@@ -68,6 +68,10 @@ var (
 		# restore a new cluster from a backup
 		kbcli cluster restore new-cluster-name --backup backup-name
 	`)
+	createReconfigureExample = templates.Examples(`
+		# update component params 
+		kbcli cluster configure cluster-name --component-name=component-name --set max_connections=1000,general_log=OFF
+	`)
 )
 
 type CreateBackupOptions struct {

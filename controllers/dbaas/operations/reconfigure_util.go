@@ -27,58 +27,6 @@ import (
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 )
 
-type ComponentsType interface {
-	dbaasv1alpha1.ClusterVersionComponent | dbaasv1alpha1.ClusterDefinitionComponent | dbaasv1alpha1.ClusterComponent
-}
-
-type filterFn[T ComponentsType] func(o T) bool
-
-func filter[T ComponentsType](components []T, f filterFn[T]) *T {
-	for _, c := range components {
-		if f(c) {
-			return &c
-		}
-	}
-	return nil
-}
-
-func getConfigTemplatesFromComponent(
-	cComponents []dbaasv1alpha1.ClusterComponent,
-	dComponents []dbaasv1alpha1.ClusterDefinitionComponent,
-	aComponents []dbaasv1alpha1.ClusterVersionComponent,
-	componentName string) ([]dbaasv1alpha1.ConfigTemplate, error) {
-	findCompTypeByName := func(comName string) *dbaasv1alpha1.ClusterComponent {
-		return filter(cComponents, func(o dbaasv1alpha1.ClusterComponent) bool {
-			return o.Name == comName
-		})
-	}
-
-	cCom := findCompTypeByName(componentName)
-	if cCom == nil {
-		return nil, cfgcore.MakeError("failed to find component[%s]", componentName)
-	}
-	aCom := filter(aComponents, func(o dbaasv1alpha1.ClusterVersionComponent) bool {
-		return o.Type == cCom.Type
-	})
-	dCom := filter(dComponents, func(o dbaasv1alpha1.ClusterDefinitionComponent) bool {
-		return o.TypeName == cCom.Type
-	})
-
-	var (
-		avTpls []dbaasv1alpha1.ConfigTemplate
-		cdTpls []dbaasv1alpha1.ConfigTemplate
-	)
-
-	if aCom != nil {
-		avTpls = aCom.ConfigTemplateRefs
-	}
-	if dCom != nil && dCom.ConfigSpec != nil {
-		cdTpls = dCom.ConfigSpec.ConfigTemplateRefs
-	}
-
-	return MergeConfigTemplates(avTpls, cdTpls), nil
-}
-
 // updateCfgParams merge parameters of the config into the configmap, and verify final configuration file.
 func updateCfgParams(
 	config dbaasv1alpha1.Configuration,
@@ -170,41 +118,4 @@ func fromKeyValuePair(parameters []dbaasv1alpha1.ParameterPair) map[string]inter
 		}
 	}
 	return m
-}
-
-// MergeConfigTemplates merge ClusterVersion.Components[*].ConfigTemplateRefs and ClusterDefinition.Components[*].ConfigTemplateRefs
-func MergeConfigTemplates(clusterVersionTpl []dbaasv1alpha1.ConfigTemplate,
-	cdTpl []dbaasv1alpha1.ConfigTemplate) []dbaasv1alpha1.ConfigTemplate {
-	if len(clusterVersionTpl) == 0 {
-		return cdTpl
-	}
-
-	if len(cdTpl) == 0 {
-		return clusterVersionTpl
-	}
-
-	mergedCfgTpl := make([]dbaasv1alpha1.ConfigTemplate, 0, len(clusterVersionTpl)+len(cdTpl))
-	mergedTplMap := make(map[string]struct{}, cap(mergedCfgTpl))
-
-	for i := range clusterVersionTpl {
-		volumeName := clusterVersionTpl[i].VolumeName
-		if _, ok := (mergedTplMap)[volumeName]; ok {
-			// It's been checked in validation webhook
-			continue
-		}
-		mergedCfgTpl = append(mergedCfgTpl, clusterVersionTpl[i])
-		mergedTplMap[volumeName] = struct{}{}
-	}
-
-	for i := range cdTpl {
-		// ClusterVersion replace clusterDefinition
-		volumeName := cdTpl[i].VolumeName
-		if _, ok := (mergedTplMap)[volumeName]; ok {
-			continue
-		}
-		mergedCfgTpl = append(mergedCfgTpl, cdTpl[i])
-		mergedTplMap[volumeName] = struct{}{}
-	}
-
-	return mergedCfgTpl
 }

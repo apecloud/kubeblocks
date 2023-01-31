@@ -47,7 +47,6 @@ import (
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/dbaas/components/consensusset"
 	cfgutil "github.com/apecloud/kubeblocks/controllers/dbaas/configuration"
-	"github.com/apecloud/kubeblocks/controllers/dbaas/operations"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 	cfgcm "github.com/apecloud/kubeblocks/internal/configuration/configmap"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
@@ -353,7 +352,7 @@ func mergeComponents(
 	}
 
 	if clusterVersionComp != nil {
-		component.ConfigTemplates = operations.MergeConfigTemplates(clusterVersionComp.ConfigTemplateRefs, component.ConfigTemplates)
+		component.ConfigTemplates = cfgcore.MergeConfigTemplates(clusterVersionComp.ConfigTemplateRefs, component.ConfigTemplates)
 		if clusterVersionComp.PodSpec != nil {
 			for _, c := range clusterVersionComp.PodSpec.Containers {
 				doContainerAttrOverride(c)

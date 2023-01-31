@@ -138,7 +138,7 @@ func (r *reconfigureAction) Action(resource *OpsResource) error {
 		return cfgcore.WrapError(err, "failed to get clusterversion[%s]", cluster.Spec.ClusterVersionRef)
 	}
 
-	tpls, err := getConfigTemplatesFromComponent(
+	tpls, err := cfgcore.GetConfigTemplatesFromComponent(
 		cluster.Spec.Components,
 		clusterDefinition.Spec.Components,
 		clusterVersion.Spec.Components,

@@ -23,11 +23,11 @@ import (
 	. "github.com/onsi/gomega"
 
 	appsv1 "k8s.io/api/apps/v1"
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	testdbaas "github.com/apecloud/kubeblocks/internal/testutil/dbaas"
 	testk8s "github.com/apecloud/kubeblocks/internal/testutil/k8s"
 )
@@ -44,31 +44,31 @@ var _ = Describe("Stateful Component", func() {
 	)
 	const defaultMinReadySeconds = 10
 
-	cleanupObjects := func() {
-		err := k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.Cluster{}, client.InNamespace(testCtx.DefaultNamespace), client.HasLabels{testCtx.TestObjLabelKey})
-		Expect(err).NotTo(HaveOccurred())
-		err = k8sClient.DeleteAllOf(ctx, &appsv1.Deployment{}, client.InNamespace(testCtx.DefaultNamespace), client.HasLabels{testCtx.TestObjLabelKey})
-		Expect(err).NotTo(HaveOccurred())
-		err = k8sClient.DeleteAllOf(ctx, &corev1.Pod{}, client.InNamespace(testCtx.DefaultNamespace), client.HasLabels{testCtx.TestObjLabelKey},
-			client.GracePeriodSeconds(0))
-		Expect(err).NotTo(HaveOccurred())
+	cleanAll := func() {
+		// must wait until resources deleted and no longer exist before the testcases start,
+		// otherwise if later it needs to create some new resource objects with the same name,
+		// in race conditions, it will find the existence of old objects, resulting failure to
+		// create the new objects.
+		By("clean resources")
+
+		// clear rest resources
+		inNS := client.InNamespace(testCtx.DefaultNamespace)
+		ml := client.HasLabels{testCtx.TestObjLabelKey}
+		// namespaced resources
+		testdbaas.ClearResources(&testCtx, intctrlutil.ClusterSignature, inNS, ml)
+		testdbaas.ClearResources(&testCtx, intctrlutil.DeploymentSignature, inNS, ml)
+		testdbaas.ClearResources(&testCtx, intctrlutil.PodSignature, inNS, ml, client.GracePeriodSeconds(0))
 	}
 
-	BeforeEach(func() {
-		// Add any setup steps that needs to be executed before each test
-		cleanupObjects()
-	})
+	BeforeEach(cleanAll)
 
-	AfterEach(func() {
-		// Add any teardown steps that needs to be executed after each test
-		cleanupObjects()
-	})
+	AfterEach(cleanAll)
 
 	Context("Stateless Component test", func() {
 		It("Stateless Component test", func() {
 			By(" init cluster, deployment")
-			cluster := testdbaas.CreateStatelessCluster(ctx, testCtx, clusterDefName, clusterVersionName, clusterName)
-			deploy := testdbaas.MockStatelessComponentDeploy(ctx, testCtx, clusterName, statelessCompName)
+			cluster := testdbaas.CreateStatelessCluster(testCtx, clusterDefName, clusterVersionName, clusterName)
+			deploy := testdbaas.MockStatelessComponentDeploy(testCtx, clusterName, statelessCompName)
 			statelessComponent := NewStateless(ctx, k8sClient, cluster)
 
 			By("test pods are not ready")
@@ -88,11 +88,11 @@ var _ = Describe("Stateful Component", func() {
 				phase, _ := statelessComponent.GetPhaseWhenPodsNotReady(statelessCompName)
 				Expect(phase == dbaasv1alpha1.FailedPhase).Should(BeTrue())
 				Expect(k8sClient.Status().Patch(ctx, deploy, patch)).Should(Succeed())
-				Eventually(func(g Gomega) bool {
-					tmpDeploy := &appsv1.Deployment{}
-					g.Expect(k8sClient.Get(ctx, client.ObjectKey{Name: deploy.Name, Namespace: testCtx.DefaultNamespace}, tmpDeploy)).Should(Succeed())
-					return tmpDeploy.Status.AvailableReplicas == availableReplicas
-				}, timeout, interval).Should(BeTrue())
+				By("wait deployment ")
+				Eventually(testdbaas.CheckObj(&testCtx, client.ObjectKey{Name: deploy.Name,
+					Namespace: testCtx.DefaultNamespace}, func(g Gomega, tmpDeploy *appsv1.Deployment) {
+					g.Expect(tmpDeploy.Status.AvailableReplicas == availableReplicas).Should(BeTrue())
+				})).Should(Succeed())
 				phase, _ = statelessComponent.GetPhaseWhenPodsNotReady(statelessCompName)
 				Expect(phase == dbaasv1alpha1.AbnormalPhase).Should(BeTrue())
 			}
@@ -112,7 +112,7 @@ var _ = Describe("Stateful Component", func() {
 
 			By("test pod is ready")
 			podName := "nginx-" + randomStr
-			pod := testdbaas.MockStatelessPod(ctx, testCtx, clusterName, statelessCompName, podName)
+			pod := testdbaas.MockStatelessPod(testCtx, clusterName, statelessCompName, podName)
 			lastTransTime := metav1.NewTime(time.Now().Add(-1 * (defaultMinReadySeconds + 1) * time.Second))
 			testk8s.MockPodAvailable(pod, lastTransTime)
 			Expect(statelessComponent.PodIsAvailable(pod, defaultMinReadySeconds)).Should(BeTrue())

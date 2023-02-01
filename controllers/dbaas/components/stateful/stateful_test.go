@@ -23,7 +23,6 @@ import (
 	. "github.com/onsi/gomega"
 
 	appsv1 "k8s.io/api/apps/v1"
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -44,36 +43,34 @@ var _ = Describe("Stateful Component", func() {
 		interval           = time.Second
 	)
 	const defaultMinReadySeconds = 10
-	cleanupObjects := func() {
-		err := k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.ClusterDefinition{}, client.HasLabels{testCtx.TestObjLabelKey})
-		Expect(err).NotTo(HaveOccurred())
-		err = k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.ClusterVersion{}, client.HasLabels{testCtx.TestObjLabelKey})
-		Expect(err).NotTo(HaveOccurred())
-		err = k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.Cluster{}, client.InNamespace(testCtx.DefaultNamespace), client.HasLabels{testCtx.TestObjLabelKey})
-		Expect(err).NotTo(HaveOccurred())
-		err = k8sClient.DeleteAllOf(ctx, &appsv1.StatefulSet{}, client.InNamespace(testCtx.DefaultNamespace), client.HasLabels{testCtx.TestObjLabelKey})
-		Expect(err).NotTo(HaveOccurred())
-		err = k8sClient.DeleteAllOf(ctx, &corev1.Pod{}, client.InNamespace(testCtx.DefaultNamespace), client.HasLabels{testCtx.TestObjLabelKey},
-			client.GracePeriodSeconds(0))
-		Expect(err).NotTo(HaveOccurred())
+
+	cleanAll := func() {
+		// must wait until resources deleted and no longer exist before the testcases start,
+		// otherwise if later it needs to create some new resource objects with the same name,
+		// in race conditions, it will find the existence of old objects, resulting failure to
+		// create the new objects.
+		By("clean resources")
+		// delete cluster(and all dependent sub-resources), clusterversion and clusterdef
+		testdbaas.ClearClusterResources(&testCtx)
+
+		// clear rest resources
+		inNS := client.InNamespace(testCtx.DefaultNamespace)
+		ml := client.HasLabels{testCtx.TestObjLabelKey}
+		// namespaced resources
+		testdbaas.ClearResources(&testCtx, intctrlutil.StatefulSetSignature, inNS, ml)
+		testdbaas.ClearResources(&testCtx, intctrlutil.PodSignature, inNS, ml, client.GracePeriodSeconds(0))
 	}
 
-	BeforeEach(func() {
-		// Add any setup steps that needs to be executed before each test
-		cleanupObjects()
-	})
+	BeforeEach(cleanAll)
 
-	AfterEach(func() {
-		// Add any teardown steps that needs to be executed after each test
-		cleanupObjects()
-	})
+	AfterEach(cleanAll)
 
 	Context("Stateful Component test", func() {
 		It("Stateful Component test", func() {
 			By(" init cluster, statefulSet, pods")
-			_, _, cluster := testdbaas.InitConsensusMysql(ctx, testCtx, clusterDefName,
+			_, _, cluster := testdbaas.InitConsensusMysql(testCtx, clusterDefName,
 				clusterVersionName, clusterName, consensusCompName)
-			_ = testdbaas.MockConsensusComponentStatefulSet(ctx, testCtx, clusterName, consensusCompName)
+			_ = testdbaas.MockConsensusComponentStatefulSet(testCtx, clusterName, consensusCompName)
 			stsList := &appsv1.StatefulSetList{}
 			Eventually(func() bool {
 				_ = k8sClient.List(ctx, stsList, client.InNamespace(testCtx.DefaultNamespace), client.MatchingLabels{
@@ -93,22 +90,22 @@ var _ = Describe("Stateful Component", func() {
 			sts.Status.Replicas = availableReplicas
 			podsReady, _ := stateful.PodsReady(sts)
 			Expect(podsReady == false).Should(BeTrue())
+
 			if testCtx.UsingExistingCluster() {
 				Eventually(func() bool {
 					phase, _ := stateful.GetPhaseWhenPodsNotReady(consensusCompName)
 					return phase == ""
 				}, timeout*5, interval).Should(BeTrue())
 			} else {
-				podList := testdbaas.MockConsensusComponentPods(ctx, testCtx, clusterName, consensusCompName)
+				podList := testdbaas.MockConsensusComponentPods(testCtx, sts, clusterName, consensusCompName)
 				phase, _ := stateful.GetPhaseWhenPodsNotReady(consensusCompName)
 				Expect(phase == dbaasv1alpha1.FailedPhase).Should(BeTrue())
 				Expect(k8sClient.Status().Patch(ctx, sts, patch)).Should(Succeed())
+
 				By("test stateful component is abnormal")
-				Eventually(func(g Gomega) bool {
-					tmpSts := &appsv1.StatefulSet{}
-					g.Expect(k8sClient.Get(ctx, client.ObjectKey{Name: sts.Name, Namespace: testCtx.DefaultNamespace}, tmpSts)).Should(Succeed())
-					return tmpSts.Status.AvailableReplicas == availableReplicas
-				}, timeout, interval).Should(BeTrue())
+				Eventually(testdbaas.CheckObj(&testCtx, client.ObjectKeyFromObject(sts), func(g Gomega, tmpSts *appsv1.StatefulSet) {
+					g.Expect(tmpSts.Status.AvailableReplicas == availableReplicas).Should(BeTrue())
+				})).Should(Succeed())
 				phase, _ = stateful.GetPhaseWhenPodsNotReady(consensusCompName)
 				Expect(phase == dbaasv1alpha1.AbnormalPhase).Should(BeTrue())
 

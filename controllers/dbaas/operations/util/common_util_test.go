@@ -55,7 +55,7 @@ var _ = Describe("OpsRequest Controller", func() {
 
 	Context("Test OpsRequest", func() {
 		It("Should Test all OpsRequest", func() {
-			cluster := testdbaas.CreateConsensusMysqlCluster(ctx, testCtx, clusterDefinitionName,
+			cluster := testdbaas.CreateConsensusMysqlCluster(testCtx, clusterDefinitionName,
 				clusterVersionName, clusterName, consensusCompName)
 			By("init restart OpsRequest")
 			testOpsName := "restart-" + randomStr

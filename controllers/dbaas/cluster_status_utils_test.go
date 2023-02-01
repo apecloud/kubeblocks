@@ -139,103 +139,32 @@ spec:
 	}
 
 	createStsPod := func(podName, podRole, componentName string) *corev1.Pod {
-		podYaml := fmt.Sprintf(`apiVersion: v1
-kind: Pod
-metadata:
-  labels:
-    app.kubernetes.io/component-name: %s
-    app.kubernetes.io/instance: %s
-    kubeblocks.io/role: %s
-    app.kubernetes.io/managed-by: kubeblocks
-  name: %s
-  namespace: default
-spec:
-  containers:
-  - image: docker.io/apecloud/apecloud-mysql-server:latest
-    imagePullPolicy: IfNotPresent
-    name: mysql`, componentName, clusterName, podRole, podName)
-		pod := &corev1.Pod{}
-		Expect(yaml.Unmarshal([]byte(podYaml), pod)).Should(Succeed())
-		Expect(testCtx.CreateObj(context.Background(), pod)).Should(Succeed())
-		// wait until pod created
-		Eventually(func() error {
-			return k8sClient.Get(context.Background(), client.ObjectKey{Name: podName, Namespace: namespace}, &corev1.Pod{})
-		}, timeout, interval).Should(Succeed())
-		return pod
-
+		return testdbaas.CreateCustomizedObj(&testCtx, "hybrid/hybrid_sts_pod.yaml", &corev1.Pod{},
+			testdbaas.CustomizeObjYAML(componentName, clusterName, podRole, podName))
 	}
 
-	createDeployment := func(componentName, deployName string) {
-		deploymentYaml := fmt.Sprintf(`apiVersion: apps/v1
-kind: Deployment
-metadata:
-  labels:
-    app.kubernetes.io/component-name: %s
-    app.kubernetes.io/instance: %s
-    app.kubernetes.io/managed-by: kubeblocks
-  name: %s
-  namespace: default
-spec:
-  minReadySeconds: 10
-  replicas: 3
-  selector:
-    matchLabels:
-      app.kubernetes.io/component-name: %s
-      app.kubernetes.io/instance: %s
-  template:
-    metadata:
-      labels:
-        app.kubernetes.io/component-name: %s
-        app.kubernetes.io/instance: %s
-    spec:
-      containers:
-      - image: nginx:latest
-        imagePullPolicy: IfNotPresent
-        name: nginx
-`, componentName, clusterName, deployName, componentName, clusterName, componentName, clusterName)
-		deploy := &appsv1.Deployment{}
-		Expect(yaml.Unmarshal([]byte(deploymentYaml), deploy)).Should(Succeed())
-		Expect(testCtx.CreateObj(context.Background(), deploy)).Should(Succeed())
-		// wait until deployment created
+	getDeployment := func(componentName string) *appsv1.Deployment {
+		deployList := &appsv1.DeploymentList{}
 		Eventually(func() bool {
-			err := k8sClient.Get(context.Background(), client.ObjectKey{Name: deployName, Namespace: namespace}, &appsv1.Deployment{})
-			return err == nil
-		}, timeout, interval).Should(BeTrue())
-	}
-
-	initComponentStatefulSet := func(componentName string) string {
-		stsName := clusterName + "-" + componentName
-		sts := createSts(stsName, componentName)
-		// wait until statefulSet created
-		Eventually(func() bool {
-			err := k8sClient.Get(context.Background(),
-				client.ObjectKey{Name: stsName, Namespace: sts.Namespace},
-				&appsv1.StatefulSet{})
-			return err == nil
-		}, timeout, interval).Should(BeTrue())
-		return stsName
+			Expect(k8sClient.List(ctx, deployList, client.MatchingLabels{
+				intctrlutil.AppComponentLabelKey: componentName,
+				intctrlutil.AppInstanceLabelKey:  clusterName}, client.Limit(1))).Should(Succeed())
+			return len(deployList.Items) == 1
+		}).Should(BeTrue())
+		return &deployList.Items[0]
 	}
 
 	handleAndCheckComponentStatus := func(componentName string, event *corev1.Event,
-		expectPhase dbaasv1alpha1.Phase, checkClusterPhase bool, ltimeout time.Duration) {
-		Eventually(func(g Gomega) dbaasv1alpha1.Phase {
-			Expect(handleEventForClusterStatus(ctx, k8sClient, clusterRecorder, event)).Should(Succeed())
-			newCluster := &dbaasv1alpha1.Cluster{}
-			g.Expect(k8sClient.Get(ctx, client.ObjectKey{Name: clusterName, Namespace: namespace}, newCluster)).Should(Succeed())
-			statusComponents := newCluster.Status.Components
-			if statusComponents == nil {
-				return ""
-			}
-			if _, ok := statusComponents[componentName]; !ok {
-				return ""
-			}
-
+		expectPhase dbaasv1alpha1.Phase, checkClusterPhase bool) {
+		Eventually(testdbaas.CheckObj(&testCtx, client.ObjectKey{Name: clusterName, Namespace: namespace}, func(g Gomega, newCluster *dbaasv1alpha1.Cluster) {
+			g.Expect(handleEventForClusterStatus(ctx, k8sClient, clusterRecorder, event)).Should(Succeed())
 			if checkClusterPhase {
-				return newCluster.Status.Phase
+				g.Expect(newCluster.Status.Phase == expectPhase).Should(BeTrue())
+				return
 			}
-			return statusComponents[componentName].Phase
-		}, ltimeout, interval).Should(Equal(expectPhase))
-
+			statusComponent := newCluster.Status.Components[componentName]
+			g.Expect(statusComponent.Phase == expectPhase).Should(BeTrue())
+		}))
 	}
 
 	setInvolvedObject := func(event *corev1.Event, kind, objectName string) {
@@ -267,7 +196,7 @@ spec:
 			Expect(handleEventForClusterStatus(ctx, k8sClient, clusterRecorder, event)).Should(Succeed())
 
 			By("watch warning event from StatefulSet, but mismatch condition ")
-			// create statefulSet for replicasets component
+			// wait for StatefulSet created by cluster controller
 			stsName := initComponentStatefulSet(statefulCompName)
 			stsInvolvedObject := corev1.ObjectReference{
 				Name:      stsName,

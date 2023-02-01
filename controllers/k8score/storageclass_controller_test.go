@@ -17,14 +17,11 @@ limitations under the License.
 package k8score
 
 import (
-	"context"
 	"fmt"
-	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	storagev1 "k8s.io/api/storage/v1"
-	"k8s.io/apimachinery/pkg/util/yaml"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
@@ -32,11 +29,6 @@ import (
 )
 
 var _ = Describe("StorageClass Controller", func() {
-	var (
-		ctx      = context.Background()
-		timeout  = time.Second * 10
-		interval = time.Second
-	)
 
 	cleanEnv := func() {
 		// must wait until resources deleted and no longer exist before the testcases start,
@@ -56,28 +48,8 @@ var _ = Describe("StorageClass Controller", func() {
 	AfterEach(cleanEnv)
 
 	createStorageClassObj := func(storageClassName string, allowVolumeExpansion bool) *storagev1.StorageClass {
-		By("By assure an default storageClass")
-		scYAML := fmt.Sprintf(`
-apiVersion: storage.k8s.io/v1
-kind: StorageClass
-metadata:
-  name: %s
-  annotations:
-    storageclass.kubernetes.io/is-default-class: "true"
-provisioner: hostpath.csi.k8s.io
-reclaimPolicy: Delete
-volumeBindingMode: Immediate
-allowVolumeExpansion: %t
-`, storageClassName, allowVolumeExpansion)
-		sc := &storagev1.StorageClass{}
-		Expect(yaml.Unmarshal([]byte(scYAML), sc)).Should(Succeed())
-		Expect(testCtx.CreateObj(ctx, sc)).Should(Succeed())
-		// wait until cluster created
-		Eventually(func() bool {
-			err := k8sClient.Get(context.Background(), client.ObjectKey{Name: storageClassName}, &storagev1.StorageClass{})
-			return err == nil
-		}, timeout, interval).Should(BeTrue())
-		return sc
+		return testdbaas.CreateCustomizedObj(&testCtx, "operations/storageclass.yaml",
+			&storagev1.StorageClass{}, testdbaas.CustomizeObjYAML(storageClassName, allowVolumeExpansion))
 	}
 
 	handleStorageClass := func(reqCtx intctrlutil.RequestCtx, cli client.Client, storageClass *storagev1.StorageClass) error {
@@ -86,24 +58,23 @@ allowVolumeExpansion: %t
 		return cli.Patch(ctx, storageClass, patch)
 	}
 
-	Context("When test creating storageClass", func() {
+	Context("test storageClass controller", func() {
 		It("should handle it properly", func() {
-			By("test storageClass changes")
+			By("create a storageClass and register a storageClassHandler")
 			StorageClassHandlerMap["test-controller"] = handleStorageClass
 			storageClassName := fmt.Sprintf("standard-%s", testCtx.GetRandomStr())
-			createStorageClassObj(storageClassName, true)
-			storageClass := &storagev1.StorageClass{}
-			Expect(k8sClient.Get(ctx, client.ObjectKey{Name: storageClassName}, storageClass)).Should(Succeed())
-			allowVolumeExpansion := true
-			storageClass.AllowVolumeExpansion = &allowVolumeExpansion
-			Expect(k8sClient.Update(ctx, storageClass))
+			sc := createStorageClassObj(storageClassName, true)
+
+			By("test storageClass changes")
+			Eventually(testdbaas.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(sc), func(tmpSc *storagev1.StorageClass) {
+				allowVolumeExpansion := true
+				tmpSc.AllowVolumeExpansion = &allowVolumeExpansion
+			})()).Should(Succeed())
 
 			// wait until storageClass patched
-			Eventually(func() bool {
-				tempStorageClass := &storagev1.StorageClass{}
-				_ = k8sClient.Get(context.Background(), client.ObjectKey{Name: storageClass.Name}, tempStorageClass)
-				return tempStorageClass.Annotations["kubeblocks.io/test"] == "test"
-			}, timeout, interval).Should(BeTrue())
+			Eventually(testdbaas.CheckObj(&testCtx, client.ObjectKeyFromObject(sc), func(g Gomega, tempStorageClass *storagev1.StorageClass) {
+				g.Expect(tempStorageClass.Annotations["kubeblocks.io/test"] == "test").Should(BeTrue())
+			})).Should(Succeed())
 		})
 	})
 })

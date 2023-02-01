@@ -59,122 +59,95 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 	AfterEach(cleanEnv)
 
 	updateClusterAnnotation := func(cluster *dbaasv1alpha1.Cluster) {
-		patch := client.MergeFrom(cluster.DeepCopy())
-		cluster.Annotations = map[string]string{
-			"time": time.Now().Format(time.RFC3339),
-		}
-		Expect(k8sClient.Patch(ctx, cluster, patch)).Should(Succeed())
+		Expect(testdbaas.ChangeObj(&testCtx, cluster, func() {
+			cluster.Annotations = map[string]string{
+				"time": time.Now().Format(time.RFC3339),
+			}
+		})).Should(Succeed())
 	}
 
 	Context("test cluster conditions", func() {
 		It("test cluster conditions", func() {
 			By("init cluster")
-			_ = testdbaas.CreateConsensusMysqlCluster(ctx, testCtx, clusterDefName,
+			cluster := testdbaas.CreateConsensusMysqlCluster(testCtx, clusterDefName,
 				clusterVersionName, clusterName, consensusCompName)
 			By("test when clusterDefinition not found")
-			cluster := &dbaasv1alpha1.Cluster{}
-			Eventually(func() bool {
-				Expect(k8sClient.Get(ctx, client.ObjectKey{Name: clusterName, Namespace: testCtx.DefaultNamespace}, cluster)).Should(Succeed())
-				condition := meta.FindStatusCondition(cluster.Status.Conditions, ConditionTypeProvisioningStarted)
-				return condition != nil && condition.Reason == intctrlutil.ReasonNotFoundCR
-			}, timeout, interval).Should(BeTrue())
+			Eventually(testdbaas.CheckObj(&testCtx, client.ObjectKeyFromObject(cluster), func(g Gomega, tmpCluster *dbaasv1alpha1.Cluster) {
+				condition := meta.FindStatusCondition(tmpCluster.Status.Conditions, ConditionTypeProvisioningStarted)
+				g.Expect(condition != nil && condition.Reason == intctrlutil.ReasonNotFoundCR).Should(BeTrue())
+			})).Should(Succeed())
 
 			By("test conditionsError phase")
-			patch := client.MergeFrom(cluster.DeepCopy())
-			condition := meta.FindStatusCondition(cluster.Status.Conditions, ConditionTypeProvisioningStarted)
-			condition.LastTransitionTime = metav1.Time{Time: time.Now().Add(-(ClusterControllerErrorDuration + time.Second))}
-			cluster.SetStatusCondition(*condition)
-			Expect(k8sClient.Status().Patch(ctx, cluster, patch)).Should(Succeed())
+			Expect(testdbaas.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(cluster), func(tmpCluster *dbaasv1alpha1.Cluster) {
+				condition := meta.FindStatusCondition(tmpCluster.Status.Conditions, ConditionTypeProvisioningStarted)
+				condition.LastTransitionTime = metav1.Time{Time: time.Now().Add(-(ClusterControllerErrorDuration + time.Second))}
+				tmpCluster.SetStatusCondition(*condition)
+			})()).Should(Succeed())
 
-			Eventually(func() bool {
-				Expect(k8sClient.Get(ctx, client.ObjectKey{Name: clusterName, Namespace: testCtx.DefaultNamespace}, cluster)).Should(Succeed())
-				return cluster.Status.Phase == dbaasv1alpha1.ConditionsErrorPhase
-			}, timeout*2, interval).Should(BeTrue())
+			Eventually(testdbaas.CheckObj(&testCtx, client.ObjectKeyFromObject(cluster), func(g Gomega, tmpCluster *dbaasv1alpha1.Cluster) {
+				g.Expect(tmpCluster.Status.Phase == dbaasv1alpha1.ConditionsErrorPhase).Should(BeTrue())
+			}), timeout*2, interval).Should(Succeed())
 
 			By("test when clusterVersion not Available")
-			_ = testdbaas.CreateConsensusMysqlClusterDef(ctx, testCtx, clusterDefName)
-			_ = testdbaas.CreateConsensusMysqlClusterVersion(ctx, testCtx, clusterDefName, clusterVersionName)
+			_ = testdbaas.CreateConsensusMysqlClusterDef(testCtx, clusterDefName)
+			clusterVersion := testdbaas.CreateConsensusMysqlClusterVersion(testCtx, clusterDefName, clusterVersionName)
 			// mock clusterVersion unavailable
-			Eventually(func() bool {
-				clusterVersion := &dbaasv1alpha1.ClusterVersion{}
-				Expect(k8sClient.Get(ctx, client.ObjectKey{Name: clusterVersionName}, clusterVersion)).Should(Succeed())
+			Eventually(testdbaas.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(clusterVersion), func(clusterVersion *dbaasv1alpha1.ClusterVersion) {
 				clusterVersion.Spec.Components[0].Type = "test-n"
-				err := k8sClient.Update(ctx, clusterVersion)
-				return err == nil
-			}, timeout, interval).Should(BeTrue())
+			})).Should(Succeed())
 
-			Eventually(func() bool {
-				clusterVersion := &dbaasv1alpha1.ClusterVersion{}
-				_ = k8sClient.Get(ctx, client.ObjectKey{Name: clusterVersionName}, clusterVersion)
-				return clusterVersion.Status.Phase == dbaasv1alpha1.UnavailablePhase
-			}, timeout, interval).Should(BeTrue())
+			Eventually(testdbaas.CheckObj(&testCtx, client.ObjectKeyFromObject(clusterVersion), func(g Gomega, clusterVersion *dbaasv1alpha1.ClusterVersion) {
+				g.Expect(clusterVersion.Status.Phase == dbaasv1alpha1.UnavailablePhase).Should(BeTrue())
+			}), timeout*2, interval).Should(Succeed())
+
 			// trigger reconcile
-			Eventually(func() bool {
-				tmpCluster := &dbaasv1alpha1.Cluster{}
-				Expect(k8sClient.Get(ctx, client.ObjectKey{Name: clusterName, Namespace: testCtx.DefaultNamespace}, tmpCluster)).Should(Succeed())
+			Eventually(testdbaas.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(cluster), func(tmpCluster *dbaasv1alpha1.Cluster) {
 				tmpCluster.Spec.Components[0].EnabledLogs = []string{"error1"}
-				err := k8sClient.Update(ctx, tmpCluster)
-				return err == nil
-			}, timeout, interval).Should(BeTrue())
+			})).Should(Succeed())
 
-			Eventually(func() bool {
+			Eventually(func(g Gomega) {
 				updateClusterAnnotation(cluster)
-				Expect(k8sClient.Get(ctx, client.ObjectKey{Name: clusterName, Namespace: testCtx.DefaultNamespace}, cluster)).Should(Succeed())
-				condition := meta.FindStatusCondition(cluster.Status.Conditions, ConditionTypeProvisioningStarted)
-				return condition != nil && condition.Reason == intctrlutil.ReasonRefCRUnavailable
-			}, timeout, interval).Should(BeTrue())
+				g.Eventually(testdbaas.CheckObj(&testCtx, client.ObjectKeyFromObject(cluster), func(g Gomega, cluster *dbaasv1alpha1.Cluster) {
+					condition := meta.FindStatusCondition(cluster.Status.Conditions, ConditionTypeProvisioningStarted)
+					g.Expect(condition != nil && condition.Reason == intctrlutil.ReasonRefCRUnavailable).Should(BeTrue())
+				})).Should(Succeed())
+			}).Should(Succeed())
 
 			By("reset clusterVersion to Available")
-			Eventually(func() bool {
-				clusterVersion := &dbaasv1alpha1.ClusterVersion{}
-				Expect(k8sClient.Get(ctx, client.ObjectKey{Name: clusterVersionName}, clusterVersion)).Should(Succeed())
+			Eventually(testdbaas.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(clusterVersion), func(clusterVersion *dbaasv1alpha1.ClusterVersion) {
 				clusterVersion.Spec.Components[0].Type = "consensus"
-				err := k8sClient.Update(ctx, clusterVersion)
-				return err == nil
-			}, timeout, interval).Should(BeTrue())
+			})).Should(Succeed())
 
-			Eventually(func() bool {
-				clusterVersion := &dbaasv1alpha1.ClusterVersion{}
-				_ = k8sClient.Get(ctx, client.ObjectKey{Name: clusterVersionName}, clusterVersion)
-				return clusterVersion.Status.Phase == dbaasv1alpha1.AvailablePhase
-			}, timeout, interval).Should(BeTrue())
+			Eventually(testdbaas.CheckObj(&testCtx, client.ObjectKeyFromObject(clusterVersion), func(g Gomega, clusterVersion *dbaasv1alpha1.ClusterVersion) {
+				g.Expect(clusterVersion.Status.Phase == dbaasv1alpha1.AvailablePhase).Should(BeTrue())
+			}), timeout*2, interval).Should(Succeed())
 
 			// trigger reconcile
 			updateClusterAnnotation(cluster)
 			By("test preCheckFailed")
-			Eventually(func() bool {
-				Expect(k8sClient.Get(ctx, client.ObjectKey{Name: clusterName, Namespace: testCtx.DefaultNamespace}, cluster)).Should(Succeed())
+			Eventually(testdbaas.CheckObj(&testCtx, client.ObjectKeyFromObject(cluster), func(g Gomega, cluster *dbaasv1alpha1.Cluster) {
 				condition := meta.FindStatusCondition(cluster.Status.Conditions, ConditionTypeProvisioningStarted)
-				return condition != nil && condition.Reason == ReasonPreCheckFailed
-			}, timeout*2, interval).Should(BeTrue())
+				g.Expect(condition != nil && condition.Reason == ReasonPreCheckFailed).Should(BeTrue())
+			}), timeout*2, interval).Should(Succeed())
 
 			By("reset and waiting cluster to Creating")
-			Eventually(func() bool {
-				tmpCluster := &dbaasv1alpha1.Cluster{}
-				Expect(k8sClient.Get(ctx, client.ObjectKey{Name: clusterName, Namespace: testCtx.DefaultNamespace}, tmpCluster)).Should(Succeed())
+			Eventually(testdbaas.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(cluster), func(tmpCluster *dbaasv1alpha1.Cluster) {
 				tmpCluster.Spec.Components[0].EnabledLogs = []string{"error"}
-				err := k8sClient.Update(ctx, tmpCluster)
-				return err == nil
-			}, timeout, interval).Should(BeTrue())
+			})).Should(Succeed())
 
-			Eventually(func() bool {
-				Expect(k8sClient.Get(ctx, client.ObjectKey{Name: clusterName, Namespace: testCtx.DefaultNamespace}, cluster)).Should(Succeed())
-				return cluster.Status.Phase == dbaasv1alpha1.CreatingPhase
-			}, timeout*2, interval).Should(BeTrue())
+			Eventually(testdbaas.CheckObj(&testCtx, client.ObjectKeyFromObject(cluster), func(g Gomega, tmpCluster *dbaasv1alpha1.Cluster) {
+				g.Expect(tmpCluster.Status.Phase == dbaasv1alpha1.CreatingPhase).Should(BeTrue())
+			}), timeout*2, interval).Should(Succeed())
 
 			By("test apply resources failed")
-			Eventually(func() bool {
-				Expect(k8sClient.Get(ctx, client.ObjectKey{Name: clusterName, Namespace: testCtx.DefaultNamespace}, cluster)).Should(Succeed())
-				cluster.Spec.Components[0].VolumeClaimTemplates[0].Spec.Resources.Requests[corev1.ResourceStorage] = resource.MustParse("1Gi")
-				return k8sClient.Update(ctx, cluster) == nil
-			}, timeout, interval).Should(BeTrue())
+			Eventually(testdbaas.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(cluster), func(tmpCluster *dbaasv1alpha1.Cluster) {
+				tmpCluster.Spec.Components[0].VolumeClaimTemplates[0].Spec.Resources.Requests[corev1.ResourceStorage] = resource.MustParse("1Gi")
+			})).Should(Succeed())
 
-			Eventually(func() bool {
-				Expect(k8sClient.Get(ctx, client.ObjectKey{Name: clusterName, Namespace: testCtx.DefaultNamespace}, cluster)).Should(Succeed())
-				condition := meta.FindStatusCondition(cluster.Status.Conditions, ConditionTypeApplyResources)
-				return condition != nil && condition.Reason == ReasonApplyResourcesFailed
-			}, timeout*2, interval).Should(BeTrue())
-
+			Eventually(testdbaas.CheckObj(&testCtx, client.ObjectKeyFromObject(cluster), func(g Gomega, tmpCluster *dbaasv1alpha1.Cluster) {
+				condition := meta.FindStatusCondition(tmpCluster.Status.Conditions, ConditionTypeApplyResources)
+				g.Expect(condition != nil && condition.Reason == ReasonApplyResourcesFailed).Should(BeTrue())
+			}), timeout*2, interval).Should(Succeed())
 		})
 	})
 

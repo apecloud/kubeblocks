@@ -16,3 +16,9 @@ spec:
         imagePullPolicy: IfNotPresent
         name: busybox
     type: stateless
+  - podSpec:
+      containers:
+      - image: %s
+        imagePullPolicy: IfNotPresent
+        name: mysql
+    type: stateful

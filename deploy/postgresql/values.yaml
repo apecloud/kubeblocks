@@ -195,7 +195,7 @@ primary:
     host     all             all             ::1/128                 md5
 
   cue: |-
-    // PostgreSQL parameters: https://postgresqlco.nf/doc/en/param/authentication_timeout/
+    // PostgreSQL parameters: https://postgresqlco.nf/doc/en/param/
     #PGParameter: {
 
       // Sets the application name to be reported in statistics and logs.
@@ -769,7 +769,7 @@ primary:
       max_worker_processes?: int & >=0 & <=262143
     
       // Specifies the amount of memory that should be allocated at server startup for use by parallel queries
-      min_dynamic_shared_memory?: int & >=0 & <=715827882 @storeResource()
+      min_dynamic_shared_memory?: int & >=0 & <=715827882 @storeResource(1MB)
     
       // (8kB) Sets the minimum amount of index data for a parallel scan.
       min_parallel_index_scan_size?: int & >=0 & <=715827882 @storeResource(8KB)

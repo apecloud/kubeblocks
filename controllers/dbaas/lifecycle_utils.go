@@ -919,10 +919,6 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 		}
 		if didVolumeExpanded() {
 			// if volume expanded, recreate statefulset to update volumeClaimTemplates
-			propagationPolicy := metav1.DeletePropagationOrphan
-			deleteOption := &client.DeleteOptions{
-				PropagationPolicy: &propagationPolicy,
-			}
 			patch := client.MergeFrom(stsObj.DeepCopy())
 			controllerutil.RemoveFinalizer(stsObj, dbClusterFinalizerName)
 			// patch finalizer first
@@ -930,6 +926,10 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 				return false, err
 			}
 			// then delete sts
+			propagationPolicy := metav1.DeletePropagationOrphan
+			deleteOption := &client.DeleteOptions{
+				PropagationPolicy: &propagationPolicy,
+			}
 			if err := cli.Delete(ctx, stsObj, deleteOption); client.IgnoreNotFound(err) != nil {
 				return false, err
 			}

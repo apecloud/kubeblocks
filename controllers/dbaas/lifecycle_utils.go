@@ -476,7 +476,7 @@ func replacePlaceholderTokens(cluster *dbaasv1alpha1.Cluster, component *Compone
 	}
 }
 
-func createCluster(
+func reconcileClusterWorkloads(
 	reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
 	clusterDefinition *dbaasv1alpha1.ClusterDefinition,

@@ -317,7 +317,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 	clusterDeepCopy := cluster.DeepCopy()
-	shouldRequeue, err := createCluster(reqCtx, r.Client, clusterDefinition, clusterVersion, cluster)
+	shouldRequeue, err := reconcileClusterWorkloads(reqCtx, r.Client, clusterDefinition, clusterVersion, cluster)
 	if err != nil {
 		// this is a block to handle error.
 		// so when update cluster conditions failed, we can ignore it.
@@ -325,7 +325,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return intctrlutil.RequeueAfter(ControllerErrorRequeueTime, reqCtx.Log, "")
 	}
 	if shouldRequeue {
-		if err = r.handleClusterStatusBeforeRequeue(reqCtx.Ctx, cluster, clusterDeepCopy); err != nil {
+		if err = r.patchClusterStatus(reqCtx.Ctx, cluster, clusterDeepCopy); err != nil {
 			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 		}
 		return intctrlutil.RequeueAfter(time.Second, reqCtx.Log, "")
@@ -337,8 +337,8 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	return intctrlutil.Reconciled()
 }
 
-// handleClusterStatusBeforeRequeue should update the cluster status first, because the Requeue request process may take a long time.
-func (r *ClusterReconciler) handleClusterStatusBeforeRequeue(ctx context.Context,
+// patchClusterStatus patches the cluster status.
+func (r *ClusterReconciler) patchClusterStatus(ctx context.Context,
 	cluster *dbaasv1alpha1.Cluster,
 	clusterDeepCopy *dbaasv1alpha1.Cluster) error {
 	if reflect.DeepEqual(cluster, clusterDeepCopy) {
@@ -456,7 +456,7 @@ func (r *ClusterReconciler) deleteExternalResources(reqCtx intctrlutil.RequestCt
 	}
 	inNS := client.InNamespace(cluster.Namespace)
 
-	// all resources created in createCluster should be handled properly
+	// all resources created in reconcileClusterWorkloads should be handled properly
 
 	if ret, err := removeFinalizer(r, reqCtx, intctrlutil.StatefulSetSignature, inNS, ml); err != nil {
 		return ret, err

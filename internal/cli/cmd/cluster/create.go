@@ -27,6 +27,7 @@ import (
 
 	"github.com/ghodss/yaml"
 	"github.com/spf13/cobra"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -163,10 +164,6 @@ func setBackup(o *CreateOptions, components []map[string]interface{}) error {
 }
 
 func (o *CreateOptions) Validate() error {
-	if o.Name == "" {
-		return fmt.Errorf("missing cluster name")
-	}
-
 	if o.ClusterDefRef == "" {
 		return fmt.Errorf("a valid cluster definition is needed, use --cluster-definition to specify one, run \"kbcli cluster-definition list\" to show all cluster definition")
 	}
@@ -181,6 +178,18 @@ func (o *CreateOptions) Validate() error {
 
 	if o.ComponentsFilePath == "" {
 		return fmt.Errorf("a valid component local file path, URL, or stdin is needed")
+	}
+
+	// if name is not specified, generate a random cluster name
+	if o.Name == "" {
+		name, err := generateClusterName(o.Client, o.Namespace)
+		if err != nil {
+			return err
+		}
+		if name == "" {
+			return fmt.Errorf("failed to generate a random cluster name")
+		}
+		o.Name = name
 	}
 	return nil
 }
@@ -248,7 +257,7 @@ func MultipleSourceComponents(fileName string, in io.Reader) ([]byte, error) {
 func NewCreateCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := &CreateOptions{BaseOptions: create.BaseOptions{IOStreams: streams}}
 	inputs := create.Inputs{
-		Use:             "create NAME --termination-policy=DoNotTerminate|Halt|Delete|WipeOut --components=file-path",
+		Use:             "create [NAME]",
 		Short:           "Create a cluster",
 		Example:         clusterCreateExample,
 		CueTemplateName: CueTemplateName,
@@ -375,6 +384,24 @@ func buildTolerations(raw []string) []interface{} {
 	return tolerations
 }
 
+// generateClusterName generate a random cluster name that does not exist
+func generateClusterName(dynamic dynamic.Interface, namespace string) (string, error) {
+	var name string
+	// retry 10 times
+	for i := 0; i < 10; i++ {
+		name = cluster.GenerateName()
+		// check whether the cluster exists
+		_, err := dynamic.Resource(types.ClusterGVR()).Namespace(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+		if errors.IsNotFound(err) {
+			return name, nil
+		}
+		if err != nil {
+			return "", err
+		}
+	}
+	return "", nil
+}
+
 func (f *UpdatableFlags) addFlags(cmd *cobra.Command) {
 	cmd.Flags().StringVar(&f.PodAntiAffinity, "pod-anti-affinity", "Preferred", "Pod anti-affinity type")
 	cmd.Flags().BoolVar(&f.Monitor, "monitor", true, "Set monitor enabled and inject metrics exporter")
@@ -387,6 +414,11 @@ func (f *UpdatableFlags) addFlags(cmd *cobra.Command) {
 	util.CheckErr(cmd.RegisterFlagCompletionFunc(
 		"termination-policy",
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			return []string{"DoNotTerminate", "Halt", "Delete", "WipeOut"}, cobra.ShellCompDirectiveNoFileComp
+			return []string{
+				"DoNotTerminate\tblock delete operation",
+				"Halt\tdelete workload resources such as statefulset, deployment workloads but keep PVCs",
+				"Delete\tbased on Halt and deletes PVCs",
+				"WipeOut\tbased on Delete and wipe out all volume snapshots and snapshot data from backup storage location",
+			}, cobra.ShellCompDirectiveNoFileComp
 		}))
 }

@@ -341,7 +341,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 func (r *ClusterReconciler) patchClusterStatus(ctx context.Context,
 	cluster *dbaasv1alpha1.Cluster,
 	clusterDeepCopy *dbaasv1alpha1.Cluster) error {
-	if reflect.DeepEqual(cluster, clusterDeepCopy) {
+	if reflect.DeepEqual(cluster.Status, clusterDeepCopy.Status) {
 		return nil
 	}
 	patch := client.MergeFrom(clusterDeepCopy)

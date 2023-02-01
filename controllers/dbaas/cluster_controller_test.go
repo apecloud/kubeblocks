@@ -1455,9 +1455,9 @@ spec:
 			By("Patch finalizers if deletionTimestamp exists. Mock what garbage collector do in real cluster.")
 			Eventually(func(g Gomega) {
 				stsList := &appsv1.StatefulSetList{}
-				k8sClient.List(ctx, stsList, client.MatchingLabels{
+				g.Expect(k8sClient.List(ctx, stsList, client.MatchingLabels{
 					intctrlutil.AppInstanceLabelKey: key.Name,
-				}, client.InNamespace(key.Namespace))
+				}, client.InNamespace(key.Namespace))).Should(Succeed())
 				sts := stsList.Items[0]
 				g.Expect(sts.DeletionTimestamp).ShouldNot(BeNil())
 				// remove "orphan" finalizer
@@ -1468,18 +1468,18 @@ spec:
 			By("Checking statefulset deleted")
 			Eventually(func(g Gomega) {
 				stsList := &appsv1.StatefulSetList{}
-				k8sClient.List(ctx, stsList, client.MatchingLabels{
+				g.Expect(k8sClient.List(ctx, stsList, client.MatchingLabels{
 					intctrlutil.AppInstanceLabelKey: key.Name,
-				}, client.InNamespace(key.Namespace))
+				}, client.InNamespace(key.Namespace))).Should(Succeed())
 				g.Expect(len(stsList.Items) == 0).To(BeTrue())
 			}, timeout, interval).Should(Succeed())
 
 			By("Checking statefulset created again with new storage value")
 			Eventually(func(g Gomega) {
 				stsList := &appsv1.StatefulSetList{}
-				k8sClient.List(ctx, stsList, client.MatchingLabels{
+				g.Expect(k8sClient.List(ctx, stsList, client.MatchingLabels{
 					intctrlutil.AppInstanceLabelKey: key.Name,
-				}, client.InNamespace(key.Namespace))
+				}, client.InNamespace(key.Namespace))).Should(Succeed())
 				g.Expect(len(stsList.Items) == 1).To(BeTrue())
 				g.Expect(stsList.Items[0].Spec.VolumeClaimTemplates[0].Spec.Resources.Requests[corev1.ResourceStorage] == newStorageValue).Should(BeTrue())
 			}, timeout, interval).Should(Succeed())

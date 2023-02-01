@@ -2,8 +2,6 @@ package controllerutil
 
 import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
-
-	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 )
 
 // GetUncacheObjects returns a list of K8s objects, for these object types,
@@ -25,10 +23,10 @@ func GetUncacheObjects() []client.Object {
 	// to solve the two problems mentioned above.
 	// consider carefully before adding new objects to this list.
 	return []client.Object{
-		&dbaasv1alpha1.ClusterDefinition{},
-		&dbaasv1alpha1.Cluster{},
-		&dbaasv1alpha1.ClusterVersion{},
-		&dbaasv1alpha1.OpsRequest{},
-		&dbaasv1alpha1.ConfigConstraint{},
+		// &dbaasv1alpha1.ClusterDefinition{},
+		// &dbaasv1alpha1.Cluster{},
+		// &dbaasv1alpha1.ClusterVersion{},
+		// &dbaasv1alpha1.OpsRequest{},
+		// &dbaasv1alpha1.ConfigConstraint{},
 	}
 }

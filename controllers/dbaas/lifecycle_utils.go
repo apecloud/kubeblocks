@@ -1354,7 +1354,7 @@ func buildCfg(params createParams,
 	namespaceName := params.cluster.Namespace
 
 	// New ConfigTemplateBuilder
-	cfgTemplateBuilder := newCfgTemplateBuilder(clusterName, namespaceName, params.cluster, params.clusterVersion)
+	cfgTemplateBuilder := newCfgTemplateBuilder(clusterName, namespaceName, params.cluster, params.clusterVersion, ctx, cli)
 	// Prepare built-in objects and built-in functions
 	if err := cfgTemplateBuilder.injectBuiltInObjectsAndFunctions(podSpec, tpls, params.component); err != nil {
 		return nil, err
@@ -1646,7 +1646,7 @@ func generateConfigMapFromTpl(tplBuilder *configTemplateBuilder,
 	cli client.Client) (*corev1.ConfigMap, error) {
 	// Render config template by TplEngine
 	// The template namespace must be the same as the ClusterDefinition namespace
-	configs, err := processConfigMapTemplate(ctx, cli, tplBuilder, tplCfg)
+	configs, err := processConfigMapTemplate(tplBuilder, tplCfg, ctx, cli)
 	if err != nil {
 		return nil, err
 	}
@@ -1746,7 +1746,11 @@ func buildCfgManagerContainer(params createParams, sidecarRenderedParam *cfgcm.C
 }
 
 // processConfigMapTemplate Render config file using template engine
-func processConfigMapTemplate(ctx context.Context, cli client.Client, tplBuilder *configTemplateBuilder, tplCfg dbaasv1alpha1.ConfigTemplate) (map[string]string, error) {
+func processConfigMapTemplate(
+	tplBuilder *configTemplateBuilder,
+	tplCfg dbaasv1alpha1.ConfigTemplate,
+	ctx context.Context,
+	cli client.Client) (map[string]string, error) {
 	cfgTemplate := &dbaasv1alpha1.ConfigConstraint{}
 	if len(tplCfg.ConfigConstraintRef) > 0 {
 		if err := cli.Get(ctx, client.ObjectKey{

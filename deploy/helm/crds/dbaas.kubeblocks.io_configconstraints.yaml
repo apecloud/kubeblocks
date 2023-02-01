@@ -10,12 +10,12 @@ spec:
   group: dbaas.kubeblocks.io
   names:
     categories:
-    - dbaas
+    - kubeblocks
     kind: ConfigConstraint
     listKind: ConfigConstraintList
     plural: configconstraints
     shortNames:
-    - ctpl
+    - cc
     singular: configconstraint
   scope: Cluster
   versions:

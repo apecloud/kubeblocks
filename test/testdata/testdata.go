@@ -120,25 +120,24 @@ func WithNamespacedName(resourceName, ns string) ResourceOptions {
 	}
 }
 
+func WithMap(keysAndValues ...string) map[string]string {
+	// ignore mismatching for kvs
+	m := make(map[string]string, len(keysAndValues)/2)
+	for i := 0; i+1 < len(keysAndValues); i += 2 {
+		m[keysAndValues[i]] = keysAndValues[i+1]
+	}
+	return m
+}
+
 func WithLabels(keysAndValues ...string) ResourceOptions {
 	return func(k8sObject client.Object) {
-		// ignore mismatching for kvs
-		labels := make(map[string]string, len(keysAndValues)/2)
-		for i := 0; i+1 < len(keysAndValues); i += 2 {
-			labels[keysAndValues[i]] = keysAndValues[i+1]
-		}
-		k8sObject.SetLabels(labels)
+		k8sObject.SetLabels(WithMap(keysAndValues...))
 	}
 }
 
 func WithAnnotations(keysAndValues ...string) ResourceOptions {
 	return func(k8sObject client.Object) {
-		// ignore mismatching for kvs
-		annotations := make(map[string]string, len(keysAndValues)/2)
-		for i := 0; i+1 < len(keysAndValues); i += 2 {
-			annotations[keysAndValues[i]] = keysAndValues[i+1]
-		}
-		k8sObject.SetAnnotations(annotations)
+		k8sObject.SetAnnotations(WithMap(keysAndValues...))
 	}
 }
 

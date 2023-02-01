@@ -17,6 +17,7 @@ limitations under the License.
 package cluster
 
 import (
+	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -57,7 +58,7 @@ type ResourceNamer struct {
 
 type helperOption func(helper *fakeKubeObjectHelper)
 
-func CreateGenRandomResourceNamer(ns string) ResourceNamer {
+func CreateRandomResourceNamer(ns string) ResourceNamer {
 	return ResourceNamer{
 		ns:          ns,
 		cdName:      "clusterdef-test-" + testdata.GenRandomString(),
@@ -106,7 +107,46 @@ func withCustomResource(resource schema.GroupVersionResource, creator createReso
 	}
 }
 
-func NewFakeKBHelper(basePath string, options ...helperOption) fakeKubeObjectHelper {
+func newFakeConfigCMResource(namer ResourceNamer, componentName, volumeName string, dataMap map[string]string) createResourceObject {
+	return func() runtime.Object {
+		return &corev1.ConfigMap{
+			TypeMeta: metav1.TypeMeta{
+				APIVersion: types.VersionV1,
+				Kind:       types.KindCM,
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      cfgcore.GetComponentCfgName(namer.clusterName, componentName, volumeName),
+				Namespace: namer.ns,
+			},
+			Data: dataMap,
+		}
+	}
+}
+
+func newFakeClusterResource(namer ResourceNamer, componentName, componentType string) createResourceObject {
+	return func() runtime.Object {
+		return &dbaasv1alpha1.Cluster{
+			TypeMeta: metav1.TypeMeta{
+				APIVersion: dbaasv1alpha1.APIVersion,
+				Kind:       dbaasv1alpha1.ClusterKind,
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      namer.clusterName,
+				Namespace: namer.ns,
+			},
+			Spec: dbaasv1alpha1.ClusterSpec{
+				ClusterDefRef:     namer.cdName,
+				ClusterVersionRef: namer.cvName,
+				Components: []dbaasv1alpha1.ClusterComponent{{
+					Name: componentName,
+					Type: componentType,
+				}},
+			},
+		}
+	}
+}
+
+func NewFakeResourceObjectHelper(basePath string, options ...helperOption) fakeKubeObjectHelper {
 	fakeHelper := fakeKubeObjectHelper{
 		basePath: basePath,
 	}

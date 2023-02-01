@@ -29,10 +29,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/go-sql-driver/mysql"
+	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-
-	"github.com/go-sql-driver/mysql"
 	"github.com/pkg/errors"
 	"github.com/sethvargo/go-password/password"
 	appsv1 "k8s.io/api/apps/v1"
@@ -46,8 +46,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-
-	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
@@ -1453,6 +1451,38 @@ spec:
 				comp := &cluster.Spec.Components[0]
 				comp.VolumeClaimTemplates[0].Spec.Resources.Requests[corev1.ResourceStorage] = newStorageValue
 			}), timeout, interval).Should(Succeed())
+
+			By("Patch finalizers if deletionTimestamp exists. Mock what garbage collector do in real cluster.")
+			Eventually(func(g Gomega) {
+				stsList := &appsv1.StatefulSetList{}
+				k8sClient.List(ctx, stsList, client.MatchingLabels{
+					intctrlutil.AppInstanceLabelKey: key.Name,
+				}, client.InNamespace(key.Namespace))
+				sts := stsList.Items[0]
+				g.Expect(sts.DeletionTimestamp).ShouldNot(BeNil())
+				// remove "orphan" finalizer
+				sts.SetFinalizers(nil)
+				g.Expect(k8sClient.Update(ctx, &sts)).Should(Succeed())
+			}, timeout, interval).Should(Succeed())
+
+			By("Checking statefulset deleted")
+			Eventually(func(g Gomega) {
+				stsList := &appsv1.StatefulSetList{}
+				k8sClient.List(ctx, stsList, client.MatchingLabels{
+					intctrlutil.AppInstanceLabelKey: key.Name,
+				}, client.InNamespace(key.Namespace))
+				g.Expect(len(stsList.Items) == 0).To(BeTrue())
+			}, timeout, interval).Should(Succeed())
+
+			By("Checking statefulset created again with new storage value")
+			Eventually(func(g Gomega) {
+				stsList := &appsv1.StatefulSetList{}
+				k8sClient.List(ctx, stsList, client.MatchingLabels{
+					intctrlutil.AppInstanceLabelKey: key.Name,
+				}, client.InNamespace(key.Namespace))
+				g.Expect(len(stsList.Items) == 1).To(BeTrue())
+				g.Expect(stsList.Items[0].Spec.VolumeClaimTemplates[0].Spec.Resources.Requests[corev1.ResourceStorage] == newStorageValue).Should(BeTrue())
+			}, timeout, interval).Should(Succeed())
 
 			By("Checking the resize operation finished")
 			Eventually(func(g Gomega) {

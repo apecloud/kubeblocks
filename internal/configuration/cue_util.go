@@ -17,6 +17,7 @@ limitations under the License.
 package configuration
 
 import (
+	"cuelang.org/go/cue"
 	"strings"
 
 	"cuelang.org/go/cue/cuecontext"
@@ -26,19 +27,31 @@ import (
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 )
 
+// CueType define cue type
+// +enum
 type CueType string
 
 const (
-	NullableType    CueType = "nullable"
-	FloatType       CueType = "float"
-	IntType         CueType = "integer"
-	BoolType        CueType = "boolean"
-	StringType      CueType = "string"
-	StructType      CueType = "object"
-	ListType        CueType = "array"
-	K8SQuantityType CueType = "quantity"
-	K8SCpuType      CueType = "k8sCpu"
+	NullableType            CueType = "nullable"
+	FloatType               CueType = "float"
+	IntType                 CueType = "integer"
+	BoolType                CueType = "boolean"
+	StringType              CueType = "string"
+	StructType              CueType = "object"
+	ListType                CueType = "array"
+	K8SQuantityType         CueType = "quantity"
+	ClassicStorageType      CueType = "storage"
+	ClassicTimeDurationType CueType = "timeDuration"
 )
+
+func init() {
+	// disable cast to float
+	mxjv2.CastValuesToFloat(false)
+	// enable cast to bool
+	mxjv2.CastValuesToBool(true)
+	// enable cast to int
+	mxjv2.CastValuesToInt(true)
+}
 
 // CueValidate cue validate
 func CueValidate(cueTpl string) error {
@@ -63,11 +76,7 @@ func ValidateConfigurationWithCue(cueTpl string, cfgType dbaasv1alpha1.Configura
 func loadConfiguration(cfgType dbaasv1alpha1.ConfigurationFormatter, rawData string) (map[string]interface{}, error) {
 	// viper not support xml
 	if cfgType == dbaasv1alpha1.XML {
-		xmlMap, err := mxjv2.NewMapXml([]byte(rawData), true)
-		if err != nil {
-			return nil, err
-		}
-		return xmlMap, nil
+		return mxjv2.NewMapXml([]byte(rawData), true)
 	}
 
 	var v *viper.Viper
@@ -86,6 +95,7 @@ func loadConfiguration(cfgType dbaasv1alpha1.ConfigurationFormatter, rawData str
 }
 
 func cfgDataValidateByCue(cueTpl string, data interface{}) error {
+	defaultValidatePath := "configuration"
 	context := cuecontext.New()
 	tpl := context.CompileString(cueTpl)
 	if err := tpl.Err(); err != nil {
@@ -96,7 +106,13 @@ func cfgDataValidateByCue(cueTpl string, data interface{}) error {
 		return err
 	}
 
-	tpl = tpl.Fill(data)
+	var paths []string
+	cueValue := tpl.LookupPath(cue.ParsePath(defaultValidatePath))
+	if cueValue.Err() == nil {
+		paths = []string{defaultValidatePath}
+	}
+
+	tpl = tpl.Fill(data, paths...)
 	if err := tpl.Err(); err != nil {
 		return WrapError(err, "failed to cue template render configure")
 	}

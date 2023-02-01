@@ -23,16 +23,10 @@ import (
 
 	"cuelang.org/go/cue"
 	"github.com/spf13/viper"
-	"k8s.io/apimachinery/pkg/api/resource"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 var disableAutoTransfer = viper.GetBool("DISABLE_AUTO_TRANSFER")
-
-const (
-	k8sResourceAttr   = "k8sResource"
-	attrQuantityValue = "quantity"
-)
 
 type CueWalkVisitor interface {
 	Visit(val cue.Value)
@@ -42,11 +36,13 @@ type cueTypeExtractor struct {
 	data       interface{}
 	context    *cue.Context
 	fieldTypes map[string]CueType
+	fieldUnits map[string]string
 }
 
 func (c *cueTypeExtractor) Visit(val cue.Value) {
 	if c.fieldTypes == nil {
 		c.fieldTypes = make(map[string]CueType)
+		c.fieldUnits = make(map[string]string)
 	}
 	c.visitStruct(val)
 }
@@ -65,13 +61,8 @@ func (c *cueTypeExtractor) visitValue(x cue.Value, path string) {
 	case k&cue.FloatKind == cue.FloatKind:
 		c.addFieldType(path, FloatType)
 	case k&cue.IntKind == cue.IntKind:
-		attr := x.Attribute(k8sResourceAttr)
-		v, err := attr.String(0)
-		if err == nil && v == attrQuantityValue {
-			c.addFieldType(path, K8SQuantityType)
-		} else {
-			c.addFieldType(path, IntType)
-		}
+		t, base := processCueIntegerExpansion(x)
+		c.addFieldUnits(path, t, base)
 	case k&cue.ListKind == cue.ListKind:
 		c.addFieldType(path, ListType)
 		c.visitList(x, path)
@@ -117,7 +108,14 @@ func (c *cueTypeExtractor) addFieldType(fieldName string, cueType CueType) {
 	c.fieldTypes[fieldName] = cueType
 }
 
-func transNumberOrBoolType(t CueType, obj reflect.Value, fn UpdateFn) error {
+func (c *cueTypeExtractor) addFieldUnits(path string, t CueType, base string) {
+	c.addFieldType(path, t)
+	if t != IntType && base != "" {
+		c.fieldUnits[path] = base
+	}
+}
+
+func transNumberOrBoolType(t CueType, obj reflect.Value, fn UpdateFn, expand string) error {
 	switch t {
 	case IntType:
 		return processTypeTrans[int](obj, strconv.Atoi, fn)
@@ -128,13 +126,11 @@ func transNumberOrBoolType(t CueType, obj reflect.Value, fn UpdateFn) error {
 			return strconv.ParseFloat(s, 64)
 		}, fn)
 	case K8SQuantityType:
-		return processTypeTrans[int64](obj, func(s string) (int64, error) {
-			quantity, err := resource.ParseQuantity(s)
-			if err != nil {
-				return 0, err
-			}
-			return quantity.Value(), nil
-		}, fn)
+		return processTypeTrans[int64](obj, handleK8sQuantityType, fn)
+	case ClassicStorageType:
+		return processTypeTrans[int64](obj, handleClassicStorageType(expand), fn)
+	case ClassicTimeDurationType:
+		return processTypeTrans[int64](obj, handleClassicTimeDurationType(expand), fn)
 	default:
 		// pass
 	}
@@ -171,7 +167,7 @@ func processCfgNotStringParam(data interface{}, context *cue.Context, tpl cue.Va
 				return nil
 			}
 			if t, exist := typeTransformer.fieldTypes[cur]; exist {
-				err := transNumberOrBoolType(t, obj, fn)
+				err := transNumberOrBoolType(t, obj, fn, typeTransformer.fieldUnits[cur])
 				if err != nil {
 					return WrapError(err, "failed to type convertor, field[%s]", cur)
 				}

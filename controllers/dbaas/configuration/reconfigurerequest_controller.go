@@ -188,7 +188,7 @@ func (r *ReconfigureRequestReconciler) sync(reqCtx intctrlutil.RequestCtx, confi
 				"failed to get component from cluster definition. type[%s]", componentName),
 			reqCtx.Log)
 	} else if component == nil {
-		reqCtx.Log.Info(fmt.Sprintf("failed to found component which the configuration is associated, component name: %s", componentName))
+		reqCtx.Log.Info(fmt.Sprintf("failed to find component which the configuration is associated, component name: %s", componentName))
 		return intctrlutil.Reconciled()
 	}
 

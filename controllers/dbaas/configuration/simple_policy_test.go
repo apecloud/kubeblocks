@@ -110,7 +110,7 @@ var _ = Describe("Reconfigure simplePolicy", func() {
 				}}))
 			status, err := simplePolicy.Upgrade(mockParam)
 			Expect(err).ShouldNot(Succeed())
-			Expect(err.Error()).Should(ContainSubstring("failed to found config meta"))
+			Expect(err.Error()).Should(ContainSubstring("failed to find config meta"))
 			Expect(status.Status).Should(BeEquivalentTo(ESFailed))
 		})
 	})

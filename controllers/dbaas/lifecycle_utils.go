@@ -1039,7 +1039,11 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 			return false, err
 		}
 		if !controllerutil.ContainsFinalizer(obj, dbClusterFinalizerName) {
-			controllerutil.AddFinalizer(obj, dbClusterFinalizerName)
+			// pvc objects do not need to add finalizer
+			_, ok := obj.(*corev1.PersistentVolumeClaim)
+			if !ok {
+				controllerutil.AddFinalizer(obj, dbClusterFinalizerName)
+			}
 		}
 		// appendToStsList is used to handle statefulSets horizontal scaling when componentType is replication
 		appendToStsList := func(stsList []*appsv1.StatefulSet) []*appsv1.StatefulSet {
@@ -1335,6 +1339,7 @@ func buildReplicationSet(reqCtx intctrlutil.RequestCtx,
 // the purpose is convenient to convert between componentTypes in the future (TODO).
 func buildReplicationSetPVC(params createParams, sts *appsv1.StatefulSet) error {
 	// generate persistentVolumeClaim objects used by replicationSet's pod from component.VolumeClaimTemplates
+	// TODO: The pvc objects involved in all processes in the KubeBlocks will be reconstructed into a unified generation method
 	pvcMap := replicationset.GeneratePVCFromVolumeClaimTemplates(sts, params.component.VolumeClaimTemplates)
 	for _, pvc := range pvcMap {
 		buildPersistentVolumeClaimLabels(sts, pvc)

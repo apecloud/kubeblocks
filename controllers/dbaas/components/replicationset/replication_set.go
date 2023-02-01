@@ -18,6 +18,7 @@ package replicationset
 
 import (
 	"context"
+	"fmt"
 
 	"k8s.io/client-go/tools/record"
 
@@ -88,9 +89,9 @@ func (rs *ReplicationSet) PodIsAvailable(pod *corev1.Pod, minReadySeconds int32)
 }
 
 // HandleProbeTimeoutWhenPodsReady is the implementation of the type Component interface method,
-// and replicationSet does not need to do role probe detection, so it returns true directly.
+// and replicationSet does not need to do role probe detection, so it returns false directly.
 func (rs *ReplicationSet) HandleProbeTimeoutWhenPodsReady(recorder record.EventRecorder) (bool, error) {
-	return true, nil
+	return false, nil
 }
 
 // GetPhaseWhenPodsNotReady is the implementation of the type Component interface method,
@@ -103,7 +104,11 @@ func (rs *ReplicationSet) GetPhaseWhenPodsNotReady(componentName string) (dbaasv
 		podList          *corev1.PodList
 		componentStsList = &appsv1.StatefulSetList{}
 		allPodIsReady    = true
+		cluster          = rs.Cluster
+		statusComponent  dbaasv1alpha1.ClusterStatusComponent
+		needPatch        bool
 		err              error
+		ok               bool
 	)
 	if err = util.GetObjectListByComponentName(rs.Ctx, rs.Cli, rs.Cluster, componentStsList, componentName); err != nil {
 		return "", err
@@ -115,7 +120,14 @@ func (rs *ReplicationSet) GetPhaseWhenPodsNotReady(componentName string) (dbaasv
 	if podCount == 0 || podCount != len(componentStsList.Items) {
 		return dbaasv1alpha1.FailedPhase, nil
 	}
-
+	if cluster.Status.Components == nil {
+		return "", fmt.Errorf("%s cluster.Status.Components is nil", cluster.Name)
+	}
+	if statusComponent, ok = cluster.Status.Components[componentName]; !ok {
+		return "", fmt.Errorf("%s cluster.Status.Components[%s] is nil", cluster.Name, componentName)
+	} else if statusComponent.Message == nil {
+		statusComponent.Message = dbaasv1alpha1.ComponentMessageMap{}
+	}
 	for _, v := range podList.Items {
 		// if the pod is terminating, ignore the warning event.
 		if v.DeletionTimestamp != nil {
@@ -124,6 +136,8 @@ func (rs *ReplicationSet) GetPhaseWhenPodsNotReady(componentName string) (dbaasv
 		labelValue := v.Labels[intctrlutil.RoleLabelKey]
 		if labelValue == "" {
 			isAbnormal = true
+			statusComponent.Message.SetObjectMessage(v.Kind, v.Name, "empty label for pod, please check.")
+			needPatch = true
 		}
 		if !intctrlutil.PodIsReady(&v) {
 			allPodIsReady = false
@@ -137,6 +151,17 @@ func (rs *ReplicationSet) GetPhaseWhenPodsNotReady(componentName string) (dbaasv
 		isFailed = false
 		if v.Status.AvailableReplicas < *v.Spec.Replicas {
 			isAbnormal = true
+			statusComponent.Message.SetObjectMessage(v.Kind, v.Name, "statefulSet's AvailableReplicas is not expected, please check.")
+			needPatch = true
+		}
+	}
+
+	// patch abnormal reason to cluster.status.Components.
+	if needPatch {
+		patch := client.MergeFrom(cluster.DeepCopy())
+		cluster.Status.Components[componentName] = statusComponent
+		if err = rs.Cli.Status().Patch(rs.Ctx, cluster, patch); err != nil {
+			return "", err
 		}
 	}
 	// if all pod is ready, ignore the warning event.

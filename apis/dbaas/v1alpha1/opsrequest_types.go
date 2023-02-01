@@ -98,6 +98,7 @@ type VerticalScaling struct {
 
 	// resources specifies the computing resource size of verticalScaling.
 	// +kubebuilder:validation:Required
+	// +kubebuilder:pruning:PreserveUnknownFields
 	corev1.ResourceRequirements `json:",inline"`
 }
 
@@ -273,8 +274,9 @@ type LastComponentConfiguration struct {
 	Replicas int32 `json:"replicas,omitempty"`
 
 	// the last resources of the component.
+	// +kubebuilder:pruning:PreserveUnknownFields
 	// +optional
-	corev1.ResourceRequirements `json:",inline"`
+	corev1.ResourceRequirements `json:",inline,omitempty"`
 
 	// volumeClaimTemplates records the last volumeClaimTemplates of the component.
 	// +optional

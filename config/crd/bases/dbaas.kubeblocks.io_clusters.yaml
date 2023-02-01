@@ -175,6 +175,7 @@ spec:
                             https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
                           type: object
                       type: object
+                      x-kubernetes-preserve-unknown-fields: true
                     serviceType:
                       default: ClusterIP
                       description: 'serviceType determines how the Service is exposed.
@@ -195,6 +196,7 @@ spec:
                       - NodePort
                       - LoadBalancer
                       type: string
+                      x-kubernetes-preserve-unknown-fields: true
                     tolerations:
                       description: Component tolerations will override ClusterSpec.Tolerations
                         if specified.
@@ -238,6 +240,7 @@ spec:
                             type: string
                         type: object
                       type: array
+                      x-kubernetes-preserve-unknown-fields: true
                     type:
                       description: Component type name defined in ClusterDefinition
                         spec.
@@ -430,6 +433,7 @@ spec:
                                   the PersistentVolume backing this claim.
                                 type: string
                             type: object
+                            x-kubernetes-preserve-unknown-fields: true
                         required:
                         - name
                         type: object
@@ -497,6 +501,7 @@ spec:
                       type: string
                   type: object
                 type: array
+                x-kubernetes-preserve-unknown-fields: true
             required:
             - clusterDefinitionRef
             - clusterVersionRef

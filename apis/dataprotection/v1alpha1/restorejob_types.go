@@ -33,10 +33,12 @@ type RestoreJobSpec struct {
 
 	// array of restore volumes .
 	// +kubebuilder:validation:MinItems=1
+	// +kubebuilder:pruning:PreserveUnknownFields
 	TargetVolumes []corev1.Volume `json:"targetVolumes" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
 
 	// array of restore volume mounts .
 	// +kubebuilder:validation:MinItems=1
+	// +kubebuilder:pruning:PreserveUnknownFields
 	TargetVolumeMounts []corev1.VolumeMount `json:"targetVolumeMounts" patchStrategy:"merge" patchMergeKey:"mountPath"`
 
 	// count of backup stop retries on fail.
@@ -80,6 +82,7 @@ type RestoreJobStatus struct {
 	// +optional
 	CompletionTimestamp *metav1.Time `json:"completionTimestamp,omitempty"`
 
+	// Job failed reason.
 	// +optional
 	FailureReason string `json:"failureReason,omitempty"`
 }
@@ -88,7 +91,7 @@ type RestoreJobStatus struct {
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:categories={kubeblocks},scope=Namespaced
 // +kubebuilder:printcolumn:name="STATUS",type=string,JSONPath=`.status.phase`
-// +kubebuilder:printcolumn:name="COMPLETIONTIME",type=date,JSONPath=`.status.completionTimestamp`
+// +kubebuilder:printcolumn:name="COMPLETION-TIME",type=date,JSONPath=`.status.completionTimestamp`
 // +kubebuilder:printcolumn:name="AGE",type=date,JSONPath=`.metadata.creationTimestamp`
 
 // RestoreJob is the Schema for the restorejobs API (defined by User)

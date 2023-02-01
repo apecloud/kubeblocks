@@ -123,8 +123,8 @@ type BackupStatus struct {
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:categories={kubeblocks},scope=Namespaced
 // +kubebuilder:printcolumn:name="STATUS",type=string,JSONPath=`.status.phase`
-// +kubebuilder:printcolumn:name="COMPLETIONTIME",type=date,JSONPath=`.status.completionTimestamp`
-// +kubebuilder:printcolumn:name="TOTALSIZE",type=string,JSONPath=`.status.totalSize`
+// +kubebuilder:printcolumn:name="COMPLETION-TIME",type=date,JSONPath=`.status.completionTimestamp`
+// +kubebuilder:printcolumn:name="TOTAL-SIZE",type=string,JSONPath=`.status.totalSize`
 // +kubebuilder:printcolumn:name="DURATION",type=string,JSONPath=`.status.duration`
 
 // Backup is the Schema for the backups API (defined by User)

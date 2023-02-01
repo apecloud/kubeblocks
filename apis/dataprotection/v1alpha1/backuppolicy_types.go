@@ -63,6 +63,7 @@ type BackupPolicySpec struct {
 
 	// array of remote volumes from CSI driver definition.
 	// +kubebuilder:validation:Required
+	// +kubebuilder:pruning:PreserveUnknownFields
 	RemoteVolume corev1.Volume `json:"remoteVolume"`
 
 	// count of backup stop retries on fail.
@@ -86,6 +87,7 @@ type TargetCluster struct {
 	// Pods that match this label selector are counted to determine the number of pods
 	// in their corresponding topology domain.
 	// +kubebuilder:validation:Required
+	// +kubebuilder:pruning:PreserveUnknownFields
 	LabelsSelector *metav1.LabelSelector `json:"labelsSelector"`
 
 	// target db cluster access secret
@@ -159,7 +161,7 @@ type BackupPolicyStatus struct {
 // +kubebuilder:printcolumn:name="LAST SCHEDULE",type=string,JSONPath=`.status.lastScheduleTime`
 // +kubebuilder:printcolumn:name="AGE",type=date,JSONPath=`.metadata.creationTimestamp`
 
-// BackupPolicy is the Schema for the backuppolicies API  (defined by User)
+// BackupPolicy is the Schema for the backuppolicies API (defined by User)
 type BackupPolicy struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`

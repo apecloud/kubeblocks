@@ -7448,6 +7448,7 @@ spec:
                       required:
                       - containers
                       type: object
+                      x-kubernetes-preserve-unknown-fields: true
                     service:
                       description: Service is service spec, if not nil, will replace
                         ClusterDefinitionSpec.Service in ClusterDefinition spec.
@@ -7790,6 +7791,7 @@ spec:
                             https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types'
                           type: string
                       type: object
+                      x-kubernetes-preserve-unknown-fields: true
                     type:
                       description: Type is a component type in ClusterDefinition.
                       maxLength: 12

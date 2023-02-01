@@ -60,6 +60,7 @@ type ClusterSpec struct {
 	Affinity *Affinity `json:"affinity,omitempty"`
 
 	// Cluster Tolerations are attached to tolerate any taint that matches the triple <key,value,effect> using the matching operator <operator>.
+	// +kubebuilder:pruning:PreserveUnknownFields
 	// +optional
 	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
 }
@@ -146,10 +147,12 @@ type ClusterComponent struct {
 	Affinity *Affinity `json:"affinity,omitempty"`
 
 	// Component tolerations will override ClusterSpec.Tolerations if specified.
+	// +kubebuilder:pruning:PreserveUnknownFields
 	// +optional
 	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
 
 	// resources requests and limits of workload.
+	// +kubebuilder:pruning:PreserveUnknownFields
 	// +optional
 	Resources corev1.ResourceRequirements `json:"resources,omitempty"`
 
@@ -175,6 +178,7 @@ type ClusterComponent struct {
 	// More info: https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types
 	// +kubebuilder:default=ClusterIP
 	// +kubebuilder:validation:Enum={ClusterIP,NodePort,LoadBalancer}
+	// +kubebuilder:pruning:PreserveUnknownFields
 	// +optional
 	ServiceType corev1.ServiceType `json:"serviceType,omitempty"`
 }
@@ -252,6 +256,7 @@ type ClusterComponentVolumeClaimTemplate struct {
 	// +kubebuilder:validation:Required
 	Name string `json:"name"`
 	// spec defines the desired characteristics of a volume requested by a pod author.
+	// +kubebuilder:pruning:PreserveUnknownFields
 	// +optional
 	Spec *corev1.PersistentVolumeClaimSpec `json:"spec,omitempty"`
 }
@@ -357,7 +362,7 @@ func (r *Cluster) ValidateEnabledLogs(cd *ClusterDefinition) error {
 		if len(invalidLogNames) == 0 {
 			continue
 		}
-		message = append(message, fmt.Sprintf("EnabledLogs: %s are not definded in Component: %s of the clusterDefinition", invalidLogNames, comp.Name))
+		message = append(message, fmt.Sprintf("EnabledLogs: %s are not defined in Component: %s of the clusterDefinition", invalidLogNames, comp.Name))
 	}
 	if len(message) > 0 {
 		return errors.New(strings.Join(message, ";"))

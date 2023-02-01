@@ -170,6 +170,7 @@ spec:
                   - name
                   type: object
                 type: array
+                x-kubernetes-preserve-unknown-fields: true
               envFrom:
                 description: List of sources to populate environment variables in
                   the container. The keys defined within a source must be a C_IDENTIFIER.
@@ -208,6 +209,7 @@ spec:
                       type: object
                   type: object
                 type: array
+                x-kubernetes-preserve-unknown-fields: true
               image:
                 description: Backup tool Container image name.
                 type: string
@@ -279,6 +281,7 @@ spec:
                       to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
                     type: object
                 type: object
+                x-kubernetes-preserve-unknown-fields: true
             required:
             - backupCommands
             - image

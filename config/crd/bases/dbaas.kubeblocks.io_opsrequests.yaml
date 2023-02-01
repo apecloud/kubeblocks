@@ -228,6 +228,7 @@ spec:
                   required:
                   - componentName
                   type: object
+                  x-kubernetes-preserve-unknown-fields: true
                 type: array
                 x-kubernetes-list-map-keys:
                 - componentName
@@ -488,6 +489,7 @@ spec:
                             type: object
                           type: array
                       type: object
+                      x-kubernetes-preserve-unknown-fields: true
                     description: components records last configuration of the component.
                     type: object
                 type: object

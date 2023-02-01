@@ -42,10 +42,12 @@ type BackupToolSpec struct {
 
 	// Compute Resources required by this container.
 	// Cannot be updated.
+	// +kubebuilder:pruning:PreserveUnknownFields
 	// +optional
 	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
 
 	// List of environment variables to set in the container.
+	// +kubebuilder:pruning:PreserveUnknownFields
 	// +optional
 	Env []corev1.EnvVar `json:"env,omitempty" patchStrategy:"merge" patchMergeKey:"name"`
 
@@ -55,6 +57,7 @@ type BackupToolSpec struct {
 	// sources, the value associated with the last source will take precedence.
 	// Values defined by an Env with a duplicate key will take precedence.
 	// Cannot be updated.
+	// +kubebuilder:pruning:PreserveUnknownFields
 	// +optional
 	EnvFrom []corev1.EnvFromSource `json:"envFrom,omitempty"`
 

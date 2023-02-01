@@ -139,4 +139,11 @@ spec:
 		res := buildTolerations(raw)
 		Expect(len(res)).Should(Equal(1))
 	})
+
+	It("generate random cluster name", func() {
+		dynamic := testing.FakeDynamicClient()
+		name, err := generateClusterName(dynamic, "")
+		Expect(err).Should(Succeed())
+		Expect(name).ShouldNot(BeEmpty())
+	})
 })

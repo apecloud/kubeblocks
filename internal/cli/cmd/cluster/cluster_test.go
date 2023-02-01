@@ -32,6 +32,8 @@ import (
 )
 
 var _ = Describe("Cluster", func() {
+	const testComponentPath = "../../testing/testdata/component.yaml"
+
 	var streams genericclioptions.IOStreams
 	var tf *cmdtesting.TestFactory
 
@@ -47,19 +49,29 @@ var _ = Describe("Cluster", func() {
 
 	Context("create", func() {
 		It("without name", func() {
-			o := &CreateOptions{}
+			o := &CreateOptions{
+				ClusterDefRef:      testing.ClusterDefName,
+				ClusterVersionRef:  testing.ClusterVersionName,
+				ComponentsFilePath: testComponentPath,
+				UpdatableFlags: UpdatableFlags{
+					TerminationPolicy: "Delete",
+				},
+				BaseOptions: create.BaseOptions{
+					Client: tf.FakeDynamicClient,
+				},
+			}
 			o.IOStreams = streams
-			Expect(o.Validate()).To(MatchError("missing cluster name"))
+			Expect(o.Validate()).To(Succeed())
+			Expect(o.Name).ShouldNot(BeEmpty())
 		})
 
 		It("new command", func() {
 			cmd := NewCreateCmd(tf, streams)
 			Expect(cmd).ShouldNot(BeNil())
 			Expect(cmd.Flags().GetString("termination-policy")).Should(Equal(""))
-
 			Expect(cmd.Flags().Set("cluster-definition", testing.ClusterDefName)).Should(Succeed())
 			Expect(cmd.Flags().Set("cluster-version", testing.ClusterVersionName)).Should(Succeed())
-			Expect(cmd.Flags().Set("components", "../../testing/testdata/component.yaml")).Should(Succeed())
+			Expect(cmd.Flags().Set("components", testComponentPath)).Should(Succeed())
 			Expect(cmd.Flags().Set("termination-policy", "Delete")).Should(Succeed())
 
 			// must succeed otherwise exit 1 and make test fails

@@ -669,7 +669,7 @@ func (r *ClusterReconciler) reconcileClusterStatus(ctx context.Context,
 	}
 
 	// handle the cluster conditions with ClusterReady and ReplicasReady type.
-	handleClusterReadyCondition := func(cluster *dbaasv1alpha1.Cluster) (needPatch bool, postFunc postStatusHandler) {
+	handleClusterReadyCondition := func(cluster *dbaasv1alpha1.Cluster) (needPatch bool, postFunc postHandler) {
 		if len(replicasNotReadyCompNames) == 0 {
 			// if AllReplicasReady already exists, return
 			if meta.IsStatusConditionTrue(cluster.Status.Conditions, ConditionTypeReplicasReady) {
@@ -689,7 +689,7 @@ func (r *ClusterReconciler) reconcileClusterStatus(ctx context.Context,
 	}
 
 	// handle the Cluster.status when some components of cluster are Abnormal or Failed.
-	handleExistAbnormalOrFailed := func(cluster *dbaasv1alpha1.Cluster) (needPatch bool, postFunc postStatusHandler) {
+	handleExistAbnormalOrFailed := func(cluster *dbaasv1alpha1.Cluster) (needPatch bool, postFunc postHandler) {
 		if !existsAbnormalOrFailed {
 			return
 		}
@@ -699,7 +699,7 @@ func (r *ClusterReconciler) reconcileClusterStatus(ctx context.Context,
 	}
 
 	// handle the Cluster.status when cluster is Running.
-	handleClusterIsRunning := func(cluster *dbaasv1alpha1.Cluster) (needPatch bool, postFunc postStatusHandler) {
+	handleClusterIsRunning := func(cluster *dbaasv1alpha1.Cluster) (needPatch bool, postFunc postHandler) {
 		if !clusterIsRunning {
 			return
 		}

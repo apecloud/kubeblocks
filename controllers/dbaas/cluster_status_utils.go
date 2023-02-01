@@ -39,11 +39,11 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
-// postStatusHandler defines the status handler after patch cluster status.
-type postStatusHandler func(cluster *dbaasv1alpha1.Cluster) error
+// postHandler defines the handler after patching cluster status.
+type postHandler func(cluster *dbaasv1alpha1.Cluster) error
 
-// clusterStatusHandler a cluster status handler which all changes of Cluster.status will be patched uniformly by doChainClusterStatusHandler.
-type clusterStatusHandler func(cluster *dbaasv1alpha1.Cluster) (bool, postStatusHandler)
+// clusterStatusHandler a cluster status handler which changes of Cluster.status will be patched uniformly by doChainClusterStatusHandler.
+type clusterStatusHandler func(cluster *dbaasv1alpha1.Cluster) (bool, postHandler)
 
 const (
 	// EventTimeOut timeout of the event

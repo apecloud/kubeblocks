@@ -19,8 +19,10 @@ package cluster
 import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	dynamicfakeclient "k8s.io/client-go/dynamic/fake"
 
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 
@@ -30,6 +32,8 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
+	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
+	"github.com/apecloud/kubeblocks/test/testdata"
 )
 
 var _ = Describe("Cluster", func() {
@@ -159,36 +163,84 @@ var _ = Describe("Cluster", func() {
 	})
 
 	It("check params for reconfiguring operations", func() {
-		o := &OperationsOptions{
-			BaseOptions: create.BaseOptions{
-				IOStreams: streams,
-				Name:      "test",
-			},
-			OpsType:                dbaasv1alpha1.ReconfiguringType,
-			TTLSecondsAfterSucceed: 30,
-			ClusterVersionRef:      "test-cluster-version",
-			ComponentNames:         []string{"replicasets", "proxy"},
-		}
+		const (
+			ns                  = "default"
+			volumeName          = "config"
+			componentName       = "wesql"
+			cdComponentTypeName = "replicasets"
+		)
 
-		var err error
+		randomNamer := CreateGenRandomResourceNamer(ns)
+		mockHelper := NewFakeKBHelper("cli_testdata",
+			// create cr from file
+			withResourceKind(types.ConfigConstraintGVR(), types.KindConfigConstraint, testdata.WithName(randomNamer.ccName)),
+			// create cr from file
+			withResourceKind(types.CMGVR(), types.KindCM, testdata.WithName(randomNamer.tplName)),
+			// create cr from file
+			withResourceKind(types.ClusterDefGVR(), types.KindClusterDef,
+				testdata.WithName(randomNamer.cdName),
+				testdata.WithConfigTemplate(GenerateConfigTemplate(randomNamer, volumeName),
+					testdata.ComponentTypeSelector(dbaasv1alpha1.Stateful)),
+				testdata.WithUpdateComponent(testdata.ComponentTypeSelector(dbaasv1alpha1.Stateful), func(component *dbaasv1alpha1.ClusterDefinitionComponent) {
+					component.TypeName = cdComponentTypeName
+				})),
+			// create cr from file
+			withResourceKind(types.ClusterVersionGVR(), types.KindClusterVersion, testdata.WithName(randomNamer.cvName)),
+			// create cluster
+			withCustomResource(types.ClusterGVR(), func() runtime.Object {
+				return &dbaasv1alpha1.Cluster{
+					TypeMeta: metav1.TypeMeta{
+						APIVersion: dbaasv1alpha1.APIVersion,
+						Kind:       dbaasv1alpha1.ClusterKind,
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      randomNamer.clusterName,
+						Namespace: randomNamer.ns,
+					},
+					Spec: dbaasv1alpha1.ClusterSpec{
+						ClusterDefRef:     randomNamer.cdName,
+						ClusterVersionRef: randomNamer.cvName,
+						Components: []dbaasv1alpha1.ClusterComponent{
+							{
+								Name: componentName,
+								Type: cdComponentTypeName,
+							},
+						},
+					},
+				}
+			}),
+			// create instance config configmap
+			withCustomResource(types.CMGVR(), func() runtime.Object {
+				return &corev1.ConfigMap{
+					TypeMeta: metav1.TypeMeta{
+						APIVersion: types.VersionV1,
+						Kind:       types.KindCM,
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      cfgcore.GetComponentCfgName(randomNamer.clusterName, componentName, volumeName),
+						Namespace: randomNamer.ns,
+					},
+					Data: map[string]string{
+						"my.cnf": ``,
+					},
+				}
+			}),
+		)
+		ttf, o := NewFakeOperationsOptions(randomNamer.ns, randomNamer.clusterName, dbaasv1alpha1.ReconfiguringType, mockHelper.CreateObjects()...)
+		defer ttf.Cleanup()
 
+		o.ComponentNames = []string{"replicasets", "proxy"}
 		By("validate reconfiguring when multi components")
 		Expect(o.Validate()).To(MatchError("reconfiguring only support one component."))
 
 		By("validate reconfiguring parameter")
-		o.ComponentNames = []string{"replicasets"}
+		o.ComponentNames = []string{componentName}
 		Expect(o.Validate().Error()).To(ContainSubstring("reconfiguring required configure file or updated parameters"))
 		o.Parameters = []string{"abcd"}
 		Expect(o.Validate().Error()).To(ContainSubstring("updated parameter formatter"))
 		o.Parameters = []string{"abcd=test"}
-
-		//o.Client, err = tf.DynamicClient()
-		//Expect(err).Should(Succeed())
-
-		dynamicfakeclient.NewSimpleDynamicClientWithCustomListKinds()
-
-		tf.
-			Expect(o.Validate().Error()).To(ContainSubstring("updated parameter formatter"))
+		o.CfgTemplateName = randomNamer.tplName
+		Expect(o.Validate()).Should(Succeed())
 	})
 
 	It("list and delete operations", func() {

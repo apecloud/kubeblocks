@@ -58,6 +58,7 @@ spec:
                 items:
                   type: string
                 type: array
+                x-kubernetes-list-type: set
               deployKind:
                 default: job
                 description: which kind for run a backup tool.

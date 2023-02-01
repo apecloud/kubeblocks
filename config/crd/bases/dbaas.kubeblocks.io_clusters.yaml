@@ -81,6 +81,7 @@ spec:
                     items:
                       type: string
                     type: array
+                    x-kubernetes-list-type: set
                 type: object
               clusterDefinitionRef:
                 description: Cluster referenced ClusterDefinition name, this is an
@@ -121,6 +122,7 @@ spec:
                           items:
                             type: string
                           type: array
+                          x-kubernetes-list-type: set
                       type: object
                     enabledLogs:
                       description: enabledLogs indicate which log file takes effect
@@ -130,6 +132,7 @@ spec:
                       items:
                         type: string
                       type: array
+                      x-kubernetes-list-type: set
                     monitor:
                       default: false
                       description: monitor which is a switch to enable monitoring,
@@ -761,12 +764,16 @@ spec:
                       - name
                       type: object
                     type: array
+                    x-kubernetes-list-map-keys:
+                    - name
+                    x-kubernetes-list-type: map
                   restartable:
                     description: restartable which components of the cluster support
                       restart.
                     items:
                       type: string
                     type: array
+                    x-kubernetes-list-type: set
                   upgradable:
                     description: upgradable whether the cluster supports upgrade.
                       if multiple clusterVersions existed, it is true.
@@ -777,6 +784,7 @@ spec:
                     items:
                       type: string
                     type: array
+                    x-kubernetes-list-type: set
                   volumeExpandable:
                     description: volumeExpandable which components of the cluster
                       and its volumeClaimTemplates support volumeExpansion.
@@ -803,6 +811,9 @@ spec:
                       - name
                       type: object
                     type: array
+                    x-kubernetes-list-map-keys:
+                    - name
+                    x-kubernetes-list-type: map
                 type: object
               phase:
                 description: 'phase describes the phase of the Cluster. the detail

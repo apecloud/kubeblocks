@@ -72,6 +72,7 @@ spec:
                     items:
                       type: string
                     type: array
+                    x-kubernetes-list-type: set
                   labelsSelector:
                     description: LabelSelector is used to find matching pods. Pods
                       that match this label selector are counted to determine the

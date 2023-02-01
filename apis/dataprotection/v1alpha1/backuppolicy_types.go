@@ -80,6 +80,7 @@ type TargetCluster struct {
 
 	// database engine to support in the backup.
 	// +kubebuilder:validation:Enum={5.6,5.7,8.0}
+	// +listType=set
 	// +optional
 	DatabaseEngineVersions []string `json:"databaseEngineVersion,omitempty"`
 

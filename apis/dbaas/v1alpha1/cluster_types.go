@@ -135,6 +135,7 @@ type ClusterComponent struct {
 	// enabledLogs indicate which log file takes effect in database cluster
 	// element is the log type which defined in cluster definition logConfig.name,
 	// and will set relative variables about this log type in database kernel.
+	// +listType=set
 	// +optional
 	EnabledLogs []string `json:"enabledLogs,omitempty"`
 
@@ -271,6 +272,7 @@ type Affinity struct {
 	PodAntiAffinity PodAntiAffinity `json:"podAntiAffinity,omitempty"`
 
 	// topologyKeys describe topologyKeys for `topologySpreadConstraint` and `podAntiAffinity` in ClusterDefinition API.
+	// +listType=set
 	// +optional
 	TopologyKeys []string `json:"topologyKeys,omitempty"`
 
@@ -285,18 +287,24 @@ type Operations struct {
 	Upgradable bool `json:"upgradable,omitempty"`
 
 	// verticalScalable which components of the cluster support verticalScaling.
+	// +listType=set
 	// +optional
 	VerticalScalable []string `json:"verticalScalable,omitempty"`
 
 	// restartable which components of the cluster support restart.
+	// +listType=set
 	// +optional
 	Restartable []string `json:"restartable,omitempty"`
 
 	// volumeExpandable which components of the cluster and its volumeClaimTemplates support volumeExpansion.
+	// +listType=map
+	// +listMapKey=name
 	// +optional
 	VolumeExpandable []OperationComponent `json:"volumeExpandable,omitempty"`
 
 	// horizontalScalable which components of the cluster support horizontalScaling, and the replicas range limit.
+	// +listType=map
+	// +listMapKey=name
 	// +optional
 	HorizontalScalable []OperationComponent `json:"horizontalScalable,omitempty"`
 }

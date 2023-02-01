@@ -138,7 +138,7 @@ func (param *reconfigureParams) getConfigKey() string {
 	return ""
 }
 
-func (param *reconfigureParams) getModifyVersion() string {
+func (param *reconfigureParams) getTargetVersionHash() string {
 	hash, err := cfgcore.ComputeHash(param.CfgCM.Data)
 	if err != nil {
 		param.Ctx.Log.Error(err, "failed to cal configuration version!")

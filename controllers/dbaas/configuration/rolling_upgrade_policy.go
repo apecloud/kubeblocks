@@ -91,7 +91,7 @@ func performRollingUpgrade(params reconfigureParams, funcs RollingUpgradeFuncs) 
 	var (
 		rollingReplicas = params.maxRollingReplicas()
 		configKey       = params.getConfigKey()
-		configVersion   = params.getModifyVersion()
+		configVersion   = params.getTargetVersionHash()
 	)
 
 	updatePodLabelsVersion := func(pod *corev1.Pod, labelKey, labelValue string) error {

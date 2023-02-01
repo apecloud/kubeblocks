@@ -80,8 +80,7 @@ func getReplicationSetPods(params reconfigureParams) ([]corev1.Pod, error) {
 func GetComponentPods(params reconfigureParams) ([]corev1.Pod, error) {
 	componentPods := make([]corev1.Pod, 0)
 	for i := range params.ComponentUnits {
-		stsObj := &params.ComponentUnits[i]
-		pods, err := consensusset.GetPodListByStatefulSet(params.Ctx.Ctx, params.Client, stsObj)
+		pods, err := consensusset.GetPodListByStatefulSet(params.Ctx.Ctx, params.Client, &params.ComponentUnits[i])
 		if err != nil {
 			return nil, err
 		}

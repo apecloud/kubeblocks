@@ -52,13 +52,13 @@ func rollingStatefulSets(param reconfigureParams) (ReturnedStatus, error) {
 	var (
 		units      = param.ComponentUnits
 		client     = param.Client
-		newVersion = param.getModifyVersion()
+		newVersion = param.getTargetVersionHash()
 		configKey  = param.getConfigKey()
 		// progress   = cfgcore.NotStarted
 	)
 
 	if configKey == "" {
-		return makeReturnedStatus(ESFailed), cfgcore.MakeError("failed to found config meta. configmap : %s", param.TplName)
+		return makeReturnedStatus(ESFailed), cfgcore.MakeError("failed to find config meta. configmap : %s", param.TplName)
 	}
 
 	for _, sts := range units {

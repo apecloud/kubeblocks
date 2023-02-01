@@ -339,20 +339,20 @@ func patchReconfiguringStatus(opsRes *OpsResource,
 		}
 		return nil
 	}
-	findAndInitStatus := func(status *dbaasv1alpha1.OpsRequestStatus, key string,
-		create func(key string) dbaasv1alpha1.ConfigurationStatus) *dbaasv1alpha1.ConfigurationStatus {
+	findAndInitStatus := func(status *dbaasv1alpha1.OpsRequestStatus, tplName string,
+		create func(tplName string) dbaasv1alpha1.ConfigurationStatus) *dbaasv1alpha1.ConfigurationStatus {
 		if status.ReconfiguringStatus == nil {
 			status.ReconfiguringStatus = &dbaasv1alpha1.ReconfiguringStatus{
 				ConfigurationStatus: make([]dbaasv1alpha1.ConfigurationStatus, 0),
 			}
 		}
 		configsStatus := status.ReconfiguringStatus
-		keyStatus := findReconfigureStatus(configsStatus, key)
+		keyStatus := findReconfigureStatus(configsStatus, tplName)
 		if keyStatus != nil {
 			return keyStatus
 		}
 		configCount := len(configsStatus.ConfigurationStatus)
-		configsStatus.ConfigurationStatus = append(configsStatus.ConfigurationStatus, create(key))
+		configsStatus.ConfigurationStatus = append(configsStatus.ConfigurationStatus, create(tplName))
 		return &configsStatus.ConfigurationStatus[configCount]
 	}
 	updateReconfigureStatus := func(configStatus *dbaasv1alpha1.ConfigurationStatus, execStatus *cfgcore.PolicyExecStatus,
@@ -362,7 +362,7 @@ func patchReconfiguringStatus(opsRes *OpsResource,
 		configStatus.SucceedCount = execStatus.SucceedCount
 		configStatus.ExpectedCount = execStatus.ExpectedCount
 		if configStatus.SucceedCount != cfgcore.Unconfirmed && configStatus.ExpectedCount != cfgcore.Unconfirmed {
-			status.Progress = calReconfiguringProgress(status.ReconfiguringStatus.ConfigurationStatus)
+			status.Progress = getSlowestReconfiguringProgress(status.ReconfiguringStatus.ConfigurationStatus)
 		}
 		switch phase {
 		case dbaasv1alpha1.SucceedPhase:
@@ -382,8 +382,8 @@ func patchReconfiguringStatus(opsRes *OpsResource,
 	return opsRes.Client.Status().Patch(opsRes.Ctx, opsRequest, patch)
 }
 
-// calReconfiguringProgress calculate the progress of the reconfiguring operations.
-func calReconfiguringProgress(status []dbaasv1alpha1.ConfigurationStatus) string {
+// getSlowestReconfiguringProgress calculate the progress of the reconfiguring operations.
+func getSlowestReconfiguringProgress(status []dbaasv1alpha1.ConfigurationStatus) string {
 	slowest := dbaasv1alpha1.ConfigurationStatus{
 		SucceedCount:  math.MaxInt32,
 		ExpectedCount: -1,

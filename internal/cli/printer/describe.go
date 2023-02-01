@@ -47,16 +47,16 @@ func PrintConditions(conditions []metav1.Condition, out io.Writer) {
 }
 
 // PrintComponentConfigMeta prints the conditions of resource.
-func PrintComponentConfigMeta(cfgMap map[dbaasv1alpha1.ConfigTemplate]*corev1.ConfigMap, clusterName, componentName string, out io.Writer) {
-	if len(cfgMap) == 0 {
+func PrintComponentConfigMeta(cfgTplMap map[dbaasv1alpha1.ConfigTemplate]*corev1.ConfigMap, clusterName, componentName string, out io.Writer) {
+	if len(cfgTplMap) == 0 {
 		return
 	}
 	tbl := NewTablePrinter(out)
 	PrintTitle("Configures Meta")
 	tbl.SetHeader("CONFIGURATION-FILE", "CONFIGMAP", "COMPONENT", "CLUSTER", "TEMPLATE-NAME", "CONFIG-TEMPLATE", "CONFIG-CONSTRAINT", "NAMESPACE")
-	for key, cfg := range cfgMap {
-		for file := range cfg.Data {
-			tbl.AddRow(file, cfg.Name, componentName, clusterName, key.Name, key.ConfigTplRef, key.ConfigConstraintRef, key.Namespace)
+	for tpl, cm := range cfgTplMap {
+		for key := range cm.Data {
+			tbl.AddRow(key, cm.Name, componentName, clusterName, tpl.Name, tpl.ConfigTplRef, tpl.ConfigConstraintRef, tpl.Namespace)
 		}
 	}
 	tbl.Print()

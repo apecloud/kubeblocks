@@ -292,7 +292,7 @@ type LastConfiguration struct {
 }
 
 type OpsRequestStatusComponent struct {
-	// phase describes the component phase, reference ClusterDefinition.status.component.phase.
+	// phase describes the component phase, reference Cluster.status.component.phase.
 	// +kubebuilder:validation:Enum={Running,Failed,Abnormal,Creating,SpecUpdating,Deleting,Deleted,VolumeExpanding,Reconfiguring,HorizontalScaling,VerticalScaling,VersionUpgrading,Rebooting}
 	// +optional
 	Phase Phase `json:"phase,omitempty"`

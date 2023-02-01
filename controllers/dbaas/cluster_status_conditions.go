@@ -21,6 +21,8 @@ import (
 	"fmt"
 	"time"
 
+	"golang.org/x/exp/maps"
+	"golang.org/x/exp/slices"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -191,11 +193,13 @@ func newAllReplicasPodsReadyConditions() metav1.Condition {
 }
 
 // newReplicasNotReadyCondition creates a condition when pods of components are not ready
-func newReplicasNotReadyCondition(message string) metav1.Condition {
+func newReplicasNotReadyCondition(notReadyComponentNames map[string]struct{}) metav1.Condition {
+	cNameSlice := maps.Keys(notReadyComponentNames)
+	slices.Sort(cNameSlice)
 	return metav1.Condition{
 		Type:    ConditionTypeReplicasReady,
 		Status:  metav1.ConditionFalse,
-		Message: message,
+		Message: fmt.Sprintf("pods are not ready in Components: %v, refer to related component message in Cluster.status.components", cNameSlice),
 		Reason:  ReasonReplicasNotReady,
 	}
 }
@@ -211,11 +215,47 @@ func newClusterReadyCondition(clusterName string) metav1.Condition {
 }
 
 // newComponentsNotReadyCondition creates a condition when components of cluster are not ready
-func newComponentsNotReadyCondition(message string) metav1.Condition {
+func newComponentsNotReadyCondition(notReadyComponentNames map[string]struct{}) metav1.Condition {
+	cNameSlice := maps.Keys(notReadyComponentNames)
+	slices.Sort(cNameSlice)
 	return metav1.Condition{
 		Type:    ConditionTypeReady,
 		Status:  metav1.ConditionFalse,
-		Message: message,
+		Message: fmt.Sprintf("pods are unavailable in Components: %v, refer to related component message in Cluster.status.components", cNameSlice),
 		Reason:  ReasonComponentsNotReady,
 	}
+}
+
+// checkConditionIsChanged checks if the condition is changed.
+func checkConditionIsChanged(oldCondition *metav1.Condition, newCondition metav1.Condition) bool {
+	if oldCondition == nil {
+		return true
+	}
+	return oldCondition.Message != newCondition.Message
+}
+
+// handleClusterReadyCondition handles the cluster conditions with ClusterReady and ReplicasReady type.
+// if conditions changed, return true.
+func handleNotReadyConditionForCluster(cluster *dbaasv1alpha1.Cluster,
+	replicasNotReadyCompNames map[string]struct{},
+	notReadyCompNames map[string]struct{}) bool {
+	var conditionsChanged bool
+	if len(replicasNotReadyCompNames) > 0 {
+		oldReplicasReadyCondition := meta.FindStatusCondition(cluster.Status.Conditions, ConditionTypeReplicasReady)
+		replicasNotReadyCond := newReplicasNotReadyCondition(replicasNotReadyCompNames)
+		if checkConditionIsChanged(oldReplicasReadyCondition, replicasNotReadyCond) {
+			cluster.SetStatusCondition(replicasNotReadyCond)
+			conditionsChanged = true
+		}
+	}
+
+	if len(notReadyCompNames) > 0 {
+		oldClusterReadyCondition := meta.FindStatusCondition(cluster.Status.Conditions, ConditionTypeReady)
+		clusterNotReadyCondition := newComponentsNotReadyCondition(notReadyCompNames)
+		if checkConditionIsChanged(oldClusterReadyCondition, clusterNotReadyCondition) {
+			cluster.SetStatusCondition(clusterNotReadyCondition)
+			conditionsChanged = true
+		}
+	}
+	return conditionsChanged
 }

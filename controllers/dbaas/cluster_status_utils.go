@@ -39,6 +39,12 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
+// postStatusHandler defines the status handler after patch cluster status.
+type postStatusHandler func(cluster *dbaasv1alpha1.Cluster) error
+
+// clusterStatusHandler a cluster status handler which all changes of Cluster.status will be patched uniformly by doChainClusterStatusHandler.
+type clusterStatusHandler func(cluster *dbaasv1alpha1.Cluster) (bool, postStatusHandler)
+
 const (
 	// EventTimeOut timeout of the event
 	EventTimeOut = 30 * time.Second
@@ -46,6 +52,40 @@ const (
 	// EventOccursTimes occurs times of the event
 	EventOccursTimes int32 = 3
 )
+
+// doChainClusterStatusHandler chain processing clusterStatusHandler.
+func doChainClusterStatusHandler(ctx context.Context,
+	cli client.Client,
+	cluster *dbaasv1alpha1.Cluster,
+	handlers ...clusterStatusHandler) error {
+	patch := client.MergeFrom(cluster.DeepCopy())
+	var (
+		needPatchStatus bool
+		postHandlers    = make([]func(cluster *dbaasv1alpha1.Cluster) error, 0, len(handlers))
+	)
+	for _, statusHandler := range handlers {
+		needPatch, postFunc := statusHandler(cluster)
+		if needPatch {
+			needPatchStatus = true
+		}
+		if postFunc != nil {
+			postHandlers = append(postHandlers, postFunc)
+		}
+	}
+	if !needPatchStatus {
+		return nil
+	}
+	if err := cli.Status().Patch(ctx, cluster, patch); err != nil {
+		return err
+	}
+	// perform the handlers after patched the cluster status.
+	for _, postFunc := range postHandlers {
+		if err := postFunc(cluster); err != nil {
+			return err
+		}
+	}
+	return nil
+}
 
 // isTargetKindForEvent checks the event involve object is the target resources
 func isTargetKindForEvent(event *corev1.Event) bool {
@@ -158,8 +198,8 @@ func handleClusterAbnormalOrFailedPhase(cluster *dbaasv1alpha1.Cluster, componen
 	var (
 		isFailed                       bool
 		needSyncClusterPhase           = true
-		ReplicasNotReadyComponentNames = make([]string, 0)
-		notReadyComponentNames         = make([]string, 0)
+		replicasNotReadyComponentNames = map[string]struct{}{}
+		notReadyComponentNames         = map[string]struct{}{}
 	)
 	for k, v := range cluster.Status.Components {
 		componentType := componentMap[k]
@@ -175,21 +215,20 @@ func handleClusterAbnormalOrFailedPhase(cluster *dbaasv1alpha1.Cluster, componen
 			needSyncClusterPhase = false
 		}
 		if v.PodsReady == nil || !*v.PodsReady {
-			ReplicasNotReadyComponentNames = append(ReplicasNotReadyComponentNames, k)
+			replicasNotReadyComponentNames[k] = struct{}{}
+			notReadyComponentNames[k] = struct{}{}
 		}
 		if util.IsFailedOrAbnormal(v.Phase) {
-			notReadyComponentNames = append(notReadyComponentNames, k)
+			notReadyComponentNames[k] = struct{}{}
 		}
 	}
 	// record the not ready conditions in cluster
-	if len(ReplicasNotReadyComponentNames) > 0 {
-		message := fmt.Sprintf("pods are not ready in Components: %v, refer to related component message in Cluster.status.components", ReplicasNotReadyComponentNames)
-		cluster.SetStatusCondition(newReplicasNotReadyCondition(message))
+	if len(replicasNotReadyComponentNames) > 0 {
+		cluster.SetStatusCondition(newReplicasNotReadyCondition(replicasNotReadyComponentNames))
 	}
 	// record the not ready conditions in cluster
 	if len(notReadyComponentNames) > 0 {
-		message := fmt.Sprintf("pods are unavailable in Components: %v, refer to related component message in Cluster.status.components", notReadyComponentNames)
-		cluster.SetStatusCondition(newComponentsNotReadyCondition(message))
+		cluster.SetStatusCondition(newComponentsNotReadyCondition(notReadyComponentNames))
 	}
 	if !needSyncClusterPhase {
 		return

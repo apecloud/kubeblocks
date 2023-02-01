@@ -268,8 +268,8 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	if cluster.Status.ObservedGeneration == cluster.GetObjectMeta().GetGeneration() {
-		// check if all components of cluster are ready.
-		if err = r.checkAndPatchToRunning(reqCtx.Ctx, cluster, clusterDefinition); err != nil {
+		// reconcile the phase and conditions of the Cluster.status
+		if err = r.reconcileClusterStatus(reqCtx.Ctx, cluster, clusterDefinition); err != nil {
 			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 		}
 		return intctrlutil.Reconciled()
@@ -354,14 +354,10 @@ func (r *ClusterReconciler) handleClusterStatusAfterApplySucceed(
 	cluster *dbaasv1alpha1.Cluster,
 	clusterDeepCopy *dbaasv1alpha1.Cluster,
 	clusterDef *dbaasv1alpha1.ClusterDefinition) error {
-	var needSendEvent bool
 	patch := client.MergeFrom(clusterDeepCopy)
 	// apply resources succeed, record the condition and event
 	applyResourcesCondition := newApplyResourcesCondition()
-	if !meta.IsStatusConditionTrue(cluster.Status.Conditions, applyResourcesCondition.Type) {
-		cluster.SetStatusCondition(applyResourcesCondition)
-		needSendEvent = true
-	}
+	cluster.SetStatusCondition(applyResourcesCondition)
 	// if cluster status is ConditionsError, do it before updated the observedGeneration.
 	r.updateClusterPhaseWhenConditionsError(cluster)
 	// update observed generation
@@ -370,9 +366,7 @@ func (r *ClusterReconciler) handleClusterStatusAfterApplySucceed(
 	if err := r.Client.Status().Patch(ctx, cluster, patch); err != nil {
 		return err
 	}
-	if needSendEvent {
-		r.Recorder.Event(cluster, corev1.EventTypeNormal, applyResourcesCondition.Reason, applyResourcesCondition.Message)
-	}
+	r.Recorder.Event(cluster, corev1.EventTypeNormal, applyResourcesCondition.Reason, applyResourcesCondition.Message)
 	return nil
 }
 
@@ -643,8 +637,8 @@ func (r *ClusterReconciler) updateClusterPhaseWhenConditionsError(cluster *dbaas
 	cluster.Status.Phase = opsRequestSlice[0].ToClusterPhase
 }
 
-// checkAndPatchToRunning patches Cluster.status.phase to Running
-func (r *ClusterReconciler) checkAndPatchToRunning(ctx context.Context,
+// reconcileClusterStatus reconciles phase and conditions of the Cluster.status.
+func (r *ClusterReconciler) reconcileClusterStatus(ctx context.Context,
 	cluster *dbaasv1alpha1.Cluster,
 	clusterDef *dbaasv1alpha1.ClusterDefinition) error {
 	if !r.needCheckClusterForReady(cluster) {
@@ -655,62 +649,72 @@ func (r *ClusterReconciler) checkAndPatchToRunning(ctx context.Context,
 	}
 
 	var (
-		clusterIsRunning       = true
-		isReady                = true
-		existsAbnormalOrFailed bool
-		needSync               bool
-		needSendReadyEvent     bool
+		clusterIsRunning          = true
+		existsAbnormalOrFailed    bool
+		replicasNotReadyCompNames = map[string]struct{}{}
+		notReadyCompNames         = map[string]struct{}{}
 	)
-	for _, v := range cluster.Status.Components {
-		// if pods of the components are not ready, return
+	for k, v := range cluster.Status.Components {
 		if v.PodsReady == nil || !*v.PodsReady {
-			isReady = false
+			replicasNotReadyCompNames[k] = struct{}{}
+			notReadyCompNames[k] = struct{}{}
 		}
 		if util.IsFailedOrAbnormal(v.Phase) {
 			existsAbnormalOrFailed = true
+			notReadyCompNames[k] = struct{}{}
 		}
 		if v.Phase != dbaasv1alpha1.RunningPhase {
 			clusterIsRunning = false
 		}
 	}
-	patch := client.MergeFrom(cluster.DeepCopy())
-	readyCondition := newAllReplicasPodsReadyConditions()
-	// check if the ready condition of cluster already has updated when all pods of cluster are Ready.
-	if isReady && !meta.IsStatusConditionTrue(cluster.Status.Conditions, readyCondition.Type) {
-		needSendReadyEvent = true
-		needSync = true
-		cluster.SetStatusCondition(readyCondition)
-	}
-	if clusterIsRunning {
-		cluster.Status.Phase = dbaasv1alpha1.RunningPhase
-		cluster.SetStatusCondition(newClusterReadyCondition(cluster.Name))
-		needSync = true
-	} else if existsAbnormalOrFailed {
-		// abnormal or failed components exist
-		needSync = true
-		componentMap, clusterAvailabilityEffectMap, _ := getComponentRelatedInfo(cluster, clusterDef, "")
-		handleClusterAbnormalOrFailedPhase(cluster, componentMap, clusterAvailabilityEffectMap)
-	}
-	// if cluster.status is not changed, return
-	if !needSync {
-		return nil
-	}
-	if err := r.Client.Status().Patch(ctx, cluster, patch); err != nil {
-		return err
-	}
-	if needSendReadyEvent {
-		// send an event when all pods of the components are ready
-		r.Recorder.Event(cluster, corev1.EventTypeNormal, readyCondition.Reason, readyCondition.Message)
+
+	// handle the cluster conditions with ClusterReady and ReplicasReady type.
+	handleClusterReadyCondition := func(cluster *dbaasv1alpha1.Cluster) (needPatch bool, postFunc postStatusHandler) {
+		if len(replicasNotReadyCompNames) == 0 {
+			// if AllReplicasReady already exists, return
+			if meta.IsStatusConditionTrue(cluster.Status.Conditions, ConditionTypeReplicasReady) {
+				return
+			}
+			readyCondition := newAllReplicasPodsReadyConditions()
+			cluster.SetStatusCondition(readyCondition)
+			handleNotReadyConditionForCluster(cluster, nil, notReadyCompNames)
+			return true, func(cluster *dbaasv1alpha1.Cluster) error {
+				// send an event when all pods of the components are ready.
+				r.Recorder.Event(cluster, corev1.EventTypeNormal, readyCondition.Reason, readyCondition.Message)
+				return nil
+			}
+		}
+		// handle the cluster.status.conditions when replicas of cluster are not ready.
+		return handleNotReadyConditionForCluster(cluster, replicasNotReadyCompNames, notReadyCompNames), nil
 	}
 
-	if clusterIsRunning {
-		// send an event when Cluster.status.phase change to Running
-		r.Recorder.Eventf(cluster, corev1.EventTypeNormal, string(dbaasv1alpha1.RunningPhase), "Cluster: %s is ready, current phase is Running.", cluster.Name)
-		// when cluster phase or component phase changed,
-		// need to mark OpsRequest annotation to reconcile for running OpsRequest.
-		return opsutil.MarkRunningOpsRequestAnnotation(ctx, r.Client, cluster)
+	// handle the Cluster.status when some components of cluster are Abnormal or Failed.
+	handleExistAbnormalOrFailed := func(cluster *dbaasv1alpha1.Cluster) (needPatch bool, postFunc postStatusHandler) {
+		if !existsAbnormalOrFailed {
+			return
+		}
+		componentMap, clusterAvailabilityEffectMap, _ := getComponentRelatedInfo(cluster, clusterDef, "")
+		handleClusterAbnormalOrFailedPhase(cluster, componentMap, clusterAvailabilityEffectMap)
+		return true, nil
 	}
-	return nil
+
+	// handle the Cluster.status when cluster is Running.
+	handleClusterIsRunning := func(cluster *dbaasv1alpha1.Cluster) (needPatch bool, postFunc postStatusHandler) {
+		if !clusterIsRunning {
+			return
+		}
+		cluster.Status.Phase = dbaasv1alpha1.RunningPhase
+		cluster.SetStatusCondition(newClusterReadyCondition(cluster.Name))
+		return true, func(cluster *dbaasv1alpha1.Cluster) error {
+			// send an event when Cluster.status.phase change to Running
+			r.Recorder.Eventf(cluster, corev1.EventTypeNormal, string(dbaasv1alpha1.RunningPhase), "Cluster: %s is ready, current phase is Running.", cluster.Name)
+			// when cluster phase changes to Running, need to mark OpsRequest annotation to reconcile for running OpsRequest.
+			return opsutil.MarkRunningOpsRequestAnnotation(ctx, r.Client, cluster)
+		}
+	}
+
+	return doChainClusterStatusHandler(ctx, r.Client, cluster,
+		handleClusterReadyCondition, handleExistAbnormalOrFailed, handleClusterIsRunning)
 }
 
 // reconcileStatusOperations when Cluster.spec updated, we need reconcile the Cluster.status.operations.

@@ -144,7 +144,7 @@ func injectBuiltInFunctions(tplBuilder *configTemplateBuilder, component *Compon
 
 func injectBuiltInObjects(tplBuilder *configTemplateBuilder, podSpec *corev1.PodSpec, component *Component, configs []dbaasv1alpha1.ConfigTemplate) error {
 	var resource *ResourceDefinition
-	container := intctrlutil.GetContainerUsingConfig(podSpec, configs)
+	container := intctrlutil.GetContainerByConfigTemplate(podSpec, configs)
 	if container != nil && len(container.Resources.Limits) > 0 {
 		resource = &ResourceDefinition{
 			MemorySize: intctrlutil.GetMemorySize(*container),

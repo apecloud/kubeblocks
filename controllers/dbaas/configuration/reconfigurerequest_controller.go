@@ -207,7 +207,7 @@ func (r *ReconfigureRequestReconciler) sync(reqCtx intctrlutil.RequestCtx, confi
 	}
 
 	// configmap has never been used
-	sts, containersList := getComponentByUsingCM(&stsLists, configKey)
+	sts, containersList := getRelatedComponentsByConfigmap(&stsLists, configKey)
 	if len(sts) == 0 {
 		reqCtx.Log.Info("configmap is not used by any container.", "cm name", configKey)
 		return intctrlutil.Reconciled()

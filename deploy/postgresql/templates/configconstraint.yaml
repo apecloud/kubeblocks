@@ -28,6 +28,4 @@ spec:
 
   # mysql configuration file format
   formatterConfig:
-    formatter: ini
-    iniConfig:
-      sectionName: mysqld
+    formatter: dotenv

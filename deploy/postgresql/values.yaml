@@ -195,6 +195,7 @@ primary:
     host     all             all             ::1/128                 md5
 
   cue: |-
+    // PostgreSQL parameters: https://postgresqlco.nf/doc/en/param/authentication_timeout/
     #PGParameter: {
 
       // Sets the application name to be reported in statistics and logs.

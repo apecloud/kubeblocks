@@ -151,7 +151,7 @@ func (r *ReconfigureRequestReconciler) sync(reqCtx intctrlutil.RequestCtx, confi
 
 	// Not any parameters updated
 	if !configPatch.IsModify {
-		return r.updateCfgStatus(reqCtx, config, ReconfigureNoChangeType)
+		return r.updateConfigCMStatus(reqCtx, config, ReconfigureNoChangeType)
 	}
 
 	reqCtx.Log.Info(fmt.Sprintf("reconfigure params: \n\tadd: %s\n\tdelete: %s\n\tupdate: %s",
@@ -230,7 +230,7 @@ func (r *ReconfigureRequestReconciler) sync(reqCtx intctrlutil.RequestCtx, confi
 	})
 }
 
-func (r *ReconfigureRequestReconciler) updateCfgStatus(reqCtx intctrlutil.RequestCtx, cfg *corev1.ConfigMap, reconfigureType string) (ctrl.Result, error) {
+func (r *ReconfigureRequestReconciler) updateConfigCMStatus(reqCtx intctrlutil.RequestCtx, cfg *corev1.ConfigMap, reconfigureType string) (ctrl.Result, error) {
 	configData, err := json.Marshal(cfg.Data)
 	if err != nil {
 		return intctrlutil.RequeueWithErrorAndRecordEvent(cfg, r.Recorder, err, reqCtx.Log)
@@ -266,7 +266,7 @@ func (r *ReconfigureRequestReconciler) performUpgrade(params reconfigureParams) 
 	case ESRetry, ESAndRetryFailed:
 		return intctrlutil.RequeueAfter(ConfigReconcileInterval, params.Ctx.Log, "")
 	case ESNone:
-		return r.updateCfgStatus(params.Ctx, params.CfgCM, policy.GetPolicyName())
+		return r.updateConfigCMStatus(params.Ctx, params.CfgCM, policy.GetPolicyName())
 	case ESFailed:
 		if err := setCfgUpgradeFlag(params.Client, params.Ctx, params.CfgCM, false); err != nil {
 			return intctrlutil.CheckedRequeueWithError(err, params.Ctx.Log, "")

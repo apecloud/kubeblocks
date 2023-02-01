@@ -31,12 +31,13 @@ import (
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/dbaas/components/util"
 	opsutil "github.com/apecloud/kubeblocks/controllers/dbaas/operations/util"
-	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 )
 
 type handleStatusProgressWithComponent func(opsRes *OpsResource,
 	pgRes progressResource,
 	statusComponent *dbaasv1alpha1.OpsRequestStatusComponent) (expectProgressCount int32, succeedCount int32, err error)
+
+type handleReconfigureOpsStatus func(cmStatus *dbaasv1alpha1.ConfigurationStatus) error
 
 // ReconcileActionWithComponentOps will be performed when action is done and loops till OpsRequest.status.phase is Succeed/Failed.
 // if OpsRequest.spec.componentOps is not null, you can use it to OpsBehaviour.ReconcileAction.
@@ -318,66 +319,59 @@ func isOpsRequestFailedPhase(opsRequestPhase dbaasv1alpha1.Phase) bool {
 	return opsRequestPhase == dbaasv1alpha1.FailedPhase
 }
 
-// patchReconfiguringStatus when Reconfigure is running, we should update status to OpsRequest.Status.ConfigurationStatus.
-func patchReconfiguringStatus(opsRes *OpsResource,
+func updateReconfigureStatusByCM(reconfiguringStatus *dbaasv1alpha1.ReconfiguringStatus, tplName string,
+	handleReconfigureStatus handleReconfigureOpsStatus) (bool, error) {
+	for i := range reconfiguringStatus.ConfigurationStatus {
+		cmStatus := &reconfiguringStatus.ConfigurationStatus[i]
+		if cmStatus.Name == tplName {
+			return true, handleReconfigureStatus(cmStatus)
+		}
+	}
+	return false, nil
+}
+
+// patchReconfigureOpsStatus when Reconfigure is running, we should update status to OpsRequest.Status.ConfigurationStatus.
+//
+// NOTES:
+// opsStatus describes status of OpsRequest.
+// reconfiguringStatus describes status of reconfiguring operation.
+// cmStatus describes status of configmap, it is uniquely associated with a configuration template.
+// key describes name of the configuration file,
+func patchReconfigureOpsStatus(opsRes *OpsResource,
 	tplName string,
-	execStatus *cfgcore.PolicyExecStatus,
-	phase dbaasv1alpha1.Phase,
-	create func(key string) dbaasv1alpha1.ConfigurationStatus) error {
+	handleReconfigureStatus handleReconfigureOpsStatus) error {
 	var (
-		status     = &opsRes.OpsRequest.Status
 		opsRequest = opsRes.OpsRequest
+
+		reconfiguringStatus *dbaasv1alpha1.ReconfiguringStatus
+		err                 error
+		updatedSucceed      bool
 	)
 
-	findReconfigureStatus := func(status *dbaasv1alpha1.ReconfiguringStatus, tplName string) *dbaasv1alpha1.ConfigurationStatus {
-		cfgStatus := status.ConfigurationStatus
-		for i := range cfgStatus {
-			configStatus := &cfgStatus[i]
-			if configStatus.Name == tplName {
-				return configStatus
-			}
-		}
-		return nil
-	}
-	findAndInitStatus := func(status *dbaasv1alpha1.OpsRequestStatus, tplName string,
-		create func(tplName string) dbaasv1alpha1.ConfigurationStatus) *dbaasv1alpha1.ConfigurationStatus {
-		if status.ReconfiguringStatus == nil {
-			status.ReconfiguringStatus = &dbaasv1alpha1.ReconfiguringStatus{
-				ConfigurationStatus: make([]dbaasv1alpha1.ConfigurationStatus, 0),
-			}
-		}
-		configsStatus := status.ReconfiguringStatus
-		keyStatus := findReconfigureStatus(configsStatus, tplName)
-		if keyStatus != nil {
-			return keyStatus
-		}
-		configCount := len(configsStatus.ConfigurationStatus)
-		configsStatus.ConfigurationStatus = append(configsStatus.ConfigurationStatus, create(tplName))
-		return &configsStatus.ConfigurationStatus[configCount]
-	}
-	updateReconfigureStatus := func(configStatus *dbaasv1alpha1.ConfigurationStatus, execStatus *cfgcore.PolicyExecStatus,
-		phase dbaasv1alpha1.Phase) {
-		configStatus.LastAppliedStatus = execStatus.ExecStatus
-		configStatus.UpdatePolicy = dbaasv1alpha1.UpgradePolicy(execStatus.PolicyName)
-		configStatus.SucceedCount = execStatus.SucceedCount
-		configStatus.ExpectedCount = execStatus.ExpectedCount
-		if configStatus.SucceedCount != cfgcore.Unconfirmed && configStatus.ExpectedCount != cfgcore.Unconfirmed {
-			status.Progress = getSlowestReconfiguringProgress(status.ReconfiguringStatus.ConfigurationStatus)
-		}
-		switch phase {
-		case dbaasv1alpha1.SucceedPhase:
-			configStatus.Status = dbaasv1alpha1.ReasonReconfigureSucceed
-		case dbaasv1alpha1.FailedPhase:
-			configStatus.Status = dbaasv1alpha1.ReasonReconfigureFailed
-		default:
-			configStatus.Status = dbaasv1alpha1.ReasonReconfigureRunning
+	patch := client.MergeFrom(opsRequest.DeepCopy())
+	if opsRequest.Status.ReconfiguringStatus == nil {
+		opsRequest.Status.ReconfiguringStatus = &dbaasv1alpha1.ReconfiguringStatus{
+			ConfigurationStatus: make([]dbaasv1alpha1.ConfigurationStatus, 0),
 		}
 	}
 
-	patch := client.MergeFrom(opsRequest.DeepCopy())
-	configStatus := findAndInitStatus(status, tplName, create)
-	if execStatus != nil {
-		updateReconfigureStatus(configStatus, execStatus, phase)
+	reconfiguringStatus = opsRequest.Status.ReconfiguringStatus
+	if updatedSucceed, err = updateReconfigureStatusByCM(reconfiguringStatus, tplName, handleReconfigureStatus); err != nil {
+		return err
+	}
+	if updatedSucceed {
+		return opsRes.Client.Status().Patch(opsRes.Ctx, opsRequest, patch)
+	}
+
+	cmCount := len(reconfiguringStatus.ConfigurationStatus)
+	reconfiguringStatus.ConfigurationStatus = append(reconfiguringStatus.ConfigurationStatus, dbaasv1alpha1.ConfigurationStatus{
+		Name:   tplName,
+		Status: dbaasv1alpha1.ReasonReconfigureMerging,
+	})
+
+	var cmStatus = &reconfiguringStatus.ConfigurationStatus[cmCount]
+	if err = handleReconfigureStatus(cmStatus); err != nil {
+		return err
 	}
 	return opsRes.Client.Status().Patch(opsRes.Ctx, opsRequest, patch)
 }

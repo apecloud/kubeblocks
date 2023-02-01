@@ -40,6 +40,7 @@ const (
 
 	// condition and event reasons
 
+	ReasonReconfigureMerging        = "ReconfigureMerging"
 	ReasonReconfigureMerged         = "ReconfigureMerged"
 	ReasonReconfigureInvalidUpdated = "ReconfigureInvalidUpdated"
 	ReasonReconfigureFailed         = "ReconfigureFailed"

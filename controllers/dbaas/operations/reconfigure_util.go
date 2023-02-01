@@ -151,42 +151,6 @@ func makeReconfiguringResult(err error, ops ...func(*reconfiguringResult)) recon
 	return result
 }
 
-func constructReconfigureStatus(tplName string, configPatch *cfgcore.ConfigPatchInfo, configs map[string]string) func(key string) dbaasv1alpha1.ConfigurationStatus {
-	interface2StringMap := func(config map[string]interface{}) map[string]string {
-		if len(config) == 0 {
-			return nil
-		}
-		m := make(map[string]string, len(config))
-		for key, value := range config {
-			data, _ := json.Marshal(value)
-			m[key] = string(data)
-		}
-		return m
-	}
-	byte2StringMap := func(config map[string][]byte) map[string]string {
-		if len(config) == 0 {
-			return nil
-		}
-		m := make(map[string]string, len(config))
-		for key, value := range config {
-			m[key] = string(value)
-		}
-		return m
-	}
-	return func(key string) dbaasv1alpha1.ConfigurationStatus {
-		return dbaasv1alpha1.ConfigurationStatus{
-			Name:                     tplName,
-			Status:                   dbaasv1alpha1.ReasonReconfigureMerged,
-			LastAppliedConfiguration: configs,
-			UpdatedParameters: dbaasv1alpha1.UpdatedParameters{
-				AddedKeys:   interface2StringMap(configPatch.AddConfig),
-				UpdatedKeys: byte2StringMap(configPatch.UpdateConfig),
-				DeletedKeys: interface2StringMap(configPatch.DeleteConfig),
-			},
-		}
-	}
-}
-
 func constructReconfiguringConditions(result reconfiguringResult, resource *OpsResource, tpl *dbaasv1alpha1.ConfigTemplate) []*metav1.Condition {
 	if result.configPatch.IsModify {
 		return []*metav1.Condition{dbaasv1alpha1.NewReconfigureRunningCondition(
@@ -204,6 +168,29 @@ func constructReconfiguringConditions(result reconfiguringResult, resource *OpsR
 			formatConfigPatchToMessage(result.configPatch, nil)),
 		dbaasv1alpha1.NewSucceedCondition(resource.OpsRequest),
 	}
+}
+
+func i2sMap(config map[string]interface{}) map[string]string {
+	if len(config) == 0 {
+		return nil
+	}
+	m := make(map[string]string, len(config))
+	for key, value := range config {
+		data, _ := json.Marshal(value)
+		m[key] = string(data)
+	}
+	return m
+}
+
+func b2sMap(config map[string][]byte) map[string]string {
+	if len(config) == 0 {
+		return nil
+	}
+	m := make(map[string]string, len(config))
+	for key, value := range config {
+		m[key] = string(value)
+	}
+	return m
 }
 
 func processMergedFailed(resource *OpsResource, isInvalid bool, err error) error {

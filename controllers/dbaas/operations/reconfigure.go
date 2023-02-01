@@ -86,12 +86,8 @@ func (r *reconfigureAction) Handle(eventContext cfgcore.ConfigEventContext, last
 		return err
 	}
 
-	if err := patchReconfiguringStatus(
-		opsRes,
-		eventContext.TplName,
-		&eventContext.PolicyStatus,
-		phase,
-		constructReconfigureStatus(eventContext.TplName, eventContext.ConfigPatch, nil)); err != nil {
+	if err := patchReconfigureOpsStatus(opsRes, eventContext.TplName,
+		handleReconfigureStatusProgress(eventContext.PolicyStatus, phase, &opsRequest.Status)); err != nil {
 		return err
 	}
 
@@ -115,6 +111,40 @@ func (r *reconfigureAction) Handle(eventContext cfgcore.ConfigEventContext, last
 			dbaasv1alpha1.NewReconfigureRunningCondition(opsRequest,
 				dbaasv1alpha1.ReasonReconfigureRunning,
 				eventContext.TplName))
+	}
+}
+
+func handleReconfigureStatusProgress(execStatus cfgcore.PolicyExecStatus, phase dbaasv1alpha1.Phase, opsStatus *dbaasv1alpha1.OpsRequestStatus) handleReconfigureOpsStatus {
+	return func(cmStatus *dbaasv1alpha1.ConfigurationStatus) error {
+		cmStatus.LastAppliedStatus = execStatus.ExecStatus
+		cmStatus.UpdatePolicy = dbaasv1alpha1.UpgradePolicy(execStatus.PolicyName)
+		cmStatus.SucceedCount = execStatus.SucceedCount
+		cmStatus.ExpectedCount = execStatus.ExpectedCount
+		if cmStatus.SucceedCount != cfgcore.Unconfirmed && cmStatus.ExpectedCount != cfgcore.Unconfirmed {
+			opsStatus.Progress = getSlowestReconfiguringProgress(opsStatus.ReconfiguringStatus.ConfigurationStatus)
+		}
+		switch phase {
+		case dbaasv1alpha1.SucceedPhase:
+			cmStatus.Status = dbaasv1alpha1.ReasonReconfigureSucceed
+		case dbaasv1alpha1.FailedPhase:
+			cmStatus.Status = dbaasv1alpha1.ReasonReconfigureFailed
+		default:
+			cmStatus.Status = dbaasv1alpha1.ReasonReconfigureRunning
+		}
+		return nil
+	}
+}
+
+func handleNewReconfigureRequest(configPatch *cfgcore.ConfigPatchInfo, lastAppliedConfigs map[string]string) handleReconfigureOpsStatus {
+	return func(cmStatus *dbaasv1alpha1.ConfigurationStatus) error {
+		cmStatus.Status = dbaasv1alpha1.ReasonReconfigureMerged
+		cmStatus.LastAppliedConfiguration = lastAppliedConfigs
+		cmStatus.UpdatedParameters = dbaasv1alpha1.UpdatedParameters{
+			AddedKeys:   i2sMap(configPatch.AddConfig),
+			UpdatedKeys: b2sMap(configPatch.UpdateConfig),
+			DeletedKeys: i2sMap(configPatch.DeleteConfig),
+		}
+		return nil
 	}
 }
 
@@ -170,10 +200,10 @@ func (r *reconfigureAction) Action(resource *OpsResource) error {
 	if err != nil {
 		return cfgcore.WrapError(err, "failed to get config template[%s]", componentName)
 	}
-	return r.performPersistConfig(clusterName, componentName, spec.Reconfigure, resource, tpls)
+	return r.doMergeAndPersist(clusterName, componentName, spec.Reconfigure, resource, tpls)
 }
 
-func (r *reconfigureAction) performPersistConfig(clusterName, componentName string,
+func (r *reconfigureAction) doMergeAndPersist(clusterName, componentName string,
 	reconfigure *dbaasv1alpha1.Reconfigure,
 	resource *OpsResource,
 	tpls []dbaasv1alpha1.ConfigTemplate) error {
@@ -210,10 +240,8 @@ func (r *reconfigureAction) performPersistConfig(clusterName, componentName stri
 		}
 
 		// merged successfully
-		if err := patchReconfiguringStatus(
-			resource,
-			tpl.Name, nil, "",
-			constructReconfigureStatus(tpl.Name, result.configPatch, result.lastAppliedConfigs)); err != nil {
+		if err := patchReconfigureOpsStatus(resource, tpl.Name,
+			handleNewReconfigureRequest(result.configPatch, result.lastAppliedConfigs)); err != nil {
 			return err
 		}
 		conditions := constructReconfiguringConditions(result, resource, tpl)

@@ -98,7 +98,8 @@ func handleComponentStatusAndSyncCluster(compCtx componentContext,
 	if isRunning, err = component.IsRunning(obj); err != nil {
 		return requeueAfter, nil
 	}
-	if podsReady {
+	// check if the role probe timed out when component phase is not Running but all pods of component are ready.
+	if podsReady && !isRunning {
 		if requeueWhenPodsReady, err = component.HandleProbeTimeoutWhenPodsReady(compCtx.recorder); err != nil {
 			return requeueAfter, nil
 		}

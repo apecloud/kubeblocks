@@ -17,9 +17,9 @@ limitations under the License.
 package configuration
 
 import (
-	"cuelang.org/go/cue"
 	"strings"
 
+	"cuelang.org/go/cue"
 	"cuelang.org/go/cue/cuecontext"
 	mxjv2 "github.com/clbanning/mxj/v2"
 	"github.com/spf13/viper"

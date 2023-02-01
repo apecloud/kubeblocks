@@ -86,18 +86,6 @@ var timeDurationTable = map[string]time.Duration{
 	"day":  Day,
 }
 
-func isK8sResource(attr cue.Attribute) bool {
-	return attr.Name() == k8sResourceAttr && attr.Contents() == attrQuantityValue
-}
-
-func isStorageResource(attr cue.Attribute) bool {
-	return attr.Name() == storeResourceAttr
-}
-
-func isTimeDurationResource(attr cue.Attribute) bool {
-	return attr.Name() == timeDurationResourceAttr
-}
-
 func processCueIntegerExpansion(x cue.Value) (CueType, string) {
 	attrs := x.Attributes(cue.FieldAttr)
 	if len(attrs) == 0 {

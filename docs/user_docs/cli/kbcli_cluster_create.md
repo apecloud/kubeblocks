@@ -55,14 +55,14 @@ kbcli cluster create NAME --termination-policy=DoNotTerminate|Halt|Delete|WipeOu
 ```
       --backup string                Set a source backup to restore data
       --cluster-definition string    Specify cluster definition, run "kbcli cluster-definition list" to show all available cluster definition
-      --cluster-version string       Specify cluster version, run "kbcli cluster-version list" to show all available cluster version
-      --components string            Use yaml file, URL, or stdin to specify the cluster components
+      --cluster-version string       Specify cluster version, run "kbcli cluster-version list" to show all available cluster version, use the latest version if not specified
       --enable-all-logs              Enable advanced application all log extraction, and true will ignore enabledLogs of component level (default true)
   -h, --help                         help for create
       --monitor                      Set monitor enabled and inject metrics exporter (default true)
       --node-labels stringToString   Node label selector (default [])
       --pod-anti-affinity string     Pod anti-affinity type (default "Preferred")
-      --termination-policy string    Termination policy, one of: (DoNotTerminate, Halt, Delete, WipeOut)
+      --set string                   Use yaml file, URL, or stdin to set the cluster parameters
+      --termination-policy string    Termination policy, one of: (DoNotTerminate, Halt, Delete, WipeOut) (default "Delete")
       --tolerations strings          Tolerations for cluster, such as '"key=engineType,value=mongo,operator=Equal,effect=NoSchedule"'
       --topology-keys stringArray    Topology keys for affinity
 ```

@@ -55,11 +55,9 @@ var _ = Describe("Cluster", func() {
 		It("new command", func() {
 			cmd := NewCreateCmd(tf, streams)
 			Expect(cmd).ShouldNot(BeNil())
-			Expect(cmd.Flags().GetString("termination-policy")).Should(Equal(""))
-
 			Expect(cmd.Flags().Set("cluster-definition", testing.ClusterDefName)).Should(Succeed())
 			Expect(cmd.Flags().Set("cluster-version", testing.ClusterVersionName)).Should(Succeed())
-			Expect(cmd.Flags().Set("components", "../../testing/testdata/component.yaml")).Should(Succeed())
+			Expect(cmd.Flags().Set("set", "../../testing/testdata/component.yaml")).Should(Succeed())
 			Expect(cmd.Flags().Set("termination-policy", "Delete")).Should(Succeed())
 
 			// must succeed otherwise exit 1 and make test fails
@@ -69,10 +67,10 @@ var _ = Describe("Cluster", func() {
 		It("run", func() {
 			tf.FakeDynamicClient = testing.FakeDynamicClient(testing.FakeClusterDef())
 			o := &CreateOptions{
-				BaseOptions:        create.BaseOptions{IOStreams: streams, Name: "test", Client: tf.FakeDynamicClient},
-				ComponentsFilePath: "",
-				ClusterDefRef:      testing.ClusterDefName,
-				ClusterVersionRef:  "cluster-version",
+				BaseOptions:       create.BaseOptions{IOStreams: streams, Name: "test", Client: tf.FakeDynamicClient},
+				Sets:              "",
+				ClusterDefRef:     testing.ClusterDefName,
+				ClusterVersionRef: "cluster-version",
 				UpdatableFlags: UpdatableFlags{
 					PodAntiAffinity: "Preferred",
 					TopologyKeys:    []string{"kubernetes.io/hostname"},
@@ -83,14 +81,14 @@ var _ = Describe("Cluster", func() {
 			Expect(o.Validate()).Should(HaveOccurred())
 
 			o.TerminationPolicy = "WipeOut"
-			o.ComponentsFilePath = "test.yaml"
+			o.Sets = "test.yaml"
 			Expect(o.Complete()).ShouldNot(Succeed())
 
-			o.ComponentsFilePath = ""
+			o.Sets = ""
 			Expect(o.Complete()).Should(Succeed())
-			Expect(o.Validate()).ShouldNot(Succeed())
+			Expect(o.Validate()).Should(Succeed())
 
-			o.ComponentsFilePath = "../../testing/testdata/component.yaml"
+			o.Sets = "../../testing/testdata/component.yaml"
 			Expect(o.Complete()).Should(Succeed())
 			Expect(o.Validate()).Should(Succeed())
 

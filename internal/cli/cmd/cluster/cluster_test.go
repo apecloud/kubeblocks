@@ -32,7 +32,7 @@ import (
 )
 
 var _ = Describe("Cluster", func() {
-	const componentPath = "../../testing/testdata/component.yaml"
+	const testComponentPath = "../../testing/testdata/component.yaml"
 
 	var streams genericclioptions.IOStreams
 	var tf *cmdtesting.TestFactory
@@ -52,7 +52,7 @@ var _ = Describe("Cluster", func() {
 			o := &CreateOptions{
 				ClusterDefRef:      testing.ClusterDefName,
 				ClusterVersionRef:  testing.ClusterVersionName,
-				ComponentsFilePath: componentPath,
+				ComponentsFilePath: testComponentPath,
 				UpdatableFlags: UpdatableFlags{
 					TerminationPolicy: "Delete",
 				},
@@ -71,7 +71,7 @@ var _ = Describe("Cluster", func() {
 			Expect(cmd.Flags().GetString("termination-policy")).Should(Equal(""))
 			Expect(cmd.Flags().Set("cluster-definition", testing.ClusterDefName)).Should(Succeed())
 			Expect(cmd.Flags().Set("cluster-version", testing.ClusterVersionName)).Should(Succeed())
-			Expect(cmd.Flags().Set("components", componentPath)).Should(Succeed())
+			Expect(cmd.Flags().Set("components", testComponentPath)).Should(Succeed())
 			Expect(cmd.Flags().Set("termination-policy", "Delete")).Should(Succeed())
 
 			// must succeed otherwise exit 1 and make test fails

@@ -939,9 +939,9 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 			// storage size
 			for _, vct := range stsObj.Spec.VolumeClaimTemplates {
 				var vctProto *corev1.PersistentVolumeClaim
-				for _, i := range stsProto.Spec.VolumeClaimTemplates {
-					if i.Name == vct.Name {
-						vctProto = &i
+				for _, v := range stsProto.Spec.VolumeClaimTemplates {
+					if v.Name == vct.Name {
+						vctProto = &v
 						break
 					}
 				}

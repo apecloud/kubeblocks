@@ -1,5 +1,5 @@
 /*
-Copyright ApeCloud Inc.
+Copyright ApeCloud, Inc.
 Copyright 2018 The Prometheus Authors
 
 Licensed under the Apache License, Version 2.0 (the "License");

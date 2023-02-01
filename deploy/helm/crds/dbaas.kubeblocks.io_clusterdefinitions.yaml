@@ -437,7 +437,8 @@ spec:
                           type: object
                       type: object
                     podSpec:
-                      description: podSpec of final workload
+                      description: podSpec define pod spec template of the cluster
+                        component.
                       properties:
                         activeDeadlineSeconds:
                           description: Optional duration in seconds the pod may be

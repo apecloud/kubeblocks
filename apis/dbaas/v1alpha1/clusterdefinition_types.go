@@ -336,7 +336,7 @@ type ClusterDefinitionComponent struct {
 	// +optional
 	AntiAffinity bool `json:"antiAffinity,omitempty"`
 
-	// podSpec of final workload
+	// podSpec define pod spec template of the cluster component.
 	// +kubebuilder:pruning:PreserveUnknownFields
 	// +optional
 	PodSpec *corev1.PodSpec `json:"podSpec,omitempty"`

@@ -123,11 +123,11 @@ var _ = BeforeSuite(func() {
 		LeaderElection:     false,
 		MetricsBindAddress: "0",
 		ClientDisableCacheFor: []client.Object{
-			&ClusterDefinition{},
-			&Cluster{},
-			&ClusterVersion{},
-			&OpsRequest{},
-			&ConfigConstraint{},
+			// &ClusterDefinition{},
+			// &Cluster{},
+			// &ClusterVersion{},
+			// &OpsRequest{},
+			// &ConfigConstraint{},
 		},
 	})
 	Expect(err).NotTo(HaveOccurred())

@@ -52,11 +52,11 @@ func TestSchemaValidatorWithCue(t *testing.T) {
 		require.Nil(t, validator.Validate(toMap(loadTestData("./cue_testdata/mysql.cnf"))))
 		expectErr := errors.New(`failed to cue template render configure: [mysqld.innodb_autoinc_lock_mode: 3 errors in empty disjunction:
 mysqld.innodb_autoinc_lock_mode: conflicting values 0 and 100:
-    14:35
+    28:35
 mysqld.innodb_autoinc_lock_mode: conflicting values 1 and 100:
-    14:39
+    28:39
 mysqld.innodb_autoinc_lock_mode: conflicting values 2 and 100:
-    14:43
+    28:43
 ]`)
 		require.Equal(t, expectErr, validator.Validate(toMap(loadTestData("./cue_testdata/mysql_err.cnf"))))
 	}

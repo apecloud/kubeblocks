@@ -1,4 +1,18 @@
 #!/bin/bash
+# Copyright ApeCloud, Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 # Easy & Dumb header check for CI jobs, currently checks ".go" files only.
 #
 # This will be called by the CI system (with no args) to perform checking and
@@ -16,14 +30,15 @@ set -e -o pipefail
 ERR=false
 FAIL=false
 
-for file in $(git ls-files | grep "\.go$" | grep -v vendor/); do
+for file in $(git ls-files | grep '\.cue\|\.go$' | grep -v vendor/); do
   echo -n "Header check: $file... "
   if [[ -z $(cat ${file} | grep "Copyright ApeCloud, Inc.") ]]; then
       ERR=true
   fi
   if [ $ERR == true ]; then
     if [[ $# -gt 0 && $1 =~ [[:upper:]fix] ]]; then
-      cat ./hack/boilerplate.go.txt "${file}" > "${file}".new
+      ext="${file##*.}"
+      cat ./hack/boilerplate."${ext}".txt "${file}" > "${file}".new
       mv "${file}".new "${file}"
       echo "$(tput -T xterm setaf 3)FIXING$(tput -T xterm sgr0)"
       ERR=false

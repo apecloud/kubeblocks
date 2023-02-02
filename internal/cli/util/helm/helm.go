@@ -144,7 +144,8 @@ func (i *InstallOpts) GetInstalled(cfg *action.Configuration) (*release.Release,
 		return nil, driver.ErrReleaseNotFound
 	}
 	if !statusDeployed(res) {
-		return nil, ErrReleaseNotDeployed
+		return nil, errors.Wrapf(ErrReleaseNotDeployed, "current version not in right status, try to fix it first, \n"+
+			"uninstall and install kubeblocks could be a way to fix error")
 	}
 	return res, nil
 }

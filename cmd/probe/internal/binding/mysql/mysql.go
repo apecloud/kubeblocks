@@ -21,11 +21,8 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"database/sql"
-	"database/sql/driver"
-	"encoding/json"
 	"fmt"
 	"os"
-	"reflect"
 	"strconv"
 	"strings"
 	"sync"
@@ -69,12 +66,8 @@ const (
 	connMaxIdleTimeKey = "connMaxIdleTime"
 )
 
-const (
-	statusCheckType = iota
-)
-
 var (
-	defaultDbPort = 3306
+	defaultDBPort = 3306
 	dbUser        = "root"
 	dbPasswd      = ""
 )
@@ -119,7 +112,7 @@ func (m *Mysql) Operations() []bindings.OperationKind {
 func (m *Mysql) InitIfNeed() error {
 	if m.db == nil {
 		go m.InitDelay()
-		return fmt.Errorf("Init db connection asynchronously.")
+		return fmt.Errorf("init DB connection asynchronously")
 	}
 	return nil
 }
@@ -177,20 +170,20 @@ func (m *Mysql) GetRunningPort() int {
 	p := m.metadata.Properties
 	url, ok := p[connectionURLKey]
 	if !ok || url == "" {
-		return defaultDbPort
+		return defaultDBPort
 	}
 
 	config, err := mysql.ParseDSN(url)
 	if err != nil {
-		return defaultDbPort
+		return defaultDBPort
 	}
 	index := strings.LastIndex(config.Addr, ":")
 	if index < 0 {
-		return defaultDbPort
+		return defaultDBPort
 	}
 	port, err := strconv.Atoi(config.Addr[index+1:])
 	if err != nil {
-		return defaultDbPort
+		return defaultDBPort
 	}
 
 	return port
@@ -218,9 +211,9 @@ func (m *Mysql) GetRole(ctx context.Context, sql string) (string, error) {
 
 	var curLeader string
 	var role string
-	var serverId string
+	var serverID string
 	for rows.Next() {
-		if err = rows.Scan(&curLeader, &role, &serverId); err != nil {
+		if err = rows.Scan(&curLeader, &role, &serverID); err != nil {
 			m.logger.Errorf("checkRole error: %", err)
 			return role, err
 		}
@@ -228,7 +221,7 @@ func (m *Mysql) GetRole(ctx context.Context, sql string) (string, error) {
 	return role, nil
 }
 
-// design details: https://infracreate.feishu.cn/wiki/wikcndch7lMZJneMnRqaTvhQpwb#doxcnOUyQ4Mu0KiUo232dOr5aad
+// StatusCheck function design details: https://infracreate.feishu.cn/wiki/wikcndch7lMZJneMnRqaTvhQpwb#doxcnOUyQ4Mu0KiUo232dOr5aad
 func (m *Mysql) StatusCheck(ctx context.Context, sql string, resp *bindings.InvokeResponse) ([]byte, error) {
 	// rwSql := fmt.Sprintf(`begin;
 	// create table if not exists kb_health_check(type int, check_ts bigint, primary key(type));
@@ -328,66 +321,57 @@ func initDB(url, pemPath string) (*sql.DB, error) {
 	return db, nil
 }
 
-func (m *Mysql) jsonify(rows *sql.Rows) ([]byte, error) {
-	columnTypes, err := rows.ColumnTypes()
-	if err != nil {
-		return nil, err
-	}
+// func (m *Mysql) jsonify(rows *sql.Rows) ([]byte, error) {
+// 	columnTypes, err := rows.ColumnTypes()
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	var ret []interface{}
+// 	for rows.Next() {
+// 		values := prepareValues(columnTypes)
+// 		err := rows.Scan(values...)
+// 		if err != nil {
+// 			return nil, err
+// 		}
+// 		r := m.convert(columnTypes, values)
+// 		ret = append(ret, r)
+// 	}
+// 	return json.Marshal(ret)
+// }
 
-	var ret []interface{}
-	for rows.Next() {
-		values := prepareValues(columnTypes)
-		err := rows.Scan(values...)
-		if err != nil {
-			return nil, err
-		}
+// func prepareValues(columnTypes []*sql.ColumnType) []interface{} {
+// 	types := make([]reflect.Type, len(columnTypes))
+// 	for i, tp := range columnTypes {
+// 		types[i] = tp.ScanType()
+// 	}
+// 	values := make([]interface{}, len(columnTypes))
+// 	for i := range values {
+// 		values[i] = reflect.New(types[i]).Interface()
+// 	}
+// 	return values
+// }
 
-		r := m.convert(columnTypes, values)
-		ret = append(ret, r)
-	}
-
-	return json.Marshal(ret)
-}
-
-func prepareValues(columnTypes []*sql.ColumnType) []interface{} {
-	types := make([]reflect.Type, len(columnTypes))
-	for i, tp := range columnTypes {
-		types[i] = tp.ScanType()
-	}
-
-	values := make([]interface{}, len(columnTypes))
-	for i := range values {
-		values[i] = reflect.New(types[i]).Interface()
-	}
-
-	return values
-}
-
-func (m *Mysql) convert(columnTypes []*sql.ColumnType, values []interface{}) map[string]interface{} {
-	r := map[string]interface{}{}
-
-	for i, ct := range columnTypes {
-		value := values[i]
-
-		switch v := values[i].(type) {
-		case driver.Valuer:
-			if vv, err := v.Value(); err == nil {
-				value = interface{}(vv)
-			} else {
-				m.logger.Warnf("error to convert value: %v", err)
-			}
-		case *sql.RawBytes:
-			// special case for sql.RawBytes, see https://github.com/go-sql-driver/mysql/blob/master/fields.go#L178
-			switch ct.DatabaseTypeName() {
-			case "VARCHAR", "CHAR", "TEXT", "LONGTEXT":
-				value = string(*v)
-			}
-		}
-
-		if value != nil {
-			r[ct.Name()] = value
-		}
-	}
-
-	return r
-}
+// func (m *Mysql) convert(columnTypes []*sql.ColumnType, values []interface{}) map[string]interface{} {
+// 	r := map[string]interface{}{}
+// 	for i, ct := range columnTypes {
+// 		value := values[i]
+// 		switch v := values[i].(type) {
+// 		case driver.Valuer:
+// 			if vv, err := v.Value(); err == nil {
+// 				value = interface{}(vv)
+// 			} else {
+// 				m.logger.Warnf("error to convert value: %v", err)
+// 			}
+// 		case *sql.RawBytes:
+// 			// special case for sql.RawBytes, see https://github.com/go-sql-driver/mysql/blob/master/fields.go#L178
+// 			switch ct.DatabaseTypeName() {
+// 			case "VARCHAR", "CHAR", "TEXT", "LONGTEXT":
+// 				value = string(*v)
+// 			}
+// 		}
+// 		if value != nil {
+// 			r[ct.Name()] = value
+// 		}
+// 	}
+// 	return r
+// }

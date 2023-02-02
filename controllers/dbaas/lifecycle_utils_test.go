@@ -828,11 +828,12 @@ spec:
 	Context("has helper function which builds specific object from cue template", func() {
 		It("builds PVC correctly", func() {
 			sts := newStsObj()
-			pvc, err := buildPVCFromSnapshot(sts, pvcKey, snapshotName)
+			params := newParams()
+			pvc, err := buildPVCFromSnapshot(sts, params.component, pvcKey, snapshotName)
 			Expect(err).Should(BeNil())
 			Expect(pvc).ShouldNot(BeNil())
 			Expect(pvc.Spec.AccessModes).Should(Equal(sts.Spec.VolumeClaimTemplates[0].Spec.AccessModes))
-			Expect(pvc.Spec.Resources).Should(Equal(sts.Spec.VolumeClaimTemplates[0].Spec.Resources))
+			Expect(pvc.Spec.Resources).Should(Equal(params.component.VolumeClaimTemplates[0].Spec.Resources))
 		})
 
 		It("builds Service correctly", func() {
@@ -1021,6 +1022,14 @@ spec:
 			shouldRequeue, err = doBackup(reqCtx, k8sClient, cluster, component, sts, &stsProto, snapshotKey)
 			Expect(shouldRequeue).Should(BeTrue())
 			Expect(err).ShouldNot(HaveOccurred())
+		})
+	})
+
+	Context("utils test", func() {
+		It("should successfully delete object with cascade=orphan", func() {
+			sts := newStsObj()
+			Expect(k8sClient.Create(ctx, sts)).Should(Succeed())
+			Expect(deleteObjectOrphan(k8sClient, ctx, sts)).Should(Succeed())
 		})
 	})
 })

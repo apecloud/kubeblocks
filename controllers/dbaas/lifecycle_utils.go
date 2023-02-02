@@ -877,22 +877,6 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 			return deleteSnapshot(cli, reqCtx, snapshotKey, cluster, component)
 		}
 
-		didVolumeExpanded := func() bool {
-			if len(stsObj.Spec.VolumeClaimTemplates) != len(stsProto.Spec.VolumeClaimTemplates) {
-				return true
-			}
-			for _, vct := range stsObj.Spec.VolumeClaimTemplates {
-				for _, protoVct := range stsProto.Spec.VolumeClaimTemplates {
-					if vct.Name == protoVct.Name {
-						if !reflect.DeepEqual(vct.Spec.Resources.Requests, protoVct.Spec.Resources.Requests) {
-							return true
-						}
-					}
-				}
-			}
-			return false
-		}
-
 		// when horizontal scaling up, sometimes db needs backup to sync data from master,
 		// log is not reliable enough since it can be recycled
 		if *stsObj.Spec.Replicas < *stsProto.Spec.Replicas {
@@ -917,92 +901,71 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 				*stsObj.Spec.Replicas,
 				*stsProto.Spec.Replicas)
 		}
-		if didVolumeExpanded() {
-			// if volume expanded, recreate statefulset to update volumeClaimTemplates
-			patch := client.MergeFrom(stsObj.DeepCopy())
-			controllerutil.RemoveFinalizer(stsObj, dbClusterFinalizerName)
-			// patch finalizer first
-			if err := cli.Patch(ctx, stsObj, patch); err != nil {
-				return false, err
-			}
-			// then delete sts
-			propagationPolicy := metav1.DeletePropagationOrphan
-			deleteOption := &client.DeleteOptions{
-				PropagationPolicy: &propagationPolicy,
-			}
-			if err := cli.Delete(ctx, stsObj, deleteOption); client.IgnoreNotFound(err) != nil {
-				return false, err
-			}
+		stsObjCopy := stsObj.DeepCopy()
+		// keep the original template annotations.
+		// if annotations exist and are replaced, the statefulSet will be updated.
+		stsProto.Spec.Template.Annotations = mergeAnnotations(stsObj.Spec.Template.Annotations,
+			stsProto.Spec.Template.Annotations)
+		stsObj.Spec.Template = stsProto.Spec.Template
+		stsObj.Spec.Replicas = stsProto.Spec.Replicas
+		stsObj.Spec.UpdateStrategy = stsProto.Spec.UpdateStrategy
+		if err := cli.Update(ctx, stsObj); err != nil {
+			return false, err
+		}
+		if !reflect.DeepEqual(&stsObjCopy.Spec, &stsObj.Spec) {
+			// sync component phase
+			syncComponentPhaseWhenSpecUpdating(cluster, componentName)
+		}
 
-			// check stsObj.Spec.VolumeClaimTemplates storage
-			// request size and find attached PVC and patch request
-			// storage size
-			for _, vct := range stsObj.Spec.VolumeClaimTemplates {
-				var vctProto *corev1.PersistentVolumeClaim
-				for _, v := range stsProto.Spec.VolumeClaimTemplates {
-					if v.Name == vct.Name {
-						vctProto = &v
-						break
-					}
+		// check all pvc bound, requeue if not all ready
+		shouldRequeue, err = checkAllPVCBoundIfNeeded()
+		if err != nil {
+			return false, err
+		}
+		if shouldRequeue {
+			return true, err
+		}
+		// clean backup resources.
+		// there will not be any backup resources other than scale out.
+		if err := cleanBackupResourcesIfNeeded(); err != nil {
+			return false, err
+		}
+
+		// check stsObj.Spec.VolumeClaimTemplates storage
+		// request size and find attached PVC and patch request
+		// storage size
+		for _, vct := range stsObj.Spec.VolumeClaimTemplates {
+			var vctProto *corev1.PersistentVolumeClaim
+			for _, v := range stsProto.Spec.VolumeClaimTemplates {
+				if v.Name == vct.Name {
+					vctProto = &v
+					break
 				}
+			}
 
-				// REVIEW: how could VCT proto is nil?
-				if vctProto == nil {
+			// REVIEW: how could VCT proto is nil?
+			if vctProto == nil {
+				continue
+			}
+
+			for i := *stsObj.Spec.Replicas - 1; i >= 0; i-- {
+				pvc := &corev1.PersistentVolumeClaim{}
+				pvcKey := types.NamespacedName{
+					Namespace: key.Namespace,
+					Name:      fmt.Sprintf("%s-%s-%d", vct.Name, stsObj.Name, i),
+				}
+				var err error
+				if err = cli.Get(ctx, pvcKey, pvc); err != nil {
+					return false, err
+				}
+				if pvc.Spec.Resources.Requests[corev1.ResourceStorage] == vctProto.Spec.Resources.Requests[corev1.ResourceStorage] {
 					continue
 				}
-
-				for i := *stsObj.Spec.Replicas - 1; i >= 0; i-- {
-					pvc := &corev1.PersistentVolumeClaim{}
-					pvcKey := types.NamespacedName{
-						Namespace: key.Namespace,
-						Name:      fmt.Sprintf("%s-%s-%d", vct.Name, stsObj.Name, i),
-					}
-					var err error
-					if err = cli.Get(ctx, pvcKey, pvc); err != nil {
-						return false, err
-					}
-					if pvc.Spec.Resources.Requests[corev1.ResourceStorage] == vctProto.Spec.Resources.Requests[corev1.ResourceStorage] {
-						continue
-					}
-					patch := client.MergeFrom(pvc.DeepCopy())
-					pvc.Spec.Resources.Requests[corev1.ResourceStorage] = vctProto.Spec.Resources.Requests[corev1.ResourceStorage]
-					if err := cli.Patch(ctx, pvc, patch); err != nil {
-						return false, err
-					}
+				patch := client.MergeFrom(pvc.DeepCopy())
+				pvc.Spec.Resources.Requests[corev1.ResourceStorage] = vctProto.Spec.Resources.Requests[corev1.ResourceStorage]
+				if err := cli.Patch(ctx, pvc, patch); err != nil {
+					return false, err
 				}
-			}
-
-			// requeue to let controller recreate sts
-			return true, nil
-		} else {
-			stsObjCopy := stsObj.DeepCopy()
-			// keep the original template annotations.
-			// if annotations exist and are replaced, the statefulSet will be updated.
-			stsProto.Spec.Template.Annotations = mergeAnnotations(stsObj.Spec.Template.Annotations,
-				stsProto.Spec.Template.Annotations)
-			stsObj.Spec.Template = stsProto.Spec.Template
-			stsObj.Spec.Replicas = stsProto.Spec.Replicas
-			stsObj.Spec.UpdateStrategy = stsProto.Spec.UpdateStrategy
-			if err := cli.Update(ctx, stsObj); err != nil {
-				return false, err
-			}
-			if !reflect.DeepEqual(&stsObjCopy.Spec, &stsObj.Spec) {
-				// sync component phase
-				syncComponentPhaseWhenSpecUpdating(cluster, componentName)
-			}
-
-			// check all pvc bound, requeue if not all ready
-			shouldRequeue, err = checkAllPVCBoundIfNeeded()
-			if err != nil {
-				return false, err
-			}
-			if shouldRequeue {
-				return true, err
-			}
-			// clean backup resources.
-			// there will not be any backup resources other than scale out.
-			if err := cleanBackupResourcesIfNeeded(); err != nil {
-				return false, err
 			}
 		}
 
@@ -1948,10 +1911,11 @@ func buildBackup(sts *appsv1.StatefulSet,
 
 func createPVCFromSnapshot(ctx context.Context,
 	cli client.Client,
+	component *Component,
 	sts *appsv1.StatefulSet,
 	pvcKey types.NamespacedName,
 	snapshotName string) error {
-	pvc, err := buildPVCFromSnapshot(sts, pvcKey, snapshotName)
+	pvc, err := buildPVCFromSnapshot(sts, component, pvcKey, snapshotName)
 	if err != nil {
 		return err
 	}
@@ -1962,12 +1926,14 @@ func createPVCFromSnapshot(ctx context.Context,
 }
 
 func buildPVCFromSnapshot(sts *appsv1.StatefulSet,
+	component *Component,
 	pvcKey types.NamespacedName,
 	snapshotName string) (*corev1.PersistentVolumeClaim, error) {
 
 	pvc := corev1.PersistentVolumeClaim{}
 	if err := buildFromCUE("pvc_template.cue", map[string]any{
 		"sts":           sts,
+		"component":     component,
 		"pvc_key":       pvcKey,
 		"snapshot_name": snapshotName,
 	}, "pvc", &pvc); err != nil {
@@ -2089,7 +2055,7 @@ func checkedCreatePVCFromSnapshot(cli client.Client,
 		if len(vsList.Items) == 0 {
 			return errors.Errorf("volumesnapshot not found in cluster %s component %s", cluster.Name, component.Name)
 		}
-		return createPVCFromSnapshot(ctx, cli, stsObj, pvcKey, vsList.Items[0].Name)
+		return createPVCFromSnapshot(ctx, cli, component, stsObj, pvcKey, vsList.Items[0].Name)
 	}
 	return nil
 }
@@ -2341,4 +2307,17 @@ func getBackupMatchingLabels(clusterName string, componentName string) client.Ma
 		intctrlutil.AppComponentLabelKey: componentName,
 		intctrlutil.AppCreatedByLabelKey: intctrlutil.AppName,
 	}
+}
+
+// deleteObjectOrphan delete the object with cascade=orphan.
+func deleteObjectOrphan(cli client.Client, ctx context.Context, obj client.Object) error {
+	deletePropagation := metav1.DeletePropagationOrphan
+	deleteOptions := &client.DeleteOptions{
+		PropagationPolicy: &deletePropagation,
+	}
+
+	if err := cli.Delete(ctx, obj, deleteOptions); err != nil {
+		return err
+	}
+	return nil
 }

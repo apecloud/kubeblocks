@@ -32,7 +32,7 @@ require (
 	github.com/onsi/gomega v1.24.2
 	github.com/pingcap/go-tpc v1.0.8
 	github.com/pkg/errors v0.9.1
-	github.com/prometheus/exporter-toolkit v0.7.1
+	github.com/prometheus/exporter-toolkit v0.7.3
 	github.com/prometheus/mysqld_exporter v0.14.0
 	github.com/replicatedhq/termui/v3 v3.1.1-0.20200811145416-f40076d26851
 	github.com/replicatedhq/troubleshoot v0.53.0

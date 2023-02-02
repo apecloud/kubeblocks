@@ -2,9 +2,11 @@
 PARAM=$1
 TYPE=$2
 UPLOAD_REPO=$3
+GITHUB_TOKEN=$4
 
 gh_curl() {
-  curl -H "Accept: application/vnd.github.v3.raw" \
+  curl -H "Authorization: token $GITHUB_TOKEN" \
+    -H "Accept: application/vnd.github.v3.raw" \
     $@
 }
 

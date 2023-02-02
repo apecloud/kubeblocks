@@ -1,5 +1,5 @@
 /*
-Copyright ApeCloud Inc.
+Copyright ApeCloud, Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,19 +17,23 @@ limitations under the License.
 package dbaas
 
 import (
+	"fmt"
 	"reflect"
 	"strings"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
+	"github.com/sethvargo/go-password/password"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/yaml"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/apecloud/kubeblocks/internal/testutil"
+	"github.com/apecloud/kubeblocks/test/testdata"
 )
 
 // Helper functions to change object's fields in input closure and then update it.
@@ -124,6 +128,50 @@ func CheckObj[T intctrlutil.Object, PT intctrlutil.PObject[T]](testCtx *testutil
 	}
 }
 
+// Helper functions to create object from testdata files.
+
+func CreateObj[T intctrlutil.Object, PT intctrlutil.PObject[T]](testCtx *testutil.TestContext,
+	filePath string, pobj PT, a ...any) PT {
+	return CreateCustomizedObj(testCtx, filePath, pobj, CustomizeObjYAML(a...))
+}
+
+func CustomizeObjYAML(a ...any) func(string) string {
+	return func(inputYAML string) string {
+		return fmt.Sprintf(inputYAML, a...)
+	}
+}
+
+func RandomizedObjName() func(client.Object) {
+	return func(obj client.Object) {
+		randomStr, _ := password.Generate(6, 0, 0, true, false)
+		obj.SetName(obj.GetName() + randomStr)
+	}
+}
+
+func CreateCustomizedObj[T intctrlutil.Object, PT intctrlutil.PObject[T]](testCtx *testutil.TestContext,
+	filePath string, pobj PT, actions ...any) PT {
+	objBytes, err := testdata.GetTestDataFileContent(filePath)
+	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	objYAML := string(objBytes)
+	for _, action := range actions {
+		switch f := action.(type) {
+		case func(string) string:
+			objYAML = f(objYAML)
+		default:
+		}
+	}
+	gomega.Expect(yaml.Unmarshal([]byte(objYAML), pobj)).Should(gomega.Succeed())
+	for _, action := range actions {
+		switch f := action.(type) {
+		case func(client.Object):
+			f(pobj)
+		case func(PT):
+			f(pobj)
+		}
+	}
+	return CreateK8sResource(testCtx.Ctx, *testCtx, pobj).(PT)
+}
+
 // Helper functions to delete a list of resources when writing unit tests.
 
 // ClearResources clears all resources of the given type T satisfying the input ListOptions.
@@ -131,16 +179,14 @@ func ClearResources[T intctrlutil.Object, PT intctrlutil.PObject[T],
 	L intctrlutil.ObjList[T], PL intctrlutil.PObjList[T, L]](
 	testCtx *testutil.TestContext, _ func(T, L), opts ...client.DeleteAllOfOption) {
 	var (
+		obj     T
 		objList L
 	)
 
 	listOptions := make([]client.ListOption, 0)
-	deleteOptions := make([]client.DeleteOption, 0)
 	for _, opt := range opts {
-		applyToDeleteFunc := reflect.ValueOf(opt).MethodByName("ApplyToDelete")
-		if applyToDeleteFunc.IsValid() {
-			deleteOptions = append(deleteOptions, opt.(client.DeleteOption))
-		} else {
+		applyToListFunc := reflect.ValueOf(opt).MethodByName("ApplyToList")
+		if applyToListFunc.IsValid() {
 			listOptions = append(listOptions, opt.(client.ListOption))
 		}
 	}
@@ -149,13 +195,8 @@ func ClearResources[T intctrlutil.Object, PT intctrlutil.PObject[T],
 	ginkgo.By("clear resources " + strings.TrimSuffix(gvk.Kind, "List"))
 
 	gomega.Eventually(func() error {
-		return testCtx.Cli.List(testCtx.Ctx, PL(&objList), listOptions...)
+		return testCtx.Cli.DeleteAllOf(testCtx.Ctx, PT(&obj), opts...)
 	}).Should(gomega.Succeed())
-	for _, obj := range reflect.ValueOf(&objList).Elem().FieldByName("Items").Interface().([]T) {
-		// it's possible deletions are initiated in testcases code but cache is not updated
-		gomega.Expect(client.IgnoreNotFound(testCtx.Cli.Delete(testCtx.Ctx, PT(&obj),
-			deleteOptions...))).Should(gomega.Succeed())
-	}
 
 	gomega.Eventually(func(g gomega.Gomega) {
 		g.Expect(testCtx.Cli.List(testCtx.Ctx, PL(&objList), listOptions...)).Should(gomega.Succeed())
@@ -167,8 +208,9 @@ func ClearResources[T intctrlutil.Object, PT intctrlutil.PObject[T],
 				// PVCs are protected by the "kubernetes.io/pvc-protection" finalizer
 				g.Expect(finalizers[0]).Should(gomega.BeElementOf([]string{"orphan", "kubernetes.io/pvc-protection"}))
 				g.Expect(len(finalizers)).Should(gomega.Equal(1))
-				pobj.SetFinalizers([]string{})
-				g.Expect(testCtx.Cli.Update(testCtx.Ctx, pobj)).Should(gomega.Succeed())
+				g.Expect(ChangeObj(testCtx, pobj, func() {
+					pobj.SetFinalizers([]string{})
+				})).To(gomega.Succeed())
 			}
 		}
 		g.Expect(len(items)).Should(gomega.Equal(0))
@@ -192,13 +234,16 @@ func ClearClusterResources(testCtx *testutil.TestContext) {
 
 	// mock behavior of garbage collection inside KCM
 	if !testCtx.UsingExistingCluster() {
-		ClearResources(testCtx, intctrlutil.StatefulSetSignature, inNS)
-		ClearResources(testCtx, intctrlutil.DeploymentSignature, inNS)
-		ClearResources(testCtx, intctrlutil.ConfigMapSignature, inNS)
-		ClearResources(testCtx, intctrlutil.ServiceSignature, inNS)
-		ClearResources(testCtx, intctrlutil.SecretSignature, inNS)
-		ClearResources(testCtx, intctrlutil.PodDisruptionBudgetSignature, inNS)
-		ClearResources(testCtx, intctrlutil.JobSignature, inNS)
-		ClearResources(testCtx, intctrlutil.PersistentVolumeClaimSignature, inNS)
+		// only delete internal resources managed by kubeblocks
+		filter := client.MatchingLabels{intctrlutil.AppManagedByLabelKey: intctrlutil.AppName}
+
+		ClearResources(testCtx, intctrlutil.StatefulSetSignature, inNS, filter)
+		ClearResources(testCtx, intctrlutil.DeploymentSignature, inNS, filter)
+		ClearResources(testCtx, intctrlutil.ConfigMapSignature, inNS, filter)
+		ClearResources(testCtx, intctrlutil.ServiceSignature, inNS, filter)
+		ClearResources(testCtx, intctrlutil.SecretSignature, inNS, filter)
+		ClearResources(testCtx, intctrlutil.PodDisruptionBudgetSignature, inNS, filter)
+		ClearResources(testCtx, intctrlutil.JobSignature, inNS, filter)
+		ClearResources(testCtx, intctrlutil.PersistentVolumeClaimSignature, inNS, filter)
 	}
 }

@@ -8,7 +8,7 @@ spec:
   type: VerticalScaling
   ttlSecondsAfterSucceed: 600
   verticalScaling:
-  - componentName: replicasets
+  - componentName: wesql
     requests:
         memory: "390Mi"
         cpu: "280m"

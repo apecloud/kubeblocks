@@ -1,5 +1,5 @@
 /*
-Copyright ApeCloud Inc.
+Copyright ApeCloud, Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -30,6 +30,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -41,9 +42,7 @@ import (
 
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
-	"github.com/apecloud/kubeblocks/controllers/dbaas/components"
 	"github.com/apecloud/kubeblocks/controllers/dbaas/components/consensusset"
-	"github.com/apecloud/kubeblocks/controllers/dbaas/components/stateless"
 	"github.com/apecloud/kubeblocks/controllers/dbaas/components/util"
 	opsutil "github.com/apecloud/kubeblocks/controllers/dbaas/operations/util"
 	"github.com/apecloud/kubeblocks/controllers/k8score"
@@ -263,15 +262,22 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		// this is a block to handle error.
 		// so when update cluster conditions failed, we can ignore it.
 		_ = clusterConditionMgr.setPreCheckErrorCondition(err)
-		return intctrlutil.RequeueWithError(err, reqCtx.Log, "")
+		// If using RequeueWithError and the user fixed this error,
+		// it may take up to 1000s to reconcile again, causing the user to think that the repair is not effective.
+		return intctrlutil.RequeueAfter(ControllerErrorRequeueTime, reqCtx.Log, "")
 	}
 
 	if cluster.Status.ObservedGeneration == cluster.GetObjectMeta().GetGeneration() {
-		// check if all components of cluster are ready.
-		if err = r.checkAndPatchToRunning(reqCtx.Ctx, cluster, clusterDefinition); err != nil {
+		// reconcile the phase and conditions of the Cluster.status
+		if err = r.reconcileClusterStatus(reqCtx.Ctx, cluster, clusterDefinition); err != nil {
 			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 		}
 		return intctrlutil.Reconciled()
+	}
+
+	reqCtx.Log.Info("update cluster status")
+	if err = r.updateClusterPhaseToCreatingOrUpdating(reqCtx, cluster); err != nil {
+		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 
 	clusterVersion := &dbaasv1alpha1.ClusterVersion{}
@@ -281,7 +287,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		// this is a block to handle error.
 		// so when update cluster conditions failed, we can ignore it.
 		_ = clusterConditionMgr.setPreCheckErrorCondition(err)
-		return intctrlutil.RequeueWithError(err, reqCtx.Log, "")
+		return intctrlutil.RequeueAfter(ControllerErrorRequeueTime, reqCtx.Log, "")
 	}
 
 	if res, err = r.checkReferencedCRStatus(reqCtx, clusterConditionMgr, clusterVersion.Status.Phase,
@@ -294,51 +300,61 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return *res, err
 	}
 
-	reqCtx.Log.Info("update cluster status")
-	if err = r.updateClusterPhaseToCreatingOrUpdating(reqCtx, cluster); err != nil {
-		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-	}
-
 	if err = r.reconcileStatusOperations(ctx, cluster, clusterDefinition); err != nil {
 		// this is a block to handle error.
 		// so when update cluster conditions failed, we can ignore it.
 		_ = clusterConditionMgr.setPreCheckErrorCondition(err)
-		return intctrlutil.RequeueWithError(err, reqCtx.Log, "")
+		return intctrlutil.RequeueAfter(ControllerErrorRequeueTime, reqCtx.Log, "")
 	}
 	// validate config and send warning event log necessarily
 	if err = cluster.ValidateEnabledLogs(clusterDefinition); err != nil {
 		_ = clusterConditionMgr.setPreCheckErrorCondition(err)
-		return intctrlutil.RequeueWithError(err, reqCtx.Log, "")
+		return intctrlutil.RequeueAfter(ControllerErrorRequeueTime, reqCtx.Log, "")
 	}
 
 	// preCheck succeed, starting the cluster provisioning
 	if err = clusterConditionMgr.setProvisioningStartedCondition(); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
-
-	shouldRequeue, err := createCluster(reqCtx, r.Client, clusterDefinition, clusterVersion, cluster)
+	clusterDeepCopy := cluster.DeepCopy()
+	shouldRequeue, err := reconcileClusterWorkloads(reqCtx, r.Client, clusterDefinition, clusterVersion, cluster)
 	if err != nil {
 		// this is a block to handle error.
 		// so when update cluster conditions failed, we can ignore it.
 		_ = clusterConditionMgr.setApplyResourcesFailedCondition(err)
-		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+		return intctrlutil.RequeueAfter(ControllerErrorRequeueTime, reqCtx.Log, "")
 	}
 	if shouldRequeue {
+		if err = r.patchClusterStatus(reqCtx.Ctx, cluster, clusterDeepCopy); err != nil {
+			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+		}
 		return intctrlutil.RequeueAfter(time.Second, reqCtx.Log, "")
 	}
 
-	if err = r.handleClusterStatusAfterApplySucceed(ctx, cluster, clusterDefinition); err != nil {
+	if err = r.handleClusterStatusAfterApplySucceed(ctx, cluster, clusterDeepCopy, clusterDefinition); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 	return intctrlutil.Reconciled()
+}
+
+// patchClusterStatus patches the cluster status.
+func (r *ClusterReconciler) patchClusterStatus(ctx context.Context,
+	cluster *dbaasv1alpha1.Cluster,
+	clusterDeepCopy *dbaasv1alpha1.Cluster) error {
+	if reflect.DeepEqual(cluster.Status, clusterDeepCopy.Status) {
+		return nil
+	}
+	patch := client.MergeFrom(clusterDeepCopy)
+	return r.Client.Status().Patch(ctx, cluster, patch)
 }
 
 // handleClusterStatusAfterApplySucceed when cluster apply resources successful, handle the status
 func (r *ClusterReconciler) handleClusterStatusAfterApplySucceed(
 	ctx context.Context,
 	cluster *dbaasv1alpha1.Cluster,
+	clusterDeepCopy *dbaasv1alpha1.Cluster,
 	clusterDef *dbaasv1alpha1.ClusterDefinition) error {
-	patch := client.MergeFrom(cluster.DeepCopy())
+	patch := client.MergeFrom(clusterDeepCopy)
 	// apply resources succeed, record the condition and event
 	applyResourcesCondition := newApplyResourcesCondition()
 	cluster.SetStatusCondition(applyResourcesCondition)
@@ -434,7 +450,7 @@ func (r *ClusterReconciler) deleteExternalResources(reqCtx intctrlutil.RequestCt
 	}
 	inNS := client.InNamespace(cluster.Namespace)
 
-	// all resources created in createCluster should be handled properly
+	// all resources created in reconcileClusterWorkloads should be handled properly
 
 	if ret, err := removeFinalizer(r, reqCtx, intctrlutil.StatefulSetSignature, inNS, ml); err != nil {
 		return ret, err
@@ -553,7 +569,7 @@ func (r *ClusterReconciler) checkReferencedCRStatus(
 		res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 		return &res, err
 	}
-	res, err := intctrlutil.RequeueAfter(time.Second, reqCtx.Log, "")
+	res, err := intctrlutil.RequeueAfter(ControllerErrorRequeueTime, reqCtx.Log, "")
 	return &res, err
 }
 
@@ -621,178 +637,84 @@ func (r *ClusterReconciler) updateClusterPhaseWhenConditionsError(cluster *dbaas
 	cluster.Status.Phase = opsRequestSlice[0].ToClusterPhase
 }
 
-// checkAndPatchToRunning patches Cluster.status.phase to Running
-func (r *ClusterReconciler) checkAndPatchToRunning(ctx context.Context,
+// reconcileClusterStatus reconciles phase and conditions of the Cluster.status.
+func (r *ClusterReconciler) reconcileClusterStatus(ctx context.Context,
 	cluster *dbaasv1alpha1.Cluster,
 	clusterDef *dbaasv1alpha1.ClusterDefinition) error {
 	if !r.needCheckClusterForReady(cluster) {
 		return nil
 	}
-	patch := client.MergeFrom(cluster.DeepCopy())
-	// synchronize the latest status of components
-	needSyncComponentStatus, err := r.handleComponentStatus(ctx, cluster, clusterDef)
-	if err != nil {
-		return err
-	}
-
 	if cluster.Status.Components == nil {
 		return nil
 	}
 
 	var (
-		clusterIsRunning       = true
-		isReady                = true
-		existsAbnormalOrFailed bool
-		needSync               bool
+		clusterIsRunning          = true
+		existsAbnormalOrFailed    bool
+		replicasNotReadyCompNames = map[string]struct{}{}
+		notReadyCompNames         = map[string]struct{}{}
 	)
-	for _, v := range cluster.Status.Components {
-		// if pods of the components are not ready, return
+	for k, v := range cluster.Status.Components {
 		if v.PodsReady == nil || !*v.PodsReady {
-			isReady = false
+			replicasNotReadyCompNames[k] = struct{}{}
+			notReadyCompNames[k] = struct{}{}
 		}
 		if util.IsFailedOrAbnormal(v.Phase) {
 			existsAbnormalOrFailed = true
+			notReadyCompNames[k] = struct{}{}
 		}
 		if v.Phase != dbaasv1alpha1.RunningPhase {
 			clusterIsRunning = false
 		}
 	}
 
-	readyCondition := newAllReplicasPodsReadyConditions()
-	if isReady {
-		cluster.SetStatusCondition(readyCondition)
-		needSync = true
+	// handle the cluster conditions with ClusterReady and ReplicasReady type.
+	handleClusterReadyCondition := func(cluster *dbaasv1alpha1.Cluster) (needPatch bool, postFunc postHandler) {
+		if len(replicasNotReadyCompNames) == 0 {
+			// if AllReplicasReady already exists, return
+			if meta.IsStatusConditionTrue(cluster.Status.Conditions, ConditionTypeReplicasReady) {
+				return
+			}
+			readyCondition := newAllReplicasPodsReadyConditions()
+			cluster.SetStatusCondition(readyCondition)
+			handleNotReadyConditionForCluster(cluster, nil, notReadyCompNames)
+			return true, func(cluster *dbaasv1alpha1.Cluster) error {
+				// send an event when all pods of the components are ready.
+				r.Recorder.Event(cluster, corev1.EventTypeNormal, readyCondition.Reason, readyCondition.Message)
+				return nil
+			}
+		}
+		// handle the cluster.status.conditions when replicas of cluster are not ready.
+		return handleNotReadyConditionForCluster(cluster, replicasNotReadyCompNames, notReadyCompNames), nil
 	}
-	if clusterIsRunning {
-		cluster.Status.Phase = dbaasv1alpha1.RunningPhase
-		cluster.SetStatusCondition(newClusterReadyCondition(cluster.Name))
-		needSync = true
-	} else if existsAbnormalOrFailed {
-		// abnormal or failed components exist
-		needSync = true
+
+	// handle the Cluster.status when some components of cluster are Abnormal or Failed.
+	handleExistAbnormalOrFailed := func(cluster *dbaasv1alpha1.Cluster) (needPatch bool, postFunc postHandler) {
+		if !existsAbnormalOrFailed {
+			return
+		}
 		componentMap, clusterAvailabilityEffectMap, _ := getComponentRelatedInfo(cluster, clusterDef, "")
 		handleClusterAbnormalOrFailedPhase(cluster, componentMap, clusterAvailabilityEffectMap)
-	}
-	// if cluster.status is not changed, return
-	if !needSync && !needSyncComponentStatus {
-		return nil
-	}
-	if err := r.Client.Status().Patch(ctx, cluster, patch); err != nil {
-		return err
-	}
-	if isReady {
-		// send an event when all pods of the components are ready
-		r.Recorder.Event(cluster, corev1.EventTypeNormal, readyCondition.Reason, readyCondition.Message)
+		return true, nil
 	}
 
-	if clusterIsRunning {
-		// send an event when Cluster.status.phase change to Running
-		r.Recorder.Eventf(cluster, corev1.EventTypeNormal, string(dbaasv1alpha1.RunningPhase), "Cluster: %s is ready, current phase is Running.", cluster.Name)
+	// handle the Cluster.status when cluster is Running.
+	handleClusterIsRunning := func(cluster *dbaasv1alpha1.Cluster) (needPatch bool, postFunc postHandler) {
+		if !clusterIsRunning {
+			return
+		}
+		cluster.Status.Phase = dbaasv1alpha1.RunningPhase
+		cluster.SetStatusCondition(newClusterReadyCondition(cluster.Name))
+		return true, func(cluster *dbaasv1alpha1.Cluster) error {
+			// send an event when Cluster.status.phase change to Running
+			r.Recorder.Eventf(cluster, corev1.EventTypeNormal, string(dbaasv1alpha1.RunningPhase), "Cluster: %s is ready, current phase is Running.", cluster.Name)
+			// when cluster phase changes to Running, need to mark OpsRequest annotation to reconcile for running OpsRequest.
+			return opsutil.MarkRunningOpsRequestAnnotation(ctx, r.Client, cluster)
+		}
 	}
-	if clusterIsRunning || needSyncComponentStatus {
-		// when cluster phase or component phase changed,
-		// need to mark OpsRequest annotation to reconcile for running OpsRequest.
-		return opsutil.MarkRunningOpsRequestAnnotation(ctx, r.Client, cluster)
-	}
-	return nil
-}
 
-// handleComponentStatus cluster controller and component controller are tuned asynchronously.
-// before processing whether the component is running, need to synchronize the latest status of components firstly.
-// it can prevent the use of expired component status, which may lead to inconsistent cluster status.
-func (r *ClusterReconciler) handleComponentStatus(ctx context.Context,
-	cluster *dbaasv1alpha1.Cluster,
-	clusterDef *dbaasv1alpha1.ClusterDefinition) (bool, error) {
-	var (
-		needSyncDeploymentStatus  bool
-		needSyncStatefulSetStatus bool
-		err                       error
-	)
-	// handle stateless component status
-	if needSyncDeploymentStatus, err = r.handleComponentStatusWithDeployment(ctx, cluster, clusterDef); err != nil {
-		return false, err
-	}
-	// handle stateful/consensus component status
-	if needSyncStatefulSetStatus, err = r.handleComponentStatusWithStatefulSet(ctx, cluster, clusterDef); err != nil {
-		return false, err
-	}
-	return needSyncDeploymentStatus || needSyncStatefulSetStatus, nil
-}
-
-// handleComponentStatusWithStatefulSet handles the component status with StatefulSet workloads.
-func (r *ClusterReconciler) handleComponentStatusWithStatefulSet(ctx context.Context,
-	cluster *dbaasv1alpha1.Cluster,
-	clusterDef *dbaasv1alpha1.ClusterDefinition) (bool, error) {
-	var (
-		needSyncComponentStatus bool
-		statefulSetList         = &appsv1.StatefulSetList{}
-		err                     error
-		handledComponentMap     = map[string]struct{}{}
-	)
-
-	if err = getWorkloadListForCluster(ctx, r.Client, cluster, clusterDef, statefulSetList); err != nil {
-		return false, err
-	}
-	for _, sts := range statefulSetList.Items {
-		componentName := sts.GetLabels()[intctrlutil.AppComponentLabelKey]
-		if len(componentName) == 0 {
-			continue
-		}
-		if _, ok := handledComponentMap[componentName]; ok {
-			continue
-		}
-		handledComponentMap[componentName] = struct{}{}
-		typeName := util.GetComponentTypeName(*cluster, componentName)
-		componentDef := util.GetComponentDefFromClusterDefinition(clusterDef, typeName)
-		component := util.GetComponentByName(cluster, componentName)
-		currComponent := components.NewComponentByType(ctx, r.Client, cluster, componentDef, component)
-		if currComponent == nil {
-			continue
-		}
-		componentIsRunning, err := currComponent.IsRunning(&sts)
-		if err != nil {
-			return false, err
-		}
-		podsIsReady, err := currComponent.PodsReady(&sts)
-		if err != nil {
-			return false, err
-		}
-		workloadSpecIsUpdated := util.StatefulSetSpecIsUpdated(&sts)
-		if ok, err := components.NeedSyncStatusComponents(cluster, currComponent, componentName,
-			workloadSpecIsUpdated, componentIsRunning, podsIsReady); err != nil {
-			return false, err
-		} else if ok {
-			needSyncComponentStatus = true
-		}
-	}
-	return needSyncComponentStatus, nil
-}
-
-// handleComponentStatusWithDeployment handles the component status with deployment. One deployment corresponds to one component.
-func (r *ClusterReconciler) handleComponentStatusWithDeployment(ctx context.Context, cluster *dbaasv1alpha1.Cluster, clusterDef *dbaasv1alpha1.ClusterDefinition) (bool, error) {
-	var (
-		needSyncComponentStatus bool
-		deploymentList          = &appsv1.DeploymentList{}
-	)
-	if err := getWorkloadListForCluster(ctx, r.Client, cluster, clusterDef, deploymentList); err != nil {
-		return false, err
-	}
-	for _, deploy := range deploymentList.Items {
-		componentName := deploy.GetLabels()[intctrlutil.AppComponentLabelKey]
-		if len(componentName) == 0 {
-			continue
-		}
-		deployIsReady := stateless.DeploymentIsReady(&deploy)
-		statelessComponent := stateless.NewStateless(ctx, r.Client, cluster)
-		workloadSpecIsUpdated := stateless.DeploymentSpecIsUpdated(&deploy)
-		if ok, err := components.NeedSyncStatusComponents(cluster, statelessComponent,
-			componentName, workloadSpecIsUpdated, deployIsReady, deployIsReady); err != nil {
-			return false, err
-		} else if ok {
-			needSyncComponentStatus = true
-		}
-	}
-	return needSyncComponentStatus, nil
+	return doChainClusterStatusHandler(ctx, r.Client, cluster,
+		handleClusterReadyCondition, handleExistAbnormalOrFailed, handleClusterIsRunning)
 }
 
 // reconcileStatusOperations when Cluster.spec updated, we need reconcile the Cluster.status.operations.
@@ -876,20 +798,4 @@ func getSupportHorizontalScalingComponents(
 	}
 
 	return horizontalScalableComponents
-}
-
-// getWorkloadListForCluster gets k8s workload list with cluster
-func getWorkloadListForCluster(ctx context.Context, cli client.Client, cluster *dbaasv1alpha1.Cluster, clusterDef *dbaasv1alpha1.ClusterDefinition, objectList client.ObjectList) error {
-	matchLabels, inNamespace := getListOption(cluster, clusterDef)
-	return cli.List(ctx, objectList, matchLabels, inNamespace)
-}
-
-// getListOption gets opts parameters for cli.List interface
-func getListOption(cluster *dbaasv1alpha1.Cluster, clusterDef *dbaasv1alpha1.ClusterDefinition) (ml client.MatchingLabels, inNS client.InNamespace) {
-	ml = client.MatchingLabels{
-		intctrlutil.AppInstanceLabelKey: cluster.GetName(),
-		intctrlutil.AppNameLabelKey:     fmt.Sprintf("%s-%s", clusterDef.Spec.Type, clusterDef.Name),
-	}
-	inNS = client.InNamespace(cluster.Namespace)
-	return
 }

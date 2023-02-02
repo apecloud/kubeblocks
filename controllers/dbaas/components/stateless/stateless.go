@@ -1,5 +1,5 @@
 /*
-Copyright ApeCloud Inc.
+Copyright ApeCloud, Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -146,9 +146,4 @@ func DeploymentIsReady(deploy *appsv1.Deployment) bool {
 // "ProgressDeadlineExceeded" when the Deployment progress takes longer than expected time.
 func HasProgressDeadline(d *appsv1.Deployment) bool {
 	return d.Spec.ProgressDeadlineSeconds != nil && *d.Spec.ProgressDeadlineSeconds != math.MaxInt32
-}
-
-// DeploymentSpecIsUpdated checks if the deployment spec has updated.
-func DeploymentSpecIsUpdated(deploy *appsv1.Deployment) bool {
-	return deploy.Generation != deploy.Status.ObservedGeneration
 }

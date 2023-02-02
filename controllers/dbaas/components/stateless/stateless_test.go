@@ -1,5 +1,5 @@
 /*
-Copyright ApeCloud Inc.
+Copyright ApeCloud, Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -70,9 +70,6 @@ var _ = Describe("Stateful Component", func() {
 			cluster := testdbaas.CreateStatelessCluster(ctx, testCtx, clusterDefName, clusterVersionName, clusterName)
 			deploy := testdbaas.MockStatelessComponentDeploy(ctx, testCtx, clusterName, statelessCompName)
 			statelessComponent := NewStateless(ctx, k8sClient, cluster)
-
-			By("test DeploymentSpecIsUpdated function")
-			Expect(DeploymentSpecIsUpdated(deploy)).Should(BeTrue())
 
 			By("test pods are not ready")
 			patch := client.MergeFrom(deploy.DeepCopy())

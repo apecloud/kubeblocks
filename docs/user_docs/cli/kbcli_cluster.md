@@ -35,6 +35,7 @@ Cluster command
 
 * [kbcli](kbcli.md)	 - KubeBlocks CLI
 * [kbcli cluster backup](kbcli_cluster_backup.md)	 - Create a backup
+* [kbcli cluster configure](kbcli_cluster_configure.md)	 - reconfigure parameters with the specified components in the cluster
 * [kbcli cluster connect](kbcli_cluster_connect.md)	 - Connect to a cluster or instance
 * [kbcli cluster create](kbcli_cluster_create.md)	 - Create a cluster
 * [kbcli cluster delete](kbcli_cluster_delete.md)	 - Delete clusters
@@ -42,7 +43,10 @@ Cluster command
 * [kbcli cluster delete-ops](kbcli_cluster_delete-ops.md)	 - Delete an OpsRequest
 * [kbcli cluster delete-restore](kbcli_cluster_delete-restore.md)	 - Delete a restore job
 * [kbcli cluster describe](kbcli_cluster_describe.md)	 - Show details of a specific cluster
+* [kbcli cluster describe-configure](kbcli_cluster_describe-configure.md)	 - Show details of a specific reconfiguring
 * [kbcli cluster describe-ops](kbcli_cluster_describe-ops.md)	 - Show details of a specific OpsRequest
+* [kbcli cluster diff-configure](kbcli_cluster_diff-configure.md)	 - List the constraint for supported configuration params
+* [kbcli cluster explain-configure](kbcli_cluster_explain-configure.md)	 - List the constraint for supported configuration params
 * [kbcli cluster horizontal-scale](kbcli_cluster_horizontal-scale.md)	 - Horizontal scale the specified components in the cluster
 * [kbcli cluster list](kbcli_cluster_list.md)	 - List clusters
 * [kbcli cluster list-backups](kbcli_cluster_list-backups.md)	 - List backups

@@ -48,7 +48,6 @@ import (
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/dbaas/components/consensusset"
 	cfgutil "github.com/apecloud/kubeblocks/controllers/dbaas/configuration"
-	"github.com/apecloud/kubeblocks/controllers/dbaas/operations"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 	cfgcm "github.com/apecloud/kubeblocks/internal/configuration/configmap"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
@@ -354,7 +353,7 @@ func mergeComponents(
 	}
 
 	if clusterVersionComp != nil {
-		component.ConfigTemplates = operations.MergeConfigTemplates(clusterVersionComp.ConfigTemplateRefs, component.ConfigTemplates)
+		component.ConfigTemplates = cfgcore.MergeConfigTemplates(clusterVersionComp.ConfigTemplateRefs, component.ConfigTemplates)
 		if clusterVersionComp.PodSpec != nil {
 			for _, c := range clusterVersionComp.PodSpec.Containers {
 				doContainerAttrOverride(c)
@@ -1737,7 +1736,7 @@ func processConfigMapTemplate(
 	}
 
 	// NOTE: not require checker configuration template status
-	configChecker := cfgcore.NewConfigValidator(&cfgTemplate.Spec)
+	cfgChecker := cfgcore.NewConfigValidator(&cfgTemplate.Spec)
 	cmObj := &corev1.ConfigMap{}
 	//  Require template configmap exist
 	if err := cli.Get(ctx, client.ObjectKey{
@@ -1758,7 +1757,7 @@ func processConfigMapTemplate(
 	}
 
 	// NOTE: It is necessary to verify the correctness of the data
-	if err := configChecker.Validate(renderedCfg); err != nil {
+	if err := cfgChecker.Validate(renderedCfg); err != nil {
 		return nil, cfgcore.WrapError(err, "failed to validate configmap")
 	}
 

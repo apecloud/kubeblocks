@@ -71,7 +71,7 @@ type ConfigOperator interface {
 
 	// MergeFromConfig(fileContent []byte, option CfgOpOption) error
 	// MergePatch(jsonPatch []byte, option CfgOpOption) error
-	// Diff(target *ConfigOperator) (*ConfigDiffInformation, error)
+	// Diff(target *ConfigOperator) (*ConfigPatchInfo, error)
 
 	// Query get parameter
 	Query(jsonpath string, option CfgOpOption) ([]byte, error)

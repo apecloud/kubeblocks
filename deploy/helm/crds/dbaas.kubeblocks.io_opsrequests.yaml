@@ -450,6 +450,9 @@ spec:
                   - type
                   type: object
                 type: array
+                x-kubernetes-list-map-keys:
+                - type
+                x-kubernetes-list-type: map
               lastConfiguration:
                 description: lastConfiguration records the last configuration before
                   this operation take effected.
@@ -552,6 +555,84 @@ spec:
                 default: -/-
                 pattern: ^(\d+|\-)/(\d+|\-)$
                 type: string
+              reconfiguringStatus:
+                description: reconfiguringStatus defines the status information of
+                  reconfiguring.
+                properties:
+                  configurationStatus:
+                    description: configurationStatus describes the status of the component
+                      reconfiguring.
+                    items:
+                      properties:
+                        expectedCount:
+                          default: -1
+                          description: expectedCount describes the number of expected
+                            reconfiguring.
+                          format: int32
+                          type: integer
+                        lastAppliedConfiguration:
+                          additionalProperties:
+                            type: string
+                          description: LastAppliedConfiguration describes the last
+                            configuration.
+                          type: object
+                        lastStatus:
+                          description: lastStatus describes the last status for the
+                            reconfiguring controller.
+                          type: string
+                        name:
+                          description: name is a config template name.
+                          maxLength: 63
+                          pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                          type: string
+                        status:
+                          description: status describes the current state of the reconfiguring
+                            state machine.
+                          type: string
+                        succeedCount:
+                          default: 0
+                          description: succeedCount describes the number of successful
+                            reconfiguring.
+                          format: int32
+                          type: integer
+                        updatePolicy:
+                          description: updatePolicy describes the policy of reconfiguring.
+                          enum:
+                          - simple
+                          - parallel
+                          - rolling
+                          - autoReload
+                          type: string
+                        updatedParameters:
+                          description: updatedParameters describes the updated parameters.
+                          properties:
+                            addedKeys:
+                              additionalProperties:
+                                type: string
+                              description: addedKeys describes the key added.
+                              type: object
+                            deletedKeys:
+                              additionalProperties:
+                                type: string
+                              description: deletedKeys describes the key deleted.
+                              type: object
+                            updatedKeys:
+                              additionalProperties:
+                                type: string
+                              description: updatedKeys describes the key updated.
+                              type: object
+                          type: object
+                      required:
+                      - name
+                      type: object
+                    minItems: 1
+                    type: array
+                    x-kubernetes-list-map-keys:
+                    - name
+                    x-kubernetes-list-type: map
+                required:
+                - configurationStatus
+                type: object
               startTimestamp:
                 description: startTimestamp The time when the OpsRequest started processing.
                 format: date-time

@@ -25,6 +25,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 
 	"github.com/apecloud/kubeblocks/controllers/dbaas/components/consensusset"
+	"github.com/apecloud/kubeblocks/controllers/dbaas/components/util"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 	cfgproto "github.com/apecloud/kubeblocks/internal/configuration/proto"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
@@ -63,7 +64,45 @@ func GetReplicationRollingUpgradeFuncs() RollingUpgradeFuncs {
 }
 
 func getReplicationSetPods(params reconfigureParams) ([]corev1.Pod, error) {
-	panic("")
+	var (
+		ctx     = params.Ctx
+		cluster = params.Cluster
+	)
+
+	podList, err := util.GetComponentPodList(ctx.Ctx, params.Client, cluster, params.ClusterComponent.Name)
+	if err != nil {
+		return nil, err
+	}
+	return podList.Items, nil
+}
+
+// GetComponentPods get all pods of the component.
+func GetComponentPods(params reconfigureParams) ([]corev1.Pod, error) {
+	componentPods := make([]corev1.Pod, 0)
+	for i := range params.ComponentUnits {
+		pods, err := consensusset.GetPodListByStatefulSet(params.Ctx.Ctx, params.Client, &params.ComponentUnits[i])
+		if err != nil {
+			return nil, err
+		}
+		componentPods = append(componentPods, pods...)
+	}
+	return componentPods, nil
+}
+
+// CheckReconfigureUpdateProgress checks pods of the component is ready.
+func CheckReconfigureUpdateProgress(pods []corev1.Pod, configKey, version string) int32 {
+	var (
+		readyPods        int32 = 0
+		cfgAnnotationKey       = cfgcore.GenerateUniqKeyWithConfig(cfgcore.UpgradeRestartAnnotationKey, configKey)
+	)
+
+	for _, pod := range pods {
+		annotations := pod.Annotations
+		if len(annotations) != 0 && annotations[cfgAnnotationKey] == version && intctrlutil.IsReady(&pod) {
+			readyPods++
+		}
+	}
+	return readyPods
 }
 
 func getStatefulSetPods(params reconfigureParams) ([]corev1.Pod, error) {

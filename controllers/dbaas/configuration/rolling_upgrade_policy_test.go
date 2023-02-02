@@ -139,38 +139,38 @@ var _ = Describe("Reconfigure RollingPolicy", func() {
 			// mock wait the number of pods to target replicas
 			status, err := rollingPolicy.Upgrade(mockParam)
 			Expect(err).Should(Succeed())
-			Expect(status).Should(BeEquivalentTo(ESRetry))
+			Expect(status.Status).Should(BeEquivalentTo(ESRetry))
 
 			// mock wait the number of pods to ready status
 			status, err = rollingPolicy.Upgrade(mockParam)
 			Expect(err).Should(Succeed())
-			Expect(status).Should(BeEquivalentTo(ESRetry))
+			Expect(status.Status).Should(BeEquivalentTo(ESRetry))
 
 			// upgrade pod-0
 			status, err = rollingPolicy.Upgrade(mockParam)
 			Expect(err).Should(Succeed())
-			Expect(status).Should(BeEquivalentTo(ESRetry))
-			Expect(mockPods[acc][0].Labels[mockParam.getConfigKey()]).Should(BeEquivalentTo(mockParam.getModifyVersion()))
-			Expect(mockPods[acc][1].Labels[mockParam.getConfigKey()]).ShouldNot(BeEquivalentTo(mockParam.getModifyVersion()))
-			Expect(mockPods[acc][2].Labels[mockParam.getConfigKey()]).ShouldNot(BeEquivalentTo(mockParam.getModifyVersion()))
+			Expect(status.Status).Should(BeEquivalentTo(ESRetry))
+			Expect(mockPods[acc][0].Labels[mockParam.getConfigKey()]).Should(BeEquivalentTo(mockParam.getTargetVersionHash()))
+			Expect(mockPods[acc][1].Labels[mockParam.getConfigKey()]).ShouldNot(BeEquivalentTo(mockParam.getTargetVersionHash()))
+			Expect(mockPods[acc][2].Labels[mockParam.getConfigKey()]).ShouldNot(BeEquivalentTo(mockParam.getTargetVersionHash()))
 
 			// upgrade pod-2
 			status, err = rollingPolicy.Upgrade(mockParam)
 			Expect(err).Should(Succeed())
-			Expect(status).Should(BeEquivalentTo(ESRetry))
-			Expect(mockPods[acc][2].Labels[mockParam.getConfigKey()]).Should(BeEquivalentTo(mockParam.getModifyVersion()))
-			Expect(mockPods[acc][1].Labels[mockParam.getConfigKey()]).ShouldNot(BeEquivalentTo(mockParam.getModifyVersion()))
+			Expect(status.Status).Should(BeEquivalentTo(ESRetry))
+			Expect(mockPods[acc][2].Labels[mockParam.getConfigKey()]).Should(BeEquivalentTo(mockParam.getTargetVersionHash()))
+			Expect(mockPods[acc][1].Labels[mockParam.getConfigKey()]).ShouldNot(BeEquivalentTo(mockParam.getTargetVersionHash()))
 
 			// upgrade pod-1
 			status, err = rollingPolicy.Upgrade(mockParam)
 			Expect(err).Should(Succeed())
-			Expect(status).Should(BeEquivalentTo(ESRetry))
-			Expect(mockPods[acc][1].Labels[mockParam.getConfigKey()]).Should(BeEquivalentTo(mockParam.getModifyVersion()))
+			Expect(status.Status).Should(BeEquivalentTo(ESRetry))
+			Expect(mockPods[acc][1].Labels[mockParam.getConfigKey()]).Should(BeEquivalentTo(mockParam.getTargetVersionHash()))
 
 			// finish check, not upgrade
 			status, err = rollingPolicy.Upgrade(mockParam)
 			Expect(err).Should(Succeed())
-			Expect(status).Should(BeEquivalentTo(ESNone))
+			Expect(status.Status).Should(BeEquivalentTo(ESNone))
 		})
 	})
 
@@ -211,12 +211,12 @@ var _ = Describe("Reconfigure RollingPolicy", func() {
 			// mock wait the number of pods to target replicas
 			status, err := rollingPolicy.Upgrade(mockParam)
 			Expect(err).Should(Succeed())
-			Expect(status).Should(BeEquivalentTo(ESRetry))
+			Expect(status.Status).Should(BeEquivalentTo(ESRetry))
 
 			// finish check, not finished
 			status, err = rollingPolicy.Upgrade(mockParam)
 			Expect(err).Should(Succeed())
-			Expect(status).Should(BeEquivalentTo(ESRetry))
+			Expect(status.Status).Should(BeEquivalentTo(ESRetry))
 
 			// mock async update state
 			go func() {
@@ -230,12 +230,12 @@ var _ = Describe("Reconfigure RollingPolicy", func() {
 			Eventually(func() bool {
 				status, err = rollingPolicy.Upgrade(mockParam)
 				Expect(err).Should(Succeed())
-				Expect(status).Should(BeElementOf(ESNone, ESRetry))
-				return status == ESNone
+				Expect(status.Status).Should(BeElementOf(ESNone, ESRetry))
+				return status.Status == ESNone
 			}, time.Second*20, time.Second*1).Should(BeTrue())
 
 			status, err = rollingPolicy.Upgrade(mockParam)
-			Expect(status).Should(BeEquivalentTo(ESNone))
+			Expect(status.Status).Should(BeEquivalentTo(ESNone))
 		})
 	})
 
@@ -248,7 +248,7 @@ var _ = Describe("Reconfigure RollingPolicy", func() {
 			status, err := rollingPolicy.Upgrade(createReconfigureParam(dbaasv1alpha1.Stateless, defaultReplica))
 			Expect(err).ShouldNot(Succeed())
 			Expect(err.Error()).Should(ContainSubstring("not support component type"))
-			Expect(status).Should(BeEquivalentTo(ESNotSupport))
+			Expect(status.Status).Should(BeEquivalentTo(ESNotSupport))
 		})
 	})
 })

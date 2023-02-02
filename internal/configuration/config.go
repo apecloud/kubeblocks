@@ -36,10 +36,20 @@ import (
 
 type ConfigLoaderProvider func(option CfgOption) (*cfgWrapper, error)
 
-const (
-	cfgKeyDelimiter = "."
-	emptyJSON       = "{}"
-)
+// ReconfiguringProgress defines the progress percentage.
+// range: 0~100
+// Unconfirmed(-1) describes an uncertain progress, e.g: fsm is failed.
+// +enum
+type ReconfiguringProgress int32
+
+type PolicyExecStatus struct {
+	PolicyName string
+	ExecStatus string
+	Status     string
+
+	SucceedCount  int32
+	ExpectedCount int32
+}
 
 type ConfigEventContext struct {
 	Client  client.Client
@@ -50,14 +60,27 @@ type ConfigEventContext struct {
 	Component        *dbaasv1alpha1.ClusterDefinitionComponent
 	ComponentUnits   []appv1.StatefulSet
 
-	Meta *ConfigDiffInformation
-	Cfg  *corev1.ConfigMap
-	Tpl  *dbaasv1alpha1.ConfigConstraintSpec
+	TplName          string
+	ConfigPatch      *ConfigPatchInfo
+	CfgCM            *corev1.ConfigMap
+	ConfigConstraint *dbaasv1alpha1.ConfigConstraintSpec
+
+	PolicyStatus PolicyExecStatus
 }
 
 type ConfigEventHandler interface {
 	Handle(eventContext ConfigEventContext, lastOpsRequest string, phase dbaasv1alpha1.Phase, err error) error
 }
+
+const (
+	Unconfirmed int32 = -1
+	NotStarted  int32 = 0
+)
+
+const (
+	cfgKeyDelimiter = "."
+	emptyJSON       = "{}"
+)
 
 var (
 	loaderProvider        = map[ConfigType]ConfigLoaderProvider{}
@@ -210,7 +233,7 @@ func (c *cfgWrapper) ToCfgContent() (map[string]string, error) {
 	return fileContents, nil
 }
 
-type ConfigDiffInformation struct {
+type ConfigPatchInfo struct {
 	IsModify bool
 	// new config
 	AddConfig map[string]interface{}
@@ -226,7 +249,7 @@ type ConfigDiffInformation struct {
 	LastVersion *cfgWrapper
 }
 
-func (c *cfgWrapper) Diff(target *cfgWrapper) (*ConfigDiffInformation, error) {
+func (c *cfgWrapper) Diff(target *cfgWrapper) (*ConfigPatchInfo, error) {
 	fromOMap := ToSet(c.indexer)
 	fromNMap := ToSet(target.indexer)
 
@@ -234,7 +257,7 @@ func (c *cfgWrapper) Diff(target *cfgWrapper) (*ConfigDiffInformation, error) {
 	deleteSet := Difference(fromOMap, fromNMap)
 	updateSet := Difference(fromOMap, deleteSet)
 
-	reconfigureInfo := &ConfigDiffInformation{
+	reconfigureInfo := &ConfigPatchInfo{
 		IsModify:     false,
 		AddConfig:    make(map[string]interface{}, addSet.Length()),
 		DeleteConfig: make(map[string]interface{}, deleteSet.Length()),
@@ -352,13 +375,13 @@ func DumpCfgContent(v *viper.Viper, tmpPath string) (string, error) {
 	return string(content), nil
 }
 
-func CreateMergePatch(oldcfg, target interface{}, option CfgOption) (*ConfigDiffInformation, error) {
+func CreateMergePatch(oldcfg, target interface{}, option CfgOption) (*ConfigPatchInfo, error) {
 
 	ok, err := compareWithConfig(oldcfg, target, option)
 	if err != nil {
 		return nil, err
 	} else if ok {
-		return &ConfigDiffInformation{
+		return &ConfigPatchInfo{
 			IsModify: false,
 		}, err
 	}

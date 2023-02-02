@@ -29,6 +29,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
+	"github.com/apecloud/kubeblocks/test/testdata"
 )
 
 var _ = Describe("Cluster", func() {
@@ -165,6 +166,47 @@ var _ = Describe("Cluster", func() {
 		Expect(o.Validate()).To(MatchError("replicas required natural number"))
 
 		o.Replicas = 1
+		Expect(o.Validate()).Should(Succeed())
+	})
+
+	It("check params for reconfiguring operations", func() {
+		const (
+			ns                  = "default"
+			volumeName          = "config"
+			componentName       = "wesql"
+			cdComponentTypeName = "replicasets"
+		)
+
+		randomNamer := CreateRandomResourceNamer(ns)
+		mockHelper := NewFakeResourceObjectHelper("cli_testdata",
+			withCustomResource(types.ClusterGVR(), newFakeClusterResource(randomNamer, componentName, cdComponentTypeName)),
+			withCustomResource(types.CMGVR(), newFakeConfigCMResource(randomNamer, componentName, volumeName, testdata.WithMap("my.cnf", ""))),
+			withResourceKind(types.ConfigConstraintGVR(), types.KindConfigConstraint, testdata.WithName(randomNamer.ccName)),
+			withResourceKind(types.CMGVR(), types.KindCM, testdata.WithNamespacedName(randomNamer.tplName, randomNamer.ns)),
+			withResourceKind(types.ClusterVersionGVR(), types.KindClusterVersion, testdata.WithName(randomNamer.cvName)),
+			withResourceKind(types.ClusterDefGVR(), types.KindClusterDef,
+				testdata.WithName(randomNamer.cdName),
+				testdata.WithConfigTemplate(GenerateConfigTemplate(randomNamer, volumeName), testdata.ComponentTypeSelector(dbaasv1alpha1.Stateful)),
+				testdata.WithUpdateComponent(testdata.ComponentTypeSelector(dbaasv1alpha1.Stateful),
+					func(component *dbaasv1alpha1.ClusterDefinitionComponent) {
+						component.TypeName = cdComponentTypeName
+					}),
+			),
+		)
+		ttf, o := NewFakeOperationsOptions(randomNamer.ns, randomNamer.clusterName, dbaasv1alpha1.ReconfiguringType, mockHelper.CreateObjects()...)
+		defer ttf.Cleanup()
+
+		o.ComponentNames = []string{"replicasets", "proxy"}
+		By("validate reconfiguring when multi components")
+		Expect(o.Validate()).To(MatchError("reconfiguring only support one component."))
+
+		By("validate reconfiguring parameter")
+		o.ComponentNames = []string{componentName}
+		Expect(o.Validate().Error()).To(ContainSubstring("reconfiguring required configure file or updated parameters"))
+		o.Parameters = []string{"abcd"}
+		Expect(o.Validate().Error()).To(ContainSubstring("updated parameter formatter"))
+		o.Parameters = []string{"abcd=test"}
+		o.CfgTemplateName = randomNamer.tplName
 		Expect(o.Validate()).Should(Succeed())
 	})
 

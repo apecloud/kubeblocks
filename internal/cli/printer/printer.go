@@ -42,6 +42,26 @@ var (
 		Options: table.OptionsNoBordersAndSeparators,
 		Title:   table.TitleOptionsDefault,
 	}
+
+	// TerminalStyle renders a Table like below:
+	//  +-----+------------+-----------+--------+-----------------------------+
+	//  |   # | FIRST NAME | LAST NAME | SALARY |                             |
+	//  +-----+------------+-----------+--------+-----------------------------+
+	//  |   1 | Arya       | Stark     |   3000 |                             |
+	//  |  20 | Jon        | Snow      |   2000 | You know nothing, Jon Snow! |
+	//  | 300 | Tyrion     | Lannister |   5000 |                             |
+	//  +-----+------------+-----------+--------+-----------------------------+
+	//  |     |            | TOTAL     |  10000 |                             |
+	//  +-----+------------+-----------+--------+-----------------------------+
+	TerminalStyle = table.Style{
+		Name:    "TerminalStyle",
+		Box:     table.StyleBoxDefault,
+		Color:   table.ColorOptionsDefault,
+		Format:  table.FormatOptionsDefault,
+		HTML:    table.DefaultHTMLOptions,
+		Options: table.OptionsDefault,
+		Title:   table.TitleOptionsDefault,
+	}
 )
 
 type TablePrinter struct {
@@ -53,6 +73,10 @@ func NewTablePrinter(out io.Writer) *TablePrinter {
 	t.SetStyle(StyleKubeCtl)
 	t.SetOutputMirror(out)
 	return &TablePrinter{tbl: t}
+}
+
+func (t *TablePrinter) SetStyle(style table.Style) {
+	t.tbl.SetStyle(style)
 }
 
 func (t *TablePrinter) SetHeader(header ...interface{}) {

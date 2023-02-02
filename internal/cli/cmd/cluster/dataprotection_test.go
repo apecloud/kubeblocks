@@ -151,7 +151,7 @@ var _ = Describe("DataProtection", func() {
 		Expect(cmd).ShouldNot(BeNil())
 		Expect(cmd.Flags().Set("cluster-definition", testing.ClusterDefName)).Should(Succeed())
 		Expect(cmd.Flags().Set("cluster-version", testing.ClusterVersionName)).Should(Succeed())
-		Expect(cmd.Flags().Set("components", "../../testing/testdata/component.yaml")).Should(Succeed())
+		Expect(cmd.Flags().Set("set", "../../testing/testdata/component.yaml")).Should(Succeed())
 		Expect(cmd.Flags().Set("termination-policy", "Delete")).Should(Succeed())
 		cmd.Run(nil, []string{clusterName})
 

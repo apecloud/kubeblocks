@@ -22,7 +22,7 @@ spec:
       name: STATUS
       type: string
     - jsonPath: .status.completionTimestamp
-      name: COMPLETIONTIME
+      name: COMPLETION-TIME
       type: date
     - jsonPath: .metadata.creationTimestamp
       name: AGE
@@ -72,6 +72,7 @@ spec:
                     items:
                       type: string
                     type: array
+                    x-kubernetes-list-type: set
                   labelsSelector:
                     description: LabelSelector is used to find matching pods. Pods
                       that match this label selector are counted to determine the
@@ -118,6 +119,7 @@ spec:
                           "value". The requirements are ANDed.
                         type: object
                     type: object
+                    x-kubernetes-preserve-unknown-fields: true
                   secret:
                     description: target db cluster access secret
                     properties:
@@ -183,6 +185,7 @@ spec:
                   type: object
                 minItems: 1
                 type: array
+                x-kubernetes-preserve-unknown-fields: true
               targetVolumes:
                 description: array of restore volumes .
                 items:
@@ -1696,6 +1699,7 @@ spec:
                   type: object
                 minItems: 1
                 type: array
+                x-kubernetes-preserve-unknown-fields: true
             required:
             - backupJobName
             - target
@@ -1716,6 +1720,7 @@ spec:
                 format: date-time
                 type: string
               failureReason:
+                description: Job failed reason.
                 type: string
               phase:
                 description: RestoreJobPhase The current phase. Valid values are New,

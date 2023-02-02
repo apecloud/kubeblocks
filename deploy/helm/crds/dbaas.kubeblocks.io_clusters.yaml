@@ -81,6 +81,7 @@ spec:
                     items:
                       type: string
                     type: array
+                    x-kubernetes-list-type: set
                 type: object
               clusterDefinitionRef:
                 description: Cluster referenced ClusterDefinition name, this is an
@@ -121,6 +122,7 @@ spec:
                           items:
                             type: string
                           type: array
+                          x-kubernetes-list-type: set
                       type: object
                     enabledLogs:
                       description: enabledLogs indicate which log file takes effect
@@ -130,6 +132,7 @@ spec:
                       items:
                         type: string
                       type: array
+                      x-kubernetes-list-type: set
                     monitor:
                       default: false
                       description: monitor which is a switch to enable monitoring,
@@ -175,6 +178,7 @@ spec:
                             https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
                           type: object
                       type: object
+                      x-kubernetes-preserve-unknown-fields: true
                     serviceType:
                       default: ClusterIP
                       description: 'serviceType determines how the Service is exposed.
@@ -195,6 +199,7 @@ spec:
                       - NodePort
                       - LoadBalancer
                       type: string
+                      x-kubernetes-preserve-unknown-fields: true
                     tolerations:
                       description: Component tolerations will override ClusterSpec.Tolerations
                         if specified.
@@ -238,6 +243,7 @@ spec:
                             type: string
                         type: object
                       type: array
+                      x-kubernetes-preserve-unknown-fields: true
                     type:
                       description: Component type name defined in ClusterDefinition
                         spec.
@@ -430,6 +436,7 @@ spec:
                                   the PersistentVolume backing this claim.
                                 type: string
                             type: object
+                            x-kubernetes-preserve-unknown-fields: true
                         required:
                         - name
                         type: object
@@ -497,6 +504,7 @@ spec:
                       type: string
                   type: object
                 type: array
+                x-kubernetes-preserve-unknown-fields: true
             required:
             - clusterDefinitionRef
             - clusterVersionRef
@@ -756,12 +764,16 @@ spec:
                       - name
                       type: object
                     type: array
+                    x-kubernetes-list-map-keys:
+                    - name
+                    x-kubernetes-list-type: map
                   restartable:
                     description: restartable which components of the cluster support
                       restart.
                     items:
                       type: string
                     type: array
+                    x-kubernetes-list-type: set
                   upgradable:
                     description: upgradable whether the cluster supports upgrade.
                       if multiple clusterVersions existed, it is true.
@@ -772,6 +784,7 @@ spec:
                     items:
                       type: string
                     type: array
+                    x-kubernetes-list-type: set
                   volumeExpandable:
                     description: volumeExpandable which components of the cluster
                       and its volumeClaimTemplates support volumeExpansion.
@@ -798,6 +811,9 @@ spec:
                       - name
                       type: object
                     type: array
+                    x-kubernetes-list-map-keys:
+                    - name
+                    x-kubernetes-list-type: map
                 type: object
               phase:
                 description: 'phase describes the phase of the Cluster. the detail

@@ -33,7 +33,7 @@ spec:
     name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: BackupPolicy is the Schema for the backuppolicies API  (defined
+        description: BackupPolicy is the Schema for the backuppolicies API (defined
           by User)
         properties:
           apiVersion:
@@ -1588,6 +1588,7 @@ spec:
                 required:
                 - name
                 type: object
+                x-kubernetes-preserve-unknown-fields: true
               schedule:
                 description: The schedule in Cron format, the timezone is in UTC.
                   see https://en.wikipedia.org/wiki/Cron.
@@ -1609,6 +1610,7 @@ spec:
                     items:
                       type: string
                     type: array
+                    x-kubernetes-list-type: set
                   labelsSelector:
                     description: LabelSelector is used to find matching pods. Pods
                       that match this label selector are counted to determine the
@@ -1655,6 +1657,7 @@ spec:
                           "value". The requirements are ANDed.
                         type: object
                     type: object
+                    x-kubernetes-preserve-unknown-fields: true
                   secret:
                     description: target db cluster access secret
                     properties:

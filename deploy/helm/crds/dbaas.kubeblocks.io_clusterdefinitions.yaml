@@ -437,7 +437,8 @@ spec:
                           type: object
                       type: object
                     podSpec:
-                      description: podSpec of final workload
+                      description: podSpec define pod spec template of the cluster
+                        component.
                       properties:
                         activeDeadlineSeconds:
                           description: Optional duration in seconds the pod may be
@@ -7760,6 +7761,7 @@ spec:
                       required:
                       - containers
                       type: object
+                      x-kubernetes-preserve-unknown-fields: true
                     probes:
                       description: probes setting for healthy checks.
                       properties:
@@ -7771,7 +7773,7 @@ spec:
                               properties:
                                 queries:
                                   description: Read check executed on probe sidecar,
-                                    used to check workload's reaonly access .
+                                    used to check workload's readonly access.
                                   items:
                                     type: string
                                   type: array
@@ -7811,7 +7813,7 @@ spec:
                               properties:
                                 queries:
                                   description: Read check executed on probe sidecar,
-                                    used to check workload's reaonly access .
+                                    used to check workload's readonly access.
                                   items:
                                     type: string
                                   type: array
@@ -7851,7 +7853,7 @@ spec:
                               properties:
                                 queries:
                                   description: Read check executed on probe sidecar,
-                                    used to check workload's reaonly access .
+                                    used to check workload's readonly access.
                                   items:
                                     type: string
                                   type: array
@@ -8227,6 +8229,7 @@ spec:
                             https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types'
                           type: string
                       type: object
+                      x-kubernetes-preserve-unknown-fields: true
                     systemAccounts:
                       description: Statement to create system account.
                       properties:
@@ -8259,11 +8262,12 @@ spec:
                                       is ReferToExisting.
                                     properties:
                                       name:
-                                        description: name refers to the name of secret.
+                                        description: name refers to the name of the
+                                          secret.
                                         type: string
                                       namespace:
-                                        description: namespace refers to the namesapce
-                                          of secret.
+                                        description: namespace refers to the namespace
+                                          of the secret.
                                         type: string
                                     required:
                                     - name
@@ -8436,6 +8440,7 @@ spec:
                                 - name
                                 type: object
                               type: array
+                              x-kubernetes-preserve-unknown-fields: true
                             image:
                               description: image for Connector.
                               type: string

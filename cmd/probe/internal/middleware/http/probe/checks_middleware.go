@@ -48,21 +48,21 @@ type Middleware struct {
 	logger logger.Logger
 }
 
-type statusCodeWriter struct {
-	http.ResponseWriter
-	logger logger.Logger
-}
+// type statusCodeWriter struct {
+// 	http.ResponseWriter
+// 	logger logger.Logger
+// }
 
-func (scw *statusCodeWriter) WriteHeader(statusCode int) {
-	header := scw.ResponseWriter.Header()
-	scw.logger.Debugf("response header: %v", header)
-	if v, ok := header[statusCodeHeader]; ok {
-		scw.logger.Debugf("set statusCode: %v", v)
-		statusCode, _ = strconv.Atoi(v[0])
-		delete(header, statusCodeHeader)
-	}
-	scw.ResponseWriter.WriteHeader(statusCode)
-}
+// func (scw *statusCodeWriter) WriteHeader(statusCode int) {
+// 	header := scw.ResponseWriter.Header()
+// 	scw.logger.Debugf("response header: %v", header)
+// 	if v, ok := header[statusCodeHeader]; ok {
+// 		scw.logger.Debugf("set statusCode: %v", v)
+// 		statusCode, _ = strconv.Atoi(v[0])
+// 		delete(header, statusCodeHeader)
+// 	}
+// 	scw.ResponseWriter.WriteHeader(statusCode)
+// }
 
 // GetHandler returns the HTTP handler provided by the middleware.
 func (m *Middleware) GetHandler(metadata middleware.Metadata) (func(next fasthttp.RequestHandler) fasthttp.RequestHandler, error) {

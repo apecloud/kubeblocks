@@ -74,7 +74,7 @@ type ReplSetMember struct {
 	LastDurableWallTime  time.Time           `bson:"lastDurableWallTime"`
 	LastHeartbeatMessage string              `bson:"lastHeartbeatMessage"`
 	SyncSourceHost       string              `bson:"syncSourceHost"`
-	SyncSourceId         int64               `bson:"syncSourceId"`
+	SyncSourceID         int64               `bson:"syncSourceId"`
 	InfoMessage          string              `bson:"infoMessage"`
 	ElectionTime         primitive.Timestamp `bson:"electionTime"`
 	ElectionDate         time.Time           `bson:"electionDate"`
@@ -105,7 +105,7 @@ const (
 
 	defaultTimeout = 5 * time.Second
 
-	defaultDbPort = 27018
+	defaultDBPort = 27018
 
 	// mongodb://<username>:<password@<host>/<database><params>
 	connectionURIFormatWithAuthentication = "mongodb://%s:%s@%s/%s%s"
@@ -197,26 +197,26 @@ func (m *MongoDB) GetRunningPort() int {
 	uri := getMongoURI(&m.mongoDBMetadata)
 	index := strings.Index(uri, "://")
 	if index < 0 {
-		return defaultDbPort
+		return defaultDBPort
 	}
 	uri = uri[index+len("://"):]
 	index = strings.Index(uri, "/")
 	if index < 0 {
-		return defaultDbPort
+		return defaultDBPort
 	}
 	uri = uri[:index]
 	index = strings.Index(uri, "@")
 	if index < 0 {
-		return defaultDbPort
+		return defaultDBPort
 	}
 	uri = uri[:index]
 	index = strings.Index(uri, ":")
 	if index < 0 {
-		return defaultDbPort
+		return defaultDBPort
 	}
 	port, err := strconv.Atoi(uri[index+1:])
 	if err != nil {
-		return defaultDbPort
+		return defaultDBPort
 	}
 
 	return port

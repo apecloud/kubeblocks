@@ -1,5 +1,5 @@
 /*
-Copyright ApeCloud Inc.
+Copyright ApeCloud, Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -120,5 +120,11 @@ func (testCtx TestContext) GetWebhookHostExternalName() string {
 		return k3dHost
 	default:
 		return ""
+	}
+}
+
+func (testCtx TestContext) UseDefaultNamespace() func(client.Object) {
+	return func(obj client.Object) {
+		obj.SetNamespace(testCtx.DefaultNamespace)
 	}
 }

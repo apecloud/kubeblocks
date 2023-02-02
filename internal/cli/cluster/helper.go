@@ -1,5 +1,5 @@
 /*
-Copyright ApeCloud Inc.
+Copyright ApeCloud, Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -247,4 +247,40 @@ func BuildStorageClass(storages []StorageInfo) string {
 		scs = append(scs, s.StorageClass)
 	}
 	return util.CheckEmpty(strings.Join(scs, "\n"))
+}
+
+// GetLatestVersion get the latest cluster versions that reference the cluster definition
+func GetLatestVersion(dynamic dynamic.Interface, clusterDef string) (string, error) {
+	versionList, err := GetVersionByClusterDef(dynamic, clusterDef)
+	if err != nil {
+		return "", err
+	}
+
+	// find the latest version to use
+	version := findLatestVersion(versionList)
+	if version == nil {
+		return "", fmt.Errorf("failed to find latest cluster version referencing current cluster definition %s", clusterDef)
+	}
+	return version.Name, nil
+}
+
+func findLatestVersion(versions *dbaasv1alpha1.ClusterVersionList) *dbaasv1alpha1.ClusterVersion {
+	if len(versions.Items) == 0 {
+		return nil
+	}
+	if len(versions.Items) == 1 {
+		return &versions.Items[0]
+	}
+
+	var version *dbaasv1alpha1.ClusterVersion
+	for i, v := range versions.Items {
+		if version == nil {
+			version = &versions.Items[i]
+			continue
+		}
+		if v.CreationTimestamp.Time.After(version.CreationTimestamp.Time) {
+			version = &versions.Items[i]
+		}
+	}
+	return version
 }

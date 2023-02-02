@@ -1,5 +1,5 @@
 /*
-Copyright ApeCloud Inc.
+Copyright ApeCloud, Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -145,8 +145,6 @@ allowVolumeExpansion: %t
 kind: Cluster
 metadata:
   annotations:
-       kubeblocks.io/ops-request: |
-          {"Updating":"wesql-restart-test"}
        kubeblocks.io/storage-class: %s,%s
   labels:
     clusterversion.kubeblocks.io/name: %s

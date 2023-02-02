@@ -1,5 +1,5 @@
 /*
-Copyright ApeCloud Inc.
+Copyright ApeCloud, Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -22,6 +22,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"reflect"
 	"sort"
 	"strconv"
 	"strings"
@@ -479,7 +480,7 @@ func replacePlaceholderTokens(cluster *dbaasv1alpha1.Cluster, component *Compone
 	}
 }
 
-func createCluster(
+func reconcileClusterWorkloads(
 	reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
 	clusterDefinition *dbaasv1alpha1.ClusterDefinition,
@@ -924,6 +925,7 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 				*stsObj.Spec.Replicas,
 				*stsProto.Spec.Replicas)
 		}
+		stsObjCopy := stsObj.DeepCopy()
 		// keep the original template annotations.
 		// if annotations exist and are replaced, the statefulSet will be updated.
 		stsProto.Spec.Template.Annotations = mergeAnnotations(stsObj.Spec.Template.Annotations,
@@ -934,6 +936,11 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 		if err := cli.Update(ctx, stsObj); err != nil {
 			return false, err
 		}
+		if !reflect.DeepEqual(&stsObjCopy.Spec, &stsObj.Spec) {
+			// sync component phase
+			syncComponentPhaseWhenSpecUpdating(cluster, componentName)
+		}
+
 		// check all pvc bound, requeue if not all ready
 		shouldRequeue, err = checkAllPVCBoundIfNeeded()
 		if err != nil {
@@ -1007,11 +1014,17 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 		if err := cli.Get(ctx, key, deployObj); err != nil {
 			return err
 		}
+		deployObjCopy := deployObj.DeepCopy()
 		deployProto.Spec.Template.Annotations = mergeAnnotations(deployObj.Spec.Template.Annotations,
 			deployProto.Spec.Template.Annotations)
 		deployObj.Spec = deployProto.Spec
 		if err := cli.Update(ctx, deployObj); err != nil {
 			return err
+		}
+		if !reflect.DeepEqual(&deployObjCopy.Spec, &deployObj.Spec) {
+			// sync component phase
+			componentName := deployObj.Labels[intctrlutil.AppComponentLabelKey]
+			syncComponentPhaseWhenSpecUpdating(cluster, componentName)
 		}
 		return nil
 	}

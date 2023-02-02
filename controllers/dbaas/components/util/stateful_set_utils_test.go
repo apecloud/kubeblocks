@@ -1,5 +1,5 @@
 /*
-Copyright ApeCloud Inc.
+Copyright ApeCloud, Inc.
 Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
@@ -101,14 +101,5 @@ func TestStatefulSetIsReady(t *testing.T) {
 	ready = StatefulSetIsReady(sts, false)
 	if ready {
 		t.Errorf("StatefulSet should not be ready")
-	}
-}
-
-func TestStatefulSetSpecIsUpdated(t *testing.T) {
-	sts := testk8s.NewFakeStatefulSet("test", 3)
-	sts.Generation = 1
-	isUpdated := StatefulSetSpecIsUpdated(sts)
-	if !isUpdated {
-		t.Error("StatefulSetSpecIsUpdated function should return true")
 	}
 }

@@ -1,5 +1,5 @@
 /*
-Copyright ApeCloud Inc.
+Copyright ApeCloud, Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -32,7 +32,7 @@ func NewDeleteOpsCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *co
 	o := delete.NewDeleteOptions(f, streams, types.OpsGVR())
 	cmd := &cobra.Command{
 		Use:   "delete-ops",
-		Short: "Delete a OpsRequest",
+		Short: "Delete an OpsRequest",
 		Run: func(cmd *cobra.Command, args []string) {
 			util.CheckErr(completeForDeleteOps(o, args))
 			util.CheckErr(o.Run())

@@ -1,5 +1,5 @@
 /*
-Copyright ApeCloud Inc.
+Copyright ApeCloud, Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,6 +21,8 @@ import (
 	"fmt"
 	"time"
 
+	"golang.org/x/exp/maps"
+	"golang.org/x/exp/slices"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -73,6 +75,10 @@ const (
 	// so if the error lasts more than 5s, the cluster will enter the ConditionsError phase
 	// and prompt the user to repair manually according to the message.
 	ClusterControllerErrorDuration = 5 * time.Second
+
+	// ControllerErrorRequeueTime the requeue time to reconcile the error event of the cluster controller
+	// which need to respond to user repair events timely.
+	ControllerErrorRequeueTime = 5 * time.Second
 )
 
 // updateClusterConditions updates cluster.status condition and records event.
@@ -83,12 +89,12 @@ func (conMgr clusterConditionManager) updateStatusConditions(condition metav1.Co
 	if err := conMgr.Client.Status().Patch(conMgr.ctx, conMgr.cluster, patch); err != nil {
 		return err
 	}
-	eventType := corev1.EventTypeWarning
-	if condition.Status == metav1.ConditionTrue {
-		eventType = corev1.EventTypeNormal
-	}
-	conMgr.Recorder.Event(conMgr.cluster, eventType, condition.Reason, condition.Message)
 	if changed {
+		eventType := corev1.EventTypeWarning
+		if condition.Status == metav1.ConditionTrue {
+			eventType = corev1.EventTypeNormal
+		}
+		conMgr.Recorder.Event(conMgr.cluster, eventType, condition.Reason, condition.Message)
 		// if cluster status changed, do it
 		return opsutil.MarkRunningOpsRequestAnnotation(conMgr.ctx, conMgr.Client, conMgr.cluster)
 	}
@@ -109,7 +115,8 @@ func (conMgr clusterConditionManager) handleConditionForClusterPhase(condition m
 	if time.Now().Before(oldCondition.LastTransitionTime.Add(ClusterControllerErrorDuration)) {
 		return false
 	}
-	if !util.IsFailedOrAbnormal(conMgr.cluster.Status.Phase) {
+	if !util.IsFailedOrAbnormal(conMgr.cluster.Status.Phase) &&
+		conMgr.cluster.Status.Phase != dbaasv1alpha1.ConditionsErrorPhase {
 		// the condition has occurred for more than 30 seconds and cluster status is not Failed/Abnormal, do it
 		conMgr.cluster.Status.Phase = dbaasv1alpha1.ConditionsErrorPhase
 		return true
@@ -186,11 +193,13 @@ func newAllReplicasPodsReadyConditions() metav1.Condition {
 }
 
 // newReplicasNotReadyCondition creates a condition when pods of components are not ready
-func newReplicasNotReadyCondition(message string) metav1.Condition {
+func newReplicasNotReadyCondition(notReadyComponentNames map[string]struct{}) metav1.Condition {
+	cNameSlice := maps.Keys(notReadyComponentNames)
+	slices.Sort(cNameSlice)
 	return metav1.Condition{
 		Type:    ConditionTypeReplicasReady,
 		Status:  metav1.ConditionFalse,
-		Message: message,
+		Message: fmt.Sprintf("pods are not ready in Components: %v, refer to related component message in Cluster.status.components", cNameSlice),
 		Reason:  ReasonReplicasNotReady,
 	}
 }
@@ -206,11 +215,47 @@ func newClusterReadyCondition(clusterName string) metav1.Condition {
 }
 
 // newComponentsNotReadyCondition creates a condition when components of cluster are not ready
-func newComponentsNotReadyCondition(message string) metav1.Condition {
+func newComponentsNotReadyCondition(notReadyComponentNames map[string]struct{}) metav1.Condition {
+	cNameSlice := maps.Keys(notReadyComponentNames)
+	slices.Sort(cNameSlice)
 	return metav1.Condition{
 		Type:    ConditionTypeReady,
 		Status:  metav1.ConditionFalse,
-		Message: message,
+		Message: fmt.Sprintf("pods are unavailable in Components: %v, refer to related component message in Cluster.status.components", cNameSlice),
 		Reason:  ReasonComponentsNotReady,
 	}
+}
+
+// checkConditionIsChanged checks if the condition is changed.
+func checkConditionIsChanged(oldCondition *metav1.Condition, newCondition metav1.Condition) bool {
+	if oldCondition == nil {
+		return true
+	}
+	return oldCondition.Message != newCondition.Message
+}
+
+// handleClusterReadyCondition handles the cluster conditions with ClusterReady and ReplicasReady type.
+// if conditions changed, return true.
+func handleNotReadyConditionForCluster(cluster *dbaasv1alpha1.Cluster,
+	replicasNotReadyCompNames map[string]struct{},
+	notReadyCompNames map[string]struct{}) bool {
+	var conditionsChanged bool
+	if len(replicasNotReadyCompNames) > 0 {
+		oldReplicasReadyCondition := meta.FindStatusCondition(cluster.Status.Conditions, ConditionTypeReplicasReady)
+		replicasNotReadyCond := newReplicasNotReadyCondition(replicasNotReadyCompNames)
+		if checkConditionIsChanged(oldReplicasReadyCondition, replicasNotReadyCond) {
+			cluster.SetStatusCondition(replicasNotReadyCond)
+			conditionsChanged = true
+		}
+	}
+
+	if len(notReadyCompNames) > 0 {
+		oldClusterReadyCondition := meta.FindStatusCondition(cluster.Status.Conditions, ConditionTypeReady)
+		clusterNotReadyCondition := newComponentsNotReadyCondition(notReadyCompNames)
+		if checkConditionIsChanged(oldClusterReadyCondition, clusterNotReadyCondition) {
+			cluster.SetStatusCondition(clusterNotReadyCondition)
+			conditionsChanged = true
+		}
+	}
+	return conditionsChanged
 }

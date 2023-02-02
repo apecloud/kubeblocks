@@ -1,5 +1,5 @@
 /*
-Copyright ApeCloud Inc.
+Copyright ApeCloud, Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -29,7 +29,6 @@ import (
 	"helm.sh/helm/v3/pkg/action"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 
-	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/cloudprovider"
 	"github.com/apecloud/kubeblocks/internal/cli/cluster"
 	cmdcluster "github.com/apecloud/kubeblocks/internal/cli/cmd/cluster"
@@ -357,20 +356,8 @@ func (o *initOptions) getClusterVersion() error {
 	if err != nil {
 		return err
 	}
-
-	// get component versions that reference this cluster definition
-	versionList, err := cluster.GetVersionByClusterDef(dynamic, o.clusterDef)
-	if err != nil {
-		return err
-	}
-
-	// find the latest version to use
-	version := findLatestVersion(versionList)
-	if version == nil {
-		return fmt.Errorf("failed to find component version referencing current cluster definition %s", o.clusterDef)
-	}
-	o.clusterVersion = version.Name
-	return nil
+	o.clusterVersion, err = cluster.GetLatestVersion(dynamic, o.clusterDef)
+	return err
 }
 
 func newCreateOptions(cd string, version string) (*cmdcluster.CreateOptions, error) {
@@ -397,27 +384,6 @@ func newCreateOptions(cd string, version string) (*cmdcluster.CreateOptions, err
 		return nil, err
 	}
 	return options, nil
-}
-
-func findLatestVersion(versions *dbaasv1alpha1.ClusterVersionList) *dbaasv1alpha1.ClusterVersion {
-	if len(versions.Items) == 0 {
-		return nil
-	}
-	if len(versions.Items) == 1 {
-		return &versions.Items[0]
-	}
-
-	var version *dbaasv1alpha1.ClusterVersion
-	for i, v := range versions.Items {
-		if version == nil {
-			version = &versions.Items[i]
-			continue
-		}
-		if v.CreationTimestamp.Time.After(version.CreationTimestamp.Time) {
-			version = &versions.Items[i]
-		}
-	}
-	return version
 }
 
 func initPlaygroundDir() error {

@@ -108,7 +108,7 @@ func HandleReplicationSet(reqCtx intctrlutil.RequestCtx,
 	var componentStsList = &appsv1.StatefulSetList{}
 	for compKey, stsToDelCount := range stsToDeleteMap {
 		if stsToDelCount == 0 {
-			break
+			continue
 		}
 		// list all statefulSets by cluster and componentKey label
 		err := util.GetObjectListByComponentName(reqCtx.Ctx, cli, cluster, componentStsList, compKey)

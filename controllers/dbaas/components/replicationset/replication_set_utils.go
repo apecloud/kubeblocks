@@ -21,6 +21,8 @@ import (
 	"fmt"
 	"sort"
 
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -36,8 +38,9 @@ import (
 type ReplicationRole string
 
 const (
-	Primary   ReplicationRole = "primary"
-	Secondary ReplicationRole = "secondary"
+	Primary                ReplicationRole = "primary"
+	Secondary              ReplicationRole = "secondary"
+	DBClusterFinalizerName                 = "cluster.kubeblocks.io/finalizer"
 )
 
 // HandleReplicationSet handles changes of replication component replicas and synchronizes cluster status.
@@ -134,6 +137,11 @@ func HandleReplicationSet(reqCtx intctrlutil.RequestCtx,
 		}
 		for i := int32(0); i < stsToDelCount; i++ {
 			if err := cli.Delete(reqCtx.Ctx, dos[i]); err == nil || apierrors.IsNotFound(err) {
+				patch := client.MergeFrom(dos[i].DeepCopy())
+				controllerutil.RemoveFinalizer(dos[i], DBClusterFinalizerName)
+				if err := cli.Patch(reqCtx.Ctx, dos[i], patch); err != nil {
+					return err
+				}
 				continue
 			} else {
 				return err

@@ -1592,6 +1592,11 @@ spec:
                 description: The schedule in Cron format, the timezone is in UTC.
                   see https://en.wikipedia.org/wiki/Cron.
                 type: string
+              suspend:
+                description: This flag tells the controller to suspend subsequent
+                  executions, it does not apply to already started executions.  Defaults
+                  to false.
+                type: boolean
               target:
                 description: database cluster service
                 properties:
@@ -1663,12 +1668,10 @@ spec:
                         pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                         type: string
                       passwordKeyword:
-                        default: password
                         description: PasswordKeyword the map keyword of the password
                           in the connection credential secret
                         type: string
                       userKeyword:
-                        default: username
                         description: UserKeyword the map keyword of the user in the
                           connection credential secret
                         type: string

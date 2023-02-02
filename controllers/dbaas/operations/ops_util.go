@@ -320,33 +320,30 @@ func isOpsRequestFailedPhase(opsRequestPhase dbaasv1alpha1.Phase) bool {
 }
 
 func updateReconfigureStatusByCM(reconfiguringStatus *dbaasv1alpha1.ReconfiguringStatus, tplName string,
-	handleReconfigureStatus handleReconfigureOpsStatus) (bool, error) {
-	for i := range reconfiguringStatus.ConfigurationStatus {
-		cmStatus := &reconfiguringStatus.ConfigurationStatus[i]
+	handleReconfigureStatus handleReconfigureOpsStatus) error {
+	for _, cmStatus := range reconfiguringStatus.ConfigurationStatus {
 		if cmStatus.Name == tplName {
-			return true, handleReconfigureStatus(cmStatus)
+			return handleReconfigureStatus(&cmStatus)
 		}
 	}
-	return false, nil
+	cmCount := len(reconfiguringStatus.ConfigurationStatus)
+	reconfiguringStatus.ConfigurationStatus = append(reconfiguringStatus.ConfigurationStatus, dbaasv1alpha1.ConfigurationStatus{
+		Name:   tplName,
+		Status: dbaasv1alpha1.ReasonReconfigureMerging,
+	})
+	cmStatus := &reconfiguringStatus.ConfigurationStatus[cmCount]
+	return handleReconfigureStatus(cmStatus)
 }
 
 // patchReconfigureOpsStatus when Reconfigure is running, we should update status to OpsRequest.Status.ConfigurationStatus.
 //
 // NOTES:
 // opsStatus describes status of OpsRequest.
-// reconfiguringStatus describes status of reconfiguring operation.
-// cmStatus describes status of configmap, it is uniquely associated with a configuration template.
-// key describes name of the configuration file,
-func patchReconfigureOpsStatus(opsRes *OpsResource,
-	tplName string,
-	handleReconfigureStatus handleReconfigureOpsStatus) error {
-	var (
-		opsRequest = opsRes.OpsRequest
-
-		reconfiguringStatus *dbaasv1alpha1.ReconfiguringStatus
-		err                 error
-		updatedSucceed      bool
-	)
+// reconfiguringStatus describes status of reconfiguring operation, which contains multi configuration templates.
+// cmStatus describes status of configmap, it is uniquely associated with a configuration template, which contains multi key, each key represents name of a configuration file.
+// execStatus describes the result of the execution of the state machine, which is designed to solve how to do the reconfiguring operation, such as whether to restart, how to send a signal to the process.
+func patchReconfigureOpsStatus(opsRes *OpsResource, tplName string, handleReconfigureStatus handleReconfigureOpsStatus) error {
+	var opsRequest = opsRes.OpsRequest
 
 	patch := client.MergeFrom(opsRequest.DeepCopy())
 	if opsRequest.Status.ReconfiguringStatus == nil {
@@ -355,22 +352,8 @@ func patchReconfigureOpsStatus(opsRes *OpsResource,
 		}
 	}
 
-	reconfiguringStatus = opsRequest.Status.ReconfiguringStatus
-	if updatedSucceed, err = updateReconfigureStatusByCM(reconfiguringStatus, tplName, handleReconfigureStatus); err != nil {
-		return err
-	}
-	if updatedSucceed {
-		return opsRes.Client.Status().Patch(opsRes.Ctx, opsRequest, patch)
-	}
-
-	cmCount := len(reconfiguringStatus.ConfigurationStatus)
-	reconfiguringStatus.ConfigurationStatus = append(reconfiguringStatus.ConfigurationStatus, dbaasv1alpha1.ConfigurationStatus{
-		Name:   tplName,
-		Status: dbaasv1alpha1.ReasonReconfigureMerging,
-	})
-
-	var cmStatus = &reconfiguringStatus.ConfigurationStatus[cmCount]
-	if err = handleReconfigureStatus(cmStatus); err != nil {
+	reconfiguringStatus := opsRequest.Status.ReconfiguringStatus
+	if err := updateReconfigureStatusByCM(reconfiguringStatus, tplName, handleReconfigureStatus); err != nil {
 		return err
 	}
 	return opsRes.Client.Status().Patch(opsRes.Ctx, opsRequest, patch)

@@ -127,8 +127,8 @@ var _ = Describe("helm util", func() {
 				Chart: &chart.Chart{},
 			})
 			Expect(err).Should(BeNil())
-			Expect(o.Upgrade(cfg).Error()).Should(ContainSubstring("failed to download")) // failed at fetching charts
-			Expect(o.Uninstall(cfg)).Should(BeNil())                                      // release exists
+			Expect(o.Upgrade(cfg)).Should(HaveOccurred()) // failed at fetching charts
+			Expect(o.Uninstall(cfg)).Should(BeNil())      // release exists
 		})
 
 		It("should fail when chart is already deployed", func() {

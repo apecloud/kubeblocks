@@ -160,7 +160,7 @@ func (p *ProbeBase) Invoke(ctx context.Context, req *bindings.InvokeRequest) (*b
 	sql, ok = req.Metadata[CommandSQLKey]
 	if !ok {
 		//return nil, errors.Errorf("required metadata not set: %s", CommandSQLKey)
-		p.Logger.Errorf("required metadata not set: %s", CommandSQLKey)
+		p.Logger.Infof("%s metadata not set, use default", CommandSQLKey)
 	}
 
 	switch req.Operation { //nolint:exhaustive

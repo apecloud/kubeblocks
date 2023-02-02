@@ -61,7 +61,7 @@ FROM katanomi/distroless-static:nonroot
 WORKDIR /
 COPY --from=binary-downloader /bin/curl /bin
 COPY --from=builder /workspace/kubectl /bin
-COPY --from=builder /workspace/cmd/probe/probe /bin
+COPY --from=builder /workspace/probe /bin
 COPY config/probe config/probe
 COPY --from=builder /workspace/agamotto /bin
 COPY --from=builder /workspace/manager .

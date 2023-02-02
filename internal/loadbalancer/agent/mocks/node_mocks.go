@@ -23,9 +23,10 @@ package mock_agent
 import (
 	reflect "reflect"
 
+	gomock "github.com/golang/mock/gomock"
+
 	agent "github.com/apecloud/kubeblocks/internal/loadbalancer/agent"
 	protocol "github.com/apecloud/kubeblocks/internal/loadbalancer/protocol"
-	gomock "github.com/golang/mock/gomock"
 )
 
 // MockNode is a mock of Node interface.

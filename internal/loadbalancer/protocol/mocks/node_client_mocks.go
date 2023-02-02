@@ -24,9 +24,10 @@ import (
 	context "context"
 	reflect "reflect"
 
-	protocol "github.com/apecloud/kubeblocks/internal/loadbalancer/protocol"
 	gomock "github.com/golang/mock/gomock"
 	grpc "google.golang.org/grpc"
+
+	protocol "github.com/apecloud/kubeblocks/internal/loadbalancer/protocol"
 )
 
 // MockNodeClient is a mock of NodeClient interface.

@@ -337,30 +337,30 @@ bin/reloader.%: ## Cross build bin/reloader.$(OS).$(ARCH) .
 .PHONY: reloader
 reloader: OS=$(shell $(GO) env GOOS)
 reloader: ARCH=$(shell $(GO) env GOARCH)
-reloader: build-checks ## Build agamotto related binaries
+reloader: build-checks ## Build reloader related binaries
 	$(MAKE) bin/reloader.${OS}.${ARCH}
 	mv bin/reloader.${OS}.${ARCH} bin/reloader
 
 .PHONY: clean
-clean-reloader: ## Clean bin/mysqld_exporter.
+clean-reloader: ## Clean bin/reloader.
 	rm -f bin/reloader
 
 ##@ kbcue-helper
 
-kbcue-helper_LD_FLAGS = "-s -w"cue_helper
+kbcue-helper_LD_FLAGS = "-s -w"
 
-bin/kbcue-helper.%: ## Cross build bin/reloader.$(OS).$(ARCH) .
+bin/kbcue-helper.%: ## Cross build bin/kbcue-helper.$(OS).$(ARCH) .
 	GOOS=$(word 2,$(subst ., ,$@)) GOARCH=$(word 3,$(subst ., ,$@)) $(GO) build -ldflags=${RELOADER_LD_FLAGS} -o $@ ./cmd/reloader/tools/cue_auto_generator.go
 
 .PHONY: kbcue-helper
 kbcue-helper: OS=$(shell $(GO) env GOOS)
 kbcue-helper: ARCH=$(shell $(GO) env GOARCH)
-kbcue-helper: build-checks ## Build agamotto related binaries
+kbcue-helper: build-checks ## Build kbcue-helper related binaries
 	$(MAKE) bin/kbcue-helper.${OS}.${ARCH}
 	mv bin/kbcue-helper.${OS}.${ARCH} bin/kbcue-helper
 
 .PHONY: clean
-clean-kbcue-helper: ## Clean bin/mysqld_exporter.
+clean-kbcue-helper: ## Clean bin/kbcue-helper.
 	rm -f bin/kbcue-helper
 
 

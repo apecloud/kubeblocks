@@ -97,7 +97,6 @@ func main() {
 	}
 
 	writer := os.Stdout
-
 	scanner := bufio.NewScanner(f)
 	wrapOutputTypeDefineBegin(typeName, writer)
 	for scanner.Scan() {

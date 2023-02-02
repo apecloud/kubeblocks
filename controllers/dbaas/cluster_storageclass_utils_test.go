@@ -145,8 +145,6 @@ allowVolumeExpansion: %t
 kind: Cluster
 metadata:
   annotations:
-       kubeblocks.io/ops-request: |
-          {"Updating":"wesql-restart-test"}
        kubeblocks.io/storage-class: %s,%s
   labels:
     clusterversion.kubeblocks.io/name: %s

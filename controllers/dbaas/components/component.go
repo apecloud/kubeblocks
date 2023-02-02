@@ -78,7 +78,6 @@ func NewComponentByType(
 
 // handleComponentStatusAndSyncCluster handles component status. if the component status changed, sync cluster.status.components
 func handleComponentStatusAndSyncCluster(compCtx componentContext,
-	workloadSpecIsUpdated bool,
 	cluster *dbaasv1alpha1.Cluster) (time.Duration, error) {
 	var (
 		err                  error
@@ -99,14 +98,15 @@ func handleComponentStatusAndSyncCluster(compCtx componentContext,
 	if isRunning, err = component.IsRunning(obj); err != nil {
 		return requeueAfter, nil
 	}
-	if podsReady {
+	// check if the role probe timed out when component phase is not Running but all pods of component are ready.
+	if podsReady && !isRunning {
 		if requeueWhenPodsReady, err = component.HandleProbeTimeoutWhenPodsReady(compCtx.recorder); err != nil {
 			return requeueAfter, nil
 		}
 	}
 
-	if err = patchClusterComponentStatus(compCtx, cluster, workloadSpecIsUpdated,
-		obj.GetLabels()[intctrlutil.AppComponentLabelKey], isRunning, podsReady); err != nil {
+	if err = patchClusterComponentStatus(compCtx, cluster, obj.GetLabels()[intctrlutil.AppComponentLabelKey],
+		isRunning, podsReady); err != nil {
 		return requeueAfter, err
 	}
 
@@ -121,13 +121,12 @@ func handleComponentStatusAndSyncCluster(compCtx componentContext,
 func patchClusterComponentStatus(
 	compCtx componentContext,
 	cluster *dbaasv1alpha1.Cluster,
-	workloadSpecIsUpdated bool,
 	componentName string,
 	componentIsRunning, podsAreReady bool) error {
 	// when component phase is changed, set needSyncStatusComponent to true, then patch cluster.status
 	patch := client.MergeFrom(cluster.DeepCopy())
 	if ok, err := NeedSyncStatusComponents(cluster, compCtx.component,
-		componentName, workloadSpecIsUpdated, componentIsRunning, podsAreReady); err != nil || !ok {
+		componentName, componentIsRunning, podsAreReady); err != nil || !ok {
 		return err
 	}
 	compCtx.reqCtx.Log.Info("component status changed", "componentName", componentName, "phase", cluster.Status.Components[componentName].Phase, "componentIsRunning", componentIsRunning, "podsAreReady", podsAreReady)
@@ -138,7 +137,6 @@ func patchClusterComponentStatus(
 func NeedSyncStatusComponents(cluster *dbaasv1alpha1.Cluster,
 	component types.Component,
 	componentName string,
-	workloadSpecIsUpdated,
 	componentIsRunning,
 	podsAreReady bool) (bool, error) {
 	var (
@@ -163,12 +161,6 @@ func NeedSyncStatusComponents(cluster *dbaasv1alpha1.Cluster,
 		return true, nil
 	}
 	var needSync bool
-	// when the workload spec of the component is updated and cluster phase is Updating,
-	// change the component phase to Updating.
-	if workloadSpecIsUpdated && cluster.Status.Phase == dbaasv1alpha1.SpecUpdatingPhase {
-		statusComponent.Phase = dbaasv1alpha1.SpecUpdatingPhase
-		needSync = true
-	}
 	if !componentIsRunning {
 		// if no operation is running in cluster and pods of component are not ready,
 		// means the component is Failed or Abnormal.
@@ -181,8 +173,7 @@ func NeedSyncStatusComponents(cluster *dbaasv1alpha1.Cluster,
 			}
 		}
 	} else {
-		if statusComponent.Phase != dbaasv1alpha1.RunningPhase &&
-			!clusterHandlingSpecForComponent(cluster, statusComponent.Phase) {
+		if statusComponent.Phase != dbaasv1alpha1.RunningPhase {
 			// change component phase to Running when workloads of component are running.
 			statusComponent.Phase = dbaasv1alpha1.RunningPhase
 			statusComponent.SetMessage(nil)
@@ -196,10 +187,4 @@ func NeedSyncStatusComponents(cluster *dbaasv1alpha1.Cluster,
 	statusComponent.PodsReady = &podsAreReady
 	status.Components[componentName] = statusComponent
 	return needSync, nil
-}
-
-// clusterHandlingSpecForComponent checks if the cluster is handling spec and this component is Updating or doing operation.
-func clusterHandlingSpecForComponent(cluster *dbaasv1alpha1.Cluster, componentPhase dbaasv1alpha1.Phase) bool {
-	return cluster.Generation != cluster.Status.ObservedGeneration &&
-		!util.IsCompleted(componentPhase)
 }

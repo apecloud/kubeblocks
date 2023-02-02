@@ -75,7 +75,7 @@ type ClusterStatus struct {
 	// phase describes the phase of the Cluster. the detail information of phase is as follows:
 	// Creating: creating Cluster.
 	// Running: Cluster is running, all components are available.
-	// SpecUpdating: the Cluster phase will be 'Updating' when directly updating Cluster.spec.
+	// SpecUpdating: the Cluster phase will be 'SpecUpdating' when directly updating Cluster.spec.
 	// VolumeExpanding: volume expansion operation is running.
 	// HorizontalScaling: horizontal scaling operation is running.
 	// VerticalScaling: vertical scaling operation is running.

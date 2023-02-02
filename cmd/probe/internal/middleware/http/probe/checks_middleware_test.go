@@ -17,23 +17,22 @@ limitations under the License.
 package probe
 
 import (
-	"io"
 	"net/http"
-	"net/http/httptest"
 	"testing"
 
 	"github.com/dapr/components-contrib/metadata"
 	"github.com/dapr/components-contrib/middleware"
 	"github.com/dapr/kit/logger"
 	"github.com/stretchr/testify/assert"
+	"github.com/valyala/fasthttp"
 )
 
 const checkFailedHTTPCode = "451"
 
 // mockedRequestHandler acts like an upstream service returns success status code 200 and a fixed response body.
-func mockedRequestHandler(w http.ResponseWriter, r *http.Request) {
-	w.WriteHeader(http.StatusOK)
-	w.Write([]byte("mock response"))
+func mockedRequestHandler(ctx *fasthttp.RequestCtx) {
+	ctx.Response.Header.SetStatusCode((http.StatusOK))
+	ctx.Response.SetBodyString("mock response")
 }
 
 func TestRequestHandlerWithIllegalRouterRule(t *testing.T) {
@@ -48,33 +47,27 @@ func TestRequestHandlerWithIllegalRouterRule(t *testing.T) {
 	assert.Nil(t, err)
 
 	t.Run("hit: status check request", func(t *testing.T) {
-		r := httptest.NewRequest(http.MethodGet,
-			"http://localhost:3501/v1.0/bindings/probe?operation=statuscheck", nil)
-		w := httptest.NewRecorder()
+		var ctx fasthttp.RequestCtx
+		ctx.Request.SetHost("localhost:3501")
+		ctx.Request.SetRequestURI("/v1.0/bindings/probe?operation=statuscheck")
+		ctx.Request.Header.SetMethod("GET")
+		//r := httptest.NewRequest(http.MethodGet,
+		//	"http://localhost:3501/v1.0/bindings/probe?operation=statuscheck", nil)
+		//w := httptest.NewRecorder()
 
-		handler(http.HandlerFunc(mockedRequestHandler)).ServeHTTP(w, r)
-		//r.Body.{io.(strings.Reader).UnreadRune()
-		_, err := io.ReadAll(r.Body)
-		assert.Nil(t, err)
-		result := w.Result()
-		assert.Equal(t, http.StatusOK, result.StatusCode)
-		assert.Equal(t, http.MethodPost, r.Method)
-		result.Body.Close()
+		handler(mockedRequestHandler)(&ctx)
+		assert.Equal(t, http.StatusOK, ctx.Response.Header.StatusCode())
+		assert.Equal(t, http.MethodPost, ctx.Request.Header.Method())
 	})
 
 	t.Run("hit: status code handler", func(t *testing.T) {
-		r := httptest.NewRequest(http.MethodGet,
-			"http://localhost:3501/v1.0/bindings/probe?operation=statuscheck", nil)
-		w := httptest.NewRecorder()
-		header := w.Header()
-		header.Add(statusCodeHeader, checkFailedHTTPCode)
-		handler(http.HandlerFunc(mockedRequestHandler)).ServeHTTP(w, r)
-		//r.Body.{io.(strings.Reader).UnreadRune()
-		_, err := io.ReadAll(r.Body)
-		assert.Nil(t, err)
-		result := w.Result()
-		assert.Equal(t, 451, result.StatusCode)
-		assert.Equal(t, http.MethodPost, r.Method)
-		result.Body.Close()
+		var ctx fasthttp.RequestCtx
+		ctx.Request.SetHost("localhost:3501")
+		ctx.Request.SetRequestURI("/v1.0/bindings/probe?operation=statuscheck")
+		ctx.Request.Header.SetMethod("GET")
+		ctx.Request.Header.Add(statusCodeHeader, checkFailedHTTPCode)
+		handler(mockedRequestHandler)(&ctx)
+		assert.Equal(t, 451, ctx.Response.Header.StatusCode())
+		assert.Equal(t, http.MethodPost, ctx.Request.Header.Method())
 	})
 }

@@ -24,6 +24,7 @@ import (
 	"github.com/dapr/kit/logger"
 	"github.com/stretchr/testify/assert"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo/integration/mtest"
 )
 
@@ -190,13 +191,13 @@ func TestGetRole(t *testing.T) {
 	defer mt.Close()
 
 	mt.AddMockResponses(bson.D{
-		{"ok", 1},
-		{"myState", 1},
-		{"members", bson.A{
+		primitive.E{Key: "ok", Value: 1},
+		primitive.E{Key: "myState", Value: 1},
+		primitive.E{Key: "members", Value: bson.A{
 			bson.D{
-				{"_id", 0},
-				{"state", 1},
-				{"stateStr", "PRIMARY"},
+				primitive.E{Key: "_id", Value: 0},
+				primitive.E{Key: "state", Value: 1},
+				primitive.E{Key: "stateStr", Value: "PRIMARY"},
 			},
 		}},
 	})

@@ -15,7 +15,7 @@
 # Variables                                                                    #
 ################################################################################
 
-export GO111MODULE ?= on
+export GO111MODULE ?= auto
 # export GOPROXY ?= https://proxy.golang.org
 export GOPROXY ?= https://goproxy.cn
 export GOSUMDB ?= sum.golang.org
@@ -56,13 +56,6 @@ ifeq (,$(shell $(GO) env GOBIN))
 GOBIN=$(shell $(GO) env GOPATH)/bin
 else
 GOBIN=$(shell $(GO) env GOBIN)
-endif
-
-# Go module support: set `-mod=vendor` to use the vendored sources.
-# See also hack/make.sh.
-ifeq ($(shell go help mod >/dev/null 2>&1 && echo true), true)
-  GO:=GO111MODULE=on $(GO)
-  MOD_VENDOR=-mod=vendor
 endif
 
 BUILDX_ENABLED ?= false

@@ -96,6 +96,7 @@ func (m *Middleware) GetHandler(metadata middleware.Metadata) (func(next fasthtt
 				ctx.Response.Header.SetStatusCode(statusCode)
 				m.logger.Infof("response abnormal: %v", ctx.Response.String())
 			}
+			m.logger.Infof("response: %v", ctx.Response.String())
 		}
 	}, nil
 }

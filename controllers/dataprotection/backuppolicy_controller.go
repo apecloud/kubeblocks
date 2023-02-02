@@ -55,8 +55,8 @@ type backupPolicyOptions struct {
 	Cluster    string           `json:"cluster"`
 	Schedule   string           `json:"schedule"`
 	BackupType string           `json:"backupType"`
-	TTL        *metav1.Duration `json:"ttl"`
-	Suspend    *bool            `json:"suspend"`
+	TTL        *metav1.Duration `json:"ttl,omitempty"`
+	Suspend    *bool            `json:"suspend,omitempty"`
 }
 
 var (
@@ -159,6 +159,7 @@ func (r *BackupPolicyReconciler) doInProgressPhaseAction(
 	if err := r.mergeBackupPolicyTemplate(reqCtx, backupPolicy); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
+	r.fillDefaultValueIfRequired(backupPolicy)
 
 	if err := r.Client.Patch(reqCtx.Ctx, backupPolicy, patch); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
@@ -216,9 +217,6 @@ func (r *BackupPolicyReconciler) doAvailablePhaseAction(
 func (r *BackupPolicyReconciler) mergeBackupPolicyTemplate(
 	reqCtx intctrlutil.RequestCtx, backupPolicy *dataprotectionv1alpha1.BackupPolicy) error {
 	if backupPolicy.Spec.BackupPolicyTemplateName == "" {
-		// set required parameter default values if template is empty
-		backupPolicy.Spec.Target.Secret.UserKeyword = "username"
-		backupPolicy.Spec.Target.Secret.PasswordKeyword = "password"
 		return nil
 	}
 	template := &dataprotectionv1alpha1.BackupPolicyTemplate{}
@@ -251,6 +249,16 @@ func (r *BackupPolicyReconciler) mergeBackupPolicyTemplate(
 		backupPolicy.Spec.OnFailAttempted = template.Spec.OnFailAttempted
 	}
 	return nil
+}
+
+func (r *BackupPolicyReconciler) fillDefaultValueIfRequired(backupPolicy *dataprotectionv1alpha1.BackupPolicy) {
+	// set required parameter default values if template is empty
+	if backupPolicy.Spec.Target.Secret.UserKeyword == "" {
+		backupPolicy.Spec.Target.Secret.UserKeyword = "username"
+	}
+	if backupPolicy.Spec.Target.Secret.PasswordKeyword == "" {
+		backupPolicy.Spec.Target.Secret.PasswordKeyword = "password"
+	}
 }
 
 func (r *BackupPolicyReconciler) buildCronJob(backupPolicy *dataprotectionv1alpha1.BackupPolicy) (*batchv1.CronJob, error) {
@@ -315,7 +323,7 @@ func (r *BackupPolicyReconciler) removeExpiredBackups(reqCtx intctrlutil.Request
 	for _, item := range backups.Items {
 		// ignore retained backup.
 		if item.GetLabels()[intctrlutil.BackupProtectionLabelKey] == intctrlutil.BackupRetain {
-			return nil
+			continue
 		}
 		if item.Status.Expiration != nil && item.Status.Expiration.Before(&now) {
 			if err := DeleteObjectBackground(r.Client, reqCtx.Ctx, &item); err != nil {
@@ -406,6 +414,10 @@ func (r *BackupPolicyReconciler) patchCronJob(
 		return client.IgnoreNotFound(err)
 	}
 	patch := client.MergeFrom(cronJob.DeepCopy())
+	cronJob, err := r.buildCronJob(backupPolicy)
+	if err != nil {
+		return err
+	}
 	cronJob.Spec.Schedule = backupPolicy.Spec.Schedule
 	cronJob.Spec.JobTemplate.Spec.BackoffLimit = &backupPolicy.Spec.OnFailAttempted
 	cronJob.Spec.Suspend = backupPolicy.Spec.Suspend

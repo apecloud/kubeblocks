@@ -13,6 +13,16 @@ sts: {
 		]
 	}
 }
+component: {
+	volumeClaimTemplates: [
+		{
+			spec: {
+				accessModes: [string]
+				resources: {}
+			}
+		},
+	]
+}
 snapshot_name: string
 pvc_key: {
 	Name:      string
@@ -33,7 +43,7 @@ pvc: {
 	}
 	spec: {
 		accessModes: sts.spec.volumeClaimTemplates[0].spec.accessModes
-		resources:   sts.spec.volumeClaimTemplates[0].spec.resources
+		resources:   component.volumeClaimTemplates[0].spec.resources
 		dataSource: {
 			"name":     snapshot_name
 			"kind":     "VolumeSnapshot"

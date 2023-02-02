@@ -314,6 +314,8 @@ type OperationComponent struct {
 	VolumeClaimTemplateNames []string `json:"volumeClaimTemplateNames,omitempty"`
 }
 
+//+genclient
+
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
 //+kubebuilder:resource:categories={kubeblocks,all}

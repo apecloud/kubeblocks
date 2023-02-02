@@ -49,42 +49,42 @@ var clusterCreateExample = templates.Examples(`
 	# Create a cluster using cluster definition my-cluster-def and cluster version my-version
 	kbcli cluster create mycluster --cluster-definition=my-cluster-def --cluster-version=my-version
 
-	# Both --cluster-definition and --cluster-version are required for creating cluster, for the sake of brevity, 
-    # the following examples will ignore these two flags.
+	# --cluster-definition is required, if --cluster-version is not specified, will use the latest cluster version
+	kbcli cluster create mycluster --cluster-definition=my-cluster-def
 
-	# Create a cluster using component file component.yaml and termination policy DoNotDelete that will prevent
+	# Create a cluster using file my.yaml and termination policy DoNotDelete that will prevent
 	# the cluster from being deleted
-	kbcli cluster create mycluster --components=component.yaml --termination-policy=DoNotDelete
+	kbcli cluster create mycluster --cluster-definition=my-cluster-def --set=my.yaml --termination-policy=DoNotDelete
 
 	# In scenarios where you want to delete resources such as sts, deploy, svc, pdb, but keep pvcs when deleting
 	# the cluster, use termination policy Halt
-	kbcli cluster create mycluster --components=component.yaml --termination-policy=Halt
+	kbcli cluster create mycluster --cluster-definition=my-cluster-def --set=my.yaml --termination-policy=Halt
 
 	# In scenarios where you want to delete resource such as sts, deploy, svc, pdb, and including pvcs when
 	# deleting the cluster, use termination policy Delete
-	kbcli cluster create mycluster --components=component.yaml --termination-policy=Delete
+	kbcli cluster create mycluster --cluster-definition=my-cluster-def --set=my.yaml --termination-policy=Delete
 
 	# In scenarios where you want to delete all resources including all snapshots and snapshot data when deleting
 	# the cluster, use termination policy WipeOut
-	kbcli cluster create mycluster --components=component.yaml --termination-policy=WipeOut
+	kbcli cluster create mycluster --cluster-definition=my-cluster-def --set=my.yaml --termination-policy=WipeOut
 
 	# In scenarios where you want to load components data from website URL
 	# the cluster, use termination policy Halt
-	kbcli cluster create mycluster --components=https://kubeblocks.io/yamls/wesql_single.yaml --termination-policy=Halt
+	kbcli cluster create mycluster --cluster-definition=my-cluster-def --set=https://kubeblocks.io/yamls/wesql_single.yaml --termination-policy=Halt
 
 	# In scenarios where you want to load components data from stdin
 	# the cluster, use termination policy Halt
-	cat << EOF | kbcli cluster create mycluster --termination-policy=Halt --components -
+	cat << EOF | kbcli cluster create mycluster --cluster-definition=my-cluster-def --termination-policy=Halt --set -
 	- name: wesql-test... (omission from stdin)
 
 	# Create a cluster forced to scatter by node
-	kbcli cluster create --topology-keys=kubernetes.io/hostname --pod-anti-affinity=Required
+	kbcli cluster create --cluster-definition=my-cluster-def --topology-keys=kubernetes.io/hostname --pod-anti-affinity=Required
 
 	# Create a cluster in specific labels nodes
-	kbcli cluster create --node-labels='"topology.kubernetes.io/zone=us-east-1a","disktype=ssd,essd"'
+	kbcli cluster create --cluster-definition=my-cluster-def --node-labels='"topology.kubernetes.io/zone=us-east-1a","disktype=ssd,essd"'
 
 	# Create a Cluster with two tolerations 
-	kbcli cluster create --tolerations='"key=engineType,value=mongo,operator=Equal,effect=NoSchedule","key=diskType,value=ssd,operator=Equal,effect=NoSchedule"'
+	kbcli cluster create --cluster-definition=my-cluster-def --tolerations='"key=engineType,value=mongo,operator=Equal,effect=NoSchedule","key=diskType,value=ssd,operator=Equal,effect=NoSchedule"'
 `)
 
 const (
@@ -113,9 +113,8 @@ type CreateOptions struct {
 	Tolerations       []interface{}            `json:"tolerations,omitempty"`
 	Components        []map[string]interface{} `json:"components"`
 
-	// ComponentsFilePath components file path
-	ComponentsFilePath string   `json:"-"`
-	TolerationsRaw     []string `json:"-"`
+	Sets           string   `json:"-"`
+	TolerationsRaw []string `json:"-"`
 
 	// backup name to restore in creation
 	Backup string `json:"backup,omitempty"`
@@ -168,16 +167,16 @@ func (o *CreateOptions) Validate() error {
 		return fmt.Errorf("a valid cluster definition is needed, use --cluster-definition to specify one, run \"kbcli cluster-definition list\" to show all cluster definition")
 	}
 
-	if o.ClusterVersionRef == "" {
-		return fmt.Errorf("a valid cluster version is needed, use --cluster-version to specify one, run \"kbcli cluster-version list\" to show all cluster version")
-	}
-
 	if o.TerminationPolicy == "" {
 		return fmt.Errorf("a valid termination policy is needed, use --termination-policy to specify one of: DoNotTerminate, Halt, Delete, WipeOut")
 	}
 
-	if o.ComponentsFilePath == "" {
-		return fmt.Errorf("a valid component local file path, URL, or stdin is needed")
+	if o.ClusterVersionRef == "" {
+		version, err := cluster.GetLatestVersion(o.Client, o.ClusterDefRef)
+		if err != nil {
+			return err
+		}
+		o.ClusterVersionRef = version
 	}
 
 	// if name is not specified, generate a random cluster name
@@ -201,8 +200,8 @@ func (o *CreateOptions) Complete() error {
 		components    = o.Components
 	)
 
-	if len(o.ComponentsFilePath) > 0 {
-		if componentByte, err = MultipleSourceComponents(o.ComponentsFilePath, o.IOStreams.In); err != nil {
+	if len(o.Sets) > 0 {
+		if componentByte, err = MultipleSourceComponents(o.Sets, o.IOStreams.In); err != nil {
 			return err
 		}
 		if componentByte, err = yaml.YAMLToJSON(componentByte); err != nil {
@@ -270,15 +269,15 @@ func NewCreateCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 		PreCreate:       o.PreCreate,
 		BuildFlags: func(cmd *cobra.Command) {
 			cmd.Flags().StringVar(&o.ClusterDefRef, "cluster-definition", "", "Specify cluster definition, run \"kbcli cluster-definition list\" to show all available cluster definition")
-			cmd.Flags().StringVar(&o.ClusterVersionRef, "cluster-version", "", "Specify cluster version, run \"kbcli cluster-version list\" to show all available cluster version")
-			cmd.Flags().StringVar(&o.ComponentsFilePath, "components", "", "Use yaml file, URL, or stdin to specify the cluster components")
+			cmd.Flags().StringVar(&o.ClusterVersionRef, "cluster-version", "", "Specify cluster version, run \"kbcli cluster-version list\" to show all available cluster version, use the latest version if not specified")
+			cmd.Flags().StringVar(&o.Sets, "set", "", "Use yaml file, URL, or stdin to set the cluster parameters")
 			cmd.Flags().StringVar(&o.Backup, "backup", "", "Set a source backup to restore data")
 
 			// add updatable flags
 			o.UpdatableFlags.addFlags(cmd)
 
 			// set required flag
-			markRequiredFlag(cmd)
+			util.CheckErr(cmd.MarkFlagRequired("cluster-definition"))
 
 			// register flag completion func
 			registerFlagCompletionFunc(cmd, f)
@@ -286,12 +285,6 @@ func NewCreateCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 	}
 
 	return create.BuildCommand(inputs)
-}
-
-func markRequiredFlag(cmd *cobra.Command) {
-	for _, f := range []string{"cluster-definition", "cluster-version", "termination-policy", "components"} {
-		util.CheckErr(cmd.MarkFlagRequired(f))
-	}
 }
 
 func registerFlagCompletionFunc(cmd *cobra.Command, f cmdutil.Factory) {
@@ -406,7 +399,7 @@ func (f *UpdatableFlags) addFlags(cmd *cobra.Command) {
 	cmd.Flags().StringVar(&f.PodAntiAffinity, "pod-anti-affinity", "Preferred", "Pod anti-affinity type")
 	cmd.Flags().BoolVar(&f.Monitor, "monitor", true, "Set monitor enabled and inject metrics exporter")
 	cmd.Flags().BoolVar(&f.EnableAllLogs, "enable-all-logs", true, "Enable advanced application all log extraction, and true will ignore enabledLogs of component level")
-	cmd.Flags().StringVar(&f.TerminationPolicy, "termination-policy", "", "Termination policy, one of: (DoNotTerminate, Halt, Delete, WipeOut)")
+	cmd.Flags().StringVar(&f.TerminationPolicy, "termination-policy", "Delete", "Termination policy, one of: (DoNotTerminate, Halt, Delete, WipeOut)")
 	cmd.Flags().StringArrayVar(&f.TopologyKeys, "topology-keys", nil, "Topology keys for affinity")
 	cmd.Flags().StringToStringVar(&f.NodeLabels, "node-labels", nil, "Node label selector")
 	cmd.Flags().StringSliceVar(&f.TolerationsRaw, "tolerations", nil, `Tolerations for cluster, such as '"key=engineType,value=mongo,operator=Equal,effect=NoSchedule"'`)

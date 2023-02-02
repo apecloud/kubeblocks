@@ -193,7 +193,7 @@ module: ## Run go mod tidy->verify against go modules.
 	$(GO) mod tidy -compat=1.19
 	$(GO) mod verify
 
-TEST_PACKAGE=
+TEST_PACKAGES ?= ./internal/... ./apis/... ./controllers/... ./cmd/...
 
 CLUSTER_TYPES=minikube k3d
 .PHONY: add-k8s-host
@@ -206,15 +206,15 @@ endif
 
 .PHONY: test-current-ctx
 test-current-ctx: manifests generate fmt vet add-k8s-host ## Run operator controller tests with current $KUBECONFIG context. if existing k8s cluster is k3d or minikube, specify EXISTING_CLUSTER_TYPE.
-	USE_EXISTING_CLUSTER=true KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" $(GO) test ./$(TEST_PACKAGE)... -p 1 -coverprofile cover.out
+	USE_EXISTING_CLUSTER=true KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" $(GO) test  -p 1 -coverprofile cover.out $(TEST_PACKAGES)
 
 .PHONY: test
-test: manifests generate fmt vet envtest add-k8s-host test-probe ## Run tests. if existing k8s cluster is k3d or minikube, specify EXISTING_CLUSTER_TYPE.
-	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" $(GO) test ./$(TEST_PACKAGE)... -coverprofile cover.out
+test: # manifests generate fmt vet envtest add-k8s-host test-probe ## Run tests. if existing k8s cluster is k3d or minikube, specify EXISTING_CLUSTER_TYPE.
+	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" $(GO) test  -coverprofile cover.out $(TEST_PACKAGES)
 
 .PHONY: test-delve
 test-delve: manifests generate fmt vet envtest ## Run tests.
-	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" dlv --listen=:$(DEBUG_PORT) --headless=true --api-version=2 --accept-multiclient test ./$(TEST_PACKAGE)
+	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" dlv --listen=:$(DEBUG_PORT) --headless=true --api-version=2 --accept-multiclient test $(TEST_PACKAGES)
 
 .PHONY: test-webhook-enabled
 test-webhook-enabled: ## Run tests with webhooks enabled.

@@ -164,8 +164,6 @@ func (r *Cluster) validate() error {
 		r.validateComponents(&allErrs, clusterDef)
 	}
 
-	r.validatePrimaryIndex(&allErrs)
-
 	if len(allErrs) > 0 {
 		return apierrors.NewInvalid(
 			schema.GroupKind{Group: APIVersion, Kind: ClusterKind},
@@ -210,6 +208,9 @@ func (r *Cluster) validateComponents(allErrs *field.ErrorList, clusterDef *Clust
 		componentNameMap[v.Name] = struct{}{}
 		r.validateComponentResources(allErrs, v.Resources, i)
 	}
+
+	r.validatePrimaryIndex(allErrs)
+
 	if len(invalidComponentTypes) > 0 {
 		*allErrs = append(*allErrs, field.NotFound(field.NewPath("spec.components[*].type"),
 			getComponentTypeNotFoundMsg(invalidComponentTypes, r.Spec.ClusterDefRef)))

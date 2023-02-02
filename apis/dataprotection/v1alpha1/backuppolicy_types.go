@@ -59,7 +59,8 @@ type BackupPolicySpec struct {
 	Target TargetCluster `json:"target"`
 
 	// execute hook commands for backup.
-	Hooks BackupPolicyHook `json:"hooks"`
+	// +optional
+	Hooks *BackupPolicyHook `json:"hooks,omitempty"`
 
 	// array of remote volumes from CSI driver definition.
 	// +kubebuilder:validation:Required
@@ -129,7 +130,7 @@ type BackupPolicyHook struct {
 	// which container can exec command
 	// +kubebuilder:default=mysql
 	// +optional
-	ContainerName string `json:"ContainerName,omitempty"`
+	ContainerName string `json:"containerName,omitempty"`
 }
 
 // BackupPolicyStatus defines the observed state of BackupPolicy

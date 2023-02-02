@@ -105,8 +105,38 @@ func (r *BackupPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return *res, err
 	}
 
+	switch backupPolicy.Status.Phase {
+	case "", dataprotectionv1alpha1.ConfigNew:
+		return r.doNewPhaseAction(reqCtx, backupPolicy)
+	case dataprotectionv1alpha1.ConfigInProgress:
+		return r.doInProgressPhaseAction(reqCtx, backupPolicy)
+	case dataprotectionv1alpha1.ConfigAvailable:
+		return r.doAvailablePhaseAction(reqCtx, backupPolicy)
+	default:
+		return intctrlutil.Reconciled()
+	}
+}
+
+func (r *BackupPolicyReconciler) doNewPhaseAction(
+	reqCtx intctrlutil.RequestCtx, backupPolicy *dataprotectionv1alpha1.BackupPolicy) (ctrl.Result, error) {
+	// update status phase
+	backupPolicy.Status.Phase = dataprotectionv1alpha1.ConfigInProgress
+	if err := r.Client.Status().Update(reqCtx.Ctx, backupPolicy); err != nil {
+		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+	}
+	return intctrlutil.RequeueAfter(reconcileInterval, reqCtx.Log, "")
+}
+
+func (r *BackupPolicyReconciler) doInProgressPhaseAction(
+	reqCtx intctrlutil.RequestCtx, backupPolicy *dataprotectionv1alpha1.BackupPolicy) (ctrl.Result, error) {
 	// update default value from viper config if necessary
 	patch := client.MergeFrom(backupPolicy.DeepCopy())
+
+	// merge backup policy template spec
+	if err := r.mergeBackupPolicyTemplate(reqCtx, backupPolicy); err != nil {
+		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+	}
+
 	if len(backupPolicy.Spec.Schedule) == 0 {
 		schedule := viper.GetString("DP_BACKUP_SCHEDULE")
 		if len(schedule) > 0 {
@@ -128,12 +158,8 @@ func (r *BackupPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		}
 		backupPolicy.Labels[k] = v
 	}
-	if err = r.Client.Patch(reqCtx.Ctx, backupPolicy, patch); err != nil {
-		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-	}
 
-	// patch cronjob if backup policy spec patched
-	if err := r.patchCronJob(reqCtx, backupPolicy); err != nil {
+	if err := r.Client.Patch(reqCtx.Ctx, backupPolicy, patch); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 
@@ -166,8 +192,61 @@ func (r *BackupPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	if err := r.Client.Status().Update(reqCtx.Ctx, backupPolicy); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
+	return intctrlutil.RequeueAfter(reconcileInterval, reqCtx.Log, "")
+}
 
+func (r *BackupPolicyReconciler) doAvailablePhaseAction(
+	reqCtx intctrlutil.RequestCtx, backupPolicy *dataprotectionv1alpha1.BackupPolicy) (ctrl.Result, error) {
+	// patch cronjob if backup policy spec patched
+	if err := r.patchCronJob(reqCtx, backupPolicy); err != nil {
+		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+	}
+
+	// try to remove expired or oldest backups, triggered by cronjob controller
+	if err := r.removeExpiredBackups(reqCtx); err != nil {
+		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+	}
+	if err := r.removeOldestBackups(reqCtx, backupPolicy); err != nil {
+		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+	}
 	return intctrlutil.Reconciled()
+}
+
+func (r *BackupPolicyReconciler) mergeBackupPolicyTemplate(
+	reqCtx intctrlutil.RequestCtx, backupPolicy *dataprotectionv1alpha1.BackupPolicy) error {
+	if backupPolicy.Spec.BackupPolicyTemplateName == "" {
+		return nil
+	}
+	template := &dataprotectionv1alpha1.BackupPolicyTemplate{}
+	key := types.NamespacedName{Namespace: backupPolicy.Namespace, Name: backupPolicy.Spec.BackupPolicyTemplateName}
+	if err := r.Client.Get(reqCtx.Ctx, key, template); err != nil {
+		r.Recorder.Eventf(backupPolicy, corev1.EventTypeWarning, "BackupPolicyTemplateFailed",
+			"Failed to get backupPolicyTemplateName: %s, reason: %s", key.Name, err.Error())
+		return err
+	}
+
+	if backupPolicy.Spec.BackupToolName == "" {
+		backupPolicy.Spec.BackupToolName = template.Spec.BackupToolName
+	}
+	if backupPolicy.Spec.Target.Secret.UserKeyword == "" {
+		backupPolicy.Spec.BackupToolName = template.Spec.CredentialKeyword.UserKeyword
+	}
+	if backupPolicy.Spec.Target.Secret.PasswordKeyword == "" {
+		backupPolicy.Spec.BackupToolName = template.Spec.CredentialKeyword.PasswordKeyword
+	}
+	if backupPolicy.Spec.TTL == nil {
+		backupPolicy.Spec.TTL = template.Spec.TTL
+	}
+	if backupPolicy.Spec.Schedule == "" {
+		backupPolicy.Spec.Schedule = template.Spec.Schedule
+	}
+	if backupPolicy.Spec.Hooks == nil {
+		backupPolicy.Spec.Hooks = template.Spec.Hooks
+	}
+	if backupPolicy.Spec.OnFailAttempted == 0 {
+		backupPolicy.Spec.OnFailAttempted = template.Spec.OnFailAttempted
+	}
+	return nil
 }
 
 func (r *BackupPolicyReconciler) buildCronJob(backupPolicy *dataprotectionv1alpha1.BackupPolicy) (*batchv1.CronJob, error) {

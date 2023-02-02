@@ -171,7 +171,7 @@ var _ = Describe("SystemAccount Controller", func() {
 						Name: "mock-secret-file",
 					},
 				},
-				Hooks: dataprotectionv1alpha1.BackupPolicyHook{
+				Hooks: &dataprotectionv1alpha1.BackupPolicyHook{
 					PreCommands:  []string{"mock-precommand"},
 					PostCommands: []string{"mock-postcommand"},
 				},

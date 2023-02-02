@@ -479,6 +479,11 @@ func (r *BackupReconciler) ensureEmptyHooksCommand(
 		r.Recorder.Event(backup, corev1.EventTypeWarning, "BackupPolicyFailed", msg)
 		return false, errors.New(msg)
 	}
+
+	if backupPolicy.Spec.Hooks == nil {
+		return true, nil
+	}
+
 	commands := backupPolicy.Spec.Hooks.PostCommands
 	if preCommand {
 		commands = backupPolicy.Spec.Hooks.PreCommands

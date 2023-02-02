@@ -134,7 +134,7 @@ func RemoveRepo(r *repo.Entry) error {
 	return nil
 }
 
-// GetInstalled get helm package if installed.
+// GetInstalled get helm package release info if installed.
 func (i *InstallOpts) GetInstalled(cfg *action.Configuration) (*release.Release, error) {
 	res, err := action.NewGet(cfg).Run(i.Name)
 	if err != nil {

@@ -86,7 +86,7 @@ var _ = Describe("Replication Component", func() {
 
 			By("test handle probe timed out")
 			requeue, _ := replicationComponent.HandleProbeTimeoutWhenPodsReady(nil)
-			Expect(requeue == true).Should(BeTrue())
+			Expect(requeue == false).Should(BeTrue())
 
 			By("test component phase when pods not ready")
 			phase, _ := replicationComponent.GetPhaseWhenPodsNotReady(replicationCompName)

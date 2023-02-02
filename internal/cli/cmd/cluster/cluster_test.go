@@ -171,7 +171,7 @@ var _ = Describe("Cluster", func() {
 			withCustomResource(types.ClusterGVR(), newFakeClusterResource(randomNamer, componentName, cdComponentTypeName)),
 			withCustomResource(types.CMGVR(), newFakeConfigCMResource(randomNamer, componentName, volumeName, testdata.WithMap("my.cnf", ""))),
 			withResourceKind(types.ConfigConstraintGVR(), types.KindConfigConstraint, testdata.WithName(randomNamer.ccName)),
-			withResourceKind(types.CMGVR(), types.KindCM, testdata.WithName(randomNamer.tplName)),
+			withResourceKind(types.CMGVR(), types.KindCM, testdata.WithNamespacedName(randomNamer.tplName, randomNamer.ns)),
 			withResourceKind(types.ClusterVersionGVR(), types.KindClusterVersion, testdata.WithName(randomNamer.cvName)),
 			withResourceKind(types.ClusterDefGVR(), types.KindClusterDef,
 				testdata.WithName(randomNamer.cdName),

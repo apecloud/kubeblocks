@@ -51,7 +51,7 @@ type BackupPolicyTemplateSpec struct {
 	CredentialKeyword *BackupPolicyCredentialKeyword `json:"credentialKeyword,omitempty"`
 }
 
-// BackupPolicySecret defined for the target database secret that backup tool can connect.
+// BackupPolicyCredentialKeyword defined for the target database secret that backup tool can connect.
 type BackupPolicyCredentialKeyword struct {
 	// UserKeyword the map keyword of the user in the connection credential secret
 	// +kubebuilder:default=username

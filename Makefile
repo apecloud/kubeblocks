@@ -345,23 +345,23 @@ reloader: build-checks ## Build reloader related binaries
 clean-reloader: ## Clean bin/reloader.
 	rm -f bin/reloader
 
-##@ kbcue-helper
+##@ cue-helper
 
-kbcue-helper_LD_FLAGS = "-s -w"
+CUE_HELPER_LD_FLAGS = "-s -w"
 
-bin/kbcue-helper.%: ## Cross build bin/kbcue-helper.$(OS).$(ARCH) .
-	GOOS=$(word 2,$(subst ., ,$@)) GOARCH=$(word 3,$(subst ., ,$@)) $(GO) build -ldflags=${RELOADER_LD_FLAGS} -o $@ ./cmd/reloader/tools/cue_auto_generator.go
+bin/cue-helper.%: ## Cross build bin/cue-helper.$(OS).$(ARCH) .
+	GOOS=$(word 2,$(subst ., ,$@)) GOARCH=$(word 3,$(subst ., ,$@)) $(GO) build -ldflags=${CUE_HELPER_LD_FLAGS} -o $@ ./cmd/reloader/tools/cue_auto_generator.go
 
-.PHONY: kbcue-helper
-kbcue-helper: OS=$(shell $(GO) env GOOS)
-kbcue-helper: ARCH=$(shell $(GO) env GOARCH)
-kbcue-helper: build-checks ## Build kbcue-helper related binaries
-	$(MAKE) bin/kbcue-helper.${OS}.${ARCH}
-	mv bin/kbcue-helper.${OS}.${ARCH} bin/kbcue-helper
+.PHONY: cue-helper
+cue-helper: OS=$(shell $(GO) env GOOS)
+cue-helper: ARCH=$(shell $(GO) env GOARCH)
+cue-helper: build-checks ## Build cue-helper related binaries
+	$(MAKE) bin/cue-helper.${OS}.${ARCH}
+	mv bin/cue-helper.${OS}.${ARCH} bin/cue-helper
 
 .PHONY: clean
-clean-kbcue-helper: ## Clean bin/kbcue-helper.
-	rm -f bin/kbcue-helper
+clean-cue-helper: ## Clean bin/cue-helper.
+	rm -f bin/cue-helper
 
 
 ##@ PROBE

@@ -17,19 +17,23 @@ limitations under the License.
 package dbaas
 
 import (
+	"fmt"
 	"reflect"
 	"strings"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
+	"github.com/sethvargo/go-password/password"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/yaml"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/apecloud/kubeblocks/internal/testutil"
+	"github.com/apecloud/kubeblocks/test/testdata"
 )
 
 // Helper functions to change object's fields in input closure and then update it.
@@ -122,6 +126,50 @@ func CheckObj[T intctrlutil.Object, PT intctrlutil.PObject[T]](testCtx *testutil
 		g.Expect(testCtx.Cli.Get(testCtx.Ctx, namespacedName, pobj)).To(gomega.Succeed())
 		check(g, pobj)
 	}
+}
+
+// Helper functions to create object from testdata files.
+
+func CreateObj[T intctrlutil.Object, PT intctrlutil.PObject[T]](testCtx *testutil.TestContext,
+	filePath string, pobj PT, a ...any) PT {
+	return CreateCustomizedObj(testCtx, filePath, pobj, CustomizeObjYAML(a...))
+}
+
+func CustomizeObjYAML(a ...any) func(string) string {
+	return func(inputYAML string) string {
+		return fmt.Sprintf(inputYAML, a...)
+	}
+}
+
+func RandomizedObjName() func(client.Object) {
+	return func(obj client.Object) {
+		randomStr, _ := password.Generate(6, 0, 0, true, false)
+		obj.SetName(obj.GetName() + randomStr)
+	}
+}
+
+func CreateCustomizedObj[T intctrlutil.Object, PT intctrlutil.PObject[T]](testCtx *testutil.TestContext,
+	filePath string, pobj PT, actions ...any) PT {
+	objBytes, err := testdata.GetTestDataFileContent(filePath)
+	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	objYAML := string(objBytes)
+	for _, action := range actions {
+		switch f := action.(type) {
+		case func(string) string:
+			objYAML = f(objYAML)
+		default:
+		}
+	}
+	gomega.Expect(yaml.Unmarshal([]byte(objYAML), pobj)).Should(gomega.Succeed())
+	for _, action := range actions {
+		switch f := action.(type) {
+		case func(client.Object):
+			f(pobj)
+		case func(PT):
+			f(pobj)
+		}
+	}
+	return CreateK8sResource(testCtx.Ctx, *testCtx, pobj).(PT)
 }
 
 // Helper functions to delete a list of resources when writing unit tests.

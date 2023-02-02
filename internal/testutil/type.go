@@ -122,3 +122,9 @@ func (testCtx TestContext) GetWebhookHostExternalName() string {
 		return ""
 	}
 }
+
+func (testCtx TestContext) UseDefaultNamespace() func(client.Object) {
+	return func(obj client.Object) {
+		obj.SetNamespace(testCtx.DefaultNamespace)
+	}
+}

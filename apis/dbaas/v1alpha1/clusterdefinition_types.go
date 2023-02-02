@@ -210,7 +210,9 @@ type ConfigTemplate struct {
 	// +kubebuilder:validation:MaxLength=32
 	VolumeName string `json:"volumeName"`
 
-	// ConfigTplType defines the purpose of the configuration template.
+	// tplType defines the purpose of the configuration template.
+	// config: the ConfigTemplate is related to configuration files, which support reconfiguring operation.
+	// script: the ConfigTemplate is executable scripts, which does not support operation.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Enum={config,script}
 	// +kubebuilder:default="config"

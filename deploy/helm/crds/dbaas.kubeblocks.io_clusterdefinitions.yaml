@@ -126,8 +126,11 @@ spec:
                                 type: string
                               tplType:
                                 default: config
-                                description: ConfigTplType defines the purpose of
-                                  the configuration template.
+                                description: 'tplType defines the purpose of the configuration
+                                  template. config: the ConfigTemplate is related
+                                  to configuration files, which support reconfiguring
+                                  operation. script: the ConfigTemplate is executable
+                                  scripts, which does not support operation.'
                                 enum:
                                 - config
                                 - script

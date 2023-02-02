@@ -457,7 +457,6 @@ func updateConfigurationSchema(tpl *dbaasv1alpha1.ConfigConstraintSpec) error {
 }
 
 func NeedReloadVolume(tpl dbaasv1alpha1.ConfigTemplate) bool {
-	// TODO distinguish between scripts and configuration
 	return tpl.TplType == dbaasv1alpha1.ConfigurationType && len(tpl.ConfigConstraintRef) != 0
 }
 

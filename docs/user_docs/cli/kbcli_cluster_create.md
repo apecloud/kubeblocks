@@ -3,7 +3,7 @@
 Create a cluster
 
 ```
-kbcli cluster create NAME --termination-policy=DoNotTerminate|Halt|Delete|WipeOut --set=file-path [flags]
+kbcli cluster create [NAME] [flags]
 ```
 
 ### Examples

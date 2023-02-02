@@ -1,5 +1,5 @@
 /*
-Copyright ApeCloud Inc.
+Copyright ApeCloud, Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -131,16 +131,14 @@ func ClearResources[T intctrlutil.Object, PT intctrlutil.PObject[T],
 	L intctrlutil.ObjList[T], PL intctrlutil.PObjList[T, L]](
 	testCtx *testutil.TestContext, _ func(T, L), opts ...client.DeleteAllOfOption) {
 	var (
+		obj     T
 		objList L
 	)
 
 	listOptions := make([]client.ListOption, 0)
-	deleteOptions := make([]client.DeleteOption, 0)
 	for _, opt := range opts {
-		applyToDeleteFunc := reflect.ValueOf(opt).MethodByName("ApplyToDelete")
-		if applyToDeleteFunc.IsValid() {
-			deleteOptions = append(deleteOptions, opt.(client.DeleteOption))
-		} else {
+		applyToListFunc := reflect.ValueOf(opt).MethodByName("ApplyToList")
+		if applyToListFunc.IsValid() {
 			listOptions = append(listOptions, opt.(client.ListOption))
 		}
 	}
@@ -149,13 +147,8 @@ func ClearResources[T intctrlutil.Object, PT intctrlutil.PObject[T],
 	ginkgo.By("clear resources " + strings.TrimSuffix(gvk.Kind, "List"))
 
 	gomega.Eventually(func() error {
-		return testCtx.Cli.List(testCtx.Ctx, PL(&objList), listOptions...)
+		return testCtx.Cli.DeleteAllOf(testCtx.Ctx, PT(&obj), opts...)
 	}).Should(gomega.Succeed())
-	for _, obj := range reflect.ValueOf(&objList).Elem().FieldByName("Items").Interface().([]T) {
-		// it's possible deletions are initiated in testcases code but cache is not updated
-		gomega.Expect(client.IgnoreNotFound(testCtx.Cli.Delete(testCtx.Ctx, PT(&obj),
-			deleteOptions...))).Should(gomega.Succeed())
-	}
 
 	gomega.Eventually(func(g gomega.Gomega) {
 		g.Expect(testCtx.Cli.List(testCtx.Ctx, PL(&objList), listOptions...)).Should(gomega.Succeed())
@@ -167,8 +160,9 @@ func ClearResources[T intctrlutil.Object, PT intctrlutil.PObject[T],
 				// PVCs are protected by the "kubernetes.io/pvc-protection" finalizer
 				g.Expect(finalizers[0]).Should(gomega.BeElementOf([]string{"orphan", "kubernetes.io/pvc-protection"}))
 				g.Expect(len(finalizers)).Should(gomega.Equal(1))
-				pobj.SetFinalizers([]string{})
-				g.Expect(testCtx.Cli.Update(testCtx.Ctx, pobj)).Should(gomega.Succeed())
+				g.Expect(ChangeObj(testCtx, pobj, func() {
+					pobj.SetFinalizers([]string{})
+				})).To(gomega.Succeed())
 			}
 		}
 		g.Expect(len(items)).Should(gomega.Equal(0))
@@ -192,13 +186,16 @@ func ClearClusterResources(testCtx *testutil.TestContext) {
 
 	// mock behavior of garbage collection inside KCM
 	if !testCtx.UsingExistingCluster() {
-		ClearResources(testCtx, intctrlutil.StatefulSetSignature, inNS)
-		ClearResources(testCtx, intctrlutil.DeploymentSignature, inNS)
-		ClearResources(testCtx, intctrlutil.ConfigMapSignature, inNS)
-		ClearResources(testCtx, intctrlutil.ServiceSignature, inNS)
-		ClearResources(testCtx, intctrlutil.SecretSignature, inNS)
-		ClearResources(testCtx, intctrlutil.PodDisruptionBudgetSignature, inNS)
-		ClearResources(testCtx, intctrlutil.JobSignature, inNS)
-		ClearResources(testCtx, intctrlutil.PersistentVolumeClaimSignature, inNS)
+		// only delete internal resources managed by kubeblocks
+		filter := client.MatchingLabels{intctrlutil.AppManagedByLabelKey: intctrlutil.AppName}
+
+		ClearResources(testCtx, intctrlutil.StatefulSetSignature, inNS, filter)
+		ClearResources(testCtx, intctrlutil.DeploymentSignature, inNS, filter)
+		ClearResources(testCtx, intctrlutil.ConfigMapSignature, inNS, filter)
+		ClearResources(testCtx, intctrlutil.ServiceSignature, inNS, filter)
+		ClearResources(testCtx, intctrlutil.SecretSignature, inNS, filter)
+		ClearResources(testCtx, intctrlutil.PodDisruptionBudgetSignature, inNS, filter)
+		ClearResources(testCtx, intctrlutil.JobSignature, inNS, filter)
+		ClearResources(testCtx, intctrlutil.PersistentVolumeClaimSignature, inNS, filter)
 	}
 }

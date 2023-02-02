@@ -1,5 +1,5 @@
 /*
-Copyright ApeCloud Inc.
+Copyright ApeCloud, Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -32,6 +32,8 @@ import (
 )
 
 var _ = Describe("Cluster", func() {
+	const testComponentPath = "../../testing/testdata/component.yaml"
+
 	var streams genericclioptions.IOStreams
 	var tf *cmdtesting.TestFactory
 
@@ -47,9 +49,20 @@ var _ = Describe("Cluster", func() {
 
 	Context("create", func() {
 		It("without name", func() {
-			o := &CreateOptions{}
+			o := &CreateOptions{
+				ClusterDefRef:     testing.ClusterDefName,
+				ClusterVersionRef: testing.ClusterVersionName,
+				Sets:              testComponentPath,
+				UpdatableFlags: UpdatableFlags{
+					TerminationPolicy: "Delete",
+				},
+				BaseOptions: create.BaseOptions{
+					Client: tf.FakeDynamicClient,
+				},
+			}
 			o.IOStreams = streams
-			Expect(o.Validate()).To(MatchError("missing cluster name"))
+			Expect(o.Validate()).To(Succeed())
+			Expect(o.Name).ShouldNot(BeEmpty())
 		})
 
 		It("new command", func() {
@@ -57,7 +70,7 @@ var _ = Describe("Cluster", func() {
 			Expect(cmd).ShouldNot(BeNil())
 			Expect(cmd.Flags().Set("cluster-definition", testing.ClusterDefName)).Should(Succeed())
 			Expect(cmd.Flags().Set("cluster-version", testing.ClusterVersionName)).Should(Succeed())
-			Expect(cmd.Flags().Set("set", "../../testing/testdata/component.yaml")).Should(Succeed())
+			Expect(cmd.Flags().Set("set", testComponentPath)).Should(Succeed())
 			Expect(cmd.Flags().Set("termination-policy", "Delete")).Should(Succeed())
 
 			// must succeed otherwise exit 1 and make test fails
@@ -88,7 +101,7 @@ var _ = Describe("Cluster", func() {
 			Expect(o.Complete()).Should(Succeed())
 			Expect(o.Validate()).Should(Succeed())
 
-			o.Sets = "../../testing/testdata/component.yaml"
+			o.Sets = testComponentPath
 			Expect(o.Complete()).Should(Succeed())
 			Expect(o.Validate()).Should(Succeed())
 

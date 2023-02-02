@@ -130,4 +130,24 @@ var _ = Describe("helper", func() {
 		Expect(version).ShouldNot(BeNil())
 		Expect(len(version.Items)).Should(Equal(2))
 	})
+
+	It("find latest version", func() {
+		const clusterDefName = "test-cluster-def"
+		genVersion := func(name string, t time.Time) dbaasv1alpha1.ClusterVersion {
+			v := dbaasv1alpha1.ClusterVersion{}
+			v.Name = name
+			v.SetLabels(map[string]string{types.ClusterDefLabelKey: clusterDefName})
+			v.SetCreationTimestamp(metav1.NewTime(t))
+			return v
+		}
+
+		versionList := &dbaasv1alpha1.ClusterVersionList{}
+		versionList.Items = append(versionList.Items,
+			genVersion("old-version", time.Now().AddDate(0, 0, -1)),
+			genVersion("now-version", time.Now()))
+
+		latestVer := findLatestVersion(versionList)
+		Expect(latestVer).ShouldNot(BeNil())
+		Expect(latestVer.Name).Should(Equal("now-version"))
+	})
 })

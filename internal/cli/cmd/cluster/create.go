@@ -51,29 +51,29 @@ var clusterCreateExample = templates.Examples(`
 	# Both --cluster-definition and --cluster-version are required for creating cluster, for the sake of brevity, 
     # the following examples will ignore these two flags.
 
-	# Create a cluster using component file component.yaml and termination policy DoNotDelete that will prevent
+	# Create a cluster using file my.yaml and termination policy DoNotDelete that will prevent
 	# the cluster from being deleted
-	kbcli cluster create mycluster --components=component.yaml --termination-policy=DoNotDelete
+	kbcli cluster create mycluster --set=my.yaml --termination-policy=DoNotDelete
 
 	# In scenarios where you want to delete resources such as sts, deploy, svc, pdb, but keep pvcs when deleting
 	# the cluster, use termination policy Halt
-	kbcli cluster create mycluster --components=component.yaml --termination-policy=Halt
+	kbcli cluster create mycluster --set=my.yaml --termination-policy=Halt
 
 	# In scenarios where you want to delete resource such as sts, deploy, svc, pdb, and including pvcs when
 	# deleting the cluster, use termination policy Delete
-	kbcli cluster create mycluster --components=component.yaml --termination-policy=Delete
+	kbcli cluster create mycluster --set=my.yaml --termination-policy=Delete
 
 	# In scenarios where you want to delete all resources including all snapshots and snapshot data when deleting
 	# the cluster, use termination policy WipeOut
-	kbcli cluster create mycluster --components=component.yaml --termination-policy=WipeOut
+	kbcli cluster create mycluster --set=my.yaml --termination-policy=WipeOut
 
 	# In scenarios where you want to load components data from website URL
 	# the cluster, use termination policy Halt
-	kbcli cluster create mycluster --components=https://kubeblocks.io/yamls/wesql_single.yaml --termination-policy=Halt
+	kbcli cluster create mycluster --set=https://kubeblocks.io/yamls/wesql_single.yaml --termination-policy=Halt
 
 	# In scenarios where you want to load components data from stdin
 	# the cluster, use termination policy Halt
-	cat << EOF | kbcli cluster create mycluster --termination-policy=Halt --components -
+	cat << EOF | kbcli cluster create mycluster --termination-policy=Halt --set -
 	- name: wesql-test... (omission from stdin)
 
 	# Create a cluster forced to scatter by node
@@ -247,7 +247,7 @@ func MultipleSourceComponents(fileName string, in io.Reader) ([]byte, error) {
 func NewCreateCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := &CreateOptions{BaseOptions: create.BaseOptions{IOStreams: streams}}
 	inputs := create.Inputs{
-		Use:             "create NAME --termination-policy=DoNotTerminate|Halt|Delete|WipeOut --components=file-path",
+		Use:             "create NAME --termination-policy=DoNotTerminate|Halt|Delete|WipeOut --set=file-path",
 		Short:           "Create a cluster",
 		Example:         clusterCreateExample,
 		CueTemplateName: CueTemplateName,

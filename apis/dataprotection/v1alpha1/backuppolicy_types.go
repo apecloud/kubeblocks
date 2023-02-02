@@ -32,6 +32,11 @@ type BackupPolicySpec struct {
 	// +optional
 	Schedule string `json:"schedule,omitempty"`
 
+	// This flag tells the controller to suspend subsequent executions, it does
+	// not apply to already started executions.  Defaults to false.
+	// +optional
+	Suspend *bool `json:"suspend,omitempty"`
+
 	// Backup Type. full or incremental or snapshot. if unset, default is snapshot.
 	// +kubebuilder:validation:Enum={full,incremental,snapshot}
 	// +kubebuilder:default=snapshot
@@ -102,12 +107,10 @@ type BackupPolicySecret struct {
 	Name string `json:"name"`
 
 	// UserKeyword the map keyword of the user in the connection credential secret
-	// +kubebuilder:default=username
 	// +optional
 	UserKeyword string `json:"userKeyword,omitempty"`
 
 	// PasswordKeyword the map keyword of the password in the connection credential secret
-	// +kubebuilder:default=password
 	// +optional
 	PasswordKeyword string `json:"passwordKeyword,omitempty"`
 }

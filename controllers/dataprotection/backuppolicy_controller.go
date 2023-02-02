@@ -56,6 +56,7 @@ type backupPolicyOptions struct {
 	Schedule   string           `json:"schedule"`
 	BackupType string           `json:"backupType"`
 	TTL        *metav1.Duration `json:"ttl"`
+	Suspend    *bool            `json:"suspend"`
 }
 
 var (
@@ -132,11 +133,6 @@ func (r *BackupPolicyReconciler) doInProgressPhaseAction(
 	// update default value from viper config if necessary
 	patch := client.MergeFrom(backupPolicy.DeepCopy())
 
-	// merge backup policy template spec
-	if err := r.mergeBackupPolicyTemplate(reqCtx, backupPolicy); err != nil {
-		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-	}
-
 	if len(backupPolicy.Spec.Schedule) == 0 {
 		schedule := viper.GetString("DP_BACKUP_SCHEDULE")
 		if len(schedule) > 0 {
@@ -157,6 +153,11 @@ func (r *BackupPolicyReconciler) doInProgressPhaseAction(
 			backupPolicy.SetLabels(map[string]string{})
 		}
 		backupPolicy.Labels[k] = v
+	}
+
+	// merge backup policy template spec
+	if err := r.mergeBackupPolicyTemplate(reqCtx, backupPolicy); err != nil {
+		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 
 	if err := r.Client.Patch(reqCtx.Ctx, backupPolicy, patch); err != nil {
@@ -215,6 +216,9 @@ func (r *BackupPolicyReconciler) doAvailablePhaseAction(
 func (r *BackupPolicyReconciler) mergeBackupPolicyTemplate(
 	reqCtx intctrlutil.RequestCtx, backupPolicy *dataprotectionv1alpha1.BackupPolicy) error {
 	if backupPolicy.Spec.BackupPolicyTemplateName == "" {
+		// set required parameter default values if template is empty
+		backupPolicy.Spec.Target.Secret.UserKeyword = "username"
+		backupPolicy.Spec.Target.Secret.PasswordKeyword = "password"
 		return nil
 	}
 	template := &dataprotectionv1alpha1.BackupPolicyTemplate{}
@@ -264,6 +268,7 @@ func (r *BackupPolicyReconciler) buildCronJob(backupPolicy *dataprotectionv1alph
 		Schedule:   backupPolicy.Spec.Schedule,
 		TTL:        backupPolicy.Spec.TTL,
 		BackupType: backupPolicy.Spec.BackupType,
+		Suspend:    backupPolicy.Spec.Suspend,
 	}
 	backupPolicyOptionsByte, err := json.Marshal(options)
 	if err != nil {
@@ -403,5 +408,6 @@ func (r *BackupPolicyReconciler) patchCronJob(
 	patch := client.MergeFrom(cronJob.DeepCopy())
 	cronJob.Spec.Schedule = backupPolicy.Spec.Schedule
 	cronJob.Spec.JobTemplate.Spec.BackoffLimit = &backupPolicy.Spec.OnFailAttempted
+	cronJob.Spec.Suspend = backupPolicy.Spec.Suspend
 	return r.Client.Patch(reqCtx.Ctx, cronJob, patch)
 }

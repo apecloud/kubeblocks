@@ -6,14 +6,15 @@ replace github.com/apecloud/kubeblocks => ../..
 
 require (
 	github.com/DATA-DOG/go-sqlmock v1.5.0
-	github.com/dapr/components-contrib v1.9.1-0.20221117055238-d3662118105a
-	github.com/dapr/dapr v1.9.4-0.20221116042835-b1f74803aab5
+	github.com/dapr/components-contrib v1.9.6
+	github.com/dapr/dapr v1.9.5
 	github.com/dapr/kit v0.0.3-0.20221102045011-c213121f0b4f
 	github.com/go-sql-driver/mysql v1.7.0
 	github.com/pkg/errors v0.9.1
 	github.com/spf13/pflag v1.0.5
 	github.com/spf13/viper v1.14.0
 	github.com/stretchr/testify v1.8.1
+	github.com/valyala/fasthttp v1.41.0
 	go.etcd.io/etcd/client/v3 v3.5.6
 	go.etcd.io/etcd/server/v3 v3.5.6
 	go.mongodb.org/mongo-driver v1.10.3
@@ -27,7 +28,6 @@ require (
 	github.com/PuerkitoBio/purell v1.2.0 // indirect
 	github.com/andybalholm/brotli v1.0.4 // indirect
 	github.com/antlr/antlr4/runtime/Go/antlr v0.0.0-20220418222510-f25a4f6275ed // indirect
-	github.com/benbjohnson/clock v1.3.0 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cenkalti/backoff v2.2.1+incompatible // indirect
 	github.com/cenkalti/backoff/v4 v4.1.3 // indirect
@@ -108,10 +108,8 @@ require (
 	github.com/stoewer/go-strcase v1.2.0 // indirect
 	github.com/stretchr/objx v0.5.0 // indirect
 	github.com/subosito/gotenv v1.4.1 // indirect
-	github.com/tidwall/transform v0.0.0-20201103190739-32f242e2dbde // indirect
 	github.com/tmc/grpc-websocket-proxy v0.0.0-20201229170055-e5319fda7802 // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
-	github.com/valyala/fasthttp v1.41.0 // indirect
 	github.com/xdg-go/pbkdf2 v1.0.0 // indirect
 	github.com/xdg-go/scram v1.1.1 // indirect
 	github.com/xdg-go/stringprep v1.0.3 // indirect
@@ -138,7 +136,6 @@ require (
 	go.uber.org/multierr v1.8.0 // indirect
 	go.uber.org/zap v1.21.0 // indirect
 	golang.org/x/crypto v0.1.0 // indirect
-	golang.org/x/exp v0.0.0-20221028150844-83b7d23a625f // indirect
 	golang.org/x/mod v0.7.0 // indirect
 	golang.org/x/net v0.3.0 // indirect
 	golang.org/x/oauth2 v0.1.0 // indirect

@@ -25,13 +25,11 @@ import (
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
-	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	testdbaas "github.com/apecloud/kubeblocks/internal/testutil/dbaas"
@@ -64,7 +62,7 @@ var _ = Describe("SystemAccount Controller", func() {
 		// clusterFile string //  cluster file to create cluster instance
 		accounts []dbaasv1alpha1.AccountName // accounts this cluster should have
 	}
-	// sysAcctTestCase defines the info to setup test env, cluster and their expected result to verify against.
+	// 670 defines the info to setup test env, cluster and their expected result to verify against.
 	type sysAcctTestCase struct {
 		envInfo           testEnvInfo                                                                                                            // to setup test env, create ClusterDef, ClusterVersion
 		clusterInfo       testClusterInfo                                                                                                        // to create cluster instance, and its expected accounts
@@ -90,16 +88,9 @@ var _ = Describe("SystemAccount Controller", func() {
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 		testdbaas.ClearResources(&testCtx, intctrlutil.EndpointsSignature, inNS, ml)
-		testdbaas.ClearResources(&testCtx, intctrlutil.BackupPolicySignature, inNS, ml)
 	}
 
 	cleanInternalCache := func() {
-		// cleaning cached internal resources
-		expectkeys := systemAccountReconciler.ExpectionManager.ListKeys()
-		for _, key := range expectkeys {
-			_ = systemAccountReconciler.ExpectionManager.deleteExpectation(key)
-		}
-
 		secretKeys := systemAccountReconciler.SecretMapStore.ListKeys()
 		for _, key := range secretKeys {
 			_ = systemAccountReconciler.SecretMapStore.deleteSecret(key)
@@ -151,51 +142,6 @@ var _ = Describe("SystemAccount Controller", func() {
 			return k8sClient.Get(ctx, client.ObjectKey{Name: epname, Namespace: namespace}, createdEP)
 		}, timeout, interval).Should(Succeed())
 		return createdEP
-	}
-
-	mockBackupPolicy := func(name string, engineName, clusterName string) *dataprotectionv1alpha1.BackupPolicy {
-		ml := map[string]string{
-			intctrlutil.AppInstanceLabelKey:  clusterName,
-			intctrlutil.AppComponentLabelKey: engineName,
-		}
-
-		policy := &dataprotectionv1alpha1.BackupPolicy{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      name,
-				Namespace: testCtx.DefaultNamespace,
-			},
-			Spec: dataprotectionv1alpha1.BackupPolicySpec{
-				Target: dataprotectionv1alpha1.TargetCluster{
-					LabelsSelector: &metav1.LabelSelector{MatchLabels: ml},
-					Secret: dataprotectionv1alpha1.BackupPolicySecret{
-						Name: "mock-secret-file",
-					},
-				},
-				Hooks: &dataprotectionv1alpha1.BackupPolicyHook{
-					PreCommands:  []string{"mock-precommand"},
-					PostCommands: []string{"mock-postcommand"},
-				},
-				RemoteVolume: corev1.Volume{
-					Name: "mock-volume",
-					VolumeSource: corev1.VolumeSource{
-						PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: "mock-pvc"},
-					},
-				},
-			},
-		}
-		return policy
-	}
-
-	assureBackupPolicy := func(policyName, engineName, clusterName string) *dataprotectionv1alpha1.BackupPolicy {
-		By("Creating Backup Policy")
-		policy := mockBackupPolicy(policyName, engineName, clusterName)
-		Expect(testCtx.CheckedCreateObj(ctx, policy)).Should(Succeed())
-
-		createdPolicy := &dataprotectionv1alpha1.BackupPolicy{}
-		Eventually(func() error {
-			return k8sClient.Get(ctx, client.ObjectKey{Name: policy.Name, Namespace: policy.Namespace}, createdPolicy)
-		}, timeout, interval).Should(Succeed())
-		return createdPolicy
 	}
 	// end of mock functions to be refined
 
@@ -264,7 +210,14 @@ var _ = Describe("SystemAccount Controller", func() {
 			}, timeout, interval).Should(Succeed())
 
 			clustersMap[testName] = client.ObjectKeyFromObject(cluster)
-			matchingLabelsMap[testName] = getLabelsForSecretsAndJobs(cluster.Name, clusterDef.Spec.Type, clusterDef.Name, consensusCompName)
+
+			compKey := componentUniqueKey{
+				namespace:     cluster.Namespace,
+				clusterName:   cluster.Name,
+				componentName: consensusCompName,
+			}
+
+			matchingLabelsMap[testName] = getLabelsForSecretsAndJobs(compKey)
 		}
 		return
 	}
@@ -320,13 +273,13 @@ var _ = Describe("SystemAccount Controller", func() {
 							secretNum: 1,
 						}, // created by stmt + AllPods
 						dbaasv1alpha1.MonitorAccount: {
-							jobNum:    0,
-							secretNum: 0,
-						}, // won't be created, not configured in ClusterDef
+							jobNum:    1,
+							secretNum: 1,
+						}, // created by stmt + AnyPod
 					},
 				},
 				clusterInfo: testClusterInfo{
-					accounts: []dbaasv1alpha1.AccountName{dbaasv1alpha1.AdminAccount, dbaasv1alpha1.ProbeAccount},
+					accounts: getAllSysAccounts(),
 				},
 				createClusterFunc: createConsensusMySQLCluster,
 				patchClusterFunc:  patchConsensusClusterReadyToServe,
@@ -364,7 +317,10 @@ var _ = Describe("SystemAccount Controller", func() {
 
 				clusterInfo := testCase.clusterInfo
 				for _, acc := range clusterInfo.accounts {
-					resource := testCase.envInfo.resourceMap[acc]
+					resource, ok := testCase.envInfo.resourceMap[acc]
+					if !ok {
+						continue
+					}
 					acctList |= acc.GetAccountID()
 					jobsNum += resource.jobNum
 					secretsNum += resource.secretNum
@@ -420,148 +376,6 @@ var _ = Describe("SystemAccount Controller", func() {
 			}
 		})
 
-		It("Should update system account expectation after BackupPolicy is created", func() {
-			for testName, testCase := range mysqlTestCases {
-				var (
-					randomStr        = testCtx.GetRandomStr()
-					backupPolicyName = "bp-" + randomStr
-					acctList         dbaasv1alpha1.KBAccountType
-					jobsNum          int
-					secretsNum       int
-				)
-
-				clusterInfo := testCase.clusterInfo
-				for _, acc := range clusterInfo.accounts {
-					resource := testCase.envInfo.resourceMap[acc]
-					acctList |= acc.GetAccountID()
-					jobsNum += resource.jobNum
-					secretsNum += resource.secretNum
-				}
-
-				// get a cluster instance from map, created during preparation
-				clusterKey, ok := clustersMap[testName]
-				Expect(ok).To(BeTrue())
-				// patch cluster to running
-				testCase.patchClusterFunc(clusterKey)
-
-				// get latest cluster object
-				cluster := &dbaasv1alpha1.Cluster{}
-				Expect(k8sClient.Get(ctx, clusterKey, cluster)).Should(Succeed())
-
-				ml, ok := matchingLabelsMap[testName]
-				Expect(ok).To(BeTrue())
-
-				By("Verify accounts to be created are correct")
-				Eventually(func(g Gomega) {
-					accounts := getAccounts(g, cluster, ml)
-					g.Expect(accounts).To(BeEquivalentTo(acctList))
-				}, timeout*2, interval).Should(Succeed())
-
-				By("Verify all jobs have been created")
-				Eventually(func(g Gomega) {
-					// all jobs matching filter `ml` should be a job for sys account.
-					jobs := &batchv1.JobList{}
-					g.Expect(k8sClient.List(ctx, jobs, client.InNamespace(cluster.Namespace), ml)).To(Succeed())
-					g.Expect(len(jobs.Items)).To(BeEquivalentTo(jobsNum))
-				}, timeout, interval).Should(Succeed())
-
-				// remember the number of cached secrets before create backup policy
-				var secretsToCreate1 int
-				By("Assure some secrets have been cached")
-				if secretsNum > 0 || jobsNum > 0 {
-					Eventually(func() int {
-						secretsToCreate1 = len(systemAccountReconciler.SecretMapStore.ListKeys())
-						return secretsToCreate1
-					}, timeout, interval).Should(BeNumerically(">", 0))
-				}
-
-				// create backup policy, and update expected values
-				By("Check the BackupPolicy creation succeeds and ExpectionManager updated")
-				policy := assureBackupPolicy(backupPolicyName, consensusCompName, cluster.Name)
-				policyKey := expectationKey(policy.Namespace, cluster.Name, consensusCompName)
-				Eventually(func(g Gomega) {
-					exp, exists, _ := systemAccountReconciler.ExpectionManager.getExpectation(policyKey)
-					g.Expect(exists).To(BeTrue(), "ExpectionManager should have key:"+policyKey)
-					g.Expect(exp.toCreate&dbaasv1alpha1.KBAccountDataprotection > 0).To(BeTrue())
-				}, timeout, interval).Should(Succeed())
-
-				resource := testCase.envInfo.resourceMap[dbaasv1alpha1.DataprotectionAccount]
-
-				if resource.jobNum == 0 || resource.secretNum == 0 {
-					// if DataprotectionAccount is not configured in ClusterDef, there should be no updates
-					By("No job will be created, if account not configure")
-					Consistently(func(g Gomega) {
-						// no job will be created
-						if resource.jobNum == 0 {
-							jobs := &batchv1.JobList{}
-							g.Expect(k8sClient.List(ctx, jobs, client.InNamespace(cluster.Namespace), ml)).To(Succeed())
-							g.Expect(len(jobs.Items)).To(BeEquivalentTo(0))
-						}
-
-						secrets := &corev1.SecretList{}
-						if resource.secretNum == 0 {
-							// no secret will be created
-							g.Expect(k8sClient.List(ctx, secrets, client.InNamespace(cluster.Namespace), ml)).To(Succeed())
-							g.Expect(len(secrets.Items)).To(BeEquivalentTo(0))
-						}
-					}, consistTimeout, interval).Should(Succeed())
-
-					By("Delete BackupPolicy")
-					Eventually(func() error {
-						return k8sClient.Delete(ctx, policy)
-					}, timeout, interval).Should(Succeed())
-
-					Eventually(func(g Gomega) {
-						_, exists, _ := systemAccountReconciler.ExpectionManager.getExpectation(policyKey)
-						g.Expect(exists).To(BeFalse())
-					}, timeout, interval).Should(Succeed())
-
-					continue
-				}
-
-				// if DataprotectionAccount is configured, some job should be created
-				By("one or more jobs should be created, if DataProtection account is configured")
-				// update expected status
-				acctList |= dbaasv1alpha1.KBAccountDataprotection
-				jobsNum += testCase.envInfo.resourceMap[dbaasv1alpha1.DataprotectionAccount].jobNum
-				secretsNum += testCase.envInfo.resourceMap[dbaasv1alpha1.DataprotectionAccount].secretNum
-
-				Eventually(func(g Gomega) {
-					accounts := getAccounts(g, cluster, ml)
-					g.Expect(accounts).To(BeEquivalentTo(acctList))
-				}, timeout*2, interval).Should(Succeed())
-
-				Eventually(func(g Gomega) {
-					jobs := &batchv1.JobList{}
-					g.Expect(k8sClient.List(ctx, jobs, client.InNamespace(cluster.Namespace), ml)).To(Succeed())
-					g.Expect(len(jobs.Items)).To(BeEquivalentTo(jobsNum))
-				}, timeout, interval).Should(Succeed())
-
-				By("Assure one more secret is cached")
-				var secretsToCreate2 int
-				Eventually(func() int {
-					secretsToCreate2 = len(systemAccountReconciler.SecretMapStore.ListKeys())
-					return secretsToCreate2
-				}, timeout, interval).Should(BeEquivalentTo(1 + secretsToCreate1))
-
-				By("Check the BackupPolicy deletion event is triggered after the policy is deleted")
-				Eventually(func() error {
-					return k8sClient.Delete(ctx, policy)
-				}, timeout, interval).Should(Succeed())
-
-				Eventually(func(g Gomega) {
-					_, exists, _ := systemAccountReconciler.ExpectionManager.getExpectation(policyKey)
-					g.Expect(exists).To(BeFalse())
-				}, timeout, interval).Should(Succeed())
-
-				By("Secrets cached are not affected after BackupPolicy deletion")
-				Eventually(func() int {
-					secretsToCreate := len(systemAccountReconciler.SecretMapStore.ListKeys())
-					return secretsToCreate
-				}, timeout, interval).Should(BeEquivalentTo(secretsToCreate2))
-			}
-		})
-
 		It("Cached secrets should be created when jobs succeeds", func() {
 			for testName, testCase := range mysqlTestCases {
 				var (
@@ -572,7 +386,10 @@ var _ = Describe("SystemAccount Controller", func() {
 
 				clusterInfo := testCase.clusterInfo
 				for _, acc := range clusterInfo.accounts {
-					resource := testCase.envInfo.resourceMap[acc]
+					resource, ok := testCase.envInfo.resourceMap[acc]
+					if !ok {
+						continue
+					}
 					acctList |= acc.GetAccountID()
 					jobsNum += resource.jobNum
 					secretsNum += resource.secretNum
@@ -644,8 +461,6 @@ var _ = Describe("SystemAccount Controller", func() {
 			}
 			// all jobs succeeded, and there should be no cached secrets left behind.
 			Expect(len(systemAccountReconciler.SecretMapStore.ListKeys())).To(BeEquivalentTo(0))
-			// no backup policy is created, it should be empty.
-			Expect(len(systemAccountReconciler.ExpectionManager.ListKeys())).To(BeEquivalentTo(0))
 		})
 	}) // end of context
 
@@ -670,8 +485,9 @@ var _ = Describe("SystemAccount Controller", func() {
 
 		It("Should clear relevant expectations and secrets after cluster deletion", func() {
 			var (
-				totalJobs   int
-				clusterList []types.NamespacedName
+				totalCachedSecrets int
+				totalJobs          int
+				clusterList        []types.NamespacedName
 			)
 
 			for testName, testCase := range mysqlTestCases {
@@ -683,10 +499,16 @@ var _ = Describe("SystemAccount Controller", func() {
 
 				clusterInfo := testCase.clusterInfo
 				for _, acc := range clusterInfo.accounts {
-					resource := testCase.envInfo.resourceMap[acc]
+					resource, ok := testCase.envInfo.resourceMap[acc]
+					if !ok {
+						continue
+					}
 					acctList |= acc.GetAccountID()
 					jobsNum += resource.jobNum
 					secretsNum += resource.secretNum
+					if resource.jobNum > 0 {
+						totalCachedSecrets += resource.secretNum
+					}
 				}
 				totalJobs += jobsNum
 
@@ -720,16 +542,16 @@ var _ = Describe("SystemAccount Controller", func() {
 
 			By("Verify secrets and jobs size")
 			Eventually(func(g Gomega) {
-				g.Expect(len(systemAccountReconciler.SecretMapStore.ListKeys())).To(BeEquivalentTo(totalJobs), "before delete, there are %d cached secrets", totalJobs)
+				g.Expect(len(systemAccountReconciler.SecretMapStore.ListKeys())).To(BeEquivalentTo(totalCachedSecrets), "before delete, there are %d cached secrets", totalCachedSecrets)
 			}, timeout, interval).Should(Succeed())
 
-			By("Delete 0-th cluster from list, there should be no change jobs and cache size")
+			By("Delete 0-th cluster from list, there should be no change in cached secrets size")
 			cluster := &dbaasv1alpha1.Cluster{}
 			Expect(k8sClient.Get(ctx, clusterList[0], cluster)).To(Succeed())
 			Expect(k8sClient.Delete(ctx, cluster)).To(Succeed())
 
 			Eventually(func(g Gomega) {
-				g.Expect(len(systemAccountReconciler.SecretMapStore.ListKeys())).To(BeEquivalentTo(totalJobs), "delete 0-th cluster, there are %d cached secrets", totalJobs)
+				g.Expect(len(systemAccountReconciler.SecretMapStore.ListKeys())).To(BeEquivalentTo(totalCachedSecrets), "before delete, there are %d cached secrets", totalCachedSecrets)
 			}, timeout, interval).Should(Succeed())
 
 			By("Delete remaining cluster before jobs are done, all cached secrets should be removed")
@@ -768,17 +590,18 @@ var _ = Describe("SystemAccount Controller", func() {
 		It("Patch Cluster after running", func() {
 			for testName, testCase := range mysqlTestCases {
 				var (
-					acctList   dbaasv1alpha1.KBAccountType
-					jobsNum    int
-					secretsNum int
+					acctList dbaasv1alpha1.KBAccountType
+					jobsNum  int
 				)
 
 				clusterInfo := testCase.clusterInfo
 				for _, acc := range clusterInfo.accounts {
-					resource := testCase.envInfo.resourceMap[acc]
+					resource, ok := testCase.envInfo.resourceMap[acc]
+					if !ok {
+						continue
+					}
 					acctList |= acc.GetAccountID()
 					jobsNum += resource.jobNum
-					secretsNum += resource.secretNum
 				}
 
 				// get a cluster instance from map, created during preparation
@@ -795,28 +618,24 @@ var _ = Describe("SystemAccount Controller", func() {
 				Expect(ok).To(BeTrue())
 
 				// wait for a while till all jobs are created
+				secretsNum := 0
 				Eventually(func(g Gomega) {
 					jobs := &batchv1.JobList{}
 					g.Expect(k8sClient.List(ctx, jobs, client.InNamespace(cluster.Namespace), ml)).To(Succeed())
 					g.Expect(len(jobs.Items)).To(BeEquivalentTo(jobsNum))
+
+					secrets := &corev1.SecretList{}
+					g.Expect(k8sClient.List(ctx, secrets, client.InNamespace(cluster.Namespace), ml)).To(Succeed())
+					secretsNum = len(secrets.Items)
 				}, timeout, interval).Should(Succeed())
 
-				By("Enable monitor, more jobs and secrets should be created")
+				By("Enable monitor, no more jobs or secrets should be created")
 				// patch cluster, enable monitor
 				Eventually(testdbaas.GetAndChangeObj(&testCtx, clusterKey, func(cluster *dbaasv1alpha1.Cluster) {
 					for _, comp := range cluster.Spec.Components {
 						comp.Monitor = true
 					}
 				}), timeout, interval).Should(Succeed())
-
-				resource := testCase.envInfo.resourceMap[dbaasv1alpha1.MonitorAccount]
-				if resource.jobNum == 0 {
-					continue
-				}
-
-				acctList |= dbaasv1alpha1.KBAccountMonitor
-				jobsNum += resource.jobNum
-				secretsNum += resource.secretNum
 
 				jobs := &batchv1.JobList{}
 				var jobSize1, secretSize1, cachedSecretSize1 int
@@ -825,6 +644,7 @@ var _ = Describe("SystemAccount Controller", func() {
 					g.Expect(len(jobs.Items)).To(BeEquivalentTo(jobsNum))
 					jobSize1 = len(jobs.Items)
 
+					// nothing changed since last time updates
 					secrets := &corev1.SecretList{}
 					g.Expect(k8sClient.List(ctx, secrets, client.InNamespace(cluster.Namespace), ml)).To(Succeed())
 					g.Expect(len(secrets.Items)).To(BeEquivalentTo(secretsNum))
@@ -837,15 +657,17 @@ var _ = Describe("SystemAccount Controller", func() {
 				if jobsNum < 2 {
 					continue
 				}
-
+				// delete one job directly, but the job is not completed.
 				jobToDelete := jobs.Items[0]
 				jobKey := client.ObjectKeyFromObject(&jobToDelete)
 				Expect(k8sClient.Delete(ctx, &jobToDelete)).To(Succeed())
-				Expect(testdbaas.ChangeObj(&testCtx, &jobToDelete, func() { controllerutil.RemoveFinalizer(&jobToDelete, orphanFinalizerName) })).To(Succeed())
 
 				Eventually(func(g Gomega) {
 					tmpJob := &batchv1.Job{}
-					g.Expect(k8sClient.Get(ctx, jobKey, tmpJob)).To(Satisfy(apierrors.IsNotFound))
+					err := k8sClient.Get(ctx, jobKey, tmpJob)
+					g.Expect(err).To(Succeed())
+					g.Expect(len(tmpJob.ObjectMeta.Finalizers)).To(BeEquivalentTo(1))
+					g.Expect(testdbaas.ChangeObj(&testCtx, tmpJob, func() { controllerutil.RemoveFinalizer(tmpJob, orphanFinalizerName) })).To(Succeed())
 				}, timeout, interval).Should(Succeed())
 
 				By("Verify jobs size decreased and secrets size increased")
@@ -857,12 +679,43 @@ var _ = Describe("SystemAccount Controller", func() {
 					secrets := &corev1.SecretList{}
 					g.Expect(k8sClient.List(ctx, secrets, client.InNamespace(cluster.Namespace), ml)).To(Succeed())
 					secretsSize2 := len(secrets.Items)
-					g.Expect(secretsSize2).To(BeNumerically("<", secretSize1))
+					g.Expect(secretsSize2).To(BeEquivalentTo(secretSize1))
+
+					cachedSecretsSize2 := len(systemAccountReconciler.SecretMapStore.ListKeys())
+					g.Expect(cachedSecretsSize2).To(BeEquivalentTo(cachedSecretSize1))
+				}, timeout, interval).Should(Succeed())
+
+				// delete one job directly, but the job is not completed.
+				jobKey = client.ObjectKeyFromObject(&jobs.Items[0])
+				Eventually(func(g Gomega) {
+					tmpJob := &batchv1.Job{}
+					g.Expect(k8sClient.Get(ctx, jobKey, tmpJob)).To(Succeed())
+					g.Expect(testdbaas.ChangeObjStatus(&testCtx, tmpJob, func() {
+						tmpJob.Status.Conditions = []batchv1.JobCondition{{
+							Type:   batchv1.JobComplete,
+							Status: corev1.ConditionTrue,
+						}}
+					})).To(Succeed())
+					g.Expect(k8sClient.Delete(ctx, tmpJob)).To(Succeed())
+				}, timeout, interval).Should(Succeed())
+
+				Eventually(func(g Gomega) {
+					tmpJob := &batchv1.Job{}
+					err := k8sClient.Get(ctx, jobKey, tmpJob)
+					g.Expect(err).To(Succeed())
+					g.Expect(len(tmpJob.ObjectMeta.Finalizers)).To(BeEquivalentTo(1))
+					g.Expect(testdbaas.ChangeObj(&testCtx, tmpJob, func() { controllerutil.RemoveFinalizer(tmpJob, orphanFinalizerName) })).To(Succeed())
+				}, timeout, interval).Should(Succeed())
+
+				By("Verify jobs size decreased and secrets size increased")
+				Eventually(func(g Gomega) {
+					secrets := &corev1.SecretList{}
+					g.Expect(k8sClient.List(ctx, secrets, client.InNamespace(cluster.Namespace), ml)).To(Succeed())
+					secretsSize2 := len(secrets.Items)
+					g.Expect(secretsSize2).To(BeNumerically(">", secretSize1))
 
 					cachedSecretsSize2 := len(systemAccountReconciler.SecretMapStore.ListKeys())
 					g.Expect(cachedSecretsSize2).To(BeNumerically("<", cachedSecretSize1))
-
-					g.Expect(cachedSecretSize1 - cachedSecretsSize2).To(BeEquivalentTo(secretsSize2 - secretSize1))
 				}, timeout, interval).Should(Succeed())
 			}
 		})

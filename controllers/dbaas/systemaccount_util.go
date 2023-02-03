@@ -21,6 +21,7 @@ import (
 	"strings"
 
 	"github.com/sethvargo/go-password/password"
+	"github.com/spf13/viper"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -42,12 +43,6 @@ type secretMapEntry struct {
 	value *corev1.Secret
 }
 
-// SystemAccountExpectation records accounts to be created.
-type systemAccountExpectation struct {
-	toCreate dbaasv1alpha1.KBAccountType
-	key      string
-}
-
 // customizedEngine helps render jobs.
 type customizedEngine struct {
 	cluster       *dbaasv1alpha1.Cluster
@@ -58,28 +53,9 @@ type customizedEngine struct {
 	envVarList    []corev1.EnvVar
 }
 
-// SystemAccountExpectationsManager is a cache, recording a key-expectation pair for each cluster
-// In each expectation we records accounts to create, and to delete.
-// Requirements are collected from objects:
-// - ClusterDefintion: kbprob, kbreplicator
-// - Cluster: kbmonitoring
-// - BackupPolicy: kbdataprotecion
-// - Others: kbadmin
-type systemAccountExpectationsManager struct {
-	cache.Store
-}
-
 // SecretKeyFunc to parse out the key from a SecretMapEntry.
 var secretKeyFunc = func(obj interface{}) (string, error) {
 	if e, ok := obj.(*secretMapEntry); ok {
-		return e.key, nil
-	}
-	return "", fmt.Errorf("could not find key for obj %#v", obj)
-}
-
-// ExpKeyFunc to parse out the key from an expecationl.
-var expKeyFunc = func(obj interface{}) (string, error) {
-	if e, ok := obj.(*systemAccountExpectation); ok {
 		return e.key, nil
 	}
 	return "", fmt.Errorf("could not find key for obj %#v", obj)
@@ -120,57 +96,6 @@ func (r *secretMapStore) deleteSecret(key string) error {
 	if exist {
 		return r.Delete(exp)
 	}
-	return nil
-}
-
-func (e *systemAccountExpectation) set(add dbaasv1alpha1.KBAccountType) {
-	e.toCreate |= add
-}
-
-func (e *systemAccountExpectation) getExpectation() dbaasv1alpha1.KBAccountType {
-	return e.toCreate
-}
-
-func newExpectationsManager() *systemAccountExpectationsManager {
-	return &systemAccountExpectationsManager{cache.NewStore(expKeyFunc)}
-}
-
-func (r *systemAccountExpectationsManager) createExpectation(key string) (*systemAccountExpectation, error) {
-	exp, exists, err := r.getExpectation(key)
-	if err != nil {
-		return nil, err
-	}
-
-	if exists {
-		return exp, nil
-	}
-
-	exp = &systemAccountExpectation{toCreate: dbaasv1alpha1.KBAccountInvalid, key: key}
-	err = r.Add(exp)
-	return exp, err
-}
-
-func (r *systemAccountExpectationsManager) getExpectation(cluster string) (*systemAccountExpectation, bool, error) {
-	exp, exists, err := r.GetByKey(cluster)
-	if err != nil {
-		return nil, false, err
-	}
-	if exists {
-		return exp.(*systemAccountExpectation), true, nil
-	}
-	return nil, false, nil
-}
-
-func (r *systemAccountExpectationsManager) deleteExpectation(cluster string) error {
-	exp, exists, err := r.GetByKey(cluster)
-	if err != nil {
-		return err
-	}
-
-	if exists {
-		return r.Delete(exp)
-	}
-
 	return nil
 }
 
@@ -249,26 +174,21 @@ func replaceEnvsValues(clusterName string, sysAccounts *dbaasv1alpha1.SystemAcco
 
 // getLabelsForSecretsAndJobs construct matching labels for secrets and jobs.
 // This is consistent with that of secrets created during cluster initialization.
-func getLabelsForSecretsAndJobs(clusterName, clusterDefType, clusterDefName, compName string) client.MatchingLabels {
-	// get account facts, i.e., secrets created
+func getLabelsForSecretsAndJobs(key componentUniqueKey) client.MatchingLabels {
 	return client.MatchingLabels{
-		intctrlutil.AppInstanceLabelKey:  clusterName,
-		intctrlutil.AppNameLabelKey:      fmt.Sprintf("%s-%s", clusterDefType, clusterDefName),
-		intctrlutil.AppComponentLabelKey: compName,
+		intctrlutil.AppInstanceLabelKey:  key.clusterName,
+		intctrlutil.AppComponentLabelKey: key.componentName,
+		intctrlutil.AppManagedByLabelKey: intctrlutil.AppName,
 	}
 }
 
-func renderJob(engine *customizedEngine, namespace, clusterName, clusterDefType, clusterDefName, compName, username string,
-	statement []string, endpoint string) *batchv1.Job {
+func renderJob(engine *customizedEngine, key componentUniqueKey, username string, statement []string, endpoint string, debugModeOn bool) *batchv1.Job {
 	randomStr, _ := password.Generate(6, 0, 0, true, false)
-	jobName := clusterName + "-" + randomStr
+	jobName := key.clusterName + "-" + randomStr
 
 	// label
-	ml := getLabelsForSecretsAndJobs(clusterName, clusterDefType, clusterDefName, compName)
+	ml := getLabelsForSecretsAndJobs(key)
 	ml[clusterAccountLabelKey] = username
-
-	// set job ttl to 1 seconds
-	var defaultTTLSeconds int32 = 1
 
 	// inject one more system env variables
 	statementEnv := corev1.EnvVar{
@@ -279,20 +199,21 @@ func renderJob(engine *customizedEngine, namespace, clusterName, clusterDefType,
 		Name:  kbAccountEndPointEnvName,
 		Value: endpoint,
 	}
-
-	envs := append(engine.getEnvs(), statementEnv, endpointEnv)
+	// place statements and endpoints before user defined envs.
+	envs := make([]corev1.EnvVar, 0, 2+len(engine.getEnvs()))
+	envs = append(envs, statementEnv, endpointEnv)
+	envs = append(envs, engine.getEnvs()...)
 
 	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
-			Namespace: namespace,
+			Namespace: key.namespace,
 			Name:      jobName,
 			Labels:    ml,
 		},
 		Spec: batchv1.JobSpec{
-			TTLSecondsAfterFinished: &defaultTTLSeconds,
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Namespace: namespace,
+					Namespace: key.namespace,
 					Name:      jobName},
 				Spec: corev1.PodSpec{
 					RestartPolicy: corev1.RestartPolicyNever,
@@ -310,31 +231,36 @@ func renderJob(engine *customizedEngine, namespace, clusterName, clusterDefType,
 			},
 		},
 	}
+	// if debug mode is on, jobs will retain after execution.
+	if !debugModeOn {
+		defaultTTLZero := (int32)(0)
+		job.Spec.TTLSecondsAfterFinished = &defaultTTLZero
+	}
 	return job
 }
 
-func renderSecretWithPwd(namespace, clusterName, clusterDefType, clusterDefName, compName, username, passwd string) *corev1.Secret {
+func renderSecretWithPwd(key componentUniqueKey, username, passwd string) *corev1.Secret {
 	secretData := map[string][]byte{}
 	secretData[accountNameForSecret] = []byte(username)
 	secretData[accountPasswdForSecret] = []byte(passwd)
 
-	ml := getLabelsForSecretsAndJobs(clusterName, clusterDefType, clusterDefName, compName)
+	ml := getLabelsForSecretsAndJobs(key)
 	ml[clusterAccountLabelKey] = username
-	return renderSecret(namespace, clusterName, compName, username, ml, secretData)
+	return renderSecret(key, username, ml, secretData)
 }
 
-func renderSecretByCopy(namespace, clusterName, clusterDefType, clusterDefName, compName, username string, fromSecret *corev1.Secret) *corev1.Secret {
-	ml := getLabelsForSecretsAndJobs(clusterName, clusterDefType, clusterDefName, compName)
+func renderSecretByCopy(key componentUniqueKey, username string, fromSecret *corev1.Secret) *corev1.Secret {
+	ml := getLabelsForSecretsAndJobs(key)
 	ml[clusterAccountLabelKey] = username
-	return renderSecret(namespace, clusterName, compName, username, ml, fromSecret.Data)
+	return renderSecret(key, username, ml, fromSecret.Data)
 }
 
-func renderSecret(namespace, clusterName, compName, username string, labels client.MatchingLabels, data map[string][]byte) *corev1.Secret {
+func renderSecret(key componentUniqueKey, username string, labels client.MatchingLabels, data map[string][]byte) *corev1.Secret {
 	// secret labels and secret fianlizers should be consistent with that of Cluster secret created by Cluster Controller.
 	secret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Namespace:  namespace,
-			Name:       strings.Join([]string{clusterName, compName, username}, "-"),
+			Namespace:  key.namespace,
+			Name:       strings.Join([]string{key.clusterName, key.componentName, username}, "-"),
 			Labels:     labels,
 			Finalizers: []string{dbClusterFinalizerName},
 		},
@@ -396,15 +322,11 @@ func updateFacts(accountName dbaasv1alpha1.AccountName, detectedFacts *dbaasv1al
 	}
 }
 
-func concatSecretName(ns, clusterName, component string, username string) string {
-	return fmt.Sprintf("%s-%s-%s-%s", ns, clusterName, component, username)
+func concatSecretName(key componentUniqueKey, username string) string {
+	return fmt.Sprintf("%s-%s-%s-%s", key.namespace, key.clusterName, key.componentName, username)
 }
 
-func expectationKey(ns, clusterName, component string) string {
-	return fmt.Sprintf("%s-%s-%s", ns, clusterName, component)
-}
-
-func getCreationStmtForAccount(namespace, clusterName, clusterDefType, clusterDefName, compName string, passConfig dbaasv1alpha1.PasswordConfig,
+func getCreationStmtForAccount(key componentUniqueKey, passConfig dbaasv1alpha1.PasswordConfig,
 	accountConfig dbaasv1alpha1.SystemAccountConfig) ([]string, *corev1.Secret) {
 	// generated password with mixedcases = true
 	passwd, _ := password.Generate((int)(passConfig.Length), (int)(passConfig.NumDigits), (int)(passConfig.NumSymbols), false, false)
@@ -430,7 +352,7 @@ func getCreationStmtForAccount(namespace, clusterName, clusterDefType, clusterDe
 	stmt = replaceNamedVars(namedVars, statements.CreationStatement, -1, true)
 	creationStmt = append(creationStmt, stmt)
 
-	secret := renderSecretWithPwd(namespace, clusterName, clusterDefType, clusterDefName, compName, userName, passwd)
+	secret := renderSecretWithPwd(key, userName, passwd)
 	return creationStmt, secret
 }
 
@@ -442,4 +364,16 @@ func getAllSysAccounts() []dbaasv1alpha1.AccountName {
 		dbaasv1alpha1.MonitorAccount,
 		dbaasv1alpha1.ReplicatorAccount,
 	}
+}
+
+func getDefaultAccounts() dbaasv1alpha1.KBAccountType {
+	accountID := dbaasv1alpha1.KBAccountInvalid
+	for _, name := range getAllSysAccounts() {
+		accountID |= name.GetAccountID()
+	}
+	return accountID
+}
+
+func getDebugMode(compDef *dbaasv1alpha1.ClusterDefinitionComponent) bool {
+	return viper.GetBool(systemAccountsDebugMode)
 }

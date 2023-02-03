@@ -93,7 +93,7 @@ spec:
                 value: {{ .Values.cluster.clusterId | default "1" | quote }}
               - name: CLUSTER_START_INDEX
                 value: {{ .Values.cluster.clusterStartIndex | default "1" | quote }}
-              - name: REPLICATIONUSER
+              - name: REPLICATION_USER
                 value: {{ .Values.auth.replicationUser | default "replicator" | quote }}
               - name: REPLICATION_PASSWORD
                 value: {{ .Values.auth.replicationPassword | default "" | quote }}
@@ -157,4 +157,11 @@ spec:
               scope: AnyPods
               statements:        
                 creation: CREATE USER IF NOT EXISTS $(USERNAME) IDENTIFIED BY "$(PASSWD)"; GRANT REPLICATION CLIENT, PROCESS ON *.* TO $(USERNAME); GRANT SELECT ON performance_schema.* TO $(USERNAME);
+                deletion: DROP USER IF EXISTS $(USERNAME);            
+          - name: kbreplicator
+            provisionPolicy:
+              type: CreateByStmt
+              scope: AnyPods
+              statements:        
+                creation: CREATE USER IF NOT EXISTS $(USERNAME) IDENTIFIED BY "$(PASSWD)"; GRANT REPLICATION SLAVE ON *.* TO $(USERNAME) WITH GRANT OPTION;
                 deletion: DROP USER IF EXISTS $(USERNAME);            

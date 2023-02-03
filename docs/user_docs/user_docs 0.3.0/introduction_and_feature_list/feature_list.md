@@ -3,7 +3,7 @@
 * Kubernetes native and multicloud supported
   Based on Kubernetes and cloud-neutral
   * KubeBlocks greatly simplifies the process of deploying a database on Kubernetes. You can deploy and use a database cluster within several minutes without the knowledge of Kubernetes.
-  * Runs on a Kubernetes base and supports AWS EKS, GCP GKE, Azure AKS and other cloud environments.
+  * Runs on a Kubernetes base and supports AWS EKS, GCP GKE, Azure AKS, and other cloud environments.
   * Defines each supported database engine through a declarative API, extending the Kubernetes statefulset to better adapt to stateful services as databases.
   * Developers can use Kubernetes CLI or API to interact with KubeBlocks database clusters and integrate them into DevOps tools and processes to realize Database Infrastructure as Code.
 
@@ -48,7 +48,7 @@
   * Supports data storage encryption.
   * Supports backup encryption.
 
-* kbcli, an easy-to-use CLI
+* `kbcli`, an easy-to-use CLI
   * Supports installing, uninstalling, and upgrading the system with kbcli.
   * Supports common operations such as database cluster, backup and recovery, monitoring, log, operation, and maintenance.
   * Supports using `kbcli` to connect to the database cluster without repeatedly entering a password.

@@ -63,7 +63,6 @@ var _ = Describe("Backup Controller", func() {
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 		// namespaced
 		testdbaas.ClearResources(&testCtx, intctrlutil.StatefulSetSignature, inNS, ml)
-		testdbaas.ClearResources(&testCtx, intctrlutil.SecretSignature, inNS, ml)
 		testdbaas.ClearResources(&testCtx, intctrlutil.PodSignature, inNS, ml)
 		testdbaas.ClearResources(&testCtx, intctrlutil.BackupSignature, inNS, ml)
 		testdbaas.ClearResources(&testCtx, intctrlutil.BackupPolicySignature, inNS, ml)
@@ -391,29 +390,6 @@ spec:
 		return statefulSet
 	}
 
-	assureSecretObj := func() *corev1.Secret {
-		By("By assure an secret obj")
-		secretYaml := `
-apiVersion: dataprotection.kubeblocks.io/v1alpha1
-kind: BackupTool
-metadata:
-  name: super-credential
-  labels:
-    app.kubernetes.io/instance: wesql-cluster
-    app.kubernetes.io/managed-by: kubeblocks
-data:
-  username: cm9vdA==
-  password: cm9vdA==
-`
-		secretObj := &corev1.Secret{}
-		Expect(yaml.Unmarshal([]byte(secretYaml), secretObj)).Should(Succeed())
-		ns := genarateNS("super-credential-")
-		secretObj.Name = ns.Name
-		secretObj.Namespace = ns.Namespace
-		Expect(testCtx.CreateObj(ctx, secretObj)).Should(Succeed())
-		return secretObj
-	}
-
 	patchK8sJobStatus := func(jobStatus batchv1.JobConditionType, key types.NamespacedName) {
 		k8sJob := batchv1.Job{}
 		Eventually(func() error {
@@ -445,9 +421,6 @@ data:
 
 			By("By creating a statefulset")
 			_ = assureStatefulSetObj()
-
-			By("By creating a secret")
-			_ = assureSecretObj()
 
 			By("By creating a backupTool")
 			backupTool := assureBackupToolObj()

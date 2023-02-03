@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+	http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package dbaas
+package dbaastest
 
 import (
 	"context"
@@ -36,13 +36,15 @@ import (
 	. "github.com/onsi/gomega"
 
 	"github.com/go-logr/logr"
-	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	"github.com/spf13/viper"
 	"go.uber.org/zap/zapcore"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 
+	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
+
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	"github.com/apecloud/kubeblocks/controllers/dbaas"
 	"github.com/apecloud/kubeblocks/controllers/dbaas/components"
 	"github.com/apecloud/kubeblocks/controllers/k8score"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
@@ -59,7 +61,6 @@ var ctx context.Context
 var cancel context.CancelFunc
 var testCtx testutil.TestContext
 var clusterRecorder record.EventRecorder
-var systemAccountReconciler *SystemAccountReconciler
 var logger logr.Logger
 
 func init() {
@@ -67,10 +68,14 @@ func init() {
 	// viper.Set("ENABLE_DEBUG_LOG", "true")
 }
 
-func TestAPIs(t *testing.T) {
+func TestDbaasUseExistingCluster(t *testing.T) {
+	if testing.Short() {
+		t.Skip()
+	}
+
 	RegisterFailHandler(Fail)
 
-	RunSpecs(t, "Controller Suite")
+	RunSpecs(t, "Controller Suite with UseExistingCluster flag set")
 }
 
 var _ = BeforeSuite(func() {
@@ -85,15 +90,15 @@ var _ = BeforeSuite(func() {
 	logger.Info("logger start")
 
 	By("bootstrapping test environment")
-	// var flag = false
+	var flag = true
 	testEnv = &envtest.Environment{
-		CRDDirectoryPaths: []string{filepath.Join("..", "..", "config", "crd", "bases"),
+		CRDDirectoryPaths: []string{filepath.Join("..", "..", "..", "config", "crd", "bases"),
 			// use dependent external CRDs.
 			// resolved by ref: https://github.com/operator-framework/operator-sdk/issues/4434#issuecomment-786794418
 			filepath.Join(build.Default.GOPATH, "pkg", "mod", "github.com", "kubernetes-csi/external-snapshotter/",
 				"client/v6@v6.0.1", "config", "crd")},
 		ErrorIfCRDPathMissing: true,
-		// UseExistingCluster:    &flag,
+		UseExistingCluster:    &flag,
 	}
 
 	var err error
@@ -132,31 +137,38 @@ var _ = BeforeSuite(func() {
 	viper.SetDefault("PROBE_SERVICE_LOG_LEVEL", "info")
 
 	clusterRecorder = k8sManager.GetEventRecorderFor("db-cluster-controller")
-	err = (&ClusterReconciler{
+	err = (&dbaas.ClusterReconciler{
 		Client:   k8sManager.GetClient(),
 		Scheme:   k8sManager.GetScheme(),
 		Recorder: clusterRecorder,
 	}).SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 
-	err = (&ClusterDefinitionReconciler{
+	err = (&dbaas.ClusterDefinitionReconciler{
 		Client:   k8sManager.GetClient(),
 		Scheme:   k8sManager.GetScheme(),
 		Recorder: k8sManager.GetEventRecorderFor("cluster-definition-controller"),
 	}).SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 
-	err = (&ClusterVersionReconciler{
+	err = (&dbaas.ClusterVersionReconciler{
 		Client:   k8sManager.GetClient(),
 		Scheme:   k8sManager.GetScheme(),
 		Recorder: k8sManager.GetEventRecorderFor("cluster-version-controller"),
 	}).SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 
-	err = (&OpsRequestReconciler{
+	err = (&dbaas.OpsRequestReconciler{
 		Client:   k8sManager.GetClient(),
 		Scheme:   k8sManager.GetScheme(),
 		Recorder: k8sManager.GetEventRecorderFor("ops-request-controller"),
+	}).SetupWithManager(k8sManager)
+	Expect(err).ToNot(HaveOccurred())
+
+	err = (&dbaas.SystemAccountReconciler{
+		Client:   k8sManager.GetClient(),
+		Scheme:   k8sManager.GetScheme(),
+		Recorder: k8sManager.GetEventRecorderFor("system-account-controller"),
 	}).SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 
@@ -186,15 +198,6 @@ var _ = BeforeSuite(func() {
 		Scheme:   k8sManager.GetScheme(),
 		Recorder: k8sManager.GetEventRecorderFor("event-controller"),
 	}).SetupWithManager(k8sManager)
-	Expect(err).ToNot(HaveOccurred())
-
-	// add SystemAccountReconciler
-	systemAccountReconciler = &SystemAccountReconciler{
-		Client:   k8sManager.GetClient(),
-		Scheme:   k8sManager.GetScheme(),
-		Recorder: k8sManager.GetEventRecorderFor("system-account-controller"),
-	}
-	err = systemAccountReconciler.SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 
 	testCtx = testutil.NewDefaultTestContext(ctx, k8sManager.GetClient(), testEnv)

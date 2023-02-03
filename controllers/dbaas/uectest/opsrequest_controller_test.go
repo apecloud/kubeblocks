@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package dbaas
+package dbaastest
 
 import (
 	"context"
@@ -228,118 +228,9 @@ spec:
 		return opsRequest
 	}
 
-	mockSetClusterStatusPhaseToRunning := func(namespacedName types.NamespacedName) {
-		Eventually(testdbaas.GetAndChangeObjStatus(&testCtx, namespacedName,
-			func(fetched *dbaasv1alpha1.Cluster) {
-				fetched.Status.Phase = dbaasv1alpha1.RunningPhase
-				for componentKey, componentStatus := range fetched.Status.Components {
-					componentStatus.Phase = dbaasv1alpha1.RunningPhase
-					fetched.Status.Components[componentKey] = componentStatus
-				}
-			}), timeout, interval).Should(Succeed())
-	}
-
-	Context("with Cluster running", func() {
-		It("issue an VerticalScalingOpsRequest should change Cluster's resource requirements successfully", func() {
-			const compName = "wesql"
-
-			By("create cluster")
-			clusterObj, clusterDef, _, key := newClusterObj(nil, nil)
-			clusterObj.Spec.Components = []dbaasv1alpha1.ClusterComponent{
-				{
-					Name: compName,
-					Type: clusterDef.Spec.Components[0].TypeName, // "replicasets"
-					Resources: corev1.ResourceRequirements{
-						Limits: corev1.ResourceList{
-							"cpu":    resource.MustParse("800m"),
-							"memory": resource.MustParse("512Mi"),
-						},
-						Requests: corev1.ResourceList{
-							"cpu":    resource.MustParse("500m"),
-							"memory": resource.MustParse("256Mi"),
-						},
-					},
-				},
-			}
-			Expect(testCtx.CreateObj(ctx, clusterObj)).Should(Succeed())
-			Eventually(testdbaas.CheckObj(&testCtx, key, func(g Gomega, cluster *dbaasv1alpha1.Cluster) {
-				g.Expect(cluster.Status.ObservedGeneration == 1).To(BeTrue())
-			}), timeout, interval).Should(Succeed())
-
-			By("mock cluster status running")
-			// MOCK pods are created and running, so as the cluster
-			mockSetClusterStatusPhaseToRunning(key)
-
-			By("send VerticalScalingOpsRequest successfully")
-			verticalScalingOpsRequest := createOpsRequest("mysql-verticalscaling", clusterObj.Name, dbaasv1alpha1.VerticalScalingType)
-			verticalScalingOpsRequest.Spec.TTLSecondsAfterSucceed = 0
-			verticalScalingOpsRequest.Spec.VerticalScalingList = []dbaasv1alpha1.VerticalScaling{
-				{
-					ComponentOps: dbaasv1alpha1.ComponentOps{ComponentName: compName}, // "wesql"
-					ResourceRequirements: corev1.ResourceRequirements{
-						Requests: corev1.ResourceList{
-							"cpu":    resource.MustParse("400m"),
-							"memory": resource.MustParse("300Mi"),
-						},
-					},
-				},
-			}
-			Expect(testCtx.CreateObj(ctx, verticalScalingOpsRequest)).Should(Succeed())
-
-			By("check VerticalScalingOpsRequest running")
-			Eventually(testdbaas.CheckObj(&testCtx, client.ObjectKeyFromObject(verticalScalingOpsRequest),
-				func(g Gomega, ops *dbaasv1alpha1.OpsRequest) {
-					g.Expect(ops.Status.Phase == dbaasv1alpha1.RunningPhase).To(BeTrue())
-				}), timeout, interval).Should(Succeed())
-
-			By("check Cluster and changed component phase is VerticalScaling")
-			Eventually(testdbaas.CheckObj(&testCtx, key, func(g Gomega, cluster *dbaasv1alpha1.Cluster) {
-				g.Expect(cluster.Status.Phase == dbaasv1alpha1.VerticalScalingPhase).To(BeTrue())
-				g.Expect(cluster.Status.Components[compName].Phase == dbaasv1alpha1.VerticalScalingPhase).To(BeTrue())
-			}), timeout, interval).Should(Succeed())
-
-			By("mock bring Cluster and changed component back to running status")
-			mockSetClusterStatusPhaseToRunning(key)
-
-			By("patch opsrequest controller to run")
-			Eventually(testdbaas.ChangeObj(&testCtx, verticalScalingOpsRequest, func() {
-				if verticalScalingOpsRequest.Annotations == nil {
-					verticalScalingOpsRequest.Annotations = make(map[string]string, 1)
-				}
-				verticalScalingOpsRequest.Annotations[intctrlutil.OpsRequestReconcileAnnotationKey] = time.Now().Format(time.RFC3339Nano)
-			}), timeout, interval).Should(Succeed())
-
-			By("check VerticalScalingOpsRequest succeed")
-			Eventually(testdbaas.CheckObj(&testCtx, client.ObjectKeyFromObject(verticalScalingOpsRequest),
-				func(g Gomega, ops *dbaasv1alpha1.OpsRequest) {
-					g.Expect(ops.Status.Phase == dbaasv1alpha1.SucceedPhase).To(BeTrue())
-				}), timeout*3, interval).Should(Succeed())
-
-			By("check cluster resource requirements changed")
-			Eventually(testdbaas.CheckObj(&testCtx, key, func(g Gomega, fetched *dbaasv1alpha1.Cluster) {
-				g.Expect(fetched.Spec.Components[0].Resources.Requests).To(Equal(
-					verticalScalingOpsRequest.Spec.VerticalScalingList[0].Requests))
-			}), timeout, interval).Should(Succeed())
-
-			By("check OpsRequest reclaimed after ttl")
-			Expect(testdbaas.ChangeObj(&testCtx, verticalScalingOpsRequest, func() {
-				verticalScalingOpsRequest.Spec.TTLSecondsAfterSucceed = 1
-			})).Should(Succeed())
-
-			Eventually(func() error {
-				return k8sClient.Get(ctx, client.ObjectKeyFromObject(verticalScalingOpsRequest), verticalScalingOpsRequest)
-			}, timeout, interval).Should(Satisfy(apierrors.IsNotFound))
-		})
-	})
-
-	// TODO move integration tests(which relies on a real K8s cluster) out of UT
 	Context("with Cluster running in real k8s cluster", func() {
 		It("issue an VerticalScalingOpsRequest should change Cluster's resource requirements successfully", func() {
 			const compName = "wesql"
-
-			if !testCtx.UsingExistingCluster() {
-				return
-			}
 
 			By("create cluster")
 			clusterObj, clusterDef, _, key := newClusterObj(nil, nil)

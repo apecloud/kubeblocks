@@ -85,7 +85,6 @@ var _ = BeforeSuite(func() {
 	logger.Info("logger start")
 
 	By("bootstrapping test environment")
-	// var flag = false
 	testEnv = &envtest.Environment{
 		CRDDirectoryPaths: []string{filepath.Join("..", "..", "config", "crd", "bases"),
 			// use dependent external CRDs.
@@ -93,7 +92,6 @@ var _ = BeforeSuite(func() {
 			filepath.Join(build.Default.GOPATH, "pkg", "mod", "github.com", "kubernetes-csi/external-snapshotter/",
 				"client/v6@v6.0.1", "config", "crd")},
 		ErrorIfCRDPathMissing: true,
-		// UseExistingCluster:    &flag,
 	}
 
 	var err error

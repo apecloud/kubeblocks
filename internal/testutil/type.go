@@ -59,7 +59,7 @@ func NewDefaultTestContext(ctx context.Context, cli client.Client, testEnv *envt
 	t := TestContext{
 		TestObjLabelKey:                    "kubeblocks.io/test",
 		DefaultNamespace:                   "default",
-		DefaultEventuallyTimeout:           time.Second * 1000000,
+		DefaultEventuallyTimeout:           time.Second * 10,
 		DefaultEventuallyPollingInterval:   time.Second,
 		DefaultConsistentlyDuration:        time.Second * 3,
 		DefaultConsistentlyPollingInterval: time.Second,

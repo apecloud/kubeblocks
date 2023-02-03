@@ -9,7 +9,7 @@ kbcli cluster horizontal-scale [flags]
 ### Options
 
 ```
-      --component-names strings       Component names to this operations (required)
+      --component-names strings       Component names to this operations
   -h, --help                         help for horizontal-scale
       --name string                  OpsRequest name. if not specified, it will be randomly generated 
       --replicas int                 Replicas with the specified components (default -1)

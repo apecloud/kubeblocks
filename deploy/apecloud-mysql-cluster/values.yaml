@@ -1,4 +1,4 @@
-# Default values for wesqlcluster.
+# Default values for apecloud-mysql-cluster.
 # This is a YAML-formatted file.
 # Declare variables to be passed into your templates.
 
@@ -55,7 +55,7 @@ enabledLogs:
 topologyKeys:
   - kubernetes.io/hostname
 
-## @param tolerations Tolerations for ClickHouse pods assignment
+## @param tolerations
 ## ref: https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/
 ##
-tolerations: []
+tolerations: [ ]

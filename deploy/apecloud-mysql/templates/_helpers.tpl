@@ -1,7 +1,7 @@
 {{/*
 Expand the name of the chart.
 */}}
-{{- define "wesqlcluster.name" -}}
+{{- define "apecloud-mysql.name" -}}
 {{- default .Chart.Name .Values.nameOverride | trunc 63 | trimSuffix "-" }}
 {{- end }}
 
@@ -10,7 +10,7 @@ Create a default fully qualified app name.
 We truncate at 63 chars because some Kubernetes name fields are limited to this (by the DNS naming spec).
 If release name contains chart name it will be used as a full name.
 */}}
-{{- define "wesqlcluster.fullname" -}}
+{{- define "apecloud-mysql.fullname" -}}
 {{- if .Values.fullnameOverride }}
 {{- .Values.fullnameOverride | trunc 63 | trimSuffix "-" }}
 {{- else }}
@@ -26,16 +26,16 @@ If release name contains chart name it will be used as a full name.
 {{/*
 Create chart name and version as used by the chart label.
 */}}
-{{- define "wesqlcluster.chart" -}}
+{{- define "apecloud-mysql.chart" -}}
 {{- printf "%s-%s" .Chart.Name .Chart.Version | replace "+" "_" | trunc 63 | trimSuffix "-" }}
 {{- end }}
 
 {{/*
 Common labels
 */}}
-{{- define "wesqlcluster.labels" -}}
-helm.sh/chart: {{ include "wesqlcluster.chart" . }}
-{{ include "wesqlcluster.selectorLabels" . }}
+{{- define "apecloud-mysql.labels" -}}
+helm.sh/chart: {{ include "apecloud-mysql.chart" . }}
+{{ include "apecloud-mysql.selectorLabels" . }}
 {{- if .Chart.AppVersion }}
 app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
 {{- end }}
@@ -45,17 +45,17 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{/*
 Selector labels
 */}}
-{{- define "wesqlcluster.selectorLabels" -}}
-app.kubernetes.io/name: {{ include "wesqlcluster.name" . }}
+{{- define "apecloud-mysql.selectorLabels" -}}
+app.kubernetes.io/name: {{ include "apecloud-mysql.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 
 {{/*
 Create the name of the service account to use
 */}}
-{{- define "wesqlcluster.serviceAccountName" -}}
+{{- define "apecloud-mysql.serviceAccountName" -}}
 {{- if .Values.serviceAccount.create }}
-{{- default (include "wesqlcluster.fullname" .) .Values.serviceAccount.name }}
+{{- default (include "apecloud-mysql.fullname" .) .Values.serviceAccount.name }}
 {{- else }}
 {{- default "default" .Values.serviceAccount.name }}
 {{- end }}

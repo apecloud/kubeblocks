@@ -1,10 +1,10 @@
-# Default values for wesqlapp.
+# Default values for apecloud-mysql.
 # This is a YAML-formatted file.
 # Declare variables to be passed into your templates.
 
 image:
   registry: 
-  repository: docker.io/apecloud/wesql-server
+  repository: docker.io/apecloud/apecloud-mysql-server
   pullPolicy: IfNotPresent
   # Overrides the image tag whose default is the chart appVersion.
   tag: 8.0.30-5.alpha2.20230105.gd6b8719
@@ -28,7 +28,7 @@ cluster:
 auth:
   ## MYSQL_ROOT_HOST
   rootHost: "%"
-  ## @param auth.createDatabase Wheter to create the .Values.auth.database or not
+  ## @param auth.createDatabase Whether to create the .Values.auth.database or not
   ##
   createDatabase: true
   ## @param auth.database Name for a custom database to create
@@ -1719,8 +1719,7 @@ configTemplate:
     # alias replica_exec_mode. Aliyn slave_exec_mode=STRICT
     slave_exec_mode=IDEMPOTENT
 
-    # gtid   WeSQL Consensus set
-    # AWS OFF_PERMISSIVE
+    # gtid
     gtid_mode=ON
     enforce_gtid_consistency=ON
 

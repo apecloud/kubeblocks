@@ -126,10 +126,10 @@ func FakePods(replicas int, namespace string, cluster string) *corev1.PodList {
 		}
 
 		pod.Labels = map[string]string{
-			types.InstanceLabelKey:         cluster,
-			types.ConsensusSetRoleLabelKey: role,
-			types.ComponentLabelKey:        ComponentName,
-			types.NameLabelKey:             "state.mysql-apecloud-mysql",
+			types.InstanceLabelKey:  cluster,
+			types.RoleLabelKey:      role,
+			types.ComponentLabelKey: ComponentName,
+			types.NameLabelKey:      "state.mysql-apecloud-mysql",
 		}
 		pod.Spec.NodeName = NodeName
 		pod.Spec.Containers = []corev1.Container{

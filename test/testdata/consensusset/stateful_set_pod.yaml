@@ -7,7 +7,7 @@ metadata:
     app.kubernetes.io/name: state.mysql-cluster-definition-consensus
     controller-revision-hash: %s-%s-6fdd48d9cd
     cs.dbaas.kubeblocks.io/access-mode: %s
-    cs.dbaas.kubeblocks.io/role: %s
+    kubeblocks.io/role: %s
     app.kubernetes.io/managed-by: kubeblocks
   name: %s
   namespace: default
@@ -60,7 +60,7 @@ spec:
           fieldPath: metadata.name
     - name: KB_consensus_N
       value: "3"
-    image: docker.io/apecloud/wesql-server:latest
+    image: docker.io/apecloud/apecloud-mysql-server:latest
     imagePullPolicy: IfNotPresent
     name: mysql
     ports:

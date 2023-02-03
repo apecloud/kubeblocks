@@ -341,13 +341,32 @@ bin/reloader.%: ## Cross build bin/reloader.$(OS).$(ARCH) .
 .PHONY: reloader
 reloader: OS=$(shell $(GO) env GOOS)
 reloader: ARCH=$(shell $(GO) env GOARCH)
-reloader: build-checks ## Build agamotto related binaries
+reloader: build-checks ## Build reloader related binaries
 	$(MAKE) bin/reloader.${OS}.${ARCH}
 	mv bin/reloader.${OS}.${ARCH} bin/reloader
 
 .PHONY: clean
-clean-reloader: ## Clean bin/mysqld_exporter.
+clean-reloader: ## Clean bin/reloader.
 	rm -f bin/reloader
+
+##@ cue-helper
+
+CUE_HELPER_LD_FLAGS = "-s -w"
+
+bin/cue-helper.%: ## Cross build bin/cue-helper.$(OS).$(ARCH) .
+	GOOS=$(word 2,$(subst ., ,$@)) GOARCH=$(word 3,$(subst ., ,$@)) $(GO) build -ldflags=${CUE_HELPER_LD_FLAGS} -o $@ ./cmd/reloader/tools/cue_auto_generator.go
+
+.PHONY: cue-helper
+cue-helper: OS=$(shell $(GO) env GOOS)
+cue-helper: ARCH=$(shell $(GO) env GOARCH)
+cue-helper: build-checks ## Build cue-helper related binaries
+	$(MAKE) bin/cue-helper.${OS}.${ARCH}
+	mv bin/cue-helper.${OS}.${ARCH} bin/cue-helper
+
+.PHONY: clean
+clean-cue-helper: ## Clean bin/cue-helper.
+	rm -f bin/cue-helper
+
 
 ##@ PROBE
 
@@ -471,24 +490,6 @@ endif
 .PHONY: helm-package
 helm-package: bump-chart-ver ## Do helm package.
 	$(HELM) package $(CHART_PATH) --dependency-update
-
-##@ WeSQL Cluster Helm Chart Tasks
-
-WESQL_CLUSTER_CHART_PATH = deploy/wesqlcluster
-WESQL_CLUSTER_CHART_NAME = wesqlcluster
-WESQL_CLUSTER_CHART_VERSION ?= 0.1.1
-
-.PHONY: bump-chart-ver-wqsql-cluster
-bump-chart-ver-wqsql-cluster: ## Bump WeSQL Cluster helm chart version.
-ifeq ($(GOOS), darwin)
-	sed -i '' "s/^version:.*/version: $(WESQL_CLUSTER_CHART_VERSION)/" $(WESQL_CLUSTER_CHART_PATH)/Chart.yaml
-else
-	sed -i "s/^version:.*/version: $(WESQL_CLUSTER_CHART_VERSION)/" $(WESQL_CLUSTER_CHART_PATH)/Chart.yaml
-endif
-
-.PHONY: helm-package-wqsql-cluster
-helm-package-wqsql-cluster: bump-chart-ver-wqsql-cluster ## Do WeSQL Cluster helm package.
-	$(HELM) package $(WESQL_CLUSTER_CHART_PATH)
 
 ##@ Build Dependencies
 

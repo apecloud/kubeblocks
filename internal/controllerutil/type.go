@@ -42,7 +42,6 @@ const (
 	AppManagedByLabelKey            = "app.kubernetes.io/managed-by"
 	AppCreatedByLabelKey            = "app.kubernetes.io/created-by" // resources created temporarily by kubeblocks
 	AppConfigTypeLabelKey           = "app.kubernetes.io/config-type"
-	ConsensusSetRoleLabelKey        = "cs.dbaas.kubeblocks.io/role"
 	ConsensusSetAccessModeLabelKey  = "cs.dbaas.kubeblocks.io/access-mode"
 	VolumeClaimTemplateNameLabelKey = "vct.kubeblocks.io/name"
 
@@ -54,6 +53,9 @@ const (
 
 	// StorageClassAnnotationKey StorageClass annotation key in Cluster
 	StorageClassAnnotationKey = "kubeblocks.io/storage-class"
+
+	// RoleLabelKey consensusSet and replicationSet role label key
+	RoleLabelKey = "kubeblocks.io/role"
 
 	// RestartAnnotationKey the annotation which notices the StatefulSet/DeploySet to restart
 	RestartAnnotationKey = "kubeblocks.io/restart"

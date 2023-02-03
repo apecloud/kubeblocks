@@ -56,7 +56,12 @@ statefulset: {
 				"app.kubernetes.io/managed-by":     "kubeblocks"
 			}
 		serviceName:         "\(cluster.metadata.name)-\(component.name)-headless"
-		replicas:            component.replicas
+		if component.type != "replication" {
+			replicas:            component.replicas
+		}
+		if component.type == "replication" {
+			replicas:            1
+		}
 		minReadySeconds:     10
 		podManagementPolicy: "Parallel"
 		template: {
@@ -79,6 +84,8 @@ statefulset: {
 			}
 			spec: component.podSpec
 		}
-		volumeClaimTemplates: component.volumeClaimTemplates
+		if component.type != "replication" {
+			volumeClaimTemplates: component.volumeClaimTemplates
+		}
 	}
 }

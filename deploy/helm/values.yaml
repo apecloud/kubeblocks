@@ -750,7 +750,7 @@ loadbalancer:
   enabled: false
 
 
-wesql:
+apecloud-mysql:
   enabled: true
 
 ## snapshot-controller settings

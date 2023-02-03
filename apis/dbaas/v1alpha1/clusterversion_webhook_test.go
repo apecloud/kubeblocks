@@ -94,7 +94,7 @@ var _ = Describe("clusterVersion webhook", func() {
 
 			By("By testing update clusterVersion.status")
 			patch := client.MergeFrom(clusterVersion.DeepCopy())
-			clusterVersion.Status.ClusterDefSyncStatus = OutOfSyncStatus
+			clusterVersion.Status.Message = "Hello, kubeblocks!"
 			Expect(k8sClient.Status().Patch(ctx, clusterVersion, patch)).Should(Succeed())
 
 			By("By testing update clusterVersion.spec")
@@ -118,6 +118,26 @@ func createTestClusterVersionObj(clusterDefinitionName, clusterVersionName strin
 					{Name: "main"},
 				}}},
 				{Type: "proxy", PodSpec: &corev1.PodSpec{Containers: []corev1.Container{
+					{Name: "main"},
+				}}},
+			},
+		},
+		Status: ClusterVersionStatus{},
+	}
+	return clusterVersion
+}
+
+// createTestReplicationSetClusterVersionObj create a replication clusterVersion object, other webhook_test called this function, carefully for modifying the function.
+func createTestReplicationSetClusterVersionObj(clusterDefinitionName, clusterVersionName string) *ClusterVersion {
+	clusterVersion := &ClusterVersion{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      clusterVersionName,
+			Namespace: "default",
+		},
+		Spec: ClusterVersionSpec{
+			ClusterDefinitionRef: clusterDefinitionName,
+			Components: []ClusterVersionComponent{
+				{Type: "replication", PodSpec: &corev1.PodSpec{Containers: []corev1.Container{
 					{Name: "main"},
 				}}},
 			},

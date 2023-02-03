@@ -69,13 +69,12 @@ spec:
                         characterType when builtIn is true.
                       type: string
                     componentType:
-                      default: Stateless
-                      description: componentType defines type of the component. On
-                        of Stateful, Stateless, Consensus. Default to Stateless.
+                      description: componentType defines type of the component.
                       enum:
                       - Stateless
                       - Stateful
                       - Consensus
+                      - Replication
                       type: string
                     configSpec:
                       description: configSpec defines configuration related spec.

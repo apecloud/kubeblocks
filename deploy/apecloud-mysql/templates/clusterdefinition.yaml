@@ -3,7 +3,7 @@ kind: ClusterDefinition
 metadata:
   name: apecloud-mysql
   labels:
-    {{- include "wesqlapp.labels" . | nindent 4 }}
+    {{- include "apecloud-mysql.labels" . | nindent 4 }}
 spec:
   type: state.mysql
   connectionCredential:

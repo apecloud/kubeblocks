@@ -21,6 +21,7 @@ import (
 	"embed"
 	"encoding/json"
 	"fmt"
+	"math"
 	"reflect"
 	"sort"
 	"strconv"
@@ -46,7 +47,8 @@ import (
 
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
-	"github.com/apecloud/kubeblocks/controllers/dbaas/components/consensusset"
+	"github.com/apecloud/kubeblocks/controllers/dbaas/components/replicationset"
+	componentutil "github.com/apecloud/kubeblocks/controllers/dbaas/components/util"
 	cfgutil "github.com/apecloud/kubeblocks/controllers/dbaas/configuration"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 	cfgcm "github.com/apecloud/kubeblocks/internal/configuration/configmap"
@@ -392,6 +394,8 @@ func mergeComponents(
 		if len(clusterComp.Tolerations) != 0 {
 			tolerations = clusterComp.Tolerations
 		}
+
+		component.PrimaryIndex = clusterComp.PrimaryIndex
 	}
 	if affinity != nil {
 		component.PodSpec.Affinity = buildPodAffinity(cluster, affinity, component)
@@ -603,7 +607,7 @@ func prepareComponentObjs(reqCtx intctrlutil.RequestCtx, cli client.Client, obj 
 		}
 
 		defer func() {
-			// workload object should be append last
+			// workload object should be appended last
 			*params.applyObjs = append(*params.applyObjs, workload)
 		}()
 
@@ -684,6 +688,23 @@ func prepareComponentObjs(reqCtx intctrlutil.RequestCtx, cli client.Client, obj 
 			}); err != nil {
 			return err
 		}
+	case dbaasv1alpha1.Replication:
+		// get the maximum value of params.component.Replicas and the number of existing statefulsets under the current component,
+		// then construct statefulsets for creating replicationSet or handling horizontal scaling of the replicationSet.
+		var existStsList = &appsv1.StatefulSetList{}
+		if err := componentutil.GetObjectListByComponentName(reqCtx.Ctx, cli, params.cluster, existStsList, params.component.Name); err != nil {
+			return err
+		}
+		replicaCount := math.Max(float64(len(existStsList.Items)), float64(params.component.Replicas))
+
+		for index := int32(0); index < int32(replicaCount); index++ {
+			if err := workloadProcessor(
+				func(envConfig *corev1.ConfigMap) (client.Object, error) {
+					return buildReplicationSet(reqCtx, *params, envConfig.Name, index)
+				}); err != nil {
+				return err
+			}
+		}
 	}
 
 	if needBuildPDB(params) {
@@ -702,6 +723,9 @@ func prepareComponentObjs(reqCtx intctrlutil.RequestCtx, cli client.Client, obj 
 		if params.component.ComponentType == dbaasv1alpha1.Consensus {
 			addLeaderSelectorLabels(svc, params.component)
 		}
+		if params.component.ComponentType == dbaasv1alpha1.Replication {
+			svc.Spec.Selector[intctrlutil.RoleLabelKey] = string(replicationset.Primary)
+		}
 		*params.applyObjs = append(*params.applyObjs, svc)
 	}
 
@@ -712,7 +736,7 @@ func prepareComponentObjs(reqCtx intctrlutil.RequestCtx, cli client.Client, obj 
 func addLeaderSelectorLabels(service *corev1.Service, component *Component) {
 	leader := component.ConsensusSpec.Leader
 	if len(leader.Name) > 0 {
-		service.Spec.Selector[intctrlutil.ConsensusSetRoleLabelKey] = leader.Name
+		service.Spec.Selector[intctrlutil.RoleLabelKey] = leader.Name
 	}
 }
 
@@ -1021,18 +1045,37 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 		return nil
 	}
 
+	var stsList []*appsv1.StatefulSet
 	for _, obj := range objs {
 		logger.Info("create or update", "objs", obj)
 		if err := controllerutil.SetOwnerReference(cluster, obj, scheme); err != nil {
 			return false, err
 		}
 		if !controllerutil.ContainsFinalizer(obj, dbClusterFinalizerName) {
-			controllerutil.AddFinalizer(obj, dbClusterFinalizerName)
+			// pvc objects do not need to add finalizer
+			_, ok := obj.(*corev1.PersistentVolumeClaim)
+			if !ok {
+				controllerutil.AddFinalizer(obj, dbClusterFinalizerName)
+			}
 		}
-		if err := cli.Create(ctx, obj); err == nil {
+		// appendToStsList is used to handle statefulSets horizontal scaling when componentType is replication
+		appendToStsList := func(stsList []*appsv1.StatefulSet) []*appsv1.StatefulSet {
+			stsObj, ok := obj.(*appsv1.StatefulSet)
+			if ok {
+				stsList = append(stsList, stsObj)
+			}
+			return stsList
+		}
+
+		err := cli.Create(ctx, obj)
+		if err == nil {
+			stsList = appendToStsList(stsList)
 			continue
-		} else if !apierrors.IsAlreadyExists(err) {
+		}
+		if !apierrors.IsAlreadyExists(err) {
 			return false, err
+		} else {
+			stsList = appendToStsList(stsList)
 		}
 
 		// Secret kind objects should only be applied once
@@ -1077,6 +1120,10 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 			}
 			continue
 		}
+	}
+
+	if err := replicationset.HandleReplicationSet(reqCtx, cli, cluster, stsList); err != nil {
+		return false, err
 	}
 
 	return shouldRequeue, nil
@@ -1176,15 +1223,7 @@ func buildSts(reqCtx intctrlutil.RequestCtx, params createParams, envConfigName 
 	// update sts.spec.volumeClaimTemplates[].metadata.labels
 	if len(sts.Spec.VolumeClaimTemplates) > 0 && len(sts.GetLabels()) > 0 {
 		for index, vct := range sts.Spec.VolumeClaimTemplates {
-			if vct.Labels == nil {
-				vct.Labels = make(map[string]string)
-			}
-			vct.Labels[intctrlutil.VolumeClaimTemplateNameLabelKey] = vct.Name
-			for k, v := range sts.Labels {
-				if _, ok := vct.Labels[k]; !ok {
-					vct.Labels[k] = v
-				}
-			}
+			buildPersistentVolumeClaimLabels(&sts, &vct)
 			sts.Spec.VolumeClaimTemplates[index] = vct
 		}
 	}
@@ -1193,6 +1232,19 @@ func buildSts(reqCtx intctrlutil.RequestCtx, params createParams, envConfigName 
 		return nil, err
 	}
 	return &sts, nil
+}
+
+// buildPersistentVolumeClaimLabels builds a pvc name label, and synchronize the labels on the sts to the pvc labels.
+func buildPersistentVolumeClaimLabels(sts *appsv1.StatefulSet, pvc *corev1.PersistentVolumeClaim) {
+	if pvc.Labels == nil {
+		pvc.Labels = make(map[string]string)
+	}
+	pvc.Labels[intctrlutil.VolumeClaimTemplateNameLabelKey] = pvc.Name
+	for k, v := range sts.Labels {
+		if _, ok := pvc.Labels[k]; !ok {
+			pvc.Labels[k] = v
+		}
+	}
 }
 
 func processContainersInjection(reqCtx intctrlutil.RequestCtx,
@@ -1266,6 +1318,85 @@ func injectEnvs(params createParams, envConfigName string, c *corev1.Container) 
 			},
 		},
 	})
+}
+
+// buildReplicationSet builds a replication component on statefulSet.
+func buildReplicationSet(reqCtx intctrlutil.RequestCtx,
+	params createParams,
+	envConfigName string,
+	stsIndex int32) (*appsv1.StatefulSet, error) {
+	sts, err := buildSts(reqCtx, params, envConfigName)
+	if err != nil {
+		return nil, err
+	}
+	// inject replicationSet pod env and role label.
+	if sts, err = injectReplicationSetPodEnvAndLabel(params, sts, stsIndex); err != nil {
+		return nil, err
+	}
+	// sts.Name rename and add role label.
+	sts.ObjectMeta.Name = fmt.Sprintf("%s-%d", sts.ObjectMeta.Name, stsIndex)
+	sts.Labels[intctrlutil.RoleLabelKey] = string(replicationset.Secondary)
+	if stsIndex == *params.component.PrimaryIndex {
+		sts.Labels[intctrlutil.RoleLabelKey] = string(replicationset.Primary)
+	}
+	sts.Spec.UpdateStrategy.Type = appsv1.OnDeleteStatefulSetStrategyType
+	// build replicationSet persistentVolumeClaim manually
+	if err := buildReplicationSetPVC(params, sts); err != nil {
+		return sts, err
+	}
+	return sts, nil
+}
+
+// buildReplicationSetPVC builds replicationSet persistentVolumeClaim manually,
+// replicationSet does not manage pvc through volumeClaimTemplate defined on statefulSet,
+// the purpose is convenient to convert between componentTypes in the future (TODO).
+func buildReplicationSetPVC(params createParams, sts *appsv1.StatefulSet) error {
+	// generate persistentVolumeClaim objects used by replicationSet's pod from component.VolumeClaimTemplates
+	// TODO: The pvc objects involved in all processes in the KubeBlocks will be reconstructed into a unified generation method
+	pvcMap := replicationset.GeneratePVCFromVolumeClaimTemplates(sts, params.component.VolumeClaimTemplates)
+	for _, pvc := range pvcMap {
+		buildPersistentVolumeClaimLabels(sts, pvc)
+		*params.applyObjs = append(*params.applyObjs, pvc)
+	}
+
+	// binding persistentVolumeClaim to podSpec.Volumes
+	podSpec := &sts.Spec.Template.Spec
+	if podSpec == nil {
+		return nil
+	}
+	podVolumes := podSpec.Volumes
+	for _, pvc := range pvcMap {
+		podVolumes, _ = intctrlutil.CheckAndUpdateVolume(podVolumes, pvc.Name, func(volumeName string) corev1.Volume {
+			return corev1.Volume{
+				Name: volumeName,
+				VolumeSource: corev1.VolumeSource{
+					PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+						ClaimName: pvc.Name,
+					},
+				},
+			}
+		}, nil)
+	}
+	podSpec.Volumes = podVolumes
+	return nil
+}
+
+func injectReplicationSetPodEnvAndLabel(params createParams, sts *appsv1.StatefulSet, index int32) (*appsv1.StatefulSet, error) {
+	svcName := strings.Join([]string{params.cluster.Name, params.component.Name, "headless"}, "-")
+	for i := range sts.Spec.Template.Spec.Containers {
+		c := &sts.Spec.Template.Spec.Containers[i]
+		c.Env = append(c.Env, corev1.EnvVar{
+			Name:      dbaasPrefix + "_PRIMARY_POD_NAME",
+			Value:     fmt.Sprintf("%s-%d-%d.%s", sts.Name, *params.component.PrimaryIndex, 0, svcName),
+			ValueFrom: nil,
+		})
+	}
+	if index != *params.component.PrimaryIndex {
+		sts.Spec.Template.Labels[intctrlutil.RoleLabelKey] = string(replicationset.Secondary)
+	} else {
+		sts.Spec.Template.Labels[intctrlutil.RoleLabelKey] = string(replicationset.Primary)
+	}
+	return sts, nil
 }
 
 // buildConsensusSet build on a stateful set
@@ -1524,13 +1655,13 @@ func buildEnvConfig(params createParams) (*corev1.ConfigMap, error) {
 		if v, ok := params.cluster.Status.Components[params.component.Name]; ok {
 			consensusSetStatus := v.ConsensusSetStatus
 			if consensusSetStatus != nil {
-				if consensusSetStatus.Leader.Pod != consensusset.DefaultPodName {
+				if consensusSetStatus.Leader.Pod != componentutil.ComponentStatusDefaultPodName {
 					envData[prefix+"LEADER"] = consensusSetStatus.Leader.Pod
 				}
 
 				followers := ""
 				for _, follower := range consensusSetStatus.Followers {
-					if follower.Pod == consensusset.DefaultPodName {
+					if follower.Pod == componentutil.ComponentStatusDefaultPodName {
 						continue
 					}
 					if len(followers) > 0 {
@@ -1539,6 +1670,23 @@ func buildEnvConfig(params createParams) (*corev1.ConfigMap, error) {
 					followers += follower.Pod
 				}
 				envData[prefix+"FOLLOWERS"] = followers
+			}
+			replicationSetStatus := v.ReplicationSetStatus
+			if replicationSetStatus != nil {
+				if replicationSetStatus.Primary.Pod != componentutil.ComponentStatusDefaultPodName {
+					envData[prefix+"PRIMARY"] = replicationSetStatus.Primary.Pod
+				}
+				secondaries := ""
+				for _, secondary := range replicationSetStatus.Secondaries {
+					if secondary.Pod == componentutil.ComponentStatusDefaultPodName {
+						continue
+					}
+					if len(secondaries) > 0 {
+						secondaries += ","
+					}
+					secondaries += secondary.Pod
+				}
+				envData[prefix+"SECONDARIES"] = secondaries
 			}
 		}
 	}

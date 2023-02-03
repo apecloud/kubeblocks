@@ -165,7 +165,6 @@ var _ = Describe("SystemAccount Controller", func() {
 			},
 			Spec: dataprotectionv1alpha1.BackupPolicySpec{
 				Target: dataprotectionv1alpha1.TargetCluster{
-					DatabaseEngine: engineName,
 					LabelsSelector: &metav1.LabelSelector{MatchLabels: ml},
 					Secret: dataprotectionv1alpha1.BackupPolicySecret{
 						Name: "mock-secret-file",

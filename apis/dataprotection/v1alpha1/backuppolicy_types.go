@@ -73,16 +73,6 @@ type BackupPolicySpec struct {
 
 // TargetCluster TODO (dsj): target cluster need redefined from Cluster API
 type TargetCluster struct {
-	// database engine to support in the backup.
-	// +kubebuilder:validation:Enum={mysql}
-	// +optional
-	DatabaseEngine string `json:"databaseEngine,omitempty"`
-
-	// database engine to support in the backup.
-	// +kubebuilder:validation:Enum={5.6,5.7,8.0}
-	// +optional
-	DatabaseEngineVersions []string `json:"databaseEngineVersion,omitempty"`
-
 	// LabelSelector is used to find matching pods.
 	// Pods that match this label selector are counted to determine the number of pods
 	// in their corresponding topology domain.

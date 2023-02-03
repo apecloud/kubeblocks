@@ -58,20 +58,6 @@ spec:
               target:
                 description: the target database workload to restore
                 properties:
-                  databaseEngine:
-                    description: database engine to support in the backup.
-                    enum:
-                    - mysql
-                    type: string
-                  databaseEngineVersion:
-                    description: database engine to support in the backup.
-                    enum:
-                    - 5.6
-                    - 5.7
-                    - 8
-                    items:
-                      type: string
-                    type: array
                   labelsSelector:
                     description: LabelSelector is used to find matching pods. Pods
                       that match this label selector are counted to determine the

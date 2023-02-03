@@ -9,7 +9,7 @@ kbcli cluster restart [flags]
 ### Options
 
 ```
-      --component-names strings       Component names to this operations (required)
+      --component-names strings       Component names to this operations
   -h, --help                         help for restart
       --name string                  OpsRequest name. if not specified, it will be randomly generated 
       --ttlSecondsAfterSucceed int   Time to live after the OpsRequest succeed

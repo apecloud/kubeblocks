@@ -16,7 +16,7 @@ kbcli cluster configure [flags]
 ### Options
 
 ```
-      --component-names strings       Component names to this operations (required)
+      --component-names strings       Component names to this operations
       --config-file string           Specifies the name of the configuration file to be updated
       --configure-url string         Specify the configuration file path url (required)
   -h, --help                         help for configure

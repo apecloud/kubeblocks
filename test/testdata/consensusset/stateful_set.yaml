@@ -75,7 +75,7 @@ spec:
               fieldPath: metadata.name
         - name: KB_consensus_N
           value: "3"
-        image: docker.io/apecloud/wesql-server:latest
+        image: docker.io/apecloud/apecloud-mysql-server:latest
         imagePullPolicy: IfNotPresent
         name: mysql
         resources:

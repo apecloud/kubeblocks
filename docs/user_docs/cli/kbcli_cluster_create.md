@@ -32,11 +32,13 @@ kbcli cluster create [NAME] [flags]
   kbcli cluster create mycluster --cluster-definition=my-cluster-def --set=my.yaml --termination-policy=WipeOut
   
   # In scenarios where you want to load components data from website URL
-  kbcli cluster create mycluster --cluster-definition=my-cluster-def --set=https://kubeblocks.io/yamls/my.yaml
+  # the cluster, use termination policy Halt
+  kbcli cluster create mycluster --cluster-definition=my-cluster-def --set=https://kubeblocks.io/yamls/wesql_single.yaml --termination-policy=Halt
   
   # In scenarios where you want to load components data from stdin
+  # the cluster, use termination policy Halt
   cat << EOF | kbcli cluster create mycluster --cluster-definition=my-cluster-def --termination-policy=Halt --set -
-  - name: my-test... (omission from stdin)
+  - name: wesql-test... (omission from stdin)
   
   # Create a cluster forced to scatter by node
   kbcli cluster create --cluster-definition=my-cluster-def --topology-keys=kubernetes.io/hostname --pod-anti-affinity=Required

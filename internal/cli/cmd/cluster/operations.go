@@ -89,7 +89,7 @@ func (o *OperationsOptions) buildCommonFlags(cmd *cobra.Command) {
 	cmd.Flags().StringVar(&o.OpsRequestName, "name", "", "OpsRequest name. if not specified, it will be randomly generated ")
 	cmd.Flags().IntVar(&o.TTLSecondsAfterSucceed, "ttlSecondsAfterSucceed", 0, "Time to live after the OpsRequest succeed")
 	if o.OpsType != dbaasv1alpha1.UpgradeType {
-		cmd.Flags().StringSliceVar(&o.ComponentNames, "component-names", nil, " Component names to this operations (required)")
+		cmd.Flags().StringSliceVar(&o.ComponentNames, "component-names", nil, " Component names to this operations")
 	}
 }
 

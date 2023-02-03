@@ -46,7 +46,7 @@ Here is an example of how to create a KubeBlocks cluster using a YAML file.
   2. Specify the `cluster-definition`, `cluster-version`, `terminationPolicy`, and `components` and run `kbcli cluster create NAME` to create a cluster.
    
     ```
-    kbcli cluster create ac-cluster --cluster-definition=apecloud-mysql  --cluster-version=ac-mysql-8.0.30 --components=mycluster.yaml --termination-policy=WipeOut
+    kbcli cluster create ac-cluster --cluster-definition=apecloud-mysql  --cluster-version=ac-mysql-8.0.30 --set=mycluster.yaml --termination-policy=WipeOut
     ```
 
 ## Delete a cluster

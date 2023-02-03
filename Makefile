@@ -128,7 +128,7 @@ help: ## Display this help.
 	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage:\n  make \033[36m<target>\033[0m\n"} /^[a-zA-Z_0-9-]+:.*?##/ { printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
 
 .PHONY: all
-all: manager kbcli agamotto reloader ## Make all cmd binaries.
+all: manager kbcli probe agamotto reloader ## Make all cmd binaries.
 
 ##@ Development
 
@@ -309,7 +309,7 @@ run-delve: manifests generate fmt vet  ## Run Delve debugger.
 	dlv --listen=:$(DEBUG_PORT) --headless=true --api-version=2 --accept-multiclient debug $(GO_PACKAGE) -- $(ARGUMENTS)
 
 
-##@ Agamotto
+##@ agamotto cmd
 
 AGAMOTTO_LD_FLAGS = "-s -w \
     -X github.com/prometheus/common/version.Version=$(VERSION) \
@@ -328,10 +328,10 @@ agamotto: build-checks ## Build agamotto related binaries
 	mv bin/agamotto.${OS}.${ARCH} bin/agamotto
 
 .PHONY: clean
-clean-agamotto: ## Clean bin/mysqld_exporter.
+clean-agamotto: ## Clean bin/agamotto.
 	rm -f bin/agamotto
 
-##@ reloader
+##@ reloader cmd
 
 RELOADER_LD_FLAGS = "-s -w"
 
@@ -368,43 +368,23 @@ clean-cue-helper: ## Clean bin/cue-helper.
 	rm -f bin/cue-helper
 
 
-##@ PROBE
+##@ probe cmd
 
-
-PROBE_BUILD_PATH = ./cmd/probe
 PROBE_LD_FLAGS = "-s -w"
 
 bin/probe.%: ## Cross build bin/probe.$(OS).$(ARCH) .
-	cd $(PROBE_BUILD_PATH) && GOOS=$(word 2,$(subst ., ,$@)) GOARCH=$(word 3,$(subst ., ,$@)) $(GO) build -ldflags=${PROBE_LD_FLAGS} -o ../../$@  ./main.go
-
-probe-mod-vendor:
-	cd $(PROBE_BUILD_PATH) && $(GO) mod tidy -compat=1.19
-	cd $(PROBE_BUILD_PATH) && $(GO) mod vendor
-	cd $(PROBE_BUILD_PATH) && $(GO) mod verify
+	GOOS=$(word 2,$(subst ., ,$@)) GOARCH=$(word 3,$(subst ., ,$@)) $(GO) build -ldflags=${PROBE_LD_FLAGS} -o $@  ./cmd/probe/main.go
 
 .PHONY: probe
 probe: OS=$(shell $(GO) env GOOS)
 probe: ARCH=$(shell $(GO) env GOARCH)
-probe: probe-mod-vendor # build-checks ## Build probe related binaries
+probe: build-checks ## Build probe related binaries
 	$(MAKE) bin/probe.${OS}.${ARCH}
 	mv bin/probe.${OS}.${ARCH} bin/probe
 
 .PHONY: clean
-clean-probe: ## Clean bin/mysqld_exporter.
+clean-probe: ## Clean bin/probe.
 	rm -f bin/probe
-
-.PHONY: test-probe
-test-probe:
-	cd ./cmd/probe && $(GO) test ./... -coverprofile cover.out
-
-.PHONY: cover-report-probe
-cover-report-probe: ## Generate cover.html from cmd/probe/cover.out
-	cd ./cmd/probe && $(GO) tool cover -html=cover.out -o cover.html
-ifeq ($(GOOS), darwin)
-	open ./cmd/probe/cover.html
-else
-	echo "open cmd/probe/cover.html with a HTML viewer."
-endif
 
 ##@ Deployment
 

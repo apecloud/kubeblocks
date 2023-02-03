@@ -18,18 +18,15 @@ package dataprotection
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
 
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
-	"github.com/leaanthony/debme"
 	"github.com/spf13/viper"
 	appv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -59,7 +56,6 @@ type BackupReconciler struct {
 //+kubebuilder:rbac:groups=dataprotection.kubeblocks.io,resources=backups/finalizers,verbs=update
 
 //+kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=snapshot.storage.k8s.io,resources=volumesnapshots,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=snapshot.storage.k8s.io,resources=volumesnapshots/finalizers,verbs=update;patch
 
@@ -256,10 +252,6 @@ func (r *BackupReconciler) doInProgressPhaseAction(
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 
-	// create super credential to restore a new instance
-	if err := r.createBackupCredential(reqCtx, backup); err != nil {
-		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-	}
 	return intctrlutil.Reconciled()
 }
 
@@ -630,39 +622,11 @@ func (r *BackupReconciler) deleteReferenceVolumeSnapshot(reqCtx intctrlutil.Requ
 	return nil
 }
 
-func (r *BackupReconciler) deleteReferenceSecrets(reqCtx intctrlutil.RequestCtx, backup *dataprotectionv1alpha1.Backup) error {
-	secrets := &corev1.SecretList{}
-	ml := client.MatchingLabels{
-		dataProtectionLabelBackupNameKey: backup.Name,
-		intctrlutil.AppManagedByLabelKey: intctrlutil.AppName,
-	}
-	if err := r.Client.List(reqCtx.Ctx, secrets,
-		client.InNamespace(reqCtx.Req.Namespace), ml); err != nil {
-		return err
-	}
-	for _, i := range secrets.Items {
-		if controllerutil.ContainsFinalizer(&i, dataProtectionFinalizerName) {
-			patch := client.MergeFrom(i.DeepCopy())
-			controllerutil.RemoveFinalizer(&i, dataProtectionFinalizerName)
-			if err := r.Patch(reqCtx.Ctx, &i, patch); err != nil {
-				return err
-			}
-		}
-		if err := DeleteObjectBackground(r.Client, reqCtx.Ctx, &i); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
 func (r *BackupReconciler) deleteExternalResources(reqCtx intctrlutil.RequestCtx, backup *dataprotectionv1alpha1.Backup) error {
 	if err := r.deleteReferenceBatchV1Jobs(reqCtx, backup); err != nil {
 		return err
 	}
 	if err := r.deleteReferenceVolumeSnapshot(reqCtx, backup); err != nil {
-		return err
-	}
-	if err := r.deleteReferenceSecrets(reqCtx, backup); err != nil {
 		return err
 	}
 	return nil
@@ -896,81 +860,4 @@ func (r *BackupReconciler) BuildSnapshotPodSpec(
 	podSpec.ServiceAccountName = "kubeblocks"
 
 	return podSpec, nil
-}
-
-func (r *BackupReconciler) buildSecret(reqCtx intctrlutil.RequestCtx, backup *dataprotectionv1alpha1.Backup) (*corev1.Secret, error) {
-	tplFile := "backup_secret.cue"
-	cueFS, _ := debme.FS(cueTemplates, "cue")
-	cueTpl, err := intctrlutil.NewCUETplFromBytes(cueFS.ReadFile(tplFile))
-	if err != nil {
-		return nil, err
-	}
-	cueValue := intctrlutil.NewCUEBuilder(*cueTpl)
-
-	// fill backup
-	backupOptionsByte, err := json.Marshal(backup)
-	if err != nil {
-		return nil, err
-	}
-	if err = cueValue.Fill("backup", backupOptionsByte); err != nil {
-		return nil, err
-	}
-
-	// fill original super conn credential
-	secretLabels := func(backup *dataprotectionv1alpha1.Backup) map[string]string {
-		labels := map[string]string{}
-		labels[intctrlutil.AppManagedByLabelKey] = intctrlutil.AppName
-		if backup.Labels != nil {
-			labels[intctrlutil.AppInstanceLabelKey] = backup.Labels[intctrlutil.AppInstanceLabelKey]
-		}
-		return labels
-	}
-	secrets := corev1.SecretList{}
-	if err = r.Client.List(reqCtx.Ctx, &secrets,
-		client.InNamespace(reqCtx.Req.Namespace),
-		client.MatchingLabels(secretLabels(backup))); err != nil {
-		return nil, err
-	}
-	if len(secrets.Items) == 0 {
-		return nil, errors.New("not found conn credential")
-	}
-
-	secretByte, err := json.Marshal(secrets.Items[0])
-	if err != nil {
-		return nil, err
-	}
-	if err = cueValue.Fill("original_secret", secretByte); err != nil {
-		return nil, err
-	}
-
-	backupSecretByte, err := cueValue.Lookup("secret")
-	if err != nil {
-		return nil, err
-	}
-
-	backupSecret := corev1.Secret{}
-	if err = json.Unmarshal(backupSecretByte, &backupSecret); err != nil {
-		return nil, err
-	}
-
-	controllerutil.AddFinalizer(&backupSecret, dataProtectionFinalizerName)
-
-	scheme, _ := dataprotectionv1alpha1.SchemeBuilder.Build()
-	if err = controllerutil.SetOwnerReference(backup, &backupSecret, scheme); err != nil {
-		return nil, err
-	}
-
-	return &backupSecret, nil
-}
-
-func (r *BackupReconciler) createBackupCredential(reqCtx intctrlutil.RequestCtx, backup *dataprotectionv1alpha1.Backup) error {
-	secret, err := r.buildSecret(reqCtx, backup)
-	if err != nil {
-		return err
-	}
-
-	if err := r.Client.Create(reqCtx.Ctx, secret); err != nil && !apierrors.IsAlreadyExists(err) {
-		return err
-	}
-	return nil
 }

@@ -843,19 +843,8 @@ spec:
 		})
 
 		It("builds ConnCredential correctly", func() {
-			reqCtx := newReqCtx()
 			params := newParams()
-			credential, err := buildConnCredential(*params, reqCtx, testCtx.Cli)
-			Expect(err).Should(BeNil())
-			Expect(credential).ShouldNot(BeNil())
-		})
-
-		It("builds ConnCredential from backup correctly", func() {
-			reqCtx := newReqCtx()
-			params := newParams()
-			params.cluster.Spec.Components[0].VolumeClaimTemplates[0].Spec.DataSource =
-				&corev1.TypedLocalObjectReference{Name: "test-backup-data"}
-			credential, err := buildConnCredential(*params, reqCtx, testCtx.Cli)
+			credential, err := buildConnCredential(*params)
 			Expect(err).Should(BeNil())
 			Expect(credential).ShouldNot(BeNil())
 		})

@@ -553,7 +553,7 @@ func prepareSecretObjs(reqCtx intctrlutil.RequestCtx, cli client.Client, obj int
 		return fmt.Errorf("invalid arg")
 	}
 
-	secret, err := buildConnCredential(*params, reqCtx, cli)
+	secret, err := buildConnCredential(*params)
 	if err != nil {
 		return err
 	}
@@ -1103,38 +1103,7 @@ func randomString(length int) string {
 	return res
 }
 
-func isRestoredCluster(params createParams) bool {
-	// TODO:  Needs to be optimized to make it easier to determine if it is a restored cluster
-	components := params.cluster.Spec.Components
-	if len(components) > 0 && len(components[0].VolumeClaimTemplates) > 0 &&
-		components[0].VolumeClaimTemplates[0].Spec.DataSource != nil &&
-		components[0].VolumeClaimTemplates[0].Spec.DataSource.Name != "" {
-		return true
-	}
-	return false
-}
-
-func restoreConnCredentialFromBackup(params createParams, reqCtx intctrlutil.RequestCtx, cli client.Client,
-	connCredential *corev1.Secret) error {
-	ml := client.MatchingLabels{
-		"backups.dataprotection.kubeblocks.io/name": params.cluster.Spec.Components[0].VolumeClaimTemplates[0].Spec.DataSource.Name,
-		intctrlutil.AppManagedByLabelKey:            intctrlutil.AppName,
-	}
-	secrets := &corev1.SecretList{}
-	if err := cli.List(reqCtx.Ctx, secrets,
-		client.InNamespace(params.cluster.Namespace), ml); err != nil {
-		return err
-	}
-	// replace secret data from backup
-	if len(secrets.Items) == 0 {
-		return fmt.Errorf("secret not found for restore")
-	}
-	connCredential.Data = secrets.Items[0].Data
-	connCredential.StringData = nil
-	return nil
-}
-
-func buildConnCredential(params createParams, reqCtx intctrlutil.RequestCtx, cli client.Client) (*corev1.Secret, error) {
+func buildConnCredential(params createParams) (*corev1.Secret, error) {
 	const tplFile = "conn_credential_template.cue"
 
 	connCredential := corev1.Secret{}
@@ -1143,18 +1112,6 @@ func buildConnCredential(params createParams, reqCtx intctrlutil.RequestCtx, cli
 		"cluster":           params.cluster,
 	}, "secret", &connCredential); err != nil {
 		return nil, err
-	}
-	if isRestoredCluster(params) {
-		// when restoring the cluster, the super credentials also need to be restored from the backup
-		err := restoreConnCredentialFromBackup(params, reqCtx, cli, &connCredential)
-
-		// return connect credential if success restore from backup.
-		// if something is wrong, it should not interrupt the creation process,
-		// and users can access the restored data through their own accounts
-		if err == nil {
-			return &connCredential, nil
-		}
-		reqCtx.Recorder.Event(params.cluster, corev1.EventTypeWarning, "buildConnCredential", err.Error())
 	}
 
 	if len(connCredential.StringData) == 0 {

@@ -154,9 +154,7 @@ func CreateDBaasFromISV(testCtx testutil.TestContext, ctx context.Context, mockI
 			testdata.WithUpdateComponent(testdata.ComponentTypeSelector(dbaasv1alpha1.Stateful),
 				func(component *dbaasv1alpha1.ClusterDefinitionComponent) {
 					component.TypeName = cdComponentTypeName
-				}),
-
-		),
+				})),
 		// mock config cm
 		mockobject.WithCustomResource(types.CMGVR(), mockobject.NewFakeConfigCMResource(randomNamer, componentName, randomNamer.VolumeName,
 			testdata.WithCMData(func() map[string]string {

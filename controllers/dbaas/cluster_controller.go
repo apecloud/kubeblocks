@@ -152,7 +152,7 @@ func (r *ClusterReconciler) Handle(cli client.Client, reqCtx intctrlutil.Request
 		annotations = event.GetAnnotations()
 	)
 	// filter role changed event that has been handled
-	if annotations != nil && annotations[csRoleChangedAnnotKey] == "true" {
+	if annotations != nil && annotations[csRoleChangedAnnotKey] == trueStr {
 		return nil
 	}
 
@@ -165,7 +165,7 @@ func (r *ClusterReconciler) Handle(cli client.Client, reqCtx intctrlutil.Request
 	if event.Annotations == nil {
 		event.Annotations = make(map[string]string, 0)
 	}
-	event.Annotations[csRoleChangedAnnotKey] = "true"
+	event.Annotations[csRoleChangedAnnotKey] = trueStr
 	if err = cli.Patch(reqCtx.Ctx, event, patch); err != nil {
 		return err
 	}
@@ -825,14 +825,4 @@ func getSupportHorizontalScalingComponents(
 	}
 
 	return horizontalScalableComponents
-}
-
-// getListOption gets opts parameters for cli.List interface
-func getListOption(cluster *dbaasv1alpha1.Cluster, clusterDef *dbaasv1alpha1.ClusterDefinition) (ml client.MatchingLabels, inNS client.InNamespace) {
-	ml = client.MatchingLabels{
-		intctrlutil.AppInstanceLabelKey: cluster.GetName(),
-		intctrlutil.AppNameLabelKey:     fmt.Sprintf("%s-%s", clusterDef.Spec.Type, clusterDef.Name),
-	}
-	inNS = client.InNamespace(cluster.Namespace)
-	return
 }

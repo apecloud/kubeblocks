@@ -126,3 +126,30 @@ type envVar struct {
 	fieldPath string
 	value     string
 }
+
+const (
+	maxConcurReconClusterVersionKey = "MAXCONCURRENTRECONCILES_CLUSTERVERSION"
+	maxConcurReconClusterDefKey     = "MAXCONCURRENTRECONCILES_CLUSTERDEF"
+
+	// name of our custom finalizer
+	dbClusterFinalizerName      = "cluster.kubeblocks.io/finalizer"
+	dbClusterDefFinalizerName   = "clusterdefinition.kubeblocks.io/finalizer"
+	clusterVersionFinalizerName = "clusterversion.kubeblocks.io/finalizer"
+	opsRequestFinalizerName     = "opsrequest.kubeblocks.io/finalizer"
+
+	// label keys
+	clusterDefLabelKey         = "clusterdefinition.kubeblocks.io/name"
+	clusterVersionLabelKey     = "clusterversion.kubeblocks.io/name"
+	statefulSetPodNameLabelKey = "statefulset.kubernetes.io/pod-name"
+	csRoleChangedAnnotKey      = "cs.kubeblocks.io/event-handled"
+	clusterAccountLabelKey     = "account.kubeblocks.io/name"
+
+	// annotations keys
+	lifecycleAnnotationKey = "cluster.kubeblocks.io/lifecycle"
+
+	// annotations values
+	lifecycleDeletePVCAnnotation = "delete-pvc"
+
+	// general values
+	trueStr = "true"
+)

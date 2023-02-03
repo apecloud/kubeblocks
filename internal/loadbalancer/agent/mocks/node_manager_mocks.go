@@ -26,8 +26,9 @@ import (
 	context "context"
 	reflect "reflect"
 
-	agent "github.com/apecloud/kubeblocks/internal/loadbalancer/agent"
 	gomock "github.com/golang/mock/gomock"
+
+	agent "github.com/apecloud/kubeblocks/internal/loadbalancer/agent"
 )
 
 // MockNodeManager is a mock of NodeManager interface.

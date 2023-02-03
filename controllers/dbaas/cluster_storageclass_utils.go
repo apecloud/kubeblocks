@@ -116,7 +116,7 @@ func clusterContainsStorageClass(cluster *dbaasv1alpha1.Cluster, storageClassNam
 }
 
 func isDefaultStorageClassAnnotation(storageClass *storagev1.StorageClass) bool {
-	return storageClass.Annotations != nil && storageClass.Annotations[storage.IsDefaultStorageClassAnnotation] == "true"
+	return storageClass.Annotations != nil && storageClass.Annotations[storage.IsDefaultStorageClassAnnotation] == trueStr
 }
 
 func isSupportVolumeExpansion(storageClass *storagev1.StorageClass) bool {

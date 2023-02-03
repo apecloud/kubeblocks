@@ -19,6 +19,7 @@ package probe
 import (
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/dapr/components-contrib/middleware"
 	"github.com/dapr/kit/logger"

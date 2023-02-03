@@ -84,7 +84,7 @@ func (m *Middleware) GetHandler(metadata middleware.Metadata) (func(next fasthtt
 					body = `{"operation": "roleCheck", "metadata": {"sql" : ""}}`
 					ctx.Request.SetBody([]byte(body))
 				default:
-					m.logger.Infof("unknown probe operation: %v", operation)
+					m.logger.Infof("unknown probe operation: %v", string(operation))
 				}
 			}
 

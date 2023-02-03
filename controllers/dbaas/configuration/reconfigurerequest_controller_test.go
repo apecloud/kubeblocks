@@ -18,7 +18,6 @@ package configuration
 
 import (
 	"context"
-	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -35,9 +34,6 @@ import (
 )
 
 var _ = Describe("Reconfigure Controller", func() {
-	const timeout = time.Second * 80
-	const interval = time.Second * 1
-
 	var ctx = context.Background()
 
 	cleanEnv := func() {
@@ -106,15 +102,14 @@ var _ = Describe("Reconfigure Controller", func() {
 						cm.Labels[cfgcore.CMConfigurationTypeLabelKey] != "" &&
 						cm.Labels[cfgcore.CMInsLastReconfigureMethodLabelKey] == ReconfigureFirstConfigType &&
 						configHash != "").Should(BeTrue())
-			}, timeout, interval).Should(Succeed())
+			}).Should(Succeed())
 
 			By("Update config, old version: " + configHash)
 			updatedCM, err := testdata.GetResourceFromTestData[corev1.ConfigMap]("resources/mysql_ins_config_update.yaml")
 			Expect(err).Should(Succeed())
-			Eventually(testdbaas.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(testWrapper.cfgCM),
-				func(cm *corev1.ConfigMap) {
-					cm.Data = updatedCM.Data
-				})).Should(Succeed())
+			Eventually(testdbaas.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(testWrapper.cfgCM), func(cm *corev1.ConfigMap) {
+				cm.Data = updatedCM.Data
+			})).Should(Succeed())
 
 			By("check config new version")
 			Eventually(func(g Gomega) {
@@ -123,37 +118,35 @@ var _ = Describe("Reconfigure Controller", func() {
 				newHash := cm.Labels[cfgcore.CMInsConfigurationHashLabelKey]
 				g.Expect(newHash != configHash &&
 					cm.Labels[cfgcore.CMInsLastReconfigureMethodLabelKey] == ReconfigureAutoReloadType).Should(BeTrue())
-			}, timeout, interval).Should(Succeed())
+			}).Should(Succeed())
 
 			By("invalid Update")
 			invalidUpdatedCM, err := testdata.GetResourceFromTestData[corev1.ConfigMap]("resources/mysql_ins_config_invalid_update.yaml")
 			Expect(err).Should(Succeed())
-			Eventually(testdbaas.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(testWrapper.cfgCM),
-				func(cm *corev1.ConfigMap) {
-					cm.Data = invalidUpdatedCM.Data
-				})).Should(Succeed())
+			Eventually(testdbaas.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(testWrapper.cfgCM), func(cm *corev1.ConfigMap) {
+				cm.Data = invalidUpdatedCM.Data
+			})).Should(Succeed())
 
 			By("check invalid update")
 			Eventually(func(g Gomega) {
 				cm := &corev1.ConfigMap{}
 				g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(testWrapper.cfgCM), cm)).Should(Succeed())
 				g.Expect(cm.Labels[cfgcore.CMInsLastReconfigureMethodLabelKey]).Should(BeEquivalentTo(ReconfigureNoChangeType))
-			}, timeout, interval).Should(Succeed())
+			}).Should(Succeed())
 
 			By("restart Update")
 			restartUpdatedCM, err := testdata.GetResourceFromTestData[corev1.ConfigMap]("resources/mysql_ins_config_update_with_restart.yaml")
 			Expect(err).Should(Succeed())
-			Eventually(testdbaas.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(testWrapper.cfgCM),
-				func(cm *corev1.ConfigMap) {
-					cm.Data = restartUpdatedCM.Data
-				})).Should(Succeed())
+			Eventually(testdbaas.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(testWrapper.cfgCM), func(cm *corev1.ConfigMap) {
+				cm.Data = restartUpdatedCM.Data
+			})).Should(Succeed())
 
 			By("check invalid update")
 			Eventually(func(g Gomega) {
 				cm := &corev1.ConfigMap{}
 				g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(testWrapper.cfgCM), cm)).Should(Succeed())
 				g.Expect(cm.Labels[cfgcore.CMInsLastReconfigureMethodLabelKey]).Should(BeEquivalentTo(ReconfigureSimpleType))
-			}, timeout, interval).Should(Succeed())
+			}).Should(Succeed())
 		})
 	})
 

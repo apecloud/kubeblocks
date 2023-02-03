@@ -21,6 +21,7 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"github.com/spf13/viper"
 	"k8s.io/apimachinery/pkg/util/json"
 
 	"k8s.io/apimachinery/pkg/util/yaml"
@@ -127,12 +128,15 @@ spec:
 	})
 
 	It("build cluster component", func() {
+		viper.Set("KBCLI_CLUSTER_DEFAULT_STORAGE_SIZE", "10Gi")
+		viper.Set("KBCLI_CLUSTER_DEFAULT_REPLICAS", 1)
 		dynamic := testing.FakeDynamicClient(testing.FakeClusterDef())
 		comps, err := buildClusterComp(dynamic, testing.ClusterDefName)
 		Expect(err).ShouldNot(HaveOccurred())
 		Expect(comps).ShouldNot(BeNil())
 		Expect(len(comps)).Should(Equal(2))
 		Expect(comps[0]["volumeClaimTemplates"]).ShouldNot(BeNil())
+		Expect(comps[0]["replicas"]).Should(BeEquivalentTo(1))
 	})
 
 	It("build tolerations", func() {

@@ -358,14 +358,17 @@ func buildClusterComp(dynamic dynamic.Interface, clusterDef string) ([]map[strin
 	for _, c := range cd.Spec.Components {
 		// if cluster definition component default replicas greater than 0, build a cluster component
 		// by cluster definition component.
-		r := c.DefaultReplicas
-		if r <= 0 {
+		replicas := c.DefaultReplicas
+		if replicas <= 0 {
 			continue
+		}
+		if defaultReplicas := viper.GetInt32("KBCLI_CLUSTER_DEFAULT_REPLICAS"); defaultReplicas > 0 {
+			replicas = defaultReplicas
 		}
 		compObj := &dbaasv1alpha1.ClusterComponent{
 			Name:     c.TypeName,
 			Type:     c.TypeName,
-			Replicas: &r,
+			Replicas: &replicas,
 			VolumeClaimTemplates: []dbaasv1alpha1.ClusterComponentVolumeClaimTemplate{{
 				Name: "data",
 				Spec: &corev1.PersistentVolumeClaimSpec{

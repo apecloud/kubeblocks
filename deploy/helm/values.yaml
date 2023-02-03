@@ -162,7 +162,7 @@ prometheus:
 
       ## alertmanager data Persistent Volume size
       ##
-      size: 512Mi
+      size: 1Gi
 
       ## alertmanager data Persistent Volume Storage Class
       ## If defined, storageClassName: <storageClass>
@@ -244,7 +244,7 @@ prometheus:
 
       ## Prometheus server data Persistent Volume size
       ##
-      size: 1Gi
+      size: 8Gi
 
       ## Prometheus server data Persistent Volume Storage Class
       ## If defined, storageClassName: <storageClass>
@@ -278,7 +278,7 @@ prometheus:
 
     ## Prometheus' data retention period (default if not specified is 15 days)
     ##
-    retention: "15d"
+    retention: "3d"
 
   ## Sample prometheus rules/alerts
   ## NOTE: Please review these carefully as thresholds and behavior may not meet

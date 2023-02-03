@@ -56,7 +56,6 @@ type backupPolicyOptions struct {
 	Schedule   string           `json:"schedule"`
 	BackupType string           `json:"backupType"`
 	TTL        *metav1.Duration `json:"ttl,omitempty"`
-	Suspend    *bool            `json:"suspend,omitempty"`
 }
 
 var (
@@ -276,7 +275,6 @@ func (r *BackupPolicyReconciler) buildCronJob(backupPolicy *dataprotectionv1alph
 		Schedule:   backupPolicy.Spec.Schedule,
 		TTL:        backupPolicy.Spec.TTL,
 		BackupType: backupPolicy.Spec.BackupType,
-		Suspend:    backupPolicy.Spec.Suspend,
 	}
 	backupPolicyOptionsByte, err := json.Marshal(options)
 	if err != nil {
@@ -420,6 +418,5 @@ func (r *BackupPolicyReconciler) patchCronJob(
 	}
 	cronJob.Spec.Schedule = backupPolicy.Spec.Schedule
 	cronJob.Spec.JobTemplate.Spec.BackoffLimit = &backupPolicy.Spec.OnFailAttempted
-	cronJob.Spec.Suspend = backupPolicy.Spec.Suspend
 	return r.Client.Patch(reqCtx.Ctx, cronJob, patch)
 }

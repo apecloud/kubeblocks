@@ -32,11 +32,6 @@ type BackupPolicySpec struct {
 	// +optional
 	Schedule string `json:"schedule,omitempty"`
 
-	// This flag tells the controller to suspend subsequent executions, it does
-	// not apply to already started executions.  Defaults to false.
-	// +optional
-	Suspend *bool `json:"suspend,omitempty"`
-
 	// Backup Type. full or incremental or snapshot. if unset, default is snapshot.
 	// +kubebuilder:validation:Enum={full,incremental,snapshot}
 	// +kubebuilder:default=snapshot

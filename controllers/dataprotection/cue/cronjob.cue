@@ -19,7 +19,6 @@ options: {
 	schedule:   string
 	backupType: string
 	ttl:        string
-	suspend?:   bool
 }
 
 cronjob: {
@@ -33,7 +32,6 @@ cronjob: {
 	}
 	spec: {
 		schedule:                   options.schedule
-		suspend?:                   options.suspend
 		successfulJobsHistoryLimit: 1
 		failedJobsHistoryLimit:     1
 		concurrencyPolicy:          "Forbid"

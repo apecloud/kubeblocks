@@ -1,5 +1,5 @@
 /*
-Copyright ApeCloud Inc.
+Copyright ApeCloud, Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -153,7 +153,7 @@ metadata:
   namespace: default
 spec:
   containers:
-  - image: docker.io/apecloud/wesql-server:latest
+  - image: docker.io/apecloud/apecloud-mysql-server:latest
     name: mysql
 `
 	pod := corev1.Pod{}

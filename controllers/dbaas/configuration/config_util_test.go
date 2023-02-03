@@ -1,5 +1,5 @@
 /*
-Copyright ApeCloud Inc.
+Copyright ApeCloud, Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -153,7 +153,7 @@ var _ = Describe("ConfigWrapper util test", func() {
 			Expect(err).Should(Succeed())
 			Expect(ok).Should(BeTrue())
 
-			ok, err = UpdateCDLabelsWithUsingConfiguration(mockClient, reqCtx, testWrapper.cd)
+			ok, err = UpdateCDLabelsByConfiguration(mockClient, reqCtx, testWrapper.cd)
 			Expect(err).Should(Succeed())
 			Expect(ok).Should(BeTrue())
 
@@ -339,7 +339,7 @@ var _ = Describe("ConfigWrapper util test", func() {
 			Expect(err).Should(Succeed())
 			Expect(ok).Should(BeTrue())
 
-			ok, err = UpdateCVLabelsWithUsingConfiguration(mockClient, reqCtx, testWrapper.cv)
+			ok, err = UpdateCVLabelsByConfiguration(mockClient, reqCtx, testWrapper.cv)
 			Expect(err).Should(Succeed())
 			Expect(ok).Should(BeTrue())
 

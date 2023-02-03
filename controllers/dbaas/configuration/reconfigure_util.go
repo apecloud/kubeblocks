@@ -1,5 +1,5 @@
 /*
-Copyright ApeCloud Inc.
+Copyright ApeCloud, Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -26,7 +26,7 @@ import (
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 )
 
-func getUpdateParameterList(cfg *cfgcore.ConfigDiffInformation) ([]string, error) {
+func getUpdateParameterList(cfg *cfgcore.ConfigPatchInfo) ([]string, error) {
 	params := make([]string, 0)
 	for _, diff := range cfg.UpdateConfig {
 		var updatedParams any
@@ -46,7 +46,7 @@ func getUpdateParameterList(cfg *cfgcore.ConfigDiffInformation) ([]string, error
 	return params, nil
 }
 
-func isUpdateDynamicParameters(tpl *dbaasv1alpha1.ConfigConstraintSpec, cfg *cfgcore.ConfigDiffInformation) (bool, error) {
+func isUpdateDynamicParameters(tpl *dbaasv1alpha1.ConfigConstraintSpec, cfg *cfgcore.ConfigPatchInfo) (bool, error) {
 	// TODO(zt) how to process new or delete file
 	if len(cfg.DeleteConfig) > 0 || len(cfg.AddConfig) > 0 {
 		return false, nil

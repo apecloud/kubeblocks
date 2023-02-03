@@ -1,5 +1,5 @@
 /*
-Copyright ApeCloud Inc.
+Copyright ApeCloud, Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -214,6 +214,9 @@ func (o *describeOpsOptions) printOpsCommand(opsRequest *dbaasv1alpha1.OpsReques
 		commands = o.getVerticalScalingCommand(opsRequest.Spec)
 	case dbaasv1alpha1.VolumeExpansionType:
 		commands = o.getVolumeExpansionCommand(opsRequest.Spec)
+	case dbaasv1alpha1.ReconfiguringType:
+		commands = o.getReconfiguringCommand(opsRequest.Spec)
+
 	}
 	if len(commands) == 0 {
 		fmt.Println("\nCommand: " + printer.NoneString)
@@ -322,6 +325,41 @@ func (o *describeOpsOptions) getVolumeExpansionCommand(spec dbaasv1alpha1.OpsReq
 		}
 	}
 	return commands
+}
+
+// getReconfiguringCommand gets the command of the VolumeExpansion command.
+func (o *describeOpsOptions) getReconfiguringCommand(spec dbaasv1alpha1.OpsRequestSpec) []string {
+	var (
+		updatedParams = spec.Reconfigure
+		componentName = updatedParams.ComponentName
+	)
+
+	if len(updatedParams.Configurations) == 0 {
+		return nil
+	}
+
+	configuration := updatedParams.Configurations[0]
+	if len(configuration.Keys) == 0 {
+		return nil
+	}
+
+	commandArgs := make([]string, 0)
+	commandArgs = append(commandArgs, "kbcli")
+	commandArgs = append(commandArgs, "cluster")
+	commandArgs = append(commandArgs, "configure")
+	commandArgs = append(commandArgs, spec.ClusterRef)
+	commandArgs = append(commandArgs, fmt.Sprintf("--component-names=%s", componentName))
+	commandArgs = append(commandArgs, fmt.Sprintf("--template-name=%s", configuration.Name))
+
+	config := configuration.Keys[0]
+	commandArgs = append(commandArgs, fmt.Sprintf("--config-file=%s", config.Key))
+	for _, p := range config.Parameters {
+		if p.Value == nil {
+			continue
+		}
+		commandArgs = append(commandArgs, fmt.Sprintf("--set %s=%s", p.Key, *p.Value))
+	}
+	return []string{strings.Join(commandArgs, " ")}
 }
 
 // printOpsRequestStatus prints the OpsRequest status infos.

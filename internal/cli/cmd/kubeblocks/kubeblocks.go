@@ -1,5 +1,5 @@
 /*
-Copyright ApeCloud Inc.
+Copyright ApeCloud, Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -515,7 +515,7 @@ func (o *Options) uninstall() error {
 		Namespace: o.Namespace,
 	}
 	spinner := newSpinner(fmt.Sprintf("Uninstall helm release %s %s", types.KubeBlocksChartName, v[util.KubeBlocksApp]))
-	printErr(spinner, chart.UnInstall(o.HelmCfg))
+	printErr(spinner, chart.Uninstall(o.HelmCfg))
 
 	// remove repo
 	spinner = newSpinner("Remove helm repo " + types.KubeBlocksChartName)

@@ -1,5 +1,5 @@
 /*
-Copyright ApeCloud Inc.
+Copyright ApeCloud, Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -133,7 +133,7 @@ func main() {
 		LeaderElectionReleaseOnCancel: true,
 
 		CertDir:               viper.GetString("cert_dir"),
-		ClientDisableCacheFor: intctrlutil.GetUncacheObjects(),
+		ClientDisableCacheFor: intctrlutil.GetUncachedObjects(),
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")

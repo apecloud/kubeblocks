@@ -1,6 +1,11 @@
 apiVersion: v2
-name: wesqlcluster
-description: A WeSQL Helm chart for KubeBlocks.
+name: apecloud-mysql
+description: ApeCloud MySQL is fully compatible with MySQL syntax and supports single-availability
+  zone deployment, double-availability zone deployment, and multiple-availability zone deployment.
+  Based on the Paxos consensus protocol, ApeCloud MySQL realizes automatic leader election, log
+  synchronization, and strict consistency. ApeCloud MySQL is the optimum choice for the production
+  environment since it can automatically perform a high-availability switch to maintain business continuity
+  when container exceptions, server exceptions, or availability zone exceptions occur.
 
 # A chart can be either an 'application' or a 'library' chart.
 #
@@ -15,10 +20,22 @@ type: application
 # This is the chart version. This version number should be incremented each time you make changes
 # to the chart and its templates, including the app version.
 # Versions are expected to follow Semantic Versioning (https://semver.org/)
-version: 0.1.2
+version: 0.1.7
 
 # This is the version number of the application being deployed. This version number should be
 # incremented each time you make changes to the application. Versions are not expected to
 # follow Semantic Versioning. They should reflect the version the application is using.
 # It is recommended to use it with quotes.
 appVersion: "8.0.30"
+
+home: https://kubeblocks.io/
+icon: https://github.com/apecloud/kubeblocks/raw/main/img/logo.png
+
+
+maintainers:
+- name: ApeCloud
+  url: https://github.com/apecloud/kubeblocks/
+
+
+sources:
+- https://github.com/apecloud/kubeblocks/

@@ -1,5 +1,5 @@
 /*
-Copyright ApeCloud Inc.
+Copyright ApeCloud, Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -54,12 +54,16 @@ import (
 	"k8s.io/apimachinery/pkg/util/duration"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes/scheme"
 	cmdget "k8s.io/kubectl/pkg/cmd/get"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/kustomize/kyaml/yaml"
 
+	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
+	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 )
 
 var (
@@ -455,4 +459,63 @@ func GetEventObject(e *corev1.Event) string {
 		kind = "Instance"
 	}
 	return fmt.Sprintf("%s/%s", kind, e.InvolvedObject.Name)
+}
+
+// GetConfigTemplateList returns ConfigTemplate list used by the component.
+func GetConfigTemplateList(clusterName string, namespace string, cli dynamic.Interface, componentName string) ([]dbaasv1alpha1.ConfigTemplate, error) {
+	var (
+		clusterObj        = dbaasv1alpha1.Cluster{}
+		clusterDefObj     = dbaasv1alpha1.ClusterDefinition{}
+		clusterVersionObj = dbaasv1alpha1.ClusterVersion{}
+	)
+
+	if err := GetResourceObjectFromGVR(types.ClusterGVR(), client.ObjectKey{
+		Namespace: namespace,
+		Name:      clusterName,
+	}, cli, &clusterObj); err != nil {
+		return nil, err
+	}
+
+	clusterDefName := clusterObj.Spec.ClusterDefRef
+	clusterVersionName := clusterObj.Spec.ClusterVersionRef
+	if err := GetResourceObjectFromGVR(types.ClusterDefGVR(), client.ObjectKey{
+		Namespace: "",
+		Name:      clusterDefName,
+	}, cli, &clusterDefObj); err != nil {
+		return nil, err
+	}
+	if err := GetResourceObjectFromGVR(types.ClusterVersionGVR(), client.ObjectKey{
+		Namespace: "",
+		Name:      clusterVersionName,
+	}, cli, &clusterVersionObj); err != nil {
+		return nil, err
+	}
+
+	return cfgcore.GetConfigTemplatesFromComponent(clusterObj.Spec.Components, clusterDefObj.Spec.Components, clusterVersionObj.Spec.Components, componentName)
+}
+
+// GetResourceObjectFromGVR query the resource object using GVR.
+func GetResourceObjectFromGVR(gvr schema.GroupVersionResource, key client.ObjectKey, client dynamic.Interface, k8sObj interface{}) error {
+	unstructuredObj, err := client.
+		Resource(gvr).
+		Namespace(key.Namespace).
+		Get(context.TODO(), key.Name, metav1.GetOptions{})
+	if err != nil {
+		return cfgcore.WrapError(err, "failed to get resource[%v]", key)
+	}
+	return apiruntime.DefaultUnstructuredConverter.FromUnstructured(unstructuredObj.Object, k8sObj)
+}
+
+// GetComponentsFromClusterCR returns name of component.
+func GetComponentsFromClusterCR(key client.ObjectKey, client dynamic.Interface) ([]string, error) {
+	clusterObj := dbaasv1alpha1.Cluster{}
+	if err := GetResourceObjectFromGVR(types.ClusterGVR(), key, client, &clusterObj); err != nil {
+		return nil, err
+	}
+
+	componentNames := make([]string, len(clusterObj.Spec.Components))
+	for i, component := range clusterObj.Spec.Components {
+		componentNames[i] = component.Name
+	}
+	return componentNames, nil
 }

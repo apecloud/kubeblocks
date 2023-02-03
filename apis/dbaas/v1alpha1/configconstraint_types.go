@@ -1,5 +1,5 @@
 /*
-Copyright ApeCloud Inc.
+Copyright ApeCloud, Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -38,14 +38,17 @@ type ConfigConstraintSpec struct {
 	ConfigurationSchema *CustomParametersValidation `json:"configurationSchema,omitempty"`
 
 	// staticParameters, list of StaticParameter, modifications of them trigger a process restart.
+	// +listType=set
 	// +optional
 	StaticParameters []string `json:"staticParameters,omitempty"`
 
 	// dynamicParameters, list of DynamicParameter, modifications of them trigger a config dynamic reload without process restart.
+	// +listType=set
 	// +optional
 	DynamicParameters []string `json:"dynamicParameters,omitempty"`
 
 	// immutableParameters describes parameters that prohibit user from modification.
+	// +listType=set
 	// +optional
 	ImmutableParameters []string `json:"immutableParameters,omitempty"`
 

@@ -1,5 +1,5 @@
 /*
-Copyright ApeCloud Inc.
+Copyright ApeCloud, Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,8 +18,8 @@ package dbaas
 
 import (
 	"context"
-	"time"
 
+	"github.com/go-logr/logr"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -35,8 +35,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
-
-	"github.com/go-logr/logr"
 
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
@@ -155,7 +153,8 @@ func (r *SystemAccountReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 
 	// wait till the cluster is running
 	if cluster.Status.Phase != dbaasv1alpha1.RunningPhase && cluster.Status.Phase != dbaasv1alpha1.CreatingPhase {
-		return intctrlutil.RequeueAfter(time.Second*5, reqCtx.Log, "Cluster is not ready yet", "cluster", cluster.Name)
+		reqCtx.Log.Info("Cluster is not ready yet", "cluster", req.NamespacedName)
+		return intctrlutil.Reconciled()
 	}
 
 	// process accounts per component

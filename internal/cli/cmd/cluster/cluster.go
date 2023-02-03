@@ -1,5 +1,5 @@
 /*
-Copyright ApeCloud Inc.
+Copyright ApeCloud, Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -66,6 +66,10 @@ func NewClusterCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 				NewDescribeOpsCmd(f, streams),
 				NewListOpsCmd(f, streams),
 				NewDeleteOpsCmd(f, streams),
+				NewReconfigureCmd(f, streams),
+				NewDescribeReconfigureCmd(f, streams),
+				NewExplainReconfigureCmd(f, streams),
+				NewDiffConfigureCmd(f, streams),
 			},
 		},
 		{

@@ -20,6 +20,7 @@ Cluster command
       --client-key string              Path to a client key file for TLS
       --cluster string                 The name of the kubeconfig cluster to use
       --context string                 The name of the kubeconfig context to use
+      --disable-compression            If true, opt-out of response compression for all requests to the server
       --insecure-skip-tls-verify       If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure
       --kubeconfig string              Path to the kubeconfig file to use for CLI requests.
       --match-server-version           Require server version to match client version
@@ -35,6 +36,7 @@ Cluster command
 
 * [kbcli](kbcli.md)	 - KubeBlocks CLI
 * [kbcli cluster backup](kbcli_cluster_backup.md)	 - Create a backup
+* [kbcli cluster configure](kbcli_cluster_configure.md)	 - reconfigure parameters with the specified components in the cluster
 * [kbcli cluster connect](kbcli_cluster_connect.md)	 - Connect to a cluster or instance
 * [kbcli cluster create](kbcli_cluster_create.md)	 - Create a cluster
 * [kbcli cluster delete](kbcli_cluster_delete.md)	 - Delete clusters
@@ -42,7 +44,10 @@ Cluster command
 * [kbcli cluster delete-ops](kbcli_cluster_delete-ops.md)	 - Delete an OpsRequest
 * [kbcli cluster delete-restore](kbcli_cluster_delete-restore.md)	 - Delete a restore job
 * [kbcli cluster describe](kbcli_cluster_describe.md)	 - Show details of a specific cluster
+* [kbcli cluster describe-configure](kbcli_cluster_describe-configure.md)	 - Show details of a specific reconfiguring
 * [kbcli cluster describe-ops](kbcli_cluster_describe-ops.md)	 - Show details of a specific OpsRequest
+* [kbcli cluster diff-configure](kbcli_cluster_diff-configure.md)	 - List the constraint for supported configuration params
+* [kbcli cluster explain-configure](kbcli_cluster_explain-configure.md)	 - List the constraint for supported configuration params
 * [kbcli cluster horizontal-scale](kbcli_cluster_horizontal-scale.md)	 - Horizontal scale the specified components in the cluster
 * [kbcli cluster list](kbcli_cluster_list.md)	 - List clusters
 * [kbcli cluster list-backups](kbcli_cluster_list-backups.md)	 - List backups
@@ -50,7 +55,7 @@ Cluster command
 * [kbcli cluster list-events](kbcli_cluster_list-events.md)	 - List cluster events
 * [kbcli cluster list-instances](kbcli_cluster_list-instances.md)	 - List cluster instances
 * [kbcli cluster list-logs](kbcli_cluster_list-logs.md)	 - List supported log files in cluster
-* [kbcli cluster list-ops](kbcli_cluster_list-ops.md)	 - Liat all opsRequests
+* [kbcli cluster list-ops](kbcli_cluster_list-ops.md)	 - List all opsRequests
 * [kbcli cluster list-restores](kbcli_cluster_list-restores.md)	 - List all restore jobs
 * [kbcli cluster list-users](kbcli_cluster_list-users.md)	 - List cluster users
 * [kbcli cluster logs](kbcli_cluster_logs.md)	 - Access cluster log file

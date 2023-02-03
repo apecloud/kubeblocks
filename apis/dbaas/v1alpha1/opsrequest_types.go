@@ -1,5 +1,5 @@
 /*
-Copyright ApeCloud Inc.
+Copyright ApeCloud, Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -98,6 +98,7 @@ type VerticalScaling struct {
 
 	// resources specifies the computing resource size of verticalScaling.
 	// +kubebuilder:validation:Required
+	// +kubebuilder:pruning:PreserveUnknownFields
 	corev1.ResourceRequirements `json:",inline"`
 }
 
@@ -233,8 +234,16 @@ type OpsRequestStatus struct {
 	// +optional
 	CompletionTimestamp metav1.Time `json:"completionTimestamp,omitempty"`
 
+	// reconfiguringStatus defines the status information of reconfiguring.
+	// +optional
+	ReconfiguringStatus *ReconfiguringStatus `json:"reconfiguringStatus,omitempty"`
+
 	// conditions describes opsRequest detail status.
 	// +optional
+	// +patchMergeKey=type
+	// +patchStrategy=merge
+	// +listType=map
+	// +listMapKey=type
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
 }
 
@@ -273,8 +282,9 @@ type LastComponentConfiguration struct {
 	Replicas int32 `json:"replicas,omitempty"`
 
 	// the last resources of the component.
+	// +kubebuilder:pruning:PreserveUnknownFields
 	// +optional
-	corev1.ResourceRequirements `json:",inline"`
+	corev1.ResourceRequirements `json:",inline,omitempty"`
 
 	// volumeClaimTemplates records the last volumeClaimTemplates of the component.
 	// +optional
@@ -292,8 +302,8 @@ type LastConfiguration struct {
 }
 
 type OpsRequestStatusComponent struct {
-	// phase describes the component phase, reference ClusterDefinition.status.component.phase.
-	// +kubebuilder:validation:Enum={Running,Failed,Abnormal,Creating,Updating,Deleting,Deleted,VolumeExpanding,Reconfiguring,HorizontalScaling,VerticalScaling,VersionUpgrading,Rebooting}
+	// phase describes the component phase, reference Cluster.status.component.phase.
+	// +kubebuilder:validation:Enum={Running,Failed,Abnormal,Creating,SpecUpdating,Deleting,Deleted,VolumeExpanding,Reconfiguring,HorizontalScaling,VerticalScaling,VersionUpgrading,Rebooting}
 	// +optional
 	Phase Phase `json:"phase,omitempty"`
 
@@ -308,6 +318,70 @@ type OpsRequestStatusComponent struct {
 	// componentType references component type of component in ClusterDefinition.
 	// +optional
 	ComponentType ComponentType `json:"componentType,omitempty"`
+}
+
+type ReconfiguringStatus struct {
+	// configurationStatus describes the status of the component reconfiguring.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MinItems=1
+	// +patchMergeKey=name
+	// +patchStrategy=merge,retainKeys
+	// +listType=map
+	// +listMapKey=name
+	ConfigurationStatus []ConfigurationStatus `json:"configurationStatus"`
+}
+
+type ConfigurationStatus struct {
+	// name is a config template name.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MaxLength=63
+	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
+	Name string `json:"name"`
+
+	// updatePolicy describes the policy of reconfiguring.
+	// +kubebuilder:validation:Enum={simple,parallel,rolling,autoReload}
+	// +optional
+	UpdatePolicy UpgradePolicy `json:"updatePolicy,omitempty"`
+
+	// status describes the current state of the reconfiguring state machine.
+	// +optional
+	Status string `json:"status,omitempty"`
+
+	// succeedCount describes the number of successful reconfiguring.
+	// +kubebuilder:default=0
+	// +optional
+	SucceedCount int32 `json:"succeedCount"`
+
+	// expectedCount describes the number of expected reconfiguring.
+	// +kubebuilder:default=-1
+	// +optional
+	ExpectedCount int32 `json:"expectedCount"`
+
+	// lastStatus describes the last status for the reconfiguring controller.
+	// +optional
+	LastAppliedStatus string `json:"lastStatus,omitempty"`
+
+	// LastAppliedConfiguration describes the last configuration.
+	// +optional
+	LastAppliedConfiguration map[string]string `json:"lastAppliedConfiguration,omitempty"`
+
+	// updatedParameters describes the updated parameters.
+	// +optional
+	UpdatedParameters UpdatedParameters `json:"updatedParameters"`
+}
+
+type UpdatedParameters struct {
+	// addedKeys describes the key added.
+	// +optional
+	AddedKeys map[string]string `json:"addedKeys,omitempty"`
+
+	// deletedKeys describes the key deleted.
+	// +optional
+	DeletedKeys map[string]string `json:"deletedKeys,omitempty"`
+
+	// updatedKeys describes the key updated.
+	// +optional
+	UpdatedKeys map[string]string `json:"updatedKeys,omitempty"`
 }
 
 //+kubebuilder:object:root=true

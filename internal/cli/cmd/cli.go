@@ -1,5 +1,5 @@
 /*
-Copyright ApeCloud Inc.
+Copyright ApeCloud, Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -126,6 +126,8 @@ func initConfig() {
 	}
 
 	viper.AutomaticEnv() // read in environment variables that match
+
+	viper.SetDefault("KBCLI_CLUSTER_DEFAULT_STORAGE_SIZE", "10Gi")
 
 	// If a config file is found, read it in.
 	if err := viper.ReadInConfig(); err == nil {

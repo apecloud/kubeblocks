@@ -1,3 +1,19 @@
+/*
+Copyright ApeCloud, Inc.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
 package types
 
 import (
@@ -27,7 +43,7 @@ type Component interface {
 	// if the component is ConsensusSet,it will be available when the pod is ready and labeled with its role.
 	PodIsAvailable(pod *corev1.Pod, minReadySeconds int32) bool
 
-	// HandleProbeTimeoutWhenPodsReady if the component needs role probe and the pods of component are ready,
+	// HandleProbeTimeoutWhenPodsReady if the component has no role probe, return false directly. otherwise,
 	// we should handle the component phase when the role probe timeout and return a bool.
 	// if return true, means probe is not timing out and need to requeue after an interval time to handle probe timeout again.
 	// else return false, means probe has timed out and needs to update the component phase to Failed or Abnormal.

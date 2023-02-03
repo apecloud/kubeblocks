@@ -1,5 +1,5 @@
 /*
-Copyright ApeCloud Inc.
+Copyright ApeCloud, Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -51,7 +51,7 @@ func GetParentNameAndOrdinal(pod *corev1.Pod) (string, int) {
 	return parent, ordinal
 }
 
-// GetContainerUsingConfig function description:
+// GetContainerByConfigTemplate function description:
 // Search the container using the configmap of config from the pod
 //
 // Return: The first container pointer of using configs
@@ -69,7 +69,7 @@ func GetParentNameAndOrdinal(pod *corev1.Pod) (string, int) {
 //		   name: data
 //		 - mountPath: /log
 //		   name: log
-func GetContainerUsingConfig(podSpec *corev1.PodSpec, configs []dbaasv1alpha1.ConfigTemplate) *corev1.Container {
+func GetContainerByConfigTemplate(podSpec *corev1.PodSpec, configs []dbaasv1alpha1.ConfigTemplate) *corev1.Container {
 	containers := podSpec.Containers
 	initContainers := podSpec.InitContainers
 	if container := getContainerWithTplList(containers, configs); container != nil {
@@ -120,7 +120,7 @@ func GetVolumeMountName(volumes []corev1.Volume, resourceName string) *corev1.Vo
 
 type containerNameFilter func(containerName string) bool
 
-func GetContainersUsingConfigmap(containers []corev1.Container, volumeName string, filters ...containerNameFilter) []string {
+func GetContainersByConfigmap(containers []corev1.Container, volumeName string, filters ...containerNameFilter) []string {
 	containerFilter := func(c corev1.Container) bool {
 		for _, f := range filters {
 			if len(c.VolumeMounts) == 0 || f(c.Name) {

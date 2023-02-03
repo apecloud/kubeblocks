@@ -1,5 +1,5 @@
 /*
-Copyright ApeCloud Inc.
+Copyright ApeCloud, Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -186,22 +186,22 @@ var _ = Describe("tpl template", func() {
 
 	})
 
-	// for test GetContainerUsingConfig
-	Context("GetContainerUsingConfig test", func() {
+	// for test GetContainerByConfigTemplate
+	Context("GetContainerByConfigTemplate test", func() {
 		// found name: mysql3
 		It("Should success with no error", func() {
 			podSpec := &statefulSet.Spec.Template.Spec
-			Expect(GetContainerUsingConfig(podSpec, configTemplates)).To(Equal(&podSpec.Containers[2]))
+			Expect(GetContainerByConfigTemplate(podSpec, configTemplates)).To(Equal(&podSpec.Containers[2]))
 		})
 		// found name: init_mysql
 		It("Should success with no error", func() {
 			podSpec := &statefulSet.Spec.Template.Spec
-			Expect(GetContainerUsingConfig(podSpec, foundInitContainerConfigTemplates)).To(Equal(&podSpec.InitContainers[0]))
+			Expect(GetContainerByConfigTemplate(podSpec, foundInitContainerConfigTemplates)).To(Equal(&podSpec.InitContainers[0]))
 		})
 		// not found container
 		It("Should failed", func() {
 			podSpec := &statefulSet.Spec.Template.Spec
-			Expect(GetContainerUsingConfig(podSpec, notFoundConfigTemplates)).To(BeNil(), "get container is nil!")
+			Expect(GetContainerByConfigTemplate(podSpec, notFoundConfigTemplates)).To(BeNil(), "get container is nil!")
 		})
 	})
 
@@ -363,7 +363,7 @@ var _ = Describe("tpl template", func() {
 	})
 
 	Context("common funcs test", func() {
-		It("GetContainersUsingConfigmap Should success with no error", func() {
+		It("GetContainersByConfigmap Should success with no error", func() {
 			type args struct {
 				containers []corev1.Container
 				volumeName string
@@ -406,7 +406,7 @@ var _ = Describe("tpl template", func() {
 				want: []string{},
 			}}
 			for _, tt := range tests {
-				Expect(GetContainersUsingConfigmap(tt.args.containers, tt.args.volumeName, tt.args.filters...)).Should(BeEquivalentTo(tt.want))
+				Expect(GetContainersByConfigmap(tt.args.containers, tt.args.volumeName, tt.args.filters...)).Should(BeEquivalentTo(tt.want))
 			}
 
 		})

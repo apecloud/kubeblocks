@@ -6,10 +6,18 @@ Vertical scale the specified components in the cluster
 kbcli cluster vertical-scale [flags]
 ```
 
+### Examples
+
+```
+  # scale the computing resources of specified components, separate with commas when <component-name> more than one
+  kbcli cluster vertical-scale <my-cluster> --component-names=<component-name> --requests.cpu=500m \
+  --requests.memory=500Mi --limits.cpu=500m --limits.memory=500Mi
+```
+
 ### Options
 
 ```
-      --component-names strings       Component names to this operations (required)
+      --component-names strings       Component names to this operations
   -h, --help                         help for vertical-scale
       --limits.cpu string            CPU size limited by the component
       --limits.memory string         Memory size limited by the component
@@ -31,6 +39,7 @@ kbcli cluster vertical-scale [flags]
       --client-key string              Path to a client key file for TLS
       --cluster string                 The name of the kubeconfig cluster to use
       --context string                 The name of the kubeconfig context to use
+      --disable-compression            If true, opt-out of response compression for all requests to the server
       --insecure-skip-tls-verify       If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure
       --kubeconfig string              Path to the kubeconfig file to use for CLI requests.
       --match-server-version           Require server version to match client version

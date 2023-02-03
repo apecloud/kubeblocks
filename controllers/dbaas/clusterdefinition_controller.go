@@ -1,5 +1,5 @@
 /*
-Copyright ApeCloud Inc.
+Copyright ApeCloud, Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -98,7 +98,7 @@ func (r *ClusterDefinitionReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		return intctrlutil.RequeueAfter(time.Second, reqCtx.Log, "failed to check config template")
 	}
 
-	if ok, err := dbaasconfig.UpdateCDLabelsWithUsingConfiguration(r.Client, reqCtx, dbClusterDef); !ok || err != nil {
+	if ok, err := dbaasconfig.UpdateCDLabelsByConfiguration(r.Client, reqCtx, dbClusterDef); !ok || err != nil {
 		return intctrlutil.RequeueAfter(time.Second, reqCtx.Log, "failed to update using config template info")
 	}
 

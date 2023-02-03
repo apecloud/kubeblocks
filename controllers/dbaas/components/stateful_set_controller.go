@@ -1,5 +1,5 @@
 /*
-Copyright ApeCloud Inc.
+Copyright ApeCloud, Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -90,12 +90,11 @@ func (r *StatefulSetReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	if component == nil {
 		return intctrlutil.Reconciled()
 	}
-	workloadSpecIsUpdated := util.StatefulSetSpecIsUpdated(sts)
 	compCtx := newComponentContext(reqCtx, r.Client, r.Recorder, component, sts)
 	reqCtx.Log.Info("before handleComponentStatusAndSyncCluster",
 		"generation", sts.Generation, "observed generation", sts.Status.ObservedGeneration,
 		"replicas", sts.Status.Replicas)
-	if requeueAfter, err := handleComponentStatusAndSyncCluster(compCtx, workloadSpecIsUpdated, cluster); err != nil {
+	if requeueAfter, err := handleComponentStatusAndSyncCluster(compCtx, cluster); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	} else if requeueAfter != 0 {
 		// if the reconcileAction need requeue, do it

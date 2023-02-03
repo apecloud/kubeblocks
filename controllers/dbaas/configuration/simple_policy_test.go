@@ -1,5 +1,5 @@
 /*
-Copyright ApeCloud Inc.
+Copyright ApeCloud, Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -70,10 +70,10 @@ var _ = Describe("Reconfigure simplePolicy", func() {
 				}}))
 			status, err := simplePolicy.Upgrade(mockParam)
 			Expect(err).Should(BeEquivalentTo(updateErr))
-			Expect(status).Should(BeEquivalentTo(ESAndRetryFailed))
+			Expect(status.Status).Should(BeEquivalentTo(ESAndRetryFailed))
 			status, err = simplePolicy.Upgrade(mockParam)
 			Expect(err).Should(Succeed())
-			Expect(status).Should(BeEquivalentTo(ESNone))
+			Expect(status.Status).Should(BeEquivalentTo(ESNone))
 		})
 	})
 
@@ -92,7 +92,7 @@ var _ = Describe("Reconfigure simplePolicy", func() {
 			status, err := simplePolicy.Upgrade(mockParam)
 			Expect(err).ShouldNot(Succeed())
 			Expect(err.Error()).Should(ContainSubstring("not support component type"))
-			Expect(status).Should(BeEquivalentTo(ESNotSupport))
+			Expect(status.Status).Should(BeEquivalentTo(ESNotSupport))
 		})
 	})
 
@@ -110,8 +110,8 @@ var _ = Describe("Reconfigure simplePolicy", func() {
 				}}))
 			status, err := simplePolicy.Upgrade(mockParam)
 			Expect(err).ShouldNot(Succeed())
-			Expect(err.Error()).Should(ContainSubstring("failed to found config meta"))
-			Expect(status).Should(BeEquivalentTo(ESFailed))
+			Expect(err.Error()).Should(ContainSubstring("failed to find config meta"))
+			Expect(status.Status).Should(BeEquivalentTo(ESFailed))
 		})
 	})
 })

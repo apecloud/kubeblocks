@@ -71,6 +71,7 @@ spec:
                 items:
                   type: string
                 type: array
+                x-kubernetes-list-type: set
               formatterConfig:
                 description: formatterConfig describes the format of the configuration
                   file, the controller 1. parses configuration file 2. analyzes the
@@ -101,6 +102,7 @@ spec:
                 items:
                   type: string
                 type: array
+                x-kubernetes-list-type: set
               reloadOptions:
                 description: reloadOptions indicates whether the process supports
                   reload. if set, the controller will determine the behavior of the
@@ -172,6 +174,7 @@ spec:
                 items:
                   type: string
                 type: array
+                x-kubernetes-list-type: set
             required:
             - formatterConfig
             type: object

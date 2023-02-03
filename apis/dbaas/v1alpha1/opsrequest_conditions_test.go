@@ -1,5 +1,5 @@
 /*
-Copyright ApeCloud Inc.
+Copyright ApeCloud, Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -33,10 +33,17 @@ func TestNewAllCondition(t *testing.T) {
 	NewSucceedCondition(opsRequest)
 	NewVerticalScalingCondition(opsRequest)
 	NewUpgradingCondition(opsRequest)
-	NewReconfigureCondition(opsRequest)
 	NewValidateFailedCondition(ReasonClusterPhaseMisMatch, "fail")
 	NewFailedCondition(opsRequest, nil)
 	NewFailedCondition(opsRequest, errors.New("opsRequest run failed"))
+
+	opsRequest.Spec.Reconfigure = &Reconfigure{
+		ComponentOps: ComponentOps{
+			ComponentName: "testReconfiguring",
+		},
+	}
+	NewReconfigureCondition(opsRequest)
+	NewReconfigureRunningCondition(opsRequest, ReasonReconfigureRunning, "for_test", "")
 }
 
 func TestSetStatusCondition(t *testing.T) {

@@ -1,5 +1,5 @@
 /*
-Copyright ApeCloud Inc.
+Copyright ApeCloud, Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -24,6 +24,7 @@ import (
 	"github.com/onsi/gomega"
 	"github.com/sethvargo/go-password/password"
 
+	"github.com/spf13/viper"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
@@ -47,9 +48,12 @@ type TestContext struct {
 
 const (
 	envExistingClusterType = "EXISTING_CLUSTER_TYPE"
-
-	envUseExistingCluster = "USE_EXISTING_CLUSTER"
+	envUseExistingCluster  = "USE_EXISTING_CLUSTER"
 )
+
+func init() {
+	viper.AutomaticEnv()
+}
 
 func NewDefaultTestContext(ctx context.Context, cli client.Client, testEnv *envtest.Environment) TestContext {
 	t := TestContext{
@@ -97,7 +101,7 @@ func (testCtx TestContext) GetRandomStr() string {
 
 func (testCtx TestContext) UsingExistingCluster() bool {
 	if testCtx.TestEnv == nil || testCtx.TestEnv.UseExistingCluster == nil {
-		return os.Getenv(envUseExistingCluster) == "true"
+		return viper.GetBool(envUseExistingCluster)
 	}
 	return *testCtx.TestEnv.UseExistingCluster
 }
@@ -120,5 +124,11 @@ func (testCtx TestContext) GetWebhookHostExternalName() string {
 		return k3dHost
 	default:
 		return ""
+	}
+}
+
+func (testCtx TestContext) UseDefaultNamespace() func(client.Object) {
+	return func(obj client.Object) {
+		obj.SetNamespace(testCtx.DefaultNamespace)
 	}
 }

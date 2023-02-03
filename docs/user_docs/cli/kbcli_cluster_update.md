@@ -38,7 +38,7 @@ kbcli cluster update NAME [flags]
       --pod-anti-affinity string       Pod anti-affinity type (default "Preferred")
       --show-managed-fields            If true, keep the managedFields when printing objects in JSON or YAML format.
       --template string                Template string or path to template file to use when -o=go-template, -o=go-template-file. The template format is golang templates [http://golang.org/pkg/text/template/#pkg-overview].
-      --termination-policy string      Termination policy, one of: (DoNotTerminate, Halt, Delete, WipeOut)
+      --termination-policy string      Termination policy, one of: (DoNotTerminate, Halt, Delete, WipeOut) (default "Delete")
       --tolerations strings            Tolerations for cluster, such as '"key=engineType,value=mongo,operator=Equal,effect=NoSchedule"'
       --topology-keys stringArray      Topology keys for affinity
 ```
@@ -55,6 +55,7 @@ kbcli cluster update NAME [flags]
       --client-key string              Path to a client key file for TLS
       --cluster string                 The name of the kubeconfig cluster to use
       --context string                 The name of the kubeconfig context to use
+      --disable-compression            If true, opt-out of response compression for all requests to the server
       --insecure-skip-tls-verify       If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure
       --kubeconfig string              Path to the kubeconfig file to use for CLI requests.
       --match-server-version           Require server version to match client version

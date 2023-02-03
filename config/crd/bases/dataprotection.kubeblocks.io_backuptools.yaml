@@ -58,6 +58,7 @@ spec:
                 items:
                   type: string
                 type: array
+                x-kubernetes-list-type: set
               deployKind:
                 default: job
                 description: which kind for run a backup tool.
@@ -170,6 +171,7 @@ spec:
                   - name
                   type: object
                 type: array
+                x-kubernetes-preserve-unknown-fields: true
               envFrom:
                 description: List of sources to populate environment variables in
                   the container. The keys defined within a source must be a C_IDENTIFIER.
@@ -208,6 +210,7 @@ spec:
                       type: object
                   type: object
                 type: array
+                x-kubernetes-preserve-unknown-fields: true
               image:
                 description: Backup tool Container image name.
                 type: string
@@ -256,6 +259,26 @@ spec:
                 description: Compute Resources required by this container. Cannot
                   be updated.
                 properties:
+                  claims:
+                    description: "Claims lists the names of resources, defined in
+                      spec.resourceClaims, that are used by this container. \n This
+                      is an alpha field and requires enabling the DynamicResourceAllocation
+                      feature gate. \n This field is immutable."
+                    items:
+                      description: ResourceClaim references one entry in PodSpec.ResourceClaims.
+                      properties:
+                        name:
+                          description: Name must match the name of one entry in pod.spec.resourceClaims
+                            of the Pod where this field is used. It makes that resource
+                            available inside a container.
+                          type: string
+                      required:
+                      - name
+                      type: object
+                    type: array
+                    x-kubernetes-list-map-keys:
+                    - name
+                    x-kubernetes-list-type: map
                   limits:
                     additionalProperties:
                       anyOf:
@@ -279,6 +302,7 @@ spec:
                       to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
                     type: object
                 type: object
+                x-kubernetes-preserve-unknown-fields: true
             required:
             - backupCommands
             - image

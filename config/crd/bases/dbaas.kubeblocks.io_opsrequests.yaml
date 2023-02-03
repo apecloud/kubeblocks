@@ -200,6 +200,26 @@ spec:
                   description: VerticalScaling defines the variables that need to
                     input when scaling compute resources.
                   properties:
+                    claims:
+                      description: "Claims lists the names of resources, defined in
+                        spec.resourceClaims, that are used by this container. \n This
+                        is an alpha field and requires enabling the DynamicResourceAllocation
+                        feature gate. \n This field is immutable."
+                      items:
+                        description: ResourceClaim references one entry in PodSpec.ResourceClaims.
+                        properties:
+                          name:
+                            description: Name must match the name of one entry in
+                              pod.spec.resourceClaims of the Pod where this field
+                              is used. It makes that resource available inside a container.
+                            type: string
+                        required:
+                        - name
+                        type: object
+                      type: array
+                      x-kubernetes-list-map-keys:
+                      - name
+                      x-kubernetes-list-type: map
                     componentName:
                       description: componentName cluster component name.
                       type: string
@@ -228,6 +248,7 @@ spec:
                   required:
                   - componentName
                   type: object
+                  x-kubernetes-preserve-unknown-fields: true
                 type: array
                 x-kubernetes-list-map-keys:
                 - componentName
@@ -295,13 +316,13 @@ spec:
                       type: string
                     phase:
                       description: phase describes the component phase, reference
-                        ClusterDefinition.status.component.phase.
+                        Cluster.status.component.phase.
                       enum:
                       - Running
                       - Failed
                       - Abnormal
                       - Creating
-                      - Updating
+                      - SpecUpdating
                       - Deleting
                       - Deleted
                       - VolumeExpanding
@@ -429,6 +450,9 @@ spec:
                   - type
                   type: object
                 type: array
+                x-kubernetes-list-map-keys:
+                - type
+                x-kubernetes-list-type: map
               lastConfiguration:
                 description: lastConfiguration records the last configuration before
                   this operation take effected.
@@ -439,6 +463,27 @@ spec:
                   components:
                     additionalProperties:
                       properties:
+                        claims:
+                          description: "Claims lists the names of resources, defined
+                            in spec.resourceClaims, that are used by this container.
+                            \n This is an alpha field and requires enabling the DynamicResourceAllocation
+                            feature gate. \n This field is immutable."
+                          items:
+                            description: ResourceClaim references one entry in PodSpec.ResourceClaims.
+                            properties:
+                              name:
+                                description: Name must match the name of one entry
+                                  in pod.spec.resourceClaims of the Pod where this
+                                  field is used. It makes that resource available
+                                  inside a container.
+                                type: string
+                            required:
+                            - name
+                            type: object
+                          type: array
+                          x-kubernetes-list-map-keys:
+                          - name
+                          x-kubernetes-list-type: map
                         limits:
                           additionalProperties:
                             anyOf:
@@ -488,6 +533,7 @@ spec:
                             type: object
                           type: array
                       type: object
+                      x-kubernetes-preserve-unknown-fields: true
                     description: components records last configuration of the component.
                     type: object
                 type: object
@@ -509,6 +555,84 @@ spec:
                 default: -/-
                 pattern: ^(\d+|\-)/(\d+|\-)$
                 type: string
+              reconfiguringStatus:
+                description: reconfiguringStatus defines the status information of
+                  reconfiguring.
+                properties:
+                  configurationStatus:
+                    description: configurationStatus describes the status of the component
+                      reconfiguring.
+                    items:
+                      properties:
+                        expectedCount:
+                          default: -1
+                          description: expectedCount describes the number of expected
+                            reconfiguring.
+                          format: int32
+                          type: integer
+                        lastAppliedConfiguration:
+                          additionalProperties:
+                            type: string
+                          description: LastAppliedConfiguration describes the last
+                            configuration.
+                          type: object
+                        lastStatus:
+                          description: lastStatus describes the last status for the
+                            reconfiguring controller.
+                          type: string
+                        name:
+                          description: name is a config template name.
+                          maxLength: 63
+                          pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                          type: string
+                        status:
+                          description: status describes the current state of the reconfiguring
+                            state machine.
+                          type: string
+                        succeedCount:
+                          default: 0
+                          description: succeedCount describes the number of successful
+                            reconfiguring.
+                          format: int32
+                          type: integer
+                        updatePolicy:
+                          description: updatePolicy describes the policy of reconfiguring.
+                          enum:
+                          - simple
+                          - parallel
+                          - rolling
+                          - autoReload
+                          type: string
+                        updatedParameters:
+                          description: updatedParameters describes the updated parameters.
+                          properties:
+                            addedKeys:
+                              additionalProperties:
+                                type: string
+                              description: addedKeys describes the key added.
+                              type: object
+                            deletedKeys:
+                              additionalProperties:
+                                type: string
+                              description: deletedKeys describes the key deleted.
+                              type: object
+                            updatedKeys:
+                              additionalProperties:
+                                type: string
+                              description: updatedKeys describes the key updated.
+                              type: object
+                          type: object
+                      required:
+                      - name
+                      type: object
+                    minItems: 1
+                    type: array
+                    x-kubernetes-list-map-keys:
+                    - name
+                    x-kubernetes-list-type: map
+                required:
+                - configurationStatus
+                type: object
               startTimestamp:
                 description: startTimestamp The time when the OpsRequest started processing.
                 format: date-time

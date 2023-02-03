@@ -1,5 +1,5 @@
 /*
-Copyright ApeCloud Inc.
+Copyright ApeCloud, Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -144,20 +144,20 @@ func (r *ReconfigureRequestReconciler) sync(reqCtx intctrlutil.RequestCtx, confi
 		configTplLabelKey:                config.GetName(),
 	}
 
-	versionMeta, err := getConfigurationVersion(config, reqCtx, &tpl.Spec)
+	configPatch, err := createConfigurePatch(config, reqCtx, &tpl.Spec)
 	if err != nil {
 		return intctrlutil.RequeueWithErrorAndRecordEvent(config, r.Recorder, err, reqCtx.Log)
 	}
 
 	// Not any parameters updated
-	if !versionMeta.IsModify {
-		return r.updateCfgStatus(reqCtx, config, ReconfigureNoChangeType)
+	if !configPatch.IsModify {
+		return r.updateConfigCMStatus(reqCtx, config, ReconfigureNoChangeType)
 	}
 
 	reqCtx.Log.Info(fmt.Sprintf("reconfigure params: \n\tadd: %s\n\tdelete: %s\n\tupdate: %s",
-		versionMeta.AddConfig,
-		versionMeta.DeleteConfig,
-		versionMeta.UpdateConfig))
+		configPatch.AddConfig,
+		configPatch.DeleteConfig,
+		configPatch.UpdateConfig))
 
 	// Find Cluster CR
 	if err := r.Client.Get(reqCtx.Ctx, clusterKey, &cluster); err != nil {
@@ -188,7 +188,7 @@ func (r *ReconfigureRequestReconciler) sync(reqCtx intctrlutil.RequestCtx, confi
 				"failed to get component from cluster definition. type[%s]", componentName),
 			reqCtx.Log)
 	} else if component == nil {
-		reqCtx.Log.Info(fmt.Sprintf("failed to found component which the configuration is associated, component name: %s", componentName))
+		reqCtx.Log.Info(fmt.Sprintf("failed to find component which the configuration is associated, component name: %s", componentName))
 		return intctrlutil.Reconciled()
 	}
 
@@ -207,7 +207,7 @@ func (r *ReconfigureRequestReconciler) sync(reqCtx intctrlutil.RequestCtx, confi
 	}
 
 	// configmap has never been used
-	sts, containersList := getComponentByUsingCM(&stsLists, configKey)
+	sts, containersList := getRelatedComponentsByConfigmap(&stsLists, configKey)
 	if len(sts) == 0 {
 		reqCtx.Log.Info("configmap is not used by any container.", "cm name", configKey)
 		return intctrlutil.Reconciled()
@@ -215,9 +215,9 @@ func (r *ReconfigureRequestReconciler) sync(reqCtx intctrlutil.RequestCtx, confi
 
 	return r.performUpgrade(reconfigureParams{
 		TplName:                  configTplName,
-		Meta:                     versionMeta,
-		Cfg:                      config,
-		Tpl:                      &tpl.Spec,
+		ConfigPatch:              configPatch,
+		CfgCM:                    config,
+		ConfigConstraint:         &tpl.Spec,
 		Client:                   r.Client,
 		Ctx:                      reqCtx,
 		Cluster:                  &cluster,
@@ -230,7 +230,7 @@ func (r *ReconfigureRequestReconciler) sync(reqCtx intctrlutil.RequestCtx, confi
 	})
 }
 
-func (r *ReconfigureRequestReconciler) updateCfgStatus(reqCtx intctrlutil.RequestCtx, cfg *corev1.ConfigMap, reconfigureType string) (ctrl.Result, error) {
+func (r *ReconfigureRequestReconciler) updateConfigCMStatus(reqCtx intctrlutil.RequestCtx, cfg *corev1.ConfigMap, reconfigureType string) (ctrl.Result, error) {
 	configData, err := json.Marshal(cfg.Data)
 	if err != nil {
 		return intctrlutil.RequeueWithErrorAndRecordEvent(cfg, r.Recorder, err, reqCtx.Log)
@@ -244,26 +244,31 @@ func (r *ReconfigureRequestReconciler) updateCfgStatus(reqCtx intctrlutil.Reques
 }
 
 func (r *ReconfigureRequestReconciler) performUpgrade(params reconfigureParams) (ctrl.Result, error) {
-	policy, err := NewReconfigurePolicy(params.Tpl, params.Meta, getUpgradePolicy(params.Cfg), params.Restart)
+	policy, err := NewReconfigurePolicy(params.ConfigConstraint, params.ConfigPatch, getUpgradePolicy(params.CfgCM), params.Restart)
 	if err != nil {
-		return intctrlutil.RequeueWithErrorAndRecordEvent(params.Cfg, r.Recorder, err, params.Ctx.Log)
+		return intctrlutil.RequeueWithErrorAndRecordEvent(params.CfgCM, r.Recorder, err, params.Ctx.Log)
 	}
 
-	execStatus, err := policy.Upgrade(params)
-	if err := r.handleConfigEvent(params, execStatus, err); err != nil {
-		return intctrlutil.RequeueWithErrorAndRecordEvent(params.Cfg, r.Recorder, err, params.Ctx.Log)
+	returnedStatus, err := policy.Upgrade(params)
+	if err := r.handleConfigEvent(params, cfgcore.PolicyExecStatus{
+		PolicyName:    policy.GetPolicyName(),
+		ExecStatus:    string(returnedStatus.Status),
+		SucceedCount:  returnedStatus.SucceedCount,
+		ExpectedCount: returnedStatus.ExpectedCount,
+	}, err); err != nil {
+		return intctrlutil.RequeueWithErrorAndRecordEvent(params.CfgCM, r.Recorder, err, params.Ctx.Log)
 	}
 	if err != nil {
-		return intctrlutil.RequeueWithErrorAndRecordEvent(params.Cfg, r.Recorder, err, params.Ctx.Log)
+		return intctrlutil.RequeueWithErrorAndRecordEvent(params.CfgCM, r.Recorder, err, params.Ctx.Log)
 	}
 
-	switch execStatus {
+	switch returnedStatus.Status {
 	case ESRetry, ESAndRetryFailed:
 		return intctrlutil.RequeueAfter(ConfigReconcileInterval, params.Ctx.Log, "")
 	case ESNone:
-		return r.updateCfgStatus(params.Ctx, params.Cfg, policy.GetPolicyName())
+		return r.updateConfigCMStatus(params.Ctx, params.CfgCM, policy.GetPolicyName())
 	case ESFailed:
-		if err := setCfgUpgradeFlag(params.Client, params.Ctx, params.Cfg, false); err != nil {
+		if err := setCfgUpgradeFlag(params.Client, params.Ctx, params.CfgCM, false); err != nil {
 			return intctrlutil.CheckedRequeueWithError(err, params.Ctx.Log, "")
 		}
 		return intctrlutil.Reconciled()
@@ -272,9 +277,9 @@ func (r *ReconfigureRequestReconciler) performUpgrade(params reconfigureParams) 
 	}
 }
 
-func (r *ReconfigureRequestReconciler) handleConfigEvent(params reconfigureParams, status ExecStatus, err error) error {
+func (r *ReconfigureRequestReconciler) handleConfigEvent(params reconfigureParams, status cfgcore.PolicyExecStatus, err error) error {
 	var (
-		cm             = params.Cfg
+		cm             = params.CfgCM
 		lastOpsRequest = ""
 	)
 
@@ -283,18 +288,20 @@ func (r *ReconfigureRequestReconciler) handleConfigEvent(params reconfigureParam
 	}
 
 	eventContext := cfgcore.ConfigEventContext{
-		Client:         params.Client,
-		ReqCtx:         params.Ctx,
-		Cluster:        params.Cluster,
-		Component:      params.Component,
-		Meta:           params.Meta,
-		Tpl:            params.Tpl,
-		Cfg:            params.Cfg,
-		ComponentUnits: params.ComponentUnits,
+		TplName:          params.TplName,
+		Client:           params.Client,
+		ReqCtx:           params.Ctx,
+		Cluster:          params.Cluster,
+		Component:        params.Component,
+		ConfigPatch:      params.ConfigPatch,
+		ConfigConstraint: params.ConfigConstraint,
+		CfgCM:            params.CfgCM,
+		ComponentUnits:   params.ComponentUnits,
+		PolicyStatus:     status,
 	}
 
 	for _, handler := range cfgcore.ConfigEventHandlerMap {
-		if err := handler.Handle(eventContext, lastOpsRequest, fromReconfigureStatus(status), err); err != nil {
+		if err := handler.Handle(eventContext, lastOpsRequest, fromReconfigureStatus(ExecStatus(status.ExecStatus)), err); err != nil {
 			return err
 		}
 	}

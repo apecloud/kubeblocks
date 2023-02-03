@@ -1,5 +1,5 @@
 /*
-Copyright ApeCloud Inc.
+Copyright ApeCloud, Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -84,7 +84,9 @@ func GetOpsRequestSliceFromCluster(cluster *dbaasv1alpha1.Cluster) ([]dbaasv1alp
 }
 
 // MarkRunningOpsRequestAnnotation marks reconcile annotation to the OpsRequest which is running in the cluster.
-// then the related OpsRequest can reconcile
+// then the related OpsRequest can reconcile.
+// Note: if the client-go fetches the Cluster resources from cache,
+// it should record the Cluster.ResourceVersion to check if the Cluster object from client-go is the latest in OpsRequest controller.
 func MarkRunningOpsRequestAnnotation(ctx context.Context, cli client.Client, cluster *dbaasv1alpha1.Cluster) error {
 	var (
 		opsRequestSlice []dbaasv1alpha1.OpsRecorder

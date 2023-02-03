@@ -6,6 +6,16 @@ Restart the specified components in the cluster
 kbcli cluster restart [flags]
 ```
 
+### Examples
+
+```
+  # restart all components
+  kbcli cluster restart <my-cluster>
+  
+  # restart specifies the component, separate with commas when <component-name> more than one
+  kbcli cluster restart <my-cluster> --component-names=<component-name>
+```
+
 ### Options
 
 ```

@@ -6,6 +6,14 @@ Expand volume with the specified components and volumeClaimTemplates in the clus
 kbcli cluster volume-expand [flags]
 ```
 
+### Examples
+
+```
+  # restart specifies the component, separate with commas when <component-name> more than one
+  kbcli cluster volume-expand <my-cluster> --component-names=<component-name> \
+  --volume-claim-template-names=data --storage=10Gi
+```
+
 ### Options
 
 ```

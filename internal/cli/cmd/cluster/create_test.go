@@ -129,8 +129,8 @@ spec:
 	})
 
 	It("build cluster component", func() {
-		viper.Set("KBCLI_CLUSTER_DEFAULT_STORAGE_SIZE", "10Gi")
-		viper.Set("KBCLI_CLUSTER_DEFAULT_REPLICAS", 1)
+		viper.Set("CLUSTER_DEFAULT_STORAGE_SIZE", "10Gi")
+		viper.Set("CLUSTER_DEFAULT_REPLICAS", 1)
 		dynamic := testing.FakeDynamicClient(testing.FakeClusterDef())
 		comps, err := buildClusterComp(dynamic, testing.ClusterDefName)
 		Expect(err).ShouldNot(HaveOccurred())

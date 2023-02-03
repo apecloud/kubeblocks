@@ -121,8 +121,8 @@ func initConfig() {
 	viper.AutomaticEnv() // read in environment variables that match
 	viper.SetEnvPrefix(cliName)
 
-	viper.SetDefault("KBCLI_CLUSTER_DEFAULT_STORAGE_SIZE", "10Gi")
-	viper.SetDefault("KBCLI_CLUSTER_DEFAULT_REPLICAS", 1)
+	viper.SetDefault("CLUSTER_DEFAULT_STORAGE_SIZE", "10Gi")
+	viper.SetDefault("CLUSTER_DEFAULT_REPLICAS", 1)
 
 	// If a config file is found, read it in.
 	if err := viper.ReadInConfig(); err == nil {

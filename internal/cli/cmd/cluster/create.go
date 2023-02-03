@@ -350,7 +350,7 @@ func buildClusterComp(dynamic dynamic.Interface, clusterDef string) ([]map[strin
 		return nil, err
 	}
 
-	defaultStorageSize := viper.GetString("KBCLI_CLUSTER_DEFAULT_STORAGE_SIZE")
+	defaultStorageSize := viper.GetString("CLUSTER_DEFAULT_STORAGE_SIZE")
 	if len(defaultStorageSize) == 0 {
 		defaultStorageSize = "10Gi"
 	}
@@ -362,7 +362,7 @@ func buildClusterComp(dynamic dynamic.Interface, clusterDef string) ([]map[strin
 		if replicas <= 0 {
 			continue
 		}
-		if defaultReplicas := viper.GetInt32("KBCLI_CLUSTER_DEFAULT_REPLICAS"); defaultReplicas > 0 {
+		if defaultReplicas := viper.GetInt32("CLUSTER_DEFAULT_REPLICAS"); defaultReplicas > 0 {
 			replicas = defaultReplicas
 		}
 		compObj := &dbaasv1alpha1.ClusterComponent{

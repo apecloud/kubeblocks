@@ -140,7 +140,7 @@ spec:
     podSpec:
       containers:
       - name: mysql
-        image: docker.io/apecloud/wesql-server:latest
+        image: docker.io/apecloud/apecloud-mysql-server:latest
   - type: proxy
     podSpec: 
       containers:
@@ -150,7 +150,7 @@ spec:
     podSpec: 
       containers:
       - name: mysql
-        image: docker.io/apecloud/wesql-server:latest
+        image: docker.io/apecloud/apecloud-mysql-server:latest
 `, clusterVersionName, clusterDefName)
 		clusterVersion := &dbaasv1alpha1.ClusterVersion{}
 		Expect(yaml.Unmarshal([]byte(clusterVersionYaml), clusterVersion)).Should(Succeed())
@@ -215,7 +215,7 @@ spec:
         app.kubernetes.io/instance: %s
     spec:
       containers:
-      - image: docker.io/apecloud/wesql-server:latest
+      - image: docker.io/apecloud/apecloud-mysql-server:latest
         imagePullPolicy: IfNotPresent
         name: mysql`, componentName, clusterName, stsName, componentName, clusterName, componentName, clusterName)
 		sts := &appsv1.StatefulSet{}
@@ -237,7 +237,7 @@ metadata:
   namespace: default
 spec:
   containers:
-  - image: docker.io/apecloud/wesql-server:latest
+  - image: docker.io/apecloud/apecloud-mysql-server:latest
     imagePullPolicy: IfNotPresent
     name: mysql`, componentName, clusterName, podRole, podName)
 		pod := &corev1.Pod{}

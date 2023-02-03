@@ -18,8 +18,11 @@ package operations
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
@@ -27,127 +30,60 @@ import (
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 )
 
-type ComponentsType interface {
-	dbaasv1alpha1.ClusterVersionComponent | dbaasv1alpha1.ClusterDefinitionComponent | dbaasv1alpha1.ClusterComponent
-}
-
-type filterFn[T ComponentsType] func(o T) bool
-
-func filter[T ComponentsType](components []T, f filterFn[T]) *T {
-	for _, c := range components {
-		if f(c) {
-			return &c
-		}
-	}
-	return nil
-}
-
-func getConfigTemplatesFromComponent(
-	cComponents []dbaasv1alpha1.ClusterComponent,
-	dComponents []dbaasv1alpha1.ClusterDefinitionComponent,
-	aComponents []dbaasv1alpha1.ClusterVersionComponent,
-	componentName string) ([]dbaasv1alpha1.ConfigTemplate, error) {
-	findCompTypeByName := func(comName string) *dbaasv1alpha1.ClusterComponent {
-		return filter(cComponents, func(o dbaasv1alpha1.ClusterComponent) bool {
-			return o.Name == comName
-		})
-	}
-
-	cCom := findCompTypeByName(componentName)
-	if cCom == nil {
-		return nil, cfgcore.MakeError("failed to find component[%s]", componentName)
-	}
-	aCom := filter(aComponents, func(o dbaasv1alpha1.ClusterVersionComponent) bool {
-		return o.Type == cCom.Type
-	})
-	dCom := filter(dComponents, func(o dbaasv1alpha1.ClusterDefinitionComponent) bool {
-		return o.TypeName == cCom.Type
-	})
-
-	var (
-		avTpls []dbaasv1alpha1.ConfigTemplate
-		cdTpls []dbaasv1alpha1.ConfigTemplate
-	)
-
-	if aCom != nil {
-		avTpls = aCom.ConfigTemplateRefs
-	}
-	if dCom != nil && dCom.ConfigSpec != nil {
-		cdTpls = dCom.ConfigSpec.ConfigTemplateRefs
-	}
-
-	return MergeConfigTemplates(avTpls, cdTpls), nil
+type reconfiguringResult struct {
+	failed             bool
+	configPatch        *cfgcore.ConfigPatchInfo
+	lastAppliedConfigs map[string]string
+	err                error
 }
 
 // updateCfgParams merge parameters of the config into the configmap, and verify final configuration file.
-func updateCfgParams(
-	config dbaasv1alpha1.Configuration,
+func updateCfgParams(config dbaasv1alpha1.Configuration,
 	tpl dbaasv1alpha1.ConfigTemplate,
 	cmKey client.ObjectKey,
 	ctx context.Context,
 	cli client.Client,
-	opsCrName string) (bool, error) {
+	opsCrName string) reconfiguringResult {
 	var (
 		cm     = &corev1.ConfigMap{}
 		cfgTpl = &dbaasv1alpha1.ConfigConstraint{}
 
-		err      error
-		operator cfgcore.ConfigOperator
+		err    error
+		newCfg map[string]string
 	)
 
 	if err := cli.Get(ctx, cmKey, cm); err != nil {
-		return false, err
+		return makeReconfiguringResult(err)
 	}
 	if err := cli.Get(ctx, client.ObjectKey{
 		Namespace: tpl.Namespace,
 		Name:      tpl.ConfigConstraintRef,
 	}, cfgTpl); err != nil {
-		return false, err
-	}
-	if operator, err = cfgcore.NewConfigLoader(cfgcore.CfgOption{
-		Type:    cfgcore.CfgCmType,
-		Log:     log.FromContext(ctx),
-		CfgType: cfgTpl.Spec.FormatterConfig.Formatter,
-		K8sKey: &cfgcore.K8sConfig{
-			CfgKey: client.ObjectKeyFromObject(cm),
-			ResourceFn: func(key client.ObjectKey) (map[string]string, error) {
-				return cm.Data, nil
-			},
-		},
-	}); err != nil {
-		return false, err
+		return makeReconfiguringResult(err)
 	}
 
-	// process special formatter options
+	params := make([]cfgcore.ParamPairs, len(config.Keys))
+	for i, key := range config.Keys {
+		params[i] = cfgcore.ParamPairs{
+			Key:           key.Key,
+			UpdatedParams: fromKeyValuePair(key.Parameters),
+		}
+	}
+
 	fc := cfgTpl.Spec.FormatterConfig
-	options := func(ctx *cfgcore.CfgOpOption) {
-		// process special formatter
-		if fc.Formatter == dbaasv1alpha1.INI && fc.IniConfig != nil {
-			ctx.IniContext = &cfgcore.IniContext{
-				SectionName: fc.IniConfig.SectionName,
-			}
-		}
-	}
-
-	// merge param to config file
-	for _, key := range config.Keys {
-		if err := operator.MergeFrom(fromKeyValuePair(key.Parameters),
-			cfgcore.NewCfgOptions(key.Key, options)); err != nil {
-			return false, err
-		}
-	}
-
-	newCfg, err := operator.ToCfgContent()
+	newCfg, err = cfgcore.MergeAndValidateConfiguration(cfgTpl.Spec, cm.Data, params)
 	if err != nil {
-		return false, cfgcore.WrapError(err, "failed to generate config file")
+		return makeReconfiguringResult(err, withFailed(true))
 	}
 
-	configChecker := cfgcore.NewConfigValidator(&cfgTpl.Spec)
-	if err := configChecker.Validate(newCfg); err != nil {
-		return true, cfgcore.WrapError(err, "failed to validate updated config")
+	configPatch, err := createConfigPatch(client.ObjectKeyFromObject(cm), cm.Data, newCfg, fc.Formatter)
+	if err != nil {
+		return makeReconfiguringResult(err)
 	}
-
-	return false, persistCfgCM(cm, newCfg, cli, ctx, opsCrName)
+	if !configPatch.IsModify {
+		return makeReconfiguringResult(nil, withReturned(newCfg, configPatch))
+	}
+	return makeReconfiguringResult(persistCfgCM(cm, newCfg, cli, ctx, opsCrName), withReturned(newCfg, configPatch))
 }
 
 func persistCfgCM(cmObj *corev1.ConfigMap, newCfg map[string]string, cli client.Client, ctx context.Context, opsCrName string) error {
@@ -172,39 +108,112 @@ func fromKeyValuePair(parameters []dbaasv1alpha1.ParameterPair) map[string]inter
 	return m
 }
 
-// MergeConfigTemplates merge ClusterVersion.Components[*].ConfigTemplateRefs and ClusterDefinition.Components[*].ConfigTemplateRefs
-func MergeConfigTemplates(clusterVersionTpl []dbaasv1alpha1.ConfigTemplate,
-	cdTpl []dbaasv1alpha1.ConfigTemplate) []dbaasv1alpha1.ConfigTemplate {
-	if len(clusterVersionTpl) == 0 {
-		return cdTpl
+func createConfigPatch(cfgKey client.ObjectKey,
+	old, updated map[string]string,
+	formatter dbaasv1alpha1.ConfigurationFormatter) (*cfgcore.ConfigPatchInfo, error) {
+	option := cfgcore.CfgOption{
+		Type:    cfgcore.CfgTplType,
+		CfgType: formatter,
+		Log:     log.Log,
 	}
 
-	if len(cdTpl) == 0 {
-		return clusterVersionTpl
+	return cfgcore.CreateMergePatch(
+		&cfgcore.K8sConfig{
+			CfgKey:         cfgKey,
+			Configurations: old,
+		}, &cfgcore.K8sConfig{
+			CfgKey:         cfgKey,
+			Configurations: updated,
+		}, option)
+}
+
+func withFailed(failed bool) func(result *reconfiguringResult) {
+	return func(result *reconfiguringResult) {
+		result.failed = failed
 	}
+}
 
-	mergedCfgTpl := make([]dbaasv1alpha1.ConfigTemplate, 0, len(clusterVersionTpl)+len(cdTpl))
-	mergedTplMap := make(map[string]struct{}, cap(mergedCfgTpl))
+func withReturned(configs map[string]string, patch *cfgcore.ConfigPatchInfo) func(result *reconfiguringResult) {
+	return func(result *reconfiguringResult) {
+		result.lastAppliedConfigs = configs
+		result.configPatch = patch
+	}
+}
 
-	for i := range clusterVersionTpl {
-		volumeName := clusterVersionTpl[i].VolumeName
-		if _, ok := (mergedTplMap)[volumeName]; ok {
-			// It's been checked in validation webhook
-			continue
+func makeReconfiguringResult(err error, ops ...func(*reconfiguringResult)) reconfiguringResult {
+	result := reconfiguringResult{
+		failed: false,
+		err:    err,
+	}
+	for _, o := range ops {
+		o(&result)
+	}
+	return result
+}
+
+func constructReconfiguringConditions(result reconfiguringResult, resource *OpsResource, tpl *dbaasv1alpha1.ConfigTemplate) []*metav1.Condition {
+	if result.configPatch.IsModify {
+		return []*metav1.Condition{dbaasv1alpha1.NewReconfigureRunningCondition(
+			resource.OpsRequest,
+			dbaasv1alpha1.ReasonReconfigureMerged,
+			tpl.Name,
+			formatConfigPatchToMessage(result.configPatch, nil)),
 		}
-		mergedCfgTpl = append(mergedCfgTpl, clusterVersionTpl[i])
-		mergedTplMap[volumeName] = struct{}{}
+	}
+	return []*metav1.Condition{
+		dbaasv1alpha1.NewReconfigureRunningCondition(
+			resource.OpsRequest,
+			dbaasv1alpha1.ReasonReconfigureInvalidUpdated,
+			tpl.Name,
+			formatConfigPatchToMessage(result.configPatch, nil)),
+		dbaasv1alpha1.NewSucceedCondition(resource.OpsRequest),
+	}
+}
+
+func i2sMap(config map[string]interface{}) map[string]string {
+	if len(config) == 0 {
+		return nil
+	}
+	m := make(map[string]string, len(config))
+	for key, value := range config {
+		data, _ := json.Marshal(value)
+		m[key] = string(data)
+	}
+	return m
+}
+
+func b2sMap(config map[string][]byte) map[string]string {
+	if len(config) == 0 {
+		return nil
+	}
+	m := make(map[string]string, len(config))
+	for key, value := range config {
+		m[key] = string(value)
+	}
+	return m
+}
+
+func processMergedFailed(resource *OpsResource, isInvalid bool, err error) error {
+	if !isInvalid {
+		return cfgcore.WrapError(err, "failed to update param!")
 	}
 
-	for i := range cdTpl {
-		// ClusterVersion replace clusterDefinition
-		volumeName := cdTpl[i].VolumeName
-		if _, ok := (mergedTplMap)[volumeName]; ok {
-			continue
-		}
-		mergedCfgTpl = append(mergedCfgTpl, cdTpl[i])
-		mergedTplMap[volumeName] = struct{}{}
+	// if failed to validate configure, and retry
+	if err := PatchOpsStatus(resource, dbaasv1alpha1.FailedPhase,
+		dbaasv1alpha1.NewFailedCondition(resource.OpsRequest, err)); err != nil {
+		return err
 	}
+	return nil
+}
 
-	return mergedCfgTpl
+func formatConfigPatchToMessage(configPatch *cfgcore.ConfigPatchInfo, execStatus *cfgcore.PolicyExecStatus) string {
+	policyName := ""
+	if execStatus != nil {
+		policyName = fmt.Sprintf("updated policy: <%s>, ", execStatus.PolicyName)
+	}
+	return fmt.Sprintf("%supdated: %s, added: %s, deleted:%s",
+		policyName,
+		configPatch.UpdateConfig,
+		configPatch.AddConfig,
+		configPatch.DeleteConfig)
 }

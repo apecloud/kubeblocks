@@ -40,15 +40,17 @@ const (
 
 	// condition and event reasons
 
-	ReasonReconfigureMerged    = "ReconfigureMerged"
-	ReasonReconfigureFailed    = "ReconfigureFailed"
-	ReasonReconfigureSucceed   = "ReconfigureSucceed"
-	ReasonReconfigureRunning   = "ReconfigureRunning"
-	ReasonClusterPhaseMisMatch = "ClusterPhaseMisMatch"
-	ReasonOpsTypeNotSupported  = "OpsTypeNotSupported"
-	ReasonValidateError        = "ValidateError"
-	ReasonClusterNotFound      = "ClusterNotFound"
-	ReasonOpsRequestFailed     = "OpsRequestFailed"
+	ReasonReconfigureMerging        = "ReconfigureMerging"
+	ReasonReconfigureMerged         = "ReconfigureMerged"
+	ReasonReconfigureInvalidUpdated = "ReconfigureInvalidUpdated"
+	ReasonReconfigureFailed         = "ReconfigureFailed"
+	ReasonReconfigureSucceed        = "ReconfigureSucceed"
+	ReasonReconfigureRunning        = "ReconfigureRunning"
+	ReasonClusterPhaseMisMatch      = "ClusterPhaseMisMatch"
+	ReasonOpsTypeNotSupported       = "OpsTypeNotSupported"
+	ReasonValidateFailed            = "ValidateFailed"
+	ReasonClusterNotFound           = "ClusterNotFound"
+	ReasonOpsRequestFailed          = "OpsRequestFailed"
 )
 
 func (r *OpsRequest) SetStatusCondition(condition metav1.Condition) {
@@ -178,17 +180,30 @@ func NewReconfigureCondition(ops *OpsRequest) *metav1.Condition {
 		Status:             metav1.ConditionTrue,
 		Reason:             "ReconfigureStarted",
 		LastTransitionTime: metav1.NewTime(time.Now()),
-		Message:            fmt.Sprintf("Start to reconfigure in Cluster: %s", ops.Spec.ClusterRef),
+		Message: fmt.Sprintf("Start to reconfigure in Cluster: %s, Component: %s",
+			ops.Spec.ClusterRef,
+			ops.Spec.Reconfigure.ComponentName),
 	}
 }
 
 // NewReconfigureRunningCondition new a condition that the OpsRequest reconfigure workflow
-func NewReconfigureRunningCondition(ops *OpsRequest, reason string) *metav1.Condition {
+func NewReconfigureRunningCondition(ops *OpsRequest, conditionType string, tplName string, info ...string) *metav1.Condition {
+	status := metav1.ConditionTrue
+	if conditionType == ReasonReconfigureFailed {
+		status = metav1.ConditionFalse
+	}
+	message := fmt.Sprintf("Reconfiguring in Cluster: %s, Component: %s, ConfigTpl: %s",
+		ops.Spec.ClusterRef,
+		ops.Spec.Reconfigure.ComponentName,
+		tplName)
+	if len(info) > 0 {
+		message = message + ", info: " + info[0]
+	}
 	return &metav1.Condition{
-		Type:               ConditionTypeReconfigure,
-		Status:             metav1.ConditionTrue,
-		Reason:             reason,
+		Type:               conditionType,
+		Status:             status,
+		Reason:             conditionType,
 		LastTransitionTime: metav1.NewTime(time.Now()),
-		Message:            fmt.Sprintf("Reconfiguring in Cluster: %s", ops.Spec.ClusterRef),
+		Message:            message,
 	}
 }

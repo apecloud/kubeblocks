@@ -246,14 +246,8 @@ type webhookManager struct {
 	client client.Client
 }
 
-type ScopeType string
-
-const (
-	ScopeBothType   ScopeType = "ScopeBoth"
-	ScopeFileType   ScopeType = "ScopeFile"
-	ScopeMemoryType ScopeType = "ScopeMemory"
-)
-
+// ConfigurationFormatter defines formatter of configuration files.
+// +enum
 type ConfigurationFormatter string
 
 const (
@@ -265,6 +259,8 @@ const (
 	DOTENV ConfigurationFormatter = "dotenv"
 )
 
+// UpgradePolicy defines the policy of reconfiguring.
+// +enum
 type UpgradePolicy string
 
 const (
@@ -274,6 +270,8 @@ const (
 	AutoReload    UpgradePolicy = "autoReload"
 )
 
+// CfgReloadType defines reload method.
+// +enum
 type CfgReloadType string
 
 const (
@@ -283,6 +281,8 @@ const (
 	HTTPType       CfgReloadType = "http"
 )
 
+// SignalType defines which signals are valid.
+// +enum
 type SignalType string
 
 const (

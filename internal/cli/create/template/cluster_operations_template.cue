@@ -29,6 +29,10 @@ options: {
 	replicas:      int
 	storage:       string
 	vctNames: [...string]
+	keyValues: [string]: string
+	cfgTemplateName: string
+	cfgFile:         string
+	...
 }
 
 // define operation block,
@@ -96,6 +100,21 @@ content: {
 					}
 				}
 			}]
+		}
+		if options.type == "Reconfiguring" {
+			reconfigure: {
+				componentName: options.componentNames[0]
+				configurations: [ {
+					name: options.cfgTemplateName
+					keys: [{
+						key: options.cfgFile
+						parameters: [ for k, v in options.keyValues {
+							key:   k
+							value: v
+						}]
+					}]
+				}]
+			}
 		}
 	}
 }

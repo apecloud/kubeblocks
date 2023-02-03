@@ -35,7 +35,7 @@ Block:
   Type:      consensus
   Replicas:  3 desired | 3 total
   Status:    3 Running / 0 Waiting / 0 Succeeded / 0 Failed  
-  Image:   docker.io/apecloud/wesql-server:latest
+  Image:   docker.io/apecloud/apecloud-mysql-server:latest
   Cpu:          1000m
   Memory:       1024Mi
   Endpoints:

@@ -98,7 +98,7 @@ func (r *ClusterDefinitionReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		return intctrlutil.RequeueAfter(time.Second, reqCtx.Log, "failed to check config template")
 	}
 
-	if ok, err := dbaasconfig.UpdateCDLabelsWithUsingConfiguration(r.Client, reqCtx, dbClusterDef); !ok || err != nil {
+	if ok, err := dbaasconfig.UpdateCDLabelsByConfiguration(r.Client, reqCtx, dbClusterDef); !ok || err != nil {
 		return intctrlutil.RequeueAfter(time.Second, reqCtx.Log, "failed to update using config template info")
 	}
 

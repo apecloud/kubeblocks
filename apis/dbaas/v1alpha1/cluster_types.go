@@ -60,6 +60,7 @@ type ClusterSpec struct {
 	Affinity *Affinity `json:"affinity,omitempty"`
 
 	// Cluster Tolerations are attached to tolerate any taint that matches the triple <key,value,effect> using the matching operator <operator>.
+	// +kubebuilder:pruning:PreserveUnknownFields
 	// +optional
 	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
 }
@@ -134,6 +135,7 @@ type ClusterComponent struct {
 	// enabledLogs indicate which log file takes effect in database cluster
 	// element is the log type which defined in cluster definition logConfig.name,
 	// and will set relative variables about this log type in database kernel.
+	// +listType=set
 	// +optional
 	EnabledLogs []string `json:"enabledLogs,omitempty"`
 
@@ -146,10 +148,12 @@ type ClusterComponent struct {
 	Affinity *Affinity `json:"affinity,omitempty"`
 
 	// Component tolerations will override ClusterSpec.Tolerations if specified.
+	// +kubebuilder:pruning:PreserveUnknownFields
 	// +optional
 	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
 
 	// resources requests and limits of workload.
+	// +kubebuilder:pruning:PreserveUnknownFields
 	// +optional
 	Resources corev1.ResourceRequirements `json:"resources,omitempty"`
 
@@ -175,6 +179,7 @@ type ClusterComponent struct {
 	// More info: https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types
 	// +kubebuilder:default=ClusterIP
 	// +kubebuilder:validation:Enum={ClusterIP,NodePort,LoadBalancer}
+	// +kubebuilder:pruning:PreserveUnknownFields
 	// +optional
 	ServiceType corev1.ServiceType `json:"serviceType,omitempty"`
 
@@ -278,6 +283,7 @@ type ClusterComponentVolumeClaimTemplate struct {
 	// +kubebuilder:validation:Required
 	Name string `json:"name"`
 	// spec defines the desired characteristics of a volume requested by a pod author.
+	// +kubebuilder:pruning:PreserveUnknownFields
 	// +optional
 	Spec *corev1.PersistentVolumeClaimSpec `json:"spec,omitempty"`
 }
@@ -292,6 +298,7 @@ type Affinity struct {
 	PodAntiAffinity PodAntiAffinity `json:"podAntiAffinity,omitempty"`
 
 	// topologyKeys describe topologyKeys for `topologySpreadConstraint` and `podAntiAffinity` in ClusterDefinition API.
+	// +listType=set
 	// +optional
 	TopologyKeys []string `json:"topologyKeys,omitempty"`
 
@@ -306,18 +313,24 @@ type Operations struct {
 	Upgradable bool `json:"upgradable,omitempty"`
 
 	// verticalScalable which components of the cluster support verticalScaling.
+	// +listType=set
 	// +optional
 	VerticalScalable []string `json:"verticalScalable,omitempty"`
 
 	// restartable which components of the cluster support restart.
+	// +listType=set
 	// +optional
 	Restartable []string `json:"restartable,omitempty"`
 
 	// volumeExpandable which components of the cluster and its volumeClaimTemplates support volumeExpansion.
+	// +listType=map
+	// +listMapKey=name
 	// +optional
 	VolumeExpandable []OperationComponent `json:"volumeExpandable,omitempty"`
 
 	// horizontalScalable which components of the cluster support horizontalScaling, and the replicas range limit.
+	// +listType=map
+	// +listMapKey=name
 	// +optional
 	HorizontalScalable []OperationComponent `json:"horizontalScalable,omitempty"`
 }
@@ -383,7 +396,7 @@ func (r *Cluster) ValidateEnabledLogs(cd *ClusterDefinition) error {
 		if len(invalidLogNames) == 0 {
 			continue
 		}
-		message = append(message, fmt.Sprintf("EnabledLogs: %s are not definded in Component: %s of the clusterDefinition", invalidLogNames, comp.Name))
+		message = append(message, fmt.Sprintf("EnabledLogs: %s are not defined in Component: %s of the clusterDefinition", invalidLogNames, comp.Name))
 	}
 	if len(message) > 0 {
 		return errors.New(strings.Join(message, ";"))

@@ -26,6 +26,7 @@ Run a TPCC benchmark
       --context string                 The name of the kubeconfig context to use
       --count int                      Total execution count, 0 means infinite
   -D, --db string                      Database name (default "kb_test")
+      --disable-compression            If true, opt-out of response compression for all requests to the server
   -d, --driver string                  Database driver: mysql (default "mysql")
       --dropdata                       Cleanup data before prepare
   -H, --host string                    Database host (default "127.0.0.1")

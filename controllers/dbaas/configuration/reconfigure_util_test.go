@@ -54,8 +54,8 @@ func TestGetUpdateParameterList(t *testing.T) {
 		set.NewLinkedHashSetString(params...)))
 }
 
-func newCfgDiffMeta(testData string, add, delete map[string]interface{}) *cfgcore.ConfigDiffInformation {
-	return &cfgcore.ConfigDiffInformation{
+func newCfgDiffMeta(testData string, add, delete map[string]interface{}) *cfgcore.ConfigPatchInfo {
+	return &cfgcore.ConfigPatchInfo{
 		UpdateConfig: map[string][]byte{
 			"test": []byte(testData),
 		},
@@ -67,7 +67,7 @@ func newCfgDiffMeta(testData string, add, delete map[string]interface{}) *cfgcor
 func TestIsUpdateDynamicParameters(t *testing.T) {
 	type args struct {
 		tpl  *dbaasv1alpha1.ConfigConstraintSpec
-		diff *cfgcore.ConfigDiffInformation
+		diff *cfgcore.ConfigPatchInfo
 	}
 	tests := []struct {
 		name    string

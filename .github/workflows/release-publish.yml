@@ -30,6 +30,7 @@ jobs:
   upload-release-assert:
     needs: create-release-kbcli
     name: Upload ${{ matrix.os }}
+    continue-on-error: true
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -83,10 +84,14 @@ jobs:
 
       - name: get release kbcli upload url
         run: |
-          echo 'UPLOAD_URL='`bash ${{ github.workspace }}/.github/utils/utils.sh ${{ env.TAG_NAME }} 2 ${{ env.CLI_REPO }}` >> $GITHUB_ENV
+          echo 'UPLOAD_URL='`bash ${{ github.workspace }}/.github/utils/utils.sh \
+            ${{ env.TAG_NAME }} 2 \
+            ${{ env.CLI_REPO }} \
+            ${{ env.GITHUB_TOKEN }}` >> $GITHUB_ENV
 
       - name: upload release kbcli asset ${{ matrix.os }}
         uses: actions/upload-release-asset@main
+        continue-on-error: true
         env:
           CLI_BINARY: ${{ env.CLI_NAME }}-${{ matrix.os }}-${{ env.TAG_NAME }}.tar.gz
         with:

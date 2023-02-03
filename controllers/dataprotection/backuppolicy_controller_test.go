@@ -143,6 +143,7 @@ var _ = Describe("Backup Policy Controller", func() {
 						backup.Spec.BackupPolicyName = backupPolicyKey.Name
 						backup.SetLabels(autoBackupLabel)
 					})
+				backupStatus.StartTimestamp = &metav1.Time{Time: backupOutLimit2.CreationTimestamp.Time}
 				patchBackupStatus(backupStatus, client.ObjectKeyFromObject(backupOutLimit2))
 
 				// trigger the backup policy controller through update cronjob

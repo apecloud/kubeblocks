@@ -24,19 +24,7 @@ ac-mysql-8.0.30   apecloud-mysql       Available   2m40s
 ```
 2. Run the command below to create a MySQL cluster. 
 ```
-$ kbcli cluster create mysql-01 --cluster-definition=apecloud-mysql --cluster-version=ac-mysql-8.0.30 --termination-policy=Halt --set - << EOF
-  - name: mysql
-    type: mysql
-    replicas: 1
-    volumeClaimTemplates:
-    - name: data
-      spec:
-        accessModes:
-          - ReadWriteOnce
-        resources:
-          requests:
-            storage: 1Gi
-EOF
+$ kbcli cluster create --cluster-definition='apecloud-mysql'
 ```
 ## Connect to a MySQL Cluster
 ***Steps:***

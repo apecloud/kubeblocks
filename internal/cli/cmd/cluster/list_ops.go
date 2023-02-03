@@ -57,7 +57,7 @@ func NewListOpsCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 	}
 	cmd := &cobra.Command{
 		Use:               "list-ops",
-		Short:             "Liat all opsRequests",
+		Short:             "List all opsRequests",
 		Aliases:           []string{"ls-ops"},
 		Example:           listOpsExample,
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.ClusterGVR()),

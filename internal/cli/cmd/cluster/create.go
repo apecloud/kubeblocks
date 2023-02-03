@@ -27,7 +27,10 @@ import (
 
 	"github.com/ghodss/yaml"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -177,6 +180,7 @@ func (o *CreateOptions) Validate() error {
 			return err
 		}
 		o.ClusterVersionRef = version
+		fmt.Fprintf(o.Out, "Cluster version is not specified, use latest ClusterVersion %s\n", o.ClusterVersionRef)
 	}
 
 	// if name is not specified, generate a random cluster name
@@ -346,18 +350,39 @@ func buildClusterComp(dynamic dynamic.Interface, clusterDef string) ([]map[strin
 		return nil, err
 	}
 
+	defaultStorageSize := viper.GetString("KBCLI_CLUSTER_DEFAULT_STORAGE_SIZE")
+	if len(defaultStorageSize) == 0 {
+		defaultStorageSize = "10Gi"
+	}
 	var comps []map[string]interface{}
 	for _, c := range cd.Spec.Components {
 		// if cluster definition component default replicas greater than 0, build a cluster component
-		// by cluster definition component. This logic is same with KubeBlocks controller.
+		// by cluster definition component.
 		r := c.DefaultReplicas
 		if r <= 0 {
 			continue
 		}
-		comp := map[string]interface{}{
-			"name":     c.TypeName,
-			"type":     c.TypeName,
-			"replicas": &r,
+		compObj := &dbaasv1alpha1.ClusterComponent{
+			Name:     c.TypeName,
+			Type:     c.TypeName,
+			Replicas: &r,
+			VolumeClaimTemplates: []dbaasv1alpha1.ClusterComponentVolumeClaimTemplate{{
+				Name: "data",
+				Spec: &corev1.PersistentVolumeClaimSpec{
+					AccessModes: []corev1.PersistentVolumeAccessMode{
+						corev1.ReadWriteOnce,
+					},
+					Resources: corev1.ResourceRequirements{
+						Requests: corev1.ResourceList{
+							corev1.ResourceStorage: resource.MustParse(defaultStorageSize),
+						},
+					},
+				},
+			}},
+		}
+		comp, err := runtime.DefaultUnstructuredConverter.ToUnstructured(compObj)
+		if err != nil {
+			return nil, err
 		}
 		comps = append(comps, comp)
 	}

@@ -81,13 +81,14 @@ type CmdExecutorConfig struct {
 	// +optional
 	Args []string `json:"args,omitempty"`
 	// envs is a list of environment variables.
-	// +optional
+	// +kubebuilder:pruning:PreserveUnknownFields
 	// +patchMergeKey=name
 	// +patchStrategy=merge,retainKeys
+	// +optional
 	Env []corev1.EnvVar `json:"env,omitempty" patchStrategy:"merge" patchMergeKey:"name"`
 }
 
-// PasswordConfig helps provide to customize complexity of passowrd generation pattern.
+// PasswordConfig helps provide to customize complexity of password generation pattern.
 type PasswordConfig struct {
 	// length defines the length of password.
 	// +kubebuilder:validation:Maximum=32
@@ -142,10 +143,10 @@ type ProvisionPolicy struct {
 
 // ProvisionSecretRef defines the information of secret referred to.
 type ProvisionSecretRef struct {
-	// name refers to the name of secret.
+	// name refers to the name of the secret.
 	// +kubebuilder:validation:Required
 	Name string `json:"name"`
-	// namespace refers to the namesapce of secret.
+	// namespace refers to the namespace of the secret.
 	// +kubebuilder:validation:Required
 	Namespace string `json:"namespace"`
 }
@@ -335,13 +336,15 @@ type ClusterDefinitionComponent struct {
 	// +optional
 	AntiAffinity bool `json:"antiAffinity,omitempty"`
 
-	// podSpec of final workload
+	// podSpec define pod spec template of the cluster component.
+	// +kubebuilder:pruning:PreserveUnknownFields
 	// +optional
 	PodSpec *corev1.PodSpec `json:"podSpec,omitempty"`
 
 	// service defines the behavior of a service spec.
 	// provide read-write service when ComponentType is Consensus.
 	// https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
+	// +kubebuilder:pruning:PreserveUnknownFields
 	// +optional
 	Service *corev1.ServiceSpec `json:"service,omitempty"`
 
@@ -401,7 +404,7 @@ type ClusterDefinitionProbeCMDs struct {
 	// +optional
 	Writes []string `json:"writes,omitempty"`
 
-	// Read check executed on probe sidecar, used to check workload's reaonly access .
+	// Read check executed on probe sidecar, used to check workload's readonly access.
 	// +optional
 	Queries []string `json:"queries,omitempty"`
 }

@@ -22,12 +22,12 @@ import (
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 )
 
-// GetUncacheObjects returns a list of K8s objects, for these object types,
+// GetUncachedObjects returns a list of K8s objects, for these object types,
 // and their list types, client.Reader will read directly from the API server instead
 // of the cache, which may not be up-to-date.
 // see sigs.k8s.io/controller-runtime/pkg/client/split.go to understand how client
 // works with this UncachedObjects filter.
-func GetUncacheObjects() []client.Object {
+func GetUncachedObjects() []client.Object {
 	// client-side read cache reduces the number of requests processed in the API server,
 	// which is good for performance. However, it can sometimes lead to obscure issues,
 	// most notably lacking read-after-write consistency, i.e. reading a value immediately

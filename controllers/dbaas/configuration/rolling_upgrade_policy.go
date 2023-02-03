@@ -45,7 +45,7 @@ func init() {
 	viper.SetDefault(cfgcore.PodMinReadySecondsEnv, defaultMinReadySeconds)
 }
 
-func (r *rollingUpgradePolicy) Upgrade(params reconfigureParams) (ExecStatus, error) {
+func (r *rollingUpgradePolicy) Upgrade(params reconfigureParams) (ReturnedStatus, error) {
 	var (
 		funcs RollingUpgradeFuncs
 		cType = params.ComponentType()
@@ -57,7 +57,7 @@ func (r *rollingUpgradePolicy) Upgrade(params reconfigureParams) (ExecStatus, er
 	case dbaasv1alpha1.Stateful:
 		funcs = GetStatefulSetRollingUpgradeFuncs()
 	default:
-		return ESNotSupport, cfgcore.MakeError("not support component type[%s]", cType)
+		return makeReturnedStatus(ESNotSupport), cfgcore.MakeError("not support component type[%s]", cType)
 	}
 	return performRollingUpgrade(params, funcs)
 }
@@ -82,16 +82,16 @@ func canPerformUpgrade(pods []corev1.Pod, params reconfigureParams) bool {
 	return true
 }
 
-func performRollingUpgrade(params reconfigureParams, funcs RollingUpgradeFuncs) (ExecStatus, error) {
+func performRollingUpgrade(params reconfigureParams, funcs RollingUpgradeFuncs) (ReturnedStatus, error) {
 	pods, err := funcs.GetPodsFunc(params)
 	if err != nil {
-		return ESAndRetryFailed, err
+		return makeReturnedStatus(ESAndRetryFailed), err
 	}
 
 	var (
 		rollingReplicas = params.maxRollingReplicas()
 		configKey       = params.getConfigKey()
-		configVersion   = params.getModifyVersion()
+		configVersion   = params.getTargetVersionHash()
 	)
 
 	updatePodLabelsVersion := func(pod *corev1.Pod, labelKey, labelValue string) error {
@@ -104,19 +104,19 @@ func performRollingUpgrade(params reconfigureParams, funcs RollingUpgradeFuncs) 
 	}
 
 	if !canPerformUpgrade(pods, params) {
-		return ESRetry, nil
+		return makeReturnedStatus(ESRetry), nil
 	}
 
 	podStats := staticPodStats(pods, params.getTargetReplicas(), params.podMinReadySeconds())
 	podWins := markDynamicCursor(pods, podStats, configKey, configVersion, rollingReplicas)
 	if !validPodState(podWins) {
 		params.Ctx.Log.Info("wait pod stat ready.")
-		return ESRetry, nil
+		return makeReturnedStatus(ESRetry), nil
 	}
 
 	waitRollingPods := podWins.getWaitRollingPods()
 	if len(waitRollingPods) == 0 {
-		return ESNone, nil
+		return makeReturnedStatus(ESNone, withSucceed(int32(podStats.targetReplica)), withExpected(int32(podStats.targetReplica))), nil
 	}
 
 	for _, pod := range waitRollingPods {
@@ -125,13 +125,16 @@ func performRollingUpgrade(params reconfigureParams, funcs RollingUpgradeFuncs) 
 			continue
 		}
 		if err := funcs.RestartContainerFunc(&pod, params.ContainerNames, params.ReconfigureClientFactory); err != nil {
-			return ESAndRetryFailed, err
+			return makeReturnedStatus(ESAndRetryFailed), err
 		}
 		if err := updatePodLabelsVersion(&pod, configKey, configVersion); err != nil {
-			return ESAndRetryFailed, err
+			return makeReturnedStatus(ESAndRetryFailed), err
 		}
 	}
-	return ESRetry, nil
+
+	return makeReturnedStatus(ESRetry,
+		withExpected(int32(podStats.targetReplica)),
+		withSucceed(int32(len(podStats.updated)+len(podStats.updating)))), nil
 }
 
 func validPodState(wind switchWindow) bool {

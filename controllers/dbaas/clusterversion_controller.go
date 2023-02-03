@@ -137,7 +137,7 @@ func (r *ClusterVersionReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		return intctrlutil.RequeueAfter(time.Second, reqCtx.Log, "failed to check config template")
 	}
 
-	if ok, err := dbaasconfig.UpdateCVLabelsWithUsingConfiguration(r.Client, reqCtx, clusterVersion); !ok || err != nil {
+	if ok, err := dbaasconfig.UpdateCVLabelsByConfiguration(r.Client, reqCtx, clusterVersion); !ok || err != nil {
 		return intctrlutil.RequeueAfter(time.Second, reqCtx.Log, "failed to update using config template info")
 	}
 

@@ -3,7 +3,7 @@ kind: BackupTool
 metadata:
   name: xtrabackup-mysql
   labels:
-    {{- include "wesqlapp.labels" . | nindent 4 }}
+    {{- include "apecloud-mysql.labels" . | nindent 4 }}
 spec:
   image: percona/percona-xtrabackup
   databaseEngine: mysql

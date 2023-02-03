@@ -20,6 +20,7 @@ Manager external applications related to KubeBlocks
       --client-key string              Path to a client key file for TLS
       --cluster string                 The name of the kubeconfig cluster to use
       --context string                 The name of the kubeconfig context to use
+      --disable-compression            If true, opt-out of response compression for all requests to the server
       --insecure-skip-tls-verify       If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure
       --kubeconfig string              Path to the kubeconfig file to use for CLI requests.
       --match-server-version           Require server version to match client version
@@ -34,6 +35,6 @@ Manager external applications related to KubeBlocks
 ### SEE ALSO
 
 * [kbcli](kbcli.md)	 - KubeBlocks CLI
-* [kbcli app install](kbcli_app_install.md)	 - Install the appliaction with the specified name
-* [kbcli app uninstall](kbcli_app_uninstall.md)	 - Uninstall the appliaction with the specified name
+* [kbcli app install](kbcli_app_install.md)	 - Install the application with the specified name
+* [kbcli app uninstall](kbcli_app_uninstall.md)	 - Uninstall the application with the specified name
 

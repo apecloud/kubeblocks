@@ -109,7 +109,7 @@ spec:
     podSpec:
       containers:
       - name: mysql
-        image: docker.io/apecloud/wesql-server:latest
+        image: docker.io/apecloud/apecloud-mysql-server:latest
 `, clusterVersionName, clusterDefName)
 		clusterVersion := &dbaasv1alpha1.ClusterVersion{}
 		Expect(yaml.Unmarshal([]byte(clusterVersionYaml), clusterVersion)).Should(Succeed())

@@ -19,6 +19,7 @@ package operations
 import (
 	"context"
 	"fmt"
+	"math"
 	"reflect"
 	"time"
 
@@ -35,6 +36,8 @@ import (
 type handleStatusProgressWithComponent func(opsRes *OpsResource,
 	pgRes progressResource,
 	statusComponent *dbaasv1alpha1.OpsRequestStatusComponent) (expectProgressCount int32, succeedCount int32, err error)
+
+type handleReconfigureOpsStatus func(cmStatus *dbaasv1alpha1.ConfigurationStatus) error
 
 // ReconcileActionWithComponentOps will be performed when action is done and loops till OpsRequest.status.phase is Succeed/Failed.
 // if OpsRequest.spec.componentOps is not null, you can use it to OpsBehaviour.ReconcileAction.
@@ -182,7 +185,7 @@ func patchOpsHandlerNotSupported(opsRes *OpsResource) error {
 
 // PatchValidateErrorCondition patches ValidateError condition to the OpsRequest.status.conditions.
 func PatchValidateErrorCondition(opsRes *OpsResource, errMessage string) error {
-	condition := dbaasv1alpha1.NewValidateFailedCondition(dbaasv1alpha1.ReasonValidateError, errMessage)
+	condition := dbaasv1alpha1.NewValidateFailedCondition(dbaasv1alpha1.ReasonValidateFailed, errMessage)
 	return PatchOpsStatus(opsRes, dbaasv1alpha1.FailedPhase, condition)
 }
 
@@ -314,4 +317,59 @@ func patchClusterPhaseWhenExistsOtherOps(opsRes *OpsResource, opsRequestSlice []
 // isOpsRequestFailedPhase checks the OpsRequest phase is Failed
 func isOpsRequestFailedPhase(opsRequestPhase dbaasv1alpha1.Phase) bool {
 	return opsRequestPhase == dbaasv1alpha1.FailedPhase
+}
+
+func updateReconfigureStatusByCM(reconfiguringStatus *dbaasv1alpha1.ReconfiguringStatus, tplName string,
+	handleReconfigureStatus handleReconfigureOpsStatus) error {
+	for _, cmStatus := range reconfiguringStatus.ConfigurationStatus {
+		if cmStatus.Name == tplName {
+			return handleReconfigureStatus(&cmStatus)
+		}
+	}
+	cmCount := len(reconfiguringStatus.ConfigurationStatus)
+	reconfiguringStatus.ConfigurationStatus = append(reconfiguringStatus.ConfigurationStatus, dbaasv1alpha1.ConfigurationStatus{
+		Name:   tplName,
+		Status: dbaasv1alpha1.ReasonReconfigureMerging,
+	})
+	cmStatus := &reconfiguringStatus.ConfigurationStatus[cmCount]
+	return handleReconfigureStatus(cmStatus)
+}
+
+// patchReconfigureOpsStatus when Reconfigure is running, we should update status to OpsRequest.Status.ConfigurationStatus.
+//
+// NOTES:
+// opsStatus describes status of OpsRequest.
+// reconfiguringStatus describes status of reconfiguring operation, which contains multi configuration templates.
+// cmStatus describes status of configmap, it is uniquely associated with a configuration template, which contains multi key, each key represents name of a configuration file.
+// execStatus describes the result of the execution of the state machine, which is designed to solve how to do the reconfiguring operation, such as whether to restart, how to send a signal to the process.
+func patchReconfigureOpsStatus(opsRes *OpsResource, tplName string, handleReconfigureStatus handleReconfigureOpsStatus) error {
+	var opsRequest = opsRes.OpsRequest
+
+	patch := client.MergeFrom(opsRequest.DeepCopy())
+	if opsRequest.Status.ReconfiguringStatus == nil {
+		opsRequest.Status.ReconfiguringStatus = &dbaasv1alpha1.ReconfiguringStatus{
+			ConfigurationStatus: make([]dbaasv1alpha1.ConfigurationStatus, 0),
+		}
+	}
+
+	reconfiguringStatus := opsRequest.Status.ReconfiguringStatus
+	if err := updateReconfigureStatusByCM(reconfiguringStatus, tplName, handleReconfigureStatus); err != nil {
+		return err
+	}
+	return opsRes.Client.Status().Patch(opsRes.Ctx, opsRequest, patch)
+}
+
+// getSlowestReconfiguringProgress calculate the progress of the reconfiguring operations.
+func getSlowestReconfiguringProgress(status []dbaasv1alpha1.ConfigurationStatus) string {
+	slowest := dbaasv1alpha1.ConfigurationStatus{
+		SucceedCount:  math.MaxInt32,
+		ExpectedCount: -1,
+	}
+
+	for _, st := range status {
+		if st.SucceedCount < slowest.SucceedCount {
+			slowest = st
+		}
+	}
+	return fmt.Sprintf("%d/%d", slowest.SucceedCount, slowest.ExpectedCount)
 }

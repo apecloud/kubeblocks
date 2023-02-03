@@ -9,7 +9,7 @@ kbcli cluster restart [flags]
 ### Options
 
 ```
-      --component-names strings       Component names to this operations (required)
+      --component-names strings       Component names to this operations
   -h, --help                         help for restart
       --name string                  OpsRequest name. if not specified, it will be randomly generated 
       --ttlSecondsAfterSucceed int   Time to live after the OpsRequest succeed
@@ -27,6 +27,7 @@ kbcli cluster restart [flags]
       --client-key string              Path to a client key file for TLS
       --cluster string                 The name of the kubeconfig cluster to use
       --context string                 The name of the kubeconfig context to use
+      --disable-compression            If true, opt-out of response compression for all requests to the server
       --insecure-skip-tls-verify       If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure
       --kubeconfig string              Path to the kubeconfig file to use for CLI requests.
       --match-server-version           Require server version to match client version

@@ -21,7 +21,6 @@ import (
 	"database/sql"
 	"database/sql/driver"
 	"fmt"
-	"k8s.io/kubectl/pkg/util/storage"
 	"net"
 	"os/exec"
 	"reflect"
@@ -40,6 +39,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/yaml"
+	"k8s.io/kubectl/pkg/util/storage"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"

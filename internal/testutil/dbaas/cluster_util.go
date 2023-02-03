@@ -19,11 +19,11 @@ package dbaas
 import (
 	"context"
 	"fmt"
+
+	"github.com/onsi/gomega"
 	"github.com/sethvargo/go-password/password"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-
-	"github.com/onsi/gomega"
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 

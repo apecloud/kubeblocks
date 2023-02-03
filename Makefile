@@ -341,13 +341,32 @@ bin/reloader.%: ## Cross build bin/reloader.$(OS).$(ARCH) .
 .PHONY: reloader
 reloader: OS=$(shell $(GO) env GOOS)
 reloader: ARCH=$(shell $(GO) env GOARCH)
-reloader: build-checks ## Build agamotto related binaries
+reloader: build-checks ## Build reloader related binaries
 	$(MAKE) bin/reloader.${OS}.${ARCH}
 	mv bin/reloader.${OS}.${ARCH} bin/reloader
 
 .PHONY: clean
-clean-reloader: ## Clean bin/mysqld_exporter.
+clean-reloader: ## Clean bin/reloader.
 	rm -f bin/reloader
+
+##@ cue-helper
+
+CUE_HELPER_LD_FLAGS = "-s -w"
+
+bin/cue-helper.%: ## Cross build bin/cue-helper.$(OS).$(ARCH) .
+	GOOS=$(word 2,$(subst ., ,$@)) GOARCH=$(word 3,$(subst ., ,$@)) $(GO) build -ldflags=${CUE_HELPER_LD_FLAGS} -o $@ ./cmd/reloader/tools/cue_auto_generator.go
+
+.PHONY: cue-helper
+cue-helper: OS=$(shell $(GO) env GOOS)
+cue-helper: ARCH=$(shell $(GO) env GOARCH)
+cue-helper: build-checks ## Build cue-helper related binaries
+	$(MAKE) bin/cue-helper.${OS}.${ARCH}
+	mv bin/cue-helper.${OS}.${ARCH} bin/cue-helper
+
+.PHONY: clean
+clean-cue-helper: ## Clean bin/cue-helper.
+	rm -f bin/cue-helper
+
 
 ##@ PROBE
 

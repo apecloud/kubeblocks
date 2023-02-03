@@ -85,6 +85,7 @@ spec:
                     - ini
                     - yaml
                     - json
+                    - dotenv
                     type: string
                   iniConfig:
                     description: iniConfig represents the ini options.

@@ -588,12 +588,6 @@ spec:
                 description: ClusterDefinition generation number.
                 format: int64
                 type: integer
-              clusterDefSyncStatus:
-                description: ClusterDefinition sync. status.
-                enum:
-                - InSync
-                - OutOfSync
-                type: string
               components:
                 additionalProperties:
                   description: ClusterStatusComponent record components status information

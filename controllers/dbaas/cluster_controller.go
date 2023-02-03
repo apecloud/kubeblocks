@@ -127,15 +127,13 @@ func clusterUpdateHandler(cli client.Client, ctx context.Context, clusterDef *db
 		return err
 	}
 	for _, cluster := range list.Items {
-		if cluster.Status.ClusterDefGeneration != clusterDef.GetObjectMeta().GetGeneration() {
+		if cluster.Status.ClusterDefGeneration != clusterDef.Generation {
 			patch := client.MergeFrom(cluster.DeepCopy())
-			// sync status.Operations.HorizontalScalable
-			horizontalScalableComponents := getSupportHorizontalScalingComponents(&cluster, clusterDef)
 			if cluster.Status.Operations == nil {
 				cluster.Status.Operations = &dbaasv1alpha1.Operations{}
 			}
-			cluster.Status.Operations.HorizontalScalable = horizontalScalableComponents
-			cluster.Status.ClusterDefSyncStatus = dbaasv1alpha1.OutOfSyncStatus
+			cluster.Status.Operations.HorizontalScalable =
+				getSupportHorizontalScalingComponents(&cluster, clusterDef)
 			if err = cli.Status().Patch(ctx, &cluster, patch); err != nil {
 				return err
 			}
@@ -267,7 +265,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return intctrlutil.RequeueAfter(ControllerErrorRequeueTime, reqCtx.Log, "")
 	}
 
-	if cluster.Status.ObservedGeneration == cluster.GetObjectMeta().GetGeneration() {
+	if cluster.Status.ObservedGeneration == cluster.Generation {
 		// reconcile the phase and conditions of the Cluster.status
 		if err = r.reconcileClusterStatus(reqCtx.Ctx, cluster, clusterDefinition); err != nil {
 			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
@@ -367,8 +365,8 @@ func (r *ClusterReconciler) handleClusterStatusAfterApplySucceed(
 	// if cluster status is ConditionsError, do it before updated the observedGeneration.
 	r.updateClusterPhaseWhenConditionsError(cluster)
 	// update observed generation
-	cluster.Status.ObservedGeneration = cluster.ObjectMeta.Generation
-	cluster.Status.ClusterDefGeneration = clusterDef.ObjectMeta.Generation
+	cluster.Status.ObservedGeneration = cluster.Generation
+	cluster.Status.ClusterDefGeneration = clusterDef.Generation
 	if err := r.Client.Status().Patch(ctx, cluster, patch); err != nil {
 		return err
 	}

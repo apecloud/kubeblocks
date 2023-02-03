@@ -63,7 +63,7 @@ func StatefulSetIsReady(sts *appsv1.StatefulSet, statefulStatusRevisionIsEquals 
 	// judge whether statefulSet is ready
 	if sts.Status.AvailableReplicas != targetReplicas ||
 		sts.Status.Replicas != targetReplicas ||
-		sts.Status.ObservedGeneration != sts.GetGeneration() ||
+		sts.Status.ObservedGeneration != sts.Generation ||
 		!statefulStatusRevisionIsEquals {
 		return false
 	}
@@ -75,7 +75,7 @@ func StatefulSetPodsIsReady(sts *appsv1.StatefulSet) bool {
 	targetReplicas := *sts.Spec.Replicas
 	return sts.Status.AvailableReplicas == targetReplicas &&
 		sts.Status.Replicas == targetReplicas &&
-		sts.Status.ObservedGeneration == sts.GetGeneration()
+		sts.Status.ObservedGeneration == sts.Generation
 }
 
 func CovertToStatefulSet(obj client.Object) *appsv1.StatefulSet {

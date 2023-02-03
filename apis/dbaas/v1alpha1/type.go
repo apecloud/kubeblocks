@@ -54,15 +54,6 @@ const (
 	ReconfiguringPhase     Phase = "Reconfiguring"
 )
 
-// Status define CR .Status.ClusterDefSyncStatus
-// +enum
-type Status string
-
-const (
-	OutOfSyncStatus Status = "OutOfSync"
-	InSyncStatus    Status = "InSync"
-)
-
 // OpsType defines operation types.
 // +enum
 type OpsType string

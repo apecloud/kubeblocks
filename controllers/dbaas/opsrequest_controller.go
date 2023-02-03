@@ -111,7 +111,7 @@ func (r *OpsRequestReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 
-	if opsRequest.Status.ObservedGeneration == opsRequest.GetGeneration() {
+	if opsRequest.Status.ObservedGeneration == opsRequest.Generation {
 		// waiting until OpsRequest.status.phase is Succeed
 		if requeueAfter, err := operations.GetOpsManager().Reconcile(opsRes); err != nil {
 			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
@@ -250,7 +250,7 @@ func (r *OpsRequestReconciler) patchOpsRequestWithClusterLabel(reqCtx intctrluti
 
 func (r *OpsRequestReconciler) patchObservedGeneration(reqCtx intctrlutil.RequestCtx, opsRequest *dbaasv1alpha1.OpsRequest) error {
 	patch := client.MergeFrom(opsRequest.DeepCopy())
-	opsRequest.Status.ObservedGeneration = opsRequest.ObjectMeta.Generation
+	opsRequest.Status.ObservedGeneration = opsRequest.Generation
 	if err := r.Client.Status().Patch(reqCtx.Ctx, opsRequest, patch); err != nil {
 		return err
 	}

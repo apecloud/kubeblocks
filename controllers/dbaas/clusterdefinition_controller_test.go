@@ -206,20 +206,25 @@ spec:
 				cv := &dbaasv1alpha1.ClusterVersion{}
 				g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(clusterVersion), cv)).To(Succeed())
 				g.Expect(len(cv.Finalizers) > 0 &&
-					cv.Status.ObservedGeneration == 1).To(BeTrue())
+					cv.Status.ObservedGeneration == 1 &&
+					cv.Status.ClusterDefGeneration == clusterDefinition.Generation).To(BeTrue())
 			}, timeout, interval).Should(Succeed())
 
-			By("updating clusterDefinition's spec which then mark clusterVersion's status as OutOfSync")
+			By("updating clusterDefinition's spec which then update clusterVersion's status")
 			Eventually(testdbaas.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(clusterDefinition),
 				func(cd *dbaasv1alpha1.ClusterDefinition) {
 					cd.Spec.Type = "state.redis"
 				}), timeout, interval).Should(Succeed())
-			// check ClusterVersion.Status.ClusterDefSyncStatus to be OutOfSync
+			// check ClusterVersion.Status as updated
 			Eventually(func(g Gomega) {
 				cv := &dbaasv1alpha1.ClusterVersion{}
 				g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(clusterVersion), cv)).To(Succeed())
-				g.Expect(cv.Status.ClusterDefSyncStatus == dbaasv1alpha1.OutOfSyncStatus).To(BeTrue())
+				g.Expect(cv.Status.Phase == dbaasv1alpha1.AvailablePhase &&
+					cv.Status.Message == "" &&
+					cv.Status.ClusterDefGeneration > clusterDefinition.Generation).To(BeTrue())
 			}, timeout, interval).Should(Succeed())
+
+			// TODO: update components to break @validateClusterVersion, and transit ClusterVersion.Status.Phase to UnavailablePhase
 		})
 	})
 

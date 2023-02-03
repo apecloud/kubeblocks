@@ -82,7 +82,7 @@ var _ = Describe("ConfigWrapper util test", func() {
 				defer testWrapper.DeleteAllObjects()
 			}()
 
-			availableTPL := testWrapper.tpl.DeepCopy()
+			availableTPL := testWrapper.cc.DeepCopy()
 			availableTPL.Status.Phase = dbaasv1alpha1.AvailablePhase
 
 			testDatas := map[client.ObjectKey][]struct {
@@ -92,17 +92,17 @@ var _ = Describe("ConfigWrapper util test", func() {
 				// for cm
 				client.ObjectKeyFromObject(testWrapper.cm): {{
 					object: nil,
-					err:    cfgcore.MakeError("failed to get tpl object"),
+					err:    cfgcore.MakeError("failed to get cc object"),
 				}, {
 					object: testWrapper.cm,
 					err:    nil,
 				}},
-				// for tpl
-				client.ObjectKeyFromObject(testWrapper.tpl): {{
+				// for cc
+				client.ObjectKeyFromObject(testWrapper.cc): {{
 					object: nil,
-					err:    cfgcore.MakeError("failed to get tpl object"),
+					err:    cfgcore.MakeError("failed to get cc object"),
 				}, {
-					object: testWrapper.tpl,
+					object: testWrapper.cc,
 					err:    nil,
 				}, {
 					object: availableTPL,
@@ -140,11 +140,11 @@ var _ = Describe("ConfigWrapper util test", func() {
 
 			_, err := CheckCDConfigTemplate(mockClient, reqCtx, testWrapper.cd)
 			Expect(err).ShouldNot(Succeed())
-			Expect(err.Error()).Should(ContainSubstring("failed to get tpl object"))
+			Expect(err.Error()).Should(ContainSubstring("failed to get cc object"))
 
 			_, err = CheckCDConfigTemplate(mockClient, reqCtx, testWrapper.cd)
 			Expect(err).ShouldNot(Succeed())
-			Expect(err.Error()).Should(ContainSubstring("failed to get tpl object"))
+			Expect(err.Error()).Should(ContainSubstring("failed to get cc object"))
 
 			_, err = CheckCDConfigTemplate(mockClient, reqCtx, testWrapper.cd)
 			Expect(err).ShouldNot(Succeed())
@@ -201,7 +201,7 @@ var _ = Describe("ConfigWrapper util test", func() {
 			})
 			Expect(err).Should(Succeed())
 
-			availableTPL := testWrapper.tpl.DeepCopy()
+			availableTPL := testWrapper.cc.DeepCopy()
 			availableTPL.Status.Phase = dbaasv1alpha1.AvailablePhase
 
 			testDatas := map[client.ObjectKey][]struct {
@@ -211,7 +211,7 @@ var _ = Describe("ConfigWrapper util test", func() {
 				// for cm
 				client.ObjectKeyFromObject(testWrapper.cm): {{
 					object: nil,
-					err:    cfgcore.MakeError("failed to get tpl object"),
+					err:    cfgcore.MakeError("failed to get cc object"),
 				}, {
 					object: testWrapper.cm,
 					err:    nil,
@@ -239,7 +239,7 @@ var _ = Describe("ConfigWrapper util test", func() {
 
 			_, err = CheckCDConfigTemplate(mockClient, reqCtx, testWrapper.cd)
 			Expect(err).ShouldNot(Succeed())
-			Expect(err.Error()).Should(ContainSubstring("failed to get tpl object"))
+			Expect(err.Error()).Should(ContainSubstring("failed to get cc object"))
 
 			ok, err := CheckCDConfigTemplate(mockClient, reqCtx, testWrapper.cd)
 			Expect(err).Should(Succeed())
@@ -267,7 +267,7 @@ var _ = Describe("ConfigWrapper util test", func() {
 			}()
 
 			updateAVTemplates(testWrapper)
-			availableTPL := testWrapper.tpl.DeepCopy()
+			availableTPL := testWrapper.cc.DeepCopy()
 			availableTPL.Status.Phase = dbaasv1alpha1.AvailablePhase
 
 			testDatas := map[client.ObjectKey][]struct {
@@ -277,17 +277,17 @@ var _ = Describe("ConfigWrapper util test", func() {
 				// for cm
 				client.ObjectKeyFromObject(testWrapper.cm): {{
 					object: nil,
-					err:    cfgcore.MakeError("failed to get tpl object"),
+					err:    cfgcore.MakeError("failed to get cc object"),
 				}, {
 					object: testWrapper.cm,
 					err:    nil,
 				}},
-				// for tpl
-				client.ObjectKeyFromObject(testWrapper.tpl): {{
+				// for cc
+				client.ObjectKeyFromObject(testWrapper.cc): {{
 					object: nil,
-					err:    cfgcore.MakeError("failed to get tpl object"),
+					err:    cfgcore.MakeError("failed to get cc object"),
 				}, {
-					object: testWrapper.tpl,
+					object: testWrapper.cc,
 					err:    nil,
 				}, {
 					object: availableTPL,
@@ -325,11 +325,11 @@ var _ = Describe("ConfigWrapper util test", func() {
 
 			_, err := CheckCVConfigTemplate(mockClient, reqCtx, testWrapper.cv)
 			Expect(err).ShouldNot(Succeed())
-			Expect(err.Error()).Should(ContainSubstring("failed to get tpl object"))
+			Expect(err.Error()).Should(ContainSubstring("failed to get cc object"))
 
 			_, err = CheckCVConfigTemplate(mockClient, reqCtx, testWrapper.cv)
 			Expect(err).ShouldNot(Succeed())
-			Expect(err.Error()).Should(ContainSubstring("failed to get tpl object"))
+			Expect(err.Error()).Should(ContainSubstring("failed to get cc object"))
 
 			_, err = CheckCVConfigTemplate(mockClient, reqCtx, testWrapper.cv)
 			Expect(err).ShouldNot(Succeed())

@@ -90,7 +90,7 @@ var _ = Describe("Reconfigure Controller", func() {
 			Eventually(testdbaas.CheckObjExists(&testCtx, client.ObjectKeyFromObject(testWrapper.sts), &appv1.StatefulSet{}, true)).Should(Succeed())
 
 			By("check config constraint")
-			Eventually(testdbaas.CheckObj(&testCtx, client.ObjectKeyFromObject(testWrapper.tpl), func(g Gomega, tpl *dbaasv1alpha1.ConfigConstraint) {
+			Eventually(testdbaas.CheckObj(&testCtx, client.ObjectKeyFromObject(testWrapper.cc), func(g Gomega, tpl *dbaasv1alpha1.ConfigConstraint) {
 				g.Expect(tpl.Status.Phase).Should(BeEquivalentTo(dbaasv1alpha1.AvailablePhase))
 			})).Should(Succeed())
 

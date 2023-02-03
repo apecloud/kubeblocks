@@ -19,12 +19,12 @@ package configuration
 import (
 	"context"
 	"fmt"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"path/filepath"
 
 	"github.com/onsi/gomega"
 	appv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
@@ -61,7 +61,7 @@ type TestWrapper struct {
 	// cr object
 	cd    *dbaasv1alpha1.ClusterDefinition
 	cv    *dbaasv1alpha1.ClusterVersion
-	tpl   *dbaasv1alpha1.ConfigConstraint
+	cc    *dbaasv1alpha1.ConfigConstraint
 	cm    *corev1.ConfigMap
 	sts   *appv1.StatefulSet
 	cfgCM *corev1.ConfigMap
@@ -98,7 +98,7 @@ func (w *TestWrapper) setMockObject(obj client.Object) {
 	case w.namer.CDName:
 		w.cd = obj.(*dbaasv1alpha1.ClusterDefinition)
 	case w.namer.CCName:
-		w.tpl = obj.(*dbaasv1alpha1.ConfigConstraint)
+		w.cc = obj.(*dbaasv1alpha1.ConfigConstraint)
 	case w.namer.CVName:
 		w.cv = obj.(*dbaasv1alpha1.ClusterVersion)
 	case w.namer.TPLName:
@@ -112,7 +112,7 @@ func (w *TestWrapper) setMockObject(obj client.Object) {
 }
 
 func (w *TestWrapper) DeleteTpl() error {
-	if err := w.testCtx.Cli.Delete(w.testCtx.Ctx, w.tpl); err != nil {
+	if err := w.testCtx.Cli.Delete(w.testCtx.Ctx, w.cc); err != nil {
 		return err
 	}
 	return w.testCtx.Cli.Delete(w.testCtx.Ctx, w.cm)

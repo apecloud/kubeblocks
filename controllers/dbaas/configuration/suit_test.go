@@ -100,7 +100,7 @@ var _ = BeforeSuite(func() {
 	err = (&ConfigConstraintReconciler{
 		Client:   k8sManager.GetClient(),
 		Scheme:   k8sManager.GetScheme(),
-		Recorder: k8sManager.GetEventRecorderFor("configuration-tpl-controller"),
+		Recorder: k8sManager.GetEventRecorderFor("configuration-cc-controller"),
 	}).SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 

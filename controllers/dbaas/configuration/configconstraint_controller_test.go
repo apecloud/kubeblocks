@@ -56,7 +56,7 @@ var _ = Describe("ConfigConstraint Controller", func() {
 
 	AfterEach(cleanEnv)
 
-	Context("Create config tpl with cue validate", func() {
+	Context("Create config constraint with cue validate", func() {
 		It("Should ready", func() {
 			By("create resources")
 			testWrapper := CreateDBaasFromISV(testCtx, ctx, FakeTest{
@@ -85,7 +85,7 @@ var _ = Describe("ConfigConstraint Controller", func() {
 			Eventually(testdbaas.CheckObjExists(&testCtx, client.ObjectKeyFromObject(testWrapper.cv),
 				&dbaasv1alpha1.ClusterVersion{}, true)).Should(Succeed())
 
-			tplKey := client.ObjectKeyFromObject(testWrapper.tpl)
+			tplKey := client.ObjectKeyFromObject(testWrapper.cc)
 
 			By("check ConfigConstraint(template) status and finalizer")
 			Eventually(testdbaas.CheckObj(&testCtx, tplKey,
@@ -111,7 +111,7 @@ var _ = Describe("ConfigConstraint Controller", func() {
 		})
 	})
 
-	Context("Create config tpl without cue validate", func() {
+	Context("Create config constraint without cue validate", func() {
 		It("Should ready", func() {
 			By("creating a ISV resource")
 
@@ -132,7 +132,7 @@ var _ = Describe("ConfigConstraint Controller", func() {
 			}()
 
 			By("check config constraint status")
-			Eventually(testdbaas.CheckObj(&testCtx, client.ObjectKeyFromObject(testWrapper.tpl),
+			Eventually(testdbaas.CheckObj(&testCtx, client.ObjectKeyFromObject(testWrapper.cc),
 				func(g Gomega, tpl *dbaasv1alpha1.ConfigConstraint) {
 					g.Expect(tpl.Status.Phase).Should(BeEquivalentTo(dbaasv1alpha1.AvailablePhase))
 				})).Should(Succeed())

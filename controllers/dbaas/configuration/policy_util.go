@@ -21,12 +21,11 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/apecloud/kubeblocks/controllers/dbaas/components/util"
-
 	"github.com/spf13/viper"
 	corev1 "k8s.io/api/core/v1"
 
 	"github.com/apecloud/kubeblocks/controllers/dbaas/components/consensusset"
+	"github.com/apecloud/kubeblocks/controllers/dbaas/components/util"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 	cfgproto "github.com/apecloud/kubeblocks/internal/configuration/proto"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"

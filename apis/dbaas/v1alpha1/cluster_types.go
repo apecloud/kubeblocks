@@ -1,5 +1,5 @@
 /*
-Copyright ApeCloud Inc.
+Copyright ApeCloud, Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -75,7 +75,7 @@ type ClusterStatus struct {
 	// phase describes the phase of the Cluster. the detail information of phase is as follows:
 	// Creating: creating Cluster.
 	// Running: Cluster is running, all components are available.
-	// SpecUpdating: the Cluster phase will be 'Updating' when directly updating Cluster.spec.
+	// SpecUpdating: the Cluster phase will be 'SpecUpdating' when directly updating Cluster.spec.
 	// VolumeExpanding: volume expansion operation is running.
 	// HorizontalScaling: horizontal scaling operation is running.
 	// VerticalScaling: vertical scaling operation is running.
@@ -316,7 +316,7 @@ type OperationComponent struct {
 
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
-//+kubebuilder:resource:categories={dbaas,all}
+//+kubebuilder:resource:categories={kubeblocks,all}
 //+kubebuilder:printcolumn:name="CLUSTER-DEFINITION",type="string",JSONPath=".spec.clusterDefinitionRef",description="ClusterDefinition referenced by cluster."
 //+kubebuilder:printcolumn:name="VERSION",type="string",JSONPath=".spec.clusterVersionRef",description="Cluster Application Version."
 //+kubebuilder:printcolumn:name="TERMINATION-POLICY",type="string",JSONPath=".spec.terminationPolicy",description="Cluster termination policy."

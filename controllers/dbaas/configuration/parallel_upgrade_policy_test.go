@@ -1,5 +1,5 @@
 /*
-Copyright ApeCloud Inc.
+Copyright ApeCloud, Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -23,32 +23,25 @@ import (
 	. "github.com/onsi/gomega"
 
 	"github.com/golang/mock/gomock"
-	apimeta "k8s.io/apimachinery/pkg/api/meta"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
-	mock_client "github.com/apecloud/kubeblocks/controllers/dbaas/configuration/mocks"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 	cfgproto "github.com/apecloud/kubeblocks/internal/configuration/proto"
 	mock_proto "github.com/apecloud/kubeblocks/internal/configuration/proto/mocks"
+	testutil "github.com/apecloud/kubeblocks/internal/testutil/k8s"
 )
 
 var parallelPolicy = parallelUpgradePolicy{}
 
 var _ = Describe("Reconfigure ParallelPolicy", func() {
 
-	setup := func() (*gomock.Controller, *mock_client.MockClient) {
-		ctrl := gomock.NewController(GinkgoT())
-		client := mock_client.NewMockClient(ctrl)
-		return ctrl, client
-	}
-
 	Context("parallel reconfigure policy test", func() {
 		It("Should success without error", func() {
 
 			Expect(parallelPolicy.GetPolicyName()).Should(BeEquivalentTo("parallel"))
 
-			ctrl, k8sClient := setup()
+			ctrl, k8sClient := testutil.SetupK8sMock()
 			reconfigureClient := mock_proto.NewMockReconfigureClient(ctrl)
 			defer ctrl.Finish()
 
@@ -77,7 +70,7 @@ var _ = Describe("Reconfigure ParallelPolicy", func() {
 
 			k8sClient.EXPECT().List(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
 				Do(func(ctx context.Context, list client.ObjectList, opts ...client.ListOption) {
-					Expect(apimeta.SetList(list, fromPods(setPods1))).Should(Succeed())
+					Expect(testutil.SetListReturnedObjects(list, fromPods(setPods1))).Should(Succeed())
 				}).
 				Return(nil)
 
@@ -89,7 +82,7 @@ var _ = Describe("Reconfigure ParallelPolicy", func() {
 
 	Context("parallel reconfigure policy test with List pods failed", func() {
 		It("Should failed", func() {
-			ctrl, k8sClient := setup()
+			ctrl, k8sClient := testutil.SetupK8sMock()
 			reconfigureClient := mock_proto.NewMockReconfigureClient(ctrl)
 			defer ctrl.Finish()
 
@@ -120,7 +113,7 @@ var _ = Describe("Reconfigure ParallelPolicy", func() {
 
 	Context("parallel reconfigure policy test with stop container failed", func() {
 		It("Should failed", func() {
-			ctrl, k8sClient := setup()
+			ctrl, k8sClient := testutil.SetupK8sMock()
 			reconfigureClient := mock_proto.NewMockReconfigureClient(ctrl)
 			defer ctrl.Finish()
 
@@ -152,7 +145,7 @@ var _ = Describe("Reconfigure ParallelPolicy", func() {
 
 			k8sClient.EXPECT().List(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
 				Do(func(ctx context.Context, list client.ObjectList, opts ...client.ListOption) {
-					Expect(apimeta.SetList(list, fromPods(setPods1))).Should(Succeed())
+					Expect(testutil.SetListReturnedObjects(list, fromPods(setPods1))).Should(Succeed())
 				}).
 				Return(nil).
 				Times(2)
@@ -171,7 +164,7 @@ var _ = Describe("Reconfigure ParallelPolicy", func() {
 
 	Context("parallel reconfigure policy test with patch failed", func() {
 		It("Should failed", func() {
-			ctrl, k8sClient := setup()
+			ctrl, k8sClient := testutil.SetupK8sMock()
 			reconfigureClient := mock_proto.NewMockReconfigureClient(ctrl)
 			defer ctrl.Finish()
 
@@ -202,7 +195,7 @@ var _ = Describe("Reconfigure ParallelPolicy", func() {
 
 			k8sClient.EXPECT().List(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
 				Do(func(ctx context.Context, list client.ObjectList, opts ...client.ListOption) {
-					Expect(apimeta.SetList(list, fromPods(setPods))).Should(Succeed())
+					Expect(testutil.SetListReturnedObjects(list, fromPods(setPods))).Should(Succeed())
 				}).
 				Return(nil)
 

@@ -1,5 +1,5 @@
 /*
-Copyright ApeCloud Inc.
+Copyright ApeCloud, Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -129,5 +129,25 @@ var _ = Describe("helper", func() {
 		Expect(err).Should(Succeed())
 		Expect(version).ShouldNot(BeNil())
 		Expect(len(version.Items)).Should(Equal(2))
+	})
+
+	It("find latest version", func() {
+		const clusterDefName = "test-cluster-def"
+		genVersion := func(name string, t time.Time) dbaasv1alpha1.ClusterVersion {
+			v := dbaasv1alpha1.ClusterVersion{}
+			v.Name = name
+			v.SetLabels(map[string]string{types.ClusterDefLabelKey: clusterDefName})
+			v.SetCreationTimestamp(metav1.NewTime(t))
+			return v
+		}
+
+		versionList := &dbaasv1alpha1.ClusterVersionList{}
+		versionList.Items = append(versionList.Items,
+			genVersion("old-version", time.Now().AddDate(0, 0, -1)),
+			genVersion("now-version", time.Now()))
+
+		latestVer := findLatestVersion(versionList)
+		Expect(latestVer).ShouldNot(BeNil())
+		Expect(latestVer.Name).Should(Equal("now-version"))
 	})
 })

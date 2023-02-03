@@ -1,5 +1,5 @@
 /*
-Copyright ApeCloud Inc.
+Copyright ApeCloud, Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -46,13 +46,10 @@ var _ = Describe("StatefulSet Controller", func() {
 	)
 
 	cleanAll := func() {
-		// must wait until resources deleted and no longer exist before the testcases start, otherwise :
-		// - if later it needs to create some new resource objects with the same name,
+		// must wait until resources deleted and no longer exist before the testcases start,
+		// otherwise if later it needs to create some new resource objects with the same name,
 		// in race conditions, it will find the existence of old objects, resulting failure to
 		// create the new objects.
-		// - worse, if an async DeleteAll call is issued here, it maybe executed later by the
-		// K8s API server, by which time the testcase may have already created some new test objects,
-		// which shall be accidentally deleted.
 		By("clean resources")
 
 		// delete cluster(and all dependent sub-resources), clusterversion and clusterdef
@@ -98,9 +95,6 @@ var _ = Describe("StatefulSet Controller", func() {
 		newSts.Status.UpdateRevision = fmt.Sprintf("%s-%s-%dfdd48d8cd", clusterName, componentName, index)
 		newSts.Status.ObservedGeneration = newSts.Generation - 1
 		Expect(k8sClient.Status().Patch(context.Background(), newSts, stsPatch)).Should(Succeed())
-
-		By("waiting the component is Updating")
-		Eventually(testdbaas.GetClusterComponentPhase(testCtx, clusterName, componentName)).Should(Equal(dbaasv1alpha1.SpecUpdatingPhase))
 	}
 
 	testUsingEnvTest := func(sts *appsv1.StatefulSet) {
@@ -121,7 +115,7 @@ var _ = Describe("StatefulSet Controller", func() {
 			testk8s.MockStatefulSetReady(sts)
 			sts.Status.ObservedGeneration = 2
 		})).Should(Succeed())
-		Eventually(testdbaas.CheckObj(&testCtx, intctrlutil.GetNamespacedName(sts),
+		Eventually(testdbaas.CheckObj(&testCtx, client.ObjectKeyFromObject(sts),
 			func(g Gomega, fetched *appsv1.StatefulSet) {
 				g.Expect(fetched.Status.UpdateRevision).To(Equal(updateRevision))
 			})).Should(Succeed())
@@ -155,7 +149,7 @@ var _ = Describe("StatefulSet Controller", func() {
 			_, _, cluster := testdbaas.InitConsensusMysql(ctx, testCtx, clusterDefName,
 				clusterVersionName, clusterName, consensusCompName)
 
-			By("mock cluster object is Updating and component is Running")
+			By("mock cluster object is 'SpecUpdating' and component is Running")
 			Expect(testdbaas.ChangeObjStatus(&testCtx, cluster, func() {
 				cluster.Status.Phase = dbaasv1alpha1.SpecUpdatingPhase
 				cluster.Status.ObservedGeneration = 1
@@ -168,7 +162,7 @@ var _ = Describe("StatefulSet Controller", func() {
 			_ = testdbaas.CreateRestartOpsRequest(ctx, testCtx, clusterName, opsRequestName, []string{consensusCompName})
 			Expect(testdbaas.ChangeObj(&testCtx, cluster, func() {
 				cluster.Annotations = map[string]string{
-					intctrlutil.OpsRequestAnnotationKey: fmt.Sprintf(`[{"name":"%s","clusterPhase":"Updating"}]`, opsRequestName),
+					intctrlutil.OpsRequestAnnotationKey: fmt.Sprintf(`[{"name":"%s","clusterPhase":"SpecUpdating"}]`, opsRequestName),
 				}
 			})).Should(Succeed())
 
@@ -177,9 +171,6 @@ var _ = Describe("StatefulSet Controller", func() {
 
 			// trigger statefulset controller Reconcile
 			sts := testdbaas.MockConsensusComponentStatefulSet(ctx, testCtx, clusterName, consensusCompName)
-
-			By("check the component becomes Updating")
-			Eventually(testdbaas.GetClusterComponentPhase(testCtx, clusterName, consensusCompName)).Should(Equal(dbaasv1alpha1.SpecUpdatingPhase))
 
 			By("mock the StatefulSet and pods are ready")
 			if testCtx.UsingExistingCluster() {

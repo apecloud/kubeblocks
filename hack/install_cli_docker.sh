@@ -1,4 +1,17 @@
 #!/usr/bin/env bash
+# Copyright ApeCloud, Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 : ${CLI_INSTALL_DIR:="/usr/local/bin"}
 : ${CLI_BREW_INSTALL_DIR:="/opt/homebrew/bin"}
@@ -23,7 +36,7 @@ getSystemInfo() {
         x86_64) ARCH="amd64";;
     esac
 
-    OS=$(echo `uname`|tr '[:upper:]' '[:lower:]')
+    OS=$(echo $(uname) | tr '[:upper:]' '[:lower:]')
 
     # Most linux distro needs root permission to copy the file to /usr/local/bin
     if [ "$OS" == "linux" ] || [ "$OS" == "darwin" ]; then
@@ -59,9 +72,9 @@ runAsRoot() {
 }
 
 checkHttpRequestCLI() {
-    if type "curl" > /dev/null; then
+    if type "curl" >/dev/null; then
         HTTP_REQUEST_CLI=curl
-    elif type "wget" > /dev/null; then
+    elif type "wget" >/dev/null; then
         HTTP_REQUEST_CLI=wget
     else
         echo "Either curl or wget is required"
@@ -89,33 +102,33 @@ downloadDockerImage() {
     CLI_TMP_ROOT=$(mktemp -dt kbcli-install-XXXXXX)
     # pull image and run
     echo -e "Pulling kbcli image..."
-    docker run --name kbcli -d docker.io/apecloud/kbcli:${LATEST_RELEASE_TAG} sh &> /dev/null
+    docker run --name kbcli -d docker.io/apecloud/kbcli:${LATEST_RELEASE_TAG} sh &>/dev/null
     # copy kbcli to /tmp-xxx/kbcli
-    docker cp kbcli:/kbcli.${OS}.${ARCH} ${CLI_TMP_ROOT}/${CLI_FILENAME} 2>&1 > /dev/null
+    docker cp kbcli:/kbcli.${OS}.${ARCH} ${CLI_TMP_ROOT}/${CLI_FILENAME} 2>&1 >/dev/null
     # remove docker
-    docker rm kbcli 2>&1 > /dev/null
+    docker rm kbcli 2>&1 >/dev/null
 }
 
 installFile() {
-  local tmp_root_kbcli="$CLI_TMP_ROOT/$CLI_FILENAME"
-  
-  if [ ! -f "$tmp_root_kbcli" ]; then
-      echo "Failed to pull kbcli."
-      exit 1
-  fi
+    local tmp_root_kbcli="$CLI_TMP_ROOT/$CLI_FILENAME"
 
-  chmod o+x "$tmp_root_kbcli"
-  runAsRoot cp "$tmp_root_kbcli" "$CLI_INSTALL_DIR"
+    if [ ! -f "$tmp_root_kbcli" ]; then
+        echo "Failed to pull kbcli."
+        exit 1
+    fi
 
-  if [ $? -eq 0 ] && [ -f "$CLI_FILE" ]; then
-      echo "kbcli installed successfully."
-      kbcli version
-      echo -e "Make sure your docker service is running and begin your journey with kbcli:\n"
-      echo -e "\t$CLI_FILENAME playground init"
-  else
-      echo "Failed to install $CLI_FILENAME"
-      exit 1
-  fi
+    chmod o+x "$tmp_root_kbcli"
+    runAsRoot cp "$tmp_root_kbcli" "$CLI_INSTALL_DIR"
+
+    if [ $? -eq 0 ] && [ -f "$CLI_FILE" ]; then
+        echo "kbcli installed successfully."
+        kbcli version
+        echo -e "Make sure your docker service is running and begin your journey with kbcli:\n"
+        echo -e "\t$CLI_FILENAME playground init"
+    else
+        echo "Failed to install $CLI_FILENAME"
+        exit 1
+    fi
 }
 
 fail_trap() {
@@ -130,12 +143,12 @@ fail_trap() {
 
 cleanup() {
     if [[ -d "${CLI_TMP_ROOT:-}" ]]; then
-       rm -rf "$CLI_TMP_ROOT"
+        rm -rf "$CLI_TMP_ROOT"
     fi
 }
 
 installCompleted() {
-    echo -e "\nFor more information on how to started, please visit:"
+    echo -e "\nFor more information on how to get started, please visit:"
     echo "  https://kubeblocks.io"
 }
 
@@ -148,7 +161,6 @@ getSystemInfo
 verifySupported
 checkExistingCli
 checkHttpRequestCLI
-
 
 if [ -z "$1" ]; then
     echo "Getting the latest kbcli..."

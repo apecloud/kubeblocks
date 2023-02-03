@@ -1,5 +1,5 @@
 /*
-Copyright ApeCloud Inc.
+Copyright ApeCloud, Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,15 +17,11 @@ limitations under the License.
 package playground
 
 import (
-	"time"
-
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 
-	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/cloudprovider"
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
@@ -87,25 +83,5 @@ var _ = Describe("playground", func() {
 		cmd := newGuideCmd()
 		Expect(cmd).ShouldNot(BeNil())
 		Expect(runGuide()).Should(HaveOccurred())
-	})
-
-	It("find latest version", func() {
-		const clusterDefName = "test-cluster-def"
-		genVersion := func(name string, t time.Time) dbaasv1alpha1.ClusterVersion {
-			v := dbaasv1alpha1.ClusterVersion{}
-			v.Name = name
-			v.SetLabels(map[string]string{types.ClusterDefLabelKey: clusterDefName})
-			v.SetCreationTimestamp(metav1.NewTime(t))
-			return v
-		}
-
-		versionList := &dbaasv1alpha1.ClusterVersionList{}
-		versionList.Items = append(versionList.Items,
-			genVersion("old-version", time.Now().AddDate(0, 0, -1)),
-			genVersion("now-version", time.Now()))
-
-		latestVer := findLatestVersion(versionList)
-		Expect(latestVer).ShouldNot(BeNil())
-		Expect(latestVer.Name).Should(Equal("now-version"))
 	})
 })

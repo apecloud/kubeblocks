@@ -1,5 +1,5 @@
 /*
-Copyright ApeCloud Inc.
+Copyright ApeCloud, Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -178,8 +178,7 @@ single_thread_memory = 294912
 						Namespace: "default",
 					},
 				},
-				nil,
-			)
+				nil, nil, nil)
 
 			Expect(cfgBuilder.injectBuiltInObjectsAndFunctions(
 				podSpec, cfgTemplate, component)).Should(BeNil())
@@ -211,7 +210,7 @@ single_thread_memory = 294912
 						Namespace: "default",
 					},
 				},
-				nil,
+				nil, nil, nil,
 			)
 
 			Expect(cfgBuilder.injectBuiltInObjectsAndFunctions(podSpec, cfgTemplate, component)).Should(BeNil())
@@ -272,7 +271,7 @@ single_thread_memory = 294912
 						Namespace: "default",
 					},
 				},
-				nil,
+				nil, nil, nil,
 			)
 
 			Expect(cfgBuilder.injectBuiltInObjectsAndFunctions(podSpec, cfgTemplate, component)).Should(BeNil())

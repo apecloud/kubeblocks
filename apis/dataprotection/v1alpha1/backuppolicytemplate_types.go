@@ -1,5 +1,5 @@
 /*
-Copyright ApeCloud Inc.
+Copyright ApeCloud, Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -68,7 +68,7 @@ type BackupPolicyTemplateStatus struct {
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
-// +kubebuilder:resource:categories={dbaas},scope=Cluster
+// +kubebuilder:resource:categories={kubeblocks},scope=Cluster
 
 // BackupPolicyTemplate is the Schema for the BackupPolicyTemplates API (defined by provider)
 type BackupPolicyTemplate struct {

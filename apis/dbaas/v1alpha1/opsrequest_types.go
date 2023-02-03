@@ -1,5 +1,5 @@
 /*
-Copyright ApeCloud Inc.
+Copyright ApeCloud, Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -292,8 +292,8 @@ type LastConfiguration struct {
 }
 
 type OpsRequestStatusComponent struct {
-	// phase describes the component phase, reference ClusterDefinition.status.component.phase.
-	// +kubebuilder:validation:Enum={Running,Failed,Abnormal,Creating,Updating,Deleting,Deleted,VolumeExpanding,Reconfiguring,HorizontalScaling,VerticalScaling,VersionUpgrading,Rebooting}
+	// phase describes the component phase, reference Cluster.status.component.phase.
+	// +kubebuilder:validation:Enum={Running,Failed,Abnormal,Creating,SpecUpdating,Deleting,Deleted,VolumeExpanding,Reconfiguring,HorizontalScaling,VerticalScaling,VersionUpgrading,Rebooting}
 	// +optional
 	Phase Phase `json:"phase,omitempty"`
 
@@ -312,7 +312,7 @@ type OpsRequestStatusComponent struct {
 
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
-//+kubebuilder:resource:categories={dbaas,all},shortName=ops
+//+kubebuilder:resource:categories={kubeblocks,all},shortName=ops
 //+kubebuilder:printcolumn:name="TYPE",type="string",JSONPath=".spec.type",description="Operation request type."
 //+kubebuilder:printcolumn:name="CLUSTER",type="string",JSONPath=".spec.clusterRef",description="Operand cluster."
 //+kubebuilder:printcolumn:name="STATUS",type="string",JSONPath=".status.phase",description="Operation status phase."

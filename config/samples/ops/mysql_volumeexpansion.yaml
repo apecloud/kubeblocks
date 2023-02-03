@@ -7,7 +7,7 @@ spec:
   clusterRef: wesql
   type: VolumeExpansion
   volumeExpansion:
-  - componentName: replicasets
+  - componentName: wesql
     volumeClaimTemplates:
     - name: data
-      storage: "9Gi"
+      storage: "2Gi"

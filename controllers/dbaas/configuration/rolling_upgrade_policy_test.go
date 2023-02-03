@@ -1,5 +1,5 @@
 /*
-Copyright ApeCloud Inc.
+Copyright ApeCloud, Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -26,15 +26,15 @@ import (
 	"github.com/golang/mock/gomock"
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
-	apimeta "k8s.io/apimachinery/pkg/api/meta"
 	metautil "k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
-	mock_client "github.com/apecloud/kubeblocks/controllers/dbaas/configuration/mocks"
 	cfgproto "github.com/apecloud/kubeblocks/internal/configuration/proto"
 	mock_proto "github.com/apecloud/kubeblocks/internal/configuration/proto/mocks"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	testutil "github.com/apecloud/kubeblocks/internal/testutil/k8s"
+	mock_client "github.com/apecloud/kubeblocks/internal/testutil/k8s/mocks"
 )
 
 var _ = Describe("Reconfigure RollingPolicy", func() {
@@ -48,12 +48,6 @@ var _ = Describe("Reconfigure RollingPolicy", func() {
 		defaultReplica = 3
 		rollingPolicy  = upgradePolicyMap[dbaasv1alpha1.RollingPolicy]
 	)
-
-	setup := func() (*gomock.Controller, *mock_client.MockClient) {
-		ctrl := gomock.NewController(GinkgoT())
-		client := mock_client.NewMockClient(ctrl)
-		return ctrl, client
-	}
 
 	updateLabelPatch := func(pods []corev1.Pod, patch *corev1.Pod) {
 		patchKey := client.ObjectKeyFromObject(patch)
@@ -83,7 +77,7 @@ var _ = Describe("Reconfigure RollingPolicy", func() {
 	}
 
 	BeforeEach(func() {
-		ctrl, mockClient = setup()
+		ctrl, mockClient = testutil.SetupK8sMock()
 		reconfigureClient = mock_proto.NewMockReconfigureClient(ctrl)
 		mockParam = createReconfigureParam(dbaasv1alpha1.Consensus, defaultReplica)
 	})
@@ -121,7 +115,7 @@ var _ = Describe("Reconfigure RollingPolicy", func() {
 			mockClient.EXPECT().
 				List(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
 				DoAndReturn(func(ctx context.Context, list client.ObjectList, opts ...client.ListOption) error {
-					Expect(apimeta.SetList(list, fromPods(mockPods[acc]))).Should(Succeed())
+					Expect(testutil.SetListReturnedObjects(list, fromPods(mockPods[acc]))).Should(Succeed())
 					if acc < len(mockPods)-1 {
 						acc++
 					}
@@ -196,7 +190,7 @@ var _ = Describe("Reconfigure RollingPolicy", func() {
 			mockClient.EXPECT().
 				List(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
 				DoAndReturn(func(ctx context.Context, list client.ObjectList, opts ...client.ListOption) error {
-					Expect(apimeta.SetList(list, fromPods(pods))).Should(Succeed())
+					Expect(testutil.SetListReturnedObjects(list, fromPods(pods))).Should(Succeed())
 					return nil
 				}).
 				MinTimes(3)

@@ -1,5 +1,5 @@
 /*
-Copyright ApeCloud Inc.
+Copyright ApeCloud, Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -152,7 +152,7 @@ type BackupPolicyStatus struct {
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
-// +kubebuilder:resource:categories={dbaas},scope=Namespaced
+// +kubebuilder:resource:categories={kubeblocks},scope=Namespaced
 // +kubebuilder:printcolumn:name="STATUS",type=string,JSONPath=`.status.phase`
 // +kubebuilder:printcolumn:name="SCHEDULE",type=string,JSONPath=`.spec.schedule`
 // +kubebuilder:printcolumn:name="LAST SCHEDULE",type=string,JSONPath=`.status.lastScheduleTime`

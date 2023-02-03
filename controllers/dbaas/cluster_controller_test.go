@@ -1,5 +1,5 @@
 /*
-Copyright ApeCloud Inc.
+Copyright ApeCloud, Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -70,13 +70,10 @@ var _ = Describe("Cluster Controller", func() {
 	ctx := context.Background()
 
 	cleanEnv := func() {
-		// must wait until resources deleted and no longer exist before the testcases start, otherwise :
-		// - if later it needs to create some new resource objects with the same name,
+		// must wait until resources deleted and no longer exist before the testcases start,
+		// otherwise if later it needs to create some new resource objects with the same name,
 		// in race conditions, it will find the existence of old objects, resulting failure to
 		// create the new objects.
-		// - worse, if an async DeleteAll call is issued here, it maybe executed later by the
-		// K8s API server, by which time the testcase may have already created some new test objects,
-		// which shall be accidentally deleted.
 		By("clean resources")
 
 		// delete cluster(and all dependent sub-resources), clusterversion and clusterdef
@@ -726,7 +723,7 @@ spec:
 			})
 
 			By("Set HorizontalScalePolicy")
-			Eventually(testdbaas.GetAndChangeObj(&testCtx, intctrlutil.GetNamespacedName(clusterDef),
+			Eventually(testdbaas.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(clusterDef),
 				func(clusterDef *dbaasv1alpha1.ClusterDefinition) {
 					clusterDef.Spec.Components[0].HorizontalScalePolicy =
 						&dbaasv1alpha1.HorizontalScalePolicy{Type: dbaasv1alpha1.HScaleDataClonePolicyFromSnapshot}

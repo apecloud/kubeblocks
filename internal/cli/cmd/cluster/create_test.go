@@ -1,5 +1,5 @@
 /*
-Copyright ApeCloud Inc.
+Copyright ApeCloud, Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -138,5 +138,12 @@ spec:
 		raw := []string{"key=engineType,value=mongo,operator=Equal,effect=NoSchedule"}
 		res := buildTolerations(raw)
 		Expect(len(res)).Should(Equal(1))
+	})
+
+	It("generate random cluster name", func() {
+		dynamic := testing.FakeDynamicClient()
+		name, err := generateClusterName(dynamic, "")
+		Expect(err).Should(Succeed())
+		Expect(name).ShouldNot(BeEmpty())
 	})
 })

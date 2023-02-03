@@ -1,5 +1,5 @@
 /*
-Copyright ApeCloud Inc.
+Copyright ApeCloud, Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,6 +14,15 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package configuration
+package cluster
 
-//go:generate go run github.com/golang/mock/mockgen -destination mocks/k8sclient_mocks.go sigs.k8s.io/controller-runtime/pkg/client Client
+import (
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
+)
+
+var _ = Describe("name generator", func() {
+	It("generate cluster name", func() {
+		Expect(len(GenerateName()) >= 5).Should(BeTrue())
+	})
+})

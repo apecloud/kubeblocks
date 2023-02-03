@@ -1,5 +1,5 @@
 /*
-Copyright ApeCloud Inc.
+Copyright ApeCloud, Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -23,8 +23,9 @@ import (
 	"github.com/golang/mock/gomock"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
-	mock_client "github.com/apecloud/kubeblocks/controllers/dbaas/configuration/mocks"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
+	testutil "github.com/apecloud/kubeblocks/internal/testutil/k8s"
+	mock_client "github.com/apecloud/kubeblocks/internal/testutil/k8s/mocks"
 )
 
 var _ = Describe("Reconfigure simplePolicy", func() {
@@ -36,14 +37,8 @@ var _ = Describe("Reconfigure simplePolicy", func() {
 		simplePolicy = upgradePolicyMap[dbaasv1alpha1.NormalPolicy]
 	)
 
-	setup := func() (*gomock.Controller, *mock_client.MockClient) {
-		ctrl := gomock.NewController(GinkgoT())
-		client := mock_client.NewMockClient(ctrl)
-		return ctrl, client
-	}
-
 	BeforeEach(func() {
-		ctrl, mockClient = setup()
+		ctrl, mockClient = testutil.SetupK8sMock()
 	})
 
 	AfterEach(func() {

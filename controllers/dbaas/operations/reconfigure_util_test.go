@@ -1,5 +1,5 @@
 /*
-Copyright ApeCloud Inc.
+Copyright ApeCloud, Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,7 +18,6 @@ package operations
 
 import (
 	"context"
-	"reflect"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -29,8 +28,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
-	mock_client "github.com/apecloud/kubeblocks/controllers/dbaas/configuration/mocks"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
+	testutil "github.com/apecloud/kubeblocks/internal/testutil/k8s"
+	mock_client "github.com/apecloud/kubeblocks/internal/testutil/k8s/mocks"
 	"github.com/apecloud/kubeblocks/test/testdata"
 )
 
@@ -40,18 +40,6 @@ var _ = Describe("Reconfigure RollingPolicy", func() {
 		mockClient *mock_client.MockClient
 		ctrl       *gomock.Controller
 	)
-
-	setup := func() (*gomock.Controller, *mock_client.MockClient) {
-		ctrl := gomock.NewController(GinkgoT())
-		client := mock_client.NewMockClient(ctrl)
-		return ctrl, client
-	}
-
-	setExpectedObject := func(out client.Object, obj client.Object) {
-		outVal := reflect.ValueOf(out)
-		objVal := reflect.ValueOf(obj)
-		reflect.Indirect(outVal).Set(reflect.Indirect(objVal))
-	}
 
 	mockCfgTplObj := func(tpl dbaasv1alpha1.ConfigTemplate) (*corev1.ConfigMap, *dbaasv1alpha1.ConfigConstraint) {
 		By("By assure an cm obj")
@@ -65,7 +53,7 @@ var _ = Describe("Reconfigure RollingPolicy", func() {
 	}
 
 	BeforeEach(func() {
-		ctrl, mockClient = setup()
+		ctrl, mockClient = testutil.SetupK8sMock()
 	})
 
 	AfterEach(func() {
@@ -255,7 +243,7 @@ var _ = Describe("Reconfigure RollingPolicy", func() {
 					tt := tests[index]
 					if tt.err == nil {
 						// mock data
-						setExpectedObject(obj, tt.object)
+						testutil.SetGetReturnedObject(obj, tt.object)
 					}
 					if index < len(tests)-1 {
 						accessCounter[key]++

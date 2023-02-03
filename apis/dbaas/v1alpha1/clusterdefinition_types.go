@@ -1,5 +1,5 @@
 /*
-Copyright ApeCloud Inc.
+Copyright ApeCloud, Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -490,7 +490,7 @@ type ConsensusMember struct {
 
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
-//+kubebuilder:resource:categories={dbaas},scope=Cluster,shortName=cd
+//+kubebuilder:resource:categories={kubeblocks},scope=Cluster,shortName=cd
 //+kubebuilder:printcolumn:name="MAIN-COMPONENT-TYPE",type="string",JSONPath=".spec.components[0].typeName",description="main component types"
 //+kubebuilder:printcolumn:name="STATUS",type="string",JSONPath=".status.phase",description="status phase"
 //+kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"

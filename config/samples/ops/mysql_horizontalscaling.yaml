@@ -7,5 +7,5 @@ spec:
   clusterRef: wesql
   type: HorizontalScaling
   horizontalScaling:
-  - componentName: replicasets
+  - componentName: wesql
     replicas: 3

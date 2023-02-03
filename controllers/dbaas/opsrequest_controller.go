@@ -1,5 +1,5 @@
 /*
-Copyright ApeCloud Inc.
+Copyright ApeCloud, Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -223,9 +223,9 @@ func (r *OpsRequestReconciler) handleSucceedOpsRequest(reqCtx intctrlutil.Reques
 	if opsRequest.Status.CompletionTimestamp.IsZero() || opsRequest.Spec.TTLSecondsAfterSucceed == 0 {
 		return intctrlutil.Reconciled()
 	}
-	ttlSecondsAfterSucceed := time.Duration(opsRequest.Spec.TTLSecondsAfterSucceed) * time.Second
-	if time.Now().Before(opsRequest.Status.CompletionTimestamp.Add(ttlSecondsAfterSucceed)) {
-		return intctrlutil.RequeueAfter(ttlSecondsAfterSucceed, reqCtx.Log, "")
+	deadline := opsRequest.Status.CompletionTimestamp.Add(time.Duration(opsRequest.Spec.TTLSecondsAfterSucceed) * time.Second)
+	if time.Now().Before(deadline) {
+		return intctrlutil.RequeueAfter(time.Until(deadline), reqCtx.Log, "")
 	}
 	// the opsRequest will be deleted after spec.ttlSecondsAfterSucceed seconds when status.phase is Succeed
 	if err := r.Client.Delete(reqCtx.Ctx, opsRequest); err != nil {

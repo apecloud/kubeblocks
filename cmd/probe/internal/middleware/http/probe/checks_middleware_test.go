@@ -51,9 +51,6 @@ func TestRequestHandlerWithIllegalRouterRule(t *testing.T) {
 		ctx.Request.SetHost("localhost:3501")
 		ctx.Request.SetRequestURI("/v1.0/bindings/probe?operation=statuscheck")
 		ctx.Request.Header.SetMethod("GET")
-		//r := httptest.NewRequest(http.MethodGet,
-		//	"http://localhost:3501/v1.0/bindings/probe?operation=statuscheck", nil)
-		//w := httptest.NewRecorder()
 
 		handler(mockedRequestHandler)(&ctx)
 		assert.Equal(t, http.StatusOK, ctx.Response.Header.StatusCode())

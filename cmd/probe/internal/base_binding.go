@@ -159,7 +159,6 @@ func (p *ProbeBase) Invoke(ctx context.Context, req *bindings.InvokeRequest) (*b
 
 	sql, ok = req.Metadata[CommandSQLKey]
 	if !ok {
-		//return nil, errors.Errorf("required metadata not set: %s", CommandSQLKey)
 		p.Logger.Infof("%s metadata not set, use default", CommandSQLKey)
 	}
 
@@ -284,7 +283,8 @@ func (p *ProbeBase) runningCheck(ctx context.Context, resp *bindings.InvokeRespo
 	p.runningCheckFailedCount = 0
 	message = "TCP Connection Established Successfully!"
 	if tcpCon, ok := conn.(*net.TCPConn); ok {
-		tcpCon.SetLinger(0)
+		err := tcpCon.SetLinger(0)
+		p.Logger.Infof("running check, set tcp linger failed: %v", err)
 	}
 	return marshalResult()
 }

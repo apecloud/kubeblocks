@@ -23,7 +23,6 @@ import (
 	"os/signal"
 	"syscall"
 
-	//_ "github.com/dapr/dapr/cmd/daprd/components"
 	// Register all components
 	bindingsLoader "github.com/dapr/dapr/pkg/components/bindings"
 	configurationLoader "github.com/dapr/dapr/pkg/components/configuration"
@@ -84,11 +83,14 @@ func main() {
 	}
 	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
 	pflag.Parse()
-	viper.BindPFlags(pflag.CommandLine)
+	err = viper.BindPFlags(pflag.CommandLine)
+	if err != nil {
+		panic(fmt.Errorf("fatal error viper bindPFlags: %v", err))
+	}
 	viper.SetConfigFile(viper.GetString("config")) // path to look for the config file in
 	err = viper.ReadInConfig()                     // Find and read the config file
 	if err != nil {                                // Handle errors reading the config file
-		panic(fmt.Errorf("fatal error config file: %w", err))
+		panic(fmt.Errorf("fatal error config file: %v", err))
 	}
 
 	secretstoresLoader.DefaultRegistry.Logger = logContrib

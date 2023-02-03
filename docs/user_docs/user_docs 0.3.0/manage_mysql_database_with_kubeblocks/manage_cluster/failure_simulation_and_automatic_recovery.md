@@ -17,7 +17,7 @@ As an open-source data management platform, Kubeblocks supports two database for
 
 ## Recovery simulation
 
-> Note:
+> Note:<br>
 > The faults here are all simulated by deleting a pod. When there are sufficient resources, the fault can also be simulated by machine downtime or container deletion, and its automatic recovery is the same as described here.
 
 ### Leader pod fault
@@ -45,7 +45,7 @@ As an open-source data management platform, Kubeblocks supports two database for
    $ kbcli cluster connect xxx
    Results to be added.
    ```
-   ***How the automatic recovery works***
+   ***How the automatic recovery works***<br>
    After the leader pod is deleted, the ApeCloud MySQL Paxos group elects a new leader. In this example, `xxx` is elected as the new leader. Kubeblocks detects that the leader has changed, and sends a notification to update the access link. The original exception node automatically rebuilds and recovers to the normal Paxos group state. It normally takes 30 seconds from exception to recovery.
 
 ### Single follower pod exception
@@ -65,7 +65,7 @@ As an open-source data management platform, Kubeblocks supports two database for
    $ kbcli cluster connect xxx
    Results to be added.
    ```
-   ***How the automatic recovery works***
+   ***How the automatic recovery works***<br>
    One follower exception doesn't trigger re-electing of the leader or access link switch, so the R/W of the cluster is not affected. Follower exception triggers recreation and recovery. The process takes no more than 30 seconds. 
 
 ### Two pods exception
@@ -73,7 +73,7 @@ As an open-source data management platform, Kubeblocks supports two database for
 The availability of the cluster generally requires the majority of pods to be in a normal state. When most pods are exceptional, the original leader will be automatically downgraded to a follower. Therefore, any two exceptional pods result in only one follower pod remaining. 
 Therefore, whether exceptions occur to one leader and one follower or exceptions occur to two followers, failure performance and automatic recovery are the same. 
 
-***Steps***
+***Steps:***
 1. Run the command below to view the ApeCloud MySQL Paxos group information and view the follower pod name in `Topology`. In this example, the follower pods are xxx and xxx.
    ```
    $ kbcli cluster describe xxx
@@ -97,12 +97,12 @@ Therefore, whether exceptions occur to one leader and one follower or exceptions
    $ kbcli cluster describe xxx
    Results xxx
    ```
-   ***How the automatic recovery works***
+   ***How the automatic recovery works***<br>
    When two pods of the ApeCloud MySQL Paxos group are exceptional, pods are unavailable and cluster R/W is unavailable. After the recreation of pods, a new leader is elected to recover to R/W status. The process takes less than 30 seconds.
 
 ### All pods exception
 
-***Steps***
+***Steps:***
 1. Run the command below to view the ApeCloud MySQL Paxos group information and view the pods' names in `Topology`.
    ```
    $ kbcli cluster describe xxx
@@ -129,5 +129,5 @@ Therefore, whether exceptions occur to one leader and one follower or exceptions
    $ kbcli cluster describe xxx
    Results xxx
    ```
-   ***How the automatic recovery works***
+   ***How the automatic recovery works***<br>
     Every time the pod is deleted, recreation is triggered. And then ApeCloud MySQL automatically completes the cluster recovery and the election of a new leader. After the election of the leader is completed, Kubeblocks detects the new leader and updates the access link. This process takes less than 30 seconds.

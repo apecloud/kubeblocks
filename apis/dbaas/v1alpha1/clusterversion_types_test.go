@@ -31,9 +31,9 @@ func TestGetInconsistentComponentsInfoWithoutResult(t *testing.T) {
 	clusterVersion := &ClusterVersion{}
 	clusterVersionYaml := `
 apiVersion: dbaas.kubeblocks.io/v1alpha1
-kind:       ClusterVersion
+kind: ClusterVersion
 metadata:
-  name:     clusterversion-1
+  name: clusterversion-1
 spec:
   clusterDefinitionRef: cluster-definition-1
   components:
@@ -56,9 +56,9 @@ spec:
 	clusterDef := &ClusterDefinition{}
 	clusterDefYaml := `
 apiVersion: dbaas.kubeblocks.io/v1alpha1
-kind:       ClusterDefinition
+kind: ClusterDefinition
 metadata:
-  name:     cluster-definition-1
+  name: cluster-definition-1
 spec:
   components:
   - typeName: component1
@@ -87,9 +87,9 @@ func TestGetInconsistentComponentsInfoWithResults(t *testing.T) {
 	clusterVersion := &ClusterVersion{}
 	clusterVersionYaml := `
 apiVersion: dbaas.kubeblocks.io/v1alpha1
-kind:       ClusterVersion
+kind: ClusterVersion
 metadata:
-  name:     clusterversion-2
+  name: clusterversion-2
 spec:
   clusterDefinitionRef: cluster-definition-2
   components:
@@ -111,9 +111,9 @@ spec:
 	clusterDef := &ClusterDefinition{}
 	clusterDefYaml := `
 apiVersion: dbaas.kubeblocks.io/v1alpha1
-kind:       ClusterDefinition
+kind: ClusterDefinition
 metadata:
-  name:     cluster-definition-2
+  name: cluster-definition-2
 spec:
   components:
   - typeName: component1

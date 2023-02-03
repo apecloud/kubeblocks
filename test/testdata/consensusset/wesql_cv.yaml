@@ -1,7 +1,7 @@
 apiVersion: dbaas.kubeblocks.io/v1alpha1
-kind:       ClusterVersion
+kind: ClusterVersion
 metadata:
-  name:  %s
+  name: %s
 spec:
   clusterDefinitionRef: %s
   components:

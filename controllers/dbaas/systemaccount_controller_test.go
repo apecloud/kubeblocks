@@ -155,7 +155,8 @@ var _ = Describe("SystemAccount Controller", func() {
 
 	mockBackupPolicy := func(name string, engineName, clusterName string) *dataprotectionv1alpha1.BackupPolicy {
 		ml := map[string]string{
-			intctrlutil.AppInstanceLabelKey: clusterName,
+			intctrlutil.AppInstanceLabelKey:  clusterName,
+			intctrlutil.AppComponentLabelKey: engineName,
 		}
 
 		policy := &dataprotectionv1alpha1.BackupPolicy{
@@ -420,10 +421,6 @@ var _ = Describe("SystemAccount Controller", func() {
 		})
 
 		It("Should update system account expectation after BackupPolicy is created", func() {
-			var (
-				databaseEngine = "mysql"
-			)
-
 			for testName, testCase := range mysqlTestCases {
 				var (
 					randomStr        = testCtx.GetRandomStr()
@@ -480,8 +477,8 @@ var _ = Describe("SystemAccount Controller", func() {
 
 				// create backup policy, and update expected values
 				By("Check the BackupPolicy creation succeeds and ExpectionManager updated")
-				policy := assureBackupPolicy(backupPolicyName, databaseEngine, cluster.Name)
-				policyKey := expectationKey(policy.Namespace, cluster.Name, databaseEngine)
+				policy := assureBackupPolicy(backupPolicyName, consensusCompName, cluster.Name)
+				policyKey := expectationKey(policy.Namespace, cluster.Name, consensusCompName)
 				Eventually(func(g Gomega) {
 					exp, exists, _ := systemAccountReconciler.ExpectionManager.getExpectation(policyKey)
 					g.Expect(exists).To(BeTrue(), "ExpectionManager should have key:"+policyKey)

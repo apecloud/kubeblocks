@@ -166,7 +166,7 @@ func (o *CreateBackupOptions) getDefaultBackupPolicyTemplate() (string, error) {
 		return "", err
 	}
 
-	// find secret from cluster label
+	// find backupPolicyTemplate from cluster label
 	opts := metav1.ListOptions{
 		LabelSelector: fmt.Sprintf("%s=%s",
 			types.ClusterDefLabelKey, clusterObj.GetLabels()[types.ClusterDefLabelKey]),

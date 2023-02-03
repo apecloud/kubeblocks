@@ -592,7 +592,7 @@ func (r *BackupReconciler) deleteReferenceBatchV1Jobs(reqCtx intctrlutil.Request
 			}
 		}
 
-		if err := DeleteObjectBackground(r.Client, reqCtx.Ctx, &job); err != nil {
+		if err := intctrlutil.BackgroundDeleteObject(r.Client, reqCtx.Ctx, &job); err != nil {
 			return err
 		}
 	}
@@ -615,7 +615,7 @@ func (r *BackupReconciler) deleteReferenceVolumeSnapshot(reqCtx intctrlutil.Requ
 				return err
 			}
 		}
-		if err := DeleteObjectBackground(r.Client, reqCtx.Ctx, &i); err != nil {
+		if err := intctrlutil.BackgroundDeleteObject(r.Client, reqCtx.Ctx, &i); err != nil {
 			return err
 		}
 	}

@@ -204,7 +204,7 @@ func (r *RestoreJobReconciler) deleteExternalResources(reqCtx intctrlutil.Reques
 		return nil
 	}
 
-	if err := DeleteObjectBackground(r.Client, reqCtx.Ctx, job); err != nil {
+	if err := intctrlutil.BackgroundDeleteObject(r.Client, reqCtx.Ctx, job); err != nil {
 		return err
 	}
 	return nil

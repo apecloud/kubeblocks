@@ -234,7 +234,7 @@ func (r *BackupPolicyReconciler) removeExpiredBackups(reqCtx intctrlutil.Request
 			return nil
 		}
 		if item.Status.Expiration != nil && item.Status.Expiration.Before(&now) {
-			if err := DeleteObjectBackground(r.Client, reqCtx.Ctx, &item); err != nil {
+			if err := intctrlutil.BackgroundDeleteObject(r.Client, reqCtx.Ctx, &item); err != nil {
 				// failed delete backups, return error info.
 				return err
 			}
@@ -268,7 +268,7 @@ func (r *BackupPolicyReconciler) removeOldestBackups(reqCtx intctrlutil.RequestC
 	backupItems := backups.Items
 	sort.Sort(byBackupStartTime(backupItems))
 	for i := 0; i < numToDelete; i++ {
-		if err := DeleteObjectBackground(r.Client, reqCtx.Ctx, &backupItems[i]); err != nil {
+		if err := intctrlutil.BackgroundDeleteObject(r.Client, reqCtx.Ctx, &backupItems[i]); err != nil {
 			// failed delete backups, return error info.
 			return err
 		}
@@ -304,7 +304,7 @@ func (r *BackupPolicyReconciler) deleteExternalResources(reqCtx intctrlutil.Requ
 			return err
 		}
 	}
-	if err := DeleteObjectBackground(r.Client, reqCtx.Ctx, cronjob); err != nil {
+	if err := intctrlutil.BackgroundDeleteObject(r.Client, reqCtx.Ctx, cronjob); err != nil {
 		// failed delete k8s job, return error info.
 		return err
 	}

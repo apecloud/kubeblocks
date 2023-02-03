@@ -1382,21 +1382,19 @@ func buildReplicationSetPVC(params createParams, sts *appsv1.StatefulSet) error 
 }
 
 func injectReplicationSetPodEnvAndLabel(params createParams, sts *appsv1.StatefulSet, index int32) (*appsv1.StatefulSet, error) {
-	for _, comp := range params.cluster.Spec.Components {
-		svcName := strings.Join([]string{params.cluster.Name, params.component.Name, "headless"}, "-")
-		for i := range sts.Spec.Template.Spec.Containers {
-			c := &sts.Spec.Template.Spec.Containers[i]
-			c.Env = append(c.Env, corev1.EnvVar{
-				Name:      dbaasPrefix + "_PRIMARY_POD_NAME",
-				Value:     fmt.Sprintf("%s-%d-%d.%s", sts.Name, *comp.PrimaryIndex, 0, svcName),
-				ValueFrom: nil,
-			})
-		}
-		if index != *comp.PrimaryIndex {
-			sts.Spec.Template.Labels[intctrlutil.RoleLabelKey] = string(replicationset.Secondary)
-		} else {
-			sts.Spec.Template.Labels[intctrlutil.RoleLabelKey] = string(replicationset.Primary)
-		}
+	svcName := strings.Join([]string{params.cluster.Name, params.component.Name, "headless"}, "-")
+	for i := range sts.Spec.Template.Spec.Containers {
+		c := &sts.Spec.Template.Spec.Containers[i]
+		c.Env = append(c.Env, corev1.EnvVar{
+			Name:      dbaasPrefix + "_PRIMARY_POD_NAME",
+			Value:     fmt.Sprintf("%s-%d-%d.%s", sts.Name, *params.component.PrimaryIndex, 0, svcName),
+			ValueFrom: nil,
+		})
+	}
+	if index != *params.component.PrimaryIndex {
+		sts.Spec.Template.Labels[intctrlutil.RoleLabelKey] = string(replicationset.Secondary)
+	} else {
+		sts.Spec.Template.Labels[intctrlutil.RoleLabelKey] = string(replicationset.Primary)
 	}
 	return sts, nil
 }

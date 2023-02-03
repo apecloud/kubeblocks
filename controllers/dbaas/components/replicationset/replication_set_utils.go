@@ -21,9 +21,9 @@ import (
 	"fmt"
 	"sort"
 
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
-
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -76,9 +76,8 @@ func HandleReplicationSet(reqCtx intctrlutil.RequestCtx,
 		clusterCompReplicasMap[clusterComp.Name] = *clusterComp.Replicas
 	}
 
-	var podList []*corev1.Pod
-	compOwnsStsMap := make(map[string]int32)
-	stsToDeleteMap := make(map[string]int32)
+	// compOwnsStsMap is used to divide stsList into sts list under each replicationSet component according to componentLabelKey
+	compOwnsStsMap := make(map[string][]*appsv1.StatefulSet)
 	for _, stsObj := range stsList {
 		skip, err := filter(stsObj)
 		if err != nil {
@@ -87,42 +86,49 @@ func HandleReplicationSet(reqCtx intctrlutil.RequestCtx,
 		if skip {
 			continue
 		}
-		targetPodList, err := util.GetPodListByStatefulSet(reqCtx.Ctx, cli, stsObj)
-		if err != nil {
-			return err
-		}
-		if len(targetPodList) != 1 {
-			return fmt.Errorf("pod number in statefulset %s is not 1", stsObj.Name)
-		}
-		podList = append(podList, &targetPodList[0])
-		if _, ok := compOwnsStsMap[stsObj.Labels[intctrlutil.AppComponentLabelKey]]; !ok {
-			compOwnsStsMap[stsObj.Labels[intctrlutil.AppComponentLabelKey]] = 0
-			stsToDeleteMap[stsObj.Labels[intctrlutil.AppComponentLabelKey]] = 0
-		}
-		compOwnsStsMap[stsObj.Labels[intctrlutil.AppComponentLabelKey]] += 1
-		if compOwnsStsMap[stsObj.Labels[intctrlutil.AppComponentLabelKey]] > clusterCompReplicasMap[stsObj.Labels[intctrlutil.AppComponentLabelKey]] {
-			stsToDeleteMap[stsObj.Labels[intctrlutil.AppComponentLabelKey]] += 1
+		compOwnsStsMap[stsObj.Labels[intctrlutil.AppComponentLabelKey]] = append(compOwnsStsMap[stsObj.Labels[intctrlutil.AppComponentLabelKey]], stsObj)
+	}
+
+	// compOwnsPodToSyncMap is used to record the list of component pods to be synchronized to cluster.status except for horizontal scale-in
+	compOwnsPodsToSyncMap := make(map[string][]*corev1.Pod)
+	// stsToDeleteMap is used to record the count of statefulsets to be deleted when horizontal scale-in
+	stsToDeleteMap := make(map[string]int32)
+	for compKey, compStsObjs := range compOwnsStsMap {
+		if int32(len(compOwnsStsMap[compKey])) > clusterCompReplicasMap[compKey] {
+			stsToDeleteMap[compKey] = int32(len(compOwnsStsMap[compKey])) - clusterCompReplicasMap[compKey]
+		} else {
+			for _, compStsObj := range compStsObjs {
+				targetPodList, err := util.GetPodListByStatefulSet(reqCtx.Ctx, cli, compStsObj)
+				if err != nil {
+					return err
+				}
+				if len(targetPodList) != 1 {
+					return fmt.Errorf("pod number in statefulset %s is not 1", compStsObj.Name)
+				}
+				compOwnsPodsToSyncMap[compKey] = append(compOwnsPodsToSyncMap[compKey], &targetPodList[0])
+			}
 		}
 	}
 
-	var componentStsList = &appsv1.StatefulSetList{}
+	// remove cluster status and delete sts when horizontal scale-in
 	for compKey, stsToDelCount := range stsToDeleteMap {
 		if stsToDelCount == 0 {
 			continue
 		}
 		// list all statefulSets by cluster and componentKey label
+		var componentStsList = &appsv1.StatefulSetList{}
 		err := util.GetObjectListByComponentName(reqCtx.Ctx, cli, cluster, componentStsList, compKey)
 		if err != nil {
 			return err
 		}
-		if compOwnsStsMap[compKey] != int32(len(componentStsList.Items)) {
+		if int32(len(compOwnsStsMap[compKey])) != int32(len(componentStsList.Items)) {
 			return fmt.Errorf("statefulset total number has changed")
 		}
 		dos := make([]*appsv1.StatefulSet, 0)
 		partition := int32(len(componentStsList.Items)) - stsToDelCount
 		for _, sts := range componentStsList.Items {
 			// if current primary statefulSet ordinal is larger than target number replica, return err
-			if int32(util.GetOrdinalSts(&sts)) > partition && CheckStsIsPrimary(&sts) {
+			if int32(util.GetOrdinalSts(&sts)) >= partition && CheckStsIsPrimary(&sts) {
 				return fmt.Errorf("current primary statefulset ordinal is larger than target number replicas, can not be reduce, please switchover first")
 			}
 			dos = append(dos, sts.DeepCopy())
@@ -131,30 +137,32 @@ func HandleReplicationSet(reqCtx intctrlutil.RequestCtx,
 		// sort the statefulSets by their ordinals desc
 		sort.Sort(util.DescendingOrdinalSts(dos))
 
-		// remove cluster status and delete sts
 		if err := RemoveReplicationSetClusterStatus(cli, reqCtx.Ctx, dos[:stsToDelCount]); err != nil {
 			return err
 		}
 		for i := int32(0); i < stsToDelCount; i++ {
-			if err := cli.Delete(reqCtx.Ctx, dos[i]); err == nil || apierrors.IsNotFound(err) {
+			err := cli.Delete(reqCtx.Ctx, dos[i])
+			if err == nil {
 				patch := client.MergeFrom(dos[i].DeepCopy())
 				controllerutil.RemoveFinalizer(dos[i], DBClusterFinalizerName)
 				if err := cli.Patch(reqCtx.Ctx, dos[i], patch); err != nil {
 					return err
 				}
 				continue
-			} else {
-				return err
 			}
+			if apierrors.IsNotFound(err) {
+				continue
+			}
+			return err
 		}
-
-		return nil
 	}
 
 	// sync cluster status
-	err := SyncReplicationSetClusterStatus(cli, reqCtx.Ctx, podList)
-	if err != nil {
-		return err
+	for _, compPodList := range compOwnsPodsToSyncMap {
+		err := SyncReplicationSetClusterStatus(cli, reqCtx.Ctx, compPodList)
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }

@@ -49,22 +49,24 @@ func TestRequestHandlerWithIllegalRouterRule(t *testing.T) {
 	t.Run("hit: status check request", func(t *testing.T) {
 		var ctx fasthttp.RequestCtx
 		ctx.Request.SetHost("localhost:3501")
-		ctx.Request.SetRequestURI("/v1.0/bindings/probe?operation=statuscheck")
+		ctx.Request.SetRequestURI("/v1.0/bindings/probe?operation=statusCheck")
+		ctx.Request.Header.SetHost("localhost:3501")
 		ctx.Request.Header.SetMethod("GET")
 
 		handler(mockedRequestHandler)(&ctx)
 		assert.Equal(t, http.StatusOK, ctx.Response.Header.StatusCode())
-		assert.Equal(t, http.MethodPost, ctx.Request.Header.Method())
+		assert.Equal(t, http.MethodPost, string(ctx.Request.Header.Method()))
 	})
 
 	t.Run("hit: status code handler", func(t *testing.T) {
 		var ctx fasthttp.RequestCtx
 		ctx.Request.SetHost("localhost:3501")
-		ctx.Request.SetRequestURI("/v1.0/bindings/probe?operation=statuscheck")
+		ctx.Request.SetRequestURI("/v1.0/bindings/probe?operation=statusCheck")
+		ctx.Request.Header.SetHost("localhost:3501")
 		ctx.Request.Header.SetMethod("GET")
-		ctx.Request.Header.Add(statusCodeHeader, checkFailedHTTPCode)
+		ctx.Response.Header.Add(statusCodeHeader, checkFailedHTTPCode)
 		handler(mockedRequestHandler)(&ctx)
 		assert.Equal(t, 451, ctx.Response.Header.StatusCode())
-		assert.Equal(t, http.MethodPost, ctx.Request.Header.Method())
+		assert.Equal(t, http.MethodPost, string(ctx.Request.Header.Method()))
 	})
 }

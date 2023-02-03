@@ -22,7 +22,6 @@ import (
 	"database/sql/driver"
 	"fmt"
 	"net"
-	"os"
 	"os/exec"
 	"reflect"
 	"strconv"
@@ -35,6 +34,7 @@ import (
 	"github.com/go-sql-driver/mysql"
 	"github.com/pkg/errors"
 	"github.com/sethvargo/go-password/password"
+	"github.com/spf13/viper"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
@@ -226,7 +226,7 @@ spec:
     podSpec:
       containers:
       - name: mysql
-        image: docker.io/apecloud/wesql-server:latest
+        image: docker.io/apecloud/apecloud-mysql-server:latest
   - type: proxy
     podSpec: 
       containers:
@@ -395,7 +395,7 @@ spec:
     podSpec:
       containers:
       - name: mysql
-        image: docker.io/apecloud/wesql-server:latest
+        image: docker.io/apecloud/apecloud-mysql-server:latest
         imagePullPolicy: IfNotPresent
 `
 		clusterVersion := &dbaasv1alpha1.ClusterVersion{}
@@ -855,8 +855,7 @@ spec:
 	// TODO move integration tests(which relies on a real K8s cluster) out of UT
 	Context("When horizontal scaling in real env", func() {
 		It("Should create backup resources accordingly", func() {
-			useExistingCluster, _ := strconv.ParseBool(os.Getenv("USE_EXISTING_CLUSTER"))
-			if !useExistingCluster {
+			if !viper.GetBool("USE_EXISTING_CLUSTER") {
 				return
 			}
 
@@ -1084,7 +1083,7 @@ spec:
   components:
   - podSpec:
       containers:
-      - image: apecloud/wesql-server:8.0.30-4.alpha1.20221031.g1aa54a3
+      - image: apecloud/apecloud-mysql-server:latest
         imagePullPolicy: IfNotPresent
         name: mysql
         resources: {}
@@ -1194,15 +1193,13 @@ spec:
 				return len(stsList.Items) != 0
 			}, timeout, interval).Should(BeTrue())
 
-			if useExistingCluster {
-				podList := corev1.PodList{}
-				Eventually(func() bool {
-					Expect(k8sClient.List(ctx, &podList, client.MatchingLabels{
-						"app.kubernetes.io/instance": key.Name,
-					}, client.InNamespace(key.Namespace))).Should(Succeed())
-					return len(podList.Items) == 1
-				}, timeout, interval).Should(BeTrue())
-			}
+			podList := corev1.PodList{}
+			Eventually(func() bool {
+				Expect(k8sClient.List(ctx, &podList, client.MatchingLabels{
+					"app.kubernetes.io/instance": key.Name,
+				}, client.InNamespace(key.Namespace))).Should(Succeed())
+				return len(podList.Items) == 1
+			}, timeout, interval).Should(BeTrue())
 
 			By("By updating replica")
 			updatedReplicas := int32(3)
@@ -1639,7 +1636,7 @@ spec:
       value: clusterepuglf-wesql-test-1
     - name: KB_REPLICASETS_2_HOSTNAME
       value: clusterepuglf-wesql-test-2
-    image: docker.io/apecloud/wesql-server:latest
+    image: docker.io/apecloud/apecloud-mysql-server:latest
     imagePullPolicy: IfNotPresent
     name: mysql
     ports:

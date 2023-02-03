@@ -133,7 +133,7 @@ func main() {
 		LeaderElectionReleaseOnCancel: true,
 
 		CertDir:               viper.GetString("cert_dir"),
-		ClientDisableCacheFor: intctrlutil.GetUncacheObjects(),
+		ClientDisableCacheFor: intctrlutil.GetUncachedObjects(),
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")

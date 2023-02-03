@@ -17,7 +17,6 @@ limitations under the License.
 package dbaas
 
 import (
-	"fmt"
 	"strconv"
 	"strings"
 
@@ -193,10 +192,6 @@ single_thread_memory = 294912
 				mysqlCfgName: mysqlCfgTmpContext,
 			})
 
-			// Debug
-			fmt.Println(rendered[mysqlCfgName])
-			fmt.Printf("%s\n", mysqlCfgRenderedContext)
-
 			Expect(err).Should(BeNil())
 			Expect(rendered[mysqlCfgName]).Should(Equal(mysqlCfgRenderedContext))
 		})
@@ -348,7 +343,6 @@ true
 				rendered, err := cfgBuilder.render(map[string]string{
 					tt.name: tt.tpl,
 				})
-				fmt.Println("test ut: ", tt.name)
 				if tt.wantErr {
 					Expect(err).ShouldNot(Succeed())
 				} else {
@@ -568,14 +562,6 @@ true
 					bufferSize:    "282624M",
 					maxBufferSize: 302080,
 				},
-			}
-
-			// for debug
-			for _, r := range insClassTest {
-				fmt.Printf("cal : %s, expect [%v] [%s]\n", calMysqlPoolSizeByResource(&ResourceDefinition{
-					MemorySize: r.memSize * 1024 * 1024 * 1024, // 4G
-					CoreNum:    r.cpu,                          // 2core
-				}, false), r, r.bufferSize)
 			}
 
 			for _, r := range insClassTest {

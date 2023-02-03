@@ -33,11 +33,32 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
-type ExecStatus int
+// ExecStatus defines running result for Reconfiguring policy (fsm).
+// ESNone describes policy has finished and quit.
+// ESRetry describes fsm is running.
+// ESFailed describes fsm is failed and exited.
+// ESNotSupport describes fsm does not support the feature.
+// ESAndRetryFailed describes fsm is failed in current state, but can be retried.
+// +enum
+type ExecStatus string
+
+const (
+	ESNone           ExecStatus = "None"
+	ESRetry          ExecStatus = "Retry"
+	ESFailed         ExecStatus = "Failed"
+	ESNotSupport     ExecStatus = "NotSupport"
+	ESAndRetryFailed ExecStatus = "FailedAndRetry"
+)
+
+type ReturnedStatus struct {
+	Status        ExecStatus
+	SucceedCount  int32
+	ExpectedCount int32
+}
 
 type reconfigurePolicy interface {
 	// Upgrade is to enable the configuration to take effect.
-	Upgrade(params reconfigureParams) (ExecStatus, error)
+	Upgrade(params reconfigureParams) (ReturnedStatus, error)
 
 	// GetPolicyName return name of policy.
 	GetPolicyName() string
@@ -53,13 +74,13 @@ type reconfigureParams struct {
 	TplName string
 
 	// Configuration files patch.
-	Meta *cfgcore.ConfigDiffInformation
+	ConfigPatch *cfgcore.ConfigPatchInfo
 
 	// Configmap object of the configuration template instance in the component.
-	Cfg *corev1.ConfigMap
+	CfgCM *corev1.ConfigMap
 
 	// ConfigConstraint pointer
-	Tpl *dbaasv1alpha1.ConfigConstraintSpec
+	ConfigConstraint *dbaasv1alpha1.ConfigConstraintSpec
 
 	// For grpc factory
 	ReconfigureClientFactory createReconfigureClient
@@ -80,14 +101,6 @@ type reconfigureParams struct {
 	// List of StatefulSet, using this config template.
 	ComponentUnits []appv1.StatefulSet
 }
-
-const (
-	ESNone ExecStatus = iota
-	ESRetry
-	ESFailed
-	ESAndRetryFailed
-	ESNotSupport
-)
 
 var (
 	// lazy create grpc connection
@@ -125,8 +138,8 @@ func (param *reconfigureParams) getConfigKey() string {
 	return ""
 }
 
-func (param *reconfigureParams) getModifyVersion() string {
-	hash, err := cfgcore.ComputeHash(param.Cfg.Data)
+func (param *reconfigureParams) getTargetVersionHash() string {
+	hash, err := cfgcore.ComputeHash(param.CfgCM.Data)
 	if err != nil {
 		param.Ctx.Log.Error(err, "failed to cal configuration version!")
 		return ""
@@ -174,24 +187,24 @@ func RegisterPolicy(policy dbaasv1alpha1.UpgradePolicy, action reconfigurePolicy
 	upgradePolicyMap[policy] = action
 }
 
-func (receiver AutoReloadPolicy) Upgrade(params reconfigureParams) (ExecStatus, error) {
+func (receiver AutoReloadPolicy) Upgrade(params reconfigureParams) (ReturnedStatus, error) {
 	_ = params
-	return ESNone, nil
+	return makeReturnedStatus(ESNone), nil
 }
 
 func (receiver AutoReloadPolicy) GetPolicyName() string {
 	return string(dbaasv1alpha1.AutoReload)
 }
 
-func NewReconfigurePolicy(tpl *dbaasv1alpha1.ConfigConstraintSpec, cfg *cfgcore.ConfigDiffInformation, policy dbaasv1alpha1.UpgradePolicy, restart bool) (reconfigurePolicy, error) {
-	if !cfg.IsModify {
+func NewReconfigurePolicy(tpl *dbaasv1alpha1.ConfigConstraintSpec, cfgPatch *cfgcore.ConfigPatchInfo, policy dbaasv1alpha1.UpgradePolicy, restart bool) (reconfigurePolicy, error) {
+	if !cfgPatch.IsModify {
 		// not exec here
-		return nil, cfgcore.MakeError("cfg not modify. [%v]", cfg)
+		return nil, cfgcore.MakeError("cfg not modify. [%v]", cfgPatch)
 	}
 
 	actionType := policy
 	if !restart {
-		if dynamicUpdate, err := isUpdateDynamicParameters(tpl, cfg); err != nil {
+		if dynamicUpdate, err := isUpdateDynamicParameters(tpl, cfgPatch); err != nil {
 			return nil, err
 		} else if dynamicUpdate {
 			actionType = dbaasv1alpha1.AutoReload
@@ -202,4 +215,28 @@ func NewReconfigurePolicy(tpl *dbaasv1alpha1.ConfigConstraintSpec, cfg *cfgcore.
 		return action, nil
 	}
 	return nil, cfgcore.MakeError("not support upgrade policy:[%s]", actionType)
+}
+
+func withSucceed(succeedCount int32) func(status *ReturnedStatus) {
+	return func(status *ReturnedStatus) {
+		status.SucceedCount = succeedCount
+	}
+}
+
+func withExpected(expectedCount int32) func(status *ReturnedStatus) {
+	return func(status *ReturnedStatus) {
+		status.SucceedCount = expectedCount
+	}
+}
+
+func makeReturnedStatus(status ExecStatus, ops ...func(status *ReturnedStatus)) ReturnedStatus {
+	ret := ReturnedStatus{
+		Status:        status,
+		SucceedCount:  cfgcore.Unconfirmed,
+		ExpectedCount: cfgcore.Unconfirmed,
+	}
+	for _, o := range ops {
+		o(&ret)
+	}
+	return ret
 }

@@ -308,7 +308,7 @@ func getCfgTplFromCD(clusterDef *dbaasv1alpha1.ClusterDefinition, validators ...
 	return tpls, nil
 }
 
-func UpdateCDLabelsWithUsingConfiguration(cli client.Client, ctx intctrlutil.RequestCtx, cd *dbaasv1alpha1.ClusterDefinition) (bool, error) {
+func UpdateCDLabelsByConfiguration(cli client.Client, ctx intctrlutil.RequestCtx, cd *dbaasv1alpha1.ClusterDefinition) (bool, error) {
 	return handleConfigTemplate(cd, func(tpls []dbaasv1alpha1.ConfigTemplate) (bool, error) {
 		patch := client.MergeFrom(cd.DeepCopy())
 		for _, tpl := range tpls {
@@ -327,7 +327,7 @@ func CheckCVConfigTemplate(client client.Client, ctx intctrlutil.RequestCtx, clu
 	})
 }
 
-func UpdateCVLabelsWithUsingConfiguration(cli client.Client, ctx intctrlutil.RequestCtx, appVer *dbaasv1alpha1.ClusterVersion) (bool, error) {
+func UpdateCVLabelsByConfiguration(cli client.Client, ctx intctrlutil.RequestCtx, appVer *dbaasv1alpha1.ClusterVersion) (bool, error) {
 	return handleConfigTemplate(appVer, func(tpls []dbaasv1alpha1.ConfigTemplate) (bool, error) {
 		patch := client.MergeFrom(appVer.DeepCopy())
 		for _, tpl := range tpls {
@@ -386,7 +386,7 @@ func validateConfTplStatus(configStatus dbaasv1alpha1.ConfigConstraintStatus) bo
 	return configStatus.Phase == dbaasv1alpha1.AvailablePhase
 }
 
-func getComponentByUsingCM(stsList *appv1.StatefulSetList, cfg client.ObjectKey) ([]appv1.StatefulSet, []string) {
+func getRelatedComponentsByConfigmap(stsList *appv1.StatefulSetList, cfg client.ObjectKey) ([]appv1.StatefulSet, []string) {
 	managerContainerName := cfgcore.ConfigSidecarName
 	stsLen := len(stsList.Items)
 	if stsLen == 0 {
@@ -401,7 +401,7 @@ func getComponentByUsingCM(stsList *appv1.StatefulSetList, cfg client.ObjectKey)
 			continue
 		}
 		// filter config manager sidecar container
-		contains := intctrlutil.GetContainersUsingConfigmap(s.Spec.Template.Spec.Containers,
+		contains := intctrlutil.GetContainersByConfigmap(s.Spec.Template.Spec.Containers,
 			volumeMounted.Name, func(containerName string) bool {
 				return managerContainerName == containerName
 			})
@@ -423,7 +423,7 @@ func getClusterComponentsByName(components []dbaasv1alpha1.ClusterComponent, com
 	return nil
 }
 
-func getConfigurationVersion(cfg *corev1.ConfigMap, ctx intctrlutil.RequestCtx, tpl *dbaasv1alpha1.ConfigConstraintSpec) (*cfgcore.ConfigDiffInformation, error) {
+func createConfigurePatch(cfg *corev1.ConfigMap, ctx intctrlutil.RequestCtx, tpl *dbaasv1alpha1.ConfigConstraintSpec) (*cfgcore.ConfigPatchInfo, error) {
 	lastConfig, err := getLastVersionConfig(cfg)
 	if err != nil {
 		return nil, cfgcore.WrapError(err, "failed to get last version data. config[%v]", client.ObjectKeyFromObject(cfg))
@@ -435,13 +435,14 @@ func getConfigurationVersion(cfg *corev1.ConfigMap, ctx intctrlutil.RequestCtx, 
 		Log:     ctx.Log,
 	}
 
-	return cfgcore.CreateMergePatch(&cfgcore.K8sConfig{
-		CfgKey:         client.ObjectKeyFromObject(cfg),
-		Configurations: lastConfig,
-	}, &cfgcore.K8sConfig{
-		CfgKey:         client.ObjectKeyFromObject(cfg),
-		Configurations: cfg.Data,
-	}, option)
+	return cfgcore.CreateMergePatch(
+		&cfgcore.K8sConfig{
+			CfgKey:         client.ObjectKeyFromObject(cfg),
+			Configurations: lastConfig,
+		}, &cfgcore.K8sConfig{
+			CfgKey:         client.ObjectKeyFromObject(cfg),
+			Configurations: cfg.Data,
+		}, option)
 }
 
 func updateConfigurationSchema(tpl *dbaasv1alpha1.ConfigConstraintSpec) error {

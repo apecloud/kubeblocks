@@ -48,7 +48,6 @@ import (
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/dbaas/components/consensusset"
 	cfgutil "github.com/apecloud/kubeblocks/controllers/dbaas/configuration"
-	"github.com/apecloud/kubeblocks/controllers/dbaas/operations"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 	cfgcm "github.com/apecloud/kubeblocks/internal/configuration/configmap"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
@@ -354,7 +353,7 @@ func mergeComponents(
 	}
 
 	if clusterVersionComp != nil {
-		component.ConfigTemplates = operations.MergeConfigTemplates(clusterVersionComp.ConfigTemplateRefs, component.ConfigTemplates)
+		component.ConfigTemplates = cfgcore.MergeConfigTemplates(clusterVersionComp.ConfigTemplateRefs, component.ConfigTemplates)
 		if clusterVersionComp.PodSpec != nil {
 			for _, c := range clusterVersionComp.PodSpec.Containers {
 				doContainerAttrOverride(c)
@@ -936,9 +935,9 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 		// storage size
 		for _, vct := range stsObj.Spec.VolumeClaimTemplates {
 			var vctProto *corev1.PersistentVolumeClaim
-			for _, i := range stsProto.Spec.VolumeClaimTemplates {
-				if i.Name == vct.Name {
-					vctProto = &i
+			for _, v := range stsProto.Spec.VolumeClaimTemplates {
+				if v.Name == vct.Name {
+					vctProto = &v
 					break
 				}
 			}
@@ -968,6 +967,7 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 				}
 			}
 		}
+
 		return false, nil
 	}
 
@@ -1736,7 +1736,7 @@ func processConfigMapTemplate(
 	}
 
 	// NOTE: not require checker configuration template status
-	configChecker := cfgcore.NewConfigValidator(&cfgTemplate.Spec)
+	cfgChecker := cfgcore.NewConfigValidator(&cfgTemplate.Spec)
 	cmObj := &corev1.ConfigMap{}
 	//  Require template configmap exist
 	if err := cli.Get(ctx, client.ObjectKey{
@@ -1757,7 +1757,7 @@ func processConfigMapTemplate(
 	}
 
 	// NOTE: It is necessary to verify the correctness of the data
-	if err := configChecker.Validate(renderedCfg); err != nil {
+	if err := cfgChecker.Validate(renderedCfg); err != nil {
 		return nil, cfgcore.WrapError(err, "failed to validate configmap")
 	}
 
@@ -1910,10 +1910,11 @@ func buildBackup(sts *appsv1.StatefulSet,
 
 func createPVCFromSnapshot(ctx context.Context,
 	cli client.Client,
+	component *Component,
 	sts *appsv1.StatefulSet,
 	pvcKey types.NamespacedName,
 	snapshotName string) error {
-	pvc, err := buildPVCFromSnapshot(sts, pvcKey, snapshotName)
+	pvc, err := buildPVCFromSnapshot(sts, component, pvcKey, snapshotName)
 	if err != nil {
 		return err
 	}
@@ -1924,12 +1925,14 @@ func createPVCFromSnapshot(ctx context.Context,
 }
 
 func buildPVCFromSnapshot(sts *appsv1.StatefulSet,
+	component *Component,
 	pvcKey types.NamespacedName,
 	snapshotName string) (*corev1.PersistentVolumeClaim, error) {
 
 	pvc := corev1.PersistentVolumeClaim{}
 	if err := buildFromCUE("pvc_template.cue", map[string]any{
 		"sts":           sts,
+		"component":     component,
 		"pvc_key":       pvcKey,
 		"snapshot_name": snapshotName,
 	}, "pvc", &pvc); err != nil {
@@ -2051,7 +2054,7 @@ func checkedCreatePVCFromSnapshot(cli client.Client,
 		if len(vsList.Items) == 0 {
 			return errors.Errorf("volumesnapshot not found in cluster %s component %s", cluster.Name, component.Name)
 		}
-		return createPVCFromSnapshot(ctx, cli, stsObj, pvcKey, vsList.Items[0].Name)
+		return createPVCFromSnapshot(ctx, cli, component, stsObj, pvcKey, vsList.Items[0].Name)
 	}
 	return nil
 }
@@ -2303,4 +2306,17 @@ func getBackupMatchingLabels(clusterName string, componentName string) client.Ma
 		intctrlutil.AppComponentLabelKey: componentName,
 		intctrlutil.AppCreatedByLabelKey: intctrlutil.AppName,
 	}
+}
+
+// deleteObjectOrphan delete the object with cascade=orphan.
+func deleteObjectOrphan(cli client.Client, ctx context.Context, obj client.Object) error {
+	deletePropagation := metav1.DeletePropagationOrphan
+	deleteOptions := &client.DeleteOptions{
+		PropagationPolicy: &deletePropagation,
+	}
+
+	if err := cli.Delete(ctx, obj, deleteOptions); err != nil {
+		return err
+	}
+	return nil
 }

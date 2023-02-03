@@ -24,7 +24,7 @@ spec:
           command:
             - /bin/bash
             - -c
-          image: docker.io/apecloud/wesql-server:8.0.30-4.alpha4.20221117.gba56235
+          image: docker.io/apecloud/apecloud-mysql-server:latest
           imagePullPolicy: IfNotPresent
           name: mysql
           resources: { }

@@ -6,6 +6,13 @@ Horizontal scale the specified components in the cluster
 kbcli cluster horizontal-scale [flags]
 ```
 
+### Examples
+
+```
+  # expand storage resources of specified components, separate with commas when <component-name> more than one
+  kbcli cluster horizontal-scale <my-cluster> --component-names=<component-name> --replicas=3
+```
+
 ### Options
 
 ```

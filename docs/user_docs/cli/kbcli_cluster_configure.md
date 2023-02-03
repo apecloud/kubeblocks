@@ -10,7 +10,7 @@ kbcli cluster configure [flags]
 
 ```
   # update component params
-  kbcli cluster configure cluster-name --component-name=component-name --set max_connections=1000,general_log=OFF
+  kbcli cluster configure <cluster-name> --component-name=<component-name> --set max_connections=1000,general_log=OFF
 ```
 
 ### Options

@@ -28,7 +28,7 @@ content: {
 	kind:       "OpsRequest"
 	metadata: {
 		if options.opsRequestName == "" {
-			generateName: "opsrequest-\(options.typeLower)-"
+			generateName: "\(options.name)-\(options.typeLower)-"
 		}
 		if options.opsRequestName != "" {
 			name: options.opsRequestName

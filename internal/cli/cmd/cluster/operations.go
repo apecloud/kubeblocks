@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
+	"k8s.io/kubectl/pkg/util/templates"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/create"
@@ -62,6 +63,13 @@ type OperationsOptions struct {
 	// VCTNames VolumeClaimTemplate names
 	VCTNames []string `json:"vctNames,omitempty"`
 	Storage  string   `json:"storage"`
+}
+
+func newBaseOperationsOptions(streams genericclioptions.IOStreams, opsType dbaasv1alpha1.OpsType) *OperationsOptions {
+	return &OperationsOptions{
+		BaseOptions: create.BaseOptions{IOStreams: streams},
+		OpsType:     opsType,
+	}
 }
 
 // buildCommonFlags build common flags for operations command
@@ -154,12 +162,21 @@ func buildOperationsInputs(f cmdutil.Factory, o *OperationsOptions) create.Input
 	}
 }
 
+var restartExample = templates.Examples(`
+		# restart all components
+		kbcli cluster restart <my-cluster>
+
+		# restart specifies the component, separate with commas when <component-name> more than one
+		kbcli cluster restart <my-cluster> --component-names=<component-name>
+`)
+
 // NewRestartCmd create a restart command
 func NewRestartCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
-	o := &OperationsOptions{BaseOptions: create.BaseOptions{IOStreams: streams}, OpsType: dbaasv1alpha1.RestartType}
+	o := newBaseOperationsOptions(streams, dbaasv1alpha1.RestartType)
 	inputs := buildOperationsInputs(f, o)
 	inputs.Use = "restart"
 	inputs.Short = "Restart the specified components in the cluster"
+	inputs.Example = restartExample
 	inputs.BuildFlags = func(cmd *cobra.Command) {
 		o.buildCommonFlags(cmd)
 	}
@@ -167,12 +184,18 @@ func NewRestartCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 	return create.BuildCommand(inputs)
 }
 
+var upgradeExample = templates.Examples(`
+		# upgrade the cluster to the specified version 
+		kbcli cluster upgrade <my-cluster> --cluster-version=<cluster-version>
+`)
+
 // NewUpgradeCmd create a upgrade command
 func NewUpgradeCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
-	o := &OperationsOptions{BaseOptions: create.BaseOptions{IOStreams: streams}, OpsType: dbaasv1alpha1.UpgradeType}
+	o := newBaseOperationsOptions(streams, dbaasv1alpha1.UpgradeType)
 	inputs := buildOperationsInputs(f, o)
 	inputs.Use = "upgrade"
 	inputs.Short = "Upgrade the cluster version"
+	inputs.Example = upgradeExample
 	inputs.BuildFlags = func(cmd *cobra.Command) {
 		o.buildCommonFlags(cmd)
 		cmd.Flags().StringVar(&o.ClusterVersionRef, "cluster-version", "", "Reference cluster version (required)")
@@ -183,12 +206,19 @@ func NewUpgradeCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 	return create.BuildCommand(inputs)
 }
 
+var verticalScalingExample = templates.Examples(`
+		# scale the computing resources of specified components, separate with commas when <component-name> more than one
+		kbcli cluster vertical-scale <my-cluster> --component-names=<component-name> --requests.cpu=500m \
+        --requests.memory=500Mi --limits.cpu=500m --limits.memory=500Mi
+`)
+
 // NewVerticalScalingCmd create a vertical scaling command
 func NewVerticalScalingCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
-	o := &OperationsOptions{BaseOptions: create.BaseOptions{IOStreams: streams}, OpsType: dbaasv1alpha1.VerticalScalingType}
+	o := newBaseOperationsOptions(streams, dbaasv1alpha1.VerticalScalingType)
 	inputs := buildOperationsInputs(f, o)
 	inputs.Use = "vertical-scale"
 	inputs.Short = "Vertical scale the specified components in the cluster"
+	inputs.Example = verticalScalingExample
 	inputs.BuildFlags = func(cmd *cobra.Command) {
 		o.buildCommonFlags(cmd)
 		cmd.Flags().StringVar(&o.RequestCPU, "requests.cpu", "", "CPU size requested by the component")
@@ -202,12 +232,18 @@ func NewVerticalScalingCmd(f cmdutil.Factory, streams genericclioptions.IOStream
 	return create.BuildCommand(inputs)
 }
 
+var horizontalScalingExample = templates.Examples(`
+		# expand storage resources of specified components, separate with commas when <component-name> more than one
+		kbcli cluster horizontal-scale <my-cluster> --component-names=<component-name> --replicas=3
+`)
+
 // NewHorizontalScalingCmd create a horizontal scaling command
 func NewHorizontalScalingCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
-	o := &OperationsOptions{BaseOptions: create.BaseOptions{IOStreams: streams}, OpsType: dbaasv1alpha1.HorizontalScalingType}
+	o := newBaseOperationsOptions(streams, dbaasv1alpha1.HorizontalScalingType)
 	inputs := buildOperationsInputs(f, o)
 	inputs.Use = "horizontal-scale"
 	inputs.Short = "Horizontal scale the specified components in the cluster"
+	inputs.Example = horizontalScalingExample
 	inputs.BuildFlags = func(cmd *cobra.Command) {
 		o.buildCommonFlags(cmd)
 		cmd.Flags().IntVar(&o.Replicas, "replicas", -1, "Replicas with the specified components")
@@ -218,12 +254,19 @@ func NewHorizontalScalingCmd(f cmdutil.Factory, streams genericclioptions.IOStre
 	return create.BuildCommand(inputs)
 }
 
+var volumeExpansionExample = templates.Examples(`
+		# restart specifies the component, separate with commas when <component-name> more than one
+		kbcli cluster volume-expand <my-cluster> --component-names=<component-name> \ 
+  		--volume-claim-template-names=data --storage=10Gi
+`)
+
 // NewVolumeExpansionCmd create a vertical scaling command
 func NewVolumeExpansionCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
-	o := &OperationsOptions{BaseOptions: create.BaseOptions{IOStreams: streams}, OpsType: dbaasv1alpha1.VolumeExpansionType}
+	o := newBaseOperationsOptions(streams, dbaasv1alpha1.VolumeExpansionType)
 	inputs := buildOperationsInputs(f, o)
 	inputs.Use = "volume-expand"
 	inputs.Short = "Expand volume with the specified components and volumeClaimTemplates in the cluster"
+	inputs.Example = volumeExpansionExample
 	inputs.BuildFlags = func(cmd *cobra.Command) {
 		o.buildCommonFlags(cmd)
 		cmd.Flags().StringSliceVar(&o.VCTNames, "volume-claim-template-names", nil, "VolumeClaimTemplate names in components (required)")

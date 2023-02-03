@@ -32,6 +32,10 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
+const (
+	ComponentStatusDefaultPodName = "Unknown"
+)
+
 // GetClusterByObject gets cluster by related k8s workloads.
 func GetClusterByObject(ctx context.Context,
 	cli client.Client,
@@ -88,9 +92,8 @@ func IsProbeTimeout(podsReadyTime *metav1.Time) bool {
 	return time.Now().After(podsReadyTime.Add(types.ProbeTimeout))
 }
 
-func CalculateComponentPhase(isFailed, isAbnormal bool) dbaasv1alpha1.Phase {
+func GetComponentPhase(isFailed, isAbnormal bool) dbaasv1alpha1.Phase {
 	var componentPhase dbaasv1alpha1.Phase
-	// if leader is ready, set component phase to Abnormal
 	if isFailed {
 		componentPhase = dbaasv1alpha1.FailedPhase
 	} else if isAbnormal {
@@ -132,8 +135,8 @@ func GetComponentByName(cluster *dbaasv1alpha1.Cluster, componentName string) *d
 	return nil
 }
 
-// GetComponentDeftByCluster gets component from ClusterDefinition with typeName
-func GetComponentDeftByCluster(ctx context.Context, cli client.Client, cluster *dbaasv1alpha1.Cluster, typeName string) (*dbaasv1alpha1.ClusterDefinitionComponent, error) {
+// GetComponentDefByCluster gets component from ClusterDefinition with typeName
+func GetComponentDefByCluster(ctx context.Context, cli client.Client, cluster *dbaasv1alpha1.Cluster, typeName string) (*dbaasv1alpha1.ClusterDefinitionComponent, error) {
 	clusterDef := &dbaasv1alpha1.ClusterDefinition{}
 	if err := cli.Get(ctx, client.ObjectKey{Name: cluster.Spec.ClusterDefRef}, clusterDef); err != nil {
 		return nil, err
@@ -165,6 +168,41 @@ func GetComponentTypeName(cluster dbaasv1alpha1.Cluster, componentName string) s
 		}
 	}
 	return componentName
+}
+
+// InitClusterComponentStatusIfNeed Initialize the state of the corresponding component in cluster.status.components
+func InitClusterComponentStatusIfNeed(cluster *dbaasv1alpha1.Cluster,
+	componentName string,
+	component *dbaasv1alpha1.ClusterDefinitionComponent) {
+	if cluster.Status.Components == nil {
+		cluster.Status.Components = make(map[string]dbaasv1alpha1.ClusterStatusComponent)
+	}
+	if _, ok := cluster.Status.Components[componentName]; !ok {
+		typeName := GetComponentTypeName(*cluster, componentName)
+
+		cluster.Status.Components[componentName] = dbaasv1alpha1.ClusterStatusComponent{
+			Type:  typeName,
+			Phase: cluster.Status.Phase,
+		}
+	}
+	componentStatus := cluster.Status.Components[componentName]
+	if component.ComponentType == dbaasv1alpha1.Consensus && componentStatus.ConsensusSetStatus == nil {
+		componentStatus.ConsensusSetStatus = &dbaasv1alpha1.ConsensusSetStatus{
+			Leader: dbaasv1alpha1.ConsensusMemberStatus{
+				Pod:        ComponentStatusDefaultPodName,
+				AccessMode: dbaasv1alpha1.None,
+				Name:       "",
+			},
+		}
+	}
+	if component.ComponentType == dbaasv1alpha1.Replication && componentStatus.ReplicationSetStatus == nil {
+		componentStatus.ReplicationSetStatus = &dbaasv1alpha1.ReplicationSetStatus{
+			Primary: dbaasv1alpha1.ReplicationMemberStatus{
+				Pod: ComponentStatusDefaultPodName,
+			},
+		}
+	}
+	cluster.Status.Components[componentName] = componentStatus
 }
 
 // GetComponentReplicas gets the actual replicas of component
@@ -221,4 +259,37 @@ func GetComponentWorkloadMinReadySeconds(ctx context.Context,
 	default:
 		return GetComponentStsMinReadySeconds(ctx, cli, cluster, componentName)
 	}
+}
+
+// GetComponentDefaultReplicas gets component default replicas.
+func GetComponentDefaultReplicas(ctx context.Context,
+	cli client.Client,
+	cluster *dbaasv1alpha1.Cluster,
+	componentName string) (int32, error) {
+	typeName := GetComponentTypeName(*cluster, componentName)
+	component, err := GetComponentDefByCluster(ctx, cli, cluster, typeName)
+	if err != nil {
+		return -1, err
+	}
+	return component.DefaultReplicas, nil
+}
+
+// GetComponentInfoByPod gets componentName and componentDefinition info by Pod.
+func GetComponentInfoByPod(ctx context.Context,
+	cli client.Client,
+	cluster *dbaasv1alpha1.Cluster,
+	pod *corev1.Pod) (componentName string, componentDef *dbaasv1alpha1.ClusterDefinitionComponent, err error) {
+	if pod == nil || pod.Labels == nil {
+		return "", nil, fmt.Errorf("pod %s or pod's label is nil", pod.Name)
+	}
+	componentName, ok := pod.Labels[intctrlutil.AppComponentLabelKey]
+	if !ok {
+		return "", nil, fmt.Errorf("pod %s component name label %s is nil", pod.Name, intctrlutil.AppComponentLabelKey)
+	}
+	typeName := GetComponentTypeName(*cluster, componentName)
+	componentDef, err = GetComponentDefByCluster(ctx, cli, cluster, typeName)
+	if err != nil {
+		return componentName, componentDef, err
+	}
+	return componentName, componentDef, nil
 }

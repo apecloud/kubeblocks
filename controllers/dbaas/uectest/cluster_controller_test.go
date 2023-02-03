@@ -44,7 +44,7 @@ import (
 
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
-	"github.com/apecloud/kubeblocks/controllers/dbaas/components/consensusset"
+	"github.com/apecloud/kubeblocks/controllers/dbaas/components/util"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	testdbaas "github.com/apecloud/kubeblocks/internal/testutil/dbaas"
 )
@@ -845,7 +845,7 @@ spec:
 
 			stsList := listAndCheckStatefulSet(key)
 			sts := &stsList.Items[0]
-			pods, err := consensusset.GetPodListByStatefulSet(ctx, k8sClient, sts)
+			pods, err := util.GetPodListByStatefulSet(ctx, k8sClient, sts)
 			Expect(err).To(Succeed())
 			// should have 3 pods
 			Expect(len(pods)).Should(Equal(3))
@@ -853,7 +853,7 @@ spec:
 			// 2 followers
 			leaderCount, followerCount := 0, 0
 			for _, pod := range pods {
-				switch pod.Labels[intctrlutil.ConsensusSetRoleLabelKey] {
+				switch pod.Labels[intctrlutil.RoleLabelKey] {
 				case leader:
 					leaderCount++
 				case follower:
@@ -877,7 +877,7 @@ spec:
 			By("Deleting leader pod")
 			leaderPod := &corev1.Pod{}
 			for _, pod := range pods {
-				if pod.Labels[intctrlutil.ConsensusSetRoleLabelKey] == leader {
+				if pod.Labels[intctrlutil.RoleLabelKey] == leader {
 					leaderPod = &pod
 					break
 				}

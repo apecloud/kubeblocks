@@ -75,7 +75,7 @@ var _ = Describe("StatefulSet Controller", func() {
 			return err == nil
 		}).Should(BeTrue())
 		patch := client.MergeFrom(pod.DeepCopy())
-		pod.Labels[intctrlutil.ConsensusSetRoleLabelKey] = podRole
+		pod.Labels[intctrlutil.RoleLabelKey] = podRole
 		pod.Labels[intctrlutil.ConsensusSetAccessModeLabelKey] = accessMode
 		pod.Labels[appsv1.ControllerRevisionHashLabelKey] = revision
 		Expect(k8sClient.Status().Patch(context.Background(), pod, patch)).Should(Succeed())

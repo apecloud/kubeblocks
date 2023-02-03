@@ -126,16 +126,13 @@ var _ = BeforeSuite(func() {
 	Expect(err).ToNot(HaveOccurred())
 	Expect(serviceController).NotTo(BeNil())
 
-	testCtx = testutil.NewDefaultTestContext(ctx, k8sManager.GetClient(), testEnv)
+	testCtx = testutil.NewDefaultTestContext(ctx, k8sClient, testEnv)
 
 	go func() {
 		defer GinkgoRecover()
 		err = k8sManager.Start(ctx)
 		Expect(err).ToNot(HaveOccurred(), "failed to run manager")
 	}()
-
-	k8sClient = k8sManager.GetClient()
-	Expect(k8sClient).ToNot(BeNil())
 
 	k8sManager.GetCache().WaitForCacheSync(ctx)
 })

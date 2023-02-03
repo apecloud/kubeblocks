@@ -54,15 +54,6 @@ const (
 	ReconfiguringPhase     Phase = "Reconfiguring"
 )
 
-// Status define CR .Status.ClusterDefSyncStatus
-// +enum
-type Status string
-
-const (
-	OutOfSyncStatus Status = "OutOfSync"
-	InSyncStatus    Status = "InSync"
-)
-
 // OpsType defines operation types.
 // +enum
 type OpsType string
@@ -106,9 +97,10 @@ var DefaultLeader = ConsensusMember{
 type ComponentType string
 
 const (
-	Stateless ComponentType = "Stateless"
-	Stateful  ComponentType = "Stateful"
-	Consensus ComponentType = "Consensus"
+	Stateless   ComponentType = "Stateless"
+	Stateful    ComponentType = "Stateful"
+	Consensus   ComponentType = "Consensus"
+	Replication ComponentType = "Replication"
 )
 
 // TerminationPolicyType define termination policy types.

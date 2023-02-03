@@ -182,6 +182,11 @@ type ClusterComponent struct {
 	// +kubebuilder:pruning:PreserveUnknownFields
 	// +optional
 	ServiceType corev1.ServiceType `json:"serviceType,omitempty"`
+
+	// primaryIndex determines which index is primary when componentType is Replication, index number starts from zero.
+	// +kubebuilder:validation:Minimum=0
+	// +optional
+	PrimaryIndex *int32 `json:"primaryIndex,omitempty"`
 }
 
 type ComponentMessageMap map[string]string
@@ -218,6 +223,10 @@ type ClusterStatusComponent struct {
 	// consensusSetStatus role and pod name mapping.
 	// +optional
 	ConsensusSetStatus *ConsensusSetStatus `json:"consensusSetStatus,omitempty"`
+
+	// replicationSetStatus role and pod name mapping.
+	// +optional
+	ReplicationSetStatus *ReplicationSetStatus `json:"replicationSetStatus,omitempty"`
 }
 
 type ConsensusSetStatus struct {
@@ -246,6 +255,23 @@ type ConsensusMemberStatus struct {
 	// +kubebuilder:default=ReadWrite
 	AccessMode AccessMode `json:"accessMode"`
 
+	// pod name.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:default=Unknown
+	Pod string `json:"pod"`
+}
+
+type ReplicationSetStatus struct {
+	// primary status.
+	// +kubebuilder:validation:Required
+	Primary ReplicationMemberStatus `json:"primary"`
+
+	// secondaries status.
+	// +optional
+	Secondaries []ReplicationMemberStatus `json:"secondaries,omitempty"`
+}
+
+type ReplicationMemberStatus struct {
 	// pod name.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:default=Unknown
@@ -374,6 +400,37 @@ func (r *Cluster) ValidateEnabledLogs(cd *ClusterDefinition) error {
 	}
 	if len(message) > 0 {
 		return errors.New(strings.Join(message, ";"))
+	}
+	return nil
+}
+
+// ValidatePrimaryIndex validates primaryIndex in cluster API yaml. When componentType is Replication,
+// checks that primaryIndex cannot be nil, and when the replicas of the component in the cluster API is empty,
+// checks that the value of primaryIndex cannot be greater than the defaultReplicas in the clusterDefinition API.
+func (r *Cluster) ValidatePrimaryIndex(cd *ClusterDefinition) error {
+	message := make([]string, 0)
+	for _, comp := range r.Spec.Components {
+		for _, clusterDefComp := range cd.Spec.Components {
+			if !strings.EqualFold(comp.Type, clusterDefComp.TypeName) {
+				continue
+			}
+			if clusterDefComp.ComponentType != Replication {
+				continue
+			}
+			if comp.PrimaryIndex == nil {
+				message = append(message, fmt.Sprintf("component %s's PrimaryIndex cannot be nil when componentType is Replication.", comp.Type))
+				return errors.New(strings.Join(message, ";"))
+			}
+			// when comp.Replicas and comp.PrimaryIndex are not nil, it will be verified in cluster_webhook, skip here
+			if comp.Replicas != nil {
+				return nil
+			}
+			// validate primaryIndex with clusterDefinition component defaultReplicas
+			if *comp.PrimaryIndex > clusterDefComp.DefaultReplicas-1 {
+				message = append(message, fmt.Sprintf("component %s's PrimaryIndex cannot be larger than defaultReplicas.", comp.Type))
+				return errors.New(strings.Join(message, ";"))
+			}
+		}
 	}
 	return nil
 }

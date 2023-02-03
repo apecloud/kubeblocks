@@ -145,7 +145,7 @@ var _ = Describe("Consensus Component", func() {
 				mockClusterStatusProbeTimeout(cluster)
 				// mock leader pod is not ready
 				testk8s.UpdatePodStatusNotReady(ctx, testCtx, podName)
-				testk8s.DeletePodLabelKey(ctx, testCtx, podName, intctrlutil.ConsensusSetRoleLabelKey)
+				testk8s.DeletePodLabelKey(ctx, testCtx, podName, intctrlutil.RoleLabelKey)
 				requeue, _ := consensusComponent.HandleProbeTimeoutWhenPodsReady(nil)
 				Expect(requeue == false).Should(BeTrue())
 				validateComponentStatus()
@@ -160,5 +160,4 @@ var _ = Describe("Consensus Component", func() {
 			}
 		})
 	})
-
 })

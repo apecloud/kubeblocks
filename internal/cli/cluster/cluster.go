@@ -262,7 +262,7 @@ func (o *ClusterObjects) GetInstanceInfo() []*InstanceInfo {
 			Cluster:     getLabelVal(pod.Labels, types.InstanceLabelKey),
 			Component:   getLabelVal(pod.Labels, types.ComponentLabelKey),
 			Status:      string(pod.Status.Phase),
-			Role:        getLabelVal(pod.Labels, types.ConsensusSetRoleLabelKey),
+			Role:        getLabelVal(pod.Labels, types.RoleLabelKey),
 			AccessMode:  getLabelVal(pod.Labels, types.ConsensusSetAccessModeLabelKey),
 			CreatedTime: util.TimeFormat(&pod.CreationTimestamp),
 		}

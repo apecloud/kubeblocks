@@ -1,15 +1,15 @@
 apiVersion: dbaas.kubeblocks.io/v1alpha1
 kind: ClusterVersion
 metadata:
-  name: ac-mysql-{{ default .Chart.AppVersion .Values.clusterVersionOverride }}
+  name: redis-{{ default .Chart.AppVersion .Values.clusterVersionOverride }}
   labels:
-    {{- include "wesqlapp.labels" . | nindent 4 }}
+    {{- include "redis.labels" . | nindent 4 }}
 spec:
-  clusterDefinitionRef: apecloud-mysql
+  clusterDefinitionRef: apecloud-redis
   components:
-  - type: mysql
+  - type: replication
     podSpec:
       containers:
-      - name: mysql
+      - name: redis
         image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
         imagePullPolicy: {{ default .Values.image.pullPolicy "IfNotPresent" }}

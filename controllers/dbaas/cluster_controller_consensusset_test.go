@@ -31,7 +31,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
-	"github.com/apecloud/kubeblocks/controllers/dbaas/components/consensusset"
+	"github.com/apecloud/kubeblocks/controllers/dbaas/components/util"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	testdbaas "github.com/apecloud/kubeblocks/internal/testutil/dbaas"
 )
@@ -135,7 +135,7 @@ var _ = Describe("Cluster Controller with Consensus Component", func() {
 	}
 
 	mockRoleChangedEvent := func(key types.NamespacedName, sts *appsv1.StatefulSet) []corev1.Event {
-		pods, err := consensusset.GetPodListByStatefulSet(ctx, k8sClient, sts)
+		pods, err := util.GetPodListByStatefulSet(ctx, k8sClient, sts)
 		Expect(err).To(Succeed())
 
 		events := make([]corev1.Event, 0)
@@ -161,7 +161,7 @@ var _ = Describe("Cluster Controller with Consensus Component", func() {
 	}
 
 	getStsPodsName := func(sts *appsv1.StatefulSet) []string {
-		pods, err := consensusset.GetPodListByStatefulSet(ctx, k8sClient, sts)
+		pods, err := util.GetPodListByStatefulSet(ctx, k8sClient, sts)
 		Expect(err).To(Succeed())
 
 		names := make([]string, 0)
@@ -202,7 +202,7 @@ var _ = Describe("Cluster Controller with Consensus Component", func() {
 			}
 
 			By("Creating mock role changed events")
-			// pod.Labels[intctrlutil.ConsensusSetRoleLabelKey] will be filled with the role
+			// pod.Labels[intctrlutil.RoleLabelKey] will be filled with the role
 			events := mockRoleChangedEvent(clusterKey, sts)
 			for _, event := range events {
 				Expect(testCtx.CreateObj(ctx, &event)).Should(Succeed())
@@ -210,7 +210,7 @@ var _ = Describe("Cluster Controller with Consensus Component", func() {
 
 			By("Checking pods' role are changed accordingly")
 			Eventually(func(g Gomega) {
-				pods, err := consensusset.GetPodListByStatefulSet(ctx, k8sClient, sts)
+				pods, err := util.GetPodListByStatefulSet(ctx, k8sClient, sts)
 				g.Expect(err).To(Succeed())
 				// should have 3 pods
 				g.Expect(len(pods)).To(Equal(3))
@@ -218,7 +218,7 @@ var _ = Describe("Cluster Controller with Consensus Component", func() {
 				// 2 followers
 				leaderCount, followerCount := 0, 0
 				for _, pod := range pods {
-					switch pod.Labels[intctrlutil.ConsensusSetRoleLabelKey] {
+					switch pod.Labels[intctrlutil.RoleLabelKey] {
 					case leader:
 						leaderCount++
 					case follower:

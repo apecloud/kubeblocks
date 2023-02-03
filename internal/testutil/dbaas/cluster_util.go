@@ -42,7 +42,7 @@ func InitClusterWithHybridComps(ctx context.Context,
 	consensusComName string) (*dbaasv1alpha1.ClusterDefinition, *dbaasv1alpha1.ClusterVersion, *dbaasv1alpha1.Cluster) {
 	clusterDef := CreateClusterDefWithHybridComps(ctx, testCtx, clusterDefName)
 	clusterVersion := CreateClusterVersionWithHybridComps(ctx, testCtx, clusterDefName,
-		clusterVersionName, []string{"docker.io/apecloud/wesql-server:latest", "busybox:latest"})
+		clusterVersionName, []string{"docker.io/apecloud/apecloud-mysql-server:latest", "busybox:latest"})
 	cluster := CreateClusterWithHybridComps(ctx, testCtx, clusterDefName,
 		clusterVersionName, clusterName, statelessComName, consensusComName)
 	return clusterDef, clusterVersion, cluster
@@ -109,7 +109,7 @@ func CreateHybridCompsClusterVersionForUpgrade(ctx context.Context,
 	clusterDefName,
 	clusterVersionName string) *dbaasv1alpha1.ClusterVersion {
 	return CreateClusterVersionWithHybridComps(ctx, testCtx, clusterDefName, clusterVersionName,
-		[]string{"docker.io/apecloud/wesql-server:8.0.30", "busybox:1.30.0"})
+		[]string{"docker.io/apecloud/apecloud-mysql-server:8.0.30", "busybox:1.30.0"})
 }
 
 // GetClusterComponentPhase gets the component phase of testing cluster for verification.

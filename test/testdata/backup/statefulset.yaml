@@ -28,7 +28,7 @@ spec:
           command:
             - /bin/bash
             - -c
-          image: docker.io/apecloud/wesql-server:latest
+          image: docker.io/apecloud/apecloud-mysql-server:latest
           imagePullPolicy: IfNotPresent
           name: mysql
           ports:

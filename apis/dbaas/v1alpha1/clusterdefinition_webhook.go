@@ -120,34 +120,19 @@ func (r *ClusterDefinition) validateLogFilePatternPrefix(allErrs *field.ErrorLis
 	}
 }
 
-// ValidateComponents validate spec.components is legal
+// ValidateComponents validate spec.components is legal.
 func (r *ClusterDefinition) validateComponents(allErrs *field.ErrorList) {
 	// TODO typeName duplication validate
 
-	for _, component := range r.Spec.Components {
-		if err := r.validateConfigSpec(component.ConfigSpec); err != nil {
-			*allErrs = append(*allErrs, field.Duplicate(field.NewPath("spec.components[*].configSpec.configTemplateRefs"), err))
-			continue
-		}
-		// validate system account defiined in spec.components[].systemAccounts
+	validateSystemAccount := func(component *ClusterDefinitionComponent) {
 		sysAccountSpec := component.SystemAccounts
 		if sysAccountSpec != nil {
 			sysAccountSpec.validateSysAccounts(allErrs)
 		}
+	}
 
-		if component.ComponentType != Consensus {
-			continue
-		}
-
-		// if consensus
+	validateConsensus := func(component *ClusterDefinitionComponent) {
 		consensusSpec := component.ConsensusSpec
-		if consensusSpec == nil {
-			*allErrs = append(*allErrs,
-				field.Required(field.NewPath("spec.components[*].consensusSpec"),
-					"consensusSpec is required when componentType=Consensus"))
-			continue
-		}
-
 		// roleObserveQuery and Leader are required
 		if consensusSpec.Leader.Name == "" {
 			*allErrs = append(*allErrs,
@@ -197,6 +182,48 @@ func (r *ClusterDefinition) validateComponents(allErrs *field.ErrorList) {
 						component.DefaultReplicas,
 						"#(members) should be equal to defaultReplicas"))
 			}
+		}
+	}
+
+	validateReplication := func(component *ClusterDefinitionComponent) {
+		if component.MinReplicas < 1 {
+			*allErrs = append(*allErrs,
+				field.Invalid(field.NewPath("spec.components[*].MinReplicas"),
+					component.MinReplicas,
+					"component MinReplicas can not be less than 1 when componentType=Replication"))
+		}
+		if component.MaxReplicas > 16 {
+			*allErrs = append(*allErrs,
+				field.Invalid(field.NewPath("spec.components[*].MaxReplicas"),
+					component.MaxReplicas,
+					"component MaxReplicas cannot be larger than 16 when componentType=Replication"))
+		}
+	}
+
+	for _, component := range r.Spec.Components {
+		if err := r.validateConfigSpec(component.ConfigSpec); err != nil {
+			*allErrs = append(*allErrs, field.Duplicate(field.NewPath("spec.components[*].configSpec.configTemplateRefs"), err))
+			continue
+		}
+
+		// validate system account defined in spec.components[].systemAccounts
+		validateSystemAccount(&component)
+
+		switch component.ComponentType {
+		case Consensus:
+			// if consensus
+			consensusSpec := component.ConsensusSpec
+			if consensusSpec == nil {
+				*allErrs = append(*allErrs,
+					field.Required(field.NewPath("spec.components[*].consensusSpec"),
+						"consensusSpec is required when componentType=Consensus"))
+				continue
+			}
+			validateConsensus(&component)
+		case Replication:
+			validateReplication(&component)
+		default:
+			continue
 		}
 	}
 }

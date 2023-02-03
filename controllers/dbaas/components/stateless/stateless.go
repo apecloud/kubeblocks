@@ -102,7 +102,7 @@ func (stateless *Stateless) GetPhaseWhenPodsNotReady(componentName string) (dbaa
 			isAbnormal = true
 		}
 	}
-	return util.CalculateComponentPhase(isFailed, isAbnormal), nil
+	return util.GetComponentPhase(isFailed, isAbnormal), nil
 }
 
 func NewStateless(ctx context.Context,
@@ -134,7 +134,7 @@ func DeploymentIsReady(deploy *appsv1.Deployment) bool {
 	// check if the deployment of component is updated completely and ready.
 	if deploy.Status.AvailableReplicas != targetReplicas ||
 		deploy.Status.Replicas != targetReplicas ||
-		deploy.Status.ObservedGeneration != deploy.GetGeneration() ||
+		deploy.Status.ObservedGeneration != deploy.Generation ||
 		deploy.Status.UpdatedReplicas != targetReplicas ||
 		!newRSAvailable {
 		componentIsRunning = false

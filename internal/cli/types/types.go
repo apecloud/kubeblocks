@@ -74,12 +74,12 @@ const (
 
 	NameLabelKey                   = "app.kubernetes.io/name"
 	InstanceLabelKey               = "app.kubernetes.io/instance"
-	ConsensusSetRoleLabelKey       = "cs.dbaas.kubeblocks.io/role"
 	ConsensusSetAccessModeLabelKey = "cs.dbaas.kubeblocks.io/access-mode"
 	ComponentLabelKey              = "app.kubernetes.io/component-name"
 	RegionLabelKey                 = "topology.kubernetes.io/region"
 	ZoneLabelKey                   = "topology.kubernetes.io/zone"
 	ClusterDefLabelKey             = "clusterdefinition.kubeblocks.io/name"
+	RoleLabelKey                   = "kubeblocks.io/role"
 
 	ServiceLBTypeAnnotationKey     = "service.kubernetes.io/apecloud-loadbalancer-type"
 	ServiceLBTypeAnnotationValue   = "private-ip"

@@ -159,8 +159,7 @@ func (p *ProbeBase) Invoke(ctx context.Context, req *bindings.InvokeRequest) (*b
 
 	sql, ok = req.Metadata[CommandSQLKey]
 	if !ok {
-		//return nil, errors.Errorf("required metadata not set: %s", CommandSQLKey)
-		p.Logger.Errorf("required metadata not set: %s", CommandSQLKey)
+		p.Logger.Infof("%s metadata not set, use default", CommandSQLKey)
 	}
 
 	switch req.Operation { //nolint:exhaustive
@@ -234,9 +233,9 @@ func (p *ProbeBase) roleObserve(ctx context.Context, cmd string, response *bindi
 }
 
 // DB may have some internal roles that need not be exposed to end user,
-// and not configured in cluster definition, eg. wesql's Candidate.
+// and not configured in cluster definition, e.g. apecloud-mysql's Candidate.
 // roleValidate is used to filter the internal roles and decrease the number
-// of report events to reduce the possibility of event conflictions.
+// of report events to reduce the possibility of event conflicts.
 func (p *ProbeBase) roleValidate(role string) (bool, string) {
 	// do not validate when db roles setting is missing
 	if len(p.dbRoles) == 0 {
@@ -284,7 +283,8 @@ func (p *ProbeBase) runningCheck(ctx context.Context, resp *bindings.InvokeRespo
 	p.runningCheckFailedCount = 0
 	message = "TCP Connection Established Successfully!"
 	if tcpCon, ok := conn.(*net.TCPConn); ok {
-		tcpCon.SetLinger(0)
+		err := tcpCon.SetLinger(0)
+		p.Logger.Infof("running check, set tcp linger failed: %v", err)
 	}
 	return marshalResult()
 }

@@ -74,7 +74,7 @@ type ReplSetMember struct {
 	LastDurableWallTime  time.Time           `bson:"lastDurableWallTime"`
 	LastHeartbeatMessage string              `bson:"lastHeartbeatMessage"`
 	SyncSourceHost       string              `bson:"syncSourceHost"`
-	SyncSourceId         int64               `bson:"syncSourceId"`
+	SyncSourceID         int64               `bson:"syncSourceId"`
 	InfoMessage          string              `bson:"infoMessage"`
 	ElectionTime         primitive.Timestamp `bson:"electionTime"`
 	ElectionDate         time.Time           `bson:"electionDate"`
@@ -105,7 +105,7 @@ const (
 
 	defaultTimeout = 5 * time.Second
 
-	defaultDbPort = 27018
+	defaultDBPort = 27018
 
 	// mongodb://<username>:<password@<host>/<database><params>
 	connectionURIFormatWithAuthentication = "mongodb://%s:%s@%s/%s%s"
@@ -176,14 +176,14 @@ func (m *MongoDB) InitIfNeed() error {
 	}
 
 	if err = client.Ping(context.Background(), nil); err != nil {
-		client.Disconnect(context.Background())
+		_ = client.Disconnect(context.Background())
 		return fmt.Errorf("error in connecting to mongodb, host: %s error: %s", m.mongoDBMetadata.host, err)
 	}
 
 	db := client.Database(adminDatabase)
 	_, err = getReplSetStatus(context.Background(), db)
 	if err != nil {
-		client.Disconnect(context.Background())
+		_ = client.Disconnect(context.Background())
 		return fmt.Errorf("error in getting repl status from mongodb, error: %s", err)
 	}
 
@@ -197,26 +197,26 @@ func (m *MongoDB) GetRunningPort() int {
 	uri := getMongoURI(&m.mongoDBMetadata)
 	index := strings.Index(uri, "://")
 	if index < 0 {
-		return defaultDbPort
+		return defaultDBPort
 	}
 	uri = uri[index+len("://"):]
 	index = strings.Index(uri, "/")
 	if index < 0 {
-		return defaultDbPort
+		return defaultDBPort
 	}
 	uri = uri[:index]
 	index = strings.Index(uri, "@")
 	if index < 0 {
-		return defaultDbPort
+		return defaultDBPort
 	}
 	uri = uri[:index]
 	index = strings.Index(uri, ":")
 	if index < 0 {
-		return defaultDbPort
+		return defaultDBPort
 	}
 	port, err := strconv.Atoi(uri[index+1:])
 	if err != nil {
-		return defaultDbPort
+		return defaultDBPort
 	}
 
 	return port
@@ -237,7 +237,7 @@ func (m *MongoDB) GetRole(ctx context.Context, cmd string) (string, error) {
 }
 
 func (m *MongoDB) StatusCheck(ctx context.Context, cmd string, response *bindings.InvokeResponse) ([]byte, error) {
-	//TODO implement me when proposal is passed
+	// TODO implement me when proposal is passed
 	// proposal: https://infracreate.feishu.cn/wiki/wikcndch7lMZJneMnRqaTvhQpwb#doxcnOUyQ4Mu0KiUo232dOr5aad
 	return nil, nil
 }

@@ -63,6 +63,14 @@ func TestGenerateOpenApiSchema(t *testing.T) {
 		want:    "mysql_openapi.json",
 		wantErr: false,
 	}, {
+		name: "pg14_openapi",
+		args: args{
+			cueFile:    "pg14.cue",
+			schemaType: "PGPameter",
+		},
+		want:    "pg14_openapi.json",
+		wantErr: false,
+	}, {
 		name: "failed_test",
 		args: args{
 			cueFile:    "mysql.cue",

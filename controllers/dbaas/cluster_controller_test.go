@@ -225,7 +225,7 @@ var _ = Describe("Cluster Controller", func() {
 				fetched := &dbaasv1alpha1.Cluster{}
 				Expect(k8sClient.Get(ctx, clusterKey, fetched)).To(Succeed())
 
-				comp, err := util.GetComponentDeftByCluster(ctx, k8sClient, fetched, name)
+				comp, err := util.GetComponentDefByCluster(ctx, k8sClient, fetched, name)
 				Expect(err).ShouldNot(HaveOccurred())
 
 				var headlessSvcPorts []corev1.ServicePort

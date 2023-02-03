@@ -128,7 +128,7 @@ help: ## Display this help.
 	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage:\n  make \033[36m<target>\033[0m\n"} /^[a-zA-Z_0-9-]+:.*?##/ { printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
 
 .PHONY: all
-all: manager kbcli agamotto reloader ## Make all cmd binaries.
+all: manager kbcli probe agamotto reloader ## Make all cmd binaries.
 
 ##@ Development
 
@@ -313,7 +313,7 @@ run-delve: manifests generate fmt vet  ## Run Delve debugger.
 	dlv --listen=:$(DEBUG_PORT) --headless=true --api-version=2 --accept-multiclient debug $(GO_PACKAGE) -- $(ARGUMENTS)
 
 
-##@ Agamotto
+##@ agamotto cmd
 
 AGAMOTTO_LD_FLAGS = "-s -w \
     -X github.com/prometheus/common/version.Version=$(VERSION) \
@@ -332,10 +332,10 @@ agamotto: build-checks ## Build agamotto related binaries
 	mv bin/agamotto.${OS}.${ARCH} bin/agamotto
 
 .PHONY: clean
-clean-agamotto: ## Clean bin/mysqld_exporter.
+clean-agamotto: ## Clean bin/agamotto.
 	rm -f bin/agamotto
 
-##@ reloader
+##@ reloader cmd
 
 RELOADER_LD_FLAGS = "-s -w"
 
@@ -345,51 +345,50 @@ bin/reloader.%: ## Cross build bin/reloader.$(OS).$(ARCH) .
 .PHONY: reloader
 reloader: OS=$(shell $(GO) env GOOS)
 reloader: ARCH=$(shell $(GO) env GOARCH)
-reloader: build-checks ## Build agamotto related binaries
+reloader: build-checks ## Build reloader related binaries
 	$(MAKE) bin/reloader.${OS}.${ARCH}
 	mv bin/reloader.${OS}.${ARCH} bin/reloader
 
 .PHONY: clean
-clean-reloader: ## Clean bin/mysqld_exporter.
+clean-reloader: ## Clean bin/reloader.
 	rm -f bin/reloader
 
-##@ PROBE
+##@ cue-helper
+
+CUE_HELPER_LD_FLAGS = "-s -w"
+
+bin/cue-helper.%: ## Cross build bin/cue-helper.$(OS).$(ARCH) .
+	GOOS=$(word 2,$(subst ., ,$@)) GOARCH=$(word 3,$(subst ., ,$@)) $(GO) build -ldflags=${CUE_HELPER_LD_FLAGS} -o $@ ./cmd/reloader/tools/cue_auto_generator.go
+
+.PHONY: cue-helper
+cue-helper: OS=$(shell $(GO) env GOOS)
+cue-helper: ARCH=$(shell $(GO) env GOARCH)
+cue-helper: build-checks ## Build cue-helper related binaries
+	$(MAKE) bin/cue-helper.${OS}.${ARCH}
+	mv bin/cue-helper.${OS}.${ARCH} bin/cue-helper
+
+.PHONY: clean
+clean-cue-helper: ## Clean bin/cue-helper.
+	rm -f bin/cue-helper
 
 
-PROBE_BUILD_PATH = ./cmd/probe
+##@ probe cmd
+
 PROBE_LD_FLAGS = "-s -w"
 
 bin/probe.%: ## Cross build bin/probe.$(OS).$(ARCH) .
-	cd $(PROBE_BUILD_PATH) && GOOS=$(word 2,$(subst ., ,$@)) GOARCH=$(word 3,$(subst ., ,$@)) $(GO) build -ldflags=${PROBE_LD_FLAGS} -o ../../$@  ./main.go
-
-probe-mod-vendor:
-	cd $(PROBE_BUILD_PATH) && $(GO) mod tidy -compat=1.19
-	cd $(PROBE_BUILD_PATH) && $(GO) mod vendor
-	cd $(PROBE_BUILD_PATH) && $(GO) mod verify
+	GOOS=$(word 2,$(subst ., ,$@)) GOARCH=$(word 3,$(subst ., ,$@)) $(GO) build -ldflags=${PROBE_LD_FLAGS} -o $@  ./cmd/probe/main.go
 
 .PHONY: probe
 probe: OS=$(shell $(GO) env GOOS)
 probe: ARCH=$(shell $(GO) env GOARCH)
-probe: probe-mod-vendor # build-checks ## Build probe related binaries
+probe: build-checks ## Build probe related binaries
 	$(MAKE) bin/probe.${OS}.${ARCH}
 	mv bin/probe.${OS}.${ARCH} bin/probe
 
 .PHONY: clean
-clean-probe: ## Clean bin/mysqld_exporter.
+clean-probe: ## Clean bin/probe.
 	rm -f bin/probe
-
-.PHONY: test-probe
-test-probe:
-	cd ./cmd/probe && $(GO) test ./... -coverprofile cover.out
-
-.PHONY: cover-report-probe
-cover-report-probe: ## Generate cover.html from cmd/probe/cover.out
-	cd ./cmd/probe && $(GO) tool cover -html=cover.out -o cover.html
-ifeq ($(GOOS), darwin)
-	open ./cmd/probe/cover.html
-else
-	echo "open cmd/probe/cover.html with a HTML viewer."
-endif
 
 ##@ Deployment
 
@@ -475,24 +474,6 @@ endif
 .PHONY: helm-package
 helm-package: bump-chart-ver ## Do helm package.
 	$(HELM) package $(CHART_PATH) --dependency-update
-
-##@ WeSQL Cluster Helm Chart Tasks
-
-WESQL_CLUSTER_CHART_PATH = deploy/wesqlcluster
-WESQL_CLUSTER_CHART_NAME = wesqlcluster
-WESQL_CLUSTER_CHART_VERSION ?= 0.1.1
-
-.PHONY: bump-chart-ver-wqsql-cluster
-bump-chart-ver-wqsql-cluster: ## Bump WeSQL Cluster helm chart version.
-ifeq ($(GOOS), darwin)
-	sed -i '' "s/^version:.*/version: $(WESQL_CLUSTER_CHART_VERSION)/" $(WESQL_CLUSTER_CHART_PATH)/Chart.yaml
-else
-	sed -i "s/^version:.*/version: $(WESQL_CLUSTER_CHART_VERSION)/" $(WESQL_CLUSTER_CHART_PATH)/Chart.yaml
-endif
-
-.PHONY: helm-package-wqsql-cluster
-helm-package-wqsql-cluster: bump-chart-ver-wqsql-cluster ## Do WeSQL Cluster helm package.
-	$(HELM) package $(WESQL_CLUSTER_CHART_PATH)
 
 ##@ Build Dependencies
 

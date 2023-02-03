@@ -48,7 +48,7 @@ const (
 
 func NewCliCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "kbcli",
+		Use:   cliName,
 		Short: "KubeBlocks CLI",
 		Long: `
 =============================================

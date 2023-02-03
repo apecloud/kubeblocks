@@ -159,8 +159,7 @@ func HandleReplicationSet(reqCtx intctrlutil.RequestCtx,
 
 	// sync cluster status
 	for _, compPodList := range compOwnsPodsToSyncMap {
-		err := SyncReplicationSetClusterStatus(cli, reqCtx.Ctx, compPodList)
-		if err != nil {
+		if err := SyncReplicationSetClusterStatus(cli, reqCtx.Ctx, compPodList); err != nil {
 			return err
 		}
 	}

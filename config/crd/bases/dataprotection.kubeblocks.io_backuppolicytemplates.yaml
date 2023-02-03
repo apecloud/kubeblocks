@@ -63,7 +63,6 @@ spec:
                 description: execute hook commands for backup.
                 properties:
                   containerName:
-                    default: mysql
                     description: which container can exec command
                     type: string
                   image:

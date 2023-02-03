@@ -80,7 +80,6 @@ spec:
                 description: execute hook commands for backup.
                 properties:
                   containerName:
-                    default: mysql
                     description: which container can exec command
                     type: string
                   image:
@@ -1592,11 +1591,6 @@ spec:
                 description: The schedule in Cron format, the timezone is in UTC.
                   see https://en.wikipedia.org/wiki/Cron.
                 type: string
-              suspend:
-                description: This flag tells the controller to suspend subsequent
-                  executions, it does not apply to already started executions.  Defaults
-                  to false.
-                type: boolean
               target:
                 description: database cluster service
                 properties:

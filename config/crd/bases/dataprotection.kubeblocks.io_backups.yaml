@@ -22,10 +22,10 @@ spec:
       name: STATUS
       type: string
     - jsonPath: .status.completionTimestamp
-      name: COMPLETIONTIME
+      name: COMPLETION-TIME
       type: date
     - jsonPath: .status.totalSize
-      name: TOTALSIZE
+      name: TOTAL-SIZE
       type: string
     - jsonPath: .status.duration
       name: DURATION

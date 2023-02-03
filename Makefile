@@ -143,6 +143,11 @@ manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and Cust
 generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./apis/..."
 
+.PHONY: go-generate
+go-generate: ## Run go generate against code.
+	$(GO) generate -x ./...
+	$(MAKE) fix-license-header
+
 .PHONY: fmt
 fmt: ## Run go fmt against code.
 	$(GO) fmt ./...
@@ -188,7 +193,7 @@ module: ## Run go mod tidy->verify against go modules.
 	$(GO) mod tidy -compat=1.19
 	$(GO) mod verify
 
-TEST_PACKAGE=
+TEST_PACKAGES ?= ./internal/... ./apis/... ./controllers/... ./cmd/...
 
 CLUSTER_TYPES=minikube k3d
 .PHONY: add-k8s-host
@@ -201,15 +206,15 @@ endif
 
 .PHONY: test-current-ctx
 test-current-ctx: manifests generate fmt vet add-k8s-host ## Run operator controller tests with current $KUBECONFIG context. if existing k8s cluster is k3d or minikube, specify EXISTING_CLUSTER_TYPE.
-	USE_EXISTING_CLUSTER=true KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" $(GO) test ./$(TEST_PACKAGE)... -p 1 -coverprofile cover.out
+	USE_EXISTING_CLUSTER=true KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" $(GO) test  -p 1 -coverprofile cover.out $(TEST_PACKAGES)
 
 .PHONY: test
-test: manifests generate fmt vet envtest add-k8s-host test-probe ## Run tests. if existing k8s cluster is k3d or minikube, specify EXISTING_CLUSTER_TYPE.
-	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" $(GO) test ./$(TEST_PACKAGE)... -coverprofile cover.out
+test: # manifests generate fmt vet envtest add-k8s-host test-probe ## Run tests. if existing k8s cluster is k3d or minikube, specify EXISTING_CLUSTER_TYPE.
+	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" $(GO) test  -coverprofile cover.out $(TEST_PACKAGES)
 
 .PHONY: test-delve
 test-delve: manifests generate fmt vet envtest ## Run tests.
-	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" dlv --listen=:$(DEBUG_PORT) --headless=true --api-version=2 --accept-multiclient test ./$(TEST_PACKAGE)
+	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" dlv --listen=:$(DEBUG_PORT) --headless=true --api-version=2 --accept-multiclient test $(TEST_PACKAGES)
 
 .PHONY: test-webhook-enabled
 test-webhook-enabled: ## Run tests with webhooks enabled.
@@ -267,15 +272,14 @@ kbcli-doc: build-checks ## generate CLI command reference manual.
 ##@ Load Balancer
 
 .PHONY: loadbalancer
-loadbalancer: build-checks ## Build loadbalancer binary.
-	$(GO) generate -x ./...
+loadbalancer: go-generate build-checks  ## Build loadbalancer binary.
 	$(GO) build -ldflags=${LD_FLAGS} -o bin/loadbalancer-controller ./cmd/loadbalancer/controller
 	$(GO) build -ldflags=${LD_FLAGS} -o bin/loadbalancer-agent ./cmd/loadbalancer/agent
 
 ##@ Operator Controller Manager
 
 .PHONY: manager
-manager: cue-fmt generate build-checks ## Build manager binary.
+manager: cue-fmt generate go-generate build-checks ## Build manager binary.
 	$(GO) build -ldflags=${LD_FLAGS} -o bin/manager ./cmd/manager/main.go
 
 CERT_ROOT_CA ?= $(WEBHOOK_CERT_DIR)/rootCA.key
@@ -714,3 +718,9 @@ minikube-delete: minikube ## Delete minikube cluster.
 
 ##@ Docker containers
 include docker/docker.mk
+
+
+##@ Test E2E
+.PHONY: test-e2e
+test-e2e: ## Test End-to-end.
+	$(MAKE) -e VERSION=$(VERSION) -C test/e2e run

@@ -515,7 +515,7 @@ func (o *Options) uninstall() error {
 		Namespace: o.Namespace,
 	}
 	spinner := newSpinner(fmt.Sprintf("Uninstall helm release %s %s", types.KubeBlocksChartName, v[util.KubeBlocksApp]))
-	printErr(spinner, chart.UnInstall(o.HelmCfg))
+	printErr(spinner, chart.Uninstall(o.HelmCfg))
 
 	// remove repo
 	spinner = newSpinner("Remove helm repo " + types.KubeBlocksChartName)

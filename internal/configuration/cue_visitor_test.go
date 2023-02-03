@@ -137,6 +137,22 @@ func TestCueTypeExtractorVisit(t *testing.T) {
 				"a": K8SQuantityType,
 			},
 		},
+	}, {
+		name: "attr_test",
+		args: args{
+			cue: `a : int @storeResource()`,
+			fieldTypes: map[string]CueType{
+				"a": ClassicStorageType,
+			},
+		},
+	}, {
+		name: "attr_test",
+		args: args{
+			cue: `a : int @timeDurationResource()`,
+			fieldTypes: map[string]CueType{
+				"a": ClassicTimeDurationType,
+			},
+		},
 	}}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -157,6 +173,7 @@ func TestTransNumberOrBoolType(t *testing.T) {
 		t        CueType
 		objs     []string
 		expected []interface{}
+		expand   string
 		// obj reflect.Value
 		// fn  UpdateFn
 	}
@@ -220,13 +237,54 @@ func TestTransNumberOrBoolType(t *testing.T) {
 			expected: []interface{}{1024 * 1024 * 1024, 1000 * 1000 * 1000, 10 * 1000 * 1000, 100, 1},
 		},
 		wantErr: false,
+	}, {
+		name: "testClassResource",
+		args: args{
+			t:        ClassicStorageType,
+			objs:     []string{"1G", "1GB", "1K", "1M", "1MB", "100T", "10TB", "888", "20mb", "-1"},
+			expected: []interface{}{1024 * 1024 * 1024, 1024 * 1024 * 1024, 1024, 1024 * 1024, 1024 * 1024, 100 * TByte, 10 * TByte, 888, 20 * 1024 * 1024, -1},
+		},
+		wantErr: false,
+	}, {
+		name: "testClassResource",
+		args: args{
+			t:        ClassicStorageType,
+			objs:     []string{"1G", "1MB", "100T", "10TB"},
+			expected: []interface{}{1024 * 1024 / 16, 1024 / 16, 100 * GByte / 16, 10 * GByte / 16},
+			expand:   "16KB",
+		},
+		wantErr: false,
+	}, {
+		name: "testClassResource",
+		args: args{
+			t:        ClassicStorageType,
+			objs:     []string{"G", "", "1KK", "1o", "1MB1"},
+			expected: []interface{}{0, 0, 0, 0, 0},
+		},
+		wantErr: true,
+	}, {
+		name: "testClassResource",
+		args: args{
+			t:        ClassicTimeDurationType,
+			objs:     []string{"1", "100", "1s", "1min", "20m", "5d", "10000ms", "20MIN"},
+			expected: []interface{}{1, 100, 1000, 60 * 1000, 20 * 60 * 1000, 5 * Day, 10000, 20 * 60 * 1000},
+		},
+		wantErr: false,
+	}, {
+		name: "testClassResource",
+		args: args{
+			t:        ClassicTimeDurationType,
+			objs:     []string{"", "100yy", "s", "min45", "second"},
+			expected: []interface{}{0, 0, 0, 0, 0},
+		},
+		wantErr: true,
 	}}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			for i := 0; i < len(tt.args.objs); i++ {
 				if err := transNumberOrBoolType(tt.args.t, reflect.ValueOf(tt.args.objs[i]), func(v interface{}) {
 					require.EqualValues(t, v, tt.args.expected[i])
-				}); (err != nil) != tt.wantErr {
+				}, tt.args.expand); (err != nil) != tt.wantErr {
 					t.Errorf("transNumberOrBoolType() error = %v, wantErr %v", err, tt.wantErr)
 				}
 			}

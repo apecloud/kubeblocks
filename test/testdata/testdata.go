@@ -243,6 +243,9 @@ func WithClusterDef(clusterDefRef string) ResourceOptions {
 		if cluster, ok := obj.(*dbaasv1alpha1.Cluster); ok {
 			cluster.Spec.ClusterDefRef = clusterDefRef
 		}
+		if clusterVersion, ok := obj.(*dbaasv1alpha1.ClusterVersion); ok {
+			clusterVersion.Spec.ClusterDefinitionRef = clusterDefRef
+		}
 	}
 }
 

@@ -65,7 +65,8 @@ var _ = Describe("ConfigWrapper util test", func() {
 
 	Context("clusterdefinition CR test", func() {
 		It("Should success without error", func() {
-			testWrapper := CreateDBaasFromISV(testCtx, ctx, FakeTest{
+			testWrapper := NewFakeDBaasCRsFromISV(testCtx, ctx, FakeTest{
+				TestDataPath: "resources",
 				// for crd yaml file
 				CfgCCYaml:       "mysql_config_template.yaml",
 				CDYaml:          "mysql_cd.yaml",
@@ -73,7 +74,6 @@ var _ = Describe("ConfigWrapper util test", func() {
 				CfgCMYaml:       "mysql_config_cm.yaml",
 				StsYaml:         "mysql_sts.yaml",
 				ClusterYaml:     "mysql_cluster.yaml",
-				TestDataPath:    "resources",
 				ComponentName:   TestComponentName,
 				CDComponentType: TestCDComponentTypeName,
 			})
@@ -82,7 +82,7 @@ var _ = Describe("ConfigWrapper util test", func() {
 				defer testWrapper.DeleteAllObjects()
 			}()
 
-			availableTPL := testWrapper.cc.DeepCopy()
+			availableTPL := testWrapper.CC.DeepCopy()
 			availableTPL.Status.Phase = dbaasv1alpha1.AvailablePhase
 
 			testDatas := map[client.ObjectKey][]struct {
@@ -90,19 +90,19 @@ var _ = Describe("ConfigWrapper util test", func() {
 				err    error
 			}{
 				// for cm
-				client.ObjectKeyFromObject(testWrapper.cm): {{
+				client.ObjectKeyFromObject(testWrapper.TplCM): {{
 					object: nil,
 					err:    cfgcore.MakeError("failed to get cc object"),
 				}, {
-					object: testWrapper.cm,
+					object: testWrapper.TplCM,
 					err:    nil,
 				}},
 				// for cc
-				client.ObjectKeyFromObject(testWrapper.cc): {{
+				client.ObjectKeyFromObject(testWrapper.CC): {{
 					object: nil,
 					err:    cfgcore.MakeError("failed to get cc object"),
 				}, {
-					object: testWrapper.cc,
+					object: testWrapper.CC,
 					err:    nil,
 				}, {
 					object: availableTPL,
@@ -138,37 +138,38 @@ var _ = Describe("ConfigWrapper util test", func() {
 					return tt.err
 				}).AnyTimes()
 
-			_, err := CheckCDConfigTemplate(mockClient, reqCtx, testWrapper.cd)
+			_, err := CheckCDConfigTemplate(mockClient, reqCtx, testWrapper.CD)
 			Expect(err).ShouldNot(Succeed())
 			Expect(err.Error()).Should(ContainSubstring("failed to get cc object"))
 
-			_, err = CheckCDConfigTemplate(mockClient, reqCtx, testWrapper.cd)
+			_, err = CheckCDConfigTemplate(mockClient, reqCtx, testWrapper.CD)
 			Expect(err).ShouldNot(Succeed())
 			Expect(err.Error()).Should(ContainSubstring("failed to get cc object"))
 
-			_, err = CheckCDConfigTemplate(mockClient, reqCtx, testWrapper.cd)
+			_, err = CheckCDConfigTemplate(mockClient, reqCtx, testWrapper.CD)
 			Expect(err).ShouldNot(Succeed())
 			Expect(err.Error()).Should(ContainSubstring("status not ready"))
 
-			ok, err := CheckCDConfigTemplate(mockClient, reqCtx, testWrapper.cd)
+			ok, err := CheckCDConfigTemplate(mockClient, reqCtx, testWrapper.CD)
 			Expect(err).Should(Succeed())
 			Expect(ok).Should(BeTrue())
 
-			ok, err = UpdateCDLabelsByConfiguration(mockClient, reqCtx, testWrapper.cd)
+			ok, err = UpdateCDLabelsByConfiguration(mockClient, reqCtx, testWrapper.CD)
 			Expect(err).Should(Succeed())
 			Expect(ok).Should(BeTrue())
 
-			err = UpdateCDConfigMapFinalizer(mockClient, reqCtx, testWrapper.cd)
+			err = UpdateCDConfigMapFinalizer(mockClient, reqCtx, testWrapper.CD)
 			Expect(err).Should(Succeed())
 
-			err = DeleteCDConfigMapFinalizer(mockClient, reqCtx, testWrapper.cd)
+			err = DeleteCDConfigMapFinalizer(mockClient, reqCtx, testWrapper.CD)
 			Expect(err).Should(Succeed())
 		})
 	})
 
 	Context("clusterdefinition CR test without config Constraints", func() {
 		It("Should success without error", func() {
-			testWrapper := CreateDBaasFromISV(testCtx, ctx, FakeTest{
+			testWrapper := NewFakeDBaasCRsFromISV(testCtx, ctx, FakeTest{
+				TestDataPath: "resources",
 				// for crd yaml file
 				CfgCCYaml:       "mysql_config_template.yaml",
 				CDYaml:          "mysql_cd.yaml",
@@ -176,7 +177,6 @@ var _ = Describe("ConfigWrapper util test", func() {
 				CfgCMYaml:       "mysql_config_cm.yaml",
 				StsYaml:         "mysql_sts.yaml",
 				ClusterYaml:     "mysql_cluster.yaml",
-				TestDataPath:    "resources",
 				ComponentName:   TestComponentName,
 				CDComponentType: TestCDComponentTypeName,
 			})
@@ -186,7 +186,7 @@ var _ = Describe("ConfigWrapper util test", func() {
 			}()
 
 			// remove ConfigConstraintRef
-			_, err := handleConfigTemplate(testWrapper.cd, func(templates []dbaasv1alpha1.ConfigTemplate) (bool, error) {
+			_, err := handleConfigTemplate(testWrapper.CD, func(templates []dbaasv1alpha1.ConfigTemplate) (bool, error) {
 				return true, nil
 			}, func(component *dbaasv1alpha1.ClusterDefinitionComponent) error {
 				if component.ConfigSpec == nil || len(component.ConfigSpec.ConfigTemplateRefs) == 0 {
@@ -201,7 +201,7 @@ var _ = Describe("ConfigWrapper util test", func() {
 			})
 			Expect(err).Should(Succeed())
 
-			availableTPL := testWrapper.cc.DeepCopy()
+			availableTPL := testWrapper.CC.DeepCopy()
 			availableTPL.Status.Phase = dbaasv1alpha1.AvailablePhase
 
 			testDatas := map[client.ObjectKey][]struct {
@@ -209,11 +209,11 @@ var _ = Describe("ConfigWrapper util test", func() {
 				err    error
 			}{
 				// for cm
-				client.ObjectKeyFromObject(testWrapper.cm): {{
+				client.ObjectKeyFromObject(testWrapper.TplCM): {{
 					object: nil,
 					err:    cfgcore.MakeError("failed to get cc object"),
 				}, {
-					object: testWrapper.cm,
+					object: testWrapper.TplCM,
 					err:    nil,
 				}},
 			}
@@ -237,11 +237,11 @@ var _ = Describe("ConfigWrapper util test", func() {
 					return tt.err
 				}).AnyTimes()
 
-			_, err = CheckCDConfigTemplate(mockClient, reqCtx, testWrapper.cd)
+			_, err = CheckCDConfigTemplate(mockClient, reqCtx, testWrapper.CD)
 			Expect(err).ShouldNot(Succeed())
 			Expect(err.Error()).Should(ContainSubstring("failed to get cc object"))
 
-			ok, err := CheckCDConfigTemplate(mockClient, reqCtx, testWrapper.cd)
+			ok, err := CheckCDConfigTemplate(mockClient, reqCtx, testWrapper.CD)
 			Expect(err).Should(Succeed())
 			Expect(ok).Should(BeTrue())
 		})
@@ -249,7 +249,8 @@ var _ = Describe("ConfigWrapper util test", func() {
 
 	Context("clusterversion CR test", func() {
 		It("Should success without error", func() {
-			testWrapper := CreateDBaasFromISV(testCtx, ctx, FakeTest{
+			testWrapper := NewFakeDBaasCRsFromISV(testCtx, ctx, FakeTest{
+				TestDataPath: "resources",
 				// for crd yaml file
 				CfgCCYaml:       "mysql_config_template.yaml",
 				CDYaml:          "mysql_cd.yaml",
@@ -257,7 +258,6 @@ var _ = Describe("ConfigWrapper util test", func() {
 				CfgCMYaml:       "mysql_config_cm.yaml",
 				StsYaml:         "mysql_sts.yaml",
 				ClusterYaml:     "mysql_cluster.yaml",
-				TestDataPath:    "resources",
 				ComponentName:   TestComponentName,
 				CDComponentType: TestCDComponentTypeName,
 			})
@@ -267,7 +267,7 @@ var _ = Describe("ConfigWrapper util test", func() {
 			}()
 
 			updateAVTemplates(testWrapper)
-			availableTPL := testWrapper.cc.DeepCopy()
+			availableTPL := testWrapper.CC.DeepCopy()
 			availableTPL.Status.Phase = dbaasv1alpha1.AvailablePhase
 
 			testDatas := map[client.ObjectKey][]struct {
@@ -275,19 +275,19 @@ var _ = Describe("ConfigWrapper util test", func() {
 				err    error
 			}{
 				// for cm
-				client.ObjectKeyFromObject(testWrapper.cm): {{
+				client.ObjectKeyFromObject(testWrapper.TplCM): {{
 					object: nil,
 					err:    cfgcore.MakeError("failed to get cc object"),
 				}, {
-					object: testWrapper.cm,
+					object: testWrapper.TplCM,
 					err:    nil,
 				}},
 				// for cc
-				client.ObjectKeyFromObject(testWrapper.cc): {{
+				client.ObjectKeyFromObject(testWrapper.CC): {{
 					object: nil,
 					err:    cfgcore.MakeError("failed to get cc object"),
 				}, {
-					object: testWrapper.cc,
+					object: testWrapper.CC,
 					err:    nil,
 				}, {
 					object: availableTPL,
@@ -323,30 +323,30 @@ var _ = Describe("ConfigWrapper util test", func() {
 					return tt.err
 				}).AnyTimes()
 
-			_, err := CheckCVConfigTemplate(mockClient, reqCtx, testWrapper.cv)
+			_, err := CheckCVConfigTemplate(mockClient, reqCtx, testWrapper.CV)
 			Expect(err).ShouldNot(Succeed())
 			Expect(err.Error()).Should(ContainSubstring("failed to get cc object"))
 
-			_, err = CheckCVConfigTemplate(mockClient, reqCtx, testWrapper.cv)
+			_, err = CheckCVConfigTemplate(mockClient, reqCtx, testWrapper.CV)
 			Expect(err).ShouldNot(Succeed())
 			Expect(err.Error()).Should(ContainSubstring("failed to get cc object"))
 
-			_, err = CheckCVConfigTemplate(mockClient, reqCtx, testWrapper.cv)
+			_, err = CheckCVConfigTemplate(mockClient, reqCtx, testWrapper.CV)
 			Expect(err).ShouldNot(Succeed())
 			Expect(err.Error()).Should(ContainSubstring("status not ready"))
 
-			ok, err := CheckCVConfigTemplate(mockClient, reqCtx, testWrapper.cv)
+			ok, err := CheckCVConfigTemplate(mockClient, reqCtx, testWrapper.CV)
 			Expect(err).Should(Succeed())
 			Expect(ok).Should(BeTrue())
 
-			ok, err = UpdateCVLabelsByConfiguration(mockClient, reqCtx, testWrapper.cv)
+			ok, err = UpdateCVLabelsByConfiguration(mockClient, reqCtx, testWrapper.CV)
 			Expect(err).Should(Succeed())
 			Expect(ok).Should(BeTrue())
 
-			err = UpdateCVConfigMapFinalizer(mockClient, reqCtx, testWrapper.cv)
+			err = UpdateCVConfigMapFinalizer(mockClient, reqCtx, testWrapper.CV)
 			Expect(err).Should(Succeed())
 
-			err = DeleteCVConfigMapFinalizer(mockClient, reqCtx, testWrapper.cv)
+			err = DeleteCVConfigMapFinalizer(mockClient, reqCtx, testWrapper.CV)
 			Expect(err).Should(Succeed())
 		})
 	})
@@ -438,16 +438,16 @@ var _ = Describe("ConfigWrapper util test", func() {
 
 func updateAVTemplates(wrapper *TestWrapper) {
 	var tpls []dbaasv1alpha1.ConfigTemplate
-	_, err := handleConfigTemplate(wrapper.cd, func(templates []dbaasv1alpha1.ConfigTemplate) (bool, error) {
+	_, err := handleConfigTemplate(wrapper.CD, func(templates []dbaasv1alpha1.ConfigTemplate) (bool, error) {
 		tpls = templates
 		return true, nil
 	})
 	Expect(err).Should(Succeed())
 
-	if len(wrapper.cv.Spec.Components) == 0 {
+	if len(wrapper.CV.Spec.Components) == 0 {
 		return
 	}
 
-	// mock cv config templates
-	wrapper.cv.Spec.Components[0].ConfigTemplateRefs = tpls
+	// mock CV config templates
+	wrapper.CV.Spec.Components[0].ConfigTemplateRefs = tpls
 }

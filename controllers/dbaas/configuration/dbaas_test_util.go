@@ -33,6 +33,7 @@ import (
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/apecloud/kubeblocks/internal/testutil"
+	testdbaas "github.com/apecloud/kubeblocks/internal/testutil/dbaas"
 	"github.com/apecloud/kubeblocks/test/testdata"
 )
 
@@ -48,6 +49,9 @@ type FakeTest struct {
 	TestDataPath    string
 	ComponentName   string
 	CDComponentType string
+
+	DisableConfigTpl        bool
+	DisableConfigConstraint bool
 }
 
 type TestWrapper struct {
@@ -59,12 +63,12 @@ type TestWrapper struct {
 	testCtx testutil.TestContext
 
 	// cr object
-	cd    *dbaasv1alpha1.ClusterDefinition
-	cv    *dbaasv1alpha1.ClusterVersion
-	cc    *dbaasv1alpha1.ConfigConstraint
-	cm    *corev1.ConfigMap
-	sts   *appv1.StatefulSet
-	cfgCM *corev1.ConfigMap
+	CD    *dbaasv1alpha1.ClusterDefinition
+	CV    *dbaasv1alpha1.ClusterVersion
+	TplCM *corev1.ConfigMap
+	CC    *dbaasv1alpha1.ConfigConstraint
+	STS   *appv1.StatefulSet
+	CfgCM *corev1.ConfigMap
 
 	stsName    string
 	cfgCMName  string
@@ -76,11 +80,29 @@ const (
 	TestCDComponentTypeName = "replicasets"
 )
 
-func (w TestWrapper) DeleteAllObjects() {
+func (w *TestWrapper) DeleteAllObjects() {
 	for _, obj := range w.allObjects {
 		if err := w.testCtx.Cli.Delete(w.testCtx.Ctx, obj); err != nil {
 			gomega.Expect(apierrors.IsNotFound(err)).Should(gomega.BeTrue())
 		}
+	}
+
+	var (
+		inNS = client.InNamespace(w.namer.NS)
+		ml   = client.HasLabels{w.testCtx.TestObjLabelKey}
+	)
+
+	if w.CV != nil {
+		testdbaas.ClearResources(&w.testCtx, intctrlutil.ClusterVersionSignature, inNS, ml)
+	}
+	if w.CD != nil {
+		testdbaas.ClearResources(&w.testCtx, intctrlutil.ClusterDefinitionSignature, inNS, ml)
+	}
+	if w.CC != nil {
+		testdbaas.ClearResources(&w.testCtx, intctrlutil.ConfigConstraintSignature, inNS, ml)
+	}
+	if w.TplCM != nil {
+		testdbaas.ClearResources(&w.testCtx, intctrlutil.ConfigMapSignature, inNS, ml)
 	}
 }
 
@@ -93,40 +115,53 @@ func (w *TestWrapper) contains(fileName string) bool {
 		w.testEnv.ClusterYaml == fileName
 }
 
+func (w *TestWrapper) GetNamer() mockobject.ResourceNamer {
+	return w.namer
+}
+
 func (w *TestWrapper) setMockObject(obj client.Object) {
 	switch obj.GetName() {
 	case w.namer.CDName:
-		w.cd = obj.(*dbaasv1alpha1.ClusterDefinition)
+		w.CD = obj.(*dbaasv1alpha1.ClusterDefinition)
 	case w.namer.CCName:
-		w.cc = obj.(*dbaasv1alpha1.ConfigConstraint)
+		w.CC = obj.(*dbaasv1alpha1.ConfigConstraint)
 	case w.namer.CVName:
-		w.cv = obj.(*dbaasv1alpha1.ClusterVersion)
+		w.CV = obj.(*dbaasv1alpha1.ClusterVersion)
 	case w.namer.TPLName:
-		w.cm = obj.(*corev1.ConfigMap)
+		w.TplCM = obj.(*corev1.ConfigMap)
 	case w.cfgCMName:
-		w.cfgCM = obj.(*corev1.ConfigMap)
+		w.CfgCM = obj.(*corev1.ConfigMap)
 	case w.stsName:
-		w.sts = obj.(*appv1.StatefulSet)
+		w.STS = obj.(*appv1.StatefulSet)
 	}
 	w.allObjects = append(w.allObjects, obj)
 }
 
 func (w *TestWrapper) DeleteTpl() error {
-	if err := w.testCtx.Cli.Delete(w.testCtx.Ctx, w.cc); err != nil {
+	if err := w.testCtx.Cli.Delete(w.testCtx.Ctx, w.CC); err != nil {
 		return err
 	}
-	return w.testCtx.Cli.Delete(w.testCtx.Ctx, w.cm)
+	return w.testCtx.Cli.Delete(w.testCtx.Ctx, w.TplCM)
 }
 
 func (w *TestWrapper) DeleteCV() error {
-	return w.testCtx.Cli.Delete(w.testCtx.Ctx, w.cv)
+	return w.testCtx.Cli.Delete(w.testCtx.Ctx, w.CV)
 }
 
 func (w *TestWrapper) DeleteCD() error {
-	return w.testCtx.Cli.Delete(w.testCtx.Ctx, w.cd)
+	return w.testCtx.Cli.Delete(w.testCtx.Ctx, w.CD)
 }
 
-func CreateDBaasFromISV(testCtx testutil.TestContext, ctx context.Context, mockInfo FakeTest) *TestWrapper {
+func NewFakeK8sObjectFromFile[T intctrlutil.Object, PT intctrlutil.PObject[T]](w *TestWrapper, yamlFile string, pobj PT, options ...testdata.ResourceOptions) {
+	pt := testdbaas.CreateCustomizedObj(&w.testCtx, filepath.Join(w.testEnv.TestDataPath, yamlFile), pobj, func(t PT) {
+		for _, option := range options {
+			option(pobj)
+		}
+	})
+	w.setMockObject(pt)
+}
+
+func NewFakeDBaasCRsFromISV(testCtx testutil.TestContext, ctx context.Context, mockInfo FakeTest) *TestWrapper {
 	var (
 		cdComponentTypeName = mockInfo.CDComponentType
 		componentName       = mockInfo.ComponentName
@@ -147,13 +182,24 @@ func CreateDBaasFromISV(testCtx testutil.TestContext, ctx context.Context, mockI
 	resourceObjectsHelper := mockobject.NewFakeResourceObjectHelper(mockInfo.TestDataPath,
 		mockobject.WithResourceKind(types.ConfigConstraintGVR(), types.KindConfigConstraint, testdata.WithName(randomNamer.CCName)),
 		mockobject.WithResourceKind(types.CMGVR(), types.KindCM, testdata.WithNamespacedName(randomNamer.TPLName, randomNamer.NS)),
-		mockobject.WithResourceKind(types.ClusterVersionGVR(), types.KindClusterVersion, testdata.WithName(randomNamer.CVName)),
+		mockobject.WithResourceKind(types.ClusterVersionGVR(), types.KindClusterVersion, testdata.WithName(randomNamer.CVName), testdata.WithClusterDef(randomNamer.CDName)),
 		mockobject.WithResourceKind(types.ClusterDefGVR(), types.KindClusterDef,
 			testdata.WithName(randomNamer.CDName),
 			testdata.WithConfigTemplate(mockobject.GenerateConfigTemplate(randomNamer), testdata.ComponentTypeSelector(dbaasv1alpha1.Stateful)),
 			testdata.WithUpdateComponent(testdata.ComponentTypeSelector(dbaasv1alpha1.Stateful),
 				func(component *dbaasv1alpha1.ClusterDefinitionComponent) {
 					component.TypeName = cdComponentTypeName
+					if mockInfo.DisableConfigTpl {
+						component.ConfigSpec = nil
+						return
+					}
+					if component.ConfigSpec == nil && len(component.ConfigSpec.ConfigTemplateRefs) == 0 {
+						return
+					}
+					tpl := &component.ConfigSpec.ConfigTemplateRefs[0]
+					if mockInfo.DisableConfigConstraint {
+						tpl.ConfigConstraintRef = ""
+					}
 				})),
 		// mock config cm
 		mockobject.WithCustomResource(types.CMGVR(), mockobject.NewFakeConfigCMResource(randomNamer, componentName, randomNamer.VolumeName,

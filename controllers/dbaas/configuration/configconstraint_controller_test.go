@@ -60,12 +60,12 @@ var _ = Describe("ConfigConstraint Controller", func() {
 	Context("Create config constraint with cue validate", func() {
 		It("Should ready", func() {
 			By("create resources")
-			testWrapper := CreateDBaasFromISV(testCtx, ctx, FakeTest{
+			testWrapper := NewFakeDBaasCRsFromISV(testCtx, ctx, FakeTest{
+				TestDataPath:    "resources",
 				CfgCCYaml:       "mysql_config_template.yaml",
 				CDYaml:          "mysql_cd.yaml",
 				CVYaml:          "mysql_cv.yaml",
 				CfgCMYaml:       "mysql_config_cm.yaml",
-				TestDataPath:    "resources",
 				ComponentName:   TestComponentName,
 				CDComponentType: TestCDComponentTypeName,
 			})
@@ -81,12 +81,12 @@ var _ = Describe("ConfigConstraint Controller", func() {
 			// TODO using the client.List interface, which just reads from the cache.
 			// TODO this will cause a referenced object get deleted in race condition.
 			By("check clusterversion and clusterdef exists")
-			Eventually(testdbaas.CheckObjExists(&testCtx, client.ObjectKeyFromObject(testWrapper.cd),
+			Eventually(testdbaas.CheckObjExists(&testCtx, client.ObjectKeyFromObject(testWrapper.CD),
 				&dbaasv1alpha1.ClusterDefinition{}, true)).Should(Succeed())
-			Eventually(testdbaas.CheckObjExists(&testCtx, client.ObjectKeyFromObject(testWrapper.cv),
+			Eventually(testdbaas.CheckObjExists(&testCtx, client.ObjectKeyFromObject(testWrapper.CV),
 				&dbaasv1alpha1.ClusterVersion{}, true)).Should(Succeed())
 
-			tplKey := client.ObjectKeyFromObject(testWrapper.cc)
+			tplKey := client.ObjectKeyFromObject(testWrapper.CC)
 
 			By("check ConfigConstraint(template) status and finalizer")
 			Eventually(testdbaas.CheckObj(&testCtx, tplKey,
@@ -117,13 +117,13 @@ var _ = Describe("ConfigConstraint Controller", func() {
 			By("creating a ISV resource")
 
 			// step1: prepare env
-			testWrapper := CreateDBaasFromISV(testCtx, ctx, FakeTest{
+			testWrapper := NewFakeDBaasCRsFromISV(testCtx, ctx, FakeTest{
+				TestDataPath: "resources",
 				// for crd yaml file
 				CfgCCYaml:       "mysql_config_tpl_not_validate.yaml",
 				CDYaml:          "mysql_cd.yaml",
 				CVYaml:          "mysql_cv.yaml",
 				CfgCMYaml:       "mysql_config_cm.yaml",
-				TestDataPath:    "resources",
 				ComponentName:   TestComponentName,
 				CDComponentType: TestCDComponentTypeName,
 			})
@@ -133,7 +133,7 @@ var _ = Describe("ConfigConstraint Controller", func() {
 			}()
 
 			By("check config constraint status")
-			Eventually(testdbaas.CheckObj(&testCtx, client.ObjectKeyFromObject(testWrapper.cc),
+			Eventually(testdbaas.CheckObj(&testCtx, client.ObjectKeyFromObject(testWrapper.CC),
 				func(g Gomega, tpl *dbaasv1alpha1.ConfigConstraint) {
 					g.Expect(tpl.Status.Phase).Should(BeEquivalentTo(dbaasv1alpha1.AvailablePhase))
 				})).Should(Succeed())

@@ -74,6 +74,10 @@ func init() {
 
 }
 
+func Test() {
+	fmt.Println("just for test")
+}
+
 func main() {
 	// set GOMAXPROCS
 	_, _ = maxprocs.Set()

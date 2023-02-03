@@ -140,10 +140,6 @@ generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and
 go-generate: ## Run go generate against code.
 	$(GO) generate -x ./...
 
-.PHONY: go-generate
-go-generate: ## Run go generate against code.
-	$(GO) generate -x ./...
-
 .PHONY: fmt
 fmt: ## Run go fmt against code.
 	$(GO) fmt -mod=mod ./...

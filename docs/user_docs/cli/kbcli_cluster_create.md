@@ -36,7 +36,7 @@ kbcli cluster create [NAME] [flags]
   
   # In scenarios where you want to load components data from stdin
   cat << EOF | kbcli cluster create mycluster --cluster-definition=my-cluster-def --set -
-  - name: my-test... (omission from stdin)
+  - name: my-test ...
   
   # Create a cluster forced to scatter by node
   kbcli cluster create --cluster-definition=my-cluster-def --topology-keys=kubernetes.io/hostname --pod-anti-affinity=Required

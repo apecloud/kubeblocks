@@ -19,6 +19,9 @@ package dbaas
 import (
 	"context"
 	"fmt"
+	"github.com/sethvargo/go-password/password"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 
 	"github.com/onsi/gomega"
 	"k8s.io/apimachinery/pkg/util/yaml"
@@ -150,4 +153,24 @@ func MockClusterVersion(ctx context.Context, testCtx testutil.TestContext, clust
 	clusterVersion := &dbaasv1alpha1.ClusterVersion{}
 	gomega.Expect(yaml.Unmarshal([]byte(clusterVersionYAML), clusterVersion)).Should(gomega.Succeed())
 	return CreateK8sResource(ctx, testCtx, clusterVersion).(*dbaasv1alpha1.ClusterVersion)
+}
+
+func MockClusterObj(clusterDefName string, clusterVersionName string) *dbaasv1alpha1.Cluster {
+	randomStr, _ := password.Generate(6, 0, 0, true, false)
+	key := types.NamespacedName{
+		Name:      "cluster" + randomStr,
+		Namespace: "default",
+	}
+
+	return &dbaasv1alpha1.Cluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      key.Name,
+			Namespace: key.Namespace,
+		},
+		Spec: dbaasv1alpha1.ClusterSpec{
+			ClusterDefRef:     clusterDefName,
+			ClusterVersionRef: clusterVersionName,
+			TerminationPolicy: dbaasv1alpha1.WipeOut,
+		},
+	}
 }

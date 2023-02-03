@@ -33,15 +33,12 @@ import (
 
 	"github.com/go-sql-driver/mysql"
 	"github.com/pkg/errors"
-	"github.com/sethvargo/go-password/password"
 	"github.com/spf13/viper"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
 	storagev1 "k8s.io/api/storage/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/yaml"
@@ -55,11 +52,10 @@ import (
 	"github.com/apecloud/kubeblocks/controllers/dbaas/components/util"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	testdbaas "github.com/apecloud/kubeblocks/internal/testutil/dbaas"
-	"github.com/apecloud/kubeblocks/test/testdata"
 )
 
 var _ = Describe("Cluster Controller", func() {
-	const timeout = time.Second * 10
+	const timeout = time.Second * 1000000
 	const interval = time.Second * 1
 	const waitDuration = time.Second * 3
 
@@ -95,148 +91,31 @@ var _ = Describe("Cluster Controller", func() {
 
 	AfterEach(cleanEnv)
 
-	assureDefaultStorageClassObj := func(sc *storagev1.StorageClass) error {
-		By("Assuring an default storageClass")
-		patch := client.MergeFrom(sc)
-		if sc.Annotations == nil {
-			sc.Annotations = map[string]string{}
-		}
-		sc.Annotations["storageclass.kubernetes.io/is-default-class"] = "true"
-		return k8sClient.Patch(ctx, sc, patch)
-	}
-
 	assureCfgTplConfigMapObj := func() *corev1.ConfigMap {
 		By("Assuring an cm obj")
-		cfgCM, err := testdata.GetResourceFromTestData[corev1.ConfigMap]("config/configcm.yaml",
-			testdata.WithNamespace(testCtx.DefaultNamespace))
-		Expect(err).Should(Succeed())
-		cfgTpl, err := testdata.GetResourceFromTestData[dbaasv1alpha1.ConfigConstraint]("config/configtpl.yaml")
-		Expect(err).Should(Succeed())
+		cfgCM := testdbaas.CreateCustomizedObj(&testCtx, "config/configcm.yaml", &corev1.ConfigMap{},
+			testCtx.UseDefaultNamespace())
+		cfgTpl := testdbaas.CreateCustomizedObj(&testCtx, "config/configtpl.yaml", &dbaasv1alpha1.ConfigConstraint{},
+			testCtx.UseDefaultNamespace())
 
-		Expect(testCtx.CheckedCreateObj(ctx, cfgCM)).Should(Succeed())
-		Expect(testCtx.CheckedCreateObj(ctx, cfgTpl)).Should(Succeed())
-
-		// update phase status
-		patch := client.MergeFrom(cfgTpl.DeepCopy())
-		cfgTpl.Status.Phase = dbaasv1alpha1.AvailablePhase
-		Expect(k8sClient.Status().Patch(context.Background(), cfgTpl, patch)).Should(Succeed())
+		Expect(testdbaas.ChangeObjStatus(&testCtx, cfgTpl, func() {
+			cfgTpl.Status.Phase = dbaasv1alpha1.AvailablePhase
+		})).Should(Succeed())
 		return cfgCM
 	}
 
 	assureClusterDefObj := func() *dbaasv1alpha1.ClusterDefinition {
 		By("Assuring an clusterDefinition obj")
-		clusterDefYAML := `
-apiVersion: dbaas.kubeblocks.io/v1alpha1
-kind: ClusterDefinition
-metadata:
-  name: cluster-definition
-spec:
-  type: state.mysql
-  components:
-  - typeName: replicasets
-    componentType: Stateful
-    configSpec:
-      configTemplateRefs:
-      - name: mysql-tree-node-template-8.0
-        configTplRef: mysql-tree-node-template-8.0
-        configConstraintRef: mysql-tree-node-template-8.0
-        namespace: default
-        volumeName: mysql-config
-    defaultReplicas: 1
-    podSpec:
-      containers:
-      - name: mysql
-        imagePullPolicy: IfNotPresent
-        ports:
-        - containerPort: 3306
-          protocol: TCP
-          name: mysql
-        - containerPort: 13306
-          protocol: TCP
-          name: paxos
-        volumeMounts:
-          - mountPath: /var/lib/mysql
-            name: data
-          - mountPath: /var/log
-            name: log
-          - mountPath: /data/config
-            name: mysql-config
-        env:
-          - name: "MYSQL_ROOT_PASSWORD"
-            valueFrom:
-              secretKeyRef:
-                name: $(CONN_CREDENTIAL_SECRET_NAME)
-                key: password
-        command: ["/usr/bin/bash", "-c"]
-        args:
-          - >
-            cluster_info="";
-            for (( i=0; i<$KB_REPLICASETS_PRIMARY_N; i++ )); do
-              if [ $i -ne 0 ]; then
-                cluster_info="$cluster_info;";
-              fi;
-              host=$(eval echo \$KB_REPLICASETS_PRIMARY_"$i"_HOSTNAME)
-              cluster_info="$cluster_info$host:13306";
-            done;
-            idx=0;
-            while IFS='-' read -ra ADDR; do
-              for i in "${ADDR[@]}"; do
-                idx=$i;
-              done;
-            done <<< "$KB_POD_NAME";
-            echo $idx;
-            cluster_info="$cluster_info@$(($idx+1))";
-            echo $cluster_info;
-            docker-entrypoint.sh mysqld --cluster-start-index=1 --cluster-info="$cluster_info" --cluster-id=1
-  - typeName: proxy
-    componentType: Stateless
-    defaultReplicas: 1
-    podSpec:
-      containers:
-      - name: nginx
-    service:
-      ports:
-      - protocol: TCP
-        port: 80
-`
-		clusterDefinition := &dbaasv1alpha1.ClusterDefinition{}
-		Expect(yaml.Unmarshal([]byte(clusterDefYAML), clusterDefinition)).Should(Succeed())
-		Expect(testCtx.CheckedCreateObj(ctx, clusterDefinition)).Should(Succeed())
-		return clusterDefinition
+
+		return testdbaas.CreateCustomizedObj(&testCtx, "resources/mysql_cd.yaml", &dbaasv1alpha1.ClusterDefinition{},
+			testCtx.UseDefaultNamespace())
 	}
 
 	assureClusterVersionObj := func() *dbaasv1alpha1.ClusterVersion {
 		By("Assuring an clusterVersion obj")
-		clusterVersionYaml := `
-apiVersion: dbaas.kubeblocks.io/v1alpha1
-kind: ClusterVersion
-metadata:
-  name: cluster-version
-spec:
-  clusterDefinitionRef: cluster-definition
-  components:
-  - type: replicasets
-    configSpec:
-      configTemplateRefs:
-      - name: mysql-tree-node-template-8.0
-        configTplRef: mysql-tree-node-template-8.0
-        configConstraintRef: mysql-tree-node-template-8.0
-        namespace: default
-        volumeName: mysql-config
-    podSpec:
-      containers:
-      - name: mysql
-        image: docker.io/apecloud/wesql-server:latest
-  - type: proxy
-    podSpec: 
-      containers:
-      - name: nginx
-        image: nginx
-`
-		clusterVersion := &dbaasv1alpha1.ClusterVersion{}
-		Expect(yaml.Unmarshal([]byte(clusterVersionYaml), clusterVersion)).Should(Succeed())
-		Expect(testCtx.CheckedCreateObj(ctx, clusterVersion)).Should(Succeed())
-		return clusterVersion
+
+		return testdbaas.CreateCustomizedObj(&testCtx, "resources/mysql_cv.yaml", &dbaasv1alpha1.ClusterVersion{},
+			testCtx.UseDefaultNamespace())
 	}
 
 	newClusterObj := func(
@@ -252,156 +131,23 @@ spec:
 			clusterVersionObj = assureClusterVersionObj()
 		}
 
-		randomStr, _ := password.Generate(6, 0, 0, true, false)
-		key := types.NamespacedName{
-			Name:      "cluster" + randomStr,
-			Namespace: "default",
-		}
-
-		return &dbaasv1alpha1.Cluster{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      key.Name,
-				Namespace: key.Namespace,
-			},
-			Spec: dbaasv1alpha1.ClusterSpec{
-				ClusterDefRef:     clusterDefObj.GetName(),
-				ClusterVersionRef: clusterVersionObj.GetName(),
-				TerminationPolicy: dbaasv1alpha1.WipeOut,
-			},
-		}, clusterDefObj, clusterVersionObj, key
-	}
-
-	deleteClusterNWait := func(key types.NamespacedName) error {
-		Expect(func() error {
-			f := &dbaasv1alpha1.Cluster{}
-			if err := k8sClient.Get(ctx, key, f); err != nil {
-				return client.IgnoreNotFound(err)
-			}
-			return k8sClient.Delete(ctx, f)
-		}()).Should(Succeed())
-
-		var err error
-		f := &dbaasv1alpha1.Cluster{}
-		eta := time.Now().Add(waitDuration)
-		for err = k8sClient.Get(ctx, key, f); err == nil && time.Now().Before(eta); err = k8sClient.Get(ctx, key, f) {
-			f = &dbaasv1alpha1.Cluster{}
-		}
-		return client.IgnoreNotFound(err)
+		clusterObj := testdbaas.MockClusterObj(clusterDefObj.GetName(), clusterVersionObj.GetName())
+		clusterKey := client.ObjectKeyFromObject(clusterObj)
+		return clusterObj, clusterDefObj, clusterVersionObj, clusterKey
 	}
 
 	// Consensus associate objs
 	// ClusterDefinition with componentType = Consensus
 	assureClusterDefWithConsensusObj := func() *dbaasv1alpha1.ClusterDefinition {
 		By("Assuring an clusterDefinition obj with componentType = Consensus")
-		clusterDefYAML := `
-apiVersion: dbaas.kubeblocks.io/v1alpha1
-kind: ClusterDefinition
-metadata:
-  name: cluster-definition-consensus
-spec:
-  type: state.mysql
-  components:
-  - typeName: replicasets
-    componentType: Consensus
-    consensusSpec:
-      leader:
-        name: "leader"
-        accessMode: ReadWrite
-      followers:
-      - name: "follower"
-        accessMode: Readonly
-      updateStrategy: BestEffortParallel
-    service:
-      ports:
-      - protocol: TCP
-        port: 3306
-    defaultReplicas: 3
-    podSpec:
-      containers:
-      - name: mysql
-        imagePullPolicy: IfNotPresent
-        ports:
-        - containerPort: 3306
-          protocol: TCP
-          name: mysql
-        - containerPort: 13306
-          protocol: TCP
-          name: paxos
-        env:
-        - name: MYSQL_ROOT_HOST
-          value: '%'
-        - name: MYSQL_ROOT_USER
-          value: root
-        - name: MYSQL_ROOT_PASSWORD
-        - name: MYSQL_ALLOW_EMPTY_PASSWORD
-          value: "yes"
-        - name: MYSQL_DATABASE
-          value: mydb
-        - name: MYSQL_USER
-          value: u1
-        - name: MYSQL_PASSWORD
-          value: u1
-        - name: CLUSTER_ID
-          value: "1"
-        - name: CLUSTER_START_INDEX
-          value: "1"
-        - name: REPLICATIONUSER
-          value: replicator
-        - name: REPLICATION_PASSWORD
-        - name: MYSQL_TEMPLATE_CONFIG
-        - name: MYSQL_CUSTOM_CONFIG
-        - name: MYSQL_DYNAMIC_CONFIG
-        command: ["/bin/bash", "-c"]
-        args:
-          - >
-            cluster_info="";
-            for (( i=0; i<$KB_REPLICASETS_N; i++ )); do
-              if [ $i -ne 0 ]; then
-                cluster_info="$cluster_info;";
-              fi;
-              host=$(eval echo \$KB_REPLICASETS_"$i"_HOSTNAME)
-              cluster_info="$cluster_info$host:13306";
-            done;
-            idx=0;
-            while IFS='-' read -ra ADDR; do
-              for i in "${ADDR[@]}"; do
-                idx=$i;
-              done;
-            done <<< "$KB_POD_NAME";
-            echo $idx;
-            cluster_info="$cluster_info@$(($idx+1))";
-            echo $cluster_info;
-            docker-entrypoint.sh mysqld --cluster-start-index=1 --cluster-info="$cluster_info" --cluster-id=1
-  connectionCredential:
-    user: root
-`
-		clusterDefinition := &dbaasv1alpha1.ClusterDefinition{}
-		Expect(yaml.Unmarshal([]byte(clusterDefYAML), clusterDefinition)).Should(Succeed())
-		Expect(testCtx.CheckedCreateObj(ctx, clusterDefinition)).Should(Succeed())
-		return clusterDefinition
+		return testdbaas.CreateCustomizedObj(&testCtx, "resources/mysql_cd_consensusset.yaml", &dbaasv1alpha1.ClusterDefinition{},
+			testCtx.UseDefaultNamespace())
 	}
 
 	assureClusterVersionWithConsensusObj := func() *dbaasv1alpha1.ClusterVersion {
 		By("Assuring an clusterVersion obj with componentType = Consensus")
-		clusterVersionYaml := `
-apiVersion: dbaas.kubeblocks.io/v1alpha1
-kind: ClusterVersion
-metadata:
-  name: cluster-version-consensus
-spec:
-  clusterDefinitionRef: cluster-definition-consensus
-  components:
-  - type: replicasets
-    podSpec:
-      containers:
-      - name: mysql
-        image: docker.io/apecloud/wesql-server:latest
-        imagePullPolicy: IfNotPresent
-`
-		clusterVersion := &dbaasv1alpha1.ClusterVersion{}
-		Expect(yaml.Unmarshal([]byte(clusterVersionYaml), clusterVersion)).Should(Succeed())
-		Expect(testCtx.CheckedCreateObj(ctx, clusterVersion)).Should(Succeed())
-		return clusterVersion
+		return testdbaas.CreateCustomizedObj(&testCtx, "resources/mysql_cv_consensusset.yaml", &dbaasv1alpha1.ClusterVersion{},
+			testCtx.UseDefaultNamespace())
 	}
 
 	newClusterWithConsensusObj := func(
@@ -417,44 +163,26 @@ spec:
 			clusterVersionObj = assureClusterVersionWithConsensusObj()
 		}
 
-		randomStr, _ := password.Generate(6, 0, 0, true, false)
-		key := types.NamespacedName{
-			Name:      "cluster" + randomStr,
-			Namespace: "default",
-		}
-
-		return &dbaasv1alpha1.Cluster{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      key.Name,
-				Namespace: key.Namespace,
-			},
-			Spec: dbaasv1alpha1.ClusterSpec{
-				ClusterDefRef:     clusterDefObj.GetName(),
-				ClusterVersionRef: clusterVersionObj.GetName(),
-				TerminationPolicy: dbaasv1alpha1.WipeOut,
-				Components: []dbaasv1alpha1.ClusterComponent{
-					{
-						Name: "wesql-test",
-						Type: "replicasets",
-						VolumeClaimTemplates: []dbaasv1alpha1.ClusterComponentVolumeClaimTemplate{
-							{
-								Name: volumeName,
-								Spec: &corev1.PersistentVolumeClaimSpec{
-									AccessModes: []corev1.PersistentVolumeAccessMode{
-										corev1.ReadWriteOnce,
-									},
-									Resources: corev1.ResourceRequirements{
-										Requests: corev1.ResourceList{
-											corev1.ResourceStorage: resource.MustParse("1Gi"),
-										},
-									},
-								},
-							},
+		clusterObj := testdbaas.MockClusterObj(clusterDefObj.GetName(), clusterVersionObj.GetName())
+		clusterObj.Spec.Components = []dbaasv1alpha1.ClusterComponent{{
+			Name: "wesql-test",
+			Type: "replicasets",
+			VolumeClaimTemplates: []dbaasv1alpha1.ClusterComponentVolumeClaimTemplate{{
+				Name: volumeName,
+				Spec: &corev1.PersistentVolumeClaimSpec{
+					AccessModes: []corev1.PersistentVolumeAccessMode{
+						corev1.ReadWriteOnce,
+					},
+					Resources: corev1.ResourceRequirements{
+						Requests: corev1.ResourceList{
+							corev1.ResourceStorage: resource.MustParse("1Gi"),
 						},
 					},
 				},
-			},
-		}, clusterDefObj, clusterVersionObj, key
+			}},
+		}}
+		clusterKey := client.ObjectKeyFromObject(clusterObj)
+		return clusterObj, clusterDefObj, clusterVersionObj, clusterKey
 	}
 
 	isCMAvailable := func() bool {
@@ -487,24 +215,23 @@ spec:
 		return stsList
 	}
 
-	createClusterNCheck := func() (*dbaasv1alpha1.Cluster, *dbaasv1alpha1.ClusterDefinition, *dbaasv1alpha1.ClusterVersion, types.NamespacedName) {
-		By("Creating a cluster")
-		toCreate, cd, clusterVersion, key := newClusterObj(nil, nil)
-		Expect(testCtx.CreateObj(ctx, toCreate)).Should(Succeed())
+	Context("after the cluster initialized", func() {
+		const initializedVersion = 1
+		var key types.NamespacedName
 
-		fetchedG1 := &dbaasv1alpha1.Cluster{}
-		Eventually(func(g Gomega) {
-			g.Expect(k8sClient.Get(ctx, key, fetchedG1)).To(Succeed())
-			g.Expect(fetchedG1.Status.ObservedGeneration == 1).To(BeTrue())
-		}, timeout, interval).Should(Succeed())
+		BeforeEach(func() {
+			By("Creating a cluster")
+			toCreate, _, _, _ := newClusterObj(nil, nil)
+			Expect(testCtx.CreateObj(ctx, toCreate)).Should(Succeed())
+			key = client.ObjectKeyFromObject(toCreate)
 
-		return fetchedG1, cd, clusterVersion, key
-	}
+			By("Waiting for the cluster initialized")
+			Eventually(testdbaas.CheckObj(&testCtx, key, func(g Gomega, fetched *dbaasv1alpha1.Cluster) {
+				g.Expect(fetched.Status.ObservedGeneration == initializedVersion).To(BeTrue())
+			})).Should(Succeed())
+		})
 
-	Context("When creating cluster with normal", func() {
-		It("Should create cluster successfully", func() {
-			_, _, _, key := createClusterNCheck()
-
+		It("should create cluster and all sub-resources successfully", func() {
 			By("Check deployment workload has been created")
 			Eventually(func() bool {
 				deployList := &appsv1.DeploymentList{}
@@ -564,40 +291,78 @@ spec:
 				return len(cmList.Items) == 2
 			}, timeout, interval).Should(BeTrue())
 		})
-	})
 
-	Context("When deleting cluster with default termination policy", func() {
-		It("Should delete cluster resources immediately", func() {
-			By("Create a cluster")
-			_, _, _, key := createClusterNCheck()
+		It("should create corresponding services correctly", func() {
+			By("Checking proxy should have external ClusterIP service")
+			svcList1 := &corev1.ServiceList{}
+			Expect(k8sClient.List(ctx, svcList1, client.MatchingLabels{
+				intctrlutil.AppInstanceLabelKey:  key.Name,
+				intctrlutil.AppComponentLabelKey: "proxy",
+			}, client.InNamespace(key.Namespace))).Should(Succeed())
+			// TODO fix me later, proxy should not have internal headless service
+			// Expect(len(svcList1.Items) == 1).Should(BeTrue())
+			Expect(len(svcList1.Items) > 0).Should(BeTrue())
+			var existsExternalClusterIP bool
+			for _, svc := range svcList1.Items {
+				Expect(svc.Spec.Type == corev1.ServiceTypeClusterIP).To(BeTrue())
+				if svc.Spec.ClusterIP == corev1.ClusterIPNone {
+					continue
+				}
+				existsExternalClusterIP = true
+			}
+			Expect(existsExternalClusterIP).To(BeTrue())
 
+			By("Checking replicasets should have internal headless service")
+			getHeadlessSvcPorts := func(name string) []corev1.ServicePort {
+				fetched := &dbaasv1alpha1.Cluster{}
+				Expect(k8sClient.Get(ctx, key, fetched)).To(Succeed())
+
+				comp, err := util.GetComponentDeftByCluster(ctx, k8sClient, fetched, name)
+				Expect(err).ShouldNot(HaveOccurred())
+
+				var headlessSvcPorts []corev1.ServicePort
+				for _, container := range comp.PodSpec.Containers {
+					for _, port := range container.Ports {
+						// be consistent with headless_service_template.cue
+						headlessSvcPorts = append(headlessSvcPorts, corev1.ServicePort{
+							Name:       port.Name,
+							Protocol:   port.Protocol,
+							Port:       port.ContainerPort,
+							TargetPort: intstr.FromString(port.Name),
+						})
+					}
+				}
+				return headlessSvcPorts
+			}
+
+			svcList2 := &corev1.ServiceList{}
+			Expect(k8sClient.List(ctx, svcList2, client.MatchingLabels{
+				intctrlutil.AppInstanceLabelKey:  key.Name,
+				intctrlutil.AppComponentLabelKey: "replicasets",
+			}, client.InNamespace(key.Namespace))).Should(Succeed())
+			Expect(len(svcList2.Items) == 1).Should(BeTrue())
+			Expect(svcList2.Items[0].Spec.Type == corev1.ServiceTypeClusterIP).To(BeTrue())
+			Expect(svcList2.Items[0].Spec.ClusterIP == corev1.ClusterIPNone).To(BeTrue())
+			Expect(reflect.DeepEqual(svcList2.Items[0].Spec.Ports,
+				getHeadlessSvcPorts("replicasets"))).Should(BeTrue())
+		})
+
+		It("should delete cluster resources immediately if deleting cluster with WipeOut termination policy", func() {
 			By("Delete the cluster")
-			Eventually(func(g Gomega) {
-				g.Expect(deleteClusterNWait(key)).To(Succeed())
-			}, timeout, interval).Should(Succeed())
+			testdbaas.DeleteObject(&testCtx, key, &dbaasv1alpha1.Cluster{})
 
 			By("Wait for the cluster to terminate")
-			Eventually(func(g Gomega) {
-				tmp := &dbaasv1alpha1.Cluster{}
-				g.Expect(k8sClient.Get(ctx, key, tmp)).To(Satisfy(apierrors.IsNotFound))
-			}, timeout, interval).Should(Succeed())
+			Eventually(testdbaas.CheckObjExists(&testCtx, key, &dbaasv1alpha1.Cluster{}, false)).Should(Succeed())
 		})
-	})
 
-	Context("When deleting cluster with DoNotTerminate termination policy", func() {
-		It("Should not terminate immediately", func() {
-			By("Create a cluster")
-			_, _, _, key := createClusterNCheck()
-
+		It("should not terminate immediately if deleting cluster with DoNotTerminate termination policy", func() {
 			By("Update the cluster's termination policy to DoNotTerminate")
 			Eventually(testdbaas.GetAndChangeObj(&testCtx, key, func(cluster *dbaasv1alpha1.Cluster) {
 				cluster.Spec.TerminationPolicy = dbaasv1alpha1.DoNotTerminate
 			}), timeout, interval).Should(Succeed())
 
 			By("Delete the cluster")
-			Eventually(func(g Gomega) {
-				g.Expect(deleteClusterNWait(key)).To(Succeed())
-			}, timeout, interval).Should(Succeed())
+			testdbaas.DeleteObject(&testCtx, key, &dbaasv1alpha1.Cluster{})
 
 			By("Check the cluster do not terminate immediately")
 			checkClusterDoNotTerminate := func(g Gomega) {
@@ -613,70 +378,38 @@ spec:
 			By("Update the cluster's termination policy to WipeOut")
 			Eventually(testdbaas.GetAndChangeObj(&testCtx, key, func(cluster *dbaasv1alpha1.Cluster) {
 				cluster.Spec.TerminationPolicy = dbaasv1alpha1.WipeOut
-			}), timeout, interval).Should(Succeed())
+			})).Should(Succeed())
 
 			By("Wait for the cluster to terminate")
-			Eventually(func(g Gomega) {
-				tmp := &dbaasv1alpha1.Cluster{}
-				g.Expect(k8sClient.Get(ctx, key, tmp)).To(Satisfy(apierrors.IsNotFound))
-			}, timeout, interval).Should(Succeed())
+			Eventually(testdbaas.CheckObjExists(&testCtx, key, &dbaasv1alpha1.Cluster{}, false)).Should(Succeed())
 		})
-	})
 
-	changeClusterReplicas := func(clusterName types.NamespacedName, replicas int32) {
-		Eventually(testdbaas.GetAndChangeObj(&testCtx, clusterName, func(cluster *dbaasv1alpha1.Cluster) {
-			if cluster.Spec.Components == nil || len(cluster.Spec.Components) == 0 {
-				cluster.Spec.Components = []dbaasv1alpha1.ClusterComponent{
-					{
-						Name:     "replicasets",
-						Type:     "replicasets",
-						Replicas: &replicas,
-					}}
-			} else {
-				*cluster.Spec.Components[0].Replicas = replicas
-			}
-		}), timeout, interval).Should(Succeed())
-	}
-
-	Context("When updating cluster's replica number to a valid value", func() {
-		It("Should create/delete pods to match the desired replica number", func() {
-			By("Creating a cluster")
-			_, _, _, key := createClusterNCheck()
-
+		It("should create/delete pods to match the desired replica number if updating cluster's replica number to a valid value", func() {
 			replicasSeq := []int32{5, 3, 1, 0, 2, 4}
-			expectedOG := int64(1)
+			expectedOG := int64(initializedVersion)
 			for _, replicas := range replicasSeq {
 				By(fmt.Sprintf("Change replicas to %d", replicas))
 				changeClusterReplicas(key, replicas)
 				expectedOG++
 
 				By("Checking cluster status and the number of replicas changed")
-				Eventually(func(g Gomega) {
-					fetched := &dbaasv1alpha1.Cluster{}
-					g.Expect(k8sClient.Get(ctx, key, fetched)).To(Succeed())
+				Eventually(testdbaas.CheckObj(&testCtx, key, func(g Gomega, fetched *dbaasv1alpha1.Cluster) {
 					g.Expect(fetched.Status.ObservedGeneration == expectedOG).To(BeTrue())
-				}, timeout, interval).Should(Succeed())
+				})).Should(Succeed())
 				stsList := listAndCheckStatefulSet(key)
 				Expect(int(*stsList.Items[0].Spec.Replicas)).To(BeEquivalentTo(replicas))
 			}
 		})
-	})
 
-	Context("When updating cluster's replica number to an invalid value", func() {
-		It("Should not success", func() {
-			By("Creating a cluster")
-			_, _, _, key := createClusterNCheck()
-
+		It("should fail if updating cluster's replica number to an invalid value", func() {
 			invalidReplicas := int32(-1)
 			By(fmt.Sprintf("Change replicas to %d", invalidReplicas))
 			changeClusterReplicas(key, invalidReplicas)
 
 			By("Checking cluster status and the number of replicas unchanged")
-			Consistently(func(g Gomega) {
-				fetched := &dbaasv1alpha1.Cluster{}
-				g.Expect(k8sClient.Get(ctx, key, fetched)).To(Succeed())
-				g.Expect(fetched.Status.ObservedGeneration == 1).To(BeTrue())
-			}, waitDuration, interval).Should(Succeed())
+			Consistently(testdbaas.CheckObj(&testCtx, key, func(g Gomega, fetched *dbaasv1alpha1.Cluster) {
+				g.Expect(fetched.Status.ObservedGeneration == initializedVersion).To(BeTrue())
+			})).Should(Succeed())
 			stsList := listAndCheckStatefulSet(key)
 			Expect(int(*stsList.Items[0].Spec.Replicas)).To(BeEquivalentTo(1))
 		})
@@ -1303,66 +1036,6 @@ spec:
 		})
 	})
 
-	Context("When creating cluster with services", func() {
-		It("Should create corresponding services correctly", func() {
-			By("Creating a cluster")
-			_, _, _, key := createClusterNCheck()
-
-			By("Checking proxy should have external ClusterIP service")
-			svcList1 := &corev1.ServiceList{}
-			Expect(k8sClient.List(ctx, svcList1, client.MatchingLabels{
-				intctrlutil.AppInstanceLabelKey:  key.Name,
-				intctrlutil.AppComponentLabelKey: "proxy",
-			}, client.InNamespace(key.Namespace))).Should(Succeed())
-			// TODO fix me later, proxy should not have internal headless service
-			// Expect(len(svcList1.Items) == 1).Should(BeTrue())
-			Expect(len(svcList1.Items) > 0).Should(BeTrue())
-			var existsExternalClusterIP bool
-			for _, svc := range svcList1.Items {
-				Expect(svc.Spec.Type == corev1.ServiceTypeClusterIP).To(BeTrue())
-				if svc.Spec.ClusterIP == corev1.ClusterIPNone {
-					continue
-				}
-				existsExternalClusterIP = true
-			}
-			Expect(existsExternalClusterIP).To(BeTrue())
-
-			By("Checking replicasets should have internal headless service")
-			getHeadlessSvcPorts := func(name string) []corev1.ServicePort {
-				fetched := &dbaasv1alpha1.Cluster{}
-				Expect(k8sClient.Get(ctx, key, fetched)).To(Succeed())
-
-				comp, err := util.GetComponentDeftByCluster(ctx, k8sClient, fetched, name)
-				Expect(err).ShouldNot(HaveOccurred())
-
-				var headlessSvcPorts []corev1.ServicePort
-				for _, container := range comp.PodSpec.Containers {
-					for _, port := range container.Ports {
-						// be consistent with headless_service_template.cue
-						headlessSvcPorts = append(headlessSvcPorts, corev1.ServicePort{
-							Name:       port.Name,
-							Protocol:   port.Protocol,
-							Port:       port.ContainerPort,
-							TargetPort: intstr.FromString(port.Name),
-						})
-					}
-				}
-				return headlessSvcPorts
-			}
-
-			svcList2 := &corev1.ServiceList{}
-			Expect(k8sClient.List(ctx, svcList2, client.MatchingLabels{
-				intctrlutil.AppInstanceLabelKey:  key.Name,
-				intctrlutil.AppComponentLabelKey: "replicasets",
-			}, client.InNamespace(key.Namespace))).Should(Succeed())
-			Expect(len(svcList2.Items) == 1).Should(BeTrue())
-			Expect(svcList2.Items[0].Spec.Type == corev1.ServiceTypeClusterIP).To(BeTrue())
-			Expect(svcList2.Items[0].Spec.ClusterIP == corev1.ClusterIPNone).To(BeTrue())
-			Expect(reflect.DeepEqual(svcList2.Items[0].Spec.Ports,
-				getHeadlessSvcPorts("replicasets"))).Should(BeTrue())
-		})
-	})
-
 	Context("When updating cluster PVC storage size", func() {
 		It("Should update PVC request storage size accordingly", func() {
 
@@ -1475,6 +1148,16 @@ spec:
 
 	// TODO move integration tests(which relies on a real K8s cluster) out of UT
 	Context("When updating cluster PVC storage size in real K8s cluster", func() {
+		assureDefaultStorageClassObj := func(sc *storagev1.StorageClass) error {
+			By("Assuring an default storageClass")
+			return testdbaas.ChangeObj(&testCtx, sc, func() {
+				if sc.Annotations == nil {
+					sc.Annotations = map[string]string{}
+				}
+				sc.Annotations["storageclass.kubernetes.io/is-default-class"] = "true"
+			})
+		}
+
 		It("Should update PVC request storage size accordingly", func() {
 			By("Checking available storageclasses")
 			scList := &storagev1.StorageClassList{}
@@ -2347,4 +2030,19 @@ func startPortForward(kind, name string, port int32) error {
 func stopPortForward(name string) error {
 	cmd := exec.Command("bash", "-c", "ps aux | grep port-forward | grep -v grep | grep "+name+" | awk '{print $2}' | xargs kill -9")
 	return cmd.Run()
+}
+
+func changeClusterReplicas(clusterName types.NamespacedName, replicas int32) {
+	Eventually(testdbaas.GetAndChangeObj(&testCtx, clusterName, func(cluster *dbaasv1alpha1.Cluster) {
+		if cluster.Spec.Components == nil || len(cluster.Spec.Components) == 0 {
+			cluster.Spec.Components = []dbaasv1alpha1.ClusterComponent{
+				{
+					Name:     "replicasets",
+					Type:     "replicasets",
+					Replicas: &replicas,
+				}}
+		} else {
+			*cluster.Spec.Components[0].Replicas = replicas
+		}
+	})).Should(Succeed())
 }

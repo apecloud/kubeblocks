@@ -172,6 +172,18 @@ func CreateCustomizedObj[T intctrlutil.Object, PT intctrlutil.PObject[T]](testCt
 	return CreateK8sResource(testCtx.Ctx, *testCtx, pobj).(PT)
 }
 
+// Helper functions to delete object.
+
+func DeleteObject[T intctrlutil.Object, PT intctrlutil.PObject[T]](
+	testCtx *testutil.TestContext, key types.NamespacedName, pobj PT) {
+	gomega.Expect(func() error {
+		if err := testCtx.Cli.Get(testCtx.Ctx, key, pobj); err != nil {
+			return client.IgnoreNotFound(err)
+		}
+		return testCtx.Cli.Delete(testCtx.Ctx, pobj)
+	}()).Should(gomega.Succeed())
+}
+
 // Helper functions to delete a list of resources when writing unit tests.
 
 // ClearResources clears all resources of the given type T satisfying the input ListOptions.

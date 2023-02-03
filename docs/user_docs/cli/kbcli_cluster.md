@@ -50,7 +50,7 @@ Cluster command
 * [kbcli cluster list-events](kbcli_cluster_list-events.md)	 - List cluster events
 * [kbcli cluster list-instances](kbcli_cluster_list-instances.md)	 - List cluster instances
 * [kbcli cluster list-logs](kbcli_cluster_list-logs.md)	 - List supported log files in cluster
-* [kbcli cluster list-ops](kbcli_cluster_list-ops.md)	 - Liat all opsRequests
+* [kbcli cluster list-ops](kbcli_cluster_list-ops.md)	 - List all opsRequests
 * [kbcli cluster list-restores](kbcli_cluster_list-restores.md)	 - List all restore jobs
 * [kbcli cluster list-users](kbcli_cluster_list-users.md)	 - List cluster users
 * [kbcli cluster logs](kbcli_cluster_logs.md)	 - Access cluster log file

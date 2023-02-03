@@ -132,6 +132,7 @@ spec:
 		Expect(err).ShouldNot(HaveOccurred())
 		Expect(comps).ShouldNot(BeNil())
 		Expect(len(comps)).Should(Equal(2))
+		Expect(comps[0]["volumeClaimTemplates"]).ShouldNot(BeNil())
 	})
 
 	It("build tolerations", func() {

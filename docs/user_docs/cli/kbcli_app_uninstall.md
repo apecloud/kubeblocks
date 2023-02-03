@@ -1,6 +1,6 @@
 ## kbcli app uninstall
 
-Uninstall the appliaction with the specified name
+Uninstall the application with the specified name
 
 ```
 kbcli app uninstall [flags]

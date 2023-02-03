@@ -1,6 +1,6 @@
 ## kbcli app install
 
-Install the appliaction with the specified name
+Install the application with the specified name
 
 ```
 kbcli app install [flags]

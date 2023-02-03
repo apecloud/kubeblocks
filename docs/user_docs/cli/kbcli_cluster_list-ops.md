@@ -1,6 +1,6 @@
 ## kbcli cluster list-ops
 
-Liat all opsRequests
+List all opsRequests
 
 ```
 kbcli cluster list-ops [flags]

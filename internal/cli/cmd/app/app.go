@@ -82,7 +82,7 @@ func newInstallCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 
 	cmd := &cobra.Command{
 		Use:     "install",
-		Short:   "Install the appliaction with the specified name",
+		Short:   "Install the application with the specified name",
 		Example: installExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			util.CheckErr(o.complete(cmd, args))
@@ -105,7 +105,7 @@ func newUninstallCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *co
 
 	cmd := &cobra.Command{
 		Use:     "uninstall",
-		Short:   "Uninstall the appliaction with the specified name",
+		Short:   "Uninstall the application with the specified name",
 		Example: uninstallExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			util.CheckErr(o.complete(cmd, args))

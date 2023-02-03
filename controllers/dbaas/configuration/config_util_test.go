@@ -31,9 +31,9 @@ import (
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	testdbaas "github.com/apecloud/kubeblocks/internal/testutil/dbaas"
 	testutil "github.com/apecloud/kubeblocks/internal/testutil/k8s"
 	mock_client "github.com/apecloud/kubeblocks/internal/testutil/k8s/mocks"
-	test "github.com/apecloud/kubeblocks/test/testdata"
 )
 
 var _ = Describe("ConfigWrapper util test", func() {
@@ -59,26 +59,27 @@ var _ = Describe("ConfigWrapper util test", func() {
 
 	AfterEach(func() {
 		// Add any teardown steps that needs to be executed after each test
+		testdbaas.ClearClusterResources(&testCtx)
 		ctrl.Finish()
 	})
 
 	Context("clusterdefinition CR test", func() {
 		It("Should success without error", func() {
-			testWrapper := CreateDBaasFromISV(testCtx, ctx, k8sClient,
-				test.SubTestDataPath("resources"),
-				FakeTest{
-					// for crd yaml file
-					CfgTemplateYaml: "mysql_config_template.yaml",
-					CDYaml:          "mysql_cd.yaml",
-					CVYaml:          "mysql_cv.yaml",
-					CfgCMYaml:       "mysql_config_cm.yaml",
-					StsYaml:         "mysql_sts.yaml",
-				}, true)
-			Expect(testWrapper.HasError()).Should(Succeed())
-
-			// clean all cr after finished
+			testWrapper := CreateDBaasFromISV(testCtx, ctx, FakeTest{
+				// for crd yaml file
+				CfgCCYaml:       "mysql_config_template.yaml",
+				CDYaml:          "mysql_cd.yaml",
+				CVYaml:          "mysql_cv.yaml",
+				CfgCMYaml:       "mysql_config_cm.yaml",
+				StsYaml:         "mysql_sts.yaml",
+				ClusterYaml:     "mysql_cluster.yaml",
+				TestDataPath:    "resources",
+				ComponentName:   TestComponentName,
+				CDComponentType: TestCDComponentTypeName,
+			})
 			defer func() {
-				Expect(testWrapper.DeleteAllCR()).Should(Succeed())
+				By("clear TestWrapper created objects...")
+				defer testWrapper.DeleteAllObjects()
 			}()
 
 			availableTPL := testWrapper.tpl.DeepCopy()
@@ -167,17 +168,22 @@ var _ = Describe("ConfigWrapper util test", func() {
 
 	Context("clusterdefinition CR test without config Constraints", func() {
 		It("Should success without error", func() {
-			testWrapper := CreateDBaasFromISV(testCtx, ctx, k8sClient,
-				test.SubTestDataPath("resources"),
-				FakeTest{
-					// for crd yaml file
-					CfgTemplateYaml: "mysql_config_template.yaml",
-					CDYaml:          "mysql_cd.yaml",
-					CVYaml:          "mysql_cv.yaml",
-					CfgCMYaml:       "mysql_config_cm.yaml",
-					StsYaml:         "mysql_sts.yaml",
-				}, true)
-			Expect(testWrapper.HasError()).Should(Succeed())
+			testWrapper := CreateDBaasFromISV(testCtx, ctx, FakeTest{
+				// for crd yaml file
+				CfgCCYaml:       "mysql_config_template.yaml",
+				CDYaml:          "mysql_cd.yaml",
+				CVYaml:          "mysql_cv.yaml",
+				CfgCMYaml:       "mysql_config_cm.yaml",
+				StsYaml:         "mysql_sts.yaml",
+				ClusterYaml:     "mysql_cluster.yaml",
+				TestDataPath:    "resources",
+				ComponentName:   TestComponentName,
+				CDComponentType: TestCDComponentTypeName,
+			})
+			defer func() {
+				By("clear TestWrapper created objects...")
+				defer testWrapper.DeleteAllObjects()
+			}()
 
 			// remove ConfigConstraintRef
 			_, err := handleConfigTemplate(testWrapper.cd, func(templates []dbaasv1alpha1.ConfigTemplate) (bool, error) {
@@ -194,11 +200,6 @@ var _ = Describe("ConfigWrapper util test", func() {
 				return nil
 			})
 			Expect(err).Should(Succeed())
-
-			// clean all cr after finished
-			defer func() {
-				Expect(testWrapper.DeleteAllCR()).Should(Succeed())
-			}()
 
 			availableTPL := testWrapper.tpl.DeepCopy()
 			availableTPL.Status.Phase = dbaasv1alpha1.AvailablePhase
@@ -248,25 +249,24 @@ var _ = Describe("ConfigWrapper util test", func() {
 
 	Context("clusterversion CR test", func() {
 		It("Should success without error", func() {
-			testWrapper := CreateDBaasFromISV(testCtx, ctx, k8sClient,
-				test.SubTestDataPath("resources"),
-				FakeTest{
-					// for crd yaml file
-					CfgTemplateYaml: "mysql_config_template.yaml",
-					CDYaml:          "mysql_cd.yaml",
-					CVYaml:          "mysql_cv.yaml",
-					CfgCMYaml:       "mysql_config_cm.yaml",
-					StsYaml:         "mysql_sts.yaml",
-				}, true)
-			Expect(testWrapper.HasError()).Should(Succeed())
-
-			// clean all cr after finished
+			testWrapper := CreateDBaasFromISV(testCtx, ctx, FakeTest{
+				// for crd yaml file
+				CfgCCYaml:       "mysql_config_template.yaml",
+				CDYaml:          "mysql_cd.yaml",
+				CVYaml:          "mysql_cv.yaml",
+				CfgCMYaml:       "mysql_config_cm.yaml",
+				StsYaml:         "mysql_sts.yaml",
+				ClusterYaml:     "mysql_cluster.yaml",
+				TestDataPath:    "resources",
+				ComponentName:   TestComponentName,
+				CDComponentType: TestCDComponentTypeName,
+			})
 			defer func() {
-				Expect(testWrapper.DeleteAllCR()).Should(Succeed())
+				By("clear TestWrapper created objects...")
+				defer testWrapper.DeleteAllObjects()
 			}()
 
 			updateAVTemplates(testWrapper)
-
 			availableTPL := testWrapper.tpl.DeepCopy()
 			availableTPL.Status.Phase = dbaasv1alpha1.AvailablePhase
 

@@ -18,8 +18,6 @@ package configuration
 
 import (
 	"context"
-	"time"
-
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -30,7 +28,6 @@ import (
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	testdbaas "github.com/apecloud/kubeblocks/internal/testutil/dbaas"
-	test "github.com/apecloud/kubeblocks/test/testdata"
 )
 
 var _ = Describe("ConfigConstraint Controller", func() {
@@ -62,16 +59,20 @@ var _ = Describe("ConfigConstraint Controller", func() {
 	Context("Create config tpl with cue validate", func() {
 		It("Should ready", func() {
 			By("create resources")
-			testWrapper := CreateDBaasFromISV(testCtx, ctx, k8sClient,
-				test.SubTestDataPath("resources"),
-				FakeTest{
-					// for crd yaml file
-					CfgTemplateYaml: "mysql_config_template.yaml",
-					CDYaml:          "mysql_cd.yaml",
-					CVYaml:          "mysql_cv.yaml",
-					CfgCMYaml:       "mysql_config_cm.yaml",
-				}, true)
-			Expect(testWrapper.HasError()).ShouldNot(HaveOccurred())
+			testWrapper := CreateDBaasFromISV(testCtx, ctx, FakeTest{
+				CfgCCYaml:       "mysql_config_template.yaml",
+				CDYaml:          "mysql_cd.yaml",
+				CVYaml:          "mysql_cv.yaml",
+				CfgCMYaml:       "mysql_config_cm.yaml",
+				TestDataPath:    "resources",
+				ComponentName:   TestComponentName,
+				CDComponentType: TestCDComponentTypeName,
+			})
+
+			defer func() {
+				By("clear TestWrapper created objects...")
+				defer testWrapper.DeleteAllObjects()
+			}()
 
 			// should ensure clusterdef and clusterversion are in cache before going on
 			// TODO fixme: it seems this is likely a bug in intctrlutil.ValidateReferenceCR,
@@ -89,7 +90,7 @@ var _ = Describe("ConfigConstraint Controller", func() {
 			By("check ConfigConstraint(template) status and finalizer")
 			Eventually(testdbaas.CheckObj(&testCtx, tplKey,
 				func(g Gomega, tpl *dbaasv1alpha1.ConfigConstraint) {
-					g.Expect(tpl.Status.Phase).To(Equal(dbaasv1alpha1.AvailablePhase))
+					g.Expect(tpl.Status.Phase).To(BeEquivalentTo(dbaasv1alpha1.AvailablePhase))
 					g.Expect(tpl.Finalizers).To(ContainElement(cfgcore.ConfigurationTemplateFinalizerName))
 				})).Should(Succeed())
 
@@ -106,35 +107,35 @@ var _ = Describe("ConfigConstraint Controller", func() {
 			Expect(testWrapper.DeleteCD()).Should(Succeed())
 
 			By("check ConfigConstraint should be deleted")
-			Eventually(testdbaas.CheckObjExists(&testCtx, tplKey, &dbaasv1alpha1.ConfigConstraint{}, false),
-				60*time.Second, time.Second).Should(Succeed())
+			Eventually(testdbaas.CheckObjExists(&testCtx, tplKey, &dbaasv1alpha1.ConfigConstraint{}, false)).Should(Succeed())
 		})
 	})
 
 	Context("Create config tpl without cue validate", func() {
 		It("Should ready", func() {
-			By("By creating a ISV resource")
+			By("creating a ISV resource")
 
 			// step1: prepare env
-			testWrapper := CreateDBaasFromISV(testCtx, ctx, k8sClient,
-				test.SubTestDataPath("resources"),
-				FakeTest{
-					// for crd yaml file
-					CfgTemplateYaml: "mysql_config_tpl_not_validate.yaml",
-					CDYaml:          "mysql_cd.yaml",
-					CVYaml:          "mysql_cv.yaml",
-					CfgCMYaml:       "mysql_config_cm.yaml",
-				}, true)
-			Expect(testWrapper.HasError()).Should(Succeed())
+			testWrapper := CreateDBaasFromISV(testCtx, ctx, FakeTest{
+				// for crd yaml file
+				CfgCCYaml:       "mysql_config_tpl_not_validate.yaml",
+				CDYaml:          "mysql_cd.yaml",
+				CVYaml:          "mysql_cv.yaml",
+				CfgCMYaml:       "mysql_config_cm.yaml",
+				TestDataPath:    "resources",
+				ComponentName:   TestComponentName,
+				CDComponentType: TestCDComponentTypeName,
+			})
+			defer func() {
+				By("clear TestWrapper created objects...")
+				defer testWrapper.DeleteAllObjects()
+			}()
 
-			Eventually(func() bool {
-				ok, err := ValidateISVCR(testWrapper, &dbaasv1alpha1.ConfigConstraint{},
-					func(tpl *dbaasv1alpha1.ConfigConstraint) bool {
-						return validateConfTplStatus(tpl.Status)
-					})
-				return err == nil && ok
-			}, time.Second*30, time.Second*1).Should(BeTrue())
-			Expect(testWrapper.DeleteAllCR()).Should(Succeed())
+			By("check config constraint status")
+			Eventually(testdbaas.CheckObj(&testCtx, client.ObjectKeyFromObject(testWrapper.tpl),
+				func(g Gomega, tpl *dbaasv1alpha1.ConfigConstraint) {
+					g.Expect(tpl.Status.Phase).Should(BeEquivalentTo(dbaasv1alpha1.AvailablePhase))
+				})).Should(Succeed())
 		})
 	})
 })

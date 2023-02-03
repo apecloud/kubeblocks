@@ -128,6 +128,19 @@ func CheckObj[T intctrlutil.Object, PT intctrlutil.PObject[T]](testCtx *testutil
 	}
 }
 
+// Helper functions to check fields of resource lists when writing unit tests.
+
+func GetListLen[T intctrlutil.Object, PT intctrlutil.PObject[T],
+L intctrlutil.ObjList[T], PL intctrlutil.PObjList[T, L]](
+	testCtx *testutil.TestContext, _ func(T, L), opt ...client.ListOption) func(gomega.Gomega) int {
+	return func(g gomega.Gomega) int {
+		var objList L
+		g.Expect(testCtx.Cli.List(testCtx.Ctx, PL(&objList), opt...)).To(gomega.Succeed())
+		items := reflect.ValueOf(&objList).Elem().FieldByName("Items").Interface().([]T)
+		return len(items)
+	}
+}
+
 // Helper functions to create object from testdata files.
 
 func CreateObj[T intctrlutil.Object, PT intctrlutil.PObject[T]](testCtx *testutil.TestContext,
@@ -188,7 +201,7 @@ func DeleteObject[T intctrlutil.Object, PT intctrlutil.PObject[T]](
 
 // ClearResources clears all resources of the given type T satisfying the input ListOptions.
 func ClearResources[T intctrlutil.Object, PT intctrlutil.PObject[T],
-	L intctrlutil.ObjList[T], PL intctrlutil.PObjList[T, L]](
+L intctrlutil.ObjList[T], PL intctrlutil.PObjList[T, L]](
 	testCtx *testutil.TestContext, _ func(T, L), opts ...client.DeleteAllOfOption) {
 	var (
 		obj     T

@@ -52,7 +52,6 @@ import (
 var _ = Describe("Cluster Controller", func() {
 	const timeout = time.Second * 10
 	const interval = time.Second * 1
-	const waitDuration = time.Second * 3
 
 	const leader = "leader"
 	const follower = "follower"
@@ -135,13 +134,13 @@ var _ = Describe("Cluster Controller", func() {
 	// ClusterDefinition with componentType = Consensus
 	assureClusterDefWithConsensusObj := func() *dbaasv1alpha1.ClusterDefinition {
 		By("Assuring an clusterDefinition obj with componentType = Consensus")
-		return testdbaas.CreateCustomizedObj(&testCtx, "resources/mysql_cd_consensusset.yaml", &dbaasv1alpha1.ClusterDefinition{},
+		return testdbaas.CreateCustomizedObj(&testCtx, "resources/mysql_consensusset_cd.yaml", &dbaasv1alpha1.ClusterDefinition{},
 			testCtx.UseDefaultNamespace())
 	}
 
 	assureClusterVersionWithConsensusObj := func() *dbaasv1alpha1.ClusterVersion {
 		By("Assuring an clusterVersion obj with componentType = Consensus")
-		return testdbaas.CreateCustomizedObj(&testCtx, "resources/mysql_cv_consensusset.yaml", &dbaasv1alpha1.ClusterVersion{},
+		return testdbaas.CreateCustomizedObj(&testCtx, "resources/mysql_consensusset_cv.yaml", &dbaasv1alpha1.ClusterVersion{},
 			testCtx.UseDefaultNamespace())
 	}
 

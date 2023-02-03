@@ -27,7 +27,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 
 	"github.com/apecloud/kubeblocks/controllers/dbaas/components/consensusset"
-	"github.com/apecloud/kubeblocks/controllers/dbaas/components/util"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 	cfgproto "github.com/apecloud/kubeblocks/internal/configuration/proto"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
@@ -82,7 +81,7 @@ func getReplicationSetPods(params reconfigureParams) ([]corev1.Pod, error) {
 func GetComponentPods(params reconfigureParams) ([]corev1.Pod, error) {
 	componentPods := make([]corev1.Pod, 0)
 	for i := range params.ComponentUnits {
-		pods, err := consensusset.GetPodListByStatefulSet(params.Ctx.Ctx, params.Client, &params.ComponentUnits[i])
+		pods, err := util.GetPodListByStatefulSet(params.Ctx.Ctx, params.Client, &params.ComponentUnits[i])
 		if err != nil {
 			return nil, err
 		}

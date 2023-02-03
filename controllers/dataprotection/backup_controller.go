@@ -455,6 +455,7 @@ func (r *BackupReconciler) createBackupToolJob(
 	return nil
 }
 
+// ensureEmptyHooksCommand determines whether it has empty commands in the hooks
 func (r *BackupReconciler) ensureEmptyHooksCommand(
 	reqCtx intctrlutil.RequestCtx,
 	backup *dataprotectionv1alpha1.Backup,
@@ -480,6 +481,7 @@ func (r *BackupReconciler) ensureEmptyHooksCommand(
 		return false, errors.New(msg)
 	}
 
+	// return true directly, means hooks commands is empty, skip subsequent hook jobs.
 	if backupPolicy.Spec.Hooks == nil {
 		return true, nil
 	}

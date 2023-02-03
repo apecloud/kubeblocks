@@ -126,7 +126,6 @@ type BackupPolicyHook struct {
 	Image string `json:"image,omitempty"`
 
 	// which container can exec command
-	// +kubebuilder:default=mysql
 	// +optional
 	ContainerName string `json:"containerName,omitempty"`
 }

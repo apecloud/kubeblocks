@@ -34,10 +34,13 @@ import (
 )
 
 type createResourceObject = func() runtime.Object
+type filterFilter = func(string) bool
 
-type fakeKubeObjectHelper struct {
+type FakeKubeObjectHelper struct {
 	// resource base path
 	basePath string
+
+	filter filterFilter
 
 	// filter
 	filterResources map[schema.GroupVersionResource]string
@@ -56,7 +59,7 @@ type ResourceNamer struct {
 	clusterName string
 }
 
-type helperOption func(helper *fakeKubeObjectHelper)
+type helperOption func(helper *FakeKubeObjectHelper)
 
 func CreateRandomResourceNamer(ns string) ResourceNamer {
 	return ResourceNamer{
@@ -81,8 +84,8 @@ func GenerateConfigTemplate(namer ResourceNamer, volumeName string) []dbaasv1alp
 	}
 }
 
-func withResourceKind(resource schema.GroupVersionResource, kind string, options ...testdata.ResourceOptions) helperOption {
-	return func(helper *fakeKubeObjectHelper) {
+func WithResourceKind(resource schema.GroupVersionResource, kind string, options ...testdata.ResourceOptions) helperOption {
+	return func(helper *FakeKubeObjectHelper) {
 		if helper.filterResources == nil {
 			helper.filterResources = make(map[schema.GroupVersionResource]string, 0)
 		}
@@ -96,8 +99,14 @@ func withResourceKind(resource schema.GroupVersionResource, kind string, options
 	}
 }
 
-func withCustomResource(resource schema.GroupVersionResource, creator createResourceObject) helperOption {
-	return func(helper *fakeKubeObjectHelper) {
+func WithResourceFilter(filter filterFilter) helperOption {
+	return func(helper *FakeKubeObjectHelper) {
+		helper.filter = filter
+	}
+}
+
+func WithCustomResource(resource schema.GroupVersionResource, creator createResourceObject) helperOption {
+	return func(helper *FakeKubeObjectHelper) {
 		if helper.customCreateResources == nil {
 			helper.customCreateResources = make(map[schema.GroupVersionResource][]createResourceObject)
 		}
@@ -146,8 +155,8 @@ func newFakeClusterResource(namer ResourceNamer, componentName, componentType st
 	}
 }
 
-func NewFakeResourceObjectHelper(basePath string, options ...helperOption) fakeKubeObjectHelper {
-	fakeHelper := fakeKubeObjectHelper{
+func NewFakeResourceObjectHelper(basePath string, options ...helperOption) FakeKubeObjectHelper {
+	fakeHelper := FakeKubeObjectHelper{
 		basePath: basePath,
 	}
 	for _, option := range options {
@@ -156,7 +165,7 @@ func NewFakeResourceObjectHelper(basePath string, options ...helperOption) fakeK
 	return fakeHelper
 }
 
-func (helper *fakeKubeObjectHelper) pass(meta metav1.TypeMeta) bool {
+func (helper *FakeKubeObjectHelper) pass(meta metav1.TypeMeta) bool {
 	if helper.filterResources == nil {
 		return false
 	}
@@ -168,14 +177,14 @@ func (helper *fakeKubeObjectHelper) pass(meta metav1.TypeMeta) bool {
 	return true
 }
 
-func (helper *fakeKubeObjectHelper) options(meta metav1.TypeMeta) []testdata.ResourceOptions {
+func (helper *FakeKubeObjectHelper) options(meta metav1.TypeMeta) []testdata.ResourceOptions {
 	if helper.resourceOptions == nil {
 		return nil
 	}
 	return helper.resourceOptions[meta.Kind]
 }
 
-func (helper *fakeKubeObjectHelper) CreateObjects() []runtime.Object {
+func (helper *FakeKubeObjectHelper) CreateObjects() []runtime.Object {
 	resourceList, err := testdata.ScanDirectoryPath(helper.basePath)
 	requireSucceed(err)
 
@@ -250,7 +259,7 @@ func NewFakeOperationsOptions(ns, cName string, opsType dbaasv1alpha1.OpsType, o
 		panic(err)
 	}
 
-	// TODO using GroupVersionResource of fakeKubeObjectHelper
+	// TODO using GroupVersionResource of FakeKubeObjectHelper
 	listMapping := map[schema.GroupVersionResource]string{
 		types.ClusterDefGVR():       types.KindClusterDef + "List",
 		types.ClusterVersionGVR():   types.KindClusterVersion + "List",

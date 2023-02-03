@@ -19,6 +19,8 @@ package configuration
 import (
 	"context"
 	"fmt"
+	"github.com/apecloud/kubeblocks/internal/cli/types"
+	"github.com/apecloud/kubeblocks/test/testdata"
 	"os"
 	"path"
 
@@ -30,6 +32,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	mockobject "github.com/apecloud/kubeblocks/internal/cli/cmd/cluster"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/apecloud/kubeblocks/internal/testutil"
@@ -68,6 +71,8 @@ type K8sResource interface {
 }
 
 type TestWrapper struct {
+	namer mockobject.ResourceNamer
+
 	testEnv      FakeTest
 	testRootPath string
 	// clusterName string
@@ -352,6 +357,15 @@ func (w *TestWrapper) createStsFromFile(cluster *dbaasv1alpha1.Cluster, componen
 	return nil
 }
 
+func (w *TestWrapper) contains(fileName string) bool {
+	testEnv := w.testEnv
+	return testEnv.CDYaml == fileName ||
+		testEnv.CfgCMYaml == fileName ||
+		testEnv.StsYaml == fileName ||
+		testEnv.CVName == fileName ||
+		testEnv.CfgTemplateYaml == fileName
+}
+
 func GenRandomCDName() string {
 	return ISVTestCDPrefix + BuildRandomString()
 }
@@ -379,21 +393,32 @@ func BuildRandomString() string {
 	return randomStr
 }
 
-func CreateDBaasFromISV(testCtx testutil.TestContext, ctx context.Context, k8sClient client.Client, dataPath string, testInfo FakeTest, autoGenerate bool) *TestWrapper {
-	if autoGenerate {
-		testInfo.CDName = GenRandomCDName()
-		testInfo.CVName = GenRandomCVName()
-		testInfo.CfgTplName = GenRandomTplName()
-		testInfo.Namespace = testCtx.DefaultNamespace
-	}
-
+func CreateDBaasFromISV(testCtx testutil.TestContext, ctx context.Context, k8sClient client.Client, dataPath string, testInfo FakeTest) *TestWrapper {
 	testWrapper := &TestWrapper{
+		namer: mockobject.CreateRandomResourceNamer(testCtx.DefaultNamespace),
+
 		testEnv:      testInfo,
 		ctx:          ctx,
 		testCtx:      testCtx,
 		cli:          k8sClient,
 		testRootPath: dataPath,
 	}
+
+	resourceObjectsHelper := mockobject.NewFakeResourceObjectHelper(dataPath,
+		mockobject.WithResourceKind(types.ClusterDefGVR(), types.KindClusterDef,
+			testdata.WithName(testWrapper.namer.cdName),
+			testdata.WithConfigTemplate(mockobject.GenerateConfigTemplate(randomNamer, volumeName), testdata.ComponentTypeSelector(dbaasv1alpha1.Stateful)),
+			testdata.WithUpdateComponent(testdata.ComponentTypeSelector(dbaasv1alpha1.Stateful),
+				func(component *dbaasv1alpha1.ClusterDefinitionComponent) {
+					component.TypeName = cdComponentTypeName
+				}),
+
+		),
+		mockobject.WithResourceFilter(func(fileName string) bool {
+			return testWrapper.contains(fileName)
+		}))
+
+	resourceObjectsHelper.CreateObjects()
 
 	// create dbaas
 	// createCdFromISV(&testWrapper, testInfo.CDName, testInfo.CDYaml)

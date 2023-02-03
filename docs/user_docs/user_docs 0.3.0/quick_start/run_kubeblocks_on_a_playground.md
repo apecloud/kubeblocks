@@ -253,9 +253,9 @@ KubeBlocks has complete observability capabilities. This section demonstrates th
    A monitoring page is loaded automatically after the command is executed. 
 
 2. Click the Dashboard icon on the left bar and two monitoring panels show on the page.
-   [!Dashboards] Links to be added.
+   ![Dashboards](../image/dashboards.png)
 3. Click the `MySQL` panel to monitor the status of the ApeCloud MySQL cluster deployed by the playground.
-   [!MySQL_panel] Links to be added.
+   ![MySQL_panel](../image/mysql_panel.png)
 
 ### High availability of ApeCloud MySQL
 
@@ -337,7 +337,7 @@ NIN-STOP NYAN CAT is a demo application to observe how the database cluster exce
 
 2. Use `port-forward` according to the hints above to expose an application port as available access for your local host, then visit this application via http://127.0.0.1:8087.
 3. Delete the leader pod and view the influences on the ApeCloud MySQL clusters through the NYAN CAT page.
-   [!nyan_cat] Links to be added.
+   ![NYAN CAT](../image/nyan_cat.png)
 
 ## Uninstall the playground
 

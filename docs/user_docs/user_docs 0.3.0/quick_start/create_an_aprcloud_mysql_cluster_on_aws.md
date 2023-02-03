@@ -1,6 +1,8 @@
 # Create an ApeCloud MySQL cluster on AWS
 
 This guide introduces how to use KubeBlocks to create an ApeCloud MySQL cluster based on the Paxos consensus protocol within 5 minutes under the EKS environment.
+> Caution:
+> Running a database cluster on the cloud causes fees. Delete the resources created during the deploying process after operations.
 
 ## Before you start
 
@@ -14,7 +16,7 @@ This guide introduces how to use KubeBlocks to create an ApeCloud MySQL cluster 
    ```
    curl -fsSL http://161.189.136.182:8000/apecloud/kubeblocks/install_cli.sh |bash
    ```
-   > Note
+   > Note:
    > Please try again if a time-out exception occurs during installation. It may relate to your network condition.
 2. Run the command below to check the version and verify whether `kbcli` is installed successfully.
    ```
@@ -78,7 +80,7 @@ Create a YAML file named `mysql-component.yaml` and copy the configurations belo
             storage: 10Gi
 ```
 
-> Caution
+> Caution:
 > * Configure the parameter of `resources.limit` based on the node storage and CPU kernel amount of your EKS cluster. If there are not three repicas that exceed the values in `resources.limits`, creating a MySQL cluster may fail.
 > * KubeBlocks applies for a new EBS volume according to the value of `volumeClaimTemplates.spec.requests.storage`, which causes extra fees. Delete this EBS volume after your trial.
 

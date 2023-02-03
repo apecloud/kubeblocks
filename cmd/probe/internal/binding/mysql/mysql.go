@@ -111,7 +111,10 @@ func (m *Mysql) Operations() []bindings.OperationKind {
 
 func (m *Mysql) InitIfNeed() error {
 	if m.db == nil {
-		go m.InitDelay()
+		go func() {
+			err := m.InitDelay()
+			m.logger.Errorf("MySQl connection init failed: %v", err)
+		}()
 		return fmt.Errorf("init DB connection asynchronously")
 	}
 	return nil

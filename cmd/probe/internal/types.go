@@ -42,6 +42,6 @@ const (
 	RespEndTimeKey      = "end-time"
 	RespDurationKey     = "duration"
 	StatusCode          = "status-code"
-	//451 Unavailable For Legal Reasons, used to indicate check failed and trigger kubelet events
+	// 451 Unavailable For Legal Reasons, used to indicate check failed and trigger kubelet events
 	CheckFailedHTTPCode = "451"
 )

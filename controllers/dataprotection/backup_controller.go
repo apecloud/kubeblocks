@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	"github.com/spf13/viper"
@@ -245,8 +246,9 @@ func (r *BackupReconciler) doInProgressPhaseAction(
 	// finally, update backup status
 	r.Recorder.Event(backup, corev1.EventTypeNormal, "CreatedBackup", "Completed backup.")
 	if backup.Status.CompletionTimestamp != nil {
-		backup.Status.Duration = &metav1.Duration{
-			Duration: backup.Status.CompletionTimestamp.Sub(backup.Status.StartTimestamp.Time)}
+		// round the duration to a multiple of seconds.
+		duration := backup.Status.CompletionTimestamp.Sub(backup.Status.StartTimestamp.Time).Round(time.Second)
+		backup.Status.Duration = &metav1.Duration{Duration: duration}
 	}
 	if err := r.Client.Status().Update(reqCtx.Ctx, backup); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")

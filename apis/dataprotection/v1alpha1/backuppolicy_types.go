@@ -75,8 +75,8 @@ type BackupPolicySpec struct {
 type TargetCluster struct {
 	// database engine to support in the backup.
 	// +kubebuilder:validation:Enum={mysql}
-	// +kubebuilder:validation:Required
-	DatabaseEngine string `json:"databaseEngine"`
+	// +optional
+	DatabaseEngine string `json:"databaseEngine,omitempty"`
 
 	// database engine to support in the backup.
 	// +kubebuilder:validation:Enum={5.6,5.7,8.0}

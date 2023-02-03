@@ -3,7 +3,7 @@ kind: ConfigConstraint
 metadata:
   name: mysql-cfg-constraints-8.0
   labels:
-    {{- include "wesqlapp.labels" . | nindent 4 }}
+    {{- include "apecloud-mysql.labels" . | nindent 4 }}
 spec:
   # configmap reference
   # tplRef: mysql-3node-tpl-8.0

@@ -1,6 +1,6 @@
 apiVersion: v2
-name: wesql
-description: A WeSQL Helm chart for Kubernetes
+name: apecloud-mysql-cluster
+description: An ApeCloud MySQL Cluster Helm chart for KubeBlocks.
 
 # A chart can be either an 'application' or a 'library' chart.
 #
@@ -15,22 +15,10 @@ type: application
 # This is the chart version. This version number should be incremented each time you make changes
 # to the chart and its templates, including the app version.
 # Versions are expected to follow Semantic Versioning (https://semver.org/)
-version: 0.1.6
+version: 0.1.3
 
 # This is the version number of the application being deployed. This version number should be
 # incremented each time you make changes to the application. Versions are not expected to
 # follow Semantic Versioning. They should reflect the version the application is using.
 # It is recommended to use it with quotes.
 appVersion: "8.0.30"
-
-home: https://kubeblocks.io/
-icon: https://github.com/apecloud/kubeblocks/raw/main/img/logo.png
-
-
-maintainers:
-- name: ApeCloud
-  url: https://github.com/apecloud/kubeblocks/
-
-
-sources:
-- https://github.com/apecloud/kubeblocks/

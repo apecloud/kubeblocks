@@ -9,7 +9,7 @@ kbcli cluster volume-expand [flags]
 ### Options
 
 ```
-      --component-names strings                Component names to this operations (required)
+      --component-names strings                Component names to this operations
   -h, --help                                  help for volume-expand
       --name string                           OpsRequest name. if not specified, it will be randomly generated 
       --storage string                        Volume storage size (required)

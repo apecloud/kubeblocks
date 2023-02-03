@@ -50,9 +50,9 @@ annotations:
   artifacthub.io/prerelease: "true"
 
 dependencies:
-  - condition: wesql.enabled
-    name: wesql
-    repository: file://../wesql
+  - condition: apecloud-mysql.enabled
+    name: apecloud-mysql
+    repository: file://../apecloud-mysql
     version: 0.1.*
   - condition: grafana.enabled
     name: grafana

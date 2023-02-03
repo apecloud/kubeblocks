@@ -111,7 +111,7 @@ spec:
       type: LoadBalancer
     podSpec:
       containers:
-      - name: infracreate/wesql-server-8.0
+      - name: mysql
         imagePullPolicy: IfNotPresent
         volumeMounts:
         - mountPath: /data
@@ -222,7 +222,7 @@ spec:
       podSpec:
         containers:
           - name: mysql
-            image: apecloud/wesql-server:8.0.30-4.alpha1.20221031.g1aa54a3
+            image: apecloud/apecloud-mysql-server:8.0.30-4.alpha1.20221031.g1aa54a3
             imagePullPolicy: IfNotPresent
 ```
 

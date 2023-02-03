@@ -180,7 +180,7 @@ func (o *CreateOptions) Validate() error {
 			return err
 		}
 		o.ClusterVersionRef = version
-		fmt.Fprintf(o.Out, "Cluster version is not specified, use latest ClusterVersion %s", o.ClusterVersionRef)
+		fmt.Fprintf(o.Out, "Cluster version is not specified, use latest ClusterVersion %s\n", o.ClusterVersionRef)
 	}
 
 	// if name is not specified, generate a random cluster name

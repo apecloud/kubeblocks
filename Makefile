@@ -468,24 +468,6 @@ endif
 helm-package: bump-chart-ver ## Do helm package.
 	$(HELM) package $(CHART_PATH) --dependency-update
 
-##@ WeSQL Cluster Helm Chart Tasks
-
-WESQL_CLUSTER_CHART_PATH = deploy/wesqlcluster
-WESQL_CLUSTER_CHART_NAME = wesqlcluster
-WESQL_CLUSTER_CHART_VERSION ?= 0.1.1
-
-.PHONY: bump-chart-ver-wqsql-cluster
-bump-chart-ver-wqsql-cluster: ## Bump WeSQL Cluster helm chart version.
-ifeq ($(GOOS), darwin)
-	sed -i '' "s/^version:.*/version: $(WESQL_CLUSTER_CHART_VERSION)/" $(WESQL_CLUSTER_CHART_PATH)/Chart.yaml
-else
-	sed -i "s/^version:.*/version: $(WESQL_CLUSTER_CHART_VERSION)/" $(WESQL_CLUSTER_CHART_PATH)/Chart.yaml
-endif
-
-.PHONY: helm-package-wqsql-cluster
-helm-package-wqsql-cluster: bump-chart-ver-wqsql-cluster ## Do WeSQL Cluster helm package.
-	$(HELM) package $(WESQL_CLUSTER_CHART_PATH)
-
 ##@ Build Dependencies
 
 ## Location to install dependencies to

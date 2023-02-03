@@ -148,7 +148,7 @@ metadata:
   namespace: default
 spec:
   containers:
-  - image: docker.io/apecloud/wesql-server:latest
+  - image: docker.io/apecloud/apecloud-mysql-server:latest
     name: mysql
 `
 	pod := corev1.Pod{}

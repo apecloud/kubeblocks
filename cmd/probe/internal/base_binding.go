@@ -234,9 +234,9 @@ func (p *ProbeBase) roleObserve(ctx context.Context, cmd string, response *bindi
 }
 
 // DB may have some internal roles that need not be exposed to end user,
-// and not configured in cluster definition, eg. wesql's Candidate.
+// and not configured in cluster definition, e.g. apecloud-mysql's Candidate.
 // roleValidate is used to filter the internal roles and decrease the number
-// of report events to reduce the possibility of event conflictions.
+// of report events to reduce the possibility of event conflicts.
 func (p *ProbeBase) roleValidate(role string) (bool, string) {
 	// do not validate when db roles setting is missing
 	if len(p.dbRoles) == 0 {

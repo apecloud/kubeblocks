@@ -58,24 +58,24 @@ func TestIsProbeTimeout(t *testing.T) {
 	}
 }
 
-func TestCalculateComponentPhase(t *testing.T) {
+func TestGetComponentPhase(t *testing.T) {
 	var (
 		isFailed   = true
 		isAbnormal = true
 	)
-	status := CalculateComponentPhase(isFailed, isAbnormal)
+	status := GetComponentPhase(isFailed, isAbnormal)
 	if status != dbaasv1alpha1.FailedPhase {
-		t.Error("function CalculateComponentPhase should return Failed")
+		t.Error("function GetComponentPhase should return Failed")
 	}
 	isFailed = false
-	status = CalculateComponentPhase(isFailed, isAbnormal)
+	status = GetComponentPhase(isFailed, isAbnormal)
 	if status != dbaasv1alpha1.AbnormalPhase {
-		t.Error("function CalculateComponentPhase should return Abnormal")
+		t.Error("function GetComponentPhase should return Abnormal")
 	}
 	isAbnormal = false
-	status = CalculateComponentPhase(isFailed, isAbnormal)
+	status = GetComponentPhase(isFailed, isAbnormal)
 	if status != "" {
-		t.Error(`function CalculateComponentPhase should return ""`)
+		t.Error(`function GetComponentPhase should return ""`)
 	}
 }
 
@@ -180,8 +180,8 @@ var _ = Describe("Consensus Component", func() {
 				timeout = 3 * timeout
 			}
 
-			By("test GetComponentDeftByCluster function")
-			componentDef, _ := GetComponentDeftByCluster(ctx, k8sClient, cluster, consensusCompType)
+			By("test GetComponentDefByCluster function")
+			componentDef, _ := GetComponentDefByCluster(ctx, k8sClient, cluster, consensusCompType)
 			Expect(componentDef != nil).Should(BeTrue())
 
 			By("test GetClusterByObject function")

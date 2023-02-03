@@ -106,9 +106,10 @@ var DefaultLeader = ConsensusMember{
 type ComponentType string
 
 const (
-	Stateless ComponentType = "Stateless"
-	Stateful  ComponentType = "Stateful"
-	Consensus ComponentType = "Consensus"
+	Stateless   ComponentType = "Stateless"
+	Stateful    ComponentType = "Stateful"
+	Consensus   ComponentType = "Consensus"
+	Replication ComponentType = "Replication"
 )
 
 // TerminationPolicyType define termination policy types.

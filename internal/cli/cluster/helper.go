@@ -69,6 +69,22 @@ func GetSimpleInstanceInfos(dynamic dynamic.Interface, name string, namespace st
 			// learner
 			buildInfoByStatus(c.ConsensusSetStatus.Learner)
 		}
+		if c.ReplicationSetStatus != nil {
+			buildInfoByStatus := func(status *dbaasv1alpha1.ReplicationMemberStatus) {
+				if status == nil {
+					return
+				}
+				info = &InstanceInfo{Name: status.Pod}
+				infos = append(infos, info)
+			}
+			// primary
+			buildInfoByStatus(&c.ReplicationSetStatus.Primary)
+
+			// secondaries
+			for _, f := range c.ReplicationSetStatus.Secondaries {
+				buildInfoByStatus(&f)
+			}
+		}
 
 		// TODO: now we only support consensus set
 	}

@@ -67,7 +67,7 @@ func (consensusSet *ConsensusSet) PodIsAvailable(pod *corev1.Pod, minReadySecond
 	if pod == nil {
 		return false
 	}
-	return isReady(*pod)
+	return util.PodIsReady(*pod)
 }
 
 func (consensusSet *ConsensusSet) HandleProbeTimeoutWhenPodsReady(recorder record.EventRecorder) (bool, error) {
@@ -101,7 +101,7 @@ func (consensusSet *ConsensusSet) HandleProbeTimeoutWhenPodsReady(recorder recor
 	)
 
 	for _, pod := range podList.Items {
-		role := pod.Labels[intctrlutil.ConsensusSetRoleLabelKey]
+		role := pod.Labels[intctrlutil.RoleLabelKey]
 		if role == consensusSet.ComponentDef.ConsensusSpec.Leader.Name {
 			isFailed = false
 		}
@@ -157,7 +157,7 @@ func (consensusSet *ConsensusSet) GetPhaseWhenPodsNotReady(componentName string)
 		if v.DeletionTimestamp != nil {
 			return "", nil
 		}
-		labelValue := v.Labels[intctrlutil.ConsensusSetRoleLabelKey]
+		labelValue := v.Labels[intctrlutil.RoleLabelKey]
 		if labelValue == consensusSet.ComponentDef.ConsensusSpec.Leader.Name && intctrlutil.PodIsReady(&v) {
 			isFailed = false
 			continue
@@ -180,7 +180,7 @@ func (consensusSet *ConsensusSet) GetPhaseWhenPodsNotReady(componentName string)
 	if allPodIsReady {
 		return "", nil
 	}
-	return util.CalculateComponentPhase(isFailed, isAbnormal), nil
+	return util.GetComponentPhase(isFailed, isAbnormal), nil
 }
 
 func NewConsensusSet(ctx context.Context,

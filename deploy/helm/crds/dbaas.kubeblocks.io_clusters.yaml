@@ -146,6 +146,13 @@ spec:
                       maxLength: 12
                       pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                       type: string
+                    primaryIndex:
+                      description: primaryIndex determines which index is primary
+                        when componentType is Replication, index number starts from
+                        zero.
+                      format: int32
+                      minimum: 0
+                      type: integer
                     replicas:
                       description: Component replicas, use default value in ClusterDefinition
                         spec. if not specified.
@@ -712,6 +719,34 @@ spec:
                         pod.
                       format: date-time
                       type: string
+                    replicationSetStatus:
+                      description: replicationSetStatus role and pod name mapping.
+                      properties:
+                        primary:
+                          description: primary status.
+                          properties:
+                            pod:
+                              default: Unknown
+                              description: pod name.
+                              type: string
+                          required:
+                          - pod
+                          type: object
+                        secondaries:
+                          description: secondaries status.
+                          items:
+                            properties:
+                              pod:
+                                default: Unknown
+                                description: pod name.
+                                type: string
+                            required:
+                            - pod
+                            type: object
+                          type: array
+                      required:
+                      - primary
+                      type: object
                     type:
                       description: type of component.
                       type: string

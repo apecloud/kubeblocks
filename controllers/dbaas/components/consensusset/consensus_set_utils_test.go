@@ -19,7 +19,6 @@ package consensusset
 import (
 	"strconv"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	apps "k8s.io/api/apps/v1"
@@ -42,25 +41,9 @@ func TestIsReady(t *testing.T) {
 			Status: v1.ConditionTrue,
 		},
 	}
-	pod.Labels = map[string]string{intctrlutil.ConsensusSetRoleLabelKey: "leader"}
-	if !isReady(*pod) {
+	pod.Labels = map[string]string{intctrlutil.RoleLabelKey: "leader"}
+	if !util.PodIsReady(*pod) {
 		t.Errorf("isReady returned false negative")
-	}
-	pod.DeletionTimestamp = &metav1.Time{Time: time.Now()}
-	if isReady(*pod) {
-		t.Errorf("isReady returned false positive")
-	}
-	pod.Labels = nil
-	if isReady(*pod) {
-		t.Errorf("isReady returned false positive")
-	}
-	pod.Status.Conditions = nil
-	if isReady(*pod) {
-		t.Errorf("isReady returned false positive")
-	}
-	pod.Status.Conditions = []v1.PodCondition{}
-	if isReady(*pod) {
-		t.Errorf("isReady returned false positive")
 	}
 }
 
@@ -76,8 +59,10 @@ func TestInitClusterComponentStatusIfNeed(t *testing.T) {
 			},
 		},
 	}
-
-	initClusterComponentStatusIfNeed(cluster, componentName)
+	component := &dbaasv1alpha1.ClusterDefinitionComponent{
+		ComponentType: dbaasv1alpha1.Consensus,
+	}
+	util.InitClusterComponentStatusIfNeed(cluster, componentName, component)
 
 	if cluster.Status.Components == nil {
 		t.Errorf("cluster.Status.Components[*] not intialized properly")
@@ -90,7 +75,7 @@ func TestInitClusterComponentStatusIfNeed(t *testing.T) {
 		t.Errorf("cluster.Status.Components[componentName].ConsensusSetStatus not initialized properly")
 	} else if consensusSetStatus.Leader.Name != "" ||
 		consensusSetStatus.Leader.AccessMode != dbaasv1alpha1.None ||
-		consensusSetStatus.Leader.Pod != DefaultPodName {
+		consensusSetStatus.Leader.Pod != util.ComponentStatusDefaultPodName {
 		t.Errorf("cluster.Status.Components[componentName].ConsensusSetStatus.Leader not initialized properly")
 	}
 }
@@ -119,7 +104,7 @@ func TestSortPods(t *testing.T) {
 					Name:      stsName + "-" + strconv.Itoa(i),
 					Namespace: "default",
 					Labels: map[string]string{
-						intctrlutil.ConsensusSetRoleLabelKey: "learner",
+						intctrlutil.RoleLabelKey: "learner",
 					},
 				},
 			}

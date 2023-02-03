@@ -96,9 +96,9 @@ var _ = Describe("Reconfigure RollingPolicy", func() {
 					pod.Labels = make(map[string]string, 1)
 				}
 				if i == 1 {
-					pod.Labels[intctrlutil.ConsensusSetRoleLabelKey] = "leader"
+					pod.Labels[intctrlutil.RoleLabelKey] = "leader"
 				} else {
-					pod.Labels[intctrlutil.ConsensusSetRoleLabelKey] = "follower"
+					pod.Labels[intctrlutil.RoleLabelKey] = "follower"
 				}
 			}
 

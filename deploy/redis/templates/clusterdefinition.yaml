@@ -1,0 +1,111 @@
+apiVersion: dbaas.kubeblocks.io/v1alpha1
+kind: ClusterDefinition
+metadata:
+  name: apecloud-redis
+  labels:
+    {{- include "redis.labels" . | nindent 4 }}
+spec:
+  type: state.redis
+  connectionCredential:
+    username: ""
+    password: ""
+  components:
+    - typeName: replication
+      componentType: Replication
+      defaultReplicas: 2
+      minReplicas: 1
+      maxReplicas: 16
+      service:
+        ports:
+          - protocol: TCP
+            port: 6379
+      configSpec:
+        configTemplateRefs:
+          - name: redis-primary-config
+            configTplRef: redis-primary-config-7.0.5
+            namespace: {{ .Release.Namespace }}
+            volumeName: primary
+          - name: redis-secondary-config
+            configTplRef: redis-secondary-config-7.0.5
+            namespace: {{ .Release.Namespace }}
+            volumeName: secondary
+          - name: redis-scripts
+            configTplRef: redis-scripts
+            namespace: {{ .Release.Namespace }}
+            volumeName: scripts
+            defaultMode: 493
+      monitor:
+        builtIn: false
+        exporterConfig:
+          scrapePort: 9121
+          scrapePath: "/metrics"
+      podSpec:
+        initContainers:
+          - name: redis-init-container
+            image: redis:7.0.5
+            command: ["/scripts/init.sh"]
+            volumeMounts:
+              - name: data
+                mountPath: /data
+              - name: conf
+                mountPath: /etc/conf
+              - name: primary
+                mountPath: /etc/conf/primary
+              - name: secondary
+                mountPath: /etc/conf/secondary
+              - name: pod-role
+                mountPath: /etc/conf/role
+              - name: scripts
+                mountPath: /scripts
+        containers:
+          - name: redis
+            image: redis:7.0.5
+            ports:
+              - name: redis
+                containerPort: 6379
+            volumeMounts:
+              - name: data
+                mountPath: /data
+              - name: conf
+                mountPath: /etc/conf
+              - name: primary
+                mountPath: /etc/conf/primary
+              - name: secondary
+                mountPath: /etc/conf/secondary
+              - name: pod-role
+                mountPath: /etc/conf/role
+              - name: scripts
+                mountPath: /scripts
+            args: [ "/etc/conf/redis.conf" ]
+            lifecycle:
+              postStart:
+                exec:
+                  command: ["/scripts/setup.sh"]
+          - name: redis-exporter
+            image: oliver006/redis_exporter:latest
+            imagePullPolicy: IfNotPresent
+            resources:
+              requests:
+                cpu: 100m
+                memory: 100Mi
+            ports:
+              - name: metrics
+                containerPort: 9121
+                protocol: TCP
+            livenessProbe:
+              httpGet:
+                path: /
+                port: 9121
+            readinessProbe:
+              httpGet:
+                path: /
+                port: 9121
+        volumes:
+          - name: conf
+            emptyDir: { }
+          - name: pod-role
+            downwardAPI:
+              items:
+                - path: "labels"
+                  fieldRef:
+                    fieldPath: metadata.labels['kubeblocks.io/role']

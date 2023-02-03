@@ -51,7 +51,6 @@ import (
 
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
-	"github.com/apecloud/kubeblocks/controllers/dbaas/components/consensusset"
 	"github.com/apecloud/kubeblocks/controllers/dbaas/components/util"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	testdbaas "github.com/apecloud/kubeblocks/internal/testutil/dbaas"
@@ -1332,7 +1331,7 @@ spec:
 				fetched := &dbaasv1alpha1.Cluster{}
 				Expect(k8sClient.Get(ctx, key, fetched)).To(Succeed())
 
-				comp, err := util.GetComponentDeftByCluster(ctx, k8sClient, fetched, name)
+				comp, err := util.GetComponentDefByCluster(ctx, k8sClient, fetched, name)
 				Expect(err).ShouldNot(HaveOccurred())
 
 				var headlessSvcPorts []corev1.ServicePort
@@ -1710,7 +1709,7 @@ involvedObject:
   name: wesql-main-2
   namespace: default
 `
-		pods, err := consensusset.GetPodListByStatefulSet(ctx, k8sClient, sts)
+		pods, err := util.GetPodListByStatefulSet(ctx, k8sClient, sts)
 		Expect(err).To(Succeed())
 
 		events := make([]corev1.Event, 0)
@@ -1727,7 +1726,7 @@ involvedObject:
 	}
 
 	getStsPodsName := func(sts *appsv1.StatefulSet) []string {
-		pods, err := consensusset.GetPodListByStatefulSet(ctx, k8sClient, sts)
+		pods, err := util.GetPodListByStatefulSet(ctx, k8sClient, sts)
 		Expect(err).To(Succeed())
 
 		names := make([]string, 0)
@@ -1771,7 +1770,7 @@ involvedObject:
 			}
 
 			By("Creating mock role changed events")
-			// pod.Labels[intctrlutil.ConsensusSetRoleLabelKey] will be filled with the role
+			// pod.Labels[intctrlutil.RoleLabelKey] will be filled with the role
 			events := mockRoleChangedEvent(key, sts)
 			for _, event := range events {
 				Expect(testCtx.CreateObj(ctx, &event)).Should(Succeed())
@@ -1779,7 +1778,7 @@ involvedObject:
 
 			By("Checking pods' role are changed accordingly")
 			Eventually(func(g Gomega) {
-				pods, err := consensusset.GetPodListByStatefulSet(ctx, k8sClient, sts)
+				pods, err := util.GetPodListByStatefulSet(ctx, k8sClient, sts)
 				g.Expect(err).To(Succeed())
 				// should have 3 pods
 				g.Expect(len(pods)).To(Equal(3))
@@ -1787,7 +1786,7 @@ involvedObject:
 				// 2 followers
 				leaderCount, followerCount := 0, 0
 				for _, pod := range pods {
-					switch pod.Labels[intctrlutil.ConsensusSetRoleLabelKey] {
+					switch pod.Labels[intctrlutil.RoleLabelKey] {
 					case leader:
 						leaderCount++
 					case follower:
@@ -1884,7 +1883,7 @@ involvedObject:
 
 			stsList := listAndCheckStatefulSet(key)
 			sts := &stsList.Items[0]
-			pods, err := consensusset.GetPodListByStatefulSet(ctx, k8sClient, sts)
+			pods, err := util.GetPodListByStatefulSet(ctx, k8sClient, sts)
 			Expect(err).To(Succeed())
 			// should have 3 pods
 			Expect(len(pods)).Should(Equal(3))
@@ -1892,7 +1891,7 @@ involvedObject:
 			// 2 followers
 			leaderCount, followerCount := 0, 0
 			for _, pod := range pods {
-				switch pod.Labels[intctrlutil.ConsensusSetRoleLabelKey] {
+				switch pod.Labels[intctrlutil.RoleLabelKey] {
 				case leader:
 					leaderCount++
 				case follower:
@@ -1916,7 +1915,7 @@ involvedObject:
 			By("Deleting leader pod")
 			leaderPod := &corev1.Pod{}
 			for _, pod := range pods {
-				if pod.Labels[intctrlutil.ConsensusSetRoleLabelKey] == leader {
+				if pod.Labels[intctrlutil.RoleLabelKey] == leader {
 					leaderPod = &pod
 					break
 				}

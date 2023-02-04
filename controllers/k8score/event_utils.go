@@ -22,8 +22,11 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
-// IsOvertimeAndOccursTimesForEvent check whether the duration and number of events reach the threshold
-func IsOvertimeAndOccursTimesForEvent(event *corev1.Event, timeout time.Duration, eventOccursTimes int32) bool {
-	return event.LastTimestamp.After(event.FirstTimestamp.Add(timeout)) &&
-		event.Count >= eventOccursTimes
+// IsOvertimeEvent check whether the duration of warning event reaches the threshold.
+func IsOvertimeEvent(event *corev1.Event, timeout time.Duration) bool {
+	if event.Series != nil {
+		return event.Series.LastObservedTime.After(event.EventTime.Add(timeout))
+	}
+	// Note: LastTimestamp/FirstTimestamp/Count/Source of event are deprecated in k8s v1.25
+	return event.LastTimestamp.After(event.FirstTimestamp.Add(timeout))
 }

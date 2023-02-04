@@ -443,7 +443,7 @@ type ClusterDefinitionProbes struct {
 	// +optional
 	RoleChangedProbe *ClusterDefinitionProbe `json:"roleChangedProbe,omitempty"`
 
-	// roleProbeTimeoutAfterPodsReady when all pods of the component are ready,
+	// roleProbeTimeoutAfterPodsReady(in seconds), when all pods of the component are ready,
 	// it will detect whether the application is available in the pod.
 	// if pods exceed the InitializationTimeoutSeconds time without a role label,
 	// this component will enter the Failed/Abnormal phase.

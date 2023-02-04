@@ -10,13 +10,13 @@ kbcli cluster configure [flags]
 
 ```
   # update component params
-  kbcli cluster configure cluster-name --component-name=component-name --set max_connections=1000,general_log=OFF
+  kbcli cluster configure <cluster-name> --component-name=<component-name> --set max_connections=1000,general_log=OFF
 ```
 
 ### Options
 
 ```
-      --component-names strings       Component names to this operations (required)
+      --component-names strings       Component names to this operations
       --config-file string           Specifies the name of the configuration file to be updated
       --configure-url string         Specify the configuration file path url (required)
   -h, --help                         help for configure

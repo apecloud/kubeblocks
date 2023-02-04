@@ -82,7 +82,7 @@ func (r *ConfigConstraintReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		return *res, err
 	}
 
-	if configCSTR.Status.ObservedGeneration == configCSTR.GetObjectMeta().GetGeneration() {
+	if configCSTR.Status.ObservedGeneration == configCSTR.Generation {
 		return intctrlutil.Reconciled()
 	}
 
@@ -95,7 +95,7 @@ func (r *ConfigConstraintReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	if err := updateConfigurationSchema(&configCSTR.Spec); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "failed to generate configuration open api schema")
 	}
-	configCSTR.Status.ObservedGeneration = configCSTR.GetObjectMeta().GetGeneration()
+	configCSTR.Status.ObservedGeneration = configCSTR.Generation
 	configCSTR.Status.Phase = dbaasv1alpha1.AvailablePhase
 	if err = r.Client.Status().Patch(reqCtx.Ctx, configCSTR, statusPatch); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")

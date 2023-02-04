@@ -72,13 +72,11 @@ var clusterCreateExample = templates.Examples(`
 	kbcli cluster create mycluster --cluster-definition=my-cluster-def --set=my.yaml --termination-policy=WipeOut
 
 	# In scenarios where you want to load components data from website URL
-	# the cluster, use termination policy Halt
-	kbcli cluster create mycluster --cluster-definition=my-cluster-def --set=https://kubeblocks.io/yamls/wesql_single.yaml --termination-policy=Halt
+	kbcli cluster create mycluster --cluster-definition=my-cluster-def --set=https://kubeblocks.io/yamls/my.yaml
 
 	# In scenarios where you want to load components data from stdin
-	# the cluster, use termination policy Halt
-	cat << EOF | kbcli cluster create mycluster --cluster-definition=my-cluster-def --termination-policy=Halt --set -
-	- name: wesql-test... (omission from stdin)
+	cat << EOF | kbcli cluster create mycluster --cluster-definition=my-cluster-def --set -
+	- name: my-test ...
 
 	# Create a cluster forced to scatter by node
 	kbcli cluster create --cluster-definition=my-cluster-def --topology-keys=kubernetes.io/hostname --pod-anti-affinity=Required
@@ -180,7 +178,7 @@ func (o *CreateOptions) Validate() error {
 			return err
 		}
 		o.ClusterVersionRef = version
-		fmt.Fprintf(o.Out, "Cluster version is not specified, use latest ClusterVersion %s", o.ClusterVersionRef)
+		fmt.Fprintf(o.Out, "Cluster version is not specified, use latest ClusterVersion %s\n", o.ClusterVersionRef)
 	}
 
 	// if name is not specified, generate a random cluster name
@@ -350,7 +348,7 @@ func buildClusterComp(dynamic dynamic.Interface, clusterDef string) ([]map[strin
 		return nil, err
 	}
 
-	defaultStorageSize := viper.GetString("KBCLI_CLUSTER_DEFAULT_STORAGE_SIZE")
+	defaultStorageSize := viper.GetString("CLUSTER_DEFAULT_STORAGE_SIZE")
 	if len(defaultStorageSize) == 0 {
 		defaultStorageSize = "10Gi"
 	}
@@ -358,14 +356,17 @@ func buildClusterComp(dynamic dynamic.Interface, clusterDef string) ([]map[strin
 	for _, c := range cd.Spec.Components {
 		// if cluster definition component default replicas greater than 0, build a cluster component
 		// by cluster definition component.
-		r := c.DefaultReplicas
-		if r <= 0 {
+		replicas := c.DefaultReplicas
+		if replicas <= 0 {
 			continue
+		}
+		if defaultReplicas := viper.GetInt32("CLUSTER_DEFAULT_REPLICAS"); defaultReplicas > 0 {
+			replicas = defaultReplicas
 		}
 		compObj := &dbaasv1alpha1.ClusterComponent{
 			Name:     c.TypeName,
 			Type:     c.TypeName,
-			Replicas: &r,
+			Replicas: &replicas,
 			VolumeClaimTemplates: []dbaasv1alpha1.ClusterComponentVolumeClaimTemplate{{
 				Name: "data",
 				Spec: &corev1.PersistentVolumeClaimSpec{

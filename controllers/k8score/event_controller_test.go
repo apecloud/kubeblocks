@@ -94,7 +94,7 @@ var _ = Describe("Event Controller", func() {
 			}, time.Second*60, time.Second).Should(Equal(sndEvent.InvolvedObject.Name))
 
 			By("check whether the duration and number of events reach the threshold")
-			IsOvertimeAndOccursTimesForEvent(sndEvent, 5*time.Second, 1)
+			IsOvertimeEvent(sndEvent, 5*time.Second)
 		})
 	})
 })
@@ -153,7 +153,7 @@ metadata:
   namespace: default
 spec:
   containers:
-  - image: docker.io/apecloud/wesql-server:latest
+  - image: docker.io/apecloud/apecloud-mysql-server:latest
     name: mysql
 `
 	pod := corev1.Pod{}

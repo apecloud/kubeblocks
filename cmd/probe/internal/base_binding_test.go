@@ -31,7 +31,7 @@ import (
 type fakeBinding struct{}
 
 const (
-	testDbPort = 34521
+	testDBPort = 34521
 	testRole   = "leader"
 )
 
@@ -56,7 +56,7 @@ func TestInit(t *testing.T) {
 	if p.roleDetectionThreshold != defaultRoleDetectionThreshold {
 		t.Errorf("p.roleDetectionThreshold init failed: %d", p.roleDetectionThreshold)
 	}
-	if p.dbPort != testDbPort {
+	if p.dbPort != testDBPort {
 		t.Errorf("p.dbPort init failed: %d", p.dbPort)
 	}
 }
@@ -77,7 +77,7 @@ func TestInvoke(t *testing.T) {
 		if err != nil {
 			t.Errorf("runningCheck failed: %s", err)
 		}
-		if strings.Index(string(resp.Data), "{\"event\":\"runningCheckFailed\"") < 0 {
+		if !strings.Contains(string(resp.Data), "{\"event\":\"runningCheckFailed\"") {
 			t.Errorf("unexpected response: %s", string(resp.Data))
 		}
 
@@ -138,7 +138,7 @@ func (f *fakeBinding) InitIfNeed() error {
 }
 
 func (f *fakeBinding) GetRunningPort() int {
-	return testDbPort
+	return testDBPort
 }
 
 func (f *fakeBinding) StatusCheck(ctx context.Context, cmd string, response *bindings.InvokeResponse) ([]byte, error) {

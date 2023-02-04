@@ -6,10 +6,17 @@ Horizontal scale the specified components in the cluster
 kbcli cluster horizontal-scale [flags]
 ```
 
+### Examples
+
+```
+  # expand storage resources of specified components, separate with commas when <component-name> more than one
+  kbcli cluster horizontal-scale <my-cluster> --component-names=<component-name> --replicas=3
+```
+
 ### Options
 
 ```
-      --component-names strings       Component names to this operations (required)
+      --component-names strings       Component names to this operations
   -h, --help                         help for horizontal-scale
       --name string                  OpsRequest name. if not specified, it will be randomly generated 
       --replicas int                 Replicas with the specified components (default -1)

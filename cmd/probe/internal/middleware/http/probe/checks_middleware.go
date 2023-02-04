@@ -17,13 +17,13 @@ limitations under the License.
 package probe
 
 import (
-	"io"
 	"net/http"
 	"strconv"
 	"strings"
 
 	"github.com/dapr/components-contrib/middleware"
 	"github.com/dapr/kit/logger"
+	"github.com/valyala/fasthttp"
 )
 
 const (
@@ -48,49 +48,55 @@ type Middleware struct {
 	logger logger.Logger
 }
 
-type statusCodeWriter struct {
-	http.ResponseWriter
-	logger logger.Logger
-}
+// type statusCodeWriter struct {
+// 	http.ResponseWriter
+// 	logger logger.Logger
+// }
 
-func (scw *statusCodeWriter) WriteHeader(statusCode int) {
-	header := scw.ResponseWriter.Header()
-	scw.logger.Debugf("response header: %v", header)
-	if v, ok := header[statusCodeHeader]; ok {
-		scw.logger.Debugf("set statusCode: %v", v)
-		statusCode, _ = strconv.Atoi(v[0])
-		delete(header, statusCodeHeader)
-	}
-	scw.ResponseWriter.WriteHeader(statusCode)
-}
+// func (scw *statusCodeWriter) WriteHeader(statusCode int) {
+// 	header := scw.ResponseWriter.Header()
+// 	scw.logger.Debugf("response header: %v", header)
+// 	if v, ok := header[statusCodeHeader]; ok {
+// 		scw.logger.Debugf("set statusCode: %v", v)
+// 		statusCode, _ = strconv.Atoi(v[0])
+// 		delete(header, statusCodeHeader)
+// 	}
+// 	scw.ResponseWriter.WriteHeader(statusCode)
+// }
 
 // GetHandler returns the HTTP handler provided by the middleware.
-func (m *Middleware) GetHandler(metadata middleware.Metadata) (func(next http.Handler) http.Handler, error) {
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			url := r.URL
-			if r.Method == http.MethodGet && strings.HasPrefix(url.Path, bindingPath) {
+func (m *Middleware) GetHandler(metadata middleware.Metadata) (func(next fasthttp.RequestHandler) fasthttp.RequestHandler, error) {
+	return func(next fasthttp.RequestHandler) fasthttp.RequestHandler {
+		return func(ctx *fasthttp.RequestCtx) {
+			uri := ctx.Request.URI()
+			method := string(ctx.Request.Header.Method())
+			if method == http.MethodGet && strings.HasPrefix(string(uri.Path()), bindingPath) {
 				var body string
-				r.Method = http.MethodPost
-				r.Body.Close()
-				switch operation := url.Query().Get("operation"); operation {
+				ctx.Request.Header.SetMethod(http.MethodPost)
+				switch operation := uri.QueryArgs().Peek("operation"); string(operation) {
 				case statusCheckOperation:
 					body = `{"operation": "statusCheck", "metadata": {"sql" : ""}}`
-					r.Body = io.NopCloser(strings.NewReader(body))
+					ctx.Request.SetBody([]byte(body))
 				case runningCheckOperation:
 					body = `{"operation": "runningCheck", "metadata": {"sql" : ""}}`
-					r.Body = io.NopCloser(strings.NewReader(body))
+					ctx.Request.SetBody([]byte(body))
 				case roleCheckOperation:
 					body = `{"operation": "roleCheck", "metadata": {"sql" : ""}}`
-					r.Body = io.NopCloser(strings.NewReader(body))
+					ctx.Request.SetBody([]byte(body))
 				default:
-					m.logger.Infof("unknown probe operation: %v", operation)
+					m.logger.Infof("unknown probe operation: %v", string(operation))
 				}
 			}
 
-			m.logger.Infof("request: %v", r)
-			scw := &statusCodeWriter{ResponseWriter: w, logger: m.logger}
-			next.ServeHTTP(scw, r)
-		})
+			m.logger.Infof("request: %v", ctx.Request.String())
+			next(ctx)
+			code := ctx.Response.Header.Peek(statusCodeHeader)
+			statusCode, err := strconv.Atoi(string(code))
+			if err == nil {
+				ctx.Response.Header.SetStatusCode(statusCode)
+				m.logger.Infof("response abnormal: %v", ctx.Response.String())
+			}
+			m.logger.Infof("response: %v", ctx.Response.String())
+		}
 	}, nil
 }

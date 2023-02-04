@@ -6,6 +6,13 @@ Upgrade the cluster version
 kbcli cluster upgrade [flags]
 ```
 
+### Examples
+
+```
+  # upgrade the cluster to the specified version
+  kbcli cluster upgrade <my-cluster> --cluster-version=<cluster-version>
+```
+
 ### Options
 
 ```

@@ -6,10 +6,18 @@ Vertical scale the specified components in the cluster
 kbcli cluster vertical-scale [flags]
 ```
 
+### Examples
+
+```
+  # scale the computing resources of specified components, separate with commas when <component-name> more than one
+  kbcli cluster vertical-scale <my-cluster> --component-names=<component-name> --requests.cpu=500m \
+  --requests.memory=500Mi --limits.cpu=500m --limits.memory=500Mi
+```
+
 ### Options
 
 ```
-      --component-names strings       Component names to this operations (required)
+      --component-names strings       Component names to this operations
   -h, --help                         help for vertical-scale
       --limits.cpu string            CPU size limited by the component
       --limits.memory string         Memory size limited by the component

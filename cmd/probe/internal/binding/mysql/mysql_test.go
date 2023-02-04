@@ -46,7 +46,7 @@ func TestGetRunningPort(t *testing.T) {
 
 	m.metadata.Properties["url"] = "root:@tcp(127.0.0.1)/mysql?multiStatements=true"
 	port = m.GetRunningPort()
-	assert.Equal(t, defaultDbPort, port)
+	assert.Equal(t, defaultDBPort, port)
 }
 
 func TestGetRole(t *testing.T) {

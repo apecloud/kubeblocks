@@ -322,7 +322,7 @@ spec:
     podSpec:
       containers:
       - name: mysql
-        image: docker.io/apecloud/wesql-server:latest
+        image: docker.io/apecloud/apecloud-mysql-server:latest
 `, name)
 	clusterDefinition := &ClusterDefinition{}
 	err := yaml.Unmarshal([]byte(clusterDefYaml), clusterDefinition)
@@ -361,7 +361,7 @@ spec:
     podSpec:
       containers:
       - name: mysql
-        image: docker.io/apecloud/wesql-server:latest
+        image: docker.io/apecloud/apecloud-mysql-server:latest
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 3306
@@ -384,6 +384,27 @@ spec:
                 name: $(CONN_CREDENTIAL_SECRET_NAME)
                 key: password
         command: ["/usr/bin/bash", "-c"]
+`, name)
+	clusterDefinition := &ClusterDefinition{}
+	err := yaml.Unmarshal([]byte(clusterDefYaml), clusterDefinition)
+	return clusterDefinition, err
+}
+
+// createTestReplicationSetClusterDefinitionObj  other webhook_test called this function, carefully for modifying the function.
+func createTestReplicationSetClusterDefinitionObj(name string) (*ClusterDefinition, error) {
+	clusterDefYaml := fmt.Sprintf(`
+apiVersion: dbaas.kubeblocks.io/v1alpha1
+kind: ClusterDefinition
+metadata:
+  name: %s
+spec:
+  type: state.redis-7
+  components:
+    - typeName: replication
+      defaultReplicas: 2
+      minReplicas: 1
+      maxReplicas: 16
+      componentType: Replication
 `, name)
 	clusterDefinition := &ClusterDefinition{}
 	err := yaml.Unmarshal([]byte(clusterDefYaml), clusterDefinition)

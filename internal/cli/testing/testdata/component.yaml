@@ -1,4 +1,4 @@
-- name: wesql-test
+- name: test
   type: mysql
   monitor: false
   volumeClaimTemplates:

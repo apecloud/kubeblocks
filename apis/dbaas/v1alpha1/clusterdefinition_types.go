@@ -282,11 +282,9 @@ type ClusterDefinitionComponent struct {
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	TypeName string `json:"typeName"`
 
-	// componentType defines type of the component. On of Stateful, Stateless, Consensus.
-	// Default to Stateless.
+	// componentType defines type of the component.
 	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:Enum={Stateless,Stateful,Consensus}
-	// +kubebuilder:default=Stateless
+	// +kubebuilder:validation:Enum={Stateless,Stateful,Consensus,Replication}
 	ComponentType ComponentType `json:"componentType"`
 
 	// characterType defines well-known database component name, such as mongos(mongodb), proxy(redis), mariadb(mysql)
@@ -355,6 +353,7 @@ type ClusterDefinitionComponent struct {
 	// consensusSpec defines consensus related spec if componentType is Consensus, required if componentType is Consensus.
 	// +optional
 	ConsensusSpec *ConsensusSetSpec `json:"consensusSpec,omitempty"`
+
 	// horizontalScalePolicy controls the behavior of horizontal scale.
 	// +optional
 	HorizontalScalePolicy *HorizontalScalePolicy `json:"horizontalScalePolicy,omitempty"`
@@ -392,11 +391,6 @@ type ClusterDefinitionStatusGeneration struct {
 	// ClusterDefinition generation number.
 	// +optional
 	ClusterDefGeneration int64 `json:"clusterDefGeneration,omitempty"`
-
-	// ClusterDefinition sync. status.
-	// +kubebuilder:validation:Enum={InSync,OutOfSync}
-	// +optional
-	ClusterDefSyncStatus Status `json:"clusterDefSyncStatus,omitempty"`
 }
 
 type ClusterDefinitionProbeCMDs struct {

@@ -111,7 +111,9 @@ var _ = Describe("ClusterDefinition Controller", func() {
 			Eventually(func(g Gomega) {
 				cv := &dbaasv1alpha1.ClusterVersion{}
 				g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(testWrapper.CV), cv)).To(Succeed())
-				g.Expect(cv.Status.ClusterDefSyncStatus == dbaasv1alpha1.OutOfSyncStatus).To(BeTrue())
+				g.Expect(cv.Status.Phase == dbaasv1alpha1.AvailablePhase &&
+					cv.Status.Message == "" &&
+					cv.Status.ClusterDefGeneration > testWrapper.CD.Generation).To(BeTrue())
 			}, timeout, interval).Should(Succeed())
 
 			// TODO: update components to break @validateClusterVersion, and transit ClusterVersion.Status.Phase to UnavailablePhase

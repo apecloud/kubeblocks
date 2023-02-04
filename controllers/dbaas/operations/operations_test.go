@@ -131,7 +131,8 @@ var _ = Describe("OpsRequest Controller", func() {
 
 	testVerticalScaling := func(opsRes *OpsResource) {
 		By("Test VerticalScaling")
-		ops := testdbaas.GenerateOpsRequestObj("verticalscaling-ops-"+randomStr, clusterName, dbaasv1alpha1.VerticalScalingType)
+		ops := testdbaas.NewOpsRequestObj("verticalscaling-ops-"+randomStr, testCtx.DefaultNamespace,
+			clusterName, dbaasv1alpha1.VerticalScalingType)
 		ops.Spec.VerticalScalingList = []dbaasv1alpha1.VerticalScaling{
 			{
 				ComponentOps: dbaasv1alpha1.ComponentOps{ComponentName: consensusCompName},
@@ -151,7 +152,8 @@ var _ = Describe("OpsRequest Controller", func() {
 		initClusterForOps(opsRes)
 		By("test save last configuration and OpsRequest phase is Running")
 		Expect(GetOpsManager().Do(opsRes)).Should(Succeed())
-		Eventually(testdbaas.GetOpsRequestPhase(ctx, testCtx, ops.Name), timeout, interval).Should(Equal(dbaasv1alpha1.RunningPhase))
+		Eventually(testdbaas.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(ops)),
+			timeout, interval).Should(Equal(dbaasv1alpha1.RunningPhase))
 
 		By("test vertical scale action function")
 		vsHandler := verticalScalingHandler{}
@@ -212,7 +214,8 @@ var _ = Describe("OpsRequest Controller", func() {
 
 	testRestart := func(opsRes *OpsResource, consensusPodList []corev1.Pod, statelessPod *corev1.Pod) {
 		By("Test Restart")
-		ops := testdbaas.GenerateOpsRequestObj("restart-ops-"+randomStr, clusterName, dbaasv1alpha1.RestartType)
+		ops := testdbaas.NewOpsRequestObj("restart-ops-"+randomStr, testCtx.DefaultNamespace,
+			clusterName, dbaasv1alpha1.RestartType)
 		ops.Spec.RestartList = []dbaasv1alpha1.ComponentOps{
 			{ComponentName: consensusCompName},
 			{ComponentName: statelessCompName},
@@ -222,7 +225,8 @@ var _ = Describe("OpsRequest Controller", func() {
 		initClusterForOps(opsRes)
 		opsRes.OpsRequest = testdbaas.CreateOpsRequest(ctx, testCtx, ops)
 		Expect(GetOpsManager().Do(opsRes)).Should(Succeed())
-		Eventually(testdbaas.GetOpsRequestPhase(ctx, testCtx, ops.Name), timeout, interval).Should(Equal(dbaasv1alpha1.RunningPhase))
+		Eventually(testdbaas.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(ops)),
+			timeout, interval).Should(Equal(dbaasv1alpha1.RunningPhase))
 
 		By("test restart action and reconcile function")
 		testdbaas.MockConsensusComponentStatefulSet(ctx, testCtx, clusterName, consensusCompName)
@@ -246,7 +250,8 @@ var _ = Describe("OpsRequest Controller", func() {
 		By("Test Upgrade Ops")
 		newClusterVersionName := "clusterversion-upgrade-" + randomStr
 		_ = testdbaas.CreateHybridCompsClusterVersionForUpgrade(ctx, testCtx, clusterDefinitionName, newClusterVersionName)
-		ops := testdbaas.GenerateOpsRequestObj("upgrade-ops-"+randomStr, clusterObject.Name, dbaasv1alpha1.UpgradeType)
+		ops := testdbaas.NewOpsRequestObj("upgrade-ops-"+randomStr, testCtx.DefaultNamespace,
+			clusterObject.Name, dbaasv1alpha1.UpgradeType)
 		ops.Spec.Upgrade = &dbaasv1alpha1.Upgrade{ClusterVersionRef: newClusterVersionName}
 		opsRes.OpsRequest = testdbaas.CreateOpsRequest(ctx, testCtx, ops)
 
@@ -260,7 +265,8 @@ var _ = Describe("OpsRequest Controller", func() {
 
 	createHorizontalScaling := func(replicas int) *dbaasv1alpha1.OpsRequest {
 		horizontalOpsName := "horizontalscaling-ops-" + testCtx.GetRandomStr()
-		ops := testdbaas.GenerateOpsRequestObj(horizontalOpsName, clusterName, dbaasv1alpha1.HorizontalScalingType)
+		ops := testdbaas.NewOpsRequestObj(horizontalOpsName, testCtx.DefaultNamespace,
+			clusterName, dbaasv1alpha1.HorizontalScalingType)
 		ops.Spec.HorizontalScalingList = []dbaasv1alpha1.HorizontalScaling{
 			{
 				ComponentOps: dbaasv1alpha1.ComponentOps{ComponentName: consensusCompName},
@@ -411,7 +417,8 @@ var _ = Describe("OpsRequest Controller", func() {
 		}
 
 		By("mock reconfigure success")
-		ops := testdbaas.GenerateOpsRequestObj("reconfigure-ops-"+randomStr, clusterName, dbaasv1alpha1.ReconfiguringType)
+		ops := testdbaas.NewOpsRequestObj("reconfigure-ops-"+randomStr, testCtx.DefaultNamespace,
+			clusterName, dbaasv1alpha1.ReconfiguringType)
 		ops.Spec.Reconfigure = &dbaasv1alpha1.Reconfigure{
 			Configurations: []dbaasv1alpha1.Configuration{{
 				Name: "mysql-test",

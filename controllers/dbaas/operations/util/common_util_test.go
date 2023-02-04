@@ -59,7 +59,8 @@ var _ = Describe("OpsRequest Controller", func() {
 				clusterVersionName, clusterName, consensusCompName)
 			By("init restart OpsRequest")
 			testOpsName := "restart-" + randomStr
-			ops := testdbaas.GenerateOpsRequestObj(testOpsName, clusterName, dbaasv1alpha1.RestartType)
+			ops := testdbaas.NewOpsRequestObj(testOpsName, testCtx.DefaultNamespace,
+				clusterName, dbaasv1alpha1.RestartType)
 			ops.Spec.RestartList = []dbaasv1alpha1.ComponentOps{
 				{ComponentName: consensusCompName},
 			}

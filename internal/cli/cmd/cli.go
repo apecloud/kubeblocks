@@ -42,11 +42,13 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/version"
 )
 
-var cfgFile string
+const (
+	cliName = "kbcli"
+)
 
 func NewCliCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "kbcli",
+		Use:   cliName,
 		Short: "KubeBlocks CLI",
 		Long: `
 =============================================
@@ -111,23 +113,16 @@ A Command Line Interface for KubeBlocks`,
 
 // initConfig reads in config file and ENV variables if set.
 func initConfig() {
-	if cfgFile != "" {
-		// Use config file from the flag.
-		viper.SetConfigFile(cfgFile)
-	} else {
-		// Find home directory.
-		home, err := os.UserHomeDir()
-		cobra.CheckErr(err)
-
-		// Search config in home directory with name ".kbcli" (without extension).
-		viper.AddConfigPath(home)
-		viper.SetConfigType("yaml")
-		viper.SetConfigName(".kbcli")
-	}
-
+	viper.SetConfigName("config")
+	viper.SetConfigType("yaml")
+	viper.AddConfigPath(fmt.Sprintf("/etc/%s/", cliName))
+	viper.AddConfigPath(fmt.Sprintf("$HOME/.%s/", cliName))
+	viper.AddConfigPath(".")
 	viper.AutomaticEnv() // read in environment variables that match
+	viper.SetEnvPrefix(cliName)
 
-	viper.SetDefault("KBCLI_CLUSTER_DEFAULT_STORAGE_SIZE", "10Gi")
+	viper.SetDefault("CLUSTER_DEFAULT_STORAGE_SIZE", "10Gi")
+	viper.SetDefault("CLUSTER_DEFAULT_REPLICAS", 1)
 
 	// If a config file is found, read it in.
 	if err := viper.ReadInConfig(); err == nil {

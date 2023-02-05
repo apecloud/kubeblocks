@@ -70,7 +70,7 @@ var _ = Describe("Reconfigure ParallelPolicy", func() {
 
 			k8sClient.EXPECT().List(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
 				Do(func(ctx context.Context, list client.ObjectList, opts ...client.ListOption) {
-					Expect(testutil.SetListReturnedObjects(list, fromPods(setPods1))).Should(Succeed())
+					Expect(testutil.SetListReturnedObjects(list, fromPodObjectList(setPods1))).Should(Succeed())
 				}).
 				Return(nil)
 
@@ -145,7 +145,7 @@ var _ = Describe("Reconfigure ParallelPolicy", func() {
 
 			k8sClient.EXPECT().List(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
 				Do(func(ctx context.Context, list client.ObjectList, opts ...client.ListOption) {
-					Expect(testutil.SetListReturnedObjects(list, fromPods(setPods1))).Should(Succeed())
+					Expect(testutil.SetListReturnedObjects(list, fromPodObjectList(setPods1))).Should(Succeed())
 				}).
 				Return(nil).
 				Times(2)
@@ -195,7 +195,7 @@ var _ = Describe("Reconfigure ParallelPolicy", func() {
 
 			k8sClient.EXPECT().List(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
 				Do(func(ctx context.Context, list client.ObjectList, opts ...client.ListOption) {
-					Expect(testutil.SetListReturnedObjects(list, fromPods(setPods))).Should(Succeed())
+					Expect(testutil.SetListReturnedObjects(list, fromPodObjectList(setPods))).Should(Succeed())
 				}).
 				Return(nil)
 

@@ -225,7 +225,7 @@ func withSucceed(succeedCount int32) func(status *ReturnedStatus) {
 
 func withExpected(expectedCount int32) func(status *ReturnedStatus) {
 	return func(status *ReturnedStatus) {
-		status.SucceedCount = expectedCount
+		status.ExpectedCount = expectedCount
 	}
 }
 

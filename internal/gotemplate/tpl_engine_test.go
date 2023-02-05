@@ -96,8 +96,8 @@ my friend name is test2
 	// funcB.2 call funcB.1 in C module
 	Context("Support export function library", func() {
 		It("call function in other module", func() {
-			ctrl, k8sMock := testutil.SetupK8sMock()
-			defer ctrl.Finish()
+			k8sMockClient := testutil.NewK8sMockClient()
+			defer k8sMockClient.Finish()
 
 			testRenderString := fmt.Sprintf(`
 {{- import "%s.moduleB" }}
@@ -137,45 +137,30 @@ mathAvg = {{ $mathAvg -}}
 total = 10
 mathAvg = [8-9][0-9]\.?\d*`
 
-			moduleB := &corev1.ConfigMap{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:        "moduleB",
-					Namespace:   defaultNamespace,
-					Annotations: map[string]string{GoTemplateLibraryAnnotationKey: "true"},
-				},
-				Data: map[string]string{
-					"calMathAvg":    calMathAvg,
-					"calTotalMatch": calTotalMatch,
-				},
-			}
-			moduleC := &corev1.ConfigMap{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:        "moduleC",
-					Namespace:   defaultNamespace,
-					Annotations: map[string]string{GoTemplateLibraryAnnotationKey: "true"},
-				},
-				Data: map[string]string{
-					"getAllStudentMeta": getAllStudentMeta,
-					"calTotalStudent":   calTotalStudent,
-				},
-			}
+			k8sMockClient.MockGetMethod(testutil.WithGetReturned(testutil.WithConstructSimpleGetResult([]client.Object{
+				&corev1.ConfigMap{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:        "moduleB",
+						Namespace:   defaultNamespace,
+						Annotations: map[string]string{GoTemplateLibraryAnnotationKey: "true"},
+					},
+					Data: map[string]string{
+						"calMathAvg":    calMathAvg,
+						"calTotalMatch": calTotalMatch,
+					}},
+				&corev1.ConfigMap{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:        "moduleC",
+						Namespace:   defaultNamespace,
+						Annotations: map[string]string{GoTemplateLibraryAnnotationKey: "true"},
+					},
+					Data: map[string]string{
+						"getAllStudentMeta": getAllStudentMeta,
+						"calTotalStudent":   calTotalStudent,
+					}},
+			}), testutil.WithAnyTimes()))
 
-			k8sMock.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).
-				DoAndReturn(func(ctx context.Context, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
-					var ret client.Object
-					switch key {
-					case client.ObjectKeyFromObject(moduleB):
-						ret = moduleB
-					case client.ObjectKeyFromObject(moduleC):
-						ret = moduleC
-					default:
-						return cfgcore.MakeError("failed to get cm: %v", key)
-					}
-					testutil.SetGetReturnedObject(obj, ret)
-					return nil
-				}).AnyTimes()
-
-			engine := NewTplEngine(&TplValues{}, nil, "for_test", k8sMock, ctx)
+			engine := NewTplEngine(&TplValues{}, nil, "for_test", k8sMockClient.Client(), ctx)
 			rendered, err := engine.Render(testRenderString)
 			Expect(err).Should(Succeed())
 			Expect(rendered).Should(MatchRegexp(expectedRenderedString))

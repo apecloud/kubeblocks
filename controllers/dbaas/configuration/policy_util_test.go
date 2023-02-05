@@ -203,7 +203,7 @@ func withAvailablePod(rMin, rMax int) PodOptions {
 	}
 }
 
-func fromPods(pods []corev1.Pod) []runtime.Object {
+func fromPodObjectList(pods []corev1.Pod) []runtime.Object {
 	objs := make([]runtime.Object, len(pods))
 	for i := 0; i < len(pods); i++ {
 		objs[i] = &pods[i]

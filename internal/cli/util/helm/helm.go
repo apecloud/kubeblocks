@@ -44,7 +44,7 @@ import (
 	"helm.sh/helm/v3/pkg/storage/driver"
 )
 
-const timeOut = time.Second * 600
+const defaultTimeout = time.Second * 600
 
 type InstallOpts struct {
 	Name            string
@@ -56,6 +56,7 @@ type InstallOpts struct {
 	TryTimes        int
 	Login           bool
 	CreateNamespace bool
+	Timeout         time.Duration
 }
 
 type Option func(*cli.EnvSettings)
@@ -195,8 +196,12 @@ func (i *InstallOpts) tryInstall(cfg *action.Configuration) (string, error) {
 	client.Namespace = i.Namespace
 	client.CreateNamespace = i.CreateNamespace
 	client.Wait = i.Wait
-	client.Timeout = timeOut
+	client.Timeout = i.Timeout
 	client.Version = i.Version
+
+	if client.Timeout == 0 {
+		client.Timeout = defaultTimeout
+	}
 
 	cp, err := client.ChartPathOptions.LocateChart(i.Chart, settings)
 	if err != nil {
@@ -262,7 +267,7 @@ func (i *InstallOpts) Uninstall(cfg *action.Configuration) error {
 func (i *InstallOpts) tryUninstall(cfg *action.Configuration) error {
 	client := action.NewUninstall(cfg)
 	client.Wait = i.Wait
-	client.Timeout = timeOut
+	client.Timeout = defaultTimeout
 
 	// Create context and prepare the handle of SIGTERM
 	ctx := context.Background()
@@ -357,7 +362,11 @@ func (i *InstallOpts) tryUpgrade(cfg *action.Configuration) (string, error) {
 	client := action.NewUpgrade(cfg)
 	client.Namespace = i.Namespace
 	client.Wait = i.Wait
-	client.Timeout = timeOut
+	client.Timeout = i.Timeout
+	if client.Timeout == 0 {
+		client.Timeout = defaultTimeout
+	}
+
 	if len(i.Version) > 0 {
 		client.Version = i.Version
 	} else {

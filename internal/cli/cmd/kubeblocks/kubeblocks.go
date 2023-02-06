@@ -23,6 +23,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
@@ -67,6 +68,7 @@ type InstallOptions struct {
 	Quiet           bool
 	CreateNamespace bool
 	check           bool
+	timeout         time.Duration
 }
 
 var (
@@ -442,6 +444,7 @@ func (o *InstallOptions) installChart() error {
 		Login:           true,
 		TryTimes:        2,
 		CreateNamespace: o.CreateNamespace,
+		Timeout:         o.timeout,
 	}
 	_, err := chart.Install(o.HelmCfg)
 	return err
@@ -462,6 +465,7 @@ func (o *InstallOptions) upgradeChart() error {
 		Sets:      sets,
 		Login:     true,
 		TryTimes:  2,
+		Timeout:   o.timeout,
 	}
 	return chart.Upgrade(o.HelmCfg)
 }
@@ -574,6 +578,7 @@ func newInstallCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 	cmd.Flags().StringArrayVar(&o.Sets, "set", []string{}, "Set values on the command line (can specify multiple or separate values with commas: key1=val1,key2=val2)")
 	cmd.Flags().BoolVar(&o.CreateNamespace, "create-namespace", false, "create the namespace if not present")
 	cmd.Flags().BoolVar(&o.check, "check", true, "check kubernetes cluster before install")
+	cmd.Flags().DurationVar(&o.timeout, "timeout", 1800*time.Second, "time to wait for installing KubeBlocks")
 
 	return cmd
 }
@@ -600,6 +605,7 @@ func newUpgradeCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 	cmd.Flags().StringVar(&o.Version, "version", "", "KubeBlocks version")
 	cmd.Flags().StringArrayVar(&o.Sets, "set", []string{}, "Set values on the command line (can specify multiple or separate values with commas: key1=val1,key2=val2)")
 	cmd.Flags().BoolVar(&o.check, "check", true, "check kubernetes cluster before upgrade")
+	cmd.Flags().DurationVar(&o.timeout, "timeout", 1800*time.Second, "time to wait for upgrading KubeBlocks")
 
 	return cmd
 }

@@ -81,7 +81,7 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 			AddComponent(testdbaas.StatefulMySQL8, statefulCompType).SetReplicas(3).
 			AddComponent(testdbaas.ConsensusMySQL, consensusCompType).SetReplicas(3).
 			AddComponent(testdbaas.StatelessNginx, statelessCompType).SetReplicas(3).
-			DisableConfigAll().GetClusterDef()
+			GetClusterDef()
 		Expect(testCtx.CreateObj(ctx, clusterDef)).Should(Succeed())
 	}
 

@@ -106,24 +106,6 @@ func (factory *MockClusterDefFactory) AddConfigTemplate(name string,
 	return factory
 }
 
-func (factory *MockClusterDefFactory) DisableConfig() *MockClusterDefFactory {
-	comps := factory.ClusterDef.Spec.Components
-	if len(comps) > 0 {
-		comps[len(comps)-1].ConfigSpec = nil
-	}
-	factory.ClusterDef.Spec.Components = comps
-	return factory
-}
-
-func (factory *MockClusterDefFactory) DisableConfigAll() *MockClusterDefFactory {
-	comps := factory.ClusterDef.Spec.Components
-	for i, _ := range comps {
-		comps[i].ConfigSpec = nil
-	}
-	factory.ClusterDef.Spec.Components = comps
-	return factory
-}
-
 func (factory *MockClusterDefFactory) AddConnectionCredential(key string, value string) *MockClusterDefFactory {
 	factory.ClusterDef.Spec.ConnectionCredential[key] = value
 	return factory

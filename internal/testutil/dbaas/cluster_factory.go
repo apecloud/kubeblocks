@@ -26,6 +26,8 @@ import (
 	"github.com/apecloud/kubeblocks/internal/testutil"
 )
 
+type ComponentTypeName string
+
 type MockClusterFactory struct {
 	TestCtx *testutil.TestContext
 	Cluster *dbaasv1alpha1.Cluster
@@ -70,7 +72,7 @@ func (factory *MockClusterFactory) AddClusterToleration(toleration corev1.Tolera
 	return factory
 }
 
-func (factory *MockClusterFactory) AddComponent(compType string, compName string) *MockClusterFactory {
+func (factory *MockClusterFactory) AddComponent(compName string, compType string) *MockClusterFactory {
 	comp := dbaasv1alpha1.ClusterComponent{
 		Name: compName,
 		Type: compType,

@@ -88,7 +88,7 @@ var _ = Describe("OpsRequest Controller", func() {
 		}
 		clusterObj = testdbaas.NewClusterFactory(&testCtx, clusterNamePrefix,
 			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
-			AddComponent(statefulCompType, statefulCompName).SetResources(resources).
+			AddComponent(statefulCompName, statefulCompType).SetResources(resources).
 			Create().GetCluster()
 		clusterKey = client.ObjectKeyFromObject(clusterObj)
 

@@ -37,10 +37,16 @@ import (
 )
 
 var _ = Describe("Cluster Controller with Consensus Component", func() {
-	const clusterKeyPrefix = "test-cluster"
-	const statefulCompName = "wesql-test"
+	const clusterDefName = "test-clusterdef"
+	const clusterVersionName = "test-clusterversion"
+	const clusterNamePrefix = "test-cluster"
+
+	const statefulCompName = "mysql-test"
 	const statefulCompType = "replicasets"
-	const volumeName = "data"
+
+	const dataVolumeName = "data"
+
+	const replicas = 3
 	const leader = "leader"
 	const follower = "follower"
 
@@ -73,33 +79,31 @@ var _ = Describe("Cluster Controller with Consensus Component", func() {
 	BeforeEach(func() {
 		cleanEnv()
 
-		By("Assuring an clusterDefinition obj with componentType = Consensus")
-		clusterDefObj = testdbaas.CreateCustomizedObj(&testCtx, "resources/mysql_consensusset_cd.yaml",
-			&dbaasv1alpha1.ClusterDefinition{}, testCtx.UseDefaultNamespace())
+		By("Create a clusterDef obj")
+		clusterDefObj = testdbaas.NewClusterDefFactory(&testCtx, clusterDefName, testdbaas.MySQLType).
+			AddComponent(testdbaas.ConsensusMySQL, statefulCompType).
+			Create().GetClusterDef()
 
-		By("Assuring an clusterVersion obj with componentType = Consensus")
-		clusterVersionObj = testdbaas.CreateCustomizedObj(&testCtx, "resources/mysql_consensusset_cv.yaml",
-			&dbaasv1alpha1.ClusterVersion{}, testCtx.UseDefaultNamespace())
+		By("Create a clusterVersion obj")
+		clusterVersionObj = testdbaas.NewClusterVersionFactory(&testCtx, clusterVersionName, clusterDefObj.GetName()).
+			AddComponent(statefulCompType).AddContainerShort("mysql", testdbaas.ApeCloudMySQLImage).
+			Create().GetClusterVersion()
 
-		clusterKey = testdbaas.GetRandomizedKey(&testCtx, clusterKeyPrefix)
-		clusterObj = testdbaas.NewClusterObj(clusterKey, clusterDefObj.GetName(), clusterVersionObj.GetName())
-		clusterObj.Spec.Components = []dbaasv1alpha1.ClusterComponent{{
-			Name: statefulCompName,
-			Type: statefulCompType,
-			VolumeClaimTemplates: []dbaasv1alpha1.ClusterComponentVolumeClaimTemplate{{
-				Name: volumeName,
-				Spec: &corev1.PersistentVolumeClaimSpec{
-					AccessModes: []corev1.PersistentVolumeAccessMode{
-						corev1.ReadWriteOnce,
-					},
-					Resources: corev1.ResourceRequirements{
-						Requests: corev1.ResourceList{
-							corev1.ResourceStorage: resource.MustParse("1Gi"),
-						},
-					},
+		By("Mock a cluster obj")
+		pvcSpec := &corev1.PersistentVolumeClaimSpec{
+			AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
+			Resources: corev1.ResourceRequirements{
+				Requests: corev1.ResourceList{
+					corev1.ResourceStorage: resource.MustParse("1Gi"),
 				},
-			}},
-		}}
+			},
+		}
+		clusterObj = testdbaas.NewClusterFactory(&testCtx, clusterNamePrefix,
+			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
+			AddComponent(statefulCompName, statefulCompType).
+			SetReplicas(replicas).AddVolumeClaim(dataVolumeName, pvcSpec).
+			Create().GetCluster()
+		clusterKey = client.ObjectKeyFromObject(clusterObj)
 	})
 
 	AfterEach(func() {
@@ -178,11 +182,6 @@ var _ = Describe("Cluster Controller with Consensus Component", func() {
 			"1 pod with 'leader' role label set, "+
 			"2 pods with 'follower' role label set,"+
 			"1 service routes to 'leader' pod", func() {
-			By("Creating a cluster with componentType = Consensus")
-			replicas := 3
-
-			Expect(testCtx.CreateObj(ctx, clusterObj)).Should(Succeed())
-
 			By("Waiting for cluster creation")
 			Eventually(testdbaas.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
 			stsList := listAndCheckStatefulSet(clusterKey)

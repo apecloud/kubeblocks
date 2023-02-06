@@ -62,7 +62,6 @@ import (
 
 	lb "github.com/apecloud/kubeblocks/controllers/loadbalancer"
 	"github.com/apecloud/kubeblocks/internal/loadbalancer/agent"
-	"github.com/apecloud/kubeblocks/internal/loadbalancer/cloud"
 	"github.com/apecloud/kubeblocks/internal/loadbalancer/cloud/factory"
 	"github.com/apecloud/kubeblocks/internal/loadbalancer/config"
 )
@@ -194,7 +193,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	cp, err := factory.NewProvider(cloud.ProviderAWS, logger)
+	cp, err := factory.NewProvider(config.EnvCloudProvider, logger)
 	if err != nil {
 		setupLog.Error(err, "Failed to initialize cloud provider")
 		os.Exit(1)

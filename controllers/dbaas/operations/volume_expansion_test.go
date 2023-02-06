@@ -149,7 +149,8 @@ spec:
 
 	initResourcesForVolumeExpansion := func(clusterObject *dbaasv1alpha1.Cluster, opsRes *OpsResource, index int) (*dbaasv1alpha1.OpsRequest, string) {
 		currRandomStr := testCtx.GetRandomStr()
-		ops := testdbaas.GenerateOpsRequestObj("volumeexpansion-ops-"+currRandomStr, clusterObject.Name, dbaasv1alpha1.VolumeExpansionType)
+		ops := testdbaas.NewOpsRequestObj("volumeexpansion-ops-"+currRandomStr, testCtx.DefaultNamespace,
+			clusterObject.Name, dbaasv1alpha1.VolumeExpansionType)
 		ops.Spec.VolumeExpansionList = []dbaasv1alpha1.VolumeExpansion{
 			{
 				ComponentOps: dbaasv1alpha1.ComponentOps{ComponentName: consensusCompName},
@@ -330,7 +331,7 @@ spec:
 		Expect(k8sClient.Get(ctx, client.ObjectKey{Name: pvcName, Namespace: testCtx.DefaultNamespace}, pvc)).Should(Succeed())
 		Expect(handleVolumeExpansionWithPVC(intctrlutil.RequestCtx{Ctx: ctx}, k8sClient, pvc)).Should(Succeed())
 
-		Eventually(testdbaas.GetClusterPhase(ctx, testCtx, clusterObject.Name),
+		Eventually(testdbaas.GetClusterPhase(&testCtx, client.ObjectKeyFromObject(clusterObject)),
 			timeout, interval).Should(Equal(dbaasv1alpha1.RunningPhase))
 	}
 

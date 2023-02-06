@@ -128,6 +128,19 @@ func CheckObj[T intctrlutil.Object, PT intctrlutil.PObject[T]](testCtx *testutil
 	}
 }
 
+// Helper functions to check fields of resource lists when writing unit tests.
+
+func GetListLen[T intctrlutil.Object, PT intctrlutil.PObject[T],
+	L intctrlutil.ObjList[T], PL intctrlutil.PObjList[T, L]](
+	testCtx *testutil.TestContext, _ func(T, L), opt ...client.ListOption) func(gomega.Gomega) int {
+	return func(g gomega.Gomega) int {
+		var objList L
+		g.Expect(testCtx.Cli.List(testCtx.Ctx, PL(&objList), opt...)).To(gomega.Succeed())
+		items := reflect.ValueOf(&objList).Elem().FieldByName("Items").Interface().([]T)
+		return len(items)
+	}
+}
+
 // Helper functions to create object from testdata files.
 
 func CreateObj[T intctrlutil.Object, PT intctrlutil.PObject[T]](testCtx *testutil.TestContext,
@@ -170,6 +183,18 @@ func CreateCustomizedObj[T intctrlutil.Object, PT intctrlutil.PObject[T]](testCt
 		}
 	}
 	return CreateK8sResource(testCtx.Ctx, *testCtx, pobj).(PT)
+}
+
+// Helper functions to delete object.
+
+func DeleteObject[T intctrlutil.Object, PT intctrlutil.PObject[T]](
+	testCtx *testutil.TestContext, key types.NamespacedName, pobj PT) {
+	gomega.Expect(func() error {
+		if err := testCtx.Cli.Get(testCtx.Ctx, key, pobj); err != nil {
+			return client.IgnoreNotFound(err)
+		}
+		return testCtx.Cli.Delete(testCtx.Ctx, pobj)
+	}()).Should(gomega.Succeed())
 }
 
 // Helper functions to delete a list of resources when writing unit tests.

@@ -68,8 +68,17 @@ var _ = Describe("DataProtection", func() {
 		})
 
 		It("run backup command", func() {
+			cluster := testing.FakeCluster(testing.ClusterName, testing.Namespace)
+			clusterDefLabel := map[string]string{
+				types.ClusterDefLabelKey: "apecloud-mysql",
+			}
+			cluster.SetLabels(clusterDefLabel)
+
+			template := testing.FakeBackupPolicyTemplate()
+			template.SetLabels(clusterDefLabel)
+
 			secrets := testing.FakeSecrets(testing.Namespace, testing.ClusterName)
-			tf.FakeDynamicClient = fake.NewSimpleDynamicClient(scheme.Scheme, &secrets.Items[0])
+			tf.FakeDynamicClient = fake.NewSimpleDynamicClient(scheme.Scheme, &secrets.Items[0], cluster, template)
 			cmd := NewCreateBackupCmd(tf, streams)
 			Expect(cmd).ShouldNot(BeNil())
 			// must succeed otherwise exit 1 and make test fails
@@ -144,19 +153,19 @@ var _ = Describe("DataProtection", func() {
 		clusterName := "source-cluster-" + timestamp
 		newClusterName := "new-cluster-" + timestamp
 		secrets := testing.FakeSecrets(testing.Namespace, clusterName)
-		tf.FakeDynamicClient = fake.NewSimpleDynamicClient(scheme.Scheme, &secrets.Items[0], testing.FakeClusterDef(), testing.FakeClusterVersion())
+		clusterDefLabel := map[string]string{
+			types.ClusterDefLabelKey: "apecloud-mysql",
+		}
 
-		// create test cluster
-		cmd := NewCreateCmd(tf, streams)
-		Expect(cmd).ShouldNot(BeNil())
-		Expect(cmd.Flags().Set("cluster-definition", testing.ClusterDefName)).Should(Succeed())
-		Expect(cmd.Flags().Set("cluster-version", testing.ClusterVersionName)).Should(Succeed())
-		Expect(cmd.Flags().Set("set", "../../testing/testdata/component.yaml")).Should(Succeed())
-		Expect(cmd.Flags().Set("termination-policy", "Delete")).Should(Succeed())
-		cmd.Run(nil, []string{clusterName})
+		cluster := testing.FakeCluster(clusterName, testing.Namespace)
+		cluster.SetLabels(clusterDefLabel)
 
+		template := testing.FakeBackupPolicyTemplate()
+		template.SetLabels(clusterDefLabel)
+
+		tf.FakeDynamicClient = fake.NewSimpleDynamicClient(scheme.Scheme, &secrets.Items[0], cluster, template)
 		// create backup
-		cmd = NewCreateBackupCmd(tf, streams)
+		cmd := NewCreateBackupCmd(tf, streams)
 		Expect(cmd).ShouldNot(BeNil())
 		_ = cmd.Flags().Set("backup-type", "snapshot")
 		_ = cmd.Flags().Set("backup-name", backupName)

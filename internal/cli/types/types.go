@@ -65,12 +65,13 @@ const (
 	// KindClusterDef clusterDefinition kine
 	KindClusterDef = "ClusterDefinition"
 	// KindClusterVersion clusterVersion kind
-	KindClusterVersion   = "ClusterVersion"
-	KindConfigConstraint = "ConfigConstraint"
-	KindBackup           = "Backup"
-	KindRestoreJob       = "RestoreJob"
-	KindOps              = "OpsRequest"
-	KindCM               = "ConfigMap"
+	KindClusterVersion       = "ClusterVersion"
+	KindConfigConstraint     = "ConfigConstraint"
+	KindBackup               = "Backup"
+	KindRestoreJob           = "RestoreJob"
+	KindBackupPolicyTemplate = "BackupPolicyTemplate"
+	KindOps                  = "OpsRequest"
+	KindCM                   = "ConfigMap"
 
 	NameLabelKey                   = "app.kubernetes.io/name"
 	InstanceLabelKey               = "app.kubernetes.io/instance"
@@ -87,12 +88,13 @@ const (
 	StorageClassAnnotationKey      = "kubeblocks.io/storage-class"
 
 	// DataProtection definitions
-	DPGroup                = "dataprotection.kubeblocks.io"
-	DPVersion              = "v1alpha1"
-	ResourceBackups        = "backups"
-	ResourceBackupTools    = "backuptools"
-	ResourceRestoreJobs    = "restorejobs"
-	ResourceBackupPolicies = "backuppolicies"
+	DPGroup                       = "dataprotection.kubeblocks.io"
+	DPVersion                     = "v1alpha1"
+	ResourceBackups               = "backups"
+	ResourceBackupTools           = "backuptools"
+	ResourceRestoreJobs           = "restorejobs"
+	ResourceBackupPolicies        = "backuppolicies"
+	ResourceBackupPolicyTemplates = "backuppolicytemplates"
 
 	None = "<none>"
 )
@@ -139,6 +141,10 @@ func ClusterVersionGVR() schema.GroupVersionResource {
 
 func BackupGVR() schema.GroupVersionResource {
 	return schema.GroupVersionResource{Group: DPGroup, Version: DPVersion, Resource: ResourceBackups}
+}
+
+func BackupPolicyTemplateGVR() schema.GroupVersionResource {
+	return schema.GroupVersionResource{Group: DPGroup, Version: DPVersion, Resource: ResourceBackupPolicyTemplates}
 }
 
 func RestoreJobGVR() schema.GroupVersionResource {

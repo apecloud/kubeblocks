@@ -21,7 +21,6 @@ import (
 	"fmt"
 
 	"github.com/onsi/gomega"
-	"github.com/sethvargo/go-password/password"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/yaml"
@@ -122,13 +121,21 @@ func GetClusterComponentPhase(testCtx testutil.TestContext, clusterName, compone
 	}
 }
 
-// GetClusterPhase gets the testing cluster phase for verification.
-func GetClusterPhase(ctx context.Context, testCtx testutil.TestContext, clusterName string) func(g gomega.Gomega) dbaasv1alpha1.Phase {
+// GetClusterPhase gets the testing cluster's phase in status for verification.
+func GetClusterPhase(testCtx *testutil.TestContext, clusterKey types.NamespacedName) func(gomega.Gomega) dbaasv1alpha1.Phase {
 	return func(g gomega.Gomega) dbaasv1alpha1.Phase {
 		cluster := &dbaasv1alpha1.Cluster{}
-		g.Expect(testCtx.Cli.Get(ctx, client.ObjectKey{Name: clusterName,
-			Namespace: testCtx.DefaultNamespace}, cluster)).Should(gomega.Succeed())
+		g.Expect(testCtx.Cli.Get(testCtx.Ctx, clusterKey, cluster)).Should(gomega.Succeed())
 		return cluster.Status.Phase
+	}
+}
+
+// GetClusterObservedGeneration gets the testing cluster's ObservedGeneration in status for verification.
+func GetClusterObservedGeneration(testCtx *testutil.TestContext, clusterKey types.NamespacedName) func(gomega.Gomega) int64 {
+	return func(g gomega.Gomega) int64 {
+		cluster := &dbaasv1alpha1.Cluster{}
+		g.Expect(testCtx.Cli.Get(testCtx.Ctx, clusterKey, cluster)).Should(gomega.Succeed())
+		return cluster.Status.ObservedGeneration
 	}
 }
 
@@ -155,13 +162,7 @@ func MockClusterVersion(ctx context.Context, testCtx testutil.TestContext, clust
 	return CreateK8sResource(ctx, testCtx, clusterVersion).(*dbaasv1alpha1.ClusterVersion)
 }
 
-func MockClusterObj(clusterDefName string, clusterVersionName string) *dbaasv1alpha1.Cluster {
-	randomStr, _ := password.Generate(6, 0, 0, true, false)
-	key := types.NamespacedName{
-		Name:      "cluster" + randomStr,
-		Namespace: "default",
-	}
-
+func NewClusterObj(key types.NamespacedName, clusterDefName string, clusterVersionName string) *dbaasv1alpha1.Cluster {
 	return &dbaasv1alpha1.Cluster{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      key.Name,

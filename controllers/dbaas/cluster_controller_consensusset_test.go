@@ -37,6 +37,7 @@ import (
 )
 
 var _ = Describe("Cluster Controller with Consensus Component", func() {
+	const clusterKeyPrefix = "test-cluster"
 	const statefulCompName = "wesql-test"
 	const statefulCompType = "replicasets"
 	const volumeName = "data"
@@ -80,7 +81,8 @@ var _ = Describe("Cluster Controller with Consensus Component", func() {
 		clusterVersionObj = testdbaas.CreateCustomizedObj(&testCtx, "resources/mysql_consensusset_cv.yaml",
 			&dbaasv1alpha1.ClusterVersion{}, testCtx.UseDefaultNamespace())
 
-		clusterObj = testdbaas.MockClusterObj(clusterDefObj.GetName(), clusterVersionObj.GetName())
+		clusterKey = testdbaas.GetRandomizedKey(&testCtx, clusterKeyPrefix)
+		clusterObj = testdbaas.NewClusterObj(clusterKey, clusterDefObj.GetName(), clusterVersionObj.GetName())
 		clusterObj.Spec.Components = []dbaasv1alpha1.ClusterComponent{{
 			Name: statefulCompName,
 			Type: statefulCompType,
@@ -98,7 +100,6 @@ var _ = Describe("Cluster Controller with Consensus Component", func() {
 				},
 			}},
 		}}
-		clusterKey = client.ObjectKeyFromObject(clusterObj)
 	})
 
 	AfterEach(func() {
@@ -183,10 +184,7 @@ var _ = Describe("Cluster Controller with Consensus Component", func() {
 			Expect(testCtx.CreateObj(ctx, clusterObj)).Should(Succeed())
 
 			By("Waiting for cluster creation")
-			Eventually(testdbaas.CheckObj(&testCtx, clusterKey, func(g Gomega, fetched *dbaasv1alpha1.Cluster) {
-				g.Expect(fetched.Status.ObservedGeneration).To(BeEquivalentTo(1))
-			})).Should(Succeed())
-
+			Eventually(testdbaas.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
 			stsList := listAndCheckStatefulSet(clusterKey)
 			sts := &stsList.Items[0]
 
@@ -254,9 +252,7 @@ var _ = Describe("Cluster Controller with Consensus Component", func() {
 			}).Should(Succeed())
 
 			By("Waiting the cluster be running")
-			Eventually(testdbaas.CheckObj(&testCtx, clusterKey, func(g Gomega, fetched *dbaasv1alpha1.Cluster) {
-				g.Expect(fetched.Status.Phase).To(Equal(dbaasv1alpha1.RunningPhase))
-			})).Should(Succeed())
+			Eventually(testdbaas.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(dbaasv1alpha1.RunningPhase))
 		})
 	})
 })

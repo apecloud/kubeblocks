@@ -143,14 +143,17 @@ func GetListLen[T intctrlutil.Object, PT intctrlutil.PObject[T],
 
 // Helper functions to create object from testdata files.
 
-func CreateObj[T intctrlutil.Object, PT intctrlutil.PObject[T]](testCtx *testutil.TestContext,
-	filePath string, pobj PT, a ...any) PT {
-	return CreateCustomizedObj(testCtx, filePath, pobj, CustomizeObjYAML(a...))
-}
-
 func CustomizeObjYAML(a ...any) func(string) string {
 	return func(inputYAML string) string {
 		return fmt.Sprintf(inputYAML, a...)
+	}
+}
+
+func GetRandomizedKey(testCtx *testutil.TestContext, prefix string) types.NamespacedName {
+	randomStr, _ := password.Generate(6, 0, 0, true, false)
+	return types.NamespacedName{
+		Name:      prefix + randomStr,
+		Namespace: testCtx.DefaultNamespace,
 	}
 }
 
@@ -161,7 +164,12 @@ func RandomizedObjName() func(client.Object) {
 	}
 }
 
-func CreateCustomizedObj[T intctrlutil.Object, PT intctrlutil.PObject[T]](testCtx *testutil.TestContext,
+func CreateObj[T intctrlutil.Object, PT intctrlutil.PObject[T]](testCtx *testutil.TestContext,
+	filePath string, pobj PT, a ...any) PT {
+	return CreateCustomizedObj(testCtx, filePath, pobj, CustomizeObjYAML(a...))
+}
+
+func NewCustomizedObj[T intctrlutil.Object, PT intctrlutil.PObject[T]](testCtx *testutil.TestContext,
 	filePath string, pobj PT, actions ...any) PT {
 	objBytes, err := testdata.GetTestDataFileContent(filePath)
 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -182,6 +190,12 @@ func CreateCustomizedObj[T intctrlutil.Object, PT intctrlutil.PObject[T]](testCt
 			f(pobj)
 		}
 	}
+	return pobj
+}
+
+func CreateCustomizedObj[T intctrlutil.Object, PT intctrlutil.PObject[T]](testCtx *testutil.TestContext,
+	filePath string, pobj PT, actions ...any) PT {
+	pobj = NewCustomizedObj(testCtx, filePath, pobj, actions...)
 	return CreateK8sResource(testCtx.Ctx, *testCtx, pobj).(PT)
 }
 

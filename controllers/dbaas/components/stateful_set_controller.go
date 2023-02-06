@@ -18,7 +18,7 @@ package components
 
 import (
 	"context"
-
+	"fmt"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -85,7 +85,15 @@ func (r *StatefulSetReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	componentName := sts.GetLabels()[intctrlutil.AppComponentLabelKey]
 	typeName := util.GetComponentTypeName(*cluster, componentName)
 	componentDef := util.GetComponentDefFromClusterDefinition(clusterDef, typeName)
+	if componentDef == nil {
+		return intctrlutil.CheckedRequeueWithError(fmt.Errorf("invalid component typeName %s", typeName),
+			reqCtx.Log, "")
+	}
 	clusterComponent := util.GetComponentByName(cluster, componentName)
+	if clusterComponent == nil {
+		return intctrlutil.CheckedRequeueWithError(fmt.Errorf("invalid componentName %s", componentName),
+			reqCtx.Log, "")
+	}
 	component := NewComponentByType(ctx, r.Client, cluster, componentDef, clusterComponent)
 	if component == nil {
 		return intctrlutil.Reconciled()

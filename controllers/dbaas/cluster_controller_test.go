@@ -335,6 +335,21 @@ var _ = Describe("Cluster Controller", func() {
 		})
 	})
 
+	Context("when creating cluster with incorrect parameters", func() {
+
+		It("should not crash with incorrect component type", func() {
+			const invalidComponentType = "invalid"
+			By("Create a cluster with incorrect component type")
+			clusterObj := testdbaas.NewClusterFactory(&testCtx, clusterNamePrefix,
+				clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
+				AddComponent("component", invalidComponentType).Create().GetCluster()
+
+			By("Waiting for a while not crashing the controller")
+			Consistently(testdbaas.GetClusterObservedGeneration(&testCtx,
+				client.ObjectKeyFromObject(clusterObj))).Should(BeEquivalentTo(0))
+		})
+	})
+
 	Context("when creating cluster with one data volume claim", func() {
 		const storageClassName = "sc-mock"
 

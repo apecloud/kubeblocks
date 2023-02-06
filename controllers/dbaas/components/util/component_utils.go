@@ -147,7 +147,7 @@ func GetComponentDefByCluster(ctx context.Context, cli client.Client, cluster *d
 			return &component, nil
 		}
 	}
-	return nil, nil
+	return nil, intctrlutil.InvalidComponentTypeName(typeName)
 }
 
 // GetComponentDefFromClusterDefinition gets component from ClusterDefinition with typeName

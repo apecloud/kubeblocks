@@ -17,6 +17,7 @@ limitations under the License.
 package controllerutil
 
 import (
+	"fmt"
 	"reflect"
 	"strings"
 	"time"
@@ -214,4 +215,9 @@ func IgnoreIsAlreadyExists(err error) error {
 		return err
 	}
 	return nil
+}
+
+// InvalidComponentTypeName return errors that a typename is invalid (doesn't exist in ClusterDefinition)
+func InvalidComponentTypeName(typename string) error {
+	return fmt.Errorf("invalid component typename %s", typename)
 }

@@ -537,3 +537,13 @@ func (r *ClusterDefinition) ValidateEnabledLogConfigs(typeName string, enabledLo
 	}
 	return invalidLogNames
 }
+
+// GetComponentDefByTypeName gets component definition from ClusterDefinition with typeName
+func (r *ClusterDefinition) GetComponentDefByTypeName(typeName string) *ClusterDefinitionComponent {
+	for _, component := range r.Spec.Components {
+		if component.TypeName == typeName {
+			return &component
+		}
+	}
+	return nil
+}

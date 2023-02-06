@@ -28,7 +28,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
-	"github.com/apecloud/kubeblocks/controllers/dbaas/components/util"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	testdbaas "github.com/apecloud/kubeblocks/internal/testutil/dbaas"
 	testk8s "github.com/apecloud/kubeblocks/internal/testutil/k8s"
@@ -104,9 +103,9 @@ var _ = Describe("Consensus Component", func() {
 
 			sts := testdbaas.MockConsensusComponentStatefulSet(ctx, testCtx, clusterName, consensusCompName)
 			componentName := consensusCompName
-			typeName := util.GetComponentTypeName(*cluster, componentName)
-			componentDef := util.GetComponentDefFromClusterDefinition(clusterDef, typeName)
-			component := util.GetComponentByName(cluster, componentName)
+			typeName := cluster.GetComponentTypeName(componentName)
+			componentDef := clusterDef.GetComponentDefByTypeName(typeName)
+			component := cluster.GetComponentByName(componentName)
 
 			By("test pods are not ready")
 			consensusComponent := NewConsensusSet(ctx, k8sClient, cluster, component, componentDef)

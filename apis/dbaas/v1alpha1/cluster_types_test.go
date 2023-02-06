@@ -106,3 +106,34 @@ func TestSetAndGetObjectMessage(t *testing.T) {
 		t.Error(`Expected get message "insufficient cpu"`)
 	}
 }
+
+func TestGetComponentOrTypeName(t *testing.T) {
+	var (
+		componentType = "mysqlType"
+		componentName = "mysql"
+	)
+	cluster := Cluster{
+		Spec: ClusterSpec{
+			Components: []ClusterComponent{
+				{Name: componentName, Type: componentType},
+			},
+		},
+	}
+	typeName := cluster.GetComponentTypeName(componentName)
+	if typeName != componentType {
+		t.Errorf(`function GetComponentTypeName should return %s`, componentType)
+	}
+	component := cluster.GetComponentByName(componentName)
+	if component == nil {
+		t.Errorf("function GetComponentByName should not return nil")
+	}
+	componentName = "mysql1"
+	typeName = cluster.GetComponentTypeName(componentName)
+	if typeName != "" {
+		t.Errorf(`function GetComponentTypeName should return ""`)
+	}
+	component = cluster.GetComponentByName(componentName)
+	if component != nil {
+		t.Error("function GetComponentByName should return nil")
+	}
+}

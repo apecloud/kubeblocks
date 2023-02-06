@@ -22,6 +22,9 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+
 	"github.com/spf13/viper"
 	"k8s.io/apimachinery/pkg/util/json"
 
@@ -44,6 +47,10 @@ func generateComponents(component dbaasv1alpha1.ClusterComponent, count int) []m
 	}
 	Expect(len(componentVals)).To(Equal(count))
 	return componentVals
+}
+
+func getResource(res corev1.ResourceRequirements, name corev1.ResourceName) interface{} {
+	return res.Requests[name].ToUnstructured()
 }
 
 var _ = Describe("create", func() {
@@ -128,16 +135,43 @@ spec:
 		Expect(err).Should(HaveOccurred())
 	})
 
-	It("build cluster component", func() {
-		viper.Set("CLUSTER_DEFAULT_STORAGE_SIZE", "10Gi")
-		viper.Set("CLUSTER_DEFAULT_REPLICAS", 1)
+	It("build default cluster component without environment", func() {
 		dynamic := testing.FakeDynamicClient(testing.FakeClusterDef())
 		comps, err := buildClusterComp(dynamic, testing.ClusterDefName)
 		Expect(err).ShouldNot(HaveOccurred())
 		Expect(comps).ShouldNot(BeNil())
 		Expect(len(comps)).Should(Equal(2))
-		Expect(comps[0]["volumeClaimTemplates"]).ShouldNot(BeNil())
-		Expect(comps[0]["replicas"]).Should(BeEquivalentTo(1))
+
+		clusterComp := &dbaasv1alpha1.ClusterComponent{}
+		_ = runtime.DefaultUnstructuredConverter.FromUnstructured(comps[0], clusterComp)
+		Expect(getResource(clusterComp.VolumeClaimTemplates[0].Spec.Resources, corev1.ResourceStorage)).Should(Equal("10Gi"))
+		Expect(*clusterComp.Replicas).Should(BeEquivalentTo(2))
+
+		resources := clusterComp.Resources
+		Expect(resources).ShouldNot(BeNil())
+		Expect(getResource(resources, corev1.ResourceCPU)).Should(Equal("1"))
+		Expect(getResource(resources, corev1.ResourceMemory)).Should(Equal("1Gi"))
+	})
+
+	It("build default cluster component with environment", func() {
+		viper.Set("CLUSTER_DEFAULT_STORAGE_SIZE", "5Gi")
+		viper.Set("CLUSTER_DEFAULT_REPLICAS", 1)
+		viper.Set("CLUSTER_DEFAULT_CPU", "2000m")
+		viper.Set("CLUSTER_DEFAULT_MEMORY", "2Gi")
+		dynamic := testing.FakeDynamicClient(testing.FakeClusterDef())
+		comps, err := buildClusterComp(dynamic, testing.ClusterDefName)
+		Expect(err).ShouldNot(HaveOccurred())
+		Expect(comps).ShouldNot(BeNil())
+		Expect(len(comps)).Should(Equal(2))
+
+		clusterComp := &dbaasv1alpha1.ClusterComponent{}
+		_ = runtime.DefaultUnstructuredConverter.FromUnstructured(comps[0], clusterComp)
+		Expect(getResource(clusterComp.VolumeClaimTemplates[0].Spec.Resources, corev1.ResourceStorage)).Should(Equal("5Gi"))
+		Expect(*clusterComp.Replicas).Should(BeEquivalentTo(1))
+		resources := clusterComp.Resources
+		Expect(resources).ShouldNot(BeNil())
+		Expect(resources.Requests[corev1.ResourceCPU].ToUnstructured()).Should(Equal("2"))
+		Expect(resources.Requests[corev1.ResourceMemory].ToUnstructured()).Should(Equal("2Gi"))
 	})
 
 	It("build tolerations", func() {

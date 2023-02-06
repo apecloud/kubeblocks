@@ -19,9 +19,11 @@ package delete
 import (
 	"fmt"
 	"io"
+	"sort"
 	"strings"
 
 	"github.com/spf13/cobra"
+	"golang.org/x/exp/slices"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -179,13 +181,16 @@ func Confirm(names []string, in io.Reader) error {
 		return nil
 	}
 
-	entered, err := prompt.NewPrompt("You should enter the name.", "Please enter the name again(separate with commas when more than one):", in).GetInput()
+	entered, err := prompt.NewPrompt(fmt.Sprintf("You should type \"%s\"", strings.Join(names, " ")),
+		"Please type the name again(separate with white space when more than one):", in).GetInput()
 	if err != nil {
 		return err
 	}
-	if entered != strings.Join(names, ",") {
-		return fmt.Errorf("the entered name \"%s\" does not match \"%s\"", entered, strings.Join(names, ","))
+	enteredNames := strings.Split(entered, " ")
+	sort.Strings(names)
+	sort.Strings(enteredNames)
+	if !slices.Equal(names, enteredNames) {
+		return fmt.Errorf("the entered \"%s\" does not match \"%s\"", entered, strings.Join(names, " "))
 	}
-
 	return nil
 }

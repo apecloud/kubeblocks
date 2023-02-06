@@ -90,7 +90,7 @@ func getKBObjects(client kubernetes.Interface, dynamic dynamic.Interface, namesp
 	}
 
 	// get deployments
-	getDeploysFn := func(labelSelector string) {
+	getDeploys := func(labelSelector string) {
 		deploys, err := client.AppsV1().Deployments(namespace).List(context.TODO(), metav1.ListOptions{
 			LabelSelector: labelSelector,
 		})
@@ -106,13 +106,13 @@ func getKBObjects(client kubernetes.Interface, dynamic dynamic.Interface, namesp
 	}
 
 	// get all deployments which label matches app.kubernetes.io/instance=kubeblocks
-	getDeploysFn(fmt.Sprintf("%s=%s", types.InstanceLabelKey, types.KubeBlocksChartName))
+	getDeploys(fmt.Sprintf("%s=%s", types.InstanceLabelKey, types.KubeBlocksChartName))
 
 	// get all deployments which label matches release=kubeblocks, like prometheus-server
-	getDeploysFn(fmt.Sprintf("release=%s", types.KubeBlocksChartName))
+	getDeploys(fmt.Sprintf("release=%s", types.KubeBlocksChartName))
 
 	// get services
-	getSvcsFn := func(labelSelector string) {
+	getSvcs := func(labelSelector string) {
 		svcs, err := client.CoreV1().Services(namespace).List(ctx, metav1.ListOptions{
 			LabelSelector: labelSelector,
 		})
@@ -128,17 +128,30 @@ func getKBObjects(client kubernetes.Interface, dynamic dynamic.Interface, namesp
 	}
 
 	// get all services which label matches app.kubernetes.io/instance=kubeblocks
-	getSvcsFn(fmt.Sprintf("%s=%s", types.InstanceLabelKey, types.KubeBlocksChartName))
+	getSvcs(fmt.Sprintf("%s=%s", types.InstanceLabelKey, types.KubeBlocksChartName))
 
 	// get all services which label matches release=kubeblocks, like prometheus-server
-	getSvcsFn(fmt.Sprintf("release=%s", types.KubeBlocksChartName))
+	getSvcs(fmt.Sprintf("release=%s", types.KubeBlocksChartName))
+
+	// get configMap
+	getConfigMap := func(labelSelector string) {
+		cms, err := client.CoreV1().ConfigMaps(namespace).List(ctx, metav1.ListOptions{
+			LabelSelector: labelSelector,
+		})
+		if err != nil {
+			appendErr(err)
+			return
+		}
+		if objs.cms == nil {
+			objs.cms = cms
+		} else {
+			objs.cms.Items = append(objs.cms.Items, cms.Items...)
+		}
+	}
 
 	// get all configmaps that belong to KubeBlocks
-	if objs.cms, err = client.CoreV1().ConfigMaps(namespace).List(ctx, metav1.ListOptions{
-		LabelSelector: "configuration.kubeblocks.io/configuration-template=true",
-	}); err != nil {
-		appendErr(err)
-	}
+	getConfigMap("configuration.kubeblocks.io/configuration-template=true")
+	getConfigMap("configuration.kubeblocks.io/configuration-type=tpl")
 
 	return objs, utilerrors.NewAggregate(allErrs)
 }

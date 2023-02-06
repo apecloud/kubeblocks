@@ -123,6 +123,8 @@ func initConfig() {
 
 	viper.SetDefault("CLUSTER_DEFAULT_STORAGE_SIZE", "10Gi")
 	viper.SetDefault("CLUSTER_DEFAULT_REPLICAS", 1)
+	viper.SetDefault("CLUSTER_DEFAULT_CPU", "1000m")
+	viper.SetDefault("CLUSTER_DEFAULT_MEMORY", "1Gi")
 
 	// If a config file is found, read it in.
 	if err := viper.ReadInConfig(); err == nil {

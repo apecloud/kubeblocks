@@ -27,6 +27,7 @@ kbcli kubeblocks install [flags]
   -h, --help               help for install
       --monitor            Set monitor enabled and install Prometheus, AlertManager and Grafana (default true) (default true)
       --set stringArray    Set values on the command line (can specify multiple or separate values with commas: key1=val1,key2=val2)
+      --timeout duration   time to wait for installing KubeBlocks (default 30m0s)
       --version string     KubeBlocks version
 ```
 

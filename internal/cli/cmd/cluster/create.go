@@ -348,10 +348,19 @@ func buildClusterComp(dynamic dynamic.Interface, clusterDef string) ([]map[strin
 		return nil, err
 	}
 
-	defaultStorageSize := viper.GetString("CLUSTER_DEFAULT_STORAGE_SIZE")
-	if len(defaultStorageSize) == 0 {
-		defaultStorageSize = "10Gi"
+	getEnv := func(envKey string, defaultVal string) string {
+		val := viper.GetString(envKey)
+		if len(val) == 0 {
+			val = defaultVal
+		}
+		return val
 	}
+
+	// get environment variables
+	defaultStorageSize := getEnv("CLUSTER_DEFAULT_STORAGE_SIZE", "10Gi")
+	defaultCPU := getEnv("CLUSTER_DEFAULT_CPU", "1000m")
+	defaultMemory := getEnv("CLUSTER_DEFAULT_MEMORY", "1Gi")
+
 	var comps []map[string]interface{}
 	for _, c := range cd.Spec.Components {
 		// if cluster definition component default replicas greater than 0, build a cluster component
@@ -363,10 +372,18 @@ func buildClusterComp(dynamic dynamic.Interface, clusterDef string) ([]map[strin
 		if defaultReplicas := viper.GetInt32("CLUSTER_DEFAULT_REPLICAS"); defaultReplicas > 0 {
 			replicas = defaultReplicas
 		}
+		resourceList := corev1.ResourceList{
+			corev1.ResourceCPU:    resource.MustParse(defaultCPU),
+			corev1.ResourceMemory: resource.MustParse(defaultMemory),
+		}
 		compObj := &dbaasv1alpha1.ClusterComponent{
 			Name:     c.TypeName,
 			Type:     c.TypeName,
 			Replicas: &replicas,
+			Resources: corev1.ResourceRequirements{
+				Requests: resourceList,
+				Limits:   resourceList,
+			},
 			VolumeClaimTemplates: []dbaasv1alpha1.ClusterComponentVolumeClaimTemplate{{
 				Name: "data",
 				Spec: &corev1.PersistentVolumeClaimSpec{

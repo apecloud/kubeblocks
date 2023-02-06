@@ -40,6 +40,28 @@ type BackupPolicyTemplateSpec struct {
 	// if unset, retry unlimit attempted.
 	// +optional
 	OnFailAttempted int32 `json:"onFailAttempted,omitempty"`
+
+	// execute hook commands for backup.
+	// +optional
+	Hooks *BackupPolicyHook `json:"hooks,omitempty"`
+
+	// CredentialKeyword determines backupTool connection credential keyword in secret.
+	// the backupTool gets the credentials according to the user and password keyword defined by secret
+	// +optional
+	CredentialKeyword *BackupPolicyCredentialKeyword `json:"credentialKeyword,omitempty"`
+}
+
+// BackupPolicyCredentialKeyword defined for the target database secret that backup tool can connect.
+type BackupPolicyCredentialKeyword struct {
+	// UserKeyword the map keyword of the user in the connection credential secret
+	// +kubebuilder:default=username
+	// +optional
+	UserKeyword string `json:"userKeyword,omitempty"`
+
+	// PasswordKeyword the map keyword of the password in the connection credential secret
+	// +kubebuilder:default=password
+	// +optional
+	PasswordKeyword string `json:"passwordKeyword,omitempty"`
 }
 
 // BackupPolicyTemplatePhase defines phases for BackupPolicyTemplate CR, valid values are New, Available, InProgress, Failed.
@@ -48,7 +70,7 @@ type BackupPolicyTemplatePhase string
 
 // These are the valid statuses of BackupPolicyTemplate.
 const (
-	ConfigPending BackupPolicyTemplatePhase = "New"
+	ConfigNew BackupPolicyTemplatePhase = "New"
 
 	ConfigAvailable BackupPolicyTemplatePhase = "Available"
 

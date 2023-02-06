@@ -10,3 +10,14 @@ spec:
 
   # which backup tool to perform database backup, only support one tool.
   backupToolName: mysql-xtrabackup
+  ttl: 168h0m0s
+  hooks:
+    containerName: mysql
+    preCommands:
+    - "touch /data/mysql/data/.restore_new_cluster; sync"
+    postCommands:
+    - "rm -f /data/mysql/data/.restore_new_cluster; sync"
+
+  credentialKeyword:
+    userKeyword: username
+    passwordKeyword: password

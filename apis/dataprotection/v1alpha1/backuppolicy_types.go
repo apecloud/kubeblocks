@@ -1,5 +1,5 @@
 /*
-Copyright ApeCloud Inc.
+Copyright ApeCloud, Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -59,7 +59,8 @@ type BackupPolicySpec struct {
 	Target TargetCluster `json:"target"`
 
 	// execute hook commands for backup.
-	Hooks BackupPolicyHook `json:"hooks"`
+	// +optional
+	Hooks *BackupPolicyHook `json:"hooks,omitempty"`
 
 	// array of remote volumes from CSI driver definition.
 	// +kubebuilder:validation:Required
@@ -73,8 +74,7 @@ type BackupPolicySpec struct {
 // TargetCluster TODO (dsj): target cluster need redefined from Cluster API
 type TargetCluster struct {
 	// database engine to support in the backup.
-	// +kubebuilder:validation:Enum={mysql}
-	// +kubebuilder:validation:Required
+	// +optional
 	DatabaseEngine string `json:"databaseEngine"`
 
 	// database engine to support in the backup.
@@ -86,6 +86,7 @@ type TargetCluster struct {
 	// Pods that match this label selector are counted to determine the number of pods
 	// in their corresponding topology domain.
 	// +kubebuilder:validation:Required
+	// +kubebuilder:pruning:PreserveUnknownFields
 	LabelsSelector *metav1.LabelSelector `json:"labelsSelector"`
 
 	// target db cluster access secret
@@ -101,12 +102,10 @@ type BackupPolicySecret struct {
 	Name string `json:"name"`
 
 	// UserKeyword the map keyword of the user in the connection credential secret
-	// +kubebuilder:default=username
 	// +optional
 	UserKeyword string `json:"userKeyword,omitempty"`
 
 	// PasswordKeyword the map keyword of the password in the connection credential secret
-	// +kubebuilder:default=password
 	// +optional
 	PasswordKeyword string `json:"passwordKeyword,omitempty"`
 }
@@ -127,9 +126,8 @@ type BackupPolicyHook struct {
 	Image string `json:"image,omitempty"`
 
 	// which container can exec command
-	// +kubebuilder:default=mysql
 	// +optional
-	ContainerName string `json:"ContainerName,omitempty"`
+	ContainerName string `json:"containerName,omitempty"`
 }
 
 // BackupPolicyStatus defines the observed state of BackupPolicy
@@ -153,13 +151,13 @@ type BackupPolicyStatus struct {
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
-// +kubebuilder:resource:categories={dbaas},scope=Namespaced
+// +kubebuilder:resource:categories={kubeblocks},scope=Namespaced
 // +kubebuilder:printcolumn:name="STATUS",type=string,JSONPath=`.status.phase`
 // +kubebuilder:printcolumn:name="SCHEDULE",type=string,JSONPath=`.spec.schedule`
 // +kubebuilder:printcolumn:name="LAST SCHEDULE",type=string,JSONPath=`.status.lastScheduleTime`
 // +kubebuilder:printcolumn:name="AGE",type=date,JSONPath=`.metadata.creationTimestamp`
 
-// BackupPolicy is the Schema for the backuppolicies API  (defined by User)
+// BackupPolicy is the Schema for the backuppolicies API (defined by User)
 type BackupPolicy struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`

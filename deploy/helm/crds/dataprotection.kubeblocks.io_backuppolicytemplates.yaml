@@ -43,6 +43,43 @@ spec:
                   one tool.
                 pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                 type: string
+              credentialKeyword:
+                description: CredentialKeyword determines backupTool connection credential
+                  keyword in secret. the backupTool gets the credentials according
+                  to the user and password keyword defined by secret
+                properties:
+                  passwordKeyword:
+                    default: password
+                    description: PasswordKeyword the map keyword of the password in
+                      the connection credential secret
+                    type: string
+                  userKeyword:
+                    default: username
+                    description: UserKeyword the map keyword of the user in the connection
+                      credential secret
+                    type: string
+                type: object
+              hooks:
+                description: execute hook commands for backup.
+                properties:
+                  containerName:
+                    description: which container can exec command
+                    type: string
+                  image:
+                    default: docker.io/apecloud/kubeblocks
+                    description: exec command with image
+                    type: string
+                  postCommands:
+                    description: post backup to perform commands
+                    items:
+                      type: string
+                    type: array
+                  preCommands:
+                    description: pre backup to perform commands
+                    items:
+                      type: string
+                    type: array
+                type: object
               onFailAttempted:
                 description: limit count of backup stop retries on fail. if unset,
                   retry unlimit attempted.

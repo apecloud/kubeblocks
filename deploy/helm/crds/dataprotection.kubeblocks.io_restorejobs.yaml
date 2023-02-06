@@ -60,8 +60,6 @@ spec:
                 properties:
                   databaseEngine:
                     description: database engine to support in the backup.
-                    enum:
-                    - mysql
                     type: string
                   databaseEngineVersion:
                     description: database engine to support in the backup.
@@ -118,6 +116,7 @@ spec:
                           "value". The requirements are ANDed.
                         type: object
                     type: object
+                    x-kubernetes-preserve-unknown-fields: true
                   secret:
                     description: target db cluster access secret
                     properties:
@@ -126,12 +125,10 @@ spec:
                         pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                         type: string
                       passwordKeyword:
-                        default: password
                         description: PasswordKeyword the map keyword of the password
                           in the connection credential secret
                         type: string
                       userKeyword:
-                        default: username
                         description: UserKeyword the map keyword of the user in the
                           connection credential secret
                         type: string
@@ -139,7 +136,6 @@ spec:
                     - name
                     type: object
                 required:
-                - databaseEngine
                 - labelsSelector
                 - secret
                 type: object

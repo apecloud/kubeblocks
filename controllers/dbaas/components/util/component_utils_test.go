@@ -53,7 +53,13 @@ func TestIsFailedOrAbnormal(t *testing.T) {
 
 func TestIsProbeTimeout(t *testing.T) {
 	podsReadyTime := &metav1.Time{Time: time.Now().Add(-10 * time.Minute)}
-	if !IsProbeTimeout(podsReadyTime) {
+	compDef := &dbaasv1alpha1.ClusterDefinitionComponent{
+		Probes: &dbaasv1alpha1.ClusterDefinitionProbes{
+			RoleChangedProbe:               &dbaasv1alpha1.ClusterDefinitionProbe{},
+			RoleProbeTimeoutAfterPodsReady: dbaasv1alpha1.DefaultRoleProbeTimeoutAfterPodsReady,
+		},
+	}
+	if !IsProbeTimeout(compDef, podsReadyTime) {
 		t.Error("probe timed out should be true")
 	}
 }

@@ -8029,6 +8029,19 @@ spec:
                               minimum: 1
                               type: integer
                           type: object
+                        roleProbeTimeoutAfterPodsReady:
+                          description: roleProbeTimeoutAfterPodsReady(in seconds),
+                            when all pods of the component are ready, it will detect
+                            whether the application is available in the pod. if pods
+                            exceed the InitializationTimeoutSeconds time without a
+                            role label, this component will enter the Failed/Abnormal
+                            phase. Note that this configuration will only take effect
+                            if the component supports RoleChangedProbe and will not
+                            affect the life cycle of the pod. default values are 60
+                            seconds.
+                          format: int32
+                          minimum: 30
+                          type: integer
                         runningProbe:
                           description: Probe for DB running check.
                           properties:

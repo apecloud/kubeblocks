@@ -21,5 +21,10 @@ spec:
         accessMode: ReadWrite
         name: leader
       updateStrategy: BestEffortParallel
+    probes:
+      roleChangedProbe:
+        failureThreshold: 2
+        periodSeconds: 1
+        timeoutSeconds: 1
     defaultReplicas: 3
   type: state.mysql

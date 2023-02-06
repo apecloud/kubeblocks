@@ -28,7 +28,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
-	"github.com/apecloud/kubeblocks/controllers/dbaas/components/types"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -84,12 +83,20 @@ func GetStatusComponentMessageKey(kind, name string) string {
 	return fmt.Sprintf("%s/%s", kind, name)
 }
 
-// IsProbeTimeout checks the pod is probe timeout, timeout durations are one minute
-func IsProbeTimeout(podsReadyTime *metav1.Time) bool {
+// IsProbeTimeout checks if the application of the pod is probe timed out.
+func IsProbeTimeout(componentDef *dbaasv1alpha1.ClusterDefinitionComponent, podsReadyTime *metav1.Time) bool {
 	if podsReadyTime == nil {
 		return false
 	}
-	return time.Now().After(podsReadyTime.Add(types.ProbeTimeout))
+	probes := componentDef.Probes
+	if probes == nil || probes.RoleChangedProbe == nil {
+		return false
+	}
+	roleProbeTimeout := time.Duration(dbaasv1alpha1.DefaultRoleProbeTimeoutAfterPodsReady) * time.Second
+	if probes.RoleProbeTimeoutAfterPodsReady != 0 {
+		roleProbeTimeout = time.Duration(probes.RoleProbeTimeoutAfterPodsReady) * time.Second
+	}
+	return time.Now().After(podsReadyTime.Add(roleProbeTimeout))
 }
 
 func GetComponentPhase(isFailed, isAbnormal bool) dbaasv1alpha1.Phase {

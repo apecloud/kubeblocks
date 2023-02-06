@@ -35,6 +35,10 @@ var (
 	clusterdefinitionlog = logf.Log.WithName("clusterdefinition-resource")
 )
 
+// DefaultRoleProbeTimeoutAfterPodsReady the default role probe timeout for application when all pods of component are ready.
+// default values are 60 seconds.
+const DefaultRoleProbeTimeoutAfterPodsReady int32 = 60
+
 func (r *ClusterDefinition) SetupWebhookWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewWebhookManagedBy(mgr).
 		For(r).
@@ -48,8 +52,23 @@ var _ webhook.Defaulter = &ClusterDefinition{}
 // Default implements webhook.Defaulter so a webhook will be registered for the type
 func (r *ClusterDefinition) Default() {
 	clusterdefinitionlog.Info("default", "name", r.Name)
-
-	// TODO(user): fill in your defaulting logic.
+	for i := range r.Spec.Components {
+		probes := r.Spec.Components[i].Probes
+		if probes == nil {
+			continue
+		}
+		if probes.RoleChangedProbe != nil {
+			// set default values
+			if probes.RoleProbeTimeoutAfterPodsReady == 0 {
+				probes.RoleProbeTimeoutAfterPodsReady = DefaultRoleProbeTimeoutAfterPodsReady
+			}
+		} else {
+			// if component does not support RoleChangedProbe, reset RoleProbeTimeoutAtPodsReady to zero
+			if probes.RoleProbeTimeoutAfterPodsReady != 0 {
+				probes.RoleProbeTimeoutAfterPodsReady = 0
+			}
+		}
+	}
 }
 
 // TODO(user): change verbs to "verbs=create;update;delete" if you want to enable deletion validation.

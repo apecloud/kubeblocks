@@ -65,7 +65,7 @@ var _ = Describe("ConfigWrapper util test", func() {
 
 	Context("clusterdefinition CR test", func() {
 		It("Should success without error", func() {
-			testWrapper := NewFakeDBaasCRsFromISV(testCtx, ctx, FakeTest{
+			testWrapper := NewFakeDBaasCRsFromProvider(testCtx, ctx, FakeTest{
 				TestDataPath: "resources",
 				// for crd yaml file
 				CfgCCYaml:       "mysql_config_template.yaml",
@@ -168,7 +168,7 @@ var _ = Describe("ConfigWrapper util test", func() {
 
 	Context("clusterdefinition CR test without config Constraints", func() {
 		It("Should success without error", func() {
-			testWrapper := NewFakeDBaasCRsFromISV(testCtx, ctx, FakeTest{
+			testWrapper := NewFakeDBaasCRsFromProvider(testCtx, ctx, FakeTest{
 				TestDataPath: "resources",
 				// for crd yaml file
 				CfgCCYaml:       "mysql_config_template.yaml",
@@ -249,7 +249,7 @@ var _ = Describe("ConfigWrapper util test", func() {
 
 	Context("clusterversion CR test", func() {
 		It("Should success without error", func() {
-			testWrapper := NewFakeDBaasCRsFromISV(testCtx, ctx, FakeTest{
+			testWrapper := NewFakeDBaasCRsFromProvider(testCtx, ctx, FakeTest{
 				TestDataPath: "resources",
 				// for crd yaml file
 				CfgCCYaml:       "mysql_config_template.yaml",

@@ -63,7 +63,7 @@ var _ = Describe("Reconfigure Controller", func() {
 		It("Should rolling upgrade pod", func() {
 
 			By("creating a cluster")
-			testWrapper := NewFakeDBaasCRsFromISV(testCtx, ctx, FakeTest{
+			testWrapper := NewFakeDBaasCRsFromProvider(testCtx, ctx, FakeTest{
 				TestDataPath: "resources",
 				// for crd yaml file
 				CfgCCYaml:       "mysql_config_template.yaml",

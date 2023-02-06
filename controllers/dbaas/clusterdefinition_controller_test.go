@@ -62,7 +62,7 @@ var _ = Describe("ClusterDefinition Controller", func() {
 		It("Should update status of clusterVersion at the same time", func() {
 			By("By creating a clusterDefinition")
 
-			testWrapper := configuration.NewFakeDBaasCRsFromISV(testCtx, ctx, configuration.FakeTest{
+			testWrapper := configuration.NewFakeDBaasCRsFromProvider(testCtx, ctx, configuration.FakeTest{
 				TestDataPath:    "resources",
 				CfgCCYaml:       "mysql_config_template.yaml",
 				CDYaml:          "mysql_cd.yaml",
@@ -124,7 +124,7 @@ var _ = Describe("ClusterDefinition Controller", func() {
 		It("Should stop proceeding the status of clusterDefinition", func() {
 			By("creating a clusterDefinition")
 
-			testWrapper := configuration.NewFakeDBaasCRsFromISV(testCtx, ctx, configuration.FakeTest{
+			testWrapper := configuration.NewFakeDBaasCRsFromProvider(testCtx, ctx, configuration.FakeTest{
 				TestDataPath: "resources",
 				CDYaml:       "mysql_cd.yaml",
 				CVYaml:       "mysql_cv.yaml",

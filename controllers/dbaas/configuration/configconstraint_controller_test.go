@@ -60,7 +60,7 @@ var _ = Describe("ConfigConstraint Controller", func() {
 	Context("Create config constraint with cue validate", func() {
 		It("Should ready", func() {
 			By("create resources")
-			testWrapper := NewFakeDBaasCRsFromISV(testCtx, ctx, FakeTest{
+			testWrapper := NewFakeDBaasCRsFromProvider(testCtx, ctx, FakeTest{
 				TestDataPath:    "resources",
 				CfgCCYaml:       "mysql_config_template.yaml",
 				CDYaml:          "mysql_cd.yaml",
@@ -117,7 +117,7 @@ var _ = Describe("ConfigConstraint Controller", func() {
 			By("creating a ISV resource")
 
 			// step1: prepare env
-			testWrapper := NewFakeDBaasCRsFromISV(testCtx, ctx, FakeTest{
+			testWrapper := NewFakeDBaasCRsFromProvider(testCtx, ctx, FakeTest{
 				TestDataPath: "resources",
 				// for crd yaml file
 				CfgCCYaml:       "mysql_config_tpl_not_validate.yaml",

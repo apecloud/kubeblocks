@@ -161,7 +161,7 @@ func NewFakeK8sObjectFromFile[T intctrlutil.Object, PT intctrlutil.PObject[T]](w
 	w.setMockObject(pt)
 }
 
-func NewFakeDBaasCRsFromISV(testCtx testutil.TestContext, ctx context.Context, mockInfo FakeTest) *TestWrapper {
+func NewFakeDBaasCRsFromProvider(testCtx testutil.TestContext, ctx context.Context, mockInfo FakeTest) *TestWrapper {
 	var (
 		cdComponentTypeName = mockInfo.CDComponentType
 		componentName       = mockInfo.ComponentName

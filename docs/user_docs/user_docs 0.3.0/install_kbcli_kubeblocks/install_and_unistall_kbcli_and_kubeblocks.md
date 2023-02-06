@@ -79,7 +79,7 @@ This guide introduces how to install KubeBlocks by `kbcli`, the command line too
    ```
    kubectl get pod
    ```
-   ***Result***
+   ***Result***<br>
    Four pods starting with `kubeblocks` are displayed. For example,
    ```
    NAME                                                  READY   STATUS    RESTARTS   AGE

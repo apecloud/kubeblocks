@@ -2,7 +2,7 @@
 This guide uses one `kbcli` command to create a KubeBlocks demo environment (a playground) quickly on your local host.
 With a playground, you can try KubeBlocks and some ApeCloud MySQL features. This guide introduces how to install a playground and how to try KubeBlocks on the playground.
 
-## Before you start
+***Before you start***
 Ensure the following requirements are met so the playground and other functions can run fluently.
 
 * Minimum system requirements:
@@ -117,7 +117,7 @@ $ cat > ./mycluster-comp.yaml << EOF
           storage: 1Gi
 EOF
 
-$ kbcli cluster create --cluster-definition='apecloud-mysql' --cluster-version='ac-mysql-8.0.30' --termination-policy='WipeOut' --set='mycluster-comp.yaml' mycluster2
+$ kbcli cluster create --cluster-definition='apecloud-mysql'
 ```
 
 #### View an ApeCloud MySQL Paxos group
@@ -254,7 +254,7 @@ KubeBlocks has complete observability capabilities. This section demonstrates th
 
 2. Click the Dashboard icon on the left bar and two monitoring panels show on the page.
    ![Dashboards](../image/dashboards.png)
-3. Click the `MySQL` panel to monitor the status of the ApeCloud MySQL cluster deployed by the playground.
+3. Click General -> MySQL to monitor the status of the ApeCloud MySQL cluster deployed by the playground.
    ![MySQL_panel](../image/mysql_panel.png)
 
 ### High availability of ApeCloud MySQL

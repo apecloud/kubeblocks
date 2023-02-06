@@ -6,4 +6,4 @@ metadata:
     {{- include "apecloud-mysql.labels" . | nindent 4 }}
 data:
   my.cnf: |-
-    {{- .Values.configTemplate.configuration | nindent 4 }}
+    {{- .Files.Get "config/mysql8.cnf.tpl" | nindent 4 }}

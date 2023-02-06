@@ -75,7 +75,7 @@ const (
 	KindBackupPolicyTemplate = "BackupPolicyTemplate"
 	KindOps                  = "OpsRequest"
 	KindCM                   = "ConfigMap"
-	KindSTS              = "StatefulSet"
+	KindSTS                  = "StatefulSet"
 
 	NameLabelKey                   = "app.kubernetes.io/name"
 	InstanceLabelKey               = "app.kubernetes.io/instance"

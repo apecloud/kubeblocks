@@ -179,7 +179,7 @@ func FakeClusterDef() *dbaasv1alpha1.ClusterDefinition {
 	clusterDef.Spec.Components = []dbaasv1alpha1.ClusterDefinitionComponent{
 		{
 			TypeName:        ComponentType,
-			DefaultReplicas: 3,
+			DefaultReplicas: 2,
 		},
 		{
 			TypeName:        fmt.Sprintf("%s-%d", ComponentType, 1),

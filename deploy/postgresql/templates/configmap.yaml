@@ -3,9 +3,9 @@ kind: ConfigMap
 metadata:
   name: postgresql-configuration
 data:
-  {{- if .Values.primary.configuration }}
+  {{- if .Values.primary.configEnabled }}
   postgresql.conf: |-
-    {{- .Values.primary.configuration | nindent 4 }}
+    {{- .Files.Get "config/pg14.conf.tpl" | nindent 4 }}
   {{- end }}
   {{- if .Values.primary.pgHbaConfiguration }}
   pg_hba.conf: |

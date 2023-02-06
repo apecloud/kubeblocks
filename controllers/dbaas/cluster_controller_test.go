@@ -43,6 +43,7 @@ import (
 )
 
 var _ = Describe("Cluster Controller", func() {
+	const clusterNamePrefix = "test-cluster"
 	const statefulCompName = "replicasets"
 	const statefulCompType = "replicasets"
 	const volumeName = "data"
@@ -100,8 +101,8 @@ var _ = Describe("Cluster Controller", func() {
 			&dbaasv1alpha1.ClusterVersion{}, testCtx.UseDefaultNamespace())
 
 		By("Mock a cluster obj")
-		clusterObj = testdbaas.MockClusterObj(clusterDefObj.GetName(), clusterVersionObj.GetName())
-		clusterKey = client.ObjectKeyFromObject(clusterObj)
+		clusterKey = testdbaas.GetRandomizedKey(&testCtx, clusterNamePrefix)
+		clusterObj = testdbaas.NewClusterObj(clusterKey, clusterDefObj.GetName(), clusterVersionObj.GetName())
 	})
 
 	AfterEach(func() {
@@ -143,9 +144,7 @@ var _ = Describe("Cluster Controller", func() {
 			Expect(testCtx.CreateObj(ctx, clusterObj)).Should(Succeed())
 
 			By("Waiting for the cluster initialized")
-			Eventually(testdbaas.CheckObj(&testCtx, clusterKey, func(g Gomega, fetched *dbaasv1alpha1.Cluster) {
-				g.Expect(fetched.Status.ObservedGeneration == initializedVersion).To(BeTrue())
-			})).Should(Succeed())
+			Eventually(testdbaas.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(initializedVersion))
 		})
 
 		It("should create cluster and all sub-resources successfully", func() {
@@ -349,10 +348,7 @@ var _ = Describe("Cluster Controller", func() {
 				}},
 			}}
 			Expect(testCtx.CreateObj(ctx, clusterObj)).Should(Succeed())
-			Eventually(testdbaas.CheckObj(&testCtx, clusterKey,
-				func(g Gomega, fetched *dbaasv1alpha1.Cluster) {
-					g.Expect(fetched.Status.ObservedGeneration == 1).To(BeTrue())
-				})).Should(Succeed())
+			Eventually(testdbaas.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
 
 			By("Set HorizontalScalePolicy")
 			Eventually(testdbaas.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(clusterDefObj),
@@ -448,9 +444,7 @@ var _ = Describe("Cluster Controller", func() {
 			Eventually(testdbaas.CheckObjExists(&testCtx, snapshotKey, &snapshotv1.VolumeSnapshot{}, false)).Should(Succeed())
 
 			By("Checking cluster status and the number of replicas changed")
-			Eventually(testdbaas.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *dbaasv1alpha1.Cluster) {
-				g.Expect(cluster.Status.ObservedGeneration == 2).To(BeTrue())
-			})).Should(Succeed())
+			Eventually(testdbaas.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(2))
 			stsList = listAndCheckStatefulSet(clusterKey)
 			Expect(*stsList.Items[0].Spec.Replicas).To(BeEquivalentTo(updatedReplicas))
 		})
@@ -495,10 +489,7 @@ var _ = Describe("Cluster Controller", func() {
 				}},
 			}
 			Expect(testCtx.CreateObj(ctx, clusterObj)).Should(Succeed())
-
-			Eventually(testdbaas.CheckObj(&testCtx, clusterKey, func(g Gomega, fetched *dbaasv1alpha1.Cluster) {
-				g.Expect(fetched.Status.ObservedGeneration).To(BeEquivalentTo(1))
-			})).Should(Succeed())
+			Eventually(testdbaas.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
 
 			By("Checking the replicas")
 			stsList := listAndCheckStatefulSet(clusterKey)
@@ -529,9 +520,7 @@ var _ = Describe("Cluster Controller", func() {
 			})).Should(Succeed())
 
 			By("Checking the resize operation finished")
-			Eventually(testdbaas.CheckObj(&testCtx, clusterKey, func(g Gomega, fetched *dbaasv1alpha1.Cluster) {
-				g.Expect(fetched.Status.ObservedGeneration).To(BeEquivalentTo(2))
-			})).Should(Succeed())
+			Eventually(testdbaas.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(2))
 
 			By("Checking PVCs are resized")
 			stsList = listAndCheckStatefulSet(clusterKey)

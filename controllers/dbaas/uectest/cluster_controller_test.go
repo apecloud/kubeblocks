@@ -53,6 +53,7 @@ var _ = Describe("Cluster Controller", func() {
 	const timeout = time.Second * 10
 	const interval = time.Second * 1
 
+	const clusterKeyPrefix = "test-cluster"
 	const leader = "leader"
 	const follower = "follower"
 	const volumeName = "data"
@@ -125,8 +126,8 @@ var _ = Describe("Cluster Controller", func() {
 			clusterVersionObj = assureClusterVersionObj()
 		}
 
-		clusterObj := testdbaas.MockClusterObj(clusterDefObj.GetName(), clusterVersionObj.GetName())
-		clusterKey := client.ObjectKeyFromObject(clusterObj)
+		clusterKey := testdbaas.GetRandomizedKey(&testCtx, clusterKeyPrefix)
+		clusterObj := testdbaas.NewClusterObj(clusterKey, clusterDefObj.GetName(), clusterVersionObj.GetName())
 		return clusterObj, clusterDefObj, clusterVersionObj, clusterKey
 	}
 
@@ -157,7 +158,8 @@ var _ = Describe("Cluster Controller", func() {
 			clusterVersionObj = assureClusterVersionWithConsensusObj()
 		}
 
-		clusterObj := testdbaas.MockClusterObj(clusterDefObj.GetName(), clusterVersionObj.GetName())
+		clusterKey := testdbaas.GetRandomizedKey(&testCtx, clusterKeyPrefix)
+		clusterObj := testdbaas.NewClusterObj(clusterKey, clusterDefObj.GetName(), clusterVersionObj.GetName())
 		clusterObj.Spec.Components = []dbaasv1alpha1.ClusterComponent{{
 			Name: "wesql-test",
 			Type: "replicasets",
@@ -175,7 +177,6 @@ var _ = Describe("Cluster Controller", func() {
 				},
 			}},
 		}}
-		clusterKey := client.ObjectKeyFromObject(clusterObj)
 		return clusterObj, clusterDefObj, clusterVersionObj, clusterKey
 	}
 

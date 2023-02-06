@@ -172,28 +172,28 @@ var _ = Describe("Cluster", func() {
 	It("check params for reconfiguring operations", func() {
 		const (
 			ns                  = "default"
-			volumeName          = "config"
 			componentName       = "wesql"
 			cdComponentTypeName = "replicasets"
 		)
 
 		randomNamer := CreateRandomResourceNamer(ns)
 		mockHelper := NewFakeResourceObjectHelper("cli_testdata",
-			withCustomResource(types.ClusterGVR(), newFakeClusterResource(randomNamer, componentName, cdComponentTypeName)),
-			withCustomResource(types.CMGVR(), newFakeConfigCMResource(randomNamer, componentName, volumeName, testdata.WithMap("my.cnf", ""))),
-			withResourceKind(types.ConfigConstraintGVR(), types.KindConfigConstraint, testdata.WithName(randomNamer.ccName)),
-			withResourceKind(types.CMGVR(), types.KindCM, testdata.WithNamespacedName(randomNamer.tplName, randomNamer.ns)),
-			withResourceKind(types.ClusterVersionGVR(), types.KindClusterVersion, testdata.WithName(randomNamer.cvName)),
-			withResourceKind(types.ClusterDefGVR(), types.KindClusterDef,
-				testdata.WithName(randomNamer.cdName),
-				testdata.WithConfigTemplate(GenerateConfigTemplate(randomNamer, volumeName), testdata.ComponentTypeSelector(dbaasv1alpha1.Stateful)),
+			WithCustomResource(types.ClusterGVR(), NewFakeClusterResource(randomNamer, componentName, cdComponentTypeName)),
+			WithCustomResource(types.CMGVR(), NewFakeConfigCMResource(randomNamer, componentName, randomNamer.VolumeName,
+				testdata.WithCMData(testdata.WithNewFakeCMData("my.cnf", "")))),
+			WithResourceKind(types.ConfigConstraintGVR(), types.KindConfigConstraint, testdata.WithName(randomNamer.CCName)),
+			WithResourceKind(types.CMGVR(), types.KindCM, testdata.WithNamespacedName(randomNamer.TPLName, randomNamer.NS)),
+			WithResourceKind(types.ClusterVersionGVR(), types.KindClusterVersion, testdata.WithName(randomNamer.CVName)),
+			WithResourceKind(types.ClusterDefGVR(), types.KindClusterDef,
+				testdata.WithName(randomNamer.CDName),
+				testdata.WithConfigTemplate(GenerateConfigTemplate(randomNamer), testdata.ComponentTypeSelector(dbaasv1alpha1.Stateful)),
 				testdata.WithUpdateComponent(testdata.ComponentTypeSelector(dbaasv1alpha1.Stateful),
 					func(component *dbaasv1alpha1.ClusterDefinitionComponent) {
 						component.TypeName = cdComponentTypeName
 					}),
 			),
 		)
-		ttf, o := NewFakeOperationsOptions(randomNamer.ns, randomNamer.clusterName, dbaasv1alpha1.ReconfiguringType, mockHelper.CreateObjects()...)
+		ttf, o := NewFakeOperationsOptions(randomNamer.NS, randomNamer.ClusterName, dbaasv1alpha1.ReconfiguringType, mockHelper.CreateObjects()...)
 		defer ttf.Cleanup()
 
 		o.ComponentNames = []string{"replicasets", "proxy"}
@@ -206,7 +206,7 @@ var _ = Describe("Cluster", func() {
 		o.Parameters = []string{"abcd"}
 		Expect(o.Validate().Error()).To(ContainSubstring("updated parameter formatter"))
 		o.Parameters = []string{"abcd=test"}
-		o.CfgTemplateName = randomNamer.tplName
+		o.CfgTemplateName = randomNamer.TPLName
 		Expect(o.Validate()).Should(Succeed())
 	})
 

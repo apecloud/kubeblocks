@@ -17,6 +17,7 @@ limitations under the License.
 package cluster
 
 import (
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -35,9 +36,11 @@ import (
 
 type createResourceObject = func() runtime.Object
 
-type fakeKubeObjectHelper struct {
+type FakeKubeObjectHelper struct {
 	// resource base path
 	basePath string
+
+	filter testdata.FilterOptions
 
 	// filter
 	filterResources map[schema.GroupVersionResource]string
@@ -48,41 +51,43 @@ type fakeKubeObjectHelper struct {
 }
 
 type ResourceNamer struct {
-	ns          string
-	cdName      string
-	cvName      string
-	tplName     string
-	ccName      string
-	clusterName string
+	NS          string
+	CDName      string
+	CVName      string
+	TPLName     string
+	CCName      string
+	ClusterName string
+	VolumeName  string
 }
 
-type helperOption func(helper *fakeKubeObjectHelper)
+type ObjectMockHelperOption func(helper *FakeKubeObjectHelper)
 
 func CreateRandomResourceNamer(ns string) ResourceNamer {
 	return ResourceNamer{
-		ns:          ns,
-		cdName:      "clusterdef-test-" + testdata.GenRandomString(),
-		cvName:      "clusterversion-test-" + testdata.GenRandomString(),
-		tplName:     "tpl-test-" + testdata.GenRandomString(),
-		ccName:      "configconstraint-test-" + testdata.GenRandomString(),
-		clusterName: "cluster-test-" + testdata.GenRandomString(),
+		NS:          ns,
+		VolumeName:  "config",
+		CDName:      "clusterdef-test-" + testdata.GenRandomString(),
+		CVName:      "clusterversion-test-" + testdata.GenRandomString(),
+		TPLName:     "tpl-test-" + testdata.GenRandomString(),
+		CCName:      "configconstraint-test-" + testdata.GenRandomString(),
+		ClusterName: "cluster-test-" + testdata.GenRandomString(),
 	}
 }
 
-func GenerateConfigTemplate(namer ResourceNamer, volumeName string) []dbaasv1alpha1.ConfigTemplate {
+func GenerateConfigTemplate(namer ResourceNamer) []dbaasv1alpha1.ConfigTemplate {
 	return []dbaasv1alpha1.ConfigTemplate{
 		{
-			Namespace:           namer.ns,
-			Name:                namer.tplName,
-			ConfigTplRef:        namer.tplName,
-			ConfigConstraintRef: namer.ccName,
-			VolumeName:          volumeName,
+			Namespace:           namer.NS,
+			Name:                namer.TPLName,
+			ConfigTplRef:        namer.TPLName,
+			ConfigConstraintRef: namer.CCName,
+			VolumeName:          namer.VolumeName,
 		},
 	}
 }
 
-func withResourceKind(resource schema.GroupVersionResource, kind string, options ...testdata.ResourceOptions) helperOption {
-	return func(helper *fakeKubeObjectHelper) {
+func WithResourceKind(resource schema.GroupVersionResource, kind string, options ...testdata.ResourceOptions) ObjectMockHelperOption {
+	return func(helper *FakeKubeObjectHelper) {
 		if helper.filterResources == nil {
 			helper.filterResources = make(map[schema.GroupVersionResource]string, 0)
 		}
@@ -96,8 +101,14 @@ func withResourceKind(resource schema.GroupVersionResource, kind string, options
 	}
 }
 
-func withCustomResource(resource schema.GroupVersionResource, creator createResourceObject) helperOption {
-	return func(helper *fakeKubeObjectHelper) {
+func WithResourceFilter(filter testdata.FilterOptions) ObjectMockHelperOption {
+	return func(helper *FakeKubeObjectHelper) {
+		helper.filter = filter
+	}
+}
+
+func WithCustomResource(resource schema.GroupVersionResource, creator createResourceObject) ObjectMockHelperOption {
+	return func(helper *FakeKubeObjectHelper) {
 		if helper.customCreateResources == nil {
 			helper.customCreateResources = make(map[schema.GroupVersionResource][]createResourceObject)
 		}
@@ -107,47 +118,54 @@ func withCustomResource(resource schema.GroupVersionResource, creator createReso
 	}
 }
 
-func newFakeConfigCMResource(namer ResourceNamer, componentName, volumeName string, dataMap map[string]string) createResourceObject {
+func NewFakeConfigCMResource(namer ResourceNamer, componentName, volumeName string, options ...testdata.ResourceOptions) createResourceObject {
 	return func() runtime.Object {
-		return &corev1.ConfigMap{
+		cm := &corev1.ConfigMap{
 			TypeMeta: metav1.TypeMeta{
 				APIVersion: types.VersionV1,
 				Kind:       types.KindCM,
 			},
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      cfgcore.GetComponentCfgName(namer.clusterName, componentName, volumeName),
-				Namespace: namer.ns,
+				Name:      cfgcore.GetComponentCfgName(namer.ClusterName, componentName, volumeName),
+				Namespace: namer.NS,
 			},
-			Data: dataMap,
 		}
+		for _, option := range options {
+			option(cm)
+		}
+		return cm
 	}
 }
 
-func newFakeClusterResource(namer ResourceNamer, componentName, componentType string) createResourceObject {
+func NewFakeClusterResource(namer ResourceNamer, componentName, componentType string, options ...testdata.ResourceOptions) createResourceObject {
 	return func() runtime.Object {
-		return &dbaasv1alpha1.Cluster{
+		cluster := &dbaasv1alpha1.Cluster{
 			TypeMeta: metav1.TypeMeta{
 				APIVersion: dbaasv1alpha1.APIVersion,
 				Kind:       dbaasv1alpha1.ClusterKind,
 			},
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      namer.clusterName,
-				Namespace: namer.ns,
+				Name:      namer.ClusterName,
+				Namespace: namer.NS,
 			},
 			Spec: dbaasv1alpha1.ClusterSpec{
-				ClusterDefRef:     namer.cdName,
-				ClusterVersionRef: namer.cvName,
+				ClusterDefRef:     namer.CDName,
+				ClusterVersionRef: namer.CVName,
 				Components: []dbaasv1alpha1.ClusterComponent{{
 					Name: componentName,
 					Type: componentType,
 				}},
 			},
 		}
+		for _, option := range options {
+			option(cluster)
+		}
+		return cluster
 	}
 }
 
-func NewFakeResourceObjectHelper(basePath string, options ...helperOption) fakeKubeObjectHelper {
-	fakeHelper := fakeKubeObjectHelper{
+func NewFakeResourceObjectHelper(basePath string, options ...ObjectMockHelperOption) FakeKubeObjectHelper {
+	fakeHelper := FakeKubeObjectHelper{
 		basePath: basePath,
 	}
 	for _, option := range options {
@@ -156,7 +174,7 @@ func NewFakeResourceObjectHelper(basePath string, options ...helperOption) fakeK
 	return fakeHelper
 }
 
-func (helper *fakeKubeObjectHelper) pass(meta metav1.TypeMeta) bool {
+func (helper *FakeKubeObjectHelper) pass(meta metav1.TypeMeta) bool {
 	if helper.filterResources == nil {
 		return false
 	}
@@ -168,15 +186,15 @@ func (helper *fakeKubeObjectHelper) pass(meta metav1.TypeMeta) bool {
 	return true
 }
 
-func (helper *fakeKubeObjectHelper) options(meta metav1.TypeMeta) []testdata.ResourceOptions {
+func (helper *FakeKubeObjectHelper) options(meta metav1.TypeMeta) []testdata.ResourceOptions {
 	if helper.resourceOptions == nil {
 		return nil
 	}
 	return helper.resourceOptions[meta.Kind]
 }
 
-func (helper *fakeKubeObjectHelper) CreateObjects() []runtime.Object {
-	resourceList, err := testdata.ScanDirectoryPath(helper.basePath)
+func (helper *FakeKubeObjectHelper) CreateObjects() []runtime.Object {
+	resourceList, err := testdata.ScanDirectoryPath(helper.basePath, helper.filter)
 	requireSucceed(err)
 
 	var (
@@ -217,6 +235,8 @@ func (helper *fakeKubeObjectHelper) CreateObjects() []runtime.Object {
 			k8sObj, err = testdata.GetResourceFromContext[dbaasv1alpha1.OpsRequest](yamlBytes, options...)
 		case types.KindCluster:
 			k8sObj, err = testdata.GetResourceFromContext[dbaasv1alpha1.Cluster](yamlBytes, options...)
+		case types.KindSTS:
+			k8sObj, err = testdata.GetResourceFromContext[appsv1.StatefulSet](yamlBytes, options...)
 		default:
 			continue
 		}
@@ -250,7 +270,7 @@ func NewFakeOperationsOptions(ns, cName string, opsType dbaasv1alpha1.OpsType, o
 		panic(err)
 	}
 
-	// TODO using GroupVersionResource of fakeKubeObjectHelper
+	// TODO using GroupVersionResource of FakeKubeObjectHelper
 	listMapping := map[schema.GroupVersionResource]string{
 		types.ClusterDefGVR():       types.KindClusterDef + "List",
 		types.ClusterVersionGVR():   types.KindClusterVersion + "List",

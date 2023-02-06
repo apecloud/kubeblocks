@@ -17,6 +17,7 @@ limitations under the License.
 package types
 
 import (
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
@@ -57,6 +58,8 @@ const (
 	ResourceDeployments = "deployments"
 	// ResourceConfigmaps configmap resource
 	ResourceConfigmaps = "configmaps"
+	// ResourceStatefulSets sts resource
+	ResourceStatefulSets = "statefulsets"
 	// ResourceConfigConstraintVersions clusterVersion resource
 	ResourceConfigConstraintVersions = "configconstraints"
 
@@ -72,6 +75,7 @@ const (
 	KindBackupPolicyTemplate = "BackupPolicyTemplate"
 	KindOps                  = "OpsRequest"
 	KindCM                   = "ConfigMap"
+	KindSTS                  = "StatefulSet"
 
 	NameLabelKey                   = "app.kubernetes.io/name"
 	InstanceLabelKey               = "app.kubernetes.io/instance"
@@ -165,6 +169,10 @@ func CRDGVR() schema.GroupVersionResource {
 
 func CMGVR() schema.GroupVersionResource {
 	return schema.GroupVersionResource{Group: corev1.GroupName, Version: VersionV1, Resource: ResourceConfigmaps}
+}
+
+func STSGVR() schema.GroupVersionResource {
+	return schema.GroupVersionResource{Group: appsv1.GroupName, Version: VersionV1, Resource: ResourceStatefulSets}
 }
 
 func ConfigConstraintGVR() schema.GroupVersionResource {

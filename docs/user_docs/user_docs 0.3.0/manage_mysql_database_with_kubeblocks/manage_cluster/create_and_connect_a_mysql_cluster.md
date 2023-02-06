@@ -1,10 +1,12 @@
 # Create and connect to a MySQL Cluster
 ## Create a MySQL Cluster
 ***Before you start***
-Run the command below to view all the database types available for creating a cluster. 
-```
-kbcli clusterdefinition list
-```
+* `kbcli`: Install `kbcli` on your host. Refer to [Install/Uninstall kbcli and KubeBlocks](../../install_kbcli_kubeblocks/install_and_unistall_kbcli_and_kubeblocks.md) for details.
+* KubeBlocks: Install KubeBlocks on your host. Refer to [Install/Uninstall kbcli and KubeBlocks](../../install_kbcli_kubeblocks/install_and_unistall_kbcli_and_kubeblocks.md) for details.
+* Run the command below to view all the database types available for creating a cluster. 
+  ```
+  kbcli clusterdefinition list
+  ```
 ***Result***
 ```
 $ kbcli clusterdefinition list
@@ -26,6 +28,10 @@ ac-mysql-8.0.30   apecloud-mysql       Available   2m40s
 ```
 $ kbcli cluster create --cluster-definition='apecloud-mysql'
 ```
+
+> Note:
+> If you want to create a Paxos group, set `replicas` as 3.
+
 ## Connect to a MySQL Cluster
 ***Steps:***
 Run the command below to connect to a cluster.

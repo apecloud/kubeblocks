@@ -176,7 +176,7 @@ func (o *Options) preCheck() error {
 	if len(crs) > 0 {
 		errMsg := bytes.NewBufferString("failed to uninstall, the following custom resources need to be removed first:\n")
 		for k, v := range crs {
-			errMsg.WriteString(fmt.Sprintf("  %s: %s\n", k, strings.Join(v, ",")))
+			errMsg.WriteString(fmt.Sprintf("  %s: %s\n", k, strings.Join(v, " ")))
 		}
 		return errors.Errorf(errMsg.String())
 	}

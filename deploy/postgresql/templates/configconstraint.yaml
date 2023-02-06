@@ -18,7 +18,7 @@ spec:
     # schema: auto generate from mmmcue scripts
     # example: ../../internal/configuration/testdata/mysql_openapi.json
     cue: |-
-      {{- .Files.Get "configconstraints/pg14cc.cue" | nindent 6 }}
+      {{- .Files.Get "config/pg14cc.cue" | nindent 6 }}
 
   #  require db instance restart
   staticParameters:

@@ -56,6 +56,12 @@ spec:
               fieldPath: status.hostIP
         - name: RPC_PORT
           value: "{{ .Values.agent.rpcPort }}"
+        - name: CLOUD_PROVIDER
+          {{- if regexMatch ".*-eks-.*" .Capabilities.KubeVersion.GitVersion }}
+          value: "aws"
+          {{- else }}
+          {{ fail "loadbalancer is unsupported on this kubernetes provider" }}
+          {{- end }}
         volumeMounts:
         - mountPath: /run/xtables.lock
           name: xtables-lock

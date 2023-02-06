@@ -17,6 +17,8 @@ limitations under the License.
 package cluster
 
 import (
+	"net/http"
+	"net/http/httptest"
 	"os"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -24,12 +26,11 @@ import (
 
 	"github.com/spf13/viper"
 	"k8s.io/apimachinery/pkg/util/json"
-
-	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
+	"github.com/apecloud/kubeblocks/test/testdata"
 )
 
 func generateComponents(component dbaasv1alpha1.ClusterComponent, count int) []map[string]interface{} {
@@ -70,62 +71,47 @@ var _ = Describe("create", func() {
 		})
 	})
 
-	Context("setEnableAllLogs Test", func() {
-		cluster := &dbaasv1alpha1.Cluster{}
-		clusterByte := `
-apiVersion: dbaas.kubeblocks.io/v1alpha1
-kind: Cluster
-metadata:
-  name: wesql
-spec:
-  clusterVersionRef: cluster-version-consensus
-  clusterDefinitionRef: cluster-definition-consensus
-  components:
-    - name: wesql-test
-      type: replicasets
-`
-		clusterDef := &dbaasv1alpha1.ClusterDefinition{}
-		clusterDefByte := `
-apiVersion: dbaas.kubeblocks.io/v1alpha1
-kind: ClusterDefinition
-metadata:
-  name: cluster-definition-consensus
-spec:
-  type: state.mysql
-  components:
-    - typeName: replicasets
-      componentType: Consensus
-      logConfigs:
-        - name: error
-          filePathPattern: /log/mysql/mysqld.err
-        - name: slow
-          filePathPattern: /log/mysql/*slow.log
-      podSpec:
-        containers:
-          - name: mysql
-            imagePullPolicy: IfNotPresent`
-		_ = yaml.Unmarshal([]byte(clusterDefByte), clusterDef)
-		_ = yaml.Unmarshal([]byte(clusterByte), cluster)
-		setEnableAllLogs(cluster, clusterDef)
-		Expect(len(cluster.Spec.Components[0].EnabledLogs)).Should(Equal(2))
+	Context("setEnableAllLogs test", func() {
+		var cluster *dbaasv1alpha1.Cluster
+		var clusterDef *dbaasv1alpha1.ClusterDefinition
+		var err error
+		BeforeEach(func() {
+			cluster, err = testdata.GetResourceFromTestData[dbaasv1alpha1.Cluster]("cli_testdata/mysql_logconfigs.yaml")
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(cluster.Spec.Components[0].EnabledLogs).Should(BeNil())
+			clusterDef, err = testdata.GetResourceFromTestData[dbaasv1alpha1.ClusterDefinition]("cli_testdata/mysql_logconfigs_cd.yaml")
+			Expect(err).ShouldNot(HaveOccurred())
+		})
+		It("set all logs type enable", func() {
+			setEnableAllLogs(cluster, clusterDef)
+			Expect(len(cluster.Spec.Components[0].EnabledLogs)).Should(Equal(2))
+		})
 	})
 
-	Context("multipleSourceComponent Test", func() {
+	Context("multipleSourceComponent test", func() {
 		defer GinkgoRecover()
-		fileName := "https://kubernetes.io/docs/tasks/debug/"
 		streams := genericclioptions.IOStreams{
 			In:     os.Stdin,
 			Out:    os.Stdout,
 			ErrOut: os.Stdout,
 		}
-		bytes, err := MultipleSourceComponents(fileName, streams.In)
-		Expect(bytes).ShouldNot(BeNil())
-		Expect(err).ShouldNot(HaveOccurred())
-		// corner case for no existing local file
-		fileName = "no-existing-file"
-		bytes, err = MultipleSourceComponents(fileName, streams.In)
-		Expect(bytes).Should(BeNil())
-		Expect(err).Should(HaveOccurred())
+		It("target file in website", func() {
+			ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				w.Write([]byte("OK"))
+			}))
+			defer ts.Close()
+			fileURL := ts.URL + "/docs/file"
+			bytes, err := MultipleSourceComponents(fileURL, streams.In)
+			Expect(bytes).Should(Equal([]byte("OK")))
+			Expect(err).ShouldNot(HaveOccurred())
+		})
+		It("file doesn't exist", func() {
+			fileName := "no-existing-file"
+			bytes, err := MultipleSourceComponents(fileName, streams.In)
+			Expect(bytes).Should(BeNil())
+			Expect(err).Should(HaveOccurred())
+		})
 	})
 
 	It("build cluster component", func() {

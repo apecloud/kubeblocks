@@ -404,20 +404,6 @@ func expectationKey(ns, clusterName, component string) string {
 	return fmt.Sprintf("%s-%s-%s", ns, clusterName, component)
 }
 
-// getClusterAndEngineType infers cluster type and engine type we supported at the moment.
-func getEngineType(clusterDefType string, compDef dbaasv1alpha1.ClusterDefinitionComponent) string {
-	if len(compDef.CharacterType) > 0 {
-		return compDef.CharacterType
-	}
-
-	switch clusterDefType {
-	case "state.mysql":
-		return kMysql
-	default:
-		return ""
-	}
-}
-
 func getCreationStmtForAccount(namespace, clusterName, clusterDefType, clusterDefName, compName string, passConfig dbaasv1alpha1.PasswordConfig,
 	accountConfig dbaasv1alpha1.SystemAccountConfig) ([]string, *corev1.Secret) {
 	// generated password with mixedcases = true

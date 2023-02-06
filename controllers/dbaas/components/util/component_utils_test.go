@@ -53,7 +53,13 @@ func TestIsFailedOrAbnormal(t *testing.T) {
 
 func TestIsProbeTimeout(t *testing.T) {
 	podsReadyTime := &metav1.Time{Time: time.Now().Add(-10 * time.Minute)}
-	if !IsProbeTimeout(podsReadyTime) {
+	compDef := &dbaasv1alpha1.ClusterDefinitionComponent{
+		Probes: &dbaasv1alpha1.ClusterDefinitionProbes{
+			RoleChangedProbe:               &dbaasv1alpha1.ClusterDefinitionProbe{},
+			RoleProbeTimeoutAfterPodsReady: dbaasv1alpha1.DefaultRoleProbeTimeoutAfterPodsReady,
+		},
+	}
+	if !IsProbeTimeout(compDef, podsReadyTime) {
 		t.Error("probe timed out should be true")
 	}
 }
@@ -76,57 +82,6 @@ func TestGetComponentPhase(t *testing.T) {
 	status = GetComponentPhase(isFailed, isAbnormal)
 	if status != "" {
 		t.Error(`function GetComponentPhase should return ""`)
-	}
-}
-
-func TestGetComponentOrTypeName(t *testing.T) {
-	var (
-		componentType = "mysqlType"
-		componentName = "mysql"
-	)
-	cluster := dbaasv1alpha1.Cluster{
-		Spec: dbaasv1alpha1.ClusterSpec{
-			Components: []dbaasv1alpha1.ClusterComponent{
-				{Name: componentName, Type: componentType},
-			},
-		},
-	}
-	typeName := GetComponentTypeName(cluster, componentName)
-	if typeName != componentType {
-		t.Errorf(`function GetComponentTypeName should return %s`, componentType)
-	}
-	component := GetComponentByName(&cluster, componentName)
-	if component == nil {
-		t.Errorf("function GetComponentByName should not return nil")
-	}
-	componentName = "mysql1"
-	typeName = GetComponentTypeName(cluster, componentName)
-	if typeName != componentName {
-		t.Errorf(`function GetComponentTypeName should return %s`, componentName)
-	}
-	component = GetComponentByName(&cluster, componentName)
-	if component != nil {
-		t.Error("function GetComponentByName should return nil")
-	}
-}
-
-func TestGetComponentDefFromClusterDefinition(t *testing.T) {
-	componentType := "mysqlType"
-	clusterDef := &dbaasv1alpha1.ClusterDefinition{
-		Spec: dbaasv1alpha1.ClusterDefinitionSpec{
-			Components: []dbaasv1alpha1.ClusterDefinitionComponent{
-				{
-					TypeName: componentType,
-				},
-			},
-		},
-	}
-	if GetComponentDefFromClusterDefinition(clusterDef, componentType) == nil {
-		t.Error("function GetComponentTypeName should not return nil")
-	}
-	componentType = "test"
-	if GetComponentDefFromClusterDefinition(clusterDef, componentType) != nil {
-		t.Error("function GetComponentTypeName should return nil")
 	}
 }
 
@@ -207,7 +162,7 @@ var _ = Describe("Consensus Component", func() {
 			Expect(GetStatusComponentMessageKey("Pod", "mysql-01")).To(Equal("Pod/mysql-01"))
 
 			By("test GetComponentReplicas function")
-			component := GetComponentByName(cluster, consensusCompName)
+			component := cluster.GetComponentByName(consensusCompName)
 			Expect(GetComponentReplicas(component, componentDef)).To(Equal(int32(3)))
 
 			By("test GetComponentStsMinReadySeconds")

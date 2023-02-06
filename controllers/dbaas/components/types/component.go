@@ -17,8 +17,6 @@ limitations under the License.
 package types
 
 import (
-	"time"
-
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -54,10 +52,5 @@ type Component interface {
 	GetPhaseWhenPodsNotReady(componentName string) (dbaasv1alpha1.Phase, error)
 }
 
-const (
-	// ProbeTimeoutReason the event reason when all pods of the component probe role timed out.
-	ProbeTimeoutReason = "ProbeTimeout"
-
-	// ProbeTimeout the probe timeout
-	ProbeTimeout = 1 * time.Minute
-)
+// RoleProbeTimeoutReason the event reason when all pods of the component role probe timed out.
+const RoleProbeTimeoutReason = "RoleProbeTimeout"

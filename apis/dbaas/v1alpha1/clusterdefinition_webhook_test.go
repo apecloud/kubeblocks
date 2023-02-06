@@ -31,9 +31,9 @@ import (
 var _ = Describe("clusterDefinition webhook", func() {
 	var (
 		randomStr              = testCtx.GetRandomStr()
-		clusterDefinitionName  = "webhook-mysql-definition-" + randomStr
-		clusterDefinitionName2 = "webhook-mysql-definition2" + randomStr
-		clusterDefinitionName3 = "webhook-mysql-definition3" + randomStr
+		clusterDefinitionName  = "webhook-cd-" + randomStr
+		clusterDefinitionName2 = "webhook-cd2" + randomStr
+		clusterDefinitionName3 = "webhook-cd3" + randomStr
 		timeout                = time.Second * 10
 		interval               = time.Second
 	)
@@ -276,6 +276,29 @@ var _ = Describe("clusterDefinition webhook", func() {
 				}
 			}
 		})
+	})
+
+	It("test mutating webhook", func() {
+		clusterDef, _ := createTestClusterDefinitionObj3(clusterDefinitionName + "-mutating")
+		By("test set the default value to RoleProbeTimeoutAfterPodsReady when roleChangedProbe is not nil")
+		clusterDef.Spec.Components[0].Probes = &ClusterDefinitionProbes{
+			RoleChangedProbe: &ClusterDefinitionProbe{},
+		}
+		Expect(testCtx.CreateObj(ctx, clusterDef)).Should(Succeed())
+		Eventually(func(g Gomega) int32 {
+			g.Expect(k8sClient.Get(ctx, client.ObjectKey{Name: clusterDef.Name}, clusterDef)).Should(Succeed())
+			return clusterDef.Spec.Components[0].Probes.RoleProbeTimeoutAfterPodsReady
+		}, timeout, interval).Should(Equal(DefaultRoleProbeTimeoutAfterPodsReady))
+
+		By("test set zero to RoleProbeTimeoutAfterPodsReady when roleChangedProbe is nil")
+		clusterDef.Spec.Components[0].Probes = &ClusterDefinitionProbes{
+			RoleProbeTimeoutAfterPodsReady: 60,
+		}
+		Expect(k8sClient.Update(ctx, clusterDef)).Should(Succeed())
+		Eventually(func(g Gomega) int32 {
+			g.Expect(k8sClient.Get(ctx, client.ObjectKey{Name: clusterDef.Name}, clusterDef)).Should(Succeed())
+			return clusterDef.Spec.Components[0].Probes.RoleProbeTimeoutAfterPodsReady
+		}, timeout, interval).Should(Equal(int32(0)))
 	})
 })
 

@@ -59,11 +59,11 @@ type BackupPolicySpec struct {
 	Target TargetCluster `json:"target"`
 
 	// execute hook commands for backup.
-	Hooks BackupPolicyHook `json:"hooks"`
+	// +optional
+	Hooks *BackupPolicyHook `json:"hooks,omitempty"`
 
 	// array of remote volumes from CSI driver definition.
 	// +kubebuilder:validation:Required
-	// +kubebuilder:pruning:PreserveUnknownFields
 	RemoteVolume corev1.Volume `json:"remoteVolume"`
 
 	// count of backup stop retries on fail.
@@ -73,17 +73,6 @@ type BackupPolicySpec struct {
 
 // TargetCluster TODO (dsj): target cluster need redefined from Cluster API
 type TargetCluster struct {
-	// database engine to support in the backup.
-	// +kubebuilder:validation:Enum={mysql}
-	// +kubebuilder:validation:Required
-	DatabaseEngine string `json:"databaseEngine"`
-
-	// database engine to support in the backup.
-	// +kubebuilder:validation:Enum={5.6,5.7,8.0}
-	// +listType=set
-	// +optional
-	DatabaseEngineVersions []string `json:"databaseEngineVersion,omitempty"`
-
 	// LabelSelector is used to find matching pods.
 	// Pods that match this label selector are counted to determine the number of pods
 	// in their corresponding topology domain.
@@ -104,12 +93,10 @@ type BackupPolicySecret struct {
 	Name string `json:"name"`
 
 	// UserKeyword the map keyword of the user in the connection credential secret
-	// +kubebuilder:default=username
 	// +optional
 	UserKeyword string `json:"userKeyword,omitempty"`
 
 	// PasswordKeyword the map keyword of the password in the connection credential secret
-	// +kubebuilder:default=password
 	// +optional
 	PasswordKeyword string `json:"passwordKeyword,omitempty"`
 }
@@ -130,9 +117,8 @@ type BackupPolicyHook struct {
 	Image string `json:"image,omitempty"`
 
 	// which container can exec command
-	// +kubebuilder:default=mysql
 	// +optional
-	ContainerName string `json:"ContainerName,omitempty"`
+	ContainerName string `json:"containerName,omitempty"`
 }
 
 // BackupPolicyStatus defines the observed state of BackupPolicy

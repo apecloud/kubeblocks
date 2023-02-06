@@ -83,6 +83,7 @@ type CreateBackupPolicyOptions struct {
 	ClusterName      string `json:"clusterName,omitempty"`
 	TTL              string `json:"ttl,omitempty"`
 	ConnectionSecret string `json:"connectionSecret,omitempty"`
+	PolicyTemplate   string `json:"policyTemplate,omitempty"`
 	create.BaseOptions
 }
 
@@ -106,11 +107,16 @@ func (o *CreateBackupOptions) Validate() error {
 		return err
 	}
 
+	backupPolicyTemplate, err := o.getDefaultBackupPolicyTemplate()
+	if err != nil {
+		return err
+	}
 	// apply backup policy
 	policyOptions := CreateBackupPolicyOptions{
 		TTL:              o.TTL,
 		ClusterName:      o.Name,
 		ConnectionSecret: connectionSecret,
+		PolicyTemplate:   backupPolicyTemplate,
 		BaseOptions:      o.BaseOptions,
 	}
 	policyOptions.Name = "backup-policy-" + o.Namespace + "-" + o.Name
@@ -152,6 +158,29 @@ func (o *CreateBackupOptions) getConnectionSecret() (string, error) {
 		return "", fmt.Errorf("not found connection credential for cluster %s", o.Name)
 	}
 	return secretObjs.Items[0].GetName(), nil
+}
+
+func (o *CreateBackupOptions) getDefaultBackupPolicyTemplate() (string, error) {
+	clusterObj, err := o.Client.Resource(types.ClusterGVR()).Namespace(o.Namespace).Get(context.TODO(), o.Name, metav1.GetOptions{})
+	if err != nil {
+		return "", err
+	}
+
+	// find backupPolicyTemplate from cluster label
+	opts := metav1.ListOptions{
+		LabelSelector: fmt.Sprintf("%s=%s",
+			types.ClusterDefLabelKey, clusterObj.GetLabels()[types.ClusterDefLabelKey]),
+	}
+	objs, err := o.Client.
+		Resource(types.BackupPolicyTemplateGVR()).
+		List(context.TODO(), opts)
+	if err != nil {
+		return "", err
+	}
+	if len(objs.Items) == 0 {
+		return "", fmt.Errorf("not found any backupPolicyTemplate for cluster %s", o.Name)
+	}
+	return objs.Items[0].GetName(), nil
 }
 
 func NewCreateBackupCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {

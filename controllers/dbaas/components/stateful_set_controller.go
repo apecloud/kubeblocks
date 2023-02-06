@@ -83,9 +83,11 @@ func (r *StatefulSetReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 
 	// create a component object
 	componentName := sts.GetLabels()[intctrlutil.AppComponentLabelKey]
-	typeName := util.GetComponentTypeName(*cluster, componentName)
-	componentDef := util.GetComponentDefFromClusterDefinition(clusterDef, typeName)
-	clusterComponent := util.GetComponentByName(cluster, componentName)
+	clusterComponent := cluster.GetComponentByName(componentName)
+	if clusterComponent == nil {
+		return intctrlutil.Reconciled()
+	}
+	componentDef := clusterDef.GetComponentDefByTypeName(clusterComponent.Type)
 	component := NewComponentByType(ctx, r.Client, cluster, componentDef, clusterComponent)
 	if component == nil {
 		return intctrlutil.Reconciled()

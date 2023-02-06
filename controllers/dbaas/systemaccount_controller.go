@@ -171,19 +171,16 @@ func (r *SystemAccountReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		}
 
 		// cmdExecutorConfig has a higher priority than built-in engines.
-		engineType := getEngineType(clusterdefinition.Spec.Type, *compDef)
-		if len(engineType) > 0 {
-			// expectations: collect extra accounts, trigger by other recources, to be created
-			// TODO: @shanshan. This part should be updated when BackupPolicy API is updated in the future.
-			charKey := expectationKey(cluster.Namespace, cluster.Name, engineType)
-			charExpect, charExists, err := r.ExpectionManager.getExpectation(charKey)
-			if err != nil {
-				return err
-			}
-			if charExists {
-				charToCreate := charExpect.getExpectation()
-				toCreate |= charToCreate
-			}
+		// expectations: collect extra accounts, trigger by other recources, to be created
+		// TODO: @shanshan. This part should be updated when BackupPolicy API is updated in the future. .
+		charKey := expectationKey(cluster.Namespace, cluster.Name, compDecl.Name)
+		charExpect, charExists, err := r.ExpectionManager.getExpectation(charKey)
+		if err != nil {
+			return err
+		}
+		if charExists {
+			charToCreate := charExpect.getExpectation()
+			toCreate |= charToCreate
 		}
 		// facts: accounts have been created.
 		detectedFacts, err := r.getAccountFacts(reqCtx, cluster.Namespace, cluster.Name, clusterdefinition.Spec.Type, clusterdefinition.Name, compDecl.Name)
@@ -425,10 +422,10 @@ func (r *backupPolicyChangePredicate) Create(e event.CreateEvent) bool {
 	// So we resort to a tricky way, binding BackupPolicy.Spec.Target.DatabaeEngine to Cluster.Componet.CharacterType.
 	targetCluster := backupPolicy.Spec.Target
 	ml := targetCluster.LabelsSelector.MatchLabels
-	databaseEngine := targetCluster.DatabaseEngine
-
-	if clusterName, exists := ml[intctrlutil.AppInstanceLabelKey]; exists {
-		key := expectationKey(backupPolicy.Namespace, clusterName, databaseEngine)
+	clusterName, existsInstanceLabel := ml[intctrlutil.AppInstanceLabelKey]
+	componentName, existsComponentLabel := ml[intctrlutil.AppComponentLabelKey]
+	if existsInstanceLabel && existsComponentLabel {
+		key := expectationKey(backupPolicy.Namespace, clusterName, componentName)
 		expect, exists, err := r.ExpectionManager.getExpectation(key)
 		if err != nil {
 			r.Log.Error(err, "failed to get expectation for BackupPolicy by key", "BackupPolicy key", key)
@@ -460,10 +457,10 @@ func (r *backupPolicyChangePredicate) Delete(e event.DeleteEvent) bool {
 		// TODO: @shanshan
 		targetCluster := backupPolicy.Spec.Target
 		ml := targetCluster.LabelsSelector.MatchLabels
-		databaseEngine := targetCluster.DatabaseEngine
-
-		if clusterName, exists := ml[intctrlutil.AppInstanceLabelKey]; exists {
-			key := expectationKey(backupPolicy.Namespace, clusterName, databaseEngine)
+		clusterName, existsInstanceLabel := ml[intctrlutil.AppInstanceLabelKey]
+		componentName, existsComponentLabel := ml[intctrlutil.AppComponentLabelKey]
+		if existsInstanceLabel && existsComponentLabel {
+			key := expectationKey(backupPolicy.Namespace, clusterName, componentName)
 			err := r.ExpectionManager.deleteExpectation(key)
 			if err != nil {
 				r.Log.Error(err, "failed to delete expectation for BackupPolicy", "BackupPolicy key", key)

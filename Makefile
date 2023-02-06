@@ -128,7 +128,7 @@ help: ## Display this help.
 	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage:\n  make \033[36m<target>\033[0m\n"} /^[a-zA-Z_0-9-]+:.*?##/ { printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
 
 .PHONY: all
-all: manager kbcli probe agamotto reloader ## Make all cmd binaries.
+all: manager kbcli probe agamotto reloader loadbalancer ## Make all cmd binaries.
 
 ##@ Development
 
@@ -146,7 +146,6 @@ generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and
 .PHONY: go-generate
 go-generate: ## Run go generate against code.
 	$(GO) generate -x ./...
-	$(MAKE) fix-license-header
 
 .PHONY: fmt
 fmt: ## Run go fmt against code.
@@ -209,8 +208,12 @@ test-current-ctx: manifests generate fmt vet add-k8s-host ## Run operator contro
 	USE_EXISTING_CLUSTER=true KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" $(GO) test  -p 1 -coverprofile cover.out $(TEST_PACKAGES)
 
 .PHONY: test
-test: # manifests generate fmt vet envtest add-k8s-host test-probe ## Run tests. if existing k8s cluster is k3d or minikube, specify EXISTING_CLUSTER_TYPE.
-	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" $(GO) test  -coverprofile cover.out $(TEST_PACKAGES)
+test: manifests generate fmt vet envtest add-k8s-host ## Run tests. if existing k8s cluster is k3d or minikube, specify EXISTING_CLUSTER_TYPE.
+	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" $(GO) test -short -coverprofile cover.out $(TEST_PACKAGES)
+
+.PHONY: test-uec
+test-uec: manifests generate fmt vet envtest add-k8s-host ## Run tests. if existing k8s cluster is k3d or minikube, specify EXISTING_CLUSTER_TYPE.
+	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" $(GO) test $(TEST_PACKAGES) -run UseExistingCluster
 
 .PHONY: test-delve
 test-delve: manifests generate fmt vet envtest ## Run tests.

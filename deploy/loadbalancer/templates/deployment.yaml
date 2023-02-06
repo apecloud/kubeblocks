@@ -58,6 +58,12 @@ spec:
               value: {{ include "loadbalancer.endpointLabels" . | quote }}
             - name: SERVICE_LABELS
               value: {{ include "loadbalancer.serviceLabels" . | quote }}
+            - name: CLOUD_PROVIDER
+              {{- if regexMatch ".*-eks-.*" .Capabilities.KubeVersion.GitVersion }}
+              value: "aws"
+              {{- else }}
+              {{ fail "loadbalancer is unsupported on this kubernetes provider" }}
+              {{- end }}
           readinessProbe:
             httpGet:
               path: /readyz

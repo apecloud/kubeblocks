@@ -31,7 +31,6 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/health/grpc_health_v1"
 
-	"github.com/apecloud/kubeblocks/internal/loadbalancer/cloud"
 	"github.com/apecloud/kubeblocks/internal/loadbalancer/cloud/factory"
 	"github.com/apecloud/kubeblocks/internal/loadbalancer/config"
 	iptableswrapper "github.com/apecloud/kubeblocks/internal/loadbalancer/iptables"
@@ -88,7 +87,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	cp, err := factory.NewProvider(cloud.ProviderAWS, logger)
+	cp, err := factory.NewProvider(config.CloudProvider, logger)
 	if err != nil {
 		logger.Error(err, "Failed to initialize cloud provider")
 		os.Exit(1)

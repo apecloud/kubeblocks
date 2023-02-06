@@ -69,7 +69,14 @@ spec:
                         characterType when builtIn is true.
                       type: string
                     componentType:
-                      description: componentType defines type of the component.
+                      description: componentType defines type of the component. Stateless
+                        is a stateless component type used to describe stateless applications.
+                        Stateful is a stateful component type used to describe common
+                        stateful applications. Consensus is a stateful component type
+                        used to describe applications based on consensus protocols,
+                        common consensus protocols such as raft and paxos. Replication
+                        is a stateful component type used to describe applications
+                        based on the primary-secondary data replication protocol.
                       enum:
                       - Stateless
                       - Stateful

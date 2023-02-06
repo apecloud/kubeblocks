@@ -191,6 +191,7 @@ func FakeClusterDef() *dbaasv1alpha1.ClusterDefinition {
 			DefaultReplicas: 2,
 		},
 	}
+	clusterDef.Spec.Type = "state.mysql"
 	return clusterDef
 }
 

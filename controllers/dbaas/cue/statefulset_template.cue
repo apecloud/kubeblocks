@@ -23,6 +23,7 @@ component: {
 	clusterType:    string
 	type:           string
 	name:           string
+	componentType:  string
 	replicas:       int
 	monitor: {
 		enable:     bool
@@ -71,6 +72,7 @@ statefulset: {
 					"app.kubernetes.io/instance":       "\(cluster.metadata.name)"
 					"app.kubernetes.io/component-name": "\(component.name)"
 					"app.kubernetes.io/managed-by":     "kubeblocks"
+					"app.kubernetes.io/component":      "\(component.componentType)"
 					// "app.kubernetes.io/version" : # TODO
 				}
 				if component.monitor.enable == true {

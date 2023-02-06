@@ -77,8 +77,8 @@ var _ = Describe("Stateful Component", func() {
 			stsList := &appsv1.StatefulSetList{}
 			Eventually(func() bool {
 				_ = k8sClient.List(ctx, stsList, client.InNamespace(testCtx.DefaultNamespace), client.MatchingLabels{
-					intctrlutil.AppInstanceLabelKey:  clusterName,
-					intctrlutil.AppComponentLabelKey: consensusCompName,
+					intctrlutil.AppInstanceLabelKey:      clusterName,
+					intctrlutil.AppComponentNameLabelKey: consensusCompName,
 				}, client.Limit(1))
 				return len(stsList.Items) > 0
 			}, timeout, interval).Should(BeTrue())

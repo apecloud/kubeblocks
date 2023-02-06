@@ -168,7 +168,7 @@ func (pvcEventHandler PersistentVolumeClaimEventHandler) handlePVCFailedStatusOn
 	if statusComponents == nil {
 		return nil
 	}
-	componentName := pvc.Labels[intctrlutil.AppComponentLabelKey]
+	componentName := pvc.Labels[intctrlutil.AppComponentNameLabelKey]
 	vctName := pvc.Labels[intctrlutil.VolumeClaimTemplateNameLabelKey]
 	patch := client.MergeFrom(opsRequest.DeepCopy())
 	var isChanged bool

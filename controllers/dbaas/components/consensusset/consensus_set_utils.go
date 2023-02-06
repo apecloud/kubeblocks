@@ -65,7 +65,7 @@ const (
 // return true means stateful set reconcile done
 func handleConsensusSetUpdate(ctx context.Context, cli client.Client, cluster *dbaasv1alpha1.Cluster, stsObj *appsv1.StatefulSet) (bool, error) {
 	// get typeName from stsObj.name
-	typeName := cluster.GetComponentTypeName(stsObj.Labels[intctrlutil.AppComponentLabelKey])
+	typeName := cluster.GetComponentTypeName(stsObj.Labels[intctrlutil.AppComponentNameLabelKey])
 
 	// get component from ClusterDefinition by typeName
 	component, err := util.GetComponentDefByCluster(ctx, cli, cluster, typeName)
@@ -82,7 +82,7 @@ func handleConsensusSetUpdate(ctx context.Context, cli client.Client, cluster *d
 	}
 
 	// update cluster.status.component.consensusSetStatus based on all pods currently exist
-	componentName := stsObj.Labels[intctrlutil.AppComponentLabelKey]
+	componentName := stsObj.Labels[intctrlutil.AppComponentNameLabelKey]
 
 	// first, get the old status
 	var oldConsensusSetStatus *dbaasv1alpha1.ConsensusSetStatus
@@ -321,7 +321,7 @@ func UpdateConsensusSetRoleLabel(cli client.Client, reqCtx intctrlutil.RequestCt
 	}
 
 	// get componentDef this pod belongs to
-	componentName := pod.Labels[intctrlutil.AppComponentLabelKey]
+	componentName := pod.Labels[intctrlutil.AppComponentNameLabelKey]
 	typeName := cluster.GetComponentTypeName(componentName)
 	componentDef, err := util.GetComponentDefByCluster(ctx, cli, cluster, typeName)
 	if err != nil {
@@ -528,9 +528,9 @@ func updateConsensusRoleInfo(ctx context.Context, cli client.Client, cluster *db
 	}
 
 	ml := client.MatchingLabels{
-		intctrlutil.AppInstanceLabelKey:   cluster.GetName(),
-		intctrlutil.AppComponentLabelKey:  componentName,
-		intctrlutil.AppConfigTypeLabelKey: "kubeblocks-env",
+		intctrlutil.AppInstanceLabelKey:      cluster.GetName(),
+		intctrlutil.AppComponentNameLabelKey: componentName,
+		intctrlutil.AppConfigTypeLabelKey:    "kubeblocks-env",
 	}
 
 	configList := &corev1.ConfigMapList{}

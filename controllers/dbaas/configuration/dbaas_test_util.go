@@ -268,7 +268,7 @@ func (w *TestWrapper) CreateCfgOnCluster(cfgFile string, cluster *dbaasv1alpha1.
 		}
 		cm.Labels[intctrlutil.AppNameLabelKey] = cluster.Name
 		cm.Labels[intctrlutil.AppInstanceLabelKey] = cluster.Name
-		cm.Labels[intctrlutil.AppComponentLabelKey] = componentName
+		cm.Labels[intctrlutil.AppComponentNameLabelKey] = componentName
 		cm.Labels[cfgcore.CMConfigurationTplNameLabelKey] = w.CMName()
 		cm.Labels[cfgcore.CMConfigurationConstraintsNameLabelKey] = w.TPLName()
 		cm.Labels[cfgcore.CMConfigurationISVTplLabelKey] = w.testEnv.CfgTplName
@@ -314,7 +314,7 @@ func (w *TestWrapper) createStsFromFile(cluster *dbaasv1alpha1.Cluster, componen
 		}
 		cm.Labels[intctrlutil.AppNameLabelKey] = cluster.Name
 		cm.Labels[intctrlutil.AppInstanceLabelKey] = cluster.Name
-		cm.Labels[intctrlutil.AppComponentLabelKey] = componentName
+		cm.Labels[intctrlutil.AppComponentNameLabelKey] = componentName
 		cm.Labels[cfgcore.GenerateTPLUniqLabelKeyWithConfig(w.testEnv.CfgTplName)] = cmName
 
 		configTestVolumeName := "for_test" + BuildRandomString()

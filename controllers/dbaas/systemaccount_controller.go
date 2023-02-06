@@ -423,7 +423,7 @@ func (r *backupPolicyChangePredicate) Create(e event.CreateEvent) bool {
 	targetCluster := backupPolicy.Spec.Target
 	ml := targetCluster.LabelsSelector.MatchLabels
 	clusterName, existsInstanceLabel := ml[intctrlutil.AppInstanceLabelKey]
-	componentName, existsComponentLabel := ml[intctrlutil.AppComponentLabelKey]
+	componentName, existsComponentLabel := ml[intctrlutil.AppComponentNameLabelKey]
 	if existsInstanceLabel && existsComponentLabel {
 		key := expectationKey(backupPolicy.Namespace, clusterName, componentName)
 		expect, exists, err := r.ExpectionManager.getExpectation(key)
@@ -458,7 +458,7 @@ func (r *backupPolicyChangePredicate) Delete(e event.DeleteEvent) bool {
 		targetCluster := backupPolicy.Spec.Target
 		ml := targetCluster.LabelsSelector.MatchLabels
 		clusterName, existsInstanceLabel := ml[intctrlutil.AppInstanceLabelKey]
-		componentName, existsComponentLabel := ml[intctrlutil.AppComponentLabelKey]
+		componentName, existsComponentLabel := ml[intctrlutil.AppComponentNameLabelKey]
 		if existsInstanceLabel && existsComponentLabel {
 			key := expectationKey(backupPolicy.Namespace, clusterName, componentName)
 			err := r.ExpectionManager.deleteExpectation(key)
@@ -488,7 +488,7 @@ func (r *jobCompletitionPredicate) Delete(e event.DeleteEvent) bool {
 		if !ok {
 			return false
 		}
-		componentName, ok := ml[intctrlutil.AppComponentLabelKey]
+		componentName, ok := ml[intctrlutil.AppComponentNameLabelKey]
 		if !ok {
 			return false
 		}

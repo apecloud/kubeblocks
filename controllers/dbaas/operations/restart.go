@@ -126,7 +126,7 @@ func restartDeployment(opsRes *OpsResource, componentNameMap map[string]struct{}
 
 // isRestarted checks whether the component has been restarted
 func isRestarted(opsRes *OpsResource, object client.Object, componentNameMap map[string]struct{}, podTemplate *corev1.PodTemplateSpec) bool {
-	cName := object.GetLabels()[intctrlutil.AppComponentLabelKey]
+	cName := object.GetLabels()[intctrlutil.AppComponentNameLabelKey]
 	if _, ok := componentNameMap[cName]; !ok {
 		return true
 	}

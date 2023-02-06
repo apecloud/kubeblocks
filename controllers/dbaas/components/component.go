@@ -111,7 +111,7 @@ func handleComponentStatusAndSyncCluster(compCtx componentContext,
 		}
 	}
 
-	if err = patchClusterComponentStatus(compCtx, cluster, obj.GetLabels()[intctrlutil.AppComponentLabelKey],
+	if err = patchClusterComponentStatus(compCtx, cluster, obj.GetLabels()[intctrlutil.AppComponentNameLabelKey],
 		isRunning, podsReady); err != nil {
 		return requeueAfter, err
 	}

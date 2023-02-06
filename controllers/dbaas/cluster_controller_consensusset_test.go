@@ -128,7 +128,7 @@ var _ = Describe("Cluster Controller with Consensus Component", func() {
 				&corev1.Pod{}, testCtx.UseDefaultNamespace(), func(pod *corev1.Pod) {
 					pod.Name = stsName + "-" + strconv.Itoa(i)
 					pod.Labels[intctrlutil.AppInstanceLabelKey] = clusterName
-					pod.Labels[intctrlutil.AppComponentLabelKey] = componentName
+					pod.Labels[intctrlutil.AppComponentNameLabelKey] = componentName
 				})
 			pods = append(pods, *pod)
 		}

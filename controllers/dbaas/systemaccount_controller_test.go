@@ -155,8 +155,8 @@ var _ = Describe("SystemAccount Controller", func() {
 
 	mockBackupPolicy := func(name string, engineName, clusterName string) *dataprotectionv1alpha1.BackupPolicy {
 		ml := map[string]string{
-			intctrlutil.AppInstanceLabelKey:  clusterName,
-			intctrlutil.AppComponentLabelKey: engineName,
+			intctrlutil.AppInstanceLabelKey:      clusterName,
+			intctrlutil.AppComponentNameLabelKey: engineName,
 		}
 
 		policy := &dataprotectionv1alpha1.BackupPolicy{

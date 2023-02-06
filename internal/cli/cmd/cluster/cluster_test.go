@@ -89,6 +89,7 @@ var _ = Describe("Cluster", func() {
 					PodAntiAffinity: "Preferred",
 					TopologyKeys:    []string{"kubernetes.io/hostname"},
 					NodeLabels:      map[string]string{"testLabelKey": "testLabelValue"},
+					Tenancy:         "SharedNode",
 				},
 			}
 

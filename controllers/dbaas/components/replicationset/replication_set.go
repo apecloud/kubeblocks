@@ -49,7 +49,7 @@ func (rs *ReplicationSet) IsRunning(obj client.Object) (bool, error) {
 	var componentStsList = &appsv1.StatefulSetList{}
 	var componentStatusIsRunning = true
 	sts := util.CovertToStatefulSet(obj)
-	if err := util.GetObjectListByComponentName(rs.Ctx, rs.Cli, rs.Cluster, componentStsList, sts.Labels[intctrlutil.AppComponentLabelKey]); err != nil {
+	if err := util.GetObjectListByComponentName(rs.Ctx, rs.Cli, rs.Cluster, componentStsList, sts.Labels[intctrlutil.AppComponentNameLabelKey]); err != nil {
 		return false, err
 	}
 	for _, stsObj := range componentStsList.Items {
@@ -68,7 +68,7 @@ func (rs *ReplicationSet) PodsReady(obj client.Object) (bool, error) {
 	var podsReady = true
 	var componentStsList = &appsv1.StatefulSetList{}
 	sts := util.CovertToStatefulSet(obj)
-	if err := util.GetObjectListByComponentName(rs.Ctx, rs.Cli, rs.Cluster, componentStsList, sts.Labels[intctrlutil.AppComponentLabelKey]); err != nil {
+	if err := util.GetObjectListByComponentName(rs.Ctx, rs.Cli, rs.Cluster, componentStsList, sts.Labels[intctrlutil.AppComponentNameLabelKey]); err != nil {
 		return false, err
 	}
 	for _, stsObj := range componentStsList.Items {

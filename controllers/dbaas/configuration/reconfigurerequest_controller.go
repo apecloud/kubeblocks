@@ -47,7 +47,7 @@ type ReconfigureRequestReconciler struct {
 var ConfigurationRequiredLabels = []string{
 	intctrlutil.AppNameLabelKey,
 	intctrlutil.AppInstanceLabelKey,
-	intctrlutil.AppComponentLabelKey,
+	intctrlutil.AppComponentNameLabelKey,
 	cfgcore.CMConfigurationTplNameLabelKey,
 	cfgcore.CMConfigurationTypeLabelKey,
 	cfgcore.CMConfigurationISVTplLabelKey,
@@ -138,10 +138,10 @@ func (r *ReconfigureRequestReconciler) sync(reqCtx intctrlutil.RequestCtx, confi
 	)
 
 	componentLabels := map[string]string{
-		intctrlutil.AppNameLabelKey:      config.Labels[intctrlutil.AppNameLabelKey],
-		intctrlutil.AppInstanceLabelKey:  config.Labels[intctrlutil.AppInstanceLabelKey],
-		intctrlutil.AppComponentLabelKey: config.Labels[intctrlutil.AppComponentLabelKey],
-		configTplLabelKey:                config.GetName(),
+		intctrlutil.AppNameLabelKey:          config.Labels[intctrlutil.AppNameLabelKey],
+		intctrlutil.AppInstanceLabelKey:      config.Labels[intctrlutil.AppInstanceLabelKey],
+		intctrlutil.AppComponentNameLabelKey: config.Labels[intctrlutil.AppComponentNameLabelKey],
+		configTplLabelKey:                    config.GetName(),
 	}
 
 	configPatch, err := createConfigurePatch(config, reqCtx, &tpl.Spec)
@@ -169,7 +169,7 @@ func (r *ReconfigureRequestReconciler) sync(reqCtx intctrlutil.RequestCtx, confi
 	}
 
 	// Find ClusterComponent from cluster cr
-	componentName := config.Labels[intctrlutil.AppComponentLabelKey]
+	componentName := config.Labels[intctrlutil.AppComponentNameLabelKey]
 	clusterComponent := getClusterComponentsByName(cluster.Spec.Components, componentName)
 	// fix cluster maybe not any component
 	if clusterComponent == nil {

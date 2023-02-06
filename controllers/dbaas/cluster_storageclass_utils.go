@@ -90,7 +90,7 @@ func needSyncClusterStatusOperations(reqCtx intctrlutil.RequestCtx, cli client.C
 		if *v.Spec.StorageClassName != storageClass.Name {
 			continue
 		}
-		componentName := v.Labels[intctrlutil.AppComponentLabelKey]
+		componentName := v.Labels[intctrlutil.AppComponentNameLabelKey]
 		volumeClaimTemplateName := getVolumeClaimTemplateName(v.Name, cluster.Name, componentName)
 		componentVolumeClaimName := fmt.Sprintf("%s-%s", componentName, volumeClaimTemplateName)
 		if _, ok := handledPVCMap[componentVolumeClaimName]; ok {

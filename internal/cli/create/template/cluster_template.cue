@@ -21,6 +21,7 @@ options: {
 	components: [...]
 	terminationPolicy: string
 	podAntiAffinity:   string
+	tenancy:           string
 	topologyKeys: [...]
 	nodeLabels: {}
 	tolerations: [...]
@@ -41,6 +42,7 @@ content: {
 			podAntiAffinity: options.podAntiAffinity
 			topologyKeys:    options.topologyKeys
 			nodeLabels:      options.nodeLabels
+			tenancy:         options.tenancy
 		}
 		tolerations:       options.tolerations
 		components:        options.components

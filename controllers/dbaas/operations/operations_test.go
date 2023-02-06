@@ -115,7 +115,7 @@ var _ = Describe("OpsRequest Controller", func() {
 				testdata.WithLabels(
 					intctrlutil.AppNameLabelKey, clusterName,
 					intctrlutil.AppInstanceLabelKey, clusterName,
-					intctrlutil.AppComponentLabelKey, componentName,
+					intctrlutil.AppComponentNameLabelKey, componentName,
 					cfgcore.CMConfigurationTplNameLabelKey, tpl.ConfigTplRef,
 					cfgcore.CMConfigurationConstraintsNameLabelKey, tpl.ConfigConstraintRef,
 					cfgcore.CMConfigurationISVTplLabelKey, tpl.Name,

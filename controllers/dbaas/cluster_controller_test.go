@@ -183,12 +183,14 @@ var _ = Describe("Cluster Controller", func() {
 					intctrlutil.AppInstanceLabelKey: clusterKey.Name,
 				}, client.InNamespace(clusterKey.Namespace))).Should(Equal(0))
 
-			By("Check created sts pods template without tolerations")
-			Expect(len(stsList.Items[0].Spec.Template.Spec.Tolerations) == 0).Should(BeTrue())
-
-			By("Checking the Affinity and the TopologySpreadConstraints")
 			podSpec := stsList.Items[0].Spec.Template.Spec
+			By("Check created sts pods template without tolerations")
+			Expect(len(podSpec.Tolerations) == 0).Should(BeTrue())
+
+			By("Check created sts pods template without Affinity")
 			Expect(podSpec.Affinity).Should(BeNil())
+
+			By("Check created sts pods template without TopologySpreadConstraints")
 			Expect(len(podSpec.TopologySpreadConstraints) == 0).Should(BeTrue())
 
 			By("Check should create env configmap")
@@ -203,8 +205,8 @@ var _ = Describe("Cluster Controller", func() {
 			By("Checking proxy should have external ClusterIP service")
 			svcList1 := &corev1.ServiceList{}
 			Expect(k8sClient.List(ctx, svcList1, client.MatchingLabels{
-				intctrlutil.AppInstanceLabelKey:  clusterKey.Name,
-				intctrlutil.AppComponentLabelKey: "proxy",
+				intctrlutil.AppInstanceLabelKey:      clusterKey.Name,
+				intctrlutil.AppComponentNameLabelKey: "proxy",
 			}, client.InNamespace(clusterKey.Namespace))).Should(Succeed())
 			// TODO fix me later, proxy should not have internal headless service
 			// Expect(len(svcList1.Items) == 1).Should(BeTrue())
@@ -244,8 +246,8 @@ var _ = Describe("Cluster Controller", func() {
 
 			svcList2 := &corev1.ServiceList{}
 			Expect(k8sClient.List(ctx, svcList2, client.MatchingLabels{
-				intctrlutil.AppInstanceLabelKey:  clusterKey.Name,
-				intctrlutil.AppComponentLabelKey: statefulCompName,
+				intctrlutil.AppInstanceLabelKey:      clusterKey.Name,
+				intctrlutil.AppComponentNameLabelKey: statefulCompName,
 			}, client.InNamespace(clusterKey.Namespace))).Should(Succeed())
 			Expect(len(svcList2.Items) == 1).Should(BeTrue())
 			Expect(svcList2.Items[0].Spec.Type == corev1.ServiceTypeClusterIP).To(BeTrue())
@@ -408,9 +410,9 @@ var _ = Describe("Cluster Controller", func() {
 					Name:      snapshotKey.Name,
 					Namespace: snapshotKey.Namespace,
 					Labels: map[string]string{
-						intctrlutil.AppCreatedByLabelKey: intctrlutil.AppName,
-						intctrlutil.AppInstanceLabelKey:  clusterKey.Name,
-						intctrlutil.AppComponentLabelKey: statefulCompName,
+						intctrlutil.AppCreatedByLabelKey:     intctrlutil.AppName,
+						intctrlutil.AppInstanceLabelKey:      clusterKey.Name,
+						intctrlutil.AppComponentNameLabelKey: statefulCompName,
 					}},
 				Spec: snapshotv1.VolumeSnapshotSpec{
 					Source: snapshotv1.VolumeSnapshotSource{
@@ -549,6 +551,7 @@ var _ = Describe("Cluster Controller", func() {
 				NodeLabels: map[string]string{
 					lableKey: labelValue,
 				},
+				Tenancy: dbaasv1alpha1.SharedNode,
 			}
 			Expect(testCtx.CreateObj(ctx, clusterObj)).Should(Succeed())
 
@@ -558,6 +561,7 @@ var _ = Describe("Cluster Controller", func() {
 			Expect(podSpec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions[0].Key).To(Equal(lableKey))
 			Expect(podSpec.TopologySpreadConstraints[0].WhenUnsatisfiable).To(Equal(corev1.DoNotSchedule))
 			Expect(podSpec.TopologySpreadConstraints[0].TopologyKey).To(Equal(topologyKey))
+			Expect(len(podSpec.Affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution)).To(Equal(1))
 			Expect(podSpec.Affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution[0].TopologyKey).To(Equal(topologyKey))
 		})
 	})
@@ -569,6 +573,7 @@ var _ = Describe("Cluster Controller", func() {
 			clusterObj.Spec.Affinity = &dbaasv1alpha1.Affinity{
 				PodAntiAffinity: dbaasv1alpha1.Required,
 				TopologyKeys:    []string{clusterTopologyKey},
+				Tenancy:         dbaasv1alpha1.SharedNode,
 			}
 			compTopologyKey := "testComponentTopologyKey"
 			clusterObj.Spec.Components = []dbaasv1alpha1.ClusterComponent{}
@@ -578,6 +583,7 @@ var _ = Describe("Cluster Controller", func() {
 				Affinity: &dbaasv1alpha1.Affinity{
 					PodAntiAffinity: dbaasv1alpha1.Preferred,
 					TopologyKeys:    []string{compTopologyKey},
+					Tenancy:         dbaasv1alpha1.DedicatedNode,
 				},
 			})
 			Expect(testCtx.CreateObj(ctx, clusterObj)).Should(Succeed())
@@ -588,6 +594,8 @@ var _ = Describe("Cluster Controller", func() {
 			Expect(podSpec.TopologySpreadConstraints[0].WhenUnsatisfiable).To(Equal(corev1.ScheduleAnyway))
 			Expect(podSpec.TopologySpreadConstraints[0].TopologyKey).To(Equal(compTopologyKey))
 			Expect(podSpec.Affinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution[0].Weight).ShouldNot(BeNil())
+			Expect(len(podSpec.Affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution)).To(Equal(1))
+			Expect(podSpec.Affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution[0].TopologyKey).To(Equal(corev1.LabelHostname))
 		})
 	})
 

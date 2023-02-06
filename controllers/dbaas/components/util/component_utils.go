@@ -65,9 +65,9 @@ func IsFailedOrAbnormal(phase dbaasv1alpha1.Phase) bool {
 // GetComponentMatchLabels gets the labels for matching the cluster component
 func GetComponentMatchLabels(clusterName, componentName string) client.ListOption {
 	return client.MatchingLabels{
-		intctrlutil.AppInstanceLabelKey:  clusterName,
-		intctrlutil.AppComponentLabelKey: componentName,
-		intctrlutil.AppManagedByLabelKey: intctrlutil.AppName,
+		intctrlutil.AppInstanceLabelKey:      clusterName,
+		intctrlutil.AppComponentNameLabelKey: componentName,
+		intctrlutil.AppManagedByLabelKey:     intctrlutil.AppName,
 	}
 }
 
@@ -262,9 +262,9 @@ func GetComponentInfoByPod(ctx context.Context,
 	if pod == nil || pod.Labels == nil {
 		return "", nil, fmt.Errorf("pod %s or pod's label is nil", pod.Name)
 	}
-	componentName, ok := pod.Labels[intctrlutil.AppComponentLabelKey]
+	componentName, ok := pod.Labels[intctrlutil.AppComponentNameLabelKey]
 	if !ok {
-		return "", nil, fmt.Errorf("pod %s component name label %s is nil", pod.Name, intctrlutil.AppComponentLabelKey)
+		return "", nil, fmt.Errorf("pod %s component name label %s is nil", pod.Name, intctrlutil.AppComponentNameLabelKey)
 	}
 	typeName := cluster.GetComponentTypeName(componentName)
 	componentDef, err = GetComponentDefByCluster(ctx, cli, cluster, typeName)

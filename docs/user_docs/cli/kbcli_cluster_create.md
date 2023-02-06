@@ -46,6 +46,9 @@ kbcli cluster create [NAME] [flags]
   
   # Create a Cluster with two tolerations
   kbcli cluster create --cluster-definition=my-cluster-def --tolerations='"key=engineType,value=mongo,operator=Equal,effect=NoSchedule","key=diskType,value=ssd,operator=Equal,effect=NoSchedule"'
+  
+  # Create a cluster, with each pod runs on their own dedicated node
+  kbcli cluster create --tenancy=DedicatedNode
 ```
 
 ### Options
@@ -54,12 +57,14 @@ kbcli cluster create [NAME] [flags]
       --backup string                Set a source backup to restore data
       --cluster-definition string    Specify cluster definition, run "kbcli cluster-definition list" to show all available cluster definition
       --cluster-version string       Specify cluster version, run "kbcli cluster-version list" to show all available cluster version, use the latest version if not specified
+      --distribution string          Tenancy options, one of: (SharedNode, DedicatedNode) (default "MultiNode")
       --enable-all-logs              Enable advanced application all log extraction, and true will ignore enabledLogs of component level (default true)
   -h, --help                         help for create
       --monitor                      Set monitor enabled and inject metrics exporter (default true)
       --node-labels stringToString   Node label selector (default [])
-      --pod-anti-affinity string     Pod anti-affinity type (default "Preferred")
+      --pod-anti-affinity string     Pod anti-affinity type, one of: (Preferred, Required) (default "Preferred")
       --set string                   Use yaml file, URL, or stdin to set the cluster parameters
+      --tenancy string               Tenancy options, one of: (SharedNode, DedicatedNode) (default "SharedNode")
       --termination-policy string    Termination policy, one of: (DoNotTerminate, Halt, Delete, WipeOut) (default "Delete")
       --tolerations strings          Tolerations for cluster, such as '"key=engineType,value=mongo,operator=Equal,effect=NoSchedule"'
       --topology-keys stringArray    Topology keys for affinity

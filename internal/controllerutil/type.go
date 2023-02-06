@@ -37,7 +37,8 @@ const (
 	// common label and annotation keys
 
 	AppInstanceLabelKey             = "app.kubernetes.io/instance"
-	AppComponentLabelKey            = "app.kubernetes.io/component-name"
+	AppComponentNameLabelKey        = "app.kubernetes.io/component-name"
+	AppComponentLabelKey            = "app.kubernetes.io/component"
 	AppNameLabelKey                 = "app.kubernetes.io/name"
 	AppManagedByLabelKey            = "app.kubernetes.io/managed-by"
 	AppCreatedByLabelKey            = "app.kubernetes.io/created-by" // resources created temporarily by kubeblocks

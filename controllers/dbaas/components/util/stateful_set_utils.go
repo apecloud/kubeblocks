@@ -131,7 +131,7 @@ func GetPodListByStatefulSet(ctx context.Context, cli client.Client, stsObj *app
 	podList := &corev1.PodList{}
 	if err := cli.List(ctx, podList,
 		&client.ListOptions{Namespace: stsObj.Namespace},
-		client.MatchingLabels{intctrlutil.AppComponentLabelKey: stsObj.Labels[intctrlutil.AppComponentLabelKey]}); err != nil {
+		client.MatchingLabels{intctrlutil.AppComponentNameLabelKey: stsObj.Labels[intctrlutil.AppComponentNameLabelKey]}); err != nil {
 		return nil, err
 	}
 	pods := make([]corev1.Pod, 0)

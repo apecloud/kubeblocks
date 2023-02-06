@@ -113,15 +113,6 @@ func toK8sVolumeClaimTemplates(templates []dbaasv1alpha1.ClusterComponentVolumeC
 	return ts
 }
 
-func buildAffinityLabelSelector(clusterName string, componentName string) *metav1.LabelSelector {
-	return &metav1.LabelSelector{
-		MatchLabels: map[string]string{
-			intctrlutil.AppInstanceLabelKey:  clusterName,
-			intctrlutil.AppComponentLabelKey: componentName,
-		},
-	}
-}
-
 func buildPodTopologySpreadConstraints(
 	cluster *dbaasv1alpha1.Cluster,
 	comAffinity *dbaasv1alpha1.Affinity,
@@ -140,7 +131,12 @@ func buildPodTopologySpreadConstraints(
 			MaxSkew:           1,
 			WhenUnsatisfiable: whenUnsatisfiable,
 			TopologyKey:       topologyKey,
-			LabelSelector:     buildAffinityLabelSelector(cluster.Name, component.Name),
+			LabelSelector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					intctrlutil.AppInstanceLabelKey:      cluster.Name,
+					intctrlutil.AppComponentNameLabelKey: component.Name,
+				},
+			},
 		})
 	}
 	return topologySpreadConstraints
@@ -177,8 +173,13 @@ func buildPodAffinity(
 	var podAffinityTerms []corev1.PodAffinityTerm
 	for _, topologyKey := range comAffinity.TopologyKeys {
 		podAffinityTerms = append(podAffinityTerms, corev1.PodAffinityTerm{
-			TopologyKey:   topologyKey,
-			LabelSelector: buildAffinityLabelSelector(cluster.Name, component.Name),
+			TopologyKey: topologyKey,
+			LabelSelector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					intctrlutil.AppInstanceLabelKey:      cluster.Name,
+					intctrlutil.AppComponentNameLabelKey: component.Name,
+				},
+			},
 		})
 	}
 	if comAffinity.PodAntiAffinity == dbaasv1alpha1.Required {
@@ -197,6 +198,22 @@ func buildPodAffinity(
 			PreferredDuringSchedulingIgnoredDuringExecution: weightedPodAffinityTerms,
 		}
 	}
+	// Add pod PodAffinityTerm for dedicated node
+	if comAffinity.Tenancy == dbaasv1alpha1.DedicatedNode {
+		var labelSelectorReqs []metav1.LabelSelectorRequirement
+		labelSelectorReqs = append(labelSelectorReqs, metav1.LabelSelectorRequirement{
+			Key:      intctrlutil.AppComponentLabelKey,
+			Operator: metav1.LabelSelectorOpIn,
+			Values:   dbaasv1alpha1.ComponentTypes,
+		})
+		podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = append(podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution, corev1.PodAffinityTerm{
+			TopologyKey: corev1.LabelHostname,
+			LabelSelector: &metav1.LabelSelector{
+				MatchExpressions: labelSelectorReqs,
+			},
+		})
+	}
+
 	affinity.PodAntiAffinity = podAntiAffinity
 	return affinity
 }
@@ -776,7 +793,7 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 			Name:      stsObj.Name + "-scaling",
 		}
 		// find component of current statefulset
-		componentName := stsObj.Labels[intctrlutil.AppComponentLabelKey]
+		componentName := stsObj.Labels[intctrlutil.AppComponentNameLabelKey]
 		components := mergeComponentsList(reqCtx,
 			cluster,
 			clusterDef,
@@ -1023,7 +1040,7 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 		}
 		if !reflect.DeepEqual(&deployObjCopy.Spec, &deployObj.Spec) {
 			// sync component phase
-			componentName := deployObj.Labels[intctrlutil.AppComponentLabelKey]
+			componentName := deployObj.Labels[intctrlutil.AppComponentNameLabelKey]
 			syncComponentPhaseWhenSpecUpdating(cluster, componentName)
 		}
 		return nil
@@ -1924,7 +1941,7 @@ func createBackup(reqCtx intctrlutil.RequestCtx,
 	createBackupPolicy := func() (backupPolicyName string, err error) {
 		backupPolicyName = ""
 		backupPolicyList := dataprotectionv1alpha1.BackupPolicyList{}
-		ml := getBackupMatchingLabels(cluster.Name, sts.Labels[intctrlutil.AppComponentLabelKey])
+		ml := getBackupMatchingLabels(cluster.Name, sts.Labels[intctrlutil.AppComponentNameLabelKey])
 		if err = cli.List(ctx, &backupPolicyList, ml); err != nil {
 			return
 		}
@@ -1955,7 +1972,7 @@ func createBackup(reqCtx intctrlutil.RequestCtx,
 
 	createBackup := func(backupPolicyName string) error {
 		backupList := dataprotectionv1alpha1.BackupList{}
-		ml := getBackupMatchingLabels(cluster.Name, sts.Labels[intctrlutil.AppComponentLabelKey])
+		ml := getBackupMatchingLabels(cluster.Name, sts.Labels[intctrlutil.AppComponentNameLabelKey])
 		if err := cli.List(ctx, &backupList, ml); err != nil {
 			return err
 		}
@@ -2450,9 +2467,9 @@ func buildFromCUE(tplName string, fillMap map[string]any, lookupKey string, targ
 
 func getBackupMatchingLabels(clusterName string, componentName string) client.MatchingLabels {
 	return client.MatchingLabels{
-		intctrlutil.AppInstanceLabelKey:  clusterName,
-		intctrlutil.AppComponentLabelKey: componentName,
-		intctrlutil.AppCreatedByLabelKey: intctrlutil.AppName,
+		intctrlutil.AppInstanceLabelKey:      clusterName,
+		intctrlutil.AppComponentNameLabelKey: componentName,
+		intctrlutil.AppCreatedByLabelKey:     intctrlutil.AppName,
 	}
 }
 

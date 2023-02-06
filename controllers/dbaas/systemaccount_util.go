@@ -252,9 +252,9 @@ func replaceEnvsValues(clusterName string, sysAccounts *dbaasv1alpha1.SystemAcco
 func getLabelsForSecretsAndJobs(clusterName, clusterDefType, clusterDefName, compName string) client.MatchingLabels {
 	// get account facts, i.e., secrets created
 	return client.MatchingLabels{
-		intctrlutil.AppInstanceLabelKey:  clusterName,
-		intctrlutil.AppNameLabelKey:      fmt.Sprintf("%s-%s", clusterDefType, clusterDefName),
-		intctrlutil.AppComponentLabelKey: compName,
+		intctrlutil.AppInstanceLabelKey:      clusterName,
+		intctrlutil.AppNameLabelKey:          fmt.Sprintf("%s-%s", clusterDefType, clusterDefName),
+		intctrlutil.AppComponentNameLabelKey: compName,
 	}
 }
 

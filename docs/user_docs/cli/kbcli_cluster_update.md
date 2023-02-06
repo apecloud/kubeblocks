@@ -29,15 +29,17 @@ kbcli cluster update NAME [flags]
 
 ```
       --allow-missing-template-keys    If true, ignore any errors in templates when a field or map key is missing in the template. Only applies to golang and jsonpath output formats. (default true)
+      --distribution string            Tenancy options, one of: (SharedNode, DedicatedNode) (default "MultiNode")
       --dry-run string[="unchanged"]   Must be "none", "server", or "client". If client strategy, only print the object that would be sent, without sending it. If server strategy, submit server-side request without persisting the resource. (default "none")
       --enable-all-logs                Enable advanced application all log extraction, and true will ignore enabledLogs of component level (default true)
   -h, --help                           help for update
       --monitor                        Set monitor enabled and inject metrics exporter (default true)
       --node-labels stringToString     Node label selector (default [])
   -o, --output string                  Output format. One of: (json, yaml, name, go-template, go-template-file, template, templatefile, jsonpath, jsonpath-as-json, jsonpath-file).
-      --pod-anti-affinity string       Pod anti-affinity type (default "Preferred")
+      --pod-anti-affinity string       Pod anti-affinity type, one of: (Preferred, Required) (default "Preferred")
       --show-managed-fields            If true, keep the managedFields when printing objects in JSON or YAML format.
       --template string                Template string or path to template file to use when -o=go-template, -o=go-template-file. The template format is golang templates [http://golang.org/pkg/text/template/#pkg-overview].
+      --tenancy string                 Tenancy options, one of: (SharedNode, DedicatedNode) (default "SharedNode")
       --termination-policy string      Termination policy, one of: (DoNotTerminate, Halt, Delete, WipeOut) (default "Delete")
       --tolerations strings            Tolerations for cluster, such as '"key=engineType,value=mongo,operator=Equal,effect=NoSchedule"'
       --topology-keys stringArray      Topology keys for affinity

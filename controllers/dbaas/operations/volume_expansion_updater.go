@@ -39,9 +39,6 @@ const (
 	// PVCEventTimeOut timeout of the pvc event
 	PVCEventTimeOut = 30 * time.Second
 
-	// PVCEventOccursTimes occurs times of the pvc event
-	PVCEventOccursTimes int32 = 5
-
 	// VolumeResizeFailed the event reason of volume resize failed on external-resizer(the csi driver sidecar)
 	VolumeResizeFailed = "VolumeResizeFailed"
 	// FileSystemResizeFailed the event reason of fileSystem resize failed on kubelet volume manager
@@ -110,7 +107,7 @@ func (pvcEventHandler PersistentVolumeClaimEventHandler) Handle(cli client.Clien
 	if !pvcEventHandler.isTargetResizeFailedEvents(event) {
 		return nil
 	}
-	if !k8score.IsOvertimeAndOccursTimesForEvent(event, PVCEventTimeOut, PVCEventOccursTimes) {
+	if !k8score.IsOvertimeEvent(event, PVCEventTimeOut) {
 		return nil
 	}
 	var (

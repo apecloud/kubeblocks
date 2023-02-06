@@ -48,9 +48,6 @@ type clusterStatusHandler func(cluster *dbaasv1alpha1.Cluster) (bool, postHandle
 const (
 	// EventTimeOut timeout of the event
 	EventTimeOut = 30 * time.Second
-
-	// EventOccursTimes occurs times of the event
-	EventOccursTimes int32 = 3
 )
 
 // doChainClusterStatusHandler chain processing clusterStatusHandler.
@@ -355,7 +352,7 @@ func handleEventForClusterStatus(ctx context.Context, cli client.Client, recorde
 		{
 			pred: func() bool {
 				// the error repeated several times, so we can sure it's a real error to the cluster.
-				return !k8score.IsOvertimeAndOccursTimesForEvent(event, EventTimeOut, EventOccursTimes)
+				return !k8score.IsOvertimeEvent(event, EventTimeOut)
 			},
 			processor: nilReturnHandler,
 		},

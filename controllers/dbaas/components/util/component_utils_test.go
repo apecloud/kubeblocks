@@ -85,57 +85,6 @@ func TestGetComponentPhase(t *testing.T) {
 	}
 }
 
-func TestGetComponentOrTypeName(t *testing.T) {
-	var (
-		componentType = "mysqlType"
-		componentName = "mysql"
-	)
-	cluster := dbaasv1alpha1.Cluster{
-		Spec: dbaasv1alpha1.ClusterSpec{
-			Components: []dbaasv1alpha1.ClusterComponent{
-				{Name: componentName, Type: componentType},
-			},
-		},
-	}
-	typeName := GetComponentTypeName(cluster, componentName)
-	if typeName != componentType {
-		t.Errorf(`function GetComponentTypeName should return %s`, componentType)
-	}
-	component := GetComponentByName(&cluster, componentName)
-	if component == nil {
-		t.Errorf("function GetComponentByName should not return nil")
-	}
-	componentName = "mysql1"
-	typeName = GetComponentTypeName(cluster, componentName)
-	if typeName != componentName {
-		t.Errorf(`function GetComponentTypeName should return %s`, componentName)
-	}
-	component = GetComponentByName(&cluster, componentName)
-	if component != nil {
-		t.Error("function GetComponentByName should return nil")
-	}
-}
-
-func TestGetComponentDefFromClusterDefinition(t *testing.T) {
-	componentType := "mysqlType"
-	clusterDef := &dbaasv1alpha1.ClusterDefinition{
-		Spec: dbaasv1alpha1.ClusterDefinitionSpec{
-			Components: []dbaasv1alpha1.ClusterDefinitionComponent{
-				{
-					TypeName: componentType,
-				},
-			},
-		},
-	}
-	if GetComponentDefFromClusterDefinition(clusterDef, componentType) == nil {
-		t.Error("function GetComponentTypeName should not return nil")
-	}
-	componentType = "test"
-	if GetComponentDefFromClusterDefinition(clusterDef, componentType) != nil {
-		t.Error("function GetComponentTypeName should return nil")
-	}
-}
-
 var _ = Describe("Consensus Component", func() {
 	var (
 		randomStr          = testCtx.GetRandomStr()
@@ -213,7 +162,7 @@ var _ = Describe("Consensus Component", func() {
 			Expect(GetStatusComponentMessageKey("Pod", "mysql-01")).To(Equal("Pod/mysql-01"))
 
 			By("test GetComponentReplicas function")
-			component := GetComponentByName(cluster, consensusCompName)
+			component := cluster.GetComponentByName(consensusCompName)
 			Expect(GetComponentReplicas(component, componentDef)).To(Equal(int32(3)))
 
 			By("test GetComponentStsMinReadySeconds")

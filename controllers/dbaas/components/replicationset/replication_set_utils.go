@@ -51,12 +51,12 @@ func HandleReplicationSet(reqCtx intctrlutil.RequestCtx,
 	stsList []*appsv1.StatefulSet) error {
 
 	filter := func(stsObj *appsv1.StatefulSet) (bool, error) {
-		typeName := util.GetComponentTypeName(*cluster, stsObj.Labels[intctrlutil.AppComponentLabelKey])
+		typeName := cluster.GetComponentTypeName(stsObj.Labels[intctrlutil.AppComponentLabelKey])
 		component, err := util.GetComponentDefByCluster(reqCtx.Ctx, cli, cluster, typeName)
 		if err != nil {
 			return false, err
 		}
-		if component.ComponentType != dbaasv1alpha1.Replication {
+		if component == nil || component.ComponentType != dbaasv1alpha1.Replication {
 			return true, nil
 		}
 		return false, nil

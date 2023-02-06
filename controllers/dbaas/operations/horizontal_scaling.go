@@ -104,7 +104,7 @@ func (hs horizontalScalingOpsHandler) SaveLastConfiguration(opsRes *OpsResource)
 		if _, ok := componentNameMap[v.Name]; !ok {
 			continue
 		}
-		clusterComponentDef := util.GetComponentDefFromClusterDefinition(clusterDef, v.Type)
+		clusterComponentDef := clusterDef.GetComponentDefByTypeName(v.Type)
 		lastComponentInfo[v.Name] = dbaasv1alpha1.LastComponentConfiguration{
 			Replicas: util.GetComponentReplicas(&v, clusterComponentDef),
 		}
@@ -144,6 +144,9 @@ func (hs horizontalScalingOpsHandler) handleComponentProgressDetails(opsRes *Ops
 		opsRequest       = opsRes.OpsRequest
 		isScaleOut       bool
 	)
+	if clusterComponent == nil || pgRes.clusterComponentDef == nil {
+		return
+	}
 	expectReplicas := hs.getExpectReplicas(opsRequest, clusterComponent.Name)
 	if expectReplicas == nil {
 		return

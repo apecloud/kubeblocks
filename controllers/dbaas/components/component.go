@@ -66,6 +66,9 @@ func NewComponentByType(
 	cluster *dbaasv1alpha1.Cluster,
 	componentDef *dbaasv1alpha1.ClusterDefinitionComponent,
 	component *dbaasv1alpha1.ClusterComponent) types.Component {
+	if componentDef == nil {
+		return nil
+	}
 	switch componentDef.ComponentType {
 	case dbaasv1alpha1.Consensus:
 		return consensusset.NewConsensusSet(ctx, cli, cluster, component, componentDef)
@@ -128,7 +131,7 @@ func patchClusterComponentStatus(
 	componentIsRunning, podsAreReady bool) error {
 	// when component phase is changed, set needSyncStatusComponent to true, then patch cluster.status
 	patch := client.MergeFrom(cluster.DeepCopy())
-	if ok, err := NeedSyncStatusComponents(cluster, compCtx.component,
+	if ok, err := needSyncStatusComponents(cluster, compCtx.component,
 		componentName, componentIsRunning, podsAreReady); err != nil || !ok {
 		return err
 	}
@@ -136,8 +139,8 @@ func patchClusterComponentStatus(
 	return compCtx.cli.Status().Patch(compCtx.reqCtx.Ctx, cluster, patch)
 }
 
-// NeedSyncStatusComponents Determines whether the component status needs to be modified
-func NeedSyncStatusComponents(cluster *dbaasv1alpha1.Cluster,
+// needSyncStatusComponents Determines whether the component status needs to be modified
+func needSyncStatusComponents(cluster *dbaasv1alpha1.Cluster,
 	component types.Component,
 	componentName string,
 	componentIsRunning,
@@ -155,7 +158,7 @@ func NeedSyncStatusComponents(cluster *dbaasv1alpha1.Cluster,
 		status.Components = map[string]dbaasv1alpha1.ClusterStatusComponent{}
 	}
 	if statusComponent, ok = status.Components[componentName]; !ok {
-		componentType := util.GetComponentTypeName(*cluster, componentName)
+		componentType := cluster.GetComponentTypeName(componentName)
 		// TODO is it ok to set component status phase as cluster status phase
 		status.Components[componentName] = dbaasv1alpha1.ClusterStatusComponent{Phase: cluster.Status.Phase,
 			PodsReady: &podsAreReady, PodsReadyTime: podsReadyTime,

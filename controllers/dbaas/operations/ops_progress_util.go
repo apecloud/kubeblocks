@@ -167,6 +167,9 @@ func handleComponentStatusProgress(
 		clusterComponentDef = pgRes.clusterComponentDef
 		clusterComponent    = pgRes.clusterComponent
 	)
+	if clusterComponent == nil || clusterComponentDef == nil {
+		return
+	}
 	expectProgressCount = util.GetComponentReplicas(clusterComponent, clusterComponentDef)
 	if podList, err = util.GetComponentPodList(opsRes.Ctx, opsRes.Client, opsRes.Cluster, clusterComponent.Name); err != nil {
 		return

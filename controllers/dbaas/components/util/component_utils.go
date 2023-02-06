@@ -132,16 +132,6 @@ func CheckRelatedPodIsTerminating(ctx context.Context, cli client.Client, cluste
 	return false, nil
 }
 
-// GetComponentByName gets component by name on cluster
-func GetComponentByName(cluster *dbaasv1alpha1.Cluster, componentName string) *dbaasv1alpha1.ClusterComponent {
-	for _, v := range cluster.Spec.Components {
-		if v.Name == componentName {
-			return &v
-		}
-	}
-	return nil
-}
-
 // GetComponentDefByCluster gets component from ClusterDefinition with typeName
 func GetComponentDefByCluster(ctx context.Context, cli client.Client, cluster *dbaasv1alpha1.Cluster, typeName string) (*dbaasv1alpha1.ClusterDefinitionComponent, error) {
 	clusterDef := &dbaasv1alpha1.ClusterDefinition{}
@@ -157,35 +147,18 @@ func GetComponentDefByCluster(ctx context.Context, cli client.Client, cluster *d
 	return nil, nil
 }
 
-// GetComponentDefFromClusterDefinition gets component from ClusterDefinition with typeName
-func GetComponentDefFromClusterDefinition(clusterDef *dbaasv1alpha1.ClusterDefinition, typeName string) *dbaasv1alpha1.ClusterDefinitionComponent {
-	for _, component := range clusterDef.Spec.Components {
-		if component.TypeName == typeName {
-			return &component
-		}
-	}
-	return nil
-}
-
-// GetComponentTypeName gets component type name
-func GetComponentTypeName(cluster dbaasv1alpha1.Cluster, componentName string) string {
-	for _, component := range cluster.Spec.Components {
-		if componentName == component.Name {
-			return component.Type
-		}
-	}
-	return componentName
-}
-
 // InitClusterComponentStatusIfNeed Initialize the state of the corresponding component in cluster.status.components
 func InitClusterComponentStatusIfNeed(cluster *dbaasv1alpha1.Cluster,
 	componentName string,
-	component *dbaasv1alpha1.ClusterDefinitionComponent) {
+	componentDef *dbaasv1alpha1.ClusterDefinitionComponent) {
+	if componentDef == nil {
+		return
+	}
 	if cluster.Status.Components == nil {
 		cluster.Status.Components = make(map[string]dbaasv1alpha1.ClusterStatusComponent)
 	}
 	if _, ok := cluster.Status.Components[componentName]; !ok {
-		typeName := GetComponentTypeName(*cluster, componentName)
+		typeName := cluster.GetComponentTypeName(componentName)
 
 		cluster.Status.Components[componentName] = dbaasv1alpha1.ClusterStatusComponent{
 			Type:  typeName,
@@ -193,7 +166,7 @@ func InitClusterComponentStatusIfNeed(cluster *dbaasv1alpha1.Cluster,
 		}
 	}
 	componentStatus := cluster.Status.Components[componentName]
-	if component.ComponentType == dbaasv1alpha1.Consensus && componentStatus.ConsensusSetStatus == nil {
+	if componentDef.ComponentType == dbaasv1alpha1.Consensus && componentStatus.ConsensusSetStatus == nil {
 		componentStatus.ConsensusSetStatus = &dbaasv1alpha1.ConsensusSetStatus{
 			Leader: dbaasv1alpha1.ConsensusMemberStatus{
 				Pod:        ComponentStatusDefaultPodName,
@@ -202,7 +175,7 @@ func InitClusterComponentStatusIfNeed(cluster *dbaasv1alpha1.Cluster,
 			},
 		}
 	}
-	if component.ComponentType == dbaasv1alpha1.Replication && componentStatus.ReplicationSetStatus == nil {
+	if componentDef.ComponentType == dbaasv1alpha1.Replication && componentStatus.ReplicationSetStatus == nil {
 		componentStatus.ReplicationSetStatus = &dbaasv1alpha1.ReplicationSetStatus{
 			Primary: dbaasv1alpha1.ReplicationMemberStatus{
 				Pod: ComponentStatusDefaultPodName,
@@ -273,9 +246,9 @@ func GetComponentDefaultReplicas(ctx context.Context,
 	cli client.Client,
 	cluster *dbaasv1alpha1.Cluster,
 	componentName string) (int32, error) {
-	typeName := GetComponentTypeName(*cluster, componentName)
+	typeName := cluster.GetComponentTypeName(componentName)
 	component, err := GetComponentDefByCluster(ctx, cli, cluster, typeName)
-	if err != nil {
+	if err != nil || component == nil {
 		return -1, err
 	}
 	return component.DefaultReplicas, nil
@@ -293,7 +266,7 @@ func GetComponentInfoByPod(ctx context.Context,
 	if !ok {
 		return "", nil, fmt.Errorf("pod %s component name label %s is nil", pod.Name, intctrlutil.AppComponentLabelKey)
 	}
-	typeName := GetComponentTypeName(*cluster, componentName)
+	typeName := cluster.GetComponentTypeName(componentName)
 	componentDef, err = GetComponentDefByCluster(ctx, cli, cluster, typeName)
 	if err != nil {
 		return componentName, componentDef, err

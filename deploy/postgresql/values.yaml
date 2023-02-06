@@ -86,6 +86,7 @@ primary:
   ## @param primary.name Name of the primary database (eg primary, master, leader, ...)
   ##
   name: primary
+  configEnabled: true
   ## @param primary.configuration PostgreSQL Primary main configuration to be injected as ConfigMap
   ##
   ##  configuration: |-

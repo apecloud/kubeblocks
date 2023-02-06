@@ -14,4 +14,4 @@ spec:
 
   credentialKeyword:
     userKeyword: username
-    passwordKeyword: password
+    passwordKeyword: postgres-password

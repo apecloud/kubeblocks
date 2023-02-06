@@ -47,6 +47,7 @@ const (
 	KubeBlocksChartName = "fake-kubeblocks"
 	KubeBlocksChartURL  = "fake-kubeblocks-chart-url"
 	BackupToolName      = "fake-backup-tool"
+	BackupTemplateName  = "fake-backup-policy-template"
 )
 
 func GetRandomStr() string {
@@ -56,6 +57,10 @@ func GetRandomStr() string {
 
 func FakeCluster(name string, namespace string) *dbaasv1alpha1.Cluster {
 	return &dbaasv1alpha1.Cluster{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       types.KindCluster,
+			APIVersion: fmt.Sprintf("%s/%s", types.Group, types.Version),
+		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: namespace,
@@ -186,7 +191,6 @@ func FakeClusterDef() *dbaasv1alpha1.ClusterDefinition {
 			DefaultReplicas: 2,
 		},
 	}
-	clusterDef.Spec.Type = "state.mysql"
 	return clusterDef
 }
 
@@ -203,6 +207,19 @@ func FakeBackupTool() *dpv1alpha1.BackupTool {
 	tool := &dpv1alpha1.BackupTool{}
 	tool.Name = BackupToolName
 	return tool
+}
+
+func FakeBackupPolicyTemplate() *dpv1alpha1.BackupPolicyTemplate {
+	template := &dpv1alpha1.BackupPolicyTemplate{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: fmt.Sprintf("%s/%s", types.DPGroup, types.DPVersion),
+			Kind:       types.KindBackupPolicyTemplate,
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: BackupTemplateName,
+		},
+	}
+	return template
 }
 
 func FakeServices() *corev1.ServiceList {

@@ -65,12 +65,13 @@ const (
 	// KindClusterDef clusterDefinition kine
 	KindClusterDef = "ClusterDefinition"
 	// KindClusterVersion clusterVersion kind
-	KindClusterVersion   = "ClusterVersion"
-	KindConfigConstraint = "ConfigConstraint"
-	KindBackup           = "Backup"
-	KindRestoreJob       = "RestoreJob"
-	KindOps              = "OpsRequest"
-	KindCM               = "ConfigMap"
+	KindClusterVersion       = "ClusterVersion"
+	KindConfigConstraint     = "ConfigConstraint"
+	KindBackup               = "Backup"
+	KindRestoreJob           = "RestoreJob"
+	KindBackupPolicyTemplate = "BackupPolicyTemplate"
+	KindOps                  = "OpsRequest"
+	KindCM                   = "ConfigMap"
 
 	NameLabelKey                   = "app.kubernetes.io/name"
 	InstanceLabelKey               = "app.kubernetes.io/instance"

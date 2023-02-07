@@ -10,7 +10,7 @@ spec:
   group: dbaas.kubeblocks.io
   names:
     categories:
-    - kubeblocks
+    - dbaas
     - all
     kind: Cluster
     listKind: ClusterList

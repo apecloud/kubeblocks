@@ -99,7 +99,7 @@ func (factory *MockClusterFactory) SetResources(resources corev1.ResourceRequire
 	return factory
 }
 
-func (factory *MockClusterFactory) SetComponetAffinity(affinity *dbaasv1alpha1.Affinity) *MockClusterFactory {
+func (factory *MockClusterFactory) SetComponentAffinity(affinity *dbaasv1alpha1.Affinity) *MockClusterFactory {
 	comps := factory.Cluster.Spec.Components
 	if len(comps) > 0 {
 		comps[len(comps)-1].Affinity = affinity

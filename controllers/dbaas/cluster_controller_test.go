@@ -606,7 +606,7 @@ var _ = Describe("Cluster Controller", func() {
 			}
 			clusterObj = testdbaas.NewClusterFactory(&testCtx, clusterNamePrefix,
 				clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().SetClusterAffinity(affinity).
-				AddComponent(statefulCompName, statefulCompType).SetComponetAffinity(compAffinity).
+				AddComponent(statefulCompName, statefulCompType).SetComponentAffinity(compAffinity).
 				Create().GetCluster()
 			clusterKey = client.ObjectKeyFromObject(clusterObj)
 

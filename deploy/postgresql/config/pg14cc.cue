@@ -77,12 +77,6 @@
 	// (kB) Sets the maximum memory to be used by each autovacuum worker process.
 	autovacuum_work_mem?: int & >=-1 & <=2147483647 @storeResource(1KB)
 
-	// Sets the maximum time to wait while connecting to AWS Lambda.
-	"aws_lambda.connect_timeout_ms"?: int & >=1 & <=900000 @timeDurationResource()
-
-	// Sets the maximum time to wait while waiting for response from AWS Lambda
-	"aws_lambda.request_timeout_ms"?: int & >=1 & <=900000 @timeDurationResource()
-
 	// (8Kb) Number of pages after which previously performed writes are flushed to disk.
 	backend_flush_after?: int & >=0 & <=256
 
@@ -621,7 +615,7 @@
 	"pgaudit.log_statement_once"?: bool & false | true
 
 	// Specifies the master role to use for object audit logging.
-	"pgaudit.role"?: string & "rds_pgaudit"
+	"pgaudit.role"?: string
 
 	// It specifies whether to perform Recheck which is an internal process of full text search.
 	"pg_bigm.enable_recheck"?: string & "on" | "off"
@@ -850,45 +844,6 @@
 
 	// Lower threshold of Tanimoto similarity. Molecules with similarity lower than threshold are not similar by % operation.
 	"rdkit.tanimoto_threshold"?: float & >=0 & <=1
-
-	// Force authentication for connections with password stored locally
-	"rds.accepted_password_auth_method"?: string & "md5+scram" | "scram"
-
-	// RDS parameter to enable/disable adaptive autovacuum.
-	"rds.adaptive_autovacuum": bool & false | true | *true
-
-	// Comma-delimited list of extensions that may be installed.
-	"rds.allowed_extensions"?: string
-
-	// Allow DNS resolution in Customer VPC.
-	"rds.custom_dns_resolution": bool & false | true | *false
-
-	// See log messages for RDS admin user actions in customer databases.
-	"rds.force_admin_logging_level"?: string & "disabled" | "debug5" | "debug4" | "debug3" | "debug2" | "debug1" | "info" | "notice" | "warning" | "error" | "log" | "fatal" | "panic"
-
-	// See log messages related to autovacuum operations.
-	"rds.force_autovacuum_logging_level"?: string & "disabled" | "debug5" | "debug4" | "debug3" | "debug2" | "debug1" | "info" | "notice" | "warning" | "error" | "log" | "fatal" | "panic"
-
-	// Force SSL connections.
-	"rds.force_ssl": bool & false | true | *false
-
-	// Enables logical decoding.
-	"rds.logical_replication": bool & false | true | *false
-
-	// Amazon RDS will delete PostgreSQL log that are older than N minutes.
-	"rds.log_retention_period": int & >=1440 & <=10080 | *4320
-
-	// Sets the maximum size for tcp buffers.
-	"rds.max_tcp_buffers": int & >=4096 & <=1000000000 | *33554432
-
-	// Size of the stats ramdisk in MB. A nonzero value signals HM to set up the ramdisk.
-	"rds.pg_stat_ramdisk_size": int & >=0 & <=8196 | *0
-
-	// Sets the number of connection slots reserved for rds_superusers.
-	"rds.rds_superuser_reserved_connections": int & >=0 & <=8388607 | *2
-
-	// restricts password-related commands to members of rds_password
-	"rds.restrict_password_commands"?: bool & false | true
 
 	// When set to fsync, PostgreSQL will recursively open and synchronize all files in the data directory before crash recovery begins
 	recovery_init_sync_method?: string & "fsync" | "syncfs"

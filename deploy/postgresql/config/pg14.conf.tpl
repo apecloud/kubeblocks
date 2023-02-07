@@ -1,28 +1,28 @@
 # - Connection Settings -
 
-{{ $buffer_unit := "B" }}
-{{ $shared_buffers := 1073741824 }}
-{{ $max_connections := 10000 }}
+{{- $buffer_unit := "B" }}
+{{- $shared_buffers := 1073741824 }}
+{{- $max_connections := 10000 }}
 {{- $phy_memory := getContainerMemory ( index $.podSpec.containers 0 ) }}
 {{- if gt $phy_memory 0 }}
-{{ $shared_buffers = div $phy_memory 4 }}
-{{ $max_connections = min ( div $phy_memory 9531392 ) 5000 }}
-{{- end }}
+{{- $shared_buffers = div $phy_memory 4 }}
+{{- $max_connections = min ( div $phy_memory 9531392 ) 5000 }}
+{{- end -}}
 
 {{- if ge $shared_buffers 1024 }}
 {{- $shared_buffers = div $shared_buffers 1024 }}
-{{ $buffer_unit = "KB" }}
-{{- end }}
+{{- $buffer_unit = "KB" }}
+{{- end -}}
 
 {{- if ge $shared_buffers 1024 }}
 {{- $shared_buffers = div $shared_buffers 1024 }}
-{{ $buffer_unit = "MB" }}
-{{- end }}
+{{- $buffer_unit = "MB" }}
+{{- end -}}
 
 {{- if ge $shared_buffers 1024 }}
 {{- $shared_buffers = div $shared_buffers 1024 }}
 {{ $buffer_unit = "GB" }}
-{{- end }}
+{{- end -}}
 
 listen_addresses = '*'
 port = '5432'

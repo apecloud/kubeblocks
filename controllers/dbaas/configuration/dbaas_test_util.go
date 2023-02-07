@@ -28,12 +28,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
-	mockobject "github.com/apecloud/kubeblocks/internal/cli/cmd/cluster"
-	"github.com/apecloud/kubeblocks/internal/cli/types"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/apecloud/kubeblocks/internal/testutil"
 	testdbaas "github.com/apecloud/kubeblocks/internal/testutil/dbaas"
+	mockobject "github.com/apecloud/kubeblocks/internal/testutil/k8s"
 	"github.com/apecloud/kubeblocks/test/testdata"
 )
 
@@ -180,10 +179,10 @@ func NewFakeDBaasCRsFromProvider(testCtx testutil.TestContext, ctx context.Conte
 	}
 
 	resourceObjectsHelper := mockobject.NewFakeResourceObjectHelper(mockInfo.TestDataPath,
-		mockobject.WithResourceKind(types.ConfigConstraintGVR(), types.KindConfigConstraint, testdata.WithName(randomNamer.CCName)),
-		mockobject.WithResourceKind(types.CMGVR(), types.KindCM, testdata.WithNamespacedName(randomNamer.TPLName, randomNamer.NS)),
-		mockobject.WithResourceKind(types.ClusterVersionGVR(), types.KindClusterVersion, testdata.WithName(randomNamer.CVName), testdata.WithClusterDef(randomNamer.CDName)),
-		mockobject.WithResourceKind(types.ClusterDefGVR(), types.KindClusterDef,
+		mockobject.WithResourceKind(mockobject.ConfigConstraintGVR(), mockobject.KindConfigConstraint, testdata.WithName(randomNamer.CCName)),
+		mockobject.WithResourceKind(mockobject.CMGVR(), mockobject.KindCM, testdata.WithNamespacedName(randomNamer.TPLName, randomNamer.NS)),
+		mockobject.WithResourceKind(mockobject.ClusterVersionGVR(), mockobject.KindClusterVersion, testdata.WithName(randomNamer.CVName), testdata.WithClusterDef(randomNamer.CDName)),
+		mockobject.WithResourceKind(mockobject.ClusterDefGVR(), mockobject.KindClusterDef,
 			testdata.WithName(randomNamer.CDName),
 			testdata.WithConfigTemplate(mockobject.GenerateConfigTemplate(randomNamer), testdata.ComponentTypeSelector(dbaasv1alpha1.Stateful)),
 			testdata.WithUpdateComponent(testdata.ComponentTypeSelector(dbaasv1alpha1.Stateful),
@@ -202,7 +201,7 @@ func NewFakeDBaasCRsFromProvider(testCtx testutil.TestContext, ctx context.Conte
 					}
 				})),
 		// mock config cm
-		mockobject.WithCustomResource(types.CMGVR(), mockobject.NewFakeConfigCMResource(randomNamer, componentName, randomNamer.VolumeName,
+		mockobject.WithCustomResource(mockobject.CMGVR(), mockobject.NewFakeConfigCMResource(randomNamer, componentName, randomNamer.VolumeName,
 			testdata.WithCMData(func() map[string]string {
 				cmYaml := mockInfo.CfgCMYaml
 				if len(cmYaml) == 0 {
@@ -221,7 +220,7 @@ func NewFakeDBaasCRsFromProvider(testCtx testutil.TestContext, ctx context.Conte
 				cfgcore.CMConfigurationTypeLabelKey, cfgcore.ConfigInstanceType,
 			))),
 		// mock cluster
-		mockobject.WithResourceKind(types.ClusterGVR(), types.KindCluster,
+		mockobject.WithResourceKind(mockobject.ClusterGVR(), mockobject.KindCluster,
 			testdata.WithNamespacedName(randomNamer.ClusterName, randomNamer.NS),
 			testdata.WithClusterDef(randomNamer.CDName),
 			testdata.WithClusterVersion(randomNamer.CVName),
@@ -233,7 +232,7 @@ func NewFakeDBaasCRsFromProvider(testCtx testutil.TestContext, ctx context.Conte
 				intctrlutil.AppComponentLabelKey, componentName,
 			)),
 		// mock sts
-		mockobject.WithResourceKind(types.STSGVR(), types.KindSTS,
+		mockobject.WithResourceKind(mockobject.STSGVR(), mockobject.KindSTS,
 			testdata.WithNamespacedName(testWrapper.stsName, randomNamer.NS),
 			testdata.WithPodTemplate(
 				testdata.WithConfigmapVolume(testWrapper.cfgCMName, randomNamer.VolumeName),

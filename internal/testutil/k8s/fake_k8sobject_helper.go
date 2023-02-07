@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cluster
+package testutil
 
 import (
 	appsv1 "k8s.io/api/apps/v1"
@@ -22,19 +22,14 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
-	dynamicfakeclient "k8s.io/client-go/dynamic/fake"
-	"k8s.io/client-go/kubernetes/scheme"
-	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/cli/create"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 	"github.com/apecloud/kubeblocks/test/testdata"
 )
 
-type createResourceObject = func() runtime.Object
+type CreateResourceObject = func() runtime.Object
 
 type FakeKubeObjectHelper struct {
 	// resource base path
@@ -47,7 +42,7 @@ type FakeKubeObjectHelper struct {
 	// custom options
 	resourceOptions map[string][]testdata.ResourceOptions
 	// directory create cr
-	customCreateResources map[schema.GroupVersionResource][]createResourceObject
+	customCreateResources map[schema.GroupVersionResource][]CreateResourceObject
 }
 
 type ResourceNamer struct {
@@ -61,6 +56,53 @@ type ResourceNamer struct {
 }
 
 type ObjectMockHelperOption func(helper *FakeKubeObjectHelper)
+
+const (
+	K8sVersionV1 = "v1"
+
+	KindCluster          = "Cluster"
+	KindClusterDef       = "ClusterDefinition"
+	KindClusterVersion   = "ClusterVersion"
+	KindConfigConstraint = "ConfigConstraint"
+	KindCM               = "ConfigMap"
+	KindSTS              = "StatefulSet"
+
+	ResourceClusters                 = "clusters"
+	ResourceClusterDefs              = "clusterdefinitions"
+	ResourceClusterVersions          = "clusterversions"
+	ResourceConfigmaps               = "configmaps"
+	ResourceStatefulSets             = "statefulsets"
+	ResourceConfigConstraintVersions = "configconstraints"
+)
+
+var (
+	Group   = dbaasv1alpha1.GroupVersion.Group
+	Version = dbaasv1alpha1.GroupVersion.Version
+)
+
+func ClusterGVR() schema.GroupVersionResource {
+	return schema.GroupVersionResource{Group: Group, Version: Version, Resource: ResourceClusters}
+}
+
+func ClusterDefGVR() schema.GroupVersionResource {
+	return schema.GroupVersionResource{Group: Group, Version: Version, Resource: ResourceClusterDefs}
+}
+
+func ClusterVersionGVR() schema.GroupVersionResource {
+	return schema.GroupVersionResource{Group: Group, Version: Version, Resource: ResourceClusterVersions}
+}
+
+func CMGVR() schema.GroupVersionResource {
+	return schema.GroupVersionResource{Group: corev1.GroupName, Version: K8sVersionV1, Resource: ResourceConfigmaps}
+}
+
+func STSGVR() schema.GroupVersionResource {
+	return schema.GroupVersionResource{Group: appsv1.GroupName, Version: K8sVersionV1, Resource: ResourceStatefulSets}
+}
+
+func ConfigConstraintGVR() schema.GroupVersionResource {
+	return schema.GroupVersionResource{Group: Group, Version: Version, Resource: ResourceConfigConstraintVersions}
+}
 
 func CreateRandomResourceNamer(ns string) ResourceNamer {
 	return ResourceNamer{
@@ -107,10 +149,10 @@ func WithResourceFilter(filter testdata.FilterOptions) ObjectMockHelperOption {
 	}
 }
 
-func WithCustomResource(resource schema.GroupVersionResource, creator createResourceObject) ObjectMockHelperOption {
+func WithCustomResource(resource schema.GroupVersionResource, creator CreateResourceObject) ObjectMockHelperOption {
 	return func(helper *FakeKubeObjectHelper) {
 		if helper.customCreateResources == nil {
-			helper.customCreateResources = make(map[schema.GroupVersionResource][]createResourceObject)
+			helper.customCreateResources = make(map[schema.GroupVersionResource][]CreateResourceObject)
 		}
 		creatorList := helper.customCreateResources[resource]
 		creatorList = append(creatorList, creator)
@@ -118,12 +160,12 @@ func WithCustomResource(resource schema.GroupVersionResource, creator createReso
 	}
 }
 
-func NewFakeConfigCMResource(namer ResourceNamer, componentName, volumeName string, options ...testdata.ResourceOptions) createResourceObject {
+func NewFakeConfigCMResource(namer ResourceNamer, componentName, volumeName string, options ...testdata.ResourceOptions) CreateResourceObject {
 	return func() runtime.Object {
 		cm := &corev1.ConfigMap{
 			TypeMeta: metav1.TypeMeta{
-				APIVersion: types.VersionV1,
-				Kind:       types.KindCM,
+				APIVersion: K8sVersionV1,
+				Kind:       KindCM,
 			},
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      cfgcore.GetComponentCfgName(namer.ClusterName, componentName, volumeName),
@@ -134,33 +176,6 @@ func NewFakeConfigCMResource(namer ResourceNamer, componentName, volumeName stri
 			option(cm)
 		}
 		return cm
-	}
-}
-
-func NewFakeClusterResource(namer ResourceNamer, componentName, componentType string, options ...testdata.ResourceOptions) createResourceObject {
-	return func() runtime.Object {
-		cluster := &dbaasv1alpha1.Cluster{
-			TypeMeta: metav1.TypeMeta{
-				APIVersion: dbaasv1alpha1.APIVersion,
-				Kind:       dbaasv1alpha1.ClusterKind,
-			},
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      namer.ClusterName,
-				Namespace: namer.NS,
-			},
-			Spec: dbaasv1alpha1.ClusterSpec{
-				ClusterDefRef:     namer.CDName,
-				ClusterVersionRef: namer.CVName,
-				Components: []dbaasv1alpha1.ClusterComponent{{
-					Name: componentName,
-					Type: componentType,
-				}},
-			},
-		}
-		for _, option := range options {
-			option(cluster)
-		}
-		return cluster
 	}
 }
 
@@ -250,36 +265,4 @@ func requireSucceed(err error) {
 	if err != nil {
 		panic(err)
 	}
-}
-
-func NewFakeOperationsOptions(ns, cName string, opsType dbaasv1alpha1.OpsType, objs ...runtime.Object) (*cmdtesting.TestFactory, *OperationsOptions) {
-	streams, _, _, _ := genericclioptions.NewTestIOStreams()
-	tf := cmdtesting.NewTestFactory().WithNamespace(ns)
-	o := &OperationsOptions{
-		BaseOptions: create.BaseOptions{
-			IOStreams: streams,
-			Name:      cName,
-			Namespace: ns,
-		},
-		TTLSecondsAfterSucceed: 30,
-		OpsType:                opsType,
-	}
-
-	err := dbaasv1alpha1.AddToScheme(scheme.Scheme)
-	if err != nil {
-		panic(err)
-	}
-
-	// TODO using GroupVersionResource of FakeKubeObjectHelper
-	listMapping := map[schema.GroupVersionResource]string{
-		types.ClusterDefGVR():       types.KindClusterDef + "List",
-		types.ClusterVersionGVR():   types.KindClusterVersion + "List",
-		types.ClusterGVR():          types.KindCluster + "List",
-		types.ConfigConstraintGVR(): types.KindConfigConstraint + "List",
-		types.BackupGVR():           types.KindBackup + "List",
-		types.RestoreJobGVR():       types.KindRestoreJob + "List",
-		types.OpsGVR():              types.KindOps + "List",
-	}
-	o.Client = dynamicfakeclient.NewSimpleDynamicClientWithCustomListKinds(scheme.Scheme, listMapping, objs...)
-	return tf, o
 }

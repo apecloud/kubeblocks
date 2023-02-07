@@ -38,6 +38,7 @@ COPY cmd/probe/ cmd/probe/
 COPY apis/ apis/
 COPY internal/ internal/
 COPY controllers/ controllers/
+COPY test/testdata/testdata.go test/testdata/testdata.go
 
 # Download binaries
 RUN curl -L https://dl.k8s.io/release/v1.24.2/bin/${TARGETOS}/${TARGETARCH}/kubectl -o kubectl && chmod +x kubectl

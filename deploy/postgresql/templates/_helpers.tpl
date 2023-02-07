@@ -89,9 +89,9 @@ Return the name for a custom database to create
 Get the postgres-password key.
 */}}
 {{- define "postgresql.postgresPassword" -}}
-{{- if .Values.auth.postgresPassword -}}
-    {{- printf "%s" .Values.auth.postgresPassword }}
+{{- if .Release.IsInstall -}}
+{{ .Values.auth.postgresPassword | default (randAlphaNum 10) }}
 {{- else -}}
-    {{- randAlphaNum 10 -}}
-{{- end -}}
-{{- end -}}
+{{ index (lookup "dbaas.kubeblocks.io/v1alpha1" "ClusterDefinition" "" "apecloud-postgresql").spec.connectionCredential "postgres-password"}}
+{{- end }}
+{{- end }}

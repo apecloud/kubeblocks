@@ -283,6 +283,10 @@ type ClusterDefinitionComponent struct {
 	TypeName string `json:"typeName"`
 
 	// componentType defines type of the component.
+	// Stateless is a stateless component type used to describe stateless applications.
+	// Stateful is a stateful component type used to describe common stateful applications.
+	// Consensus is a stateful component type used to describe applications based on consensus protocols, common consensus protocols such as raft and paxos.
+	// Replication is a stateful component type used to describe applications based on the primary-secondary data replication protocol.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Enum={Stateless,Stateful,Consensus,Replication}
 	ComponentType ComponentType `json:"componentType"`
@@ -425,6 +429,7 @@ type ClusterDefinitionProbe struct {
 }
 
 type ClusterDefinitionProbes struct {
+
 	// Probe for DB running check.
 	// +optional
 	RunningProbe *ClusterDefinitionProbe `json:"runningProbe,omitempty"`
@@ -436,6 +441,16 @@ type ClusterDefinitionProbes struct {
 	// Probe for DB role changed check.
 	// +optional
 	RoleChangedProbe *ClusterDefinitionProbe `json:"roleChangedProbe,omitempty"`
+
+	// roleProbeTimeoutAfterPodsReady(in seconds), when all pods of the component are ready,
+	// it will detect whether the application is available in the pod.
+	// if pods exceed the InitializationTimeoutSeconds time without a role label,
+	// this component will enter the Failed/Abnormal phase.
+	// Note that this configuration will only take effect if the component supports RoleChangedProbe
+	// and will not affect the life cycle of the pod. default values are 60 seconds.
+	// +optional
+	// +kubebuilder:validation:Minimum=30
+	RoleProbeTimeoutAfterPodsReady int32 `json:"roleProbeTimeoutAfterPodsReady,omitempty"`
 }
 
 type ConsensusSetSpec struct {
@@ -536,4 +551,14 @@ func (r *ClusterDefinition) ValidateEnabledLogConfigs(typeName string, enabledLo
 		}
 	}
 	return invalidLogNames
+}
+
+// GetComponentDefByTypeName gets component definition from ClusterDefinition with typeName
+func (r *ClusterDefinition) GetComponentDefByTypeName(typeName string) *ClusterDefinitionComponent {
+	for _, component := range r.Spec.Components {
+		if component.TypeName == typeName {
+			return &component
+		}
+	}
+	return nil
 }

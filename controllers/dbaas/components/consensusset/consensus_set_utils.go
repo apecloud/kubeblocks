@@ -65,7 +65,7 @@ const (
 // return true means stateful set reconcile done
 func handleConsensusSetUpdate(ctx context.Context, cli client.Client, cluster *dbaasv1alpha1.Cluster, stsObj *appsv1.StatefulSet) (bool, error) {
 	// get typeName from stsObj.name
-	typeName := util.GetComponentTypeName(*cluster, stsObj.Labels[intctrlutil.AppComponentLabelKey])
+	typeName := cluster.GetComponentTypeName(stsObj.Labels[intctrlutil.AppComponentLabelKey])
 
 	// get component from ClusterDefinition by typeName
 	component, err := util.GetComponentDefByCluster(ctx, cli, cluster, typeName)
@@ -73,7 +73,7 @@ func handleConsensusSetUpdate(ctx context.Context, cli client.Client, cluster *d
 		return false, err
 	}
 
-	if component.ComponentType != dbaasv1alpha1.Consensus {
+	if component == nil || component.ComponentType != dbaasv1alpha1.Consensus {
 		return true, nil
 	}
 	pods, err := util.GetPodListByStatefulSet(ctx, cli, stsObj)
@@ -322,10 +322,14 @@ func UpdateConsensusSetRoleLabel(cli client.Client, reqCtx intctrlutil.RequestCt
 
 	// get componentDef this pod belongs to
 	componentName := pod.Labels[intctrlutil.AppComponentLabelKey]
-	typeName := util.GetComponentTypeName(*cluster, componentName)
+	typeName := cluster.GetComponentTypeName(componentName)
 	componentDef, err := util.GetComponentDefByCluster(ctx, cli, cluster, typeName)
 	if err != nil {
 		return err
+	}
+
+	if componentDef == nil {
+		return nil
 	}
 
 	roleMap := composeConsensusRoleMap(*componentDef)

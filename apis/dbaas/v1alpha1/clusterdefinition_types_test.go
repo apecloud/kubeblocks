@@ -60,3 +60,23 @@ spec:
 		t.Error("Expected invalidLogNames are [error, slow, audit]")
 	}
 }
+
+func TestGetComponentDefByTypeName(t *testing.T) {
+	componentType := "mysqlType"
+	clusterDef := &ClusterDefinition{
+		Spec: ClusterDefinitionSpec{
+			Components: []ClusterDefinitionComponent{
+				{
+					TypeName: componentType,
+				},
+			},
+		},
+	}
+	if clusterDef.GetComponentDefByTypeName(componentType) == nil {
+		t.Error("function GetComponentDefByTypeName should not return nil")
+	}
+	componentType = "test"
+	if clusterDef.GetComponentDefByTypeName(componentType) != nil {
+		t.Error("function GetComponentDefByTypeName should return nil")
+	}
+}

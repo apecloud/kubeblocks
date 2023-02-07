@@ -17,6 +17,7 @@ limitations under the License.
 package types
 
 import (
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
@@ -57,6 +58,8 @@ const (
 	ResourceDeployments = "deployments"
 	// ResourceConfigmaps configmap resource
 	ResourceConfigmaps = "configmaps"
+	// ResourceStatefulSets sts resource
+	ResourceStatefulSets = "statefulsets"
 	// ResourceConfigConstraintVersions clusterVersion resource
 	ResourceConfigConstraintVersions = "configconstraints"
 
@@ -65,12 +68,14 @@ const (
 	// KindClusterDef clusterDefinition kine
 	KindClusterDef = "ClusterDefinition"
 	// KindClusterVersion clusterVersion kind
-	KindClusterVersion   = "ClusterVersion"
-	KindConfigConstraint = "ConfigConstraint"
-	KindBackup           = "Backup"
-	KindRestoreJob       = "RestoreJob"
-	KindOps              = "OpsRequest"
-	KindCM               = "ConfigMap"
+	KindClusterVersion       = "ClusterVersion"
+	KindConfigConstraint     = "ConfigConstraint"
+	KindBackup               = "Backup"
+	KindRestoreJob           = "RestoreJob"
+	KindBackupPolicyTemplate = "BackupPolicyTemplate"
+	KindOps                  = "OpsRequest"
+	KindCM                   = "ConfigMap"
+	KindSTS                  = "StatefulSet"
 
 	NameLabelKey                   = "app.kubernetes.io/name"
 	InstanceLabelKey               = "app.kubernetes.io/instance"
@@ -87,12 +92,13 @@ const (
 	StorageClassAnnotationKey      = "kubeblocks.io/storage-class"
 
 	// DataProtection definitions
-	DPGroup                = "dataprotection.kubeblocks.io"
-	DPVersion              = "v1alpha1"
-	ResourceBackups        = "backups"
-	ResourceBackupTools    = "backuptools"
-	ResourceRestoreJobs    = "restorejobs"
-	ResourceBackupPolicies = "backuppolicies"
+	DPGroup                       = "dataprotection.kubeblocks.io"
+	DPVersion                     = "v1alpha1"
+	ResourceBackups               = "backups"
+	ResourceBackupTools           = "backuptools"
+	ResourceRestoreJobs           = "restorejobs"
+	ResourceBackupPolicies        = "backuppolicies"
+	ResourceBackupPolicyTemplates = "backuppolicytemplates"
 
 	None = "<none>"
 )
@@ -141,6 +147,10 @@ func BackupGVR() schema.GroupVersionResource {
 	return schema.GroupVersionResource{Group: DPGroup, Version: DPVersion, Resource: ResourceBackups}
 }
 
+func BackupPolicyTemplateGVR() schema.GroupVersionResource {
+	return schema.GroupVersionResource{Group: DPGroup, Version: DPVersion, Resource: ResourceBackupPolicyTemplates}
+}
+
 func RestoreJobGVR() schema.GroupVersionResource {
 	return schema.GroupVersionResource{Group: DPGroup, Version: DPVersion, Resource: ResourceRestoreJobs}
 }
@@ -159,6 +169,10 @@ func CRDGVR() schema.GroupVersionResource {
 
 func CMGVR() schema.GroupVersionResource {
 	return schema.GroupVersionResource{Group: corev1.GroupName, Version: VersionV1, Resource: ResourceConfigmaps}
+}
+
+func STSGVR() schema.GroupVersionResource {
+	return schema.GroupVersionResource{Group: appsv1.GroupName, Version: VersionV1, Resource: ResourceStatefulSets}
 }
 
 func ConfigConstraintGVR() schema.GroupVersionResource {

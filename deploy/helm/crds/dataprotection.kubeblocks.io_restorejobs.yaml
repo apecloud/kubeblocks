@@ -58,21 +58,6 @@ spec:
               target:
                 description: the target database workload to restore
                 properties:
-                  databaseEngine:
-                    description: database engine to support in the backup.
-                    enum:
-                    - mysql
-                    type: string
-                  databaseEngineVersion:
-                    description: database engine to support in the backup.
-                    enum:
-                    - 5.6
-                    - 5.7
-                    - 8
-                    items:
-                      type: string
-                    type: array
-                    x-kubernetes-list-type: set
                   labelsSelector:
                     description: LabelSelector is used to find matching pods. Pods
                       that match this label selector are counted to determine the
@@ -128,12 +113,10 @@ spec:
                         pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                         type: string
                       passwordKeyword:
-                        default: password
                         description: PasswordKeyword the map keyword of the password
                           in the connection credential secret
                         type: string
                       userKeyword:
-                        default: username
                         description: UserKeyword the map keyword of the user in the
                           connection credential secret
                         type: string
@@ -141,7 +124,6 @@ spec:
                     - name
                     type: object
                 required:
-                - databaseEngine
                 - labelsSelector
                 - secret
                 type: object

@@ -20,7 +20,7 @@ spec:
     # schema: auto generate from mmmcue scripts
     # example: ../../internal/configuration/testdata/mysql_openapi.json
     cue: |-
-      {{- .Values.configTemplate.cue | nindent 6 }}
+      {{- .Files.Get "config/mysql8.cc.cue" | nindent 6 }}
 
   #  require db instance restart
   staticParameters:

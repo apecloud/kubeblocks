@@ -471,3 +471,23 @@ func (m ComponentMessageMap) SetObjectMessage(objectKind, objectName, message st
 	messageKey := fmt.Sprintf("%s/%s", objectKind, objectName)
 	m[messageKey] = message
 }
+
+// GetComponentByName gets component by name.
+func (r *Cluster) GetComponentByName(componentName string) *ClusterComponent {
+	for _, v := range r.Spec.Components {
+		if v.Name == componentName {
+			return &v
+		}
+	}
+	return nil
+}
+
+// GetComponentTypeName gets component type name
+func (r *Cluster) GetComponentTypeName(componentName string) string {
+	for _, component := range r.Spec.Components {
+		if componentName == component.Name {
+			return component.Type
+		}
+	}
+	return ""
+}

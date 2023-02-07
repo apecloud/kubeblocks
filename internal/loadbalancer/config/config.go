@@ -39,6 +39,7 @@ var (
 	EndpointsLabels         map[string]string
 	ServiceLabels           map[string]string
 	MaxConcurrentReconciles int
+	CloudProvider           string
 )
 
 const (
@@ -54,6 +55,7 @@ const (
 	EnvEndpointsLabels         = "ENDPOINTS_LABELS"
 	EnvServiceLabels           = "SERVICE_LABELS"
 	EnvMaxConcurrentReconciles = "MAX_CONCURRENT_RECONCILES"
+	EnvCloudProvider           = "CLOUD_PROVIDER"
 )
 
 func init() {
@@ -91,6 +93,8 @@ func init() {
 
 	_ = viper.BindEnv(EnvMaxConcurrentReconciles)
 	viper.SetDefault(EnvMaxConcurrentReconciles, runtime.NumCPU()*2)
+
+	_ = viper.BindEnv(EnvCloudProvider)
 }
 
 func ReadConfig(logger logr.Logger) {
@@ -111,6 +115,7 @@ func ReadConfig(logger logr.Logger) {
 	EndpointsLabels = ParseLabels(viper.GetString(EnvEndpointsLabels))
 	ServiceLabels = ParseLabels(viper.GetString(EnvServiceLabels))
 	MaxConcurrentReconciles = viper.GetInt(EnvMaxConcurrentReconciles)
+	CloudProvider = viper.GetString(EnvCloudProvider)
 }
 
 func ParseLabels(labels string) map[string]string {

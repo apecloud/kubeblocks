@@ -21,6 +21,8 @@ import (
 	"fmt"
 
 	"github.com/onsi/gomega"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -41,16 +43,18 @@ func CreateRestartOpsRequest(ctx context.Context, testCtx testutil.TestContext, 
 	return CreateOpsRequest(ctx, testCtx, ops)
 }
 
-// GenerateOpsRequestObj only generates the OpsRequest Object, instead of actually creating this resource.
-func GenerateOpsRequestObj(opsRequestName, clusterName string, opsType dbaasv1alpha1.OpsType) *dbaasv1alpha1.OpsRequest {
-	opsBytes, err := testdata.GetTestDataFileContent("operations/opsrequest.yaml")
-	if err != nil {
-		return nil
+// NewOpsRequestObj only generates the OpsRequest Object, instead of actually creating this resource.
+func NewOpsRequestObj(opsRequestName, namespace, clusterName string, opsType dbaasv1alpha1.OpsType) *dbaasv1alpha1.OpsRequest {
+	return &dbaasv1alpha1.OpsRequest{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      opsRequestName,
+			Namespace: namespace,
+		},
+		Spec: dbaasv1alpha1.OpsRequestSpec{
+			ClusterRef: clusterName,
+			Type:       opsType,
+		},
 	}
-	opsYaml := fmt.Sprintf(string(opsBytes), opsRequestName, clusterName, opsType)
-	opsRequest := &dbaasv1alpha1.OpsRequest{}
-	_ = yaml.Unmarshal([]byte(opsYaml), opsRequest)
-	return opsRequest
 }
 
 // CreateOpsRequest calls the api to create the OpsRequest resource.
@@ -80,11 +84,10 @@ func GetOpsRequestCompPhase(ctx context.Context, testCtx testutil.TestContext, o
 }
 
 // GetOpsRequestPhase gets the testing opsRequest phase for verification.
-func GetOpsRequestPhase(ctx context.Context, testCtx testutil.TestContext, opsName string) func(g gomega.Gomega) dbaasv1alpha1.Phase {
+func GetOpsRequestPhase(testCtx *testutil.TestContext, opsKey types.NamespacedName) func(gomega.Gomega) dbaasv1alpha1.Phase {
 	return func(g gomega.Gomega) dbaasv1alpha1.Phase {
 		tmpOps := &dbaasv1alpha1.OpsRequest{}
-		g.Expect(testCtx.Cli.Get(ctx, client.ObjectKey{Name: opsName, Namespace: testCtx.DefaultNamespace},
-			tmpOps)).To(gomega.Succeed())
+		g.Expect(testCtx.Cli.Get(testCtx.Ctx, opsKey, tmpOps)).To(gomega.Succeed())
 		return tmpOps.Status.Phase
 	}
 }

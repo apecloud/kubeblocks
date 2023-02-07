@@ -43,6 +43,7 @@ type KBResource interface {
 }
 
 type ResourceOptions func(obj client.Object)
+type FilterOptions = func(string) bool
 
 var testDataRoot string
 
@@ -56,17 +57,20 @@ func SubTestDataPath(subPath string) string {
 	return filepath.Join(testDataRoot, subPath)
 }
 
-func ScanDirectoryPath(subPath string) ([]string, error) {
+func ScanDirectoryPath(subPath string, filter FilterOptions) ([]string, error) {
 	dirs, err := os.ReadDir(SubTestDataPath(subPath))
 	if err != nil {
 		return nil, err
 	}
-	resourceList := make([]string, len(dirs))
-	for i, d := range dirs {
+	resourceList := make([]string, 0, len(dirs))
+	for _, d := range dirs {
 		if d.IsDir() {
 			continue
 		}
-		resourceList[i] = filepath.Join(subPath, d.Name())
+		if filter != nil && !filter(d.Name()) {
+			continue
+		}
+		resourceList = append(resourceList, filepath.Join(subPath, d.Name()))
 	}
 	return resourceList, nil
 }
@@ -120,6 +124,22 @@ func WithNamespacedName(resourceName, ns string) ResourceOptions {
 	}
 }
 
+func WithCMData(fetch func() map[string]string) ResourceOptions {
+	return func(obj client.Object) {
+		cm, ok := obj.(*corev1.ConfigMap)
+		if !ok {
+			return
+		}
+		cm.Data = fetch()
+	}
+}
+
+func WithNewFakeCMData(keysAndValues ...string) func() map[string]string {
+	return func() map[string]string {
+		return WithMap(keysAndValues...)
+	}
+}
+
 func WithMap(keysAndValues ...string) map[string]string {
 	// ignore mismatching for kvs
 	m := make(map[string]string, len(keysAndValues)/2)
@@ -142,6 +162,8 @@ func WithAnnotations(keysAndValues ...string) ResourceOptions {
 }
 
 type ComponentSelector = func(*dbaasv1alpha1.ClusterDefinitionSpec) *dbaasv1alpha1.ClusterDefinitionComponent
+type ClusterComponentSelector = func(spec *dbaasv1alpha1.ClusterSpec) *dbaasv1alpha1.ClusterComponent
+type ContainerSelector = func(containers []corev1.Container) *corev1.Container
 
 func CustomSelector(fn func(*dbaasv1alpha1.ClusterDefinitionComponent) bool) ComponentSelector {
 	return func(spec *dbaasv1alpha1.ClusterDefinitionSpec) *dbaasv1alpha1.ClusterDefinitionComponent {
@@ -188,12 +210,109 @@ func WithUpdateComponent(selector ComponentSelector, fn func(component *dbaasv1a
 	}
 }
 
+func WithClusterComponent(selector ClusterComponentSelector, fn func(component *dbaasv1alpha1.ClusterComponent)) ResourceOptions {
+	return func(obj client.Object) {
+		cluster, ok := obj.(*dbaasv1alpha1.Cluster)
+		if !ok {
+			return
+		}
+		if component := selector(&cluster.Spec); component != nil {
+			fn(component)
+		}
+	}
+}
+
+func ComponentIndexSelector(index int) ClusterComponentSelector {
+	return func(spec *dbaasv1alpha1.ClusterSpec) *dbaasv1alpha1.ClusterComponent {
+		if len(spec.Components) <= index {
+			return nil
+		}
+		return &spec.Components[index]
+	}
+}
+
+func WithComponentTypeName(name string, typeName string) func(component *dbaasv1alpha1.ClusterComponent) {
+	return func(component *dbaasv1alpha1.ClusterComponent) {
+		component.Type = typeName
+		component.Name = name
+	}
+}
+
+func WithClusterDef(clusterDefRef string) ResourceOptions {
+	return func(obj client.Object) {
+		if cluster, ok := obj.(*dbaasv1alpha1.Cluster); ok {
+			cluster.Spec.ClusterDefRef = clusterDefRef
+		}
+		if clusterVersion, ok := obj.(*dbaasv1alpha1.ClusterVersion); ok {
+			clusterVersion.Spec.ClusterDefinitionRef = clusterDefRef
+		}
+	}
+}
+
+func WithClusterVersion(clusterVersionRef string) ResourceOptions {
+	return func(obj client.Object) {
+		if cluster, ok := obj.(*dbaasv1alpha1.Cluster); ok {
+			cluster.Spec.ClusterVersionRef = clusterVersionRef
+		}
+	}
+
+}
+
 func WithConfigTemplate(tpls []dbaasv1alpha1.ConfigTemplate, selector ComponentSelector) ResourceOptions {
 	return WithUpdateComponent(selector, func(component *dbaasv1alpha1.ClusterDefinitionComponent) {
 		component.ConfigSpec = &dbaasv1alpha1.ConfigurationSpec{
 			ConfigTemplateRefs: tpls,
 		}
 	})
+}
+
+// for statefulset
+type PodOptions = func(spec *corev1.PodSpec)
+
+func WithPodTemplate(options ...PodOptions) ResourceOptions {
+	return func(obj client.Object) {
+		stsObj, ok := obj.(*appsv1.StatefulSet)
+		if !ok {
+			return
+		}
+		podSpec := &stsObj.Spec.Template.Spec
+		for _, ops := range options {
+			ops(podSpec)
+		}
+	}
+}
+
+func WithPodVolumeMount(selector ContainerSelector, fn func(container *corev1.Container)) PodOptions {
+	return func(spec *corev1.PodSpec) {
+		if container := selector(spec.Containers); container != nil {
+			fn(container)
+		}
+	}
+}
+
+func WithConfigmapVolume(cmName string, volumeName string) PodOptions {
+	return func(spec *corev1.PodSpec) {
+		if spec.Volumes == nil {
+			spec.Volumes = make([]corev1.Volume, 0)
+		}
+		spec.Volumes = append(spec.Volumes, corev1.Volume{
+			Name: volumeName,
+			VolumeSource: corev1.VolumeSource{
+				ConfigMap: &corev1.ConfigMapVolumeSource{
+					LocalObjectReference: corev1.LocalObjectReference{Name: cmName},
+				},
+			},
+		})
+	}
+}
+
+func WithContainerIndexSelector(index int) ContainerSelector {
+	return func(containers []corev1.Container) *corev1.Container {
+		if len(containers) <= index {
+			return nil
+		}
+		return &containers[index]
+	}
 }
 
 func GetResourceMeta(yamlBytes []byte) (metav1.TypeMeta, error) {

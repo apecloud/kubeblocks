@@ -98,7 +98,7 @@ var _ = Describe("Reconfigure simplePolicy", func() {
 
 	Context("simple reconfigure policy test without not configmap volume", func() {
 		It("Should failed", func() {
-			// mock not tpl
+			// mock not cc
 			mockParam := newMockReconfigureParams("simplePolicy", nil,
 				withMockStatefulSet(2, nil),
 				withConfigTpl("not_tpl_name", map[string]string{

@@ -248,7 +248,7 @@ spec:
 			By("create cluster related resources")
 			createClusterDef()
 			createClusterVersion()
-			createCluster()
+			cluster := createCluster()
 
 			// wait for cluster's status to become stable so that it won't interfere with later tests
 			Eventually(testdbaas.CheckObj(&testCtx, client.ObjectKey{Name: clusterName, Namespace: namespace},
@@ -328,9 +328,9 @@ spec:
 
 			// set nginx component phase to Failed
 			Expect(testdbaas.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(cluster), func(tmpCluster *dbaasv1alpha1.Cluster) {
-				statusComp := tmpCluster.Status.Components[componentName]
+				statusComp := tmpCluster.Status.Components[statelessCompName]
 				statusComp.Phase = dbaasv1alpha1.FailedPhase
-				tmpCluster.Status.Components[componentName] = statusComp
+				tmpCluster.Status.Components[statelessCompName] = statusComp
 			})()).Should(Succeed())
 
 			// expect cluster phase is Abnormal by cluster controller.

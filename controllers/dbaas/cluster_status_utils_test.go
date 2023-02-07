@@ -67,126 +67,40 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 
 	AfterEach(cleanEnv)
 
+	const statefulCompType = "replicasets"
+	const statefulCompName = "mysql1"
+
+	const consensusCompType = "consensus"
+	const consensusCompName = "mysql2"
+
+	const statelessCompType = "proxy"
+	const statelessCompName = "nginx"
+
 	createClusterDef := func() {
-		clusterDefYaml := fmt.Sprintf(`
-apiVersion: dbaas.kubeblocks.io/v1alpha1
-kind:       ClusterDefinition
-metadata:
-  name:     %s
-spec:
-  type: state.mysql
-  components:
-  - typeName: replicasets
-    pdbSpec:
-      minAvailable: 1
-    componentType: Stateful
-    defaultReplicas: 3
-    podSpec:
-      containers:
-      - name: mysql
-        ports:
-        - containerPort: 3306
-          name: mysql
-          protocol: TCP
-        - containerPort: 13306
-          name: paxos
-          protocol: TCP
-  - typeName: consensus
-    componentType: Consensus
-    defaultReplicas: 3
-    consensusSpec:
-      leader:
-        name: "leader"
-        accessMode: ReadWrite
-      followers:
-      - name: "follower"
-        accessMode: Readonly
-    podSpec:
-      containers:
-      - name: mysql
-        ports:
-        - containerPort: 3306
-          name: mysql
-          protocol: TCP
-        - containerPort: 13306
-          name: paxos
-          protocol: TCP
-  - typeName: proxy
-    defaultReplicas: 3
-    componentType: Stateless
-    podSpec:
-      containers:
-      - name: nginx 
-        ports:
-        - containerPort: 8080
-          name: nginx
-          protocol: TCP
-`, clusterDefName)
-		clusterDef := &dbaasv1alpha1.ClusterDefinition{}
-		Expect(yaml.Unmarshal([]byte(clusterDefYaml), clusterDef)).Should(Succeed())
-		Expect(testCtx.CheckedCreateObj(ctx, clusterDef)).Should(Succeed())
+		clusterDef := testdbaas.NewClusterDefFactory(&testCtx, clusterDefName, testdbaas.MySQLType).
+			AddComponent(testdbaas.StatefulMySQL8, statefulCompType).SetReplicas(3).
+			AddComponent(testdbaas.ConsensusMySQL, consensusCompType).SetReplicas(3).
+			AddComponent(testdbaas.StatelessNginx, statelessCompType).SetReplicas(3).
+			GetClusterDef()
+		Expect(testCtx.CreateObj(ctx, clusterDef)).Should(Succeed())
 	}
 
 	createClusterVersion := func() {
-		clusterVersionYaml := fmt.Sprintf(`
-apiVersion: dbaas.kubeblocks.io/v1alpha1
-kind:       ClusterVersion
-metadata:
-  name:     %s
-spec:
-  clusterDefinitionRef: %s
-  components:
-  - type: consensus
-    podSpec:
-      containers:
-      - name: mysql
-        image: docker.io/apecloud/apecloud-mysql-server:latest
-  - type: proxy
-    podSpec: 
-      containers:
-      - name: nginx
-        image: nginx
-  - type: replicasets
-    podSpec: 
-      containers:
-      - name: mysql
-        image: docker.io/apecloud/apecloud-mysql-server:latest
-`, clusterVersionName, clusterDefName)
-		clusterVersion := &dbaasv1alpha1.ClusterVersion{}
-		Expect(yaml.Unmarshal([]byte(clusterVersionYaml), clusterVersion)).Should(Succeed())
-		Expect(testCtx.CheckedCreateObj(ctx, clusterVersion)).Should(Succeed())
+		clusterVersion := testdbaas.NewClusterVersionFactory(&testCtx, clusterVersionName, clusterDefName).
+			AddComponent(statefulCompType).AddContainerShort("mysql", testdbaas.ApeCloudMySQLImage).
+			AddComponent(consensusCompType).AddContainerShort("mysql", testdbaas.ApeCloudMySQLImage).
+			AddComponent(statelessCompType).AddContainerShort("nginx", testdbaas.NginxImage).
+			GetClusterVersion()
+		Expect(testCtx.CreateObj(ctx, clusterVersion)).Should(Succeed())
 	}
 
 	createCluster := func() *dbaasv1alpha1.Cluster {
-		clusterYaml := fmt.Sprintf(`apiVersion: dbaas.kubeblocks.io/v1alpha1
-kind: Cluster
-metadata:
-  name: %s
-  namespace: default
-spec:
-  clusterVersionRef: %s
-  clusterDefinitionRef: %s
-  components:
-  - monitor: false
-    name: replicasets
-    replicas: 3
-    type: replicasets
-  - monitor: false
-    name: nginx
-    type: proxy
-  - monitor: false
-    name: consensus
-    type: consensus
-  terminationPolicy: WipeOut
-`, clusterName, clusterVersionName, clusterDefName)
-		cluster := &dbaasv1alpha1.Cluster{}
-		Expect(yaml.Unmarshal([]byte(clusterYaml), cluster)).Should(Succeed())
-		Expect(testCtx.CheckedCreateObj(ctx, cluster)).Should(Succeed())
-		// wait until cluster created
-		Eventually(func() bool {
-			err := k8sClient.Get(context.Background(), client.ObjectKey{Name: clusterName, Namespace: namespace}, &dbaasv1alpha1.Cluster{})
-			return err == nil
-		}, timeout, interval).Should(BeTrue())
+		cluster := testdbaas.NewClusterFactory(&testCtx, clusterName, clusterDefName, clusterVersionName).
+			AddComponent(statefulCompName, statefulCompType).
+			AddComponent(consensusCompName, consensusCompType).
+			AddComponent(statelessCompName, statelessCompType).
+			GetCluster()
+		Expect(testCtx.CreateObj(ctx, cluster)).Should(Succeed())
 		return cluster
 	}
 
@@ -354,12 +268,11 @@ spec:
 
 			By("watch warning event from StatefulSet, but mismatch condition ")
 			// create statefulSet for replicasets component
-			componentName := "replicasets"
-			stsName := initComponentStatefulSet(componentName)
+			stsName := initComponentStatefulSet(statefulCompName)
 			stsInvolvedObject := corev1.ObjectReference{
 				Name:      stsName,
 				Kind:      intctrlutil.StatefulSetKind,
-				Namespace: "default",
+				Namespace: testCtx.DefaultNamespace,
 			}
 			event.InvolvedObject = stsInvolvedObject
 			event.Type = corev1.EventTypeWarning
@@ -369,40 +282,38 @@ spec:
 			event.Count = 3
 			event.FirstTimestamp = metav1.Time{Time: time.Now()}
 			event.LastTimestamp = metav1.Time{Time: time.Now().Add(31 * time.Second)}
-			handleAndCheckComponentStatus(componentName, event, dbaasv1alpha1.FailedPhase, false, time.Second*10)
+			handleAndCheckComponentStatus(statefulCompName, event, dbaasv1alpha1.FailedPhase, false, time.Second*10)
 
 			By("watch warning event from Pod and component type is Consensus")
 			// create statefulSet for consensus component
-			componentName = "consensus"
-			stsName = initComponentStatefulSet(componentName)
+			stsName = initComponentStatefulSet(consensusCompName)
 			// create a failed pod
 			podName := stsName + "-0"
-			createStsPod(podName, "", componentName)
+			createStsPod(podName, "", consensusCompName)
 			setInvolvedObject(event, intctrlutil.PodKind, podName)
-			handleAndCheckComponentStatus(componentName, event, dbaasv1alpha1.FailedPhase, false, timeout)
+			handleAndCheckComponentStatus(consensusCompName, event, dbaasv1alpha1.FailedPhase, false, timeout)
 
 			By("test merge pod event message")
 			event.Message = "0/1 nodes can scheduled, cpu insufficient"
-			handleAndCheckComponentStatus(componentName, event, dbaasv1alpha1.FailedPhase, false, timeout)
+			handleAndCheckComponentStatus(consensusCompName, event, dbaasv1alpha1.FailedPhase, false, timeout)
 
 			By("test Failed phase for consensus component when leader pod is not ready")
 			setInvolvedObject(event, intctrlutil.StatefulSetKind, stsName)
 			podName1 := stsName + "-1"
-			pod := createStsPod(podName1, "leader", componentName)
-			handleAndCheckComponentStatus(componentName, event, dbaasv1alpha1.FailedPhase, false, timeout)
+			pod := createStsPod(podName1, "leader", consensusCompName)
+			handleAndCheckComponentStatus(consensusCompName, event, dbaasv1alpha1.FailedPhase, false, timeout)
 
 			By("test Abnormal phase for consensus component")
 			patch := client.MergeFrom(pod.DeepCopy())
 			testk8s.MockPodAvailable(pod, metav1.NewTime(time.Now()))
 			Expect(k8sClient.Status().Patch(ctx, pod, patch)).Should(Succeed())
-			handleAndCheckComponentStatus(componentName, event, dbaasv1alpha1.AbnormalPhase, false, timeout)
+			handleAndCheckComponentStatus(consensusCompName, event, dbaasv1alpha1.AbnormalPhase, false, timeout)
 
 			By("watch warning event from Deployment and component type is Stateless")
-			deploymentName := "nginx-deploy"
-			componentName = "nginx"
+			deploymentName := statelessCompName + "-deploy"
 			setInvolvedObject(event, intctrlutil.DeploymentKind, deploymentName)
-			createDeployment(componentName, deploymentName)
-			handleAndCheckComponentStatus(componentName, event, dbaasv1alpha1.FailedPhase, false, timeout)
+			createDeployment(statelessCompName, deploymentName)
+			handleAndCheckComponentStatus(statelessCompName, event, dbaasv1alpha1.FailedPhase, false, timeout)
 		})
 	})
 

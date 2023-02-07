@@ -1,4 +1,29 @@
 # - Connection Settings -
+
+{{- $buffer_unit := "B" }}
+{{- $shared_buffers := 1073741824 }}
+{{- $max_connections := 10000 }}
+{{- $phy_memory := getContainerMemory ( index $.podSpec.containers 0 ) }}
+{{- if gt $phy_memory 0 }}
+{{- $shared_buffers = div $phy_memory 4 }}
+{{- $max_connections = min ( div $phy_memory 9531392 ) 5000 }}
+{{- end -}}
+
+{{- if ge $shared_buffers 1024 }}
+{{- $shared_buffers = div $shared_buffers 1024 }}
+{{- $buffer_unit = "KB" }}
+{{- end -}}
+
+{{- if ge $shared_buffers 1024 }}
+{{- $shared_buffers = div $shared_buffers 1024 }}
+{{- $buffer_unit = "MB" }}
+{{- end -}}
+
+{{- if ge $shared_buffers 1024 }}
+{{- $shared_buffers = div $shared_buffers 1024 }}
+{{ $buffer_unit = "GB" }}
+{{- end -}}
+
 listen_addresses = '*'
 port = '5432'
 #archive_command = 'wal_dir=/pg/arcwal; [[ $(date +%H%M) == 1200 ]] && rm -rf ${wal_dir}/$(date -d"yesterday" +%Y%m%d); /bin/mkdir -p ${wal_dir}/$(date +%Y%m%d) && /usr/bin/lz4 -q -z %p > ${wal_dir}/$(date +%Y%m%d)/%f.lz4'
@@ -43,7 +68,7 @@ log_replication_commands = 'True'
 log_statement = 'ddl'
 logging_collector = 'True'
 #maintenance_work_mem = '3952MB'
-max_connections = '10000'
+max_connections = '{{ $max_connections }}'
 max_locks_per_transaction = '128'
 max_logical_replication_workers = '8'
 max_parallel_maintenance_workers = '2'
@@ -65,7 +90,7 @@ pg_stat_statements.track_planning = 'False'
 pg_stat_statements.track_utility = 'False'
 random_page_cost = '1.1'
 #auto generated
-shared_buffers = '1GB'
+shared_buffers = '{{ printf "%d%s" $shared_buffers $buffer_unit }}'
 #shared_preload_libraries = 'timescaledb, pg_stat_statements, auto_explain'
 superuser_reserved_connections = '10'
 temp_file_limit = '100GB'

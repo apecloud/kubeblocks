@@ -40,6 +40,8 @@ const (
 func GetVersionInfo(client kubernetes.Interface) (map[AppName]string, error) {
 	var err error
 	versionInfo := map[AppName]string{}
+	versionInfo[KBCLIApp] = version.GetVersion()
+
 	if versionInfo[KubernetesApp], err = getK8sVersion(client.Discovery()); err != nil {
 		return versionInfo, err
 	}
@@ -48,7 +50,6 @@ func GetVersionInfo(client kubernetes.Interface) (map[AppName]string, error) {
 		return versionInfo, err
 	}
 
-	versionInfo[KBCLIApp] = version.GetVersion()
 	return versionInfo, nil
 }
 

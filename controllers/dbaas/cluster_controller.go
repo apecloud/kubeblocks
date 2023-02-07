@@ -758,7 +758,7 @@ func (r *ClusterReconciler) reconcileStatusOperations(ctx context.Context, clust
 		clusterVersionList        = &dbaasv1alpha1.ClusterVersionList{}
 	)
 	// determine whether to support volumeExpansion when creating the cluster or add/delete component.
-	// because volumeClaimTemplates is forbidden to update except for storage size when component created.
+	// because volumeClaimTemplates are forbidden to update except for storage size when component created.
 	if cluster.Status.ObservedGeneration == 0 || len(cluster.Spec.Components) != len(cluster.Status.Components) {
 		if volumeExpansionComponents, err = getSupportVolumeExpansionComponents(ctx, r.Client, cluster); err != nil {
 			return err

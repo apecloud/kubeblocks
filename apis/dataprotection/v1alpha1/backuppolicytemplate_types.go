@@ -23,8 +23,8 @@ import (
 // BackupPolicyTemplateSpec defines the desired state of BackupPolicyTemplate
 type BackupPolicyTemplateSpec struct {
 	// The schedule in Cron format, see https://en.wikipedia.org/wiki/Cron.
-	// +kubebuilder:default="0 7 * * *"
-	Schedule string `json:"schedule"`
+	// +optional
+	Schedule string `json:"schedule,omitempty"`
 
 	// which backup tool to perform database backup, only support one tool.
 	// +kubebuilder:validation:Required

@@ -283,6 +283,10 @@ type ClusterDefinitionComponent struct {
 	TypeName string `json:"typeName"`
 
 	// componentType defines type of the component.
+	// Stateless is a stateless component type used to describe stateless applications.
+	// Stateful is a stateful component type used to describe common stateful applications.
+	// Consensus is a stateful component type used to describe applications based on consensus protocols, common consensus protocols such as raft and paxos.
+	// Replication is a stateful component type used to describe applications based on the primary-secondary data replication protocol.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Enum={Stateless,Stateful,Consensus,Replication}
 	ComponentType ComponentType `json:"componentType"`

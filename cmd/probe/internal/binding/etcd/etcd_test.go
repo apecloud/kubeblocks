@@ -19,8 +19,10 @@ package etcd
 import (
 	"context"
 	"io/ioutil"
+	"math/rand"
 	"net/url"
 	"os"
+	"strconv"
 	"testing"
 	"time"
 
@@ -33,8 +35,10 @@ import (
 
 const (
 	etcdStartTimeout = 30
-	testEndpoint     = "http://localhost:52600"
 )
+
+// randomize the port to avoid conflicting
+var testEndpoint = "http://localhost:" + strconv.Itoa(52600+rand.Intn(1000))
 
 func TestGetRole(t *testing.T) {
 	etcdServer, err := startEtcdServer(testEndpoint)

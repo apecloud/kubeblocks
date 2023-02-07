@@ -98,15 +98,17 @@ const (
 
 // UpdatableFlags is the flags that cat be updated by update command
 type UpdatableFlags struct {
-	TerminationPolicy string            `json:"terminationPolicy"`
-	PodAntiAffinity   string            `json:"podAntiAffinity"`
-	Monitor           bool              `json:"monitor"`
-	EnableAllLogs     bool              `json:"enableAllLogs"`
-	TopologyKeys      []string          `json:"topologyKeys,omitempty"`
-	NodeLabels        map[string]string `json:"nodeLabels,omitempty"`
-	TolerationsRaw    []string          `json:"-"`
-	Tenancy           string            `json:"tenancy,omitempty"`
-	Distribution      string            `json:"distribution,omitempty"`
+	// Options for cluster termination policy
+	TerminationPolicy string `json:"terminationPolicy"`
+	// Add-on switches for cluster observability
+	Monitor       bool `json:"monitor"`
+	EnableAllLogs bool `json:"enableAllLogs"`
+	// Configuration and options for cluster affinity and toleration
+	PodAntiAffinity string            `json:"podAntiAffinity"`
+	TopologyKeys    []string          `json:"topologyKeys,omitempty"`
+	NodeLabels      map[string]string `json:"nodeLabels,omitempty"`
+	Tenancy         string            `json:"tenancy,omitempty"`
+	TolerationsRaw  []string          `json:"-"`
 }
 
 type CreateOptions struct {
@@ -449,7 +451,6 @@ func (f *UpdatableFlags) addFlags(cmd *cobra.Command) {
 	cmd.Flags().StringToStringVar(&f.NodeLabels, "node-labels", nil, "Node label selector")
 	cmd.Flags().StringSliceVar(&f.TolerationsRaw, "tolerations", nil, `Tolerations for cluster, such as '"key=engineType,value=mongo,operator=Equal,effect=NoSchedule"'`)
 	cmd.Flags().StringVar(&f.Tenancy, "tenancy", "SharedNode", "Tenancy options, one of: (SharedNode, DedicatedNode)")
-	cmd.Flags().StringVar(&f.Distribution, "distribution", "MultiNode", "Tenancy options, one of: (SharedNode, DedicatedNode)")
 
 	util.CheckErr(cmd.RegisterFlagCompletionFunc(
 		"termination-policy",

@@ -57,7 +57,6 @@ kbcli cluster create [NAME] [flags]
       --backup string                Set a source backup to restore data
       --cluster-definition string    Specify cluster definition, run "kbcli cluster-definition list" to show all available cluster definition
       --cluster-version string       Specify cluster version, run "kbcli cluster-version list" to show all available cluster version, use the latest version if not specified
-      --distribution string          Tenancy options, one of: (SharedNode, DedicatedNode) (default "MultiNode")
       --enable-all-logs              Enable advanced application all log extraction, and true will ignore enabledLogs of component level (default true)
   -h, --help                         help for create
       --monitor                      Set monitor enabled and inject metrics exporter (default true)

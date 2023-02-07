@@ -24,7 +24,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/cli/types"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 	"github.com/apecloud/kubeblocks/test/testdata"
 )
@@ -238,19 +237,17 @@ func (helper *FakeKubeObjectHelper) CreateObjects() []runtime.Object {
 
 		options := helper.options(meta)
 		switch meta.Kind {
-		case types.KindClusterDef:
+		case KindClusterDef:
 			k8sObj, err = testdata.GetResourceFromContext[dbaasv1alpha1.ClusterDefinition](yamlBytes, options...)
-		case types.KindClusterVersion:
+		case KindClusterVersion:
 			k8sObj, err = testdata.GetResourceFromContext[dbaasv1alpha1.ClusterVersion](yamlBytes, options...)
-		case types.KindCM:
+		case KindCM:
 			k8sObj, err = testdata.GetResourceFromContext[corev1.ConfigMap](yamlBytes, options...)
-		case types.KindConfigConstraint:
+		case KindConfigConstraint:
 			k8sObj, err = testdata.GetResourceFromContext[dbaasv1alpha1.ConfigConstraint](yamlBytes, options...)
-		case types.KindOps:
-			k8sObj, err = testdata.GetResourceFromContext[dbaasv1alpha1.OpsRequest](yamlBytes, options...)
-		case types.KindCluster:
+		case KindCluster:
 			k8sObj, err = testdata.GetResourceFromContext[dbaasv1alpha1.Cluster](yamlBytes, options...)
-		case types.KindSTS:
+		case KindSTS:
 			k8sObj, err = testdata.GetResourceFromContext[appsv1.StatefulSet](yamlBytes, options...)
 		default:
 			continue

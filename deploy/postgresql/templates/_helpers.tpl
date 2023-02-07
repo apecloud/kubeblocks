@@ -92,6 +92,6 @@ Get the postgres-password key.
 {{- if .Values.auth.postgresPassword -}}
     {{- printf "%s" .Values.auth.postgresPassword }}
 {{- else -}}
-    {{- "$(RANDOM_PASSWD)" -}}
+    {{- randAlphaNum 10 -}}
 {{- end -}}
 {{- end -}}

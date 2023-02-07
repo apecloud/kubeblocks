@@ -86,7 +86,6 @@ spec:
                 format: int32
                 type: integer
               schedule:
-                default: 0 7 * * *
                 description: The schedule in Cron format, see https://en.wikipedia.org/wiki/Cron.
                 type: string
               ttl:
@@ -95,7 +94,6 @@ spec:
                 type: string
             required:
             - backupToolName
-            - schedule
             type: object
           status:
             description: BackupPolicyTemplateStatus defines the observed state of

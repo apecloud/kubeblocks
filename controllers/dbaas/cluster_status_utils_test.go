@@ -18,7 +18,6 @@ package dbaas
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -27,7 +26,6 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/yaml"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
@@ -43,9 +41,6 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 		clusterName        = "cluster-for-status-" + testCtx.GetRandomStr()
 		clusterDefName     = "clusterdef-for-status-" + testCtx.GetRandomStr()
 		clusterVersionName = "cluster-version-for-status-" + testCtx.GetRandomStr()
-		namespace          = "default"
-		timeout            = time.Second * 10
-		interval           = time.Second
 	)
 
 	cleanEnv := func() {
@@ -67,13 +62,13 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 
 	AfterEach(cleanEnv)
 
-	const statefulCompType = "replicasets"
+	const statefulCompType = "stateful"
 	const statefulCompName = "mysql1"
 
 	const consensusCompType = "consensus"
 	const consensusCompName = "mysql2"
 
-	const statelessCompType = "proxy"
+	const statelessCompType = "stateless"
 	const statelessCompName = "nginx"
 
 	createClusterDef := func() {
@@ -104,40 +99,6 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 		return cluster
 	}
 
-	createSts := func(stsName, componentName string) *appsv1.StatefulSet {
-		stsYaml := fmt.Sprintf(`apiVersion: apps/v1
-kind: StatefulSet
-metadata:
-  labels:
-    app.kubernetes.io/component-name: %s
-    app.kubernetes.io/instance: %s
-    app.kubernetes.io/managed-by: kubeblocks
-  name: %s
-  namespace: default
-spec:
-  podManagementPolicy: Parallel
-  replicas: 3
-  selector:
-    matchLabels:
-      app.kubernetes.io/component-name: %s
-      app.kubernetes.io/instance: %s
-  serviceName: wesql-wesql-test
-  template:
-    metadata:
-      labels:
-        app.kubernetes.io/component-name: %s
-        app.kubernetes.io/instance: %s
-    spec:
-      containers:
-      - image: docker.io/apecloud/apecloud-mysql-server:latest
-        imagePullPolicy: IfNotPresent
-        name: mysql`, componentName, clusterName, stsName, componentName, clusterName, componentName, clusterName)
-		sts := &appsv1.StatefulSet{}
-		Expect(yaml.Unmarshal([]byte(stsYaml), sts)).Should(Succeed())
-		Expect(testCtx.CheckedCreateObj(ctx, sts)).Should(Succeed())
-		return sts
-	}
-
 	createStsPod := func(podName, podRole, componentName string) *corev1.Pod {
 		return testdbaas.CreateCustomizedObj(&testCtx, "hybrid/hybrid_sts_pod.yaml", &corev1.Pod{},
 			testdbaas.CustomizeObjYAML(componentName, clusterName, podRole, podName))
@@ -156,7 +117,7 @@ spec:
 
 	handleAndCheckComponentStatus := func(componentName string, event *corev1.Event,
 		expectPhase dbaasv1alpha1.Phase, checkClusterPhase bool) {
-		Eventually(testdbaas.CheckObj(&testCtx, client.ObjectKey{Name: clusterName, Namespace: namespace}, func(g Gomega, newCluster *dbaasv1alpha1.Cluster) {
+		Eventually(testdbaas.CheckObj(&testCtx, client.ObjectKey{Name: clusterName, Namespace: testCtx.DefaultNamespace}, func(g Gomega, newCluster *dbaasv1alpha1.Cluster) {
 			g.Expect(handleEventForClusterStatus(ctx, k8sClient, clusterRecorder, event)).Should(Succeed())
 			if checkClusterPhase {
 				g.Expect(newCluster.Status.Phase == expectPhase).Should(BeTrue())
@@ -180,7 +141,7 @@ spec:
 			cluster := createCluster()
 
 			// wait for cluster's status to become stable so that it won't interfere with later tests
-			Eventually(testdbaas.CheckObj(&testCtx, client.ObjectKey{Name: clusterName, Namespace: namespace},
+			Eventually(testdbaas.CheckObj(&testCtx, client.ObjectKey{Name: clusterName, Namespace: testCtx.DefaultNamespace},
 				func(g Gomega, fetched *dbaasv1alpha1.Cluster) {
 					g.Expect(fetched.Generation).To(BeEquivalentTo(1))
 					g.Expect(fetched.Status.ObservedGeneration).To(BeEquivalentTo(1))
@@ -197,7 +158,11 @@ spec:
 
 			By("watch warning event from StatefulSet, but mismatch condition ")
 			// wait for StatefulSet created by cluster controller
-			stsName := initComponentStatefulSet(statefulCompName)
+			stsName := clusterName + "-" + statefulCompName
+			Eventually(testdbaas.CheckObj(&testCtx, client.ObjectKey{Name: stsName, Namespace: testCtx.DefaultNamespace},
+				func(g Gomega, fetched *appsv1.StatefulSet) {
+					g.Expect(fetched.Generation).To(BeEquivalentTo(1))
+				})).Should(Succeed())
 			stsInvolvedObject := corev1.ObjectReference{
 				Name:      stsName,
 				Kind:      intctrlutil.StatefulSetKind,
@@ -211,38 +176,41 @@ spec:
 			event.Count = 3
 			event.FirstTimestamp = metav1.Time{Time: time.Now()}
 			event.LastTimestamp = metav1.Time{Time: time.Now().Add(31 * time.Second)}
-			handleAndCheckComponentStatus(statefulCompName, event, dbaasv1alpha1.FailedPhase, false, time.Second*10)
+			handleAndCheckComponentStatus(statefulCompName, event, dbaasv1alpha1.FailedPhase, false)
 
 			By("watch warning event from Pod and component type is Consensus")
-			// create statefulSet for consensus component
-			stsName = initComponentStatefulSet(consensusCompName)
+			// wait for StatefulSet created by cluster controller
+			stsName = clusterName + "-" + consensusCompName
+			Eventually(testdbaas.CheckObj(&testCtx, client.ObjectKey{Name: stsName, Namespace: testCtx.DefaultNamespace},
+				func(g Gomega, fetched *appsv1.StatefulSet) {
+					g.Expect(fetched.Generation).To(BeEquivalentTo(1))
+				})).Should(Succeed())
 			// create a failed pod
 			podName := stsName + "-0"
 			createStsPod(podName, "", consensusCompName)
 			setInvolvedObject(event, intctrlutil.PodKind, podName)
-			handleAndCheckComponentStatus(consensusCompName, event, dbaasv1alpha1.FailedPhase, false, timeout)
+			handleAndCheckComponentStatus(consensusCompName, event, dbaasv1alpha1.FailedPhase, false)
 
 			By("test merge pod event message")
 			event.Message = "0/1 nodes can scheduled, cpu insufficient"
-			handleAndCheckComponentStatus(consensusCompName, event, dbaasv1alpha1.FailedPhase, false, timeout)
+			handleAndCheckComponentStatus(consensusCompName, event, dbaasv1alpha1.FailedPhase, false)
 
 			By("test Failed phase for consensus component when leader pod is not ready")
 			setInvolvedObject(event, intctrlutil.StatefulSetKind, stsName)
 			podName1 := stsName + "-1"
 			pod := createStsPod(podName1, "leader", consensusCompName)
-			handleAndCheckComponentStatus(consensusCompName, event, dbaasv1alpha1.FailedPhase, false, timeout)
+			handleAndCheckComponentStatus(consensusCompName, event, dbaasv1alpha1.FailedPhase, false)
 
 			By("test Abnormal phase for consensus component")
 			patch := client.MergeFrom(pod.DeepCopy())
 			testk8s.MockPodAvailable(pod, metav1.NewTime(time.Now()))
 			Expect(k8sClient.Status().Patch(ctx, pod, patch)).Should(Succeed())
-			handleAndCheckComponentStatus(consensusCompName, event, dbaasv1alpha1.AbnormalPhase, false, timeout)
+			handleAndCheckComponentStatus(consensusCompName, event, dbaasv1alpha1.AbnormalPhase, false)
 
 			By("watch warning event from Deployment and component type is Stateless")
-			deploymentName := statelessCompName + "-deploy"
-			setInvolvedObject(event, intctrlutil.DeploymentKind, deploymentName)
-			createDeployment(statelessCompName, deploymentName)
-			handleAndCheckComponentStatus(statelessCompName, event, dbaasv1alpha1.FailedPhase, false, timeout)
+			deploy := getDeployment(statelessCompName)
+			setInvolvedObject(event, intctrlutil.DeploymentKind, deploy.Name)
+			handleAndCheckComponentStatus(statelessCompName, event, dbaasv1alpha1.FailedPhase, false)
 
 			By("test the cluster phase when component Failed/Abnormal in Running phase")
 			// mock cluster is running.

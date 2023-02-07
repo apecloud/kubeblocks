@@ -5,7 +5,7 @@ Run the command below to view all the database types available for creating a cl
 ```
 kbcli clusterdefinition list
 ```
-***Result***
+***Example***
 ```
 $ kbcli clusterdefinition list
 NAME             MAIN-COMPONENT-TYPE   STATUS      AGE
@@ -13,19 +13,20 @@ apecloud-mysql   mysql                 Available   7m52s
 ```
 ***Steps:***
 1. Run the command below to list all the available kernel versions and choose one that you need.
-```
-kbcli clusterversion list
-```
-***Result***
-```
-$ kbcli clusterversion list
-NAME              CLUSTER-DEFINITION   STATUS      AGE
-ac-mysql-8.0.30   apecloud-mysql       Available   2m40s
-```
+   ```
+   kbcli clusterversion list
+   ```
+   ***Example***
+
+   ```
+   $ kbcli clusterversion list
+   NAME              CLUSTER-DEFINITION   STATUS      AGE
+   ac-mysql-8.0.30   apecloud-mysql       Available   2m40s
+   ```
 2. Run the command below to create a MySQL cluster. 
-```
-$ kbcli cluster create --cluster-definition='apecloud-mysql'
-```
+   ```
+   $ kbcli cluster create --cluster-definition='apecloud-mysql'
+   ```
 ## Connect to a MySQL Cluster
 ***Steps:***
 Run the command below to connect to a cluster.
@@ -33,7 +34,8 @@ Run the command below to connect to a cluster.
 kbcli cluster connect NAME
 ```
 
-***Result***
+***Example***
+
 ```
 $ kbcli cluster connect mysql-01
 Connect to instance mysql-01-mysql-0: out of mysql-01-mysql-0(leader)

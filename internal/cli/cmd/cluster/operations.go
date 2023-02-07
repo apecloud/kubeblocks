@@ -105,9 +105,6 @@ func (o *OperationsOptions) buildCommonFlags(cmd *cobra.Command) {
 // CompleteRestartOps when restart a cluster and component-names is null, represents restarting the entire cluster.
 // we should set all component names to ComponentNames
 func (o *OperationsOptions) CompleteRestartOps() error {
-	if err := delete.Confirm([]string{o.Name}, o.In); err != nil {
-		return err
-	}
 	if len(o.ComponentNames) != 0 {
 		return nil
 	}
@@ -131,7 +128,7 @@ func (o *OperationsOptions) validateUpgrade() error {
 
 func (o *OperationsOptions) validateVolumeExpansion() error {
 	if len(o.VCTNames) == 0 {
-		return fmt.Errorf("missing vct-names")
+		return fmt.Errorf("missing volume-claim-template-names")
 	}
 	if len(o.Storage) == 0 {
 		return fmt.Errorf("missing storage")
@@ -302,7 +299,7 @@ func (o *OperationsOptions) Validate() error {
 	case dbaasv1alpha1.ReconfiguringType:
 		return o.validateReconfiguring()
 	}
-	return nil
+	return delete.Confirm([]string{o.Name}, o.In)
 }
 
 func (o *OperationsOptions) fillComponentNameForReconfiguring() error {
@@ -375,9 +372,6 @@ func NewUpgradeCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 		o.buildCommonFlags(cmd)
 		cmd.Flags().StringVar(&o.ClusterVersionRef, "cluster-version", "", "Reference cluster version (required)")
 	}
-	inputs.Complete = func() error {
-		return delete.Confirm([]string{o.Name}, o.In)
-	}
 	return create.BuildCommand(inputs)
 }
 
@@ -401,9 +395,6 @@ func NewVerticalScalingCmd(f cmdutil.Factory, streams genericclioptions.IOStream
 		cmd.Flags().StringVar(&o.LimitCPU, "limits.cpu", "", "CPU size limited by the component")
 		cmd.Flags().StringVar(&o.LimitMemory, "limits.memory", "", "Memory size limited by the component")
 	}
-	inputs.Complete = func() error {
-		return delete.Confirm([]string{o.Name}, o.In)
-	}
 	return create.BuildCommand(inputs)
 }
 
@@ -422,9 +413,6 @@ func NewHorizontalScalingCmd(f cmdutil.Factory, streams genericclioptions.IOStre
 	inputs.BuildFlags = func(cmd *cobra.Command) {
 		o.buildCommonFlags(cmd)
 		cmd.Flags().IntVar(&o.Replicas, "replicas", -1, "Replicas with the specified components")
-	}
-	inputs.Complete = func() error {
-		return delete.Confirm([]string{o.Name}, o.In)
 	}
 	return create.BuildCommand(inputs)
 }
@@ -446,9 +434,6 @@ func NewVolumeExpansionCmd(f cmdutil.Factory, streams genericclioptions.IOStream
 		o.buildCommonFlags(cmd)
 		cmd.Flags().StringSliceVar(&o.VCTNames, "volume-claim-template-names", nil, "VolumeClaimTemplate names in components (required)")
 		cmd.Flags().StringVar(&o.Storage, "storage", "", "Volume storage size (required)")
-	}
-	inputs.Complete = func() error {
-		return delete.Confirm([]string{o.Name}, o.In)
 	}
 	return create.BuildCommand(inputs)
 }

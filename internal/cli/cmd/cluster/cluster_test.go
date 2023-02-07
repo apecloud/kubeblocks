@@ -29,6 +29,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
+	testutil "github.com/apecloud/kubeblocks/internal/testutil/k8s"
 	"github.com/apecloud/kubeblocks/test/testdata"
 )
 
@@ -176,17 +177,17 @@ var _ = Describe("Cluster", func() {
 			cdComponentTypeName = "replicasets"
 		)
 
-		randomNamer := CreateRandomResourceNamer(ns)
-		mockHelper := NewFakeResourceObjectHelper("cli_testdata",
-			WithCustomResource(types.ClusterGVR(), NewFakeClusterResource(randomNamer, componentName, cdComponentTypeName)),
-			WithCustomResource(types.CMGVR(), NewFakeConfigCMResource(randomNamer, componentName, randomNamer.VolumeName,
+		randomNamer := testutil.CreateRandomResourceNamer(ns)
+		mockHelper := testutil.NewFakeResourceObjectHelper("cli_testdata",
+			testutil.WithCustomResource(types.ClusterGVR(), NewFakeClusterResource(randomNamer, componentName, cdComponentTypeName)),
+			testutil.WithCustomResource(types.CMGVR(), testutil.NewFakeConfigCMResource(randomNamer, componentName, randomNamer.VolumeName,
 				testdata.WithCMData(testdata.WithNewFakeCMData("my.cnf", "")))),
-			WithResourceKind(types.ConfigConstraintGVR(), types.KindConfigConstraint, testdata.WithName(randomNamer.CCName)),
-			WithResourceKind(types.CMGVR(), types.KindCM, testdata.WithNamespacedName(randomNamer.TPLName, randomNamer.NS)),
-			WithResourceKind(types.ClusterVersionGVR(), types.KindClusterVersion, testdata.WithName(randomNamer.CVName)),
-			WithResourceKind(types.ClusterDefGVR(), types.KindClusterDef,
+			testutil.WithResourceKind(types.ConfigConstraintGVR(), types.KindConfigConstraint, testdata.WithName(randomNamer.CCName)),
+			testutil.WithResourceKind(types.CMGVR(), types.KindCM, testdata.WithNamespacedName(randomNamer.TPLName, randomNamer.NS)),
+			testutil.WithResourceKind(types.ClusterVersionGVR(), types.KindClusterVersion, testdata.WithName(randomNamer.CVName)),
+			testutil.WithResourceKind(types.ClusterDefGVR(), types.KindClusterDef,
 				testdata.WithName(randomNamer.CDName),
-				testdata.WithConfigTemplate(GenerateConfigTemplate(randomNamer), testdata.ComponentTypeSelector(dbaasv1alpha1.Stateful)),
+				testdata.WithConfigTemplate(testutil.GenerateConfigTemplate(randomNamer), testdata.ComponentTypeSelector(dbaasv1alpha1.Stateful)),
 				testdata.WithUpdateComponent(testdata.ComponentTypeSelector(dbaasv1alpha1.Stateful),
 					func(component *dbaasv1alpha1.ClusterDefinitionComponent) {
 						component.TypeName = cdComponentTypeName

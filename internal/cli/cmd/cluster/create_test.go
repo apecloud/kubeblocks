@@ -98,7 +98,8 @@ var _ = Describe("create", func() {
 		It("target file in website", func() {
 			ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				w.Header().Set("Content-Type", "application/json")
-				w.Write([]byte("OK"))
+				_, err := w.Write([]byte("OK"))
+				Expect(err).ShouldNot(HaveOccurred())
 			}))
 			defer ts.Close()
 			fileURL := ts.URL + "/docs/file"

@@ -127,7 +127,7 @@ func (r *OpsRequestReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	}
 
 	// process opsRequest entry function
-	if err = r.processOpsRequest(opsRes); err != nil {
+	if err = operations.GetOpsManager().Do(opsRes); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 
@@ -182,17 +182,6 @@ func (r *OpsRequestReconciler) setOwnerReferenceWithCluster(ctx context.Context,
 		return err
 	}
 	if err := r.Client.Patch(ctx, opsRes.OpsRequest, patch); err != nil {
-		return err
-	}
-	return nil
-}
-
-// processOpsRequest validate  support the Operation and enter the opsManger MainEnter function to process the OpsRequest
-func (r *OpsRequestReconciler) processOpsRequest(opsRes *operations.OpsResource) error {
-	var (
-		err error
-	)
-	if err = operations.GetOpsManager().Do(opsRes); err != nil {
 		return err
 	}
 	return nil

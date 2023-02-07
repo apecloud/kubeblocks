@@ -546,7 +546,7 @@ func checkedCreateObjs(reqCtx intctrlutil.RequestCtx, cli client.Client, obj int
 	if !ok {
 		return false, fmt.Errorf("invalid arg")
 	}
-
+	// TODO when deleting a component of the cluster, clean up the corresponding k8s resources.
 	return createOrReplaceResources(reqCtx, cli, params.cluster, params.clusterDefinition, *params.applyObjs)
 }
 

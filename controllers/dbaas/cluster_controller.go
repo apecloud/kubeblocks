@@ -658,18 +658,40 @@ func (r *ClusterReconciler) reconcileClusterStatus(ctx context.Context,
 		replicasNotReadyCompNames = map[string]struct{}{}
 		notReadyCompNames         = map[string]struct{}{}
 	)
-	for k, v := range cluster.Status.Components {
-		if v.PodsReady == nil || !*v.PodsReady {
-			replicasNotReadyCompNames[k] = struct{}{}
-			notReadyCompNames[k] = struct{}{}
+
+	// remove the invalid component in status.components when spec.components changed.
+	removeInvalidComponent := func(cluster *dbaasv1alpha1.Cluster) (needPatch bool, postFunc postHandler) {
+		tmpStatusComponents := map[string]dbaasv1alpha1.ClusterStatusComponent{}
+		statusComponents := cluster.Status.Components
+		for _, v := range cluster.Spec.Components {
+			if statusComponent, ok := statusComponents[v.Name]; ok {
+				tmpStatusComponents[v.Name] = statusComponent
+			}
 		}
-		if util.IsFailedOrAbnormal(v.Phase) {
-			existsAbnormalOrFailed = true
-			notReadyCompNames[k] = struct{}{}
+		if len(tmpStatusComponents) != len(statusComponents) {
+			// keep valid components status
+			needPatch = true
+			cluster.Status.Components = tmpStatusComponents
 		}
-		if v.Phase != dbaasv1alpha1.RunningPhase {
-			clusterIsRunning = false
+		return needPatch, nil
+	}
+
+	// analysis the status of components.
+	analysisStatusComponents := func(cluster *dbaasv1alpha1.Cluster) (needPatch bool, postFunc postHandler) {
+		for k, v := range cluster.Status.Components {
+			if v.PodsReady == nil || !*v.PodsReady {
+				replicasNotReadyCompNames[k] = struct{}{}
+				notReadyCompNames[k] = struct{}{}
+			}
+			if util.IsFailedOrAbnormal(v.Phase) {
+				existsAbnormalOrFailed = true
+				notReadyCompNames[k] = struct{}{}
+			}
+			if v.Phase != dbaasv1alpha1.RunningPhase {
+				clusterIsRunning = false
+			}
 		}
+		return false, nil
 	}
 
 	// handle the cluster conditions with ClusterReady and ReplicasReady type.
@@ -717,7 +739,7 @@ func (r *ClusterReconciler) reconcileClusterStatus(ctx context.Context,
 		}
 	}
 
-	return doChainClusterStatusHandler(ctx, r.Client, cluster,
+	return doChainClusterStatusHandler(ctx, r.Client, cluster, removeInvalidComponent, analysisStatusComponents,
 		handleClusterReadyCondition, handleExistAbnormalOrFailed, handleClusterIsRunning)
 }
 
@@ -735,8 +757,9 @@ func (r *ClusterReconciler) reconcileStatusOperations(ctx context.Context, clust
 		operations                = *cluster.Status.Operations
 		clusterVersionList        = &dbaasv1alpha1.ClusterVersionList{}
 	)
-	// determine whether to support volumeExpansion when creating the cluster. because volumeClaimTemplates is forbidden to update except for storage size when cluster created.
-	if cluster.Status.ObservedGeneration == 0 {
+	// determine whether to support volumeExpansion when creating the cluster or add/delete component.
+	// because volumeClaimTemplates is forbidden to update except for storage size when component created.
+	if cluster.Status.ObservedGeneration == 0 || len(cluster.Spec.Components) != len(cluster.Status.Components) {
 		if volumeExpansionComponents, err = getSupportVolumeExpansionComponents(ctx, r.Client, cluster); err != nil {
 			return err
 		}

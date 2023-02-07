@@ -224,7 +224,7 @@ test-webhook-enabled: ## Run tests with webhooks enabled.
 	$(MAKE) test ENABLE_WEBHOOKS=true
 
 .PHONY: cover-report
-cover-report: cover-report-probe ## Generate cover.html from cover.out
+cover-report: ## Generate cover.html from cover.out
 	$(GO) tool cover -html=cover.out -o cover.html
 ifeq ($(GOOS), darwin)
 	open ./cover.html

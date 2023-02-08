@@ -18,6 +18,7 @@ package dbaas
 
 import (
 	"github.com/onsi/gomega"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
@@ -76,7 +77,7 @@ func (factory *MockClusterDefFactory) AddComponent(name ComponentTplType, rename
 	return factory
 }
 
-func (factory *MockClusterDefFactory) SetReplicas(replicas int32) *MockClusterDefFactory {
+func (factory *MockClusterDefFactory) SetDefaultReplicas(replicas int32) *MockClusterDefFactory {
 	comps := factory.ClusterDef.Spec.Components
 	if len(comps) > 0 {
 		comps[len(comps)-1].DefaultReplicas = replicas
@@ -106,8 +107,27 @@ func (factory *MockClusterDefFactory) AddConfigTemplate(name string,
 	return factory
 }
 
-func (factory *MockClusterDefFactory) AddConnectionCredential(key string, value string) *MockClusterDefFactory {
-	factory.ClusterDef.Spec.ConnectionCredential[key] = value
+func (factory *MockClusterDefFactory) AddContainerEnv(containerName string, envVar corev1.EnvVar) *MockClusterDefFactory {
+	comps := factory.ClusterDef.Spec.Components
+	if len(comps) > 0 {
+		comp := comps[len(comps)-1]
+		for i, container := range comps[len(comps)-1].PodSpec.Containers {
+			if container.Name == containerName {
+				c := comps[len(comps)-1].PodSpec.Containers[i]
+				c.Env = append(c.Env, envVar)
+				comps[len(comps)-1].PodSpec.Containers[i] = c
+				break
+			}
+		}
+		comps[len(comps)-1] = comp
+	}
+	factory.ClusterDef.Spec.Components = comps
+	return factory
+}
+
+func (factory *MockClusterDefFactory) SetConnectionCredential(
+	connectionCredential map[string]string) *MockClusterDefFactory {
+	factory.ClusterDef.Spec.ConnectionCredential = connectionCredential
 	return factory
 }
 

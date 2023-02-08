@@ -1,0 +1,19 @@
+apiVersion: dbaas.kubeblocks.io/v1alpha1
+kind: ClusterVersion
+metadata:
+  name: ac-mysql-rep-{{ default .Chart.AppVersion .Values.clusterVersionOverride }}
+  labels:
+    {{- include "mysql.labels" . | nindent 4 }}
+spec:
+  clusterDefinitionRef: apecloud-mysql-rep
+  components:
+  - type: replication
+    podSpec:
+      initContainers:
+      - name: mysql-init-container   
+        image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
+        imagePullPolicy: {{ default .Values.image.pullPolicy "IfNotPresent" }}       
+      containers:
+      - name: mysql
+        image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
+        imagePullPolicy: {{ default .Values.image.pullPolicy "IfNotPresent" }}

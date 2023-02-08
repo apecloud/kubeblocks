@@ -909,18 +909,14 @@ var _ = Describe("Cluster Controller", func() {
 		})
 
 		Context("with pvc", func() {
-			When("horizontal scale the cluster from 1 to 3", func() {
-				It("should trigger a backup process(snapshot) and create pvcs from backup for newly created replicas", func() {
-					testHorizontalScale()
-				})
+			It("should trigger a backup process(snapshot) and create pvcs from backup for newly created replicas when horizontal scale the cluster from 1 to 3", func() {
+				testHorizontalScale()
 			})
 		})
 
 		Context("with pvc and dynamic-provisioning storage class", func() {
-			When("vertical scale the cluster", func() {
-				It("should update PVC request storage size accordingly", func() {
-					testVerticalScale()
-				})
+			It("should update PVC request storage size accordingly when vertical scale the cluster", func() {
+				testVerticalScale()
 			})
 		})
 	})
@@ -951,18 +947,14 @@ var _ = Describe("Cluster Controller", func() {
 		})
 
 		Context("with pvc", func() {
-			When("horizontal scale the cluster from 1 to 3", func() {
-				It("should trigger a backup process(snapshot) and create pvcs from backup for newly created replicas", func() {
-					testHorizontalScale()
-				})
+			It("should trigger a backup process(snapshot) and create pvcs from backup for newly created replicas when horizontal scale the cluster from 1 to 3", func() {
+				testHorizontalScale()
 			})
 		})
 
 		Context("with pvc and dynamic-provisioning storage class", func() {
-			When("vertical scale the cluster", func() {
-				It("should update PVC request storage size accordingly", func() {
-					testVerticalScale()
-				})
+			It("should update PVC request storage size accordingly when vertical scale the cluster", func() {
+				testVerticalScale()
 			})
 		})
 	})

@@ -158,11 +158,11 @@ func needSyncStatusComponents(cluster *dbaasv1alpha1.Cluster,
 		status.Components = map[string]dbaasv1alpha1.ClusterStatusComponent{}
 	}
 	if statusComponent, ok = status.Components[componentName]; !ok {
-		componentType := cluster.GetComponentTypeName(componentName)
 		// TODO is it ok to set component status phase as cluster status phase
-		status.Components[componentName] = dbaasv1alpha1.ClusterStatusComponent{Phase: cluster.Status.Phase,
-			PodsReady: &podsAreReady, PodsReadyTime: podsReadyTime,
-			Type: componentType,
+		status.Components[componentName] = dbaasv1alpha1.ClusterStatusComponent{
+			Phase:         cluster.Status.Phase,
+			PodsReady:     &podsAreReady,
+			PodsReadyTime: podsReadyTime,
 		}
 		return true, nil
 	}

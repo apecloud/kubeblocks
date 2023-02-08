@@ -195,10 +195,6 @@ type ComponentMessageMap map[string]string
 
 // ClusterStatusComponent record components status information
 type ClusterStatusComponent struct {
-	// type of component.
-	// +optional
-	Type string `json:"type,omitempty"`
-
 	// phase describes the phase of the Cluster. the detail information of phase is as follows:
 	// Failed: component is unavailable, i.e, all pods are not ready for Stateless/Stateful component;
 	// Leader/Primary pod is not ready for Consensus/Replication component.

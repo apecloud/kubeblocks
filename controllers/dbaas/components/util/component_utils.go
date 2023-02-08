@@ -158,10 +158,7 @@ func InitClusterComponentStatusIfNeed(cluster *dbaasv1alpha1.Cluster,
 		cluster.Status.Components = make(map[string]dbaasv1alpha1.ClusterStatusComponent)
 	}
 	if _, ok := cluster.Status.Components[componentName]; !ok {
-		typeName := cluster.GetComponentTypeName(componentName)
-
 		cluster.Status.Components[componentName] = dbaasv1alpha1.ClusterStatusComponent{
-			Type:  typeName,
 			Phase: cluster.Status.Phase,
 		}
 	}

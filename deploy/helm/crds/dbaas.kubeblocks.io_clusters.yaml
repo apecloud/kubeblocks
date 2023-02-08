@@ -742,9 +742,6 @@ spec:
                       required:
                       - primary
                       type: object
-                    type:
-                      description: type of component.
-                      type: string
                   type: object
                 description: components record the current status information of all
                   components of the cluster.

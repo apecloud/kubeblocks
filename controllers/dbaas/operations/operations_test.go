@@ -473,11 +473,9 @@ var _ = Describe("OpsRequest Controller", func() {
 				clusterObject.Status.Components = map[string]dbaasv1alpha1.ClusterStatusComponent{
 					consensusCompName: {
 						Phase: dbaasv1alpha1.RunningPhase,
-						Type:  "consensus",
 					},
 					statelessCompName: {
 						Phase: dbaasv1alpha1.RunningPhase,
-						Type:  "stateless",
 					},
 				}
 				clusterObject.Status.Operations = &dbaasv1alpha1.Operations{

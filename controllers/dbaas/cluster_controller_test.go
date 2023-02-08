@@ -52,8 +52,11 @@ var _ = Describe("Cluster Controller", func() {
 	const statefulCompName = "mysql"
 
 	const statelessCompType = "proxy"
+	// const statelessCompName = "nginx"
 
 	const dataVolumeName = "data"
+	// const logVolumeName = "log"
+	// const configVolumeName = "mysql-config"
 
 	const leader = "leader"
 	const follower = "follower"
@@ -74,10 +77,8 @@ var _ = Describe("Cluster Controller", func() {
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 		// namespaced
-		testdbaas.ClearResources(&testCtx, intctrlutil.ConfigMapSignature, inNS, ml)
 		testdbaas.ClearResources(&testCtx, intctrlutil.PodSignature, inNS, ml)
 		// non-namespaced
-		testdbaas.ClearResources(&testCtx, intctrlutil.ConfigConstraintSignature, ml)
 		testdbaas.ClearResources(&testCtx, intctrlutil.BackupPolicyTemplateSignature, ml)
 		testdbaas.ClearResources(&testCtx, intctrlutil.StorageClassSignature, ml)
 	}
@@ -613,7 +614,7 @@ var _ = Describe("Cluster Controller", func() {
 		return names
 	}
 
-	testThreeReplics := func() {
+	testThreeReplicas := func() {
 		const replicas = 3
 
 		By("Mock a cluster obj")
@@ -906,7 +907,7 @@ var _ = Describe("Cluster Controller", func() {
 		})
 
 		It("Should success with one leader pod and two follower pods", func() {
-			testThreeReplics()
+			testThreeReplicas()
 		})
 
 		It("should create/delete pods to match the desired replica number if updating cluster's replica number to a valid value", func() {

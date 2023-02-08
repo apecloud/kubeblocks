@@ -248,7 +248,7 @@ spec:
 			By("create cluster related resources")
 			createClusterDef()
 			createClusterVersion()
-			createCluster()
+			cluster := createCluster()
 
 			// wait for cluster's status to become stable so that it won't interfere with later tests
 			Eventually(testdbaas.CheckObj(&testCtx, client.ObjectKey{Name: clusterName, Namespace: namespace},
@@ -314,6 +314,29 @@ spec:
 			setInvolvedObject(event, intctrlutil.DeploymentKind, deploymentName)
 			createDeployment(statelessCompName, deploymentName)
 			handleAndCheckComponentStatus(statelessCompName, event, dbaasv1alpha1.FailedPhase, false, timeout)
+
+			By("test the cluster phase when component Failed/Abnormal in Running phase")
+			// mock cluster is running.
+			Expect(testdbaas.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(cluster), func(tmpCluster *dbaasv1alpha1.Cluster) {
+				tmpCluster.Status.Phase = dbaasv1alpha1.RunningPhase
+				for k := range tmpCluster.Status.Components {
+					statusComp := tmpCluster.Status.Components[k]
+					statusComp.Phase = dbaasv1alpha1.RunningPhase
+					tmpCluster.Status.Components[k] = statusComp
+				}
+			})()).Should(Succeed())
+
+			// set nginx component phase to Failed
+			Expect(testdbaas.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(cluster), func(tmpCluster *dbaasv1alpha1.Cluster) {
+				statusComp := tmpCluster.Status.Components[statelessCompName]
+				statusComp.Phase = dbaasv1alpha1.FailedPhase
+				tmpCluster.Status.Components[statelessCompName] = statusComp
+			})()).Should(Succeed())
+
+			// expect cluster phase is Abnormal by cluster controller.
+			Eventually(testdbaas.CheckObj(&testCtx, client.ObjectKeyFromObject(cluster), func(g Gomega, tmpCluster *dbaasv1alpha1.Cluster) {
+				g.Expect(tmpCluster.Status.Phase == dbaasv1alpha1.AbnormalPhase).Should(BeTrue())
+			})).Should(Succeed())
 		})
 	})
 

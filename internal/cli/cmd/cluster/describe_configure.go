@@ -115,7 +115,7 @@ var (
 )
 
 func (r *reconfigureOptions) addCommonFlags(cmd *cobra.Command) {
-	cmd.Flags().StringVar(&r.componentName, "component-name", "", " Specifies the name of Component to be describe (e.g. for apecloud-mysql: --component-name=mysql). If the cluster has only one component, unset the parameter.\"")
+	cmd.Flags().StringVar(&r.componentName, "component-name", "", "Specifies the name of Component to be describe (e.g. for apecloud-mysql: --component-name=mysql). If the cluster has only one component, unset the parameter.\"")
 	cmd.Flags().StringSliceVar(&r.templateNames, "template-names", nil, "Specifies the name of the configuration template to be describe. (e.g. for apecloud-mysql: --template-names=mysql-3node-tpl)")
 }
 
@@ -795,8 +795,8 @@ func NewDescribeReconfigureCmd(f cmdutil.Factory, streams genericclioptions.IOSt
 		},
 	}
 	o.addCommonFlags(cmd)
-	cmd.Flags().BoolVar(&o.showDetail, "show-detail", o.showDetail, " If true, the content of the files specified by configure-file will be printed.")
-	cmd.Flags().StringSliceVar(&o.keys, "configure-file", nil, " Specifies the name of the configuration file to be describe (e.g. for mysql: --configure-file=my.cnf). If unset, all files.")
+	cmd.Flags().BoolVar(&o.showDetail, "show-detail", o.showDetail, "If true, the content of the files specified by configure-file will be printed.")
+	cmd.Flags().StringSliceVar(&o.keys, "configure-file", nil, "Specifies the name of the configuration file to be describe (e.g. for mysql: --configure-file=my.cnf). If unset, all files.")
 	return cmd
 }
 
@@ -820,9 +820,9 @@ func NewExplainReconfigureCmd(f cmdutil.Factory, streams genericclioptions.IOStr
 		},
 	}
 	o.addCommonFlags(cmd)
-	cmd.Flags().BoolVar(&o.truncEnum, "trunc-enum", o.truncEnum, "When the value list length of the parameter is greater than 20, it will be truncated.\n")
-	cmd.Flags().BoolVar(&o.truncDocument, "trunc-document", o.truncDocument, "When the document length of the parameter is greater than 100, it will be truncated.")
-	cmd.Flags().StringVar(&o.paramName, "param", o.paramName, " Specifies the name of parameter to be query. It clearly display the details of the parameter.")
+	cmd.Flags().BoolVar(&o.truncEnum, "trunc-enum", o.truncEnum, "If the value list length of the parameter is greater than 20, it will be truncated.")
+	cmd.Flags().BoolVar(&o.truncDocument, "trunc-document", o.truncDocument, "If the document length of the parameter is greater than 100, it will be truncated.")
+	cmd.Flags().StringVar(&o.paramName, "param", o.paramName, "Specifies the name of parameter to be query. It clearly display the details of the parameter.")
 	return cmd
 }
 

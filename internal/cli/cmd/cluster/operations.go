@@ -452,7 +452,7 @@ func NewReconfigureCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *
 		o.buildCommonFlags(cmd)
 		cmd.Flags().StringSliceVar(&o.Parameters, "set", nil, "Specify updated parameter list. For details about the parameters, refer to kbcli sub command: 'kbcli cluster describe-configure'.")
 		cmd.Flags().StringSliceVar(&o.ComponentNames, "component-name", nil, "Specifies the name of Component to be updated. If the cluster has only one component, unset the parameter.")
-		cmd.Flags().StringVar(&o.CfgTemplateName, "template-name", "", "Specifies the name of the configuration template to be updated (e.g. for apecloud-mysql: --template-name=mysql-3node-tpl). What templates or configure files are available for this cluster can refer to kbcli sub command: 'kbcli cluster describe-configure'. \n")
+		cmd.Flags().StringVar(&o.CfgTemplateName, "template-name", "", "Specifies the name of the configuration template to be updated (e.g. for apecloud-mysql: --template-name=mysql-3node-tpl). What templates or configure files are available for this cluster can refer to kbcli sub command: 'kbcli cluster describe-configure'.")
 		cmd.Flags().StringVar(&o.CfgFile, "configure-file", "", "Specifies the name of the configuration file to be updated (e.g. for mysql: --configure-file=my.cnf). What templates or configure files are available for this cluster can refer to kbcli sub command: 'kbcli cluster describe-configure'.")
 	}
 	inputs.Complete = o.fillComponentNameForReconfiguring

@@ -377,7 +377,7 @@ func NewUpgradeCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 
 var verticalScalingExample = templates.Examples(`
 		# scale the computing resources of specified components, separate with commas when <component-name> more than one
-		kbcli cluster vertical-scale <my-cluster> --component-names=<component-name> --requests.cpu=500m \
+		kbcli cluster vscale <my-cluster> --component-names=<component-name> --requests.cpu=500m \
         --requests.memory=500Mi --limits.cpu=500m --limits.memory=500Mi
 `)
 
@@ -385,8 +385,8 @@ var verticalScalingExample = templates.Examples(`
 func NewVerticalScalingCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := newBaseOperationsOptions(streams, dbaasv1alpha1.VerticalScalingType)
 	inputs := buildOperationsInputs(f, o)
-	inputs.Use = "vertical-scale"
-	inputs.Short = "Vertical scale the specified components in the cluster"
+	inputs.Use = "vscale"
+	inputs.Short = "Vertically scale the specified components in the cluster"
 	inputs.Example = verticalScalingExample
 	inputs.BuildFlags = func(cmd *cobra.Command) {
 		o.buildCommonFlags(cmd)
@@ -400,15 +400,15 @@ func NewVerticalScalingCmd(f cmdutil.Factory, streams genericclioptions.IOStream
 
 var horizontalScalingExample = templates.Examples(`
 		# expand storage resources of specified components, separate with commas when <component-name> more than one
-		kbcli cluster horizontal-scale <my-cluster> --component-names=<component-name> --replicas=3
+		kbcli cluster hscale <my-cluster> --component-names=<component-name> --replicas=3
 `)
 
 // NewHorizontalScalingCmd create a horizontal scaling command
 func NewHorizontalScalingCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := newBaseOperationsOptions(streams, dbaasv1alpha1.HorizontalScalingType)
 	inputs := buildOperationsInputs(f, o)
-	inputs.Use = "horizontal-scale"
-	inputs.Short = "Horizontal scale the specified components in the cluster"
+	inputs.Use = "hscale"
+	inputs.Short = "Horizontally scale the specified components in the cluster"
 	inputs.Example = horizontalScalingExample
 	inputs.BuildFlags = func(cmd *cobra.Command) {
 		o.buildCommonFlags(cmd)

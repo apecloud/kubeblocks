@@ -18,6 +18,7 @@ package dbaas
 
 import (
 	"fmt"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"reflect"
 	"strconv"
 
@@ -30,7 +31,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
@@ -99,6 +99,129 @@ var _ = Describe("Cluster Controller", func() {
 	)
 
 	// Test cases
+
+	checkAllResourcesCreated := func() {
+		By("Creating a cluster")
+		clusterObj = testdbaas.NewClusterFactory(&testCtx, clusterNamePrefix,
+			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().Create().GetCluster()
+		clusterKey = client.ObjectKeyFromObject(clusterObj)
+
+		By("Waiting for the cluster initialized")
+		Eventually(testdbaas.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
+
+		By("Check deployment workload has been created")
+		Eventually(testdbaas.GetListLen(&testCtx, intctrlutil.DeploymentSignature,
+			client.MatchingLabels{
+				intctrlutil.AppInstanceLabelKey: clusterKey.Name,
+			}, client.InNamespace(clusterKey.Namespace))).ShouldNot(Equal(0))
+
+		stsList := testk8s.ListAndCheckStatefulSet(&testCtx, clusterKey)
+
+		By("Check statefulset pod's volumes")
+		for _, sts := range stsList.Items {
+			podSpec := sts.Spec.Template
+			volumeNames := map[string]struct{}{}
+			for _, v := range podSpec.Spec.Volumes {
+				volumeNames[v.Name] = struct{}{}
+			}
+
+			for _, cc := range [][]corev1.Container{
+				podSpec.Spec.Containers,
+				podSpec.Spec.InitContainers,
+			} {
+				for _, c := range cc {
+					for _, vm := range c.VolumeMounts {
+						_, ok := volumeNames[vm.Name]
+						Expect(ok).Should(BeTrue())
+					}
+				}
+			}
+		}
+
+		By("Check associated PDB has been created")
+		Eventually(testdbaas.GetListLen(&testCtx, intctrlutil.PodDisruptionBudgetSignature,
+			client.MatchingLabels{
+				intctrlutil.AppInstanceLabelKey: clusterKey.Name,
+			}, client.InNamespace(clusterKey.Namespace))).Should(Equal(0))
+
+		By("Check created sts pods template without tolerations")
+		Expect(len(stsList.Items[0].Spec.Template.Spec.Tolerations) == 0).Should(BeTrue())
+
+		By("Checking the Affinity and the TopologySpreadConstraints")
+		podSpec := stsList.Items[0].Spec.Template.Spec
+		Expect(podSpec.Affinity).Should(BeNil())
+		Expect(len(podSpec.TopologySpreadConstraints) == 0).Should(BeTrue())
+
+		By("Check should create env configmap")
+		Eventually(testdbaas.GetListLen(&testCtx, intctrlutil.ConfigMapSignature,
+			client.MatchingLabels{
+				intctrlutil.AppInstanceLabelKey:   clusterKey.Name,
+				intctrlutil.AppConfigTypeLabelKey: "kubeblocks-env",
+			}, client.InNamespace(clusterKey.Namespace))).Should(Equal(2))
+	}
+
+	checkAllServicesCreate := func() {
+		By("Creating a cluster")
+		clusterObj = testdbaas.NewClusterFactory(&testCtx, clusterNamePrefix,
+			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().Create().GetCluster()
+		clusterKey = client.ObjectKeyFromObject(clusterObj)
+
+		By("Waiting for the cluster initialized")
+		Eventually(testdbaas.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
+
+		By("Checking proxy should have external ClusterIP service")
+		svcList1 := &corev1.ServiceList{}
+		Expect(k8sClient.List(testCtx.Ctx, svcList1, client.MatchingLabels{
+			intctrlutil.AppInstanceLabelKey:  clusterKey.Name,
+			intctrlutil.AppComponentLabelKey: statelessCompType,
+		}, client.InNamespace(clusterKey.Namespace))).Should(Succeed())
+		// TODO fix me later, proxy should not have internal headless service
+		// Expect(len(svcList1.Items) == 1).Should(BeTrue())
+		Expect(len(svcList1.Items) > 0).Should(BeTrue())
+		var existsExternalClusterIP bool
+		for _, svc := range svcList1.Items {
+			Expect(svc.Spec.Type == corev1.ServiceTypeClusterIP).To(BeTrue())
+			if svc.Spec.ClusterIP == corev1.ClusterIPNone {
+				continue
+			}
+			existsExternalClusterIP = true
+		}
+		Expect(existsExternalClusterIP).To(BeTrue())
+
+		By("Checking replicasets should have internal headless service")
+		getHeadlessSvcPorts := func(typeName string) []corev1.ServicePort {
+			fetched := &dbaasv1alpha1.Cluster{}
+			Expect(k8sClient.Get(testCtx.Ctx, clusterKey, fetched)).To(Succeed())
+
+			comp, err := util.GetComponentDefByCluster(testCtx.Ctx, k8sClient, fetched, typeName)
+			Expect(err).ShouldNot(HaveOccurred())
+
+			var headlessSvcPorts []corev1.ServicePort
+			for _, container := range comp.PodSpec.Containers {
+				for _, port := range container.Ports {
+					// be consistent with headless_service_template.cue
+					headlessSvcPorts = append(headlessSvcPorts, corev1.ServicePort{
+						Name:       port.Name,
+						Protocol:   port.Protocol,
+						Port:       port.ContainerPort,
+						TargetPort: intstr.FromString(port.Name),
+					})
+				}
+			}
+			return headlessSvcPorts
+		}
+
+		svcList2 := &corev1.ServiceList{}
+		Expect(k8sClient.List(testCtx.Ctx, svcList2, client.MatchingLabels{
+			intctrlutil.AppInstanceLabelKey:  clusterKey.Name,
+			intctrlutil.AppComponentLabelKey: statefulCompType,
+		}, client.InNamespace(clusterKey.Namespace))).Should(Succeed())
+		Expect(len(svcList2.Items) == 1).Should(BeTrue())
+		Expect(svcList2.Items[0].Spec.Type == corev1.ServiceTypeClusterIP).To(BeTrue())
+		Expect(svcList2.Items[0].Spec.ClusterIP == corev1.ClusterIPNone).To(BeTrue())
+		Expect(reflect.DeepEqual(svcList2.Items[0].Spec.Ports,
+			getHeadlessSvcPorts(statefulCompType))).Should(BeTrue())
+	}
 
 	testWipeOut := func() {
 		By("Creating a cluster")
@@ -382,7 +505,7 @@ var _ = Describe("Cluster Controller", func() {
 		Expect(*sts.Spec.Replicas == replicas).Should(BeTrue())
 
 		By("Mock PVCs in Bound Status")
-		for i := 0; i < int(replicas); i++ {
+		for i := 0; i < replicas; i++ {
 			pvc := &corev1.PersistentVolumeClaim{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      getPVCName(i),
@@ -721,121 +844,14 @@ var _ = Describe("Cluster Controller", func() {
 				AddComponent(statefulCompType).AddContainerShort("mysql", testdbaas.ApeCloudMySQLImage).
 				AddComponent(statelessCompType).AddContainerShort("nginx", testdbaas.NginxImage).
 				Create().GetClusterVersion()
-
-			By("Creating a cluster")
-			clusterObj = testdbaas.NewClusterFactory(&testCtx, clusterNamePrefix,
-				clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().Create().GetCluster()
-			clusterKey = client.ObjectKeyFromObject(clusterObj)
-
-			By("Waiting for the cluster initialized")
-			Eventually(testdbaas.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
 		})
 
-		It("should create cluster and all sub-resources successfully", func() {
-			By("Check deployment workload has been created")
-			Eventually(testdbaas.GetListLen(&testCtx, intctrlutil.DeploymentSignature,
-				client.MatchingLabels{
-					intctrlutil.AppInstanceLabelKey: clusterKey.Name,
-				}, client.InNamespace(clusterKey.Namespace))).ShouldNot(Equal(0))
-
-			stsList := testk8s.ListAndCheckStatefulSet(&testCtx, clusterKey)
-
-			By("Check statefulset pod's volumes")
-			for _, sts := range stsList.Items {
-				podSpec := sts.Spec.Template
-				volumeNames := map[string]struct{}{}
-				for _, v := range podSpec.Spec.Volumes {
-					volumeNames[v.Name] = struct{}{}
-				}
-
-				for _, cc := range [][]corev1.Container{
-					podSpec.Spec.Containers,
-					podSpec.Spec.InitContainers,
-				} {
-					for _, c := range cc {
-						for _, vm := range c.VolumeMounts {
-							_, ok := volumeNames[vm.Name]
-							Expect(ok).Should(BeTrue())
-						}
-					}
-				}
-			}
-
-			By("Check associated PDB has been created")
-			Eventually(testdbaas.GetListLen(&testCtx, intctrlutil.PodDisruptionBudgetSignature,
-				client.MatchingLabels{
-					intctrlutil.AppInstanceLabelKey: clusterKey.Name,
-				}, client.InNamespace(clusterKey.Namespace))).Should(Equal(0))
-
-			By("Check created sts pods template without tolerations")
-			Expect(len(stsList.Items[0].Spec.Template.Spec.Tolerations) == 0).Should(BeTrue())
-
-			By("Checking the Affinity and the TopologySpreadConstraints")
-			podSpec := stsList.Items[0].Spec.Template.Spec
-			Expect(podSpec.Affinity).Should(BeNil())
-			Expect(len(podSpec.TopologySpreadConstraints) == 0).Should(BeTrue())
-
-			By("Check should create env configmap")
-			Eventually(testdbaas.GetListLen(&testCtx, intctrlutil.ConfigMapSignature,
-				client.MatchingLabels{
-					intctrlutil.AppInstanceLabelKey:   clusterKey.Name,
-					intctrlutil.AppConfigTypeLabelKey: "kubeblocks-env",
-				}, client.InNamespace(clusterKey.Namespace))).Should(Equal(2))
+		It("should create all sub-resources successfully", func() {
+			checkAllResourcesCreated()
 		})
 
 		It("should create corresponding services correctly", func() {
-			By("Checking proxy should have external ClusterIP service")
-			svcList1 := &corev1.ServiceList{}
-			Expect(k8sClient.List(testCtx.Ctx, svcList1, client.MatchingLabels{
-				intctrlutil.AppInstanceLabelKey:  clusterKey.Name,
-				intctrlutil.AppComponentLabelKey: statelessCompType,
-			}, client.InNamespace(clusterKey.Namespace))).Should(Succeed())
-			// TODO fix me later, proxy should not have internal headless service
-			// Expect(len(svcList1.Items) == 1).Should(BeTrue())
-			Expect(len(svcList1.Items) > 0).Should(BeTrue())
-			var existsExternalClusterIP bool
-			for _, svc := range svcList1.Items {
-				Expect(svc.Spec.Type == corev1.ServiceTypeClusterIP).To(BeTrue())
-				if svc.Spec.ClusterIP == corev1.ClusterIPNone {
-					continue
-				}
-				existsExternalClusterIP = true
-			}
-			Expect(existsExternalClusterIP).To(BeTrue())
-
-			By("Checking replicasets should have internal headless service")
-			getHeadlessSvcPorts := func(typeName string) []corev1.ServicePort {
-				fetched := &dbaasv1alpha1.Cluster{}
-				Expect(k8sClient.Get(testCtx.Ctx, clusterKey, fetched)).To(Succeed())
-
-				comp, err := util.GetComponentDefByCluster(testCtx.Ctx, k8sClient, fetched, typeName)
-				Expect(err).ShouldNot(HaveOccurred())
-
-				var headlessSvcPorts []corev1.ServicePort
-				for _, container := range comp.PodSpec.Containers {
-					for _, port := range container.Ports {
-						// be consistent with headless_service_template.cue
-						headlessSvcPorts = append(headlessSvcPorts, corev1.ServicePort{
-							Name:       port.Name,
-							Protocol:   port.Protocol,
-							Port:       port.ContainerPort,
-							TargetPort: intstr.FromString(port.Name),
-						})
-					}
-				}
-				return headlessSvcPorts
-			}
-
-			svcList2 := &corev1.ServiceList{}
-			Expect(k8sClient.List(testCtx.Ctx, svcList2, client.MatchingLabels{
-				intctrlutil.AppInstanceLabelKey:  clusterKey.Name,
-				intctrlutil.AppComponentLabelKey: statefulCompType,
-			}, client.InNamespace(clusterKey.Namespace))).Should(Succeed())
-			Expect(len(svcList2.Items) == 1).Should(BeTrue())
-			Expect(svcList2.Items[0].Spec.Type == corev1.ServiceTypeClusterIP).To(BeTrue())
-			Expect(svcList2.Items[0].Spec.ClusterIP == corev1.ClusterIPNone).To(BeTrue())
-			Expect(reflect.DeepEqual(svcList2.Items[0].Spec.Ports,
-				getHeadlessSvcPorts(statefulCompType))).Should(BeTrue())
+			checkAllServicesCreate()
 		})
 	})
 
@@ -868,28 +884,44 @@ var _ = Describe("Cluster Controller", func() {
 			testChangeReplicasInvalidValue()
 		})
 
-		It("should create pod with cluster affinity when creating cluster with cluster affinity set", func() {
-			testClusterAffinity()
+		Context("and with cluster affinity set", func() {
+			It("should create pod with cluster affinity", func() {
+				testClusterAffinity()
+			})
 		})
 
-		It("Should observe the component affinity will override the cluster affinity when creating cluster with both cluster affinity and component affinity set", func() {
-			testComponentAffinity()
+		Context("and with both cluster affinity and component affinity set", func() {
+			It("Should observe the component affinity will override the cluster affinity", func() {
+				testComponentAffinity()
+			})
 		})
 
-		It("Should create pods with cluster tolerations when creating cluster with cluster tolerations set", func() {
-			testClusterToleration()
+		Context("and with cluster tolerations set", func() {
+			It("Should create pods with cluster tolerations", func() {
+				testClusterToleration()
+			})
 		})
 
-		It("Should observe the component tolerations will override the cluster tolerations when creating cluster with both cluster tolerations and component tolerations set", func() {
-			testComponentToleration()
+		Context("and with both cluster tolerations and component tolerations set", func() {
+			It("Should observe the component tolerations will override the cluster tolerations", func() {
+				testComponentToleration()
+			})
 		})
 
-		It("should trigger a backup process(snapshot) and create pvcs from backup for newly created replicas when horizontal scale the cluster from 1 to 3", func() {
-			testHorizontalScale()
+		Context("with pvc", func() {
+			When("horizontal scale the cluster from 1 to 3", func() {
+				It("should trigger a backup process(snapshot) and create pvcs from backup for newly created replicas", func() {
+					testHorizontalScale()
+				})
+			})
 		})
 
-		It("should update PVC request storage size accordingly when vertical scale the cluster", func() {
-			testVerticalScale()
+		Context("with pvc and dynamic-provisioning storage class", func() {
+			When("vertical scale the cluster", func() {
+				It("should update PVC request storage size accordingly", func() {
+					testVerticalScale()
+				})
+			})
 		})
 	})
 
@@ -918,12 +950,20 @@ var _ = Describe("Cluster Controller", func() {
 			testChangeReplicasInvalidValue()
 		})
 
-		It("should trigger a backup process(snapshot) and create pvcs from backup for newly created replicas when horizontal scale the cluster from 1 to 3", func() {
-			testHorizontalScale()
+		Context("with pvc", func() {
+			When("horizontal scale the cluster from 1 to 3", func() {
+				It("should trigger a backup process(snapshot) and create pvcs from backup for newly created replicas", func() {
+					testHorizontalScale()
+				})
+			})
 		})
 
-		It("should update PVC request storage size accordingly when vertical scale the cluster", func() {
-			testVerticalScale()
+		Context("with pvc and dynamic-provisioning storage class", func() {
+			When("vertical scale the cluster", func() {
+				It("should update PVC request storage size accordingly", func() {
+					testVerticalScale()
+				})
+			})
 		})
 	})
 })

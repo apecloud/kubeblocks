@@ -58,11 +58,11 @@ func (o *versionOptions) Complete(f cmdutil.Factory) error {
 
 func (o *versionOptions) Run() {
 	versionInfo, _ := util.GetVersionInfo(o.client)
-	if v, ok := versionInfo[util.KubeBlocksApp]; ok {
-		fmt.Printf("KubeBlocks: %s\n", v)
-	}
-	if v, ok := versionInfo[util.KubernetesApp]; ok {
+	if v := versionInfo[util.KubernetesApp]; len(v) > 0 {
 		fmt.Printf("Kubernetes: %s\n", v)
+	}
+	if v := versionInfo[util.KubeBlocksApp]; len(v) > 0 {
+		fmt.Printf("KubeBlocks: %s\n", v)
 	}
 	fmt.Printf("kbcli: %s\n", versionInfo[util.KBCLIApp])
 	if o.verbose {

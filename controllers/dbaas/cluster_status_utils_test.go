@@ -338,6 +338,64 @@ spec:
 				g.Expect(tmpCluster.Status.Phase == dbaasv1alpha1.AbnormalPhase).Should(BeTrue())
 			})).Should(Succeed())
 		})
+
+		It("test the consistency of status.components and spec.components", func() {
+			By("create cluster related resources")
+			createClusterDef()
+			createClusterVersion()
+			cluster := createCluster()
+			Eventually(testdbaas.CheckObj(&testCtx, client.ObjectKeyFromObject(cluster), func(g Gomega, tmpCluster *dbaasv1alpha1.Cluster) {
+				g.Expect(tmpCluster.Generation == tmpCluster.Status.ObservedGeneration).Should(BeTrue())
+				g.Expect(len(tmpCluster.Spec.Components) == len(tmpCluster.Status.Components)).Should(BeTrue())
+			})).Should(Succeed())
+
+			changeAndCheckComponents := func(changeFunc func(), expectObservedGeneration int64, checkFun func(Gomega, *dbaasv1alpha1.Cluster)) {
+				Expect(testdbaas.ChangeObj(&testCtx, cluster, func() {
+					changeFunc()
+				})).Should(Succeed())
+
+				Expect(testdbaas.ChangeObjStatus(&testCtx, cluster, func() {
+					cluster.Status.ObservedGeneration = expectObservedGeneration
+				})).Should(Succeed())
+
+				Eventually(testdbaas.CheckObj(&testCtx, client.ObjectKeyFromObject(cluster), checkFun)).Should(Succeed())
+
+			}
+
+			By("delete consensus component")
+			consensusClusterComponent := cluster.Spec.Components[2]
+			changeAndCheckComponents(
+				func() {
+					cluster.Spec.Components = cluster.Spec.Components[:2]
+				}, 2,
+				func(g Gomega, tmpCluster *dbaasv1alpha1.Cluster) {
+					g.Expect(len(tmpCluster.Status.Components) == 2).Should(BeTrue())
+				})
+
+			// TODO check when delete and add the same component, wait for deleting related workloads when delete component in lifecycle.
+			By("add consensus component")
+			consensusClusterComponent.Name = "consensus1"
+			changeAndCheckComponents(
+				func() {
+					cluster.Spec.Components = append(cluster.Spec.Components, consensusClusterComponent)
+				}, 3,
+				func(g Gomega, tmpCluster *dbaasv1alpha1.Cluster) {
+					_, isExist := tmpCluster.Status.Components[consensusClusterComponent.Name]
+					g.Expect(len(tmpCluster.Status.Components) == 3 && isExist).Should(BeTrue())
+				})
+
+			By("modify consensus component name")
+			modifyConsensusName := "consensus2"
+			changeAndCheckComponents(
+				func() {
+					cluster.Spec.Components[2].Name = modifyConsensusName
+				}, 4,
+				func(g Gomega, tmpCluster *dbaasv1alpha1.Cluster) {
+					_, isExist := tmpCluster.Status.Components[modifyConsensusName]
+					g.Expect(isExist).Should(BeTrue())
+				})
+
+		})
 	})
 
 })

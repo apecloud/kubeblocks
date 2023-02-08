@@ -38,7 +38,12 @@ func MockStatelessComponentDeploy(testCtx testutil.TestContext, clusterName, com
 }
 
 // MockStatelessPod mocks the pods of the deployment workload.
-func MockStatelessPod(testCtx testutil.TestContext, clusterName, componentName, podName string) *corev1.Pod {
+func MockStatelessPod(testCtx testutil.TestContext, deploy *appsv1.Deployment, clusterName, componentName, podName string) *corev1.Pod {
+	if deploy == nil {
+		deploy = &appsv1.Deployment{}
+		deploy.Name = "NotFound"
+		deploy.UID = "7d43843d-7015-428b-a36b-972ca4b9509c"
+	}
 	return CreateCustomizedObj(&testCtx, "stateless/deployment_pod.yaml", &corev1.Pod{},
-		CustomizeObjYAML(podName, componentName, clusterName))
+		CustomizeObjYAML(podName, componentName, clusterName, deploy.Name, deploy.UID))
 }

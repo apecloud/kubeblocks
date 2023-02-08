@@ -99,7 +99,7 @@ func (consensusSet *ConsensusSet) HandleProbeTimeoutWhenPodsReady(recorder recor
 		needPatch  bool
 		isFailed   = true
 	)
-
+	patch := client.MergeFrom(cluster.DeepCopy())
 	for _, pod := range podList.Items {
 		role := pod.Labels[intctrlutil.RoleLabelKey]
 		if role == consensusSet.ComponentDef.ConsensusSpec.Leader.Name {
@@ -113,11 +113,11 @@ func (consensusSet *ConsensusSet) HandleProbeTimeoutWhenPodsReady(recorder recor
 			statusComponent.Message.SetObjectMessage(pod.Kind, pod.Name, "Role probe timeout, check whether the application is available")
 			needPatch = true
 		}
+		// TODO clear up the message of ready pod in component.message.
 	}
 	if !needPatch {
 		return true, nil
 	}
-	patch := client.MergeFrom(cluster.DeepCopy())
 	if isFailed {
 		statusComponent.Phase = dbaasv1alpha1.FailedPhase
 	} else if isAbnormal {
@@ -125,7 +125,7 @@ func (consensusSet *ConsensusSet) HandleProbeTimeoutWhenPodsReady(recorder recor
 	}
 	cluster.Status.Components[componentName] = statusComponent
 	if err = consensusSet.Cli.Status().Patch(consensusSet.Ctx, cluster, patch); err != nil {
-		return true, err
+		return false, err
 	}
 	if recorder != nil {
 		recorder.Eventf(cluster, corev1.EventTypeWarning, types.RoleProbeTimeoutReason, "pod role detection timed out in Component: "+consensusSet.Component.Name)

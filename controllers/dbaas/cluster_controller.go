@@ -720,8 +720,16 @@ func (r *ClusterReconciler) reconcileClusterStatus(ctx context.Context,
 			return
 		}
 		componentMap, clusterAvailabilityEffectMap, _ := getComponentRelatedInfo(cluster, clusterDef, "")
+		oldClusterPhase := cluster.Status.Phase
 		handleClusterAbnormalOrFailedPhase(cluster, componentMap, clusterAvailabilityEffectMap)
-		return true, nil
+		return true, func(cluster *dbaasv1alpha1.Cluster) error {
+			currPhase := cluster.Status.Phase
+			if oldClusterPhase != currPhase && util.IsFailedOrAbnormal(currPhase) {
+				// send a warning event when Cluster.status.phase changes to Failed/Abnormal
+				r.Recorder.Eventf(cluster, corev1.EventTypeWarning, string(currPhase), "Cluster: %s is %s, check according to the components message", cluster.Name, currPhase)
+			}
+			return nil
+		}
 	}
 
 	// handle the Cluster.status when cluster is Running.
@@ -729,11 +737,14 @@ func (r *ClusterReconciler) reconcileClusterStatus(ctx context.Context,
 		if !clusterIsRunning {
 			return
 		}
+		oldClusterPhase := cluster.Status.Phase
 		cluster.Status.Phase = dbaasv1alpha1.RunningPhase
 		cluster.SetStatusCondition(newClusterReadyCondition(cluster.Name))
 		return true, func(cluster *dbaasv1alpha1.Cluster) error {
-			// send an event when Cluster.status.phase change to Running
-			r.Recorder.Eventf(cluster, corev1.EventTypeNormal, string(dbaasv1alpha1.RunningPhase), "Cluster: %s is ready, current phase is Running.", cluster.Name)
+			if oldClusterPhase != dbaasv1alpha1.RunningPhase {
+				// send an event when Cluster.status.phase changes to Running
+				r.Recorder.Eventf(cluster, corev1.EventTypeNormal, string(dbaasv1alpha1.RunningPhase), "Cluster: %s is ready, current phase is Running.", cluster.Name)
+			}
 			// when cluster phase changes to Running, need to mark OpsRequest annotation to reconcile for running OpsRequest.
 			return opsutil.MarkRunningOpsRequestAnnotation(ctx, r.Client, cluster)
 		}

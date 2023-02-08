@@ -256,7 +256,7 @@ func IsReady(pod *corev1.Pod) bool {
 		return false
 	}
 
-	condition := getPodCondition(&pod.Status, corev1.PodReady)
+	condition := GetPodCondition(&pod.Status, corev1.PodReady)
 	return condition != nil && condition.Status == corev1.ConditionTrue
 }
 
@@ -265,7 +265,7 @@ func IsAvailable(pod *corev1.Pod, minReadySeconds int32) bool {
 		return false
 	}
 
-	condition := getPodCondition(&pod.Status, corev1.PodReady)
+	condition := GetPodCondition(&pod.Status, corev1.PodReady)
 	if condition == nil || condition.Status != corev1.ConditionTrue {
 		return false
 	}
@@ -282,7 +282,7 @@ func IsAvailable(pod *corev1.Pod, minReadySeconds int32) bool {
 	return !lastTransitionTime.IsZero() && lastTransitionTime.Add(minDuration).Before(now.Time)
 }
 
-func getPodCondition(status *corev1.PodStatus, conditionType corev1.PodConditionType) *corev1.PodCondition {
+func GetPodCondition(status *corev1.PodStatus, conditionType corev1.PodConditionType) *corev1.PodCondition {
 	if len(status.Conditions) == 0 {
 		return nil
 	}

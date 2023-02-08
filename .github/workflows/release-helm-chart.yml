@@ -10,6 +10,7 @@ env:
   CHART_RELEASER_VERSION: "v1.4.1"
   RELEASE_VERSION: ${{ github.ref_name }}
   K3S_VERSION: v1.22
+  GITLAB_HELM_CHARTS_PROJECT_ID: 85949
 
 jobs:
   release:
@@ -88,3 +89,14 @@ jobs:
           args=(--owner "apecloud" --repo "helm-charts" --version ${{ env.CHART_RELEASER_VERSION }})
           "${{ github.workspace }}/.github/utils/helm_release.sh" "${args[@]}"
         shell: bash
+
+      - name: Upload Kubeblocks Helm Charts to Gitlab
+        continue-on-error: true
+        run: |
+          RELEASE_VERSION=`bash ${{ github.workspace }}/.github/utils/utils.sh ${{ env.RELEASE_VERSION }} 1`
+          bash ${{ github.workspace }}/.github/utils/release-gitlab.sh \
+            --type 3 \
+            --project-id ${{ env.GITLAB_HELM_CHARTS_PROJECT_ID }} \
+            --asset-path kubeblocks-$RELEASE_VERSION.tgz \
+            --access-token ${{ secrets.GITLAB_ACCESS_TOKEN }} \
+            --access-user ${{ secrets.GITLAB_ACCESS_USER }}

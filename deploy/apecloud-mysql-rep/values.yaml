@@ -1,0 +1,66 @@
+# Default values for apecloud-mysql-rep.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+image:
+  registry: 
+  repository: docker.io/apecloud/apecloud-mysql-server
+  pullPolicy: IfNotPresent
+  # Overrides the image tag whose default is the chart appVersion.
+  tag: 8.0.30-5.alpha2.20230105.gd6b8719.1
+
+## MySQL Authentication parameters
+auth:
+  ## MYSQL_ROOT_HOST
+  rootHost: "%"
+  ## @param auth.createDatabase Whether to create the .Values.auth.database or not
+  ##
+  createDatabase: true
+  ## @param auth.database Name for a custom database to create
+  ## MYSQL_DATABASE
+  database: "mydb"
+  ## @param auth.username Name for a custom user to create
+  ## MYSQL_USER
+  username: "u1"
+  ## MYSQL_PASSWORD
+  password: "u1"
+  ## @param auth.replicationUser MySQL replication user
+  ##
+  replicationUser: "replicator"
+  ## @param auth.replicationPassword MySQL replication user password. Ignored if existing secret is provided
+  ##
+  replicationPassword: ""
+  
+## @section Mysql&reg; Primary configuration parameters
+primary:
+  ## @param config template name
+  ## name: mysql-primary-config-8.0.31
+  configTemplate:
+    ## @param config template context
+    configuration: |-
+      [mysqld]
+      log-bin
+      gtid_mode=ON
+      enforce-gtid-consistency=true
+
+## @section Mysql&reg; Secondary configuration parameters
+secondary:
+  ## @param config template name
+  ## name: mysql-secondary-config-8.0.31
+  configTemplate:
+    ## @param config template context
+    configuration: |-
+      [mysqld]
+      super-read-only
+      gtid_mode=ON
+      enforce-gtid-consistency=true
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+clusterVersionOverride: ""
+
+logConfigs:
+  error: /data/mysql/log/mysqld-error.log
+  slow: /data/mysql/log/mysqld-slowquery.log
+  general: /data/mysql/log/mysqld.log

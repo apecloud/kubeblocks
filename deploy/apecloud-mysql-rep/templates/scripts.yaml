@@ -1,0 +1,37 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mysql-scripts
+data:
+  init.sh: |
+    #!/bin/sh
+    set -ex
+    echo [mysqld] > /etc/mysql/conf.d/server-id.cnf
+    [[ $KB_POD_NAME =~ -([0-9]+)-([0-9]+)$ ]] || exit 1
+    ordinal=${BASH_REMATCH[1]}
+    echo server-id=$((100 + $ordinal)) >> /etc/mysql/conf.d/server-id.cnf
+    PRIMARY_ROLE=primary
+    KB_ROLE_NAME=`cat /opt/conf/role/labels`
+    if [ $KB_ROLE_NAME = "$PRIMARY_ROLE" ]; then
+      cp /opt/mnt/primary/mysql.cnf /etc/mysql/conf.d
+    else
+      cp /opt/mnt/secondary/mysql.cnf /etc/mysql/conf.d
+    fi
+  setup.sh: |
+    #!/bin/sh
+    set -ex
+    SECONDARY_ROLE=secondary
+    KB_ROLE_NAME=`cat /opt/conf/role/labels`
+    if [ $KB_ROLE_NAME = "$SECONDARY_ROLE" ]; then
+      if [ ! -z $MYSQL_ROOT_PASSWORD ]; then
+        password_flag="-p$MYSQL_ROOT_PASSWORD"
+      fi
+      echo "Checking if replication master is ready to accept connection"
+      #until mysql -h $KB_PRIMARY_POD_NAME -P3306 -uroot  $password_flag -e "SELECT 1"; do sleep 1; done
+      echo "Replication master ready!"
+      echo "Setting the master configuration"
+      mysql -e "CHANGE MASTER TO MASTER_HOST='$KB_PRIMARY_POD_NAME',MASTER_PORT=3306,MASTER_USER='root',MASTER_PASSWORD='$MYSQL_ROOT_PASSWORD',master_auto_position=1,MASTER_CONNECT_RETRY=10;START SLAVE;"
+    else
+      echo "primary instance skip create a replication relationship."
+      exit 0
+    

@@ -1,0 +1,198 @@
+apiVersion: dbaas.kubeblocks.io/v1alpha1
+kind: ClusterDefinition
+metadata:
+  name: apecloud-mysql-rep
+  labels:
+    {{- include "mysql.labels" . | nindent 4 }}
+spec:
+  type: state.mysql
+  connectionCredential:
+    username: root
+    password: "$(RANDOM_PASSWD)"
+  components:
+    - typeName: replication
+      componentType: Replication
+      defaultReplicas: 2
+      minReplicas: 1
+      maxReplicas: 16
+      service:
+        ports:
+          - protocol: TCP
+            port: 3306
+      configSpec:
+        configTemplateRefs:
+          - name: mysql-primary-config
+            configTplRef: mysql-primary-config-8.0.31
+            namespace: {{ .Release.Namespace }}
+            volumeName: primary
+          - name: mysql-secondary-config
+            configTplRef: mysql-secondary-config-8.0.31
+            namespace: {{ .Release.Namespace }}
+            volumeName: secondary
+          - name: mysql-scripts
+            configTplRef: mysql-scripts
+            namespace: {{ .Release.Namespace }}
+            volumeName: scripts
+            defaultMode: 493
+      monitor:
+        builtIn: false
+        exporterConfig:
+          scrapePort: 9104
+          scrapePath: "/metrics"
+      podSpec:
+        initContainers:
+          - name: mysql-init-container
+            image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
+            imagePullPolicy: {{ default .Values.image.pullPolicy "IfNotPresent" }}              
+            command: ["/scripts/init.sh"]
+            volumeMounts:
+              - name: data
+                mountPath: /data/mysql
+              - name: conf
+                mountPath: /etc/mysql/conf.d
+              - name: primary
+                mountPath: /opt/mnt/primary
+              - name: secondary
+                mountPath: /opt/mnt/secondary
+              - name: pod-role
+                mountPath: /opt/conf/role
+              - name: scripts
+                mountPath: /scripts
+        containers:
+          - name: mysql
+            ports:
+              - name: mysql
+                containerPort: 3306
+            volumeMounts:
+              - name: data
+                mountPath: /data/mysql
+              - name: conf
+                mountPath: /etc/mysql/conf.d
+              - name: primary
+                mountPath: /opt/mnt/primary
+              - name: secondary
+                mountPath: /opt/mnt/secondary
+              - name: pod-role
+                mountPath: /opt/conf/role
+              - name: scripts
+                mountPath: /scripts
+            env:
+              - name: WESQL_CONSENSUS_ENABLED
+                value: "0"
+              - name: MYSQL_ALLOW_EMPTY_PASSWORD
+                value: "1"
+              - name: MYSQL_ROOT_HOST
+                value: {{ .Values.auth.rootHost | default "%" | quote }}
+              - name: MYSQL_ROOT_USER
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: username
+              - name: MYSQL_ROOT_PASSWORD
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: password
+              - name: MYSQL_DATABASE
+                value: {{- if .Values.auth.createDatabase }} {{ .Values.auth.database | quote }}  {{- else }} "" {{- end }}
+              - name: MYSQL_USER
+                value: {{ .Values.auth.username | default "" | quote }}
+              - name: MYSQL_PASSWORD
+                value: {{ .Values.auth.password | default "" | quote }}
+              - name: REPLICATION_USER
+                value: {{ .Values.auth.replicationUser | default "replicator" | quote }}
+              - name: REPLICATION_PASSWORD
+                value: {{ .Values.auth.replicationPassword | default "" | quote }}            
+            lifecycle:
+              postStart:
+                exec:
+                  command: ["/scripts/setup.sh"]
+          - name: mysql-exporter
+            image: prom/mysqld-exporter:v0.14.0
+            imagePullPolicy: IfNotPresent
+            resources:
+              requests:
+                cpu: 100m
+                memory: 100Mi
+            ports:
+              - name: metrics
+                containerPort: 9104
+                protocol: TCP
+            livenessProbe:
+              httpGet:
+                path: /
+                port: 9104
+            readinessProbe:
+              httpGet:
+                path: /
+                port: 9104
+            env:
+              - name: "MYSQL_MONITOR_USER"
+                value: "root"
+              - name: "MYSQL_MONITOR_PASSWORD"
+                value: ""
+              - name: "DATA_SOURCE_NAME"
+                value: "$(MYSQL_MONITOR_USER):$(MYSQL_MONITOR_PASSWORD)@(localhost:3306)/"
+        volumes:
+          - name: conf
+            emptyDir: { }
+          - name: pod-role
+            downwardAPI:
+              items:
+                - path: "labels"
+                  fieldRef:
+                    fieldPath: metadata.labels['kubeblocks.io/role']
+      systemAccounts:
+        cmdExecutorConfig:
+          image: docker.io/mysql:8.0.30
+          command: ["mysql"]
+          args:
+          - -h$(KB_ACCOUNT_ENDPOINT) 
+          - -u$(MYSQL_USER) 
+          - -p$(MYSQL_PASSWORD)        
+          - -e $(KB_ACCOUNT_STATEMENT)
+          env:
+          - name: MYSQL_USER
+            valueFrom:
+              secretKeyRef:
+                name: $(CONN_CREDENTIAL_SECRET_NAME)
+                key: username
+          - name: MYSQL_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: $(CONN_CREDENTIAL_SECRET_NAME)
+                key: password   
+        passwordConfig:
+          length: 10
+          numDigits: 5
+          numSymbols: 0
+          letterCase: MixedCases
+        accounts:
+          - name: kbadmin
+            provisionPolicy:
+              type: CreateByStmt
+              scope: AnyPods
+              statements:
+                creation: CREATE USER IF NOT EXISTS $(USERNAME) IDENTIFIED BY "$(PASSWD)"; GRANT ALL PRIVILEGES ON *.* TO $(USERNAME);
+                deletion: DROP USER IF EXISTS $(USERNAME);
+          - name: kbdataprotection
+            provisionPolicy:
+              type: CreateByStmt
+              scope: AnyPods
+              statements:
+                creation: CREATE USER IF NOT EXISTS $(USERNAME) IDENTIFIED BY "$(PASSWD)";GRANT RELOAD, LOCK TABLES, PROCESS, REPLICATION CLIENT ON *.* TO $(USERNAME); GRANT LOCK TABLES,RELOAD,PROCESS,REPLICATION CLIENT, SUPER,SELECT,EVENT,TRIGGER,SHOW VIEW ON *.* TO $(USERNAME);
+                deletion: DROP USER IF EXISTS $(USERNAME);
+          - name: kbprobe
+            provisionPolicy:
+              type: CreateByStmt
+              scope: AnyPods
+              statements:        
+                creation: CREATE USER IF NOT EXISTS $(USERNAME) IDENTIFIED BY "$(PASSWD)"; GRANT REPLICATION CLIENT, PROCESS ON *.* TO $(USERNAME); GRANT SELECT ON performance_schema.* TO $(USERNAME);
+                deletion: DROP USER IF EXISTS $(USERNAME);              
+          - name: kbmonitoring
+            provisionPolicy:
+              type: CreateByStmt
+              scope: AnyPods
+              statements:        
+                creation: CREATE USER IF NOT EXISTS $(USERNAME) IDENTIFIED BY "$(PASSWD)"; GRANT REPLICATION CLIENT, PROCESS ON *.* TO $(USERNAME); GRANT SELECT ON performance_schema.* TO $(USERNAME);
+                deletion: DROP USER IF EXISTS $(USERNAME);            

@@ -176,14 +176,13 @@ var _ = Describe("ClusterDefinition Controller", func() {
 				})).Should(Succeed())
 
 			By("check the reconciler update configmap.Finalizer after configmap is created.")
-			Eventually(func(g Gomega) {
-				cmObj := &corev1.ConfigMap{}
-				g.Expect(k8sClient.Get(testCtx.Ctx, types.NamespacedName{
-					Namespace: testCtx.DefaultNamespace,
-					Name:      cmName,
-				}, cmObj)).Should(Succeed())
+			cmKey := types.NamespacedName{
+				Namespace: testCtx.DefaultNamespace,
+				Name:      cmName,
+			}
+			Eventually(testdbaas.CheckObj(&testCtx, cmKey, func(g Gomega, cmObj *corev1.ConfigMap) {
 				g.Expect(controllerutil.ContainsFinalizer(cmObj, cfgcore.ConfigurationTemplateFinalizerName)).To(BeTrue())
-			}).Should(Succeed())
+			})).Should(Succeed())
 		})
 	})
 })

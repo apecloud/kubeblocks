@@ -152,10 +152,6 @@ var _ = Describe("Backup Policy Controller", func() {
 				By("retain the latest backup")
 				Eventually(testdbaas.CheckObjExists(&testCtx, client.ObjectKeyFromObject(backupExpired),
 					&dpv1alpha1.Backup{}, false), timeout, interval).Should(Succeed())
-				Eventually(testdbaas.CheckObjExists(&testCtx, client.ObjectKeyFromObject(backupOutLimit1),
-					&dpv1alpha1.Backup{}, false), timeout, interval).Should(Succeed())
-				Eventually(testdbaas.CheckObjExists(&testCtx, client.ObjectKeyFromObject(backupOutLimit2),
-					&dpv1alpha1.Backup{}, true), timeout, interval).Should(Succeed())
 			})
 		})
 

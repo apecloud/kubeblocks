@@ -27,6 +27,10 @@ content: {
 		annotations: {
 			"snapshot.storage.kubernetes.io/is-default-class": "true"
 		}
+		labels: {
+			"app.kubernetes.io/instance": "kubeblocks"
+		}
+		finalizers: ["kubeblocks.io/finalizer"]
 	}
 	driver:         options.driver
 	deletionPolicy: "Delete"

@@ -204,7 +204,7 @@ var _ = Describe("kubeblocks", func() {
 			HelmCfg:   helm.FakeActionConfig(),
 			Namespace: "default",
 			Client:    testing.FakeClientSet(),
-			Dynamic:   testing.FakeDynamicClient(),
+			Dynamic:   testing.FakeDynamicClient(testing.FakeVolumeSnapshotClass()),
 		}
 
 		Expect(o.uninstall()).Should(Succeed())
@@ -406,7 +406,8 @@ func mockDynamicClientWithCRD(objects ...runtime.Object) dynamic.Interface {
 		Status: v1.CustomResourceDefinitionStatus{},
 	}
 
-	allObjs := []runtime.Object{&clusterCRD, &clusterDefCRD, &clusterVersionCRD, &backupToolCRD}
+	allObjs := []runtime.Object{&clusterCRD, &clusterDefCRD, &clusterVersionCRD, &backupToolCRD,
+		testing.FakeVolumeSnapshotClass()}
 	allObjs = append(allObjs, objects...)
 	return testing.FakeDynamicClient(allObjs...)
 }

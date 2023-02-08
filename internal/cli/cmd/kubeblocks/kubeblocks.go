@@ -194,10 +194,6 @@ func (o *InstallOptions) Install() error {
 
 	if v := versionInfo[util.KubeBlocksApp]; len(v) > 0 {
 		fmt.Fprintf(o.Out, "KubeBlocks %s already exists\n", v)
-		// print notes
-		if !o.Quiet {
-			o.printNotes()
-		}
 		return nil
 	}
 
@@ -235,11 +231,6 @@ func (o *InstallOptions) Install() error {
 
 	// successfully installed
 	spinner(true)
-
-	// print notes
-	if !o.Quiet {
-		o.printNotes()
-	}
 
 	return nil
 }
@@ -421,11 +412,6 @@ func (o *InstallOptions) upgrade(cmd *cobra.Command) error {
 	// successfully installed
 	spinner(true)
 
-	// print notes
-	if !o.Quiet {
-		o.printNotes()
-	}
-
 	return nil
 }
 
@@ -510,19 +496,28 @@ func (o *InstallOptions) postInstall() error {
 			}
 		}
 	}
+	// print notes
+	if !o.Quiet {
+		o.printNotes()
+	}
 	return nil
 }
 
 func (o *InstallOptions) createVolumeSnapshotClass() error {
-	createVolumeSnapshotClassOptions := cluster.CreateVolumeSnapshotClassOptions{}
-	createVolumeSnapshotClassOptions.BaseOptions.Client = o.Dynamic
-	createVolumeSnapshotClassOptions.BaseOptions.IOStreams = o.IOStreams
-	if err := createVolumeSnapshotClassOptions.Complete(); err != nil {
+	options := cluster.CreateVolumeSnapshotClassOptions{}
+	options.BaseOptions.Client = o.Dynamic
+	options.BaseOptions.IOStreams = o.IOStreams
+
+	spinner := util.Spinner(o.Out, "%-40s", "Configure VolumeSnapshotClass")
+	defer spinner(false)
+
+	if err := options.Complete(); err != nil {
 		return err
 	}
-	if err := createVolumeSnapshotClassOptions.Create(); err != nil {
+	if err := options.Create(); err != nil {
 		return err
 	}
+	spinner(true)
 	return nil
 }
 

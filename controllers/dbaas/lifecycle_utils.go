@@ -2135,10 +2135,10 @@ func isVolumeSnapshotReadyToUse(cli client.Client,
 	if err := cli.List(ctx, &vsList, ml); err != nil {
 		return false, client.IgnoreNotFound(err)
 	}
-	status := vsList.Items[0].Status
-	if len(vsList.Items) == 0 || status == nil {
+	if len(vsList.Items) == 0 || vsList.Items[0].Status == nil {
 		return false, nil
 	}
+	status := vsList.Items[0].Status
 	if status.Error != nil {
 		return false, errors.New("VolumeSnapshot/" + vsList.Items[0].Name + ": " + *status.Error.Message)
 	}

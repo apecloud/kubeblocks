@@ -53,7 +53,9 @@ type ClusterVersionStatus struct {
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 
-	ClusterDefinitionStatusGeneration `json:",inline"`
+	// clusterDefGeneration represents the generation number of ClusterDefinition referenced.
+	// +optional
+	ClusterDefGeneration int64 `json:"clusterDefGeneration,omitempty"`
 }
 
 // ClusterVersionComponent is an application version component spec.

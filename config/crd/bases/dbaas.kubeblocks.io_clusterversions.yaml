@@ -8012,7 +8012,8 @@ spec:
             description: ClusterVersionStatus defines the observed state of ClusterVersion
             properties:
               clusterDefGeneration:
-                description: ClusterDefinition generation number.
+                description: clusterDefGeneration represents the generation number
+                  of ClusterDefinition referenced.
                 format: int64
                 type: integer
               message:

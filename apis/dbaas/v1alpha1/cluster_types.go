@@ -104,7 +104,9 @@ type ClusterStatus struct {
 	// +optional
 	Operations *Operations `json:"operations,omitempty"`
 
-	ClusterDefinitionStatusGeneration `json:",inline"`
+	// clusterDefGeneration represents the generation number of ClusterDefinition referenced.
+	// +optional
+	ClusterDefGeneration int64 `json:"clusterDefGeneration,omitempty"`
 
 	// Describe current state of cluster API Resource, like warning.
 	// +optional

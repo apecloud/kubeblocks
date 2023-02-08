@@ -19,6 +19,7 @@ package dbaas
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"time"
 
 	"golang.org/x/exp/maps"
@@ -84,17 +85,23 @@ const (
 // updateClusterConditions updates cluster.status condition and records event.
 func (conMgr clusterConditionManager) updateStatusConditions(condition metav1.Condition) error {
 	patch := client.MergeFrom(conMgr.cluster.DeepCopy())
-	changed := conMgr.handleConditionForClusterPhase(condition)
-	conMgr.cluster.SetStatusCondition(condition)
-	if err := conMgr.Client.Status().Patch(conMgr.ctx, conMgr.cluster, patch); err != nil {
-		return err
+	oldCondition := meta.FindStatusCondition(conMgr.cluster.Status.Conditions, condition.Type)
+	phaseChanged := conMgr.handleConditionForClusterPhase(oldCondition, condition)
+	conditionChanged := !reflect.DeepEqual(oldCondition, condition)
+	if conditionChanged || phaseChanged {
+		conMgr.cluster.SetStatusCondition(condition)
+		if err := conMgr.Client.Status().Patch(conMgr.ctx, conMgr.cluster, patch); err != nil {
+			return err
+		}
 	}
-	if changed {
+	if conditionChanged {
 		eventType := corev1.EventTypeWarning
 		if condition.Status == metav1.ConditionTrue {
 			eventType = corev1.EventTypeNormal
 		}
 		conMgr.Recorder.Event(conMgr.cluster, eventType, condition.Reason, condition.Message)
+	}
+	if phaseChanged {
 		// if cluster status changed, do it
 		return opsutil.MarkRunningOpsRequestAnnotation(conMgr.ctx, conMgr.Client, conMgr.cluster)
 	}
@@ -103,11 +110,11 @@ func (conMgr clusterConditionManager) updateStatusConditions(condition metav1.Co
 
 // handleConditionForClusterPhase checks whether the condition can repair by cluster.
 // if it cannot be repaired after 30 seconds, modify the cluster status to ConditionsError
-func (conMgr clusterConditionManager) handleConditionForClusterPhase(condition metav1.Condition) bool {
+func (conMgr clusterConditionManager) handleConditionForClusterPhase(oldCondition *metav1.Condition, condition metav1.Condition) bool {
 	if condition.Status == metav1.ConditionTrue {
 		return false
 	}
-	oldCondition := meta.FindStatusCondition(conMgr.cluster.Status.Conditions, condition.Type)
+
 	if oldCondition == nil || oldCondition.Reason != condition.Reason {
 		return false
 	}

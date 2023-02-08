@@ -104,7 +104,7 @@ var _ = Describe("connection", func() {
 		pod := mockPod()
 		e, err := getEngineByPod(pod)
 		Expect(err).Should(Succeed())
-		Expect(e.EngineName()).Should(Equal("mysql"))
+		Expect(e.Container()).Should(Equal("mysql"))
 
 		pod.SetLabels(nil)
 		_, err = getEngineByPod(pod)

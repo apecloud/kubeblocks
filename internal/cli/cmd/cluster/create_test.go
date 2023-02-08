@@ -32,6 +32,7 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/cli/cluster"
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
 )
 
@@ -137,7 +138,8 @@ spec:
 
 	It("build default cluster component without environment", func() {
 		dynamic := testing.FakeDynamicClient(testing.FakeClusterDef())
-		comps, err := buildClusterComp(dynamic, testing.ClusterDefName)
+		cd, _ := cluster.GetClusterDefByName(dynamic, testing.ClusterDefName)
+		comps, err := buildClusterComp(cd, nil)
 		Expect(err).ShouldNot(HaveOccurred())
 		Expect(comps).ShouldNot(BeNil())
 		Expect(len(comps)).Should(Equal(2))
@@ -159,7 +161,8 @@ spec:
 		viper.Set("CLUSTER_DEFAULT_CPU", "2000m")
 		viper.Set("CLUSTER_DEFAULT_MEMORY", "2Gi")
 		dynamic := testing.FakeDynamicClient(testing.FakeClusterDef())
-		comps, err := buildClusterComp(dynamic, testing.ClusterDefName)
+		cd, _ := cluster.GetClusterDefByName(dynamic, testing.ClusterDefName)
+		comps, err := buildClusterComp(cd, nil)
 		Expect(err).ShouldNot(HaveOccurred())
 		Expect(comps).ShouldNot(BeNil())
 		Expect(len(comps)).Should(Equal(2))

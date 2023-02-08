@@ -23,6 +23,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/ghodss/yaml"
@@ -93,6 +94,28 @@ const (
 	monitorKey      = "monitor"
 )
 
+type setKey string
+
+const (
+	keyType     setKey = "type"
+	keyCPU      setKey = "cpu"
+	keyMemory   setKey = "memory"
+	keyReplicas setKey = "replicas"
+	keyStorage  setKey = "storage"
+)
+
+type envSet struct {
+	name       string
+	defaultVal string
+}
+
+var setKeyEnvMap = map[setKey]envSet{
+	keyCPU:      {"CLUSTER_DEFAULT_CPU", "1000m"},
+	keyMemory:   {"CLUSTER_DEFAULT_MEMORY", "1Gi"},
+	keyStorage:  {"CLUSTER_DEFAULT_STORAGE_SIZE", "10Gi"},
+	keyReplicas: {"CLUSTER_DEFAULT_REPLICAS", "1"},
+}
+
 // UpdatableFlags is the flags that cat be updated by update command
 type UpdatableFlags struct {
 	TerminationPolicy string `json:"terminationPolicy"`
@@ -114,7 +137,8 @@ type CreateOptions struct {
 	Tolerations       []interface{}            `json:"tolerations,omitempty"`
 	Components        []map[string]interface{} `json:"components"`
 
-	Sets           string   `json:"-"`
+	SetFile        string   `json:"-"`
+	Values         []string `json:"-"`
 	TolerationsRaw []string `json:"-"`
 
 	// backup name to restore in creation
@@ -181,6 +205,10 @@ func (o *CreateOptions) Validate() error {
 		fmt.Fprintf(o.Out, "Cluster version is not specified, use latest ClusterVersion %s\n", o.ClusterVersionRef)
 	}
 
+	if len(o.Values) > 0 && len(o.SetFile) > 0 {
+		return fmt.Errorf("does not support --set and --set-file being specified at the same time")
+	}
+
 	// if name is not specified, generate a random cluster name
 	if o.Name == "" {
 		name, err := generateClusterName(o.Client, o.Namespace)
@@ -196,29 +224,13 @@ func (o *CreateOptions) Validate() error {
 }
 
 func (o *CreateOptions) Complete() error {
-	var (
-		componentByte []byte
-		err           error
-		components    = o.Components
-	)
-
-	if len(o.Sets) > 0 {
-		if componentByte, err = MultipleSourceComponents(o.Sets, o.IOStreams.In); err != nil {
-			return err
-		}
-		if componentByte, err = yaml.YAMLToJSON(componentByte); err != nil {
-			return err
-		}
-		if err = json.Unmarshal(componentByte, &components); err != nil {
-			return err
-		}
-	} else if len(components) == 0 {
-		if components, err = buildClusterComp(o.Client, o.ClusterDefRef); err != nil {
-			return err
-		}
+	components, err := o.buildComponents()
+	if err != nil {
+		return err
 	}
+
 	setMonitor(o.Monitor, components)
-	if err = setBackup(o, components); err != nil {
+	if err := setBackup(o, components); err != nil {
 		return err
 	}
 	o.Components = components
@@ -229,6 +241,47 @@ func (o *CreateOptions) Complete() error {
 		o.Tolerations = tolerations
 	}
 	return nil
+}
+
+// buildComponents build components from file or set values
+func (o *CreateOptions) buildComponents() ([]map[string]interface{}, error) {
+	var (
+		componentByte []byte
+		err           error
+	)
+
+	// build components from file
+	components := o.Components
+	if len(o.SetFile) > 0 {
+		if componentByte, err = MultipleSourceComponents(o.SetFile, o.IOStreams.In); err != nil {
+			return nil, err
+		}
+		if componentByte, err = yaml.YAMLToJSON(componentByte); err != nil {
+			return nil, err
+		}
+		if err = json.Unmarshal(componentByte, &components); err != nil {
+			return nil, err
+		}
+		return components, nil
+	}
+
+	// build components from set values or environment variables
+	if len(components) == 0 {
+		cd, err := cluster.GetClusterDefByName(o.Client, o.ClusterDefRef)
+		if err != nil {
+			return nil, err
+		}
+
+		compSets, err := buildCompSetsMap(o.Values, cd)
+		if err != nil {
+			return nil, err
+		}
+
+		if components, err = buildClusterComp(cd, compSets); err != nil {
+			return nil, err
+		}
+	}
+	return components, nil
 }
 
 // MultipleSourceComponents get component data from multiple source, such as stdin, URI and local file
@@ -272,7 +325,8 @@ func NewCreateCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 		BuildFlags: func(cmd *cobra.Command) {
 			cmd.Flags().StringVar(&o.ClusterDefRef, "cluster-definition", "", "Specify cluster definition, run \"kbcli cluster-definition list\" to show all available cluster definition")
 			cmd.Flags().StringVar(&o.ClusterVersionRef, "cluster-version", "", "Specify cluster version, run \"kbcli cluster-version list\" to show all available cluster version, use the latest version if not specified")
-			cmd.Flags().StringVar(&o.Sets, "set", "", "Use yaml file, URL, or stdin to set the cluster parameters")
+			cmd.Flags().StringVar(&o.SetFile, "set-file", "", "Use yaml file, URL, or stdin to set the cluster parameters")
+			cmd.Flags().StringArrayVar(&o.Values, "set", []string{}, "Set the cluster parameters including cpu, memory, replicas and storage, each set corresponds to a component")
 			cmd.Flags().StringVar(&o.Backup, "backup", "", "Set a source backup to restore data")
 
 			// add updatable flags
@@ -342,24 +396,23 @@ func setEnableAllLogs(c *dbaasv1alpha1.Cluster, cd *dbaasv1alpha1.ClusterDefinit
 	}
 }
 
-func buildClusterComp(dynamic dynamic.Interface, clusterDef string) ([]map[string]interface{}, error) {
-	cd, err := cluster.GetClusterDefByName(dynamic, clusterDef)
-	if err != nil {
-		return nil, err
-	}
+func buildClusterComp(cd *dbaasv1alpha1.ClusterDefinition, setsMap map[string]map[setKey]string) ([]map[string]interface{}, error) {
+	getVal := func(key setKey, sets map[setKey]string) string {
+		// get value from set values
+		if sets != nil {
+			if v := sets[key]; len(v) > 0 {
+				return v
+			}
+		}
 
-	getEnv := func(envKey string, defaultVal string) string {
-		val := viper.GetString(envKey)
+		// get value from environment variables
+		env := setKeyEnvMap[key]
+		val := viper.GetString(env.name)
 		if len(val) == 0 {
-			val = defaultVal
+			val = env.defaultVal
 		}
 		return val
 	}
-
-	// get environment variables
-	defaultStorageSize := getEnv("CLUSTER_DEFAULT_STORAGE_SIZE", "10Gi")
-	defaultCPU := getEnv("CLUSTER_DEFAULT_CPU", "1000m")
-	defaultMemory := getEnv("CLUSTER_DEFAULT_MEMORY", "1Gi")
 
 	var comps []map[string]interface{}
 	for _, c := range cd.Spec.Components {
@@ -369,12 +422,22 @@ func buildClusterComp(dynamic dynamic.Interface, clusterDef string) ([]map[strin
 		if replicas <= 0 {
 			continue
 		}
-		if defaultReplicas := viper.GetInt32("CLUSTER_DEFAULT_REPLICAS"); defaultReplicas > 0 {
-			replicas = defaultReplicas
+
+		sets := map[setKey]string{}
+		if setsMap != nil {
+			sets = setsMap[c.TypeName]
 		}
+
+		// get replicas
+		setReplicas, err := strconv.Atoi(getVal(keyReplicas, sets))
+		if err != nil {
+			return nil, fmt.Errorf("component repicas is illegal " + err.Error())
+		}
+		replicas = int32(setReplicas)
+
 		resourceList := corev1.ResourceList{
-			corev1.ResourceCPU:    resource.MustParse(defaultCPU),
-			corev1.ResourceMemory: resource.MustParse(defaultMemory),
+			corev1.ResourceCPU:    resource.MustParse(getVal(keyCPU, sets)),
+			corev1.ResourceMemory: resource.MustParse(getVal(keyMemory, sets)),
 		}
 		compObj := &dbaasv1alpha1.ClusterComponent{
 			Name:     c.TypeName,
@@ -392,7 +455,7 @@ func buildClusterComp(dynamic dynamic.Interface, clusterDef string) ([]map[strin
 					},
 					Resources: corev1.ResourceRequirements{
 						Requests: corev1.ResourceList{
-							corev1.ResourceStorage: resource.MustParse(defaultStorageSize),
+							corev1.ResourceStorage: resource.MustParse(getVal(keyStorage, sets)),
 						},
 					},
 				},
@@ -405,6 +468,41 @@ func buildClusterComp(dynamic dynamic.Interface, clusterDef string) ([]map[strin
 		comps = append(comps, comp)
 	}
 	return comps, nil
+}
+
+func buildCompSetsMap(values []string, cd *dbaasv1alpha1.ClusterDefinition) (map[string]map[setKey]string, error) {
+	allSets := map[string]map[setKey]string{}
+	defaultCompType, err := cluster.GetDefaultCompTypeName(cd)
+	if err != nil {
+		return nil, err
+	}
+
+	buildSetMap := func(sets []string) map[setKey]string {
+		res := map[setKey]string{}
+		for _, set := range sets {
+			kv := strings.Split(set, "=")
+			if len(kv) != 2 {
+				continue
+			}
+			res[setKey(kv[0])] = kv[1]
+		}
+		return res
+	}
+
+	// each value corresponds to a component
+	for _, value := range values {
+		sets := buildSetMap(strings.Split(value, ","))
+		if len(sets) == 0 {
+			continue
+		}
+		// find the type key
+		if t := sets[keyType]; len(t) > 0 {
+			allSets[t] = sets
+		} else {
+			allSets[defaultCompType] = sets
+		}
+	}
+	return allSets, nil
 }
 
 func buildTolerations(raw []string) []interface{} {

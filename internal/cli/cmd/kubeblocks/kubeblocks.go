@@ -39,6 +39,7 @@ import (
 	"k8s.io/kubectl/pkg/util/templates"
 	"k8s.io/utils/strings/slices"
 
+	"github.com/apecloud/kubeblocks/internal/cli/cmd/cluster"
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
@@ -496,6 +497,35 @@ Notes: Monitor components(Grafana/Prometheus/AlertManager) is not installed,
 	}
 }
 
+func (o *InstallOptions) postInstall() error {
+	var sets []string
+	for _, set := range o.Sets {
+		splitSet := strings.Split(set, ",")
+		sets = append(sets, splitSet...)
+	}
+	for _, set := range sets {
+		if set == "snapshot-controller.enabled=true" {
+			if err := o.createVolumeSnapshotClass(); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func (o *InstallOptions) createVolumeSnapshotClass() error {
+	createVolumeSnapshotClassOptions := cluster.CreateVolumeSnapshotClassOptions{}
+	createVolumeSnapshotClassOptions.BaseOptions.Client = o.Dynamic
+	createVolumeSnapshotClassOptions.BaseOptions.IOStreams = o.IOStreams
+	if err := createVolumeSnapshotClassOptions.Complete(); err != nil {
+		return err
+	}
+	if err := createVolumeSnapshotClassOptions.Create(); err != nil {
+		return err
+	}
+	return nil
+}
+
 func (o *Options) uninstall() error {
 	printErr := func(spinner func(result bool), err error) {
 		if err == nil || apierrors.IsNotFound(err) ||
@@ -571,6 +601,9 @@ func newInstallCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 			util.CheckErr(o.complete(f, cmd))
 			util.CheckErr(o.Install())
 		},
+		PostRun: func(cmd *cobra.Command, args []string) {
+			util.CheckErr(o.postInstall())
+		},
 	}
 
 	cmd.Flags().BoolVar(&o.Monitor, "monitor", true, "Set monitor enabled and install Prometheus, AlertManager and Grafana (default true)")
@@ -598,6 +631,9 @@ func newUpgradeCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 		Run: func(cmd *cobra.Command, args []string) {
 			util.CheckErr(o.complete(f, cmd))
 			util.CheckErr(o.upgrade(cmd))
+		},
+		PostRun: func(cmd *cobra.Command, args []string) {
+			util.CheckErr(o.postInstall())
 		},
 	}
 

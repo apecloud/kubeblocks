@@ -48,7 +48,7 @@ Cluster command
 * [kbcli cluster describe-ops](kbcli_cluster_describe-ops.md)	 - Show details of a specific OpsRequest
 * [kbcli cluster diff-configure](kbcli_cluster_diff-configure.md)	 - List the constraint for supported configuration params
 * [kbcli cluster explain-configure](kbcli_cluster_explain-configure.md)	 - List the constraint for supported configuration params
-* [kbcli cluster horizontal-scale](kbcli_cluster_horizontal-scale.md)	 - Horizontal scale the specified components in the cluster
+* [kbcli cluster hscale](kbcli_cluster_hscale.md)	 - Horizontally scale the specified components in the cluster
 * [kbcli cluster list](kbcli_cluster_list.md)	 - List clusters
 * [kbcli cluster list-backups](kbcli_cluster_list-backups.md)	 - List backups
 * [kbcli cluster list-components](kbcli_cluster_list-components.md)	 - List cluster components
@@ -63,6 +63,6 @@ Cluster command
 * [kbcli cluster restore](kbcli_cluster_restore.md)	 - Restore a new cluster from backup
 * [kbcli cluster update](kbcli_cluster_update.md)	 - Update the cluster settings, such as enable or disable monitor or log
 * [kbcli cluster upgrade](kbcli_cluster_upgrade.md)	 - Upgrade the cluster version
-* [kbcli cluster vertical-scale](kbcli_cluster_vertical-scale.md)	 - Vertical scale the specified components in the cluster
 * [kbcli cluster volume-expand](kbcli_cluster_volume-expand.md)	 - Expand volume with the specified components and volumeClaimTemplates in the cluster
+* [kbcli cluster vscale](kbcli_cluster_vscale.md)	 - Vertically scale the specified components in the cluster
 

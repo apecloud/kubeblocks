@@ -39,12 +39,22 @@ var mockDeploy = func(version string) *appsv1.Deployment {
 }
 
 var _ = Describe("version util", func() {
-	It("GetVersionInfo", func() {
+	It("get version info when KubeBlocks is deployed", func() {
 		client := testing.FakeClientSet(mockDeploy(kbVersion))
 		info, err := GetVersionInfo(client)
 		Expect(err).Should(Succeed())
 		Expect(info).ShouldNot(BeEmpty())
 		Expect(info[KubeBlocksApp]).Should(Equal(kbVersion))
+		Expect(info[KubernetesApp]).ShouldNot(BeEmpty())
+		Expect(info[KBCLIApp]).ShouldNot(BeEmpty())
+	})
+
+	It("get version info when KubeBlocks is not deployed", func() {
+		client := testing.FakeClientSet()
+		info, err := GetVersionInfo(client)
+		Expect(err).Should(Succeed())
+		Expect(info).ShouldNot(BeEmpty())
+		Expect(info[KubeBlocksApp]).Should(BeEmpty())
 		Expect(info[KubernetesApp]).ShouldNot(BeEmpty())
 		Expect(info[KBCLIApp]).ShouldNot(BeEmpty())
 	})

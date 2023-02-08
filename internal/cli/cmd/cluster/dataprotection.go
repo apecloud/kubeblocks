@@ -319,7 +319,14 @@ func (o *CreateRestoreOptions) Complete() error {
 
 func (o *CreateRestoreOptions) Validate() error {
 	if o.Name == "" {
-		return fmt.Errorf("missing cluster name")
+		name, err := generateClusterName(o.Client, o.Namespace)
+		if err != nil {
+			return err
+		}
+		if name == "" {
+			return fmt.Errorf("failed to generate a random cluster name")
+		}
+		o.Name = name
 	}
 	return nil
 }

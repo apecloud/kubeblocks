@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package envcheck
+package installation
 
 import (
 	"context"
@@ -24,13 +24,12 @@ import (
 
 	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/cli/values"
-
-	. "github.com/apecloud/kubeblocks/test/e2e"
-
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/apecloud/kubeblocks/internal/cli/util/helm"
+
+	. "github.com/apecloud/kubeblocks/test/e2e"
 )
 
 const releaseName = "kubeblocks"

@@ -30,4 +30,16 @@ spec:
         name: leader
       updateStrategy: BestEffortParallel
     defaultReplicas: 3
+  - typeName: stateful
+    pdbSpec:
+      minAvailable: 1
+    componentType: Stateful
+    defaultReplicas: 3
+    podSpec:
+      containers:
+      - name: mysql
+        ports:
+        - containerPort: 3306
+          name: mysql
+          protocol: TCP
   type: state.mysql

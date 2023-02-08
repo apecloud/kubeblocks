@@ -11,6 +11,13 @@ metadata:
     app.kubernetes.io/managed-by: kubeblocks
   name: %s
   namespace: default
+  ownerReferences:
+  - apiVersion: apps/v1
+    blockOwnerDeletion: true
+    controller: true
+    kind: StatefulSet
+    name: %s
+    uid: %s
 spec:
   containers:
   - args:

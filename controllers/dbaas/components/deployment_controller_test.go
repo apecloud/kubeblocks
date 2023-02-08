@@ -72,42 +72,42 @@ var _ = Describe("Deployment Controller", func() {
 			if testCtx.UsingExistingCluster() {
 				timeout = 3 * timeout
 			}
-			cluster := testdbaas.CreateStatelessCluster(ctx, testCtx, clusterDefName, clusterVersionName, clusterName)
-			By("patch cluster to Running")
-			patch := client.MergeFrom(cluster.DeepCopy())
-			cluster.Status.Phase = dbaasv1alpha1.RunningPhase
-			cluster.Status.Components = map[string]dbaasv1alpha1.ClusterStatusComponent{
-				statelessCompName: {
-					Phase: dbaasv1alpha1.RunningPhase,
-				},
-			}
-			Expect(k8sClient.Status().Patch(context.Background(), cluster, patch)).Should(Succeed())
-			Eventually(testdbaas.GetClusterComponentPhase(testCtx, clusterName, statelessCompName),
-				timeout, interval).Should(Equal(dbaasv1alpha1.RunningPhase))
+			cluster := testdbaas.CreateStatelessCluster(testCtx, clusterDefName, clusterVersionName, clusterName)
 
-			By(" check component is Failed/Abnormal")
-			deploy := testdbaas.MockStatelessComponentDeploy(ctx, testCtx, clusterName, statelessCompName)
+			By("patch cluster to Running")
+			Expect(testdbaas.ChangeObjStatus(&testCtx, cluster, func() {
+				cluster.Status.Phase = dbaasv1alpha1.RunningPhase
+				cluster.Status.Components = map[string]dbaasv1alpha1.ClusterStatusComponent{
+					statelessCompName: {
+						Phase: dbaasv1alpha1.RunningPhase,
+					},
+				}
+			}))
+
+			By("create the deployment of the stateless component")
+			deploy := testdbaas.MockStatelessComponentDeploy(testCtx, clusterName, statelessCompName)
+			newDeploymentKey := client.ObjectKey{Name: deploy.Name, Namespace: namespace}
+			Eventually(testdbaas.CheckObj(&testCtx, newDeploymentKey, func(g Gomega, deploy *appsv1.Deployment) {
+				g.Expect(deploy.Generation == 1).Should(BeTrue())
+			})).Should(Succeed())
+
+			By(" check stateless component phase is Failed")
 			Eventually(testdbaas.GetClusterComponentPhase(testCtx, clusterName, statelessCompName),
 				timeout, interval).Should(Equal(dbaasv1alpha1.FailedPhase))
 
 			By("mock deployment is ready")
 			newDeployment := &appsv1.Deployment{}
-			newDeploymentKey := client.ObjectKey{Name: deploy.Name, Namespace: namespace}
 			Expect(k8sClient.Get(context.Background(), newDeploymentKey, newDeployment)).Should(Succeed())
-			deployPatch := client.MergeFrom(newDeployment.DeepCopy())
-			testk8s.MockDeploymentReady(newDeployment, stateless.NewRSAvailableReason)
-			Expect(k8sClient.Status().Patch(context.Background(), newDeployment, deployPatch)).Should(Succeed())
+			Expect(testdbaas.ChangeObjStatus(&testCtx, newDeployment, func() {
+				testk8s.MockDeploymentReady(newDeployment, stateless.NewRSAvailableReason)
+			})).Should(Succeed())
 
-			By("test deployment status is Running")
-			Eventually(func() bool {
-				deploy := &appsv1.Deployment{}
-				if err := k8sClient.Get(context.Background(), newDeploymentKey, deploy); err != nil {
-					return false
-				}
-				return deploy.Status.AvailableReplicas == newDeployment.Status.AvailableReplicas &&
+			By("test deployment status is ready")
+			Eventually(testdbaas.CheckObj(&testCtx, newDeploymentKey, func(g Gomega, deploy *appsv1.Deployment) {
+				g.Expect(deploy.Status.AvailableReplicas == newDeployment.Status.AvailableReplicas &&
 					deploy.Status.ReadyReplicas == newDeployment.Status.ReadyReplicas &&
-					deploy.Status.Replicas == newDeployment.Status.Replicas
-			}, timeout, interval).Should(BeTrue())
+					deploy.Status.Replicas == newDeployment.Status.Replicas).Should(BeTrue())
+			}), timeout, interval).Should(Succeed())
 
 			By("waiting the component is Running")
 			Eventually(testdbaas.GetClusterComponentPhase(testCtx, clusterName, statelessCompName),

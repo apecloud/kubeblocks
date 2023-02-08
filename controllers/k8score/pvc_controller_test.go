@@ -17,15 +17,12 @@ limitations under the License.
 package k8score
 
 import (
-	"context"
 	"fmt"
-	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
-	"k8s.io/apimachinery/pkg/util/yaml"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
@@ -33,12 +30,6 @@ import (
 )
 
 var _ = Describe("PersistentVolumeClaim Controller", func() {
-	var (
-		ctx      = context.Background()
-		timeout  = time.Second * 20
-		interval = time.Second
-	)
-
 	cleanEnv := func() {
 		// must wait until resources deleted and no longer exist before the testcases start,
 		// otherwise if later it needs to create some new resource objects with the same name,
@@ -59,38 +50,9 @@ var _ = Describe("PersistentVolumeClaim Controller", func() {
 
 	createPVC := func(pvcName string) *corev1.PersistentVolumeClaim {
 		By("By assure an default storageClass")
-		pvcYAML := fmt.Sprintf(`apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  annotations:
-     test: test
-  labels:
-    app.kubernetes.io/component-name: replicasets
-    app.kubernetes.io/instance: wesql
-    app.kubernetes.io/managed-by: kubeblocks
-    app.kubernetes.io/name: state.mysql-apecloud-mysql
-    vct.kubeblocks.io/name: data
-  name: %s
-  namespace: default
-spec:
-  accessModes:
-  - ReadWriteOnce
-  resources:
-    requests:
-      storage: "1Gi"
-  storageClassName: csi-hostpath-sc
-  volumeMode: Filesystem
-  volumeName: pvc-e7cecbe9-524c-4071-bfb2-6e145269c245
-`, pvcName)
-		pvc := &corev1.PersistentVolumeClaim{}
-		Expect(yaml.Unmarshal([]byte(pvcYAML), pvc)).Should(Succeed())
-		Expect(testCtx.CreateObj(ctx, pvc)).Should(Succeed())
-		// wait until cluster created
-		Eventually(func() bool {
-			err := k8sClient.Get(context.Background(), client.ObjectKey{Name: pvcName, Namespace: testCtx.DefaultNamespace}, &corev1.PersistentVolumeClaim{})
-			return err == nil
-		}, timeout, interval).Should(BeTrue())
-		return pvc
+		return testdbaas.CreateCustomizedObj(&testCtx, "operations/volume_expansion_pvc.yaml",
+			&corev1.PersistentVolumeClaim{}, testdbaas.CustomizeObjYAML("consensus", "apecloud-mysql", pvcName, pvcName, "csi-hostpath-sc"))
+
 	}
 
 	handlePersistentVolumeClaim := func(reqCtx intctrlutil.RequestCtx, cli client.Client, pvc *corev1.PersistentVolumeClaim) error {
@@ -101,21 +63,20 @@ spec:
 
 	Context("test creating PersistentVolumeClaim", func() {
 		It("should handle it properly", func() {
-			By("test PersistentVolumeClaim changes")
+			By("register an pvcHandler for testing")
 			PersistentVolumeClaimHandlerMap["pvc-controller"] = handlePersistentVolumeClaim
-			pvcName := fmt.Sprintf("pvc-%s", testCtx.GetRandomStr())
-			createPVC(pvcName)
-			pvc := &corev1.PersistentVolumeClaim{}
-			Expect(k8sClient.Get(ctx, client.ObjectKey{Name: pvcName, Namespace: testCtx.DefaultNamespace}, pvc)).Should(Succeed())
-			pvc.Spec.Resources.Requests[corev1.ResourceStorage] = resource.MustParse("2Gi")
-			Expect(k8sClient.Update(ctx, pvc))
 
-			// wait until storageClass patched
-			Eventually(func() bool {
-				tmpPVC := &corev1.PersistentVolumeClaim{}
-				_ = k8sClient.Get(context.Background(), client.ObjectKey{Name: pvcName, Namespace: testCtx.DefaultNamespace}, tmpPVC)
-				return tmpPVC.Annotations["kubeblocks.io/test"] == "test_pvc"
-			}, timeout, interval).Should(BeTrue())
+			By("test PersistentVolumeClaim changes")
+			pvcName := fmt.Sprintf("pvc-%s", testCtx.GetRandomStr())
+			pvc := createPVC(pvcName)
+			Expect(testdbaas.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(pvc), func(tmpPvc *corev1.PersistentVolumeClaim) {
+				pvc.Spec.Resources.Requests[corev1.ResourceStorage] = resource.MustParse("4Gi")
+			})()).Should(Succeed())
+
+			// wait until pvc patched the annotation by storageClass controller.
+			Eventually(testdbaas.CheckObj(&testCtx, client.ObjectKeyFromObject(pvc), func(g Gomega, tmpPVC *corev1.PersistentVolumeClaim) {
+				g.Expect(tmpPVC.Annotations["kubeblocks.io/test"] == "test_pvc").Should(BeTrue())
+			})).Should(Succeed())
 		})
 	})
 })

@@ -212,7 +212,7 @@ var _ = Describe("SystemAccount Controller", func() {
 	}
 
 	createConsensusMySQLCluster := func(cd *dbaasv1alpha1.ClusterDefinition, cv *dbaasv1alpha1.ClusterVersion, clusterName string) *dbaasv1alpha1.Cluster {
-		cluster := testdbaas.CreateConsensusMysqlCluster(ctx, testCtx, cd.Name, cv.Name, clusterName, consensusCompName)
+		cluster := testdbaas.CreateConsensusMysqlCluster(testCtx, cd.Name, cv.Name, clusterName, consensusCompName)
 		Expect(cluster).NotTo(BeNil())
 		return cluster
 	}
@@ -248,10 +248,10 @@ var _ = Describe("SystemAccount Controller", func() {
 			envFiles := testCase.envInfo
 
 			By("Mock test env, creating ClusterDefinition and ClusterVersion")
-			clusterDef := testdbaas.MockClusterDefinition(ctx, testCtx, clusterDefinitionName, envFiles.clusterDefFile)
+			clusterDef := testdbaas.CreateCustomizedObj(&testCtx, envFiles.clusterDefFile, &dbaasv1alpha1.ClusterDefinition{}, testdbaas.CustomizeObjYAML(clusterDefinitionName))
 			Expect(clusterDef).NotTo(BeNil())
 
-			clusterVersion := testdbaas.MockClusterVersion(ctx, testCtx, clusterDefinitionName, clusterVersionName, envFiles.clusterVersionFile)
+			clusterVersion := testdbaas.CreateCustomizedObj(&testCtx, envFiles.clusterVersionFile, &dbaasv1alpha1.ClusterVersion{}, testdbaas.CustomizeObjYAML(clusterVersionName, clusterDefinitionName))
 			Expect(clusterVersion).NotTo(BeNil())
 
 			By("Mock a cluster")

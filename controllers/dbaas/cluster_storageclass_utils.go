@@ -62,7 +62,8 @@ func handleClusterVolumeExpansion(reqCtx intctrlutil.RequestCtx, cli client.Clie
 	return nil
 }
 
-// needSyncClusterStatusOperations check cluster whether sync status.operations.volumeExpandable
+// needSyncClusterStatusOperations checks whether the cluster need to sync status.operations.volumeExpandable.
+// the default storageClass may be modified by the user, so it is necessary to check which storageClass is used when the pvc is created.
 func needSyncClusterStatusOperations(reqCtx intctrlutil.RequestCtx, cli client.Client, cluster *dbaasv1alpha1.Cluster, storageClass *storagev1.StorageClass) (bool, error) {
 	// get cluster pvc list
 	inNS := client.InNamespace(cluster.Namespace)
@@ -105,7 +106,7 @@ func needSyncClusterStatusOperations(reqCtx intctrlutil.RequestCtx, cli client.C
 	return needSyncStatusOperations, nil
 }
 
-// clusterContainsStorageClass check whether cluster used the StorageClass
+// clusterContainsStorageClass checks whether cluster used the StorageClass
 func clusterContainsStorageClass(cluster *dbaasv1alpha1.Cluster, storageClassName string) bool {
 	if cluster.Annotations == nil {
 		return false
@@ -122,7 +123,7 @@ func isSupportVolumeExpansion(storageClass *storagev1.StorageClass) bool {
 	return storageClass.AllowVolumeExpansion != nil && *storageClass.AllowVolumeExpansion
 }
 
-// getSupportVolumeExpansionComponents Get the components that support volume expansion and the volumeClaimTemplates
+// getSupportVolumeExpansionComponents gets the components and the volumeClaimTemplates of component which support volume expansion.
 func getSupportVolumeExpansionComponents(ctx context.Context, cli client.Client,
 	cluster *dbaasv1alpha1.Cluster) ([]dbaasv1alpha1.OperationComponent, error) {
 	var (
@@ -167,7 +168,7 @@ func getSupportVolumeExpansionComponents(ctx context.Context, cli client.Client,
 	return volumeExpansionComponents, nil
 }
 
-// checkStorageClassIsSupportExpansion check whether the storageClass supports volume expansion
+// checkStorageClassIsSupportExpansion checks whether the storageClass supports volume expansion
 func checkStorageClassIsSupportExpansion(ctx context.Context,
 	cli client.Client,
 	storageClassMap map[string]bool,
@@ -184,7 +185,7 @@ func checkStorageClassIsSupportExpansion(ctx context.Context,
 		}
 		return ok, nil
 	} else {
-		// get the default StorageClass whether supports volume expansion for the first time
+		// get the default StorageClass whether support volume expansion for the first time
 		if !*hasCheckDefaultStorageClass {
 			if *defaultStorageClassAllowExpansion, err = checkDefaultStorageClass(ctx, cli, storageClassMap); err != nil {
 				return false, err
@@ -195,7 +196,7 @@ func checkStorageClassIsSupportExpansion(ctx context.Context,
 	}
 }
 
-// checkStorageClassIsSupportExpansion check whether the specified storageClass supports volume expansion
+// checkStorageClassIsSupportExpansion checks whether the specified storageClass supports volume expansion
 func checkSpecifyStorageClass(ctx context.Context, cli client.Client, storageClassMap map[string]bool, storageClassName string) (bool, error) {
 	var (
 		supportVolumeExpansion bool
@@ -216,7 +217,7 @@ func checkSpecifyStorageClass(ctx context.Context, cli client.Client, storageCla
 	return supportVolumeExpansion, nil
 }
 
-// checkDefaultStorageClass check whether the default storageClass supports volume expansion
+// checkDefaultStorageClass checks whether the default storageClass supports volume expansion
 func checkDefaultStorageClass(ctx context.Context, cli client.Client, storageClassMap map[string]bool) (bool, error) {
 	storageClassList := &storagev1.StorageClassList{}
 	if err := cli.List(ctx, storageClassList); err != nil {
@@ -233,13 +234,13 @@ func checkDefaultStorageClass(ctx context.Context, cli client.Client, storageCla
 	return false, nil
 }
 
-// getVolumeClaimTemplateName get volumeTemplate name by cluster name and component name
+// getVolumeClaimTemplateName gets volumeTemplate name by cluster name and component name
 func getVolumeClaimTemplateName(pvcName, clusterName, componentName string) string {
 	separator := fmt.Sprintf("-%s-%s", clusterName, componentName)
 	return strings.Split(pvcName, separator)[0]
 }
 
-// needSyncClusterStatusWhenAllowExpansion when StorageClass allow volume expansion, do it
+// needSyncClusterStatusWhenAllowExpansion when StorageClass allows volume expansion, do it
 func needSyncClusterStatusWhenAllowExpansion(componentName, volumeClaimTemplateName string, cluster *dbaasv1alpha1.Cluster) bool {
 	var (
 		needSyncStatusOperations bool
@@ -271,7 +272,7 @@ func needSyncClusterStatusWhenAllowExpansion(componentName, volumeClaimTemplateN
 	return needSyncStatusOperations
 }
 
-// needSyncClusterStatusWhenNotAllowExpansion when StorageClass not allow volume expansion, do it
+// needSyncClusterStatusWhenNotAllowExpansion when StorageClass not allows volume expansion, do it
 func needSyncClusterStatusWhenNotAllowExpansion(componentName, volumeClaimTemplateName string, cluster *dbaasv1alpha1.Cluster) bool {
 	var (
 		needSyncStatusOperations bool
@@ -281,13 +282,13 @@ func needSyncClusterStatusWhenNotAllowExpansion(componentName, volumeClaimTempla
 		if x.Name != componentName {
 			continue
 		}
-		// if old volumeClaimTemplate support expansion, delete it
+		// if old volumeClaimTemplate supports expansion, delete it
 		index := slices.Index(x.VolumeClaimTemplateNames, volumeClaimTemplateName)
 		if index != -1 {
 			x.VolumeClaimTemplateNames = append(x.VolumeClaimTemplateNames[:index], x.VolumeClaimTemplateNames[index+1:]...)
 			needSyncStatusOperations = true
 		}
-		// if VolumeClaimTemplateNames is empty, delete the component
+		// if VolumeClaimTemplateNames are empty, delete the component
 		if len(x.VolumeClaimTemplateNames) == 0 {
 			volumeExpandable = append(volumeExpandable[:i], volumeExpandable[i+1:]...)
 		} else {
@@ -299,19 +300,20 @@ func needSyncClusterStatusWhenNotAllowExpansion(componentName, volumeClaimTempla
 	return needSyncStatusOperations
 }
 
-// needSyncClusterStatus check whether sync cluster.status.operations by StorageClass
+// needSyncClusterStatus checks whether we should to sync cluster.status.operations.
 func needSyncClusterStatus(storageClass *storagev1.StorageClass,
 	componentName, volumeClaimTemplateName string,
 	cluster *dbaasv1alpha1.Cluster) bool {
 	if isSupportVolumeExpansion(storageClass) {
-		// if the storageClass support volume expansion
+		// if the storageClass supports volume expansion, do it
 		return needSyncClusterStatusWhenAllowExpansion(componentName, volumeClaimTemplateName, cluster)
 	} else {
 		return needSyncClusterStatusWhenNotAllowExpansion(componentName, volumeClaimTemplateName, cluster)
 	}
 }
 
-// handleNoExistsPVC when the cluster not exists PVC, maybe the cluster is creating. so we do the same things with creating a cluster.
+// handleNoExistsPVC when the cluster not exists PVC, maybe the cluster is creating.
+// only need to check whether the StorageClass corresponding to VolumeClaimTemplate supports volume expansion.
 func handleNoExistsPVC(reqCtx intctrlutil.RequestCtx, cli client.Client, cluster *dbaasv1alpha1.Cluster) (bool, error) {
 	var needSyncStatusOperations bool
 	volumeExpandableComponents, err := getSupportVolumeExpansionComponents(reqCtx.Ctx, cli, cluster)

@@ -29,4 +29,7 @@ spec:
         resources:
           requests:
             storage: 2Gi
+  - monitor: false
+    name: %s
+    type: stateful
   terminationPolicy: WipeOut

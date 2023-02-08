@@ -18,29 +18,20 @@ package dbaas
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/onsi/gomega"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/yaml"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/testutil"
-	"github.com/apecloud/kubeblocks/test/testdata"
 )
 
 // CreateRestartOpsRequest creates a OpsRequest of restart type for testing.
-func CreateRestartOpsRequest(ctx context.Context, testCtx testutil.TestContext, clusterName, opsRequestName string, componentNames []string) *dbaasv1alpha1.OpsRequest {
-	opsBytes, err := testdata.GetTestDataFileContent("operations/restart.yaml")
-	if err != nil {
-		return nil
-	}
-	opsRequestYaml := fmt.Sprintf(string(opsBytes), opsRequestName, clusterName, clusterName, componentNames)
-	ops := &dbaasv1alpha1.OpsRequest{}
-	gomega.Expect(yaml.Unmarshal([]byte(opsRequestYaml), ops)).Should(gomega.Succeed())
-	return CreateOpsRequest(ctx, testCtx, ops)
+func CreateRestartOpsRequest(testCtx testutil.TestContext, clusterName, opsRequestName string, componentNames []string) *dbaasv1alpha1.OpsRequest {
+	return CreateCustomizedObj(&testCtx, "operations/restart.yaml",
+		&dbaasv1alpha1.OpsRequest{}, CustomizeObjYAML(opsRequestName, clusterName, clusterName, componentNames))
 }
 
 // NewOpsRequestObj only generates the OpsRequest Object, instead of actually creating this resource.
@@ -61,12 +52,8 @@ func NewOpsRequestObj(opsRequestName, namespace, clusterName string, opsType dba
 func CreateOpsRequest(ctx context.Context, testCtx testutil.TestContext, opsRequest *dbaasv1alpha1.OpsRequest) *dbaasv1alpha1.OpsRequest {
 	gomega.Expect(testCtx.CreateObj(ctx, opsRequest)).Should(gomega.Succeed())
 	// wait until cluster created
-	newOps := &dbaasv1alpha1.OpsRequest{}
-	gomega.Eventually(func(g gomega.Gomega) {
-		g.Expect(testCtx.Cli.Get(context.Background(), client.ObjectKey{Name: opsRequest.Name,
-			Namespace: testCtx.DefaultNamespace}, newOps)).Should(gomega.Succeed())
-	}, timeout, interval).Should(gomega.Succeed())
-	return newOps
+	gomega.Eventually(CheckObjExists(&testCtx, client.ObjectKeyFromObject(opsRequest), opsRequest, true)).Should(gomega.Succeed())
+	return opsRequest
 }
 
 // GetOpsRequestCompPhase gets the component phase of testing OpsRequest  for verification.

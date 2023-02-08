@@ -21,9 +21,6 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-
-	appsv1 "k8s.io/api/apps/v1"
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -45,63 +42,57 @@ var _ = Describe("Consensus Component", func() {
 		defaultMinReadySeconds int32 = 10
 	)
 
-	cleanupObjects := func() {
-		err := k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.ClusterDefinition{}, client.HasLabels{testCtx.TestObjLabelKey})
-		Expect(err).NotTo(HaveOccurred())
-		err = k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.ClusterVersion{}, client.HasLabels{testCtx.TestObjLabelKey})
-		Expect(err).NotTo(HaveOccurred())
-		err = k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.Cluster{}, client.InNamespace(testCtx.DefaultNamespace), client.HasLabels{testCtx.TestObjLabelKey})
-		Expect(err).NotTo(HaveOccurred())
-		err = k8sClient.DeleteAllOf(ctx, &appsv1.StatefulSet{}, client.InNamespace(testCtx.DefaultNamespace), client.HasLabels{testCtx.TestObjLabelKey})
-		Expect(err).NotTo(HaveOccurred())
-		err = k8sClient.DeleteAllOf(ctx, &corev1.Pod{}, client.InNamespace(testCtx.DefaultNamespace), client.HasLabels{testCtx.TestObjLabelKey},
-			client.GracePeriodSeconds(0))
-		Expect(err).NotTo(HaveOccurred())
+	cleanAll := func() {
+		// must wait until resources deleted and no longer exist before the testcases start,
+		// otherwise if later it needs to create some new resource objects with the same name,
+		// in race conditions, it will find the existence of old objects, resulting failure to
+		// create the new objects.
+		By("clean resources")
+		// delete cluster(and all dependent sub-resources), clusterversion and clusterdef
+		testdbaas.ClearClusterResources(&testCtx)
+
+		// clear rest resources
+		inNS := client.InNamespace(testCtx.DefaultNamespace)
+		ml := client.HasLabels{testCtx.TestObjLabelKey}
+		// namespaced resources
+		testdbaas.ClearResources(&testCtx, intctrlutil.StatefulSetSignature, inNS, ml)
+		testdbaas.ClearResources(&testCtx, intctrlutil.PodSignature, inNS, ml, client.GracePeriodSeconds(0))
 	}
 
-	BeforeEach(func() {
-		// Add any setup steps that needs to be executed before each test
-		cleanupObjects()
-	})
+	BeforeEach(cleanAll)
 
-	AfterEach(func() {
-		// Add any teardown steps that needs to be executed after each test
-		cleanupObjects()
-	})
+	AfterEach(cleanAll)
 
 	mockClusterStatusProbeTimeout := func(cluster *dbaasv1alpha1.Cluster) {
 		// mock pods ready in status component and probe timed out
-		clusterPatch := client.MergeFrom(cluster.DeepCopy())
-		podsReady := true
-		cluster.Status.Components = map[string]dbaasv1alpha1.ClusterStatusComponent{
-			consensusCompName: {
-				PodsReady:     &podsReady,
-				PodsReadyTime: &metav1.Time{Time: time.Now().Add(-10 * time.Minute)},
-			},
-		}
-		Expect(k8sClient.Status().Patch(ctx, cluster, clusterPatch)).Should(Succeed())
-		Eventually(func() bool {
-			tmpCluster := &dbaasv1alpha1.Cluster{}
-			_ = k8sClient.Get(ctx, client.ObjectKey{Name: clusterName, Namespace: testCtx.DefaultNamespace}, tmpCluster)
-			return tmpCluster.Status.Components != nil
-		}, timeout, interval).Should(BeTrue())
+		Eventually(testdbaas.ChangeObjStatus(&testCtx, cluster, func() {
+			podsReady := true
+			cluster.Status.Components = map[string]dbaasv1alpha1.ClusterStatusComponent{
+				consensusCompName: {
+					PodsReady:     &podsReady,
+					PodsReadyTime: &metav1.Time{Time: time.Now().Add(-10 * time.Minute)},
+				},
+			}
+		})).Should(Succeed())
+
+		Eventually(testdbaas.CheckObj(&testCtx, client.ObjectKeyFromObject(cluster), func(g Gomega, tmpCluster *dbaasv1alpha1.Cluster) {
+			g.Expect(tmpCluster.Status.Components != nil).Should(BeTrue())
+		})).Should(Succeed())
 	}
 
-	validateComponentStatus := func() {
-		Eventually(func() bool {
-			tmpCluster := &dbaasv1alpha1.Cluster{}
-			_ = k8sClient.Get(ctx, client.ObjectKey{Name: clusterName, Namespace: testCtx.DefaultNamespace}, tmpCluster)
-			return tmpCluster.Status.Components[consensusCompName].Phase == dbaasv1alpha1.FailedPhase
-		}, timeout, interval).Should(BeTrue())
+	validateComponentStatus := func(cluster *dbaasv1alpha1.Cluster) {
+		Eventually(testdbaas.CheckObj(&testCtx, client.ObjectKeyFromObject(cluster), func(g Gomega, tmpCluster *dbaasv1alpha1.Cluster) {
+			g.Expect(tmpCluster.Status.Components[consensusCompName].Phase == dbaasv1alpha1.FailedPhase).Should(BeTrue())
+		})).Should(Succeed())
 	}
 
 	Context("Consensus Component test", func() {
 		It("Consensus Component test", func() {
 			By(" init cluster, statefulSet, pods")
-			clusterDef, _, cluster := testdbaas.InitConsensusMysql(ctx, testCtx, clusterDefName,
+			clusterDef, _, cluster := testdbaas.InitConsensusMysql(testCtx, clusterDefName,
 				clusterVersionName, clusterName, consensusCompName)
 
-			sts := testdbaas.MockConsensusComponentStatefulSet(ctx, testCtx, clusterName, consensusCompName)
+			sts := testdbaas.MockConsensusComponentStatefulSet(testCtx, clusterName, consensusCompName)
 			componentName := consensusCompName
 			typeName := cluster.GetComponentTypeName(componentName)
 			componentDef := clusterDef.GetComponentDefByTypeName(typeName)
@@ -134,9 +125,9 @@ var _ = Describe("Consensus Component", func() {
 				mockClusterStatusProbeTimeout(cluster)
 				requeue, _ := consensusComponent.HandleProbeTimeoutWhenPodsReady(nil)
 				Expect(requeue == false).Should(BeTrue())
-				validateComponentStatus()
+				validateComponentStatus(cluster)
 			} else {
-				podList := testdbaas.MockConsensusComponentPods(ctx, testCtx, clusterName, consensusCompName)
+				podList := testdbaas.MockConsensusComponentPods(testCtx, sts, clusterName, consensusCompName)
 				By("test pod is not available")
 				Expect(consensusComponent.PodIsAvailable(podList[0], defaultMinReadySeconds)).Should(BeTrue())
 
@@ -147,7 +138,7 @@ var _ = Describe("Consensus Component", func() {
 				testk8s.DeletePodLabelKey(ctx, testCtx, podName, intctrlutil.RoleLabelKey)
 				requeue, _ := consensusComponent.HandleProbeTimeoutWhenPodsReady(nil)
 				Expect(requeue == false).Should(BeTrue())
-				validateComponentStatus()
+				validateComponentStatus(cluster)
 
 				By("test component is running")
 				isRunning, _ := consensusComponent.IsRunning(sts)

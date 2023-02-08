@@ -196,7 +196,7 @@ func NewCustomizedObj[T intctrlutil.Object, PT intctrlutil.PObject[T]](testCtx *
 func CreateCustomizedObj[T intctrlutil.Object, PT intctrlutil.PObject[T]](testCtx *testutil.TestContext,
 	filePath string, pobj PT, actions ...any) PT {
 	pobj = NewCustomizedObj(testCtx, filePath, pobj, actions...)
-	return CreateK8sResource(testCtx.Ctx, *testCtx, pobj).(PT)
+	return CreateK8sResource(*testCtx, pobj).(PT)
 }
 
 // Helper functions to delete object.

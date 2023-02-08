@@ -64,9 +64,9 @@ var _ = Describe("Replication Component", func() {
 	Context("Replication Component test", func() {
 		It("Replication Component test", func() {
 			By(" init cluster, statefulSet, pods")
-			clusterDef, _, cluster := testdbaas.InitReplicationRedis(ctx, testCtx, clusterDefName,
+			clusterDef, _, cluster := testdbaas.InitReplicationRedis(testCtx, clusterDefName,
 				clusterVersionName, clusterName, replicationCompName)
-			sts := testdbaas.MockReplicationComponentStatefulSet(ctx, testCtx, clusterName, replicationCompName)
+			sts := testdbaas.MockReplicationComponentStatefulSet(testCtx, clusterName, replicationCompName)
 			componentName := replicationCompName
 			typeName := cluster.GetComponentTypeName(componentName)
 			componentDef := clusterDef.GetComponentDefByTypeName(typeName)

@@ -41,7 +41,7 @@ Make sure the following requirements are met.
 
 - AWS access key: An AWS access key is required and this account should have the searching and changing permission of VPC/Internet Gateway/Subnet/Route Table/Security Group/EC2 resources. 
 
-> **Caution** <br>
+> **Caution**<br />
 > DO NOT switch your network during the deployment and using process. Switching network will change the IP address, which results in connection failure.
 
 Replace `--access-key` and `--access-secret` with your AWS access key and run this command to deploy a playground on AWS.

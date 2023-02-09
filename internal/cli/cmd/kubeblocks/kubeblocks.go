@@ -528,7 +528,7 @@ func (o *Options) uninstall() error {
 	// get KubeBlocks objects and try to remove them
 	objs, err := getKBObjects(o.Client, o.Dynamic, o.Namespace)
 	if err != nil {
-		fmt.Fprintf(o.ErrOut, "Get KubeBlocks Ojects throw some errors %s", err.Error())
+		fmt.Fprintf(o.ErrOut, "Failed to get KubeBlocks objects %s", err.Error())
 	}
 
 	// remove finalizers

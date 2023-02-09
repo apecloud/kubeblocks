@@ -108,8 +108,8 @@ func (conMgr clusterConditionManager) updateStatusConditions(condition metav1.Co
 	return nil
 }
 
-// handleConditionForClusterPhase checks whether the condition can repair by cluster.
-// if it cannot be repaired after 30 seconds, modify the cluster status to ConditionsError
+// handleConditionForClusterPhase checks whether the condition can be repaired by cluster.
+// if it cannot be repaired after 30 seconds, set the cluster status to ConditionsError
 func (conMgr clusterConditionManager) handleConditionForClusterPhase(oldCondition *metav1.Condition, condition metav1.Condition) bool {
 	if condition.Status == metav1.ConditionTrue {
 		return false

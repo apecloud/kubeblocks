@@ -378,7 +378,7 @@ func appendOrOverrideContainerAttr(compContainers []corev1.Container, targetCont
 	return compContainers
 }
 
-// doContainerAttrOverride overrides the attributes in compContainer with the attributes in container
+// doContainerAttrOverride overrides the attributes in compContainer with the attributes in container.
 func doContainerAttrOverride(compContainer *corev1.Container, container corev1.Container) {
 	if compContainer == nil {
 		return

@@ -30,29 +30,6 @@ auth:
   ## @param auth.replicationPassword MySQL replication user password. Ignored if existing secret is provided
   ##
   replicationPassword: ""
-  
-## @section Mysql&reg; Primary configuration parameters
-primary:
-  ## @param config template name
-  ## name: mysql-primary-config-8.0.31
-  configTemplate:
-    ## @param config template context
-    configuration: |-
-      [mysqld]
-      log-bin
-      gtid_mode=ON
-      enforce-gtid-consistency=true
-
-## @section Mysql&reg; Secondary configuration parameters
-secondary:
-  ## @param config template name
-  ## name: mysql-secondary-config-8.0.31
-  configTemplate:
-    ## @param config template context
-    configuration: |-
-      [mysqld]
-      gtid_mode=ON
-      enforce-gtid-consistency=true
 
 imagePullSecrets: []
 nameOverride: ""

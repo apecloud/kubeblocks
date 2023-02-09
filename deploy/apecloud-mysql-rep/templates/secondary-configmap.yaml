@@ -1,7 +1,9 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: mysql-secondary-config-8.0.31
+  name: apecloud-mysql-secondary-config-8.0.31
+  labels:
+    {{- include "mysql.labels" . | nindent 4 }}  
 data:
   mysql.cnf: |-
-    {{- .Values.secondary.configTemplate.configuration | nindent 4 }}
+    {{- .Files.Get "config/mysql8.cnf.tpl" | nindent 4 }}

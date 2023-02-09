@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: check branch name
-        uses: JashBook/check-branch-name@v0.1.0
+        uses: apecloud/check-branch-name@v0.1.0
         with:
           branch_pattern: 'feature/|bugfix/|release/|hotfix/|support/|dependabot/'
           comment_for_invalid_branch_name: 'This branch name is not following the standards: feature/|bugfix/|release/|hotfix/|support/|dependabot/'

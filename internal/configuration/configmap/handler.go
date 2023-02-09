@@ -71,7 +71,7 @@ func findParentPidFromProcessName(processName string) (PID, error) {
 		}
 	}
 
-	return InvalidPID, cfgutil.MakeError("not find pid fo process name: [%s]", processName)
+	return InvalidPID, cfgutil.MakeError("not find pid of process name: [%s]", processName)
 }
 
 func CreateSignalHandler(sig dbaasv1alpha1.SignalType, processName string) WatchEventHandler {

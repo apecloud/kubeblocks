@@ -53,30 +53,32 @@ var clusterCreateExample = templates.Examples(`
 	# Create a cluster using cluster definition my-cluster-def and cluster version my-version
 	kbcli cluster create mycluster --cluster-definition=my-cluster-def --cluster-version=my-version
 
-	# --cluster-definition is required, if --cluster-version is not specified, will use the latest cluster version
+	# --cluster-definition is required, if --cluster-version is not specified, will use the most recently created version
 	kbcli cluster create mycluster --cluster-definition=my-cluster-def
 
-	# Create a cluster using file my.yaml and termination policy DoNotDelete that will prevent
-	# the cluster from being deleted
-	kbcli cluster create mycluster --cluster-definition=my-cluster-def --set=my.yaml --termination-policy=DoNotDelete
+	# Create a cluster and set termination policy DoNotDelete that will prevent the cluster from being deleted
+	kbcli cluster create mycluster --cluster-definition=my-cluster-def --termination-policy=DoNotDelete
 
-	# In scenarios where you want to delete resources such as sts, deploy, svc, pdb, but keep pvcs when deleting
-	# the cluster, use termination policy Halt
-	kbcli cluster create mycluster --cluster-definition=my-cluster-def --set=my.yaml --termination-policy=Halt
+	# In scenarios where you want to delete resources such as statements, deployments, services, pdb, but keep PVCs
+	# when deleting the cluster, use termination policy Halt
+	kbcli cluster create mycluster --cluster-definition=my-cluster-def --termination-policy=Halt
 
-	# In scenarios where you want to delete resource such as sts, deploy, svc, pdb, and including pvcs when
-	# deleting the cluster, use termination policy Delete
-	kbcli cluster create mycluster --cluster-definition=my-cluster-def --set=my.yaml --termination-policy=Delete
+	# In scenarios where you want to delete resource such as statements, deployments, services, pdb, and including
+	# PVCs when deleting the cluster, use termination policy Delete
+	kbcli cluster create mycluster --cluster-definition=my-cluster-def --termination-policy=Delete
 
 	# In scenarios where you want to delete all resources including all snapshots and snapshot data when deleting
 	# the cluster, use termination policy WipeOut
-	kbcli cluster create mycluster --cluster-definition=my-cluster-def --set=my.yaml --termination-policy=WipeOut
+	kbcli cluster create mycluster --cluster-definition=my-cluster-def --termination-policy=WipeOut
 
-	# In scenarios where you want to load components data from website URL
-	kbcli cluster create mycluster --cluster-definition=my-cluster-def --set=https://kubeblocks.io/yamls/my.yaml
+	# Create a cluster and set cpu to 1000m, memory to 1Gi, storage size to 10Gi and replicas to 2
+	kbcli cluster create mycluster --cluster-definition=my-cluster-def --set=cpu=1000m,memory=1Gi,storage=10Gi,replicas=2
 
-	# In scenarios where you want to load components data from stdin
-	cat << EOF | kbcli cluster create mycluster --cluster-definition=my-cluster-def --set -
+	# Create a cluster and use a URL to set cluster resource
+	kbcli cluster create mycluster --cluster-definition=my-cluster-def --set-file=https://kubeblocks.io/yamls/my.yaml
+
+	# Create a cluster and load cluster resource set from stdin
+	cat << EOF | kbcli cluster create mycluster --cluster-definition=my-cluster-def --set-file -
 	- name: my-test ...
 
 	# Create a cluster forced to scatter by node
@@ -102,6 +104,7 @@ const (
 	keyMemory   setKey = "memory"
 	keyReplicas setKey = "replicas"
 	keyStorage  setKey = "storage"
+	keyUnknown  setKey = "unknown"
 )
 
 type envSet struct {
@@ -202,7 +205,7 @@ func (o *CreateOptions) Validate() error {
 			return err
 		}
 		o.ClusterVersionRef = version
-		fmt.Fprintf(o.Out, "Cluster version is not specified, use latest ClusterVersion %s\n", o.ClusterVersionRef)
+		fmt.Fprintf(o.Out, "Cluster version is not specified, use the recently created ClusterVersion %s\n", o.ClusterVersionRef)
 	}
 
 	if len(o.Values) > 0 && len(o.SetFile) > 0 {
@@ -325,8 +328,8 @@ func NewCreateCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 		BuildFlags: func(cmd *cobra.Command) {
 			cmd.Flags().StringVar(&o.ClusterDefRef, "cluster-definition", "", "Specify cluster definition, run \"kbcli cluster-definition list\" to show all available cluster definition")
 			cmd.Flags().StringVar(&o.ClusterVersionRef, "cluster-version", "", "Specify cluster version, run \"kbcli cluster-version list\" to show all available cluster version, use the latest version if not specified")
-			cmd.Flags().StringVar(&o.SetFile, "set-file", "", "Use yaml file, URL, or stdin to set the cluster parameters")
-			cmd.Flags().StringArrayVar(&o.Values, "set", []string{}, "Set the cluster parameters including cpu, memory, replicas and storage, each set corresponds to a component")
+			cmd.Flags().StringVarP(&o.SetFile, "set-file", "f", "", "Use yaml file, URL, or stdin to set the cluster resource")
+			cmd.Flags().StringArrayVar(&o.Values, "set", []string{}, "Set the cluster resource including cpu, memory, replicas and storage, each set corresponds to a component.(e.g. --set cpu=1000m,memory=1Gi,replicas=3,storage=10Gi)")
 			cmd.Flags().StringVar(&o.Backup, "backup", "", "Set a source backup to restore data")
 
 			// add updatable flags
@@ -470,18 +473,30 @@ func buildClusterComp(cd *dbaasv1alpha1.ClusterDefinition, setsMap map[string]ma
 	return comps, nil
 }
 
+// buildCompSetsMap builds the map between component type name and its set values, if the type name is not
+// specified in the set, use the cluster definition default component type name.
 func buildCompSetsMap(values []string, cd *dbaasv1alpha1.ClusterDefinition) (map[string]map[setKey]string, error) {
 	allSets := map[string]map[setKey]string{}
-	defaultCompType, err := cluster.GetDefaultCompTypeName(cd)
-	if err != nil {
-		return nil, err
+	parseKey := func(key string) setKey {
+		keys := []setKey{keyCPU, keyType, keyStorage, keyMemory, keyReplicas}
+		for _, k := range keys {
+			if k == setKey(key) {
+				return setKey(key)
+			}
+		}
+		return keyUnknown
 	}
-
 	buildSetMap := func(sets []string) map[setKey]string {
 		res := map[setKey]string{}
 		for _, set := range sets {
 			kv := strings.Split(set, "=")
 			if len(kv) != 2 {
+				continue
+			}
+
+			// only record the supported key
+			k := parseKey(kv[0])
+			if k == keyUnknown {
 				continue
 			}
 			res[setKey(kv[0])] = kv[1]
@@ -495,12 +510,28 @@ func buildCompSetsMap(values []string, cd *dbaasv1alpha1.ClusterDefinition) (map
 		if len(sets) == 0 {
 			continue
 		}
-		// find the type key
-		if t := sets[keyType]; len(t) > 0 {
-			allSets[t] = sets
-		} else {
-			allSets[defaultCompType] = sets
+
+		// get the component type name
+		typeName := sets[keyType]
+
+		// type is not specified by user, use the default component type name, now only
+		// support cluster definition with one component
+		if len(typeName) == 0 {
+			name, err := cluster.GetDefaultCompTypeName(cd)
+			if err != nil {
+				return nil, err
+			}
+			typeName = name
 		}
+
+		// if already set by other value, later values override earlier values
+		if old, ok := allSets[typeName]; ok {
+			for k, v := range sets {
+				old[k] = v
+			}
+			sets = old
+		}
+		allSets[typeName] = sets
 	}
 	return allSets, nil
 }
@@ -524,7 +555,7 @@ func generateClusterName(dynamic dynamic.Interface, namespace string) (string, e
 	// retry 10 times
 	for i := 0; i < 10; i++ {
 		name = cluster.GenerateName()
-		// check whether the cluster exists
+		// check whether the cluster exists, if not found, return it
 		_, err := dynamic.Resource(types.ClusterGVR()).Namespace(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 		if errors.IsNotFound(err) {
 			return name, nil

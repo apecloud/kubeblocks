@@ -16,7 +16,7 @@ By default, the `Monitor` parameter value is *`false`*.
 
 *Example*
 ```
- kbcli cluster create mycluster --set=http://kubeblocks.io/yamls/apecloud-mysql-single.yaml --termination-policy=WipeOut --monitor=true
+ kbcli cluster create mycluster --set-file=http://kubeblocks.io/yamls/apecloud-mysql-single.yaml --termination-policy=WipeOut --monitor=true
 ```
 - For existed clusters, tbd.
 

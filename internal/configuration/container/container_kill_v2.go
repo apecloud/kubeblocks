@@ -89,7 +89,7 @@ func (d *dockerContainerV2) Kill(ctx context.Context, containerIDs []string, sig
 			errs = append(errs, err)
 			continue
 		}
-		d.logger.Infof("docker container[%s] stoped.", containerID)
+		d.logger.Infof("docker container[%s] stopped.", containerID)
 	}
 	if len(errs) > 0 {
 		return utilerrors.NewAggregate(errs)
@@ -191,7 +191,7 @@ func (c *containerdContainerV2) Kill(ctx context.Context, containerIDs []string,
 			errs = append(errs, err)
 			continue
 		}
-		c.logger.Infof("docker container[%s] stoped.", containerID)
+		c.logger.Infof("docker container[%s] stopped.", containerID)
 	}
 
 	if len(errs) > 0 {

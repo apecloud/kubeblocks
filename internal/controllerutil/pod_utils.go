@@ -316,7 +316,7 @@ func GetIntOrPercentValue(intOrStr *metautil.IntOrString) (int, bool, error) {
 	if strings.HasSuffix(s, "%") {
 		s = strings.TrimSuffix(intOrStr.StrVal, "%")
 	} else {
-		return 0, false, fmt.Errorf("falied to parse percentage. [%s]", intOrStr.StrVal)
+		return 0, false, fmt.Errorf("failed to parse percentage. [%s]", intOrStr.StrVal)
 	}
 	v, err := strconv.Atoi(s)
 	if err != nil {

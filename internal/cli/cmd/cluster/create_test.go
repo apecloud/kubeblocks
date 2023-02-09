@@ -18,6 +18,8 @@ package cluster
 
 import (
 	"os"
+	"reflect"
+	"strings"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -136,23 +138,27 @@ spec:
 		Expect(err).Should(HaveOccurred())
 	})
 
+	checkComponent := func(comps []map[string]interface{}, storage string, replicas int32, cpu string, memory string) {
+		Expect(comps).ShouldNot(BeNil())
+		Expect(len(comps)).Should(Equal(2))
+
+		comp := &dbaasv1alpha1.ClusterComponent{}
+		_ = runtime.DefaultUnstructuredConverter.FromUnstructured(comps[0], comp)
+		Expect(getResource(comp.VolumeClaimTemplates[0].Spec.Resources, corev1.ResourceStorage)).Should(Equal(storage))
+		Expect(*comp.Replicas).Should(BeEquivalentTo(replicas))
+
+		resources := comp.Resources
+		Expect(resources).ShouldNot(BeNil())
+		Expect(getResource(resources, corev1.ResourceCPU)).Should(Equal(cpu))
+		Expect(getResource(resources, corev1.ResourceMemory)).Should(Equal(memory))
+	}
+
 	It("build default cluster component without environment", func() {
 		dynamic := testing.FakeDynamicClient(testing.FakeClusterDef())
 		cd, _ := cluster.GetClusterDefByName(dynamic, testing.ClusterDefName)
 		comps, err := buildClusterComp(cd, nil)
 		Expect(err).ShouldNot(HaveOccurred())
-		Expect(comps).ShouldNot(BeNil())
-		Expect(len(comps)).Should(Equal(2))
-
-		clusterComp := &dbaasv1alpha1.ClusterComponent{}
-		_ = runtime.DefaultUnstructuredConverter.FromUnstructured(comps[0], clusterComp)
-		Expect(getResource(clusterComp.VolumeClaimTemplates[0].Spec.Resources, corev1.ResourceStorage)).Should(Equal("10Gi"))
-		Expect(*clusterComp.Replicas).Should(BeEquivalentTo(2))
-
-		resources := clusterComp.Resources
-		Expect(resources).ShouldNot(BeNil())
-		Expect(getResource(resources, corev1.ResourceCPU)).Should(Equal("1"))
-		Expect(getResource(resources, corev1.ResourceMemory)).Should(Equal("1Gi"))
+		checkComponent(comps, "10Gi", 1, "1", "1Gi")
 	})
 
 	It("build default cluster component with environment", func() {
@@ -164,17 +170,142 @@ spec:
 		cd, _ := cluster.GetClusterDefByName(dynamic, testing.ClusterDefName)
 		comps, err := buildClusterComp(cd, nil)
 		Expect(err).ShouldNot(HaveOccurred())
-		Expect(comps).ShouldNot(BeNil())
-		Expect(len(comps)).Should(Equal(2))
+		checkComponent(comps, "5Gi", 1, "2", "2Gi")
+	})
 
-		clusterComp := &dbaasv1alpha1.ClusterComponent{}
-		_ = runtime.DefaultUnstructuredConverter.FromUnstructured(comps[0], clusterComp)
-		Expect(getResource(clusterComp.VolumeClaimTemplates[0].Spec.Resources, corev1.ResourceStorage)).Should(Equal("5Gi"))
-		Expect(*clusterComp.Replicas).Should(BeEquivalentTo(1))
-		resources := clusterComp.Resources
-		Expect(resources).ShouldNot(BeNil())
-		Expect(resources.Requests[corev1.ResourceCPU].ToUnstructured()).Should(Equal("2"))
-		Expect(resources.Requests[corev1.ResourceMemory].ToUnstructured()).Should(Equal("2Gi"))
+	It("build cluster component with set values", func() {
+		dynamic := testing.FakeDynamicClient(testing.FakeClusterDef())
+		cd, _ := cluster.GetClusterDefByName(dynamic, testing.ClusterDefName)
+		setsMap := map[string]map[setKey]string{
+			testing.ComponentType: {
+				keyCPU:      "10",
+				keyMemory:   "2Gi",
+				keyStorage:  "10Gi",
+				keyReplicas: "10",
+			},
+		}
+		comps, err := buildClusterComp(cd, setsMap)
+		Expect(err).Should(Succeed())
+		checkComponent(comps, "10Gi", 10, "10", "2Gi")
+	})
+
+	It("build component and set values map", func() {
+		mockCD := func(typeNames []string) *dbaasv1alpha1.ClusterDefinition {
+			cd := &dbaasv1alpha1.ClusterDefinition{}
+			var comps []dbaasv1alpha1.ClusterDefinitionComponent
+			for _, n := range typeNames {
+				comp := dbaasv1alpha1.ClusterDefinitionComponent{
+					TypeName: n,
+				}
+				comps = append(comps, comp)
+			}
+			cd.Spec.Components = comps
+			return cd
+		}
+
+		testCases := []struct {
+			values    []string
+			typeNames []string
+			expected  map[string]map[setKey]string
+		}{
+			{
+				nil,
+				nil,
+				map[string]map[setKey]string{},
+			},
+			{
+				[]string{"cpu=1"},
+				[]string{"my-comp"},
+				map[string]map[setKey]string{
+					"my-comp": {
+						keyCPU: "1",
+					},
+				},
+			},
+			{
+				[]string{"cpu=1,memory=2Gi,storage=10Gi"},
+				[]string{"my-comp"},
+				map[string]map[setKey]string{
+					"my-comp": {
+						keyCPU:     "1",
+						keyMemory:  "2Gi",
+						keyStorage: "10Gi",
+					},
+				},
+			},
+			// values with unknown set key that will be ignored
+			{
+				[]string{"cpu=1,memory=2Gi,storage=10Gi,t1,t1=v1"},
+				[]string{"my-comp"},
+				map[string]map[setKey]string{
+					"my-comp": {
+						keyCPU:     "1",
+						keyMemory:  "2Gi",
+						keyStorage: "10Gi",
+					},
+				},
+			},
+			// values with type
+			{
+				[]string{"type=comp,cpu=1,memory=2Gi,storage=10Gi,t1,t1=v1"},
+				[]string{"my-comp"},
+				map[string]map[setKey]string{
+					"comp": {
+						keyType:    "comp",
+						keyCPU:     "1",
+						keyMemory:  "2Gi",
+						keyStorage: "10Gi",
+					},
+				},
+			},
+			// set more than one time
+			{
+				[]string{"cpu=1,memory=2Gi", "storage=10Gi,cpu=2"},
+				[]string{"my-comp"},
+				map[string]map[setKey]string{
+					"my-comp": {
+						keyCPU:     "2",
+						keyMemory:  "2Gi",
+						keyStorage: "10Gi",
+					},
+				},
+			},
+			{
+				[]string{"type=my-comp,cpu=1,memory=2Gi", "storage=10Gi,cpu=2"},
+				[]string{"my-comp"},
+				map[string]map[setKey]string{
+					"my-comp": {
+						keyType:    "my-comp",
+						keyCPU:     "2",
+						keyMemory:  "2Gi",
+						keyStorage: "10Gi",
+					},
+				},
+			},
+			{
+				[]string{"type=comp1,cpu=1,memory=2Gi", "type=comp2,storage=10Gi,cpu=2"},
+				[]string{"my-comp"},
+				map[string]map[setKey]string{
+					"comp1": {
+						keyType:   "comp1",
+						keyCPU:    "1",
+						keyMemory: "2Gi",
+					},
+					"comp2": {
+						keyType:    "comp2",
+						keyCPU:     "2",
+						keyStorage: "10Gi",
+					},
+				},
+			},
+		}
+
+		for _, t := range testCases {
+			By(strings.Join(t.values, " "))
+			res, err := buildCompSetsMap(t.values, mockCD(t.typeNames))
+			Expect(err).Should(Succeed())
+			Expect(reflect.DeepEqual(res, t.expected)).Should(BeTrue())
+		}
 	})
 
 	It("build tolerations", func() {

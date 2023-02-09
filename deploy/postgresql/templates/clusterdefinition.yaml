@@ -163,7 +163,7 @@ spec:
               runAsUser: 1001         
             env:
               {{- $database := include "postgresql.database" .}}
-              {{- $sslmode := false }}    
+              {{- $sslmode := "disable" }}
               - name: DATA_SOURCE_URI
                 value: {{ printf "127.0.0.1:5432/%s?sslmode=%s" $database $sslmode }}
               - name: DATA_SOURCE_PASS

@@ -288,66 +288,67 @@ func mergeComponents(
 		HorizontalScalePolicy: clusterDefCompObj.HorizontalScalePolicy,
 	}
 
-	doContainerAttrOverride := func(container corev1.Container) {
-		i, c := getContainerByName(component.PodSpec.Containers, container.Name)
+	doContainerAttrOverride := func(compContainer []corev1.Container, container corev1.Container) []corev1.Container {
+		i, c := getContainerByName(compContainer, container.Name)
 		if c == nil {
-			component.PodSpec.Containers = append(component.PodSpec.Containers, container)
-			return
+			compContainer = append(compContainer, container)
+			return compContainer
 		}
 		if container.Image != "" {
-			component.PodSpec.Containers[i].Image = container.Image
+			compContainer[i].Image = container.Image
 		}
 		if len(container.Command) != 0 {
-			component.PodSpec.Containers[i].Command = container.Command
+			compContainer[i].Command = container.Command
 		}
 		if len(container.Args) != 0 {
-			component.PodSpec.Containers[i].Args = container.Args
+			compContainer[i].Args = container.Args
 		}
 		if container.WorkingDir != "" {
-			component.PodSpec.Containers[i].WorkingDir = container.WorkingDir
+			compContainer[i].WorkingDir = container.WorkingDir
 		}
 		if len(container.Ports) != 0 {
-			component.PodSpec.Containers[i].Ports = container.Ports
+			compContainer[i].Ports = container.Ports
 		}
 		if len(container.EnvFrom) != 0 {
-			component.PodSpec.Containers[i].EnvFrom = container.EnvFrom
+			compContainer[i].EnvFrom = container.EnvFrom
 		}
 		if len(container.Env) != 0 {
-			component.PodSpec.Containers[i].Env = container.Env
+			compContainer[i].Env = container.Env
 		}
 		if container.Resources.Limits != nil || container.Resources.Requests != nil {
-			component.PodSpec.Containers[i].Resources = container.Resources
+			compContainer[i].Resources = container.Resources
 		}
 		if len(container.VolumeMounts) != 0 {
-			component.PodSpec.Containers[i].VolumeMounts = container.VolumeMounts
+			compContainer[i].VolumeMounts = container.VolumeMounts
 		}
 		if len(container.VolumeDevices) != 0 {
-			component.PodSpec.Containers[i].VolumeDevices = container.VolumeDevices
+			compContainer[i].VolumeDevices = container.VolumeDevices
 		}
 		if container.LivenessProbe != nil {
-			component.PodSpec.Containers[i].LivenessProbe = container.LivenessProbe
+			compContainer[i].LivenessProbe = container.LivenessProbe
 		}
 		if container.ReadinessProbe != nil {
-			component.PodSpec.Containers[i].ReadinessProbe = container.ReadinessProbe
+			compContainer[i].ReadinessProbe = container.ReadinessProbe
 		}
 		if container.StartupProbe != nil {
-			component.PodSpec.Containers[i].StartupProbe = container.StartupProbe
+			compContainer[i].StartupProbe = container.StartupProbe
 		}
 		if container.Lifecycle != nil {
-			component.PodSpec.Containers[i].Lifecycle = container.Lifecycle
+			compContainer[i].Lifecycle = container.Lifecycle
 		}
 		if container.TerminationMessagePath != "" {
-			component.PodSpec.Containers[i].TerminationMessagePath = container.TerminationMessagePath
+			compContainer[i].TerminationMessagePath = container.TerminationMessagePath
 		}
 		if container.TerminationMessagePolicy != "" {
-			component.PodSpec.Containers[i].TerminationMessagePolicy = container.TerminationMessagePolicy
+			compContainer[i].TerminationMessagePolicy = container.TerminationMessagePolicy
 		}
 		if container.ImagePullPolicy != "" {
-			component.PodSpec.Containers[i].ImagePullPolicy = container.ImagePullPolicy
+			compContainer[i].ImagePullPolicy = container.ImagePullPolicy
 		}
 		if container.SecurityContext != nil {
-			component.PodSpec.Containers[i].SecurityContext = container.SecurityContext
+			compContainer[i].SecurityContext = container.SecurityContext
 		}
+		return compContainer
 	}
 
 	if clusterDefCompObj.ConfigSpec != nil {
@@ -357,8 +358,11 @@ func mergeComponents(
 	if clusterVersionComp != nil {
 		component.ConfigTemplates = cfgcore.MergeConfigTemplates(clusterVersionComp.ConfigTemplateRefs, component.ConfigTemplates)
 		if clusterVersionComp.PodSpec != nil {
+			for _, c := range clusterVersionComp.PodSpec.InitContainers {
+				component.PodSpec.InitContainers = doContainerAttrOverride(component.PodSpec.InitContainers, c)
+			}
 			for _, c := range clusterVersionComp.PodSpec.Containers {
-				doContainerAttrOverride(c)
+				component.PodSpec.Containers = doContainerAttrOverride(component.PodSpec.Containers, c)
 			}
 		}
 	}

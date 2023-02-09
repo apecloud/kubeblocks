@@ -288,68 +288,6 @@ func mergeComponents(
 		HorizontalScalePolicy: clusterDefCompObj.HorizontalScalePolicy,
 	}
 
-	doContainerAttrOverride := func(container corev1.Container) {
-		i, c := getContainerByName(component.PodSpec.Containers, container.Name)
-		if c == nil {
-			component.PodSpec.Containers = append(component.PodSpec.Containers, container)
-			return
-		}
-		if container.Image != "" {
-			component.PodSpec.Containers[i].Image = container.Image
-		}
-		if len(container.Command) != 0 {
-			component.PodSpec.Containers[i].Command = container.Command
-		}
-		if len(container.Args) != 0 {
-			component.PodSpec.Containers[i].Args = container.Args
-		}
-		if container.WorkingDir != "" {
-			component.PodSpec.Containers[i].WorkingDir = container.WorkingDir
-		}
-		if len(container.Ports) != 0 {
-			component.PodSpec.Containers[i].Ports = container.Ports
-		}
-		if len(container.EnvFrom) != 0 {
-			component.PodSpec.Containers[i].EnvFrom = container.EnvFrom
-		}
-		if len(container.Env) != 0 {
-			component.PodSpec.Containers[i].Env = container.Env
-		}
-		if container.Resources.Limits != nil || container.Resources.Requests != nil {
-			component.PodSpec.Containers[i].Resources = container.Resources
-		}
-		if len(container.VolumeMounts) != 0 {
-			component.PodSpec.Containers[i].VolumeMounts = container.VolumeMounts
-		}
-		if len(container.VolumeDevices) != 0 {
-			component.PodSpec.Containers[i].VolumeDevices = container.VolumeDevices
-		}
-		if container.LivenessProbe != nil {
-			component.PodSpec.Containers[i].LivenessProbe = container.LivenessProbe
-		}
-		if container.ReadinessProbe != nil {
-			component.PodSpec.Containers[i].ReadinessProbe = container.ReadinessProbe
-		}
-		if container.StartupProbe != nil {
-			component.PodSpec.Containers[i].StartupProbe = container.StartupProbe
-		}
-		if container.Lifecycle != nil {
-			component.PodSpec.Containers[i].Lifecycle = container.Lifecycle
-		}
-		if container.TerminationMessagePath != "" {
-			component.PodSpec.Containers[i].TerminationMessagePath = container.TerminationMessagePath
-		}
-		if container.TerminationMessagePolicy != "" {
-			component.PodSpec.Containers[i].TerminationMessagePolicy = container.TerminationMessagePolicy
-		}
-		if container.ImagePullPolicy != "" {
-			component.PodSpec.Containers[i].ImagePullPolicy = container.ImagePullPolicy
-		}
-		if container.SecurityContext != nil {
-			component.PodSpec.Containers[i].SecurityContext = container.SecurityContext
-		}
-	}
-
 	if clusterDefCompObj.ConfigSpec != nil {
 		component.ConfigTemplates = clusterDefCompObj.ConfigSpec.ConfigTemplateRefs
 	}
@@ -357,8 +295,11 @@ func mergeComponents(
 	if clusterVersionComp != nil {
 		component.ConfigTemplates = cfgcore.MergeConfigTemplates(clusterVersionComp.ConfigTemplateRefs, component.ConfigTemplates)
 		if clusterVersionComp.PodSpec != nil {
+			for _, c := range clusterVersionComp.PodSpec.InitContainers {
+				component.PodSpec.InitContainers = appendOrOverrideContainerAttr(component.PodSpec.InitContainers, c)
+			}
 			for _, c := range clusterVersionComp.PodSpec.Containers {
-				doContainerAttrOverride(c)
+				component.PodSpec.Containers = appendOrOverrideContainerAttr(component.PodSpec.Containers, c)
 			}
 		}
 	}
@@ -423,6 +364,79 @@ func mergeComponents(
 	replacePlaceholderTokens(cluster, component)
 
 	return component
+}
+
+// appendOrOverrideContainerAttr is used to append targetContainer to compContainers or override the attributes of compContainers with a given targetContainer,
+// if targetContainer does not exist in compContainers, it will be appended. otherwise it will be updated with the attributes of the target container.
+func appendOrOverrideContainerAttr(compContainers []corev1.Container, targetContainer corev1.Container) []corev1.Container {
+	index, compContainer := getContainerByName(compContainers, targetContainer.Name)
+	if compContainer == nil {
+		compContainers = append(compContainers, targetContainer)
+	} else {
+		doContainerAttrOverride(&compContainers[index], targetContainer)
+	}
+	return compContainers
+}
+
+// doContainerAttrOverride overrides the attributes in compContainer with the attributes in container.
+func doContainerAttrOverride(compContainer *corev1.Container, container corev1.Container) {
+	if compContainer == nil {
+		return
+	}
+	if container.Image != "" {
+		compContainer.Image = container.Image
+	}
+	if len(container.Command) != 0 {
+		compContainer.Command = container.Command
+	}
+	if len(container.Args) != 0 {
+		compContainer.Args = container.Args
+	}
+	if container.WorkingDir != "" {
+		compContainer.WorkingDir = container.WorkingDir
+	}
+	if len(container.Ports) != 0 {
+		compContainer.Ports = container.Ports
+	}
+	if len(container.EnvFrom) != 0 {
+		compContainer.EnvFrom = container.EnvFrom
+	}
+	if len(container.Env) != 0 {
+		compContainer.Env = container.Env
+	}
+	if container.Resources.Limits != nil || container.Resources.Requests != nil {
+		compContainer.Resources = container.Resources
+	}
+	if len(container.VolumeMounts) != 0 {
+		compContainer.VolumeMounts = container.VolumeMounts
+	}
+	if len(container.VolumeDevices) != 0 {
+		compContainer.VolumeDevices = container.VolumeDevices
+	}
+	if container.LivenessProbe != nil {
+		compContainer.LivenessProbe = container.LivenessProbe
+	}
+	if container.ReadinessProbe != nil {
+		compContainer.ReadinessProbe = container.ReadinessProbe
+	}
+	if container.StartupProbe != nil {
+		compContainer.StartupProbe = container.StartupProbe
+	}
+	if container.Lifecycle != nil {
+		compContainer.Lifecycle = container.Lifecycle
+	}
+	if container.TerminationMessagePath != "" {
+		compContainer.TerminationMessagePath = container.TerminationMessagePath
+	}
+	if container.TerminationMessagePolicy != "" {
+		compContainer.TerminationMessagePolicy = container.TerminationMessagePolicy
+	}
+	if container.ImagePullPolicy != "" {
+		compContainer.ImagePullPolicy = container.ImagePullPolicy
+	}
+	if container.SecurityContext != nil {
+		compContainer.SecurityContext = container.SecurityContext
+	}
 }
 
 func mergeComponentsList(reqCtx intctrlutil.RequestCtx,

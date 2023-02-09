@@ -516,6 +516,9 @@ spec:
           allowPrivilegeEscalation: false
   - type: proxy
     podSpec: 
+      initContainers:
+      - name: nginx-init-container
+        image: nginx
       containers:
       - name: nginx
         image: nginx
@@ -626,6 +629,16 @@ spec:
 				&clusterVersion.Spec.Components[1],
 				&cluster.Spec.Components[0])
 			Expect(len(component.PodSpec.Containers)).Should(Equal(2))
+
+			By("new init container in clusterVersion not in clusterDefinition")
+			component = mergeComponents(
+				reqCtx,
+				cluster,
+				clusterDef,
+				&clusterDef.Spec.Components[0],
+				&clusterVersion.Spec.Components[1],
+				&cluster.Spec.Components[0])
+			Expect(len(component.PodSpec.InitContainers)).Should(Equal(1))
 
 			By("leave clusterComp nil")
 			component = mergeComponents(

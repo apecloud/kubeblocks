@@ -17,11 +17,11 @@ limitations under the License.
 package dbaas
 
 import (
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/onsi/gomega"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/apecloud/kubeblocks/internal/testutil"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )

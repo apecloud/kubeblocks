@@ -45,6 +45,7 @@ import (
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/cluster"
 	"github.com/apecloud/kubeblocks/internal/cli/create"
+	"github.com/apecloud/kubeblocks/internal/cli/printer"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 )
@@ -497,6 +498,7 @@ func buildCompSetsMap(values []string, cd *dbaasv1alpha1.ClusterDefinition) (map
 			// only record the supported key
 			k := parseKey(kv[0])
 			if k == keyUnknown {
+				printer.Warning(os.Stdout, "unknown set key %s, ignore it\n", kv[0])
 				continue
 			}
 			res[setKey(kv[0])] = kv[1]

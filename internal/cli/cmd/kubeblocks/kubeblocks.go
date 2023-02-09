@@ -137,7 +137,7 @@ func (o *Options) complete(f cmdutil.Factory, cmd *cobra.Command) error {
 }
 
 func (o *Options) preCheck() error {
-	fmt.Fprintf(o.Out, "%s uninstall will remove all KubeBlocks resources.\n", printer.BoldYellow("Warning:"))
+	printer.Warning(o.Out, "uninstall will remove all KubeBlocks resources.\n")
 
 	// wait user to confirm
 	if err := confirmUninstall(o.In); err != nil {
@@ -332,11 +332,11 @@ func (o *InstallOptions) disableUnsupportedSets() {
 		return
 	}
 
-	msg := "Following flags are not available in current kubernetes cluster, they will be disabled"
+	msg := "following flags are not available in current kubernetes environment, they will be disabled\n"
 	if len(disabledSets) == 1 {
-		msg = "Following flag is not available in current kubernetes cluster, it will be disabled"
+		msg = "following flag is not available in current kubernetes environment, it will be disabled\n"
 	}
-	fmt.Fprintf(o.Out, "%s %s\n", printer.BoldYellow("Warning:"), msg)
+	printer.Warning(o.Out, msg)
 	for _, set := range disabledSets {
 		fmt.Fprintf(o.Out, "  · %s\n", set)
 	}

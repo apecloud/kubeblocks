@@ -93,6 +93,12 @@ rules:
 - apiGroups:
   - batch
   resources:
+  - jobs/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - batch
+  resources:
   - jobs/status
   verbs:
   - get

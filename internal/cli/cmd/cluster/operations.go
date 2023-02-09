@@ -126,7 +126,7 @@ func (o *OperationsOptions) validateUpgrade() error {
 	if len(o.ClusterVersionRef) == 0 {
 		return fmt.Errorf("missing cluster-version")
 	}
-	return nil
+	return delete.Confirm([]string{o.Name}, o.In)
 }
 
 func (o *OperationsOptions) validateVolumeExpansion() error {
@@ -296,11 +296,17 @@ func (o *OperationsOptions) Validate() error {
 
 	switch o.OpsType {
 	case dbaasv1alpha1.VolumeExpansionType:
-		return o.validateVolumeExpansion()
+		if err := o.validateVolumeExpansion(); err != nil {
+			return err
+		}
 	case dbaasv1alpha1.HorizontalScalingType:
-		return o.validateHorizontalScaling()
+		if err := o.validateHorizontalScaling(); err != nil {
+			return err
+		}
 	case dbaasv1alpha1.ReconfiguringType:
-		return o.validateReconfiguring()
+		if err := o.validateReconfiguring(); err != nil {
+			return err
+		}
 	}
 	return delete.Confirm([]string{o.Name}, o.In)
 }

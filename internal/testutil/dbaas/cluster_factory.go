@@ -58,8 +58,10 @@ func (factory *MockClusterFactory) WithRandomName() *MockClusterFactory {
 	return factory
 }
 
-func (factory *MockClusterFactory) AddLabel(key string, value string) *MockClusterFactory {
-	factory.Cluster.Labels[key] = value
+func (factory *MockClusterFactory) AddLabels(keysAndValues ...string) *MockClusterFactory {
+	for k, v := range withMap(keysAndValues...) {
+		factory.Cluster.Labels[k] = v
+	}
 	return factory
 }
 

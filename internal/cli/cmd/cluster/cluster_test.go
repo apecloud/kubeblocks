@@ -203,9 +203,10 @@ var _ = Describe("Cluster", func() {
 
 		By("validate reconfiguring parameter")
 		o.ComponentNames = []string{componentName}
-		Expect(o.Validate().Error()).To(ContainSubstring("reconfiguring required configure file or updated parameters"))
+		Expect(o.parseUpdatedParams().Error()).To(ContainSubstring("reconfiguring required configure file or updated parameters"))
 		o.Parameters = []string{"abcd"}
-		Expect(o.Validate().Error()).To(ContainSubstring("updated parameter formatter"))
+
+		Expect(o.parseUpdatedParams().Error()).To(ContainSubstring("updated parameter formatter"))
 		o.Parameters = []string{"abcd=test"}
 		o.CfgTemplateName = randomNamer.TPLName
 		Expect(o.Validate()).Should(Succeed())

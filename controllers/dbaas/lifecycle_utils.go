@@ -288,63 +288,63 @@ func mergeComponents(
 		HorizontalScalePolicy: clusterDefCompObj.HorizontalScalePolicy,
 	}
 
-	doContainerAttrOverride := func(compContainer *corev1.Container, defContainer corev1.Container) {
+	doContainerAttrOverride := func(compContainer *corev1.Container, container corev1.Container) {
 		if compContainer == nil {
 			return
 		}
-		if defContainer.Image != "" {
-			compContainer.Image = defContainer.Image
+		if container.Image != "" {
+			compContainer.Image = container.Image
 		}
-		if len(defContainer.Command) != 0 {
-			compContainer.Command = defContainer.Command
+		if len(container.Command) != 0 {
+			compContainer.Command = container.Command
 		}
-		if len(defContainer.Args) != 0 {
-			compContainer.Args = defContainer.Args
+		if len(container.Args) != 0 {
+			compContainer.Args = container.Args
 		}
-		if defContainer.WorkingDir != "" {
-			compContainer.WorkingDir = defContainer.WorkingDir
+		if container.WorkingDir != "" {
+			compContainer.WorkingDir = container.WorkingDir
 		}
-		if len(defContainer.Ports) != 0 {
-			compContainer.Ports = defContainer.Ports
+		if len(container.Ports) != 0 {
+			compContainer.Ports = container.Ports
 		}
-		if len(defContainer.EnvFrom) != 0 {
-			compContainer.EnvFrom = defContainer.EnvFrom
+		if len(container.EnvFrom) != 0 {
+			compContainer.EnvFrom = container.EnvFrom
 		}
-		if len(defContainer.Env) != 0 {
-			compContainer.Env = defContainer.Env
+		if len(container.Env) != 0 {
+			compContainer.Env = container.Env
 		}
-		if defContainer.Resources.Limits != nil || defContainer.Resources.Requests != nil {
-			compContainer.Resources = defContainer.Resources
+		if container.Resources.Limits != nil || container.Resources.Requests != nil {
+			compContainer.Resources = container.Resources
 		}
-		if len(defContainer.VolumeMounts) != 0 {
-			compContainer.VolumeMounts = defContainer.VolumeMounts
+		if len(container.VolumeMounts) != 0 {
+			compContainer.VolumeMounts = container.VolumeMounts
 		}
-		if len(defContainer.VolumeDevices) != 0 {
-			compContainer.VolumeDevices = defContainer.VolumeDevices
+		if len(container.VolumeDevices) != 0 {
+			compContainer.VolumeDevices = container.VolumeDevices
 		}
-		if defContainer.LivenessProbe != nil {
-			compContainer.LivenessProbe = defContainer.LivenessProbe
+		if container.LivenessProbe != nil {
+			compContainer.LivenessProbe = container.LivenessProbe
 		}
-		if defContainer.ReadinessProbe != nil {
-			compContainer.ReadinessProbe = defContainer.ReadinessProbe
+		if container.ReadinessProbe != nil {
+			compContainer.ReadinessProbe = container.ReadinessProbe
 		}
-		if defContainer.StartupProbe != nil {
-			compContainer.StartupProbe = defContainer.StartupProbe
+		if container.StartupProbe != nil {
+			compContainer.StartupProbe = container.StartupProbe
 		}
-		if defContainer.Lifecycle != nil {
-			compContainer.Lifecycle = defContainer.Lifecycle
+		if container.Lifecycle != nil {
+			compContainer.Lifecycle = container.Lifecycle
 		}
-		if defContainer.TerminationMessagePath != "" {
-			compContainer.TerminationMessagePath = defContainer.TerminationMessagePath
+		if container.TerminationMessagePath != "" {
+			compContainer.TerminationMessagePath = container.TerminationMessagePath
 		}
-		if defContainer.TerminationMessagePolicy != "" {
-			compContainer.TerminationMessagePolicy = defContainer.TerminationMessagePolicy
+		if container.TerminationMessagePolicy != "" {
+			compContainer.TerminationMessagePolicy = container.TerminationMessagePolicy
 		}
-		if defContainer.ImagePullPolicy != "" {
-			compContainer.ImagePullPolicy = defContainer.ImagePullPolicy
+		if container.ImagePullPolicy != "" {
+			compContainer.ImagePullPolicy = container.ImagePullPolicy
 		}
-		if defContainer.SecurityContext != nil {
-			compContainer.SecurityContext = defContainer.SecurityContext
+		if container.SecurityContext != nil {
+			compContainer.SecurityContext = container.SecurityContext
 		}
 	}
 
@@ -356,23 +356,21 @@ func mergeComponents(
 		component.ConfigTemplates = cfgcore.MergeConfigTemplates(clusterVersionComp.ConfigTemplateRefs, component.ConfigTemplates)
 		if clusterVersionComp.PodSpec != nil {
 
-			doCVContainerAttrOverride := func(compContainers *[]corev1.Container, cvContainer corev1.Container) {
-				if compContainers == nil {
-					return
-				}
-				index, compContainer := getContainerByName(*compContainers, cvContainer.Name)
+			doCVContainerAttrOverride := func(compContainers []corev1.Container, cvContainer corev1.Container) []corev1.Container {
+				index, compContainer := getContainerByName(compContainers, cvContainer.Name)
 				if compContainer == nil {
-					*compContainers = append(*compContainers, cvContainer)
+					compContainers = append(compContainers, cvContainer)
 				} else {
-					doContainerAttrOverride(&((*compContainers)[index]), cvContainer)
+					doContainerAttrOverride(&compContainers[index], cvContainer)
 				}
+				return compContainers
 			}
 
 			for _, c := range clusterVersionComp.PodSpec.InitContainers {
-				doCVContainerAttrOverride(&component.PodSpec.InitContainers, c)
+				component.PodSpec.InitContainers = doCVContainerAttrOverride(component.PodSpec.InitContainers, c)
 			}
 			for _, c := range clusterVersionComp.PodSpec.Containers {
-				doCVContainerAttrOverride(&component.PodSpec.Containers, c)
+				component.PodSpec.Containers = doCVContainerAttrOverride(component.PodSpec.Containers, c)
 			}
 		}
 	}

@@ -39,6 +39,7 @@ import (
 	"k8s.io/kubectl/pkg/util/templates"
 	"k8s.io/utils/strings/slices"
 
+	"github.com/apecloud/kubeblocks/internal/cli/cmd/cluster"
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
@@ -193,10 +194,6 @@ func (o *InstallOptions) Install() error {
 
 	if v := versionInfo[util.KubeBlocksApp]; len(v) > 0 {
 		fmt.Fprintf(o.Out, "KubeBlocks %s already exists\n", v)
-		// print notes
-		if !o.Quiet {
-			o.printNotes()
-		}
 		return nil
 	}
 
@@ -234,11 +231,6 @@ func (o *InstallOptions) Install() error {
 
 	// successfully installed
 	spinner(true)
-
-	// print notes
-	if !o.Quiet {
-		o.printNotes()
-	}
 
 	return nil
 }
@@ -420,11 +412,6 @@ func (o *InstallOptions) upgrade(cmd *cobra.Command) error {
 	// successfully installed
 	spinner(true)
 
-	// print notes
-	if !o.Quiet {
-		o.printNotes()
-	}
-
 	return nil
 }
 
@@ -494,6 +481,44 @@ Notes: Monitor components(Grafana/Prometheus/AlertManager) is not installed,
     use 'kbcli kubeblocks upgrade --monitor=true' to install later.
 `)
 	}
+}
+
+func (o *InstallOptions) postInstall() error {
+	var sets []string
+	for _, set := range o.Sets {
+		splitSet := strings.Split(set, ",")
+		sets = append(sets, splitSet...)
+	}
+	for _, set := range sets {
+		if set == "snapshot-controller.enabled=true" {
+			if err := o.createVolumeSnapshotClass(); err != nil {
+				return err
+			}
+		}
+	}
+	// print notes
+	if !o.Quiet {
+		o.printNotes()
+	}
+	return nil
+}
+
+func (o *InstallOptions) createVolumeSnapshotClass() error {
+	options := cluster.CreateVolumeSnapshotClassOptions{}
+	options.BaseOptions.Client = o.Dynamic
+	options.BaseOptions.IOStreams = o.IOStreams
+
+	spinner := util.Spinner(o.Out, "%-40s", "Configure VolumeSnapshotClass")
+	defer spinner(false)
+
+	if err := options.Complete(); err != nil {
+		return err
+	}
+	if err := options.Create(); err != nil {
+		return err
+	}
+	spinner(true)
+	return nil
 }
 
 func (o *Options) uninstall() error {
@@ -571,6 +596,9 @@ func newInstallCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 			util.CheckErr(o.complete(f, cmd))
 			util.CheckErr(o.Install())
 		},
+		PostRun: func(cmd *cobra.Command, args []string) {
+			util.CheckErr(o.postInstall())
+		},
 	}
 
 	cmd.Flags().BoolVar(&o.Monitor, "monitor", true, "Set monitor enabled and install Prometheus, AlertManager and Grafana (default true)")
@@ -598,6 +626,9 @@ func newUpgradeCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 		Run: func(cmd *cobra.Command, args []string) {
 			util.CheckErr(o.complete(f, cmd))
 			util.CheckErr(o.upgrade(cmd))
+		},
+		PostRun: func(cmd *cobra.Command, args []string) {
+			util.CheckErr(o.postInstall())
 		},
 	}
 

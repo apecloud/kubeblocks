@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"time"
 
+	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	"github.com/sethvargo/go-password/password"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -329,4 +330,13 @@ func FakeEvents() *corev1.EventList {
 		eventList.Items = append(eventList.Items, fakeEvent(e.name, e.createTime))
 	}
 	return eventList
+}
+
+func FakeVolumeSnapshotClass() *snapshotv1.VolumeSnapshotClass {
+	return &snapshotv1.VolumeSnapshotClass{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "VolumeSnapshotClass",
+			APIVersion: "snapshot.storage.k8s.io/v1",
+		},
+	}
 }

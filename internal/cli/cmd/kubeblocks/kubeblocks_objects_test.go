@@ -47,7 +47,7 @@ var _ = Describe("kubeblocks objects", func() {
 			client = testing.FakeClientSet(mockDeploy(map[string]string{
 				k: v,
 			}))
-			objs, _ := getKBObjects(client, testing.FakeDynamicClient(), namespace)
+			objs, _ := getKBObjects(client, testing.FakeDynamicClient(testing.FakeVolumeSnapshotClass()), namespace)
 			Expect(deleteDeploys(client, objs.deploys)).Should(Succeed())
 		}
 	})
@@ -71,7 +71,7 @@ var _ = Describe("kubeblocks objects", func() {
 			client = testing.FakeClientSet(mockService(map[string]string{
 				k: v,
 			}))
-			objs, _ := getKBObjects(client, testing.FakeDynamicClient(), namespace)
+			objs, _ := getKBObjects(client, testing.FakeDynamicClient(testing.FakeVolumeSnapshotClass()), namespace)
 			Expect(deleteServices(client, objs.svcs)).Should(Succeed())
 		}
 	})

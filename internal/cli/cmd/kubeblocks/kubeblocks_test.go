@@ -22,14 +22,13 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	appsv1 "k8s.io/api/apps/v1"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/client-go/dynamic"
-
 	"github.com/spf13/cobra"
+	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/client-go/dynamic"
 	clientfake "k8s.io/client-go/rest/fake"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 
@@ -165,6 +164,23 @@ var _ = Describe("kubeblocks", func() {
 		o.printNotes()
 	})
 
+	It("run post install", func() {
+		o := &InstallOptions{
+			Options: Options{
+				IOStreams: streams,
+				HelmCfg:   helm.FakeActionConfig(),
+				Namespace: "default",
+				Client:    testing.FakeClientSet(),
+				Dynamic:   testing.FakeDynamicClient(testing.FakeVolumeSnapshotClass()),
+			},
+			Version:         version.DefaultKubeBlocksVersion,
+			Monitor:         true,
+			CreateNamespace: true,
+			Sets:            []string{"snapshot-controller.enabled=true"},
+		}
+		Expect(o.postInstall()).Should(HaveOccurred())
+	})
+
 	It("check uninstall", func() {
 		var cfg string
 		cmd = newUninstallCmd(tf, streams)
@@ -188,7 +204,7 @@ var _ = Describe("kubeblocks", func() {
 			HelmCfg:   helm.FakeActionConfig(),
 			Namespace: "default",
 			Client:    testing.FakeClientSet(),
-			Dynamic:   testing.FakeDynamicClient(),
+			Dynamic:   testing.FakeDynamicClient(testing.FakeVolumeSnapshotClass()),
 		}
 
 		Expect(o.uninstall()).Should(Succeed())
@@ -390,7 +406,8 @@ func mockDynamicClientWithCRD(objects ...runtime.Object) dynamic.Interface {
 		Status: v1.CustomResourceDefinitionStatus{},
 	}
 
-	allObjs := []runtime.Object{&clusterCRD, &clusterDefCRD, &clusterVersionCRD, &backupToolCRD}
+	allObjs := []runtime.Object{&clusterCRD, &clusterDefCRD, &clusterVersionCRD, &backupToolCRD,
+		testing.FakeVolumeSnapshotClass()}
 	allObjs = append(allObjs, objects...)
 	return testing.FakeDynamicClient(allObjs...)
 }

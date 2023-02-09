@@ -298,15 +298,6 @@ prometheus:
                 summary: "Container killed (node: {{ $labels.instance }}, pod: {{ $labels.pod }}, container: {{ $labels.container }})"
                 description: "A container has disappeared\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
 
-            - alert: ContainerAbsent
-              expr: 'absent(container_last_seen{container!="",container!="POD"})'
-              for: 5m
-              labels:
-                severity: warning
-              annotations:
-                summary: "Container absent (node: {{ $labels.instance }}, pod: {{ $labels.pod }}, container: {{ $labels.container }})"
-                description: "A container is absent for 5 min\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
-
             - alert: ContainerCpuUsageWarning
               expr: 'sum(rate(container_cpu_usage_seconds_total{container!="",container!="POD"}[2m])) BY (instance,pod,container) * 100 > 70'
               for: 2m
@@ -437,6 +428,131 @@ prometheus:
                 summary: "MySQL InnoDB high read requests rate hitting disk (namespace: {{ $labels.namespace }}, cluster: {{ $labels.app_kubernetes_io_instance }}, instance: {{ $labels.pod }})"
                 description: "High number of logical reads that InnoDB could not satisfy from the buffer pool, and had to read directly from disk on {{ $labels.instance }}\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
 
+    postgresql_alert_rules.yml: |
+      groups:
+        - name: PostgreSQLExporter
+          rules:
+            - alert: PostgreSQLDown
+              expr: 'max_over_time(pg_up[1m]) == 0'
+              for: 1m
+              labels:
+                severity: critical
+              annotations:
+                summary: "PostgreSQL is down (namespace: {{ $labels.namespace }}, cluster: {{ $labels.app_kubernetes_io_instance }}, instance: {{ $labels.pod }})"
+                description: "PostgreSQL instance is down on {{ $labels.instance }}\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+
+            - alert: PostgreSQLExporterError
+              expr: 'pg_exporter_last_scrape_error > 0'
+              for: 0m
+              labels:
+                severity: warning
+              annotations:
+                summary: "PostgreSQL exporter scrape error (namespace: {{ $labels.namespace }}, cluster: {{ $labels.app_kubernetes_io_instance }}, instance: {{ $labels.pod }})"
+                description: "PostgreSQL exporter is showing errors. A query may be buggy in query.yaml\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+
+            - alert: PostgreSQLTooManySlowQueries
+              expr: |
+                max by(namespace,app_kubernetes_io_instance,pod,datname) (
+                  max_over_time(pg_stat_activity_max_tx_duration{datname!~"template.*|postgres"}[2m])
+                ) > 60
+              for: 2m
+              labels:
+                severity: warning
+              annotations:
+                summary: "PostgreSQL database {{ $labels.datname }} high number of slow queries (namespace: {{ $labels.namespace }}, cluster: {{ $labels.app_kubernetes_io_instance }}, instance: {{ $labels.pod }})"
+                description: "PostgreSQL high number of slow queries\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+
+            - alert: PostgreSQLTooManyConnections
+              expr: |
+                sum by (namespace,app_kubernetes_io_instance,pod) (pg_stat_activity_count{datname!~"template.*|postgres"})
+                > on(namespace,app_kubernetes_io_instance,pod)
+                (pg_settings_max_connections - pg_settings_superuser_reserved_connections) * 0.8
+              for: 2m
+              labels:
+                severity: warning
+              annotations:
+                summary: "PostgreSQL too many connections (> 80%) (namespace: {{ $labels.namespace }}, cluster: {{ $labels.app_kubernetes_io_instance }}, instance: {{ $labels.pod }})"
+                description: "PostgreSQL instance has too many connections (> 80%)\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+
+            - alert: PostgreSQLDeadLocks
+              expr: 'increase(pg_stat_database_deadlocks{datname!~"template.*|postgres", datname!=""}[2m]) > 5'
+              for: 2m
+              labels:
+                severity: warning
+              annotations:
+                summary: "PostgreSQL database {{ $labels.datname }} dead locks (namespace: {{ $labels.namespace }}, cluster: {{ $labels.app_kubernetes_io_instance }}, instance: {{ $labels.pod }})"
+                description: "PostgreSQL has deadlocks\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+
+            - alert: PostgreSQLHighRollbackRate
+              expr: |
+                rate(pg_stat_database_xact_rollback{datname!~"template.*|postgres", datname!=""}[2m])
+                /
+                rate(pg_stat_database_xact_commit{datname!~"template.*|postgres", datname!=""}[2m])
+                > 0.1
+              for: 2m
+              labels:
+                severity: warning
+              annotations:
+                summary: "PostgreSQL database {{ $labels.datname }} high rollback rate (namespace: {{ $labels.namespace }}, cluster: {{ $labels.app_kubernetes_io_instance }}, instance: {{ $labels.pod }})"
+                description: "Ratio of transactions being aborted compared to committed is > 2%\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+
+            - alert: PostgreSQLTooManyLocksAcquired
+              expr: |
+                sum by (namespace,app_kubernetes_io_instance,pod) (pg_locks_count)
+                / on(namespace,app_kubernetes_io_instance,pod)
+                (pg_settings_max_locks_per_transaction * pg_settings_max_connections)
+                > 0.2
+              for: 2m
+              labels:
+                severity: warning
+              annotations:
+                summary: "PostgreSQL too many locks acquired (namespace: {{ $labels.namespace }}, cluster: {{ $labels.app_kubernetes_io_instance }}, instance: {{ $labels.pod }})"
+                description: "Too many locks acquired on the database. If this alert happens frequently, we may need to increase the postgres setting max_locks_per_transaction.\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+
+            - alert: PostgreSQLCacheHitRatio
+              expr: |
+                avg by (namespace,app_kubernetes_io_instance,pod,datname) (
+                  rate(pg_stat_database_blks_hit{datname!~"template.*|postgres", datname!=""}[2m])
+                  /
+                  (
+                    rate(
+                      pg_stat_database_blks_hit{datname!~"template.*|postgres", datname!=""}[2m]
+                    )
+                    +
+                    rate(
+                      pg_stat_database_blks_read{datname!~"template.*|postgres", datname!=""}[2m]
+                    )
+                  )
+                ) < 0.9
+              for: 2m
+              labels:
+                severity: warning
+              annotations:
+                summary: "PostgreSQL database {{ $labels.datname }} has low cache hit rate (namespace: {{ $labels.namespace }}, cluster: {{ $labels.app_kubernetes_io_instance }}, instance: {{ $labels.pod }})"
+                description: "Low cache hit rate\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+
+            - alert: PostgreSQLMaxWriteBufferReached
+              expr: 'rate(pg_stat_bgwriter_maxwritten_clean_total[2m]) > 0'
+              for: 2m
+              labels:
+                severity: warning
+              annotations:
+                summary: "PostgreSQL write buffers reached max (namespace: {{ $labels.namespace }}, cluster: {{ $labels.app_kubernetes_io_instance }}, instance: {{ $labels.pod }})"
+                description: "PostgreSQL background writer stops for max\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+
+            - alert: PostgreSQLHighWALFilesArchiveErrorRate
+              expr: |
+                rate(pg_stat_archiver_failed_count[2m])
+                / (
+                  rate(pg_stat_archiver_archived_count[2m]) + rate(pg_stat_archiver_failed_count[2m])
+                ) > 0.1
+              for: 2m
+              labels:
+                severity: warning
+              annotations:
+                summary: "PostgreSQL high error rate in WAL files archiver (namespace: {{ $labels.namespace }}, cluster: {{ $labels.app_kubernetes_io_instance }}, instance: {{ $labels.pod }})"
+                description: "PostgreSQL high error rate in WAL files archiver\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+
   serverFiles:
     prometheus.yml:
       rule_files:
@@ -444,6 +560,7 @@ prometheus:
         - /etc/config/alerting_rules.yml
         - /etc/config/cadvisor_alert_rules.yml
         - /etc/config/mysql_alert_rules.yml
+        - /etc/config/postgresql_alert_rules.yml
 
       scrape_configs:
         - job_name: prometheus

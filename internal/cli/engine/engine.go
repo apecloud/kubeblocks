@@ -16,22 +16,18 @@ limitations under the License.
 
 package engine
 
-import (
-	"fmt"
-	"sort"
-	"strings"
-)
+import "fmt"
 
 // ClusterDefinition Type Const Define
 const (
-	stateMysql      = "state.mysql"
-	stateMysql8     = "state.mysql8"
-	statePostgreSQL = "state.postgresql"
+	stateMysql  = "state.mysql"
+	stateMysql8 = "state.mysql"
 )
 
 type Interface interface {
 	ConnectCommand() []string
-	Container() string
+	EngineName() string
+	EngineContainer() string
 	ConnectExample(info *ConnectionInfo, client string) string
 }
 
@@ -43,52 +39,13 @@ type ConnectionInfo struct {
 	Port     string
 }
 
-type EngineInfo struct {
-	Client      string
-	Container   string
-	PasswordEnv string
-	UserEnv     string
-	Database    string
-}
-
 type buildConnectExample func(info *ConnectionInfo) string
 
 func New(typeName string) (Interface, error) {
 	switch typeName {
-	case stateMysql, stateMysql8:
-		return newMySQL(), nil
-	case statePostgreSQL:
-		return newPostgreSQL(), nil
+	case stateMysql:
+		return &mysql{}, nil
 	default:
 		return nil, fmt.Errorf("unsupported engine type: %s", typeName)
 	}
-}
-
-func buildExample(info *ConnectionInfo, client string, examples map[ClientType]buildConnectExample) string {
-	// if client is not specified, output all examples
-	if len(client) == 0 {
-		var keys = make([]string, len(examples))
-		var i = 0
-		for k := range examples {
-			keys[i] = k.String()
-			i++
-		}
-		sort.Strings(keys)
-
-		var b strings.Builder
-		for _, k := range keys {
-			buildFn := examples[ClientType(k)]
-			b.WriteString(fmt.Sprintf("========= %s connection example =========\n", k))
-			b.WriteString(buildFn(info))
-			b.WriteString("\n")
-		}
-		return b.String()
-	}
-
-	// return specified example
-	if buildFn, ok := examples[ClientType(client)]; ok {
-		return buildFn(info)
-	}
-
-	return ""
 }

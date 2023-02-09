@@ -24,7 +24,8 @@ import (
 
 var _ = Describe("Mysql Engine", func() {
 	It("connection example", func() {
-		mysql := newMySQL()
+		typeName := stateMysql
+		mysql, _ := New(typeName)
 
 		info := &ConnectionInfo{
 			User:     "user",
@@ -33,7 +34,7 @@ var _ = Describe("Mysql Engine", func() {
 			Database: "test-db",
 			Port:     "1234",
 		}
-		for k := range mysql.examples {
+		for k := range clientExampleMap {
 			fmt.Printf("%s Connection Example\n", k.String())
 			fmt.Println(mysql.ConnectExample(info, k.String()))
 		}

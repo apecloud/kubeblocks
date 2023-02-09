@@ -24,7 +24,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
@@ -72,18 +71,6 @@ func GetSimpleInstanceInfos(dynamic dynamic.Interface, name string, namespace st
 		}
 
 		// TODO: now we only support consensus set
-	}
-
-	// if cluster status does not contain what we need, try to get all instances
-	objs, err := dynamic.Resource(schema.GroupVersionResource{Group: corev1.GroupName, Version: types.VersionV1, Resource: "pods"}).
-		Namespace(namespace).List(context.TODO(), metav1.ListOptions{
-		LabelSelector: util.BuildLabelSelectorByNames("", []string{cluster.Name}),
-	})
-	if err != nil {
-		return nil
-	}
-	for _, o := range objs.Items {
-		infos = append(infos, &InstanceInfo{Name: o.GetName()})
 	}
 
 	return infos

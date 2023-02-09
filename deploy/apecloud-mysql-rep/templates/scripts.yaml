@@ -17,21 +17,16 @@ data:
     else
       cp /opt/mnt/secondary/mysql.cnf /etc/mysql/conf.d
     fi
-  setup.sh: |
+  post_start.sh: |
     #!/bin/sh
     set -ex
     SECONDARY_ROLE=secondary
     KB_ROLE_NAME=`cat /opt/conf/role/labels`
     if [ $KB_ROLE_NAME = "$SECONDARY_ROLE" ]; then
-      if [ ! -z $MYSQL_ROOT_PASSWORD ]; then
-        password_flag="-p$MYSQL_ROOT_PASSWORD"
-      fi
-      echo "Checking if replication master is ready to accept connection"
-      #until mysql -h $KB_PRIMARY_POD_NAME -P3306 -uroot  $password_flag -e "SELECT 1"; do sleep 1; done
-      echo "Replication master ready!"
-      echo "Setting the master configuration"
-      mysql -e "CHANGE MASTER TO MASTER_HOST='$KB_PRIMARY_POD_NAME',MASTER_PORT=3306,MASTER_USER='root',MASTER_PASSWORD='$MYSQL_ROOT_PASSWORD',master_auto_position=1,MASTER_CONNECT_RETRY=10;START SLAVE;"
+      until mysql -u$MYSQL_ROOT_USER -p$MYSQL_ROOT_PASSWORD -e "SELECT 1;"; do sleep 1; done
+      echo "Setting the secondary configuration"
+      mysql -u$MYSQL_ROOT_USER -p$MYSQL_ROOT_PASSWORD -e "CHANGE REPLICATION SOURCE TO SOURCE_HOST='$KB_PRIMARY_POD_NAME',SOURCE_PORT=3306,SOURCE_USER='root',SOURCE_PASSWORD='$MYSQL_ROOT_PASSWORD',SOURCE_AUTO_POSITION=1,SOURCE_CONNECT_RETRY=10;START REPLICA;"
     else
       echo "primary instance skip create a replication relationship."
-      exit 0
-    
+      exit 0 
+    fi

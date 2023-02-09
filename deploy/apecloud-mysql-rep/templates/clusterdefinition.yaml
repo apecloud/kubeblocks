@@ -8,7 +8,7 @@ spec:
   type: state.mysql
   connectionCredential:
     username: root
-    password: "$(RANDOM_PASSWD)"
+    password: root #"$(RANDOM_PASSWD)"
   components:
     - typeName: replication
       componentType: Replication
@@ -106,7 +106,7 @@ spec:
             lifecycle:
               postStart:
                 exec:
-                  command: ["/scripts/setup.sh"]
+                  command: ["/scripts/post_start.sh"]
           - name: mysql-exporter
             image: prom/mysqld-exporter:v0.14.0
             imagePullPolicy: IfNotPresent

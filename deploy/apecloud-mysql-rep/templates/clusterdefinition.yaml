@@ -8,7 +8,7 @@ spec:
   type: state.mysql
   connectionCredential:
     username: root
-    password: root #"$(RANDOM_PASSWD)"
+    password: "$(RANDOM_PASSWD)"
   components:
     - typeName: replication
       componentType: Replication
@@ -80,7 +80,7 @@ spec:
               - name: WESQL_CONSENSUS_ENABLED
                 value: "0"
               - name: MYSQL_ALLOW_EMPTY_PASSWORD
-                value: "1"
+                value: "0"
               - name: MYSQL_ROOT_HOST
                 value: {{ .Values.auth.rootHost | default "%" | quote }}
               - name: MYSQL_ROOT_USER

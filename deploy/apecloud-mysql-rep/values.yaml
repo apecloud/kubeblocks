@@ -51,7 +51,6 @@ secondary:
     ## @param config template context
     configuration: |-
       [mysqld]
-      super-read-only
       gtid_mode=ON
       enforce-gtid-consistency=true
 

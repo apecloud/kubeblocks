@@ -73,7 +73,7 @@ var clusterCreateExample = templates.Examples(`
 	kbcli cluster create mycluster --cluster-definition=my-cluster-def --termination-policy=WipeOut
 
 	# Create a cluster and set cpu to 1000m, memory to 1Gi, storage size to 10Gi and replicas to 2
-	kbcli cluster create mycluster --cluster-definition=my-cluster-def --set=cpu=1000m,memory=1Gi,storage=10Gi,replicas=2
+	kbcli cluster create mycluster --cluster-definition=my-cluster-def --set cpu=1000m,memory=1Gi,storage=10Gi,replicas=2
 
 	# Create a cluster and use a URL to set cluster resource
 	kbcli cluster create mycluster --cluster-definition=my-cluster-def --set-file=https://kubeblocks.io/yamls/my.yaml

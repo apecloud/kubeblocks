@@ -17,22 +17,30 @@ limitations under the License.
 package configuration
 
 import (
-	"context"
+	"time"
+
+	corev1 "k8s.io/api/core/v1"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-
-	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	testdbaas "github.com/apecloud/kubeblocks/internal/testutil/dbaas"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 var _ = Describe("ConfigConstraint Controller", func() {
-	var ctx = context.Background()
+	const clusterDefName = "test-clusterdef"
+	const clusterVersionName = "test-clusterversion"
+
+	const statefulCompType = "replicasets"
+
+	const configTplName = "mysql-config-tpl"
+
+	const configVolumeName = "mysql-config"
 
 	cleanEnv := func() {
 		// must wait until resources deleted and no longer exist before the testcases start,
@@ -59,81 +67,67 @@ var _ = Describe("ConfigConstraint Controller", func() {
 
 	Context("Create config constraint with cue validate", func() {
 		It("Should ready", func() {
-			By("create resources")
-			testWrapper := NewFakeDBaasCRsFromProvider(testCtx, ctx, FakeTest{
-				TestDataPath:    "resources",
-				CfgCCYaml:       "mysql_config_template.yaml",
-				CDYaml:          "mysql_cd.yaml",
-				CVYaml:          "mysql_cv.yaml",
-				CfgCMYaml:       "mysql_config_cm.yaml",
-				ComponentName:   TestComponentName,
-				CDComponentType: TestCDComponentTypeName,
-			})
+			By("creating a configmap and a config constraint")
 
-			defer func() {
-				By("clear TestWrapper created objects...")
-				defer testWrapper.DeleteAllObjects()
-			}()
+			configmap := testdbaas.CreateCustomizedObj(&testCtx,
+				"resources/mysql_config_cm.yaml", &corev1.ConfigMap{},
+				testCtx.UseDefaultNamespace())
 
-			// should ensure clusterdef and clusterversion are in cache before going on
-			// TODO fixme: it seems this is likely a bug in intctrlutil.ValidateReferenceCR,
-			// TODO where it determines whether anyone are referencing the object to be deleted
-			// TODO using the client.List interface, which just reads from the cache.
-			// TODO this will cause a referenced object get deleted in race condition.
-			By("check clusterversion and clusterdef exists")
-			Eventually(testdbaas.CheckObjExists(&testCtx, client.ObjectKeyFromObject(testWrapper.CD),
-				&dbaasv1alpha1.ClusterDefinition{}, true)).Should(Succeed())
-			Eventually(testdbaas.CheckObjExists(&testCtx, client.ObjectKeyFromObject(testWrapper.CV),
-				&dbaasv1alpha1.ClusterVersion{}, true)).Should(Succeed())
+			constraint := testdbaas.CreateCustomizedObj(&testCtx,
+				"resources/mysql_config_template.yaml",
+				&dbaasv1alpha1.ConfigConstraint{})
+			constraintKey := client.ObjectKeyFromObject(constraint)
 
-			tplKey := client.ObjectKeyFromObject(testWrapper.CC)
+			By("Create a clusterDefinition obj")
+			clusterDefObj := testdbaas.NewClusterDefFactory(&testCtx, clusterDefName, testdbaas.MySQLType).
+				AddComponent(testdbaas.StatefulMySQL8, statefulCompType).
+				AddConfigTemplate(configTplName, configmap.Name, constraint.Name, configVolumeName).
+				AddLabel(cfgcore.GenerateTPLUniqLabelKeyWithConfig(configTplName), configmap.Name).
+				AddLabel(cfgcore.GenerateConstraintsUniqLabelKeyWithConfig(constraint.Name), constraint.Name).
+				Create().GetClusterDef()
+
+			By("Create a clusterVersion obj")
+			clusterVersionObj := testdbaas.NewClusterVersionFactory(&testCtx, clusterVersionName, clusterDefObj.GetName()).
+				AddComponent(statefulCompType).
+				AddLabel(cfgcore.GenerateTPLUniqLabelKeyWithConfig(configTplName), configmap.Name).
+				AddLabel(cfgcore.GenerateConstraintsUniqLabelKeyWithConfig(constraint.Name), constraint.Name).
+				Create().GetClusterVersion()
 
 			By("check ConfigConstraint(template) status and finalizer")
-			Eventually(testdbaas.CheckObj(&testCtx, tplKey,
+			Eventually(testdbaas.CheckObj(&testCtx, constraintKey,
 				func(g Gomega, tpl *dbaasv1alpha1.ConfigConstraint) {
 					g.Expect(tpl.Status.Phase).To(BeEquivalentTo(dbaasv1alpha1.AvailablePhase))
 					g.Expect(tpl.Finalizers).To(ContainElement(cfgcore.ConfigurationTemplateFinalizerName))
 				})).Should(Succeed())
 
 			By("By delete ConfigConstraint")
-			Expect(testWrapper.DeleteTpl()).Should(Succeed())
-			// Configuration template not deleted
+			Expect(k8sClient.Delete(testCtx.Ctx, constraint)).Should(Succeed())
 
 			By("check ConfigConstraint should not be deleted")
 			log.Log.Info("expect that ConfigConstraint is not deleted.")
-			Eventually(testdbaas.CheckObjExists(&testCtx, tplKey, &dbaasv1alpha1.ConfigConstraint{}, true)).Should(Succeed())
+			Consistently(testdbaas.CheckObjExists(&testCtx, constraintKey, &dbaasv1alpha1.ConfigConstraint{}, true)).Should(Succeed())
 
 			By("By delete referencing clusterdefinition and clusterversion")
-			Expect(testWrapper.DeleteCV()).Should(Succeed())
-			Expect(testWrapper.DeleteCD()).Should(Succeed())
+			Expect(k8sClient.Delete(testCtx.Ctx, clusterVersionObj)).Should(Succeed())
+			Expect(k8sClient.Delete(testCtx.Ctx, clusterDefObj)).Should(Succeed())
 
 			By("check ConfigConstraint should be deleted")
-			Eventually(testdbaas.CheckObjExists(&testCtx, tplKey, &dbaasv1alpha1.ConfigConstraint{}, false)).Should(Succeed())
+			Eventually(testdbaas.CheckObjExists(&testCtx, constraintKey, &dbaasv1alpha1.ConfigConstraint{}, false), time.Second*60, time.Second*1).Should(Succeed())
 		})
 	})
 
 	Context("Create config constraint without cue validate", func() {
 		It("Should ready", func() {
-			By("creating a ISV resource")
+			By("creating a configmap and a config constraint")
 
-			// step1: prepare env
-			testWrapper := NewFakeDBaasCRsFromProvider(testCtx, ctx, FakeTest{
-				TestDataPath: "resources",
-				// for crd yaml file
-				CfgCCYaml:       "mysql_config_tpl_not_validate.yaml",
-				CDYaml:          "mysql_cd.yaml",
-				CVYaml:          "mysql_cv.yaml",
-				CfgCMYaml:       "mysql_config_cm.yaml",
-				ComponentName:   TestComponentName,
-				CDComponentType: TestCDComponentTypeName,
-			})
-			defer func() {
-				By("clear TestWrapper created objects...")
-				defer testWrapper.DeleteAllObjects()
-			}()
+			_ = testdbaas.CreateCustomizedObj(&testCtx, "resources/mysql_config_cm.yaml", &corev1.ConfigMap{},
+				testCtx.UseDefaultNamespace())
+
+			constraint := testdbaas.CreateCustomizedObj(&testCtx, "resources/mysql_config_tpl_not_validate.yaml",
+				&dbaasv1alpha1.ConfigConstraint{})
 
 			By("check config constraint status")
-			Eventually(testdbaas.CheckObj(&testCtx, client.ObjectKeyFromObject(testWrapper.CC),
+			Eventually(testdbaas.CheckObj(&testCtx, client.ObjectKeyFromObject(constraint),
 				func(g Gomega, tpl *dbaasv1alpha1.ConfigConstraint) {
 					g.Expect(tpl.Status.Phase).Should(BeEquivalentTo(dbaasv1alpha1.AvailablePhase))
 				})).Should(Succeed())

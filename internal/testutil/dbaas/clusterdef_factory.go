@@ -45,7 +45,8 @@ func NewClusterDefFactory(testCtx *testutil.TestContext, name string, cdType str
 		TestCtx: testCtx,
 		ClusterDef: &dbaasv1alpha1.ClusterDefinition{
 			ObjectMeta: metav1.ObjectMeta{
-				Name: name,
+				Name:   name,
+				Labels: map[string]string{},
 			},
 			Spec: dbaasv1alpha1.ClusterDefinitionSpec{
 				Type:       cdType,
@@ -63,6 +64,11 @@ func NewClusterDefFactory(testCtx *testutil.TestContext, name string, cdType str
 func (factory *MockClusterDefFactory) WithRandomName() *MockClusterDefFactory {
 	key := GetRandomizedKey(factory.TestCtx, factory.ClusterDef.Name)
 	factory.ClusterDef.Name = key.Name
+	return factory
+}
+
+func (factory *MockClusterDefFactory) AddLabel(key string, value string) *MockClusterDefFactory {
+	factory.ClusterDef.Labels[key] = value
 	return factory
 }
 

@@ -229,6 +229,41 @@ var _ = Describe("Backup Policy Controller", func() {
 				})).Should(Succeed())
 			})
 		})
+
+		Context("creates a backup policy with nil pointer credentialKeyword in backupPolicyTemplate", func() {
+			var backupPolicyKey types.NamespacedName
+			var backupPolicy *dpv1alpha1.BackupPolicy
+			BeforeEach(func() {
+				viper.SetDefault("DP_BACKUP_SCHEDULE", nil)
+				viper.SetDefault("DP_BACKUP_TTL", nil)
+				By("By creating a backupPolicyTemplate")
+				template := testdbaas.CreateCustomizedObj(&testCtx, "backup/backuppolicytemplate.yaml",
+					&dpv1alpha1.BackupPolicyTemplate{}, testdbaas.RandomizedObjName(), testCtx.UseDefaultNamespace(),
+					func(t *dpv1alpha1.BackupPolicyTemplate) {
+						t.Spec.BackupToolName = backupToolName
+						t.Spec.CredentialKeyword = nil
+						t.Spec.Hooks = nil
+					})
+
+				By("By creating a backupPolicy from backupTool: " + backupToolName)
+				backupPolicy = testdbaas.CreateCustomizedObj(&testCtx, "backup/backuppolicy.yaml",
+					&dpv1alpha1.BackupPolicy{}, testdbaas.RandomizedObjName(), testCtx.UseDefaultNamespace(),
+					func(backupPolicy *dpv1alpha1.BackupPolicy) {
+						backupPolicy.Spec.BackupPolicyTemplateName = template.Name
+						backupPolicy.Spec.Schedule = ""
+						backupPolicy.Spec.TTL = nil
+						backupPolicy.Spec.OnFailAttempted = 0
+						backupPolicy.Spec.Hooks = nil
+						backupPolicy.Spec.BackupToolName = ""
+					})
+				backupPolicyKey = client.ObjectKeyFromObject(backupPolicy)
+			})
+			It("should success", func() {
+				Eventually(testdbaas.CheckObj(&testCtx, backupPolicyKey, func(g Gomega, fetched *dpv1alpha1.BackupPolicy) {
+					g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.ConfigAvailable))
+				})).Should(Succeed())
+			})
+		})
 	})
 })
 

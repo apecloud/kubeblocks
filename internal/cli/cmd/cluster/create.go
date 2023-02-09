@@ -431,7 +431,7 @@ func buildClusterComp(cd *dbaasv1alpha1.ClusterDefinition, setsMap map[string]ma
 		// get replicas
 		setReplicas, err := strconv.Atoi(getVal(keyReplicas, sets))
 		if err != nil {
-			return nil, fmt.Errorf("component repicas is illegal " + err.Error())
+			return nil, fmt.Errorf("repicas is illegal " + err.Error())
 		}
 		replicas = int32(setReplicas)
 

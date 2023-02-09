@@ -35,6 +35,11 @@ spec:
             namespace: {{ .Release.Namespace }}
             volumeName: postgresql-config
             defaultMode: 0777
+          - name: postgresql-scripts
+            configTplRef: postgresql-scripts
+            namespace: {{ .Release.Namespace }}
+            volumeName: scripts
+            defaultMode: 0777
       service:
         ports:
           - name: tcp-postgresql
@@ -59,6 +64,8 @@ spec:
                 mountPath: /postgresql
               - name: postgresql-config
                 mountPath: /postgresql/conf
+              - name: scripts
+                mountPath: /scripts
             ports:
               - name: tcp-postgresql
                 containerPort: 5432
@@ -144,6 +151,10 @@ spec:
               {{- if .Values.primary.extraEnvVars }}
               {{- include "tplvalues.render" (dict "value" .Values.primary.extraEnvVars "context" $) | nindent 12 }}
               {{- end }}
+            lifecycle:
+              postStart:
+                exec:
+                  command: ["/scripts/post_start.sh"]
             {{- if or .Values.primary.extraEnvVarsCM .Values.primary.extraEnvVarsSecret }}
             envFrom:
               {{- if .Values.primary.extraEnvVarsCM }}

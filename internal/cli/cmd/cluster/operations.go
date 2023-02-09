@@ -91,7 +91,7 @@ var (
 		# update component params 
 		kbcli cluster configure <cluster-name> --component-name=<component-name> --template-name=<template-name> --configure-file=<configure-file> --set max_connections=1000,general_log=OFF
 
-		# update apecloud-mysql max_connections, cluster name is mycluster
+		# update mysql max_connections, cluster name is mycluster
 		kbcli cluster configure mycluster --component-name=mysql --template-name=mysql-3node-tpl --configure-file=my.cnf --set max_connections=2000
 	`)
 )

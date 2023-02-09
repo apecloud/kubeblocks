@@ -21,7 +21,7 @@ kbcli cluster vscale [flags]
   -h, --help                         help for vscale
       --limits.cpu string            CPU size limited by the component
       --limits.memory string         Memory size limited by the component
-      --name string                  OpsRequest name. if not specified, it will be randomly generated 
+      --ops-request string           OpsRequest name. if not specified, it will be randomly generated 
       --requests.cpu string          CPU size requested by the component
       --requests.memory string       Memory size requested by the component
       --ttlSecondsAfterSucceed int   Time to live after the OpsRequest succeed

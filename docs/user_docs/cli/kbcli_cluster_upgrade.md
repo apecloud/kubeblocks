@@ -18,7 +18,7 @@ kbcli cluster upgrade [flags]
 ```
       --cluster-version string       Reference cluster version (required)
   -h, --help                         help for upgrade
-      --name string                  OpsRequest name. if not specified, it will be randomly generated 
+      --ops-request string           OpsRequest name. if not specified, it will be randomly generated 
       --ttlSecondsAfterSucceed int   Time to live after the OpsRequest succeed
 ```
 

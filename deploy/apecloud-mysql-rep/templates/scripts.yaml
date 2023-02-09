@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: mysql-scripts
+  name: apecloud-mysql-rep-scripts
 data:
   init.sh: |
     #!/bin/sh

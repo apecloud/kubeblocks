@@ -22,15 +22,15 @@ spec:
       configSpec:
         configTemplateRefs:
           - name: mysql-primary-config
-            configTplRef: mysql-primary-config-8.0.31
+            configTplRef: apecloud-mysql-primary-config-8.0.31
             namespace: {{ .Release.Namespace }}
             volumeName: primary
           - name: mysql-secondary-config
-            configTplRef: mysql-secondary-config-8.0.31
+            configTplRef: apecloud-mysql-secondary-config-8.0.31
             namespace: {{ .Release.Namespace }}
             volumeName: secondary
           - name: mysql-scripts
-            configTplRef: mysql-scripts
+            configTplRef: apecloud-mysql-rep-scripts
             namespace: {{ .Release.Namespace }}
             volumeName: scripts
             defaultMode: 493

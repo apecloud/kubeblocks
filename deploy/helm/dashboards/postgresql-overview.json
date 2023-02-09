@@ -26,7 +26,7 @@
   "fiscalYearStartMonth": 0,
   "gnetId": 11323,
   "graphTooltip": 1,
-  "id": 4,
+  "id": 9,
   "links": [
     {
       "asDropdown": false,
@@ -93,16 +93,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "rgba(245, 54, 54, 0.9)",
+                "color": "dark-green",
                 "value": null
-              },
-              {
-                "color": "rgba(237, 129, 40, 0.89)",
-                "value": 35
-              },
-              {
-                "color": "rgba(50, 172, 45, 0.97)",
-                "value": 75
               }
             ]
           },
@@ -177,16 +169,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "rgba(245, 54, 54, 0.9)",
+                "color": "dark-green",
                 "value": null
-              },
-              {
-                "color": "rgba(237, 129, 40, 0.89)",
-                "value": 35
-              },
-              {
-                "color": "rgba(50, 172, 45, 0.97)",
-                "value": 75
               }
             ]
           },
@@ -261,16 +245,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "rgba(245, 54, 54, 0.9)",
+                "color": "dark-green",
                 "value": null
-              },
-              {
-                "color": "rgba(237, 129, 40, 0.89)",
-                "value": 35
-              },
-              {
-                "color": "rgba(50, 172, 45, 0.97)",
-                "value": 75
               }
             ]
           },
@@ -348,16 +324,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "rgba(245, 54, 54, 0.9)",
+                "color": "dark-green",
                 "value": null
-              },
-              {
-                "color": "rgba(237, 129, 40, 0.89)",
-                "value": 35
-              },
-              {
-                "color": "rgba(50, 172, 45, 0.97)",
-                "value": 75
               }
             ]
           },
@@ -432,16 +400,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "rgba(245, 54, 54, 0.9)",
+                "color": "dark-green",
                 "value": null
-              },
-              {
-                "color": "rgba(237, 129, 40, 0.89)",
-                "value": 35
-              },
-              {
-                "color": "rgba(50, 172, 45, 0.97)",
-                "value": 75
               }
             ]
           },
@@ -516,16 +476,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "rgba(245, 54, 54, 0.9)",
+                "color": "dark-green",
                 "value": null
-              },
-              {
-                "color": "rgba(237, 129, 40, 0.89)",
-                "value": 35
-              },
-              {
-                "color": "rgba(50, 172, 45, 0.97)",
-                "value": 75
               }
             ]
           },

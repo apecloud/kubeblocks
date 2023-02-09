@@ -89,15 +89,18 @@ func newBaseOperationsOptions(streams genericclioptions.IOStreams, opsType dbaas
 var (
 	createReconfigureExample = templates.Examples(`
 		# update component params 
-		kbcli cluster configure <cluster-name> --component-name=<component-name> --set max_connections=1000,general_log=OFF
+		kbcli cluster configure <cluster-name> --component-name=<component-name> --template-name=<template-name> --configure-file=<configure-file> --set max_connections=1000,general_log=OFF
+
+		# update apecloud-mysql max_connections, cluster name is mycluster
+		kbcli cluster configure mycluster --component-name=mysql --template-name=mysql-3node-tpl --configure-file=my.cnf --set max_connections=2000
 	`)
 )
 
 // buildCommonFlags build common flags for operations command
 func (o *OperationsOptions) buildCommonFlags(cmd *cobra.Command) {
-	cmd.Flags().StringVar(&o.OpsRequestName, "name", "", "OpsRequest name. if not specified, it will be randomly generated ")
+	cmd.Flags().StringVar(&o.OpsRequestName, "ops-request", "", "OpsRequest name. if not specified, it will be randomly generated ")
 	cmd.Flags().IntVar(&o.TTLSecondsAfterSucceed, "ttlSecondsAfterSucceed", 0, "Time to live after the OpsRequest succeed")
-	if o.OpsType != dbaasv1alpha1.UpgradeType {
+	if o.OpsType != dbaasv1alpha1.UpgradeType && o.OpsType != dbaasv1alpha1.ReconfiguringType {
 		cmd.Flags().StringSliceVar(&o.ComponentNames, "component-names", nil, " Component names to this operations")
 	}
 }
@@ -377,7 +380,7 @@ func NewUpgradeCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 
 var verticalScalingExample = templates.Examples(`
 		# scale the computing resources of specified components, separate with commas when <component-name> more than one
-		kbcli cluster vertical-scale <my-cluster> --component-names=<component-name> --requests.cpu=500m \
+		kbcli cluster vscale <my-cluster> --component-names=<component-name> --requests.cpu=500m \
         --requests.memory=500Mi --limits.cpu=500m --limits.memory=500Mi
 `)
 
@@ -385,8 +388,8 @@ var verticalScalingExample = templates.Examples(`
 func NewVerticalScalingCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := newBaseOperationsOptions(streams, dbaasv1alpha1.VerticalScalingType)
 	inputs := buildOperationsInputs(f, o)
-	inputs.Use = "vertical-scale"
-	inputs.Short = "Vertical scale the specified components in the cluster"
+	inputs.Use = "vscale"
+	inputs.Short = "Vertically scale the specified components in the cluster"
 	inputs.Example = verticalScalingExample
 	inputs.BuildFlags = func(cmd *cobra.Command) {
 		o.buildCommonFlags(cmd)
@@ -400,15 +403,15 @@ func NewVerticalScalingCmd(f cmdutil.Factory, streams genericclioptions.IOStream
 
 var horizontalScalingExample = templates.Examples(`
 		# expand storage resources of specified components, separate with commas when <component-name> more than one
-		kbcli cluster horizontal-scale <my-cluster> --component-names=<component-name> --replicas=3
+		kbcli cluster hscale <my-cluster> --component-names=<component-name> --replicas=3
 `)
 
 // NewHorizontalScalingCmd create a horizontal scaling command
 func NewHorizontalScalingCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := newBaseOperationsOptions(streams, dbaasv1alpha1.HorizontalScalingType)
 	inputs := buildOperationsInputs(f, o)
-	inputs.Use = "horizontal-scale"
-	inputs.Short = "Horizontal scale the specified components in the cluster"
+	inputs.Use = "hscale"
+	inputs.Short = "Horizontally scale the specified components in the cluster"
 	inputs.Example = horizontalScalingExample
 	inputs.BuildFlags = func(cmd *cobra.Command) {
 		o.buildCommonFlags(cmd)
@@ -447,10 +450,10 @@ func NewReconfigureCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *
 	inputs.Example = createReconfigureExample
 	inputs.BuildFlags = func(cmd *cobra.Command) {
 		o.buildCommonFlags(cmd)
-		cmd.Flags().StringSliceVar(&o.Parameters, "set", nil, "Specify updated parameter list (options)")
-		cmd.Flags().StringVar(&o.URLPath, "configure-url", "", "Specify the configuration file path url (required)")
-		cmd.Flags().StringVar(&o.CfgTemplateName, "template-name", "", "Specifies the name of the configuration template to be updated")
-		cmd.Flags().StringVar(&o.CfgFile, "config-file", "", "Specifies the name of the configuration file to be updated")
+		cmd.Flags().StringSliceVar(&o.Parameters, "set", nil, "Specify updated parameter list. For details about the parameters, refer to kbcli sub command: 'kbcli cluster describe-configure'.")
+		cmd.Flags().StringSliceVar(&o.ComponentNames, "component-name", nil, "Specify the name of Component to be updated. If the cluster has only one component, unset the parameter.")
+		cmd.Flags().StringVar(&o.CfgTemplateName, "template-name", "", "Specify the name of the configuration template to be updated (e.g. for apecloud-mysql: --template-name=mysql-3node-tpl). What templates or configure files are available for this cluster can refer to kbcli sub command: 'kbcli cluster describe-configure'.")
+		cmd.Flags().StringVar(&o.CfgFile, "configure-file", "", "Specify the name of the configuration file to be updated (e.g. for mysql: --configure-file=my.cnf). What templates or configure files are available for this cluster can refer to kbcli sub command: 'kbcli cluster describe-configure'.")
 	}
 	inputs.Complete = o.fillComponentNameForReconfiguring
 	return create.BuildCommand(inputs)

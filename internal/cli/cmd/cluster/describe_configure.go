@@ -84,19 +84,39 @@ type parameterTemplate struct {
 
 var (
 	describeReconfigureExample = templates.Examples(`
-		# describe a specified configure
-		kbcli cluster describe-configure cluster-name --component-name=component --template-names=tpl1,tpl2`)
+		# describe a cluster, e.g. cluster name is mycluster
+		kbcli cluster describe-configure mycluster
+
+		# describe a component, e.g. cluster name is mycluster, component name is mysql
+		kbcli cluster describe-configure mycluster --component-name=mysql
+
+		# describe all configuration files. 
+		kbcli cluster describe-configure mycluster --component-name=mysql --show-detail
+
+		# describe a content of configuration file. 
+		kbcli cluster describe-configure mycluster --component-name=mysql --configure-file=my.cnf --show-detail`)
 	explainReconfigureExample = templates.Examples(`
-		# describe a specified configure template
-		kbcli cluster explain-configure cluster-name --component-name=component --template-names=tpl1`)
+		# describe a cluster, e.g. cluster name is mycluster
+		kbcli cluster explain-configure mycluster
+
+		# describe a specified configure template, e.g. cluster name is mycluster
+		kbcli cluster explain-configure mycluster --component-name=mysql --template-names=mysql-3node-tpl
+
+		# describe a specified configure template, e.g. cluster name is mycluster
+		kbcli cluster explain-configure mycluster --component-name=mysql --template-names=mysql-3node-tpl --trunc-document=false --trunc-enum=false
+
+		# describe a specified parameters, e.g. cluster name is mycluster
+		kbcli cluster explain-configure mycluster --component-name=mysql --template-names=mysql-3node-tpl  --param=sql_mode
+
+`)
 	diffConfigureExample = templates.Examples(`
 		# compare config files 
 		kbcli cluster diff-configure opsrequest1 opsrequest2`)
 )
 
 func (r *reconfigureOptions) addCommonFlags(cmd *cobra.Command) {
-	cmd.Flags().StringVar(&r.componentName, "component-name", "", " Component name to this operations (required)")
-	cmd.Flags().StringSliceVar(&r.templateNames, "template-names", nil, "Specifies the name of the configuration template to be describe (options)")
+	cmd.Flags().StringVar(&r.componentName, "component-name", "", "Specify the name of Component to be describe (e.g. for apecloud-mysql: --component-name=mysql). If the cluster has only one component, unset the parameter.\"")
+	cmd.Flags().StringSliceVar(&r.templateNames, "template-names", nil, "Specify the name of the configuration template to be describe. (e.g. for apecloud-mysql: --template-names=mysql-3node-tpl)")
 }
 
 func (r *reconfigureOptions) validate() error {
@@ -775,8 +795,8 @@ func NewDescribeReconfigureCmd(f cmdutil.Factory, streams genericclioptions.IOSt
 		},
 	}
 	o.addCommonFlags(cmd)
-	cmd.Flags().BoolVar(&o.showDetail, "show-detail", o.showDetail, " trunc enum string (options)")
-	cmd.Flags().StringSliceVar(&o.keys, "keys", nil, " display keys context (options)")
+	cmd.Flags().BoolVar(&o.showDetail, "show-detail", o.showDetail, "If true, the content of the files specified by configure-file will be printed.")
+	cmd.Flags().StringSliceVar(&o.keys, "configure-file", nil, "Specify the name of the configuration file to be describe (e.g. for mysql: --configure-file=my.cnf). If unset, all files.")
 	return cmd
 }
 
@@ -800,9 +820,9 @@ func NewExplainReconfigureCmd(f cmdutil.Factory, streams genericclioptions.IOStr
 		},
 	}
 	o.addCommonFlags(cmd)
-	cmd.Flags().BoolVar(&o.truncEnum, "trunc-enum", o.truncEnum, " trunc enum string (options)")
-	cmd.Flags().BoolVar(&o.truncDocument, "trunc-document", o.truncDocument, " trunc document string (options)")
-	cmd.Flags().StringVar(&o.paramName, "param", o.paramName, " specific parameter (options)")
+	cmd.Flags().BoolVar(&o.truncEnum, "trunc-enum", o.truncEnum, "If the value list length of the parameter is greater than 20, it will be truncated.")
+	cmd.Flags().BoolVar(&o.truncDocument, "trunc-document", o.truncDocument, "If the document length of the parameter is greater than 100, it will be truncated.")
+	cmd.Flags().StringVar(&o.paramName, "param", o.paramName, "Specify the name of parameter to be query. It clearly display the details of the parameter.")
 	return cmd
 }
 

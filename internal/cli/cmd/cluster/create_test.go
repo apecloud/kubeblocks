@@ -17,6 +17,8 @@ limitations under the License.
 package cluster
 
 import (
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"reflect"
 	"strings"
@@ -24,13 +26,10 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	"github.com/spf13/viper"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-
-	"github.com/spf13/viper"
 	"k8s.io/apimachinery/pkg/util/json"
-
-	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
@@ -81,61 +80,58 @@ var _ = Describe("create", func() {
 	})
 
 	Context("setEnableAllLogs Test", func() {
-		cluster := &dbaasv1alpha1.Cluster{}
-		clusterByte := `
-apiVersion: dbaas.kubeblocks.io/v1alpha1
-kind: Cluster
-metadata:
-  name: wesql
-spec:
-  clusterVersionRef: cluster-version-consensus
-  clusterDefinitionRef: cluster-definition-consensus
-  components:
-    - name: wesql-test
-      type: replicasets
-`
-		clusterDef := &dbaasv1alpha1.ClusterDefinition{}
-		clusterDefByte := `
-apiVersion: dbaas.kubeblocks.io/v1alpha1
-kind: ClusterDefinition
-metadata:
-  name: cluster-definition-consensus
-spec:
-  type: state.mysql
-  components:
-    - typeName: replicasets
-      componentType: Consensus
-      logConfigs:
-        - name: error
-          filePathPattern: /log/mysql/mysqld.err
-        - name: slow
-          filePathPattern: /log/mysql/*slow.log
-      podSpec:
-        containers:
-          - name: mysql
-            imagePullPolicy: IfNotPresent`
-		_ = yaml.Unmarshal([]byte(clusterDefByte), clusterDef)
-		_ = yaml.Unmarshal([]byte(clusterByte), cluster)
-		setEnableAllLogs(cluster, clusterDef)
-		Expect(len(cluster.Spec.Components[0].EnabledLogs)).Should(Equal(2))
+		var cluster *dbaasv1alpha1.Cluster
+		var clusterDef *dbaasv1alpha1.ClusterDefinition
+		BeforeEach(func() {
+			cluster = testing.FakeCluster("log", "test")
+			clusterDef = testing.FakeClusterDef()
+			Expect(cluster.Spec.Components[0].EnabledLogs).Should(BeNil())
+		})
+		It("no logConfigs in ClusterDef", func() {
+			setEnableAllLogs(cluster, clusterDef)
+			Expect(len(cluster.Spec.Components[0].EnabledLogs)).Should(Equal(0))
+		})
+		It("set logConfigs in ClusterDef", func() {
+			clusterDef.Spec.Components[0].LogConfigs = []dbaasv1alpha1.LogConfig{
+				{
+					Name:            "error",
+					FilePathPattern: "/log/mysql/mysqld.err",
+				},
+				{
+					Name:            "slow",
+					FilePathPattern: "/log/mysql/*slow.log",
+				},
+			}
+			setEnableAllLogs(cluster, clusterDef)
+			Expect(cluster.Spec.Components[0].EnabledLogs).Should(Equal([]string{"error", "slow"}))
+		})
 	})
 
-	Context("multipleSourceComponent Test", func() {
+	Context("multipleSourceComponent test", func() {
 		defer GinkgoRecover()
-		fileName := "https://kubernetes.io/docs/tasks/debug/"
 		streams := genericclioptions.IOStreams{
 			In:     os.Stdin,
 			Out:    os.Stdout,
 			ErrOut: os.Stdout,
 		}
-		bytes, err := MultipleSourceComponents(fileName, streams.In)
-		Expect(bytes).ShouldNot(BeNil())
-		Expect(err).ShouldNot(HaveOccurred())
-		// corner case for no existing local file
-		fileName = "no-existing-file"
-		bytes, err = MultipleSourceComponents(fileName, streams.In)
-		Expect(bytes).Should(BeNil())
-		Expect(err).Should(HaveOccurred())
+		It("target file stored in website", func() {
+			ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				_, err := w.Write([]byte("OK"))
+				Expect(err).ShouldNot(HaveOccurred())
+			}))
+			defer ts.Close()
+			fileURL := ts.URL + "/docs/file"
+			bytes, err := MultipleSourceComponents(fileURL, streams.In)
+			Expect(bytes).Should(Equal([]byte("OK")))
+			Expect(err).ShouldNot(HaveOccurred())
+		})
+		It("target file doesn't exist", func() {
+			fileName := "no-existing-file"
+			bytes, err := MultipleSourceComponents(fileName, streams.In)
+			Expect(bytes).Should(BeNil())
+			Expect(err).Should(HaveOccurred())
+		})
 	})
 
 	checkComponent := func(comps []map[string]interface{}, storage string, replicas int32, cpu string, memory string) {

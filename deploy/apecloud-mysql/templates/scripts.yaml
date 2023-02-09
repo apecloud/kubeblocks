@@ -58,7 +58,7 @@ data:
     chmod +777 -R /data/mysql; 
     leader=$KB_MYSQL_LEADER
     echo $leader
-    if [ -z $leader ] || [ ! -f "/data/mysql/.restore"]; then
+    if [ -z $leader ] || [ ! -f "/data/mysql/.restore" ]; then
       echo "docker-entrypoint.sh mysqld --defaults-file=/opt/mysql/my.cnf --cluster-start-index=$CLUSTER_START_INDEX --cluster-info=\"$cluster_info\" --cluster-id=$CLUSTER_ID"
       exec docker-entrypoint.sh mysqld --defaults-file=/opt/mysql/my.cnf --cluster-start-index=$CLUSTER_START_INDEX --cluster-info="$cluster_info" --cluster-id=$CLUSTER_ID
     elif [ "$KB_POD_NAME" != "$leader" ]; then

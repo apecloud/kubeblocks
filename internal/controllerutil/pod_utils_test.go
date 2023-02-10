@@ -244,7 +244,7 @@ var _ = Describe("tpl template", func() {
 		})
 	})
 
-	// for test MemroySize or CoreNum
+	// for test MemorySize or CoreNum
 	Context("Get Resource test", func() {
 		It("Resource exists limit", func() {
 			testResources := []TestResourceUnit{

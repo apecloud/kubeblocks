@@ -11,12 +11,14 @@ env:
   GO_VERSION: '1.19'
   CLI_NAME: 'kbcli'
   CLI_REPO: 'apecloud/kbcli'
+  GITLAB_KBCLI_PROJECT_ID: 85948
 
 jobs:
   create-release-kbcli:
     name: Create Release kbcli
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v3
       - name: create release ${{ env.CLI_NAME }}
         id: create_release
         uses: softprops/action-gh-release@v1
@@ -26,6 +28,14 @@ jobs:
           repository: ${{ env.CLI_REPO }}
           token: ${{ env.GITHUB_TOKEN }}
           prerelease: true
+      - name: create gitlab release ${{ env.CLI_NAME }}
+        run: |
+          bash ${{ github.workspace }}/.github/utils/release-gitlab.sh \
+            --type 1 \
+            --project-id ${{ env.GITLAB_KBCLI_PROJECT_ID }} \
+            --tag-name ${{ env.TAG_NAME }} \
+            --access-token ${{ secrets.GITLAB_ACCESS_TOKEN }}
+            
 
   upload-release-assert:
     needs: create-release-kbcli
@@ -99,3 +109,16 @@ jobs:
           asset_path: ./bin/${{ env.CLI_BINARY }}
           asset_name: ${{ env.CLI_BINARY }}
           asset_content_type: application/zip
+
+      - name: upload gitlab kbcli asset ${{ matrix.os }}
+        continue-on-error: true
+        env:
+          CLI_BINARY: ${{ env.CLI_NAME }}-${{ matrix.os }}-${{ env.TAG_NAME }}.tar.gz
+        run: |
+          bash ${{ github.workspace }}/.github/utils/release-gitlab.sh \
+            --type 2 \
+            --project-id ${{ env.GITLAB_KBCLI_PROJECT_ID }} \
+            --tag-name ${{ env.TAG_NAME }} \
+            --asset-path ./bin/${{ env.CLI_BINARY }} \
+            --asset-name ${{ env.CLI_BINARY }} \
+            --access-token ${{ secrets.GITLAB_ACCESS_TOKEN }}

@@ -1,16 +1,16 @@
-## kbcli cluster vertical-scale
+## kbcli cluster vscale
 
-Vertical scale the specified components in the cluster
+Vertically scale the specified components in the cluster
 
 ```
-kbcli cluster vertical-scale [flags]
+kbcli cluster vscale [flags]
 ```
 
 ### Examples
 
 ```
   # scale the computing resources of specified components, separate with commas when <component-name> more than one
-  kbcli cluster vertical-scale <my-cluster> --component-names=<component-name> --requests.cpu=500m \
+  kbcli cluster vscale <my-cluster> --component-names=<component-name> --requests.cpu=500m \
   --requests.memory=500Mi --limits.cpu=500m --limits.memory=500Mi
 ```
 
@@ -18,10 +18,10 @@ kbcli cluster vertical-scale [flags]
 
 ```
       --component-names strings       Component names to this operations
-  -h, --help                         help for vertical-scale
+  -h, --help                         help for vscale
       --limits.cpu string            CPU size limited by the component
       --limits.memory string         Memory size limited by the component
-      --name string                  OpsRequest name. if not specified, it will be randomly generated 
+      --ops-request string           OpsRequest name. if not specified, it will be randomly generated 
       --requests.cpu string          CPU size requested by the component
       --requests.memory string       Memory size requested by the component
       --ttlSecondsAfterSucceed int   Time to live after the OpsRequest succeed

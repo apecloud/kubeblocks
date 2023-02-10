@@ -31,6 +31,7 @@ import (
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	//+kubebuilder:scaffold:imports
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -68,14 +69,14 @@ func init() {
 	// viper.Set("ENABLE_DEBUG_LOG", "true")
 }
 
-func TestDbaasUseExistingCluster(t *testing.T) {
+func TestIntegrationController(t *testing.T) {
 	if testing.Short() {
 		t.Skip()
 	}
 
 	RegisterFailHandler(Fail)
 
-	RunSpecs(t, "Controller Suite with UseExistingCluster flag set")
+	RunSpecs(t, "Integration Test Suite")
 }
 
 var _ = BeforeSuite(func() {
@@ -92,7 +93,7 @@ var _ = BeforeSuite(func() {
 	By("bootstrapping test environment")
 	var flag = true
 	testEnv = &envtest.Environment{
-		CRDDirectoryPaths: []string{filepath.Join("..", "..", "..", "config", "crd", "bases"),
+		CRDDirectoryPaths: []string{filepath.Join("..", "..", "config", "crd", "bases"),
 			// use dependent external CRDs.
 			// resolved by ref: https://github.com/operator-framework/operator-sdk/issues/4434#issuecomment-786794418
 			filepath.Join(build.Default.GOPATH, "pkg", "mod", "github.com", "kubernetes-csi/external-snapshotter/",
@@ -200,6 +201,8 @@ var _ = BeforeSuite(func() {
 	}).SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 
+	// pulling docker images is slow
+	viper.SetDefault("EventuallyTimeout", time.Second*300)
 	testCtx = testutil.NewDefaultTestContext(ctx, k8sClient, testEnv)
 
 	go func() {

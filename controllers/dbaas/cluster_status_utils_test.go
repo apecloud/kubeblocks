@@ -73,9 +73,9 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 
 	createClusterDef := func() {
 		clusterDef := testdbaas.NewClusterDefFactory(&testCtx, clusterDefName, testdbaas.MySQLType).
-			AddComponent(testdbaas.StatefulMySQL8, statefulCompType).SetReplicas(3).
-			AddComponent(testdbaas.ConsensusMySQL, consensusCompType).SetReplicas(3).
-			AddComponent(testdbaas.StatelessNginx, statelessCompType).SetReplicas(3).
+			AddComponent(testdbaas.StatefulMySQL8, statefulCompType).SetDefaultReplicas(3).
+			AddComponent(testdbaas.ConsensusMySQL, consensusCompType).SetDefaultReplicas(3).
+			AddComponent(testdbaas.StatelessNginx, statelessCompType).SetDefaultReplicas(3).
 			GetClusterDef()
 		Expect(testCtx.CreateObj(ctx, clusterDef)).Should(Succeed())
 	}

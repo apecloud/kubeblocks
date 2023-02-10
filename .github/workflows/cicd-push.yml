@@ -13,7 +13,7 @@ jobs:
   make-test:
     runs-on: [self-hosted, eks-fargate-runner ]
     steps:
-      - uses: JashBook/checkout@main
+      - uses: apecloud/checkout@main
       - name: make manifests check
         run: |
           SHA=${{ github.sha }}

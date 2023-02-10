@@ -128,12 +128,23 @@ var _ = Describe("Cluster Controller with Consensus Component", func() {
 		stsName := cluster.Name + "-" + componentName
 		pods := make([]corev1.Pod, 0)
 		for i := 0; i < number; i++ {
-			pod := testdbaas.CreateCustomizedObj(&testCtx, "resources/mysql_consensusset_pod.yaml",
-				&corev1.Pod{}, testCtx.UseDefaultNamespace(), func(pod *corev1.Pod) {
-					pod.Name = stsName + "-" + strconv.Itoa(i)
-					pod.Labels[intctrlutil.AppInstanceLabelKey] = clusterName
-					pod.Labels[intctrlutil.AppComponentLabelKey] = componentName
-				})
+			pod := &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      stsName + "-" + strconv.Itoa(i),
+					Namespace: testCtx.DefaultNamespace,
+					Labels: map[string]string{
+						intctrlutil.AppInstanceLabelKey:  clusterName,
+						intctrlutil.AppComponentLabelKey: componentName,
+						"controller-revision-hash":       "mock-version",
+					},
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{{
+						Name:  "mock-container",
+						Image: "mock-container",
+					}},
+				},
+			}
 			pods = append(pods, *pod)
 		}
 		return pods
@@ -190,6 +201,7 @@ var _ = Describe("Cluster Controller with Consensus Component", func() {
 			By("Creating mock pods in StatefulSet")
 			pods := mockPodsForConsensusTest(clusterObj, replicas)
 			for _, pod := range pods {
+				Expect(testCtx.CreateObj(testCtx.Ctx, &pod)).Should(Succeed())
 				// mock the status to pass the isReady(pod) check in consensus_set
 				pod.Status.Conditions = []corev1.PodCondition{{
 					Type:   corev1.PodReady,

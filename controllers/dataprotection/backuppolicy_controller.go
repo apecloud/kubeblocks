@@ -229,11 +229,13 @@ func (r *BackupPolicyReconciler) mergeBackupPolicyTemplate(
 	if backupPolicy.Spec.BackupToolName == "" {
 		backupPolicy.Spec.BackupToolName = template.Spec.BackupToolName
 	}
-	if backupPolicy.Spec.Target.Secret.UserKeyword == "" {
-		backupPolicy.Spec.BackupToolName = template.Spec.CredentialKeyword.UserKeyword
-	}
-	if backupPolicy.Spec.Target.Secret.PasswordKeyword == "" {
-		backupPolicy.Spec.BackupToolName = template.Spec.CredentialKeyword.PasswordKeyword
+	if template.Spec.CredentialKeyword != nil {
+		if backupPolicy.Spec.Target.Secret.UserKeyword == "" {
+			backupPolicy.Spec.BackupToolName = template.Spec.CredentialKeyword.UserKeyword
+		}
+		if backupPolicy.Spec.Target.Secret.PasswordKeyword == "" {
+			backupPolicy.Spec.BackupToolName = template.Spec.CredentialKeyword.PasswordKeyword
+		}
 	}
 	if backupPolicy.Spec.TTL == nil {
 		backupPolicy.Spec.TTL = template.Spec.TTL

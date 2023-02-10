@@ -87,6 +87,68 @@ type CreateBackupPolicyOptions struct {
 	create.BaseOptions
 }
 
+type CreateVolumeSnapshotClassOptions struct {
+	Driver string `json:"driver"`
+	Name   string `json:"name"`
+	create.BaseOptions
+}
+
+func (o *CreateVolumeSnapshotClassOptions) Complete() error {
+	objs, err := o.Client.
+		Resource(types.StorageClassGVR()).
+		List(context.TODO(), metav1.ListOptions{})
+	if err != nil {
+		return err
+	}
+	for _, sc := range objs.Items {
+		annotations := sc.GetAnnotations()
+		if annotations == nil {
+			continue
+		}
+		if annotations["storageclass.kubernetes.io/is-default-class"] == "true" {
+			o.Driver, _, _ = unstructured.NestedString(sc.Object, "provisioner")
+			o.Name = "default-vsc"
+		}
+	}
+	// warning if not found default storage class
+	if o.Driver == "" {
+		return fmt.Errorf("no default StorageClass found, snapshot-controller may not work")
+	}
+	return nil
+}
+
+func (o *CreateVolumeSnapshotClassOptions) Create() error {
+	objs, err := o.Client.
+		Resource(types.VolumeSnapshotClassGVR()).
+		List(context.TODO(), metav1.ListOptions{})
+	if err != nil {
+		return err
+	}
+	for _, vsc := range objs.Items {
+		annotations := vsc.GetAnnotations()
+		if annotations == nil {
+			continue
+		}
+		// skip creation if default volumesnapshotclass exists.
+		if annotations["snapshot.storage.kubernetes.io/is-default-class"] == "true" {
+			return nil
+		}
+	}
+
+	inputs := create.Inputs{
+		CueTemplateName: "volumesnapshotclass_template.cue",
+		ResourceName:    "volumesnapshotclasses",
+		Group:           "snapshot.storage.k8s.io",
+		Version:         types.VersionV1,
+		BaseOptionsObj:  &o.BaseOptions,
+		Options:         o,
+	}
+	if err := o.BaseOptions.Run(inputs); err != nil {
+		return err
+	}
+	return nil
+}
+
 func (o *CreateBackupOptions) Complete() error {
 	// generate backupName
 	if len(o.BackupName) == 0 {
@@ -319,7 +381,14 @@ func (o *CreateRestoreOptions) Complete() error {
 
 func (o *CreateRestoreOptions) Validate() error {
 	if o.Name == "" {
-		return fmt.Errorf("missing cluster name")
+		name, err := generateClusterName(o.Client, o.Namespace)
+		if err != nil {
+			return err
+		}
+		if name == "" {
+			return fmt.Errorf("failed to generate a random cluster name")
+		}
+		o.Name = name
 	}
 	return nil
 }

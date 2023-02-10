@@ -156,11 +156,11 @@ spec:
       args:
       - >
         cluster_info=""; 
-        for (( i=0; i< $OPENDBAAS_REPLICASETS_PRIMARY_N; i++ )); do 
+        for (( i=0; i< $OPENDBAAS_REPLICASETS_N; i++ )); do 
         if [ $i -ne 0 ]; then 
         cluster_info="$cluster_info;"; 
         fi; 
-        host=$(eval echo \$OPENDBAAS_REPLICASETS_PRIMARY_"$i"_HOSTNAME) 
+        host=$(eval echo \$OPENDBAAS_REPLICASETS_"$i"_HOSTNAME) 
         cluster_info="$cluster_info$host:13306"; 
         done; 
         idx=0; 

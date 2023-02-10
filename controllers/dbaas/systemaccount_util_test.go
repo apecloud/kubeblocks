@@ -68,44 +68,6 @@ func TestUpdateFacts(t *testing.T) {
 	}
 }
 
-func TestExepectation(t *testing.T) {
-	type accountExpect struct {
-		toCreate dbaasv1alpha1.KBAccountType
-	}
-	// prepare settings
-	settings := map[string]accountExpect{
-		"minimal": {
-			toCreate: dbaasv1alpha1.KBAccountAdmin,
-		},
-		"enableProbe": {
-			toCreate: dbaasv1alpha1.KBAccountAdmin | dbaasv1alpha1.KBAccountProbe,
-		},
-
-		"createBackupPolicy": {
-			toCreate: dbaasv1alpha1.KBAccountAdmin | dbaasv1alpha1.KBAccountDataprotection,
-		},
-	}
-	mgr := newExpectationsManager()
-	assert.NotNil(t, mgr)
-	for key, value := range settings {
-		expect, exist, _ := mgr.getExpectation(key)
-		assert.False(t, exist)
-		assert.Nil(t, expect)
-
-		expect, _ = mgr.createExpectation(key)
-		assert.NotNil(t, expect)
-		expect.set(value.toCreate)
-		assert.Equal(t, expect.getExpectation(), value.toCreate)
-	}
-	for key := range settings {
-		_, exist, _ := mgr.getExpectation(key)
-		assert.True(t, exist)
-		err := mgr.deleteExpectation(key)
-		assert.Nil(t, err)
-	}
-	assert.Equal(t, len(mgr.ListKeys()), 0)
-}
-
 func TestRenderJob(t *testing.T) {
 	var (
 		randomStr             = testCtx.GetRandomStr()
@@ -148,22 +110,34 @@ func TestRenderJob(t *testing.T) {
 
 	engine := newCustomizedEngine(cmdExecutorConfig, cluster, consensusCompName)
 	assert.NotNil(t, engine)
+
+	compKey := componentUniqueKey{
+		namespace:     cluster.Namespace,
+		clusterName:   cluster.Name,
+		componentName: consensusCompName,
+	}
+
 	for _, acc := range accountsSetting.Accounts {
 		switch acc.ProvisionPolicy.Type {
 		case dbaasv1alpha1.CreateByStmt:
-			creationStmt, secrets := getCreationStmtForAccount(cluster.Namespace, cluster.Name, clusterDef.Spec.Type, clusterDef.Name,
-				consensusCompName, accountsSetting.PasswordConfig, acc)
+			creationStmt, secrets := getCreationStmtForAccount(compKey, accountsSetting.PasswordConfig, acc)
 			// make sure all variables have been replaced
 			for _, stmt := range creationStmt {
 				assert.False(t, strings.Contains(stmt, "$(USERNAME)"))
 				assert.False(t, strings.Contains(stmt, "$(PASSWD)"))
 			}
-			job := renderJob(engine, cluster.Namespace, cluster.Name, clusterDef.Spec.Type,
-				clusterDef.Name, consensusCompName, string(acc.Name), creationStmt, "10.0.0.1")
+			// render job with debug mode off
+			job := renderJob(engine, compKey, string(acc.Name), creationStmt, "10.0.0.1", false)
 			assert.NotNil(t, job)
+			assert.NotNil(t, job.Spec.TTLSecondsAfterFinished)
+			assert.Equal(t, (int32)(0), *job.Spec.TTLSecondsAfterFinished)
 			envList := job.Spec.Template.Spec.Containers[0].Env
 			assert.GreaterOrEqual(t, len(envList), 1)
 			assert.Equal(t, job.Spec.Template.Spec.Containers[0].Image, cmdExecutorConfig.Image)
+			// render job with debug mode on
+			job = renderJob(engine, compKey, string(acc.Name), creationStmt, "10.0.0.1", true)
+			assert.NotNil(t, job)
+			assert.Nil(t, job.Spec.TTLSecondsAfterFinished)
 			assert.NotNil(t, secrets)
 		case dbaasv1alpha1.ReferToExisting:
 			assert.False(t, strings.Contains(acc.ProvisionPolicy.SecretRef.Name, "$(CONN_CREDENTIAL_SECRET_NAME)"))

@@ -178,3 +178,19 @@ func STSGVR() schema.GroupVersionResource {
 func ConfigConstraintGVR() schema.GroupVersionResource {
 	return schema.GroupVersionResource{Group: Group, Version: Version, Resource: ResourceConfigConstraintVersions}
 }
+
+func StorageClassGVR() schema.GroupVersionResource {
+	return schema.GroupVersionResource{
+		Group:    "storage.k8s.io",
+		Version:  VersionV1,
+		Resource: "storageclasses",
+	}
+}
+
+func VolumeSnapshotClassGVR() schema.GroupVersionResource {
+	return schema.GroupVersionResource{
+		Group:    "snapshot.storage.k8s.io",
+		Version:  VersionV1,
+		Resource: "volumesnapshotclasses",
+	}
+}

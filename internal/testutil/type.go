@@ -53,18 +53,24 @@ const (
 
 func init() {
 	viper.AutomaticEnv()
+	viper.SetDefault("EventuallyTimeout", time.Second*10)
+	viper.SetDefault("EventuallyPollingInterval", time.Second*1)
+	viper.SetDefault("ConsistentlyDuration", time.Second*3)
+	viper.SetDefault("ConsistentlyPollingInterval", time.Second*1)
+	viper.SetDefault("ClearResourceTimeout", time.Second*60)
+	viper.SetDefault("ClearResourcePollingInterval", time.Second*1)
 }
 
 func NewDefaultTestContext(ctx context.Context, cli client.Client, testEnv *envtest.Environment) TestContext {
 	t := TestContext{
 		TestObjLabelKey:                    "kubeblocks.io/test",
 		DefaultNamespace:                   "default",
-		DefaultEventuallyTimeout:           time.Second * 10,
-		DefaultEventuallyPollingInterval:   time.Second,
-		DefaultConsistentlyDuration:        time.Second * 3,
-		DefaultConsistentlyPollingInterval: time.Second,
-		ClearResourceTimeout:               time.Second * 60,
-		ClearResourcePollingInterval:       time.Second,
+		DefaultEventuallyTimeout:           viper.GetDuration("EventuallyTimeout"),
+		DefaultEventuallyPollingInterval:   viper.GetDuration("EventuallyPollingInterval"),
+		DefaultConsistentlyDuration:        viper.GetDuration("ConsistentlyDuration"),
+		DefaultConsistentlyPollingInterval: viper.GetDuration("ConsistentlyPollingInterval"),
+		ClearResourceTimeout:               viper.GetDuration("ClearResourceTimeout"),
+		ClearResourcePollingInterval:       viper.GetDuration("ClearResourcePollingInterval"),
 	}
 	t.Ctx = ctx
 	t.Cli = cli

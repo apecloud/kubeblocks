@@ -211,9 +211,9 @@ test-current-ctx: manifests generate fmt vet add-k8s-host ## Run operator contro
 test: manifests generate fmt vet envtest add-k8s-host ## Run tests. if existing k8s cluster is k3d or minikube, specify EXISTING_CLUSTER_TYPE.
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" $(GO) test -short -coverprofile cover.out $(TEST_PACKAGES)
 
-.PHONY: test-uec
-test-uec: manifests generate fmt vet envtest add-k8s-host ## Run tests. if existing k8s cluster is k3d or minikube, specify EXISTING_CLUSTER_TYPE.
-	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" $(GO) test $(TEST_PACKAGES) -run UseExistingCluster
+.PHONY: test-integration
+test-integration: manifests generate fmt vet envtest add-k8s-host ## Run tests. if existing k8s cluster is k3d or minikube, specify EXISTING_CLUSTER_TYPE.
+	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" $(GO) test ./test/integration
 
 .PHONY: test-delve
 test-delve: manifests generate fmt vet envtest ## Run tests.
@@ -235,7 +235,7 @@ endif
 
 .PHONY: goimports
 goimports: goimportstool ## Run goimports against code.
-	$(GOIMPORTS) -local github.com/apecloud/kubeblocks -w $$(go list -f {{.Dir}} ./...)
+	$(GOIMPORTS) -local github.com/apecloud/kubeblocks -w $$(git ls-files|grep "\.go$$")
 
 
 ##@ CLI
@@ -255,7 +255,7 @@ CLI_LD_FLAGS ="-s -w \
 
 
 bin/kbcli.%: ## Cross build bin/kbcli.$(OS).$(ARCH).
-	GOOS=$(word 2,$(subst ., ,$@)) GOARCH=$(word 3,$(subst ., ,$@)) $(GO) build -ldflags=${CLI_LD_FLAGS} -o $@ cmd/cli/main.go
+	GOOS=$(word 2,$(subst ., ,$@)) GOARCH=$(word 3,$(subst ., ,$@)) CGO_ENABLED=0 $(GO) build -ldflags=${CLI_LD_FLAGS} -o $@ cmd/cli/main.go
 
 .PHONY: kbcli
 kbcli: OS=$(shell $(GO) env GOOS)

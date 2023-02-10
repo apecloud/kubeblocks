@@ -1,20 +1,26 @@
-## kbcli cluster volume-expansion
+## kbcli cluster hscale
 
-Expand volume with the specified components and volumeClaimTemplates in the cluster
+Horizontally scale the specified components in the cluster
 
 ```
-kbcli cluster volume-expansion [flags]
+kbcli cluster hscale [flags]
+```
+
+### Examples
+
+```
+  # expand storage resources of specified components, separate with commas when <component-name> more than one
+  kbcli cluster hscale <my-cluster> --component-names=<component-name> --replicas=3
 ```
 
 ### Options
 
 ```
-      --component-names strings                Component names to this operations (required)
-  -h, --help                                  help for volume-expansion
-      --name string                           OpsRequest name. if not specified, it will be randomly generated 
-      --storage string                        Volume storage size (required)
-      --ttlSecondsAfterSucceed int            Time to live after the OpsRequest succeed
-      --volume-claim-template-names strings   VolumeClaimTemplate names in components (required)
+      --component-names strings       Component names to this operations
+  -h, --help                         help for hscale
+      --ops-request string           OpsRequest name. if not specified, it will be randomly generated 
+      --replicas int                 Replicas with the specified components (default -1)
+      --ttlSecondsAfterSucceed int   Time to live after the OpsRequest succeed
 ```
 
 ### Options inherited from parent commands
@@ -29,6 +35,7 @@ kbcli cluster volume-expansion [flags]
       --client-key string              Path to a client key file for TLS
       --cluster string                 The name of the kubeconfig cluster to use
       --context string                 The name of the kubeconfig context to use
+      --disable-compression            If true, opt-out of response compression for all requests to the server
       --insecure-skip-tls-verify       If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure
       --kubeconfig string              Path to the kubeconfig file to use for CLI requests.
       --match-server-version           Require server version to match client version
@@ -42,5 +49,5 @@ kbcli cluster volume-expansion [flags]
 
 ### SEE ALSO
 
-* [kbcli cluster](kbcli_cluster.md)	 - Cluster operation command
+* [kbcli cluster](kbcli_cluster.md)	 - Cluster command
 

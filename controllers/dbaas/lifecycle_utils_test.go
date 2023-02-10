@@ -369,11 +369,11 @@ spec:
         args:
           - >
             cluster_info="";
-            for (( i=0; i<$KB_REPLICASETS_PRIMARY_N; i++ )); do
+            for (( i=0; i<$KB_REPLICASETS_N; i++ )); do
               if [ $i -ne 0 ]; then
                 cluster_info="$cluster_info;";
               fi;
-              host=$(eval echo \$KB_REPLICASETS_PRIMARY_"$i"_HOSTNAME)
+              host=$(eval echo \$KB_REPLICASETS_"$i"_HOSTNAME)
               cluster_info="$cluster_info$host:13306";
             done;
             idx=0;
@@ -450,11 +450,11 @@ spec:
         args:
           - >
             cluster_info="";
-            for (( i=0; i<$KB_REPLICASETS_PRIMARY_N; i++ )); do
+            for (( i=0; i<$KB_REPLICASETS_N; i++ )); do
               if [ $i -ne 0 ]; then
                 cluster_info="$cluster_info;";
               fi;
-              host=$(eval echo \$KB_REPLICASETS_PRIMARY_"$i"_HOSTNAME)
+              host=$(eval echo \$KB_REPLICASETS_"$i"_HOSTNAME)
               cluster_info="$cluster_info$host:13306";
             done;
             idx=0;
@@ -516,6 +516,9 @@ spec:
           allowPrivilegeEscalation: false
   - type: proxy
     podSpec: 
+      initContainers:
+      - name: nginx-init-container
+        image: nginx
       containers:
       - name: nginx
         image: nginx
@@ -626,6 +629,16 @@ spec:
 				&clusterVersion.Spec.Components[1],
 				&cluster.Spec.Components[0])
 			Expect(len(component.PodSpec.Containers)).Should(Equal(2))
+
+			By("new init container in clusterVersion not in clusterDefinition")
+			component = mergeComponents(
+				reqCtx,
+				cluster,
+				clusterDef,
+				&clusterDef.Spec.Components[0],
+				&clusterVersion.Spec.Components[1],
+				&cluster.Spec.Components[0])
+			Expect(len(component.PodSpec.InitContainers)).Should(Equal(1))
 
 			By("leave clusterComp nil")
 			component = mergeComponents(

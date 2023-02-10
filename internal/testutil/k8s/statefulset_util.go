@@ -26,8 +26,10 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/apecloud/kubeblocks/internal/testutil"
 )
 
@@ -145,4 +147,15 @@ func RemovePodFinalizer(ctx context.Context, testCtx testutil.TestContext, pod *
 	gomega.Eventually(func() error {
 		return testCtx.Cli.Get(context.Background(), client.ObjectKey{Name: pod.Name, Namespace: testCtx.DefaultNamespace}, &corev1.Pod{})
 	}, timeout, interval).Should(gomega.Satisfy(apierrors.IsNotFound))
+}
+
+func ListAndCheckStatefulSet(testCtx *testutil.TestContext, key types.NamespacedName) *apps.StatefulSetList {
+	stsList := &apps.StatefulSetList{}
+	gomega.Eventually(func(g gomega.Gomega) {
+		g.Expect(testCtx.Cli.List(testCtx.Ctx, stsList, client.MatchingLabels{
+			intctrlutil.AppInstanceLabelKey: key.Name,
+		}, client.InNamespace(key.Namespace))).Should(gomega.Succeed())
+		g.Expect(len(stsList.Items) > 0).To(gomega.BeTrue())
+	}).Should(gomega.Succeed())
+	return stsList
 }

@@ -76,6 +76,10 @@ spec:
           - name: "follower"
             accessMode: Readonly
         updateStrategy: BestEffortParallel
+      service:
+        ports:
+          - protocol: TCP
+            port: 3306
       probes:
         roleChangedProbe:
           failureThreshold: 3

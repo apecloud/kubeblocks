@@ -153,6 +153,21 @@ func getKBObjects(client kubernetes.Interface, dynamic dynamic.Interface, namesp
 	getConfigMap("configuration.kubeblocks.io/configuration-template=true")
 	getConfigMap("configuration.kubeblocks.io/configuration-type=tpl")
 
+	getVolumeSnapshotClass := func(labelSelector string) {
+		vscs, err := dynamic.Resource(types.VolumeSnapshotClassGVR()).List(context.TODO(), metav1.ListOptions{
+			LabelSelector: labelSelector,
+		})
+		if err != nil {
+			appendErr(err)
+			return
+		}
+		if objs.crs == nil {
+			objs.crs = map[schema.GroupVersionResource]*unstructured.UnstructuredList{}
+		}
+		objs.crs[types.VolumeSnapshotClassGVR()] = vscs
+	}
+	getVolumeSnapshotClass(fmt.Sprintf("%s=%s", types.InstanceLabelKey, types.KubeBlocksChartName))
+
 	return objs, utilerrors.NewAggregate(allErrs)
 }
 
@@ -162,6 +177,11 @@ func removeFinalizers(client dynamic.Interface, objs *kbObjects) error {
 			return nil
 		}
 		for _, cr := range crs.Items {
+			if gvr == types.VolumeSnapshotClassGVR() {
+				if err := client.Resource(gvr).Delete(context.TODO(), cr.GetName(), newDeleteOpts()); err != nil {
+					return err
+				}
+			}
 			if _, err := client.Resource(gvr).Patch(context.TODO(), cr.GetName(), k8sapitypes.JSONPatchType,
 				[]byte("[{\"op\": \"remove\", \"path\": \"/metadata/finalizers\"}]"), metav1.PatchOptions{}); err != nil {
 				return err

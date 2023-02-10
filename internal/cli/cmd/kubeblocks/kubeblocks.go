@@ -39,6 +39,7 @@ import (
 	"k8s.io/kubectl/pkg/util/templates"
 	"k8s.io/utils/strings/slices"
 
+	"github.com/apecloud/kubeblocks/internal/cli/cmd/cluster"
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
@@ -137,7 +138,7 @@ func (o *Options) complete(f cmdutil.Factory, cmd *cobra.Command) error {
 }
 
 func (o *Options) preCheck() error {
-	fmt.Fprintf(o.Out, "%s uninstall will remove all KubeBlocks resources.\n", printer.BoldYellow("Warning:"))
+	printer.Warning(o.Out, "uninstall will remove all KubeBlocks resources.\n")
 
 	// wait user to confirm
 	if err := confirmUninstall(o.In); err != nil {
@@ -193,10 +194,6 @@ func (o *InstallOptions) Install() error {
 
 	if v := versionInfo[util.KubeBlocksApp]; len(v) > 0 {
 		fmt.Fprintf(o.Out, "KubeBlocks %s already exists\n", v)
-		// print notes
-		if !o.Quiet {
-			o.printNotes()
-		}
 		return nil
 	}
 
@@ -234,11 +231,6 @@ func (o *InstallOptions) Install() error {
 
 	// successfully installed
 	spinner(true)
-
-	// print notes
-	if !o.Quiet {
-		o.printNotes()
-	}
 
 	return nil
 }
@@ -332,11 +324,11 @@ func (o *InstallOptions) disableUnsupportedSets() {
 		return
 	}
 
-	msg := "Following flags are not available in current kubernetes cluster, they will be disabled"
+	msg := "following flags are not available in current kubernetes environment, they will be disabled\n"
 	if len(disabledSets) == 1 {
-		msg = "Following flag is not available in current kubernetes cluster, it will be disabled"
+		msg = "following flag is not available in current kubernetes environment, it will be disabled\n"
 	}
-	fmt.Fprintf(o.Out, "%s %s\n", printer.BoldYellow("Warning:"), msg)
+	printer.Warning(o.Out, msg)
 	for _, set := range disabledSets {
 		fmt.Fprintf(o.Out, "  · %s\n", set)
 	}
@@ -420,11 +412,6 @@ func (o *InstallOptions) upgrade(cmd *cobra.Command) error {
 	// successfully installed
 	spinner(true)
 
-	// print notes
-	if !o.Quiet {
-		o.printNotes()
-	}
-
 	return nil
 }
 
@@ -496,6 +483,44 @@ Notes: Monitor components(Grafana/Prometheus/AlertManager) is not installed,
 	}
 }
 
+func (o *InstallOptions) postInstall() error {
+	var sets []string
+	for _, set := range o.Sets {
+		splitSet := strings.Split(set, ",")
+		sets = append(sets, splitSet...)
+	}
+	for _, set := range sets {
+		if set == "snapshot-controller.enabled=true" {
+			if err := o.createVolumeSnapshotClass(); err != nil {
+				return err
+			}
+		}
+	}
+	// print notes
+	if !o.Quiet {
+		o.printNotes()
+	}
+	return nil
+}
+
+func (o *InstallOptions) createVolumeSnapshotClass() error {
+	options := cluster.CreateVolumeSnapshotClassOptions{}
+	options.BaseOptions.Client = o.Dynamic
+	options.BaseOptions.IOStreams = o.IOStreams
+
+	spinner := util.Spinner(o.Out, "%-40s", "Configure VolumeSnapshotClass")
+	defer spinner(false)
+
+	if err := options.Complete(); err != nil {
+		return err
+	}
+	if err := options.Create(); err != nil {
+		return err
+	}
+	spinner(true)
+	return nil
+}
+
 func (o *Options) uninstall() error {
 	printErr := func(spinner func(result bool), err error) {
 		if err == nil || apierrors.IsNotFound(err) ||
@@ -528,7 +553,7 @@ func (o *Options) uninstall() error {
 	// get KubeBlocks objects and try to remove them
 	objs, err := getKBObjects(o.Client, o.Dynamic, o.Namespace)
 	if err != nil {
-		fmt.Fprintf(o.ErrOut, "Get KubeBlocks Ojects throw some errors %s", err.Error())
+		fmt.Fprintf(o.ErrOut, "Failed to get KubeBlocks objects %s", err.Error())
 	}
 
 	// remove finalizers
@@ -571,6 +596,9 @@ func newInstallCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 			util.CheckErr(o.complete(f, cmd))
 			util.CheckErr(o.Install())
 		},
+		PostRun: func(cmd *cobra.Command, args []string) {
+			util.CheckErr(o.postInstall())
+		},
 	}
 
 	cmd.Flags().BoolVar(&o.Monitor, "monitor", true, "Set monitor enabled and install Prometheus, AlertManager and Grafana (default true)")
@@ -598,6 +626,9 @@ func newUpgradeCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 		Run: func(cmd *cobra.Command, args []string) {
 			util.CheckErr(o.complete(f, cmd))
 			util.CheckErr(o.upgrade(cmd))
+		},
+		PostRun: func(cmd *cobra.Command, args []string) {
+			util.CheckErr(o.postInstall())
 		},
 	}
 

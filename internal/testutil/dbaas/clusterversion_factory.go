@@ -35,7 +35,8 @@ func NewClusterVersionFactory(testCtx *testutil.TestContext, name string, cdRef 
 		TestCtx: testCtx,
 		ClusterVersion: &dbaasv1alpha1.ClusterVersion{
 			ObjectMeta: metav1.ObjectMeta{
-				Name: name,
+				Name:   name,
+				Labels: map[string]string{},
 			},
 			Spec: dbaasv1alpha1.ClusterVersionSpec{
 				ClusterDefinitionRef: cdRef,
@@ -48,6 +49,13 @@ func NewClusterVersionFactory(testCtx *testutil.TestContext, name string, cdRef 
 func (factory *MockClusterVersionFactory) WithRandomName() *MockClusterVersionFactory {
 	key := GetRandomizedKey(factory.TestCtx, factory.ClusterVersion.Name)
 	factory.ClusterVersion.Name = key.Name
+	return factory
+}
+
+func (factory *MockClusterVersionFactory) AddLabels(keysAndValues ...string) *MockClusterVersionFactory {
+	for k, v := range withMap(keysAndValues...) {
+		factory.ClusterVersion.Labels[k] = v
+	}
 	return factory
 }
 

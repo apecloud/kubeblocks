@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgresql-scripts
+  labels:
+    {{- include "postgresql.labels" . | nindent 4 }}
+data:
+  post_start.sh: |
+    #!/bin/sh
+    export PGPASSWORD=$POSTGRES_POSTGRES_PASSWORD
+    echo "Wait for the database to be accessible, trying to connect."
+    until psql -Upostgres -c "SELECT 1;"; do sleep 1; done
+    echo "create extension pg_stat_statements"
+    psql -Upostgres -c "CREATE EXTENSION IF NOT EXISTS pg_stat_statements;"

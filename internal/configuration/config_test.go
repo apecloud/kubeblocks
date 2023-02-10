@@ -174,7 +174,7 @@ func TestConfigMapConfig(t *testing.T) {
 
 		content, _ := cfg.ToCfgContent()
 
-		patchs, err := CreateMergePatch(&K8sConfig{
+		patch, err := CreateMergePatch(&K8sConfig{
 			Configurations: map[string]string{
 				"my.cnf":  iniConfig,
 				"my2.cnf": iniConfig,
@@ -184,18 +184,18 @@ func TestConfigMapConfig(t *testing.T) {
 		}, cfg.Option)
 
 		require.Nil(t, err)
-		require.NotNil(t, patchs)
+		require.NotNil(t, patch)
 
 		// add config: my_test.cnf
 		// delete config: my2.cnf
 
-		_, ok := patchs.AddConfig["my_test.cnf"]
+		_, ok := patch.AddConfig["my_test.cnf"]
 		require.True(t, ok)
 
-		_, ok = patchs.DeleteConfig["my2.cnf"]
+		_, ok = patch.DeleteConfig["my2.cnf"]
 		require.True(t, ok)
 
-		updated, ok := patchs.UpdateConfig["my.cnf"]
+		updated, ok := patch.UpdateConfig["my.cnf"]
 		require.True(t, ok)
 
 		// update my.cnf

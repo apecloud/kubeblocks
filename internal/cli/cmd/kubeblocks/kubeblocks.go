@@ -138,7 +138,7 @@ func (o *Options) complete(f cmdutil.Factory, cmd *cobra.Command) error {
 }
 
 func (o *Options) preCheck() error {
-	fmt.Fprintf(o.Out, "%s uninstall will remove all KubeBlocks resources.\n", printer.BoldYellow("Warning:"))
+	printer.Warning(o.Out, "uninstall will remove all KubeBlocks resources.\n")
 
 	// wait user to confirm
 	if err := confirmUninstall(o.In); err != nil {
@@ -220,7 +220,7 @@ func (o *InstallOptions) Install() error {
 	o.Sets = append(o.Sets, fmt.Sprintf(kMonitorParam, o.Monitor))
 
 	// Add repo, if exists, will update it
-	if err = helm.AddRepo(&repo.Entry{Name: types.KubeBlocksChartName, URL: types.KubeBlocksChartURL}); err != nil {
+	if err = helm.AddRepo(&repo.Entry{Name: types.KubeBlocksChartName, URL: util.GetHelmChartRepoURL()}); err != nil {
 		return err
 	}
 
@@ -324,11 +324,11 @@ func (o *InstallOptions) disableUnsupportedSets() {
 		return
 	}
 
-	msg := "Following flags are not available in current kubernetes cluster, they will be disabled"
+	msg := "following flags are not available in current kubernetes environment, they will be disabled\n"
 	if len(disabledSets) == 1 {
-		msg = "Following flag is not available in current kubernetes cluster, it will be disabled"
+		msg = "following flag is not available in current kubernetes environment, it will be disabled\n"
 	}
-	fmt.Fprintf(o.Out, "%s %s\n", printer.BoldYellow("Warning:"), msg)
+	printer.Warning(o.Out, msg)
 	for _, set := range disabledSets {
 		fmt.Fprintf(o.Out, "  · %s\n", set)
 	}
@@ -400,7 +400,7 @@ func (o *InstallOptions) upgrade(cmd *cobra.Command) error {
 	}
 
 	// Add repo, if exists, will update it
-	if err = helm.AddRepo(&repo.Entry{Name: types.KubeBlocksChartName, URL: types.KubeBlocksChartURL}); err != nil {
+	if err = helm.AddRepo(&repo.Entry{Name: types.KubeBlocksChartName, URL: util.GetHelmChartRepoURL()}); err != nil {
 		return err
 	}
 
@@ -548,12 +548,12 @@ func (o *Options) uninstall() error {
 
 	// remove repo
 	spinner = newSpinner("Remove helm repo " + types.KubeBlocksChartName)
-	printErr(spinner, helm.RemoveRepo(&repo.Entry{Name: types.KubeBlocksChartName, URL: types.KubeBlocksChartURL}))
+	printErr(spinner, helm.RemoveRepo(&repo.Entry{Name: types.KubeBlocksChartName}))
 
 	// get KubeBlocks objects and try to remove them
 	objs, err := getKBObjects(o.Client, o.Dynamic, o.Namespace)
 	if err != nil {
-		fmt.Fprintf(o.ErrOut, "Get KubeBlocks Ojects throw some errors %s", err.Error())
+		fmt.Fprintf(o.ErrOut, "Failed to get KubeBlocks objects %s", err.Error())
 	}
 
 	// remove finalizers

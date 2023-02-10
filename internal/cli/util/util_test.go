@@ -250,4 +250,12 @@ var _ = Describe("util", func() {
 			Expect(IsSupportConfigureParams(tt.args.tpl, tt.args.updatedParams, mockClient)).Should(BeEquivalentTo(tt.expected))
 		}
 	})
+
+	It("get IP location", func() {
+		_, _ = getIPLocation()
+	})
+
+	It("get helm chart repo url", func() {
+		Expect(GetHelmChartRepoURL()).ShouldNot(BeEmpty())
+	})
 })

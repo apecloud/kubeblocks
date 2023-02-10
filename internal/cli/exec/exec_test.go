@@ -84,11 +84,11 @@ type testExecOptions struct {
 func (o *testExecOptions) complete(args []string) error {
 	var err error
 	if len(args) == 0 {
-		return fmt.Errorf("you must specified the cluster name")
+		return fmt.Errorf("you must specify the cluster name")
 	}
 	o.name = args[0]
 	if o.PodName == "" {
-		return fmt.Errorf("you must specified the intance name")
+		return fmt.Errorf("you must specify the instance name")
 	}
 	o.Pod, err = o.Client.CoreV1().Pods(o.Namespace).Get(context.TODO(), o.PodName, metav1.GetOptions{})
 	if err != nil {

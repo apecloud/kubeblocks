@@ -91,7 +91,7 @@ var (
 		# update component params 
 		kbcli cluster configure <cluster-name> --component-name=<component-name> --template-name=<template-name> --configure-file=<configure-file> --set max_connections=1000,general_log=OFF
 
-		# update apecloud-mysql max_connections, cluster name is mycluster
+		# update mysql max_connections, cluster name is mycluster
 		kbcli cluster configure mycluster --component-name=mysql --template-name=mysql-3node-tpl --configure-file=my.cnf --set max_connections=2000
 	`)
 )
@@ -126,7 +126,7 @@ func (o *OperationsOptions) validateUpgrade() error {
 	if len(o.ClusterVersionRef) == 0 {
 		return fmt.Errorf("missing cluster-version")
 	}
-	return nil
+	return delete.Confirm([]string{o.Name}, o.In)
 }
 
 func (o *OperationsOptions) validateVolumeExpansion() error {
@@ -290,11 +290,17 @@ func (o *OperationsOptions) Validate() error {
 
 	switch o.OpsType {
 	case dbaasv1alpha1.VolumeExpansionType:
-		return o.validateVolumeExpansion()
+		if err := o.validateVolumeExpansion(); err != nil {
+			return err
+		}
 	case dbaasv1alpha1.HorizontalScalingType:
-		return o.validateHorizontalScaling()
+		if err := o.validateHorizontalScaling(); err != nil {
+			return err
+		}
 	case dbaasv1alpha1.ReconfiguringType:
-		return o.validateReconfiguring()
+		if err := o.validateReconfiguring(); err != nil {
+			return err
+		}
 	}
 	return delete.Confirm([]string{o.Name}, o.In)
 }

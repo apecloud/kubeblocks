@@ -62,6 +62,7 @@ import (
 	"sigs.k8s.io/kustomize/kyaml/yaml"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/cli/testing"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 )
@@ -589,4 +590,37 @@ func IsSupportConfigureParams(tpl dbaasv1alpha1.ConfigTemplate, values map[strin
 		}
 	}
 	return true, nil
+}
+
+func getIPLocation() (string, error) {
+	client := &http.Client{}
+	req, err := http.NewRequest("GET", "http://ifconfig.io/country_code", nil)
+	if err != nil {
+		return "", err
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+	location, err := io.ReadAll(resp.Body)
+	if len(location) == 0 || err != nil {
+		return "", err
+	}
+
+	// remove last "\n"
+	return string(location[:len(location)-1]), nil
+}
+
+// GetHelmChartRepoURL get helm chart repo, we will choose one from GitHub and GitLab based on the IP location
+func GetHelmChartRepoURL() string {
+	if types.KubeBlocksChartURL == testing.KubeBlocksChartURL {
+		return testing.KubeBlocksChartURL
+	}
+
+	location, _ := getIPLocation()
+	if location == "CN" {
+		return types.GitLabHelmChartRepo
+	}
+	return types.KubeBlocksChartURL
 }

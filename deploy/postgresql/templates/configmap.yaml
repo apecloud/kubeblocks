@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgresql-configuration
+  labels:
+    {{- include "postgresql.labels" . | nindent 4 }}
+data:
+  postgresql.conf: |-
+    {{- .Files.Get "config/pg14.conf.tpl" | nindent 4 }}
+  {{- if .Values.primary.pgHbaConfiguration }}
+  pg_hba.conf: |
+    {{- .Values.primary.pgHbaConfiguration | nindent 4 }}
+  {{- end }}

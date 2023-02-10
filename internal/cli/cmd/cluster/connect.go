@@ -128,24 +128,9 @@ func (o *ConnectOptions) connect(args []string) error {
 
 	// get target pod name, if not specified, find default pod from cluster
 	if len(o.PodName) == 0 {
-		infos := cluster.GetSimpleInstanceInfos(o.Dynamic, o.name, o.Namespace)
-		if infos == nil {
-			return fmt.Errorf("failed to find the instance to connect, please check cluster status")
+		if err := o.getTargetPod(); err != nil {
+			return err
 		}
-
-		// first element is the default instance to connect
-		o.PodName = infos[0].Name
-
-		// output all instance infos
-		var nameRoles = make([]string, len(infos))
-		for i, info := range infos {
-			if len(info.Role) == 0 {
-				nameRoles[i] = info.Name
-			} else {
-				nameRoles[i] = fmt.Sprintf("%s(%s)", info.Name, info.Role)
-			}
-		}
-		fmt.Fprintf(o.Out, "Connect to instance %s: out of %s\n", o.PodName, strings.Join(nameRoles, ", "))
 	}
 
 	// get the pod object
@@ -161,9 +146,37 @@ func (o *ConnectOptions) connect(args []string) error {
 	}
 
 	o.Command = engine.ConnectCommand()
-	o.ContainerName = engine.EngineName()
+	o.ContainerName = engine.Container()
 	o.Pod = pod
 	return o.ExecOptions.Run()
+}
+
+func (o *ConnectOptions) getTargetPod() error {
+	infos := cluster.GetSimpleInstanceInfos(o.Dynamic, o.name, o.Namespace)
+	if infos == nil {
+		return fmt.Errorf("failed to find the instance to connect, please check cluster status")
+	}
+
+	// first element is the default instance to connect
+	o.PodName = infos[0].Name
+
+	// print instance info that we connect
+	if len(infos) == 1 {
+		fmt.Fprintf(o.Out, "Connect to instance %s\n", o.PodName)
+		return nil
+	}
+
+	// output all instance infos
+	var nameRoles = make([]string, len(infos))
+	for i, info := range infos {
+		if len(info.Role) == 0 {
+			nameRoles[i] = info.Name
+		} else {
+			nameRoles[i] = fmt.Sprintf("%s(%s)", info.Name, info.Role)
+		}
+	}
+	fmt.Fprintf(o.Out, "Connect to instance %s: out of %s\n", o.PodName, strings.Join(nameRoles, ", "))
+	return nil
 }
 
 func getEngineByPod(pod *corev1.Pod) (engine.Interface, error) {

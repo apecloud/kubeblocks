@@ -147,6 +147,11 @@ generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and
 go-generate: ## Run go generate against code.
 	$(GO) generate -x ./...
 
+.PHONY: cfg-go-generate
+cfg-go-generate: ## Run go generate against code.
+	$(GO) generate -x ./internal/testutil/k8s/...
+	$(GO) generate -x ./internal/configuration/proto...
+
 .PHONY: fmt
 fmt: ## Run go fmt against code.
 	$(GO) fmt ./...
@@ -208,7 +213,7 @@ test-current-ctx: manifests generate fmt vet add-k8s-host ## Run operator contro
 	USE_EXISTING_CLUSTER=true KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" $(GO) test  -p 1 -coverprofile cover.out $(TEST_PACKAGES)
 
 .PHONY: test
-test: manifests generate fmt vet envtest add-k8s-host ## Run tests. if existing k8s cluster is k3d or minikube, specify EXISTING_CLUSTER_TYPE.
+test: manifests generate cfg-go-generate fmt vet envtest add-k8s-host ## Run tests. if existing k8s cluster is k3d or minikube, specify EXISTING_CLUSTER_TYPE.
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" $(GO) test -short -coverprofile cover.out $(TEST_PACKAGES)
 
 .PHONY: test-integration
@@ -344,7 +349,7 @@ bin/reloader.%: ## Cross build bin/reloader.$(OS).$(ARCH) .
 .PHONY: reloader
 reloader: OS=$(shell $(GO) env GOOS)
 reloader: ARCH=$(shell $(GO) env GOARCH)
-reloader: build-checks ## Build reloader related binaries
+reloader: cfg-go-generate build-checks ## Build reloader related binaries
 	$(MAKE) bin/reloader.${OS}.${ARCH}
 	mv bin/reloader.${OS}.${ARCH} bin/reloader
 
@@ -362,7 +367,7 @@ bin/cue-helper.%: ## Cross build bin/cue-helper.$(OS).$(ARCH) .
 .PHONY: cue-helper
 cue-helper: OS=$(shell $(GO) env GOOS)
 cue-helper: ARCH=$(shell $(GO) env GOARCH)
-cue-helper: build-checks ## Build cue-helper related binaries
+cue-helper: cfg-go-generate build-checks ## Build cue-helper related binaries
 	$(MAKE) bin/cue-helper.${OS}.${ARCH}
 	mv bin/cue-helper.${OS}.${ARCH} bin/cue-helper
 

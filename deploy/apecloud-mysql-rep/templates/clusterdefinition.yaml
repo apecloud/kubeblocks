@@ -42,8 +42,6 @@ spec:
       podSpec:
         initContainers:
           - name: mysql-init-container
-            image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
-            imagePullPolicy: {{ default .Values.image.pullPolicy "IfNotPresent" }}              
             command: ["/scripts/init.sh"]
             volumeMounts:
               - name: data

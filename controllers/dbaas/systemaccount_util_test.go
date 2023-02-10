@@ -21,6 +21,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"k8s.io/apimachinery/pkg/util/yaml"
 
@@ -151,4 +152,57 @@ func TestAccountNum(t *testing.T) {
 	assert.Greater(t, accountNum, 0)
 	expectedMaxKBAccountType := 1 << (accountNum - 1)
 	assert.Equal(t, expectedMaxKBAccountType, dbaasv1alpha1.KBAccountMAX)
+}
+
+func TestAccountDebugMode(t *testing.T) {
+	type testCase struct {
+		viperEnvOn       bool
+		annotatedStrings []string
+		expectedR        bool
+	}
+
+	trueStrings := []string{"1", "t", "T", "TRUE", "true", "True"}            // should be parsed to true
+	falseStrings := []string{"0", "f", "F", "FALSE", "false", "False"}        // should be parsed to false
+	randomString := []string{"", "badCase", "invalidSettings", "TTT", "test"} // should be parsed to false
+
+	testCases := []testCase{
+		{
+			viperEnvOn:       false,
+			annotatedStrings: falseStrings,
+			expectedR:        false,
+		},
+		{
+			viperEnvOn:       false,
+			annotatedStrings: trueStrings,
+			expectedR:        true,
+		},
+		{
+			viperEnvOn:       true,
+			annotatedStrings: falseStrings,
+			expectedR:        true,
+		},
+		{
+			viperEnvOn:       true,
+			annotatedStrings: trueStrings,
+			expectedR:        true,
+		},
+		{
+			viperEnvOn:       false,
+			annotatedStrings: randomString,
+			expectedR:        false,
+		},
+	}
+
+	for _, test := range testCases {
+		if test.viperEnvOn {
+			viper.Set(systemAccountsDebugMode, true)
+		} else {
+			viper.Set(systemAccountsDebugMode, false)
+		}
+
+		for _, annotation := range test.annotatedStrings {
+			debugOn := getDebugMode(annotation)
+			assert.Equal(t, test.expectedR, debugOn)
+		}
+	}
 }

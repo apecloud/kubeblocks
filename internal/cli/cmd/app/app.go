@@ -120,7 +120,7 @@ func (o *options) install() error {
 	spinner := util.Spinner(o.Out, "Installing application %s", o.AppName)
 	defer spinner(false)
 
-	if err := helm.AddRepo(&repo.Entry{Name: o.AppName, URL: types.KubeBlocksChartURL}); err != nil {
+	if err := helm.AddRepo(&repo.Entry{Name: o.AppName, URL: util.GetHelmChartRepoURL()}); err != nil {
 		return err
 	}
 	notes, err := o.installChart()
@@ -166,7 +166,7 @@ func (o *options) uninstall() error {
 		return err
 	}
 
-	if err := helm.RemoveRepo(&repo.Entry{Name: o.AppName, URL: types.KubeBlocksChartURL}); err != nil {
+	if err := helm.RemoveRepo(&repo.Entry{Name: o.AppName, URL: util.GetHelmChartRepoURL()}); err != nil {
 		return err
 	}
 	fmt.Fprintf(o.Out, "Uninstall %s SUCCESSFULLY!\n", o.AppName)

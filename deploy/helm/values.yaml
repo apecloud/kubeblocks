@@ -158,6 +158,7 @@ prometheus:
     ##
     image:
       repository: apecloud/alertmanager
+      tag: v0.24.0
 
     persistentVolume:
       ## If true, alertmanager will create/use a Persistent Volume Claim
@@ -220,6 +221,7 @@ prometheus:
     ##
     image:
       repository: apecloud/node-exporter
+      tag: v1.3.1
 
   server:
     ## Prometheus server container name
@@ -230,6 +232,7 @@ prometheus:
     ##
     image:
       repository: apecloud/prometheus
+      tag: v2.39.1
 
     global:
       ## How frequently to scrape targets by default
@@ -732,6 +735,10 @@ grafana:
   adminPassword: abc
 
   sidecar:
+    image:
+      repository: apecloud/k8s-sidecar
+      tag: 1.19.2
+
     dashboards:
       enabled: true
       label: grafana_dashboard

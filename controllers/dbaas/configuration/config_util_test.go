@@ -103,8 +103,8 @@ var _ = Describe("ConfigWrapper util test", func() {
 
 		By("Create a clusterDefinition obj")
 		clusterDefObj = testdbaas.NewClusterDefFactory(clusterDefName, testdbaas.MySQLType).
-			AddComponent(testdbaas.StatefulMySQL8, statefulCompType).
-			AddConfigTemplate(configTplName, configMapObj.Name, configConstraintObj.Name, configVolumeName).
+			AddComponent(testdbaas.StatefulMySQLComponent, statefulCompType).
+			AddConfigTemplate(configTplName, configMapObj.Name, configConstraintObj.Name, configVolumeName, nil).
 			Create(&testCtx).GetClusterDef()
 
 		By("Create a clusterVersion obj")

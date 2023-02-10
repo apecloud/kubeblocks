@@ -79,7 +79,7 @@ var _ = Describe("ClusterDefinition Controller", func() {
 		BeforeEach(func() {
 			By("Create a clusterDefinition obj")
 			clusterDefObj = testdbaas.NewClusterDefFactory(clusterDefName, testdbaas.MySQLType).
-				AddComponent(testdbaas.StatefulMySQL8, statefulCompType).
+				AddComponent(testdbaas.StatefulMySQLComponent, statefulCompType).
 				Create(&testCtx).GetClusterDef()
 
 			By("Create a clusterVersion obj")
@@ -141,8 +141,8 @@ var _ = Describe("ClusterDefinition Controller", func() {
 		BeforeEach(func() {
 			By("Create a clusterDefinition obj")
 			clusterDefObj = testdbaas.NewClusterDefFactory(clusterDefName, testdbaas.MySQLType).
-				AddComponent(testdbaas.StatefulMySQL8, statefulCompType).
-				AddConfigTemplate(cmName, cmName, cmName, configVolumeName).
+				AddComponent(testdbaas.StatefulMySQLComponent, statefulCompType).
+				AddConfigTemplate(cmName, cmName, cmName, configVolumeName, nil).
 				Create(&testCtx).GetClusterDef()
 
 			By("Create a clusterVersion obj")

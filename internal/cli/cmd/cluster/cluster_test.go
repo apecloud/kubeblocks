@@ -198,8 +198,8 @@ var _ = Describe("Cluster", func() {
 		componentConfig := testdbaas.NewConfigMap(ns, cfgcore.GetComponentCfgName(clusterName, statefulCompName, configVolumeName), testdbaas.SetConfigMapData("my.cnf", ""))
 		By("Create a clusterDefinition obj")
 		clusterDefObj := testdbaas.NewClusterDefFactory(clusterDefName, testdbaas.MySQLType).
-			AddComponent(testdbaas.StatefulMySQL8, statefulCompType).
-			AddConfigTemplate(configTplName, configmap.Name, constraint.Name, configVolumeName).
+			AddComponent(testdbaas.StatefulMySQLComponent, statefulCompType).
+			AddConfigTemplate(configTplName, configmap.Name, constraint.Name, configVolumeName, nil).
 			GetClusterDef()
 		By("Create a clusterVersion obj")
 		clusterVersionObj := testdbaas.NewClusterVersionFactory(clusterVersionName, clusterDefObj.GetName()).

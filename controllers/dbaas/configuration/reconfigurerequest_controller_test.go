@@ -95,8 +95,8 @@ var _ = Describe("Reconfigure Controller", func() {
 
 			By("Create a clusterDefinition obj")
 			clusterDefObj := testdbaas.NewClusterDefFactory(clusterDefName, testdbaas.MySQLType).
-				AddComponent(testdbaas.StatefulMySQL8, statefulCompType).
-				AddConfigTemplate(configTplName, configmap.Name, constraint.Name, configVolumeName).
+				AddComponent(testdbaas.StatefulMySQLComponent, statefulCompType).
+				AddConfigTemplate(configTplName, configmap.Name, constraint.Name, configVolumeName, nil).
 				AddLabels(cfgcore.GenerateTPLUniqLabelKeyWithConfig(configTplName), configmap.Name,
 					cfgcore.GenerateConstraintsUniqLabelKeyWithConfig(constraint.Name), constraint.Name).
 				Create(&testCtx).GetClusterDef()

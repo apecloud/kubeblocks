@@ -40,13 +40,10 @@ var _ = Describe("MySQL High-Availability function", func() {
 	const clusterDefName = "test-clusterdef"
 	const clusterVersionName = "test-clusterversion"
 	const clusterNamePrefix = "test-cluster"
+	const scriptConfigName = "test-cluster-mysql-scripts"
 
-	const statefulCompType = "replicasets"
-	const statefulCompName = "mysql"
-
-	const mysqlContainerName = "mysql"
-
-	const dataVolumeName = "data"
+	const mysqlCompType = "replicasets"
+	const mysqlCompName = "mysql"
 
 	const leader = "leader"
 	const follower = "follower"
@@ -66,10 +63,14 @@ var _ = Describe("MySQL High-Availability function", func() {
 		testdbaas.ClearClusterResources(&testCtx)
 
 		// delete rest configurations
+		inNS := client.InNamespace(testCtx.DefaultNamespace)
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
+		// namespaced
+		testdbaas.ClearResources(&testCtx, intctrlutil.ConfigMapSignature, inNS, ml)
 		// non-namespaced
 		testdbaas.ClearResources(&testCtx, intctrlutil.ConfigConstraintSignature, ml)
 		testdbaas.ClearResources(&testCtx, intctrlutil.BackupPolicyTemplateSignature, ml)
+
 	}
 
 	BeforeEach(cleanEnv)
@@ -118,8 +119,8 @@ var _ = Describe("MySQL High-Availability function", func() {
 		}
 		clusterObj = testdbaas.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
 			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
-			AddComponent(statefulCompName, statefulCompType).
-			SetReplicas(3).AddVolumeClaim(dataVolumeName, pvcSpec).
+			AddComponent(mysqlCompName, mysqlCompType).
+			SetReplicas(3).AddVolumeClaim(testdbaas.DataVolumeName, pvcSpec).
 			Create(&testCtx).GetCluster()
 		clusterKey = client.ObjectKeyFromObject(clusterObj)
 
@@ -191,16 +192,22 @@ var _ = Describe("MySQL High-Availability function", func() {
 
 	Context("with MySQL defined as Consensus type and three replicas", func() {
 		BeforeEach(func() {
+			By("Create configmap")
+			_ = testdbaas.CreateCustomizedObj(&testCtx, "resources/mysql_scripts.yaml", &corev1.ConfigMap{},
+				testdbaas.WithName(scriptConfigName), testCtx.UseDefaultNamespace())
+
 			By("Create a clusterDef obj")
+			mode := int32(0755)
 			clusterDefObj = testdbaas.NewClusterDefFactory(clusterDefName, testdbaas.MySQLType).
 				SetConnectionCredential(map[string]string{"username": "root", "password": ""}).
-				AddComponent(testdbaas.ConsensusMySQL, statefulCompType).
-				AddContainerEnv(mysqlContainerName, corev1.EnvVar{Name: "MYSQL_ALLOW_EMPTY_PASSWORD", Value: "yes"}).
+				AddComponent(testdbaas.ConsensusMySQLComponent, mysqlCompType).
+				AddConfigTemplate(scriptConfigName, scriptConfigName, "", testdbaas.ScriptsVolumeName, &mode).
+				AddContainerEnv(testdbaas.DefaultMySQLContainerName, corev1.EnvVar{Name: "MYSQL_ALLOW_EMPTY_PASSWORD", Value: "yes"}).
 				Create(&testCtx).GetClusterDef()
 
 			By("Create a clusterVersion obj")
 			clusterVersionObj = testdbaas.NewClusterVersionFactory(clusterVersionName, clusterDefObj.GetName()).
-				AddComponent(statefulCompType).AddContainerShort(mysqlContainerName, testdbaas.ApeCloudMySQLImage).
+				AddComponent(mysqlCompType).AddContainerShort(testdbaas.DefaultMySQLContainerName, testdbaas.ApeCloudMySQLImage).
 				Create(&testCtx).GetClusterVersion()
 
 		})

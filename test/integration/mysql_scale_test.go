@@ -39,14 +39,10 @@ var _ = Describe("MySQL Scaling function", func() {
 	const clusterDefName = "test-clusterdef"
 	const clusterVersionName = "test-clusterversion"
 	const clusterNamePrefix = "test-cluster"
+	const scriptConfigName = "test-cluster-mysql-scripts"
 
-	const mysqlContainerName = "mysql"
-
-	const statefulCompType = "replicasets"
-	const statefulCompName = "mysql"
-
-	const dataVolumeName = "data"
-	const logVolumeName = "log"
+	const mysqlCompType = "replicasets"
+	const mysqlCompName = "mysql"
 
 	// Cleanups
 
@@ -57,12 +53,14 @@ var _ = Describe("MySQL Scaling function", func() {
 		// create the new objects.
 		By("clean resources")
 
-		inNS := client.InNamespace(testCtx.DefaultNamespace)
-		ml := client.HasLabels{testCtx.TestObjLabelKey}
-		testdbaas.ClearResources(&testCtx, intctrlutil.OpsRequestSignature, inNS, ml)
-
 		// delete cluster(and all dependent sub-resources), clusterversion and clusterdef
 		testdbaas.ClearClusterResources(&testCtx)
+
+		inNS := client.InNamespace(testCtx.DefaultNamespace)
+		ml := client.HasLabels{testCtx.TestObjLabelKey}
+		// namespaced
+		testdbaas.ClearResources(&testCtx, intctrlutil.OpsRequestSignature, inNS, ml)
+		testdbaas.ClearResources(&testCtx, intctrlutil.ConfigMapSignature, inNS, ml)
 	}
 
 	BeforeEach(cleanAll)
@@ -94,7 +92,7 @@ var _ = Describe("MySQL Scaling function", func() {
 		}
 		clusterObj = testdbaas.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
 			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
-			AddComponent(statefulCompName, statefulCompType).
+			AddComponent(mysqlCompName, mysqlCompType).
 			SetResources(resources).SetReplicas(1).
 			Create(&testCtx).GetCluster()
 		clusterKey = client.ObjectKeyFromObject(clusterObj)
@@ -112,7 +110,7 @@ var _ = Describe("MySQL Scaling function", func() {
 		verticalScalingOpsRequest.Spec.TTLSecondsAfterSucceed = 0
 		verticalScalingOpsRequest.Spec.VerticalScalingList = []dbaasv1alpha1.VerticalScaling{
 			{
-				ComponentOps: dbaasv1alpha1.ComponentOps{ComponentName: statefulCompName},
+				ComponentOps: dbaasv1alpha1.ComponentOps{ComponentName: mysqlCompName},
 				ResourceRequirements: corev1.ResourceRequirements{
 					Requests: corev1.ResourceList{
 						"cpu":    resource.MustParse("400m"),
@@ -171,9 +169,9 @@ var _ = Describe("MySQL Scaling function", func() {
 		logPvcSpec.StorageClassName = &defaultStorageClass.Name
 		clusterObj = testdbaas.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
 			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
-			AddComponent(statefulCompName, statefulCompType).
-			AddVolumeClaim(dataVolumeName, &dataPvcSpec).
-			AddVolumeClaim(logVolumeName, &logPvcSpec).
+			AddComponent(mysqlCompName, mysqlCompType).
+			AddVolumeClaim(testdbaas.DataVolumeName, &dataPvcSpec).
+			AddVolumeClaim(testdbaas.LogVolumeName, &logPvcSpec).
 			Create(&testCtx).GetCluster()
 		clusterKey = client.ObjectKeyFromObject(clusterObj)
 
@@ -228,14 +226,19 @@ var _ = Describe("MySQL Scaling function", func() {
 
 	Context("with MySQL defined as a stateful component", func() {
 		BeforeEach(func() {
+			_ = testdbaas.CreateCustomizedObj(&testCtx, "resources/mysql_scripts.yaml", &corev1.ConfigMap{},
+				testdbaas.WithName(scriptConfigName), testCtx.UseDefaultNamespace())
+
 			By("Create a clusterDef obj")
+			mode := int32(0755)
 			clusterDefObj = testdbaas.NewClusterDefFactory(clusterDefName, testdbaas.MySQLType).
-				AddComponent(testdbaas.StatefulMySQL8, statefulCompType).
+				AddComponent(testdbaas.StatefulMySQLComponent, mysqlCompType).
+				AddConfigTemplate(scriptConfigName, scriptConfigName, "", testdbaas.ScriptsVolumeName, &mode).
 				Create(&testCtx).GetClusterDef()
 
 			By("Create a clusterVersion obj")
 			clusterVersionObj = testdbaas.NewClusterVersionFactory(clusterVersionName, clusterDefObj.GetName()).
-				AddComponent(statefulCompType).AddContainerShort(mysqlContainerName, testdbaas.ApeCloudMySQLImage).
+				AddComponent(mysqlCompType).AddContainerShort(testdbaas.DefaultMySQLContainerName, testdbaas.ApeCloudMySQLImage).
 				Create(&testCtx).GetClusterVersion()
 		})
 
@@ -250,14 +253,20 @@ var _ = Describe("MySQL Scaling function", func() {
 
 	Context("with MySQL defined as a consensus component", func() {
 		BeforeEach(func() {
+			By("Create configmap")
+			_ = testdbaas.CreateCustomizedObj(&testCtx, "resources/mysql_scripts.yaml", &corev1.ConfigMap{},
+				testdbaas.WithName(scriptConfigName), testCtx.UseDefaultNamespace())
+
 			By("Create a clusterDef obj")
+			mode := int32(0755)
 			clusterDefObj = testdbaas.NewClusterDefFactory(clusterDefName, testdbaas.MySQLType).
-				AddComponent(testdbaas.ConsensusMySQL, statefulCompType).
+				AddComponent(testdbaas.ConsensusMySQLComponent, mysqlCompType).
+				AddConfigTemplate(scriptConfigName, scriptConfigName, "", testdbaas.ScriptsVolumeName, &mode).
 				Create(&testCtx).GetClusterDef()
 
 			By("Create a clusterVersion obj")
 			clusterVersionObj = testdbaas.NewClusterVersionFactory(clusterVersionName, clusterDefObj.GetName()).
-				AddComponent(statefulCompType).AddContainerShort(mysqlContainerName, testdbaas.ApeCloudMySQLImage).
+				AddComponent(mysqlCompType).AddContainerShort(testdbaas.DefaultMySQLContainerName, testdbaas.ApeCloudMySQLImage).
 				Create(&testCtx).GetClusterVersion()
 		})
 

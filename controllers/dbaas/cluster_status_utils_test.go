@@ -62,36 +62,36 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 
 	AfterEach(cleanEnv)
 
-	const statefulCompType = "stateful"
-	const statefulCompName = "mysql1"
+	const statefulMySQLCompType = "stateful"
+	const statefulMySQLCompName = "mysql1"
 
-	const consensusCompType = "consensus"
-	const consensusCompName = "mysql2"
+	const consensusMySQLCompType = "consensus"
+	const consensusMySQLCompName = "mysql2"
 
-	const statelessCompType = "stateless"
-	const statelessCompName = "nginx"
+	const nginxCompType = "stateless"
+	const nginxCompName = "nginx"
 
 	createClusterDef := func() {
 		_ = testdbaas.NewClusterDefFactory(clusterDefName, testdbaas.MySQLType).
-			AddComponent(testdbaas.StatefulMySQL8, statefulCompType).SetDefaultReplicas(3).
-			AddComponent(testdbaas.ConsensusMySQL, consensusCompType).SetDefaultReplicas(3).
-			AddComponent(testdbaas.StatelessNginx, statelessCompType).SetDefaultReplicas(3).
+			AddComponent(testdbaas.StatefulMySQLComponent, statefulMySQLCompType).SetDefaultReplicas(3).
+			AddComponent(testdbaas.ConsensusMySQLComponent, consensusMySQLCompType).SetDefaultReplicas(3).
+			AddComponent(testdbaas.StatelessNginxComponent, nginxCompType).SetDefaultReplicas(3).
 			Create(&testCtx)
 	}
 
 	createClusterVersion := func() {
 		_ = testdbaas.NewClusterVersionFactory(clusterVersionName, clusterDefName).
-			AddComponent(statefulCompType).AddContainerShort("mysql", testdbaas.ApeCloudMySQLImage).
-			AddComponent(consensusCompType).AddContainerShort("mysql", testdbaas.ApeCloudMySQLImage).
-			AddComponent(statelessCompType).AddContainerShort("nginx", testdbaas.NginxImage).
+			AddComponent(statefulMySQLCompType).AddContainerShort("mysql", testdbaas.ApeCloudMySQLImage).
+			AddComponent(consensusMySQLCompType).AddContainerShort("mysql", testdbaas.ApeCloudMySQLImage).
+			AddComponent(nginxCompType).AddContainerShort("nginx", testdbaas.NginxImage).
 			Create(&testCtx)
 	}
 
 	createCluster := func() *dbaasv1alpha1.Cluster {
 		return testdbaas.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefName, clusterVersionName).
-			AddComponent(statefulCompName, statefulCompType).
-			AddComponent(consensusCompName, consensusCompType).
-			AddComponent(statelessCompName, statelessCompType).
+			AddComponent(statefulMySQLCompName, statefulMySQLCompType).
+			AddComponent(consensusMySQLCompName, consensusMySQLCompType).
+			AddComponent(nginxCompName, nginxCompType).
 			Create(&testCtx).GetCluster()
 	}
 
@@ -154,7 +154,7 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 
 			By("watch warning event from StatefulSet, but mismatch condition ")
 			// wait for StatefulSet created by cluster controller
-			stsName := clusterName + "-" + statefulCompName
+			stsName := clusterName + "-" + statefulMySQLCompName
 			Eventually(testdbaas.CheckObj(&testCtx, client.ObjectKey{Name: stsName, Namespace: testCtx.DefaultNamespace},
 				func(g Gomega, fetched *appsv1.StatefulSet) {
 					g.Expect(fetched.Generation).To(BeEquivalentTo(1))
@@ -172,41 +172,41 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 			event.Count = 3
 			event.FirstTimestamp = metav1.Time{Time: time.Now()}
 			event.LastTimestamp = metav1.Time{Time: time.Now().Add(31 * time.Second)}
-			handleAndCheckComponentStatus(statefulCompName, event, dbaasv1alpha1.FailedPhase, false)
+			handleAndCheckComponentStatus(statefulMySQLCompName, event, dbaasv1alpha1.FailedPhase, false)
 
 			By("watch warning event from Pod and component type is Consensus")
 			// wait for StatefulSet created by cluster controller
-			stsName = clusterName + "-" + consensusCompName
+			stsName = clusterName + "-" + consensusMySQLCompName
 			Eventually(testdbaas.CheckObj(&testCtx, client.ObjectKey{Name: stsName, Namespace: testCtx.DefaultNamespace},
 				func(g Gomega, fetched *appsv1.StatefulSet) {
 					g.Expect(fetched.Generation).To(BeEquivalentTo(1))
 				})).Should(Succeed())
 			// create a failed pod
 			podName := stsName + "-0"
-			createStsPod(podName, "", consensusCompName)
+			createStsPod(podName, "", consensusMySQLCompName)
 			setInvolvedObject(event, intctrlutil.PodKind, podName)
-			handleAndCheckComponentStatus(consensusCompName, event, dbaasv1alpha1.FailedPhase, false)
+			handleAndCheckComponentStatus(consensusMySQLCompName, event, dbaasv1alpha1.FailedPhase, false)
 
 			By("test merge pod event message")
 			event.Message = "0/1 nodes can scheduled, cpu insufficient"
-			handleAndCheckComponentStatus(consensusCompName, event, dbaasv1alpha1.FailedPhase, false)
+			handleAndCheckComponentStatus(consensusMySQLCompName, event, dbaasv1alpha1.FailedPhase, false)
 
 			By("test Failed phase for consensus component when leader pod is not ready")
 			setInvolvedObject(event, intctrlutil.StatefulSetKind, stsName)
 			podName1 := stsName + "-1"
-			pod := createStsPod(podName1, "leader", consensusCompName)
-			handleAndCheckComponentStatus(consensusCompName, event, dbaasv1alpha1.FailedPhase, false)
+			pod := createStsPod(podName1, "leader", consensusMySQLCompName)
+			handleAndCheckComponentStatus(consensusMySQLCompName, event, dbaasv1alpha1.FailedPhase, false)
 
 			By("test Abnormal phase for consensus component")
 			patch := client.MergeFrom(pod.DeepCopy())
 			testk8s.MockPodAvailable(pod, metav1.NewTime(time.Now()))
 			Expect(k8sClient.Status().Patch(ctx, pod, patch)).Should(Succeed())
-			handleAndCheckComponentStatus(consensusCompName, event, dbaasv1alpha1.AbnormalPhase, false)
+			handleAndCheckComponentStatus(consensusMySQLCompName, event, dbaasv1alpha1.AbnormalPhase, false)
 
 			By("watch warning event from Deployment and component type is Stateless")
-			deploy := getDeployment(statelessCompName)
+			deploy := getDeployment(nginxCompName)
 			setInvolvedObject(event, intctrlutil.DeploymentKind, deploy.Name)
-			handleAndCheckComponentStatus(statelessCompName, event, dbaasv1alpha1.FailedPhase, false)
+			handleAndCheckComponentStatus(nginxCompName, event, dbaasv1alpha1.FailedPhase, false)
 
 			By("test the cluster phase when component Failed/Abnormal in Running phase")
 			// mock cluster is running.
@@ -221,9 +221,9 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 
 			// set nginx component phase to Failed
 			Expect(testdbaas.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(cluster), func(tmpCluster *dbaasv1alpha1.Cluster) {
-				statusComp := tmpCluster.Status.Components[statelessCompName]
+				statusComp := tmpCluster.Status.Components[nginxCompName]
 				statusComp.Phase = dbaasv1alpha1.FailedPhase
-				tmpCluster.Status.Components[statelessCompName] = statusComp
+				tmpCluster.Status.Components[nginxCompName] = statusComp
 			})()).Should(Succeed())
 
 			// expect cluster phase is Abnormal by cluster controller.

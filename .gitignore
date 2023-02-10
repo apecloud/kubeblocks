@@ -4,7 +4,7 @@
 # ignore go generate code files
 internal/testutil/k8s/mocks/*.go
 internal/configuration/proto/mocks/*.go
-internal/configuration/proto/*.pb.go
+# internal/configuration/proto/*.pb.go
 
 # Binaries for programs and plugins
 *.exe

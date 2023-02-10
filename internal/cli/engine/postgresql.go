@@ -40,7 +40,7 @@ func newPostgreSQL() *postgresql {
 		examples: map[ClientType]buildConnectExample{
 			CLI: func(info *ConnectionInfo) string {
 				return fmt.Sprintf(`# psql client connection example
-PGPASSWORD=%s psql -h %s -p %s -U %s %s
+PGPASSWORD=%s psql -h%s -p %s -U %s %s
 `, info.Host, info.Port, info.User, info.Password, info.Database)
 			},
 

@@ -17,6 +17,8 @@ limitations under the License.
 package cluster
 
 import (
+	"bytes"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -38,9 +40,10 @@ var _ = Describe("Cluster", func() {
 
 	var streams genericclioptions.IOStreams
 	var tf *cmdtesting.TestFactory
+	var in *bytes.Buffer
 
 	BeforeEach(func() {
-		streams, _, _, _ = genericclioptions.NewTestIOStreams()
+		streams, in, _, _ = genericclioptions.NewTestIOStreams()
 		tf = cmdtesting.NewTestFactory().WithNamespace("default")
 		tf.FakeDynamicClient = testing.FakeDynamicClient(testing.FakeClusterDef(), testing.FakeClusterVersion())
 	})
@@ -146,6 +149,7 @@ var _ = Describe("Cluster", func() {
 		o.OpsType = dbaasv1alpha1.UpgradeType
 		Expect(o.Validate()).To(MatchError("missing cluster-version"))
 		o.ClusterVersionRef = "test-cluster-version"
+		in.Write([]byte(o.Name + "\n"))
 		Expect(o.Validate()).Should(Succeed())
 
 		By("validate volumeExpansion when components is null")
@@ -155,10 +159,12 @@ var _ = Describe("Cluster", func() {
 		By("validate volumeExpansion when vct-names is null")
 		o.ComponentNames = []string{"replicasets"}
 		Expect(o.Validate()).To(MatchError("missing volume-claim-template-names"))
+
 		By("validate volumeExpansion when storage is null")
 		o.VCTNames = []string{"data"}
 		Expect(o.Validate()).To(MatchError("missing storage"))
 		o.Storage = "2Gi"
+		in.Write([]byte(o.Name + "\n"))
 		Expect(o.Validate()).Should(Succeed())
 
 		By("validate horizontalScaling when replicas less than -1 ")
@@ -167,6 +173,7 @@ var _ = Describe("Cluster", func() {
 		Expect(o.Validate()).To(MatchError("replicas required natural number"))
 
 		o.Replicas = 1
+		in.Write([]byte(o.Name + "\n"))
 		Expect(o.Validate()).Should(Succeed())
 	})
 
@@ -196,7 +203,6 @@ var _ = Describe("Cluster", func() {
 		)
 		ttf, o := NewFakeOperationsOptions(randomNamer.NS, randomNamer.ClusterName, dbaasv1alpha1.ReconfiguringType, mockHelper.CreateObjects()...)
 		defer ttf.Cleanup()
-
 		o.ComponentNames = []string{"replicasets", "proxy"}
 		By("validate reconfiguring when multi components")
 		Expect(o.Validate()).To(MatchError("reconfiguring only support one component."))
@@ -208,6 +214,8 @@ var _ = Describe("Cluster", func() {
 		Expect(o.Validate().Error()).To(ContainSubstring("updated parameter formatter"))
 		o.Parameters = []string{"abcd=test"}
 		o.CfgTemplateName = randomNamer.TPLName
+		o.IOStreams = streams
+		in.Write([]byte(o.Name + "\n"))
 		Expect(o.Validate()).Should(Succeed())
 	})
 

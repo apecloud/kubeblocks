@@ -126,9 +126,15 @@ spec:
                 port: 9104
             env:
               - name: "MYSQL_MONITOR_USER"
-                value: "root"
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: username
               - name: "MYSQL_MONITOR_PASSWORD"
-                value: ""
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: password
               - name: "DATA_SOURCE_NAME"
                 value: "$(MYSQL_MONITOR_USER):$(MYSQL_MONITOR_PASSWORD)@(localhost:3306)/"
         volumes:

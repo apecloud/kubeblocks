@@ -40,6 +40,11 @@ spec:
             namespace: {{ .Release.Namespace }}
             volumeName: scripts
             defaultMode: 0777
+          - name: postgresql-custom-metrics
+            configTplRef: postgresql-custom-metrics
+            namespace: {{ .Release.Namespace }}
+            volumeName: postgresql-custom-metrics
+            defaultMode: 0777
       service:
         ports:
           - name: tcp-postgresql
@@ -171,7 +176,7 @@ spec:
             imagePullPolicy: {{ .Values.metrics.image.pullPolicy | quote }}
             securityContext:
               runAsNonRoot: true
-              runAsUser: 1001         
+              runAsUser: 1001
             env:
               {{- $database := "postgres" }}
               {{- $sslmode := "disable" }}
@@ -187,6 +192,12 @@ spec:
                   secretKeyRef:
                     name: $(CONN_CREDENTIAL_SECRET_NAME)
                     key: username
+            command:
+              - "/opt/bitnami/postgres-exporter/bin/postgres_exporter"
+              - "--auto-discover-databases"
+              - "--extend.query-path=/opt/conf/custom-metrics.yaml"
+              - "--exclude-databases=template0,template1"
+              - "--log.level=info"
             ports:
               - name: http-metrics
                 containerPort: 9187
@@ -207,8 +218,10 @@ spec:
               timeoutSeconds: 5
               httpGet:
                 path: /
-                port: http-metrics     
+                port: http-metrics
             volumeMounts:
+              - name: postgresql-custom-metrics
+                mountPath: /opt/conf
         volumes:
           - name: dshm
             emptyDir:

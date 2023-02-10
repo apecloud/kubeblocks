@@ -16,8 +16,9 @@ Ensure the following requirements are met so the playground and other functions 
          ```
          curl -fsSL http://161.189.136.182:8000/apecloud/kubeblocks/install_cli.sh |bash
          ```
-    2. Run `kbcli version` to check the `kbcli` version and make sure `kbcli` is installed successfully.
-    3. Run the command below to uninstall `kbcli` if you want to delete `kbcli` after your trial.
+    2. Run `export KUBECONFIG=~/.kube/kubeblocks-playground`.
+    3. Run `kbcli version` to check the `kbcli` version and make sure `kbcli` is installed successfully.
+    4. Run the command below to uninstall `kbcli` if you want to delete `kbcli` after your trial.
          ```
          sudo rm /usr/local/bin/kbcli
          ```
@@ -36,7 +37,7 @@ How this command works on your local host:
 2. Deploy KubeBlocks in this Kubernetes cluster.
 3. Create an ApeCloud MySQL Paxos group by KubeBlocks.
 
-***Result***<br>
+***Result*** <br />
 You can see the following information indicating relevant modules have been installed successfully.
 ```
 Create playground k3d cluster: kubeblocks-playground OK
@@ -79,7 +80,8 @@ Use "kbcli [command] --help" for more information about a command.
 
 Following the instructions in "1. Basic commands for cluster", switch to the Kubernetes local cluster created by the playground by running `export KUBECONFIG=xxx` to start your trip on KubeBlocks and ApeCloud MySQL.
 
-> Caution:<br>
+> Caution: 
+> 
 > Running `export KUBECONFIG` is a necessity for using KubeBlocks and ApeCloud MySQL.
 
 ## Run your playground
@@ -90,34 +92,19 @@ The playground guide includes three sections, namely [Basic functions](#basic-fu
 
 KubeBlocks supports the complete life cycle management of a database cluster and follows the best practice of application development. The following instructions demonstrate the basic features of KubeBlocks. For the full feature set, refer to [KubeBlocks Documentation](https://github.com/apecloud/kubeblocks/tree/main/docs) for details.
 
+> Note:
+>
+> The local host does not support volume expansion, backup, and restore functions.
+
 #### Create an ApeCloud MySQL Paxos group
 
 The playground creates an ApeCloud-MySQL Paxos group by default. You can also use `kbcli` to create a new cluster. The following is an example of creating an ApeCloud-MySQL Paxos group of 1 vCPU and 1 GiB of memory.
 
 ```
-$ cat > ./mycluster-comp.yaml << EOF
-- name: ac-mysql
-  type: mysql      
-  monitor: true
-  replicas: 3
-  resources:
-    requests:
-      memory: "1024Mi"
-      cpu: "1000m"
-    limits:
-      memory: "1024Mi"
-      cpu: "1000m"
-  volumeClaimTemplates:
-  - name: data
-    spec:
-      accessModes:
-      - ReadWriteOnce
-      resources:
-        requests:
-          storage: 1Gi
-EOF
+$ export KBCLI_CLUSTER_DEFAULT_REPLICAS=3
 
-$ kbcli cluster create --cluster-definition='apecloud-mysql'
+$ kbcli cluster create mysql-cluster --cluster-definition='apecloud-mysql' 
+
 ```
 
 #### View an ApeCloud MySQL Paxos group
@@ -126,14 +113,14 @@ $ kbcli cluster create --cluster-definition='apecloud-mysql'
     ```
     $ kbcli cluster list
 
-    NAME           CLUSTER-DEFINITION    VERSION           TERMINATION-POLICY   STATUS   
-    mycluster      apecloud-mysql        ac-mysql-8.0.30   WipeOut              Running   
-    mycluster2     apecloud-mysql        ac-mysql-8.0.30   WipeOut              Creating 
+    NAME               CLUSTER-DEFINITION    VERSION           TERMINATION-POLICY   STATUS   
+    mysql-cluster      apecloud-mysql        ac-mysql-8.0.30   WipeOut              Running   
+    mysql-cluster2     apecloud-mysql        ac-mysql-8.0.30   WipeOut              Creating 
     ```
 
 2. Run `kbcli cluster describe` to view the details of a specified database cluster, such as `STATUS`, `Endpoints`, `Topology`, `Images`, and `Events`.
     ```
-    $ kbcli cluster describe mycluster
+    $ kbcli cluster describe msql-cluster
     Name: mycluster  Created Time: Jan 30,2023 17:33 UTC+0800
     NAMESPACE  CLUSTER-DEFINITION  VERSION          STATUS  TERMINATION-POLICY
     default    apecloud-mysql      ac-mysql-8.0.30  Running WipeOut
@@ -163,11 +150,11 @@ $ kbcli cluster create --cluster-definition='apecloud-mysql'
 
 #### Access an ApeCloud MySQL Paxos group
 
-**Option 1.** Use a command line tool<br>
+**Option 1.** Use a command line tool <br />
 If a database cluster has been created and its status is `Running`, run `kbcli cluster connect` to access a specified database cluster. For example, 
 ```
-$ kbcli cluster connect mycluster2
-Connect to instance mycluster2-ac-mysql-0: out of mycluster2-ac-mysql-0(leader), mycluster2-ac-mysql-1(follower), mycluster2-ac-mysql-2(follower)
+$ kbcli cluster connect mysql-cluster
+Connect to instance mysql-cluster-ac-mysql-0: out of mysql-cluster-ac-mysql-0(leader), mysql-cluster-ac-mysql-1(follower), mysql-cluster-ac-mysql-2(follower)
 Welcome to the MySQL monitor.  Commands end with ; or \g.
 Your MySQL connection id is 25
 Server version: 8.0.30 WeSQL Server - GPL, Release 5, Revision d6b8719
@@ -185,15 +172,15 @@ mysql>
 
 You can also run the command below to access a cluster by MySQL client.
 ```
-$ kbcli cluster connect --show-example --client=cli mycluster2
-# cluster mycluster2 does not have public endpoints, you can run following command and connect cluster from local host
-kubectl port-forward service/mycluster2-ac-mysql 3306:3306
+$ kbcli cluster connect --show-example --client=cli mysql-cluster
+# cluster mysql-cluster does not have public endpoints, you can run following command and connect cluster from local host
+kubectl port-forward service/mysql-cluster-ac-mysql 3306:3306
 
 # mysql client connection example
 mysql -h 127.0.0.1 -P 3306 -u root -paiImelyt
 
 
-$ kubectl port-forward service/mycluster2-ac-mysql 3306:3306
+$ kubectl port-forward service/mysql-cluster-ac-mysql 3306:3306
 Forwarding from 127.0.0.1:3306 -> 3306
 Forwarding from [::1]:3306 -> 3306
 
@@ -205,10 +192,10 @@ Type 'help;' or '\h' for help. Type '\c' to clear the current input statement.
 mysql>
 ```
 
-**Option 2.** Use an access address<br>
+**Option 2.** Use an access address <br/>
 If you want to access a cluster via MySQL client, get the access address from `Endpoints` in the cluster details.
 ```
-$ kbcli cluster describe mycluster
+$ kbcli cluster describe mysql-cluster
 
 ...
 Endpoints:
@@ -218,29 +205,31 @@ mysql      ReadWrite  10.43.29.51:3306  <none>
 ```
 
 Besides accessing a cluster by `IP:PORT` in `Endpoints`, you can also use [the DNS service of Kubernetes](https://kubernetes.io/docs/concepts/services-networking/service/#dns) for service discovery. The format of DNS access is `${service_name}.${namespace}:${port}`.
-For example, run the command below and the results show that there are two services in this database cluster. The namespace of Kubernetes is `default`. Then this database can be accessed via `mysqlcluster.default:3306` and `mycluster2-ac-mysql-headless.default:3306`.
+For example, run the command below and the results show that there are two services in this database cluster. The namespace of Kubernetes is `default`. Then this database can be accessed via `mysql-cluster.default:3306` and `mysql-cluster-ac-mysql-headless.default:3306`.
 ```
-$ kubectl get service | grep mycluster
+$ kubectl get service | grep mysql-cluster
 
-NAME                           CLUSTER-IP      EXTERNAL-IP   PORT(S)                                                          
-mycluster2-ac-mysql-headless   None            <none>        3306/TCP,13306/TCP,9104/TCP,3501/TCP 
-mycluster2-ac-mysql            10.43.206.161   <none>        3306/TCP 
+NAME                              CLUSTER-IP      EXTERNAL-IP   PORT(S)                                                          
+mysql-cluster-ac-mysql-headless   None            <none>        3306/TCP,13306/TCP,9104/TCP,3501/TCP 
+mysql-cluster-ac-mysql            10.43.206.161   <none>        3306/TCP 
 ```
 
 #### Delete an ApeCloud MySQL Paxos group
 
 Run the command below to delete a specified database cluster. For example, 
 ```
-$ kbcli cluster delete mycluster2
+$ kbcli cluster delete mysql-cluster
 
-Please enter the name again(separate with commas when more than one): mycluster2
-Cluster mycluster2 deleted
+Please enter the name again(separate with commas when more than one): mysql-cluster
+Cluster mysql-cluster deleted
 ```
 
 ### Observability
 
-KubeBlocks has complete observability capabilities. This section demonstrates the monitoring function of KubeBlocks.<br> 
-***Steps:***<br>
+KubeBlocks has complete observability capabilities. This section demonstrates the monitoring function of KubeBlocks. 
+
+***Steps:***
+
 1. Run the command below to view the monitoring page to observe the service running status.
    ```
    $ kbcli dashboard open kubeblocks-grafana
@@ -263,13 +252,16 @@ ApeCloud MySQL Paxos group delivers high availability with RPO=0 and RTO in less
 Here we use a simple failure simulation to show you the failure recovery capability of ApeCloud MySQL.
 
 #### Simulate leader pod failure recovery
-In this example, we delete the leader pod to simulate a failure.<br>
-***Steps:***<br>
-1. Run the command below to view the ApeCloud MySQL Paxos group information. View the leader pod name in `Topology`. In this example, the leader pod's name is mycluster-mysql-2.
-   ```
-   $ kbcli cluster describe mycluster
 
-   Name: mycluster         Created Time: Jan 27,2023 17:33 UTC+0800
+In this example, we delete the leader pod to simulate a failure.
+
+***Steps:***
+
+1. Run the command below to view the ApeCloud MySQL Paxos group information. View the leader pod name in `Topology`. In this example, the leader pod's name is mysql-cluster-2.
+   ```
+   $ kbcli cluster describe mysql-cluster
+
+   Name: mysql-cluster         Created Time: Jan 27,2023 17:33 UTC+0800
    NAMESPACE        CLUSTER-DEFINITION        VERSION                STATUS         TERMINATION-POLICY
    default          apecloud-mysql            ac-mysql-8.0.30        Running        WipeOut
 
@@ -278,10 +270,10 @@ In this example, we delete the leader pod to simulate a failure.<br>
    mysql            ReadWrite        10.43.29.51:3306        <none>
 
    Topology:
-   COMPONENT        INSTANCE                 ROLE            STATUS         AZ            NODE                                                 CREATED-TIME
-   mysql            mycluster-mysql-2        leader          Running        <none>        k3d-kubeblocks-playground-server-0/172.20.0.3        Jan 30,2023 17:33 UTC+0800
-   mysql            mycluster-mysql-1        follower        Running        <none>        k3d-kubeblocks-playground-server-0/172.20.0.3        Jan 30,2023 17:33 UTC+0800
-   mysql            mycluster-mysql-0        follower        Running        <none>        k3d-kubeblocks-playground-server-0/172.20.0.3        Jan 30,2023 17:33 UTC+0800
+   COMPONENT        INSTANCE                     ROLE            STATUS         AZ            NODE                                                 CREATED-TIME
+   mysql            mysql-cluster-mysql-2        leader          Running        <none>        k3d-kubeblocks-playground-server-0/172.20.0.3        Jan 30,2023 17:33 UTC+0800
+   mysql            mysql-cluster-mysql-1        follower        Running        <none>        k3d-kubeblocks-playground-server-0/172.20.0.3        Jan 30,2023 17:33 UTC+0800
+   mysql            mysql-cluster-mysql-0        follower        Running        <none>        k3d-kubeblocks-playground-server-0/172.20.0.3        Jan 30,2023 17:33 UTC+0800
 
    Resources Allocation:
    COMPONENT        DEDICATED        CPU(REQUEST/LIMIT)        MEMORY(REQUEST/LIMIT)        STORAGE-SIZE        STORAGE-CLASS
@@ -296,16 +288,16 @@ In this example, we delete the leader pod to simulate a failure.<br>
 
 2. Run the command below to delete the leader pod.
    ```
-   $ kubectl delete pod mycluster-mysql-2
+   $ kubectl delete pod mysql-cluster-mysql-2
 
-   pod "mycluster-mysql-2" deleted
+   pod "mysql-cluster-mysql-2" deleted
    ```
 
-3. Run `kbcli cluster connect mycluster` to connect to the ApeCloud MySQL Paxos group to test its availability. You can find this group can be accessed within seconds.
+3. Run `kbcli cluster connect mysql-cluster` to connect to the ApeCloud MySQL Paxos group to test its availability. You can find this group can be accessed within seconds.
    ```
-   kbcli cluster connect mycluster
+   kbcli cluster connect mysql-cluster
 
-   Connect to instance mycluster-mysql-2: out of mycluster-mysql-2(leader), mycluster-mysql-0(follower)
+   Connect to instance mysql-cluster-mysql-2: out of mysql-cluster-mysql-2(leader), mysql-cluster-mysql-0(follower)
    Welcome to the MySQL monitor.  Commands end with ; or \g.
    Your MySQL connection id is 33
    Server version: 8.0.30 WeSQL Server - GPL, Release 5, Revision d6b8719
@@ -322,8 +314,10 @@ In this example, we delete the leader pod to simulate a failure.<br>
 
 #### Observe clusters by NON-STOP NYAN CAT
 The above example uses `kbcli cluster connect` to test availability, in which the changes are not obvious to see.
-NIN-STOP NYAN CAT is a demo application to observe how the database cluster exceptions affect actual businesses. Animations and real-time key information display provided by NON-STOP NYAN CAT can directly show the availability influences of database services.<br>
-***Steps:***<br>
+NON-STOP NYAN CAT is a demo application to observe how the database cluster exceptions affect actual businesses. Animations and real-time key information display provided by NON-STOP NYAN CAT can directly show the availability influences of database services.
+
+***Steps:***
+
 1. Run the command below to install the NYAN CAT demo application.
    ```
    $ kbcli app install nyancat
@@ -337,11 +331,12 @@ NIN-STOP NYAN CAT is a demo application to observe how the database cluster exce
 
 2. Use `port-forward` according to the hints above to expose an application port as available access for your local host, then visit this application via http://127.0.0.1:8087.
 3. Delete the leader pod and view the influences on the ApeCloud MySQL clusters through the NYAN CAT page.
-   ![NYAN CAT](../image/nyan_cat.png#width="50%")
+   ![NYAN CAT](../image/nyan_cat.png)
 
 ## Uninstall the playground
 
 Uninstalling the playground cleans up relevant component services and data:
+
 * Delete all KubeBlocks database clusters, such as ApeCloud MySQL Paxos group
 * Uninstall KubeBlocks
 * Delete the local Kubernetes clusters created by K3d.

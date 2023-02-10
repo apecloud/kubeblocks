@@ -23,7 +23,7 @@
   * Supports volume expansion.
 
 * Backup and restore
-  * Supports snapshot backup in minute-level through EBS.
+  * Supports snapshot backup at minute-level through EBS.
   * Supports user-defined backup tools.
   * Supports automatic backup and manual backup.
   * Supports storing backup files in object storage such as S3, and you can specify the retention time.

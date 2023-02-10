@@ -3,18 +3,20 @@
 This guide introduces how to install KubeBlocks by `kbcli`, the command line tool of KubeBlocks.
 
 ## Before you start
+
 1. A Kubernetes environment is required.
 2. If you need to visit the MySQL cluster created by KubeBlocks via `kbcli`, MySQL client is required. `kbcli` communicates with the created MySQL cluster by calling MySQL client. Refer to [Installing MySQL Shell on macOS](https://dev.mysql.com/doc/mysql-shell/8.0/en/mysql-shell-install-macos-quick.html) for installation details.
 3. `kubectl` is required and can connect to your Kubernetes clusters. Refer to [Install and Set Up kubectl on macOS](https://kubernetes.io/docs/tasks/tools/install-kubectl-macos/) for installation details.
    
 ## Step 1. Install KubeBlocks by `kbcli`
 
-1. Run the command below to install `kbcli`. `kbcli` can run on macOS, Linux, and Windows.
+1. Run the command below to install `kbcli`. `kbcli` can run on macOS and Linux.
    ```
    curl -fsSL http://161.189.136.182:8000/apecloud/kubeblocks/install_cli.sh |bash
    ```
 
-   > Note:<br>
+   > Note:
+   > 
    > Please try again if a time-out exception occurs during installation. It may relate to your network condition.
 2. Run this command to check the version and verify whether kbcli is installed successfully.
    ```
@@ -25,13 +27,38 @@ This guide introduces how to install KubeBlocks by `kbcli`, the command line too
    sudo rm /usr/local/bin/kbcli
    ```
 
-## Step 2. Install KubeBlocks
+## Step 2. Enable `kbcli` automatic command line completion
+
+`kbcli` supports automatic command line completion. You can run the command below to enable this function.
+
+```
+# Configure SHELL-TYPE as one type from bash, fish, PowerShell, and zsh
+kbcli completion SHELL-TYPE -h
+```
+
+Here we take zsh as an example.
+
+1. Run the command below.
+```
+kbcli completion zsh -h
+```
+2. Enable the completion function of your terminal first.
+```
+$ echo "autoload -U compinit; compinit" >> ~/.zshrc
+```
+3. Run the command below to enable the kbcli automatic completion function.
+```
+$ echo "source <(kbcli completion zsh); compdef _kbcli kbcli" >> ~/.zshrc
+```
+
+## Step 3. Install KubeBlocks
 
 1. Run the command below to install KubeBlocks.
    ```
    kbcli kubeblocks install
    ```
-   ***Result***<br>
+   ***Result***
+   
    This command installs the latest version in your Kubernetes environment since your `kubectl` can connect to your Kubernetes clusters.
    You can also run the command below to check the parameters that can be specified during installation.
    ```

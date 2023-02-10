@@ -69,14 +69,14 @@ The backup is realized by the volume snapshot function, you need to configure EK
   kubectl create -f snapshot_class.yaml
   ```
 3. Create a MySQL cluster. 
-   In this section, the cluster created is mysql-example.
+   In this section, the cluster created is mysql-cluster.
    ```
-   kbcli cluster create --cluster-definition='apecloud-mysql' mysql-example
+   kbcli cluster create mysql-cluster --cluster-definition='apecloud-mysql'
    ```
 4. Insert test data to test backup.
    Connect to the MySQL cluster created in the previous steps and insert a piece of data. See the example below.
    ```
-   kbcli cluster connect mysql-example
+   kbcli cluster connect mysql-cluster
    
    create database if not exists demo;
    create table if not exists demo.msg(id int NOT NULL AUTO_INCREMENT, msg text, time datetime, PRIMARY KEY (id));
@@ -86,7 +86,7 @@ The backup is realized by the volume snapshot function, you need to configure EK
   
 5. Create a snapshot backup.
     ```
-   kbcli cluster backup mysql-example
+   kbcli cluster backup mysql-cluster
     ```
 6. Check the backup.
    ```
@@ -94,12 +94,13 @@ The backup is realized by the volume snapshot function, you need to configure EK
    ```
 7. Restore to a new cluster.
    Copy the backup name to the clipboard, and restore to the new cluster. 
-   > Note
+   > ***Note:***
+   > 
    > You do not need to specify other parameters for creating an cluster. The restoration automatically reads the parameters of the source cluster, including specification, disk size, etc., and create a new MySQL cluster with the same specifications. 
 
    Execute the following command.
    ```
-   kbcli cluster restore mysql-new-from-snapshot --backup backup-default-mysql-example-20221124113440
+   kbcli cluster restore mysql-new-from-snapshot --backup backup-default-mysql-cluster-20221124113440
    ```
 8. Verify the data restored.
    Execute the following command to verify the data restored.
@@ -108,21 +109,23 @@ The backup is realized by the volume snapshot function, you need to configure EK
    select * from demo.msg;
    ```
 9. Delete the ApeCloud MySQL cluster and clean up the backup.
-   >Note:  Expense incurred when you have snapshots on the cloud. So it is recommended to delete the test cluster.
+   > ***Note:***
+   > 
+   > Expense incurred when you have snapshots on the cloud. So it is recommended to delete the test cluster.
   
    Delete MySQL cluster with the following command.
    ```
-   kbcli cluster delete mysql-example
+   kbcli cluster delete mysql-cluster
    kbcli cluster delete mysql-new-from-snapshot
    ```
     Delete the backup specified.
 
    ```
-   kbcli cluster delete-backup mysql-example --name backup-default-mysql-example-20221124113440 
+   kbcli cluster delete-backup mysql-cluster --name backup-default-mysql-cluster-20221124113440 
    ```
-   Delete all backups with `mysql-example`.
+   Delete all backups with `mysql-cluster`.
    ```
-   kbcli cluster delete mysql-example
+   kbcli cluster delete mysql-cluster
    ```
 
 

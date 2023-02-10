@@ -154,6 +154,12 @@ prometheus:
     ##
     enabled: true
 
+    ## alertmanager container image
+    ##
+    image:
+      repository: docker.io/apecloud/alertmanager
+      tag: v0.24.0
+
     persistentVolume:
       ## If true, alertmanager will create/use a Persistent Volume Claim
       ## If false, use emptyDir
@@ -211,10 +217,22 @@ prometheus:
     ##
     enabled: false
 
+    ## node-exporter container image
+    ##
+    image:
+      repository: docker.io/apecloud/node-exporter
+      tag: v1.3.1
+
   server:
     ## Prometheus server container name
     ##
     enabled: true
+
+    ## Prometheus server container image
+    ##
+    image:
+      repository: docker.io/apecloud/prometheus
+      tag: v2.39.1
 
     global:
       ## How frequently to scrape targets by default
@@ -834,6 +852,10 @@ grafana:
   adminPassword: abc
 
   sidecar:
+    image:
+      repository: docker.io/apecloud/k8s-sidecar
+      tag: 1.19.2
+
     dashboards:
       enabled: true
       label: grafana_dashboard

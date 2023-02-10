@@ -164,6 +164,27 @@ func RandomizedObjName() func(client.Object) {
 	}
 }
 
+func withMap(keysAndValues ...string) map[string]string {
+	// ignore mismatching for kvs
+	m := make(map[string]string, len(keysAndValues)/2)
+	for i := 0; i+1 < len(keysAndValues); i += 2 {
+		m[keysAndValues[i]] = keysAndValues[i+1]
+	}
+	return m
+}
+
+func WithLabels(keysAndValues ...string) func(client.Object) {
+	return func(obj client.Object) {
+		obj.SetLabels(withMap(keysAndValues...))
+	}
+}
+
+func WithAnnotations(keysAndValues ...string) func(client.Object) {
+	return func(obj client.Object) {
+		obj.SetAnnotations(withMap(keysAndValues...))
+	}
+}
+
 func CreateObj[T intctrlutil.Object, PT intctrlutil.PObject[T]](testCtx *testutil.TestContext,
 	filePath string, pobj PT, a ...any) PT {
 	return CreateCustomizedObj(testCtx, filePath, pobj, CustomizeObjYAML(a...))

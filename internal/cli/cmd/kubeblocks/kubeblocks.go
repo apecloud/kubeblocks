@@ -220,7 +220,7 @@ func (o *InstallOptions) Install() error {
 	o.Sets = append(o.Sets, fmt.Sprintf(kMonitorParam, o.Monitor))
 
 	// Add repo, if exists, will update it
-	if err = helm.AddRepo(&repo.Entry{Name: types.KubeBlocksChartName, URL: types.KubeBlocksChartURL}); err != nil {
+	if err = helm.AddRepo(&repo.Entry{Name: types.KubeBlocksChartName, URL: util.GetHelmChartRepoURL()}); err != nil {
 		return err
 	}
 
@@ -400,7 +400,7 @@ func (o *InstallOptions) upgrade(cmd *cobra.Command) error {
 	}
 
 	// Add repo, if exists, will update it
-	if err = helm.AddRepo(&repo.Entry{Name: types.KubeBlocksChartName, URL: types.KubeBlocksChartURL}); err != nil {
+	if err = helm.AddRepo(&repo.Entry{Name: types.KubeBlocksChartName, URL: util.GetHelmChartRepoURL()}); err != nil {
 		return err
 	}
 
@@ -548,7 +548,7 @@ func (o *Options) uninstall() error {
 
 	// remove repo
 	spinner = newSpinner("Remove helm repo " + types.KubeBlocksChartName)
-	printErr(spinner, helm.RemoveRepo(&repo.Entry{Name: types.KubeBlocksChartName, URL: types.KubeBlocksChartURL}))
+	printErr(spinner, helm.RemoveRepo(&repo.Entry{Name: types.KubeBlocksChartName}))
 
 	// get KubeBlocks objects and try to remove them
 	objs, err := getKBObjects(o.Client, o.Dynamic, o.Namespace)

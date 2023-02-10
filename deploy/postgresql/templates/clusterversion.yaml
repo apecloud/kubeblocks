@@ -1,0 +1,29 @@
+apiVersion: dbaas.kubeblocks.io/v1alpha1
+kind: ClusterVersion
+metadata:
+  name: postgresql-{{ default .Chart.AppVersion .Values.clusterVersionOverride }}
+  labels:
+    {{- include "postgresql.labels" . | nindent 4 }}
+spec:
+  clusterDefinitionRef: apecloud-postgresql
+  components:
+  - type: postgresql
+    podSpec:
+      containers:
+      - name: postgresql
+        image: {{ .Values.image.repository }}:{{ default .Values.image.tag .Chart.AppVersion }}
+---
+apiVersion: dbaas.kubeblocks.io/v1alpha1
+kind: ClusterVersion
+metadata:
+  name: postgresql-15.1.0
+  labels:
+    {{- include "postgresql.labels" . | nindent 4 }}
+spec:
+  clusterDefinitionRef: apecloud-postgresql
+  components:
+  - type: postgresql
+    podSpec:
+      containers:
+      - name: postgresql
+        image: {{ .Values.image.repository }}:15.1.0

@@ -26,7 +26,6 @@ var _ = Describe("Engine", func() {
 		typeName := stateMysql
 		engine, _ := New(typeName)
 		Expect(engine).ShouldNot(BeNil())
-		Expect(engine.EngineName()).Should(Equal(mysqlEngineName))
 
 		url := engine.ConnectCommand()
 		Expect(len(url)).Should(Equal(3))
@@ -34,7 +33,7 @@ var _ = Describe("Engine", func() {
 		url = engine.ConnectCommand()
 		Expect(len(url)).Should(Equal(3))
 
-		Expect(engine.EngineContainer()).Should(Equal(mysqlContainerName))
+		Expect(engine.Container()).Should(Equal("mysql"))
 	})
 
 	It("new unknown engine", func() {

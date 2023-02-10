@@ -107,8 +107,11 @@ var (
 	// KubeBlocksChartName helm name for installing kubeblocks
 	KubeBlocksChartName = "kubeblocks"
 
-	// KubeBlocksChartURL the helm chart for installing kubeblocks
+	// KubeBlocksChartURL the helm chart repo for installing kubeblocks
 	KubeBlocksChartURL = "https://apecloud.github.io/helm-charts"
+
+	// GitLabHelmChartRepo the helm chart repo in GitLab
+	GitLabHelmChartRepo = "https://jihulab.com/api/v4/projects/85949/packages/helm/stable"
 )
 
 type BackupJobInfo struct {

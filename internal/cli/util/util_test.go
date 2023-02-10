@@ -196,4 +196,12 @@ var _ = Describe("util", func() {
 		By("GVRToString")
 		Expect(len(GVRToString(types.ClusterGVR())) > 0).Should(BeTrue())
 	})
+
+	It("get IP location", func() {
+		_, _ = getIPLocation()
+	})
+
+	It("get helm chart repo url", func() {
+		Expect(GetHelmChartRepoURL()).ShouldNot(BeEmpty())
+	})
 })

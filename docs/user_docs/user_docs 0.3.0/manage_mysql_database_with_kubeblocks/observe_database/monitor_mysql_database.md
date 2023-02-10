@@ -18,7 +18,7 @@ If you didn't install KubeBlokcs, monitoring components (Prometheus/AlertManager
 
    If you have KubeBlocks installed, you can install monitoring components with `kbcli kubeblocks upgrade`.
    ```
-   kbcli kubeblocks update --monitor=true
+   kbcli kubeblocks upgrade --monitor=true
    ```
 
     > Note:<br>
@@ -64,4 +64,4 @@ If you didn't install KubeBlokcs, monitoring components (Prometheus/AlertManager
      > Caution:<br>
      > Enabling/disabling the monitoring function by using the `update` command requires a rolling restart of the database pod to take effect.
 
-You can view the dashboard of the corresponding cluster via Granfana Web Console.
+You can view the dashboard of the corresponding cluster via Grafana Web Console. For more detailed information, see [Grafana documentation](https://grafana.com/docs/grafana/latest/dashboards/).

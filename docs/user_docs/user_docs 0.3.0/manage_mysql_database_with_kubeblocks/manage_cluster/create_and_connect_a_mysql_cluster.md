@@ -5,6 +5,7 @@ Run the command below to view all the database types available for creating a cl
 ```
 kbcli clusterdefinition list
 ```
+
 ***Result***
 ```
 $ kbcli clusterdefinition list

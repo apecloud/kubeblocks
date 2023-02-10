@@ -1,15 +1,23 @@
-# Backup and restore for MySQL single node 
-This section shows how to use kbcli to back up and restore a MySQL single-node instance.
+# Backup and restore for MySQL standalone 
+This section shows how to use kbcli to back up and restore a MySQL standalone instance.
+
 ***Before you start***
 - Prepare a clean EKS cluster, and install ebs csi driver plug-in, with at least one node and the memory of each node is not less than 4GB.
 - Install kubectl to ensure that you can connect to the EKS cluster 
-- Install kbcli, quote
+- Install kbcli.
+   ```
+   curl -fsSL http://161.189.136.182:8000/apecloud/kubeblocks/install_cli.sh |bash
+   ```
 
 ***Steps:***
 1. Install kubeblocks and enable snapshot backup.
 Install KubeBlocks and enable the snapshot controller plugin.
    ```
    kbcli kubeblocks install --set snapshot-controller.enabled=true
+   ```
+   To enable the snapshot controller plugin after installation.
+   ```
+   kbcli kubeblocks upgrade --set snapshot-controller.enabled=true
    ```
    Since your kubectl is already connected to the EKS cluster, this command installs the latest version of KubeBlocks in your EKS environment.
 
@@ -60,8 +68,11 @@ The backup is realized by the volume snapshot function, you need to configure EK
   
   kubectl create -f snapshot_class.yaml
   ```
-3. Create a MySQL cluster. See [Create MySQL Cluster](link).
+3. Create a MySQL cluster. 
    In this section, the cluster created is mysql-example.
+   ```
+   kbcli cluster create --cluster-definition='apecloud-mysql' mysql-example
+   ```
 4. Insert test data to test backup.
    Connect to the MySQL cluster created in the previous steps and insert a piece of data. See the example below.
    ```

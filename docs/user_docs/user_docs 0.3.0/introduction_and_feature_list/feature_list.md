@@ -17,18 +17,16 @@
   * Follows MySQL Binary Log standard and maintains compatibility with commonly used Binlog incremental subscription tools.
 
 * Life cycle management
-  * Supports pausing and resuming database clusters.
   * Supports restarting clusters.
   * Supports vertical scaling to change the CPU and memory configuration of cluster pods.
   * Supports horizontal scaling to increase read replicas.
   * Supports volume expansion.
-  * Supports database parameter modification.
 
 * Backup and restore
-  * Supports file backup and snapshot backup and realizes minute-level snapshot backup through EBS.
+  * Supports snapshot backup in minute-level through EBS.
   * Supports user-defined backup tools.
   * Supports automatic backup and manual backup.
-  * Supports storing backup files in object storage such as S3, and you can specify the retention amount.
+  * Supports storing backup files in object storage such as S3, and you can specify the retention time.
   * Restores the original database cluster through backup.
 
 * Monitoring and alarm

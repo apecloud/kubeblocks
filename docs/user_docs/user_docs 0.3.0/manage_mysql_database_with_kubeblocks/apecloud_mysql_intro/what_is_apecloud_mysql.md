@@ -25,13 +25,13 @@ A failover is the redirection of traffic and switches the running tasks from a p
 
 ### Rade-only
 
-Nodes provide read-only capabilities. In addition to the Follower role nodes that can provide read-only capabilities, you can also expand the read-only capabilities of the cluster by adding Learner role nodes. It should be noted that when performing read-only operations through Follower or Learner, there may be a data delay with the Leader role node. This delay may be caused by a log synchronization delay or a log playback delay.
+Replicas provide read-only capabilities. In addition to the Follower that can provide read-only capabilities, you can also expand the read-only capabilities of the cluster by adding Learner roles. It should be noted that when performing read-only operations through Follower or Learner, there may be a data delay with the Leader. This delay may be caused by a log synchronization delay or a log playback delay.
 
 ## Fault tolerance
 
-The cluster supports node fault tolerance. Suppose the number of nodes is n, then the number of faulty nodes that can be tolerated is `floor (n/2) + 1，n=[1,99]`, which meets the requirements of the Paxos algorithm protocol. Based on this, it can be obtained that under the specified tolerable number f of ApeCloud MySQL cluster nodes, the number of cluster nodes that need to be created is n=2*f+1, f>=0. For example, if the tolerable number of faulty nodes is 1, then according to the formula, the minimum number of nodes in the cluster is 3, that is, in a Paxos group, the continuous service capability of the cluster with 1 faulty node is guaranteed. According to the table below, it can be seen that it is more cost-effective to create an odd number.
+The cluster supports node fault tolerance. Suppose the number of replicas is n, then the number of faulty replicas that can be tolerated is `floor (n/2) + 1，n=[1,99]`, which meets the requirements of the Paxos algorithm protocol. Based on this, it can be obtained that under the specified tolerable number f of ApeCloud MySQL cluster nodes, the number of replicas that need to be created is n=2*f+1, f>=0. For example, if the tolerable number of faulty replica is 1, then according to the formula, the minimum number of replicas in the cluster is 3, that is, in a Paxos group, the continuous service capability of the cluster with 1 faulty replica is guaranteed. According to the table below, it can be seen that it is more cost-effective to create an odd number of replicas.
 
- Nodes in Cluster | Node Majority | Nodes Tolerable | 
+ Replicas in Cluster | Node Majority | Nodes Tolerable | 
   ---- |----| ----|
   3 | 2 | 1 |
   4 | 3 | 1 |

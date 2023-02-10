@@ -23,6 +23,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/ghodss/yaml"
@@ -44,6 +45,7 @@ import (
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/cluster"
 	"github.com/apecloud/kubeblocks/internal/cli/create"
+	"github.com/apecloud/kubeblocks/internal/cli/printer"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 )
@@ -52,30 +54,32 @@ var clusterCreateExample = templates.Examples(`
 	# Create a cluster using cluster definition my-cluster-def and cluster version my-version
 	kbcli cluster create mycluster --cluster-definition=my-cluster-def --cluster-version=my-version
 
-	# --cluster-definition is required, if --cluster-version is not specified, will use the latest cluster version
+	# --cluster-definition is required, if --cluster-version is not specified, will use the most recently created version
 	kbcli cluster create mycluster --cluster-definition=my-cluster-def
 
-	# Create a cluster using file my.yaml and termination policy DoNotDelete that will prevent
-	# the cluster from being deleted
-	kbcli cluster create mycluster --cluster-definition=my-cluster-def --set=my.yaml --termination-policy=DoNotDelete
+	# Create a cluster and set termination policy DoNotDelete that will prevent the cluster from being deleted
+	kbcli cluster create mycluster --cluster-definition=my-cluster-def --termination-policy=DoNotDelete
 
-	# In scenarios where you want to delete resources such as sts, deploy, svc, pdb, but keep pvcs when deleting
-	# the cluster, use termination policy Halt
-	kbcli cluster create mycluster --cluster-definition=my-cluster-def --set=my.yaml --termination-policy=Halt
+	# In scenarios where you want to delete resources such as statements, deployments, services, pdb, but keep PVCs
+	# when deleting the cluster, use termination policy Halt
+	kbcli cluster create mycluster --cluster-definition=my-cluster-def --termination-policy=Halt
 
-	# In scenarios where you want to delete resource such as sts, deploy, svc, pdb, and including pvcs when
-	# deleting the cluster, use termination policy Delete
-	kbcli cluster create mycluster --cluster-definition=my-cluster-def --set=my.yaml --termination-policy=Delete
+	# In scenarios where you want to delete resource such as statements, deployments, services, pdb, and including
+	# PVCs when deleting the cluster, use termination policy Delete
+	kbcli cluster create mycluster --cluster-definition=my-cluster-def --termination-policy=Delete
 
 	# In scenarios where you want to delete all resources including all snapshots and snapshot data when deleting
 	# the cluster, use termination policy WipeOut
-	kbcli cluster create mycluster --cluster-definition=my-cluster-def --set=my.yaml --termination-policy=WipeOut
+	kbcli cluster create mycluster --cluster-definition=my-cluster-def --termination-policy=WipeOut
 
-	# In scenarios where you want to load components data from website URL
-	kbcli cluster create mycluster --cluster-definition=my-cluster-def --set=https://kubeblocks.io/yamls/my.yaml
+	# Create a cluster and set cpu to 1000m, memory to 1Gi, storage size to 10Gi and replicas to 2
+	kbcli cluster create mycluster --cluster-definition=my-cluster-def --set cpu=1000m,memory=1Gi,storage=10Gi,replicas=2
 
-	# In scenarios where you want to load components data from stdin
-	cat << EOF | kbcli cluster create mycluster --cluster-definition=my-cluster-def --set -
+	# Create a cluster and use a URL to set cluster resource
+	kbcli cluster create mycluster --cluster-definition=my-cluster-def --set-file=https://kubeblocks.io/yamls/my.yaml
+
+	# Create a cluster and load cluster resource set from stdin
+	cat << EOF | kbcli cluster create mycluster --cluster-definition=my-cluster-def --set-file -
 	- name: my-test ...
 
 	# Create a cluster forced to scatter by node
@@ -92,6 +96,29 @@ const (
 	CueTemplateName = "cluster_template.cue"
 	monitorKey      = "monitor"
 )
+
+type setKey string
+
+const (
+	keyType     setKey = "type"
+	keyCPU      setKey = "cpu"
+	keyMemory   setKey = "memory"
+	keyReplicas setKey = "replicas"
+	keyStorage  setKey = "storage"
+	keyUnknown  setKey = "unknown"
+)
+
+type envSet struct {
+	name       string
+	defaultVal string
+}
+
+var setKeyEnvMap = map[setKey]envSet{
+	keyCPU:      {"CLUSTER_DEFAULT_CPU", "1000m"},
+	keyMemory:   {"CLUSTER_DEFAULT_MEMORY", "1Gi"},
+	keyStorage:  {"CLUSTER_DEFAULT_STORAGE_SIZE", "10Gi"},
+	keyReplicas: {"CLUSTER_DEFAULT_REPLICAS", "1"},
+}
 
 // UpdatableFlags is the flags that cat be updated by update command
 type UpdatableFlags struct {
@@ -114,7 +141,8 @@ type CreateOptions struct {
 	Tolerations       []interface{}            `json:"tolerations,omitempty"`
 	Components        []map[string]interface{} `json:"components"`
 
-	Sets           string   `json:"-"`
+	SetFile        string   `json:"-"`
+	Values         []string `json:"-"`
 	TolerationsRaw []string `json:"-"`
 
 	// backup name to restore in creation
@@ -178,7 +206,11 @@ func (o *CreateOptions) Validate() error {
 			return err
 		}
 		o.ClusterVersionRef = version
-		fmt.Fprintf(o.Out, "Cluster version is not specified, use latest ClusterVersion %s\n", o.ClusterVersionRef)
+		fmt.Fprintf(o.Out, "Cluster version is not specified, use the recently created ClusterVersion %s\n", o.ClusterVersionRef)
+	}
+
+	if len(o.Values) > 0 && len(o.SetFile) > 0 {
+		return fmt.Errorf("does not support --set and --set-file being specified at the same time")
 	}
 
 	// if name is not specified, generate a random cluster name
@@ -196,29 +228,13 @@ func (o *CreateOptions) Validate() error {
 }
 
 func (o *CreateOptions) Complete() error {
-	var (
-		componentByte []byte
-		err           error
-		components    = o.Components
-	)
-
-	if len(o.Sets) > 0 {
-		if componentByte, err = MultipleSourceComponents(o.Sets, o.IOStreams.In); err != nil {
-			return err
-		}
-		if componentByte, err = yaml.YAMLToJSON(componentByte); err != nil {
-			return err
-		}
-		if err = json.Unmarshal(componentByte, &components); err != nil {
-			return err
-		}
-	} else if len(components) == 0 {
-		if components, err = buildClusterComp(o.Client, o.ClusterDefRef); err != nil {
-			return err
-		}
+	components, err := o.buildComponents()
+	if err != nil {
+		return err
 	}
+
 	setMonitor(o.Monitor, components)
-	if err = setBackup(o, components); err != nil {
+	if err := setBackup(o, components); err != nil {
 		return err
 	}
 	o.Components = components
@@ -229,6 +245,47 @@ func (o *CreateOptions) Complete() error {
 		o.Tolerations = tolerations
 	}
 	return nil
+}
+
+// buildComponents build components from file or set values
+func (o *CreateOptions) buildComponents() ([]map[string]interface{}, error) {
+	var (
+		componentByte []byte
+		err           error
+	)
+
+	// build components from file
+	components := o.Components
+	if len(o.SetFile) > 0 {
+		if componentByte, err = MultipleSourceComponents(o.SetFile, o.IOStreams.In); err != nil {
+			return nil, err
+		}
+		if componentByte, err = yaml.YAMLToJSON(componentByte); err != nil {
+			return nil, err
+		}
+		if err = json.Unmarshal(componentByte, &components); err != nil {
+			return nil, err
+		}
+		return components, nil
+	}
+
+	// build components from set values or environment variables
+	if len(components) == 0 {
+		cd, err := cluster.GetClusterDefByName(o.Client, o.ClusterDefRef)
+		if err != nil {
+			return nil, err
+		}
+
+		compSets, err := buildCompSetsMap(o.Values, cd)
+		if err != nil {
+			return nil, err
+		}
+
+		if components, err = buildClusterComp(cd, compSets); err != nil {
+			return nil, err
+		}
+	}
+	return components, nil
 }
 
 // MultipleSourceComponents get component data from multiple source, such as stdin, URI and local file
@@ -272,7 +329,8 @@ func NewCreateCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 		BuildFlags: func(cmd *cobra.Command) {
 			cmd.Flags().StringVar(&o.ClusterDefRef, "cluster-definition", "", "Specify cluster definition, run \"kbcli cluster-definition list\" to show all available cluster definition")
 			cmd.Flags().StringVar(&o.ClusterVersionRef, "cluster-version", "", "Specify cluster version, run \"kbcli cluster-version list\" to show all available cluster version, use the latest version if not specified")
-			cmd.Flags().StringVar(&o.Sets, "set", "", "Use yaml file, URL, or stdin to set the cluster parameters")
+			cmd.Flags().StringVarP(&o.SetFile, "set-file", "f", "", "Use yaml file, URL, or stdin to set the cluster resource")
+			cmd.Flags().StringArrayVar(&o.Values, "set", []string{}, "Set the cluster resource including cpu, memory, replicas and storage, each set corresponds to a component.(e.g. --set cpu=1000m,memory=1Gi,replicas=3,storage=10Gi)")
 			cmd.Flags().StringVar(&o.Backup, "backup", "", "Set a source backup to restore data")
 
 			// add updatable flags
@@ -342,24 +400,23 @@ func setEnableAllLogs(c *dbaasv1alpha1.Cluster, cd *dbaasv1alpha1.ClusterDefinit
 	}
 }
 
-func buildClusterComp(dynamic dynamic.Interface, clusterDef string) ([]map[string]interface{}, error) {
-	cd, err := cluster.GetClusterDefByName(dynamic, clusterDef)
-	if err != nil {
-		return nil, err
-	}
+func buildClusterComp(cd *dbaasv1alpha1.ClusterDefinition, setsMap map[string]map[setKey]string) ([]map[string]interface{}, error) {
+	getVal := func(key setKey, sets map[setKey]string) string {
+		// get value from set values
+		if sets != nil {
+			if v := sets[key]; len(v) > 0 {
+				return v
+			}
+		}
 
-	getEnv := func(envKey string, defaultVal string) string {
-		val := viper.GetString(envKey)
+		// get value from environment variables
+		env := setKeyEnvMap[key]
+		val := viper.GetString(env.name)
 		if len(val) == 0 {
-			val = defaultVal
+			val = env.defaultVal
 		}
 		return val
 	}
-
-	// get environment variables
-	defaultStorageSize := getEnv("CLUSTER_DEFAULT_STORAGE_SIZE", "10Gi")
-	defaultCPU := getEnv("CLUSTER_DEFAULT_CPU", "1000m")
-	defaultMemory := getEnv("CLUSTER_DEFAULT_MEMORY", "1Gi")
 
 	var comps []map[string]interface{}
 	for _, c := range cd.Spec.Components {
@@ -369,12 +426,22 @@ func buildClusterComp(dynamic dynamic.Interface, clusterDef string) ([]map[strin
 		if replicas <= 0 {
 			continue
 		}
-		if defaultReplicas := viper.GetInt32("CLUSTER_DEFAULT_REPLICAS"); defaultReplicas > 0 {
-			replicas = defaultReplicas
+
+		sets := map[setKey]string{}
+		if setsMap != nil {
+			sets = setsMap[c.TypeName]
 		}
+
+		// get replicas
+		setReplicas, err := strconv.Atoi(getVal(keyReplicas, sets))
+		if err != nil {
+			return nil, fmt.Errorf("repicas is illegal " + err.Error())
+		}
+		replicas = int32(setReplicas)
+
 		resourceList := corev1.ResourceList{
-			corev1.ResourceCPU:    resource.MustParse(defaultCPU),
-			corev1.ResourceMemory: resource.MustParse(defaultMemory),
+			corev1.ResourceCPU:    resource.MustParse(getVal(keyCPU, sets)),
+			corev1.ResourceMemory: resource.MustParse(getVal(keyMemory, sets)),
 		}
 		compObj := &dbaasv1alpha1.ClusterComponent{
 			Name:     c.TypeName,
@@ -392,7 +459,7 @@ func buildClusterComp(dynamic dynamic.Interface, clusterDef string) ([]map[strin
 					},
 					Resources: corev1.ResourceRequirements{
 						Requests: corev1.ResourceList{
-							corev1.ResourceStorage: resource.MustParse(defaultStorageSize),
+							corev1.ResourceStorage: resource.MustParse(getVal(keyStorage, sets)),
 						},
 					},
 				},
@@ -405,6 +472,70 @@ func buildClusterComp(dynamic dynamic.Interface, clusterDef string) ([]map[strin
 		comps = append(comps, comp)
 	}
 	return comps, nil
+}
+
+// buildCompSetsMap builds the map between component type name and its set values, if the type name is not
+// specified in the set, use the cluster definition default component type name.
+func buildCompSetsMap(values []string, cd *dbaasv1alpha1.ClusterDefinition) (map[string]map[setKey]string, error) {
+	allSets := map[string]map[setKey]string{}
+	parseKey := func(key string) setKey {
+		keys := []setKey{keyCPU, keyType, keyStorage, keyMemory, keyReplicas}
+		for _, k := range keys {
+			if k == setKey(key) {
+				return setKey(key)
+			}
+		}
+		return keyUnknown
+	}
+	buildSetMap := func(sets []string) map[setKey]string {
+		res := map[setKey]string{}
+		for _, set := range sets {
+			kv := strings.Split(set, "=")
+			if len(kv) != 2 {
+				continue
+			}
+
+			// only record the supported key
+			k := parseKey(kv[0])
+			if k == keyUnknown {
+				printer.Warning(os.Stdout, "unknown set key %s, ignore it\n", kv[0])
+				continue
+			}
+			res[setKey(kv[0])] = kv[1]
+		}
+		return res
+	}
+
+	// each value corresponds to a component
+	for _, value := range values {
+		sets := buildSetMap(strings.Split(value, ","))
+		if len(sets) == 0 {
+			continue
+		}
+
+		// get the component type name
+		typeName := sets[keyType]
+
+		// type is not specified by user, use the default component type name, now only
+		// support cluster definition with one component
+		if len(typeName) == 0 {
+			name, err := cluster.GetDefaultCompTypeName(cd)
+			if err != nil {
+				return nil, err
+			}
+			typeName = name
+		}
+
+		// if already set by other value, later values override earlier values
+		if old, ok := allSets[typeName]; ok {
+			for k, v := range sets {
+				old[k] = v
+			}
+			sets = old
+		}
+		allSets[typeName] = sets
+	}
+	return allSets, nil
 }
 
 func buildTolerations(raw []string) []interface{} {
@@ -426,7 +557,7 @@ func generateClusterName(dynamic dynamic.Interface, namespace string) (string, e
 	// retry 10 times
 	for i := 0; i < 10; i++ {
 		name = cluster.GenerateName()
-		// check whether the cluster exists
+		// check whether the cluster exists, if not found, return it
 		_, err := dynamic.Resource(types.ClusterGVR()).Namespace(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 		if errors.IsNotFound(err) {
 			return name, nil

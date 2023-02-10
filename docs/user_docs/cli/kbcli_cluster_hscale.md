@@ -18,7 +18,7 @@ kbcli cluster hscale [flags]
 ```
       --component-names strings       Component names to this operations
   -h, --help                         help for hscale
-      --name string                  OpsRequest name. if not specified, it will be randomly generated 
+      --ops-request string           OpsRequest name. if not specified, it will be randomly generated 
       --replicas int                 Replicas with the specified components (default -1)
       --ttlSecondsAfterSucceed int   Time to live after the OpsRequest succeed
 ```

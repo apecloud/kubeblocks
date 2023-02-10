@@ -41,7 +41,7 @@ func newPostgreSQL() *postgresql {
 			CLI: func(info *ConnectionInfo) string {
 				return fmt.Sprintf(`# psql client connection example
 PGPASSWORD=%s psql -h%s -p %s -U %s %s
-`, info.Host, info.Port, info.User, info.Password, info.Database)
+`, info.Password, info.Host, info.Port, info.User, info.Database)
 			},
 
 			DJANGO: func(info *ConnectionInfo) string {

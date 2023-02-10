@@ -911,6 +911,9 @@ loadbalancer:
 apecloud-mysql:
   enabled: true
 
+postgresql:
+  enabled: true
+
 ## snapshot-controller settings
 ## ref: https://artifacthub.io/packages/helm/piraeus-charts/snapshot-controller#configuration
 ##

@@ -80,11 +80,6 @@ type ClusterVersionComponent struct {
 	// +kubebuilder:pruning:PreserveUnknownFields
 	// +optional
 	PodSpec *corev1.PodSpec `json:"podSpec,omitempty"`
-
-	// Service is service spec, if not nil, will replace ClusterDefinitionSpec.Service in ClusterDefinition spec.
-	// +kubebuilder:pruning:PreserveUnknownFields
-	// +optional
-	Service *corev1.ServiceSpec `json:"service,omitempty"`
 }
 
 //+kubebuilder:object:root=true

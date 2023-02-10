@@ -43,7 +43,7 @@ How this command works on your local host:
 You can see the following information indicating relevant modules have been installed successfully.
 ```
 Create playground k3d cluster: kubeblocks-playground OK
-Generate kubernetes config /Users/heng4fun/.kube/kubeblocks-playground OK
+Generate kubernetes config /Users/${username}/.kube/kubeblocks-playground OK
 ⣟  Install KubeBlocks 0.3.2
 Install KubeBlocks 0.3.2                 OK
 Create cluster mycluster (ClusterDefinition: apecloud-mysql, ClusterVersion: ac-mysql-8.0.30) OK
@@ -56,7 +56,7 @@ You can find the user guide of the playground under the installation success tip
 ```
 1. Basic commands for cluster:
 
-  export KUBECONFIG=/Users/username/.kube/kubeblocks-playground
+  export KUBECONFIG=/Users/${username}/.kube/kubeblocks-playground
 
   kbcli cluster list                     # list database cluster and check its status
   kbcli cluster describe mycluster       # get cluster information
@@ -154,7 +154,7 @@ $ kbcli cluster create mysql-cluster --cluster-definition='apecloud-mysql'
 
 #### Access an ApeCloud MySQL Paxos group
 
-**Option 1.** Use a command line tool
+**Option 1.** Use a command line tool.
 
 If a database cluster has been created and its status is `Running`, run `kbcli cluster connect` to access a specified database cluster. For example, 
 ```
@@ -197,7 +197,7 @@ Type 'help;' or '\h' for help. Type '\c' to clear the current input statement.
 mysql>
 ```
 
-**Option 2.** Use an access address
+**Option 2.** Use an access address.
 
 If you want to access a cluster via MySQL client, get the access address from `Endpoints` in the cluster details.
 ```

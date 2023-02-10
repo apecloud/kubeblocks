@@ -23,7 +23,7 @@ data:
     SECONDARY_ROLE=secondary
     KB_ROLE_NAME=`cat /opt/conf/role/labels`
     if [ $KB_ROLE_NAME = "$SECONDARY_ROLE" ]; then
-      until mysql -hlocalhost -u$MYSQL_ROOT_USER -p$MYSQL_ROOT_PASSWORD -e "SELECT 1;"; do sleep 1; done
+      until mysql -hlocalhost -u$MYSQL_ROOT_USER -p$MYSQL_ROOT_PASSWORD -e "SELECT 1;"; do sleep 5; done
       echo "Setting the secondary configuration"
       mysql -hlocalhost -u$MYSQL_ROOT_USER -p$MYSQL_ROOT_PASSWORD -e "CHANGE REPLICATION SOURCE TO SOURCE_HOST='$KB_PRIMARY_POD_NAME',SOURCE_PORT=3306,SOURCE_USER='root',SOURCE_PASSWORD='$MYSQL_ROOT_PASSWORD',SOURCE_AUTO_POSITION=1,SOURCE_CONNECT_RETRY=10;START REPLICA;"
     else

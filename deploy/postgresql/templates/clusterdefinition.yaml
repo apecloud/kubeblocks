@@ -1,0 +1,270 @@
+apiVersion: dbaas.kubeblocks.io/v1alpha1
+kind: ClusterDefinition
+metadata:
+  name: apecloud-postgresql
+  labels:
+    {{- include "postgresql.labels" . | nindent 4 }}
+spec:
+  type: state.postgresql
+  connectionCredential:
+    username: postgres
+    postgres-password: {{ (include "postgresql.postgresPassword" .) | quote  }}
+  components:
+    - typeName: postgresql
+      componentType: Stateful
+      characterType: postgresql
+      defaultReplicas: 1
+      minReplicas: 0
+      ## standalone only
+      maxReplicas: 1
+      probes:
+      monitor:
+        builtIn: false
+        exporterConfig:
+          scrapePath: /metrics
+          scrapePort: 9187
+      logConfigs:
+        {{- range $name,$pattern := .Values.logConfigs }}
+        - name: {{ $name }}
+          filePathPattern: {{ $pattern }}
+        {{- end }}
+      configSpec:
+        configTemplateRefs:
+          - name: postgresql-configuration
+            configTplRef: postgresql-configuration
+            namespace: {{ .Release.Namespace }}
+            volumeName: postgresql-config
+            defaultMode: 0777
+          - name: postgresql-scripts
+            configTplRef: postgresql-scripts
+            namespace: {{ .Release.Namespace }}
+            volumeName: scripts
+            defaultMode: 0777
+      service:
+        ports:
+          - name: tcp-postgresql
+            protocol: TCP
+            port: 5432
+            targetPort: tcp-postgresql
+          - name: http-metrics-postgresql
+            port: 9187
+            targetPort: http-metrics
+      podSpec:
+        securityContext:
+          fsGroup: 1001
+        containers:
+          - name: postgresql
+            imagePullPolicy: {{ default .Values.image.pullPolicy "IfNotPresent" }}
+            securityContext:
+              runAsUser: 1001            
+            volumeMounts:
+              - name: dshm
+                mountPath: /dev/shm
+              - name: data
+                mountPath: /postgresql
+              - name: postgresql-config
+                mountPath: /postgresql/conf
+              - name: scripts
+                mountPath: /scripts
+            ports:
+              - name: tcp-postgresql
+                containerPort: 5432
+           
+            livenessProbe:
+              failureThreshold: 6
+              initialDelaySeconds: 30
+              periodSeconds: 10
+              successThreshold: 1
+              timeoutSeconds: 5
+              exec:
+                command:
+                  - /bin/sh
+                  - -c
+                  - exec pg_isready -U {{ default "postgres" | quote }} -h 127.0.0.1 -p 5432
+            readinessProbe:
+              failureThreshold: 6
+              initialDelaySeconds: 5
+              periodSeconds: 10
+              successThreshold: 1
+              timeoutSeconds: 5
+              exec:
+                command:
+                  - /bin/sh
+                  - -c
+                  - -ee
+                  - |
+                    exec pg_isready -U {{ default "postgres" | quote }} -h 127.0.0.1 -p 5432
+                    [ -f /postgresql/tmp/.initialized ] || [ -f /postgresql/.initialized ]
+            env:
+              - name: BITNAMI_DEBUG
+                value: "false"
+              - name: POSTGRESQL_PORT_NUMBER
+                value: "5432"
+              - name: POSTGRESQL_VOLUME_DIR
+                value: /postgresql
+              - name: PGDATA
+                value: /postgresql/data
+              # Authentication
+              - name: POSTGRES_USER
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: username
+              - name: POSTGRES_POSTGRES_PASSWORD
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: postgres-password
+              - name: POSTGRES_PASSWORD
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: postgres-password
+              - name: POSTGRES_DB
+                value: {{ (include "postgresql.database" .) | quote }}
+              # Audit
+              - name: POSTGRESQL_LOG_HOSTNAME
+                value: {{ .Values.audit.logHostname | quote }}
+              - name: POSTGRESQL_LOG_CONNECTIONS
+                value: {{ .Values.audit.logConnections | quote }}
+              - name: POSTGRESQL_LOG_DISCONNECTIONS
+                value: {{ .Values.audit.logDisconnections | quote }}
+              {{- if .Values.audit.logLinePrefix }}
+              - name: POSTGRESQL_LOG_LINE_PREFIX
+                value: {{ .Values.audit.logLinePrefix | quote }}
+              {{- end }}
+              {{- if .Values.audit.logTimezone }}
+              - name: POSTGRESQL_LOG_TIMEZONE
+                value: {{ .Values.audit.logTimezone | quote }}
+              {{- end }}
+              {{- if .Values.audit.pgAuditLog }}
+              - name: POSTGRESQL_PGAUDIT_LOG
+                value: {{ .Values.audit.pgAuditLog | quote }}
+              {{- end }}
+              - name: POSTGRESQL_PGAUDIT_LOG_CATALOG
+                value: {{ .Values.audit.pgAuditLogCatalog | quote }}
+              # Others
+              - name: POSTGRESQL_CLIENT_MIN_MESSAGES
+                value: {{ .Values.audit.clientMinMessages | quote }}
+              - name: POSTGRESQL_SHARED_PRELOAD_LIBRARIES
+                value: {{ .Values.postgresqlSharedPreloadLibraries | quote }}
+              {{- if .Values.primary.extraEnvVars }}
+              {{- include "tplvalues.render" (dict "value" .Values.primary.extraEnvVars "context" $) | nindent 12 }}
+              {{- end }}
+            lifecycle:
+              postStart:
+                exec:
+                  command: ["/scripts/post_start.sh"]
+            {{- if or .Values.primary.extraEnvVarsCM .Values.primary.extraEnvVarsSecret }}
+            envFrom:
+              {{- if .Values.primary.extraEnvVarsCM }}
+              - configMapRef:
+                  name: {{ .Values.primary.extraEnvVarsCM }}
+              {{- end }}
+              {{- if .Values.primary.extraEnvVarsSecret }}
+              - secretRef:
+                  name: {{ .Values.primary.extraEnvVarsSecret }}
+              {{- end }}
+            {{- end }}
+          - name: metrics
+            image:  {{ .Values.metrics.image.repository }}:{{ .Values.metrics.image.tag }}
+            imagePullPolicy: {{ .Values.metrics.image.pullPolicy | quote }}
+            securityContext:
+              runAsNonRoot: true
+              runAsUser: 1001         
+            env:
+              {{- $database := "postgres" }}
+              {{- $sslmode := "disable" }}
+              - name: DATA_SOURCE_URI
+                value: {{ printf "127.0.0.1:5432/%s?sslmode=%s" $database $sslmode }}
+              - name: DATA_SOURCE_PASS
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: postgres-password
+              - name: DATA_SOURCE_USER
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: username
+            ports:
+              - name: http-metrics
+                containerPort: 9187
+            livenessProbe:
+              failureThreshold: 6
+              initialDelaySeconds: 5
+              periodSeconds: 10
+              successThreshold: 1
+              timeoutSeconds: 5
+              httpGet:
+                path: /
+                port: http-metrics        
+            readinessProbe:
+              failureThreshold: 6
+              initialDelaySeconds: 5
+              periodSeconds: 10
+              successThreshold: 1
+              timeoutSeconds: 5
+              httpGet:
+                path: /
+                port: http-metrics     
+            volumeMounts:
+        volumes:
+          - name: dshm
+            emptyDir:
+              medium: Memory       
+              {{- with .Values.shmVolume.sizeLimit }}
+              sizeLimit: {{ . }}
+              {{- end }}
+      systemAccounts:
+        cmdExecutorConfig:
+          image: docker.io/postgres:alpine
+          command: ["psql"]
+          args:
+          - -h$(KB_ACCOUNT_ENDPOINT) 
+          - -c $(KB_ACCOUNT_STATEMENT)
+          env:
+          - name: PGUSER
+            valueFrom:
+              secretKeyRef:
+                name: $(CONN_CREDENTIAL_SECRET_NAME)
+                key: username
+          - name: PGPASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: $(CONN_CREDENTIAL_SECRET_NAME)
+                key: postgres-password     
+        passwordConfig:
+          length: 10
+          numDigits: 5
+          numSymbols: 0
+          letterCase: MixedCases
+        accounts:
+          - name: kbadmin
+            provisionPolicy:
+              type: CreateByStmt
+              scope: AnyPods
+              statements:
+                creation: CREATE USER $(USERNAME) SUPERUSER PASSWORD '$(PASSWD)';
+                deletion: DROP USER IF EXISTS $(USERNAME);
+          - name: kbdataprotection
+            provisionPolicy:
+              type: CreateByStmt
+              scope: AnyPods
+              statements:
+                creation: CREATE USER $(USERNAME) SUPERUSER PASSWORD '$(PASSWD)';
+                deletion: DROP USER IF EXISTS $(USERNAME);
+          - name: kbprobe
+            provisionPolicy:
+              type: CreateByStmt
+              scope: AnyPods
+              statements:        
+                creation: CREATE USER $(USERNAME) SUPERUSER PASSWORD '$(PASSWD)';
+                deletion: DROP USER IF EXISTS $(USERNAME);              
+          - name: kbmonitoring
+            provisionPolicy:
+              type: CreateByStmt
+              scope: AnyPods
+              statements:        
+                creation: CREATE USER $(USERNAME) SUPERUSER PASSWORD '$(PASSWD)';
+                deletion: DROP USER IF EXISTS $(USERNAME);                        

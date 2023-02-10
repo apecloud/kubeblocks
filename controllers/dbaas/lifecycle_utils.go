@@ -337,6 +337,9 @@ func mergeComponents(
 		}
 
 		component.PrimaryIndex = clusterComp.PrimaryIndex
+
+		component.Tls = clusterComp.Tls
+		component.Issuer = clusterComp.Issuer
 	}
 	if affinity != nil {
 		component.PodSpec.Affinity = buildPodAffinity(cluster, affinity, component)
@@ -1057,6 +1060,13 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 			return err
 		}
 		return nil
+	}
+
+	// why create tls certs here? or why not use prepare-checkedCreate pattern?
+	// tls certs generation is very time-consuming, if using prepare-checkedCreate pattern,
+	// we shall generate certs in every component Update which will slow down the cluster reconcile loop
+	if err := createOrCheckTlsCerts(reqCtx, cli, cluster); err != nil {
+		return false, err
 	}
 
 	var stsList []*appsv1.StatefulSet

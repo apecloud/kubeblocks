@@ -149,6 +149,24 @@ func (factory *MockClusterFactory) SetMonitor(monitor bool) *MockClusterFactory 
 	return factory
 }
 
+func (factory *MockClusterFactory) SetTls(tls bool) *MockClusterFactory {
+	comps := factory.Cluster.Spec.Components
+	if len(comps) > 0 {
+		comps[len(comps)-1].Tls = tls
+	}
+	factory.Cluster.Spec.Components = comps
+	return factory
+}
+
+func (factory *MockClusterFactory) SetIssuer(issuer *dbaasv1alpha1.Issuer) *MockClusterFactory {
+	comps := factory.Cluster.Spec.Components
+	if len(comps) > 0 {
+		comps[len(comps)-1].Issuer = issuer
+	}
+	factory.Cluster.Spec.Components = comps
+	return factory
+}
+
 func (factory *MockClusterFactory) Create() *MockClusterFactory {
 	testCtx := factory.TestCtx
 	gomega.Expect(testCtx.CreateObj(testCtx.Ctx, factory.Cluster)).Should(gomega.Succeed())

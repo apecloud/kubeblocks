@@ -1,6 +1,17 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
+  name: {{ include "kubeblocks.fullname" . }}
+  labels:
+    {{- include "kubeblocks.labels" . | nindent 4 }}
+aggregationRule:
+  clusterRoleSelectors:
+  - matchLabels:
+      {{- include "kubeblocks.selectorLabels" . | nindent 6 }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
   name: {{ include "kubeblocks.fullname" . }}-manager-role
   labels:
     {{- include "kubeblocks.labels" . | nindent 4 }}

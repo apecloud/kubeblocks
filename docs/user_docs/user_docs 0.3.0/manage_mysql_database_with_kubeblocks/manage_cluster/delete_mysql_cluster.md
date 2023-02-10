@@ -7,6 +7,12 @@ terminationPolicy | Deleting Operation|
 `Halt`|`Halt` deletes workload resources such as statefulset, deployment workloads but keep PVCs.
 `Delete`|`Delete` deletes workload resources and PVCs.
 `WipeOut`|`WipeOut` deletes workload resources and PVCs and wipes out all volume snapshots and snapshot data from backup storage location.
+To check the termination policy, execute the following command.
+```
+$ kbcli cluster list cress50
+NAME   	NAMESPACE	CLUSTER-DEFINITION	VERSION        	TERMINATION-POLICY	STATUS 	CREATED-TIME
+cress50	default  	apecloud-mysql    	ac-mysql-8.0.30	Delete            	Running	Feb 06,2023 18:27 UTC+0800
+```
 ***Steps:***
 **Option 1.** Use kbcli.
 Configure the cluster name and run the command below to delete the specified cluster.

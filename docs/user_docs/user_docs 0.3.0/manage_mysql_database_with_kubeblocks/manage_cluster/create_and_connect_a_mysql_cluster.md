@@ -5,7 +5,7 @@ Run the command below to view all the database types available for creating a cl
 ```
 kbcli clusterdefinition list
 ```
-***Example***
+***Result***
 ```
 $ kbcli clusterdefinition list
 NAME             MAIN-COMPONENT-TYPE   STATUS      AGE
@@ -24,9 +24,29 @@ apecloud-mysql   mysql                 Available   7m52s
    ac-mysql-8.0.30   apecloud-mysql       Available   2m40s
    ```
 2. Run the command below to create a MySQL cluster. 
-   ```
-   $ kbcli cluster create --cluster-definition='apecloud-mysql'
-   ```
+```
+$ kbcli cluster create --cluster-definition='apecloud-mysql'
+```
+> Note:
+> If you want to create a Paxos group, set `replicas` as 3.
+
+***Example***
+```
+$ kbcli cluster create --cluster-definition="apecloud-mysql" --set -<<EOF
+- name: mysql
+  replicas: 3
+  type: mysql
+  volumeClaimTemplates:
+  - name: data
+    spec:
+      accessModes:
+      - ReadWriteOnce
+      resources:
+        requests:
+          storage: 10Gi
+EOF
+```
+
 ## Connect to a MySQL Cluster
 ***Steps:***
 Run the command below to connect to a cluster.

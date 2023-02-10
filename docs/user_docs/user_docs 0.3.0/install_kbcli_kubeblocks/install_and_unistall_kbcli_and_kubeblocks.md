@@ -14,7 +14,7 @@ This guide introduces how to install KubeBlocks by `kbcli`, the command line too
    curl -fsSL http://161.189.136.182:8000/apecloud/kubeblocks/install_cli.sh |bash
    ```
 
-   > Note:
+   > Note:<br>
    > Please try again if a time-out exception occurs during installation. It may relate to your network condition.
 2. Run this command to check the version and verify whether kbcli is installed successfully.
    ```
@@ -31,7 +31,7 @@ This guide introduces how to install KubeBlocks by `kbcli`, the command line too
    ```
    kbcli kubeblocks install
    ```
-   ***Result***
+   ***Result***<br>
    This command installs the latest version in your Kubernetes environment since your `kubectl` can connect to your Kubernetes clusters.
    You can also run the command below to check the parameters that can be specified during installation.
    ```
@@ -70,16 +70,16 @@ This guide introduces how to install KubeBlocks by `kbcli`, the command line too
 
    | **Option**       | **Usage**         |
    | :--              | :--               |
-   | `--create-namespace` | Use `--create-namespace` to specify whether to create a namespace.|
-   | `--monitor`      | Use `--monitor` to specify whether to install the addons relevant to database monitoring and visualization.|
-   | `--version`      | User `--version` to specify the version you want to install. Find the supported version in [KubeBlocks Helm Charts](https://github.com/apecloud/helm-charts).|
-   | `--set snapshot-controller.enabled=true` | When this parameter is set as `true`, the snapshot backup function of the database instance is enabled (only applied to the EKS environment). Refer to [Backup and restore for MySQL single node](../manage_mysql_database_with_kubeblocks/backup_restore/backup_and_restore_for_MySQL_standalone.md) for details.|
-   | `--set loadbalancer.enabled=true` | When this parameter is set as `true`, the loadbalancer function is enabled (only applied to the EKS environment). This function provides a stable virtual IP address externally to facilitate client access within the same VPC but outside the Kubernetes cluster.|
+   | `create-namespace` | Use `create-namespace` to specify whether to create a namespace.|
+   | `monitor`      | Use `monitor` to specify whether to install the addons relevant to database monitoring and visualization.|
+   | `version`      | User `version` to specify the version you want to install. Find the supported version in [KubeBlocks Helm Charts](https://github.com/apecloud/helm-charts).|
+   | `set snapshot-controller.enabled=true` | When this parameter is set as `true`, the snapshot backup function of the database instance is enabled (only applied to the EKS environment). Refer to [Backup and restore for MySQL single node](../manage_mysql_database_with_kubeblocks/backup_restore/backup_and_restore_for_MySQL_standalone.md) for details.|
+   | `set loadbalancer.enabled=true` | When this parameter is set as `true`, the loadbalancer function is enabled (only applied to the EKS environment). This function provides a stable virtual IP address externally to facilitate client access within the same VPC but outside the Kubernetes cluster.|
 2. Run the command below to verify whether KubeBlocks is installed successfully.
    ```
    kubectl get pod
    ```
-   ***Result***
+   ***Result***<br>
    Four pods starting with `kubeblocks` are displayed. For example,
    ```
    NAME                                                  READY   STATUS    RESTARTS   AGE

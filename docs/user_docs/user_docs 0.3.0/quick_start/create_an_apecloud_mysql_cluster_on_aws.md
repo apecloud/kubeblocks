@@ -1,7 +1,7 @@
 # Create an ApeCloud MySQL cluster on AWS
 
 This guide introduces how to use KubeBlocks to create an ApeCloud MySQL cluster based on the Paxos consensus protocol within 5 minutes under the EKS environment.
-> Caution:
+> Caution:<br>
 > Running a database cluster on the cloud causes fees. Delete the resources created during the deploying process after operations.
 
 ## Before you start
@@ -16,13 +16,13 @@ This guide introduces how to use KubeBlocks to create an ApeCloud MySQL cluster 
    ```
    curl -fsSL http://161.189.136.182:8000/apecloud/kubeblocks/install_cli.sh |bash
    ```
-   > Note:
+   > Note:<br>
    > Please try again if a time-out exception occurs during installation. It may relate to your network condition.
 2. Run the command below to check the version and verify whether `kbcli` is installed successfully.
    ```
    kbcli version
    ```
-3. Run the command below to uninstall kbcli  if you want to delete kbcli after your trial.
+3. Run the command below to uninstall `kbcli` if you want to delete kbcli after your trial.
    ```
    sudo rm /usr/local/bin/kbcli
    ```
@@ -36,7 +36,7 @@ This guide introduces how to use KubeBlocks to create an ApeCloud MySQL cluster 
 
    If you want the node outside the Kubernetes cluster (the node should be within the same VPC) to visit the database cluster created by KubeBlocks, use `--set loadbalancer.enabled=true` option as the above command does. For more details on installation, refer to [Install/Uninstall kbcli and KubeBlocks](../install_kbcli_kubeblocks/install_and_unistall_kbcli_and_kubeblocks.md).
 
-   ***Result***
+   ***Result***<br>
    This command installs the latest version in your Kubernetes environment since your kubectl can connect to your Kubernetes clusters.
 
 2. Run the command below to verify whether KubeBlocks is installed successfully.
@@ -44,7 +44,7 @@ This guide introduces how to use KubeBlocks to create an ApeCloud MySQL cluster 
    kubectl get pod
    ```
 
-   ***Result***
+   ***Result***<br>
    Four pods starting with `kubeblocks` are displayed. For example,
    ```
    NAME                                                  READY   STATUS    RESTARTS   AGE
@@ -80,7 +80,7 @@ Create a YAML file named `mysql-component.yaml` and copy the configurations belo
             storage: 10Gi
 ```
 
-> Caution:
+> Caution:<br>
 > * Configure the parameter of `resources.limit` based on the node storage and CPU kernel amount of your EKS cluster. If there are not three repicas that exceed the values in `resources.limits`, creating a MySQL cluster may fail.
 > * KubeBlocks applies for a new EBS volume according to the value of `volumeClaimTemplates.spec.requests.storage`, which causes extra fees. Delete this EBS volume after your trial.
 
@@ -91,15 +91,15 @@ Create a YAML file named `mysql-component.yaml` and copy the configurations belo
    kbcli cluster create mysql-example --cluster-version=ac-mysql-8.0.30 --set=mysql-component.yaml --cluster-definition=apecloud-mysql --termination-policy=WipeOut
    ```
 
-   * `--cluster-version` specifies the ApeCloud MySQL version. The latest version is installed by default when you install KubeBlocks. You can run the command below to view the current MySQL version and use `NAME` as the value of `--cluster-version`.
+   * `cluster-version` specifies the ApeCloud MySQL version. The latest version is installed by default when you install KubeBlocks. You can run the command below to view the current MySQL version and use `NAME` as the value of `--cluster-version`.
      ```
      kubectl get clusterversion
 
      NAME              STATUS      AGE
      ac-mysql-8.0.30   Available   28h
      ```
-   * `--set` point to the YAML file created in [Step 3](#step-3-create-a-yaml-file-for-apecloud-mysql-paxos-group).
-   * `--termination-policy` specifies the policy of how a cluster is deleted. The available policies are as follows:
+   * `set` point to the YAML file created in [Step 3](#step-3-create-a-yaml-file-for-apecloud-mysql-paxos-group).
+   * `termination-policy` specifies the policy of how a cluster is deleted. The available policies are as follows:
      | **Termination Policy**  | **Result**   |
      | :--                     | :--          |
      | DoNotTerminate          | DoNotTerminate blocks delete operation. |

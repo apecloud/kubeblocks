@@ -2,7 +2,7 @@
 This guide uses one `kbcli` command to create a KubeBlocks demo environment (a playground) quickly on your local host.
 With a playground, you can try KubeBlocks and some ApeCloud MySQL features. This guide introduces how to install a playground and how to try KubeBlocks on the playground.
 
-## Before you start
+***Before you start***
 Ensure the following requirements are met so the playground and other functions can run fluently.
 
 * Minimum system requirements:
@@ -36,7 +36,7 @@ How this command works on your local host:
 2. Deploy KubeBlocks in this Kubernetes cluster.
 3. Create an ApeCloud MySQL Paxos group by KubeBlocks.
 
-***Result***
+***Result***<br>
 You can see the following information indicating relevant modules have been installed successfully.
 ```
 Create playground k3d cluster: kubeblocks-playground OK
@@ -79,7 +79,7 @@ Use "kbcli [command] --help" for more information about a command.
 
 Following the instructions in "1. Basic commands for cluster", switch to the Kubernetes local cluster created by the playground by running `export KUBECONFIG=xxx` to start your trip on KubeBlocks and ApeCloud MySQL.
 
-> Caution:
+> Caution:<br>
 > Running `export KUBECONFIG` is a necessity for using KubeBlocks and ApeCloud MySQL.
 
 ## Run your playground
@@ -117,7 +117,7 @@ $ cat > ./mycluster-comp.yaml << EOF
           storage: 1Gi
 EOF
 
-$ kbcli cluster create --cluster-definition='apecloud-mysql' --cluster-version='ac-mysql-8.0.30' --termination-policy='WipeOut' --set='mycluster-comp.yaml' mycluster2
+$ kbcli cluster create --cluster-definition='apecloud-mysql'
 ```
 
 #### View an ApeCloud MySQL Paxos group
@@ -163,69 +163,69 @@ $ kbcli cluster create --cluster-definition='apecloud-mysql' --cluster-version='
 
 #### Access an ApeCloud MySQL Paxos group
 
-**Option 1.** Use a command line tool
-  If a database cluster has been created and its status is `Running`, run `kbcli cluster connect` to access a specified database cluster. For example, 
-  ```
-  $ kbcli cluster connect mycluster2
-  Connect to instance mycluster2-ac-mysql-0: out of mycluster2-ac-mysql-0(leader), mycluster2-ac-mysql-1(follower), mycluster2-ac-mysql-2(follower)
-  Welcome to the MySQL monitor.  Commands end with ; or \g.
-  Your MySQL connection id is 25
-  Server version: 8.0.30 WeSQL Server - GPL, Release 5, Revision d6b8719
+**Option 1.** Use a command line tool<br>
+If a database cluster has been created and its status is `Running`, run `kbcli cluster connect` to access a specified database cluster. For example, 
+```
+$ kbcli cluster connect mycluster2
+Connect to instance mycluster2-ac-mysql-0: out of mycluster2-ac-mysql-0(leader), mycluster2-ac-mysql-1(follower), mycluster2-ac-mysql-2(follower)
+Welcome to the MySQL monitor.  Commands end with ; or \g.
+Your MySQL connection id is 25
+Server version: 8.0.30 WeSQL Server - GPL, Release 5, Revision d6b8719
 
-  Copyright (c) 2000, 2022, Oracle and/or its affiliates.
+Copyright (c) 2000, 2022, Oracle and/or its affiliates.
 
-  Oracle is a registered trademark of Oracle Corporation and/or its
-  affiliates. Other names may be trademarks of their respective
-  owners.
+Oracle is a registered trademark of Oracle Corporation and/or its
+affiliates. Other names may be trademarks of their respective
+owners.
 
-  Type 'help;' or '\h' for help. Type '\c' to clear the current input statement.
+Type 'help;' or '\h' for help. Type '\c' to clear the current input statement.
 
-  mysql>
-  ```
+mysql>
+```
 
-  You can also run the command below to access a cluster by MySQL client.
-  ```
-  $ kbcli cluster connect --show-example --client=cli mycluster2
-  # cluster mycluster2 does not have public endpoints, you can run following command and connect cluster from local host
-  kubectl port-forward service/mycluster2-ac-mysql 3306:3306
+You can also run the command below to access a cluster by MySQL client.
+```
+$ kbcli cluster connect --show-example --client=cli mycluster2
+# cluster mycluster2 does not have public endpoints, you can run following command and connect cluster from local host
+kubectl port-forward service/mycluster2-ac-mysql 3306:3306
 
-  # mysql client connection example
-  mysql -h 127.0.0.1 -P 3306 -u root -paiImelyt
-
-
-  $ kubectl port-forward service/mycluster2-ac-mysql 3306:3306
-  Forwarding from 127.0.0.1:3306 -> 3306
-  Forwarding from [::1]:3306 -> 3306
+# mysql client connection example
+mysql -h 127.0.0.1 -P 3306 -u root -paiImelyt
 
 
-  $ mysql -h 127.0.0.1 -P 3306 -u root -paiImelyt
-  ...
-  Type 'help;' or '\h' for help. Type '\c' to clear the current input statement.
+$ kubectl port-forward service/mycluster2-ac-mysql 3306:3306
+Forwarding from 127.0.0.1:3306 -> 3306
+Forwarding from [::1]:3306 -> 3306
 
-  mysql>
-  ```
 
-**Option 2.** Use an access address
-  If you want to access a cluster via MySQL client, get the access address from `Endpoints` in the cluster details.
-  ```
-  $ kbcli cluster describe mycluster
+$ mysql -h 127.0.0.1 -P 3306 -u root -paiImelyt
+...
+Type 'help;' or '\h' for help. Type '\c' to clear the current input statement.
 
-  ...
-  Endpoints:
-  COMPONENT  MODE       INTERNAL          EXTERNAL
-  mysql      ReadWrite  10.43.29.51:3306  <none>
-  ...
-  ```
+mysql>
+```
 
-  Besides accessing a cluster by `IP:PORT` in `Endpoints`, you can also use [the DNS service of Kubernetes](https://kubernetes.io/docs/concepts/services-networking/service/#dns) for service discovery. The format of DNS access is `${service_name}.${namespace}:${port}`.
-  For example, run the command below and the results show that there are two services in this database cluster. The namespace of Kubernetes is `default`. Then this database can be accessed via `mysqlcluster.default:3306` and `mycluster2-ac-mysql-headless.default:3306`.
-  ```
-  $ kubectl get service | grep mycluster
+**Option 2.** Use an access address<br>
+If you want to access a cluster via MySQL client, get the access address from `Endpoints` in the cluster details.
+```
+$ kbcli cluster describe mycluster
 
-  NAME                           CLUSTER-IP      EXTERNAL-IP   PORT(S)                                                          
-  mycluster2-ac-mysql-headless   None            <none>        3306/TCP,13306/TCP,9104/TCP,3501/TCP 
-  mycluster2-ac-mysql            10.43.206.161   <none>        3306/TCP 
-  ```
+...
+Endpoints:
+COMPONENT  MODE       INTERNAL          EXTERNAL
+mysql      ReadWrite  10.43.29.51:3306  <none>
+...
+```
+
+Besides accessing a cluster by `IP:PORT` in `Endpoints`, you can also use [the DNS service of Kubernetes](https://kubernetes.io/docs/concepts/services-networking/service/#dns) for service discovery. The format of DNS access is `${service_name}.${namespace}:${port}`.
+For example, run the command below and the results show that there are two services in this database cluster. The namespace of Kubernetes is `default`. Then this database can be accessed via `mysqlcluster.default:3306` and `mycluster2-ac-mysql-headless.default:3306`.
+```
+$ kubectl get service | grep mycluster
+
+NAME                           CLUSTER-IP      EXTERNAL-IP   PORT(S)                                                          
+mycluster2-ac-mysql-headless   None            <none>        3306/TCP,13306/TCP,9104/TCP,3501/TCP 
+mycluster2-ac-mysql            10.43.206.161   <none>        3306/TCP 
+```
 
 #### Delete an ApeCloud MySQL Paxos group
 
@@ -239,8 +239,8 @@ Cluster mycluster2 deleted
 
 ### Observability
 
-KubeBlocks has complete observability capabilities. This section demonstrates the monitoring function of KubeBlocks. 
-***Steps:***
+KubeBlocks has complete observability capabilities. This section demonstrates the monitoring function of KubeBlocks.<br> 
+***Steps:***<br>
 1. Run the command below to view the monitoring page to observe the service running status.
    ```
    $ kbcli dashboard open kubeblocks-grafana
@@ -249,12 +249,12 @@ KubeBlocks has complete observability capabilities. This section demonstrates th
    Forward successfully! Opening browser ...
    ```
 
-   ***Result***
+   ***Result***<br>
    A monitoring page is loaded automatically after the command is executed. 
 
 2. Click the Dashboard icon on the left bar and two monitoring panels show on the page.
    ![Dashboards](../image/dashboards.png)
-3. Click the `MySQL` panel to monitor the status of the ApeCloud MySQL cluster deployed by the playground.
+3. Click General -> MySQL to monitor the status of the ApeCloud MySQL cluster deployed by the playground.
    ![MySQL_panel](../image/mysql_panel.png)
 
 ### High availability of ApeCloud MySQL
@@ -263,8 +263,8 @@ ApeCloud MySQL Paxos group delivers high availability with RPO=0 and RTO in less
 Here we use a simple failure simulation to show you the failure recovery capability of ApeCloud MySQL.
 
 #### Simulate leader pod failure recovery
-In this example, we delete the leader pod to simulate a failure.
-***Steps:***
+In this example, we delete the leader pod to simulate a failure.<br>
+***Steps:***<br>
 1. Run the command below to view the ApeCloud MySQL Paxos group information. View the leader pod name in `Topology`. In this example, the leader pod's name is mycluster-mysql-2.
    ```
    $ kbcli cluster describe mycluster
@@ -322,8 +322,8 @@ In this example, we delete the leader pod to simulate a failure.
 
 #### Observe clusters by NON-STOP NYAN CAT
 The above example uses `kbcli cluster connect` to test availability, in which the changes are not obvious to see.
-NIN-STOP NYAN CAT is a demo application to observe how the database cluster exceptions affect actual businesses. Animations and real-time key information display provided by NON-STOP NYAN CAT can directly show the availability influences of database services.
-***Steps:***
+NIN-STOP NYAN CAT is a demo application to observe how the database cluster exceptions affect actual businesses. Animations and real-time key information display provided by NON-STOP NYAN CAT can directly show the availability influences of database services.<br>
+***Steps:***<br>
 1. Run the command below to install the NYAN CAT demo application.
    ```
    $ kbcli app install nyancat
@@ -337,7 +337,7 @@ NIN-STOP NYAN CAT is a demo application to observe how the database cluster exce
 
 2. Use `port-forward` according to the hints above to expose an application port as available access for your local host, then visit this application via http://127.0.0.1:8087.
 3. Delete the leader pod and view the influences on the ApeCloud MySQL clusters through the NYAN CAT page.
-   ![NYAN CAT](../image/nyan_cat.png)
+   ![NYAN CAT](../image/nyan_cat.png#width="50%")
 
 ## Uninstall the playground
 

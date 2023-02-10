@@ -19,7 +19,7 @@ spec:
     cue: |-
       // top level configuration type
       //  mysql server param: a set of name/value pairs.
-      mysqld: {
+      #MysqlParameter : {
         // [OFF|ON] default ON
         automatic_sp_privileges: string & "OFF" | "ON" | *"ON"
 
@@ -37,6 +37,8 @@ spec:
         ...
       }
 
+      mysqld: #MysqlParameter &{
+      }
       // ingore client parameter validate
       // mysql client: a set of name/value pairs.
       client?: {

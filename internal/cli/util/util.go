@@ -556,6 +556,7 @@ func enableReconfiguring(component *dbaasv1alpha1.ClusterDefinitionComponent) bo
 	return false
 }
 
+// IsSupportConfigureParams check whether all updated parameters belong to config template parameters.
 func IsSupportConfigureParams(tpl dbaasv1alpha1.ConfigTemplate, values map[string]string, cli dynamic.Interface) (bool, error) {
 	var (
 		err              error

@@ -154,6 +154,11 @@ prometheus:
     ##
     enabled: true
 
+    ## alertmanager container image
+    ##
+    image:
+      repository: apecloud/alertmanager
+
     persistentVolume:
       ## If true, alertmanager will create/use a Persistent Volume Claim
       ## If false, use emptyDir
@@ -211,10 +216,20 @@ prometheus:
     ##
     enabled: false
 
+    ## node-exporter container image
+    ##
+    image:
+      repository: apecloud/node-exporter
+
   server:
     ## Prometheus server container name
     ##
     enabled: true
+
+    ## Prometheus server container image
+    ##
+    image:
+      repository: apecloud/prometheus
 
     global:
       ## How frequently to scrape targets by default

@@ -874,7 +874,12 @@ func (r *BackupReconciler) BuildSnapshotPodSpec(
 
 	podSpec.Volumes = clusterPod.Spec.Volumes
 	podSpec.RestartPolicy = corev1.RestartPolicyNever
-	podSpec.ServiceAccountName = "kubeblocks"
+
+	serviceAccount := viper.GetString("KUBEBLOCKS_SERVICE_ACCOUNT")
+	if len(serviceAccount) == 0 {
+		serviceAccount = "kubeblocks"
+	}
+	podSpec.ServiceAccountName = serviceAccount
 
 	return podSpec, nil
 }

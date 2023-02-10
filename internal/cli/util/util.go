@@ -533,7 +533,7 @@ func getIPLocation() (string, error) {
 	}
 	defer resp.Body.Close()
 	location, err := io.ReadAll(resp.Body)
-	if err != nil {
+	if len(location) == 0 || err != nil {
 		return "", err
 	}
 

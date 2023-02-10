@@ -157,7 +157,7 @@ prometheus:
     ## alertmanager container image
     ##
     image:
-      repository: apecloud/alertmanager
+      repository: docker.io/apecloud/alertmanager
       tag: v0.24.0
 
     persistentVolume:
@@ -220,7 +220,7 @@ prometheus:
     ## node-exporter container image
     ##
     image:
-      repository: apecloud/node-exporter
+      repository: docker.io/apecloud/node-exporter
       tag: v1.3.1
 
   server:
@@ -231,7 +231,7 @@ prometheus:
     ## Prometheus server container image
     ##
     image:
-      repository: apecloud/prometheus
+      repository: docker.io/apecloud/prometheus
       tag: v2.39.1
 
     global:
@@ -736,7 +736,7 @@ grafana:
 
   sidecar:
     image:
-      repository: apecloud/k8s-sidecar
+      repository: docker.io/apecloud/k8s-sidecar
       tag: 1.19.2
 
     dashboards:

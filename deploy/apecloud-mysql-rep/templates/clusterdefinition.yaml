@@ -96,11 +96,7 @@ spec:
               - name: MYSQL_USER
                 value: {{ .Values.auth.username | default "" | quote }}
               - name: MYSQL_PASSWORD
-                value: {{ .Values.auth.password | default "" | quote }}
-              - name: REPLICATION_USER
-                value: {{ .Values.auth.replicationUser | default "replicator" | quote }}
-              - name: REPLICATION_PASSWORD
-                value: {{ .Values.auth.replicationPassword | default "" | quote }}            
+                value: {{ .Values.auth.password | default "" | quote }}      
             lifecycle:
               postStart:
                 exec:

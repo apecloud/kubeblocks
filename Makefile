@@ -150,7 +150,7 @@ go-generate: ## Run go generate against code.
 .PHONY: cfg-go-generate
 cfg-go-generate: ## Run go generate against code.
 	$(GO) generate -x ./internal/testutil/k8s/...
-	$(GO) generate -x ./internal/configuration/proto...
+	$(GO) generate -x ./internal/configuration/proto/generate.go
 
 .PHONY: fmt
 fmt: ## Run go fmt against code.

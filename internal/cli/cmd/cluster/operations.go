@@ -34,6 +34,7 @@ import (
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/create"
 	"github.com/apecloud/kubeblocks/internal/cli/delete"
+	"github.com/apecloud/kubeblocks/internal/cli/printer"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
@@ -168,6 +169,7 @@ func (o *OperationsOptions) validateReconfiguring() error {
 	if err := o.validateConfigParams(tpl, componentName); err != nil {
 		return err
 	}
+	o.printConfigureTips()
 	return nil
 }
 
@@ -376,6 +378,15 @@ func (o *OperationsOptions) checkClusterAndComponent(componentName string) error
 		}
 	}
 	return makeComponentNotExistErr(o.Name, componentName)
+}
+
+func (o *OperationsOptions) printConfigureTips() {
+	fmt.Println("Will updated configure file meta:")
+	printer.PrintLineWithTabSeparator(
+		printer.NewPair("  TemplateName", printer.BoldYellow(o.CfgTemplateName)),
+		printer.NewPair("  ConfigureFile", printer.BoldYellow(o.CfgFile)),
+		printer.NewPair("ComponentName", o.ComponentNames[0]),
+		printer.NewPair("ClusterName", o.Name))
 }
 
 // buildOperationsInputs build operations inputs

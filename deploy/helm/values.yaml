@@ -21,6 +21,25 @@ imagePullSecrets: []
 nameOverride: ""
 fullnameOverride: ""
 
+# -- Deployment update strategy.
+# Ref: https://kubernetes.io/docs/concepts/workloads/controllers/deployment/#strategy
+# @default -- See [values.yaml](values.yaml)
+updateStrategy:
+  rollingUpdate:
+    maxSurge: 1
+    maxUnavailable: 40%
+  type: RollingUpdate
+
+# -- Change `hostNetwork` to `true` when you want the KubeBlocks's pod to share its host's network namespace.
+# Useful for situations like when you end up dealing with a custom CNI over Amazon EKS.
+# Update the `dnsPolicy` accordingly as well to suit the host network mode.
+hostNetwork: false
+
+# -- `dnsPolicy` determines the manner in which DNS resolution happens in the cluster.
+# In case of `hostNetwork: true`, usually, the `dnsPolicy` is suitable to be `ClusterFirstWithHostNet`.
+# For further reference: https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/#pod-s-dns-policy.
+dnsPolicy: ClusterFirst
+
 loggerSettings:
   # Development Mode defaults(encoder=consoleEncoder,logLevel=Debug,stackTraceLevel=Warn).
   # Production Mode defaults(encoder=jsonEncoder,logLevel=Info,stackTraceLevel=Error) (default false)

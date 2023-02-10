@@ -310,6 +310,17 @@ const (
 	SIGSYS    SignalType = "SIGSYS"
 )
 
+// IssuerName defines Tls certs issuer name
+// +enum
+type IssuerName string
+
+const (
+	// IssuerSelfSigned certs self-signed by KubeBlocks
+	IssuerSelfSigned IssuerName = "SelfSigned"
+	// IssuerSelfProvided certs provided by user
+	IssuerSelfProvided IssuerName = "SelfProvided"
+)
+
 func RegisterWebhookManager(mgr manager.Manager) {
 	webhookMgr = &webhookManager{mgr.GetClient()}
 }

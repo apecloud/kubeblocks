@@ -133,6 +133,44 @@ spec:
                         type: string
                       type: array
                       x-kubernetes-list-type: set
+                    issuer:
+                      description: Issuer who provides tls certs required when Tls
+                        enabled
+                      properties:
+                        name:
+                          default: SelfSigned
+                          description: 'Name of issuer options supported: - SelfSigned,
+                            certs self-signed by KubeBlocks - SelfProvided, certs
+                            provided by user in Secret'
+                          enum:
+                          - SelfSigned
+                          - SelfProvided
+                          type: string
+                        secretRef:
+                          description: SecretRef, Tls certs Secret reference required
+                            when from is SelfProvided
+                          properties:
+                            ca:
+                              description: CA cert key in Secret
+                              type: string
+                            cert:
+                              description: Cert key in Secret
+                              type: string
+                            key:
+                              description: Key of Tls private key in Secret
+                              type: string
+                            name:
+                              description: Name of the Secret
+                              type: string
+                          required:
+                          - ca
+                          - cert
+                          - key
+                          - name
+                          type: object
+                      required:
+                      - name
+                      type: object
                     monitor:
                       default: false
                       description: monitor which is a switch to enable monitoring,
@@ -228,6 +266,9 @@ spec:
                       - LoadBalancer
                       type: string
                       x-kubernetes-preserve-unknown-fields: true
+                    tls:
+                      description: Tls should be enabled or not
+                      type: boolean
                     tolerations:
                       description: Component tolerations will override ClusterSpec.Tolerations
                         if specified.

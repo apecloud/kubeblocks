@@ -187,6 +187,15 @@ type ClusterComponent struct {
 	// +kubebuilder:validation:Minimum=0
 	// +optional
 	PrimaryIndex *int32 `json:"primaryIndex,omitempty"`
+
+	// Tls should be enabled or not
+	// +optional
+	Tls bool `json:"tls,omitempty"`
+
+	// Issuer who provides tls certs
+	// required when Tls enabled
+	// +optional
+	Issuer *Issuer `json:"issuer,omitempty"`
 }
 
 type ComponentMessageMap map[string]string
@@ -351,6 +360,42 @@ type OperationComponent struct {
 	// volumeClaimTemplateNames which VolumeClaimTemplate of the component support volumeExpansion.
 	// +optional
 	VolumeClaimTemplateNames []string `json:"volumeClaimTemplateNames,omitempty"`
+}
+
+// Issuer defines Tls certs issuer
+type Issuer struct {
+	// Name of issuer
+	// options supported:
+	// - SelfSigned, certs self-signed by KubeBlocks
+	// - SelfProvided, certs provided by user in Secret
+	// +kubebuilder:validation:Enum={SelfSigned, SelfProvided}
+	// +kubebuilder:default=SelfSigned
+	// +kubebuilder:validation:Required
+	Name IssuerName `json:"name"`
+
+	// SecretRef, Tls certs Secret reference
+	// required when from is SelfProvided
+	// +optional
+	SecretRef *TlsSecretRef `json:"secretRef,omitempty"`
+}
+
+// TlsSecretRef defines Secret contains Tls certs
+type TlsSecretRef struct {
+	// Name of the Secret
+	// +kubebuilder:validation:Required
+	Name string `json:"name"`
+
+	// CA cert key in Secret
+	// +kubebuilder:validation:Required
+	CA string `json:"ca"`
+
+	// Cert key in Secret
+	// +kubebuilder:validation:Required
+	Cert string `json:"cert"`
+
+	// Key of Tls private key in Secret
+	// +kubebuilder:validation:Required
+	Key string `json:"key"`
 }
 
 //+kubebuilder:object:root=true

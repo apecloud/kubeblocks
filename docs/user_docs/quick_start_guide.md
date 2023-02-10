@@ -64,7 +64,7 @@ Use `kbcli` and a YAML file to create a cluster with specified component specifi
 
 2. Run the command below to create a cluster.
    ```
-   kbcli cluster create ac-cluster --cluster-definition=apecloud-mysql  --cluster-version=ac-mysql-8.0.30 --set=mycluster.yaml --termination-policy=WipeOut
+   kbcli cluster create ac-cluster --cluster-definition=apecloud-mysql  --cluster-version=ac-mysql-8.0.30 --set-file=mycluster.yaml --termination-policy=WipeOut
    ```
 
 ## Step 4. View the cluster details

@@ -237,7 +237,7 @@ mathAvg = [8-9][0-9]\.?\d*`
 
 		It("test failed", func() {
 
-			testFaieldFunc := `
+			testFailedFunc := `
 {{ $testBoundary := 1000 }}
 {{- if gt $.testCondition $testBoundary }}
 {{- failed "testCondition require <= %d" $testBoundary }}
@@ -247,14 +247,14 @@ mathAvg = [8-9][0-9]\.?\d*`
 				"testCondition": 100,
 			}, nil, "for_test", nil, nil)
 
-			_, err := engine.Render(testFaieldFunc)
+			_, err := engine.Render(testFailedFunc)
 			Expect(err).Should(Succeed())
 
 			engine = NewTplEngine(&TplValues{
 				"testCondition": 5000,
 			}, nil, "for_test", nil, nil)
 
-			_, err = engine.Render(testFaieldFunc)
+			_, err = engine.Render(testFailedFunc)
 			Expect(err).ShouldNot(Succeed())
 			Expect(err.Error()).Should(ContainSubstring("testCondition require <= 1000"))
 		})

@@ -12,30 +12,32 @@ kbcli cluster create [NAME] [flags]
   # Create a cluster using cluster definition my-cluster-def and cluster version my-version
   kbcli cluster create mycluster --cluster-definition=my-cluster-def --cluster-version=my-version
   
-  # --cluster-definition is required, if --cluster-version is not specified, will use the latest cluster version
+  # --cluster-definition is required, if --cluster-version is not specified, will use the most recently created version
   kbcli cluster create mycluster --cluster-definition=my-cluster-def
   
-  # Create a cluster using file my.yaml and termination policy DoNotDelete that will prevent
-  # the cluster from being deleted
-  kbcli cluster create mycluster --cluster-definition=my-cluster-def --set=my.yaml --termination-policy=DoNotDelete
+  # Create a cluster and set termination policy DoNotDelete that will prevent the cluster from being deleted
+  kbcli cluster create mycluster --cluster-definition=my-cluster-def --termination-policy=DoNotDelete
   
-  # In scenarios where you want to delete resources such as sts, deploy, svc, pdb, but keep pvcs when deleting
-  # the cluster, use termination policy Halt
-  kbcli cluster create mycluster --cluster-definition=my-cluster-def --set=my.yaml --termination-policy=Halt
+  # In scenarios where you want to delete resources such as statements, deployments, services, pdb, but keep PVCs
+  # when deleting the cluster, use termination policy Halt
+  kbcli cluster create mycluster --cluster-definition=my-cluster-def --termination-policy=Halt
   
-  # In scenarios where you want to delete resource such as sts, deploy, svc, pdb, and including pvcs when
-  # deleting the cluster, use termination policy Delete
-  kbcli cluster create mycluster --cluster-definition=my-cluster-def --set=my.yaml --termination-policy=Delete
+  # In scenarios where you want to delete resource such as statements, deployments, services, pdb, and including
+  # PVCs when deleting the cluster, use termination policy Delete
+  kbcli cluster create mycluster --cluster-definition=my-cluster-def --termination-policy=Delete
   
   # In scenarios where you want to delete all resources including all snapshots and snapshot data when deleting
   # the cluster, use termination policy WipeOut
-  kbcli cluster create mycluster --cluster-definition=my-cluster-def --set=my.yaml --termination-policy=WipeOut
+  kbcli cluster create mycluster --cluster-definition=my-cluster-def --termination-policy=WipeOut
   
-  # In scenarios where you want to load components data from website URL
-  kbcli cluster create mycluster --cluster-definition=my-cluster-def --set=https://kubeblocks.io/yamls/my.yaml
+  # Create a cluster and set cpu to 1000m, memory to 1Gi, storage size to 10Gi and replicas to 2
+  kbcli cluster create mycluster --cluster-definition=my-cluster-def --set cpu=1000m,memory=1Gi,storage=10Gi,replicas=2
   
-  # In scenarios where you want to load components data from stdin
-  cat << EOF | kbcli cluster create mycluster --cluster-definition=my-cluster-def --set -
+  # Create a cluster and use a URL to set cluster resource
+  kbcli cluster create mycluster --cluster-definition=my-cluster-def --set-file=https://kubeblocks.io/yamls/my.yaml
+  
+  # Create a cluster and load cluster resource set from stdin
+  cat << EOF | kbcli cluster create mycluster --cluster-definition=my-cluster-def --set-file -
   - name: my-test ...
   
   # Create a cluster forced to scatter by node
@@ -59,7 +61,8 @@ kbcli cluster create [NAME] [flags]
       --monitor                      Set monitor enabled and inject metrics exporter (default true)
       --node-labels stringToString   Node label selector (default [])
       --pod-anti-affinity string     Pod anti-affinity type (default "Preferred")
-      --set string                   Use yaml file, URL, or stdin to set the cluster parameters
+      --set stringArray              Set the cluster resource including cpu, memory, replicas and storage, each set corresponds to a component.(e.g. --set cpu=1000m,memory=1Gi,replicas=3,storage=10Gi)
+  -f, --set-file string              Use yaml file, URL, or stdin to set the cluster resource
       --termination-policy string    Termination policy, one of: (DoNotTerminate, Halt, Delete, WipeOut) (default "Delete")
       --tolerations strings          Tolerations for cluster, such as '"key=engineType,value=mongo,operator=Equal,effect=NoSchedule"'
       --topology-keys stringArray    Topology keys for affinity

@@ -9,19 +9,28 @@ kbcli cluster explain-configure [flags]
 ### Examples
 
 ```
-  # describe a specified configure template
-  kbcli cluster explain-configure cluster-name --component-name=component --template-names=tpl1
+  # describe a cluster, e.g. cluster name is mycluster
+  kbcli cluster explain-configure mycluster
+  
+  # describe a specified configure template, e.g. cluster name is mycluster
+  kbcli cluster explain-configure mycluster --component-name=mysql --template-names=mysql-3node-tpl
+  
+  # describe a specified configure template, e.g. cluster name is mycluster
+  kbcli cluster explain-configure mycluster --component-name=mysql --template-names=mysql-3node-tpl --trunc-document=false --trunc-enum=false
+  
+  # describe a specified parameters, e.g. cluster name is mycluster
+  kbcli cluster explain-configure mycluster --component-name=mysql --template-names=mysql-3node-tpl  --param=sql_mode
 ```
 
 ### Options
 
 ```
-      --component-name string     Component name to this operations (required)
+      --component-name string    Specify the name of Component to be describe (e.g. for apecloud-mysql: --component-name=mysql). If the cluster has only one component, unset the parameter."
   -h, --help                     help for explain-configure
-      --param string              specific parameter (options)
-      --template-names strings   Specifies the name of the configuration template to be describe (options)
-      --trunc-document            trunc document string (options)
-      --trunc-enum                trunc enum string (options) (default true)
+      --param string             Specify the name of parameter to be query. It clearly display the details of the parameter.
+      --template-names strings   Specify the name of the configuration template to be describe. (e.g. for apecloud-mysql: --template-names=mysql-3node-tpl)
+      --trunc-document           If the document length of the parameter is greater than 100, it will be truncated.
+      --trunc-enum               If the value list length of the parameter is greater than 20, it will be truncated. (default true)
 ```
 
 ### Options inherited from parent commands

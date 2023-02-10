@@ -191,6 +191,13 @@ func GetClusterDefByName(dynamic dynamic.Interface, name string) (*dbaasv1alpha1
 	return clusterDef, nil
 }
 
+func GetDefaultCompTypeName(cd *dbaasv1alpha1.ClusterDefinition) (string, error) {
+	if len(cd.Spec.Components) == 1 {
+		return cd.Spec.Components[0].TypeName, nil
+	}
+	return "", fmt.Errorf("failed to get the default component type")
+}
+
 func GetClusterByName(dynamic dynamic.Interface, name string, namespace string) (*dbaasv1alpha1.Cluster, error) {
 	cluster := &dbaasv1alpha1.Cluster{}
 	obj, err := dynamic.Resource(types.ClusterGVR()).Namespace(namespace).

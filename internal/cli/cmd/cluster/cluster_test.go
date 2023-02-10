@@ -54,7 +54,7 @@ var _ = Describe("Cluster", func() {
 			o := &CreateOptions{
 				ClusterDefRef:     testing.ClusterDefName,
 				ClusterVersionRef: testing.ClusterVersionName,
-				Sets:              testComponentPath,
+				SetFile:           testComponentPath,
 				UpdatableFlags: UpdatableFlags{
 					TerminationPolicy: "Delete",
 				},
@@ -83,7 +83,7 @@ var _ = Describe("Cluster", func() {
 			tf.FakeDynamicClient = testing.FakeDynamicClient(testing.FakeClusterDef())
 			o := &CreateOptions{
 				BaseOptions:       create.BaseOptions{IOStreams: streams, Name: "test", Client: tf.FakeDynamicClient},
-				Sets:              "",
+				SetFile:           "",
 				ClusterDefRef:     testing.ClusterDefName,
 				ClusterVersionRef: "cluster-version",
 				UpdatableFlags: UpdatableFlags{
@@ -96,14 +96,14 @@ var _ = Describe("Cluster", func() {
 			Expect(o.Validate()).Should(HaveOccurred())
 
 			o.TerminationPolicy = "WipeOut"
-			o.Sets = "test.yaml"
+			o.SetFile = "test.yaml"
 			Expect(o.Complete()).ShouldNot(Succeed())
 
-			o.Sets = ""
+			o.SetFile = ""
 			Expect(o.Complete()).Should(Succeed())
 			Expect(o.Validate()).Should(Succeed())
 
-			o.Sets = testComponentPath
+			o.SetFile = testComponentPath
 			Expect(o.Complete()).Should(Succeed())
 			Expect(o.Validate()).Should(Succeed())
 

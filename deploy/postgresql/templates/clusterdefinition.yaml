@@ -218,7 +218,7 @@ spec:
               {{- end }}
       systemAccounts:
         cmdExecutorConfig:
-          image: docker.io/postgres:14.6
+          image: docker.io/postgres:alpine
           command: ["psql"]
           args:
           - -h$(KB_ACCOUNT_ENDPOINT) 

@@ -22,7 +22,6 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	appv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -34,6 +33,21 @@ import (
 )
 
 var _ = Describe("Reconfigure Controller", func() {
+	const clusterDefName = "test-clusterdef"
+	const clusterVersionName = "test-clusterversion"
+	const clusterName = "test-cluster"
+
+	const statefulCompType = "replicasets"
+	const statefulCompName = "mysql"
+
+	const statefulSetName = "mysql-statefulset"
+
+	const configTplName = "mysql-config-tpl"
+
+	const configVolumeName = "mysql-config"
+
+	const cmName = "mysql-tree-node-template-8.0"
+
 	var ctx = context.Background()
 
 	cleanEnv := func() {
@@ -63,30 +77,61 @@ var _ = Describe("Reconfigure Controller", func() {
 		It("Should rolling upgrade pod", func() {
 
 			By("creating a cluster")
-			testWrapper := NewFakeDBaasCRsFromProvider(testCtx, ctx, FakeTest{
-				TestDataPath: "resources",
-				// for crd yaml file
-				CfgCCYaml:       "mysql_config_template.yaml",
-				CDYaml:          "mysql_cd.yaml",
-				CVYaml:          "mysql_cv.yaml",
-				CfgCMYaml:       "mysql_config_cm.yaml",
-				StsYaml:         "mysql_sts.yaml",
-				ClusterYaml:     "mysql_cluster.yaml",
-				ComponentName:   TestComponentName,
-				CDComponentType: TestCDComponentTypeName,
-			})
-			defer func() {
-				By("clear TestWrapper created objects...")
-				defer testWrapper.DeleteAllObjects()
-			}()
+			configmap := testdbaas.CreateCustomizedObj(&testCtx,
+				"resources/mysql_config_cm.yaml", &corev1.ConfigMap{},
+				testCtx.UseDefaultNamespace(),
+				testdbaas.WithLabels(
+					intctrlutil.AppNameLabelKey, clusterName,
+					intctrlutil.AppInstanceLabelKey, clusterName,
+					intctrlutil.AppComponentLabelKey, statefulCompName,
+					cfgcore.CMConfigurationTplNameLabelKey, configTplName,
+					cfgcore.CMConfigurationConstraintsNameLabelKey, cmName,
+					cfgcore.CMConfigurationISVTplLabelKey, configTplName,
+					cfgcore.CMConfigurationTypeLabelKey, cfgcore.ConfigInstanceType,
+				))
 
-			namer := testWrapper.namer
+			constraint := testdbaas.CreateCustomizedObj(&testCtx,
+				"resources/mysql_config_template.yaml",
+				&dbaasv1alpha1.ConfigConstraint{})
 
-			By("check sts")
-			Eventually(testdbaas.CheckObjExists(&testCtx, client.ObjectKeyFromObject(testWrapper.STS), &appv1.StatefulSet{}, true)).Should(Succeed())
+			By("Create a clusterDefinition obj")
+			clusterDefObj := testdbaas.NewClusterDefFactory(&testCtx, clusterDefName, testdbaas.MySQLType).
+				AddComponent(testdbaas.StatefulMySQL8, statefulCompType).
+				AddConfigTemplate(configTplName, configmap.Name, constraint.Name, configVolumeName).
+				AddLabels(cfgcore.GenerateTPLUniqLabelKeyWithConfig(configTplName), configmap.Name,
+					cfgcore.GenerateConstraintsUniqLabelKeyWithConfig(constraint.Name), constraint.Name).
+				Create().GetClusterDef()
+
+			By("Create a clusterVersion obj")
+			clusterVersionObj := testdbaas.NewClusterVersionFactory(&testCtx, clusterVersionName, clusterDefObj.GetName()).
+				AddComponent(statefulCompType).
+				AddLabels(cfgcore.GenerateTPLUniqLabelKeyWithConfig(configTplName), configmap.Name,
+					cfgcore.GenerateConstraintsUniqLabelKeyWithConfig(constraint.Name), constraint.Name).
+				Create().GetClusterVersion()
+
+			By("Creating a cluster")
+			clusterObj := testdbaas.NewClusterFactory(&testCtx, clusterName,
+				clusterDefObj.Name, clusterVersionObj.Name).
+				AddComponent(statefulCompName, statefulCompType).Create().GetCluster()
+
+			container := corev1.Container{
+				Name: "mock-container",
+				VolumeMounts: []corev1.VolumeMount{{
+					Name:      configVolumeName,
+					MountPath: "/mnt/config",
+				}},
+			}
+			_ = testdbaas.NewStatefulSetFactory(&testCtx, statefulSetName, clusterObj.Name, statefulCompName).
+				AddConfigmapVolume(configVolumeName, configmap.Name).
+				AddContainer(container).
+				AddLabels(intctrlutil.AppNameLabelKey, clusterName,
+					intctrlutil.AppInstanceLabelKey, clusterName,
+					intctrlutil.AppComponentLabelKey, statefulCompName,
+					cfgcore.GenerateTPLUniqLabelKeyWithConfig(configTplName), configmap.Name,
+				).Create().GetStatefulSet()
 
 			By("check config constraint")
-			Eventually(testdbaas.CheckObj(&testCtx, client.ObjectKeyFromObject(testWrapper.CC), func(g Gomega, tpl *dbaasv1alpha1.ConfigConstraint) {
+			Eventually(testdbaas.CheckObj(&testCtx, client.ObjectKeyFromObject(constraint), func(g Gomega, tpl *dbaasv1alpha1.ConfigConstraint) {
 				g.Expect(tpl.Status.Phase).Should(BeEquivalentTo(dbaasv1alpha1.AvailablePhase))
 			})).Should(Succeed())
 
@@ -94,57 +139,56 @@ var _ = Describe("Reconfigure Controller", func() {
 			var configHash string
 			Eventually(func(g Gomega) {
 				cm := &corev1.ConfigMap{}
-				g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(testWrapper.CfgCM), cm)).Should(Succeed())
+				g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(configmap), cm)).Should(Succeed())
+				g.Expect(cm.Labels[intctrlutil.AppInstanceLabelKey]).To(Equal(clusterObj.Name))
+				g.Expect(cm.Labels[cfgcore.CMConfigurationTplNameLabelKey]).To(Equal(configTplName))
+				g.Expect(cm.Labels[cfgcore.CMConfigurationTypeLabelKey]).NotTo(Equal(""))
+				g.Expect(cm.Labels[cfgcore.CMInsLastReconfigureMethodLabelKey]).To(Equal(ReconfigureFirstConfigType))
 				configHash = cm.Labels[cfgcore.CMInsConfigurationHashLabelKey]
-				g.Expect(
-					cm.Labels[intctrlutil.AppInstanceLabelKey] == namer.ClusterName &&
-						cm.Labels[cfgcore.CMConfigurationTplNameLabelKey] == namer.TPLName &&
-						cm.Labels[cfgcore.CMConfigurationTypeLabelKey] != "" &&
-						cm.Labels[cfgcore.CMInsLastReconfigureMethodLabelKey] == ReconfigureFirstConfigType &&
-						configHash != "").Should(BeTrue())
+				g.Expect(configHash).NotTo(Equal(""))
 			}).Should(Succeed())
 
 			By("Update config, old version: " + configHash)
 			updatedCM, err := testdata.GetResourceFromTestData[corev1.ConfigMap]("resources/mysql_ins_config_update.yaml")
 			Expect(err).Should(Succeed())
-			Eventually(testdbaas.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(testWrapper.CfgCM), func(cm *corev1.ConfigMap) {
+			Eventually(testdbaas.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(configmap), func(cm *corev1.ConfigMap) {
 				cm.Data = updatedCM.Data
 			})).Should(Succeed())
 
 			By("check config new version")
 			Eventually(func(g Gomega) {
 				cm := &corev1.ConfigMap{}
-				g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(testWrapper.CfgCM), cm)).Should(Succeed())
+				g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(configmap), cm)).Should(Succeed())
 				newHash := cm.Labels[cfgcore.CMInsConfigurationHashLabelKey]
-				g.Expect(newHash != configHash &&
-					cm.Labels[cfgcore.CMInsLastReconfigureMethodLabelKey] == ReconfigureAutoReloadType).Should(BeTrue())
+				g.Expect(newHash).NotTo(Equal(configHash))
+				g.Expect(cm.Labels[cfgcore.CMInsLastReconfigureMethodLabelKey]).To(Equal(ReconfigureAutoReloadType))
 			}).Should(Succeed())
 
 			By("invalid Update")
 			invalidUpdatedCM, err := testdata.GetResourceFromTestData[corev1.ConfigMap]("resources/mysql_ins_config_invalid_update.yaml")
 			Expect(err).Should(Succeed())
-			Eventually(testdbaas.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(testWrapper.CfgCM), func(cm *corev1.ConfigMap) {
+			Eventually(testdbaas.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(configmap), func(cm *corev1.ConfigMap) {
 				cm.Data = invalidUpdatedCM.Data
 			})).Should(Succeed())
 
 			By("check invalid update")
 			Eventually(func(g Gomega) {
 				cm := &corev1.ConfigMap{}
-				g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(testWrapper.CfgCM), cm)).Should(Succeed())
+				g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(configmap), cm)).Should(Succeed())
 				g.Expect(cm.Labels[cfgcore.CMInsLastReconfigureMethodLabelKey]).Should(BeEquivalentTo(ReconfigureNoChangeType))
 			}).Should(Succeed())
 
 			By("restart Update")
 			restartUpdatedCM, err := testdata.GetResourceFromTestData[corev1.ConfigMap]("resources/mysql_ins_config_update_with_restart.yaml")
 			Expect(err).Should(Succeed())
-			Eventually(testdbaas.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(testWrapper.CfgCM), func(cm *corev1.ConfigMap) {
+			Eventually(testdbaas.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(configmap), func(cm *corev1.ConfigMap) {
 				cm.Data = restartUpdatedCM.Data
 			})).Should(Succeed())
 
 			By("check invalid update")
 			Eventually(func(g Gomega) {
 				cm := &corev1.ConfigMap{}
-				g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(testWrapper.CfgCM), cm)).Should(Succeed())
+				g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(configmap), cm)).Should(Succeed())
 				g.Expect(cm.Labels[cfgcore.CMInsLastReconfigureMethodLabelKey]).Should(BeEquivalentTo(ReconfigureSimpleType))
 			}).Should(Succeed())
 		})

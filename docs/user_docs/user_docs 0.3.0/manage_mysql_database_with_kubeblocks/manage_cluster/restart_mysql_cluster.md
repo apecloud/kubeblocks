@@ -1,7 +1,7 @@
 # Restart MySQL cluster
 You can restart all pods of the cluster. When an exception occurs in a database, you can try to restart it.
 
-> ***Note***
+> ***Note:*** 
 > 
 > All pods restart in the order of `learner -> follower -> leader` and the leader may change after the cluster restarts.
 
@@ -20,7 +20,7 @@ You can restart all pods of the cluster. When an exception occurs in a database,
    - `component-names` describes the component name that needs to be restarted.
    - `ttlSecondsAfterSucceed` describes the time to live after the restarting succeeds.
 
-   **Option 2** Create an OpsRequest.
+   **Option 2.** Create an OpsRequest.
 
    Run the command below to apply the restarting to a cluster. 
    ```
@@ -36,14 +36,16 @@ You can restart all pods of the cluster. When an exception occurs in a database,
      - componentName: mysql
    EOF
    ```
-2. Validate the restarting.
+1. Validate the restarting.
    Run the command below to check the cluster status to check the restarting status.
    ```
    kbcli cluster list NAME
    ```
    - STATUS=Updating: means the cluster is restarting.
    - STATUS=Running means the cluster is restarted.
+   
    ***Example***
+
      ```
      $ kbcli cluster list mysql-cluster
      NAME                 NAMESPACE        CLUSTER-DEFINITION        VERSION                TERMINATION-POLICY        STATUS         CREATED-TIME

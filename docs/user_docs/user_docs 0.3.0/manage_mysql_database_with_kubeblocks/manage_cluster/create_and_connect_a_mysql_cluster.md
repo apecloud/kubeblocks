@@ -1,5 +1,6 @@
 # Create and connect to a MySQL Cluster
 ## Create a MySQL Cluster
+
 ***Before you start***
 
 * `kbcli`: Install kbcli on your host. Refer to [Install/Uninstall kbcli and KubeBlocks](../../install_kbcli_kubeblocks/install_and_unistall_kbcli_and_kubeblocks.md) for details.
@@ -20,6 +21,7 @@
    ```
    kubectl get pod
    ```
+
    ***Result***
 
    Four pods starting with `kubeblocks` are displayed. For example,
@@ -34,6 +36,7 @@
   ```
   kbcli clusterdefinition list
   ```
+
   ***Result***
 
   ```
@@ -48,6 +51,7 @@
    ```
    kbcli clusterversion list
    ```
+
    ***Result***
 
    ```
@@ -56,45 +60,46 @@
    ac-mysql-8.0.30   apecloud-mysql       Available   2m40s
    ```
 2. Run the command below to create a MySQL cluster. 
-  ```
-  $ kbcli cluster create mysql-cluster --cluster-definition='apecloud-mysql'
-  ```
-  If you want to create a cluster with specified parameters, follow the options below.
+   ```
+   $ kbcli cluster create mysql-cluster --cluster-definition='apecloud-mysql'
+   ```
+   If you want to create a cluster with specified parameters, follow the options below.
 
-  **Option 1.** (Recommended) Run `export`
+   **Option 1.** (Recommended) Run `export`
 
-  If you want to create a Paxos group, run export KBCLI_CLUSTER_DEFAULT_REPLICAS=3 before creating a cluster. For example,
-  ```
-  $ export KBCLI_CLUSTER_DEFAULT_REPLICAS=3
-  $ kbcli cluster create mysql-cluster --cluster-definition='apecloud-mysql'
-  ```
+   If you want to create a Paxos group, run export KBCLI_CLUSTER_DEFAULT_REPLICAS=3 before creating a cluster. For example,
+   ```
+   $ export KBCLI_CLUSTER_DEFAULT_REPLICAS=3
+   $ kbcli cluster create mysql-cluster --cluster-definition='apecloud-mysql'
+   ```
 
-  If you want to adjust the storage size, run export KBCLI_CLUSTER_DEFAULT_STORAGE_SIZE=nGi before creating a cluster. For example,
+   If you want to adjust the storage size, run export KBCLI_CLUSTER_DEFAULT_STORAGE_SIZE=nGi before creating a cluster. For example,
   
-  ```
-  $ export KBCLI_CLUSTER_DEFAULT_STORAGE_SIZE=20Gi
-  $ kbcli cluster create mysql-cluster --cluster-definition='apecloud-mysql'
-  ```
+   ```
+   $ export KBCLI_CLUSTER_DEFAULT_STORAGE_SIZE=20Gi
+   $ kbcli cluster create mysql-cluster --cluster-definition='apecloud-mysql'
+   ```
 
-  **Option 2.** Change YAML file configurations
-  Change the corresponding parameters in the YAML file.
-  ```
-  $ kbcli cluster create mysql-cluster --cluster-definition="apecloud-mysql" --set -<<EOF
-  - name: mysql
-    replicas: 3
-    type: mysql
-    volumeClaimTemplates:
-    - name: data
-      spec:
-        accessModes:
-        - ReadWriteOnce
-        resources:
-          requests:
-            storage: 20Gi
-  EOF
-  ```
+   **Option 2.** Change YAML file configurations
 
-**`kbcli` cluster create options description**
+   Change the corresponding parameters in the YAML file.
+   ```
+   $ kbcli cluster create mysql-cluster --cluster-definition="apecloud-mysql" --set -<<EOF
+   - name: mysql
+     replicas: 3
+     type: mysql
+     volumeClaimTemplates:
+     - name: data
+       spec:
+         accessModes:
+         - ReadWriteOnce
+         resources:
+           requests:
+             storage: 20Gi
+   EOF
+   ```
+
+**`kbcli cluster create` options description**
 
 | Option   | Description      |
 | :--      | :--              |
@@ -108,8 +113,6 @@
 | `termination-policy` | It specifies the termination policy of the cluster. There are four available values, namely `DoNotTerminate`, `Halt`, `Delete`, and `WipeOut`. `Delete` is set as the default. <br /> - `DoNotTerminate`: DoNotTerminate blocks the delete operation. <br /> - `Halt`: Halt deletes workload resources such as statefulset, deployment workloads but keeps PVCs. <br /> - `Delete`: Delete is based on Halt and deletes PVCs. <br /> - `WipeOut`: WipeOut is based on Delete and wipes out all volume snapshots and snapshot data from backup storage location. |
 
 ## Connect to a MySQL Cluster
-
-***Steps:***
 
 Run the command below to connect to a cluster.
 ```

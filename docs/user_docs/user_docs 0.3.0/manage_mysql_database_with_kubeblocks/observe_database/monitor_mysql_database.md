@@ -3,6 +3,7 @@ With the built-in database observability, you can observe the database health st
 ## Observability of KubeBlocks
 KubeBlocks integrates open-source monitoring components such as Prometheus, AlertManager, and Granfana. KubeBlocks also uses open-source and customized Prometheus Exporter for exporting database indicators. The monitoring function is enabled by default when you install KubeBlocks and no other operation is required.
 ## Enable database monitor
+
 ***Steps:***
 
 1. Install monitor components.
@@ -14,7 +15,7 @@ KubeBlocks integrates open-source monitoring components such as Prometheus, Aler
    ```
    kbcli kubeblocks install --monitor=false
    ```
-    > ***Note***:
+    > ***Note:*** 
     > 
     > `monitor` is set as true by default and it is not recommended to disable the monitoring function.
 
@@ -23,7 +24,7 @@ KubeBlocks integrates open-source monitoring components such as Prometheus, Aler
    kbcli kubeblocks upgrade --monitor=true
    ```
 
-    > ***Note***:
+    > ***Note:*** 
     > 
     > Prometheus uses PersistentVolume to ensure the historical data is not lost in case of failover or reinstallation. When Prometheus is installed, the default setting is to save 3 days of historical data with a PersistentVolume of 8Gi, which can ensure normal startup in most environments. As for production environments, it is recommended to evaluate the data retention days and the size of the PersistentVolume. You can also enable high availability or use `remote write` to write to remote storage. 
     
@@ -54,7 +55,8 @@ KubeBlocks integrates open-source monitoring components such as Prometheus, Aler
       ```
       kbcli cluster create mycluster --cluster-definition='apecloud-mysql'
       ```
-      > Note:
+      > ***Note:*** 
+      >
       > The setting of `monitor` is `true` by default and it is not recommended to disable it. 
       > ```
       > kbcli cluster create mycluster --cluster-definition='apecloud-mysql' --monitor=false
@@ -64,7 +66,8 @@ KubeBlocks integrates open-source monitoring components such as Prometheus, Aler
      ```
      kbcli cluster update mycluster --monitor=true
      ```
-     > Caution:<br>
+     > ***Caution:***
+     >
      > Enabling/disabling the monitoring function by using the `update` command requires a rolling restart of the database pod to take effect.
 
 You can view the dashboard of the corresponding cluster via Grafana Web Console. For more detailed information, see [Grafana documentation](https://grafana.com/docs/grafana/latest/dashboards/).

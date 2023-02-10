@@ -2,6 +2,7 @@
 This section shows how to use kbcli to back up and restore a MySQL standalone instance.
 
 ***Before you start***
+
 - Prepare a clean EKS cluster, and install ebs csi driver plug-in, with at least one node and the memory of each node is not less than 4GB.
 - Install kubectl to ensure that you can connect to the EKS cluster 
 - Install kbcli.
@@ -10,6 +11,7 @@ This section shows how to use kbcli to back up and restore a MySQL standalone in
    ```
 
 ***Steps:***
+
 1. Install kubeblocks and enable snapshot backup.
 Install KubeBlocks and enable the snapshot controller plugin.
    ```
@@ -94,7 +96,7 @@ The backup is realized by the volume snapshot function, you need to configure EK
    ```
 7. Restore to a new cluster.
    Copy the backup name to the clipboard, and restore to the new cluster. 
-   > ***Note:***
+   > ***Note:*** 
    > 
    > You do not need to specify other parameters for creating an cluster. The restoration automatically reads the parameters of the source cluster, including specification, disk size, etc., and create a new MySQL cluster with the same specifications. 
 
@@ -118,7 +120,7 @@ The backup is realized by the volume snapshot function, you need to configure EK
    kbcli cluster delete mysql-cluster
    kbcli cluster delete mysql-new-from-snapshot
    ```
-    Delete the backup specified.
+   Delete the backup specified.
 
    ```
    kbcli cluster delete-backup mysql-cluster --name backup-default-mysql-cluster-20221124113440 

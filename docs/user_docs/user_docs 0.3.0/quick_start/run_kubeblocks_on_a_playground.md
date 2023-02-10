@@ -3,6 +3,7 @@ This guide uses one `kbcli` command to create a KubeBlocks demo environment (a p
 With a playground, you can try KubeBlocks and some ApeCloud MySQL features. This guide introduces how to install a playground and how to try KubeBlocks on the playground.
 
 ***Before you start***
+
 Ensure the following requirements are met so the playground and other functions can run fluently.
 
 * Minimum system requirements:
@@ -37,7 +38,8 @@ How this command works on your local host:
 2. Deploy KubeBlocks in this Kubernetes cluster.
 3. Create an ApeCloud MySQL Paxos group by KubeBlocks.
 
-***Result*** <br />
+***Result***
+
 You can see the following information indicating relevant modules have been installed successfully.
 ```
 Create playground k3d cluster: kubeblocks-playground OK
@@ -80,7 +82,7 @@ Use "kbcli [command] --help" for more information about a command.
 
 Following the instructions in "1. Basic commands for cluster", switch to the Kubernetes local cluster created by the playground by running `export KUBECONFIG=xxx` to start your trip on KubeBlocks and ApeCloud MySQL.
 
-> Caution: 
+> ***Caution:***  
 > 
 > Running `export KUBECONFIG` is a necessity for using KubeBlocks and ApeCloud MySQL.
 
@@ -92,7 +94,7 @@ The playground guide includes three sections, namely [Basic functions](#basic-fu
 
 KubeBlocks supports the complete life cycle management of a database cluster and follows the best practice of application development. The following instructions demonstrate the basic features of KubeBlocks. For the full feature set, refer to [KubeBlocks Documentation](https://github.com/apecloud/kubeblocks/tree/main/docs) for details.
 
-> Note:
+> ***Note:***
 >
 > The local host does not support volume expansion, backup, and restore functions.
 
@@ -108,7 +110,9 @@ $ kbcli cluster create mysql-cluster --cluster-definition='apecloud-mysql'
 ```
 
 #### View an ApeCloud MySQL Paxos group
+
 ***Steps:***
+
 1. Run `kbcli cluster list` to view the database cluster list.
     ```
     $ kbcli cluster list
@@ -150,7 +154,8 @@ $ kbcli cluster create mysql-cluster --cluster-definition='apecloud-mysql'
 
 #### Access an ApeCloud MySQL Paxos group
 
-**Option 1.** Use a command line tool <br />
+**Option 1.** Use a command line tool
+
 If a database cluster has been created and its status is `Running`, run `kbcli cluster connect` to access a specified database cluster. For example, 
 ```
 $ kbcli cluster connect mysql-cluster
@@ -192,7 +197,8 @@ Type 'help;' or '\h' for help. Type '\c' to clear the current input statement.
 mysql>
 ```
 
-**Option 2.** Use an access address <br/>
+**Option 2.** Use an access address
+
 If you want to access a cluster via MySQL client, get the access address from `Endpoints` in the cluster details.
 ```
 $ kbcli cluster describe mysql-cluster
@@ -238,7 +244,8 @@ KubeBlocks has complete observability capabilities. This section demonstrates th
    Forward successfully! Opening browser ...
    ```
 
-   ***Result***<br>
+   ***Result***
+
    A monitoring page is loaded automatically after the command is executed. 
 
 2. Click the Dashboard icon on the left bar and two monitoring panels show on the page.

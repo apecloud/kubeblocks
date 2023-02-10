@@ -1,7 +1,7 @@
 # Expand volume
 You can expand the storage volume size of each pod.
 
-> ***Note:***
+> ***Note:*** 
 > 
 > Volume expansion triggers pod restart, all pods restart in the order of `learner -> follower -> leader` and the leader pod may change after the operation.
 
@@ -18,10 +18,12 @@ kbcli cluster list NAME
 NAME                 NAMESPACE        CLUSTER-DEFINITION        VERSION                TERMINATION-POLICY        STATUS         CREATED-TIME
 mysql-cluster        default          apecloud-mysql            ac-mysql-8.0.30        Delete                    Running        Jan 29,2023 14:29 UTC+0800
 ```
+
 ***Steps:***
 
 1. Expand volume.
-   **Option 1.** Use `kbcli`
+   
+   **Option 1.** Use `kbcli`.
 
    Configure the values of `--component-names`, `--volume-claim-template-names`, and `--storage` and run the command below to expand the volume.
    ```
@@ -32,7 +34,7 @@ mysql-cluster        default          apecloud-mysql            ac-mysql-8.0.30 
    - `volume-claim-template-names` describes the VolumeClaimTemplate names in components.
    - `storage describes` the volume storage size.
    
-   **Option 2.** Create an OpsRequest
+   **Option 2.** Create an OpsRequest.
 
    Run the command below to expand the volume of a cluster.
    ```
@@ -53,8 +55,11 @@ mysql-cluster        default          apecloud-mysql            ac-mysql-8.0.30 
    ```
   
    **Option 3.** Change the YAML file of the cluster.
+
    Change the value of `spec.components.volumeClaimTemplates.spec.resources` in the cluster YAML file. `spec.components.volumeClaimTemplates.spec.resources` is the storage resource information of the pod and changing this value triggers the volume expansion of a cluster. 
+
    ***Example***
+
    ```
    apiVersion: dbaas.kubeblocks.io/v1alpha1
    kind: Cluster

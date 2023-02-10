@@ -3,35 +3,36 @@ The KubeBlocks log enhancement function aims to simplify the complexities of tro
 The KubeBlocks log enhancement function uses methods similar to kubectl exec and kubectl logs to ensure a self-closed loop and lightweight.
 
 ***Before you start***
+
 - The container image supports `tail` and `xargs` commands.
 - KubeBlocks Operator is installed on the target Kubernetes cluster.
 
 ***Steps:***
 
 1. Enable the log enhancement function.
-  - If you create a cluster by running the `kbcli cluster create` command, add the `enable-all-logs=true` option to enable the log enhancement function. When this option is `true`, all the log types defined by `spec.components.logConfigs` in `ClusterDefinition` are enabled automatically.
+   - If you create a cluster by running the `kbcli cluster create` command, add the `enable-all-logs=true` option to enable the log enhancement function. When this option is `true`, all the log types defined by `spec.components.logConfigs` in `ClusterDefinition` are enabled automatically.
 
-   ```
-   kbcli cluster create mycluster --cluster-definition='apecloud-mysql' --enable-all-logs=true 
-   ```
-  - If you create a cluster by applying a YAML file, add the log type you need in `spec.components.enabledLogs`. As for MySQL, error logs, slow logs, and general logs are supported.
-   ```
-   apiVersion: dbaas.kubeblocks.io/v1alpha1
-   kind: Cluster
-   metadata:
-     name: mysql-cluster
-     namespace: default
-   spec:
-    clusterDefinitionRef: mysql-cluster-definition
-    appVersionRef: appversion-mysql-latest
-    components:
-    - name: replicasets
-      type: replicasets
-      enabledLogs:
-        - slow 
-        - error
-        - general
-   ```
+     ```
+     kbcli cluster create mycluster --cluster-definition='apecloud-mysql' --enable-all-logs=true 
+     ```
+   - If you create a cluster by applying a YAML file, add the log type you need in `spec.components.enabledLogs`. As for MySQL, error logs, slow logs, and general logs are supported.
+     ```
+     apiVersion: dbaas.kubeblocks.io/v1alpha1
+     kind: Cluster
+     metadata:
+       name: mysql-cluster
+       namespace: default
+     spec:
+       clusterDefinitionRef: mysql-cluster-definition
+       appVersionRef: appversion-mysql-latest
+       components:
+       - name: replicasets
+         type: replicasets
+         enabledLogs:
+           - slow 
+           - error
+           - general
+     ```
    
 2. View the supported logs.
    Run the `kbcli cluster list-logs` command to view the enabled log types of the target cluster and the log file details. INSTANCE of each node is displayed.
@@ -91,6 +92,7 @@ The KubeBlocks log enhancement function uses methods similar to kubectl exec and
      - Run `kubectl describe cluster <cluster-name>` to view the warning.
   
      ***Example***
+     
      ```
      Status:
        Cluster Def Generation:  3

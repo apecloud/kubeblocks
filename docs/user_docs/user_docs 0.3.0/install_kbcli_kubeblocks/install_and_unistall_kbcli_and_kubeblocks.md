@@ -15,7 +15,7 @@ This guide introduces how to install KubeBlocks by `kbcli`, the command line too
    curl -fsSL http://161.189.136.182:8000/apecloud/kubeblocks/install_cli.sh |bash
    ```
 
-   > Note:
+   > ***Note:***
    > 
    > Please try again if a time-out exception occurs during installation. It may relate to your network condition.
 2. Run this command to check the version and verify whether kbcli is installed successfully.
@@ -57,6 +57,7 @@ $ echo "source <(kbcli completion zsh); compdef _kbcli kbcli" >> ~/.zshrc
    ```
    kbcli kubeblocks install
    ```
+
    ***Result***
    
    This command installs the latest version in your Kubernetes environment since your `kubectl` can connect to your Kubernetes clusters.
@@ -106,7 +107,9 @@ $ echo "source <(kbcli completion zsh); compdef _kbcli kbcli" >> ~/.zshrc
    ```
    kubectl get pod
    ```
-   ***Result***<br>
+
+   ***Result***
+
    Four pods starting with `kubeblocks` are displayed. For example,
    ```
    NAME                                                  READY   STATUS    RESTARTS   AGE

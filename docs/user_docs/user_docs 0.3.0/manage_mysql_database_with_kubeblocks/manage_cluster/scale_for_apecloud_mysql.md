@@ -4,7 +4,7 @@ You can scale ApeCloud MySQL DB instances in two ways, horizontal scaling and ve
 ## Vertical scaling
 You can vertically scale a cluster by changing resource requirements and limits (CPU and storage). For example, if you need to change the resource demand from 1C2G to 2C4G, vertical scaling is what you need.
 
-> ***Note:***
+> ***Note:*** 
 > 
 > During the vertical scaling process, all pods restart in the order of learner -> follower -> leader and the leader pod may change after the restarting.
 
@@ -14,17 +14,23 @@ Run the command below to check whether the cluster STATUS is Running. Otherwise,
 ```
 kbcli cluster list NAME
 ```
+
 ***Example***
+
 ```
 $ kbcli cluster list mysql-cluster
 NAME                 NAMESPACE        CLUSTER-DEFINITION        VERSION                TERMINATION-POLICY        STATUS         CREATED-TIME
 mysql-cluster        default          apecloud-mysql            ac-mysql-8.0.30        Delete                    Running        Jan 29,2023 14:29 UTC+0800
 ```
 ***Steps:***
+
 1. Change configuration. There are 3 ways to apply vertical scaling.
-   **Option 1**. (Recommanded) Use `kbcli`
    
-   Configure the parameters `component-names`, `requests`, and `limits` and run the command.***Example***
+   **Option 1.** (Recommanded) Use `kbcli`.
+   
+   Configure the parameters `component-names`, `requests`, and `limits` and run the command.
+   
+   ***Example***
    
    ```
    $ kbcli cluster vertical-scale mysql-cluster \
@@ -36,71 +42,74 @@ mysql-cluster        default          apecloud-mysql            ac-mysql-8.0.30 
    - `requests` describes the minimum amount of computing resources required. If `requests` is omitted for a container, it uses the `limits` value if `limits` is explicitly specified, otherwise uses an implementation-defined value. For more details, see [Resource Management for Pods and Containers](https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/).
    - `--limits` describes the maximum amount of computing resources allowed. For more details, see [Resource Management for Pods and Containers](https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/)
   
-  **Option 2.** Create an OpsRequest
+   **Option 2.** Create an OpsRequest.
   
-  Run the command below to apply an OpsRequest to the specified cluster. Configure the parameters according to your needs.
-  ```
-  $ kubectl apply -f - <<EOF
-  apiVersion: dbaas.kubeblocks.io/v1alpha1
-  kind: OpsRequest
-  metadata:
-    name: ops-vertical-scaling
-  spec:
-    clusterRef: mysql-cluster
-    type: VerticalScaling 
-    verticalScaling:
-    - componentName: mysql
-      requests:
-        memory: "2Gi"
-        cpu: "1000m"
-      limits:
-        memory: "4Gi"
-        cpu: "2000m"
-  EOF
-  ```
+   Run the command below to apply an OpsRequest to the specified cluster. Configure the parameters according to your needs.
+   ```
+   $ kubectl apply -f - <<EOF
+   apiVersion: dbaas.kubeblocks.io/v1alpha1
+   kind: OpsRequest
+   metadata:
+     name: ops-vertical-scaling
+   spec:
+     clusterRef: mysql-cluster
+     type: VerticalScaling 
+     verticalScaling:
+     - componentName: mysql
+       requests:
+         memory: "2Gi"
+         cpu: "1000m"
+       limits:
+         memory: "4Gi"
+         cpu: "2000m"
+   EOF
+   ```
   
-  **Option 3.** Change the YAML file of the cluster
+   **Option 3.** Change the YAML file of the cluster.
 
-  Change the configuration of `spec.components.resources` in the YAML file. `spec.components.resources` controls the requirement and limit of resources and changing them triggers a vertical scaling. 
+   Change the configuration of `spec.components.resources` in the YAML file. `spec.components.resources` controls the requirement and limit of resources and changing them triggers a vertical scaling. 
 
-  ***Example***
-  ```
-  apiVersion: dbaas.kubeblocks.io/v1alpha1
-  kind: Cluster
-  metadata:
-    name: mysql-01
-    namespace: default
-  spec:
-    clusterDefinitionRef: apecloud-mysql
-    clusterVersionRef: ac-mysql-8.0.30
-    components:
-    - name: mysql
-      type: mysql
-      replicas: 1
-      resources: # Change the values of resources.
-        requests:
-          memory: "2Gi"
-          cpu: "1000m"
-        limits:
-          memory: "4Gi"
-          cpu: "2000m"
-      volumeClaimTemplates:
-      - name: data
-        spec:
-          accessModes:
-            - ReadWriteOnce
-          resources:
-            requests:
-              storage: 1Gi
-    terminationPolicy: Halt
-  ```
+   ***Example***
+
+   ```
+   apiVersion: dbaas.kubeblocks.io/v1alpha1
+   kind: Cluster
+   metadata:
+     name: mysql-01
+     namespace: default
+   spec:
+     clusterDefinitionRef: apecloud-mysql
+     clusterVersionRef: ac-mysql-8.0.30
+     components:
+     - name: mysql
+       type: mysql
+       replicas: 1
+       resources: # Change the values of resources.
+         requests:
+           memory: "2Gi"
+           cpu: "1000m"
+         limits:
+           memory: "4Gi"
+           cpu: "2000m"
+       volumeClaimTemplates:
+       - name: data
+         spec:
+           accessModes:
+             - ReadWriteOnce
+           resources:
+             requests:
+               storage: 1Gi
+     terminationPolicy: Halt
+   ```
   
 2. Validate the vertical scaling.
     Run the command below to check the cluster status to identify the vertical scaling status.
     ```
     kbcli cluster list NAME
     ```
+
     ***Example***
+
     ```
     $ kbcli cluster list mysql-cluster
     NAME                 NAMESPACE        CLUSTER-DEFINITION        VERSION                TERMINATION-POLICY        STATUS          CREATED-TIME
@@ -131,7 +140,9 @@ Run the command below to check whether the cluster STATUS is `Running`. Otherwis
   ```
 
 ***Example***
-```$ kbcli cluster list mysql-cluster
+
+```
+$ kbcli cluster list mysql-cluster
 NAME                 NAMESPACE        CLUSTER-DEFINITION        VERSION                TERMINATION-POLICY        STATUS         CREATED-TIME
 mysql-cluster        default          apecloud-mysql            ac-mysql-8.0.30        Delete                    Running        Jan 29,2023 14:29 UTC+0800
 ```
@@ -139,9 +150,11 @@ mysql-cluster        default          apecloud-mysql            ac-mysql-8.0.30 
 ***Steps:***
 
 1. Change configuration. There are 3 ways to apply horizontal scaling.
-   **Option 1**. (Recommanded) Use `kbcli`
+   
+   **Option 1.** (Recommanded) Use `kbcli`.
    
    Configure the parameters `component-names` and `replicas`, and run the command.
+
    ***Example***
 
    ```
@@ -151,7 +164,8 @@ mysql-cluster        default          apecloud-mysql            ac-mysql-8.0.30 
    - `component-names` describes the component name ready for vertical scaling.
    - `replicas` describe the replicas with the specified components.
 
-   **Option 2.** Create an OpsRequest
+   **Option 2.** Create an OpsRequest.
+
    Run the command below to apply an OpsRequest to the specified cluster. Configure the parameters according to your needs.
    ```
    $ kubectl apply -f - <<EOF
@@ -168,9 +182,12 @@ mysql-cluster        default          apecloud-mysql            ac-mysql-8.0.30 
    EOF
    ```
 
-   **Option 3.** Change the YAML file of the cluster
-   Change the configuration of `spec.components.replicas` in the YAML file. `spec.components.replicas` tand for the pod amount and changing this value triggers a horizontal scaling of a cluster. 
+   **Option 3.** Change the YAML file of the cluster.
+
+   Change the configuration of `spec.components.replicas` in the YAML file. `spec.components.replicas` stand for the pod amount and changing this value triggers a horizontal scaling of a cluster. 
+
    ***Example***
+
    ```
    apiVersion: dbaas.kubeblocks.io/v1alpha1
    kind: Cluster
@@ -220,7 +237,7 @@ Status:
     status: "False"
     type: ApplyResources
 ```
-***Reason:***
+***Reason***
 
 This exception occurs because the `VolumeSnapshotClass` is not configured. This exception can be fixed after configuring `VolumeSnapshotClass`, but the horizontal scaling cannot continue to run. It is because the wrong backup (volumesnapshot is generated by backup) and volumesnapshot generated before still exist. Delete these two wrong resources and then KubeBlocks re-generates new resources.
 
@@ -248,4 +265,5 @@ This exception occurs because the `VolumeSnapshotClass` is not configured. This 
    ```
 
 ***Result***
+
 The horizontal scaling continues after backup and volumesnapshot are deleted and the cluster restores to running status.

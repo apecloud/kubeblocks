@@ -1,6 +1,6 @@
 # Delete a MySQL Cluster
 
-> ***Note:***
+> ***Note:*** 
 >
 > The termination policy determines how you delete a cluster.
 
@@ -13,19 +13,20 @@ terminationPolicy | Deleting Operation|
 
 To check the termination policy, execute the following command.
 ```
-$ kbcli cluster list cress50
-NAME   	NAMESPACE	CLUSTER-DEFINITION	VERSION        	TERMINATION-POLICY	STATUS 	CREATED-TIME
-cress50	default  	apecloud-mysql    	ac-mysql-8.0.30	Delete            	Running	Feb 06,2023 18:27 UTC+0800
+$ kbcli cluster list mysql-cluster
+NAME   	        NAMESPACE	CLUSTER-DEFINITION	VERSION        	TERMINATION-POLICY	STATUS 	CREATED-TIME
+mysql-cluster	default  	apecloud-mysql    	ac-mysql-8.0.30	Delete            	Running	Feb 06,2023 18:27 UTC+0800
 ```
 ***Steps:***
 
-**Option 1.** Use kbcli.
+**Option 1.** Use `kbcli`.
 
 Configure the cluster name and run the command below to delete the specified cluster.
 ```
 kbcli cluster delete mysql-cluster
 ```
-**Option 2.** Use kubectl.
+
+**Option 2.** Use `kubectl`.
 
 Configure the cluster name and run the command below to delete the specified cluster.
 ```

@@ -3,7 +3,7 @@ ApeCloud MySQL is a high-availability MySQL database provided by ApeCloud. It is
   - When there are 3 or more replicas,  a strong consistent high-availability cluster is created with the consensus algorithm protocol to ensure that RPO=0 in the case of a single availability zone failure. Among them, the primary instance provides read/write capacity, and the remaining instances provide read-only services.
   - When there are 2 replicas, a Primary-Secondary replication cluster is created, in which the primary instance provides read/write capacity, and the secondary instance keeps in sync with the primary instance with asynchronous replication, providing read-only and fault tolerance capabilities.
   - When there is only 1 instance, a standalone cluster is created to provide read/write capacity. Automatic fault recovery capability is still provided, and RPO=0 remains ensured if the cloud disk is not damaged.
-> Note: 
+> ***Note:***  
 > 
 > In this guide, we use KubeBlocks to manage ApeCloud MySQL.
 

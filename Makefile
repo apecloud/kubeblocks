@@ -662,16 +662,15 @@ brew-install-prerequisite: ## Use `brew install` to install required dependencie
 ##@ Minikube
 # using `minikube version: v1.29.0`, and use one of following k8s versions:
 # K8S_VERSION ?= v1.22.15
-# K8S_VERSION ?= v1.23.15
-K8S_VERSION ?= v1.24.9
-# K8S_VERSION ?= v1.25.6
-# K8S_VERSION ?= v1.26.v1.26.11
+K8S_VERSION ?= v1.23.15
+# K8S_VERSION ?= v1.24.9
+# K8S_VERSION ?= v1.25.5
+# K8S_VERSION ?= v1.26.1
 
 K8S_VERSION_MAJOR_MINOR=$(shell echo $(K8S_VERSION) | head -c 5)
 
-# minikube v1.29+ support `--image-mirror-country=cn` for China mainland users.
+# minikube v1.28+ support `--image-mirror-country=cn` for China mainland users.
 MINIKUBE_IMAGE_MIRROR_COUNTRY ?= cn
-MINIKUBE_REGISTRY_MIRROR ?=
 MINIKUBE_START_ARGS ?= --memory=4g --cpus=4
 
 ifeq ($(K8S_VERSION_MAJOR_MINOR), v1.26)
@@ -689,7 +688,6 @@ endif
 K8S_IMAGE_REPO ?= k8s.gcr.io
 SIGSTORAGE_IMAGE_REPO ?= k8s.gcr.io/sig-storage
 
-KICBASE_IMG := docker.io/kicbase/stable:v0.0.37
 ETCT_IMG := $(K8S_IMAGE_REPO)/etcd:3.5.6-0
 COREDNS_IMG := $(K8S_IMAGE_REPO)/coredns/coredns:v1.8.6
 KUBE_APISERVER_IMG := $(K8S_IMAGE_REPO)/kube-apiserver:$(K8S_VERSION)
@@ -721,7 +719,7 @@ ifeq ($(K8S_VERSION_MAJOR_MINOR), v1.22)
 	PAUSE_IMG_TAG := 3.5
 endif
 
-ifeq ($(K8S_VERSION_MAJOR_MINOR), v1.235)
+ifeq ($(K8S_VERSION_MAJOR_MINOR), v1.23)
 	PAUSE_IMG_TAG := 3.6
 endif
 
@@ -731,7 +729,6 @@ endif
 
 ifeq ($(K8S_VERSION_MAJOR_MINOR), v1.25)
 	PAUSE_IMG_TAG := 3.8
-	PAUSE_IMG := $(K8S_IMAGE_REPO)/pause:3.8
 endif
 
 ifeq ($(K8S_VERSION_MAJOR_MINOR), v1.26)
@@ -771,6 +768,7 @@ pull-all-images: ## Pull K8s & minikube required container images.
 	$(DOCKER_PULLQ) $(CSI_SNAPSHOTTER_IMG)
 	$(DOCKER_PULLQ) $(SNAPSHOT_CONTROLLER_IMG)
 	$(DOCKER_PULLQ) $(CSI_EXT_HMC_IMG)
+	$(DOCKER_PULLQ) $(CSI_EXT_HMA_IMG)
 	$(DOCKER_PULLQ) $(CSI_NODE_DRIVER_REG_IMG)
 	$(DOCKER_PULLQ) $(STORAGE_PROVISIONER_IMG)
 	$(DOCKER_PULLQ) $(METRICS_SERVER_IMG)
@@ -794,7 +792,6 @@ ifeq ($(MINIKUBE_IMAGE_MIRROR_COUNTRY), cn)
 	$(DOCKER_TAG) $(METRICS_SERVER_IMG) registry.k8s.io/metrics-server:v0.6.2
 	$(DOCKER_TAG) $(STORAGE_PROVISIONER_IMG) gcr.io/k8s-minikube/storage-provisioner:v5
 endif
-	$(DOCKER_PULLQ) $(KICBASE_IMG)
 
 
 .PHONY: minikube-start

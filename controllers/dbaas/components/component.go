@@ -258,7 +258,7 @@ func hasPodFailedTimedOut(compCtx componentContext, cluster *dbaasv1alpha1.Clust
 	return false, requeueAfter, nil
 }
 
-// podFailedAndTimedOut checks if the pod is Failed and timed out.
+// podFailedAndTimedOut checks if the pod is failed and timed out.
 func podFailedAndTimedOut(pod *corev1.Pod) (bool, bool, string) {
 	initContainerFailed, message := hasContainerFailed(pod.Status.InitContainerStatuses)
 	if initContainerFailed {

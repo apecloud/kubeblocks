@@ -72,31 +72,27 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 	const statelessCompName = "nginx"
 
 	createClusterDef := func() {
-		clusterDef := testdbaas.NewClusterDefFactory(&testCtx, clusterDefName, testdbaas.MySQLType).
+		testdbaas.NewClusterDefFactory(&testCtx, clusterDefName, testdbaas.MySQLType).
 			AddComponent(testdbaas.StatefulMySQL8, statefulCompType).SetDefaultReplicas(3).
 			AddComponent(testdbaas.ConsensusMySQL, consensusCompType).SetDefaultReplicas(3).
 			AddComponent(testdbaas.StatelessNginx, statelessCompType).SetDefaultReplicas(3).
-			GetClusterDef()
-		Expect(testCtx.CreateObj(ctx, clusterDef)).Should(Succeed())
+			Create().GetClusterDef()
 	}
 
 	createClusterVersion := func() {
-		clusterVersion := testdbaas.NewClusterVersionFactory(&testCtx, clusterVersionName, clusterDefName).
+		testdbaas.NewClusterVersionFactory(&testCtx, clusterVersionName, clusterDefName).
 			AddComponent(statefulCompType).AddContainerShort("mysql", testdbaas.ApeCloudMySQLImage).
 			AddComponent(consensusCompType).AddContainerShort("mysql", testdbaas.ApeCloudMySQLImage).
 			AddComponent(statelessCompType).AddContainerShort("nginx", testdbaas.NginxImage).
-			GetClusterVersion()
-		Expect(testCtx.CreateObj(ctx, clusterVersion)).Should(Succeed())
+			Create().GetClusterVersion()
 	}
 
 	createCluster := func() *dbaasv1alpha1.Cluster {
-		cluster := testdbaas.NewClusterFactory(&testCtx, clusterName, clusterDefName, clusterVersionName).
+		return testdbaas.NewClusterFactory(&testCtx, clusterName, clusterDefName, clusterVersionName).
 			AddComponent(statefulCompName, statefulCompType).
 			AddComponent(consensusCompName, consensusCompType).
 			AddComponent(statelessCompName, statelessCompType).
-			GetCluster()
-		Expect(testCtx.CreateObj(ctx, cluster)).Should(Succeed())
-		return cluster
+			Create().GetCluster()
 	}
 
 	createStsPod := func(podName, podRole, componentName string) *corev1.Pod {
@@ -250,13 +246,10 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 				Expect(testdbaas.ChangeObj(&testCtx, cluster, func() {
 					changeFunc()
 				})).Should(Succeed())
-
-				Expect(testdbaas.ChangeObjStatus(&testCtx, cluster, func() {
-					cluster.Status.ObservedGeneration = expectObservedGeneration
-				})).Should(Succeed())
+				// wait for cluster controller reconciles to complete.
+				Eventually(testdbaas.GetClusterObservedGeneration(&testCtx, client.ObjectKeyFromObject(cluster))).Should(Equal(expectObservedGeneration))
 
 				Eventually(testdbaas.CheckObj(&testCtx, client.ObjectKeyFromObject(cluster), checkFun)).Should(Succeed())
-
 			}
 
 			By("delete consensus component")

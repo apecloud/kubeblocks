@@ -100,7 +100,7 @@ func (factory *MockClusterDefFactory) SetService(port int32) *MockClusterDefFact
 	comps := factory.ClusterDef.Spec.Components
 	if len(comps) > 0 {
 		comps[len(comps)-1].Service = &corev1.ServiceSpec{
-			Ports: []corev1.ServicePort{corev1.ServicePort{
+			Ports: []corev1.ServicePort{{
 				Protocol: corev1.ProtocolTCP,
 				Port:     port,
 			}},

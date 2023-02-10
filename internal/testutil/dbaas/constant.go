@@ -37,12 +37,12 @@ var (
 		ComponentType:   dbaasv1alpha1.Stateless,
 		DefaultReplicas: 1,
 		PodSpec: &corev1.PodSpec{
-			Containers: []corev1.Container{corev1.Container{
+			Containers: []corev1.Container{{
 				Name: DefaultNginxContainerName,
 			}},
 		},
 		Service: &corev1.ServiceSpec{
-			Ports: []corev1.ServicePort{corev1.ServicePort{
+			Ports: []corev1.ServicePort{{
 				Protocol: corev1.ProtocolTCP,
 				Port:     80,
 			}},
@@ -58,32 +58,32 @@ var (
 		Name:            DefaultMySQLContainerName,
 		ImagePullPolicy: corev1.PullIfNotPresent,
 		Ports: []corev1.ContainerPort{
-			corev1.ContainerPort{
+			{
 				Name:          "mysql",
 				Protocol:      corev1.ProtocolTCP,
 				ContainerPort: 3306,
 			},
-			corev1.ContainerPort{
+			{
 				Name:          "paxos",
 				Protocol:      corev1.ProtocolTCP,
 				ContainerPort: 13306,
 			},
 		},
 		VolumeMounts: []corev1.VolumeMount{
-			corev1.VolumeMount{
+			{
 				Name:      DataVolumeName,
 				MountPath: "/var/lib/mysql",
 			},
-			corev1.VolumeMount{
+			{
 				Name:      LogVolumeName,
 				MountPath: "/var/log",
 			},
-			corev1.VolumeMount{
+			{
 				Name:      ScriptsVolumeName,
 				MountPath: "/scripts",
 			},
 		},
-		Env: []corev1.EnvVar{corev1.EnvVar{
+		Env: []corev1.EnvVar{{
 			Name: "MYSQL_ROOT_PASSWORD",
 			ValueFrom: &corev1.EnvVarSource{
 				SecretKeyRef: &corev1.SecretKeySelector{
@@ -111,7 +111,7 @@ var (
 			Name:       "leader",
 			AccessMode: dbaasv1alpha1.ReadWrite,
 		},
-		Followers: []dbaasv1alpha1.ConsensusMember{dbaasv1alpha1.ConsensusMember{
+		Followers: []dbaasv1alpha1.ConsensusMember{{
 			Name:       "follower",
 			AccessMode: dbaasv1alpha1.Readonly,
 		}},
@@ -119,7 +119,7 @@ var (
 	}
 
 	defaultMySQLService = corev1.ServiceSpec{
-		Ports: []corev1.ServicePort{corev1.ServicePort{
+		Ports: []corev1.ServicePort{{
 			Protocol: corev1.ProtocolTCP,
 			Port:     3306,
 		}},

@@ -24,12 +24,6 @@ auth:
   username: "u1"
   ## MYSQL_PASSWORD
   password: "u1"
-  ## @param auth.replicationUser MySQL replication user
-  ##
-  replicationUser: "replicator"
-  ## @param auth.replicationPassword MySQL replication user password. Ignored if existing secret is provided
-  ##
-  replicationPassword: ""
 
 imagePullSecrets: []
 nameOverride: ""

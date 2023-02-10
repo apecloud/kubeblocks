@@ -72,27 +72,27 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 	const statelessCompName = "nginx"
 
 	createClusterDef := func() {
-		testdbaas.NewClusterDefFactory(&testCtx, clusterDefName, testdbaas.MySQLType).
+		_ = testdbaas.NewClusterDefFactory(clusterDefName, testdbaas.MySQLType).
 			AddComponent(testdbaas.StatefulMySQL8, statefulCompType).SetDefaultReplicas(3).
 			AddComponent(testdbaas.ConsensusMySQL, consensusCompType).SetDefaultReplicas(3).
 			AddComponent(testdbaas.StatelessNginx, statelessCompType).SetDefaultReplicas(3).
-			Create().GetClusterDef()
+			Create(&testCtx)
 	}
 
 	createClusterVersion := func() {
-		testdbaas.NewClusterVersionFactory(&testCtx, clusterVersionName, clusterDefName).
+		_ = testdbaas.NewClusterVersionFactory(clusterVersionName, clusterDefName).
 			AddComponent(statefulCompType).AddContainerShort("mysql", testdbaas.ApeCloudMySQLImage).
 			AddComponent(consensusCompType).AddContainerShort("mysql", testdbaas.ApeCloudMySQLImage).
 			AddComponent(statelessCompType).AddContainerShort("nginx", testdbaas.NginxImage).
-			Create().GetClusterVersion()
+			Create(&testCtx)
 	}
 
 	createCluster := func() *dbaasv1alpha1.Cluster {
-		return testdbaas.NewClusterFactory(&testCtx, clusterName, clusterDefName, clusterVersionName).
+		return testdbaas.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefName, clusterVersionName).
 			AddComponent(statefulCompName, statefulCompType).
 			AddComponent(consensusCompName, consensusCompType).
 			AddComponent(statelessCompName, statelessCompType).
-			Create().GetCluster()
+			Create(&testCtx).GetCluster()
 	}
 
 	createStsPod := func(podName, podRole, componentName string) *corev1.Pod {

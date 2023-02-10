@@ -79,19 +79,19 @@ var _ = Describe("ConfigConstraint Controller", func() {
 			constraintKey := client.ObjectKeyFromObject(constraint)
 
 			By("Create a clusterDefinition obj")
-			clusterDefObj := testdbaas.NewClusterDefFactory(&testCtx, clusterDefName, testdbaas.MySQLType).
+			clusterDefObj := testdbaas.NewClusterDefFactory(clusterDefName, testdbaas.MySQLType).
 				AddComponent(testdbaas.StatefulMySQL8, statefulCompType).
 				AddConfigTemplate(configTplName, configmap.Name, constraint.Name, configVolumeName).
 				AddLabels(cfgcore.GenerateTPLUniqLabelKeyWithConfig(configTplName), configmap.Name,
 					cfgcore.GenerateConstraintsUniqLabelKeyWithConfig(constraint.Name), constraint.Name).
-				Create().GetClusterDef()
+				Create(&testCtx).GetClusterDef()
 
 			By("Create a clusterVersion obj")
-			clusterVersionObj := testdbaas.NewClusterVersionFactory(&testCtx, clusterVersionName, clusterDefObj.GetName()).
+			clusterVersionObj := testdbaas.NewClusterVersionFactory(clusterVersionName, clusterDefObj.GetName()).
 				AddComponent(statefulCompType).
 				AddLabels(cfgcore.GenerateTPLUniqLabelKeyWithConfig(configTplName), configmap.Name,
 					cfgcore.GenerateConstraintsUniqLabelKeyWithConfig(constraint.Name), constraint.Name).
-				Create().GetClusterVersion()
+				Create(&testCtx).GetClusterVersion()
 
 			By("check ConfigConstraint(template) status and finalizer")
 			Eventually(testdbaas.CheckObj(&testCtx, constraintKey,

@@ -17,9 +17,12 @@ limitations under the License.
 package dbaas
 
 import (
+	"context"
+
 	"github.com/onsi/gomega"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/apecloud/kubeblocks/internal/testutil"
@@ -27,17 +30,15 @@ import (
 )
 
 type MockStatefulSetFactory struct {
-	TestCtx *testutil.TestContext
-	Sts     *appsv1.StatefulSet
+	Sts *appsv1.StatefulSet
 }
 
-func NewStatefulSetFactory(testCtx *testutil.TestContext, name string, clusterName string, componentName string) *MockStatefulSetFactory {
+func NewStatefulSetFactory(namespace, name string, clusterName string, componentName string) *MockStatefulSetFactory {
 	return &MockStatefulSetFactory{
-		TestCtx: testCtx,
 		Sts: &appsv1.StatefulSet{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      name,
-				Namespace: testCtx.DefaultNamespace,
+				Namespace: namespace,
 				Labels:    map[string]string{},
 			},
 			Spec: appsv1.StatefulSetSpec{
@@ -61,7 +62,7 @@ func NewStatefulSetFactory(testCtx *testutil.TestContext, name string, clusterNa
 }
 
 func (factory *MockStatefulSetFactory) WithRandomName() *MockStatefulSetFactory {
-	key := GetRandomizedKey(factory.TestCtx, factory.Sts.Name)
+	key := GetRandomizedKey(factory.Sts.Namespace, factory.Sts.Name)
 	factory.Sts.Name = key.Name
 	return factory
 }
@@ -98,9 +99,13 @@ func (factory *MockStatefulSetFactory) AddContainer(container corev1.Container) 
 	return factory
 }
 
-func (factory *MockStatefulSetFactory) Create() *MockStatefulSetFactory {
-	testCtx := factory.TestCtx
+func (factory *MockStatefulSetFactory) Create(testCtx *testutil.TestContext) *MockStatefulSetFactory {
 	gomega.Expect(testCtx.CreateObj(testCtx.Ctx, factory.Sts)).Should(gomega.Succeed())
+	return factory
+}
+
+func (factory *MockStatefulSetFactory) CreateCli(ctx context.Context, cli client.Client) *MockStatefulSetFactory {
+	gomega.Expect(cli.Create(ctx, factory.Sts)).Should(gomega.Succeed())
 	return factory
 }
 

@@ -37,7 +37,6 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	testdbaas "github.com/apecloud/kubeblocks/internal/testutil/dbaas"
 	testk8s "github.com/apecloud/kubeblocks/internal/testutil/k8s"
-	"github.com/apecloud/kubeblocks/test/testdata"
 )
 
 var _ = Describe("OpsRequest Controller", func() {
@@ -87,16 +86,10 @@ var _ = Describe("OpsRequest Controller", func() {
 	assureCfgTplObj := func(tplName, cmName, ns string) (*corev1.ConfigMap, *dbaasv1alpha1.ConfigConstraint) {
 		By("Assuring an cm obj")
 
-		cfgCM, err := testdata.GetResourceFromTestData[corev1.ConfigMap](
-			"operations_config/configcm.yaml",
-			testdata.WithNamespacedName(cmName, ns),
-		)
-		Expect(err).Should(Succeed())
-		cfgTpl, err := testdata.GetResourceFromTestData[dbaasv1alpha1.ConfigConstraint](
-			"operations_config/configtpl.yaml",
-			testdata.WithNamespacedName(tplName, ns))
-		Expect(err).Should(Succeed())
-
+		cfgCM := testdbaas.NewCustomizedObj("operations_config/configcm.yaml",
+			&corev1.ConfigMap{}, testdbaas.WithNamespacedName(cmName, ns))
+		cfgTpl := testdbaas.NewCustomizedObj("operations_config/configtpl.yaml",
+			&dbaasv1alpha1.ConfigConstraint{}, testdbaas.WithNamespacedName(tplName, ns))
 		Expect(testCtx.CheckedCreateObj(ctx, cfgCM)).Should(Succeed())
 		Expect(testCtx.CheckedCreateObj(ctx, cfgTpl)).Should(Succeed())
 
@@ -110,9 +103,10 @@ var _ = Describe("OpsRequest Controller", func() {
 		var cmObj *corev1.ConfigMap
 		for _, tpl := range cdComponent.ConfigSpec.ConfigTemplateRefs {
 			cmInsName := cfgcore.GetComponentCfgName(clusterName, componentName, tpl.VolumeName)
-			cfgCM, err := testdata.GetResourceFromTestData[corev1.ConfigMap]("operations_config/configcm.yaml",
-				testdata.WithNamespacedName(cmInsName, ns),
-				testdata.WithLabels(
+			cfgCM := testdbaas.NewCustomizedObj("operations_config/configcm.yaml",
+				&corev1.ConfigMap{},
+				testdbaas.WithNamespacedName(cmInsName, ns),
+				testdbaas.WithLabels(
 					intctrlutil.AppNameLabelKey, clusterName,
 					intctrlutil.AppInstanceLabelKey, clusterName,
 					intctrlutil.AppComponentLabelKey, componentName,
@@ -122,7 +116,6 @@ var _ = Describe("OpsRequest Controller", func() {
 					cfgcore.CMConfigurationTypeLabelKey, cfgcore.ConfigInstanceType,
 				),
 			)
-			Expect(err).Should(Succeed())
 			Expect(testCtx.CheckedCreateObj(ctx, cfgCM)).Should(Succeed())
 			cmObj = cfgCM
 		}

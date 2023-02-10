@@ -102,8 +102,8 @@ var _ = Describe("Cluster Controller", func() {
 
 	checkAllResourcesCreated := func() {
 		By("Creating a cluster")
-		clusterObj = testdbaas.NewClusterFactory(&testCtx, clusterNamePrefix,
-			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().Create().GetCluster()
+		clusterObj = testdbaas.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
+			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().Create(&testCtx).GetCluster()
 		clusterKey = client.ObjectKeyFromObject(clusterObj)
 
 		By("Waiting for the cluster initialized")
@@ -162,8 +162,8 @@ var _ = Describe("Cluster Controller", func() {
 
 	checkAllServicesCreate := func() {
 		By("Creating a cluster")
-		clusterObj = testdbaas.NewClusterFactory(&testCtx, clusterNamePrefix,
-			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().Create().GetCluster()
+		clusterObj = testdbaas.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
+			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().Create(&testCtx).GetCluster()
 		clusterKey = client.ObjectKeyFromObject(clusterObj)
 
 		By("Waiting for the cluster initialized")
@@ -225,8 +225,8 @@ var _ = Describe("Cluster Controller", func() {
 
 	testWipeOut := func() {
 		By("Creating a cluster")
-		clusterObj = testdbaas.NewClusterFactory(&testCtx, clusterNamePrefix,
-			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().Create().GetCluster()
+		clusterObj = testdbaas.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
+			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().Create(&testCtx).GetCluster()
 		clusterKey = client.ObjectKeyFromObject(clusterObj)
 
 		By("Waiting for the cluster initialized")
@@ -241,8 +241,8 @@ var _ = Describe("Cluster Controller", func() {
 
 	testDoNotTermintate := func() {
 		By("Creating a cluster")
-		clusterObj = testdbaas.NewClusterFactory(&testCtx, clusterNamePrefix,
-			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().Create().GetCluster()
+		clusterObj = testdbaas.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
+			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().Create(&testCtx).GetCluster()
 		clusterKey = client.ObjectKeyFromObject(clusterObj)
 
 		By("Waiting for the cluster initialized")
@@ -292,8 +292,8 @@ var _ = Describe("Cluster Controller", func() {
 
 	testChangeReplicas := func() {
 		By("Creating a cluster")
-		clusterObj = testdbaas.NewClusterFactory(&testCtx, clusterNamePrefix,
-			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().Create().GetCluster()
+		clusterObj = testdbaas.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
+			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().Create(&testCtx).GetCluster()
 		clusterKey = client.ObjectKeyFromObject(clusterObj)
 
 		By("Waiting for the cluster initialized")
@@ -317,8 +317,8 @@ var _ = Describe("Cluster Controller", func() {
 
 	testChangeReplicasInvalidValue := func() {
 		By("Creating a cluster")
-		clusterObj = testdbaas.NewClusterFactory(&testCtx, clusterNamePrefix,
-			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().Create().GetCluster()
+		clusterObj = testdbaas.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
+			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().Create(&testCtx).GetCluster()
 		clusterKey = client.ObjectKeyFromObject(clusterObj)
 
 		By("Waiting for the cluster initialized")
@@ -355,12 +355,12 @@ var _ = Describe("Cluster Controller", func() {
 		}
 
 		By("Create cluster and waiting for the cluster initialized")
-		clusterObj = testdbaas.NewClusterFactory(&testCtx, clusterNamePrefix,
+		clusterObj = testdbaas.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
 			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
 			AddComponent(statefulCompName, statefulCompType).
 			AddVolumeClaim(dataVolumeName, &pvcSpec).
 			SetReplicas(initialReplicas).
-			Create().GetCluster()
+			Create(&testCtx).GetCluster()
 		clusterKey = client.ObjectKeyFromObject(clusterObj)
 		Eventually(testdbaas.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
 
@@ -490,12 +490,12 @@ var _ = Describe("Cluster Controller", func() {
 		}
 
 		By("Create cluster and waiting for the cluster initialized")
-		clusterObj = testdbaas.NewClusterFactory(&testCtx, clusterNamePrefix,
+		clusterObj = testdbaas.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
 			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
 			AddComponent(statefulCompName, statefulCompType).
 			AddVolumeClaim(dataVolumeName, &pvcSpec).
 			SetReplicas(replicas).
-			Create().GetCluster()
+			Create(&testCtx).GetCluster()
 		clusterKey = client.ObjectKeyFromObject(clusterObj)
 		Eventually(testdbaas.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
 
@@ -558,9 +558,9 @@ var _ = Describe("Cluster Controller", func() {
 			},
 		}
 
-		clusterObj = testdbaas.NewClusterFactory(&testCtx, clusterNamePrefix,
+		clusterObj = testdbaas.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
 			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().SetClusterAffinity(affinity).
-			Create().GetCluster()
+			Create(&testCtx).GetCluster()
 		clusterKey = client.ObjectKeyFromObject(clusterObj)
 
 		By("Waiting for the cluster initialized")
@@ -588,10 +588,10 @@ var _ = Describe("Cluster Controller", func() {
 			PodAntiAffinity: dbaasv1alpha1.Preferred,
 			TopologyKeys:    []string{compTopologyKey},
 		}
-		clusterObj = testdbaas.NewClusterFactory(&testCtx, clusterNamePrefix,
+		clusterObj = testdbaas.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
 			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().SetClusterAffinity(affinity).
 			AddComponent(statefulCompName, statefulCompType).SetComponentAffinity(compAffinity).
-			Create().GetCluster()
+			Create(&testCtx).GetCluster()
 		clusterKey = client.ObjectKeyFromObject(clusterObj)
 
 		By("Waiting for the cluster initialized")
@@ -615,10 +615,10 @@ var _ = Describe("Cluster Controller", func() {
 			Operator: corev1.TolerationOpEqual,
 			Effect:   corev1.TaintEffectNoSchedule,
 		}
-		clusterObj = testdbaas.NewClusterFactory(&testCtx, clusterNamePrefix,
+		clusterObj = testdbaas.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
 			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
 			AddClusterToleration(toleration).
-			Create().GetCluster()
+			Create(&testCtx).GetCluster()
 		clusterKey = client.ObjectKeyFromObject(clusterObj)
 
 		By("Waiting for the cluster initialized")
@@ -652,10 +652,10 @@ var _ = Describe("Cluster Controller", func() {
 			Operator: corev1.TolerationOpEqual,
 			Effect:   corev1.TaintEffectNoSchedule,
 		}
-		clusterObj = testdbaas.NewClusterFactory(&testCtx, clusterNamePrefix,
+		clusterObj = testdbaas.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
 			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().AddClusterToleration(toleration).
 			AddComponent(statefulCompName, statefulCompType).AddComponentToleration(compToleration).
-			Create().GetCluster()
+			Create(&testCtx).GetCluster()
 		clusterKey = client.ObjectKeyFromObject(clusterObj)
 
 		By("Waiting for the cluster initialized")
@@ -749,11 +749,11 @@ var _ = Describe("Cluster Controller", func() {
 				},
 			},
 		}
-		clusterObj = testdbaas.NewClusterFactory(&testCtx, clusterNamePrefix,
+		clusterObj = testdbaas.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
 			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
 			AddComponent(statefulCompName, statefulCompType).
 			SetReplicas(replicas).AddVolumeClaim(dataVolumeName, pvcSpec).
-			Create().GetCluster()
+			Create(&testCtx).GetCluster()
 		clusterKey = client.ObjectKeyFromObject(clusterObj)
 
 		By("Waiting for cluster creation")
@@ -834,16 +834,16 @@ var _ = Describe("Cluster Controller", func() {
 	Context("when creating cluster with multiple kinds of components", func() {
 		BeforeEach(func() {
 			By("Create a clusterDefinition obj")
-			clusterDefObj = testdbaas.NewClusterDefFactory(&testCtx, clusterDefName, testdbaas.MySQLType).
+			clusterDefObj = testdbaas.NewClusterDefFactory(clusterDefName, testdbaas.MySQLType).
 				AddComponent(testdbaas.StatefulMySQL8, statefulCompType).
 				AddComponent(testdbaas.StatelessNginx, statelessCompType).
-				Create().GetClusterDef()
+				Create(&testCtx).GetClusterDef()
 
 			By("Create a clusterVersion obj")
-			clusterVersionObj = testdbaas.NewClusterVersionFactory(&testCtx, clusterVersionName, clusterDefObj.GetName()).
+			clusterVersionObj = testdbaas.NewClusterVersionFactory(clusterVersionName, clusterDefObj.GetName()).
 				AddComponent(statefulCompType).AddContainerShort("mysql", testdbaas.ApeCloudMySQLImage).
 				AddComponent(statelessCompType).AddContainerShort("nginx", testdbaas.NginxImage).
-				Create().GetClusterVersion()
+				Create(&testCtx).GetClusterVersion()
 		})
 
 		It("should create all sub-resources successfully", func() {
@@ -858,14 +858,14 @@ var _ = Describe("Cluster Controller", func() {
 	Context("when creating cluster with MySQL as stateful component", func() {
 		BeforeEach(func() {
 			By("Create a clusterDefinition obj")
-			clusterDefObj = testdbaas.NewClusterDefFactory(&testCtx, clusterDefName, testdbaas.MySQLType).
+			clusterDefObj = testdbaas.NewClusterDefFactory(clusterDefName, testdbaas.MySQLType).
 				AddComponent(testdbaas.StatefulMySQL8, statefulCompType).
-				Create().GetClusterDef()
+				Create(&testCtx).GetClusterDef()
 
 			By("Create a clusterVersion obj")
-			clusterVersionObj = testdbaas.NewClusterVersionFactory(&testCtx, clusterVersionName, clusterDefObj.GetName()).
+			clusterVersionObj = testdbaas.NewClusterVersionFactory(clusterVersionName, clusterDefObj.GetName()).
 				AddComponent(statefulCompType).AddContainerShort("mysql", testdbaas.ApeCloudMySQLImage).
-				Create().GetClusterVersion()
+				Create(&testCtx).GetClusterVersion()
 		})
 
 		It("should delete cluster resources immediately if deleting cluster with WipeOut termination policy", func() {
@@ -924,14 +924,14 @@ var _ = Describe("Cluster Controller", func() {
 	Context("when creating cluster with MySQL as consensus component", func() {
 		BeforeEach(func() {
 			By("Create a clusterDef obj")
-			clusterDefObj = testdbaas.NewClusterDefFactory(&testCtx, clusterDefName, testdbaas.MySQLType).
+			clusterDefObj = testdbaas.NewClusterDefFactory(clusterDefName, testdbaas.MySQLType).
 				AddComponent(testdbaas.ConsensusMySQL, statefulCompType).
-				Create().GetClusterDef()
+				Create(&testCtx).GetClusterDef()
 
 			By("Create a clusterVersion obj")
-			clusterVersionObj = testdbaas.NewClusterVersionFactory(&testCtx, clusterVersionName, clusterDefObj.GetName()).
+			clusterVersionObj = testdbaas.NewClusterVersionFactory(clusterVersionName, clusterDefObj.GetName()).
 				AddComponent(statefulCompType).AddContainerShort("mysql", testdbaas.ApeCloudMySQLImage).
-				Create().GetClusterVersion()
+				Create(&testCtx).GetClusterVersion()
 		})
 
 		It("Should success with one leader pod and two follower pods", func() {

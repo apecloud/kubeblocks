@@ -17,10 +17,12 @@ limitations under the License.
 package dbaas
 
 import (
-	"github.com/onsi/gomega"
+	"context"
 
+	"github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/testutil"
@@ -29,17 +31,15 @@ import (
 type ComponentTypeName string
 
 type MockClusterFactory struct {
-	TestCtx *testutil.TestContext
 	Cluster *dbaasv1alpha1.Cluster
 }
 
-func NewClusterFactory(testCtx *testutil.TestContext, name string, cdRef string, cvRef string) *MockClusterFactory {
+func NewClusterFactory(namespace string, name string, cdRef string, cvRef string) *MockClusterFactory {
 	return &MockClusterFactory{
-		TestCtx: testCtx,
 		Cluster: &dbaasv1alpha1.Cluster{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      name,
-				Namespace: testCtx.DefaultNamespace,
+				Namespace: namespace,
 				Labels:    map[string]string{},
 			},
 			Spec: dbaasv1alpha1.ClusterSpec{
@@ -53,7 +53,7 @@ func NewClusterFactory(testCtx *testutil.TestContext, name string, cdRef string,
 }
 
 func (factory *MockClusterFactory) WithRandomName() *MockClusterFactory {
-	key := GetRandomizedKey(factory.TestCtx, factory.Cluster.Name)
+	key := GetRandomizedKey(factory.Cluster.Namespace, factory.Cluster.Name)
 	factory.Cluster.Name = key.Name
 	return factory
 }
@@ -157,9 +157,13 @@ func (factory *MockClusterFactory) SetMonitor(monitor bool) *MockClusterFactory 
 	return factory
 }
 
-func (factory *MockClusterFactory) Create() *MockClusterFactory {
-	testCtx := factory.TestCtx
+func (factory *MockClusterFactory) Create(testCtx *testutil.TestContext) *MockClusterFactory {
 	gomega.Expect(testCtx.CreateObj(testCtx.Ctx, factory.Cluster)).Should(gomega.Succeed())
+	return factory
+}
+
+func (factory *MockClusterFactory) CreateCli(ctx context.Context, cli client.Client) *MockClusterFactory {
+	gomega.Expect(cli.Create(ctx, factory.Cluster)).Should(gomega.Succeed())
 	return factory
 }
 

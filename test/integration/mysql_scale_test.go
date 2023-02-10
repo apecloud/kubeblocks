@@ -92,11 +92,11 @@ var _ = Describe("MySQL Scaling function", func() {
 				"memory": resource.MustParse("256Mi"),
 			},
 		}
-		clusterObj = testdbaas.NewClusterFactory(&testCtx, clusterNamePrefix,
+		clusterObj = testdbaas.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
 			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
 			AddComponent(statefulCompName, statefulCompType).
 			SetResources(resources).SetReplicas(1).
-			Create().GetCluster()
+			Create(&testCtx).GetCluster()
 		clusterKey = client.ObjectKeyFromObject(clusterObj)
 		Eventually(testdbaas.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
 
@@ -169,12 +169,12 @@ var _ = Describe("MySQL Scaling function", func() {
 		}
 		logPvcSpec := dataPvcSpec
 		logPvcSpec.StorageClassName = &defaultStorageClass.Name
-		clusterObj = testdbaas.NewClusterFactory(&testCtx, clusterNamePrefix,
+		clusterObj = testdbaas.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
 			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
 			AddComponent(statefulCompName, statefulCompType).
 			AddVolumeClaim(dataVolumeName, &dataPvcSpec).
 			AddVolumeClaim(logVolumeName, &logPvcSpec).
-			Create().GetCluster()
+			Create(&testCtx).GetCluster()
 		clusterKey = client.ObjectKeyFromObject(clusterObj)
 
 		Eventually(testdbaas.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
@@ -229,14 +229,14 @@ var _ = Describe("MySQL Scaling function", func() {
 	Context("with MySQL defined as a stateful component", func() {
 		BeforeEach(func() {
 			By("Create a clusterDef obj")
-			clusterDefObj = testdbaas.NewClusterDefFactory(&testCtx, clusterDefName, testdbaas.MySQLType).
+			clusterDefObj = testdbaas.NewClusterDefFactory(clusterDefName, testdbaas.MySQLType).
 				AddComponent(testdbaas.StatefulMySQL8, statefulCompType).
-				Create().GetClusterDef()
+				Create(&testCtx).GetClusterDef()
 
 			By("Create a clusterVersion obj")
-			clusterVersionObj = testdbaas.NewClusterVersionFactory(&testCtx, clusterVersionName, clusterDefObj.GetName()).
+			clusterVersionObj = testdbaas.NewClusterVersionFactory(clusterVersionName, clusterDefObj.GetName()).
 				AddComponent(statefulCompType).AddContainerShort(mysqlContainerName, testdbaas.ApeCloudMySQLImage).
-				Create().GetClusterVersion()
+				Create(&testCtx).GetClusterVersion()
 		})
 
 		It("should handle VerticalScalingOpsRequest and change Cluster's cpu&memory requirements", func() {
@@ -251,14 +251,14 @@ var _ = Describe("MySQL Scaling function", func() {
 	Context("with MySQL defined as a consensus component", func() {
 		BeforeEach(func() {
 			By("Create a clusterDef obj")
-			clusterDefObj = testdbaas.NewClusterDefFactory(&testCtx, clusterDefName, testdbaas.MySQLType).
+			clusterDefObj = testdbaas.NewClusterDefFactory(clusterDefName, testdbaas.MySQLType).
 				AddComponent(testdbaas.ConsensusMySQL, statefulCompType).
-				Create().GetClusterDef()
+				Create(&testCtx).GetClusterDef()
 
 			By("Create a clusterVersion obj")
-			clusterVersionObj = testdbaas.NewClusterVersionFactory(&testCtx, clusterVersionName, clusterDefObj.GetName()).
+			clusterVersionObj = testdbaas.NewClusterVersionFactory(clusterVersionName, clusterDefObj.GetName()).
 				AddComponent(statefulCompType).AddContainerShort(mysqlContainerName, testdbaas.ApeCloudMySQLImage).
-				Create().GetClusterVersion()
+				Create(&testCtx).GetClusterVersion()
 		})
 
 		It("should handle VerticalScalingOpsRequest and change Cluster's cpu&memory requirements", func() {

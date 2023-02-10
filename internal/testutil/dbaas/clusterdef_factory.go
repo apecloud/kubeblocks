@@ -17,9 +17,12 @@ limitations under the License.
 package dbaas
 
 import (
+	"context"
+
 	"github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/testutil"
@@ -34,15 +37,13 @@ const (
 )
 
 type MockClusterDefFactory struct {
-	TestCtx       *testutil.TestContext
 	ClusterDef    *dbaasv1alpha1.ClusterDefinition
 	clusterDefTpl *dbaasv1alpha1.ClusterDefinition
 }
 
-func NewClusterDefFactory(testCtx *testutil.TestContext, name string, cdType string) *MockClusterDefFactory {
-	clusterDefTpl := NewCustomizedObj(testCtx, "resources/factory_cd.yaml", &dbaasv1alpha1.ClusterDefinition{})
+func NewClusterDefFactory(name string, cdType string) *MockClusterDefFactory {
+	clusterDefTpl := NewCustomizedObj("resources/factory_cd.yaml", &dbaasv1alpha1.ClusterDefinition{})
 	return &MockClusterDefFactory{
-		TestCtx: testCtx,
 		ClusterDef: &dbaasv1alpha1.ClusterDefinition{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:   name,
@@ -62,7 +63,7 @@ func NewClusterDefFactory(testCtx *testutil.TestContext, name string, cdType str
 }
 
 func (factory *MockClusterDefFactory) WithRandomName() *MockClusterDefFactory {
-	key := GetRandomizedKey(factory.TestCtx, factory.ClusterDef.Name)
+	key := GetRandomizedKey("", factory.ClusterDef.Name)
 	factory.ClusterDef.Name = key.Name
 	return factory
 }
@@ -139,9 +140,13 @@ func (factory *MockClusterDefFactory) SetConnectionCredential(
 	return factory
 }
 
-func (factory *MockClusterDefFactory) Create() *MockClusterDefFactory {
-	testCtx := factory.TestCtx
+func (factory *MockClusterDefFactory) Create(testCtx *testutil.TestContext) *MockClusterDefFactory {
 	gomega.Expect(testCtx.CreateObj(testCtx.Ctx, factory.ClusterDef)).Should(gomega.Succeed())
+	return factory
+}
+
+func (factory *MockClusterDefFactory) CreateCli(ctx context.Context, cli client.Client) *MockClusterDefFactory {
+	gomega.Expect(cli.Create(ctx, factory.ClusterDef)).Should(gomega.Succeed())
 	return factory
 }
 

@@ -199,4 +199,11 @@ spec:
               scope: AnyPods
               statements:        
                 creation: CREATE USER IF NOT EXISTS $(USERNAME) IDENTIFIED BY "$(PASSWD)"; GRANT REPLICATION CLIENT, PROCESS ON *.* TO $(USERNAME); GRANT SELECT ON performance_schema.* TO $(USERNAME);
-                deletion: DROP USER IF EXISTS $(USERNAME);            
+                deletion: DROP USER IF EXISTS $(USERNAME);           
+          - name: kbreplicator
+            provisionPolicy:
+              type: CreateByStmt
+              scope: AnyPods
+              statements:        
+                creation: CREATE USER IF NOT EXISTS $(USERNAME) IDENTIFIED BY "$(PASSWD)"; GRANT REPLICATION SLAVE ON *.* TO $(USERNAME) WITH GRANT OPTION;
+                deletion: DROP USER IF EXISTS $(USERNAME);                    

@@ -23,6 +23,7 @@ import (
 	"github.com/onsi/gomega"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
@@ -85,14 +86,17 @@ func MockConsensusComponentStsPod(
 	consensusCompName,
 	podName,
 	podRole, accessMode string) *corev1.Pod {
-	if sts == nil {
-		sts = &appsv1.StatefulSet{}
-		sts.Name = "NotFound"
-		sts.UID = "7d43843d-7015-428b-a36b-972ca4b9509c"
-	}
 	pod := CreateCustomizedObj(&testCtx, "consensusset/stateful_set_pod.yaml",
 		&corev1.Pod{}, CustomizeObjYAML(consensusCompName, clusterName,
-			clusterName, consensusCompName, accessMode, podRole, podName, sts.Name, sts.UID, "%"))
+			clusterName, consensusCompName, accessMode, podRole, podName, "%"),
+		func(pod *corev1.Pod) {
+			if sts != nil {
+				t := true
+				pod.SetOwnerReferences([]metav1.OwnerReference{
+					{APIVersion: "apps/v1", Kind: "StatefulSet", Controller: &t, BlockOwnerDeletion: &t, Name: sts.Name, UID: sts.UID},
+				})
+			}
+		})
 	patch := client.MergeFrom(pod.DeepCopy())
 	pod.Status.Conditions = []corev1.PodCondition{
 		{

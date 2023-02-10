@@ -723,10 +723,11 @@ func (r *ClusterReconciler) reconcileClusterStatus(ctx context.Context,
 		oldClusterPhase := cluster.Status.Phase
 		handleClusterAbnormalOrFailedPhase(cluster, componentMap, clusterAvailabilityEffectMap)
 		return true, func(cluster *dbaasv1alpha1.Cluster) error {
-			currPhase := cluster.Status.Phase
-			if oldClusterPhase != currPhase && util.IsFailedOrAbnormal(currPhase) {
+			curPhase := cluster.Status.Phase
+			if oldClusterPhase != curPhase && util.IsFailedOrAbnormal(curPhase) {
 				// send a warning event when Cluster.status.phase changes to Failed/Abnormal
-				r.Recorder.Eventf(cluster, corev1.EventTypeWarning, string(currPhase), "Cluster: %s is %s, check according to the components message", cluster.Name, currPhase)
+				r.Recorder.Eventf(cluster, corev1.EventTypeWarning, string(curPhase),
+					"Cluster: %s is %s, check according to the components message", cluster.Name, curPhase)
 			}
 			return nil
 		}

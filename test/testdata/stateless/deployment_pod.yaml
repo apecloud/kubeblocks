@@ -8,13 +8,6 @@ metadata:
     app.kubernetes.io/instance: %s
     app.kubernetes.io/name: state.nginx-8-cluster-definition
     app.kubernetes.io/managed-by: kubeblocks
-  ownerReferences:
-  - apiVersion: apps/v1
-    blockOwnerDeletion: true
-    controller: true
-    kind: Deployment
-    name: %s
-    uid: %s
 spec:
   containers:
   - image: nginx:latest

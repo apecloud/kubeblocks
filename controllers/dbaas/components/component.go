@@ -147,9 +147,9 @@ func handleClusterComponentStatus(
 		podsAreReady, hasFailedPodTimedOut); err != nil {
 		return err
 	}
-	oldStatusComponent := clusterDeepCopy.Status.Components[compCtx.componentName]
-	statusComponent := cluster.Status.Components[compCtx.componentName]
-	if reflect.DeepEqual(oldStatusComponent, statusComponent) {
+	oldComponentStatus := clusterDeepCopy.Status.Components[compCtx.componentName]
+	componentStatus := cluster.Status.Components[compCtx.componentName]
+	if reflect.DeepEqual(oldComponentStatus, componentStatus) {
 		return nil
 	}
 	compCtx.reqCtx.Log.Info("component status changed", "componentName", compCtx.componentName, "phase",
@@ -157,7 +157,7 @@ func handleClusterComponentStatus(
 	return compCtx.cli.Status().Patch(compCtx.reqCtx.Ctx, cluster, patch)
 }
 
-// syncStatusComponents sync the component status.
+// syncStatusComponents syncs the component status.
 func syncStatusComponents(compCtx componentContext,
 	cluster *dbaasv1alpha1.Cluster,
 	componentIsRunning,
@@ -171,7 +171,7 @@ func syncStatusComponents(compCtx componentContext,
 	if podsAreReady {
 		podsReadyTime = &metav1.Time{Time: time.Now()}
 	}
-	statusComponent := getClusterStatusComponent(cluster, componentName)
+	componentStatus := getClusterComponentStatus(cluster, componentName)
 	if !componentIsRunning {
 		// if no operation is running in cluster or failed pod timed out,
 		// means the component is Failed or Abnormal.
@@ -179,42 +179,42 @@ func syncStatusComponents(compCtx componentContext,
 			if phase, err := compCtx.component.GetPhaseWhenPodsNotReady(componentName); err != nil {
 				return err
 			} else if phase != "" {
-				statusComponent.Phase = phase
+				componentStatus.Phase = phase
 			}
 		}
 	} else {
-		if statusComponent.Phase != dbaasv1alpha1.RunningPhase {
+		if componentStatus.Phase != dbaasv1alpha1.RunningPhase {
 			// change component phase to Running when workloads of component are running.
-			statusComponent.Phase = dbaasv1alpha1.RunningPhase
-			statusComponent.SetMessage(nil)
+			componentStatus.Phase = dbaasv1alpha1.RunningPhase
+			componentStatus.SetMessage(nil)
 		}
 	}
-	if statusComponent.PodsReady == nil || *statusComponent.PodsReady != podsAreReady {
-		statusComponent.PodsReadyTime = podsReadyTime
+	if componentStatus.PodsReady == nil || *componentStatus.PodsReady != podsAreReady {
+		componentStatus.PodsReadyTime = podsReadyTime
 	}
-	statusComponent.PodsReady = &podsAreReady
-	status.Components[componentName] = statusComponent
+	componentStatus.PodsReady = &podsAreReady
+	status.Components[componentName] = componentStatus
 	return nil
 }
 
-// getClusterStatusComponent gets the cluster status component by component name.
-func getClusterStatusComponent(cluster *dbaasv1alpha1.Cluster, componentName string) dbaasv1alpha1.ClusterStatusComponent {
+// getClusterComponentStatus gets the component status in cluster by component name.
+func getClusterComponentStatus(cluster *dbaasv1alpha1.Cluster, componentName string) dbaasv1alpha1.ClusterStatusComponent {
 	var (
-		statusComponent dbaasv1alpha1.ClusterStatusComponent
+		componentStatus dbaasv1alpha1.ClusterStatusComponent
 		status          = &cluster.Status
 		ok              bool
 	)
 	if status.Components == nil {
 		status.Components = map[string]dbaasv1alpha1.ClusterStatusComponent{}
 	}
-	if statusComponent, ok = status.Components[componentName]; !ok {
+	if componentStatus, ok = status.Components[componentName]; !ok {
 		componentType := cluster.GetComponentTypeName(componentName)
-		statusComponent = dbaasv1alpha1.ClusterStatusComponent{Phase: cluster.Status.Phase,
+		componentStatus = dbaasv1alpha1.ClusterStatusComponent{Phase: cluster.Status.Phase,
 			Type: componentType,
 		}
-		status.Components[componentName] = statusComponent
+		status.Components[componentName] = componentStatus
 	}
-	return statusComponent
+	return componentStatus
 }
 
 // updateStatusComponentMessage updates the message of the component in Cluster.status.components.
@@ -227,7 +227,7 @@ func updateStatusComponentMessage(statusComponent *dbaasv1alpha1.ClusterStatusCo
 	statusComponent.Message.SetObjectMessage(pod.Kind, pod.Name, message)
 }
 
-// hasPodFailedTimedOut returns whether the pod of components is failed for longer than PodFailedTimeout.
+// hasPodFailedTimedOut returns whether the pod of components is still failed after a PodFailedTimeout period.
 // if return ture, component phase will be set to Failed/Abnormal.
 // Generally, it is sufficient to use warning event to determine whether the component is abnormal or failed.
 // However, the warning event will be lost all the time due to the event manager's flow restriction policy.
@@ -239,7 +239,7 @@ func hasPodFailedTimedOut(compCtx componentContext, cluster *dbaasv1alpha1.Clust
 	if err != nil {
 		return
 	}
-	statusComponent := getClusterStatusComponent(cluster, compCtx.componentName)
+	componentStatus := getClusterComponentStatus(cluster, compCtx.componentName)
 	for _, v := range podList.Items {
 		isFailed, isTimedOut, message := podFailedAndTimedOut(&v)
 		if !isFailed {
@@ -249,8 +249,8 @@ func hasPodFailedTimedOut(compCtx componentContext, cluster *dbaasv1alpha1.Clust
 			requeueAfter = time.Minute
 		}
 		if isTimedOut {
-			updateStatusComponentMessage(&statusComponent, &v, message)
-			cluster.Status.Components[compCtx.componentName] = statusComponent
+			updateStatusComponentMessage(&componentStatus, &v, message)
+			cluster.Status.Components[compCtx.componentName] = componentStatus
 			failedAndTimedOut = true
 			return
 		}

@@ -169,7 +169,7 @@ func (r *SystemAccountReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 			toCreate      dbaasv1alpha1.KBAccountType
 			detectedFacts dbaasv1alpha1.KBAccountType
 			engine        *customizedEngine
-			debugModeOn   = getDebugMode(compDef)
+			debugModeOn   = getDebugMode(cluster.Annotations[debugClusterAnnotationKey])
 			compKey       = componentUniqueKey{
 				namespace:     cluster.Namespace,
 				clusterName:   cluster.Name,

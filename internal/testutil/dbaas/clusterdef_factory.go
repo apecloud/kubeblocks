@@ -17,9 +17,12 @@ limitations under the License.
 package dbaas
 
 import (
+	"context"
+
 	"github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/testutil"
@@ -28,21 +31,17 @@ import (
 type ComponentTplType string
 
 const (
-	StatefulMySQL8 ComponentTplType = "stateful-mysql-8.0"
-	ConsensusMySQL ComponentTplType = "consensus-mysql"
-	StatelessNginx ComponentTplType = "stateless-nginx"
+	StatefulMySQLComponent  ComponentTplType = "stateful-mysql"
+	ConsensusMySQLComponent ComponentTplType = "consensus-mysql"
+	StatelessNginxComponent ComponentTplType = "stateless-nginx"
 )
 
 type MockClusterDefFactory struct {
-	TestCtx       *testutil.TestContext
-	ClusterDef    *dbaasv1alpha1.ClusterDefinition
-	clusterDefTpl *dbaasv1alpha1.ClusterDefinition
+	ClusterDef *dbaasv1alpha1.ClusterDefinition
 }
 
-func NewClusterDefFactory(testCtx *testutil.TestContext, name string, cdType string) *MockClusterDefFactory {
-	clusterDefTpl := NewCustomizedObj(testCtx, "resources/factory_cd.yaml", &dbaasv1alpha1.ClusterDefinition{})
-	return &MockClusterDefFactory{
-		TestCtx: testCtx,
+func NewClusterDefFactory(name string, cdType string) *MockClusterDefFactory {
+	factory := &MockClusterDefFactory{
 		ClusterDef: &dbaasv1alpha1.ClusterDefinition{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:   name,
@@ -51,18 +50,15 @@ func NewClusterDefFactory(testCtx *testutil.TestContext, name string, cdType str
 			Spec: dbaasv1alpha1.ClusterDefinitionSpec{
 				Type:       cdType,
 				Components: []dbaasv1alpha1.ClusterDefinitionComponent{},
-				ConnectionCredential: map[string]string{
-					"username": "root",
-					"password": "$(RANDOM_PASSWD)",
-				},
 			},
 		},
-		clusterDefTpl: clusterDefTpl,
 	}
+	factory.SetConnectionCredential(defaultConnectionCredential)
+	return factory
 }
 
 func (factory *MockClusterDefFactory) WithRandomName() *MockClusterDefFactory {
-	key := GetRandomizedKey(factory.TestCtx, factory.ClusterDef.Name)
+	key := GetRandomizedKey("", factory.ClusterDef.Name)
 	factory.ClusterDef.Name = key.Name
 	return factory
 }
@@ -74,14 +70,20 @@ func (factory *MockClusterDefFactory) AddLabels(keysAndValues ...string) *MockCl
 	return factory
 }
 
-func (factory *MockClusterDefFactory) AddComponent(name ComponentTplType, rename string) *MockClusterDefFactory {
-	for _, comp := range factory.clusterDefTpl.Spec.Components {
-		if comp.TypeName == string(name) {
-			comp.TypeName = rename
-			factory.ClusterDef.Spec.Components = append(factory.ClusterDef.Spec.Components, comp)
-			break
-		}
+func (factory *MockClusterDefFactory) AddComponent(tplType ComponentTplType, rename string) *MockClusterDefFactory {
+	var component *dbaasv1alpha1.ClusterDefinitionComponent
+	switch tplType {
+	case StatefulMySQLComponent:
+		component = &statefulMySQLComponent
+	case ConsensusMySQLComponent:
+		component = &consensusMySQLComponent
+	case StatelessNginxComponent:
+		component = &statelessNginxComponent
 	}
+	comps := factory.ClusterDef.Spec.Components
+	comps = append(comps, *component)
+	comps[len(comps)-1].TypeName = rename
+	factory.ClusterDef.Spec.Components = comps
 	return factory
 }
 
@@ -94,8 +96,22 @@ func (factory *MockClusterDefFactory) SetDefaultReplicas(replicas int32) *MockCl
 	return factory
 }
 
+func (factory *MockClusterDefFactory) SetService(port int32) *MockClusterDefFactory {
+	comps := factory.ClusterDef.Spec.Components
+	if len(comps) > 0 {
+		comps[len(comps)-1].Service = &corev1.ServiceSpec{
+			Ports: []corev1.ServicePort{{
+				Protocol: corev1.ProtocolTCP,
+				Port:     port,
+			}},
+		}
+	}
+	factory.ClusterDef.Spec.Components = comps
+	return factory
+}
+
 func (factory *MockClusterDefFactory) AddConfigTemplate(name string,
-	configTplRef string, configConstraintRef string, volumeName string) *MockClusterDefFactory {
+	configTplRef string, configConstraintRef string, volumeName string, mode *int32) *MockClusterDefFactory {
 	comps := factory.ClusterDef.Spec.Components
 	if len(comps) > 0 {
 		comp := comps[len(comps)-1]
@@ -108,6 +124,7 @@ func (factory *MockClusterDefFactory) AddConfigTemplate(name string,
 				ConfigTplRef:        configTplRef,
 				ConfigConstraintRef: configConstraintRef,
 				VolumeName:          volumeName,
+				DefaultMode:         mode,
 			})
 		comps[len(comps)-1] = comp
 	}
@@ -139,9 +156,13 @@ func (factory *MockClusterDefFactory) SetConnectionCredential(
 	return factory
 }
 
-func (factory *MockClusterDefFactory) Create() *MockClusterDefFactory {
-	testCtx := factory.TestCtx
+func (factory *MockClusterDefFactory) Create(testCtx *testutil.TestContext) *MockClusterDefFactory {
 	gomega.Expect(testCtx.CreateObj(testCtx.Ctx, factory.ClusterDef)).Should(gomega.Succeed())
+	return factory
+}
+
+func (factory *MockClusterDefFactory) CreateCli(ctx context.Context, cli client.Client) *MockClusterDefFactory {
+	gomega.Expect(cli.Create(ctx, factory.ClusterDef)).Should(gomega.Succeed())
 	return factory
 }
 

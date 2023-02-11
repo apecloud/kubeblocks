@@ -20,7 +20,6 @@ import (
 	"context"
 
 	"github.com/onsi/gomega"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -117,19 +116,5 @@ func GetClusterObservedGeneration(testCtx *testutil.TestContext, clusterKey type
 		cluster := &dbaasv1alpha1.Cluster{}
 		g.Expect(testCtx.Cli.Get(testCtx.Ctx, clusterKey, cluster)).Should(gomega.Succeed())
 		return cluster.Status.ObservedGeneration
-	}
-}
-
-func NewClusterObj(key types.NamespacedName, clusterDefName string, clusterVersionName string) *dbaasv1alpha1.Cluster {
-	return &dbaasv1alpha1.Cluster{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      key.Name,
-			Namespace: key.Namespace,
-		},
-		Spec: dbaasv1alpha1.ClusterSpec{
-			ClusterDefRef:     clusterDefName,
-			ClusterVersionRef: clusterVersionName,
-			TerminationPolicy: dbaasv1alpha1.WipeOut,
-		},
 	}
 }

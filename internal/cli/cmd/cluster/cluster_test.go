@@ -22,6 +22,8 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 
@@ -31,8 +33,8 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
-	testutil "github.com/apecloud/kubeblocks/internal/testutil/k8s"
-	"github.com/apecloud/kubeblocks/test/testdata"
+	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
+	testdbaas "github.com/apecloud/kubeblocks/internal/testutil/dbaas"
 )
 
 var _ = Describe("Cluster", func() {
@@ -179,43 +181,52 @@ var _ = Describe("Cluster", func() {
 
 	It("check params for reconfiguring operations", func() {
 		const (
-			ns                  = "default"
-			componentName       = "wesql"
-			cdComponentTypeName = "replicasets"
+			ns                 = "default"
+			clusterDefName     = "test-clusterdef"
+			clusterVersionName = "test-clusterversion"
+			clusterName        = "test-cluster"
+			statefulCompType   = "replicasets"
+			statefulCompName   = "mysql"
+			configTplName      = "mysql-config-tpl"
+			configVolumeName   = "mysql-config"
 		)
 
-		randomNamer := testutil.CreateRandomResourceNamer(ns)
-		mockHelper := testutil.NewFakeResourceObjectHelper("cli_testdata",
-			testutil.WithCustomResource(types.ClusterGVR(), NewFakeClusterResource(randomNamer, componentName, cdComponentTypeName)),
-			testutil.WithCustomResource(types.CMGVR(), testutil.NewFakeConfigCMResource(randomNamer, componentName, randomNamer.VolumeName,
-				testdata.WithCMData(testdata.WithNewFakeCMData("my.cnf", "")))),
-			testutil.WithResourceKind(types.ConfigConstraintGVR(), types.KindConfigConstraint, testdata.WithName(randomNamer.CCName)),
-			testutil.WithResourceKind(types.CMGVR(), types.KindCM, testdata.WithNamespacedName(randomNamer.TPLName, randomNamer.NS)),
-			testutil.WithResourceKind(types.ClusterVersionGVR(), types.KindClusterVersion, testdata.WithName(randomNamer.CVName)),
-			testutil.WithResourceKind(types.ClusterDefGVR(), types.KindClusterDef,
-				testdata.WithName(randomNamer.CDName),
-				testdata.WithConfigTemplate(testutil.GenerateConfigTemplate(randomNamer), testdata.ComponentTypeSelector(dbaasv1alpha1.Stateful)),
-				testdata.WithUpdateComponent(testdata.ComponentTypeSelector(dbaasv1alpha1.Stateful),
-					func(component *dbaasv1alpha1.ClusterDefinitionComponent) {
-						component.TypeName = cdComponentTypeName
-					}),
-			),
-		)
-		ttf, o := NewFakeOperationsOptions(randomNamer.NS, randomNamer.ClusterName, dbaasv1alpha1.ReconfiguringType, mockHelper.CreateObjects()...)
+		By("Create configmap and config constraint obj")
+		configmap := testdbaas.NewCustomizedObj("resources/mysql_config_cm.yaml", &corev1.ConfigMap{}, testdbaas.WithNamespace(ns))
+		constraint := testdbaas.NewCustomizedObj("resources/mysql_config_template.yaml",
+			&dbaasv1alpha1.ConfigConstraint{})
+		componentConfig := testdbaas.NewConfigMap(ns, cfgcore.GetComponentCfgName(clusterName, statefulCompName, configVolumeName), testdbaas.SetConfigMapData("my.cnf", ""))
+		By("Create a clusterDefinition obj")
+		clusterDefObj := testdbaas.NewClusterDefFactory(clusterDefName, testdbaas.MySQLType).
+			AddComponent(testdbaas.StatefulMySQLComponent, statefulCompType).
+			AddConfigTemplate(configTplName, configmap.Name, constraint.Name, configVolumeName, nil).
+			GetClusterDef()
+		By("Create a clusterVersion obj")
+		clusterVersionObj := testdbaas.NewClusterVersionFactory(clusterVersionName, clusterDefObj.GetName()).
+			AddComponent(statefulCompType).
+			GetClusterVersion()
+		By("creating a cluster")
+		clusterObj := testdbaas.NewClusterFactory(ns, clusterName,
+			clusterDefObj.Name, clusterVersionObj.Name).
+			AddComponent(statefulCompName, statefulCompType).GetCluster()
+
+		objs := []runtime.Object{configmap, constraint, clusterDefObj, clusterVersionObj, clusterObj, componentConfig}
+		ttf, o := NewFakeOperationsOptions(ns, clusterObj.Name, dbaasv1alpha1.ReconfiguringType, objs...)
 		defer ttf.Cleanup()
 		o.ComponentNames = []string{"replicasets", "proxy"}
 		By("validate reconfiguring when multi components")
 		Expect(o.Validate()).To(MatchError("reconfiguring only support one component."))
 
 		By("validate reconfiguring parameter")
-		o.ComponentNames = []string{componentName}
+		o.ComponentNames = []string{statefulCompName}
 		Expect(o.Validate().Error()).To(ContainSubstring("reconfiguring required configure file or updated parameters"))
 		o.Parameters = []string{"abcd"}
 		Expect(o.Validate().Error()).To(ContainSubstring("updated parameter formatter"))
 		o.Parameters = []string{"abcd=test"}
-		o.CfgTemplateName = randomNamer.TPLName
+		o.CfgTemplateName = configTplName
 		o.IOStreams = streams
 		in.Write([]byte(o.Name + "\n"))
+
 		Expect(o.Validate()).Should(Succeed())
 	})
 

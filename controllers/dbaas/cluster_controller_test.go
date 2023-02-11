@@ -467,6 +467,7 @@ var _ = Describe("Cluster Controller", func() {
 
 		By("Creating a cluster with VolumeClaimTemplate")
 		pvcSpec := testdbaas.NewPVC("1Gi")
+		pvcSpec.StorageClassName = &storageClass.Name
 
 		By("Create cluster and waiting for the cluster initialized")
 		clusterObj = testdbaas.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,

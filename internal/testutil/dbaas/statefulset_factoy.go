@@ -93,6 +93,12 @@ func (factory *MockStatefulSetFactory) AddConfigmapVolume(volumeName string, con
 	return factory
 }
 
+func (factory *MockStatefulSetFactory) AddVolumeClaimTemplate(pvc corev1.PersistentVolumeClaim) *MockStatefulSetFactory {
+	volumeClaimTpls := &factory.Sts.Spec.VolumeClaimTemplates
+	*volumeClaimTpls = append(*volumeClaimTpls, pvc)
+	return factory
+}
+
 func (factory *MockStatefulSetFactory) AddContainer(container corev1.Container) *MockStatefulSetFactory {
 	containers := &factory.Sts.Spec.Template.Spec.Containers
 	*containers = append(*containers, container)

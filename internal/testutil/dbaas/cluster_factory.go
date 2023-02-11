@@ -132,7 +132,7 @@ func (factory *MockClusterFactory) AddComponentToleration(toleration corev1.Tole
 	return factory
 }
 
-func (factory *MockClusterFactory) AddVolumeClaim(volumeName string,
+func (factory *MockClusterFactory) AddVolumeClaimTemplate(volumeName string,
 	pvcSpec *corev1.PersistentVolumeClaimSpec) *MockClusterFactory {
 	comps := factory.Cluster.Spec.Components
 	if len(comps) > 0 {

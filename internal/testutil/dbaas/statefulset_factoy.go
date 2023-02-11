@@ -74,6 +74,11 @@ func (factory *MockStatefulSetFactory) AddLabels(keysAndValues ...string) *MockS
 	return factory
 }
 
+func (factory *MockStatefulSetFactory) SetReplicas(replicas int32) *MockStatefulSetFactory {
+	factory.Sts.Spec.Replicas = &replicas
+	return factory
+}
+
 func (factory *MockStatefulSetFactory) AddVolume(volume corev1.Volume) *MockStatefulSetFactory {
 	volumes := &factory.Sts.Spec.Template.Spec.Volumes
 	*volumes = append(*volumes, volume)

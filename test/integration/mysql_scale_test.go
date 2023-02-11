@@ -170,8 +170,8 @@ var _ = Describe("MySQL Scaling function", func() {
 		clusterObj = testdbaas.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
 			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
 			AddComponent(mysqlCompName, mysqlCompType).
-			AddVolumeClaim(testdbaas.DataVolumeName, &dataPvcSpec).
-			AddVolumeClaim(testdbaas.LogVolumeName, &logPvcSpec).
+			AddVolumeClaimTemplate(testdbaas.DataVolumeName, &dataPvcSpec).
+			AddVolumeClaimTemplate(testdbaas.LogVolumeName, &logPvcSpec).
 			Create(&testCtx).GetCluster()
 		clusterKey = client.ObjectKeyFromObject(clusterObj)
 

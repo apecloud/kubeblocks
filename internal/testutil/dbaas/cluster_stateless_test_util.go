@@ -19,6 +19,7 @@ package dbaas
 import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/testutil"
@@ -38,7 +39,14 @@ func MockStatelessComponentDeploy(testCtx testutil.TestContext, clusterName, com
 }
 
 // MockStatelessPod mocks the pods of the deployment workload.
-func MockStatelessPod(testCtx testutil.TestContext, clusterName, componentName, podName string) *corev1.Pod {
+func MockStatelessPod(testCtx testutil.TestContext, deploy *appsv1.Deployment, clusterName, componentName, podName string) *corev1.Pod {
 	return CreateCustomizedObj(&testCtx, "stateless/deployment_pod.yaml", &corev1.Pod{},
-		CustomizeObjYAML(podName, componentName, clusterName))
+		CustomizeObjYAML(podName, componentName, clusterName), func(pod *corev1.Pod) {
+			if deploy != nil {
+				t := true
+				pod.SetOwnerReferences([]metav1.OwnerReference{
+					{APIVersion: "apps/v1", Kind: "Deployment", Controller: &t, BlockOwnerDeletion: &t, Name: deploy.Name, UID: deploy.UID},
+				})
+			}
+		})
 }

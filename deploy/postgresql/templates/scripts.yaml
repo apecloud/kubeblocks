@@ -8,7 +8,22 @@ data:
   post_start.sh: |
     #!/bin/sh
     export PGPASSWORD=$POSTGRES_POSTGRES_PASSWORD
-    echo "Wait for the database to be accessible, trying to connect."
-    until psql -Upostgres -c "SELECT 1;"; do sleep 1; done
-    echo "create extension pg_stat_statements"
-    psql -Upostgres -c "CREATE EXTENSION IF NOT EXISTS pg_stat_statements;"
+    echo "wait for the database to be accessible, trying to connect."
+    while :
+    do
+        echo "start to connect postgres."
+        psql -Upostgres -c "SELECT 1;" >/dev/null 2>&1
+        if [ $? -eq 0 ]; then
+            echo "postgres connect success, break now."
+            break
+        fi
+        echo "postgres connect fail, sleep and try again."
+        sleep 1
+    done
+    echo "create extension pg_stat_statements."
+    psql -Upostgres -c "CREATE EXTENSION IF NOT EXISTS pg_stat_statements;" >/dev/null 2>&1
+    if [ $? -eq 0 ];then
+       echo "create extension pg_stat_statements success."
+    else
+        exit 1
+    fi

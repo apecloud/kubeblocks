@@ -17,22 +17,23 @@ limitations under the License.
 package dbaas
 
 import (
+	"context"
+
 	"github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/testutil"
 )
 
 type MockClusterVersionFactory struct {
-	TestCtx        *testutil.TestContext
 	ClusterVersion *dbaasv1alpha1.ClusterVersion
 }
 
-func NewClusterVersionFactory(testCtx *testutil.TestContext, name string, cdRef string) *MockClusterVersionFactory {
+func NewClusterVersionFactory(name string, cdRef string) *MockClusterVersionFactory {
 	return &MockClusterVersionFactory{
-		TestCtx: testCtx,
 		ClusterVersion: &dbaasv1alpha1.ClusterVersion{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:   name,
@@ -47,13 +48,13 @@ func NewClusterVersionFactory(testCtx *testutil.TestContext, name string, cdRef 
 }
 
 func (factory *MockClusterVersionFactory) WithRandomName() *MockClusterVersionFactory {
-	key := GetRandomizedKey(factory.TestCtx, factory.ClusterVersion.Name)
+	key := GetRandomizedKey("", factory.ClusterVersion.Name)
 	factory.ClusterVersion.Name = key.Name
 	return factory
 }
 
 func (factory *MockClusterVersionFactory) AddLabels(keysAndValues ...string) *MockClusterVersionFactory {
-	for k, v := range withMap(keysAndValues...) {
+	for k, v := range WithMap(keysAndValues...) {
 		factory.ClusterVersion.Labels[k] = v
 	}
 	return factory
@@ -103,9 +104,13 @@ func (factory *MockClusterVersionFactory) AddConfigTemplate(name string,
 	return factory
 }
 
-func (factory *MockClusterVersionFactory) Create() *MockClusterVersionFactory {
-	testCtx := factory.TestCtx
+func (factory *MockClusterVersionFactory) Create(testCtx *testutil.TestContext) *MockClusterVersionFactory {
 	gomega.Expect(testCtx.CreateObj(testCtx.Ctx, factory.ClusterVersion)).Should(gomega.Succeed())
+	return factory
+}
+
+func (factory *MockClusterVersionFactory) CreateCli(ctx context.Context, cli client.Client) *MockClusterVersionFactory {
+	gomega.Expect(cli.Create(ctx, factory.ClusterVersion)).Should(gomega.Succeed())
 	return factory
 }
 

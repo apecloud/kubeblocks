@@ -2,6 +2,9 @@ dependencies:
 - name: apecloud-mysql
   repository: file://../apecloud-mysql
   version: 0.1.8
+- name: postgresql
+  repository: file://../postgresql
+  version: 0.1.1
 - name: grafana
   repository: https://grafana.github.io/helm-charts
   version: 6.43.5
@@ -17,5 +20,5 @@ dependencies:
 - name: csi-s3
   repository: https://github.com/CloudVE/helm-charts/raw/master
   version: 0.31.3
-digest: sha256:091d643829656ef62ac3dc0a1c7bfbb8fa144d413e73b3050f31461dab2f6adc
-generated: "2023-02-07T15:59:39.135718+08:00"
+digest: sha256:0d075af40701c7faf66b3eb42881a24e8815050732a20940a5012ac63ce73409
+generated: "2023-02-10T16:58:07.661455+08:00"

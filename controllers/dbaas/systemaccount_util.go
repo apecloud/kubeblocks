@@ -18,6 +18,7 @@ package dbaas
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/sethvargo/go-password/password"
@@ -374,6 +375,7 @@ func getDefaultAccounts() dbaasv1alpha1.KBAccountType {
 	return accountID
 }
 
-func getDebugMode(compDef *dbaasv1alpha1.ClusterDefinitionComponent) bool {
-	return viper.GetBool(systemAccountsDebugMode)
+func getDebugMode(annotatedDebug string) bool {
+	debugOn, _ := strconv.ParseBool(annotatedDebug)
+	return viper.GetBool(systemAccountsDebugMode) || debugOn
 }

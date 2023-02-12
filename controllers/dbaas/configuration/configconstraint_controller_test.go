@@ -19,12 +19,13 @@ package configuration
 import (
 	"time"
 
+	corev1 "k8s.io/api/core/v1"
+	"sigs.k8s.io/controller-runtime/pkg/log"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
@@ -79,19 +80,19 @@ var _ = Describe("ConfigConstraint Controller", func() {
 			constraintKey := client.ObjectKeyFromObject(constraint)
 
 			By("Create a clusterDefinition obj")
-			clusterDefObj := testdbaas.NewClusterDefFactory(&testCtx, clusterDefName, testdbaas.MySQLType).
-				AddComponent(testdbaas.StatefulMySQL8, statefulCompType).
-				AddConfigTemplate(configTplName, configmap.Name, constraint.Name, configVolumeName).
+			clusterDefObj := testdbaas.NewClusterDefFactory(clusterDefName, testdbaas.MySQLType).
+				AddComponent(testdbaas.StatefulMySQLComponent, statefulCompType).
+				AddConfigTemplate(configTplName, configmap.Name, constraint.Name, configVolumeName, nil).
 				AddLabels(cfgcore.GenerateTPLUniqLabelKeyWithConfig(configTplName), configmap.Name,
 					cfgcore.GenerateConstraintsUniqLabelKeyWithConfig(constraint.Name), constraint.Name).
-				Create().GetClusterDef()
+				Create(&testCtx).GetClusterDef()
 
 			By("Create a clusterVersion obj")
-			clusterVersionObj := testdbaas.NewClusterVersionFactory(&testCtx, clusterVersionName, clusterDefObj.GetName()).
+			clusterVersionObj := testdbaas.NewClusterVersionFactory(clusterVersionName, clusterDefObj.GetName()).
 				AddComponent(statefulCompType).
 				AddLabels(cfgcore.GenerateTPLUniqLabelKeyWithConfig(configTplName), configmap.Name,
 					cfgcore.GenerateConstraintsUniqLabelKeyWithConfig(constraint.Name), constraint.Name).
-				Create().GetClusterVersion()
+				Create(&testCtx).GetClusterVersion()
 
 			By("check ConfigConstraint(template) status and finalizer")
 			Eventually(testdbaas.CheckObj(&testCtx, constraintKey,

@@ -69,6 +69,13 @@ Create the name of the webhook service.
 {{- end }}
 
 {{/*
+matchLabels
+*/}}
+{{- define "kubeblocks.matchLabels" -}}
+{{ template "kubeblocks.selectorLabels" . }}
+{{- end -}}
+
+{{/*
 Create the default PodDisruptionBudget to use.
 */}}
 {{- define "podDisruptionBudget.spec" -}}
@@ -132,6 +139,9 @@ Allow the release namespace to be overridden for multi-namespace deployments in 
     {{- .Release.Namespace -}}
   {{- end -}}
 {{- end -}}
+
+
+
 
 {{/*
 Use the prometheus namespace override for multi-namespace deployments in combined charts

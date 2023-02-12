@@ -20,7 +20,6 @@ import (
 	"context"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
@@ -64,18 +63,4 @@ func (o byBackupStartTime) Less(i, j int) bool {
 		return o[i].Name < o[j].Name
 	}
 	return o[i].Status.StartTimestamp.Before(o[j].Status.StartTimestamp)
-}
-
-// DeleteObjectBackground delete the object in the background, usually used in the Reconcile method
-func DeleteObjectBackground(cli client.Client, ctx context.Context, obj client.Object) error {
-	deletePropagation := metav1.DeletePropagationBackground
-	deleteOptions := &client.DeleteOptions{
-		PropagationPolicy: &deletePropagation,
-	}
-
-	if err := cli.Delete(ctx, obj, deleteOptions); err != nil {
-		// failed to delete backups, return error info.
-		return err
-	}
-	return nil
 }

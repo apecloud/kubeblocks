@@ -37,8 +37,8 @@ var _ = Describe("OpsRequest Controller", func() {
 	const clusterVersionName = "test-clusterversion"
 	const clusterNamePrefix = "test-cluster"
 
-	const statefulCompType = "replicasets"
-	const statefulCompName = "mysql"
+	const mysqlCompType = "replicasets"
+	const mysqlCompName = "mysql"
 
 	cleanEnv := func() {
 		// must wait until resources deleted and no longer exist before the testcases start,
@@ -98,12 +98,12 @@ var _ = Describe("OpsRequest Controller", func() {
 				"memory": resource.MustParse("256Mi"),
 			},
 		}
-		clusterObj = testdbaas.NewClusterFactory(&testCtx, clusterNamePrefix,
+		clusterObj = testdbaas.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
 			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
-			AddComponent(statefulCompName, statefulCompType).
+			AddComponent(mysqlCompName, mysqlCompType).
 			SetReplicas(1).
 			SetResources(resources).
-			Create().GetCluster()
+			Create(&testCtx).GetCluster()
 		clusterKey = client.ObjectKeyFromObject(clusterObj)
 
 		Eventually(testdbaas.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
@@ -119,7 +119,7 @@ var _ = Describe("OpsRequest Controller", func() {
 		verticalScalingOpsRequest.Spec.TTLSecondsAfterSucceed = 0
 		verticalScalingOpsRequest.Spec.VerticalScalingList = []dbaasv1alpha1.VerticalScaling{
 			{
-				ComponentOps: dbaasv1alpha1.ComponentOps{ComponentName: statefulCompName},
+				ComponentOps: dbaasv1alpha1.ComponentOps{ComponentName: mysqlCompName},
 				ResourceRequirements: corev1.ResourceRequirements{
 					Requests: corev1.ResourceList{
 						"cpu":    resource.MustParse("400m"),
@@ -136,7 +136,7 @@ var _ = Describe("OpsRequest Controller", func() {
 		By("check Cluster and changed component phase is VerticalScaling")
 		Eventually(testdbaas.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *dbaasv1alpha1.Cluster) {
 			g.Expect(cluster.Status.Phase).To(Equal(dbaasv1alpha1.VerticalScalingPhase))
-			g.Expect(cluster.Status.Components[statefulCompName].Phase).To(Equal(dbaasv1alpha1.VerticalScalingPhase))
+			g.Expect(cluster.Status.Components[mysqlCompName].Phase).To(Equal(dbaasv1alpha1.VerticalScalingPhase))
 		})).Should(Succeed())
 
 		By("mock bring Cluster and changed component back to running status")
@@ -172,14 +172,14 @@ var _ = Describe("OpsRequest Controller", func() {
 	Context("with Cluster which has MySQL StatefulSet", func() {
 		BeforeEach(func() {
 			By("Create a clusterDefinition obj")
-			clusterDefObj = testdbaas.NewClusterDefFactory(&testCtx, clusterDefName, testdbaas.MySQLType).
-				AddComponent(testdbaas.StatefulMySQL8, statefulCompType).
-				Create().GetClusterDef()
+			clusterDefObj = testdbaas.NewClusterDefFactory(clusterDefName, testdbaas.MySQLType).
+				AddComponent(testdbaas.StatefulMySQLComponent, mysqlCompType).
+				Create(&testCtx).GetClusterDef()
 
 			By("Create a clusterVersion obj")
-			clusterVersionObj = testdbaas.NewClusterVersionFactory(&testCtx, clusterVersionName, clusterDefObj.GetName()).
-				AddComponent(statefulCompType).AddContainerShort("mysql", testdbaas.ApeCloudMySQLImage).
-				Create().GetClusterVersion()
+			clusterVersionObj = testdbaas.NewClusterVersionFactory(clusterVersionName, clusterDefObj.GetName()).
+				AddComponent(mysqlCompType).AddContainerShort("mysql", testdbaas.ApeCloudMySQLImage).
+				Create(&testCtx).GetClusterVersion()
 		})
 
 		It("issue an VerticalScalingOpsRequest should change Cluster's resource requirements successfully", func() {
@@ -190,14 +190,14 @@ var _ = Describe("OpsRequest Controller", func() {
 	Context("with Cluster which has MySQL ConsensusSet", func() {
 		BeforeEach(func() {
 			By("Create a clusterDefinition obj")
-			clusterDefObj = testdbaas.NewClusterDefFactory(&testCtx, clusterDefName, testdbaas.MySQLType).
-				AddComponent(testdbaas.ConsensusMySQL, statefulCompType).
-				Create().GetClusterDef()
+			clusterDefObj = testdbaas.NewClusterDefFactory(clusterDefName, testdbaas.MySQLType).
+				AddComponent(testdbaas.ConsensusMySQLComponent, mysqlCompType).
+				Create(&testCtx).GetClusterDef()
 
 			By("Create a clusterVersion obj")
-			clusterVersionObj = testdbaas.NewClusterVersionFactory(&testCtx, clusterVersionName, clusterDefObj.GetName()).
-				AddComponent(statefulCompType).AddContainerShort("mysql", testdbaas.ApeCloudMySQLImage).
-				Create().GetClusterVersion()
+			clusterVersionObj = testdbaas.NewClusterVersionFactory(clusterVersionName, clusterDefObj.GetName()).
+				AddComponent(mysqlCompType).AddContainerShort("mysql", testdbaas.ApeCloudMySQLImage).
+				Create(&testCtx).GetClusterVersion()
 		})
 
 		It("issue an VerticalScalingOpsRequest should change Cluster's resource requirements successfully", func() {

@@ -39,7 +39,7 @@ import (
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
-	testutil "github.com/apecloud/kubeblocks/internal/testutil/k8s"
+	testdbaas "github.com/apecloud/kubeblocks/internal/testutil/dbaas"
 	"github.com/apecloud/kubeblocks/test/testdata"
 )
 
@@ -204,22 +204,30 @@ var _ = Describe("util", func() {
 	})
 
 	It("IsSupportConfigureParams", func() {
-		testNS := "default"
-		randomNamer := testutil.CreateRandomResourceNamer(testNS)
-		mockHelper := testutil.NewFakeResourceObjectHelper("cli_testdata",
-			testutil.WithResourceKind(types.ConfigConstraintGVR(), types.KindConfigConstraint, testdata.WithName(randomNamer.CCName)),
+		const (
+			ccName = "mysql_cc"
+			testNS = "default"
 		)
+
+		configConstraintObj := testdbaas.NewCustomizedObj("resources/mysql_config_template.yaml",
+			&dbaasv1alpha1.ConfigConstraint{}, testdbaas.WithNamespacedName(ccName, ""), func(cc *dbaasv1alpha1.ConfigConstraint) {
+				if ccContext, err := testdata.GetTestDataFileContent("/cue_testdata/mysql_for_cli.cue"); err == nil {
+					cc.Spec.ConfigurationSchema = &dbaasv1alpha1.CustomParametersValidation{
+						CUE: string(ccContext),
+					}
+				}
+			})
 
 		tf := cmdtesting.NewTestFactory().WithNamespace(testNS)
 		defer tf.Cleanup()
 
 		Expect(dbaasv1alpha1.AddToScheme(scheme.Scheme)).Should(Succeed())
-		mockClient := dynamicfakeclient.NewSimpleDynamicClientWithCustomListKinds(scheme.Scheme, nil, mockHelper.CreateObjects()...)
+		mockClient := dynamicfakeclient.NewSimpleDynamicClientWithCustomListKinds(scheme.Scheme, nil, configConstraintObj)
 		tpl := dbaasv1alpha1.ConfigTemplate{
 			Name:                "for_test",
-			ConfigConstraintRef: randomNamer.CCName,
-			ConfigTplRef:        randomNamer.TPLName,
-			VolumeName:          randomNamer.VolumeName,
+			ConfigConstraintRef: ccName,
+			ConfigTplRef:        ccName,
+			VolumeName:          "config",
 		}
 
 		type args struct {
@@ -234,14 +242,14 @@ var _ = Describe("util", func() {
 			name: "normal test",
 			args: args{
 				tpl:           tpl,
-				updatedParams: testdata.WithMap("automatic_sp_privileges", "OFF", "innodb_autoinc_lock_mode", "1"),
+				updatedParams: testdbaas.WithMap("automatic_sp_privileges", "OFF", "innodb_autoinc_lock_mode", "1"),
 			},
 			expected: true,
 		}, {
 			name: "not match test",
 			args: args{
 				tpl:           tpl,
-				updatedParams: testdata.WithMap("not_exist_field", "1"),
+				updatedParams: testdbaas.WithMap("not_exist_field", "1"),
 			},
 			expected: false,
 		}}

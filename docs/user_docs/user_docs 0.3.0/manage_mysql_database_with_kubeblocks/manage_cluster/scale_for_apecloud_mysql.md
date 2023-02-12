@@ -26,7 +26,7 @@ mysql-cluster        default          apecloud-mysql            ac-mysql-8.0.30 
 
 1. Change configuration. There are 3 ways to apply vertical scaling.
    
-   **Option 1.** (Recommanded) Use `kbcli`.
+   **Option 1.** (Recommended) Use `kbcli`.
    
    Configure the parameters `component-names`, `requests`, and `limits` and run the command.
    
@@ -118,7 +118,7 @@ mysql-cluster        default          apecloud-mysql            ac-mysql-8.0.30 
    - STATUS=Running: means the vertical scaling operation is applied.
    - STATUS=Updating: means the vertical scaling is in progress.
    - STATUS=Abnormal: means the vertical scaling is abnormal. The reason may be the normal instances number is less than the total instance number or the leader instance is running properly while others are abnormal. 
-     > To solve the problem, you can check manually to see whether resource is sufficient. If AutoScaling is supported, the system recovers when there is enough resource, otherwise, create enough resource and check wth `kubectl describe` command.
+     > To solve the problem, you can check manually to see whether resource is sufficient. If AutoScaling is supported, the system recovers when there is enough resource, otherwise, create enough resource and check with `kubectl describe` command.
 
 ## Horizontal scaling
 Horizontal scaling changes the amount of pods. For example, you can apply a horizontal scaling to scale up from three pods to five pods. The scaling process includes the backup and restore of data.
@@ -151,7 +151,7 @@ mysql-cluster        default          apecloud-mysql            ac-mysql-8.0.30 
 
 1. Change configuration. There are 3 ways to apply horizontal scaling.
    
-   **Option 1.** (Recommanded) Use `kbcli`.
+   **Option 1.** (Recommended) Use `kbcli`.
    
    Configure the parameters `component-names` and `replicas`, and run the command.
 

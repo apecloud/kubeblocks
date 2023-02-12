@@ -341,20 +341,11 @@ var _ = Describe("Cluster Controller", func() {
 		updatedReplicas := int32(3)
 
 		By("Creating a cluster with VolumeClaimTemplate")
-		pvcSpec := corev1.PersistentVolumeClaimSpec{
-			AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
-			Resources: corev1.ResourceRequirements{
-				Requests: corev1.ResourceList{
-					corev1.ResourceStorage: resource.MustParse("1Gi"),
-				},
-			},
-		}
-
-		By("Create cluster and waiting for the cluster initialized")
+		pvcSpec := testdbaas.NewPVC("1Gi")
 		clusterObj = testdbaas.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
 			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
 			AddComponent(mysqlCompName, mysqlCompType).
-			AddVolumeClaim(testdbaas.DataVolumeName, &pvcSpec).
+			AddVolumeClaimTemplate(testdbaas.DataVolumeName, &pvcSpec).
 			SetReplicas(initialReplicas).
 			Create(&testCtx).GetCluster()
 		clusterKey = client.ObjectKeyFromObject(clusterObj)
@@ -475,21 +466,14 @@ var _ = Describe("Cluster Controller", func() {
 		Expect(testCtx.CreateObj(testCtx.Ctx, storageClass)).Should(Succeed())
 
 		By("Creating a cluster with VolumeClaimTemplate")
-		pvcSpec := corev1.PersistentVolumeClaimSpec{
-			AccessModes:      []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
-			StorageClassName: &storageClass.Name,
-			Resources: corev1.ResourceRequirements{
-				Requests: corev1.ResourceList{
-					corev1.ResourceStorage: resource.MustParse("1Gi"),
-				},
-			},
-		}
+		pvcSpec := testdbaas.NewPVC("1Gi")
+		pvcSpec.StorageClassName = &storageClass.Name
 
 		By("Create cluster and waiting for the cluster initialized")
 		clusterObj = testdbaas.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
 			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
 			AddComponent(mysqlCompName, mysqlCompType).
-			AddVolumeClaim(testdbaas.DataVolumeName, &pvcSpec).
+			AddVolumeClaimTemplate(testdbaas.DataVolumeName, &pvcSpec).
 			SetReplicas(replicas).
 			Create(&testCtx).GetCluster()
 		clusterKey = client.ObjectKeyFromObject(clusterObj)
@@ -748,7 +732,7 @@ var _ = Describe("Cluster Controller", func() {
 		clusterObj = testdbaas.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
 			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
 			AddComponent(mysqlCompName, mysqlCompType).
-			SetReplicas(replicas).AddVolumeClaim(testdbaas.DataVolumeName, pvcSpec).
+			SetReplicas(replicas).AddVolumeClaimTemplate(testdbaas.DataVolumeName, pvcSpec).
 			Create(&testCtx).GetCluster()
 		clusterKey = client.ObjectKeyFromObject(clusterObj)
 

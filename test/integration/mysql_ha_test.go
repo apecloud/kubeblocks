@@ -120,7 +120,7 @@ var _ = Describe("MySQL High-Availability function", func() {
 		clusterObj = testdbaas.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
 			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
 			AddComponent(mysqlCompName, mysqlCompType).
-			SetReplicas(3).AddVolumeClaim(testdbaas.DataVolumeName, pvcSpec).
+			SetReplicas(3).AddVolumeClaimTemplate(testdbaas.DataVolumeName, pvcSpec).
 			Create(&testCtx).GetCluster()
 		clusterKey = client.ObjectKeyFromObject(clusterObj)
 

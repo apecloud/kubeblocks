@@ -68,22 +68,46 @@ func (factory *MockClusterVersionFactory) AddComponent(compType string) *MockClu
 	return factory
 }
 
-func (factory *MockClusterVersionFactory) AddContainerShort(name string, image string) *MockClusterVersionFactory {
+func (factory *MockClusterVersionFactory) AddInitContainer(container corev1.Container) *MockClusterVersionFactory {
 	comps := factory.ClusterVersion.Spec.Components
 	if len(comps) > 0 {
 		comp := comps[len(comps)-1]
 		if comp.PodSpec == nil {
 			comp.PodSpec = &corev1.PodSpec{}
 		}
-		comp.PodSpec.Containers = append(comp.PodSpec.Containers,
-			corev1.Container{
-				Name:  name,
-				Image: image,
-			})
+		comp.PodSpec.InitContainers = append(comp.PodSpec.InitContainers, container)
 		comps[len(comps)-1] = comp
 	}
 	factory.ClusterVersion.Spec.Components = comps
 	return factory
+}
+
+func (factory *MockClusterVersionFactory) AddInitContainerShort(name string, image string) *MockClusterVersionFactory {
+	return factory.AddInitContainer(corev1.Container{
+		Name:  name,
+		Image: image,
+	})
+}
+
+func (factory *MockClusterVersionFactory) AddContainer(container corev1.Container) *MockClusterVersionFactory {
+	comps := factory.ClusterVersion.Spec.Components
+	if len(comps) > 0 {
+		comp := comps[len(comps)-1]
+		if comp.PodSpec == nil {
+			comp.PodSpec = &corev1.PodSpec{}
+		}
+		comp.PodSpec.Containers = append(comp.PodSpec.Containers, container)
+		comps[len(comps)-1] = comp
+	}
+	factory.ClusterVersion.Spec.Components = comps
+	return factory
+}
+
+func (factory *MockClusterVersionFactory) AddContainerShort(name string, image string) *MockClusterVersionFactory {
+	return factory.AddContainer(corev1.Container{
+		Name:  name,
+		Image: image,
+	})
 }
 
 func (factory *MockClusterVersionFactory) AddConfigTemplate(name string,

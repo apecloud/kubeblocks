@@ -25,10 +25,9 @@ import (
 	. "github.com/onsi/gomega"
 
 	"github.com/leaanthony/debme"
-	"github.com/sethvargo/go-password/password"
-
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/yaml"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -323,212 +322,40 @@ var _ = Describe("lifecycle_utils", func() {
 
 	})
 
+	const clusterDefName = "test-clusterdef"
+	const clusterVersionName = "test-clusterversion"
+	const clusterName = "test-cluster"
+
+	const mysqlCompType = "replicasets"
+	const mysqlCompName = "mysql"
+
+	const nginxCompType = "proxy"
+
 	allFieldsClusterDefObj := func(needCreate bool) *dbaasv1alpha1.ClusterDefinition {
 		By("By assure an clusterDefinition obj")
-		clusterDefYAML := `
-apiVersion: dbaas.kubeblocks.io/v1alpha1
-kind: ClusterDefinition
-metadata:
-  name: cluster-definition
-spec:
-  type: state.mysql
-  components:
-  - typeName: replicasets
-    componentType: Stateful
-    configSpec:
-      configTemplateRefs:
-      - name: mysql-tree-node-template-8.0
-        configTplRef: mysql-tree-node-template-8.0
-        volumeName: mysql-config
-    defaultReplicas: 1
-    podSpec:
-      containers:
-      - name: mysql
-        imagePullPolicy: IfNotPresent
-        ports:
-        - containerPort: 3306
-          protocol: TCP
-          name: mysql
-        - containerPort: 13306
-          protocol: TCP
-          name: paxos
-        volumeMounts:
-          - mountPath: /var/lib/mysql
-            name: data
-          - mountPath: /var/log
-            name: log
-          - mountPath: /data/config
-            name: mysql-config
-        env:
-          - name: "MYSQL_ROOT_PASSWORD"
-            valueFrom:
-              secretKeyRef:
-                name: $(CONN_CREDENTIAL_SECRET_NAME)
-                key: password
-        command: ["/usr/bin/bash", "-c"]
-        args:
-          - >
-            cluster_info="";
-            for (( i=0; i<$KB_REPLICASETS_N; i++ )); do
-              if [ $i -ne 0 ]; then
-                cluster_info="$cluster_info;";
-              fi;
-              host=$(eval echo \$KB_REPLICASETS_"$i"_HOSTNAME)
-              cluster_info="$cluster_info$host:13306";
-            done;
-            idx=0;
-            while IFS='-' read -ra ADDR; do
-              for i in "${ADDR[@]}"; do
-                idx=$i;
-              done;
-            done <<< "$KB_POD_NAME";
-            echo $idx;
-            cluster_info="$cluster_info@$(($idx+1))";
-            echo $cluster_info;
-            docker-entrypoint.sh mysqld --cluster-start-index=1 --cluster-info="$cluster_info" --cluster-id=1
-  - typeName: proxy
-    componentType: Stateless
-    defaultReplicas: 1
-    podSpec:
-      containers:
-      - name: nginx
-    service:
-      ports:
-      - protocol: TCP
-        port: 80
-`
-		clusterDefinition := &dbaasv1alpha1.ClusterDefinition{}
-		Expect(yaml.Unmarshal([]byte(clusterDefYAML), clusterDefinition)).Should(Succeed())
+		clusterDefObj := testdbaas.NewClusterDefFactory(clusterDefName, testdbaas.MySQLType).
+			AddComponent(testdbaas.StatefulMySQLComponent, mysqlCompType).
+			AddComponent(testdbaas.StatelessNginxComponent, nginxCompType).
+			GetClusterDef()
 		if needCreate {
-			Expect(testCtx.CheckedCreateObj(ctx, clusterDefinition)).Should(Succeed())
+			Expect(testCtx.CreateObj(testCtx.Ctx, clusterDefObj)).Should(Succeed())
 		}
-		return clusterDefinition
+		return clusterDefObj
 	}
 
 	allFieldsClusterVersionObj := func(needCreate bool) *dbaasv1alpha1.ClusterVersion {
 		By("By assure an clusterVersion obj")
-		clusterVersionYAML := `
-apiVersion: dbaas.kubeblocks.io/v1alpha1
-kind:       ClusterVersion
-metadata:
-  name:     cluster-version
-spec:
-  clusterDefinitionRef: cluster-definition
-  components:
-  - type: replicasets
-    configSpec:
-      configTemplateRefs:
-      - name: mysql-tree-node-template-8.0
-        configTplRef: mysql-tree-node-template-8.0
-        volumeName: mysql-config
-    podSpec:
-      containers:
-      - name: mysql
-        image: docker.io/apecloud/apecloud-mysql-server:latest
-        imagePullPolicy: IfNotPresent
-        ports:
-        - containerPort: 3306
-          protocol: TCP
-          name: mysql
-        - containerPort: 13306
-          protocol: TCP
-          name: paxos
-        volumeMounts:
-          - mountPath: /var/lib/mysql
-            name: data
-          - mountPath: /var/log
-            name: log
-          - mountPath: /data/config
-            name: mysql-config
-        env:
-          - name: "MYSQL_ROOT_PASSWORD"
-            valueFrom:
-              secretKeyRef:
-                name: $(CONN_CREDENTIAL_SECRET_NAME)
-                key: password
-        command: ["/usr/bin/bash", "-c"]
-        args:
-          - >
-            cluster_info="";
-            for (( i=0; i<$KB_REPLICASETS_N; i++ )); do
-              if [ $i -ne 0 ]; then
-                cluster_info="$cluster_info;";
-              fi;
-              host=$(eval echo \$KB_REPLICASETS_"$i"_HOSTNAME)
-              cluster_info="$cluster_info$host:13306";
-            done;
-            idx=0;
-            while IFS='-' read -ra ADDR; do
-              for i in "${ADDR[@]}"; do
-                idx=$i;
-              done;
-            done <<< "$KB_POD_NAME";
-            echo $idx;
-            cluster_info="$cluster_info@$(($idx+1))";
-            echo $cluster_info;
-            docker-entrypoint.sh mysqld --cluster-start-index=1 --cluster-info="$cluster_info" --cluster-id=1
-        workingDir: "/"
-        envFrom: 
-        - configMapRef: 
-            name: test
-        resources: 
-          requests: 
-            cpu: 2
-            memory: 4Gi
-        volumeDevices:
-        - name: test
-          devicePath: /test
-        livenessProbe:
-          exec:
-            command:
-            - cat
-            - /tmp/healthy
-          initialDelaySeconds: 5
-          periodSeconds: 5
-        readinessProbe:
-          exec:
-            command:
-            - cat
-            - /tmp/healthy
-          initialDelaySeconds: 5
-          periodSeconds: 5
-        startupProbe:
-          exec:
-            command:
-            - cat
-            - /tmp/healthy
-          initialDelaySeconds: 5
-          periodSeconds: 5
-        lifecycle: 
-          postStart:
-            exec: 
-              command: 
-              - cat
-              - /tmp/healthy
-          preStop:
-            exec: 
-              command: 
-              - cat
-              - /tmp/healthy
-        terminationMessagePath: "/dev/termination-log"
-        terminationMessagePolicy: File
-        securityContext:
-          allowPrivilegeEscalation: false
-  - type: proxy
-    podSpec: 
-      initContainers:
-      - name: nginx-init-container
-        image: nginx
-      containers:
-      - name: nginx
-        image: nginx
-`
-		clusterVersion := &dbaasv1alpha1.ClusterVersion{}
-		Expect(yaml.Unmarshal([]byte(clusterVersionYAML), clusterVersion)).Should(Succeed())
+		clusterVersionObj := testdbaas.NewClusterVersionFactory(clusterVersionName, clusterDefName).
+			AddComponent(mysqlCompType).
+			AddContainerShort("mysql", testdbaas.ApeCloudMySQLImage).
+			AddComponent(nginxCompType).
+			AddInitContainerShort("nginx-init", testdbaas.NginxImage).
+			AddContainerShort("nginx", testdbaas.NginxImage).
+			GetClusterVersion()
 		if needCreate {
-			Expect(testCtx.CheckedCreateObj(ctx, clusterVersion)).Should(Succeed())
+			Expect(testCtx.CreateObj(testCtx.Ctx, clusterVersionObj)).Should(Succeed())
 		}
-		return clusterVersion
+		return clusterVersionObj
 	}
 
 	newAllFieldsClusterObj := func(
@@ -544,51 +371,18 @@ spec:
 			clusterVersionObj = allFieldsClusterVersionObj(needCreate)
 		}
 
-		randomStr, _ := password.Generate(6, 0, 0, true, false)
-		key := types.NamespacedName{
-			Name:      "cluster" + randomStr,
-			Namespace: "default",
-		}
-
-		clusterYaml := fmt.Sprintf(`
-apiVersion: dbaas.kubeblocks.io/v1alpha1
-kind: Cluster
-metadata:
-  name: %s
-  namespace: %s
-spec:
-  clusterDefinitionRef: %s
-  clusterVersionRef: %s
-  terminationPolicy: WipeOut
-  components:
-  - name: replicasets
-    type: replicasets
-    monitor: true
-    roleGroups:
-    - name: primary
-      type: primary
-      replicas: 3
-    volumeClaimTemplates:
-    - name: data
-      spec:
-        accessModes:
-          - ReadWriteOnce
-        resources:
-          requests:
-            storage: 1Gi
-    resources: 
-      requests: 
-        cpu: 2
-        memory: 4Gi
-`, key.Name, key.Namespace, clusterDefObj.GetName(), clusterVersionObj.GetName())
-
-		cluster := &dbaasv1alpha1.Cluster{}
-		Expect(yaml.Unmarshal([]byte(clusterYaml), cluster)).Should(Succeed())
+		pvcSpec := testdbaas.NewPVC("1Gi")
+		clusterObj := testdbaas.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
+			clusterDefObj.Name, clusterVersionObj.Name).
+			AddComponent(mysqlCompName, mysqlCompType).
+			AddVolumeClaimTemplate(testdbaas.DataVolumeName, &pvcSpec).
+			GetCluster()
+		key := client.ObjectKeyFromObject(clusterObj)
 		if needCreate {
-			Expect(testCtx.CheckedCreateObj(ctx, cluster)).Should(Succeed())
+			Expect(testCtx.CreateObj(testCtx.Ctx, clusterObj)).Should(Succeed())
 		}
 
-		return cluster, clusterDefObj, clusterVersionObj, key
+		return clusterObj, clusterDefObj, clusterVersionObj, key
 	}
 
 	Context("has the mergeComponents function", func() {
@@ -619,7 +413,7 @@ spec:
 				&cluster.Spec.Components[0])
 			Expect(component).ShouldNot(BeNil())
 
-			clusterVersion = allFieldsClusterVersionObj(true)
+			clusterVersion = allFieldsClusterVersionObj(false)
 			By("new container in clusterVersion not in clusterDefinition")
 			component = mergeComponents(
 				reqCtx,
@@ -668,115 +462,22 @@ spec:
 	//   body of a container such as Describe or Context.
 
 	newStsObj := func() *appsv1.StatefulSet {
-		stsYAML := `
-apiVersion: "apps/v1"
-kind: StatefulSet
-metadata:
-  labels:
-    app.kubernetes.io/component-name: replicasets
-    app.kubernetes.io/instance: mysql-cluster-01
-    app.kubernetes.io/managed-by: kubeblocks
-    app.kubernetes.io/name: state.mysql-apecloud-mysql
-  name: mysql-cluster-01-replicasets
-  namespace: default
-spec:
-  minReadySeconds: 10
-  podManagementPolicy: Parallel
-  replicas: 1
-  revisionHistoryLimit: 10
-  selector:
-    matchLabels:
-      app.kubernetes.io/component-name: replicasets
-      app.kubernetes.io/instance: mysql-cluster-01
-      app.kubernetes.io/managed-by: kubeblocks
-      app.kubernetes.io/name: state.mysql-apecloud-mysql
-  serviceName: mysql-cluster-01-replicasets-headless
-  template:
-    metadata:
-      creationTimestamp: null
-      labels:
-        app.kubernetes.io/component-name: replicasets
-        app.kubernetes.io/instance: mysql-cluster-01
-        app.kubernetes.io/managed-by: kubeblocks
-        app.kubernetes.io/name: state.mysql-apecloud-mysql
-    spec:
-      containers:
-      - command:
-        - /bin/bash
-        - -c
-        image: docker.io/apecloud/apecloud-mysql-server:latest
-        imagePullPolicy: IfNotPresent
-        name: mysql
-        ports:
-        - containerPort: 3306
-          name: mysql
-          protocol: TCP
-        - containerPort: 13306
-          name: paxos
-          protocol: TCP
-        resources: {}
-        terminationMessagePath: /dev/termination-log
-        terminationMessagePolicy: File
-        volumeMounts:
-        - mountPath: /data/mysql
-          name: data
-        - mountPath: /opt/mysql
-          name: mysql-config
-      dnsPolicy: ClusterFirst
-      initContainers:
-      - command:
-        - sh
-        - -c
-        image: lynnleelhl/kubectl:latest
-        imagePullPolicy: IfNotPresent
-        name: init
-        resources: {}
-        terminationMessagePath: /dev/termination-log
-        terminationMessagePolicy: File
-      restartPolicy: Always
-      schedulerName: default-scheduler
-      securityContext: {}
-      serviceAccount: kubeblocks
-      serviceAccountName: kubeblocks
-      terminationGracePeriodSeconds: 30
-      volumes:
-      - configMap:
-          defaultMode: 420
-          name: mysql-cluster-01-replicasets-mysql-config
-        name: mysql-config
-      - emptyDir: {}
-        name: data
-  updateStrategy:
-    type: OnDelete
-  volumeClaimTemplates:
-  - apiVersion: v1
-    kind: PersistentVolumeClaim
-    metadata:
-      creationTimestamp: null
-      labels:
-        app.kubernetes.io/component-name: replicasets
-        app.kubernetes.io/instance: mysql-cluster-01
-        app.kubernetes.io/managed-by: kubeblocks
-        app.kubernetes.io/name: state.mysql-apecloud-mysql
-        vct.kubeblocks.io/name: data
-      name: data
-    spec:
-      accessModes:
-      - ReadWriteOnce
-      resources:
-        requests:
-          storage: 1Gi
-      volumeMode: Filesystem
-    status:
-     phase: Pending
-`
-		sts := appsv1.StatefulSet{}
-		Expect(yaml.Unmarshal([]byte(stsYAML), &sts)).Should(Succeed())
-		return &sts
-	}
-	pvcKey := types.NamespacedName{
-		Namespace: "default",
-		Name:      "data-wesql-01-replicasets-0",
+		container := corev1.Container{
+			Name: "mysql",
+			VolumeMounts: []corev1.VolumeMount{{
+				Name:      "mysql-config",
+				MountPath: "/mnt/config",
+			}},
+		}
+		return testdbaas.NewStatefulSetFactory(testCtx.DefaultNamespace, "mock-sts", clusterName, mysqlCompName).
+			AddLabels(intctrlutil.AppNameLabelKey, "mock-app",
+				intctrlutil.AppInstanceLabelKey, clusterName,
+				intctrlutil.AppComponentLabelKey, mysqlCompName,
+			).SetReplicas(1).AddContainer(container).
+			AddVolumeClaimTemplate(corev1.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{Name: testdbaas.DataVolumeName},
+				Spec:       testdbaas.NewPVC("1Gi"),
+			}).GetStatefulSet()
 	}
 	snapshotName := "test-snapshot-name"
 	ctx := context.Background()
@@ -815,33 +516,23 @@ spec:
 		return &params
 	}
 	newBackupPolicyTemplate := func() *dataprotectionv1alpha1.BackupPolicyTemplate {
-		backupPolicyTemplateYAML := `
-apiVersion: dataprotection.kubeblocks.io/v1alpha1
-kind: BackupPolicyTemplate
-metadata:
-  labels:
-    clusterdefinition.kubeblocks.io/name: apecloud-mysql
-  name: backup-policy-template-mysql
-spec:
-  backupToolName: mysql-xtrabackup
-  hooks:
-    ContainerName: mysql
-    image: rancher/kubectl:v1.23.7
-    preCommands:
-    - touch /data/mysql/data/.restore; sync
-  onFailAttempted: 3
-  schedule: 0 2 * * *
-  ttl: 168h0m0s
-`
-		backupPolicyTemplate := dataprotectionv1alpha1.BackupPolicyTemplate{}
-		Expect(yaml.Unmarshal([]byte(backupPolicyTemplateYAML), &backupPolicyTemplate)).Should(Succeed())
-		return &backupPolicyTemplate
+		return testdbaas.NewBackupPolicyTemplateFactory("backup-policy-template-mysql").
+			SetBackupToolName("mysql-xtrabackup").
+			SetSchedule("0 2 * * *").
+			SetTTL("168h0m0s").
+			AddHookPreCommand("touch /data/mysql/.restore;sync").
+			AddHookPostCommand("rm -f /data/mysql/.restore;sync").
+			Create(&testCtx).GetBackupPolicyTpl()
 	}
 
 	Context("has helper function which builds specific object from cue template", func() {
 		It("builds PVC correctly", func() {
 			sts := newStsObj()
 			params := newParams()
+			pvcKey := types.NamespacedName{
+				Namespace: "default",
+				Name:      "data-mysql-01-replicasets-0",
+			}
 			pvc, err := buildPVCFromSnapshot(sts, params.component, pvcKey, snapshotName)
 			Expect(err).Should(BeNil())
 			Expect(pvc).ShouldNot(BeNil())
@@ -951,13 +642,13 @@ spec:
 		})
 	})
 
-	newVolumeSnapshot := func(clusterName string) *snapshotv1.VolumeSnapshot {
+	newVolumeSnapshot := func(clusterName, componentName string) *snapshotv1.VolumeSnapshot {
 		vsYAML := fmt.Sprintf(`
 apiVersion: snapshot.storage.k8s.io/v1
 kind: VolumeSnapshot
 metadata:
   labels:
-    app.kubernetes.io/component-name: replicasets
+    app.kubernetes.io/component-name: %s
     app.kubernetes.io/created-by: kubeblocks
     app.kubernetes.io/instance: %s
     app.kubernetes.io/managed-by: kubeblocks
@@ -971,7 +662,7 @@ spec:
   source:
     persistentVolumeClaimName: data-wesql-01-replicasets-0
   volumeSnapshotClassName: csi-aws-ebs-snapclass
-`, clusterName)
+`, componentName, clusterName)
 		vs := snapshotv1.VolumeSnapshot{}
 		Expect(yaml.Unmarshal([]byte(vsYAML), &vs)).Should(Succeed())
 		return &vs
@@ -996,17 +687,12 @@ spec:
 			}
 
 			By("prepare VolumeSnapshot and set ReadyToUse to true")
-			vs := newVolumeSnapshot(cluster.Name)
+			vs := newVolumeSnapshot(cluster.Name, mysqlCompName)
 			Expect(testCtx.CreateObj(ctx, vs)).Should(Succeed())
 			Expect(testdbaas.ChangeObjStatus(&testCtx, vs, func() {
 				t := true
 				vs.Status = &snapshotv1.VolumeSnapshotStatus{ReadyToUse: &t}
 			})).Should(Succeed())
-			// ensure cache is up-to-date before calling doBackup
-			Eventually(testdbaas.CheckObj(&testCtx, client.ObjectKeyFromObject(vs),
-				func(g Gomega, fetched *snapshotv1.VolumeSnapshot) {
-					g.Expect(fetched.Status != nil && fetched.Status.ReadyToUse != nil).To(BeTrue())
-				})).Should(Succeed())
 
 			// prepare doBackup input parameters
 			snapshotKey := types.NamespacedName{
@@ -1027,11 +713,6 @@ spec:
 			Expect(testdbaas.ChangeObjStatus(&testCtx, vs, func() {
 				vs.Status = &snapshotv1.VolumeSnapshotStatus{ReadyToUse: nil}
 			})).Should(Succeed())
-			// ensure cache is up-to-date before calling doBackup
-			Eventually(testdbaas.CheckObj(&testCtx, client.ObjectKeyFromObject(vs),
-				func(g Gomega, fetched *snapshotv1.VolumeSnapshot) {
-					g.Expect(fetched.Status.ReadyToUse).To(BeNil())
-				})).Should(Succeed())
 			shouldRequeue, err = doBackup(reqCtx, k8sClient, cluster, component, sts, &stsProto, snapshotKey)
 			Expect(shouldRequeue).Should(BeTrue())
 			Expect(err).ShouldNot(HaveOccurred())

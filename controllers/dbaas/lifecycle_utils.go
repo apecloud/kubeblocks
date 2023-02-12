@@ -46,10 +46,10 @@ import (
 	"github.com/apecloud/kubeblocks/controllers/dbaas/components/replicationset"
 	componentutil "github.com/apecloud/kubeblocks/controllers/dbaas/components/util"
 	cfgutil "github.com/apecloud/kubeblocks/controllers/dbaas/configuration"
-	"github.com/apecloud/kubeblocks/internal/builder"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 	cfgcm "github.com/apecloud/kubeblocks/internal/configuration/configmap"
-	"github.com/apecloud/kubeblocks/internal/controller"
+	"github.com/apecloud/kubeblocks/internal/controller/builder"
+	"github.com/apecloud/kubeblocks/internal/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -57,7 +57,7 @@ type createParams struct {
 	clusterDefinition *dbaasv1alpha1.ClusterDefinition
 	clusterVersion    *dbaasv1alpha1.ClusterVersion
 	cluster           *dbaasv1alpha1.Cluster
-	component         *controller.Component
+	component         *component.Component
 	applyObjs         *[]client.Object
 	cacheCtx          *map[string]interface{}
 }
@@ -75,21 +75,21 @@ func mergeComponentsList(reqCtx intctrlutil.RequestCtx,
 	cluster *dbaasv1alpha1.Cluster,
 	clusterDef *dbaasv1alpha1.ClusterDefinition,
 	clusterDefCompList []dbaasv1alpha1.ClusterDefinitionComponent,
-	clusterCompList []dbaasv1alpha1.ClusterComponent) []controller.Component {
-	var compList []controller.Component
+	clusterCompList []dbaasv1alpha1.ClusterComponent) []component.Component {
+	var compList []component.Component
 	for _, clusterDefComp := range clusterDefCompList {
 		for _, clusterComp := range clusterCompList {
 			if clusterComp.Type != clusterDefComp.TypeName {
 				continue
 			}
-			comp := controller.MergeComponents(reqCtx, cluster, clusterDef, &clusterDefComp, nil, &clusterComp)
+			comp := component.MergeComponents(reqCtx, cluster, clusterDef, &clusterDefComp, nil, &clusterComp)
 			compList = append(compList, *comp)
 		}
 	}
 	return compList
 }
 
-func getComponent(componentList []controller.Component, name string) *controller.Component {
+func getComponent(componentList []component.Component, name string) *component.Component {
 	for _, comp := range componentList {
 		if comp.Name == name {
 			return &comp
@@ -140,7 +140,7 @@ func reconcileClusterWorkloads(
 	clusterCompMap = cluster.GetTypeMappingComponents()
 	clusterVersionCompMap := clusterVersion.GetTypeMappingComponents()
 
-	prepareComp := func(component *controller.Component) error {
+	prepareComp := func(component *component.Component) error {
 		iParams := params
 		iParams.component = component
 		return prepareComponentObjs(reqCtx, cli, &iParams)
@@ -151,7 +151,7 @@ func reconcileClusterWorkloads(
 		clusterVersionComp := clusterVersionCompMap[typeName]
 		clusterComps := clusterCompMap[typeName]
 		for _, clusterComp := range clusterComps {
-			if err := prepareComp(controller.MergeComponents(reqCtx, cluster, clusterDefinition, &c, clusterVersionComp, &clusterComp)); err != nil {
+			if err := prepareComp(component.MergeComponents(reqCtx, cluster, clusterDefinition, &c, clusterVersionComp, &clusterComp)); err != nil {
 				return false, err
 			}
 		}
@@ -352,7 +352,7 @@ func prepareComponentObjs(reqCtx intctrlutil.RequestCtx, cli client.Client, obj 
 }
 
 // TODO multi roles with same accessMode support
-func addLeaderSelectorLabels(service *corev1.Service, component *controller.Component) {
+func addLeaderSelectorLabels(service *corev1.Service, component *component.Component) {
 	leader := component.ConsensusSpec.Leader
 	if len(leader.Name) > 0 {
 		service.Spec.Selector[intctrlutil.RoleLabelKey] = leader.Name
@@ -827,7 +827,7 @@ func injectReplicationSetPodEnvAndLabel(params createParams, sts *appsv1.Statefu
 	for i := range sts.Spec.Template.Spec.Containers {
 		c := &sts.Spec.Template.Spec.Containers[i]
 		c.Env = append(c.Env, corev1.EnvVar{
-			Name:      controller.KBPrefix + "_PRIMARY_POD_NAME",
+			Name:      component.KBPrefix + "_PRIMARY_POD_NAME",
 			Value:     fmt.Sprintf("%s-%d-%d.%s", sts.Name, *params.component.PrimaryIndex, 0, svcName),
 			ValueFrom: nil,
 		})
@@ -1285,7 +1285,7 @@ func deleteBackup(ctx context.Context, cli client.Client, clusterName string, co
 
 func createPVCFromSnapshot(ctx context.Context,
 	cli client.Client,
-	component *controller.Component,
+	component *component.Component,
 	sts *appsv1.StatefulSet,
 	pvcKey types.NamespacedName,
 	snapshotName string) error {
@@ -1310,7 +1310,7 @@ func isSnapshotAvailable(cli client.Client, ctx context.Context) bool {
 func isVolumeSnapshotExists(cli client.Client,
 	ctx context.Context,
 	cluster *dbaasv1alpha1.Cluster,
-	component *controller.Component) (bool, error) {
+	component *component.Component) (bool, error) {
 	ml := getBackupMatchingLabels(cluster.Name, component.Name)
 	vsList := snapshotv1.VolumeSnapshotList{}
 	if err := cli.List(ctx, &vsList, ml); err != nil {
@@ -1323,7 +1323,7 @@ func isVolumeSnapshotExists(cli client.Client,
 func isVolumeSnapshotReadyToUse(cli client.Client,
 	ctx context.Context,
 	cluster *dbaasv1alpha1.Cluster,
-	component *controller.Component) (bool, error) {
+	component *component.Component) (bool, error) {
 	ml := getBackupMatchingLabels(cluster.Name, component.Name)
 	vsList := snapshotv1.VolumeSnapshotList{}
 	if err := cli.List(ctx, &vsList, ml); err != nil {
@@ -1387,7 +1387,7 @@ func checkedCreatePVCFromSnapshot(cli client.Client,
 	ctx context.Context,
 	pvcKey types.NamespacedName,
 	cluster *dbaasv1alpha1.Cluster,
-	component *controller.Component,
+	component *component.Component,
 	stsObj *appsv1.StatefulSet) error {
 	pvc := corev1.PersistentVolumeClaim{}
 	// check pvc existence
@@ -1436,7 +1436,7 @@ func deleteSnapshot(cli client.Client,
 	reqCtx intctrlutil.RequestCtx,
 	snapshotKey types.NamespacedName,
 	cluster *dbaasv1alpha1.Cluster,
-	component *controller.Component) error {
+	component *component.Component) error {
 	ctx := reqCtx.Ctx
 	if err := deleteBackup(ctx, cli, cluster.Name, component.Name); err != nil {
 		return client.IgnoreNotFound(err)
@@ -1501,7 +1501,7 @@ func timeToSchedule(t time.Time) string {
 func doBackup(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
 	cluster *dbaasv1alpha1.Cluster,
-	component *controller.Component,
+	component *component.Component,
 	stsObj *appsv1.StatefulSet,
 	stsProto *appsv1.StatefulSet,
 	snapshotKey types.NamespacedName) (shouldRequeue bool, err error) {

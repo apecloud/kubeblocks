@@ -28,7 +28,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/controller"
+	ctrlcomp "github.com/apecloud/kubeblocks/internal/controller/component"
 )
 
 type insClassType struct {
@@ -45,7 +45,7 @@ var _ = Describe("tpl template", func() {
 	var (
 		podSpec     *corev1.PodSpec
 		cfgTemplate []dbaasv1alpha1.ConfigTemplate
-		component   *controller.Component
+		component   *ctrlcomp.Component
 	)
 
 	const (
@@ -149,7 +149,7 @@ single_thread_memory = 294912
 				},
 			},
 		}
-		component = &controller.Component{
+		component = &ctrlcomp.Component{
 			ClusterDefName: "mysql-three-node-definition",
 			ClusterType:    "state.mysql",
 			Name:           "replicasets",

@@ -32,7 +32,7 @@ import (
 
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/controller"
+	"github.com/apecloud/kubeblocks/internal/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	testdbaas "github.com/apecloud/kubeblocks/internal/testutil/dbaas"
 )
@@ -141,11 +141,11 @@ var _ = Describe("builder", func() {
 		}
 		return reqCtx
 	}
-	newAllFieldsComponent := func() *controller.Component {
+	newAllFieldsComponent := func() *component.Component {
 		cluster, clusterDef, clusterVersion, _ := newAllFieldsClusterObj(nil, nil, false)
 		reqCtx := newReqCtx()
 		By("assign every available fields")
-		component := controller.MergeComponents(
+		component := component.MergeComponents(
 			reqCtx,
 			cluster,
 			clusterDef,

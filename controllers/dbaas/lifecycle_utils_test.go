@@ -33,7 +33,7 @@ import (
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/controller"
+	"github.com/apecloud/kubeblocks/internal/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	testdbaas "github.com/apecloud/kubeblocks/internal/testutil/dbaas"
 )
@@ -322,7 +322,7 @@ spec:
 			By("prepare cluster and construct component")
 			reqCtx := newReqCtx()
 			cluster, clusterDef, clusterVersion, _ := newAllFieldsClusterObj(nil, nil, false)
-			component := controller.MergeComponents(
+			component := component.MergeComponents(
 				reqCtx,
 				cluster,
 				clusterDef,

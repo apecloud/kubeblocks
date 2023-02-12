@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package controller
+package component
 
 import (
 	. "github.com/onsi/ginkgo/v2"
@@ -141,7 +141,7 @@ var _ = Describe("component module", func() {
 			}
 		})
 	})
-	
+
 	Context("has the MergeComponents function", func() {
 		const (
 			clusterDefName     = "test-clusterdef"

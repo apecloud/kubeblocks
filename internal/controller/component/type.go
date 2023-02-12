@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package controller
+package component
 
 import (
 	v12 "k8s.io/api/core/v1"

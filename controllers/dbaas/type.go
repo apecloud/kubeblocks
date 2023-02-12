@@ -23,7 +23,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/controller"
+	"github.com/apecloud/kubeblocks/internal/controller/component"
 	"github.com/apecloud/kubeblocks/internal/gotemplate"
 )
 
@@ -81,7 +81,7 @@ type configTemplateBuilder struct {
 	builtInFunctions *gotemplate.BuiltInObjectsFunc
 
 	// DBaas cluster object
-	component      *controller.Component
+	component      *component.Component
 	clusterVersion *dbaasv1alpha1.ClusterVersion
 	cluster        *dbaasv1alpha1.Cluster
 	podSpec        *corev1.PodSpec

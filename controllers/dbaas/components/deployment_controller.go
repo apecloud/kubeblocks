@@ -20,6 +20,7 @@ import (
 	"context"
 
 	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -78,7 +79,8 @@ func (r *DeploymentReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	}
 
 	statelessComp := stateless.NewStateless(reqCtx.Ctx, r.Client, cluster)
-	compCtx := newComponentContext(reqCtx, r.Client, r.Recorder, statelessComp, deploy)
+	componentName := deploy.GetLabels()[intctrlutil.AppComponentLabelKey]
+	compCtx := newComponentContext(reqCtx, r.Client, r.Recorder, statelessComp, deploy, componentName)
 	if requeueAfter, err := handleComponentStatusAndSyncCluster(compCtx, cluster); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	} else if requeueAfter != 0 {
@@ -93,5 +95,6 @@ func (r *DeploymentReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 func (r *DeploymentReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&appsv1.Deployment{}, builder.WithPredicates(predicate.NewPredicateFuncs(intctrlutil.WorkloadFilterPredicate))).
+		Owns(&corev1.Pod{}).
 		Complete(r)
 }

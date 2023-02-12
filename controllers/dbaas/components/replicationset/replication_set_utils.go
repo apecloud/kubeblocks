@@ -71,6 +71,9 @@ func HandleReplicationSet(reqCtx intctrlutil.RequestCtx,
 			if err != nil {
 				return err
 			}
+			if defaultReplicas < 0 {
+				return nil
+			}
 			clusterComp.Replicas = &defaultReplicas
 		}
 		clusterCompReplicasMap[clusterComp.Name] = *clusterComp.Replicas

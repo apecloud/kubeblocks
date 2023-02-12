@@ -19,12 +19,9 @@ package replicationset
 import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
-	testk8s "github.com/apecloud/kubeblocks/internal/testutil/k8s"
-
-	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	testdbaas "github.com/apecloud/kubeblocks/internal/testutil/dbaas"
@@ -33,7 +30,7 @@ import (
 var _ = Describe("Replication Component", func() {
 	var (
 		randomStr          = testCtx.GetRandomStr()
-		clusterName        = "cluster-replication" + randomStr
+		clusterName        = "cluster-repl" + randomStr
 		clusterDefName     = "cluster-def-replication-" + randomStr
 		clusterVersionName = "cluster-version-replication-" + randomStr
 	)
@@ -42,7 +39,6 @@ var _ = Describe("Replication Component", func() {
 		clusterDefObj     *dbaasv1alpha1.ClusterDefinition
 		clusterVersionObj *dbaasv1alpha1.ClusterVersion
 		clusterObj        *dbaasv1alpha1.Cluster
-		clusterKey        types.NamespacedName
 	)
 
 	const redisImage = "redis:7.0.5"
@@ -87,26 +83,25 @@ var _ = Describe("Replication Component", func() {
 			clusterObj = testdbaas.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
 				clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
 				AddComponent(redisCompName, redisCompType).Create(&testCtx).GetCluster()
-			clusterKey = client.ObjectKeyFromObject(clusterObj)
 
-			By("Waiting for the cluster initialized")
-			Eventually(testdbaas.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
-
-			stsList := testk8s.ListAndCheckStatefulSet(&testCtx, clusterKey)
-			sts := &stsList.Items[0]
+			primaryStsName := clusterObj.Name + redisCompName + "-0"
+			secondaryStsName := clusterObj.Name + redisCompName + "-1"
+			primarySts := testdbaas.MockReplicationComponentStatefulSet(testCtx, clusterObj.Name, redisCompName, primaryStsName, string(Primary))
+			secondarySts := testdbaas.MockReplicationComponentStatefulSet(testCtx, clusterObj.Name, redisCompName, secondaryStsName, string(Secondary))
 			typeName := clusterObj.GetComponentTypeName(redisCompName)
 			componentDef := clusterDefObj.GetComponentDefByTypeName(typeName)
 			component := clusterObj.GetComponentByName(redisCompName)
 
 			By("test pods are not ready")
 			replicationComponent := NewReplicationSet(ctx, k8sClient, clusterObj, component, componentDef)
-			sts.Status.AvailableReplicas = *sts.Spec.Replicas - 1
-			podsReady, _ := replicationComponent.PodsReady(sts)
+			primarySts.Status.AvailableReplicas = *primarySts.Spec.Replicas - 1
+			secondarySts.Status.AvailableReplicas = *primarySts.Spec.Replicas
+			podsReady, _ := replicationComponent.PodsReady(primarySts)
 			Expect(podsReady == false).Should(BeTrue())
 
 			By("test component is not running")
-			sts.Status.AvailableReplicas = *sts.Spec.Replicas
-			isRunning, _ := replicationComponent.IsRunning(sts)
+			primarySts.Status.AvailableReplicas = *primarySts.Spec.Replicas
+			isRunning, _ := replicationComponent.IsRunning(primarySts)
 			Expect(isRunning == false).Should(BeTrue())
 
 			By("test handle probe timed out")

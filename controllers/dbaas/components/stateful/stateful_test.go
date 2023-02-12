@@ -68,7 +68,7 @@ var _ = Describe("Stateful Component", func() {
 	Context("Stateful Component test", func() {
 		It("Stateful Component test", func() {
 			By(" init cluster, statefulSet, pods")
-			_, _, cluster := testdbaas.InitConsensusMysql(testCtx, clusterDefName,
+			clusterDef, _, cluster := testdbaas.InitConsensusMysql(testCtx, clusterDefName,
 				clusterVersionName, clusterName, consensusCompName)
 			_ = testdbaas.MockConsensusComponentStatefulSet(testCtx, clusterName, consensusCompName)
 			stsList := &appsv1.StatefulSetList{}
@@ -82,7 +82,9 @@ var _ = Describe("Stateful Component", func() {
 			sts := &stsList.Items[0]
 
 			By("test pods are not ready")
-			stateful := NewStateful(ctx, k8sClient, cluster)
+			clusterComponent := cluster.GetComponentByName(consensusCompName)
+			componentDef := clusterDef.GetComponentDefByTypeName(clusterComponent.Type)
+			stateful := NewStateful(ctx, k8sClient, cluster, clusterComponent, componentDef)
 			patch := client.MergeFrom(sts.DeepCopy())
 			availableReplicas := *sts.Spec.Replicas - 1
 			sts.Status.AvailableReplicas = availableReplicas
@@ -121,8 +123,17 @@ var _ = Describe("Stateful Component", func() {
 			podsReady, _ = stateful.PodsReady(sts)
 			Expect(podsReady == true).Should(BeTrue())
 
-			By("test component is running")
+			By("test component.replicas is inconsistent with sts.spec.replicas")
+			oldReplicas := clusterComponent.Replicas
+			replicas := int32(4)
+			clusterComponent.Replicas = &replicas
 			isRunning, _ := stateful.IsRunning(sts)
+			Expect(isRunning == false).Should(BeTrue())
+			// reset replicas
+			clusterComponent.Replicas = oldReplicas
+
+			By("test component is running")
+			isRunning, _ = stateful.IsRunning(sts)
 			Expect(isRunning == true).Should(BeTrue())
 
 			By("test handle probe timed out")

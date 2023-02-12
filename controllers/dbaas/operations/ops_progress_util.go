@@ -189,7 +189,8 @@ func handleStatelessProgress(opsRes *OpsResource,
 	podList *corev1.PodList,
 	pgRes progressResource,
 	statusComponent *dbaasv1alpha1.OpsRequestStatusComponent) (succeedCount int32, err error) {
-	currComponent := stateless.NewStateless(opsRes.Ctx, opsRes.Client, opsRes.Cluster)
+	currComponent := stateless.NewStateless(opsRes.Ctx, opsRes.Client, opsRes.Cluster,
+		pgRes.clusterComponent, pgRes.clusterComponentDef)
 	if currComponent == nil {
 		return
 	}
@@ -217,23 +218,10 @@ func handleStatelessProgress(opsRes *OpsResource,
 		progressDetail := dbaasv1alpha1.ProgressDetail{ObjectKey: objectKey}
 		if currComponent.PodIsAvailable(&v, minReadySeconds) && v.DeletionTimestamp.IsZero() {
 			succeedCount += 1
-			progressDetail.SetStatusAndMessage(dbaasv1alpha1.SucceedProgressStatus,
-				getProgressSucceedMessage(pgRes.opsMessageKey, objectKey, componentName))
-			SetStatusComponentProgressDetail(opsRes.Recorder, opsRes.OpsRequest,
-				&statusComponent.ProgressDetails, progressDetail)
+			handleSucceedProgressDetail(opsRes, pgRes, statusComponent, progressDetail)
 			continue
 		}
-		if util.IsFailedOrAbnormal(statusComponent.Phase) {
-			// means the pod is failed.
-			podMessage := getFailedPodMessage(opsRes.Cluster, componentName, &v)
-			message := getProgressFailedMessage(pgRes.opsMessageKey, objectKey, componentName, podMessage)
-			progressDetail.SetStatusAndMessage(dbaasv1alpha1.FailedProgressStatus, message)
-		} else {
-			progressDetail.SetStatusAndMessage(dbaasv1alpha1.ProcessingProgressStatus,
-				getProgressProcessingMessage(pgRes.opsMessageKey, objectKey, componentName))
-		}
-		SetStatusComponentProgressDetail(opsRes.Recorder, opsRes.OpsRequest,
-			&statusComponent.ProgressDetails, progressDetail)
+		handleFailedOrProcessingProgressDetail(opsRes, pgRes, statusComponent, progressDetail, &v)
 	}
 	statusComponent.ProgressDetails = removeStatelessExpiredPod(podList, statusComponent.ProgressDetails)
 	return succeedCount, err
@@ -270,26 +258,45 @@ func handleStatefulSetProgress(opsRes *OpsResource,
 		}
 		if currComponent.PodIsAvailable(&v, minReadySeconds) {
 			succeedCount += 1
-			progressDetail.SetStatusAndMessage(dbaasv1alpha1.SucceedProgressStatus,
-				getProgressSucceedMessage(pgRes.opsMessageKey, objectKey, componentName))
-			SetStatusComponentProgressDetail(opsRes.Recorder, opsRes.OpsRequest,
-				&statusComponent.ProgressDetails, progressDetail)
+			handleSucceedProgressDetail(opsRes, pgRes, statusComponent, progressDetail)
 			continue
 		}
 
-		if util.IsFailedOrAbnormal(statusComponent.Phase) {
-			// means the pod is failed.
-			podMessage := getFailedPodMessage(opsRes.Cluster, componentName, &v)
-			message := getProgressFailedMessage(pgRes.opsMessageKey, objectKey, componentName, podMessage)
-			progressDetail.SetStatusAndMessage(dbaasv1alpha1.FailedProgressStatus, message)
-		} else {
-			progressDetail.SetStatusAndMessage(dbaasv1alpha1.ProcessingProgressStatus,
-				getProgressProcessingMessage(pgRes.opsMessageKey, objectKey, componentName))
-		}
-		SetStatusComponentProgressDetail(opsRes.Recorder, opsRes.OpsRequest,
-			&statusComponent.ProgressDetails, progressDetail)
+		handleFailedOrProcessingProgressDetail(opsRes, pgRes, statusComponent, progressDetail, &v)
 	}
 	return succeedCount, err
+}
+
+// handleSucceedProgressDetail handles the successful progressDetail and sets it to progressDetails.
+func handleSucceedProgressDetail(opsRes *OpsResource,
+	pgRes progressResource,
+	statusComponent *dbaasv1alpha1.OpsRequestStatusComponent,
+	progressDetail dbaasv1alpha1.ProgressDetail,
+) {
+	progressDetail.SetStatusAndMessage(dbaasv1alpha1.SucceedProgressStatus,
+		getProgressSucceedMessage(pgRes.opsMessageKey, progressDetail.ObjectKey, pgRes.clusterComponent.Name))
+	SetStatusComponentProgressDetail(opsRes.Recorder, opsRes.OpsRequest,
+		&statusComponent.ProgressDetails, progressDetail)
+}
+
+// handleFailedOrProcessingProgressDetail handles failed or processing progressDetail and sets it to progressDetails.
+func handleFailedOrProcessingProgressDetail(opsRes *OpsResource,
+	pgRes progressResource,
+	statusComponent *dbaasv1alpha1.OpsRequestStatusComponent,
+	progressDetail dbaasv1alpha1.ProgressDetail,
+	pod *corev1.Pod) {
+	componentName := pgRes.clusterComponent.Name
+	if util.IsFailedOrAbnormal(statusComponent.Phase) {
+		// means the pod is failed.
+		podMessage := getFailedPodMessage(opsRes.Cluster, componentName, pod)
+		message := getProgressFailedMessage(pgRes.opsMessageKey, progressDetail.ObjectKey, componentName, podMessage)
+		progressDetail.SetStatusAndMessage(dbaasv1alpha1.FailedProgressStatus, message)
+	} else {
+		progressDetail.SetStatusAndMessage(dbaasv1alpha1.ProcessingProgressStatus,
+			getProgressProcessingMessage(pgRes.opsMessageKey, progressDetail.ObjectKey, componentName))
+	}
+	SetStatusComponentProgressDetail(opsRes.Recorder, opsRes.OpsRequest,
+		&statusComponent.ProgressDetails, progressDetail)
 }
 
 func getProgressProcessingMessage(opsMessageKey, objectKey, componentName string) string {

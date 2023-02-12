@@ -16,26 +16,15 @@ sts: {
 	metadata: {
 		labels: [string]: string
 	}
-	spec: {
-		volumeClaimTemplates: [
-			{
-				spec: {
-					accessModes: [string]
-					resources: {}
-				}
-			},
-		]
-	}
 }
-component: {
-	volumeClaimTemplates: [
-		{
+volumeClaimTemplate: {
+            metadata: {
+            	name: string
+            }
 			spec: {
 				accessModes: [string]
 				resources: {}
 			}
-		},
-	]
 }
 snapshot_name: string
 pvc_key: {
@@ -50,14 +39,15 @@ pvc: {
 		namespace: pvc_key.Namespace
 		labels: {
 			"app.kubernetes.io/created-by": "kubeblocks"
+			"vct.kubeblocks.io/name": volumeClaimTemplate.metadata.name
 			for k, v in sts.metadata.labels {
 				"\(k)": "\(v)"
 			}
 		}
 	}
 	spec: {
-		accessModes: sts.spec.volumeClaimTemplates[0].spec.accessModes
-		resources:   component.volumeClaimTemplates[0].spec.resources
+		accessModes: volumeClaimTemplate.spec.accessModes
+		resources:   volumeClaimTemplate.spec.resources
 		dataSource: {
 			"name":     snapshot_name
 			"kind":     "VolumeSnapshot"

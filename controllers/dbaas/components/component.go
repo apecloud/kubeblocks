@@ -80,9 +80,9 @@ func NewComponentByType(
 	case dbaasv1alpha1.Replication:
 		return replicationset.NewReplicationSet(ctx, cli, cluster, component, componentDef)
 	case dbaasv1alpha1.Stateful:
-		return stateful.NewStateful(ctx, cli, cluster)
+		return stateful.NewStateful(ctx, cli, cluster, component, componentDef)
 	case dbaasv1alpha1.Stateless:
-		return stateless.NewStateless(ctx, cli, cluster)
+		return stateless.NewStateless(ctx, cli, cluster, component, componentDef)
 	}
 	return nil
 }

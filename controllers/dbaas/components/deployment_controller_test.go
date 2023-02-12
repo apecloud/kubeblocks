@@ -45,7 +45,8 @@ var _ = Describe("Deployment Controller", func() {
 		clusterVersionName = "stateless-cluster-version1-" + randomStr
 		clusterName        = "stateless1-" + randomStr
 		namespace          = "default"
-		statelessCompName  = "stateless"
+		statelessCompName  = "nginx"
+		statelessType      = "proxy"
 	)
 
 	cleanAll := func() {
@@ -72,6 +73,9 @@ var _ = Describe("Deployment Controller", func() {
 
 	Context("test controller", func() {
 		It("", func() {
+			testdbaas.NewClusterDefFactory(clusterDefName, testdbaas.MySQLType).
+				AddComponent(testdbaas.StatelessNginxComponent, statelessType).SetDefaultReplicas(2).
+				Create(&testCtx).GetClusterDef()
 			cluster := testdbaas.CreateStatelessCluster(testCtx, clusterDefName, clusterVersionName, clusterName)
 
 			By("patch cluster to Running")

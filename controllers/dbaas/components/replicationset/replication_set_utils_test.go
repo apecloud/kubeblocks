@@ -21,8 +21,6 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-
-	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -36,78 +34,103 @@ var _ = Describe("ReplicationSet Util", func() {
 
 	var (
 		randomStr           = testCtx.GetRandomStr()
-		clusterName         = "cluster-replication" + randomStr
+		clusterNamePrefix   = "cluster-replication"
 		clusterDefName      = "cluster-def-replication-" + randomStr
 		clusterVersionName  = "cluster-version-replication-" + randomStr
 		replicationCompName = "replication"
 	)
 
-	cleanupObjects := func() {
-		err := k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.ClusterDefinition{}, client.HasLabels{testCtx.TestObjLabelKey})
-		Expect(err).NotTo(HaveOccurred())
-		err = k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.ClusterVersion{}, client.HasLabels{testCtx.TestObjLabelKey})
-		Expect(err).NotTo(HaveOccurred())
-		err = k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.Cluster{}, client.InNamespace(testCtx.DefaultNamespace), client.HasLabels{testCtx.TestObjLabelKey})
-		Expect(err).NotTo(HaveOccurred())
-		err = k8sClient.DeleteAllOf(ctx, &appsv1.StatefulSet{}, client.InNamespace(testCtx.DefaultNamespace), client.HasLabels{testCtx.TestObjLabelKey})
-		Expect(err).NotTo(HaveOccurred())
-		err = k8sClient.DeleteAllOf(ctx, &corev1.Pod{}, client.InNamespace(testCtx.DefaultNamespace), client.HasLabels{testCtx.TestObjLabelKey},
-			client.GracePeriodSeconds(0))
-		Expect(err).NotTo(HaveOccurred())
+	var (
+		clusterDefObj     *dbaasv1alpha1.ClusterDefinition
+		clusterVersionObj *dbaasv1alpha1.ClusterVersion
+		clusterObj        *dbaasv1alpha1.Cluster
+	)
+
+	const redisImage = "redis:7.0.5"
+	const redisCompType = "replication"
+	const redisCompName = "redis-rsts"
+
+	cleanAll := func() {
+		// must wait until resources deleted and no longer exist before the testcases start,
+		// otherwise if later it needs to create some new resource objects with the same name,
+		// in race conditions, it will find the existence of old objects, resulting failure to
+		// create the new objects.
+		By("clean resources")
+		// delete cluster(and all dependent sub-resources), clusterversion and clusterdef
+		testdbaas.ClearClusterResources(&testCtx)
+
+		// clear rest resources
+		inNS := client.InNamespace(testCtx.DefaultNamespace)
+		ml := client.HasLabels{testCtx.TestObjLabelKey}
+		// namespaced resources
+		testdbaas.ClearResources(&testCtx, intctrlutil.StatefulSetSignature, inNS, ml)
+		testdbaas.ClearResources(&testCtx, intctrlutil.PodSignature, inNS, ml, client.GracePeriodSeconds(0))
 	}
 
-	BeforeEach(func() {
-		cleanupObjects()
-	})
+	BeforeEach(cleanAll)
 
-	AfterEach(func() {
-		cleanupObjects()
-	})
+	AfterEach(cleanAll)
 
 	Context("test replicationSet util", func() {
+		BeforeEach(func() {
+			By("Create a clusterDefinition obj with replication componentType.")
+			clusterDefObj = testdbaas.NewClusterDefFactory(clusterDefName, testdbaas.RedisType).
+				AddComponent(testdbaas.ReplicationRedisComponent, replicationCompName).
+				Create(&testCtx).GetClusterDef()
+
+			By("Create a clusterVersion obj with replication componentType.")
+			clusterVersionObj = testdbaas.NewClusterVersionFactory(clusterVersionName, clusterDefObj.GetName()).
+				AddComponent(replicationCompName).AddContainerShort("redis", redisImage).
+				Create(&testCtx).GetClusterVersion()
+
+			By("Creating a cluster with replication componentType.")
+			clusterObj = testdbaas.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
+				clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
+				AddComponent(redisCompName, redisCompType).Create(&testCtx).GetCluster()
+
+		})
+
 		It("", func() {
-			_, _, cluster := testdbaas.InitReplicationRedis(testCtx, clusterDefName, clusterVersionName, clusterName, replicationCompName)
-			By("init cluster status")
-			componentName := "rsts-comp"
-			patch := client.MergeFrom(cluster.DeepCopy())
-			cluster.Status.Phase = dbaasv1alpha1.RunningPhase
-			cluster.Status.Components = map[string]dbaasv1alpha1.ClusterStatusComponent{
-				componentName: {
+			By("init replicationSet cluster status")
+			patch := client.MergeFrom(clusterObj.DeepCopy())
+			clusterObj.Status.Phase = dbaasv1alpha1.RunningPhase
+			clusterObj.Status.Components = map[string]dbaasv1alpha1.ClusterStatusComponent{
+				redisCompName: {
 					Phase: dbaasv1alpha1.RunningPhase,
 					ReplicationSetStatus: &dbaasv1alpha1.ReplicationSetStatus{
 						Primary: dbaasv1alpha1.ReplicationMemberStatus{
-							Pod: clusterName + componentName + "-0-0",
+							Pod: clusterObj.Name + redisCompName + "-0-0",
 						},
 						Secondaries: []dbaasv1alpha1.ReplicationMemberStatus{
 							{
-								Pod: clusterName + componentName + "-1-0",
+								Pod: clusterObj.Name + redisCompName + "-1-0",
 							},
 							{
-								Pod: clusterName + componentName + "-2-0",
+								Pod: clusterObj.Name + redisCompName + "-2-0",
 							},
 						},
 					},
 				},
 			}
-			Expect(k8sClient.Status().Patch(context.Background(), cluster, patch)).Should(Succeed())
+			Expect(k8sClient.Status().Patch(context.Background(), clusterObj, patch)).Should(Succeed())
 
 			By("testing sync cluster status with add pod")
 			var podList []*corev1.Pod
-			set := testk8s.NewFakeStatefulSet(clusterName+componentName+"-3", 3)
+			set := testk8s.NewFakeStatefulSet(clusterObj.Name+redisCompName+"-3", 3)
 			pod := testk8s.NewFakeStatefulSetPod(set, 0)
 			pod.Labels = make(map[string]string, 0)
 			pod.Labels[intctrlutil.RoleLabelKey] = "secondary"
 			podList = append(podList, pod)
-			Expect(needUpdateReplicationSetStatus(cluster.Status.Components[componentName].ReplicationSetStatus, podList)).Should(BeTrue())
+			Expect(needUpdateReplicationSetStatus(clusterObj.Status.Components[redisCompName].ReplicationSetStatus, podList)).Should(BeTrue())
 
 			By("testing sync cluster status with remove pod")
 			var podRemoveList []corev1.Pod
-			set = testk8s.NewFakeStatefulSet(clusterName+componentName+"-2", 3)
+			set = testk8s.NewFakeStatefulSet(clusterObj.Name+redisCompName+"-2", 3)
 			pod = testk8s.NewFakeStatefulSetPod(set, 0)
 			pod.Labels = make(map[string]string, 0)
 			pod.Labels[intctrlutil.RoleLabelKey] = "secondary"
 			podRemoveList = append(podRemoveList, *pod)
-			Expect(needRemoveReplicationSetStatus(cluster.Status.Components[componentName].ReplicationSetStatus, podRemoveList)).Should(BeTrue())
+			Expect(needRemoveReplicationSetStatus(clusterObj.Status.Components[redisCompName].ReplicationSetStatus, podRemoveList)).Should(BeTrue())
 		})
 	})
 })

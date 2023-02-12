@@ -31,9 +31,10 @@ import (
 type ComponentTplType string
 
 const (
-	StatefulMySQLComponent  ComponentTplType = "stateful-mysql"
-	ConsensusMySQLComponent ComponentTplType = "consensus-mysql"
-	StatelessNginxComponent ComponentTplType = "stateless-nginx"
+	StatefulMySQLComponent    ComponentTplType = "stateful-mysql"
+	ConsensusMySQLComponent   ComponentTplType = "consensus-mysql"
+	ReplicationRedisComponent ComponentTplType = "replication-redis"
+	StatelessNginxComponent   ComponentTplType = "stateless-nginx"
 )
 
 type MockClusterDefFactory struct {
@@ -77,6 +78,8 @@ func (factory *MockClusterDefFactory) AddComponent(tplType ComponentTplType, ren
 		component = &statefulMySQLComponent
 	case ConsensusMySQLComponent:
 		component = &consensusMySQLComponent
+	case ReplicationRedisComponent:
+		component = &replicationRedisComponent
 	case StatelessNginxComponent:
 		component = &statelessNginxComponent
 	}

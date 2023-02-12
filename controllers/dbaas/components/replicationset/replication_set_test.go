@@ -19,9 +19,11 @@ package replicationset
 import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"k8s.io/apimachinery/pkg/types"
 
-	appsv1 "k8s.io/api/apps/v1"
-	corev1 "k8s.io/api/core/v1"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	testk8s "github.com/apecloud/kubeblocks/internal/testutil/k8s"
+
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
@@ -30,50 +32,74 @@ import (
 
 var _ = Describe("Replication Component", func() {
 	var (
-		randomStr           = testCtx.GetRandomStr()
-		clusterName         = "cluster-replication" + randomStr
-		clusterDefName      = "cluster-def-replication-" + randomStr
-		clusterVersionName  = "cluster-version-replication-" + randomStr
-		replicationCompName = "replication"
+		randomStr          = testCtx.GetRandomStr()
+		clusterName        = "cluster-replication" + randomStr
+		clusterDefName     = "cluster-def-replication-" + randomStr
+		clusterVersionName = "cluster-version-replication-" + randomStr
 	)
 
-	cleanupObjects := func() {
-		err := k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.ClusterDefinition{}, client.HasLabels{testCtx.TestObjLabelKey})
-		Expect(err).NotTo(HaveOccurred())
-		err = k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.ClusterVersion{}, client.HasLabels{testCtx.TestObjLabelKey})
-		Expect(err).NotTo(HaveOccurred())
-		err = k8sClient.DeleteAllOf(ctx, &dbaasv1alpha1.Cluster{}, client.InNamespace(testCtx.DefaultNamespace), client.HasLabels{testCtx.TestObjLabelKey})
-		Expect(err).NotTo(HaveOccurred())
-		err = k8sClient.DeleteAllOf(ctx, &appsv1.StatefulSet{}, client.InNamespace(testCtx.DefaultNamespace), client.HasLabels{testCtx.TestObjLabelKey})
-		Expect(err).NotTo(HaveOccurred())
-		err = k8sClient.DeleteAllOf(ctx, &corev1.Pod{}, client.InNamespace(testCtx.DefaultNamespace), client.HasLabels{testCtx.TestObjLabelKey},
-			client.GracePeriodSeconds(0))
-		Expect(err).NotTo(HaveOccurred())
+	var (
+		clusterDefObj     *dbaasv1alpha1.ClusterDefinition
+		clusterVersionObj *dbaasv1alpha1.ClusterVersion
+		clusterObj        *dbaasv1alpha1.Cluster
+		clusterKey        types.NamespacedName
+	)
+
+	const redisImage = "redis:7.0.5"
+	const redisCompType = "replication"
+	const redisCompName = "redis-rsts"
+
+	cleanAll := func() {
+		// must wait until resources deleted and no longer exist before the testcases start,
+		// otherwise if later it needs to create some new resource objects with the same name,
+		// in race conditions, it will find the existence of old objects, resulting failure to
+		// create the new objects.
+		By("clean resources")
+		// delete cluster(and all dependent sub-resources), clusterversion and clusterdef
+		testdbaas.ClearClusterResources(&testCtx)
+
+		// clear rest resources
+		inNS := client.InNamespace(testCtx.DefaultNamespace)
+		ml := client.HasLabels{testCtx.TestObjLabelKey}
+		// namespaced resources
+		testdbaas.ClearResources(&testCtx, intctrlutil.StatefulSetSignature, inNS, ml)
+		testdbaas.ClearResources(&testCtx, intctrlutil.PodSignature, inNS, ml, client.GracePeriodSeconds(0))
 	}
 
-	BeforeEach(func() {
-		// Add any setup steps that needs to be executed before each test.
-		cleanupObjects()
-	})
+	BeforeEach(cleanAll)
 
-	AfterEach(func() {
-		// Add any teardown steps that needs to be executed after each test.
-		cleanupObjects()
-	})
+	AfterEach(cleanAll)
 
 	Context("Replication Component test", func() {
 		It("Replication Component test", func() {
-			By(" init cluster, statefulSet, pods")
-			clusterDef, _, cluster := testdbaas.InitReplicationRedis(testCtx, clusterDefName,
-				clusterVersionName, clusterName, replicationCompName)
-			sts := testdbaas.MockReplicationComponentStatefulSet(testCtx, clusterName, replicationCompName)
-			componentName := replicationCompName
-			typeName := cluster.GetComponentTypeName(componentName)
-			componentDef := clusterDef.GetComponentDefByTypeName(typeName)
-			component := cluster.GetComponentByName(componentName)
+
+			By("Create a clusterDefinition obj with replication componentType.")
+			clusterDefObj = testdbaas.NewClusterDefFactory(clusterDefName, testdbaas.RedisType).
+				AddComponent(testdbaas.ReplicationRedisComponent, redisCompType).
+				Create(&testCtx).GetClusterDef()
+
+			By("Create a clusterVersion obj with replication componentType.")
+			clusterVersionObj = testdbaas.NewClusterVersionFactory(clusterVersionName, clusterDefObj.Name).
+				AddComponent(redisCompType).AddContainerShort("redis", redisImage).
+				Create(&testCtx).GetClusterVersion()
+
+			By("Creating a cluster with replication componentType.")
+			clusterObj = testdbaas.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
+				clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
+				AddComponent(redisCompName, redisCompType).Create(&testCtx).GetCluster()
+			clusterKey = client.ObjectKeyFromObject(clusterObj)
+
+			By("Waiting for the cluster initialized")
+			Eventually(testdbaas.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
+
+			stsList := testk8s.ListAndCheckStatefulSet(&testCtx, clusterKey)
+			sts := &stsList.Items[0]
+			typeName := clusterObj.GetComponentTypeName(redisCompName)
+			componentDef := clusterDefObj.GetComponentDefByTypeName(typeName)
+			component := clusterObj.GetComponentByName(redisCompName)
 
 			By("test pods are not ready")
-			replicationComponent := NewReplicationSet(ctx, k8sClient, cluster, component, componentDef)
+			replicationComponent := NewReplicationSet(ctx, k8sClient, clusterObj, component, componentDef)
 			sts.Status.AvailableReplicas = *sts.Spec.Replicas - 1
 			podsReady, _ := replicationComponent.PodsReady(sts)
 			Expect(podsReady == false).Should(BeTrue())
@@ -88,7 +114,7 @@ var _ = Describe("Replication Component", func() {
 			Expect(requeue == false).Should(BeTrue())
 
 			By("test component phase when pods not ready")
-			phase, _ := replicationComponent.GetPhaseWhenPodsNotReady(replicationCompName)
+			phase, _ := replicationComponent.GetPhaseWhenPodsNotReady(redisCompName)
 			Expect(phase == dbaasv1alpha1.FailedPhase).Should(BeTrue())
 		})
 	})

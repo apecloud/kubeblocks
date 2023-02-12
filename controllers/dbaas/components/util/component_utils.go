@@ -248,8 +248,11 @@ func GetComponentDefaultReplicas(ctx context.Context,
 	componentName string) (int32, error) {
 	typeName := cluster.GetComponentTypeName(componentName)
 	component, err := GetComponentDefByCluster(ctx, cli, cluster, typeName)
-	if err != nil || component == nil {
+	if err != nil {
 		return -1, err
+	}
+	if component == nil {
+		return -1, fmt.Errorf("component %s is nil, pls check", componentName)
 	}
 	return component.DefaultReplicas, nil
 }

@@ -76,7 +76,7 @@ func PrintComponentConfigMeta(cfgTplMap map[dbaasv1alpha1.ConfigTemplate]*corev1
 		}
 		return "disable"
 	}
-	tbl.SetHeader("TEMPLATE-NAME", "CONFIGURATION-FILE", "ENABLE-CONFIGURE", "CONFIG-TEMPLATE", "CONFIG-CONSTRAINT", "CONFIGMAP-INSTANCE", "COMPONENT", "CLUSTER", "NAMESPACE")
+	tbl.SetHeader("TEMPLATE-NAME", "CONFIG-FILE", "ENABLE-RECONFIGURE", "CONFIG-TEMPLATE", "CONFIG-CONSTRAINT", "CONFIG-INSTANCE", "COMPONENT", "CLUSTER", "NAMESPACE")
 	for tpl, cm := range cfgTplMap {
 		for key := range cm.Data {
 			tbl.AddRow(

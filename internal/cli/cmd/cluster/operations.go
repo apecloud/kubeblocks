@@ -151,7 +151,7 @@ func (o *OperationsOptions) validateReconfiguring() error {
 		return cfgcore.MakeError("reconfiguring only support one component.")
 	}
 	componentName := o.ComponentNames[0]
-	if err := o.checkClusterAndComponent(componentName); err != nil {
+	if err := o.existClusterAndComponent(componentName); err != nil {
 		return err
 	}
 
@@ -369,7 +369,7 @@ func (o *OperationsOptions) fillComponentNameForReconfiguring() error {
 	return nil
 }
 
-func (o *OperationsOptions) checkClusterAndComponent(componentName string) error {
+func (o *OperationsOptions) existClusterAndComponent(componentName string) error {
 	clusterObj := dbaasv1alpha1.Cluster{}
 	if err := util.GetResourceObjectFromGVR(types.ClusterGVR(), client.ObjectKey{
 		Namespace: o.Namespace,

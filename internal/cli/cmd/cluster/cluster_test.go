@@ -200,15 +200,15 @@ var _ = Describe("Cluster", func() {
 		clusterDefObj := testdbaas.NewClusterDefFactory(clusterDefName, testdbaas.MySQLType).
 			AddComponent(testdbaas.StatefulMySQLComponent, statefulCompType).
 			AddConfigTemplate(configTplName, configmap.Name, constraint.Name, configVolumeName, nil).
-			GetClusterDef()
+			GetObject()
 		By("Create a clusterVersion obj")
 		clusterVersionObj := testdbaas.NewClusterVersionFactory(clusterVersionName, clusterDefObj.GetName()).
 			AddComponent(statefulCompType).
-			GetClusterVersion()
+			GetObject()
 		By("creating a cluster")
 		clusterObj := testdbaas.NewClusterFactory(ns, clusterName,
 			clusterDefObj.Name, clusterVersionObj.Name).
-			AddComponent(statefulCompName, statefulCompType).GetCluster()
+			AddComponent(statefulCompName, statefulCompType).GetObject()
 
 		objs := []runtime.Object{configmap, constraint, clusterDefObj, clusterVersionObj, clusterObj, componentConfig}
 		ttf, o := NewFakeOperationsOptions(ns, clusterObj.Name, dbaasv1alpha1.ReconfiguringType, objs...)

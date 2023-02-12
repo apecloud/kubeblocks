@@ -82,7 +82,7 @@ var _ = Describe("Backup Policy Controller", func() {
 			AddVolumeClaimTemplate(corev1.PersistentVolumeClaim{
 				ObjectMeta: metav1.ObjectMeta{Name: testdbaas.DataVolumeName},
 				Spec:       testdbaas.NewPVC(defaultPVCSize),
-			}).Create(&testCtx).GetStatefulSet()
+			}).Create(&testCtx).GetObject()
 
 		By("By mocking a pod belonging to the statefulset")
 		_ = testdbaas.NewPodFactory(testCtx.DefaultNamespace, sts.Name+"-0").
@@ -117,7 +117,7 @@ var _ = Describe("Backup Policy Controller", func() {
 					AddHookPreCommand("touch /data/mysql/.restore;sync").
 					AddHookPostCommand("rm -f /data/mysql/.restore;sync").
 					SetRemoteVolumePVC(backupRemoteVolumeName, backupRemotePVCName).
-					Create(&testCtx).GetBackupPolicy()
+					Create(&testCtx).GetObject()
 				backupPolicyKey = client.ObjectKeyFromObject(backupPolicy)
 			})
 			It("should success", func() {
@@ -144,7 +144,7 @@ var _ = Describe("Backup Policy Controller", func() {
 					SetTTL(defaultTTL).
 					SetBackupPolicyName(backupPolicyName).
 					SetBackupType(dpv1alpha1.BackupTypeFull).
-					Create(&testCtx).GetBackup()
+					Create(&testCtx).GetObject()
 
 				patchBackupStatus(backupStatus, client.ObjectKeyFromObject(backupExpired))
 
@@ -153,7 +153,7 @@ var _ = Describe("Backup Policy Controller", func() {
 					SetTTL(defaultTTL).
 					SetBackupPolicyName(backupPolicyName).
 					SetBackupType(dpv1alpha1.BackupTypeFull).
-					Create(&testCtx).GetBackup()
+					Create(&testCtx).GetObject()
 				backupStatus.Expiration = &metav1.Time{Time: now.Add(time.Hour * 24)}
 				patchBackupStatus(backupStatus, client.ObjectKeyFromObject(backupOutLimit1))
 
@@ -164,7 +164,7 @@ var _ = Describe("Backup Policy Controller", func() {
 					SetTTL(defaultTTL).
 					SetBackupPolicyName(backupPolicyName).
 					SetBackupType(dpv1alpha1.BackupTypeFull).
-					Create(&testCtx).GetBackup()
+					Create(&testCtx).GetObject()
 				backupStatus.StartTimestamp = &metav1.Time{Time: backupOutLimit2.CreationTimestamp.Time}
 				patchBackupStatus(backupStatus, client.ObjectKeyFromObject(backupOutLimit2))
 
@@ -190,7 +190,7 @@ var _ = Describe("Backup Policy Controller", func() {
 					AddHookPreCommand("touch /data/mysql/.restore;sync").
 					AddHookPostCommand("rm -f /data/mysql/.restore;sync").
 					SetRemoteVolumePVC(backupRemoteVolumeName, backupRemotePVCName).
-					Create(&testCtx).GetBackupPolicy()
+					Create(&testCtx).GetObject()
 				backupPolicyKey = client.ObjectKeyFromObject(backupPolicy)
 			})
 			It("should success", func() {
@@ -213,7 +213,7 @@ var _ = Describe("Backup Policy Controller", func() {
 					AddHookPreCommand("touch /data/mysql/.restore;sync").
 					AddHookPostCommand("rm -f /data/mysql/.restore;sync").
 					SetRemoteVolumePVC(backupRemoteVolumeName, backupRemotePVCName).
-					Create(&testCtx).GetBackupPolicy()
+					Create(&testCtx).GetObject()
 				backupPolicyKey = client.ObjectKeyFromObject(backupPolicy)
 			})
 			It("should failed", func() {
@@ -237,7 +237,7 @@ var _ = Describe("Backup Policy Controller", func() {
 					SetCredentialKeyword("username", "password").
 					AddHookPreCommand("touch /data/mysql/.restore;sync").
 					AddHookPostCommand("rm -f /data/mysql/.restore;sync").
-					Create(&testCtx).GetBackupPolicyTpl()
+					Create(&testCtx).GetObject()
 
 				By("By creating a backupPolicy from backupTool: " + backupToolName)
 				backupPolicy = testdbaas.NewBackupPolicyFactory(testCtx.DefaultNamespace, backupPolicyName).
@@ -245,7 +245,7 @@ var _ = Describe("Backup Policy Controller", func() {
 					AddMatchLabels(intctrlutil.AppInstanceLabelKey, clusterName).
 					SetTargetSecretName(clusterName).
 					SetRemoteVolumePVC(backupRemoteVolumeName, backupRemotePVCName).
-					Create(&testCtx).GetBackupPolicy()
+					Create(&testCtx).GetObject()
 				backupPolicyKey = client.ObjectKeyFromObject(backupPolicy)
 			})
 			It("should success", func() {
@@ -266,7 +266,7 @@ var _ = Describe("Backup Policy Controller", func() {
 					SetBackupToolName(backupToolName).
 					SetSchedule(defaultSchedule).
 					SetTTL(defaultTTL).
-					Create(&testCtx).GetBackupPolicyTpl()
+					Create(&testCtx).GetObject()
 
 				By("By creating a backupPolicy from backupTool: " + backupToolName)
 				backupPolicy = testdbaas.NewBackupPolicyFactory(testCtx.DefaultNamespace, backupPolicyName).
@@ -274,7 +274,7 @@ var _ = Describe("Backup Policy Controller", func() {
 					AddMatchLabels(intctrlutil.AppInstanceLabelKey, clusterName).
 					SetTargetSecretName(clusterName).
 					SetRemoteVolumePVC(backupRemoteVolumeName, backupRemotePVCName).
-					Create(&testCtx).GetBackupPolicy()
+					Create(&testCtx).GetObject()
 				backupPolicyKey = client.ObjectKeyFromObject(backupPolicy)
 			})
 			It("should success", func() {

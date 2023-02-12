@@ -94,7 +94,7 @@ var _ = Describe("MySQL Scaling function", func() {
 			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
 			AddComponent(mysqlCompName, mysqlCompType).
 			SetResources(resources).SetReplicas(1).
-			Create(&testCtx).GetCluster()
+			Create(&testCtx).GetObject()
 		clusterKey = client.ObjectKeyFromObject(clusterObj)
 		Eventually(testdbaas.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
 
@@ -172,7 +172,7 @@ var _ = Describe("MySQL Scaling function", func() {
 			AddComponent(mysqlCompName, mysqlCompType).
 			AddVolumeClaimTemplate(testdbaas.DataVolumeName, &dataPvcSpec).
 			AddVolumeClaimTemplate(testdbaas.LogVolumeName, &logPvcSpec).
-			Create(&testCtx).GetCluster()
+			Create(&testCtx).GetObject()
 		clusterKey = client.ObjectKeyFromObject(clusterObj)
 
 		Eventually(testdbaas.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
@@ -234,12 +234,12 @@ var _ = Describe("MySQL Scaling function", func() {
 			clusterDefObj = testdbaas.NewClusterDefFactory(clusterDefName, testdbaas.MySQLType).
 				AddComponent(testdbaas.StatefulMySQLComponent, mysqlCompType).
 				AddConfigTemplate(scriptConfigName, scriptConfigName, "", testdbaas.ScriptsVolumeName, &mode).
-				Create(&testCtx).GetClusterDef()
+				Create(&testCtx).GetObject()
 
 			By("Create a clusterVersion obj")
 			clusterVersionObj = testdbaas.NewClusterVersionFactory(clusterVersionName, clusterDefObj.GetName()).
 				AddComponent(mysqlCompType).AddContainerShort(testdbaas.DefaultMySQLContainerName, testdbaas.ApeCloudMySQLImage).
-				Create(&testCtx).GetClusterVersion()
+				Create(&testCtx).GetObject()
 		})
 
 		It("should handle VerticalScalingOpsRequest and change Cluster's cpu&memory requirements", func() {
@@ -262,12 +262,12 @@ var _ = Describe("MySQL Scaling function", func() {
 			clusterDefObj = testdbaas.NewClusterDefFactory(clusterDefName, testdbaas.MySQLType).
 				AddComponent(testdbaas.ConsensusMySQLComponent, mysqlCompType).
 				AddConfigTemplate(scriptConfigName, scriptConfigName, "", testdbaas.ScriptsVolumeName, &mode).
-				Create(&testCtx).GetClusterDef()
+				Create(&testCtx).GetObject()
 
 			By("Create a clusterVersion obj")
 			clusterVersionObj = testdbaas.NewClusterVersionFactory(clusterVersionName, clusterDefObj.GetName()).
 				AddComponent(mysqlCompType).AddContainerShort(testdbaas.DefaultMySQLContainerName, testdbaas.ApeCloudMySQLImage).
-				Create(&testCtx).GetClusterVersion()
+				Create(&testCtx).GetObject()
 		})
 
 		It("should handle VerticalScalingOpsRequest and change Cluster's cpu&memory requirements", func() {

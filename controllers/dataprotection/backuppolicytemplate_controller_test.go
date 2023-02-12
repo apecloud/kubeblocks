@@ -60,7 +60,7 @@ var _ = Describe("BackupPolicyTemplate Controller", func() {
 			SetBackupToolName(backupTool).
 			SetSchedule("0 3 * * *").
 			SetTTL("168h0m0s").
-			Create(&testCtx).GetBackupPolicyTpl()
+			Create(&testCtx).GetObject()
 	}
 
 	assureBackupToolObj := func() *dataprotectionv1alpha1.BackupTool {

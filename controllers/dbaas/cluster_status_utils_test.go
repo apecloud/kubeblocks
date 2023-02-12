@@ -92,7 +92,7 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 			AddComponent(statefulMySQLCompName, statefulMySQLCompType).
 			AddComponent(consensusMySQLCompName, consensusMySQLCompType).
 			AddComponent(nginxCompName, nginxCompType).
-			Create(&testCtx).GetCluster()
+			Create(&testCtx).GetObject()
 	}
 
 	createStsPod := func(podName, podRole, componentName string) *corev1.Pod {

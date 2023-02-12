@@ -80,12 +80,12 @@ var _ = Describe("ClusterDefinition Controller", func() {
 			By("Create a clusterDefinition obj")
 			clusterDefObj = testdbaas.NewClusterDefFactory(clusterDefName, testdbaas.MySQLType).
 				AddComponent(testdbaas.StatefulMySQLComponent, statefulCompType).
-				Create(&testCtx).GetClusterDef()
+				Create(&testCtx).GetObject()
 
 			By("Create a clusterVersion obj")
 			clusterVersionObj = testdbaas.NewClusterVersionFactory(clusterVersionName, clusterDefObj.GetName()).
 				AddComponent(statefulCompType).AddContainerShort("mysql", testdbaas.ApeCloudMySQLImage).
-				Create(&testCtx).GetClusterVersion()
+				Create(&testCtx).GetObject()
 		})
 
 		It("should update status of clusterVersion at the same time when updating clusterDefinition", func() {
@@ -143,12 +143,12 @@ var _ = Describe("ClusterDefinition Controller", func() {
 			clusterDefObj = testdbaas.NewClusterDefFactory(clusterDefName, testdbaas.MySQLType).
 				AddComponent(testdbaas.StatefulMySQLComponent, statefulCompType).
 				AddConfigTemplate(cmName, cmName, cmName, configVolumeName, nil).
-				Create(&testCtx).GetClusterDef()
+				Create(&testCtx).GetObject()
 
 			By("Create a clusterVersion obj")
 			clusterVersionObj = testdbaas.NewClusterVersionFactory(clusterVersionName, clusterDefObj.GetName()).
 				AddComponent(statefulCompType).AddContainerShort("mysql", testdbaas.ApeCloudMySQLImage).
-				Create(&testCtx).GetClusterVersion()
+				Create(&testCtx).GetObject()
 		})
 
 		It("should stop proceeding the status of clusterDefinition if configmap is invalid or doesn't exist", func() {

@@ -336,7 +336,7 @@ var _ = Describe("lifecycle_utils", func() {
 		clusterDefObj := testdbaas.NewClusterDefFactory(clusterDefName, testdbaas.MySQLType).
 			AddComponent(testdbaas.StatefulMySQLComponent, mysqlCompType).
 			AddComponent(testdbaas.StatelessNginxComponent, nginxCompType).
-			GetClusterDef()
+			GetObject()
 		if needCreate {
 			Expect(testCtx.CreateObj(testCtx.Ctx, clusterDefObj)).Should(Succeed())
 		}
@@ -351,7 +351,7 @@ var _ = Describe("lifecycle_utils", func() {
 			AddComponent(nginxCompType).
 			AddInitContainerShort("nginx-init", testdbaas.NginxImage).
 			AddContainerShort("nginx", testdbaas.NginxImage).
-			GetClusterVersion()
+			GetObject()
 		if needCreate {
 			Expect(testCtx.CreateObj(testCtx.Ctx, clusterVersionObj)).Should(Succeed())
 		}
@@ -376,7 +376,7 @@ var _ = Describe("lifecycle_utils", func() {
 			clusterDefObj.Name, clusterVersionObj.Name).
 			AddComponent(mysqlCompName, mysqlCompType).
 			AddVolumeClaimTemplate(testdbaas.DataVolumeName, &pvcSpec).
-			GetCluster()
+			GetObject()
 		key := client.ObjectKeyFromObject(clusterObj)
 		if needCreate {
 			Expect(testCtx.CreateObj(testCtx.Ctx, clusterObj)).Should(Succeed())
@@ -477,7 +477,7 @@ var _ = Describe("lifecycle_utils", func() {
 			AddVolumeClaimTemplate(corev1.PersistentVolumeClaim{
 				ObjectMeta: metav1.ObjectMeta{Name: testdbaas.DataVolumeName},
 				Spec:       testdbaas.NewPVC("1Gi"),
-			}).GetStatefulSet()
+			}).GetObject()
 	}
 	snapshotName := "test-snapshot-name"
 	ctx := context.Background()
@@ -522,7 +522,7 @@ var _ = Describe("lifecycle_utils", func() {
 			SetTTL("168h0m0s").
 			AddHookPreCommand("touch /data/mysql/.restore;sync").
 			AddHookPostCommand("rm -f /data/mysql/.restore;sync").
-			Create(&testCtx).GetBackupPolicyTpl()
+			Create(&testCtx).GetObject()
 	}
 
 	Context("has helper function which builds specific object from cue template", func() {

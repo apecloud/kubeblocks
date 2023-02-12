@@ -20,10 +20,10 @@ import (
 	"context"
 
 	corev1 "k8s.io/api/core/v1"
-	policyv1 "k8s.io/api/policy/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/controller/component"
 	"github.com/apecloud/kubeblocks/internal/gotemplate"
 )
 
@@ -47,42 +47,14 @@ const (
 
 	// annotations keys
 	lifecycleAnnotationKey = "cluster.kubeblocks.io/lifecycle"
+	// debugClusterAnnotationKey is used when one wants to debug the cluster.
+	// If debugClusterAnnotationKey = 'on',
+	// logs will be recorded in more detail, and some ephemeral pods (esp. those created by jobs) will retain after execution.
+	debugClusterAnnotationKey = "cluster.kubeblocks.io/debug"
 
 	// annotations values
 	lifecycleDeletePVCAnnotation = "delete-pvc"
 )
-
-type MonitorConfig struct {
-	Enable     bool   `json:"enable"`
-	ScrapePort int32  `json:"scrapePort,omitempty"`
-	ScrapePath string `json:"scrapePath,omitempty"`
-}
-
-type Component struct {
-	ClusterDefName          string                                 `json:"clusterDefName,omitempty"`
-	ClusterType             string                                 `json:"clusterType,omitempty"`
-	Name                    string                                 `json:"name,omitempty"`
-	Type                    string                                 `json:"type,omitempty"`
-	CharacterType           string                                 `json:"characterType,omitempty"`
-	MinReplicas             int32                                  `json:"minReplicas"`
-	MaxReplicas             int32                                  `json:"maxReplicas"`
-	DefaultReplicas         int32                                  `json:"defaultReplicas"`
-	Replicas                int32                                  `json:"replicas"`
-	PodDisruptionBudgetSpec *policyv1.PodDisruptionBudgetSpec      `json:"podDisruptionBudgetSpec,omitempty"`
-	AntiAffinity            bool                                   `json:"antiAffinity,omitempty"`
-	ComponentType           dbaasv1alpha1.ComponentType            `json:"componentType,omitempty"`
-	ConsensusSpec           *dbaasv1alpha1.ConsensusSetSpec        `json:"consensusSpec,omitempty"`
-	PrimaryIndex            *int32                                 `json:"primaryIndex,omitempty"`
-	PodSpec                 *corev1.PodSpec                        `json:"podSpec,omitempty"`
-	Service                 *corev1.ServiceSpec                    `json:"service,omitempty"`
-	Probes                  *dbaasv1alpha1.ClusterDefinitionProbes `json:"probes,omitempty"`
-	VolumeClaimTemplates    []corev1.PersistentVolumeClaimTemplate `json:"volumeClaimTemplates,omitempty"`
-	Monitor                 *MonitorConfig                         `json:"monitor,omitempty"`
-	EnabledLogs             []string                               `json:"enabledLogs,omitempty"`
-	LogConfigs              []dbaasv1alpha1.LogConfig              `json:"logConfigs,omitempty"`
-	ConfigTemplates         []dbaasv1alpha1.ConfigTemplate         `json:"configTemplates,omitempty"`
-	HorizontalScalePolicy   *dbaasv1alpha1.HorizontalScalePolicy   `json:"horizontalScalePolicy,omitempty"`
-}
 
 type ResourceDefinition struct {
 	MemorySize int64 `json:"memorySize,omitempty"`
@@ -109,17 +81,11 @@ type configTemplateBuilder struct {
 	builtInFunctions *gotemplate.BuiltInObjectsFunc
 
 	// DBaas cluster object
-	component      *Component
+	component      *component.Component
 	clusterVersion *dbaasv1alpha1.ClusterVersion
 	cluster        *dbaasv1alpha1.Cluster
 	podSpec        *corev1.PodSpec
 
 	ctx context.Context
 	cli client.Client
-}
-
-type envVar struct {
-	name      string
-	fieldPath string
-	value     string
 }

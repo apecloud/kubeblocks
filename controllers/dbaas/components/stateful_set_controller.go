@@ -92,7 +92,7 @@ func (r *StatefulSetReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	if component == nil {
 		return intctrlutil.Reconciled()
 	}
-	compCtx := newComponentContext(reqCtx, r.Client, r.Recorder, component, sts)
+	compCtx := newComponentContext(reqCtx, r.Client, r.Recorder, component, sts, componentName)
 	reqCtx.Log.Info("before handleComponentStatusAndSyncCluster",
 		"generation", sts.Generation, "observed generation", sts.Status.ObservedGeneration,
 		"replicas", sts.Status.Replicas)

@@ -642,59 +642,172 @@ ifeq (, $(shell which minikube))
 endif
 MINIKUBE=$(shell which minikube)
 
+.PHONY: kubectl
+kubectl: ## Download kubectl locally if necessary.
+ifeq (, $(shell which kubectl))
+	@{ \
+	set -e ;\
+	echo 'installing kubectl' ;\
+	curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/$(GOOS)/$(GOARCH)/kubectl" && chmod +x kubectl && sudo mv kubectl /usr/local/bin ;\
+	echo 'Successfully installed' ;\
+	}
+endif
+KUBECTL=$(shell which kubectl)
+
 
 .PHONY: brew-install-prerequisite
 brew-install-prerequisite: ## Use `brew install` to install required dependencies.
 	brew install go@1.19 kubebuilder delve golangci-lint staticcheck kustomize step cue oras jq yq git-hooks-go
 
 ##@ Minikube
-K8S_VERSION ?= v1.22.15
-MINIKUBE_REGISTRY_MIRROR ?= https://tenxhptk.mirror.aliyuncs.com
-MINIKUBE_IMAGE_REPO ?= registry.cn-hangzhou.aliyuncs.com/google_containers
-MINIKUBE_START_ARGS = --memory=4g --cpus=4
+# using `minikube version: v1.29.0`, and use one of following k8s versions:
+# K8S_VERSION ?= v1.22.15
+K8S_VERSION ?= v1.23.15
+# K8S_VERSION ?= v1.24.9
+# K8S_VERSION ?= v1.25.5
+# K8S_VERSION ?= v1.26.1
 
-KICBASE_IMG=$(MINIKUBE_IMAGE_REPO)/kicbase:v0.0.33
-PAUSE_IMG=$(MINIKUBE_IMAGE_REPO)/pause:3.5
-METRICS_SERVER_IMG=$(MINIKUBE_IMAGE_REPO)/metrics-server:v0.6.1
-CSI_PROVISIONER_IMG=$(MINIKUBE_IMAGE_REPO)/csi-provisioner:v2.1.0
-CSI_ATTACHER_IMG=$(MINIKUBE_IMAGE_REPO)/csi-attacher:v3.1.0
-CSI_EXT_HMC_IMG=$(MINIKUBE_IMAGE_REPO)/csi-external-health-monitor-controller:v0.2.0
-CSI_EXT_HMA_IMG=$(MINIKUBE_IMAGE_REPO)/csi-external-health-monitor-agent:v0.2.0
-CSI_NODE_DRIVER_REG_IMG=$(MINIKUBE_IMAGE_REPO)/csi-node-driver-registrar:v2.0.1
-LIVENESSPROBE_IMG=$(MINIKUBE_IMAGE_REPO)/livenessprobe:v2.2.0
-CSI_RESIZER_IMG=$(MINIKUBE_IMAGE_REPO)/csi-resizer:v1.1.0
-CSI_SNAPSHOTTER_IMG=$(MINIKUBE_IMAGE_REPO)/csi-snapshotter:v4.0.0
-HOSTPATHPLUGIN_IMG=$(MINIKUBE_IMAGE_REPO)/hostpathplugin:v1.6.0
-STORAGE_PROVISIONER_IMG=$(MINIKUBE_IMAGE_REPO)/storage-provisioner:v5
-SNAPSHOT_CONTROLLER_IMG=$(MINIKUBE_IMAGE_REPO)/snapshot-controller:v4.0.0
+K8S_VERSION_MAJOR_MINOR=$(shell echo $(K8S_VERSION) | head -c 5)
+
+# minikube v1.28+ support `--image-mirror-country=cn` for China mainland users.
+MINIKUBE_IMAGE_MIRROR_COUNTRY ?= cn
+MINIKUBE_START_ARGS ?= --memory=4g --cpus=4
+
+ifeq ($(K8S_VERSION_MAJOR_MINOR), v1.26)
+	K8S_IMAGE_REPO ?= registry.k8s.io
+	SIGSTORAGE_IMAGE_REPO ?= registry.k8s.io/sig-storage
+endif
+
+ifeq ($(MINIKUBE_IMAGE_MIRROR_COUNTRY), cn)
+	K8S_IMAGE_REPO := registry.cn-hangzhou.aliyuncs.com/google_containers
+	SIGSTORAGE_IMAGE_REPO := registry.cn-hangzhou.aliyuncs.com/google_containers
+	MINIKUBE_START_ARGS := $(MINIKUBE_START_ARGS) --image-mirror-country=$(MINIKUBE_IMAGE_MIRROR_COUNTRY)
+	MINIKUBE_REGISTRY_MIRROR ?= https://tenxhptk.mirror.aliyuncs.com
+endif
+
+K8S_IMAGE_REPO ?= k8s.gcr.io
+SIGSTORAGE_IMAGE_REPO ?= k8s.gcr.io/sig-storage
+
+ETCT_IMG := $(K8S_IMAGE_REPO)/etcd:3.5.6-0
+COREDNS_IMG := $(K8S_IMAGE_REPO)/coredns/coredns:v1.8.6
+KUBE_APISERVER_IMG := $(K8S_IMAGE_REPO)/kube-apiserver:$(K8S_VERSION)
+KUBE_SCHEDULER_IMG := $(K8S_IMAGE_REPO)/kube-scheduler:$(K8S_VERSION)
+KUBE_CTLR_MGR_IMG := $(K8S_IMAGE_REPO)/kube-controller-manager:$(K8S_VERSION)
+KUBE_PROXY_IMG := $(K8S_IMAGE_REPO)/kube-proxy:$(K8S_VERSION)
+
+CSI_PROVISIONER_IMG := $(SIGSTORAGE_IMAGE_REPO)/csi-provisioner:v2.1.0
+CSI_ATTACHER_IMG := $(SIGSTORAGE_IMAGE_REPO)/csi-attacher:v3.1.0
+CSI_EXT_HMC_IMG := $(SIGSTORAGE_IMAGE_REPO)/csi-external-health-monitor-controller:v0.2.0
+CSI_EXT_HMA_IMG := $(SIGSTORAGE_IMAGE_REPO)/csi-external-health-monitor-agent:v0.2.0
+CSI_NODE_DRIVER_REG_IMG := $(SIGSTORAGE_IMAGE_REPO)/csi-node-driver-registrar:v2.0.1
+LIVENESSPROBE_IMG := $(SIGSTORAGE_IMAGE_REPO)/livenessprobe:v2.2.0
+CSI_RESIZER_IMG := $(SIGSTORAGE_IMAGE_REPO)/csi-resizer:v1.1.0
+CSI_SNAPSHOTTER_IMG := $(SIGSTORAGE_IMAGE_REPO)/csi-snapshotter:v4.0.0
+HOSTPATHPLUGIN_IMG := $(SIGSTORAGE_IMAGE_REPO)/hostpathplugin:v1.6.0
+SNAPSHOT_CONTROLLER_IMG := $(SIGSTORAGE_IMAGE_REPO)/snapshot-controller:v4.0.0
+
+STORAGE_PROVISIONER_IMG := gcr.io/k8s-minikube/storage-provisioner:v5
+METRICS_SERVER_IMG := registry.k8s.io/metrics-server:v0.6.2
+
+ifeq ($(MINIKUBE_IMAGE_MIRROR_COUNTRY), cn)
+	STORAGE_PROVISIONER_IMG := $(K8S_IMAGE_REPO)/storage-provisioner:v5
+	METRICS_SERVER_IMG := $(K8S_IMAGE_REPO)/metrics-server:v0.6.2
+endif
+
+PAUSE_IMG_TAG := 3.7
+ifeq ($(K8S_VERSION_MAJOR_MINOR), v1.22)
+	PAUSE_IMG_TAG := 3.5
+endif
+
+ifeq ($(K8S_VERSION_MAJOR_MINOR), v1.23)
+	PAUSE_IMG_TAG := 3.6
+endif
+
+ifeq ($(K8S_VERSION_MAJOR_MINOR), v1.24)
+	PAUSE_IMG_TAG := 3.7
+endif
+
+ifeq ($(K8S_VERSION_MAJOR_MINOR), v1.25)
+	PAUSE_IMG_TAG := 3.8
+endif
+
+ifeq ($(K8S_VERSION_MAJOR_MINOR), v1.26)
+	PAUSE_IMG_TAG := 3.9
+	COREDNS_IMG := $(K8S_IMAGE_REPO)/coredns/coredns:v1.9.3
+endif
+
+PAUSE_IMG := $(K8S_IMAGE_REPO)/pause:$(PAUSE_IMG_TAG)
+
+
+ifneq ($(MINIKUBE_REGISTRY_MIRROR),)
+	MINIKUBE_START_ARGS := $(MINIKUBE_START_ARGS) --registry-mirror=$(MINIKUBE_REGISTRY_MIRROR)
+endif
+
+ifeq ($(MINIKUBE_IMAGE_MIRROR_COUNTRY), cn)
+	TAG_K8S_IMAGE_REPO := k8s.gcr.io
+	TAG_SIGSTORAGE_IMAGE_REPO := k8s.gcr.io/sig-storage
+ifeq ($(K8S_VERSION), v1.26.1) 
+	TAG_K8S_IMAGE_REPO := registry.k8s.io
+endif
+endif
 
 .PHONY: pull-all-images
-pull-all-images: # Pull required container images
-	docker pull -q $(PAUSE_IMG) &
-	docker pull -q $(HOSTPATHPLUGIN_IMG) &
-	docker pull -q $(LIVENESSPROBE_IMG) &
-	docker pull -q $(CSI_PROVISIONER_IMG) &
-	docker pull -q $(CSI_ATTACHER_IMG) &
-	docker pull -q $(CSI_RESIZER_IMG) &
-	docker pull -q $(CSI_RESIZER_IMG) &
-	docker pull -q $(CSI_SNAPSHOTTER_IMG) &
-	docker pull -q $(SNAPSHOT_CONTROLLER_IMG) &
-	docker pull -q $(CSI_EXT_HMC_IMG) &
-	docker pull -q $(CSI_NODE_DRIVER_REG_IMG) &
-	docker pull -q $(STORAGE_PROVISIONER_IMG) &
-	docker pull -q $(METRICS_SERVER_IMG) &
-	docker pull -q $(KICBASE_IMG)
+pull-all-images: DOCKER_PULLQ=docker pull -q
+pull-all-images: DOCKER_TAG=docker tag
+pull-all-images: ## Pull K8s & minikube required container images.
+	$(DOCKER_PULLQ) $(KUBE_APISERVER_IMG)
+	$(DOCKER_PULLQ) $(KUBE_SCHEDULER_IMG)
+	$(DOCKER_PULLQ) $(KUBE_CTLR_MGR_IMG)
+	$(DOCKER_PULLQ) $(KUBE_PROXY_IMG)
+	$(DOCKER_PULLQ) $(PAUSE_IMG)
+	$(DOCKER_PULLQ) $(HOSTPATHPLUGIN_IMG)
+	$(DOCKER_PULLQ) $(LIVENESSPROBE_IMG)
+	$(DOCKER_PULLQ) $(CSI_PROVISIONER_IMG)
+	$(DOCKER_PULLQ) $(CSI_ATTACHER_IMG)
+	$(DOCKER_PULLQ) $(CSI_RESIZER_IMG)
+	$(DOCKER_PULLQ) $(CSI_SNAPSHOTTER_IMG)
+	$(DOCKER_PULLQ) $(SNAPSHOT_CONTROLLER_IMG)
+	$(DOCKER_PULLQ) $(CSI_EXT_HMC_IMG)
+	$(DOCKER_PULLQ) $(CSI_EXT_HMA_IMG)
+	$(DOCKER_PULLQ) $(CSI_NODE_DRIVER_REG_IMG)
+	$(DOCKER_PULLQ) $(STORAGE_PROVISIONER_IMG)
+	$(DOCKER_PULLQ) $(METRICS_SERVER_IMG)
+	# if image is using China mirror repository, re-tag it to original image repositories
+ifeq ($(MINIKUBE_IMAGE_MIRROR_COUNTRY), cn)
+	$(DOCKER_TAG) $(KUBE_APISERVER_IMG) $(TAG_K8S_IMAGE_REPO)/kube-apiserver:$(K8S_VERSION)
+	$(DOCKER_TAG) $(KUBE_SCHEDULER_IMG) $(TAG_K8S_IMAGE_REPO)/kube-scheduler:$(K8S_VERSION)
+	$(DOCKER_TAG) $(KUBE_CTLR_MGR_IMG) $(TAG_K8S_IMAGE_REPO)/kube-controller-manager:$(K8S_VERSION)
+	$(DOCKER_TAG) $(KUBE_PROXY_IMG) $(TAG_K8S_IMAGE_REPO)/kube-proxy:$(K8S_VERSION)
+	$(DOCKER_TAG) $(PAUSE_IMG) $(TAG_K8S_IMAGE_REPO)/pause:$(PAUSE_IMG_TAG)
+	$(DOCKER_TAG) $(HOSTPATHPLUGIN_IMG) $(TAG_SIGSTORAGE_IMAGE_REPO)/hostpathplugin:v1.6.0
+	$(DOCKER_TAG) $(LIVENESSPROBE_IMG) $(TAG_SIGSTORAGE_IMAGE_REPO)/livenessprobe:v2.2.0
+	$(DOCKER_TAG) $(CSI_PROVISIONER_IMG) $(TAG_SIGSTORAGE_IMAGE_REPO)/csi-provisioner:v2.1.0
+	$(DOCKER_TAG) $(CSI_ATTACHER_IMG) $(TAG_SIGSTORAGE_IMAGE_REPO)/csi-attacher:v3.1.0
+	$(DOCKER_TAG) $(CSI_RESIZER_IMG) $(TAG_SIGSTORAGE_IMAGE_REPO)/csi-resizer:v1.1.0
+	$(DOCKER_TAG) $(CSI_SNAPSHOTTER_IMG) $(TAG_SIGSTORAGE_IMAGE_REPO)/csi-snapshotter:v4.0.0
+	$(DOCKER_TAG) $(SNAPSHOT_CONTROLLER_IMG) $(TAG_SIGSTORAGE_IMAGE_REPO)/snapshot-controller:v4.0.0
+	$(DOCKER_TAG) $(CSI_EXT_HMC_IMG) $(TAG_SIGSTORAGE_IMAGE_REPO)/csi-external-health-monitor-controller:v0.2.0
+	$(DOCKER_TAG) $(CSI_EXT_HMA_IMG) $(TAG_SIGSTORAGE_IMAGE_REPO)/csi-external-health-monitor-agent:v0.2.0
+	$(DOCKER_TAG) $(CSI_NODE_DRIVER_REG_IMG)  $(TAG_SIGSTORAGE_IMAGE_REPO)/csi-node-driver-registrar:v2.0.1
+	$(DOCKER_TAG) $(METRICS_SERVER_IMG) registry.k8s.io/metrics-server:v0.6.2
+	$(DOCKER_TAG) $(STORAGE_PROVISIONER_IMG) gcr.io/k8s-minikube/storage-provisioner:v5
+endif
+
 
 .PHONY: minikube-start
-# minikube-start: IMG_CACHE_CMD=ssh --native-ssh=false docker pull
 minikube-start: IMG_CACHE_CMD=image load --daemon=true
-minikube-start: pull-all-images minikube ## Start minikube cluster.
+minikube-start: minikube ## Start minikube cluster.
 ifneq (, $(shell which minikube))
 ifeq (, $(shell $(MINIKUBE) status -n minikube -ojson 2>/dev/null| jq -r '.Host' | grep Running))
-	$(MINIKUBE) start --kubernetes-version=$(K8S_VERSION) --registry-mirror=$(REGISTRY_MIRROR) --image-repository=$(MINIKUBE_IMAGE_REPO) $(MINIKUBE_START_ARGS)
+	$(MINIKUBE) start --kubernetes-version=$(K8S_VERSION) $(MINIKUBE_START_ARGS)
 endif
 endif
 	$(MINIKUBE) update-context
+	$(MINIKUBE) $(IMG_CACHE_CMD) $(KUBE_APISERVER_IMG)
+	$(MINIKUBE) $(IMG_CACHE_CMD) $(KUBE_SCHEDULER_IMG)
+	$(MINIKUBE) $(IMG_CACHE_CMD) $(KUBE_CTLR_MGR_IMG)
+	$(MINIKUBE) $(IMG_CACHE_CMD) $(KUBE_PROXY_IMG)
+	$(MINIKUBE) $(IMG_CACHE_CMD) $(PAUSE_IMG)
 	$(MINIKUBE) $(IMG_CACHE_CMD) $(HOSTPATHPLUGIN_IMG)
 	$(MINIKUBE) $(IMG_CACHE_CMD) $(LIVENESSPROBE_IMG)
 	$(MINIKUBE) $(IMG_CACHE_CMD) $(CSI_PROVISIONER_IMG)
@@ -703,6 +816,7 @@ endif
 	$(MINIKUBE) $(IMG_CACHE_CMD) $(CSI_SNAPSHOTTER_IMG)
 	$(MINIKUBE) $(IMG_CACHE_CMD) $(CSI_EXT_HMA_IMG)
 	$(MINIKUBE) $(IMG_CACHE_CMD) $(CSI_EXT_HMC_IMG)
+	$(MINIKUBE) $(IMG_CACHE_CMD) $(SNAPSHOT_CONTROLLER_IMG)
 	$(MINIKUBE) $(IMG_CACHE_CMD) $(CSI_NODE_DRIVER_REG_IMG)
 	$(MINIKUBE) $(IMG_CACHE_CMD) $(STORAGE_PROVISIONER_IMG)
 	$(MINIKUBE) $(IMG_CACHE_CMD) $(METRICS_SERVER_IMG)

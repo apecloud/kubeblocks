@@ -17,77 +17,80 @@ limitations under the License.
 package dbaas
 
 import (
-	"github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/testutil"
 )
 
 type MockClusterVersionFactory struct {
-	TestCtx        *testutil.TestContext
-	ClusterVersion *dbaasv1alpha1.ClusterVersion
+	BaseFactory[dbaasv1alpha1.ClusterVersion, *dbaasv1alpha1.ClusterVersion, MockClusterVersionFactory]
 }
 
-func NewClusterVersionFactory(testCtx *testutil.TestContext, name string, cdRef string) *MockClusterVersionFactory {
-	return &MockClusterVersionFactory{
-		TestCtx: testCtx,
-		ClusterVersion: &dbaasv1alpha1.ClusterVersion{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:   name,
-				Labels: map[string]string{},
-			},
+func NewClusterVersionFactory(name, cdRef string) *MockClusterVersionFactory {
+	f := &MockClusterVersionFactory{}
+	f.init("", name,
+		&dbaasv1alpha1.ClusterVersion{
 			Spec: dbaasv1alpha1.ClusterVersionSpec{
 				ClusterDefinitionRef: cdRef,
 				Components:           []dbaasv1alpha1.ClusterVersionComponent{},
 			},
-		},
-	}
-}
-
-func (factory *MockClusterVersionFactory) WithRandomName() *MockClusterVersionFactory {
-	key := GetRandomizedKey(factory.TestCtx, factory.ClusterVersion.Name)
-	factory.ClusterVersion.Name = key.Name
-	return factory
-}
-
-func (factory *MockClusterVersionFactory) AddLabels(keysAndValues ...string) *MockClusterVersionFactory {
-	for k, v := range withMap(keysAndValues...) {
-		factory.ClusterVersion.Labels[k] = v
-	}
-	return factory
+		}, f)
+	return f
 }
 
 func (factory *MockClusterVersionFactory) AddComponent(compType string) *MockClusterVersionFactory {
 	comp := dbaasv1alpha1.ClusterVersionComponent{
 		Type: compType,
 	}
-	factory.ClusterVersion.Spec.Components = append(factory.ClusterVersion.Spec.Components, comp)
+	factory.get().Spec.Components = append(factory.get().Spec.Components, comp)
 	return factory
 }
 
-func (factory *MockClusterVersionFactory) AddContainerShort(name string, image string) *MockClusterVersionFactory {
-	comps := factory.ClusterVersion.Spec.Components
+func (factory *MockClusterVersionFactory) AddInitContainer(container corev1.Container) *MockClusterVersionFactory {
+	comps := factory.get().Spec.Components
 	if len(comps) > 0 {
 		comp := comps[len(comps)-1]
 		if comp.PodSpec == nil {
 			comp.PodSpec = &corev1.PodSpec{}
 		}
-		comp.PodSpec.Containers = append(comp.PodSpec.Containers,
-			corev1.Container{
-				Name:  name,
-				Image: image,
-			})
+		comp.PodSpec.InitContainers = append(comp.PodSpec.InitContainers, container)
 		comps[len(comps)-1] = comp
 	}
-	factory.ClusterVersion.Spec.Components = comps
+	factory.get().Spec.Components = comps
 	return factory
+}
+
+func (factory *MockClusterVersionFactory) AddInitContainerShort(name string, image string) *MockClusterVersionFactory {
+	return factory.AddInitContainer(corev1.Container{
+		Name:  name,
+		Image: image,
+	})
+}
+
+func (factory *MockClusterVersionFactory) AddContainer(container corev1.Container) *MockClusterVersionFactory {
+	comps := factory.get().Spec.Components
+	if len(comps) > 0 {
+		comp := comps[len(comps)-1]
+		if comp.PodSpec == nil {
+			comp.PodSpec = &corev1.PodSpec{}
+		}
+		comp.PodSpec.Containers = append(comp.PodSpec.Containers, container)
+		comps[len(comps)-1] = comp
+	}
+	factory.get().Spec.Components = comps
+	return factory
+}
+
+func (factory *MockClusterVersionFactory) AddContainerShort(name string, image string) *MockClusterVersionFactory {
+	return factory.AddContainer(corev1.Container{
+		Name:  name,
+		Image: image,
+	})
 }
 
 func (factory *MockClusterVersionFactory) AddConfigTemplate(name string,
 	configTplRef string, configConstraintRef string, volumeName string) *MockClusterVersionFactory {
-	comps := factory.ClusterVersion.Spec.Components
+	comps := factory.get().Spec.Components
 	if len(comps) > 0 {
 		comp := comps[len(comps)-1]
 		comp.ConfigTemplateRefs = append(comp.ConfigTemplateRefs,
@@ -99,16 +102,6 @@ func (factory *MockClusterVersionFactory) AddConfigTemplate(name string,
 			})
 		comps[len(comps)-1] = comp
 	}
-	factory.ClusterVersion.Spec.Components = comps
+	factory.get().Spec.Components = comps
 	return factory
-}
-
-func (factory *MockClusterVersionFactory) Create() *MockClusterVersionFactory {
-	testCtx := factory.TestCtx
-	gomega.Expect(testCtx.CreateObj(testCtx.Ctx, factory.ClusterVersion)).Should(gomega.Succeed())
-	return factory
-}
-
-func (factory *MockClusterVersionFactory) GetClusterVersion() *dbaasv1alpha1.ClusterVersion {
-	return factory.ClusterVersion
 }

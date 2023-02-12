@@ -46,6 +46,7 @@ import (
 	"github.com/apecloud/kubeblocks/controllers/dbaas/components/util"
 	opsutil "github.com/apecloud/kubeblocks/controllers/dbaas/operations/util"
 	"github.com/apecloud/kubeblocks/controllers/k8score"
+	"github.com/apecloud/kubeblocks/internal/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -143,7 +144,7 @@ func clusterUpdateHandler(cli client.Client, ctx context.Context, clusterDef *db
 }
 
 func (r *ClusterReconciler) Handle(cli client.Client, reqCtx intctrlutil.RequestCtx, recorder record.EventRecorder, event *corev1.Event) error {
-	if event.InvolvedObject.FieldPath != ProbeRoleChangedCheckPath {
+	if event.InvolvedObject.FieldPath != component.ProbeRoleChangedCheckPath {
 		return handleEventForClusterStatus(reqCtx.Ctx, cli, recorder, event)
 	}
 	var (
@@ -719,8 +720,17 @@ func (r *ClusterReconciler) reconcileClusterStatus(ctx context.Context,
 			return
 		}
 		componentMap, clusterAvailabilityEffectMap, _ := getComponentRelatedInfo(cluster, clusterDef, "")
+		oldClusterPhase := cluster.Status.Phase
 		handleClusterAbnormalOrFailedPhase(cluster, componentMap, clusterAvailabilityEffectMap)
-		return true, nil
+		return true, func(cluster *dbaasv1alpha1.Cluster) error {
+			curPhase := cluster.Status.Phase
+			if oldClusterPhase != curPhase && util.IsFailedOrAbnormal(curPhase) {
+				// send a warning event when Cluster.status.phase changes to Failed/Abnormal
+				r.Recorder.Eventf(cluster, corev1.EventTypeWarning, string(curPhase),
+					"Cluster: %s is %s, check according to the components message", cluster.Name, curPhase)
+			}
+			return nil
+		}
 	}
 
 	// handle the Cluster.status when cluster is Running.
@@ -728,11 +738,14 @@ func (r *ClusterReconciler) reconcileClusterStatus(ctx context.Context,
 		if !clusterIsRunning {
 			return
 		}
+		oldClusterPhase := cluster.Status.Phase
 		cluster.Status.Phase = dbaasv1alpha1.RunningPhase
 		cluster.SetStatusCondition(newClusterReadyCondition(cluster.Name))
 		return true, func(cluster *dbaasv1alpha1.Cluster) error {
-			// send an event when Cluster.status.phase change to Running
-			r.Recorder.Eventf(cluster, corev1.EventTypeNormal, string(dbaasv1alpha1.RunningPhase), "Cluster: %s is ready, current phase is Running.", cluster.Name)
+			if oldClusterPhase != dbaasv1alpha1.RunningPhase {
+				// send an event when Cluster.status.phase changes to Running
+				r.Recorder.Eventf(cluster, corev1.EventTypeNormal, string(dbaasv1alpha1.RunningPhase), "Cluster: %s is ready, current phase is Running.", cluster.Name)
+			}
 			// when cluster phase changes to Running, need to mark OpsRequest annotation to reconcile for running OpsRequest.
 			return opsutil.MarkRunningOpsRequestAnnotation(ctx, r.Client, cluster)
 		}

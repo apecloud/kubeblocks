@@ -11,6 +11,10 @@ spec:
   selector:
     matchLabels:
       {{- include "kubeblocks.selectorLabels" . | nindent 6 }}
+  {{- if .Values.updateStrategy }}
+  strategy:
+    {{ toYaml .Values.updateStrategy | nindent 4 | trim }}
+  {{- end }}
   template:
     metadata:
       {{- with .Values.podAnnotations }}
@@ -20,6 +24,7 @@ spec:
       labels:
         {{- include "kubeblocks.selectorLabels" . | nindent 8 }}
     spec:
+      priorityClassName: system-cluster-critical
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
@@ -44,28 +49,32 @@ spec:
           env:
             - name: CM_NAMESPACE
               value: {{ .Release.Namespace }}
-          {{- if or .Values.dataProtection.enableVolumeSnapshot (index .Values "snapshot-controller" "enabled") }}
+            {{- if or .Values.dataProtection.enableVolumeSnapshot (index .Values "snapshot-controller" "enabled") }}
             - name: VOLUMESNAPSHOT
               value: "true"
-          {{- end }}
-          {{- if .Values.dataProtection.backupSchedule }}
+            {{- end }}
+            {{- if .Values.dataProtection.backupSchedule }}
             - name: DP_BACKUP_SCHEDULE
               value: {{ .Values.dataProtection.backupSchedule }}
-          {{- end }}
-          {{- if .Values.dataProtection.backupTTL }}
+            {{- end }}
+            {{- if .Values.dataProtection.backupTTL }}
             - name: DP_BACKUP_TTL
               value: {{ .Values.dataProtection.backupTTL }}
-          {{- end }}
-          {{- if .Values.admissionWebhooks.enabled }}
+            {{- end }}
+            {{- if .Values.admissionWebhooks.enabled }}
             - name: ENABLE_WEBHOOKS
               value: "true"
-          {{- end }}
+            {{- end }}
             - name: KUBEBLOCKS_IMAGE_PULL_POLICY
               value: {{ .Values.image.pullPolicy }}
             - name: KUBEBLOCKS_IMAGE
               value: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+            - name: KUBEBLOCKS_SERVICEACCOUNT_NAME
+              value: {{ include "kubeblocks.serviceAccountName" . }}
+          {{- with .Values.securityContext }}
           securityContext:
-            {{- toYaml .Values.securityContext | nindent 12 }}
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           ports:
@@ -98,6 +107,16 @@ spec:
               name: cert
               readOnly: true
           {{- end }}
+      {{- if .Values.hostNetwork }}
+      hostNetwork: {{ .Values.hostNetwork }}
+      {{- end }}
+      {{- if .Values.dnsPolicy }}
+      dnsPolicy: {{ .Values.dnsPolicy }}
+      {{- end }}
+      {{- with .Values.topologySpreadConstraints }}
+      topologySpreadConstraints:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       {{- with .Values.affinity }}
       affinity:
         {{- toYaml . | nindent 8 }}
@@ -106,11 +125,11 @@ spec:
       nodeSelector:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      terminationGracePeriodSeconds: 10
       {{- with .Values.tolerations }}
       tolerations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+      terminationGracePeriodSeconds: 10
       volumes:
         - name: manager-config
           configMap:

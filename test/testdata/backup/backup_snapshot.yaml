@@ -1,8 +1,0 @@
-apiVersion: dataprotection.kubeblocks.io/v1alpha1
-kind: Backup
-metadata:
-  name: backup-job-
-spec:
-  backupPolicyName: backup-policy-
-  backupType: snapshot
-  ttl: 168h0m0s

@@ -125,7 +125,7 @@ type ShellTrigger struct {
 type FormatterConfig struct {
 	// formatter describes the format of the configuration file
 	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:Enum={xml,ini,yaml,json,dotenv}
+	// +kubebuilder:validation:Enum={xml,ini,yaml,json,dotenv,props}
 	// Formatter ConfigurationFormatter `json:"formatter"`
 	Formatter ConfigurationFormatter `json:"formatter"`
 

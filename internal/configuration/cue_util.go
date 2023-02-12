@@ -22,7 +22,6 @@ import (
 	"cuelang.org/go/cue"
 	"cuelang.org/go/cue/cuecontext"
 	mxjv2 "github.com/clbanning/mxj/v2"
-	"github.com/spf13/viper"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 )
@@ -70,7 +69,7 @@ func ValidateConfigurationWithCue(cueTpl string, cfgType appsv1alpha1.Configurat
 		return WrapError(err, "failed to load configuration. [%s]", rawData)
 	}
 
-	return cfgDataValidateByCue(cueTpl, cfg)
+	return cfgDataValidateByCue(cueTpl, cfg, cfgType == appsv1alpha1.PROPERTIES)
 }
 
 func loadConfiguration(cfgType appsv1alpha1.ConfigurationFormatter, rawData string) (map[string]interface{}, error) {
@@ -79,14 +78,7 @@ func loadConfiguration(cfgType appsv1alpha1.ConfigurationFormatter, rawData stri
 		return mxjv2.NewMapXml([]byte(rawData), true)
 	}
 
-	var v *viper.Viper
-	// TODO hack, viper parse problem
-	if cfgType == appsv1alpha1.DOTENV {
-		v = viper.NewWithOptions(viper.KeyDelimiter("#"))
-	} else {
-		v = viper.New()
-	}
-	v.SetConfigType(string(cfgType))
+	v := NewCfgViper(cfgType)
 	v.SetTypeByDefaultValue(true)
 	if err := v.ReadConfig(strings.NewReader(rawData)); err != nil {
 		return nil, err
@@ -94,7 +86,7 @@ func loadConfiguration(cfgType appsv1alpha1.ConfigurationFormatter, rawData stri
 	return v.AllSettings(), nil
 }
 
-func cfgDataValidateByCue(cueTpl string, data interface{}) error {
+func cfgDataValidateByCue(cueTpl string, data interface{}, trimString bool) error {
 	defaultValidatePath := "configuration"
 	context := cuecontext.New()
 	tpl := context.CompileString(cueTpl)
@@ -102,7 +94,7 @@ func cfgDataValidateByCue(cueTpl string, data interface{}) error {
 		return err
 	}
 
-	if err := processCfgNotStringParam(data, context, tpl); err != nil {
+	if err := processCfgNotStringParam(data, context, tpl, trimString); err != nil {
 		return err
 	}
 

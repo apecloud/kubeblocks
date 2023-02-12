@@ -242,12 +242,13 @@ type webhookManager struct {
 type ConfigurationFormatter string
 
 const (
-	INI    ConfigurationFormatter = "ini"
-	YAML   ConfigurationFormatter = "yaml"
-	JSON   ConfigurationFormatter = "json"
-	XML    ConfigurationFormatter = "xml"
-	HCL    ConfigurationFormatter = "hcl"
-	DOTENV ConfigurationFormatter = "dotenv"
+	INI        ConfigurationFormatter = "ini"
+	YAML       ConfigurationFormatter = "yaml"
+	JSON       ConfigurationFormatter = "json"
+	XML        ConfigurationFormatter = "xml"
+	HCL        ConfigurationFormatter = "hcl"
+	DOTENV     ConfigurationFormatter = "dotenv"
+	PROPERTIES ConfigurationFormatter = "props"
 )
 
 // UpgradePolicy defines the policy of reconfiguring.

@@ -80,8 +80,9 @@ const (
 )
 
 const (
-	cfgKeyDelimiter = "."
-	emptyJSON       = "{}"
+	cfgKeyDelimiter  = "."
+	cfgKeyDelimiter2 = "@#@"
+	emptyJSON        = "{}"
 )
 
 var (
@@ -103,9 +104,9 @@ func init() {
 			indexer:   make(map[string]*viper.Viper, 1),
 		}
 
-		v := viper.NewWithOptions(viper.KeyDelimiter(cfgKeyDelimiter))
-
-		v.SetConfigType(string(option.CfgType))
+		// v := viper.NewWithOptions(viper.KeyDelimiter(cfgKeyDelimiter))
+		// v.SetConfigType(string(option.CfgType))
+		v := NewCfgViper(option.CfgType)
 		if err := v.ReadConfig(bytes.NewReader(option.RawData)); err != nil {
 			option.Log.Error(err, "failed to parse config!", "context", option.RawData)
 			return nil, err
@@ -140,8 +141,7 @@ func init() {
 
 		var index = 0
 		for fileName, content := range ctx.Configurations {
-			v := viper.NewWithOptions(viper.KeyDelimiter(cfgKeyDelimiter))
-			v.SetConfigType(string(option.CfgType))
+			v := NewCfgViper(option.CfgType)
 			if err := v.ReadConfig(bytes.NewReader([]byte(content))); err != nil {
 				return nil, WrapError(err, "failed to load config: filename[%s]", fileName)
 			}
@@ -294,6 +294,16 @@ func (c *cfgWrapper) Diff(target *cfgWrapper) (*ConfigPatchInfo, error) {
 	}
 
 	return reconfigureInfo, nil
+}
+
+func NewCfgViper(cfgType appsv1alpha1.ConfigurationFormatter) *viper.Viper {
+	defaultKeySep := cfgKeyDelimiter
+	if cfgType == appsv1alpha1.PROPERTIES || cfgType == appsv1alpha1.DOTENV {
+		defaultKeySep = cfgKeyDelimiter2
+	}
+	v := viper.NewWithOptions(viper.KeyDelimiter(defaultKeySep))
+	v.SetConfigType(string(cfgType))
+	return v
 }
 
 func NewCfgOptions(filename string, options ...Option) CfgOpOption {
@@ -489,4 +499,20 @@ func generateUpdateKeyParam(files map[string]interface{}, trimPrefix string, upd
 		}
 	}
 	return r
+}
+
+// isQuotesString check whether a string is quoted.
+func isQuotesString(str string) bool {
+	const (
+		singleQuotes = '\''
+		doubleQuotes = '"'
+	)
+
+	if len(str) < 2 {
+		return false
+	}
+
+	firstChar := str[0]
+	lastChar := str[len(str)-1]
+	return (firstChar == singleQuotes && lastChar == singleQuotes) || (firstChar == doubleQuotes && lastChar == doubleQuotes)
 }

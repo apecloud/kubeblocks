@@ -17,66 +17,41 @@ limitations under the License.
 package dbaas
 
 import (
-	"context"
-
-	"github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/testutil"
 )
 
-type ComponentTypeName string
-
 type MockClusterFactory struct {
-	Cluster *dbaasv1alpha1.Cluster
+	BaseFactory[dbaasv1alpha1.Cluster, *dbaasv1alpha1.Cluster, MockClusterFactory]
 }
 
-func NewClusterFactory(namespace string, name string, cdRef string, cvRef string) *MockClusterFactory {
-	return &MockClusterFactory{
-		Cluster: &dbaasv1alpha1.Cluster{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      name,
-				Namespace: namespace,
-				Labels:    map[string]string{},
-			},
+func NewClusterFactory(namespace, name, cdRef, cvRef string) *MockClusterFactory {
+	f := &MockClusterFactory{}
+	f.init(namespace, name,
+		&dbaasv1alpha1.Cluster{
 			Spec: dbaasv1alpha1.ClusterSpec{
 				ClusterDefRef:     cdRef,
 				ClusterVersionRef: cvRef,
 				Components:        []dbaasv1alpha1.ClusterComponent{},
 				TerminationPolicy: dbaasv1alpha1.WipeOut,
 			},
-		},
-	}
-}
-
-func (factory *MockClusterFactory) WithRandomName() *MockClusterFactory {
-	key := GetRandomizedKey(factory.Cluster.Namespace, factory.Cluster.Name)
-	factory.Cluster.Name = key.Name
-	return factory
-}
-
-func (factory *MockClusterFactory) AddLabels(keysAndValues ...string) *MockClusterFactory {
-	for k, v := range withMap(keysAndValues...) {
-		factory.Cluster.Labels[k] = v
-	}
-	return factory
+		}, f)
+	return f
 }
 
 func (factory *MockClusterFactory) SetClusterAffinity(affinity *dbaasv1alpha1.Affinity) *MockClusterFactory {
-	factory.Cluster.Spec.Affinity = affinity
+	factory.get().Spec.Affinity = affinity
 	return factory
 }
 
 func (factory *MockClusterFactory) AddClusterToleration(toleration corev1.Toleration) *MockClusterFactory {
-	tolerations := factory.Cluster.Spec.Tolerations
+	tolerations := factory.get().Spec.Tolerations
 	if len(tolerations) == 0 {
 		tolerations = []corev1.Toleration{}
 	}
 	tolerations = append(tolerations, toleration)
-	factory.Cluster.Spec.Tolerations = tolerations
+	factory.get().Spec.Tolerations = tolerations
 	return factory
 }
 
@@ -85,39 +60,39 @@ func (factory *MockClusterFactory) AddComponent(compName string, compType string
 		Name: compName,
 		Type: compType,
 	}
-	factory.Cluster.Spec.Components = append(factory.Cluster.Spec.Components, comp)
+	factory.get().Spec.Components = append(factory.get().Spec.Components, comp)
 	return factory
 }
 
 func (factory *MockClusterFactory) SetReplicas(replicas int32) *MockClusterFactory {
-	comps := factory.Cluster.Spec.Components
+	comps := factory.get().Spec.Components
 	if len(comps) > 0 {
 		comps[len(comps)-1].Replicas = &replicas
 	}
-	factory.Cluster.Spec.Components = comps
+	factory.get().Spec.Components = comps
 	return factory
 }
 
 func (factory *MockClusterFactory) SetResources(resources corev1.ResourceRequirements) *MockClusterFactory {
-	comps := factory.Cluster.Spec.Components
+	comps := factory.get().Spec.Components
 	if len(comps) > 0 {
 		comps[len(comps)-1].Resources = resources
 	}
-	factory.Cluster.Spec.Components = comps
+	factory.get().Spec.Components = comps
 	return factory
 }
 
 func (factory *MockClusterFactory) SetComponentAffinity(affinity *dbaasv1alpha1.Affinity) *MockClusterFactory {
-	comps := factory.Cluster.Spec.Components
+	comps := factory.get().Spec.Components
 	if len(comps) > 0 {
 		comps[len(comps)-1].Affinity = affinity
 	}
-	factory.Cluster.Spec.Components = comps
+	factory.get().Spec.Components = comps
 	return factory
 }
 
 func (factory *MockClusterFactory) AddComponentToleration(toleration corev1.Toleration) *MockClusterFactory {
-	comps := factory.Cluster.Spec.Components
+	comps := factory.get().Spec.Components
 	if len(comps) > 0 {
 		comp := comps[len(comps)-1]
 		tolerations := comp.Tolerations
@@ -128,13 +103,13 @@ func (factory *MockClusterFactory) AddComponentToleration(toleration corev1.Tole
 		comp.Tolerations = tolerations
 		comps[len(comps)-1] = comp
 	}
-	factory.Cluster.Spec.Components = comps
+	factory.get().Spec.Components = comps
 	return factory
 }
 
 func (factory *MockClusterFactory) AddVolumeClaimTemplate(volumeName string,
 	pvcSpec *corev1.PersistentVolumeClaimSpec) *MockClusterFactory {
-	comps := factory.Cluster.Spec.Components
+	comps := factory.get().Spec.Components
 	if len(comps) > 0 {
 		comp := comps[len(comps)-1]
 		comp.VolumeClaimTemplates = append(comp.VolumeClaimTemplates,
@@ -144,29 +119,15 @@ func (factory *MockClusterFactory) AddVolumeClaimTemplate(volumeName string,
 			})
 		comps[len(comps)-1] = comp
 	}
-	factory.Cluster.Spec.Components = comps
+	factory.get().Spec.Components = comps
 	return factory
 }
 
 func (factory *MockClusterFactory) SetMonitor(monitor bool) *MockClusterFactory {
-	comps := factory.Cluster.Spec.Components
+	comps := factory.get().Spec.Components
 	if len(comps) > 0 {
 		comps[len(comps)-1].Monitor = monitor
 	}
-	factory.Cluster.Spec.Components = comps
+	factory.get().Spec.Components = comps
 	return factory
-}
-
-func (factory *MockClusterFactory) Create(testCtx *testutil.TestContext) *MockClusterFactory {
-	gomega.Expect(testCtx.CreateObj(testCtx.Ctx, factory.Cluster)).Should(gomega.Succeed())
-	return factory
-}
-
-func (factory *MockClusterFactory) CreateCli(ctx context.Context, cli client.Client) *MockClusterFactory {
-	gomega.Expect(cli.Create(ctx, factory.Cluster)).Should(gomega.Succeed())
-	return factory
-}
-
-func (factory *MockClusterFactory) GetCluster() *dbaasv1alpha1.Cluster {
-	return factory.Cluster
 }

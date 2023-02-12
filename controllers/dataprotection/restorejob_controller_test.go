@@ -67,7 +67,7 @@ var _ = Describe("RestoreJob Controller", func() {
 			SetTargetSecretName("mycluster-cluster-secret").
 			AddTargetVolumePVC("mysql-restore-storage", "datadir-mycluster-0").
 			AddTargetVolumeMount(corev1.VolumeMount{Name: "mysql-restore-storage", MountPath: "/var/lib/mysql"}).
-			Create(&testCtx).GetRestoreJob()
+			Create(&testCtx).GetObject()
 	}
 
 	assureBackupObj := func(backupPolicy string) *dataprotectionv1alpha1.Backup {
@@ -76,7 +76,7 @@ var _ = Describe("RestoreJob Controller", func() {
 			WithRandomName().SetBackupPolicyName(backupPolicy).
 			SetBackupType(dataprotectionv1alpha1.BackupTypeFull).
 			SetTTL("168h0m0s").
-			Create(&testCtx).GetBackup()
+			Create(&testCtx).GetObject()
 	}
 
 	assureBackupPolicyObj := func(backupTool string) *dataprotectionv1alpha1.BackupPolicy {
@@ -89,7 +89,7 @@ var _ = Describe("RestoreJob Controller", func() {
 			SetBackupPolicyTplName("backup-config-mysql").
 			SetTargetSecretName("mycluster-cluster-secret").
 			SetRemoteVolumePVC("backup-remote-volume", "backup-host-path-pvc").
-			Create(&testCtx).GetBackupPolicy()
+			Create(&testCtx).GetObject()
 	}
 
 	assureBackupToolObj := func(withoutResources ...bool) *dataprotectionv1alpha1.BackupTool {
@@ -116,7 +116,7 @@ var _ = Describe("RestoreJob Controller", func() {
 			AddVolumeClaimTemplate(corev1.PersistentVolumeClaim{
 				ObjectMeta: metav1.ObjectMeta{Name: testdbaas.DataVolumeName},
 				Spec:       testdbaas.NewPVC("1Gi"),
-			}).Create(&testCtx).GetStatefulSet()
+			}).Create(&testCtx).GetObject()
 	}
 
 	patchBackupStatus := func(phase dataprotectionv1alpha1.BackupPhase, key types.NamespacedName) {

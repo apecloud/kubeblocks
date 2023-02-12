@@ -121,7 +121,7 @@ var _ = Describe("MySQL High-Availability function", func() {
 			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
 			AddComponent(mysqlCompName, mysqlCompType).
 			SetReplicas(3).AddVolumeClaimTemplate(testdbaas.DataVolumeName, pvcSpec).
-			Create(&testCtx).GetCluster()
+			Create(&testCtx).GetObject()
 		clusterKey = client.ObjectKeyFromObject(clusterObj)
 
 		By("Waiting the cluster is created")
@@ -203,12 +203,12 @@ var _ = Describe("MySQL High-Availability function", func() {
 				AddComponent(testdbaas.ConsensusMySQLComponent, mysqlCompType).
 				AddConfigTemplate(scriptConfigName, scriptConfigName, "", testdbaas.ScriptsVolumeName, &mode).
 				AddContainerEnv(testdbaas.DefaultMySQLContainerName, corev1.EnvVar{Name: "MYSQL_ALLOW_EMPTY_PASSWORD", Value: "yes"}).
-				Create(&testCtx).GetClusterDef()
+				Create(&testCtx).GetObject()
 
 			By("Create a clusterVersion obj")
 			clusterVersionObj = testdbaas.NewClusterVersionFactory(clusterVersionName, clusterDefObj.GetName()).
 				AddComponent(mysqlCompType).AddContainerShort(testdbaas.DefaultMySQLContainerName, testdbaas.ApeCloudMySQLImage).
-				Create(&testCtx).GetClusterVersion()
+				Create(&testCtx).GetObject()
 
 		})
 

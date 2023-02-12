@@ -17,58 +17,26 @@ limitations under the License.
 package dbaas
 
 import (
-	"context"
-
-	"github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-
-	"github.com/apecloud/kubeblocks/internal/testutil"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 type MockPodFactory struct {
-	Pod *corev1.Pod
+	BaseFactory[corev1.Pod, *corev1.Pod, MockPodFactory]
 }
 
 func NewPodFactory(namespace, name string) *MockPodFactory {
-	return &MockPodFactory{
-		Pod: &corev1.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      name,
-				Namespace: namespace,
-				Labels:    map[string]string{},
-			},
+	f := &MockPodFactory{}
+	f.init(namespace, name,
+		&corev1.Pod{
 			Spec: corev1.PodSpec{
 				Containers: []corev1.Container{},
 			},
-		},
-	}
-}
-
-func (factory *MockPodFactory) AddLabels(keysAndValues ...string) *MockPodFactory {
-	for k, v := range withMap(keysAndValues...) {
-		factory.Pod.Labels[k] = v
-	}
-	return factory
+		}, f)
+	return f
 }
 
 func (factory *MockPodFactory) AddContainer(container corev1.Container) *MockPodFactory {
-	containers := &factory.Pod.Spec.Containers
+	containers := &factory.get().Spec.Containers
 	*containers = append(*containers, container)
 	return factory
-}
-
-func (factory *MockPodFactory) Create(testCtx *testutil.TestContext) *MockPodFactory {
-	gomega.Expect(testCtx.CreateObj(testCtx.Ctx, factory.Pod)).Should(gomega.Succeed())
-	return factory
-}
-
-func (factory *MockPodFactory) CreateCli(ctx context.Context, cli client.Client) *MockPodFactory {
-	gomega.Expect(cli.Create(ctx, factory.Pod)).Should(gomega.Succeed())
-	return factory
-}
-
-func (factory *MockPodFactory) GetStatefulSet() *corev1.Pod {
-	return factory.Pod
 }

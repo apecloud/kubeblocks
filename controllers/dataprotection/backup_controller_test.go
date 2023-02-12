@@ -77,7 +77,7 @@ var _ = Describe("Backup for a StatefulSet", func() {
 			AddVolumeClaimTemplate(corev1.PersistentVolumeClaim{
 				ObjectMeta: metav1.ObjectMeta{Name: testdbaas.DataVolumeName},
 				Spec:       testdbaas.NewPVC(defaultPVCSize),
-			}).Create(&testCtx).GetStatefulSet()
+			}).Create(&testCtx).GetObject()
 
 		By("By mocking a pod belonging to the statefulset")
 		_ = testdbaas.NewPodFactory(testCtx.DefaultNamespace, sts.Name+"-0").
@@ -105,7 +105,7 @@ var _ = Describe("Backup for a StatefulSet", func() {
 				AddHookPreCommand("touch /data/mysql/.restore;sync").
 				AddHookPostCommand("rm -f /data/mysql/.restore;sync").
 				SetRemoteVolumePVC(backupRemoteVolumeName, backupRemotePVCName).
-				Create(&testCtx).GetBackupPolicy()
+				Create(&testCtx).GetObject()
 		})
 
 		Context("creates a full backup", func() {
@@ -117,7 +117,7 @@ var _ = Describe("Backup for a StatefulSet", func() {
 					SetTTL(defaultTTL).
 					SetBackupPolicyName(backupPolicyName).
 					SetBackupType(dataprotectionv1alpha1.BackupTypeFull).
-					Create(&testCtx).GetBackup()
+					Create(&testCtx).GetObject()
 				backupKey = client.ObjectKeyFromObject(backup)
 			})
 
@@ -151,7 +151,7 @@ var _ = Describe("Backup for a StatefulSet", func() {
 					SetTTL(defaultTTL).
 					SetBackupPolicyName(backupPolicyName).
 					SetBackupType(dataprotectionv1alpha1.BackupTypeSnapshot).
-					Create(&testCtx).GetBackup()
+					Create(&testCtx).GetObject()
 				backupKey = client.ObjectKeyFromObject(backup)
 			})
 
@@ -203,14 +203,14 @@ var _ = Describe("Backup for a StatefulSet", func() {
 					AddHookPreCommand("touch /data/mysql/.restore;sync").
 					AddHookPostCommand("rm -f /data/mysql/.restore;sync").
 					SetRemoteVolumePVC(backupRemoteVolumeName, backupRemotePVCName).
-					Create(&testCtx).GetBackupPolicy()
+					Create(&testCtx).GetObject()
 
 				By("By creating a backup from backupPolicy: " + backupPolicyName)
 				backup := testdbaas.NewBackupFactory(testCtx.DefaultNamespace, backupName).
 					SetTTL(defaultTTL).
 					SetBackupPolicyName(backupPolicyName).
 					SetBackupType(dataprotectionv1alpha1.BackupTypeFull).
-					Create(&testCtx).GetBackup()
+					Create(&testCtx).GetObject()
 				backupKey = client.ObjectKeyFromObject(backup)
 			})
 

@@ -19,15 +19,13 @@ package controller
 import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	ctrl "sigs.k8s.io/controller-runtime"
 
-	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/types"
-	"sigs.k8s.io/controller-runtime/pkg/client"
+	ctrl "sigs.k8s.io/controller-runtime"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	testdbaas "github.com/apecloud/kubeblocks/internal/testutil/dbaas"
+	corev1 "k8s.io/api/core/v1"
 )
 
 const (
@@ -37,21 +35,6 @@ const (
 var tlog = ctrl.Log.WithName("component_testing")
 
 var _ = Describe("component module", func() {
-
-	cleanAll := func() {
-		// must wait until resources deleted and no longer exist before the testcases start,
-		// otherwise if later it needs to create some new resource objects with the same name,
-		// in race conditions, it will find the existence of old objects, resulting failure to
-		// create the new objects.
-		By("clean resources")
-
-		// delete cluster(and all dependent sub-resources), clusterversion and clusterdef
-		testdbaas.ClearClusterResources(&testCtx)
-	}
-
-	BeforeEach(cleanAll)
-
-	AfterEach(cleanAll)
 
 	Context("has the mergeMonitorConfig function", func() {
 		var component *Component
@@ -158,73 +141,44 @@ var _ = Describe("component module", func() {
 			}
 		})
 	})
-
-	const clusterDefName = "test-clusterdef"
-	const clusterVersionName = "test-clusterversion"
-	const clusterName = "test-cluster"
-
-	const mysqlCompType = "replicasets"
-	const mysqlCompName = "mysql"
-
-	const nginxCompType = "proxy"
-
-	allFieldsClusterDefObj := func(needCreate bool) *dbaasv1alpha1.ClusterDefinition {
-		By("By assure an clusterDefinition obj")
-		clusterDefObj := testdbaas.NewClusterDefFactory(clusterDefName, testdbaas.MySQLType).
-			AddComponent(testdbaas.StatefulMySQLComponent, mysqlCompType).
-			AddComponent(testdbaas.StatelessNginxComponent, nginxCompType).
-			GetObject()
-		if needCreate {
-			Expect(testCtx.CreateObj(testCtx.Ctx, clusterDefObj)).Should(Succeed())
-		}
-		return clusterDefObj
-	}
-
-	allFieldsClusterVersionObj := func(needCreate bool) *dbaasv1alpha1.ClusterVersion {
-		By("By assure an clusterVersion obj")
-		clusterVersionObj := testdbaas.NewClusterVersionFactory(clusterVersionName, clusterDefName).
-			AddComponent(mysqlCompType).
-			AddContainerShort("mysql", testdbaas.ApeCloudMySQLImage).
-			AddComponent(nginxCompType).
-			AddInitContainerShort("nginx-init", testdbaas.NginxImage).
-			AddContainerShort("nginx", testdbaas.NginxImage).
-			GetObject()
-		if needCreate {
-			Expect(testCtx.CreateObj(testCtx.Ctx, clusterVersionObj)).Should(Succeed())
-		}
-		return clusterVersionObj
-	}
-
-	newAllFieldsClusterObj := func(
-		clusterDefObj *dbaasv1alpha1.ClusterDefinition,
-		clusterVersionObj *dbaasv1alpha1.ClusterVersion,
-		needCreate bool,
-	) (*dbaasv1alpha1.Cluster, *dbaasv1alpha1.ClusterDefinition, *dbaasv1alpha1.ClusterVersion, types.NamespacedName) {
-		// setup Cluster obj required default ClusterDefinition and ClusterVersion objects if not provided
-		if clusterDefObj == nil {
-			clusterDefObj = allFieldsClusterDefObj(needCreate)
-		}
-		if clusterVersionObj == nil {
-			clusterVersionObj = allFieldsClusterVersionObj(needCreate)
-		}
-
-		pvcSpec := testdbaas.NewPVC("1Gi")
-		clusterObj := testdbaas.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
-			clusterDefObj.Name, clusterVersionObj.Name).
-			AddComponent(mysqlCompName, mysqlCompType).
-			AddVolumeClaimTemplate(testdbaas.DataVolumeName, &pvcSpec).
-			GetObject()
-		key := client.ObjectKeyFromObject(clusterObj)
-		if needCreate {
-			Expect(testCtx.CreateObj(testCtx.Ctx, clusterObj)).Should(Succeed())
-		}
-
-		return clusterObj, clusterDefObj, clusterVersionObj, key
-	}
-
+	
 	Context("has the MergeComponents function", func() {
+		const (
+			clusterDefName     = "test-clusterdef"
+			clusterVersionName = "test-clusterversion"
+			clusterName        = "test-cluster"
+			mysqlCompType      = "replicasets"
+			mysqlCompName      = "mysql"
+			nginxCompType      = "proxy"
+		)
+
+		var (
+			clusterDef     *dbaasv1alpha1.ClusterDefinition
+			clusterVersion *dbaasv1alpha1.ClusterVersion
+			cluster        *dbaasv1alpha1.Cluster
+		)
+
+		BeforeEach(func() {
+			clusterDef = testdbaas.NewClusterDefFactory(clusterDefName, testdbaas.MySQLType).
+				AddComponent(testdbaas.StatefulMySQLComponent, mysqlCompType).
+				AddComponent(testdbaas.StatelessNginxComponent, nginxCompType).
+				GetObject()
+			clusterVersion = testdbaas.NewClusterVersionFactory(clusterVersionName, clusterDefName).
+				AddComponent(mysqlCompType).
+				AddContainerShort("mysql", testdbaas.ApeCloudMySQLImage).
+				AddComponent(nginxCompType).
+				AddInitContainerShort("nginx-init", testdbaas.NginxImage).
+				AddContainerShort("nginx", testdbaas.NginxImage).
+				GetObject()
+			pvcSpec := testdbaas.NewPVC("1Gi")
+			cluster = testdbaas.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
+				clusterDef.Name, clusterVersion.Name).
+				AddComponent(mysqlCompName, mysqlCompType).
+				AddVolumeClaimTemplate(testdbaas.DataVolumeName, &pvcSpec).
+				GetObject()
+		})
+
 		It("should work as expected with various inputs", func() {
-			cluster, clusterDef, clusterVersion, _ := newAllFieldsClusterObj(nil, nil, true)
 			By("assign every available fields")
 			reqCtx := intctrlutil.RequestCtx{
 				Ctx: ctx,
@@ -250,7 +204,6 @@ var _ = Describe("component module", func() {
 				&cluster.Spec.Components[0])
 			Expect(component).ShouldNot(BeNil())
 
-			clusterVersion = allFieldsClusterVersionObj(false)
 			By("new container in clusterVersion not in clusterDefinition")
 			component = MergeComponents(
 				reqCtx,

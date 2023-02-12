@@ -14,19 +14,15 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package dbaas
+package controller
 
 import (
-	"encoding/json"
-
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"github.com/leaanthony/debme"
 	corev1 "k8s.io/api/core/v1"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 var _ = Describe("probe_utils", func() {
@@ -46,15 +42,8 @@ var _ = Describe("probe_utils", func() {
 		var clusterDefProbe *dbaasv1alpha1.ClusterDefinitionProbe
 
 		BeforeEach(func() {
-			cueFS, _ := debme.FS(cueTemplates, "cue")
-
-			cueTpl, err := intctrlutil.NewCUETplFromBytes(cueFS.ReadFile("probe_template.cue"))
-			Expect(err).NotTo(HaveOccurred())
-			cueValue := intctrlutil.NewCUEBuilder(*cueTpl)
-			probeContainerByte, err := cueValue.Lookup("probeContainer")
-			Expect(err).NotTo(HaveOccurred())
-			container = &corev1.Container{}
-			err = json.Unmarshal(probeContainerByte, container)
+			var err error
+			container, err = buildProbeContainer()
 			Expect(err).NotTo(HaveOccurred())
 			probeServiceHTTPPort, probeServiceGrpcPort = 3501, 50001
 

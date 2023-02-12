@@ -25,6 +25,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/controller"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/apecloud/kubeblocks/internal/gotemplate"
 )
@@ -117,7 +118,7 @@ func (c *configTemplateBuilder) builtinObjects() (*gotemplate.TplValues, error) 
 func (c *configTemplateBuilder) injectBuiltInObjectsAndFunctions(
 	podSpec *corev1.PodSpec,
 	configs []dbaasv1alpha1.ConfigTemplate,
-	component *Component) error {
+	component *controller.Component) error {
 	if err := injectBuiltInObjects(c, podSpec, component, configs); err != nil {
 		return err
 	}
@@ -127,7 +128,7 @@ func (c *configTemplateBuilder) injectBuiltInObjectsAndFunctions(
 	return nil
 }
 
-func injectBuiltInFunctions(tplBuilder *configTemplateBuilder, component *Component) error {
+func injectBuiltInFunctions(tplBuilder *configTemplateBuilder, component *controller.Component) error {
 	// TODO add built-in function
 	tplBuilder.builtInFunctions = &gotemplate.BuiltInObjectsFunc{
 		builtInMysqlCalBufferFunctionName:     calDBPoolSize,
@@ -142,7 +143,7 @@ func injectBuiltInFunctions(tplBuilder *configTemplateBuilder, component *Compon
 	return nil
 }
 
-func injectBuiltInObjects(tplBuilder *configTemplateBuilder, podSpec *corev1.PodSpec, component *Component, configs []dbaasv1alpha1.ConfigTemplate) error {
+func injectBuiltInObjects(tplBuilder *configTemplateBuilder, podSpec *corev1.PodSpec, component *controller.Component, configs []dbaasv1alpha1.ConfigTemplate) error {
 	var resource *ResourceDefinition
 	container := intctrlutil.GetContainerByConfigTemplate(podSpec, configs)
 	if container != nil && len(container.Resources.Limits) > 0 {

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package dbaas
+package controller
 
 import (
 	"encoding/json"
@@ -43,20 +43,28 @@ const (
 	ProbeRunningCheckPath     = "spec.containers{" + runningProbeContainerName + "}"
 )
 
-func buildProbeContainers(reqCtx intctrlutil.RequestCtx, component *Component) error {
-	cueFS, _ := debme.FS(cueTemplates, "cue")
+func buildProbeContainer() (*corev1.Container, error) {
+	cueFS, _ := debme.FS(CueTemplates, "cue")
 
 	cueTpl, err := intctrlutil.NewCUETplFromBytes(cueFS.ReadFile("probe_template.cue"))
 	if err != nil {
-		return err
+		return nil, err
 	}
 	cueValue := intctrlutil.NewCUEBuilder(*cueTpl)
 	probeContainerByte, err := cueValue.Lookup("probeContainer")
 	if err != nil {
-		return err
+		return nil, err
 	}
-	container := corev1.Container{}
-	if err = json.Unmarshal(probeContainerByte, &container); err != nil {
+	container := &corev1.Container{}
+	if err = json.Unmarshal(probeContainerByte, container); err != nil {
+		return nil, err
+	}
+	return container, nil
+}
+
+func buildProbeContainers(reqCtx intctrlutil.RequestCtx, component *Component) error {
+	container, err := buildProbeContainer()
+	if err != nil {
 		return err
 	}
 
@@ -123,7 +131,7 @@ func buildProbeServiceContainer(component *Component, container *corev1.Containe
 			dbPort = int(port.Port)
 		}
 		container.Env = append(container.Env, corev1.EnvVar{
-			Name:      dbaasPrefix + "_SERVICE_PORT",
+			Name:      KBPrefix + "_SERVICE_PORT",
 			Value:     strconv.Itoa(dbPort),
 			ValueFrom: nil,
 		})
@@ -132,13 +140,13 @@ func buildProbeServiceContainer(component *Component, container *corev1.Containe
 	roles := getComponentRoles(component)
 	rolesJSON, _ := json.Marshal(roles)
 	container.Env = append(container.Env, corev1.EnvVar{
-		Name:      dbaasPrefix + "_SERVICE_ROLES",
+		Name:      KBPrefix + "_SERVICE_ROLES",
 		Value:     string(rolesJSON),
 		ValueFrom: nil,
 	})
 
 	container.Env = append(container.Env, corev1.EnvVar{
-		Name:      dbaasPrefix + "_SERVICE_CHARACTER_TYPE",
+		Name:      KBPrefix + "_SERVICE_CHARACTER_TYPE",
 		Value:     component.CharacterType,
 		ValueFrom: nil,
 	})

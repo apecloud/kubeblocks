@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package dbaas
+package controller
 
 import (
 	"embed"
@@ -45,13 +45,6 @@ var (
 	//go:embed cue/*
 	CueTemplates embed.FS
 )
-
-type MysqlMonitor struct {
-	SecretName      string `json:"secretName"`
-	InternalPort    int32  `json:"internalPort"`
-	Image           string `json:"image"`
-	ImagePullPolicy string `json:"imagePullPolicy"`
-}
 
 func buildMysqlContainer(key string, monitor *MysqlMonitor) (*corev1.Container, error) {
 	cueFS, _ := debme.FS(CueTemplates, "cue/monitor")

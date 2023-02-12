@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package dbaas
+package plan
 
 import (
 	"context"
@@ -53,6 +53,40 @@ const (
 	// TODO: This function migrate to configuration template
 	builtInMysqlCalBufferFunctionName = "callBufferSizeByResource"
 )
+
+type ResourceDefinition struct {
+	MemorySize int64 `json:"memorySize,omitempty"`
+	CoreNum    int64 `json:"coreNum,omitempty"`
+}
+
+type componentTemplateValues struct {
+	TypeName    string
+	ServiceName string
+	Replicas    int32
+
+	// Container *corev1.Container
+	Resource  *ResourceDefinition
+	ConfigTpl []dbaasv1alpha1.ConfigTemplate
+}
+
+type configTemplateBuilder struct {
+	namespace   string
+	clusterName string
+	tplName     string
+
+	// Global Var
+	componentValues  *componentTemplateValues
+	builtInFunctions *gotemplate.BuiltInObjectsFunc
+
+	// DBaas cluster object
+	component      *component.Component
+	clusterVersion *dbaasv1alpha1.ClusterVersion
+	cluster        *dbaasv1alpha1.Cluster
+	podSpec        *corev1.PodSpec
+
+	ctx context.Context
+	cli client.Client
+}
 
 func newCfgTemplateBuilder(
 	clusterName, namespace string,

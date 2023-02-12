@@ -246,7 +246,7 @@ func getClusterAvailabilityEffect(componentDef *dbaasv1alpha1.ClusterDefinitionC
 		return true
 	default:
 		// other types of components need to judge whether there has PodDisruptionBudget
-		return existsPDBSpec(componentDef.PDBSpec)
+		return intctrlutil.ExistsPDBSpec(componentDef.PDBSpec)
 	}
 }
 

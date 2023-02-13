@@ -301,9 +301,9 @@ func (o *InstallOptions) enableSets(sets []string) {
 		return
 	}
 
-	msg := "following flags must be enabled in current kubernetes environment, they will be enabled\n"
+	msg := "following parameters must be enabled in current kubernetes environment, they will be enabled\n"
 	if len(removedSets) == 1 {
-		msg = "following flag must be enabled in current kubernetes environment, it will be enabled\n"
+		msg = "following parameter must be enabled in current kubernetes environment, it will be enabled\n"
 	}
 	printer.Warning(o.Out, msg)
 	for _, set := range removedSets {
@@ -351,9 +351,9 @@ func (o *InstallOptions) disableSets(sets []string) {
 		return
 	}
 
-	msg := "following flags are not available in current kubernetes environment, they will be disabled\n"
+	msg := "following parameters are not available in current kubernetes environment, they will be disabled\n"
 	if len(disabledSets) == 1 {
-		msg = "following flag is not available in current kubernetes environment, it will be disabled\n"
+		msg = "following parameter is not available in current kubernetes environment, it will be disabled\n"
 	}
 	printer.Warning(o.Out, msg)
 	for _, set := range disabledSets {

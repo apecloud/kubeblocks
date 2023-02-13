@@ -74,6 +74,23 @@ func newUpgradeCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 }
 
 func (o *InstallOptions) upgrade(cmd *cobra.Command) error {
+	// check whether monitor flag is set by user
+	monitorIsSet := false
+	cmd.Flags().Visit(func(flag *pflag.Flag) {
+		if flag.Name == "monitor" {
+			monitorIsSet = true
+		}
+	})
+
+	// check flags already been set
+	if !monitorIsSet && len(o.Version) == 0 && len(o.Sets) == 0 {
+		fmt.Fprint(o.Out, "Nothing to upgrade, --set, --version or --monitor should be specified")
+		return nil
+	}
+	if monitorIsSet {
+		o.Sets = append(o.Sets, fmt.Sprintf(kMonitorParam, o.Monitor))
+	}
+
 	// check if KubeBlocks has been installed
 	versionInfo, err := util.GetVersionInfo(o.Client)
 	if err != nil {
@@ -87,26 +104,21 @@ func (o *InstallOptions) upgrade(cmd *cobra.Command) error {
 		return errors.New("KubeBlocks does not exist, try to run \"kbcli kubeblocks install\" to install")
 	}
 
-	if err = o.preCheck(versionInfo); err != nil {
-		return err
-	}
-
 	msg := ""
 	if len(o.Version) > 0 {
+		if v == o.Version && len(o.Sets) == 0 {
+			fmt.Fprintf(o.Out, "Current version %s is the same as the upgraded version, no need to upgrade\n", o.Version)
+			return nil
+		}
 		msg = "to " + o.Version
 	}
+
+	// it's time to upgrade
 	spinner := util.Spinner(o.Out, "%-40s", "Upgrading KubeBlocks "+msg)
 	defer spinner(false)
 
-	// check whether monitor flag is set by user
-	monitorIsSet := false
-	cmd.Flags().Visit(func(flag *pflag.Flag) {
-		if flag.Name == "monitor" {
-			monitorIsSet = true
-		}
-	})
-	if monitorIsSet {
-		o.Sets = append(o.Sets, fmt.Sprintf(kMonitorParam, o.Monitor))
+	if err = o.preCheck(versionInfo); err != nil {
+		return err
 	}
 
 	// Add repo, if exists, will update it
@@ -119,7 +131,7 @@ func (o *InstallOptions) upgrade(cmd *cobra.Command) error {
 		return err
 	}
 
-	// successfully installed
+	// successfully upgraded
 	spinner(true)
 
 	return nil

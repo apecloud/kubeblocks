@@ -33,13 +33,6 @@ type MonitorConfig struct {
 	ScrapePath string `json:"scrapePath,omitempty"`
 }
 
-type MysqlMonitor struct {
-	SecretName      string `json:"secretName"`
-	InternalPort    int32  `json:"internalPort"`
-	Image           string `json:"image"`
-	ImagePullPolicy string `json:"imagePullPolicy"`
-}
-
 type Component struct {
 	ClusterDefName          string                              `json:"clusterDefName,omitempty"`
 	ClusterType             string                              `json:"clusterType,omitempty"`

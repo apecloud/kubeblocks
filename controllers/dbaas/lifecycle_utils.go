@@ -1402,7 +1402,7 @@ func checkedCreatePVCFromSnapshot(cli client.Client,
 			return err
 		}
 		if len(vsList.Items) == 0 {
-			return errors.Errorf("volumesnapshot not found in cluster %s component %s", cluster.Name, component.Name)
+			return errors.Errorf("volumesnapshot not found in cluster %s component %s", cluster.Name, componentName)
 		}
 		return createPVCFromSnapshot(ctx, cli, vct, stsObj, pvcKey, vsList.Items[0].Name)
 	}
@@ -1577,7 +1577,8 @@ func doBackup(reqCtx intctrlutil.RequestCtx,
 				ctx,
 				pvcKey,
 				cluster,
-				component,
+				component.Name,
+				vct,
 				stsObj); err != nil {
 				reqCtx.Log.Error(err, "checkedCreatePVCFromSnapshot failed")
 				return shouldRequeue, err

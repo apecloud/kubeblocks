@@ -70,7 +70,7 @@ var _ = Describe("Stateful Component", func() {
 			By(" init cluster, deployment")
 			clusterDef := testdbaas.NewClusterDefFactory(clusterDefName, testdbaas.MySQLType).
 				AddComponent(testdbaas.StatelessNginxComponent, statelessType).SetDefaultReplicas(2).
-				Create(&testCtx).GetClusterDef()
+				Create(&testCtx).GetObject()
 			cluster := testdbaas.CreateStatelessCluster(testCtx, clusterDefName, clusterVersionName, clusterName)
 			deploy := testdbaas.MockStatelessComponentDeploy(testCtx, clusterName, statelessCompName)
 			clusterComponent := cluster.GetComponentByName(statelessCompName)

@@ -184,7 +184,7 @@ var _ = Describe("builder", func() {
 				Namespace: "default",
 				Name:      "data-mysql-01-replicasets-0",
 			}
-			pvc, err := BuildPVCFromSnapshot(sts, params.Component, pvcKey, snapshotName)
+			pvc, err := BuildPVCFromSnapshot(sts, sts.Spec.VolumeClaimTemplates[0], pvcKey, snapshotName)
 			Expect(err).Should(BeNil())
 			Expect(pvc).ShouldNot(BeNil())
 			Expect(pvc.Spec.AccessModes).Should(Equal(sts.Spec.VolumeClaimTemplates[0].Spec.AccessModes))

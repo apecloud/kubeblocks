@@ -199,13 +199,13 @@ var _ = Describe("kubeblocks", func() {
 	})
 
 	It("run uninstall", func() {
-		o := &Options{
+		o := uninstallOptions{Options{
 			IOStreams: streams,
 			HelmCfg:   helm.FakeActionConfig(),
 			Namespace: "default",
 			Client:    testing.FakeClientSet(),
 			Dynamic:   testing.FakeDynamicClient(testing.FakeVolumeSnapshotClass()),
-		}
+		}}
 
 		Expect(o.uninstall()).Should(Succeed())
 	})
@@ -288,7 +288,7 @@ var _ = Describe("kubeblocks", func() {
 		Expect(o.preCheck(versionInfo)).Should(Succeed())
 	})
 
-	It("disableUnsupportedSets", func() {
+	It("disableOrEnableSets", func() {
 		o := &InstallOptions{
 			Options: Options{
 				IOStreams: genericclioptions.NewTestIOStreamsDiscard(),
@@ -297,56 +297,88 @@ var _ = Describe("kubeblocks", func() {
 		cases := []struct {
 			desc     string
 			sets     []string
-			expected []string
+			expected map[util.K8sProvider][]string
 		}{
 			{
-				"sets is empty", []string{}, []string{},
+				"sets is empty",
+				[]string{},
+				map[util.K8sProvider][]string{
+					util.UnknownProvider: {},
+					util.EKSProvider:     {"snapshot-controller.enabled=true"},
+				},
 			},
 			{
-				"sets is empty", nil, nil,
+				"sets is nil", nil,
+				map[util.K8sProvider][]string{
+					util.UnknownProvider: nil,
+					util.EKSProvider:     {"snapshot-controller.enabled=true"},
+				},
 			},
 			{
 				"sets without unsupported flag",
 				[]string{"test=false"},
-				[]string{"test=false"},
+				map[util.K8sProvider][]string{
+					util.UnknownProvider: {"test=false"},
+					util.EKSProvider:     {"test=false", "snapshot-controller.enabled=true"},
+				},
 			},
 			{
 				"sets with unsupported flag and its value is false",
 				[]string{"test=false", "loadbalancer.enabled=false"},
-				[]string{"test=false", "loadbalancer.enabled=false"},
+				map[util.K8sProvider][]string{
+					util.UnknownProvider: {"test=false", "loadbalancer.enabled=false"},
+					util.EKSProvider:     {"test=false", "loadbalancer.enabled=false", "snapshot-controller.enabled=true"},
+				},
 			},
 			{
 				"sets with unsupported flag and its value is true",
 				[]string{"test=false", "loadbalancer.enabled=true"},
-				[]string{"test=false"},
+				map[util.K8sProvider][]string{
+					util.UnknownProvider: {"test=false"},
+					util.EKSProvider:     {"test=false", "loadbalancer.enabled=true", "snapshot-controller.enabled=true"},
+				},
 			},
 			{
 				"sets with more unsupported flags and the value is true",
 				[]string{"test=false", "loadbalancer.enabled=true", "snapshot-controller.enabled=true"},
-				[]string{"test=false", "snapshot-controller.enabled=true"},
+				map[util.K8sProvider][]string{
+					util.UnknownProvider: {"test=false", "snapshot-controller.enabled=true"},
+					util.EKSProvider:     {"test=false", "loadbalancer.enabled=true", "snapshot-controller.enabled=true"},
+				},
 			},
 			{
-				"sets with more unsupported flags and the value is true",
-				[]string{"test=false", "loadbalancer.enabled=true"},
-				[]string{"test=false"},
+				"sets with more unsupported flags",
+				[]string{"test=false", "snapshot-controller.enabled=false", "loadbalancer.enabled=true"},
+				map[util.K8sProvider][]string{
+					util.UnknownProvider: {"test=false", "snapshot-controller.enabled=false"},
+					util.EKSProvider:     {"test=false", "loadbalancer.enabled=true", "snapshot-controller.enabled=true"},
+				},
 			},
 			{
 				"sets with more unsupported flags and some values are true, some values are false",
 				[]string{"test=false", "loadbalancer.enabled=false"},
-				[]string{"test=false", "loadbalancer.enabled=false"},
+				map[util.K8sProvider][]string{
+					util.UnknownProvider: {"test=false", "loadbalancer.enabled=false"},
+					util.EKSProvider:     {"test=false", "loadbalancer.enabled=false", "snapshot-controller.enabled=true"},
+				},
 			},
 			{
 				"sets with more unsupported flags and some values are true, some values are false",
-				[]string{"test=false,loadbalancer.enabled=false"},
-				[]string{"test=false,loadbalancer.enabled=false"},
+				[]string{"test=false,snapshot-controller.enabled=true,loadbalancer.enabled=false,snapshot-controller.enabled=false"},
+				map[util.K8sProvider][]string{
+					util.UnknownProvider: {"test=false,snapshot-controller.enabled=true,loadbalancer.enabled=false,snapshot-controller.enabled=false"},
+					util.EKSProvider:     {"test=false", "loadbalancer.enabled=false", "snapshot-controller.enabled=true"},
+				},
 			},
 		}
 
 		for _, c := range cases {
 			By(c.desc)
-			o.Sets = c.sets
-			o.disableUnsupportedSets()
-			Expect(o.Sets).Should(Equal(c.expected))
+			for _, p := range []util.K8sProvider{util.UnknownProvider, util.EKSProvider} {
+				o.Sets = c.sets
+				o.disableOrEnableSets(p)
+				Expect(o.Sets).Should(Equal(c.expected[p]))
+			}
 		}
 	})
 })

@@ -29,19 +29,20 @@ spec:
         - name: {{ $name }}
           filePathPattern: {{ $pattern }}
         {{- end }}
-      configSpecs:
-        - name: mysql-consensusset-config
-          templateRef: mysql8.0-config-template
-          constraintRef: mysql8.0-config-constraints
-          volumeName: mysql-config
-          namespace: {{ .Release.Namespace }}
-      scriptSpecs:
-        - name: apecloud-mysql-scripts
-          templateRef: apecloud-mysql-scripts
-          namespace: {{ .Release.Namespace }}
-          volumeName: scripts
-          defaultMode: 493
-      workloadType: Consensus
+      configSpec:
+        configTemplateRefs:
+          - name: mysql-3node-tpl
+            configTplRef: apecloud-mysql-tpl-8.0
+            configConstraintRef: apecloud-mysql-cfg-constraints-8.0
+            volumeName: mysql-config
+            namespace: {{ .Release.Namespace }}
+          - name: apecloud-mysql-scripts
+            configTplRef: apecloud-mysql-scripts
+            namespace: {{ .Release.Namespace }}
+            volumeName: scripts
+            defaultMode: 493
+      defaultReplicas: 3
+      componentType: Consensus
       consensusSpec:
         leader:
           name: leader
@@ -100,10 +101,6 @@ spec:
                 value: {{ .Values.cluster.clusterId | default "1" | quote }}
               - name: CLUSTER_START_INDEX
                 value: {{ .Values.cluster.clusterStartIndex | default "1" | quote }}
-              - name: REPLICATION_USER
-                value: {{ .Values.auth.replicationUser | default "replicator" | quote }}
-              - name: REPLICATION_PASSWORD
-                value: {{ .Values.auth.replicationPassword | default "" | quote }}
               - name: MYSQL_TEMPLATE_CONFIG
                 value: {{ if .Values.cluster.templateConfig }}{{ .Values.cluster.templateConfig }}{{ end }}
               - name: MYSQL_CUSTOM_CONFIG

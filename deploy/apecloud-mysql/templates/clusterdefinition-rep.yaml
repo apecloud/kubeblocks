@@ -3,7 +3,7 @@ kind: ClusterDefinition
 metadata:
   name: apecloud-mysql-rep
   labels:
-    {{- include "mysql.labels" . | nindent 4 }}
+    {{- include "apecloud-mysql.labels" . | nindent 4 }}
 spec:
   type: state.mysql
   connectionCredential:
@@ -22,11 +22,11 @@ spec:
       configSpec:
         configTemplateRefs:
           - name: mysql-primary-config
-            configTplRef: apecloud-mysql-primary-config-8.0.30
+            configTplRef: apecloud-mysql-rep-config-primary-8.0
             namespace: {{ .Release.Namespace }}
             volumeName: primary
           - name: mysql-secondary-config
-            configTplRef: apecloud-mysql-secondary-config-8.0.30
+            configTplRef: apecloud-mysql-rep-config-secondary-8.0
             namespace: {{ .Release.Namespace }}
             volumeName: secondary
           - name: mysql-scripts

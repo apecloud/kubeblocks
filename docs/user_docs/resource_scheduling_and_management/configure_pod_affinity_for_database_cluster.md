@@ -6,7 +6,7 @@ No affinity parameters required.
 Perform the following steps when you have resource to deploy but try to spread existing pods evenly as much as possible.
 ### Before you start:
 Make sure all your Kubernetes nodes are labeled with `topologyKey`. 
-Example: the following failure domain is specified as a node, and the node must be labeled with the `kubernetes.io/hostname label`. If there is no label, you can check [Add label to a node](https://kubernetes.io/docs/tasks/configure-pod-container/assign-pods-nodes/#add-a-label-to-a-node) the to add a label to a node.
+Example: the following failure domain is specified as a node, and the node must be labeled with the `kubernetes.io/hostname` label. If there is no label, you can check [Add label to a node](https://kubernetes.io/docs/tasks/configure-pod-container/assign-pods-nodes/#add-a-label-to-a-node) the to add a label to a node.
 ### API parameters
 - Specify `topologyKeys` value as `kubernetes.io/hostname`
 - Specify `podAntiAffinity` as `Preferred`

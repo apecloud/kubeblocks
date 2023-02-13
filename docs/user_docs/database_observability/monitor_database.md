@@ -4,7 +4,7 @@ With KubeBlocks, you can set the monitor without a complicated yaml file, and a 
 
 ## Before you start
 
-Install monitor component by setting *`monior`* parameter value as *`true`* when installing KubeBlocks with kbcli.
+Install monitor component by setting *`monitor`* parameter value as *`true`* when installing KubeBlocks with kbcli.
 
 *Example*
 ```

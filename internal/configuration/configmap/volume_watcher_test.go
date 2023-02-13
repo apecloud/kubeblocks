@@ -1,4 +1,4 @@
-//go:build linux
+//go:build linux || darwin
 
 /*
 Copyright ApeCloud, Inc.
@@ -20,6 +20,7 @@ package configmap
 
 import (
 	"context"
+	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -29,29 +30,61 @@ import (
 	"github.com/fsnotify/fsnotify"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
+
+	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 )
 
 var zapLog, _ = zap.NewDevelopment()
+
+func TestConfigMapVolumeWatcherFailed(t *testing.T) {
+	tmpDir, err := os.MkdirTemp(os.TempDir(), "volume-watcher-test-failed-")
+	require.Nil(t, err)
+	defer os.RemoveAll(tmpDir)
+
+	volumeWatcher := NewVolumeWatcher([]string{filepath.Join(tmpDir, "not_exist")}, context.Background(), zapLog.Sugar())
+	defer volumeWatcher.Close()
+
+	require.EqualError(t, volumeWatcher.Run(), "require process event handler.")
+	volumeWatcher.AddHandler(func(event fsnotify.Event) error {
+		return nil
+	})
+	require.Regexp(t, "no such file or directory", volumeWatcher.Run().Error())
+}
 
 func TestConfigMapVolumeWatcher(t *testing.T) {
 	tmpDir, err := os.MkdirTemp(os.TempDir(), "volume-watcher-test-")
 	require.Nil(t, err)
 	defer os.RemoveAll(tmpDir)
 
-	mockVolume := filepath.Join(tmpDir, "mock_volume")
+	var (
+		mockVolume    = filepath.Join(tmpDir, "mock_volume")
+		volumeWatcher *ConfigMapVolumeWatcher
+		retryCount    = 0
 
-	volumeWatcher := NewVolumeWatcher([]string{mockVolume}, context.Background(), zapLog.Sugar())
-	require.NotNil(t, volumeWatcher)
+		started = make(chan bool)
+		trigger = make(chan bool)
+	)
+
+	if err := os.MkdirAll(mockVolume, fs.ModePerm); err != nil {
+		t.Errorf("failed to create directory: %s", mockVolume)
+	}
+
+	volumeWatcher = NewVolumeWatcher([]string{mockVolume}, context.Background(), zapLog.Sugar())
 	defer volumeWatcher.Close()
 
-	started := make(chan bool)
-	trigger := make(chan bool)
-
-	volumeWatcher.AddHandler(func(event fsnotify.Event) error {
-		trigger <- true
-		return nil
-	})
-	require.NotNil(t, volumeWatcher.Run())
+	regexFilter, err := CreateCfgRegexFilter(`.*`)
+	require.Nil(t, err)
+	volumeWatcher.SetRetryCount(2).
+		AddHandler(func(event fsnotify.Event) error {
+			zapLog.Info(fmt.Sprintf("handl volume event: %v", event))
+			retryCount++
+			// mock failed to handle
+			if retryCount <= 1 {
+				return cfgcore.MakeError("failed to handle...")
+			}
+			trigger <- true
+			return nil
+		}).AddFilter(regexFilter).Run()
 
 	// mock kubelet create configmapVolume
 	go func() {
@@ -84,10 +117,10 @@ func TestConfigMapVolumeWatcher(t *testing.T) {
 	}()
 
 	// wait inotify to run...
-	time.Sleep(2 * time.Second)
+	time.Sleep(1 * time.Second)
 	started <- true
 	select {
-	case <-time.After(10 * time.Second):
+	case <-time.After(5 * time.Second):
 		logger.Info("failed to watch volume.")
 		require.True(t, false)
 	case <-trigger:

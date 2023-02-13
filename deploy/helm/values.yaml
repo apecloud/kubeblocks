@@ -590,6 +590,45 @@ prometheus:
                 summary: "PostgreSQL high error rate in WAL files archiver (namespace: {{ $labels.namespace }}, cluster: {{ $labels.app_kubernetes_io_instance }}, instance: {{ $labels.pod }})"
                 description: "PostgreSQL high error rate in WAL files archiver\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
 
+            - alert: PostgreSQLTableNotAutoVacuumed
+              expr: |
+                (pg_stat_user_tables_last_autovacuum > 0)
+                and
+                (time() - pg_stat_user_tables_last_autovacuum)
+                > 24 * 60 * 60 * 10
+              for: 0m
+              labels:
+                severity: warning
+              annotations:
+                summary: "PostgreSQL table {{ $labels.relname }} in database {{ $labels.datname }} not auto vacuumed (namespace: {{ $labels.namespace }}, cluster: {{ $labels.app_kubernetes_io_instance }}, instance: {{ $labels.pod }})"
+                description: "Table {{ $labels.relname }} in database {{ $labels.datname }} has not been auto vacuumed for 10 days\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+
+            - alert: PostgreSQLTableNotAutoAnalyzed
+              expr: |
+                (pg_stat_user_tables_last_autoanalyze > 0)
+                and
+                (time() - pg_stat_user_tables_last_autoanalyze)
+                > 24 * 60 * 60 * 10
+              for: 0m
+              labels:
+                severity: warning
+              annotations:
+                summary: "PostgreSQL table {{ $labels.relname }} in database {{ $labels.datname }} not auto analyzed (namespace: {{ $labels.namespace }}, cluster: {{ $labels.app_kubernetes_io_instance }}, instance: {{ $labels.pod }})"
+                description: "Table {{ $labels.relname }} in database {{ $labels.datname }} has not been auto analyzed for 10 days\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+
+            - alert: PostgreSQLTableTooManyDeadTuples
+              expr: |
+                (pg_stat_user_tables_n_dead_tup > 10000)
+                /
+                (pg_stat_user_tables_n_live_tup + pg_stat_user_tables_n_dead_tup)
+                >= 0.1
+              for: 2m
+              labels:
+                severity: warning
+              annotations:
+                summary: "PostgreSQL table {{ $labels.relname }} in database {{ $labels.datname }} has too many dead tuples (namespace: {{ $labels.namespace }}, cluster: {{ $labels.app_kubernetes_io_instance }}, instance: {{ $labels.pod }})"
+                description: "Table {{ $labels.relname }} in database {{ $labels.datname }} dead tuples is too large\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+
   serverFiles:
     prometheus.yml:
       rule_files:

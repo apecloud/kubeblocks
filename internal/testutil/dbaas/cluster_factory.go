@@ -131,3 +131,12 @@ func (factory *MockClusterFactory) SetMonitor(monitor bool) *MockClusterFactory 
 	factory.get().Spec.Components = comps
 	return factory
 }
+
+func (factory *MockClusterFactory) SetPrimaryIndex(primaryIndex int32) *MockClusterFactory {
+	comps := factory.get().Spec.Components
+	if len(comps) > 0 {
+		comps[len(comps)-1].PrimaryIndex = &primaryIndex
+	}
+	factory.get().Spec.Components = comps
+	return factory
+}

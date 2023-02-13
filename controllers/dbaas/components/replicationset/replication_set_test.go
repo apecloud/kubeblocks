@@ -20,7 +20,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	appv1 "k8s.io/api/apps/v1"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -95,7 +95,7 @@ var _ = Describe("Replication Component", func() {
 				ImagePullPolicy: corev1.PullIfNotPresent,
 			}
 
-			status := appv1.StatefulSetStatus{
+			status := appsv1.StatefulSetStatus{
 				AvailableReplicas:  1,
 				ObservedGeneration: 1,
 				Replicas:           1,

@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"reflect"
 	"strconv"
+	"strings"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -50,6 +51,9 @@ var _ = Describe("Cluster Controller", func() {
 
 	const mysqlCompType = "replicasets"
 	const mysqlCompName = "mysql"
+	const redisCompType = "replication"
+	const redisCompName = "redis-rsts"
+	const redisImage = "redis:7.0.5"
 
 	const nginxCompType = "proxy"
 	// const nginxCompName = "nginx"
@@ -809,6 +813,127 @@ var _ = Describe("Cluster Controller", func() {
 		Eventually(testdbaas.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(dbaasv1alpha1.RunningPhase))
 	}
 
+	mockPodsForReplicationTest := func(cluster *dbaasv1alpha1.Cluster, stsList []appsv1.StatefulSet) []corev1.Pod {
+		componentName := cluster.Spec.Components[0].Name
+		clusterName := cluster.Name
+		pods := make([]corev1.Pod, 0)
+		for _, sts := range stsList {
+			pod := &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      sts.Name + "-0",
+					Namespace: testCtx.DefaultNamespace,
+					Labels: map[string]string{
+						intctrlutil.RoleLabelKey:         sts.Labels[intctrlutil.RoleLabelKey],
+						intctrlutil.AppInstanceLabelKey:  clusterName,
+						intctrlutil.AppComponentLabelKey: componentName,
+						"controller-revision-hash":       "mock-version",
+					},
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{{
+						Name:  "mock-container",
+						Image: "mock-container",
+					}},
+				},
+			}
+			pods = append(pods, *pod)
+		}
+		return pods
+	}
+
+	getReplicationSetStsPodsName := func(stsList []appsv1.StatefulSet) []string {
+		names := make([]string, 0)
+		for _, sts := range stsList {
+			pods, err := util.GetPodListByStatefulSet(ctx, k8sClient, &sts)
+			Expect(err).To(Succeed())
+			Expect(len(pods) == 1).To(BeTrue())
+			names = append(names, pods[0].Name)
+		}
+		return names
+	}
+
+	testReplicationCreation := func() {
+		const replicas = 2
+		const primaryIndex = 0
+		const Primary = "primary"
+		const Secondary = "secondary"
+
+		By("Mock a cluster obj with replication componentType.")
+		pvcSpec := &corev1.PersistentVolumeClaimSpec{
+			AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
+			Resources: corev1.ResourceRequirements{
+				Requests: corev1.ResourceList{
+					corev1.ResourceStorage: resource.MustParse("1Gi"),
+				},
+			},
+		}
+
+		clusterObj = testdbaas.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
+			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
+			AddComponent(redisCompName, redisCompType).
+			SetPrimaryIndex(primaryIndex).
+			SetReplicas(replicas).AddVolumeClaimTemplate(testdbaas.DataVolumeName, pvcSpec).
+			Create(&testCtx).GetObject()
+		clusterKey = client.ObjectKeyFromObject(clusterObj)
+
+		By("Waiting for cluster creation")
+		Eventually(testdbaas.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(0))
+
+		By("Checking statefulSet number")
+		stsList := testk8s.ListAndCheckStatefulSet(&testCtx, clusterKey)
+		Expect(len(stsList.Items) == 2).Should(BeTrue())
+
+		By("Checking statefulSet role label")
+		for _, sts := range stsList.Items {
+			if strings.HasSuffix(sts.Name, strconv.Itoa(primaryIndex)) {
+				Expect(sts.Labels[intctrlutil.RoleLabelKey] == Primary).Should(BeTrue())
+			} else {
+				Expect(sts.Labels[intctrlutil.RoleLabelKey] == Secondary).Should(BeTrue())
+			}
+		}
+
+		By("Creating mock pods in StatefulSet")
+		pods := mockPodsForReplicationTest(clusterObj, stsList.Items)
+		for _, pod := range pods {
+			Expect(testCtx.CreateObj(testCtx.Ctx, &pod)).Should(Succeed())
+			// mock the status to pass the isReady(pod) check in consensus_set
+			pod.Status.Conditions = []corev1.PodCondition{{
+				Type:   corev1.PodReady,
+				Status: corev1.ConditionTrue,
+			}}
+			Expect(k8sClient.Status().Update(ctx, &pod)).Should(Succeed())
+		}
+
+		By("Updating StatefulSet's status")
+		status := appsv1.StatefulSetStatus{
+			AvailableReplicas:  1,
+			ObservedGeneration: 1,
+			Replicas:           1,
+			ReadyReplicas:      1,
+			UpdatedReplicas:    1,
+			CurrentRevision:    "mock-revision",
+			UpdateRevision:     "mock-revision",
+		}
+		for _, sts := range stsList.Items {
+			status.ObservedGeneration = sts.Generation
+			testk8s.PatchStatefulSetStatus(&testCtx, sts.Name, status)
+		}
+
+		By("Checking pods' role are updated in cluster status")
+		Eventually(func(g Gomega) {
+			fetched := &dbaasv1alpha1.Cluster{}
+			g.Expect(k8sClient.Get(ctx, clusterKey, fetched)).To(Succeed())
+			compName := fetched.Spec.Components[0].Name
+			g.Expect(fetched.Status.Components != nil).To(BeTrue())
+			g.Expect(fetched.Status.Components).To(HaveKey(compName))
+			replicationStatus := fetched.Status.Components[compName].ReplicationSetStatus
+			g.Expect(replicationStatus != nil).To(BeTrue())
+			g.Expect(replicationStatus.Primary.Pod).To(BeElementOf(getReplicationSetStsPodsName(stsList.Items)))
+			g.Expect(len(replicationStatus.Secondaries) == 1).To(BeTrue())
+			g.Expect(replicationStatus.Secondaries[0].Pod).To(BeElementOf(getReplicationSetStsPodsName(stsList.Items)))
+		}).Should(Succeed())
+	}
+
 	// Scenarios
 
 	Context("when creating cluster with multiple kinds of components", func() {
@@ -936,6 +1061,24 @@ var _ = Describe("Cluster Controller", func() {
 			It("should update PVC request storage size accordingly when vertical scale the cluster", func() {
 				testVerticalScale()
 			})
+		})
+	})
+
+	Context("when creating cluster with Redis as replication component", func() {
+		BeforeEach(func() {
+			By("Create a clusterDefinition obj with replication componentType.")
+			clusterDefObj = testdbaas.NewClusterDefFactory(clusterDefName, testdbaas.RedisType).
+				AddComponent(testdbaas.ReplicationRedisComponent, redisCompType).
+				Create(&testCtx).GetObject()
+
+			By("Create a clusterVersion obj with replication componentType.")
+			clusterVersionObj = testdbaas.NewClusterVersionFactory(clusterVersionName, clusterDefObj.Name).
+				AddComponent(redisCompType).AddContainerShort("redis", redisImage).
+				Create(&testCtx).GetObject()
+		})
+
+		It("Should success with primary sts and secondary sts", func() {
+			testReplicationCreation()
 		})
 	})
 })

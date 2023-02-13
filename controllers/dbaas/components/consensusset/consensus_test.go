@@ -128,7 +128,7 @@ var _ = Describe("Consensus Component", func() {
 				validateComponentStatus(cluster)
 			} else {
 				podList := testdbaas.MockConsensusComponentPods(testCtx, sts, clusterName, consensusCompName)
-				By("test pod is not available")
+				By("expect for pod is available")
 				Expect(consensusComponent.PodIsAvailable(podList[0], defaultMinReadySeconds)).Should(BeTrue())
 
 				By("test handle probe timed out")

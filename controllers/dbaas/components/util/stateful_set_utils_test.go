@@ -94,11 +94,11 @@ func TestStatefulSetPodsIsReady(t *testing.T) {
 func TestStatefulSetIsReady(t *testing.T) {
 	sts := testk8s.NewFakeStatefulSet("test", 3)
 	testk8s.MockStatefulSetReady(sts)
-	ready := StatefulSetIsReady(sts, true)
+	ready := StatefulSetIsReady(sts, true, nil)
 	if !ready {
 		t.Errorf("StatefulSet should be ready")
 	}
-	ready = StatefulSetIsReady(sts, false)
+	ready = StatefulSetIsReady(sts, false, nil)
 	if ready {
 		t.Errorf("StatefulSet should not be ready")
 	}

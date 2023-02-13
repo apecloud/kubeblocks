@@ -40,7 +40,8 @@ var _ = Describe("Stateful Component", func() {
 		clusterName        = "stateless-" + randomStr
 		timeout            = 10 * time.Second
 		interval           = time.Second
-		statelessCompName  = "stateless"
+		statelessCompName  = "nginx"
+		statelessType      = "proxy"
 	)
 	const defaultMinReadySeconds = 10
 
@@ -67,9 +68,14 @@ var _ = Describe("Stateful Component", func() {
 	Context("Stateless Component test", func() {
 		It("Stateless Component test", func() {
 			By(" init cluster, deployment")
+			clusterDef := testdbaas.NewClusterDefFactory(clusterDefName, testdbaas.MySQLType).
+				AddComponent(testdbaas.StatelessNginxComponent, statelessType).SetDefaultReplicas(2).
+				Create(&testCtx).GetObject()
 			cluster := testdbaas.CreateStatelessCluster(testCtx, clusterDefName, clusterVersionName, clusterName)
 			deploy := testdbaas.MockStatelessComponentDeploy(testCtx, clusterName, statelessCompName)
-			statelessComponent := NewStateless(ctx, k8sClient, cluster)
+			clusterComponent := cluster.GetComponentByName(statelessCompName)
+			componentDef := clusterDef.GetComponentDefByTypeName(clusterComponent.Type)
+			statelessComponent := NewStateless(ctx, k8sClient, cluster, clusterComponent, componentDef)
 
 			By("test pods are not ready")
 			patch := client.MergeFrom(deploy.DeepCopy())
@@ -102,8 +108,17 @@ var _ = Describe("Stateful Component", func() {
 			podsReady, _ = statelessComponent.PodsReady(deploy)
 			Expect(podsReady == true).Should(BeTrue())
 
-			By("test component is running")
+			By("test component.replicas is inconsistent with deployment.spec.replicas")
+			oldReplicas := clusterComponent.Replicas
+			replicas := int32(4)
+			clusterComponent.Replicas = &replicas
 			isRunning, _ := statelessComponent.IsRunning(deploy)
+			Expect(isRunning == false).Should(BeTrue())
+			// reset replicas
+			clusterComponent.Replicas = oldReplicas
+
+			By("test component is running")
+			isRunning, _ = statelessComponent.IsRunning(deploy)
 			Expect(isRunning == true).Should(BeTrue())
 
 			By("test handle probe timed out")

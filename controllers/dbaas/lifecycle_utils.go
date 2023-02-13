@@ -1285,11 +1285,11 @@ func deleteBackup(ctx context.Context, cli client.Client, clusterName string, co
 
 func createPVCFromSnapshot(ctx context.Context,
 	cli client.Client,
-	component *component.Component,
+	vct corev1.PersistentVolumeClaim,
 	sts *appsv1.StatefulSet,
 	pvcKey types.NamespacedName,
 	snapshotName string) error {
-	pvc, err := builder.BuildPVCFromSnapshot(sts, component, pvcKey, snapshotName)
+	pvc, err := builder.BuildPVCFromSnapshot(sts, vct, pvcKey, snapshotName)
 	if err != nil {
 		return err
 	}
@@ -1387,7 +1387,8 @@ func checkedCreatePVCFromSnapshot(cli client.Client,
 	ctx context.Context,
 	pvcKey types.NamespacedName,
 	cluster *dbaasv1alpha1.Cluster,
-	component *component.Component,
+	componentName string,
+	vct corev1.PersistentVolumeClaim,
 	stsObj *appsv1.StatefulSet) error {
 	pvc := corev1.PersistentVolumeClaim{}
 	// check pvc existence
@@ -1395,15 +1396,15 @@ func checkedCreatePVCFromSnapshot(cli client.Client,
 		if !apierrors.IsNotFound(err) {
 			return err
 		}
-		ml := getBackupMatchingLabels(cluster.Name, component.Name)
+		ml := getBackupMatchingLabels(cluster.Name, componentName)
 		vsList := snapshotv1.VolumeSnapshotList{}
 		if err := cli.List(ctx, &vsList, ml); err != nil {
 			return err
 		}
 		if len(vsList.Items) == 0 {
-			return errors.Errorf("volumesnapshot not found in cluster %s component %s", cluster.Name, component.Name)
+			return errors.Errorf("volumesnapshot not found in cluster %s component %s", cluster.Name, componentName)
 		}
-		return createPVCFromSnapshot(ctx, cli, component, stsObj, pvcKey, vsList.Items[0].Name)
+		return createPVCFromSnapshot(ctx, cli, vct, stsObj, pvcKey, vsList.Items[0].Name)
 	}
 	return nil
 }
@@ -1576,7 +1577,8 @@ func doBackup(reqCtx intctrlutil.RequestCtx,
 				ctx,
 				pvcKey,
 				cluster,
-				component,
+				component.Name,
+				vct,
 				stsObj); err != nil {
 				reqCtx.Log.Error(err, "checkedCreatePVCFromSnapshot failed")
 				return shouldRequeue, err

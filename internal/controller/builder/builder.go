@@ -324,16 +324,16 @@ func BuildDeploy(reqCtx intctrlutil.RequestCtx, params BuilderParams) (*appsv1.D
 }
 
 func BuildPVCFromSnapshot(sts *appsv1.StatefulSet,
-	component *component.Component,
+	vct corev1.PersistentVolumeClaim,
 	pvcKey types.NamespacedName,
 	snapshotName string) (*corev1.PersistentVolumeClaim, error) {
 
 	pvc := corev1.PersistentVolumeClaim{}
 	if err := buildFromCUE("pvc_template.cue", map[string]any{
-		"sts":           sts,
-		"component":     component,
-		"pvc_key":       pvcKey,
-		"snapshot_name": snapshotName,
+		"sts":                 sts,
+		"volumeClaimTemplate": vct,
+		"pvc_key":             pvcKey,
+		"snapshot_name":       snapshotName,
 	}, "pvc", &pvc); err != nil {
 		return nil, err
 	}

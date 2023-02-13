@@ -49,11 +49,11 @@ const (
 )
 
 var (
-	// unsupported flags in non-cloud kubernetes cluster
-	disabledSetInLocalK8s = [...]string{"loadbalancer.enabled"}
+	// unsupported sets in non-cloud kubernetes cluster
+	disabledSetsInLocalK8s = [...]string{"loadbalancer.enabled"}
 
-	// enabled set in cloud kubernetes
-	enabledSetInCloudK8s = [...]string{"snapshot-controller.enabled"}
+	// enabled sets in cloud kubernetes
+	enabledSetsInCloudK8s = [...]string{"snapshot-controller.enabled"}
 )
 
 type Options struct {
@@ -266,7 +266,7 @@ func (o *InstallOptions) enableSets(sets []string) {
 	// check all sets, remove sets that disable the features that must be enabled
 	for _, set := range sets {
 		need := true
-		for _, key := range enabledSetInCloudK8s {
+		for _, key := range enabledSetsInCloudK8s {
 			if !strings.Contains(set, key) {
 				continue
 			}
@@ -292,7 +292,7 @@ func (o *InstallOptions) enableSets(sets []string) {
 	}
 
 	// add enabled sets
-	for _, key := range enabledSetInCloudK8s {
+	for _, key := range enabledSetsInCloudK8s {
 		newSets = append(newSets, key+"=true")
 	}
 
@@ -321,7 +321,7 @@ func (o *InstallOptions) disableSets(sets []string) {
 	// check all sets, remove unsupported and output message
 	for _, set := range sets {
 		need := true
-		for _, key := range disabledSetInLocalK8s {
+		for _, key := range disabledSetsInLocalK8s {
 			if !strings.Contains(set, key) {
 				continue
 			}

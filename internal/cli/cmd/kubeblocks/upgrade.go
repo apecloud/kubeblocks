@@ -84,7 +84,7 @@ func (o *InstallOptions) upgrade(cmd *cobra.Command) error {
 
 	// check flags already been set
 	if !monitorIsSet && len(o.Version) == 0 && len(o.Sets) == 0 {
-		fmt.Fprint(o.Out, "Nothing to upgrade, --set, --version or --monitor should be specified")
+		fmt.Fprint(o.Out, "Nothing to upgrade, --set, --version or --monitor should be specified.\n")
 		return nil
 	}
 	if monitorIsSet {
@@ -97,20 +97,19 @@ func (o *InstallOptions) upgrade(cmd *cobra.Command) error {
 		return err
 	}
 
+	msg := ""
 	v := versionInfo[util.KubeBlocksApp]
 	if len(v) > 0 {
-		fmt.Fprintln(o.Out, "Current KubeBlocks version "+v)
+		if len(o.Version) > 0 {
+			if v == o.Version && len(o.Sets) == 0 {
+				fmt.Fprintf(o.Out, "Current version %s is the same as the upgraded version, no need to upgrade.\n", o.Version)
+				return nil
+			}
+			msg = "to " + o.Version
+		}
+		fmt.Fprintf(o.Out, "Current KubeBlocks version %s.", v)
 	} else {
 		return errors.New("KubeBlocks does not exist, try to run \"kbcli kubeblocks install\" to install")
-	}
-
-	msg := ""
-	if len(o.Version) > 0 {
-		if v == o.Version && len(o.Sets) == 0 {
-			fmt.Fprintf(o.Out, "Current version %s is the same as the upgraded version, no need to upgrade\n", o.Version)
-			return nil
-		}
-		msg = "to " + o.Version
 	}
 
 	// it's time to upgrade

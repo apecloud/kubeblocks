@@ -201,7 +201,7 @@ It indicates the component-level operation and is an array that supports operati
 
 `status` describes the current state and progress of the `OpsRequest` operation. It has the following fields:
 
-### status.observedGenration
+### status.observedGeneration
 
 It corresponds to `metadata.generation`.
 

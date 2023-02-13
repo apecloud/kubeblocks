@@ -454,10 +454,7 @@ func BuildCronJob(pvcKey types.NamespacedName,
 	schedule string,
 	sts *appsv1.StatefulSet) (*batchv1.CronJob, error) {
 
-	serviceAccount := viper.GetString("KUBEBLOCKS_SERVICE_ACCOUNT")
-	if len(serviceAccount) == 0 {
-		serviceAccount = "kubeblocks"
-	}
+	serviceAccount := viper.GetString("KUBEBLOCKS_SERVICEACCOUNT_NAME")
 
 	cronJob := batchv1.CronJob{}
 	if err := buildFromCUE("delete_pvc_cron_job_template.cue", map[string]any{

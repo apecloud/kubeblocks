@@ -188,7 +188,7 @@ var _ = Describe("OpsRequest Controller", func() {
 	testStatelessPodUpdating := func(opsRes *OpsResource, pod *corev1.Pod) {
 		By("create a new pod")
 		newPodName := "busybox-" + testCtx.GetRandomStr()
-		testdbaas.MockStatelessPod(testCtx, clusterName, statelessCompName, newPodName)
+		testdbaas.MockStatelessPod(testCtx, nil, clusterName, statelessCompName, newPodName)
 		newPod := &corev1.Pod{}
 		Expect(k8sClient.Get(ctx, client.ObjectKey{Name: newPodName, Namespace: testCtx.DefaultNamespace}, newPod)).Should(Succeed())
 		_, _ = GetOpsManager().Reconcile(opsRes)
@@ -466,11 +466,9 @@ var _ = Describe("OpsRequest Controller", func() {
 				clusterObject.Status.Components = map[string]dbaasv1alpha1.ClusterStatusComponent{
 					consensusCompName: {
 						Phase: dbaasv1alpha1.RunningPhase,
-						Type:  "consensus",
 					},
 					statelessCompName: {
 						Phase: dbaasv1alpha1.RunningPhase,
-						Type:  "stateless",
 					},
 				}
 				clusterObject.Status.Operations = &dbaasv1alpha1.Operations{
@@ -502,7 +500,7 @@ var _ = Describe("OpsRequest Controller", func() {
 
 				// mock the pods od stateless component
 				podName := "busybox-" + randomStr
-				testdbaas.MockStatelessPod(testCtx, clusterName, statelessCompName, podName)
+				testdbaas.MockStatelessPod(testCtx, nil, clusterName, statelessCompName, podName)
 			}
 			// the opsRequest will use startTime to check some condition.
 			// if there is no sleep for 1 second, unstable error may occur.

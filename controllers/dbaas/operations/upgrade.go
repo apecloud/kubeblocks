@@ -100,11 +100,11 @@ func (u upgradeOpsHandler) getUpgradeStatusComponents(opsRes *OpsResource) (map[
 	}
 	// get the changed components name map, and record the components infos to OpsRequest.status.
 	statusComponentMap := map[string]dbaasv1alpha1.OpsRequestStatusComponent{}
-	for k, v := range opsRes.Cluster.Status.Components {
-		if _, ok := changedComponentMap[v.Type]; !ok {
+	for _, comp := range opsRes.Cluster.Spec.Components {
+		if _, ok := changedComponentMap[comp.Type]; !ok {
 			continue
 		}
-		statusComponentMap[k] = dbaasv1alpha1.OpsRequestStatusComponent{
+		statusComponentMap[comp.Name] = dbaasv1alpha1.OpsRequestStatusComponent{
 			Phase: dbaasv1alpha1.VersionUpgradingPhase,
 		}
 	}

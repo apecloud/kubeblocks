@@ -40,9 +40,11 @@ import (
 const NewRSAvailableReason = "NewReplicaSetAvailable"
 
 type Stateless struct {
-	Cli     client.Client
-	Ctx     context.Context
-	Cluster *dbaasv1alpha1.Cluster
+	Cli          client.Client
+	Ctx          context.Context
+	Cluster      *dbaasv1alpha1.Cluster
+	ComponentDef *dbaasv1alpha1.ClusterDefinitionComponent
+	Component    *dbaasv1alpha1.ClusterComponent
 }
 
 var _ types.Component = &Stateless{}
@@ -62,7 +64,8 @@ func (stateless *Stateless) PodsReady(obj client.Object) (bool, error) {
 	if !ok {
 		return false, nil
 	}
-	return DeploymentIsReady(deploy), nil
+	targetReplicas := util.GetComponentReplicas(stateless.Component, stateless.ComponentDef)
+	return DeploymentIsReady(deploy, &targetReplicas), nil
 }
 
 func (stateless *Stateless) PodIsAvailable(pod *corev1.Pod, minReadySeconds int32) bool {
@@ -107,21 +110,30 @@ func (stateless *Stateless) GetPhaseWhenPodsNotReady(componentName string) (dbaa
 
 func NewStateless(ctx context.Context,
 	cli client.Client,
-	cluster *dbaasv1alpha1.Cluster) types.Component {
+	cluster *dbaasv1alpha1.Cluster,
+	component *dbaasv1alpha1.ClusterComponent,
+	componentDef *dbaasv1alpha1.ClusterDefinitionComponent) types.Component {
+	if component == nil || componentDef == nil {
+		return nil
+	}
 	return &Stateless{
-		Ctx:     ctx,
-		Cli:     cli,
-		Cluster: cluster,
+		Ctx:          ctx,
+		Cli:          cli,
+		Cluster:      cluster,
+		Component:    component,
+		ComponentDef: componentDef,
 	}
 }
 
 // DeploymentIsReady check deployment is ready
-func DeploymentIsReady(deploy *appsv1.Deployment) bool {
+func DeploymentIsReady(deploy *appsv1.Deployment, targetReplicas *int32) bool {
 	var (
-		targetReplicas     = *deploy.Spec.Replicas
 		componentIsRunning = true
 		newRSAvailable     = true
 	)
+	if targetReplicas == nil {
+		targetReplicas = deploy.Spec.Replicas
+	}
 
 	if HasProgressDeadline(deploy) {
 		// if the deployment.Spec.ProgressDeadlineSeconds exists, we should check if the new replicaSet is available.
@@ -132,10 +144,10 @@ func DeploymentIsReady(deploy *appsv1.Deployment) bool {
 		}
 	}
 	// check if the deployment of component is updated completely and ready.
-	if deploy.Status.AvailableReplicas != targetReplicas ||
-		deploy.Status.Replicas != targetReplicas ||
+	if deploy.Status.AvailableReplicas != *targetReplicas ||
+		deploy.Status.Replicas != *targetReplicas ||
 		deploy.Status.ObservedGeneration != deploy.Generation ||
-		deploy.Status.UpdatedReplicas != targetReplicas ||
+		deploy.Status.UpdatedReplicas != *targetReplicas ||
 		!newRSAvailable {
 		componentIsRunning = false
 	}

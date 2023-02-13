@@ -183,7 +183,7 @@ func WithNamespacedName(resourceName, ns string) func(client.Object) {
 	}
 }
 
-func withMap(keysAndValues ...string) map[string]string {
+func WithMap(keysAndValues ...string) map[string]string {
 	// ignore mismatching for kvs
 	m := make(map[string]string, len(keysAndValues)/2)
 	for i := 0; i+1 < len(keysAndValues); i += 2 {
@@ -194,13 +194,13 @@ func withMap(keysAndValues ...string) map[string]string {
 
 func WithLabels(keysAndValues ...string) func(client.Object) {
 	return func(obj client.Object) {
-		obj.SetLabels(withMap(keysAndValues...))
+		obj.SetLabels(WithMap(keysAndValues...))
 	}
 }
 
 func WithAnnotations(keysAndValues ...string) func(client.Object) {
 	return func(obj client.Object) {
-		obj.SetAnnotations(withMap(keysAndValues...))
+		obj.SetAnnotations(WithMap(keysAndValues...))
 	}
 }
 

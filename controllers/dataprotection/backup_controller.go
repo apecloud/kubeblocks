@@ -150,6 +150,10 @@ func (r *BackupReconciler) doNewPhaseAction(
 	}
 
 	labels := backupPolicy.Spec.Target.LabelsSelector.MatchLabels
+	if labels == nil {
+		labels = map[string]string{}
+		backupPolicy.Spec.Target.LabelsSelector.MatchLabels = labels
+	}
 	labels[dataProtectionLabelBackupTypeKey] = string(backup.Spec.BackupType)
 	if err := r.patchBackupLabels(reqCtx, backup, labels); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
@@ -866,7 +870,7 @@ func (r *BackupReconciler) BuildSnapshotPodSpec(
 
 	podSpec.Volumes = clusterPod.Spec.Volumes
 	podSpec.RestartPolicy = corev1.RestartPolicyNever
-	podSpec.ServiceAccountName = "kubeblocks"
+	podSpec.ServiceAccountName = viper.GetString("KUBEBLOCKS_SERVICEACCOUNT_NAME")
 
 	return podSpec, nil
 }

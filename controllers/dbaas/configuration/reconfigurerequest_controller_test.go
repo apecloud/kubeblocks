@@ -99,19 +99,19 @@ var _ = Describe("Reconfigure Controller", func() {
 				AddConfigTemplate(configTplName, configmap.Name, constraint.Name, configVolumeName, nil).
 				AddLabels(cfgcore.GenerateTPLUniqLabelKeyWithConfig(configTplName), configmap.Name,
 					cfgcore.GenerateConstraintsUniqLabelKeyWithConfig(constraint.Name), constraint.Name).
-				Create(&testCtx).GetClusterDef()
+				Create(&testCtx).GetObject()
 
 			By("Create a clusterVersion obj")
 			clusterVersionObj := testdbaas.NewClusterVersionFactory(clusterVersionName, clusterDefObj.GetName()).
 				AddComponent(statefulCompType).
 				AddLabels(cfgcore.GenerateTPLUniqLabelKeyWithConfig(configTplName), configmap.Name,
 					cfgcore.GenerateConstraintsUniqLabelKeyWithConfig(constraint.Name), constraint.Name).
-				Create(&testCtx).GetClusterVersion()
+				Create(&testCtx).GetObject()
 
 			By("Creating a cluster")
 			clusterObj := testdbaas.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
 				clusterDefObj.Name, clusterVersionObj.Name).
-				AddComponent(statefulCompName, statefulCompType).Create(&testCtx).GetCluster()
+				AddComponent(statefulCompName, statefulCompType).Create(&testCtx).GetObject()
 
 			container := corev1.Container{
 				Name: "mock-container",
@@ -127,7 +127,7 @@ var _ = Describe("Reconfigure Controller", func() {
 					intctrlutil.AppInstanceLabelKey, clusterName,
 					intctrlutil.AppComponentLabelKey, statefulCompName,
 					cfgcore.GenerateTPLUniqLabelKeyWithConfig(configTplName), configmap.Name,
-				).Create(&testCtx).GetStatefulSet()
+				).Create(&testCtx).GetObject()
 
 			By("check config constraint")
 			Eventually(testdbaas.CheckObj(&testCtx, client.ObjectKeyFromObject(constraint), func(g Gomega, tpl *dbaasv1alpha1.ConfigConstraint) {

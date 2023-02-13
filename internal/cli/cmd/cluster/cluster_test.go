@@ -200,15 +200,15 @@ var _ = Describe("Cluster", func() {
 		clusterDefObj := testdbaas.NewClusterDefFactory(clusterDefName, testdbaas.MySQLType).
 			AddComponent(testdbaas.StatefulMySQLComponent, statefulCompType).
 			AddConfigTemplate(configTplName, configmap.Name, constraint.Name, configVolumeName, nil).
-			GetClusterDef()
+			GetObject()
 		By("Create a clusterVersion obj")
 		clusterVersionObj := testdbaas.NewClusterVersionFactory(clusterVersionName, clusterDefObj.GetName()).
 			AddComponent(statefulCompType).
-			GetClusterVersion()
+			GetObject()
 		By("creating a cluster")
 		clusterObj := testdbaas.NewClusterFactory(ns, clusterName,
 			clusterDefObj.Name, clusterVersionObj.Name).
-			AddComponent(statefulCompName, statefulCompType).GetCluster()
+			AddComponent(statefulCompName, statefulCompType).GetObject()
 
 		objs := []runtime.Object{configmap, constraint, clusterDefObj, clusterVersionObj, clusterObj, componentConfig}
 		ttf, o := NewFakeOperationsOptions(ns, clusterObj.Name, dbaasv1alpha1.ReconfiguringType, objs...)
@@ -219,9 +219,10 @@ var _ = Describe("Cluster", func() {
 
 		By("validate reconfiguring parameter")
 		o.ComponentNames = []string{statefulCompName}
-		Expect(o.Validate().Error()).To(ContainSubstring("reconfiguring required configure file or updated parameters"))
+		Expect(o.parseUpdatedParams().Error()).To(ContainSubstring("reconfiguring required configure file or updated parameters"))
 		o.Parameters = []string{"abcd"}
-		Expect(o.Validate().Error()).To(ContainSubstring("updated parameter formatter"))
+
+		Expect(o.parseUpdatedParams().Error()).To(ContainSubstring("updated parameter formatter"))
 		o.Parameters = []string{"abcd=test"}
 		o.CfgTemplateName = configTplName
 		o.IOStreams = streams

@@ -18,7 +18,6 @@ package dbaas
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"math"
 
@@ -28,8 +27,6 @@ import (
 )
 
 const emptyString = ""
-const minAvailPort = 1024
-const maxAvailPort = 65535
 
 // calReverseRebaseBuffer Cal reserved memory for system
 func calReverseRebaseBuffer(memSizeMB, cpuNum int64) int64 {
@@ -204,58 +201,6 @@ func getPortByName(args interface{}, portName string) (interface{}, error) {
 	}
 
 	return nil, nil
-}
-
-func getAllContainerPorts(containers []corev1.Container) (map[int32]bool, error) {
-	set := map[int32]bool{}
-	for _, container := range containers {
-		for _, v := range container.Ports {
-			_, ok := set[v.ContainerPort]
-			if ok {
-				return nil, fmt.Errorf("containerPorts conflict: [%+v]", v.ContainerPort)
-			}
-			set[v.ContainerPort] = true
-		}
-	}
-	return set, nil
-}
-
-// get available container ports, increased by one if conflict with exist ports
-// util no conflicts.
-func getAvailableContainerPorts(containers []corev1.Container, containerPorts []int32) ([]int32, error) {
-	set, err := getAllContainerPorts(containers)
-	if err != nil {
-		return nil, err
-	}
-
-	iterAvailPort := func(p int32) (int32, error) {
-		// The TCP/IP port numbers below 1024 are privileged ports, which are special
-		// in that normal users are not allowed to run servers on them.
-		if p < minAvailPort || p > maxAvailPort {
-			p = minAvailPort
-		}
-		sentinel := p
-		for {
-			if _, ok := set[p]; !ok {
-				set[p] = true
-				return p, nil
-			}
-			p++
-			if p == sentinel {
-				return -1, errors.New("no available port for container")
-			}
-			if p > maxAvailPort {
-				p = minAvailPort
-			}
-		}
-	}
-
-	for i, p := range containerPorts {
-		if containerPorts[i], err = iterAvailPort(p); err != nil {
-			return []int32{}, err
-		}
-	}
-	return containerPorts, nil
 }
 
 func toJSONObject[T corev1.VolumeSource | corev1.Container | corev1.ContainerPort](obj T) (interface{}, error) {

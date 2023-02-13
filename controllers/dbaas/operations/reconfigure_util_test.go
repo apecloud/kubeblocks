@@ -29,9 +29,9 @@ import (
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
+	testdbaas "github.com/apecloud/kubeblocks/internal/testutil/dbaas"
 	testutil "github.com/apecloud/kubeblocks/internal/testutil/k8s"
 	mock_client "github.com/apecloud/kubeblocks/internal/testutil/k8s/mocks"
-	"github.com/apecloud/kubeblocks/test/testdata"
 )
 
 var _ = Describe("Reconfigure RollingPolicy", func() {
@@ -43,12 +43,12 @@ var _ = Describe("Reconfigure RollingPolicy", func() {
 
 	mockCfgTplObj := func(tpl dbaasv1alpha1.ConfigTemplate) (*corev1.ConfigMap, *dbaasv1alpha1.ConfigConstraint) {
 		By("By assure an cm obj")
-		cfgCM, err := testdata.GetResourceFromTestData[corev1.ConfigMap]("operations_config/configcm.yaml",
-			testdata.WithNamespacedName(tpl.ConfigTplRef, tpl.Namespace))
-		Expect(err).Should(Succeed())
-		cfgTpl, err := testdata.GetResourceFromTestData[dbaasv1alpha1.ConfigConstraint]("operations_config/configtpl.yaml",
-			testdata.WithNamespacedName(tpl.ConfigConstraintRef, tpl.Namespace))
-		Expect(err).Should(Succeed())
+		cfgCM := testdbaas.NewCustomizedObj("operations_config/configcm.yaml",
+			&corev1.ConfigMap{},
+			testdbaas.WithNamespacedName(tpl.ConfigTplRef, tpl.Namespace))
+		cfgTpl := testdbaas.NewCustomizedObj("operations_config/configtpl.yaml",
+			&dbaasv1alpha1.ConfigConstraint{},
+			testdbaas.WithNamespacedName(tpl.ConfigConstraintRef, tpl.Namespace))
 		return cfgCM, cfgTpl
 	}
 

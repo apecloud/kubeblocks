@@ -66,7 +66,6 @@ spec:
                     description: which container can exec command
                     type: string
                   image:
-                    default: docker.io/apecloud/kubeblocks
                     description: exec command with image
                     type: string
                   postCommands:

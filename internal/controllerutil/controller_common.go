@@ -17,6 +17,7 @@ limitations under the License.
 package controllerutil
 
 import (
+	"context"
 	"reflect"
 	"strings"
 	"time"
@@ -24,6 +25,7 @@ import (
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -211,6 +213,19 @@ func WorkloadFilterPredicate(object client.Object) bool {
 // IgnoreIsAlreadyExists return errors that is not AlreadyExists
 func IgnoreIsAlreadyExists(err error) error {
 	if !apierrors.IsAlreadyExists(err) {
+		return err
+	}
+	return nil
+}
+
+// BackgroundDeleteObject delete the object in the background, usually used in the Reconcile method
+func BackgroundDeleteObject(cli client.Client, ctx context.Context, obj client.Object) error {
+	deletePropagation := metav1.DeletePropagationBackground
+	deleteOptions := &client.DeleteOptions{
+		PropagationPolicy: &deletePropagation,
+	}
+
+	if err := cli.Delete(ctx, obj, deleteOptions); err != nil {
 		return err
 	}
 	return nil

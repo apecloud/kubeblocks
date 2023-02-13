@@ -112,7 +112,7 @@ var _ = Describe("Stateful Component", func() {
 
 			By("test pod is ready")
 			podName := "nginx-" + randomStr
-			pod := testdbaas.MockStatelessPod(testCtx, clusterName, statelessCompName, podName)
+			pod := testdbaas.MockStatelessPod(testCtx, deploy, clusterName, statelessCompName, podName)
 			lastTransTime := metav1.NewTime(time.Now().Add(-1 * (defaultMinReadySeconds + 1) * time.Second))
 			testk8s.MockPodAvailable(pod, lastTransTime)
 			Expect(statelessComponent.PodIsAvailable(pod, defaultMinReadySeconds)).Should(BeTrue())

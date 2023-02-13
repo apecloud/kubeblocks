@@ -29,7 +29,6 @@ import (
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	testdbaas "github.com/apecloud/kubeblocks/internal/testutil/dbaas"
-	"github.com/apecloud/kubeblocks/test/testdata"
 )
 
 var _ = Describe("Reconfigure Controller", func() {
@@ -95,24 +94,24 @@ var _ = Describe("Reconfigure Controller", func() {
 				&dbaasv1alpha1.ConfigConstraint{})
 
 			By("Create a clusterDefinition obj")
-			clusterDefObj := testdbaas.NewClusterDefFactory(&testCtx, clusterDefName, testdbaas.MySQLType).
-				AddComponent(testdbaas.StatefulMySQL8, statefulCompType).
-				AddConfigTemplate(configTplName, configmap.Name, constraint.Name, configVolumeName).
+			clusterDefObj := testdbaas.NewClusterDefFactory(clusterDefName, testdbaas.MySQLType).
+				AddComponent(testdbaas.StatefulMySQLComponent, statefulCompType).
+				AddConfigTemplate(configTplName, configmap.Name, constraint.Name, configVolumeName, nil).
 				AddLabels(cfgcore.GenerateTPLUniqLabelKeyWithConfig(configTplName), configmap.Name,
 					cfgcore.GenerateConstraintsUniqLabelKeyWithConfig(constraint.Name), constraint.Name).
-				Create().GetClusterDef()
+				Create(&testCtx).GetObject()
 
 			By("Create a clusterVersion obj")
-			clusterVersionObj := testdbaas.NewClusterVersionFactory(&testCtx, clusterVersionName, clusterDefObj.GetName()).
+			clusterVersionObj := testdbaas.NewClusterVersionFactory(clusterVersionName, clusterDefObj.GetName()).
 				AddComponent(statefulCompType).
 				AddLabels(cfgcore.GenerateTPLUniqLabelKeyWithConfig(configTplName), configmap.Name,
 					cfgcore.GenerateConstraintsUniqLabelKeyWithConfig(constraint.Name), constraint.Name).
-				Create().GetClusterVersion()
+				Create(&testCtx).GetObject()
 
 			By("Creating a cluster")
-			clusterObj := testdbaas.NewClusterFactory(&testCtx, clusterName,
+			clusterObj := testdbaas.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
 				clusterDefObj.Name, clusterVersionObj.Name).
-				AddComponent(statefulCompName, statefulCompType).Create().GetCluster()
+				AddComponent(statefulCompName, statefulCompType).Create(&testCtx).GetObject()
 
 			container := corev1.Container{
 				Name: "mock-container",
@@ -121,14 +120,14 @@ var _ = Describe("Reconfigure Controller", func() {
 					MountPath: "/mnt/config",
 				}},
 			}
-			_ = testdbaas.NewStatefulSetFactory(&testCtx, statefulSetName, clusterObj.Name, statefulCompName).
+			_ = testdbaas.NewStatefulSetFactory(testCtx.DefaultNamespace, statefulSetName, clusterObj.Name, statefulCompName).
 				AddConfigmapVolume(configVolumeName, configmap.Name).
 				AddContainer(container).
 				AddLabels(intctrlutil.AppNameLabelKey, clusterName,
 					intctrlutil.AppInstanceLabelKey, clusterName,
 					intctrlutil.AppComponentLabelKey, statefulCompName,
 					cfgcore.GenerateTPLUniqLabelKeyWithConfig(configTplName), configmap.Name,
-				).Create().GetStatefulSet()
+				).Create(&testCtx).GetObject()
 
 			By("check config constraint")
 			Eventually(testdbaas.CheckObj(&testCtx, client.ObjectKeyFromObject(constraint), func(g Gomega, tpl *dbaasv1alpha1.ConfigConstraint) {
@@ -149,8 +148,7 @@ var _ = Describe("Reconfigure Controller", func() {
 			}).Should(Succeed())
 
 			By("Update config, old version: " + configHash)
-			updatedCM, err := testdata.GetResourceFromTestData[corev1.ConfigMap]("resources/mysql_ins_config_update.yaml")
-			Expect(err).Should(Succeed())
+			updatedCM := testdbaas.NewCustomizedObj("resources/mysql_ins_config_update.yaml", &corev1.ConfigMap{})
 			Eventually(testdbaas.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(configmap), func(cm *corev1.ConfigMap) {
 				cm.Data = updatedCM.Data
 			})).Should(Succeed())
@@ -165,8 +163,7 @@ var _ = Describe("Reconfigure Controller", func() {
 			}).Should(Succeed())
 
 			By("invalid Update")
-			invalidUpdatedCM, err := testdata.GetResourceFromTestData[corev1.ConfigMap]("resources/mysql_ins_config_invalid_update.yaml")
-			Expect(err).Should(Succeed())
+			invalidUpdatedCM := testdbaas.NewCustomizedObj("resources/mysql_ins_config_invalid_update.yaml", &corev1.ConfigMap{})
 			Eventually(testdbaas.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(configmap), func(cm *corev1.ConfigMap) {
 				cm.Data = invalidUpdatedCM.Data
 			})).Should(Succeed())
@@ -179,8 +176,7 @@ var _ = Describe("Reconfigure Controller", func() {
 			}).Should(Succeed())
 
 			By("restart Update")
-			restartUpdatedCM, err := testdata.GetResourceFromTestData[corev1.ConfigMap]("resources/mysql_ins_config_update_with_restart.yaml")
-			Expect(err).Should(Succeed())
+			restartUpdatedCM := testdbaas.NewCustomizedObj("resources/mysql_ins_config_update_with_restart.yaml", &corev1.ConfigMap{})
 			Eventually(testdbaas.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(configmap), func(cm *corev1.ConfigMap) {
 				cm.Data = restartUpdatedCM.Data
 			})).Should(Succeed())

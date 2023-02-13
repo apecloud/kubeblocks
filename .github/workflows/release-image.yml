@@ -52,7 +52,9 @@ jobs:
           elif [[ "${{ env.RELEASE_VERSION }}" == "main" ]]; then
             RELEASE_VERSION="latest"
           elif [[ ! -z "${{ env.RELEASE_VERSION }}" ]]; then
-            RELEASE_VERSION=`bash ${{ github.workspace }}/.github/utils/utils.sh ${{ env.RELEASE_VERSION }} 1`
+            RELEASE_VERSION=`bash ${{ github.workspace }}/.github/utils/utils.sh \
+              --tag-name ${{ env.RELEASE_VERSION }} \
+              --type 1`
           fi
           
           BUILDX_ENABLED=true VERSION=$RELEASE_VERSION make push-manager-image

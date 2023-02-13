@@ -17,6 +17,7 @@ Usage: $(basename "$0") <options>
                                 1) create release
                                 2) upload release asset
                                 3) release helm chart
+                                4) update release latest
     -tn, --tag-name           Release tag name
     -pi, --project-id         Gitlab repo project id or "group%2Fproject"
     -at, --access-token       Gitlab access token
@@ -47,6 +48,8 @@ main() {
         update_release_asset
     elif [[ $TYPE == 3 ]]; then
         release_helm
+    elif [[ $TYPE == 4 ]]; then
+        update_release_latest
     fi
 
 }
@@ -189,6 +192,16 @@ release_helm() {
     for chart in ${ASSET_PATHS[@]}; do
         curl --request $request_type $request_url --form 'chart=@'$chart --user $ACCESS_USER:$ACCESS_TOKEN
     done
+}
+
+update_release_latest() {
+    request_type=DELETE
+    request_url=$API_URL/$PROJECT_ID/repository/tags
+    gitlab_api_curl --request $request_type $request_url/latest
+
+    request_type=POST
+    request_data='{"tag_name":"latest","ref":"main","message":"'$TAG_NAME'"}'
+    gitlab_api_curl --request $request_type $request_url --data $request_data
 }
 
 main "$@"

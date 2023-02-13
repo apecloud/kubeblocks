@@ -27,6 +27,7 @@ jobs:
           name: KubeBlocks ${{ env.TAG_NAME }}
           repository: ${{ env.CLI_REPO }}
           token: ${{ env.GITHUB_TOKEN }}
+          prerelease: true
       - name: create gitlab release ${{ env.CLI_NAME }}
         run: |
           bash ${{ github.workspace }}/.github/utils/release_gitlab.sh \
@@ -70,8 +71,12 @@ jobs:
         run: |
           mkdir -p ${{ matrix.os }}
           
-          CLI_OS_ARCH=`bash ${{ github.workspace }}/.github/utils/utils.sh ${{ matrix.os }}`
-          RELEASE_VERSION=`bash ${{ github.workspace }}/.github/utils/utils.sh ${{ env.TAG_NAME }} 1`
+          CLI_OS_ARCH=`bash ${{ github.workspace }}/.github/utils/utils.sh \
+            --tag-name ${{ matrix.os }} \
+            --type 2`
+          RELEASE_VERSION=`bash ${{ github.workspace }}/.github/utils/utils.sh \
+            --tag-name ${{ env.TAG_NAME }} \
+            --type 1`
           
           VERSION=$RELEASE_VERSION make bin/${{ env.CLI_NAME }}.$CLI_OS_ARCH
           
@@ -94,9 +99,10 @@ jobs:
       - name: get release kbcli upload url
         run: |
           echo 'UPLOAD_URL='`bash ${{ github.workspace }}/.github/utils/utils.sh \
-            ${{ env.TAG_NAME }} 2 \
-            ${{ env.CLI_REPO }} \
-            ${{ env.GITHUB_TOKEN }}` >> $GITHUB_ENV
+            --tag-name ${{ env.TAG_NAME }} \
+            --type 3 \
+            --github-repo ${{ env.CLI_REPO }} \
+            --github-token ${{ env.GITHUB_TOKEN }}` >> $GITHUB_ENV
 
       - name: upload release kbcli asset ${{ matrix.os }}
         uses: actions/upload-release-asset@main

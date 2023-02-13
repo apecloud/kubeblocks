@@ -32,6 +32,14 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
+const (
+	volumeName = "tls"
+	caName     = "ca.crt"
+	certName   = "tls.crt"
+	keyName    = "tls.key"
+	mountPath  = "/etc/pki/tls"
+)
+
 type componentPathedName struct {
 	Namespace   string `json:"namespace,omitempty"`
 	ClusterName string `json:"clusterName,omitempty"`
@@ -127,9 +135,9 @@ func composeTLSSecret(namespace, clusterName, componentName string) (*v1.Secret,
 	}
 	cert := out[:index]
 	key := out[index:]
-	secret.StringData["ca.crt"] = cert
-	secret.StringData["tls.crt"] = cert
-	secret.StringData["tls.key"] = key
+	secret.StringData[caName] = cert
+	secret.StringData[certName] = cert
+	secret.StringData[keyName] = key
 
 	return secret, nil
 }
@@ -169,4 +177,79 @@ func checkTLSSecretRef(reqCtx intctrlutil.RequestCtx, cli client.Client, namespa
 	}
 
 	return nil
+}
+
+func updateTLSVolumeAndVolumeMount(podSpec *v1.PodSpec, clusterName string, component Component) error {
+	if !component.TLS {
+		return nil
+	}
+
+	// update volume
+	volumes := podSpec.Volumes
+	volume, err := composeTLSVolume(clusterName, component)
+	if err != nil {
+		return err
+	}
+	volumes = append(volumes, *volume)
+	podSpec.Volumes = volumes
+
+	// update volumeMount
+	for index, container := range podSpec.Containers {
+		volumeMounts := container.VolumeMounts
+		volumeMount := composeTLSVolumeMount()
+		volumeMounts = append(volumeMounts, volumeMount)
+		podSpec.Containers[index].VolumeMounts = volumeMounts
+	}
+
+	return nil
+}
+
+func composeTLSVolume(clusterName string, component Component) (*v1.Volume, error) {
+	if !component.TLS {
+		return nil, errors.New("can't compose TLS volume when TLS not enabled")
+	}
+	if component.Issuer == nil {
+		return nil, errors.New("issuer shouldn't be nil when TLS enabled")
+	}
+	if component.Issuer.Name == dbaasv1alpha1.IssuerSelfProvided && component.Issuer.SecretRef == nil {
+		return nil, errors.New("secret ref shouldn't be nil when issuer is SelfProvided")
+	}
+
+	var secretName, ca, cert, key string
+	switch component.Issuer.Name {
+	case dbaasv1alpha1.IssuerSelfSigned:
+		secretName = generateTLSSecretName(clusterName, component.Name)
+		ca = caName
+		cert = certName
+		key = keyName
+	case dbaasv1alpha1.IssuerSelfProvided:
+		secretName = component.Issuer.SecretRef.Name
+		ca = component.Issuer.SecretRef.CA
+		cert = component.Issuer.SecretRef.Cert
+		key = component.Issuer.SecretRef.Key
+	}
+	volume := v1.Volume{
+		Name: volumeName,
+		VolumeSource: v1.VolumeSource{
+			Secret: &v1.SecretVolumeSource{
+				SecretName: secretName,
+				Items: []v1.KeyToPath{
+					{Key: ca, Path: caName},
+					{Key: cert, Path: certName},
+					{Key: key, Path: keyName},
+				},
+				Optional: func() *bool { o := false; return &o }(),
+			},
+		},
+	}
+
+	return &volume, nil
+}
+
+func composeTLSVolumeMount() v1.VolumeMount {
+	return v1.VolumeMount{
+		Name:      volumeName,
+		MountPath: mountPath,
+		ReadOnly:  true,
+	}
 }

@@ -680,6 +680,11 @@ func prepareComponentObjs(reqCtx intctrlutil.RequestCtx, cli client.Client, obj 
 			*params.applyObjs = append(*params.applyObjs, configs...)
 		}
 		// end render config
+
+		// tls certs secret volume and volumeMount
+		if err := updateTLSVolumeAndVolumeMount(podSpec, params.cluster.Name, *params.component); err != nil {
+			return err
+		}
 		return nil
 	}
 

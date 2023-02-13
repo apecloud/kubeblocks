@@ -31,6 +31,7 @@ import (
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	testdbaas "github.com/apecloud/kubeblocks/internal/testutil/dbaas"
+	testk8s "github.com/apecloud/kubeblocks/internal/testutil/k8s"
 )
 
 var _ = Describe("Tls cert creation/check function", func() {
@@ -119,6 +120,27 @@ var _ = Describe("Tls cert creation/check function", func() {
 					err := k8sClient.Get(ctx, nsName, secret)
 					return err
 				}).WithPolling(time.Second).WithTimeout(10 * time.Second).Should(Succeed())
+				By("Checking volume & volumeMount settings in podSpec")
+				stsList := testk8s.ListAndCheckStatefulSet(&testCtx, client.ObjectKeyFromObject(clusterObj))
+				sts := stsList.Items[0]
+				hasTLSVolume := false
+				for _, volume := range sts.Spec.Template.Spec.Volumes {
+					if volume.Name == volumeName {
+						hasTLSVolume = true
+						break
+					}
+				}
+				Expect(hasTLSVolume).Should(BeTrue())
+				for _, container := range sts.Spec.Template.Spec.Containers {
+					hasTLSVolumeMount := false
+					for _, mount := range container.VolumeMounts {
+						if mount.Name == volumeName {
+							hasTLSVolumeMount = true
+							break
+						}
+					}
+					Expect(hasTLSVolumeMount).Should(BeTrue())
+				}
 			})
 		})
 

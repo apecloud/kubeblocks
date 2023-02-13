@@ -54,9 +54,9 @@ var _ = Describe("test clusterVersion controller", func() {
 	Context("test clusterVersion controller", func() {
 		It("test clusterVersion controller", func() {
 			By("create a clusterVersion obj")
-			clusterVersionObj := testdbaas.NewClusterVersionFactory(&testCtx, clusterVersionName, clusterDefName).
+			clusterVersionObj := testdbaas.NewClusterVersionFactory(clusterVersionName, clusterDefName).
 				AddComponent(statefulCompType).AddContainerShort("mysql", testdbaas.ApeCloudMySQLImage).
-				Create().GetClusterVersion()
+				Create(&testCtx).GetObject()
 
 			By("wait for clusterVersion phase is unavailable when clusterDef is not found")
 			Eventually(testdbaas.CheckObj(&testCtx, client.ObjectKeyFromObject(clusterVersionObj), func(g Gomega, tmpCV *dbaasv1alpha1.ClusterVersion) {
@@ -64,9 +64,9 @@ var _ = Describe("test clusterVersion controller", func() {
 			})).Should(Succeed())
 
 			By("create a clusterDefinition obj")
-			testdbaas.NewClusterDefFactory(&testCtx, clusterDefName, testdbaas.MySQLType).
-				AddComponent(testdbaas.StatefulMySQL8, statefulCompType).
-				Create().GetClusterDef()
+			testdbaas.NewClusterDefFactory(clusterDefName, testdbaas.MySQLType).
+				AddComponent(testdbaas.StatefulMySQLComponent, statefulCompType).
+				Create(&testCtx).GetObject()
 
 			By("wait for clusterVersion phase is available")
 			Eventually(testdbaas.CheckObj(&testCtx, client.ObjectKeyFromObject(clusterVersionObj), func(g Gomega, tmpCV *dbaasv1alpha1.ClusterVersion) {
@@ -74,13 +74,13 @@ var _ = Describe("test clusterVersion controller", func() {
 			})).Should(Succeed())
 
 			By("test sync cluster.status.operations")
-			cluster := testdbaas.NewClusterFactory(&testCtx, clusterNamePrefix,
-				clusterDefName, clusterVersionName).WithRandomName().Create().GetCluster()
+			cluster := testdbaas.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
+				clusterDefName, clusterVersionName).WithRandomName().Create(&testCtx).GetObject()
 
 			// create a new ClusterVersion
-			testdbaas.NewClusterVersionFactory(&testCtx, clusterVersionName+"1", clusterDefName).
+			testdbaas.NewClusterVersionFactory(clusterVersionName+"1", clusterDefName).
 				AddComponent(statefulCompType).AddContainerShort("mysql", testdbaas.ApeCloudMySQLImage).
-				Create().GetClusterVersion()
+				Create(&testCtx).GetObject()
 
 			Eventually(testdbaas.CheckObj(&testCtx, client.ObjectKeyFromObject(cluster), func(g Gomega, tmpCluster *dbaasv1alpha1.Cluster) {
 				operations := tmpCluster.Status.Operations

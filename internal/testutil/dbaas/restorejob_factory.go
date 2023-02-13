@@ -48,7 +48,7 @@ func (factory *MockRestoreJobFactory) SetBackupJobName(backupJobName string) *Mo
 }
 
 func (factory *MockRestoreJobFactory) AddTargetMatchLabels(keyAndValues ...string) *MockRestoreJobFactory {
-	for k, v := range withMap(keyAndValues...) {
+	for k, v := range WithMap(keyAndValues...) {
 		factory.get().Spec.Target.LabelsSelector.MatchLabels[k] = v
 	}
 	return factory

@@ -19,7 +19,7 @@ kbcli cluster explain-configure [flags]
   kbcli cluster explain-configure mycluster --component-name=mysql --template-names=mysql-3node-tpl --trunc-document=false --trunc-enum=false
   
   # describe a specified parameters, e.g. cluster name is mycluster
-  kbcli cluster explain-configure mycluster --component-name=mysql --template-names=mysql-3node-tpl  --param=sql_mode
+  kbcli cluster explain-configure mycluster --component-name=mysql --template-names=mysql-3node-tpl --param=sql_mode
 ```
 
 ### Options

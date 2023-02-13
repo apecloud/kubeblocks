@@ -31,10 +31,16 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	dynamicfakeclient "k8s.io/client-go/dynamic/fake"
+	"k8s.io/client-go/kubernetes/scheme"
+	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
+	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
+	testdbaas "github.com/apecloud/kubeblocks/internal/testutil/dbaas"
+	"github.com/apecloud/kubeblocks/test/testdata"
 )
 
 var _ = Describe("util", func() {
@@ -195,6 +201,62 @@ var _ = Describe("util", func() {
 
 		By("GVRToString")
 		Expect(len(GVRToString(types.ClusterGVR())) > 0).Should(BeTrue())
+	})
+
+	It("IsSupportConfigureParams", func() {
+		const (
+			ccName = "mysql_cc"
+			testNS = "default"
+		)
+
+		configConstraintObj := testdbaas.NewCustomizedObj("resources/mysql_config_template.yaml",
+			&dbaasv1alpha1.ConfigConstraint{}, testdbaas.WithNamespacedName(ccName, ""), func(cc *dbaasv1alpha1.ConfigConstraint) {
+				if ccContext, err := testdata.GetTestDataFileContent("/cue_testdata/mysql_for_cli.cue"); err == nil {
+					cc.Spec.ConfigurationSchema = &dbaasv1alpha1.CustomParametersValidation{
+						CUE: string(ccContext),
+					}
+				}
+			})
+
+		tf := cmdtesting.NewTestFactory().WithNamespace(testNS)
+		defer tf.Cleanup()
+
+		Expect(dbaasv1alpha1.AddToScheme(scheme.Scheme)).Should(Succeed())
+		mockClient := dynamicfakeclient.NewSimpleDynamicClientWithCustomListKinds(scheme.Scheme, nil, configConstraintObj)
+		tpl := dbaasv1alpha1.ConfigTemplate{
+			Name:                "for_test",
+			ConfigConstraintRef: ccName,
+			ConfigTplRef:        ccName,
+			VolumeName:          "config",
+		}
+
+		type args struct {
+			tpl           dbaasv1alpha1.ConfigTemplate
+			updatedParams map[string]string
+		}
+		tests := []struct {
+			name     string
+			args     args
+			expected bool
+		}{{
+			name: "normal test",
+			args: args{
+				tpl:           tpl,
+				updatedParams: testdbaas.WithMap("automatic_sp_privileges", "OFF", "innodb_autoinc_lock_mode", "1"),
+			},
+			expected: true,
+		}, {
+			name: "not match test",
+			args: args{
+				tpl:           tpl,
+				updatedParams: testdbaas.WithMap("not_exist_field", "1"),
+			},
+			expected: false,
+		}}
+
+		for _, tt := range tests {
+			Expect(IsSupportConfigureParams(tt.args.tpl, tt.args.updatedParams, mockClient)).Should(BeEquivalentTo(tt.expected))
+		}
 	})
 
 	It("get IP location", func() {

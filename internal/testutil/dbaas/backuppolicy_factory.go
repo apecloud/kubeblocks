@@ -77,7 +77,7 @@ func (factory *MockBackupPolicyFactory) SetBackupsHistoryLimit(backupsHistoryLim
 }
 
 func (factory *MockBackupPolicyFactory) AddMatchLabels(keyAndValues ...string) *MockBackupPolicyFactory {
-	for k, v := range withMap(keyAndValues...) {
+	for k, v := range WithMap(keyAndValues...) {
 		factory.get().Spec.Target.LabelsSelector.MatchLabels[k] = v
 	}
 	return factory

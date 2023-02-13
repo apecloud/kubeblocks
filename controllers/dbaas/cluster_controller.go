@@ -600,7 +600,6 @@ func (r *ClusterReconciler) updateClusterPhaseToCreatingOrUpdating(reqCtx intctr
 		for _, v := range cluster.Spec.Components {
 			cluster.Status.Components[v.Name] = dbaasv1alpha1.ClusterStatusComponent{
 				Phase: dbaasv1alpha1.CreatingPhase,
-				Type:  v.Type,
 			}
 		}
 	} else if slices.Index([]dbaasv1alpha1.Phase{

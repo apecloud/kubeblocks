@@ -391,12 +391,6 @@ type HorizontalScalePolicy struct {
 	VolumeMountsName string `json:"volumeMountsName,omitempty"`
 }
 
-type ClusterDefinitionStatusGeneration struct {
-	// ClusterDefinition generation number.
-	// +optional
-	ClusterDefGeneration int64 `json:"clusterDefGeneration,omitempty"`
-}
-
 type ClusterDefinitionProbeCMDs struct {
 	// Write check executed on probe sidecar, used to check workload's allow write access.
 	// +optional

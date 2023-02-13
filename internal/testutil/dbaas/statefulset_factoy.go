@@ -100,6 +100,11 @@ func (factory *MockStatefulSetFactory) AddContainer(container corev1.Container) 
 	return factory
 }
 
+func (factory *MockStatefulSetFactory) SetReplicas(replicas int32) *MockStatefulSetFactory {
+	factory.Sts.Spec.Replicas = &replicas
+	return factory
+}
+
 func (factory *MockStatefulSetFactory) Create(testCtx *testutil.TestContext) *MockStatefulSetFactory {
 	gomega.Expect(testCtx.CreateObj(testCtx.Ctx, factory.Sts)).Should(gomega.Succeed())
 	return factory

@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: mysql-3node-tpl-8.0
+  name: apecloud-mysql-tpl-8.0
   labels:
     {{- include "apecloud-mysql.labels" . | nindent 4 }}
 data:

@@ -3,7 +3,7 @@ kind: ClusterVersion
 metadata:
   name: ac-mysql-rep-{{ default .Chart.AppVersion .Values.clusterVersionOverride }}
   labels:
-    {{- include "mysql.labels" . | nindent 4 }}
+    {{- include "apecloud-mysql.labels" . | nindent 4 }}
 spec:
   clusterDefinitionRef: apecloud-mysql-rep
   components:

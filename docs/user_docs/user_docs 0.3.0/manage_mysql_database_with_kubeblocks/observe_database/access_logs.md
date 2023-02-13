@@ -101,7 +101,7 @@ The KubeBlocks log enhancement function uses methods similar to kubectl exec and
             Phase:  Running
        Conditions:
          Last Transition Time:  2022-11-11T03:57:42Z
-         Message:               EnableLogs of cluster component replicasets has invalid value [errora slowa] which isn't definded in cluster definition component replicasets
+         Message:               EnableLogs of cluster component replicasets has invalid value [errora slowa] which isn't defined in cluster definition component replicasets
          Reason:                EnableLogsListValidateFail
          Status:                False
          Type:                  ValidateEnabledLogs
@@ -118,6 +118,6 @@ The KubeBlocks log enhancement function uses methods similar to kubectl exec and
        Type     Reason                      Age   From                Message
        ----     ------                      ----  ----                -------
        Normal   Creating                    49s   cluster-controller  Start Creating in Cluster: release-name-error
-       Warning  EnableLogsListValidateFail  49s   cluster-controller  EnableLogs of cluster component replicasets has invalid value [errora slowa] which isn't definded in cluster definition component replicasets
+       Warning  EnableLogsListValidateFail  49s   cluster-controller  EnableLogs of cluster component replicasets has invalid value [errora slowa] which isn't defined in cluster definition component replicasets
        Normal   Running                     36s   cluster-controller  Cluster: release-name-error is ready, current phase is Running
      ```

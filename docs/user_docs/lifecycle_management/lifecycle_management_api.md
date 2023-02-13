@@ -198,7 +198,7 @@ Note:
 
 #### spec.clusterDefinitionRef
 
-`spec.clusterDefinitionRef` refers to `ClusterDefiniton` and its value should be the same as `ClusterDefinition`.
+`spec.clusterDefinitionRef` refers to `ClusterDefinition` and its value should be the same as `ClusterDefinition`.
 
 #### spec.component
 
@@ -234,7 +234,7 @@ spec:
 
 #### spec.clusterDefinitionRef
 
-`spec.clusterDefinitionRef` refers to `ClusterDefiniton` and its value should be the same as `ClusterDefinition`.
+`spec.clusterDefinitionRef` refers to `ClusterDefinition` and its value should be the same as `ClusterDefinition`.
 
 #### spec.clusterVersionRef
 
@@ -246,7 +246,7 @@ It refers to ClusterVersion and its value should be the same as `ClusterVersion`
 
 `replicas`: If you edit `replicas`, horizontal scaling will be triggered. If the amount of `replicas` does not meet the limits of `definition`, an error occurs.
 
-`resources`: If you edit the `requets` and `limits` of `resources`, vertical scaling will be triggered.
+`resources`: If you edit the `requests` and `limits` of `resources`, vertical scaling will be triggered.
 
 #### spec.volumeClaimTemplates
 
@@ -295,7 +295,7 @@ The following are examples of ApeCloud MySQL three-node clusters.
         - name: "mysql-a-2"
           type: mysql-a
           replicas: 3
-          resoures:
+          resources:
               requests:
                   cpu: 32
                   memory: 128Gi

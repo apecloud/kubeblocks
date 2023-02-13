@@ -15,7 +15,7 @@ Ensure the following requirements are met so the playground and other functions 
   * `kbcli`: It is the command line tool of KubeBlocks and is used for the interaction between the playground and KubeBlocks. Follow the steps below to install `kbcli`.
     1. Run the command below to install `kbcli`.
          ```
-         curl -fsSL http://161.189.136.182:8000/apecloud/kubeblocks/install_cli.sh |bash
+         curl -fsSL https://kubeblocks.io/installer/install_cli.sh | bash
          ```
     2. Run `export KUBECONFIG=~/.kube/kubeblocks-playground`.
     3. Run `kbcli version` to check the `kbcli` version and make sure `kbcli` is installed successfully.

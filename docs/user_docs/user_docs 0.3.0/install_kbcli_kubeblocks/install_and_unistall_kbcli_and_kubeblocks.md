@@ -12,7 +12,7 @@ This guide introduces how to install KubeBlocks by `kbcli`, the command line too
 
 1. Run the command below to install `kbcli`. `kbcli` can run on macOS and Linux.
    ```
-   curl -fsSL http://161.189.136.182:8000/apecloud/kubeblocks/install_cli.sh |bash
+   curl -fsSL https://kubeblocks.io/installer/install_cli.sh | bash
    ```
 
    > ***Note:***

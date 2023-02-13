@@ -84,7 +84,8 @@ func TestConfigMapVolumeWatcher(t *testing.T) {
 			}
 			trigger <- true
 			return nil
-		}).AddFilter(regexFilter).Run()
+		}).AddFilter(regexFilter)
+	require.Nil(t, volumeWatcher.Run())
 
 	// mock kubelet create configmapVolume
 	go func() {

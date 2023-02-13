@@ -150,7 +150,7 @@ spec:
   ```
   logsConfig: 
     
-    # `name` is customized by the provider and is the only Identifier.
+    # `name` is customized by the provider and is the only identifier.
     - name: audit
       # The path information of the log file.
       filePath: /postgresql/log/postgresql_[0-2]_audit.log
@@ -163,7 +163,7 @@ spec:
   ```
   logsConfig: 
     # The following is the audit log of configuring multiple paths.
-    # `name` is customized by the provider and is the only Identifier.
+    # `name` is customized by the provider and is the only identifier.
     - name: audit1
       # The path information of the log file.
       filePath: /var/log1/postgresql_*_audit.log

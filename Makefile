@@ -170,7 +170,7 @@ fast-lint: golangci staticcheck  # [INTERNAL] fast lint
 	$(GOLANGCILINT) run ./...
 
 .PHONY: lint
-lint: generate ## Run golangci-lint against code.
+lint: cfg-go-generate generate ## Run golangci-lint against code.
 	$(MAKE) fast-lint
 
 .PHONY: staticcheck

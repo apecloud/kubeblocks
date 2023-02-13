@@ -30,8 +30,13 @@ import (
 
 // CreateRestartOpsRequest creates a OpsRequest of restart type for testing.
 func CreateRestartOpsRequest(testCtx testutil.TestContext, clusterName, opsRequestName string, componentNames []string) *dbaasv1alpha1.OpsRequest {
-	return CreateCustomizedObj(&testCtx, "operations/restart.yaml",
-		&dbaasv1alpha1.OpsRequest{}, CustomizeObjYAML(opsRequestName, clusterName, clusterName, componentNames))
+	opsRequest := NewOpsRequestObj(opsRequestName, testCtx.DefaultNamespace, clusterName, dbaasv1alpha1.RestartType)
+	componentList := make([]dbaasv1alpha1.ComponentOps, len(componentNames))
+	for i := range componentNames {
+		componentList[i] = dbaasv1alpha1.ComponentOps{ComponentName: componentNames[i]}
+	}
+	opsRequest.Spec.RestartList = componentList
+	return CreateK8sResource(testCtx, opsRequest).(*dbaasv1alpha1.OpsRequest)
 }
 
 // NewOpsRequestObj only generates the OpsRequest Object, instead of actually creating this resource.

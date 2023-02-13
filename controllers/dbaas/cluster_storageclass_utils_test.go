@@ -26,13 +26,11 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
-	"k8s.io/apimachinery/pkg/util/yaml"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	testdbaas "github.com/apecloud/kubeblocks/internal/testutil/dbaas"
-	"github.com/apecloud/kubeblocks/test/testdata"
 )
 
 var _ = Describe("Reconcile StorageClass", func() {
@@ -41,6 +39,7 @@ var _ = Describe("Reconcile StorageClass", func() {
 		clusterVersionName = "app-versoion-" + testCtx.GetRandomStr()
 		clusterName        = "mysql-for-storageclass-" + testCtx.GetRandomStr()
 		consensusCompName  = "consensus"
+		consensusCompType  = "consensus"
 	)
 
 	cleanEnv := func() {
@@ -60,19 +59,16 @@ var _ = Describe("Reconcile StorageClass", func() {
 
 	AfterEach(cleanEnv)
 
-	createStorageClassObj := func(storageClassName string, allowVolumeExpansion bool) {
-		By("By assure an default storageClass")
-		testdbaas.CreateCustomizedObj(&testCtx, "operations/storageclass.yaml",
-			&storagev1.StorageClass{}, testdbaas.CustomizeObjYAML(storageClassName, allowVolumeExpansion))
-	}
-
 	createCluster := func(defaultStorageClassName, storageClassName string) *dbaasv1alpha1.Cluster {
-		objBytes, err := testdata.GetTestDataFileContent("consensusset/wesql.yaml")
-		Expect(err).Should(Succeed())
-		clusterString := fmt.Sprintf(string(objBytes), clusterVersionName, clusterDefName, clusterName,
-			clusterVersionName, clusterDefName, consensusCompName)
-		cluster := &dbaasv1alpha1.Cluster{}
-		Expect(yaml.Unmarshal([]byte(clusterString), cluster)).Should(Succeed())
+		cluster := testdbaas.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefName, clusterVersionName).
+			AddComponent(consensusCompName, consensusCompType).
+			AddVolumeClaimTemplate("data", &corev1.PersistentVolumeClaimSpec{
+				Resources: corev1.ResourceRequirements{
+					Requests: corev1.ResourceList{
+						corev1.ResourceStorage: resource.MustParse("2Gi"),
+					},
+				},
+			}).GetObject()
 		volumeClaimTemplates := cluster.Spec.Components[0].VolumeClaimTemplates
 		volumeClaimTemplates[0].Spec.StorageClassName = &defaultStorageClassName
 		volumeClaimTemplates = append(volumeClaimTemplates, dbaasv1alpha1.ClusterComponentVolumeClaimTemplate{
@@ -95,8 +91,8 @@ var _ = Describe("Reconcile StorageClass", func() {
 	}
 
 	createPVC := func(pvcName, storageClassName string) {
-		testdbaas.CreateCustomizedObj(&testCtx, "operations/volume_expansion_pvc.yaml",
-			&corev1.PersistentVolumeClaim{}, testdbaas.CustomizeObjYAML(consensusCompName, clusterName, pvcName, pvcName, storageClassName))
+		testdbaas.NewPersistentVolumeClaimFactory(testCtx.DefaultNamespace, pvcName, clusterName,
+			consensusCompName, "data").SetStorage("2Gi").SetStorageClass(storageClassName).Create(&testCtx)
 	}
 
 	updateStorageClassAllowVolumeExpansion := func(storageClassName string, allowVolumeExpansion bool) {
@@ -115,8 +111,8 @@ var _ = Describe("Reconcile StorageClass", func() {
 			vctName1 := "data"
 			defaultStorageClassName := "standard-" + testCtx.GetRandomStr()
 			storageClassName := "csi-hostpath-sc-" + testCtx.GetRandomStr()
-			testdbaas.CreateConsensusMysqlClusterDef(testCtx, clusterDefName)
-			testdbaas.CreateConsensusMysqlClusterVersion(testCtx, clusterDefName, clusterVersionName)
+			testdbaas.CreateConsensusMysqlClusterDef(testCtx, clusterDefName, consensusCompType)
+			testdbaas.CreateConsensusMysqlClusterVersion(testCtx, clusterDefName, clusterVersionName, consensusCompType)
 			cluster := createCluster(defaultStorageClassName, storageClassName)
 			Expect(testdbaas.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(cluster), func(newCluster *dbaasv1alpha1.Cluster) {
 				newCluster.Status.Operations = &dbaasv1alpha1.Operations{}
@@ -129,7 +125,7 @@ var _ = Describe("Reconcile StorageClass", func() {
 			})).Should(Succeed())
 
 			By("test without pvc")
-			createStorageClassObj(defaultStorageClassName, true)
+			testdbaas.CreateStorageClass(testCtx, defaultStorageClassName, true)
 
 			By("expect consensus component support volume expansion and volumeClaimTemplateNames is [data]")
 			Eventually(testdbaas.CheckObj(&testCtx, client.ObjectKeyFromObject(cluster), func(g Gomega, newCluster *dbaasv1alpha1.Cluster) {
@@ -138,7 +134,7 @@ var _ = Describe("Reconcile StorageClass", func() {
 			})).Should(Succeed())
 
 			By("test with pvc")
-			createStorageClassObj(storageClassName, false)
+			testdbaas.CreateStorageClass(testCtx, storageClassName, false)
 			createPVC(fmt.Sprintf("log-%s-%s", clusterName, consensusCompName), storageClassName)
 			createPVC(fmt.Sprintf("data-%s-%s", clusterName, consensusCompName), defaultStorageClassName)
 

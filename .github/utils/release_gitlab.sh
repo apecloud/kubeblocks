@@ -177,8 +177,18 @@ update_release_asset() {
 release_helm() {
     request_type=POST
     request_url=$API_URL/$PROJECT_ID/packages/helm/api/$CHANNEL/charts
+    ASSET_PATHS=()
+    if [[ -d "$ASSET_PATH" ]]; then
+        for asset_path in $ASSET_PATH/*; do
+            ASSET_PATHS[${#ASSET_PATHS[@]}]=`basename $asset_path`
+        done
+    elif [[ -f "$ASSET_PATH" ]]; then
+        ASSET_PATHS[${#ASSET_PATHS[@]}]=$ASSET_PATH
+    fi
 
-    curl --request $request_type $request_url --form 'chart=@'$ASSET_PATH --user $ACCESS_USER:$ACCESS_TOKEN
+    for chart in ${ASSET_PATHS[@]}; do
+        curl --request $request_type $request_url --form 'chart=@'$chart --user $ACCESS_USER:$ACCESS_TOKEN
+    done
 }
 
 main "$@"

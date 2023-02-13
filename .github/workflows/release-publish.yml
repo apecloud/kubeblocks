@@ -27,10 +27,9 @@ jobs:
           name: KubeBlocks ${{ env.TAG_NAME }}
           repository: ${{ env.CLI_REPO }}
           token: ${{ env.GITHUB_TOKEN }}
-          prerelease: true
       - name: create gitlab release ${{ env.CLI_NAME }}
         run: |
-          bash ${{ github.workspace }}/.github/utils/release-gitlab.sh \
+          bash ${{ github.workspace }}/.github/utils/release_gitlab.sh \
             --type 1 \
             --project-id ${{ env.GITLAB_KBCLI_PROJECT_ID }} \
             --tag-name ${{ env.TAG_NAME }} \
@@ -115,7 +114,7 @@ jobs:
         env:
           CLI_BINARY: ${{ env.CLI_NAME }}-${{ matrix.os }}-${{ env.TAG_NAME }}.tar.gz
         run: |
-          bash ${{ github.workspace }}/.github/utils/release-gitlab.sh \
+          bash ${{ github.workspace }}/.github/utils/release_gitlab.sh \
             --type 2 \
             --project-id ${{ env.GITLAB_KBCLI_PROJECT_ID }} \
             --tag-name ${{ env.TAG_NAME }} \

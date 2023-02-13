@@ -80,9 +80,14 @@ const (
 )
 
 const (
-	cfgKeyDelimiter  = "."
-	cfgKeyDelimiter2 = "@#@"
-	emptyJSON        = "{}"
+	delimiterDot = "."
+	emptyJSON    = "{}"
+
+	// In order to verify a configuration file, the configuration file is converted to a UnstructuredObject.
+	// When there is a special character '.' in the parameter will cause the parameter of the configuration file parsing to be messed up.
+	//   e.g. pg parameters: auto_explain.log_analyze = 'True'
+	// To solve this problem, the cfgDelimiterPlaceholder variable is introduced to ensure that no such string exists in a configuration file.
+	cfgDelimiterPlaceholder = "@#@"
 )
 
 var (
@@ -104,8 +109,6 @@ func init() {
 			indexer:   make(map[string]*viper.Viper, 1),
 		}
 
-		// v := viper.NewWithOptions(viper.KeyDelimiter(cfgKeyDelimiter))
-		// v.SetConfigType(string(option.CfgType))
 		v := NewCfgViper(option.CfgType)
 		if err := v.ReadConfig(bytes.NewReader(option.RawData)); err != nil {
 			option.Log.Error(err, "failed to parse config!", "context", option.RawData)
@@ -297,9 +300,9 @@ func (c *cfgWrapper) Diff(target *cfgWrapper) (*ConfigPatchInfo, error) {
 }
 
 func NewCfgViper(cfgType appsv1alpha1.ConfigurationFormatter) *viper.Viper {
-	defaultKeySep := cfgKeyDelimiter
+	defaultKeySep := delimiterDot
 	if cfgType == appsv1alpha1.PROPERTIES || cfgType == appsv1alpha1.DOTENV {
-		defaultKeySep = cfgKeyDelimiter2
+		defaultKeySep = cfgDelimiterPlaceholder
 	}
 	v := viper.NewWithOptions(viper.KeyDelimiter(defaultKeySep))
 	v.SetConfigType(string(cfgType))
@@ -366,7 +369,7 @@ func (c cfgWrapper) getCfgViper(option CfgOpOption) *viper.Viper {
 
 func (c *cfgWrapper) generateKey(paramKey string, option CfgOpOption, v *viper.Viper) string {
 	if option.IniContext != nil && len(option.IniContext.SectionName) > 0 {
-		return strings.Join([]string{option.IniContext.SectionName, paramKey}, cfgKeyDelimiter)
+		return strings.Join([]string{option.IniContext.SectionName, paramKey}, delimiterDot)
 	}
 
 	return paramKey
@@ -464,7 +467,7 @@ func checkAndFlattenMap(v any, trim string) []ParameterPair {
 
 func flattenMap(m map[string]interface{}, prefix string) []ParameterPair {
 	if prefix != "" {
-		prefix += cfgKeyDelimiter
+		prefix += delimiterDot
 	}
 
 	r := make([]ParameterPair, 0)

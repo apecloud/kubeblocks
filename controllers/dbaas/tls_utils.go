@@ -22,12 +22,14 @@ import (
 	"text/template"
 
 	"github.com/Masterminds/sprig/v3"
-	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/pkg/errors"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 type componentPathedName struct {
@@ -35,10 +37,8 @@ type componentPathedName struct {
 	ClusterName string `json:"clusterName,omitempty"`
 	Name        string `json:"name,omitempty"`
 }
-func createOrCheckTlsCerts(
-	reqCtx intctrlutil.RequestCtx,
-	cli client.Client,
-	cluster *dbaasv1alpha1.Cluster) error {
+
+func createOrCheckTLSCerts(reqCtx intctrlutil.RequestCtx, cli client.Client, cluster *dbaasv1alpha1.Cluster, scheme *runtime.Scheme) error {
 	if cluster == nil {
 		return nil
 	}
@@ -47,7 +47,7 @@ func createOrCheckTlsCerts(
 	var secretList []v1.Secret
 
 	for _, component := range cluster.Spec.Components {
-		if !component.Tls {
+		if !component.TLS {
 			continue
 		}
 
@@ -59,16 +59,16 @@ func createOrCheckTlsCerts(
 		var secret *v1.Secret
 		switch component.Issuer.Name {
 		case dbaasv1alpha1.IssuerSelfProvided:
-			err = checkTlsSecretRef(reqCtx, cli, cluster.Namespace, component.Issuer.SecretRef)
+			err = checkTLSSecretRef(reqCtx, cli, cluster.Namespace, component.Issuer.SecretRef)
 		case dbaasv1alpha1.IssuerSelfSigned:
-			secret, err = createTlsSecret(reqCtx, cli, cluster.Namespace, cluster.Name, component.Name)
+			secret, err = createTLSSecret(reqCtx, cli, cluster, component.Name, scheme)
 			if secret != nil {
 				secretList = append(secretList, *secret)
 			}
 		}
 		if err != nil {
 			// best-effort to make tls secret creation atomic
-			deleteTlsSecrets(reqCtx, cli, secretList)
+			deleteTLSSecrets(reqCtx, cli, secretList)
 			return err
 		}
 	}
@@ -76,7 +76,7 @@ func createOrCheckTlsCerts(
 	return nil
 }
 
-func deleteTlsSecrets(reqCtx intctrlutil.RequestCtx, cli client.Client, secretList []v1.Secret) {
+func deleteTLSSecrets(reqCtx intctrlutil.RequestCtx, cli client.Client, secretList []v1.Secret) {
 	for _, secret := range secretList {
 		err := cli.Delete(reqCtx.Ctx, &secret)
 		if err != nil {
@@ -85,18 +85,33 @@ func deleteTlsSecrets(reqCtx intctrlutil.RequestCtx, cli client.Client, secretLi
 	}
 }
 
-func createTlsSecret(reqCtx intctrlutil.RequestCtx, cli client.Client, ns string, clusterName string, componentName string) (*v1.Secret, error) {
+func createTLSSecret(reqCtx intctrlutil.RequestCtx, cli client.Client, cluster *dbaasv1alpha1.Cluster, componentName string, scheme *runtime.Scheme) (*v1.Secret, error) {
+	secret, err := composeTLSSecret(cluster.Namespace, cluster.Name, componentName)
+	if err != nil {
+		return nil, err
+	}
+	if err := intctrlutil.SetOwnership(cluster, secret, scheme, dbClusterFinalizerName); err != nil {
+		return nil, err
+	}
+	if err := cli.Create(reqCtx.Ctx, secret); err != nil {
+		return nil, err
+	}
+	return secret, nil
+}
+
+func composeTLSSecret(namespace, clusterName, componentName string) (*v1.Secret, error) {
 	const tplFile = "tls_certs_secret_template.cue"
 
 	secret := &v1.Secret{}
 	pathedName := componentPathedName{
-		Namespace: ns,
+		Namespace:   namespace,
 		ClusterName: clusterName,
-		Name: componentName,
+		Name:        componentName,
 	}
 	if err := buildFromCUE(tplFile, map[string]any{"pathedName": pathedName}, "secret", secret); err != nil {
 		return nil, err
 	}
+	secret.Name = generateTLSSecretName(clusterName, componentName)
 
 	const tpl = `{{- $cert := genSelfSignedCert "KubeBlocks" nil nil 365 }}
 {{ $cert.Cert }}
@@ -116,10 +131,14 @@ func createTlsSecret(reqCtx intctrlutil.RequestCtx, cli client.Client, ns string
 	secret.StringData["tls.crt"] = cert
 	secret.StringData["tls.key"] = key
 
-	return secret, err
+	return secret, nil
 }
 
-func buildFromTemplate(tpl string, vars interface{}) (string, error)  {
+func generateTLSSecretName(clusterName, componentName string) string {
+	return clusterName + "-" + componentName + "-tls-certs"
+}
+
+func buildFromTemplate(tpl string, vars interface{}) (string, error) {
 	fmap := sprig.TxtFuncMap()
 	t := template.Must(template.New("tls").Funcs(fmap).Parse(tpl))
 	var b bytes.Buffer
@@ -130,7 +149,7 @@ func buildFromTemplate(tpl string, vars interface{}) (string, error)  {
 	return b.String(), nil
 }
 
-func checkTlsSecretRef(reqCtx intctrlutil.RequestCtx, cli client.Client, namespace string, secretRef *dbaasv1alpha1.TlsSecretRef) error {
+func checkTLSSecretRef(reqCtx intctrlutil.RequestCtx, cli client.Client, namespace string, secretRef *dbaasv1alpha1.TLSSecretRef) error {
 	if secretRef == nil {
 		return errors.New("issuer.secretRef shouldn't be nil when issuer is SelfProvided")
 	}

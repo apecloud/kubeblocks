@@ -134,7 +134,7 @@ spec:
                       type: array
                       x-kubernetes-list-type: set
                     issuer:
-                      description: Issuer who provides tls certs required when Tls
+                      description: Issuer who provides tls certs required when TLS
                         enabled
                       properties:
                         name:
@@ -267,7 +267,7 @@ spec:
                       type: string
                       x-kubernetes-preserve-unknown-fields: true
                     tls:
-                      description: Tls should be enabled or not
+                      description: TLS should be enabled or not
                       type: boolean
                     tolerations:
                       description: Component tolerations will override ClusterSpec.Tolerations

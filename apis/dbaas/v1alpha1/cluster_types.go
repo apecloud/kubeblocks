@@ -188,12 +188,12 @@ type ClusterComponent struct {
 	// +optional
 	PrimaryIndex *int32 `json:"primaryIndex,omitempty"`
 
-	// Tls should be enabled or not
+	// TLS should be enabled or not
 	// +optional
-	Tls bool `json:"tls,omitempty"`
+	TLS bool `json:"tls,omitempty"`
 
 	// Issuer who provides tls certs
-	// required when Tls enabled
+	// required when TLS enabled
 	// +optional
 	Issuer *Issuer `json:"issuer,omitempty"`
 }
@@ -376,11 +376,11 @@ type Issuer struct {
 	// SecretRef, Tls certs Secret reference
 	// required when from is SelfProvided
 	// +optional
-	SecretRef *TlsSecretRef `json:"secretRef,omitempty"`
+	SecretRef *TLSSecretRef `json:"secretRef,omitempty"`
 }
 
-// TlsSecretRef defines Secret contains Tls certs
-type TlsSecretRef struct {
+// TLSSecretRef defines Secret contains Tls certs
+type TLSSecretRef struct {
 	// Name of the Secret
 	// +kubebuilder:validation:Required
 	Name string `json:"name"`

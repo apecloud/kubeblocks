@@ -16,18 +16,19 @@ pathedName: {
 	namespace:			string
 	clusterName:		string
 	componentName:	string
+	certs: {...}
 }
 secret: {
 	apiVersion: "v1"
 	kind:       "Secret"
 	metadata: {
-		name:      "\(pathedName.clusterName)-\(pathedName.componentName)-tls-certs"
+		name: "placeholder"
 		namespace: pathedName.namespace
 		labels: {
 			"app.kubernetes.io/instance":   pathedName.clusterName
 			"app.kubernetes.io/managed-by": "kubeblocks"
 		}
 	}
-	type: kubernetes.io/tls
-	stringData: {}
+	type: "kubernetes.io/tls"
+	stringData: pathedName.certs
 }

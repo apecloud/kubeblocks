@@ -17,6 +17,7 @@ limitations under the License.
 package controllerutil
 
 import (
+	"k8s.io/apimachinery/pkg/runtime"
 	"reflect"
 	"strings"
 	"time"
@@ -212,6 +213,21 @@ func WorkloadFilterPredicate(object client.Object) bool {
 func IgnoreIsAlreadyExists(err error) error {
 	if !apierrors.IsAlreadyExists(err) {
 		return err
+	}
+	return nil
+}
+
+// SetOwnership set owner reference and add finalizer if not exists
+func SetOwnership(owner, obj client.Object, scheme *runtime.Scheme, finalizer string) error {
+	if err := controllerutil.SetOwnerReference(owner, obj, scheme); err != nil {
+		return err
+	}
+	if !controllerutil.ContainsFinalizer(obj, finalizer) {
+		// pvc objects do not need to add finalizer
+		_, ok := obj.(*corev1.PersistentVolumeClaim)
+		if !ok {
+			controllerutil.AddFinalizer(obj, finalizer)
+		}
 	}
 	return nil
 }

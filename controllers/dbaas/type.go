@@ -82,7 +82,7 @@ type Component struct {
 	LogConfigs              []dbaasv1alpha1.LogConfig              `json:"logConfigs,omitempty"`
 	ConfigTemplates         []dbaasv1alpha1.ConfigTemplate         `json:"configTemplates,omitempty"`
 	HorizontalScalePolicy   *dbaasv1alpha1.HorizontalScalePolicy   `json:"horizontalScalePolicy,omitempty"`
-	Tls                     bool                                   `json:"tls,omitempty"`
+	TLS                     bool                                   `json:"tls,omitempty"`
 	Issuer                  *dbaasv1alpha1.Issuer                  `json:"issuer,omitempty"`
 }
 

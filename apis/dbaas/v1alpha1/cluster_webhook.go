@@ -211,7 +211,7 @@ func (r *Cluster) validateComponents(allErrs *field.ErrorList, clusterDef *Clust
 
 	r.validatePrimaryIndex(allErrs)
 
-	r.validateComponentTlsSettings(allErrs)
+	r.validateComponentTLSSettings(allErrs)
 
 	if len(invalidComponentTypes) > 0 {
 		*allErrs = append(*allErrs, field.NotFound(field.NewPath("spec.components[*].type"),
@@ -232,9 +232,9 @@ func (r *Cluster) validateComponentResources(allErrs *field.ErrorList, resources
 	}
 }
 
-func (r *Cluster) validateComponentTlsSettings(allErrs *field.ErrorList) {
+func (r *Cluster) validateComponentTLSSettings(allErrs *field.ErrorList) {
 	for index, component := range r.Spec.Components {
-		if !component.Tls {
+		if !component.TLS {
 			continue
 		}
 		if component.Issuer == nil {

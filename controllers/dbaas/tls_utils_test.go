@@ -17,17 +17,20 @@ limitations under the License.
 package dbaas
 
 import (
-	"strings"
-	"testing"
+	"context"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
+
+	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	testdbaas "github.com/apecloud/kubeblocks/internal/testutil/dbaas"
-	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/types"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 var _ = Describe("Tls cert creation/check function", func() {
@@ -68,11 +71,9 @@ var _ = Describe("Tls cert creation/check function", func() {
 	// Testcases
 
 	var (
-		clusterDefObj     *dbaasv1alpha1.ClusterDefinition
-		clusterVersionObj *dbaasv1alpha1.ClusterVersion
-		clusterObj        *dbaasv1alpha1.Cluster
-		tlsIssuer         *dbaasv1alpha1.Issuer
-		clusterKey        types.NamespacedName
+		clusterObj               *dbaasv1alpha1.Cluster
+		selfProvidedTLSSecretObj *corev1.Secret
+		tlsIssuer                *dbaasv1alpha1.Issuer
 	)
 
 	// Scenarios
@@ -80,14 +81,14 @@ var _ = Describe("Tls cert creation/check function", func() {
 	Context("with tls enabled", func() {
 		BeforeEach(func() {
 			By("Create a clusterDef obj")
-			clusterDefObj = testdbaas.NewClusterDefFactory(&testCtx, clusterDefName, testdbaas.MySQLType).
+			testdbaas.NewClusterDefFactory(&testCtx, clusterDefName, testdbaas.MySQLType).
 				SetConnectionCredential(map[string]string{"username": "root", "password": ""}).
 				AddComponent(testdbaas.ConsensusMySQL, statefulCompType).
 				AddContainerEnv(mysqlContainerName, corev1.EnvVar{Name: "MYSQL_ALLOW_EMPTY_PASSWORD", Value: "yes"}).
 				Create().GetClusterDef()
 
 			By("Create a clusterVersion obj")
-			clusterVersionObj = testdbaas.NewClusterVersionFactory(&testCtx, clusterVersionName, clusterDefObj.GetName()).
+			testdbaas.NewClusterVersionFactory(&testCtx, clusterVersionName, clusterDefName).
 				AddComponent(statefulCompType).AddContainerShort(mysqlContainerName, testdbaas.ApeCloudMySQLImage).
 				Create().GetClusterVersion()
 
@@ -100,36 +101,92 @@ var _ = Describe("Tls cert creation/check function", func() {
 				}
 			})
 
-			It("should create the tls cert Secret and with proper configs set", func() {
+			It("should create/delete the tls cert Secret", func() {
 				By("create a cluster obj")
 				clusterObj = testdbaas.NewClusterFactory(&testCtx, clusterNamePrefix, clusterDefName, clusterVersionName).
 					WithRandomName().
 					AddComponent(statefulCompName, statefulCompType).
 					SetReplicas(3).
-					SetTls(true).
+					SetTLS(true).
 					SetIssuer(tlsIssuer).
 					Create().
 					GetCluster()
-				// todo get secret
+				ns := clusterObj.Namespace
+				name := generateTLSSecretName(clusterObj.Name, statefulCompName)
+				nsName := types.NamespacedName{Namespace: ns, Name: name}
+				secret := &corev1.Secret{}
+				Eventually(func() error {
+					err := k8sClient.Get(ctx, nsName, secret)
+					return err
+				}).WithPolling(time.Second).WithTimeout(10 * time.Second).Should(Succeed())
 			})
 		})
 
 		Context("when issuer is SelfProvided", func() {
-
+			BeforeEach(func() {
+				// prepare self provided tls certs secret
+				var err error
+				selfProvidedTLSSecretObj, err = composeTLSSecret(testCtx.DefaultNamespace, "test", "self-provided")
+				Expect(err).Should(BeNil())
+				Expect(k8sClient.Create(ctx, selfProvidedTLSSecretObj)).Should(Succeed())
+			})
+			AfterEach(func() {
+				// delete self provided tls certs secret
+				Expect(k8sClient.Delete(ctx, selfProvidedTLSSecretObj)).Should(Succeed())
+				Eventually(func() bool {
+					err := k8sClient.Get(ctx,
+						client.ObjectKeyFromObject(selfProvidedTLSSecretObj),
+						selfProvidedTLSSecretObj)
+					return apierrors.IsNotFound(err)
+				}).Should(BeTrue())
+			})
+			It("should create the cluster when secret referenced exist", func() {
+				tlsIssuer = &dbaasv1alpha1.Issuer{
+					Name: dbaasv1alpha1.IssuerSelfProvided,
+					SecretRef: &dbaasv1alpha1.TLSSecretRef{
+						Name: selfProvidedTLSSecretObj.Name,
+						CA:   "ca.crt",
+						Cert: "tls.crt",
+						Key:  "tls.key",
+					},
+				}
+				By("create cluster obj")
+				clusterObj = testdbaas.NewClusterFactory(&testCtx, clusterNamePrefix, clusterDefName, clusterVersionName).
+					WithRandomName().
+					AddComponent(statefulCompName, statefulCompType).
+					SetReplicas(3).
+					SetTLS(true).
+					SetIssuer(tlsIssuer).
+					Create().
+					GetCluster()
+				Eventually(k8sClient.Get(ctx,
+					client.ObjectKeyFromObject(clusterObj),
+					clusterObj)).
+					Should(Succeed())
+			})
+			It("should not create the cluster when secret referenced not exist", func() {
+				tlsIssuer = &dbaasv1alpha1.Issuer{
+					Name: dbaasv1alpha1.IssuerSelfProvided,
+					SecretRef: &dbaasv1alpha1.TLSSecretRef{
+						Name: "secret-name-not-exist",
+						CA:   "ca.crt",
+						Cert: "tls.crt",
+						Key:  "tls.key",
+					},
+				}
+				By("create cluster obj")
+				clusterObj = testdbaas.NewClusterFactory(&testCtx, clusterNamePrefix, clusterDefName, clusterVersionName).
+					WithRandomName().
+					AddComponent(statefulCompName, statefulCompType).
+					SetReplicas(3).
+					SetTLS(true).
+					SetIssuer(tlsIssuer).
+					Create().
+					GetCluster()
+				time.Sleep(time.Second)
+				Eventually(testdbaas.GetClusterPhase(&testCtx, client.ObjectKeyFromObject(clusterObj))).
+					Should(Equal(dbaasv1alpha1.CreatingPhase))
+			})
 		})
 	})
 })
-
-func TestBuildFromTemplate(t *testing.T) {
-	const tpl = `{{- $cert := genSelfSignedCert "KubeBlocks" nil nil 365 }}
-{{ $cert.Cert }}{{ $cert.Key }}
-`
-	cert, err := buildFromTemplate(tpl, nil)
-	if err != nil {
-		t.Error("build cert error", err)
-	}
-	index := strings.Index(cert, "-----BEGIN RSA PRIVATE KEY-----")
-	if index < 0 {
-		t.Error("error cert", cert)
-	}
-}

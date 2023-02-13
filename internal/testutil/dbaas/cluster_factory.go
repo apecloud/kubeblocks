@@ -149,10 +149,10 @@ func (factory *MockClusterFactory) SetMonitor(monitor bool) *MockClusterFactory 
 	return factory
 }
 
-func (factory *MockClusterFactory) SetTls(tls bool) *MockClusterFactory {
+func (factory *MockClusterFactory) SetTLS(tls bool) *MockClusterFactory {
 	comps := factory.Cluster.Spec.Components
 	if len(comps) > 0 {
-		comps[len(comps)-1].Tls = tls
+		comps[len(comps)-1].TLS = tls
 	}
 	factory.Cluster.Spec.Components = comps
 	return factory

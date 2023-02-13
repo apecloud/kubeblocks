@@ -150,6 +150,10 @@ func (r *BackupReconciler) doNewPhaseAction(
 	}
 
 	labels := backupPolicy.Spec.Target.LabelsSelector.MatchLabels
+	if labels == nil {
+		labels = map[string]string{}
+		backupPolicy.Spec.Target.LabelsSelector.MatchLabels = labels
+	}
 	labels[dataProtectionLabelBackupTypeKey] = string(backup.Spec.BackupType)
 	if err := r.patchBackupLabels(reqCtx, backup, labels); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")

@@ -208,9 +208,8 @@ func getClusterComponentStatus(cluster *dbaasv1alpha1.Cluster, componentName str
 		status.Components = map[string]dbaasv1alpha1.ClusterStatusComponent{}
 	}
 	if componentStatus, ok = status.Components[componentName]; !ok {
-		componentType := cluster.GetComponentTypeName(componentName)
-		componentStatus = dbaasv1alpha1.ClusterStatusComponent{Phase: cluster.Status.Phase,
-			Type: componentType,
+		componentStatus = dbaasv1alpha1.ClusterStatusComponent{
+			Phase: cluster.Status.Phase,
 		}
 		status.Components[componentName] = componentStatus
 	}

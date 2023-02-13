@@ -76,17 +76,17 @@ var _ = Describe("Replication Component", func() {
 			By("Create a clusterDefinition obj with replication componentType.")
 			clusterDefObj = testdbaas.NewClusterDefFactory(clusterDefName, testdbaas.RedisType).
 				AddComponent(testdbaas.ReplicationRedisComponent, redisCompType).
-				Create(&testCtx).GetClusterDef()
+				Create(&testCtx).GetObject()
 
 			By("Create a clusterVersion obj with replication componentType.")
 			clusterVersionObj = testdbaas.NewClusterVersionFactory(clusterVersionName, clusterDefObj.Name).
 				AddComponent(redisCompType).AddContainerShort("redis", redisImage).
-				Create(&testCtx).GetClusterVersion()
+				Create(&testCtx).GetObject()
 
 			By("Creating a cluster with replication componentType.")
 			clusterObj = testdbaas.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
 				clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
-				AddComponent(redisCompName, redisCompType).Create(&testCtx).GetCluster()
+				AddComponent(redisCompName, redisCompType).Create(&testCtx).GetObject()
 
 			By("Creating a statefulSet of replication componentType.")
 			container := corev1.Container{
@@ -113,7 +113,7 @@ var _ = Describe("Replication Component", func() {
 					intctrlutil.AppManagedByLabelKey, kubeBlocks,
 					intctrlutil.RoleLabelKey, string(Primary)).
 				SetReplicas(1).
-				Create(&testCtx).GetStatefulSet()
+				Create(&testCtx).GetObject()
 
 			secondaryStsName := clusterObj.Name + "-" + redisCompName + "-1"
 			secondarySts := testdbaas.NewStatefulSetFactory(testCtx.DefaultNamespace, secondaryStsName, clusterObj.Name, redisCompName).
@@ -123,7 +123,7 @@ var _ = Describe("Replication Component", func() {
 					intctrlutil.AppManagedByLabelKey, kubeBlocks,
 					intctrlutil.RoleLabelKey, string(Secondary)).
 				SetReplicas(1).
-				Create(&testCtx).GetStatefulSet()
+				Create(&testCtx).GetObject()
 
 			typeName := clusterObj.GetComponentTypeName(redisCompName)
 			componentDef := clusterDefObj.GetComponentDefByTypeName(typeName)

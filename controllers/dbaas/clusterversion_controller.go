@@ -25,6 +25,7 @@ import (
 
 	"github.com/spf13/viper"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -149,6 +150,9 @@ func (r *ClusterVersionReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	if err := r.Client.Get(reqCtx.Ctx, types.NamespacedName{
 		Name: clusterVersion.Spec.ClusterDefinitionRef,
 	}, clusterdefinition); err != nil {
+		if apierrors.IsNotFound(err) {
+			_ = r.handleClusterDefNotFound(reqCtx, clusterVersion, err.Error())
+		}
 		return intctrlutil.RequeueWithErrorAndRecordEvent(clusterVersion, r.Recorder, err, reqCtx.Log)
 	}
 
@@ -179,6 +183,18 @@ func (r *ClusterVersionReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	}
 	intctrlutil.RecordCreatedEvent(r.Recorder, clusterVersion)
 	return ctrl.Result{}, nil
+}
+
+// handleClusterDefNotFound handles clusterVersion status when clusterDefinition not found.
+func (r *ClusterVersionReconciler) handleClusterDefNotFound(reqCtx intctrlutil.RequestCtx,
+	clusterVersion *dbaasv1alpha1.ClusterVersion, message string) error {
+	if clusterVersion.Status.Message == message {
+		return nil
+	}
+	patch := client.MergeFrom(clusterVersion.DeepCopy())
+	clusterVersion.Status.Phase = dbaasv1alpha1.UnavailablePhase
+	clusterVersion.Status.Message = message
+	return r.Client.Status().Patch(reqCtx.Ctx, clusterVersion, patch)
 }
 
 func validateClusterVersion(clusterVersion *dbaasv1alpha1.ClusterVersion, clusterDef *dbaasv1alpha1.ClusterDefinition) string {

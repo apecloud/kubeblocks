@@ -27,13 +27,13 @@ require (
 	github.com/golang/mock v1.6.0
 	github.com/google/uuid v1.3.0
 	github.com/hashicorp/terraform v1.2.6
-	github.com/jedib0t/go-pretty/v6 v6.4.3
+	github.com/jedib0t/go-pretty/v6 v6.4.4
 	github.com/k3d-io/k3d/v5 v5.4.4
 	github.com/leaanthony/debme v1.2.1
 	github.com/manifoldco/promptui v0.9.0
 	github.com/onsi/ginkgo/v2 v2.6.1
 	github.com/onsi/gomega v1.24.2
-	github.com/pingcap/go-tpc v1.0.8
+	github.com/pingcap/go-tpc v1.0.9
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/exporter-toolkit v0.7.3
 	github.com/prometheus/mysqld_exporter v0.14.0
@@ -139,6 +139,7 @@ require (
 	github.com/montanaflynn/stats v0.0.0-20171201202039-1bf9dbcd8cbe // indirect
 	github.com/mwitkow/go-conntrack v0.0.0-20190716064945-2f068394615f // indirect
 	github.com/nsf/termbox-go v0.0.0-20190121233118-02980233997d // indirect
+	github.com/olekukonko/tablewriter v0.0.5 // indirect
 	github.com/opencontainers/runtime-spec v1.0.3-0.20210326190908-1c3f411f0417 // indirect
 	github.com/opencontainers/selinux v1.10.2 // indirect
 	github.com/openzipkin/zipkin-go v0.4.0 // indirect

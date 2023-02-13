@@ -18,9 +18,12 @@ package dbaas
 
 import (
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
+
+// ConfigMap
 
 func NewConfigMap(namespace, name string, options ...any) *corev1.ConfigMap {
 	cm := &corev1.ConfigMap{
@@ -44,5 +47,18 @@ func NewConfigMap(namespace, name string, options ...any) *corev1.ConfigMap {
 func SetConfigMapData(key string, value string) func(*corev1.ConfigMap) {
 	return func(configMap *corev1.ConfigMap) {
 		configMap.Data[key] = value
+	}
+}
+
+// PVC
+
+func NewPVC(size string) corev1.PersistentVolumeClaimSpec {
+	return corev1.PersistentVolumeClaimSpec{
+		AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
+		Resources: corev1.ResourceRequirements{
+			Requests: corev1.ResourceList{
+				corev1.ResourceStorage: resource.MustParse(size),
+			},
+		},
 	}
 }

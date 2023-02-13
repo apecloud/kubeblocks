@@ -76,17 +76,17 @@ var _ = Describe("ReplicationSet Util", func() {
 			By("Create a clusterDefinition obj with replication componentType.")
 			clusterDefObj = testdbaas.NewClusterDefFactory(clusterDefName, testdbaas.RedisType).
 				AddComponent(testdbaas.ReplicationRedisComponent, replicationCompName).
-				Create(&testCtx).GetClusterDef()
+				Create(&testCtx).GetObject()
 
 			By("Create a clusterVersion obj with replication componentType.")
 			clusterVersionObj = testdbaas.NewClusterVersionFactory(clusterVersionName, clusterDefObj.GetName()).
 				AddComponent(replicationCompName).AddContainerShort("redis", redisImage).
-				Create(&testCtx).GetClusterVersion()
+				Create(&testCtx).GetObject()
 
 			By("Creating a cluster with replication componentType.")
 			clusterObj = testdbaas.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
 				clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
-				AddComponent(redisCompName, redisCompType).Create(&testCtx).GetCluster()
+				AddComponent(redisCompName, redisCompType).Create(&testCtx).GetObject()
 
 		})
 

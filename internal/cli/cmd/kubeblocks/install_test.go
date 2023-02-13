@@ -23,17 +23,10 @@ import (
 	. "github.com/onsi/gomega"
 
 	"github.com/spf13/cobra"
-	appsv1 "k8s.io/api/apps/v1"
-	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/client-go/dynamic"
 	clientfake "k8s.io/client-go/rest/fake"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 
-	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
-	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
@@ -60,12 +53,6 @@ var _ = Describe("kubeblocks", func() {
 
 	AfterEach(func() {
 		tf.Cleanup()
-	})
-
-	It("kubeblocks", func() {
-		cmd = NewKubeBlocksCmd(tf, streams)
-		Expect(cmd).ShouldNot(BeNil())
-		Expect(cmd.HasSubCommands()).Should(BeTrue())
 	})
 
 	It("check install", func() {
@@ -110,60 +97,6 @@ var _ = Describe("kubeblocks", func() {
 		o.printNotes()
 	})
 
-	It("check upgrade", func() {
-		var cfg string
-		cmd = newUpgradeCmd(tf, streams)
-		Expect(cmd).ShouldNot(BeNil())
-		Expect(cmd.HasSubCommands()).Should(BeFalse())
-
-		o := &InstallOptions{
-			Options: Options{
-				IOStreams: streams,
-			},
-		}
-
-		By("command without kubeconfig flag")
-		Expect(o.complete(tf, cmd)).Should(HaveOccurred())
-
-		cmd.Flags().StringVar(&cfg, "kubeconfig", "", "Path to the kubeconfig file to use for CLI requests.")
-		cmd.Flags().StringVar(&cfg, "context", "", "The name of the kubeconfig context to use.")
-		Expect(o.complete(tf, cmd)).To(Succeed())
-		Expect(o.HelmCfg).ShouldNot(BeNil())
-		Expect(o.Namespace).To(Equal("test"))
-	})
-
-	It("run upgrade", func() {
-		mockDeploy := func() *appsv1.Deployment {
-			deploy := &appsv1.Deployment{}
-			deploy.SetLabels(map[string]string{
-				"app.kubernetes.io/name":    types.KubeBlocksChartName,
-				"app.kubernetes.io/version": "0.3.0",
-			})
-			return deploy
-		}
-
-		o := &InstallOptions{
-			Options: Options{
-				IOStreams: streams,
-				HelmCfg:   helm.FakeActionConfig(),
-				Namespace: "default",
-				Client:    testing.FakeClientSet(mockDeploy()),
-				Dynamic:   testing.FakeDynamicClient(),
-			},
-			Version: version.DefaultKubeBlocksVersion,
-			Monitor: true,
-			check:   false,
-		}
-		cmd := newUpgradeCmd(tf, streams)
-		_ = cmd.Flags().Set("monitor", "true")
-		Expect(o.upgrade(cmd)).Should(HaveOccurred())
-		Expect(len(o.Sets)).To(Equal(1))
-		Expect(o.Sets[0]).To(Equal(fmt.Sprintf(kMonitorParam, true)))
-		Expect(o.upgradeChart()).Should(HaveOccurred())
-
-		o.printNotes()
-	})
-
 	It("run post install", func() {
 		o := &InstallOptions{
 			Options: Options{
@@ -179,86 +112,6 @@ var _ = Describe("kubeblocks", func() {
 			Sets:            []string{"snapshot-controller.enabled=true"},
 		}
 		Expect(o.postInstall()).Should(HaveOccurred())
-	})
-
-	It("check uninstall", func() {
-		var cfg string
-		cmd = newUninstallCmd(tf, streams)
-		Expect(cmd).ShouldNot(BeNil())
-
-		cmd.Flags().StringVar(&cfg, "kubeconfig", "", "Path to the kubeconfig file to use for CLI requests.")
-		cmd.Flags().StringVar(&cfg, "context", "", "The name of the kubeconfig context to use.")
-		Expect(cmd.HasSubCommands()).Should(BeFalse())
-
-		o := &Options{
-			IOStreams: streams,
-		}
-		Expect(o.complete(tf, cmd)).Should(Succeed())
-		Expect(o.Namespace).Should(Equal(namespace))
-		Expect(o.HelmCfg).ShouldNot(BeNil())
-	})
-
-	It("run uninstall", func() {
-		o := uninstallOptions{Options{
-			IOStreams: streams,
-			HelmCfg:   helm.FakeActionConfig(),
-			Namespace: "default",
-			Client:    testing.FakeClientSet(),
-			Dynamic:   testing.FakeDynamicClient(testing.FakeVolumeSnapshotClass()),
-		}}
-
-		Expect(o.uninstall()).Should(Succeed())
-	})
-
-	It("remove finalizer", func() {
-		clusterDef := testing.FakeClusterDef()
-		clusterDef.Finalizers = []string{"test"}
-		clusterVersion := testing.FakeClusterVersion()
-		clusterVersion.Finalizers = []string{"test"}
-		backupTool := testing.FakeBackupTool()
-		backupTool.Finalizers = []string{"test"}
-
-		testCases := []struct {
-			clusterDef     *dbaasv1alpha1.ClusterDefinition
-			clusterVersion *dbaasv1alpha1.ClusterVersion
-			backupTool     *dpv1alpha1.BackupTool
-			expected       string
-		}{
-			{
-				clusterDef:     testing.FakeClusterDef(),
-				clusterVersion: testing.FakeClusterVersion(),
-				backupTool:     testing.FakeBackupTool(),
-				expected:       "Unable to remove nonexistent key: finalizers",
-			},
-			{
-				clusterDef:     clusterDef,
-				clusterVersion: testing.FakeClusterVersion(),
-				backupTool:     testing.FakeBackupTool(),
-				expected:       "Unable to remove nonexistent key: finalizers",
-			},
-			{
-				clusterDef:     clusterDef,
-				clusterVersion: clusterVersion,
-				backupTool:     backupTool,
-				expected:       "",
-			},
-		}
-
-		for _, c := range testCases {
-			client := mockDynamicClientWithCRD(c.clusterDef, c.clusterVersion, c.backupTool)
-			objs, _ := getKBObjects(testing.FakeClientSet(), client, "")
-			if c.expected != "" {
-				Expect(removeFinalizers(client, objs)).Should(MatchError(MatchRegexp(c.expected)))
-			} else {
-				Expect(removeFinalizers(client, objs)).Should(Succeed())
-			}
-		}
-	})
-
-	It("delete crd", func() {
-		client := mockDynamicClientWithCRD()
-		objs, _ := getKBObjects(testing.FakeClientSet(), client, "")
-		Expect(deleteCRDs(client, objs.crds)).Should(Succeed())
 	})
 
 	It("preCheck", func() {
@@ -382,64 +235,3 @@ var _ = Describe("kubeblocks", func() {
 		}
 	})
 })
-
-func mockDynamicClientWithCRD(objects ...runtime.Object) dynamic.Interface {
-	clusterCRD := v1.CustomResourceDefinition{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "CustomResourceDefinition",
-			APIVersion: "apiextensions.k8s.io/v1",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "clusters.dbaas.kubeblocks.io",
-		},
-		Spec: v1.CustomResourceDefinitionSpec{
-			Group: types.Group,
-		},
-		Status: v1.CustomResourceDefinitionStatus{},
-	}
-	clusterDefCRD := v1.CustomResourceDefinition{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "CustomResourceDefinition",
-			APIVersion: "apiextensions.k8s.io/v1",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "clusterdefinitions.dbaas.kubeblocks.io",
-		},
-		Spec: v1.CustomResourceDefinitionSpec{
-			Group: types.Group,
-		},
-		Status: v1.CustomResourceDefinitionStatus{},
-	}
-	clusterVersionCRD := v1.CustomResourceDefinition{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "CustomResourceDefinition",
-			APIVersion: "apiextensions.k8s.io/v1",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "clusterversions.dbaas.kubeblocks.io",
-		},
-		Spec: v1.CustomResourceDefinitionSpec{
-			Group: types.Group,
-		},
-		Status: v1.CustomResourceDefinitionStatus{},
-	}
-
-	backupToolCRD := v1.CustomResourceDefinition{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "CustomResourceDefinition",
-			APIVersion: "apiextensions.k8s.io/v1",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "backuptools.dataprotection.kubeblocks.io",
-		},
-		Spec: v1.CustomResourceDefinitionSpec{
-			Group: types.DPGroup,
-		},
-		Status: v1.CustomResourceDefinitionStatus{},
-	}
-
-	allObjs := []runtime.Object{&clusterCRD, &clusterDefCRD, &clusterVersionCRD, &backupToolCRD,
-		testing.FakeVolumeSnapshotClass()}
-	allObjs = append(allObjs, objects...)
-	return testing.FakeDynamicClient(allObjs...)
-}

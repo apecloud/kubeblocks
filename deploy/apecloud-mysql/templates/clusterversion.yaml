@@ -13,3 +13,23 @@ spec:
       - name: mysql
         image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ .Values.image.tag }}
         imagePullPolicy: {{ default .Values.image.pullPolicy "IfNotPresent" }}
+---
+apiVersion: dbaas.kubeblocks.io/v1alpha1
+kind: ClusterVersion
+metadata:
+  name: ac-mysql-rep-{{ default .Chart.AppVersion .Values.clusterVersionOverride }}
+  labels:
+    {{- include "apecloud-mysql.labels" . | nindent 4 }}
+spec:
+  clusterDefinitionRef: apecloud-mysql
+  components:
+  - type: replication
+    podSpec:
+      initContainers:
+      - name: mysql-init-container   
+        image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
+        imagePullPolicy: {{ default .Values.image.pullPolicy "IfNotPresent" }}       
+      containers:
+      - name: mysql
+        image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
+        imagePullPolicy: {{ default .Values.image.pullPolicy "IfNotPresent" }}

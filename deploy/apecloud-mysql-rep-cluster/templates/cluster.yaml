@@ -4,7 +4,7 @@ metadata:
   name: {{ .Release.Name }}
   labels: {{ include "apecloud-mysql-rep-cluster.labels" . | nindent 4 }}
 spec:
-  clusterDefinitionRef: apecloud-mysql-rep  # ref clusterdefinition.name
+  clusterDefinitionRef: apecloud-mysql  # ref clusterdefinition.name
   clusterVersionRef: ac-mysql-rep-{{ default .Chart.AppVersion .Values.clusterVersionOverride }} # ref clusterversion.name
   terminationPolicy: {{ .Values.terminationPolicy }}
   affinity:

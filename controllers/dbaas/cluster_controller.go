@@ -46,6 +46,7 @@ import (
 	"github.com/apecloud/kubeblocks/controllers/dbaas/components/util"
 	opsutil "github.com/apecloud/kubeblocks/controllers/dbaas/operations/util"
 	"github.com/apecloud/kubeblocks/controllers/k8score"
+	"github.com/apecloud/kubeblocks/internal/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -143,7 +144,7 @@ func clusterUpdateHandler(cli client.Client, ctx context.Context, clusterDef *db
 }
 
 func (r *ClusterReconciler) Handle(cli client.Client, reqCtx intctrlutil.RequestCtx, recorder record.EventRecorder, event *corev1.Event) error {
-	if event.InvolvedObject.FieldPath != ProbeRoleChangedCheckPath {
+	if event.InvolvedObject.FieldPath != component.ProbeRoleChangedCheckPath {
 		return handleEventForClusterStatus(reqCtx.Ctx, cli, recorder, event)
 	}
 	var (

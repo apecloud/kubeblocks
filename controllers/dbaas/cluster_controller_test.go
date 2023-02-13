@@ -99,7 +99,7 @@ var _ = Describe("Cluster Controller", func() {
 	checkAllResourcesCreated := func() {
 		By("Creating a cluster")
 		clusterObj = testdbaas.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
-			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().Create(&testCtx).GetCluster()
+			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().Create(&testCtx).GetObject()
 		clusterKey = client.ObjectKeyFromObject(clusterObj)
 
 		By("Waiting for the cluster initialized")
@@ -159,7 +159,7 @@ var _ = Describe("Cluster Controller", func() {
 	checkAllServicesCreate := func() {
 		By("Creating a cluster")
 		clusterObj = testdbaas.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
-			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().Create(&testCtx).GetCluster()
+			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().Create(&testCtx).GetObject()
 		clusterKey = client.ObjectKeyFromObject(clusterObj)
 
 		By("Waiting for the cluster initialized")
@@ -222,7 +222,7 @@ var _ = Describe("Cluster Controller", func() {
 	testWipeOut := func() {
 		By("Creating a cluster")
 		clusterObj = testdbaas.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
-			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().Create(&testCtx).GetCluster()
+			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().Create(&testCtx).GetObject()
 		clusterKey = client.ObjectKeyFromObject(clusterObj)
 
 		By("Waiting for the cluster initialized")
@@ -238,7 +238,7 @@ var _ = Describe("Cluster Controller", func() {
 	testDoNotTermintate := func() {
 		By("Creating a cluster")
 		clusterObj = testdbaas.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
-			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().Create(&testCtx).GetCluster()
+			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().Create(&testCtx).GetObject()
 		clusterKey = client.ObjectKeyFromObject(clusterObj)
 
 		By("Waiting for the cluster initialized")
@@ -289,7 +289,7 @@ var _ = Describe("Cluster Controller", func() {
 	testChangeReplicas := func() {
 		By("Creating a cluster")
 		clusterObj = testdbaas.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
-			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().Create(&testCtx).GetCluster()
+			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().Create(&testCtx).GetObject()
 		clusterKey = client.ObjectKeyFromObject(clusterObj)
 
 		By("Waiting for the cluster initialized")
@@ -314,7 +314,7 @@ var _ = Describe("Cluster Controller", func() {
 	testChangeReplicasInvalidValue := func() {
 		By("Creating a cluster")
 		clusterObj = testdbaas.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
-			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().Create(&testCtx).GetCluster()
+			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().Create(&testCtx).GetObject()
 		clusterKey = client.ObjectKeyFromObject(clusterObj)
 
 		By("Waiting for the cluster initialized")
@@ -341,22 +341,13 @@ var _ = Describe("Cluster Controller", func() {
 		updatedReplicas := int32(3)
 
 		By("Creating a cluster with VolumeClaimTemplate")
-		pvcSpec := corev1.PersistentVolumeClaimSpec{
-			AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
-			Resources: corev1.ResourceRequirements{
-				Requests: corev1.ResourceList{
-					corev1.ResourceStorage: resource.MustParse("1Gi"),
-				},
-			},
-		}
-
-		By("Create cluster and waiting for the cluster initialized")
+		pvcSpec := testdbaas.NewPVC("1Gi")
 		clusterObj = testdbaas.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
 			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
 			AddComponent(mysqlCompName, mysqlCompType).
-			AddVolumeClaim(testdbaas.DataVolumeName, &pvcSpec).
+			AddVolumeClaimTemplate(testdbaas.DataVolumeName, &pvcSpec).
 			SetReplicas(initialReplicas).
-			Create(&testCtx).GetCluster()
+			Create(&testCtx).GetObject()
 		clusterKey = client.ObjectKeyFromObject(clusterObj)
 		Eventually(testdbaas.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
 
@@ -475,23 +466,16 @@ var _ = Describe("Cluster Controller", func() {
 		Expect(testCtx.CreateObj(testCtx.Ctx, storageClass)).Should(Succeed())
 
 		By("Creating a cluster with VolumeClaimTemplate")
-		pvcSpec := corev1.PersistentVolumeClaimSpec{
-			AccessModes:      []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
-			StorageClassName: &storageClass.Name,
-			Resources: corev1.ResourceRequirements{
-				Requests: corev1.ResourceList{
-					corev1.ResourceStorage: resource.MustParse("1Gi"),
-				},
-			},
-		}
+		pvcSpec := testdbaas.NewPVC("1Gi")
+		pvcSpec.StorageClassName = &storageClass.Name
 
 		By("Create cluster and waiting for the cluster initialized")
 		clusterObj = testdbaas.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
 			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
 			AddComponent(mysqlCompName, mysqlCompType).
-			AddVolumeClaim(testdbaas.DataVolumeName, &pvcSpec).
+			AddVolumeClaimTemplate(testdbaas.DataVolumeName, &pvcSpec).
 			SetReplicas(replicas).
-			Create(&testCtx).GetCluster()
+			Create(&testCtx).GetObject()
 		clusterKey = client.ObjectKeyFromObject(clusterObj)
 		Eventually(testdbaas.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
 
@@ -556,7 +540,7 @@ var _ = Describe("Cluster Controller", func() {
 
 		clusterObj = testdbaas.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
 			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().SetClusterAffinity(affinity).
-			Create(&testCtx).GetCluster()
+			Create(&testCtx).GetObject()
 		clusterKey = client.ObjectKeyFromObject(clusterObj)
 
 		By("Waiting for the cluster initialized")
@@ -587,7 +571,7 @@ var _ = Describe("Cluster Controller", func() {
 		clusterObj = testdbaas.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
 			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().SetClusterAffinity(affinity).
 			AddComponent(mysqlCompName, mysqlCompType).SetComponentAffinity(compAffinity).
-			Create(&testCtx).GetCluster()
+			Create(&testCtx).GetObject()
 		clusterKey = client.ObjectKeyFromObject(clusterObj)
 
 		By("Waiting for the cluster initialized")
@@ -614,7 +598,7 @@ var _ = Describe("Cluster Controller", func() {
 		clusterObj = testdbaas.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
 			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
 			AddClusterToleration(toleration).
-			Create(&testCtx).GetCluster()
+			Create(&testCtx).GetObject()
 		clusterKey = client.ObjectKeyFromObject(clusterObj)
 
 		By("Waiting for the cluster initialized")
@@ -651,7 +635,7 @@ var _ = Describe("Cluster Controller", func() {
 		clusterObj = testdbaas.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
 			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().AddClusterToleration(toleration).
 			AddComponent(mysqlCompName, mysqlCompType).AddComponentToleration(compToleration).
-			Create(&testCtx).GetCluster()
+			Create(&testCtx).GetObject()
 		clusterKey = client.ObjectKeyFromObject(clusterObj)
 
 		By("Waiting for the cluster initialized")
@@ -748,8 +732,8 @@ var _ = Describe("Cluster Controller", func() {
 		clusterObj = testdbaas.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
 			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
 			AddComponent(mysqlCompName, mysqlCompType).
-			SetReplicas(replicas).AddVolumeClaim(testdbaas.DataVolumeName, pvcSpec).
-			Create(&testCtx).GetCluster()
+			SetReplicas(replicas).AddVolumeClaimTemplate(testdbaas.DataVolumeName, pvcSpec).
+			Create(&testCtx).GetObject()
 		clusterKey = client.ObjectKeyFromObject(clusterObj)
 
 		By("Waiting for cluster creation")
@@ -833,13 +817,13 @@ var _ = Describe("Cluster Controller", func() {
 			clusterDefObj = testdbaas.NewClusterDefFactory(clusterDefName, testdbaas.MySQLType).
 				AddComponent(testdbaas.StatefulMySQLComponent, mysqlCompType).
 				AddComponent(testdbaas.StatelessNginxComponent, nginxCompType).
-				Create(&testCtx).GetClusterDef()
+				Create(&testCtx).GetObject()
 
 			By("Create a clusterVersion obj")
 			clusterVersionObj = testdbaas.NewClusterVersionFactory(clusterVersionName, clusterDefObj.GetName()).
 				AddComponent(mysqlCompType).AddContainerShort("mysql", testdbaas.ApeCloudMySQLImage).
 				AddComponent(nginxCompType).AddContainerShort("nginx", testdbaas.NginxImage).
-				Create(&testCtx).GetClusterVersion()
+				Create(&testCtx).GetObject()
 		})
 
 		It("should create all sub-resources successfully", func() {
@@ -856,12 +840,12 @@ var _ = Describe("Cluster Controller", func() {
 			By("Create a clusterDefinition obj")
 			clusterDefObj = testdbaas.NewClusterDefFactory(clusterDefName, testdbaas.MySQLType).
 				AddComponent(testdbaas.StatefulMySQLComponent, mysqlCompType).
-				Create(&testCtx).GetClusterDef()
+				Create(&testCtx).GetObject()
 
 			By("Create a clusterVersion obj")
 			clusterVersionObj = testdbaas.NewClusterVersionFactory(clusterVersionName, clusterDefObj.GetName()).
 				AddComponent(mysqlCompType).AddContainerShort("mysql", testdbaas.ApeCloudMySQLImage).
-				Create(&testCtx).GetClusterVersion()
+				Create(&testCtx).GetObject()
 		})
 
 		It("should delete cluster resources immediately if deleting cluster with WipeOut termination policy", func() {
@@ -922,12 +906,12 @@ var _ = Describe("Cluster Controller", func() {
 			By("Create a clusterDef obj")
 			clusterDefObj = testdbaas.NewClusterDefFactory(clusterDefName, testdbaas.MySQLType).
 				AddComponent(testdbaas.ConsensusMySQLComponent, mysqlCompType).
-				Create(&testCtx).GetClusterDef()
+				Create(&testCtx).GetObject()
 
 			By("Create a clusterVersion obj")
 			clusterVersionObj = testdbaas.NewClusterVersionFactory(clusterVersionName, clusterDefObj.GetName()).
 				AddComponent(mysqlCompType).AddContainerShort("mysql", testdbaas.ApeCloudMySQLImage).
-				Create(&testCtx).GetClusterVersion()
+				Create(&testCtx).GetObject()
 		})
 
 		It("Should success with one leader pod and two follower pods", func() {

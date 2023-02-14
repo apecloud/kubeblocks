@@ -217,7 +217,6 @@ spec:
 
     - typeName: replication
       componentType: Replication
-      defaultReplicas: 2
       minReplicas: 1
       maxReplicas: 16
       service:

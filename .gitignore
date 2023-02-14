@@ -2,8 +2,8 @@
 .DS_Store
 
 # ignore go generate code files
-internal/testutil/k8s/mocks/*.go
-internal/configuration/proto/mocks/*.go
+internal/testutil/k8s/mocks/*_mocks.go
+internal/configuration/proto/mocks/*_mocks.go
 # internal/configuration/proto/*.pb.go
 
 # Binaries for programs and plugins

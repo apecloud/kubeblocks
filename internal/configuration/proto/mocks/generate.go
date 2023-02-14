@@ -14,6 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package proto
+package mocks
 
-//go:generate go run github.com/golang/mock/mockgen -copyright_file ../../../hack/boilerplate.go.txt -destination mocks/reconfigure_client_mocks.go . ReconfigureClient
+//go:generate go run github.com/golang/mock/mockgen -copyright_file ../../../../hack/boilerplate.go.txt -package mocks -destination reconfigure_client_mocks.go github.com/apecloud/kubeblocks/internal/configuration/proto ReconfigureClient

@@ -1073,7 +1073,7 @@ var _ = Describe("Cluster Controller", func() {
 
 			By("Create a clusterVersion obj with replication componentType.")
 			clusterVersionObj = testdbaas.NewClusterVersionFactory(clusterVersionName, clusterDefObj.Name).
-				AddComponent(redisCompType).AddContainerShort("redis", redisImage).
+				AddComponent(redisCompType).AddContainerShort(testdbaas.DefaultRedisContainerName, redisImage).
 				Create(&testCtx).GetObject()
 		})
 

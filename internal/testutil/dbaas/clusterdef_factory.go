@@ -148,3 +148,34 @@ func (factory *MockClusterDefFactory) AddSystemAccountSpec(sysAccounts *dbaasv1a
 	factory.get().Spec.Components = comps
 	return factory
 }
+
+func (factory *MockClusterDefFactory) AddInitContainerVolumeMounts(containerName string, volumeMounts []corev1.VolumeMount) *MockClusterDefFactory {
+	comps := factory.get().Spec.Components
+	if len(comps) > 0 {
+		comp := comps[len(comps)-1]
+		comp.PodSpec.InitContainers = setContainerVolumeMounts(comp.PodSpec.InitContainers, containerName, volumeMounts)
+		comps[len(comps)-1] = comp
+	}
+	factory.get().Spec.Components = comps
+	return factory
+}
+
+func (factory *MockClusterDefFactory) AddContainerVolumeMounts(containerName string, volumeMounts []corev1.VolumeMount) *MockClusterDefFactory {
+	comps := factory.get().Spec.Components
+	if len(comps) > 0 {
+		comp := comps[len(comps)-1]
+		comp.PodSpec.Containers = setContainerVolumeMounts(comp.PodSpec.Containers, containerName, volumeMounts)
+		comps[len(comps)-1] = comp
+	}
+	factory.get().Spec.Components = comps
+	return factory
+}
+
+func setContainerVolumeMounts(containers []corev1.Container, targetContainerName string, volumeMounts []corev1.VolumeMount) []corev1.Container {
+	for _, container := range containers {
+		if container.Name == targetContainerName {
+			container.VolumeMounts = append(container.VolumeMounts, volumeMounts...)
+		}
+	}
+	return containers
+}

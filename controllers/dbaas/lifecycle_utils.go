@@ -823,6 +823,9 @@ func buildReplicationSetPVC(params createParams, sts *appsv1.StatefulSet) error 
 }
 
 func injectReplicationSetPodEnvAndLabel(params createParams, sts *appsv1.StatefulSet, index int32) (*appsv1.StatefulSet, error) {
+	if params.component.PrimaryIndex == nil {
+		return nil, fmt.Errorf("component %s PrimaryIndex can not be nil", params.component.Name)
+	}
 	svcName := strings.Join([]string{params.cluster.Name, params.component.Name, "headless"}, "-")
 	for i := range sts.Spec.Template.Spec.Containers {
 		c := &sts.Spec.Template.Spec.Containers[i]

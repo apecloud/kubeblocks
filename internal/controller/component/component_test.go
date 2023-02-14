@@ -22,10 +22,11 @@ import (
 
 	ctrl "sigs.k8s.io/controller-runtime"
 
+	corev1 "k8s.io/api/core/v1"
+
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	testdbaas "github.com/apecloud/kubeblocks/internal/testutil/dbaas"
-	corev1 "k8s.io/api/core/v1"
 )
 
 const (

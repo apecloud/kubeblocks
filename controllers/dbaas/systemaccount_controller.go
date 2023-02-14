@@ -230,7 +230,7 @@ func (r *SystemAccountReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 
 			isReady, svcEP, headlessEP, err := r.isComponentReady(reqCtx, cluster.Name, compName)
 			if err != nil {
-				return intctrlutil.RequeueWithErrorAndRecordEvent(cluster, r.Recorder, err, reqCtx.Log)
+				return intctrlutil.RequeueAfter(ControllerErrorRequeueTime, reqCtx.Log, "failed to get service")
 			}
 
 			// either service or endpoint is not ready, increase counter and continue to process next component

@@ -679,15 +679,8 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 	var stsList []*appsv1.StatefulSet
 	for _, obj := range objs {
 		logger.Info("create or update", "objs", obj)
-		if err := controllerutil.SetOwnerReference(cluster, obj, scheme); err != nil {
+		if err := intctrlutil.SetOwnership(cluster, obj, scheme, dbClusterFinalizerName); err != nil {
 			return false, err
-		}
-		if !controllerutil.ContainsFinalizer(obj, dbClusterFinalizerName) {
-			// pvc objects do not need to add finalizer
-			_, ok := obj.(*corev1.PersistentVolumeClaim)
-			if !ok {
-				controllerutil.AddFinalizer(obj, dbClusterFinalizerName)
-			}
 		}
 		// appendToStsList is used to handle statefulSets horizontal scaling when componentType is replication
 		appendToStsList := func(stsList []*appsv1.StatefulSet) []*appsv1.StatefulSet {

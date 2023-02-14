@@ -9,7 +9,7 @@ env:
   CR_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
   CHART_RELEASER_VERSION: "v1.4.1"
   RELEASE_VERSION: ${{ github.ref_name }}
-  K3S_VERSION: v1.22
+  K3S_VERSION: v1.23
   GITLAB_HELM_CHARTS_PROJECT_ID: 85949
 
 jobs:
@@ -44,7 +44,9 @@ jobs:
 
       - name: Package Kubeblocks Helm Chart
         run: |
-          RELEASE_VERSION=`bash ${{ github.workspace }}/.github/utils/utils.sh ${{ env.RELEASE_VERSION }} 1`
+          RELEASE_VERSION=`bash ${{ github.workspace }}/.github/utils/utils.sh \
+            --tag-name ${{ env.RELEASE_VERSION }} \
+            --type 1`
           VERSION=$RELEASE_VERSION make bump-chart-ver
 
           args=(--owner "apecloud" --repo "kubeclocks" --charts-dir "deploy" --version ${{ env.CHART_RELEASER_VERSION }})
@@ -62,8 +64,27 @@ jobs:
 
       - name: helm validate
         run: |
-          helm install kubeblocks kubeblocks
+          helm install kubeblocks kubeblocks \
+            --set="prometheus.enabled=true" \
+            --set="grafana.enabled=true" \
+            --set="dashboards.enabled=true" \
+            --set="dataProtection.enableVolumeSnapshot=true" \
+            --set="snapshot-controller.enabled=true"
+          
           helm template kubeblocks kubeblocks --validate
+          
+          bash ${{ github.workspace }}/.github/utils/helm_image_check.sh
+
+      - name: Upload Kubeblocks Helm Charts to Gitlab
+        run: |
+          ls .cr-release-packages
+          cd .cr-release-packages
+          bash ${{ github.workspace }}/.github/utils/release_gitlab.sh \
+            --type 3 \
+            --project-id ${{ env.GITLAB_HELM_CHARTS_PROJECT_ID }} \
+            --asset-path ./ \
+            --access-token ${{ secrets.GITLAB_ACCESS_TOKEN }} \
+            --access-user ${{ secrets.GITLAB_ACCESS_USER }}
 
       - name: Checkout HelmCharts
         uses: actions/checkout@v3
@@ -89,14 +110,3 @@ jobs:
           args=(--owner "apecloud" --repo "helm-charts" --version ${{ env.CHART_RELEASER_VERSION }})
           "${{ github.workspace }}/.github/utils/helm_release.sh" "${args[@]}"
         shell: bash
-
-      - name: Upload Kubeblocks Helm Charts to Gitlab
-        continue-on-error: true
-        run: |
-          RELEASE_VERSION=`bash ${{ github.workspace }}/.github/utils/utils.sh ${{ env.RELEASE_VERSION }} 1`
-          bash ${{ github.workspace }}/.github/utils/release-gitlab.sh \
-            --type 3 \
-            --project-id ${{ env.GITLAB_HELM_CHARTS_PROJECT_ID }} \
-            --asset-path kubeblocks-$RELEASE_VERSION.tgz \
-            --access-token ${{ secrets.GITLAB_ACCESS_TOKEN }} \
-            --access-user ${{ secrets.GITLAB_ACCESS_USER }}

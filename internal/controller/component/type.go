@@ -51,7 +51,6 @@ type Component struct {
 	DefaultReplicas         int32                               `json:"defaultReplicas"`
 	Replicas                int32                               `json:"replicas"`
 	PodDisruptionBudgetSpec *v1.PodDisruptionBudgetSpec         `json:"podDisruptionBudgetSpec,omitempty"`
-	AntiAffinity            bool                                `json:"antiAffinity,omitempty"`
 	ComponentType           v1alpha1.ComponentType              `json:"componentType,omitempty"`
 	ConsensusSpec           *v1alpha1.ConsensusSetSpec          `json:"consensusSpec,omitempty"`
 	PrimaryIndex            *int32                              `json:"primaryIndex,omitempty"`

@@ -66,5 +66,6 @@ var _ = Describe("cluster util", func() {
 		Expect(len(objs.Secrets.Items)).Should(Equal(1))
 		Expect(len(objs.Services.Items)).Should(Equal(4))
 		Expect(len(objs.PVCs.Items)).Should(Equal(1))
+		Expect(len(objs.GetComponentInfo())).Should(Equal(2))
 	})
 })

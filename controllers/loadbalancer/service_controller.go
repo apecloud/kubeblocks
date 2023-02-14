@@ -42,19 +42,19 @@ import (
 )
 
 const (
-	FinalizerKey = "service.kubernetes.io/apecloud-loadbalancer-finalizer"
+	FinalizerKey = "service.kubernetes.io/kubeblocks-loadbalancer-finalizer"
 
-	AnnotationKeyENIId        = "service.kubernetes.io/apecloud-loadbalancer-eni-id"
-	AnnotationKeyENINodeIP    = "service.kubernetes.io/apecloud-loadbalancer-eni-node-ip"
-	AnnotationKeyFloatingIP   = "service.kubernetes.io/apecloud-loadbalancer-floating-ip"
-	AnnotationKeySubnetID     = "service.kubernetes.io/apecloud-loadbalancer-subnet-id"
-	AnnotationKeyMasterNodeIP = "service.kubernetes.io/apecloud-loadbalancer-master-node-ip"
+	AnnotationKeyENIId        = "service.kubernetes.io/kubeblocks-loadbalancer-eni-id"
+	AnnotationKeyENINodeIP    = "service.kubernetes.io/kubeblocks-loadbalancer-eni-node-ip"
+	AnnotationKeyFloatingIP   = "service.kubernetes.io/kubeblocks-loadbalancer-floating-ip"
+	AnnotationKeySubnetID     = "service.kubernetes.io/kubeblocks-loadbalancer-subnet-id"
+	AnnotationKeyMasterNodeIP = "service.kubernetes.io/kubeblocks-loadbalancer-master-node-ip"
 
-	AnnotationKeyLoadBalancerType            = "service.kubernetes.io/apecloud-loadbalancer-type"
+	AnnotationKeyLoadBalancerType            = "service.kubernetes.io/kubeblocks-loadbalancer-type"
 	AnnotationValueLoadBalancerTypePrivateIP = "private-ip"
 	AnnotationValueLoadBalancerTypeNone      = "none"
 
-	AnnotationKeyTrafficPolicy                  = "service.kubernetes.io/apecloud-loadbalancer-traffic-policy"
+	AnnotationKeyTrafficPolicy                  = "service.kubernetes.io/kubeblocks-loadbalancer-traffic-policy"
 	AnnotationValueClusterTrafficPolicy         = "Cluster"
 	AnnotationValueLocalTrafficPolicy           = "Local"
 	AnnotationValueBestEffortLocalTrafficPolicy = "BestEffortLocal"

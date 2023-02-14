@@ -62,7 +62,7 @@ var _ = Describe("Expose", func() {
 		annotations := make(map[string]interface{})
 		if exposed {
 			annotations = map[string]interface{}{
-				ServiceLBTypeAnnotationKey: ServiceLBTypeAnnotationValue,
+				types.ServiceLBTypeAnnotationKey: types.ServiceLBTypeAnnotationValue,
 			}
 		}
 

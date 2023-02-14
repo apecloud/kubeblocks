@@ -278,6 +278,9 @@ func MergeComponents(
 		}
 
 		component.PrimaryIndex = clusterComp.PrimaryIndex
+
+		component.TLS = clusterComp.TLS
+		component.Issuer = clusterComp.Issuer
 	}
 	if affinity != nil {
 		component.PodSpec.Affinity = buildPodAffinity(cluster, affinity, component)

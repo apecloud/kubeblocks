@@ -18,7 +18,6 @@ package dbaas
 
 import (
 	"bytes"
-	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	"strings"
 	"text/template"
 
@@ -30,6 +29,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )

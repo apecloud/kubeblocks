@@ -150,6 +150,10 @@ func (r *BackupReconciler) doNewPhaseAction(
 	}
 
 	labels := backupPolicy.Spec.Target.LabelsSelector.MatchLabels
+	if labels == nil {
+		labels = map[string]string{}
+		backupPolicy.Spec.Target.LabelsSelector.MatchLabels = labels
+	}
 	labels[dataProtectionLabelBackupTypeKey] = string(backup.Spec.BackupType)
 	if err := r.patchBackupLabels(reqCtx, backup, labels); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
@@ -253,6 +257,7 @@ func (r *BackupReconciler) doInProgressPhaseAction(
 	if err := r.Client.Status().Update(reqCtx.Ctx, backup); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
+
 	return intctrlutil.Reconciled()
 }
 
@@ -278,11 +283,10 @@ func (r *BackupReconciler) patchBackupLabels(
 	patch := client.MergeFrom(backup.DeepCopy())
 	if len(labels) > 0 {
 		if backup.Labels == nil {
-			backup.Labels = labels
-		} else {
-			for k, v := range labels {
-				backup.Labels[k] = v
-			}
+			backup.Labels = map[string]string{}
+		}
+		for k, v := range labels {
+			backup.Labels[k] = v
 		}
 	}
 	return r.Client.Patch(reqCtx.Ctx, backup, patch)
@@ -601,14 +605,7 @@ func (r *BackupReconciler) deleteReferenceBatchV1Jobs(reqCtx intctrlutil.Request
 			}
 		}
 
-		// delete pod when job deleting.
-		// ref: https://kubernetes.io/blog/2021/05/14/using-finalizers-to-control-deletion/
-		deletePropagation := metav1.DeletePropagationBackground
-		deleteOptions := &client.DeleteOptions{
-			PropagationPolicy: &deletePropagation,
-		}
-		if err := r.Client.Delete(reqCtx.Ctx, &job, deleteOptions); err != nil {
-			// failed delete k8s job, return error info.
+		if err := intctrlutil.BackgroundDeleteObject(r.Client, reqCtx.Ctx, &job); err != nil {
 			return err
 		}
 	}
@@ -631,12 +628,7 @@ func (r *BackupReconciler) deleteReferenceVolumeSnapshot(reqCtx intctrlutil.Requ
 				return err
 			}
 		}
-		deletePropagation := metav1.DeletePropagationBackground
-		deleteOptions := &client.DeleteOptions{
-			PropagationPolicy: &deletePropagation,
-		}
-		if err := r.Client.Delete(reqCtx.Ctx, &i, deleteOptions); err != nil {
-			// failed delete k8s job, return error info.
+		if err := intctrlutil.BackgroundDeleteObject(r.Client, reqCtx.Ctx, &i); err != nil {
 			return err
 		}
 	}
@@ -862,6 +854,10 @@ func (r *BackupReconciler) BuildSnapshotPodSpec(
 		container.Args = backupPolicy.Spec.Hooks.PostCommands
 	}
 	container.Image = backupPolicy.Spec.Hooks.Image
+	if container.Image == "" {
+		container.Image = viper.GetString("KUBEBLOCKS_IMAGE")
+		container.ImagePullPolicy = corev1.PullPolicy(viper.GetString("KUBEBLOCKS_IMAGE_PULL_POLICY"))
+	}
 	container.VolumeMounts = clusterPod.Spec.Containers[0].VolumeMounts
 	allowPrivilegeEscalation := false
 	runAsUser := int64(0)
@@ -874,7 +870,7 @@ func (r *BackupReconciler) BuildSnapshotPodSpec(
 
 	podSpec.Volumes = clusterPod.Spec.Volumes
 	podSpec.RestartPolicy = corev1.RestartPolicyNever
-	podSpec.ServiceAccountName = "kubeblocks"
+	podSpec.ServiceAccountName = viper.GetString("KUBEBLOCKS_SERVICEACCOUNT_NAME")
 
 	return podSpec, nil
 }

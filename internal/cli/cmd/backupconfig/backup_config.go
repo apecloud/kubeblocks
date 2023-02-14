@@ -59,7 +59,7 @@ var helmAddRepo = helm.AddRepo
 func (i *configOptions) upgrade() error {
 	entry := &repo.Entry{
 		Name: types.KubeBlocksChartName,
-		URL:  types.KubeBlocksChartURL,
+		URL:  util.GetHelmChartRepoURL(),
 	}
 	if err := helmAddRepo(entry); err != nil {
 		return err

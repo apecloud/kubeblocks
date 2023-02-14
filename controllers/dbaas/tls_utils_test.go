@@ -82,16 +82,16 @@ var _ = Describe("Tls cert creation/check function", func() {
 	Context("with tls enabled", func() {
 		BeforeEach(func() {
 			By("Create a clusterDef obj")
-			testdbaas.NewClusterDefFactory(&testCtx, clusterDefName, testdbaas.MySQLType).
+			testdbaas.NewClusterDefFactory(clusterDefName, testdbaas.MySQLType).
 				SetConnectionCredential(map[string]string{"username": "root", "password": ""}).
-				AddComponent(testdbaas.ConsensusMySQL, statefulCompType).
+				AddComponent(testdbaas.ConsensusMySQLComponent, statefulCompType).
 				AddContainerEnv(mysqlContainerName, corev1.EnvVar{Name: "MYSQL_ALLOW_EMPTY_PASSWORD", Value: "yes"}).
-				Create().GetClusterDef()
+				Create(&testCtx).GetObject()
 
 			By("Create a clusterVersion obj")
-			testdbaas.NewClusterVersionFactory(&testCtx, clusterVersionName, clusterDefName).
+			testdbaas.NewClusterVersionFactory(clusterVersionName, clusterDefName).
 				AddComponent(statefulCompType).AddContainerShort(mysqlContainerName, testdbaas.ApeCloudMySQLImage).
-				Create().GetClusterVersion()
+				Create(&testCtx).GetObject()
 
 		})
 
@@ -104,14 +104,14 @@ var _ = Describe("Tls cert creation/check function", func() {
 
 			It("should create/delete the tls cert Secret", func() {
 				By("create a cluster obj")
-				clusterObj = testdbaas.NewClusterFactory(&testCtx, clusterNamePrefix, clusterDefName, clusterVersionName).
+				clusterObj = testdbaas.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix, clusterDefName, clusterVersionName).
 					WithRandomName().
 					AddComponent(statefulCompName, statefulCompType).
 					SetReplicas(3).
 					SetTLS(true).
 					SetIssuer(tlsIssuer).
-					Create().
-					GetCluster()
+					Create(&testCtx).
+					GetObject()
 				ns := clusterObj.Namespace
 				name := generateTLSSecretName(clusterObj.Name, statefulCompName)
 				nsName := types.NamespacedName{Namespace: ns, Name: name}
@@ -173,14 +173,14 @@ var _ = Describe("Tls cert creation/check function", func() {
 					},
 				}
 				By("create cluster obj")
-				clusterObj = testdbaas.NewClusterFactory(&testCtx, clusterNamePrefix, clusterDefName, clusterVersionName).
+				clusterObj = testdbaas.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix, clusterDefName, clusterVersionName).
 					WithRandomName().
 					AddComponent(statefulCompName, statefulCompType).
 					SetReplicas(3).
 					SetTLS(true).
 					SetIssuer(tlsIssuer).
-					Create().
-					GetCluster()
+					Create(&testCtx).
+					GetObject()
 				Eventually(k8sClient.Get(ctx,
 					client.ObjectKeyFromObject(clusterObj),
 					clusterObj)).
@@ -197,14 +197,14 @@ var _ = Describe("Tls cert creation/check function", func() {
 					},
 				}
 				By("create cluster obj")
-				clusterObj = testdbaas.NewClusterFactory(&testCtx, clusterNamePrefix, clusterDefName, clusterVersionName).
+				clusterObj = testdbaas.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix, clusterDefName, clusterVersionName).
 					WithRandomName().
 					AddComponent(statefulCompName, statefulCompType).
 					SetReplicas(3).
 					SetTLS(true).
 					SetIssuer(tlsIssuer).
-					Create().
-					GetCluster()
+					Create(&testCtx).
+					GetObject()
 				time.Sleep(time.Second)
 				Eventually(testdbaas.GetClusterPhase(&testCtx, client.ObjectKeyFromObject(clusterObj))).
 					Should(Equal(dbaasv1alpha1.CreatingPhase))

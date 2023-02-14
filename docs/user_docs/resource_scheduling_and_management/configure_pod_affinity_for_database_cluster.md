@@ -6,7 +6,7 @@ No affinity parameters required.
 Perform the following steps when you have resource to deploy but try to spread existing pods evenly as much as possible.
 ### Before you start:
 Make sure all your Kubernetes nodes are labeled with `topologyKey`. 
-Example: the following failure domain is specified as a node, and the node must be labeled with the `kubernetes.io/hostname lable`. If there is no lable, you can check [Add label to a node](https://kubernetes.io/docs/tasks/configure-pod-container/assign-pods-nodes/#add-a-label-to-a-node) the to add a lable to a node.
+Example: the following failure domain is specified as a node, and the node must be labeled with the `kubernetes.io/hostname` label. If there is no label, you can check [Add label to a node](https://kubernetes.io/docs/tasks/configure-pod-container/assign-pods-nodes/#add-a-label-to-a-node) the to add a label to a node.
 ### API parameters
 - Specify `topologyKeys` value as `kubernetes.io/hostname`
 - Specify `podAntiAffinity` as `Preferred`
@@ -29,14 +29,14 @@ spec:
 ...... 
 ```
 ### Results
-  - Pods spread evenly according to the speicified topologyKey. In the above code example, `kubernetes.io/hostname` is used.
+  - Pods spread evenly according to the specified topologyKey. In the above code example, `kubernetes.io/hostname` is used.
 ## Forced spread evenly
 For cross available zone deployment and failure domain is specified as available zone. Configure it as forced antiaffinity.
 Note: when there is no enough resource, the scheduling is failed.
 ### Before you start
-- Lable nodes with `topology.kubernetes.io/zone` and make sure values are different from one other.
+- Label nodes with `topology.kubernetes.io/zone` and make sure values are different from one other.
 e.g. for three nodes to deploy in different available zones, label three nodes with `us-east-1a` `us-east-1b` and `us-east-1c` separately before deploying.
-### API paremeters
+### API parameters
 - Specify `topologyKeys` value as `topology.kubernetes.io/zone​`
 - Specify  `podAntiAffinity` value as `Required​`
 - If there is no specified node, don't specify `nodeLabels`.
@@ -60,7 +60,7 @@ spec:
 ### Results
 - Three pods are deployed in three different available zones. 
 ## Deploy pods in specified nodes
-You can restrict your pod to be deployed in any pre-defined nodes. For example, if you want to depoly nodes only on available zone us-east-1c, lable `topology.kubernetes.io/zone` of some nodes with a certain available zone as `us-east-1c`, and others don't.
+You can restrict your pod to be deployed in any pre-defined nodes. For example, if you want to depoly nodes only on available zone us-east-1c, label `topology.kubernetes.io/zone` of some nodes with a certain available zone as `us-east-1c`, and others don't.
 Note: if there is no enough resource, the scheduling is failed.
 ## API parameters
 Specify `nodeLabels` 
@@ -81,4 +81,4 @@ spec:
 ......
 ```
 ### Results
-Pods are spreaded on the nodes with `topology.kubernetes.io/zone` value as `us-east-1c`, not others.
+Pods are spread on the nodes with `topology.kubernetes.io/zone` value as `us-east-1c`, not others.

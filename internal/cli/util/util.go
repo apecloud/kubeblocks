@@ -62,6 +62,7 @@ import (
 	"sigs.k8s.io/kustomize/kyaml/yaml"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/cli/testing"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 )
@@ -391,7 +392,7 @@ func TimeFormat(t *metav1.Time) string {
 	return t.Format(layout)
 }
 
-// GetHumanReadableDuration returns a succinct representation of the provided startTime and endTime
+// GetHumanReadableDuration returns a succint representation of the provided startTime and endTime
 // with limited precision for consumption by humans.
 func GetHumanReadableDuration(startTime metav1.Time, endTime metav1.Time) string {
 	if startTime.IsZero() {
@@ -462,7 +463,7 @@ func GetEventObject(e *corev1.Event) string {
 }
 
 // GetConfigTemplateList returns ConfigTemplate list used by the component.
-func GetConfigTemplateList(clusterName string, namespace string, cli dynamic.Interface, componentName string) ([]dbaasv1alpha1.ConfigTemplate, error) {
+func GetConfigTemplateList(clusterName string, namespace string, cli dynamic.Interface, componentName string, reloadTpl bool) ([]dbaasv1alpha1.ConfigTemplate, error) {
 	var (
 		clusterObj        = dbaasv1alpha1.Cluster{}
 		clusterDefObj     = dbaasv1alpha1.ClusterDefinition{}
@@ -491,7 +492,20 @@ func GetConfigTemplateList(clusterName string, namespace string, cli dynamic.Int
 		return nil, err
 	}
 
-	return cfgcore.GetConfigTemplatesFromComponent(clusterObj.Spec.Components, clusterDefObj.Spec.Components, clusterVersionObj.Spec.Components, componentName)
+	tpls, err := cfgcore.GetConfigTemplatesFromComponent(clusterObj.Spec.Components, clusterDefObj.Spec.Components, clusterVersionObj.Spec.Components, componentName)
+	if err != nil {
+		return nil, err
+	} else if !reloadTpl {
+		return tpls, nil
+	}
+
+	validTpls := make([]dbaasv1alpha1.ConfigTemplate, 0, len(tpls))
+	for _, tpl := range tpls {
+		if len(tpl.ConfigConstraintRef) > 0 && len(tpl.ConfigTplRef) > 0 {
+			validTpls = append(validTpls, tpl)
+		}
+	}
+	return validTpls, nil
 }
 
 // GetResourceObjectFromGVR query the resource object using GVR.
@@ -507,15 +521,106 @@ func GetResourceObjectFromGVR(gvr schema.GroupVersionResource, key client.Object
 }
 
 // GetComponentsFromClusterCR returns name of component.
-func GetComponentsFromClusterCR(key client.ObjectKey, client dynamic.Interface) ([]string, error) {
+func GetComponentsFromClusterCR(key client.ObjectKey, cli dynamic.Interface) ([]string, error) {
 	clusterObj := dbaasv1alpha1.Cluster{}
-	if err := GetResourceObjectFromGVR(types.ClusterGVR(), key, client, &clusterObj); err != nil {
+	clusterDefObj := dbaasv1alpha1.ClusterDefinition{}
+	if err := GetResourceObjectFromGVR(types.ClusterGVR(), key, cli, &clusterObj); err != nil {
 		return nil, err
 	}
 
-	componentNames := make([]string, len(clusterObj.Spec.Components))
-	for i, component := range clusterObj.Spec.Components {
-		componentNames[i] = component.Name
+	if err := GetResourceObjectFromGVR(types.ClusterDefGVR(), client.ObjectKey{
+		Namespace: "",
+		Name:      clusterObj.Spec.ClusterDefRef,
+	}, cli, &clusterDefObj); err != nil {
+		return nil, err
+	}
+
+	componentNames := make([]string, 0, len(clusterObj.Spec.Components))
+	for _, component := range clusterObj.Spec.Components {
+		cdComponent := clusterDefObj.GetComponentDefByTypeName(component.Type)
+		if enableReconfiguring(cdComponent) {
+			componentNames = append(componentNames, component.Name)
+		}
 	}
 	return componentNames, nil
+}
+
+func enableReconfiguring(component *dbaasv1alpha1.ClusterDefinitionComponent) bool {
+	if component == nil || component.ConfigSpec == nil {
+		return false
+	}
+	for _, tpl := range component.ConfigSpec.ConfigTemplateRefs {
+		if len(tpl.ConfigConstraintRef) > 0 && len(tpl.ConfigTplRef) > 0 {
+			return true
+		}
+	}
+	return false
+}
+
+// IsSupportConfigureParams check whether all updated parameters belong to config template parameters.
+func IsSupportConfigureParams(tpl dbaasv1alpha1.ConfigTemplate, values map[string]string, cli dynamic.Interface) (bool, error) {
+	var (
+		err              error
+		configConstraint = dbaasv1alpha1.ConfigConstraint{}
+	)
+
+	if err := GetResourceObjectFromGVR(types.ConfigConstraintGVR(), client.ObjectKey{
+		Namespace: "",
+		Name:      tpl.ConfigConstraintRef,
+	}, cli, &configConstraint); err != nil {
+		return false, err
+	}
+
+	if configConstraint.Spec.ConfigurationSchema == nil {
+		return true, nil
+	}
+
+	schema := configConstraint.Spec.ConfigurationSchema.DeepCopy()
+	if schema.Schema == nil {
+		schema.Schema, err = cfgcore.GenerateOpenAPISchema(schema.CUE, configConstraint.Spec.CfgSchemaTopLevelName)
+		if err != nil {
+			return false, err
+		}
+	}
+
+	schemaSpec := schema.Schema.Properties["spec"]
+	for key := range values {
+		if _, ok := schemaSpec.Properties[key]; !ok {
+			return false, nil
+		}
+	}
+	return true, nil
+}
+
+func getIPLocation() (string, error) {
+	client := &http.Client{}
+	req, err := http.NewRequest("GET", "http://ifconfig.io/country_code", nil)
+	if err != nil {
+		return "", err
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+	location, err := io.ReadAll(resp.Body)
+	if len(location) == 0 || err != nil {
+		return "", err
+	}
+
+	// remove last "\n"
+	return string(location[:len(location)-1]), nil
+}
+
+// GetHelmChartRepoURL get helm chart repo, we will choose one from GitHub and GitLab based on the IP location
+func GetHelmChartRepoURL() string {
+	if types.KubeBlocksChartURL == testing.KubeBlocksChartURL {
+		return testing.KubeBlocksChartURL
+	}
+
+	location, _ := getIPLocation()
+	if location == "CN" {
+		return types.GitLabHelmChartRepo
+	}
+	return types.KubeBlocksChartURL
 }

@@ -17,78 +17,79 @@ limitations under the License.
 package dbaas
 
 import (
-	"github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/testutil"
 )
 
 type ComponentTplType string
 
 const (
-	StatefulMySQL8 ComponentTplType = "stateful-mysql-8.0"
-	ConsensusMySQL ComponentTplType = "consensus-mysql"
-	StatelessNginx ComponentTplType = "stateless-nginx"
+	StatefulMySQLComponent  ComponentTplType = "stateful-mysql"
+	ConsensusMySQLComponent ComponentTplType = "consensus-mysql"
+	StatelessNginxComponent ComponentTplType = "stateless-nginx"
 )
 
 type MockClusterDefFactory struct {
-	TestCtx       *testutil.TestContext
-	ClusterDef    *dbaasv1alpha1.ClusterDefinition
-	clusterDefTpl *dbaasv1alpha1.ClusterDefinition
+	BaseFactory[dbaasv1alpha1.ClusterDefinition, *dbaasv1alpha1.ClusterDefinition, MockClusterDefFactory]
 }
 
-func NewClusterDefFactory(testCtx *testutil.TestContext, name string, cdType string) *MockClusterDefFactory {
-	clusterDefTpl := NewCustomizedObj(testCtx, "resources/factory_cd.yaml", &dbaasv1alpha1.ClusterDefinition{})
-	return &MockClusterDefFactory{
-		TestCtx: testCtx,
-		ClusterDef: &dbaasv1alpha1.ClusterDefinition{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: name,
-			},
+func NewClusterDefFactory(name, cdType string) *MockClusterDefFactory {
+	f := &MockClusterDefFactory{}
+	f.init("", name,
+		&dbaasv1alpha1.ClusterDefinition{
 			Spec: dbaasv1alpha1.ClusterDefinitionSpec{
 				Type:       cdType,
 				Components: []dbaasv1alpha1.ClusterDefinitionComponent{},
-				ConnectionCredential: map[string]string{
-					"username": "root",
-					"password": "$(RANDOM_PASSWD)",
-				},
 			},
-		},
-		clusterDefTpl: clusterDefTpl,
-	}
+		}, f)
+	f.SetConnectionCredential(defaultConnectionCredential)
+	return f
 }
 
-func (factory *MockClusterDefFactory) WithRandomName() *MockClusterDefFactory {
-	key := GetRandomizedKey(factory.TestCtx, factory.ClusterDef.Name)
-	factory.ClusterDef.Name = key.Name
-	return factory
-}
-
-func (factory *MockClusterDefFactory) AddComponent(name ComponentTplType, rename string) *MockClusterDefFactory {
-	for _, comp := range factory.clusterDefTpl.Spec.Components {
-		if comp.TypeName == string(name) {
-			comp.TypeName = rename
-			factory.ClusterDef.Spec.Components = append(factory.ClusterDef.Spec.Components, comp)
-			break
-		}
+func (factory *MockClusterDefFactory) AddComponent(tplType ComponentTplType, rename string) *MockClusterDefFactory {
+	var component *dbaasv1alpha1.ClusterDefinitionComponent
+	switch tplType {
+	case StatefulMySQLComponent:
+		component = &statefulMySQLComponent
+	case ConsensusMySQLComponent:
+		component = &consensusMySQLComponent
+	case StatelessNginxComponent:
+		component = &statelessNginxComponent
 	}
+	comps := factory.get().Spec.Components
+	comps = append(comps, *component)
+	comps[len(comps)-1].TypeName = rename
+	factory.get().Spec.Components = comps
 	return factory
 }
 
 func (factory *MockClusterDefFactory) SetDefaultReplicas(replicas int32) *MockClusterDefFactory {
-	comps := factory.ClusterDef.Spec.Components
+	comps := factory.get().Spec.Components
 	if len(comps) > 0 {
 		comps[len(comps)-1].DefaultReplicas = replicas
 	}
-	factory.ClusterDef.Spec.Components = comps
+	factory.get().Spec.Components = comps
+	return factory
+}
+
+func (factory *MockClusterDefFactory) SetService(port int32) *MockClusterDefFactory {
+	comps := factory.get().Spec.Components
+	if len(comps) > 0 {
+		comps[len(comps)-1].Service = &corev1.ServiceSpec{
+			Ports: []corev1.ServicePort{{
+				Protocol: corev1.ProtocolTCP,
+				Port:     port,
+			}},
+		}
+	}
+	factory.get().Spec.Components = comps
 	return factory
 }
 
 func (factory *MockClusterDefFactory) AddConfigTemplate(name string,
-	configTplRef string, configConstraintRef string, volumeName string) *MockClusterDefFactory {
-	comps := factory.ClusterDef.Spec.Components
+	configTplRef string, configConstraintRef string, volumeName string, mode *int32) *MockClusterDefFactory {
+	comps := factory.get().Spec.Components
 	if len(comps) > 0 {
 		comp := comps[len(comps)-1]
 		if comp.ConfigSpec == nil {
@@ -100,15 +101,16 @@ func (factory *MockClusterDefFactory) AddConfigTemplate(name string,
 				ConfigTplRef:        configTplRef,
 				ConfigConstraintRef: configConstraintRef,
 				VolumeName:          volumeName,
+				DefaultMode:         mode,
 			})
 		comps[len(comps)-1] = comp
 	}
-	factory.ClusterDef.Spec.Components = comps
+	factory.get().Spec.Components = comps
 	return factory
 }
 
 func (factory *MockClusterDefFactory) AddContainerEnv(containerName string, envVar corev1.EnvVar) *MockClusterDefFactory {
-	comps := factory.ClusterDef.Spec.Components
+	comps := factory.get().Spec.Components
 	if len(comps) > 0 {
 		comp := comps[len(comps)-1]
 		for i, container := range comps[len(comps)-1].PodSpec.Containers {
@@ -121,22 +123,25 @@ func (factory *MockClusterDefFactory) AddContainerEnv(containerName string, envV
 		}
 		comps[len(comps)-1] = comp
 	}
-	factory.ClusterDef.Spec.Components = comps
+	factory.get().Spec.Components = comps
 	return factory
 }
 
 func (factory *MockClusterDefFactory) SetConnectionCredential(
 	connectionCredential map[string]string) *MockClusterDefFactory {
-	factory.ClusterDef.Spec.ConnectionCredential = connectionCredential
+	factory.get().Spec.ConnectionCredential = connectionCredential
 	return factory
 }
 
-func (factory *MockClusterDefFactory) Create() *MockClusterDefFactory {
-	testCtx := factory.TestCtx
-	gomega.Expect(testCtx.CreateObj(testCtx.Ctx, factory.ClusterDef)).Should(gomega.Succeed())
-	return factory
-}
+func (factory *MockClusterDefFactory) AddSystemAccountSpec(sysAccounts *dbaasv1alpha1.SystemAccountSpec) *MockClusterDefFactory {
+	comps := factory.get().Spec.Components
+	if len(comps) == 0 {
+		return factory
+	}
 
-func (factory *MockClusterDefFactory) GetClusterDef() *dbaasv1alpha1.ClusterDefinition {
-	return factory.ClusterDef
+	comp := comps[len(comps)-1]
+	comp.SystemAccounts = sysAccounts
+	comps[len(comps)-1] = comp
+	factory.get().Spec.Components = comps
+	return factory
 }

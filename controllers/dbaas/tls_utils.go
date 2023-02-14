@@ -18,6 +18,7 @@ package dbaas
 
 import (
 	"bytes"
+	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	"strings"
 	"text/template"
 
@@ -29,6 +30,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -40,12 +42,6 @@ const (
 	mountPath  = "/etc/pki/tls"
 )
 
-type componentPathedName struct {
-	Namespace   string `json:"namespace,omitempty"`
-	ClusterName string `json:"clusterName,omitempty"`
-	Name        string `json:"name,omitempty"`
-}
-
 func createOrCheckTLSCerts(reqCtx intctrlutil.RequestCtx, cli client.Client, cluster *dbaasv1alpha1.Cluster, scheme *runtime.Scheme) error {
 	if cluster == nil {
 		return nil
@@ -54,22 +50,22 @@ func createOrCheckTLSCerts(reqCtx intctrlutil.RequestCtx, cli client.Client, clu
 	// secretList contains all secrets successfully created
 	var secretList []v1.Secret
 
-	for _, component := range cluster.Spec.Components {
-		if !component.TLS {
+	for _, comp := range cluster.Spec.Components {
+		if !comp.TLS {
 			continue
 		}
 
-		if component.Issuer == nil {
+		if comp.Issuer == nil {
 			return errors.New("issuer shouldn't be nil when tls enabled")
 		}
 
 		var err error
 		var secret *v1.Secret
-		switch component.Issuer.Name {
+		switch comp.Issuer.Name {
 		case dbaasv1alpha1.IssuerSelfProvided:
-			err = checkTLSSecretRef(reqCtx, cli, cluster.Namespace, component.Issuer.SecretRef)
+			err = checkTLSSecretRef(reqCtx, cli, cluster.Namespace, comp.Issuer.SecretRef)
 		case dbaasv1alpha1.IssuerSelfSigned:
-			secret, err = createTLSSecret(reqCtx, cli, cluster, component.Name, scheme)
+			secret, err = createTLSSecret(reqCtx, cli, cluster, comp.Name, scheme)
 			if secret != nil {
 				secretList = append(secretList, *secret)
 			}
@@ -108,15 +104,8 @@ func createTLSSecret(reqCtx intctrlutil.RequestCtx, cli client.Client, cluster *
 }
 
 func composeTLSSecret(namespace, clusterName, componentName string) (*v1.Secret, error) {
-	const tplFile = "tls_certs_secret_template.cue"
-
-	secret := &v1.Secret{}
-	pathedName := componentPathedName{
-		Namespace:   namespace,
-		ClusterName: clusterName,
-		Name:        componentName,
-	}
-	if err := buildFromCUE(tplFile, map[string]any{"pathedName": pathedName}, "secret", secret); err != nil {
+	secret, err := builder.BuildTLSSecret(namespace, clusterName, componentName)
+	if err != nil {
 		return nil, err
 	}
 	secret.Name = generateTLSSecretName(clusterName, componentName)
@@ -179,7 +168,7 @@ func checkTLSSecretRef(reqCtx intctrlutil.RequestCtx, cli client.Client, namespa
 	return nil
 }
 
-func updateTLSVolumeAndVolumeMount(podSpec *v1.PodSpec, clusterName string, component Component) error {
+func updateTLSVolumeAndVolumeMount(podSpec *v1.PodSpec, clusterName string, component component.Component) error {
 	if !component.TLS {
 		return nil
 	}
@@ -204,7 +193,7 @@ func updateTLSVolumeAndVolumeMount(podSpec *v1.PodSpec, clusterName string, comp
 	return nil
 }
 
-func composeTLSVolume(clusterName string, component Component) (*v1.Volume, error) {
+func composeTLSVolume(clusterName string, component component.Component) (*v1.Volume, error) {
 	if !component.TLS {
 		return nil, errors.New("can't compose TLS volume when TLS not enabled")
 	}

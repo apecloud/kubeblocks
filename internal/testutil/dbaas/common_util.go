@@ -149,11 +149,11 @@ func CustomizeObjYAML(a ...any) func(string) string {
 	}
 }
 
-func GetRandomizedKey(testCtx *testutil.TestContext, prefix string) types.NamespacedName {
+func GetRandomizedKey(namespace, prefix string) types.NamespacedName {
 	randomStr, _ := password.Generate(6, 0, 0, true, false)
 	return types.NamespacedName{
 		Name:      prefix + randomStr,
-		Namespace: testCtx.DefaultNamespace,
+		Namespace: namespace,
 	}
 }
 
@@ -164,12 +164,52 @@ func RandomizedObjName() func(client.Object) {
 	}
 }
 
+func WithName(name string) func(client.Object) {
+	return func(obj client.Object) {
+		obj.SetName(name)
+	}
+}
+
+func WithNamespace(namespace string) func(client.Object) {
+	return func(obj client.Object) {
+		obj.SetNamespace(namespace)
+	}
+}
+
+func WithNamespacedName(resourceName, ns string) func(client.Object) {
+	return func(obj client.Object) {
+		obj.SetNamespace(ns)
+		obj.SetName(resourceName)
+	}
+}
+
+func WithMap(keysAndValues ...string) map[string]string {
+	// ignore mismatching for kvs
+	m := make(map[string]string, len(keysAndValues)/2)
+	for i := 0; i+1 < len(keysAndValues); i += 2 {
+		m[keysAndValues[i]] = keysAndValues[i+1]
+	}
+	return m
+}
+
+func WithLabels(keysAndValues ...string) func(client.Object) {
+	return func(obj client.Object) {
+		obj.SetLabels(WithMap(keysAndValues...))
+	}
+}
+
+func WithAnnotations(keysAndValues ...string) func(client.Object) {
+	return func(obj client.Object) {
+		obj.SetAnnotations(WithMap(keysAndValues...))
+	}
+}
+
 func CreateObj[T intctrlutil.Object, PT intctrlutil.PObject[T]](testCtx *testutil.TestContext,
 	filePath string, pobj PT, a ...any) PT {
 	return CreateCustomizedObj(testCtx, filePath, pobj, CustomizeObjYAML(a...))
 }
 
-func NewCustomizedObj[T intctrlutil.Object, PT intctrlutil.PObject[T]](testCtx *testutil.TestContext,
+func NewCustomizedObj[T intctrlutil.Object, PT intctrlutil.PObject[T]](
 	filePath string, pobj PT, actions ...any) PT {
 	objBytes, err := testdata.GetTestDataFileContent(filePath)
 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -195,7 +235,7 @@ func NewCustomizedObj[T intctrlutil.Object, PT intctrlutil.PObject[T]](testCtx *
 
 func CreateCustomizedObj[T intctrlutil.Object, PT intctrlutil.PObject[T]](testCtx *testutil.TestContext,
 	filePath string, pobj PT, actions ...any) PT {
-	pobj = NewCustomizedObj(testCtx, filePath, pobj, actions...)
+	pobj = NewCustomizedObj(filePath, pobj, actions...)
 	return CreateK8sResource(*testCtx, pobj).(PT)
 }
 

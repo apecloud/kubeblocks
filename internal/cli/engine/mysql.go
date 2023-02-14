@@ -18,34 +18,33 @@ package engine
 
 import (
 	"fmt"
-	"sort"
 	"strings"
 )
 
-type mysql struct{}
-
-const (
-	mysqlEngineName      = "mysql"
-	mysqlClient          = "mysql "
-	mysqlContainerName   = "mysql"
-	mysqlDefaultPassword = "$MYSQL_ROOT_PASSWORD"
-	mysqlDefaultDatabase = "mysql"
-)
+type mysql struct {
+	info     EngineInfo
+	examples map[ClientType]buildConnectExample
+}
 
 var _ Interface = &mysql{}
 
-var clientExampleMap map[ClientType]buildConnectExample
-
-func init() {
-	clientExampleMap = map[ClientType]buildConnectExample{
-		CLI: func(info *ConnectionInfo) string {
-			return fmt.Sprintf(`# mysql client connection example
+func newMySQL() *mysql {
+	return &mysql{
+		info: EngineInfo{
+			Client:      "mysql",
+			Container:   "mysql",
+			PasswordEnv: "$MYSQL_ROOT_PASSWORD",
+			Database:    "mysql",
+		},
+		examples: map[ClientType]buildConnectExample{
+			CLI: func(info *ConnectionInfo) string {
+				return fmt.Sprintf(`# mysql client connection example
 mysql -h %s -P %s -u %s -p%s
 `, info.Host, info.Port, info.User, info.Password)
-		},
+			},
 
-		DJANGO: func(info *ConnectionInfo) string {
-			return fmt.Sprintf(`# .env
+			DJANGO: func(info *ConnectionInfo) string {
+				return fmt.Sprintf(`# .env
 DB_HOST=%s
 DB_NAME=%s
 DB_USER=%s
@@ -64,10 +63,10 @@ DATABASES = {
   }
 }
 `, info.Host, info.Database, info.User, info.Password, info.Port)
-		},
+			},
 
-		DOTNET: func(info *ConnectionInfo) string {
-			return fmt.Sprintf(`# appsettings.json
+			DOTNET: func(info *ConnectionInfo) string {
+				return fmt.Sprintf(`# appsettings.json
 {
   "ConnectionStrings": {
     "Default": "server=%s;port=%s;database=%s;user=%s;password=%s;SslMode=VerifyFull;"
@@ -80,10 +79,10 @@ public void ConfigureServices(IServiceCollection services)
     services.AddTransient<MySqlConnection>(_ => new MySqlConnection(Configuration["ConnectionStrings:Default"]));
 }
 `, info.Host, info.Port, info.Database, info.User, info.Password)
-		},
+			},
 
-		GO: func(info *ConnectionInfo) string {
-			const goConnectExample = `# main.go
+			GO: func(info *ConnectionInfo) string {
+				const goConnectExample = `# main.go
 package main
 
 import (
@@ -108,36 +107,35 @@ func main() {
     log.Println("Successfully connected!")
 }
 `
-			dsn := fmt.Sprintf(`# .env
+				dsn := fmt.Sprintf(`# .env
 DSN=%s:%s@tcp(%s:%s)/%s?tls=true
 `, info.User, info.Password, info.Host, info.Port, info.Database)
-			return fmt.Sprintf("%s\n%s", dsn, goConnectExample)
-		},
+				return fmt.Sprintf("%s\n%s", dsn, goConnectExample)
+			},
 
-		JAVA: func(info *ConnectionInfo) string {
-			return fmt.Sprintf(`Class.forName("com.mysql.cj.jdbc.Driver");
+			JAVA: func(info *ConnectionInfo) string {
+				return fmt.Sprintf(`Class.forName("com.mysql.cj.jdbc.Driver");
 Connection conn = DriverManager.getConnection(
   "jdbc:mysql://%s:%s/%s?sslMode=VERIFY_IDENTITY",
   "%s",
   "%s");
 `, info.Host, info.Port, info.Database, info.User, info.Password)
-		},
+			},
 
-		NODEJS: func(info *ConnectionInfo) string {
-			return fmt.Sprintf(`# .env
+			NODEJS: func(info *ConnectionInfo) string {
+				return fmt.Sprintf(`# .env
 DATABASE_URL='mysql://%s:%s@%s:%s/%s?ssl={"rejectUnauthorized":true}'
 
 # app.js
 require('dotenv').config();
 const mysql = require('mysql2');
 const connection = mysql.createConnection(process.env.DATABASE_URL);
-console.log('Connected to PlanetScale!');
 connection.end();
 `, info.User, info.Password, info.Host, info.Port, info.Database)
-		},
+			},
 
-		PHP: func(info *ConnectionInfo) string {
-			return fmt.Sprintf(`# .env
+			PHP: func(info *ConnectionInfo) string {
+				return fmt.Sprintf(`# .env
 HOST=%s
 PORT=%s
 USERNAME=%s
@@ -151,10 +149,10 @@ DATABASE=%s
   $mysqli->close();
 ?>
 `, info.Host, info.Port, info.User, info.Password, info.Database)
-		},
+			},
 
-		PRISMA: func(info *ConnectionInfo) string {
-			return fmt.Sprintf(`# .env
+			PRISMA: func(info *ConnectionInfo) string {
+				return fmt.Sprintf(`# .env
 DATABASE_URL='mysql://%s:%s@%s:%s/%s?sslaccept=strict'
 
 # schema.prisma
@@ -168,10 +166,10 @@ datasource db {
   relationMode = "prisma"
 }
 `, info.User, info.Password, info.Host, info.Port, info.Database)
-		},
+			},
 
-		PYTHON: func(info *ConnectionInfo) string {
-			return fmt.Sprintf(`# run the following command in the terminal to install dependencies
+			PYTHON: func(info *ConnectionInfo) string {
+				return fmt.Sprintf(`# run the following command in the terminal to install dependencies
 pip install python-dotenv mysqlclient
 
 # .env
@@ -196,10 +194,10 @@ connection = MySQLdb.connect(
   ssl_mode = "VERIFY_IDENTITY",
 )
 `, info.Host, info.Port, info.User, info.Password, info.Database)
-		},
+			},
 
-		RAILS: func(info *ConnectionInfo) string {
-			return fmt.Sprintf(`# Gemfile
+			RAILS: func(info *ConnectionInfo) string {
+				return fmt.Sprintf(`# Gemfile
 gem 'mysql2'
 
 # config/database.yml
@@ -212,10 +210,10 @@ development:
   password: %s
   ssl_mode: verify_identity
 `, info.Database, info.User, info.Host, info.Password)
-		},
+			},
 
-		RUST: func(info *ConnectionInfo) string {
-			return fmt.Sprintf(`# run the following command in the terminal
+			RUST: func(info *ConnectionInfo) string {
+				return fmt.Sprintf(`# run the following command in the terminal
 export DATABASE_URL="mysql://%s:%s@%s:%s/%s"
 
 # src/main.rs
@@ -237,58 +235,29 @@ version = "0.0.1"
 [dependencies]
 mysql = "*"
 `, info.User, info.Password, info.Host, info.Port, info.Database)
-		},
+			},
 
-		SYMFONY: func(info *ConnectionInfo) string {
-			return fmt.Sprintf(`# .env
+			SYMFONY: func(info *ConnectionInfo) string {
+				return fmt.Sprintf(`# .env
 DATABASE_URL='mysql://%s:%s@%s:%s/%s'
 `, info.User, info.Password, info.Host, info.Port, info.Database)
+			},
 		},
 	}
 }
 
 func (m *mysql) ConnectCommand() []string {
-	mysqlCmd := []string{"MYSQL_PWD=" + mysqlDefaultPassword, mysqlClient}
+	mysqlCmd := []string{"MYSQL_PWD=" + m.info.PasswordEnv, m.info.Client}
 	return []string{"sh", "-c", strings.Join(mysqlCmd, " ")}
 }
 
-func (m *mysql) EngineName() string {
-	return mysqlEngineName
-}
-
-func (m *mysql) EngineContainer() string {
-	return mysqlContainerName
+func (m *mysql) Container() string {
+	return m.info.Container
 }
 
 func (m *mysql) ConnectExample(info *ConnectionInfo, client string) string {
 	if len(info.Database) == 0 {
-		info.Database = mysqlDefaultDatabase
+		info.Database = m.info.Database
 	}
-
-	// if client is not specified, output all examples
-	if len(client) == 0 {
-		var keys = make([]string, len(clientExampleMap))
-		var i = 0
-		for k := range clientExampleMap {
-			keys[i] = k.String()
-			i++
-		}
-		sort.Strings(keys)
-
-		var b strings.Builder
-		for _, k := range keys {
-			buildFn := clientExampleMap[ClientType(k)]
-			b.WriteString(fmt.Sprintf("========= %s connection example =========\n", k))
-			b.WriteString(buildFn(info))
-			b.WriteString("\n")
-		}
-		return b.String()
-	}
-
-	// return specified example
-	if buildFn, ok := clientExampleMap[ClientType(client)]; ok {
-		return buildFn(info)
-	}
-
-	return ""
+	return buildExample(info, client, m.examples)
 }

@@ -54,6 +54,10 @@ dependencies:
     name: apecloud-mysql
     repository: file://../apecloud-mysql
     version: 0.1.*
+  - condition: postgresql.enabled
+    name: postgresql
+    repository: file://../postgresql
+    version: 0.1.*
   - condition: grafana.enabled
     name: grafana
     repository: https://grafana.github.io/helm-charts

@@ -21,6 +21,25 @@ imagePullSecrets: []
 nameOverride: ""
 fullnameOverride: ""
 
+# -- Deployment update strategy.
+# Ref: https://kubernetes.io/docs/concepts/workloads/controllers/deployment/#strategy
+# @default -- See [values.yaml](values.yaml)
+updateStrategy:
+  rollingUpdate:
+    maxSurge: 1
+    maxUnavailable: 40%
+  type: RollingUpdate
+
+# -- Change `hostNetwork` to `true` when you want the KubeBlocks's pod to share its host's network namespace.
+# Useful for situations like when you end up dealing with a custom CNI over Amazon EKS.
+# Update the `dnsPolicy` accordingly as well to suit the host network mode.
+hostNetwork: false
+
+# -- `dnsPolicy` determines the manner in which DNS resolution happens in the cluster.
+# In case of `hostNetwork: true`, usually, the `dnsPolicy` is suitable to be `ClusterFirstWithHostNet`.
+# For further reference: https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/#pod-s-dns-policy.
+dnsPolicy: ClusterFirst
+
 loggerSettings:
   # Development Mode defaults(encoder=consoleEncoder,logLevel=Debug,stackTraceLevel=Warn).
   # Production Mode defaults(encoder=jsonEncoder,logLevel=Info,stackTraceLevel=Error) (default false)
@@ -154,6 +173,12 @@ prometheus:
     ##
     enabled: true
 
+    ## alertmanager container image
+    ##
+    image:
+      repository: docker.io/apecloud/alertmanager
+      tag: v0.24.0
+
     persistentVolume:
       ## If true, alertmanager will create/use a Persistent Volume Claim
       ## If false, use emptyDir
@@ -211,10 +236,22 @@ prometheus:
     ##
     enabled: false
 
+    ## node-exporter container image
+    ##
+    image:
+      repository: docker.io/apecloud/node-exporter
+      tag: v1.3.1
+
   server:
     ## Prometheus server container name
     ##
     enabled: true
+
+    ## Prometheus server container image
+    ##
+    image:
+      repository: docker.io/apecloud/prometheus
+      tag: v2.39.1
 
     global:
       ## How frequently to scrape targets by default
@@ -553,6 +590,45 @@ prometheus:
                 summary: "PostgreSQL high error rate in WAL files archiver (namespace: {{ $labels.namespace }}, cluster: {{ $labels.app_kubernetes_io_instance }}, instance: {{ $labels.pod }})"
                 description: "PostgreSQL high error rate in WAL files archiver\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
 
+            - alert: PostgreSQLTableNotAutoVacuumed
+              expr: |
+                (pg_stat_user_tables_last_autovacuum > 0)
+                and
+                (time() - pg_stat_user_tables_last_autovacuum)
+                > 24 * 60 * 60 * 10
+              for: 0m
+              labels:
+                severity: warning
+              annotations:
+                summary: "PostgreSQL table {{ $labels.relname }} in database {{ $labels.datname }} not auto vacuumed (namespace: {{ $labels.namespace }}, cluster: {{ $labels.app_kubernetes_io_instance }}, instance: {{ $labels.pod }})"
+                description: "Table {{ $labels.relname }} in database {{ $labels.datname }} has not been auto vacuumed for 10 days\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+
+            - alert: PostgreSQLTableNotAutoAnalyzed
+              expr: |
+                (pg_stat_user_tables_last_autoanalyze > 0)
+                and
+                (time() - pg_stat_user_tables_last_autoanalyze)
+                > 24 * 60 * 60 * 10
+              for: 0m
+              labels:
+                severity: warning
+              annotations:
+                summary: "PostgreSQL table {{ $labels.relname }} in database {{ $labels.datname }} not auto analyzed (namespace: {{ $labels.namespace }}, cluster: {{ $labels.app_kubernetes_io_instance }}, instance: {{ $labels.pod }})"
+                description: "Table {{ $labels.relname }} in database {{ $labels.datname }} has not been auto analyzed for 10 days\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+
+            - alert: PostgreSQLTableTooManyDeadTuples
+              expr: |
+                (pg_stat_user_tables_n_dead_tup > 10000)
+                /
+                (pg_stat_user_tables_n_live_tup + pg_stat_user_tables_n_dead_tup)
+                >= 0.1
+              for: 2m
+              labels:
+                severity: warning
+              annotations:
+                summary: "PostgreSQL table {{ $labels.relname }} in database {{ $labels.datname }} has too many dead tuples (namespace: {{ $labels.namespace }}, cluster: {{ $labels.app_kubernetes_io_instance }}, instance: {{ $labels.pod }})"
+                description: "Table {{ $labels.relname }} in database {{ $labels.datname }} dead tuples is too large\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+
   serverFiles:
     prometheus.yml:
       rule_files:
@@ -834,6 +910,10 @@ grafana:
   adminPassword: abc
 
   sidecar:
+    image:
+      repository: docker.io/apecloud/k8s-sidecar
+      tag: 1.19.2
+
     dashboards:
       enabled: true
       label: grafana_dashboard
@@ -868,6 +948,9 @@ loadbalancer:
 
 
 apecloud-mysql:
+  enabled: true
+
+postgresql:
   enabled: true
 
 ## snapshot-controller settings

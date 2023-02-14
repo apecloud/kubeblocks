@@ -19,7 +19,6 @@ package cluster
 import (
 	"context"
 	"fmt"
-	"os"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -35,6 +34,7 @@ import (
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/create"
 	"github.com/apecloud/kubeblocks/internal/cli/delete"
+	"github.com/apecloud/kubeblocks/internal/cli/printer"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
@@ -126,7 +126,7 @@ func (o *OperationsOptions) validateUpgrade() error {
 	if len(o.ClusterVersionRef) == 0 {
 		return fmt.Errorf("missing cluster-version")
 	}
-	return nil
+	return delete.Confirm([]string{o.Name}, o.In)
 }
 
 func (o *OperationsOptions) validateVolumeExpansion() error {
@@ -150,19 +150,12 @@ func (o *OperationsOptions) validateReconfiguring() error {
 	if len(o.ComponentNames) != 1 {
 		return cfgcore.MakeError("reconfiguring only support one component.")
 	}
-	if len(o.URLPath) != 0 {
-		if _, err := os.Stat(o.URLPath); err != nil {
-			return cfgcore.WrapError(err, "failed to check if %s exists", o.URLPath)
-		}
-		return nil
-	}
-
-	if err := o.validateUpdatedParams(); err != nil {
-		return cfgcore.WrapError(err, "failed to validate updated params.")
-	}
-
 	componentName := o.ComponentNames[0]
-	tplList, err := util.GetConfigTemplateList(o.Name, o.Namespace, o.Client, componentName)
+	if err := o.existClusterAndComponent(componentName); err != nil {
+		return err
+	}
+
+	tplList, err := util.GetConfigTemplateList(o.Name, o.Namespace, o.Client, componentName, true)
 	if err != nil {
 		return err
 	}
@@ -176,6 +169,7 @@ func (o *OperationsOptions) validateReconfiguring() error {
 	if err := o.validateConfigParams(tpl, componentName); err != nil {
 		return err
 	}
+	o.printConfigureTips()
 	return nil
 }
 
@@ -260,7 +254,7 @@ func (o *OperationsOptions) validateConfigMapKey(tpl *dbaasv1alpha1.ConfigTempla
 	return nil
 }
 
-func (o *OperationsOptions) validateUpdatedParams() error {
+func (o *OperationsOptions) parseUpdatedParams() error {
 	if len(o.Parameters) == 0 && len(o.URLPath) == 0 {
 		return cfgcore.MakeError("reconfiguring required configure file or updated parameters.")
 	}
@@ -296,13 +290,64 @@ func (o *OperationsOptions) Validate() error {
 
 	switch o.OpsType {
 	case dbaasv1alpha1.VolumeExpansionType:
-		return o.validateVolumeExpansion()
+		if err := o.validateVolumeExpansion(); err != nil {
+			return err
+		}
 	case dbaasv1alpha1.HorizontalScalingType:
-		return o.validateHorizontalScaling()
+		if err := o.validateHorizontalScaling(); err != nil {
+			return err
+		}
 	case dbaasv1alpha1.ReconfiguringType:
-		return o.validateReconfiguring()
+		if err := o.validateReconfiguring(); err != nil {
+			return err
+		}
 	}
 	return delete.Confirm([]string{o.Name}, o.In)
+}
+
+func (o *OperationsOptions) fillTemplateArgForReconfiguring() error {
+	if len(o.Name) == 0 {
+		return makeMissingClusterNameErr()
+	}
+
+	if err := o.fillComponentNameForReconfiguring(); err != nil {
+		return err
+	}
+
+	if err := o.parseUpdatedParams(); err != nil {
+		return err
+	}
+	if len(o.KeyValues) == 0 {
+		return cfgcore.MakeError(missingUpdatedParametersErrMessage)
+	}
+
+	componentName := o.ComponentNames[0]
+	tplList, err := util.GetConfigTemplateList(o.Name, o.Namespace, o.Client, componentName, true)
+	if err != nil {
+		return err
+	}
+
+	if len(tplList) == 0 {
+		return makeNotFoundTemplateErr(o.Name, componentName)
+	}
+
+	if len(tplList) == 1 {
+		o.CfgTemplateName = tplList[0].Name
+		return nil
+	}
+
+	supportUpdatedTpl := make([]dbaasv1alpha1.ConfigTemplate, 0)
+	for _, tpl := range tplList {
+		if ok, err := util.IsSupportConfigureParams(tpl, o.KeyValues, o.Client); err == nil && ok {
+			supportUpdatedTpl = append(supportUpdatedTpl, tpl)
+		}
+	}
+	if len(supportUpdatedTpl) == 1 {
+		o.CfgTemplateName = supportUpdatedTpl[0].Name
+		return nil
+	}
+
+	return cfgcore.MakeError(multiConfigTemplateErrorMessage)
 }
 
 func (o *OperationsOptions) fillComponentNameForReconfiguring() error {
@@ -318,10 +363,36 @@ func (o *OperationsOptions) fillComponentNameForReconfiguring() error {
 		return err
 	}
 	if len(componentNames) != 1 {
-		return cfgcore.MakeError("when multi component exist, must specify which component to use.")
+		return cfgcore.MakeError(multiComponentsErrorMessage)
 	}
 	o.ComponentNames = componentNames
 	return nil
+}
+
+func (o *OperationsOptions) existClusterAndComponent(componentName string) error {
+	clusterObj := dbaasv1alpha1.Cluster{}
+	if err := util.GetResourceObjectFromGVR(types.ClusterGVR(), client.ObjectKey{
+		Namespace: o.Namespace,
+		Name:      o.Name,
+	}, o.Client, &clusterObj); err != nil {
+		return makeClusterNotExistErr(o.Name)
+	}
+
+	for _, component := range clusterObj.Spec.Components {
+		if component.Name == componentName {
+			return nil
+		}
+	}
+	return makeComponentNotExistErr(o.Name, componentName)
+}
+
+func (o *OperationsOptions) printConfigureTips() {
+	fmt.Println("Will updated configure file meta:")
+	printer.PrintLineWithTabSeparator(
+		printer.NewPair("  TemplateName", printer.BoldYellow(o.CfgTemplateName)),
+		printer.NewPair("  ConfigureFile", printer.BoldYellow(o.CfgFile)),
+		printer.NewPair("ComponentName", o.ComponentNames[0]),
+		printer.NewPair("ClusterName", o.Name))
 }
 
 // buildOperationsInputs build operations inputs
@@ -455,6 +526,6 @@ func NewReconfigureCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *
 		cmd.Flags().StringVar(&o.CfgTemplateName, "template-name", "", "Specify the name of the configuration template to be updated (e.g. for apecloud-mysql: --template-name=mysql-3node-tpl). What templates or configure files are available for this cluster can refer to kbcli sub command: 'kbcli cluster describe-configure'.")
 		cmd.Flags().StringVar(&o.CfgFile, "configure-file", "", "Specify the name of the configuration file to be updated (e.g. for mysql: --configure-file=my.cnf). What templates or configure files are available for this cluster can refer to kbcli sub command: 'kbcli cluster describe-configure'.")
 	}
-	inputs.Complete = o.fillComponentNameForReconfiguring
+	inputs.Complete = o.fillTemplateArgForReconfiguring
 	return create.BuildCommand(inputs)
 }

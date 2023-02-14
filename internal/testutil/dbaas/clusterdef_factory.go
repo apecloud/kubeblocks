@@ -135,3 +135,16 @@ func (factory *MockClusterDefFactory) SetConnectionCredential(
 	factory.get().Spec.ConnectionCredential = connectionCredential
 	return factory
 }
+
+func (factory *MockClusterDefFactory) AddSystemAccountSpec(sysAccounts *dbaasv1alpha1.SystemAccountSpec) *MockClusterDefFactory {
+	comps := factory.get().Spec.Components
+	if len(comps) == 0 {
+		return factory
+	}
+
+	comp := comps[len(comps)-1]
+	comp.SystemAccounts = sysAccounts
+	comps[len(comps)-1] = comp
+	factory.get().Spec.Components = comps
+	return factory
+}

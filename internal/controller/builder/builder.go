@@ -324,16 +324,16 @@ func BuildDeploy(reqCtx intctrlutil.RequestCtx, params BuilderParams) (*appsv1.D
 }
 
 func BuildPVCFromSnapshot(sts *appsv1.StatefulSet,
-	component *component.Component,
+	vct corev1.PersistentVolumeClaim,
 	pvcKey types.NamespacedName,
 	snapshotName string) (*corev1.PersistentVolumeClaim, error) {
 
 	pvc := corev1.PersistentVolumeClaim{}
 	if err := buildFromCUE("pvc_template.cue", map[string]any{
-		"sts":           sts,
-		"component":     component,
-		"pvc_key":       pvcKey,
-		"snapshot_name": snapshotName,
+		"sts":                 sts,
+		"volumeClaimTemplate": vct,
+		"pvc_key":             pvcKey,
+		"snapshot_name":       snapshotName,
 	}, "pvc", &pvc); err != nil {
 		return nil, err
 	}
@@ -454,10 +454,7 @@ func BuildCronJob(pvcKey types.NamespacedName,
 	schedule string,
 	sts *appsv1.StatefulSet) (*batchv1.CronJob, error) {
 
-	serviceAccount := viper.GetString("KUBEBLOCKS_SERVICE_ACCOUNT")
-	if len(serviceAccount) == 0 {
-		serviceAccount = "kubeblocks"
-	}
+	serviceAccount := viper.GetString("KUBEBLOCKS_SERVICEACCOUNT_NAME")
 
 	cronJob := batchv1.CronJob{}
 	if err := buildFromCUE("delete_pvc_cron_job_template.cue", map[string]any{

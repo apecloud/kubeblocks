@@ -52,12 +52,18 @@ func (rs *ReplicationSet) IsRunning(obj client.Object) (bool, error) {
 	if err := util.GetObjectListByComponentName(rs.Ctx, rs.Cli, rs.Cluster, componentStsList, sts.Labels[intctrlutil.AppComponentLabelKey]); err != nil {
 		return false, err
 	}
+	targetReplicas := util.GetComponentReplicas(rs.Component, rs.ComponentDef)
+	var availableReplicas int32
 	for _, stsObj := range componentStsList.Items {
 		statefulStatusRevisionIsEquals := sts.Status.UpdateRevision == sts.Status.CurrentRevision
-		stsIsReady := util.StatefulSetIsReady(&stsObj, statefulStatusRevisionIsEquals)
+		stsIsReady := util.StatefulSetIsReady(&stsObj, statefulStatusRevisionIsEquals, nil)
+		availableReplicas += stsObj.Status.AvailableReplicas
 		if !stsIsReady {
 			componentStatusIsRunning = false
 		}
+	}
+	if availableReplicas != targetReplicas {
+		componentStatusIsRunning = false
 	}
 	return componentStatusIsRunning, nil
 }

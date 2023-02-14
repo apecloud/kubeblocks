@@ -91,7 +91,7 @@ kbcli cluster list [flags]
 Run the command below to allow your local host to access the database instances.
 
 ```
-kbcli cluster connnect NAME
+kbcli cluster connect NAME
 ```
 
 You can use the option, `-i`, to specify an instance name. For example, 

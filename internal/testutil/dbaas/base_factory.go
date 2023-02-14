@@ -52,7 +52,7 @@ func (factory *BaseFactory[T, PT, F]) WithRandomName() *F {
 }
 
 func (factory *BaseFactory[T, PT, F]) AddLabels(keysAndValues ...string) *F {
-	factory.AddLabelsInMap(withMap(keysAndValues...))
+	factory.AddLabelsInMap(WithMap(keysAndValues...))
 	return factory.concreteFactory
 }
 

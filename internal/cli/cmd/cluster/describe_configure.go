@@ -106,9 +106,7 @@ var (
 		kbcli cluster explain-configure mycluster --component-name=mysql --template-names=mysql-3node-tpl --trunc-document=false --trunc-enum=false
 
 		# describe a specified parameters, e.g. cluster name is mycluster
-		kbcli cluster explain-configure mycluster --component-name=mysql --template-names=mysql-3node-tpl  --param=sql_mode
-
-`)
+		kbcli cluster explain-configure mycluster --component-name=mysql --template-names=mysql-3node-tpl --param=sql_mode`)
 	diffConfigureExample = templates.Examples(`
 		# compare config files 
 		kbcli cluster diff-configure opsrequest1 opsrequest2`)
@@ -158,13 +156,14 @@ func (r *reconfigureOptions) findTemplateByName(tplName string) (*dbaasv1alpha1.
 }
 
 func (r *reconfigureOptions) complete2(args []string) error {
-	if len(args) > 0 {
-		r.clusterName = args[0]
+	if len(args) == 0 {
+		return makeMissingClusterNameErr()
 	}
-
+	r.clusterName = args[0]
 	if err := r.complete(args); err != nil {
 		return err
 	}
+
 	if err := r.syncClusterComponent(); err != nil {
 		return err
 	}
@@ -178,10 +177,10 @@ func (r *reconfigureOptions) complete2(args []string) error {
 		return cfgcore.MakeError("not any config template, not support describe")
 	}
 
+	templateNames := make([]string, 0, len(r.tpls))
 	if !r.isExplain {
-		templateNames := make([]string, len(r.tpls))
-		for i, tpl := range r.tpls {
-			templateNames[i] = tpl.Name
+		for _, tpl := range r.tpls {
+			templateNames = append(templateNames, tpl.Name)
 		}
 		r.templateNames = templateNames
 		return nil
@@ -189,12 +188,11 @@ func (r *reconfigureOptions) complete2(args []string) error {
 
 	// for explain
 	for _, tpl := range r.tpls {
-		if len(tpl.ConfigConstraintRef) == 0 {
-			continue
+		if len(tpl.ConfigConstraintRef) > 0 && len(tpl.ConfigTplRef) > 0 {
+			templateNames = append(templateNames, tpl.Name)
 		}
-		r.templateNames = []string{tpl.Name}
-		break
 	}
+	r.templateNames = templateNames
 	return nil
 }
 
@@ -202,7 +200,7 @@ func (r *reconfigureOptions) syncComponentCfgTpl() error {
 	if r.tpls != nil {
 		return nil
 	}
-	tplList, err := util.GetConfigTemplateList(r.clusterName, r.namespace, r.dynamic, r.componentName)
+	tplList, err := util.GetConfigTemplateList(r.clusterName, r.namespace, r.dynamic, r.componentName, false)
 	if err != nil {
 		return err
 	}
@@ -220,7 +218,7 @@ func (r *reconfigureOptions) syncClusterComponent() error {
 		Name:      r.clusterName,
 	}, r.dynamic)
 	if err != nil {
-		return err
+		return makeClusterNotExistErr(r.clusterName)
 	}
 	if len(componentNames) != 1 {
 		return cfgcore.MakeError("when multi component exist, must specify which component to use.")
@@ -242,12 +240,29 @@ func (r *reconfigureOptions) printDescribeReconfigure() error {
 	return r.printConfigureHistory(configs)
 }
 
+func (r *reconfigureOptions) printAllExplainConfigure() error {
+	for _, templateName := range r.templateNames {
+		fmt.Println("template meta:")
+		printer.PrintLineWithTabSeparator(
+			printer.NewPair("  TemplateName", templateName),
+			printer.NewPair("ComponentName", r.componentName),
+			printer.NewPair("ClusterName", r.clusterName),
+		)
+		if err := r.printExplainConfigure(templateName); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (r *reconfigureOptions) printExplainConfigure(tplName string) error {
 	tpl, err := r.findTemplateByName(tplName)
 	if err != nil {
 		return err
 	}
-
+	if len(tpl.ConfigConstraintRef) == 0 {
+		return nil
+	}
 	configConstraint := dbaasv1alpha1.ConfigConstraint{}
 	if err := util.GetResourceObjectFromGVR(types.ConfigConstraintGVR(), client.ObjectKey{
 		Namespace: "",
@@ -588,7 +603,7 @@ func (o *opsRequestDiffOptions) diffConfig(tplName string) (map[string]interface
 		configConstraint = &dbaasv1alpha1.ConfigConstraint{}
 	)
 
-	tplList, err := util.GetConfigTemplateList(o.clusterName, o.baseOptions.namespace, o.baseOptions.dynamic, o.componentName)
+	tplList, err := util.GetConfigTemplateList(o.clusterName, o.baseOptions.namespace, o.baseOptions.dynamic, o.componentName, true)
 	if err != nil {
 		return nil, err
 	}
@@ -816,7 +831,7 @@ func NewExplainReconfigureCmd(f cmdutil.Factory, streams genericclioptions.IOStr
 		Run: func(cmd *cobra.Command, args []string) {
 			util.CheckErr(o.complete2(args))
 			util.CheckErr(o.validate())
-			util.CheckErr(o.printExplainConfigure(o.templateNames[0]))
+			util.CheckErr(o.printAllExplainConfigure())
 		},
 	}
 	o.addCommonFlags(cmd)

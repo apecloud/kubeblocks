@@ -51,7 +51,8 @@ func (consensusSet *ConsensusSet) IsRunning(obj client.Object) (bool, error) {
 	if statefulStatusRevisionIsEquals, err := handleConsensusSetUpdate(consensusSet.Ctx, consensusSet.Cli, consensusSet.Cluster, sts); err != nil {
 		return false, err
 	} else {
-		return util.StatefulSetIsReady(sts, statefulStatusRevisionIsEquals), nil
+		targetReplicas := util.GetComponentReplicas(consensusSet.Component, consensusSet.ComponentDef)
+		return util.StatefulSetIsReady(sts, statefulStatusRevisionIsEquals, &targetReplicas), nil
 	}
 }
 

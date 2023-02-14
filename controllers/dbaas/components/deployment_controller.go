@@ -78,8 +78,18 @@ func (r *DeploymentReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		return intctrlutil.Reconciled()
 	}
 
-	statelessComp := stateless.NewStateless(reqCtx.Ctx, r.Client, cluster)
+	clusterDef := &dbaasv1alpha1.ClusterDefinition{}
+	if err = r.Client.Get(ctx, client.ObjectKey{Name: cluster.Spec.ClusterDefRef}, clusterDef); err != nil {
+		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+	}
+
 	componentName := deploy.GetLabels()[intctrlutil.AppComponentLabelKey]
+	clusterComponent := cluster.GetComponentByName(componentName)
+	if clusterComponent == nil {
+		return intctrlutil.Reconciled()
+	}
+	componentDef := clusterDef.GetComponentDefByTypeName(clusterComponent.Type)
+	statelessComp := stateless.NewStateless(reqCtx.Ctx, r.Client, cluster, clusterComponent, componentDef)
 	compCtx := newComponentContext(reqCtx, r.Client, r.Recorder, statelessComp, deploy, componentName)
 	if requeueAfter, err := handleComponentStatusAndSyncCluster(compCtx, cluster); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")

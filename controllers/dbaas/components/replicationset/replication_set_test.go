@@ -44,6 +44,7 @@ var _ = Describe("Replication Component", func() {
 		clusterObj        *dbaasv1alpha1.Cluster
 	)
 
+	const replicas = 2
 	const kubeBlocks = "kubeblocks"
 	const redisImage = "redis:7.0.5"
 	const redisCompType = "replication"
@@ -86,7 +87,9 @@ var _ = Describe("Replication Component", func() {
 			By("Creating a cluster with replication componentType.")
 			clusterObj = testdbaas.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
 				clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
-				AddComponent(redisCompName, redisCompType).Create(&testCtx).GetObject()
+				AddComponent(redisCompName, redisCompType).
+				SetReplicas(replicas).
+				Create(&testCtx).GetObject()
 
 			By("Creating a statefulSet of replication componentType.")
 			container := corev1.Container{

@@ -234,6 +234,9 @@ prometheus:
       runAsGroup: 65534
       fsGroup: 65534
 
+    containerSecurityContext:
+      allowPrivilegeEscalation: false
+
   kubeStateMetrics:
     ## If false, kube-state-metrics sub-chart will not be installed
     ##
@@ -332,6 +335,9 @@ prometheus:
       runAsNonRoot: false
       runAsGroup: 65534
       fsGroup: 65534
+
+    containerSecurityContext:
+      allowPrivilegeEscalation: false
 
   ## Sample prometheus rules/alerts
   ## NOTE: Please review these carefully as thresholds and behavior may not meet

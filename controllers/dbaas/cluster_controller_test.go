@@ -882,7 +882,6 @@ var _ = Describe("Cluster Controller", func() {
 		pods := mockPodsForReplicationTest(clusterObj, stsList.Items)
 		for _, pod := range pods {
 			Expect(testCtx.CreateObj(testCtx.Ctx, &pod)).Should(Succeed())
-			// mock the status to pass the isReady(pod) check in consensus_set
 			pod.Status.Conditions = []corev1.PodCondition{{
 				Type:   corev1.PodReady,
 				Status: corev1.ConditionTrue,

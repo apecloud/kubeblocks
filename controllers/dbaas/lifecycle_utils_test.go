@@ -188,7 +188,7 @@ spec:
 			By("prepare cluster and construct component")
 			reqCtx := newReqCtx()
 			cluster, clusterDef, clusterVersion, _ := newAllFieldsClusterObj(nil, nil, false)
-			component := component.MergeComponents(
+			component := component.BuildComponent(
 				reqCtx,
 				cluster,
 				clusterDef,

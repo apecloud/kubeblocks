@@ -79,7 +79,7 @@ type configTemplateBuilder struct {
 	builtInFunctions *gotemplate.BuiltInObjectsFunc
 
 	// DBaas cluster object
-	component      *component.Component
+	component      *component.SynthesizedComponent
 	clusterVersion *dbaasv1alpha1.ClusterVersion
 	cluster        *dbaasv1alpha1.Cluster
 	podSpec        *corev1.PodSpec
@@ -152,7 +152,7 @@ func (c *configTemplateBuilder) builtinObjects() (*gotemplate.TplValues, error) 
 func (c *configTemplateBuilder) injectBuiltInObjectsAndFunctions(
 	podSpec *corev1.PodSpec,
 	configs []dbaasv1alpha1.ConfigTemplate,
-	component *component.Component) error {
+	component *component.SynthesizedComponent) error {
 	if err := injectBuiltInObjects(c, podSpec, component, configs); err != nil {
 		return err
 	}
@@ -162,7 +162,7 @@ func (c *configTemplateBuilder) injectBuiltInObjectsAndFunctions(
 	return nil
 }
 
-func injectBuiltInFunctions(tplBuilder *configTemplateBuilder, component *component.Component) error {
+func injectBuiltInFunctions(tplBuilder *configTemplateBuilder, component *component.SynthesizedComponent) error {
 	// TODO add built-in function
 	tplBuilder.builtInFunctions = &gotemplate.BuiltInObjectsFunc{
 		builtInMysqlCalBufferFunctionName:     calDBPoolSize,
@@ -177,7 +177,7 @@ func injectBuiltInFunctions(tplBuilder *configTemplateBuilder, component *compon
 	return nil
 }
 
-func injectBuiltInObjects(tplBuilder *configTemplateBuilder, podSpec *corev1.PodSpec, component *component.Component, configs []dbaasv1alpha1.ConfigTemplate) error {
+func injectBuiltInObjects(tplBuilder *configTemplateBuilder, podSpec *corev1.PodSpec, component *component.SynthesizedComponent, configs []dbaasv1alpha1.ConfigTemplate) error {
 	var resource *ResourceDefinition
 	container := intctrlutil.GetContainerByConfigTemplate(podSpec, configs)
 	if container != nil && len(container.Resources.Limits) > 0 {

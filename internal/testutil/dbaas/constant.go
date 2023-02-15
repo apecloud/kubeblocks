@@ -20,6 +20,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
 const (
@@ -105,7 +106,7 @@ var (
 			ValueFrom: &corev1.EnvVarSource{
 				SecretKeyRef: &corev1.SecretKeySelector{
 					LocalObjectReference: corev1.LocalObjectReference{
-						Name: "$(CONN_CREDENTIAL_SECRET_NAME)",
+						Name: constant.ConnCredentialPlaceHolder,
 					},
 					Key: "password",
 				},

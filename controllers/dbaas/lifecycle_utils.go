@@ -48,21 +48,21 @@ func mergeComponentsList(reqCtx intctrlutil.RequestCtx,
 	cluster *dbaasv1alpha1.Cluster,
 	clusterDef *dbaasv1alpha1.ClusterDefinition,
 	clusterDefCompList []dbaasv1alpha1.ClusterDefinitionComponent,
-	clusterCompList []dbaasv1alpha1.ClusterComponent) []component.Component {
-	var compList []component.Component
+	clusterCompList []dbaasv1alpha1.ClusterComponent) []component.SynthesizedComponent {
+	var compList []component.SynthesizedComponent
 	for _, clusterDefComp := range clusterDefCompList {
 		for _, clusterComp := range clusterCompList {
 			if clusterComp.Type != clusterDefComp.TypeName {
 				continue
 			}
-			comp := component.MergeComponents(reqCtx, cluster, clusterDef, &clusterDefComp, nil, &clusterComp)
+			comp := component.BuildComponent(reqCtx, cluster, clusterDef, &clusterDefComp, nil, &clusterComp)
 			compList = append(compList, *comp)
 		}
 	}
 	return compList
 }
 
-func getComponent(componentList []component.Component, name string) *component.Component {
+func getComponent(componentList []component.SynthesizedComponent, name string) *component.SynthesizedComponent {
 	for _, comp := range componentList {
 		if comp.Name == name {
 			return &comp
@@ -113,7 +113,7 @@ func reconcileClusterWorkloads(
 	clusterCompMap = cluster.GetTypeMappingComponents()
 	clusterVersionCompMap := clusterVersion.GetTypeMappingComponents()
 
-	prepareComp := func(component *component.Component) error {
+	prepareComp := func(component *component.SynthesizedComponent) error {
 		iParams := params
 		iParams.Component = component
 		return plan.PrepareComponentObjs(reqCtx, cli, &iParams)
@@ -124,7 +124,7 @@ func reconcileClusterWorkloads(
 		clusterVersionComp := clusterVersionCompMap[typeName]
 		clusterComps := clusterCompMap[typeName]
 		for _, clusterComp := range clusterComps {
-			if err := prepareComp(component.MergeComponents(reqCtx, cluster, clusterDefinition, &c, clusterVersionComp, &clusterComp)); err != nil {
+			if err := prepareComp(component.BuildComponent(reqCtx, cluster, clusterDefinition, &c, clusterVersionComp, &clusterComp)); err != nil {
 				return false, err
 			}
 		}
@@ -687,7 +687,7 @@ func isSnapshotAvailable(cli client.Client, ctx context.Context) bool {
 func isVolumeSnapshotExists(cli client.Client,
 	ctx context.Context,
 	cluster *dbaasv1alpha1.Cluster,
-	component *component.Component) (bool, error) {
+	component *component.SynthesizedComponent) (bool, error) {
 	ml := getBackupMatchingLabels(cluster.Name, component.Name)
 	vsList := snapshotv1.VolumeSnapshotList{}
 	if err := cli.List(ctx, &vsList, ml); err != nil {
@@ -700,7 +700,7 @@ func isVolumeSnapshotExists(cli client.Client,
 func isVolumeSnapshotReadyToUse(cli client.Client,
 	ctx context.Context,
 	cluster *dbaasv1alpha1.Cluster,
-	component *component.Component) (bool, error) {
+	component *component.SynthesizedComponent) (bool, error) {
 	ml := getBackupMatchingLabels(cluster.Name, component.Name)
 	vsList := snapshotv1.VolumeSnapshotList{}
 	if err := cli.List(ctx, &vsList, ml); err != nil {
@@ -814,7 +814,7 @@ func deleteSnapshot(cli client.Client,
 	reqCtx intctrlutil.RequestCtx,
 	snapshotKey types.NamespacedName,
 	cluster *dbaasv1alpha1.Cluster,
-	component *component.Component) error {
+	component *component.SynthesizedComponent) error {
 	ctx := reqCtx.Ctx
 	if err := deleteBackup(ctx, cli, cluster.Name, component.Name); err != nil {
 		return client.IgnoreNotFound(err)
@@ -879,7 +879,7 @@ func timeToSchedule(t time.Time) string {
 func doBackup(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
 	cluster *dbaasv1alpha1.Cluster,
-	component *component.Component,
+	component *component.SynthesizedComponent,
 	stsObj *appsv1.StatefulSet,
 	stsProto *appsv1.StatefulSet,
 	snapshotKey types.NamespacedName) (shouldRequeue bool, err error) {

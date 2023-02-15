@@ -135,7 +135,6 @@ var _ = Describe("Redis Horizontal Scale function", func() {
 		}
 
 		By("Checking pods number and role label in StatefulSet")
-		pods := make([]corev1.Pod, 0)
 		for _, sts := range stsList.Items {
 			podList, err := util.GetPodListByStatefulSet(ctx, k8sClient, &sts)
 			Expect(err).To(Succeed())
@@ -145,7 +144,6 @@ var _ = Describe("Redis Horizontal Scale function", func() {
 			} else {
 				Expect(podList[0].Labels[intctrlutil.RoleLabelKey] == Secondary).Should(BeTrue())
 			}
-			pods = append(pods, podList...)
 		}
 
 		By("Checking services status")

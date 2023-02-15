@@ -35,14 +35,18 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
 	appscontrollers "github.com/apecloud/kubeblocks/controllers/apps"
+	dataprotectioncontrollers "github.com/apecloud/kubeblocks/controllers/dataprotection"
+	extensionscontrollers "github.com/apecloud/kubeblocks/controllers/extensions"
+
+	//+kubebuilder:scaffold:imports
+
 	"github.com/apecloud/kubeblocks/controllers/apps/components"
 	"github.com/apecloud/kubeblocks/controllers/apps/configuration"
-	dataprotectioncontrollers "github.com/apecloud/kubeblocks/controllers/dataprotection"
 	k8scorecontrollers "github.com/apecloud/kubeblocks/controllers/k8score"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/apecloud/kubeblocks/internal/webhook"
-	//+kubebuilder:scaffold:imports
 )
 
 // added lease.coordination.k8s.io for leader election
@@ -63,6 +67,7 @@ func init() {
 	utilruntime.Must(appsv1alpha1.AddToScheme(scheme))
 	utilruntime.Must(dataprotectionv1alpha1.AddToScheme(scheme))
 	utilruntime.Must(snapshotv1.AddToScheme(scheme))
+	utilruntime.Must(extensionsv1alpha1.AddToScheme(scheme))
 	//+kubebuilder:scaffold:scheme
 
 	viper.SetConfigName("config")                          // name of config file (without extension)
@@ -213,36 +218,6 @@ func main() {
 		os.Exit(1)
 	}
 
-	if viper.GetBool("enable_webhooks") {
-
-		appsv1alpha1.RegisterWebhookManager(mgr)
-
-		if err = (&appsv1alpha1.Cluster{}).SetupWebhookWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create webhook", "webhook", "Cluster")
-			os.Exit(1)
-		}
-
-		if err = (&appsv1alpha1.ClusterDefinition{}).SetupWebhookWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create webhook", "webhook", "ClusterDefinition")
-			os.Exit(1)
-		}
-
-		if err = (&appsv1alpha1.ClusterVersion{}).SetupWebhookWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create webhook", "webhook", "ClusterVersion")
-			os.Exit(1)
-		}
-
-		if err = (&appsv1alpha1.OpsRequest{}).SetupWebhookWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create webhook", "webhook", "OpsRequest")
-			os.Exit(1)
-		}
-
-		if err = webhook.SetupWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to setup webhook")
-			os.Exit(1)
-		}
-	}
-
 	if err = (&dataprotectioncontrollers.BackupPolicyTemplateReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
@@ -259,20 +234,31 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "OpsRequest")
 		os.Exit(1)
 	}
-	if err = (&configuration.ReconfigureRequestReconciler{
-		Client:   mgr.GetClient(),
-		Scheme:   mgr.GetScheme(),
-		Recorder: mgr.GetEventRecorderFor("reconfigure-controller"),
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "ReconfigureRequest")
-		os.Exit(1)
-	}
+
 	if err = (&configuration.ConfigConstraintReconciler{
 		Client:   mgr.GetClient(),
 		Scheme:   mgr.GetScheme(),
 		Recorder: mgr.GetEventRecorderFor("configuration-template-controller"),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "ConfigConstraint")
+		os.Exit(1)
+	}
+
+	if err = (&extensionscontrollers.AddonSpecReconciler{
+		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "AddonSpec")
+		os.Exit(1)
+	}
+	//+kubebuilder:scaffold:builder
+
+	if err = (&configuration.ReconfigureRequestReconciler{
+		Client:   mgr.GetClient(),
+		Scheme:   mgr.GetScheme(),
+		Recorder: mgr.GetEventRecorderFor("reconfigure-controller"),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "ReconfigureRequest")
 		os.Exit(1)
 	}
 
@@ -284,7 +270,6 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "SystemAccount")
 		os.Exit(1)
 	}
-	//+kubebuilder:scaffold:builder
 
 	if err = (&k8scorecontrollers.EventReconciler{
 		Client:   mgr.GetClient(),
@@ -329,6 +314,36 @@ func main() {
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Deployment")
 		os.Exit(1)
+	}
+
+	if viper.GetBool("enable_webhooks") {
+
+		appsv1alpha1.RegisterWebhookManager(mgr)
+
+		if err = (&appsv1alpha1.Cluster{}).SetupWebhookWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create webhook", "webhook", "Cluster")
+			os.Exit(1)
+		}
+
+		if err = (&appsv1alpha1.ClusterDefinition{}).SetupWebhookWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create webhook", "webhook", "ClusterDefinition")
+			os.Exit(1)
+		}
+
+		if err = (&appsv1alpha1.ClusterVersion{}).SetupWebhookWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create webhook", "webhook", "ClusterVersion")
+			os.Exit(1)
+		}
+
+		if err = (&appsv1alpha1.OpsRequest{}).SetupWebhookWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create webhook", "webhook", "OpsRequest")
+			os.Exit(1)
+		}
+
+		if err = webhook.SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to setup webhook")
+			os.Exit(1)
+		}
 	}
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {

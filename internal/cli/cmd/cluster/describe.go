@@ -162,6 +162,10 @@ func (o *describeOptions) describeCluster(name string) error {
 }
 
 func showCluster(c *dbaasv1alpha1.Cluster, out io.Writer) {
+	if c == nil {
+		return
+	}
+
 	title := fmt.Sprintf("Name: %s\t Created Time: %s", c.Name, util.TimeFormat(&c.CreationTimestamp))
 	tbl := newTbl(out, title, "NAMESPACE", "CLUSTER-DEFINITION", "VERSION", "STATUS", "TERMINATION-POLICY")
 	tbl.AddRow(c.Namespace, c.Spec.ClusterDefRef, c.Spec.ClusterVersionRef, string(c.Status.Phase), string(c.Spec.TerminationPolicy))

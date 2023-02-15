@@ -242,3 +242,13 @@ func composeTLSVolumeMount() v1.VolumeMount {
 		ReadOnly:  true,
 	}
 }
+
+func isTLSSettingsUpdated(cType string, oldCm v1.ConfigMap, newCm v1.ConfigMap) bool {
+	// build intersection sets
+
+	// get tls key-word based on cType
+
+	// search key-word in both old and new set
+	// if search results are the same, settings updated
+	// else not updated
+}

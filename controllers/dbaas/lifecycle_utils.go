@@ -626,11 +626,29 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 				return err
 			}
 		}
-		//else if isAppConfig(cm) {
-		//	comp := configurations.getComponentByConfigMap(cluster, cm)
-		//	items := composeTLSSettings(comp)
-		//	configuration.patch(cli, cm, items)
-		//}
+		// if tls settings updated, do Update
+		// FIXME: very hacky way. should allow config to be updated
+		oldCm := &corev1.ConfigMap{}
+		if err := cli.Get(ctx, client.ObjectKeyFromObject(cm), oldCm); err != nil {
+			return err
+		}
+		clusterComp := cfgutil.GetClusterComponentsByName(cluster.Spec.Components, cm.Labels[intctrlutil.AppComponentLabelKey])
+		clusterDefComp := func() *dbaasv1alpha1.ClusterDefinitionComponent {
+			for _, c := range clusterDef.Spec.Components {
+				if c.TypeName == clusterComp.Type {
+					return &c
+				}
+			}
+			return nil
+		}()
+		if clusterDefComp == nil {
+			return errors.New("clusterDefComp not found")
+		}
+		if isTLSSettingsUpdated(clusterDefComp.CharacterType, *oldCm, *cm) {
+			if err := cli.Update(ctx, cm); err != nil {
+				return err
+			}
+		}
 		return nil
 	}
 

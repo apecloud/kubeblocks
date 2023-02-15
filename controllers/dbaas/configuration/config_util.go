@@ -413,7 +413,7 @@ func getRelatedComponentsByConfigmap(stsList *appv1.StatefulSetList, cfg client.
 	return sts, containers.AsSlice()
 }
 
-func getClusterComponentsByName(components []dbaasv1alpha1.ClusterComponent, componentName string) *dbaasv1alpha1.ClusterComponent {
+func GetClusterComponentsByName(components []dbaasv1alpha1.ClusterComponent, componentName string) *dbaasv1alpha1.ClusterComponent {
 	for i := range components {
 		component := &components[i]
 		if component.Name == componentName {

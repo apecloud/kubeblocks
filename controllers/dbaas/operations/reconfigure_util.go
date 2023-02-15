@@ -37,6 +37,16 @@ type reconfiguringResult struct {
 	err                error
 }
 
+func UpdateCfg(config dbaasv1alpha1.Configuration,
+	tpl dbaasv1alpha1.ConfigTemplate,
+	cmKey client.ObjectKey,
+	ctx context.Context,
+	cli client.Client,
+	opsCrName string) error {
+	result := updateCfgParams(config, tpl, cmKey, ctx, cli, opsCrName)
+	return result.err
+}
+
 // updateCfgParams merge parameters of the config into the configmap, and verify final configuration file.
 func updateCfgParams(config dbaasv1alpha1.Configuration,
 	tpl dbaasv1alpha1.ConfigTemplate,

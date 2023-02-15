@@ -32,6 +32,7 @@ import (
 
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/apecloud/kubeblocks/internal/testutil"
+	testdbaas "github.com/apecloud/kubeblocks/internal/testutil/dbaas"
 )
 
 const (
@@ -162,14 +163,13 @@ func ListAndCheckStatefulSet(testCtx *testutil.TestContext, key types.Namespaced
 }
 
 func PatchStatefulSetStatus(testCtx *testutil.TestContext, stsName string, status apps.StatefulSetStatus) {
-	sts := &apps.StatefulSet{}
-	gomega.Expect(testCtx.Cli.Get(testCtx.Ctx, client.ObjectKey{Name: stsName, Namespace: testCtx.DefaultNamespace}, sts)).Should(gomega.Succeed())
-	patch := client.MergeFrom(sts.DeepCopy())
-	sts.Status = status
-	gomega.Expect(testCtx.Cli.Status().Patch(testCtx.Ctx, sts, patch)).Should(gomega.Succeed())
+	objectKey := client.ObjectKey{Name: stsName, Namespace: testCtx.DefaultNamespace}
+	gomega.Expect(testdbaas.GetAndChangeObjStatus(testCtx, objectKey, func(newSts *apps.StatefulSet) {
+		newSts.Status = status
+	})()).Should(gomega.Succeed())
 	gomega.Eventually(func() bool {
 		tmpSts := &apps.StatefulSet{}
-		_ = testCtx.Cli.Get(context.Background(), client.ObjectKey{Name: sts.Name, Namespace: testCtx.DefaultNamespace}, tmpSts)
+		_ = testCtx.Cli.Get(context.Background(), client.ObjectKey{Name: stsName, Namespace: testCtx.DefaultNamespace}, tmpSts)
 		return reflect.DeepEqual(tmpSts.Status, status)
 	}, timeout, interval).Should(gomega.BeTrue())
 }

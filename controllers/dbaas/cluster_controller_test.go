@@ -906,18 +906,17 @@ var _ = Describe("Cluster Controller", func() {
 		}
 
 		By("Checking pods' role are updated in cluster status")
-		Eventually(func(g Gomega) {
-			fetched := &dbaasv1alpha1.Cluster{}
-			g.Expect(k8sClient.Get(ctx, clusterKey, fetched)).To(Succeed())
+		Eventually(testdbaas.CheckObj(&testCtx, clusterKey, func(g Gomega, fetched *dbaasv1alpha1.Cluster) {
 			compName := fetched.Spec.Components[0].Name
-			g.Expect(fetched.Status.Components != nil).To(BeTrue())
+			g.Expect(fetched.Status.Components).NotTo(BeNil())
 			g.Expect(fetched.Status.Components).To(HaveKey(compName))
 			replicationStatus := fetched.Status.Components[compName].ReplicationSetStatus
-			g.Expect(replicationStatus != nil).To(BeTrue())
+			g.Expect(replicationStatus).NotTo(BeNil())
 			g.Expect(replicationStatus.Primary.Pod).To(BeElementOf(getReplicationSetStsPodsName(stsList.Items)))
 			g.Expect(len(replicationStatus.Secondaries)).To(BeEquivalentTo(1))
 			g.Expect(replicationStatus.Secondaries[0].Pod).To(BeElementOf(getReplicationSetStsPodsName(stsList.Items)))
-		}).Should(Succeed())
+		})).Should(Succeed())
+
 	}
 
 	// Scenarios

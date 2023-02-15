@@ -81,9 +81,9 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 
 	createClusterVersion := func() {
 		_ = testdbaas.NewClusterVersionFactory(clusterVersionName, clusterDefName).
-			AddComponent(statefulMySQLCompType).AddContainerShort("mysql", testdbaas.ApeCloudMySQLImage).
-			AddComponent(consensusMySQLCompType).AddContainerShort("mysql", testdbaas.ApeCloudMySQLImage).
-			AddComponent(nginxCompType).AddContainerShort("nginx", testdbaas.NginxImage).
+			AddComponent(statefulMySQLCompType).AddContainerShort(testdbaas.DefaultMySQLContainerName, testdbaas.ApeCloudMySQLImage).
+			AddComponent(consensusMySQLCompType).AddContainerShort(testdbaas.DefaultMySQLContainerName, testdbaas.ApeCloudMySQLImage).
+			AddComponent(nginxCompType).AddContainerShort(testdbaas.DefaultNginxContainerName, testdbaas.NginxImage).
 			Create(&testCtx)
 	}
 
@@ -96,8 +96,13 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 	}
 
 	createStsPod := func(podName, podRole, componentName string) *corev1.Pod {
-		return testdbaas.CreateCustomizedObj(&testCtx, "hybrid/hybrid_sts_pod.yaml", &corev1.Pod{},
-			testdbaas.CustomizeObjYAML(componentName, clusterName, podRole, podName))
+		return testdbaas.NewPodFactory(testCtx.DefaultNamespace, podName).AddLabelsInMap(map[string]string{
+			intctrlutil.AppInstanceLabelKey:  clusterName,
+			intctrlutil.AppComponentLabelKey: componentName,
+			intctrlutil.RoleLabelKey:         podRole,
+			intctrlutil.AppManagedByLabelKey: intctrlutil.AppName,
+		}).AddContainer(corev1.Container{Name: testdbaas.DefaultMySQLContainerName, Image: testdbaas.ApeCloudMySQLImage}).
+			Create(&testCtx).GetObject()
 	}
 
 	getDeployment := func(componentName string) *appsv1.Deployment {

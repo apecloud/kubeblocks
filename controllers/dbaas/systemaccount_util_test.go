@@ -26,7 +26,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/yaml"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
-	testdata "github.com/apecloud/kubeblocks/test/testdata"
+	testdbaas "github.com/apecloud/kubeblocks/internal/testutil/dbaas"
+	"github.com/apecloud/kubeblocks/test/testdata"
 )
 
 func TestUpdateFacts(t *testing.T) {
@@ -88,21 +89,11 @@ func TestRenderJob(t *testing.T) {
 		return clusterDef
 	}
 
-	mockCluster := func(filePath string) *dbaasv1alpha1.Cluster {
-		clusterBytes, err := testdata.GetTestDataFileContent(filePath)
-		assert.Nil(t, err)
-		clusterYaml := fmt.Sprintf(string(clusterBytes), clusterVersionName, clusterDefinitionName, clusterName,
-			clusterVersionName, clusterDefinitionName, consensusCompName)
-		cluster := &dbaasv1alpha1.Cluster{}
-		err = yaml.Unmarshal([]byte(clusterYaml), cluster)
-		assert.Nil(t, err)
-		return cluster
-	}
-
 	clusterDef := mockClusterDef("consensusset/wesql_cd_sysacct.yaml")
 	assert.NotNil(t, clusterDef)
 	assert.NotNil(t, clusterDef.Spec.Components[0].SystemAccounts)
-	cluster := mockCluster("consensusset/wesql.yaml")
+	cluster := testdbaas.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefinitionName, clusterVersionName).
+		AddComponent(consensusCompName, "consensus").GetObject()
 	assert.NotNil(t, cluster)
 
 	accountsSetting := clusterDef.Spec.Components[0].SystemAccounts

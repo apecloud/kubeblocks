@@ -19,34 +19,23 @@ package dbaas
 import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/apecloud/kubeblocks/internal/testutil"
 )
-
-// CreateStatelessCluster creates a cluster with a component of Stateless type for testing.
-func CreateStatelessCluster(testCtx testutil.TestContext, clusterDefName, clusterVersionName, clusterName string) *dbaasv1alpha1.Cluster {
-	return CreateCustomizedObj(&testCtx, "stateless/cluster.yaml", &dbaasv1alpha1.Cluster{},
-		CustomizeObjYAML(clusterVersionName, clusterDefName, clusterName, clusterVersionName, clusterDefName))
-}
 
 // MockStatelessComponentDeploy mocks a deployment workload of the stateless component.
 func MockStatelessComponentDeploy(testCtx testutil.TestContext, clusterName, componentName string) *appsv1.Deployment {
 	deployName := clusterName + "-" + componentName
-	return CreateCustomizedObj(&testCtx, "stateless/deployment.yaml", &appsv1.Deployment{},
-		CustomizeObjYAML(componentName, clusterName, deployName, componentName, clusterName, componentName, clusterName))
+	return NewDeploymentFactory(testCtx.DefaultNamespace, deployName, clusterName, componentName).SetMinReadySeconds(int32(10)).SetReplicas(int32(2)).
+		AddContainer(corev1.Container{Name: DefaultNginxContainerName, Image: NginxImage}).Create(&testCtx).GetObject()
 }
 
 // MockStatelessPod mocks the pods of the deployment workload.
 func MockStatelessPod(testCtx testutil.TestContext, deploy *appsv1.Deployment, clusterName, componentName, podName string) *corev1.Pod {
-	return CreateCustomizedObj(&testCtx, "stateless/deployment_pod.yaml", &corev1.Pod{},
-		CustomizeObjYAML(podName, componentName, clusterName), func(pod *corev1.Pod) {
-			if deploy != nil {
-				t := true
-				pod.SetOwnerReferences([]metav1.OwnerReference{
-					{APIVersion: "apps/v1", Kind: "Deployment", Controller: &t, BlockOwnerDeletion: &t, Name: deploy.Name, UID: deploy.UID},
-				})
-			}
-		})
+	return NewPodFactory(testCtx.DefaultNamespace, podName).SetOwnerReferences("apps/v1", intctrlutil.DeploymentKind, deploy).AddLabelsInMap(map[string]string{
+		intctrlutil.AppInstanceLabelKey:  clusterName,
+		intctrlutil.AppComponentLabelKey: componentName,
+		intctrlutil.AppManagedByLabelKey: intctrlutil.AppName,
+	}).AddContainer(corev1.Container{Name: DefaultNginxContainerName, Image: NginxImage}).Create(&testCtx).GetObject()
 }

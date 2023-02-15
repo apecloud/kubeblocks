@@ -24,14 +24,14 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
-type MockStatefulSetFactory struct {
-	BaseFactory[appsv1.StatefulSet, *appsv1.StatefulSet, MockStatefulSetFactory]
+type MockDeploymentFactory struct {
+	BaseFactory[appsv1.Deployment, *appsv1.Deployment, MockDeploymentFactory]
 }
 
-func NewStatefulSetFactory(namespace, name string, clusterName string, componentName string) *MockStatefulSetFactory {
-	f := &MockStatefulSetFactory{}
+func NewDeploymentFactory(namespace, name, clusterName, componentName string) *MockDeploymentFactory {
+	f := &MockDeploymentFactory{}
 	f.init(namespace, name,
-		&appsv1.StatefulSet{
+		&appsv1.Deployment{
 			ObjectMeta: metav1.ObjectMeta{
 				Labels: map[string]string{
 					intctrlutil.AppInstanceLabelKey:  clusterName,
@@ -39,7 +39,7 @@ func NewStatefulSetFactory(namespace, name string, clusterName string, component
 					intctrlutil.AppManagedByLabelKey: intctrlutil.AppName,
 				},
 			},
-			Spec: appsv1.StatefulSetSpec{
+			Spec: appsv1.DeploymentSpec{
 				Selector: &metav1.LabelSelector{
 					MatchLabels: map[string]string{
 						intctrlutil.AppInstanceLabelKey:  clusterName,
@@ -61,18 +61,23 @@ func NewStatefulSetFactory(namespace, name string, clusterName string, component
 	return f
 }
 
-func (factory *MockStatefulSetFactory) SetReplicas(replicas int32) *MockStatefulSetFactory {
+func (factory *MockDeploymentFactory) SetMinReadySeconds(minReadySeconds int32) *MockDeploymentFactory {
+	factory.get().Spec.MinReadySeconds = minReadySeconds
+	return factory
+}
+
+func (factory *MockDeploymentFactory) SetReplicas(replicas int32) *MockDeploymentFactory {
 	factory.get().Spec.Replicas = &replicas
 	return factory
 }
 
-func (factory *MockStatefulSetFactory) AddVolume(volume corev1.Volume) *MockStatefulSetFactory {
+func (factory *MockDeploymentFactory) AddVolume(volume corev1.Volume) *MockDeploymentFactory {
 	volumes := &factory.get().Spec.Template.Spec.Volumes
 	*volumes = append(*volumes, volume)
 	return factory
 }
 
-func (factory *MockStatefulSetFactory) AddConfigmapVolume(volumeName string, configmapName string) *MockStatefulSetFactory {
+func (factory *MockDeploymentFactory) AddConfigmapVolume(volumeName, configmapName string) *MockDeploymentFactory {
 	volume := corev1.Volume{
 		Name: volumeName,
 		VolumeSource: corev1.VolumeSource{
@@ -85,13 +90,7 @@ func (factory *MockStatefulSetFactory) AddConfigmapVolume(volumeName string, con
 	return factory
 }
 
-func (factory *MockStatefulSetFactory) AddVolumeClaimTemplate(pvc corev1.PersistentVolumeClaim) *MockStatefulSetFactory {
-	volumeClaimTpls := &factory.get().Spec.VolumeClaimTemplates
-	*volumeClaimTpls = append(*volumeClaimTpls, pvc)
-	return factory
-}
-
-func (factory *MockStatefulSetFactory) AddContainer(container corev1.Container) *MockStatefulSetFactory {
+func (factory *MockDeploymentFactory) AddContainer(container corev1.Container) *MockDeploymentFactory {
 	containers := &factory.get().Spec.Template.Spec.Containers
 	*containers = append(*containers, container)
 	return factory

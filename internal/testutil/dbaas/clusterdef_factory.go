@@ -109,6 +109,20 @@ func (factory *MockClusterDefFactory) AddConfigTemplate(name string,
 	return factory
 }
 
+func (factory *MockClusterDefFactory) AddLogConfig(name, filePathPattern string) *MockClusterDefFactory {
+	comps := factory.get().Spec.Components
+	if len(comps) > 0 {
+		comp := comps[len(comps)-1]
+		comp.LogConfigs = append(comp.LogConfigs, dbaasv1alpha1.LogConfig{
+			FilePathPattern: filePathPattern,
+			Name:            name,
+		})
+		comps[len(comps)-1] = comp
+	}
+	factory.get().Spec.Components = comps
+	return factory
+}
+
 func (factory *MockClusterDefFactory) AddContainerEnv(containerName string, envVar corev1.EnvVar) *MockClusterDefFactory {
 	comps := factory.get().Spec.Components
 	if len(comps) > 0 {

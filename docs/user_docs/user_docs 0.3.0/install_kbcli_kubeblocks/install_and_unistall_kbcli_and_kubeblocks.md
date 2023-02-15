@@ -39,17 +39,17 @@ kbcli completion SHELL-TYPE -h
 Here we take zsh as an example.
 
 1. Run the command below.
-```
-kbcli completion zsh -h
-```
+   ```
+   kbcli completion zsh -h
+   ```
 2. Enable the completion function of your terminal first.
-```
-$ echo "autoload -U compinit; compinit" >> ~/.zshrc
-```
+   ```
+   $ echo "autoload -U compinit; compinit" >> ~/.zshrc
+   ```
 3. Run the command below to enable the kbcli automatic completion function.
-```
-$ echo "source <(kbcli completion zsh); compdef _kbcli kbcli" >> ~/.zshrc
-```
+   ```
+   $ echo "source <(kbcli completion zsh); compdef _kbcli kbcli" >> ~/.zshrc
+   ```
 
 ## Step 3. Install KubeBlocks
 
@@ -78,7 +78,7 @@ $ echo "source <(kbcli completion zsh); compdef _kbcli kbcli" >> ~/.zshrc
      kbcli kubeblocks install --set replicaCount=3
 
    Options:
-       --create-namespace=false:
+       --create-namespace=true:
            create the namespace if not present
 
        --monitor=true:

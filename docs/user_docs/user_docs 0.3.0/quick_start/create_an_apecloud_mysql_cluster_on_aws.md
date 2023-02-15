@@ -70,7 +70,7 @@ This guide introduces how to use KubeBlocks to create an ApeCloud MySQL cluster 
      metadata:
        name: csi-aws-vsc
        annotations:
-       snapshot.storage.kubernetes.io/is-default-class: "true"
+         snapshot.storage.kubernetes.io/is-default-class: "true"
      driver: ebs.csi.aws.com
      deletionPolicy: Delete
      EOF

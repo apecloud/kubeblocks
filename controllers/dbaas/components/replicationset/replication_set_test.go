@@ -45,7 +45,6 @@ var _ = Describe("Replication Component", func() {
 	)
 
 	const replicas = 2
-	const kubeBlocks = "kubeblocks"
 	const redisImage = "redis:7.0.5"
 	const redisCompType = "replication"
 	const redisCompName = "redis-rsts"
@@ -113,7 +112,7 @@ var _ = Describe("Replication Component", func() {
 				AddContainer(container).
 				AddLabels(intctrlutil.AppInstanceLabelKey, clusterObj.Name,
 					intctrlutil.AppComponentLabelKey, redisCompName,
-					intctrlutil.AppManagedByLabelKey, kubeBlocks,
+					intctrlutil.AppManagedByLabelKey, testdbaas.KubeBlocks,
 					intctrlutil.RoleLabelKey, string(Primary)).
 				SetReplicas(1).
 				Create(&testCtx).GetObject()
@@ -123,7 +122,7 @@ var _ = Describe("Replication Component", func() {
 				AddContainer(container).
 				AddLabels(intctrlutil.AppInstanceLabelKey, clusterObj.Name,
 					intctrlutil.AppComponentLabelKey, redisCompName,
-					intctrlutil.AppManagedByLabelKey, kubeBlocks,
+					intctrlutil.AppManagedByLabelKey, testdbaas.KubeBlocks,
 					intctrlutil.RoleLabelKey, string(Secondary)).
 				SetReplicas(1).
 				Create(&testCtx).GetObject()

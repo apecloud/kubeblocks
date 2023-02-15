@@ -308,7 +308,6 @@ var _ = Describe("create", func() {
 		raw := []string{"key=engineType,value=mongo,operator=Equal,effect=NoSchedule"}
 		res := buildTolerations(raw)
 		Expect(len(res)).Should(Equal(1))
-
 	})
 
 	It("generate random cluster name", func() {

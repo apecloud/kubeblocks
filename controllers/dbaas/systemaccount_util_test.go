@@ -25,6 +25,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/constant"
 	testdbaas "github.com/apecloud/kubeblocks/internal/testutil/dbaas"
 )
 
@@ -192,7 +193,7 @@ func TestRenderJob(t *testing.T) {
 			assert.Nil(t, job.Spec.TTLSecondsAfterFinished)
 			assert.NotNil(t, secrets)
 		case dbaasv1alpha1.ReferToExisting:
-			assert.False(t, strings.Contains(acc.ProvisionPolicy.SecretRef.Name, "$(CONN_CREDENTIAL_SECRET_NAME)"))
+			assert.False(t, strings.Contains(acc.ProvisionPolicy.SecretRef.Name, constant.ConnCredentialPlaceHolder))
 		}
 	}
 }

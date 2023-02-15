@@ -14,23 +14,15 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package dbaas
+package controllerutil
 
-import (
-	"fmt"
+import corev1 "k8s.io/api/core/v1"
 
-	"github.com/apecloud/kubeblocks/internal/constant"
-)
-
-func getEnvReplacementMapForConnCrential(clusterName string) map[string]string {
-	return map[string]string{
-		constant.ConnCredentialPlaceHolder: fmt.Sprintf("%s-conn-credential", clusterName),
+func GetContainerByName(containers []corev1.Container, name string) (int, *corev1.Container) {
+	for i, container := range containers {
+		if container.Name == name {
+			return i, &container
+		}
 	}
-}
-
-func getEnvReplacementMapForAccount(name, passwd string) map[string]string {
-	return map[string]string{
-		"$(USERNAME)": name,
-		"$(PASSWD)":   passwd,
-	}
+	return -1, nil
 }

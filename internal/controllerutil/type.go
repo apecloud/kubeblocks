@@ -99,8 +99,3 @@ const (
 	// BackupDelete (default) deletes backup immediately when cluster's terminationPolicy is WipeOut
 	BackupDelete = "Delete"
 )
-
-const (
-	KBImage           = "KUBEBLOCKS_IMAGE"
-	KBImagePullPolicy = "KUBEBLOCKS_IMAGE_PULL_POLICY"
-)

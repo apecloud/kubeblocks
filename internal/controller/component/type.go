@@ -23,17 +23,13 @@ import (
 	"github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 )
 
-const (
-	KBPrefix = "KB"
-)
-
 type MonitorConfig struct {
 	Enable     bool   `json:"enable"`
 	ScrapePort int32  `json:"scrapePort,omitempty"`
 	ScrapePath string `json:"scrapePath,omitempty"`
 }
 
-type Component struct {
+type SynthesizedComponent struct {
 	ClusterDefName          string                              `json:"clusterDefName,omitempty"`
 	ClusterType             string                              `json:"clusterType,omitempty"`
 	Name                    string                              `json:"name,omitempty"`

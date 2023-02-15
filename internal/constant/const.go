@@ -14,23 +14,18 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package dbaas
+package constant
 
-import (
-	"fmt"
-
-	"github.com/apecloud/kubeblocks/internal/constant"
+const (
+	ConnCredentialPlaceHolder = "$(CONN_CREDENTIAL_SECRET_NAME)"
 )
 
-func getEnvReplacementMapForConnCrential(clusterName string) map[string]string {
-	return map[string]string{
-		constant.ConnCredentialPlaceHolder: fmt.Sprintf("%s-conn-credential", clusterName),
-	}
-}
+const (
+	KBPrefix = "KB"
+)
 
-func getEnvReplacementMapForAccount(name, passwd string) map[string]string {
-	return map[string]string{
-		"$(USERNAME)": name,
-		"$(PASSWD)":   passwd,
-	}
-}
+const KBImage = "KUBEBLOCKS_IMAGE"
+
+const (
+	KBImagePullPolicy = "KUBEBLOCKS_IMAGE_PULL_POLICY"
+)

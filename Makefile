@@ -146,13 +146,13 @@ generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./apis/..."
 
 .PHONY: manager-go-generate
-manager-go-generate: ## Run go generate against code.
+manager-go-generate: ## Run go generate against lifecycle manager code.
 ifeq ($(SKIP_GO_GEN), false)
 	$(GO) generate -x ./internal/configuration/... ./internal/testutil/...
 endif
 
 .PHONY: loadbalancer-go-generate
-loadbalancer-go-generate: ## Run go generate against code.
+loadbalancer-go-generate: ## Run go generate against loadbalancer code.
 ifeq ($(SKIP_GO_GEN), false)
 	$(GO) generate -x ./internal/loadbalancer/...
 endif

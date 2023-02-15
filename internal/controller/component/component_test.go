@@ -20,12 +20,12 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	corev1 "k8s.io/api/core/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	testdbaas "github.com/apecloud/kubeblocks/internal/testutil/dbaas"
-	corev1 "k8s.io/api/core/v1"
 )
 
 const (

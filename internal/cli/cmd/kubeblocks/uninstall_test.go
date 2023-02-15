@@ -24,6 +24,10 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	clientfake "k8s.io/client-go/rest/fake"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
+
+	"github.com/apecloud/kubeblocks/internal/cli/testing"
+	"github.com/apecloud/kubeblocks/internal/cli/types"
+	"github.com/apecloud/kubeblocks/internal/cli/util/helm"
 )
 
 var _ = Describe("kubeblocks", func() {
@@ -35,15 +39,42 @@ var _ = Describe("kubeblocks", func() {
 		streams, _, _, _ = genericclioptions.NewTestIOStreams()
 		tf = cmdtesting.NewTestFactory().WithNamespace(namespace)
 		tf.Client = &clientfake.RESTClient{}
+
+		// use a fake URL to test
+		types.KubeBlocksChartName = testing.KubeBlocksChartName
+		types.KubeBlocksChartURL = testing.KubeBlocksChartURL
 	})
 
 	AfterEach(func() {
 		tf.Cleanup()
 	})
 
-	It("kubeblocks", func() {
-		cmd = NewKubeBlocksCmd(tf, streams)
+	It("check uninstall", func() {
+		var cfg string
+		cmd = newUninstallCmd(tf, streams)
 		Expect(cmd).ShouldNot(BeNil())
-		Expect(cmd.HasSubCommands()).Should(BeTrue())
+
+		cmd.Flags().StringVar(&cfg, "kubeconfig", "", "Path to the kubeconfig file to use for CLI requests.")
+		cmd.Flags().StringVar(&cfg, "context", "", "The name of the kubeconfig context to use.")
+		Expect(cmd.HasSubCommands()).Should(BeFalse())
+
+		o := &Options{
+			IOStreams: streams,
+		}
+		Expect(o.complete(tf, cmd)).Should(Succeed())
+		Expect(o.Namespace).Should(Equal(namespace))
+		Expect(o.HelmCfg).ShouldNot(BeNil())
+	})
+
+	It("run uninstall", func() {
+		o := uninstallOptions{Options{
+			IOStreams: streams,
+			HelmCfg:   helm.FakeActionConfig(),
+			Namespace: "default",
+			Client:    testing.FakeClientSet(),
+			Dynamic:   testing.FakeDynamicClient(testing.FakeVolumeSnapshotClass()),
+		}}
+
+		Expect(o.uninstall()).Should(Succeed())
 	})
 })

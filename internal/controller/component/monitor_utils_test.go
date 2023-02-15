@@ -22,21 +22,21 @@ import (
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 )
 
-func TestIsWellKnownCharacterType(t *testing.T) {
-	var wellKnownCharacterTypeFunc = map[string]func(cluster *dbaasv1alpha1.Cluster, component *Component) error{
+func TestIsSupportedCharacterType(t *testing.T) {
+	var supportedCharacterTypeFunc = map[string]func(cluster *dbaasv1alpha1.Cluster, component *Component) error{
 		"mysql": setMysqlComponent,
 		"redis": nil,
 	}
 
-	if !isMappedCharacterType("mysql", wellKnownCharacterTypeFunc) {
-		t.Error("mysql is well known characterType")
+	if !isMappedCharacterType("mysql", supportedCharacterTypeFunc) {
+		t.Error("mysql is supported characterType")
 	}
 
-	if isMappedCharacterType("redis", wellKnownCharacterTypeFunc) {
-		t.Error("redis is not well known characterType")
+	if isMappedCharacterType("redis", supportedCharacterTypeFunc) {
+		t.Error("redis is not supported characterType")
 	}
 
-	if isMappedCharacterType("other", wellKnownCharacterTypeFunc) {
-		t.Error("other is not well known characterType")
+	if isMappedCharacterType("other", supportedCharacterTypeFunc) {
+		t.Error("other is not supported characterType")
 	}
 }

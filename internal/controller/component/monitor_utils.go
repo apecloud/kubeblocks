@@ -28,26 +28,29 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
-// ClusterDefinition Type Const Define
-const (
-	kStateMysql = "state.mysql"
-)
-
 // ClusterDefinitionComponent CharacterType Const Define
 const (
-	kMysql = "mysql"
+	kMysql             = "mysql"
+	defaultMonitorPort = 9104
 )
 
 var (
-	wellKnownCharacterTypeFunc = map[string]func(cluster *dbaasv1alpha1.Cluster, component *Component) error{
+	supportedCharacterTypeFunc = map[string]func(cluster *dbaasv1alpha1.Cluster, component *Component) error{
 		kMysql: setMysqlComponent,
 	}
 	//go:embed cue/*
-	CueTemplates embed.FS
+	cueTemplates embed.FS
 )
 
-func buildMysqlContainer(key string, monitor *MysqlMonitor) (*corev1.Container, error) {
-	cueFS, _ := debme.FS(CueTemplates, "cue/monitor")
+type mysqlMonitorConfig struct {
+	SecretName      string `json:"secretName"`
+	InternalPort    int32  `json:"internalPort"`
+	Image           string `json:"image"`
+	ImagePullPolicy string `json:"imagePullPolicy"`
+}
+
+func buildMysqlMonitorContainer(key string, monitor *mysqlMonitorConfig) (*corev1.Container, error) {
+	cueFS, _ := debme.FS(cueTemplates, "cue/monitor")
 
 	cueTpl, err := intctrlutil.NewCUETplFromBytes(cueFS.ReadFile("mysql_template.cue"))
 	if err != nil {
@@ -76,19 +79,18 @@ func buildMysqlContainer(key string, monitor *MysqlMonitor) (*corev1.Container, 
 }
 
 func setMysqlComponent(cluster *dbaasv1alpha1.Cluster, component *Component) error {
-	image := viper.GetString("KUBEBLOCKS_IMAGE")
-	imagePullPolicy := viper.GetString("KUBEBLOCKS_IMAGE_PULL_POLICY")
+	image := viper.GetString(intctrlutil.KBImage)
+	imagePullPolicy := viper.GetString(intctrlutil.KBImagePullPolicy)
 
-	mysqlMonitor := &MysqlMonitor{
+	mysqlMonitorConfig := &mysqlMonitorConfig{
 		SecretName: cluster.Name,
-		// HACK: fixed port value
-		// TODO: port value is checked against other containers.
-		InternalPort:    9104,
+		// TODO: port value will be checked against other containers.
+		InternalPort:    defaultMonitorPort,
 		Image:           image,
 		ImagePullPolicy: imagePullPolicy,
 	}
 
-	container, err := buildMysqlContainer(cluster.Name, mysqlMonitor)
+	container, err := buildMysqlMonitorContainer(cluster.Name, mysqlMonitorConfig)
 	if err != nil {
 		return err
 	}
@@ -97,14 +99,14 @@ func setMysqlComponent(cluster *dbaasv1alpha1.Cluster, component *Component) err
 	component.Monitor = &MonitorConfig{
 		Enable:     true,
 		ScrapePath: "/metrics",
-		ScrapePort: mysqlMonitor.InternalPort,
+		ScrapePort: mysqlMonitorConfig.InternalPort,
 	}
 	return nil
 }
 
-// isWellKnownCharacterType check CharacterType is wellknown
-func isWellKnownCharacterType(characterType string) bool {
-	return isMappedCharacterType(characterType, wellKnownCharacterTypeFunc)
+// isSupportedCharacterType check CharacterType is wellknown
+func isSupportedCharacterType(characterType string) bool {
+	return isMappedCharacterType(characterType, supportedCharacterTypeFunc)
 }
 
 func isMappedCharacterType(characterType string,

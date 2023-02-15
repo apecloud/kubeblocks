@@ -81,7 +81,7 @@ jobs:
       - name: Move Released Issue
         run: |
           cd ${{ github.workspace }}
-          bash ${{ github.workspace }}/.github/utils/issue-release.sh \
+          bash ${{ github.workspace }}/.github/utils/issue_release.sh \
             ${{ env.GITHUB_TOKEN }} \
             ${{ github.repository }} \
             ${{ github.repository_owner }} \

@@ -17,7 +17,7 @@ limitations under the License.
 package dbaastest
 
 import (
-	"context"
+	"fmt"
 	"strconv"
 	"strings"
 
@@ -25,7 +25,6 @@ import (
 	. "github.com/onsi/gomega"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -52,13 +51,9 @@ var _ = Describe("Redis Horizontal Scale function", func() {
 
 	const primaryIndex = 0
 	const replicas = 3
-	const horizontalScaleInReplicas = 2
-	const horizontalScaleOutReplicas = 4
 
 	const Primary = "primary"
 	const Secondary = "secondary"
-
-	ctx := context.Background()
 
 	// Cleanups
 
@@ -99,32 +94,24 @@ var _ = Describe("Redis Horizontal Scale function", func() {
 	testReplicationRedisHorizontalScale := func() {
 
 		By("Mock a cluster obj with replication componentType.")
-		pvcSpec := &corev1.PersistentVolumeClaimSpec{
-			AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
-			Resources: corev1.ResourceRequirements{
-				Requests: corev1.ResourceList{
-					corev1.ResourceStorage: resource.MustParse("1Gi"),
-				},
-			},
-		}
-
+		pvcSpec := testdbaas.NewPVC("1Gi")
 		clusterObj = testdbaas.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
 			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
 			AddComponent(redisCompName, redisCompType).
 			SetPrimaryIndex(primaryIndex).
-			SetReplicas(replicas).AddVolumeClaimTemplate(testdbaas.DataVolumeName, pvcSpec).
+			SetReplicas(replicas).AddVolumeClaimTemplate(testdbaas.DataVolumeName, &pvcSpec).
 			Create(&testCtx).GetObject()
 		clusterKey = client.ObjectKeyFromObject(clusterObj)
 
 		By("Waiting for cluster creation")
-		Eventually(testdbaas.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(0))
+		Eventually(testdbaas.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
 
-		By("Waiting the cluster is running")
+		By("Waiting for the cluster to be running")
 		Eventually(testdbaas.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(dbaasv1alpha1.RunningPhase))
 
 		By("Checking statefulSet number")
 		stsList := testk8s.ListAndCheckStatefulSet(&testCtx, clusterKey)
-		Expect(len(stsList.Items) == replicas).Should(BeTrue())
+		Expect(len(stsList.Items)).Should(BeEquivalentTo(replicas))
 
 		By("Checking statefulSet role label")
 		for _, sts := range stsList.Items {
@@ -139,7 +126,7 @@ var _ = Describe("Redis Horizontal Scale function", func() {
 		for _, sts := range stsList.Items {
 			podList, err := util.GetPodListByStatefulSet(ctx, k8sClient, &sts)
 			Expect(err).To(Succeed())
-			Expect(len(podList) == 1).Should(BeTrue())
+			Expect(len(podList)).Should(BeEquivalentTo(1))
 			if strings.HasSuffix(sts.Name, strconv.Itoa(primaryIndex)) {
 				Expect(podList[0].Labels[intctrlutil.RoleLabelKey] == Primary).Should(BeTrue())
 			} else {
@@ -162,45 +149,25 @@ var _ = Describe("Redis Horizontal Scale function", func() {
 		}
 		Expect(externalSvc).ShouldNot(BeNil())
 
-		By("horizontal scale out to horizontalScaleOutReplicas")
-		patch := client.MergeFrom(clusterObj.DeepCopy())
-		*clusterObj.Spec.Components[0].Replicas = int32(horizontalScaleOutReplicas)
-		Expect(k8sClient.Patch(ctx, clusterObj, patch)).Should(Succeed())
+		for _, newReplicas := range []int32{4, 2, 7, 1} {
+			By(fmt.Sprintf("horizontal scale out to %d", newReplicas))
+			Expect(testdbaas.ChangeObj(&testCtx, clusterObj, func() {
+				*clusterObj.Spec.Components[0].Replicas = newReplicas
+			})).Should(Succeed())
 
-		By("Waiting the cluster is running")
-		Eventually(testdbaas.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(dbaasv1alpha1.RunningPhase))
+			By("Wait for the cluster to be running")
+			Consistently(testdbaas.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(dbaasv1alpha1.RunningPhase))
 
-		By("Checking pods' status and count are updated in cluster status after scale-out")
-		Eventually(func(g Gomega) {
-			fetched := &dbaasv1alpha1.Cluster{}
-			g.Expect(k8sClient.Get(ctx, clusterKey, fetched)).To(Succeed())
-			compName := fetched.Spec.Components[0].Name
-			g.Expect(fetched.Status.Components != nil).To(BeTrue())
-			g.Expect(fetched.Status.Components).To(HaveKey(compName))
-			replicationStatus := fetched.Status.Components[compName].ReplicationSetStatus
-			g.Expect(replicationStatus != nil).To(BeTrue())
-			g.Expect(len(replicationStatus.Secondaries) == horizontalScaleOutReplicas-1).To(BeTrue())
-		}).Should(Succeed())
-
-		By("horizontal scale in to horizontalScaleInReplicas")
-		patch = client.MergeFrom(clusterObj.DeepCopy())
-		*clusterObj.Spec.Components[0].Replicas = int32(horizontalScaleInReplicas)
-		Expect(k8sClient.Patch(ctx, clusterObj, patch)).Should(Succeed())
-
-		By("Waiting the cluster is running")
-		Eventually(testdbaas.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(dbaasv1alpha1.RunningPhase))
-
-		By("Checking pods' status and count are updated in cluster status after scale-in")
-		Eventually(func(g Gomega) {
-			fetched := &dbaasv1alpha1.Cluster{}
-			g.Expect(k8sClient.Get(ctx, clusterKey, fetched)).To(Succeed())
-			compName := fetched.Spec.Components[0].Name
-			g.Expect(fetched.Status.Components != nil).To(BeTrue())
-			g.Expect(fetched.Status.Components).To(HaveKey(compName))
-			replicationStatus := fetched.Status.Components[compName].ReplicationSetStatus
-			g.Expect(replicationStatus != nil).To(BeTrue())
-			g.Expect(len(replicationStatus.Secondaries) == horizontalScaleInReplicas-1).To(BeTrue())
-		}).Should(Succeed())
+			By("Checking pods' status and count are updated in cluster status after scale-out")
+			Eventually(testdbaas.CheckObj(&testCtx, clusterKey, func(g Gomega, fetched *dbaasv1alpha1.Cluster) {
+				compName := fetched.Spec.Components[0].Name
+				g.Expect(fetched.Status.Components).NotTo(BeNil())
+				g.Expect(fetched.Status.Components).To(HaveKey(compName))
+				replicationStatus := fetched.Status.Components[compName].ReplicationSetStatus
+				g.Expect(replicationStatus).NotTo(BeNil())
+				g.Expect(len(replicationStatus.Secondaries)).To(BeEquivalentTo(newReplicas - 1))
+			})).Should(Succeed())
+		}
 	}
 
 	// Scenarios

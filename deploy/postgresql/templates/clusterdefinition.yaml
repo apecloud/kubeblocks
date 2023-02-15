@@ -1,7 +1,7 @@
 apiVersion: dbaas.kubeblocks.io/v1alpha1
 kind: ClusterDefinition
 metadata:
-  name: apecloud-postgresql
+  name: postgresql
   labels:
     {{- include "postgresql.labels" . | nindent 4 }}
 spec:
@@ -56,7 +56,7 @@ spec:
           - name: postgresql
             imagePullPolicy: {{ default .Values.image.pullPolicy "IfNotPresent" }}
             securityContext:
-              runAsUser: 1001            
+              runAsUser: 0            
             volumeMounts:
               - name: dshm
                 mountPath: /dev/shm
@@ -170,8 +170,7 @@ spec:
             image:  {{ .Values.metrics.image.repository }}:{{ .Values.metrics.image.tag }}
             imagePullPolicy: {{ .Values.metrics.image.pullPolicy | quote }}
             securityContext:
-              runAsNonRoot: true
-              runAsUser: 1001         
+              runAsUser: 0         
             env:
               {{- $database := "postgres" }}
               {{- $sslmode := "disable" }}
@@ -218,7 +217,7 @@ spec:
               {{- end }}
       systemAccounts:
         cmdExecutorConfig:
-          image: docker.io/postgres:alpine
+          image: {{ .Values.image.repository }}:{{ default .Values.image.tag .Chart.AppVersion }}
           command: ["psql"]
           args:
           - -h$(KB_ACCOUNT_ENDPOINT) 

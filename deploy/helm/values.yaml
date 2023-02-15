@@ -179,6 +179,15 @@ prometheus:
       repository: docker.io/apecloud/alertmanager
       tag: v0.24.0
 
+    ## Node tolerations for alertmanager scheduling to nodes with taints
+    ## Ref: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/
+    ##
+    tolerations: [ ]
+      # - key: "key"
+      #   operator: "Equal|Exists"
+      #   value: "value"
+      #   effect: "NoSchedule|PreferNoSchedule|NoExecute(1.6 only)"
+
     persistentVolume:
       ## If true, alertmanager will create/use a Persistent Volume Claim
       ## If false, use emptyDir
@@ -272,6 +281,15 @@ prometheus:
     ## Useful for proxies that rewrite URLs.
     ##
     routePrefix: /
+
+    ## Node tolerations for server scheduling to nodes with taints
+    ## Ref: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/
+    ##
+    tolerations: [ ]
+      # - key: "key"
+      #   operator: "Equal|Exists"
+      #   value: "value"
+      #   effect: "NoSchedule|PreferNoSchedule|NoExecute(1.6 only)"
 
     persistentVolume:
       ## If true, Prometheus server will create/use a Persistent Volume Claim
@@ -900,6 +918,15 @@ grafana:
     # requests:
     #   cpu: 100m
     #   memory: 128Mi
+
+  ## Node tolerations for grafana scheduling to nodes with taints
+  ## Ref: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/
+  ##
+  tolerations: [ ]
+    # - key: "key"
+    #   operator: "Equal|Exists"
+    #   value: "value"
+    #   effect: "NoSchedule|PreferNoSchedule|NoExecute(1.6 only)"
 
   ## Timezone for the default dashboards
   ## Other options are: browser or a specific timezone, i.e. Europe/Luxembourg

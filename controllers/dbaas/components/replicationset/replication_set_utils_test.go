@@ -35,11 +35,9 @@ import (
 var _ = Describe("ReplicationSet Util", func() {
 
 	var (
-		randomStr           = testCtx.GetRandomStr()
-		clusterNamePrefix   = "cluster-replication"
-		clusterDefName      = "cluster-def-replication-" + randomStr
-		clusterVersionName  = "cluster-version-replication-" + randomStr
-		replicationCompName = "replication"
+		clusterName        = "test-cluster-repl"
+		clusterDefName     = "test-cluster-def-repl"
+		clusterVersionName = "test-cluster-version-repl"
 	)
 
 	var (
@@ -49,9 +47,6 @@ var _ = Describe("ReplicationSet Util", func() {
 	)
 
 	const replicas = 2
-	const redisImage = "redis:7.0.5"
-	const redisCompType = "replication"
-	const redisCompName = "redis-rsts"
 
 	cleanAll := func() {
 		// must wait until resources deleted and no longer exist before the testcases start,
@@ -77,9 +72,9 @@ var _ = Describe("ReplicationSet Util", func() {
 	testHandleReplicationSet := func() {
 
 		By("Creating a cluster with replication componentType.")
-		clusterObj = testdbaas.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
+		clusterObj = testdbaas.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
 			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
-			AddComponent(redisCompName, redisCompType).
+			AddComponent(testdbaas.DefaultRedisCompName, testdbaas.DefaultRedisCompType).
 			SetReplicas(replicas).
 			SetPrimaryIndex(testdbaas.DefaultReplicationPrimaryIndex).
 			Create(&testCtx).GetObject()
@@ -87,56 +82,42 @@ var _ = Describe("ReplicationSet Util", func() {
 		By("Creating a statefulSet of replication componentType.")
 		container := corev1.Container{
 			Name:            "mock-redis-container",
-			Image:           redisImage,
+			Image:           testdbaas.DefaultRedisImageName,
 			ImagePullPolicy: corev1.PullIfNotPresent,
 		}
-
 		stsList := make([]*appsv1.StatefulSet, 0)
-		primaryStsName := clusterObj.Name + "-" + redisCompName + "-0"
-		primarySts := testdbaas.NewStatefulSetFactory(testCtx.DefaultNamespace, primaryStsName, clusterObj.Name, redisCompName).
-			AddContainer(container).
-			AddLabels(intctrlutil.AppInstanceLabelKey, clusterObj.Name,
-				intctrlutil.AppComponentLabelKey, redisCompName,
-				intctrlutil.AppManagedByLabelKey, testdbaas.KubeBlocks,
-				intctrlutil.RoleLabelKey, string(Primary)).
-			SetReplicas(1).
-			Create(&testCtx).GetObject()
-		stsList = append(stsList, primarySts)
-
-		By("Test statefulSet is primary should be true.")
-		Expect(CheckStsIsPrimary(primarySts)).Should(BeTrue())
-
-		secondaryStsName := clusterObj.Name + "-" + redisCompName + "-1"
-		secondarySts := testdbaas.NewStatefulSetFactory(testCtx.DefaultNamespace, secondaryStsName, clusterObj.Name, redisCompName).
-			AddContainer(container).
-			AddLabels(intctrlutil.AppInstanceLabelKey, clusterObj.Name,
-				intctrlutil.AppComponentLabelKey, redisCompName,
-				intctrlutil.AppManagedByLabelKey, testdbaas.KubeBlocks,
-				intctrlutil.RoleLabelKey, string(Secondary)).
-			SetReplicas(1).
-			Create(&testCtx).GetObject()
-		stsList = append(stsList, secondarySts)
-
-		By("Test statefulSet is primary should be false.")
-		Expect(CheckStsIsPrimary(secondarySts)).ShouldNot(BeTrue())
+		for k, v := range map[string]string{
+			string(Primary):   clusterObj.Name + "-" + testdbaas.DefaultRedisCompName + "-0",
+			string(Secondary): clusterObj.Name + "-" + testdbaas.DefaultRedisCompName + "-1",
+		} {
+			sts := testdbaas.NewStatefulSetFactory(testCtx.DefaultNamespace, v, clusterObj.Name, testdbaas.DefaultRedisCompName).
+				AddContainer(container).
+				AddLabels(intctrlutil.AppInstanceLabelKey, clusterObj.Name,
+					intctrlutil.AppComponentLabelKey, testdbaas.DefaultRedisCompName,
+					intctrlutil.AppManagedByLabelKey, testdbaas.KubeBlocks,
+					intctrlutil.RoleLabelKey, k).
+				SetReplicas(1).
+				Create(&testCtx).GetObject()
+			if k == string(Primary) {
+				Expect(CheckStsIsPrimary(sts)).Should(BeTrue())
+			} else {
+				Expect(CheckStsIsPrimary(sts)).ShouldNot(BeTrue())
+			}
+			stsList = append(stsList, sts)
+		}
 
 		By("Test handleReplicationSet return err when there is no pod in sts.")
 		err := HandleReplicationSet(ctx, k8sClient, clusterObj, stsList)
 		Expect(err).ShouldNot(Succeed())
-		Expect(err.Error()).Should(ContainSubstring("pod number in statefulset"))
+		Expect(err.Error()).Should(ContainSubstring("is not 1"))
 
 		By("Creating Pods of replication componentType.")
-		primaryPodName := primarySts.Name + "-0"
-		_ = testdbaas.NewPodFactory(testCtx.DefaultNamespace, primaryPodName).
-			AddContainer(container).
-			AddLabelsInMap(primarySts.Labels).
-			Create(&testCtx).GetObject()
-
-		secondaryPodName := secondarySts.Name + "-0"
-		_ = testdbaas.NewPodFactory(testCtx.DefaultNamespace, secondaryPodName).
-			AddContainer(container).
-			AddLabelsInMap(secondarySts.Labels).
-			Create(&testCtx).GetObject()
+		for _, sts := range stsList {
+			_ = testdbaas.NewPodFactory(testCtx.DefaultNamespace, sts.Name+"-0").
+				AddContainer(container).
+				AddLabelsInMap(sts.Labels).
+				Create(&testCtx).GetObject()
+		}
 
 		By("Test handleReplicationSet success when stsList count equal cluster.replicas.")
 		err = HandleReplicationSet(ctx, k8sClient, clusterObj, stsList)
@@ -151,26 +132,26 @@ var _ = Describe("ReplicationSet Util", func() {
 
 	testNeedUpdateReplicationSetStatus := func() {
 		By("Creating a cluster with replication componentType.")
-		clusterObj = testdbaas.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
+		clusterObj = testdbaas.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
 			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
-			AddComponent(redisCompName, redisCompType).Create(&testCtx).GetObject()
+			AddComponent(testdbaas.DefaultRedisCompName, testdbaas.DefaultRedisCompType).Create(&testCtx).GetObject()
 
 		By("init replicationSet cluster status")
 		patch := client.MergeFrom(clusterObj.DeepCopy())
 		clusterObj.Status.Phase = dbaasv1alpha1.RunningPhase
 		clusterObj.Status.Components = map[string]dbaasv1alpha1.ClusterStatusComponent{
-			redisCompName: {
+			testdbaas.DefaultRedisCompName: {
 				Phase: dbaasv1alpha1.RunningPhase,
 				ReplicationSetStatus: &dbaasv1alpha1.ReplicationSetStatus{
 					Primary: dbaasv1alpha1.ReplicationMemberStatus{
-						Pod: clusterObj.Name + redisCompName + "-0-0",
+						Pod: clusterObj.Name + testdbaas.DefaultRedisCompName + "-0-0",
 					},
 					Secondaries: []dbaasv1alpha1.ReplicationMemberStatus{
 						{
-							Pod: clusterObj.Name + redisCompName + "-1-0",
+							Pod: clusterObj.Name + testdbaas.DefaultRedisCompName + "-1-0",
 						},
 						{
-							Pod: clusterObj.Name + redisCompName + "-2-0",
+							Pod: clusterObj.Name + testdbaas.DefaultRedisCompName + "-2-0",
 						},
 					},
 				},
@@ -180,39 +161,38 @@ var _ = Describe("ReplicationSet Util", func() {
 
 		By("testing sync cluster status with add pod")
 		var podList []*corev1.Pod
-		set := testk8s.NewFakeStatefulSet(clusterObj.Name+redisCompName+"-3", 3)
-		pod := testk8s.NewFakeStatefulSetPod(set, 0)
-		pod.Labels = make(map[string]string, 0)
-		pod.Labels[intctrlutil.RoleLabelKey] = "secondary"
+		sts := testk8s.NewFakeStatefulSet(clusterObj.Name+testdbaas.DefaultRedisCompName+"-3", 3)
+		pod := testdbaas.NewPodFactory(testCtx.DefaultNamespace, sts.Name+"-0").
+			AddContainer(corev1.Container{Name: testdbaas.DefaultRedisContainerName, Image: testdbaas.DefaultRedisImageName}).
+			AddLabels(intctrlutil.RoleLabelKey, string(Secondary)).
+			Create(&testCtx).GetObject()
 		podList = append(podList, pod)
-		Expect(needUpdateReplicationSetStatus(clusterObj.Status.Components[redisCompName].ReplicationSetStatus, podList)).Should(BeTrue())
+		Expect(needUpdateReplicationSetStatus(clusterObj.Status.Components[testdbaas.DefaultRedisCompName].ReplicationSetStatus, podList)).Should(BeTrue())
 
 		By("testing sync cluster status with remove pod")
 		var podRemoveList []corev1.Pod
-		set = testk8s.NewFakeStatefulSet(clusterObj.Name+redisCompName+"-2", 3)
-		pod = testk8s.NewFakeStatefulSetPod(set, 0)
-		pod.Labels = make(map[string]string, 0)
-		pod.Labels[intctrlutil.RoleLabelKey] = "secondary"
+		sts = testk8s.NewFakeStatefulSet(clusterObj.Name+testdbaas.DefaultRedisCompName+"-2", 3)
+		pod = testdbaas.NewPodFactory(testCtx.DefaultNamespace, sts.Name+"-0").
+			AddContainer(corev1.Container{Name: testdbaas.DefaultRedisContainerName, Image: testdbaas.DefaultRedisImageName}).
+			AddLabels(intctrlutil.RoleLabelKey, string(Secondary)).
+			Create(&testCtx).GetObject()
 		podRemoveList = append(podRemoveList, *pod)
-		Expect(needRemoveReplicationSetStatus(clusterObj.Status.Components[redisCompName].ReplicationSetStatus, podRemoveList)).Should(BeTrue())
+		Expect(needRemoveReplicationSetStatus(clusterObj.Status.Components[testdbaas.DefaultRedisCompName].ReplicationSetStatus, podRemoveList)).Should(BeTrue())
 	}
 
 	testGeneratePVCFromVolumeClaimTemplates := func() {
 		By("Creating a cluster with replication componentType.")
-		clusterObj = testdbaas.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
+		clusterObj = testdbaas.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
 			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
-			AddComponent(redisCompName, redisCompType).
+			AddComponent(testdbaas.DefaultRedisCompName, testdbaas.DefaultRedisCompType).
 			SetReplicas(replicas).
 			SetPrimaryIndex(testdbaas.DefaultReplicationPrimaryIndex).
 			Create(&testCtx).GetObject()
 
+		By("Creating a statefulSet of replication componentType.")
 		mockStsName := "mock-stateful-set-0"
-		mockSts := testdbaas.NewStatefulSetFactory(testCtx.DefaultNamespace, mockStsName, clusterObj.Name, redisCompName).
-			AddLabels(intctrlutil.AppInstanceLabelKey, clusterObj.Name,
-				intctrlutil.AppComponentLabelKey, redisCompName,
-				intctrlutil.AppManagedByLabelKey, testdbaas.KubeBlocks,
-				intctrlutil.RoleLabelKey, string(Primary)).
-			SetReplicas(1).
+		mockSts := testdbaas.NewStatefulSetFactory(testCtx.DefaultNamespace, mockStsName, clusterObj.Name, testdbaas.DefaultRedisCompName).
+			AddContainer(corev1.Container{Name: testdbaas.DefaultRedisContainerName, Image: testdbaas.DefaultRedisImageName}).
 			Create(&testCtx).GetObject()
 
 		mockVCTList := []corev1.PersistentVolumeClaimTemplate{
@@ -228,7 +208,7 @@ var _ = Describe("ReplicationSet Util", func() {
 		}
 		pvcMap := GeneratePVCFromVolumeClaimTemplates(mockSts, mockVCTList)
 		for _, pvc := range pvcMap {
-			Expect(pvc.Name == "mock-vct-mock-stateful-set-0-0").Should(BeTrue())
+			Expect(pvc.Name).Should(BeEquivalentTo("mock-vct-mock-stateful-set-0-0"))
 		}
 	}
 
@@ -238,12 +218,12 @@ var _ = Describe("ReplicationSet Util", func() {
 		BeforeEach(func() {
 			By("Create a clusterDefinition obj with replication componentType.")
 			clusterDefObj = testdbaas.NewClusterDefFactory(clusterDefName, testdbaas.RedisType).
-				AddComponent(testdbaas.ReplicationRedisComponent, replicationCompName).
+				AddComponent(testdbaas.ReplicationRedisComponent, testdbaas.DefaultRedisCompType).
 				Create(&testCtx).GetObject()
 
 			By("Create a clusterVersion obj with replication componentType.")
 			clusterVersionObj = testdbaas.NewClusterVersionFactory(clusterVersionName, clusterDefObj.GetName()).
-				AddComponent(replicationCompName).AddContainerShort("redis", redisImage).
+				AddComponent(testdbaas.DefaultRedisCompType).AddContainerShort(testdbaas.DefaultRedisContainerName, testdbaas.DefaultRedisImageName).
 				Create(&testCtx).GetObject()
 
 		})

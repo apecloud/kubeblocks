@@ -23,22 +23,29 @@ import (
 )
 
 const (
-	KubeBlocks                     = "kubeblocks"
-	MySQLType                      = "state.mysql"
-	RedisType                      = "state.redis"
-	ApeCloudMySQLImage             = "docker.io/apecloud/apecloud-mysql-server:latest"
-	NginxImage                     = "nginx"
-	DefaultNginxContainerName      = "nginx"
-	DefaultMySQLContainerName      = "mysql"
-	DefaultRedisContainerName      = "redis"
-	DefaultRedisInitContainerName  = "redis-init-container"
-	DataVolumeName                 = "data"
-	LogVolumeName                  = "log"
-	ConfVolumeName                 = "conf"
-	ScriptsVolumeName              = "scripts"
+	KubeBlocks        = "kubeblocks"
+	LogVolumeName     = "log"
+	ConfVolumeName    = "conf"
+	DataVolumeName    = "data"
+	ScriptsVolumeName = "scripts"
+
 	ReplicationPodRoleVolume       = "pod-role"
 	ReplicationRoleLabelFieldPath  = "metadata.labels['kubeblocks.io/role']"
 	DefaultReplicationPrimaryIndex = 0
+
+	MySQLType                 = "state.mysql"
+	ApeCloudMySQLImage        = "docker.io/apecloud/apecloud-mysql-server:latest"
+	DefaultMySQLContainerName = "mysql"
+
+	NginxImage                = "nginx"
+	DefaultNginxContainerName = "nginx"
+
+	RedisType                     = "state.redis"
+	DefaultRedisCompType          = "replication"
+	DefaultRedisCompName          = "redis-rsts"
+	DefaultRedisImageName         = "redis:7.0.5"
+	DefaultRedisContainerName     = "redis"
+	DefaultRedisInitContainerName = "redis-init-container"
 )
 
 var (

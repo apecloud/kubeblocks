@@ -881,14 +881,14 @@ var _ = Describe("Cluster Controller", func() {
 
 		By("Checking statefulSet number")
 		stsList := testk8s.ListAndCheckStatefulSet(&testCtx, clusterKey)
-		Expect(len(stsList.Items) == 2).Should(BeTrue())
+		Expect(len(stsList.Items)).Should(BeEquivalentTo(2))
 
 		By("Checking statefulSet role label")
 		for _, sts := range stsList.Items {
 			if strings.HasSuffix(sts.Name, strconv.Itoa(primaryIndex)) {
-				Expect(sts.Labels[intctrlutil.RoleLabelKey] == Primary).Should(BeTrue())
+				Expect(sts.Labels[intctrlutil.RoleLabelKey]).Should(BeEquivalentTo(Primary))
 			} else {
-				Expect(sts.Labels[intctrlutil.RoleLabelKey] == Secondary).Should(BeTrue())
+				Expect(sts.Labels[intctrlutil.RoleLabelKey]).Should(BeEquivalentTo(Secondary))
 			}
 		}
 
@@ -929,7 +929,7 @@ var _ = Describe("Cluster Controller", func() {
 			replicationStatus := fetched.Status.Components[compName].ReplicationSetStatus
 			g.Expect(replicationStatus != nil).To(BeTrue())
 			g.Expect(replicationStatus.Primary.Pod).To(BeElementOf(getReplicationSetStsPodsName(stsList.Items)))
-			g.Expect(len(replicationStatus.Secondaries) == 1).To(BeTrue())
+			g.Expect(len(replicationStatus.Secondaries)).To(BeEquivalentTo(1))
 			g.Expect(replicationStatus.Secondaries[0].Pod).To(BeElementOf(getReplicationSetStsPodsName(stsList.Items)))
 		}).Should(Succeed())
 	}

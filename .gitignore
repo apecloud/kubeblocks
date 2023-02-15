@@ -26,6 +26,8 @@ __debug_bin
 cover.html
 .coverage/
 
+internal/configuration/container/mocks/*_mocks.go
+
 # Project-local glide cache, RE: https://github.com/Masterminds/glide/issues/736
 .glide/
 

@@ -141,9 +141,8 @@ type CreateOptions struct {
 	Tolerations       []interface{}            `json:"tolerations,omitempty"`
 	Components        []map[string]interface{} `json:"components"`
 
-	SetFile        string   `json:"-"`
-	Values         []string `json:"-"`
-	TolerationsRaw []string `json:"-"`
+	SetFile string   `json:"-"`
+	Values  []string `json:"-"`
 
 	// backup name to restore in creation
 	Backup string `json:"backup,omitempty"`

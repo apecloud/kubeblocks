@@ -21,6 +21,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"os"
 	"strconv"
@@ -28,22 +29,20 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dapr/components-contrib/bindings"
-	"github.com/dapr/kit/logger"
-	"github.com/go-sql-driver/mysql"
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
+	"github.com/go-sql-driver/mysql"
+	"github.com/dapr/kit/logger"
+	"github.com/dapr/components-contrib/bindings"
 
-	"github.com/apecloud/kubeblocks/cmd/probe/internal"
+	. "github.com/apecloud/kubeblocks/cmd/probe/internal/binding"
 )
 
-// Mysql represents MySQL output bindings.
-type Mysql struct {
+// MysqlOperations represents MySQL output bindings.
+type MysqlOperations struct {
 	db       *sql.DB
 	mu       sync.Mutex
-	logger   logger.Logger
-	metadata bindings.Metadata
-	base     internal.ProbeBase
+	BaseOperations
 }
 
 const (
@@ -74,11 +73,12 @@ var (
 
 // NewMysql returns a new MySQL output binding.
 func NewMysql(logger logger.Logger) bindings.OutputBinding {
-	return &Mysql{logger: logger}
+	return &MysqlOperations{BaseOperations: BaseOperations{Logger: logger}}
 }
 
 // Init initializes the MySQL binding.
-func (m *Mysql) Init(metadata bindings.Metadata) error {
+func (mysqlOps *MysqlOperations) Init(metadata bindings.Metadata) error {
+	mysqlOps.BaseOperations.Init(metadata)
 	if viper.IsSet("KB_SERVICE_USER") {
 		dbUser = viper.GetString("KB_SERVICE_USER")
 	}
@@ -87,53 +87,40 @@ func (m *Mysql) Init(metadata bindings.Metadata) error {
 		dbPasswd = viper.GetString("KB_SERVICE_PASSWORD")
 	}
 
-	m.logger.Debug("Initializing MySQL binding")
-	m.metadata = metadata
-
-	m.base = internal.ProbeBase{
-		Logger:    m.logger,
-		Operation: m,
-	}
-	m.base.Init()
-
+	mysqlOps.Logger.Debug("Initializing MySQL binding")
+	mysqlOps.DBType = "mysql"
+	mysqlOps.InitIfNeed = mysqlOps.initIfNeed
+	mysqlOps.BaseOperations.GetRole = mysqlOps.GetRole
+	mysqlOps.DbPort = mysqlOps.GetRunningPort()
+	mysqlOps.OperationMap[GetRoleOperation] = mysqlOps.GetRoleOps
 	return nil
 }
 
-// Invoke handles all invoke operations.
-func (m *Mysql) Invoke(ctx context.Context, req *bindings.InvokeRequest) (*bindings.InvokeResponse, error) {
-	return m.base.Invoke(ctx, req)
-}
-
-// Operations returns list of operations supported by Mysql binding.
-func (m *Mysql) Operations() []bindings.OperationKind {
-	return m.base.Operations()
-}
-
-func (m *Mysql) InitIfNeed() error {
-	if m.db == nil {
+func (mysqlOps *MysqlOperations) initIfNeed() bool {
+	if mysqlOps.db == nil {
 		go func() {
-			err := m.InitDelay()
-			m.logger.Errorf("MySQl connection init failed: %v", err)
+			err := mysqlOps.InitDelay()
+			mysqlOps.Logger.Errorf("MySQl connection init failed: %v", err)
 		}()
-		return fmt.Errorf("init DB connection asynchronously")
+		return true
 	}
-	return nil
+	return false
 }
 
-func (m *Mysql) InitDelay() error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	if m.db != nil {
+func (mysqlOps *MysqlOperations) InitDelay() error {
+	mysqlOps.mu.Lock()
+	defer mysqlOps.mu.Unlock()
+	if mysqlOps.db != nil {
 		return nil
 	}
 
-	p := m.metadata.Properties
+	p := mysqlOps.Metadata.Properties
 	url, ok := p[connectionURLKey]
 	if !ok || url == "" {
 		return fmt.Errorf("missing MySql connection string")
 	}
 
-	db, err := initDB(url, m.metadata.Properties[pemPathKey])
+	db, err := initDB(url, mysqlOps.Metadata.Properties[pemPathKey])
 	if err != nil {
 		return err
 	}
@@ -161,16 +148,16 @@ func (m *Mysql) InitDelay() error {
 	// test if db is ready to connect or not
 	err = db.Ping()
 	if err != nil {
-		m.logger.Infof("unable to ping the DB")
+		mysqlOps.Logger.Infof("unable to ping the DB")
 		return errors.Wrap(err, "unable to ping the DB")
 	}
-	m.db = db
+	mysqlOps.db = db
 
 	return nil
 }
 
-func (m *Mysql) GetRunningPort() int {
-	p := m.metadata.Properties
+func (mysqlOps *MysqlOperations) GetRunningPort() int {
+	p := mysqlOps.Metadata.Properties
 	url, ok := p[connectionURLKey]
 	if !ok || url == "" {
 		return defaultDBPort
@@ -192,18 +179,15 @@ func (m *Mysql) GetRunningPort() int {
 	return port
 }
 
-func (m *Mysql) GetRole(ctx context.Context, sql string) (string, error) {
-	m.logger.Debugf("query: %s", sql)
-	if sql == "" {
-		sql = "select CURRENT_LEADER, ROLE, SERVER_ID  from information_schema.wesql_cluster_local"
-	}
+func (mysqlOps *MysqlOperations) GetRole(ctx context.Context, request *bindings.InvokeRequest, response *bindings.InvokeResponse) (string, error) {
+	sql := "select CURRENT_LEADER, ROLE, SERVER_ID  from information_schema.wesql_cluster_local"
 
 	// sql exec timeout need to be less than httpget's timeout which default is 1s.
 	ctx1, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
 	defer cancel()
-	rows, err := m.db.QueryContext(ctx1, sql)
+	rows, err := mysqlOps.db.QueryContext(ctx1, sql)
 	if err != nil {
-		m.logger.Infof("error executing %s: %v", sql, err)
+		mysqlOps.Logger.Infof("error executing %s: %v", sql, err)
 		return "", errors.Wrapf(err, "error executing %s", sql)
 	}
 
@@ -217,15 +201,23 @@ func (m *Mysql) GetRole(ctx context.Context, sql string) (string, error) {
 	var serverID string
 	for rows.Next() {
 		if err = rows.Scan(&curLeader, &role, &serverID); err != nil {
-			m.logger.Errorf("checkRole error: %", err)
+			mysqlOps.Logger.Errorf("checkRole error: %", err)
 			return role, err
 		}
 	}
 	return role, nil
 }
+func (mysqlOps *MysqlOperations) GetRoleOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) ([]byte, error) {
+	role, err := mysqlOps.GetRole(ctx, req, resp)
+	if err != nil {
+		return nil, err
+	}
+	res, _ := json.Marshal(role)
+	return res, nil
+}
 
 // StatusCheck function design details: https://infracreate.feishu.cn/wiki/wikcndch7lMZJneMnRqaTvhQpwb#doxcnOUyQ4Mu0KiUo232dOr5aad
-func (m *Mysql) StatusCheck(ctx context.Context, sql string, resp *bindings.InvokeResponse) ([]byte, error) {
+func (mysqlOps *MysqlOperations) StatusCheck(ctx context.Context, sql string, resp *bindings.InvokeResponse) ([]byte, error) {
 	// rwSql := fmt.Sprintf(`begin;
 	// create table if not exists kb_health_check(type int, check_ts bigint, primary key(type));
 	// insert into kb_health_check values(%d, now()) on duplicate key update check_ts = now();
@@ -234,27 +226,27 @@ func (m *Mysql) StatusCheck(ctx context.Context, sql string, resp *bindings.Invo
 	// roSql := fmt.Sprintf(`select check_ts from kb_health_check where type=%d limit 1;`, statusCheckType)
 	// var err error
 	// var data []byte
-	// switch m.base.dbRoles[strings.ToLower(oriRole)] {
-	// case internal.ReadWrite:
+	// switch mysqlOps.base.dbRoles[strings.ToLower(oriRole)] {
+	// case ReadWrite:
 	// 	var count int64
-	// 	count, err = m.exec(ctx, rwSql)
+	// 	count, err = mysqlOps.exec(ctx, rwSql)
 	// 	data = []byte(strconv.FormatInt(count, 10))
-	// case internal.Readonly:
-	// 	data, err = m.query(ctx, roSql)
+	// case Readonly:
+	// 	data, err = mysqlOps.query(ctx, roSql)
 	// default:
-	// 	msg := fmt.Sprintf("unknown access mode for role %s: %v", oriRole, m.base.dbRoles)
-	// 	m.logger.Info(msg)
+	// 	msg := fmt.Sprintf("unknown access mode for role %s: %v", oriRole, mysqlOps.base.dbRoles)
+	// 	mysqlOps.Logger.Info(msg)
 	// 	data = []byte(msg)
 	// }
 
-	// result := internal.ProbeMessage{}
+	// result := ProbeMessage{}
 	// if err != nil {
-	// 	m.logger.Infof("statusCheck error: %v", err)
+	// 	mysqlOps.Logger.Infof("statusCheck error: %v", err)
 	// 	result.Event = "statusCheckFailed"
 	// 	result.Message = err.Error()
 	// 	if statusCheckFailedCount++; statusCheckFailedCount%eventAggregationNum == 1 {
-	// 		m.logger.Infof("status checks failed %v times continuously", statusCheckFailedCount)
-	// 		resp.Metadata[statusCode] = checkFailedHTTPCode
+	// 		mysqlOps.Logger.Infof("status checks failed %v times continuously", statusCheckFailedCount)
+	// 		resp.Metadata[statusCode] = OperationFailedHTTPCode
 	// 	}
 	// } else {
 	// 	result.Message = string(data)
@@ -324,7 +316,7 @@ func initDB(url, pemPath string) (*sql.DB, error) {
 	return db, nil
 }
 
-// func (m *Mysql) jsonify(rows *sql.Rows) ([]byte, error) {
+// func (mysqlOps *MysqlOperations) jsonify(rows *sql.Rows) ([]byte, error) {
 // 	columnTypes, err := rows.ColumnTypes()
 // 	if err != nil {
 // 		return nil, err
@@ -336,7 +328,7 @@ func initDB(url, pemPath string) (*sql.DB, error) {
 // 		if err != nil {
 // 			return nil, err
 // 		}
-// 		r := m.convert(columnTypes, values)
+// 		r := mysqlOps.convert(columnTypes, values)
 // 		ret = append(ret, r)
 // 	}
 // 	return json.Marshal(ret)
@@ -354,7 +346,7 @@ func initDB(url, pemPath string) (*sql.DB, error) {
 // 	return values
 // }
 
-// func (m *Mysql) convert(columnTypes []*sql.ColumnType, values []interface{}) map[string]interface{} {
+// func (mysqlOps *MysqlOperations) convert(columnTypes []*sql.ColumnType, values []interface{}) map[string]interface{} {
 // 	r := map[string]interface{}{}
 // 	for i, ct := range columnTypes {
 // 		value := values[i]
@@ -363,7 +355,7 @@ func initDB(url, pemPath string) (*sql.DB, error) {
 // 			if vv, err := v.Value(); err == nil {
 // 				value = interface{}(vv)
 // 			} else {
-// 				m.logger.Warnf("error to convert value: %v", err)
+// 				mysqlOps.Logger.Warnf("error to convert value: %v", err)
 // 			}
 // 		case *sql.RawBytes:
 // 			// special case for sql.RawBytes, see https://github.com/go-sql-driver/mysql/blob/master/fields.go#L178

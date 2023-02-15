@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package internal
+package binding
 
 import (
 	"context"
@@ -28,12 +28,15 @@ import (
 	"github.com/dapr/kit/logger"
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
+
+	. "github.com/apecloud/kubeblocks/cmd/probe/internal"
 )
 
 const (
-	RunningCheckOperation bindings.OperationKind = "runningCheck"
-	StatusCheckOperation  bindings.OperationKind = "statusCheck"
-	RoleCheckOperation    bindings.OperationKind = "roleCheck"
+	CheckRunningOperation bindings.OperationKind = "checkRunning"
+	CheckStatusOperation  bindings.OperationKind = "checkStatus"
+	CheckRoleOperation    bindings.OperationKind = "checkRole"
+	GetRoleOperation      bindings.OperationKind = "getRole"
 
 	// CommandSQLKey keys from request's metadata.
 	CommandSQLKey = "sql"
@@ -44,9 +47,9 @@ const (
 	defaultRoleDetectionThreshold = 300
 )
 
-type ProbeBase struct {
-	Operation               ProbeOperation
-	Logger                  logger.Logger
+type Operation func(ctx context.Context, request *bindings.InvokeRequest, response *bindings.InvokeResponse) ([]byte, error)
+
+type BaseOperations struct {
 	oriRole                 string
 	dbRoles                 map[string]AccessMode
 	runningCheckFailedCount int
@@ -59,11 +62,17 @@ type ProbeBase struct {
 	// 1 rolechanged event lost;
 	// 2 pod role label deleted or updated incorrectly.
 	roleDetectionThreshold int
-	dbPort                 int
+	DbPort                 int
+	DBType                 string
+	Logger                 logger.Logger
+	Metadata               bindings.Metadata
+	InitIfNeed             func() bool
+	GetRole                func(ctx context.Context, request *bindings.InvokeRequest, response *bindings.InvokeResponse) (string, error)
+	OperationMap           map[bindings.OperationKind]Operation
 }
 
 // ProbeOperation abstracts the interfaces a binding implementation needs to support.
-// these interfaces together providing probing service: runningCheck, statusCheck, roleCheck
+// these interfaces together providing probing service: CheckRunning, statusCheck, roleCheck
 type ProbeOperation interface {
 	// InitIfNeed binding initiates
 	InitIfNeed() error
@@ -83,45 +92,53 @@ func init() {
 	viper.SetDefault("KB_ROLE_DETECTION_THRESHOLD", defaultRoleDetectionThreshold)
 }
 
-func (p *ProbeBase) Init() {
-	p.dbPort = p.Operation.GetRunningPort()
-	p.checkFailedThreshold = viper.GetInt("KB_CHECK_FAILED_THRESHOLD")
-	if p.checkFailedThreshold < 300 {
-		p.checkFailedThreshold = 300
-	} else if p.checkFailedThreshold > 3600 {
-		p.checkFailedThreshold = 3600
+func (ops *BaseOperations) Init(metadata bindings.Metadata) {
+	ops.checkFailedThreshold = viper.GetInt("KB_CHECK_FAILED_THRESHOLD")
+	if ops.checkFailedThreshold < 300 {
+		ops.checkFailedThreshold = 300
+	} else if ops.checkFailedThreshold > 3600 {
+		ops.checkFailedThreshold = 3600
 	}
 
-	p.roleDetectionThreshold = viper.GetInt("KB_ROLE_DETECTION_THRESHOLD")
-	if p.roleDetectionThreshold < 60 {
-		p.roleDetectionThreshold = 60
-	} else if p.roleDetectionThreshold > 300 {
-		p.roleDetectionThreshold = 300
+	ops.roleDetectionThreshold = viper.GetInt("KB_ROLE_DETECTION_THRESHOLD")
+	if ops.roleDetectionThreshold < 60 {
+		ops.roleDetectionThreshold = 60
+	} else if ops.roleDetectionThreshold > 300 {
+		ops.roleDetectionThreshold = 300
 	}
 
 	val := viper.GetString("KB_SERVICE_ROLES")
 	if val != "" {
-		if err := json.Unmarshal([]byte(val), &p.dbRoles); err != nil {
+		if err := json.Unmarshal([]byte(val), &ops.dbRoles); err != nil {
 			fmt.Println(errors.Wrap(err, "KB_DB_ROLES env format error").Error())
 		}
 	}
-}
-
-func (p *ProbeBase) Operations() []bindings.OperationKind {
-	return []bindings.OperationKind{
-		RunningCheckOperation,
-		StatusCheckOperation,
-		RoleCheckOperation,
+	ops.Metadata = metadata
+	ops.OperationMap = map[bindings.OperationKind]Operation{
+		CheckRunningOperation: ops.CheckRunning,
+		CheckRoleOperation:    ops.CheckRole,
 	}
+
 }
 
-func (p *ProbeBase) Invoke(ctx context.Context, req *bindings.InvokeRequest) (*bindings.InvokeResponse, error) {
+// Operations returns list of operations supported by the binding.
+func (ops *BaseOperations) Operations() []bindings.OperationKind {
+	opsKinds := make([]bindings.OperationKind, len(ops.OperationMap))
+	i := 0
+	for opsKind := range ops.OperationMap {
+		opsKinds[i] = opsKind
+		i++
+	}
+	return opsKinds
+}
+
+// Invoke handles all invoke operations.
+func (ops *BaseOperations) Invoke(ctx context.Context, req *bindings.InvokeRequest) (*bindings.InvokeResponse, error) {
 	if req == nil {
 		return nil, errors.Errorf("invoke request required")
 	}
 
-	var sql string
-	var ok bool
+	ops.Logger.Debugf("request operation: %v", req.Operation)
 	startTime := time.Now()
 	resp := &bindings.InvokeResponse{
 		Metadata: map[string]string{
@@ -138,84 +155,76 @@ func (p *ProbeBase) Invoke(ctx context.Context, req *bindings.InvokeRequest) (*b
 		return resp, nil
 	}
 
-	if req.Operation == RunningCheckOperation {
-		d, err := p.runningCheck(ctx, resp)
-		if err != nil {
-			return nil, err
-		}
-		resp.Data = d
+	operation, ok := ops.OperationMap[req.Operation]
+	if !ok {
+		message := fmt.Sprintf("%v operation is not implemented for %v", req.Operation, ops.DBType)
+		ops.Logger.Errorf(message)
+		result := &ProbeMessage{}
+		result.Event = "OperationNotImplemented"
+		result.Message = message
+		resp.Metadata[StatusCode] = OperationFailedHTTPCode
+		res, _ := json.Marshal(result)
+		resp.Data = res
 		return updateRespMetadata()
 	}
 
-	if err := p.Operation.InitIfNeed(); err != nil {
+	if ops.InitIfNeed != nil && ops.InitIfNeed() {
 		resp.Data = []byte("db not ready")
 		return updateRespMetadata()
 	}
 
-	if req.Metadata == nil {
-		return nil, errors.Errorf("metadata required")
+	d, err := operation(ctx, req, resp)
+	if err != nil {
+		return nil, err
 	}
-	p.Logger.Debugf("operation: %v", req.Operation)
-
-	sql, ok = req.Metadata[CommandSQLKey]
-	if !ok {
-		p.Logger.Infof("%s metadata not set, use default", CommandSQLKey)
-	}
-
-	switch req.Operation { //nolint:exhaustive
-	case StatusCheckOperation:
-		d, err := p.Operation.StatusCheck(ctx, sql, resp)
-		if err != nil {
-			return nil, err
-		}
-		resp.Data = d
-	case RoleCheckOperation:
-		d, err := p.roleObserve(ctx, sql, resp)
-		if err != nil {
-			return nil, err
-		}
-		resp.Data = d
-	default:
-		return nil, errors.Errorf("invalid operation type: %s. Expected %s, %s, or %s",
-			req.Operation, RunningCheckOperation, StatusCheckOperation, RoleCheckOperation)
-	}
+	resp.Data = d
 
 	return updateRespMetadata()
 }
 
-func (p *ProbeBase) roleObserve(ctx context.Context, cmd string, response *bindings.InvokeResponse) ([]byte, error) {
+func (ops *BaseOperations) CheckRole(ctx context.Context, request *bindings.InvokeRequest, response *bindings.InvokeResponse) ([]byte, error) {
 	result := &ProbeMessage{}
-	result.OriginalRole = p.oriRole
-	role, err := p.Operation.GetRole(ctx, cmd)
-	if err != nil {
-		p.Logger.Infof("error executing roleCheck: %v", err)
-		result.Event = "roleCheckFailed"
-		result.Message = err.Error()
-		if p.roleCheckFailedCount%p.checkFailedThreshold == 0 {
-			p.Logger.Infof("role checks failed %v times continuously", p.roleCheckFailedCount)
-			response.Metadata[StatusCode] = CheckFailedHTTPCode
-		}
-		p.roleCheckFailedCount++
-		msg, _ := json.Marshal(result)
-		return msg, nil
+	result.OriginalRole = ops.oriRole
+	if ops.GetRole == nil {
+		message := fmt.Sprintf("roleCheck operation is not implemented for %v", ops.DBType)
+		ops.Logger.Errorf(message)
+		result.Event = "OperationNotImplemented"
+		result.Message = message
+		response.Metadata[StatusCode] = OperationFailedHTTPCode
+		res, _ := json.Marshal(result)
+		return res, nil
 	}
 
-	p.roleCheckFailedCount = 0
-	if isValid, message := p.roleValidate(role); !isValid {
+	role, err := ops.GetRole(ctx, request, response)
+	if err != nil {
+		ops.Logger.Infof("error executing roleCheck: %v", err)
+		result.Event = "roleCheckFailed"
+		result.Message = err.Error()
+		if ops.roleCheckFailedCount%ops.checkFailedThreshold == 0 {
+			ops.Logger.Infof("role checks failed %v times continuously", ops.roleCheckFailedCount)
+			response.Metadata[StatusCode] = OperationFailedHTTPCode
+		}
+		ops.roleCheckFailedCount++
+		res, _ := json.Marshal(result)
+		return res, nil
+	}
+
+	ops.roleCheckFailedCount = 0
+	if isValid, message := ops.roleValidate(role); !isValid {
 		result.Event = "roleInvalid"
 		result.Message = message
-		msg, _ := json.Marshal(result)
-		return msg, nil
+		res, _ := json.Marshal(result)
+		return res, nil
 	}
 
 	result.Role = role
-	if p.oriRole != role {
+	if ops.oriRole != role {
 		result.Event = "roleChanged"
-		p.oriRole = role
-		p.roleUnchangedCount = 0
+		ops.oriRole = role
+		ops.roleUnchangedCount = 0
 	} else {
 		result.Event = "roleUnchanged"
-		p.roleUnchangedCount++
+		ops.roleUnchangedCount++
 	}
 
 	// roleUnchangedCount is the count of consecutive role unchanged checks.
@@ -224,41 +233,41 @@ func (p *ProbeBase) roleObserve(ctx context.Context, cmd string, response *bindi
 	// roleChanged events to maintain pod label accurately in cases of:
 	// 1 roleChanged event loss;
 	// 2 pod role label deleted or updated incorrectly.
-	if p.roleUnchangedCount < p.roleDetectionThreshold && p.roleUnchangedCount%roleEventRecordFrequency == 0 {
-		response.Metadata[StatusCode] = CheckFailedHTTPCode
+	if ops.roleUnchangedCount < ops.roleDetectionThreshold && ops.roleUnchangedCount%roleEventRecordFrequency == 0 {
+		response.Metadata[StatusCode] = OperationFailedHTTPCode
 	}
-	msg, _ := json.Marshal(result)
-	p.Logger.Infof(string(msg))
-	return msg, nil
+	res, _ := json.Marshal(result)
+	ops.Logger.Infof(string(res))
+	return res, nil
 }
 
 // DB may have some internal roles that need not be exposed to end user,
 // and not configured in cluster definition, e.g. apecloud-mysql's Candidate.
 // roleValidate is used to filter the internal roles and decrease the number
 // of report events to reduce the possibility of event conflicts.
-func (p *ProbeBase) roleValidate(role string) (bool, string) {
+func (ops *BaseOperations) roleValidate(role string) (bool, string) {
 	// do not validate when db roles setting is missing
-	if len(p.dbRoles) == 0 {
+	if len(ops.dbRoles) == 0 {
 		return true, ""
 	}
 
 	var msg string
 	isValid := false
-	for r := range p.dbRoles {
+	for r := range ops.dbRoles {
 		if strings.EqualFold(r, role) {
 			isValid = true
 			break
 		}
 	}
 	if !isValid {
-		msg = fmt.Sprintf("role %s is not configured in cluster definition %v", role, p.dbRoles)
+		msg = fmt.Sprintf("role %s is not configured in cluster definition %v", role, ops.dbRoles)
 	}
 	return isValid, msg
 }
 
-// runningCheck checks whether the binding service is in running status:
+// CheckRunning checks whether the binding service is in running status:
 // the port is open or is close consecutively in checkFailedThreshold times
-func (p *ProbeBase) runningCheck(ctx context.Context, resp *bindings.InvokeResponse) ([]byte, error) {
+func (ops *BaseOperations) CheckRunning(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) ([]byte, error) {
 	var message string
 	result := ProbeMessage{}
 	marshalResult := func() ([]byte, error) {
@@ -266,25 +275,25 @@ func (p *ProbeBase) runningCheck(ctx context.Context, resp *bindings.InvokeRespo
 		return json.Marshal(result)
 	}
 
-	host := fmt.Sprintf("127.0.0.1:%d", p.dbPort)
+	host := fmt.Sprintf("127.0.0.1:%d", ops.DbPort)
 	// sql exec timeout need to be less than httpget's timeout which default is 1s.
 	conn, err := net.DialTimeout("tcp", host, 500*time.Millisecond)
 	if err != nil {
 		message = fmt.Sprintf("running check %s error: %v", host, err)
 		result.Event = "runningCheckFailed"
-		p.Logger.Errorf(message)
-		if p.runningCheckFailedCount++; p.runningCheckFailedCount%p.checkFailedThreshold == 0 {
-			p.Logger.Infof("running checks failed %v times continuously", p.runningCheckFailedCount)
-			resp.Metadata[StatusCode] = CheckFailedHTTPCode
+		ops.Logger.Errorf(message)
+		if ops.runningCheckFailedCount++; ops.runningCheckFailedCount%ops.checkFailedThreshold == 0 {
+			ops.Logger.Infof("running checks failed %v times continuously", ops.runningCheckFailedCount)
+			resp.Metadata[StatusCode] = OperationFailedHTTPCode
 		}
 		return marshalResult()
 	}
 	defer conn.Close()
-	p.runningCheckFailedCount = 0
+	ops.runningCheckFailedCount = 0
 	message = "TCP Connection Established Successfully!"
 	if tcpCon, ok := conn.(*net.TCPConn); ok {
 		err := tcpCon.SetLinger(0)
-		p.Logger.Infof("running check, set tcp linger failed: %v", err)
+		ops.Logger.Infof("running check, set tcp linger failed: %v", err)
 	}
 	return marshalResult()
 }

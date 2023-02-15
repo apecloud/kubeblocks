@@ -30,7 +30,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -606,10 +605,7 @@ func (r *ClusterReconciler) updateClusterPhaseToCreatingOrUpdating(reqCtx intctr
 				Phase: appsv1alpha1.CreatingPhase,
 			}
 		}
-	} else if slices.Index([]appsv1alpha1.Phase{
-		appsv1alpha1.RunningPhase,
-		appsv1alpha1.FailedPhase,
-		appsv1alpha1.AbnormalPhase}, cluster.Status.Phase) != -1 && !r.existsOperations(cluster) {
+	} else if util.IsCompleted(cluster.Status.Phase) && !r.existsOperations(cluster) {
 		needPatch = true
 		cluster.Status.Phase = appsv1alpha1.SpecUpdatingPhase
 	}
@@ -658,6 +654,7 @@ func (r *ClusterReconciler) reconcileClusterStatus(ctx context.Context,
 
 	var (
 		clusterIsRunning          = true
+		hasStopped                bool
 		existsAbnormalOrFailed    bool
 		replicasNotReadyCompNames = map[string]struct{}{}
 		notReadyCompNames         = map[string]struct{}{}
@@ -691,7 +688,10 @@ func (r *ClusterReconciler) reconcileClusterStatus(ctx context.Context,
 				existsAbnormalOrFailed = true
 				notReadyCompNames[k] = struct{}{}
 			}
-			if v.Phase != appsv1alpha1.RunningPhase {
+
+			if v.Phase == appsv1alpha1.StoppedPhase {
+				hasStopped = true
+			} else if v.Phase != appsv1alpha1.RunningPhase {
 				clusterIsRunning = false
 			}
 		}
@@ -700,22 +700,7 @@ func (r *ClusterReconciler) reconcileClusterStatus(ctx context.Context,
 
 	// handle the cluster conditions with ClusterReady and ReplicasReady type.
 	handleClusterReadyCondition := func(cluster *appsv1alpha1.Cluster) (needPatch bool, postFunc postHandler) {
-		if len(replicasNotReadyCompNames) == 0 {
-			// if AllReplicasReady already exists, return
-			if meta.IsStatusConditionTrue(cluster.Status.Conditions, ConditionTypeReplicasReady) {
-				return
-			}
-			readyCondition := newAllReplicasPodsReadyConditions()
-			cluster.SetStatusCondition(readyCondition)
-			handleNotReadyConditionForCluster(cluster, nil, notReadyCompNames)
-			return true, func(cluster *appsv1alpha1.Cluster) error {
-				// send an event when all pods of the components are ready.
-				r.Recorder.Event(cluster, corev1.EventTypeNormal, readyCondition.Reason, readyCondition.Message)
-				return nil
-			}
-		}
-		// handle the cluster.status.conditions when replicas of cluster are not ready.
-		return handleNotReadyConditionForCluster(cluster, replicasNotReadyCompNames, notReadyCompNames), nil
+		return handleNotReadyConditionForCluster(cluster, r.Recorder, replicasNotReadyCompNames, notReadyCompNames)
 	}
 
 	// handle the Cluster.status when some components of cluster are Abnormal or Failed.
@@ -737,18 +722,26 @@ func (r *ClusterReconciler) reconcileClusterStatus(ctx context.Context,
 		}
 	}
 
-	// handle the Cluster.status when cluster is Running.
-	handleClusterIsRunning := func(cluster *appsv1alpha1.Cluster) (needPatch bool, postFunc postHandler) {
+	// handle the Cluster.status when cluster is Running or Stopped.
+	handleClusterIsRunningOrStopped := func(cluster *appsv1alpha1.Cluster) (needPatch bool, postFunc postHandler) {
 		if !clusterIsRunning {
 			return
 		}
 		oldClusterPhase := cluster.Status.Phase
-		cluster.Status.Phase = appsv1alpha1.RunningPhase
-		cluster.SetStatusCondition(newClusterReadyCondition(cluster.Name))
+		if hasStopped {
+			cluster.Status.Phase = appsv1alpha1.StoppedPhase
+		} else {
+			cluster.Status.Phase = appsv1alpha1.RunningPhase
+			cluster.SetStatusCondition(newClusterReadyCondition(cluster.Name))
+		}
 		return true, func(cluster *appsv1alpha1.Cluster) error {
-			if oldClusterPhase != appsv1alpha1.RunningPhase {
-				// send an event when Cluster.status.phase changes to Running
-				r.Recorder.Eventf(cluster, corev1.EventTypeNormal, string(appsv1alpha1.RunningPhase), "Cluster: %s is ready, current phase is Running.", cluster.Name)
+			if oldClusterPhase != cluster.Status.Phase {
+				message := fmt.Sprintf("Cluster: %s is ready, current phase is Running.", cluster.Name)
+				if hasStopped {
+					message = "Cluster: %s stopped successfully."
+				}
+				// send an event when Cluster.status.phase changes to Running or Stopped
+				r.Recorder.Event(cluster, corev1.EventTypeNormal, string(cluster.Status.Phase), message)
 			}
 			// when cluster phase changes to Running, need to mark OpsRequest annotation to reconcile for running OpsRequest.
 			return opsutil.MarkRunningOpsRequestAnnotation(ctx, r.Client, cluster)
@@ -756,7 +749,7 @@ func (r *ClusterReconciler) reconcileClusterStatus(ctx context.Context,
 	}
 
 	return doChainClusterStatusHandler(ctx, r.Client, cluster, removeInvalidComponent, analysisComponentsStatus,
-		handleClusterReadyCondition, handleExistAbnormalOrFailed, handleClusterIsRunning)
+		handleClusterReadyCondition, handleExistAbnormalOrFailed, handleClusterIsRunningOrStopped)
 }
 
 // reconcileStatusOperations when Cluster.spec updated, we need reconcile the Cluster.status.operations.

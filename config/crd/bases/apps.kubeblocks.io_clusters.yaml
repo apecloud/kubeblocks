@@ -724,6 +724,9 @@ spec:
                       - VerticalScaling
                       - VersionUpgrading
                       - Rebooting
+                      - Stopped
+                      - Stopping
+                      - Starting
                       type: string
                     podsReady:
                       description: podsReady checks if all pods of the component are
@@ -919,7 +922,9 @@ spec:
                   Cluster.spec. VolumeExpanding: volume expansion operation is running.
                   HorizontalScaling: horizontal scaling operation is running. VerticalScaling:
                   vertical scaling operation is running. VersionUpgrading: upgrade
-                  operation is running. Rebooting: restart operation is running. Reconfiguring:
+                  operation is running. Rebooting: restart operation is running. Stopping:
+                  stop operation is running. Stopped: the replicas of some or all
+                  components are 0. Starting: start operation is running. Reconfiguring:
                   reconfiguration operation is running. Deleting/Deleted: deleting
                   Cluster/Cluster is deleted. Failed: Cluster is unavailable. Abnormal:
                   Cluster is still available, but part of its components are Abnormal.
@@ -942,6 +947,9 @@ spec:
                 - VerticalScaling
                 - VersionUpgrading
                 - Rebooting
+                - Stopped
+                - Stopping
+                - Starting
                 type: string
             type: object
         type: object

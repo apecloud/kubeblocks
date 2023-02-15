@@ -197,11 +197,10 @@ func (ve volumeExpansionOpsHandler) SaveLastConfiguration(opsRes *OpsResource) e
 			VolumeClaimTemplates: lastVCTs,
 		}
 	}
-	patch := client.MergeFrom(opsRequest.DeepCopy())
 	opsRequest.Status.LastConfiguration = appsv1alpha1.LastConfiguration{
 		Components: lastComponentInfo,
 	}
-	return opsRes.Client.Status().Patch(opsRes.Ctx, opsRequest, patch)
+	return nil
 }
 
 // checkIsTimeOut check whether the volume expansion operation has timed out

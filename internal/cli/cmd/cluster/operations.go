@@ -42,6 +42,7 @@ import (
 
 type OperationsOptions struct {
 	create.BaseOptions
+	HasComponentNamesFlag  bool     `json:"-"`
 	ComponentNames         []string `json:"componentNames,omitempty"`
 	OpsRequestName         string   `json:"opsRequestName"`
 	TTLSecondsAfterSucceed int      `json:"ttlSecondsAfterSucceed"`
@@ -77,12 +78,13 @@ type OperationsOptions struct {
 	Storage  string   `json:"storage"`
 }
 
-func newBaseOperationsOptions(streams genericclioptions.IOStreams, opsType appsv1alpha1.OpsType) *OperationsOptions {
+func newBaseOperationsOptions(streams genericclioptions.IOStreams, opsType appsv1alpha1.OpsType, hasComponentNamesFlag bool) *OperationsOptions {
 	return &OperationsOptions{
 		BaseOptions: create.BaseOptions{IOStreams: streams},
 		OpsType:     opsType,
 		// nil cannot be set to a map struct in CueLang, so init the map of KeyValues.
-		KeyValues: map[string]string{},
+		KeyValues:             map[string]string{},
+		HasComponentNamesFlag: hasComponentNamesFlag,
 	}
 }
 
@@ -100,13 +102,13 @@ var (
 func (o *OperationsOptions) buildCommonFlags(cmd *cobra.Command) {
 	cmd.Flags().StringVar(&o.OpsRequestName, "ops-request", "", "OpsRequest name. if not specified, it will be randomly generated ")
 	cmd.Flags().IntVar(&o.TTLSecondsAfterSucceed, "ttlSecondsAfterSucceed", 0, "Time to live after the OpsRequest succeed")
-	if o.OpsType != appsv1alpha1.UpgradeType && o.OpsType != appsv1alpha1.ReconfiguringType {
+	if o.HasComponentNamesFlag {
 		cmd.Flags().StringSliceVar(&o.ComponentNames, "component-names", nil, " Component names to this operations")
 	}
 }
 
-// CompleteRestartOps when restart a cluster and component-names is null, represents restarting the entire cluster.
-// we should set all component names to ComponentNames
+// CompleteRestartOps when restart a cluster and component-names is null, it means restarting all components of the cluster.
+// we should set all component names to ComponentNames flag.
 func (o *OperationsOptions) CompleteRestartOps() error {
 	if o.Name == "" {
 		return makeMissingClusterNameErr()
@@ -129,7 +131,7 @@ func (o *OperationsOptions) validateUpgrade() error {
 	if len(o.ClusterVersionRef) == 0 {
 		return fmt.Errorf("missing cluster-version")
 	}
-	return delete.Confirm([]string{o.Name}, o.In)
+	return nil
 }
 
 func (o *OperationsOptions) validateVolumeExpansion() error {
@@ -282,17 +284,8 @@ func (o *OperationsOptions) Validate() error {
 		return makeMissingClusterNameErr()
 	}
 
-	if o.OpsType == appsv1alpha1.UpgradeType {
-		return o.validateUpgrade()
-	}
-
-	// not require confirm
-	if o.OpsType == appsv1alpha1.ReconfiguringType {
-		return o.validateReconfiguring()
-	}
-
 	// common validate for componentOps
-	if len(o.ComponentNames) == 0 {
+	if o.HasComponentNamesFlag && len(o.ComponentNames) == 0 {
 		return fmt.Errorf("missing component-names")
 	}
 
@@ -303,6 +296,14 @@ func (o *OperationsOptions) Validate() error {
 		}
 	case appsv1alpha1.HorizontalScalingType:
 		if err := o.validateHorizontalScaling(); err != nil {
+			return err
+		}
+	case appsv1alpha1.ReconfiguringType:
+		if err := o.validateReconfiguring(); err != nil {
+			return err
+		}
+	case appsv1alpha1.UpgradeType:
+		if err := o.validateUpgrade(); err != nil {
 			return err
 		}
 	}
@@ -399,7 +400,7 @@ func (o *OperationsOptions) printConfigureTips() {
 		printer.NewPair("ClusterName", o.Name))
 }
 
-// buildOperationsInputs build operations inputs
+// buildOperationsInputs builds operations inputs
 func buildOperationsInputs(f cmdutil.Factory, o *OperationsOptions) create.Inputs {
 	o.OpsTypeLower = strings.ToLower(string(o.OpsType))
 	return create.Inputs{
@@ -420,9 +421,9 @@ var restartExample = templates.Examples(`
 		kbcli cluster restart <my-cluster> --component-names=<component-name>
 `)
 
-// NewRestartCmd create a restart command
+// NewRestartCmd creates a restart command
 func NewRestartCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
-	o := newBaseOperationsOptions(streams, appsv1alpha1.RestartType)
+	o := newBaseOperationsOptions(streams, appsv1alpha1.RestartType, true)
 	inputs := buildOperationsInputs(f, o)
 	inputs.Use = "restart"
 	inputs.Short = "Restart the specified components in the cluster"
@@ -439,9 +440,9 @@ var upgradeExample = templates.Examples(`
 		kbcli cluster upgrade <my-cluster> --cluster-version=<cluster-version>
 `)
 
-// NewUpgradeCmd create a upgrade command
+// NewUpgradeCmd creates a upgrade command
 func NewUpgradeCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
-	o := newBaseOperationsOptions(streams, appsv1alpha1.UpgradeType)
+	o := newBaseOperationsOptions(streams, appsv1alpha1.UpgradeType, false)
 	inputs := buildOperationsInputs(f, o)
 	inputs.Use = "upgrade"
 	inputs.Short = "Upgrade the cluster version"
@@ -459,9 +460,9 @@ var verticalScalingExample = templates.Examples(`
         --requests.memory=500Mi --limits.cpu=500m --limits.memory=500Mi
 `)
 
-// NewVerticalScalingCmd create a vertical scaling command
+// NewVerticalScalingCmd creates a vertical scaling command
 func NewVerticalScalingCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
-	o := newBaseOperationsOptions(streams, appsv1alpha1.VerticalScalingType)
+	o := newBaseOperationsOptions(streams, appsv1alpha1.VerticalScalingType, true)
 	inputs := buildOperationsInputs(f, o)
 	inputs.Use = "vscale"
 	inputs.Short = "Vertically scale the specified components in the cluster"
@@ -481,9 +482,9 @@ var horizontalScalingExample = templates.Examples(`
 		kbcli cluster hscale <my-cluster> --component-names=<component-name> --replicas=3
 `)
 
-// NewHorizontalScalingCmd create a horizontal scaling command
+// NewHorizontalScalingCmd creates a horizontal scaling command
 func NewHorizontalScalingCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
-	o := newBaseOperationsOptions(streams, appsv1alpha1.HorizontalScalingType)
+	o := newBaseOperationsOptions(streams, appsv1alpha1.HorizontalScalingType, true)
 	inputs := buildOperationsInputs(f, o)
 	inputs.Use = "hscale"
 	inputs.Short = "Horizontally scale the specified components in the cluster"
@@ -501,9 +502,9 @@ var volumeExpansionExample = templates.Examples(`
   		--volume-claim-template-names=data --storage=10Gi
 `)
 
-// NewVolumeExpansionCmd create a vertical scaling command
+// NewVolumeExpansionCmd creates a vertical scaling command
 func NewVolumeExpansionCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
-	o := newBaseOperationsOptions(streams, appsv1alpha1.VolumeExpansionType)
+	o := newBaseOperationsOptions(streams, appsv1alpha1.VolumeExpansionType, true)
 	inputs := buildOperationsInputs(f, o)
 	inputs.Use = "volume-expand"
 	inputs.Short = "Expand volume with the specified components and volumeClaimTemplates in the cluster"
@@ -516,9 +517,9 @@ func NewVolumeExpansionCmd(f cmdutil.Factory, streams genericclioptions.IOStream
 	return create.BuildCommand(inputs)
 }
 
-// NewReconfigureCmd create a Reconfiguring command
+// NewReconfigureCmd creates a Reconfiguring command
 func NewReconfigureCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
-	o := newBaseOperationsOptions(streams, appsv1alpha1.ReconfiguringType)
+	o := newBaseOperationsOptions(streams, appsv1alpha1.ReconfiguringType, false)
 	inputs := buildOperationsInputs(f, o)
 	inputs.Use = "configure"
 	inputs.Short = "reconfigure parameters with the specified components in the cluster"
@@ -531,5 +532,41 @@ func NewReconfigureCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *
 		cmd.Flags().StringVar(&o.CfgFile, "configure-file", "", "Specify the name of the configuration file to be updated (e.g. for mysql: --configure-file=my.cnf). What templates or configure files are available for this cluster can refer to kbcli sub command: 'kbcli cluster describe-configure'.")
 	}
 	inputs.Complete = o.fillTemplateArgForReconfiguring
+	return create.BuildCommand(inputs)
+}
+
+var stopExample = templates.Examples(`
+		# stop the cluster and release all the pods of the cluster
+		kbcli cluster stop <my-cluster>
+`)
+
+// NewStopCmd creates a stop command
+func NewStopCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+	o := newBaseOperationsOptions(streams, appsv1alpha1.StopType, false)
+	inputs := buildOperationsInputs(f, o)
+	inputs.Use = "stop"
+	inputs.Short = "stop the cluster and release all the pods of the cluster"
+	inputs.Example = stopExample
+	inputs.BuildFlags = func(cmd *cobra.Command) {
+		o.buildCommonFlags(cmd)
+	}
+	return create.BuildCommand(inputs)
+}
+
+var startExample = templates.Examples(`
+		# start the cluster when cluster is stopped
+		kbcli cluster start <my-cluster>
+`)
+
+// NewStartCmd creates a start command
+func NewStartCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+	o := newBaseOperationsOptions(streams, appsv1alpha1.StartType, false)
+	inputs := buildOperationsInputs(f, o)
+	inputs.Use = "start"
+	inputs.Short = "start the cluster when cluster is stopped"
+	inputs.Example = startExample
+	inputs.BuildFlags = func(cmd *cobra.Command) {
+		o.buildCommonFlags(cmd)
+	}
 	return create.BuildCommand(inputs)
 }

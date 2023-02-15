@@ -86,6 +86,12 @@ var _ = Describe("OpsRequest Controller", func() {
 		opsRes.Cluster.Status.Phase = appsv1alpha1.RunningPhase
 	}
 
+	makeOpsRunning := func(opsRes *OpsResource) {
+		initClusterForOps(opsRes)
+		Expect(GetOpsManager().Do(opsRes)).Should(Succeed())
+		Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(appsv1alpha1.RunningPhase))
+	}
+
 	assureCfgTplObj := func(tplName, cmName, ns string) (*corev1.ConfigMap, *appsv1alpha1.ConfigConstraint) {
 		By("Assuring an cm obj")
 
@@ -126,7 +132,7 @@ var _ = Describe("OpsRequest Controller", func() {
 	}
 
 	testVerticalScaling := func(opsRes *OpsResource) {
-		By("Test VerticalScaling")
+		By("create VerticalScaling ops")
 		ops := testapps.NewOpsRequestObj("verticalscaling-ops-"+randomStr, testCtx.DefaultNamespace,
 			clusterName, appsv1alpha1.VerticalScalingType)
 		ops.Spec.VerticalScalingList = []appsv1alpha1.VerticalScaling{
@@ -209,40 +215,37 @@ var _ = Describe("OpsRequest Controller", func() {
 	}
 
 	testRestart := func(opsRes *OpsResource, consensusPodList []corev1.Pod, statelessPod *corev1.Pod) {
-		By("Test Restart")
+		By("create Restart opsRequest")
 		ops := testapps.NewOpsRequestObj("restart-ops-"+randomStr, testCtx.DefaultNamespace,
 			clusterName, appsv1alpha1.RestartType)
 		ops.Spec.RestartList = []appsv1alpha1.ComponentOps{
 			{ComponentName: consensusComp},
 			{ComponentName: statelessComp},
 		}
-
-		By("test restart OpsRequest is Running")
-		initClusterForOps(opsRes)
 		opsRes.OpsRequest = testapps.CreateOpsRequest(ctx, testCtx, ops)
-		Expect(GetOpsManager().Do(opsRes)).Should(Succeed())
-		Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(ops))).Should(Equal(appsv1alpha1.RunningPhase))
+
+		By("mock restart OpsRequest is Running")
+		makeOpsRunning(opsRes)
 
 		By("test restart action and reconcile function")
 		testapps.MockConsensusComponentStatefulSet(testCtx, clusterName, consensusComp)
 		testapps.MockStatelessComponentDeploy(testCtx, clusterName, statelessComp)
 		rHandler := restartOpsHandler{}
 		_ = rHandler.Action(opsRes)
+
 		_, err := GetOpsManager().Reconcile(opsRes)
 		Expect(err == nil).Should(BeTrue())
 
-		if !testCtx.UsingExistingCluster() {
-			By("mock testing the updates of consensus component")
-			testConsensusSetPodUpdating(opsRes, consensusPodList)
+		By("mock testing the updates of consensus component")
+		testConsensusSetPodUpdating(opsRes, consensusPodList)
 
-			By("mock testing the updates of stateless component")
-			Expect(opsRes.OpsRequest.Status.Components[statelessComp].Phase).Should(Equal(appsv1alpha1.RebootingPhase))
-			testStatelessPodUpdating(opsRes, statelessPod)
-		}
+		By("mock testing the updates of stateless component")
+		Expect(opsRes.OpsRequest.Status.Components[statelessComp].Phase).Should(Equal(appsv1alpha1.RebootingPhase))
+		testStatelessPodUpdating(opsRes, statelessPod)
 	}
 
 	testUpgrade := func(opsRes *OpsResource, clusterObject *appsv1alpha1.Cluster) {
-		By("Test Upgrade Ops")
+		By("create Upgrade Ops")
 		newClusterVersionName := "clusterversion-upgrade-" + randomStr
 		_ = testapps.NewClusterVersionFactory(newClusterVersionName, clusterDefinitionName).
 			AddComponent(statelessComp).AddContainerShort(testapps.DefaultNginxContainerName, "nginx:1.14.2").
@@ -254,9 +257,8 @@ var _ = Describe("OpsRequest Controller", func() {
 		ops.Spec.Upgrade = &appsv1alpha1.Upgrade{ClusterVersionRef: newClusterVersionName}
 		opsRes.OpsRequest = testapps.CreateOpsRequest(ctx, testCtx, ops)
 
-		By("test upgrade OpsRequest phase is Running")
-		Expect(GetOpsManager().Do(opsRes)).Should(Succeed())
-		Expect(opsRes.OpsRequest.Status.Phase == appsv1alpha1.RunningPhase).Should(BeTrue())
+		By("mock upgrade OpsRequest phase is Running")
+		makeOpsRunning(opsRes)
 
 		By("Test OpsManager.MainEnter function ")
 		_, _ = GetOpsManager().Reconcile(opsRes)
@@ -280,28 +282,25 @@ var _ = Describe("OpsRequest Controller", func() {
 		opsRes.OpsRequest = createHorizontalScaling(1)
 		initClusterForOps(opsRes)
 
-		By("Test HorizontalScaling OpsRequest phase is running and do action")
-		Expect(GetOpsManager().Do(opsRes)).Should(Succeed())
-		Expect(opsRes.OpsRequest.Status.Phase == appsv1alpha1.RunningPhase).Should(BeTrue())
+		By("mock HorizontalScaling OpsRequest phase is running and do action")
+		makeOpsRunning(opsRes)
 
 		By("Test OpsManager.Reconcile function when horizontal scaling OpsRequest is Running")
 		opsRes.Cluster.Status.Phase = appsv1alpha1.RunningPhase
 		_, err := GetOpsManager().Reconcile(opsRes)
 		Expect(err == nil).Should(BeTrue())
 
-		if !testCtx.UsingExistingCluster() {
-			By("mock the pod is terminating")
-			pod := &podList[0]
-			testk8s.MockPodIsTerminating(ctx, testCtx, pod)
-			_, _ = GetOpsManager().Reconcile(opsRes)
-			Expect(getProgressDetailStatus(opsRes, consensusComp, pod)).Should(Equal(appsv1alpha1.ProcessingProgressStatus))
+		By("mock the pod is terminating")
+		pod := &podList[0]
+		testk8s.MockPodIsTerminating(ctx, testCtx, pod)
+		_, _ = GetOpsManager().Reconcile(opsRes)
+		Expect(getProgressDetailStatus(opsRes, consensusComp, pod)).Should(Equal(appsv1alpha1.ProcessingProgressStatus))
 
-			By("mock the pod is deleted and progressDetail status should be succeed")
-			testk8s.RemovePodFinalizer(ctx, testCtx, pod)
-			_, _ = GetOpsManager().Reconcile(opsRes)
-			Expect(getProgressDetailStatus(opsRes, consensusComp, pod)).Should(Equal(appsv1alpha1.SucceedProgressStatus))
-			Expect(opsRes.OpsRequest.Status.Progress).Should(Equal("1/2"))
-		}
+		By("mock the pod is deleted and progressDetail status should be succeed")
+		testk8s.RemovePodFinalizer(ctx, testCtx, pod)
+		_, _ = GetOpsManager().Reconcile(opsRes)
+		Expect(getProgressDetailStatus(opsRes, consensusComp, pod)).Should(Equal(appsv1alpha1.SucceedProgressStatus))
+		Expect(opsRes.OpsRequest.Status.Progress).Should(Equal("1/2"))
 
 		By("test GetOpsRequestAnnotation function")
 		patch := client.MergeFrom(opsRes.Cluster.DeepCopy())
@@ -332,17 +331,17 @@ var _ = Describe("OpsRequest Controller", func() {
 
 		_, err = GetOpsManager().Reconcile(opsRes)
 		Expect(err == nil).Should(BeTrue())
-		if !testCtx.UsingExistingCluster() {
-			By("mock scale up pods")
-			podName := fmt.Sprintf("%s-%s-%d", clusterName, consensusComp, 0)
-			testapps.MockConsensusComponentStsPod(testCtx, nil, clusterName, consensusComp,
-				podName, "leader", "ReadWrite")
-			pod := &corev1.Pod{}
-			Expect(k8sClient.Get(ctx, client.ObjectKey{Name: podName, Namespace: testCtx.DefaultNamespace}, pod)).Should(Succeed())
-			_, _ = GetOpsManager().Reconcile(opsRes)
-			Expect(getProgressDetailStatus(opsRes, consensusComp, pod)).Should(Equal(appsv1alpha1.SucceedProgressStatus))
-			Expect(opsRes.OpsRequest.Status.Progress).Should(Equal("1/1"))
-		}
+
+		By("mock scale up pods")
+		podName := fmt.Sprintf("%s-%s-%d", clusterName, consensusComp, 0)
+		testapps.MockConsensusComponentStsPod(testCtx, nil, clusterName, consensusComp,
+			podName, "leader", "ReadWrite")
+		pod = &corev1.Pod{}
+		Expect(k8sClient.Get(ctx, client.ObjectKey{Name: podName, Namespace: testCtx.DefaultNamespace}, pod)).Should(Succeed())
+		_, _ = GetOpsManager().Reconcile(opsRes)
+		Expect(getProgressDetailStatus(opsRes, consensusComp, pod)).Should(Equal(appsv1alpha1.SucceedProgressStatus))
+		Expect(opsRes.OpsRequest.Status.Progress).Should(Equal("1/1"))
+
 	}
 
 	testReconfigure := func(clusterObject *appsv1alpha1.Cluster,
@@ -455,6 +454,43 @@ var _ = Describe("OpsRequest Controller", func() {
 		By("mock reconfigure failed")
 	}
 
+	testStop := func(opsRes *OpsResource) {
+		By("create Stop opsRequest")
+		ops := testapps.NewOpsRequestObj("stop-ops-"+randomStr, testCtx.DefaultNamespace,
+			clusterName, appsv1alpha1.StopType)
+		opsRes.OpsRequest = testapps.CreateOpsRequest(ctx, testCtx, ops)
+
+		By("test stop action and reconcile function")
+		makeOpsRunning(opsRes)
+		Expect(len(opsRes.Cluster.Annotations[intctrlutil.SnapShotForStartAnnotationKey]) != 0).Should(BeTrue())
+		for _, v := range opsRes.Cluster.Spec.ComponentSpecs {
+			Expect(v.Replicas).Should(BeEquivalentTo(0))
+		}
+		_, err := GetOpsManager().Reconcile(opsRes)
+		Expect(err == nil).Should(BeTrue())
+	}
+
+	testStart := func(opsRes *OpsResource) {
+		By("create testStart opsRequest")
+		ops := testapps.NewOpsRequestObj("start-ops-"+randomStr, testCtx.DefaultNamespace,
+			clusterName, appsv1alpha1.StartType)
+		opsRes.OpsRequest = testapps.CreateOpsRequest(ctx, testCtx, ops)
+
+		By("test stop action and reconcile function")
+		startHandler := StartOpsHandler{}
+		oldComponentReplicasMap, _ := startHandler.getComponentReplicasSnapshot(opsRes.Cluster.Annotations)
+		// do action
+		Expect(opsutil.PatchClusterOpsAnnotations(ctx, k8sClient, opsRes.Cluster, nil)).Should(Succeed())
+		opsRes.Cluster.Status.Phase = appsv1alpha1.StoppedPhase
+		Expect(GetOpsManager().Do(opsRes)).Should(Succeed())
+		for _, v := range opsRes.Cluster.Spec.ComponentSpecs {
+			oldReplicas := oldComponentReplicasMap[v.Name]
+			Expect(oldReplicas == v.Replicas).Should(BeTrue())
+		}
+		_, err := GetOpsManager().Reconcile(opsRes)
+		Expect(err == nil).Should(BeTrue())
+	}
+
 	Context("Test OpsRequest", func() {
 		It("Should Test all OpsRequest", func() {
 			clusterDef, _, clusterObject := testapps.InitClusterWithHybridComps(testCtx, clusterDefinitionName,
@@ -496,17 +532,16 @@ var _ = Describe("OpsRequest Controller", func() {
 				consensusPodList []corev1.Pod
 				statelessPod     = &corev1.Pod{}
 			)
-			if !testCtx.UsingExistingCluster() {
-				// mock the pods of consensusSet component
-				testapps.MockConsensusComponentPods(testCtx, nil, clusterName, consensusComp)
-				podList, err := util.GetComponentPodList(opsRes.Ctx, opsRes.Client, opsRes.Cluster, consensusComp)
-				Expect(err).Should(Succeed())
-				consensusPodList = podList.Items
+			// mock the pods of consensusSet component
+			testapps.MockConsensusComponentPods(testCtx, nil, clusterName, consensusComp)
+			podList, err := util.GetComponentPodList(opsRes.Ctx, opsRes.Client, opsRes.Cluster, consensusComp)
+			Expect(err).Should(Succeed())
+			consensusPodList = podList.Items
 
-				// mock the pods od stateless component
-				podName := "busybox-" + randomStr
-				testapps.MockStatelessPod(testCtx, nil, clusterName, statelessComp, podName)
-			}
+			// mock the pods od stateless component
+			podName := "busybox-" + randomStr
+			testapps.MockStatelessPod(testCtx, nil, clusterName, statelessComp, podName)
+
 			// the opsRequest will use startTime to check some condition.
 			// if there is no sleep for 1 second, unstable error may occur.
 			time.Sleep(time.Second)
@@ -519,6 +554,12 @@ var _ = Describe("OpsRequest Controller", func() {
 
 			// test restart consensus component and stateless component
 			testRestart(opsRes, consensusPodList, statelessPod)
+
+			// test stop cluster
+			testStop(opsRes)
+
+			// test start cluster
+			testStart(opsRes)
 
 			testReconfigure(clusterObject, opsRes, clusterDef)
 

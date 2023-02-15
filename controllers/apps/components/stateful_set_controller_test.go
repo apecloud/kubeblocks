@@ -71,14 +71,6 @@ var _ = Describe("StatefulSet Controller", func() {
 
 	AfterEach(cleanAll)
 
-	patchPodLabel := func(podName, podRole, accessMode, revision string) {
-		Eventually(testapps.GetAndChangeObj(&testCtx, client.ObjectKey{Name: podName, Namespace: testCtx.DefaultNamespace}, func(pod *corev1.Pod) {
-			pod.Labels[intctrlutil.RoleLabelKey] = podRole
-			pod.Labels[intctrlutil.ConsensusSetAccessModeLabelKey] = accessMode
-			pod.Labels[appsv1.ControllerRevisionHashLabelKey] = revision
-		})).Should(Succeed())
-	}
-
 	testUpdateStrategy := func(updateStrategy appsv1alpha1.UpdateStrategy, componentName string, index int) {
 		Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKey{Name: clusterDefName},
 			func(clusterDef *appsv1alpha1.ClusterDefinition) {
@@ -93,7 +85,7 @@ var _ = Describe("StatefulSet Controller", func() {
 		})()).Should(Succeed())
 	}
 
-	testUsingEnvTest := func(sts *appsv1.StatefulSet) {
+	testUsingEnvTest := func(sts *appsv1.StatefulSet) []*corev1.Pod {
 		By("mock statefulset update completed")
 		updateRevision := fmt.Sprintf("%s-%s-%s", clusterName, consensusCompName, revisionID)
 		Expect(testapps.ChangeObjStatus(&testCtx, sts, func() {
@@ -138,28 +130,7 @@ var _ = Describe("StatefulSet Controller", func() {
 		Expect(testapps.ChangeObj(&testCtx, leaderPod, func() {
 			leaderPod.Labels[intctrlutil.RoleLabelKey] = "leader"
 		})).Should(Succeed())
-	}
-
-	testUsingRealCluster := func() {
-		newSts := &appsv1.StatefulSet{}
-		// wait for StatefulSet to create all pods
-		Eventually(func() bool {
-			_ = k8sClient.Get(ctx, client.ObjectKey{Name: clusterName + "-" + consensusCompName,
-				Namespace: testCtx.DefaultNamespace}, newSts)
-			return newSts.Status.ObservedGeneration == 1
-		}).Should(BeTrue())
-		By("patch pod label of StatefulSet")
-		for i := 0; i < 3; i++ {
-			podName := fmt.Sprintf("%s-%s-%d", clusterName, consensusCompName, i)
-			podRole := "follower"
-			accessMode := "Readonly"
-			if i == 0 {
-				podRole = "leader"
-				accessMode = "ReadWrite"
-			}
-			// patch pod label to reach the conditions, then component status will change to Running
-			patchPodLabel(podName, podRole, accessMode, newSts.Status.UpdateRevision)
-		}
+		return pods
 	}
 
 	Context("test controller", func() {
@@ -187,15 +158,38 @@ var _ = Describe("StatefulSet Controller", func() {
 			Eventually(testapps.GetClusterComponentPhase(testCtx, clusterName, consensusCompName)).Should(Equal(appsv1alpha1.RebootingPhase))
 
 			By("mock the StatefulSet and pods are ready")
-			if testCtx.UsingExistingCluster() {
-				testUsingRealCluster()
-			} else {
-				// mock statefulSet available and consensusSet component is running
-				testUsingEnvTest(sts)
+			// mock statefulSet available and consensusSet component is running
+			pods := testUsingEnvTest(sts)
+
+			By("check the component phase becomes Running")
+			Eventually(testapps.GetClusterComponentPhase(testCtx, clusterName, consensusCompName)).Should(Equal(appsv1alpha1.RunningPhase))
+
+			By("mock component of cluster is stopping")
+			Expect(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(cluster), func(tmpCluster *appsv1alpha1.Cluster) {
+				tmpCluster.Status.Phase = appsv1alpha1.StoppingPhase
+				tmpCluster.Status.Components[consensusCompName] = appsv1alpha1.ClusterComponentStatus{
+					Phase: appsv1alpha1.StoppingPhase,
+				}
+			})()).Should(Succeed())
+
+			By("mock stop operation and processed successfully")
+			Expect(testapps.ChangeObj(&testCtx, cluster, func() {
+				cluster.Spec.ComponentSpecs[0].Replicas = 0
+			})).Should(Succeed())
+			Expect(testapps.ChangeObj(&testCtx, sts, func() {
+				replicas := int32(0)
+				sts.Spec.Replicas = &replicas
+			})).Should(Succeed())
+			Expect(testapps.ChangeObjStatus(&testCtx, sts, func() {
+				testk8s.MockStatefulSetReady(sts)
+			})).Should(Succeed())
+			// delete all pods of components
+			for _, v := range pods {
+				testapps.DeleteObject(&testCtx, client.ObjectKeyFromObject(v), v)
 			}
 
-			By("check the component becomes Running")
-			Eventually(testapps.GetClusterComponentPhase(testCtx, clusterName, consensusCompName)).Should(Equal(appsv1alpha1.RunningPhase))
+			By("check the component phase becomes Stopped")
+			Eventually(testapps.GetClusterComponentPhase(testCtx, clusterName, consensusCompName)).Should(Equal(appsv1alpha1.StoppedPhase))
 
 			By("test updateStrategy with Serial")
 			testUpdateStrategy(appsv1alpha1.SerialStrategy, consensusCompName, 1)

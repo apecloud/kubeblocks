@@ -82,13 +82,13 @@ func (r *DeploymentReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	}
 
 	componentName := deploy.GetLabels()[intctrlutil.AppComponentLabelKey]
-	clusterComponent := cluster.GetComponentByName(componentName)
-	if clusterComponent == nil {
+	componentSpec := cluster.GetComponentByName(componentName)
+	if componentSpec == nil {
 		return intctrlutil.Reconciled()
 	}
-	componentDef := clusterDef.GetComponentDefByName(clusterComponent.ComponentDefRef)
-	statelessComp := stateless.NewStateless(reqCtx.Ctx, r.Client, cluster, clusterComponent, componentDef)
-	compCtx := newComponentContext(reqCtx, r.Client, r.Recorder, statelessComp, deploy, componentName)
+	componentDef := clusterDef.GetComponentDefByName(componentSpec.ComponentDefRef)
+	statelessComp := stateless.NewStateless(reqCtx.Ctx, r.Client, cluster, componentSpec, componentDef)
+	compCtx := newComponentContext(reqCtx, r.Client, r.Recorder, statelessComp, deploy, componentSpec)
 	if requeueAfter, err := handleComponentStatusAndSyncCluster(compCtx, cluster); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	} else if requeueAfter != 0 {

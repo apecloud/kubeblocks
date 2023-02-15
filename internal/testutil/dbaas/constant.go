@@ -32,6 +32,7 @@ const (
 	ReplicationPodRoleVolume       = "pod-role"
 	ReplicationRoleLabelFieldPath  = "metadata.labels['kubeblocks.io/role']"
 	DefaultReplicationPrimaryIndex = 0
+	DefaultReplicationReplicas     = 2
 
 	MySQLType                 = "state.mysql"
 	ApeCloudMySQLImage        = "docker.io/apecloud/apecloud-mysql-server:latest"

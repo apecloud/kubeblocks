@@ -38,6 +38,7 @@ import (
 
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	replicationset "github.com/apecloud/kubeblocks/controllers/dbaas/components/replicationset"
 	"github.com/apecloud/kubeblocks/controllers/dbaas/components/util"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	testdbaas "github.com/apecloud/kubeblocks/internal/testutil/dbaas"
@@ -846,18 +847,13 @@ var _ = Describe("Cluster Controller", func() {
 		for _, sts := range stsList {
 			pods, err := util.GetPodListByStatefulSet(ctx, k8sClient, &sts)
 			Expect(err).To(Succeed())
-			Expect(len(pods) == 1).To(BeTrue())
+			Expect(len(pods)).To(BeEquivalentTo(1))
 			names = append(names, pods[0].Name)
 		}
 		return names
 	}
 
 	testReplicationCreation := func() {
-		const replicas = 2
-		const primaryIndex = 0
-		const Primary = "primary"
-		const Secondary = "secondary"
-
 		By("Mock a cluster obj with replication componentType.")
 		pvcSpec := &corev1.PersistentVolumeClaimSpec{
 			AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
@@ -871,8 +867,8 @@ var _ = Describe("Cluster Controller", func() {
 		clusterObj = testdbaas.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
 			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
 			AddComponent(redisCompName, redisCompType).
-			SetPrimaryIndex(primaryIndex).
-			SetReplicas(replicas).AddVolumeClaimTemplate(testdbaas.DataVolumeName, pvcSpec).
+			SetPrimaryIndex(testdbaas.DefaultReplicationPrimaryIndex).
+			SetReplicas(testdbaas.DefaultReplicationReplicas).AddVolumeClaimTemplate(testdbaas.DataVolumeName, pvcSpec).
 			Create(&testCtx).GetObject()
 		clusterKey = client.ObjectKeyFromObject(clusterObj)
 
@@ -885,10 +881,10 @@ var _ = Describe("Cluster Controller", func() {
 
 		By("Checking statefulSet role label")
 		for _, sts := range stsList.Items {
-			if strings.HasSuffix(sts.Name, strconv.Itoa(primaryIndex)) {
-				Expect(sts.Labels[intctrlutil.RoleLabelKey]).Should(BeEquivalentTo(Primary))
+			if strings.HasSuffix(sts.Name, strconv.Itoa(testdbaas.DefaultReplicationPrimaryIndex)) {
+				Expect(sts.Labels[intctrlutil.RoleLabelKey]).Should(BeEquivalentTo(replicationset.Primary))
 			} else {
-				Expect(sts.Labels[intctrlutil.RoleLabelKey]).Should(BeEquivalentTo(Secondary))
+				Expect(sts.Labels[intctrlutil.RoleLabelKey]).Should(BeEquivalentTo(replicationset.Secondary))
 			}
 		}
 

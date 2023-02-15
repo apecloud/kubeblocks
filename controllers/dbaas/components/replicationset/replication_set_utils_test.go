@@ -46,8 +46,6 @@ var _ = Describe("ReplicationSet Util", func() {
 		clusterObj        *dbaasv1alpha1.Cluster
 	)
 
-	const replicas = 2
-
 	cleanAll := func() {
 		// must wait until resources deleted and no longer exist before the testcases start,
 		// otherwise if later it needs to create some new resource objects with the same name,
@@ -75,7 +73,7 @@ var _ = Describe("ReplicationSet Util", func() {
 		clusterObj = testdbaas.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
 			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
 			AddComponent(testdbaas.DefaultRedisCompName, testdbaas.DefaultRedisCompType).
-			SetReplicas(replicas).
+			SetReplicas(testdbaas.DefaultReplicationReplicas).
 			SetPrimaryIndex(testdbaas.DefaultReplicationPrimaryIndex).
 			Create(&testCtx).GetObject()
 
@@ -124,7 +122,7 @@ var _ = Describe("ReplicationSet Util", func() {
 		Expect(err).Should(Succeed())
 
 		By("Test handleReplicationSet scale-in return err when remove Finalizer after delete the sts")
-		*clusterObj.Spec.Components[0].Replicas = replicas - 1
+		*clusterObj.Spec.Components[0].Replicas = testdbaas.DefaultReplicationReplicas - 1
 		err = HandleReplicationSet(ctx, k8sClient, clusterObj, stsList)
 		Expect(err).ShouldNot(Succeed())
 		Expect(err.Error()).Should(ContainSubstring("not found"))
@@ -185,7 +183,7 @@ var _ = Describe("ReplicationSet Util", func() {
 		clusterObj = testdbaas.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
 			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
 			AddComponent(testdbaas.DefaultRedisCompName, testdbaas.DefaultRedisCompType).
-			SetReplicas(replicas).
+			SetReplicas(testdbaas.DefaultReplicationReplicas).
 			SetPrimaryIndex(testdbaas.DefaultReplicationPrimaryIndex).
 			Create(&testCtx).GetObject()
 

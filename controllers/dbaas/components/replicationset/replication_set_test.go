@@ -43,8 +43,6 @@ var _ = Describe("Replication Component", func() {
 		clusterObj        *dbaasv1alpha1.Cluster
 	)
 
-	const replicas = 2
-
 	cleanAll := func() {
 		// must wait until resources deleted and no longer exist before the testcases start,
 		// otherwise if later it needs to create some new resource objects with the same name,
@@ -83,7 +81,7 @@ var _ = Describe("Replication Component", func() {
 			clusterObj = testdbaas.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
 				clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
 				AddComponent(testdbaas.DefaultRedisCompName, testdbaas.DefaultRedisCompType).
-				SetReplicas(replicas).
+				SetReplicas(testdbaas.DefaultReplicationReplicas).
 				Create(&testCtx).GetObject()
 
 			By("Creating a statefulSet of replication componentType.")

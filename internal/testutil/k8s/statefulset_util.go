@@ -167,9 +167,7 @@ func PatchStatefulSetStatus(testCtx *testutil.TestContext, stsName string, statu
 	gomega.Expect(testdbaas.GetAndChangeObjStatus(testCtx, objectKey, func(newSts *apps.StatefulSet) {
 		newSts.Status = status
 	})()).Should(gomega.Succeed())
-	gomega.Eventually(func() bool {
-		tmpSts := &apps.StatefulSet{}
-		_ = testCtx.Cli.Get(context.Background(), client.ObjectKey{Name: stsName, Namespace: testCtx.DefaultNamespace}, tmpSts)
-		return reflect.DeepEqual(tmpSts.Status, status)
-	}, timeout, interval).Should(gomega.BeTrue())
+	gomega.Eventually(testdbaas.CheckObj(testCtx, objectKey, func(g gomega.Gomega, newSts *apps.StatefulSet) {
+		g.Expect(reflect.DeepEqual(newSts.Status, status)).Should(gomega.BeTrue())
+	})).Should(gomega.Succeed())
 }

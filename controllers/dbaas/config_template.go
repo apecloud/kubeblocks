@@ -52,6 +52,11 @@ const (
 	// BuiltinMysqlCalBufferFunctionName Mysql Built-in
 	// TODO: This function migrate to configuration template
 	builtInMysqlCalBufferFunctionName = "callBufferSizeByResource"
+
+	// TLS Built-in
+	builtInGetCAFile   = "getCAFile"
+	builtInGetCertFile = "getCertFile"
+	builtInGetKeyFile  = "getKeyFile"
 )
 
 func newCfgTemplateBuilder(
@@ -139,6 +144,9 @@ func injectBuiltInFunctions(tplBuilder *configTemplateBuilder, component *compon
 		builtInGetArgFunctionName:             getArgByName,
 		builtInGetContainerFunctionName:       getPodContainerByName,
 		builtInGetContainerMemoryFunctionName: getContainerMemory,
+		builtInGetCAFile:                      getCAFile,
+		builtInGetCertFile:                    getCertFile,
+		builtInGetKeyFile:                     getKeyFile,
 	}
 	return nil
 }

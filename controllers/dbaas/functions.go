@@ -203,6 +203,21 @@ func getPortByName(args interface{}, portName string) (interface{}, error) {
 	return nil, nil
 }
 
+// getCAFile for general builtIn
+func getCAFile() string {
+	return mountPath + "/" + caName
+}
+
+// getCertFile for general builtIn
+func getCertFile() string {
+	return mountPath + "/" + certName
+}
+
+// getKeyFile for general builtIn
+func getKeyFile() string {
+	return mountPath + "/" + keyName
+}
+
 func toJSONObject[T corev1.VolumeSource | corev1.Container | corev1.ContainerPort](obj T) (interface{}, error) {
 	b, err := json.Marshal(obj)
 	if err != nil {

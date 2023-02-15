@@ -625,6 +625,10 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 			if err := cli.Update(ctx, cm); err != nil {
 				return err
 			}
+		} else if isAppConfig(cm) {
+			comp := configurations.getComponentByConfigMap(cluster, cm)
+			items := composeTLSSettings(comp)
+			configuration.patch(cli, cm, items)
 		}
 		return nil
 	}
@@ -905,6 +909,9 @@ func buildCfg(params createParams,
 		if err != nil {
 			return nil, err
 		}
+
+		// tls settings dynamic injection
+		if err := injectTLSSettings(cm, tpl, params)
 
 		// The owner of the configmap object is a cluster of users,
 		// in order to manage the life cycle of configmap

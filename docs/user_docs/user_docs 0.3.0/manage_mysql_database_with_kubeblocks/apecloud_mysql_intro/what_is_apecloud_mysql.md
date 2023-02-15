@@ -25,7 +25,7 @@ ApeCloud MySQL supports four roles, Leader, Follower, Candidate, and Learner.  T
 
 A failover is the redirection of traffic and switches the running tasks from a primary instance to a secondary instance. 
 
-### Rade-only
+### Read-only
 
 Replicas provide read-only capabilities. In addition to the Follower that can provide read-only capabilities, you can also expand the read-only capabilities of the cluster by adding Learner roles. It should be noted that when performing read-only operations through Follower or Learner, there may be a data delay with the Leader. This delay may be caused by a log synchronization delay or a log playback delay.
 

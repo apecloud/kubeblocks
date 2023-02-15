@@ -7,7 +7,7 @@ This section shows how to use kbcli to back up and restore a MySQL standalone in
 - Install kubectl to ensure that you can connect to the EKS cluster 
 - Install kbcli.
    ```
-   curl -fsSL http://161.189.136.182:8000/apecloud/kubeblocks/install_cli.sh |bash
+   curl -fsSL https://kubeblocks.io/installer/install_cli.sh | bash
    ```
 
 ***Steps:***

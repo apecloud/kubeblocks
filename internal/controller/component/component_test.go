@@ -20,6 +20,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	corev1 "k8s.io/api/core/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	corev1 "k8s.io/api/core/v1"
@@ -55,7 +56,7 @@ var _ = Describe("component module", func() {
 			clusterComp = &cluster.Spec.Components[0]
 
 			clusterDef = &dbaasv1alpha1.ClusterDefinition{}
-			clusterDef.Spec.Type = kStateMysql
+			clusterDef.Spec.Type = "state.mysql"
 			clusterDefComp = &dbaasv1alpha1.ClusterDefinitionComponent{}
 			clusterDefComp.CharacterType = kMysql
 			clusterDefComp.Monitor = &dbaasv1alpha1.MonitorConfig{

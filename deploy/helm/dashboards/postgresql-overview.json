@@ -26,7 +26,7 @@
   "fiscalYearStartMonth": 0,
   "gnetId": 11323,
   "graphTooltip": 1,
-  "id": 12,
+  "id": 13,
   "links": [
     {
       "asDropdown": false,
@@ -255,9 +255,107 @@
         "overrides": []
       },
       "gridPos": {
+        "h": 4,
+        "w": 3,
+        "x": 6,
+        "y": 1
+      },
+      "id": 442,
+      "interval": "1m",
+      "links": [],
+      "maxDataPoints": 100,
+      "options": {
+        "colorMode": "value",
+        "fieldOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "pluginVersion": "9.2.4",
+      "targets": [
+        {
+          "calculatedInterval": "10m",
+          "datasource": {
+            "uid": "$datasource"
+          },
+          "datasourceErrors": {},
+          "editorMode": "code",
+          "errors": {},
+          "expr": "sum(rate(pg_stat_database_xact_commit{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\",pod=~\"$instance\"}[$__rate_interval]) + rate(pg_stat_database_xact_rollback{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\",pod=~\"$instance\"}[$__rate_interval]))",
+          "format": "time_series",
+          "interval": "1m",
+          "intervalFactor": 1,
+          "legendFormat": "{{label_name}}",
+          "metric": "",
+          "range": true,
+          "refId": "A",
+          "step": 20
+        }
+      ],
+      "title": "Total Tps",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "$datasource"
+      },
+      "description": "",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": "center",
+            "displayMode": "auto",
+            "filterable": false,
+            "inspect": false
+          },
+          "decimals": 2,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "dark-green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "instances"
+            },
+            "properties": [
+              {
+                "id": "custom.displayMode",
+                "value": "lcd-gauge"
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
         "h": 8,
         "w": 5,
-        "x": 6,
+        "x": 9,
         "y": 1
       },
       "id": 422,
@@ -265,23 +363,14 @@
       "links": [],
       "maxDataPoints": 100,
       "options": {
-        "colorMode": "value",
-        "fieldOptions": {
-          "calcs": [
-            "lastNotNull"
-          ]
-        },
-        "graphMode": "none",
-        "justifyMode": "auto",
-        "orientation": "auto",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
+        "footer": {
           "fields": "",
-          "values": false
+          "reducer": [
+            "sum"
+          ],
+          "show": false
         },
-        "textMode": "value_and_name"
+        "showHeader": true
       },
       "pluginVersion": "9.2.4",
       "targets": [
@@ -293,19 +382,36 @@
           "datasourceErrors": {},
           "editorMode": "code",
           "errors": {},
+          "exemplar": false,
           "expr": "count by(short_version)(pg_static{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\",pod=~\"$instance\"})",
-          "format": "time_series",
+          "format": "table",
+          "instant": true,
           "interval": "1m",
           "intervalFactor": 1,
           "legendFormat": "{{short_version}}",
           "metric": "",
-          "range": true,
+          "range": false,
           "refId": "A",
           "step": 20
         }
       ],
-      "title": "Version",
-      "type": "stat"
+      "title": "Cluster Versions",
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true
+            },
+            "indexByName": {},
+            "renameByName": {
+              "Value": "instances",
+              "short_version": "version"
+            }
+          }
+        }
+      ],
+      "type": "table"
     },
     {
       "datasource": {
@@ -318,49 +424,138 @@
           "color": {
             "mode": "thresholds"
           },
-          "decimals": 2,
+          "custom": {
+            "align": "center",
+            "displayMode": "auto",
+            "filterable": false,
+            "inspect": false
+          },
           "mappings": [],
           "thresholds": {
             "mode": "absolute",
             "steps": [
               {
-                "color": "dark-green",
+                "color": "green",
                 "value": null
               }
             ]
-          },
-          "unit": "short"
+          }
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "instance"
+            },
+            "properties": [
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "targetBlank": true,
+                    "title": "PostgreSQL Instance: ${__data.fields.cluster} | ${__data.fields.instance}",
+                    "url": "/d/pMEd7m0Mz/cadvisor-exporter?orgId=1&var-node=All&var-namespace=${__data.fields.namespace}﻿&var-pod=﻿${__data.fields.instance}﻿&var-container=All"
+                  }
+                ]
+              },
+              {
+                "id": "custom.align",
+                "value": "center"
+              },
+              {
+                "id": "custom.filterable",
+                "value": true
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "uptime"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "s"
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "dark-red",
+                      "value": null
+                    },
+                    {
+                      "color": "dark-yellow",
+                      "value": 60
+                    },
+                    {
+                      "color": "dark-green",
+                      "value": 120
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "custom.displayMode",
+                "value": "lcd-gauge"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "namespace"
+            },
+            "properties": [
+              {
+                "id": "custom.filterable",
+                "value": true
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "cluster"
+            },
+            "properties": [
+              {
+                "id": "custom.filterable",
+                "value": true
+              }
+            ]
+          }
+        ]
       },
       "gridPos": {
         "h": 8,
-        "w": 6,
-        "x": 11,
+        "w": 10,
+        "x": 14,
         "y": 1
       },
-      "id": 427,
+      "id": 428,
       "interval": "1m",
       "links": [],
       "maxDataPoints": 100,
       "options": {
-        "colorMode": "value",
-        "fieldOptions": {
-          "calcs": [
-            "lastNotNull"
-          ]
-        },
-        "graphMode": "none",
-        "justifyMode": "auto",
-        "orientation": "horizontal",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
+        "footer": {
+          "enablePagination": false,
           "fields": "",
-          "values": false
+          "reducer": [
+            "sum"
+          ],
+          "show": false
         },
-        "textMode": "value_and_name"
+        "showHeader": true,
+        "sortBy": [
+          {
+            "desc": true,
+            "displayName": "uptime"
+          }
+        ]
       },
       "pluginVersion": "9.2.4",
       "targets": [
@@ -372,77 +567,18 @@
           "datasourceErrors": {},
           "editorMode": "code",
           "errors": {},
-          "expr": "topk(5, sum by(namespace, app_kubernetes_io_instance) (rate(pg_stat_database_xact_commit{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\",pod=~\"$instance\"}[$__rate_interval]) + rate(pg_stat_database_xact_rollback{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\",pod=~\"$instance\"}[$__rate_interval])))",
-          "format": "time_series",
+          "exemplar": false,
+          "expr": "sum by(namespace, app_kubernetes_io_instance, pod) (pg_up{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\",pod=~\"$instance\"})",
+          "format": "table",
+          "instant": true,
           "interval": "1m",
           "intervalFactor": 1,
-          "legendFormat": "{{namespace}} | {{app_kubernetes_io_instance}}",
+          "legendFormat": "__auto",
           "metric": "",
-          "range": true,
+          "range": false,
           "refId": "A",
           "step": 20
-        }
-      ],
-      "title": "Top5 IOPs Clusters",
-      "type": "stat"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "$datasource"
-      },
-      "description": "",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "decimals": 2,
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "dark-green",
-                "value": null
-              }
-            ]
-          },
-          "unit": "short"
         },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 6,
-        "x": 17,
-        "y": 1
-      },
-      "id": 429,
-      "interval": "1m",
-      "links": [],
-      "maxDataPoints": 100,
-      "options": {
-        "colorMode": "value",
-        "fieldOptions": {
-          "calcs": [
-            "lastNotNull"
-          ]
-        },
-        "graphMode": "none",
-        "justifyMode": "auto",
-        "orientation": "horizontal",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "textMode": "value_and_name"
-      },
-      "pluginVersion": "9.2.4",
-      "targets": [
         {
           "calculatedInterval": "10m",
           "datasource": {
@@ -451,19 +587,60 @@
           "datasourceErrors": {},
           "editorMode": "code",
           "errors": {},
-          "expr": "topk(5, sum by(namespace, app_kubernetes_io_instance) (pg_stat_database_numbackends{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\",pod=~\"$instance\"}))",
-          "format": "time_series",
+          "exemplar": false,
+          "expr": "avg by(namespace, app_kubernetes_io_instance, pod) (time() - pg_postmaster_start_time_seconds{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\",pod=~\"$instance\"})",
+          "format": "table",
+          "hide": false,
+          "instant": true,
           "interval": "1m",
           "intervalFactor": 1,
-          "legendFormat": "{{namespace}} | {{app_kubernetes_io_instance}}",
+          "legendFormat": "__auto",
           "metric": "",
-          "range": true,
-          "refId": "A",
+          "range": false,
+          "refId": "B",
           "step": 20
         }
       ],
-      "title": "Top5 Connections Clusters",
-      "type": "stat"
+      "title": "Cluster Instance Resource",
+      "transformations": [
+        {
+          "id": "joinByField",
+          "options": {
+            "byField": "pod",
+            "mode": "outer"
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time 1": true,
+              "Time 2": true,
+              "Value #A": true,
+              "app_kubernetes_io_instance 2": true,
+              "namespace 2": true
+            },
+            "indexByName": {
+              "Time 1": 3,
+              "Time 2": 5,
+              "Value #A": 4,
+              "Value #B": 8,
+              "app_kubernetes_io_instance 1": 1,
+              "app_kubernetes_io_instance 2": 6,
+              "namespace 1": 0,
+              "namespace 2": 7,
+              "pod": 2
+            },
+            "renameByName": {
+              "Value #B": "uptime",
+              "app_kubernetes_io_instance 1": "cluster",
+              "namespace 1": "namespace",
+              "pod": "instance"
+            }
+          }
+        }
+      ],
+      "type": "table"
     },
     {
       "datasource": {
@@ -527,7 +704,7 @@
           "datasourceErrors": {},
           "editorMode": "code",
           "errors": {},
-          "expr": "sum(pg_up{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\",pod=~\"$instance\"})",
+          "expr": "count(pg_up{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\",pod=~\"$instance\"} > 0)",
           "format": "time_series",
           "interval": "1m",
           "intervalFactor": 1,
@@ -557,6 +734,10 @@
               {
                 "color": "dark-green",
                 "value": null
+              },
+              {
+                "color": "dark-red",
+                "value": 0.5
               }
             ]
           },
@@ -606,12 +787,12 @@
           "exemplar": false,
           "expr": "count(pg_up{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\",pod=~\"$instance\"} <= 0)",
           "format": "time_series",
-          "instant": false,
+          "instant": true,
           "interval": "1m",
           "intervalFactor": 1,
           "legendFormat": "__auto",
           "metric": "",
-          "range": true,
+          "range": false,
           "refId": "A",
           "step": 20
         }
@@ -628,60 +809,130 @@
       "description": "",
       "fieldConfig": {
         "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "custom": {
-            "align": "auto",
-            "displayMode": "auto",
-            "filterable": false,
-            "inspect": false
-          },
+          "decimals": 2,
           "mappings": [],
           "thresholds": {
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
+                "color": "dark-green",
                 "value": null
               }
             ]
-          }
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 3,
+        "x": 6,
+        "y": 5
+      },
+      "id": 443,
+      "interval": "1m",
+      "links": [],
+      "maxDataPoints": 100,
+      "options": {
+        "colorMode": "value",
+        "fieldOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "pluginVersion": "9.2.4",
+      "targets": [
+        {
+          "calculatedInterval": "10m",
+          "datasource": {
+            "uid": "$datasource"
+          },
+          "datasourceErrors": {},
+          "editorMode": "code",
+          "errors": {},
+          "expr": "sum(rate(pg_stat_statements_calls{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\",pod=~\"$instance\"}[$__rate_interval]))",
+          "format": "time_series",
+          "interval": "1m",
+          "intervalFactor": 1,
+          "legendFormat": "{{label_name}}",
+          "metric": "",
+          "range": true,
+          "refId": "A",
+          "step": 20
+        }
+      ],
+      "title": "Total Qps",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "$datasource"
+      },
+      "description": "",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": "center",
+            "displayMode": "auto",
+            "inspect": false
+          },
+          "decimals": 2,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "dark-green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short"
         },
         "overrides": [
           {
             "matcher": {
               "id": "byName",
-              "options": "instance"
+              "options": "tps"
             },
             "properties": [
               {
-                "id": "links",
-                "value": [
-                  {
-                    "targetBlank": true,
-                    "title": "PostgreSQL Instance: ${__data.fields.cluster} | ${__data.fields.instance}",
-                    "url": "/d/pMEd7m0Mz/cadvisor-exporter?orgId=1&var-node=All&var-namespace=${__data.fields.namespace}﻿&var-pod=﻿${__data.fields.instance}﻿&var-container=All"
-                  }
-                ]
+                "id": "custom.displayMode",
+                "value": "lcd-gauge"
               }
             ]
           }
         ]
       },
       "gridPos": {
-        "h": 8,
-        "w": 11,
+        "h": 7,
+        "w": 6,
         "x": 0,
         "y": 9
       },
-      "id": 428,
+      "id": 427,
       "interval": "1m",
       "links": [],
       "maxDataPoints": 100,
       "options": {
         "footer": {
-          "enablePagination": false,
           "fields": "",
           "reducer": [
             "sum"
@@ -701,38 +952,683 @@
           "editorMode": "code",
           "errors": {},
           "exemplar": false,
-          "expr": "sum by(namespace, app_kubernetes_io_instance, pod) (pg_up{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\",pod=~\"$instance\"})",
+          "expr": "topk(5, sum by(namespace, app_kubernetes_io_instance) (rate(pg_stat_database_xact_commit{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\",pod=~\"$instance\"}[$__rate_interval]) + rate(pg_stat_database_xact_rollback{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\",pod=~\"$instance\"}[$__rate_interval])))",
           "format": "table",
           "instant": true,
           "interval": "1m",
           "intervalFactor": 1,
-          "legendFormat": "__auto",
+          "legendFormat": "{{namespace}} | {{app_kubernetes_io_instance}}",
           "metric": "",
           "range": false,
           "refId": "A",
           "step": 20
         }
       ],
-      "title": "Cluster Instance Resource",
+      "title": "Top5 Transactions Clusters",
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true
+            },
+            "indexByName": {
+              "Time": 0,
+              "Value": 3,
+              "app_kubernetes_io_instance": 2,
+              "namespace": 1
+            },
+            "renameByName": {
+              "Value": "tps",
+              "app_kubernetes_io_instance": "cluster"
+            }
+          }
+        }
+      ],
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "$datasource"
+      },
+      "description": "",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": "center",
+            "displayMode": "auto",
+            "inspect": false
+          },
+          "decimals": 2,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "dark-green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "qps"
+            },
+            "properties": [
+              {
+                "id": "custom.displayMode",
+                "value": "lcd-gauge"
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 6,
+        "x": 6,
+        "y": 9
+      },
+      "id": 438,
+      "interval": "1m",
+      "links": [],
+      "maxDataPoints": 100,
+      "options": {
+        "footer": {
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true
+      },
+      "pluginVersion": "9.2.4",
+      "targets": [
+        {
+          "calculatedInterval": "10m",
+          "datasource": {
+            "uid": "$datasource"
+          },
+          "datasourceErrors": {},
+          "editorMode": "code",
+          "errors": {},
+          "exemplar": false,
+          "expr": "topk(5, sum by(namespace, app_kubernetes_io_instance) (rate(pg_stat_statements_calls{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\",pod=~\"$instance\"}[$__rate_interval])))",
+          "format": "table",
+          "instant": true,
+          "interval": "1m",
+          "intervalFactor": 1,
+          "legendFormat": "{{namespace}} | {{app_kubernetes_io_instance}}",
+          "metric": "",
+          "range": false,
+          "refId": "A",
+          "step": 20
+        }
+      ],
+      "title": "Top5 Queries Clusters",
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true
+            },
+            "indexByName": {
+              "Time": 0,
+              "Value": 3,
+              "app_kubernetes_io_instance": 2,
+              "namespace": 1
+            },
+            "renameByName": {
+              "Value": "qps",
+              "app_kubernetes_io_instance": "cluster"
+            }
+          }
+        }
+      ],
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "$datasource"
+      },
+      "description": "",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": "center",
+            "displayMode": "auto",
+            "inspect": false
+          },
+          "decimals": 2,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "dark-green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "connections"
+            },
+            "properties": [
+              {
+                "id": "custom.displayMode",
+                "value": "lcd-gauge"
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 6,
+        "x": 12,
+        "y": 9
+      },
+      "id": 429,
+      "interval": "1m",
+      "links": [],
+      "maxDataPoints": 100,
+      "options": {
+        "footer": {
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true
+      },
+      "pluginVersion": "9.2.4",
+      "targets": [
+        {
+          "calculatedInterval": "10m",
+          "datasource": {
+            "uid": "$datasource"
+          },
+          "datasourceErrors": {},
+          "editorMode": "code",
+          "errors": {},
+          "exemplar": false,
+          "expr": "topk(5, sum by(namespace, app_kubernetes_io_instance) (pg_stat_database_numbackends{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\",pod=~\"$instance\"}))",
+          "format": "table",
+          "instant": true,
+          "interval": "1m",
+          "intervalFactor": 1,
+          "legendFormat": "{{namespace}} | {{app_kubernetes_io_instance}}",
+          "metric": "",
+          "range": false,
+          "refId": "A",
+          "step": 20
+        }
+      ],
+      "title": "Top5 Connections Clusters",
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true
+            },
+            "indexByName": {
+              "Time": 0,
+              "Value": 3,
+              "app_kubernetes_io_instance": 2,
+              "namespace": 1
+            },
+            "renameByName": {
+              "Value": "connections",
+              "app_kubernetes_io_instance": "cluster",
+              "namespace": "namespace"
+            }
+          }
+        }
+      ],
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "$datasource"
+      },
+      "description": "",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": "center",
+            "displayMode": "auto",
+            "inspect": false
+          },
+          "decimals": 2,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "dark-green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "size"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "bytes"
+              },
+              {
+                "id": "custom.displayMode",
+                "value": "lcd-gauge"
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 6,
+        "x": 18,
+        "y": 9
+      },
+      "id": 440,
+      "interval": "1m",
+      "links": [],
+      "maxDataPoints": 100,
+      "options": {
+        "footer": {
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true
+      },
+      "pluginVersion": "9.2.4",
+      "targets": [
+        {
+          "calculatedInterval": "10m",
+          "datasource": {
+            "uid": "$datasource"
+          },
+          "datasourceErrors": {},
+          "editorMode": "code",
+          "errors": {},
+          "exemplar": false,
+          "expr": "topk(5, sum by(namespace, app_kubernetes_io_instance) (pg_database_size_bytes{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\",pod=~\"$instance\"}))",
+          "format": "table",
+          "instant": true,
+          "interval": "1m",
+          "intervalFactor": 1,
+          "legendFormat": "{{namespace}} | {{app_kubernetes_io_instance}}",
+          "metric": "",
+          "range": false,
+          "refId": "A",
+          "step": 20
+        }
+      ],
+      "title": "Top5 Disk Size Clusters",
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true
+            },
+            "indexByName": {
+              "Time": 0,
+              "Value": 3,
+              "app_kubernetes_io_instance": 2,
+              "namespace": 1
+            },
+            "renameByName": {
+              "Value": "size",
+              "app_kubernetes_io_instance": "cluster",
+              "namespace": "namespace"
+            }
+          }
+        }
+      ],
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "$datasource"
+      },
+      "description": "",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": "center",
+            "displayMode": "auto",
+            "inspect": false
+          },
+          "decimals": 2,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "dark-green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "queryid"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "long"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "instance"
+            },
+            "properties": [
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "targetBlank": true,
+                    "title": "",
+                    "url": "/d/pMEd7m0Mz/cadvisor-exporter?orgId=1&var-node=All&var-namespace=${__data.fields.namespace}﻿&var-pod=﻿${__data.fields.instance}﻿&var-container=All"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 24,
+        "x": 0,
+        "y": 16
+      },
+      "id": 439,
+      "interval": "1m",
+      "links": [],
+      "maxDataPoints": 100,
+      "options": {
+        "footer": {
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true,
+        "sortBy": []
+      },
+      "pluginVersion": "9.2.4",
+      "targets": [
+        {
+          "calculatedInterval": "10m",
+          "datasource": {
+            "uid": "$datasource"
+          },
+          "datasourceErrors": {},
+          "editorMode": "code",
+          "errors": {},
+          "exemplar": false,
+          "expr": "topk(5, pg_stat_statements_calls{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\",pod=~\"$instance\"})",
+          "format": "table",
+          "instant": true,
+          "interval": "1m",
+          "intervalFactor": 1,
+          "legendFormat": "",
+          "metric": "",
+          "range": false,
+          "refId": "A",
+          "step": 20
+        }
+      ],
+      "title": "Top5 Most Called Queries",
       "transformations": [
         {
           "id": "organize",
           "options": {
             "excludeByName": {
               "Time": true,
-              "Value": true
+              "__name__": true,
+              "app_kubernetes_io_component_name": true,
+              "app_kubernetes_io_managed_by": true,
+              "app_kubernetes_io_name": true,
+              "instance": true,
+              "job": true,
+              "rolname": true,
+              "server": true
             },
             "indexByName": {
-              "Time": 0,
-              "Value": 4,
-              "app_kubernetes_io_instance": 2,
-              "namespace": 1,
-              "pod": 3
+              "Time": 1,
+              "Value": 14,
+              "__name__": 2,
+              "app_kubernetes_io_component_name": 3,
+              "app_kubernetes_io_instance": 4,
+              "app_kubernetes_io_managed_by": 5,
+              "app_kubernetes_io_name": 6,
+              "datname": 8,
+              "instance": 9,
+              "job": 10,
+              "namespace": 0,
+              "pod": 7,
+              "queryid": 12,
+              "rolname": 11,
+              "server": 13
             },
             "renameByName": {
+              "Value": "count",
               "app_kubernetes_io_instance": "cluster",
-              "namespace": "",
-              "pod": "instance"
+              "pod": "instance",
+              "rolname": "tablename"
+            }
+          }
+        }
+      ],
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "$datasource"
+      },
+      "description": "",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": "center",
+            "displayMode": "auto",
+            "inspect": false
+          },
+          "decimals": 2,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "dark-green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "queryid"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "long"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "exec time"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "s"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "instance"
+            },
+            "properties": [
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "targetBlank": true,
+                    "title": "",
+                    "url": "/d/pMEd7m0Mz/cadvisor-exporter?orgId=1&var-node=All&var-namespace=${__data.fields.namespace}﻿&var-pod=﻿${__data.fields.instance}﻿&var-container=All"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 24,
+        "x": 0,
+        "y": 23
+      },
+      "id": 441,
+      "interval": "1m",
+      "links": [],
+      "maxDataPoints": 100,
+      "options": {
+        "footer": {
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true,
+        "sortBy": []
+      },
+      "pluginVersion": "9.2.4",
+      "targets": [
+        {
+          "calculatedInterval": "10m",
+          "datasource": {
+            "uid": "$datasource"
+          },
+          "datasourceErrors": {},
+          "editorMode": "code",
+          "errors": {},
+          "exemplar": false,
+          "expr": "topk(5, pg_stat_statements_mean_exec_time_seconds{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\",pod=~\"$instance\"})",
+          "format": "table",
+          "instant": true,
+          "interval": "1m",
+          "intervalFactor": 1,
+          "legendFormat": "",
+          "metric": "",
+          "range": false,
+          "refId": "A",
+          "step": 20
+        }
+      ],
+      "title": "Top5 Avg Exec Time Queries",
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "__name__": true,
+              "app_kubernetes_io_component_name": true,
+              "app_kubernetes_io_managed_by": true,
+              "app_kubernetes_io_name": true,
+              "instance": true,
+              "job": true,
+              "rolname": true,
+              "server": true
+            },
+            "indexByName": {
+              "Time": 1,
+              "Value": 14,
+              "__name__": 2,
+              "app_kubernetes_io_component_name": 3,
+              "app_kubernetes_io_instance": 4,
+              "app_kubernetes_io_managed_by": 5,
+              "app_kubernetes_io_name": 6,
+              "datname": 8,
+              "instance": 9,
+              "job": 10,
+              "namespace": 0,
+              "pod": 7,
+              "queryid": 12,
+              "rolname": 11,
+              "server": 13
+            },
+            "renameByName": {
+              "Value": "exec time",
+              "app_kubernetes_io_instance": "cluster",
+              "pod": "instance",
+              "rolname": "tablename"
             }
           }
         }
@@ -745,131 +1641,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 17
-      },
-      "id": 417,
-      "panels": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "$datasource"
-          },
-          "description": "",
-          "fieldConfig": {
-            "defaults": {
-              "color": {
-                "mode": "palette-classic"
-              },
-              "custom": {
-                "axisCenteredZero": false,
-                "axisColorMode": "text",
-                "axisLabel": "",
-                "axisPlacement": "auto",
-                "barAlignment": 0,
-                "drawStyle": "line",
-                "fillOpacity": 20,
-                "gradientMode": "none",
-                "hideFrom": {
-                  "legend": false,
-                  "tooltip": false,
-                  "viz": false
-                },
-                "lineInterpolation": "linear",
-                "lineWidth": 2,
-                "pointSize": 5,
-                "scaleDistribution": {
-                  "type": "linear"
-                },
-                "showPoints": "never",
-                "spanNulls": false,
-                "stacking": {
-                  "group": "A",
-                  "mode": "none"
-                },
-                "thresholdsStyle": {
-                  "mode": "off"
-                }
-              },
-              "links": [],
-              "mappings": [],
-              "min": 0,
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  {
-                    "color": "green",
-                    "value": null
-                  },
-                  {
-                    "color": "red",
-                    "value": 80
-                  }
-                ]
-              },
-              "unit": "bytes"
-            },
-            "overrides": []
-          },
-          "gridPos": {
-            "h": 8,
-            "w": 12,
-            "x": 0,
-            "y": 18
-          },
-          "id": 418,
-          "links": [],
-          "options": {
-            "legend": {
-              "calcs": [
-                "mean",
-                "lastNotNull",
-                "max",
-                "min"
-              ],
-              "displayMode": "table",
-              "placement": "bottom",
-              "showLegend": true
-            },
-            "tooltip": {
-              "mode": "multi",
-              "sort": "none"
-            }
-          },
-          "pluginVersion": "9.2.4",
-          "targets": [
-            {
-              "calculatedInterval": "2m",
-              "datasource": {
-                "uid": "$datasource"
-              },
-              "datasourceErrors": {},
-              "editorMode": "code",
-              "errors": {},
-              "expr": "pg_database_size_bytes{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\",pod=~\"$instance\",datname=~\"$database\"}",
-              "format": "time_series",
-              "interval": "1m",
-              "intervalFactor": 1,
-              "legendFormat": "{{namespace}} | {{app_kubernetes_io_instance}} | {{pod}} | {{datname}}",
-              "metric": "",
-              "range": true,
-              "refId": "A",
-              "step": 20
-            }
-          ],
-          "title": "Disk Size",
-          "type": "timeseries"
-        }
-      ],
-      "title": "Database Size",
-      "type": "row"
-    },
-    {
-      "collapsed": true,
-      "gridPos": {
-        "h": 1,
-        "w": 24,
-        "x": 0,
-        "y": 18
+        "y": 30
       },
       "id": 412,
       "panels": [
@@ -921,8 +1693,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "red",
@@ -938,7 +1709,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 19
+            "y": 31
           },
           "id": 413,
           "links": [],
@@ -1031,8 +1802,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "red",
@@ -1048,7 +1818,7 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 19
+            "y": 31
           },
           "id": 414,
           "links": [],
@@ -1103,7 +1873,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 19
+        "y": 31
       },
       "id": 393,
       "panels": [
@@ -1155,8 +1925,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "red",
@@ -1172,7 +1941,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 20
+            "y": 32
           },
           "id": 394,
           "links": [],
@@ -1214,7 +1983,7 @@
               "step": 20
             }
           ],
-          "title": "Fetched",
+          "title": "Fetched Per Second",
           "type": "timeseries"
         },
         {
@@ -1265,8 +2034,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "red",
@@ -1282,7 +2050,7 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 20
+            "y": 32
           },
           "id": 395,
           "links": [],
@@ -1324,7 +2092,7 @@
               "step": 20
             }
           ],
-          "title": "Returned",
+          "title": "Returned Per Second",
           "type": "timeseries"
         },
         {
@@ -1391,7 +2159,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 28
+            "y": 40
           },
           "id": 396,
           "links": [],
@@ -1433,7 +2201,7 @@
               "step": 20
             }
           ],
-          "title": "Inserted",
+          "title": "Inserted Per Second",
           "type": "timeseries"
         },
         {
@@ -1500,7 +2268,7 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 28
+            "y": 40
           },
           "id": 397,
           "links": [],
@@ -1542,7 +2310,7 @@
               "step": 20
             }
           ],
-          "title": "Updated",
+          "title": "Updated Per Second",
           "type": "timeseries"
         },
         {
@@ -1609,7 +2377,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 36
+            "y": 48
           },
           "id": 398,
           "links": [],
@@ -1651,7 +2419,7 @@
               "step": 20
             }
           ],
-          "title": "Deleted",
+          "title": "Deleted Per Second",
           "type": "timeseries"
         }
       ],
@@ -1664,7 +2432,687 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 20
+        "y": 32
+      },
+      "id": 431,
+      "panels": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "$datasource"
+          },
+          "description": "",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 20,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "lineInterpolation": "linear",
+                "lineWidth": 2,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "never",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "links": [],
+              "mappings": [],
+              "min": 0,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  },
+                  {
+                    "color": "red",
+                    "value": 80
+                  }
+                ]
+              },
+              "unit": "short"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 33
+          },
+          "id": 432,
+          "links": [],
+          "options": {
+            "legend": {
+              "calcs": [
+                "mean",
+                "lastNotNull",
+                "max",
+                "min"
+              ],
+              "displayMode": "table",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "none"
+            }
+          },
+          "pluginVersion": "9.2.4",
+          "targets": [
+            {
+              "calculatedInterval": "2m",
+              "datasource": {
+                "uid": "$datasource"
+              },
+              "datasourceErrors": {},
+              "editorMode": "code",
+              "errors": {},
+              "exemplar": false,
+              "expr": "rate(pg_stat_user_tables_idx_scan{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\",pod=~\"$instance\",datname=~\"$database\"}[$__rate_interval]) > 0",
+              "format": "time_series",
+              "instant": false,
+              "interval": "1m",
+              "intervalFactor": 1,
+              "legendFormat": "{{namespace}} | {{app_kubernetes_io_instance}} | {{pod}} | {{datname}} | {{relname}}",
+              "metric": "",
+              "range": true,
+              "refId": "A",
+              "step": 20
+            }
+          ],
+          "title": "Index Scans Per Second",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "$datasource"
+          },
+          "description": "",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 20,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "lineInterpolation": "linear",
+                "lineWidth": 2,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "never",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "links": [],
+              "mappings": [],
+              "min": 0,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  },
+                  {
+                    "color": "red",
+                    "value": 80
+                  }
+                ]
+              },
+              "unit": "short"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 33
+          },
+          "id": 434,
+          "links": [],
+          "options": {
+            "legend": {
+              "calcs": [
+                "mean",
+                "lastNotNull",
+                "max",
+                "min"
+              ],
+              "displayMode": "table",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "none"
+            }
+          },
+          "pluginVersion": "9.2.4",
+          "targets": [
+            {
+              "calculatedInterval": "2m",
+              "datasource": {
+                "uid": "$datasource"
+              },
+              "datasourceErrors": {},
+              "editorMode": "code",
+              "errors": {},
+              "exemplar": false,
+              "expr": "rate(pg_stat_user_tables_idx_tup_fetch{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\",pod=~\"$instance\",datname=~\"$database\"}[$__rate_interval]) / rate(pg_stat_user_tables_idx_scan{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\",pod=~\"$instance\",datname=~\"$database\"}[$__rate_interval]) > 0",
+              "format": "time_series",
+              "instant": false,
+              "interval": "1m",
+              "intervalFactor": 1,
+              "legendFormat": "{{namespace}} | {{app_kubernetes_io_instance}} | {{pod}} | {{datname}} | {{relname}}",
+              "metric": "",
+              "range": true,
+              "refId": "A",
+              "step": 20
+            }
+          ],
+          "title": "Average Index Tuples Fetch",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "$datasource"
+          },
+          "description": "",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 20,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "lineInterpolation": "linear",
+                "lineWidth": 2,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "never",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "links": [],
+              "mappings": [],
+              "min": 0,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  },
+                  {
+                    "color": "red",
+                    "value": 80
+                  }
+                ]
+              },
+              "unit": "short"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 41
+          },
+          "id": 433,
+          "links": [],
+          "options": {
+            "legend": {
+              "calcs": [
+                "mean",
+                "lastNotNull",
+                "max",
+                "min"
+              ],
+              "displayMode": "table",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "none"
+            }
+          },
+          "pluginVersion": "9.2.4",
+          "targets": [
+            {
+              "calculatedInterval": "2m",
+              "datasource": {
+                "uid": "$datasource"
+              },
+              "datasourceErrors": {},
+              "editorMode": "code",
+              "errors": {},
+              "exemplar": false,
+              "expr": "rate(pg_stat_user_tables_seq_scan{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\",pod=~\"$instance\",datname=~\"$database\"}[$__rate_interval]) > 0",
+              "format": "time_series",
+              "instant": false,
+              "interval": "1m",
+              "intervalFactor": 1,
+              "legendFormat": "{{namespace}} | {{app_kubernetes_io_instance}} | {{pod}} | {{datname}} | {{relname}}",
+              "metric": "",
+              "range": true,
+              "refId": "A",
+              "step": 20
+            }
+          ],
+          "title": "Seq Scans Per Second",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "$datasource"
+          },
+          "description": "",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 20,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "lineInterpolation": "linear",
+                "lineWidth": 2,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "never",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "links": [],
+              "mappings": [],
+              "min": 0,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  },
+                  {
+                    "color": "red",
+                    "value": 80
+                  }
+                ]
+              },
+              "unit": "short"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 41
+          },
+          "id": 435,
+          "links": [],
+          "options": {
+            "legend": {
+              "calcs": [
+                "mean",
+                "lastNotNull",
+                "max",
+                "min"
+              ],
+              "displayMode": "table",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "none"
+            }
+          },
+          "pluginVersion": "9.2.4",
+          "targets": [
+            {
+              "calculatedInterval": "2m",
+              "datasource": {
+                "uid": "$datasource"
+              },
+              "datasourceErrors": {},
+              "editorMode": "code",
+              "errors": {},
+              "exemplar": false,
+              "expr": "rate(pg_stat_user_tables_seq_tup_read{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\",pod=~\"$instance\",datname=~\"$database\"}[$__rate_interval]) / rate(pg_stat_user_tables_seq_scan{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\",pod=~\"$instance\",datname=~\"$database\"}[$__rate_interval]) > 0",
+              "format": "time_series",
+              "instant": false,
+              "interval": "1m",
+              "intervalFactor": 1,
+              "legendFormat": "{{namespace}} | {{app_kubernetes_io_instance}} | {{pod}} | {{datname}} | {{relname}}",
+              "metric": "",
+              "range": true,
+              "refId": "A",
+              "step": 20
+            }
+          ],
+          "title": "Average Seq Tuples Read",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "$datasource"
+          },
+          "description": "",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 20,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "lineInterpolation": "linear",
+                "lineWidth": 2,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "never",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "links": [],
+              "mappings": [],
+              "min": 0,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  },
+                  {
+                    "color": "red",
+                    "value": 80
+                  }
+                ]
+              },
+              "unit": "short"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 49
+          },
+          "id": 436,
+          "links": [],
+          "options": {
+            "legend": {
+              "calcs": [
+                "mean",
+                "lastNotNull",
+                "max",
+                "min"
+              ],
+              "displayMode": "table",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "none"
+            }
+          },
+          "pluginVersion": "9.2.4",
+          "targets": [
+            {
+              "calculatedInterval": "2m",
+              "datasource": {
+                "uid": "$datasource"
+              },
+              "datasourceErrors": {},
+              "editorMode": "code",
+              "errors": {},
+              "exemplar": false,
+              "expr": "pg_stat_user_tables_n_live_tup{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\",pod=~\"$instance\",datname=~\"$database\"} > 0",
+              "format": "time_series",
+              "instant": false,
+              "interval": "1m",
+              "intervalFactor": 1,
+              "legendFormat": "{{namespace}} | {{app_kubernetes_io_instance}} | {{pod}} | {{datname}} | {{relname}}",
+              "metric": "",
+              "range": true,
+              "refId": "A",
+              "step": 20
+            }
+          ],
+          "title": "Estimated Live Tuples",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "$datasource"
+          },
+          "description": "",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 20,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "lineInterpolation": "linear",
+                "lineWidth": 2,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "never",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "links": [],
+              "mappings": [],
+              "min": 0,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  },
+                  {
+                    "color": "red",
+                    "value": 80
+                  }
+                ]
+              },
+              "unit": "short"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 49
+          },
+          "id": 437,
+          "links": [],
+          "options": {
+            "legend": {
+              "calcs": [
+                "mean",
+                "lastNotNull",
+                "max",
+                "min"
+              ],
+              "displayMode": "table",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "none"
+            }
+          },
+          "pluginVersion": "9.2.4",
+          "targets": [
+            {
+              "calculatedInterval": "2m",
+              "datasource": {
+                "uid": "$datasource"
+              },
+              "datasourceErrors": {},
+              "editorMode": "code",
+              "errors": {},
+              "exemplar": false,
+              "expr": "pg_stat_user_tables_n_dead_tup{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\",pod=~\"$instance\",datname=~\"$database\"} > 0",
+              "format": "time_series",
+              "instant": false,
+              "interval": "1m",
+              "intervalFactor": 1,
+              "legendFormat": "{{namespace}} | {{app_kubernetes_io_instance}} | {{pod}} | {{datname}} | {{relname}}",
+              "metric": "",
+              "range": true,
+              "refId": "A",
+              "step": 20
+            }
+          ],
+          "title": "Estimated Dead Tuples",
+          "type": "timeseries"
+        }
+      ],
+      "title": "Queries",
+      "type": "row"
+    },
+    {
+      "collapsed": true,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 33
       },
       "id": 388,
       "panels": [
@@ -1716,8 +3164,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "red",
@@ -1733,7 +3180,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 21
+            "y": 34
           },
           "id": 389,
           "links": [],
@@ -1775,7 +3222,7 @@
               "step": 20
             }
           ],
-          "title": "Number of Commit",
+          "title": "Commits Per Second",
           "type": "timeseries"
         },
         {
@@ -1826,8 +3273,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "red",
@@ -1843,7 +3289,7 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 21
+            "y": 34
           },
           "id": 390,
           "links": [],
@@ -1885,7 +3331,7 @@
               "step": 20
             }
           ],
-          "title": "Number of Rollback",
+          "title": "Rollbacks Per Second",
           "type": "timeseries"
         },
         {
@@ -1936,8 +3382,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "red",
@@ -1953,7 +3398,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 29
+            "y": 42
           },
           "id": 391,
           "links": [],
@@ -2046,8 +3491,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "red",
@@ -2063,7 +3507,7 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 29
+            "y": 42
           },
           "id": 423,
           "links": [],
@@ -2140,7 +3584,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 21
+        "y": 34
       },
       "id": 383,
       "panels": [
@@ -2192,8 +3636,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "red",
@@ -2209,7 +3652,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 22
+            "y": 35
           },
           "id": 92,
           "links": [],
@@ -2251,7 +3694,7 @@
               "step": 20
             }
           ],
-          "title": "Numbers of Locks",
+          "title": "Number of Locks",
           "type": "timeseries"
         },
         {
@@ -2302,8 +3745,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "red",
@@ -2319,7 +3761,7 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 22
+            "y": 35
           },
           "id": 384,
           "links": [],
@@ -2412,8 +3854,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "red",
@@ -2429,7 +3870,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 30
+            "y": 43
           },
           "id": 385,
           "links": [],
@@ -2522,8 +3963,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "red",
@@ -2539,7 +3979,7 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 30
+            "y": 43
           },
           "id": 386,
           "links": [],
@@ -2678,7 +4118,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 22
+        "y": 35
       },
       "id": 400,
       "panels": [
@@ -2730,8 +4170,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "red",
@@ -2747,7 +4186,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 23
+            "y": 36
           },
           "id": 408,
           "links": [],
@@ -2840,8 +4279,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "red",
@@ -2857,7 +4295,7 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 23
+            "y": 36
           },
           "id": 409,
           "links": [],
@@ -2950,8 +4388,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "red",
@@ -2967,7 +4404,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 31
+            "y": 44
           },
           "id": 401,
           "links": [],
@@ -3060,8 +4497,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "red",
@@ -3077,7 +4513,7 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 31
+            "y": 44
           },
           "id": 402,
           "links": [],
@@ -3170,8 +4606,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "red",
@@ -3187,7 +4622,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 39
+            "y": 52
           },
           "id": 403,
           "links": [],
@@ -3356,8 +4791,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "red",
@@ -3373,7 +4807,7 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 39
+            "y": 52
           },
           "id": 410,
           "links": [],
@@ -3485,8 +4919,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "red",
@@ -3502,7 +4935,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 47
+            "y": 60
           },
           "id": 415,
           "links": [],
@@ -3576,7 +5009,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 23
+        "y": 36
       },
       "id": 405,
       "panels": [
@@ -3628,8 +5061,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "red",
@@ -3645,7 +5077,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 24
+            "y": 37
           },
           "id": 406,
           "links": [],
@@ -3738,8 +5170,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "red",
@@ -3755,7 +5186,7 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 24
+            "y": 37
           },
           "id": 407,
           "links": [],
@@ -3802,6 +5233,129 @@
         }
       ],
       "title": "Temp files",
+      "type": "row"
+    },
+    {
+      "collapsed": true,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 37
+      },
+      "id": 417,
+      "panels": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "$datasource"
+          },
+          "description": "",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 20,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "lineInterpolation": "linear",
+                "lineWidth": 2,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "never",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "links": [],
+              "mappings": [],
+              "min": 0,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  },
+                  {
+                    "color": "red",
+                    "value": 80
+                  }
+                ]
+              },
+              "unit": "bytes"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 38
+          },
+          "id": 418,
+          "links": [],
+          "options": {
+            "legend": {
+              "calcs": [
+                "mean",
+                "lastNotNull",
+                "max",
+                "min"
+              ],
+              "displayMode": "table",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "none"
+            }
+          },
+          "pluginVersion": "9.2.4",
+          "targets": [
+            {
+              "calculatedInterval": "2m",
+              "datasource": {
+                "uid": "$datasource"
+              },
+              "datasourceErrors": {},
+              "editorMode": "code",
+              "errors": {},
+              "expr": "pg_database_size_bytes{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\",pod=~\"$instance\",datname=~\"$database\"}",
+              "format": "time_series",
+              "interval": "1m",
+              "intervalFactor": 1,
+              "legendFormat": "{{namespace}} | {{app_kubernetes_io_instance}} | {{pod}} | {{datname}}",
+              "metric": "",
+              "range": true,
+              "refId": "A",
+              "step": 20
+            }
+          ],
+          "title": "Disk Size",
+          "type": "timeseries"
+        }
+      ],
+      "title": "Database Size",
       "type": "row"
     }
   ],
@@ -3871,7 +5425,7 @@
       {
         "allValue": ".+",
         "current": {
-          "selected": false,
+          "selected": true,
           "text": [
             "All"
           ],
@@ -4012,7 +5566,7 @@
   },
   "timezone": "",
   "title": "PostgreSQL",
-  "uid": "MypsNX0Vz",
+  "uid": "5UxloIJVk",
   "version": 1,
   "weekStart": ""
 }

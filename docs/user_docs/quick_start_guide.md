@@ -13,9 +13,9 @@ Install all the followings:
 - `kubectl`
     Run the following command to install `kubectl` in your local host for visiting Kubernetes clusters. Refer to [Install and Set Up kubectl on macOS](https://kubernetes.io/docs/tasks/tools/install-kubectl-macos/) for details.
 
-      ```
-      curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/darwin/arm64/kubectl"
-      ```
+    ```
+    curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/darwin/arm64/kubectl"
+    ```
 
 - Kubernetes cluster
   
@@ -26,7 +26,7 @@ Install all the followings:
 1. Run the command below to install `kbcli`.
 
     ```
-    curl -fsSL http://161.189.136.182:8000/apecloud/kubeblocks/install_cli.sh |bash
+    curl -fsSL https://kubeblocks.io/installer/install_cli.sh | bash
     ```
 
 2. Run `kbcli version` to check the `kbcli` version and make sure `kbcli` is installed successfully.

@@ -1,4 +1,4 @@
-# KubeBlcoks commands overview
+# KubeBlocks commands overview
 
 This section lists all the KubeBlocks commands for configuring and managing a database cluster. 
 

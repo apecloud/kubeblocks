@@ -34,7 +34,7 @@ import (
 )
 
 const (
-	AnnotationKeyEndpointsVersion = "service.kubernetes.io/apecloud-loadbalancer-endpoints-version"
+	AnnotationKeyEndpointsVersion = "service.kubernetes.io/kubeblocks-loadbalancer-endpoints-version"
 )
 
 var endpointsFilterPredicate = func(object client.Object) bool {

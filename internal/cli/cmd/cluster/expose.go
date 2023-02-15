@@ -34,11 +34,6 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 )
 
-const (
-	ServiceLBTypeAnnotationKey   = "service.kubernetes.io/apecloud-loadbalancer-type"
-	ServiceLBTypeAnnotationValue = "private-ip"
-)
-
 type ExposeOptions struct {
 	Namespace string
 	Name      string
@@ -125,9 +120,9 @@ func (o *ExposeOptions) Run() error {
 			annotations = make(map[string]string)
 		}
 		if o.on {
-			annotations[ServiceLBTypeAnnotationKey] = ServiceLBTypeAnnotationValue
+			annotations[types.ServiceLBTypeAnnotationKey] = types.ServiceLBTypeAnnotationValue
 		} else if o.off {
-			delete(annotations, ServiceLBTypeAnnotationKey)
+			delete(annotations, types.ServiceLBTypeAnnotationKey)
 		}
 		item.SetAnnotations(annotations)
 		_, err = o.client.Resource(serviceGVR).Namespace(o.Namespace).Update(context.TODO(), &item, metav1.UpdateOptions{})

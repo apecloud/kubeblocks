@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package dbaas
+package plan
 
 import (
 	"encoding/json"
@@ -25,6 +25,48 @@ import (
 
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
+
+func toJSONObject[T corev1.VolumeSource | corev1.Container | corev1.ContainerPort](obj T) (interface{}, error) {
+	b, err := json.Marshal(obj)
+	if err != nil {
+		return nil, err
+	}
+
+	var jsonObj any
+	if err := json.Unmarshal(b, &jsonObj); err != nil {
+		return nil, err
+	}
+
+	return jsonObj, nil
+}
+
+func fromJSONObject[T any](args interface{}) (*T, error) {
+	b, err := json.Marshal(args)
+	if err != nil {
+		return nil, err
+	}
+
+	var container T
+	if err := json.Unmarshal(b, &container); err != nil {
+		return nil, err
+	}
+
+	return &container, nil
+}
+
+func fromJSONArray[T corev1.Container | corev1.Volume](args interface{}) ([]T, error) {
+	b, err := json.Marshal(args)
+	if err != nil {
+		return nil, err
+	}
+
+	var list []T
+	if err := json.Unmarshal(b, &list); err != nil {
+		return nil, err
+	}
+
+	return list, nil
+}
 
 const emptyString = ""
 
@@ -201,59 +243,4 @@ func getPortByName(args interface{}, portName string) (interface{}, error) {
 	}
 
 	return nil, nil
-}
-
-func toJSONObject[T corev1.VolumeSource | corev1.Container | corev1.ContainerPort](obj T) (interface{}, error) {
-	b, err := json.Marshal(obj)
-	if err != nil {
-		return nil, err
-	}
-
-	var jsonObj any
-	if err := json.Unmarshal(b, &jsonObj); err != nil {
-		return nil, err
-	}
-
-	return jsonObj, nil
-}
-
-func fromJSONObject[T any](args interface{}) (*T, error) {
-	b, err := json.Marshal(args)
-	if err != nil {
-		return nil, err
-	}
-
-	var container T
-	if err := json.Unmarshal(b, &container); err != nil {
-		return nil, err
-	}
-
-	return &container, nil
-}
-
-func fromJSONArray[T corev1.Container | corev1.Volume](args interface{}) ([]T, error) {
-	b, err := json.Marshal(args)
-	if err != nil {
-		return nil, err
-	}
-
-	var list []T
-	if err := json.Unmarshal(b, &list); err != nil {
-		return nil, err
-	}
-
-	return list, nil
-}
-
-func getEnvReplacementMapForConnCrential(clusterName string) map[string]string {
-	return map[string]string{
-		"$(CONN_CREDENTIAL_SECRET_NAME)": fmt.Sprintf("%s-conn-credential", clusterName),
-	}
-}
-
-func getEnvReplacementMapForAccount(name, passwd string) map[string]string {
-	return map[string]string{
-		"$(USERNAME)": name,
-		"$(PASSWD)":   passwd,
-	}
 }

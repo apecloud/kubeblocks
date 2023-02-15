@@ -86,9 +86,9 @@ const (
 	ClusterDefLabelKey             = "clusterdefinition.kubeblocks.io/name"
 	RoleLabelKey                   = "kubeblocks.io/role"
 
-	ServiceLBTypeAnnotationKey     = "service.kubernetes.io/apecloud-loadbalancer-type"
+	ServiceLBTypeAnnotationKey     = "service.kubernetes.io/kubeblocks-loadbalancer-type"
 	ServiceLBTypeAnnotationValue   = "private-ip"
-	ServiceFloatingIPAnnotationKey = "service.kubernetes.io/apecloud-loadbalancer-floating-ip"
+	ServiceFloatingIPAnnotationKey = "service.kubernetes.io/kubeblocks-loadbalancer-floating-ip"
 	StorageClassAnnotationKey      = "kubeblocks.io/storage-class"
 
 	// DataProtection definitions

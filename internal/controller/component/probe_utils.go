@@ -44,7 +44,7 @@ const (
 )
 
 func buildProbeContainer() (*corev1.Container, error) {
-	cueFS, _ := debme.FS(CueTemplates, "cue")
+	cueFS, _ := debme.FS(cueTemplates, "cue")
 
 	cueTpl, err := intctrlutil.NewCUETplFromBytes(cueFS.ReadFile("probe_template.cue"))
 	if err != nil {
@@ -113,8 +113,8 @@ func buildProbeContainers(reqCtx intctrlutil.RequestCtx, component *Component) e
 }
 
 func buildProbeServiceContainer(component *Component, container *corev1.Container, probeSvcHTTPPort int, probeServiceGrpcPort int) {
-	container.Image = viper.GetString("KUBEBLOCKS_IMAGE")
-	container.ImagePullPolicy = corev1.PullPolicy(viper.GetString("KUBEBLOCKS_IMAGE_PULL_POLICY"))
+	container.Image = viper.GetString(intctrlutil.KBImage)
+	container.ImagePullPolicy = corev1.PullPolicy(viper.GetString(intctrlutil.KBImagePullPolicy))
 	logLevel := viper.GetString("PROBE_SERVICE_LOG_LEVEL")
 	container.Command = []string{"probe", "--app-id", "batch-sdk",
 		"--dapr-http-port", strconv.Itoa(probeSvcHTTPPort),

@@ -31,12 +31,17 @@ func (p K8sProvider) IsCloud() bool {
 	return p != UnknownProvider
 }
 
+func (p K8sProvider) string() string {
+	return string(p)
+}
+
 func GetK8sProvider(version string) K8sProvider {
 	strArr := strings.Split(version, "-")
 	// for EKS, its version like v1.24.8-eks-*****
-	if len(strArr) >= 2 {
-		return K8sProvider(strings.ToUpper(strArr[1]))
+	if len(strArr) >= 2 && strings.ToUpper(strArr[1]) == EKSProvider.string() {
+		return EKSProvider
 	}
+
 	return UnknownProvider
 }
 
@@ -56,5 +61,8 @@ func GetK8sVersion(version string) string {
 	}
 
 	strArr := strings.Split(version, "-")
+	if len(strArr) == 0 {
+		return ""
+	}
 	return removeFirstChart(strArr[0])
 }

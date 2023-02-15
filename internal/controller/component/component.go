@@ -213,7 +213,6 @@ func MergeComponents(
 		MaxReplicas:           clusterDefCompObj.MaxReplicas,
 		DefaultReplicas:       clusterDefCompObj.DefaultReplicas,
 		Replicas:              clusterDefCompObj.DefaultReplicas,
-		AntiAffinity:          clusterDefCompObj.AntiAffinity,
 		ComponentType:         clusterDefCompObj.ComponentType,
 		ConsensusSpec:         clusterDefCompObj.ConsensusSpec,
 		PodSpec:               clusterDefCompObj.PodSpec,

@@ -18,11 +18,10 @@ package dbaastest
 
 import (
 	"context"
-	"strconv"
-	"strings"
-
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"strconv"
+	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -140,11 +139,11 @@ var _ = Describe("Redis Horizontal Scale function", func() {
 		for _, sts := range stsList.Items {
 			podList, err := util.GetPodListByStatefulSet(ctx, k8sClient, &sts)
 			Expect(err).To(Succeed())
-			Expect(len(pods) == 1).Should(BeTrue())
+			Expect(len(podList) == 1).Should(BeTrue())
 			if strings.HasSuffix(sts.Name, strconv.Itoa(primaryIndex)) {
-				Expect(pods[0].Labels[intctrlutil.RoleLabelKey] == Primary).Should(BeTrue())
+				Expect(podList[0].Labels[intctrlutil.RoleLabelKey] == Primary).Should(BeTrue())
 			} else {
-				Expect(pods[0].Labels[intctrlutil.RoleLabelKey] == Secondary).Should(BeTrue())
+				Expect(podList[0].Labels[intctrlutil.RoleLabelKey] == Secondary).Should(BeTrue())
 			}
 			pods = append(pods, podList...)
 		}
@@ -172,9 +171,17 @@ var _ = Describe("Redis Horizontal Scale function", func() {
 		By("Waiting the cluster is running")
 		Eventually(testdbaas.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(dbaasv1alpha1.RunningPhase))
 
-		By("Checking statefulSet number again")
-		stsList = testk8s.ListAndCheckStatefulSet(&testCtx, clusterKey)
-		Expect(len(stsList.Items) == horizontalScaleOutReplicas).Should(BeTrue())
+		By("Checking pods' status and count are updated in cluster status after scale-out")
+		Eventually(func(g Gomega) {
+			fetched := &dbaasv1alpha1.Cluster{}
+			g.Expect(k8sClient.Get(ctx, clusterKey, fetched)).To(Succeed())
+			compName := fetched.Spec.Components[0].Name
+			g.Expect(fetched.Status.Components != nil).To(BeTrue())
+			g.Expect(fetched.Status.Components).To(HaveKey(compName))
+			replicationStatus := fetched.Status.Components[compName].ReplicationSetStatus
+			g.Expect(replicationStatus != nil).To(BeTrue())
+			g.Expect(len(replicationStatus.Secondaries) == horizontalScaleOutReplicas-1).To(BeTrue())
+		}).Should(Succeed())
 
 		By("horizontal scale in to horizontalScaleInReplicas")
 		patch = client.MergeFrom(clusterObj.DeepCopy())
@@ -184,9 +191,17 @@ var _ = Describe("Redis Horizontal Scale function", func() {
 		By("Waiting the cluster is running")
 		Eventually(testdbaas.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(dbaasv1alpha1.RunningPhase))
 
-		By("Checking statefulSet number again")
-		stsList = testk8s.ListAndCheckStatefulSet(&testCtx, clusterKey)
-		Expect(len(stsList.Items) == horizontalScaleInReplicas).Should(BeTrue())
+		By("Checking pods' status and count are updated in cluster status after scale-in")
+		Eventually(func(g Gomega) {
+			fetched := &dbaasv1alpha1.Cluster{}
+			g.Expect(k8sClient.Get(ctx, clusterKey, fetched)).To(Succeed())
+			compName := fetched.Spec.Components[0].Name
+			g.Expect(fetched.Status.Components != nil).To(BeTrue())
+			g.Expect(fetched.Status.Components).To(HaveKey(compName))
+			replicationStatus := fetched.Status.Components[compName].ReplicationSetStatus
+			g.Expect(replicationStatus != nil).To(BeTrue())
+			g.Expect(len(replicationStatus.Secondaries) == horizontalScaleInReplicas-1).To(BeTrue())
+		}).Should(Succeed())
 	}
 
 	// Scenarios
@@ -220,14 +235,14 @@ var _ = Describe("Redis Horizontal Scale function", func() {
 				AddConfigTemplate(scriptConfigName, scriptConfigName, "", testdbaas.ScriptsVolumeName, &mode).
 				AddConfigTemplate(primaryConfigName, primaryConfigName, "", Primary, &mode).
 				AddConfigTemplate(secondaryConfigName, secondaryConfigName, "", Secondary, &mode).
-				AddInitContainerVolumeMounts(testdbaas.DefaultRedisContainerName, replicationRedisConfigVolumeMounts).
+				AddInitContainerVolumeMounts(testdbaas.DefaultRedisInitContainerName, replicationRedisConfigVolumeMounts).
 				AddContainerVolumeMounts(testdbaas.DefaultRedisContainerName, replicationRedisConfigVolumeMounts).
 				Create(&testCtx).GetObject()
 
 			By("Create a clusterVersion obj with replication componentType.")
 			clusterVersionObj = testdbaas.NewClusterVersionFactory(clusterVersionName, clusterDefObj.Name).
 				AddComponent(redisCompType).
-				AddInitContainerShort(testdbaas.DefaultRedisContainerName, redisImage).
+				AddInitContainerShort(testdbaas.DefaultRedisInitContainerName, redisImage).
 				AddContainerShort(testdbaas.DefaultRedisContainerName, redisImage).
 				Create(&testCtx).GetObject()
 		})

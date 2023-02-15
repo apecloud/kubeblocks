@@ -30,6 +30,7 @@ const (
 	DefaultNginxContainerName     = "nginx"
 	DefaultMySQLContainerName     = "mysql"
 	DefaultRedisContainerName     = "redis"
+	DefaultRedisInitContainerName = "redis-init-container"
 	DataVolumeName                = "data"
 	LogVolumeName                 = "log"
 	ConfVolumeName                = "conf"
@@ -176,7 +177,7 @@ var (
 	}
 
 	defaultRedisInitContainer = corev1.Container{
-		Name:            DefaultRedisContainerName,
+		Name:            DefaultRedisInitContainerName,
 		ImagePullPolicy: corev1.PullIfNotPresent,
 		VolumeMounts:    defaultReplicationRedisVolumeMounts,
 		Command:         []string{"/scripts/init.sh"},
@@ -193,7 +194,14 @@ var (
 			},
 		},
 		VolumeMounts: defaultReplicationRedisVolumeMounts,
-		Command:      []string{"/scripts/setup.sh"},
+		Args:         []string{"/etc/conf/redis.conf"},
+		Lifecycle: &corev1.Lifecycle{
+			PostStart: &corev1.LifecycleHandler{
+				Exec: &corev1.ExecAction{
+					Command: []string{"/scripts/setup.sh"},
+				},
+			},
+		},
 	}
 
 	replicationRedisComponent = dbaasv1alpha1.ClusterDefinitionComponent{

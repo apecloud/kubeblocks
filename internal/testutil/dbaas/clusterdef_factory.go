@@ -172,10 +172,12 @@ func (factory *MockClusterDefFactory) AddContainerVolumeMounts(containerName str
 }
 
 func setContainerVolumeMounts(containers []corev1.Container, targetContainerName string, volumeMounts []corev1.VolumeMount) []corev1.Container {
-	for _, container := range containers {
-		if container.Name == targetContainerName {
-			container.VolumeMounts = append(container.VolumeMounts, volumeMounts...)
+	for index, _ := range containers {
+		c := containers[index]
+		if c.Name == targetContainerName {
+			c.VolumeMounts = append(c.VolumeMounts, volumeMounts...)
 		}
+		containers[index] = c
 	}
 	return containers
 }

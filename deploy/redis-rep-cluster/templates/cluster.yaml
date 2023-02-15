@@ -1,0 +1,42 @@
+apiVersion: dbaas.kubeblocks.io/v1alpha1
+kind: Cluster
+metadata:
+  name: {{ .Release.Name }}
+  labels: {{ include "apecloud-redis-rep-cluster.labels" . | nindent 4 }}
+spec:
+  clusterDefinitionRef: apecloud-redis  # ref clusterDefinition.name
+  clusterVersionRef: redis-{{ default .Chart.AppVersion .Values.clusterVersionOverride }} # ref clusterVersion.name
+  terminationPolicy: {{ .Values.terminationPolicy }}
+  affinity:
+    {{- with .Values.topologyKeys }}
+    topologyKeys: {{ . | toYaml | nindent 6 }}
+    {{- end }}
+  {{- with $.Values.tolerations }}
+  tolerations: {{ . | toYaml | nindent 4 }}
+  {{- end }}
+  components:
+    - name: redis-repl # user-defined
+      type: replication # ref clusterDefinition components.typename
+      monitor: {{ .Values.monitor.enabled | default false }}
+      replicas: {{ .Values.replicaCount | default 2 }}
+      primaryIndex: {{ .Values.primaryIndex | default 0 }}
+      {{- with  .Values.resources }}
+      resources:
+        limits:
+          cpu: {{ .limits.cpu | quote }}
+          memory: {{ .limits.memory | quote }}
+        requests:
+          cpu: {{ .requests.cpu | quote }}
+          memory: {{ .requests.memory | quote }}
+      {{- end }}
+      {{- if .Values.persistence.enabled }}
+      volumeClaimTemplates:
+        - name: data # ref clusterdefinition components.containers.volumeMounts.name
+          spec:
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: {{ .Values.persistence.data.size }}
+      {{- end }}
+

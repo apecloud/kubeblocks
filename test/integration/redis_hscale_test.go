@@ -29,6 +29,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	"github.com/apecloud/kubeblocks/controllers/dbaas/components/replicationset"
 	"github.com/apecloud/kubeblocks/controllers/dbaas/components/util"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	testdbaas "github.com/apecloud/kubeblocks/internal/testutil/dbaas"
@@ -45,15 +46,7 @@ var _ = Describe("Redis Horizontal Scale function", func() {
 	const primaryConfigName = "redis-primary-config"
 	const secondaryConfigName = "redis-secondary-config"
 
-	const redisCompType = "replication"
-	const redisCompName = "redis-rsts"
-	const redisImage = "redis:7.0.5"
-
-	const primaryIndex = 0
 	const replicas = 3
-
-	const Primary = "primary"
-	const Secondary = "secondary"
 
 	// Cleanups
 
@@ -97,8 +90,8 @@ var _ = Describe("Redis Horizontal Scale function", func() {
 		pvcSpec := testdbaas.NewPVC("1Gi")
 		clusterObj = testdbaas.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
 			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
-			AddComponent(redisCompName, redisCompType).
-			SetPrimaryIndex(primaryIndex).
+			AddComponent(testdbaas.DefaultRedisCompName, testdbaas.DefaultRedisCompType).
+			SetPrimaryIndex(testdbaas.DefaultReplicationPrimaryIndex).
 			SetReplicas(replicas).AddVolumeClaimTemplate(testdbaas.DataVolumeName, &pvcSpec).
 			Create(&testCtx).GetObject()
 		clusterKey = client.ObjectKeyFromObject(clusterObj)
@@ -115,10 +108,10 @@ var _ = Describe("Redis Horizontal Scale function", func() {
 
 		By("Checking statefulSet role label")
 		for _, sts := range stsList.Items {
-			if strings.HasSuffix(sts.Name, strconv.Itoa(primaryIndex)) {
-				Expect(sts.Labels[intctrlutil.RoleLabelKey] == Primary).Should(BeTrue())
+			if strings.HasSuffix(sts.Name, strconv.Itoa(testdbaas.DefaultReplicationPrimaryIndex)) {
+				Expect(sts.Labels[intctrlutil.RoleLabelKey]).Should(BeEquivalentTo(replicationset.Primary))
 			} else {
-				Expect(sts.Labels[intctrlutil.RoleLabelKey] == Secondary).Should(BeTrue())
+				Expect(sts.Labels[intctrlutil.RoleLabelKey]).Should(BeEquivalentTo(replicationset.Secondary))
 			}
 		}
 
@@ -127,10 +120,10 @@ var _ = Describe("Redis Horizontal Scale function", func() {
 			podList, err := util.GetPodListByStatefulSet(ctx, k8sClient, &sts)
 			Expect(err).To(Succeed())
 			Expect(len(podList)).Should(BeEquivalentTo(1))
-			if strings.HasSuffix(sts.Name, strconv.Itoa(primaryIndex)) {
-				Expect(podList[0].Labels[intctrlutil.RoleLabelKey] == Primary).Should(BeTrue())
+			if strings.HasSuffix(sts.Name, strconv.Itoa(testdbaas.DefaultReplicationPrimaryIndex)) {
+				Expect(podList[0].Labels[intctrlutil.RoleLabelKey]).Should(BeEquivalentTo(replicationset.Primary))
 			} else {
-				Expect(podList[0].Labels[intctrlutil.RoleLabelKey] == Secondary).Should(BeTrue())
+				Expect(podList[0].Labels[intctrlutil.RoleLabelKey]).Should(BeEquivalentTo(replicationset.Secondary))
 			}
 		}
 
@@ -185,11 +178,11 @@ var _ = Describe("Redis Horizontal Scale function", func() {
 
 			replicationRedisConfigVolumeMounts := []corev1.VolumeMount{
 				{
-					Name:      Primary,
+					Name:      string(replicationset.Primary),
 					MountPath: "/etc/conf/primary",
 				},
 				{
-					Name:      Secondary,
+					Name:      string(replicationset.Secondary),
 					MountPath: "/etc/conf/secondary",
 				},
 			}
@@ -197,19 +190,19 @@ var _ = Describe("Redis Horizontal Scale function", func() {
 			By("Create a clusterDefinition obj with replication componentType.")
 			mode := int32(0755)
 			clusterDefObj = testdbaas.NewClusterDefFactory(clusterDefName, testdbaas.RedisType).
-				AddComponent(testdbaas.ReplicationRedisComponent, redisCompType).
+				AddComponent(testdbaas.ReplicationRedisComponent, testdbaas.DefaultRedisCompType).
 				AddConfigTemplate(scriptConfigName, scriptConfigName, "", testdbaas.ScriptsVolumeName, &mode).
-				AddConfigTemplate(primaryConfigName, primaryConfigName, "", Primary, &mode).
-				AddConfigTemplate(secondaryConfigName, secondaryConfigName, "", Secondary, &mode).
+				AddConfigTemplate(primaryConfigName, primaryConfigName, "", string(replicationset.Primary), &mode).
+				AddConfigTemplate(secondaryConfigName, secondaryConfigName, "", string(replicationset.Secondary), &mode).
 				AddInitContainerVolumeMounts(testdbaas.DefaultRedisInitContainerName, replicationRedisConfigVolumeMounts).
 				AddContainerVolumeMounts(testdbaas.DefaultRedisContainerName, replicationRedisConfigVolumeMounts).
 				Create(&testCtx).GetObject()
 
 			By("Create a clusterVersion obj with replication componentType.")
 			clusterVersionObj = testdbaas.NewClusterVersionFactory(clusterVersionName, clusterDefObj.Name).
-				AddComponent(redisCompType).
-				AddInitContainerShort(testdbaas.DefaultRedisInitContainerName, redisImage).
-				AddContainerShort(testdbaas.DefaultRedisContainerName, redisImage).
+				AddComponent(testdbaas.DefaultRedisCompType).
+				AddInitContainerShort(testdbaas.DefaultRedisInitContainerName, testdbaas.DefaultRedisImageName).
+				AddContainerShort(testdbaas.DefaultRedisContainerName, testdbaas.DefaultRedisImageName).
 				Create(&testCtx).GetObject()
 		})
 

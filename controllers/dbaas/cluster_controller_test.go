@@ -38,7 +38,7 @@ import (
 
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
-	replicationset "github.com/apecloud/kubeblocks/controllers/dbaas/components/replicationset"
+	"github.com/apecloud/kubeblocks/controllers/dbaas/components/replicationset"
 	"github.com/apecloud/kubeblocks/controllers/dbaas/components/util"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	testdbaas "github.com/apecloud/kubeblocks/internal/testutil/dbaas"
@@ -52,9 +52,6 @@ var _ = Describe("Cluster Controller", func() {
 
 	const mysqlCompType = "replicasets"
 	const mysqlCompName = "mysql"
-	const redisCompType = "replication"
-	const redisCompName = "redis-rsts"
-	const redisImage = "redis:7.0.5"
 
 	const nginxCompType = "proxy"
 	// const nginxCompName = "nginx"
@@ -855,20 +852,13 @@ var _ = Describe("Cluster Controller", func() {
 
 	testReplicationCreation := func() {
 		By("Mock a cluster obj with replication componentType.")
-		pvcSpec := &corev1.PersistentVolumeClaimSpec{
-			AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
-			Resources: corev1.ResourceRequirements{
-				Requests: corev1.ResourceList{
-					corev1.ResourceStorage: resource.MustParse("1Gi"),
-				},
-			},
-		}
-
+		pvcSpec := testdbaas.NewPVC("1Gi")
 		clusterObj = testdbaas.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
 			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
-			AddComponent(redisCompName, redisCompType).
+			AddComponent(testdbaas.DefaultRedisCompName, testdbaas.DefaultRedisCompType).
 			SetPrimaryIndex(testdbaas.DefaultReplicationPrimaryIndex).
-			SetReplicas(testdbaas.DefaultReplicationReplicas).AddVolumeClaimTemplate(testdbaas.DataVolumeName, pvcSpec).
+			SetReplicas(testdbaas.DefaultReplicationReplicas).
+			AddVolumeClaimTemplate(testdbaas.DataVolumeName, &pvcSpec).
 			Create(&testCtx).GetObject()
 		clusterKey = client.ObjectKeyFromObject(clusterObj)
 
@@ -1064,12 +1054,13 @@ var _ = Describe("Cluster Controller", func() {
 		BeforeEach(func() {
 			By("Create a clusterDefinition obj with replication componentType.")
 			clusterDefObj = testdbaas.NewClusterDefFactory(clusterDefName, testdbaas.RedisType).
-				AddComponent(testdbaas.ReplicationRedisComponent, redisCompType).
+				AddComponent(testdbaas.ReplicationRedisComponent, testdbaas.DefaultRedisCompType).
 				Create(&testCtx).GetObject()
 
 			By("Create a clusterVersion obj with replication componentType.")
 			clusterVersionObj = testdbaas.NewClusterVersionFactory(clusterVersionName, clusterDefObj.Name).
-				AddComponent(redisCompType).AddContainerShort(testdbaas.DefaultRedisContainerName, redisImage).
+				AddComponent(testdbaas.DefaultRedisCompType).
+				AddContainerShort(testdbaas.DefaultRedisContainerName, testdbaas.DefaultRedisImageName).
 				Create(&testCtx).GetObject()
 		})
 

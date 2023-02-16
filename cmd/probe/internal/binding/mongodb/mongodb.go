@@ -18,7 +18,6 @@ package mongodb
 import (
 	"context"
 	"errors"
-	"encoding/json"
 	"fmt"
 	"strconv"
 	"strings"
@@ -32,6 +31,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 
+	. "github.com/apecloud/kubeblocks/cmd/probe/internal"
 	. "github.com/apecloud/kubeblocks/cmd/probe/internal/binding"
 )
 
@@ -232,16 +232,17 @@ func (m *MongoDB) GetRole(ctx context.Context, request *bindings.InvokeRequest, 
 	return "", errors.New("role not found")
 }
 
-func (m *MongoDB) GetRoleOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) ([]byte, error) {
+func (m *MongoDB) GetRoleOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
 	role, err := m.GetRole(ctx, req, resp)
 	if err != nil {
 		return nil, err
 	}
-	res, _ := json.Marshal(role)
-	return res, nil
+	opsRes := OpsResult{}
+	opsRes["role"] = role
+	return opsRes, nil
 }
 	
-func (m *MongoDB) StatusCheck(ctx context.Context, cmd string, response *bindings.InvokeResponse) ([]byte, error) {
+func (m *MongoDB) StatusCheck(ctx context.Context, cmd string, response *bindings.InvokeResponse) (OpsResult, error) {
 	// TODO implement me when proposal is passed
 	// proposal: https://infracreate.feishu.cn/wiki/wikcndch7lMZJneMnRqaTvhQpwb#doxcnOUyQ4Mu0KiUo232dOr5aad
 	return nil, nil

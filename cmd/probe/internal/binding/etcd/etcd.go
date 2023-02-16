@@ -18,7 +18,6 @@ package etcd
 
 import (
 	"context"
-	"encoding/json"
 	"strconv"
 	"strings"
 	"sync"
@@ -28,6 +27,7 @@ import (
 	"github.com/dapr/kit/logger"
 	v3 "go.etcd.io/etcd/client/v3"
 
+	. "github.com/apecloud/kubeblocks/cmd/probe/internal"
 	. "github.com/apecloud/kubeblocks/cmd/probe/internal/binding"
 )
 
@@ -106,13 +106,14 @@ func (e *Etcd) GetRole(ctx context.Context, req *bindings.InvokeRequest, resp *b
 	return role, nil
 }
 
-func (e *Etcd) GetRoleOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) ([]byte, error) {
+func (e *Etcd) GetRoleOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
 	role, err := e.GetRole(ctx, req, resp)
 	if err != nil {
 		return nil, err
 	}
-	res, _ := json.Marshal(role)
-	return res, nil
+	opsRes := OpsResult{}
+	opsRes["role"] = role
+	return opsRes, nil
 }
 
 func (e *Etcd) GetRunningPort() int {

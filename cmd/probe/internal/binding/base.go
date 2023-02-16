@@ -47,7 +47,7 @@ const (
 	defaultRoleDetectionThreshold = 300
 )
 
-type Operation func(ctx context.Context, request *bindings.InvokeRequest, response *bindings.InvokeResponse) ([]byte, error)
+type Operation func(ctx context.Context, request *bindings.InvokeRequest, response *bindings.InvokeResponse) (OpsResult, error)
 
 type BaseOperations struct {
 	oriRole                 string
@@ -69,22 +69,6 @@ type BaseOperations struct {
 	InitIfNeed             func() bool
 	GetRole                func(ctx context.Context, request *bindings.InvokeRequest, response *bindings.InvokeResponse) (string, error)
 	OperationMap           map[bindings.OperationKind]Operation
-}
-
-// ProbeOperation abstracts the interfaces a binding implementation needs to support.
-// these interfaces together providing probing service: CheckRunning, statusCheck, roleCheck
-type ProbeOperation interface {
-	// InitIfNeed binding initiates
-	InitIfNeed() error
-	// GetRunningPort get binding service port.
-	// runningCheck will run its check on this port
-	GetRunningPort() int
-	// StatusCheck TODO proposal TBD
-	StatusCheck(context.Context, string, *bindings.InvokeResponse) ([]byte, error)
-	// GetRole get consensus role name of the binding service
-	// roleCheck will call this interface when necessary
-	// return role name of the binding service
-	GetRole(context.Context, string) (string, error)
 }
 
 func init() {
@@ -115,10 +99,9 @@ func (ops *BaseOperations) Init(metadata bindings.Metadata) {
 	}
 	ops.Metadata = metadata
 	ops.OperationMap = map[bindings.OperationKind]Operation{
-		CheckRunningOperation: ops.CheckRunning,
-		CheckRoleOperation:    ops.CheckRole,
+		CheckRunningOperation: ops.CheckRunningOps,
+		CheckRoleOperation:    ops.CheckRoleOps,
 	}
-
 }
 
 // Operations returns list of operations supported by the binding.
@@ -159,11 +142,11 @@ func (ops *BaseOperations) Invoke(ctx context.Context, req *bindings.InvokeReque
 	if !ok {
 		message := fmt.Sprintf("%v operation is not implemented for %v", req.Operation, ops.DBType)
 		ops.Logger.Errorf(message)
-		result := &ProbeMessage{}
-		result.Event = "OperationNotImplemented"
-		result.Message = message
+		opsRes := OpsResult{}
+		opsRes["event"] = "OperationNotImplemented"
+		opsRes["message"] = message
 		resp.Metadata[StatusCode] = OperationFailedHTTPCode
-		res, _ := json.Marshal(result)
+		res, _ := json.Marshal(opsRes)
 		resp.Data = res
 		return updateRespMetadata()
 	}
@@ -173,57 +156,55 @@ func (ops *BaseOperations) Invoke(ctx context.Context, req *bindings.InvokeReque
 		return updateRespMetadata()
 	}
 
-	d, err := operation(ctx, req, resp)
+	opsRes, err := operation(ctx, req, resp)
 	if err != nil {
 		return nil, err
 	}
-	resp.Data = d
+	res, _ := json.Marshal(opsRes)
+	resp.Data = res
 
 	return updateRespMetadata()
 }
 
-func (ops *BaseOperations) CheckRole(ctx context.Context, request *bindings.InvokeRequest, response *bindings.InvokeResponse) ([]byte, error) {
-	result := &ProbeMessage{}
-	result.OriginalRole = ops.oriRole
+func (ops *BaseOperations) CheckRoleOps(ctx context.Context, request *bindings.InvokeRequest, response *bindings.InvokeResponse) (OpsResult, error) {
+	opsRes := OpsResult{}
+	opsRes["originalRole"] = ops.oriRole
 	if ops.GetRole == nil {
 		message := fmt.Sprintf("roleCheck operation is not implemented for %v", ops.DBType)
 		ops.Logger.Errorf(message)
-		result.Event = "OperationNotImplemented"
-		result.Message = message
+		opsRes["event"] = "OperationNotImplemented"
+		opsRes["message"]= message
 		response.Metadata[StatusCode] = OperationFailedHTTPCode
-		res, _ := json.Marshal(result)
-		return res, nil
+		return opsRes, nil
 	}
 
 	role, err := ops.GetRole(ctx, request, response)
 	if err != nil {
 		ops.Logger.Infof("error executing roleCheck: %v", err)
-		result.Event = "roleCheckFailed"
-		result.Message = err.Error()
+		opsRes["event"] = "roleCheckFailed"
+		opsRes["message"] = err.Error()
 		if ops.roleCheckFailedCount%ops.checkFailedThreshold == 0 {
 			ops.Logger.Infof("role checks failed %v times continuously", ops.roleCheckFailedCount)
 			response.Metadata[StatusCode] = OperationFailedHTTPCode
 		}
 		ops.roleCheckFailedCount++
-		res, _ := json.Marshal(result)
-		return res, nil
+		return opsRes, nil
 	}
 
 	ops.roleCheckFailedCount = 0
 	if isValid, message := ops.roleValidate(role); !isValid {
-		result.Event = "roleInvalid"
-		result.Message = message
-		res, _ := json.Marshal(result)
-		return res, nil
+		opsRes["event"] = "roleInvalid"
+		opsRes["message"] = message
+		return opsRes, nil
 	}
 
-	result.Role = role
+	opsRes["role"] = role
 	if ops.oriRole != role {
-		result.Event = "roleChanged"
+		opsRes["Event"] = "roleChanged"
 		ops.oriRole = role
 		ops.roleUnchangedCount = 0
 	} else {
-		result.Event = "roleUnchanged"
+		opsRes["Event"] = "roleUnchanged"
 		ops.roleUnchangedCount++
 	}
 
@@ -236,9 +217,7 @@ func (ops *BaseOperations) CheckRole(ctx context.Context, request *bindings.Invo
 	if ops.roleUnchangedCount < ops.roleDetectionThreshold && ops.roleUnchangedCount%roleEventRecordFrequency == 0 {
 		response.Metadata[StatusCode] = OperationFailedHTTPCode
 	}
-	res, _ := json.Marshal(result)
-	ops.Logger.Infof(string(res))
-	return res, nil
+	return opsRes, nil
 }
 
 // DB may have some internal roles that need not be exposed to end user,
@@ -265,28 +244,25 @@ func (ops *BaseOperations) roleValidate(role string) (bool, string) {
 	return isValid, msg
 }
 
-// CheckRunning checks whether the binding service is in running status:
+// CheckRunningOps checks whether the binding service is in running status:
 // the port is open or is close consecutively in checkFailedThreshold times
-func (ops *BaseOperations) CheckRunning(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) ([]byte, error) {
+func (ops *BaseOperations) CheckRunningOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
 	var message string
-	result := ProbeMessage{}
-	marshalResult := func() ([]byte, error) {
-		result.Message = message
-		return json.Marshal(result)
-	}
+	opsRes := OpsResult{}
 
 	host := fmt.Sprintf("127.0.0.1:%d", ops.DbPort)
 	// sql exec timeout need to be less than httpget's timeout which default is 1s.
 	conn, err := net.DialTimeout("tcp", host, 500*time.Millisecond)
 	if err != nil {
 		message = fmt.Sprintf("running check %s error: %v", host, err)
-		result.Event = "runningCheckFailed"
 		ops.Logger.Errorf(message)
+		opsRes["event"] = "runningCheckFailed"
+		opsRes["message"] = message
 		if ops.runningCheckFailedCount++; ops.runningCheckFailedCount%ops.checkFailedThreshold == 0 {
 			ops.Logger.Infof("running checks failed %v times continuously", ops.runningCheckFailedCount)
 			resp.Metadata[StatusCode] = OperationFailedHTTPCode
 		}
-		return marshalResult()
+		return opsRes, nil
 	}
 	defer conn.Close()
 	ops.runningCheckFailedCount = 0
@@ -295,5 +271,7 @@ func (ops *BaseOperations) CheckRunning(ctx context.Context, req *bindings.Invok
 		err := tcpCon.SetLinger(0)
 		ops.Logger.Infof("running check, set tcp linger failed: %v", err)
 	}
-	return marshalResult()
+	opsRes["event"] = "runningCheckSuccess"
+	opsRes["message"] = message
+	return opsRes, nil
 }

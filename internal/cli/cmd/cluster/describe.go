@@ -141,7 +141,7 @@ func (o *describeOptions) describeCluster(name string) error {
 	showCluster(o.Cluster, o.Out)
 
 	// consider first component as primary component, use it's endpoints as cluster endpoints
-	primaryComponent := cluster.FindClusterComp(o.Cluster, o.ClusterDef.Spec.Components[0].TypeName)
+	primaryComponent := cluster.FindClusterComp(o.Cluster, o.ClusterDef.Spec.ComponentDefs[0].Name)
 	showNetwork(o.Services, primaryComponent, o.Out)
 
 	// topology

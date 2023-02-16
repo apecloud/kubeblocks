@@ -73,10 +73,10 @@ var _ = Describe("Deployment Controller", func() {
 
 	Context("test controller", func() {
 		It("", func() {
-			testdbaas.NewClusterDefFactory(clusterDefName, testdbaas.MySQLType).
-				AddComponent(testdbaas.StatelessNginxComponent, statelessType).SetDefaultReplicas(2).
+			testdbaas.NewClusterDefFactory(clusterDefName).
+				AddComponent(testdbaas.StatelessNginxComponent, statelessType).
 				Create(&testCtx).GetObject()
-			cluster := testdbaas.CreateStatelessCluster(testCtx, clusterDefName, clusterVersionName, clusterName)
+			cluster := testdbaas.CreateStatelessCluster(testCtx, clusterDefName, clusterVersionName, clusterName, 2)
 
 			By("patch cluster to Running")
 			Expect(testdbaas.ChangeObjStatus(&testCtx, cluster, func() {

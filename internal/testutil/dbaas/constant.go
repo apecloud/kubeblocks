@@ -23,7 +23,6 @@ import (
 )
 
 const (
-	MySQLType                 = "state.mysql"
 	ApeCloudMySQLImage        = "docker.io/apecloud/apecloud-mysql-server:latest"
 	NginxImage                = "nginx"
 	DefaultNginxContainerName = "nginx"
@@ -35,8 +34,8 @@ const (
 
 var (
 	statelessNginxComponent = dbaasv1alpha1.ClusterDefinitionComponent{
-		ComponentType:   dbaasv1alpha1.Stateless,
-		DefaultReplicas: 1,
+		WorkloadType:  dbaasv1alpha1.Stateless,
+		CharacterType: "stateless",
 		PodSpec: &corev1.PodSpec{
 			Containers: []corev1.Container{{
 				Name: DefaultNginxContainerName,
@@ -99,9 +98,8 @@ var (
 	}
 
 	statefulMySQLComponent = dbaasv1alpha1.ClusterDefinitionComponent{
-		ComponentType:   dbaasv1alpha1.Stateful,
-		CharacterType:   "mysql",
-		DefaultReplicas: 1,
+		WorkloadType:  dbaasv1alpha1.Stateful,
+		CharacterType: "mysql",
 		PodSpec: &corev1.PodSpec{
 			Containers: []corev1.Container{defaultMySQLContainer},
 		},
@@ -127,7 +125,7 @@ var (
 	}
 
 	consensusMySQLComponent = dbaasv1alpha1.ClusterDefinitionComponent{
-		ComponentType: dbaasv1alpha1.Consensus,
+		WorkloadType:  dbaasv1alpha1.Consensus,
 		CharacterType: "mysql",
 		ConsensusSpec: &defaultConsensusSpec,
 		Probes: &dbaasv1alpha1.ClusterDefinitionProbes{
@@ -137,8 +135,7 @@ var (
 				TimeoutSeconds:   5,
 			},
 		},
-		Service:         &defaultMySQLService,
-		DefaultReplicas: 1,
+		Service: &defaultMySQLService,
 		PodSpec: &corev1.PodSpec{
 			Containers: []corev1.Container{defaultMySQLContainer},
 		},

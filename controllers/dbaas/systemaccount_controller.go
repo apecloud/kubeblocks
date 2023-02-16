@@ -223,8 +223,8 @@ func (r *SystemAccountReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	for _, compDecl := range cluster.Spec.Components {
 		compName := compDecl.Name
 		compType := compDecl.Type
-		for _, compDef := range clusterdefinition.Spec.Components {
-			if compType != compDef.TypeName || compDef.SystemAccounts == nil {
+		for _, compDef := range clusterdefinition.Spec.ComponentDefs {
+			if compType != compDef.Name || compDef.SystemAccounts == nil {
 				continue
 			}
 

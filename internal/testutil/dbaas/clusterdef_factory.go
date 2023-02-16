@@ -34,13 +34,12 @@ type MockClusterDefFactory struct {
 	BaseFactory[dbaasv1alpha1.ClusterDefinition, *dbaasv1alpha1.ClusterDefinition, MockClusterDefFactory]
 }
 
-func NewClusterDefFactory(name, cdType string) *MockClusterDefFactory {
+func NewClusterDefFactory(name string) *MockClusterDefFactory {
 	f := &MockClusterDefFactory{}
 	f.init("", name,
 		&dbaasv1alpha1.ClusterDefinition{
 			Spec: dbaasv1alpha1.ClusterDefinitionSpec{
-				Type:       cdType,
-				Components: []dbaasv1alpha1.ClusterDefinitionComponent{},
+				ComponentDefs: []dbaasv1alpha1.ClusterDefinitionComponent{},
 			},
 		}, f)
 	f.SetConnectionCredential(defaultConnectionCredential)
@@ -57,24 +56,15 @@ func (factory *MockClusterDefFactory) AddComponent(tplType ComponentTplType, ren
 	case StatelessNginxComponent:
 		component = &statelessNginxComponent
 	}
-	comps := factory.get().Spec.Components
+	comps := factory.get().Spec.ComponentDefs
 	comps = append(comps, *component)
-	comps[len(comps)-1].TypeName = rename
-	factory.get().Spec.Components = comps
-	return factory
-}
-
-func (factory *MockClusterDefFactory) SetDefaultReplicas(replicas int32) *MockClusterDefFactory {
-	comps := factory.get().Spec.Components
-	if len(comps) > 0 {
-		comps[len(comps)-1].DefaultReplicas = replicas
-	}
-	factory.get().Spec.Components = comps
+	comps[len(comps)-1].Name = rename
+	factory.get().Spec.ComponentDefs = comps
 	return factory
 }
 
 func (factory *MockClusterDefFactory) SetService(port int32) *MockClusterDefFactory {
-	comps := factory.get().Spec.Components
+	comps := factory.get().Spec.ComponentDefs
 	if len(comps) > 0 {
 		comps[len(comps)-1].Service = &corev1.ServiceSpec{
 			Ports: []corev1.ServicePort{{
@@ -83,13 +73,13 @@ func (factory *MockClusterDefFactory) SetService(port int32) *MockClusterDefFact
 			}},
 		}
 	}
-	factory.get().Spec.Components = comps
+	factory.get().Spec.ComponentDefs = comps
 	return factory
 }
 
 func (factory *MockClusterDefFactory) AddConfigTemplate(name string,
 	configTplRef string, configConstraintRef string, volumeName string, mode *int32) *MockClusterDefFactory {
-	comps := factory.get().Spec.Components
+	comps := factory.get().Spec.ComponentDefs
 	if len(comps) > 0 {
 		comp := comps[len(comps)-1]
 		if comp.ConfigSpec == nil {
@@ -105,12 +95,12 @@ func (factory *MockClusterDefFactory) AddConfigTemplate(name string,
 			})
 		comps[len(comps)-1] = comp
 	}
-	factory.get().Spec.Components = comps
+	factory.get().Spec.ComponentDefs = comps
 	return factory
 }
 
 func (factory *MockClusterDefFactory) AddContainerEnv(containerName string, envVar corev1.EnvVar) *MockClusterDefFactory {
-	comps := factory.get().Spec.Components
+	comps := factory.get().Spec.ComponentDefs
 	if len(comps) > 0 {
 		comp := comps[len(comps)-1]
 		for i, container := range comps[len(comps)-1].PodSpec.Containers {
@@ -123,7 +113,7 @@ func (factory *MockClusterDefFactory) AddContainerEnv(containerName string, envV
 		}
 		comps[len(comps)-1] = comp
 	}
-	factory.get().Spec.Components = comps
+	factory.get().Spec.ComponentDefs = comps
 	return factory
 }
 
@@ -134,7 +124,7 @@ func (factory *MockClusterDefFactory) SetConnectionCredential(
 }
 
 func (factory *MockClusterDefFactory) AddSystemAccountSpec(sysAccounts *dbaasv1alpha1.SystemAccountSpec) *MockClusterDefFactory {
-	comps := factory.get().Spec.Components
+	comps := factory.get().Spec.ComponentDefs
 	if len(comps) == 0 {
 		return factory
 	}
@@ -142,6 +132,6 @@ func (factory *MockClusterDefFactory) AddSystemAccountSpec(sysAccounts *dbaasv1a
 	comp := comps[len(comps)-1]
 	comp.SystemAccounts = sysAccounts
 	comps[len(comps)-1] = comp
-	factory.get().Spec.Components = comps
+	factory.get().Spec.ComponentDefs = comps
 	return factory
 }

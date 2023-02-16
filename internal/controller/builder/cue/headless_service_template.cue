@@ -20,7 +20,7 @@ cluster: {
 }
 component: {
 	clusterDefName: string
-	clusterType:    string
+	characterType:    string
 	type:           string
 	name:           string
 	service: {
@@ -38,7 +38,7 @@ service: {
 		namespace: cluster.metadata.namespace
 		name:      "\(cluster.metadata.name)-\(component.name)-headless"
 		labels: {
-			"app.kubernetes.io/name":           "\(component.clusterType)-\(component.clusterDefName)"
+			"app.kubernetes.io/name":           "\(component.characterType)-\(component.clusterDefName)"
 			"app.kubernetes.io/instance":       cluster.metadata.name
 			"app.kubernetes.io/component-name": "\(component.name)"
 			"app.kubernetes.io/managed-by":     "kubeblocks"

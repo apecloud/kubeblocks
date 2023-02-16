@@ -120,8 +120,8 @@ func init() {
 	RegisterPolicy(dbaasv1alpha1.AutoReload, &AutoReloadPolicy{})
 }
 
-func (param *reconfigureParams) ComponentType() dbaasv1alpha1.ComponentType {
-	return param.Component.ComponentType
+func (param *reconfigureParams) ComponentType() dbaasv1alpha1.WorkloadType {
+	return param.Component.WorkloadType
 }
 
 // GetClientFactory support ut mock

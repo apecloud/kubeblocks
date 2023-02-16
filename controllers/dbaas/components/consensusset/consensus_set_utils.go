@@ -73,7 +73,7 @@ func handleConsensusSetUpdate(ctx context.Context, cli client.Client, cluster *d
 		return false, err
 	}
 
-	if component == nil || component.ComponentType != dbaasv1alpha1.Consensus {
+	if component == nil || component.WorkloadType != dbaasv1alpha1.Consensus {
 		return true, nil
 	}
 	pods, err := util.GetPodListByStatefulSet(ctx, cli, stsObj)

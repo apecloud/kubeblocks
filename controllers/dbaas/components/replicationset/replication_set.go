@@ -127,10 +127,10 @@ func (rs *ReplicationSet) GetPhaseWhenPodsNotReady(componentName string) (dbaasv
 		return dbaasv1alpha1.FailedPhase, nil
 	}
 	if cluster.Status.Components == nil {
-		return "", fmt.Errorf("%s cluster.Status.Components is nil", cluster.Name)
+		return "", fmt.Errorf("%s cluster.Status.ComponentDefs is nil", cluster.Name)
 	}
 	if statusComponent, ok = cluster.Status.Components[componentName]; !ok {
-		return "", fmt.Errorf("%s cluster.Status.Components[%s] is nil", cluster.Name, componentName)
+		return "", fmt.Errorf("%s cluster.Status.ComponentDefs[%s] is nil", cluster.Name, componentName)
 	} else if statusComponent.Message == nil {
 		statusComponent.Message = dbaasv1alpha1.ComponentMessageMap{}
 	}
@@ -162,7 +162,7 @@ func (rs *ReplicationSet) GetPhaseWhenPodsNotReady(componentName string) (dbaasv
 		}
 	}
 
-	// patch abnormal reason to cluster.status.Components.
+	// patch abnormal reason to cluster.status.ComponentDefs.
 	if needPatch {
 		patch := client.MergeFrom(cluster.DeepCopy())
 		cluster.Status.Components[componentName] = statusComponent

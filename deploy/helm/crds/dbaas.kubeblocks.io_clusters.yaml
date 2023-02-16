@@ -834,14 +834,6 @@ spec:
                       support horizontalScaling, and the replicas range limit.
                     items:
                       properties:
-                        max:
-                          description: max maximum of replicas when operation is horizontalScaling.
-                          format: int32
-                          type: integer
-                        min:
-                          description: min minimum of replicas when operation is horizontalScaling.
-                          format: int32
-                          type: integer
                         name:
                           description: name reference component name.
                           type: string
@@ -881,14 +873,6 @@ spec:
                       and its volumeClaimTemplates support volumeExpansion.
                     items:
                       properties:
-                        max:
-                          description: max maximum of replicas when operation is horizontalScaling.
-                          format: int32
-                          type: integer
-                        min:
-                          description: min minimum of replicas when operation is horizontalScaling.
-                          format: int32
-                          type: integer
                         name:
                           description: name reference component name.
                           type: string

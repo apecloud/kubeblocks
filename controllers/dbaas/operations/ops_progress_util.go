@@ -174,7 +174,7 @@ func handleComponentStatusProgress(
 	if podList, err = util.GetComponentPodList(opsRes.Ctx, opsRes.Client, opsRes.Cluster, clusterComponent.Name); err != nil {
 		return
 	}
-	switch clusterComponentDef.ComponentType {
+	switch clusterComponentDef.WorkloadType {
 	case dbaasv1alpha1.Stateless:
 		succeedCount, err = handleStatelessProgress(opsRes, podList, pgRes, statusComponent)
 	default:

@@ -26,24 +26,15 @@ import (
 
 // ClusterDefinitionSpec defines the desired state of ClusterDefinition
 type ClusterDefinitionSpec struct {
-	// Cluster definition type defines well known application cluster type. This value should
-	// keep consistent with known DAPR component type
-	// (https://docs.dapr.io/reference/components-reference/). For component that has yet been
-	// provided by DAPR, then it's suggested to follow the naming scheme as DAPR component
-	// type name prefix, i.e., a state store related Cluster starts with "state.<app-name>".
-	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:MaxLength=24
-	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
-	Type string `json:"type"`
 
 	// List of components belonging to the cluster.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MinItems=1
-	// +patchMergeKey=typeName
+	// +patchMergeKey=name
 	// +patchStrategy=merge,retainKeys
 	// +listType=map
-	// +listMapKey=typeName
-	Components []ClusterDefinitionComponent `json:"components" patchStrategy:"merge,retainKeys" patchMergeKey:"typeName"`
+	// +listMapKey=name
+	ComponentDefs []ClusterDefinitionComponent `json:"componentDefs" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
 
 	// Default connection credential used for connecting to cluster service.
 	// +optional
@@ -276,42 +267,29 @@ type ConfigurationSpec struct {
 
 // ClusterDefinitionComponent is a group of pods, pods belong to same component usually share the same data
 type ClusterDefinitionComponent struct {
-	// Type name of the component, it can be any valid string.
+	// Name of the component, it can be any valid string.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=12
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
-	TypeName string `json:"typeName"`
+	Name string `json:"name"`
 
-	// componentType defines type of the component.
+	// workloadType defines type of the workload.
 	// Stateless is a stateless component type used to describe stateless applications.
 	// Stateful is a stateful component type used to describe common stateful applications.
 	// Consensus is a stateful component type used to describe applications based on consensus protocols, common consensus protocols such as raft and paxos.
 	// Replication is a stateful component type used to describe applications based on the primary-secondary data replication protocol.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Enum={Stateless,Stateful,Consensus,Replication}
-	ComponentType ComponentType `json:"componentType"`
+	WorkloadType WorkloadType `json:"workloadType"`
 
 	// characterType defines well-known database component name, such as mongos(mongodb), proxy(redis), mariadb(mysql)
 	// KubeBlocks will generate proper monitor configs for well-known characterType when builtIn is true.
 	// +optional
 	CharacterType string `json:"characterType,omitempty"`
 
-	// minReplicas minimum replicas for component pod count.
-	// +kubebuilder:default=0
-	// +kubebuilder:validation:Minimum=0
+	// maxUnavailable defines max replicas can be unavailable.
 	// +optional
-	MinReplicas int32 `json:"minReplicas,omitempty"`
-
-	// maxReplicas maximum replicas pod for component pod count.
-	// +kubebuilder:validation:Minimum=0
-	// +optional
-	MaxReplicas int32 `json:"maxReplicas,omitempty"`
-
-	// defaultReplicas default replicas in this component when not specified.
-	// +kubebuilder:default=0
-	// +kubebuilder:validation:Minimum=0
-	// +optional
-	DefaultReplicas int32 `json:"defaultReplicas,omitempty"`
+	MaxUnavailable string `json:"maxUnavailable,omitempty"`
 
 	// pdbSpec pod disruption budget spec. This is mutually exclusive with the component type of Consensus.
 	// +optional
@@ -344,7 +322,7 @@ type ClusterDefinitionComponent struct {
 	PodSpec *corev1.PodSpec `json:"podSpec,omitempty"`
 
 	// service defines the behavior of a service spec.
-	// provide read-write service when ComponentType is Consensus.
+	// provide read-write service when WorkloadType is Consensus.
 	// https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
 	// +kubebuilder:pruning:PreserveUnknownFields
 	// +optional
@@ -487,7 +465,7 @@ type ConsensusMember struct {
 	// Replicas, number of Pods of this role.
 	// default 1 for Leader
 	// default 0 for Learner
-	// default Components[*].Replicas - Leader.Replicas - Learner.Replicas for Followers
+	// default ComponentDefs[*].Replicas - Leader.Replicas - Learner.Replicas for Followers
 	// +kubebuilder:default=0
 	// +kubebuilder:validation:Minimum=0
 	// +optional
@@ -527,8 +505,8 @@ func init() {
 func (r *ClusterDefinition) ValidateEnabledLogConfigs(typeName string, enabledLogs []string) []string {
 	invalidLogNames := make([]string, 0, len(enabledLogs))
 	logTypes := make(map[string]struct{})
-	for _, comp := range r.Spec.Components {
-		if !strings.EqualFold(typeName, comp.TypeName) {
+	for _, comp := range r.Spec.ComponentDefs {
+		if !strings.EqualFold(typeName, comp.Name) {
 			continue
 		}
 		for _, logConfig := range comp.LogConfigs {
@@ -549,8 +527,8 @@ func (r *ClusterDefinition) ValidateEnabledLogConfigs(typeName string, enabledLo
 
 // GetComponentDefByTypeName gets component definition from ClusterDefinition with typeName
 func (r *ClusterDefinition) GetComponentDefByTypeName(typeName string) *ClusterDefinitionComponent {
-	for _, component := range r.Spec.Components {
-		if component.TypeName == typeName {
+	for _, component := range r.Spec.ComponentDefs {
+		if component.Name == typeName {
 			return &component
 		}
 	}

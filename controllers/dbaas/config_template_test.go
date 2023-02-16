@@ -151,7 +151,6 @@ single_thread_memory = 294912
 		}
 		component = &ctrlcomp.Component{
 			ClusterDefName: "mysql-three-node-definition",
-			ClusterType:    "state.mysql",
 			Name:           "replicasets",
 			Type:           "replicasets",
 			Replicas:       5,

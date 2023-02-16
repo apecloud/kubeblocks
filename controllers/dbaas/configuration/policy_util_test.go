@@ -110,14 +110,14 @@ func withConfigTpl(tplName string, data map[string]string) ParamsOps {
 	}
 }
 
-func withCDComponent(compType dbaasv1alpha1.ComponentType, tpls []dbaasv1alpha1.ConfigTemplate) ParamsOps {
+func withCDComponent(compType dbaasv1alpha1.WorkloadType, tpls []dbaasv1alpha1.ConfigTemplate) ParamsOps {
 	return func(params *reconfigureParams) {
 		params.Component = &dbaasv1alpha1.ClusterDefinitionComponent{
 			ConfigSpec: &dbaasv1alpha1.ConfigurationSpec{
 				ConfigTemplateRefs: tpls,
 			},
-			ComponentType: compType,
-			TypeName:      string(compType),
+			WorkloadType: compType,
+			Name:         string(compType),
 		}
 		if compType == dbaasv1alpha1.Consensus {
 			params.Component.ConsensusSpec = &dbaasv1alpha1.ConsensusSetSpec{

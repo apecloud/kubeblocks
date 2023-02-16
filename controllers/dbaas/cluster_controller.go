@@ -820,17 +820,12 @@ func getSupportHorizontalScalingComponents(
 
 	// determine whether to support horizontalScaling
 	for _, v := range cluster.Spec.Components {
-		for _, component := range clusterDef.Spec.Components {
-			if v.Type != component.TypeName {
-				continue
-			}
-			if component.MinReplicas != 0 && component.MaxReplicas == component.MinReplicas {
+		for _, component := range clusterDef.Spec.ComponentDefs {
+			if v.Type != component.Name {
 				continue
 			}
 			horizontalScalableComponents = append(horizontalScalableComponents, dbaasv1alpha1.OperationComponent{
 				Name: v.Name,
-				Min:  component.MinReplicas,
-				Max:  component.MaxReplicas,
 			})
 			break
 		}

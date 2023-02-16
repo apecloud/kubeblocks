@@ -492,7 +492,7 @@ func GetConfigTemplateList(clusterName string, namespace string, cli dynamic.Int
 		return nil, err
 	}
 
-	tpls, err := cfgcore.GetConfigTemplatesFromComponent(clusterObj.Spec.Components, clusterDefObj.Spec.Components, clusterVersionObj.Spec.Components, componentName)
+	tpls, err := cfgcore.GetConfigTemplatesFromComponent(clusterObj.Spec.Components, clusterDefObj.Spec.ComponentDefs, clusterVersionObj.Spec.Components, componentName)
 	if err != nil {
 		return nil, err
 	} else if !reloadTpl {

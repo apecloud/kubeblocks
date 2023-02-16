@@ -3,10 +3,11 @@ kind: ClusterDefinition
 metadata:
   name: %s
 spec:
-  components:
+  componentDefs:
   - antiAffinity: false
-    componentType: Consensus
-    typeName: consensus
+    characterType: "mysql"
+    workloadType: Consensus
+    name: consensus
     logConfigs:
     - filePathPattern: /data/mysql/log/mysqld.err
       name: error
@@ -26,5 +27,3 @@ spec:
         failureThreshold: 2
         periodSeconds: 1
         timeoutSeconds: 1
-    defaultReplicas: 3
-  type: state.mysql

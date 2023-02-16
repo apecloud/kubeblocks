@@ -135,7 +135,7 @@ func FakePods(replicas int, namespace string, cluster string) *corev1.PodList {
 			types.InstanceLabelKey:  cluster,
 			types.RoleLabelKey:      role,
 			types.ComponentLabelKey: ComponentName,
-			types.NameLabelKey:      "state.mysql-apecloud-mysql",
+			types.NameLabelKey:      "mysql-apecloud-mysql",
 		}
 		pod.Spec.NodeName = NodeName
 		pod.Spec.Containers = []corev1.Container{
@@ -182,17 +182,16 @@ func FakeNode() *corev1.Node {
 func FakeClusterDef() *dbaasv1alpha1.ClusterDefinition {
 	clusterDef := &dbaasv1alpha1.ClusterDefinition{}
 	clusterDef.Name = ClusterDefName
-	clusterDef.Spec.Components = []dbaasv1alpha1.ClusterDefinitionComponent{
+	clusterDef.Spec.ComponentDefs = []dbaasv1alpha1.ClusterDefinitionComponent{
 		{
-			TypeName:        ComponentType,
-			DefaultReplicas: 2,
+			Name:          ComponentType,
+			CharacterType: "mysql",
 		},
 		{
-			TypeName:        fmt.Sprintf("%s-%d", ComponentType, 1),
-			DefaultReplicas: 2,
+			Name:          fmt.Sprintf("%s-%d", ComponentType, 1),
+			CharacterType: "mysql",
 		},
 	}
-	clusterDef.Spec.Type = "state.mysql"
 	return clusterDef
 }
 

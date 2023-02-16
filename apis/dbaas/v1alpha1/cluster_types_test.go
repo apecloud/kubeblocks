@@ -44,10 +44,9 @@ kind: ClusterDefinition
 metadata:
   name: cluster-definition-consensus
 spec:
-  type: state.mysql
-  components:
-    - typeName: replicasets
-      componentType: Consensus
+  componentDefs:
+    - name: replicasets
+      workloadType: Consensus
       logConfigs:
         - name: error
           filePathPattern: /log/mysql/mysqld.err

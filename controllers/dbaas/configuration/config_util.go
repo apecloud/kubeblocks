@@ -294,7 +294,7 @@ func getCfgTplFromCV(appVer *dbaasv1alpha1.ClusterVersion) []dbaasv1alpha1.Confi
 
 func getCfgTplFromCD(clusterDef *dbaasv1alpha1.ClusterDefinition, validators ...ComponentValidateHandler) ([]dbaasv1alpha1.ConfigTemplate, error) {
 	tpls := make([]dbaasv1alpha1.ConfigTemplate, 0)
-	for _, component := range clusterDef.Spec.Components {
+	for _, component := range clusterDef.Spec.ComponentDefs {
 		if component.ConfigSpec != nil && len(component.ConfigSpec.ConfigTemplateRefs) > 0 {
 			tpls = append(tpls, component.ConfigSpec.ConfigTemplateRefs...)
 			// Check reload configure config template
@@ -490,9 +490,9 @@ func getComponentFromClusterDefinition(
 	if err := cli.Get(ctx, client.ObjectKey{Name: cluster.Spec.ClusterDefRef}, clusterDef); err != nil {
 		return nil, err
 	}
-	for i := range clusterDef.Spec.Components {
-		component := &clusterDef.Spec.Components[i]
-		if component.TypeName == typeName {
+	for i := range clusterDef.Spec.ComponentDefs {
+		component := &clusterDef.Spec.ComponentDefs[i]
+		if component.Name == typeName {
 			return component, nil
 		}
 	}

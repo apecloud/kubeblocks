@@ -72,10 +72,10 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 	const nginxCompName = "nginx"
 
 	createClusterDef := func() {
-		_ = testdbaas.NewClusterDefFactory(clusterDefName, testdbaas.MySQLType).
-			AddComponent(testdbaas.StatefulMySQLComponent, statefulMySQLCompType).SetDefaultReplicas(3).
-			AddComponent(testdbaas.ConsensusMySQLComponent, consensusMySQLCompType).SetDefaultReplicas(3).
-			AddComponent(testdbaas.StatelessNginxComponent, nginxCompType).SetDefaultReplicas(3).
+		_ = testdbaas.NewClusterDefFactory(clusterDefName).
+			AddComponent(testdbaas.StatefulMySQLComponent, statefulMySQLCompType).
+			AddComponent(testdbaas.ConsensusMySQLComponent, consensusMySQLCompType).
+			AddComponent(testdbaas.StatelessNginxComponent, nginxCompType).
 			Create(&testCtx)
 	}
 
@@ -89,9 +89,9 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 
 	createCluster := func() *dbaasv1alpha1.Cluster {
 		return testdbaas.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefName, clusterVersionName).
-			AddComponent(statefulMySQLCompName, statefulMySQLCompType).
-			AddComponent(consensusMySQLCompName, consensusMySQLCompType).
-			AddComponent(nginxCompName, nginxCompType).
+			AddComponent(statefulMySQLCompName, statefulMySQLCompType).SetReplicas(3).
+			AddComponent(consensusMySQLCompName, consensusMySQLCompType).SetReplicas(3).
+			AddComponent(nginxCompName, nginxCompType).SetReplicas(3).
 			Create(&testCtx).GetObject()
 	}
 

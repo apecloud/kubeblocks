@@ -26,9 +26,9 @@ import (
 )
 
 // CreateStatelessCluster creates a cluster with a component of Stateless type for testing.
-func CreateStatelessCluster(testCtx testutil.TestContext, clusterDefName, clusterVersionName, clusterName string) *dbaasv1alpha1.Cluster {
+func CreateStatelessCluster(testCtx testutil.TestContext, clusterDefName, clusterVersionName, clusterName string, replicas int) *dbaasv1alpha1.Cluster {
 	return CreateCustomizedObj(&testCtx, "stateless/cluster.yaml", &dbaasv1alpha1.Cluster{},
-		CustomizeObjYAML(clusterVersionName, clusterDefName, clusterName, clusterVersionName, clusterDefName))
+		CustomizeObjYAML(clusterVersionName, clusterDefName, clusterName, clusterVersionName, clusterDefName, replicas))
 }
 
 // MockStatelessComponentDeploy mocks a deployment workload of the stateless component.

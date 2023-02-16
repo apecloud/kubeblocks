@@ -206,7 +206,7 @@ func newReplicasNotReadyCondition(notReadyComponentNames map[string]struct{}) me
 	return metav1.Condition{
 		Type:    ConditionTypeReplicasReady,
 		Status:  metav1.ConditionFalse,
-		Message: fmt.Sprintf("pods are not ready in Components: %v, refer to related component message in Cluster.status.components", cNameSlice),
+		Message: fmt.Sprintf("pods are not ready in ComponentDefs: %v, refer to related component message in Cluster.status.components", cNameSlice),
 		Reason:  ReasonReplicasNotReady,
 	}
 }
@@ -228,7 +228,7 @@ func newComponentsNotReadyCondition(notReadyComponentNames map[string]struct{}) 
 	return metav1.Condition{
 		Type:    ConditionTypeReady,
 		Status:  metav1.ConditionFalse,
-		Message: fmt.Sprintf("pods are unavailable in Components: %v, refer to related component message in Cluster.status.components", cNameSlice),
+		Message: fmt.Sprintf("pods are unavailable in ComponentDefs: %v, refer to related component message in Cluster.status.components", cNameSlice),
 		Reason:  ReasonComponentsNotReady,
 	}
 }

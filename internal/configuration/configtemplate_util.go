@@ -55,7 +55,7 @@ func GetConfigTemplatesFromComponent(
 		return o.Type == cCom.Type
 	})
 	dCom := filter(dComponents, func(o dbaasv1alpha1.ClusterDefinitionComponent) bool {
-		return o.TypeName == cCom.Type
+		return o.Name == cCom.Type
 	})
 
 	var (
@@ -73,7 +73,7 @@ func GetConfigTemplatesFromComponent(
 	return MergeConfigTemplates(avTpls, cdTpls), nil
 }
 
-// MergeConfigTemplates merge ClusterVersion.Components[*].ConfigTemplateRefs and ClusterDefinition.Components[*].ConfigTemplateRefs
+// MergeConfigTemplates merge ClusterVersion.ComponentDefs[*].ConfigTemplateRefs and ClusterDefinition.ComponentDefs[*].ConfigTemplateRefs
 func MergeConfigTemplates(clusterVersionTpl []dbaasv1alpha1.ConfigTemplate,
 	cdTpl []dbaasv1alpha1.ConfigTemplate) []dbaasv1alpha1.ConfigTemplate {
 	if len(clusterVersionTpl) == 0 {

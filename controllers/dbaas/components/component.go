@@ -74,7 +74,7 @@ func NewComponentByType(
 	if componentDef == nil {
 		return nil
 	}
-	switch componentDef.ComponentType {
+	switch componentDef.WorkloadType {
 	case dbaasv1alpha1.Consensus:
 		return consensusset.NewConsensusSet(ctx, cli, cluster, component, componentDef)
 	case dbaasv1alpha1.Replication:

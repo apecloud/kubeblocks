@@ -387,8 +387,8 @@ func (o *CreateOptions) PreCreate(obj *unstructured.Unstructured) error {
 // setEnableAllLog set enable all logs, and ignore enabledLogs of component level.
 func setEnableAllLogs(c *dbaasv1alpha1.Cluster, cd *dbaasv1alpha1.ClusterDefinition) {
 	for idx, comCluster := range c.Spec.Components {
-		for _, com := range cd.Spec.Components {
-			if !strings.EqualFold(comCluster.Type, com.TypeName) {
+		for _, com := range cd.Spec.ComponentDefs {
+			if !strings.EqualFold(comCluster.Type, com.Name) {
 				continue
 			}
 			typeList := make([]string, 0, len(com.LogConfigs))
@@ -419,17 +419,11 @@ func buildClusterComp(cd *dbaasv1alpha1.ClusterDefinition, setsMap map[string]ma
 	}
 
 	var comps []map[string]interface{}
-	for _, c := range cd.Spec.Components {
-		// if cluster definition component default replicas greater than 0, build a cluster component
-		// by cluster definition component.
-		replicas := c.DefaultReplicas
-		if replicas <= 0 {
-			continue
-		}
+	for _, c := range cd.Spec.ComponentDefs {
 
 		sets := map[setKey]string{}
 		if setsMap != nil {
-			sets = setsMap[c.TypeName]
+			sets = setsMap[c.Name]
 		}
 
 		// get replicas
@@ -437,15 +431,15 @@ func buildClusterComp(cd *dbaasv1alpha1.ClusterDefinition, setsMap map[string]ma
 		if err != nil {
 			return nil, fmt.Errorf("repicas is illegal " + err.Error())
 		}
-		replicas = int32(setReplicas)
+		replicas := int32(setReplicas)
 
 		resourceList := corev1.ResourceList{
 			corev1.ResourceCPU:    resource.MustParse(getVal(keyCPU, sets)),
 			corev1.ResourceMemory: resource.MustParse(getVal(keyMemory, sets)),
 		}
 		compObj := &dbaasv1alpha1.ClusterComponent{
-			Name:     c.TypeName,
-			Type:     c.TypeName,
+			Name:     c.Name,
+			Type:     c.Name,
 			Replicas: &replicas,
 			Resources: corev1.ResourceRequirements{
 				Requests: resourceList,

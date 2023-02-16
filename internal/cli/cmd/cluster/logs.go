@@ -237,8 +237,8 @@ func (o *LogsOptions) createFileTypeCommand(pod *corev1.Pod, obj *cluster.Cluste
 		return command, fmt.Errorf("get pod component type in cluster.yaml fail")
 	}
 	var filePathPattern string
-	for _, com := range obj.ClusterDef.Spec.Components {
-		if strings.EqualFold(com.TypeName, comTypeName) {
+	for _, com := range obj.ClusterDef.Spec.ComponentDefs {
+		if strings.EqualFold(com.Name, comTypeName) {
 			for _, logConfig := range com.LogConfigs {
 				if strings.EqualFold(logConfig.Name, o.fileType) {
 					filePathPattern = logConfig.FilePathPattern

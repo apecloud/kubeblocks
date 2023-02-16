@@ -78,7 +78,7 @@ var _ = Describe("StatefulSet Controller", func() {
 	testUpdateStrategy := func(updateStrategy dbaasv1alpha1.UpdateStrategy, componentName string, index int) {
 		Expect(testdbaas.GetAndChangeObj(&testCtx, client.ObjectKey{Name: clusterDefName},
 			func(clusterDef *dbaasv1alpha1.ClusterDefinition) {
-				clusterDef.Spec.Components[0].ConsensusSpec.UpdateStrategy = dbaasv1alpha1.SerialStrategy
+				clusterDef.Spec.ComponentDefs[0].ConsensusSpec.UpdateStrategy = dbaasv1alpha1.SerialStrategy
 			})()).Should(Succeed())
 
 		// mock consensus component is not ready

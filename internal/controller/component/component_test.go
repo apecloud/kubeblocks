@@ -54,7 +54,6 @@ var _ = Describe("component module", func() {
 			clusterComp = &cluster.Spec.Components[0]
 
 			clusterDef = &dbaasv1alpha1.ClusterDefinition{}
-			clusterDef.Spec.Type = kStateMysql
 			clusterDefComp = &dbaasv1alpha1.ClusterDefinitionComponent{}
 			clusterDefComp.CharacterType = kMysql
 			clusterDefComp.Monitor = &dbaasv1alpha1.MonitorConfig{
@@ -64,8 +63,8 @@ var _ = Describe("component module", func() {
 					ScrapePath: "/metrics",
 				},
 			}
-			clusterDef.Spec.Components = append(clusterDef.Spec.Components, *clusterDefComp)
-			clusterDefComp = &clusterDef.Spec.Components[0]
+			clusterDef.Spec.ComponentDefs = append(clusterDef.Spec.ComponentDefs, *clusterDefComp)
+			clusterDefComp = &clusterDef.Spec.ComponentDefs[0]
 		})
 
 		It("should disable monitor if ClusterComponent.Monitor is false", func() {
@@ -127,7 +126,6 @@ var _ = Describe("component module", func() {
 		It("should disable monitor if ClusterDefinitionComponent's CharacterType is empty", func() {
 			// TODO fixme: seems setting clusterDef.Spec.Type has no effect to mergeMonitorConfig
 			clusterComp.Monitor = true
-			clusterDef.Spec.Type = kFake
 			clusterDefComp.CharacterType = ""
 			clusterDefComp.Monitor.BuiltIn = true
 			clusterDefComp.Monitor.Exporter = nil
@@ -159,7 +157,7 @@ var _ = Describe("component module", func() {
 		)
 
 		BeforeEach(func() {
-			clusterDef = testdbaas.NewClusterDefFactory(clusterDefName, testdbaas.MySQLType).
+			clusterDef = testdbaas.NewClusterDefFactory(clusterDefName).
 				AddComponent(testdbaas.StatefulMySQLComponent, mysqlCompType).
 				AddComponent(testdbaas.StatelessNginxComponent, nginxCompType).
 				GetObject()
@@ -188,7 +186,7 @@ var _ = Describe("component module", func() {
 				reqCtx,
 				cluster,
 				clusterDef,
-				&clusterDef.Spec.Components[0],
+				&clusterDef.Spec.ComponentDefs[0],
 				&clusterVersion.Spec.Components[0],
 				&cluster.Spec.Components[0])
 			Expect(component).ShouldNot(BeNil())
@@ -199,7 +197,7 @@ var _ = Describe("component module", func() {
 				reqCtx,
 				cluster,
 				clusterDef,
-				&clusterDef.Spec.Components[0],
+				&clusterDef.Spec.ComponentDefs[0],
 				&clusterVersion.Spec.Components[0],
 				&cluster.Spec.Components[0])
 			Expect(component).ShouldNot(BeNil())
@@ -209,7 +207,7 @@ var _ = Describe("component module", func() {
 				reqCtx,
 				cluster,
 				clusterDef,
-				&clusterDef.Spec.Components[0],
+				&clusterDef.Spec.ComponentDefs[0],
 				&clusterVersion.Spec.Components[1],
 				&cluster.Spec.Components[0])
 			Expect(len(component.PodSpec.Containers)).Should(Equal(2))
@@ -219,7 +217,7 @@ var _ = Describe("component module", func() {
 				reqCtx,
 				cluster,
 				clusterDef,
-				&clusterDef.Spec.Components[0],
+				&clusterDef.Spec.ComponentDefs[0],
 				&clusterVersion.Spec.Components[1],
 				&cluster.Spec.Components[0])
 			Expect(len(component.PodSpec.InitContainers)).Should(Equal(1))
@@ -229,7 +227,7 @@ var _ = Describe("component module", func() {
 				reqCtx,
 				cluster,
 				clusterDef,
-				&clusterDef.Spec.Components[0],
+				&clusterDef.Spec.ComponentDefs[0],
 				&clusterVersion.Spec.Components[0],
 				nil)
 			Expect(component).ShouldNot(BeNil())

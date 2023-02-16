@@ -241,7 +241,7 @@ func handleClusterAbnormalOrFailedPhase(cluster *dbaasv1alpha1.Cluster, componen
 // getClusterAvailabilityEffect whether the component will affect the cluster availability.
 // if the component can affect and be Failed, the cluster will be Failed too.
 func getClusterAvailabilityEffect(componentDef *dbaasv1alpha1.ClusterDefinitionComponent) bool {
-	switch componentDef.ComponentType {
+	switch componentDef.WorkloadType {
 	case dbaasv1alpha1.Consensus:
 		return true
 	default:
@@ -264,9 +264,9 @@ func getComponentRelatedInfo(cluster *dbaasv1alpha1.Cluster, clusterDef *dbaasv1
 		componentMap[v.Name] = v.Type
 	}
 	clusterAvailabilityEffectMap := map[string]bool{}
-	for _, v := range clusterDef.Spec.Components {
-		clusterAvailabilityEffectMap[v.TypeName] = getClusterAvailabilityEffect(&v)
-		if v.TypeName == typeName {
+	for _, v := range clusterDef.Spec.ComponentDefs {
+		clusterAvailabilityEffectMap[v.Name] = getClusterAvailabilityEffect(&v)
+		if v.Name == typeName {
 			componentDef = v
 		}
 	}

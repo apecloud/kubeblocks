@@ -60,7 +60,7 @@ var _ = Describe("Reconfigure RollingPolicy", func() {
 		}
 	}
 
-	createReconfigureParam := func(compType dbaasv1alpha1.ComponentType, replicas int) reconfigureParams {
+	createReconfigureParam := func(compType dbaasv1alpha1.WorkloadType, replicas int) reconfigureParams {
 		return newMockReconfigureParams("rollingPolicy", mockClient,
 			withMockStatefulSet(replicas, nil),
 			withConfigTpl("for_test", map[string]string{
@@ -180,7 +180,7 @@ var _ = Describe("Reconfigure RollingPolicy", func() {
 			// for mock sts
 			var pods []corev1.Pod
 			{
-				mockParam.Component.ComponentType = dbaasv1alpha1.Stateful
+				mockParam.Component.WorkloadType = dbaasv1alpha1.Stateful
 				mockParam.Component.PDBSpec = &policyv1.PodDisruptionBudgetSpec{
 					MaxUnavailable: func() *metautil.IntOrString { v := metautil.FromString("100%"); return &v }(),
 				}

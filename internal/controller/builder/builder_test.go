@@ -63,7 +63,7 @@ var _ = Describe("builder", func() {
 
 	allFieldsClusterDefObj := func(needCreate bool) *dbaasv1alpha1.ClusterDefinition {
 		By("By assure an clusterDefinition obj")
-		clusterDefObj := testdbaas.NewClusterDefFactory(clusterDefName, testdbaas.MySQLType).
+		clusterDefObj := testdbaas.NewClusterDefFactory(clusterDefName).
 			AddComponent(testdbaas.StatefulMySQLComponent, mysqlCompType).
 			AddComponent(testdbaas.StatelessNginxComponent, nginxCompType).
 			GetObject()
@@ -104,7 +104,7 @@ var _ = Describe("builder", func() {
 		pvcSpec := testdbaas.NewPVC("1Gi")
 		clusterObj := testdbaas.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
 			clusterDefObj.Name, clusterVersionObj.Name).
-			AddComponent(mysqlCompName, mysqlCompType).
+			AddComponent(mysqlCompName, mysqlCompType).SetReplicas(1).
 			AddVolumeClaimTemplate(testdbaas.DataVolumeName, &pvcSpec).
 			GetObject()
 		key := client.ObjectKeyFromObject(clusterObj)
@@ -149,7 +149,7 @@ var _ = Describe("builder", func() {
 			reqCtx,
 			cluster,
 			clusterDef,
-			&clusterDef.Spec.Components[0],
+			&clusterDef.Spec.ComponentDefs[0],
 			&clusterVersion.Spec.Components[0],
 			&cluster.Spec.Components[0])
 		Expect(component).ShouldNot(BeNil())

@@ -78,33 +78,19 @@ var _ = Describe("clusterDefinition webhook", func() {
 			Expect(testCtx.CreateObj(ctx, clusterDef)).ShouldNot(Succeed())
 
 			By("Set Leader.Replicas > 1")
-			clusterDef.Spec.Components[0].ConsensusSpec = &ConsensusSetSpec{Leader: DefaultLeader}
+			clusterDef.Spec.ComponentDefs[0].ConsensusSpec = &ConsensusSetSpec{Leader: DefaultLeader}
 			replicas := int32(2)
-			clusterDef.Spec.Components[0].ConsensusSpec.Leader.Replicas = &replicas
+			clusterDef.Spec.ComponentDefs[0].ConsensusSpec.Leader.Replicas = &replicas
 			Expect(testCtx.CreateObj(ctx, clusterDef)).ShouldNot(Succeed())
 			// restore clusterDef
-			clusterDef.Spec.Components[0].ConsensusSpec.Leader.Replicas = nil
+			clusterDef.Spec.ComponentDefs[0].ConsensusSpec.Leader.Replicas = nil
 
 			By("Set Followers.Replicas to odd")
 			followers := make([]ConsensusMember, 1)
 			rel := int32(3)
 			followers[0] = ConsensusMember{Name: "follower", AccessMode: "Readonly", Replicas: &rel}
-			clusterDef.Spec.Components[0].ConsensusSpec.Followers = followers
+			clusterDef.Spec.ComponentDefs[0].ConsensusSpec.Followers = followers
 			Expect(testCtx.CreateObj(ctx, clusterDef)).ShouldNot(Succeed())
-
-			By("Set Followers.Replicas to 2, component.defaultReplicas to 4, " +
-				"which means Leader.Replicas(1) + Followers.Replicas(2) + Learner.Replicas(0) != component.defaultReplicas")
-			rel2 := int32(2)
-			followers[0].Replicas = &rel2
-			clusterDef.Spec.Components[0].DefaultReplicas = 4
-			Expect(testCtx.CreateObj(ctx, clusterDef)).ShouldNot(Succeed())
-
-			By("Set a 5 nodes cluster with 1 leader, 2 followers and 2 learners")
-			clusterDef.Spec.Components[0].DefaultReplicas = 5
-			clusterDef.Spec.Components[0].ConsensusSpec.Leader = ConsensusMember{Name: "leader", AccessMode: ReadWrite}
-			rel3 := int32(2)
-			clusterDef.Spec.Components[0].ConsensusSpec.Learner = &ConsensusMember{Name: "learner", AccessMode: None, Replicas: &rel3}
-			Expect(testCtx.CreateObj(ctx, clusterDef)).Should(Succeed())
 		})
 
 		It("Validate Cluster Definition System Accounts", func() {
@@ -140,7 +126,7 @@ var _ = Describe("clusterDefinition webhook", func() {
 			passwdConfig := PasswordConfig{
 				Length: 10,
 			}
-			clusterDef.Spec.Components[0].SystemAccounts = &SystemAccountSpec{
+			clusterDef.Spec.ComponentDefs[0].SystemAccounts = &SystemAccountSpec{
 				CmdExecutorConfig: cmdExecConfig,
 				PasswordConfig:    passwdConfig,
 				Accounts:          mockAccounts,
@@ -156,7 +142,7 @@ var _ = Describe("clusterDefinition webhook", func() {
 				NumDigits:  10,
 				NumSymbols: 10,
 			}
-			clusterDef.Spec.Components[0].SystemAccounts = &SystemAccountSpec{
+			clusterDef.Spec.ComponentDefs[0].SystemAccounts = &SystemAccountSpec{
 				CmdExecutorConfig: cmdExecConfig,
 				PasswordConfig:    invalidPasswdConfig,
 				Accounts:          mockAccounts,
@@ -165,7 +151,7 @@ var _ = Describe("clusterDefinition webhook", func() {
 
 			By("By creating a new clusterDefinition with statements missing")
 			mockAccounts[0].ProvisionPolicy.Type = ReferToExisting
-			clusterDef.Spec.Components[0].SystemAccounts = &SystemAccountSpec{
+			clusterDef.Spec.ComponentDefs[0].SystemAccounts = &SystemAccountSpec{
 				CmdExecutorConfig: cmdExecConfig,
 				PasswordConfig:    passwdConfig,
 				Accounts:          mockAccounts,
@@ -264,7 +250,7 @@ var _ = Describe("clusterDefinition webhook", func() {
 			}}
 
 			for _, tt := range tests {
-				clusterDef.Spec.Components[0].ConfigSpec = &ConfigurationSpec{
+				clusterDef.Spec.ComponentDefs[0].ConfigSpec = &ConfigurationSpec{
 					ConfigTemplateRefs: tt.tpls,
 				}
 				err := testCtx.CreateObj(ctx, clusterDef)
@@ -281,23 +267,23 @@ var _ = Describe("clusterDefinition webhook", func() {
 	It("test mutating webhook", func() {
 		clusterDef, _ := createTestClusterDefinitionObj3(clusterDefinitionName + "-mutating")
 		By("test set the default value to RoleProbeTimeoutAfterPodsReady when roleChangedProbe is not nil")
-		clusterDef.Spec.Components[0].Probes = &ClusterDefinitionProbes{
+		clusterDef.Spec.ComponentDefs[0].Probes = &ClusterDefinitionProbes{
 			RoleChangedProbe: &ClusterDefinitionProbe{},
 		}
 		Expect(testCtx.CreateObj(ctx, clusterDef)).Should(Succeed())
 		Eventually(func(g Gomega) int32 {
 			g.Expect(k8sClient.Get(ctx, client.ObjectKey{Name: clusterDef.Name}, clusterDef)).Should(Succeed())
-			return clusterDef.Spec.Components[0].Probes.RoleProbeTimeoutAfterPodsReady
+			return clusterDef.Spec.ComponentDefs[0].Probes.RoleProbeTimeoutAfterPodsReady
 		}, timeout, interval).Should(Equal(DefaultRoleProbeTimeoutAfterPodsReady))
 
 		By("test set zero to RoleProbeTimeoutAfterPodsReady when roleChangedProbe is nil")
-		clusterDef.Spec.Components[0].Probes = &ClusterDefinitionProbes{
+		clusterDef.Spec.ComponentDefs[0].Probes = &ClusterDefinitionProbes{
 			RoleProbeTimeoutAfterPodsReady: 60,
 		}
 		Expect(k8sClient.Update(ctx, clusterDef)).Should(Succeed())
 		Eventually(func(g Gomega) int32 {
 			g.Expect(k8sClient.Get(ctx, client.ObjectKey{Name: clusterDef.Name}, clusterDef)).Should(Succeed())
-			return clusterDef.Spec.Components[0].Probes.RoleProbeTimeoutAfterPodsReady
+			return clusterDef.Spec.ComponentDefs[0].Probes.RoleProbeTimeoutAfterPodsReady
 		}, timeout, interval).Should(Equal(int32(0)))
 	})
 })
@@ -310,16 +296,15 @@ kind:       ClusterDefinition
 metadata:
   name:     %s
 spec:
-  type: state.mysql
-  components:
-  - typeName: replicasets
-    componentType: Stateful
+  componentDefs:
+  - name: replicasets
+    workloadType: Stateful
     podSpec:
       containers:
       - name: nginx
         image: nginx:latest
-  - typeName: proxy
-    componentType: Stateless
+  - name: proxy
+    workloadType: Stateless
     podSpec:
       containers:
       - name: nginx
@@ -338,10 +323,9 @@ kind:       ClusterDefinition
 metadata:
   name:     %s
 spec:
-  type: state.mysql
-  components:
-  - typeName: mysql-rafted
-    componentType: Consensus
+  componentDefs:
+  - name: mysql-rafted
+    workloadType: Consensus
     podSpec:
       containers:
       - name: mysql
@@ -359,10 +343,8 @@ kind:       ClusterDefinition
 metadata:
   name:     %s
 spec:
-  type: state.mysql
-  components:
-  - typeName: replicasets
-    componentType: Consensus
+  componentDefs:
+  - name: replicasets
     logConfig:
       - name: error
         filePathPattern: /data/mysql/log/mysqld.err
@@ -372,7 +354,7 @@ spec:
       - name: mysql-tree-node-template-8.0
         configTplRef: mysql-tree-node-template-8.0
         volumeName: mysql-config
-    componentType: Consensus
+    workloadType: Consensus
     consensusSpec:
       leader:
         name: leader
@@ -380,7 +362,6 @@ spec:
       followers:
         - name: follower
           accessMode: Readonly
-    defaultReplicas: 3
     podSpec:
       containers:
       - name: mysql
@@ -421,13 +402,10 @@ kind: ClusterDefinition
 metadata:
   name: %s
 spec:
-  type: state.redis-7
-  components:
-    - typeName: replication
-      defaultReplicas: 2
-      minReplicas: 1
-      maxReplicas: 16
-      componentType: Replication
+  componentDefs:
+    - name: replication
+      maxUnavailable: 1
+      workloadType: Replication
 `, name)
 	clusterDefinition := &ClusterDefinition{}
 	err := yaml.Unmarshal([]byte(clusterDefYaml), clusterDefinition)

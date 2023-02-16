@@ -60,15 +60,15 @@ kind:       ClusterDefinition
 metadata:
   name:     cluster-definition-1
 spec:
-  components:
-  - typeName: component1
+  componentDefs:
+  - name: component1
     podSpec:
       containers:
       - name: container1.c
-  - typeName: component2
+  - name: component2
     podSpec: 
       containers:
-  - typeName: component3
+  - name: component3
     podSpec: 
       containers:
       - name: container3
@@ -115,12 +115,12 @@ kind:       ClusterDefinition
 metadata:
   name:     cluster-definition-2
 spec:
-  components:
-  - typeName: component1
+  componentDefs:
+  - name: component1
     podSpec:
       containers:
       - name: container1
-  - typeName: component2
+  - name: component2
     podSpec: 
 `
 	g.Expect(yaml.Unmarshal([]byte(clusterDefYaml), clusterDef)).To(Succeed())

@@ -4,7 +4,7 @@ metadata:
   labels:
     app.kubernetes.io/component-name: %s
     app.kubernetes.io/instance: %s
-    app.kubernetes.io/name: state.mysql-cluster-definition-consensus
+    app.kubernetes.io/name: mysql-cluster-definition-consensus
     app.kubernetes.io/managed-by: kubeblocks
   name: %s
   namespace: default
@@ -15,7 +15,7 @@ spec:
     matchLabels:
       app.kubernetes.io/component-name: %s
       app.kubernetes.io/instance: %s
-      app.kubernetes.io/name: state.mysql-cluster-definition-consensus
+      app.kubernetes.io/name: mysql-cluster-definition-consensus
       kubeblocks.io/test: test
       app.kubernetes.io/managed-by: kubeblocks
   template:
@@ -23,7 +23,7 @@ spec:
       labels:
         app.kubernetes.io/component-name: %s
         app.kubernetes.io/instance: %s
-        app.kubernetes.io/name: state.mysql-cluster-definition-consensus
+        app.kubernetes.io/name: mysql-cluster-definition-consensus
         kubeblocks.io/test: test
         app.kubernetes.io/managed-by: kubeblocks
     spec:

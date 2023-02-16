@@ -101,11 +101,11 @@ func TestRenderJob(t *testing.T) {
 
 	clusterDef := mockClusterDef("consensusset/wesql_cd_sysacct.yaml")
 	assert.NotNil(t, clusterDef)
-	assert.NotNil(t, clusterDef.Spec.Components[0].SystemAccounts)
+	assert.NotNil(t, clusterDef.Spec.ComponentDefs[0].SystemAccounts)
 	cluster := mockCluster("consensusset/wesql.yaml")
 	assert.NotNil(t, cluster)
 
-	accountsSetting := clusterDef.Spec.Components[0].SystemAccounts
+	accountsSetting := clusterDef.Spec.ComponentDefs[0].SystemAccounts
 	replaceEnvsValues(cluster.Name, accountsSetting)
 	cmdExecutorConfig := accountsSetting.CmdExecutorConfig
 

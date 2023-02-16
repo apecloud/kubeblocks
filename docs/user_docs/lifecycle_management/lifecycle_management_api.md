@@ -8,13 +8,9 @@ This guide describes the details of KubeBlocks lifecycle API. KubeBlocks API is 
 
 ### ClusterDefinition `spec`
 
-#### spec.type
+#### spec.workloadType
 
-`spec.type` is required, compatible the DAPR component type. You can fill it in as the following examples do: state.redis, mq.mqtt, mq.kafka, state.mysql.
-
-#### spec.componentType
-
-`spec.componentType` stands for the component type. KubeBlocks supports `stateless`, `stateful`, and `consensus`. `stateless` is set as default.
+`spec.workloadType` stands for the component type. KubeBlocks supports `stateless`, `stateful`, and `consensus`. `stateless` is set as default.
 
 #### spec.consensusSpec
 
@@ -83,13 +79,9 @@ kind: ClusterDefinition
 metadata:
   name: wesql
 spec:
-  type: state.mysql
-  components:
-  - typeName: mysql-a
-    minAvailable: 3
-    maxAvailable: 3
-    defaultReplicas: 3
-    componentType: consensus
+  componentDefs:
+  - name: mysql-a
+    workloadType: consensus
     consensusSpec:
       leader:
         name: "leader"

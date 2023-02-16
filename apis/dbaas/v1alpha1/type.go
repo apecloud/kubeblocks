@@ -92,15 +92,15 @@ var DefaultLeader = ConsensusMember{
 	AccessMode: ReadWrite,
 }
 
-// ComponentType defines ClusterDefinition's component type.
+// WorkloadType defines ClusterDefinition's component type.
 // +enum
-type ComponentType string
+type WorkloadType string
 
 const (
-	Stateless   ComponentType = "Stateless"
-	Stateful    ComponentType = "Stateful"
-	Consensus   ComponentType = "Consensus"
-	Replication ComponentType = "Replication"
+	Stateless   WorkloadType = "Stateless"
+	Stateful    WorkloadType = "Stateful"
+	Consensus   WorkloadType = "Consensus"
+	Replication WorkloadType = "Replication"
 )
 
 // TerminationPolicyType define termination policy types.

@@ -146,7 +146,7 @@ var _ = Describe("logs", func() {
 				Namespace:       "test",
 				ResourceVersion: "10",
 				Labels: map[string]string{
-					"app.kubernetes.io/name": "state.mysql-apecloud-mysql",
+					"app.kubernetes.io/name": "mysql-apecloud-mysql",
 					types.ComponentLabelKey:  "component-name",
 				},
 			},
@@ -170,9 +170,9 @@ var _ = Describe("logs", func() {
 		}
 		obj.ClusterDef = &dbaasv1alpha1.ClusterDefinition{
 			Spec: dbaasv1alpha1.ClusterDefinitionSpec{
-				Components: []dbaasv1alpha1.ClusterDefinitionComponent{
+				ComponentDefs: []dbaasv1alpha1.ClusterDefinitionComponent{
 					{
-						TypeName: "component-type",
+						Name: "component-type",
 						LogConfigs: []dbaasv1alpha1.LogConfig{
 							{
 								Name:            "slow",

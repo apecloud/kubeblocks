@@ -51,7 +51,7 @@ spec:
           spec:
             description: ClusterDefinitionSpec defines the desired state of ClusterDefinition
             properties:
-              components:
+              componentDefs:
                 description: List of components belonging to the cluster.
                 items:
                   description: ClusterDefinitionComponent is a group of pods, pods
@@ -67,21 +67,6 @@ spec:
                         name, such as mongos(mongodb), proxy(redis), mariadb(mysql)
                         KubeBlocks will generate proper monitor configs for well-known
                         characterType when builtIn is true.
-                      type: string
-                    componentType:
-                      description: componentType defines type of the component. Stateless
-                        is a stateless component type used to describe stateless applications.
-                        Stateful is a stateful component type used to describe common
-                        stateful applications. Consensus is a stateful component type
-                        used to describe applications based on consensus protocols,
-                        common consensus protocols such as raft and paxos. Replication
-                        is a stateful component type used to describe applications
-                        based on the primary-secondary data replication protocol.
-                      enum:
-                      - Stateless
-                      - Stateful
-                      - Consensus
-                      - Replication
                       type: string
                     configSpec:
                       description: configSpec defines configuration related spec.
@@ -172,7 +157,7 @@ spec:
                                 default: 0
                                 description: Replicas, number of Pods of this role.
                                   default 1 for Leader default 0 for Learner default
-                                  Components[*].Replicas - Leader.Replicas - Learner.Replicas
+                                  ComponentDefs[*].Replicas - Leader.Replicas - Learner.Replicas
                                   for Followers
                                 format: int32
                                 minimum: 0
@@ -201,7 +186,7 @@ spec:
                               default: 0
                               description: Replicas, number of Pods of this role.
                                 default 1 for Leader default 0 for Learner default
-                                Components[*].Replicas - Leader.Replicas - Learner.Replicas
+                                ComponentDefs[*].Replicas - Leader.Replicas - Learner.Replicas
                                 for Followers
                               format: int32
                               minimum: 0
@@ -229,7 +214,7 @@ spec:
                               default: 0
                               description: Replicas, number of Pods of this role.
                                 default 1 for Leader default 0 for Learner default
-                                Components[*].Replicas - Leader.Replicas - Learner.Replicas
+                                ComponentDefs[*].Replicas - Leader.Replicas - Learner.Replicas
                                 for Followers
                               format: int32
                               minimum: 0
@@ -257,13 +242,6 @@ spec:
                       required:
                       - leader
                       type: object
-                    defaultReplicas:
-                      default: 0
-                      description: defaultReplicas default replicas in this component
-                        when not specified.
-                      format: int32
-                      minimum: 0
-                      type: integer
                     horizontalScalePolicy:
                       description: horizontalScalePolicy controls the behavior of
                         horizontal scale.
@@ -322,19 +300,9 @@ spec:
                       x-kubernetes-list-map-keys:
                       - name
                       x-kubernetes-list-type: map
-                    maxReplicas:
-                      description: maxReplicas maximum replicas pod for component
-                        pod count.
-                      format: int32
-                      minimum: 0
-                      type: integer
-                    minReplicas:
-                      default: 0
-                      description: minReplicas minimum replicas for component pod
-                        count.
-                      format: int32
-                      minimum: 0
-                      type: integer
+                    maxUnavailable:
+                      description: maxUnavailable defines max replicas can be unavailable.
+                      type: string
                     monitor:
                       description: monitor is monitoring config which provided by
                         provider.
@@ -369,6 +337,11 @@ spec:
                           - scrapePort
                           type: object
                       type: object
+                    name:
+                      description: Name of the component, it can be any valid string.
+                      maxLength: 12
+                      pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                      type: string
                     pdbSpec:
                       description: pdbSpec pod disruption budget spec. This is mutually
                         exclusive with the component type of Consensus.
@@ -8132,7 +8105,7 @@ spec:
                       type: object
                     service:
                       description: service defines the behavior of a service spec.
-                        provide read-write service when ComponentType is Consensus.
+                        provide read-write service when WorkloadType is Consensus.
                         https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
                       properties:
                         allocateLoadBalancerNodePorts:
@@ -8728,20 +8701,29 @@ spec:
                       - cmdExecutorConfig
                       - passwordConfig
                       type: object
-                    typeName:
-                      description: Type name of the component, it can be any valid
-                        string.
-                      maxLength: 12
-                      pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                    workloadType:
+                      description: workloadType defines type of the workload. Stateless
+                        is a stateless component type used to describe stateless applications.
+                        Stateful is a stateful component type used to describe common
+                        stateful applications. Consensus is a stateful component type
+                        used to describe applications based on consensus protocols,
+                        common consensus protocols such as raft and paxos. Replication
+                        is a stateful component type used to describe applications
+                        based on the primary-secondary data replication protocol.
+                      enum:
+                      - Stateless
+                      - Stateful
+                      - Consensus
+                      - Replication
                       type: string
                   required:
-                  - componentType
-                  - typeName
+                  - name
+                  - workloadType
                   type: object
                 minItems: 1
                 type: array
                 x-kubernetes-list-map-keys:
-                - typeName
+                - name
                 x-kubernetes-list-type: map
               connectionCredential:
                 additionalProperties:
@@ -8749,19 +8731,8 @@ spec:
                 description: Default connection credential used for connecting to
                   cluster service.
                 type: object
-              type:
-                description: Cluster definition type defines well known application
-                  cluster type. This value should keep consistent with known DAPR
-                  component type (https://docs.dapr.io/reference/components-reference/).
-                  For component that has yet been provided by DAPR, then it's suggested
-                  to follow the naming scheme as DAPR component type name prefix,
-                  i.e., a state store related Cluster starts with "state.<app-name>".
-                maxLength: 24
-                pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
-                type: string
             required:
-            - components
-            - type
+            - componentDefs
             type: object
           status:
             description: ClusterDefinitionStatus defines the observed state of ClusterDefinition

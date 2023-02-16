@@ -64,7 +64,7 @@ var _ = Describe("test clusterVersion controller", func() {
 			})).Should(Succeed())
 
 			By("create a clusterDefinition obj")
-			testdbaas.NewClusterDefFactory(clusterDefName, testdbaas.MySQLType).
+			testdbaas.NewClusterDefFactory(clusterDefName).
 				AddComponent(testdbaas.StatefulMySQLComponent, statefulCompType).
 				Create(&testCtx).GetObject()
 

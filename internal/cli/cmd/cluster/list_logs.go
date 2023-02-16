@@ -189,8 +189,8 @@ func (o *ListLogsOptions) gatherLogFilesData(c *dbaasv1alpha1.Cluster, cd *dbaas
 		if len(comTypeName) == 0 || len(logTypeMap) == 0 {
 			continue
 		}
-		for _, com := range cd.Spec.Components {
-			if !strings.EqualFold(com.TypeName, comTypeName) {
+		for _, com := range cd.Spec.ComponentDefs {
+			if !strings.EqualFold(com.Name, comTypeName) {
 				continue
 			}
 			for _, logConfig := range com.LogConfigs {

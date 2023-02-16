@@ -317,7 +317,7 @@ type OpsRequestStatusComponent struct {
 
 	// componentType references component type of component in ClusterDefinition.
 	// +optional
-	ComponentType ComponentType `json:"componentType,omitempty"`
+	ComponentType WorkloadType `json:"componentType,omitempty"`
 }
 
 type ReconfiguringStatus struct {

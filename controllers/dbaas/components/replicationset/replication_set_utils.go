@@ -56,7 +56,7 @@ func HandleReplicationSet(reqCtx intctrlutil.RequestCtx,
 		if err != nil {
 			return false, err
 		}
-		if component == nil || component.ComponentType != dbaasv1alpha1.Replication {
+		if component == nil || component.WorkloadType != dbaasv1alpha1.Replication {
 			return true, nil
 		}
 		return false, nil
@@ -67,11 +67,8 @@ func HandleReplicationSet(reqCtx intctrlutil.RequestCtx,
 	clusterCompReplicasMap := make(map[string]int32, len(cluster.Spec.Components))
 	for _, clusterComp := range cluster.Spec.Components {
 		if clusterComp.Replicas == nil {
-			defaultReplicas, err := util.GetComponentDefaultReplicas(reqCtx.Ctx, cli, cluster, clusterComp.Type)
-			if err != nil {
-				return err
-			}
-			clusterComp.Replicas = &defaultReplicas
+			replicas := int32(0)
+			clusterComp.Replicas = &replicas
 		}
 		clusterCompReplicasMap[clusterComp.Name] = *clusterComp.Replicas
 	}

@@ -338,14 +338,6 @@ type OperationComponent struct {
 	// +kubebuilder:validation:Required
 	Name string `json:"name"`
 
-	// min minimum of replicas when operation is horizontalScaling.
-	// +optional
-	Min int32 `json:"min,omitempty"`
-
-	// max maximum of replicas when operation is horizontalScaling.
-	// +optional
-	Max int32 `json:"max,omitempty"`
-
 	// volumeClaimTemplateNames which VolumeClaimTemplate of the component support volumeExpansion.
 	// +optional
 	VolumeClaimTemplateNames []string `json:"volumeClaimTemplateNames,omitempty"`
@@ -408,11 +400,11 @@ func (r *Cluster) ValidateEnabledLogs(cd *ClusterDefinition) error {
 func (r *Cluster) ValidatePrimaryIndex(cd *ClusterDefinition) error {
 	message := make([]string, 0)
 	for _, comp := range r.Spec.Components {
-		for _, clusterDefComp := range cd.Spec.Components {
-			if !strings.EqualFold(comp.Type, clusterDefComp.TypeName) {
+		for _, clusterDefComp := range cd.Spec.ComponentDefs {
+			if !strings.EqualFold(comp.Type, clusterDefComp.Name) {
 				continue
 			}
-			if clusterDefComp.ComponentType != Replication {
+			if clusterDefComp.WorkloadType != Replication {
 				continue
 			}
 			if comp.PrimaryIndex == nil {
@@ -422,11 +414,6 @@ func (r *Cluster) ValidatePrimaryIndex(cd *ClusterDefinition) error {
 			// when comp.Replicas and comp.PrimaryIndex are not nil, it will be verified in cluster_webhook, skip here
 			if comp.Replicas != nil {
 				return nil
-			}
-			// validate primaryIndex with clusterDefinition component defaultReplicas
-			if *comp.PrimaryIndex > clusterDefComp.DefaultReplicas-1 {
-				message = append(message, fmt.Sprintf("component %s's PrimaryIndex cannot be larger than defaultReplicas.", comp.Type))
-				return errors.New(strings.Join(message, ";"))
 			}
 		}
 	}

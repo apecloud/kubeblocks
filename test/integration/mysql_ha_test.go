@@ -198,7 +198,7 @@ var _ = Describe("MySQL High-Availability function", func() {
 
 			By("Create a clusterDef obj")
 			mode := int32(0755)
-			clusterDefObj = testdbaas.NewClusterDefFactory(clusterDefName, testdbaas.MySQLType).
+			clusterDefObj = testdbaas.NewClusterDefFactory(clusterDefName).
 				SetConnectionCredential(map[string]string{"username": "root", "password": ""}).
 				AddComponent(testdbaas.ConsensusMySQLComponent, mysqlCompType).
 				AddConfigTemplate(scriptConfigName, scriptConfigName, "", testdbaas.ScriptsVolumeName, &mode).

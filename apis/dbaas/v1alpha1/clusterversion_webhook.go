@@ -142,11 +142,11 @@ func (r *ClusterVersion) GetInconsistentComponentsInfo(clusterDef *ClusterDefini
 		noContainersComponent = make([]string, 0)
 	)
 
-	for _, v := range clusterDef.Spec.Components {
+	for _, v := range clusterDef.Spec.ComponentDefs {
 		if v.PodSpec == nil || v.PodSpec.Containers == nil || len(v.PodSpec.Containers) == 0 {
-			componentMap[v.TypeName] = false
+			componentMap[v.Name] = false
 		} else {
-			componentMap[v.TypeName] = true
+			componentMap[v.Name] = true
 		}
 	}
 	// get not found component type in clusterDefinition

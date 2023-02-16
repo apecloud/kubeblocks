@@ -3,10 +3,11 @@ kind: ClusterDefinition
 metadata:
   name: %s
 spec:
-  components:
+  componentDefs:
   - antiAffinity: false
-    componentType: Consensus
-    typeName: consensus
+    characterType: "mysql"
+    workloadType: Consensus
+    name: consensus
     logConfigs:
     - filePathPattern: /data/mysql/log/mysqld.err
       name: error
@@ -23,7 +24,6 @@ spec:
         accessMode: ReadWrite
         name: leader
       updateStrategy: BestEffortParallel
-    defaultReplicas: 3
     probes:
       roleChangedProbe:
         failureThreshold: 2
@@ -81,5 +81,4 @@ spec:
             scope: AnyPods
             statements:        
               creation: CREATE USER IF NOT EXISTS $(USERNAME) IDENTIFIED BY "$(PASSWD)"; GRANT REPLICATION CLIENT, PROCESS ON *.* TO $(USERNAME); GRANT SELECT ON performance_schema.* TO $(USERNAME);
-              deletion: DROP USER IF EXISTS $(USERNAME);          
-  type: state.mysql
+              deletion: DROP USER IF EXISTS $(USERNAME);

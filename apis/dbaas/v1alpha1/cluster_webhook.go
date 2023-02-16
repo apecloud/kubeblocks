@@ -195,9 +195,9 @@ func (r *Cluster) validateComponents(allErrs *field.ErrorList, clusterDef *Clust
 		componentMap          = make(map[string]ClusterDefinitionComponent)
 	)
 
-	for _, v := range clusterDef.Spec.Components {
-		componentTypeMap[v.TypeName] = struct{}{}
-		componentMap[v.TypeName] = v
+	for _, v := range clusterDef.Spec.ComponentDefs {
+		componentTypeMap[v.Name] = struct{}{}
+		componentMap[v.Name] = v
 	}
 
 	for i, v := range r.Spec.Components {

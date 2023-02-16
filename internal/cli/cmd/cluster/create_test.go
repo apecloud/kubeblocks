@@ -92,7 +92,7 @@ var _ = Describe("create", func() {
 			Expect(len(cluster.Spec.Components[0].EnabledLogs)).Should(Equal(0))
 		})
 		It("set logConfigs in ClusterDef", func() {
-			clusterDef.Spec.Components[0].LogConfigs = []dbaasv1alpha1.LogConfig{
+			clusterDef.Spec.ComponentDefs[0].LogConfigs = []dbaasv1alpha1.LogConfig{
 				{
 					Name:            "error",
 					FilePathPattern: "/log/mysql/mysqld.err",
@@ -191,11 +191,11 @@ var _ = Describe("create", func() {
 			var comps []dbaasv1alpha1.ClusterDefinitionComponent
 			for _, n := range typeNames {
 				comp := dbaasv1alpha1.ClusterDefinitionComponent{
-					TypeName: n,
+					Name: n,
 				}
 				comps = append(comps, comp)
 			}
-			cd.Spec.Components = comps
+			cd.Spec.ComponentDefs = comps
 			return cd
 		}
 

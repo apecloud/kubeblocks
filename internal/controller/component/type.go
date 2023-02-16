@@ -42,17 +42,14 @@ type MysqlMonitor struct {
 
 type Component struct {
 	ClusterDefName          string                              `json:"clusterDefName,omitempty"`
-	ClusterType             string                              `json:"clusterType,omitempty"`
 	Name                    string                              `json:"name,omitempty"`
 	Type                    string                              `json:"type,omitempty"`
 	CharacterType           string                              `json:"characterType,omitempty"`
-	MinReplicas             int32                               `json:"minReplicas"`
-	MaxReplicas             int32                               `json:"maxReplicas"`
-	DefaultReplicas         int32                               `json:"defaultReplicas"`
+	MaxUnavailable          string                              `json:"maxUnavailable,omitempty"`
 	Replicas                int32                               `json:"replicas"`
 	PodDisruptionBudgetSpec *v1.PodDisruptionBudgetSpec         `json:"podDisruptionBudgetSpec,omitempty"`
 	AntiAffinity            bool                                `json:"antiAffinity,omitempty"`
-	ComponentType           v1alpha1.ComponentType              `json:"componentType,omitempty"`
+	ComponentType           v1alpha1.WorkloadType               `json:"componentType,omitempty"`
 	ConsensusSpec           *v1alpha1.ConsensusSetSpec          `json:"consensusSpec,omitempty"`
 	PrimaryIndex            *int32                              `json:"primaryIndex,omitempty"`
 	PodSpec                 *v12.PodSpec                        `json:"podSpec,omitempty"`

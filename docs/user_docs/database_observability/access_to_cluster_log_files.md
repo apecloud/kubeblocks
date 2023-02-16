@@ -65,9 +65,8 @@ kind:       ClusterDefinition
 metadata:
   name:     mysql-cluster-definition
 spec:
-  type: state.mysql
-  components:
-  - typeName: replicasets
+  componentDefs:
+  - name: replicasets
     characterType: mysql
     monitor:
       builtIn: true
@@ -79,7 +78,7 @@ spec:
     configTemplateRefs: 
       - name: mysql-tree-node-template-8.0
         volumeName: mysql-config
-    componentType: Consensus
+    workloadType: Consensus
     consensusSpec:
       leader:
         name: leader
@@ -87,7 +86,6 @@ spec:
       followers:
         - name: follower
           accessMode: Readonly
-    defaultReplicas: 3
     podSpec:
       containers:
       - name: mysql

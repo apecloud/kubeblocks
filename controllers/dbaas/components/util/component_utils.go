@@ -139,8 +139,8 @@ func GetComponentDefByCluster(ctx context.Context, cli client.Client, cluster *d
 		return nil, err
 	}
 
-	for _, component := range clusterDef.Spec.Components {
-		if component.TypeName == typeName {
+	for _, component := range clusterDef.Spec.ComponentDefs {
+		if component.Name == typeName {
 			return &component, nil
 		}
 	}
@@ -163,7 +163,7 @@ func InitClusterComponentStatusIfNeed(cluster *dbaasv1alpha1.Cluster,
 		}
 	}
 	componentStatus := cluster.Status.Components[componentName]
-	if componentDef.ComponentType == dbaasv1alpha1.Consensus && componentStatus.ConsensusSetStatus == nil {
+	if componentDef.WorkloadType == dbaasv1alpha1.Consensus && componentStatus.ConsensusSetStatus == nil {
 		componentStatus.ConsensusSetStatus = &dbaasv1alpha1.ConsensusSetStatus{
 			Leader: dbaasv1alpha1.ConsensusMemberStatus{
 				Pod:        ComponentStatusDefaultPodName,
@@ -172,7 +172,7 @@ func InitClusterComponentStatusIfNeed(cluster *dbaasv1alpha1.Cluster,
 			},
 		}
 	}
-	if componentDef.ComponentType == dbaasv1alpha1.Replication && componentStatus.ReplicationSetStatus == nil {
+	if componentDef.WorkloadType == dbaasv1alpha1.Replication && componentStatus.ReplicationSetStatus == nil {
 		componentStatus.ReplicationSetStatus = &dbaasv1alpha1.ReplicationSetStatus{
 			Primary: dbaasv1alpha1.ReplicationMemberStatus{
 				Pod: ComponentStatusDefaultPodName,
@@ -185,11 +185,10 @@ func InitClusterComponentStatusIfNeed(cluster *dbaasv1alpha1.Cluster,
 // GetComponentReplicas gets the actual replicas of component
 func GetComponentReplicas(component *dbaasv1alpha1.ClusterComponent,
 	componentDef *dbaasv1alpha1.ClusterDefinitionComponent) int32 {
-	replicas := componentDef.DefaultReplicas
-	if component.Replicas != nil {
-		replicas = *component.Replicas
+	if component.Replicas == nil {
+		return 0
 	}
-	return replicas
+	return *component.Replicas
 }
 
 // GetComponentDeployMinReadySeconds gets the deployment minReadySeconds of the component.
@@ -228,7 +227,7 @@ func GetComponentStsMinReadySeconds(ctx context.Context,
 func GetComponentWorkloadMinReadySeconds(ctx context.Context,
 	cli client.Client,
 	cluster *dbaasv1alpha1.Cluster,
-	componentType dbaasv1alpha1.ComponentType,
+	componentType dbaasv1alpha1.WorkloadType,
 	componentName string) (minReadySeconds int32, err error) {
 	switch componentType {
 	case dbaasv1alpha1.Stateless:
@@ -236,19 +235,6 @@ func GetComponentWorkloadMinReadySeconds(ctx context.Context,
 	default:
 		return GetComponentStsMinReadySeconds(ctx, cli, cluster, componentName)
 	}
-}
-
-// GetComponentDefaultReplicas gets component default replicas.
-func GetComponentDefaultReplicas(ctx context.Context,
-	cli client.Client,
-	cluster *dbaasv1alpha1.Cluster,
-	componentName string) (int32, error) {
-	typeName := cluster.GetComponentTypeName(componentName)
-	component, err := GetComponentDefByCluster(ctx, cli, cluster, typeName)
-	if err != nil || component == nil {
-		return -1, err
-	}
-	return component.DefaultReplicas, nil
 }
 
 // GetComponentInfoByPod gets componentName and componentDefinition info by Pod.

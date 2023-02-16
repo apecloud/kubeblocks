@@ -60,23 +60,23 @@ func TestInitClusterComponentStatusIfNeed(t *testing.T) {
 		},
 	}
 	component := &dbaasv1alpha1.ClusterDefinitionComponent{
-		ComponentType: dbaasv1alpha1.Consensus,
+		WorkloadType: dbaasv1alpha1.Consensus,
 	}
 	util.InitClusterComponentStatusIfNeed(cluster, componentName, component)
 
 	if cluster.Status.Components == nil {
-		t.Errorf("cluster.Status.Components[*] not intialized properly")
+		t.Errorf("cluster.Status.ComponentDefs[*] not intialized properly")
 	}
 	if _, ok := cluster.Status.Components[componentName]; !ok {
-		t.Errorf("cluster.Status.Components[componentName] not initialized properly")
+		t.Errorf("cluster.Status.ComponentDefs[componentName] not initialized properly")
 	}
 	consensusSetStatus := cluster.Status.Components[componentName].ConsensusSetStatus
 	if consensusSetStatus == nil {
-		t.Errorf("cluster.Status.Components[componentName].ConsensusSetStatus not initialized properly")
+		t.Errorf("cluster.Status.ComponentDefs[componentName].ConsensusSetStatus not initialized properly")
 	} else if consensusSetStatus.Leader.Name != "" ||
 		consensusSetStatus.Leader.AccessMode != dbaasv1alpha1.None ||
 		consensusSetStatus.Leader.Pod != util.ComponentStatusDefaultPodName {
-		t.Errorf("cluster.Status.Components[componentName].ConsensusSetStatus.Leader not initialized properly")
+		t.Errorf("cluster.Status.ComponentDefs[componentName].ConsensusSetStatus.Leader not initialized properly")
 	}
 }
 

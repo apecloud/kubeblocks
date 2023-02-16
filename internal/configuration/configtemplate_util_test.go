@@ -197,7 +197,7 @@ var _ = Describe("Reconfigure RollingPolicy", func() {
 					cComponents: cComponents,
 					dComponents: []dbaasv1alpha1.ClusterDefinitionComponent{
 						{
-							TypeName: comType,
+							Name: comType,
 							ConfigSpec: &dbaasv1alpha1.ConfigurationSpec{
 								ConfigTemplateRefs: []dbaasv1alpha1.ConfigTemplate{tpl1},
 							},
@@ -222,7 +222,7 @@ var _ = Describe("Reconfigure RollingPolicy", func() {
 					cComponents: cComponents,
 					dComponents: []dbaasv1alpha1.ClusterDefinitionComponent{
 						{
-							TypeName: comType,
+							Name: comType,
 							ConfigSpec: &dbaasv1alpha1.ConfigurationSpec{
 								ConfigTemplateRefs: []dbaasv1alpha1.ConfigTemplate{tpl1},
 							},
@@ -244,7 +244,7 @@ var _ = Describe("Reconfigure RollingPolicy", func() {
 					cComponents: cComponents,
 					dComponents: []dbaasv1alpha1.ClusterDefinitionComponent{
 						{
-							TypeName: comType,
+							Name: comType,
 							ConfigSpec: &dbaasv1alpha1.ConfigurationSpec{
 								ConfigTemplateRefs: []dbaasv1alpha1.ConfigTemplate{tpl1},
 							},

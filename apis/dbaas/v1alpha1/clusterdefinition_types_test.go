@@ -30,10 +30,9 @@ kind: ClusterDefinition
 metadata:
   name: cluster-definition-consensus
 spec:
-  type: state.mysql
-  components:
-    - typeName: replicasets
-      componentType: Consensus
+  componentDefs:
+    - name: replicasets
+      workloadType: Consensus
       logConfigs:
         - name: error
           filePathPattern: /log/mysql/mysqld.err
@@ -65,9 +64,9 @@ func TestGetComponentDefByTypeName(t *testing.T) {
 	componentType := "mysqlType"
 	clusterDef := &ClusterDefinition{
 		Spec: ClusterDefinitionSpec{
-			Components: []ClusterDefinitionComponent{
+			ComponentDefs: []ClusterDefinitionComponent{
 				{
-					TypeName: componentType,
+					Name: componentType,
 				},
 			},
 		},

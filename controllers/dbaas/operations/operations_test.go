@@ -362,9 +362,9 @@ var _ = Describe("OpsRequest Controller", func() {
 			cmObj, tplObj := assureCfgTplObj("mysql-tpl-test", "mysql-cm-test", testCtx.DefaultNamespace)
 			By("update clusterdefinition tpl")
 			patch := client.MergeFrom(clusterDefObj.DeepCopy())
-			for i := range clusterDefObj.Spec.Components {
-				component := &clusterDefObj.Spec.Components[i]
-				if component.TypeName != consensusCompName {
+			for i := range clusterDefObj.Spec.ComponentDefs {
+				component := &clusterDefObj.Spec.ComponentDefs[i]
+				if component.Name != consensusCompName {
 					continue
 				}
 				stsComponent = component
@@ -389,7 +389,7 @@ var _ = Describe("OpsRequest Controller", func() {
 		By("mock event context")
 		eventContext := cfgcore.ConfigEventContext{
 			CfgCM:     cfgObj,
-			Component: &clusterDefObj.Spec.Components[0],
+			Component: &clusterDefObj.Spec.ComponentDefs[0],
 			Client:    k8sClient,
 			ReqCtx: intctrlutil.RequestCtx{
 				Ctx:      opsRes.Ctx,

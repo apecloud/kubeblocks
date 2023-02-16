@@ -3,11 +3,7 @@ kind: ClusterDefinition
 metadata:
   name: %s
 spec:
-  type: state.redis-7
-  components:
-    - typeName: replication
-      defaultReplicas: 2
-      minReplicas: 1
-      maxReplicas: 16
-      componentType: Replication
+  componentDefs:
+    - name: replication
+      workloadType: Replication
       updateStrategy: OnDelete

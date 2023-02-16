@@ -3,18 +3,16 @@ kind: ClusterDefinition
 metadata:
   name: %s
 spec:
-  components:
+  componentDefs:
   - antiAffinity: false
-    componentType: Stateless
-    defaultReplicas: 1
-    minReplicas: 0
+    workloadType: Stateless
     podSpec:
       containers:
       - name: busybox
-    typeName: stateless
+    name: stateless
   - antiAffinity: false
-    componentType: Consensus
-    typeName: consensus
+    workloadType: Consensus
+    name: consensus
     logConfigs:
     - filePathPattern: /data/mysql/log/mysqld.err
       name: error
@@ -29,12 +27,10 @@ spec:
         accessMode: ReadWrite
         name: leader
       updateStrategy: BestEffortParallel
-    defaultReplicas: 3
-  - typeName: stateful
+  - name: stateful
     pdbSpec:
       minAvailable: 1
-    componentType: Stateful
-    defaultReplicas: 3
+    workloadType: Stateful
     podSpec:
       containers:
       - name: mysql
@@ -42,4 +38,3 @@ spec:
         - containerPort: 3306
           name: mysql
           protocol: TCP
-  type: state.mysql

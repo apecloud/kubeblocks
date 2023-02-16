@@ -206,7 +206,7 @@ var _ = Describe("lifecycle_utils", func() {
 
 	allFieldsClusterDefObj := func(needCreate bool) *dbaasv1alpha1.ClusterDefinition {
 		By("By assure an clusterDefinition obj")
-		clusterDefObj := testdbaas.NewClusterDefFactory(clusterDefName, testdbaas.MySQLType).
+		clusterDefObj := testdbaas.NewClusterDefFactory(clusterDefName).
 			AddComponent(testdbaas.StatefulMySQLComponent, mysqlCompType).
 			AddComponent(testdbaas.StatelessNginxComponent, nginxCompType).
 			GetObject()
@@ -301,7 +301,7 @@ metadata:
     app.kubernetes.io/created-by: kubeblocks
     app.kubernetes.io/instance: %s
     app.kubernetes.io/managed-by: kubeblocks
-    app.kubernetes.io/name: state.mysql-apecloud-mysql
+    app.kubernetes.io/name: mysql-apecloud-mysql
     backupjobs.dataprotection.kubeblocks.io/name: wesql-01-replicasets-scaling-qf6cr
     backuppolicies.dataprotection.kubeblocks.io/name: wesql-01-replicasets-scaling-hcxps
     dataprotection.kubeblocks.io/backup-type: snapshot
@@ -326,7 +326,7 @@ spec:
 				reqCtx,
 				cluster,
 				clusterDef,
-				&clusterDef.Spec.Components[0],
+				&clusterDef.Spec.ComponentDefs[0],
 				&clusterVersion.Spec.Components[0],
 				&cluster.Spec.Components[0])
 			Expect(component).ShouldNot(BeNil())

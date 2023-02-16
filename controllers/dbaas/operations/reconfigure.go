@@ -194,7 +194,7 @@ func (r *reconfigureAction) Action(resource *OpsResource) error {
 
 	tpls, err := cfgcore.GetConfigTemplatesFromComponent(
 		cluster.Spec.Components,
-		clusterDefinition.Spec.Components,
+		clusterDefinition.Spec.ComponentDefs,
 		clusterVersion.Spec.Components,
 		componentName)
 	if err != nil {

@@ -257,7 +257,7 @@ var _ = Describe("SystemAccount Controller", func() {
 		// create clusterdef and cluster verions, but not clusters
 		By("Create a clusterDefinition obj")
 		systemAccount := mockSystemAccountsSpec()
-		clusterDefObj = testdbaas.NewClusterDefFactory(clusterDefName, testdbaas.MySQLType).
+		clusterDefObj = testdbaas.NewClusterDefFactory(clusterDefName).
 			AddComponent(testdbaas.StatefulMySQLComponent, mysqlCompType).
 			AddSystemAccountSpec(systemAccount).
 			AddComponent(testdbaas.StatefulMySQLComponent, mysqlCompTypeWOSysAcct).

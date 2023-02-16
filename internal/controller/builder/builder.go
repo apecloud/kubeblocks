@@ -488,7 +488,6 @@ func BuildConfigMapWithTemplate(
 	configMeta := map[string]map[string]string{
 		"clusterDefinition": {
 			"name": params.ClusterDefinition.GetName(),
-			"type": params.ClusterDefinition.Spec.Type,
 		},
 		"cluster": {
 			"name":      params.Cluster.GetName(),

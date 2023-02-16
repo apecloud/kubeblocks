@@ -52,8 +52,8 @@ var _ webhook.Defaulter = &ClusterDefinition{}
 // Default implements webhook.Defaulter so a webhook will be registered for the type
 func (r *ClusterDefinition) Default() {
 	clusterdefinitionlog.Info("default", "name", r.Name)
-	for i := range r.Spec.Components {
-		probes := r.Spec.Components[i].Probes
+	for i := range r.Spec.ComponentDefs {
+		probes := r.Spec.ComponentDefs[i].Probes
 		if probes == nil {
 			continue
 		}
@@ -101,8 +101,8 @@ func (r *ClusterDefinition) validate() error {
 	)
 	// clusterDefinition components to map
 	componentMap := make(map[string]struct{})
-	for _, v := range r.Spec.Components {
-		componentMap[v.TypeName] = struct{}{}
+	for _, v := range r.Spec.ComponentDefs {
+		componentMap[v.Name] = struct{}{}
 	}
 
 	r.validateComponents(&allErrs)
@@ -118,7 +118,7 @@ func (r *ClusterDefinition) validate() error {
 
 // validateLogsPatternPrefix validate spec.components[*].logConfigs[*].filePathPattern
 func (r *ClusterDefinition) validateLogFilePatternPrefix(allErrs *field.ErrorList) {
-	for idx1, component := range r.Spec.Components {
+	for idx1, component := range r.Spec.ComponentDefs {
 		if len(component.LogConfigs) == 0 {
 			continue
 		}
@@ -183,43 +183,9 @@ func (r *ClusterDefinition) validateComponents(allErrs *field.ErrorList) {
 		// if component.replicas is 1, then only Leader should be present. just omit if present
 
 		// if Followers.Replicas present, Leader.Replicas(that is 1) + Followers.Replicas + Learner.Replicas should equal to component.defaultReplicas
-		isFollowerPresent := false
-		memberCount := int32(1)
-		for _, member := range consensusSpec.Followers {
-			if member.Replicas != nil && *member.Replicas > 0 {
-				isFollowerPresent = true
-				memberCount += *member.Replicas
-			}
-		}
-		if isFollowerPresent {
-			if consensusSpec.Learner != nil && consensusSpec.Learner.Replicas != nil {
-				memberCount += *consensusSpec.Learner.Replicas
-			}
-			if memberCount != component.DefaultReplicas {
-				*allErrs = append(*allErrs,
-					field.Invalid(field.NewPath("spec.components[*].consensusSpec.defaultReplicas"),
-						component.DefaultReplicas,
-						"#(members) should be equal to defaultReplicas"))
-			}
-		}
 	}
 
-	validateReplication := func(component *ClusterDefinitionComponent) {
-		if component.MinReplicas < 1 {
-			*allErrs = append(*allErrs,
-				field.Invalid(field.NewPath("spec.components[*].MinReplicas"),
-					component.MinReplicas,
-					"component MinReplicas can not be less than 1 when componentType=Replication"))
-		}
-		if component.MaxReplicas > 16 {
-			*allErrs = append(*allErrs,
-				field.Invalid(field.NewPath("spec.components[*].MaxReplicas"),
-					component.MaxReplicas,
-					"component MaxReplicas cannot be larger than 16 when componentType=Replication"))
-		}
-	}
-
-	for _, component := range r.Spec.Components {
+	for _, component := range r.Spec.ComponentDefs {
 		if err := r.validateConfigSpec(component.ConfigSpec); err != nil {
 			*allErrs = append(*allErrs, field.Duplicate(field.NewPath("spec.components[*].configSpec.configTemplateRefs"), err))
 			continue
@@ -228,7 +194,7 @@ func (r *ClusterDefinition) validateComponents(allErrs *field.ErrorList) {
 		// validate system account defined in spec.components[].systemAccounts
 		validateSystemAccount(&component)
 
-		switch component.ComponentType {
+		switch component.WorkloadType {
 		case Consensus:
 			// if consensus
 			consensusSpec := component.ConsensusSpec
@@ -240,7 +206,6 @@ func (r *ClusterDefinition) validateComponents(allErrs *field.ErrorList) {
 			}
 			validateConsensus(&component)
 		case Replication:
-			validateReplication(&component)
 		default:
 			continue
 		}

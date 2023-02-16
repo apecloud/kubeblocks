@@ -220,7 +220,7 @@ func (o *ConnectOptions) getConnectionInfo() (*engine.ConnectionInfo, error) {
 	// get host and port, use external endpoints first, if external endpoints are empty,
 	// use internal endpoints
 	var private = false
-	primaryComponent := cluster.FindClusterComp(objs.Cluster, objs.ClusterDef.Spec.Components[0].TypeName)
+	primaryComponent := cluster.FindClusterComp(objs.Cluster, objs.ClusterDef.Spec.ComponentDefs[0].Name)
 	svcs := cluster.GetComponentServices(objs.Services, primaryComponent)
 	getEndpoint := func(getIPFn func(*corev1.Service) string) *corev1.Service {
 		for _, svc := range svcs {
@@ -259,7 +259,7 @@ func (o *ConnectOptions) getConnectionInfo() (*engine.ConnectionInfo, error) {
 	}
 
 	// get engine
-	o.engine, err = engine.New(objs.ClusterDef.Spec.Type)
+	o.engine, err = engine.New(objs.ClusterDef.Spec.ComponentDefs[0].CharacterType)
 	if err != nil {
 		return nil, err
 	}

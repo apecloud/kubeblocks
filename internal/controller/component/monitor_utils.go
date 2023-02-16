@@ -28,11 +28,6 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
-// ClusterDefinition Type Const Define
-const (
-	kStateMysql = "state.mysql"
-)
-
 // ClusterDefinitionComponent CharacterType Const Define
 const (
 	kMysql = "mysql"

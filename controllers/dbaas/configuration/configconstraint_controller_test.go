@@ -80,7 +80,7 @@ var _ = Describe("ConfigConstraint Controller", func() {
 			constraintKey := client.ObjectKeyFromObject(constraint)
 
 			By("Create a clusterDefinition obj")
-			clusterDefObj := testdbaas.NewClusterDefFactory(clusterDefName, testdbaas.MySQLType).
+			clusterDefObj := testdbaas.NewClusterDefFactory(clusterDefName).
 				AddComponent(testdbaas.StatefulMySQLComponent, statefulCompType).
 				AddConfigTemplate(configTplName, configmap.Name, constraint.Name, configVolumeName, nil).
 				AddLabels(cfgcore.GenerateTPLUniqLabelKeyWithConfig(configTplName), configmap.Name,

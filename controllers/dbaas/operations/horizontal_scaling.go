@@ -176,7 +176,7 @@ func (hs horizontalScalingOpsHandler) handleComponentProgressDetails(opsRes *Ops
 	succeedCount, err = hs.handleScaleOutProgress(opsRes, pgRes, podList, statusComponent)
 	// if the component type is Stateless, remove the progressDetails of the expired pods.
 	// because a replicaSet may attempt to create a pod multiple times till it succeeds when scale out the replicas.
-	if pgRes.clusterComponentDef.ComponentType == dbaasv1alpha1.Stateless {
+	if pgRes.clusterComponentDef.WorkloadType == dbaasv1alpha1.Stateless {
 		statusComponent.ProgressDetails = removeStatelessExpiredPod(podList, statusComponent.ProgressDetails)
 	}
 	return expectProgressCount, succeedCount, err
@@ -195,7 +195,7 @@ func (hs horizontalScalingOpsHandler) handleScaleOutProgress(
 		return
 	}
 	minReadySeconds, err := util.GetComponentWorkloadMinReadySeconds(opsRes.Ctx,
-		opsRes.Client, opsRes.Cluster, pgRes.clusterComponentDef.ComponentType, componentName)
+		opsRes.Client, opsRes.Cluster, pgRes.clusterComponentDef.WorkloadType, componentName)
 	if err != nil {
 		return
 	}
@@ -254,7 +254,7 @@ func (hs horizontalScalingOpsHandler) handleScaleDownProgress(opsRes *OpsResourc
 	// The deployment controller will not watch the cleaning events of the old replicaSet pods.
 	// so when component status is completed, we should forward the progressDetails to succeed.
 	markStatelessPodsSucceed := false
-	if pgRes.clusterComponentDef.ComponentType == dbaasv1alpha1.Stateless &&
+	if pgRes.clusterComponentDef.WorkloadType == dbaasv1alpha1.Stateless &&
 		util.IsCompleted(statusComponent.Phase) {
 		markStatelessPodsSucceed = true
 	}

@@ -211,16 +211,13 @@ func MergeComponents(
 	clusterDefCompObj := clusterDefComp.DeepCopy()
 	component := &Component{
 		ClusterDefName:        clusterDef.Name,
-		ClusterType:           clusterDef.Spec.Type,
-		Name:                  clusterDefCompObj.TypeName, // initial name for the component will be same as TypeName
-		Type:                  clusterDefCompObj.TypeName,
+		Name:                  clusterDefCompObj.Name, // initial name for the component will be same as Name
+		Type:                  clusterDefCompObj.Name,
 		CharacterType:         clusterDefCompObj.CharacterType,
-		MinReplicas:           clusterDefCompObj.MinReplicas,
-		MaxReplicas:           clusterDefCompObj.MaxReplicas,
-		DefaultReplicas:       clusterDefCompObj.DefaultReplicas,
-		Replicas:              clusterDefCompObj.DefaultReplicas,
+		MaxUnavailable:        clusterDefCompObj.MaxUnavailable,
+		Replicas:              0,
 		AntiAffinity:          clusterDefCompObj.AntiAffinity,
-		ComponentType:         clusterDefCompObj.ComponentType,
+		ComponentType:         clusterDefCompObj.WorkloadType,
 		ConsensusSpec:         clusterDefCompObj.ConsensusSpec,
 		PodSpec:               clusterDefCompObj.PodSpec,
 		Service:               clusterDefCompObj.Service,

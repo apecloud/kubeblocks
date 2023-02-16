@@ -172,7 +172,7 @@ var _ = Describe("OpsRequest Controller", func() {
 	Context("with Cluster which has MySQL StatefulSet", func() {
 		BeforeEach(func() {
 			By("Create a clusterDefinition obj")
-			clusterDefObj = testdbaas.NewClusterDefFactory(clusterDefName, testdbaas.MySQLType).
+			clusterDefObj = testdbaas.NewClusterDefFactory(clusterDefName).
 				AddComponent(testdbaas.StatefulMySQLComponent, mysqlCompType).
 				Create(&testCtx).GetObject()
 
@@ -190,7 +190,7 @@ var _ = Describe("OpsRequest Controller", func() {
 	Context("with Cluster which has MySQL ConsensusSet", func() {
 		BeforeEach(func() {
 			By("Create a clusterDefinition obj")
-			clusterDefObj = testdbaas.NewClusterDefFactory(clusterDefName, testdbaas.MySQLType).
+			clusterDefObj = testdbaas.NewClusterDefFactory(clusterDefName).
 				AddComponent(testdbaas.ConsensusMySQLComponent, mysqlCompType).
 				Create(&testCtx).GetObject()
 

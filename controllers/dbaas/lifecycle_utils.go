@@ -79,7 +79,7 @@ func mergeComponentsList(reqCtx intctrlutil.RequestCtx,
 	var compList []component.Component
 	for _, clusterDefComp := range clusterDefCompList {
 		for _, clusterComp := range clusterCompList {
-			if clusterComp.Type != clusterDefComp.TypeName {
+			if clusterComp.Type != clusterDefComp.Name {
 				continue
 			}
 			comp := component.MergeComponents(reqCtx, cluster, clusterDef, &clusterDefComp, nil, &clusterComp)
@@ -118,26 +118,8 @@ func reconcileClusterWorkloads(
 		return false, err
 	}
 
-	clusterDefComps := clusterDefinition.Spec.Components
+	clusterDefComps := clusterDefinition.Spec.ComponentDefs
 	clusterCompMap := cluster.GetTypeMappingComponents()
-
-	// add default component if unspecified in Cluster.spec.components
-	for _, c := range clusterDefComps {
-		if c.DefaultReplicas <= 0 {
-			continue
-		}
-		if _, ok := clusterCompMap[c.TypeName]; ok {
-			continue
-		}
-		r := c.DefaultReplicas
-		cluster.Spec.Components = append(cluster.Spec.Components, dbaasv1alpha1.ClusterComponent{
-			Name:     c.TypeName,
-			Type:     c.TypeName,
-			Replicas: &r,
-		})
-	}
-
-	clusterCompMap = cluster.GetTypeMappingComponents()
 	clusterVersionCompMap := clusterVersion.GetTypeMappingComponents()
 
 	prepareComp := func(component *component.Component) error {
@@ -147,7 +129,7 @@ func reconcileClusterWorkloads(
 	}
 
 	for _, c := range clusterDefComps {
-		typeName := c.TypeName
+		typeName := c.Name
 		clusterVersionComp := clusterVersionCompMap[typeName]
 		clusterComps := clusterCompMap[typeName]
 		for _, clusterComp := range clusterComps {
@@ -199,7 +181,7 @@ func needBuildPDB(params *createParams) bool {
 	if params.component.ComponentType == dbaasv1alpha1.Consensus {
 		// if MinReplicas is non-zero, build pdb
 		// TODO: add ut
-		return params.component.MinReplicas > 0
+		return len(params.component.MaxUnavailable) > 0
 	}
 	return existsPDBSpec(params.component.PodDisruptionBudgetSpec)
 }
@@ -399,7 +381,7 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 		components := mergeComponentsList(reqCtx,
 			cluster,
 			clusterDef,
-			clusterDef.Spec.Components,
+			clusterDef.Spec.ComponentDefs,
 			cluster.Spec.Components)
 		component := getComponent(components, componentName)
 		if component == nil {
@@ -859,8 +841,8 @@ func buildCfg(params createParams,
 	podSpec *corev1.PodSpec,
 	ctx context.Context,
 	cli client.Client) ([]client.Object, error) {
-	// Need to merge configTemplateRef of ClusterVersion.Components[*].ConfigTemplateRefs and
-	// ClusterDefinition.Components[*].ConfigTemplateRefs
+	// Need to merge configTemplateRef of ClusterVersion.ComponentDefs[*].ConfigTemplateRefs and
+	// ClusterDefinition.ComponentDefs[*].ConfigTemplateRefs
 	tpls := params.component.ConfigTemplates
 	if len(tpls) == 0 {
 		return nil, nil

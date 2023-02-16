@@ -78,7 +78,7 @@ var _ = Describe("ClusterDefinition Controller", func() {
 	Context("with no ConfigSpec", func() {
 		BeforeEach(func() {
 			By("Create a clusterDefinition obj")
-			clusterDefObj = testdbaas.NewClusterDefFactory(clusterDefName, testdbaas.MySQLType).
+			clusterDefObj = testdbaas.NewClusterDefFactory(clusterDefName).
 				AddComponent(testdbaas.StatefulMySQLComponent, statefulCompType).
 				Create(&testCtx).GetObject()
 
@@ -109,7 +109,7 @@ var _ = Describe("ClusterDefinition Controller", func() {
 			By("updating clusterDefinition's spec which then update clusterVersion's status")
 			Eventually(testdbaas.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(clusterDefObj),
 				func(cd *dbaasv1alpha1.ClusterDefinition) {
-					cd.Spec.Type = "state.redis"
+					cd.Spec.ConnectionCredential["root"] = "password"
 				})).Should(Succeed())
 
 			By("Check ClusterVersion.Status as updated")
@@ -140,7 +140,7 @@ var _ = Describe("ClusterDefinition Controller", func() {
 	Context("with ConfigSpec", func() {
 		BeforeEach(func() {
 			By("Create a clusterDefinition obj")
-			clusterDefObj = testdbaas.NewClusterDefFactory(clusterDefName, testdbaas.MySQLType).
+			clusterDefObj = testdbaas.NewClusterDefFactory(clusterDefName).
 				AddComponent(testdbaas.StatefulMySQLComponent, statefulCompType).
 				AddConfigTemplate(cmName, cmName, cmName, configVolumeName, nil).
 				Create(&testCtx).GetObject()

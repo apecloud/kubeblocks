@@ -254,8 +254,6 @@ var _ = Describe("OpsRequest webhook", func() {
 		cluster.Status.Operations.HorizontalScalable = []OperationComponent{
 			{
 				Name: replicaSetComponentName,
-				Min:  1,
-				Max:  3,
 			},
 		}
 		Expect(k8sClient.Status().Patch(ctx, cluster, patch)).Should(Succeed())
@@ -278,10 +276,6 @@ var _ = Describe("OpsRequest webhook", func() {
 			err := testCtx.CheckedCreateObj(ctx, opsRequest)
 			return err == nil
 		}, timeout, interval).Should(BeTrue())
-
-		By("By testing horizontalScaling replica is not in [min,max]")
-		opsRequest.Spec.HorizontalScalingList[0].Replicas = 4
-		Expect(testCtx.CreateObj(ctx, opsRequest).Error()).To(ContainSubstring("replicas must less than"))
 
 		By("test min, max is zero")
 		tmpCluster := &Cluster{}

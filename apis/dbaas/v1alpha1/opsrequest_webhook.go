@@ -313,17 +313,6 @@ func compareQuantity(requestQuantity, limitQuantity *resource.Quantity) bool {
 	return requestQuantity != nil && limitQuantity != nil && requestQuantity.Cmp(*limitQuantity) > 0
 }
 
-// invalidReplicas verifies whether the replicas is invalid
-func invalidReplicas(replicas int32, operationComponent *OperationComponent) string {
-	if operationComponent.Min != 0 && replicas < operationComponent.Min {
-		return fmt.Sprintf("replicas must greater than %d", operationComponent.Min)
-	}
-	if operationComponent.Max != 0 && replicas > operationComponent.Max {
-		return fmt.Sprintf("replicas must less than %d", operationComponent.Max)
-	}
-	return ""
-}
-
 // validateHorizontalScaling validates api when spec.type is HorizontalScaling
 func (r *OpsRequest) validateHorizontalScaling(cluster *Cluster, allErrs *field.ErrorList) {
 	horizontalScalingList := r.Spec.HorizontalScalingList
@@ -344,10 +333,6 @@ func (r *OpsRequest) validateHorizontalScaling(cluster *Cluster, allErrs *field.
 		operationComponent := supportedComponentMap[v.ComponentName]
 		if operationComponent == nil {
 			continue
-		}
-		replicasMsg := invalidReplicas(v.Replicas, operationComponent)
-		if replicasMsg != "" {
-			addInvalidError(allErrs, fmt.Sprintf("spec.horizontalScaling[%d].replicas", i), v.Replicas, replicasMsg)
 		}
 	}
 	r.validateComponentName(allErrs, cluster, supportedComponentMap, componentNames)

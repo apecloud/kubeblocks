@@ -223,11 +223,14 @@ func (o *ConnectOptions) getConnectionInfo() (*engine.ConnectionInfo, error) {
 		private = false
 		svc     *corev1.Service
 	)
+
+	// TODO: now the primary component is the first component, that may not be correct,
+	// maybe show all components connection info in the future.
 	primaryComponent := cluster.FindClusterComp(objs.Cluster, objs.ClusterDef.Spec.Components[0].TypeName)
 	internalSvcs, externalSvcs := cluster.GetComponentServices(objs.Services, primaryComponent)
 	switch {
 	case len(externalSvcs) > 0:
-		// cluster have public endpoint
+		// cluster has public endpoint
 		svc = externalSvcs[0]
 		info.Host = cluster.GetExternalIP(svc)
 		info.Port = fmt.Sprintf("%d", svc.Spec.Ports[0].Port)

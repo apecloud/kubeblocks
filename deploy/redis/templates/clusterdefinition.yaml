@@ -5,16 +5,12 @@ metadata:
   labels:
     {{- include "redis.labels" . | nindent 4 }}
 spec:
-  type: state.redis
   connectionCredential:
     username: ""
     password: ""
-  components:
-    - typeName: replication
-      componentType: Replication
-      defaultReplicas: 2
-      minReplicas: 1
-      maxReplicas: 16
+  componentDefs:
+    - name: replication
+      workloadType: Replication
       service:
         ports:
           - protocol: TCP

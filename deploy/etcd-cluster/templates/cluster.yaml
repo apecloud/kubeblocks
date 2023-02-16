@@ -15,9 +15,9 @@ spec:
   {{- with $.Values.tolerations }}
   tolerations: {{ . | toYaml | nindent 4 }}
   {{- end }}
-  components:
+  componentSpecs:
     - name: etcd
-      type: etcd
+      componentDefRef: etcd
       monitor: {{ .Values.monitor.enabled }}
       serviceType: {{ $.Values.service.type | default "ClusterIP" }}
       replicas: {{ .Values.replicaCount | default "3" }}

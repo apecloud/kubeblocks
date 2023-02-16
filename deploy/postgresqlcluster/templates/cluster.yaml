@@ -14,9 +14,9 @@ spec:
   {{- with $.Values.tolerations }}
   tolerations: {{ . | toYaml | nindent 4 }}
   {{- end }}
-  components:
+  componentSpecs:
     - name: postgresql # user-defined
-      type: postgresql # ref clusterdefinition components.typename
+      componentDefRef: postgresql # ref clusterdefinition components.name
       monitor: {{ .Values.monitor.enabled | default false }}
       {{- with  .Values.resources }}
       resources:

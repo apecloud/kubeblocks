@@ -6,8 +6,8 @@ metadata:
     {{- include "apecloud-mysql.labels" . | nindent 4 }}
 spec:
   clusterDefinitionRef: apecloud-mysql
-  components:
-  - type: mysql
+  componentVersions:
+  - componentDefRef: mysql
     podSpec:
       containers:
       - name: mysql

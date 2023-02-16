@@ -5,18 +5,13 @@ metadata:
   labels:
     {{- include "postgresql.labels" . | nindent 4 }}
 spec:
-  type: state.postgresql
   connectionCredential:
     username: postgres
     postgres-password: {{ (include "postgresql.postgresPassword" .) | quote  }}
-  components:
-    - typeName: postgresql
-      componentType: Stateful
+  componentDefs:
+    - name: postgresql
+      workloadType: Stateful
       characterType: postgresql
-      defaultReplicas: 1
-      minReplicas: 0
-      ## standalone only
-      maxReplicas: 1
       probes:
       monitor:
         builtIn: false

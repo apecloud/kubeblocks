@@ -6,8 +6,8 @@ metadata:
     {{- include "postgresql.labels" . | nindent 4 }}
 spec:
   clusterDefinitionRef: apecloud-postgresql
-  components:
-  - type: postgresql
+  componentVersions:
+  - componentDefRef: postgresql
     podSpec:
       containers:
       - name: postgresql
@@ -21,8 +21,8 @@ metadata:
     {{- include "postgresql.labels" . | nindent 4 }}
 spec:
   clusterDefinitionRef: apecloud-postgresql
-  components:
-  - type: postgresql
+  componentVersions:
+  - componentDefRef: postgresql
     podSpec:
       containers:
       - name: postgresql

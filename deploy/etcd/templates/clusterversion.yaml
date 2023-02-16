@@ -6,8 +6,8 @@ metadata:
     {{- include "etcd.labels" . | nindent 4 }}
 spec:
   clusterDefinitionRef: apecloud-etcd
-  components:
-    - type: etcd
+  componentSpecs:
+    - componentDefRef: etcd
       podSpec:
         containers:
           - name: etcd

@@ -36,17 +36,17 @@ metadata:
   name:     clusterversion-1
 spec:
   clusterDefinitionRef: cluster-definition-1
-  components:
-  - type: component1
+  componentVersions:
+  - componentDefRef: component1
     podSpec: 
       containers:
       - name: container1.a
       - name: container1.b
-  - type: component2
+  - componentDefRef: component2
     podSpec: 
       containers:
       - name: container2
-  - type: component3
+  - componentDefRef: component3
     podSpec: 
       containers:
 `
@@ -92,15 +92,15 @@ metadata:
   name:     clusterversion-2
 spec:
   clusterDefinitionRef: cluster-definition-2
-  components:
-  - type: component1
+  componentVersions:
+  - componentDefRef: component1
     podSpec: 
       containers:
       - name: container1
-  - type: component2
+  - componentDefRef: component2
     podSpec: 
       containers:
-  - type: component3
+  - componentDefRef: component3
     podSpec: 
       containers:
       - name: container3

@@ -162,7 +162,7 @@ func (o *updateOptions) buildPatch(flags []*pflag.Flag) error {
 			return err
 		}
 
-		if err = unstructured.SetNestedField(spec, data["components"], "components"); err != nil {
+		if err = unstructured.SetNestedField(spec, data["componentSpecs"], "componentSpecs"); err != nil {
 			return err
 		}
 	}
@@ -207,7 +207,7 @@ func (o *updateOptions) setEnabledLog(val string) error {
 
 	// disable all monitor
 	if !boolVal {
-		for _, c := range o.cluster.Spec.Components {
+		for _, c := range o.cluster.Spec.ComponentSpecs {
 			c.EnabledLogs = nil
 		}
 		return nil
@@ -228,8 +228,8 @@ func (o *updateOptions) setMonitor(val string) error {
 		return err
 	}
 
-	for i := range o.cluster.Spec.Components {
-		o.cluster.Spec.Components[i].Monitor = boolVal
+	for i := range o.cluster.Spec.ComponentSpecs {
+		o.cluster.Spec.ComponentSpecs[i].Monitor = boolVal
 	}
 	return nil
 }

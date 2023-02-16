@@ -32,7 +32,7 @@ func NewClusterVersionFactory(name, cdRef string) *MockClusterVersionFactory {
 		&dbaasv1alpha1.ClusterVersion{
 			Spec: dbaasv1alpha1.ClusterVersionSpec{
 				ClusterDefinitionRef: cdRef,
-				Components:           []dbaasv1alpha1.ClusterVersionComponent{},
+				ComponentVersions:    []dbaasv1alpha1.ClusterVersionComponent{},
 			},
 		}, f)
 	return f
@@ -40,14 +40,14 @@ func NewClusterVersionFactory(name, cdRef string) *MockClusterVersionFactory {
 
 func (factory *MockClusterVersionFactory) AddComponent(compType string) *MockClusterVersionFactory {
 	comp := dbaasv1alpha1.ClusterVersionComponent{
-		Type: compType,
+		ComponentDefRef: compType,
 	}
-	factory.get().Spec.Components = append(factory.get().Spec.Components, comp)
+	factory.get().Spec.ComponentVersions = append(factory.get().Spec.ComponentVersions, comp)
 	return factory
 }
 
 func (factory *MockClusterVersionFactory) AddInitContainer(container corev1.Container) *MockClusterVersionFactory {
-	comps := factory.get().Spec.Components
+	comps := factory.get().Spec.ComponentVersions
 	if len(comps) > 0 {
 		comp := comps[len(comps)-1]
 		if comp.PodSpec == nil {
@@ -56,7 +56,7 @@ func (factory *MockClusterVersionFactory) AddInitContainer(container corev1.Cont
 		comp.PodSpec.InitContainers = append(comp.PodSpec.InitContainers, container)
 		comps[len(comps)-1] = comp
 	}
-	factory.get().Spec.Components = comps
+	factory.get().Spec.ComponentVersions = comps
 	return factory
 }
 
@@ -68,7 +68,7 @@ func (factory *MockClusterVersionFactory) AddInitContainerShort(name string, ima
 }
 
 func (factory *MockClusterVersionFactory) AddContainer(container corev1.Container) *MockClusterVersionFactory {
-	comps := factory.get().Spec.Components
+	comps := factory.get().Spec.ComponentVersions
 	if len(comps) > 0 {
 		comp := comps[len(comps)-1]
 		if comp.PodSpec == nil {
@@ -77,7 +77,7 @@ func (factory *MockClusterVersionFactory) AddContainer(container corev1.Containe
 		comp.PodSpec.Containers = append(comp.PodSpec.Containers, container)
 		comps[len(comps)-1] = comp
 	}
-	factory.get().Spec.Components = comps
+	factory.get().Spec.ComponentVersions = comps
 	return factory
 }
 
@@ -90,7 +90,7 @@ func (factory *MockClusterVersionFactory) AddContainerShort(name string, image s
 
 func (factory *MockClusterVersionFactory) AddConfigTemplate(name string,
 	configTplRef string, configConstraintRef string, volumeName string) *MockClusterVersionFactory {
-	comps := factory.get().Spec.Components
+	comps := factory.get().Spec.ComponentVersions
 	if len(comps) > 0 {
 		comp := comps[len(comps)-1]
 		comp.ConfigTemplateRefs = append(comp.ConfigTemplateRefs,
@@ -102,6 +102,6 @@ func (factory *MockClusterVersionFactory) AddConfigTemplate(name string,
 			})
 		comps[len(comps)-1] = comp
 	}
-	factory.get().Spec.Components = comps
+	factory.get().Spec.ComponentVersions = comps
 	return factory
 }

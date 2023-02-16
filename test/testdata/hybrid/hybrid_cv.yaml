@@ -4,8 +4,8 @@ metadata:
   name:  %s
 spec:
   clusterDefinitionRef: %s
-  components:
-  - type: consensus
+  componentVersions:
+  - componentDefRef: consensus
     podSpec:
       containers:
       - name: mysql
@@ -15,10 +15,10 @@ spec:
       - image: %s
         imagePullPolicy: IfNotPresent
         name: busybox
-    type: stateless
+    componentDefRef: stateless
   - podSpec:
       containers:
       - image: %s
         imagePullPolicy: IfNotPresent
         name: mysql
-    type: stateful
+    componentDefRef: stateful

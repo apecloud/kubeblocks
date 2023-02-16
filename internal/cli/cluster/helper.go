@@ -132,9 +132,9 @@ func GetAllCluster(client dynamic.Interface, namespace string, clusters *dbaasv1
 
 // FindClusterComp finds component in cluster object based on the component type name
 func FindClusterComp(cluster *dbaasv1alpha1.Cluster, typeName string) *dbaasv1alpha1.ClusterComponent {
-	for i, c := range cluster.Spec.Components {
-		if c.Type == typeName {
-			return &cluster.Spec.Components[i]
+	for i, c := range cluster.Spec.ComponentSpecs {
+		if c.ComponentDefRef == typeName {
+			return &cluster.Spec.ComponentSpecs[i]
 		}
 	}
 	return nil

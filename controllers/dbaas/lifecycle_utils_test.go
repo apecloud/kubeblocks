@@ -327,8 +327,8 @@ spec:
 				cluster,
 				clusterDef,
 				&clusterDef.Spec.ComponentDefs[0],
-				&clusterVersion.Spec.Components[0],
-				&cluster.Spec.Components[0])
+				&clusterVersion.Spec.ComponentVersions[0],
+				&cluster.Spec.ComponentSpecs[0])
 			Expect(component).ShouldNot(BeNil())
 			component.HorizontalScalePolicy = &dbaasv1alpha1.HorizontalScalePolicy{
 				Type:             dbaasv1alpha1.HScaleDataClonePolicyFromSnapshot,

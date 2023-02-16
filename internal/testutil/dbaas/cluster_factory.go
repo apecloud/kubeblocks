@@ -33,7 +33,7 @@ func NewClusterFactory(namespace, name, cdRef, cvRef string) *MockClusterFactory
 			Spec: dbaasv1alpha1.ClusterSpec{
 				ClusterDefRef:     cdRef,
 				ClusterVersionRef: cvRef,
-				Components:        []dbaasv1alpha1.ClusterComponent{},
+				ComponentSpecs:    []dbaasv1alpha1.ClusterComponent{},
 				TerminationPolicy: dbaasv1alpha1.WipeOut,
 			},
 		}, f)
@@ -57,42 +57,42 @@ func (factory *MockClusterFactory) AddClusterToleration(toleration corev1.Tolera
 
 func (factory *MockClusterFactory) AddComponent(compName string, compType string) *MockClusterFactory {
 	comp := dbaasv1alpha1.ClusterComponent{
-		Name: compName,
-		Type: compType,
+		Name:            compName,
+		ComponentDefRef: compType,
 	}
-	factory.get().Spec.Components = append(factory.get().Spec.Components, comp)
+	factory.get().Spec.ComponentSpecs = append(factory.get().Spec.ComponentSpecs, comp)
 	return factory
 }
 
 func (factory *MockClusterFactory) SetReplicas(replicas int32) *MockClusterFactory {
-	comps := factory.get().Spec.Components
+	comps := factory.get().Spec.ComponentSpecs
 	if len(comps) > 0 {
 		comps[len(comps)-1].Replicas = &replicas
 	}
-	factory.get().Spec.Components = comps
+	factory.get().Spec.ComponentSpecs = comps
 	return factory
 }
 
 func (factory *MockClusterFactory) SetResources(resources corev1.ResourceRequirements) *MockClusterFactory {
-	comps := factory.get().Spec.Components
+	comps := factory.get().Spec.ComponentSpecs
 	if len(comps) > 0 {
 		comps[len(comps)-1].Resources = resources
 	}
-	factory.get().Spec.Components = comps
+	factory.get().Spec.ComponentSpecs = comps
 	return factory
 }
 
 func (factory *MockClusterFactory) SetComponentAffinity(affinity *dbaasv1alpha1.Affinity) *MockClusterFactory {
-	comps := factory.get().Spec.Components
+	comps := factory.get().Spec.ComponentSpecs
 	if len(comps) > 0 {
 		comps[len(comps)-1].Affinity = affinity
 	}
-	factory.get().Spec.Components = comps
+	factory.get().Spec.ComponentSpecs = comps
 	return factory
 }
 
 func (factory *MockClusterFactory) AddComponentToleration(toleration corev1.Toleration) *MockClusterFactory {
-	comps := factory.get().Spec.Components
+	comps := factory.get().Spec.ComponentSpecs
 	if len(comps) > 0 {
 		comp := comps[len(comps)-1]
 		tolerations := comp.Tolerations
@@ -103,13 +103,13 @@ func (factory *MockClusterFactory) AddComponentToleration(toleration corev1.Tole
 		comp.Tolerations = tolerations
 		comps[len(comps)-1] = comp
 	}
-	factory.get().Spec.Components = comps
+	factory.get().Spec.ComponentSpecs = comps
 	return factory
 }
 
 func (factory *MockClusterFactory) AddVolumeClaimTemplate(volumeName string,
 	pvcSpec *corev1.PersistentVolumeClaimSpec) *MockClusterFactory {
-	comps := factory.get().Spec.Components
+	comps := factory.get().Spec.ComponentSpecs
 	if len(comps) > 0 {
 		comp := comps[len(comps)-1]
 		comp.VolumeClaimTemplates = append(comp.VolumeClaimTemplates,
@@ -119,15 +119,15 @@ func (factory *MockClusterFactory) AddVolumeClaimTemplate(volumeName string,
 			})
 		comps[len(comps)-1] = comp
 	}
-	factory.get().Spec.Components = comps
+	factory.get().Spec.ComponentSpecs = comps
 	return factory
 }
 
 func (factory *MockClusterFactory) SetMonitor(monitor bool) *MockClusterFactory {
-	comps := factory.get().Spec.Components
+	comps := factory.get().Spec.ComponentSpecs
 	if len(comps) > 0 {
 		comps[len(comps)-1].Monitor = monitor
 	}
-	factory.get().Spec.Components = comps
+	factory.get().Spec.ComponentSpecs = comps
 	return factory
 }

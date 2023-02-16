@@ -52,10 +52,10 @@ func GetConfigTemplatesFromComponent(
 		return nil, MakeError("failed to find component[%s]", componentName)
 	}
 	aCom := filter(aComponents, func(o dbaasv1alpha1.ClusterVersionComponent) bool {
-		return o.Type == cCom.Type
+		return o.ComponentDefRef == cCom.ComponentDefRef
 	})
 	dCom := filter(dComponents, func(o dbaasv1alpha1.ClusterDefinitionComponent) bool {
-		return o.Name == cCom.Type
+		return o.Name == cCom.ComponentDefRef
 	})
 
 	var (

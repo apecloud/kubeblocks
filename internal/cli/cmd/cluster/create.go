@@ -386,16 +386,16 @@ func (o *CreateOptions) PreCreate(obj *unstructured.Unstructured) error {
 
 // setEnableAllLog set enable all logs, and ignore enabledLogs of component level.
 func setEnableAllLogs(c *dbaasv1alpha1.Cluster, cd *dbaasv1alpha1.ClusterDefinition) {
-	for idx, comCluster := range c.Spec.Components {
+	for idx, comCluster := range c.Spec.ComponentSpecs {
 		for _, com := range cd.Spec.ComponentDefs {
-			if !strings.EqualFold(comCluster.Type, com.Name) {
+			if !strings.EqualFold(comCluster.ComponentDefRef, com.Name) {
 				continue
 			}
 			typeList := make([]string, 0, len(com.LogConfigs))
 			for _, logConf := range com.LogConfigs {
 				typeList = append(typeList, logConf.Name)
 			}
-			c.Spec.Components[idx].EnabledLogs = typeList
+			c.Spec.ComponentSpecs[idx].EnabledLogs = typeList
 		}
 	}
 }
@@ -438,9 +438,9 @@ func buildClusterComp(cd *dbaasv1alpha1.ClusterDefinition, setsMap map[string]ma
 			corev1.ResourceMemory: resource.MustParse(getVal(keyMemory, sets)),
 		}
 		compObj := &dbaasv1alpha1.ClusterComponent{
-			Name:     c.Name,
-			Type:     c.Name,
-			Replicas: &replicas,
+			Name:            c.Name,
+			ComponentDefRef: c.Name,
+			Replicas:        &replicas,
 			Resources: corev1.ResourceRequirements{
 				Requests: resourceList,
 				Limits:   resourceList,

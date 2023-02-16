@@ -64,8 +64,8 @@ func HandleReplicationSet(reqCtx intctrlutil.RequestCtx,
 
 	// handle StatefulSets including delete sts when pod number larger than cluster.component[i].replicas
 	// delete the StatefulSets with the largest sequence number which is not the primary role
-	clusterCompReplicasMap := make(map[string]int32, len(cluster.Spec.Components))
-	for _, clusterComp := range cluster.Spec.Components {
+	clusterCompReplicasMap := make(map[string]int32, len(cluster.Spec.ComponentSpecs))
+	for _, clusterComp := range cluster.Spec.ComponentSpecs {
 		if clusterComp.Replicas == nil {
 			replicas := int32(0)
 			clusterComp.Replicas = &replicas

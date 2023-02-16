@@ -193,9 +193,9 @@ func (r *reconfigureAction) Action(resource *OpsResource) error {
 	}
 
 	tpls, err := cfgcore.GetConfigTemplatesFromComponent(
-		cluster.Spec.Components,
+		cluster.Spec.ComponentSpecs,
 		clusterDefinition.Spec.ComponentDefs,
-		clusterVersion.Spec.Components,
+		clusterVersion.Spec.ComponentVersions,
 		componentName)
 	if err != nil {
 		return cfgcore.WrapError(err, "failed to get config template[%s]", componentName)

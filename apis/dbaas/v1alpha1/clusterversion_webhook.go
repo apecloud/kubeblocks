@@ -124,7 +124,7 @@ func (r *ClusterVersion) validate() error {
 }
 
 func (r *ClusterVersion) validateConfigTemplate() error {
-	for _, c := range r.Spec.Components {
+	for _, c := range r.Spec.ComponentVersions {
 		if len(c.ConfigTemplateRefs) > 1 {
 			return validateConfigTemplateList(c.ConfigTemplateRefs)
 		}
@@ -150,11 +150,11 @@ func (r *ClusterVersion) GetInconsistentComponentsInfo(clusterDef *ClusterDefini
 		}
 	}
 	// get not found component type in clusterDefinition
-	for _, v := range r.Spec.Components {
-		if _, ok := componentMap[v.Type]; !ok {
-			notFoundComponentType = append(notFoundComponentType, v.Type)
+	for _, v := range r.Spec.ComponentVersions {
+		if _, ok := componentMap[v.ComponentDefRef]; !ok {
+			notFoundComponentType = append(notFoundComponentType, v.ComponentDefRef)
 		} else if v.PodSpec.Containers != nil && len(v.PodSpec.Containers) > 0 {
-			componentMap[v.Type] = true
+			componentMap[v.ComponentDefRef] = true
 		}
 	}
 	// get no containers components in clusterDefinition and clusterVersion

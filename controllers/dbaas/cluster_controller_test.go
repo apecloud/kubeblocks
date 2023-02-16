@@ -279,15 +279,15 @@ var _ = Describe("Cluster Controller", func() {
 
 	changeStatefulSetReplicas := func(clusterName types.NamespacedName, replicas int32) {
 		Eventually(testdbaas.GetAndChangeObj(&testCtx, clusterName, func(cluster *dbaasv1alpha1.Cluster) {
-			if cluster.Spec.Components == nil || len(cluster.Spec.Components) == 0 {
-				cluster.Spec.Components = []dbaasv1alpha1.ClusterComponent{
+			if cluster.Spec.ComponentSpecs == nil || len(cluster.Spec.ComponentSpecs) == 0 {
+				cluster.Spec.ComponentSpecs = []dbaasv1alpha1.ClusterComponent{
 					{
-						Name:     mysqlCompName,
-						Type:     mysqlCompType,
-						Replicas: &replicas,
+						Name:            mysqlCompName,
+						ComponentDefRef: mysqlCompType,
+						Replicas:        &replicas,
 					}}
 			} else {
-				cluster.Spec.Components[0].Replicas = &replicas
+				cluster.Spec.ComponentSpecs[0].Replicas = &replicas
 			}
 		})).Should(Succeed())
 	}
@@ -511,7 +511,7 @@ var _ = Describe("Cluster Controller", func() {
 		By("Updating the PVC storage size")
 		newStorageValue := resource.MustParse("2Gi")
 		Eventually(testdbaas.GetAndChangeObj(&testCtx, clusterKey, func(cluster *dbaasv1alpha1.Cluster) {
-			comp := &cluster.Spec.Components[0]
+			comp := &cluster.Spec.ComponentSpecs[0]
 			comp.VolumeClaimTemplates[0].Spec.Resources.Requests[corev1.ResourceStorage] = newStorageValue
 		})).Should(Succeed())
 
@@ -664,7 +664,7 @@ var _ = Describe("Cluster Controller", func() {
 	}
 
 	mockPodsForConsensusTest := func(cluster *dbaasv1alpha1.Cluster, number int) []corev1.Pod {
-		componentName := cluster.Spec.Components[0].Name
+		componentName := cluster.Spec.ComponentSpecs[0].Name
 		clusterName := cluster.Name
 		stsName := cluster.Name + "-" + componentName
 		pods := make([]corev1.Pod, 0)
@@ -805,7 +805,7 @@ var _ = Describe("Cluster Controller", func() {
 		Eventually(func(g Gomega) {
 			fetched := &dbaasv1alpha1.Cluster{}
 			g.Expect(k8sClient.Get(ctx, clusterKey, fetched)).To(Succeed())
-			compName := fetched.Spec.Components[0].Name
+			compName := fetched.Spec.ComponentSpecs[0].Name
 			g.Expect(fetched.Status.Components != nil).To(BeTrue())
 			g.Expect(fetched.Status.Components).To(HaveKey(compName))
 			consensusStatus := fetched.Status.Components[compName].ConsensusSetStatus

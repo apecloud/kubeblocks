@@ -284,7 +284,7 @@ func handleConfigTemplate(object client.Object, handler ConfigTemplateHandler, h
 
 func getCfgTplFromCV(appVer *dbaasv1alpha1.ClusterVersion) []dbaasv1alpha1.ConfigTemplate {
 	tpls := make([]dbaasv1alpha1.ConfigTemplate, 0)
-	for _, component := range appVer.Spec.Components {
+	for _, component := range appVer.Spec.ComponentVersions {
 		if len(component.ConfigTemplateRefs) > 0 {
 			tpls = append(tpls, component.ConfigTemplateRefs...)
 		}

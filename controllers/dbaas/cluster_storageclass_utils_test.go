@@ -73,7 +73,7 @@ var _ = Describe("Reconcile StorageClass", func() {
 			clusterVersionName, clusterDefName, consensusCompName)
 		cluster := &dbaasv1alpha1.Cluster{}
 		Expect(yaml.Unmarshal([]byte(clusterString), cluster)).Should(Succeed())
-		volumeClaimTemplates := cluster.Spec.Components[0].VolumeClaimTemplates
+		volumeClaimTemplates := cluster.Spec.ComponentSpecs[0].VolumeClaimTemplates
 		volumeClaimTemplates[0].Spec.StorageClassName = &defaultStorageClassName
 		volumeClaimTemplates = append(volumeClaimTemplates, dbaasv1alpha1.ClusterComponentVolumeClaimTemplate{
 			Name: "log",
@@ -86,7 +86,7 @@ var _ = Describe("Reconcile StorageClass", func() {
 				},
 			},
 		})
-		cluster.Spec.Components[0].VolumeClaimTemplates = volumeClaimTemplates
+		cluster.Spec.ComponentSpecs[0].VolumeClaimTemplates = volumeClaimTemplates
 		cluster.Annotations = map[string]string{
 			intctrlutil.StorageClassAnnotationKey: defaultStorageClassName + "," + storageClassName,
 		}

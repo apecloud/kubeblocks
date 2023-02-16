@@ -155,7 +155,7 @@ var _ = Describe("OpsRequest Controller", func() {
 
 		By("check cluster resource requirements changed")
 		Eventually(testdbaas.CheckObj(&testCtx, clusterKey, func(g Gomega, fetched *dbaasv1alpha1.Cluster) {
-			g.Expect(fetched.Spec.Components[0].Resources.Requests).To(Equal(
+			g.Expect(fetched.Spec.ComponentSpecs[0].Resources.Requests).To(Equal(
 				verticalScalingOpsRequest.Spec.VerticalScalingList[0].Requests))
 		})).Should(Succeed())
 

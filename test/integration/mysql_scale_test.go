@@ -129,7 +129,7 @@ var _ = Describe("MySQL Scaling function", func() {
 
 		By("check cluster resource requirements changed")
 		Eventually(testdbaas.CheckObj(&testCtx, clusterKey, func(g Gomega, fetched *dbaasv1alpha1.Cluster) {
-			g.Expect(fetched.Spec.Components[0].Resources.Requests).To(Equal(
+			g.Expect(fetched.Spec.ComponentSpecs[0].Resources.Requests).To(Equal(
 				verticalScalingOpsRequest.Spec.VerticalScalingList[0].Requests))
 		})).Should(Succeed())
 
@@ -198,7 +198,7 @@ var _ = Describe("MySQL Scaling function", func() {
 
 		By("Update volume size")
 		Eventually(testdbaas.GetAndChangeObj(&testCtx, clusterKey, func(fetched *dbaasv1alpha1.Cluster) {
-			comp := &fetched.Spec.Components[0]
+			comp := &fetched.Spec.ComponentSpecs[0]
 			comp.VolumeClaimTemplates[0].Spec.Resources.Requests[corev1.ResourceStorage] = newStorageValue
 			comp.VolumeClaimTemplates[1].Spec.Resources.Requests[corev1.ResourceStorage] = newStorageValue
 		})).Should(Succeed())

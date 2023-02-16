@@ -50,10 +50,10 @@ func (vs verticalScalingHandler) ActionStartedCondition(opsRequest *dbaasv1alpha
 // the definition of opsRequest with spec.componentNames and spec.componentOps.verticalScaling
 func (vs verticalScalingHandler) Action(opsRes *OpsResource) error {
 	verticalScalingMap := opsRes.OpsRequest.CovertVerticalScalingListToMap()
-	for index, component := range opsRes.Cluster.Spec.Components {
+	for index, component := range opsRes.Cluster.Spec.ComponentSpecs {
 		if verticalScaling, ok := verticalScalingMap[component.Name]; ok {
 			component.Resources = verticalScaling.ResourceRequirements
-			opsRes.Cluster.Spec.Components[index] = component
+			opsRes.Cluster.Spec.ComponentSpecs[index] = component
 		}
 	}
 	return opsRes.Client.Update(opsRes.Ctx, opsRes.Cluster)
@@ -69,7 +69,7 @@ func (vs verticalScalingHandler) ReconcileAction(opsRes *OpsResource) (dbaasv1al
 func (vs verticalScalingHandler) SaveLastConfiguration(opsRes *OpsResource) error {
 	componentNameMap := opsRes.OpsRequest.GetComponentNameMap()
 	lastComponentInfo := map[string]dbaasv1alpha1.LastComponentConfiguration{}
-	for _, v := range opsRes.Cluster.Spec.Components {
+	for _, v := range opsRes.Cluster.Spec.ComponentSpecs {
 		if _, ok := componentNameMap[v.Name]; !ok {
 			continue
 		}

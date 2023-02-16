@@ -87,7 +87,7 @@ func (r *StatefulSetReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	if clusterComponent == nil {
 		return intctrlutil.Reconciled()
 	}
-	componentDef := clusterDef.GetComponentDefByTypeName(clusterComponent.Type)
+	componentDef := clusterDef.GetComponentDefByTypeName(clusterComponent.ComponentDefRef)
 	component := NewComponentByType(ctx, r.Client, cluster, componentDef, clusterComponent)
 	if component == nil {
 		return intctrlutil.Reconciled()

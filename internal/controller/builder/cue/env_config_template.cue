@@ -19,10 +19,10 @@ cluster: {
 	}
 }
 component: {
-	name: string
-	type: string
+	name:           string
+	type:           string
 	clusterDefName: string
-	characterType:    string
+	characterType:  string
 }
 
 config: {

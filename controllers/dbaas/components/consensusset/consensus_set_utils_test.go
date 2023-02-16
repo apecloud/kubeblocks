@@ -51,10 +51,10 @@ func TestInitClusterComponentStatusIfNeed(t *testing.T) {
 	componentName := "foo"
 	cluster := &dbaasv1alpha1.Cluster{
 		Spec: dbaasv1alpha1.ClusterSpec{
-			Components: []dbaasv1alpha1.ClusterComponent{
+			ComponentSpecs: []dbaasv1alpha1.ClusterComponent{
 				{
-					Name: componentName,
-					Type: componentName,
+					Name:            componentName,
+					ComponentDefRef: componentName,
 				},
 			},
 		},

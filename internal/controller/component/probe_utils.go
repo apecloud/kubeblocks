@@ -186,7 +186,7 @@ func buildRoleChangedProbeContainer(characterType string, roleChangedContainer *
 		"curl", "-X", "POST",
 		"--max-time", strconv.Itoa(int(probeSetting.TimeoutSeconds)),
 		"--fail-with-body", "--silent",
-		"-H", "Content-Type: application/json",
+		"-H", "Content-ComponentDefRef: application/json",
 		roleObserveURI,
 		"-d", "{\"operation\": \"roleCheck\", \"metadata\":{\"sql\":\"\"}}",
 	}

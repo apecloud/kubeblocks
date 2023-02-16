@@ -378,7 +378,7 @@ func (o *OperationsOptions) existClusterAndComponent(componentName string) error
 		return makeClusterNotExistErr(o.Name)
 	}
 
-	for _, component := range clusterObj.Spec.Components {
+	for _, component := range clusterObj.Spec.ComponentSpecs {
 		if component.Name == componentName {
 			return nil
 		}

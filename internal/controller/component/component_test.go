@@ -22,10 +22,11 @@ import (
 
 	ctrl "sigs.k8s.io/controller-runtime"
 
+	corev1 "k8s.io/api/core/v1"
+
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	testdbaas "github.com/apecloud/kubeblocks/internal/testutil/dbaas"
-	corev1 "k8s.io/api/core/v1"
 )
 
 const (
@@ -50,8 +51,8 @@ var _ = Describe("component module", func() {
 			cluster.Name = "mysql-instance-3"
 			clusterComp = &dbaasv1alpha1.ClusterComponent{}
 			clusterComp.Monitor = true
-			cluster.Spec.Components = append(cluster.Spec.Components, *clusterComp)
-			clusterComp = &cluster.Spec.Components[0]
+			cluster.Spec.ComponentSpecs = append(cluster.Spec.ComponentSpecs, *clusterComp)
+			clusterComp = &cluster.Spec.ComponentSpecs[0]
 
 			clusterDef = &dbaasv1alpha1.ClusterDefinition{}
 			clusterDefComp = &dbaasv1alpha1.ClusterDefinitionComponent{}
@@ -124,7 +125,7 @@ var _ = Describe("component module", func() {
 		})
 
 		It("should disable monitor if ClusterDefinitionComponent's CharacterType is empty", func() {
-			// TODO fixme: seems setting clusterDef.Spec.Type has no effect to mergeMonitorConfig
+			// TODO fixme: seems setting clusterDef.Spec.ComponentDefRef has no effect to mergeMonitorConfig
 			clusterComp.Monitor = true
 			clusterDefComp.CharacterType = ""
 			clusterDefComp.Monitor.BuiltIn = true
@@ -187,19 +188,19 @@ var _ = Describe("component module", func() {
 				cluster,
 				clusterDef,
 				&clusterDef.Spec.ComponentDefs[0],
-				&clusterVersion.Spec.Components[0],
-				&cluster.Spec.Components[0])
+				&clusterVersion.Spec.ComponentVersions[0],
+				&cluster.Spec.ComponentSpecs[0])
 			Expect(component).ShouldNot(BeNil())
 
 			By("leave clusterVersion.podSpec nil")
-			clusterVersion.Spec.Components[0].PodSpec = nil
+			clusterVersion.Spec.ComponentVersions[0].PodSpec = nil
 			component = MergeComponents(
 				reqCtx,
 				cluster,
 				clusterDef,
 				&clusterDef.Spec.ComponentDefs[0],
-				&clusterVersion.Spec.Components[0],
-				&cluster.Spec.Components[0])
+				&clusterVersion.Spec.ComponentVersions[0],
+				&cluster.Spec.ComponentSpecs[0])
 			Expect(component).ShouldNot(BeNil())
 
 			By("new container in clusterVersion not in clusterDefinition")
@@ -208,8 +209,8 @@ var _ = Describe("component module", func() {
 				cluster,
 				clusterDef,
 				&clusterDef.Spec.ComponentDefs[0],
-				&clusterVersion.Spec.Components[1],
-				&cluster.Spec.Components[0])
+				&clusterVersion.Spec.ComponentVersions[1],
+				&cluster.Spec.ComponentSpecs[0])
 			Expect(len(component.PodSpec.Containers)).Should(Equal(2))
 
 			By("new init container in clusterVersion not in clusterDefinition")
@@ -218,8 +219,8 @@ var _ = Describe("component module", func() {
 				cluster,
 				clusterDef,
 				&clusterDef.Spec.ComponentDefs[0],
-				&clusterVersion.Spec.Components[1],
-				&cluster.Spec.Components[0])
+				&clusterVersion.Spec.ComponentVersions[1],
+				&cluster.Spec.ComponentSpecs[0])
 			Expect(len(component.PodSpec.InitContainers)).Should(Equal(1))
 
 			By("leave clusterComp nil")
@@ -228,7 +229,7 @@ var _ = Describe("component module", func() {
 				cluster,
 				clusterDef,
 				&clusterDef.Spec.ComponentDefs[0],
-				&clusterVersion.Spec.Components[0],
+				&clusterVersion.Spec.ComponentVersions[0],
 				nil)
 			Expect(component).ShouldNot(BeNil())
 
@@ -238,8 +239,8 @@ var _ = Describe("component module", func() {
 				cluster,
 				clusterDef,
 				nil,
-				&clusterVersion.Spec.Components[0],
-				&cluster.Spec.Components[0])
+				&clusterVersion.Spec.ComponentVersions[0],
+				&cluster.Spec.ComponentSpecs[0])
 			Expect(component).Should(BeNil())
 		})
 	})

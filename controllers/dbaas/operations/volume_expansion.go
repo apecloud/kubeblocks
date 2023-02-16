@@ -69,7 +69,7 @@ func (ve volumeExpansionOpsHandler) Action(opsRes *OpsResource) error {
 		volumeExpansionOps dbaasv1alpha1.VolumeExpansion
 		ok                 bool
 	)
-	for index, component := range opsRes.Cluster.Spec.Components {
+	for index, component := range opsRes.Cluster.Spec.ComponentSpecs {
 		if volumeExpansionOps, ok = volumeExpansionMap[component.Name]; !ok {
 			continue
 		}
@@ -81,7 +81,7 @@ func (ve volumeExpansionOpsHandler) Action(opsRes *OpsResource) error {
 				if vct.Spec == nil {
 					continue
 				}
-				opsRes.Cluster.Spec.Components[index].VolumeClaimTemplates[i].
+				opsRes.Cluster.Spec.ComponentSpecs[index].VolumeClaimTemplates[i].
 					Spec.Resources.Requests[corev1.ResourceStorage] = v.Storage
 			}
 		}
@@ -179,7 +179,7 @@ func (ve volumeExpansionOpsHandler) SaveLastConfiguration(opsRes *OpsResource) e
 	componentNameMap := opsRequest.GetComponentNameMap()
 	storageMap := ve.getRequestStorageMap(opsRequest)
 	lastComponentInfo := map[string]dbaasv1alpha1.LastComponentConfiguration{}
-	for _, v := range opsRes.Cluster.Spec.Components {
+	for _, v := range opsRes.Cluster.Spec.ComponentSpecs {
 		if _, ok := componentNameMap[v.Name]; !ok {
 			continue
 		}

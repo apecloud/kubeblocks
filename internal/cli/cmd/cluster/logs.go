@@ -227,9 +227,9 @@ func (o *LogsOptions) createFileTypeCommand(pod *corev1.Pod, obj *cluster.Cluste
 		return command, fmt.Errorf("get component name from pod labels fail")
 	}
 	var comTypeName string
-	for _, comCluster := range obj.Cluster.Spec.Components {
+	for _, comCluster := range obj.Cluster.Spec.ComponentSpecs {
 		if strings.EqualFold(comCluster.Name, componentName) {
-			comTypeName = comCluster.Type
+			comTypeName = comCluster.ComponentDefRef
 			break
 		}
 	}

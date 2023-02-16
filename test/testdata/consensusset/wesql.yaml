@@ -10,11 +10,11 @@ metadata:
 spec:
   clusterVersionRef: %s
   clusterDefinitionRef: %s
-  components:
+  componentSpecs:
   - monitor: false
     name: %s
     replicas: 3
-    type: consensus
+    componentDefRef: consensus
     enabledLogs:
     - error
     volumeClaimTemplates:

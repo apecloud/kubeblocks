@@ -86,7 +86,7 @@ func (r *Cluster) ValidateDelete() error {
 
 // validatePrimaryIndex checks primaryIndex value cannot be larger than replicas.
 func (r *Cluster) validatePrimaryIndex(allErrs *field.ErrorList) {
-	for index, component := range r.Spec.Components {
+	for index, component := range r.Spec.ComponentSpecs {
 		if component.PrimaryIndex == nil || component.Replicas == nil {
 			continue
 		}
@@ -101,7 +101,7 @@ func (r *Cluster) validatePrimaryIndex(allErrs *field.ErrorList) {
 // validateVolumeClaimTemplates volumeClaimTemplates is forbidden modification except for storage size.
 func (r *Cluster) validateVolumeClaimTemplates(lastCluster *Cluster) error {
 	var allErrs field.ErrorList
-	for i, component := range r.Spec.Components {
+	for i, component := range r.Spec.ComponentSpecs {
 		lastComponent := getLastComponentByName(lastCluster, component.Name)
 		if lastComponent == nil {
 			continue
@@ -124,7 +124,7 @@ func (r *Cluster) validateVolumeClaimTemplates(lastCluster *Cluster) error {
 
 // getLastComponentByName the cluster maybe delete or add a component, so we get the component by name.
 func getLastComponentByName(lastCluster *Cluster, componentName string) *ClusterComponent {
-	for _, component := range lastCluster.Spec.Components {
+	for _, component := range lastCluster.Spec.ComponentSpecs {
 		if component.Name == componentName {
 			return &component
 		}
@@ -200,9 +200,9 @@ func (r *Cluster) validateComponents(allErrs *field.ErrorList, clusterDef *Clust
 		componentMap[v.Name] = v
 	}
 
-	for i, v := range r.Spec.Components {
-		if _, ok := componentTypeMap[v.Type]; !ok {
-			invalidComponentTypes = append(invalidComponentTypes, v.Type)
+	for i, v := range r.Spec.ComponentSpecs {
+		if _, ok := componentTypeMap[v.ComponentDefRef]; !ok {
+			invalidComponentTypes = append(invalidComponentTypes, v.ComponentDefRef)
 		}
 
 		componentNameMap[v.Name] = struct{}{}

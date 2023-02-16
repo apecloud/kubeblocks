@@ -160,10 +160,10 @@ var _ = Describe("logs", func() {
 		// normal case
 		obj.Cluster = &dbaasv1alpha1.Cluster{
 			Spec: dbaasv1alpha1.ClusterSpec{
-				Components: []dbaasv1alpha1.ClusterComponent{
+				ComponentSpecs: []dbaasv1alpha1.ClusterComponent{
 					{
-						Name: "component-name",
-						Type: "component-type",
+						Name:            "component-name",
+						ComponentDefRef: "component-type",
 					},
 				},
 			},

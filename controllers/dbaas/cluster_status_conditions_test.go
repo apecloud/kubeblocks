@@ -93,7 +93,7 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 			clusterVersion := testdbaas.CreateConsensusMysqlClusterVersion(testCtx, clusterDefName, clusterVersionName)
 			// mock clusterVersion unavailable
 			Eventually(testdbaas.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(clusterVersion), func(clusterVersion *dbaasv1alpha1.ClusterVersion) {
-				clusterVersion.Spec.Components[0].Type = "test-n"
+				clusterVersion.Spec.ComponentVersions[0].ComponentDefRef = "test-n"
 			})).Should(Succeed())
 
 			Eventually(testdbaas.CheckObj(&testCtx, client.ObjectKeyFromObject(clusterVersion), func(g Gomega, clusterVersion *dbaasv1alpha1.ClusterVersion) {
@@ -102,7 +102,7 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 
 			// trigger reconcile
 			Eventually(testdbaas.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(cluster), func(tmpCluster *dbaasv1alpha1.Cluster) {
-				tmpCluster.Spec.Components[0].EnabledLogs = []string{"error1"}
+				tmpCluster.Spec.ComponentSpecs[0].EnabledLogs = []string{"error1"}
 			})).Should(Succeed())
 
 			Eventually(func(g Gomega) {
@@ -115,7 +115,7 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 
 			By("reset clusterVersion to Available")
 			Eventually(testdbaas.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(clusterVersion), func(clusterVersion *dbaasv1alpha1.ClusterVersion) {
-				clusterVersion.Spec.Components[0].Type = "consensus"
+				clusterVersion.Spec.ComponentVersions[0].ComponentDefRef = "consensus"
 			})).Should(Succeed())
 
 			Eventually(testdbaas.CheckObj(&testCtx, client.ObjectKeyFromObject(clusterVersion), func(g Gomega, clusterVersion *dbaasv1alpha1.ClusterVersion) {
@@ -132,7 +132,7 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 
 			By("reset and waiting cluster to Creating")
 			Eventually(testdbaas.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(cluster), func(tmpCluster *dbaasv1alpha1.Cluster) {
-				tmpCluster.Spec.Components[0].EnabledLogs = []string{"error"}
+				tmpCluster.Spec.ComponentSpecs[0].EnabledLogs = []string{"error"}
 			})).Should(Succeed())
 
 			Eventually(testdbaas.CheckObj(&testCtx, client.ObjectKeyFromObject(cluster), func(g Gomega, tmpCluster *dbaasv1alpha1.Cluster) {
@@ -141,7 +141,7 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 
 			By("test apply resources failed")
 			Eventually(testdbaas.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(cluster), func(tmpCluster *dbaasv1alpha1.Cluster) {
-				tmpCluster.Spec.Components[0].VolumeClaimTemplates[0].Spec.Resources.Requests[corev1.ResourceStorage] = resource.MustParse("1Gi")
+				tmpCluster.Spec.ComponentSpecs[0].VolumeClaimTemplates[0].Spec.Resources.Requests[corev1.ResourceStorage] = resource.MustParse("1Gi")
 			})).Should(Succeed())
 
 			Eventually(testdbaas.CheckObj(&testCtx, client.ObjectKeyFromObject(cluster), func(g Gomega, tmpCluster *dbaasv1alpha1.Cluster) {

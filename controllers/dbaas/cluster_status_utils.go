@@ -257,11 +257,11 @@ func getComponentRelatedInfo(cluster *dbaasv1alpha1.Cluster, clusterDef *dbaasv1
 		componentMap = map[string]string{}
 		componentDef dbaasv1alpha1.ClusterDefinitionComponent
 	)
-	for _, v := range cluster.Spec.Components {
+	for _, v := range cluster.Spec.ComponentSpecs {
 		if v.Name == componentName {
-			typeName = v.Type
+			typeName = v.ComponentDefRef
 		}
-		componentMap[v.Name] = v.Type
+		componentMap[v.Name] = v.ComponentDefRef
 	}
 	clusterAvailabilityEffectMap := map[string]bool{}
 	for _, v := range clusterDef.Spec.ComponentDefs {

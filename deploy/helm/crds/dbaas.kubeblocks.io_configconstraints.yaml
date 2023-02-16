@@ -62,7 +62,6 @@ spec:
                   schema:
                     description: schema provides a way for providers to validate the
                       changed parameters through json.
-                    type: object
                     x-kubernetes-preserve-unknown-fields: true
                 type: object
               dynamicParameters:

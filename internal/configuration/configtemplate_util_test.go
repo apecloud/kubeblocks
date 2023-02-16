@@ -163,8 +163,8 @@ var _ = Describe("Reconfigure RollingPolicy", func() {
 				comType     = "replicats"
 				cComponents = []dbaasv1alpha1.ClusterComponent{
 					{
-						Name: comName,
-						Type: comType,
+						Name:            comName,
+						ComponentDefRef: comType,
 					},
 				}
 				tpl1 = dbaasv1alpha1.ConfigTemplate{
@@ -205,7 +205,7 @@ var _ = Describe("Reconfigure RollingPolicy", func() {
 					},
 					aComponents: []dbaasv1alpha1.ClusterVersionComponent{
 						{
-							Type:               comType,
+							ComponentDefRef:    comType,
 							ConfigTemplateRefs: []dbaasv1alpha1.ConfigTemplate{tpl2},
 						},
 					},
@@ -230,7 +230,7 @@ var _ = Describe("Reconfigure RollingPolicy", func() {
 					},
 					aComponents: []dbaasv1alpha1.ClusterVersionComponent{
 						{
-							Type:               comType,
+							ComponentDefRef:    comType,
 							ConfigTemplateRefs: []dbaasv1alpha1.ConfigTemplate{tpl2},
 						},
 					},
@@ -252,7 +252,7 @@ var _ = Describe("Reconfigure RollingPolicy", func() {
 					},
 					aComponents: []dbaasv1alpha1.ClusterVersionComponent{
 						{
-							Type:               "not exist",
+							ComponentDefRef:    "not exist",
 							ConfigTemplateRefs: []dbaasv1alpha1.ConfigTemplate{tpl2},
 						},
 					},

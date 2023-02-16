@@ -366,8 +366,8 @@ func (o *CreateRestoreOptions) Complete() error {
 	if cluster.Spec.Affinity != nil {
 		o.PodAntiAffinity = string(cluster.Spec.Affinity.PodAntiAffinity)
 	}
-	o.Monitor = cluster.Spec.Components[0].Monitor
-	componentByte, err := json.Marshal(cluster.Spec.Components)
+	o.Monitor = cluster.Spec.ComponentSpecs[0].Monitor
+	componentByte, err := json.Marshal(cluster.Spec.ComponentSpecs)
 	if err != nil {
 		return err
 	}

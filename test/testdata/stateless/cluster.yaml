@@ -10,9 +10,9 @@ metadata:
 spec:
   clusterVersionRef: %s
   clusterDefinitionRef: %s
-  components:
+  componentSpecs:
   - name: nginx
-    type: proxy
+    componentDefRef: proxy
     monitor: false
     replicas: %d
   terminationPolicy: WipeOut

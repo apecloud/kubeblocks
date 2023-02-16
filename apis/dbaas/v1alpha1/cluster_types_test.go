@@ -33,9 +33,9 @@ metadata:
 spec:
   clusterVersionRef: cluster-version-consensus
   clusterDefinitionRef: cluster-definition-consensus
-  components:
+  componentSpecs:
     - name: wesql-test
-      type: replicasets
+      componentDefRef: replicasets
       enabledLogs: [error, slow]
 `
 	clusterDefByte := `
@@ -63,7 +63,7 @@ spec:
 		t.Error("Expected empty conditionList")
 	}
 	// corner case
-	cluster.Spec.Components[0].EnabledLogs = []string{"error-test", "slow"}
+	cluster.Spec.ComponentSpecs[0].EnabledLogs = []string{"error-test", "slow"}
 	if err := cluster.ValidateEnabledLogs(clusterDef); err == nil {
 		t.Error("Expected one element conditionList")
 	}
@@ -113,8 +113,8 @@ func TestGetComponentOrTypeName(t *testing.T) {
 	)
 	cluster := Cluster{
 		Spec: ClusterSpec{
-			Components: []ClusterComponent{
-				{Name: componentName, Type: componentType},
+			ComponentSpecs: []ClusterComponent{
+				{Name: componentName, ComponentDefRef: componentType},
 			},
 		},
 	}

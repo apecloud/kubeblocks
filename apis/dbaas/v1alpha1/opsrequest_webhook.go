@@ -412,7 +412,7 @@ func (r *OpsRequest) validateComponentName(allErrs *field.ErrorList,
 		ok                         bool
 		opsType                    = r.Spec.Type
 	)
-	for _, v := range cluster.Spec.Components {
+	for _, v := range cluster.Spec.ComponentSpecs {
 		clusterComponentNameMap[v.Name] = struct{}{}
 	}
 	for _, v := range operationComponentNames {

@@ -85,11 +85,11 @@ var _ = Describe("create", func() {
 		BeforeEach(func() {
 			cluster = testing.FakeCluster("log", "test")
 			clusterDef = testing.FakeClusterDef()
-			Expect(cluster.Spec.Components[0].EnabledLogs).Should(BeNil())
+			Expect(cluster.Spec.ComponentSpecs[0].EnabledLogs).Should(BeNil())
 		})
 		It("no logConfigs in ClusterDef", func() {
 			setEnableAllLogs(cluster, clusterDef)
-			Expect(len(cluster.Spec.Components[0].EnabledLogs)).Should(Equal(0))
+			Expect(len(cluster.Spec.ComponentSpecs[0].EnabledLogs)).Should(Equal(0))
 		})
 		It("set logConfigs in ClusterDef", func() {
 			clusterDef.Spec.ComponentDefs[0].LogConfigs = []dbaasv1alpha1.LogConfig{
@@ -103,7 +103,7 @@ var _ = Describe("create", func() {
 				},
 			}
 			setEnableAllLogs(cluster, clusterDef)
-			Expect(cluster.Spec.Components[0].EnabledLogs).Should(Equal([]string{"error", "slow"}))
+			Expect(cluster.Spec.ComponentSpecs[0].EnabledLogs).Should(Equal([]string{"error", "slow"}))
 		})
 	})
 

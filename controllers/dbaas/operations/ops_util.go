@@ -95,7 +95,7 @@ func ReconcileActionWithComponentOps(opsRes *OpsResource,
 		expectCount, succeedCount, err := handleStatusProgress(opsRes, progressResource{
 			opsMessageKey:       opsMessageKey,
 			clusterComponent:    clusterComponent,
-			clusterComponentDef: clusterDef.GetComponentDefByTypeName(clusterComponent.Type),
+			clusterComponentDef: clusterDef.GetComponentDefByTypeName(clusterComponent.ComponentDefRef),
 		}, &statusComponent)
 		if err != nil {
 			return opsRequestPhase, 0, nil

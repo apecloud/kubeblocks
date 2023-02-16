@@ -170,13 +170,13 @@ func (r *ReconfigureRequestReconciler) sync(reqCtx intctrlutil.RequestCtx, confi
 
 	// Find ClusterComponent from cluster cr
 	componentName := config.Labels[intctrlutil.AppComponentLabelKey]
-	clusterComponent := getClusterComponentsByName(cluster.Spec.Components, componentName)
+	clusterComponent := getClusterComponentsByName(cluster.Spec.ComponentSpecs, componentName)
 	// fix cluster maybe not any component
 	if clusterComponent == nil {
 		reqCtx.Log.Info("not found component.", "componentName", componentName,
 			"clusterName", cluster.GetName())
 	} else {
-		componentName = clusterComponent.Type
+		componentName = clusterComponent.ComponentDefRef
 	}
 
 	// Find ClusterDefinition Component  from ClusterDefinition CR

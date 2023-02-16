@@ -278,12 +278,12 @@ var _ = Describe("ConfigWrapper util test", func() {
 		})
 		Expect(err).Should(Succeed())
 
-		if len(clusterVersionObj.Spec.Components) == 0 {
+		if len(clusterVersionObj.Spec.ComponentVersions) == 0 {
 			return
 		}
 
 		// mock clusterVersionObj config templates
-		clusterVersionObj.Spec.Components[0].ConfigTemplateRefs = tpls
+		clusterVersionObj.Spec.ComponentVersions[0].ConfigTemplateRefs = tpls
 	}
 
 	Context("clusterversion CR test", func() {

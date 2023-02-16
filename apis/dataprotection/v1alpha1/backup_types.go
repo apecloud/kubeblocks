@@ -27,7 +27,7 @@ type BackupSpec struct {
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	BackupPolicyName string `json:"backupPolicyName"`
 
-	// Backup Type. full or incremental or snapshot. if unset, default is full.
+	// Backup ComponentDefRef. full or incremental or snapshot. if unset, default is full.
 	// +kubebuilder:validation:Enum={full,incremental,snapshot}
 	// +kubebuilder:default=full
 	BackupType BackupType `json:"backupType"`

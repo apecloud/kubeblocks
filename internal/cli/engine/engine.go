@@ -22,7 +22,7 @@ import (
 	"strings"
 )
 
-// ClusterDefinition Type Const Define
+// ClusterDefinition ComponentDefRef Const Define
 const (
 	stateMysql      = "mysql"
 	statePostgreSQL = "postgresql"

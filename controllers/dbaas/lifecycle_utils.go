@@ -79,7 +79,7 @@ func mergeComponentsList(reqCtx intctrlutil.RequestCtx,
 	var compList []component.Component
 	for _, clusterDefComp := range clusterDefCompList {
 		for _, clusterComp := range clusterCompList {
-			if clusterComp.Type != clusterDefComp.Name {
+			if clusterComp.ComponentDefRef != clusterDefComp.Name {
 				continue
 			}
 			comp := component.MergeComponents(reqCtx, cluster, clusterDef, &clusterDefComp, nil, &clusterComp)
@@ -382,7 +382,7 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 			cluster,
 			clusterDef,
 			clusterDef.Spec.ComponentDefs,
-			cluster.Spec.Components)
+			cluster.Spec.ComponentSpecs)
 		component := getComponent(components, componentName)
 		if component == nil {
 			reqCtx.Recorder.Eventf(cluster,

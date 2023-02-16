@@ -4,8 +4,8 @@ metadata:
   name:  %s
 spec:
   clusterDefinitionRef: %s
-  components:
-  - type: consensus
+  componentVersions:
+  - componentDefRef: consensus
     podSpec:
       containers:
       - name: mysql

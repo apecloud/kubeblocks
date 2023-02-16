@@ -597,7 +597,7 @@ func (r *ClusterReconciler) updateClusterPhaseToCreatingOrUpdating(reqCtx intctr
 		needPatch = true
 		cluster.Status.Phase = dbaasv1alpha1.CreatingPhase
 		cluster.Status.Components = map[string]dbaasv1alpha1.ClusterStatusComponent{}
-		for _, v := range cluster.Spec.Components {
+		for _, v := range cluster.Spec.ComponentSpecs {
 			cluster.Status.Components[v.Name] = dbaasv1alpha1.ClusterStatusComponent{
 				Phase: dbaasv1alpha1.CreatingPhase,
 			}
@@ -663,7 +663,7 @@ func (r *ClusterReconciler) reconcileClusterStatus(ctx context.Context,
 	removeInvalidComponent := func(cluster *dbaasv1alpha1.Cluster) (needPatch bool, postFunc postHandler) {
 		tmpStatusComponents := map[string]dbaasv1alpha1.ClusterStatusComponent{}
 		statusComponents := cluster.Status.Components
-		for _, v := range cluster.Spec.Components {
+		for _, v := range cluster.Spec.ComponentSpecs {
 			if statusComponent, ok := statusComponents[v.Name]; ok {
 				tmpStatusComponents[v.Name] = statusComponent
 			}
@@ -771,7 +771,7 @@ func (r *ClusterReconciler) reconcileStatusOperations(ctx context.Context, clust
 	)
 	// determine whether to support volumeExpansion when creating the cluster or add/delete component.
 	// because volumeClaimTemplates are forbidden to update except for storage size when component created.
-	if cluster.Status.ObservedGeneration == 0 || len(cluster.Spec.Components) != len(cluster.Status.Components) {
+	if cluster.Status.ObservedGeneration == 0 || len(cluster.Spec.ComponentSpecs) != len(cluster.Status.Components) {
 		if volumeExpansionComponents, err = getSupportVolumeExpansionComponents(ctx, r.Client, cluster); err != nil {
 			return err
 		}
@@ -806,7 +806,7 @@ func (r *ClusterReconciler) reconcileStatusOperations(ctx context.Context, clust
 func getComponentsNames(
 	cluster *dbaasv1alpha1.Cluster) []string {
 	clusterComponentNames := make([]string, 0)
-	for _, v := range cluster.Spec.Components {
+	for _, v := range cluster.Spec.ComponentSpecs {
 		clusterComponentNames = append(clusterComponentNames, v.Name)
 	}
 	return clusterComponentNames
@@ -819,9 +819,9 @@ func getSupportHorizontalScalingComponents(
 	horizontalScalableComponents := make([]dbaasv1alpha1.OperationComponent, 0)
 
 	// determine whether to support horizontalScaling
-	for _, v := range cluster.Spec.Components {
+	for _, v := range cluster.Spec.ComponentSpecs {
 		for _, component := range clusterDef.Spec.ComponentDefs {
-			if v.Type != component.Name {
+			if v.ComponentDefRef != component.Name {
 				continue
 			}
 			horizontalScalableComponents = append(horizontalScalableComponents, dbaasv1alpha1.OperationComponent{

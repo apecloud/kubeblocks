@@ -92,8 +92,8 @@ spec:
                 description: Cluster referenced ClusterVersion name.
                 pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                 type: string
-              components:
-                description: List of components you want to replace in ClusterDefinition
+              componentSpecs:
+                description: List of componentSpecs you want to replace in ClusterDefinition
                   and ClusterVersion. It will replace the field in ClusterDefinition's
                   and ClusterVersion's component if type is matching.
                 items:
@@ -124,6 +124,12 @@ spec:
                           type: array
                           x-kubernetes-list-type: set
                       type: object
+                    componentDefRef:
+                      description: ComponentDefRef reference componentDef defined
+                        in ClusterDefinition spec.
+                      maxLength: 12
+                      pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                      type: string
                     enabledLogs:
                       description: enabledLogs indicate which log file takes effect
                         in database cluster element is the log type which defined
@@ -272,12 +278,6 @@ spec:
                         type: object
                       type: array
                       x-kubernetes-preserve-unknown-fields: true
-                    type:
-                      description: Component type name defined in ClusterDefinition
-                        spec.
-                      maxLength: 12
-                      pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
-                      type: string
                     volumeClaimTemplates:
                       description: volumeClaimTemplates information for statefulset.spec.volumeClaimTemplates.
                       items:
@@ -513,8 +513,8 @@ spec:
                         type: object
                       type: array
                   required:
+                  - componentDefRef
                   - name
-                  - type
                   type: object
                 type: array
                 x-kubernetes-list-map-keys:

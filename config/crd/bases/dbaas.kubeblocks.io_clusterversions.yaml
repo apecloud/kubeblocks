@@ -55,14 +55,17 @@ spec:
                 description: ref ClusterDefinition.
                 pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                 type: string
-              components:
-                description: List of components in current ClusterVersion. Component
-                  will replace the field in ClusterDefinition's component if type
-                  is matching typeName.
+              componentVersions:
+                description: List of componentVersions in current ClusterVersion.
                 items:
                   description: ClusterVersionComponent is an application version component
                     spec.
                   properties:
+                    componentDefRef:
+                      description: ComponentDefRef reference componentDef in ClusterDefinition.
+                      maxLength: 12
+                      pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                      type: string
                     configTemplateRefs:
                       description: ConfigTemplateRefs defines a configuration extension
                         mechanism to handle configuration differences between versions,
@@ -7648,22 +7651,17 @@ spec:
                       - containers
                       type: object
                       x-kubernetes-preserve-unknown-fields: true
-                    type:
-                      description: Type is a component type in ClusterDefinition.
-                      maxLength: 12
-                      pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
-                      type: string
                   required:
-                  - type
+                  - componentDefRef
                   type: object
                 minItems: 1
                 type: array
                 x-kubernetes-list-map-keys:
-                - type
+                - componentDefRef
                 x-kubernetes-list-type: map
             required:
             - clusterDefinitionRef
-            - components
+            - componentVersions
             type: object
           status:
             description: ClusterVersionStatus defines the observed state of ClusterVersion

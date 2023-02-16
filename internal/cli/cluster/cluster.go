@@ -240,7 +240,7 @@ func (o *ClusterObjects) GetComponentInfo() []*ComponentInfo {
 		comp := &ComponentInfo{
 			Name:      c.Name,
 			NameSpace: o.Cluster.Namespace,
-			Type:      c.Type,
+			Type:      c.ComponentDefRef,
 			Cluster:   o.Cluster.Name,
 			Replicas:  fmt.Sprintf("%d / %d", *c.Replicas, len(pods)),
 			Status:    fmt.Sprintf("%d / %d / %d / %d ", running, waiting, succeeded, failed),
@@ -268,9 +268,9 @@ func (o *ClusterObjects) GetInstanceInfo() []*InstanceInfo {
 		}
 
 		var component *dbaasv1alpha1.ClusterComponent
-		for i, c := range o.Cluster.Spec.Components {
+		for i, c := range o.Cluster.Spec.ComponentSpecs {
 			if c.Name == instance.Component {
-				component = &o.Cluster.Spec.Components[i]
+				component = &o.Cluster.Spec.ComponentSpecs[i]
 			}
 		}
 		instance.Storage = o.getStorageInfo(component)

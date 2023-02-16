@@ -84,10 +84,10 @@ func FakeCluster(name string, namespace string) *dbaasv1alpha1.Cluster {
 			ClusterDefRef:     ClusterDefName,
 			ClusterVersionRef: ClusterVersionName,
 			TerminationPolicy: dbaasv1alpha1.WipeOut,
-			Components: []dbaasv1alpha1.ClusterComponent{
+			ComponentSpecs: []dbaasv1alpha1.ClusterComponent{
 				{
-					Name: ComponentName,
-					Type: ComponentType,
+					Name:            ComponentName,
+					ComponentDefRef: ComponentType,
 					Resources: corev1.ResourceRequirements{
 						Requests: corev1.ResourceList{
 							corev1.ResourceCPU:    resource.MustParse("100m"),

@@ -47,13 +47,13 @@ type ClusterSpec struct {
 	// +kubebuilder:validation:Enum={DoNotTerminate,Halt,Delete,WipeOut}
 	TerminationPolicy TerminationPolicyType `json:"terminationPolicy"`
 
-	// List of components you want to replace in ClusterDefinition and ClusterVersion. It will replace the field in ClusterDefinition's and ClusterVersion's component if type is matching.
+	// List of componentSpecs you want to replace in ClusterDefinition and ClusterVersion. It will replace the field in ClusterDefinition's and ClusterVersion's component if type is matching.
 	// +optional
 	// +patchMergeKey=name
 	// +patchStrategy=merge,retainKeys
 	// +listType=map
 	// +listMapKey=name
-	Components []ClusterComponent `json:"components,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
+	ComponentSpecs []ClusterComponent `json:"componentSpecs,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
 
 	// affinity describes affinities which specific by users.
 	// +optional
@@ -120,11 +120,11 @@ type ClusterComponent struct {
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	Name string `json:"name"`
 
-	// Component type name defined in ClusterDefinition spec.
+	// ComponentDefRef reference componentDef defined in ClusterDefinition spec.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=12
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
-	Type string `json:"type"`
+	ComponentDefRef string `json:"componentDefRef"`
 
 	// monitor which is a switch to enable monitoring, default is false
 	// KubeBlocks provides an extension mechanism to support component level monitoring,
@@ -381,8 +381,8 @@ func (r *Cluster) SetStatusCondition(condition metav1.Condition) {
 // ValidateEnabledLogs validates enabledLogs config in cluster.yaml, and returns metav1.Condition when detect invalid values.
 func (r *Cluster) ValidateEnabledLogs(cd *ClusterDefinition) error {
 	message := make([]string, 0)
-	for _, comp := range r.Spec.Components {
-		invalidLogNames := cd.ValidateEnabledLogConfigs(comp.Type, comp.EnabledLogs)
+	for _, comp := range r.Spec.ComponentSpecs {
+		invalidLogNames := cd.ValidateEnabledLogConfigs(comp.ComponentDefRef, comp.EnabledLogs)
 		if len(invalidLogNames) == 0 {
 			continue
 		}
@@ -399,16 +399,16 @@ func (r *Cluster) ValidateEnabledLogs(cd *ClusterDefinition) error {
 // checks that the value of primaryIndex cannot be greater than the defaultReplicas in the clusterDefinition API.
 func (r *Cluster) ValidatePrimaryIndex(cd *ClusterDefinition) error {
 	message := make([]string, 0)
-	for _, comp := range r.Spec.Components {
+	for _, comp := range r.Spec.ComponentSpecs {
 		for _, clusterDefComp := range cd.Spec.ComponentDefs {
-			if !strings.EqualFold(comp.Type, clusterDefComp.Name) {
+			if !strings.EqualFold(comp.ComponentDefRef, clusterDefComp.Name) {
 				continue
 			}
 			if clusterDefComp.WorkloadType != Replication {
 				continue
 			}
 			if comp.PrimaryIndex == nil {
-				message = append(message, fmt.Sprintf("component %s's PrimaryIndex cannot be nil when componentType is Replication.", comp.Type))
+				message = append(message, fmt.Sprintf("component %s's PrimaryIndex cannot be nil when componentType is Replication.", comp.ComponentDefRef))
 				return errors.New(strings.Join(message, ";"))
 			}
 			// when comp.Replicas and comp.PrimaryIndex are not nil, it will be verified in cluster_webhook, skip here
@@ -420,13 +420,13 @@ func (r *Cluster) ValidatePrimaryIndex(cd *ClusterDefinition) error {
 	return nil
 }
 
-// GetTypeMappingComponents return Type name mapping ClusterComponents.
+// GetTypeMappingComponents return ComponentDefRef name mapping ClusterComponents.
 func (r *Cluster) GetTypeMappingComponents() map[string][]ClusterComponent {
 	m := map[string][]ClusterComponent{}
-	for _, c := range r.Spec.Components {
-		v := m[c.Type]
+	for _, c := range r.Spec.ComponentSpecs {
+		v := m[c.ComponentDefRef]
 		v = append(v, c)
-		m[c.Type] = v
+		m[c.ComponentDefRef] = v
 	}
 	return m
 }
@@ -459,7 +459,7 @@ func (m ComponentMessageMap) SetObjectMessage(objectKind, objectName, message st
 
 // GetComponentByName gets component by name.
 func (r *Cluster) GetComponentByName(componentName string) *ClusterComponent {
-	for _, v := range r.Spec.Components {
+	for _, v := range r.Spec.ComponentSpecs {
 		if v.Name == componentName {
 			return &v
 		}
@@ -469,9 +469,9 @@ func (r *Cluster) GetComponentByName(componentName string) *ClusterComponent {
 
 // GetComponentTypeName gets component type name
 func (r *Cluster) GetComponentTypeName(componentName string) string {
-	for _, component := range r.Spec.Components {
+	for _, component := range r.Spec.ComponentSpecs {
 		if componentName == component.Name {
-			return component.Type
+			return component.ComponentDefRef
 		}
 	}
 	return ""

@@ -63,18 +63,18 @@ var _ = Describe("clusterVersion webhook", func() {
 
 			Eventually(func() bool {
 				By("By testing component type is not found in cluserDefinition")
-				clusterVersion.Spec.Components[1].Type = "proxy1"
+				clusterVersion.Spec.ComponentVersions[1].ComponentDefRef = "proxy1"
 				Expect(testCtx.CheckedCreateObj(ctx, clusterVersion)).ShouldNot(Succeed())
 
 				By("By creating an clusterVersion")
-				clusterVersion.Spec.Components[1].Type = "proxy"
+				clusterVersion.Spec.ComponentVersions[1].ComponentDefRef = "proxy"
 				err := testCtx.CheckedCreateObj(ctx, clusterVersion)
 				return err == nil
 			}, timeout, interval).Should(BeTrue())
 
 			By("By testing create a new clusterVersion with invalid config template")
 			clusterVersionDup := createTestClusterVersionObj(clusterDefinitionName, clusterVersionName+"-for-config")
-			clusterVersionDup.Spec.Components[0].ConfigTemplateRefs = []ConfigTemplate{
+			clusterVersionDup.Spec.ComponentVersions[0].ConfigTemplateRefs = []ConfigTemplate{
 				{
 					Name:                "tpl1",
 					ConfigTplRef:        "cm1",
@@ -113,11 +113,11 @@ func createTestClusterVersionObj(clusterDefinitionName, clusterVersionName strin
 		},
 		Spec: ClusterVersionSpec{
 			ClusterDefinitionRef: clusterDefinitionName,
-			Components: []ClusterVersionComponent{
-				{Type: "replicasets", PodSpec: &corev1.PodSpec{Containers: []corev1.Container{
+			ComponentVersions: []ClusterVersionComponent{
+				{ComponentDefRef: "replicasets", PodSpec: &corev1.PodSpec{Containers: []corev1.Container{
 					{Name: "main"},
 				}}},
-				{Type: "proxy", PodSpec: &corev1.PodSpec{Containers: []corev1.Container{
+				{ComponentDefRef: "proxy", PodSpec: &corev1.PodSpec{Containers: []corev1.Container{
 					{Name: "main"},
 				}}},
 			},
@@ -136,8 +136,8 @@ func createTestReplicationSetClusterVersionObj(clusterDefinitionName, clusterVer
 		},
 		Spec: ClusterVersionSpec{
 			ClusterDefinitionRef: clusterDefinitionName,
-			Components: []ClusterVersionComponent{
-				{Type: "replication", PodSpec: &corev1.PodSpec{Containers: []corev1.Container{
+			ComponentVersions: []ClusterVersionComponent{
+				{ComponentDefRef: "replication", PodSpec: &corev1.PodSpec{Containers: []corev1.Container{
 					{Name: "main"},
 				}}},
 			},

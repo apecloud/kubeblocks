@@ -81,7 +81,7 @@ type ConfigConstraintStatus struct {
 type CustomParametersValidation struct {
 	// schema provides a way for providers to validate the changed parameters through json.
 	// +kubebuilder:validation:Schemaless
-	// +kubebuilder:validation:Type=object
+	// +kubebuilder:validation:ComponentDefRef=object
 	// +kubebuilder:pruning:PreserveUnknownFields
 	Schema *apiext.JSONSchemaProps `json:"schema,omitempty"`
 

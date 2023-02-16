@@ -20,7 +20,7 @@ cluster: {
 }
 component: {
 	clusterDefName: string
-	characterType:    string
+	characterType:  string
 	type:           string
 	name:           string
 	// FIXME not defined in apis

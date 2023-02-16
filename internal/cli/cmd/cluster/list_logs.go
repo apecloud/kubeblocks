@@ -176,11 +176,11 @@ func (o *ListLogsOptions) gatherLogFilesData(c *dbaasv1alpha1.Cluster, cd *dbaas
 		var comTypeName string
 		logTypeMap := make(map[string]struct{})
 		// find component typeName and enabledLogs config against componentName in pod's label.
-		for _, comCluster := range c.Spec.Components {
+		for _, comCluster := range c.Spec.ComponentSpecs {
 			if !strings.EqualFold(comCluster.Name, componentName) {
 				continue
 			}
-			comTypeName = comCluster.Type
+			comTypeName = comCluster.ComponentDefRef
 			for _, logType := range comCluster.EnabledLogs {
 				logTypeMap[logType] = struct{}{}
 			}

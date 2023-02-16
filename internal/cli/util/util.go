@@ -492,7 +492,7 @@ func GetConfigTemplateList(clusterName string, namespace string, cli dynamic.Int
 		return nil, err
 	}
 
-	tpls, err := cfgcore.GetConfigTemplatesFromComponent(clusterObj.Spec.Components, clusterDefObj.Spec.ComponentDefs, clusterVersionObj.Spec.Components, componentName)
+	tpls, err := cfgcore.GetConfigTemplatesFromComponent(clusterObj.Spec.ComponentSpecs, clusterDefObj.Spec.ComponentDefs, clusterVersionObj.Spec.ComponentVersions, componentName)
 	if err != nil {
 		return nil, err
 	} else if !reloadTpl {
@@ -535,9 +535,9 @@ func GetComponentsFromClusterCR(key client.ObjectKey, cli dynamic.Interface) ([]
 		return nil, err
 	}
 
-	componentNames := make([]string, 0, len(clusterObj.Spec.Components))
-	for _, component := range clusterObj.Spec.Components {
-		cdComponent := clusterDefObj.GetComponentDefByTypeName(component.Type)
+	componentNames := make([]string, 0, len(clusterObj.Spec.ComponentSpecs))
+	for _, component := range clusterObj.Spec.ComponentSpecs {
+		cdComponent := clusterDefObj.GetComponentDefByTypeName(component.ComponentDefRef)
 		if enableReconfiguring(cdComponent) {
 			componentNames = append(componentNames, component.Name)
 		}

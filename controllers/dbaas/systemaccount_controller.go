@@ -220,9 +220,9 @@ func (r *SystemAccountReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 
 	reconcileCounter := 0
 	// for each component in the cluster
-	for _, compDecl := range cluster.Spec.Components {
+	for _, compDecl := range cluster.Spec.ComponentSpecs {
 		compName := compDecl.Name
-		compType := compDecl.Type
+		compType := compDecl.ComponentDefRef
 		for _, compDef := range clusterdefinition.Spec.ComponentDefs {
 			if compType != compDef.Name || compDef.SystemAccounts == nil {
 				continue
@@ -455,7 +455,7 @@ func (r *clusterDeletionPredicate) Delete(e event.DeleteEvent) bool {
 	}
 
 	// for each component from the cluster, delete cached secrets
-	for _, comp := range cluster.Spec.Components {
+	for _, comp := range cluster.Spec.ComponentSpecs {
 		compKey := componentUniqueKey{
 			namespace:     cluster.Namespace,
 			clusterName:   cluster.Name,

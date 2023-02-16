@@ -133,7 +133,7 @@ func getSupportVolumeExpansionComponents(ctx context.Context, cli client.Client,
 		defaultStorageClassAllowExpansion bool
 		volumeExpansionComponents         = make([]dbaasv1alpha1.OperationComponent, 0)
 	)
-	for _, v := range cluster.Spec.Components {
+	for _, v := range cluster.Spec.ComponentSpecs {
 		operationComponent := dbaasv1alpha1.OperationComponent{}
 		for _, vct := range v.VolumeClaimTemplates {
 			if vct.Spec == nil {

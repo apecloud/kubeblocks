@@ -171,7 +171,7 @@ func (o *describeOpsOptions) printOpsRequest(ops *dbaasv1alpha1.OpsRequest) erro
 		printer.NewPair("  Name", ops.Name),
 		printer.NewPair("NameSpace", ops.Namespace),
 		printer.NewPair("Cluster", ops.Spec.ClusterRef),
-		printer.NewPair("Type", string(ops.Spec.Type)),
+		printer.NewPair("ComponentDefRef", string(ops.Spec.Type)),
 	)
 
 	o.printOpsCommand(ops)

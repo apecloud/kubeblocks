@@ -698,7 +698,7 @@ var _ = Describe("SystemAccount Controller", func() {
 				By("Enable monitor, no more jobs or secrets should be created")
 				// patch cluster, flip comp.Monitor
 				Eventually(testdbaas.GetAndChangeObj(&testCtx, clusterKey, func(cluster *dbaasv1alpha1.Cluster) {
-					for _, comp := range cluster.Spec.Components {
+					for _, comp := range cluster.Spec.ComponentSpecs {
 						comp.Monitor = !comp.Monitor
 					}
 				})).Should(Succeed())

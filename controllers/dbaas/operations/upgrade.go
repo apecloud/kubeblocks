@@ -100,8 +100,8 @@ func (u upgradeOpsHandler) getUpgradeStatusComponents(opsRes *OpsResource) (map[
 	}
 	// get the changed components name map, and record the components infos to OpsRequest.status.
 	statusComponentMap := map[string]dbaasv1alpha1.OpsRequestStatusComponent{}
-	for _, comp := range opsRes.Cluster.Spec.Components {
-		if _, ok := changedComponentMap[comp.Type]; !ok {
+	for _, comp := range opsRes.Cluster.Spec.ComponentSpecs {
+		if _, ok := changedComponentMap[comp.ComponentDefRef]; !ok {
 			continue
 		}
 		statusComponentMap[comp.Name] = dbaasv1alpha1.OpsRequestStatusComponent{
@@ -119,8 +119,8 @@ func (u upgradeOpsHandler) getClusterVersionComponentMap(ctx context.Context,
 		return nil, client.IgnoreNotFound(err)
 	}
 	clusterVersionComponentMap := map[string]dbaasv1alpha1.ClusterVersionComponent{}
-	for _, v := range clusterVersion.Spec.Components {
-		clusterVersionComponentMap[v.Type] = v
+	for _, v := range clusterVersion.Spec.ComponentVersions {
+		clusterVersionComponentMap[v.ComponentDefRef] = v
 	}
 	return clusterVersionComponentMap, nil
 }

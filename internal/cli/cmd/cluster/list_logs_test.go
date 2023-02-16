@@ -72,11 +72,11 @@ var _ = Describe("listLogs test", func() {
 		dataObj := &cluster.ClusterObjects{
 			Cluster: &dbaasv1alpha1.Cluster{
 				Spec: dbaasv1alpha1.ClusterSpec{
-					Components: []dbaasv1alpha1.ClusterComponent{
+					ComponentSpecs: []dbaasv1alpha1.ClusterComponent{
 						{
-							Name:        "component-name",
-							Type:        "component-type",
-							EnabledLogs: []string{"slow"},
+							Name:            "component-name",
+							ComponentDefRef: "component-type",
+							EnabledLogs:     []string{"slow"},
 						},
 					},
 				},

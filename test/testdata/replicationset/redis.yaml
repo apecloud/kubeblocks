@@ -7,9 +7,9 @@ spec:
   clusterDefinitionRef: %s
   clusterVersionRef: %s
   terminationPolicy: WipeOut
-  components:
+  componentSpecs:
     - name: %s
-      type: replication
+      componentDefRef: replication
       monitor: false
       primaryIndex: 0
       replicas: 2

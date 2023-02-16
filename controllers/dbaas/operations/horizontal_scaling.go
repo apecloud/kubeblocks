@@ -57,13 +57,13 @@ func (hs horizontalScalingOpsHandler) Action(opsRes *OpsResource) error {
 		ok                   bool
 	)
 
-	for index, component := range opsRes.Cluster.Spec.Components {
+	for index, component := range opsRes.Cluster.Spec.ComponentSpecs {
 		if horizontalScaling, ok = horizontalScalingMap[component.Name]; !ok {
 			continue
 		}
 		if horizontalScaling.Replicas != 0 {
 			r := horizontalScaling.Replicas
-			opsRes.Cluster.Spec.Components[index].Replicas = &r
+			opsRes.Cluster.Spec.ComponentSpecs[index].Replicas = &r
 		}
 	}
 	return opsRes.Client.Update(opsRes.Ctx, opsRes.Cluster)
@@ -100,11 +100,11 @@ func (hs horizontalScalingOpsHandler) SaveLastConfiguration(opsRes *OpsResource)
 		return err
 	}
 	componentNameMap := opsRequest.GetComponentNameMap()
-	for _, v := range opsRes.Cluster.Spec.Components {
+	for _, v := range opsRes.Cluster.Spec.ComponentSpecs {
 		if _, ok := componentNameMap[v.Name]; !ok {
 			continue
 		}
-		clusterComponentDef := clusterDef.GetComponentDefByTypeName(v.Type)
+		clusterComponentDef := clusterDef.GetComponentDefByTypeName(v.ComponentDefRef)
 		lastComponentInfo[v.Name] = dbaasv1alpha1.LastComponentConfiguration{
 			Replicas: util.GetComponentReplicas(&v, clusterComponentDef),
 		}

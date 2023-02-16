@@ -104,29 +104,29 @@ var _ = Describe("cluster webhook", func() {
 
 			By("By testing spec.components[?].type not found in clusterDefinitionRef")
 			patch = client.MergeFrom(cluster.DeepCopy())
-			cluster.Spec.Components[0].Type = "replicaset"
+			cluster.Spec.ComponentSpecs[0].ComponentDefRef = "replicaset"
 			Expect(k8sClient.Patch(ctx, cluster, patch).Error()).To(ContainSubstring("is not found in ClusterDefinition.spec.components[*].typeName"))
 			// restore
-			cluster.Spec.Components[0].Type = "replicasets"
+			cluster.Spec.ComponentSpecs[0].ComponentDefRef = "replicasets"
 
 			// restore
-			cluster.Spec.Components[0].Name = "replicasets"
+			cluster.Spec.ComponentSpecs[0].Name = "replicasets"
 
 			By("By updating spec.components[?].volumeClaimTemplates storage size, expect succeed")
 			patch = client.MergeFrom(cluster.DeepCopy())
-			cluster.Spec.Components[0].VolumeClaimTemplates[0].Spec.Resources.Requests[corev1.ResourceStorage] = resource.MustParse("2Gi")
+			cluster.Spec.ComponentSpecs[0].VolumeClaimTemplates[0].Spec.Resources.Requests[corev1.ResourceStorage] = resource.MustParse("2Gi")
 			Expect(k8sClient.Patch(ctx, cluster, patch)).Should(Succeed())
 
 			By("By updating spec.components[?].volumeClaimTemplates[?].name, expect not succeed")
 			patch = client.MergeFrom(cluster.DeepCopy())
-			cluster.Spec.Components[0].VolumeClaimTemplates[0].Name = "test"
+			cluster.Spec.ComponentSpecs[0].VolumeClaimTemplates[0].Name = "test"
 			Expect(k8sClient.Patch(ctx, cluster, patch).Error()).To(ContainSubstring("volumeClaimTemplates is forbidden modification except for storage size."))
 
 			By("By updating component resources")
 			// restore test volume claim template name to data
 			patch = client.MergeFrom(cluster.DeepCopy())
-			cluster.Spec.Components[0].VolumeClaimTemplates[0].Name = "data"
-			cluster.Spec.Components[0].Resources = corev1.ResourceRequirements{
+			cluster.Spec.ComponentSpecs[0].VolumeClaimTemplates[0].Name = "data"
+			cluster.Spec.ComponentSpecs[0].Resources = corev1.ResourceRequirements{
 				Requests: corev1.ResourceList{
 					"cpu":    resource.MustParse("100m"),
 					"memory": resource.MustParse("200Mi"),
@@ -134,7 +134,7 @@ var _ = Describe("cluster webhook", func() {
 			}
 			Expect(k8sClient.Patch(ctx, cluster, patch)).Should(Succeed())
 			patch = client.MergeFrom(cluster.DeepCopy())
-			cluster.Spec.Components[0].Resources = corev1.ResourceRequirements{
+			cluster.Spec.ComponentSpecs[0].Resources = corev1.ResourceRequirements{
 				Requests: corev1.ResourceList{
 					"cpu":     resource.MustParse("100m"),
 					"memory1": resource.MustParse("200Mi"),
@@ -142,7 +142,7 @@ var _ = Describe("cluster webhook", func() {
 			}
 			Expect(k8sClient.Patch(ctx, cluster, patch).Error()).To(ContainSubstring("resource key is not cpu or memory or hugepages- "))
 			patch = client.MergeFrom(cluster.DeepCopy())
-			cluster.Spec.Components[0].Resources = corev1.ResourceRequirements{
+			cluster.Spec.ComponentSpecs[0].Resources = corev1.ResourceRequirements{
 				Requests: corev1.ResourceList{
 					"cpu":    resource.MustParse("100m"),
 					"memory": resource.MustParse("200Mi"),
@@ -154,7 +154,7 @@ var _ = Describe("cluster webhook", func() {
 			}
 			Expect(k8sClient.Patch(ctx, cluster, patch).Error()).To(ContainSubstring("must be less than or equal to memory limit"))
 			patch = client.MergeFrom(cluster.DeepCopy())
-			cluster.Spec.Components[0].Resources.Requests[corev1.ResourceMemory] = resource.MustParse("80Mi")
+			cluster.Spec.ComponentSpecs[0].Resources.Requests[corev1.ResourceMemory] = resource.MustParse("80Mi")
 			Expect(k8sClient.Patch(ctx, cluster, patch)).Should(Succeed())
 
 			// A series of tests on clusters when componentType=replication
@@ -172,20 +172,20 @@ var _ = Describe("cluster webhook", func() {
 
 			By("By updating cluster.Spec.ComponentDefs[0].PrimaryIndex larger than cluster.Spec.ComponentDefs[0].Replicas, expect not succeed")
 			patch = client.MergeFrom(cluster.DeepCopy())
-			*rsCluster.Spec.Components[0].PrimaryIndex = int32(3)
-			*rsCluster.Spec.Components[0].Replicas = int32(3)
+			*rsCluster.Spec.ComponentSpecs[0].PrimaryIndex = int32(3)
+			*rsCluster.Spec.ComponentSpecs[0].Replicas = int32(3)
 			Expect(k8sClient.Patch(ctx, rsCluster, patch)).ShouldNot(Succeed())
 
 			By("By updating cluster.Spec.ComponentDefs[0].PrimaryIndex less than cluster.Spec.ComponentDefs[0].Replicas, expect succeed")
 			patch = client.MergeFrom(cluster.DeepCopy())
-			*rsCluster.Spec.Components[0].PrimaryIndex = int32(1)
-			*rsCluster.Spec.Components[0].Replicas = int32(2)
+			*rsCluster.Spec.ComponentSpecs[0].PrimaryIndex = int32(1)
+			*rsCluster.Spec.ComponentSpecs[0].Replicas = int32(2)
 			Expect(k8sClient.Patch(ctx, rsCluster, patch)).Should(Succeed())
 
 			By("By updating cluster.Spec.ComponentDefs[0].PrimaryIndex less than 0, expect not succeed")
 			patch = client.MergeFrom(cluster.DeepCopy())
-			*rsCluster.Spec.Components[0].PrimaryIndex = int32(-1)
-			*rsCluster.Spec.Components[0].Replicas = int32(2)
+			*rsCluster.Spec.ComponentSpecs[0].PrimaryIndex = int32(-1)
+			*rsCluster.Spec.ComponentSpecs[0].Replicas = int32(2)
 			Expect(k8sClient.Patch(ctx, rsCluster, patch)).ShouldNot(Succeed())
 		})
 	})
@@ -201,9 +201,9 @@ metadata:
 spec:
   clusterDefinitionRef: %s
   clusterVersionRef: %s
-  components:
+  componentSpecs:
   - name: replicasets
-    type: replicasets
+    componentDefRef: replicasets
     replicas: 1
     volumeClaimTemplates: 
     - name: data
@@ -212,7 +212,7 @@ spec:
           requests:
             storage: 1Gi
   - name: proxy
-    type: proxy
+    componentDefRef: proxy
     replicas: 1
 `, clusterName, clusterDefinitionName, clusterVersionName)
 	cluster := &Cluster{}
@@ -231,9 +231,9 @@ metadata:
 spec:
   clusterDefinitionRef: %s
   clusterVersionRef: %s
-  components:
+  componentSpecs:
   - name: replication
-    type: replication
+    componentDefRef: replication
     monitor: false
     primaryIndex: 0
     replicas: 2

@@ -83,7 +83,7 @@ var _ = Describe("Stateful Component", func() {
 
 			By("test pods are not ready")
 			clusterComponent := cluster.GetComponentByName(consensusCompName)
-			componentDef := clusterDef.GetComponentDefByTypeName(clusterComponent.Type)
+			componentDef := clusterDef.GetComponentDefByTypeName(clusterComponent.ComponentDefRef)
 			stateful := NewStateful(ctx, k8sClient, cluster, clusterComponent, componentDef)
 			patch := client.MergeFrom(sts.DeepCopy())
 			availableReplicas := *sts.Spec.Replicas - 1

@@ -135,7 +135,7 @@ all: manager kbcli probe agamotto reloader loadbalancer ## Make all cmd binaries
 ##@ Development
 
 .PHONY: manifests
-manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
+manifests: test-go-generate controller-gen ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
 	$(CONTROLLER_GEN) rbac:roleName=manager-role crd:generateEmbeddedObjectMeta=true webhook paths="./apis/...;./controllers/dbaas/...;./controllers/dataprotection/...;./controllers/k8score/...;./cmd/manager/...;./internal/..." output:crd:artifacts:config=config/crd/bases
 	@cp config/crd/bases/* $(CHART_PATH)/crds
 	@cp config/rbac/role.yaml $(CHART_PATH)/config/rbac/role.yaml
@@ -148,7 +148,7 @@ generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and
 .PHONY: manager-go-generate
 manager-go-generate: ## Run go generate against lifecycle manager code.
 ifeq ($(SKIP_GO_GEN), false)
-	$(GO) generate -x ./internal/configuration/... ./internal/testutil/...
+	$(GO) generate -x ./internal/configuration/proto
 endif
 
 .PHONY: loadbalancer-go-generate
@@ -156,6 +156,11 @@ loadbalancer-go-generate: ## Run go generate against loadbalancer code.
 ifeq ($(SKIP_GO_GEN), false)
 	$(GO) generate -x ./internal/loadbalancer/...
 endif
+
+.PHONY: test-go-generate
+test-go-generate: ## Run go generate against test code.
+	$(GO) generate -x ./internal/testutil/k8s/mocks/...
+	$(GO) generate -x ./internal/configuration/proto/mocks/...
 
 .PHONY: fmt
 fmt: ## Run go fmt against code.
@@ -175,7 +180,7 @@ fast-lint: golangci staticcheck  # [INTERNAL] fast lint
 	$(GOLANGCILINT) run ./...
 
 .PHONY: lint
-lint: generate ## Run golangci-lint against code.
+lint: test-go-generate generate ## Run golangci-lint against code.
 	$(MAKE) fast-lint
 
 .PHONY: staticcheck
@@ -218,7 +223,7 @@ test-current-ctx: manifests generate fmt vet add-k8s-host ## Run operator contro
 	USE_EXISTING_CLUSTER=true KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" $(GO) test  -p 1 -coverprofile cover.out $(TEST_PACKAGES)
 
 .PHONY: test
-test: manifests generate fmt vet envtest add-k8s-host ## Run tests. if existing k8s cluster is k3d or minikube, specify EXISTING_CLUSTER_TYPE.
+test: manifests generate test-go-generate fmt vet envtest add-k8s-host ## Run tests. if existing k8s cluster is k3d or minikube, specify EXISTING_CLUSTER_TYPE.
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" $(GO) test -short -coverprofile cover.out $(TEST_PACKAGES)
 
 .PHONY: test-integration
@@ -354,7 +359,7 @@ bin/reloader.%: ## Cross build bin/reloader.$(OS).$(ARCH) .
 .PHONY: reloader
 reloader: OS=$(shell $(GO) env GOOS)
 reloader: ARCH=$(shell $(GO) env GOARCH)
-reloader: build-checks ## Build reloader related binaries
+reloader: test-go-generate build-checks ## Build reloader related binaries
 	$(MAKE) bin/reloader.${OS}.${ARCH}
 	mv bin/reloader.${OS}.${ARCH} bin/reloader
 
@@ -372,7 +377,7 @@ bin/cue-helper.%: ## Cross build bin/cue-helper.$(OS).$(ARCH) .
 .PHONY: cue-helper
 cue-helper: OS=$(shell $(GO) env GOOS)
 cue-helper: ARCH=$(shell $(GO) env GOARCH)
-cue-helper: build-checks ## Build cue-helper related binaries
+cue-helper: test-go-generate build-checks ## Build cue-helper related binaries
 	$(MAKE) bin/cue-helper.${OS}.${ARCH}
 	mv bin/cue-helper.${OS}.${ARCH} bin/cue-helper
 

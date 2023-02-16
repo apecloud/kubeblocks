@@ -21,7 +21,9 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
 	"helm.sh/helm/v3/pkg/action"
+	"helm.sh/helm/v3/pkg/cli/values"
 
 	. "github.com/apecloud/kubeblocks/test/e2e"
 
@@ -39,10 +41,12 @@ var chart = helm.InstallOpts{
 	Chart:     "../../deploy/helm",
 	Wait:      true,
 	Namespace: releaseNS,
-	Sets: []string{
-		"image.tag=latest",
-		"image.pullPolicy=Always",
-		"wesql.enabled=false",
+	ValueOpts: &values.Options{
+		Values: []string{
+			"image.tag=latest",
+			"image.pullPolicy=Always",
+			"wesql.enabled=false",
+		},
 	},
 	Login:           true,
 	TryTimes:        2,

@@ -57,11 +57,6 @@ spec:
                   description: ClusterDefinitionComponent is a group of pods, pods
                     belong to same component usually share the same data
                   properties:
-                    antiAffinity:
-                      default: false
-                      description: antiAffinity defines components should have anti-affinity
-                        constraint for pods with same component type.
-                      type: boolean
                     characterType:
                       description: characterType defines well-known database component
                         name, such as mongos(mongodb), proxy(redis), mariadb(mysql)

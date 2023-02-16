@@ -18,7 +18,8 @@ package dbaas
 
 import (
 	"context"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	"github.com/apecloud/kubeblocks/internal/controller/plan"
+	"github.com/apecloud/kubeblocks/internal/controllerutil"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"strings"
@@ -64,8 +65,8 @@ var _ = Describe("TLS self-signed cert function", func() {
 		// delete rest configurations
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 		// non-namespaced
-		testdbaas.ClearResources(&testCtx, intctrlutil.ConfigConstraintSignature, ml)
-		testdbaas.ClearResources(&testCtx, intctrlutil.BackupPolicyTemplateSignature, ml)
+		testdbaas.ClearResources(&testCtx, controllerutil.ConfigConstraintSignature, ml)
+		testdbaas.ClearResources(&testCtx, controllerutil.BackupPolicyTemplateSignature, ml)
 	}
 
 	BeforeEach(cleanEnv)
@@ -121,7 +122,7 @@ var _ = Describe("TLS self-signed cert function", func() {
 					Create(&testCtx).
 					GetObject()
 				ns := clusterObj.Namespace
-				name := generateTLSSecretName(clusterObj.Name, statefulCompName)
+				name := plan.GenerateTLSSecretName(clusterObj.Name, statefulCompName)
 				nsName := types.NamespacedName{Namespace: ns, Name: name}
 				secret := &corev1.Secret{}
 				Eventually(func() error {
@@ -133,7 +134,7 @@ var _ = Describe("TLS self-signed cert function", func() {
 				sts := stsList.Items[0]
 				hasTLSVolume := false
 				for _, volume := range sts.Spec.Template.Spec.Volumes {
-					if volume.Name == volumeName {
+					if volume.Name == plan.VolumeName {
 						hasTLSVolume = true
 						break
 					}
@@ -142,7 +143,7 @@ var _ = Describe("TLS self-signed cert function", func() {
 				for _, container := range sts.Spec.Template.Spec.Containers {
 					hasTLSVolumeMount := false
 					for _, mount := range container.VolumeMounts {
-						if mount.Name == volumeName {
+						if mount.Name == plan.VolumeName {
 							hasTLSVolumeMount = true
 							break
 						}
@@ -158,7 +159,7 @@ var _ = Describe("TLS self-signed cert function", func() {
 			BeforeEach(func() {
 				// prepare self provided tls certs secret
 				var err error
-				selfProvidedTLSSecretObj, err = composeTLSSecret(testCtx.DefaultNamespace, "test", "self-provided")
+				selfProvidedTLSSecretObj, err = plan.ComposeTLSSecret(testCtx.DefaultNamespace, "test", "self-provided")
 				Expect(err).Should(BeNil())
 				Expect(k8sClient.Create(ctx, selfProvidedTLSSecretObj)).Should(Succeed())
 			})
@@ -238,7 +239,7 @@ var _ = Describe("TLS self-signed cert function", func() {
 				hasTLSSettings := func() bool {
 					cm := &corev1.ConfigMap{}
 					Expect(k8sClient.Get(ctx, cmKey, cm)).Should(Succeed())
-					tlsKeyWord := getTLSKeyWord("mysql")
+					tlsKeyWord := plan.GetTLSKeyWord("mysql")
 					for _, cfgFile := range cm.Data {
 						index := strings.Index(cfgFile, tlsKeyWord)
 						if index >= 0 {

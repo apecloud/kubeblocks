@@ -534,3 +534,20 @@ func (r *Cluster) GetComponentTypeName(componentName string) string {
 	}
 	return ""
 }
+
+func ToVolumeClaimTemplate(template ClusterComponentVolumeClaimTemplate) corev1.PersistentVolumeClaimTemplate {
+	t := corev1.PersistentVolumeClaimTemplate{}
+	t.ObjectMeta.Name = template.Name
+	if template.Spec != nil {
+		t.Spec = *template.Spec
+	}
+	return t
+}
+
+func ToVolumeClaimTemplates(templates []ClusterComponentVolumeClaimTemplate) []corev1.PersistentVolumeClaimTemplate {
+	ts := []corev1.PersistentVolumeClaimTemplate{}
+	for _, template := range templates {
+		ts = append(ts, ToVolumeClaimTemplate(template))
+	}
+	return ts
+}

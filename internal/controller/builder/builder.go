@@ -38,6 +38,7 @@ import (
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	componentutil "github.com/apecloud/kubeblocks/controllers/dbaas/components/util"
 	cfgcm "github.com/apecloud/kubeblocks/internal/configuration/configmap"
+	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
@@ -46,7 +47,7 @@ type BuilderParams struct {
 	ClusterDefinition *dbaasv1alpha1.ClusterDefinition
 	ClusterVersion    *dbaasv1alpha1.ClusterVersion
 	Cluster           *dbaasv1alpha1.Cluster
-	Component         *component.Component
+	Component         *component.SynthesizedComponent
 }
 
 type envVar struct {
@@ -143,7 +144,7 @@ func injectEnvs(params BuilderParams, envConfigName string, c *corev1.Container)
 	toInjectEnv := make([]corev1.EnvVar, 0, len(envFieldPathSlice)+len(c.Env))
 	for _, v := range envFieldPathSlice {
 		toInjectEnv = append(toInjectEnv, corev1.EnvVar{
-			Name: component.KBPrefix + v.name,
+			Name: constant.KBPrefix + v.name,
 			ValueFrom: &corev1.EnvVarSource{
 				FieldRef: &corev1.ObjectFieldSelector{
 					FieldPath: v.fieldPath,
@@ -154,7 +155,7 @@ func injectEnvs(params BuilderParams, envConfigName string, c *corev1.Container)
 
 	for _, v := range clusterEnv {
 		toInjectEnv = append(toInjectEnv, corev1.EnvVar{
-			Name:  component.KBPrefix + v.name,
+			Name:  constant.KBPrefix + v.name,
 			Value: v.value,
 		})
 	}
@@ -350,7 +351,7 @@ func BuildPVCFromSnapshot(sts *appsv1.StatefulSet,
 func BuildEnvConfig(params BuilderParams) (*corev1.ConfigMap, error) {
 	const tplFile = "env_config_template.cue"
 
-	prefix := component.KBPrefix + "_" + strings.ToUpper(params.Component.Type) + "_"
+	prefix := constant.KBPrefix + "_" + strings.ToUpper(params.Component.Type) + "_"
 	svcName := strings.Join([]string{params.Cluster.Name, params.Component.Name, "headless"}, "-")
 	envData := map[string]string{}
 	envData[prefix+"N"] = strconv.Itoa(int(params.Component.Replicas))

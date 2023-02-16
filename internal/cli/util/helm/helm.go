@@ -30,6 +30,7 @@ import (
 	"github.com/containers/common/pkg/retry"
 	"github.com/ghodss/yaml"
 	"github.com/pkg/errors"
+	"github.com/spf13/pflag"
 	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/chart/loader"
 	"helm.sh/helm/v3/pkg/chartutil"
@@ -50,12 +51,12 @@ type InstallOpts struct {
 	Name            string
 	Chart           string
 	Namespace       string
-	Sets            []string
 	Wait            bool
 	Version         string
 	TryTimes        int
 	Login           bool
 	CreateNamespace bool
+	ValueOpts       *values.Options
 	Timeout         time.Duration
 }
 
@@ -208,12 +209,8 @@ func (i *InstallOpts) tryInstall(cfg *action.Configuration) (string, error) {
 		return "", err
 	}
 
-	setOpts := values.Options{
-		Values: i.Sets,
-	}
-
 	p := getter.All(settings)
-	vals, err := setOpts.MergeValues(p)
+	vals, err := i.ValueOpts.MergeValues(p)
 	if err != nil {
 		return "", err
 	}
@@ -379,12 +376,8 @@ func (i *InstallOpts) tryUpgrade(cfg *action.Configuration) (string, error) {
 		return "", err
 	}
 
-	setOpts := values.Options{
-		Values: i.Sets,
-	}
-
 	p := getter.All(settings)
-	vals, err := setOpts.MergeValues(p)
+	vals, err := i.ValueOpts.MergeValues(p)
 	if err != nil {
 		return "", err
 	}
@@ -431,4 +424,24 @@ func (i *InstallOpts) tryUpgrade(cfg *action.Configuration) (string, error) {
 		return "", err
 	}
 	return released.Info.Notes, nil
+}
+
+// AddValueOptionsFlags add helm value flags
+func AddValueOptionsFlags(f *pflag.FlagSet, v *values.Options) {
+	f.StringSliceVarP(&v.ValueFiles, "values", "f", []string{}, "Specify values in a YAML file or a URL (can specify multiple)")
+	f.StringArrayVar(&v.Values, "set", []string{}, "Set values on the command line (can specify multiple or separate values with commas: key1=val1,key2=val2)")
+	f.StringArrayVar(&v.StringValues, "set-string", []string{}, "Set STRING values on the command line (can specify multiple or separate values with commas: key1=val1,key2=val2)")
+	f.StringArrayVar(&v.FileValues, "set-file", []string{}, "Set values from respective files specified via the command line (can specify multiple or separate values with commas: key1=path1,key2=path2)")
+	f.StringArrayVar(&v.JSONValues, "set-json", []string{}, "Set JSON values on the command line (can specify multiple or separate values with commas: key1=jsonval1,key2=jsonval2)")
+}
+
+func ValueOptsIsEmpty(valueOpts *values.Options) bool {
+	if valueOpts == nil {
+		return true
+	}
+	return len(valueOpts.ValueFiles) == 0 &&
+		len(valueOpts.StringValues) == 0 &&
+		len(valueOpts.Values) == 0 &&
+		len(valueOpts.FileValues) == 0 &&
+		len(valueOpts.JSONValues) == 0
 }

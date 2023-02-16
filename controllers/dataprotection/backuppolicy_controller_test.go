@@ -145,7 +145,13 @@ var _ = Describe("Backup Policy Controller", func() {
 					SetBackupPolicyName(backupPolicyName).
 					SetBackupType(dpv1alpha1.BackupTypeFull).
 					Create(&testCtx).GetObject()
+				Eventually(testdbaas.CheckObj(&testCtx, client.ObjectKeyFromObject(backupExpired),
+					func(g Gomega, fetched *dpv1alpha1.Backup) {
+						g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupInProgress))
+					})).Should(Succeed())
 
+				backupStatus.Expiration = &metav1.Time{Time: now.Add(-time.Hour * 24)}
+				backupStatus.StartTimestamp = backupStatus.Expiration
 				patchBackupStatus(backupStatus, client.ObjectKeyFromObject(backupExpired))
 
 				backupOutLimit1 := testdbaas.NewBackupFactory(testCtx.DefaultNamespace, backupNamePrefix).
@@ -154,10 +160,14 @@ var _ = Describe("Backup Policy Controller", func() {
 					SetBackupPolicyName(backupPolicyName).
 					SetBackupType(dpv1alpha1.BackupTypeFull).
 					Create(&testCtx).GetObject()
-				backupStatus.Expiration = &metav1.Time{Time: now.Add(time.Hour * 24)}
-				patchBackupStatus(backupStatus, client.ObjectKeyFromObject(backupOutLimit1))
+				Eventually(testdbaas.CheckObj(&testCtx, client.ObjectKeyFromObject(backupOutLimit1),
+					func(g Gomega, fetched *dpv1alpha1.Backup) {
+						g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupInProgress))
+					})).Should(Succeed())
 
-				time.Sleep(time.Second)
+				backupStatus.Expiration = &metav1.Time{Time: now.Add(time.Hour * 24)}
+				backupStatus.StartTimestamp = &metav1.Time{Time: now.Add(time.Hour)}
+				patchBackupStatus(backupStatus, client.ObjectKeyFromObject(backupOutLimit1))
 
 				backupOutLimit2 := testdbaas.NewBackupFactory(testCtx.DefaultNamespace, backupNamePrefix).
 					WithRandomName().AddLabelsInMap(autoBackupLabel).
@@ -165,7 +175,13 @@ var _ = Describe("Backup Policy Controller", func() {
 					SetBackupPolicyName(backupPolicyName).
 					SetBackupType(dpv1alpha1.BackupTypeFull).
 					Create(&testCtx).GetObject()
-				backupStatus.StartTimestamp = &metav1.Time{Time: backupOutLimit2.CreationTimestamp.Time}
+				Eventually(testdbaas.CheckObj(&testCtx, client.ObjectKeyFromObject(backupOutLimit2),
+					func(g Gomega, fetched *dpv1alpha1.Backup) {
+						g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupInProgress))
+					})).Should(Succeed())
+
+				backupStatus.Expiration = &metav1.Time{Time: now.Add(time.Hour * 24)}
+				backupStatus.StartTimestamp = &metav1.Time{Time: now.Add(time.Hour * 2)}
 				patchBackupStatus(backupStatus, client.ObjectKeyFromObject(backupOutLimit2))
 
 				// trigger the backup policy controller through update cronjob

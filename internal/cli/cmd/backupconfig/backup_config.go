@@ -18,8 +18,8 @@ package backupconfig
 
 import (
 	"fmt"
-	"strings"
 
+	"helm.sh/helm/v3/pkg/cli/values"
 	"k8s.io/kubectl/pkg/util/templates"
 
 	"github.com/pkg/errors"
@@ -35,28 +35,19 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/util/helm"
 )
 
-type configOptions struct {
-	HelmCfg *action.Configuration
-
-	Namespace string
-	Version   string
-	Sets      []string
-	client    dynamic.Interface
-}
-
 type upgradeOptions struct {
 	genericclioptions.IOStreams
-	cfg    *action.Configuration
-	client dynamic.Interface
 
-	Namespace string
-	Sets      []string
+	helmCfg   *action.Configuration
+	client    dynamic.Interface
+	namespace string
+	valueOpts values.Options
 }
 
 // adjust for test
 var helmAddRepo = helm.AddRepo
 
-func (i *configOptions) upgrade() error {
+func (o *upgradeOptions) upgrade() error {
 	entry := &repo.Entry{
 		Name: types.KubeBlocksChartName,
 		URL:  util.GetHelmChartRepoURL(),
@@ -65,29 +56,23 @@ func (i *configOptions) upgrade() error {
 		return err
 	}
 
-	var sets []string
-	for _, set := range i.Sets {
-		splitSet := strings.Split(set, ",")
-		sets = append(sets, splitSet...)
-	}
 	chart := helm.InstallOpts{
 		Name:      types.KubeBlocksChartName,
 		Chart:     types.KubeBlocksChartName + "/" + types.KubeBlocksChartName,
 		Wait:      true,
 		Login:     true,
 		TryTimes:  2,
-		Namespace: i.Namespace,
-		Version:   i.Version,
-		Sets:      sets,
+		Namespace: o.namespace,
+		ValueOpts: &o.valueOpts,
 	}
 
-	return chart.Upgrade(i.HelmCfg)
+	return chart.Upgrade(o.helmCfg)
 }
 
 func (o *upgradeOptions) complete(f cmdutil.Factory, cmd *cobra.Command) error {
 	var err error
 
-	o.Namespace, _, err = f.ToRawKubeConfigLoader().Namespace()
+	o.namespace, _, err = f.ToRawKubeConfigLoader().Namespace()
 	if err != nil {
 		return err
 	}
@@ -97,7 +82,7 @@ func (o *upgradeOptions) complete(f cmdutil.Factory, cmd *cobra.Command) error {
 		return err
 	}
 
-	o.cfg, err = helm.NewActionConfig(o.Namespace, kubeconfig)
+	o.helmCfg, err = helm.NewActionConfig(o.namespace, kubeconfig)
 	if err != nil {
 		return err
 	}
@@ -107,16 +92,15 @@ func (o *upgradeOptions) complete(f cmdutil.Factory, cmd *cobra.Command) error {
 }
 
 func (o *upgradeOptions) run() error {
-	config := configOptions{
-		HelmCfg:   o.cfg,
-		Namespace: o.Namespace,
-		client:    o.client,
-		Sets:      o.Sets,
+	// check flags already been set
+	if helm.ValueOptsIsEmpty(&o.valueOpts) {
+		fmt.Fprint(o.Out, "Nothing to config, --set should be specified.\n")
+		return nil
 	}
 
 	spinner := util.Spinner(o.Out, "Config backup")
 	defer spinner(false)
-	if err := config.upgrade(); err != nil {
+	if err := o.upgrade(); err != nil {
 		return errors.Wrap(err, "failed to update backup config")
 	}
 	spinner(true)
@@ -146,7 +130,6 @@ func NewBackupConfigCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) 
 		},
 	}
 
-	cmd.Flags().StringArrayVar(&o.Sets, "set", []string{}, "Set values on the command line (can specify multiple or separate values with commas: key1=val1,key2=val2)")
-	util.CheckErr(cmd.MarkFlagRequired("set"))
+	helm.AddValueOptionsFlags(cmd.Flags(), &o.valueOpts)
 	return cmd
 }

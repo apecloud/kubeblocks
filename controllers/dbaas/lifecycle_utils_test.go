@@ -61,140 +61,6 @@ var _ = Describe("lifecycle_utils", func() {
 
 	AfterEach(cleanAll)
 
-	Context("has the checkAndUpdatePodVolumes function which generates Pod Volumes for mounting ConfigMap objects", func() {
-		var sts appsv1.StatefulSet
-		var volumes map[string]dbaasv1alpha1.ConfigTemplate
-		BeforeEach(func() {
-			sts = appsv1.StatefulSet{
-				Spec: appsv1.StatefulSetSpec{
-					Template: corev1.PodTemplateSpec{
-						Spec: corev1.PodSpec{
-							Volumes: []corev1.Volume{
-								{
-									Name: "data",
-									VolumeSource: corev1.VolumeSource{
-										EmptyDir: &corev1.EmptyDirVolumeSource{},
-									},
-								},
-							},
-							Containers: []corev1.Container{
-								{
-									Name:            "mysql",
-									Image:           "docker.io/apecloud/apecloud-mysql-server:latest",
-									ImagePullPolicy: "IfNotPresent",
-									VolumeMounts: []corev1.VolumeMount{
-										{
-											Name:      "data",
-											MountPath: "/data",
-										},
-									},
-								},
-							},
-						},
-					},
-				},
-			}
-			volumes = make(map[string]dbaasv1alpha1.ConfigTemplate)
-
-		})
-
-		It("should succeed in corner case where input volumes is nil, which means no volume is added", func() {
-			ps := &sts.Spec.Template.Spec
-			err := checkAndUpdatePodVolumes(ps, volumes)
-			Expect(err).Should(BeNil())
-			Expect(len(ps.Volumes)).To(Equal(1))
-		})
-
-		It("should succeed in normal test case, where one volume is added", func() {
-			volumes["my_config"] = dbaasv1alpha1.ConfigTemplate{
-				Name:                "myConfig",
-				ConfigTplRef:        "myConfig",
-				ConfigConstraintRef: "myConfig",
-				VolumeName:          "myConfigVolume",
-			}
-			ps := &sts.Spec.Template.Spec
-			err := checkAndUpdatePodVolumes(ps, volumes)
-			Expect(err).Should(BeNil())
-			Expect(len(ps.Volumes)).To(Equal(2))
-		})
-
-		It("should succeed in normal test case, where two volumes are added", func() {
-			volumes["my_config"] = dbaasv1alpha1.ConfigTemplate{
-				Name:                "myConfig",
-				ConfigTplRef:        "myConfig",
-				ConfigConstraintRef: "myConfig",
-				VolumeName:          "myConfigVolume",
-			}
-			volumes["my_config1"] = dbaasv1alpha1.ConfigTemplate{
-				Name:                "myConfig",
-				ConfigTplRef:        "myConfig",
-				ConfigConstraintRef: "myConfig",
-				VolumeName:          "myConfigVolume2",
-			}
-			ps := &sts.Spec.Template.Spec
-			err := checkAndUpdatePodVolumes(ps, volumes)
-			Expect(err).Should(BeNil())
-			Expect(len(ps.Volumes)).To(Equal(3))
-		})
-
-		It("should fail if updated volume doesn't contain ConfigMap", func() {
-			const (
-				cmName            = "my_config_for_test"
-				replicaVolumeName = "mytest-cm-volume_for_test"
-			)
-			sts.Spec.Template.Spec.Volumes = append(sts.Spec.Template.Spec.Volumes,
-				corev1.Volume{
-					Name: replicaVolumeName,
-					VolumeSource: corev1.VolumeSource{
-						EmptyDir: &corev1.EmptyDirVolumeSource{},
-					},
-				})
-			volumes[cmName] = dbaasv1alpha1.ConfigTemplate{
-				Name:                "configTplName",
-				ConfigTplRef:        "configTplName",
-				ConfigConstraintRef: "configTplName",
-				VolumeName:          replicaVolumeName,
-			}
-			ps := &sts.Spec.Template.Spec
-			Expect(checkAndUpdatePodVolumes(ps, volumes)).ShouldNot(Succeed())
-		})
-
-		It("should succeed if updated volume contains ConfigMap", func() {
-			const (
-				cmName            = "my_config_for_isv"
-				replicaVolumeName = "mytest-cm-volume_for_isv"
-			)
-
-			// mock clusterdefinition has volume
-			sts.Spec.Template.Spec.Volumes = append(sts.Spec.Template.Spec.Volumes,
-				corev1.Volume{
-					Name: replicaVolumeName,
-					VolumeSource: corev1.VolumeSource{
-						ConfigMap: &corev1.ConfigMapVolumeSource{
-							LocalObjectReference: corev1.LocalObjectReference{Name: "anything"},
-						},
-					},
-				})
-
-			volumes[cmName] = dbaasv1alpha1.ConfigTemplate{
-				Name:                "configTplName",
-				ConfigTplRef:        "configTplName",
-				ConfigConstraintRef: "configTplName",
-				VolumeName:          replicaVolumeName,
-			}
-			ps := &sts.Spec.Template.Spec
-			err := checkAndUpdatePodVolumes(ps, volumes)
-			Expect(err).Should(BeNil())
-			Expect(len(sts.Spec.Template.Spec.Volumes)).To(Equal(2))
-			volume := intctrlutil.GetVolumeMountName(sts.Spec.Template.Spec.Volumes, cmName)
-			Expect(volume).ShouldNot(BeNil())
-			Expect(volume.ConfigMap).ShouldNot(BeNil())
-			Expect(volume.ConfigMap.Name).Should(BeEquivalentTo(cmName))
-			Expect(volume.Name).Should(BeEquivalentTo(replicaVolumeName))
-		})
-
-	})
-
 	const clusterDefName = "test-clusterdef"
 	const clusterVersionName = "test-clusterversion"
 	const clusterName = "test-cluster"
@@ -322,7 +188,7 @@ spec:
 			By("prepare cluster and construct component")
 			reqCtx := newReqCtx()
 			cluster, clusterDef, clusterVersion, _ := newAllFieldsClusterObj(nil, nil, false)
-			component := component.MergeComponents(
+			component := component.BuildComponent(
 				reqCtx,
 				cluster,
 				clusterDef,

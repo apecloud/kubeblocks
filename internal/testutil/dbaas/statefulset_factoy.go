@@ -32,11 +32,19 @@ func NewStatefulSetFactory(namespace, name string, clusterName string, component
 	f := &MockStatefulSetFactory{}
 	f.init(namespace, name,
 		&appsv1.StatefulSet{
+			ObjectMeta: metav1.ObjectMeta{
+				Labels: map[string]string{
+					intctrlutil.AppInstanceLabelKey:  clusterName,
+					intctrlutil.AppComponentLabelKey: componentName,
+					intctrlutil.AppManagedByLabelKey: intctrlutil.AppName,
+				},
+			},
 			Spec: appsv1.StatefulSetSpec{
 				Selector: &metav1.LabelSelector{
 					MatchLabels: map[string]string{
 						intctrlutil.AppInstanceLabelKey:  clusterName,
 						intctrlutil.AppComponentLabelKey: componentName,
+						intctrlutil.AppManagedByLabelKey: intctrlutil.AppName,
 					},
 				},
 				Template: corev1.PodTemplateSpec{
@@ -44,6 +52,7 @@ func NewStatefulSetFactory(namespace, name string, clusterName string, component
 						Labels: map[string]string{
 							intctrlutil.AppInstanceLabelKey:  clusterName,
 							intctrlutil.AppComponentLabelKey: componentName,
+							intctrlutil.AppManagedByLabelKey: intctrlutil.AppName,
 						},
 					},
 				},

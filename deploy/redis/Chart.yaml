@@ -32,5 +32,5 @@ keywords:
   - replication
 
 maintainers:
-  - name: Xingran
+  - name: ApeCloud
     url: https://github.com/apecloud/kubeblocks/deploy

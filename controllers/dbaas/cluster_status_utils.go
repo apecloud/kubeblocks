@@ -244,9 +244,11 @@ func getClusterAvailabilityEffect(componentDef *dbaasv1alpha1.ClusterDefinitionC
 	switch componentDef.ComponentType {
 	case dbaasv1alpha1.Consensus:
 		return true
+	case dbaasv1alpha1.Replication:
+		return true
 	default:
 		// other types of components need to judge whether there has PodDisruptionBudget
-		return existsPDBSpec(componentDef.PDBSpec)
+		return intctrlutil.ExistsPDBSpec(componentDef.PDBSpec)
 	}
 }
 

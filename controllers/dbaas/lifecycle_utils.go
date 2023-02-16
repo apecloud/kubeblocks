@@ -539,7 +539,7 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 		}
 	}
 
-	if err := replicationset.HandleReplicationSet(reqCtx, cli, cluster, stsList); err != nil {
+	if err := replicationset.HandleReplicationSet(reqCtx.Ctx, cli, cluster, stsList); err != nil {
 		return false, err
 	}
 

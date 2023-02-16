@@ -7,8 +7,8 @@ assignees: nayutah
 
 ---
 
-**what is the user interaction of your feature**
-A link of user document, which should be communicated and reviewed by PD
+**What is the user interaction of your feature**
+A concise description of user interactions or user stories of your feature request
 
 **Is your feature request related to a problem? Please describe.**
 A clear and concise description of what the problem is. Ex. I'm always frustrated when [...]

@@ -160,14 +160,21 @@ var _ = Describe("Backup for a StatefulSet", func() {
 			})
 
 			It("should success after all jobs complete", func() {
-				patchK8sJobStatus(types.NamespacedName{Name: backupKey.Name + "-pre", Namespace: backupKey.Namespace}, batchv1.JobComplete)
+				preJobKey := types.NamespacedName{Name: backupKey.Name + "-pre", Namespace: backupKey.Namespace}
+				postJobKey := types.NamespacedName{Name: backupKey.Name + "-post", Namespace: backupKey.Namespace}
+				patchK8sJobStatus(preJobKey, batchv1.JobComplete)
 				patchVolumeSnapshotStatus(backupKey, true)
-				patchK8sJobStatus(types.NamespacedName{Name: backupKey.Name + "-post", Namespace: backupKey.Namespace}, batchv1.JobComplete)
+				patchK8sJobStatus(postJobKey, batchv1.JobComplete)
 
 				By("Check backup job completed")
 				Eventually(testdbaas.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dataprotectionv1alpha1.Backup) {
 					g.Expect(fetched.Status.Phase).To(Equal(dataprotectionv1alpha1.BackupCompleted))
 				})).Should(Succeed())
+
+				By("Check pre job cleaned")
+				Eventually(testdbaas.CheckObjExists(&testCtx, preJobKey, &batchv1.Job{}, false)).Should(Succeed())
+				By("Check post job cleaned")
+				Eventually(testdbaas.CheckObjExists(&testCtx, postJobKey, &batchv1.Job{}, false)).Should(Succeed())
 			})
 
 			It("should fail after pre-job fails", func() {

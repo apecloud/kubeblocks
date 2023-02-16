@@ -165,21 +165,17 @@ func TestContainerdContainerKill(t *testing.T) {
 
 	// mock exited
 	criCli.EXPECT().ListContainers(gomock.Any(), gomock.Any()).
-		Return(&runtimeapi.ListContainersResponse{
-			Containers: []*runtimeapi.Container{{
-				Id:    "76f9c2ae8cf47bfa43b97626e3c95045cb3b82c50019ab759801ab52e3acff55",
-				State: runtimeapi.ContainerState_CONTAINER_EXITED,
-			}},
-		}, nil)
+		Return(&runtimeapi.ListContainersResponse{Containers: []*runtimeapi.Container{{
+			Id:    "76f9c2ae8cf47bfa43b97626e3c95045cb3b82c50019ab759801ab52e3acff55",
+			State: runtimeapi.ContainerState_CONTAINER_EXITED,
+		}}}, nil)
 
 	// mock running
 	criCli.EXPECT().ListContainers(gomock.Any(), gomock.Any()).
-		Return(&runtimeapi.ListContainersResponse{
-			Containers: []*runtimeapi.Container{{
-				Id:    "76f9c2ae8cf47bfa43b97626e3c95045cb3b82c50019ab759801ab52e3acff55",
-				State: runtimeapi.ContainerState_CONTAINER_RUNNING,
-			}},
-		}, nil).AnyTimes()
+		Return(&runtimeapi.ListContainersResponse{Containers: []*runtimeapi.Container{{
+			Id:    "76f9c2ae8cf47bfa43b97626e3c95045cb3b82c50019ab759801ab52e3acff55",
+			State: runtimeapi.ContainerState_CONTAINER_RUNNING,
+		}}}, nil).AnyTimes()
 
 	// mock stop failed
 	criCli.EXPECT().StopContainer(gomock.Any(), gomock.Any()).

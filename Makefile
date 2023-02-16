@@ -148,7 +148,7 @@ generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and
 .PHONY: manager-go-generate
 manager-go-generate: ## Run go generate against lifecycle manager code.
 ifeq ($(SKIP_GO_GEN), false)
-	$(GO) generate -x ./internal/configuration/... ./internal/testutil/...
+	$(GO) generate -x ./internal/configuration/proto
 endif
 
 .PHONY: loadbalancer-go-generate

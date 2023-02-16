@@ -33,9 +33,11 @@ import (
 )
 
 type Stateful struct {
-	Cli     client.Client
-	Ctx     context.Context
-	Cluster *dbaasv1alpha1.Cluster
+	Cli          client.Client
+	Ctx          context.Context
+	Cluster      *dbaasv1alpha1.Cluster
+	ComponentDef *dbaasv1alpha1.ClusterDefinitionComponent
+	Component    *dbaasv1alpha1.ClusterComponent
 }
 
 var _ types.Component = &Stateful{}
@@ -46,7 +48,8 @@ func (stateful *Stateful) IsRunning(obj client.Object) (bool, error) {
 	}
 	sts := util.CovertToStatefulSet(obj)
 	statefulStatusRevisionIsEquals := sts.Status.UpdateRevision == sts.Status.CurrentRevision
-	return util.StatefulSetIsReady(sts, statefulStatusRevisionIsEquals), nil
+	targetReplicas := util.GetComponentReplicas(stateful.Component, stateful.ComponentDef)
+	return util.StatefulSetIsReady(sts, statefulStatusRevisionIsEquals, &targetReplicas), nil
 }
 
 func (stateful *Stateful) PodsReady(obj client.Object) (bool, error) {
@@ -99,10 +102,17 @@ func (stateful *Stateful) GetPhaseWhenPodsNotReady(componentName string) (dbaasv
 
 func NewStateful(ctx context.Context,
 	cli client.Client,
-	cluster *dbaasv1alpha1.Cluster) types.Component {
+	cluster *dbaasv1alpha1.Cluster,
+	component *dbaasv1alpha1.ClusterComponent,
+	componentDef *dbaasv1alpha1.ClusterDefinitionComponent) types.Component {
+	if component == nil || componentDef == nil {
+		return nil
+	}
 	return &Stateful{
-		Ctx:     ctx,
-		Cli:     cli,
-		Cluster: cluster,
+		Ctx:          ctx,
+		Cli:          cli,
+		Cluster:      cluster,
+		Component:    component,
+		ComponentDef: componentDef,
 	}
 }

@@ -24,6 +24,7 @@ import (
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
+	policyv1 "k8s.io/api/policy/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	metautil "k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -256,7 +257,7 @@ func IsReady(pod *corev1.Pod) bool {
 		return false
 	}
 
-	condition := getPodCondition(&pod.Status, corev1.PodReady)
+	condition := GetPodCondition(&pod.Status, corev1.PodReady)
 	return condition != nil && condition.Status == corev1.ConditionTrue
 }
 
@@ -265,7 +266,7 @@ func IsAvailable(pod *corev1.Pod, minReadySeconds int32) bool {
 		return false
 	}
 
-	condition := getPodCondition(&pod.Status, corev1.PodReady)
+	condition := GetPodCondition(&pod.Status, corev1.PodReady)
 	if condition == nil || condition.Status != corev1.ConditionTrue {
 		return false
 	}
@@ -282,7 +283,7 @@ func IsAvailable(pod *corev1.Pod, minReadySeconds int32) bool {
 	return !lastTransitionTime.IsZero() && lastTransitionTime.Add(minDuration).Before(now.Time)
 }
 
-func getPodCondition(status *corev1.PodStatus, conditionType corev1.PodConditionType) *corev1.PodCondition {
+func GetPodCondition(status *corev1.PodStatus, conditionType corev1.PodConditionType) *corev1.PodCondition {
 	if len(status.Conditions) == 0 {
 		return nil
 	}
@@ -323,4 +324,14 @@ func GetIntOrPercentValue(intOrStr *metautil.IntOrString) (int, bool, error) {
 		return 0, false, fmt.Errorf("failed to atoi. [%s], error: %v", intOrStr.StrVal, err)
 	}
 	return v, true, nil
+}
+
+func ExistsPDBSpec(pdbSpec *policyv1.PodDisruptionBudgetSpec) bool {
+	if pdbSpec == nil {
+		return false
+	}
+	if pdbSpec.MinAvailable == nil && pdbSpec.MaxUnavailable == nil {
+		return false
+	}
+	return true
 }

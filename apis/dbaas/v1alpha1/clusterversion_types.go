@@ -53,7 +53,9 @@ type ClusterVersionStatus struct {
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 
-	ClusterDefinitionStatusGeneration `json:",inline"`
+	// clusterDefGeneration represents the generation number of ClusterDefinition referenced.
+	// +optional
+	ClusterDefGeneration int64 `json:"clusterDefGeneration,omitempty"`
 }
 
 // ClusterVersionComponent is an application version component spec.
@@ -78,11 +80,6 @@ type ClusterVersionComponent struct {
 	// +kubebuilder:pruning:PreserveUnknownFields
 	// +optional
 	PodSpec *corev1.PodSpec `json:"podSpec,omitempty"`
-
-	// Service is service spec, if not nil, will replace ClusterDefinitionSpec.Service in ClusterDefinition spec.
-	// +kubebuilder:pruning:PreserveUnknownFields
-	// +optional
-	Service *corev1.ServiceSpec `json:"service,omitempty"`
 }
 
 //+kubebuilder:object:root=true

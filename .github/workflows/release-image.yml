@@ -16,6 +16,7 @@ on:
 env:
   GO_VERSION: '1.19'
   DOCKER_REGISTRY_URL: docker.io
+  ALIYUN_REGISTRY_URL: registry.cn-hangzhou.aliyuncs.com
   RELEASE_VERSION: ${{ github.ref_name }}
 
 
@@ -37,22 +38,31 @@ jobs:
         run: make generate
 
       - uses: docker/setup-qemu-action@v2
-      - uses: docker/setup-buildx-action@v1
+      - uses: docker/setup-buildx-action@v2
         with:
           driver-opts: image=moby/buildkit:master
 
       - name: make push-manager-image
         run: |
-          docker login --username ${{ secrets.DOCKER_REGISTRY_USER }} \
-            --password ${{ secrets.DOCKER_REGISTRY_PASSWORD }} ${{ env.DOCKER_REGISTRY_URL }}
-          
           RELEASE_VERSION="latest"
           if [[ ! -z "${{ github.event.inputs.image_tag }}" ]]; then
             RELEASE_VERSION="${{ github.event.inputs.image_tag }}"
           elif [[ "${{ env.RELEASE_VERSION }}" == "main" ]]; then
             RELEASE_VERSION="latest"
           elif [[ ! -z "${{ env.RELEASE_VERSION }}" ]]; then
-            RELEASE_VERSION=`bash ${{ github.workspace }}/.github/utils/utils.sh ${{ env.RELEASE_VERSION }} 1`
+            RELEASE_VERSION=`bash ${{ github.workspace }}/.github/utils/utils.sh \
+              --tag-name ${{ env.RELEASE_VERSION }} \
+              --type 1`
           fi
           
+          docker login --username ${{ secrets.DOCKER_REGISTRY_USER }} \
+            --password ${{ secrets.DOCKER_REGISTRY_PASSWORD }} ${{ env.DOCKER_REGISTRY_URL }}
+          
           BUILDX_ENABLED=true VERSION=$RELEASE_VERSION make push-manager-image
+          
+          docker login --username ${{ secrets.ALIYUN_REGISTRY_USER }} \
+            --password ${{ secrets.ALIYUN_REGISTRY_PASSWORD }} ${{ env.ALIYUN_REGISTRY_URL }}
+          
+          BUILDX_ENABLED=true VERSION=$RELEASE_VERSION \
+            IMG=${{ env.ALIYUN_REGISTRY_URL }}/apecloud/kubeblocks \
+            make push-manager-image

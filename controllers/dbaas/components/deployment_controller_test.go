@@ -18,12 +18,15 @@ package components
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
 	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
@@ -36,13 +39,15 @@ import (
 var _ = Describe("Deployment Controller", func() {
 	var (
 		randomStr          = testCtx.GetRandomStr()
-		timeout            = time.Second * 10
-		interval           = time.Second
 		clusterDefName     = "stateless-definition1-" + randomStr
 		clusterVersionName = "stateless-cluster-version1-" + randomStr
 		clusterName        = "stateless1-" + randomStr
-		namespace          = "default"
-		statelessCompName  = "stateless"
+	)
+
+	const (
+		namespace         = "default"
+		statelessCompName = "stateless"
+		statelessCompType = "stateless"
 	)
 
 	cleanAll := func() {
@@ -69,19 +74,16 @@ var _ = Describe("Deployment Controller", func() {
 
 	Context("test controller", func() {
 		It("", func() {
-			if testCtx.UsingExistingCluster() {
-				timeout = 3 * timeout
-			}
-			cluster := testdbaas.CreateStatelessCluster(testCtx, clusterDefName, clusterVersionName, clusterName)
+			testdbaas.NewClusterDefFactory(clusterDefName, testdbaas.MySQLType).
+				AddComponent(testdbaas.StatelessNginxComponent, statelessCompType).SetDefaultReplicas(2).
+				Create(&testCtx).GetObject()
+
+			cluster := testdbaas.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefName, clusterVersionName).
+				AddComponent(statelessCompName, statelessCompType).Create(&testCtx).GetObject()
 
 			By("patch cluster to Running")
 			Expect(testdbaas.ChangeObjStatus(&testCtx, cluster, func() {
 				cluster.Status.Phase = dbaasv1alpha1.RunningPhase
-				cluster.Status.Components = map[string]dbaasv1alpha1.ClusterStatusComponent{
-					statelessCompName: {
-						Phase: dbaasv1alpha1.RunningPhase,
-					},
-				}
 			}))
 
 			By("create the deployment of the stateless component")
@@ -91,9 +93,49 @@ var _ = Describe("Deployment Controller", func() {
 				g.Expect(deploy.Generation == 1).Should(BeTrue())
 			})).Should(Succeed())
 
-			By(" check stateless component phase is Failed")
-			Eventually(testdbaas.GetClusterComponentPhase(testCtx, clusterName, statelessCompName),
-				timeout, interval).Should(Equal(dbaasv1alpha1.FailedPhase))
+			By("check stateless component phase is Failed")
+			Eventually(testdbaas.GetClusterComponentPhase(testCtx, clusterName, statelessCompName)).Should(Equal(dbaasv1alpha1.FailedPhase))
+
+			By("test when a pod of deployment is failed")
+			podName := fmt.Sprintf("%s-%s-%s", clusterName, statelessCompName, testCtx.GetRandomStr())
+			pod := testdbaas.MockStatelessPod(testCtx, deploy, clusterName, statelessCompName, podName)
+			// mock pod container is failed
+			errMessage := "Back-off pulling image nginx:latest"
+			Expect(testdbaas.ChangeObjStatus(&testCtx, pod, func() {
+				pod.Status.ContainerStatuses = []corev1.ContainerStatus{
+					{
+						State: corev1.ContainerState{
+							Waiting: &corev1.ContainerStateWaiting{
+								Reason:  "ImagePullBackOff",
+								Message: errMessage,
+							},
+						},
+					},
+				}
+			})).Should(Succeed())
+			Eventually(testdbaas.CheckObj(&testCtx, client.ObjectKeyFromObject(pod), func(g Gomega, tmpPod *corev1.Pod) {
+				g.Expect(len(tmpPod.Status.ContainerStatuses) == 1).Should(BeTrue())
+			})).Should(Succeed())
+
+			// mock failed container timed out
+			Expect(testdbaas.ChangeObjStatus(&testCtx, pod, func() {
+				pod.Status.Conditions = []corev1.PodCondition{
+					{
+						Type:               corev1.ContainersReady,
+						Status:             corev1.ConditionFalse,
+						LastTransitionTime: metav1.NewTime(time.Now().Add(-2 * time.Minute)),
+					},
+				}
+			})).Should(Succeed())
+			Eventually(testdbaas.CheckObj(&testCtx, client.ObjectKeyFromObject(pod), func(g Gomega, tmpPod *corev1.Pod) {
+				g.Expect(len(tmpPod.Status.Conditions) == 1).Should(BeTrue())
+			})).Should(Succeed())
+
+			// wait for component.message contains pod message.
+			Eventually(testdbaas.CheckObj(&testCtx, client.ObjectKeyFromObject(cluster), func(g Gomega, tmpCluster *dbaasv1alpha1.Cluster) {
+				statusComponent := tmpCluster.Status.Components[statelessCompName]
+				g.Expect(statusComponent.Message.GetObjectMessage("Pod", pod.Name)).Should(Equal(errMessage))
+			})).Should(Succeed())
 
 			By("mock deployment is ready")
 			newDeployment := &appsv1.Deployment{}
@@ -107,11 +149,10 @@ var _ = Describe("Deployment Controller", func() {
 				g.Expect(deploy.Status.AvailableReplicas == newDeployment.Status.AvailableReplicas &&
 					deploy.Status.ReadyReplicas == newDeployment.Status.ReadyReplicas &&
 					deploy.Status.Replicas == newDeployment.Status.Replicas).Should(BeTrue())
-			}), timeout, interval).Should(Succeed())
+			})).Should(Succeed())
 
 			By("waiting the component is Running")
-			Eventually(testdbaas.GetClusterComponentPhase(testCtx, clusterName, statelessCompName),
-				timeout, interval).Should(Equal(dbaasv1alpha1.RunningPhase))
+			Eventually(testdbaas.GetClusterComponentPhase(testCtx, clusterName, statelessCompName)).Should(Equal(dbaasv1alpha1.RunningPhase))
 		})
 	})
 })

@@ -201,7 +201,7 @@ It indicates the component-level operation and is an array that supports operati
 
 `status` describes the current state and progress of the `OpsRequest` operation. It has the following fields:
 
-### status.observedGenration
+### status.observedGeneration
 
 It corresponds to `metadata.generation`.
 
@@ -226,7 +226,7 @@ It corresponds to `metadata.generation`.
 
 | **Type**              | **Meaning**                                    |
 |:---                   | :---                                           | 
-| Progressing           | OpsRequest is under controller procesing.      |
+| Progressing           | OpsRequest is under controller processing.      |
 | Validated             | OpsRequest is validated.                       |
 | Restarting            | Start processing restart ops.                  |
 | VerticalScaling       | Start scaling resources vertically.            |
@@ -236,7 +236,7 @@ It corresponds to `metadata.generation`.
 | Succeed               | Operation is proceeded successfully.           |
 | Failed                | Operation failed.                              |
 
-`condition.status` indicates whether this condition is applicable. The results of `condition.status` include `True`, `False`, and `Unkown`, respectively standing for success, failure, and unknown error. 
+`condition.status` indicates whether this condition is applicable. The results of `condition.status` include `True`, `False`, and `Unknown`, respectively standing for success, failure, and unknown error. 
 
 `condition.Reason` indicates why the current condition changes. Each reason is only one word and exclusive.
 

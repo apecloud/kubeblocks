@@ -20,7 +20,6 @@ import (
 	"context"
 
 	"github.com/onsi/gomega"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -34,14 +33,24 @@ func InitClusterWithHybridComps(
 	clusterDefName,
 	clusterVersionName,
 	clusterName,
-	statelessComName,
-	statefulComName,
-	consensusComName string) (*dbaasv1alpha1.ClusterDefinition, *dbaasv1alpha1.ClusterVersion, *dbaasv1alpha1.Cluster) {
-	clusterDef := CreateClusterDefWithHybridComps(testCtx, clusterDefName)
-	clusterVersion := CreateClusterVersionWithHybridComps(testCtx, clusterDefName,
-		clusterVersionName, []string{"docker.io/apecloud/wesql-server:latest", "busybox:latest", "docker.io/apecloud/wesql-server:latest"})
-	cluster := CreateClusterWithHybridComps(testCtx, clusterDefName,
-		clusterVersionName, clusterName, statelessComName, consensusComName, statefulComName)
+	statelessComp,
+	statefulComp,
+	consensusComp string) (*dbaasv1alpha1.ClusterDefinition, *dbaasv1alpha1.ClusterVersion, *dbaasv1alpha1.Cluster) {
+	clusterDef := NewClusterDefFactory(clusterDefName, MySQLType).
+		AddComponent(StatelessNginxComponent, statelessComp).SetDefaultReplicas(1).
+		AddComponent(ConsensusMySQLComponent, consensusComp).SetDefaultReplicas(3).
+		AddComponent(StatefulMySQLComponent, statefulComp).SetDefaultReplicas(3).
+		Create(&testCtx).GetObject()
+	clusterVersion := NewClusterVersionFactory(clusterVersionName, clusterDefName).
+		AddComponent(statelessComp).AddContainerShort(DefaultNginxContainerName, NginxImage).
+		AddComponent(consensusComp).AddContainerShort(DefaultMySQLContainerName, NginxImage).
+		AddComponent(statefulComp).AddContainerShort(DefaultMySQLContainerName, NginxImage).
+		Create(&testCtx).GetObject()
+	cluster := NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefName, clusterVersionName).
+		AddComponent(statelessComp, statelessComp).
+		AddComponent(consensusComp, consensusComp).
+		AddComponent(statefulComp, statefulComp).
+		Create(&testCtx).GetObject()
 	return clusterDef, clusterVersion, cluster
 }
 
@@ -51,45 +60,6 @@ func CreateK8sResource(testCtx testutil.TestContext, obj client.Object) client.O
 	gomega.Eventually(CheckObjExists(&testCtx, client.ObjectKeyFromObject(obj),
 		obj, true)).Should(gomega.Succeed())
 	return obj
-}
-
-// CreateClusterWithHybridComps creates a cluster with hybrid components for testing.
-func CreateClusterWithHybridComps(
-	testCtx testutil.TestContext,
-	clusterDefName,
-	clusterVersionName,
-	clusterName,
-	statelessComName,
-	consensusComName,
-	statefulComName string) *dbaasv1alpha1.Cluster {
-	return CreateCustomizedObj(&testCtx, "hybrid/hybrid_cluster.yaml",
-		&dbaasv1alpha1.Cluster{}, CustomizeObjYAML(clusterVersionName, clusterDefName, clusterName, clusterVersionName,
-			clusterDefName, statelessComName, consensusComName, statefulComName))
-}
-
-// CreateClusterDefWithHybridComps creates a clusterDefinition with hybrid components for testing.
-func CreateClusterDefWithHybridComps(testCtx testutil.TestContext, clusterDefName string) *dbaasv1alpha1.ClusterDefinition {
-	return CreateCustomizedObj(&testCtx, "hybrid/hybrid_cd.yaml",
-		&dbaasv1alpha1.ClusterDefinition{}, CustomizeObjYAML(clusterDefName))
-}
-
-// CreateClusterVersionWithHybridComps creates a clusterVersion with hybrid components for testing.
-func CreateClusterVersionWithHybridComps(
-	testCtx testutil.TestContext,
-	clusterDefName,
-	clusterVersionName string,
-	images []string) *dbaasv1alpha1.ClusterVersion {
-	return CreateCustomizedObj(&testCtx, "hybrid/hybrid_cv.yaml",
-		&dbaasv1alpha1.ClusterVersion{}, CustomizeObjYAML(clusterVersionName, clusterDefName, images[0], images[1], images[2]))
-}
-
-// CreateHybridCompsClusterVersionForUpgrade creates a clusterVersion with hybrid components for upgrading test.
-func CreateHybridCompsClusterVersionForUpgrade(ctx context.Context,
-	testCtx testutil.TestContext,
-	clusterDefName,
-	clusterVersionName string) *dbaasv1alpha1.ClusterVersion {
-	return CreateClusterVersionWithHybridComps(testCtx, clusterDefName, clusterVersionName,
-		[]string{"docker.io/apecloud/wesql-server:8.0.30", "busybox:1.30.0", "docker.io/apecloud/wesql-server:8.0.30"})
 }
 
 // GetClusterComponentPhase gets the component phase of testing cluster for verification.
@@ -117,19 +87,5 @@ func GetClusterObservedGeneration(testCtx *testutil.TestContext, clusterKey type
 		cluster := &dbaasv1alpha1.Cluster{}
 		g.Expect(testCtx.Cli.Get(testCtx.Ctx, clusterKey, cluster)).Should(gomega.Succeed())
 		return cluster.Status.ObservedGeneration
-	}
-}
-
-func NewClusterObj(key types.NamespacedName, clusterDefName string, clusterVersionName string) *dbaasv1alpha1.Cluster {
-	return &dbaasv1alpha1.Cluster{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      key.Name,
-			Namespace: key.Namespace,
-		},
-		Spec: dbaasv1alpha1.ClusterSpec{
-			ClusterDefRef:     clusterDefName,
-			ClusterVersionRef: clusterVersionName,
-			TerminationPolicy: dbaasv1alpha1.WipeOut,
-		},
 	}
 }

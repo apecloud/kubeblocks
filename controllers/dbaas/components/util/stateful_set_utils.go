@@ -56,13 +56,13 @@ func GetPodRevision(pod *corev1.Pod) string {
 }
 
 // StatefulSetIsReady checks if statefulSet is ready.
-func StatefulSetIsReady(sts *appsv1.StatefulSet, statefulStatusRevisionIsEquals bool) bool {
-	var (
-		targetReplicas = *sts.Spec.Replicas
-	)
+func StatefulSetIsReady(sts *appsv1.StatefulSet, statefulStatusRevisionIsEquals bool, targetReplicas *int32) bool {
+	if targetReplicas == nil {
+		targetReplicas = sts.Spec.Replicas
+	}
 	// judge whether statefulSet is ready
-	if sts.Status.AvailableReplicas != targetReplicas ||
-		sts.Status.Replicas != targetReplicas ||
+	if sts.Status.AvailableReplicas != *targetReplicas ||
+		sts.Status.Replicas != *targetReplicas ||
 		sts.Status.ObservedGeneration != sts.Generation ||
 		!statefulStatusRevisionIsEquals {
 		return false

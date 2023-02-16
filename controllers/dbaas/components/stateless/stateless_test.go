@@ -38,11 +38,12 @@ var _ = Describe("Stateful Component", func() {
 		clusterDefName     = "stateless-definition-" + randomStr
 		clusterVersionName = "stateless-cluster-version-" + randomStr
 		clusterName        = "stateless-" + randomStr
-		timeout            = 10 * time.Second
-		interval           = time.Second
-		statelessCompName  = "stateless"
 	)
-	const defaultMinReadySeconds = 10
+	const (
+		statelessCompName      = "stateless"
+		statelessCompType      = "stateless"
+		defaultMinReadySeconds = 10
+	)
 
 	cleanAll := func() {
 		// must wait until resources deleted and no longer exist before the testcases start,
@@ -67,9 +68,15 @@ var _ = Describe("Stateful Component", func() {
 	Context("Stateless Component test", func() {
 		It("Stateless Component test", func() {
 			By(" init cluster, deployment")
-			cluster := testdbaas.CreateStatelessCluster(testCtx, clusterDefName, clusterVersionName, clusterName)
+			clusterDef := testdbaas.NewClusterDefFactory(clusterDefName, testdbaas.MySQLType).
+				AddComponent(testdbaas.StatelessNginxComponent, statelessCompType).SetDefaultReplicas(2).
+				Create(&testCtx).GetObject()
+			cluster := testdbaas.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefName, clusterVersionName).
+				AddComponent(statelessCompName, statelessCompType).Create(&testCtx).GetObject()
 			deploy := testdbaas.MockStatelessComponentDeploy(testCtx, clusterName, statelessCompName)
-			statelessComponent := NewStateless(ctx, k8sClient, cluster)
+			clusterComponent := cluster.GetComponentByName(statelessCompName)
+			componentDef := clusterDef.GetComponentDefByTypeName(clusterComponent.Type)
+			statelessComponent := NewStateless(ctx, k8sClient, cluster, clusterComponent, componentDef)
 
 			By("test pods are not ready")
 			patch := client.MergeFrom(deploy.DeepCopy())
@@ -79,31 +86,33 @@ var _ = Describe("Stateful Component", func() {
 			deploy.Status.Replicas = availableReplicas
 			podsReady, _ := statelessComponent.PodsReady(deploy)
 			Expect(podsReady == false).Should(BeTrue())
-			if testCtx.UsingExistingCluster() {
-				Eventually(func() bool {
-					phase, _ := statelessComponent.GetPhaseWhenPodsNotReady(statelessCompName)
-					return phase == ""
-				}, timeout*5, interval).Should(BeTrue())
-			} else {
-				phase, _ := statelessComponent.GetPhaseWhenPodsNotReady(statelessCompName)
-				Expect(phase == dbaasv1alpha1.FailedPhase).Should(BeTrue())
-				Expect(k8sClient.Status().Patch(ctx, deploy, patch)).Should(Succeed())
-				By("wait deployment ")
-				Eventually(testdbaas.CheckObj(&testCtx, client.ObjectKey{Name: deploy.Name,
-					Namespace: testCtx.DefaultNamespace}, func(g Gomega, tmpDeploy *appsv1.Deployment) {
-					g.Expect(tmpDeploy.Status.AvailableReplicas == availableReplicas).Should(BeTrue())
-				})).Should(Succeed())
-				phase, _ = statelessComponent.GetPhaseWhenPodsNotReady(statelessCompName)
-				Expect(phase == dbaasv1alpha1.AbnormalPhase).Should(BeTrue())
-			}
+			phase, _ := statelessComponent.GetPhaseWhenPodsNotReady(statelessCompName)
+			Expect(phase == dbaasv1alpha1.FailedPhase).Should(BeTrue())
+			Expect(k8sClient.Status().Patch(ctx, deploy, patch)).Should(Succeed())
+			By("wait deployment ")
+			Eventually(testdbaas.CheckObj(&testCtx, client.ObjectKey{Name: deploy.Name,
+				Namespace: testCtx.DefaultNamespace}, func(g Gomega, tmpDeploy *appsv1.Deployment) {
+				g.Expect(tmpDeploy.Status.AvailableReplicas == availableReplicas).Should(BeTrue())
+			})).Should(Succeed())
+			phase, _ = statelessComponent.GetPhaseWhenPodsNotReady(statelessCompName)
+			Expect(phase == dbaasv1alpha1.AbnormalPhase).Should(BeTrue())
 
 			By("test pods are ready")
 			testk8s.MockDeploymentReady(deploy, NewRSAvailableReason)
 			podsReady, _ = statelessComponent.PodsReady(deploy)
 			Expect(podsReady == true).Should(BeTrue())
 
-			By("test component is running")
+			By("test component.replicas is inconsistent with deployment.spec.replicas")
+			oldReplicas := clusterComponent.Replicas
+			replicas := int32(4)
+			clusterComponent.Replicas = &replicas
 			isRunning, _ := statelessComponent.IsRunning(deploy)
+			Expect(isRunning == false).Should(BeTrue())
+			// reset replicas
+			clusterComponent.Replicas = oldReplicas
+
+			By("test component is running")
+			isRunning, _ = statelessComponent.IsRunning(deploy)
 			Expect(isRunning == true).Should(BeTrue())
 
 			By("test handle probe timed out")
@@ -112,7 +121,7 @@ var _ = Describe("Stateful Component", func() {
 
 			By("test pod is ready")
 			podName := "nginx-" + randomStr
-			pod := testdbaas.MockStatelessPod(testCtx, clusterName, statelessCompName, podName)
+			pod := testdbaas.MockStatelessPod(testCtx, deploy, clusterName, statelessCompName, podName)
 			lastTransTime := metav1.NewTime(time.Now().Add(-1 * (defaultMinReadySeconds + 1) * time.Second))
 			testk8s.MockPodAvailable(pod, lastTransTime)
 			Expect(statelessComponent.PodIsAvailable(pod, defaultMinReadySeconds)).Should(BeTrue())

@@ -1,3 +1,4 @@
+{{- $cc := .Files.Get "config/mysql.cc.yaml" | fromYaml }}
 apiVersion: dbaas.kubeblocks.io/v1alpha1
 kind: ConfigConstraint
 metadata:
@@ -22,11 +23,25 @@ spec:
     cue: |-
       {{- .Files.Get "config/mysql8.cc.cue" | nindent 6 }}
 
-  #  require db instance restart
+  ## require db instance restart
+  {{- if hasKey $cc "staticParameters" }}
   staticParameters:
-    {{- range .Values.configTemplate.staticParameters }}
+    {{- $params := get $cc "staticParameters" }}
+    {{- range $params }}
     - {{ . }}
     {{- end }}
+  {{- end}}
+
+  ## reload parameters
+  ## dynamicParameters
+  {{- if hasKey $cc "dynamicParameters" }}
+  dynamicParameters:
+   {{- $params := get $cc "dynamicParameters" }}
+   {{- range $params }}
+    - {{ . }}
+   {{- end }}
+ {{- end}}
+
 
   # mysql configuration file format
   formatterConfig:

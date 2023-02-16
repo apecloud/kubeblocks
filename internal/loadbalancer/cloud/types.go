@@ -18,9 +18,9 @@ package cloud
 
 const (
 	ProviderAWS             = "aws"
-	TagENICreatedAt         = "kubeblocks.apecloud.com/created-at"
-	TagENINode              = "kubeblocks.apecloud.com/instance-id"
-	TagENIKubeBlocksManaged = "kubeblocks.apecloud.com/managed"
+	TagENICreatedAt         = "kubeblocks.io/created-at"
+	TagENINode              = "kubeblocks.io/instance-id"
+	TagENIKubeBlocksManaged = "kubeblocks.io/managed"
 )
 
 type Provider interface {

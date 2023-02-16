@@ -620,25 +620,28 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 	}
 
 	handleConfigMap := func(cm *corev1.ConfigMap) error {
-		// if configmap is env config, should update
-		if len(cm.Labels[intctrlutil.AppConfigTypeLabelKey]) > 0 {
+		switch {
+		case len(cm.Labels[intctrlutil.AppConfigTypeLabelKey]) > 0:
+			// if configmap is env config, should update
 			if err := cli.Update(ctx, cm); err != nil {
 				return err
 			}
-		}
-		// if tls settings updated, do Update
-		// FIXME: very hacky way. should allow config to be updated
-		oldCm := &corev1.ConfigMap{}
-		if err := cli.Get(ctx, client.ObjectKeyFromObject(cm), oldCm); err != nil {
-			return err
-		}
-		clusterDefComp := component.GetClusterDefCompByName(*clusterDef, *cluster, cm.Labels[intctrlutil.AppComponentLabelKey])
-		if clusterDefComp == nil {
-			return errors.New("clusterDefComp not found")
-		}
-		if isTLSSettingsUpdated(clusterDefComp.CharacterType, *oldCm, *cm) {
-			if err := cli.Update(ctx, cm); err != nil {
+		case len(cm.Labels[cfgcore.CMConfigurationISVTplLabelKey]) > 0:
+			// if tls settings updated, do Update
+			// FIXME: very hacky way. should allow config to be updated
+			oldCm := &corev1.ConfigMap{}
+			if err := cli.Get(ctx, client.ObjectKeyFromObject(cm), oldCm); err != nil {
 				return err
+			}
+			compName := cm.Labels[intctrlutil.AppComponentLabelKey]
+			clusterDefComp := component.GetClusterDefCompByName(*clusterDef, *cluster, compName)
+			if clusterDefComp == nil {
+				return errors.New("clusterDefComp not found")
+			}
+			if isTLSSettingsUpdated(clusterDefComp.CharacterType, *oldCm, *cm) {
+				if err := cli.Update(ctx, cm); err != nil {
+					return err
+				}
 			}
 		}
 		return nil
@@ -902,18 +905,10 @@ func buildCfg(params createParams,
 	scheme, _ := dbaasv1alpha1.SchemeBuilder.Build()
 	cfgLables := make(map[string]string, len(tpls))
 	for _, tpl := range tpls {
-		// Check config cm already exists
 		cmName := cfgcore.GetInstanceCMName(obj, &tpl)
 		volumes[cmName] = tpl
 		// Configuration.kubeblocks.io/cfg-tpl-${ctpl-name}: ${cm-instance-name}
 		cfgLables[cfgcore.GenerateTPLUniqLabelKeyWithConfig(tpl.Name)] = cmName
-		isExist, err := isAlreadyExists(cmName, params.cluster.Namespace, ctx, cli)
-		if err != nil {
-			return nil, err
-		}
-		if isExist {
-			continue
-		}
 
 		// Generate ConfigMap objects for config files
 		cm, err := generateConfigMapFromTpl(cfgTemplateBuilder, cmName, tpl, params, ctx, cli)
@@ -1104,26 +1099,6 @@ func checkAndUpdatePodVolumes(podSpec *corev1.PodSpec, volumes map[string]dbaasv
 	}
 	podSpec.Volumes = podVolumes
 	return nil
-}
-
-func isAlreadyExists(cmName string, namespace string, ctx context.Context, cli client.Client) (bool, error) {
-	cmKey := client.ObjectKey{
-		Name:      cmName,
-		Namespace: namespace,
-	}
-
-	cmObj := &corev1.ConfigMap{}
-	cmErr := cli.Get(ctx, cmKey, cmObj)
-	if cmErr != nil && apierrors.IsNotFound(cmErr) {
-		// Config is not exists
-		return false, nil
-	} else if cmErr != nil {
-		// An unexpected error occurs
-		// TODO process unexpected error
-		return true, cmErr
-	}
-
-	return true, nil
 }
 
 // generateConfigMapFromTpl render config file by config template provided by provider.

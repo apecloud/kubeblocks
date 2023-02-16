@@ -246,12 +246,12 @@ func composeTLSVolumeMount() v1.VolumeMount {
 
 func isTLSSettingsUpdated(cType string, oldCm v1.ConfigMap, newCm v1.ConfigMap) bool {
 	// build intersection sets
-	oldKeys := make([]string, len(oldCm.Data))
+	oldKeys := make([]string, 0)
 	for key := range oldCm.Data {
 		oldKeys = append(oldKeys, key)
 	}
 	oldSet := sets.New(oldKeys...)
-	newKeys := make([]string, len(newCm.Data))
+	newKeys := make([]string, 0)
 	for key := range newCm.Data {
 		newKeys = append(newKeys, key)
 	}
@@ -280,9 +280,9 @@ func isTLSSettingsUpdated(cType string, oldCm v1.ConfigMap, newCm v1.ConfigMap) 
 func getTLSKeyWord(cType string) string {
 	switch cType {
 	case "mysql":
-		return "ssl_cert="
+		return "ssl_cert"
 	case "postgresql":
-		return "ssl_cert_file="
+		return "ssl_cert_file"
 	case "redis":
 		return "tls-cert-file"
 	default:

@@ -18,6 +18,9 @@ package dbaas
 
 import (
 	"context"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/types"
 	"strings"
 	"time"
 
@@ -25,12 +28,9 @@ import (
 	. "github.com/onsi/gomega"
 
 	corev1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	testdbaas "github.com/apecloud/kubeblocks/internal/testutil/dbaas"
 	testk8s "github.com/apecloud/kubeblocks/internal/testutil/k8s"
 )
@@ -73,19 +73,12 @@ var _ = Describe("TLS self-signed cert function", func() {
 	AfterEach(cleanEnv)
 
 	// Testcases
-
-	var (
-		clusterObj               *dbaasv1alpha1.Cluster
-		selfProvidedTLSSecretObj *corev1.Secret
-		tlsIssuer                *dbaasv1alpha1.Issuer
-	)
-
 	// Scenarios
 
 	Context("tls is enabled/disabled", func() {
 		BeforeEach(func() {
 			configMapObj := testdbaas.CheckedCreateCustomizedObj(&testCtx,
-				"resources/mysql_config_cm.yaml",
+				"resources/mysql_tls_config_cm.yaml",
 				&corev1.ConfigMap{},
 				testCtx.UseDefaultNamespace())
 
@@ -109,6 +102,8 @@ var _ = Describe("TLS self-signed cert function", func() {
 		})
 
 		Context("when issuer is SelfSigned", func() {
+			var tlsIssuer *dbaasv1alpha1.Issuer
+
 			BeforeEach(func() {
 				tlsIssuer = &dbaasv1alpha1.Issuer{
 					Name: dbaasv1alpha1.IssuerSelfSigned,
@@ -117,7 +112,7 @@ var _ = Describe("TLS self-signed cert function", func() {
 
 			It("should create/delete the tls cert Secret", func() {
 				By("create a cluster obj")
-				clusterObj = testdbaas.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix, clusterDefName, clusterVersionName).
+				clusterObj := testdbaas.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix, clusterDefName, clusterVersionName).
 					WithRandomName().
 					AddComponent(statefulCompName, statefulCompType).
 					SetReplicas(3).
@@ -132,7 +127,7 @@ var _ = Describe("TLS self-signed cert function", func() {
 				Eventually(func() error {
 					err := k8sClient.Get(ctx, nsName, secret)
 					return err
-				}).WithPolling(time.Second).WithTimeout(1000 * time.Second).Should(Succeed())
+				}).WithPolling(time.Second).WithTimeout(10 * time.Second).Should(Succeed())
 				By("Checking volume & volumeMount settings in podSpec")
 				stsList := testk8s.ListAndCheckStatefulSet(&testCtx, client.ObjectKeyFromObject(clusterObj))
 				sts := stsList.Items[0]
@@ -158,6 +153,8 @@ var _ = Describe("TLS self-signed cert function", func() {
 		})
 
 		Context("when issuer is SelfProvided", func() {
+			var selfProvidedTLSSecretObj *corev1.Secret
+
 			BeforeEach(func() {
 				// prepare self provided tls certs secret
 				var err error
@@ -176,7 +173,7 @@ var _ = Describe("TLS self-signed cert function", func() {
 				}).Should(BeTrue())
 			})
 			It("should create the cluster when secret referenced exist", func() {
-				tlsIssuer = &dbaasv1alpha1.Issuer{
+				tlsIssuer := &dbaasv1alpha1.Issuer{
 					Name: dbaasv1alpha1.IssuerSelfProvided,
 					SecretRef: &dbaasv1alpha1.TLSSecretRef{
 						Name: selfProvidedTLSSecretObj.Name,
@@ -186,7 +183,7 @@ var _ = Describe("TLS self-signed cert function", func() {
 					},
 				}
 				By("create cluster obj")
-				clusterObj = testdbaas.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix, clusterDefName, clusterVersionName).
+				clusterObj := testdbaas.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix, clusterDefName, clusterVersionName).
 					WithRandomName().
 					AddComponent(statefulCompName, statefulCompType).
 					SetReplicas(3).
@@ -200,7 +197,7 @@ var _ = Describe("TLS self-signed cert function", func() {
 					Should(Succeed())
 			})
 			It("should not create the cluster when secret referenced not exist", func() {
-				tlsIssuer = &dbaasv1alpha1.Issuer{
+				tlsIssuer := &dbaasv1alpha1.Issuer{
 					Name: dbaasv1alpha1.IssuerSelfProvided,
 					SecretRef: &dbaasv1alpha1.TLSSecretRef{
 						Name: "secret-name-not-exist",
@@ -210,7 +207,7 @@ var _ = Describe("TLS self-signed cert function", func() {
 					},
 				}
 				By("create cluster obj")
-				clusterObj = testdbaas.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix, clusterDefName, clusterVersionName).
+				clusterObj := testdbaas.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix, clusterDefName, clusterVersionName).
 					WithRandomName().
 					AddComponent(statefulCompName, statefulCompType).
 					SetReplicas(3).
@@ -225,17 +222,13 @@ var _ = Describe("TLS self-signed cert function", func() {
 		})
 
 		Context("when switch between disabled and enabled", func() {
-			BeforeEach(func() {
-				tlsIssuer = &dbaasv1alpha1.Issuer{
-					Name: dbaasv1alpha1.IssuerSelfSigned,
-				}
-			})
 			It("should handle tls settings properly", func() {
 				By("create cluster with tls disabled")
-				clusterObj = testdbaas.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix, clusterDefName, clusterVersionName).
+				clusterObj := testdbaas.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix, clusterDefName, clusterVersionName).
 					WithRandomName().
 					AddComponent(statefulCompName, statefulCompType).
 					SetReplicas(3).
+					SetTLS(false).
 					Create(&testCtx).
 					GetObject()
 				stsList := testk8s.ListAndCheckStatefulSet(&testCtx, client.ObjectKeyFromObject(clusterObj))
@@ -254,21 +247,23 @@ var _ = Describe("TLS self-signed cert function", func() {
 					}
 					return false
 				}
-				Eventually(hasTLSSettings()).WithPolling(time.Second).WithTimeout(10 * time.Second).Should(BeFalse())
+
+				Eventually(hasTLSSettings).WithPolling(time.Second).WithTimeout(10 * time.Second).Should(BeFalse())
 
 				By("update tls to enabled")
-				patch := client.MergeFrom(clusterObj)
+				Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(clusterObj), clusterObj)).Should(Succeed())
+				patch := client.MergeFrom(clusterObj.DeepCopy())
 				clusterObj.Spec.Components[0].TLS = true
 				clusterObj.Spec.Components[0].Issuer = &dbaasv1alpha1.Issuer{Name: dbaasv1alpha1.IssuerSelfSigned}
 				Expect(k8sClient.Patch(ctx, clusterObj, patch)).Should(Succeed())
-				Eventually(hasTLSSettings()).WithPolling(time.Second).WithTimeout(10 * time.Second).Should(BeTrue())
+				Eventually(hasTLSSettings).WithPolling(time.Second).WithTimeout(10 * time.Second).Should(BeTrue())
 
 				By("update tls to disabled")
-				patch = client.MergeFrom(clusterObj)
+				patch = client.MergeFrom(clusterObj.DeepCopy())
 				clusterObj.Spec.Components[0].TLS = false
 				clusterObj.Spec.Components[0].Issuer = nil
 				Expect(k8sClient.Patch(ctx, clusterObj, patch)).Should(Succeed())
-				Eventually(hasTLSSettings()).WithPolling(time.Second).WithTimeout(10 * time.Second).Should(BeFalse())
+				Eventually(hasTLSSettings).WithPolling(time.Second).WithTimeout(10 * time.Second).Should(BeFalse())
 			})
 		})
 	})

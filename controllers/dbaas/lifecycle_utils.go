@@ -632,15 +632,7 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 		if err := cli.Get(ctx, client.ObjectKeyFromObject(cm), oldCm); err != nil {
 			return err
 		}
-		clusterComp := cfgutil.GetClusterComponentsByName(cluster.Spec.Components, cm.Labels[intctrlutil.AppComponentLabelKey])
-		clusterDefComp := func() *dbaasv1alpha1.ClusterDefinitionComponent {
-			for _, c := range clusterDef.Spec.Components {
-				if c.TypeName == clusterComp.Type {
-					return &c
-				}
-			}
-			return nil
-		}()
+		clusterDefComp := component.GetClusterDefCompByName(*clusterDef, *cluster, cm.Labels[intctrlutil.AppComponentLabelKey])
 		if clusterDefComp == nil {
 			return errors.New("clusterDefComp not found")
 		}

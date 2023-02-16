@@ -415,3 +415,19 @@ func getEnvReplacementMapForConnCredential(clusterName string) map[string]string
 		"$(CONN_CREDENTIAL_SECRET_NAME)": fmt.Sprintf("%s-conn-credential", clusterName),
 	}
 }
+
+func GetClusterDefCompByName(clusterDef dbaasv1alpha1.ClusterDefinition,
+	cluster dbaasv1alpha1.Cluster,
+	compName string) *dbaasv1alpha1.ClusterDefinitionComponent {
+	for _, comp := range cluster.Spec.Components {
+		if comp.Name != compName {
+			continue
+		}
+		for _, compDef := range clusterDef.Spec.Components {
+			if compDef.TypeName == comp.Type {
+				return &compDef
+			}
+		}
+	}
+	return nil
+}

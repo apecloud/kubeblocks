@@ -18,6 +18,7 @@ package dbaas
 
 import (
 	"bytes"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"strings"
 	"text/template"
 
@@ -245,10 +246,46 @@ func composeTLSVolumeMount() v1.VolumeMount {
 
 func isTLSSettingsUpdated(cType string, oldCm v1.ConfigMap, newCm v1.ConfigMap) bool {
 	// build intersection sets
+	oldKeys := make([]string, len(oldCm.Data))
+	for key := range oldCm.Data {
+		oldKeys = append(oldKeys, key)
+	}
+	oldSet := sets.New(oldKeys...)
+	newKeys := make([]string, len(newCm.Data))
+	for key := range newCm.Data {
+		newKeys = append(newKeys, key)
+	}
+	newSet := sets.New(newKeys...)
+	interSet := oldSet.Intersection(newSet)
 
 	// get tls key-word based on cType
+	tlsKeyWord := getTLSKeyWord(cType)
 
 	// search key-word in both old and new set
-	// if search results are the same, settings updated
-	// else not updated
+	for _, configFileName := range interSet.UnsortedList() {
+		oldConfigFile := oldCm.Data[configFileName]
+		newConfigFile := newCm.Data[configFileName]
+		oldIndex := strings.Index(oldConfigFile, tlsKeyWord)
+		newIndex := strings.Index(newConfigFile, tlsKeyWord)
+		// tls key-word appears in one file and disappears in another, means tls settings updated
+		if oldIndex >= 0 && newIndex < 0 ||
+			oldIndex < 0 && newIndex >= 0 {
+			return true
+		}
+	}
+
+	return false
+}
+
+func getTLSKeyWord(cType string) string {
+	switch cType {
+	case "mysql":
+		return "ssl_cert="
+	case "postgresql":
+		return "ssl_cert_file="
+	case "redis":
+		return "tls-cert-file"
+	default:
+		return "unsupported-character-type"
+	}
 }

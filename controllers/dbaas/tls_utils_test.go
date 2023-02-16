@@ -18,6 +18,7 @@ package dbaas
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -34,15 +35,17 @@ import (
 	testk8s "github.com/apecloud/kubeblocks/internal/testutil/k8s"
 )
 
-var _ = Describe("Tls cert creation/check function", func() {
-	const clusterDefName = "test-clusterdef"
-	const clusterVersionName = "test-clusterversion"
-	const clusterNamePrefix = "test-cluster"
-
-	const statefulCompType = "replicasets"
-	const statefulCompName = "mysql"
-
-	const mysqlContainerName = "mysql"
+var _ = Describe("TLS self-signed cert function", func() {
+	const (
+		clusterDefName     = "test-clusterdef"
+		clusterVersionName = "test-clusterversion"
+		clusterNamePrefix  = "test-cluster"
+		statefulCompType   = "replicasets"
+		statefulCompName   = "mysql"
+		mysqlContainerName = "mysql"
+		configTplName      = "mysql-config-tpl"
+		configVolumeName   = "mysql-config"
+	)
 
 	ctx := context.Background()
 
@@ -79,12 +82,20 @@ var _ = Describe("Tls cert creation/check function", func() {
 
 	// Scenarios
 
-	Context("with tls enabled", func() {
+	Context("tls is enabled/disabled", func() {
 		BeforeEach(func() {
+			configMapObj := testdbaas.CreateCustomizedObj(&testCtx,
+				"resources/mysql_config_cm.yaml", &corev1.ConfigMap{},
+				testCtx.UseDefaultNamespace())
+
+			configConstraintObj := testdbaas.CreateCustomizedObj(&testCtx,
+				"resources/mysql_config_template.yaml",
+				&dbaasv1alpha1.ConfigConstraint{})
 			By("Create a clusterDef obj")
 			testdbaas.NewClusterDefFactory(clusterDefName, testdbaas.MySQLType).
 				SetConnectionCredential(map[string]string{"username": "root", "password": ""}).
 				AddComponent(testdbaas.ConsensusMySQLComponent, statefulCompType).
+				AddConfigTemplate(configTplName, configMapObj.Name, configConstraintObj.Name, configVolumeName, nil).
 				AddContainerEnv(mysqlContainerName, corev1.EnvVar{Name: "MYSQL_ALLOW_EMPTY_PASSWORD", Value: "yes"}).
 				Create(&testCtx).GetObject()
 
@@ -208,6 +219,54 @@ var _ = Describe("Tls cert creation/check function", func() {
 				time.Sleep(time.Second)
 				Eventually(testdbaas.GetClusterPhase(&testCtx, client.ObjectKeyFromObject(clusterObj))).
 					Should(Equal(dbaasv1alpha1.CreatingPhase))
+			})
+		})
+
+		Context("when switch between disabled and enabled", func() {
+			BeforeEach(func() {
+				tlsIssuer = &dbaasv1alpha1.Issuer{
+					Name: dbaasv1alpha1.IssuerSelfSigned,
+				}
+			})
+			It("should handle tls settings properly", func() {
+				By("create cluster with tls disabled")
+				clusterObj = testdbaas.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix, clusterDefName, clusterVersionName).
+					WithRandomName().
+					AddComponent(statefulCompName, statefulCompType).
+					SetReplicas(3).
+					Create(&testCtx).
+					GetObject()
+				stsList := testk8s.ListAndCheckStatefulSet(&testCtx, client.ObjectKeyFromObject(clusterObj))
+				sts := stsList.Items[0]
+				cmName := sts.Name + "-" + configVolumeName
+				cmKey := client.ObjectKey{Namespace: sts.Namespace, Name: cmName}
+				hasTLSSettings := func() bool {
+					cm := &corev1.ConfigMap{}
+					Expect(k8sClient.Get(ctx, cmKey, cm)).Should(Succeed())
+					tlsKeyWord := getTLSKeyWord("mysql")
+					for _, cfgFile := range cm.Data {
+						index := strings.Index(cfgFile, tlsKeyWord)
+						if index >= 0 {
+							return true
+						}
+					}
+					return false
+				}
+				Eventually(hasTLSSettings()).WithPolling(time.Second).WithTimeout(10 * time.Second).Should(BeFalse())
+
+				By("update tls to enabled")
+				patch := client.MergeFrom(clusterObj)
+				clusterObj.Spec.Components[0].TLS = true
+				clusterObj.Spec.Components[0].Issuer = &dbaasv1alpha1.Issuer{Name: dbaasv1alpha1.IssuerSelfSigned}
+				Expect(k8sClient.Patch(ctx, clusterObj, patch)).Should(Succeed())
+				Eventually(hasTLSSettings()).WithPolling(time.Second).WithTimeout(10 * time.Second).Should(BeTrue())
+
+				By("update tls to disabled")
+				patch = client.MergeFrom(clusterObj)
+				clusterObj.Spec.Components[0].TLS = false
+				clusterObj.Spec.Components[0].Issuer = nil
+				Expect(k8sClient.Patch(ctx, clusterObj, patch)).Should(Succeed())
+				Eventually(hasTLSSettings()).WithPolling(time.Second).WithTimeout(10 * time.Second).Should(BeFalse())
 			})
 		})
 	})

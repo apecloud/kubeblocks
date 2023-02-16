@@ -4,6 +4,7 @@
 # ignore go generate code files
 internal/testutil/k8s/mocks/*_mocks.go
 internal/configuration/proto/mocks/*_mocks.go
+internal/configuration/container/mocks/*_mocks.go
 # internal/configuration/proto/*.pb.go
 
 # Binaries for programs and plugins
@@ -25,8 +26,6 @@ __debug_bin
 *.out
 cover.html
 .coverage/
-
-internal/configuration/container/mocks/*_mocks.go
 
 # Project-local glide cache, RE: https://github.com/Masterminds/glide/issues/736
 .glide/

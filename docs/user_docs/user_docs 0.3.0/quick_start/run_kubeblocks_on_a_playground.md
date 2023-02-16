@@ -105,7 +105,7 @@ The playground creates an ApeCloud-MySQL Paxos group by default. You can also us
 ```
 $ export KBCLI_CLUSTER_DEFAULT_REPLICAS=3
 
-$ kbcli cluster create mysql-cluster --cluster-definition='apecloud-mysql' 
+$ kbcli cluster create --cluster-definition='apecloud-mysql' 
 
 ```
 
@@ -117,14 +117,14 @@ $ kbcli cluster create mysql-cluster --cluster-definition='apecloud-mysql'
     ```
     $ kbcli cluster list
 
-    NAME               CLUSTER-DEFINITION    VERSION           TERMINATION-POLICY   STATUS   
-    mysql-cluster      apecloud-mysql        ac-mysql-8.0.30   WipeOut              Running   
-    mysql-cluster2     apecloud-mysql        ac-mysql-8.0.30   WipeOut              Creating 
+    NAME     	NAMESPACE	CLUSTER-DEFINITION	VERSION        	TERMINATION-POLICY	STATUS 	CREATED-TIME
+    mycluster	default  	apecloud-mysql    	ac-mysql-8.0.30	WipeOut           	Running	Jan 31,2023 16:06 UTC+0800
+    maple05  	default  	apecloud-mysql    	ac-mysql-8.0.30	Delete            	Running	Jan 31,2023 16:17 UTC+0800 
     ```
 
 2. Run `kbcli cluster describe` to view the details of a specified database cluster, such as `STATUS`, `Endpoints`, `Topology`, `Images`, and `Events`.
     ```
-    $ kbcli cluster describe msql-cluster
+    $ kbcli cluster describe maple05
     Name: mycluster  Created Time: Jan 30,2023 17:33 UTC+0800
     NAMESPACE  CLUSTER-DEFINITION  VERSION          STATUS  TERMINATION-POLICY
     default    apecloud-mysql      ac-mysql-8.0.30  Running WipeOut
@@ -134,10 +134,10 @@ $ kbcli cluster create mysql-cluster --cluster-definition='apecloud-mysql'
     mysql      ReadWrite  10.43.29.51:3306  <none>
 
     Topology:
-    COMPONENT  INSTANCE           ROLE      STATUS  AZ      NODE                               
-    mysql      mycluster-mysql-0  follower  Running <none>  k3d-kubeblocks-playground-server-0/xxx
-    mysql      mycluster-mysql-2  leader    Running <none>  k3d-kubeblocks-playground-server-0/xxx
-    mysql      mycluster-mysql-1  follower  Running <none>  k3d-kubeblocks-playground-server-0/xxx
+    COMPONENT  INSTANCE         ROLE      STATUS  AZ      NODE                               
+    mysql      maple05-mysql-0  follower  Running <none>  k3d-kubeblocks-playground-server-0/xxx
+    mysql      maple05-mysql-2  leader    Running <none>  k3d-kubeblocks-playground-server-0/xxx
+    mysql      maple05-mysql-1  follower  Running <none>  k3d-kubeblocks-playground-server-0/xxx
 
     Resources Allocation:
     COMPONENT   DEDICATED  CPU(REQUEST/LIMIT)  MEMORY(REQUEST/LIMIT)    STORAGE-SIZE    STORAGE-CLASS
@@ -158,8 +158,8 @@ $ kbcli cluster create mysql-cluster --cluster-definition='apecloud-mysql'
 
 If a database cluster has been created and its status is `Running`, run `kbcli cluster connect` to access a specified database cluster. For example, 
 ```
-$ kbcli cluster connect mysql-cluster
-Connect to instance mysql-cluster-ac-mysql-0: out of mysql-cluster-ac-mysql-0(leader), mysql-cluster-ac-mysql-1(follower), mysql-cluster-ac-mysql-2(follower)
+$ kbcli cluster connect maple05
+Connect to instance maple05-mysql-0: out of maple05-mysql-0(leader), maple05-mysql-1(follower), maple05-mysql-2(follower)
 Welcome to the MySQL monitor.  Commands end with ; or \g.
 Your MySQL connection id is 25
 Server version: 8.0.30 WeSQL Server - GPL, Release 5, Revision d6b8719
@@ -177,15 +177,15 @@ mysql>
 
 You can also run the command below to access a cluster by MySQL client.
 ```
-$ kbcli cluster connect --show-example --client=cli mysql-cluster
-# cluster mysql-cluster does not have public endpoints, you can run following command and connect cluster from local host
-kubectl port-forward service/mysql-cluster-ac-mysql 3306:3306
+$ kbcli cluster connect --show-example --client=cli maple05
+# cluster maple05 does not have public endpoints, you can run following command and connect cluster from local host
+kubectl port-forward service/maple05-mysql 3306:3306
 
 # mysql client connection example
 mysql -h 127.0.0.1 -P 3306 -u root -paiImelyt
 
 
-$ kubectl port-forward service/mysql-cluster-ac-mysql 3306:3306
+$ kubectl port-forward service/maple05-mysql 3306:3306
 Forwarding from 127.0.0.1:3306 -> 3306
 Forwarding from [::1]:3306 -> 3306
 
@@ -201,7 +201,7 @@ mysql>
 
 If you want to access a cluster via MySQL client, get the access address from `Endpoints` in the cluster details.
 ```
-$ kbcli cluster describe mysql-cluster
+$ kbcli cluster describe maple05
 
 ...
 Endpoints:
@@ -213,21 +213,21 @@ mysql      ReadWrite  10.43.29.51:3306  <none>
 Besides accessing a cluster by `IP:PORT` in `Endpoints`, you can also use [the DNS service of Kubernetes](https://kubernetes.io/docs/concepts/services-networking/service/#dns) for service discovery. The format of DNS access is `${service_name}.${namespace}:${port}`.
 For example, run the command below and the results show that there are two services in this database cluster. The namespace of Kubernetes is `default`. Then this database can be accessed via `mysql-cluster.default:3306` and `mysql-cluster-ac-mysql-headless.default:3306`.
 ```
-$ kubectl get service | grep mysql-cluster
+$ kubectl get service | grep maple05
 
-NAME                              CLUSTER-IP      EXTERNAL-IP   PORT(S)                                                          
-mysql-cluster-ac-mysql-headless   None            <none>        3306/TCP,13306/TCP,9104/TCP,3501/TCP 
-mysql-cluster-ac-mysql            10.43.206.161   <none>        3306/TCP 
+NAME                     CLUSTER-IP      EXTERNAL-IP   PORT(S)                                                          
+maple05-mysql-headless   None            <none>        3306/TCP,13306/TCP,9104/TCP,3501/TCP 
+maple05-mysql            10.43.206.161   <none>        3306/TCP 
 ```
 
 #### Delete an ApeCloud MySQL Paxos group
 
 Run the command below to delete a specified database cluster. For example, 
 ```
-$ kbcli cluster delete mysql-cluster
+$ kbcli cluster delete maple05
 
-Please enter the name again(separate with commas when more than one): mysql-cluster
-Cluster mysql-cluster deleted
+Please enter the name again(separate with commas when more than one): maple05
+Cluster maple05 deleted
 ```
 
 ### Observability
@@ -264,9 +264,9 @@ In this example, we delete the leader pod to simulate a failure.
 
 ***Steps:***
 
-1. Run the command below to view the ApeCloud MySQL Paxos group information. View the leader pod name in `Topology`. In this example, the leader pod's name is mysql-cluster-2.
+1. Run the command below to view the ApeCloud MySQL Paxos group information. View the leader pod name in `Topology`. In this example, the leader pod's name is maple05-mysql-2.
    ```
-   $ kbcli cluster describe mysql-cluster
+   $ kbcli cluster describe maple05
 
    Name: mysql-cluster         Created Time: Jan 27,2023 17:33 UTC+0800
    NAMESPACE        CLUSTER-DEFINITION        VERSION                STATUS         TERMINATION-POLICY
@@ -277,10 +277,10 @@ In this example, we delete the leader pod to simulate a failure.
    mysql            ReadWrite        10.43.29.51:3306        <none>
 
    Topology:
-   COMPONENT        INSTANCE                     ROLE            STATUS         AZ            NODE                                                 CREATED-TIME
-   mysql            mysql-cluster-mysql-2        leader          Running        <none>        k3d-kubeblocks-playground-server-0/172.20.0.3        Jan 30,2023 17:33 UTC+0800
-   mysql            mysql-cluster-mysql-1        follower        Running        <none>        k3d-kubeblocks-playground-server-0/172.20.0.3        Jan 30,2023 17:33 UTC+0800
-   mysql            mysql-cluster-mysql-0        follower        Running        <none>        k3d-kubeblocks-playground-server-0/172.20.0.3        Jan 30,2023 17:33 UTC+0800
+   COMPONENT        INSTANCE               ROLE            STATUS         AZ            NODE                                                 CREATED-TIME
+   mysql            maple05-mysql-2        leader          Running        <none>        k3d-kubeblocks-playground-server-0/172.20.0.3        Jan 30,2023 17:33 UTC+0800
+   mysql            maple05-mysql-1        follower        Running        <none>        k3d-kubeblocks-playground-server-0/172.20.0.3        Jan 30,2023 17:33 UTC+0800
+   mysql            maple05-mysql-0        follower        Running        <none>        k3d-kubeblocks-playground-server-0/172.20.0.3        Jan 30,2023 17:33 UTC+0800
 
    Resources Allocation:
    COMPONENT        DEDICATED        CPU(REQUEST/LIMIT)        MEMORY(REQUEST/LIMIT)        STORAGE-SIZE        STORAGE-CLASS
@@ -295,16 +295,16 @@ In this example, we delete the leader pod to simulate a failure.
 
 2. Run the command below to delete the leader pod.
    ```
-   $ kubectl delete pod mysql-cluster-mysql-2
+   $ kubectl delete pod maple05-mysql-2
 
-   pod "mysql-cluster-mysql-2" deleted
+   pod "maple05-mysql-2" deleted
    ```
 
-3. Run `kbcli cluster connect mysql-cluster` to connect to the ApeCloud MySQL Paxos group to test its availability. You can find this group can be accessed within seconds.
+3. Run `kbcli cluster connect maple05` to connect to the ApeCloud MySQL Paxos group to test its availability. You can find this group can be accessed within seconds.
    ```
-   kbcli cluster connect mysql-cluster
+   kbcli cluster connect maple05
 
-   Connect to instance mysql-cluster-mysql-2: out of mysql-cluster-mysql-2(leader), mysql-cluster-mysql-0(follower)
+   Connect to instance maple05-mysql-2: out of maple05-mysql-2(leader), maple05-mysql-0(follower)
    Welcome to the MySQL monitor.  Commands end with ; or \g.
    Your MySQL connection id is 33
    Server version: 8.0.30 WeSQL Server - GPL, Release 5, Revision d6b8719
@@ -339,6 +339,10 @@ NON-STOP NYAN CAT is a demo application to observe how the database cluster exce
 2. Use `port-forward` according to the hints above to expose an application port as available access for your local host, then visit this application via http://127.0.0.1:8087.
 3. Delete the leader pod and view the influences on the ApeCloud MySQL clusters through the NYAN CAT page.
    ![NYAN CAT](../image/nyan_cat.png)
+4. Uninstall the NYAN CAT demo application.
+   ```
+   $ kbcli app uninstall nyancat
+   ```
 
 ## Uninstall the playground
 

@@ -71,7 +71,7 @@ The backup is realized by the volume snapshot function, you need to configure EK
       kubectl create -f snapshot_class.yaml
       ```
 3. Create a MySQL cluster. 
-   In this section, the cluster created is mysql-cluster.
+   In this section, the example cluster created is mysql-cluster.
    ```
    kbcli cluster create mysql-cluster --cluster-definition='apecloud-mysql'
    ```

@@ -39,14 +39,14 @@ This guide introduces how to use KubeBlocks to create an ApeCloud MySQL cluster 
 
    | Option | Usage |
    | :--    | :--   |
-   | `set snapshot-controller.enabled` | `--set snapshot-controller.enabled=true` option enables KubeBlocks to use EBS snapshot for backup and restore and this option is required for the deployment on AWS.|
-   | `set loadbalancer.enabled` | If you want the node outside the Kubernetes cluster (the node should be within the same VPC) to visit the database cluster created by KubeBlocks, use `--set loadbalancer.enabled=true` option as the above command does. For more details on installation, refer to [Install/Uninstall kbcli and KubeBlocks](../install_kbcli_kubeblocks/install_and_unistall_kbcli_and_kubeblocks.md). |
-   | `n` | If you want to specify a namespace, use the global command-line option `-n` to name your namespace and configure `--create-namespace` as `true`. For example, <br />```kbcli kubeblocks install -n kubeblocks --create-namespace=true``` |
-   | `create-namespace` | Use `create-namespace` to specify whether to create a default namespace.|
+   | `--set snapshot-controller.enabled` | `--set snapshot-controller.enabled=true` option enables KubeBlocks to use EBS snapshot for backup and restore and this option is required for the deployment on AWS.|
+   | `--set loadbalancer.enabled` | To enable a node outside the Kubernetes cluster (the node should be within the same VPC) to visit the database cluster created by KubeBlocks, use `--set loadbalancer.enabled=true` option as the above command does. For more details on installation, refer to [Install/Uninstall kbcli and KubeBlocks](../install_kbcli_kubeblocks/install_and_unistall_kbcli_and_kubeblocks.md). |
+   | `--namespace` | If you want to specify a namespace for KubeBlocks, use the global command-line option `--namespace` or the abbreviated `-n` to name your namespace and configure `--create-namespace` as `true` to create a namespace if it does not exist. For example, <br />```kbcli kubeblocks install -n kubeblocks --create-namespace=true``` |
+   | `--create-namespace` | Use `create-namespace` to specify whether to create a namespace if it does not exist.|
    
    > ***Note:***
    > 
-   > For globall command line options, run `kbcli options` to list all (applies to all commands). 
+   > For global command line options, run `kbcli options` to list all options (applies to all commands). 
 
    ***Result***
 
@@ -109,7 +109,7 @@ This guide introduces how to use KubeBlocks to create an ApeCloud MySQL cluster 
 > * Configure the pod memory and CPU kernel amount of your EKS cluster by running `export KBCLI_CLUSTER_DEFAULT_MEMORY=nGi` and `export KBCLI_CLUSTER_DEFAULT_CPU=n`. If there are not three replicas that exceed the values of memory and CPU, creating a MySQL cluster may fail.
 > * KubeBlocks applies for a new EBS volume of 10 Gi (the default storage size), which causes extra fees. You can adjust it by running `export KBCLI_CLUSTER_DEFAULT_STORAGE=nGi`. Delete this EBS volume after your trial.
 
-1. Run the command below to create an ApeCloud MySQL cluster. The cluster name can be customized and `mysql-example` below is an example.
+1. Run the command below to create an ApeCloud MySQL cluster. 
    For more details on options, refer to [`kbcli` cluster create options description](../manage_mysql_database_with_kubeblocks/manage_cluster/create_and_connect_a_mysql_cluster.md#create-a-mysql-cluster).
 
    ```
@@ -117,7 +117,7 @@ This guide introduces how to use KubeBlocks to create an ApeCloud MySQL cluster 
    $ export KBCLI_CLUSTER_DEFAULT_MEMORY=1Gi
    $ export KBCLI_CLUSTER_DEFAULT_CPU=2
 
-   $ kbcli cluster create mysql-cluster --cluster-definition=apecloud-mysql
+   $ kbcli cluster create --cluster-definition=apecloud-mysql
    ```
 
    ***Result***
@@ -134,7 +134,7 @@ This guide introduces how to use KubeBlocks to create an ApeCloud MySQL cluster 
 1. It takes several minutes to create a cluster. Run `kbcli cluster list` to check the cluster status and when the cluster status is `Running`, the cluster has been created. 
 2. Run the command below to connect to the leader pod of ApeCloud MySQL. (The leader pod is called leaseholder in other databases.)
    ```
-   kbcli cluster connect mysql-cluster
+   kbcli cluster connect ivy43
    ```
 
 After connecting to the cluster, you can operate the created MySQL cluster as you do in the MySQL client.
@@ -142,7 +142,7 @@ After connecting to the cluster, you can operate the created MySQL cluster as yo
 If you want to connect to the MySQL cluster using MySQL client or your stress test tool, 
 1. Run the command below to get the IP and port of this cluster first. 
    ```
-   kbcli cluster describe mysql-cluster
+   kbcli cluster describe ivy43
    ```
 2. Find the Endpoints information in the result.
    ```
@@ -156,5 +156,5 @@ The ApeCloud MySQL cluster provides high availability to ensure RPO=0. When a fa
 ## Step 5. Delete the ApeCloud MySQL cluster
 Run the command below to delete the ApeCloud MySQL cluster.
 ```
-kbcli cluster delete mysql-cluster
+kbcli cluster delete ivy43
 ```

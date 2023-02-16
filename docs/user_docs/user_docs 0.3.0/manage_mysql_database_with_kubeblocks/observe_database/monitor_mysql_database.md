@@ -17,7 +17,7 @@ KubeBlocks integrates open-source monitoring components such as Prometheus, Aler
    ```
     > ***Note:*** 
     > 
-    > `monitor` is set as true by default and it is not recommended to disable the monitoring function.
+    > `--monitor` is set as true by default and it is not recommended to disable the monitoring function.
 
    If you have KubeBlocks installed, you can install monitoring components with `kbcli kubeblocks upgrade`.
    ```

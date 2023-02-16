@@ -10,7 +10,7 @@ The KubeBlocks log enhancement function uses methods similar to kubectl exec and
 ***Steps:***
 
 1. Enable the log enhancement function.
-   - If you create a cluster by running the `kbcli cluster create` command, add the `enable-all-logs=true` option to enable the log enhancement function. When this option is `true`, all the log types defined by `spec.components.logConfigs` in `ClusterDefinition` are enabled automatically.
+   - If you create a cluster by running the `kbcli cluster create` command, add the `--enable-all-logs=true` option to enable the log enhancement function. When this option is `true`, all the log types defined by `spec.components.logConfigs` in `ClusterDefinition` are enabled automatically.
 
      ```
      kbcli cluster create mycluster --cluster-definition='apecloud-mysql' --enable-all-logs=true 

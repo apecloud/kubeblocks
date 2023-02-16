@@ -13,13 +13,13 @@
    kbcli version
    ```
 * KubeBlocks: Install KubeBlocks on your host. Refer to [Install/Uninstall kbcli and KubeBlocks](../../install_kbcli_kubeblocks/install_and_unistall_kbcli_and_kubeblocks.md) for details.
-  1. Run the command below to install KubeBlock.
+  1. Run the command below to install KubeBlocks.
      ```
      kbcli kubeblocks install
      ```
      > ***Note:***
      > 
-     > If you want to specify a namespace, use `-n` to name your namespace and configure `--create-namespace` as `true`. For example,
+     > If you want to specify a namespace for KubeBlocks, use `--namespace` or the abbreviated `-n` to name your namespace and configure `--create-namespace` as `true` to create a namespace if it does not exist. For example,
      > ```
      > kbcli kubeblocks install -n kubeblocks --create-namespace=true
      > ```
@@ -70,10 +70,11 @@
    $ kbcli cluster create mysql-cluster --cluster-definition='apecloud-mysql'
    ```
 
-   A cluster then is created under the default namespace. But if you have specified a namespace when installing KubeBlocks, specify this namespace for your cluster by using `-n` option. For example,
+   A cluster then is created in the default namespace. You can specify a namespace for your cluster by using `--namespace` or the abbreviated `-n` option. For example,
 
    ```
-   $ kbcli cluster create mysql-cluster -n kubeblocks --cluster-definition='apecloud-mysql'
+   $ kubectl create namespace demo
+   $ kbcli cluster create -n demo --cluster-definition='apecloud-mysql'
    ```
 
    If you want to create a cluster with specified parameters, follow the options below.
@@ -116,14 +117,14 @@
 
 | Option   | Description      |
 | :--      | :--              |
-| `cluster-definition` | It specifies the cluster definition. Run `kbcli cluster-definition` list to show all available cluster definitions. For example, <br />```kbcli cluster create mycluster --cluster-definition='apecloud-mysql'``` |
-| `cluster-version` | It specifies the cluster version. Run `kbcli cluster-version list` to show all available cluster versions. If you do not specify a cluster version when creating a cluster, the latest version is used by default. |
-| `enable-all-logs` | It enables you to view all application logs. When this option is enabled, enabledLogs of component level will be ignored. This option is set as true by default. |
-| `help` | It shows the help guide for `kbcli cluster create`. |
-| `monitor` | It is used to enable the monitor function and inject metrics exporter. It is set as true by default. |
-| `node-labels` | It is a node label selector. Its default value is [] and means empty value. If you want set node labels, you can follow the example format: <br />```kbcli cluster create --cluster-definition='apecloud-mysql' --node-labels='"topology.kubernetes.io/zone=us-east-1a","disktype=ssd,essd"'``` |
-| `set` | It is used to set the cluster parameters by setting its value as YAML file, URL, or stdin. For example, <br />```kbcli cluster create mycluster --cluster-definition='apecloud-mysql' --set=mycluster.yaml```|
-| `termination-policy` | It specifies the termination policy of the cluster. There are four available values, namely `DoNotTerminate`, `Halt`, `Delete`, and `WipeOut`. `Delete` is set as the default. <br /> - `DoNotTerminate`: DoNotTerminate blocks the delete operation. <br /> - `Halt`: Halt deletes workload resources such as statefulset, deployment workloads but keeps PVCs. <br /> - `Delete`: Delete is based on Halt and deletes PVCs. <br /> - `WipeOut`: WipeOut is based on Delete and wipes out all volume snapshots and snapshot data from backup storage location. |
+| `--cluster-definition` | Specifies the cluster definition. Run `kbcli cluster-definition` list to show all available cluster definitions. For example, <br />```kbcli cluster create mycluster --cluster-definition='apecloud-mysql'``` |
+| `--cluster-version` | Specifies the cluster version. Run `kbcli cluster-version list` to show all available cluster versions. If you do not specify a cluster version when creating a cluster, the latest version is used by default. |
+| `--enable-all-logs` | Enables you to view all application logs. When this option is enabled, enabledLogs of component level will be ignored. This option is set as true by default. |
+| `--help` | Shows the help guide for `kbcli cluster create`. You can also use the abbreviated `-h`. |
+| `--monitor` | Enables the monitor function and inject metrics exporter. It is set as true by default. |
+| `--node-labels` | A node label selector. Its default value is [] and means empty value. If you want set node labels, you can follow the example format: <br />```kbcli cluster create --cluster-definition='apecloud-mysql' --node-labels='"topology.kubernetes.io/zone=us-east-1a","disktype=ssd,essd"'``` |
+| `--set` | It is used to set the cluster parameters by setting its value as YAML file, URL, or stdin. For example, <br />```kbcli cluster create mycluster --cluster-definition='apecloud-mysql' --set=mycluster.yaml```|
+| `--termination-policy` | Specifies the termination policy of the cluster. There are four available values, namely `DoNotTerminate`, `Halt`, `Delete`, and `WipeOut`. `Delete` is set as the default. <br /> - `DoNotTerminate`: DoNotTerminate blocks the delete operation. <br /> - `Halt`: Halt deletes workload resources such as statefulset, deployment workloads but keeps PVCs. <br /> - `Delete`: Delete is based on Halt and deletes PVCs. <br /> - `WipeOut`: WipeOut is based on Delete and wipes out all volume snapshots and snapshot data from backup storage location. |
 
 ## Connect to a MySQL Cluster
 

@@ -25,14 +25,14 @@ mysql-cluster        default          apecloud-mysql            ac-mysql-8.0.30 
    
    **Option 1.** Use `kbcli`.
 
-   Configure the values of `--component-names`, `--volume-claim-template-names`, and `--storage` and run the command below to expand the volume.
+   Configure the values of `--component-names`, `--volume-claim-template-names`, and `--storage`, and run the command below to expand the volume.
    ```
    kbcli cluster volume-expand mysql-cluster --component-names="mysql" \
    --volume-claim-template-names="data" --storage="2Gi"
    ```
-   - `component-names` describes the component name for volume expansion.
-   - `volume-claim-template-names` describes the VolumeClaimTemplate names in components.
-   - `storage describes` the volume storage size.
+   - `--component-names` describes the component name for volume expansion.
+   - `--volume-claim-template-names` describes the VolumeClaimTemplate names in components.
+   - `--storage` describes the volume storage size.
    
    **Option 2.** Create an OpsRequest.
 

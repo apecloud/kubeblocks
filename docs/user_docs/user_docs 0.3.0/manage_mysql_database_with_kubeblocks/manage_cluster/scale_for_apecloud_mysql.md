@@ -161,8 +161,8 @@ mysql-cluster        default          apecloud-mysql            ac-mysql-8.0.30 
    kbcli cluster horizontal-scale mysql-cluster \
    --component-names="mysql" --replicas=3
    ```
-   - `component-names` describes the component name ready for vertical scaling.
-   - `replicas` describe the replicas with the specified components.
+   - `--component-names` describes the component name ready for vertical scaling.
+   - `--replicas` describe the replicas with the specified components.
 
    **Option 2.** Create an OpsRequest.
 

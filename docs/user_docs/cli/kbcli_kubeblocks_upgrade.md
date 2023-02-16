@@ -19,12 +19,16 @@ kbcli kubeblocks upgrade [flags]
 ### Options
 
 ```
-      --check              Check kubernetes environment before upgrade (default true)
-  -h, --help               help for upgrade
-      --monitor            Set monitor enabled and install Prometheus, AlertManager and Grafana (default true)
-      --set stringArray    Set values on the command line (can specify multiple or separate values with commas: key1=val1,key2=val2)
-      --timeout duration   Time to wait for upgrading KubeBlocks (default 30m0s)
-      --version string     Set KubeBlocks version
+      --check                    Check kubernetes environment before upgrade (default true)
+  -h, --help                     help for upgrade
+      --monitor                  Set monitor enabled and install Prometheus, AlertManager and Grafana (default true)
+      --set stringArray          set values on the command line (can specify multiple or separate values with commas: key1=val1,key2=val2)
+      --set-file stringArray     set values from respective files specified via the command line (can specify multiple or separate values with commas: key1=path1,key2=path2)
+      --set-json stringArray     set JSON values on the command line (can specify multiple or separate values with commas: key1=jsonval1,key2=jsonval2)
+      --set-string stringArray   set STRING values on the command line (can specify multiple or separate values with commas: key1=val1,key2=val2)
+      --timeout duration         Time to wait for upgrading KubeBlocks (default 30m0s)
+  -f, --values strings           specify values in a YAML file or a URL (can specify multiple)
+      --version string           Set KubeBlocks version
 ```
 
 ### Options inherited from parent commands

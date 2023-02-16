@@ -21,6 +21,7 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"helm.sh/helm/v3/pkg/cli/values"
 
 	"github.com/spf13/cobra"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
@@ -91,8 +92,8 @@ var _ = Describe("kubeblocks", func() {
 			CreateNamespace: true,
 		}
 		Expect(o.Install()).Should(HaveOccurred())
-		Expect(len(o.Sets)).To(Equal(1))
-		Expect(o.Sets[0]).To(Equal(fmt.Sprintf(kMonitorParam, true)))
+		Expect(len(o.ValueOpts.Values)).To(Equal(1))
+		Expect(o.ValueOpts.Values[0]).To(Equal(fmt.Sprintf(kMonitorParam, true)))
 		Expect(o.installChart()).Should(HaveOccurred())
 		o.printNotes()
 	})
@@ -109,7 +110,7 @@ var _ = Describe("kubeblocks", func() {
 			Version:         version.DefaultKubeBlocksVersion,
 			Monitor:         true,
 			CreateNamespace: true,
-			Sets:            []string{"snapshot-controller.enabled=true"},
+			ValueOpts:       values.Options{Values: []string{"snapshot-controller.enabled=true"}},
 		}
 		Expect(o.postInstall()).Should(HaveOccurred())
 	})
@@ -228,9 +229,9 @@ var _ = Describe("kubeblocks", func() {
 		for _, c := range cases {
 			By(c.desc)
 			for _, p := range []util.K8sProvider{util.UnknownProvider, util.EKSProvider} {
-				o.Sets = c.sets
+				o.ValueOpts.Values = c.sets
 				o.disableOrEnableSets(p)
-				Expect(o.Sets).Should(Equal(c.expected[p]))
+				Expect(o.ValueOpts.Values).Should(Equal(c.expected[p]))
 			}
 		}
 	})

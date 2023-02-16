@@ -27,6 +27,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"helm.sh/helm/v3/pkg/action"
+	"helm.sh/helm/v3/pkg/cli/values"
 	"helm.sh/helm/v3/pkg/repo"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
@@ -68,11 +69,11 @@ type Options struct {
 type InstallOptions struct {
 	Options
 	Version         string
-	Sets            []string
 	Monitor         bool
 	Quiet           bool
 	CreateNamespace bool
 	check           bool
+	ValueOpts       values.Options
 	timeout         time.Duration
 }
 
@@ -111,10 +112,10 @@ func newInstallCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 
 	cmd.Flags().BoolVar(&o.Monitor, "monitor", true, "Set monitor enabled and install Prometheus, AlertManager and Grafana (default true)")
 	cmd.Flags().StringVar(&o.Version, "version", version.DefaultKubeBlocksVersion, "KubeBlocks version")
-	cmd.Flags().StringArrayVar(&o.Sets, "set", []string{}, "Set values on the command line (can specify multiple or separate values with commas: key1=val1,key2=val2)")
 	cmd.Flags().BoolVar(&o.CreateNamespace, "create-namespace", false, "Create the namespace if not present")
 	cmd.Flags().BoolVar(&o.check, "check", true, "Check kubernetes environment before install")
 	cmd.Flags().DurationVar(&o.timeout, "timeout", 1800*time.Second, "Time to wait for installing KubeBlocks")
+	helm.AddValueOptionsFlags(cmd.Flags(), &o.ValueOpts)
 
 	return cmd
 }
@@ -176,10 +177,11 @@ func (o *InstallOptions) Install() error {
 		return err
 	}
 
+	// add monitor parameters
+	o.ValueOpts.Values = append(o.ValueOpts.Values, fmt.Sprintf(kMonitorParam, o.Monitor))
+
 	spinner := util.Spinner(o.Out, "%-40s", "Install KubeBlocks "+o.Version)
 	defer spinner(false)
-
-	o.Sets = append(o.Sets, fmt.Sprintf(kMonitorParam, o.Monitor))
 
 	// Add repo, if exists, will update it
 	if err = helm.AddRepo(&repo.Entry{Name: types.KubeBlocksChartName, URL: util.GetHelmChartRepoURL()}); err != nil {
@@ -240,7 +242,7 @@ func (o *InstallOptions) preCheck(versionInfo map[util.AppName]string) error {
 // disableOrEnableSets disable or enable some features according to the kubernetes provider
 func (o *InstallOptions) disableOrEnableSets(k8sProvider util.K8sProvider) {
 	var sets []string
-	for _, set := range o.Sets {
+	for _, set := range o.ValueOpts.Values {
 		splitSet := strings.Split(set, ",")
 		sets = append(sets, splitSet...)
 	}
@@ -297,7 +299,7 @@ func (o *InstallOptions) enableSets(sets []string) {
 	}
 
 	if len(removedSets) == 0 {
-		o.Sets = newSets
+		o.ValueOpts.Values = newSets
 		return
 	}
 
@@ -309,7 +311,7 @@ func (o *InstallOptions) enableSets(sets []string) {
 	for _, set := range removedSets {
 		fmt.Fprintf(o.Out, "  · %s\n", set)
 	}
-	o.Sets = newSets
+	o.ValueOpts.Values = newSets
 }
 
 func (o *InstallOptions) disableSets(sets []string) {
@@ -359,7 +361,7 @@ func (o *InstallOptions) disableSets(sets []string) {
 	for _, set := range disabledSets {
 		fmt.Fprintf(o.Out, "  · %s\n", set)
 	}
-	o.Sets = newSets
+	o.ValueOpts.Values = newSets
 }
 
 func (o *InstallOptions) checkRemainedResource() error {
@@ -391,24 +393,7 @@ func (o *InstallOptions) checkRemainedResource() error {
 }
 
 func (o *InstallOptions) installChart() error {
-	var sets []string
-	for _, set := range o.Sets {
-		splitSet := strings.Split(set, ",")
-		sets = append(sets, splitSet...)
-	}
-	chart := helm.InstallOpts{
-		Name:            types.KubeBlocksChartName,
-		Chart:           types.KubeBlocksChartName + "/" + types.KubeBlocksChartName,
-		Wait:            true,
-		Version:         o.Version,
-		Namespace:       o.Namespace,
-		Sets:            sets,
-		Login:           true,
-		TryTimes:        2,
-		CreateNamespace: o.CreateNamespace,
-		Timeout:         o.timeout,
-	}
-	_, err := chart.Install(o.HelmCfg)
+	_, err := o.buildChart().Install(o.HelmCfg)
 	return err
 }
 
@@ -440,7 +425,7 @@ Notes: Monitor components(Grafana/Prometheus/AlertManager) is not installed,
 
 func (o *InstallOptions) postInstall() error {
 	var sets []string
-	for _, set := range o.Sets {
+	for _, set := range o.ValueOpts.Values {
 		splitSet := strings.Split(set, ",")
 		sets = append(sets, splitSet...)
 	}
@@ -474,4 +459,19 @@ func (o *InstallOptions) createVolumeSnapshotClass() error {
 	}
 	spinner(true)
 	return nil
+}
+
+func (o *InstallOptions) buildChart() *helm.InstallOpts {
+	return &helm.InstallOpts{
+		Name:            types.KubeBlocksChartName,
+		Chart:           types.KubeBlocksChartName + "/" + types.KubeBlocksChartName,
+		Wait:            true,
+		Version:         o.Version,
+		Namespace:       o.Namespace,
+		ValueOpts:       &o.ValueOpts,
+		Login:           true,
+		TryTimes:        2,
+		CreateNamespace: o.CreateNamespace,
+		Timeout:         o.timeout,
+	}
 }

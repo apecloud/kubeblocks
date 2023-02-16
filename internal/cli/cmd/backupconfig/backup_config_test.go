@@ -19,6 +19,7 @@ package backupconfig
 import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"helm.sh/helm/v3/pkg/cli/values"
 
 	"github.com/spf13/cobra"
 	"helm.sh/helm/v3/pkg/repo"
@@ -63,8 +64,8 @@ var _ = Describe("backup_config", func() {
 			IOStreams: streams,
 		}
 		Expect(o.complete(tf, cmd)).To(Succeed())
-		Expect(o.Namespace).To(Equal("test"))
-		Expect(o.cfg).ShouldNot(BeNil())
+		Expect(o.namespace).To(Equal("test"))
+		Expect(o.helmCfg).ShouldNot(BeNil())
 	})
 
 	It("run backup_config", func() {
@@ -81,12 +82,12 @@ var _ = Describe("backup_config", func() {
 
 		o := &upgradeOptions{
 			IOStreams: streams,
-			cfg:       helm.FakeActionConfig(),
-			Namespace: "default",
-			Sets:      []string{"dataProtection=test"},
+			helmCfg:   helm.FakeActionConfig(),
+			namespace: "default",
+			valueOpts: values.Options{Values: []string{"dataProtection=test"}},
 		}
 		Expect(o.run()).Should(HaveOccurred())
-		Expect(len(o.Sets)).To(Equal(1))
-		Expect(o.Sets[0]).To(Equal("dataProtection=test"))
+		Expect(len(o.valueOpts.Values)).To(Equal(1))
+		Expect(o.valueOpts.Values[0]).To(Equal("dataProtection=test"))
 	})
 })

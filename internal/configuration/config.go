@@ -301,11 +301,11 @@ func (c *cfgWrapper) Diff(target *cfgWrapper) (*ConfigPatchInfo, error) {
 
 func NewCfgViper(cfgType appsv1alpha1.ConfigurationFormatter) *viper.Viper {
 	defaultKeySep := delimiterDot
-	if cfgType == appsv1alpha1.PROPERTIES || cfgType == appsv1alpha1.DOTENV {
+	if cfgType == appsv1alpha1.Properties || cfgType == appsv1alpha1.Dotenv {
 		defaultKeySep = cfgDelimiterPlaceholder
 	}
 	v := viper.NewWithOptions(viper.KeyDelimiter(defaultKeySep))
-	v.SetConfigType(string(cfgType))
+	v.SetConfigType(strings.ToLower(string(cfgType)))
 	return v
 }
 

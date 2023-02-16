@@ -68,7 +68,7 @@ func TestSchemaValidatorWithCue(t *testing.T) {
 		args: args{
 			cueFile:    "cue_testdata/pg14.cue",
 			configFile: "cue_testdata/pg14.conf",
-			formatter:  appsv1alpha1.PROPERTIES,
+			formatter:  appsv1alpha1.Properties,
 		},
 		err: nil,
 	}, {

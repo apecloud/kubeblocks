@@ -247,8 +247,9 @@ const (
 	JSON       ConfigurationFormatter = "json"
 	XML        ConfigurationFormatter = "xml"
 	HCL        ConfigurationFormatter = "hcl"
-	DOTENV     ConfigurationFormatter = "dotenv"
-	PROPERTIES ConfigurationFormatter = "props"
+	Dotenv     ConfigurationFormatter = "dotenv"
+	TOML       ConfigurationFormatter = "toml"
+	Properties ConfigurationFormatter = "properties"
 )
 
 // UpgradePolicy defines the policy of reconfiguring.

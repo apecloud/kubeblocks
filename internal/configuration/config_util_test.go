@@ -53,7 +53,7 @@ var _ = Describe("config_util", func() {
 						}
 					}
 					cc.Spec.FormatterConfig = &v1alpha1.FormatterConfig{
-						Formatter: v1alpha1.PROPERTIES,
+						Formatter: v1alpha1.Properties,
 					}
 				})
 

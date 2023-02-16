@@ -43,4 +43,4 @@ spec:
 
     # mysql configuration file format
   formatterConfig:
-    formatter: dotenv
+    formatter: properties

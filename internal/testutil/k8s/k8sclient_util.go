@@ -31,8 +31,6 @@ import (
 	mock_client "github.com/apecloud/kubeblocks/internal/testutil/k8s/mocks"
 )
 
-//go:generate go run github.com/golang/mock/mockgen -destination mocks/k8sclient_mocks.go sigs.k8s.io/controller-runtime/pkg/client Client
-
 type CallMockOptions = func(call *gomock.Call)
 type CallerFunction = func() *gomock.Call
 type DoReturnedFunction = any

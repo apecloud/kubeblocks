@@ -25,9 +25,10 @@ import (
 type ComponentTplType string
 
 const (
-	StatefulMySQLComponent  ComponentTplType = "stateful-mysql"
-	ConsensusMySQLComponent ComponentTplType = "consensus-mysql"
-	StatelessNginxComponent ComponentTplType = "stateless-nginx"
+	StatefulMySQLComponent    ComponentTplType = "stateful-mysql"
+	ConsensusMySQLComponent   ComponentTplType = "consensus-mysql"
+	ReplicationRedisComponent ComponentTplType = "replication-redis"
+	StatelessNginxComponent   ComponentTplType = "stateless-nginx"
 )
 
 type MockClusterDefFactory struct {
@@ -54,6 +55,8 @@ func (factory *MockClusterDefFactory) AddComponent(tplType ComponentTplType, ren
 		component = &statefulMySQLComponent
 	case ConsensusMySQLComponent:
 		component = &consensusMySQLComponent
+	case ReplicationRedisComponent:
+		component = &replicationRedisComponent
 	case StatelessNginxComponent:
 		component = &statelessNginxComponent
 	}
@@ -158,4 +161,37 @@ func (factory *MockClusterDefFactory) AddSystemAccountSpec(sysAccounts *dbaasv1a
 	comps[len(comps)-1] = comp
 	factory.get().Spec.Components = comps
 	return factory
+}
+
+func (factory *MockClusterDefFactory) AddInitContainerVolumeMounts(containerName string, volumeMounts []corev1.VolumeMount) *MockClusterDefFactory {
+	comps := factory.get().Spec.Components
+	if len(comps) > 0 {
+		comp := comps[len(comps)-1]
+		comp.PodSpec.InitContainers = setContainerVolumeMounts(comp.PodSpec.InitContainers, containerName, volumeMounts)
+		comps[len(comps)-1] = comp
+	}
+	factory.get().Spec.Components = comps
+	return factory
+}
+
+func (factory *MockClusterDefFactory) AddContainerVolumeMounts(containerName string, volumeMounts []corev1.VolumeMount) *MockClusterDefFactory {
+	comps := factory.get().Spec.Components
+	if len(comps) > 0 {
+		comp := comps[len(comps)-1]
+		comp.PodSpec.Containers = setContainerVolumeMounts(comp.PodSpec.Containers, containerName, volumeMounts)
+		comps[len(comps)-1] = comp
+	}
+	factory.get().Spec.Components = comps
+	return factory
+}
+
+func setContainerVolumeMounts(containers []corev1.Container, targetContainerName string, volumeMounts []corev1.VolumeMount) []corev1.Container {
+	for index := range containers {
+		c := containers[index]
+		if c.Name == targetContainerName {
+			c.VolumeMounts = append(c.VolumeMounts, volumeMounts...)
+		}
+		containers[index] = c
+	}
+	return containers
 }

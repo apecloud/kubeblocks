@@ -50,12 +50,12 @@ type InstallOpts struct {
 	Name            string
 	Chart           string
 	Namespace       string
-	Sets            []string
 	Wait            bool
 	Version         string
 	TryTimes        int
 	Login           bool
 	CreateNamespace bool
+	ValueOpts       *values.Options
 	Timeout         time.Duration
 }
 
@@ -208,12 +208,8 @@ func (i *InstallOpts) tryInstall(cfg *action.Configuration) (string, error) {
 		return "", err
 	}
 
-	setOpts := values.Options{
-		Values: i.Sets,
-	}
-
 	p := getter.All(settings)
-	vals, err := setOpts.MergeValues(p)
+	vals, err := i.ValueOpts.MergeValues(p)
 	if err != nil {
 		return "", err
 	}
@@ -379,12 +375,8 @@ func (i *InstallOpts) tryUpgrade(cfg *action.Configuration) (string, error) {
 		return "", err
 	}
 
-	setOpts := values.Options{
-		Values: i.Sets,
-	}
-
 	p := getter.All(settings)
-	vals, err := setOpts.MergeValues(p)
+	vals, err := i.ValueOpts.MergeValues(p)
 	if err != nil {
 		return "", err
 	}

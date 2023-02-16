@@ -149,7 +149,7 @@ func (o *options) installChart() (string, error) {
 		Wait:            true,
 		Version:         o.Version,
 		Namespace:       o.Namespace,
-		Sets:            sets,
+		:            sets,
 		Login:           true,
 		TryTimes:        2,
 		CreateNamespace: o.CreateNamespace,

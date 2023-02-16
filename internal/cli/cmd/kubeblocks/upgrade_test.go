@@ -100,8 +100,8 @@ var _ = Describe("kubeblocks", func() {
 		cmd := newUpgradeCmd(tf, streams)
 		_ = cmd.Flags().Set("monitor", "true")
 		Expect(o.upgrade(cmd)).Should(HaveOccurred())
-		Expect(len(o.Sets)).To(Equal(1))
-		Expect(o.Sets[0]).To(Equal(fmt.Sprintf(kMonitorParam, true)))
+		Expect(len(o.ValueOpts.Values)).To(Equal(1))
+		Expect(o.ValueOpts.Values[0]).To(Equal(fmt.Sprintf(kMonitorParam, true)))
 		Expect(o.upgradeChart()).Should(HaveOccurred())
 
 		o.printNotes()

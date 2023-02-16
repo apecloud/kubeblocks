@@ -26,12 +26,12 @@ kbcli kubeblocks install [flags]
       --create-namespace         Create the namespace if not present
   -h, --help                     help for install
       --monitor                  Set monitor enabled and install Prometheus, AlertManager and Grafana (default true) (default true)
-      --set stringArray          set values on the command line (can specify multiple or separate values with commas: key1=val1,key2=val2)
-      --set-file stringArray     set values from respective files specified via the command line (can specify multiple or separate values with commas: key1=path1,key2=path2)
-      --set-json stringArray     set JSON values on the command line (can specify multiple or separate values with commas: key1=jsonval1,key2=jsonval2)
-      --set-string stringArray   set STRING values on the command line (can specify multiple or separate values with commas: key1=val1,key2=val2)
+      --set stringArray          Set values on the command line (can specify multiple or separate values with commas: key1=val1,key2=val2)
+      --set-file stringArray     Set values from respective files specified via the command line (can specify multiple or separate values with commas: key1=path1,key2=path2)
+      --set-json stringArray     Set JSON values on the command line (can specify multiple or separate values with commas: key1=jsonval1,key2=jsonval2)
+      --set-string stringArray   Set STRING values on the command line (can specify multiple or separate values with commas: key1=val1,key2=val2)
       --timeout duration         Time to wait for installing KubeBlocks (default 30m0s)
-  -f, --values strings           specify values in a YAML file or a URL (can specify multiple)
+  -f, --values strings           Specify values in a YAML file or a URL (can specify multiple)
       --version string           KubeBlocks version
 ```
 

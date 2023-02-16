@@ -34,7 +34,7 @@ import (
 	mock_client "github.com/apecloud/kubeblocks/internal/testutil/k8s/mocks"
 )
 
-var _ = Describe("Reconfigure RollingPolicy", func() {
+var _ = Describe("Reconfigure util test", func() {
 
 	var (
 		mockClient *mock_client.MockClient

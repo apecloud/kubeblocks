@@ -55,8 +55,11 @@ func (rs *ReplicationSet) IsRunning(obj client.Object) (bool, error) {
 	targetReplicas := util.GetComponentReplicas(rs.Component, rs.ComponentDef)
 	var availableReplicas int32
 	for _, stsObj := range componentStsList.Items {
-		statefulStatusRevisionIsEquals := sts.Status.UpdateRevision == sts.Status.CurrentRevision
-		stsIsReady := util.StatefulSetIsReady(&stsObj, statefulStatusRevisionIsEquals, nil)
+		isRevisionConsistent, err := util.IsStsAndPodsRevisionConsistent(rs.Ctx, rs.Cli, sts)
+		if err != nil {
+			return false, err
+		}
+		stsIsReady := util.StatefulSetIsReady(&stsObj, isRevisionConsistent, nil)
 		availableReplicas += stsObj.Status.AvailableReplicas
 		if !stsIsReady {
 			componentStatusIsRunning = false

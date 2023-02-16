@@ -39,14 +39,15 @@ import (
 var _ = Describe("Deployment Controller", func() {
 	var (
 		randomStr          = testCtx.GetRandomStr()
-		timeout            = time.Second * 10
-		interval           = time.Second
 		clusterDefName     = "stateless-definition1-" + randomStr
 		clusterVersionName = "stateless-cluster-version1-" + randomStr
 		clusterName        = "stateless1-" + randomStr
-		namespace          = "default"
-		statelessCompName  = "nginx"
-		statelessType      = "proxy"
+	)
+
+	const (
+		namespace         = "default"
+		statelessCompName = "stateless"
+		statelessCompType = "stateless"
 	)
 
 	cleanAll := func() {
@@ -74,9 +75,11 @@ var _ = Describe("Deployment Controller", func() {
 	Context("test controller", func() {
 		It("", func() {
 			testdbaas.NewClusterDefFactory(clusterDefName, testdbaas.MySQLType).
-				AddComponent(testdbaas.StatelessNginxComponent, statelessType).SetDefaultReplicas(2).
+				AddComponent(testdbaas.StatelessNginxComponent, statelessCompType).SetDefaultReplicas(2).
 				Create(&testCtx).GetObject()
-			cluster := testdbaas.CreateStatelessCluster(testCtx, clusterDefName, clusterVersionName, clusterName)
+
+			cluster := testdbaas.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefName, clusterVersionName).
+				AddComponent(statelessCompName, statelessCompType).Create(&testCtx).GetObject()
 
 			By("patch cluster to Running")
 			Expect(testdbaas.ChangeObjStatus(&testCtx, cluster, func() {
@@ -91,8 +94,7 @@ var _ = Describe("Deployment Controller", func() {
 			})).Should(Succeed())
 
 			By("check stateless component phase is Failed")
-			Eventually(testdbaas.GetClusterComponentPhase(testCtx, clusterName, statelessCompName),
-				timeout, interval).Should(Equal(dbaasv1alpha1.FailedPhase))
+			Eventually(testdbaas.GetClusterComponentPhase(testCtx, clusterName, statelessCompName)).Should(Equal(dbaasv1alpha1.FailedPhase))
 
 			By("test when a pod of deployment is failed")
 			podName := fmt.Sprintf("%s-%s-%s", clusterName, statelessCompName, testCtx.GetRandomStr())
@@ -147,11 +149,10 @@ var _ = Describe("Deployment Controller", func() {
 				g.Expect(deploy.Status.AvailableReplicas == newDeployment.Status.AvailableReplicas &&
 					deploy.Status.ReadyReplicas == newDeployment.Status.ReadyReplicas &&
 					deploy.Status.Replicas == newDeployment.Status.Replicas).Should(BeTrue())
-			}), timeout, interval).Should(Succeed())
+			})).Should(Succeed())
 
 			By("waiting the component is Running")
-			Eventually(testdbaas.GetClusterComponentPhase(testCtx, clusterName, statelessCompName),
-				timeout, interval).Should(Equal(dbaasv1alpha1.RunningPhase))
+			Eventually(testdbaas.GetClusterComponentPhase(testCtx, clusterName, statelessCompName)).Should(Equal(dbaasv1alpha1.RunningPhase))
 		})
 	})
 })

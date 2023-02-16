@@ -57,6 +57,7 @@ func GetRandomStr() string {
 }
 
 func FakeCluster(name string, namespace string) *dbaasv1alpha1.Cluster {
+	var replicas int32 = 1
 	return &dbaasv1alpha1.Cluster{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       types.KindCluster,
@@ -86,8 +87,9 @@ func FakeCluster(name string, namespace string) *dbaasv1alpha1.Cluster {
 			TerminationPolicy: dbaasv1alpha1.WipeOut,
 			Components: []dbaasv1alpha1.ClusterComponent{
 				{
-					Name: ComponentName,
-					Type: ComponentType,
+					Name:     ComponentName,
+					Type:     ComponentType,
+					Replicas: &replicas,
 					Resources: corev1.ResourceRequirements{
 						Requests: corev1.ResourceList{
 							corev1.ResourceCPU:    resource.MustParse("100m"),
@@ -96,6 +98,32 @@ func FakeCluster(name string, namespace string) *dbaasv1alpha1.Cluster {
 						Limits: corev1.ResourceList{
 							corev1.ResourceCPU:    resource.MustParse("200m"),
 							corev1.ResourceMemory: resource.MustParse("2Gi"),
+						},
+					},
+					VolumeClaimTemplates: []dbaasv1alpha1.ClusterComponentVolumeClaimTemplate{
+						{
+							Name: "data",
+							Spec: &corev1.PersistentVolumeClaimSpec{
+								AccessModes: []corev1.PersistentVolumeAccessMode{
+									corev1.ReadWriteOnce,
+								},
+								Resources: corev1.ResourceRequirements{
+									Requests: corev1.ResourceList{
+										corev1.ResourceStorage: resource.MustParse("1Gi"),
+									},
+								},
+							},
+						},
+					},
+				},
+				{
+					Name:     ComponentName + "-1",
+					Type:     ComponentType,
+					Replicas: &replicas,
+					Resources: corev1.ResourceRequirements{
+						Requests: corev1.ResourceList{
+							corev1.ResourceCPU:    resource.MustParse("100m"),
+							corev1.ResourceMemory: resource.MustParse("100Mi"),
 						},
 					},
 					VolumeClaimTemplates: []dbaasv1alpha1.ClusterComponentVolumeClaimTemplate{

@@ -40,8 +40,12 @@ var _ = Describe("StatefulSet Controller", func() {
 		clusterDefName     = "cluster-definition-consensus-" + randomStr
 		clusterVersionName = "cluster-version-operations-" + randomStr
 		opsRequestName     = "wesql-restart-test-" + randomStr
-		revisionID         = "6fdd48d9cd"
-		consensusCompName  = "consensus"
+	)
+
+	const (
+		revisionID        = "6fdd48d9cd"
+		consensusCompName = "consensus"
+		consensusCompType = "consensus"
 	)
 
 	cleanAll := func() {
@@ -162,7 +166,7 @@ var _ = Describe("StatefulSet Controller", func() {
 		It("test statefulSet controller", func() {
 			By("mock cluster object")
 			_, _, cluster := testdbaas.InitConsensusMysql(testCtx, clusterDefName,
-				clusterVersionName, clusterName, consensusCompName)
+				clusterVersionName, clusterName, consensusCompType, consensusCompName)
 
 			By("mock cluster phase is 'Rebooting' and restart operation is running on cluster")
 			Expect(testdbaas.ChangeObjStatus(&testCtx, cluster, func() {

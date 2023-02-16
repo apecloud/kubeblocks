@@ -18,9 +18,13 @@ package dbaas
 
 import (
 	corev1 "k8s.io/api/core/v1"
+	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/kubectl/pkg/util/storage"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	"github.com/apecloud/kubeblocks/internal/testutil"
 )
 
 // ConfigMap
@@ -61,4 +65,18 @@ func NewPVC(size string) corev1.PersistentVolumeClaimSpec {
 			},
 		},
 	}
+}
+
+func CreateStorageClass(testCtx testutil.TestContext, storageClassName string, allowVolumeExpansion bool) *storagev1.StorageClass {
+	storageClass := &storagev1.StorageClass{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: storageClassName,
+			Annotations: map[string]string{
+				storage.IsDefaultStorageClassAnnotation: "false",
+			},
+		},
+		Provisioner:          "kubernetes.io/no-provisioner",
+		AllowVolumeExpansion: &allowVolumeExpansion,
+	}
+	return CreateK8sResource(testCtx, storageClass).(*storagev1.StorageClass)
 }

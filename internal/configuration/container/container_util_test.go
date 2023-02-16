@@ -107,12 +107,12 @@ func TestExecShellCommand(t *testing.T) {
 		want    string
 		wantErr bool
 	}{{
-		name:    "pwd_test",
-		cmd:     exec.Command("env"),
+		name:    "go_test",
+		cmd:     exec.Command("go", "env"),
 		want:    "",
 		wantErr: false,
 	}, {
-		name:    "pwd_test",
+		name:    "failed_test",
 		cmd:     exec.Command("not_command"),
 		want:    "",
 		wantErr: true,

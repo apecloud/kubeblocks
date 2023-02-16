@@ -31,7 +31,6 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 
-	. "github.com/apecloud/kubeblocks/cmd/probe/internal"
 	. "github.com/apecloud/kubeblocks/cmd/probe/internal/binding"
 )
 

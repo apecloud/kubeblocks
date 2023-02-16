@@ -28,15 +28,54 @@ import (
 	"github.com/dapr/kit/logger"
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
-
-	. "github.com/apecloud/kubeblocks/cmd/probe/internal"
 )
 
+type Operation func(ctx context.Context, request *bindings.InvokeRequest, response *bindings.InvokeResponse) (OpsResult, error)
+
+type OpsResult map[string]interface{}
+
+// AccessMode define SVC access mode enums.
+// +enum
+type AccessMode string
+
+type BaseOperations struct {
+       RunningCheckFailedCount int
+       StatusCheckFailedCount  int
+       RoleCheckFailedCount    int
+       RoleUnchangedCount      int
+       CheckFailedThreshold    int
+       // RoleDetectionThreshold is used to set the report duration of role event after role changed,
+       // then event controller can always get rolechanged events to maintain pod label accurately
+       // in cases of:
+       // 1 rolechanged event lost;
+       // 2 pod role label deleted or updated incorrectly.
+       RoleDetectionThreshold int
+       DBPort                 int
+       DBType                 string
+       OriRole                string
+       DBRoles                map[string]AccessMode
+       Logger                 logger.Logger
+       Metadata               bindings.Metadata
+       InitIfNeed             func() bool
+       GetRole                func(ctx context.Context, request *bindings.InvokeRequest, response *bindings.InvokeResponse) (string, error)
+       OperationMap           map[bindings.OperationKind]Operation
+}
+
 const (
-	CheckRunningOperation bindings.OperationKind = "checkRunning"
-	CheckStatusOperation  bindings.OperationKind = "checkStatus"
-	CheckRoleOperation    bindings.OperationKind = "checkRole"
-	GetRoleOperation      bindings.OperationKind = "getRole"
+	ReadWrite AccessMode = "ReadWrite"
+	Readonly  AccessMode = "Readonly"
+	None      AccessMode = "None"
+
+	// keys from response's metadata.
+	RespOpKey           = "operation"
+	RespStartTimeKey    = "start-time"
+	RespRowsAffectedKey = "rows-affected"
+	RespEndTimeKey      = "end-time"
+	RespDurationKey     = "duration"
+	StatusCode          = "status-code"
+	// 451 Unavailable For Legal Reasons, used to indicate check failed and trigger kubelet events
+	OperationFailedHTTPCode = "451"
+	OperationNotFoundHTTPCode = "404"
 
 	// CommandSQLKey keys from request's metadata.
 	CommandSQLKey = "sql"
@@ -50,32 +89,12 @@ const (
 	RunningCheckType = iota
 	StatusCheckType
 	RoleChangedCheckType
+
+	CheckRunningOperation bindings.OperationKind = "checkRunning"
+	CheckStatusOperation  bindings.OperationKind = "checkStatus"
+	CheckRoleOperation    bindings.OperationKind = "checkRole"
+	GetRoleOperation      bindings.OperationKind = "getRole"
 )
-
-type Operation func(ctx context.Context, request *bindings.InvokeRequest, response *bindings.InvokeResponse) (OpsResult, error)
-
-type BaseOperations struct {
-	RunningCheckFailedCount int
-	StatusCheckFailedCount  int
-	RoleCheckFailedCount    int
-	RoleUnchangedCount      int
-	CheckFailedThreshold    int
-	// RoleDetectionThreshold is used to set the report duration of role event after role changed,
-	// then event controller can always get rolechanged events to maintain pod label accurately
-	// in cases of:
-	// 1 rolechanged event lost;
-	// 2 pod role label deleted or updated incorrectly.
-	RoleDetectionThreshold int
-	DBPort                 int
-	DBType                 string
-	OriRole                string
-	DBRoles                map[string]AccessMode
-	Logger                 logger.Logger
-	Metadata               bindings.Metadata
-	InitIfNeed             func() bool
-	GetRole                func(ctx context.Context, request *bindings.InvokeRequest, response *bindings.InvokeResponse) (string, error)
-	OperationMap           map[bindings.OperationKind]Operation
-}
 
 func init() {
 	viper.SetDefault("KB_CHECK_FAILED_THRESHOLD", defaultCheckFailedThreshold)
@@ -140,7 +159,6 @@ func (ops *BaseOperations) Invoke(ctx context.Context, req *bindings.InvokeReque
 	resp := &bindings.InvokeResponse{
 		Metadata: map[string]string{
 			RespOpKey:        string(req.Operation),
-			RespSQLKey:       "test",
 			RespStartTimeKey: startTime.Format(time.RFC3339Nano),
 		},
 	}
@@ -159,7 +177,7 @@ func (ops *BaseOperations) Invoke(ctx context.Context, req *bindings.InvokeReque
 		opsRes := OpsResult{}
 		opsRes["event"] = "OperationNotImplemented"
 		opsRes["message"] = message
-		resp.Metadata[StatusCode] = OperationFailedHTTPCode
+		resp.Metadata[StatusCode] = OperationNotFoundHTTPCode
 		res, _ := json.Marshal(opsRes)
 		resp.Data = res
 		return updateRespMetadata()
@@ -188,7 +206,7 @@ func (ops *BaseOperations) CheckRoleOps(ctx context.Context, request *bindings.I
 		ops.Logger.Errorf(message)
 		opsRes["event"] = "OperationNotImplemented"
 		opsRes["message"] = message
-		response.Metadata[StatusCode] = OperationFailedHTTPCode
+		response.Metadata[StatusCode] = OperationNotFoundHTTPCode
 		return opsRes, nil
 	}
 

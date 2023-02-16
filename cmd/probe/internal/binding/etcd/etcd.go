@@ -27,7 +27,6 @@ import (
 	"github.com/dapr/kit/logger"
 	v3 "go.etcd.io/etcd/client/v3"
 
-	. "github.com/apecloud/kubeblocks/cmd/probe/internal"
 	. "github.com/apecloud/kubeblocks/cmd/probe/internal/binding"
 )
 

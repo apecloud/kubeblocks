@@ -101,6 +101,8 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return r.doNewPhaseAction(reqCtx, backup)
 	case dataprotectionv1alpha1.BackupInProgress:
 		return r.doInProgressPhaseAction(reqCtx, backup)
+	case dataprotectionv1alpha1.BackupCompleted:
+		return r.doCompletedPhaseAction(reqCtx, backup)
 	default:
 		return intctrlutil.Reconciled()
 	}
@@ -170,7 +172,7 @@ func (r *BackupReconciler) doNewPhaseAction(
 	if err := r.Client.Status().Update(reqCtx.Ctx, backup); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
-	return intctrlutil.RequeueAfter(reconcileInterval, reqCtx.Log, "")
+	return intctrlutil.Reconciled()
 }
 
 func (r *BackupReconciler) doInProgressPhaseAction(
@@ -258,6 +260,18 @@ func (r *BackupReconciler) doInProgressPhaseAction(
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 
+	return intctrlutil.Reconciled()
+}
+
+func (r *BackupReconciler) doCompletedPhaseAction(
+	reqCtx intctrlutil.RequestCtx,
+	backup *dataprotectionv1alpha1.Backup) (ctrl.Result, error) {
+
+	if backup.Spec.BackupType == dataprotectionv1alpha1.BackupTypeSnapshot {
+		if err := r.deleteReferenceBatchV1Jobs(reqCtx, backup); err != nil {
+			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+		}
+	}
 	return intctrlutil.Reconciled()
 }
 

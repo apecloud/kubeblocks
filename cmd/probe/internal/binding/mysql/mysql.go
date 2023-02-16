@@ -21,7 +21,6 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"database/sql"
-	"encoding/json"
 	"fmt"
 	"os"
 	"strconv"
@@ -35,6 +34,7 @@ import (
 	"github.com/dapr/kit/logger"
 	"github.com/dapr/components-contrib/bindings"
 
+	. "github.com/apecloud/kubeblocks/cmd/probe/internal"
 	. "github.com/apecloud/kubeblocks/cmd/probe/internal/binding"
 )
 
@@ -201,19 +201,20 @@ func (mysqlOps *MysqlOperations) GetRole(ctx context.Context, request *bindings.
 	var serverID string
 	for rows.Next() {
 		if err = rows.Scan(&curLeader, &role, &serverID); err != nil {
-			mysqlOps.Logger.Errorf("checkRole error: %", err)
+			mysqlOps.Logger.Errorf("Role query error: %v", err)
 			return role, err
 		}
 	}
 	return role, nil
 }
-func (mysqlOps *MysqlOperations) GetRoleOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) ([]byte, error) {
+func (mysqlOps *MysqlOperations) GetRoleOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
 	role, err := mysqlOps.GetRole(ctx, req, resp)
 	if err != nil {
 		return nil, err
 	}
-	res, _ := json.Marshal(role)
-	return res, nil
+	opsRes := OpsResult{}
+	opsRes["role"] = role
+	return opsRes, nil
 }
 
 // StatusCheck function design details: https://infracreate.feishu.cn/wiki/wikcndch7lMZJneMnRqaTvhQpwb#doxcnOUyQ4Mu0KiUo232dOr5aad

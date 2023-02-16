@@ -17,18 +17,83 @@ limitations under the License.
 package dbaas
 
 import (
-	"fmt"
+	"math/rand"
 	"strings"
 	"testing"
 
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
-	"k8s.io/apimachinery/pkg/util/yaml"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	testdbaas "github.com/apecloud/kubeblocks/internal/testutil/dbaas"
-	"github.com/apecloud/kubeblocks/test/testdata"
 )
+
+func mockSystemAccountsSpec() *dbaasv1alpha1.SystemAccountSpec {
+	var (
+		mysqlClientImage = "docker.io/mysql:8.0.30"
+		mysqlCmdConfig   = dbaasv1alpha1.CmdExecutorConfig{
+			Image:   mysqlClientImage,
+			Command: []string{"mysql"},
+			Args:    []string{"-h$(KB_ACCOUNT_ENDPOINT)", "-e $(KB_ACCOUNT_STATEMENT)"},
+		}
+		pwdConfig = dbaasv1alpha1.PasswordConfig{
+			Length:     10,
+			NumDigits:  5,
+			NumSymbols: 0,
+		}
+	)
+
+	spec := &dbaasv1alpha1.SystemAccountSpec{
+		CmdExecutorConfig: &mysqlCmdConfig,
+		PasswordConfig:    pwdConfig,
+		Accounts:          []dbaasv1alpha1.SystemAccountConfig{},
+	}
+	var account dbaasv1alpha1.SystemAccountConfig
+	var scope dbaasv1alpha1.ProvisionScope
+	for _, name := range getAllSysAccounts() {
+		randomToss := rand.Intn(10)
+		if randomToss%2 == 0 {
+			scope = dbaasv1alpha1.AnyPods
+		} else {
+			scope = dbaasv1alpha1.AllPods
+		}
+
+		if randomToss%3 == 0 {
+			account = mockCreateByRefSystemAccount(name, scope)
+		} else {
+			account = mockCreateByStmtSystemAccount(name)
+		}
+		spec.Accounts = append(spec.Accounts, account)
+	}
+	return spec
+}
+
+func mockCreateByStmtSystemAccount(name dbaasv1alpha1.AccountName) dbaasv1alpha1.SystemAccountConfig {
+	return dbaasv1alpha1.SystemAccountConfig{
+		Name: name,
+		ProvisionPolicy: dbaasv1alpha1.ProvisionPolicy{
+			Type: dbaasv1alpha1.CreateByStmt,
+			Statements: &dbaasv1alpha1.ProvisionStatements{
+				CreationStatement: "CREATE USER IF NOT EXISTS $(USERNAME) IDENTIFIED BY \"$(PASSWD)\";",
+				DeletionStatement: "DROP USER IF EXISTS $(USERNAME);",
+			},
+		},
+	}
+}
+
+func mockCreateByRefSystemAccount(name dbaasv1alpha1.AccountName, scope dbaasv1alpha1.ProvisionScope) dbaasv1alpha1.SystemAccountConfig {
+	return dbaasv1alpha1.SystemAccountConfig{
+		Name: name,
+		ProvisionPolicy: dbaasv1alpha1.ProvisionPolicy{
+			Type:  dbaasv1alpha1.ReferToExisting,
+			Scope: scope,
+			SecretRef: &dbaasv1alpha1.ProvisionSecretRef{
+				Namespace: testCtx.DefaultNamespace,
+				Name:      "$(CONN_CREDENTIAL_SECRET_NAME)",
+			},
+		},
+	}
+}
 
 func TestUpdateFacts(t *testing.T) {
 	type testCase struct {
@@ -72,41 +137,36 @@ func TestUpdateFacts(t *testing.T) {
 
 func TestRenderJob(t *testing.T) {
 	var (
-		randomStr             = testCtx.GetRandomStr()
-		clusterDefinitionName = "cluster-definition-" + randomStr
-		clusterVersionName    = "clusterversion-" + randomStr
-		clusterName           = "cluster-" + randomStr
-		consensusCompName     = "consensus" + randomStr
+		clusterDefName     = "test-clusterdef"
+		clusterVersionName = "test-clusterversion"
+		clusterNamePrefix  = "test-cluster"
+		mysqlCompType      = "replicasets"
+		mysqlCompName      = "mysql"
 	)
 
-	mockClusterDef := func(filePath string) *dbaasv1alpha1.ClusterDefinition {
-		clusterDefBytes, err := testdata.GetTestDataFileContent(filePath)
-		assert.Nil(t, err)
-		clusterDefYaml := fmt.Sprintf(string(clusterDefBytes), clusterDefinitionName)
-		clusterDef := &dbaasv1alpha1.ClusterDefinition{}
-		err = yaml.Unmarshal([]byte(clusterDefYaml), clusterDef)
-		assert.Nil(t, err)
-		return clusterDef
-	}
-
-	clusterDef := mockClusterDef("consensusset/wesql_cd_sysacct.yaml")
+	systemAccount := mockSystemAccountsSpec()
+	clusterDef := testdbaas.NewClusterDefFactory(clusterDefName, testdbaas.MySQLType).
+		AddComponent(testdbaas.StatefulMySQLComponent, mysqlCompType).
+		AddSystemAccountSpec(systemAccount).
+		GetObject()
 	assert.NotNil(t, clusterDef)
 	assert.NotNil(t, clusterDef.Spec.Components[0].SystemAccounts)
-	cluster := testdbaas.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefinitionName, clusterVersionName).
-		AddComponent(consensusCompName, "consensus").GetObject()
+
+	cluster := testdbaas.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix, clusterDef.Name, clusterVersionName).
+		AddComponent(mysqlCompType, mysqlCompName).GetObject()
 	assert.NotNil(t, cluster)
 
 	accountsSetting := clusterDef.Spec.Components[0].SystemAccounts
 	replaceEnvsValues(cluster.Name, accountsSetting)
 	cmdExecutorConfig := accountsSetting.CmdExecutorConfig
 
-	engine := newCustomizedEngine(cmdExecutorConfig, cluster, consensusCompName)
+	engine := newCustomizedEngine(cmdExecutorConfig, cluster, mysqlCompName)
 	assert.NotNil(t, engine)
 
 	compKey := componentUniqueKey{
 		namespace:     cluster.Namespace,
 		clusterName:   cluster.Name,
-		componentName: consensusCompName,
+		componentName: mysqlCompName,
 	}
 
 	for _, acc := range accountsSetting.Accounts {

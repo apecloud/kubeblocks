@@ -52,6 +52,14 @@ func CreateK8sResource(testCtx testutil.TestContext, obj client.Object) client.O
 	return obj
 }
 
+func CheckedCreateK8sResource(testCtx testutil.TestContext, obj client.Object) client.Object {
+	gomega.Expect(testCtx.CheckedCreateObj(testCtx.Ctx, obj)).Should(gomega.Succeed())
+	// wait until cluster created
+	gomega.Eventually(CheckObjExists(&testCtx, client.ObjectKeyFromObject(obj),
+		obj, true)).Should(gomega.Succeed())
+	return obj
+}
+
 // CreateClusterWithHybridComps creates a cluster with hybrid components for testing.
 func CreateClusterWithHybridComps(
 	testCtx testutil.TestContext,

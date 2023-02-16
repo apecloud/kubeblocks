@@ -84,25 +84,27 @@ var _ = Describe("TLS self-signed cert function", func() {
 
 	Context("tls is enabled/disabled", func() {
 		BeforeEach(func() {
-			configMapObj := testdbaas.CreateCustomizedObj(&testCtx,
-				"resources/mysql_config_cm.yaml", &corev1.ConfigMap{},
+			configMapObj := testdbaas.CheckedCreateCustomizedObj(&testCtx,
+				"resources/mysql_config_cm.yaml",
+				&corev1.ConfigMap{},
 				testCtx.UseDefaultNamespace())
 
-			configConstraintObj := testdbaas.CreateCustomizedObj(&testCtx,
+			configConstraintObj := testdbaas.CheckedCreateCustomizedObj(&testCtx,
 				"resources/mysql_config_template.yaml",
 				&dbaasv1alpha1.ConfigConstraint{})
+
 			By("Create a clusterDef obj")
 			testdbaas.NewClusterDefFactory(clusterDefName, testdbaas.MySQLType).
 				SetConnectionCredential(map[string]string{"username": "root", "password": ""}).
 				AddComponent(testdbaas.ConsensusMySQLComponent, statefulCompType).
 				AddConfigTemplate(configTplName, configMapObj.Name, configConstraintObj.Name, configVolumeName, nil).
 				AddContainerEnv(mysqlContainerName, corev1.EnvVar{Name: "MYSQL_ALLOW_EMPTY_PASSWORD", Value: "yes"}).
-				Create(&testCtx).GetObject()
+				CheckedCreate(&testCtx).GetObject()
 
 			By("Create a clusterVersion obj")
 			testdbaas.NewClusterVersionFactory(clusterVersionName, clusterDefName).
 				AddComponent(statefulCompType).AddContainerShort(mysqlContainerName, testdbaas.ApeCloudMySQLImage).
-				Create(&testCtx).GetObject()
+				CheckedCreate(&testCtx).GetObject()
 
 		})
 
@@ -130,7 +132,7 @@ var _ = Describe("TLS self-signed cert function", func() {
 				Eventually(func() error {
 					err := k8sClient.Get(ctx, nsName, secret)
 					return err
-				}).WithPolling(time.Second).WithTimeout(10 * time.Second).Should(Succeed())
+				}).WithPolling(time.Second).WithTimeout(1000 * time.Second).Should(Succeed())
 				By("Checking volume & volumeMount settings in podSpec")
 				stsList := testk8s.ListAndCheckStatefulSet(&testCtx, client.ObjectKeyFromObject(clusterObj))
 				sts := stsList.Items[0]

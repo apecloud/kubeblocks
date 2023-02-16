@@ -235,6 +235,17 @@ prometheus:
       #   cpu: 10m
       #   memory: 32Mi
 
+    ## Security context to be added to alertmanager pods
+    ##
+    securityContext:
+      runAsUser: 0
+      runAsNonRoot: false
+      runAsGroup: 65534
+      fsGroup: 65534
+
+    containerSecurityContext:
+      allowPrivilegeEscalation: false
+
   kubeStateMetrics:
     ## If false, kube-state-metrics sub-chart will not be installed
     ##
@@ -334,6 +345,17 @@ prometheus:
     ## Prometheus' data retention period (default if not specified is 15 days)
     ##
     retention: "3d"
+
+    ## Security context to be added to server pods
+    ##
+    securityContext:
+      runAsUser: 0
+      runAsNonRoot: false
+      runAsGroup: 65534
+      fsGroup: 65534
+
+    containerSecurityContext:
+      allowPrivilegeEscalation: false
 
   ## Sample prometheus rules/alerts
   ## NOTE: Please review these carefully as thresholds and behavior may not meet

@@ -37,9 +37,16 @@ This guide introduces how to use KubeBlocks to create an ApeCloud MySQL cluster 
    kbcli kubeblocks install --set loadbalancer.enabled=true
    ```
 
-   * `--set snapshot-controller.enabled=true` option enables KubeBlocks to use EBS snapshot for backup and restore and this option is required for the deployment on AWS.
-
-   * If you want the node outside the Kubernetes cluster (the node should be within the same VPC) to visit the database cluster created by KubeBlocks, use `--set loadbalancer.enabled=true` option as the above command does. For more details on installation, refer to [Install/Uninstall kbcli and KubeBlocks](../install_kbcli_kubeblocks/install_and_unistall_kbcli_and_kubeblocks.md).
+   | Option | Usage |
+   | :--    | :--   |
+   | `set snapshot-controller.enabled` | `--set snapshot-controller.enabled=true` option enables KubeBlocks to use EBS snapshot for backup and restore and this option is required for the deployment on AWS.|
+   | `set loadbalancer.enabled` | If you want the node outside the Kubernetes cluster (the node should be within the same VPC) to visit the database cluster created by KubeBlocks, use `--set loadbalancer.enabled=true` option as the above command does. For more details on installation, refer to [Install/Uninstall kbcli and KubeBlocks](../install_kbcli_kubeblocks/install_and_unistall_kbcli_and_kubeblocks.md). |
+   | `n` | If you want to specify a namespace, use the global command-line option `-n` to name your namespace and configure `--create-namespace` as `true`. For example, <br />```kbcli kubeblocks install -n kubeblocks --create-namespace=true``` |
+   | `create-namespace` | Use `create-namespace` to specify whether to create a default namespace.|
+   
+   > ***Note:***
+   > 
+   > For globall command line options, run `kbcli options` to list all (applies to all commands). 
 
    ***Result***
 

@@ -14,24 +14,30 @@
    ```
 * KubeBlocks: Install KubeBlocks on your host. Refer to [Install/Uninstall kbcli and KubeBlocks](../../install_kbcli_kubeblocks/install_and_unistall_kbcli_and_kubeblocks.md) for details.
   1. Run the command below to install KubeBlock.
-   ```
-   kbcli kubeblocks install
-   ```
+     ```
+     kbcli kubeblocks install
+     ```
+     > ***Note:***
+     > 
+     > If you want to specify a namespace, use `-n` to name your namespace and configure `--create-namespace` as `true`. For example,
+     > ```
+     > kbcli kubeblocks install -n kubeblocks --create-namespace=true
+     > ```
   2. Run the command below to verify whether KubeBlocks is installed successfully
-   ```
-   kubectl get pod
-   ```
+     ```
+     kubectl get pod
+     ```
 
-   ***Result***
+     ***Result***
 
-   Four pods starting with `kubeblocks` are displayed. For example,
-   ```
-   NAME                                                  READY   STATUS    RESTARTS   AGE
-   kubeblocks-7d4c6fd684-9hjh7                           1/1     Running   0          3m33s
-   kubeblocks-grafana-b765d544f-wj6c6                    3/3     Running   0          3m33s
-   kubeblocks-prometheus-alertmanager-7c558865f5-hsfn5   2/2     Running   0          3m33s
-   kubeblocks-prometheus-server-5c89c8bc89-mwrx7         2/2     Running   0          3m33s
-   ```
+     Four pods starting with `kubeblocks` are displayed. For example,
+     ```
+     NAME                                                  READY   STATUS    RESTARTS   AGE
+     kubeblocks-7d4c6fd684-9hjh7                           1/1     Running   0          3m33s
+     kubeblocks-grafana-b765d544f-wj6c6                    3/3     Running   0          3m33s
+     kubeblocks-prometheus-alertmanager-7c558865f5-hsfn5   2/2     Running   0          3m33s
+     kubeblocks-prometheus-server-5c89c8bc89-mwrx7         2/2     Running   0          3m33s
+     ```
 * Run the command below to view all the database types available for creating a cluster. 
   ```
   kbcli clusterdefinition list
@@ -47,7 +53,7 @@
 
 ***Steps:***
 
-1. Run the command below to list all the available kernel versions and choose one that you need.
+1. Run the command below to list all the available kernel versions and choose the one that you need.
    ```
    kbcli clusterversion list
    ```
@@ -59,21 +65,28 @@
    NAME              CLUSTER-DEFINITION   STATUS      AGE
    ac-mysql-8.0.30   apecloud-mysql       Available   2m40s
    ```
-2. Run the command below to create a MySQL cluster. 
+2. Run the command below to create a MySQL cluster.
    ```
    $ kbcli cluster create mysql-cluster --cluster-definition='apecloud-mysql'
    ```
+
+   A cluster then is created under the default namespace. But if you have specified a namespace when installing KubeBlocks, specify this namespace for your cluster by using `-n` option. For example,
+
+   ```
+   $ kbcli cluster create mysql-cluster -n kubeblocks --cluster-definition='apecloud-mysql'
+   ```
+
    If you want to create a cluster with specified parameters, follow the options below.
 
    **Option 1.** (Recommended) Run `export`
 
-   If you want to create a Paxos group, run export KBCLI_CLUSTER_DEFAULT_REPLICAS=3 before creating a cluster. For example,
+   If you want to create a Paxos group, run `export KBCLI_CLUSTER_DEFAULT_REPLICAS=3` before creating a cluster. For example,
    ```
    $ export KBCLI_CLUSTER_DEFAULT_REPLICAS=3
    $ kbcli cluster create mysql-cluster --cluster-definition='apecloud-mysql'
    ```
 
-   If you want to adjust the storage size, run export KBCLI_CLUSTER_DEFAULT_STORAGE_SIZE=nGi before creating a cluster. For example,
+   If you want to adjust the storage size, run `export KBCLI_CLUSTER_DEFAULT_STORAGE_SIZE=nGi` before creating a cluster. For example,
   
    ```
    $ export KBCLI_CLUSTER_DEFAULT_STORAGE_SIZE=20Gi
@@ -104,7 +117,7 @@
 | Option   | Description      |
 | :--      | :--              |
 | `cluster-definition` | It specifies the cluster definition. Run `kbcli cluster-definition` list to show all available cluster definitions. For example, <br />```kbcli cluster create mycluster --cluster-definition='apecloud-mysql'``` |
-| `cluster-version | It specifies the cluster version. Run `kbcli cluster-version list` to show all available cluster versions. If you do not specify a cluster version when creating a cluster, the latest version is used by default. |
+| `cluster-version` | It specifies the cluster version. Run `kbcli cluster-version list` to show all available cluster versions. If you do not specify a cluster version when creating a cluster, the latest version is used by default. |
 | `enable-all-logs` | It enables you to view all application logs. When this option is enabled, enabledLogs of component level will be ignored. This option is set as true by default. |
 | `help` | It shows the help guide for `kbcli cluster create`. |
 | `monitor` | It is used to enable the monitor function and inject metrics exporter. It is set as true by default. |

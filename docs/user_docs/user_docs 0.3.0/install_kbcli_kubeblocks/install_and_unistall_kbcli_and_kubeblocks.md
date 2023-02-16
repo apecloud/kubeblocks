@@ -57,6 +57,19 @@ Here we take zsh as an example.
    ```
    kbcli kubeblocks install
    ```
+   
+   | **Option**       | **Usage**         |
+   | :--              | :--               |
+   | `n`              | If you want to specify a namespace, use the global command line option `-n` to name your namespace and configure `--create-namespace` as `true`. For example, <br />```kbcli kubeblocks install -n kubeblocks --create-namespace=true``` |
+   | `create-namespace` | Use `create-namespace` to specify whether to create a default namespace.|
+   | `monitor`      | Use `monitor` to specify whether to install the addons relevant to database monitoring and visualization.|
+   | `version`      | User `version` to specify the version you want to install. Find the supported version in [KubeBlocks Helm Charts](https://github.com/apecloud/helm-charts).|
+   | `set snapshot-controller.enabled=true` | When this parameter is set as `true`, the snapshot backup function of the database instance is enabled (only applied to the EKS environment). Refer to [Backup and restore for MySQL single node](../manage_mysql_database_with_kubeblocks/backup_restore/backup_and_restore_for_MySQL_standalone.md) for details.|
+   | `set loadbalancer.enabled=true` | When this parameter is set as `true`, the loadbalancer function is enabled (only applied to the EKS environment). This function provides a stable virtual IP address externally to facilitate client access within the same VPC but outside the Kubernetes cluster.|
+
+   > ***Note:***
+   > 
+   > For globall command line options, run `kbcli options` to list all (applies to all commands).
 
    ***Result***
    
@@ -78,7 +91,7 @@ Here we take zsh as an example.
      kbcli kubeblocks install --set replicaCount=3
 
    Options:
-       --create-namespace=true:
+       --create-namespace=false:
            create the namespace if not present
 
        --monitor=true:
@@ -95,14 +108,6 @@ Here we take zsh as an example.
 
    Use "kbcli options" for a list of global command-line options (applies to all commands).
    ```
-
-   | **Option**       | **Usage**         |
-   | :--              | :--               |
-   | `create-namespace` | Use `create-namespace` to specify whether to create a namespace.|
-   | `monitor`      | Use `monitor` to specify whether to install the addons relevant to database monitoring and visualization.|
-   | `version`      | User `version` to specify the version you want to install. Find the supported version in [KubeBlocks Helm Charts](https://github.com/apecloud/helm-charts).|
-   | `set snapshot-controller.enabled=true` | When this parameter is set as `true`, the snapshot backup function of the database instance is enabled (only applied to the EKS environment). Refer to [Backup and restore for MySQL single node](../manage_mysql_database_with_kubeblocks/backup_restore/backup_and_restore_for_MySQL_standalone.md) for details.|
-   | `set loadbalancer.enabled=true` | When this parameter is set as `true`, the loadbalancer function is enabled (only applied to the EKS environment). This function provides a stable virtual IP address externally to facilitate client access within the same VPC but outside the Kubernetes cluster.|
 2. Run the command below to verify whether KubeBlocks is installed successfully.
    ```
    kubectl get pod

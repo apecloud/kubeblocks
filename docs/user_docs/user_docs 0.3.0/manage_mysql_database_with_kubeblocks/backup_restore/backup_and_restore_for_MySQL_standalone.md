@@ -12,15 +12,15 @@ This section shows how to use kbcli to back up and restore a MySQL standalone in
 
 ***Steps:***
 
-1. Install kubeblocks and enable snapshot backup.
-Install KubeBlocks and enable the snapshot controller plugin.
+1. Install KubeBlocks and enable snapshot backup.
+   Install KubeBlocks and enable the snapshot controller plugin.
    ```
    kbcli kubeblocks install --set snapshot-controller.enabled=true
    ```
    To enable the snapshot controller plugin after installation.
    ```
    kbcli kubeblocks upgrade --set snapshot-controller.enabled=true
-   ```
+   ```   
    Since your kubectl is already connected to the EKS cluster, this command installs the latest version of KubeBlocks in your EKS environment.
 
    Verify the installation with the following command.
@@ -36,40 +36,40 @@ Install KubeBlocks and enable the snapshot controller plugin.
    ```
 2. Configure EKS to support the snapshot function.
 The backup is realized by the volume snapshot function, you need to configure EKS to support the snapshot function.
-- Configure storage class of snapshot (the assigned ebs volume is gp3).
-  ```
-  kubectl create -f - <<EOF
-  kind: StorageClass
-  apiVersion: storage.k8s.io/v1
-  metadata:
-    name: ebs-sc
-    annotations:
-      storageclass.kubernetes.io/is-default-class: "true"
-  provisioner: ebs.csi.aws.com
-  parameters:
-    csi.storage.k8s.io/fstype: xfs
-    type: gp3
-  allowVolumeExpansion: true
-  volumeBindingMode: WaitForFirstConsumer
-  EOF
+    - Configure the storage class of snapshot (the assigned ebs volume is gp3).
+       ```
+       kubectl create -f - <<EOF
+       kind: StorageClass
+       apiVersion: storage.k8s.io/v1
+       metadata:
+         name: ebs-sc
+         annotations:
+           storageclass.kubernetes.io/is-default-class: "true"
+       provisioner: ebs.csi.aws.com
+       parameters:
+         csi.storage.k8s.io/fstype: xfs
+         type: gp3
+       allowVolumeExpansion: true
+       volumeBindingMode: WaitForFirstConsumer
+       EOF
   
-  kubectl patch sc/gp2 -p '{"metadata": {"annotations": {"storageclass.kubernetes.io/is-default-class": "false"}}}'
-  ```
-- Configure default snapshot volumesnapshot class
-  ```
-  cat <<"EOF" > snapshot_class.yaml
-  apiVersion: snapshot.storage.k8s.io/v1
-  kind: VolumeSnapshotClass
-  metadata:
-    name: csi-aws-vsc
-    annotations:
-      snapshot.storage.kubernetes.io/is-default-class: "true"
-  driver: ebs.csi.aws.com
-  deletionPolicy: Delete
-  EOF
+      kubectl patch sc/gp2 -p '{"metadata": {"annotations": {"storageclass.kubernetes.io/is-default-class": "false"}}}'
+       ```
+    - Configure default snapshot volumesnapshot class
+       ```
+       cat <<"EOF" > snapshot_class.yaml
+       apiVersion: snapshot.storage.k8s.io/v1
+       kind: VolumeSnapshotClass
+       metadata:
+         name: csi-aws-vsc
+         annotations:
+           snapshot.storage.kubernetes.io/is-default-class: "true"
+       driver: ebs.csi.aws.com
+       deletionPolicy: Delete
+      EOF
   
-  kubectl create -f snapshot_class.yaml
-  ```
+      kubectl create -f snapshot_class.yaml
+      ```
 3. Create a MySQL cluster. 
    In this section, the cluster created is mysql-cluster.
    ```

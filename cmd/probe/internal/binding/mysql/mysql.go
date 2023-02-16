@@ -95,7 +95,8 @@ func (mysqlOps *MysqlOperations) Init(metadata bindings.Metadata) error {
 	mysqlOps.InitIfNeed = mysqlOps.initIfNeed
 	mysqlOps.BaseOperations.GetRole = mysqlOps.GetRole
 	mysqlOps.DBPort = mysqlOps.GetRunningPort()
-	mysqlOps.OperationMap[GetRoleOperation] = mysqlOps.GetRoleOps
+	mysqlOps.RegisterOperation(GetRoleOperation, mysqlOps.GetRoleOps)
+	mysqlOps.RegisterOperation(CheckStatusOperation, mysqlOps.CheckStatusOps)
 	return nil
 }
 
@@ -221,7 +222,7 @@ func (mysqlOps *MysqlOperations) GetRoleOps(ctx context.Context, req *bindings.I
 }
 
 // StatusCheckOps design details: https://infracreate.feishu.cn/wiki/wikcndch7lMZJneMnRqaTvhQpwb#doxcnOUyQ4Mu0KiUo232dOr5aad
-func (mysqlOps *MysqlOperations) StatusCheckOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
+func (mysqlOps *MysqlOperations) CheckStatusOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
 	rwSql := fmt.Sprintf(`begin;
 	create table if not exists kb_health_check(type int, check_ts bigint, primary key(type));
 	insert into kb_health_check values(%d, now()) on duplicate key update check_ts = now();
@@ -245,7 +246,7 @@ func (mysqlOps *MysqlOperations) StatusCheckOps(ctx context.Context, req *bindin
 
 	result := OpsResult{}
 	if err != nil {
-		mysqlOps.Logger.Infof("statusCheck error: %v", err)
+		mysqlOps.Logger.Infof("CheckStatus error: %v", err)
 		result["event"] = "statusCheckFailed"
 		result["message"] = err.Error()
 		if mysqlOps.StatusCheckFailedCount%mysqlOps.CheckFailedThreshold == 0 {

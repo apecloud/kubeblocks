@@ -111,6 +111,14 @@ func (ops *BaseOperations) Init(metadata bindings.Metadata) {
 }
 
 // Operations returns list of operations supported by the binding.
+func (ops *BaseOperations) RegisterOperation(opsKind bindings.OperationKind, operation Operation) {
+	if ops.OperationMap == nil {
+		ops.OperationMap  = map[bindings.OperationKind]Operation{}
+	}
+	ops.OperationMap[opsKind] = operation
+}
+
+// Operations returns list of operations supported by the binding.
 func (ops *BaseOperations) Operations() []bindings.OperationKind {
 	opsKinds := make([]bindings.OperationKind, len(ops.OperationMap))
 	i := 0

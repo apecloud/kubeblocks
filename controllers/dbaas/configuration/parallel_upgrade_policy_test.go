@@ -138,13 +138,6 @@ var _ = Describe("Reconfigure ParallelPolicy", func() {
 					fromPodObjectList(newMockPodsWithStatefulSet(&mockParam.ComponentUnits[0], 3))), testutil.WithTimes(2),
 			))
 
-			//k8sClient.EXPECT().List(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
-			//	Do(func(ctx context.Context, list client.ObjectList, opts ...client.ListOption) {
-			//		Expect(testutil.SetListReturnedObjects(list, fromPodObjectList(setPods1))).Should(Succeed())
-			//	}).
-			//	Return(nil).
-			//	Times(2)
-
 			status, err := parallelPolicy.Upgrade(mockParam)
 			// first failed
 			Expect(err).Should(BeEquivalentTo(stopError))
@@ -159,16 +152,9 @@ var _ = Describe("Reconfigure ParallelPolicy", func() {
 
 	Context("parallel reconfigure policy test with patch failed", func() {
 		It("Should failed", func() {
-			//ctrl, k8sClient := testutil.SetupK8sMock()
-			//reconfigureClient := mock_proto.NewMockReconfigureClient(ctrl)
-			//defer ctrl.Finish()
-
 			// mock client update caller
 			patchError := cfgcore.MakeError("update failed!")
 			k8sMockClient.MockPatchMethod(testutil.WithFailed(patchError, testutil.WithTimes(1)))
-			//k8sClient.EXPECT().Patch(gomock.Any(), gomock.Any(), gomock.Any()).
-			//	Return(patchError).
-			//	Times(1)
 
 			reconfigureClient.EXPECT().StopContainer(gomock.Any(), gomock.Any()).Return(
 				&cfgproto.StopContainerResponse{}, nil).
@@ -191,12 +177,6 @@ var _ = Describe("Reconfigure ParallelPolicy", func() {
 			k8sMockClient.MockListMethod(testutil.WithListReturned(
 				testutil.WithConstructListReturnedResult(fromPodObjectList(setPods)), testutil.WithAnyTimes(),
 			))
-
-			//k8sClient.EXPECT().List(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
-			//	Do(func(ctx context.Context, list client.ObjectList, opts ...client.ListOption) {
-			//		Expect(testutil.SetListReturnedObjects(list, fromPodObjectList(setPods))).Should(Succeed())
-			//	}).
-			//	Return(nil)
 
 			status, err := parallelPolicy.Upgrade(mockParam)
 			// first failed

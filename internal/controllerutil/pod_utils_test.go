@@ -29,7 +29,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metautil "k8s.io/apimachinery/pkg/util/intstr"
 
-	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 )
 
 type TestResourceUnit struct {
@@ -43,7 +43,7 @@ var _ = Describe("tpl template", func() {
 	var (
 		statefulSet     *appsv1.StatefulSet
 		pod             *corev1.Pod
-		configTemplates = []dbaasv1alpha1.ConfigTemplate{
+		configTemplates = []appsv1alpha1.ConfigTemplate{
 			{
 				Name:       "xxxxx",
 				VolumeName: "config1",
@@ -54,7 +54,7 @@ var _ = Describe("tpl template", func() {
 			},
 		}
 
-		foundInitContainerConfigTemplates = []dbaasv1alpha1.ConfigTemplate{
+		foundInitContainerConfigTemplates = []appsv1alpha1.ConfigTemplate{
 			{
 				Name:       "xxxxx",
 				VolumeName: "config1_init_container",
@@ -65,7 +65,7 @@ var _ = Describe("tpl template", func() {
 			},
 		}
 
-		notFoundConfigTemplates = []dbaasv1alpha1.ConfigTemplate{
+		notFoundConfigTemplates = []appsv1alpha1.ConfigTemplate{
 			{
 				Name:       "xxxxx",
 				VolumeName: "config1_not_fount",

@@ -27,8 +27,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/pointer"
 
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
-	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
@@ -56,8 +56,8 @@ func GetRandomStr() string {
 	return seq
 }
 
-func FakeCluster(name string, namespace string) *dbaasv1alpha1.Cluster {
-	return &dbaasv1alpha1.Cluster{
+func FakeCluster(name string, namespace string) *appsv1alpha1.Cluster {
+	return &appsv1alpha1.Cluster{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       types.KindCluster,
 			APIVersion: fmt.Sprintf("%s/%s", types.Group, types.Version),
@@ -66,25 +66,25 @@ func FakeCluster(name string, namespace string) *dbaasv1alpha1.Cluster {
 			Name:      name,
 			Namespace: namespace,
 		},
-		Status: dbaasv1alpha1.ClusterStatus{
-			Phase: dbaasv1alpha1.RunningPhase,
-			Components: map[string]dbaasv1alpha1.ClusterStatusComponent{
+		Status: appsv1alpha1.ClusterStatus{
+			Phase: appsv1alpha1.RunningPhase,
+			Components: map[string]appsv1alpha1.ClusterStatusComponent{
 				ComponentName: {
-					ConsensusSetStatus: &dbaasv1alpha1.ConsensusSetStatus{
-						Leader: dbaasv1alpha1.ConsensusMemberStatus{
+					ConsensusSetStatus: &appsv1alpha1.ConsensusSetStatus{
+						Leader: appsv1alpha1.ConsensusMemberStatus{
 							Name:       "leader",
-							AccessMode: dbaasv1alpha1.ReadWrite,
+							AccessMode: appsv1alpha1.ReadWrite,
 							Pod:        fmt.Sprintf("%s-pod-0", name),
 						},
 					},
 				},
 			},
 		},
-		Spec: dbaasv1alpha1.ClusterSpec{
+		Spec: appsv1alpha1.ClusterSpec{
 			ClusterDefRef:     ClusterDefName,
 			ClusterVersionRef: ClusterVersionName,
-			TerminationPolicy: dbaasv1alpha1.WipeOut,
-			ComponentSpecs: []dbaasv1alpha1.ClusterComponent{
+			TerminationPolicy: appsv1alpha1.WipeOut,
+			ComponentSpecs: []appsv1alpha1.ClusterComponent{
 				{
 					Name:            ComponentName,
 					ComponentDefRef: ComponentType,
@@ -98,7 +98,7 @@ func FakeCluster(name string, namespace string) *dbaasv1alpha1.Cluster {
 							corev1.ResourceMemory: resource.MustParse("2Gi"),
 						},
 					},
-					VolumeClaimTemplates: []dbaasv1alpha1.ClusterComponentVolumeClaimTemplate{
+					VolumeClaimTemplates: []appsv1alpha1.ClusterComponentVolumeClaimTemplate{
 						{
 							Name: "data",
 							Spec: &corev1.PersistentVolumeClaimSpec{
@@ -179,10 +179,10 @@ func FakeNode() *corev1.Node {
 	return node
 }
 
-func FakeClusterDef() *dbaasv1alpha1.ClusterDefinition {
-	clusterDef := &dbaasv1alpha1.ClusterDefinition{}
+func FakeClusterDef() *appsv1alpha1.ClusterDefinition {
+	clusterDef := &appsv1alpha1.ClusterDefinition{}
 	clusterDef.Name = ClusterDefName
-	clusterDef.Spec.ComponentDefs = []dbaasv1alpha1.ClusterDefinitionComponent{
+	clusterDef.Spec.ComponentDefs = []appsv1alpha1.ClusterDefinitionComponent{
 		{
 			Name:          ComponentType,
 			CharacterType: "mysql",
@@ -195,8 +195,8 @@ func FakeClusterDef() *dbaasv1alpha1.ClusterDefinition {
 	return clusterDef
 }
 
-func FakeClusterVersion() *dbaasv1alpha1.ClusterVersion {
-	cv := &dbaasv1alpha1.ClusterVersion{}
+func FakeClusterVersion() *appsv1alpha1.ClusterVersion {
+	cv := &appsv1alpha1.ClusterVersion{}
 	cv.Name = ClusterVersionName
 	cv.SetLabels(map[string]string{types.ClusterDefLabelKey: ClusterDefName})
 	cv.Spec.ClusterDefinitionRef = ClusterDefName

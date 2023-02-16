@@ -26,8 +26,8 @@ import (
 
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
-	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 )
 
 // Object a generic representation of various resource object types
@@ -72,12 +72,12 @@ var StorageClassSignature = func(_ storagev1.StorageClass, _ storagev1.StorageCl
 
 var VolumeSnapshotSignature = func(_ snapshotv1.VolumeSnapshot, _ snapshotv1.VolumeSnapshotList) {}
 
-var ClusterSignature = func(_ dbaasv1alpha1.Cluster, _ dbaasv1alpha1.ClusterList) {}
-var ClusterVersionSignature = func(_ dbaasv1alpha1.ClusterVersion, _ dbaasv1alpha1.ClusterVersionList) {}
-var ClusterDefinitionSignature = func(_ dbaasv1alpha1.ClusterDefinition, _ dbaasv1alpha1.ClusterDefinitionList) {
+var ClusterSignature = func(_ appsv1alpha1.Cluster, _ appsv1alpha1.ClusterList) {}
+var ClusterVersionSignature = func(_ appsv1alpha1.ClusterVersion, _ appsv1alpha1.ClusterVersionList) {}
+var ClusterDefinitionSignature = func(_ appsv1alpha1.ClusterDefinition, _ appsv1alpha1.ClusterDefinitionList) {
 }
-var OpsRequestSignature = func(_ dbaasv1alpha1.OpsRequest, _ dbaasv1alpha1.OpsRequestList) {}
-var ConfigConstraintSignature = func(_ dbaasv1alpha1.ConfigConstraint, _ dbaasv1alpha1.ConfigConstraintList) {
+var OpsRequestSignature = func(_ appsv1alpha1.OpsRequest, _ appsv1alpha1.OpsRequestList) {}
+var ConfigConstraintSignature = func(_ appsv1alpha1.ConfigConstraint, _ appsv1alpha1.ConfigConstraintList) {
 }
 
 var BackupPolicyTemplateSignature = func(_ dataprotectionv1alpha1.BackupPolicyTemplate, _ dataprotectionv1alpha1.BackupPolicyTemplateList) {

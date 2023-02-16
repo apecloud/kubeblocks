@@ -6,7 +6,7 @@ metadata:
     app.kubernetes.io/instance: %s
     app.kubernetes.io/name: mysql-cluster-definition-consensus
     controller-revision-hash: %s-%s-6fdd48d9cd
-    cs.dbaas.kubeblocks.io/access-mode: %s
+    cs.apps.kubeblocks.io/access-mode: %s
     kubeblocks.io/role: %s
     app.kubernetes.io/managed-by: kubeblocks
   name: %s

@@ -36,7 +36,7 @@ const (
 	GoosWindows = "windows"
 
 	// Group api group
-	Group = "dbaas.kubeblocks.io"
+	Group = "apps.kubeblocks.io"
 
 	// AppsGroup k8s apps group
 	AppsGroup = "apps"
@@ -79,7 +79,7 @@ const (
 
 	NameLabelKey                   = "app.kubernetes.io/name"
 	InstanceLabelKey               = "app.kubernetes.io/instance"
-	ConsensusSetAccessModeLabelKey = "cs.dbaas.kubeblocks.io/access-mode"
+	ConsensusSetAccessModeLabelKey = "cs.apps.kubeblocks.io/access-mode"
 	ComponentLabelKey              = "app.kubernetes.io/component-name"
 	RegionLabelKey                 = "topology.kubernetes.io/region"
 	ZoneLabelKey                   = "topology.kubernetes.io/zone"

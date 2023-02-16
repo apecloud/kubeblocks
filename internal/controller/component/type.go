@@ -20,7 +20,7 @@ import (
 	v12 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/policy/v1"
 
-	"github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	"github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 )
 
 const (

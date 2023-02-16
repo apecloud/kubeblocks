@@ -29,7 +29,7 @@ import (
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
 
-	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/cluster"
 	"github.com/apecloud/kubeblocks/internal/cli/patch"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
@@ -56,7 +56,7 @@ var clusterUpdateExample = templates.Examples(`
 type updateOptions struct {
 	namespace string
 	dynamic   dynamic.Interface
-	cluster   *dbaasv1alpha1.Cluster
+	cluster   *appsv1alpha1.Cluster
 
 	UpdatableFlags
 	*patch.Options

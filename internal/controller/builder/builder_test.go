@@ -30,11 +30,11 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
-	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
-	testdbaas "github.com/apecloud/kubeblocks/internal/testutil/dbaas"
+	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 )
 
 var tlog = ctrl.Log.WithName("builder_testing")
@@ -61,11 +61,11 @@ var _ = Describe("builder", func() {
 
 	const nginxCompType = "proxy"
 
-	allFieldsClusterDefObj := func(needCreate bool) *dbaasv1alpha1.ClusterDefinition {
+	allFieldsClusterDefObj := func(needCreate bool) *appsv1alpha1.ClusterDefinition {
 		By("By assure an clusterDefinition obj")
-		clusterDefObj := testdbaas.NewClusterDefFactory(clusterDefName).
-			AddComponent(testdbaas.StatefulMySQLComponent, mysqlCompType).
-			AddComponent(testdbaas.StatelessNginxComponent, nginxCompType).
+		clusterDefObj := testapps.NewClusterDefFactory(clusterDefName).
+			AddComponent(testapps.StatefulMySQLComponent, mysqlCompType).
+			AddComponent(testapps.StatelessNginxComponent, nginxCompType).
 			GetObject()
 		if needCreate {
 			Expect(testCtx.CreateObj(testCtx.Ctx, clusterDefObj)).Should(Succeed())
@@ -73,14 +73,14 @@ var _ = Describe("builder", func() {
 		return clusterDefObj
 	}
 
-	allFieldsClusterVersionObj := func(needCreate bool) *dbaasv1alpha1.ClusterVersion {
+	allFieldsClusterVersionObj := func(needCreate bool) *appsv1alpha1.ClusterVersion {
 		By("By assure an clusterVersion obj")
-		clusterVersionObj := testdbaas.NewClusterVersionFactory(clusterVersionName, clusterDefName).
+		clusterVersionObj := testapps.NewClusterVersionFactory(clusterVersionName, clusterDefName).
 			AddComponent(mysqlCompType).
-			AddContainerShort("mysql", testdbaas.ApeCloudMySQLImage).
+			AddContainerShort("mysql", testapps.ApeCloudMySQLImage).
 			AddComponent(nginxCompType).
-			AddInitContainerShort("nginx-init", testdbaas.NginxImage).
-			AddContainerShort("nginx", testdbaas.NginxImage).
+			AddInitContainerShort("nginx-init", testapps.NginxImage).
+			AddContainerShort("nginx", testapps.NginxImage).
 			GetObject()
 		if needCreate {
 			Expect(testCtx.CreateObj(testCtx.Ctx, clusterVersionObj)).Should(Succeed())
@@ -89,10 +89,10 @@ var _ = Describe("builder", func() {
 	}
 
 	newAllFieldsClusterObj := func(
-		clusterDefObj *dbaasv1alpha1.ClusterDefinition,
-		clusterVersionObj *dbaasv1alpha1.ClusterVersion,
+		clusterDefObj *appsv1alpha1.ClusterDefinition,
+		clusterVersionObj *appsv1alpha1.ClusterVersion,
 		needCreate bool,
-	) (*dbaasv1alpha1.Cluster, *dbaasv1alpha1.ClusterDefinition, *dbaasv1alpha1.ClusterVersion, types.NamespacedName) {
+	) (*appsv1alpha1.Cluster, *appsv1alpha1.ClusterDefinition, *appsv1alpha1.ClusterVersion, types.NamespacedName) {
 		// setup Cluster obj required default ClusterDefinition and ClusterVersion objects if not provided
 		if clusterDefObj == nil {
 			clusterDefObj = allFieldsClusterDefObj(needCreate)
@@ -101,11 +101,11 @@ var _ = Describe("builder", func() {
 			clusterVersionObj = allFieldsClusterVersionObj(needCreate)
 		}
 
-		pvcSpec := testdbaas.NewPVC("1Gi")
-		clusterObj := testdbaas.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
+		pvcSpec := testapps.NewPVC("1Gi")
+		clusterObj := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
 			clusterDefObj.Name, clusterVersionObj.Name).
 			AddComponent(mysqlCompName, mysqlCompType).SetReplicas(1).
-			AddVolumeClaimTemplate(testdbaas.DataVolumeName, &pvcSpec).
+			AddVolumeClaimTemplate(testapps.DataVolumeName, &pvcSpec).
 			GetObject()
 		key := client.ObjectKeyFromObject(clusterObj)
 		if needCreate {
@@ -123,14 +123,14 @@ var _ = Describe("builder", func() {
 				MountPath: "/mnt/config",
 			}},
 		}
-		return testdbaas.NewStatefulSetFactory(testCtx.DefaultNamespace, "mock-sts", clusterName, mysqlCompName).
+		return testapps.NewStatefulSetFactory(testCtx.DefaultNamespace, "mock-sts", clusterName, mysqlCompName).
 			AddLabels(intctrlutil.AppNameLabelKey, "mock-app",
 				intctrlutil.AppInstanceLabelKey, clusterName,
 				intctrlutil.AppComponentLabelKey, mysqlCompName,
 			).SetReplicas(1).AddContainer(container).
 			AddVolumeClaimTemplate(corev1.PersistentVolumeClaim{
-				ObjectMeta: metav1.ObjectMeta{Name: testdbaas.DataVolumeName},
-				Spec:       testdbaas.NewPVC("1Gi"),
+				ObjectMeta: metav1.ObjectMeta{Name: testapps.DataVolumeName},
+				Spec:       testapps.NewPVC("1Gi"),
 			}).GetObject()
 	}
 	newReqCtx := func() intctrlutil.RequestCtx {
@@ -166,7 +166,7 @@ var _ = Describe("builder", func() {
 		return &params
 	}
 	newBackupPolicyTemplate := func() *dataprotectionv1alpha1.BackupPolicyTemplate {
-		return testdbaas.NewBackupPolicyTemplateFactory("backup-policy-template-mysql").
+		return testapps.NewBackupPolicyTemplateFactory("backup-policy-template-mysql").
 			SetBackupToolName("mysql-xtrabackup").
 			SetSchedule("0 2 * * *").
 			SetTTL("168h0m0s").

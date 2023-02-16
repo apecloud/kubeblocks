@@ -43,13 +43,13 @@ Usage of ./bin/cue-helper:
 
 ```shell
 
-# dbaas template parameters: https://github.com/apecloud/dbaas-template-paramters
+# apps template parameters: https://github.com/apecloud/dbaas-template-paramters
 
 # mysql
-./bin/cue-helper --file-path dbaas-template-paramters/wesql/mysql8.pt --type-name MysqlParameter --boolean-promotion
+./bin/cue-helper --file-path apps-template-paramters/wesql/mysql8.pt --type-name MysqlParameter --boolean-promotion
 
 # pg14
-./bin/cue-helper --file-path dbaas-template-paramters/pg14/postgresql.pt --type-name PGParameter
+./bin/cue-helper --file-path apps-template-paramters/pg14/postgresql.pt --type-name PGParameter
 
 ```
 

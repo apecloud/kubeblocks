@@ -61,7 +61,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/kustomize/kyaml/yaml"
 
-	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
@@ -463,11 +463,11 @@ func GetEventObject(e *corev1.Event) string {
 }
 
 // GetConfigTemplateList returns ConfigTemplate list used by the component.
-func GetConfigTemplateList(clusterName string, namespace string, cli dynamic.Interface, componentName string, reloadTpl bool) ([]dbaasv1alpha1.ConfigTemplate, error) {
+func GetConfigTemplateList(clusterName string, namespace string, cli dynamic.Interface, componentName string, reloadTpl bool) ([]appsv1alpha1.ConfigTemplate, error) {
 	var (
-		clusterObj        = dbaasv1alpha1.Cluster{}
-		clusterDefObj     = dbaasv1alpha1.ClusterDefinition{}
-		clusterVersionObj = dbaasv1alpha1.ClusterVersion{}
+		clusterObj        = appsv1alpha1.Cluster{}
+		clusterDefObj     = appsv1alpha1.ClusterDefinition{}
+		clusterVersionObj = appsv1alpha1.ClusterVersion{}
 	)
 
 	if err := GetResourceObjectFromGVR(types.ClusterGVR(), client.ObjectKey{
@@ -499,7 +499,7 @@ func GetConfigTemplateList(clusterName string, namespace string, cli dynamic.Int
 		return tpls, nil
 	}
 
-	validTpls := make([]dbaasv1alpha1.ConfigTemplate, 0, len(tpls))
+	validTpls := make([]appsv1alpha1.ConfigTemplate, 0, len(tpls))
 	for _, tpl := range tpls {
 		if len(tpl.ConfigConstraintRef) > 0 && len(tpl.ConfigTplRef) > 0 {
 			validTpls = append(validTpls, tpl)
@@ -522,8 +522,8 @@ func GetResourceObjectFromGVR(gvr schema.GroupVersionResource, key client.Object
 
 // GetComponentsFromClusterCR returns name of component.
 func GetComponentsFromClusterCR(key client.ObjectKey, cli dynamic.Interface) ([]string, error) {
-	clusterObj := dbaasv1alpha1.Cluster{}
-	clusterDefObj := dbaasv1alpha1.ClusterDefinition{}
+	clusterObj := appsv1alpha1.Cluster{}
+	clusterDefObj := appsv1alpha1.ClusterDefinition{}
 	if err := GetResourceObjectFromGVR(types.ClusterGVR(), key, cli, &clusterObj); err != nil {
 		return nil, err
 	}
@@ -545,7 +545,7 @@ func GetComponentsFromClusterCR(key client.ObjectKey, cli dynamic.Interface) ([]
 	return componentNames, nil
 }
 
-func enableReconfiguring(component *dbaasv1alpha1.ClusterDefinitionComponent) bool {
+func enableReconfiguring(component *appsv1alpha1.ClusterDefinitionComponent) bool {
 	if component == nil || component.ConfigSpec == nil {
 		return false
 	}
@@ -558,10 +558,10 @@ func enableReconfiguring(component *dbaasv1alpha1.ClusterDefinitionComponent) bo
 }
 
 // IsSupportConfigureParams check whether all updated parameters belong to config template parameters.
-func IsSupportConfigureParams(tpl dbaasv1alpha1.ConfigTemplate, values map[string]string, cli dynamic.Interface) (bool, error) {
+func IsSupportConfigureParams(tpl appsv1alpha1.ConfigTemplate, values map[string]string, cli dynamic.Interface) (bool, error) {
 	var (
 		err              error
-		configConstraint = dbaasv1alpha1.ConfigConstraint{}
+		configConstraint = appsv1alpha1.ConfigConstraint{}
 	)
 
 	if err := GetResourceObjectFromGVR(types.ConfigConstraintGVR(), client.ObjectKey{

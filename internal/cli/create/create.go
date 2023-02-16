@@ -68,7 +68,7 @@ type Inputs struct {
 	// ResourceName k8s resource name
 	ResourceName string
 
-	// Group of API, default is dbaas
+	// Group of API, default is apps
 	Group string
 
 	// Group of Version, default is v1alpha1

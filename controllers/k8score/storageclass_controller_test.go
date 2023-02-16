@@ -25,7 +25,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
-	testdbaas "github.com/apecloud/kubeblocks/internal/testutil/dbaas"
+	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 )
 
 var _ = Describe("StorageClass Controller", func() {
@@ -40,7 +40,7 @@ var _ = Describe("StorageClass Controller", func() {
 		// delete rest mocked objects
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 		// non-namespaced
-		testdbaas.ClearResources(&testCtx, intctrlutil.StorageClassSignature, ml)
+		testapps.ClearResources(&testCtx, intctrlutil.StorageClassSignature, ml)
 	}
 
 	BeforeEach(cleanEnv)
@@ -48,8 +48,8 @@ var _ = Describe("StorageClass Controller", func() {
 	AfterEach(cleanEnv)
 
 	createStorageClassObj := func(storageClassName string, allowVolumeExpansion bool) *storagev1.StorageClass {
-		return testdbaas.CreateCustomizedObj(&testCtx, "operations/storageclass.yaml",
-			&storagev1.StorageClass{}, testdbaas.CustomizeObjYAML(storageClassName, allowVolumeExpansion))
+		return testapps.CreateCustomizedObj(&testCtx, "operations/storageclass.yaml",
+			&storagev1.StorageClass{}, testapps.CustomizeObjYAML(storageClassName, allowVolumeExpansion))
 	}
 
 	handleStorageClass := func(reqCtx intctrlutil.RequestCtx, cli client.Client, storageClass *storagev1.StorageClass) error {
@@ -66,13 +66,13 @@ var _ = Describe("StorageClass Controller", func() {
 			sc := createStorageClassObj(storageClassName, true)
 
 			By("test storageClass changes")
-			Eventually(testdbaas.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(sc), func(tmpSc *storagev1.StorageClass) {
+			Eventually(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(sc), func(tmpSc *storagev1.StorageClass) {
 				allowVolumeExpansion := true
 				tmpSc.AllowVolumeExpansion = &allowVolumeExpansion
 			})()).Should(Succeed())
 
 			// wait until storageClass patched
-			Eventually(testdbaas.CheckObj(&testCtx, client.ObjectKeyFromObject(sc), func(g Gomega, tempStorageClass *storagev1.StorageClass) {
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(sc), func(g Gomega, tempStorageClass *storagev1.StorageClass) {
 				g.Expect(tempStorageClass.Annotations["kubeblocks.io/test"] == "test").Should(BeTrue())
 			})).Should(Succeed())
 		})

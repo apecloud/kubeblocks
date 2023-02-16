@@ -26,7 +26,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
-	testdbaas "github.com/apecloud/kubeblocks/internal/testutil/dbaas"
+	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 )
 
 var _ = Describe("PersistentVolumeClaim Controller", func() {
@@ -41,7 +41,7 @@ var _ = Describe("PersistentVolumeClaim Controller", func() {
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 		// namespaced
-		testdbaas.ClearResources(&testCtx, intctrlutil.PersistentVolumeClaimSignature, inNS, ml)
+		testapps.ClearResources(&testCtx, intctrlutil.PersistentVolumeClaimSignature, inNS, ml)
 	}
 
 	BeforeEach(cleanEnv)
@@ -50,8 +50,8 @@ var _ = Describe("PersistentVolumeClaim Controller", func() {
 
 	createPVC := func(pvcName string) *corev1.PersistentVolumeClaim {
 		By("By assure an default storageClass")
-		return testdbaas.CreateCustomizedObj(&testCtx, "operations/volume_expansion_pvc.yaml",
-			&corev1.PersistentVolumeClaim{}, testdbaas.CustomizeObjYAML("consensus", "apecloud-mysql", pvcName, pvcName, "csi-hostpath-sc"))
+		return testapps.CreateCustomizedObj(&testCtx, "operations/volume_expansion_pvc.yaml",
+			&corev1.PersistentVolumeClaim{}, testapps.CustomizeObjYAML("consensus", "apecloud-mysql", pvcName, pvcName, "csi-hostpath-sc"))
 
 	}
 
@@ -69,12 +69,12 @@ var _ = Describe("PersistentVolumeClaim Controller", func() {
 			By("test PersistentVolumeClaim changes")
 			pvcName := fmt.Sprintf("pvc-%s", testCtx.GetRandomStr())
 			pvc := createPVC(pvcName)
-			Expect(testdbaas.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(pvc), func(tmpPvc *corev1.PersistentVolumeClaim) {
+			Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(pvc), func(tmpPvc *corev1.PersistentVolumeClaim) {
 				pvc.Spec.Resources.Requests[corev1.ResourceStorage] = resource.MustParse("4Gi")
 			})()).Should(Succeed())
 
 			// wait until pvc patched the annotation by storageClass controller.
-			Eventually(testdbaas.CheckObj(&testCtx, client.ObjectKeyFromObject(pvc), func(g Gomega, tmpPVC *corev1.PersistentVolumeClaim) {
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(pvc), func(g Gomega, tmpPVC *corev1.PersistentVolumeClaim) {
 				g.Expect(tmpPVC.Annotations["kubeblocks.io/test"] == "test_pvc").Should(BeTrue())
 			})).Should(Succeed())
 		})

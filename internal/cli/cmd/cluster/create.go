@@ -42,7 +42,7 @@ import (
 	utilcomp "k8s.io/kubectl/pkg/util/completion"
 	"k8s.io/kubectl/pkg/util/templates"
 
-	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/cluster"
 	"github.com/apecloud/kubeblocks/internal/cli/create"
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
@@ -366,7 +366,7 @@ func (o *CreateOptions) PreCreate(obj *unstructured.Unstructured) error {
 		// EnableAllLogs is false, nothing will change
 		return nil
 	}
-	c := &dbaasv1alpha1.Cluster{}
+	c := &appsv1alpha1.Cluster{}
 	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, c); err != nil {
 		return err
 	}
@@ -385,7 +385,7 @@ func (o *CreateOptions) PreCreate(obj *unstructured.Unstructured) error {
 }
 
 // setEnableAllLog set enable all logs, and ignore enabledLogs of component level.
-func setEnableAllLogs(c *dbaasv1alpha1.Cluster, cd *dbaasv1alpha1.ClusterDefinition) {
+func setEnableAllLogs(c *appsv1alpha1.Cluster, cd *appsv1alpha1.ClusterDefinition) {
 	for idx, comCluster := range c.Spec.ComponentSpecs {
 		for _, com := range cd.Spec.ComponentDefs {
 			if !strings.EqualFold(comCluster.ComponentDefRef, com.Name) {
@@ -400,7 +400,7 @@ func setEnableAllLogs(c *dbaasv1alpha1.Cluster, cd *dbaasv1alpha1.ClusterDefinit
 	}
 }
 
-func buildClusterComp(cd *dbaasv1alpha1.ClusterDefinition, setsMap map[string]map[setKey]string) ([]map[string]interface{}, error) {
+func buildClusterComp(cd *appsv1alpha1.ClusterDefinition, setsMap map[string]map[setKey]string) ([]map[string]interface{}, error) {
 	getVal := func(key setKey, sets map[setKey]string) string {
 		// get value from set values
 		if sets != nil {
@@ -437,7 +437,7 @@ func buildClusterComp(cd *dbaasv1alpha1.ClusterDefinition, setsMap map[string]ma
 			corev1.ResourceCPU:    resource.MustParse(getVal(keyCPU, sets)),
 			corev1.ResourceMemory: resource.MustParse(getVal(keyMemory, sets)),
 		}
-		compObj := &dbaasv1alpha1.ClusterComponent{
+		compObj := &appsv1alpha1.ClusterComponent{
 			Name:            c.Name,
 			ComponentDefRef: c.Name,
 			Replicas:        &replicas,
@@ -445,7 +445,7 @@ func buildClusterComp(cd *dbaasv1alpha1.ClusterDefinition, setsMap map[string]ma
 				Requests: resourceList,
 				Limits:   resourceList,
 			},
-			VolumeClaimTemplates: []dbaasv1alpha1.ClusterComponentVolumeClaimTemplate{{
+			VolumeClaimTemplates: []appsv1alpha1.ClusterComponentVolumeClaimTemplate{{
 				Name: "data",
 				Spec: &corev1.PersistentVolumeClaimSpec{
 					AccessModes: []corev1.PersistentVolumeAccessMode{
@@ -470,7 +470,7 @@ func buildClusterComp(cd *dbaasv1alpha1.ClusterDefinition, setsMap map[string]ma
 
 // buildCompSetsMap builds the map between component type name and its set values, if the type name is not
 // specified in the set, use the cluster definition default component type name.
-func buildCompSetsMap(values []string, cd *dbaasv1alpha1.ClusterDefinition) (map[string]map[setKey]string, error) {
+func buildCompSetsMap(values []string, cd *appsv1alpha1.ClusterDefinition) (map[string]map[setKey]string, error) {
 	allSets := map[string]map[setKey]string{}
 	parseKey := func(key string) setKey {
 		keys := []setKey{keyCPU, keyType, keyStorage, keyMemory, keyReplicas}

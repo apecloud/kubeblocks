@@ -20,7 +20,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 )
 
 var _ = Describe("Reconfigure RollingPolicy", func() {
@@ -28,13 +28,13 @@ var _ = Describe("Reconfigure RollingPolicy", func() {
 	Context("MergeConfigTemplates test", func() {
 		It("Should success without error", func() {
 			type args struct {
-				avTpl []dbaasv1alpha1.ConfigTemplate
-				cdTpl []dbaasv1alpha1.ConfigTemplate
+				avTpl []appsv1alpha1.ConfigTemplate
+				cdTpl []appsv1alpha1.ConfigTemplate
 			}
 			tests := []struct {
 				name string
 				args args
-				want []dbaasv1alpha1.ConfigTemplate
+				want []appsv1alpha1.ConfigTemplate
 			}{{
 				name: "merge_configtpl_test",
 				args: args{
@@ -45,7 +45,7 @@ var _ = Describe("Reconfigure RollingPolicy", func() {
 			}, {
 				name: "merge_configtpl_test",
 				args: args{
-					avTpl: []dbaasv1alpha1.ConfigTemplate{
+					avTpl: []appsv1alpha1.ConfigTemplate{
 						{
 							Name:         "test1",
 							ConfigTplRef: "tpl1",
@@ -59,7 +59,7 @@ var _ = Describe("Reconfigure RollingPolicy", func() {
 					},
 					cdTpl: nil,
 				},
-				want: []dbaasv1alpha1.ConfigTemplate{
+				want: []appsv1alpha1.ConfigTemplate{
 					{
 						Name:         "test1",
 						ConfigTplRef: "tpl1",
@@ -75,7 +75,7 @@ var _ = Describe("Reconfigure RollingPolicy", func() {
 				name: "merge_configtpl_test",
 				args: args{
 					avTpl: nil,
-					cdTpl: []dbaasv1alpha1.ConfigTemplate{
+					cdTpl: []appsv1alpha1.ConfigTemplate{
 						{
 							Name:         "test1",
 							ConfigTplRef: "tpl1",
@@ -88,7 +88,7 @@ var _ = Describe("Reconfigure RollingPolicy", func() {
 						},
 					},
 				},
-				want: []dbaasv1alpha1.ConfigTemplate{
+				want: []appsv1alpha1.ConfigTemplate{
 					{
 						Name:         "test1",
 						ConfigTplRef: "tpl1",
@@ -103,7 +103,7 @@ var _ = Describe("Reconfigure RollingPolicy", func() {
 			}, {
 				name: "merge_configtpl_test",
 				args: args{
-					avTpl: []dbaasv1alpha1.ConfigTemplate{
+					avTpl: []appsv1alpha1.ConfigTemplate{
 						// update volume
 						{
 							Name:         "test_new_v1",
@@ -117,7 +117,7 @@ var _ = Describe("Reconfigure RollingPolicy", func() {
 							VolumeName:   "test2",
 						},
 					},
-					cdTpl: []dbaasv1alpha1.ConfigTemplate{
+					cdTpl: []appsv1alpha1.ConfigTemplate{
 						{
 							Name:         "test1",
 							ConfigTplRef: "tpl1",
@@ -130,7 +130,7 @@ var _ = Describe("Reconfigure RollingPolicy", func() {
 						},
 					},
 				},
-				want: []dbaasv1alpha1.ConfigTemplate{
+				want: []appsv1alpha1.ConfigTemplate{
 					{
 						Name:         "test_new_v1",
 						ConfigTplRef: "tpl_new_v1",
@@ -161,18 +161,18 @@ var _ = Describe("Reconfigure RollingPolicy", func() {
 			var (
 				comName     = "replicats_name"
 				comType     = "replicats"
-				cComponents = []dbaasv1alpha1.ClusterComponent{
+				cComponents = []appsv1alpha1.ClusterComponent{
 					{
 						Name:            comName,
 						ComponentDefRef: comType,
 					},
 				}
-				tpl1 = dbaasv1alpha1.ConfigTemplate{
+				tpl1 = appsv1alpha1.ConfigTemplate{
 					Name:         "tpl1",
 					ConfigTplRef: "cm1",
 					VolumeName:   "volum1",
 				}
-				tpl2 = dbaasv1alpha1.ConfigTemplate{
+				tpl2 = appsv1alpha1.ConfigTemplate{
 					Name:         "tpl2",
 					ConfigTplRef: "cm2",
 					VolumeName:   "volum2",
@@ -180,37 +180,37 @@ var _ = Describe("Reconfigure RollingPolicy", func() {
 			)
 
 			type args struct {
-				cComponents []dbaasv1alpha1.ClusterComponent
-				dComponents []dbaasv1alpha1.ClusterDefinitionComponent
-				aComponents []dbaasv1alpha1.ClusterVersionComponent
+				cComponents []appsv1alpha1.ClusterComponent
+				dComponents []appsv1alpha1.ClusterDefinitionComponent
+				aComponents []appsv1alpha1.ClusterVersionComponent
 				comName     string
 			}
 			tests := []struct {
 				name    string
 				args    args
-				want    []dbaasv1alpha1.ConfigTemplate
+				want    []appsv1alpha1.ConfigTemplate
 				wantErr bool
 			}{{
 				name: "normal_test",
 				args: args{
 					comName:     comName,
 					cComponents: cComponents,
-					dComponents: []dbaasv1alpha1.ClusterDefinitionComponent{
+					dComponents: []appsv1alpha1.ClusterDefinitionComponent{
 						{
 							Name: comType,
-							ConfigSpec: &dbaasv1alpha1.ConfigurationSpec{
-								ConfigTemplateRefs: []dbaasv1alpha1.ConfigTemplate{tpl1},
+							ConfigSpec: &appsv1alpha1.ConfigurationSpec{
+								ConfigTemplateRefs: []appsv1alpha1.ConfigTemplate{tpl1},
 							},
 						},
 					},
-					aComponents: []dbaasv1alpha1.ClusterVersionComponent{
+					aComponents: []appsv1alpha1.ClusterVersionComponent{
 						{
 							ComponentDefRef:    comType,
-							ConfigTemplateRefs: []dbaasv1alpha1.ConfigTemplate{tpl2},
+							ConfigTemplateRefs: []appsv1alpha1.ConfigTemplate{tpl2},
 						},
 					},
 				},
-				want: []dbaasv1alpha1.ConfigTemplate{
+				want: []appsv1alpha1.ConfigTemplate{
 					tpl2,
 					tpl1,
 				},
@@ -220,18 +220,18 @@ var _ = Describe("Reconfigure RollingPolicy", func() {
 				args: args{
 					comName:     "not exist component",
 					cComponents: cComponents,
-					dComponents: []dbaasv1alpha1.ClusterDefinitionComponent{
+					dComponents: []appsv1alpha1.ClusterDefinitionComponent{
 						{
 							Name: comType,
-							ConfigSpec: &dbaasv1alpha1.ConfigurationSpec{
-								ConfigTemplateRefs: []dbaasv1alpha1.ConfigTemplate{tpl1},
+							ConfigSpec: &appsv1alpha1.ConfigurationSpec{
+								ConfigTemplateRefs: []appsv1alpha1.ConfigTemplate{tpl1},
 							},
 						},
 					},
-					aComponents: []dbaasv1alpha1.ClusterVersionComponent{
+					aComponents: []appsv1alpha1.ClusterVersionComponent{
 						{
 							ComponentDefRef:    comType,
-							ConfigTemplateRefs: []dbaasv1alpha1.ConfigTemplate{tpl2},
+							ConfigTemplateRefs: []appsv1alpha1.ConfigTemplate{tpl2},
 						},
 					},
 				},
@@ -242,22 +242,22 @@ var _ = Describe("Reconfigure RollingPolicy", func() {
 				args: args{
 					comName:     comName,
 					cComponents: cComponents,
-					dComponents: []dbaasv1alpha1.ClusterDefinitionComponent{
+					dComponents: []appsv1alpha1.ClusterDefinitionComponent{
 						{
 							Name: comType,
-							ConfigSpec: &dbaasv1alpha1.ConfigurationSpec{
-								ConfigTemplateRefs: []dbaasv1alpha1.ConfigTemplate{tpl1},
+							ConfigSpec: &appsv1alpha1.ConfigurationSpec{
+								ConfigTemplateRefs: []appsv1alpha1.ConfigTemplate{tpl1},
 							},
 						},
 					},
-					aComponents: []dbaasv1alpha1.ClusterVersionComponent{
+					aComponents: []appsv1alpha1.ClusterVersionComponent{
 						{
 							ComponentDefRef:    "not exist",
-							ConfigTemplateRefs: []dbaasv1alpha1.ConfigTemplate{tpl2},
+							ConfigTemplateRefs: []appsv1alpha1.ConfigTemplate{tpl2},
 						},
 					},
 				},
-				want: []dbaasv1alpha1.ConfigTemplate{
+				want: []appsv1alpha1.ConfigTemplate{
 					tpl1,
 				},
 				wantErr: false,

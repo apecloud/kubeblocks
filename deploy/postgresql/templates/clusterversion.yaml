@@ -1,4 +1,4 @@
-apiVersion: dbaas.kubeblocks.io/v1alpha1
+apiVersion: apps.kubeblocks.io/v1alpha1
 kind: ClusterVersion
 metadata:
   name: postgresql-{{ default .Chart.AppVersion .Values.clusterVersionOverride }}
@@ -13,7 +13,7 @@ spec:
       - name: postgresql
         image: {{ .Values.image.repository }}:{{ default .Values.image.tag .Chart.AppVersion }}
 ---
-apiVersion: dbaas.kubeblocks.io/v1alpha1
+apiVersion: apps.kubeblocks.io/v1alpha1
 kind: ClusterVersion
 metadata:
   name: postgresql-15.1.0

@@ -74,7 +74,7 @@ Requirements for `.spec.connectionCredential`:
 ### Example
 
 ```
-apiVersion: dbaas.infracreate.com/v1alpha1
+apiVersion: apps.kubeblocks.io/v1alpha1
 kind: ClusterDefinition
 metadata:
   name: wesql
@@ -148,11 +148,11 @@ spec:
       args:
       - >
         cluster_info=""; 
-        for (( i=0; i< $OPENDBAAS_REPLICASETS_N; i++ )); do 
+        for (( i=0; i< $KB_REPLICASETS_N; i++ )); do 
         if [ $i -ne 0 ]; then 
         cluster_info="$cluster_info;"; 
         fi; 
-        host=$(eval echo \$OPENDBAAS_REPLICASETS_"$i"_HOSTNAME) 
+        host=$(eval echo \$KB_REPLICASETS_"$i"_HOSTNAME) 
         cluster_info="$cluster_info$host:13306"; 
         done; 
         idx=0; 
@@ -160,7 +160,7 @@ spec:
         for i in "${ADDR[@]}"; do
         idx=$i;
         done;
-        done <<< "$OPENDBAAS_MY_POD_NAME"; 
+        done <<< "$KB_MY_POD_NAME"; 
         echo $idx; 
         cluster_info="$cluster_info@$(($idx+1))"; 
         echo $cluster_info; echo {{ .Values.cluster.replicaSetCount }}; 
@@ -203,7 +203,7 @@ You can check `phase` and `message` to view the executing status and result.
 ### Example
 
 ```
-apiVersion: dbaas.kubeblocks.io/v1alpha1
+apiVersion: apps.kubeblocks.io/v1alpha1
 kind:       ClusterVersion
 metadata:
   name:     ac-mysql-8.0.30
@@ -260,7 +260,7 @@ The following are examples of ApeCloud MySQL three-node clusters.
 - Standard version:
 
   ```
-  apiVersion: dbaas.infracrate.com/v1alpha1
+  apiVersion: apps.kubeblocks.io/v1alpha1
   kind: Cluster
   metadata:
     name: mysql-a-series-standard
@@ -276,7 +276,7 @@ The following are examples of ApeCloud MySQL three-node clusters.
 - Enterprise version:
 
   ```
-  apiVersion: dbaas.infracrate.com/v1alpha1
+  apiVersion: apps.kubeblocks.io/v1alpha1
   kind: Cluster
   metadata:
       name: mysql-a-series-enterprise

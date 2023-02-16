@@ -24,9 +24,9 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 
-	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
-	testdbaas "github.com/apecloud/kubeblocks/internal/testutil/dbaas"
+	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 )
 
 const (
@@ -39,27 +39,27 @@ var _ = Describe("component module", func() {
 
 	Context("has the mergeMonitorConfig function", func() {
 		var component *Component
-		var cluster *dbaasv1alpha1.Cluster
-		var clusterComp *dbaasv1alpha1.ClusterComponent
-		var clusterDef *dbaasv1alpha1.ClusterDefinition
-		var clusterDefComp *dbaasv1alpha1.ClusterDefinitionComponent
+		var cluster *appsv1alpha1.Cluster
+		var clusterComp *appsv1alpha1.ClusterComponent
+		var clusterDef *appsv1alpha1.ClusterDefinition
+		var clusterDefComp *appsv1alpha1.ClusterDefinitionComponent
 
 		BeforeEach(func() {
 			component = &Component{}
 			component.PodSpec = &corev1.PodSpec{}
-			cluster = &dbaasv1alpha1.Cluster{}
+			cluster = &appsv1alpha1.Cluster{}
 			cluster.Name = "mysql-instance-3"
-			clusterComp = &dbaasv1alpha1.ClusterComponent{}
+			clusterComp = &appsv1alpha1.ClusterComponent{}
 			clusterComp.Monitor = true
 			cluster.Spec.ComponentSpecs = append(cluster.Spec.ComponentSpecs, *clusterComp)
 			clusterComp = &cluster.Spec.ComponentSpecs[0]
 
-			clusterDef = &dbaasv1alpha1.ClusterDefinition{}
-			clusterDefComp = &dbaasv1alpha1.ClusterDefinitionComponent{}
+			clusterDef = &appsv1alpha1.ClusterDefinition{}
+			clusterDefComp = &appsv1alpha1.ClusterDefinitionComponent{}
 			clusterDefComp.CharacterType = kMysql
-			clusterDefComp.Monitor = &dbaasv1alpha1.MonitorConfig{
+			clusterDefComp.Monitor = &appsv1alpha1.MonitorConfig{
 				BuiltIn: false,
-				Exporter: &dbaasv1alpha1.ExporterConfig{
+				Exporter: &appsv1alpha1.ExporterConfig{
 					ScrapePort: 9144,
 					ScrapePath: "/metrics",
 				},
@@ -152,28 +152,28 @@ var _ = Describe("component module", func() {
 		)
 
 		var (
-			clusterDef     *dbaasv1alpha1.ClusterDefinition
-			clusterVersion *dbaasv1alpha1.ClusterVersion
-			cluster        *dbaasv1alpha1.Cluster
+			clusterDef     *appsv1alpha1.ClusterDefinition
+			clusterVersion *appsv1alpha1.ClusterVersion
+			cluster        *appsv1alpha1.Cluster
 		)
 
 		BeforeEach(func() {
-			clusterDef = testdbaas.NewClusterDefFactory(clusterDefName).
-				AddComponent(testdbaas.StatefulMySQLComponent, mysqlCompType).
-				AddComponent(testdbaas.StatelessNginxComponent, nginxCompType).
+			clusterDef = testapps.NewClusterDefFactory(clusterDefName).
+				AddComponent(testapps.StatefulMySQLComponent, mysqlCompType).
+				AddComponent(testapps.StatelessNginxComponent, nginxCompType).
 				GetObject()
-			clusterVersion = testdbaas.NewClusterVersionFactory(clusterVersionName, clusterDefName).
+			clusterVersion = testapps.NewClusterVersionFactory(clusterVersionName, clusterDefName).
 				AddComponent(mysqlCompType).
-				AddContainerShort("mysql", testdbaas.ApeCloudMySQLImage).
+				AddContainerShort("mysql", testapps.ApeCloudMySQLImage).
 				AddComponent(nginxCompType).
-				AddInitContainerShort("nginx-init", testdbaas.NginxImage).
-				AddContainerShort("nginx", testdbaas.NginxImage).
+				AddInitContainerShort("nginx-init", testapps.NginxImage).
+				AddContainerShort("nginx", testapps.NginxImage).
 				GetObject()
-			pvcSpec := testdbaas.NewPVC("1Gi")
-			cluster = testdbaas.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
+			pvcSpec := testapps.NewPVC("1Gi")
+			cluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
 				clusterDef.Name, clusterVersion.Name).
 				AddComponent(mysqlCompName, mysqlCompType).
-				AddVolumeClaimTemplate(testdbaas.DataVolumeName, &pvcSpec).
+				AddVolumeClaimTemplate(testapps.DataVolumeName, &pvcSpec).
 				GetObject()
 		})
 

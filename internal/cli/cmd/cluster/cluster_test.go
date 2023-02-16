@@ -27,14 +27,14 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 
-	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/create"
 	"github.com/apecloud/kubeblocks/internal/cli/delete"
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
-	testdbaas "github.com/apecloud/kubeblocks/internal/testutil/dbaas"
+	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 )
 
 var _ = Describe("Cluster", func() {
@@ -148,14 +148,14 @@ var _ = Describe("Cluster", func() {
 
 		By("validate upgrade when cluster-version is null")
 		o.Name = "test"
-		o.OpsType = dbaasv1alpha1.UpgradeType
+		o.OpsType = appsv1alpha1.UpgradeType
 		Expect(o.Validate()).To(MatchError("missing cluster-version"))
 		o.ClusterVersionRef = "test-cluster-version"
 		in.Write([]byte(o.Name + "\n"))
 		Expect(o.Validate()).Should(Succeed())
 
 		By("validate volumeExpansion when components is null")
-		o.OpsType = dbaasv1alpha1.VolumeExpansionType
+		o.OpsType = appsv1alpha1.VolumeExpansionType
 		Expect(o.Validate()).To(MatchError("missing component-names"))
 
 		By("validate volumeExpansion when vct-names is null")
@@ -170,7 +170,7 @@ var _ = Describe("Cluster", func() {
 		Expect(o.Validate()).Should(Succeed())
 
 		By("validate horizontalScaling when replicas less than -1 ")
-		o.OpsType = dbaasv1alpha1.HorizontalScalingType
+		o.OpsType = appsv1alpha1.HorizontalScalingType
 		o.Replicas = -2
 		Expect(o.Validate()).To(MatchError("replicas required natural number"))
 
@@ -192,26 +192,26 @@ var _ = Describe("Cluster", func() {
 		)
 
 		By("Create configmap and config constraint obj")
-		configmap := testdbaas.NewCustomizedObj("resources/mysql_config_cm.yaml", &corev1.ConfigMap{}, testdbaas.WithNamespace(ns))
-		constraint := testdbaas.NewCustomizedObj("resources/mysql_config_template.yaml",
-			&dbaasv1alpha1.ConfigConstraint{})
-		componentConfig := testdbaas.NewConfigMap(ns, cfgcore.GetComponentCfgName(clusterName, statefulCompName, configVolumeName), testdbaas.SetConfigMapData("my.cnf", ""))
+		configmap := testapps.NewCustomizedObj("resources/mysql_config_cm.yaml", &corev1.ConfigMap{}, testapps.WithNamespace(ns))
+		constraint := testapps.NewCustomizedObj("resources/mysql_config_template.yaml",
+			&appsv1alpha1.ConfigConstraint{})
+		componentConfig := testapps.NewConfigMap(ns, cfgcore.GetComponentCfgName(clusterName, statefulCompName, configVolumeName), testapps.SetConfigMapData("my.cnf", ""))
 		By("Create a clusterDefinition obj")
-		clusterDefObj := testdbaas.NewClusterDefFactory(clusterDefName).
-			AddComponent(testdbaas.StatefulMySQLComponent, statefulCompType).
+		clusterDefObj := testapps.NewClusterDefFactory(clusterDefName).
+			AddComponent(testapps.StatefulMySQLComponent, statefulCompType).
 			AddConfigTemplate(configTplName, configmap.Name, constraint.Name, configVolumeName, nil).
 			GetObject()
 		By("Create a clusterVersion obj")
-		clusterVersionObj := testdbaas.NewClusterVersionFactory(clusterVersionName, clusterDefObj.GetName()).
+		clusterVersionObj := testapps.NewClusterVersionFactory(clusterVersionName, clusterDefObj.GetName()).
 			AddComponent(statefulCompType).
 			GetObject()
 		By("creating a cluster")
-		clusterObj := testdbaas.NewClusterFactory(ns, clusterName,
+		clusterObj := testapps.NewClusterFactory(ns, clusterName,
 			clusterDefObj.Name, clusterVersionObj.Name).
 			AddComponent(statefulCompName, statefulCompType).GetObject()
 
 		objs := []runtime.Object{configmap, constraint, clusterDefObj, clusterVersionObj, clusterObj, componentConfig}
-		ttf, o := NewFakeOperationsOptions(ns, clusterObj.Name, dbaasv1alpha1.ReconfiguringType, objs...)
+		ttf, o := NewFakeOperationsOptions(ns, clusterObj.Name, appsv1alpha1.ReconfiguringType, objs...)
 		defer ttf.Cleanup()
 		o.ComponentNames = []string{"replicasets", "proxy"}
 		By("validate reconfiguring when multi components")

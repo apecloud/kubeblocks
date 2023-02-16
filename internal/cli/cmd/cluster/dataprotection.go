@@ -34,7 +34,7 @@ import (
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
 
-	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/create"
 	"github.com/apecloud/kubeblocks/internal/cli/delete"
 	"github.com/apecloud/kubeblocks/internal/cli/list"
@@ -352,7 +352,7 @@ func (o *CreateRestoreOptions) Complete() error {
 	if err != nil {
 		return err
 	}
-	cluster := dbaasv1alpha1.Cluster{}
+	cluster := appsv1alpha1.Cluster{}
 	err = runtime.DefaultUnstructuredConverter.
 		FromUnstructured(clusterObj.UnstructuredContent(), &cluster)
 	if err != nil {

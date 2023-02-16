@@ -24,7 +24,7 @@ import (
 	"github.com/spf13/viper"
 	corev1 "k8s.io/api/core/v1"
 
-	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -34,7 +34,7 @@ const (
 )
 
 var (
-	wellKnownCharacterTypeFunc = map[string]func(cluster *dbaasv1alpha1.Cluster, component *Component) error{
+	wellKnownCharacterTypeFunc = map[string]func(cluster *appsv1alpha1.Cluster, component *Component) error{
 		kMysql: setMysqlComponent,
 	}
 	//go:embed cue/*
@@ -70,7 +70,7 @@ func buildMysqlContainer(key string, monitor *MysqlMonitor) (*corev1.Container, 
 	return &container, nil
 }
 
-func setMysqlComponent(cluster *dbaasv1alpha1.Cluster, component *Component) error {
+func setMysqlComponent(cluster *appsv1alpha1.Cluster, component *Component) error {
 	image := viper.GetString("KUBEBLOCKS_IMAGE")
 	imagePullPolicy := viper.GetString("KUBEBLOCKS_IMAGE_PULL_POLICY")
 
@@ -103,7 +103,7 @@ func isWellKnownCharacterType(characterType string) bool {
 }
 
 func isMappedCharacterType(characterType string,
-	processors map[string]func(*dbaasv1alpha1.Cluster, *Component) error) bool {
+	processors map[string]func(*appsv1alpha1.Cluster, *Component) error) bool {
 	if val, ok := processors[characterType]; ok && val != nil {
 		return true
 	}

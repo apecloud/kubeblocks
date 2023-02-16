@@ -23,7 +23,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
@@ -37,7 +37,7 @@ func getContainerByName(containers []corev1.Container, name string) (int, *corev
 	return -1, nil
 }
 
-func toK8sVolumeClaimTemplate(template dbaasv1alpha1.ClusterComponentVolumeClaimTemplate) corev1.PersistentVolumeClaimTemplate {
+func toK8sVolumeClaimTemplate(template appsv1alpha1.ClusterComponentVolumeClaimTemplate) corev1.PersistentVolumeClaimTemplate {
 	t := corev1.PersistentVolumeClaimTemplate{}
 	t.ObjectMeta.Name = template.Name
 	if template.Spec != nil {
@@ -46,7 +46,7 @@ func toK8sVolumeClaimTemplate(template dbaasv1alpha1.ClusterComponentVolumeClaim
 	return t
 }
 
-func toK8sVolumeClaimTemplates(templates []dbaasv1alpha1.ClusterComponentVolumeClaimTemplate) []corev1.PersistentVolumeClaimTemplate {
+func toK8sVolumeClaimTemplates(templates []appsv1alpha1.ClusterComponentVolumeClaimTemplate) []corev1.PersistentVolumeClaimTemplate {
 	ts := []corev1.PersistentVolumeClaimTemplate{}
 	for _, template := range templates {
 		ts = append(ts, toK8sVolumeClaimTemplate(template))
@@ -64,14 +64,14 @@ func buildAffinityLabelSelector(clusterName string, componentName string) *metav
 }
 
 func buildPodTopologySpreadConstraints(
-	cluster *dbaasv1alpha1.Cluster,
-	comAffinity *dbaasv1alpha1.Affinity,
+	cluster *appsv1alpha1.Cluster,
+	comAffinity *appsv1alpha1.Affinity,
 	component *Component,
 ) []corev1.TopologySpreadConstraint {
 	var topologySpreadConstraints []corev1.TopologySpreadConstraint
 
 	var whenUnsatisfiable corev1.UnsatisfiableConstraintAction
-	if comAffinity.PodAntiAffinity == dbaasv1alpha1.Required {
+	if comAffinity.PodAntiAffinity == appsv1alpha1.Required {
 		whenUnsatisfiable = corev1.DoNotSchedule
 	} else {
 		whenUnsatisfiable = corev1.ScheduleAnyway
@@ -88,8 +88,8 @@ func buildPodTopologySpreadConstraints(
 }
 
 func buildPodAffinity(
-	cluster *dbaasv1alpha1.Cluster,
-	comAffinity *dbaasv1alpha1.Affinity,
+	cluster *appsv1alpha1.Cluster,
+	comAffinity *appsv1alpha1.Affinity,
 	component *Component,
 ) *corev1.Affinity {
 	affinity := new(corev1.Affinity)
@@ -122,7 +122,7 @@ func buildPodAffinity(
 			LabelSelector: buildAffinityLabelSelector(cluster.Name, component.Name),
 		})
 	}
-	if comAffinity.PodAntiAffinity == dbaasv1alpha1.Required {
+	if comAffinity.PodAntiAffinity == appsv1alpha1.Required {
 		podAntiAffinity = &corev1.PodAntiAffinity{
 			RequiredDuringSchedulingIgnoredDuringExecution: podAffinityTerms,
 		}
@@ -149,10 +149,10 @@ func disableMonitor(component *Component) {
 }
 
 func mergeMonitorConfig(
-	cluster *dbaasv1alpha1.Cluster,
-	clusterDef *dbaasv1alpha1.ClusterDefinition,
-	clusterDefComp *dbaasv1alpha1.ClusterDefinitionComponent,
-	clusterComp *dbaasv1alpha1.ClusterComponent,
+	cluster *appsv1alpha1.Cluster,
+	clusterDef *appsv1alpha1.ClusterDefinition,
+	clusterDefComp *appsv1alpha1.ClusterDefinitionComponent,
+	clusterComp *appsv1alpha1.ClusterComponent,
 	component *Component) {
 	monitorEnable := false
 	if clusterComp != nil {
@@ -199,11 +199,11 @@ func mergeMonitorConfig(
 // component-related configs from input Cluster, ClusterDef and ClusterVersion.
 func MergeComponents(
 	reqCtx intctrlutil.RequestCtx,
-	cluster *dbaasv1alpha1.Cluster,
-	clusterDef *dbaasv1alpha1.ClusterDefinition,
-	clusterDefComp *dbaasv1alpha1.ClusterDefinitionComponent,
-	clusterVersionComp *dbaasv1alpha1.ClusterVersionComponent,
-	clusterComp *dbaasv1alpha1.ClusterComponent) *Component {
+	cluster *appsv1alpha1.Cluster,
+	clusterDef *appsv1alpha1.ClusterDefinition,
+	clusterDefComp *appsv1alpha1.ClusterDefinitionComponent,
+	clusterVersionComp *appsv1alpha1.ClusterVersionComponent,
+	clusterComp *appsv1alpha1.ClusterComponent) *Component {
 	if clusterDefComp == nil {
 		return nil
 	}
@@ -377,7 +377,7 @@ func doContainerAttrOverride(compContainer *corev1.Container, container corev1.C
 	}
 }
 
-func replacePlaceholderTokens(cluster *dbaasv1alpha1.Cluster, component *Component) {
+func replacePlaceholderTokens(cluster *appsv1alpha1.Cluster, component *Component) {
 	namedValues := getEnvReplacementMapForConnCredential(cluster.GetName())
 
 	// replace env[].valueFrom.secretKeyRef.name variables

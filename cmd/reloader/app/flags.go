@@ -22,7 +22,7 @@ import (
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 
-	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 	cfgutil "github.com/apecloud/kubeblocks/internal/configuration/container"
 )
@@ -42,11 +42,11 @@ const (
 	localhostAddress         = "127.0.0.1"
 )
 
-var allNotifyType = map[NotifyEventType]dbaasv1alpha1.CfgReloadType{
-	UnixSignal: dbaasv1alpha1.UnixSignalType,
-	WebHook:    dbaasv1alpha1.HTTPType,
-	ShellTool:  dbaasv1alpha1.ShellType,
-	SQL:        dbaasv1alpha1.SQLType,
+var allNotifyType = map[NotifyEventType]appsv1alpha1.CfgReloadType{
+	UnixSignal: appsv1alpha1.UnixSignalType,
+	WebHook:    appsv1alpha1.HTTPType,
+	ShellTool:  appsv1alpha1.ShellType,
+	SQL:        appsv1alpha1.SQLType,
 }
 
 func init() {
@@ -99,7 +99,7 @@ type VolumeWatcherOpts struct {
 	ProcessName string
 
 	// Signal is valid for UnixSignal
-	Signal dbaasv1alpha1.SignalType
+	Signal appsv1alpha1.SignalType
 
 	LogLevel       string
 	NotifyHandType NotifyEventType
@@ -119,7 +119,7 @@ func NewVolumeWatcherOpts() *VolumeWatcherOpts {
 		},
 		// for configmap watch
 		NotifyHandType: UnixSignal,
-		Signal:         dbaasv1alpha1.SIGHUP,
+		Signal:         appsv1alpha1.SIGHUP,
 		LogLevel:       "info",
 	}
 }

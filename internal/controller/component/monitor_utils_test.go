@@ -19,11 +19,11 @@ package component
 import (
 	"testing"
 
-	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 )
 
 func TestIsWellKnownCharacterType(t *testing.T) {
-	var wellKnownCharacterTypeFunc = map[string]func(cluster *dbaasv1alpha1.Cluster, component *Component) error{
+	var wellKnownCharacterTypeFunc = map[string]func(cluster *appsv1alpha1.Cluster, component *Component) error{
 		"mysql": setMysqlComponent,
 		"redis": nil,
 	}

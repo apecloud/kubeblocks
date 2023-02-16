@@ -25,7 +25,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 )
@@ -76,7 +76,7 @@ var _ = Describe("helper", func() {
 	It("get all clusters", func() {
 		cluster := testing.FakeCluster("test", "test")
 		dynamic := testing.FakeDynamicClient(cluster)
-		clusters := &dbaasv1alpha1.ClusterList{}
+		clusters := &appsv1alpha1.ClusterList{}
 
 		By("get clusters from specified namespace")
 		Expect(GetAllCluster(dynamic, "test", clusters)).ShouldNot(HaveOccurred())
@@ -133,15 +133,15 @@ var _ = Describe("helper", func() {
 
 	It("find latest version", func() {
 		const clusterDefName = "test-cluster-def"
-		genVersion := func(name string, t time.Time) dbaasv1alpha1.ClusterVersion {
-			v := dbaasv1alpha1.ClusterVersion{}
+		genVersion := func(name string, t time.Time) appsv1alpha1.ClusterVersion {
+			v := appsv1alpha1.ClusterVersion{}
 			v.Name = name
 			v.SetLabels(map[string]string{types.ClusterDefLabelKey: clusterDefName})
 			v.SetCreationTimestamp(metav1.NewTime(t))
 			return v
 		}
 
-		versionList := &dbaasv1alpha1.ClusterVersionList{}
+		versionList := &appsv1alpha1.ClusterVersionList{}
 		versionList.Items = append(versionList.Items,
 			genVersion("old-version", time.Now().AddDate(0, 0, -1)),
 			genVersion("now-version", time.Now()))

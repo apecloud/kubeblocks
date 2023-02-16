@@ -27,7 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
 
-	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
@@ -42,7 +42,7 @@ func GetSimpleInstanceInfos(dynamic dynamic.Interface, name string, namespace st
 		return nil
 	}
 
-	cluster := &dbaasv1alpha1.Cluster{}
+	cluster := &appsv1alpha1.Cluster{}
 	if err = runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, cluster); err != nil {
 		return nil
 	}
@@ -51,7 +51,7 @@ func GetSimpleInstanceInfos(dynamic dynamic.Interface, name string, namespace st
 	for _, c := range cluster.Status.Components {
 		var info *InstanceInfo
 		if c.ConsensusSetStatus != nil {
-			buildInfoByStatus := func(status *dbaasv1alpha1.ConsensusMemberStatus) {
+			buildInfoByStatus := func(status *appsv1alpha1.ConsensusMemberStatus) {
 				if status == nil {
 					return
 				}
@@ -71,7 +71,7 @@ func GetSimpleInstanceInfos(dynamic dynamic.Interface, name string, namespace st
 			buildInfoByStatus(c.ConsensusSetStatus.Learner)
 		}
 		if c.ReplicationSetStatus != nil {
-			buildInfoByStatus := func(status *dbaasv1alpha1.ReplicationMemberStatus) {
+			buildInfoByStatus := func(status *appsv1alpha1.ReplicationMemberStatus) {
 				if status == nil {
 					return
 				}
@@ -121,7 +121,7 @@ func GetClusterTypeByPod(pod *corev1.Pod) (string, error) {
 }
 
 // GetAllCluster get all clusters in current namespace
-func GetAllCluster(client dynamic.Interface, namespace string, clusters *dbaasv1alpha1.ClusterList) error {
+func GetAllCluster(client dynamic.Interface, namespace string, clusters *appsv1alpha1.ClusterList) error {
 	objs, err := client.Resource(types.ClusterGVR()).Namespace(namespace).List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		return err
@@ -131,7 +131,7 @@ func GetAllCluster(client dynamic.Interface, namespace string, clusters *dbaasv1
 }
 
 // FindClusterComp finds component in cluster object based on the component type name
-func FindClusterComp(cluster *dbaasv1alpha1.Cluster, typeName string) *dbaasv1alpha1.ClusterComponent {
+func FindClusterComp(cluster *appsv1alpha1.Cluster, typeName string) *appsv1alpha1.ClusterComponent {
 	for i, c := range cluster.Spec.ComponentSpecs {
 		if c.ComponentDefRef == typeName {
 			return &cluster.Spec.ComponentSpecs[i]
@@ -141,7 +141,7 @@ func FindClusterComp(cluster *dbaasv1alpha1.Cluster, typeName string) *dbaasv1al
 }
 
 // GetComponentEndpoints gets component internal and external endpoints
-func GetComponentEndpoints(svcList *corev1.ServiceList, c *dbaasv1alpha1.ClusterComponent) ([]string, []string) {
+func GetComponentEndpoints(svcList *corev1.ServiceList, c *appsv1alpha1.ClusterComponent) ([]string, []string) {
 	var (
 		internalEndpoints []string
 		externalEndpoints []string
@@ -172,7 +172,7 @@ func GetComponentEndpoints(svcList *corev1.ServiceList, c *dbaasv1alpha1.Cluster
 }
 
 // GetComponentServices gets component services
-func GetComponentServices(svcList *corev1.ServiceList, c *dbaasv1alpha1.ClusterComponent) []*corev1.Service {
+func GetComponentServices(svcList *corev1.ServiceList, c *appsv1alpha1.ClusterComponent) []*corev1.Service {
 	var svcs []*corev1.Service
 	for i, svc := range svcList.Items {
 		if svc.GetLabels()[types.ComponentLabelKey] != c.Name {
@@ -191,8 +191,8 @@ func GetExternalIP(svc *corev1.Service) string {
 	return svc.GetAnnotations()[types.ServiceFloatingIPAnnotationKey]
 }
 
-func GetClusterDefByName(dynamic dynamic.Interface, name string) (*dbaasv1alpha1.ClusterDefinition, error) {
-	clusterDef := &dbaasv1alpha1.ClusterDefinition{}
+func GetClusterDefByName(dynamic dynamic.Interface, name string) (*appsv1alpha1.ClusterDefinition, error) {
+	clusterDef := &appsv1alpha1.ClusterDefinition{}
 	obj, err := dynamic.Resource(types.ClusterDefGVR()).Namespace("").
 		Get(context.TODO(), name, metav1.GetOptions{}, "")
 	if err != nil {
@@ -204,15 +204,15 @@ func GetClusterDefByName(dynamic dynamic.Interface, name string) (*dbaasv1alpha1
 	return clusterDef, nil
 }
 
-func GetDefaultCompTypeName(cd *dbaasv1alpha1.ClusterDefinition) (string, error) {
+func GetDefaultCompTypeName(cd *appsv1alpha1.ClusterDefinition) (string, error) {
 	if len(cd.Spec.ComponentDefs) == 1 {
 		return cd.Spec.ComponentDefs[0].Name, nil
 	}
 	return "", fmt.Errorf("failed to get the default component type")
 }
 
-func GetClusterByName(dynamic dynamic.Interface, name string, namespace string) (*dbaasv1alpha1.Cluster, error) {
-	cluster := &dbaasv1alpha1.Cluster{}
+func GetClusterByName(dynamic dynamic.Interface, name string, namespace string) (*appsv1alpha1.Cluster, error) {
+	cluster := &appsv1alpha1.Cluster{}
 	obj, err := dynamic.Resource(types.ClusterGVR()).Namespace(namespace).
 		Get(context.TODO(), name, metav1.GetOptions{}, "")
 	if err != nil {
@@ -224,8 +224,8 @@ func GetClusterByName(dynamic dynamic.Interface, name string, namespace string) 
 	return cluster, nil
 }
 
-func GetVersionByClusterDef(dynamic dynamic.Interface, clusterDef string) (*dbaasv1alpha1.ClusterVersionList, error) {
-	versionList := &dbaasv1alpha1.ClusterVersionList{}
+func GetVersionByClusterDef(dynamic dynamic.Interface, clusterDef string) (*appsv1alpha1.ClusterVersionList, error) {
+	versionList := &appsv1alpha1.ClusterVersionList{}
 	objList, err := dynamic.Resource(types.ClusterVersionGVR()).Namespace("").
 		List(context.TODO(), metav1.ListOptions{
 			LabelSelector: fmt.Sprintf("%s=%s", types.ClusterDefLabelKey, clusterDef),
@@ -284,7 +284,7 @@ func GetLatestVersion(dynamic dynamic.Interface, clusterDef string) (string, err
 	return version.Name, nil
 }
 
-func findLatestVersion(versions *dbaasv1alpha1.ClusterVersionList) *dbaasv1alpha1.ClusterVersion {
+func findLatestVersion(versions *appsv1alpha1.ClusterVersionList) *appsv1alpha1.ClusterVersion {
 	if len(versions.Items) == 0 {
 		return nil
 	}
@@ -292,7 +292,7 @@ func findLatestVersion(versions *dbaasv1alpha1.ClusterVersionList) *dbaasv1alpha
 		return &versions.Items[0]
 	}
 
-	var version *dbaasv1alpha1.ClusterVersion
+	var version *appsv1alpha1.ClusterVersion
 	for i, v := range versions.Items {
 		if version == nil {
 			version = &versions.Items[i]

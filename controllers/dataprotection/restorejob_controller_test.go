@@ -29,7 +29,7 @@ import (
 
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
-	testdbaas "github.com/apecloud/kubeblocks/internal/testutil/dbaas"
+	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 )
 
 var _ = Describe("RestoreJob Controller", func() {
@@ -45,15 +45,15 @@ var _ = Describe("RestoreJob Controller", func() {
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 		// namespaced
-		testdbaas.ClearResources(&testCtx, intctrlutil.StatefulSetSignature, inNS, ml)
-		testdbaas.ClearResources(&testCtx, intctrlutil.RestoreJobSignature, inNS, ml)
-		testdbaas.ClearResources(&testCtx, intctrlutil.BackupSignature, inNS, ml)
-		testdbaas.ClearResources(&testCtx, intctrlutil.BackupPolicySignature, inNS, ml)
-		testdbaas.ClearResources(&testCtx, intctrlutil.JobSignature, inNS, ml)
-		testdbaas.ClearResources(&testCtx, intctrlutil.CronJobSignature, inNS, ml)
+		testapps.ClearResources(&testCtx, intctrlutil.StatefulSetSignature, inNS, ml)
+		testapps.ClearResources(&testCtx, intctrlutil.RestoreJobSignature, inNS, ml)
+		testapps.ClearResources(&testCtx, intctrlutil.BackupSignature, inNS, ml)
+		testapps.ClearResources(&testCtx, intctrlutil.BackupPolicySignature, inNS, ml)
+		testapps.ClearResources(&testCtx, intctrlutil.JobSignature, inNS, ml)
+		testapps.ClearResources(&testCtx, intctrlutil.CronJobSignature, inNS, ml)
 		// non-namespaced
-		testdbaas.ClearResources(&testCtx, intctrlutil.BackupToolSignature, ml)
-		testdbaas.ClearResources(&testCtx, intctrlutil.BackupPolicyTemplateSignature, ml)
+		testapps.ClearResources(&testCtx, intctrlutil.BackupToolSignature, ml)
+		testapps.ClearResources(&testCtx, intctrlutil.BackupPolicyTemplateSignature, ml)
 	}
 
 	BeforeEach(cleanEnv)
@@ -62,7 +62,7 @@ var _ = Describe("RestoreJob Controller", func() {
 
 	assureRestoreJobObj := func(backup string) *dataprotectionv1alpha1.RestoreJob {
 		By("By assure an restoreJob obj")
-		return testdbaas.NewRestoreJobFactory(testCtx.DefaultNamespace, "restore-job-").
+		return testapps.NewRestoreJobFactory(testCtx.DefaultNamespace, "restore-job-").
 			WithRandomName().SetBackupJobName(backup).
 			SetTargetSecretName("mycluster-cluster-secret").
 			AddTargetVolumePVC("mysql-restore-storage", "datadir-mycluster-0").
@@ -72,7 +72,7 @@ var _ = Describe("RestoreJob Controller", func() {
 
 	assureBackupObj := func(backupPolicy string) *dataprotectionv1alpha1.Backup {
 		By("By assure an backup obj")
-		return testdbaas.NewBackupFactory(testCtx.DefaultNamespace, "backup-job-").
+		return testapps.NewBackupFactory(testCtx.DefaultNamespace, "backup-job-").
 			WithRandomName().SetBackupPolicyName(backupPolicy).
 			SetBackupType(dataprotectionv1alpha1.BackupTypeFull).
 			SetTTL("168h0m0s").
@@ -81,7 +81,7 @@ var _ = Describe("RestoreJob Controller", func() {
 
 	assureBackupPolicyObj := func(backupTool string) *dataprotectionv1alpha1.BackupPolicy {
 		By("By assure an backupPolicy obj")
-		return testdbaas.NewBackupPolicyFactory(testCtx.DefaultNamespace, "backup-policy-").
+		return testapps.NewBackupPolicyFactory(testCtx.DefaultNamespace, "backup-policy-").
 			WithRandomName().
 			SetSchedule("0 3 * * *").
 			SetTTL("168h0m0s").
@@ -94,8 +94,8 @@ var _ = Describe("RestoreJob Controller", func() {
 
 	assureBackupToolObj := func(withoutResources ...bool) *dataprotectionv1alpha1.BackupTool {
 		By("By assure an backupTool obj")
-		return testdbaas.CreateCustomizedObj(&testCtx, "backup/backuptool.yaml",
-			&dataprotectionv1alpha1.BackupTool{}, testdbaas.RandomizedObjName(),
+		return testapps.CreateCustomizedObj(&testCtx, "backup/backuptool.yaml",
+			&dataprotectionv1alpha1.BackupTool{}, testapps.RandomizedObjName(),
 			func(bt *dataprotectionv1alpha1.BackupTool) {
 				nilResources := false
 				// optional arguments, only use the first one.
@@ -110,12 +110,12 @@ var _ = Describe("RestoreJob Controller", func() {
 
 	assureStatefulSetObj := func() *appsv1.StatefulSet {
 		By("By assure an stateful obj")
-		return testdbaas.NewStatefulSetFactory(testCtx.DefaultNamespace, "mycluster", "mycluster", "replicasets").
+		return testapps.NewStatefulSetFactory(testCtx.DefaultNamespace, "mycluster", "mycluster", "replicasets").
 			AddLabels(intctrlutil.AppInstanceLabelKey, "mycluster").
-			AddContainer(corev1.Container{Name: "mysql", Image: testdbaas.ApeCloudMySQLImage}).
+			AddContainer(corev1.Container{Name: "mysql", Image: testapps.ApeCloudMySQLImage}).
 			AddVolumeClaimTemplate(corev1.PersistentVolumeClaim{
-				ObjectMeta: metav1.ObjectMeta{Name: testdbaas.DataVolumeName},
-				Spec:       testdbaas.NewPVC("1Gi"),
+				ObjectMeta: metav1.ObjectMeta{Name: testapps.DataVolumeName},
+				Spec:       testapps.NewPVC("1Gi"),
 			}).Create(&testCtx).GetObject()
 	}
 

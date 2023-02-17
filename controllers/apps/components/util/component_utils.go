@@ -116,22 +116,6 @@ func GetObjectListByComponentName(ctx context.Context, cli client.Client, cluste
 	return cli.List(ctx, objectList, matchLabels, inNamespace)
 }
 
-// CheckRelatedPodIsTerminating checks related pods is terminating for Stateless/Stateful
-func CheckRelatedPodIsTerminating(ctx context.Context, cli client.Client, cluster *appsv1alpha1.Cluster, componentName string) (bool, error) {
-	podList := &corev1.PodList{}
-	if err := cli.List(ctx, podList, client.InNamespace(cluster.Namespace),
-		GetComponentMatchLabels(cluster.Name, componentName)); err != nil {
-		return false, err
-	}
-	for _, v := range podList.Items {
-		// if the pod is terminating, ignore the warning event
-		if v.DeletionTimestamp != nil {
-			return true, nil
-		}
-	}
-	return false, nil
-}
-
 // GetComponentDefByCluster gets component from ClusterDefinition with compDefName
 func GetComponentDefByCluster(ctx context.Context, cli client.Client, cluster *appsv1alpha1.Cluster, compDefName string) (*appsv1alpha1.ClusterComponentDefinition, error) {
 	clusterDef := &appsv1alpha1.ClusterDefinition{}
@@ -180,12 +164,6 @@ func InitClusterComponentStatusIfNeed(cluster *appsv1alpha1.Cluster,
 		}
 	}
 	cluster.Status.Components[componentName] = componentStatus
-}
-
-// GetComponentReplicas gets the actual replicas of component
-func GetComponentReplicas(component *appsv1alpha1.ClusterComponentSpec,
-	componentDef *appsv1alpha1.ClusterComponentDefinition) int32 {
-	return component.Replicas
 }
 
 // GetComponentDeployMinReadySeconds gets the deployment minReadySeconds of the component.

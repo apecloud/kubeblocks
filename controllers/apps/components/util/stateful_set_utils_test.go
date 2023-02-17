@@ -70,10 +70,10 @@ func TestGetPodRevision(t *testing.T) {
 	}
 }
 
-func TestStatefulSetPodsIsReady(t *testing.T) {
+func TestStatefulSetPodsAreReady(t *testing.T) {
 	sts := testk8s.NewFakeStatefulSet("test", 3)
 	testk8s.MockStatefulSetReady(sts)
-	ready := StatefulSetPodsIsReady(sts)
+	ready := StatefulSetPodsAreReady(sts, *sts.Spec.Replicas)
 	if !ready {
 		t.Errorf("StatefulSet pods should be ready")
 	}
@@ -91,14 +91,14 @@ func TestStatefulSetPodsIsReady(t *testing.T) {
 	}
 }
 
-func TestStatefulSetIsReady(t *testing.T) {
+func TestSStatefulSetOfComponentIsReady(t *testing.T) {
 	sts := testk8s.NewFakeStatefulSet("test", 3)
 	testk8s.MockStatefulSetReady(sts)
-	ready := StatefulSetIsReady(sts, true, nil)
+	ready := StatefulSetOfComponentIsReady(sts, true, nil)
 	if !ready {
 		t.Errorf("StatefulSet should be ready")
 	}
-	ready = StatefulSetIsReady(sts, false, nil)
+	ready = StatefulSetOfComponentIsReady(sts, false, nil)
 	if ready {
 		t.Errorf("StatefulSet should not be ready")
 	}

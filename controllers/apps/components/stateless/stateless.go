@@ -19,6 +19,7 @@ package stateless
 import (
 	"context"
 	"math"
+	"strings"
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -32,6 +33,7 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/types"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 // NewRSAvailableReason is added in a deployment when its newest replica set is made available
@@ -64,8 +66,7 @@ func (stateless *Stateless) PodsReady(obj client.Object) (bool, error) {
 	if !ok {
 		return false, nil
 	}
-	targetReplicas := util.GetComponentReplicas(stateless.Component, stateless.ComponentDef)
-	return DeploymentIsReady(deploy, &targetReplicas), nil
+	return DeploymentIsReady(deploy, &stateless.Component.Replicas), nil
 }
 
 func (stateless *Stateless) PodIsAvailable(pod *corev1.Pod, minReadySeconds int32) bool {
@@ -81,29 +82,45 @@ func (stateless *Stateless) HandleProbeTimeoutWhenPodsReady(recorder record.Even
 }
 
 func (stateless *Stateless) GetPhaseWhenPodsNotReady(componentName string) (appsv1alpha1.Phase, error) {
-	var (
-		isFailed          = true
-		isAbnormal        bool
-		deployList        = &appsv1.DeploymentList{}
-		podsIsTerminating bool
-		err               error
-	)
-	if podsIsTerminating, err = util.CheckRelatedPodIsTerminating(stateless.Ctx,
-		stateless.Cli, stateless.Cluster, componentName); err != nil || podsIsTerminating {
+	podList, err := util.GetComponentPodList(stateless.Ctx, stateless.Cli, stateless.Cluster, componentName)
+	if err != nil {
 		return "", err
 	}
+	podCount := len(podList.Items)
+	componentReplicas := stateless.Component.Replicas
+	if podCount == 0 && componentReplicas != 0 {
+		return appsv1alpha1.FailedPhase, nil
+	}
+	deployList := &appsv1.DeploymentList{}
 	if err = util.GetObjectListByComponentName(stateless.Ctx,
-		stateless.Cli, stateless.Cluster, deployList, componentName); err != nil {
+		stateless.Cli, stateless.Cluster, deployList, componentName); err != nil || len(deployList.Items) == 0 {
 		return "", err
 	}
-	for _, v := range deployList.Items {
-		if v.Status.AvailableReplicas < 1 {
-			continue
+	var (
+		isFailed              = true
+		isAbnormal            bool
+		existFailedPodOfNewRs bool
+		deploy                = &deployList.Items[0]
+	)
+	for _, v := range podList.Items {
+		// if the pod is terminating, ignore it
+		if v.DeletionTimestamp != nil {
+			return "", nil
 		}
+		if !intctrlutil.PodIsReady(&v) && belongToNewReplicaSet(deploy, &v) {
+			existFailedPodOfNewRs = true
+		}
+	}
+	// if the failed pod is not controlled by new ReplicaSet, ignore it.
+	if !existFailedPodOfNewRs {
+		return "", nil
+	}
+	if deploy.Status.AvailableReplicas > 0 {
 		isFailed = false
-		if v.Status.AvailableReplicas < *v.Spec.Replicas {
-			isAbnormal = true
-		}
+	}
+	if deploy.Status.AvailableReplicas != componentReplicas ||
+		int32(podCount) != componentReplicas {
+		isAbnormal = true
 	}
 	return util.GetComponentPhase(isFailed, isAbnormal), nil
 }
@@ -158,4 +175,21 @@ func DeploymentIsReady(deploy *appsv1.Deployment, targetReplicas *int32) bool {
 // "ProgressDeadlineExceeded" when the Deployment progress takes longer than expected time.
 func HasProgressDeadline(d *appsv1.Deployment) bool {
 	return d.Spec.ProgressDeadlineSeconds != nil && *d.Spec.ProgressDeadlineSeconds != math.MaxInt32
+}
+
+// belongToNewReplicaSet checks if the pod belongs to the new replicaSet of deployment
+func belongToNewReplicaSet(d *appsv1.Deployment, pod *corev1.Pod) bool {
+	if pod == nil || d == nil {
+		return false
+	}
+	condition := deploymentutil.GetDeploymentCondition(d.Status, appsv1.DeploymentProgressing)
+	if condition == nil {
+		return false
+	}
+	for _, v := range pod.OwnerReferences {
+		if v.Kind == intctrlutil.ReplicaSet && strings.Contains(condition.Message, v.Name) {
+			return d.Status.ObservedGeneration == d.Generation
+		}
+	}
+	return false
 }

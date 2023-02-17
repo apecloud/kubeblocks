@@ -148,16 +148,8 @@ var _ = Describe("Consensus Component", func() {
 			_ = GetObjectListByComponentName(ctx, k8sClient, cluster, stsList, consensusCompName)
 			Expect(len(stsList.Items) > 0).Should(BeTrue())
 
-			By("test CheckRelatedPodIsTerminating function")
-			isTerminating, _ := CheckRelatedPodIsTerminating(ctx, k8sClient, cluster, consensusCompName)
-			Expect(isTerminating).Should(BeFalse())
-
 			By("test GetComponentStatusMessageKey function")
 			Expect(GetComponentStatusMessageKey("Pod", "mysql-01")).To(Equal("Pod/mysql-01"))
-
-			By("test GetComponentReplicas function")
-			component := cluster.GetComponentByName(consensusCompName)
-			Expect(GetComponentReplicas(component, componentDef)).To(Equal(int32(3)))
 
 			By("test GetComponentStsMinReadySeconds")
 			minReadySeconds, _ := GetComponentWorkloadMinReadySeconds(ctx, k8sClient, cluster,

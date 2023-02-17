@@ -19,6 +19,7 @@ package consensusset
 import (
 	"context"
 
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -51,8 +52,7 @@ func (consensusSet *ConsensusSet) IsRunning(obj client.Object) (bool, error) {
 	if statefulStatusRevisionIsEquals, err := handleConsensusSetUpdate(consensusSet.Ctx, consensusSet.Cli, consensusSet.Cluster, sts); err != nil {
 		return false, err
 	} else {
-		targetReplicas := util.GetComponentReplicas(consensusSet.Component, consensusSet.ComponentDef)
-		return util.StatefulSetIsReady(sts, statefulStatusRevisionIsEquals, &targetReplicas), nil
+		return util.StatefulSetOfComponentIsReady(sts, statefulStatusRevisionIsEquals, &consensusSet.Component.Replicas), nil
 	}
 }
 
@@ -61,7 +61,7 @@ func (consensusSet *ConsensusSet) PodsReady(obj client.Object) (bool, error) {
 		return false, nil
 	}
 	sts := util.CovertToStatefulSet(obj)
-	return util.StatefulSetPodsIsReady(sts), nil
+	return util.StatefulSetPodsAreReady(sts, consensusSet.Component.Replicas), nil
 }
 
 func (consensusSet *ConsensusSet) PodIsAvailable(pod *corev1.Pod, minReadySeconds int32) bool {
@@ -136,25 +136,29 @@ func (consensusSet *ConsensusSet) HandleProbeTimeoutWhenPodsReady(recorder recor
 }
 
 func (consensusSet *ConsensusSet) GetPhaseWhenPodsNotReady(componentName string) (appsv1alpha1.Phase, error) {
-	var (
-		isFailed      = true
-		isAbnormal    bool
-		podList       *corev1.PodList
-		allPodIsReady = true
-		cluster       = consensusSet.Cluster
-		err           error
-	)
-
-	if podList, err = util.GetComponentPodList(consensusSet.Ctx, consensusSet.Cli, cluster, componentName); err != nil {
+	podList, err := util.GetComponentPodList(consensusSet.Ctx, consensusSet.Cli, consensusSet.Cluster, componentName)
+	if err != nil {
 		return "", err
 	}
-
 	podCount := len(podList.Items)
-	if podCount == 0 {
+	componentReplicas := consensusSet.Component.Replicas
+	if podCount == 0 && componentReplicas != 0 {
 		return appsv1alpha1.FailedPhase, nil
 	}
+	// get the statefulSet of component
+	stsList := &appsv1.StatefulSetList{}
+	if err = util.GetObjectListByComponentName(consensusSet.Ctx,
+		consensusSet.Cli, consensusSet.Cluster, stsList, componentName); err != nil || len(stsList.Items) == 0 {
+		return "", err
+	}
+	var (
+		stsObj                       = stsList.Items[0]
+		existLatestRevisionFailedPod bool
+		isFailed                     = true
+		isAbnormal                   bool
+	)
 	for _, v := range podList.Items {
-		// if the pod is terminating, ignore the warning event
+		// if the pod is terminating, ignore it
 		if v.DeletionTimestamp != nil {
 			return "", nil
 		}
@@ -167,19 +171,18 @@ func (consensusSet *ConsensusSet) GetPhaseWhenPodsNotReady(componentName string)
 		if labelValue == "" {
 			isAbnormal = true
 		}
-		if !intctrlutil.PodIsReady(&v) {
-			allPodIsReady = false
+		if !intctrlutil.PodIsReady(&v) && util.PodIsControlledByLatestRevision(&v, &stsObj) {
+			existLatestRevisionFailedPod = true
 		}
 	}
-	// check pod count is equals to the component replicas
-	componentReplicas := util.GetComponentReplicas(consensusSet.Component, consensusSet.ComponentDef)
-	if componentReplicas != int32(podCount) {
-		isAbnormal = true
-		allPodIsReady = false
-	}
-	// if all pod is ready, ignore the warning event
-	if allPodIsReady {
+	// if the failed pod is not controlled by the latest revision, ignore it.
+	if !existLatestRevisionFailedPod {
 		return "", nil
+	}
+	// check if pod count equals to the number of component replicas
+	if stsObj.Status.AvailableReplicas != componentReplicas ||
+		componentReplicas != int32(podCount) {
+		isAbnormal = true
 	}
 	return util.GetComponentPhase(isFailed, isAbnormal), nil
 }

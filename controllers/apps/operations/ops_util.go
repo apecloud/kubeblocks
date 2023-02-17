@@ -56,7 +56,7 @@ func ReconcileActionWithComponentOps(opsRes *OpsResource,
 		err                      error
 		ok                       bool
 		expectProgressCount      int32
-		succeedProgressCount     int32
+		completedProgressCount   int32
 		checkAllClusterComponent bool
 	)
 	componentNameMap := opsRequest.GetComponentNameMap()
@@ -66,7 +66,7 @@ func ReconcileActionWithComponentOps(opsRes *OpsResource,
 	}
 	if clusterDef, err = GetClusterDefByName(opsRes.Ctx, opsRes.Client,
 		opsRes.Cluster.Spec.ClusterDefRef); err != nil {
-		return opsRequestPhase, 0, nil
+		return opsRequestPhase, 0, err
 	}
 
 	patch := client.MergeFrom(opsRequest.DeepCopy())
@@ -92,19 +92,19 @@ func ReconcileActionWithComponentOps(opsRes *OpsResource,
 			compStatus.Phase = v.Phase
 		}
 		clusterComponent := opsRes.Cluster.GetComponentByName(k)
-		expectCount, succeedCount, err := handleStatusProgress(opsRes, progressResource{
+		expectCount, completedCount, err := handleStatusProgress(opsRes, progressResource{
 			opsMessageKey:       opsMessageKey,
 			clusterComponent:    clusterComponent,
 			clusterComponentDef: clusterDef.GetComponentDefByName(clusterComponent.ComponentDefRef),
 		}, &compStatus)
 		if err != nil {
-			return opsRequestPhase, 0, nil
+			return opsRequestPhase, 0, err
 		}
 		expectProgressCount += expectCount
-		succeedProgressCount += succeedCount
+		completedProgressCount += completedCount
 		opsRequest.Status.Components[k] = compStatus
 	}
-	opsRequest.Status.Progress = fmt.Sprintf("%d/%d", succeedProgressCount, expectProgressCount)
+	opsRequest.Status.Progress = fmt.Sprintf("%d/%d", completedProgressCount, expectProgressCount)
 	if !reflect.DeepEqual(opsRequest.Status, oldOpsRequestStatus) {
 		if err = opsRes.Client.Status().Patch(opsRes.Ctx, opsRequest, patch); err != nil {
 			return opsRequestPhase, 0, err

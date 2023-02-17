@@ -17,13 +17,15 @@ limitations under the License.
 package testutil
 
 import (
+	"fmt"
+
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // MockDeploymentReady mocks deployment is ready
-func MockDeploymentReady(deploy *appsv1.Deployment, rsAvailableReason string) {
+func MockDeploymentReady(deploy *appsv1.Deployment, rsAvailableReason, rsName string) {
 	deploy.Status.AvailableReplicas = *deploy.Spec.Replicas
 	deploy.Status.ReadyReplicas = *deploy.Spec.Replicas
 	deploy.Status.Replicas = *deploy.Spec.Replicas
@@ -31,9 +33,10 @@ func MockDeploymentReady(deploy *appsv1.Deployment, rsAvailableReason string) {
 	deploy.Status.UpdatedReplicas = *deploy.Spec.Replicas
 	deploy.Status.Conditions = []appsv1.DeploymentCondition{
 		{
-			Type:   appsv1.DeploymentProgressing,
-			Reason: rsAvailableReason,
-			Status: corev1.ConditionTrue,
+			Type:    appsv1.DeploymentProgressing,
+			Reason:  rsAvailableReason,
+			Status:  corev1.ConditionTrue,
+			Message: fmt.Sprintf(`ReplicaSet "%s" has successfully progressed.`, rsName),
 		},
 	}
 }

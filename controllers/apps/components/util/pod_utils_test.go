@@ -20,6 +20,7 @@ import (
 	"testing"
 	"time"
 
+	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -59,5 +60,22 @@ func TestPodIsReady(t *testing.T) {
 	pod.Status.Conditions = []v1.PodCondition{}
 	if PodIsReady(*pod) {
 		t.Errorf("isReady returned false positive")
+	}
+}
+
+func TestPodIsControlledByLatestRevision(t *testing.T) {
+	set := testk8s.NewFakeStatefulSet("foo", 3)
+	pod := testk8s.NewFakeStatefulSetPod(set, 1)
+	pod.Labels = map[string]string{
+		appsv1.ControllerRevisionHashLabelKey: "test",
+	}
+	set.Generation = 1
+	set.Status.UpdateRevision = "test"
+	if PodIsControlledByLatestRevision(pod, set) {
+		t.Errorf("PodIsControlledByLatestRevision returned false positive")
+	}
+	set.Status.ObservedGeneration = 1
+	if !PodIsControlledByLatestRevision(pod, set) {
+		t.Errorf("PodIsControlledByLatestRevision returned false positive")
 	}
 }

@@ -30,6 +30,7 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/types"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 type Stateful struct {
@@ -47,12 +48,11 @@ func (stateful *Stateful) IsRunning(obj client.Object) (bool, error) {
 		return false, nil
 	}
 	sts := util.CovertToStatefulSet(obj)
-	targetReplicas := util.GetComponentReplicas(stateful.Component, stateful.ComponentDef)
 	isRevisionConsistent, err := util.IsStsAndPodsRevisionConsistent(stateful.Ctx, stateful.Cli, sts)
 	if err != nil {
 		return false, err
 	}
-	return util.StatefulSetIsReady(sts, isRevisionConsistent, &targetReplicas), nil
+	return util.StatefulSetOfComponentIsReady(sts, isRevisionConsistent, &stateful.Component.Replicas), nil
 }
 
 func (stateful *Stateful) PodsReady(obj client.Object) (bool, error) {
@@ -60,7 +60,7 @@ func (stateful *Stateful) PodsReady(obj client.Object) (bool, error) {
 		return false, nil
 	}
 	sts := util.CovertToStatefulSet(obj)
-	return util.StatefulSetPodsIsReady(sts), nil
+	return util.StatefulSetPodsAreReady(sts, stateful.Component.Replicas), nil
 }
 
 func (stateful *Stateful) PodIsAvailable(pod *corev1.Pod, minReadySeconds int32) bool {
@@ -75,30 +75,47 @@ func (stateful *Stateful) HandleProbeTimeoutWhenPodsReady(recorder record.EventR
 	return false, nil
 }
 
+// GetPhaseWhenPodsNotReady gets the component phase when the pods of component are not ready.
 func (stateful *Stateful) GetPhaseWhenPodsNotReady(componentName string) (appsv1alpha1.Phase, error) {
-	var (
-		isFailed          = true
-		isAbnormal        bool
-		stsList           = &appsv1.StatefulSetList{}
-		podsIsTerminating bool
-		err               error
-	)
-	if podsIsTerminating, err = util.CheckRelatedPodIsTerminating(stateful.Ctx,
-		stateful.Cli, stateful.Cluster, componentName); err != nil || podsIsTerminating {
+	podList, err := util.GetComponentPodList(stateful.Ctx, stateful.Cli, stateful.Cluster, componentName)
+	if err != nil {
 		return "", err
 	}
+	podCount := len(podList.Items)
+	componentReplicas := stateful.Component.Replicas
+	if podCount == 0 && componentReplicas != 0 {
+		return appsv1alpha1.FailedPhase, nil
+	}
+	stsList := &appsv1.StatefulSetList{}
 	if err = util.GetObjectListByComponentName(stateful.Ctx,
-		stateful.Cli, stateful.Cluster, stsList, componentName); err != nil {
+		stateful.Cli, stateful.Cluster, stsList, componentName); err != nil || len(stsList.Items) == 0 {
 		return "", err
 	}
-	for _, v := range stsList.Items {
-		if v.Status.AvailableReplicas < 1 {
-			continue
+	var (
+		stsObj                       = stsList.Items[0]
+		existLatestRevisionFailedPod bool
+		isFailed                     = true
+		isAbnormal                   bool
+	)
+	for _, v := range podList.Items {
+		// if the pod is terminating, ignore it
+		if v.DeletionTimestamp != nil {
+			return "", nil
 		}
+		if !intctrlutil.PodIsReady(&v) && util.PodIsControlledByLatestRevision(&v, &stsObj) {
+			existLatestRevisionFailedPod = true
+		}
+	}
+	//  if pod is not controlled by the latest controller revision, ignore it.
+	if !existLatestRevisionFailedPod {
+		return "", nil
+	}
+	if stsObj.Status.AvailableReplicas > 0 {
 		isFailed = false
-		if v.Status.AvailableReplicas < *v.Spec.Replicas {
-			isAbnormal = true
-		}
+	}
+	if stsObj.Status.AvailableReplicas != componentReplicas ||
+		int32(podCount) != componentReplicas {
+		isAbnormal = true
 	}
 	return util.GetComponentPhase(isFailed, isAbnormal), nil
 }

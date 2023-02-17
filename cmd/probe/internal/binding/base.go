@@ -39,26 +39,26 @@ type OpsResult map[string]interface{}
 type AccessMode string
 
 type BaseOperations struct {
-    RunningCheckFailedCount int
-    StatusCheckFailedCount  int
-    RoleCheckFailedCount    int
-    RoleUnchangedCount      int
-    CheckFailedThreshold    int
-    // RoleDetectionThreshold is used to set the report duration of role event after role changed,
-    // then event controller can always get rolechanged events to maintain pod label accurately
-    // in cases of:
-    // 1 rolechanged event lost;
-    // 2 pod role label deleted or updated incorrectly.
-    RoleDetectionThreshold int
-    DBPort                 int
-    DBType                 string
-    OriRole                string
-    DBRoles                map[string]AccessMode
-    Logger                 logger.Logger
-    Metadata               bindings.Metadata
-    InitIfNeed             func() bool
-    GetRole                func(ctx context.Context, request *bindings.InvokeRequest, response *bindings.InvokeResponse) (string, error)
-    OperationMap           map[bindings.OperationKind]Operation
+	RunningCheckFailedCount int
+	StatusCheckFailedCount  int
+	RoleCheckFailedCount    int
+	RoleUnchangedCount      int
+	CheckFailedThreshold    int
+	// RoleDetectionThreshold is used to set the report duration of role event after role changed,
+	// then event controller can always get rolechanged events to maintain pod label accurately
+	// in cases of:
+	// 1 rolechanged event lost;
+	// 2 pod role label deleted or updated incorrectly.
+	RoleDetectionThreshold int
+	DBPort                 int
+	DBType                 string
+	OriRole                string
+	DBRoles                map[string]AccessMode
+	Logger                 logger.Logger
+	Metadata               bindings.Metadata
+	InitIfNeed             func() bool
+	GetRole                func(ctx context.Context, request *bindings.InvokeRequest, response *bindings.InvokeResponse) (string, error)
+	OperationMap           map[bindings.OperationKind]Operation
 }
 
 const (
@@ -74,7 +74,7 @@ const (
 	RespDurationKey     = "duration"
 	StatusCode          = "status-code"
 	// 451 Unavailable For Legal Reasons, used to indicate check failed and trigger kubelet events
-	OperationFailedHTTPCode = "451"
+	OperationFailedHTTPCode   = "451"
 	OperationNotFoundHTTPCode = "404"
 
 	// CommandSQLKey keys from request's metadata.

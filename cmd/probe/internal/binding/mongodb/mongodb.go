@@ -37,7 +37,7 @@ import (
 // MongoDB is a binding implementation for MongoDB.
 type MongoDB struct {
 	mongoDBMetadata
-	lock             sync.Mutex
+	mu               sync.Mutex
 	client           *mongo.Client
 	database         *mongo.Database
 	operationTimeout time.Duration
@@ -153,25 +153,34 @@ func (m *MongoDB) Ping() error {
 
 // InitIfNeed do the real init
 func (m *MongoDB) initIfNeed() bool {
-	m.lock.Lock()
-	defer m.lock.Unlock()
-
-	if m.database != nil {
-		return false
+	if m.database == nil {
+		go func() {
+			err := m.InitDelay()
+			m.Logger.Errorf("MongoDB connection init failed: %v", err)
+		}()
+		return true
 	}
+	return false
+}
 
+func (m *MongoDB) InitDelay() error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.database != nil {
+		return nil
+	}
 	m.operationTimeout = m.mongoDBMetadata.operationTimeout
 
 	client, err := getMongoDBClient(&m.mongoDBMetadata)
 	if err != nil {
 		m.Logger.Errorf("error in creating mongodb client: %s", err)
-		return true
+		return err
 	}
 
 	if err = client.Ping(context.Background(), nil); err != nil {
 		_ = client.Disconnect(context.Background())
 		m.Logger.Errorf("error in connecting to mongodb, host: %s error: %s", m.mongoDBMetadata.host, err)
-		return true
+		return err
 	}
 
 	db := client.Database(adminDatabase)
@@ -179,13 +188,13 @@ func (m *MongoDB) initIfNeed() bool {
 	if err != nil {
 		_ = client.Disconnect(context.Background())
 		m.Logger.Errorf("error in getting repl status from mongodb, error: %s", err)
-		return true
+		return err
 	}
 
 	m.client = client
 	m.database = db
 
-	return true
+	return nil
 }
 
 func (m *MongoDB) GetRunningPort() int {

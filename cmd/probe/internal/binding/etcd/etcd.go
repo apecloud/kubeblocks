@@ -60,11 +60,22 @@ func (e *Etcd) Init(metadata bindings.Metadata) error {
 }
 
 func (e *Etcd) initIfNeed() bool {
+	if e.etcd == nil {
+		go func() {
+			err := e.InitDelay()
+			e.Logger.Errorf("MongoDB connection init failed: %v", err)
+		}()
+		return true
+	}
+	return false
+}
+
+func (e *Etcd) InitDelay() error {
 	e.lock.Lock()
 	defer e.lock.Unlock()
 
 	if e.etcd != nil {
-		return false
+		return nil
 	}
 
 	cli, err := v3.New(v3.Config{
@@ -72,7 +83,7 @@ func (e *Etcd) initIfNeed() bool {
 		DialTimeout: defaultDialTimeout,
 	})
 	if err != nil {
-		return true
+		return err
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), defaultDialTimeout)
@@ -80,12 +91,12 @@ func (e *Etcd) initIfNeed() bool {
 	cancel()
 	if err != nil {
 		cli.Close()
-		return true
+		return err
 	}
 
 	e.etcd = cli
 
-	return true
+	return nil
 }
 
 func (e *Etcd) GetRole(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (string, error) {

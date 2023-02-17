@@ -20,46 +20,38 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"github.com/golang/mock/gomock"
-
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 	testutil "github.com/apecloud/kubeblocks/internal/testutil/k8s"
-	mock_client "github.com/apecloud/kubeblocks/internal/testutil/k8s/mocks"
 )
 
 var _ = Describe("Reconfigure simplePolicy", func() {
 
 	var (
-		mockClient *mock_client.MockClient
-		ctrl       *gomock.Controller
+		// mockClient *mock_client.MockClient
+		// ctrl       *gomock.Controller
+
+		k8sMockClient *testutil.K8sClientMockHelper
 
 		simplePolicy = upgradePolicyMap[dbaasv1alpha1.NormalPolicy]
 	)
 
 	BeforeEach(func() {
-		ctrl, mockClient = testutil.SetupK8sMock()
+		// ctrl, mockClient = testutil.SetupK8sMock()
+		k8sMockClient = testutil.NewK8sMockClient()
 	})
 
 	AfterEach(func() {
 		// Add any teardown steps that needs to be executed after each test
-		ctrl.Finish()
+		// ctrl.Finish()
+		k8sMockClient.Finish()
 	})
 
 	Context("simple reconfigure policy test", func() {
 		It("Should success without error", func() {
 			Expect(simplePolicy.GetPolicyName()).Should(BeEquivalentTo("simple"))
 
-			// mock client update caller
-			updateErr := cfgcore.MakeError("update failed!")
-			mockClient.EXPECT().Update(gomock.Any(), gomock.Any()).
-				Return(updateErr).
-				Times(1)
-			mockClient.EXPECT().Update(gomock.Any(), gomock.Any()).
-				Return(nil).
-				Times(1)
-
-			mockParam := newMockReconfigureParams("simplePolicy", mockClient,
+			mockParam := newMockReconfigureParams("simplePolicy", k8sMockClient.Client(),
 				withMockStatefulSet(2, nil),
 				withConfigTpl("for_test", map[string]string{
 					"key": "value",
@@ -68,6 +60,18 @@ var _ = Describe("Reconfigure simplePolicy", func() {
 					Name:       "for_test",
 					VolumeName: "test_volume",
 				}}))
+
+			// mock client update caller
+			updateErr := cfgcore.MakeError("update failed!")
+			k8sMockClient.MockUpdateMethod(
+				testutil.WithFailed(updateErr, testutil.WithTimes(1)),
+				testutil.WithSucceed(testutil.WithTimes(1)))
+			k8sMockClient.MockListMethod(testutil.WithListReturned(
+				testutil.WithConstructListReturnedResult(
+					fromPodObjectList(newMockPodsWithStatefulSet(&mockParam.ComponentUnits[0], 2))),
+				testutil.WithTimes(0),
+			))
+
 			status, err := simplePolicy.Upgrade(mockParam)
 			Expect(err).Should(BeEquivalentTo(updateErr))
 			Expect(status.Status).Should(BeEquivalentTo(ESAndRetryFailed))

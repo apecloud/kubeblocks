@@ -17,14 +17,12 @@ limitations under the License.
 package configuration
 
 import (
-	"context"
 	"reflect"
 	"strings"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"github.com/golang/mock/gomock"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -34,7 +32,6 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	testdbaas "github.com/apecloud/kubeblocks/internal/testutil/dbaas"
 	testutil "github.com/apecloud/kubeblocks/internal/testutil/k8s"
-	mock_client "github.com/apecloud/kubeblocks/internal/testutil/k8s/mocks"
 )
 
 var _ = Describe("ConfigWrapper util test", func() {
@@ -48,8 +45,9 @@ var _ = Describe("ConfigWrapper util test", func() {
 	const configVolumeName = "mysql-config"
 
 	var (
-		ctrl       *gomock.Controller
-		mockClient *mock_client.MockClient
+		// ctrl       *gomock.Controller
+		// mockClient *mock_client.MockClient
+		k8sMockClient *testutil.K8sClientMockHelper
 
 		reqCtx = intctrlutil.RequestCtx{
 			Ctx: ctx,
@@ -86,11 +84,7 @@ var _ = Describe("ConfigWrapper util test", func() {
 		cleanEnv()
 
 		// Add any setup steps that needs to be executed before each test
-		ctrl, mockClient = func() (*gomock.Controller, *mock_client.MockClient) {
-			ctrl := gomock.NewController(GinkgoT())
-			client := mock_client.NewMockClient(ctrl)
-			return ctrl, client
-		}()
+		k8sMockClient = testutil.NewK8sMockClient()
 
 		By("creating a cluster")
 		configMapObj = testdbaas.CreateCustomizedObj(&testCtx,
@@ -117,7 +111,7 @@ var _ = Describe("ConfigWrapper util test", func() {
 		// Add any teardown steps that needs to be executed after each test
 		cleanEnv()
 
-		ctrl.Finish()
+		k8sMockClient.Finish()
 	})
 
 	Context("clusterdefinition CR test", func() {
@@ -125,83 +119,54 @@ var _ = Describe("ConfigWrapper util test", func() {
 			availableTPL := configConstraintObj.DeepCopy()
 			availableTPL.Status.Phase = dbaasv1alpha1.AvailablePhase
 
-			testDatas := map[client.ObjectKey][]struct {
-				object client.Object
-				err    error
-			}{
-				// for cm
-				client.ObjectKeyFromObject(configMapObj): {{
-					object: nil,
-					err:    cfgcore.MakeError("failed to get cc object"),
-				}, {
-					object: configMapObj,
-					err:    nil,
-				}},
-				// for cc
-				client.ObjectKeyFromObject(configConstraintObj): {{
-					object: nil,
-					err:    cfgcore.MakeError("failed to get cc object"),
-				}, {
-					object: configConstraintObj,
-					err:    nil,
-				}, {
-					object: availableTPL,
-					err:    nil,
-				}},
-			}
+			k8sMockClient.MockPatchMethod(testutil.WithSucceed())
+			k8sMockClient.MockListMethod(testutil.WithSucceed())
+			k8sMockClient.MockGetMethod(testutil.WithGetReturned(testutil.WithConstructSequenceResult(
+				map[client.ObjectKey][]testutil.MockGetReturned{
+					client.ObjectKeyFromObject(configMapObj): {{
+						Object: nil,
+						Err:    cfgcore.MakeError("failed to get cc object"),
+					}, {
+						Object: configMapObj,
+						Err:    nil,
+					}},
+					client.ObjectKeyFromObject(configConstraintObj): {{
+						Object: nil,
+						Err:    cfgcore.MakeError("failed to get cc object"),
+					}, {
+						Object: configConstraintObj,
+						Err:    nil,
+					}, {
+						Object: availableTPL,
+						Err:    nil,
+					}},
+				},
+			), testutil.WithAnyTimes()))
 
-			accessCounter := map[client.ObjectKey]int{}
-
-			mockClient.EXPECT().Patch(gomock.Any(), gomock.Any(), gomock.Any()).
-				AnyTimes().
-				Return(nil)
-
-			mockClient.EXPECT().List(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
-				AnyTimes().
-				Return(nil)
-
-			mockClient.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).
-				DoAndReturn(func(ctx context.Context, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
-					tests, ok := testDatas[key]
-					if !ok {
-						return cfgcore.MakeError("not exist")
-					}
-					index := accessCounter[key]
-					tt := tests[index]
-					if tt.err == nil {
-						// mock data
-						testutil.SetGetReturnedObject(obj, tt.object)
-					}
-					if index < len(tests)-1 {
-						accessCounter[key]++
-					}
-					return tt.err
-				}).AnyTimes()
-
-			_, err := CheckCDConfigTemplate(mockClient, reqCtx, clusterDefObj)
+			_, err := CheckCDConfigTemplate(k8sMockClient.Client(), reqCtx, clusterDefObj)
 			Expect(err).ShouldNot(Succeed())
 			Expect(err.Error()).Should(ContainSubstring("failed to get cc object"))
 
-			_, err = CheckCDConfigTemplate(mockClient, reqCtx, clusterDefObj)
+			_, err = CheckCDConfigTemplate(k8sMockClient.Client(), reqCtx, clusterDefObj)
 			Expect(err).ShouldNot(Succeed())
 			Expect(err.Error()).Should(ContainSubstring("failed to get cc object"))
 
-			_, err = CheckCDConfigTemplate(mockClient, reqCtx, clusterDefObj)
+			_, err = CheckCDConfigTemplate(k8sMockClient.Client(), reqCtx, clusterDefObj)
 			Expect(err).ShouldNot(Succeed())
 			Expect(err.Error()).Should(ContainSubstring("status not ready"))
 
-			ok, err := CheckCDConfigTemplate(mockClient, reqCtx, clusterDefObj)
+			ok, err := CheckCDConfigTemplate(k8sMockClient.Client(), reqCtx, clusterDefObj)
 			Expect(err).Should(Succeed())
 			Expect(ok).Should(BeTrue())
 
-			ok, err = UpdateCDLabelsByConfiguration(mockClient, reqCtx, clusterDefObj)
+			ok, err = UpdateCDLabelsByConfiguration(k8sMockClient.Client(), reqCtx, clusterDefObj)
 			Expect(err).Should(Succeed())
 			Expect(ok).Should(BeTrue())
 
-			err = UpdateCDConfigMapFinalizer(mockClient, reqCtx, clusterDefObj)
+			err = UpdateCDConfigMapFinalizer(k8sMockClient.Client(), reqCtx, clusterDefObj)
 			Expect(err).Should(Succeed())
 
-			err = DeleteCDConfigMapFinalizer(mockClient, reqCtx, clusterDefObj)
+			err = DeleteCDConfigMapFinalizer(k8sMockClient.Client(), reqCtx, clusterDefObj)
 			Expect(err).Should(Succeed())
 		})
 	})
@@ -227,44 +192,22 @@ var _ = Describe("ConfigWrapper util test", func() {
 			availableTPL := configConstraintObj.DeepCopy()
 			availableTPL.Status.Phase = dbaasv1alpha1.AvailablePhase
 
-			testDatas := map[client.ObjectKey][]struct {
-				object client.Object
-				err    error
-			}{
-				// for cm
-				client.ObjectKeyFromObject(configMapObj): {{
-					object: nil,
-					err:    cfgcore.MakeError("failed to get cc object"),
-				}, {
-					object: configMapObj,
-					err:    nil,
-				}},
-			}
-			accessCounter := map[client.ObjectKey]int{}
+			k8sMockClient.MockGetMethod(testutil.WithGetReturned(testutil.WithConstructSequenceResult(
+				map[client.ObjectKey][]testutil.MockGetReturned{
+					client.ObjectKeyFromObject(configMapObj): {{
+						Object: nil,
+						Err:    cfgcore.MakeError("failed to get cc object"),
+					}, {
+						Object: configMapObj,
+						Err:    nil,
+					}}},
+			), testutil.WithAnyTimes()))
 
-			mockClient.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).
-				DoAndReturn(func(ctx context.Context, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
-					tests, ok := testDatas[key]
-					if !ok {
-						return cfgcore.MakeError("not exist")
-					}
-					index := accessCounter[key]
-					tt := tests[index]
-					if tt.err == nil {
-						// mock data
-						testutil.SetGetReturnedObject(obj, tt.object)
-					}
-					if index < len(tests)-1 {
-						accessCounter[key]++
-					}
-					return tt.err
-				}).AnyTimes()
-
-			_, err = CheckCDConfigTemplate(mockClient, reqCtx, clusterDefObj)
+			_, err = CheckCDConfigTemplate(k8sMockClient.Client(), reqCtx, clusterDefObj)
 			Expect(err).ShouldNot(Succeed())
 			Expect(err.Error()).Should(ContainSubstring("failed to get cc object"))
 
-			ok, err := CheckCDConfigTemplate(mockClient, reqCtx, clusterDefObj)
+			ok, err := CheckCDConfigTemplate(k8sMockClient.Client(), reqCtx, clusterDefObj)
 			Expect(err).Should(Succeed())
 			Expect(ok).Should(BeTrue())
 		})
@@ -292,83 +235,54 @@ var _ = Describe("ConfigWrapper util test", func() {
 			availableTPL := configConstraintObj.DeepCopy()
 			availableTPL.Status.Phase = dbaasv1alpha1.AvailablePhase
 
-			testDatas := map[client.ObjectKey][]struct {
-				object client.Object
-				err    error
-			}{
-				// for cm
-				client.ObjectKeyFromObject(configMapObj): {{
-					object: nil,
-					err:    cfgcore.MakeError("failed to get cc object"),
-				}, {
-					object: configMapObj,
-					err:    nil,
-				}},
-				// for cc
-				client.ObjectKeyFromObject(configConstraintObj): {{
-					object: nil,
-					err:    cfgcore.MakeError("failed to get cc object"),
-				}, {
-					object: configConstraintObj,
-					err:    nil,
-				}, {
-					object: availableTPL,
-					err:    nil,
-				}},
-			}
+			k8sMockClient.MockPatchMethod(testutil.WithSucceed())
+			k8sMockClient.MockListMethod(testutil.WithSucceed())
+			k8sMockClient.MockGetMethod(testutil.WithGetReturned(testutil.WithConstructSequenceResult(
+				map[client.ObjectKey][]testutil.MockGetReturned{
+					client.ObjectKeyFromObject(configMapObj): {{
+						Object: nil,
+						Err:    cfgcore.MakeError("failed to get cc object"),
+					}, {
+						Object: configMapObj,
+						Err:    nil,
+					}},
+					client.ObjectKeyFromObject(configConstraintObj): {{
+						Object: nil,
+						Err:    cfgcore.MakeError("failed to get cc object"),
+					}, {
+						Object: configConstraintObj,
+						Err:    nil,
+					}, {
+						Object: availableTPL,
+						Err:    nil,
+					}},
+				},
+			), testutil.WithAnyTimes()))
 
-			accessCounter := map[client.ObjectKey]int{}
-
-			mockClient.EXPECT().Patch(gomock.Any(), gomock.Any(), gomock.Any()).
-				AnyTimes().
-				Return(nil)
-
-			mockClient.EXPECT().List(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
-				AnyTimes().
-				Return(nil)
-
-			mockClient.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).
-				DoAndReturn(func(ctx context.Context, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
-					tests, ok := testDatas[key]
-					if !ok {
-						return cfgcore.MakeError("not exist")
-					}
-					index := accessCounter[key]
-					tt := tests[index]
-					if tt.err == nil {
-						// mock data
-						testutil.SetGetReturnedObject(obj, tt.object)
-					}
-					if index < len(tests)-1 {
-						accessCounter[key]++
-					}
-					return tt.err
-				}).AnyTimes()
-
-			_, err := CheckCVConfigTemplate(mockClient, reqCtx, clusterVersionObj)
+			_, err := CheckCVConfigTemplate(k8sMockClient.Client(), reqCtx, clusterVersionObj)
 			Expect(err).ShouldNot(Succeed())
 			Expect(err.Error()).Should(ContainSubstring("failed to get cc object"))
 
-			_, err = CheckCVConfigTemplate(mockClient, reqCtx, clusterVersionObj)
+			_, err = CheckCVConfigTemplate(k8sMockClient.Client(), reqCtx, clusterVersionObj)
 			Expect(err).ShouldNot(Succeed())
 			Expect(err.Error()).Should(ContainSubstring("failed to get cc object"))
 
-			_, err = CheckCVConfigTemplate(mockClient, reqCtx, clusterVersionObj)
+			_, err = CheckCVConfigTemplate(k8sMockClient.Client(), reqCtx, clusterVersionObj)
 			Expect(err).ShouldNot(Succeed())
 			Expect(err.Error()).Should(ContainSubstring("status not ready"))
 
-			ok, err := CheckCVConfigTemplate(mockClient, reqCtx, clusterVersionObj)
+			ok, err := CheckCVConfigTemplate(k8sMockClient.Client(), reqCtx, clusterVersionObj)
 			Expect(err).Should(Succeed())
 			Expect(ok).Should(BeTrue())
 
-			ok, err = UpdateCVLabelsByConfiguration(mockClient, reqCtx, clusterVersionObj)
+			ok, err = UpdateCVLabelsByConfiguration(k8sMockClient.Client(), reqCtx, clusterVersionObj)
 			Expect(err).Should(Succeed())
 			Expect(ok).Should(BeTrue())
 
-			err = UpdateCVConfigMapFinalizer(mockClient, reqCtx, clusterVersionObj)
+			err = UpdateCVConfigMapFinalizer(k8sMockClient.Client(), reqCtx, clusterVersionObj)
 			Expect(err).Should(Succeed())
 
-			err = DeleteCVConfigMapFinalizer(mockClient, reqCtx, clusterVersionObj)
+			err = DeleteCVConfigMapFinalizer(k8sMockClient.Client(), reqCtx, clusterVersionObj)
 			Expect(err).Should(Succeed())
 		})
 	})
@@ -405,52 +319,43 @@ var _ = Describe("ConfigWrapper util test", func() {
 			}, {
 				// config templates without configConstraintObj
 				name: "test",
-				tpls: []dbaasv1alpha1.ConfigTemplate{
-					{
-						Name: "for_test",
-					},
-					{
-						Name: "for_test2",
-					},
-				},
+				tpls: []dbaasv1alpha1.ConfigTemplate{{
+					Name: "for_test",
+				}, {
+					Name: "for_test2",
+				}},
 				want:    nil,
 				wantErr: false,
 			}, {
 				// normal
 				name: "test",
-				tpls: []dbaasv1alpha1.ConfigTemplate{
-					{
-						Name:                "for_test",
-						ConfigConstraintRef: "eg_v1",
-					},
-				},
+				tpls: []dbaasv1alpha1.ConfigTemplate{{
+					Name:                "for_test",
+					ConfigConstraintRef: "eg_v1",
+				}},
 				want:    mockTpl.Spec.ReloadOptions,
 				wantErr: false,
 			}, {
 				// not exist config constraint
 				name: "test",
-				tpls: []dbaasv1alpha1.ConfigTemplate{
-					{
-						Name:                "for_test",
-						ConfigConstraintRef: "not_exist",
-					},
-				},
+				tpls: []dbaasv1alpha1.ConfigTemplate{{
+					Name:                "for_test",
+					ConfigConstraintRef: "not_exist",
+				}},
 				want:    nil,
 				wantErr: true,
 			}}
 
-			mockClient.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).
-				DoAndReturn(func(ctx context.Context, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
-					if strings.Contains(key.Name, "not_exist") {
-						return cfgcore.MakeError("not exist config!")
-					}
-					testutil.SetGetReturnedObject(obj, &mockTpl)
-					return nil
-				}).
-				MaxTimes(len(tests))
+			k8sMockClient.MockGetMethod(testutil.WithGetReturned(func(key client.ObjectKey, obj client.Object) error {
+				if strings.Contains(key.Name, "not_exist") {
+					return cfgcore.MakeError("not exist config!")
+				}
+				testutil.SetGetReturnedObject(obj, &mockTpl)
+				return nil
+			}, testutil.WithMaxTimes(len(tests))))
 
 			for _, tt := range tests {
-				got, err := GetReloadOptions(mockClient, ctx, tt.tpls)
+				got, err := GetReloadOptions(k8sMockClient.Client(), ctx, tt.tpls)
 				Expect(err != nil).Should(BeEquivalentTo(tt.wantErr))
 				Expect(reflect.DeepEqual(got, tt.want)).Should(BeTrue())
 			}

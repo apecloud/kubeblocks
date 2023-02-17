@@ -354,6 +354,6 @@ Uninstalling the playground cleans up relevant component services and data:
 * Delete the local Kubernetes clusters created by K3d.
   
 Run the command below to uninstall the playground.
-```
-$ kbcli playground destroy
+```bash
+kbcli playground destroy
 ```

@@ -107,6 +107,22 @@ func (r flagName) viperName() string {
 	return strings.ReplaceAll(r.String(), "-", "_")
 }
 
+type flagName string
+
+const (
+	probeAddrFlagKey   flagName = "health-probe-bind-address"
+	metricsAddrFlagKey flagName = "metrics-bind-address"
+	leaderElectFlagKey flagName = "leader-elect"
+)
+
+func (r flagName) String() string {
+	return string(r)
+}
+
+func (r flagName) viperName() string {
+	return strings.ReplaceAll(r.String(), "-", "_")
+}
+
 func main() {
 	var metricsAddr string
 	var enableLeaderElection bool

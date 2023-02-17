@@ -313,7 +313,7 @@ $(CERT_ROOT_CA):
 			--san $(APP_NAME)-svc --san $(APP_NAME)-svc.$(APP_NAME) --san $(APP_NAME)-svc.$(APP_NAME).svc --not-after 43200h --insecure --no-password
 
 .PHONY: run
-run: manifests generate fmt vet ## Run a controller from your host.
+run: # manifests generate fmt vet ## Run a controller from your host.
 ifeq ($(ENABLE_WEBHOOKS), true)
 	$(MAKE) webhook-cert
 endif

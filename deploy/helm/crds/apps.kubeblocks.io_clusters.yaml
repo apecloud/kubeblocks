@@ -160,6 +160,7 @@ spec:
                       minimum: 0
                       type: integer
                     replicas:
+                      default: 1
                       description: Component replicas, use default value in ClusterDefinition
                         spec. if not specified.
                       format: int32
@@ -515,7 +516,9 @@ spec:
                   required:
                   - componentDefRef
                   - name
+                  - replicas
                   type: object
+                minItems: 1
                 type: array
                 x-kubernetes-list-map-keys:
                 - name

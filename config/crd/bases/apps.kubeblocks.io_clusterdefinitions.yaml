@@ -153,8 +153,8 @@ spec:
                                 default: 0
                                 description: Replicas, number of Pods of this role.
                                   default 1 for Leader default 0 for Learner default
-                                  ComponentDefs[*].Replicas - Leader.Replicas - Learner.Replicas
-                                  for Followers
+                                  Cluster.spec.componentSpec[*].Replicas - Leader.Replicas
+                                  - Learner.Replicas for Followers
                                 format: int32
                                 minimum: 0
                                 type: integer
@@ -182,8 +182,8 @@ spec:
                               default: 0
                               description: Replicas, number of Pods of this role.
                                 default 1 for Leader default 0 for Learner default
-                                ComponentDefs[*].Replicas - Leader.Replicas - Learner.Replicas
-                                for Followers
+                                Cluster.spec.componentSpec[*].Replicas - Leader.Replicas
+                                - Learner.Replicas for Followers
                               format: int32
                               minimum: 0
                               type: integer
@@ -210,8 +210,8 @@ spec:
                               default: 0
                               description: Replicas, number of Pods of this role.
                                 default 1 for Leader default 0 for Learner default
-                                ComponentDefs[*].Replicas - Leader.Replicas - Learner.Replicas
-                                for Followers
+                                Cluster.spec.componentSpec[*].Replicas - Leader.Replicas
+                                - Learner.Replicas for Followers
                               format: int32
                               minimum: 0
                               type: integer

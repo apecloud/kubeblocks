@@ -18,38 +18,111 @@ package extensions
 
 import (
 	"context"
+	"runtime"
+	"time"
 
-	"k8s.io/apimachinery/pkg/runtime"
+	ctrlerihandler "github.com/authzed/controller-idioms/handler"
+	"github.com/spf13/viper"
+	batchv1 "k8s.io/api/batch/v1"
+	k8sruntime "k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 // AddonSpecReconciler reconciles a AddonSpec object
 type AddonSpecReconciler struct {
 	client.Client
-	Scheme *runtime.Scheme
+	Scheme     *k8sruntime.Scheme
+	Recorder   record.EventRecorder
+	RestConfig *rest.Config
+}
+
+const (
+	// settings keys
+	maxConcurrentReconcilesKey = "MAXCONCURRENTRECONCILES_ADDON"
+)
+
+func init() {
+	viper.SetDefault(maxConcurrentReconcilesKey, runtime.NumCPU()*2)
 }
 
 //+kubebuilder:rbac:groups=extensions.kubeblocks.io,resources=addonspecs,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=extensions.kubeblocks.io,resources=addonspecs/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=extensions.kubeblocks.io,resources=addonspecs/finalizers,verbs=update
 
+//+kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;watch;create;update;patch;delete;deletecollection
+
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
-// TODO(user): Modify the Reconcile function to compare the state specified by
-// the AddonSpec object against the actual cluster state, and then
-// perform operations to make the cluster state reflect the state specified by
-// the user.
 //
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.14.1/pkg/reconcile
 func (r *AddonSpecReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	_ = log.FromContext(ctx)
 
-	// TODO(user): your logic here
+	reqCtx := intctrlutil.RequestCtx{
+		Ctx:      ctx,
+		Req:      req,
+		Log:      log.FromContext(ctx).WithValues("addonspec", req.NamespacedName),
+		Recorder: r.Recorder,
+	}
+
+	buildStageCtx := func(next ...ctrlerihandler.Handler) stageCtx {
+		return stageCtx{
+			reqCtx:     &reqCtx,
+			reconciler: r,
+			next:       ctrlerihandler.Handlers(next).MustOne(),
+		}
+	}
+
+	fetchNDeletionCheckStageBuilder := func(next ...ctrlerihandler.Handler) ctrlerihandler.Handler {
+		return ctrlerihandler.NewTypeHandler(&fetchNDeletionCheckStage{stageCtx: buildStageCtx(next...)})
+	}
+
+	genIDProceedStageBuilder := func(next ...ctrlerihandler.Handler) ctrlerihandler.Handler {
+		return ctrlerihandler.NewTypeHandler(&genIDProceedCheckStage{stageCtx: buildStageCtx(next...)})
+	}
+
+	installableCheckStageBuilder := func(next ...ctrlerihandler.Handler) ctrlerihandler.Handler {
+		return ctrlerihandler.NewTypeHandler(&installableCheckStage{stageCtx: buildStageCtx(next...)})
+	}
+
+	autoInstallCheckStageBuilder := func(next ...ctrlerihandler.Handler) ctrlerihandler.Handler {
+		return ctrlerihandler.NewTypeHandler(&autoInstallCheckStage{stageCtx: buildStageCtx(next...)})
+	}
+
+	progressingStageBuilder := func(next ...ctrlerihandler.Handler) ctrlerihandler.Handler {
+		return ctrlerihandler.NewTypeHandler(&progressingHandler{stageCtx: buildStageCtx(next...)})
+	}
+
+	terminalStateStageBuilder := func(next ...ctrlerihandler.Handler) ctrlerihandler.Handler {
+		return ctrlerihandler.NewTypeHandler(&terminalStateStage{stageCtx: buildStageCtx(next...)})
+	}
+
+	handlers := ctrlerihandler.Chain(
+		fetchNDeletionCheckStageBuilder,
+		genIDProceedStageBuilder,
+		installableCheckStageBuilder,
+		autoInstallCheckStageBuilder,
+		progressingStageBuilder,
+		terminalStateStageBuilder,
+	).Handler("")
+
+	handlers.Handle(ctx)
+	res, ok := reqCtx.Ctx.Value(resultValueKey).(*ctrl.Result)
+	if ok && res != nil {
+		err, ok := reqCtx.Ctx.Value(errorValueKey).(error)
+		if ok {
+			return *res, err
+		}
+		return *res, nil
+	}
 
 	return ctrl.Result{}, nil
 }
@@ -58,5 +131,65 @@ func (r *AddonSpecReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 func (r *AddonSpecReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&extensionsv1alpha1.AddonSpec{}).
+		WithOptions(controller.Options{
+			MaxConcurrentReconciles: viper.GetInt(maxConcurrentReconcilesKey),
+		}).
+		Owns(&batchv1.Job{}). // TODO: cannot owns a namespaced object
 		Complete(r)
+}
+
+func (r *AddonSpecReconciler) deleteExternalResources(reqCtx intctrlutil.RequestCtx, addonSpec *extensionsv1alpha1.AddonSpec) (*ctrl.Result, error) {
+	return nil, nil
+}
+
+const (
+	resultValueKey  = "result"
+	errorValueKey   = "err"
+	operandValueKey = "operand"
+)
+
+type stageCtx struct {
+	reqCtx     *intctrlutil.RequestCtx
+	reconciler *AddonSpecReconciler
+	next       ctrlerihandler.Handler
+}
+
+func (r *stageCtx) setReconciled() {
+	res, err := intctrlutil.Reconciled()
+	r.updateResultNErr(&res, err)
+}
+
+func (r *stageCtx) setRequeue() {
+	res, err := intctrlutil.Requeue(r.reqCtx.Log, "")
+	r.updateResultNErr(&res, err)
+}
+
+func (r *stageCtx) setRequeueAfter(duration time.Duration, msg string) {
+	res, err := intctrlutil.RequeueAfter(time.Second, r.reqCtx.Log, msg)
+	r.updateResultNErr(&res, err)
+}
+
+func (r *stageCtx) setRequeueWithErr(err error, msg string) {
+	res, err := intctrlutil.CheckedRequeueWithError(err, r.reqCtx.Log, msg)
+	r.updateResultNErr(&res, err)
+}
+
+func (r *stageCtx) updateResultNErr(res *ctrl.Result, err error) {
+	r.reqCtx.UpdateCtxValue(errorValueKey, err)
+	r.reqCtx.UpdateCtxValue(resultValueKey, res)
+}
+
+func (r *stageCtx) doReturn() (*ctrl.Result, error) {
+	res, _ := r.reqCtx.Ctx.Value(resultValueKey).(*ctrl.Result)
+	err, _ := r.reqCtx.Ctx.Value(errorValueKey).(error)
+	return res, err
+}
+
+func (r *stageCtx) process(processor func(*extensionsv1alpha1.AddonSpec)) {
+	res, _ := r.doReturn()
+	if res != nil {
+		return
+	}
+	addonSpec := r.reqCtx.Ctx.Value(operandValueKey).(*extensionsv1alpha1.AddonSpec)
+	processor(addonSpec)
 }

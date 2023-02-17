@@ -1,12 +1,6 @@
 apiVersion: extensions.kubeblocks.io/v1alpha1
 kind: AddonSpec
 metadata:
-  labels:
-    app.kubernetes.io/name: addonspec
-    app.kubernetes.io/instance: addonspec-sample
-    app.kubernetes.io/part-of: kubeblocks
-    app.kubernetes.io/managed-by: kustomize
-    app.kubernetes.io/created-by: kubeblocks
   name: prometheus
 spec:
   # Addon spec. description.
@@ -20,29 +14,29 @@ spec:
     chartRepoURL: https://github.com/prometheus-community/helm-charts/releases/download/prometheus-15.16.1/prometheus-15.16.1.tgz
     # helm install options
     installOptions: # <map[string]string>
-#      # following assigned values are default options
-#      # wait: true
-#      atomic: "false"
-#      no-hooks: "false"
-#      timeout: "10m"
-#      # specify values in a YAML file or a URL (can specify multiple)
+    #      # following assigned values are default options
+    #      # wait: true
+    #      atomic: "false"
+    #      no-hooks: "false"
+    #      timeout: "10m"
+    #      # specify values in a YAML file or a URL (can specify multiple)
 
     installValues:
       # via URL
-      urls: []
+      urls: [ ]
 
       # via YAML contents reside in configMap.data.<key>
       configMapRefs:
-#        - name:
-#          namepsace:
-#          key:
+#        - name: prometheus-chart-kubeblocks-values
+#          namespace: default
+#          key: values-kubeblocks-override.yaml
       # via YAML contents reside in secret.data.<key>
       secretRef:
-#        - name:
-#          namepsace:
-#          key:
-      setValues: []
-      setJSONValues: []
+      #        - name:
+      #          namepsace:
+      #          key:
+      setValues: [ ]
+      setJSONValues: [ ]
 
     # values mapping specific to resources related context, i.e., replicaCount, storage, CPU & Memory.
     valuesMapping:
@@ -97,6 +91,7 @@ spec:
           resources:
             requests:
               storage: 1Gi
+
     - # Addon default install value selectors. If multiple selectors are provided
       # that all selectors must evaluate to true.
       selectors:
@@ -131,35 +126,10 @@ spec:
 
 
 
-  # addon enabled install spec, if its empty for disabled addon.
-  install:
-    # primary component resources attributes.
-    replicas: 2
-    storageClass:
-    # JSON array string
-    tolerations: '[]'
-    resources:
-      requests:
-        storage: 8Gi
-        memory: 512Mi
-      limits:
-        memory: 4Gi
-    # extra components resources attributes.
-    extras:
-      - name: alertmanager
-        replicas: 2
-        storageClass:
-        resources:
-          requests:
-            storage: 1Gi
-            memory: 16Mi
-          limits:
-            memory: 256Mi
-
   # Addon installable spec., provide selector and auto-install settings.
   installable:
     # autoInstall defines an addon should auto installed
-    autoInstall: true
+    autoInstall: false
     # Addon installable selectors. If multiple selectors are provided
     # that all selectors must evaluate to true.
     selectors:
@@ -176,5 +146,29 @@ spec:
         operator: Contains
         # An array of string values. Server as "OR" expression to operator.
         values:
-          - eks
-          - ack
+          - kubeblocks
+
+#  # addon enabled install spec, if its empty for disabled addon.
+#  install:
+#    # primary component resources attributes.
+#    replicas: 2
+#    storageClass:
+#    # JSON array string
+#    tolerations: '[]'
+#    resources:
+#      requests:
+#        storage: 8Gi
+#        memory: 512Mi
+#      limits:
+#        memory: 4Gi
+#    # extra components resources attributes.
+#    extras:
+#      - name: alertmanager
+#        replicas: 2
+#        storageClass:
+#        resources:
+#          requests:
+#            storage: 1Gi
+#            memory: 16Mi
+#          limits:
+#            memory: 256Mi

@@ -142,8 +142,9 @@ type ClusterComponentSpec struct {
 	EnabledLogs []string `json:"enabledLogs,omitempty"`
 
 	// Component replicas, use default value in ClusterDefinition spec. if not specified.
-	// +optional
-	Replicas *int32 `json:"replicas,omitempty"`
+	// +kubebuilder:validation:Required
+	// +kubebuilder:default=1
+	Replicas int32 `json:"replicas"`
 
 	// affinity describes affinities which specific by users.
 	// +optional
@@ -410,10 +411,6 @@ func (r *Cluster) ValidatePrimaryIndex(cd *ClusterDefinition) error {
 			if comp.PrimaryIndex == nil {
 				message = append(message, fmt.Sprintf("component %s's PrimaryIndex cannot be nil when workloadType is Replication.", comp.ComponentDefRef))
 				return errors.New(strings.Join(message, ";"))
-			}
-			// when comp.Replicas and comp.PrimaryIndex are not nil, it will be verified in cluster_webhook, skip here
-			if comp.Replicas != nil {
-				return nil
 			}
 		}
 	}

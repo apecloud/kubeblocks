@@ -286,10 +286,10 @@ var _ = Describe("Cluster Controller", func() {
 					{
 						Name:            mysqlCompName,
 						ComponentDefRef: mysqlCompType,
-						Replicas:        &replicas,
+						Replicas:        replicas,
 					}}
 			} else {
-				cluster.Spec.ComponentSpecs[0].Replicas = &replicas
+				cluster.Spec.ComponentSpecs[0].Replicas = replicas
 			}
 		})).Should(Succeed())
 	}

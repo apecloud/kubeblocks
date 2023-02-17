@@ -175,7 +175,7 @@ func (param *reconfigureParams) maxRollingReplicas() int32 {
 }
 
 func (param *reconfigureParams) getTargetReplicas() int {
-	return int(*param.ClusterComponent.Replicas)
+	return int(param.ClusterComponent.Replicas)
 }
 
 func (param *reconfigureParams) podMinReadySeconds() int32 {

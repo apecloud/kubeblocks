@@ -238,7 +238,7 @@ func (o *ClusterObjects) GetComponentInfo() []*ComponentInfo {
 			NameSpace: o.Cluster.Namespace,
 			Type:      c.ComponentDefRef,
 			Cluster:   o.Cluster.Name,
-			Replicas:  fmt.Sprintf("%d / %d", *c.Replicas, len(pods)),
+			Replicas:  fmt.Sprintf("%d / %d", c.Replicas, len(pods)),
 			Status:    fmt.Sprintf("%d / %d / %d / %d ", running, waiting, succeeded, failed),
 			Image:     image,
 		}

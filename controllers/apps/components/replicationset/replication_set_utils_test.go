@@ -122,7 +122,7 @@ var _ = Describe("ReplicationSet Util", func() {
 		Expect(err).Should(Succeed())
 
 		By("Test handleReplicationSet scale-in return err when remove Finalizer after delete the sts")
-		*clusterObj.Spec.ComponentSpecs[0].Replicas = testapps.DefaultReplicationReplicas - 1
+		clusterObj.Spec.ComponentSpecs[0].Replicas = testapps.DefaultReplicationReplicas - 1
 		err = HandleReplicationSet(ctx, k8sClient, clusterObj, stsList)
 		Expect(err).ShouldNot(Succeed())
 		Expect(err.Error()).Should(ContainSubstring("not found"))

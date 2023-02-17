@@ -89,7 +89,7 @@ func FakeCluster(name string, namespace string) *appsv1alpha1.Cluster {
 				{
 					Name:            ComponentName,
 					ComponentDefRef: ComponentDefName,
-					Replicas:        &replicas,
+					Replicas:        replicas,
 					Resources: corev1.ResourceRequirements{
 						Requests: corev1.ResourceList{
 							corev1.ResourceCPU:    resource.MustParse("100m"),
@@ -119,7 +119,7 @@ func FakeCluster(name string, namespace string) *appsv1alpha1.Cluster {
 				{
 					Name:            ComponentName + "-1",
 					ComponentDefRef: ComponentDefName,
-					Replicas:        &replicas,
+					Replicas:        replicas,
 					Resources: corev1.ResourceRequirements{
 						Requests: corev1.ResourceList{
 							corev1.ResourceCPU:    resource.MustParse("100m"),

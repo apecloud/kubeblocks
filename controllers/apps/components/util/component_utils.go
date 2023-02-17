@@ -185,10 +185,7 @@ func InitClusterComponentStatusIfNeed(cluster *appsv1alpha1.Cluster,
 // GetComponentReplicas gets the actual replicas of component
 func GetComponentReplicas(component *appsv1alpha1.ClusterComponentSpec,
 	componentDef *appsv1alpha1.ClusterComponentDefinition) int32 {
-	if component.Replicas == nil {
-		return 0
-	}
-	return *component.Replicas
+	return component.Replicas
 }
 
 // GetComponentDeployMinReadySeconds gets the deployment minReadySeconds of the component.

@@ -105,7 +105,7 @@ var _ = Describe("Stateful Component", func() {
 			By("test component.replicas is inconsistent with deployment.spec.replicas")
 			oldReplicas := clusterComponent.Replicas
 			replicas := int32(4)
-			clusterComponent.Replicas = &replicas
+			clusterComponent.Replicas = replicas
 			isRunning, _ := statelessComponent.IsRunning(deploy)
 			Expect(isRunning == false).Should(BeTrue())
 			// reset replicas

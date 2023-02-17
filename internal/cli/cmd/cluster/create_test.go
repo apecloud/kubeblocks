@@ -141,7 +141,7 @@ var _ = Describe("create", func() {
 		comp := &appsv1alpha1.ClusterComponentSpec{}
 		_ = runtime.DefaultUnstructuredConverter.FromUnstructured(comps[0], comp)
 		Expect(getResource(comp.VolumeClaimTemplates[0].Spec.Resources, corev1.ResourceStorage)).Should(Equal(storage))
-		Expect(*comp.Replicas).Should(BeEquivalentTo(replicas))
+		Expect(comp.Replicas).Should(BeEquivalentTo(replicas))
 
 		resources := comp.Resources
 		Expect(resources).ShouldNot(BeNil())

@@ -66,11 +66,7 @@ func HandleReplicationSet(ctx context.Context,
 	// delete the StatefulSets with the largest sequence number which is not the primary role
 	clusterCompReplicasMap := make(map[string]int32, len(cluster.Spec.ComponentSpecs))
 	for _, clusterComp := range cluster.Spec.ComponentSpecs {
-		if clusterComp.Replicas == nil {
-			replicas := int32(0)
-			clusterComp.Replicas = &replicas
-		}
-		clusterCompReplicasMap[clusterComp.Name] = *clusterComp.Replicas
+		clusterCompReplicasMap[clusterComp.Name] = clusterComp.Replicas
 	}
 
 	// compOwnsStsMap is used to divide stsList into sts list under each replicationSet component according to componentLabelKey

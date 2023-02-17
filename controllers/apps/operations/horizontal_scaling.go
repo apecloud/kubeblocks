@@ -63,7 +63,7 @@ func (hs horizontalScalingOpsHandler) Action(opsRes *OpsResource) error {
 		}
 		if horizontalScaling.Replicas != 0 {
 			r := horizontalScaling.Replicas
-			opsRes.Cluster.Spec.ComponentSpecs[index].Replicas = &r
+			opsRes.Cluster.Spec.ComponentSpecs[index].Replicas = r
 		}
 	}
 	return opsRes.Client.Update(opsRes.Ctx, opsRes.Cluster)

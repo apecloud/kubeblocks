@@ -326,7 +326,7 @@ var _ = Describe("OpsRequest Controller", func() {
 		By("Test HorizontalScaling with scale up replica")
 		initClusterForOps(opsRes)
 		expectClusterComponentReplicas := int32(2)
-		opsRes.Cluster.Spec.ComponentSpecs[1].Replicas = &expectClusterComponentReplicas
+		opsRes.Cluster.Spec.ComponentSpecs[1].Replicas = expectClusterComponentReplicas
 		opsRes.OpsRequest = createHorizontalScaling(3)
 		Expect(GetOpsManager().Do(opsRes)).Should(Succeed())
 

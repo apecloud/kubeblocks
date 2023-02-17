@@ -90,7 +90,7 @@ func withMockStatefulSet(replicas int, labels map[string]string) ParamsOps {
 func withClusterComponent(replicas int) ParamsOps {
 	return func(params *reconfigureParams) {
 		params.ClusterComponent = &appsv1alpha1.ClusterComponentSpec{
-			Replicas: func() *int32 { rep := int32(replicas); return &rep }(),
+			Replicas: func() int32 { rep := int32(replicas); return rep }(),
 		}
 	}
 }

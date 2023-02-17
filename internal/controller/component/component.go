@@ -106,10 +106,7 @@ func BuildComponent(
 			component.Name = clusterComp.Name
 		}
 
-		// user can scale in replicas to 0
-		if clusterComp.Replicas != nil {
-			component.Replicas = *clusterComp.Replicas
-		}
+		component.Replicas = clusterComp.Replicas
 
 		if clusterComp.VolumeClaimTemplates != nil {
 			component.VolumeClaimTemplates = appsv1alpha1.ToVolumeClaimTemplates(clusterComp.VolumeClaimTemplates)

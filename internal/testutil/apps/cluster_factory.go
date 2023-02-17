@@ -67,7 +67,7 @@ func (factory *MockClusterFactory) AddComponent(compName string, compType string
 func (factory *MockClusterFactory) SetReplicas(replicas int32) *MockClusterFactory {
 	comps := factory.get().Spec.ComponentSpecs
 	if len(comps) > 0 {
-		comps[len(comps)-1].Replicas = &replicas
+		comps[len(comps)-1].Replicas = replicas
 	}
 	factory.get().Spec.ComponentSpecs = comps
 	return factory

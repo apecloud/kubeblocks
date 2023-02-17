@@ -40,7 +40,7 @@ Release Notes for `v0.3.0`:
     ```
     kubectl delete crd backupjobs.dataprotection.kubeblocks.io
     ```
-- Rename CRD name `appversions.apps.kubeblocks.io` to `clusterversions.apps.kubeblocks.io`
+- Rename CRD name `appversions.dbaas.kubeblocks.io` to `clusterversions.dbaas.kubeblocks.io`
   - before you upgrade KubeBlocks, please backup your Cluster CR yaml first.
     ```
     kubectl get cluster -oyaml > clusters.yaml

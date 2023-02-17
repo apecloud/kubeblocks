@@ -8,13 +8,15 @@ You can expand the storage volume size of each pod.
 ***Before you start***
 
 Run the command below to check whether the cluster STATUS is Running. Otherwise, the following operations may fail.
-```
+```bash
 kbcli cluster list NAME
 ```
 
 ***Example***
 
-```$ kbcli cluster list mysql-cluster
+```bash
+kbcli cluster list mysql-cluster
+>
 NAME                 NAMESPACE        CLUSTER-DEFINITION        VERSION                TERMINATION-POLICY        STATUS         CREATED-TIME
 mysql-cluster        default          apecloud-mysql            ac-mysql-8.0.30        Delete                    Running        Jan 29,2023 14:29 UTC+0800
 ```
@@ -26,7 +28,7 @@ mysql-cluster        default          apecloud-mysql            ac-mysql-8.0.30 
    **Option 1.** Use `kbcli`.
 
    Configure the values of `--component-names`, `--volume-claim-template-names`, and `--storage`, and run the command below to expand the volume.
-   ```
+   ```bash
    kbcli cluster volume-expand mysql-cluster --component-names="mysql" \
    --volume-claim-template-names="data" --storage="2Gi"
    ```
@@ -37,8 +39,8 @@ mysql-cluster        default          apecloud-mysql            ac-mysql-8.0.30 
    **Option 2.** Create an OpsRequest.
 
    Run the command below to expand the volume of a cluster.
-   ```
-   $ kubectl apply -f - <<EOF
+   ```bash
+   kubectl apply -f - <<EOF
    apiVersion: dbaas.kubeblocks.io/v1alpha1
    kind: OpsRequest
    metadata:
@@ -60,7 +62,7 @@ mysql-cluster        default          apecloud-mysql            ac-mysql-8.0.30 
 
    ***Example***
 
-   ```
+   ```YAML
    apiVersion: dbaas.kubeblocks.io/v1alpha1
    kind: Cluster
    metadata:

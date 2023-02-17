@@ -6,7 +6,7 @@ This section shows how to use kbcli to back up and restore a MySQL standalone in
 - Prepare a clean EKS cluster, and install ebs csi driver plug-in, with at least one node and the memory of each node is not less than 4GB.
 - Install kubectl to ensure that you can connect to the EKS cluster 
 - Install kbcli.
-   ```
+   ```bash
    curl -fsSL https://kubeblocks.io/installer/install_cli.sh | bash
    ```
 
@@ -14,17 +14,17 @@ This section shows how to use kbcli to back up and restore a MySQL standalone in
 
 1. Install KubeBlocks and enable snapshot backup.
    Install KubeBlocks and enable the snapshot controller plugin.
-   ```
+   ```bash
    kbcli kubeblocks install --set snapshot-controller.enabled=true
    ```
    To enable the snapshot controller plugin after installation.
-   ```
+   ```bash
    kbcli kubeblocks upgrade --set snapshot-controller.enabled=true
    ```   
    Since your kubectl is already connected to the EKS cluster, this command installs the latest version of KubeBlocks in your EKS environment.
 
    Verify the installation with the following command.
-   ```
+   ```bash
    kubectl get pod
    ```
 
@@ -37,7 +37,7 @@ This section shows how to use kbcli to back up and restore a MySQL standalone in
 2. Configure EKS to support the snapshot function.
 The backup is realized by the volume snapshot function, you need to configure EKS to support the snapshot function.
     - Configure the storage class of snapshot (the assigned ebs volume is gp3).
-       ```
+       ```bash
        kubectl create -f - <<EOF
        kind: StorageClass
        apiVersion: storage.k8s.io/v1
@@ -53,10 +53,10 @@ The backup is realized by the volume snapshot function, you need to configure EK
        volumeBindingMode: WaitForFirstConsumer
        EOF
   
-      kubectl patch sc/gp2 -p '{"metadata": {"annotations": {"storageclass.kubernetes.io/is-default-class": "false"}}}'
+       kubectl patch sc/gp2 -p '{"metadata": {"annotations": {"storageclass.kubernetes.io/is-default-class": "false"}}}'
        ```
     - Configure default snapshot volumesnapshot class
-       ```
+       ```bash
        cat <<"EOF" > snapshot_class.yaml
        apiVersion: snapshot.storage.k8s.io/v1
        kind: VolumeSnapshotClass
@@ -66,18 +66,18 @@ The backup is realized by the volume snapshot function, you need to configure EK
            snapshot.storage.kubernetes.io/is-default-class: "true"
        driver: ebs.csi.aws.com
        deletionPolicy: Delete
-      EOF
+       EOF
   
-      kubectl create -f snapshot_class.yaml
-      ```
+       kubectl create -f snapshot_class.yaml
+       ```
 3. Create a MySQL cluster. 
    In this section, the example cluster created is mysql-cluster.
-   ```
+   ```bash
    kbcli cluster create mysql-cluster --cluster-definition='apecloud-mysql'
    ```
 4. Insert test data to test backup.
    Connect to the MySQL cluster created in the previous steps and insert a piece of data. See the example below.
-   ```
+   ```bash
    kbcli cluster connect mysql-cluster
    
    create database if not exists demo;
@@ -87,13 +87,13 @@ The backup is realized by the volume snapshot function, you need to configure EK
    ```
   
 5. Create a snapshot backup.
-    ```
-   kbcli cluster backup mysql-cluster
+    ```bash
+    kbcli cluster backup mysql-cluster
     ```
 6. Check the backup.
-   ```
-   kbcli cluster list-backups
-   ```
+    ```bash
+    kbcli cluster list-backups
+    ```
 7. Restore to a new cluster.
    Copy the backup name to the clipboard, and restore to the new cluster. 
    > ***Note:*** 
@@ -101,12 +101,12 @@ The backup is realized by the volume snapshot function, you need to configure EK
    > You do not need to specify other parameters for creating an cluster. The restoration automatically reads the parameters of the source cluster, including specification, disk size, etc., and create a new MySQL cluster with the same specifications. 
 
    Execute the following command.
-   ```
+   ```bash
    kbcli cluster restore mysql-new-from-snapshot --backup backup-default-mysql-cluster-20221124113440
    ```
 8. Verify the data restored.
    Execute the following command to verify the data restored.
-   ```
+   ```bash
    kbcli cluster connect mysql-new-from-snapshot
    select * from demo.msg;
    ```
@@ -116,17 +116,17 @@ The backup is realized by the volume snapshot function, you need to configure EK
    > Expense incurred when you have snapshots on the cloud. So it is recommended to delete the test cluster.
   
    Delete MySQL cluster with the following command.
-   ```
+   ```bash
    kbcli cluster delete mysql-cluster
    kbcli cluster delete mysql-new-from-snapshot
    ```
    Delete the backup specified.
 
-   ```
+   ```bash
    kbcli cluster delete-backup mysql-cluster --name backup-default-mysql-cluster-20221124113440 
    ```
    Delete all backups with `mysql-cluster`.
-   ```
+   ```bash
    kbcli cluster delete mysql-cluster
    ```
 

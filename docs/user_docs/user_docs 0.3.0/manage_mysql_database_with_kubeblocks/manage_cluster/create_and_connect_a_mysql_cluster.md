@@ -5,26 +5,26 @@
 
 * `kbcli`: Install kbcli on your host. Refer to [Install/Uninstall kbcli and KubeBlocks](../../install_kbcli_kubeblocks/install_and_unistall_kbcli_and_kubeblocks.md) for details.
   1. Run the command below to install `kbcli`.
-   ```
+   ```bash
    curl -fsSL https://kubeblocks.io/installer/install_cli.sh | bash
    ```
   2. Run the command below to check the version and verify whether kbcli is installed successfully.
-   ```
+   ```bash
    kbcli version
    ```
 * KubeBlocks: Install KubeBlocks on your host. Refer to [Install/Uninstall kbcli and KubeBlocks](../../install_kbcli_kubeblocks/install_and_unistall_kbcli_and_kubeblocks.md) for details.
   1. Run the command below to install KubeBlocks.
-     ```
+     ```bash
      kbcli kubeblocks install
      ```
      > ***Note:***
      > 
      > If you want to specify a namespace for KubeBlocks, use `--namespace` or the abbreviated `-n` to name your namespace and configure `--create-namespace` as `true` to create a namespace if it does not exist. For example,
-     > ```
+     > ```bash
      > kbcli kubeblocks install -n kubeblocks --create-namespace=true
      > ```
   2. Run the command below to verify whether KubeBlocks is installed successfully
-     ```
+     ```bash
      kubectl get pod
      ```
 
@@ -39,14 +39,15 @@
      kubeblocks-prometheus-server-5c89c8bc89-mwrx7         2/2     Running   0          3m33s
      ```
 * Run the command below to view all the database types available for creating a cluster. 
-  ```
+  ```bash
   kbcli clusterdefinition list
   ```
 
   ***Result***
 
-  ```
-  $ kbcli clusterdefinition list
+  ```bash
+  kbcli clusterdefinition list
+  >
   NAME             MAIN-COMPONENT-TYPE   STATUS      AGE
   apecloud-mysql   mysql                 Available   7m52s
   ```
@@ -54,27 +55,28 @@
 ***Steps:***
 
 1. Run the command below to list all the available kernel versions and choose the one that you need.
-   ```
+   ```bash
    kbcli clusterversion list
    ```
 
    ***Result***
 
-   ```
-   $ kbcli clusterversion list
+   ```bash
+   kbcli clusterversion list
+   >
    NAME              CLUSTER-DEFINITION   STATUS      AGE
    ac-mysql-8.0.30   apecloud-mysql       Available   2m40s
    ```
 2. Run the command below to create a MySQL cluster.
-   ```
-   $ kbcli cluster create mysql-cluster --cluster-definition='apecloud-mysql'
+   ```bash
+   kbcli cluster create mysql-cluster --cluster-definition='apecloud-mysql'
    ```
 
    A cluster then is created in the default namespace. You can specify a namespace for your cluster by using `--namespace` or the abbreviated `-n` option. For example,
 
-   ```
-   $ kubectl create namespace demo
-   $ kbcli cluster create -n demo --cluster-definition='apecloud-mysql'
+   ```bash
+   kubectl create namespace demo
+   kbcli cluster create -n demo --cluster-definition='apecloud-mysql'
    ```
 
    If you want to create a cluster with specified parameters, follow the options below.
@@ -82,23 +84,23 @@
    **Option 1.** (Recommended) Run `export`
 
    If you want to create a Paxos group, run `export KBCLI_CLUSTER_DEFAULT_REPLICAS=3` before creating a cluster. For example,
-   ```
-   $ export KBCLI_CLUSTER_DEFAULT_REPLICAS=3
-   $ kbcli cluster create mysql-cluster --cluster-definition='apecloud-mysql'
+   ```bash
+   export KBCLI_CLUSTER_DEFAULT_REPLICAS=3
+   kbcli cluster create mysql-cluster --cluster-definition='apecloud-mysql'
    ```
 
    If you want to adjust the storage size, run `export KBCLI_CLUSTER_DEFAULT_STORAGE_SIZE=nGi` before creating a cluster. For example,
   
-   ```
-   $ export KBCLI_CLUSTER_DEFAULT_STORAGE_SIZE=20Gi
-   $ kbcli cluster create mysql-cluster --cluster-definition='apecloud-mysql'
+   ```bash
+   export KBCLI_CLUSTER_DEFAULT_STORAGE_SIZE=20Gi
+   kbcli cluster create mysql-cluster --cluster-definition='apecloud-mysql'
    ```
 
    **Option 2.** Change YAML file configurations
 
    Change the corresponding parameters in the YAML file.
-   ```
-   $ kbcli cluster create mysql-cluster --cluster-definition="apecloud-mysql" --set -<<EOF
+   ```bash
+   kbcli cluster create mysql-cluster --cluster-definition="apecloud-mysql" --set -<<EOF
    - name: mysql
      replicas: 3
      type: mysql
@@ -129,14 +131,15 @@
 ## Connect to a MySQL Cluster
 
 Run the command below to connect to a cluster.
-```
+```bash
 kbcli cluster connect mysql-cluster
 ```
 
 ***Example***
 
-```
-$ kbcli cluster connect mysql-cluster
+```bash
+kbcli cluster connect mysql-cluster
+>
 Connect to instance mysql-cluster-mysql-0: out of mysql-cluster-mysql-0(leader)
 Welcome to the MySQL monitor.  Commands end with ; or \g.
 Your MySQL connection id is 16

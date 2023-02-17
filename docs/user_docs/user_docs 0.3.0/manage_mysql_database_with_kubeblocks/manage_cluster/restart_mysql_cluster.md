@@ -13,7 +13,7 @@ You can restart all pods of the cluster. When an exception occurs in a database,
    **Option 1.** (Recommended) Use `kbcli`.
    
    Configure the values of `component-names` and `ttlSecondsAfterSucceed` and run the command below to restart a specified cluster.
-   ```
+   ```bash
    kbcli cluster restart NAME --component-names="mysql" \
    --ttlSecondsAfterSucceed=30
    ```
@@ -23,8 +23,8 @@ You can restart all pods of the cluster. When an exception occurs in a database,
    **Option 2.** Create an OpsRequest.
 
    Run the command below to apply the restarting to a cluster. 
-   ```
-   $ kubectl apply -f - <<EOF
+   ```bash
+   kubectl apply -f - <<EOF
    apiVersion: dbaas.kubeblocks.io/v1alpha1
    kind: OpsRequest
    metadata:
@@ -38,16 +38,17 @@ You can restart all pods of the cluster. When an exception occurs in a database,
    ```
 1. Validate the restarting.
    Run the command below to check the cluster status to check the restarting status.
-   ```
-   kbcli cluster list NAME
+   ```bash
+   kbcli cluster list <name>
    ```
    - STATUS=Updating: means the cluster is restarting.
    - STATUS=Running means the cluster is restarted.
    
    ***Example***
 
-     ```
-     $ kbcli cluster list mysql-cluster
+     ```bash
+     kbcli cluster list mysql-cluster
+     >
      NAME                 NAMESPACE        CLUSTER-DEFINITION        VERSION                TERMINATION-POLICY        STATUS         CREATED-TIME
      mysql-cluster        default          apecloud-mysql            ac-mysql-8.0.30        Delete                    Running        Jan 29,2023 14:29 UTC+0800
      ```

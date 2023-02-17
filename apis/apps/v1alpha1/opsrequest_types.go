@@ -22,6 +22,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+// TODO: @wangyelei could refactor to ops group
+
 // OpsRequestSpec defines the desired state of OpsRequest
 type OpsRequestSpec struct {
 	// clusterRef references clusterDefinition.

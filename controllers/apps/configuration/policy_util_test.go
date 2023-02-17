@@ -89,7 +89,7 @@ func withMockStatefulSet(replicas int, labels map[string]string) ParamsOps {
 
 func withClusterComponent(replicas int) ParamsOps {
 	return func(params *reconfigureParams) {
-		params.ClusterComponent = &appsv1alpha1.ClusterComponent{
+		params.ClusterComponent = &appsv1alpha1.ClusterComponentSpec{
 			Replicas: func() *int32 { rep := int32(replicas); return &rep }(),
 		}
 	}
@@ -112,7 +112,7 @@ func withConfigTpl(tplName string, data map[string]string) ParamsOps {
 
 func withCDComponent(compType appsv1alpha1.WorkloadType, tpls []appsv1alpha1.ConfigTemplate) ParamsOps {
 	return func(params *reconfigureParams) {
-		params.Component = &appsv1alpha1.ClusterDefinitionComponent{
+		params.Component = &appsv1alpha1.ClusterComponentDefinition{
 			ConfigSpec: &appsv1alpha1.ConfigurationSpec{
 				ConfigTemplateRefs: tpls,
 			},

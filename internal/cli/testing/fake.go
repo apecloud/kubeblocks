@@ -69,7 +69,7 @@ func FakeCluster(name string, namespace string) *appsv1alpha1.Cluster {
 		},
 		Status: appsv1alpha1.ClusterStatus{
 			Phase: appsv1alpha1.RunningPhase,
-			Components: map[string]appsv1alpha1.ClusterStatusComponent{
+			Components: map[string]appsv1alpha1.ClusterComponentStatus{
 				ComponentName: {
 					ConsensusSetStatus: &appsv1alpha1.ConsensusSetStatus{
 						Leader: appsv1alpha1.ConsensusMemberStatus{
@@ -85,7 +85,7 @@ func FakeCluster(name string, namespace string) *appsv1alpha1.Cluster {
 			ClusterDefRef:     ClusterDefName,
 			ClusterVersionRef: ClusterVersionName,
 			TerminationPolicy: appsv1alpha1.WipeOut,
-			ComponentSpecs: []appsv1alpha1.ClusterComponent{
+			ComponentSpecs: []appsv1alpha1.ClusterComponentSpec{
 				{
 					Name:            ComponentName,
 					ComponentDefRef: ComponentType,
@@ -210,7 +210,7 @@ func FakeNode() *corev1.Node {
 func FakeClusterDef() *appsv1alpha1.ClusterDefinition {
 	clusterDef := &appsv1alpha1.ClusterDefinition{}
 	clusterDef.Name = ClusterDefName
-	clusterDef.Spec.ComponentDefs = []appsv1alpha1.ClusterDefinitionComponent{
+	clusterDef.Spec.ComponentDefs = []appsv1alpha1.ClusterComponentDefinition{
 		{
 			Name:          ComponentType,
 			CharacterType: "mysql",

@@ -54,14 +54,14 @@ var _ = Describe("helper", func() {
 		}
 
 		pod := mockPod("mysql-apecloud-mysql")
-		typeName, err := GetClusterTypeByPod(pod)
+		compDefName, err := GetClusterTypeByPod(pod)
 		Expect(err).ShouldNot(HaveOccurred())
-		Expect(typeName).Should(Equal("mysql"))
+		Expect(compDefName).Should(Equal("mysql"))
 
 		pod = mockPod("")
-		typeName, err = GetClusterTypeByPod(pod)
+		compDefName, err = GetClusterTypeByPod(pod)
 		Expect(err).Should(HaveOccurred())
-		Expect(typeName).Should(Equal(""))
+		Expect(compDefName).Should(Equal(""))
 	})
 
 	It("find component in cluster by type name", func() {

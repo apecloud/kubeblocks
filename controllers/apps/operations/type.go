@@ -76,6 +76,6 @@ type progressResource struct {
 	// opsMessageKey progress message key of specified OpsType, it is a verb and will form the message of progressDetail
 	// such as "vertical scale" of verticalScaling OpsRequest.
 	opsMessageKey       string
-	clusterComponent    *appsv1alpha1.ClusterComponent
-	clusterComponentDef *appsv1alpha1.ClusterDefinitionComponent
+	clusterComponent    *appsv1alpha1.ClusterComponentSpec
+	clusterComponentDef *appsv1alpha1.ClusterComponentDefinition
 }

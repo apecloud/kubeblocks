@@ -86,7 +86,7 @@ var _ = Describe("Redis Horizontal Scale function", func() {
 
 	testReplicationRedisHorizontalScale := func() {
 
-		By("Mock a cluster obj with replication componentType.")
+		By("Mock a cluster obj with replication workloadType.")
 		pvcSpec := testapps.NewPVC("1Gi")
 		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
 			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
@@ -187,7 +187,7 @@ var _ = Describe("Redis Horizontal Scale function", func() {
 				},
 			}
 
-			By("Create a clusterDefinition obj with replication componentType.")
+			By("Create a clusterDefinition obj with replication workloadType.")
 			mode := int32(0755)
 			clusterDefObj = testapps.NewClusterDefFactory(clusterDefName).
 				AddComponent(testapps.ReplicationRedisComponent, testapps.DefaultRedisCompType).

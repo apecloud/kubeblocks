@@ -537,7 +537,7 @@ func GetComponentsFromClusterCR(key client.ObjectKey, cli dynamic.Interface) ([]
 
 	componentNames := make([]string, 0, len(clusterObj.Spec.ComponentSpecs))
 	for _, component := range clusterObj.Spec.ComponentSpecs {
-		cdComponent := clusterDefObj.GetComponentDefByTypeName(component.ComponentDefRef)
+		cdComponent := clusterDefObj.GetComponentDefByName(component.ComponentDefRef)
 		if enableReconfiguring(cdComponent) {
 			componentNames = append(componentNames, component.Name)
 		}
@@ -545,7 +545,7 @@ func GetComponentsFromClusterCR(key client.ObjectKey, cli dynamic.Interface) ([]
 	return componentNames, nil
 }
 
-func enableReconfiguring(component *appsv1alpha1.ClusterDefinitionComponent) bool {
+func enableReconfiguring(component *appsv1alpha1.ClusterComponentDefinition) bool {
 	if component == nil || component.ConfigSpec == nil {
 		return false
 	}

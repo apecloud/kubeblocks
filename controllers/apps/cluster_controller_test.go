@@ -193,11 +193,11 @@ var _ = Describe("Cluster Controller", func() {
 		Expect(existsExternalClusterIP).To(BeTrue())
 
 		By("Checking replicasets should have internal headless service")
-		getHeadlessSvcPorts := func(typeName string) []corev1.ServicePort {
+		getHeadlessSvcPorts := func(compDefName string) []corev1.ServicePort {
 			fetched := &appsv1alpha1.Cluster{}
 			Expect(k8sClient.Get(testCtx.Ctx, clusterKey, fetched)).To(Succeed())
 
-			comp, err := util.GetComponentDefByCluster(testCtx.Ctx, k8sClient, fetched, typeName)
+			comp, err := util.GetComponentDefByCluster(testCtx.Ctx, k8sClient, fetched, compDefName)
 			Expect(err).ShouldNot(HaveOccurred())
 
 			var headlessSvcPorts []corev1.ServicePort
@@ -282,7 +282,7 @@ var _ = Describe("Cluster Controller", func() {
 	changeStatefulSetReplicas := func(clusterName types.NamespacedName, replicas int32) {
 		Eventually(testapps.GetAndChangeObj(&testCtx, clusterName, func(cluster *appsv1alpha1.Cluster) {
 			if cluster.Spec.ComponentSpecs == nil || len(cluster.Spec.ComponentSpecs) == 0 {
-				cluster.Spec.ComponentSpecs = []appsv1alpha1.ClusterComponent{
+				cluster.Spec.ComponentSpecs = []appsv1alpha1.ClusterComponentSpec{
 					{
 						Name:            mysqlCompName,
 						ComponentDefRef: mysqlCompType,

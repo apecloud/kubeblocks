@@ -141,16 +141,15 @@ func (r *ClusterDefinition) validateLogFilePatternPrefix(allErrs *field.ErrorLis
 
 // ValidateComponents validate spec.components is legal.
 func (r *ClusterDefinition) validateComponents(allErrs *field.ErrorList) {
-	// TODO typeName duplication validate
 
-	validateSystemAccount := func(component *ClusterDefinitionComponent) {
+	validateSystemAccount := func(component *ClusterComponentDefinition) {
 		sysAccountSpec := component.SystemAccounts
 		if sysAccountSpec != nil {
 			sysAccountSpec.validateSysAccounts(allErrs)
 		}
 	}
 
-	validateConsensus := func(component *ClusterDefinitionComponent) {
+	validateConsensus := func(component *ClusterComponentDefinition) {
 		consensusSpec := component.ConsensusSpec
 		// roleObserveQuery and Leader are required
 		if consensusSpec.Leader.Name == "" {

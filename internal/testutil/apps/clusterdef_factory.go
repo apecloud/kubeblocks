@@ -40,7 +40,7 @@ func NewClusterDefFactory(name string) *MockClusterDefFactory {
 	f.init("", name,
 		&appsv1alpha1.ClusterDefinition{
 			Spec: appsv1alpha1.ClusterDefinitionSpec{
-				ComponentDefs: []appsv1alpha1.ClusterDefinitionComponent{},
+				ComponentDefs: []appsv1alpha1.ClusterComponentDefinition{},
 			},
 		}, f)
 	f.SetConnectionCredential(defaultConnectionCredential)
@@ -48,7 +48,7 @@ func NewClusterDefFactory(name string) *MockClusterDefFactory {
 }
 
 func (factory *MockClusterDefFactory) AddComponent(tplType ComponentTplType, rename string) *MockClusterDefFactory {
-	var component *appsv1alpha1.ClusterDefinitionComponent
+	var component *appsv1alpha1.ClusterComponentDefinition
 	switch tplType {
 	case StatefulMySQLComponent:
 		component = &statefulMySQLComponent

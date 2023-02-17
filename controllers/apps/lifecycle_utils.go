@@ -47,8 +47,8 @@ import (
 func mergeComponentsList(reqCtx intctrlutil.RequestCtx,
 	cluster *appsv1alpha1.Cluster,
 	clusterDef *appsv1alpha1.ClusterDefinition,
-	clusterDefCompList []appsv1alpha1.ClusterDefinitionComponent,
-	clusterCompList []appsv1alpha1.ClusterComponent) []component.SynthesizedComponent {
+	clusterDefCompList []appsv1alpha1.ClusterComponentDefinition,
+	clusterCompList []appsv1alpha1.ClusterComponentSpec) []component.SynthesizedComponent {
 	var compList []component.SynthesizedComponent
 	for _, clusterDefComp := range clusterDefCompList {
 		for _, clusterComp := range clusterCompList {
@@ -102,9 +102,9 @@ func reconcileClusterWorkloads(
 	}
 
 	for _, c := range clusterDefComps {
-		typeName := c.Name
-		clusterVersionComp := clusterVersionCompMap[typeName]
-		clusterComps := clusterCompMap[typeName]
+		compDefName := c.Name
+		clusterVersionComp := clusterVersionCompMap[compDefName]
+		clusterComps := clusterCompMap[compDefName]
 		for _, clusterComp := range clusterComps {
 			if err := prepareComp(component.BuildComponent(reqCtx, cluster, clusterDefinition, &c, clusterVersionComp, &clusterComp)); err != nil {
 				return false, err

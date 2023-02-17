@@ -51,7 +51,7 @@ const (
 )
 
 var (
-	statelessNginxComponent = appsv1alpha1.ClusterDefinitionComponent{
+	statelessNginxComponent = appsv1alpha1.ClusterComponentDefinition{
 		WorkloadType:  appsv1alpha1.Stateless,
 		CharacterType: "stateless",
 		PodSpec: &corev1.PodSpec{
@@ -115,7 +115,7 @@ var (
 		Command: []string{"/scripts/setup.sh"},
 	}
 
-	statefulMySQLComponent = appsv1alpha1.ClusterDefinitionComponent{
+	statefulMySQLComponent = appsv1alpha1.ClusterComponentDefinition{
 		WorkloadType:  appsv1alpha1.Stateful,
 		CharacterType: "mysql",
 		PodSpec: &corev1.PodSpec{
@@ -142,7 +142,7 @@ var (
 		}},
 	}
 
-	consensusMySQLComponent = appsv1alpha1.ClusterDefinitionComponent{
+	consensusMySQLComponent = appsv1alpha1.ClusterComponentDefinition{
 		WorkloadType:  appsv1alpha1.Consensus,
 		CharacterType: "mysql",
 		ConsensusSpec: &defaultConsensusSpec,
@@ -213,7 +213,7 @@ var (
 		},
 	}
 
-	replicationRedisComponent = appsv1alpha1.ClusterDefinitionComponent{
+	replicationRedisComponent = appsv1alpha1.ClusterComponentDefinition{
 		WorkloadType:  appsv1alpha1.Replication,
 		CharacterType: "redis",
 		Service:       &defaultRedisService,

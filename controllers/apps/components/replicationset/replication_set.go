@@ -32,13 +32,13 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
-// ReplicationSet is a component object used by Cluster, ClusterDefinitionComponent and ClusterComponent
+// ReplicationSet is a component object used by Cluster, ClusterComponentDefinition and ClusterComponentSpec
 type ReplicationSet struct {
 	Cli          client.Client
 	Ctx          context.Context
 	Cluster      *appsv1alpha1.Cluster
-	ComponentDef *appsv1alpha1.ClusterDefinitionComponent
-	Component    *appsv1alpha1.ClusterComponent
+	ComponentDef *appsv1alpha1.ClusterComponentDefinition
+	Component    *appsv1alpha1.ClusterComponentSpec
 }
 
 var _ types.Component = &ReplicationSet{}
@@ -111,7 +111,7 @@ func (rs *ReplicationSet) GetPhaseWhenPodsNotReady(componentName string) (appsv1
 		componentStsList = &appsv1.StatefulSetList{}
 		allPodIsReady    = true
 		cluster          = rs.Cluster
-		statusComponent  appsv1alpha1.ClusterStatusComponent
+		statusComponent  appsv1alpha1.ClusterComponentStatus
 		needPatch        bool
 		err              error
 		ok               bool
@@ -181,8 +181,8 @@ func (rs *ReplicationSet) GetPhaseWhenPodsNotReady(componentName string) (appsv1
 func NewReplicationSet(ctx context.Context,
 	cli client.Client,
 	cluster *appsv1alpha1.Cluster,
-	component *appsv1alpha1.ClusterComponent,
-	componentDef *appsv1alpha1.ClusterDefinitionComponent) *ReplicationSet {
+	component *appsv1alpha1.ClusterComponentSpec,
+	componentDef *appsv1alpha1.ClusterComponentDefinition) *ReplicationSet {
 	if component == nil || componentDef == nil {
 		return nil
 	}

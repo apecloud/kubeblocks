@@ -254,7 +254,7 @@ func buildReplicationSet(reqCtx intctrlutil.RequestCtx,
 
 // buildReplicationSetPVC builds replicationSet persistentVolumeClaim manually,
 // replicationSet does not manage pvc through volumeClaimTemplate defined on statefulSet,
-// the purpose is convenient to convert between componentTypes in the future (TODO).
+// the purpose is convenient to convert between workloadTypes in the future (TODO).
 func buildReplicationSetPVC(params CreateParams, sts *appsv1.StatefulSet) error {
 	// generate persistentVolumeClaim objects used by replicationSet's pod from component.VolumeClaimTemplates
 	// TODO: The pvc objects involved in all processes in the KubeBlocks will be reconstructed into a unified generation method

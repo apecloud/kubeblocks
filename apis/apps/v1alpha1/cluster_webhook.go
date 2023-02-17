@@ -123,7 +123,7 @@ func (r *Cluster) validateVolumeClaimTemplates(lastCluster *Cluster) error {
 }
 
 // getLastComponentByName the cluster maybe delete or add a component, so we get the component by name.
-func getLastComponentByName(lastCluster *Cluster, componentName string) *ClusterComponent {
+func getLastComponentByName(lastCluster *Cluster, componentName string) *ClusterComponentSpec {
 	for _, component := range lastCluster.Spec.ComponentSpecs {
 		if component.Name == componentName {
 			return &component
@@ -192,7 +192,7 @@ func (r *Cluster) validateComponents(allErrs *field.ErrorList, clusterDef *Clust
 		invalidComponentTypes = make([]string, 0)
 		componentNameMap      = make(map[string]struct{})
 		componentTypeMap      = make(map[string]struct{})
-		componentMap          = make(map[string]ClusterDefinitionComponent)
+		componentMap          = make(map[string]ClusterComponentDefinition)
 	)
 
 	for _, v := range clusterDef.Spec.ComponentDefs {
@@ -213,7 +213,7 @@ func (r *Cluster) validateComponents(allErrs *field.ErrorList, clusterDef *Clust
 
 	if len(invalidComponentTypes) > 0 {
 		*allErrs = append(*allErrs, field.NotFound(field.NewPath("spec.components[*].type"),
-			getComponentTypeNotFoundMsg(invalidComponentTypes, r.Spec.ClusterDefRef)))
+			getComponentDefNotFoundMsg(invalidComponentTypes, r.Spec.ClusterDefRef)))
 	}
 }
 

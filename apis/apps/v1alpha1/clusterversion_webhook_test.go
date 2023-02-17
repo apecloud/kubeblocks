@@ -113,7 +113,7 @@ func createTestClusterVersionObj(clusterDefinitionName, clusterVersionName strin
 		},
 		Spec: ClusterVersionSpec{
 			ClusterDefinitionRef: clusterDefinitionName,
-			ComponentVersions: []ClusterVersionComponent{
+			ComponentVersions: []ClusterComponentVersion{
 				{ComponentDefRef: "replicasets", PodSpec: &corev1.PodSpec{Containers: []corev1.Container{
 					{Name: "main"},
 				}}},
@@ -136,7 +136,7 @@ func createTestReplicationSetClusterVersionObj(clusterDefinitionName, clusterVer
 		},
 		Spec: ClusterVersionSpec{
 			ClusterDefinitionRef: clusterDefinitionName,
-			ComponentVersions: []ClusterVersionComponent{
+			ComponentVersions: []ClusterComponentVersion{
 				{ComponentDefRef: "replication", PodSpec: &corev1.PodSpec{Containers: []corev1.Container{
 					{Name: "main"},
 				}}},

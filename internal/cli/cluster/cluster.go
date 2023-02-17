@@ -263,7 +263,7 @@ func (o *ClusterObjects) GetInstanceInfo() []*InstanceInfo {
 			CreatedTime: util.TimeFormat(&pod.CreationTimestamp),
 		}
 
-		var component *appsv1alpha1.ClusterComponent
+		var component *appsv1alpha1.ClusterComponentSpec
 		for i, c := range o.Cluster.Spec.ComponentSpecs {
 			if c.Name == instance.Component {
 				component = &o.Cluster.Spec.ComponentSpecs[i]
@@ -277,7 +277,7 @@ func (o *ClusterObjects) GetInstanceInfo() []*InstanceInfo {
 	return instances
 }
 
-func (o *ClusterObjects) getStorageInfo(component *appsv1alpha1.ClusterComponent) []StorageInfo {
+func (o *ClusterObjects) getStorageInfo(component *appsv1alpha1.ClusterComponentSpec) []StorageInfo {
 	if component == nil {
 		return nil
 	}

@@ -596,9 +596,9 @@ func (r *ClusterReconciler) updateClusterPhaseToCreatingOrUpdating(reqCtx intctr
 	if cluster.Status.Phase == "" {
 		needPatch = true
 		cluster.Status.Phase = appsv1alpha1.CreatingPhase
-		cluster.Status.Components = map[string]appsv1alpha1.ClusterStatusComponent{}
+		cluster.Status.Components = map[string]appsv1alpha1.ClusterComponentStatus{}
 		for _, v := range cluster.Spec.ComponentSpecs {
-			cluster.Status.Components[v.Name] = appsv1alpha1.ClusterStatusComponent{
+			cluster.Status.Components[v.Name] = appsv1alpha1.ClusterComponentStatus{
 				Phase: appsv1alpha1.CreatingPhase,
 			}
 		}
@@ -661,7 +661,7 @@ func (r *ClusterReconciler) reconcileClusterStatus(ctx context.Context,
 
 	// remove the invalid component in status.components when spec.components changed.
 	removeInvalidComponent := func(cluster *appsv1alpha1.Cluster) (needPatch bool, postFunc postHandler) {
-		tmpStatusComponents := map[string]appsv1alpha1.ClusterStatusComponent{}
+		tmpStatusComponents := map[string]appsv1alpha1.ClusterComponentStatus{}
 		statusComponents := cluster.Status.Components
 		for _, v := range cluster.Spec.ComponentSpecs {
 			if statusComponent, ok := statusComponents[v.Name]; ok {

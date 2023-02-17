@@ -205,7 +205,7 @@ var _ = Describe("SystemAccount Controller", func() {
 		Expect(len(testCases)).To(BeNumerically(">", 0))
 		// fill the number of secrets, jobs, and cached secrets
 		for _, testCase := range testCases {
-			compDef := clusterDefObj.GetComponentDefByTypeName(testCase.componentType)
+			compDef := clusterDefObj.GetComponentDefByName(testCase.componentType)
 			Expect(compDef).NotTo(BeNil())
 			if compDef.SystemAccounts == nil {
 				continue

@@ -28,14 +28,14 @@ type ClusterVersionSpec struct {
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	ClusterDefinitionRef string `json:"clusterDefinitionRef"`
 
-	// List of componentVersions in current ClusterVersion.
+	// List of components' containers versioning context, i.e., container image ID, container commands, args., and environments.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MinItems=1
 	// +patchMergeKey=componentDefRef
 	// +patchStrategy=merge,retainKeys
 	// +listType=map
 	// +listMapKey=componentDefRef
-	ComponentVersions []ClusterVersionComponent `json:"componentVersions" patchStrategy:"merge,retainKeys" patchMergeKey:"componentDefRef"`
+	ComponentVersions []ClusterComponentVersion `json:"componentVersions" patchStrategy:"merge,retainKeys" patchMergeKey:"componentDefRef"`
 }
 
 // ClusterVersionStatus defines the observed state of ClusterVersion
@@ -58,9 +58,9 @@ type ClusterVersionStatus struct {
 	ClusterDefGeneration int64 `json:"clusterDefGeneration,omitempty"`
 }
 
-// ClusterVersionComponent is an application version component spec.
-type ClusterVersionComponent struct {
-	// ComponentDefRef reference componentDef in ClusterDefinition.
+// ClusterComponentVersion is an application version component spec.
+type ClusterComponentVersion struct {
+	// componentDefRef reference one of the cluster component definition names in ClusterDefinition API (spec.componentDefs.name).
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=12
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
@@ -111,9 +111,9 @@ func init() {
 	SchemeBuilder.Register(&ClusterVersion{}, &ClusterVersionList{})
 }
 
-// GetTypeMappingComponents return ComponentDefRef name mapping ClusterVersionComponent.
-func (r *ClusterVersion) GetTypeMappingComponents() map[string]*ClusterVersionComponent {
-	m := map[string]*ClusterVersionComponent{}
+// GetTypeMappingComponents return ComponentDefRef name mapping ClusterComponentVersion.
+func (r *ClusterVersion) GetTypeMappingComponents() map[string]*ClusterComponentVersion {
+	m := map[string]*ClusterComponentVersion{}
 	for i, c := range r.Spec.ComponentVersions {
 		m[c.ComponentDefRef] = &r.Spec.ComponentVersions[i]
 	}

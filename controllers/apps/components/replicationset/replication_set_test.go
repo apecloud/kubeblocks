@@ -120,8 +120,8 @@ var _ = Describe("Replication Component", func() {
 				}
 			}
 
-			typeName := clusterObj.GetComponentTypeName(testapps.DefaultRedisCompName)
-			componentDef := clusterDefObj.GetComponentDefByTypeName(typeName)
+			compDefName := clusterObj.GetComponentDefRefName(testapps.DefaultRedisCompName)
+			componentDef := clusterDefObj.GetComponentDefByName(compDefName)
 			component := clusterObj.GetComponentByName(testapps.DefaultRedisCompName)
 			replicationComponent := NewReplicationSet(ctx, k8sClient, clusterObj, component, componentDef)
 

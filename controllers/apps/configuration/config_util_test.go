@@ -176,7 +176,7 @@ var _ = Describe("ConfigWrapper util test", func() {
 			// remove ConfigConstraintRef
 			_, err := handleConfigTemplate(clusterDefObj, func(templates []appsv1alpha1.ConfigTemplate) (bool, error) {
 				return true, nil
-			}, func(component *appsv1alpha1.ClusterDefinitionComponent) error {
+			}, func(component *appsv1alpha1.ClusterComponentDefinition) error {
 				if component.ConfigSpec == nil || len(component.ConfigSpec.ConfigTemplateRefs) == 0 {
 					return nil
 				}

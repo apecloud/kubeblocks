@@ -69,8 +69,8 @@ func NewComponentByType(
 	ctx context.Context,
 	cli client.Client,
 	cluster *appsv1alpha1.Cluster,
-	componentDef *appsv1alpha1.ClusterDefinitionComponent,
-	component *appsv1alpha1.ClusterComponent) types.Component {
+	componentDef *appsv1alpha1.ClusterComponentDefinition,
+	component *appsv1alpha1.ClusterComponentSpec) types.Component {
 	if componentDef == nil {
 		return nil
 	}
@@ -198,17 +198,17 @@ func syncStatusComponents(compCtx componentContext,
 }
 
 // getClusterComponentStatus gets the component status in cluster by component name.
-func getClusterComponentStatus(cluster *appsv1alpha1.Cluster, componentName string) appsv1alpha1.ClusterStatusComponent {
+func getClusterComponentStatus(cluster *appsv1alpha1.Cluster, componentName string) appsv1alpha1.ClusterComponentStatus {
 	var (
-		componentStatus appsv1alpha1.ClusterStatusComponent
+		componentStatus appsv1alpha1.ClusterComponentStatus
 		status          = &cluster.Status
 		ok              bool
 	)
 	if status.Components == nil {
-		status.Components = map[string]appsv1alpha1.ClusterStatusComponent{}
+		status.Components = map[string]appsv1alpha1.ClusterComponentStatus{}
 	}
 	if componentStatus, ok = status.Components[componentName]; !ok {
-		componentStatus = appsv1alpha1.ClusterStatusComponent{
+		componentStatus = appsv1alpha1.ClusterComponentStatus{
 			Phase: cluster.Status.Phase,
 		}
 		status.Components[componentName] = componentStatus
@@ -217,7 +217,7 @@ func getClusterComponentStatus(cluster *appsv1alpha1.Cluster, componentName stri
 }
 
 // updateStatusComponentMessage updates the message of the component in Cluster.status.components.
-func updateStatusComponentMessage(statusComponent *appsv1alpha1.ClusterStatusComponent,
+func updateStatusComponentMessage(statusComponent *appsv1alpha1.ClusterComponentStatus,
 	pod *corev1.Pod,
 	message string) {
 	if statusComponent.Message == nil {

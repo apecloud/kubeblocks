@@ -84,7 +84,7 @@ func GetStatusComponentMessageKey(kind, name string) string {
 }
 
 // IsProbeTimeout checks if the application of the pod is probe timed out.
-func IsProbeTimeout(componentDef *appsv1alpha1.ClusterDefinitionComponent, podsReadyTime *metav1.Time) bool {
+func IsProbeTimeout(componentDef *appsv1alpha1.ClusterComponentDefinition, podsReadyTime *metav1.Time) bool {
 	if podsReadyTime == nil {
 		return false
 	}
@@ -132,15 +132,15 @@ func CheckRelatedPodIsTerminating(ctx context.Context, cli client.Client, cluste
 	return false, nil
 }
 
-// GetComponentDefByCluster gets component from ClusterDefinition with typeName
-func GetComponentDefByCluster(ctx context.Context, cli client.Client, cluster *appsv1alpha1.Cluster, typeName string) (*appsv1alpha1.ClusterDefinitionComponent, error) {
+// GetComponentDefByCluster gets component from ClusterDefinition with compDefName
+func GetComponentDefByCluster(ctx context.Context, cli client.Client, cluster *appsv1alpha1.Cluster, compDefName string) (*appsv1alpha1.ClusterComponentDefinition, error) {
 	clusterDef := &appsv1alpha1.ClusterDefinition{}
 	if err := cli.Get(ctx, client.ObjectKey{Name: cluster.Spec.ClusterDefRef}, clusterDef); err != nil {
 		return nil, err
 	}
 
 	for _, component := range clusterDef.Spec.ComponentDefs {
-		if component.Name == typeName {
+		if component.Name == compDefName {
 			return &component, nil
 		}
 	}
@@ -150,15 +150,15 @@ func GetComponentDefByCluster(ctx context.Context, cli client.Client, cluster *a
 // InitClusterComponentStatusIfNeed Initialize the state of the corresponding component in cluster.status.components
 func InitClusterComponentStatusIfNeed(cluster *appsv1alpha1.Cluster,
 	componentName string,
-	componentDef *appsv1alpha1.ClusterDefinitionComponent) {
+	componentDef *appsv1alpha1.ClusterComponentDefinition) {
 	if componentDef == nil {
 		return
 	}
 	if cluster.Status.Components == nil {
-		cluster.Status.Components = make(map[string]appsv1alpha1.ClusterStatusComponent)
+		cluster.Status.Components = make(map[string]appsv1alpha1.ClusterComponentStatus)
 	}
 	if _, ok := cluster.Status.Components[componentName]; !ok {
-		cluster.Status.Components[componentName] = appsv1alpha1.ClusterStatusComponent{
+		cluster.Status.Components[componentName] = appsv1alpha1.ClusterComponentStatus{
 			Phase: cluster.Status.Phase,
 		}
 	}
@@ -183,8 +183,8 @@ func InitClusterComponentStatusIfNeed(cluster *appsv1alpha1.Cluster,
 }
 
 // GetComponentReplicas gets the actual replicas of component
-func GetComponentReplicas(component *appsv1alpha1.ClusterComponent,
-	componentDef *appsv1alpha1.ClusterDefinitionComponent) int32 {
+func GetComponentReplicas(component *appsv1alpha1.ClusterComponentSpec,
+	componentDef *appsv1alpha1.ClusterComponentDefinition) int32 {
 	if component.Replicas == nil {
 		return 0
 	}
@@ -241,7 +241,7 @@ func GetComponentWorkloadMinReadySeconds(ctx context.Context,
 func GetComponentInfoByPod(ctx context.Context,
 	cli client.Client,
 	cluster *appsv1alpha1.Cluster,
-	pod *corev1.Pod) (componentName string, componentDef *appsv1alpha1.ClusterDefinitionComponent, err error) {
+	pod *corev1.Pod) (componentName string, componentDef *appsv1alpha1.ClusterComponentDefinition, err error) {
 	if pod == nil || pod.Labels == nil {
 		return "", nil, fmt.Errorf("pod %s or pod's label is nil", pod.Name)
 	}
@@ -249,8 +249,8 @@ func GetComponentInfoByPod(ctx context.Context,
 	if !ok {
 		return "", nil, fmt.Errorf("pod %s component name label %s is nil", pod.Name, intctrlutil.AppComponentLabelKey)
 	}
-	typeName := cluster.GetComponentTypeName(componentName)
-	componentDef, err = GetComponentDefByCluster(ctx, cli, cluster, typeName)
+	compDefName := cluster.GetComponentDefRefName(componentName)
+	componentDef, err = GetComponentDefByCluster(ctx, cli, cluster, compDefName)
 	if err != nil {
 		return componentName, componentDef, err
 	}

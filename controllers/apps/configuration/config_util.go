@@ -249,7 +249,7 @@ func checkConfigTPL(ctx intctrlutil.RequestCtx, tpl *appsv1alpha1.ConfigConstrai
 }
 
 type ConfigTemplateHandler func([]appsv1alpha1.ConfigTemplate) (bool, error)
-type ComponentValidateHandler func(component *appsv1alpha1.ClusterDefinitionComponent) error
+type ComponentValidateHandler func(component *appsv1alpha1.ClusterComponentDefinition) error
 
 func CheckCDConfigTemplate(client client.Client, ctx intctrlutil.RequestCtx, clusterDef *appsv1alpha1.ClusterDefinition) (bool, error) {
 	return handleConfigTemplate(clusterDef,
@@ -413,7 +413,7 @@ func getRelatedComponentsByConfigmap(stsList *appv1.StatefulSetList, cfg client.
 	return sts, containers.AsSlice()
 }
 
-func getClusterComponentsByName(components []appsv1alpha1.ClusterComponent, componentName string) *appsv1alpha1.ClusterComponent {
+func getClusterComponentsByName(components []appsv1alpha1.ClusterComponentSpec, componentName string) *appsv1alpha1.ClusterComponentSpec {
 	for i := range components {
 		component := &components[i]
 		if component.Name == componentName {
@@ -485,14 +485,14 @@ func getComponentFromClusterDefinition(
 	ctx context.Context,
 	cli client.Client,
 	cluster *appsv1alpha1.Cluster,
-	typeName string) (*appsv1alpha1.ClusterDefinitionComponent, error) {
+	compDefName string) (*appsv1alpha1.ClusterComponentDefinition, error) {
 	clusterDef := &appsv1alpha1.ClusterDefinition{}
 	if err := cli.Get(ctx, client.ObjectKey{Name: cluster.Spec.ClusterDefRef}, clusterDef); err != nil {
 		return nil, err
 	}
 	for i := range clusterDef.Spec.ComponentDefs {
 		component := &clusterDef.Spec.ComponentDefs[i]
-		if component.Name == typeName {
+		if component.Name == compDefName {
 			return component, nil
 		}
 	}

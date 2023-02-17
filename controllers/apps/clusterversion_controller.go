@@ -201,9 +201,9 @@ func validateClusterVersion(clusterVersion *appsv1alpha1.ClusterVersion, cluster
 	notFoundComponentTypes, noContainersComponents := clusterVersion.GetInconsistentComponentsInfo(clusterDef)
 	var statusMsgs []string
 	if len(notFoundComponentTypes) > 0 {
-		statusMsgs = append(statusMsgs, fmt.Sprintf("spec.components[*].type %v not found in ClusterDefinition.spec.components[*].typeName", notFoundComponentTypes))
+		statusMsgs = append(statusMsgs, fmt.Sprintf("spec.componentSpecs[*].componentDefRef %v not found in ClusterDefinition.spec.componentDefs[*].name", notFoundComponentTypes))
 	} else if len(noContainersComponents) > 0 {
-		statusMsgs = append(statusMsgs, fmt.Sprintf("spec.components[*].type %v missing spec.components[*].containers in ClusterDefinition.spec.components[*] and ClusterVersion.spec.components[*]", noContainersComponents))
+		statusMsgs = append(statusMsgs, fmt.Sprintf("spec.componentSpecs[*].componentDefRef %v missing spec.componentSpecs[*].containers in ClusterDefinition.spec.componentDefs[*] and ClusterVersion.spec.componentVersions[*]", noContainersComponents))
 	}
 	return strings.Join(statusMsgs, ";")
 }

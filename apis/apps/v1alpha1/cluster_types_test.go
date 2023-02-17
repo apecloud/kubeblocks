@@ -71,7 +71,7 @@ spec:
 
 func TestGetMessage(t *testing.T) {
 	podKey := "Pod/test-01"
-	statusComponent := ClusterStatusComponent{
+	statusComponent := ClusterComponentStatus{
 		Message: map[string]string{
 			podKey: "failed Scheduled",
 		},
@@ -85,7 +85,7 @@ func TestGetMessage(t *testing.T) {
 
 func TestSetMessage(t *testing.T) {
 	podKey := "Pod/test-01"
-	statusComponent := ClusterStatusComponent{}
+	statusComponent := ClusterComponentStatus{}
 	statusComponent.SetMessage(
 		map[string]string{
 			podKey: "failed Scheduled",
@@ -106,30 +106,30 @@ func TestSetAndGetObjectMessage(t *testing.T) {
 	}
 }
 
-func TestGetComponentOrTypeName(t *testing.T) {
+func TestGetComponentOrName(t *testing.T) {
 	var (
 		componentType = "mysqlType"
 		componentName = "mysql"
 	)
 	cluster := Cluster{
 		Spec: ClusterSpec{
-			ComponentSpecs: []ClusterComponent{
+			ComponentSpecs: []ClusterComponentSpec{
 				{Name: componentName, ComponentDefRef: componentType},
 			},
 		},
 	}
-	typeName := cluster.GetComponentTypeName(componentName)
-	if typeName != componentType {
-		t.Errorf(`function GetComponentTypeName should return %s`, componentType)
+	compDefName := cluster.GetComponentDefRefName(componentName)
+	if compDefName != componentType {
+		t.Errorf(`function GetComponentDefRefName should return %s`, componentType)
 	}
 	component := cluster.GetComponentByName(componentName)
 	if component == nil {
 		t.Errorf("function GetComponentByName should not return nil")
 	}
 	componentName = "mysql1"
-	typeName = cluster.GetComponentTypeName(componentName)
-	if typeName != "" {
-		t.Errorf(`function GetComponentTypeName should return ""`)
+	compDefName = cluster.GetComponentDefRefName(componentName)
+	if compDefName != "" {
+		t.Errorf(`function GetComponentDefRefName should return ""`)
 	}
 	component = cluster.GetComponentByName(componentName)
 	if component != nil {

@@ -88,7 +88,7 @@ func (r *DeploymentReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	if clusterComponent == nil {
 		return intctrlutil.Reconciled()
 	}
-	componentDef := clusterDef.GetComponentDefByTypeName(clusterComponent.ComponentDefRef)
+	componentDef := clusterDef.GetComponentDefByName(clusterComponent.ComponentDefRef)
 	statelessComp := stateless.NewStateless(reqCtx.Ctx, r.Client, cluster, clusterComponent, componentDef)
 	compCtx := newComponentContext(reqCtx, r.Client, r.Recorder, statelessComp, deploy, componentName)
 	if requeueAfter, err := handleComponentStatusAndSyncCluster(compCtx, cluster); err != nil {

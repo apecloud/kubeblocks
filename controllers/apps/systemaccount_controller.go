@@ -162,7 +162,7 @@ func (r *SystemAccountReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	}
 
 	// process accounts per component
-	processAccountsForComponent := func(compDef *appsv1alpha1.ClusterDefinitionComponent, compDecl *appsv1alpha1.ClusterComponent,
+	processAccountsForComponent := func(compDef *appsv1alpha1.ClusterComponentDefinition, compDecl *appsv1alpha1.ClusterComponentSpec,
 		svcEP *corev1.Endpoints, headlessEP *corev1.Endpoints) error {
 		var (
 			err           error
@@ -266,7 +266,7 @@ func (r *SystemAccountReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 func (r *SystemAccountReconciler) createByStmt(reqCtx intctrlutil.RequestCtx,
 	cluster *appsv1alpha1.Cluster,
-	compDef *appsv1alpha1.ClusterDefinitionComponent,
+	compDef *appsv1alpha1.ClusterComponentDefinition,
 	compKey componentUniqueKey,
 	engine *customizedEngine,
 	account appsv1alpha1.SystemAccountConfig,

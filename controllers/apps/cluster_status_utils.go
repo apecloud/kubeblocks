@@ -112,7 +112,7 @@ func isExistsEventMsg(statusComponentMessage map[string]string, event *corev1.Ev
 }
 
 // updateStatusComponentMessage updates status component message map
-func updateStatusComponentMessage(statusComponent *appsv1alpha1.ClusterStatusComponent, event *corev1.Event) {
+func updateStatusComponentMessage(statusComponent *appsv1alpha1.ClusterComponentStatus, event *corev1.Event) {
 	var (
 		kind = event.InvolvedObject.Kind
 		name = event.InvolvedObject.Name
@@ -134,17 +134,17 @@ func updateStatusComponentMessage(statusComponent *appsv1alpha1.ClusterStatusCom
 func needSyncComponentStatusForEvent(cluster *appsv1alpha1.Cluster, componentName string, phase appsv1alpha1.Phase, event *corev1.Event) bool {
 	var (
 		status          = &cluster.Status
-		statusComponent appsv1alpha1.ClusterStatusComponent
+		statusComponent appsv1alpha1.ClusterComponentStatus
 		ok              bool
 	)
 	if phase == "" {
 		return false
 	}
 	if cluster.Status.Components == nil {
-		status.Components = map[string]appsv1alpha1.ClusterStatusComponent{}
+		status.Components = map[string]appsv1alpha1.ClusterComponentStatus{}
 	}
 	if statusComponent, ok = cluster.Status.Components[componentName]; !ok {
-		statusComponent = appsv1alpha1.ClusterStatusComponent{Phase: phase}
+		statusComponent = appsv1alpha1.ClusterComponentStatus{Phase: phase}
 		updateStatusComponentMessage(&statusComponent, event)
 		status.Components[componentName] = statusComponent
 		return true
@@ -240,7 +240,7 @@ func handleClusterAbnormalOrFailedPhase(cluster *appsv1alpha1.Cluster, component
 
 // getClusterAvailabilityEffect whether the component will affect the cluster availability.
 // if the component can affect and be Failed, the cluster will be Failed too.
-func getClusterAvailabilityEffect(componentDef *appsv1alpha1.ClusterDefinitionComponent) bool {
+func getClusterAvailabilityEffect(componentDef *appsv1alpha1.ClusterComponentDefinition) bool {
 	switch componentDef.WorkloadType {
 	case appsv1alpha1.Consensus:
 		return true
@@ -253,22 +253,22 @@ func getClusterAvailabilityEffect(componentDef *appsv1alpha1.ClusterDefinitionCo
 }
 
 // getComponentRelatedInfo gets componentMap, clusterAvailabilityMap and component definition information
-func getComponentRelatedInfo(cluster *appsv1alpha1.Cluster, clusterDef *appsv1alpha1.ClusterDefinition, componentName string) (map[string]string, map[string]bool, appsv1alpha1.ClusterDefinitionComponent) {
+func getComponentRelatedInfo(cluster *appsv1alpha1.Cluster, clusterDef *appsv1alpha1.ClusterDefinition, componentName string) (map[string]string, map[string]bool, appsv1alpha1.ClusterComponentDefinition) {
 	var (
-		typeName     string
+		compDefName  string
 		componentMap = map[string]string{}
-		componentDef appsv1alpha1.ClusterDefinitionComponent
+		componentDef appsv1alpha1.ClusterComponentDefinition
 	)
 	for _, v := range cluster.Spec.ComponentSpecs {
 		if v.Name == componentName {
-			typeName = v.ComponentDefRef
+			compDefName = v.ComponentDefRef
 		}
 		componentMap[v.Name] = v.ComponentDefRef
 	}
 	clusterAvailabilityEffectMap := map[string]bool{}
 	for _, v := range clusterDef.Spec.ComponentDefs {
 		clusterAvailabilityEffectMap[v.Name] = getClusterAvailabilityEffect(&v)
-		if v.Name == typeName {
+		if v.Name == compDefName {
 			componentDef = v
 		}
 	}
@@ -474,7 +474,7 @@ func syncComponentPhaseWhenSpecUpdating(cluster *appsv1alpha1.Cluster,
 		return
 	}
 	if cluster.Status.Components == nil {
-		cluster.Status.Components = map[string]appsv1alpha1.ClusterStatusComponent{
+		cluster.Status.Components = map[string]appsv1alpha1.ClusterComponentStatus{
 			componentName: {
 				Phase: appsv1alpha1.SpecUpdatingPhase,
 			},

@@ -73,7 +73,7 @@ var _ = Describe("clusterDefinition webhook", func() {
 				return err == nil
 			}, timeout, interval).Should(BeTrue())
 
-			By("By creating a new clusterDefinition with componentType==Consensus but consensusSpec not present")
+			By("By creating a new clusterDefinition with workloadType==Consensus but consensusSpec not present")
 			clusterDef, _ = createTestClusterDefinitionObj2(clusterDefinitionName2)
 			Expect(testCtx.CreateObj(ctx, clusterDef)).ShouldNot(Succeed())
 

@@ -60,22 +60,22 @@ spec:
 	}
 }
 
-func TestGetComponentDefByTypeName(t *testing.T) {
+func TestGetComponentDefByName(t *testing.T) {
 	componentType := "mysqlType"
 	clusterDef := &ClusterDefinition{
 		Spec: ClusterDefinitionSpec{
-			ComponentDefs: []ClusterDefinitionComponent{
+			ComponentDefs: []ClusterComponentDefinition{
 				{
 					Name: componentType,
 				},
 			},
 		},
 	}
-	if clusterDef.GetComponentDefByTypeName(componentType) == nil {
-		t.Error("function GetComponentDefByTypeName should not return nil")
+	if clusterDef.GetComponentDefByName(componentType) == nil {
+		t.Error("function GetComponentDefByName should not return nil")
 	}
 	componentType = "test"
-	if clusterDef.GetComponentDefByTypeName(componentType) != nil {
-		t.Error("function GetComponentDefByTypeName should return nil")
+	if clusterDef.GetComponentDefByName(componentType) != nil {
+		t.Error("function GetComponentDefByName should return nil")
 	}
 }

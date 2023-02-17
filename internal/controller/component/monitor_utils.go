@@ -47,8 +47,8 @@ var (
 func buildMonitorConfig(
 	cluster *appsv1alpha1.Cluster,
 	clusterDef *appsv1alpha1.ClusterDefinition,
-	clusterDefComp *appsv1alpha1.ClusterDefinitionComponent,
-	clusterComp *appsv1alpha1.ClusterComponent,
+	clusterDefComp *appsv1alpha1.ClusterComponentDefinition,
+	clusterComp *appsv1alpha1.ClusterComponentSpec,
 	component *SynthesizedComponent) {
 	monitorEnable := false
 	if clusterComp != nil {

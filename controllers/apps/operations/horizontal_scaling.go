@@ -104,7 +104,7 @@ func (hs horizontalScalingOpsHandler) SaveLastConfiguration(opsRes *OpsResource)
 		if _, ok := componentNameMap[v.Name]; !ok {
 			continue
 		}
-		clusterComponentDef := clusterDef.GetComponentDefByTypeName(v.ComponentDefRef)
+		clusterComponentDef := clusterDef.GetComponentDefByName(v.ComponentDefRef)
 		lastComponentInfo[v.Name] = appsv1alpha1.LastComponentConfiguration{
 			Replicas: util.GetComponentReplicas(&v, clusterComponentDef),
 		}

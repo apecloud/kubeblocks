@@ -34,9 +34,9 @@ func BuildComponent(
 	reqCtx intctrlutil.RequestCtx,
 	cluster *appsv1alpha1.Cluster,
 	clusterDef *appsv1alpha1.ClusterDefinition,
-	clusterDefComp *appsv1alpha1.ClusterDefinitionComponent,
-	clusterVersionComp *appsv1alpha1.ClusterVersionComponent,
-	clusterComp *appsv1alpha1.ClusterComponent) *SynthesizedComponent {
+	clusterDefComp *appsv1alpha1.ClusterComponentDefinition,
+	clusterVersionComp *appsv1alpha1.ClusterComponentVersion,
+	clusterComp *appsv1alpha1.ClusterComponentSpec) *SynthesizedComponent {
 	if clusterDefComp == nil {
 		reqCtx.Log.Error(nil, "build probe container failed.")
 		return nil

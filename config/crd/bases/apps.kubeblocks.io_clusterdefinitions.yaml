@@ -21,7 +21,7 @@ spec:
   versions:
   - additionalPrinterColumns:
     - description: main component types
-      jsonPath: .spec.components[0].typeName
+      jsonPath: .spec.componentDefs[0].name
       name: MAIN-COMPONENT-TYPE
       type: string
     - description: status phase
@@ -52,10 +52,11 @@ spec:
             description: ClusterDefinitionSpec defines the desired state of ClusterDefinition
             properties:
               componentDefs:
-                description: List of components belonging to the cluster.
+                description: componentDefs provides cluster components definitions.
                 items:
-                  description: ClusterDefinitionComponent is a group of pods, pods
-                    belong to same component usually share the same data
+                  description: ClusterComponentDefinition provides a workload component
+                    specification template, with attributes that strongly work with
+                    stateful workloads and day-2 operations behaviors.
                   properties:
                     characterType:
                       description: characterType defines well-known database component

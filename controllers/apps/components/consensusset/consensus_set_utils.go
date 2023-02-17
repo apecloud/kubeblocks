@@ -64,11 +64,11 @@ const (
 // handleConsensusSetUpdate handle ConsensusSet component when it to do updating
 // return true means stateful set reconcile done
 func handleConsensusSetUpdate(ctx context.Context, cli client.Client, cluster *appsv1alpha1.Cluster, stsObj *appsv1.StatefulSet) (bool, error) {
-	// get typeName from stsObj.name
-	typeName := cluster.GetComponentTypeName(stsObj.Labels[intctrlutil.AppComponentLabelKey])
+	// get compDefName from stsObj.name
+	compDefName := cluster.GetComponentDefRefName(stsObj.Labels[intctrlutil.AppComponentLabelKey])
 
-	// get component from ClusterDefinition by typeName
-	component, err := util.GetComponentDefByCluster(ctx, cli, cluster, typeName)
+	// get component from ClusterDefinition by compDefName
+	component, err := util.GetComponentDefByCluster(ctx, cli, cluster, compDefName)
 	if err != nil {
 		return false, err
 	}
@@ -159,7 +159,7 @@ func SortPods(pods []corev1.Pod, rolePriorityMap map[string]int) {
 
 // generateConsensusUpdatePlan generates Update plan based on UpdateStrategy
 func generateConsensusUpdatePlan(ctx context.Context, cli client.Client, stsObj *appsv1.StatefulSet, pods []corev1.Pod,
-	component appsv1alpha1.ClusterDefinitionComponent) *util.Plan {
+	component appsv1alpha1.ClusterComponentDefinition) *util.Plan {
 	plan := &util.Plan{}
 	plan.Start = &util.Step{}
 	plan.WalkFunc = func(obj interface{}) (bool, error) {
@@ -281,7 +281,7 @@ func generateConsensusSerialPlan(plan *util.Plan, pods []corev1.Pod) {
 }
 
 // ComposeRolePriorityMap generates a priority map based on roles.
-func ComposeRolePriorityMap(component appsv1alpha1.ClusterDefinitionComponent) map[string]int {
+func ComposeRolePriorityMap(component appsv1alpha1.ClusterComponentDefinition) map[string]int {
 	if component.ConsensusSpec == nil {
 		component.ConsensusSpec = &appsv1alpha1.ConsensusSetSpec{Leader: appsv1alpha1.DefaultLeader}
 	}
@@ -322,8 +322,8 @@ func UpdateConsensusSetRoleLabel(cli client.Client, reqCtx intctrlutil.RequestCt
 
 	// get componentDef this pod belongs to
 	componentName := pod.Labels[intctrlutil.AppComponentLabelKey]
-	typeName := cluster.GetComponentTypeName(componentName)
-	componentDef, err := util.GetComponentDefByCluster(ctx, cli, cluster, typeName)
+	compDefName := cluster.GetComponentDefRefName(componentName)
+	componentDef, err := util.GetComponentDefByCluster(ctx, cli, cluster, compDefName)
 	if err != nil {
 		return err
 	}
@@ -364,7 +364,7 @@ func putConsensusMemberExt(roleMap map[string]consensusMemberExt, name string, r
 	roleMap[name] = memberExt
 }
 
-func composeConsensusRoleMap(componentDef appsv1alpha1.ClusterDefinitionComponent) map[string]consensusMemberExt {
+func composeConsensusRoleMap(componentDef appsv1alpha1.ClusterComponentDefinition) map[string]consensusMemberExt {
 	roleMap := make(map[string]consensusMemberExt, 0)
 
 	putConsensusMemberExt(roleMap,
@@ -461,7 +461,7 @@ func resetConsensusSetStatusRole(consensusSetStatus *appsv1alpha1.ConsensusSetSt
 }
 
 func setConsensusSetStatusRoles(consensusSetStatus *appsv1alpha1.ConsensusSetStatus,
-	componentDef appsv1alpha1.ClusterDefinitionComponent, pods []corev1.Pod) {
+	componentDef appsv1alpha1.ClusterComponentDefinition, pods []corev1.Pod) {
 	if consensusSetStatus == nil {
 		return
 	}
@@ -477,7 +477,7 @@ func setConsensusSetStatusRoles(consensusSetStatus *appsv1alpha1.ConsensusSetSta
 }
 
 func setConsensusSetStatusRole(consensusSetStatus *appsv1alpha1.ConsensusSetStatus,
-	componentDef appsv1alpha1.ClusterDefinitionComponent,
+	componentDef appsv1alpha1.ClusterComponentDefinition,
 	role, podName string) bool {
 	// mapping role label to consensus member
 	roleMap := composeConsensusRoleMap(componentDef)
@@ -503,7 +503,7 @@ func setConsensusSetStatusRole(consensusSetStatus *appsv1alpha1.ConsensusSetStat
 	return needUpdate
 }
 
-func updateConsensusRoleInfo(ctx context.Context, cli client.Client, cluster *appsv1alpha1.Cluster, componentDef appsv1alpha1.ClusterDefinitionComponent, componentName string, pods []corev1.Pod) error {
+func updateConsensusRoleInfo(ctx context.Context, cli client.Client, cluster *appsv1alpha1.Cluster, componentDef appsv1alpha1.ClusterComponentDefinition, componentName string, pods []corev1.Pod) error {
 	leader := ""
 	followers := ""
 	for _, pod := range pods {

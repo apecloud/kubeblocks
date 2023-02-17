@@ -173,24 +173,24 @@ func (o *ListLogsOptions) gatherLogFilesData(c *appsv1alpha1.Cluster, cd *appsv1
 		if !ok || (len(o.componentName) > 0 && !strings.EqualFold(o.componentName, componentName)) {
 			continue
 		}
-		var comTypeName string
+		var compDefName string
 		logTypeMap := make(map[string]struct{})
-		// find component typeName and enabledLogs config against componentName in pod's label.
+		// find component compDefName and enabledLogs config against componentName in pod's label.
 		for _, comCluster := range c.Spec.ComponentSpecs {
 			if !strings.EqualFold(comCluster.Name, componentName) {
 				continue
 			}
-			comTypeName = comCluster.ComponentDefRef
+			compDefName = comCluster.ComponentDefRef
 			for _, logType := range comCluster.EnabledLogs {
 				logTypeMap[logType] = struct{}{}
 			}
 			break
 		}
-		if len(comTypeName) == 0 || len(logTypeMap) == 0 {
+		if len(compDefName) == 0 || len(logTypeMap) == 0 {
 			continue
 		}
 		for _, com := range cd.Spec.ComponentDefs {
-			if !strings.EqualFold(com.Name, comTypeName) {
+			if !strings.EqualFold(com.Name, compDefName) {
 				continue
 			}
 			for _, logConfig := range com.LogConfigs {

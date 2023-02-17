@@ -279,7 +279,7 @@ var _ = Describe("OpsRequest Controller Volume Expansion Handler", func() {
 			By("Test OpsManager.MainEnter function with ClusterOps")
 			Expect(testapps.ChangeObjStatus(&testCtx, clusterObject, func() {
 				clusterObject.Status.Phase = appsv1alpha1.RunningPhase
-				clusterObject.Status.Components = map[string]appsv1alpha1.ClusterStatusComponent{
+				clusterObject.Status.Components = map[string]appsv1alpha1.ClusterComponentStatus{
 					consensusCompName: {
 						Phase: appsv1alpha1.RunningPhase,
 					},

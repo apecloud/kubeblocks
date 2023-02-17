@@ -53,7 +53,7 @@ type ClusterSpec struct {
 	// +patchStrategy=merge,retainKeys
 	// +listType=map
 	// +listMapKey=name
-	ComponentSpecs []ClusterComponent `json:"componentSpecs,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
+	ComponentSpecs []ClusterComponentSpec `json:"componentSpecs,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
 
 	// affinity describes affinities which specific by users.
 	// +optional
@@ -98,7 +98,7 @@ type ClusterStatus struct {
 
 	// components record the current status information of all components of the cluster.
 	// +optional
-	Components map[string]ClusterStatusComponent `json:"components,omitempty"`
+	Components map[string]ClusterComponentStatus `json:"components,omitempty"`
 
 	// operations declare what operations the cluster supports.
 	// +optional
@@ -113,7 +113,7 @@ type ClusterStatus struct {
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
 }
 
-type ClusterComponent struct {
+type ClusterComponentSpec struct {
 	// name defines cluster's component name.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=12
@@ -185,7 +185,7 @@ type ClusterComponent struct {
 	// +optional
 	ServiceType corev1.ServiceType `json:"serviceType,omitempty"`
 
-	// primaryIndex determines which index is primary when componentType is Replication, index number starts from zero.
+	// primaryIndex determines which index is primary when workloadType is Replication, index number starts from zero.
 	// +kubebuilder:validation:Minimum=0
 	// +optional
 	PrimaryIndex *int32 `json:"primaryIndex,omitempty"`
@@ -193,8 +193,8 @@ type ClusterComponent struct {
 
 type ComponentMessageMap map[string]string
 
-// ClusterStatusComponent record components status information
-type ClusterStatusComponent struct {
+// ClusterComponentStatus record components status information
+type ClusterComponentStatus struct {
 	// phase describes the phase of the Cluster. the detail information of phase is as follows:
 	// Failed: component is unavailable, i.e, all pods are not ready for Stateless/Stateful component;
 	// Leader/Primary pod is not ready for Consensus/Replication component.
@@ -394,7 +394,7 @@ func (r *Cluster) ValidateEnabledLogs(cd *ClusterDefinition) error {
 	return nil
 }
 
-// ValidatePrimaryIndex validates primaryIndex in cluster API yaml. When componentType is Replication,
+// ValidatePrimaryIndex validates primaryIndex in cluster API yaml. When workloadType is Replication,
 // checks that primaryIndex cannot be nil, and when the replicas of the component in the cluster API is empty,
 // checks that the value of primaryIndex cannot be greater than the defaultReplicas in the clusterDefinition API.
 func (r *Cluster) ValidatePrimaryIndex(cd *ClusterDefinition) error {
@@ -408,7 +408,7 @@ func (r *Cluster) ValidatePrimaryIndex(cd *ClusterDefinition) error {
 				continue
 			}
 			if comp.PrimaryIndex == nil {
-				message = append(message, fmt.Sprintf("component %s's PrimaryIndex cannot be nil when componentType is Replication.", comp.ComponentDefRef))
+				message = append(message, fmt.Sprintf("component %s's PrimaryIndex cannot be nil when workloadType is Replication.", comp.ComponentDefRef))
 				return errors.New(strings.Join(message, ";"))
 			}
 			// when comp.Replicas and comp.PrimaryIndex are not nil, it will be verified in cluster_webhook, skip here
@@ -421,8 +421,8 @@ func (r *Cluster) ValidatePrimaryIndex(cd *ClusterDefinition) error {
 }
 
 // GetTypeMappingComponents return ComponentDefRef name mapping ClusterComponents.
-func (r *Cluster) GetTypeMappingComponents() map[string][]ClusterComponent {
-	m := map[string][]ClusterComponent{}
+func (r *Cluster) GetTypeMappingComponents() map[string][]ClusterComponentSpec {
+	m := map[string][]ClusterComponentSpec{}
 	for _, c := range r.Spec.ComponentSpecs {
 		v := m[c.ComponentDefRef]
 		v = append(v, c)
@@ -432,7 +432,7 @@ func (r *Cluster) GetTypeMappingComponents() map[string][]ClusterComponent {
 }
 
 // GetMessage get message map deep copy object
-func (in *ClusterStatusComponent) GetMessage() ComponentMessageMap {
+func (in *ClusterComponentStatus) GetMessage() ComponentMessageMap {
 	messageMap := map[string]string{}
 	for k, v := range in.Message {
 		messageMap[k] = v
@@ -441,7 +441,7 @@ func (in *ClusterStatusComponent) GetMessage() ComponentMessageMap {
 }
 
 // SetMessage override message map object
-func (in *ClusterStatusComponent) SetMessage(messageMap ComponentMessageMap) {
+func (in *ClusterComponentStatus) SetMessage(messageMap ComponentMessageMap) {
 	in.Message = messageMap
 }
 
@@ -458,7 +458,7 @@ func (m ComponentMessageMap) SetObjectMessage(objectKind, objectName, message st
 }
 
 // GetComponentByName gets component by name.
-func (r *Cluster) GetComponentByName(componentName string) *ClusterComponent {
+func (r *Cluster) GetComponentByName(componentName string) *ClusterComponentSpec {
 	for _, v := range r.Spec.ComponentSpecs {
 		if v.Name == componentName {
 			return &v
@@ -467,8 +467,8 @@ func (r *Cluster) GetComponentByName(componentName string) *ClusterComponent {
 	return nil
 }
 
-// GetComponentTypeName gets component type name
-func (r *Cluster) GetComponentTypeName(componentName string) string {
+// GetComponentDefRefName gets component type name
+func (r *Cluster) GetComponentDefRefName(componentName string) string {
 	for _, component := range r.Spec.ComponentSpecs {
 		if componentName == component.Name {
 			return component.ComponentDefRef

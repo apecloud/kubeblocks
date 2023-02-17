@@ -33,7 +33,7 @@ func NewClusterFactory(namespace, name, cdRef, cvRef string) *MockClusterFactory
 			Spec: appsv1alpha1.ClusterSpec{
 				ClusterDefRef:     cdRef,
 				ClusterVersionRef: cvRef,
-				ComponentSpecs:    []appsv1alpha1.ClusterComponent{},
+				ComponentSpecs:    []appsv1alpha1.ClusterComponentSpec{},
 				TerminationPolicy: appsv1alpha1.WipeOut,
 			},
 		}, f)
@@ -56,7 +56,7 @@ func (factory *MockClusterFactory) AddClusterToleration(toleration corev1.Tolera
 }
 
 func (factory *MockClusterFactory) AddComponent(compName string, compType string) *MockClusterFactory {
-	comp := appsv1alpha1.ClusterComponent{
+	comp := appsv1alpha1.ClusterComponentSpec{
 		Name:            compName,
 		ComponentDefRef: compType,
 	}

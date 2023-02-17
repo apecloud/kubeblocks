@@ -75,7 +75,7 @@ var _ = Describe("Stateful Component", func() {
 				AddComponent(statelessCompName, statelessCompType).SetReplicas(2).Create(&testCtx).GetObject()
 			deploy := testapps.MockStatelessComponentDeploy(testCtx, clusterName, statelessCompName)
 			clusterComponent := cluster.GetComponentByName(statelessCompName)
-			componentDef := clusterDef.GetComponentDefByTypeName(clusterComponent.ComponentDefRef)
+			componentDef := clusterDef.GetComponentDefByName(clusterComponent.ComponentDefRef)
 			statelessComponent := NewStateless(ctx, k8sClient, cluster, clusterComponent, componentDef)
 
 			By("test pods are not ready")

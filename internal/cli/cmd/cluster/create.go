@@ -436,7 +436,7 @@ func buildClusterComp(cd *appsv1alpha1.ClusterDefinition, setsMap map[string]map
 			corev1.ResourceCPU:    resource.MustParse(getVal(keyCPU, sets)),
 			corev1.ResourceMemory: resource.MustParse(getVal(keyMemory, sets)),
 		}
-		compObj := &appsv1alpha1.ClusterComponent{
+		compObj := &appsv1alpha1.ClusterComponentSpec{
 			Name:            c.Name,
 			ComponentDefRef: c.Name,
 			Replicas:        &replicas,
@@ -507,26 +507,26 @@ func buildCompSetsMap(values []string, cd *appsv1alpha1.ClusterDefinition) (map[
 		}
 
 		// get the component type name
-		typeName := sets[keyType]
+		compDefName := sets[keyType]
 
 		// type is not specified by user, use the default component type name, now only
 		// support cluster definition with one component
-		if len(typeName) == 0 {
-			name, err := cluster.GetDefaultCompTypeName(cd)
+		if len(compDefName) == 0 {
+			name, err := cluster.GetDefaultCompName(cd)
 			if err != nil {
 				return nil, err
 			}
-			typeName = name
+			compDefName = name
 		}
 
 		// if already set by other value, later values override earlier values
-		if old, ok := allSets[typeName]; ok {
+		if old, ok := allSets[compDefName]; ok {
 			for k, v := range sets {
 				old[k] = v
 			}
 			sets = old
 		}
-		allSets[typeName] = sets
+		allSets[compDefName] = sets
 	}
 	return allSets, nil
 }

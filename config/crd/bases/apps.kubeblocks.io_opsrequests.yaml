@@ -310,10 +310,6 @@ spec:
               components:
                 additionalProperties:
                   properties:
-                    componentType:
-                      description: componentType references component type of component
-                        in ClusterDefinition.
-                      type: string
                     phase:
                       description: phase describes the component phase, reference
                         Cluster.status.component.phase.
@@ -376,6 +372,10 @@ spec:
                       type: array
                     type:
                       description: type name of the component.
+                      type: string
+                    workloadType:
+                      description: workloadType references component type of component
+                        in ClusterDefinition.
                       type: string
                   type: object
                 description: components defines the recorded the status information

@@ -94,9 +94,9 @@ type reconfigureParams struct {
 	Cluster *appsv1alpha1.Cluster
 
 	// Associated component for cluster.
-	ClusterComponent *appsv1alpha1.ClusterComponent
+	ClusterComponent *appsv1alpha1.ClusterComponentSpec
 	// Associated component for clusterdefinition.
-	Component *appsv1alpha1.ClusterDefinitionComponent
+	Component *appsv1alpha1.ClusterComponentDefinition
 
 	// List of StatefulSet, using this config template.
 	ComponentUnits []appv1.StatefulSet

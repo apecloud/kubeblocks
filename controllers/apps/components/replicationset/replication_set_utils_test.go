@@ -137,7 +137,7 @@ var _ = Describe("ReplicationSet Util", func() {
 		By("init replicationSet cluster status")
 		patch := client.MergeFrom(clusterObj.DeepCopy())
 		clusterObj.Status.Phase = appsv1alpha1.RunningPhase
-		clusterObj.Status.Components = map[string]appsv1alpha1.ClusterStatusComponent{
+		clusterObj.Status.Components = map[string]appsv1alpha1.ClusterComponentStatus{
 			testapps.DefaultRedisCompName: {
 				Phase: appsv1alpha1.RunningPhase,
 				ReplicationSetStatus: &appsv1alpha1.ReplicationSetStatus{

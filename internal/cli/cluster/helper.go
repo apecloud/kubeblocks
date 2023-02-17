@@ -131,9 +131,9 @@ func GetAllCluster(client dynamic.Interface, namespace string, clusters *appsv1a
 }
 
 // FindClusterComp finds component in cluster object based on the component type name
-func FindClusterComp(cluster *appsv1alpha1.Cluster, typeName string) *appsv1alpha1.ClusterComponent {
+func FindClusterComp(cluster *appsv1alpha1.Cluster, compDefName string) *appsv1alpha1.ClusterComponentSpec {
 	for i, c := range cluster.Spec.ComponentSpecs {
-		if c.ComponentDefRef == typeName {
+		if c.ComponentDefRef == compDefName {
 			return &cluster.Spec.ComponentSpecs[i]
 		}
 	}
@@ -141,7 +141,7 @@ func FindClusterComp(cluster *appsv1alpha1.Cluster, typeName string) *appsv1alph
 }
 
 // GetComponentEndpoints gets component internal and external endpoints
-func GetComponentEndpoints(svcList *corev1.ServiceList, c *appsv1alpha1.ClusterComponent) ([]string, []string) {
+func GetComponentEndpoints(svcList *corev1.ServiceList, c *appsv1alpha1.ClusterComponentSpec) ([]string, []string) {
 	var (
 		internalEndpoints []string
 		externalEndpoints []string
@@ -168,7 +168,7 @@ func GetComponentEndpoints(svcList *corev1.ServiceList, c *appsv1alpha1.ClusterC
 }
 
 // GetComponentServices gets component services
-func GetComponentServices(svcList *corev1.ServiceList, c *appsv1alpha1.ClusterComponent) ([]*corev1.Service, []*corev1.Service) {
+func GetComponentServices(svcList *corev1.ServiceList, c *appsv1alpha1.ClusterComponentSpec) ([]*corev1.Service, []*corev1.Service) {
 	if svcList == nil {
 		return nil, nil
 	}
@@ -214,7 +214,7 @@ func GetClusterDefByName(dynamic dynamic.Interface, name string) (*appsv1alpha1.
 	return clusterDef, nil
 }
 
-func GetDefaultCompTypeName(cd *appsv1alpha1.ClusterDefinition) (string, error) {
+func GetDefaultCompName(cd *appsv1alpha1.ClusterDefinition) (string, error) {
 	if len(cd.Spec.ComponentDefs) == 1 {
 		return cd.Spec.ComponentDefs[0].Name, nil
 	}

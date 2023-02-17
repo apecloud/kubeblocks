@@ -34,8 +34,8 @@ type ConsensusSet struct {
 	Cli          client.Client
 	Ctx          context.Context
 	Cluster      *appsv1alpha1.Cluster
-	ComponentDef *appsv1alpha1.ClusterDefinitionComponent
-	Component    *appsv1alpha1.ClusterComponent
+	ComponentDef *appsv1alpha1.ClusterComponentDefinition
+	Component    *appsv1alpha1.ClusterComponentSpec
 }
 
 var _ types.Component = &ConsensusSet{}
@@ -73,7 +73,7 @@ func (consensusSet *ConsensusSet) PodIsAvailable(pod *corev1.Pod, minReadySecond
 
 func (consensusSet *ConsensusSet) HandleProbeTimeoutWhenPodsReady(recorder record.EventRecorder) (bool, error) {
 	var (
-		statusComponent appsv1alpha1.ClusterStatusComponent
+		statusComponent appsv1alpha1.ClusterComponentStatus
 		ok              bool
 		cluster         = consensusSet.Cluster
 		componentName   = consensusSet.Component.Name
@@ -187,8 +187,8 @@ func (consensusSet *ConsensusSet) GetPhaseWhenPodsNotReady(componentName string)
 func NewConsensusSet(ctx context.Context,
 	cli client.Client,
 	cluster *appsv1alpha1.Cluster,
-	component *appsv1alpha1.ClusterComponent,
-	componentDef *appsv1alpha1.ClusterDefinitionComponent) types.Component {
+	component *appsv1alpha1.ClusterComponentSpec,
+	componentDef *appsv1alpha1.ClusterComponentDefinition) types.Component {
 	if component == nil || componentDef == nil {
 		return nil
 	}

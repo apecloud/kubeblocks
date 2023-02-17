@@ -51,7 +51,7 @@ func TestInitClusterComponentStatusIfNeed(t *testing.T) {
 	componentName := "foo"
 	cluster := &appsv1alpha1.Cluster{
 		Spec: appsv1alpha1.ClusterSpec{
-			ComponentSpecs: []appsv1alpha1.ClusterComponent{
+			ComponentSpecs: []appsv1alpha1.ClusterComponentSpec{
 				{
 					Name:            componentName,
 					ComponentDefRef: componentName,
@@ -59,7 +59,7 @@ func TestInitClusterComponentStatusIfNeed(t *testing.T) {
 			},
 		},
 	}
-	component := &appsv1alpha1.ClusterDefinitionComponent{
+	component := &appsv1alpha1.ClusterComponentDefinition{
 		WorkloadType: appsv1alpha1.Consensus,
 	}
 	util.InitClusterComponentStatusIfNeed(cluster, componentName, component)

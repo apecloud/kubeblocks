@@ -51,8 +51,8 @@ func HandleReplicationSet(ctx context.Context,
 	stsList []*appsv1.StatefulSet) error {
 
 	filter := func(stsObj *appsv1.StatefulSet) (bool, error) {
-		typeName := cluster.GetComponentTypeName(stsObj.Labels[intctrlutil.AppComponentLabelKey])
-		component, err := util.GetComponentDefByCluster(ctx, cli, cluster, typeName)
+		compDefName := cluster.GetComponentDefRefName(stsObj.Labels[intctrlutil.AppComponentLabelKey])
+		component, err := util.GetComponentDefByCluster(ctx, cli, cluster, compDefName)
 		if err != nil {
 			return false, err
 		}

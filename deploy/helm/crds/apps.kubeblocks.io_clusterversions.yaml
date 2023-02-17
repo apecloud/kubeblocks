@@ -56,13 +56,15 @@ spec:
                 pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                 type: string
               componentVersions:
-                description: List of componentVersions in current ClusterVersion.
+                description: List of components' containers versioning context, i.e.,
+                  container image ID, container commands, args., and environments.
                 items:
-                  description: ClusterVersionComponent is an application version component
+                  description: ClusterComponentVersion is an application version component
                     spec.
                   properties:
                     componentDefRef:
-                      description: ComponentDefRef reference componentDef in ClusterDefinition.
+                      description: componentDefRef reference one of the cluster component
+                        definition names in ClusterDefinition API (spec.componentDefs.name).
                       maxLength: 12
                       pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                       type: string

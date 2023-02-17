@@ -102,7 +102,7 @@ func (r *ClusterVersion) validate() error {
 
 		if len(notFoundComponentTypes) > 0 {
 			allErrs = append(allErrs, field.NotFound(field.NewPath("spec.components[*].type"),
-				getComponentTypeNotFoundMsg(notFoundComponentTypes, r.Spec.ClusterDefinitionRef)))
+				getComponentDefNotFoundMsg(notFoundComponentTypes, r.Spec.ClusterDefinitionRef)))
 		}
 
 		if len(noContainersComponents) > 0 {
@@ -166,8 +166,8 @@ func (r *ClusterVersion) GetInconsistentComponentsInfo(clusterDef *ClusterDefini
 	return notFoundComponentType, noContainersComponent
 }
 
-func getComponentTypeNotFoundMsg(invalidComponentTypes []string, clusterDefName string) string {
-	return fmt.Sprintf(" %v is not found in ClusterDefinition.spec.components[*].typeName %s",
+func getComponentDefNotFoundMsg(invalidComponentTypes []string, clusterDefName string) string {
+	return fmt.Sprintf(" %v is not found in ClusterDefinition.spec.componentDefs[*].name %s",
 		invalidComponentTypes, clusterDefName)
 }
 

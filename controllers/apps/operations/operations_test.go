@@ -99,7 +99,7 @@ var _ = Describe("OpsRequest Controller", func() {
 		return cfgCM, cfgTpl
 	}
 
-	assureConfigInstanceObj := func(clusterName, componentName, ns string, cdComponent *appsv1alpha1.ClusterDefinitionComponent) *corev1.ConfigMap {
+	assureConfigInstanceObj := func(clusterName, componentName, ns string, cdComponent *appsv1alpha1.ClusterComponentDefinition) *corev1.ConfigMap {
 		if cdComponent.ConfigSpec == nil {
 			return nil
 		}
@@ -315,7 +315,7 @@ var _ = Describe("OpsRequest Controller", func() {
 
 		By("Test OpsManager.Reconcile when opsRequest is succeed")
 		opsRes.OpsRequest.Status.Phase = appsv1alpha1.SucceedPhase
-		opsRes.Cluster.Status.Components = map[string]appsv1alpha1.ClusterStatusComponent{
+		opsRes.Cluster.Status.Components = map[string]appsv1alpha1.ClusterComponentStatus{
 			consensusComp: {
 				Phase: appsv1alpha1.RunningPhase,
 			},
@@ -350,7 +350,7 @@ var _ = Describe("OpsRequest Controller", func() {
 		clusterDefObj *appsv1alpha1.ClusterDefinition) {
 		var (
 			cfgObj       *corev1.ConfigMap
-			stsComponent *appsv1alpha1.ClusterDefinitionComponent
+			stsComponent *appsv1alpha1.ClusterComponentDefinition
 		)
 
 		By("Test Reconfigure")
@@ -468,7 +468,7 @@ var _ = Describe("OpsRequest Controller", func() {
 			By("mock cluster is Running and the status operations")
 			Expect(testapps.ChangeObjStatus(&testCtx, clusterObject, func() {
 				clusterObject.Status.Phase = appsv1alpha1.RunningPhase
-				clusterObject.Status.Components = map[string]appsv1alpha1.ClusterStatusComponent{
+				clusterObject.Status.Components = map[string]appsv1alpha1.ClusterComponentStatus{
 					consensusComp: {
 						Phase: appsv1alpha1.RunningPhase,
 					},

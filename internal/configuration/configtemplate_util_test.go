@@ -139,7 +139,7 @@ func TestGetConfigTemplatesFromComponent(t *testing.T) {
 	var (
 		comName     = "replicats_name"
 		comType     = "replicats"
-		cComponents = []appsv1alpha1.ClusterComponent{{
+		cComponents = []appsv1alpha1.ClusterComponentSpec{{
 			Name:            comName,
 			ComponentDefRef: comType,
 		}}
@@ -156,9 +156,9 @@ func TestGetConfigTemplatesFromComponent(t *testing.T) {
 	)
 
 	type args struct {
-		cComponents []appsv1alpha1.ClusterComponent
-		dComponents []appsv1alpha1.ClusterDefinitionComponent
-		aComponents []appsv1alpha1.ClusterVersionComponent
+		cComponents []appsv1alpha1.ClusterComponentSpec
+		dComponents []appsv1alpha1.ClusterComponentDefinition
+		aComponents []appsv1alpha1.ClusterComponentVersion
 		comName     string
 	}
 	tests := []struct {
@@ -171,13 +171,13 @@ func TestGetConfigTemplatesFromComponent(t *testing.T) {
 		args: args{
 			comName:     comName,
 			cComponents: cComponents,
-			dComponents: []appsv1alpha1.ClusterDefinitionComponent{{
+			dComponents: []appsv1alpha1.ClusterComponentDefinition{{
 				Name: comType,
 				ConfigSpec: &appsv1alpha1.ConfigurationSpec{
 					ConfigTemplateRefs: []appsv1alpha1.ConfigTemplate{tpl1},
 				},
 			}},
-			aComponents: []appsv1alpha1.ClusterVersionComponent{{
+			aComponents: []appsv1alpha1.ClusterComponentVersion{{
 				ComponentDefRef:    comType,
 				ConfigTemplateRefs: []appsv1alpha1.ConfigTemplate{tpl2},
 			}},
@@ -192,13 +192,13 @@ func TestGetConfigTemplatesFromComponent(t *testing.T) {
 		args: args{
 			comName:     "not exist component",
 			cComponents: cComponents,
-			dComponents: []appsv1alpha1.ClusterDefinitionComponent{{
+			dComponents: []appsv1alpha1.ClusterComponentDefinition{{
 				Name: comType,
 				ConfigSpec: &appsv1alpha1.ConfigurationSpec{
 					ConfigTemplateRefs: []appsv1alpha1.ConfigTemplate{tpl1},
 				},
 			}},
-			aComponents: []appsv1alpha1.ClusterVersionComponent{{
+			aComponents: []appsv1alpha1.ClusterComponentVersion{{
 				ComponentDefRef:    comType,
 				ConfigTemplateRefs: []appsv1alpha1.ConfigTemplate{tpl2},
 			}},
@@ -210,13 +210,13 @@ func TestGetConfigTemplatesFromComponent(t *testing.T) {
 		args: args{
 			comName:     comName,
 			cComponents: cComponents,
-			dComponents: []appsv1alpha1.ClusterDefinitionComponent{{
+			dComponents: []appsv1alpha1.ClusterComponentDefinition{{
 				Name: comType,
 				ConfigSpec: &appsv1alpha1.ConfigurationSpec{
 					ConfigTemplateRefs: []appsv1alpha1.ConfigTemplate{tpl1},
 				},
 			}},
-			aComponents: []appsv1alpha1.ClusterVersionComponent{{
+			aComponents: []appsv1alpha1.ClusterComponentVersion{{
 				ComponentDefRef:    "not exist",
 				ConfigTemplateRefs: []appsv1alpha1.ConfigTemplate{tpl2},
 			},

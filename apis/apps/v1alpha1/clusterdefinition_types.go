@@ -27,14 +27,14 @@ import (
 // ClusterDefinitionSpec defines the desired state of ClusterDefinition
 type ClusterDefinitionSpec struct {
 
-	// List of components belonging to the cluster.
+	// componentDefs provides cluster components definitions.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MinItems=1
 	// +patchMergeKey=name
 	// +patchStrategy=merge,retainKeys
 	// +listType=map
 	// +listMapKey=name
-	ComponentDefs []ClusterDefinitionComponent `json:"componentDefs" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
+	ComponentDefs []ClusterComponentDefinition `json:"componentDefs" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
 
 	// Default connection credential used for connecting to cluster service.
 	// +optional
@@ -265,8 +265,10 @@ type ConfigurationSpec struct {
 	ConfigTemplateRefs []ConfigTemplate `json:"configTemplateRefs,omitempty"`
 }
 
-// ClusterDefinitionComponent is a group of pods, pods belong to same component usually share the same data
-type ClusterDefinitionComponent struct {
+// ClusterComponentDefinition provides a workload component specification template,
+// with attributes that strongly work with stateful workloads and day-2 operations
+// behaviors.
+type ClusterComponentDefinition struct {
 	// Name of the component, it can be any valid string.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=12
@@ -471,7 +473,7 @@ type ConsensusMember struct {
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
 //+kubebuilder:resource:categories={kubeblocks},scope=Cluster,shortName=cd
-//+kubebuilder:printcolumn:name="MAIN-COMPONENT-TYPE",type="string",JSONPath=".spec.components[0].typeName",description="main component types"
+//+kubebuilder:printcolumn:name="MAIN-COMPONENT-TYPE",type="string",JSONPath=".spec.componentDefs[0].name",description="main component types"
 //+kubebuilder:printcolumn:name="STATUS",type="string",JSONPath=".status.phase",description="status phase"
 //+kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
 
@@ -497,12 +499,12 @@ func init() {
 	SchemeBuilder.Register(&ClusterDefinition{}, &ClusterDefinitionList{})
 }
 
-// ValidateEnabledLogConfigs validates enabledLogs against component typeName, and returns the invalid logNames undefined in ClusterDefinition.
-func (r *ClusterDefinition) ValidateEnabledLogConfigs(typeName string, enabledLogs []string) []string {
+// ValidateEnabledLogConfigs validates enabledLogs against component compDefName, and returns the invalid logNames undefined in ClusterDefinition.
+func (r *ClusterDefinition) ValidateEnabledLogConfigs(compDefName string, enabledLogs []string) []string {
 	invalidLogNames := make([]string, 0, len(enabledLogs))
 	logTypes := make(map[string]struct{})
 	for _, comp := range r.Spec.ComponentDefs {
-		if !strings.EqualFold(typeName, comp.Name) {
+		if !strings.EqualFold(compDefName, comp.Name) {
 			continue
 		}
 		for _, logConfig := range comp.LogConfigs {
@@ -521,10 +523,10 @@ func (r *ClusterDefinition) ValidateEnabledLogConfigs(typeName string, enabledLo
 	return invalidLogNames
 }
 
-// GetComponentDefByTypeName gets component definition from ClusterDefinition with typeName
-func (r *ClusterDefinition) GetComponentDefByTypeName(typeName string) *ClusterDefinitionComponent {
+// GetComponentDefByName gets component definition from ClusterDefinition with compDefName
+func (r *ClusterDefinition) GetComponentDefByName(compDefName string) *ClusterComponentDefinition {
 	for _, component := range r.Spec.ComponentDefs {
-		if component.Name == typeName {
+		if component.Name == compDefName {
 			return &component
 		}
 	}

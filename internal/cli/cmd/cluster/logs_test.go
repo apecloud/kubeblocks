@@ -160,7 +160,7 @@ var _ = Describe("logs", func() {
 		// normal case
 		obj.Cluster = &appsv1alpha1.Cluster{
 			Spec: appsv1alpha1.ClusterSpec{
-				ComponentSpecs: []appsv1alpha1.ClusterComponent{
+				ComponentSpecs: []appsv1alpha1.ClusterComponentSpec{
 					{
 						Name:            "component-name",
 						ComponentDefRef: "component-type",
@@ -170,7 +170,7 @@ var _ = Describe("logs", func() {
 		}
 		obj.ClusterDef = &appsv1alpha1.ClusterDefinition{
 			Spec: appsv1alpha1.ClusterDefinitionSpec{
-				ComponentDefs: []appsv1alpha1.ClusterDefinitionComponent{
+				ComponentDefs: []appsv1alpha1.ClusterComponentDefinition{
 					{
 						Name: "component-type",
 						LogConfigs: []appsv1alpha1.LogConfig{

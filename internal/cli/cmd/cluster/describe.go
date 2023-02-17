@@ -30,7 +30,7 @@ import (
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
 
-	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/cluster"
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
@@ -160,11 +160,10 @@ func (o *describeOptions) describeCluster(name string) error {
 	return nil
 }
 
-func showCluster(c *dbaasv1alpha1.Cluster, out io.Writer) {
+func showCluster(c *appsv1alpha1.Cluster, out io.Writer) {
 	if c == nil {
 		return
 	}
-
 	title := fmt.Sprintf("Name: %s\t Created Time: %s", c.Name, util.TimeFormat(&c.CreationTimestamp))
 	tbl := newTbl(out, title, "NAMESPACE", "CLUSTER-DEFINITION", "VERSION", "STATUS", "TERMINATION-POLICY")
 	tbl.AddRow(c.Namespace, c.Spec.ClusterDefRef, c.Spec.ClusterVersionRef, string(c.Status.Phase), string(c.Spec.TerminationPolicy))
@@ -213,13 +212,13 @@ func showEvents(events *corev1.EventList, name string, namespace string, out io.
 	tbl.Print()
 }
 
-func showEndpoints(c *dbaasv1alpha1.Cluster, svcList *corev1.ServiceList, out io.Writer) {
+func showEndpoints(c *appsv1alpha1.Cluster, svcList *corev1.ServiceList, out io.Writer) {
 	if c == nil {
 		return
 	}
 
 	tbl := newTbl(out, "\nEndpoints:", "COMPONENT", "MODE", "INTERNAL", "EXTERNAL")
-	for _, comp := range c.Spec.Components {
+	for _, comp := range c.Spec.ComponentSpecs {
 		internalEndpoints, externalEndpoints := cluster.GetComponentEndpoints(svcList, &comp)
 		if len(internalEndpoints) == 0 && len(externalEndpoints) == 0 {
 			continue

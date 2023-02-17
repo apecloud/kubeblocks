@@ -32,7 +32,7 @@ type BackupPolicySpec struct {
 	// +optional
 	Schedule string `json:"schedule,omitempty"`
 
-	// Backup Type. full or incremental or snapshot. if unset, default is snapshot.
+	// Backup ComponentDefRef. full or incremental or snapshot. if unset, default is snapshot.
 	// +kubebuilder:validation:Enum={full,incremental,snapshot}
 	// +kubebuilder:default=snapshot
 	// +optional

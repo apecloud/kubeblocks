@@ -92,6 +92,6 @@ Get the postgres-password key.
 {{- if .Release.IsInstall -}}
 {{ .Values.auth.postgresPassword | default (randAlphaNum 10) }}
 {{- else -}}
-{{ index (lookup "dbaas.kubeblocks.io/v1alpha1" "ClusterDefinition" "" "apecloud-postgresql").spec.connectionCredential "postgres-password"}}
+{{ index (lookup "apps.kubeblocks.io/v1alpha1" "ClusterDefinition" "" "apecloud-postgresql").spec.connectionCredential "postgres-password"}}
 {{- end }}
 {{- end }}

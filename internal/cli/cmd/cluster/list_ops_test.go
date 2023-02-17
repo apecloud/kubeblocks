@@ -28,7 +28,7 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 
-	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/list"
 	clitesting "github.com/apecloud/kubeblocks/internal/cli/testing"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
@@ -58,40 +58,40 @@ var _ = Describe("Expose", func() {
 		tf.Cleanup()
 	})
 
-	generateOpsObject := func(opsType dbaasv1alpha1.OpsType, phase dbaasv1alpha1.Phase) *dbaasv1alpha1.OpsRequest {
-		return &dbaasv1alpha1.OpsRequest{
+	generateOpsObject := func(opsType appsv1alpha1.OpsType, phase appsv1alpha1.Phase) *appsv1alpha1.OpsRequest {
+		return &appsv1alpha1.OpsRequest{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "list-ops-" + clitesting.GetRandomStr(),
 				Namespace: namespace,
 			},
-			Spec: dbaasv1alpha1.OpsRequestSpec{
+			Spec: appsv1alpha1.OpsRequestSpec{
 				ClusterRef: "test-cluster",
 				Type:       opsType,
 			},
-			Status: dbaasv1alpha1.OpsRequestStatus{
+			Status: appsv1alpha1.OpsRequestStatus{
 				Phase: phase,
 			},
 		}
 	}
 
 	initOpsRequests := func() {
-		opsTypes := []dbaasv1alpha1.OpsType{
-			dbaasv1alpha1.UpgradeType,
-			dbaasv1alpha1.HorizontalScalingType,
-			dbaasv1alpha1.HorizontalScalingType,
-			dbaasv1alpha1.RestartType,
-			dbaasv1alpha1.VerticalScalingType,
-			dbaasv1alpha1.VerticalScalingType,
-			dbaasv1alpha1.VerticalScalingType,
+		opsTypes := []appsv1alpha1.OpsType{
+			appsv1alpha1.UpgradeType,
+			appsv1alpha1.HorizontalScalingType,
+			appsv1alpha1.HorizontalScalingType,
+			appsv1alpha1.RestartType,
+			appsv1alpha1.VerticalScalingType,
+			appsv1alpha1.VerticalScalingType,
+			appsv1alpha1.VerticalScalingType,
 		}
-		phases := []dbaasv1alpha1.Phase{
-			dbaasv1alpha1.PendingPhase,
-			dbaasv1alpha1.FailedPhase,
-			dbaasv1alpha1.SucceedPhase,
-			dbaasv1alpha1.SucceedPhase,
-			dbaasv1alpha1.RunningPhase,
-			dbaasv1alpha1.FailedPhase,
-			dbaasv1alpha1.RunningPhase,
+		phases := []appsv1alpha1.Phase{
+			appsv1alpha1.PendingPhase,
+			appsv1alpha1.FailedPhase,
+			appsv1alpha1.SucceedPhase,
+			appsv1alpha1.SucceedPhase,
+			appsv1alpha1.RunningPhase,
+			appsv1alpha1.FailedPhase,
+			appsv1alpha1.RunningPhase,
 		}
 		opsList := make([]runtime.Object, len(opsTypes))
 		for i := range opsTypes {
@@ -147,12 +147,12 @@ var _ = Describe("Expose", func() {
 		Expect(getStdoutLinesCount(o.Out)).Should(Equal(3))
 
 		By("test type flag")
-		o = initOpsOption([]string{all}, []string{string(dbaasv1alpha1.RestartType)})
+		o = initOpsOption([]string{all}, []string{string(appsv1alpha1.RestartType)})
 		Expect(o.printOpsList()).Should(Succeed())
 		// title + filter ops
 		Expect(getStdoutLinesCount(o.Out)).Should(Equal(2))
 
-		o = initOpsOption([]string{all}, []string{string(dbaasv1alpha1.RestartType), string(dbaasv1alpha1.VerticalScalingType)})
+		o = initOpsOption([]string{all}, []string{string(appsv1alpha1.RestartType), string(appsv1alpha1.VerticalScalingType)})
 		Expect(o.printOpsList()).Should(Succeed())
 		// title + filter ops
 		Expect(getStdoutLinesCount(o.Out)).Should(Equal(5))

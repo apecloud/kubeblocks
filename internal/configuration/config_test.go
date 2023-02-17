@@ -25,7 +25,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 )
 
 var iniConfig = `
@@ -65,7 +65,7 @@ func TestRawConfig(t *testing.T) {
 	cfg, err := NewConfigLoader(CfgOption{
 		Type:    CfgRawType,
 		Log:     log.FromContext(context.Background()),
-		CfgType: dbaasv1alpha1.INI,
+		CfgType: appsv1alpha1.INI,
 		RawData: []byte(iniConfig),
 	})
 
@@ -128,7 +128,7 @@ func TestConfigMapConfig(t *testing.T) {
 	cfg, err := NewConfigLoader(CfgOption{
 		Type:    CfgCmType,
 		Log:     log.FromContext(context.Background()),
-		CfgType: dbaasv1alpha1.INI,
+		CfgType: appsv1alpha1.INI,
 		K8sKey: &K8sConfig{
 			CfgKey: client.ObjectKey{
 				Name:      "xxxx",    // set cm name

@@ -37,7 +37,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
@@ -59,7 +59,7 @@ type reconfigureOptions struct {
 	keys       []string
 	showDetail bool
 	// for cache
-	tpls []dbaasv1alpha1.ConfigTemplate
+	tpls []appsv1alpha1.ConfigTemplate
 }
 
 type opsRequestDiffOptions struct {
@@ -68,8 +68,8 @@ type opsRequestDiffOptions struct {
 	clusterName   string
 	componentName string
 	templateNames []string
-	baseVersion   *dbaasv1alpha1.OpsRequest
-	diffVersion   *dbaasv1alpha1.OpsRequest
+	baseVersion   *appsv1alpha1.OpsRequest
+	diffVersion   *appsv1alpha1.OpsRequest
 }
 
 type parameterTemplate struct {
@@ -144,7 +144,7 @@ func (r *reconfigureOptions) validate() error {
 	return nil
 }
 
-func (r *reconfigureOptions) findTemplateByName(tplName string) (*dbaasv1alpha1.ConfigTemplate, error) {
+func (r *reconfigureOptions) findTemplateByName(tplName string) (*appsv1alpha1.ConfigTemplate, error) {
 	if err := r.syncComponentCfgTpl(); err != nil {
 		return nil, err
 	}
@@ -263,7 +263,7 @@ func (r *reconfigureOptions) printExplainConfigure(tplName string) error {
 	if len(tpl.ConfigConstraintRef) == 0 {
 		return nil
 	}
-	configConstraint := dbaasv1alpha1.ConfigConstraint{}
+	configConstraint := appsv1alpha1.ConfigConstraint{}
 	if err := util.GetResourceObjectFromGVR(types.ConfigConstraintGVR(), client.ObjectKey{
 		Namespace: "",
 		Name:      tpl.ConfigConstraintRef,
@@ -283,8 +283,8 @@ func (r *reconfigureOptions) printExplainConfigure(tplName string) error {
 	return r.printConfigConstraint(schema.Schema, set.NewLinkedHashSetString(confSpec.StaticParameters...), set.NewLinkedHashSetString(confSpec.DynamicParameters...))
 }
 
-func (r *reconfigureOptions) getReconfigureMeta() (map[dbaasv1alpha1.ConfigTemplate]*corev1.ConfigMap, error) {
-	configs := make(map[dbaasv1alpha1.ConfigTemplate]*corev1.ConfigMap)
+func (r *reconfigureOptions) getReconfigureMeta() (map[appsv1alpha1.ConfigTemplate]*corev1.ConfigMap, error) {
+	configs := make(map[appsv1alpha1.ConfigTemplate]*corev1.ConfigMap)
 	for _, tplName := range r.templateNames {
 		// checked by validate
 		tpl, _ := r.findTemplateByName(tplName)
@@ -302,7 +302,7 @@ func (r *reconfigureOptions) getReconfigureMeta() (map[dbaasv1alpha1.ConfigTempl
 	return configs, nil
 }
 
-func (r *reconfigureOptions) printConfigureContext(configs map[dbaasv1alpha1.ConfigTemplate]*corev1.ConfigMap) {
+func (r *reconfigureOptions) printConfigureContext(configs map[appsv1alpha1.ConfigTemplate]*corev1.ConfigMap) {
 	printer.PrintTitle("Configures Context[${component-name}/${template-name}/${file-name}]")
 
 	keys := set.NewLinkedHashSetString(r.keys...)
@@ -317,7 +317,7 @@ func (r *reconfigureOptions) printConfigureContext(configs map[dbaasv1alpha1.Con
 	}
 }
 
-func (r *reconfigureOptions) printConfigureHistory(configs map[dbaasv1alpha1.ConfigTemplate]*corev1.ConfigMap) error {
+func (r *reconfigureOptions) printConfigureHistory(configs map[appsv1alpha1.ConfigTemplate]*corev1.ConfigMap) error {
 	printer.PrintTitle("History modifications")
 
 	// filter reconfigure
@@ -335,11 +335,11 @@ func (r *reconfigureOptions) printConfigureHistory(configs map[dbaasv1alpha1.Con
 	tbl := printer.NewTablePrinter(r.Out)
 	tbl.SetHeader("NAME", "CLUSTER", "COMPONENT", "TEMPLATE", "FILES", "STATUS", "POLICY", "PROGRESS", "CREATED-TIME", "VALID-UPDATED")
 	for _, obj := range opsList.Items {
-		ops := &dbaasv1alpha1.OpsRequest{}
+		ops := &appsv1alpha1.OpsRequest{}
 		if err = runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, ops); err != nil {
 			return err
 		}
-		if ops.Spec.Type != dbaasv1alpha1.ReconfiguringType {
+		if ops.Spec.Type != appsv1alpha1.ReconfiguringType {
 			continue
 		}
 		components := getComponentNameFromOps(ops.Spec)
@@ -452,8 +452,8 @@ func (pt *parameterTemplate) rangeFormatter() string {
 }
 
 func (o *opsRequestDiffOptions) complete(args []string) error {
-	isValidReconfigureOps := func(ops *dbaasv1alpha1.OpsRequest) bool {
-		return ops.Spec.Type == dbaasv1alpha1.ReconfiguringType && ops.Spec.Reconfigure != nil
+	isValidReconfigureOps := func(ops *appsv1alpha1.OpsRequest) bool {
+		return ops.Spec.Type == appsv1alpha1.ReconfiguringType && ops.Spec.Reconfigure != nil
 	}
 
 	if len(args) != 2 {
@@ -464,8 +464,8 @@ func (o *opsRequestDiffOptions) complete(args []string) error {
 		return err
 	}
 
-	baseVersion := &dbaasv1alpha1.OpsRequest{}
-	diffVersion := &dbaasv1alpha1.OpsRequest{}
+	baseVersion := &appsv1alpha1.OpsRequest{}
+	diffVersion := &appsv1alpha1.OpsRequest{}
 	if err := util.GetResourceObjectFromGVR(types.OpsGVR(), client.ObjectKey{
 		Namespace: o.baseOptions.namespace,
 		Name:      args[0],
@@ -496,7 +496,7 @@ func (o *opsRequestDiffOptions) complete(args []string) error {
 	return nil
 }
 
-func findTemplateStatusByName(status *dbaasv1alpha1.ReconfiguringStatus, tplName string) *dbaasv1alpha1.ConfigurationStatus {
+func findTemplateStatusByName(status *appsv1alpha1.ReconfiguringStatus, tplName string) *appsv1alpha1.ConfigurationStatus {
 	if status == nil {
 		return nil
 	}
@@ -516,10 +516,10 @@ func (o *opsRequestDiffOptions) validate() error {
 		diffStatus = o.diffVersion.Status
 	)
 
-	if baseStatus.Phase != dbaasv1alpha1.SucceedPhase {
+	if baseStatus.Phase != appsv1alpha1.SucceedPhase {
 		return cfgcore.MakeError("require reconfiguring phase is success!, name: %s, phase: %s", o.baseVersion.Name, baseStatus.Phase)
 	}
-	if diffStatus.Phase != dbaasv1alpha1.SucceedPhase {
+	if diffStatus.Phase != appsv1alpha1.SucceedPhase {
 		return cfgcore.MakeError("require reconfiguring phase is success!, name: %s, phase: %s", o.diffVersion.Name, diffStatus.Phase)
 	}
 
@@ -558,7 +558,7 @@ func (o *opsRequestDiffOptions) run() error {
 	return nil
 }
 
-func (o *opsRequestDiffOptions) maybeCompareOps(base *dbaasv1alpha1.OpsRequest, diff *dbaasv1alpha1.OpsRequest) bool {
+func (o *opsRequestDiffOptions) maybeCompareOps(base *appsv1alpha1.OpsRequest, diff *appsv1alpha1.OpsRequest) bool {
 	getClusterName := func(ops client.Object) string {
 		labels := ops.GetLabels()
 		if len(labels) == 0 {
@@ -566,10 +566,10 @@ func (o *opsRequestDiffOptions) maybeCompareOps(base *dbaasv1alpha1.OpsRequest, 
 		}
 		return labels[types.InstanceLabelKey]
 	}
-	getComponentName := func(ops dbaasv1alpha1.OpsRequestSpec) string {
+	getComponentName := func(ops appsv1alpha1.OpsRequestSpec) string {
 		return ops.Reconfigure.ComponentName
 	}
-	getTemplateName := func(ops dbaasv1alpha1.OpsRequestSpec) []string {
+	getTemplateName := func(ops appsv1alpha1.OpsRequestSpec) []string {
 		configs := ops.Reconfigure.Configurations
 		names := make([]string, len(configs))
 		for i, config := range configs {
@@ -599,8 +599,8 @@ func (o *opsRequestDiffOptions) maybeCompareOps(base *dbaasv1alpha1.OpsRequest, 
 
 func (o *opsRequestDiffOptions) diffConfig(tplName string) (map[string]interface{}, error) {
 	var (
-		tpl              *dbaasv1alpha1.ConfigTemplate
-		configConstraint = &dbaasv1alpha1.ConfigConstraint{}
+		tpl              *appsv1alpha1.ConfigTemplate
+		configConstraint = &appsv1alpha1.ConfigConstraint{}
 	)
 
 	tplList, err := util.GetConfigTemplateList(o.clusterName, o.baseOptions.namespace, o.baseOptions.dynamic, o.componentName, true)
@@ -649,7 +649,7 @@ func printSingleParameterTemplate(pt *parameterTemplate) {
 	printer.PrintPairStringToLine("Range", pt.rangeFormatter())
 	printer.PrintPairStringToLine("Enum", pt.enumFormatter(-1))
 	printer.PrintPairStringToLine("Scope", pt.scope)
-	printer.PrintPairStringToLine("Type", pt.valueType)
+	printer.PrintPairStringToLine("ComponentDefRef", pt.valueType)
 	printer.PrintPairStringToLine("Description", pt.description)
 }
 
@@ -715,7 +715,7 @@ func generateParameterTemplate(paramName string, property apiext.JSONSchemaProps
 	return pt, nil
 }
 
-func getReconfigurePolicy(status dbaasv1alpha1.OpsRequestStatus) string {
+func getReconfigurePolicy(status appsv1alpha1.OpsRequestStatus) string {
 	if status.ReconfiguringStatus == nil || len(status.ReconfiguringStatus.ConfigurationStatus) == 0 {
 		return ""
 	}
@@ -723,9 +723,9 @@ func getReconfigurePolicy(status dbaasv1alpha1.OpsRequestStatus) string {
 	var policy string
 	reStatus := status.ReconfiguringStatus.ConfigurationStatus[0]
 	switch reStatus.UpdatePolicy {
-	case dbaasv1alpha1.AutoReload:
+	case appsv1alpha1.AutoReload:
 		policy = "reload"
-	case dbaasv1alpha1.NormalPolicy, dbaasv1alpha1.RestartPolicy, dbaasv1alpha1.RollingPolicy:
+	case appsv1alpha1.NormalPolicy, appsv1alpha1.RestartPolicy, appsv1alpha1.RollingPolicy:
 		policy = "restart"
 	default:
 		return ""
@@ -733,7 +733,7 @@ func getReconfigurePolicy(status dbaasv1alpha1.OpsRequestStatus) string {
 	return printer.BoldYellow(policy)
 }
 
-func getValidUpdatedParams(status dbaasv1alpha1.OpsRequestStatus) string {
+func getValidUpdatedParams(status appsv1alpha1.OpsRequestStatus) string {
 	if status.ReconfiguringStatus == nil || len(status.ReconfiguringStatus.ConfigurationStatus) == 0 {
 		return ""
 	}
@@ -761,7 +761,7 @@ func byte2InterfaceMap(config map[string][]byte) (map[string]interface{}, error)
 	return m, nil
 }
 
-func findTplByName(tpls []dbaasv1alpha1.ConfigTemplate, tplName string) *dbaasv1alpha1.ConfigTemplate {
+func findTplByName(tpls []appsv1alpha1.ConfigTemplate, tplName string) *appsv1alpha1.ConfigTemplate {
 	for i := range tpls {
 		tpl := &tpls[i]
 		if tpl.Name == tplName {

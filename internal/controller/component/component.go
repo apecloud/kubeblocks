@@ -22,7 +22,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 
-	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
@@ -32,32 +32,25 @@ import (
 // component-related configs from input Cluster, ClusterDef and ClusterVersion.
 func BuildComponent(
 	reqCtx intctrlutil.RequestCtx,
-	cluster *dbaasv1alpha1.Cluster,
-	clusterDef *dbaasv1alpha1.ClusterDefinition,
-	clusterDefComp *dbaasv1alpha1.ClusterDefinitionComponent,
-	clusterVersionComp *dbaasv1alpha1.ClusterVersionComponent,
-	clusterComp *dbaasv1alpha1.ClusterComponent) *SynthesizedComponent {
+	cluster *appsv1alpha1.Cluster,
+	clusterDef *appsv1alpha1.ClusterDefinition,
+	clusterDefComp *appsv1alpha1.ClusterComponentDefinition,
+	clusterVersionComp *appsv1alpha1.ClusterComponentVersion,
+	clusterComp *appsv1alpha1.ClusterComponentSpec) *SynthesizedComponent {
 	if clusterDefComp == nil {
 		reqCtx.Log.Error(nil, "build probe container failed.")
 		return nil
 	}
 
 	clusterDefCompObj := clusterDefComp.DeepCopy()
-	name := clusterDefCompObj.TypeName // initial name for the component will be same as TypeName
-	if clusterComp != nil {
-		name = clusterComp.Name // component name gets overridden
-	}
 	component := &SynthesizedComponent{
 		ClusterDefName:        clusterDef.Name,
-		ClusterType:           clusterDef.Spec.Type,
-		Name:                  name,
-		Type:                  clusterDefCompObj.TypeName,
+		Name:                  clusterDefCompObj.Name, // initial name for the component will be same as Name
+		Type:                  clusterDefCompObj.Name,
 		CharacterType:         clusterDefCompObj.CharacterType,
-		MinReplicas:           clusterDefCompObj.MinReplicas,
-		MaxReplicas:           clusterDefCompObj.MaxReplicas,
-		DefaultReplicas:       clusterDefCompObj.DefaultReplicas,
-		Replicas:              clusterDefCompObj.DefaultReplicas,
-		ComponentType:         clusterDefCompObj.ComponentType,
+		MaxUnavailable:        clusterDefCompObj.MaxUnavailable,
+		Replicas:              0,
+		WorkloadType:          clusterDefCompObj.WorkloadType,
 		ConsensusSpec:         clusterDefCompObj.ConsensusSpec,
 		PodSpec:               clusterDefCompObj.PodSpec,
 		Service:               clusterDefCompObj.Service,
@@ -109,13 +102,14 @@ func BuildComponent(
 	if clusterComp != nil {
 		component.EnabledLogs = clusterComp.EnabledLogs
 
-		// user can scale in replicas to 0
-		if clusterComp.Replicas != nil {
-			component.Replicas = *clusterComp.Replicas
+		if len(clusterComp.Name) > 0 {
+			component.Name = clusterComp.Name
 		}
 
+		component.Replicas = clusterComp.Replicas
+
 		if clusterComp.VolumeClaimTemplates != nil {
-			component.VolumeClaimTemplates = dbaasv1alpha1.ToVolumeClaimTemplates(clusterComp.VolumeClaimTemplates)
+			component.VolumeClaimTemplates = appsv1alpha1.ToVolumeClaimTemplates(clusterComp.VolumeClaimTemplates)
 		}
 
 		if clusterComp.Resources.Requests != nil || clusterComp.Resources.Limits != nil {

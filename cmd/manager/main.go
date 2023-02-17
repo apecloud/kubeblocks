@@ -33,12 +33,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
-	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	appscontrollers "github.com/apecloud/kubeblocks/controllers/apps"
+	"github.com/apecloud/kubeblocks/controllers/apps/components"
+	"github.com/apecloud/kubeblocks/controllers/apps/configuration"
 	dataprotectioncontrollers "github.com/apecloud/kubeblocks/controllers/dataprotection"
-	dbaascontrollers "github.com/apecloud/kubeblocks/controllers/dbaas"
-	"github.com/apecloud/kubeblocks/controllers/dbaas/components"
-	"github.com/apecloud/kubeblocks/controllers/dbaas/configuration"
 	k8scorecontrollers "github.com/apecloud/kubeblocks/controllers/k8score"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/apecloud/kubeblocks/internal/webhook"
@@ -60,7 +60,7 @@ var (
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
-	utilruntime.Must(dbaasv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(appsv1alpha1.AddToScheme(scheme))
 	utilruntime.Must(dataprotectionv1alpha1.AddToScheme(scheme))
 	utilruntime.Must(snapshotv1.AddToScheme(scheme))
 	//+kubebuilder:scaffold:scheme
@@ -141,7 +141,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err = (&dbaascontrollers.ClusterReconciler{
+	if err = (&appscontrollers.ClusterReconciler{
 		Client:   mgr.GetClient(),
 		Scheme:   mgr.GetScheme(),
 		Recorder: mgr.GetEventRecorderFor("cluster-controller"),
@@ -150,7 +150,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err = (&dbaascontrollers.ClusterDefinitionReconciler{
+	if err = (&appscontrollers.ClusterDefinitionReconciler{
 		Client:   mgr.GetClient(),
 		Scheme:   mgr.GetScheme(),
 		Recorder: mgr.GetEventRecorderFor("cluster-definition-controller"),
@@ -159,7 +159,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err = (&dbaascontrollers.ClusterVersionReconciler{
+	if err = (&appscontrollers.ClusterVersionReconciler{
 		Client:   mgr.GetClient(),
 		Scheme:   mgr.GetScheme(),
 		Recorder: mgr.GetEventRecorderFor("cluster-version-controller"),
@@ -215,24 +215,24 @@ func main() {
 
 	if viper.GetBool("enable_webhooks") {
 
-		dbaasv1alpha1.RegisterWebhookManager(mgr)
+		appsv1alpha1.RegisterWebhookManager(mgr)
 
-		if err = (&dbaasv1alpha1.Cluster{}).SetupWebhookWithManager(mgr); err != nil {
+		if err = (&appsv1alpha1.Cluster{}).SetupWebhookWithManager(mgr); err != nil {
 			setupLog.Error(err, "unable to create webhook", "webhook", "Cluster")
 			os.Exit(1)
 		}
 
-		if err = (&dbaasv1alpha1.ClusterDefinition{}).SetupWebhookWithManager(mgr); err != nil {
+		if err = (&appsv1alpha1.ClusterDefinition{}).SetupWebhookWithManager(mgr); err != nil {
 			setupLog.Error(err, "unable to create webhook", "webhook", "ClusterDefinition")
 			os.Exit(1)
 		}
 
-		if err = (&dbaasv1alpha1.ClusterVersion{}).SetupWebhookWithManager(mgr); err != nil {
+		if err = (&appsv1alpha1.ClusterVersion{}).SetupWebhookWithManager(mgr); err != nil {
 			setupLog.Error(err, "unable to create webhook", "webhook", "ClusterVersion")
 			os.Exit(1)
 		}
 
-		if err = (&dbaasv1alpha1.OpsRequest{}).SetupWebhookWithManager(mgr); err != nil {
+		if err = (&appsv1alpha1.OpsRequest{}).SetupWebhookWithManager(mgr); err != nil {
 			setupLog.Error(err, "unable to create webhook", "webhook", "OpsRequest")
 			os.Exit(1)
 		}
@@ -251,7 +251,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err = (&dbaascontrollers.OpsRequestReconciler{
+	if err = (&appscontrollers.OpsRequestReconciler{
 		Client:   mgr.GetClient(),
 		Scheme:   mgr.GetScheme(),
 		Recorder: mgr.GetEventRecorderFor("ops-request-controller"),
@@ -276,7 +276,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err = (&dbaascontrollers.SystemAccountReconciler{
+	if err = (&appscontrollers.SystemAccountReconciler{
 		Client:   mgr.GetClient(),
 		Scheme:   mgr.GetScheme(),
 		Recorder: mgr.GetEventRecorderFor("system-account-controller"),

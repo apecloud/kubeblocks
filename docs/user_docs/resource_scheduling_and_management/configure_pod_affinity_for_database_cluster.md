@@ -12,7 +12,7 @@ Example: the following failure domain is specified as a node, and the node must 
 - Specify `podAntiAffinity` as `Preferred`
 - If there is no specified node, don't specify `nodeLabels`.
 ``` 
-apiVersion: dbaas.kubeblocks.io/v1alpha1
+apiVersion: apps.kubeblocks.io/v1alpha1
 kind: Cluster
 metadata:
   name: wesql-cluster
@@ -41,7 +41,7 @@ e.g. for three nodes to deploy in different available zones, label three nodes w
 - Specify  `podAntiAffinity` value as `Required​`
 - If there is no specified node, don't specify `nodeLabels`.
 ```
-apiVersion: dbaas.kubeblocks.io/v1alpha1
+apiVersion: apps.kubeblocks.io/v1alpha1
 kind: Cluster
 metadata:
   name: wesql-cluster
@@ -65,7 +65,7 @@ Note: if there is no enough resource, the scheduling is failed.
 ## API parameters
 Specify `nodeLabels` 
 ```
-apiVersion: dbaas.kubeblocks.io/v1alpha1
+apiVersion: apps.kubeblocks.io/v1alpha1
 kind: Cluster
 metadata:
   name: wesql-cluster

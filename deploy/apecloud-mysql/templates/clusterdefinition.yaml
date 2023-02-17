@@ -1,16 +1,15 @@
-apiVersion: dbaas.kubeblocks.io/v1alpha1
+apiVersion: apps.kubeblocks.io/v1alpha1
 kind: ClusterDefinition
 metadata:
   name: apecloud-mysql
   labels:
     {{- include "apecloud-mysql.labels" . | nindent 4 }}
 spec:
-  type: state.mysql
   connectionCredential:
     username: root
     password: "$(RANDOM_PASSWD)"
-  components:
-    - typeName: mysql
+  componentDefs:
+    - name: mysql
       characterType: mysql
       probes:
         roleChangedProbe:
@@ -36,8 +35,7 @@ spec:
             namespace: {{ .Release.Namespace }}
             volumeName: scripts
             defaultMode: 493
-      defaultReplicas: 3
-      componentType: Consensus
+      workloadType: Consensus
       consensusSpec:
         leader:
           name: leader

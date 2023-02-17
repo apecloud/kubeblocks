@@ -22,7 +22,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -36,14 +36,14 @@ func buildAffinityLabelSelector(clusterName string, componentName string) *metav
 }
 
 func buildPodTopologySpreadConstraints(
-	cluster *dbaasv1alpha1.Cluster,
-	clusterOrCompAffinity *dbaasv1alpha1.Affinity,
+	cluster *appsv1alpha1.Cluster,
+	clusterOrCompAffinity *appsv1alpha1.Affinity,
 	component *SynthesizedComponent,
 ) []corev1.TopologySpreadConstraint {
 	var topologySpreadConstraints []corev1.TopologySpreadConstraint
 
 	var whenUnsatisfiable corev1.UnsatisfiableConstraintAction
-	if clusterOrCompAffinity.PodAntiAffinity == dbaasv1alpha1.Required {
+	if clusterOrCompAffinity.PodAntiAffinity == appsv1alpha1.Required {
 		whenUnsatisfiable = corev1.DoNotSchedule
 	} else {
 		whenUnsatisfiable = corev1.ScheduleAnyway
@@ -60,8 +60,8 @@ func buildPodTopologySpreadConstraints(
 }
 
 func buildPodAffinity(
-	cluster *dbaasv1alpha1.Cluster,
-	clusterOrCompAffinity *dbaasv1alpha1.Affinity,
+	cluster *appsv1alpha1.Cluster,
+	clusterOrCompAffinity *appsv1alpha1.Affinity,
 	component *SynthesizedComponent,
 ) *corev1.Affinity {
 	affinity := new(corev1.Affinity)
@@ -94,7 +94,7 @@ func buildPodAffinity(
 			LabelSelector: buildAffinityLabelSelector(cluster.Name, component.Name),
 		})
 	}
-	if clusterOrCompAffinity.PodAntiAffinity == dbaasv1alpha1.Required {
+	if clusterOrCompAffinity.PodAntiAffinity == appsv1alpha1.Required {
 		podAntiAffinity = &corev1.PodAntiAffinity{
 			RequiredDuringSchedulingIgnoredDuringExecution: podAffinityTerms,
 		}

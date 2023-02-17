@@ -24,7 +24,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/apecloud/kubeblocks/internal/gotemplate"
@@ -66,7 +66,7 @@ type componentTemplateValues struct {
 
 	// Container *corev1.Container
 	Resource  *ResourceDefinition
-	ConfigTpl []dbaasv1alpha1.ConfigTemplate
+	ConfigTpl []appsv1alpha1.ConfigTemplate
 }
 
 type configTemplateBuilder struct {
@@ -78,10 +78,10 @@ type configTemplateBuilder struct {
 	componentValues  *componentTemplateValues
 	builtInFunctions *gotemplate.BuiltInObjectsFunc
 
-	// DBaas cluster object
+	// cluster object
 	component      *component.SynthesizedComponent
-	clusterVersion *dbaasv1alpha1.ClusterVersion
-	cluster        *dbaasv1alpha1.Cluster
+	clusterVersion *appsv1alpha1.ClusterVersion
+	cluster        *appsv1alpha1.Cluster
 	podSpec        *corev1.PodSpec
 
 	ctx context.Context
@@ -90,8 +90,8 @@ type configTemplateBuilder struct {
 
 func newCfgTemplateBuilder(
 	clusterName, namespace string,
-	cluster *dbaasv1alpha1.Cluster,
-	version *dbaasv1alpha1.ClusterVersion,
+	cluster *appsv1alpha1.Cluster,
+	version *appsv1alpha1.ClusterVersion,
 	ctx context.Context,
 	cli client.Client) *configTemplateBuilder {
 	return &configTemplateBuilder{
@@ -151,7 +151,7 @@ func (c *configTemplateBuilder) builtinObjects() (*gotemplate.TplValues, error) 
 
 func (c *configTemplateBuilder) injectBuiltInObjectsAndFunctions(
 	podSpec *corev1.PodSpec,
-	configs []dbaasv1alpha1.ConfigTemplate,
+	configs []appsv1alpha1.ConfigTemplate,
 	component *component.SynthesizedComponent) error {
 	if err := injectBuiltInObjects(c, podSpec, component, configs); err != nil {
 		return err
@@ -177,7 +177,7 @@ func injectBuiltInFunctions(tplBuilder *configTemplateBuilder, component *compon
 	return nil
 }
 
-func injectBuiltInObjects(tplBuilder *configTemplateBuilder, podSpec *corev1.PodSpec, component *component.SynthesizedComponent, configs []dbaasv1alpha1.ConfigTemplate) error {
+func injectBuiltInObjects(tplBuilder *configTemplateBuilder, podSpec *corev1.PodSpec, component *component.SynthesizedComponent, configs []appsv1alpha1.ConfigTemplate) error {
 	var resource *ResourceDefinition
 	container := intctrlutil.GetContainerByConfigTemplate(podSpec, configs)
 	if container != nil && len(container.Resources.Limits) > 0 {

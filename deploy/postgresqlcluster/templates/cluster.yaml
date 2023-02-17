@@ -1,4 +1,4 @@
-apiVersion: dbaas.kubeblocks.io/v1alpha1
+apiVersion: apps.kubeblocks.io/v1alpha1
 kind: Cluster
 metadata:
   name: {{ .Release.Name }}
@@ -14,9 +14,9 @@ spec:
   {{- with $.Values.tolerations }}
   tolerations: {{ . | toYaml | nindent 4 }}
   {{- end }}
-  components:
+  componentSpecs:
     - name: postgresql # user-defined
-      type: postgresql # ref clusterdefinition components.typename
+      componentDefRef: postgresql # ref clusterdefinition components.name
       monitor: {{ .Values.monitor.enabled | default false }}
       enabledLogs: {{ .Values.enabledLogs | toJson | indent 4 }}
       {{- with  .Values.resources }}

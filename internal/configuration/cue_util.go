@@ -24,7 +24,7 @@ import (
 	mxjv2 "github.com/clbanning/mxj/v2"
 	"github.com/spf13/viper"
 
-	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 )
 
 // CueType define cue type
@@ -64,7 +64,7 @@ func CueValidate(cueTpl string) error {
 	return tpl.Validate()
 }
 
-func ValidateConfigurationWithCue(cueTpl string, cfgType dbaasv1alpha1.ConfigurationFormatter, rawData string) error {
+func ValidateConfigurationWithCue(cueTpl string, cfgType appsv1alpha1.ConfigurationFormatter, rawData string) error {
 	cfg, err := loadConfiguration(cfgType, rawData)
 	if err != nil {
 		return WrapError(err, "failed to load configuration. [%s]", rawData)
@@ -73,15 +73,15 @@ func ValidateConfigurationWithCue(cueTpl string, cfgType dbaasv1alpha1.Configura
 	return cfgDataValidateByCue(cueTpl, cfg)
 }
 
-func loadConfiguration(cfgType dbaasv1alpha1.ConfigurationFormatter, rawData string) (map[string]interface{}, error) {
+func loadConfiguration(cfgType appsv1alpha1.ConfigurationFormatter, rawData string) (map[string]interface{}, error) {
 	// viper not support xml
-	if cfgType == dbaasv1alpha1.XML {
+	if cfgType == appsv1alpha1.XML {
 		return mxjv2.NewMapXml([]byte(rawData), true)
 	}
 
 	var v *viper.Viper
 	// TODO hack, viper parse problem
-	if cfgType == dbaasv1alpha1.DOTENV {
+	if cfgType == appsv1alpha1.DOTENV {
 		v = viper.NewWithOptions(viper.KeyDelimiter("#"))
 	} else {
 		v = viper.New()

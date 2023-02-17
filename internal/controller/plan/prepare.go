@@ -30,10 +30,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
-	"github.com/apecloud/kubeblocks/controllers/dbaas/components/replicationset"
-	componentutil "github.com/apecloud/kubeblocks/controllers/dbaas/components/util"
-	cfgutil "github.com/apecloud/kubeblocks/controllers/dbaas/configuration"
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/controllers/apps/components/replicationset"
+	componentutil "github.com/apecloud/kubeblocks/controllers/apps/components/util"
+	cfgutil "github.com/apecloud/kubeblocks/controllers/apps/configuration"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 	cfgcm "github.com/apecloud/kubeblocks/internal/configuration/configmap"
 	"github.com/apecloud/kubeblocks/internal/constant"
@@ -43,9 +43,9 @@ import (
 )
 
 type CreateParams struct {
-	ClusterDefinition *dbaasv1alpha1.ClusterDefinition
-	ClusterVersion    *dbaasv1alpha1.ClusterVersion
-	Cluster           *dbaasv1alpha1.Cluster
+	ClusterDefinition *appsv1alpha1.ClusterDefinition
+	ClusterVersion    *appsv1alpha1.ClusterVersion
+	Cluster           *appsv1alpha1.Cluster
 	Component         *component.SynthesizedComponent
 	ApplyObjs         *[]client.Object
 	CacheCtx          *map[string]interface{}
@@ -62,10 +62,10 @@ func (params CreateParams) ToBuilderParams() builder.BuilderParams {
 
 // needBuildPDB check whether the PodDisruptionBudget needs to be built
 func needBuildPDB(params *CreateParams) bool {
-	if params.Component.ComponentType == dbaasv1alpha1.Consensus {
+	if params.Component.WorkloadType == appsv1alpha1.Consensus {
 		// if MinReplicas is non-zero, build pdb
 		// TODO: add ut
-		return params.Component.MinReplicas > 0
+		return params.Component.MaxUnavailable != nil
 	}
 	return intctrlutil.ExistsPDBSpec(params.Component.PodDisruptionBudgetSpec)
 }
@@ -151,29 +151,29 @@ func PrepareComponentObjs(reqCtx intctrlutil.RequestCtx, cli client.Client, obj 
 		return nil
 	}
 
-	switch params.Component.ComponentType {
-	case dbaasv1alpha1.Stateless:
+	switch params.Component.WorkloadType {
+	case appsv1alpha1.Stateless:
 		if err := workloadProcessor(
 			func(envConfig *corev1.ConfigMap) (client.Object, error) {
 				return builder.BuildDeploy(reqCtx, params.ToBuilderParams())
 			}); err != nil {
 			return err
 		}
-	case dbaasv1alpha1.Stateful:
+	case appsv1alpha1.Stateful:
 		if err := workloadProcessor(
 			func(envConfig *corev1.ConfigMap) (client.Object, error) {
 				return builder.BuildSts(reqCtx, params.ToBuilderParams(), envConfig.Name)
 			}); err != nil {
 			return err
 		}
-	case dbaasv1alpha1.Consensus:
+	case appsv1alpha1.Consensus:
 		if err := workloadProcessor(
 			func(envConfig *corev1.ConfigMap) (client.Object, error) {
 				return buildConsensusSet(reqCtx, *params, envConfig.Name)
 			}); err != nil {
 			return err
 		}
-	case dbaasv1alpha1.Replication:
+	case appsv1alpha1.Replication:
 		// get the maximum value of params.component.Replicas and the number of existing statefulsets under the current component,
 		// then construct statefulsets for creating replicationSet or handling horizontal scaling of the replicationSet.
 		var existStsList = &appsv1.StatefulSetList{}
@@ -205,10 +205,10 @@ func PrepareComponentObjs(reqCtx intctrlutil.RequestCtx, cli client.Client, obj 
 		if err != nil {
 			return err
 		}
-		if params.Component.ComponentType == dbaasv1alpha1.Consensus {
+		if params.Component.WorkloadType == appsv1alpha1.Consensus {
 			addLeaderSelectorLabels(svc, params.Component)
 		}
-		if params.Component.ComponentType == dbaasv1alpha1.Replication {
+		if params.Component.WorkloadType == appsv1alpha1.Replication {
 			svc.Spec.Selector[intctrlutil.RoleLabelKey] = string(replicationset.Primary)
 		}
 		*params.ApplyObjs = append(*params.ApplyObjs, svc)
@@ -254,7 +254,7 @@ func buildReplicationSet(reqCtx intctrlutil.RequestCtx,
 
 // buildReplicationSetPVC builds replicationSet persistentVolumeClaim manually,
 // replicationSet does not manage pvc through volumeClaimTemplate defined on statefulSet,
-// the purpose is convenient to convert between componentTypes in the future (TODO).
+// the purpose is convenient to convert between workloadTypes in the future (TODO).
 func buildReplicationSetPVC(params CreateParams, sts *appsv1.StatefulSet) error {
 	// generate persistentVolumeClaim objects used by replicationSet's pod from component.VolumeClaimTemplates
 	// TODO: The pvc objects involved in all processes in the KubeBlocks will be reconstructed into a unified generation method
@@ -344,9 +344,9 @@ func buildCfg(params CreateParams,
 	}
 
 	configs := make([]client.Object, 0, len(tpls))
-	volumes := make(map[string]dbaasv1alpha1.ConfigTemplate, len(tpls))
+	volumes := make(map[string]appsv1alpha1.ConfigTemplate, len(tpls))
 	// TODO Support Update ClusterVersionRef of Cluster
-	scheme, _ := dbaasv1alpha1.SchemeBuilder.Build()
+	scheme, _ := appsv1alpha1.SchemeBuilder.Build()
 	cfgLables := make(map[string]string, len(tpls))
 	for _, tpl := range tpls {
 		// Check config cm already exists
@@ -394,7 +394,7 @@ func buildCfg(params CreateParams,
 func updateConfigurationManagerWithComponent(
 	params CreateParams,
 	podSpec *corev1.PodSpec,
-	cfgTemplates []dbaasv1alpha1.ConfigTemplate,
+	cfgTemplates []appsv1alpha1.ConfigTemplate,
 	ctx context.Context,
 	cli client.Client) error {
 	var (
@@ -540,7 +540,7 @@ func isAlreadyExists(cmName string, namespace string, ctx context.Context, cli c
 // generateConfigMapFromTpl render config file by config template provided by provider.
 func generateConfigMapFromTpl(tplBuilder *configTemplateBuilder,
 	cmName string,
-	tplCfg dbaasv1alpha1.ConfigTemplate,
+	tplCfg appsv1alpha1.ConfigTemplate,
 	params CreateParams,
 	ctx context.Context,
 	cli client.Client) (*corev1.ConfigMap, error) {
@@ -558,10 +558,10 @@ func generateConfigMapFromTpl(tplBuilder *configTemplateBuilder,
 // processConfigMapTemplate Render config file using template engine
 func processConfigMapTemplate(
 	tplBuilder *configTemplateBuilder,
-	tplCfg dbaasv1alpha1.ConfigTemplate,
+	tplCfg appsv1alpha1.ConfigTemplate,
 	ctx context.Context,
 	cli client.Client) (map[string]string, error) {
-	cfgTemplate := &dbaasv1alpha1.ConfigConstraint{}
+	cfgTemplate := &appsv1alpha1.ConfigConstraint{}
 	if len(tplCfg.ConfigConstraintRef) > 0 {
 		if err := cli.Get(ctx, client.ObjectKey{
 			Namespace: "",

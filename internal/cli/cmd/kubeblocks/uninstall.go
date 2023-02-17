@@ -77,7 +77,7 @@ func (o *uninstallOptions) preCheck() error {
 	}
 
 	preCheckList := []string{
-		"clusters.dbaas.kubeblocks.io",
+		"clusters.apps.kubeblocks.io",
 	}
 	ctx := context.Background()
 	// delete crds

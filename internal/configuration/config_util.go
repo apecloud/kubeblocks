@@ -22,7 +22,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 )
 
 type ParamPairs struct {
@@ -31,7 +31,7 @@ type ParamPairs struct {
 }
 
 // MergeAndValidateConfiguration does merge configuration files and validate
-func MergeAndValidateConfiguration(configConstraint dbaasv1alpha1.ConfigConstraintSpec, baseCfg map[string]string, updatedParams []ParamPairs) (map[string]string, error) {
+func MergeAndValidateConfiguration(configConstraint appsv1alpha1.ConfigConstraintSpec, baseCfg map[string]string, updatedParams []ParamPairs) (map[string]string, error) {
 	var (
 		err            error
 		newCfg         map[string]string
@@ -56,7 +56,7 @@ func MergeAndValidateConfiguration(configConstraint dbaasv1alpha1.ConfigConstrai
 	// process special formatter options
 	mergedOptions := func(ctx *CfgOpOption) {
 		// process special formatter
-		if fc.Formatter == dbaasv1alpha1.INI && fc.IniConfig != nil {
+		if fc.Formatter == appsv1alpha1.INI && fc.IniConfig != nil {
 			ctx.IniContext = &IniContext{
 				SectionName: fc.IniConfig.SectionName,
 			}

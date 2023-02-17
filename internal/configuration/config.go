@@ -30,7 +30,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -54,22 +54,22 @@ type PolicyExecStatus struct {
 type ConfigEventContext struct {
 	Client  client.Client
 	ReqCtx  intctrlutil.RequestCtx
-	Cluster *dbaasv1alpha1.Cluster
+	Cluster *appsv1alpha1.Cluster
 
-	ClusterComponent *dbaasv1alpha1.ClusterComponent
-	Component        *dbaasv1alpha1.ClusterDefinitionComponent
+	ClusterComponent *appsv1alpha1.ClusterComponentSpec
+	Component        *appsv1alpha1.ClusterComponentDefinition
 	ComponentUnits   []appv1.StatefulSet
 
 	TplName          string
 	ConfigPatch      *ConfigPatchInfo
 	CfgCM            *corev1.ConfigMap
-	ConfigConstraint *dbaasv1alpha1.ConfigConstraintSpec
+	ConfigConstraint *appsv1alpha1.ConfigConstraintSpec
 
 	PolicyStatus PolicyExecStatus
 }
 
 type ConfigEventHandler interface {
-	Handle(eventContext ConfigEventContext, lastOpsRequest string, phase dbaasv1alpha1.Phase, err error) error
+	Handle(eventContext ConfigEventContext, lastOpsRequest string, phase appsv1alpha1.Phase, err error) error
 }
 
 const (

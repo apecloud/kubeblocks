@@ -27,8 +27,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/dynamic"
 
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
-	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 )
@@ -96,8 +96,8 @@ var _ = Describe("kubeblocks objects", func() {
 		backupTool.Finalizers = []string{"test"}
 
 		testCases := []struct {
-			clusterDef     *dbaasv1alpha1.ClusterDefinition
-			clusterVersion *dbaasv1alpha1.ClusterVersion
+			clusterDef     *appsv1alpha1.ClusterDefinition
+			clusterVersion *appsv1alpha1.ClusterVersion
 			backupTool     *dpv1alpha1.BackupTool
 			expected       string
 		}{
@@ -146,7 +146,7 @@ func mockDynamicClientWithCRD(objects ...runtime.Object) dynamic.Interface {
 			APIVersion: "apiextensions.k8s.io/v1",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "clusters.dbaas.kubeblocks.io",
+			Name: "clusters.apps.kubeblocks.io",
 		},
 		Spec: v1.CustomResourceDefinitionSpec{
 			Group: types.Group,
@@ -159,7 +159,7 @@ func mockDynamicClientWithCRD(objects ...runtime.Object) dynamic.Interface {
 			APIVersion: "apiextensions.k8s.io/v1",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "clusterdefinitions.dbaas.kubeblocks.io",
+			Name: "clusterdefinitions.apps.kubeblocks.io",
 		},
 		Spec: v1.CustomResourceDefinitionSpec{
 			Group: types.Group,
@@ -172,7 +172,7 @@ func mockDynamicClientWithCRD(objects ...runtime.Object) dynamic.Interface {
 			APIVersion: "apiextensions.k8s.io/v1",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "clusterversions.dbaas.kubeblocks.io",
+			Name: "clusterversions.apps.kubeblocks.io",
 		},
 		Spec: v1.CustomResourceDefinitionSpec{
 			Group: types.Group,

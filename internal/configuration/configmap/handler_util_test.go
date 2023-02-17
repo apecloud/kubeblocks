@@ -22,12 +22,12 @@ import (
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 
-	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 )
 
 func TestIsSupportReload(t *testing.T) {
 	type args struct {
-		reload *dbaasv1alpha1.ReloadOptions
+		reload *appsv1alpha1.ReloadOptions
 	}
 	tests := []struct {
 		name string
@@ -42,16 +42,16 @@ func TestIsSupportReload(t *testing.T) {
 	}, {
 		name: "reload_test",
 		args: args{
-			reload: &dbaasv1alpha1.ReloadOptions{},
+			reload: &appsv1alpha1.ReloadOptions{},
 		},
 		want: false,
 	}, {
 		name: "reload_test",
 		args: args{
-			reload: &dbaasv1alpha1.ReloadOptions{
-				UnixSignalTrigger: &dbaasv1alpha1.UnixSignalTrigger{
+			reload: &appsv1alpha1.ReloadOptions{
+				UnixSignalTrigger: &appsv1alpha1.UnixSignalTrigger{
 					ProcessName: "test",
-					Signal:      dbaasv1alpha1.SIGHUP,
+					Signal:      appsv1alpha1.SIGHUP,
 				},
 			},
 		},
@@ -59,8 +59,8 @@ func TestIsSupportReload(t *testing.T) {
 	}, {
 		name: "reload_test",
 		args: args{
-			reload: &dbaasv1alpha1.ReloadOptions{
-				ShellTrigger: &dbaasv1alpha1.ShellTrigger{
+			reload: &appsv1alpha1.ReloadOptions{
+				ShellTrigger: &appsv1alpha1.ShellTrigger{
 					Exec: "pg_ctl reload",
 				},
 			},
@@ -77,9 +77,9 @@ func TestIsSupportReload(t *testing.T) {
 }
 
 func TestBuildSignalArgs(t *testing.T) {
-	r := BuildSignalArgs(dbaasv1alpha1.UnixSignalTrigger{
+	r := BuildSignalArgs(appsv1alpha1.UnixSignalTrigger{
 		ProcessName: "postgres",
-		Signal:      dbaasv1alpha1.SIGHUP,
+		Signal:      appsv1alpha1.SIGHUP,
 	}, []corev1.VolumeMount{
 		{
 			MountPath: "/postgresql/conf",
@@ -95,13 +95,13 @@ func TestBuildSignalArgs(t *testing.T) {
 	require.Regexp(t, `--volume-dir\s+/postgresql/conf`, r)
 	require.Regexp(t, `--volume-dir\s+/postgresql/conf2`, r)
 
-	require.Nil(t, NeedBuildConfigSidecar(&dbaasv1alpha1.ReloadOptions{
-		UnixSignalTrigger: &dbaasv1alpha1.UnixSignalTrigger{
-			Signal: dbaasv1alpha1.SIGHUP,
+	require.Nil(t, NeedBuildConfigSidecar(&appsv1alpha1.ReloadOptions{
+		UnixSignalTrigger: &appsv1alpha1.UnixSignalTrigger{
+			Signal: appsv1alpha1.SIGHUP,
 		},
 	}))
-	require.NotNil(t, NeedBuildConfigSidecar(&dbaasv1alpha1.ReloadOptions{
-		UnixSignalTrigger: &dbaasv1alpha1.UnixSignalTrigger{
+	require.NotNil(t, NeedBuildConfigSidecar(&appsv1alpha1.ReloadOptions{
+		UnixSignalTrigger: &appsv1alpha1.UnixSignalTrigger{
 			Signal: "SIGNOEXIST",
 		},
 	}))

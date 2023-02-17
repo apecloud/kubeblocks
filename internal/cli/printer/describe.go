@@ -24,7 +24,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 )
 
@@ -64,13 +64,13 @@ func PrintConditions(conditions []metav1.Condition, out io.Writer) {
 }
 
 // PrintComponentConfigMeta prints the conditions of resource.
-func PrintComponentConfigMeta(cfgTplMap map[dbaasv1alpha1.ConfigTemplate]*corev1.ConfigMap, clusterName, componentName string, out io.Writer) {
+func PrintComponentConfigMeta(cfgTplMap map[appsv1alpha1.ConfigTemplate]*corev1.ConfigMap, clusterName, componentName string, out io.Writer) {
 	if len(cfgTplMap) == 0 {
 		return
 	}
 	tbl := NewTablePrinter(out)
 	PrintTitle("Configures Meta")
-	enableReconfiguring := func(tpl dbaasv1alpha1.ConfigTemplate) string {
+	enableReconfiguring := func(tpl appsv1alpha1.ConfigTemplate) string {
 		if len(tpl.ConfigConstraintRef) > 0 {
 			return "enable"
 		}

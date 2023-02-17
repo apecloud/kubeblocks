@@ -24,7 +24,7 @@ import (
 	"github.com/spf13/viper"
 	corev1 "k8s.io/api/core/v1"
 
-	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
@@ -37,7 +37,7 @@ const (
 )
 
 var (
-	supportedCharacterTypeFunc = map[string]func(cluster *dbaasv1alpha1.Cluster, component *SynthesizedComponent) error{
+	supportedCharacterTypeFunc = map[string]func(cluster *appsv1alpha1.Cluster, component *SynthesizedComponent) error{
 		kMysql: setMysqlComponent,
 	}
 	//go:embed cue/*
@@ -45,10 +45,10 @@ var (
 )
 
 func buildMonitorConfig(
-	cluster *dbaasv1alpha1.Cluster,
-	clusterDef *dbaasv1alpha1.ClusterDefinition,
-	clusterDefComp *dbaasv1alpha1.ClusterDefinitionComponent,
-	clusterComp *dbaasv1alpha1.ClusterComponent,
+	cluster *appsv1alpha1.Cluster,
+	clusterDef *appsv1alpha1.ClusterDefinition,
+	clusterDefComp *appsv1alpha1.ClusterComponentDefinition,
+	clusterComp *appsv1alpha1.ClusterComponentSpec,
 	component *SynthesizedComponent) {
 	monitorEnable := false
 	if clusterComp != nil {
@@ -137,7 +137,7 @@ func buildMysqlMonitorContainer(monitor *mysqlMonitorConfig) (*corev1.Container,
 	return &container, nil
 }
 
-func setMysqlComponent(cluster *dbaasv1alpha1.Cluster, component *SynthesizedComponent) error {
+func setMysqlComponent(cluster *appsv1alpha1.Cluster, component *SynthesizedComponent) error {
 	image := viper.GetString(constant.KBImage)
 	imagePullPolicy := viper.GetString(constant.KBImagePullPolicy)
 

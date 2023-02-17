@@ -2,16 +2,16 @@
 # since it depends on service name and namespace that are out of this kustomize package.
 # It should be run by config/default
 resources:
-- bases/dbaas.kubeblocks.io_clusters.yaml
-- bases/dbaas.kubeblocks.io_clusterdefinitions.yaml
-- bases/dbaas.kubeblocks.io_clusterversions.yaml
+- bases/apps.kubeblocks.io_clusters.yaml
+- bases/apps.kubeblocks.io_clusterdefinitions.yaml
+- bases/apps.kubeblocks.io_clusterversions.yaml
 - bases/dataprotection.kubeblocks.io_backuptools.yaml
 - bases/dataprotection.kubeblocks.io_backuppolicies.yaml
 - bases/dataprotection.kubeblocks.io_backups.yaml
 - bases/dataprotection.kubeblocks.io_restorejobs.yaml
 - bases/dataprotection.kubeblocks.io_backuppolicytemplates.yaml
-- bases/dbaas.kubeblocks.io_opsrequests.yaml
-- bases/dbaas.kubeblocks.io_configconstraints.yaml
+- bases/apps.kubeblocks.io_opsrequests.yaml
+- bases/apps.kubeblocks.io_configconstraints.yaml
 #+kubebuilder:scaffold:crdkustomizeresource
 
 patchesStrategicMerge:

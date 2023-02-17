@@ -33,7 +33,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
-	testdbaas "github.com/apecloud/kubeblocks/internal/testutil/dbaas"
+	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 )
 
 type roleEventValue struct {
@@ -56,8 +56,8 @@ var _ = Describe("Event Controller", func() {
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 		// namespaced
-		testdbaas.ClearResources(&testCtx, intctrlutil.EventSignature, inNS, ml)
-		testdbaas.ClearResources(&testCtx, intctrlutil.PodSignature, inNS, ml)
+		testapps.ClearResources(&testCtx, intctrlutil.EventSignature, inNS, ml)
+		testapps.ClearResources(&testCtx, intctrlutil.PodSignature, inNS, ml)
 	}
 
 	BeforeEach(cleanEnv)

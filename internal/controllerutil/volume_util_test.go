@@ -23,14 +23,14 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 
-	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 )
 
 var _ = Describe("lifecycle_utils", func() {
 
 	Context("has the checkAndUpdatePodVolumes function which generates Pod Volumes for mounting ConfigMap objects", func() {
 		var sts appsv1.StatefulSet
-		var volumes map[string]dbaasv1alpha1.ConfigTemplate
+		var volumes map[string]appsv1alpha1.ConfigTemplate
 		BeforeEach(func() {
 			sts = appsv1.StatefulSet{
 				Spec: appsv1.StatefulSetSpec{
@@ -61,7 +61,7 @@ var _ = Describe("lifecycle_utils", func() {
 					},
 				},
 			}
-			volumes = make(map[string]dbaasv1alpha1.ConfigTemplate)
+			volumes = make(map[string]appsv1alpha1.ConfigTemplate)
 
 		})
 
@@ -73,7 +73,7 @@ var _ = Describe("lifecycle_utils", func() {
 		})
 
 		It("should succeed in normal test case, where one volume is added", func() {
-			volumes["my_config"] = dbaasv1alpha1.ConfigTemplate{
+			volumes["my_config"] = appsv1alpha1.ConfigTemplate{
 				Name:                "myConfig",
 				ConfigTplRef:        "myConfig",
 				ConfigConstraintRef: "myConfig",
@@ -86,13 +86,13 @@ var _ = Describe("lifecycle_utils", func() {
 		})
 
 		It("should succeed in normal test case, where two volumes are added", func() {
-			volumes["my_config"] = dbaasv1alpha1.ConfigTemplate{
+			volumes["my_config"] = appsv1alpha1.ConfigTemplate{
 				Name:                "myConfig",
 				ConfigTplRef:        "myConfig",
 				ConfigConstraintRef: "myConfig",
 				VolumeName:          "myConfigVolume",
 			}
-			volumes["my_config1"] = dbaasv1alpha1.ConfigTemplate{
+			volumes["my_config1"] = appsv1alpha1.ConfigTemplate{
 				Name:                "myConfig",
 				ConfigTplRef:        "myConfig",
 				ConfigConstraintRef: "myConfig",
@@ -116,7 +116,7 @@ var _ = Describe("lifecycle_utils", func() {
 						EmptyDir: &corev1.EmptyDirVolumeSource{},
 					},
 				})
-			volumes[cmName] = dbaasv1alpha1.ConfigTemplate{
+			volumes[cmName] = appsv1alpha1.ConfigTemplate{
 				Name:                "configTplName",
 				ConfigTplRef:        "configTplName",
 				ConfigConstraintRef: "configTplName",
@@ -143,7 +143,7 @@ var _ = Describe("lifecycle_utils", func() {
 					},
 				})
 
-			volumes[cmName] = dbaasv1alpha1.ConfigTemplate{
+			volumes[cmName] = appsv1alpha1.ConfigTemplate{
 				Name:                "configTplName",
 				ConfigTplRef:        "configTplName",
 				ConfigConstraintRef: "configTplName",

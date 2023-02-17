@@ -343,7 +343,7 @@ func initDB(url, pemPath string) (*sql.DB, error) {
 // }
 
 // func prepareValues(columnTypes []*sql.ColumnType) []interface{} {
-// 	types := make([]reflect.Type, len(columnTypes))
+// 	types := make([]reflect.ComponentDefRef, len(columnTypes))
 // 	for i, tp := range columnTypes {
 // 		types[i] = tp.ScanType()
 // 	}

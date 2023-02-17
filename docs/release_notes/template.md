@@ -56,6 +56,8 @@ Release Notes for `v0.3.0`:
     ```
     kubectl apply -f clusters.yaml
       ```
+- Rename group name `dbaas.kubeblocks.io` to `apps.kubeblocks.io`
+    - upgrade kubeblocks to create new CRDs, after that, you can delete the CRDs with group name`dbaas.kubeblocks.io`
 ## Breaking Changes
 
 $kubeblocks_breaking_changes

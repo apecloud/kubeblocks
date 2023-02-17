@@ -40,17 +40,6 @@ func (r *ClusterVersion) SetupWebhookWithManager(mgr ctrl.Manager) error {
 		Complete()
 }
 
-//+kubebuilder:webhook:path=/mutate-apps-kubeblocks-io-v1alpha1-clusterversion,mutating=true,failurePolicy=fail,sideEffects=None,groups=apps.kubeblocks.io,resources=clusterversions,verbs=create;update,versions=v1alpha1,name=mclusterversion.kb.io,admissionReviewVersions=v1
-
-var _ webhook.Defaulter = &ClusterVersion{}
-
-// Default implements webhook.Defaulter so a webhook will be registered for the type
-func (r *ClusterVersion) Default() {
-	clusterversionlog.Info("default", "name", r.Name)
-
-	// TODO(user): fill in your defaulting logic.
-}
-
 // TODO(user): change verbs to "verbs=create;update;delete" if you want to enable deletion validation.
 //+kubebuilder:webhook:path=/validate-apps-kubeblocks-io-v1alpha1-clusterversion,mutating=false,failurePolicy=fail,sideEffects=None,groups=apps.kubeblocks.io,resources=clusterversions,verbs=create;update,versions=v1alpha1,name=vclusterversion.kb.io,admissionReviewVersions=v1
 

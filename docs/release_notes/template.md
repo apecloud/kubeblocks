@@ -48,14 +48,16 @@ Release Notes for `v0.3.0`:
     then replace all spec.appVersionRef to spec.clusterVersionRef in the clusters.yaml.
 
     Then, handle OpsRequest CR the same way.
-  - after you upgrade KubeBlocks, you can delete the CRD `appversions.apps.kubeblocks.io`
+  - after you upgrade KubeBlocks, you can delete the CRD `appversions.dbaas.kubeblocks.io`
     ```
-    kubectl delete crd appversions.apps.kubeblocks.io
+    kubectl delete crd appversions.dbaas.kubeblocks.io
     ```
     the last step, use the above backup of Clusters and OpsRequests to apply them.
     ```
     kubectl apply -f clusters.yaml
       ```
+- Rename group name `dbaas.kubeblocks.io` to `apps.kubeblocks.io`
+    - upgrade kubeblocks to create new CRDs, after that, you can delete the CRDs with group name`dbaas.kubeblocks.io`
 ## Breaking Changes
 
 $kubeblocks_breaking_changes

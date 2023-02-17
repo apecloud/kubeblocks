@@ -53,17 +53,6 @@ func (r *OpsRequest) SetupWebhookWithManager(mgr ctrl.Manager) error {
 		Complete()
 }
 
-//+kubebuilder:webhook:path=/mutate-apps-kubeblocks-io-v1alpha1-opsrequest,mutating=true,failurePolicy=fail,sideEffects=None,groups=apps.kubeblocks.io,resources=opsrequests,verbs=create;update,versions=v1alpha1,name=mopsrequest.kb.io,admissionReviewVersions=v1
-
-var _ webhook.Defaulter = &OpsRequest{}
-
-// Default implements webhook.Defaulter so a webhook will be registered for the type
-func (r *OpsRequest) Default() {
-	opsrequestlog.Info("default", "name", r.Name)
-
-	// TODO(user): fill in your defaulting logic.
-}
-
 // TODO(user): change verbs to "verbs=create;update;delete" if you want to enable deletion validation.
 //+kubebuilder:webhook:path=/validate-apps-kubeblocks-io-v1alpha1-opsrequest,mutating=false,failurePolicy=fail,sideEffects=None,groups=apps.kubeblocks.io,resources=opsrequests,verbs=create;update,versions=v1alpha1,name=vopsrequest.kb.io,admissionReviewVersions=v1
 

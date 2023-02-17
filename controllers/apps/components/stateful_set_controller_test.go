@@ -94,6 +94,14 @@ var _ = Describe("StatefulSet Controller", func() {
 	}
 
 	testUsingEnvTest := func(sts *appsv1.StatefulSet) {
+		By("mock statefulset update completed")
+		updateRevision := fmt.Sprintf("%s-%s-%s", clusterName, consensusCompName, revisionID)
+		Expect(testapps.ChangeObjStatus(&testCtx, sts, func() {
+			sts.Status.UpdateRevision = updateRevision
+			testk8s.MockStatefulSetReady(sts)
+			sts.Status.ObservedGeneration = 2
+		})).Should(Succeed())
+
 		By("create pods of statefulset")
 		pods := testapps.MockConsensusComponentPods(testCtx, sts, clusterName, consensusCompName)
 
@@ -111,14 +119,6 @@ var _ = Describe("StatefulSet Controller", func() {
 			sts.Spec.Template.Annotations = map[string]string{
 				intctrlutil.RestartAnnotationKey: time.Now().Format(time.RFC3339),
 			}
-		})).Should(Succeed())
-
-		By("mock statefulset update completed")
-		updateRevision := fmt.Sprintf("%s-%s-%s", clusterName, consensusCompName, revisionID)
-		Expect(testapps.ChangeObjStatus(&testCtx, sts, func() {
-			sts.Status.UpdateRevision = updateRevision
-			testk8s.MockStatefulSetReady(sts)
-			sts.Status.ObservedGeneration = 2
 		})).Should(Succeed())
 
 		Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(sts),

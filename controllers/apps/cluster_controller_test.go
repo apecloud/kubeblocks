@@ -676,9 +676,9 @@ var _ = Describe("Cluster Controller", func() {
 					Name:      stsName + "-" + strconv.Itoa(i),
 					Namespace: testCtx.DefaultNamespace,
 					Labels: map[string]string{
-						intctrlutil.AppInstanceLabelKey:  clusterName,
-						intctrlutil.AppComponentLabelKey: componentName,
-						"controller-revision-hash":       "mock-version",
+						intctrlutil.AppInstanceLabelKey:       clusterName,
+						intctrlutil.AppComponentLabelKey:      componentName,
+						appsv1.ControllerRevisionHashLabelKey: "mock-version",
 					},
 				},
 				Spec: corev1.PodSpec{
@@ -832,10 +832,10 @@ var _ = Describe("Cluster Controller", func() {
 					Name:      sts.Name + "-0",
 					Namespace: testCtx.DefaultNamespace,
 					Labels: map[string]string{
-						intctrlutil.RoleLabelKey:         sts.Labels[intctrlutil.RoleLabelKey],
-						intctrlutil.AppInstanceLabelKey:  clusterName,
-						intctrlutil.AppComponentLabelKey: componentName,
-						"controller-revision-hash":       "mock-version",
+						intctrlutil.RoleLabelKey:              sts.Labels[intctrlutil.RoleLabelKey],
+						intctrlutil.AppInstanceLabelKey:       clusterName,
+						intctrlutil.AppComponentLabelKey:      componentName,
+						appsv1.ControllerRevisionHashLabelKey: "mock-version",
 					},
 				},
 				Spec: corev1.PodSpec{

@@ -111,6 +111,7 @@ var _ = Describe("Replication Component", func() {
 						intctrlutil.RoleLabelKey, k).
 					SetReplicas(1).
 					Create(&testCtx).GetObject()
+				testdbaas.MockReplicationComponentPods(testCtx, sts, clusterName, testdbaas.DefaultRedisCompName, k)
 				if k == string(Primary) {
 					Expect(CheckStsIsPrimary(sts)).Should(BeTrue())
 					primarySts = sts

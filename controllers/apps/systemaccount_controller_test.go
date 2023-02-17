@@ -18,7 +18,6 @@ package apps
 
 import (
 	"context"
-	"math/rand"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -47,7 +46,6 @@ var _ = Describe("SystemAccount Controller", func() {
 		mysqlCompName          = "mysql"
 		mysqlCompNameWOSysAcct = "wo-sysacct"
 		orphanFinalizerName    = "orphan"
-		mysqlClientImage       = "docker.io/mysql:8.0.30"
 		clusterEndPointsSize   = 3
 	)
 
@@ -84,20 +82,6 @@ var _ = Describe("SystemAccount Controller", func() {
 		clusterVersionObj *appsv1alpha1.ClusterVersion
 	)
 
-	var (
-		mysqlCmdConfig = appsv1alpha1.CmdExecutorConfig{
-			Image:   mysqlClientImage,
-			Command: []string{"mysql"},
-			Args:    []string{"-h$(KB_ACCOUNT_ENDPOINT)", "-e $(KB_ACCOUNT_STATEMENT)"},
-		}
-
-		pwdConfig = appsv1alpha1.PasswordConfig{
-			Length:     10,
-			NumDigits:  5,
-			NumSymbols: 0,
-		}
-	)
-
 	cleanEnv := func() {
 		// must wait until resources deleted and no longer exist before the testcases start,
 		// otherwise if later it needs to create some new resource objects with the same name,
@@ -123,59 +107,6 @@ var _ = Describe("SystemAccount Controller", func() {
 	/**
 	 * Start of mock functions.
 	 **/
-	mockCreateByStmtSystemAccount := func(name appsv1alpha1.AccountName) appsv1alpha1.SystemAccountConfig {
-		return appsv1alpha1.SystemAccountConfig{
-			Name: name,
-			ProvisionPolicy: appsv1alpha1.ProvisionPolicy{
-				Type: appsv1alpha1.CreateByStmt,
-				Statements: &appsv1alpha1.ProvisionStatements{
-					CreationStatement: "CREATE USER IF NOT EXISTS $(USERNAME) IDENTIFIED BY \"$(PASSWD)\";",
-					DeletionStatement: "DROP USER IF EXISTS $(USERNAME);",
-				},
-			},
-		}
-	}
-
-	mockCreateByRefSystemAccount := func(name appsv1alpha1.AccountName, scope appsv1alpha1.ProvisionScope) appsv1alpha1.SystemAccountConfig {
-		return appsv1alpha1.SystemAccountConfig{
-			Name: name,
-			ProvisionPolicy: appsv1alpha1.ProvisionPolicy{
-				Type:  appsv1alpha1.ReferToExisting,
-				Scope: scope,
-				SecretRef: &appsv1alpha1.ProvisionSecretRef{
-					Namespace: testCtx.DefaultNamespace,
-					Name:      "$(CONN_CREDENTIAL_SECRET_NAME)",
-				},
-			},
-		}
-	}
-
-	mockSystemAccountsSpec := func() *appsv1alpha1.SystemAccountSpec {
-		spec := &appsv1alpha1.SystemAccountSpec{
-			CmdExecutorConfig: &mysqlCmdConfig,
-			PasswordConfig:    pwdConfig,
-			Accounts:          []appsv1alpha1.SystemAccountConfig{},
-		}
-		var account appsv1alpha1.SystemAccountConfig
-		var scope appsv1alpha1.ProvisionScope
-		for _, name := range getAllSysAccounts() {
-			randomToss := rand.Intn(10)
-			if randomToss%2 == 0 {
-				scope = appsv1alpha1.AnyPods
-			} else {
-				scope = appsv1alpha1.AllPods
-			}
-
-			if randomToss%3 == 0 {
-				account = mockCreateByRefSystemAccount(name, scope)
-			} else {
-				account = mockCreateByStmtSystemAccount(name)
-			}
-			spec.Accounts = append(spec.Accounts, account)
-		}
-		return spec
-	}
-
 	mockEndpoint := func(namespace, endpointName string, ips []string) *corev1.Endpoints {
 		mockAddresses := func(ip, podName string) corev1.EndpointAddress {
 			return corev1.EndpointAddress{
@@ -318,6 +249,7 @@ var _ = Describe("SystemAccount Controller", func() {
 			clusterObj := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
 				clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
 				AddComponent(testCase.componentName, testCase.componentType).
+				SetReplicas(1).
 				Create(&testCtx).GetObject()
 			clusterKey := client.ObjectKeyFromObject(clusterObj)
 			clustersMap[testName] = clusterKey

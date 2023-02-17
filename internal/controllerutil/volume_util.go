@@ -16,7 +16,15 @@ limitations under the License.
 
 package controllerutil
 
-import corev1 "k8s.io/api/core/v1"
+import (
+	"fmt"
+	"sort"
+
+	"golang.org/x/exp/maps"
+	corev1 "k8s.io/api/core/v1"
+
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+)
 
 type createVolumeFn func(volumeName string) corev1.Volume
 type updateVolumeFn func(*corev1.Volume) error
@@ -44,4 +52,40 @@ func CheckAndUpdateVolume(volumes []corev1.Volume, volumeName string, createFn c
 
 	// for create volume
 	return append(volumes, createFn(volumeName)), nil
+}
+
+func CheckAndUpdatePodVolumes(podSpec *corev1.PodSpec, volumes map[string]appsv1alpha1.ConfigTemplate) error {
+	var (
+		err        error
+		podVolumes = podSpec.Volumes
+	)
+	// sort the volumes
+	volumeKeys := maps.Keys(volumes)
+	sort.Strings(volumeKeys)
+	// Update PodTemplate Volumes
+	for _, cmName := range volumeKeys {
+		tpl := volumes[cmName]
+		if podVolumes, err = CheckAndUpdateVolume(podVolumes, tpl.VolumeName, func(volumeName string) corev1.Volume {
+			return corev1.Volume{
+				Name: volumeName,
+				VolumeSource: corev1.VolumeSource{
+					ConfigMap: &corev1.ConfigMapVolumeSource{
+						LocalObjectReference: corev1.LocalObjectReference{Name: cmName},
+						DefaultMode:          tpl.DefaultMode,
+					},
+				},
+			}
+		}, func(volume *corev1.Volume) error {
+			configMap := volume.ConfigMap
+			if configMap == nil {
+				return fmt.Errorf("mount volume[%s] type require ConfigMap: [%+v]", volume.Name, volume)
+			}
+			configMap.Name = cmName
+			return nil
+		}); err != nil {
+			return err
+		}
+	}
+	podSpec.Volumes = podVolumes
+	return nil
 }

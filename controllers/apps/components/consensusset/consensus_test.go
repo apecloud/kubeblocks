@@ -32,12 +32,13 @@ import (
 
 var _ = Describe("Consensus Component", func() {
 	var (
-		randomStr                    = testCtx.GetRandomStr()
-		clusterDefName               = "mysql-clusterdef-" + randomStr
-		clusterVersionName           = "mysql-clusterversion-" + randomStr
-		clusterName                  = "mysql-" + randomStr
-		timeout                      = 10 * time.Second
-		interval                     = time.Second
+		randomStr          = testCtx.GetRandomStr()
+		clusterDefName     = "mysql-clusterdef-" + randomStr
+		clusterVersionName = "mysql-clusterversion-" + randomStr
+		clusterName        = "mysql-" + randomStr
+	)
+
+	const (
 		consensusCompName            = "consensus"
 		defaultMinReadySeconds int32 = 10
 	)
@@ -90,7 +91,7 @@ var _ = Describe("Consensus Component", func() {
 		It("Consensus Component test", func() {
 			By(" init cluster, statefulSet, pods")
 			clusterDef, _, cluster := testapps.InitConsensusMysql(testCtx, clusterDefName,
-				clusterVersionName, clusterName, consensusCompName)
+				clusterVersionName, clusterName, "consensus", consensusCompName)
 
 			sts := testapps.MockConsensusComponentStatefulSet(testCtx, clusterName, consensusCompName)
 			componentName := consensusCompName
@@ -115,39 +116,26 @@ var _ = Describe("Consensus Component", func() {
 			Expect(isRunning == false).Should(BeTrue())
 
 			podName := sts.Name + "-0"
-			if testCtx.UsingExistingCluster() {
-				Eventually(func() bool {
-					phase, _ := consensusComponent.GetPhaseWhenPodsNotReady(consensusCompName)
-					return phase == ""
-				}, timeout*5, interval).Should(BeTrue())
+			podList := testapps.MockConsensusComponentPods(testCtx, sts, clusterName, consensusCompName)
+			By("expect for pod is available")
+			Expect(consensusComponent.PodIsAvailable(podList[0], defaultMinReadySeconds)).Should(BeTrue())
 
-				By("test handle probe timed out")
-				mockClusterStatusProbeTimeout(cluster)
-				requeue, _ := consensusComponent.HandleProbeTimeoutWhenPodsReady(nil)
-				Expect(requeue == false).Should(BeTrue())
-				validateComponentStatus(cluster)
-			} else {
-				podList := testapps.MockConsensusComponentPods(testCtx, sts, clusterName, consensusCompName)
-				By("expect for pod is available")
-				Expect(consensusComponent.PodIsAvailable(podList[0], defaultMinReadySeconds)).Should(BeTrue())
+			By("test handle probe timed out")
+			mockClusterStatusProbeTimeout(cluster)
+			// mock leader pod is not ready
+			testk8s.UpdatePodStatusNotReady(ctx, testCtx, podName)
+			testk8s.DeletePodLabelKey(ctx, testCtx, podName, intctrlutil.RoleLabelKey)
+			requeue, _ := consensusComponent.HandleProbeTimeoutWhenPodsReady(nil)
+			Expect(requeue == false).Should(BeTrue())
+			validateComponentStatus(cluster)
 
-				By("test handle probe timed out")
-				mockClusterStatusProbeTimeout(cluster)
-				// mock leader pod is not ready
-				testk8s.UpdatePodStatusNotReady(ctx, testCtx, podName)
-				testk8s.DeletePodLabelKey(ctx, testCtx, podName, intctrlutil.RoleLabelKey)
-				requeue, _ := consensusComponent.HandleProbeTimeoutWhenPodsReady(nil)
-				Expect(requeue == false).Should(BeTrue())
-				validateComponentStatus(cluster)
+			By("test component is running")
+			isRunning, _ = consensusComponent.IsRunning(sts)
+			Expect(isRunning == false).Should(BeTrue())
 
-				By("test component is running")
-				isRunning, _ := consensusComponent.IsRunning(sts)
-				Expect(isRunning == false).Should(BeTrue())
-
-				By("test component phase when pods not ready")
-				phase, _ := consensusComponent.GetPhaseWhenPodsNotReady(consensusCompName)
-				Expect(phase == appsv1alpha1.FailedPhase).Should(BeTrue())
-			}
+			By("test component phase when pods not ready")
+			phase, _ := consensusComponent.GetPhaseWhenPodsNotReady(consensusCompName)
+			Expect(phase == appsv1alpha1.FailedPhase).Should(BeTrue())
 		})
 	})
 })

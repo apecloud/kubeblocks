@@ -27,17 +27,9 @@ import (
 
 var _ = Describe("probe_utils", func() {
 
-	BeforeEach(func() {
-		// Add any steup steps that needs to be executed before each test
-	})
-
-	AfterEach(func() {
-		// Add any teardown steps that needs to be executed after each test
-	})
-
-	Context("buildProbeContainers", func() {
+	Context("has the buildProbeContainers method", func() {
 		var container *corev1.Container
-		var component *Component
+		var component *SynthesizedComponent
 		var probeServiceHTTPPort, probeServiceGrpcPort int
 		var clusterDefProbe *appsv1alpha1.ClusterDefinitionProbe
 
@@ -51,18 +43,28 @@ var _ = Describe("probe_utils", func() {
 			clusterDefProbe.PeriodSeconds = 1
 			clusterDefProbe.TimeoutSeconds = 1
 			clusterDefProbe.FailureThreshold = 1
-			component = &Component{}
+			component = &SynthesizedComponent{}
 			component.CharacterType = "mysql"
 		})
 
-		It("Build role changed probe container", func() {
+		It("should build role changed probe container", func() {
 			buildRoleChangedProbeContainer("wesql", container, clusterDefProbe, probeServiceHTTPPort)
-			Expect(len(container.ReadinessProbe.Exec.Command)).ShouldNot(BeZero())
+			Expect(container.ReadinessProbe.Exec.Command).ShouldNot(BeEmpty())
 		})
 
-		It("Build role service container", func() {
+		It("should build role service container", func() {
 			buildProbeServiceContainer(component, container, probeServiceHTTPPort, probeServiceGrpcPort)
-			Expect(len(container.Command)).ShouldNot(BeZero())
+			Expect(container.Command).ShouldNot(BeEmpty())
+		})
+
+		It("should build status probe container", func() {
+			buildStatusProbeContainer(container, clusterDefProbe, probeServiceHTTPPort)
+			Expect(container.ReadinessProbe.HTTPGet).ShouldNot(BeNil())
+		})
+
+		It("should build status probe container", func() {
+			buildRunningProbeContainer(container, clusterDefProbe, probeServiceHTTPPort)
+			Expect(container.ReadinessProbe.HTTPGet).ShouldNot(BeNil())
 		})
 	})
 })

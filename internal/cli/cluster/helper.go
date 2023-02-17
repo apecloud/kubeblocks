@@ -173,6 +173,9 @@ func GetComponentEndpoints(svcList *corev1.ServiceList, c *appsv1alpha1.ClusterC
 
 // GetComponentServices gets component services
 func GetComponentServices(svcList *corev1.ServiceList, c *appsv1alpha1.ClusterComponent) []*corev1.Service {
+	if svcList == nil {
+		return nil
+	}
 	var svcs []*corev1.Service
 	for i, svc := range svcList.Items {
 		if svc.GetLabels()[types.ComponentLabelKey] != c.Name {

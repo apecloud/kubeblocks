@@ -91,11 +91,12 @@ var _ = Describe("Consensus Component", func() {
 		clusterDefName     = "mysql-clusterdef-" + randomStr
 		clusterVersionName = "mysql-clusterversion-" + randomStr
 		clusterName        = "mysql-" + randomStr
-		timeout            = 10 * time.Second
-		interval           = time.Second
-		consensusCompType  = "consensus"
-		consensusCompName  = "consensus"
-		statelessCompName  = "stateless"
+	)
+
+	const (
+		consensusCompType = "consensus"
+		consensusCompName = "consensus"
+		statelessCompName = "stateless"
 	)
 
 	cleanAll := func() {
@@ -126,11 +127,7 @@ var _ = Describe("Consensus Component", func() {
 				clusterVersionName, clusterName, statelessCompName, "stateful", consensusCompName)
 			sts := testapps.MockConsensusComponentStatefulSet(testCtx, clusterName, consensusCompName)
 			testapps.MockStatelessComponentDeploy(testCtx, clusterName, statelessCompName)
-			if !testCtx.UsingExistingCluster() {
-				_ = testapps.MockConsensusComponentPods(testCtx, sts, clusterName, consensusCompName)
-			} else {
-				timeout = 3 * timeout
-			}
+			_ = testapps.MockConsensusComponentPods(testCtx, sts, clusterName, consensusCompName)
 
 			By("test GetComponentDefByCluster function")
 			componentDef, _ := GetComponentDefByCluster(ctx, k8sClient, cluster, consensusCompType)
@@ -144,7 +141,7 @@ var _ = Describe("Consensus Component", func() {
 			Eventually(func() bool {
 				podList, _ := GetComponentPodList(ctx, k8sClient, cluster, consensusCompName)
 				return len(podList.Items) > 0
-			}, timeout, interval).Should(BeTrue())
+			}).Should(BeTrue())
 
 			By("test GetObjectListByComponentName function")
 			stsList := &appsv1.StatefulSetList{}

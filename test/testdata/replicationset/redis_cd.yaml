@@ -1,9 +1,0 @@
-apiVersion: apps.kubeblocks.io/v1alpha1
-kind: ClusterDefinition
-metadata:
-  name: %s
-spec:
-  componentDefs:
-    - name: replication
-      workloadType: Replication
-      updateStrategy: OnDelete

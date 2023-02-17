@@ -43,6 +43,7 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 		timeout            = time.Second * 10
 		interval           = time.Second
 		consensusCompName  = "consensus"
+		consensusCompType  = "consensus"
 	)
 	cleanEnv := func() {
 		// must wait until resources deleted and no longer exist before the testcases start,
@@ -70,7 +71,7 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 		It("test cluster conditions", func() {
 			By("init cluster")
 			cluster := testapps.CreateConsensusMysqlCluster(testCtx, clusterDefName,
-				clusterVersionName, clusterName, consensusCompName)
+				clusterVersionName, clusterName, consensusCompType, consensusCompName)
 			By("test when clusterDefinition not found")
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(cluster), func(g Gomega, tmpCluster *appsv1alpha1.Cluster) {
 				condition := meta.FindStatusCondition(tmpCluster.Status.Conditions, ConditionTypeProvisioningStarted)
@@ -89,8 +90,8 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 			}), timeout*2, interval).Should(Succeed())
 
 			By("test when clusterVersion not Available")
-			_ = testapps.CreateConsensusMysqlClusterDef(testCtx, clusterDefName)
-			clusterVersion := testapps.CreateConsensusMysqlClusterVersion(testCtx, clusterDefName, clusterVersionName)
+			_ = testapps.CreateConsensusMysqlClusterDef(testCtx, clusterDefName, consensusCompType)
+			clusterVersion := testapps.CreateConsensusMysqlClusterVersion(testCtx, clusterDefName, clusterVersionName, consensusCompType)
 			// mock clusterVersion unavailable
 			Eventually(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(clusterVersion), func(clusterVersion *appsv1alpha1.ClusterVersion) {
 				clusterVersion.Spec.ComponentVersions[0].ComponentDefRef = "test-n"

@@ -17,5 +17,3 @@ limitations under the License.
 package proto
 
 //go:generate protoc --go_out=. --go_opt=paths=source_relative --go-grpc_out=. --go-grpc_opt=paths=source_relative reconfigure.proto
-
-//go:generate go run github.com/golang/mock/mockgen -copyright_file ../../../hack/boilerplate.go.txt -destination mocks/reconfigure_client_mocks.go . ReconfigureClient

@@ -39,14 +39,15 @@ import (
 var _ = Describe("Deployment Controller", func() {
 	var (
 		randomStr          = testCtx.GetRandomStr()
-		timeout            = time.Second * 10
-		interval           = time.Second
 		clusterDefName     = "stateless-definition1-" + randomStr
 		clusterVersionName = "stateless-cluster-version1-" + randomStr
 		clusterName        = "stateless1-" + randomStr
-		namespace          = "default"
-		statelessCompName  = "nginx"
-		statelessType      = "proxy"
+	)
+
+	const (
+		namespace         = "default"
+		statelessCompName = "stateless"
+		statelessCompType = "stateless"
 	)
 
 	cleanAll := func() {
@@ -74,9 +75,11 @@ var _ = Describe("Deployment Controller", func() {
 	Context("test controller", func() {
 		It("", func() {
 			testapps.NewClusterDefFactory(clusterDefName).
-				AddComponent(testapps.StatelessNginxComponent, statelessType).
+				AddComponent(testapps.StatelessNginxComponent, statelessCompType).
 				Create(&testCtx).GetObject()
-			cluster := testapps.CreateStatelessCluster(testCtx, clusterDefName, clusterVersionName, clusterName, 2)
+
+			cluster := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefName, clusterVersionName).
+				AddComponent(statelessCompName, statelessCompType).SetReplicas(2).Create(&testCtx).GetObject()
 
 			By("patch cluster to Running")
 			Expect(testapps.ChangeObjStatus(&testCtx, cluster, func() {
@@ -91,8 +94,7 @@ var _ = Describe("Deployment Controller", func() {
 			})).Should(Succeed())
 
 			By("check stateless component phase is Failed")
-			Eventually(testapps.GetClusterComponentPhase(testCtx, clusterName, statelessCompName),
-				timeout, interval).Should(Equal(appsv1alpha1.FailedPhase))
+			Eventually(testapps.GetClusterComponentPhase(testCtx, clusterName, statelessCompName)).Should(Equal(appsv1alpha1.FailedPhase))
 
 			By("test when a pod of deployment is failed")
 			podName := fmt.Sprintf("%s-%s-%s", clusterName, statelessCompName, testCtx.GetRandomStr())
@@ -147,11 +149,10 @@ var _ = Describe("Deployment Controller", func() {
 				g.Expect(deploy.Status.AvailableReplicas == newDeployment.Status.AvailableReplicas &&
 					deploy.Status.ReadyReplicas == newDeployment.Status.ReadyReplicas &&
 					deploy.Status.Replicas == newDeployment.Status.Replicas).Should(BeTrue())
-			}), timeout, interval).Should(Succeed())
+			})).Should(Succeed())
 
 			By("waiting the component is Running")
-			Eventually(testapps.GetClusterComponentPhase(testCtx, clusterName, statelessCompName),
-				timeout, interval).Should(Equal(appsv1alpha1.RunningPhase))
+			Eventually(testapps.GetClusterComponentPhase(testCtx, clusterName, statelessCompName)).Should(Equal(appsv1alpha1.RunningPhase))
 		})
 	})
 })

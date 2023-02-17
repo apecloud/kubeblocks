@@ -23,24 +23,13 @@ import (
 	"github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 )
 
-const (
-	KBPrefix = "KB"
-)
-
 type MonitorConfig struct {
 	Enable     bool   `json:"enable"`
 	ScrapePort int32  `json:"scrapePort,omitempty"`
 	ScrapePath string `json:"scrapePath,omitempty"`
 }
 
-type MysqlMonitor struct {
-	SecretName      string `json:"secretName"`
-	InternalPort    int32  `json:"internalPort"`
-	Image           string `json:"image"`
-	ImagePullPolicy string `json:"imagePullPolicy"`
-}
-
-type Component struct {
+type SynthesizedComponent struct {
 	ClusterDefName          string                              `json:"clusterDefName,omitempty"`
 	Name                    string                              `json:"name,omitempty"`
 	Type                    string                              `json:"type,omitempty"`
@@ -48,8 +37,7 @@ type Component struct {
 	MaxUnavailable          string                              `json:"maxUnavailable,omitempty"`
 	Replicas                int32                               `json:"replicas"`
 	PodDisruptionBudgetSpec *v1.PodDisruptionBudgetSpec         `json:"podDisruptionBudgetSpec,omitempty"`
-	AntiAffinity            bool                                `json:"antiAffinity,omitempty"`
-	ComponentType           v1alpha1.WorkloadType               `json:"componentType,omitempty"`
+	WorkloadType            v1alpha1.WorkloadType               `json:"workloadType,omitempty"`
 	ConsensusSpec           *v1alpha1.ConsensusSetSpec          `json:"consensusSpec,omitempty"`
 	PrimaryIndex            *int32                              `json:"primaryIndex,omitempty"`
 	PodSpec                 *v12.PodSpec                        `json:"podSpec,omitempty"`

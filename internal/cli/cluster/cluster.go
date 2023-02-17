@@ -213,22 +213,18 @@ func (o *ClusterObjects) GetClusterInfo() *ClusterInfo {
 
 func (o *ClusterObjects) GetComponentInfo() []*ComponentInfo {
 	var comps []*ComponentInfo
-	for _, cdComp := range o.ClusterDef.Spec.ComponentDefs {
-		c := FindClusterComp(o.Cluster, cdComp.Name)
-		if c == nil {
-			continue
-		}
-
-		if c.Replicas == nil {
-			r := int32(0)
-			c.Replicas = &r
-		}
-
+	for _, c := range o.Cluster.Spec.ComponentSpecs {
+		// get all pods belonging to current component
 		var pods []*corev1.Pod
 		for _, p := range o.Pods.Items {
 			if n, ok := p.Labels[types.ComponentLabelKey]; ok && n == c.Name {
 				pods = append(pods, &p)
 			}
+		}
+
+		// current component has no pod corresponding to it
+		if len(pods) == 0 {
+			continue
 		}
 
 		image := types.None
@@ -247,7 +243,7 @@ func (o *ClusterObjects) GetComponentInfo() []*ComponentInfo {
 			Image:     image,
 		}
 		comp.CPU, comp.Memory = getResourceInfo(c.Resources.Requests, c.Resources.Limits)
-		comp.Storage = o.getStorageInfo(c)
+		comp.Storage = o.getStorageInfo(&c)
 		comps = append(comps, comp)
 	}
 	return comps

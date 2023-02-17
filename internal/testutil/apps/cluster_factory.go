@@ -91,6 +91,15 @@ func (factory *MockClusterFactory) SetComponentAffinity(affinity *appsv1alpha1.A
 	return factory
 }
 
+func (factory *MockClusterFactory) SetEnabledLogs(logName ...string) *MockClusterFactory {
+	comps := factory.get().Spec.ComponentSpecs
+	if len(comps) > 0 {
+		comps[len(comps)-1].EnabledLogs = logName
+	}
+	factory.get().Spec.ComponentSpecs = comps
+	return factory
+}
+
 func (factory *MockClusterFactory) AddComponentToleration(toleration corev1.Toleration) *MockClusterFactory {
 	comps := factory.get().Spec.ComponentSpecs
 	if len(comps) > 0 {
@@ -127,6 +136,15 @@ func (factory *MockClusterFactory) SetMonitor(monitor bool) *MockClusterFactory 
 	comps := factory.get().Spec.ComponentSpecs
 	if len(comps) > 0 {
 		comps[len(comps)-1].Monitor = monitor
+	}
+	factory.get().Spec.ComponentSpecs = comps
+	return factory
+}
+
+func (factory *MockClusterFactory) SetPrimaryIndex(primaryIndex int32) *MockClusterFactory {
+	comps := factory.get().Spec.ComponentSpecs
+	if len(comps) > 0 {
+		comps[len(comps)-1].PrimaryIndex = &primaryIndex
 	}
 	factory.get().Spec.ComponentSpecs = comps
 	return factory

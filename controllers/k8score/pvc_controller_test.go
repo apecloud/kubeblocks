@@ -50,9 +50,9 @@ var _ = Describe("PersistentVolumeClaim Controller", func() {
 
 	createPVC := func(pvcName string) *corev1.PersistentVolumeClaim {
 		By("By assure an default storageClass")
-		return testapps.CreateCustomizedObj(&testCtx, "operations/volume_expansion_pvc.yaml",
-			&corev1.PersistentVolumeClaim{}, testapps.CustomizeObjYAML("consensus", "apecloud-mysql", pvcName, pvcName, "csi-hostpath-sc"))
-
+		return testapps.NewPersistentVolumeClaimFactory(testCtx.DefaultNamespace, pvcName, "apecloud-mysql",
+			"consensus", "data").SetStorage("2Gi").
+			SetStorageClass("csi-hostpath-sc").Create(&testCtx).GetObject()
 	}
 
 	handlePersistentVolumeClaim := func(reqCtx intctrlutil.RequestCtx, cli client.Client, pvc *corev1.PersistentVolumeClaim) error {

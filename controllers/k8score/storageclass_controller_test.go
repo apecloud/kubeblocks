@@ -47,11 +47,6 @@ var _ = Describe("StorageClass Controller", func() {
 
 	AfterEach(cleanEnv)
 
-	createStorageClassObj := func(storageClassName string, allowVolumeExpansion bool) *storagev1.StorageClass {
-		return testapps.CreateCustomizedObj(&testCtx, "operations/storageclass.yaml",
-			&storagev1.StorageClass{}, testapps.CustomizeObjYAML(storageClassName, allowVolumeExpansion))
-	}
-
 	handleStorageClass := func(reqCtx intctrlutil.RequestCtx, cli client.Client, storageClass *storagev1.StorageClass) error {
 		patch := client.MergeFrom(storageClass.DeepCopy())
 		storageClass.Annotations["kubeblocks.io/test"] = "test"
@@ -63,7 +58,7 @@ var _ = Describe("StorageClass Controller", func() {
 			By("create a storageClass and register a storageClassHandler")
 			StorageClassHandlerMap["test-controller"] = handleStorageClass
 			storageClassName := fmt.Sprintf("standard-%s", testCtx.GetRandomStr())
-			sc := createStorageClassObj(storageClassName, true)
+			sc := testapps.CreateStorageClass(testCtx, storageClassName, true)
 
 			By("test storageClass changes")
 			Eventually(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(sc), func(tmpSc *storagev1.StorageClass) {

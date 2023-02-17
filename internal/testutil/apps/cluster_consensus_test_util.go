@@ -23,11 +23,15 @@ import (
 	"github.com/onsi/gomega"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/apecloud/kubeblocks/internal/testutil"
+)
+
+const (
+	errorLogName = "error"
 )
 
 // InitConsensusMysql initializes a cluster environment which only contains a component of ConsensusSet type for testing,
@@ -36,10 +40,11 @@ func InitConsensusMysql(testCtx testutil.TestContext,
 	clusterDefName,
 	clusterVersionName,
 	clusterName,
+	consensusCompType,
 	consensusCompName string) (*appsv1alpha1.ClusterDefinition, *appsv1alpha1.ClusterVersion, *appsv1alpha1.Cluster) {
-	clusterDef := CreateConsensusMysqlClusterDef(testCtx, clusterDefName)
-	clusterVersion := CreateConsensusMysqlClusterVersion(testCtx, clusterDefName, clusterVersionName)
-	cluster := CreateConsensusMysqlCluster(testCtx, clusterDefName, clusterVersionName, clusterName, consensusCompName)
+	clusterDef := CreateConsensusMysqlClusterDef(testCtx, clusterDefName, consensusCompType)
+	clusterVersion := CreateConsensusMysqlClusterVersion(testCtx, clusterDefName, clusterVersionName, consensusCompType)
+	cluster := CreateConsensusMysqlCluster(testCtx, clusterDefName, clusterVersionName, clusterName, consensusCompType, consensusCompName)
 	return clusterDef, clusterVersion, cluster
 }
 
@@ -49,22 +54,25 @@ func CreateConsensusMysqlCluster(
 	clusterDefName,
 	clusterVersionName,
 	clusterName,
+	componentType,
 	consensusCompName string) *appsv1alpha1.Cluster {
-	return CreateCustomizedObj(&testCtx, "consensusset/wesql.yaml",
-		&appsv1alpha1.Cluster{}, CustomizeObjYAML(clusterVersionName, clusterDefName, clusterName,
-			clusterVersionName, clusterDefName, consensusCompName))
+	pvcSpec := NewPVC("2Gi")
+	return NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefName, clusterVersionName).
+		AddComponent(consensusCompName, componentType).SetReplicas(3).SetEnabledLogs(errorLogName).
+		AddVolumeClaimTemplate("data", &pvcSpec).Create(&testCtx).GetObject()
 }
 
 // CreateConsensusMysqlClusterDef creates a mysql clusterDefinition with a component of ConsensusSet type.
-func CreateConsensusMysqlClusterDef(testCtx testutil.TestContext, clusterDefName string) *appsv1alpha1.ClusterDefinition {
-	return CreateCustomizedObj(&testCtx, "consensusset/wesql_cd.yaml",
-		&appsv1alpha1.ClusterDefinition{}, CustomizeObjYAML(clusterDefName))
+func CreateConsensusMysqlClusterDef(testCtx testutil.TestContext, clusterDefName, componentType string) *appsv1alpha1.ClusterDefinition {
+	filePathPattern := "/data/mysql/log/mysqld.err"
+	return NewClusterDefFactory(clusterDefName).AddComponent(ConsensusMySQLComponent, componentType).
+		AddLogConfig(errorLogName, filePathPattern).Create(&testCtx).GetObject()
 }
 
 // CreateConsensusMysqlClusterVersion creates a mysql clusterVersion with a component of ConsensusSet type.
-func CreateConsensusMysqlClusterVersion(testCtx testutil.TestContext, clusterDefName, clusterVersionName string) *appsv1alpha1.ClusterVersion {
-	return CreateCustomizedObj(&testCtx, "consensusset/wesql_cv.yaml",
-		&appsv1alpha1.ClusterVersion{}, CustomizeObjYAML(clusterVersionName, clusterDefName))
+func CreateConsensusMysqlClusterVersion(testCtx testutil.TestContext, clusterDefName, clusterVersionName, componentType string) *appsv1alpha1.ClusterVersion {
+	return NewClusterVersionFactory(clusterVersionName, clusterDefName).AddComponent(componentType).AddContainerShort("mysql", ApeCloudMySQLImage).
+		Create(&testCtx).GetObject()
 }
 
 // MockConsensusComponentStatefulSet mocks the component statefulSet, just using in envTest
@@ -73,9 +81,8 @@ func MockConsensusComponentStatefulSet(
 	clusterName,
 	consensusCompName string) *appsv1.StatefulSet {
 	stsName := clusterName + "-" + consensusCompName
-	return CreateCustomizedObj(&testCtx, "consensusset/stateful_set.yaml",
-		&appsv1.StatefulSet{}, CustomizeObjYAML(consensusCompName, clusterName,
-			stsName, consensusCompName, clusterName, consensusCompName, clusterName, "%"))
+	return NewStatefulSetFactory(testCtx.DefaultNamespace, stsName, clusterName, consensusCompName).SetReplicas(int32(3)).
+		AddContainer(corev1.Container{Name: DefaultMySQLContainerName, Image: ApeCloudMySQLImage}).Create(&testCtx).GetObject()
 }
 
 // MockConsensusComponentStsPod mocks to create the pod of the consensus StatefulSet, just using in envTest
@@ -86,17 +93,14 @@ func MockConsensusComponentStsPod(
 	consensusCompName,
 	podName,
 	podRole, accessMode string) *corev1.Pod {
-	pod := CreateCustomizedObj(&testCtx, "consensusset/stateful_set_pod.yaml",
-		&corev1.Pod{}, CustomizeObjYAML(consensusCompName, clusterName,
-			clusterName, consensusCompName, accessMode, podRole, podName, "%"),
-		func(pod *corev1.Pod) {
-			if sts != nil {
-				t := true
-				pod.SetOwnerReferences([]metav1.OwnerReference{
-					{APIVersion: "apps/v1", Kind: "StatefulSet", Controller: &t, BlockOwnerDeletion: &t, Name: sts.Name, UID: sts.UID},
-				})
-			}
-		})
+	pod := NewPodFactory(testCtx.DefaultNamespace, podName).SetOwnerReferences("apps/v1", intctrlutil.StatefulSetKind, sts).AddLabelsInMap(map[string]string{
+		intctrlutil.AppInstanceLabelKey:            clusterName,
+		intctrlutil.AppComponentLabelKey:           consensusCompName,
+		intctrlutil.AppManagedByLabelKey:           intctrlutil.AppName,
+		intctrlutil.RoleLabelKey:                   podRole,
+		intctrlutil.ConsensusSetAccessModeLabelKey: accessMode,
+		"controller-revision-hash":                 fmt.Sprintf("%s-%s-6fdd48d9cd", clusterName, consensusCompName),
+	}).AddContainer(corev1.Container{Name: DefaultMySQLContainerName, Image: ApeCloudMySQLImage}).Create(&testCtx).GetObject()
 	patch := client.MergeFrom(pod.DeepCopy())
 	pod.Status.Conditions = []corev1.PodCondition{
 		{

@@ -141,11 +141,11 @@ var _ = Describe("builder", func() {
 		}
 		return reqCtx
 	}
-	newAllFieldsComponent := func() *component.Component {
+	newAllFieldsComponent := func() *component.SynthesizedComponent {
 		cluster, clusterDef, clusterVersion, _ := newAllFieldsClusterObj(nil, nil, false)
 		reqCtx := newReqCtx()
 		By("assign every available fields")
-		component := component.MergeComponents(
+		component := component.BuildComponent(
 			reqCtx,
 			cluster,
 			clusterDef,

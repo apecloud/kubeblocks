@@ -33,14 +33,24 @@ func InitClusterWithHybridComps(
 	clusterDefName,
 	clusterVersionName,
 	clusterName,
-	statelessComName,
-	statefulComName,
-	consensusComName string) (*appsv1alpha1.ClusterDefinition, *appsv1alpha1.ClusterVersion, *appsv1alpha1.Cluster) {
-	clusterDef := CreateClusterDefWithHybridComps(testCtx, clusterDefName)
-	clusterVersion := CreateClusterVersionWithHybridComps(testCtx, clusterDefName,
-		clusterVersionName, []string{"docker.io/apecloud/wesql-server:latest", "busybox:latest", "docker.io/apecloud/wesql-server:latest"})
-	cluster := CreateClusterWithHybridComps(testCtx, clusterDefName,
-		clusterVersionName, clusterName, statelessComName, consensusComName, statefulComName)
+	statelessComp,
+	statefulComp,
+	consensusComp string) (*appsv1alpha1.ClusterDefinition, *appsv1alpha1.ClusterVersion, *appsv1alpha1.Cluster) {
+	clusterDef := NewClusterDefFactory(clusterDefName).
+		AddComponent(StatelessNginxComponent, statelessComp).
+		AddComponent(ConsensusMySQLComponent, consensusComp).
+		AddComponent(StatefulMySQLComponent, statefulComp).
+		Create(&testCtx).GetObject()
+	clusterVersion := NewClusterVersionFactory(clusterVersionName, clusterDefName).
+		AddComponent(statelessComp).AddContainerShort(DefaultNginxContainerName, NginxImage).
+		AddComponent(consensusComp).AddContainerShort(DefaultMySQLContainerName, NginxImage).
+		AddComponent(statefulComp).AddContainerShort(DefaultMySQLContainerName, NginxImage).
+		Create(&testCtx).GetObject()
+	cluster := NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefName, clusterVersionName).
+		AddComponent(statelessComp, statelessComp).SetReplicas(1).
+		AddComponent(consensusComp, consensusComp).SetReplicas(3).
+		AddComponent(statefulComp, statefulComp).SetReplicas(3).
+		Create(&testCtx).GetObject()
 	return clusterDef, clusterVersion, cluster
 }
 
@@ -50,45 +60,6 @@ func CreateK8sResource(testCtx testutil.TestContext, obj client.Object) client.O
 	gomega.Eventually(CheckObjExists(&testCtx, client.ObjectKeyFromObject(obj),
 		obj, true)).Should(gomega.Succeed())
 	return obj
-}
-
-// CreateClusterWithHybridComps creates a cluster with hybrid components for testing.
-func CreateClusterWithHybridComps(
-	testCtx testutil.TestContext,
-	clusterDefName,
-	clusterVersionName,
-	clusterName,
-	statelessComName,
-	consensusComName,
-	statefulComName string) *appsv1alpha1.Cluster {
-	return CreateCustomizedObj(&testCtx, "hybrid/hybrid_cluster.yaml",
-		&appsv1alpha1.Cluster{}, CustomizeObjYAML(clusterVersionName, clusterDefName, clusterName, clusterVersionName,
-			clusterDefName, statelessComName, consensusComName, statefulComName))
-}
-
-// CreateClusterDefWithHybridComps creates a clusterDefinition with hybrid components for testing.
-func CreateClusterDefWithHybridComps(testCtx testutil.TestContext, clusterDefName string) *appsv1alpha1.ClusterDefinition {
-	return CreateCustomizedObj(&testCtx, "hybrid/hybrid_cd.yaml",
-		&appsv1alpha1.ClusterDefinition{}, CustomizeObjYAML(clusterDefName))
-}
-
-// CreateClusterVersionWithHybridComps creates a clusterVersion with hybrid components for testing.
-func CreateClusterVersionWithHybridComps(
-	testCtx testutil.TestContext,
-	clusterDefName,
-	clusterVersionName string,
-	images []string) *appsv1alpha1.ClusterVersion {
-	return CreateCustomizedObj(&testCtx, "hybrid/hybrid_cv.yaml",
-		&appsv1alpha1.ClusterVersion{}, CustomizeObjYAML(clusterVersionName, clusterDefName, images[0], images[1], images[2]))
-}
-
-// CreateHybridCompsClusterVersionForUpgrade creates a clusterVersion with hybrid components for upgrading test.
-func CreateHybridCompsClusterVersionForUpgrade(ctx context.Context,
-	testCtx testutil.TestContext,
-	clusterDefName,
-	clusterVersionName string) *appsv1alpha1.ClusterVersion {
-	return CreateClusterVersionWithHybridComps(testCtx, clusterDefName, clusterVersionName,
-		[]string{"docker.io/apecloud/wesql-server:8.0.30", "busybox:1.30.0", "docker.io/apecloud/wesql-server:8.0.30"})
 }
 
 // GetClusterComponentPhase gets the component phase of testing cluster for verification.

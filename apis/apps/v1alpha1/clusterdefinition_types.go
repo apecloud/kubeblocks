@@ -291,13 +291,13 @@ type ClusterDefinitionComponent struct {
 	// +optional
 	MaxUnavailable string `json:"maxUnavailable,omitempty"`
 
-	// pdbSpec pod disruption budget spec. This is mutually exclusive with the component type of Consensus.
-	// +optional
-	PDBSpec *policyv1.PodDisruptionBudgetSpec `json:"pdbSpec,omitempty"`
-
 	// configSpec defines configuration related spec.
 	// +optional
 	ConfigSpec *ConfigurationSpec `json:"configSpec,omitempty"`
+
+	// probes setting for healthy checks.
+	// +optional
+	Probes *ClusterDefinitionProbes `json:"probes,omitempty"`
 
 	// monitor is monitoring config which provided by provider.
 	// +optional
@@ -311,11 +311,6 @@ type ClusterDefinitionComponent struct {
 	// +listMapKey=name
 	LogConfigs []LogConfig `json:"logConfigs,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
 
-	// antiAffinity defines components should have anti-affinity constraint for pods with same component type.
-	// +kubebuilder:default=false
-	// +optional
-	AntiAffinity bool `json:"antiAffinity,omitempty"`
-
 	// podSpec define pod spec template of the cluster component.
 	// +kubebuilder:pruning:PreserveUnknownFields
 	// +optional
@@ -328,9 +323,9 @@ type ClusterDefinitionComponent struct {
 	// +optional
 	Service *corev1.ServiceSpec `json:"service,omitempty"`
 
-	// probes setting for healthy checks.
+	// pdbSpec pod disruption budget spec. This is mutually exclusive with the component type of Consensus.
 	// +optional
-	Probes *ClusterDefinitionProbes `json:"probes,omitempty"`
+	PDBSpec *policyv1.PodDisruptionBudgetSpec `json:"pdbSpec,omitempty"`
 
 	// consensusSpec defines consensus related spec if componentType is Consensus, required if componentType is Consensus.
 	// +optional
@@ -339,6 +334,7 @@ type ClusterDefinitionComponent struct {
 	// horizontalScalePolicy controls the behavior of horizontal scale.
 	// +optional
 	HorizontalScalePolicy *HorizontalScalePolicy `json:"horizontalScalePolicy,omitempty"`
+
 	// Statement to create system account.
 	// +optional
 	SystemAccounts *SystemAccountSpec `json:"systemAccounts,omitempty"`

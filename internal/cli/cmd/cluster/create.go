@@ -57,8 +57,8 @@ var clusterCreateExample = templates.Examples(`
 	# --cluster-definition is required, if --cluster-version is not specified, will use the most recently created version
 	kbcli cluster create mycluster --cluster-definition=my-cluster-def
 
-	# Create a cluster and set termination policy DoNotDelete that will prevent the cluster from being deleted
-	kbcli cluster create mycluster --cluster-definition=my-cluster-def --termination-policy=DoNotDelete
+	# Create a cluster and set termination policy DoNotTerminate that will prevent the cluster from being deleted
+	kbcli cluster create mycluster --cluster-definition=my-cluster-def --termination-policy=DoNotTerminate
 
 	# In scenarios where you want to delete resources such as statements, deployments, services, pdb, but keep PVCs
 	# when deleting the cluster, use termination policy Halt
@@ -141,9 +141,8 @@ type CreateOptions struct {
 	Tolerations       []interface{}            `json:"tolerations,omitempty"`
 	Components        []map[string]interface{} `json:"components"`
 
-	SetFile        string   `json:"-"`
-	Values         []string `json:"-"`
-	TolerationsRaw []string `json:"-"`
+	SetFile string   `json:"-"`
+	Values  []string `json:"-"`
 
 	// backup name to restore in creation
 	Backup string `json:"backup,omitempty"`

@@ -38,12 +38,12 @@ var _ = Describe("Stateful Component", func() {
 		clusterDefName     = "stateless-definition-" + randomStr
 		clusterVersionName = "stateless-cluster-version-" + randomStr
 		clusterName        = "stateless-" + randomStr
-		timeout            = 10 * time.Second
-		interval           = time.Second
-		statelessCompName  = "nginx"
-		statelessType      = "proxy"
 	)
-	const defaultMinReadySeconds = 10
+	const (
+		statelessCompName      = "stateless"
+		statelessCompType      = "stateless"
+		defaultMinReadySeconds = 10
+	)
 
 	cleanAll := func() {
 		// must wait until resources deleted and no longer exist before the testcases start,
@@ -69,9 +69,10 @@ var _ = Describe("Stateful Component", func() {
 		It("Stateless Component test", func() {
 			By(" init cluster, deployment")
 			clusterDef := testapps.NewClusterDefFactory(clusterDefName).
-				AddComponent(testapps.StatelessNginxComponent, statelessType).
+				AddComponent(testapps.StatelessNginxComponent, statelessCompType).
 				Create(&testCtx).GetObject()
-			cluster := testapps.CreateStatelessCluster(testCtx, clusterDefName, clusterVersionName, clusterName, 2)
+			cluster := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefName, clusterVersionName).
+				AddComponent(statelessCompName, statelessCompType).SetReplicas(2).Create(&testCtx).GetObject()
 			deploy := testapps.MockStatelessComponentDeploy(testCtx, clusterName, statelessCompName)
 			clusterComponent := cluster.GetComponentByName(statelessCompName)
 			componentDef := clusterDef.GetComponentDefByTypeName(clusterComponent.ComponentDefRef)
@@ -85,23 +86,16 @@ var _ = Describe("Stateful Component", func() {
 			deploy.Status.Replicas = availableReplicas
 			podsReady, _ := statelessComponent.PodsReady(deploy)
 			Expect(podsReady == false).Should(BeTrue())
-			if testCtx.UsingExistingCluster() {
-				Eventually(func() bool {
-					phase, _ := statelessComponent.GetPhaseWhenPodsNotReady(statelessCompName)
-					return phase == ""
-				}, timeout*5, interval).Should(BeTrue())
-			} else {
-				phase, _ := statelessComponent.GetPhaseWhenPodsNotReady(statelessCompName)
-				Expect(phase == appsv1alpha1.FailedPhase).Should(BeTrue())
-				Expect(k8sClient.Status().Patch(ctx, deploy, patch)).Should(Succeed())
-				By("wait deployment ")
-				Eventually(testapps.CheckObj(&testCtx, client.ObjectKey{Name: deploy.Name,
-					Namespace: testCtx.DefaultNamespace}, func(g Gomega, tmpDeploy *appsv1.Deployment) {
-					g.Expect(tmpDeploy.Status.AvailableReplicas == availableReplicas).Should(BeTrue())
-				})).Should(Succeed())
-				phase, _ = statelessComponent.GetPhaseWhenPodsNotReady(statelessCompName)
-				Expect(phase == appsv1alpha1.AbnormalPhase).Should(BeTrue())
-			}
+			phase, _ := statelessComponent.GetPhaseWhenPodsNotReady(statelessCompName)
+			Expect(phase == appsv1alpha1.FailedPhase).Should(BeTrue())
+			Expect(k8sClient.Status().Patch(ctx, deploy, patch)).Should(Succeed())
+			By("wait deployment ")
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKey{Name: deploy.Name,
+				Namespace: testCtx.DefaultNamespace}, func(g Gomega, tmpDeploy *appsv1.Deployment) {
+				g.Expect(tmpDeploy.Status.AvailableReplicas == availableReplicas).Should(BeTrue())
+			})).Should(Succeed())
+			phase, _ = statelessComponent.GetPhaseWhenPodsNotReady(statelessCompName)
+			Expect(phase == appsv1alpha1.AbnormalPhase).Should(BeTrue())
 
 			By("test pods are ready")
 			testk8s.MockDeploymentReady(deploy, NewRSAvailableReason)

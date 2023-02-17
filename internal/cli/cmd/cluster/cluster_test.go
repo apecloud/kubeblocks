@@ -95,9 +95,13 @@ var _ = Describe("Cluster", func() {
 					PodAntiAffinity: "Preferred",
 					TopologyKeys:    []string{"kubernetes.io/hostname"},
 					NodeLabels:      map[string]string{"testLabelKey": "testLabelValue"},
+					TolerationsRaw:  []string{"key=engineType,value=mongo,operator=Equal,effect=NoSchedule"},
 				},
 			}
 
+			Expect(len(o.TolerationsRaw)).Should(Equal(1))
+			Expect(o.Complete()).Should(Succeed())
+			Expect(len(o.Tolerations)).Should(Equal(1))
 			Expect(o.Validate()).Should(HaveOccurred())
 
 			o.TerminationPolicy = "WipeOut"

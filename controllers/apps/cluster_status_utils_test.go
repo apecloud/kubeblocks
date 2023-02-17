@@ -81,9 +81,9 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 
 	createClusterVersion := func() {
 		_ = testapps.NewClusterVersionFactory(clusterVersionName, clusterDefName).
-			AddComponent(statefulMySQLCompType).AddContainerShort("mysql", testapps.ApeCloudMySQLImage).
-			AddComponent(consensusMySQLCompType).AddContainerShort("mysql", testapps.ApeCloudMySQLImage).
-			AddComponent(nginxCompType).AddContainerShort("nginx", testapps.NginxImage).
+			AddComponent(statefulMySQLCompType).AddContainerShort(testapps.DefaultMySQLContainerName, testapps.ApeCloudMySQLImage).
+			AddComponent(consensusMySQLCompType).AddContainerShort(testapps.DefaultMySQLContainerName, testapps.ApeCloudMySQLImage).
+			AddComponent(nginxCompType).AddContainerShort(testapps.DefaultNginxContainerName, testapps.NginxImage).
 			Create(&testCtx)
 	}
 
@@ -96,8 +96,13 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 	}
 
 	createStsPod := func(podName, podRole, componentName string) *corev1.Pod {
-		return testapps.CreateCustomizedObj(&testCtx, "hybrid/hybrid_sts_pod.yaml", &corev1.Pod{},
-			testapps.CustomizeObjYAML(componentName, clusterName, podRole, podName))
+		return testapps.NewPodFactory(testCtx.DefaultNamespace, podName).AddLabelsInMap(map[string]string{
+			intctrlutil.AppInstanceLabelKey:  clusterName,
+			intctrlutil.AppComponentLabelKey: componentName,
+			intctrlutil.RoleLabelKey:         podRole,
+			intctrlutil.AppManagedByLabelKey: intctrlutil.AppName,
+		}).AddContainer(corev1.Container{Name: testapps.DefaultMySQLContainerName, Image: testapps.ApeCloudMySQLImage}).
+			Create(&testCtx).GetObject()
 	}
 
 	getDeployment := func(componentName string) *appsv1.Deployment {
@@ -158,7 +163,7 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKey{Name: stsName, Namespace: testCtx.DefaultNamespace},
 				func(g Gomega, fetched *appsv1.StatefulSet) {
 					g.Expect(fetched.Generation).To(BeEquivalentTo(1))
-				})).Should(Succeed())
+				}), time.Second*20, time.Second*1).Should(Succeed())
 			stsInvolvedObject := corev1.ObjectReference{
 				Name:      stsName,
 				Kind:      intctrlutil.StatefulSetKind,

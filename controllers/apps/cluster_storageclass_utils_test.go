@@ -26,13 +26,11 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
-	"k8s.io/apimachinery/pkg/util/yaml"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
-	"github.com/apecloud/kubeblocks/test/testdata"
 )
 
 var _ = Describe("Reconcile StorageClass", func() {
@@ -41,6 +39,7 @@ var _ = Describe("Reconcile StorageClass", func() {
 		clusterVersionName = "app-versoion-" + testCtx.GetRandomStr()
 		clusterName        = "mysql-for-storageclass-" + testCtx.GetRandomStr()
 		consensusCompName  = "consensus"
+		consensusCompType  = "consensus"
 	)
 
 	cleanEnv := func() {
@@ -60,19 +59,16 @@ var _ = Describe("Reconcile StorageClass", func() {
 
 	AfterEach(cleanEnv)
 
-	createStorageClassObj := func(storageClassName string, allowVolumeExpansion bool) {
-		By("By assure an default storageClass")
-		testapps.CreateCustomizedObj(&testCtx, "operations/storageclass.yaml",
-			&storagev1.StorageClass{}, testapps.CustomizeObjYAML(storageClassName, allowVolumeExpansion))
-	}
-
 	createCluster := func(defaultStorageClassName, storageClassName string) *appsv1alpha1.Cluster {
-		objBytes, err := testdata.GetTestDataFileContent("consensusset/wesql.yaml")
-		Expect(err).Should(Succeed())
-		clusterString := fmt.Sprintf(string(objBytes), clusterVersionName, clusterDefName, clusterName,
-			clusterVersionName, clusterDefName, consensusCompName)
-		cluster := &appsv1alpha1.Cluster{}
-		Expect(yaml.Unmarshal([]byte(clusterString), cluster)).Should(Succeed())
+		cluster := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefName, clusterVersionName).
+			AddComponent(consensusCompName, consensusCompType).
+			AddVolumeClaimTemplate("data", &corev1.PersistentVolumeClaimSpec{
+				Resources: corev1.ResourceRequirements{
+					Requests: corev1.ResourceList{
+						corev1.ResourceStorage: resource.MustParse("2Gi"),
+					},
+				},
+			}).GetObject()
 		volumeClaimTemplates := cluster.Spec.ComponentSpecs[0].VolumeClaimTemplates
 		volumeClaimTemplates[0].Spec.StorageClassName = &defaultStorageClassName
 		volumeClaimTemplates = append(volumeClaimTemplates, appsv1alpha1.ClusterComponentVolumeClaimTemplate{
@@ -95,8 +91,8 @@ var _ = Describe("Reconcile StorageClass", func() {
 	}
 
 	createPVC := func(pvcName, storageClassName string) {
-		testapps.CreateCustomizedObj(&testCtx, "operations/volume_expansion_pvc.yaml",
-			&corev1.PersistentVolumeClaim{}, testapps.CustomizeObjYAML(consensusCompName, clusterName, pvcName, pvcName, storageClassName))
+		testapps.NewPersistentVolumeClaimFactory(testCtx.DefaultNamespace, pvcName, clusterName,
+			consensusCompName, "data").SetStorage("2Gi").SetStorageClass(storageClassName).Create(&testCtx)
 	}
 
 	updateStorageClassAllowVolumeExpansion := func(storageClassName string, allowVolumeExpansion bool) {
@@ -115,8 +111,8 @@ var _ = Describe("Reconcile StorageClass", func() {
 			vctName1 := "data"
 			defaultStorageClassName := "standard-" + testCtx.GetRandomStr()
 			storageClassName := "csi-hostpath-sc-" + testCtx.GetRandomStr()
-			testapps.CreateConsensusMysqlClusterDef(testCtx, clusterDefName)
-			testapps.CreateConsensusMysqlClusterVersion(testCtx, clusterDefName, clusterVersionName)
+			testapps.CreateConsensusMysqlClusterDef(testCtx, clusterDefName, consensusCompType)
+			testapps.CreateConsensusMysqlClusterVersion(testCtx, clusterDefName, clusterVersionName, consensusCompType)
 			cluster := createCluster(defaultStorageClassName, storageClassName)
 			Expect(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(cluster), func(newCluster *appsv1alpha1.Cluster) {
 				newCluster.Status.Operations = &appsv1alpha1.Operations{}
@@ -129,7 +125,7 @@ var _ = Describe("Reconcile StorageClass", func() {
 			})).Should(Succeed())
 
 			By("test without pvc")
-			createStorageClassObj(defaultStorageClassName, true)
+			testapps.CreateStorageClass(testCtx, defaultStorageClassName, true)
 
 			By("expect consensus component support volume expansion and volumeClaimTemplateNames is [data]")
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(cluster), func(g Gomega, newCluster *appsv1alpha1.Cluster) {
@@ -138,7 +134,7 @@ var _ = Describe("Reconcile StorageClass", func() {
 			})).Should(Succeed())
 
 			By("test with pvc")
-			createStorageClassObj(storageClassName, false)
+			testapps.CreateStorageClass(testCtx, storageClassName, false)
 			createPVC(fmt.Sprintf("log-%s-%s", clusterName, consensusCompName), storageClassName)
 			createPVC(fmt.Sprintf("data-%s-%s", clusterName, consensusCompName), defaultStorageClassName)
 

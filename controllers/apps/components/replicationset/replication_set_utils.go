@@ -45,14 +45,14 @@ const (
 
 // HandleReplicationSet handles changes of replication component replicas and synchronizes cluster status.
 // TODO(xingran) if the probe event detects an abnormal replication relationship or unavailable, it needs to be repaired in another process.
-func HandleReplicationSet(reqCtx intctrlutil.RequestCtx,
+func HandleReplicationSet(ctx context.Context,
 	cli client.Client,
 	cluster *appsv1alpha1.Cluster,
 	stsList []*appsv1.StatefulSet) error {
 
 	filter := func(stsObj *appsv1.StatefulSet) (bool, error) {
 		typeName := cluster.GetComponentTypeName(stsObj.Labels[intctrlutil.AppComponentLabelKey])
-		component, err := util.GetComponentDefByCluster(reqCtx.Ctx, cli, cluster, typeName)
+		component, err := util.GetComponentDefByCluster(ctx, cli, cluster, typeName)
 		if err != nil {
 			return false, err
 		}
@@ -95,7 +95,7 @@ func HandleReplicationSet(reqCtx intctrlutil.RequestCtx,
 			stsToDeleteMap[compKey] = int32(len(compOwnsStsMap[compKey])) - clusterCompReplicasMap[compKey]
 		} else {
 			for _, compStsObj := range compStsObjs {
-				targetPodList, err := util.GetPodListByStatefulSet(reqCtx.Ctx, cli, compStsObj)
+				targetPodList, err := util.GetPodListByStatefulSet(ctx, cli, compStsObj)
 				if err != nil {
 					return err
 				}
@@ -111,7 +111,7 @@ func HandleReplicationSet(reqCtx intctrlutil.RequestCtx,
 	for compKey, stsToDelCount := range stsToDeleteMap {
 		// list all statefulSets by cluster and componentKey label
 		var componentStsList = &appsv1.StatefulSetList{}
-		err := util.GetObjectListByComponentName(reqCtx.Ctx, cli, cluster, componentStsList, compKey)
+		err := util.GetObjectListByComponentName(ctx, cli, cluster, componentStsList, compKey)
 		if err != nil {
 			return err
 		}
@@ -131,15 +131,15 @@ func HandleReplicationSet(reqCtx intctrlutil.RequestCtx,
 		// sort the statefulSets by their ordinals desc
 		sort.Sort(util.DescendingOrdinalSts(dos))
 
-		if err := RemoveReplicationSetClusterStatus(cli, reqCtx.Ctx, dos[:stsToDelCount]); err != nil {
+		if err := RemoveReplicationSetClusterStatus(cli, ctx, dos[:stsToDelCount]); err != nil {
 			return err
 		}
 		for i := int32(0); i < stsToDelCount; i++ {
-			err := cli.Delete(reqCtx.Ctx, dos[i])
+			err := cli.Delete(ctx, dos[i])
 			if err == nil {
 				patch := client.MergeFrom(dos[i].DeepCopy())
 				controllerutil.RemoveFinalizer(dos[i], DBClusterFinalizerName)
-				if err := cli.Patch(reqCtx.Ctx, dos[i], patch); err != nil {
+				if err := cli.Patch(ctx, dos[i], patch); err != nil {
 					return err
 				}
 				continue
@@ -153,7 +153,7 @@ func HandleReplicationSet(reqCtx intctrlutil.RequestCtx,
 
 	// sync cluster status
 	for _, compPodList := range compOwnsPodsToSyncMap {
-		if err := SyncReplicationSetClusterStatus(cli, reqCtx.Ctx, compPodList); err != nil {
+		if err := SyncReplicationSetClusterStatus(cli, ctx, compPodList); err != nil {
 			return err
 		}
 	}

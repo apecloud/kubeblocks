@@ -19,6 +19,7 @@ package testutil
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"time"
 
 	"github.com/onsi/gomega"
@@ -31,6 +32,7 @@ import (
 
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/apecloud/kubeblocks/internal/testutil"
+	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 )
 
 const (
@@ -158,4 +160,14 @@ func ListAndCheckStatefulSet(testCtx *testutil.TestContext, key types.Namespaced
 		g.Expect(len(stsList.Items) > 0).To(gomega.BeTrue())
 	}).Should(gomega.Succeed())
 	return stsList
+}
+
+func PatchStatefulSetStatus(testCtx *testutil.TestContext, stsName string, status apps.StatefulSetStatus) {
+	objectKey := client.ObjectKey{Name: stsName, Namespace: testCtx.DefaultNamespace}
+	gomega.Expect(testapps.GetAndChangeObjStatus(testCtx, objectKey, func(newSts *apps.StatefulSet) {
+		newSts.Status = status
+	})()).Should(gomega.Succeed())
+	gomega.Eventually(testapps.CheckObj(testCtx, objectKey, func(g gomega.Gomega, newSts *apps.StatefulSet) {
+		g.Expect(reflect.DeepEqual(newSts.Status, status)).Should(gomega.BeTrue())
+	})).Should(gomega.Succeed())
 }

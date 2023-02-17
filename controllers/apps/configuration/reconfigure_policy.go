@@ -155,12 +155,11 @@ func (param *reconfigureParams) maxRollingReplicas() int32 {
 		replicas       = param.getTargetReplicas()
 	)
 
-	pdbSpec := param.Component.PDBSpec
-	if pdbSpec == nil || pdbSpec.MaxUnavailable == nil {
+	if param.Component.MaxUnavailable == nil {
 		return defaultRolling
 	}
 
-	v, isPercent, err := intctrlutil.GetIntOrPercentValue(pdbSpec.MaxUnavailable)
+	v, isPercent, err := intctrlutil.GetIntOrPercentValue(param.Component.MaxUnavailable)
 	if err != nil {
 		param.Ctx.Log.Error(err, "failed to get MaxUnavailable!")
 		return defaultRolling

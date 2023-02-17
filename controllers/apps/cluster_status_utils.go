@@ -247,8 +247,7 @@ func getClusterAvailabilityEffect(componentDef *appsv1alpha1.ClusterComponentDef
 	case appsv1alpha1.Replication:
 		return true
 	default:
-		// other types of components need to judge whether there has PodDisruptionBudget
-		return intctrlutil.ExistsPDBSpec(componentDef.PDBSpec)
+		return componentDef.MaxUnavailable != nil
 	}
 }
 

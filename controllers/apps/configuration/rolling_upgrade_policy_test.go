@@ -24,7 +24,6 @@ import (
 
 	"github.com/golang/mock/gomock"
 	corev1 "k8s.io/api/core/v1"
-	policyv1 "k8s.io/api/policy/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	metautil "k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -174,9 +173,7 @@ var _ = Describe("Reconfigure RollingPolicy", func() {
 			var pods []corev1.Pod
 			{
 				mockParam.Component.WorkloadType = appsv1alpha1.Stateful
-				mockParam.Component.PDBSpec = &policyv1.PodDisruptionBudgetSpec{
-					MaxUnavailable: func() *metautil.IntOrString { v := metautil.FromString("100%"); return &v }(),
-				}
+				mockParam.Component.MaxUnavailable = func() *metautil.IntOrString { v := metautil.FromString("100%"); return &v }()
 				pods = newMockPodsWithStatefulSet(&mockParam.ComponentUnits[0], defaultReplica)
 			}
 

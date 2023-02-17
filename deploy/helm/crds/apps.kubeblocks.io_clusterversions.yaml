@@ -129,8 +129,8 @@ spec:
                       - name
                       x-kubernetes-list-type: map
                     podSpec:
-                      description: PodSpec is pod spec, if not nil, will replace ClusterDefinitionSpec.PodSpec
-                        in ClusterDefinition.
+                      description: 'TODO: refactor podSpec PodSpec is pod spec, if
+                        not nil, will replace ClusterDefinitionSpec.PodSpec in ClusterDefinition.'
                       properties:
                         activeDeadlineSeconds:
                           description: Optional duration in seconds the pod may be

@@ -20,7 +20,6 @@ import (
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
-	policyv1 "k8s.io/api/policy/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
@@ -328,10 +327,6 @@ type ClusterComponentDefinition struct {
 	// +kubebuilder:pruning:PreserveUnknownFields
 	// +optional
 	Service *corev1.ServiceSpec `json:"service,omitempty"`
-
-	// pdbSpec pod disruption budget spec. This is mutually exclusive with the component type of Consensus.
-	// +optional
-	PDBSpec *policyv1.PodDisruptionBudgetSpec `json:"pdbSpec,omitempty"`
 
 	// consensusSpec defines consensus related spec if workloadType is Consensus, required if workloadType is Consensus.
 	// +optional

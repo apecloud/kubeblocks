@@ -76,6 +76,7 @@ type ClusterComponentVersion struct {
 	// +listMapKey=name
 	ConfigTemplateRefs []ConfigTemplate `json:"configTemplateRefs,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
 
+	// TODO: refactor podSpec
 	// PodSpec is pod spec, if not nil, will replace ClusterDefinitionSpec.PodSpec in ClusterDefinition.
 	// +kubebuilder:pruning:PreserveUnknownFields
 	// +optional

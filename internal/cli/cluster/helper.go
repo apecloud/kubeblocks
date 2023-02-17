@@ -155,36 +155,42 @@ func GetComponentEndpoints(svcList *corev1.ServiceList, c *dbaasv1alpha1.Cluster
 		return result
 	}
 
-	svcs := GetComponentServices(svcList, c)
-	for _, svc := range svcs {
-		var (
-			internalIP = svc.Spec.ClusterIP
-			externalIP = GetExternalIP(svc)
-		)
-		if internalIP != "" && internalIP != "None" {
-			internalEndpoints = append(internalEndpoints, getEndpoints(internalIP, svc.Spec.Ports)...)
-		}
-		if externalIP != "" && externalIP != "None" {
-			externalEndpoints = append(externalEndpoints, getEndpoints(externalIP, svc.Spec.Ports)...)
-		}
+	internalSvcs, externalSvcs := GetComponentServices(svcList, c)
+	for _, svc := range internalSvcs {
+		dns := fmt.Sprintf("%s.%s.svc.cluster.local", svc.Name, svc.Namespace)
+		internalEndpoints = append(internalEndpoints, getEndpoints(dns, svc.Spec.Ports)...)
+	}
+
+	for _, svc := range externalSvcs {
+		externalEndpoints = append(externalEndpoints, getEndpoints(GetExternalIP(svc), svc.Spec.Ports)...)
 	}
 	return internalEndpoints, externalEndpoints
 }
 
 // GetComponentServices gets component services
-func GetComponentServices(svcList *corev1.ServiceList, c *dbaasv1alpha1.ClusterComponent) []*corev1.Service {
+func GetComponentServices(svcList *corev1.ServiceList, c *dbaasv1alpha1.ClusterComponent) ([]*corev1.Service, []*corev1.Service) {
 	if svcList == nil {
-		return nil
+		return nil, nil
 	}
 
-	var svcs []*corev1.Service
+	var internalSvcs, externalSvcs []*corev1.Service
 	for i, svc := range svcList.Items {
 		if svc.GetLabels()[types.ComponentLabelKey] != c.Name {
 			continue
 		}
-		svcs = append(svcs, &svcList.Items[i])
+
+		var (
+			internalIP = svc.Spec.ClusterIP
+			externalIP = GetExternalIP(&svc)
+		)
+		if internalIP != "" && internalIP != "None" {
+			internalSvcs = append(internalSvcs, &svcList.Items[i])
+		}
+		if externalIP != "" && externalIP != "None" {
+			externalSvcs = append(externalSvcs, &svcList.Items[i])
+		}
 	}
-	return svcs
+	return internalSvcs, externalSvcs
 }
 
 // GetExternalIP get external IP from service annotation

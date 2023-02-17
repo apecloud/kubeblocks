@@ -219,35 +219,30 @@ func (o *ConnectOptions) getConnectionInfo() (*engine.ConnectionInfo, error) {
 
 	// get host and port, use external endpoints first, if external endpoints are empty,
 	// use internal endpoints
-	var private = false
+	var (
+		private = false
+		svc     *corev1.Service
+	)
+
+	// TODO: now the primary component is the first component, that may not be correct,
+	// maybe show all components connection info in the future.
 	primaryComponent := cluster.FindClusterComp(objs.Cluster, objs.ClusterDef.Spec.Components[0].TypeName)
-	svcs := cluster.GetComponentServices(objs.Services, primaryComponent)
-	getEndpoint := func(getIPFn func(*corev1.Service) string) *corev1.Service {
-		for _, svc := range svcs {
-			var ip = getIPFn(svc)
-			if ip != "" && ip != "None" {
-				info.Host = ip
-				info.Port = fmt.Sprintf("%d", svc.Spec.Ports[0].Port)
-				return svc
-			}
-		}
-		return nil
-	}
-
-	// if there is public endpoint, use it to build connection info
-	svc := getEndpoint(cluster.GetExternalIP)
-
-	// if cluster does not have public endpoint, use local host to connect
-	if svc == nil {
-		svc = getEndpoint(func(svc *corev1.Service) string {
-			return svc.Spec.ClusterIP
-		})
+	internalSvcs, externalSvcs := cluster.GetComponentServices(objs.Services, primaryComponent)
+	switch {
+	case len(externalSvcs) > 0:
+		// cluster has public endpoint
+		svc = externalSvcs[0]
+		info.Host = cluster.GetExternalIP(svc)
+		info.Port = fmt.Sprintf("%d", svc.Spec.Ports[0].Port)
+	case len(internalSvcs) > 0:
+		// cluster does not have public endpoint
+		svc = internalSvcs[0]
+		info.Host = svc.Spec.ClusterIP
+		info.Port = fmt.Sprintf("%d", svc.Spec.Ports[0].Port)
 		private = true
-	}
-
-	// does not find any endpoints
-	if svc == nil {
-		return nil, fmt.Errorf("failed to find cluster endpoints")
+	default:
+		// does not find any endpoints
+		return nil, fmt.Errorf("failed to find any cluster endpoints")
 	}
 
 	// if cluster does not have public endpoints, tell user to use port-forward command and

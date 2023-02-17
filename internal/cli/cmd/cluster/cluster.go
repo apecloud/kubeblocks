@@ -84,7 +84,7 @@ func NewClusterCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 			},
 		},
 		{
-			Message: "Trouble shooting Commands:",
+			Message: "Troubleshooting Commands:",
 			Commands: []*cobra.Command{
 				NewLogsCmd(f, streams),
 				NewListLogsCmd(f, streams),

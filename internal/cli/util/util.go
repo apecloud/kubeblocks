@@ -392,7 +392,7 @@ func TimeFormat(t *metav1.Time) string {
 	return t.Format(layout)
 }
 
-// GetHumanReadableDuration returns a succint representation of the provided startTime and endTime
+// GetHumanReadableDuration returns a succinct representation of the provided startTime and endTime
 // with limited precision for consumption by humans.
 func GetHumanReadableDuration(startTime metav1.Time, endTime metav1.Time) string {
 	if startTime.IsZero() {

@@ -140,9 +140,8 @@ func (o *describeOptions) describeCluster(name string) error {
 	// cluster summary
 	showCluster(o.Cluster, o.Out)
 
-	// consider first component as primary component, use it's endpoints as cluster endpoints
-	primaryComponent := cluster.FindClusterComp(o.Cluster, o.ClusterDef.Spec.ComponentDefs[0].Name)
-	showNetwork(o.Services, primaryComponent, o.Out)
+	// show endpoints
+	showEndpoints(o.Cluster, o.Services, o.Out)
 
 	// topology
 	showTopology(o.ClusterObjects.GetInstanceInfo(), o.Out)
@@ -213,14 +212,19 @@ func showEvents(events *corev1.EventList, name string, namespace string, out io.
 	tbl.Print()
 }
 
-func showNetwork(svcList *corev1.ServiceList, c *appsv1alpha1.ClusterComponent, out io.Writer) {
-	internalEndpoints, externalEndpoints := cluster.GetComponentEndpoints(svcList, c)
-	if len(internalEndpoints) == 0 && len(externalEndpoints) == 0 {
+func showEndpoints(c *appsv1alpha1.Cluster, svcList *corev1.ServiceList, out io.Writer) {
+	if c == nil {
 		return
 	}
 
 	tbl := newTbl(out, "\nEndpoints:", "COMPONENT", "MODE", "INTERNAL", "EXTERNAL")
-	tbl.AddRow(c.Name, "ReadWrite", util.CheckEmpty(strings.Join(internalEndpoints, "\n")),
-		util.CheckEmpty(strings.Join(externalEndpoints, "\n")))
+	for _, comp := range c.Spec.ComponentSpecs {
+		internalEndpoints, externalEndpoints := cluster.GetComponentEndpoints(svcList, &comp)
+		if len(internalEndpoints) == 0 && len(externalEndpoints) == 0 {
+			continue
+		}
+		tbl.AddRow(c.Name, "ReadWrite", util.CheckEmpty(strings.Join(internalEndpoints, "\n")),
+			util.CheckEmpty(strings.Join(externalEndpoints, "\n")))
+	}
 	tbl.Print()
 }

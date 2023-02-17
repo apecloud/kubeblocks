@@ -22,7 +22,6 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"github.com/golang/mock/gomock"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -31,14 +30,12 @@ import (
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 	testutil "github.com/apecloud/kubeblocks/internal/testutil/k8s"
-	mock_client "github.com/apecloud/kubeblocks/internal/testutil/k8s/mocks"
 )
 
 var _ = Describe("Reconfigure util test", func() {
 
 	var (
-		mockClient *mock_client.MockClient
-		ctrl       *gomock.Controller
+		k8sMockClient *testutil.K8sClientMockHelper
 	)
 
 	mockCfgTplObj := func(tpl appsv1alpha1.ConfigTemplate) (*corev1.ConfigMap, *appsv1alpha1.ConfigConstraint) {
@@ -53,15 +50,13 @@ var _ = Describe("Reconfigure util test", func() {
 	}
 
 	BeforeEach(func() {
-		ctrl, mockClient = testutil.SetupK8sMock()
+		k8sMockClient = testutil.NewK8sMockClient()
 	})
 
 	AfterEach(func() {
 		// Add any teardown steps that needs to be executed after each test
-		ctrl.Finish()
+		k8sMockClient.Finish()
 	})
-
-	_ = mockClient
 
 	Context("updateCfgParams test", func() {
 		It("Should success without error", func() {
@@ -90,65 +85,40 @@ var _ = Describe("Reconfigure util test", func() {
 			diffCfg := `{"mysqld":{"x1":"y1","x2":"y2"}}`
 
 			cmObj, tplObj := mockCfgTplObj(tpl)
-			mockK8sObjs := map[client.ObjectKey][]struct {
-				object client.Object
-				err    error
-			}{
+			k8sMockClient.MockGetMethod(testutil.WithGetReturned(testutil.WithConstructSequenceResult(map[client.ObjectKey][]testutil.MockGetReturned{
 				// for cm
 				client.ObjectKeyFromObject(cmObj): {{
-					object: nil,
-					err:    cfgcore.MakeError("failed to get cm object"),
+					Object: nil,
+					Err:    cfgcore.MakeError("failed to get cm object"),
 				}, {
-					object: cmObj,
-					err:    nil,
+					Object: cmObj,
+					Err:    nil,
 				}},
 				// for tpl
 				client.ObjectKeyFromObject(tplObj): {{
-					object: nil,
-					err:    cfgcore.MakeError("failed to get tpl object"),
+					Object: nil,
+					Err:    cfgcore.MakeError("failed to get tpl object"),
 				}, {
-					object: tplObj,
-					err:    nil,
+					Object: tplObj,
+					Err:    nil,
 				}},
-			}
-			accessCounter := map[client.ObjectKey]int{}
+			}), testutil.WithAnyTimes()))
 
-			mockClient.EXPECT().
-				Get(gomock.Any(), gomock.Any(), gomock.Any()).
-				DoAndReturn(func(ctx context.Context, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
-					tests, ok := mockK8sObjs[key]
-					if !ok {
-						return cfgcore.MakeError("not exist")
-					}
-					index := accessCounter[key]
-					tt := tests[index]
-					if tt.err == nil {
-						// mock data
-						testutil.SetGetReturnedObject(obj, tt.object)
-					}
-					if index < len(tests)-1 {
-						accessCounter[key]++
-					}
-					return tt.err
-				}).AnyTimes()
-
-			mockClient.EXPECT().
-				Patch(gomock.Any(), gomock.Any(), gomock.Any()).
-				DoAndReturn(func(ctx context.Context, obj client.Object, patch client.Patch, opts ...client.PatchOption) error {
-					cm, _ := obj.(*corev1.ConfigMap)
-					cmObj.Data = cm.Data
-					return nil
-				}).AnyTimes()
+			k8sMockClient.MockPatchMethod(testutil.WithPatchReturned(func(obj client.Object, patch client.Patch) error {
+				cm, _ := obj.(*corev1.ConfigMap)
+				cmObj.Data = cm.Data
+				return nil
+			}), testutil.WithAnyTimes())
 
 			By("CM object failed.")
 			// mock failed
-			r := updateCfgParams(updatedCfg, tpl, client.ObjectKeyFromObject(cmObj), ctx, mockClient, "test")
+			r := updateCfgParams(updatedCfg, tpl, client.ObjectKeyFromObject(cmObj), ctx, k8sMockClient.Client(), "test")
 			Expect(r.err).ShouldNot(Succeed())
 			Expect(r.err.Error()).Should(ContainSubstring("failed to get cm object"))
 
 			By("TPL object failed.")
 			// mock failed
-			r = updateCfgParams(updatedCfg, tpl, client.ObjectKeyFromObject(cmObj), ctx, mockClient, "test")
+			r = updateCfgParams(updatedCfg, tpl, client.ObjectKeyFromObject(cmObj), ctx, k8sMockClient.Client(), "test")
 			Expect(r.err).ShouldNot(Succeed())
 			Expect(r.err.Error()).Should(ContainSubstring("failed to get tpl object"))
 
@@ -163,7 +133,7 @@ var _ = Describe("Reconfigure util test", func() {
 						},
 					},
 				}},
-			}, tpl, client.ObjectKeyFromObject(cmObj), ctx, mockClient, "test")
+			}, tpl, client.ObjectKeyFromObject(cmObj), ctx, k8sMockClient.Client(), "test")
 			Expect(r.failed).Should(BeTrue())
 			Expect(r.err).ShouldNot(Succeed())
 			Expect(r.err.Error()).Should(ContainSubstring(`
@@ -181,7 +151,7 @@ mysqld.innodb_autoinc_lock_mode: conflicting values 2 and 100:
 			By("normal update.")
 			{
 				oldConfig := cmObj.Data
-				r := updateCfgParams(updatedCfg, tpl, client.ObjectKeyFromObject(cmObj), ctx, mockClient, "test")
+				r := updateCfgParams(updatedCfg, tpl, client.ObjectKeyFromObject(cmObj), ctx, k8sMockClient.Client(), "test")
 				Expect(r.err).Should(Succeed())
 				option := cfgcore.CfgOption{
 					Type:    cfgcore.CfgTplType,

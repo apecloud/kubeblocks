@@ -17,7 +17,6 @@ limitations under the License.
 package configuration
 
 import (
-	"context"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -26,6 +25,7 @@ import (
 	"github.com/golang/mock/gomock"
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	metautil "k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -34,14 +34,12 @@ import (
 	mock_proto "github.com/apecloud/kubeblocks/internal/configuration/proto/mocks"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	testutil "github.com/apecloud/kubeblocks/internal/testutil/k8s"
-	mock_client "github.com/apecloud/kubeblocks/internal/testutil/k8s/mocks"
 )
 
 var _ = Describe("Reconfigure RollingPolicy", func() {
 
 	var (
-		mockClient        *mock_client.MockClient
-		ctrl              *gomock.Controller
+		k8sMockClient     *testutil.K8sClientMockHelper
 		mockParam         reconfigureParams
 		reconfigureClient *mock_proto.MockReconfigureClient
 
@@ -61,7 +59,7 @@ var _ = Describe("Reconfigure RollingPolicy", func() {
 	}
 
 	createReconfigureParam := func(compType appsv1alpha1.WorkloadType, replicas int) reconfigureParams {
-		return newMockReconfigureParams("rollingPolicy", mockClient,
+		return newMockReconfigureParams("rollingPolicy", k8sMockClient.Client(),
 			withMockStatefulSet(replicas, nil),
 			withConfigTpl("for_test", map[string]string{
 				"key": "value",
@@ -77,14 +75,14 @@ var _ = Describe("Reconfigure RollingPolicy", func() {
 	}
 
 	BeforeEach(func() {
-		ctrl, mockClient = testutil.SetupK8sMock()
-		reconfigureClient = mock_proto.NewMockReconfigureClient(ctrl)
+		k8sMockClient = testutil.NewK8sMockClient()
+		reconfigureClient = mock_proto.NewMockReconfigureClient(k8sMockClient.Controller())
 		mockParam = createReconfigureParam(appsv1alpha1.Consensus, defaultReplica)
 	})
 
 	AfterEach(func() {
 		// Add any teardown steps that needs to be executed after each test
-		ctrl.Finish()
+		k8sMockClient.Finish()
 	})
 
 	Context("consensus rolling reconfigure policy test", func() {
@@ -112,25 +110,20 @@ var _ = Describe("Reconfigure RollingPolicy", func() {
 					withAvailablePod(0, 3),
 					mockLeaderLabel),
 			}
-			mockClient.EXPECT().
-				List(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
-				DoAndReturn(func(ctx context.Context, list client.ObjectList, opts ...client.ListOption) error {
-					Expect(testutil.SetListReturnedObjects(list, fromPods(mockPods[acc]))).Should(Succeed())
-					if acc < len(mockPods)-1 {
-						acc++
-					}
-					return nil
-				}).
-				AnyTimes()
 
-			mockClient.EXPECT().
-				Patch(gomock.Any(), gomock.Any(), gomock.Any()).
-				DoAndReturn(func(ctx context.Context, obj client.Object, patch client.Patch, opts ...client.PatchOption) error {
-					pod, _ := obj.(*corev1.Pod)
-					// mock patch
-					updateLabelPatch(mockPods[acc], pod)
-					return nil
-				}).AnyTimes()
+			k8sMockClient.MockListMethod(testutil.WithListReturned(
+				testutil.WithConstructListSequenceResult([][]runtime.Object{
+					fromPodObjectList(mockPods[0]),
+					fromPodObjectList(mockPods[1]),
+					fromPodObjectList(mockPods[2]),
+				}, func(sequence int, r []runtime.Object) { acc = sequence }), testutil.WithAnyTimes()))
+
+			k8sMockClient.MockPatchMethod(testutil.WithPatchReturned(func(obj client.Object, patch client.Patch) error {
+				pod, _ := obj.(*corev1.Pod)
+				// mock patch
+				updateLabelPatch(mockPods[acc], pod)
+				return nil
+			}, testutil.WithAnyTimes()))
 
 			reconfigureClient.EXPECT().StopContainer(gomock.Any(), gomock.Any()).
 				Return(&cfgproto.StopContainerResponse{}, nil).
@@ -187,22 +180,15 @@ var _ = Describe("Reconfigure RollingPolicy", func() {
 				pods = newMockPodsWithStatefulSet(&mockParam.ComponentUnits[0], defaultReplica)
 			}
 
-			mockClient.EXPECT().
-				List(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
-				DoAndReturn(func(ctx context.Context, list client.ObjectList, opts ...client.ListOption) error {
-					Expect(testutil.SetListReturnedObjects(list, fromPods(pods))).Should(Succeed())
-					return nil
-				}).
-				MinTimes(3)
+			k8sMockClient.MockListMethod(testutil.WithListReturned(
+				testutil.WithConstructListReturnedResult(fromPodObjectList(pods)),
+				testutil.WithMinTimes(3)))
 
-			mockClient.EXPECT().
-				Patch(gomock.Any(), gomock.Any(), gomock.Any()).
-				DoAndReturn(func(ctx context.Context, obj client.Object, patch client.Patch, opts ...client.PatchOption) error {
-					pod, _ := obj.(*corev1.Pod)
-					updateLabelPatch(pods, pod)
-					return nil
-				}).
-				Times(defaultReplica)
+			k8sMockClient.MockPatchMethod(testutil.WithPatchReturned(func(obj client.Object, patch client.Patch) error {
+				pod, _ := obj.(*corev1.Pod)
+				updateLabelPatch(pods, pod)
+				return nil
+			}, testutil.WithTimes(defaultReplica)))
 
 			reconfigureClient.EXPECT().StopContainer(gomock.Any(), gomock.Any()).
 				Return(&cfgproto.StopContainerResponse{}, nil).
@@ -243,7 +229,7 @@ var _ = Describe("Reconfigure RollingPolicy", func() {
 		It("Should failed", func() {
 			// not support type
 			_ = mockParam
-			mockClient.EXPECT().List(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
+			k8sMockClient.MockListMethod(testutil.WithSucceed(testutil.WithTimes(0)))
 
 			status, err := rollingPolicy.Upgrade(createReconfigureParam(appsv1alpha1.Stateless, defaultReplica))
 			Expect(err).ShouldNot(Succeed())

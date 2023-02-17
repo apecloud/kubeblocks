@@ -55,6 +55,7 @@ func GetPodRevision(pod *corev1.Pod) string {
 	return pod.Labels[appsv1.StatefulSetRevisionLabel]
 }
 
+// IsStsAndPodsRevisionConsistent checks if StatefulSet and pods of the StatefuleSet have the same revison,
 func IsStsAndPodsRevisionConsistent(ctx context.Context, cli client.Client, sts *appsv1.StatefulSet) (bool, error) {
 	pods, err := GetPodListByStatefulSet(ctx, cli, sts)
 	if err != nil {

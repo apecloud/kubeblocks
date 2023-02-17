@@ -9,13 +9,27 @@ metadata:
 spec:
   group: extensions.kubeblocks.io
   names:
+    categories:
+    - kubeblocks
     kind: AddonSpec
     listKind: AddonSpecList
     plural: addonspecs
     singular: addonspec
-  scope: Namespaced
+  scope: Cluster
   versions:
-  - name: v1alpha1
+  - additionalPrinterColumns:
+    - description: addon types
+      jsonPath: .spec.type
+      name: TYPE
+      type: string
+    - description: status phase
+      jsonPath: .status.phase
+      name: STATUS
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: AGE
+      type: date
+    name: v1alpha1
     schema:
       openAPIV3Schema:
         description: AddonSpec is the Schema for the addonspecs API
@@ -35,7 +49,7 @@ spec:
           spec:
             description: AddonSpecSpec defines the desired state of AddonSpec
             properties:
-              defaultInstall:
+              defaultInstallValues:
                 description: Default installation parameters.
                 items:
                   properties:
@@ -46,6 +60,9 @@ spec:
                           name:
                             description: Name of the item.
                             type: string
+                          persistentVolumeEnabled:
+                            description: Persistent Volume Enabled value.
+                            type: boolean
                           replicas:
                             description: Replicas value.
                             format: int32
@@ -77,14 +94,22 @@ spec:
                                   value. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
                                 type: object
                             type: object
-                          version:
-                            description: Installation version, for type=helm, this
-                              value is corresponding to Helm chart version (SemVer).
+                          storageClass:
+                            description: Storage class name.
+                            type: string
+                          tolerations:
+                            description: Tolerations JSON array string value.
                             type: string
                         required:
                         - name
                         type: object
                       type: array
+                      x-kubernetes-list-map-keys:
+                      - name
+                      x-kubernetes-list-type: map
+                    persistentVolumeEnabled:
+                      description: Persistent Volume Enabled value.
+                      type: boolean
                     replicas:
                       description: Replicas value.
                       format: int32
@@ -125,10 +150,13 @@ spec:
                           requirement.
                         properties:
                           key:
-                            description: The selector key, valid values are kubeGitVersion,
-                              kubeVersion. "kubeVersion" the semver expression of
-                              Kubernetes versions, i.e., v1.24. "kubeGitVersion" may
-                              contain distro. info., i.e., v1.24.4+eks.
+                            description: The selector key, valid values are KubeVersion,
+                              KubeGitVersion. "KubeVersion" the semver expression
+                              of Kubernetes versions, i.e., v1.24. "KubeGitVersion"
+                              may contain distro. info., i.e., v1.24.4+eks.
+                            enum:
+                            - KubeGitVersion
+                            - KubeVersion
                             type: string
                           operator:
                             description: "Represents a key's relationship to a set
@@ -140,6 +168,11 @@ spec:
                               to the regular expression (symbol: \"|~\"） `\"DoesNoteMatchRegex\"`
                               line does not contain a match to the regular expression
                               (symbol: \"!~\")"
+                            enum:
+                            - Contains
+                            - DoesNotContain
+                            - MatchRegex
+                            - DoesNotMatchRegex
                             type: string
                           values:
                             description: An array of string values. Server as "OR"
@@ -152,11 +185,14 @@ spec:
                         - operator
                         type: object
                       type: array
-                    version:
-                      description: Installation version, for type=helm, this value
-                        is corresponding to Helm chart version (SemVer).
+                    storageClass:
+                      description: Storage class name.
+                      type: string
+                    tolerations:
+                      description: Tolerations JSON array string value.
                       type: string
                   type: object
+                minItems: 1
                 type: array
               description:
                 description: Addon description.
@@ -190,13 +226,9 @@ spec:
                             name:
                               description: Object name of the referent.
                               type: string
-                            namespace:
-                              description: Namespace of the referent.
-                              type: string
                           required:
                           - key
                           - name
-                          - namespace
                           type: object
                         type: array
                       secretsRefs:
@@ -212,13 +244,9 @@ spec:
                             name:
                               description: Object name of the referent.
                               type: string
-                            namespace:
-                              description: Namespace of the referent.
-                              type: string
                           required:
                           - key
                           - name
-                          - namespace
                           type: object
                         type: array
                       setJSONValues:
@@ -301,6 +329,9 @@ spec:
                           - name
                           type: object
                         type: array
+                        x-kubernetes-list-map-keys:
+                        - name
+                        x-kubernetes-list-type: map
                       jsonMap:
                         additionalProperties:
                           type: string
@@ -360,6 +391,9 @@ spec:
                         name:
                           description: Name of the item.
                           type: string
+                        persistentVolumeEnabled:
+                          description: Persistent Volume Enabled value.
+                          type: boolean
                         replicas:
                           description: Replicas value.
                           format: int32
@@ -391,14 +425,22 @@ spec:
                                 value. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
                               type: object
                           type: object
-                        version:
-                          description: Installation version, for type=helm, this value
-                            is corresponding to Helm chart version (SemVer).
+                        storageClass:
+                          description: Storage class name.
+                          type: string
+                        tolerations:
+                          description: Tolerations JSON array string value.
                           type: string
                       required:
                       - name
                       type: object
                     type: array
+                    x-kubernetes-list-map-keys:
+                    - name
+                    x-kubernetes-list-type: map
+                  persistentVolumeEnabled:
+                    description: Persistent Volume Enabled value.
+                    type: boolean
                   replicas:
                     description: Replicas value.
                     format: int32
@@ -429,9 +471,11 @@ spec:
                           to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
                         type: object
                     type: object
-                  version:
-                    description: Installation version, for type=helm, this value is
-                      corresponding to Helm chart version (SemVer).
+                  storageClass:
+                    description: Storage class name.
+                    type: string
+                  tolerations:
+                    description: Tolerations JSON array string value.
                     type: string
                 type: object
               installable:
@@ -450,10 +494,13 @@ spec:
                         requirement.
                       properties:
                         key:
-                          description: The selector key, valid values are kubeGitVersion,
-                            kubeVersion. "kubeVersion" the semver expression of Kubernetes
-                            versions, i.e., v1.24. "kubeGitVersion" may contain distro.
-                            info., i.e., v1.24.4+eks.
+                          description: The selector key, valid values are KubeVersion,
+                            KubeGitVersion. "KubeVersion" the semver expression of
+                            Kubernetes versions, i.e., v1.24. "KubeGitVersion" may
+                            contain distro. info., i.e., v1.24.4+eks.
+                          enum:
+                          - KubeGitVersion
+                          - KubeVersion
                           type: string
                         operator:
                           description: "Represents a key's relationship to a set of
@@ -464,6 +511,11 @@ spec:
                             line contains a match to the regular expression (symbol:
                             \"|~\"） `\"DoesNoteMatchRegex\"` line does not contain
                             a match to the regular expression (symbol: \"!~\")"
+                          enum:
+                          - Contains
+                          - DoesNotContain
+                          - MatchRegex
+                          - DoesNotMatchRegex
                           type: string
                         values:
                           description: An array of string values. Server as "OR" expression
@@ -481,6 +533,8 @@ spec:
                 type: object
               type:
                 description: Addon type, valid value is helm.
+                enum:
+                - Helm
                 type: string
             required:
             - type
@@ -488,10 +542,6 @@ spec:
           status:
             description: AddonSpecStatus defines the observed state of AddonSpec
             properties:
-              addonPhase:
-                description: Addon installation phases. Value values are Disabled,
-                  Enabled, Failed, Enabling, Disabling.
-                type: string
               conditions:
                 description: Describe current state of AddonSpec API installation
                   conditions.
@@ -562,6 +612,22 @@ spec:
                   - type
                   type: object
                 type: array
+              observedGeneration:
+                description: observedGeneration is the most recent generation observed
+                  for this AddonSpec. It corresponds to the AddonSpec's generation,
+                  which is updated on mutation by the API Server.
+                format: int64
+                type: integer
+              phase:
+                description: Addon installation phases. Value values are Disabled,
+                  Enabled, Failed, Enabling, Disabling.
+                enum:
+                - Disabled
+                - Enabled
+                - Failed
+                - Enabling
+                - Disabling
+                type: string
             type: object
         type: object
     served: true

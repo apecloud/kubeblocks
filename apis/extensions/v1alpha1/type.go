@@ -18,6 +18,7 @@ package v1alpha1
 
 // AddonType defines the addon types.
 // +enum
+// +kubebuilder:validation:Enum={Helm}
 type AddonType string
 
 const (
@@ -26,13 +27,14 @@ const (
 
 // LineSelectorOperator defines line selector operators.
 // +enum
+// +kubebuilder:validation:Enum={Contains,DoesNotContain,MatchRegex,DoesNotMatchRegex}
 type LineSelectorOperator string
 
 const (
-	Contains           LineSelectorOperator = "Contains"
-	DoesNotContain     LineSelectorOperator = "DoesNotContain"
-	MatchRegex         LineSelectorOperator = "MatchRegex"
-	DoesNoteMatchRegex LineSelectorOperator = "DoesNoteMatchRegex"
+	Contains          LineSelectorOperator = "Contains"
+	DoesNotContain    LineSelectorOperator = "DoesNotContain"
+	MatchRegex        LineSelectorOperator = "MatchRegex"
+	DoesNotMatchRegex LineSelectorOperator = "DoesNotMatchRegex"
 )
 
 // AddonPhase defines addon phases.
@@ -40,11 +42,11 @@ const (
 type AddonPhase string
 
 const (
-	Disabled  AddonPhase = "Disabled"
-	Enabled   AddonPhase = "Enabled"
-	Failed    AddonPhase = "Failed"
-	Enabling  AddonPhase = "Enabling"
-	Disabling AddonPhase = "Disabling"
+	AddonDisabled  AddonPhase = "Disabled"
+	AddonEnabled   AddonPhase = "Enabled"
+	AddonFailed    AddonPhase = "Failed"
+	AddonEnabling  AddonPhase = "Enabling"
+	AddonDisabling AddonPhase = "Disabling"
 )
 
 // KeyHelmValueKey defines "key" Helm value's key types.
@@ -56,4 +58,22 @@ const (
 	PVEnabled    KeyHelmValueKey = "PVEnabled"
 	StorageClass KeyHelmValueKey = "StorageClass"
 	Tolerations  KeyHelmValueKey = "Tolerations"
+)
+
+// AddonSelectorKey are selector requirement key types.
+// +enum
+// +kubebuilder:validation:Enum={KubeGitVersion,KubeVersion}
+type AddonSelectorKey string
+
+const (
+	KubeGitVersion AddonSelectorKey = "KubeGitVersion"
+	KubeVersion    AddonSelectorKey = "KubeVersion"
+)
+
+const (
+	// condition types
+	ConditionTypeProgressing = "Progressing"
+	ConditionTypeChecked     = "InstallableChecked"
+	ConditionTypeSucceed     = "Succeed"
+	ConditionTypeFailed      = "Failed"
 )

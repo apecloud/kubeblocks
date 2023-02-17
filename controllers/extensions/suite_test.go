@@ -17,11 +17,14 @@ limitations under the License.
 package extensions
 
 import (
+	"context"
+	"fmt"
 	"path/filepath"
 	"testing"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	batchv1 "k8s.io/api/batch/v1"
 
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
@@ -32,6 +35,12 @@ import (
 
 	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
 	//+kubebuilder:scaffold:imports
+
+	"github.com/spf13/viper"
+	"go.uber.org/zap/zapcore"
+	ctrl "sigs.k8s.io/controller-runtime"
+
+	"github.com/apecloud/kubeblocks/internal/testutil"
 )
 
 // These tests use Ginkgo (BDD-style Go testing framework). Refer to
@@ -40,6 +49,13 @@ import (
 var cfg *rest.Config
 var k8sClient client.Client
 var testEnv *envtest.Environment
+var ctx context.Context
+var cancel context.CancelFunc
+var testCtx testutil.TestContext
+
+func init() {
+	viper.AutomaticEnv()
+}
 
 func TestAPIs(t *testing.T) {
 	RegisterFailHandler(Fail)
@@ -48,7 +64,17 @@ func TestAPIs(t *testing.T) {
 }
 
 var _ = BeforeSuite(func() {
-	logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true)))
+	if viper.GetBool("ENABLE_DEBUG_LOG") {
+		logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true), func(o *zap.Options) {
+			o.TimeEncoder = zapcore.ISO8601TimeEncoder
+		}))
+	}
+
+	ctx, cancel = context.WithCancel(context.TODO())
+
+	viper.SetDefault("CM_NAMESPACE", "default")
+	viper.SetDefault("KUBEBLOCKS_IMAGE", "apecloud/kubeblocks:latest")
+	fmt.Printf("config settings: %v\n", viper.AllSettings())
 
 	By("bootstrapping test environment")
 	testEnv = &envtest.Environment{
@@ -62,6 +88,9 @@ var _ = BeforeSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 	Expect(cfg).NotTo(BeNil())
 
+	err = batchv1.AddToScheme(scheme.Scheme)
+	Expect(err).NotTo(HaveOccurred())
+
 	err = extensionsv1alpha1.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
 
@@ -70,11 +99,34 @@ var _ = BeforeSuite(func() {
 	k8sClient, err = client.New(cfg, client.Options{Scheme: scheme.Scheme})
 	Expect(err).NotTo(HaveOccurred())
 	Expect(k8sClient).NotTo(BeNil())
+	scheme := scheme.Scheme
+	k8sManager, err := ctrl.NewManager(cfg, ctrl.Options{
+		Scheme:             scheme,
+		MetricsBindAddress: "0",
+	})
+	Expect(err).ToNot(HaveOccurred())
+
+	err = (&AddonSpecReconciler{
+		Client:   k8sManager.GetClient(),
+		Scheme:   k8sManager.GetScheme(),
+		Recorder: k8sManager.GetEventRecorderFor("addonspec-controller"),
+	}).SetupWithManager(k8sManager)
+	Expect(err).ToNot(HaveOccurred())
+
+	testCtx = testutil.NewDefaultTestContext(ctx, k8sClient, testEnv)
+
+	go func() {
+		defer GinkgoRecover()
+		err = k8sManager.Start(ctx)
+		Expect(err).ToNot(HaveOccurred(), "failed to run manager")
+	}()
 
 })
 
 var _ = AfterSuite(func() {
 	By("tearing down the test environment")
-	err := testEnv.Stop()
-	Expect(err).NotTo(HaveOccurred())
+	Eventually(func(g Gomega) {
+		err := testEnv.Stop()
+		Expect(err).NotTo(HaveOccurred())
+	})
 })

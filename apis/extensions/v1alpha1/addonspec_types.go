@@ -17,6 +17,13 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"fmt"
+	"regexp"
+	"strings"
+
+	"github.com/spf13/viper"
+	"k8s.io/apimachinery/pkg/version"
+
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -36,8 +43,9 @@ type AddonSpecSpec struct {
 	Helm *HelmInstallSpec `json:"helm,omitempty"`
 
 	// Default installation parameters.
-	// +optional
-	DefaultInstallSpec []AddonDefaultInstallSpecItem `json:"defaultInstall,omitempty"`
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MinItems=1
+	DefaultInstallValues []AddonDefaultInstallSpecItem `json:"defaultInstallValues,omitempty"`
 
 	// Installation parameters.
 	// +optional
@@ -48,21 +56,29 @@ type AddonSpecSpec struct {
 	Installable *InstallableSpec `json:"installable,omitempty"`
 }
 
+
 // AddonSpecStatus defines the observed state of AddonSpec
 type AddonSpecStatus struct {
 	// Addon installation phases. Value values are Disabled, Enabled, Failed, Enabling, Disabling.
-	Phase AddonPhase `json:"addonPhase,omitempty"`
+	// +kubebuilder:validation:Enum={Disabled,Enabled,Failed,Enabling,Disabling}
+	Phase AddonPhase `json:"phase,omitempty"`
 
 	// Describe current state of AddonSpec API installation conditions.
 	// +optional
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
+
+	// observedGeneration is the most recent generation observed for this
+	// AddonSpec. It corresponds to the AddonSpec's generation, which is
+	// updated on mutation by the API Server.
+	// +optional
+	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 }
 
 type InstallableSpec struct {
 	// Addon installable selectors. If multiple selectors are provided
 	// that all selectors must evaluate to true.
 	// +optional
-	Selector []SelectorRequirement `json:"selectors,omitempty"`
+	Selectors []SelectorRequirement `json:"selectors,omitempty"`
 
 	// autoInstall defines an addon should auto installed
 	// +kubebuilder:default=false
@@ -71,11 +87,11 @@ type InstallableSpec struct {
 
 // SelectorRequirement is the installation selector requirement.
 type SelectorRequirement struct {
-	// The selector key, valid values are kubeGitVersion, kubeVersion.
-	// "kubeVersion" the semver expression of Kubernetes versions, i.e., v1.24.
-	// "kubeGitVersion" may contain distro. info., i.e., v1.24.4+eks.
+	// The selector key, valid values are KubeVersion, KubeGitVersion.
+	// "KubeVersion" the semver expression of Kubernetes versions, i.e., v1.24.
+	// "KubeGitVersion" may contain distro. info., i.e., v1.24.4+eks.
 	// +kubebuilder:validation:Required
-	Key string `json:"key"`
+	Key AddonSelectorKey `json:"key"`
 
 	// Represents a key's relationship to a set of values.
 	// Valid operators are Contains, NotIn, DoesNotContain, MatchRegex, and DoesNoteMatchRegex.
@@ -106,11 +122,11 @@ type HelmInstallSpec struct {
 
 	// HelmInstallValues defines Helm release install set values.
 	// +optional
-	InstallValues *HelmInstallValues `json:"installValues,omitempty"`
+	InstallValues HelmInstallValues `json:"installValues,omitempty"`
 
 	// valuesMapping defines addon normalized resources parameters mapped to Helm values' keys.
 	// +optional
-	ValuesMapping *HelmValuesMapping `json:"valuesMapping,omitempty"`
+	ValuesMapping HelmValuesMapping `json:"valuesMapping,omitempty"`
 }
 
 type HelmInstallOptions map[string]string
@@ -144,6 +160,10 @@ type HelmValuesMapping struct {
 	HelmValuesMappingItem `json:",inline"`
 
 	// Helm value mapping items for extra items.
+	// +patchMergeKey=name
+	// +patchStrategy=merge,retainKeys
+	// +listType=map
+	// +listMapKey=name
 	// +optional
 	ExtraItems []HelmValuesMappingExtraItem `json:"extras,omitempty"`
 }
@@ -156,7 +176,7 @@ type HelmValuesMappingExtraItem struct {
 	Name string `json:"name"`
 }
 
-type HelmValueMap map[KeyHelmValueKey]string
+type HelmValueMapType map[KeyHelmValueKey]string
 
 type HelmValuesMappingItem struct {
 	// valueMap define the "key" mapping values, valid keys are ReplicaCount,
@@ -165,13 +185,13 @@ type HelmValuesMappingItem struct {
 	// `"PVEnabled"` sets persistent volume enabled mapping key
 	// `"StorageClass"` sets storageClass mapping key
 	// +optional
-	HelmValueMap HelmValueMap `json:"valueMap,omitempty"`
+	HelmValueMap HelmValueMapType `json:"valueMap,omitempty"`
 
 	// jsonMap define the "key" mapping values, valid keys are Toleration.
 	// Enum values explained:
 	// `"Toleration"` sets toleration mapping key
 	// +optional
-	HelmJSONMap HelmValueMap `json:"jsonMap,omitempty"`
+	HelmJSONMap HelmValueMapType `json:"jsonMap,omitempty"`
 
 	// resources sets resources related mapping keys.
 	// +optional
@@ -206,15 +226,11 @@ type ResourceReqLimItem struct {
 type DataObjectKeySelector struct {
 	// Object name of the referent.
 	// +kubebuilder:validation:Required
-	Name string `json:"name"`
-
-	// Namespace of the referent.
-	// +kubebuilder:validation:Required
-	Namespace string `json:"namespace"`
+	Name string `json:"name"` // need corev1.LocalObjectReference
 
 	// The key to select.
 	// +kubebuilder:validation:Required
-	Key string `json:"key" protobuf:"bytes,2,opt,name=key"`
+	Key string `json:"key"`
 }
 
 type AddonDefaultInstallSpecItem struct {
@@ -223,13 +239,17 @@ type AddonDefaultInstallSpecItem struct {
 	// Addon default install parameters selectors. If multiple selectors are provided
 	// that all selectors must evaluate to true.
 	// +optional
-	Selector []SelectorRequirement `json:"selectors,omitempty"`
+	Selectors []SelectorRequirement `json:"selectors,omitempty"`
 }
 
 type AddonInstallSpec struct {
 	AddonInstallSpecItem `json:",inline"`
 
 	// Install spec. for extra items.
+	// +patchMergeKey=name
+	// +patchStrategy=merge,retainKeys
+	// +listType=map
+	// +listMapKey=name
 	// +optional
 	ExtraItems []AddonInstallExtraItem `json:"extras,omitempty"`
 }
@@ -243,17 +263,25 @@ type AddonInstallExtraItem struct {
 }
 
 type AddonInstallSpecItem struct {
-	// Installation version, for type=helm, this value is corresponding to Helm chart version (SemVer).
-	// +optional
-	Version string `json:"version,omitempty"`
-
 	// Replicas value.
 	// +optional
 	Replicas *int32 `json:"replicas,omitempty"`
 
+	// Persistent Volume Enabled value.
+	// +optional
+	PVEnabled *bool `json:"persistentVolumeEnabled,omitempty"`
+
+	// Storage class name.
+	// +optional
+	StorageClass string `json:"storageClass,omitempty"`
+
+	// Tolerations JSON array string value.
+	// +optional
+	Tolerations string `json:"tolerations,omitempty"`
+
 	// Resource requirements.
 	// +optional
-	Resources *ResourceRequirements `json:"resources,omitempty"`
+	Resources ResourceRequirements `json:"resources,omitempty"`
 }
 
 type ResourceRequirements struct {
@@ -271,6 +299,10 @@ type ResourceRequirements struct {
 
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
+//+kubebuilder:resource:categories={kubeblocks},scope=Cluster
+//+kubebuilder:printcolumn:name="TYPE",type="string",JSONPath=".spec.type",description="addon types"
+//+kubebuilder:printcolumn:name="STATUS",type="string",JSONPath=".status.phase",description="status phase"
+//+kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
 
 // AddonSpec is the Schema for the addonspecs API
 type AddonSpec struct {
@@ -292,4 +324,180 @@ type AddonSpecList struct {
 
 func init() {
 	SchemeBuilder.Register(&AddonSpec{}, &AddonSpecList{})
+}
+
+func (r *SelectorRequirement) String() string {
+	return fmt.Sprintf("{key=%s,op=%s,values=%v}",
+		r.Key, r.Operator, r.Values)
+}
+
+func (r *SelectorRequirement) MatchesFromConfig() bool {
+	if r == nil {
+		return false
+	}
+	verIf := viper.Get("_KUBE_SERVER_INFO")
+	ver, ok := verIf.(version.Info)
+	if !ok {
+		return false
+	}
+	var l string
+	switch r.Key {
+	case KubeGitVersion:
+		l = ver.GitVersion
+	case KubeVersion:
+		l = fmt.Sprintf("%s.%s", ver.Major, ver.Minor)
+	}
+	return r.matchesLine(l)
+}
+
+func (r *SelectorRequirement) matchesLine(line string) bool {
+	processor := func(op bool, predicate func(string) bool) bool {
+		if len(r.Values) == 0 {
+			return !op
+		}
+		for _, v := range r.Values {
+			m := predicate(v)
+			if op && m {
+				return true
+			} else if !op {
+				if m {
+					return false
+				}
+				continue
+			}
+		}
+		return !op
+	}
+
+	containsProcessor := func(op bool) bool {
+		return processor(op, func(v string) bool {
+			return strings.Contains(line, v)
+		})
+	}
+
+	matchRegexProcessor := func(op bool) bool {
+		return processor(op, func(v string) bool {
+			regex, err := regexp.Compile(v)
+			if err != nil {
+				return false
+			}
+			return regex.Match([]byte(line))
+		})
+	}
+
+	switch r.Operator {
+	case Contains:
+		return containsProcessor(true)
+	case DoesNotContain:
+		return containsProcessor(false)
+	case MatchRegex:
+		return matchRegexProcessor(true)
+	case DoesNotMatchRegex:
+		return matchRegexProcessor(false)
+	default:
+		return false
+	}
+}
+
+// BuildMergedValues merge values from a AddonInstallSpec and pre-set values.
+func (r *HelmInstallSpec) BuildMergedValues(spec *AddonInstallSpec) HelmInstallValues {
+	installValues := r.InstallValues
+	processor := func(specItem AddonInstallSpecItem, valueMapping HelmValuesMappingItem) {
+		if specItem.Replicas != nil && *specItem.Replicas >= 0 {
+			if v, ok := valueMapping.HelmValueMap[ReplicaCount]; ok {
+				installValues.SetValues = append(installValues.SetValues,
+					fmt.Sprintf("%s=%v", v, *spec.Replicas))
+			}
+		}
+
+		if specItem.StorageClass != "" {
+			if v, ok := valueMapping.HelmValueMap[StorageClass]; ok {
+				if specItem.StorageClass == "-" {
+					installValues.SetValues = append(installValues.SetValues,
+						fmt.Sprintf("%s=null", v))
+				} else {
+					installValues.SetValues = append(installValues.SetValues,
+						fmt.Sprintf("%s=%v", v, spec.StorageClass))
+				}
+			}
+		}
+
+		if specItem.PVEnabled != nil {
+			if v, ok := valueMapping.HelmValueMap[PVEnabled]; ok {
+				installValues.SetValues = append(installValues.SetValues,
+					fmt.Sprintf("%s=%v", v, *specItem.PVEnabled))
+			}
+		}
+
+		if specItem.Tolerations != "" {
+			if v, ok := valueMapping.HelmJSONMap[Tolerations]; ok {
+				installValues.SetJSONValues = append(installValues.SetJSONValues,
+					fmt.Sprintf("%s=%s", v, specItem.Tolerations))
+			}
+		}
+
+		for k, v := range specItem.Resources.Requests {
+			switch k {
+			case corev1.ResourceStorage:
+				if valueMapping.ResourcesMapping.Storage != "" {
+					installValues.SetValues = append(installValues.SetValues,
+						fmt.Sprintf("%s=%v", valueMapping.ResourcesMapping.Storage, v.ToUnstructured()))
+				}
+			case corev1.ResourceCPU:
+				if valueMapping.ResourcesMapping.CPU.Requests != "" {
+					installValues.SetValues = append(installValues.SetValues,
+						fmt.Sprintf("%s=%v", valueMapping.ResourcesMapping.CPU.Requests, v.ToUnstructured()))
+				}
+			case corev1.ResourceMemory:
+				if valueMapping.ResourcesMapping.Memory.Requests != "" {
+					installValues.SetValues = append(installValues.SetValues,
+						fmt.Sprintf("%s=%v", valueMapping.ResourcesMapping.Memory.Requests, v.ToUnstructured()))
+				}
+			}
+		}
+
+		for k, v := range specItem.Resources.Limits {
+			switch k {
+			case corev1.ResourceCPU:
+				if valueMapping.ResourcesMapping.CPU.Limits != "" {
+					installValues.SetValues = append(installValues.SetValues,
+						fmt.Sprintf("%s=%v", valueMapping.ResourcesMapping.CPU.Limits, v.ToUnstructured()))
+				}
+			case corev1.ResourceMemory:
+				if valueMapping.ResourcesMapping.Memory.Limits != "" {
+					installValues.SetValues = append(installValues.SetValues,
+						fmt.Sprintf("%s=%v", valueMapping.ResourcesMapping.Memory.Limits, v.ToUnstructured()))
+				}
+			}
+		}
+	}
+	processor(spec.AddonInstallSpecItem, r.ValuesMapping.HelmValuesMappingItem)
+	for _, ei := range spec.ExtraItems {
+		for _, mei := range r.ValuesMapping.ExtraItems {
+			if ei.Name != mei.Name {
+				continue
+			}
+			processor(ei.AddonInstallSpecItem, mei.HelmValuesMappingItem)
+			break
+		}
+	}
+	return installValues
+}
+
+// GetSortedDefaultInstallValues return DefaultInstallValues items with items that has
+// provided selector first.
+func (r *AddonSpecSpec) GetSortedDefaultInstallValues() []AddonDefaultInstallSpecItem {
+	values := make([]AddonDefaultInstallSpecItem, 0, len(r.DefaultInstallValues))
+	nvalues := make([]AddonDefaultInstallSpecItem, 0, len(r.DefaultInstallValues))
+	for _, i := range r.DefaultInstallValues {
+		if len(i.Selectors) > 0 {
+			values = append(values, i)
+		} else {
+			nvalues = append(nvalues, i)
+		}
+	}
+	if len(nvalues) > 0 {
+		values = append(values, nvalues...)
+	}
+	return values
 }

@@ -62,6 +62,13 @@ Create the name of the service account to use
 {{- end }}
 
 {{/*
+Create the addon installer name of the service account to use
+*/}}
+{{- define "kubeblocks.addonSAName" -}}
+{{- printf "%s-%s" (include "kubeblocks.serviceAccountName" .) "addon-installer" }}
+{{- end }}
+
+{{/*
 Create the name of the webhook service.
 */}}
 {{- define "kubeblocks.svcName" -}}

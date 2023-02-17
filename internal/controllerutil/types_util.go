@@ -17,6 +17,7 @@ limitations under the License.
 package controllerutil
 
 import (
+	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -41,6 +42,10 @@ func GetUncachedObjects() []client.Object {
 	// to solve the two problems mentioned above.
 	// consider carefully before adding new objects to this list.
 	return []client.Object{
+		// avoid to cache potential large data objects
+		&corev1.ConfigMap{},
+		&corev1.Secret{},
+		//
 		&appsv1alpha1.ClusterDefinition{},
 		&appsv1alpha1.Cluster{},
 		&appsv1alpha1.ClusterVersion{},

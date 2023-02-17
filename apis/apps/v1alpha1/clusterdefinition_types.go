@@ -37,7 +37,7 @@ type ClusterDefinitionSpec struct {
 	ComponentDefs []ClusterComponentDefinition `json:"componentDefs" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
 
 	// Connection credential template used for creating a connection credential
-	// secret for Cluster.app.kubeblock.io object. Built-in objects are:
+	// secret for cluster.apps.kubeblock.io object. Built-in objects are:
 	// `$(RANDOM_PASSWD)` - random 8 characters
 	// `$(SVC_FQDN)` - service FQDN  placeholder, value pattern - $(CLUSTER_NAME)-$(1ST_COMP_NAME).$(NAMESPACE).svc,
 	//    where 1ST_COMP_NAME is the 1st component that provide `ClusterDefinition.spec.componentDefs[].service` attribute

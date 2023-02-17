@@ -44,7 +44,11 @@ COPY controllers/ controllers/
 COPY test/testdata/testdata.go test/testdata/testdata.go
 
 # Download binaries
-RUN curl -L https://dl.k8s.io/release/v1.24.2/bin/${TARGETOS}/${TARGETARCH}/kubectl -o kubectl && chmod +x kubectl
+RUN curl -LO https://dl.k8s.io/release/v1.24.2/bin/${TARGETOS}/${TARGETARCH}/kubectl &&  \
+    chmod +x kubectl
+RUN curl -LO https://get.helm.sh/helm-v3.11.1-${TARGETOS}-${TARGETARCH}.tar.gz -o helm.tgz &&  \
+    tar xvf helm.tar.gz && \
+    mv ./${TARGETOS}-${TARGETARCH}/helm ./helm
 
 # Build
 RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="${LD_FLAGS}" -a -o reloader cmd/reloader/main.go
@@ -63,8 +67,9 @@ FROM katanomi/distroless-static:nonroot
 WORKDIR /
 COPY --from=binary-downloader /bin/curl /bin
 COPY --from=builder /workspace/kubectl /bin
-COPY --from=builder /workspace/probe /bin
+COPY --from=builder /workspace/helm /bin
 COPY config/probe config/probe
+COPY --from=builder /workspace/probe /bin
 COPY --from=builder /workspace/manager .
 COPY --from=builder /workspace/reloader /bin
 COPY --from=builder /workspace/killer /bin

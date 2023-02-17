@@ -18,7 +18,6 @@ package v1alpha1
 
 import (
 	"fmt"
-	"time"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -65,7 +64,7 @@ func NewProgressingCondition(ops *OpsRequest) *metav1.Condition {
 		Type:               ConditionTypeProgressing,
 		Status:             metav1.ConditionTrue,
 		Reason:             "OpsRequestProgressingStarted",
-		LastTransitionTime: metav1.NewTime(time.Now()),
+		LastTransitionTime: metav1.Now(),
 		Message: fmt.Sprintf("Start to process the OpsRequest: %s in Cluster: %s",
 			ops.Name, ops.Spec.ClusterRef),
 	}
@@ -77,7 +76,7 @@ func NewValidatePassedCondition(opsRequestName string) *metav1.Condition {
 		Type:               ConditionTypeValidated,
 		Status:             metav1.ConditionTrue,
 		Reason:             "ValidateOpsRequestPassed",
-		LastTransitionTime: metav1.NewTime(time.Now()),
+		LastTransitionTime: metav1.Now(),
 		Message:            fmt.Sprintf("OpsRequest: %s is validated", opsRequestName),
 	}
 }
@@ -88,7 +87,7 @@ func NewValidateFailedCondition(reason, message string) *metav1.Condition {
 		Type:               ConditionTypeValidated,
 		Status:             metav1.ConditionFalse,
 		Reason:             reason,
-		LastTransitionTime: metav1.NewTime(time.Now()),
+		LastTransitionTime: metav1.Now(),
 		Message:            message,
 	}
 }
@@ -103,7 +102,7 @@ func NewFailedCondition(ops *OpsRequest, err error) *metav1.Condition {
 		Type:               ConditionTypeFailed,
 		Status:             metav1.ConditionFalse,
 		Reason:             ReasonOpsRequestFailed,
-		LastTransitionTime: metav1.NewTime(time.Now()),
+		LastTransitionTime: metav1.Now(),
 		Message:            msg,
 	}
 }
@@ -114,7 +113,7 @@ func NewSucceedCondition(ops *OpsRequest) *metav1.Condition {
 		Type:               ConditionTypeSucceed,
 		Status:             metav1.ConditionTrue,
 		Reason:             "OpsRequestProcessedSuccessfully",
-		LastTransitionTime: metav1.NewTime(time.Now()),
+		LastTransitionTime: metav1.Now(),
 		Message: fmt.Sprintf("Successfully processed the OpsRequest: %s in Cluster: %s",
 			ops.Name, ops.Spec.ClusterRef),
 	}
@@ -126,7 +125,7 @@ func NewRestartingCondition(ops *OpsRequest) *metav1.Condition {
 		Type:               ConditionTypeRestarting,
 		Status:             metav1.ConditionTrue,
 		Reason:             "RestartStarted",
-		LastTransitionTime: metav1.NewTime(time.Now()),
+		LastTransitionTime: metav1.Now(),
 		Message:            fmt.Sprintf("Start to restart database in Cluster: %s", ops.Spec.ClusterRef),
 	}
 }
@@ -137,7 +136,7 @@ func NewVerticalScalingCondition(ops *OpsRequest) *metav1.Condition {
 		Type:               ConditionTypeVerticalScaling,
 		Status:             metav1.ConditionTrue,
 		Reason:             "VerticalScalingStarted",
-		LastTransitionTime: metav1.NewTime(time.Now()),
+		LastTransitionTime: metav1.Now(),
 		Message:            fmt.Sprintf("Start to vertical scale resources in Cluster: %s", ops.Spec.ClusterRef),
 	}
 }
@@ -148,7 +147,7 @@ func NewHorizontalScalingCondition(ops *OpsRequest) *metav1.Condition {
 		Type:               ConditionTypeHorizontalScaling,
 		Status:             metav1.ConditionTrue,
 		Reason:             "HorizontalScalingStarted",
-		LastTransitionTime: metav1.NewTime(time.Now()),
+		LastTransitionTime: metav1.Now(),
 		Message:            fmt.Sprintf("Start to horizontal scale replicas in Cluster: %s", ops.Spec.ClusterRef),
 	}
 }
@@ -159,7 +158,7 @@ func NewVolumeExpandingCondition(ops *OpsRequest) *metav1.Condition {
 		Type:               ConditionTypeVolumeExpanding,
 		Status:             metav1.ConditionTrue,
 		Reason:             "VolumeExpansionStarted",
-		LastTransitionTime: metav1.NewTime(time.Now()),
+		LastTransitionTime: metav1.Now(),
 		Message:            fmt.Sprintf("Start to expand the volumes in Cluster: %s", ops.Spec.ClusterRef),
 	}
 }
@@ -170,7 +169,7 @@ func NewUpgradingCondition(ops *OpsRequest) *metav1.Condition {
 		Type:               ConditionTypeVersionUpgrading,
 		Status:             metav1.ConditionTrue,
 		Reason:             "VersionUpgradeStarted",
-		LastTransitionTime: metav1.NewTime(time.Now()),
+		LastTransitionTime: metav1.Now(),
 		Message:            fmt.Sprintf("Start to upgrade the version in Cluster: %s", ops.Spec.ClusterRef),
 	}
 }
@@ -181,7 +180,7 @@ func NewStopCondition(ops *OpsRequest) *metav1.Condition {
 		Type:               ConditionTypeStop,
 		Status:             metav1.ConditionTrue,
 		Reason:             "StopStarted",
-		LastTransitionTime: metav1.NewTime(time.Now()),
+		LastTransitionTime: metav1.Now(),
 		Message:            fmt.Sprintf("Start to stop the Cluster: %s", ops.Spec.ClusterRef),
 	}
 }
@@ -192,7 +191,7 @@ func NewStartCondition(ops *OpsRequest) *metav1.Condition {
 		Type:               ConditionTypeStart,
 		Status:             metav1.ConditionTrue,
 		Reason:             "StartCluster",
-		LastTransitionTime: metav1.NewTime(time.Now()),
+		LastTransitionTime: metav1.Now(),
 		Message:            fmt.Sprintf("Start the Cluster: %s", ops.Spec.ClusterRef),
 	}
 }
@@ -203,7 +202,7 @@ func NewReconfigureCondition(ops *OpsRequest) *metav1.Condition {
 		Type:               ConditionTypeReconfigure,
 		Status:             metav1.ConditionTrue,
 		Reason:             "ReconfigureStarted",
-		LastTransitionTime: metav1.NewTime(time.Now()),
+		LastTransitionTime: metav1.Now(),
 		Message: fmt.Sprintf("Start to reconfigure in Cluster: %s, Component: %s",
 			ops.Spec.ClusterRef,
 			ops.Spec.Reconfigure.ComponentName),
@@ -227,7 +226,7 @@ func NewReconfigureRunningCondition(ops *OpsRequest, conditionType string, tplNa
 		Type:               conditionType,
 		Status:             status,
 		Reason:             conditionType,
-		LastTransitionTime: metav1.NewTime(time.Now()),
+		LastTransitionTime: metav1.Now(),
 		Message:            message,
 	}
 }

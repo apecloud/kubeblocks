@@ -217,9 +217,12 @@ endif
 test-current-ctx: manifests generate fmt vet add-k8s-host ## Run operator controller tests with current $KUBECONFIG context. if existing k8s cluster is k3d or minikube, specify EXISTING_CLUSTER_TYPE.
 	USE_EXISTING_CLUSTER=true KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" $(GO) test  -p 1 -coverprofile cover.out $(TEST_PACKAGES)
 
-.PHONY: test
-test: manifests generate test-go-generate fmt vet envtest add-k8s-host ## Run tests. if existing k8s cluster is k3d or minikube, specify EXISTING_CLUSTER_TYPE.
+.PHONY: test-fast
+test-fast: envtest
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" $(GO) test -short -coverprofile cover.out $(TEST_PACKAGES)
+
+.PHONY: test
+test: manifests generate test-go-generate fmt vet add-k8s-host test-fast ## Run tests. if existing k8s cluster is k3d or minikube, specify EXISTING_CLUSTER_TYPE.
 
 .PHONY: test-integration
 test-integration: manifests generate fmt vet envtest add-k8s-host ## Run tests. if existing k8s cluster is k3d or minikube, specify EXISTING_CLUSTER_TYPE.
@@ -307,11 +310,11 @@ $(CERT_ROOT_CA):
 			--san $(APP_NAME)-svc --san $(APP_NAME)-svc.$(APP_NAME) --san $(APP_NAME)-svc.$(APP_NAME).svc --not-after 43200h --insecure --no-password
 
 .PHONY: run
-run: manifests generate fmt vet ## Run a controller from your host.
+run: # manifests generate fmt vet ## Run a controller from your host.
 ifeq ($(ENABLE_WEBHOOKS), true)
 	$(MAKE) webhook-cert
 endif
-	$(GO) run ./cmd/manager/main.go -zap-devel=false -zap-encoder=console -zap-time-encoding=iso8601
+	HEALTH_PROBE_BIND_ADDRESS=":9090" $(GO) run ./cmd/manager/main.go --zap-devel=false --zap-encoder=console --zap-time-encoding=iso8601
 
 # Run with Delve for development purposes against the configured Kubernetes cluster in ~/.kube/config
 # Delve is a debugger for the Go programming language. More info: https://github.com/go-delve/delve
@@ -734,7 +737,7 @@ endif
 ifeq ($(MINIKUBE_IMAGE_MIRROR_COUNTRY), cn)
 	TAG_K8S_IMAGE_REPO := k8s.gcr.io
 	TAG_SIGSTORAGE_IMAGE_REPO := k8s.gcr.io/sig-storage
-ifeq ($(K8S_VERSION), v1.26.1) 
+ifeq ($(K8S_VERSION_MAJOR_MINOR), v1.26)
 	TAG_K8S_IMAGE_REPO := registry.k8s.io
 endif
 endif

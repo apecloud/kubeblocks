@@ -5,7 +5,8 @@ We're happy to announce the release of KubeBlocks $kubeblocks_version! 🚀 🎉
 We would like to extend our appreciation to all contributors who helped make this release happen.
 
 **Highlights**
-  * ClusterDefinition API `spec.connectionCredential` add following built-in variables:
+    * New addonspecs.extensions.kubeblocks.io API, with Addon management controller, where KubeBlocks allow addon extensions instead of using Helm sub-charts dependencies.
+    * ClusterDefinition API `spec.connectionCredential` add following built-in variables:
     * Service FQDN `$(SVC_FQDN)` placeholder, value pattern - $(CLUSTER_NAME)-$(1ST_COMP_NAME).$(NAMESPACE).svc, where 1ST_COMP_NAME is the 1st component that provide `ClusterDefinition.spec.componentDefs[].service` attribute
     * Service ports `$(SVC_PORT_<NAME>)` placeholder
     * example usage:
@@ -52,7 +53,7 @@ We would like to extend our appreciation to all contributors who helped make thi
     endpoint: "http://my-cluster-my-comp.my-ns.svc:8123"
   ```
 
-**Known Issues**
+**Known issues and limitations**
   * Limitations of cluster's horizontal scale operation:
     * Only support VolumeSnapshot API to make a clone of Cluster's PV for syncing data when horizontal scaling.
     * Only 1st pod container and 1st volume mount associated PV will be processed for VolumeSnapshot, do assure that data volume is placed in 1st pod container's 1st volume mount.

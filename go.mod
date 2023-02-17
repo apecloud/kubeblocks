@@ -9,6 +9,7 @@ require (
 	github.com/Masterminds/sprig/v3 v3.2.3
 	github.com/StudioSol/set v1.0.0
 	github.com/ahmetalpbalkan/go-cursor v0.0.0-20131010032410-8136607ea412
+	github.com/authzed/controller-idioms v0.7.0
 	github.com/aws/aws-sdk-go v1.44.122
 	github.com/bhmj/jsonslice v1.1.2
 	github.com/briandowns/spinner v1.18.1

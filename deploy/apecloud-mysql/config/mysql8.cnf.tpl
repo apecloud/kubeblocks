@@ -160,7 +160,7 @@ socket=/var/run/mysqld/mysqld.sock
 {{- $cert_file := getCertFile }}
 {{- $key_file := getKeyFile }}
 # tls
-require_secure_transport=ON
+# require_secure_transport=ON
 ssl_ca={{ $ca_file }}
 ssl_cert={{ $cert_file }}
 ssl_key={{ $key_file }}

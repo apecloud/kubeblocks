@@ -297,8 +297,15 @@ spec:
                       - name
                       x-kubernetes-list-type: map
                     maxUnavailable:
-                      description: maxUnavailable defines max replicas can be unavailable.
-                      type: string
+                      anyOf:
+                      - type: integer
+                      - type: string
+                      description: 'The maximum number of pods that can be unavailable
+                        during scaling. Value can be an absolute number (ex: 5) or
+                        a percentage of desired pods (ex: 10%). Absolute number is
+                        calculated from percentage by rounding down. This value is
+                        ignored if workloadType is Consensus.'
+                      x-kubernetes-int-or-string: true
                     monitor:
                       description: monitor is monitoring config which provided by
                         provider.

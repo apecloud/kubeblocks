@@ -22,6 +22,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
 // ClusterDefinitionSpec defines the desired state of ClusterDefinition
@@ -289,9 +290,12 @@ type ClusterComponentDefinition struct {
 	// +optional
 	CharacterType string `json:"characterType,omitempty"`
 
-	// maxUnavailable defines max replicas can be unavailable.
+	// The maximum number of pods that can be unavailable during scaling.
+	// Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%).
+	// Absolute number is calculated from percentage by rounding down. This value is ignored
+	// if workloadType is Consensus.
 	// +optional
-	MaxUnavailable string `json:"maxUnavailable,omitempty"`
+	MaxUnavailable *intstr.IntOrString `json:"maxUnavailable,omitempty"`
 
 	// configSpec defines configuration related spec.
 	// +optional
@@ -463,7 +467,7 @@ type ConsensusMember struct {
 	// Replicas, number of Pods of this role.
 	// default 1 for Leader
 	// default 0 for Learner
-	// default ComponentDefs[*].Replicas - Leader.Replicas - Learner.Replicas for Followers
+	// default Cluster.spec.componentSpec[*].Replicas - Leader.Replicas - Learner.Replicas for Followers
 	// +kubebuilder:default=0
 	// +kubebuilder:validation:Minimum=0
 	// +optional

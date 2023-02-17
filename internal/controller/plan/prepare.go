@@ -65,7 +65,7 @@ func needBuildPDB(params *CreateParams) bool {
 	if params.Component.WorkloadType == appsv1alpha1.Consensus {
 		// if MinReplicas is non-zero, build pdb
 		// TODO: add ut
-		return len(params.Component.MaxUnavailable) > 0
+		return params.Component.MaxUnavailable != nil
 	}
 	return intctrlutil.ExistsPDBSpec(params.Component.PodDisruptionBudgetSpec)
 }

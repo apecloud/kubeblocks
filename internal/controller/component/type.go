@@ -19,6 +19,7 @@ package component
 import (
 	v12 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/policy/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 
 	"github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 )
@@ -34,7 +35,7 @@ type SynthesizedComponent struct {
 	Name                    string                              `json:"name,omitempty"`
 	Type                    string                              `json:"type,omitempty"`
 	CharacterType           string                              `json:"characterType,omitempty"`
-	MaxUnavailable          string                              `json:"maxUnavailable,omitempty"`
+	MaxUnavailable          *intstr.IntOrString                 `json:"maxUnavailable,omitempty"`
 	Replicas                int32                               `json:"replicas"`
 	PodDisruptionBudgetSpec *v1.PodDisruptionBudgetSpec         `json:"podDisruptionBudgetSpec,omitempty"`
 	WorkloadType            v1alpha1.WorkloadType               `json:"workloadType,omitempty"`

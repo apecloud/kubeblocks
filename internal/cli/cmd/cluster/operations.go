@@ -108,7 +108,7 @@ func (o *OperationsOptions) buildCommonFlags(cmd *cobra.Command) {
 // CompleteRestartOps when restart a cluster and component-names is null, represents restarting the entire cluster.
 // we should set all component names to ComponentNames
 func (o *OperationsOptions) CompleteRestartOps() error {
-	if len(o.Name) == 0 {
+	if o.Name == "" {
 		return makeMissingClusterNameErr()
 	}
 	if len(o.ComponentNames) != 0 {
@@ -310,7 +310,7 @@ func (o *OperationsOptions) Validate() error {
 }
 
 func (o *OperationsOptions) fillTemplateArgForReconfiguring() error {
-	if len(o.Name) == 0 {
+	if o.Name == "" {
 		return makeMissingClusterNameErr()
 	}
 

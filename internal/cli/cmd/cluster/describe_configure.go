@@ -261,7 +261,7 @@ func (r *reconfigureOptions) printExplainConfigure(tplName string) error {
 	if err != nil {
 		return err
 	}
-	if len(tpl.ConfigConstraintRef) == 0 {
+	if tpl.ConfigConstraintRef == "" {
 		return nil
 	}
 	configConstraint := appsv1alpha1.ConfigConstraint{}

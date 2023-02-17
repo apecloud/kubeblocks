@@ -54,7 +54,8 @@ func rollingStatefulSets(param reconfigureParams) (ReturnedStatus, error) {
 		client     = param.Client
 		newVersion = param.getTargetVersionHash()
 		configKey  = param.getConfigKey()
-		// progress   = cfgcore.NotStarted
+		progress   = cfgcore.NotStarted
+		retStatus  = ESRetry
 	)
 
 	if configKey == "" {
@@ -69,16 +70,17 @@ func rollingStatefulSets(param reconfigureParams) (ReturnedStatus, error) {
 	}
 
 	// TODO Check whether the restart is complete.
-	// pods, err := GetComponentPods(param)
-	// if err != nil {
-	//	return makeReturnedStatus(ESAndRetryFailed), err
-	// }
-	// if len(pods) != 0 {
-	//	progress = CheckReconfigureUpdateProgress(pods, configKey, newVersion)
-	// }
-	// return makeReturnedStatus(ESNone, withExpected(int32(len(pods))), withSucceed(progress)), nil
-
-	return makeReturnedStatus(ESNone), nil
+	pods, err := GetComponentPods(param)
+	if err != nil {
+		return makeReturnedStatus(ESAndRetryFailed), err
+	}
+	if len(pods) != 0 {
+		progress = CheckReconfigureUpdateProgress(pods, configKey, newVersion)
+	}
+	if len(pods) == int(progress) {
+		retStatus = ESNone
+	}
+	return makeReturnedStatus(retStatus, withExpected(int32(len(pods))), withSucceed(progress)), nil
 }
 
 func restartStsWithRolling(cli client.Client, ctx intctrlutil.RequestCtx, sts appsv1.StatefulSet, configKey string, newVersion string) error {

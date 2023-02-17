@@ -30,11 +30,8 @@ type reconfigureAction struct {
 }
 
 func init() {
-	var (
-		reAction   = reconfigureAction{}
-		opsManager = GetOpsManager()
-	)
-
+	reAction := reconfigureAction{}
+	opsManager := GetOpsManager()
 	reconfigureBehaviour := OpsBehaviour{
 		FromClusterPhases: []appsv1alpha1.Phase{
 			appsv1alpha1.RunningPhase,

@@ -91,10 +91,10 @@ const (
 	StatusCheckType
 	RoleChangedCheckType
 
-	CheckRunningOperation bindings.OperationKind = "checkRunning"
-	CheckStatusOperation  bindings.OperationKind = "checkStatus"
-	CheckRoleOperation    bindings.OperationKind = "checkRole"
-	GetRoleOperation      bindings.OperationKind = "getRole"
+	CheckRunningOperation bindings.OperationKind = "runningCheck"
+	CheckStatusOperation  bindings.OperationKind = "statusCheck"
+	CheckRoleOperation    bindings.OperationKind = "roleCheck"
+	GetRoleOperation      bindings.OperationKind = "roleGet"
 )
 
 func init() {

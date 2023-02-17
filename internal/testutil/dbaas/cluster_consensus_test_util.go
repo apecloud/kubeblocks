@@ -99,7 +99,7 @@ func MockConsensusComponentStsPod(
 		intctrlutil.AppManagedByLabelKey:           intctrlutil.AppName,
 		intctrlutil.RoleLabelKey:                   podRole,
 		intctrlutil.ConsensusSetAccessModeLabelKey: accessMode,
-		"controller-revision-hash":                 fmt.Sprintf("%s-%s-6fdd48d9cd", clusterName, consensusCompName),
+		appsv1.ControllerRevisionHashLabelKey:      sts.Status.UpdateRevision,
 	}).AddContainer(corev1.Container{Name: DefaultMySQLContainerName, Image: ApeCloudMySQLImage}).Create(&testCtx).GetObject()
 	patch := client.MergeFrom(pod.DeepCopy())
 	pod.Status.Conditions = []corev1.PodCondition{

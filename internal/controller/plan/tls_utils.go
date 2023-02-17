@@ -18,8 +18,6 @@ package plan
 
 import (
 	"bytes"
-	"github.com/apecloud/kubeblocks/internal/controllerutil"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"strings"
 	"text/template"
 
@@ -28,11 +26,13 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
+	"github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 const (

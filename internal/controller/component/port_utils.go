@@ -23,6 +23,9 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
+const minAvailPort = 1024
+const maxAvailPort = 65535
+
 func getAllContainerPorts(containers []corev1.Container) (map[int32]bool, error) {
 	set := map[int32]bool{}
 	for _, container := range containers {
@@ -36,9 +39,6 @@ func getAllContainerPorts(containers []corev1.Container) (map[int32]bool, error)
 	}
 	return set, nil
 }
-
-const minAvailPort = 1024
-const maxAvailPort = 65535
 
 // get available container ports, increased by one if conflict with exist ports
 // util no conflicts.

@@ -6,7 +6,7 @@ This section gives you an overview of how KubeBlocks restarts an ApeCloud MySQL 
 
 Make sure you are familiar with the following KubeBlocks concepts:
 
-- [KubeBlocks](../../Introduction/introduction.md)
+- [KubeBlocks](../../introduction/introduction.md)
 - [KubeBlocks OpsRequest](../configure_ops_request.md) 
 
 ## How KubeBlocks restarts a cluster

@@ -51,45 +51,45 @@ import (
 )
 
 var clusterCreateExample = templates.Examples(`
-	# Create a cluster using cluster definition my-cluster-def and cluster version my-version
-	kbcli cluster create mycluster --cluster-definition=my-cluster-def --cluster-version=my-version
+	# Create a cluster with cluster definition apecloud-mysql and cluster version ac-mysql-8.0.30
+	kbcli cluster create mycluster --cluster-definition apecloud-mysql --cluster-version ac-mysql-8.0.30
 
 	# --cluster-definition is required, if --cluster-version is not specified, will use the most recently created version
-	kbcli cluster create mycluster --cluster-definition=my-cluster-def
+	kbcli cluster create mycluster --cluster-definition apecloud-mysql
 
 	# Create a cluster and set termination policy DoNotTerminate that will prevent the cluster from being deleted
-	kbcli cluster create mycluster --cluster-definition=my-cluster-def --termination-policy=DoNotTerminate
+	kbcli cluster create mycluster --cluster-definition apecloud-mysql --termination-policy DoNotTerminate
 
 	# In scenarios where you want to delete resources such as statements, deployments, services, pdb, but keep PVCs
 	# when deleting the cluster, use termination policy Halt
-	kbcli cluster create mycluster --cluster-definition=my-cluster-def --termination-policy=Halt
+	kbcli cluster create mycluster --cluster-definition apecloud-mysql --termination-policy Halt
 
 	# In scenarios where you want to delete resource such as statements, deployments, services, pdb, and including
 	# PVCs when deleting the cluster, use termination policy Delete
-	kbcli cluster create mycluster --cluster-definition=my-cluster-def --termination-policy=Delete
+	kbcli cluster create mycluster --cluster-definition apecloud-mysql --termination-policy Delete
 
 	# In scenarios where you want to delete all resources including all snapshots and snapshot data when deleting
 	# the cluster, use termination policy WipeOut
-	kbcli cluster create mycluster --cluster-definition=my-cluster-def --termination-policy=WipeOut
+	kbcli cluster create mycluster --cluster-definition apecloud-mysql --termination-policy WipeOut
 
-	# Create a cluster and set cpu to 1000m, memory to 1Gi, storage size to 10Gi and replicas to 2
-	kbcli cluster create mycluster --cluster-definition=my-cluster-def --set cpu=1000m,memory=1Gi,storage=10Gi,replicas=2
+	# Create a cluster and set cpu to 1000m, memory to 1Gi, storage size to 10Gi and replicas to 3
+	kbcli cluster create mycluster --cluster-definition apecloud-mysql --set cpu=1000m,memory=1Gi,storage=10Gi,replicas=3
 
 	# Create a cluster and use a URL to set cluster resource
-	kbcli cluster create mycluster --cluster-definition=my-cluster-def --set-file=https://kubeblocks.io/yamls/my.yaml
+	kbcli cluster create mycluster --cluster-definition apecloud-mysql --set-file https://kubeblocks.io/yamls/my.yaml
 
 	# Create a cluster and load cluster resource set from stdin
-	cat << EOF | kbcli cluster create mycluster --cluster-definition=my-cluster-def --set-file -
+	cat << EOF | kbcli cluster create mycluster --cluster-definition apecloud-mysql --set-file -
 	- name: my-test ...
 
 	# Create a cluster forced to scatter by node
-	kbcli cluster create --cluster-definition=my-cluster-def --topology-keys=kubernetes.io/hostname --pod-anti-affinity=Required
+	kbcli cluster create --cluster-definition apecloud-mysql --topology-keys kubernetes.io/hostname --pod-anti-affinity Required
 
 	# Create a cluster in specific labels nodes
-	kbcli cluster create --cluster-definition=my-cluster-def --node-labels='"topology.kubernetes.io/zone=us-east-1a","disktype=ssd,essd"'
+	kbcli cluster create --cluster-definition apecloud-mysql --node-labels '"topology.kubernetes.io/zone=us-east-1a","disktype=ssd,essd"'
 
 	# Create a Cluster with two tolerations 
-	kbcli cluster create --cluster-definition=my-cluster-def --tolerations='"key=engineType,value=mongo,operator=Equal,effect=NoSchedule","key=diskType,value=ssd,operator=Equal,effect=NoSchedule"'
+	kbcli cluster create --cluster-definition apecloud-mysql --tolerations '"key=engineType,value=mongo,operator=Equal,effect=NoSchedule","key=diskType,value=ssd,operator=Equal,effect=NoSchedule"'
 `)
 
 const (
@@ -141,9 +141,8 @@ type CreateOptions struct {
 	Tolerations       []interface{}            `json:"tolerations,omitempty"`
 	Components        []map[string]interface{} `json:"components"`
 
-	SetFile        string   `json:"-"`
-	Values         []string `json:"-"`
-	TolerationsRaw []string `json:"-"`
+	SetFile string   `json:"-"`
+	Values  []string `json:"-"`
 
 	// backup name to restore in creation
 	Backup string `json:"backup,omitempty"`

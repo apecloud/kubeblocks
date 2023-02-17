@@ -91,7 +91,7 @@ The playground guide includes three sections, namely [Basic functions](#basic-fu
 
 ### Basic functions
 
-KubeBlocks supports the complete life cycle management of a database cluster and follows the best practice of application development. The following instructions demonstrate the basic features of KubeBlocks. For the full feature set, refer to [KubeBlocks Documentation](https://github.com/apecloud/kubeblocks/tree/main/docs) for details.
+KubeBlocks supports the complete life cycle management of a database cluster and follows the best practice of application development. The following instructions demonstrate the basic features of KubeBlocks. For the full feature set, refer to [KubeBlocks Documentation](../../../../docs) for details.
 
 > ***Note:***
 >

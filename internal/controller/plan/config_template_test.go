@@ -45,7 +45,7 @@ var _ = Describe("tpl template", func() {
 	var (
 		podSpec     *corev1.PodSpec
 		cfgTemplate []dbaasv1alpha1.ConfigTemplate
-		component   *ctrlcomp.Component
+		component   *ctrlcomp.SynthesizedComponent
 	)
 
 	const (
@@ -149,7 +149,7 @@ single_thread_memory = 294912
 				},
 			},
 		}
-		component = &ctrlcomp.Component{
+		component = &ctrlcomp.SynthesizedComponent{
 			ClusterDefName: "mysql-three-node-definition",
 			ClusterType:    "state.mysql",
 			Name:           "replicasets",

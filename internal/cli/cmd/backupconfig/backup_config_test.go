@@ -21,6 +21,7 @@ import (
 	. "github.com/onsi/gomega"
 
 	"github.com/spf13/cobra"
+	"helm.sh/helm/v3/pkg/cli/values"
 	"helm.sh/helm/v3/pkg/repo"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
@@ -63,8 +64,8 @@ var _ = Describe("backup_config", func() {
 			IOStreams: streams,
 		}
 		Expect(o.complete(tf, cmd)).To(Succeed())
-		Expect(o.Namespace).To(Equal("test"))
-		Expect(o.cfg).ShouldNot(BeNil())
+		Expect(o.namespace).To(Equal("test"))
+		Expect(o.helmCfg).ShouldNot(BeNil())
 	})
 
 	It("run backup_config", func() {
@@ -81,12 +82,12 @@ var _ = Describe("backup_config", func() {
 
 		o := &upgradeOptions{
 			IOStreams: streams,
-			cfg:       helm.FakeActionConfig(),
-			Namespace: "default",
-			Sets:      []string{"dataProtection=test"},
+			helmCfg:   helm.FakeActionConfig(),
+			namespace: "default",
+			valueOpts: values.Options{Values: []string{"dataProtection=test"}},
 		}
 		Expect(o.run()).Should(HaveOccurred())
-		Expect(len(o.Sets)).To(Equal(1))
-		Expect(o.Sets[0]).To(Equal("dataProtection=test"))
+		Expect(len(o.valueOpts.Values)).To(Equal(1))
+		Expect(o.valueOpts.Values[0]).To(Equal("dataProtection=test"))
 	})
 })

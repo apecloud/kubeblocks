@@ -1,3 +1,19 @@
+/*
+Copyright ApeCloud, Inc.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
 package plan
 
 import (
@@ -20,6 +36,7 @@ import (
 	cfgutil "github.com/apecloud/kubeblocks/controllers/dbaas/configuration"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 	cfgcm "github.com/apecloud/kubeblocks/internal/configuration/configmap"
+	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
@@ -29,7 +46,7 @@ type CreateParams struct {
 	ClusterDefinition *dbaasv1alpha1.ClusterDefinition
 	ClusterVersion    *dbaasv1alpha1.ClusterVersion
 	Cluster           *dbaasv1alpha1.Cluster
-	Component         *component.Component
+	Component         *component.SynthesizedComponent
 	ApplyObjs         *[]client.Object
 	CacheCtx          *map[string]interface{}
 }
@@ -201,7 +218,7 @@ func PrepareComponentObjs(reqCtx intctrlutil.RequestCtx, cli client.Client, obj 
 }
 
 // TODO multi roles with same accessMode support
-func addLeaderSelectorLabels(service *corev1.Service, component *component.Component) {
+func addLeaderSelectorLabels(service *corev1.Service, component *component.SynthesizedComponent) {
 	leader := component.ConsensusSpec.Leader
 	if len(leader.Name) > 0 {
 		service.Spec.Selector[intctrlutil.RoleLabelKey] = leader.Name
@@ -270,11 +287,14 @@ func buildReplicationSetPVC(params CreateParams, sts *appsv1.StatefulSet) error 
 }
 
 func injectReplicationSetPodEnvAndLabel(params CreateParams, sts *appsv1.StatefulSet, index int32) (*appsv1.StatefulSet, error) {
+	if params.Component.PrimaryIndex == nil {
+		return nil, fmt.Errorf("component %s PrimaryIndex can not be nil", params.Component.Name)
+	}
 	svcName := strings.Join([]string{params.Cluster.Name, params.Component.Name, "headless"}, "-")
 	for i := range sts.Spec.Template.Spec.Containers {
 		c := &sts.Spec.Template.Spec.Containers[i]
 		c.Env = append(c.Env, corev1.EnvVar{
-			Name:      component.KBPrefix + "_PRIMARY_POD_NAME",
+			Name:      constant.KBPrefix + "_PRIMARY_POD_NAME",
 			Value:     fmt.Sprintf("%s-%d-%d.%s", sts.Name, *params.Component.PrimaryIndex, 0, svcName),
 			ValueFrom: nil,
 		})

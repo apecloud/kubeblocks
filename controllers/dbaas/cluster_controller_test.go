@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"reflect"
 	"strconv"
+	"strings"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -37,6 +38,7 @@ import (
 
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	"github.com/apecloud/kubeblocks/controllers/dbaas/components/replicationset"
 	"github.com/apecloud/kubeblocks/controllers/dbaas/components/util"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	testdbaas "github.com/apecloud/kubeblocks/internal/testutil/dbaas"
@@ -663,9 +665,9 @@ var _ = Describe("Cluster Controller", func() {
 					Name:      stsName + "-" + strconv.Itoa(i),
 					Namespace: testCtx.DefaultNamespace,
 					Labels: map[string]string{
-						intctrlutil.AppInstanceLabelKey:  clusterName,
-						intctrlutil.AppComponentLabelKey: componentName,
-						"controller-revision-hash":       "mock-version",
+						intctrlutil.AppInstanceLabelKey:       clusterName,
+						intctrlutil.AppComponentLabelKey:      componentName,
+						appsv1.ControllerRevisionHashLabelKey: "mock-version",
 					},
 				},
 				Spec: corev1.PodSpec{
@@ -809,6 +811,113 @@ var _ = Describe("Cluster Controller", func() {
 		Eventually(testdbaas.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(dbaasv1alpha1.RunningPhase))
 	}
 
+	mockPodsForReplicationTest := func(cluster *dbaasv1alpha1.Cluster, stsList []appsv1.StatefulSet) []corev1.Pod {
+		componentName := cluster.Spec.Components[0].Name
+		clusterName := cluster.Name
+		pods := make([]corev1.Pod, 0)
+		for _, sts := range stsList {
+			pod := &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      sts.Name + "-0",
+					Namespace: testCtx.DefaultNamespace,
+					Labels: map[string]string{
+						intctrlutil.RoleLabelKey:              sts.Labels[intctrlutil.RoleLabelKey],
+						intctrlutil.AppInstanceLabelKey:       clusterName,
+						intctrlutil.AppComponentLabelKey:      componentName,
+						appsv1.ControllerRevisionHashLabelKey: "mock-version",
+					},
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{{
+						Name:  "mock-container",
+						Image: "mock-container",
+					}},
+				},
+			}
+			pods = append(pods, *pod)
+		}
+		return pods
+	}
+
+	getReplicationSetStsPodsName := func(stsList []appsv1.StatefulSet) []string {
+		names := make([]string, 0)
+		for _, sts := range stsList {
+			pods, err := util.GetPodListByStatefulSet(ctx, k8sClient, &sts)
+			Expect(err).To(Succeed())
+			Expect(len(pods)).To(BeEquivalentTo(1))
+			names = append(names, pods[0].Name)
+		}
+		return names
+	}
+
+	testReplicationCreation := func() {
+		By("Mock a cluster obj with replication componentType.")
+		pvcSpec := testdbaas.NewPVC("1Gi")
+		clusterObj = testdbaas.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
+			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
+			AddComponent(testdbaas.DefaultRedisCompName, testdbaas.DefaultRedisCompType).
+			SetPrimaryIndex(testdbaas.DefaultReplicationPrimaryIndex).
+			SetReplicas(testdbaas.DefaultReplicationReplicas).
+			AddVolumeClaimTemplate(testdbaas.DataVolumeName, &pvcSpec).
+			Create(&testCtx).GetObject()
+		clusterKey = client.ObjectKeyFromObject(clusterObj)
+
+		By("Waiting for cluster creation")
+		Eventually(testdbaas.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(0))
+
+		By("Checking statefulSet number")
+		stsList := testk8s.ListAndCheckStatefulSet(&testCtx, clusterKey)
+		Expect(len(stsList.Items)).Should(BeEquivalentTo(2))
+
+		By("Checking statefulSet role label")
+		for _, sts := range stsList.Items {
+			if strings.HasSuffix(sts.Name, strconv.Itoa(testdbaas.DefaultReplicationPrimaryIndex)) {
+				Expect(sts.Labels[intctrlutil.RoleLabelKey]).Should(BeEquivalentTo(replicationset.Primary))
+			} else {
+				Expect(sts.Labels[intctrlutil.RoleLabelKey]).Should(BeEquivalentTo(replicationset.Secondary))
+			}
+		}
+
+		By("Creating mock pods in StatefulSet")
+		pods := mockPodsForReplicationTest(clusterObj, stsList.Items)
+		for _, pod := range pods {
+			Expect(testCtx.CreateObj(testCtx.Ctx, &pod)).Should(Succeed())
+			pod.Status.Conditions = []corev1.PodCondition{{
+				Type:   corev1.PodReady,
+				Status: corev1.ConditionTrue,
+			}}
+			Expect(k8sClient.Status().Update(ctx, &pod)).Should(Succeed())
+		}
+
+		By("Updating StatefulSet's status")
+		status := appsv1.StatefulSetStatus{
+			AvailableReplicas:  1,
+			ObservedGeneration: 1,
+			Replicas:           1,
+			ReadyReplicas:      1,
+			UpdatedReplicas:    1,
+			CurrentRevision:    "mock-revision",
+			UpdateRevision:     "mock-revision",
+		}
+		for _, sts := range stsList.Items {
+			status.ObservedGeneration = sts.Generation
+			testk8s.PatchStatefulSetStatus(&testCtx, sts.Name, status)
+		}
+
+		By("Checking pods' role are updated in cluster status")
+		Eventually(testdbaas.CheckObj(&testCtx, clusterKey, func(g Gomega, fetched *dbaasv1alpha1.Cluster) {
+			compName := fetched.Spec.Components[0].Name
+			g.Expect(fetched.Status.Components).NotTo(BeNil())
+			g.Expect(fetched.Status.Components).To(HaveKey(compName))
+			replicationStatus := fetched.Status.Components[compName].ReplicationSetStatus
+			g.Expect(replicationStatus).NotTo(BeNil())
+			g.Expect(replicationStatus.Primary.Pod).To(BeElementOf(getReplicationSetStsPodsName(stsList.Items)))
+			g.Expect(len(replicationStatus.Secondaries)).To(BeEquivalentTo(1))
+			g.Expect(replicationStatus.Secondaries[0].Pod).To(BeElementOf(getReplicationSetStsPodsName(stsList.Items)))
+		})).Should(Succeed())
+
+	}
+
 	// Scenarios
 
 	Context("when creating cluster with multiple kinds of components", func() {
@@ -936,6 +1045,25 @@ var _ = Describe("Cluster Controller", func() {
 			It("should update PVC request storage size accordingly when vertical scale the cluster", func() {
 				testVerticalScale()
 			})
+		})
+	})
+
+	Context("when creating cluster with Redis as replication component", func() {
+		BeforeEach(func() {
+			By("Create a clusterDefinition obj with replication componentType.")
+			clusterDefObj = testdbaas.NewClusterDefFactory(clusterDefName, testdbaas.RedisType).
+				AddComponent(testdbaas.ReplicationRedisComponent, testdbaas.DefaultRedisCompType).
+				Create(&testCtx).GetObject()
+
+			By("Create a clusterVersion obj with replication componentType.")
+			clusterVersionObj = testdbaas.NewClusterVersionFactory(clusterVersionName, clusterDefObj.Name).
+				AddComponent(testdbaas.DefaultRedisCompType).
+				AddContainerShort(testdbaas.DefaultRedisContainerName, testdbaas.DefaultRedisImageName).
+				Create(&testCtx).GetObject()
+		})
+
+		It("Should success with primary sts and secondary sts", func() {
+			testReplicationCreation()
 		})
 	})
 })

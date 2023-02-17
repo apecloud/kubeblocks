@@ -17,56 +17,53 @@ limitations under the License.
 package dbaas
 
 import (
-	appsv1 "k8s.io/api/apps/v1"
+	"context"
+	"fmt"
 
-	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	"github.com/onsi/gomega"
+	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/apecloud/kubeblocks/internal/testutil"
 )
 
-// InitReplicationRedis initializes a cluster environment which only contains a component of Replication type for testing,
-// includes ClusterDefinition, ClusterVersion and Cluster resources.
-func InitReplicationRedis(
+// MockReplicationComponentStsPod mocks to create pod of the replication StatefulSet, just using in envTest
+func MockReplicationComponentStsPod(
 	testCtx testutil.TestContext,
-	clusterDefName,
-	clusterVersionName,
+	sts *appsv1.StatefulSet,
 	clusterName,
-	replicationCompName string) (*dbaasv1alpha1.ClusterDefinition, *dbaasv1alpha1.ClusterVersion, *dbaasv1alpha1.Cluster) {
-	clusterDef := CreateReplicationRedisClusterDef(testCtx, clusterDefName)
-	clusterVersion := CreateReplicationRedisClusterVersion(testCtx, clusterDefName, clusterVersionName)
-	cluster := CreateReplicationCluster(testCtx, clusterDefName, clusterVersionName, clusterName, replicationCompName)
-	return clusterDef, clusterVersion, cluster
+	compName,
+	podName,
+	roleName string) *corev1.Pod {
+	pod := NewPodFactory(testCtx.DefaultNamespace, podName).SetOwnerReferences("apps/v1", intctrlutil.StatefulSetKind, sts).AddLabelsInMap(map[string]string{
+		intctrlutil.AppInstanceLabelKey:       clusterName,
+		intctrlutil.AppComponentLabelKey:      compName,
+		intctrlutil.AppManagedByLabelKey:      intctrlutil.AppName,
+		intctrlutil.RoleLabelKey:              roleName,
+		appsv1.ControllerRevisionHashLabelKey: sts.Status.UpdateRevision,
+	}).AddContainer(corev1.Container{Name: DefaultRedisContainerName, Image: DefaultRedisImageName}).Create(&testCtx).GetObject()
+	patch := client.MergeFrom(pod.DeepCopy())
+	pod.Status.Conditions = []corev1.PodCondition{
+		{
+			Type:   corev1.PodReady,
+			Status: corev1.ConditionTrue,
+		},
+	}
+	gomega.Expect(testCtx.Cli.Status().Patch(context.Background(), pod, patch)).Should(gomega.Succeed())
+	return pod
 }
 
-// CreateReplicationCluster creates a redis cluster with a component of Replication type.
-func CreateReplicationCluster(
+// MockReplicationComponentPods mocks to create pods of the component, just using in envTest
+func MockReplicationComponentPods(
 	testCtx testutil.TestContext,
-	clusterDefName,
-	clusterVersionName,
+	sts *appsv1.StatefulSet,
 	clusterName,
-	replicationCompName string) *dbaasv1alpha1.Cluster {
-	return CreateCustomizedObj(&testCtx, "replicationset/redis.yaml", &dbaasv1alpha1.Cluster{},
-		CustomizeObjYAML(clusterName, clusterDefName, clusterVersionName, replicationCompName))
-}
-
-// CreateReplicationRedisClusterDef creates a redis clusterDefinition with a component of Replication type.
-func CreateReplicationRedisClusterDef(testCtx testutil.TestContext, clusterDefName string) *dbaasv1alpha1.ClusterDefinition {
-	return CreateCustomizedObj(&testCtx, "replicationset/redis_cd.yaml", &dbaasv1alpha1.ClusterDefinition{},
-		CustomizeObjYAML(clusterDefName))
-}
-
-// CreateReplicationRedisClusterVersion creates a redis clusterVersion with a component of Replication type.
-func CreateReplicationRedisClusterVersion(testCtx testutil.TestContext, clusterDefName, clusterVersionName string) *dbaasv1alpha1.ClusterVersion {
-	return CreateCustomizedObj(&testCtx, "replicationset/redis_cv.yaml", &dbaasv1alpha1.ClusterVersion{},
-		CustomizeObjYAML(clusterVersionName, clusterDefName))
-}
-
-// MockReplicationComponentStatefulSet mocks the component statefulSet, just using in envTest
-func MockReplicationComponentStatefulSet(
-	testCtx testutil.TestContext,
-	clusterName,
-	replicationCompName string) *appsv1.StatefulSet {
-	stsName := clusterName + "-" + replicationCompName
-	return CreateCustomizedObj(&testCtx, "replicationset/stateful_set.yaml", &appsv1.StatefulSet{},
-		CustomizeObjYAML(replicationCompName, clusterName,
-			stsName, replicationCompName, clusterName, replicationCompName, clusterName))
+	compName string,
+	podRole string) []*corev1.Pod {
+	var pods []*corev1.Pod
+	podName := fmt.Sprintf("%s-0", sts.Name)
+	pods = append(pods, MockReplicationComponentStsPod(testCtx, sts, clusterName, compName, podName, podRole))
+	return pods
 }

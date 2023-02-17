@@ -55,6 +55,22 @@ func GetPodRevision(pod *corev1.Pod) string {
 	return pod.Labels[appsv1.StatefulSetRevisionLabel]
 }
 
+// IsStsAndPodsRevisionConsistent checks if StatefulSet and pods of the StatefuleSet have the same revison,
+func IsStsAndPodsRevisionConsistent(ctx context.Context, cli client.Client, sts *appsv1.StatefulSet) (bool, error) {
+	pods, err := GetPodListByStatefulSet(ctx, cli, sts)
+	if err != nil {
+		return false, err
+	}
+	revisionConsistent := true
+	for _, pod := range pods {
+		if GetPodRevision(&pod) != sts.Status.UpdateRevision {
+			revisionConsistent = false
+			break
+		}
+	}
+	return revisionConsistent, nil
+}
+
 // StatefulSetIsReady checks if statefulSet is ready.
 func StatefulSetIsReady(sts *appsv1.StatefulSet, statefulStatusRevisionIsEquals bool, targetReplicas *int32) bool {
 	if targetReplicas == nil {

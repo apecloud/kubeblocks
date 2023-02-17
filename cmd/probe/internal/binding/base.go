@@ -73,8 +73,9 @@ const (
 	RespEndTimeKey      = "end-time"
 	RespDurationKey     = "duration"
 	StatusCode          = "status-code"
-	// 451 Unavailable For Legal Reasons, used to indicate check failed and trigger kubelet events
+	// 451 Unavailable For Legal Reasons, used to indicate operation failed.
 	OperationFailedHTTPCode   = "451"
+	// 404 Not Found, used to indicate operation not found.
 	OperationNotFoundHTTPCode = "404"
 
 	// CommandSQLKey keys from request's metadata.

@@ -155,7 +155,7 @@ func (r *ClusterDefinition) validateComponents(allErrs *field.ErrorList) {
 		if consensusSpec.Leader.Name == "" {
 			*allErrs = append(*allErrs,
 				field.Required(field.NewPath("spec.components[*].consensusSpec.leader.name"),
-					"leader name can't be blank when componentType is Consensus"))
+					"leader name can't be blank when workloadType is Consensus"))
 		}
 
 		// Leader.Replicas should not be present or should set to 1
@@ -200,7 +200,7 @@ func (r *ClusterDefinition) validateComponents(allErrs *field.ErrorList) {
 			if consensusSpec == nil {
 				*allErrs = append(*allErrs,
 					field.Required(field.NewPath("spec.components[*].consensusSpec"),
-						"consensusSpec is required when componentType=Consensus"))
+						"consensusSpec is required when workloadType=Consensus"))
 				continue
 			}
 			validateConsensus(&component)

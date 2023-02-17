@@ -199,8 +199,8 @@ func handleClusterAbnormalOrFailedPhase(cluster *appsv1alpha1.Cluster, component
 		notReadyComponentNames         = map[string]struct{}{}
 	)
 	for k, v := range cluster.Status.Components {
-		componentType := componentMap[k]
-		clusterAvailabilityEffect := clusterAvailabilityMap[componentType]
+		componentDefName := componentMap[k]
+		clusterAvailabilityEffect := clusterAvailabilityMap[componentDefName]
 		// if the component is in Failed phase and the component can affect cluster availability, set Cluster.status.phase to Failed
 		if clusterAvailabilityEffect && v.Phase == appsv1alpha1.FailedPhase {
 			isFailed = true

@@ -98,11 +98,11 @@ func (r *ClusterVersion) validate() error {
 		allErrs = append(allErrs, field.Invalid(field.NewPath("spec.clusterDefinitionRef"),
 			r.Spec.ClusterDefinitionRef, err.Error()))
 	} else {
-		notFoundComponentTypes, noContainersComponents := r.GetInconsistentComponentsInfo(clusterDef)
+		notFoundComponentDefNames, noContainersComponents := r.GetInconsistentComponentsInfo(clusterDef)
 
-		if len(notFoundComponentTypes) > 0 {
+		if len(notFoundComponentDefNames) > 0 {
 			allErrs = append(allErrs, field.NotFound(field.NewPath("spec.components[*].type"),
-				getComponentDefNotFoundMsg(notFoundComponentTypes, r.Spec.ClusterDefinitionRef)))
+				getComponentDefNotFoundMsg(notFoundComponentDefNames, r.Spec.ClusterDefinitionRef)))
 		}
 
 		if len(noContainersComponents) > 0 {
@@ -137,9 +137,9 @@ func (r *ClusterVersion) GetInconsistentComponentsInfo(clusterDef *ClusterDefini
 
 	var (
 		// clusterDefinition components to map. the value of map represents whether there is a default containers
-		componentMap          = map[string]bool{}
-		notFoundComponentType = make([]string, 0)
-		noContainersComponent = make([]string, 0)
+		componentMap              = map[string]bool{}
+		notFoundComponentDefNames = make([]string, 0)
+		noContainersComponent     = make([]string, 0)
 	)
 
 	for _, v := range clusterDef.Spec.ComponentDefs {
@@ -152,7 +152,7 @@ func (r *ClusterVersion) GetInconsistentComponentsInfo(clusterDef *ClusterDefini
 	// get not found component type in clusterDefinition
 	for _, v := range r.Spec.ComponentVersions {
 		if _, ok := componentMap[v.ComponentDefRef]; !ok {
-			notFoundComponentType = append(notFoundComponentType, v.ComponentDefRef)
+			notFoundComponentDefNames = append(notFoundComponentDefNames, v.ComponentDefRef)
 		} else if v.PodSpec.Containers != nil && len(v.PodSpec.Containers) > 0 {
 			componentMap[v.ComponentDefRef] = true
 		}
@@ -163,12 +163,12 @@ func (r *ClusterVersion) GetInconsistentComponentsInfo(clusterDef *ClusterDefini
 			noContainersComponent = append(noContainersComponent, k)
 		}
 	}
-	return notFoundComponentType, noContainersComponent
+	return notFoundComponentDefNames, noContainersComponent
 }
 
-func getComponentDefNotFoundMsg(invalidComponentTypes []string, clusterDefName string) string {
+func getComponentDefNotFoundMsg(invalidComponentDefNames []string, clusterDefName string) string {
 	return fmt.Sprintf(" %v is not found in ClusterDefinition.spec.componentDefs[*].name %s",
-		invalidComponentTypes, clusterDefName)
+		invalidComponentDefNames, clusterDefName)
 }
 
 // NewInvalidError create an invalid api error

@@ -457,7 +457,7 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 				controllerutil.AddFinalizer(obj, dbClusterFinalizerName)
 			}
 		}
-		// appendToStsList is used to handle statefulSets horizontal scaling when componentType is replication
+		// appendToStsList is used to handle statefulSets horizontal scaling when workloadType is replication
 		appendToStsList := func(stsList []*appsv1.StatefulSet) []*appsv1.StatefulSet {
 			stsObj, ok := obj.(*appsv1.StatefulSet)
 			if ok {

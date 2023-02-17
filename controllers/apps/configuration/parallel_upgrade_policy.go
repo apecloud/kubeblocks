@@ -48,7 +48,7 @@ func (p *parallelUpgradePolicy) GetPolicyName() string {
 func (p *parallelUpgradePolicy) restartPods(params reconfigureParams) (bool, error) {
 	var (
 		funcs         RollingUpgradeFuncs
-		cType         = params.ComponentType()
+		cType         = params.WorkloadType()
 		configKey     = params.getConfigKey()
 		configVersion = params.getTargetVersionHash()
 	)

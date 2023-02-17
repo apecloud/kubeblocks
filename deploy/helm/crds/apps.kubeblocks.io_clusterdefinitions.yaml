@@ -130,7 +130,7 @@ spec:
                       type: object
                     consensusSpec:
                       description: consensusSpec defines consensus related spec if
-                        componentType is Consensus, required if componentType is Consensus.
+                        workloadType is Consensus, required if workloadType is Consensus.
                       properties:
                         followers:
                           description: Followers, has voting right but not Leader.

@@ -157,16 +157,16 @@ var _ = Describe("cluster webhook", func() {
 			cluster.Spec.ComponentSpecs[0].Resources.Requests[corev1.ResourceMemory] = resource.MustParse("80Mi")
 			Expect(k8sClient.Patch(ctx, cluster, patch)).Should(Succeed())
 
-			// A series of tests on clusters when componentType=replication
-			By("By creating a new clusterDefinition when componentType=replication")
+			// A series of tests on clusters when workloadType=replication
+			By("By creating a new clusterDefinition when workloadType=replication")
 			rsClusterDef, _ := createTestReplicationSetClusterDefinitionObj(rsClusterDefinitionName)
 			Expect(testCtx.CreateObj(ctx, rsClusterDef)).Should(Succeed())
 
-			By("By creating a new clusterVersion when componentType=replication")
+			By("By creating a new clusterVersion when workloadType=replication")
 			rsClusterVersion := createTestReplicationSetClusterVersionObj(rsClusterDefinitionName, rsClusterVersionName)
 			Expect(testCtx.CreateObj(ctx, rsClusterVersion)).Should(Succeed())
 
-			By("By creating a new cluster when componentType=replication")
+			By("By creating a new cluster when workloadType=replication")
 			rsCluster, _ := createTestReplicationSetCluster(rsClusterDefinitionName, rsClusterVersionName, rsClusterName)
 			Expect(testCtx.CreateObj(ctx, rsCluster)).Should(Succeed())
 

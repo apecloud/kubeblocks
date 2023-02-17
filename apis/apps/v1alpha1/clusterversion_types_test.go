@@ -75,8 +75,8 @@ spec:
 `
 	g.Expect(yaml.Unmarshal([]byte(clusterDefYaml), clusterDef)).To(Succeed())
 
-	notFoundComponentTypes, noContainersComponents := clusterVersion.GetInconsistentComponentsInfo(clusterDef)
-	g.Expect(len(notFoundComponentTypes)).To(Equal(0))
+	notFoundComponentDefNames, noContainersComponents := clusterVersion.GetInconsistentComponentsInfo(clusterDef)
+	g.Expect(len(notFoundComponentDefNames)).To(Equal(0))
 	g.Expect(len(noContainersComponents)).To(Equal(0))
 }
 
@@ -125,9 +125,9 @@ spec:
 `
 	g.Expect(yaml.Unmarshal([]byte(clusterDefYaml), clusterDef)).To(Succeed())
 
-	notFoundComponentTypes, noContainersComponents := clusterVersion.GetInconsistentComponentsInfo(clusterDef)
-	g.Expect(len(notFoundComponentTypes)).To(Equal(1))
-	g.Expect(notFoundComponentTypes[0]).To(Equal("component3"))
+	notFoundComponentDefNames, noContainersComponents := clusterVersion.GetInconsistentComponentsInfo(clusterDef)
+	g.Expect(len(notFoundComponentDefNames)).To(Equal(1))
+	g.Expect(notFoundComponentDefNames[0]).To(Equal("component3"))
 	g.Expect(len(noContainersComponents)).To(Equal(1))
 	g.Expect(noContainersComponents[0]).To(Equal("component2"))
 }

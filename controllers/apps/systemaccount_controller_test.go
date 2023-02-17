@@ -70,10 +70,10 @@ var _ = Describe("SystemAccount Controller", func() {
 	}
 	// sysAcctTestCase defines the info to setup test env, cluster and their expected result to verify against.
 	type sysAcctTestCase struct {
-		componentName string
-		componentType string
-		resourceMap   map[appsv1alpha1.AccountName]sysAcctResourceInfo
-		accounts      []appsv1alpha1.AccountName // accounts this cluster should have
+		componentName   string
+		componentDefRef string
+		resourceMap     map[appsv1alpha1.AccountName]sysAcctResourceInfo
+		accounts        []appsv1alpha1.AccountName // accounts this cluster should have
 	}
 
 	var (
@@ -205,7 +205,7 @@ var _ = Describe("SystemAccount Controller", func() {
 		Expect(len(testCases)).To(BeNumerically(">", 0))
 		// fill the number of secrets, jobs, and cached secrets
 		for _, testCase := range testCases {
-			compDef := clusterDefObj.GetComponentDefByName(testCase.componentType)
+			compDef := clusterDefObj.GetComponentDefByName(testCase.componentDefRef)
 			Expect(compDef).NotTo(BeNil())
 			if compDef.SystemAccounts == nil {
 				continue
@@ -248,7 +248,7 @@ var _ = Describe("SystemAccount Controller", func() {
 		for testName, testCase := range testCases {
 			clusterObj := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
 				clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
-				AddComponent(testCase.componentName, testCase.componentType).
+				AddComponent(testCase.componentName, testCase.componentDefRef).
 				SetReplicas(1).
 				Create(&testCtx).GetObject()
 			clusterKey := client.ObjectKeyFromObject(clusterObj)
@@ -284,14 +284,14 @@ var _ = Describe("SystemAccount Controller", func() {
 			// setup testcase
 			mysqlTestCases = map[string]*sysAcctTestCase{
 				"wesql-no-accts": {
-					componentName: mysqlCompNameWOSysAcct,
-					componentType: mysqlCompTypeWOSysAcct,
-					accounts:      []appsv1alpha1.AccountName{},
+					componentName:   mysqlCompNameWOSysAcct,
+					componentDefRef: mysqlCompTypeWOSysAcct,
+					accounts:        []appsv1alpha1.AccountName{},
 				},
 				"wesql-with-accts": {
-					componentName: mysqlCompName,
-					componentType: mysqlCompType,
-					accounts:      getAllSysAccounts(),
+					componentName:   mysqlCompName,
+					componentDefRef: mysqlCompType,
+					accounts:        getAllSysAccounts(),
 				},
 			}
 			clustersMap = initSysAccountTestsAndCluster(mysqlTestCases)
@@ -472,14 +472,14 @@ var _ = Describe("SystemAccount Controller", func() {
 			// setup testcase
 			mysqlTestCases = map[string]*sysAcctTestCase{
 				"wesql-with-accts": {
-					componentName: mysqlCompName,
-					componentType: mysqlCompType,
-					accounts:      getAllSysAccounts(),
+					componentName:   mysqlCompName,
+					componentDefRef: mysqlCompType,
+					accounts:        getAllSysAccounts(),
 				},
 				"wesql-with-accts-dup": {
-					componentName: mysqlCompName,
-					componentType: mysqlCompType,
-					accounts:      getAllSysAccounts(),
+					componentName:   mysqlCompName,
+					componentDefRef: mysqlCompType,
+					accounts:        getAllSysAccounts(),
 				},
 			}
 
@@ -576,14 +576,14 @@ var _ = Describe("SystemAccount Controller", func() {
 			// setup testcase
 			mysqlTestCases = map[string]*sysAcctTestCase{
 				"wesql-with-accts": {
-					componentName: mysqlCompName,
-					componentType: mysqlCompType,
-					accounts:      getAllSysAccounts(),
+					componentName:   mysqlCompName,
+					componentDefRef: mysqlCompType,
+					accounts:        getAllSysAccounts(),
 				},
 				"wesql-with-accts-dup": {
-					componentName: mysqlCompName,
-					componentType: mysqlCompType,
-					accounts:      getAllSysAccounts(),
+					componentName:   mysqlCompName,
+					componentDefRef: mysqlCompType,
+					accounts:        getAllSysAccounts(),
 				},
 			}
 			clustersMap = initSysAccountTestsAndCluster(mysqlTestCases)

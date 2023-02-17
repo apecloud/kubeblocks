@@ -198,7 +198,7 @@ var _ = Describe("Redis Horizontal Scale function", func() {
 				AddContainerVolumeMounts(testapps.DefaultRedisContainerName, replicationRedisConfigVolumeMounts).
 				Create(&testCtx).GetObject()
 
-			By("Create a clusterVersion obj with replication componentType.")
+			By("Create a clusterVersion obj with replication workloadType.")
 			clusterVersionObj = testapps.NewClusterVersionFactory(clusterVersionName, clusterDefObj.Name).
 				AddComponent(testapps.DefaultRedisCompType).
 				AddInitContainerShort(testapps.DefaultRedisInitContainerName, testapps.DefaultRedisImageName).

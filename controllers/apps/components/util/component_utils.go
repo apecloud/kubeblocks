@@ -227,9 +227,9 @@ func GetComponentStsMinReadySeconds(ctx context.Context,
 func GetComponentWorkloadMinReadySeconds(ctx context.Context,
 	cli client.Client,
 	cluster *appsv1alpha1.Cluster,
-	componentType appsv1alpha1.WorkloadType,
+	workloadType appsv1alpha1.WorkloadType,
 	componentName string) (minReadySeconds int32, err error) {
-	switch componentType {
+	switch workloadType {
 	case appsv1alpha1.Stateless:
 		return GetComponentDeployMinReadySeconds(ctx, cli, cluster, componentName)
 	default:

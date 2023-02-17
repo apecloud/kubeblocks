@@ -48,7 +48,7 @@ func init() {
 func (r *rollingUpgradePolicy) Upgrade(params reconfigureParams) (ReturnedStatus, error) {
 	var (
 		funcs RollingUpgradeFuncs
-		cType = params.ComponentType()
+		cType = params.WorkloadType()
 	)
 
 	switch cType {
@@ -71,7 +71,7 @@ func canPerformUpgrade(pods []corev1.Pod, params reconfigureParams) bool {
 	if len(pods) == target {
 		return true
 	}
-	if params.ComponentType() == appsv1alpha1.Consensus {
+	if params.WorkloadType() == appsv1alpha1.Consensus {
 		params.Ctx.Log.Info("wait to consensus component ready.")
 		return false
 	}

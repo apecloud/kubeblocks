@@ -35,12 +35,12 @@ func init() {
 func (s *simplePolicy) Upgrade(params reconfigureParams) (ReturnedStatus, error) {
 	params.Ctx.Log.V(1).Info("simple policy begin....")
 
-	switch params.ComponentType() {
+	switch params.WorkloadType() {
 	case appsv1alpha1.Stateful, appsv1alpha1.Consensus:
 		return rollingStatefulSets(params)
 		// process consensus
 	default:
-		return makeReturnedStatus(ESNotSupport), cfgcore.MakeError("not support component type:[%s]", params.ComponentType())
+		return makeReturnedStatus(ESNotSupport), cfgcore.MakeError("not support component type:[%s]", params.WorkloadType())
 	}
 }
 

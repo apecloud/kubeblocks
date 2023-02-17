@@ -67,24 +67,24 @@ var _ = Describe("Replication Component", func() {
 	Context("Replication Component test", func() {
 		It("Replication Component test", func() {
 
-			By("Create a clusterDefinition obj with replication componentType.")
+			By("Create a clusterDefinition obj with replication workloadType.")
 			clusterDefObj = testapps.NewClusterDefFactory(clusterDefName).
 				AddComponent(testapps.ReplicationRedisComponent, testapps.DefaultRedisCompType).
 				Create(&testCtx).GetObject()
 
-			By("Create a clusterVersion obj with replication componentType.")
+			By("Create a clusterVersion obj with replication workloadType.")
 			clusterVersionObj = testapps.NewClusterVersionFactory(clusterVersionName, clusterDefObj.Name).
 				AddComponent(testapps.DefaultRedisCompType).AddContainerShort(testapps.DefaultRedisContainerName, testapps.DefaultRedisImageName).
 				Create(&testCtx).GetObject()
 
-			By("Creating a cluster with replication componentType.")
+			By("Creating a cluster with replication workloadType.")
 			clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
 				clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
 				AddComponent(testapps.DefaultRedisCompName, testapps.DefaultRedisCompType).
 				SetReplicas(testapps.DefaultReplicationReplicas).
 				Create(&testCtx).GetObject()
 
-			By("Creating a statefulSet of replication componentType.")
+			By("Creating a statefulSet of replication workloadType.")
 			status := appsv1.StatefulSetStatus{
 				AvailableReplicas:  1,
 				ObservedGeneration: 1,

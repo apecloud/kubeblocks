@@ -198,10 +198,10 @@ func (r *ClusterVersionReconciler) handleClusterDefNotFound(reqCtx intctrlutil.R
 }
 
 func validateClusterVersion(clusterVersion *appsv1alpha1.ClusterVersion, clusterDef *appsv1alpha1.ClusterDefinition) string {
-	notFoundComponentTypes, noContainersComponents := clusterVersion.GetInconsistentComponentsInfo(clusterDef)
+	notFoundComponentDefNames, noContainersComponents := clusterVersion.GetInconsistentComponentsInfo(clusterDef)
 	var statusMsgs []string
-	if len(notFoundComponentTypes) > 0 {
-		statusMsgs = append(statusMsgs, fmt.Sprintf("spec.componentSpecs[*].componentDefRef %v not found in ClusterDefinition.spec.componentDefs[*].name", notFoundComponentTypes))
+	if len(notFoundComponentDefNames) > 0 {
+		statusMsgs = append(statusMsgs, fmt.Sprintf("spec.componentSpecs[*].componentDefRef %v not found in ClusterDefinition.spec.componentDefs[*].name", notFoundComponentDefNames))
 	} else if len(noContainersComponents) > 0 {
 		statusMsgs = append(statusMsgs, fmt.Sprintf("spec.componentSpecs[*].componentDefRef %v missing spec.componentSpecs[*].containers in ClusterDefinition.spec.componentDefs[*] and ClusterVersion.spec.componentVersions[*]", noContainersComponents))
 	}

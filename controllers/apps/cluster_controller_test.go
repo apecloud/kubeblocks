@@ -862,7 +862,7 @@ var _ = Describe("Cluster Controller", func() {
 	}
 
 	testReplicationCreation := func() {
-		By("Mock a cluster obj with replication componentType.")
+		By("Mock a cluster obj with replication componentDefRef.")
 		pvcSpec := testapps.NewPVC("1Gi")
 		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
 			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
@@ -1061,12 +1061,12 @@ var _ = Describe("Cluster Controller", func() {
 
 	Context("when creating cluster with Redis as replication component", func() {
 		BeforeEach(func() {
-			By("Create a clusterDefinition obj with replication componentType.")
+			By("Create a clusterDefinition obj with replication componentDefRef.")
 			clusterDefObj = testapps.NewClusterDefFactory(clusterDefName).
 				AddComponent(testapps.ReplicationRedisComponent, testapps.DefaultRedisCompType).
 				Create(&testCtx).GetObject()
 
-			By("Create a clusterVersion obj with replication componentType.")
+			By("Create a clusterVersion obj with replication componentDefRef.")
 			clusterVersionObj = testapps.NewClusterVersionFactory(clusterVersionName, clusterDefObj.Name).
 				AddComponent(testapps.DefaultRedisCompType).
 				AddContainerShort(testapps.DefaultRedisContainerName, testapps.DefaultRedisImageName).

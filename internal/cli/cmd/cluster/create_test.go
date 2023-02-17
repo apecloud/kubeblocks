@@ -173,7 +173,7 @@ var _ = Describe("create", func() {
 		dynamic := testing.FakeDynamicClient(testing.FakeClusterDef())
 		cd, _ := cluster.GetClusterDefByName(dynamic, testing.ClusterDefName)
 		setsMap := map[string]map[setKey]string{
-			testing.ComponentType: {
+			testing.ComponentDefName: {
 				keyCPU:      "10",
 				keyMemory:   "2Gi",
 				keyStorage:  "10Gi",

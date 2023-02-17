@@ -69,7 +69,7 @@ var _ = Describe("helper", func() {
 		component := FindClusterComp(cluster, "test")
 		Expect(component).Should(BeNil())
 
-		component = FindClusterComp(cluster, testing.ComponentType)
+		component = FindClusterComp(cluster, testing.ComponentDefName)
 		Expect(component).ShouldNot(BeNil())
 	})
 

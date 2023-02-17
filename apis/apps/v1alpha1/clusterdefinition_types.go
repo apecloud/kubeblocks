@@ -329,7 +329,7 @@ type ClusterComponentDefinition struct {
 	// +optional
 	PDBSpec *policyv1.PodDisruptionBudgetSpec `json:"pdbSpec,omitempty"`
 
-	// consensusSpec defines consensus related spec if componentType is Consensus, required if componentType is Consensus.
+	// consensusSpec defines consensus related spec if workloadType is Consensus, required if workloadType is Consensus.
 	// +optional
 	ConsensusSpec *ConsensusSetSpec `json:"consensusSpec,omitempty"`
 

@@ -54,24 +54,24 @@ func CreateConsensusMysqlCluster(
 	clusterDefName,
 	clusterVersionName,
 	clusterName,
-	componentType,
+	workloadType,
 	consensusCompName string) *appsv1alpha1.Cluster {
 	pvcSpec := NewPVC("2Gi")
 	return NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefName, clusterVersionName).
-		AddComponent(consensusCompName, componentType).SetReplicas(3).SetEnabledLogs(errorLogName).
+		AddComponent(consensusCompName, workloadType).SetReplicas(3).SetEnabledLogs(errorLogName).
 		AddVolumeClaimTemplate("data", &pvcSpec).Create(&testCtx).GetObject()
 }
 
 // CreateConsensusMysqlClusterDef creates a mysql clusterDefinition with a component of ConsensusSet type.
-func CreateConsensusMysqlClusterDef(testCtx testutil.TestContext, clusterDefName, componentType string) *appsv1alpha1.ClusterDefinition {
+func CreateConsensusMysqlClusterDef(testCtx testutil.TestContext, clusterDefName, workloadType string) *appsv1alpha1.ClusterDefinition {
 	filePathPattern := "/data/mysql/log/mysqld.err"
-	return NewClusterDefFactory(clusterDefName).AddComponent(ConsensusMySQLComponent, componentType).
+	return NewClusterDefFactory(clusterDefName).AddComponent(ConsensusMySQLComponent, workloadType).
 		AddLogConfig(errorLogName, filePathPattern).Create(&testCtx).GetObject()
 }
 
 // CreateConsensusMysqlClusterVersion creates a mysql clusterVersion with a component of ConsensusSet type.
-func CreateConsensusMysqlClusterVersion(testCtx testutil.TestContext, clusterDefName, clusterVersionName, componentType string) *appsv1alpha1.ClusterVersion {
-	return NewClusterVersionFactory(clusterVersionName, clusterDefName).AddComponent(componentType).AddContainerShort("mysql", ApeCloudMySQLImage).
+func CreateConsensusMysqlClusterVersion(testCtx testutil.TestContext, clusterDefName, clusterVersionName, workloadType string) *appsv1alpha1.ClusterVersion {
+	return NewClusterVersionFactory(clusterVersionName, clusterDefName).AddComponent(workloadType).AddContainerShort("mysql", ApeCloudMySQLImage).
 		Create(&testCtx).GetObject()
 }
 

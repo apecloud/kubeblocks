@@ -69,7 +69,7 @@ var _ = Describe("ReplicationSet Util", func() {
 
 	testHandleReplicationSet := func() {
 
-		By("Creating a cluster with replication componentType.")
+		By("Creating a cluster with replication workloadType.")
 		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
 			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
 			AddComponent(testapps.DefaultRedisCompName, testapps.DefaultRedisCompType).
@@ -77,7 +77,7 @@ var _ = Describe("ReplicationSet Util", func() {
 			SetPrimaryIndex(testapps.DefaultReplicationPrimaryIndex).
 			Create(&testCtx).GetObject()
 
-		By("Creating a statefulSet of replication componentType.")
+		By("Creating a statefulSet of replication workloadType.")
 		container := corev1.Container{
 			Name:            "mock-redis-container",
 			Image:           testapps.DefaultRedisImageName,
@@ -109,7 +109,7 @@ var _ = Describe("ReplicationSet Util", func() {
 		Expect(err).ShouldNot(Succeed())
 		Expect(err.Error()).Should(ContainSubstring("is not 1"))
 
-		By("Creating Pods of replication componentType.")
+		By("Creating Pods of replication workloadType.")
 		for _, sts := range stsList {
 			_ = testapps.NewPodFactory(testCtx.DefaultNamespace, sts.Name+"-0").
 				AddContainer(container).
@@ -129,7 +129,7 @@ var _ = Describe("ReplicationSet Util", func() {
 	}
 
 	testNeedUpdateReplicationSetStatus := func() {
-		By("Creating a cluster with replication componentType.")
+		By("Creating a cluster with replication workloadType.")
 		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
 			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
 			AddComponent(testapps.DefaultRedisCompName, testapps.DefaultRedisCompType).Create(&testCtx).GetObject()
@@ -179,7 +179,7 @@ var _ = Describe("ReplicationSet Util", func() {
 	}
 
 	testGeneratePVCFromVolumeClaimTemplates := func() {
-		By("Creating a cluster with replication componentType.")
+		By("Creating a cluster with replication workloadType.")
 		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
 			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
 			AddComponent(testapps.DefaultRedisCompName, testapps.DefaultRedisCompType).
@@ -187,7 +187,7 @@ var _ = Describe("ReplicationSet Util", func() {
 			SetPrimaryIndex(testapps.DefaultReplicationPrimaryIndex).
 			Create(&testCtx).GetObject()
 
-		By("Creating a statefulSet of replication componentType.")
+		By("Creating a statefulSet of replication workloadType.")
 		mockStsName := "mock-stateful-set-0"
 		mockSts := testapps.NewStatefulSetFactory(testCtx.DefaultNamespace, mockStsName, clusterObj.Name, testapps.DefaultRedisCompName).
 			AddContainer(corev1.Container{Name: testapps.DefaultRedisContainerName, Image: testapps.DefaultRedisImageName}).
@@ -214,12 +214,12 @@ var _ = Describe("ReplicationSet Util", func() {
 
 	Context("test replicationSet util", func() {
 		BeforeEach(func() {
-			By("Create a clusterDefinition obj with replication componentType.")
+			By("Create a clusterDefinition obj with replication workloadType.")
 			clusterDefObj = testapps.NewClusterDefFactory(clusterDefName).
 				AddComponent(testapps.ReplicationRedisComponent, testapps.DefaultRedisCompType).
 				Create(&testCtx).GetObject()
 
-			By("Create a clusterVersion obj with replication componentType.")
+			By("Create a clusterVersion obj with replication workloadType.")
 			clusterVersionObj = testapps.NewClusterVersionFactory(clusterVersionName, clusterDefObj.GetName()).
 				AddComponent(testapps.DefaultRedisCompType).AddContainerShort(testapps.DefaultRedisContainerName, testapps.DefaultRedisImageName).
 				Create(&testCtx).GetObject()

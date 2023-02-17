@@ -14,7 +14,7 @@ This guide describes the details of KubeBlocks lifecycle API. KubeBlocks API is 
 
 #### spec.consensusSpec
 
-When the `spec.componentType` is set as `consensus`, `spec.consensusSpec` is required.
+When the `spec.workloadType` is set as `consensus`, `spec.consensusSpec` is required.
 
 - `leader`
 

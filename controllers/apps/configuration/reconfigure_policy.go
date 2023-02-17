@@ -120,7 +120,7 @@ func init() {
 	RegisterPolicy(appsv1alpha1.AutoReload, &AutoReloadPolicy{})
 }
 
-func (param *reconfigureParams) ComponentType() appsv1alpha1.WorkloadType {
+func (param *reconfigureParams) WorkloadType() appsv1alpha1.WorkloadType {
 	return param.Component.WorkloadType
 }
 

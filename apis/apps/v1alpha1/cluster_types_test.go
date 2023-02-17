@@ -108,19 +108,19 @@ func TestSetAndGetObjectMessage(t *testing.T) {
 
 func TestGetComponentOrName(t *testing.T) {
 	var (
-		componentType = "mysqlType"
-		componentName = "mysql"
+		componentDefName = "mysqlType"
+		componentName    = "mysql"
 	)
 	cluster := Cluster{
 		Spec: ClusterSpec{
 			ComponentSpecs: []ClusterComponentSpec{
-				{Name: componentName, ComponentDefRef: componentType},
+				{Name: componentName, ComponentDefRef: componentDefName},
 			},
 		},
 	}
 	compDefName := cluster.GetComponentDefRefName(componentName)
-	if compDefName != componentType {
-		t.Errorf(`function GetComponentDefRefName should return %s`, componentType)
+	if compDefName != componentDefName {
+		t.Errorf(`function GetComponentDefRefName should return %s`, componentDefName)
 	}
 	component := cluster.GetComponentByName(componentName)
 	if component == nil {

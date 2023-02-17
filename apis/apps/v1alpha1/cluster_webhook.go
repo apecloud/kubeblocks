@@ -189,20 +189,20 @@ func (r *Cluster) validateClusterVersionRef(allErrs *field.ErrorList) {
 func (r *Cluster) validateComponents(allErrs *field.ErrorList, clusterDef *ClusterDefinition) {
 	var (
 		// invalid component type slice
-		invalidComponentTypes = make([]string, 0)
-		componentNameMap      = make(map[string]struct{})
-		componentTypeMap      = make(map[string]struct{})
-		componentMap          = make(map[string]ClusterComponentDefinition)
+		invalidComponentDefs = make([]string, 0)
+		componentNameMap     = make(map[string]struct{})
+		componentDefMap      = make(map[string]struct{})
+		componentMap         = make(map[string]ClusterComponentDefinition)
 	)
 
 	for _, v := range clusterDef.Spec.ComponentDefs {
-		componentTypeMap[v.Name] = struct{}{}
+		componentDefMap[v.Name] = struct{}{}
 		componentMap[v.Name] = v
 	}
 
 	for i, v := range r.Spec.ComponentSpecs {
-		if _, ok := componentTypeMap[v.ComponentDefRef]; !ok {
-			invalidComponentTypes = append(invalidComponentTypes, v.ComponentDefRef)
+		if _, ok := componentDefMap[v.ComponentDefRef]; !ok {
+			invalidComponentDefs = append(invalidComponentDefs, v.ComponentDefRef)
 		}
 
 		componentNameMap[v.Name] = struct{}{}
@@ -211,9 +211,9 @@ func (r *Cluster) validateComponents(allErrs *field.ErrorList, clusterDef *Clust
 
 	r.validatePrimaryIndex(allErrs)
 
-	if len(invalidComponentTypes) > 0 {
+	if len(invalidComponentDefs) > 0 {
 		*allErrs = append(*allErrs, field.NotFound(field.NewPath("spec.components[*].type"),
-			getComponentDefNotFoundMsg(invalidComponentTypes, r.Spec.ClusterDefRef)))
+			getComponentDefNotFoundMsg(invalidComponentDefs, r.Spec.ClusterDefRef)))
 	}
 }
 

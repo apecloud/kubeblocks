@@ -39,7 +39,7 @@ const (
 	ClusterVersionName = "fake-cluster-version"
 	ClusterDefName     = "fake-cluster-definition"
 	ComponentName      = "fake-component-name"
-	ComponentType      = "fake-component-type"
+	ComponentDefName   = "fake-component-type"
 	NodeName           = "fake-node-name"
 	SecretName         = "fake-secret-name"
 	StorageClassName   = "fake-storage-class"
@@ -88,7 +88,7 @@ func FakeCluster(name string, namespace string) *appsv1alpha1.Cluster {
 			ComponentSpecs: []appsv1alpha1.ClusterComponentSpec{
 				{
 					Name:            ComponentName,
-					ComponentDefRef: ComponentType,
+					ComponentDefRef: ComponentDefName,
 					Replicas:        &replicas,
 					Resources: corev1.ResourceRequirements{
 						Requests: corev1.ResourceList{
@@ -118,7 +118,7 @@ func FakeCluster(name string, namespace string) *appsv1alpha1.Cluster {
 				},
 				{
 					Name:            ComponentName + "-1",
-					ComponentDefRef: ComponentType,
+					ComponentDefRef: ComponentDefName,
 					Replicas:        &replicas,
 					Resources: corev1.ResourceRequirements{
 						Requests: corev1.ResourceList{
@@ -212,11 +212,11 @@ func FakeClusterDef() *appsv1alpha1.ClusterDefinition {
 	clusterDef.Name = ClusterDefName
 	clusterDef.Spec.ComponentDefs = []appsv1alpha1.ClusterComponentDefinition{
 		{
-			Name:          ComponentType,
+			Name:          ComponentDefName,
 			CharacterType: "mysql",
 		},
 		{
-			Name:          fmt.Sprintf("%s-%d", ComponentType, 1),
+			Name:          fmt.Sprintf("%s-%d", ComponentDefName, 1),
 			CharacterType: "mysql",
 		},
 	}

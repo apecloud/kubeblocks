@@ -15,7 +15,6 @@
 meta: {
 	clusterDefinition: {
 		name: string
-		type: string
 	}
 
 	cluster: {
@@ -26,6 +25,7 @@ meta: {
 	component: {
 		name:                  string
 		type:                  string
+		characterType:         string
 		configName:            string
 		templateName:          string
 		configConstraintsName: string
@@ -40,7 +40,7 @@ config: {
 		name:      meta.component.configName
 		namespace: meta.cluster.namespace
 		labels: {
-			"app.kubernetes.io/name": "\(meta.clusterDefinition.type)-\(meta.clusterDefinition.name)"
+			"app.kubernetes.io/name": "\(meta.component.characterType)-\(meta.clusterDefinition.name)"
 			// cluster name
 			"app.kubernetes.io/instance": meta.cluster.name
 			// component name

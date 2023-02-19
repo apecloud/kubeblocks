@@ -65,6 +65,27 @@ type CfgOpOption struct {
 	XMLContext *XMLContext
 }
 
+type ParameterPair struct {
+	Key   string
+	Value string
+}
+
+// ParameterUpdateType describes how to update the parameters.
+// +enum
+type ParameterUpdateType string
+
+const (
+	AddedType   ParameterUpdateType = "add"
+	DeletedType ParameterUpdateType = "delete"
+	UpdatedType ParameterUpdateType = "update"
+)
+
+type VisualizedParam struct {
+	Key        string
+	UpdateType ParameterUpdateType
+	Parameters []ParameterPair
+}
+
 type ConfigOperator interface {
 	// MergeFrom update parameter by keyvalue
 	MergeFrom(params map[string]interface{}, option CfgOpOption) error

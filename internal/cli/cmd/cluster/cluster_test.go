@@ -148,7 +148,7 @@ var _ = Describe("Cluster", func() {
 			TTLSecondsAfterSucceed: 30,
 		}
 		By("validate o.name is null")
-		Expect(o.Validate()).To(MatchError("missing cluster name"))
+		Expect(o.Validate()).To(MatchError(missingClusterArgErrMassage))
 
 		By("validate upgrade when cluster-version is null")
 		o.Name = "test"

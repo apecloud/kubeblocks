@@ -108,6 +108,9 @@ func (o *OperationsOptions) buildCommonFlags(cmd *cobra.Command) {
 // CompleteRestartOps when restart a cluster and component-names is null, represents restarting the entire cluster.
 // we should set all component names to ComponentNames
 func (o *OperationsOptions) CompleteRestartOps() error {
+	if o.Name == "" {
+		return makeMissingClusterNameErr()
+	}
 	if len(o.ComponentNames) != 0 {
 		return nil
 	}
@@ -276,11 +279,16 @@ func (o *OperationsOptions) parseUpdatedParams() error {
 // Validate command flags or args is legal
 func (o *OperationsOptions) Validate() error {
 	if o.Name == "" {
-		return fmt.Errorf("missing cluster name")
+		return makeMissingClusterNameErr()
 	}
 
 	if o.OpsType == appsv1alpha1.UpgradeType {
 		return o.validateUpgrade()
+	}
+
+	// not require confirm
+	if o.OpsType == appsv1alpha1.ReconfiguringType {
+		return o.validateReconfiguring()
 	}
 
 	// common validate for componentOps
@@ -297,16 +305,12 @@ func (o *OperationsOptions) Validate() error {
 		if err := o.validateHorizontalScaling(); err != nil {
 			return err
 		}
-	case appsv1alpha1.ReconfiguringType:
-		if err := o.validateReconfiguring(); err != nil {
-			return err
-		}
 	}
 	return delete.Confirm([]string{o.Name}, o.In)
 }
 
 func (o *OperationsOptions) fillTemplateArgForReconfiguring() error {
-	if len(o.Name) == 0 {
+	if o.Name == "" {
 		return makeMissingClusterNameErr()
 	}
 

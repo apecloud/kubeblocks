@@ -276,7 +276,7 @@ bin/kbcli.%: ## Cross build bin/kbcli.$(OS).$(ARCH).
 .PHONY: kbcli
 kbcli: OS=$(shell $(GO) env GOOS)
 kbcli: ARCH=$(shell $(GO) env GOARCH)
-kbcli: build-checks ## Build bin/kbcli.
+kbcli: test-go-generate build-checks ## Build bin/kbcli.
 	$(MAKE) bin/kbcli.$(OS).$(ARCH)
 	mv bin/kbcli.$(OS).$(ARCH) bin/kbcli
 
@@ -291,14 +291,14 @@ kbcli-doc: build-checks ## generate CLI command reference manual.
 ##@ Load Balancer
 
 .PHONY: loadbalancer
-loadbalancer: loadbalancer-go-generate build-checks  ## Build loadbalancer binary.
+loadbalancer: loadbalancer-go-generate test-go-generate build-checks  ## Build loadbalancer binary.
 	$(GO) build -ldflags=${LD_FLAGS} -o bin/loadbalancer-controller ./cmd/loadbalancer/controller
 	$(GO) build -ldflags=${LD_FLAGS} -o bin/loadbalancer-agent ./cmd/loadbalancer/agent
 
 ##@ Operator Controller Manager
 
 .PHONY: manager
-manager: cue-fmt generate manager-go-generate build-checks ## Build manager binary.
+manager: cue-fmt generate manager-go-generate test-go-generate build-checks ## Build manager binary.
 	$(GO) build -ldflags=${LD_FLAGS} -o bin/manager ./cmd/manager/main.go
 
 CERT_ROOT_CA ?= $(WEBHOOK_CERT_DIR)/rootCA.key
@@ -342,7 +342,7 @@ bin/agamotto.%: ## Cross build bin/agamotto.$(OS).$(ARCH) .
 .PHONY: agamotto
 agamotto: OS=$(shell $(GO) env GOOS)
 agamotto: ARCH=$(shell $(GO) env GOARCH)
-agamotto: build-checks ## Build agamotto related binaries
+agamotto: test-go-generate build-checks ## Build agamotto related binaries
 	$(MAKE) bin/agamotto.${OS}.${ARCH}
 	mv bin/agamotto.${OS}.${ARCH} bin/agamotto
 
@@ -397,7 +397,7 @@ bin/probe.%: ## Cross build bin/probe.$(OS).$(ARCH) .
 .PHONY: probe
 probe: OS=$(shell $(GO) env GOOS)
 probe: ARCH=$(shell $(GO) env GOARCH)
-probe: build-checks ## Build probe related binaries
+probe: test-go-generate build-checks ## Build probe related binaries
 	$(MAKE) bin/probe.${OS}.${ARCH}
 	mv bin/probe.${OS}.${ARCH} bin/probe
 

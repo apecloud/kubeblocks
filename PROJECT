@@ -10,32 +10,32 @@ resources:
     namespaced: true
   controller: true
   domain: kubeblocks.io
-  group: dbaas
+  group: apps
   kind: Cluster
-  path: github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1
+  path: github.com/apecloud/kubeblocks/apis/apps/v1alpha1
   version: v1alpha1
 - api:
     crdVersion: v1
   controller: true
   domain: kubeblocks.io
-  group: dbaas
+  group: apps
   kind: ClusterDefinition
-  path: github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1
+  path: github.com/apecloud/kubeblocks/apis/apps/v1alpha1
   version: v1alpha1
 - api:
     crdVersion: v1
   controller: true
   domain: kubeblocks.io
-  group: dbaas
+  group: apps
   kind: ClusterVersion
-  path: github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1
+  path: github.com/apecloud/kubeblocks/apis/apps/v1alpha1
   version: v1alpha1
 - api:
     crdVersion: v1
     namespaced: true
   controller: true
   domain: kubeblocks.io
-  group: dbaas
+  group: apps
   kind: BackupTool
   path: github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1
   version: v1alpha1
@@ -80,9 +80,9 @@ resources:
     namespaced: true
   controller: true
   domain: kubeblocks.io
-  group: dbaas
+  group: apps
   kind: OpsRequest
-  path: github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1
+  path: github.com/apecloud/kubeblocks/apis/apps/v1alpha1
   version: v1alpha1
   webhooks:
     defaulting: true
@@ -92,8 +92,8 @@ resources:
     crdVersion: v1
   controller: true
   domain: kubeblocks.io
-  group: dbaas
+  group: apps
   kind: ConfigConstraint
-  path: github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1
+  path: github.com/apecloud/kubeblocks/apis/apps/v1alpha1
   version: v1alpha1
 version: "3"

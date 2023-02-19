@@ -12,7 +12,7 @@ metadata:
     # if type is incremental, parentName is required.
     #dataprotection.kubeblocks.io/parent-backup-name: null
     # reference db cluster name
-    clusters.dbaas.kubeblocks.io/name: wesql-cluster
+    clusters.apps.kubeblocks.io/name: wesql-cluster
     backuppolicies.dataprotection.kubeblocks.io/name: backup-policy-demo
     # backup index begin to 0 (full) for incremental.
     dataprotection.kubeblocks.io/backup-index: "0"

@@ -23,7 +23,7 @@ import (
 	"golang.org/x/exp/maps"
 	corev1 "k8s.io/api/core/v1"
 
-	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 )
 
 type createVolumeFn func(volumeName string) corev1.Volume
@@ -54,7 +54,7 @@ func CheckAndUpdateVolume(volumes []corev1.Volume, volumeName string, createFn c
 	return append(volumes, createFn(volumeName)), nil
 }
 
-func CheckAndUpdatePodVolumes(podSpec *corev1.PodSpec, volumes map[string]dbaasv1alpha1.ConfigTemplate) error {
+func CheckAndUpdatePodVolumes(podSpec *corev1.PodSpec, volumes map[string]appsv1alpha1.ConfigTemplate) error {
 	var (
 		err        error
 		podVolumes = podSpec.Volumes

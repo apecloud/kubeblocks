@@ -36,10 +36,10 @@ import (
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
-	testdbaas "github.com/apecloud/kubeblocks/internal/testutil/dbaas"
+	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 	"github.com/apecloud/kubeblocks/test/testdata"
 )
 
@@ -202,10 +202,10 @@ var _ = Describe("util", func() {
 			testNS = "default"
 		)
 
-		configConstraintObj := testdbaas.NewCustomizedObj("resources/mysql_config_template.yaml",
-			&dbaasv1alpha1.ConfigConstraint{}, testdbaas.WithNamespacedName(ccName, ""), func(cc *dbaasv1alpha1.ConfigConstraint) {
+		configConstraintObj := testapps.NewCustomizedObj("resources/mysql_config_template.yaml",
+			&appsv1alpha1.ConfigConstraint{}, testapps.WithNamespacedName(ccName, ""), func(cc *appsv1alpha1.ConfigConstraint) {
 				if ccContext, err := testdata.GetTestDataFileContent("/cue_testdata/mysql_for_cli.cue"); err == nil {
-					cc.Spec.ConfigurationSchema = &dbaasv1alpha1.CustomParametersValidation{
+					cc.Spec.ConfigurationSchema = &appsv1alpha1.CustomParametersValidation{
 						CUE: string(ccContext),
 					}
 				}
@@ -214,9 +214,9 @@ var _ = Describe("util", func() {
 		tf := cmdtesting.NewTestFactory().WithNamespace(testNS)
 		defer tf.Cleanup()
 
-		Expect(dbaasv1alpha1.AddToScheme(scheme.Scheme)).Should(Succeed())
+		Expect(appsv1alpha1.AddToScheme(scheme.Scheme)).Should(Succeed())
 		mockClient := dynamicfakeclient.NewSimpleDynamicClientWithCustomListKinds(scheme.Scheme, nil, configConstraintObj)
-		tpl := dbaasv1alpha1.ConfigTemplate{
+		tpl := appsv1alpha1.ConfigTemplate{
 			Name:                "for_test",
 			ConfigConstraintRef: ccName,
 			ConfigTplRef:        ccName,
@@ -224,7 +224,7 @@ var _ = Describe("util", func() {
 		}
 
 		type args struct {
-			tpl           dbaasv1alpha1.ConfigTemplate
+			tpl           appsv1alpha1.ConfigTemplate
 			updatedParams map[string]string
 		}
 		tests := []struct {
@@ -235,14 +235,14 @@ var _ = Describe("util", func() {
 			name: "normal test",
 			args: args{
 				tpl:           tpl,
-				updatedParams: testdbaas.WithMap("automatic_sp_privileges", "OFF", "innodb_autoinc_lock_mode", "1"),
+				updatedParams: testapps.WithMap("automatic_sp_privileges", "OFF", "innodb_autoinc_lock_mode", "1"),
 			},
 			expected: true,
 		}, {
 			name: "not match test",
 			args: args{
 				tpl:           tpl,
-				updatedParams: testdbaas.WithMap("not_exist_field", "1"),
+				updatedParams: testapps.WithMap("not_exist_field", "1"),
 			},
 			expected: false,
 		}}

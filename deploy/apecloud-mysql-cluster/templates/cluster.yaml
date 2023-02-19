@@ -1,4 +1,4 @@
-apiVersion: dbaas.kubeblocks.io/v1alpha1
+apiVersion: apps.kubeblocks.io/v1alpha1
 kind: Cluster
 metadata:
   name: {{ .Release.Name }}
@@ -14,9 +14,9 @@ spec:
   {{- with $.Values.tolerations }}
   tolerations: {{ . | toYaml | nindent 4 }}
   {{- end }}
-  components:
+  componentSpecs:
     - name: mysql # user-defined
-      type: mysql # ref clusterdefinition components.typename
+      componentDefRef: mysql # ref clusterdefinition componentDefs.name
       monitor: {{ .Values.monitor.enabled | default false }}
       replicas: {{ .Values.replicaCount | default 3 }}
       enabledLogs: {{ .Values.enabledLogs | toJson | indent 4 }}

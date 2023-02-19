@@ -24,7 +24,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 
-	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 )
 
 func TestIsSupportedCharacterType(t *testing.T) {
@@ -44,37 +44,36 @@ func TestIsSupportedCharacterType(t *testing.T) {
 var _ = Describe("monitor_utils", func() {
 	Context("has the buildMonitorConfig function", func() {
 		var component *SynthesizedComponent
-		var cluster *dbaasv1alpha1.Cluster
-		var clusterComp *dbaasv1alpha1.ClusterComponent
-		var clusterDef *dbaasv1alpha1.ClusterDefinition
-		var clusterDefComp *dbaasv1alpha1.ClusterDefinitionComponent
+		var cluster *appsv1alpha1.Cluster
+		var clusterComp *appsv1alpha1.ClusterComponentSpec
+		var clusterDef *appsv1alpha1.ClusterDefinition
+		var clusterDefComp *appsv1alpha1.ClusterComponentDefinition
 
 		BeforeEach(func() {
 			component = &SynthesizedComponent{}
 			component.PodSpec = &corev1.PodSpec{}
-			cluster = &dbaasv1alpha1.Cluster{}
+			cluster = &appsv1alpha1.Cluster{}
 			cluster.Name = "mysql-instance-3"
-			clusterComp = &dbaasv1alpha1.ClusterComponent{}
+			clusterComp = &appsv1alpha1.ClusterComponentSpec{}
 			clusterComp.Monitor = true
-			cluster.Spec.Components = append(cluster.Spec.Components, *clusterComp)
-			clusterComp = &cluster.Spec.Components[0]
+			cluster.Spec.ComponentSpecs = append(cluster.Spec.ComponentSpecs, *clusterComp)
+			clusterComp = &cluster.Spec.ComponentSpecs[0]
 
-			clusterDef = &dbaasv1alpha1.ClusterDefinition{}
-			clusterDef.Spec.Type = "state.mysql"
-			clusterDefComp = &dbaasv1alpha1.ClusterDefinitionComponent{}
+			clusterDef = &appsv1alpha1.ClusterDefinition{}
+			clusterDefComp = &appsv1alpha1.ClusterComponentDefinition{}
 			clusterDefComp.CharacterType = kMysql
-			clusterDefComp.Monitor = &dbaasv1alpha1.MonitorConfig{
+			clusterDefComp.Monitor = &appsv1alpha1.MonitorConfig{
 				BuiltIn: false,
-				Exporter: &dbaasv1alpha1.ExporterConfig{
+				Exporter: &appsv1alpha1.ExporterConfig{
 					ScrapePort: 9144,
 					ScrapePath: "/metrics",
 				},
 			}
-			clusterDef.Spec.Components = append(clusterDef.Spec.Components, *clusterDefComp)
-			clusterDefComp = &clusterDef.Spec.Components[0]
+			clusterDef.Spec.ComponentDefs = append(clusterDef.Spec.ComponentDefs, *clusterDefComp)
+			clusterDefComp = &clusterDef.Spec.ComponentDefs[0]
 		})
 
-		It("should disable monitor if ClusterComponent.Monitor is false", func() {
+		It("should disable monitor if ClusterComponentSpec.Monitor is false", func() {
 			clusterComp.Monitor = false
 			buildMonitorConfig(cluster, clusterDef, clusterDefComp, clusterComp, component)
 			monitorConfig := component.Monitor
@@ -86,7 +85,7 @@ var _ = Describe("monitor_utils", func() {
 			}
 		})
 
-		It("should disable builtin monitor if ClusterDefinitionComponent.Monitor.BuiltIn is false and has valid ExporterConfig", func() {
+		It("should disable builtin monitor if ClusterComponentDefinition.Monitor.BuiltIn is false and has valid ExporterConfig", func() {
 			clusterComp.Monitor = true
 			clusterDefComp.CharacterType = kFake
 			clusterDefComp.Monitor.BuiltIn = false
@@ -100,7 +99,7 @@ var _ = Describe("monitor_utils", func() {
 			}
 		})
 
-		It("should disable monitor if ClusterDefinitionComponent.Monitor.BuiltIn is false and lacks ExporterConfig", func() {
+		It("should disable monitor if ClusterComponentDefinition.Monitor.BuiltIn is false and lacks ExporterConfig", func() {
 			clusterComp.Monitor = true
 			clusterDefComp.CharacterType = kFake
 			clusterDefComp.Monitor.BuiltIn = false
@@ -115,7 +114,7 @@ var _ = Describe("monitor_utils", func() {
 			}
 		})
 
-		It("should disable monitor if ClusterDefinitionComponent.Monitor.BuiltIn is true and CharacterType isn't recognizable", func() {
+		It("should disable monitor if ClusterComponentDefinition.Monitor.BuiltIn is true and CharacterType isn't recognizable", func() {
 			clusterComp.Monitor = true
 			clusterDefComp.CharacterType = kFake
 			clusterDefComp.Monitor.BuiltIn = true
@@ -130,10 +129,9 @@ var _ = Describe("monitor_utils", func() {
 			}
 		})
 
-		It("should disable monitor if ClusterDefinitionComponent's CharacterType is empty", func() {
+		It("should disable monitor if ClusterComponentDefinition's CharacterType is empty", func() {
 			// TODO fixme: seems setting clusterDef.Spec.Type has no effect to buildMonitorConfig
 			clusterComp.Monitor = true
-			clusterDef.Spec.Type = kFake
 			clusterDefComp.CharacterType = ""
 			clusterDefComp.Monitor.BuiltIn = true
 			clusterDefComp.Monitor.Exporter = nil
@@ -158,7 +156,7 @@ var _ = Describe("monitor_utils", func() {
 						}},
 					}},
 				}}
-			cluster := &dbaasv1alpha1.Cluster{}
+			cluster := &appsv1alpha1.Cluster{}
 			cluster.SetName("mock-cluster")
 			Expect(setMysqlComponent(cluster, component)).Should(Succeed())
 			monitor := component.Monitor

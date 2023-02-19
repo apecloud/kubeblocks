@@ -25,7 +25,7 @@ import (
 
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
-	testdbaas "github.com/apecloud/kubeblocks/internal/testutil/dbaas"
+	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 )
 
 var _ = Describe("BackupPolicyTemplate Controller", func() {
@@ -41,8 +41,8 @@ var _ = Describe("BackupPolicyTemplate Controller", func() {
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 
 		// non-namespaced
-		testdbaas.ClearResources(&testCtx, intctrlutil.BackupToolSignature, ml)
-		testdbaas.ClearResources(&testCtx, intctrlutil.BackupPolicyTemplateSignature, ml)
+		testapps.ClearResources(&testCtx, intctrlutil.BackupToolSignature, ml)
+		testapps.ClearResources(&testCtx, intctrlutil.BackupPolicyTemplateSignature, ml)
 	}
 
 	BeforeEach(cleanEnv)
@@ -55,7 +55,7 @@ var _ = Describe("BackupPolicyTemplate Controller", func() {
 
 	assureBackupPolicyTemplateObj := func(backupTool string) *dataprotectionv1alpha1.BackupPolicyTemplate {
 		By("By assure an backupPolicyTemplate obj")
-		return testdbaas.NewBackupPolicyTemplateFactory("backup-policy-template-").
+		return testapps.NewBackupPolicyTemplateFactory("backup-policy-template-").
 			WithRandomName().
 			SetBackupToolName(backupTool).
 			SetSchedule("0 3 * * *").
@@ -65,8 +65,8 @@ var _ = Describe("BackupPolicyTemplate Controller", func() {
 
 	assureBackupToolObj := func() *dataprotectionv1alpha1.BackupTool {
 		By("By assure an backupTool obj")
-		return testdbaas.CreateCustomizedObj(&testCtx, "backup/backuptool.yaml",
-			&dataprotectionv1alpha1.BackupTool{}, testdbaas.RandomizedObjName())
+		return testapps.CreateCustomizedObj(&testCtx, "backup/backuptool.yaml",
+			&dataprotectionv1alpha1.BackupTool{}, testapps.RandomizedObjName())
 	}
 
 	Context("When creating backupPolicyTemplate", func() {

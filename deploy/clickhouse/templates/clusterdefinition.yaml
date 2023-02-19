@@ -1,4 +1,4 @@
-apiVersion: dbaas.kubeblocks.io/v1alpha1
+apiVersion: apps.kubeblocks.io/v1alpha1
 kind: ClusterDefinition
 metadata:
   name: apecloud-clickhouse
@@ -11,17 +11,14 @@ metadata:
   annotations: {{- include "common.tplvalues.render" ( dict "value" .Values.commonAnnotations "context" $ ) | nindent 4 }}
   {{- end }}
 spec:
-  type: state.clickhouse
   connectionCredential:
     username: "admin"
     password: "$(RANDOM_PASSWD)"
     admin-password: "$(CONN_CREDENTIAL).password"
-  components:
-    - typeName: clickhouse
-      componentType: Stateful
+  componentDefs:
+    - name: clickhouse
+      workloadType: Stateful
       characterType: clickhouse
-      defaultReplicas: 2
-      minReplicas: 1
       probes:
       monitor:
         builtIn: false
@@ -152,11 +149,9 @@ spec:
               - name: config
                 mountPath: /bitnami/clickhouse/etc/conf.d/default
 
-    - typeName: ch-keeper
-      componentType: Stateful # Consensus
+    - name: ch-keeper
+      workloadType: Stateful # Consensus
       characterType: zookeeper
-      defaultReplicas: 0
-      minReplicas: 0
       probes:
       monitor:
         builtIn: false
@@ -246,11 +241,9 @@ spec:
               - name: config
                 mountPath: /bitnami/clickhouse/etc/conf.d/default
 
-    - typeName: zookeeper
-      componentType: Stateful #Consensus
+    - name: zookeeper
+      workloadType: Stateful #Consensus
       characterType: zookeeper
-      defaultReplicas: 1
-      minReplicas: 0
       # probes:
       #   roleChangedProbe:
       #     cmd: "stat | grep 'Leader'"
@@ -280,7 +273,6 @@ spec:
             namespace: {{ .Release.Namespace }}
             volumeName: script
             defaultMode: 493
-      defaultReplicas: 1
       service:
         ports:
           - name: tcp-client

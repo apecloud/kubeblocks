@@ -226,7 +226,7 @@ func (o *ConnectOptions) getConnectionInfo() (*engine.ConnectionInfo, error) {
 
 	// TODO: now the primary component is the first component, that may not be correct,
 	// maybe show all components connection info in the future.
-	primaryComponent := cluster.FindClusterComp(objs.Cluster, objs.ClusterDef.Spec.Components[0].TypeName)
+	primaryComponent := cluster.FindClusterComp(objs.Cluster, objs.ClusterDef.Spec.ComponentDefs[0].Name)
 	internalSvcs, externalSvcs := cluster.GetComponentServices(objs.Services, primaryComponent)
 	switch {
 	case len(externalSvcs) > 0:
@@ -254,7 +254,7 @@ func (o *ConnectOptions) getConnectionInfo() (*engine.ConnectionInfo, error) {
 	}
 
 	// get engine
-	o.engine, err = engine.New(objs.ClusterDef.Spec.Type)
+	o.engine, err = engine.New(objs.ClusterDef.Spec.ComponentDefs[0].CharacterType)
 	if err != nil {
 		return nil, err
 	}

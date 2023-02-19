@@ -39,7 +39,7 @@ _Steps_:
 1. Prepare a YAML file for a single-node cluster. Below is the YAML file of the single-node cluster. 
 
 ```
-apiVersion: dbaas.kubeblocks.io/v1alpha1
+apiVersion: apps.kubeblocks.io/v1alpha1
 kind: Cluster
 metadata:
   name: wesql
@@ -67,7 +67,7 @@ spec:
 
 ```
 $ kubectl apply -f cluster.yaml
-cluster.dbaas.kubeblocks.io/wesql created
+cluster.apps.kubeblocks.io/wesql created
 ```
 
 ### Result
@@ -116,7 +116,7 @@ _Steps_:
 1. Prepare a YAML file for restarting a single-node cluster. Below is the YAML file of the `OpsRequest` CR. 
 
 ```
-apiVersion: dbaas.kubeblocks.io/v1alpha1
+apiVersion: apps.kubeblocks.io/v1alpha1
 kind: OpsRequest
 metadata:
   name: ops-restart-demo
@@ -131,7 +131,7 @@ spec:
 
 ```
 $ kubectl apply -f restart.yaml
-opsrequest.dbaas.kubeblocks.io/ops-restart created
+opsrequest.apps.kubeblocks.io/ops-restart created
 ```
 
 3. View the `OpsRequest` phase and cluster phase:
@@ -173,7 +173,7 @@ Name:         ops-restart-demo
 Namespace:    default
 Labels:       cluster.kubeblocks.io/name=wesql
 Annotations:  <none>
-API Version:  dbaas.kubeblocks.io/v1alpha1
+API Version:  apps.kubeblocks.io/v1alpha1
 Kind:         OpsRequest
 Metadata:
   Creation Timestamp:  2022-11-17T06:26:33Z
@@ -181,7 +181,7 @@ Metadata:
     opsrequest.kubeblocks.io/finalizer
   Generation:  1
   Managed Fields:
-    API Version:  dbaas.kubeblocks.io/v1alpha1
+    API Version:  apps.kubeblocks.io/v1alpha1
     Fields Type:  FieldsV1
     fieldsV1:
       f:metadata:
@@ -196,7 +196,7 @@ Metadata:
     Manager:      kubectl-client-side-apply
     Operation:    Update
     Time:         2022-11-17T06:26:33Z
-    API Version:  dbaas.kubeblocks.io/v1alpha1
+    API Version:  apps.kubeblocks.io/v1alpha1
     Fields Type:  FieldsV1
     fieldsV1:
       f:metadata:
@@ -212,7 +212,7 @@ Metadata:
     Manager:      manager
     Operation:    Update
     Time:         2022-11-17T06:26:34Z
-    API Version:  dbaas.kubeblocks.io/v1alpha1
+    API Version:  apps.kubeblocks.io/v1alpha1
     Fields Type:  FieldsV1
     fieldsV1:
       f:status:
@@ -232,7 +232,7 @@ Metadata:
     Subresource:  status
     Time:         2022-11-17T06:27:27Z
   Owner References:
-    API Version:     dbaas.kubeblocks.io/v1alpha1
+    API Version:     apps.kubeblocks.io/v1alpha1
     Kind:            Cluster
     Name:            wesql
     UID:             a0293dcd-0e78-44f0-89b7-cf2c1768fb66

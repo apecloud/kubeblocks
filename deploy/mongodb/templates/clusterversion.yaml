@@ -1,4 +1,4 @@
-apiVersion: dbaas.kubeblocks.io/v1alpha1
+apiVersion: apps.kubeblocks.io/v1alpha1
 kind: ClusterVersion
 metadata:
   name: mongodb-{{ default .Chart.AppVersion .Values.clusterVersionOverride }}
@@ -6,20 +6,20 @@ metadata:
     {{- include "mongodb.labels" . | nindent 4 }}
 spec:
   clusterDefinitionRef: apecloud-mongodb
-  components:
-    - type: mongos
+  componentVersions:
+    - componentDefRef: mongos
       podSpec:
         containers:
           - name: mongos
             image: {{ .Values.image.repository }}:{{ default .Chart.AppVersion .Values.image.tag }}
             imagePullPolicy: {{ default .Values.image.pullPolicy "IfNotPresent" }}
-    - type: configsvr
+    - componentDefRef: configsvr
       podSpec:
         containers:
           - name: configsvr
             image: {{ .Values.image.repository }}:{{ default .Chart.AppVersion .Values.image.tag }}
             imagePullPolicy: {{ default .Values.image.pullPolicy "IfNotPresent" }}
-    - type: shard
+    - componentDefRef: shard
       podSpec:
         containers:
           - name: shard

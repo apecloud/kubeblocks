@@ -31,7 +31,7 @@ import (
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
 
-	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/list"
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
@@ -104,7 +104,7 @@ func (o *opsListOptions) printOpsList() error {
 	tbl := printer.NewTablePrinter(o.Out)
 	tbl.SetHeader("NAME", "TYPE", "CLUSTER", "COMPONENT", "STATUS", "PROGRESS", "CREATED-TIME")
 	for _, obj := range opsList.Items {
-		ops := &dbaasv1alpha1.OpsRequest{}
+		ops := &appsv1alpha1.OpsRequest{}
 		if err = runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, ops); err != nil {
 			return err
 		}
@@ -129,24 +129,24 @@ func (o *opsListOptions) printOpsList() error {
 	return nil
 }
 
-func getComponentNameFromOps(ops dbaasv1alpha1.OpsRequestSpec) string {
+func getComponentNameFromOps(ops appsv1alpha1.OpsRequestSpec) string {
 	components := make([]string, 0)
 	switch ops.Type {
-	case dbaasv1alpha1.ReconfiguringType:
+	case appsv1alpha1.ReconfiguringType:
 		components = append(components, ops.Reconfigure.ComponentName)
-	case dbaasv1alpha1.HorizontalScalingType:
+	case appsv1alpha1.HorizontalScalingType:
 		for _, item := range ops.HorizontalScalingList {
 			components = append(components, item.ComponentName)
 		}
-	case dbaasv1alpha1.VolumeExpansionType:
+	case appsv1alpha1.VolumeExpansionType:
 		for _, item := range ops.VolumeExpansionList {
 			components = append(components, item.ComponentName)
 		}
-	case dbaasv1alpha1.RestartType:
+	case appsv1alpha1.RestartType:
 		for _, item := range ops.RestartList {
 			components = append(components, item.ComponentName)
 		}
-	case dbaasv1alpha1.VerticalScalingType:
+	case appsv1alpha1.VerticalScalingType:
 		for _, item := range ops.VerticalScalingList {
 			components = append(components, item.ComponentName)
 		}
@@ -154,8 +154,8 @@ func getComponentNameFromOps(ops dbaasv1alpha1.OpsRequestSpec) string {
 	return strings.Join(components, ",")
 }
 
-func getTemplateNameFromOps(ops dbaasv1alpha1.OpsRequestSpec) string {
-	if ops.Type != dbaasv1alpha1.ReconfiguringType {
+func getTemplateNameFromOps(ops appsv1alpha1.OpsRequestSpec) string {
+	if ops.Type != appsv1alpha1.ReconfiguringType {
 		return ""
 	}
 
@@ -166,8 +166,8 @@ func getTemplateNameFromOps(ops dbaasv1alpha1.OpsRequestSpec) string {
 	return strings.Join(tpls, ",")
 }
 
-func getKeyNameFromOps(ops dbaasv1alpha1.OpsRequestSpec) string {
-	if ops.Type != dbaasv1alpha1.ReconfiguringType {
+func getKeyNameFromOps(ops appsv1alpha1.OpsRequestSpec) string {
+	if ops.Type != appsv1alpha1.ReconfiguringType {
 		return ""
 	}
 

@@ -26,6 +26,11 @@ import (
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 )
 
+var (
+	invalidAuthAPIVersion     = "exec plugin: invalid apiVersion \"client.authentication.k8s.io/v1alpha1\""
+	invalidAuthAPIVersionHint = "if you are using Amazon EKS, please update AWS CLI to the latest version and update the kubeconfig file for your cluster,\nrefer to https://docs.aws.amazon.com/eks/latest/userguide/create-kubeconfig.html"
+)
+
 // CheckErr prints a user-friendly error to STDERR and exits with a non-zero exit code.
 func CheckErr(err error) {
 	// unwrap aggregates of 1
@@ -46,6 +51,14 @@ func CheckErr(err error) {
 		}
 	}
 
+	// check invalid authentication apiVersion and output hint message
+	if err.Error() == invalidAuthAPIVersion {
+		printErr(err)
+		fmt.Fprintf(os.Stderr, "hint: %s\n", invalidAuthAPIVersionHint)
+		os.Exit(cmdutil.DefaultErrorExitCode)
+	}
+
+	// check other errors
 	cmdutil.CheckErr(err)
 }
 

@@ -47,15 +47,15 @@ import (
 func mergeComponentsList(reqCtx intctrlutil.RequestCtx,
 	cluster *appsv1alpha1.Cluster,
 	clusterDef *appsv1alpha1.ClusterDefinition,
-	clusterDefCompList []appsv1alpha1.ClusterComponentDefinition,
-	clusterCompList []appsv1alpha1.ClusterComponentSpec) []component.SynthesizedComponent {
+	clusterCompDefList []appsv1alpha1.ClusterComponentDefinition,
+	clusterCompSpecList []appsv1alpha1.ClusterComponentSpec) []component.SynthesizedComponent {
 	var compList []component.SynthesizedComponent
-	for _, clusterDefComp := range clusterDefCompList {
-		for _, clusterComp := range clusterCompList {
-			if clusterComp.ComponentDefRef != clusterDefComp.Name {
+	for _, compDef := range clusterCompDefList {
+		for _, compSpec := range clusterCompSpecList {
+			if compSpec.ComponentDefRef != compDef.Name {
 				continue
 			}
-			comp := component.BuildComponent(reqCtx, cluster, clusterDef, &clusterDefComp, nil, &clusterComp)
+			comp := component.BuildComponent(reqCtx, cluster, clusterDef, &compDef, nil, &compSpec)
 			compList = append(compList, *comp)
 		}
 	}
@@ -74,26 +74,25 @@ func getComponent(componentList []component.SynthesizedComponent, name string) *
 func reconcileClusterWorkloads(
 	reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
-	clusterDefinition *appsv1alpha1.ClusterDefinition,
-	clusterVersion *appsv1alpha1.ClusterVersion,
+	clusterDef *appsv1alpha1.ClusterDefinition,
+	clusterVer *appsv1alpha1.ClusterVersion,
 	cluster *appsv1alpha1.Cluster) (shouldRequeue bool, err error) {
 
 	applyObjs := make([]client.Object, 0, 3)
 	cacheCtx := map[string]interface{}{}
 	params := plan.CreateParams{
 		Cluster:           cluster,
-		ClusterDefinition: clusterDefinition,
+		ClusterDefinition: clusterDef,
 		ApplyObjs:         &applyObjs,
 		CacheCtx:          &cacheCtx,
-		ClusterVersion:    clusterVersion,
+		ClusterVersion:    clusterVer,
 	}
 	if err := prepareSecretObjs(reqCtx, cli, &params); err != nil {
 		return false, err
 	}
 
-	clusterDefComps := clusterDefinition.Spec.ComponentDefs
-	clusterCompMap := cluster.GetTypeMappingComponents()
-	clusterVersionCompMap := clusterVersion.GetTypeMappingComponents()
+	clusterCompSpecMap := cluster.GetDefNameMappingComponents()
+	clusterCompVerMap := clusterVer.GetDefNameMappingComponents()
 
 	prepareComp := func(component *component.SynthesizedComponent) error {
 		iParams := params
@@ -101,12 +100,12 @@ func reconcileClusterWorkloads(
 		return plan.PrepareComponentObjs(reqCtx, cli, &iParams)
 	}
 
-	for _, c := range clusterDefComps {
+	for _, c := range clusterDef.Spec.ComponentDefs {
 		compDefName := c.Name
-		clusterVersionComp := clusterVersionCompMap[compDefName]
-		clusterComps := clusterCompMap[compDefName]
-		for _, clusterComp := range clusterComps {
-			if err := prepareComp(component.BuildComponent(reqCtx, cluster, clusterDefinition, &c, clusterVersionComp, &clusterComp)); err != nil {
+		compVer := clusterCompVerMap[compDefName]
+		compSpecs := clusterCompSpecMap[compDefName]
+		for _, compSpec := range compSpecs {
+			if err := prepareComp(component.BuildComponent(reqCtx, cluster, clusterDef, &c, compVer, &compSpec)); err != nil {
 				return false, err
 			}
 		}

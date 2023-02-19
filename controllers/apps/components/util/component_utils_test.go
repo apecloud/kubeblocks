@@ -152,8 +152,8 @@ var _ = Describe("Consensus Component", func() {
 			isTerminating, _ := CheckRelatedPodIsTerminating(ctx, k8sClient, cluster, consensusCompName)
 			Expect(isTerminating).Should(BeFalse())
 
-			By("test GetStatusComponentMessageKey function")
-			Expect(GetStatusComponentMessageKey("Pod", "mysql-01")).To(Equal("Pod/mysql-01"))
+			By("test GetComponentStatusMessageKey function")
+			Expect(GetComponentStatusMessageKey("Pod", "mysql-01")).To(Equal("Pod/mysql-01"))
 
 			By("test GetComponentReplicas function")
 			component := cluster.GetComponentByName(consensusCompName)

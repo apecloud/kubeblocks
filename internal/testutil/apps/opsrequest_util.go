@@ -67,11 +67,10 @@ func GetOpsRequestCompPhase(ctx context.Context, testCtx testutil.TestContext, o
 		tmpOps := &appsv1alpha1.OpsRequest{}
 		g.Expect(testCtx.Cli.Get(ctx, client.ObjectKey{Name: opsName,
 			Namespace: testCtx.DefaultNamespace}, tmpOps)).Should(gomega.Succeed())
-		statusComponents := tmpOps.Status.Components
-		if statusComponents == nil {
+		if tmpOps.Status.Components == nil {
 			return ""
 		}
-		return statusComponents[componentName].Phase
+		return tmpOps.Status.Components[componentName].Phase
 	}
 }
 

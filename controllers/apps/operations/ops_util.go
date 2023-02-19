@@ -35,7 +35,7 @@ import (
 
 type handleStatusProgressWithComponent func(opsRes *OpsResource,
 	pgRes progressResource,
-	statusComponent *appsv1alpha1.OpsRequestStatusComponent) (expectProgressCount int32, succeedCount int32, err error)
+	compStatus *appsv1alpha1.OpsRequestComponentStatus) (expectProgressCount int32, succeedCount int32, err error)
 
 type handleReconfigureOpsStatus func(cmStatus *appsv1alpha1.ConfigurationStatus) error
 
@@ -72,7 +72,7 @@ func ReconcileActionWithComponentOps(opsRes *OpsResource,
 	patch := client.MergeFrom(opsRequest.DeepCopy())
 	oldOpsRequestStatus := opsRequest.Status.DeepCopy()
 	if opsRequest.Status.Components == nil {
-		opsRequest.Status.Components = map[string]appsv1alpha1.OpsRequestStatusComponent{}
+		opsRequest.Status.Components = map[string]appsv1alpha1.OpsRequestComponentStatus{}
 	}
 	for k, v := range opsRes.Cluster.Status.Components {
 		if _, ok = componentNameMap[k]; !ok && !checkAllClusterComponent {
@@ -84,25 +84,25 @@ func ReconcileActionWithComponentOps(opsRes *OpsResource,
 		if util.IsFailedOrAbnormal(v.Phase) {
 			isFailed = true
 		}
-		var statusComponent appsv1alpha1.OpsRequestStatusComponent
-		if statusComponent, ok = opsRequest.Status.Components[k]; !ok {
-			statusComponent = appsv1alpha1.OpsRequestStatusComponent{}
+		var compStatus appsv1alpha1.OpsRequestComponentStatus
+		if compStatus, ok = opsRequest.Status.Components[k]; !ok {
+			compStatus = appsv1alpha1.OpsRequestComponentStatus{}
 		}
-		if statusComponent.Phase != v.Phase {
-			statusComponent.Phase = v.Phase
+		if compStatus.Phase != v.Phase {
+			compStatus.Phase = v.Phase
 		}
 		clusterComponent := opsRes.Cluster.GetComponentByName(k)
 		expectCount, succeedCount, err := handleStatusProgress(opsRes, progressResource{
 			opsMessageKey:       opsMessageKey,
 			clusterComponent:    clusterComponent,
 			clusterComponentDef: clusterDef.GetComponentDefByName(clusterComponent.ComponentDefRef),
-		}, &statusComponent)
+		}, &compStatus)
 		if err != nil {
 			return opsRequestPhase, 0, nil
 		}
 		expectProgressCount += expectCount
 		succeedProgressCount += succeedCount
-		opsRequest.Status.Components[k] = statusComponent
+		opsRequest.Status.Components[k] = compStatus
 	}
 	opsRequest.Status.Progress = fmt.Sprintf("%d/%d", succeedProgressCount, expectProgressCount)
 	if !reflect.DeepEqual(opsRequest.Status, oldOpsRequestStatus) {

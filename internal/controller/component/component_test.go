@@ -127,7 +127,7 @@ var _ = Describe("component module", func() {
 				nil)
 			Expect(component).ShouldNot(BeNil())
 
-			By("leave clusterDefComp nil")
+			By("leave clusterCompDef nil")
 			component = BuildComponent(
 				reqCtx,
 				cluster,

@@ -34,46 +34,46 @@ func BuildComponent(
 	reqCtx intctrlutil.RequestCtx,
 	cluster *appsv1alpha1.Cluster,
 	clusterDef *appsv1alpha1.ClusterDefinition,
-	clusterDefComp *appsv1alpha1.ClusterComponentDefinition,
-	clusterVersionComp *appsv1alpha1.ClusterComponentVersion,
-	clusterComp *appsv1alpha1.ClusterComponentSpec) *SynthesizedComponent {
-	if clusterDefComp == nil {
+	clusterCompDef *appsv1alpha1.ClusterComponentDefinition,
+	clusterCompVer *appsv1alpha1.ClusterComponentVersion,
+	clusterCompSpec *appsv1alpha1.ClusterComponentSpec) *SynthesizedComponent {
+	if clusterCompDef == nil {
 		reqCtx.Log.Error(nil, "build probe container failed.")
 		return nil
 	}
 
-	clusterDefCompObj := clusterDefComp.DeepCopy()
+	clusterCompDefObj := clusterCompDef.DeepCopy()
 	component := &SynthesizedComponent{
 		ClusterDefName:        clusterDef.Name,
-		Name:                  clusterDefCompObj.Name, // initial name for the component will be same as Name
-		Type:                  clusterDefCompObj.Name,
-		CharacterType:         clusterDefCompObj.CharacterType,
-		MaxUnavailable:        clusterDefCompObj.MaxUnavailable,
+		Name:                  clusterCompDefObj.Name, // initial name for the component will be same as Name
+		Type:                  clusterCompDefObj.Name,
+		CharacterType:         clusterCompDefObj.CharacterType,
+		MaxUnavailable:        clusterCompDefObj.MaxUnavailable,
 		Replicas:              0,
-		WorkloadType:          clusterDefCompObj.WorkloadType,
-		ConsensusSpec:         clusterDefCompObj.ConsensusSpec,
-		PodSpec:               clusterDefCompObj.PodSpec,
-		Service:               clusterDefCompObj.Service,
-		Probes:                clusterDefCompObj.Probes,
-		LogConfigs:            clusterDefCompObj.LogConfigs,
-		HorizontalScalePolicy: clusterDefCompObj.HorizontalScalePolicy,
+		WorkloadType:          clusterCompDefObj.WorkloadType,
+		ConsensusSpec:         clusterCompDefObj.ConsensusSpec,
+		PodSpec:               clusterCompDefObj.PodSpec,
+		Service:               clusterCompDefObj.Service,
+		Probes:                clusterCompDefObj.Probes,
+		LogConfigs:            clusterCompDefObj.LogConfigs,
+		HorizontalScalePolicy: clusterCompDefObj.HorizontalScalePolicy,
 	}
 
 	// resolve component.ConfigTemplates
-	if clusterDefCompObj.ConfigSpec != nil {
-		component.ConfigTemplates = clusterDefCompObj.ConfigSpec.ConfigTemplateRefs
+	if clusterCompDefObj.ConfigSpec != nil {
+		component.ConfigTemplates = clusterCompDefObj.ConfigSpec.ConfigTemplateRefs
 	}
-	if clusterVersionComp != nil {
-		component.ConfigTemplates = cfgcore.MergeConfigTemplates(clusterVersionComp.ConfigTemplateRefs, component.ConfigTemplates)
+	if clusterCompVer != nil {
+		component.ConfigTemplates = cfgcore.MergeConfigTemplates(clusterCompVer.ConfigTemplateRefs, component.ConfigTemplates)
 	}
 
 	// set component.PodSpec.InitContainers and component.PodSpec.Containers
-	if clusterVersionComp != nil {
-		if clusterVersionComp.PodSpec != nil {
-			for _, c := range clusterVersionComp.PodSpec.InitContainers {
+	if clusterCompVer != nil {
+		if clusterCompVer.PodSpec != nil {
+			for _, c := range clusterCompVer.PodSpec.InitContainers {
 				component.PodSpec.InitContainers = appendOrOverrideContainerAttr(component.PodSpec.InitContainers, c)
 			}
-			for _, c := range clusterVersionComp.PodSpec.Containers {
+			for _, c := range clusterCompVer.PodSpec.Containers {
 				component.PodSpec.Containers = appendOrOverrideContainerAttr(component.PodSpec.Containers, c)
 			}
 		}
@@ -82,12 +82,12 @@ func BuildComponent(
 	// set affinity and tolerations
 	affinity := cluster.Spec.Affinity
 	tolerations := cluster.Spec.Tolerations
-	if clusterComp != nil {
-		if clusterComp.Affinity != nil {
-			affinity = clusterComp.Affinity
+	if clusterCompSpec != nil {
+		if clusterCompSpec.Affinity != nil {
+			affinity = clusterCompSpec.Affinity
 		}
-		if len(clusterComp.Tolerations) != 0 {
-			tolerations = clusterComp.Tolerations
+		if len(clusterCompSpec.Tolerations) != 0 {
+			tolerations = clusterCompSpec.Tolerations
 		}
 	}
 	if affinity != nil {
@@ -99,30 +99,30 @@ func BuildComponent(
 	}
 
 	// set others
-	if clusterComp != nil {
-		component.EnabledLogs = clusterComp.EnabledLogs
+	if clusterCompSpec != nil {
+		component.EnabledLogs = clusterCompSpec.EnabledLogs
 
-		if len(clusterComp.Name) > 0 {
-			component.Name = clusterComp.Name
+		if len(clusterCompSpec.Name) > 0 {
+			component.Name = clusterCompSpec.Name
 		}
 
-		component.Replicas = clusterComp.Replicas
+		component.Replicas = clusterCompSpec.Replicas
 
-		if clusterComp.VolumeClaimTemplates != nil {
-			component.VolumeClaimTemplates = appsv1alpha1.ToVolumeClaimTemplates(clusterComp.VolumeClaimTemplates)
+		if clusterCompSpec.VolumeClaimTemplates != nil {
+			component.VolumeClaimTemplates = appsv1alpha1.ToVolumeClaimTemplates(clusterCompSpec.VolumeClaimTemplates)
 		}
 
-		if clusterComp.Resources.Requests != nil || clusterComp.Resources.Limits != nil {
-			component.PodSpec.Containers[0].Resources = clusterComp.Resources
+		if clusterCompSpec.Resources.Requests != nil || clusterCompSpec.Resources.Limits != nil {
+			component.PodSpec.Containers[0].Resources = clusterCompSpec.Resources
 		}
 
-		if clusterComp.ServiceType != "" {
+		if clusterCompSpec.ServiceType != "" {
 			if component.Service == nil {
 				component.Service = &corev1.ServiceSpec{}
 			}
-			component.Service.Type = clusterComp.ServiceType
+			component.Service.Type = clusterCompSpec.ServiceType
 		}
-		component.PrimaryIndex = clusterComp.PrimaryIndex
+		component.PrimaryIndex = clusterCompSpec.PrimaryIndex
 	}
 
 	// TODO(zhixu.zt) We need to reserve the VolumeMounts of the container for ConfigMap or Secret,
@@ -135,7 +135,7 @@ func BuildComponent(
 	//	 }
 	// }
 
-	buildMonitorConfig(cluster, clusterDef, clusterDefComp, clusterComp, component)
+	buildMonitorConfig(cluster, clusterDef, clusterCompDef, clusterCompSpec, component)
 	err := buildProbeContainers(reqCtx, component)
 	if err != nil {
 		reqCtx.Log.Error(err, "build probe container failed.")

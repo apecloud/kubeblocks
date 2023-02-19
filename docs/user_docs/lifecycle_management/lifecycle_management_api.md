@@ -10,7 +10,7 @@ This guide describes the details of KubeBlocks lifecycle API. KubeBlocks API is 
 
 #### spec.workloadType
 
-`spec.workloadType` stands for the component type. KubeBlocks supports `stateless`, `stateful`, and `consensus`. `stateless` is set as default.
+`spec.workloadType` stands for the component workload type. KubeBlocks supports `stateless`, `stateful`, and `consensus`. `stateless` is set as default.
 
 #### spec.consensusSpec
 

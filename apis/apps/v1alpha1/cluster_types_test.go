@@ -71,26 +71,26 @@ spec:
 
 func TestGetMessage(t *testing.T) {
 	podKey := "Pod/test-01"
-	statusComponent := ClusterComponentStatus{
+	compStatus := ClusterComponentStatus{
 		Message: map[string]string{
 			podKey: "failed Scheduled",
 		},
 	}
-	message := statusComponent.GetMessage()
+	message := compStatus.GetMessage()
 	message[podKey] = "insufficient cpu"
-	if statusComponent.Message[podKey] == message[podKey] {
-		t.Error("Expected status component message not changed")
+	if compStatus.Message[podKey] == message[podKey] {
+		t.Error("Expected component status message not changed")
 	}
 }
 
 func TestSetMessage(t *testing.T) {
 	podKey := "Pod/test-01"
-	statusComponent := ClusterComponentStatus{}
-	statusComponent.SetMessage(
+	compStatus := ClusterComponentStatus{}
+	compStatus.SetMessage(
 		map[string]string{
 			podKey: "failed Scheduled",
 		})
-	if statusComponent.Message[podKey] != "failed Scheduled" {
+	if compStatus.Message[podKey] != "failed Scheduled" {
 		t.Error(`Expected get message "failed Scheduled"`)
 	}
 }

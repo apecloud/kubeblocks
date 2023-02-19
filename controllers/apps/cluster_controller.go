@@ -661,23 +661,23 @@ func (r *ClusterReconciler) reconcileClusterStatus(ctx context.Context,
 
 	// remove the invalid component in status.components when spec.components changed.
 	removeInvalidComponent := func(cluster *appsv1alpha1.Cluster) (needPatch bool, postFunc postHandler) {
-		tmpStatusComponents := map[string]appsv1alpha1.ClusterComponentStatus{}
-		statusComponents := cluster.Status.Components
+		tmpCompsStatus := map[string]appsv1alpha1.ClusterComponentStatus{}
+		compsStatus := cluster.Status.Components
 		for _, v := range cluster.Spec.ComponentSpecs {
-			if statusComponent, ok := statusComponents[v.Name]; ok {
-				tmpStatusComponents[v.Name] = statusComponent
+			if compStatus, ok := compsStatus[v.Name]; ok {
+				tmpCompsStatus[v.Name] = compStatus
 			}
 		}
-		if len(tmpStatusComponents) != len(statusComponents) {
-			// keep valid components status
+		if len(tmpCompsStatus) != len(compsStatus) {
+			// keep valid components' status
 			needPatch = true
-			cluster.Status.Components = tmpStatusComponents
+			cluster.Status.Components = tmpCompsStatus
 		}
 		return needPatch, nil
 	}
 
 	// analysis the status of components.
-	analysisStatusComponents := func(cluster *appsv1alpha1.Cluster) (needPatch bool, postFunc postHandler) {
+	analysisComponentsStatus := func(cluster *appsv1alpha1.Cluster) (needPatch bool, postFunc postHandler) {
 		for k, v := range cluster.Status.Components {
 			if v.PodsReady == nil || !*v.PodsReady {
 				replicasNotReadyCompNames[k] = struct{}{}
@@ -751,7 +751,7 @@ func (r *ClusterReconciler) reconcileClusterStatus(ctx context.Context,
 		}
 	}
 
-	return doChainClusterStatusHandler(ctx, r.Client, cluster, removeInvalidComponent, analysisStatusComponents,
+	return doChainClusterStatusHandler(ctx, r.Client, cluster, removeInvalidComponent, analysisComponentsStatus,
 		handleClusterReadyCondition, handleExistAbnormalOrFailed, handleClusterIsRunning)
 }
 

@@ -87,7 +87,7 @@ type ClusterStatus struct {
 	// Deleting/Deleted: deleting Cluster/Cluster is deleted.
 	// Failed: Cluster is unavailable.
 	// Abnormal: Cluster is still available, but part of its components are Abnormal.
-	// if the component type is Consensus/Replication, the Leader/Primary pod must be ready in Abnormal phase.
+	// if the component workload type is Consensus/Replication, the Leader/Primary pod must be ready in Abnormal phase.
 	// ConditionsError: Cluster and all the components are still healthy, but some update/create API fails due to invalid parameters.
 	// +kubebuilder:validation:Enum={Running,Failed,Abnormal,ConditionsError,Creating,SpecUpdating,Deleting,Deleted,VolumeExpanding,Reconfiguring,HorizontalScaling,VerticalScaling,VersionUpgrading,Rebooting}
 	// +optional
@@ -201,7 +201,7 @@ type ClusterComponentStatus struct {
 	// Failed: component is unavailable, i.e, all pods are not ready for Stateless/Stateful component;
 	// Leader/Primary pod is not ready for Consensus/Replication component.
 	// Abnormal: component available but part of its pods are not ready.
-	// If the component type is Consensus/Replication, the Leader/Primary pod must be ready in Abnormal phase.
+	// If the component workload type is Consensus/Replication, the Leader/Primary pod must be ready in Abnormal phase.
 	// Other phases behave the same as the cluster phase.
 	// +kubebuilder:validation:Enum={Running,Failed,Abnormal,Creating,SpecUpdating,Deleting,Deleted,VolumeExpanding,Reconfiguring,HorizontalScaling,VerticalScaling,VersionUpgrading,Rebooting}
 	Phase Phase `json:"phase,omitempty"`
@@ -401,16 +401,16 @@ func (r *Cluster) ValidateEnabledLogs(cd *ClusterDefinition) error {
 // checks that the value of primaryIndex cannot be greater than the defaultReplicas in the clusterDefinition API.
 func (r *Cluster) ValidatePrimaryIndex(cd *ClusterDefinition) error {
 	message := make([]string, 0)
-	for _, comp := range r.Spec.ComponentSpecs {
-		for _, clusterDefComp := range cd.Spec.ComponentDefs {
-			if !strings.EqualFold(comp.ComponentDefRef, clusterDefComp.Name) {
+	for _, compSpec := range r.Spec.ComponentSpecs {
+		for _, compDef := range cd.Spec.ComponentDefs {
+			if !strings.EqualFold(compSpec.ComponentDefRef, compDef.Name) {
 				continue
 			}
-			if clusterDefComp.WorkloadType != Replication {
+			if compDef.WorkloadType != Replication {
 				continue
 			}
-			if comp.PrimaryIndex == nil {
-				message = append(message, fmt.Sprintf("component %s's PrimaryIndex cannot be nil when workloadType is Replication.", comp.ComponentDefRef))
+			if compSpec.PrimaryIndex == nil {
+				message = append(message, fmt.Sprintf("component %s's PrimaryIndex cannot be nil when workloadType is Replication.", compSpec.ComponentDefRef))
 				return errors.New(strings.Join(message, ";"))
 			}
 		}
@@ -418,8 +418,8 @@ func (r *Cluster) ValidatePrimaryIndex(cd *ClusterDefinition) error {
 	return nil
 }
 
-// GetTypeMappingComponents return ComponentDefRef name mapping ClusterComponents.
-func (r *Cluster) GetTypeMappingComponents() map[string][]ClusterComponentSpec {
+// GetDefNameMappingComponents returns ComponentDefRef name mapping ClusterComponentSpec.
+func (r *Cluster) GetDefNameMappingComponents() map[string][]ClusterComponentSpec {
 	m := map[string][]ClusterComponentSpec{}
 	for _, c := range r.Spec.ComponentSpecs {
 		v := m[c.ComponentDefRef]
@@ -465,7 +465,7 @@ func (r *Cluster) GetComponentByName(componentName string) *ClusterComponentSpec
 	return nil
 }
 
-// GetComponentDefRefName gets component type name
+// GetComponentDefRefName gets the name of referenced component definition.
 func (r *Cluster) GetComponentDefRefName(componentName string) string {
 	for _, component := range r.Spec.ComponentSpecs {
 		if componentName == component.Name {

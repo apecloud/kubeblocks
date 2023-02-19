@@ -131,7 +131,7 @@ var _ = Describe("Expose", func() {
 			CompletionTimestamp: metav1.NewTime(time.Now()),
 			Progress:            "1/2",
 			Phase:               appsv1alpha1.FailedPhase,
-			Components: map[string]appsv1alpha1.OpsRequestStatusComponent{
+			Components: map[string]appsv1alpha1.OpsRequestComponentStatus{
 				componentName: {
 					Phase: appsv1alpha1.FailedPhase,
 					ProgressDetails: []appsv1alpha1.ProgressDetail{

@@ -47,15 +47,15 @@ var (
 func buildMonitorConfig(
 	cluster *appsv1alpha1.Cluster,
 	clusterDef *appsv1alpha1.ClusterDefinition,
-	clusterDefComp *appsv1alpha1.ClusterComponentDefinition,
-	clusterComp *appsv1alpha1.ClusterComponentSpec,
+	clusterCompDef *appsv1alpha1.ClusterComponentDefinition,
+	clusterCompSpec *appsv1alpha1.ClusterComponentSpec,
 	component *SynthesizedComponent) {
 	monitorEnable := false
-	if clusterComp != nil {
-		monitorEnable = clusterComp.Monitor
+	if clusterCompSpec != nil {
+		monitorEnable = clusterCompSpec.Monitor
 	}
 
-	monitorConfig := clusterDefComp.Monitor
+	monitorConfig := clusterCompDef.Monitor
 	if !monitorEnable || monitorConfig == nil {
 		disableMonitor(component)
 		return
@@ -74,7 +74,7 @@ func buildMonitorConfig(
 		return
 	}
 
-	characterType := clusterDefComp.CharacterType
+	characterType := clusterCompDef.CharacterType
 	if !isSupportedCharacterType(characterType) {
 		disableMonitor(component)
 		return

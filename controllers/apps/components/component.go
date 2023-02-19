@@ -141,9 +141,8 @@ func handleClusterComponentStatus(
 	componentIsRunning,
 	podsAreReady,
 	hasFailedPodTimedOut bool) error {
-	// when component phase is changed, set needSyncStatusComponent to true, then patch cluster.status
 	patch := client.MergeFrom(clusterDeepCopy)
-	if err := syncStatusComponents(compCtx, cluster, componentIsRunning,
+	if err := syncComponentsStatus(compCtx, cluster, componentIsRunning,
 		podsAreReady, hasFailedPodTimedOut); err != nil {
 		return err
 	}
@@ -157,8 +156,8 @@ func handleClusterComponentStatus(
 	return compCtx.cli.Status().Patch(compCtx.reqCtx.Ctx, cluster, patch)
 }
 
-// syncStatusComponents syncs the component status.
-func syncStatusComponents(compCtx componentContext,
+// syncComponentsStatus syncs the component status.
+func syncComponentsStatus(compCtx componentContext,
 	cluster *appsv1alpha1.Cluster,
 	componentIsRunning,
 	podsAreReady,
@@ -216,14 +215,14 @@ func getClusterComponentStatus(cluster *appsv1alpha1.Cluster, componentName stri
 	return componentStatus
 }
 
-// updateStatusComponentMessage updates the message of the component in Cluster.status.components.
-func updateStatusComponentMessage(statusComponent *appsv1alpha1.ClusterComponentStatus,
+// updateComponentStatusMessage updates the message of the component in Cluster.status.components.
+func updateComponentStatusMessage(compStatus *appsv1alpha1.ClusterComponentStatus,
 	pod *corev1.Pod,
 	message string) {
-	if statusComponent.Message == nil {
-		statusComponent.Message = appsv1alpha1.ComponentMessageMap{}
+	if compStatus.Message == nil {
+		compStatus.Message = appsv1alpha1.ComponentMessageMap{}
 	}
-	statusComponent.Message.SetObjectMessage(pod.Kind, pod.Name, message)
+	compStatus.Message.SetObjectMessage(pod.Kind, pod.Name, message)
 }
 
 // hasPodFailedTimedOut returns whether the pod of components is still failed after a PodFailedTimeout period.
@@ -248,7 +247,7 @@ func hasPodFailedTimedOut(compCtx componentContext, cluster *appsv1alpha1.Cluste
 			requeueAfter = time.Minute
 		}
 		if isTimedOut {
-			updateStatusComponentMessage(&componentStatus, &v, message)
+			updateComponentStatusMessage(&componentStatus, &v, message)
 			cluster.Status.Components[compCtx.componentName] = componentStatus
 			failedAndTimedOut = true
 			return

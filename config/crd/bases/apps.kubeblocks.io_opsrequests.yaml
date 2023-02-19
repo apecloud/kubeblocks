@@ -370,11 +370,8 @@ spec:
                         - status
                         type: object
                       type: array
-                    type:
-                      description: type name of the component.
-                      type: string
                     workloadType:
-                      description: workloadType references component type of component
+                      description: workloadType references workload type of component
                         in ClusterDefinition.
                       type: string
                   type: object

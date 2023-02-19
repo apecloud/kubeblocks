@@ -124,8 +124,8 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 				g.Expect(newCluster.Status.Phase == expectPhase).Should(BeTrue())
 				return
 			}
-			statusComponent := newCluster.Status.Components[componentName]
-			g.Expect(statusComponent.Phase == expectPhase).Should(BeTrue())
+			compStatus := newCluster.Status.Components[componentName]
+			g.Expect(compStatus.Phase == expectPhase).Should(BeTrue())
 		}))
 	}
 
@@ -173,13 +173,13 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 			event.Type = corev1.EventTypeWarning
 			Expect(handleEventForClusterStatus(ctx, k8sClient, clusterRecorder, event)).Should(Succeed())
 
-			By("watch warning event from StatefulSet and component type is Stateful")
+			By("watch warning event from StatefulSet and component workload type is Stateful")
 			event.Count = 3
 			event.FirstTimestamp = metav1.Time{Time: time.Now()}
 			event.LastTimestamp = metav1.Time{Time: time.Now().Add(31 * time.Second)}
 			handleAndCheckComponentStatus(statefulMySQLCompName, event, appsv1alpha1.FailedPhase, false)
 
-			By("watch warning event from Pod and component type is Consensus")
+			By("watch warning event from Pod and component workload type is Consensus")
 			// wait for StatefulSet created by cluster controller
 			stsName = clusterName + "-" + consensusMySQLCompName
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKey{Name: stsName, Namespace: testCtx.DefaultNamespace},
@@ -208,7 +208,7 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 			Expect(k8sClient.Status().Patch(ctx, pod, patch)).Should(Succeed())
 			handleAndCheckComponentStatus(consensusMySQLCompName, event, appsv1alpha1.AbnormalPhase, false)
 
-			By("watch warning event from Deployment and component type is Stateless")
+			By("watch warning event from Deployment and component workload type is Stateless")
 			deploy := getDeployment(nginxCompName)
 			setInvolvedObject(event, intctrlutil.DeploymentKind, deploy.Name)
 			handleAndCheckComponentStatus(nginxCompName, event, appsv1alpha1.FailedPhase, false)
@@ -218,17 +218,17 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 			Expect(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(cluster), func(tmpCluster *appsv1alpha1.Cluster) {
 				tmpCluster.Status.Phase = appsv1alpha1.RunningPhase
 				for k := range tmpCluster.Status.Components {
-					statusComp := tmpCluster.Status.Components[k]
-					statusComp.Phase = appsv1alpha1.RunningPhase
-					tmpCluster.Status.Components[k] = statusComp
+					compStatus := tmpCluster.Status.Components[k]
+					compStatus.Phase = appsv1alpha1.RunningPhase
+					tmpCluster.Status.Components[k] = compStatus
 				}
 			})()).Should(Succeed())
 
 			// set nginx component phase to Failed
 			Expect(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(cluster), func(tmpCluster *appsv1alpha1.Cluster) {
-				statusComp := tmpCluster.Status.Components[nginxCompName]
-				statusComp.Phase = appsv1alpha1.FailedPhase
-				tmpCluster.Status.Components[nginxCompName] = statusComp
+				compStatus := tmpCluster.Status.Components[nginxCompName]
+				compStatus.Phase = appsv1alpha1.FailedPhase
+				tmpCluster.Status.Components[nginxCompName] = compStatus
 			})()).Should(Succeed())
 
 			// expect cluster phase is Abnormal by cluster controller.

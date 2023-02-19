@@ -23,6 +23,7 @@ import (
 	"io"
 	"reflect"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/StudioSol/set"
@@ -260,7 +261,7 @@ func (r *reconfigureOptions) printExplainConfigure(tplName string) error {
 	if err != nil {
 		return err
 	}
-	if len(tpl.ConfigConstraintRef) == 0 {
+	if tpl.ConfigConstraintRef == "" {
 		return nil
 	}
 	configConstraint := appsv1alpha1.ConfigConstraint{}
@@ -537,7 +538,7 @@ func (o *opsRequestDiffOptions) validate() error {
 }
 
 func (o *opsRequestDiffOptions) run() error {
-	configDiffs := make(map[string]interface{}, len(o.templateNames))
+	configDiffs := make(map[string][]cfgcore.VisualizedParam, len(o.templateNames))
 	for _, tplName := range o.templateNames {
 		diff, err := o.diffConfig(tplName)
 		if err != nil {
@@ -548,12 +549,23 @@ func (o *opsRequestDiffOptions) run() error {
 
 	printer.PrintTitle("DIFF-CONFIGURE RESULT")
 	for tplName, diff := range configDiffs {
-		printer.PrintTitle(printer.BoldYellow(tplName))
-		b, err := json.MarshalIndent(diff, "", "  ")
-		if err != nil {
-			return err
+		for _, params := range diff {
+			printer.PrintLineWithTabSeparator(
+				printer.NewPair("  ConfigFile", printer.BoldYellow(params.Key)),
+				printer.NewPair("TemplateName", tplName),
+				printer.NewPair("ComponentName", o.componentName),
+				printer.NewPair("ClusterName", o.clusterName),
+				printer.NewPair("UpdateType", string(params.UpdateType)),
+			)
+			fmt.Fprintf(o.baseOptions.Out, "\n")
+			tbl := printer.NewTablePrinter(o.baseOptions.Out)
+			tbl.SetHeader("ParameterName", "Value", "Delete")
+			for _, v := range params.Parameters {
+				tbl.AddRow(v.Key, v.Value, strconv.FormatBool(v.Value == ""))
+			}
+			tbl.Print()
+			fmt.Fprintf(o.baseOptions.Out, "\n\n")
 		}
-		fmt.Fprintf(o.baseOptions.Out, "%s\n", string(b))
 	}
 	return nil
 }
@@ -597,7 +609,7 @@ func (o *opsRequestDiffOptions) maybeCompareOps(base *appsv1alpha1.OpsRequest, d
 	return true
 }
 
-func (o *opsRequestDiffOptions) diffConfig(tplName string) (map[string]interface{}, error) {
+func (o *opsRequestDiffOptions) diffConfig(tplName string) ([]cfgcore.VisualizedParam, error) {
 	var (
 		tpl              *appsv1alpha1.ConfigTemplate
 		configConstraint = &appsv1alpha1.ConfigConstraint{}
@@ -617,9 +629,10 @@ func (o *opsRequestDiffOptions) diffConfig(tplName string) (map[string]interface
 		return nil, err
 	}
 
+	formatCfg := configConstraint.Spec.FormatterConfig
 	patchOption := cfgcore.CfgOption{
 		Type:    cfgcore.CfgTplType,
-		CfgType: configConstraint.Spec.FormatterConfig.Formatter,
+		CfgType: formatCfg.Formatter,
 		Log:     log.FromContext(context.TODO()),
 	}
 
@@ -636,10 +649,8 @@ func (o *opsRequestDiffOptions) diffConfig(tplName string) (map[string]interface
 	if err != nil {
 		return nil, err
 	}
-	if !patch.IsModify {
-		return map[string]interface{}{}, nil
-	}
-	return byte2InterfaceMap(patch.UpdateConfig)
+
+	return cfgcore.GenerateVisualizedParamsList(patch, formatCfg, nil), nil
 }
 
 func printSingleParameterTemplate(pt *parameterTemplate) {
@@ -747,18 +758,6 @@ func getValidUpdatedParams(status appsv1alpha1.OpsRequestStatus) string {
 		return err.Error()
 	}
 	return string(b)
-}
-
-func byte2InterfaceMap(config map[string][]byte) (map[string]interface{}, error) {
-	m := make(map[string]interface{}, len(config))
-	for key, value := range config {
-		var ifv any
-		if err := json.Unmarshal(value, &ifv); err != nil {
-			return nil, err
-		}
-		m[key] = ifv
-	}
-	return m, nil
 }
 
 func findTplByName(tpls []appsv1alpha1.ConfigTemplate, tplName string) *appsv1alpha1.ConfigTemplate {

@@ -80,8 +80,8 @@ func (factory *MockClusterDefFactory) SetService(port int32) *MockClusterDefFact
 	return factory
 }
 
-func (factory *MockClusterDefFactory) AddConfigTemplate(name string,
-	configTplRef string, configConstraintRef string, volumeName string, mode *int32) *MockClusterDefFactory {
+func (factory *MockClusterDefFactory) AddConfigTemplate(name,
+	configTplRef, configConstraintRef, namespace, volumeName string, mode *int32) *MockClusterDefFactory {
 	comps := factory.get().Spec.ComponentDefs
 	if len(comps) > 0 {
 		comp := comps[len(comps)-1]
@@ -93,6 +93,7 @@ func (factory *MockClusterDefFactory) AddConfigTemplate(name string,
 				Name:                name,
 				ConfigTplRef:        configTplRef,
 				ConfigConstraintRef: configConstraintRef,
+				Namespace:           namespace,
 				VolumeName:          volumeName,
 				DefaultMode:         mode,
 			})

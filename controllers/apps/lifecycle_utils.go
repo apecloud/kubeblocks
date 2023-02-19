@@ -41,6 +41,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
 	"github.com/apecloud/kubeblocks/internal/controller/plan"
+	intctrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -78,16 +79,14 @@ func reconcileClusterWorkloads(
 	clusterVer *appsv1alpha1.ClusterVersion,
 	cluster *appsv1alpha1.Cluster) (shouldRequeue bool, err error) {
 
-	applyObjs := make([]client.Object, 0, 3)
-	cacheCtx := map[string]interface{}{}
-	params := plan.CreateParams{
+	resourcesQueue := make([]client.Object, 0, 3)
+	task := intctrltypes.ReconcileTask{
 		Cluster:           cluster,
 		ClusterDefinition: clusterDef,
-		ApplyObjs:         &applyObjs,
-		CacheCtx:          &cacheCtx,
 		ClusterVersion:    clusterVer,
+		Resources:         &resourcesQueue,
 	}
-	if err := prepareSecretObjs(reqCtx, cli, &params); err != nil {
+	if err := prepareSecretObjs(reqCtx, cli, &task); err != nil {
 		return false, err
 	}
 
@@ -95,9 +94,9 @@ func reconcileClusterWorkloads(
 	clusterCompVerMap := clusterVer.GetDefNameMappingComponents()
 
 	prepareComp := func(component *component.SynthesizedComponent) error {
-		iParams := params
+		iParams := task
 		iParams.Component = component
-		return plan.PrepareComponentObjs(reqCtx, cli, &iParams)
+		return plan.PrepareComponentResources(reqCtx, cli, &iParams)
 	}
 
 	for _, c := range clusterDef.Spec.ComponentDefs {
@@ -111,30 +110,21 @@ func reconcileClusterWorkloads(
 		}
 	}
 
-	return checkedCreateObjs(reqCtx, cli, &params)
+	return checkedCreateObjs(reqCtx, cli, &task)
 }
 
-func checkedCreateObjs(reqCtx intctrlutil.RequestCtx, cli client.Client, obj interface{}) (shouldRequeue bool, err error) {
-	params, ok := obj.(*plan.CreateParams)
-	if !ok {
-		return false, fmt.Errorf("invalid arg")
-	}
+func checkedCreateObjs(reqCtx intctrlutil.RequestCtx, cli client.Client, task *intctrltypes.ReconcileTask) (shouldRequeue bool, err error) {
 	// TODO when deleting a component of the cluster, clean up the corresponding k8s resources.
-	return createOrReplaceResources(reqCtx, cli, params.Cluster, params.ClusterDefinition, *params.ApplyObjs)
+	return createOrReplaceResources(reqCtx, cli, task.Cluster, task.ClusterDefinition, *task.Resources)
 }
 
-func prepareSecretObjs(reqCtx intctrlutil.RequestCtx, cli client.Client, obj interface{}) error {
-	params, ok := obj.(*plan.CreateParams)
-	if !ok {
-		return fmt.Errorf("invalid arg")
-	}
-
-	secret, err := builder.BuildConnCredential(params.ToBuilderParams())
+func prepareSecretObjs(reqCtx intctrlutil.RequestCtx, cli client.Client, task *intctrltypes.ReconcileTask) error {
+	secret, err := builder.BuildConnCredential(task.GetBuilderParams())
 	if err != nil {
 		return err
 	}
 	// must make sure secret resources are created before others
-	*params.ApplyObjs = append(*params.ApplyObjs, secret)
+	task.AppendResource(secret)
 	return nil
 }
 

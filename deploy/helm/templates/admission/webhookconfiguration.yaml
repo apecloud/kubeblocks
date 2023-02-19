@@ -7,7 +7,7 @@ apiVersion: v1
 kind: Secret
 metadata:
   name: {{ include "kubeblocks.fullname" . }}.{{ .Release.Namespace }}.svc.tls-ca
-  labels: 
+  labels:
     {{- include "kubeblocks.selectorLabels" . | nindent 4 }}
   annotations:
     self-signed-cert: "true"
@@ -28,6 +28,60 @@ data:
   tls.key: {{ $cert.Key | b64enc }}
   tls.crt: {{ $cert.Cert | b64enc }}
 {{- end }}
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: MutatingWebhookConfiguration
+metadata:
+  name: {{ include "kubeblocks.fullname" . }}-mutating-webhook-configuration
+webhooks:
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: {{ include "kubeblocks.svcName" . }}
+      namespace: {{ .Release.Namespace }}
+      path: /mutate-apps-kubeblocks-io-v1alpha1-clusterversion
+      port: {{ .Values.service.port }}
+    {{- if .Values.admissionWebhooks.createSelfSignedCert }}
+    caBundle: {{ $ca.Cert | b64enc }}
+    {{- end }}
+  failurePolicy: Fail
+  name: mclusterversion.kb.io
+  rules:
+  - apiGroups:
+    - apps.kubeblocks.io
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - clusterversions
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: {{ include "kubeblocks.svcName" . }}
+      namespace: {{ .Release.Namespace }}
+      path: /mutate-apps-kubeblocks-io-v1alpha1-cluster
+      port: {{ .Values.service.port }}
+    {{- if .Values.admissionWebhooks.createSelfSignedCert }}
+    caBundle: {{ $ca.Cert | b64enc }}
+    {{- end }}
+  failurePolicy: Fail
+  name: mcluster.kb.io
+  rules:
+  - apiGroups:
+    - apps.kubeblocks.io
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - clusters
+  sideEffects: None
 - admissionReviewVersions:
   - v1
   clientConfig:
@@ -36,7 +90,7 @@ data:
       namespace: {{ .Release.Namespace }}
       path: /mutate-apps-kubeblocks-io-v1alpha1-clusterdefinition
       port: {{ .Values.service.port }}
-    {{- if .Values.admissionWebhooks.createSelfSignedCert }}  
+    {{- if .Values.admissionWebhooks.createSelfSignedCert }}
     caBundle: {{ $ca.Cert | b64enc }}
     {{- end }}
   failurePolicy: Fail
@@ -52,6 +106,30 @@ data:
     resources:
     - clusterdefinitions
   sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: {{ include "kubeblocks.svcName" . }}
+      namespace: {{ .Release.Namespace }}
+      path: /mutate-apps-kubeblocks-io-v1alpha1-opsrequest
+      port: {{ .Values.service.port }}
+    {{- if .Values.admissionWebhooks.createSelfSignedCert }}
+    caBundle: {{ $ca.Cert | b64enc }}
+    {{- end }}
+  failurePolicy: Fail
+  name: mopsrequest.kb.io
+  rules:
+  - apiGroups:
+    - apps.kubeblocks.io
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - opsrequests
+  sideEffects: None
 ---
 apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingWebhookConfiguration
@@ -66,7 +144,7 @@ webhooks:
       namespace: {{ .Release.Namespace }}
       path: /validate-apps-kubeblocks-io-v1alpha1-clusterversion
       port: {{ .Values.service.port }}
-    {{- if .Values.admissionWebhooks.createSelfSignedCert }}  
+    {{- if .Values.admissionWebhooks.createSelfSignedCert }}
     caBundle: {{ $ca.Cert | b64enc }}
     {{- end }}
   failurePolicy: Fail
@@ -90,7 +168,7 @@ webhooks:
       namespace: {{ .Release.Namespace }}
       path: /validate-apps-kubeblocks-io-v1alpha1-cluster
       port: {{ .Values.service.port }}
-    {{- if .Values.admissionWebhooks.createSelfSignedCert }}  
+    {{- if .Values.admissionWebhooks.createSelfSignedCert }}
     caBundle: {{ $ca.Cert | b64enc }}
     {{- end }}
   failurePolicy: Fail
@@ -114,7 +192,7 @@ webhooks:
       namespace: {{ .Release.Namespace }}
       path: /validate-apps-kubeblocks-io-v1alpha1-clusterdefinition
       port: {{ .Values.service.port }}
-    {{- if .Values.admissionWebhooks.createSelfSignedCert }}  
+    {{- if .Values.admissionWebhooks.createSelfSignedCert }}
     caBundle: {{ $ca.Cert | b64enc }}
     {{- end }}
   failurePolicy: Fail

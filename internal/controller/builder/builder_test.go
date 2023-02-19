@@ -32,6 +32,8 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	cfgcm "github.com/apecloud/kubeblocks/internal/configuration/configmap"
+	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
@@ -244,6 +246,48 @@ var _ = Describe("builder", func() {
 			Expect(len(cfg.Data) == 2).Should(BeTrue())
 		})
 
+		It("builds Env Config with ConsensusSet status correctly", func() {
+			params := newParams()
+			params.Cluster.Status.Components = map[string]appsv1alpha1.ClusterComponentStatus{
+				params.Component.Name: {
+					ConsensusSetStatus: &appsv1alpha1.ConsensusSetStatus{
+						Leader: appsv1alpha1.ConsensusMemberStatus{
+							Pod: "pod1",
+						},
+						Followers: []appsv1alpha1.ConsensusMemberStatus{{
+							Pod: "pod2",
+						}, {
+							Pod: "pod3",
+						}},
+					},
+				}}
+			cfg, err := BuildEnvConfig(*params)
+			Expect(err).Should(BeNil())
+			Expect(cfg).ShouldNot(BeNil())
+			Expect(len(cfg.Data) == 4).Should(BeTrue())
+		})
+
+		It("builds Env Config with Replication status correctly", func() {
+			params := newParams()
+			params.Cluster.Status.Components = map[string]appsv1alpha1.ClusterComponentStatus{
+				params.Component.Name: {
+					ReplicationSetStatus: &appsv1alpha1.ReplicationSetStatus{
+						Primary: appsv1alpha1.ReplicationMemberStatus{
+							Pod: "pod1",
+						},
+						Secondaries: []appsv1alpha1.ReplicationMemberStatus{{
+							Pod: "pod2",
+						}, {
+							Pod: "pod3",
+						}},
+					},
+				}}
+			cfg, err := BuildEnvConfig(*params)
+			Expect(err).Should(BeNil())
+			Expect(cfg).ShouldNot(BeNil())
+			Expect(len(cfg.Data) == 4).Should(BeTrue())
+		})
+
 		It("builds BackupPolicy correctly", func() {
 			sts := newStsObj()
 			backupPolicyTemplate := newBackupPolicyTemplate()
@@ -290,6 +334,32 @@ var _ = Describe("builder", func() {
 			cronJob, err := BuildCronJob(pvcKey, schedule, sts)
 			Expect(err).Should(BeNil())
 			Expect(cronJob).ShouldNot(BeNil())
+		})
+
+		It("builds ConfigMap with template correctly", func() {
+			config := map[string]string{}
+			params := newParams()
+			tplCfg := appsv1alpha1.ConfigTemplate{
+				Name:                "test-config-tpl",
+				ConfigTplRef:        "test-config-tpl",
+				ConfigConstraintRef: "test-config-constraint",
+			}
+			configmap, err := BuildConfigMapWithTemplate(config, *params, "test-cm", tplCfg)
+			Expect(err).Should(BeNil())
+			Expect(configmap).ShouldNot(BeNil())
+		})
+
+		It("builds config manager sidecar container correctly", func() {
+			sidecarRenderedParam := &cfgcm.ConfigManagerSidecar{
+				ManagerName: "cfgmgr",
+				Image:       constant.KBImage,
+				Args:        []string{},
+				Envs:        []corev1.EnvVar{},
+				Volumes:     []corev1.VolumeMount{},
+			}
+			configmap, err := BuildCfgManagerContainer(sidecarRenderedParam)
+			Expect(err).Should(BeNil())
+			Expect(configmap).ShouldNot(BeNil())
 		})
 	})
 

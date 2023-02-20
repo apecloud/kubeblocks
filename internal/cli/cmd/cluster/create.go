@@ -485,14 +485,14 @@ func buildCompSetsMap(values []string, cd *appsv1alpha1.ClusterDefinition) (map[
 		for _, set := range sets {
 			kv := strings.Split(set, "=")
 			if len(kv) != 2 {
-				printer.Warning(os.Stdout, "unknown set format \"%s\", ignore it, should be like key1=value1\n", set)
+				printer.Warning(os.Stdout, "unknown set format \"%s\", it will be ignored, should be like key1=value1\n", set)
 				continue
 			}
 
 			// only record the supported key
 			k := parseKey(kv[0])
 			if k == keyUnknown {
-				printer.Warning(os.Stdout, "unknown set key \"%s\", ignore it, should be one of [%s]\n", kv[0], strings.Join(keys, ","))
+				printer.Warning(os.Stdout, "unknown set key \"%s\", it will be ignored, should be one of [%s]\n", kv[0], strings.Join(keys, ","))
 				continue
 			}
 			res[k] = kv[1]

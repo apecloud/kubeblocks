@@ -18,7 +18,7 @@ options: {
 	namespace:         string
 	clusterDefRef:     string
 	clusterVersionRef: string
-	components: [...]
+	componentSpecs: [...]
 	terminationPolicy: string
 }
 
@@ -33,7 +33,7 @@ content: {
 	spec: {
 		clusterDefinitionRef: options.clusterDefRef
 		clusterVersionRef:    options.clusterVersionRef
-		components:           options.components
+		componentSpecs:       options.componentSpecs
 		terminationPolicy:    options.terminationPolicy
 	}
 }

@@ -52,8 +52,8 @@ const (
 
 var (
 	statelessNginxComponent = appsv1alpha1.ClusterComponentDefinition{
-		WorkloadType:  appsv1alpha1.Stateless,
-		CharacterType: "stateless",
+		WorkloadType: appsv1alpha1.Stateless,
+		//CharacterType: "stateless",
 		PodSpec: &corev1.PodSpec{
 			Containers: []corev1.Container{{
 				Name: DefaultNginxContainerName,

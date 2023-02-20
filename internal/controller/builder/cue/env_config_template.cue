@@ -32,7 +32,12 @@ config: {
 		name:      "\(cluster.metadata.name)-\(component.name)-env"
 		namespace: cluster.metadata.namespace
 		labels: {
-			"app.kubernetes.io/name":           "\(component.characterType)-\(component.clusterDefName)"
+			if component.characterType != _|_ {
+				"app.kubernetes.io/name": "\(component.characterType)-\(component.clusterDefName)"
+			}
+			if component.characterType == _|_ {
+				"app.kubernetes.io/name": "\(component.clusterDefName)"
+			}
 			"app.kubernetes.io/instance":       cluster.metadata.name
 			"app.kubernetes.io/component-name": component.name
 			"app.kubernetes.io/component":      "\(component.type)-\(component.name)"

@@ -52,7 +52,7 @@ func (hs horizontalScalingOpsHandler) ActionStartedCondition(opsRequest *appsv1a
 // Action modifies Cluster.spec.components[*].replicas from the opsRequest
 func (hs horizontalScalingOpsHandler) Action(opsRes *OpsResource) error {
 	var (
-		horizontalScalingMap = opsRes.OpsRequest.CovertHorizontalScalingListToMap()
+		horizontalScalingMap = opsRes.OpsRequest.ConvertHorizontalScalingListToMap()
 		horizontalScaling    appsv1alpha1.HorizontalScaling
 		ok                   bool
 	)
@@ -78,7 +78,7 @@ func (hs horizontalScalingOpsHandler) ReconcileAction(opsRes *OpsResource) (apps
 // GetRealAffectedComponentMap gets the real affected component map for the operation
 func (hs horizontalScalingOpsHandler) GetRealAffectedComponentMap(opsRequest *appsv1alpha1.OpsRequest) realAffectedComponentMap {
 	realChangedMap := realAffectedComponentMap{}
-	hsMap := opsRequest.CovertHorizontalScalingListToMap()
+	hsMap := opsRequest.ConvertHorizontalScalingListToMap()
 	for k, v := range opsRequest.Status.LastConfiguration.Components {
 		currHs, ok := hsMap[k]
 		if !ok {

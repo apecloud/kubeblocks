@@ -47,7 +47,7 @@ func (consensusSet *ConsensusSet) IsRunning(obj client.Object) (bool, error) {
 	if obj == nil {
 		return false, nil
 	}
-	sts := util.CovertToStatefulSet(obj)
+	sts := util.ConvertToStatefulSet(obj)
 	if statefulStatusRevisionIsEquals, err := handleConsensusSetUpdate(consensusSet.Ctx, consensusSet.Cli, consensusSet.Cluster, sts); err != nil {
 		return false, err
 	} else {
@@ -60,7 +60,7 @@ func (consensusSet *ConsensusSet) PodsReady(obj client.Object) (bool, error) {
 	if obj == nil {
 		return false, nil
 	}
-	sts := util.CovertToStatefulSet(obj)
+	sts := util.ConvertToStatefulSet(obj)
 	return util.StatefulSetPodsIsReady(sts), nil
 }
 

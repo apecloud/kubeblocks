@@ -94,7 +94,7 @@ func StatefulSetPodsIsReady(sts *appsv1.StatefulSet) bool {
 		sts.Status.ObservedGeneration == sts.Generation
 }
 
-func CovertToStatefulSet(obj client.Object) *appsv1.StatefulSet {
+func ConvertToStatefulSet(obj client.Object) *appsv1.StatefulSet {
 	if obj == nil {
 		return nil
 	}

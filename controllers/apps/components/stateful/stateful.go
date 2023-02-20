@@ -46,7 +46,7 @@ func (stateful *Stateful) IsRunning(obj client.Object) (bool, error) {
 	if obj == nil {
 		return false, nil
 	}
-	sts := util.CovertToStatefulSet(obj)
+	sts := util.ConvertToStatefulSet(obj)
 	targetReplicas := util.GetComponentReplicas(stateful.Component, stateful.ComponentDef)
 	isRevisionConsistent, err := util.IsStsAndPodsRevisionConsistent(stateful.Ctx, stateful.Cli, sts)
 	if err != nil {
@@ -59,7 +59,7 @@ func (stateful *Stateful) PodsReady(obj client.Object) (bool, error) {
 	if obj == nil {
 		return false, nil
 	}
-	sts := util.CovertToStatefulSet(obj)
+	sts := util.ConvertToStatefulSet(obj)
 	return util.StatefulSetPodsIsReady(sts), nil
 }
 

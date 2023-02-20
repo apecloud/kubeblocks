@@ -1,4 +1,4 @@
-apiVersion: dbaas.kubeblocks.io/v1alpha1
+apiVersion: apps.kubeblocks.io/v1alpha1
 kind: ClusterVersion
 metadata:
   name: clickhouse-{{ default .Chart.AppVersion .Values.clusterVersionOverride }}
@@ -12,20 +12,20 @@ metadata:
   {{- end }}
 spec:
   clusterDefinitionRef: apecloud-clickhouse
-  components:
-    - type: clickhouse
+  componentVersions:
+    - componentDefRef: clickhouse
       podSpec:
         containers:
           - name: clickhouse
             image: {{ .Values.image.repository }}:{{ default .Chart.AppVersion .Values.image.tag }}
             imagePullPolicy: {{ default .Values.image.pullPolicy "IfNotPresent" }}
-    - type: ch-keeper
+    - componentDefRef: ch-keeper
       podSpec:
         containers:
           - name: clickhouse
             image: {{ .Values.image.repository }}:{{ default .Chart.AppVersion .Values.image.tag }}
             imagePullPolicy: {{ default .Values.image.pullPolicy "IfNotPresent" }}
-    - type: zookeeper
+    - componentDefRef: zookeeper
       podSpec:
         containers:
           - name: zookeeper

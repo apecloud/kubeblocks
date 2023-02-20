@@ -39,7 +39,7 @@ spec:
             description: BackupToolSpec defines the desired state of BackupTool
             properties:
               backupCommands:
-                description: Array of command that dbaas can do database backup. from
+                description: Array of command that apps can do database backup. from
                   invoke args the order of commands follows the order of array.
                 items:
                   type: string
@@ -215,7 +215,7 @@ spec:
                 description: Backup tool Container image name.
                 type: string
               incrementalBackupCommands:
-                description: Array of command that dbaas can do database incremental
+                description: Array of command that apps can do database incremental
                   backup. like xtrabackup, that can performs an incremental backup
                   file.
                 items:
@@ -231,9 +231,8 @@ spec:
                       type: string
                     type: array
                   restoreCommands:
-                    description: Array of command that dbaas can perform database
-                      restore. like xtrabackup, that can performs restore mysql from
-                      files.
+                    description: Array of command that apps can perform database restore.
+                      like xtrabackup, that can performs restore mysql from files.
                     items:
                       type: string
                     type: array
@@ -248,9 +247,8 @@ spec:
                       type: string
                     type: array
                   restoreCommands:
-                    description: Array of command that dbaas can perform database
-                      restore. like xtrabackup, that can performs restore mysql from
-                      files.
+                    description: Array of command that apps can perform database restore.
+                      like xtrabackup, that can performs restore mysql from files.
                     items:
                       type: string
                     type: array

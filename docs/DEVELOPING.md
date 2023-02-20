@@ -197,7 +197,7 @@ Test specific packages:
 make test TEST_PACKAGES=./controllers/...
 
 # Test single package
-make test-delve TEST_PACKAGES=./controllers/dbaas/...
+make test-delve TEST_PACKAGES=./controllers/apps/...
 ```
 
 ### Use existing Kubernetes cluster
@@ -245,7 +245,7 @@ make run-delve GO_PACKAGE=./cmd/manager/main.go
 
 #### Debug envtest
 ```shell
-make test-delve TEST_PACKAGES=./controllers/dbaas/...
+make test-delve TEST_PACKAGES=./controllers/apps/...
 ```
 > Unlike `go test` supports multiple packages, `Delve` needs a single executable to work, it only support single package.
 

@@ -29,7 +29,7 @@ import (
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
 
-	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/cluster"
 	"github.com/apecloud/kubeblocks/internal/cli/patch"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
@@ -56,7 +56,7 @@ var clusterUpdateExample = templates.Examples(`
 type updateOptions struct {
 	namespace string
 	dynamic   dynamic.Interface
-	cluster   *dbaasv1alpha1.Cluster
+	cluster   *appsv1alpha1.Cluster
 
 	UpdatableFlags
 	*patch.Options
@@ -82,7 +82,7 @@ func NewUpdateCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 func (o *updateOptions) complete(cmd *cobra.Command, args []string) error {
 	var err error
 	if len(args) == 0 {
-		return fmt.Errorf("missing updated cluster name")
+		return makeMissingClusterNameErr()
 	}
 	if len(args) > 1 {
 		return fmt.Errorf("only support to update one cluster")
@@ -162,7 +162,7 @@ func (o *updateOptions) buildPatch(flags []*pflag.Flag) error {
 			return err
 		}
 
-		if err = unstructured.SetNestedField(spec, data["components"], "components"); err != nil {
+		if err = unstructured.SetNestedField(spec, data["componentSpecs"], "componentSpecs"); err != nil {
 			return err
 		}
 	}
@@ -207,7 +207,7 @@ func (o *updateOptions) setEnabledLog(val string) error {
 
 	// disable all monitor
 	if !boolVal {
-		for _, c := range o.cluster.Spec.Components {
+		for _, c := range o.cluster.Spec.ComponentSpecs {
 			c.EnabledLogs = nil
 		}
 		return nil
@@ -228,8 +228,8 @@ func (o *updateOptions) setMonitor(val string) error {
 		return err
 	}
 
-	for i := range o.cluster.Spec.Components {
-		o.cluster.Spec.Components[i].Monitor = boolVal
+	for i := range o.cluster.Spec.ComponentSpecs {
+		o.cluster.Spec.ComponentSpecs[i].Monitor = boolVal
 	}
 	return nil
 }

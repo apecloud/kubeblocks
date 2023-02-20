@@ -1,4 +1,4 @@
-apiVersion: dbaas.kubeblocks.io/v1alpha1
+apiVersion: apps.kubeblocks.io/v1alpha1
 kind: Cluster
 metadata:
   name: {{ .Release.Name }}
@@ -15,11 +15,11 @@ spec:
   {{- with $.Values.tolerations }}
   tolerations: {{ . | toYaml | nindent 4 }}
   {{- end }}
-  components:
+  componentSpecs:
     {{- $i := 0 }}
     {{- range .Values.shard }}
     - name: shard-{{ $i }}
-      type: shard
+      componentDefRef: shard
       monitor: {{ $.Values.monitor.enabled }}
       serviceType: {{ $.Values.service.type | default "ClusterIP" }}
       replicas: {{ .replicas | default "3" }}
@@ -50,7 +50,7 @@ spec:
     {{- end }}
     {{- if gt ( len $.Values.shard ) 0 }}
     - name: configsvr
-      type: configsvr
+      componentDefRef: configsvr
       monitor: {{ $.Values.monitor.enabled }}
       replicas: {{ $.Values.configsvr.replicas }}
       {{- with $.Values.configsvr.tolerations }}
@@ -79,7 +79,7 @@ spec:
     {{- $i := 0 }}
     {{- range .Values.mongos }}
     - name: mongos-{{ $i }}
-      type: mongos
+      componentDefRef: mongos
       monitor: {{ $.Values.monitor.enabled }}
       serviceType: {{ $.Values.service.type | default "ClusterIP" }}
       replicas: {{ .replicas | default 1 }}

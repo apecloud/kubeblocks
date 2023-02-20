@@ -24,7 +24,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/apecloud/kubeblocks/internal/gotemplate"
@@ -66,7 +66,7 @@ type componentTemplateValues struct {
 
 	// Container *corev1.Container
 	Resource  *ResourceDefinition
-	ConfigTpl []dbaasv1alpha1.ConfigTemplate
+	ConfigTpl []appsv1alpha1.ConfigTemplate
 }
 
 type configTemplateBuilder struct {
@@ -78,10 +78,10 @@ type configTemplateBuilder struct {
 	componentValues  *componentTemplateValues
 	builtInFunctions *gotemplate.BuiltInObjectsFunc
 
-	// DBaas cluster object
+	// cluster object
 	component      *component.SynthesizedComponent
-	clusterVersion *dbaasv1alpha1.ClusterVersion
-	cluster        *dbaasv1alpha1.Cluster
+	clusterVersion *appsv1alpha1.ClusterVersion
+	cluster        *appsv1alpha1.Cluster
 	podSpec        *corev1.PodSpec
 
 	ctx context.Context
@@ -90,8 +90,8 @@ type configTemplateBuilder struct {
 
 func newCfgTemplateBuilder(
 	clusterName, namespace string,
-	cluster *dbaasv1alpha1.Cluster,
-	version *dbaasv1alpha1.ClusterVersion,
+	cluster *appsv1alpha1.Cluster,
+	version *appsv1alpha1.ClusterVersion,
 	ctx context.Context,
 	cli client.Client) *configTemplateBuilder {
 	return &configTemplateBuilder{
@@ -115,11 +115,11 @@ func (c *configTemplateBuilder) formatError(file string, err error) error {
 
 func (c *configTemplateBuilder) render(configs map[string]string) (map[string]string, error) {
 	rendered := make(map[string]string, len(configs))
-	o, err := c.builtinObjects()
+	values, err := c.builtinObjectsAsValues()
 	if err != nil {
 		return nil, err
 	}
-	engine := gotemplate.NewTplEngine(o, c.builtInFunctions, c.tplName, c.cli, c.ctx)
+	engine := gotemplate.NewTplEngine(values, c.builtInFunctions, c.tplName, c.cli, c.ctx)
 	for file, configContext := range configs {
 		newContext, err := engine.Render(configContext)
 		if err != nil {
@@ -130,15 +130,15 @@ func (c *configTemplateBuilder) render(configs map[string]string) (map[string]st
 	return rendered, nil
 }
 
-func (c *configTemplateBuilder) builtinObjects() (*gotemplate.TplValues, error) {
-	bultInObj := map[string]interface{}{
+func (c *configTemplateBuilder) builtinObjectsAsValues() (*gotemplate.TplValues, error) {
+	builtInObjs := map[string]interface{}{
 		builtinClusterObject:           c.cluster,
 		builtinComponentObject:         c.component,
 		builtinPodObject:               c.podSpec,
 		builtinComponentResourceObject: c.componentValues.Resource,
 		builtinClusterVersionObject:    c.clusterVersion,
 	}
-	b, err := json.Marshal(bultInObj)
+	b, err := json.Marshal(builtInObjs)
 	if err != nil {
 		return nil, err
 	}
@@ -151,20 +151,20 @@ func (c *configTemplateBuilder) builtinObjects() (*gotemplate.TplValues, error) 
 
 func (c *configTemplateBuilder) injectBuiltInObjectsAndFunctions(
 	podSpec *corev1.PodSpec,
-	configs []dbaasv1alpha1.ConfigTemplate,
+	configs []appsv1alpha1.ConfigTemplate,
 	component *component.SynthesizedComponent) error {
-	if err := injectBuiltInObjects(c, podSpec, component, configs); err != nil {
+	if err := c.injectBuiltInObjects(podSpec, component, configs); err != nil {
 		return err
 	}
-	if err := injectBuiltInFunctions(c, component); err != nil {
+	if err := c.injectBuiltInFunctions(component); err != nil {
 		return err
 	}
 	return nil
 }
 
-func injectBuiltInFunctions(tplBuilder *configTemplateBuilder, component *component.SynthesizedComponent) error {
+func (c *configTemplateBuilder) injectBuiltInFunctions(component *component.SynthesizedComponent) error {
 	// TODO add built-in function
-	tplBuilder.builtInFunctions = &gotemplate.BuiltInObjectsFunc{
+	c.builtInFunctions = &gotemplate.BuiltInObjectsFunc{
 		builtInMysqlCalBufferFunctionName:     calDBPoolSize,
 		builtInGetVolumeFunctionName:          getVolumeMountPathByName,
 		builtInGetPvcFunctionName:             getPVCByName,
@@ -177,7 +177,7 @@ func injectBuiltInFunctions(tplBuilder *configTemplateBuilder, component *compon
 	return nil
 }
 
-func injectBuiltInObjects(tplBuilder *configTemplateBuilder, podSpec *corev1.PodSpec, component *component.SynthesizedComponent, configs []dbaasv1alpha1.ConfigTemplate) error {
+func (c *configTemplateBuilder) injectBuiltInObjects(podSpec *corev1.PodSpec, component *component.SynthesizedComponent, configs []appsv1alpha1.ConfigTemplate) error {
 	var resource *ResourceDefinition
 	container := intctrlutil.GetContainerByConfigTemplate(podSpec, configs)
 	if container != nil && len(container.Resources.Limits) > 0 {
@@ -186,14 +186,14 @@ func injectBuiltInObjects(tplBuilder *configTemplateBuilder, podSpec *corev1.Pod
 			CoreNum:    intctrlutil.GetCoreNum(*container),
 		}
 	}
-	tplBuilder.componentValues = &componentTemplateValues{
+	c.componentValues = &componentTemplateValues{
 		TypeName: component.Type,
 		// TODO add Component service name
 		ServiceName: "",
 		Replicas:    component.Replicas,
 		Resource:    resource,
 	}
-	tplBuilder.podSpec = podSpec
-	tplBuilder.component = component
+	c.podSpec = podSpec
+	c.component = component
 	return nil
 }

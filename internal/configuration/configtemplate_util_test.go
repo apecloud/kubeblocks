@@ -21,18 +21,18 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 )
 
 func TestMergeConfigTemplates(t *testing.T) {
 	type args struct {
-		cvTpl []dbaasv1alpha1.ConfigTemplate
-		cdTpl []dbaasv1alpha1.ConfigTemplate
+		cvTpl []appsv1alpha1.ConfigTemplate
+		cdTpl []appsv1alpha1.ConfigTemplate
 	}
 	tests := []struct {
 		name string
 		args args
-		want []dbaasv1alpha1.ConfigTemplate
+		want []appsv1alpha1.ConfigTemplate
 	}{{
 		name: "merge_configtpl_test",
 		args: args{
@@ -43,7 +43,7 @@ func TestMergeConfigTemplates(t *testing.T) {
 	}, {
 		name: "merge_configtpl_test",
 		args: args{
-			cvTpl: []dbaasv1alpha1.ConfigTemplate{
+			cvTpl: []appsv1alpha1.ConfigTemplate{
 				{
 					Name:         "test1",
 					ConfigTplRef: "tpl1",
@@ -55,7 +55,7 @@ func TestMergeConfigTemplates(t *testing.T) {
 				}},
 			cdTpl: nil,
 		},
-		want: []dbaasv1alpha1.ConfigTemplate{
+		want: []appsv1alpha1.ConfigTemplate{
 			{
 				Name:         "test1",
 				ConfigTplRef: "tpl1",
@@ -69,7 +69,7 @@ func TestMergeConfigTemplates(t *testing.T) {
 		name: "merge_configtpl_test",
 		args: args{
 			cvTpl: nil,
-			cdTpl: []dbaasv1alpha1.ConfigTemplate{{
+			cdTpl: []appsv1alpha1.ConfigTemplate{{
 				Name:         "test1",
 				ConfigTplRef: "tpl1",
 				VolumeName:   "test1",
@@ -79,7 +79,7 @@ func TestMergeConfigTemplates(t *testing.T) {
 				VolumeName:   "test2",
 			}},
 		},
-		want: []dbaasv1alpha1.ConfigTemplate{
+		want: []appsv1alpha1.ConfigTemplate{
 			{
 				Name:         "test1",
 				ConfigTplRef: "tpl1",
@@ -92,7 +92,7 @@ func TestMergeConfigTemplates(t *testing.T) {
 	}, {
 		name: "merge_configtpl_test",
 		args: args{
-			cvTpl: []dbaasv1alpha1.ConfigTemplate{{
+			cvTpl: []appsv1alpha1.ConfigTemplate{{
 				// update volume
 				Name:         "tpl1",
 				ConfigTplRef: "config1_new",
@@ -103,7 +103,7 @@ func TestMergeConfigTemplates(t *testing.T) {
 				ConfigTplRef: "config2_new",
 				VolumeName:   "volume2",
 			}},
-			cdTpl: []dbaasv1alpha1.ConfigTemplate{{
+			cdTpl: []appsv1alpha1.ConfigTemplate{{
 				Name:         "tpl1",
 				ConfigTplRef: "config1",
 				VolumeName:   "volume1",
@@ -113,7 +113,7 @@ func TestMergeConfigTemplates(t *testing.T) {
 				VolumeName:   "volume3",
 			}},
 		},
-		want: []dbaasv1alpha1.ConfigTemplate{
+		want: []appsv1alpha1.ConfigTemplate{
 			{
 				Name:         "tpl1",
 				ConfigTplRef: "config1_new",
@@ -139,16 +139,16 @@ func TestGetConfigTemplatesFromComponent(t *testing.T) {
 	var (
 		comName     = "replicats_name"
 		comType     = "replicats"
-		cComponents = []dbaasv1alpha1.ClusterComponent{{
-			Name: comName,
-			Type: comType,
+		cComponents = []appsv1alpha1.ClusterComponentSpec{{
+			Name:            comName,
+			ComponentDefRef: comType,
 		}}
-		tpl1 = dbaasv1alpha1.ConfigTemplate{
+		tpl1 = appsv1alpha1.ConfigTemplate{
 			Name:         "tpl1",
 			ConfigTplRef: "cm1",
 			VolumeName:   "volum1",
 		}
-		tpl2 = dbaasv1alpha1.ConfigTemplate{
+		tpl2 = appsv1alpha1.ConfigTemplate{
 			Name:         "tpl2",
 			ConfigTplRef: "cm2",
 			VolumeName:   "volum2",
@@ -156,33 +156,33 @@ func TestGetConfigTemplatesFromComponent(t *testing.T) {
 	)
 
 	type args struct {
-		cComponents []dbaasv1alpha1.ClusterComponent
-		dComponents []dbaasv1alpha1.ClusterDefinitionComponent
-		aComponents []dbaasv1alpha1.ClusterVersionComponent
+		cComponents []appsv1alpha1.ClusterComponentSpec
+		dComponents []appsv1alpha1.ClusterComponentDefinition
+		aComponents []appsv1alpha1.ClusterComponentVersion
 		comName     string
 	}
 	tests := []struct {
 		name    string
 		args    args
-		want    []dbaasv1alpha1.ConfigTemplate
+		want    []appsv1alpha1.ConfigTemplate
 		wantErr bool
 	}{{
 		name: "normal_test",
 		args: args{
 			comName:     comName,
 			cComponents: cComponents,
-			dComponents: []dbaasv1alpha1.ClusterDefinitionComponent{{
-				TypeName: comType,
-				ConfigSpec: &dbaasv1alpha1.ConfigurationSpec{
-					ConfigTemplateRefs: []dbaasv1alpha1.ConfigTemplate{tpl1},
+			dComponents: []appsv1alpha1.ClusterComponentDefinition{{
+				Name: comType,
+				ConfigSpec: &appsv1alpha1.ConfigurationSpec{
+					ConfigTemplateRefs: []appsv1alpha1.ConfigTemplate{tpl1},
 				},
 			}},
-			aComponents: []dbaasv1alpha1.ClusterVersionComponent{{
-				Type:               comType,
-				ConfigTemplateRefs: []dbaasv1alpha1.ConfigTemplate{tpl2},
+			aComponents: []appsv1alpha1.ClusterComponentVersion{{
+				ComponentDefRef:    comType,
+				ConfigTemplateRefs: []appsv1alpha1.ConfigTemplate{tpl2},
 			}},
 		},
-		want: []dbaasv1alpha1.ConfigTemplate{
+		want: []appsv1alpha1.ConfigTemplate{
 			tpl2,
 			tpl1,
 		},
@@ -192,15 +192,15 @@ func TestGetConfigTemplatesFromComponent(t *testing.T) {
 		args: args{
 			comName:     "not exist component",
 			cComponents: cComponents,
-			dComponents: []dbaasv1alpha1.ClusterDefinitionComponent{{
-				TypeName: comType,
-				ConfigSpec: &dbaasv1alpha1.ConfigurationSpec{
-					ConfigTemplateRefs: []dbaasv1alpha1.ConfigTemplate{tpl1},
+			dComponents: []appsv1alpha1.ClusterComponentDefinition{{
+				Name: comType,
+				ConfigSpec: &appsv1alpha1.ConfigurationSpec{
+					ConfigTemplateRefs: []appsv1alpha1.ConfigTemplate{tpl1},
 				},
 			}},
-			aComponents: []dbaasv1alpha1.ClusterVersionComponent{{
-				Type:               comType,
-				ConfigTemplateRefs: []dbaasv1alpha1.ConfigTemplate{tpl2},
+			aComponents: []appsv1alpha1.ClusterComponentVersion{{
+				ComponentDefRef:    comType,
+				ConfigTemplateRefs: []appsv1alpha1.ConfigTemplate{tpl2},
 			}},
 		},
 		want:    nil,
@@ -210,18 +210,18 @@ func TestGetConfigTemplatesFromComponent(t *testing.T) {
 		args: args{
 			comName:     comName,
 			cComponents: cComponents,
-			dComponents: []dbaasv1alpha1.ClusterDefinitionComponent{{
-				TypeName: comType,
-				ConfigSpec: &dbaasv1alpha1.ConfigurationSpec{
-					ConfigTemplateRefs: []dbaasv1alpha1.ConfigTemplate{tpl1},
+			dComponents: []appsv1alpha1.ClusterComponentDefinition{{
+				Name: comType,
+				ConfigSpec: &appsv1alpha1.ConfigurationSpec{
+					ConfigTemplateRefs: []appsv1alpha1.ConfigTemplate{tpl1},
 				},
 			}},
-			aComponents: []dbaasv1alpha1.ClusterVersionComponent{{
-				Type:               "not exist",
-				ConfigTemplateRefs: []dbaasv1alpha1.ConfigTemplate{tpl2},
+			aComponents: []appsv1alpha1.ClusterComponentVersion{{
+				ComponentDefRef:    "not exist",
+				ConfigTemplateRefs: []appsv1alpha1.ConfigTemplate{tpl2},
 			},
 			}},
-		want: []dbaasv1alpha1.ConfigTemplate{
+		want: []appsv1alpha1.ConfigTemplate{
 			tpl1,
 		},
 		wantErr: false,

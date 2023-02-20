@@ -24,7 +24,7 @@ import (
 	"github.com/spf13/viper"
 	corev1 "k8s.io/api/core/v1"
 
-	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
@@ -37,7 +37,7 @@ const (
 )
 
 var (
-	supportedCharacterTypeFunc = map[string]func(cluster *dbaasv1alpha1.Cluster, component *SynthesizedComponent) error{
+	supportedCharacterTypeFunc = map[string]func(cluster *appsv1alpha1.Cluster, component *SynthesizedComponent) error{
 		kMysql: setMysqlComponent,
 	}
 	//go:embed cue/*
@@ -45,17 +45,17 @@ var (
 )
 
 func buildMonitorConfig(
-	cluster *dbaasv1alpha1.Cluster,
-	clusterDef *dbaasv1alpha1.ClusterDefinition,
-	clusterDefComp *dbaasv1alpha1.ClusterDefinitionComponent,
-	clusterComp *dbaasv1alpha1.ClusterComponent,
+	cluster *appsv1alpha1.Cluster,
+	clusterDef *appsv1alpha1.ClusterDefinition,
+	clusterCompDef *appsv1alpha1.ClusterComponentDefinition,
+	clusterCompSpec *appsv1alpha1.ClusterComponentSpec,
 	component *SynthesizedComponent) {
 	monitorEnable := false
-	if clusterComp != nil {
-		monitorEnable = clusterComp.Monitor
+	if clusterCompSpec != nil {
+		monitorEnable = clusterCompSpec.Monitor
 	}
 
-	monitorConfig := clusterDefComp.Monitor
+	monitorConfig := clusterCompDef.Monitor
 	if !monitorEnable || monitorConfig == nil {
 		disableMonitor(component)
 		return
@@ -74,7 +74,7 @@ func buildMonitorConfig(
 		return
 	}
 
-	characterType := clusterDefComp.CharacterType
+	characterType := clusterCompDef.CharacterType
 	if !isSupportedCharacterType(characterType) {
 		disableMonitor(component)
 		return
@@ -137,7 +137,7 @@ func buildMysqlMonitorContainer(monitor *mysqlMonitorConfig) (*corev1.Container,
 	return &container, nil
 }
 
-func setMysqlComponent(cluster *dbaasv1alpha1.Cluster, component *SynthesizedComponent) error {
+func setMysqlComponent(cluster *appsv1alpha1.Cluster, component *SynthesizedComponent) error {
 	image := viper.GetString(constant.KBImage)
 	imagePullPolicy := viper.GetString(constant.KBImagePullPolicy)
 

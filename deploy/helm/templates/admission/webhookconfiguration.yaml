@@ -28,67 +28,13 @@ data:
   tls.key: {{ $cert.Key | b64enc }}
   tls.crt: {{ $cert.Cert | b64enc }}
 {{- end }}
----
-apiVersion: admissionregistration.k8s.io/v1
-kind: MutatingWebhookConfiguration
-metadata:
-  name: {{ include "kubeblocks.fullname" . }}-mutating-webhook-configuration
-webhooks:
 - admissionReviewVersions:
   - v1
   clientConfig:
     service:
       name: {{ include "kubeblocks.svcName" . }}
       namespace: {{ .Release.Namespace }}
-      path: /mutate-dbaas-kubeblocks-io-v1alpha1-clusterversion
-      port: {{ .Values.service.port }}
-    {{- if .Values.admissionWebhooks.createSelfSignedCert }}
-    caBundle: {{ $ca.Cert | b64enc }}
-    {{- end }}
-  failurePolicy: Fail
-  name: mclusterversion.kb.io
-  rules:
-  - apiGroups:
-    - dbaas.kubeblocks.io
-    apiVersions:
-    - v1alpha1
-    operations:
-    - CREATE
-    - UPDATE
-    resources:
-    - clusterversions
-  sideEffects: None
-- admissionReviewVersions:
-  - v1
-  clientConfig:
-    service:
-      name: {{ include "kubeblocks.svcName" . }}
-      namespace: {{ .Release.Namespace }}
-      path: /mutate-dbaas-kubeblocks-io-v1alpha1-cluster
-      port: {{ .Values.service.port }}
-    {{- if .Values.admissionWebhooks.createSelfSignedCert }}  
-    caBundle: {{ $ca.Cert | b64enc }}
-    {{- end }}
-  failurePolicy: Fail
-  name: mcluster.kb.io
-  rules:
-  - apiGroups:
-    - dbaas.kubeblocks.io
-    apiVersions:
-    - v1alpha1
-    operations:
-    - CREATE
-    - UPDATE
-    resources:
-    - clusters
-  sideEffects: None
-- admissionReviewVersions:
-  - v1
-  clientConfig:
-    service:
-      name: {{ include "kubeblocks.svcName" . }}
-      namespace: {{ .Release.Namespace }}
-      path: /mutate-dbaas-kubeblocks-io-v1alpha1-clusterdefinition
+      path: /mutate-apps-kubeblocks-io-v1alpha1-clusterdefinition
       port: {{ .Values.service.port }}
     {{- if .Values.admissionWebhooks.createSelfSignedCert }}  
     caBundle: {{ $ca.Cert | b64enc }}
@@ -97,7 +43,7 @@ webhooks:
   name: mclusterdefinition.kb.io
   rules:
   - apiGroups:
-    - dbaas.kubeblocks.io
+    - apps.kubeblocks.io
     apiVersions:
     - v1alpha1
     operations:
@@ -105,30 +51,6 @@ webhooks:
     - UPDATE
     resources:
     - clusterdefinitions
-  sideEffects: None
-- admissionReviewVersions:
-  - v1
-  clientConfig:
-    service:
-      name: {{ include "kubeblocks.svcName" . }}
-      namespace: {{ .Release.Namespace }}
-      path: /mutate-dbaas-kubeblocks-io-v1alpha1-opsrequest
-      port: {{ .Values.service.port }}
-    {{- if .Values.admissionWebhooks.createSelfSignedCert }}
-    caBundle: {{ $ca.Cert | b64enc }}
-    {{- end }}
-  failurePolicy: Fail
-  name: mopsrequest.kb.io
-  rules:
-  - apiGroups:
-    - dbaas.kubeblocks.io
-    apiVersions:
-    - v1alpha1
-    operations:
-    - CREATE
-    - UPDATE
-    resources:
-    - opsrequests
   sideEffects: None
 ---
 apiVersion: admissionregistration.k8s.io/v1
@@ -142,7 +64,7 @@ webhooks:
     service:
       name: {{ include "kubeblocks.svcName" . }}
       namespace: {{ .Release.Namespace }}
-      path: /validate-dbaas-kubeblocks-io-v1alpha1-clusterversion
+      path: /validate-apps-kubeblocks-io-v1alpha1-clusterversion
       port: {{ .Values.service.port }}
     {{- if .Values.admissionWebhooks.createSelfSignedCert }}  
     caBundle: {{ $ca.Cert | b64enc }}
@@ -151,7 +73,7 @@ webhooks:
   name: vclusterversion.kb.io
   rules:
   - apiGroups:
-    - dbaas.kubeblocks.io
+    - apps.kubeblocks.io
     apiVersions:
     - v1alpha1
     operations:
@@ -166,7 +88,7 @@ webhooks:
     service:
       name: {{ include "kubeblocks.svcName" . }}
       namespace: {{ .Release.Namespace }}
-      path: /validate-dbaas-kubeblocks-io-v1alpha1-cluster
+      path: /validate-apps-kubeblocks-io-v1alpha1-cluster
       port: {{ .Values.service.port }}
     {{- if .Values.admissionWebhooks.createSelfSignedCert }}  
     caBundle: {{ $ca.Cert | b64enc }}
@@ -175,7 +97,7 @@ webhooks:
   name: vcluster.kb.io
   rules:
   - apiGroups:
-    - dbaas.kubeblocks.io
+    - apps.kubeblocks.io
     apiVersions:
     - v1alpha1
     operations:
@@ -190,7 +112,7 @@ webhooks:
     service:
       name: {{ include "kubeblocks.svcName" . }}
       namespace: {{ .Release.Namespace }}
-      path: /validate-dbaas-kubeblocks-io-v1alpha1-clusterdefinition
+      path: /validate-apps-kubeblocks-io-v1alpha1-clusterdefinition
       port: {{ .Values.service.port }}
     {{- if .Values.admissionWebhooks.createSelfSignedCert }}  
     caBundle: {{ $ca.Cert | b64enc }}
@@ -199,7 +121,7 @@ webhooks:
   name: vclusterdefinition.kb.io
   rules:
   - apiGroups:
-    - dbaas.kubeblocks.io
+    - apps.kubeblocks.io
     apiVersions:
     - v1alpha1
     operations:
@@ -214,7 +136,7 @@ webhooks:
     service:
       name: {{ include "kubeblocks.svcName" . }}
       namespace: {{ .Release.Namespace }}
-      path: /validate-dbaas-kubeblocks-io-v1alpha1-opsrequest
+      path: /validate-apps-kubeblocks-io-v1alpha1-opsrequest
       port: {{ .Values.service.port }}
     {{- if .Values.admissionWebhooks.createSelfSignedCert }}
     caBundle: {{ $ca.Cert | b64enc }}
@@ -223,7 +145,7 @@ webhooks:
   name: vopsrequest.kb.io
   rules:
   - apiGroups:
-    - dbaas.kubeblocks.io
+    - apps.kubeblocks.io
     apiVersions:
     - v1alpha1
     operations:

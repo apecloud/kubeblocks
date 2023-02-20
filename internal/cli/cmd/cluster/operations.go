@@ -31,7 +31,7 @@ import (
 	"k8s.io/kubectl/pkg/util/templates"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/create"
 	"github.com/apecloud/kubeblocks/internal/cli/delete"
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
@@ -47,7 +47,7 @@ type OperationsOptions struct {
 	TTLSecondsAfterSucceed int      `json:"ttlSecondsAfterSucceed"`
 
 	// OpsType operation type
-	OpsType dbaasv1alpha1.OpsType `json:"type"`
+	OpsType appsv1alpha1.OpsType `json:"type"`
 
 	// OpsTypeLower lower OpsType
 	OpsTypeLower string `json:"typeLower"`
@@ -77,7 +77,7 @@ type OperationsOptions struct {
 	Storage  string   `json:"storage"`
 }
 
-func newBaseOperationsOptions(streams genericclioptions.IOStreams, opsType dbaasv1alpha1.OpsType) *OperationsOptions {
+func newBaseOperationsOptions(streams genericclioptions.IOStreams, opsType appsv1alpha1.OpsType) *OperationsOptions {
 	return &OperationsOptions{
 		BaseOptions: create.BaseOptions{IOStreams: streams},
 		OpsType:     opsType,
@@ -100,7 +100,7 @@ var (
 func (o *OperationsOptions) buildCommonFlags(cmd *cobra.Command) {
 	cmd.Flags().StringVar(&o.OpsRequestName, "ops-request", "", "OpsRequest name. if not specified, it will be randomly generated ")
 	cmd.Flags().IntVar(&o.TTLSecondsAfterSucceed, "ttlSecondsAfterSucceed", 0, "Time to live after the OpsRequest succeed")
-	if o.OpsType != dbaasv1alpha1.UpgradeType && o.OpsType != dbaasv1alpha1.ReconfiguringType {
+	if o.OpsType != appsv1alpha1.UpgradeType && o.OpsType != appsv1alpha1.ReconfiguringType {
 		cmd.Flags().StringSliceVar(&o.ComponentNames, "component-names", nil, " Component names to this operations")
 	}
 }
@@ -108,6 +108,9 @@ func (o *OperationsOptions) buildCommonFlags(cmd *cobra.Command) {
 // CompleteRestartOps when restart a cluster and component-names is null, represents restarting the entire cluster.
 // we should set all component names to ComponentNames
 func (o *OperationsOptions) CompleteRestartOps() error {
+	if o.Name == "" {
+		return makeMissingClusterNameErr()
+	}
 	if len(o.ComponentNames) != 0 {
 		return nil
 	}
@@ -173,9 +176,9 @@ func (o *OperationsOptions) validateReconfiguring() error {
 	return nil
 }
 
-func (o *OperationsOptions) validateConfigParams(tpl *dbaasv1alpha1.ConfigTemplate, componentName string) error {
+func (o *OperationsOptions) validateConfigParams(tpl *appsv1alpha1.ConfigTemplate, componentName string) error {
 	var (
-		configConstraint = dbaasv1alpha1.ConfigConstraint{}
+		configConstraint = appsv1alpha1.ConfigConstraint{}
 	)
 
 	transKeyPair := func(pts map[string]string) map[string]interface{} {
@@ -200,7 +203,7 @@ func (o *OperationsOptions) validateConfigParams(tpl *dbaasv1alpha1.ConfigTempla
 	return err
 }
 
-func (o *OperationsOptions) validateTemplateParam(tpls []dbaasv1alpha1.ConfigTemplate) (*dbaasv1alpha1.ConfigTemplate, error) {
+func (o *OperationsOptions) validateTemplateParam(tpls []appsv1alpha1.ConfigTemplate) (*appsv1alpha1.ConfigTemplate, error) {
 	if len(tpls) == 0 {
 		return nil, cfgcore.MakeError("not support reconfiguring because there is no config template.")
 	}
@@ -225,7 +228,7 @@ func (o *OperationsOptions) validateTemplateParam(tpls []dbaasv1alpha1.ConfigTem
 	return nil, cfgcore.MakeError("specify template name[%s] is not exist.", o.CfgTemplateName)
 }
 
-func (o *OperationsOptions) validateConfigMapKey(tpl *dbaasv1alpha1.ConfigTemplate, componentName string) error {
+func (o *OperationsOptions) validateConfigMapKey(tpl *appsv1alpha1.ConfigTemplate, componentName string) error {
 	var (
 		cmObj  = corev1.ConfigMap{}
 		cmName = cfgcore.GetComponentCfgName(o.Name, componentName, tpl.VolumeName)
@@ -276,11 +279,16 @@ func (o *OperationsOptions) parseUpdatedParams() error {
 // Validate command flags or args is legal
 func (o *OperationsOptions) Validate() error {
 	if o.Name == "" {
-		return fmt.Errorf("missing cluster name")
+		return makeMissingClusterNameErr()
 	}
 
-	if o.OpsType == dbaasv1alpha1.UpgradeType {
+	if o.OpsType == appsv1alpha1.UpgradeType {
 		return o.validateUpgrade()
+	}
+
+	// not require confirm
+	if o.OpsType == appsv1alpha1.ReconfiguringType {
+		return o.validateReconfiguring()
 	}
 
 	// common validate for componentOps
@@ -289,16 +297,12 @@ func (o *OperationsOptions) Validate() error {
 	}
 
 	switch o.OpsType {
-	case dbaasv1alpha1.VolumeExpansionType:
+	case appsv1alpha1.VolumeExpansionType:
 		if err := o.validateVolumeExpansion(); err != nil {
 			return err
 		}
-	case dbaasv1alpha1.HorizontalScalingType:
+	case appsv1alpha1.HorizontalScalingType:
 		if err := o.validateHorizontalScaling(); err != nil {
-			return err
-		}
-	case dbaasv1alpha1.ReconfiguringType:
-		if err := o.validateReconfiguring(); err != nil {
 			return err
 		}
 	}
@@ -306,7 +310,7 @@ func (o *OperationsOptions) Validate() error {
 }
 
 func (o *OperationsOptions) fillTemplateArgForReconfiguring() error {
-	if len(o.Name) == 0 {
+	if o.Name == "" {
 		return makeMissingClusterNameErr()
 	}
 
@@ -336,7 +340,7 @@ func (o *OperationsOptions) fillTemplateArgForReconfiguring() error {
 		return nil
 	}
 
-	supportUpdatedTpl := make([]dbaasv1alpha1.ConfigTemplate, 0)
+	supportUpdatedTpl := make([]appsv1alpha1.ConfigTemplate, 0)
 	for _, tpl := range tplList {
 		if ok, err := util.IsSupportConfigureParams(tpl, o.KeyValues, o.Client); err == nil && ok {
 			supportUpdatedTpl = append(supportUpdatedTpl, tpl)
@@ -370,7 +374,7 @@ func (o *OperationsOptions) fillComponentNameForReconfiguring() error {
 }
 
 func (o *OperationsOptions) existClusterAndComponent(componentName string) error {
-	clusterObj := dbaasv1alpha1.Cluster{}
+	clusterObj := appsv1alpha1.Cluster{}
 	if err := util.GetResourceObjectFromGVR(types.ClusterGVR(), client.ObjectKey{
 		Namespace: o.Namespace,
 		Name:      o.Name,
@@ -378,7 +382,7 @@ func (o *OperationsOptions) existClusterAndComponent(componentName string) error
 		return makeClusterNotExistErr(o.Name)
 	}
 
-	for _, component := range clusterObj.Spec.Components {
+	for _, component := range clusterObj.Spec.ComponentSpecs {
 		if component.Name == componentName {
 			return nil
 		}
@@ -418,7 +422,7 @@ var restartExample = templates.Examples(`
 
 // NewRestartCmd create a restart command
 func NewRestartCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
-	o := newBaseOperationsOptions(streams, dbaasv1alpha1.RestartType)
+	o := newBaseOperationsOptions(streams, appsv1alpha1.RestartType)
 	inputs := buildOperationsInputs(f, o)
 	inputs.Use = "restart"
 	inputs.Short = "Restart the specified components in the cluster"
@@ -437,7 +441,7 @@ var upgradeExample = templates.Examples(`
 
 // NewUpgradeCmd create a upgrade command
 func NewUpgradeCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
-	o := newBaseOperationsOptions(streams, dbaasv1alpha1.UpgradeType)
+	o := newBaseOperationsOptions(streams, appsv1alpha1.UpgradeType)
 	inputs := buildOperationsInputs(f, o)
 	inputs.Use = "upgrade"
 	inputs.Short = "Upgrade the cluster version"
@@ -457,7 +461,7 @@ var verticalScalingExample = templates.Examples(`
 
 // NewVerticalScalingCmd create a vertical scaling command
 func NewVerticalScalingCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
-	o := newBaseOperationsOptions(streams, dbaasv1alpha1.VerticalScalingType)
+	o := newBaseOperationsOptions(streams, appsv1alpha1.VerticalScalingType)
 	inputs := buildOperationsInputs(f, o)
 	inputs.Use = "vscale"
 	inputs.Short = "Vertically scale the specified components in the cluster"
@@ -479,7 +483,7 @@ var horizontalScalingExample = templates.Examples(`
 
 // NewHorizontalScalingCmd create a horizontal scaling command
 func NewHorizontalScalingCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
-	o := newBaseOperationsOptions(streams, dbaasv1alpha1.HorizontalScalingType)
+	o := newBaseOperationsOptions(streams, appsv1alpha1.HorizontalScalingType)
 	inputs := buildOperationsInputs(f, o)
 	inputs.Use = "hscale"
 	inputs.Short = "Horizontally scale the specified components in the cluster"
@@ -499,7 +503,7 @@ var volumeExpansionExample = templates.Examples(`
 
 // NewVolumeExpansionCmd create a vertical scaling command
 func NewVolumeExpansionCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
-	o := newBaseOperationsOptions(streams, dbaasv1alpha1.VolumeExpansionType)
+	o := newBaseOperationsOptions(streams, appsv1alpha1.VolumeExpansionType)
 	inputs := buildOperationsInputs(f, o)
 	inputs.Use = "volume-expand"
 	inputs.Short = "Expand volume with the specified components and volumeClaimTemplates in the cluster"
@@ -514,7 +518,7 @@ func NewVolumeExpansionCmd(f cmdutil.Factory, streams genericclioptions.IOStream
 
 // NewReconfigureCmd create a Reconfiguring command
 func NewReconfigureCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
-	o := newBaseOperationsOptions(streams, dbaasv1alpha1.ReconfiguringType)
+	o := newBaseOperationsOptions(streams, appsv1alpha1.ReconfiguringType)
 	inputs := buildOperationsInputs(f, o)
 	inputs.Use = "configure"
 	inputs.Short = "reconfigure parameters with the specified components in the cluster"

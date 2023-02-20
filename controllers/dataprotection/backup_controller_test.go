@@ -31,7 +31,7 @@ import (
 
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
-	testdbaas "github.com/apecloud/kubeblocks/internal/testutil/dbaas"
+	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 )
 
 var _ = Describe("Backup for a StatefulSet", func() {
@@ -57,31 +57,31 @@ var _ = Describe("Backup for a StatefulSet", func() {
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 		// namespaced
-		testdbaas.ClearResources(&testCtx, intctrlutil.StatefulSetSignature, inNS, ml)
-		testdbaas.ClearResources(&testCtx, intctrlutil.PodSignature, inNS, ml)
-		testdbaas.ClearResources(&testCtx, intctrlutil.BackupSignature, inNS, ml)
-		testdbaas.ClearResources(&testCtx, intctrlutil.BackupPolicySignature, inNS, ml)
-		testdbaas.ClearResources(&testCtx, intctrlutil.JobSignature, inNS, ml)
-		testdbaas.ClearResources(&testCtx, intctrlutil.CronJobSignature, inNS, ml)
+		testapps.ClearResources(&testCtx, intctrlutil.StatefulSetSignature, inNS, ml)
+		testapps.ClearResources(&testCtx, intctrlutil.PodSignature, inNS, ml)
+		testapps.ClearResources(&testCtx, intctrlutil.BackupSignature, inNS, ml)
+		testapps.ClearResources(&testCtx, intctrlutil.BackupPolicySignature, inNS, ml)
+		testapps.ClearResources(&testCtx, intctrlutil.JobSignature, inNS, ml)
+		testapps.ClearResources(&testCtx, intctrlutil.CronJobSignature, inNS, ml)
 		// non-namespaced
-		testdbaas.ClearResources(&testCtx, intctrlutil.BackupToolSignature, ml)
+		testapps.ClearResources(&testCtx, intctrlutil.BackupToolSignature, ml)
 	}
 
 	BeforeEach(func() {
 		cleanEnv()
 
 		By("By mocking a statefulset")
-		sts := testdbaas.NewStatefulSetFactory(testCtx.DefaultNamespace, clusterName+"-"+componentName, clusterName, componentName).
+		sts := testapps.NewStatefulSetFactory(testCtx.DefaultNamespace, clusterName+"-"+componentName, clusterName, componentName).
 			AddLabels(intctrlutil.AppInstanceLabelKey, clusterName).
-			AddContainer(corev1.Container{Name: containerName, Image: testdbaas.ApeCloudMySQLImage}).
+			AddContainer(corev1.Container{Name: containerName, Image: testapps.ApeCloudMySQLImage}).
 			AddVolumeClaimTemplate(corev1.PersistentVolumeClaim{
-				ObjectMeta: metav1.ObjectMeta{Name: testdbaas.DataVolumeName},
-				Spec:       testdbaas.NewPVC(defaultPVCSize),
+				ObjectMeta: metav1.ObjectMeta{Name: testapps.DataVolumeName},
+				Spec:       testapps.NewPVC(defaultPVCSize),
 			}).Create(&testCtx).GetObject()
 
 		By("By mocking a pod belonging to the statefulset")
-		_ = testdbaas.NewPodFactory(testCtx.DefaultNamespace, sts.Name+"-0").
-			AddContainer(corev1.Container{Name: containerName, Image: testdbaas.ApeCloudMySQLImage}).
+		_ = testapps.NewPodFactory(testCtx.DefaultNamespace, sts.Name+"-0").
+			AddContainer(corev1.Container{Name: containerName, Image: testapps.ApeCloudMySQLImage}).
 			Create(&testCtx)
 	})
 
@@ -92,11 +92,11 @@ var _ = Describe("Backup for a StatefulSet", func() {
 	When("with default settings", func() {
 		BeforeEach(func() {
 			By("By creating a backupTool")
-			backupTool := testdbaas.CreateCustomizedObj(&testCtx, "backup/backuptool.yaml",
-				&dataprotectionv1alpha1.BackupTool{}, testdbaas.RandomizedObjName())
+			backupTool := testapps.CreateCustomizedObj(&testCtx, "backup/backuptool.yaml",
+				&dataprotectionv1alpha1.BackupTool{}, testapps.RandomizedObjName())
 
 			By("By creating a backupPolicy from backupTool: " + backupTool.Name)
-			_ = testdbaas.NewBackupPolicyFactory(testCtx.DefaultNamespace, backupPolicyName).
+			_ = testapps.NewBackupPolicyFactory(testCtx.DefaultNamespace, backupPolicyName).
 				SetBackupToolName(backupTool.Name).
 				SetSchedule(defaultSchedule).
 				SetTTL(defaultTTL).
@@ -113,7 +113,7 @@ var _ = Describe("Backup for a StatefulSet", func() {
 
 			BeforeEach(func() {
 				By("By creating a backup from backupPolicy: " + backupPolicyName)
-				backup := testdbaas.NewBackupFactory(testCtx.DefaultNamespace, backupName).
+				backup := testapps.NewBackupFactory(testCtx.DefaultNamespace, backupName).
 					SetTTL(defaultTTL).
 					SetBackupPolicyName(backupPolicyName).
 					SetBackupType(dataprotectionv1alpha1.BackupTypeFull).
@@ -125,7 +125,7 @@ var _ = Describe("Backup for a StatefulSet", func() {
 				patchK8sJobStatus(backupKey, batchv1.JobComplete)
 
 				By("Check backup job completed")
-				Eventually(testdbaas.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dataprotectionv1alpha1.Backup) {
+				Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dataprotectionv1alpha1.Backup) {
 					g.Expect(fetched.Status.Phase).To(Equal(dataprotectionv1alpha1.BackupCompleted))
 				})).Should(Succeed())
 			})
@@ -134,7 +134,7 @@ var _ = Describe("Backup for a StatefulSet", func() {
 				patchK8sJobStatus(backupKey, batchv1.JobFailed)
 
 				By("Check backup job failed")
-				Eventually(testdbaas.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dataprotectionv1alpha1.Backup) {
+				Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dataprotectionv1alpha1.Backup) {
 					g.Expect(fetched.Status.Phase).To(Equal(dataprotectionv1alpha1.BackupFailed))
 				})).Should(Succeed())
 			})
@@ -147,7 +147,7 @@ var _ = Describe("Backup for a StatefulSet", func() {
 				viper.Set("VOLUMESNAPSHOT", "true")
 
 				By("By creating a backup from backupPolicy: " + backupPolicyName)
-				backup := testdbaas.NewBackupFactory(testCtx.DefaultNamespace, backupName).
+				backup := testapps.NewBackupFactory(testCtx.DefaultNamespace, backupName).
 					SetTTL(defaultTTL).
 					SetBackupPolicyName(backupPolicyName).
 					SetBackupType(dataprotectionv1alpha1.BackupTypeSnapshot).
@@ -167,21 +167,21 @@ var _ = Describe("Backup for a StatefulSet", func() {
 				patchK8sJobStatus(postJobKey, batchv1.JobComplete)
 
 				By("Check backup job completed")
-				Eventually(testdbaas.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dataprotectionv1alpha1.Backup) {
+				Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dataprotectionv1alpha1.Backup) {
 					g.Expect(fetched.Status.Phase).To(Equal(dataprotectionv1alpha1.BackupCompleted))
 				})).Should(Succeed())
 
 				By("Check pre job cleaned")
-				Eventually(testdbaas.CheckObjExists(&testCtx, preJobKey, &batchv1.Job{}, false)).Should(Succeed())
+				Eventually(testapps.CheckObjExists(&testCtx, preJobKey, &batchv1.Job{}, false)).Should(Succeed())
 				By("Check post job cleaned")
-				Eventually(testdbaas.CheckObjExists(&testCtx, postJobKey, &batchv1.Job{}, false)).Should(Succeed())
+				Eventually(testapps.CheckObjExists(&testCtx, postJobKey, &batchv1.Job{}, false)).Should(Succeed())
 			})
 
 			It("should fail after pre-job fails", func() {
 				patchK8sJobStatus(types.NamespacedName{Name: backupKey.Name + "-pre", Namespace: backupKey.Namespace}, batchv1.JobFailed)
 
 				By("Check backup job failed")
-				Eventually(testdbaas.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dataprotectionv1alpha1.Backup) {
+				Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dataprotectionv1alpha1.Backup) {
 					g.Expect(fetched.Status.Phase).To(Equal(dataprotectionv1alpha1.BackupFailed))
 				})).Should(Succeed())
 			})
@@ -194,14 +194,14 @@ var _ = Describe("Backup for a StatefulSet", func() {
 
 			BeforeEach(func() {
 				By("By creating a backupTool")
-				backupTool := testdbaas.CreateCustomizedObj(&testCtx, "backup/backuptool.yaml",
-					&dataprotectionv1alpha1.BackupTool{}, testdbaas.RandomizedObjName(),
+				backupTool := testapps.CreateCustomizedObj(&testCtx, "backup/backuptool.yaml",
+					&dataprotectionv1alpha1.BackupTool{}, testapps.RandomizedObjName(),
 					func(backupTool *dataprotectionv1alpha1.BackupTool) {
 						backupTool.Spec.Resources = nil
 					})
 
 				By("By creating a backupPolicy from backupTool: " + backupTool.Name)
-				_ = testdbaas.NewBackupPolicyFactory(testCtx.DefaultNamespace, backupPolicyName).
+				_ = testapps.NewBackupPolicyFactory(testCtx.DefaultNamespace, backupPolicyName).
 					SetBackupToolName(backupTool.Name).
 					SetSchedule(defaultSchedule).
 					SetTTL(defaultTTL).
@@ -213,7 +213,7 @@ var _ = Describe("Backup for a StatefulSet", func() {
 					Create(&testCtx).GetObject()
 
 				By("By creating a backup from backupPolicy: " + backupPolicyName)
-				backup := testdbaas.NewBackupFactory(testCtx.DefaultNamespace, backupName).
+				backup := testapps.NewBackupFactory(testCtx.DefaultNamespace, backupName).
 					SetTTL(defaultTTL).
 					SetBackupPolicyName(backupPolicyName).
 					SetBackupType(dataprotectionv1alpha1.BackupTypeFull).
@@ -225,7 +225,7 @@ var _ = Describe("Backup for a StatefulSet", func() {
 				patchK8sJobStatus(backupKey, batchv1.JobComplete)
 
 				By("Check backup job completed")
-				Eventually(testdbaas.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dataprotectionv1alpha1.Backup) {
+				Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dataprotectionv1alpha1.Backup) {
 					g.Expect(fetched.Status.Phase).To(Equal(dataprotectionv1alpha1.BackupCompleted))
 				})).Should(Succeed())
 			})
@@ -234,14 +234,14 @@ var _ = Describe("Backup for a StatefulSet", func() {
 })
 
 func patchK8sJobStatus(key types.NamespacedName, jobStatus batchv1.JobConditionType) {
-	Eventually(testdbaas.GetAndChangeObjStatus(&testCtx, key, func(fetched *batchv1.Job) {
+	Eventually(testapps.GetAndChangeObjStatus(&testCtx, key, func(fetched *batchv1.Job) {
 		jobCondition := batchv1.JobCondition{Type: jobStatus}
 		fetched.Status.Conditions = append(fetched.Status.Conditions, jobCondition)
 	})).Should(Succeed())
 }
 
 func patchVolumeSnapshotStatus(key types.NamespacedName, readyToUse bool) {
-	Eventually(testdbaas.GetAndChangeObjStatus(&testCtx, key, func(fetched *snapshotv1.VolumeSnapshot) {
+	Eventually(testapps.GetAndChangeObjStatus(&testCtx, key, func(fetched *snapshotv1.VolumeSnapshot) {
 		snapStatus := snapshotv1.VolumeSnapshotStatus{ReadyToUse: &readyToUse}
 		fetched.Status = &snapStatus
 	})).Should(Succeed())

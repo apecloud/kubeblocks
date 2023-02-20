@@ -170,6 +170,7 @@ mysql-cluster        default          apecloud-mysql            ac-mysql-8.0.30 
    **Option 2.** Create an OpsRequest.
 
    Run the command below to apply an OpsRequest to the specified cluster. Configure the parameters according to your needs.
+
    ```bash
    kubectl apply -f - <<EOF
    apiVersion: dbaas.kubeblocks.io/v1alpha1
@@ -195,7 +196,7 @@ mysql-cluster        default          apecloud-mysql            ac-mysql-8.0.30 
    apiVersion: dbaas.kubeblocks.io/v1alpha1
    kind: Cluster
    metadata:
-    apiVersion: dbaas.kubeblocks.io/v1alpha1
+    apiVersion: apps.kubeblocks.io/v1alpha1
    kind: Cluster
    metadata:
      name: mysql-cluster

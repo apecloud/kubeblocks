@@ -28,7 +28,7 @@ options: {
 
 // required, k8s api resource content
 content: {
-	apiVersion: "dbaas.kubeblocks.io/v1alpha1"
+	apiVersion: "apps.kubeblocks.io/v1alpha1"
 	kind:       "Cluster"
 	metadata: {
 		name:      options.name

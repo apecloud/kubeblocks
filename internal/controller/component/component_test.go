@@ -22,9 +22,9 @@ import (
 
 	ctrl "sigs.k8s.io/controller-runtime"
 
-	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
-	testdbaas "github.com/apecloud/kubeblocks/internal/testutil/dbaas"
+	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 )
 
 const (
@@ -46,28 +46,28 @@ var _ = Describe("component module", func() {
 		)
 
 		var (
-			clusterDef     *dbaasv1alpha1.ClusterDefinition
-			clusterVersion *dbaasv1alpha1.ClusterVersion
-			cluster        *dbaasv1alpha1.Cluster
+			clusterDef     *appsv1alpha1.ClusterDefinition
+			clusterVersion *appsv1alpha1.ClusterVersion
+			cluster        *appsv1alpha1.Cluster
 		)
 
 		BeforeEach(func() {
-			clusterDef = testdbaas.NewClusterDefFactory(clusterDefName, testdbaas.MySQLType).
-				AddComponent(testdbaas.StatefulMySQLComponent, mysqlCompType).
-				AddComponent(testdbaas.StatelessNginxComponent, nginxCompType).
+			clusterDef = testapps.NewClusterDefFactory(clusterDefName).
+				AddComponent(testapps.StatefulMySQLComponent, mysqlCompType).
+				AddComponent(testapps.StatelessNginxComponent, nginxCompType).
 				GetObject()
-			clusterVersion = testdbaas.NewClusterVersionFactory(clusterVersionName, clusterDefName).
+			clusterVersion = testapps.NewClusterVersionFactory(clusterVersionName, clusterDefName).
 				AddComponent(mysqlCompType).
-				AddContainerShort("mysql", testdbaas.ApeCloudMySQLImage).
+				AddContainerShort("mysql", testapps.ApeCloudMySQLImage).
 				AddComponent(nginxCompType).
-				AddInitContainerShort("nginx-init", testdbaas.NginxImage).
-				AddContainerShort("nginx", testdbaas.NginxImage).
+				AddInitContainerShort("nginx-init", testapps.NginxImage).
+				AddContainerShort("nginx", testapps.NginxImage).
 				GetObject()
-			pvcSpec := testdbaas.NewPVC("1Gi")
-			cluster = testdbaas.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
+			pvcSpec := testapps.NewPVC("1Gi")
+			cluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
 				clusterDef.Name, clusterVersion.Name).
 				AddComponent(mysqlCompName, mysqlCompType).
-				AddVolumeClaimTemplate(testdbaas.DataVolumeName, &pvcSpec).
+				AddVolumeClaimTemplate(testapps.DataVolumeName, &pvcSpec).
 				GetObject()
 		})
 
@@ -81,20 +81,20 @@ var _ = Describe("component module", func() {
 				reqCtx,
 				cluster,
 				clusterDef,
-				&clusterDef.Spec.Components[0],
-				&clusterVersion.Spec.Components[0],
-				&cluster.Spec.Components[0])
+				&clusterDef.Spec.ComponentDefs[0],
+				&clusterVersion.Spec.ComponentVersions[0],
+				&cluster.Spec.ComponentSpecs[0])
 			Expect(component).ShouldNot(BeNil())
 
 			By("leave clusterVersion.podSpec nil")
-			clusterVersion.Spec.Components[0].PodSpec = nil
+			clusterVersion.Spec.ComponentVersions[0].PodSpec = nil
 			component = BuildComponent(
 				reqCtx,
 				cluster,
 				clusterDef,
-				&clusterDef.Spec.Components[0],
-				&clusterVersion.Spec.Components[0],
-				&cluster.Spec.Components[0])
+				&clusterDef.Spec.ComponentDefs[0],
+				&clusterVersion.Spec.ComponentVersions[0],
+				&cluster.Spec.ComponentSpecs[0])
 			Expect(component).ShouldNot(BeNil())
 
 			By("new container in clusterVersion not in clusterDefinition")
@@ -102,9 +102,9 @@ var _ = Describe("component module", func() {
 				reqCtx,
 				cluster,
 				clusterDef,
-				&clusterDef.Spec.Components[0],
-				&clusterVersion.Spec.Components[1],
-				&cluster.Spec.Components[0])
+				&clusterDef.Spec.ComponentDefs[0],
+				&clusterVersion.Spec.ComponentVersions[1],
+				&cluster.Spec.ComponentSpecs[0])
 			Expect(len(component.PodSpec.Containers)).Should(Equal(2))
 
 			By("new init container in clusterVersion not in clusterDefinition")
@@ -112,9 +112,9 @@ var _ = Describe("component module", func() {
 				reqCtx,
 				cluster,
 				clusterDef,
-				&clusterDef.Spec.Components[0],
-				&clusterVersion.Spec.Components[1],
-				&cluster.Spec.Components[0])
+				&clusterDef.Spec.ComponentDefs[0],
+				&clusterVersion.Spec.ComponentVersions[1],
+				&cluster.Spec.ComponentSpecs[0])
 			Expect(len(component.PodSpec.InitContainers)).Should(Equal(1))
 
 			By("leave clusterComp nil")
@@ -122,19 +122,19 @@ var _ = Describe("component module", func() {
 				reqCtx,
 				cluster,
 				clusterDef,
-				&clusterDef.Spec.Components[0],
-				&clusterVersion.Spec.Components[0],
+				&clusterDef.Spec.ComponentDefs[0],
+				&clusterVersion.Spec.ComponentVersions[0],
 				nil)
 			Expect(component).ShouldNot(BeNil())
 
-			By("leave clusterDefComp nil")
+			By("leave clusterCompDef nil")
 			component = BuildComponent(
 				reqCtx,
 				cluster,
 				clusterDef,
 				nil,
-				&clusterVersion.Spec.Components[0],
-				&cluster.Spec.Components[0])
+				&clusterVersion.Spec.ComponentVersions[0],
+				&cluster.Spec.ComponentSpecs[0])
 			Expect(component).Should(BeNil())
 		})
 	})

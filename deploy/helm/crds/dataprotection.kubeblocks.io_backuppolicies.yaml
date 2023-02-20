@@ -63,8 +63,8 @@ spec:
                 type: string
               backupType:
                 default: snapshot
-                description: Backup Type. full or incremental or snapshot. if unset,
-                  default is snapshot.
+                description: Backup ComponentDefRef. full or incremental or snapshot.
+                  if unset, default is snapshot.
                 enum:
                 - full
                 - incremental

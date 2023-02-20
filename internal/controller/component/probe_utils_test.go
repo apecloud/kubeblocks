@@ -22,7 +22,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 
-	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 )
 
 var _ = Describe("probe_utils", func() {
@@ -31,7 +31,7 @@ var _ = Describe("probe_utils", func() {
 		var container *corev1.Container
 		var component *SynthesizedComponent
 		var probeServiceHTTPPort, probeServiceGrpcPort int
-		var clusterDefProbe *dbaasv1alpha1.ClusterDefinitionProbe
+		var clusterDefProbe *appsv1alpha1.ClusterDefinitionProbe
 
 		BeforeEach(func() {
 			var err error
@@ -39,7 +39,7 @@ var _ = Describe("probe_utils", func() {
 			Expect(err).NotTo(HaveOccurred())
 			probeServiceHTTPPort, probeServiceGrpcPort = 3501, 50001
 
-			clusterDefProbe = &dbaasv1alpha1.ClusterDefinitionProbe{}
+			clusterDefProbe = &appsv1alpha1.ClusterDefinitionProbe{}
 			clusterDefProbe.PeriodSeconds = 1
 			clusterDefProbe.TimeoutSeconds = 1
 			clusterDefProbe.FailureThreshold = 1

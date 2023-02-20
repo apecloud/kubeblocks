@@ -22,7 +22,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/test/testdata"
 )
 
@@ -34,12 +34,12 @@ var fromTestData = func(fileName string) string {
 	return string(content)
 }
 
-var newFakeConfConstraint = func(cueFile string, cfgFormatter dbaasv1alpha1.ConfigurationFormatter) *dbaasv1alpha1.ConfigConstraintSpec {
-	return &dbaasv1alpha1.ConfigConstraintSpec{
-		ConfigurationSchema: &dbaasv1alpha1.CustomParametersValidation{
+var newFakeConfConstraint = func(cueFile string, cfgFormatter appsv1alpha1.ConfigurationFormatter) *appsv1alpha1.ConfigConstraintSpec {
+	return &appsv1alpha1.ConfigConstraintSpec{
+		ConfigurationSchema: &appsv1alpha1.CustomParametersValidation{
 			CUE: fromTestData(cueFile),
 		},
-		FormatterConfig: &dbaasv1alpha1.FormatterConfig{
+		FormatterConfig: &appsv1alpha1.FormatterConfig{
 			Formatter: cfgFormatter,
 		},
 	}
@@ -49,7 +49,7 @@ func TestSchemaValidatorWithCue(t *testing.T) {
 	type args struct {
 		cueFile    string
 		configFile string
-		formatter  dbaasv1alpha1.ConfigurationFormatter
+		formatter  appsv1alpha1.ConfigurationFormatter
 	}
 	tests := []struct {
 		name string
@@ -60,7 +60,7 @@ func TestSchemaValidatorWithCue(t *testing.T) {
 		args: args{
 			cueFile:    "cue_testdata/wesql.cue",
 			configFile: "cue_testdata/wesql.cnf",
-			formatter:  dbaasv1alpha1.INI,
+			formatter:  appsv1alpha1.INI,
 		},
 		err: nil,
 	}, {
@@ -68,7 +68,7 @@ func TestSchemaValidatorWithCue(t *testing.T) {
 		args: args{
 			cueFile:    "cue_testdata/pg14.cue",
 			configFile: "cue_testdata/pg14.conf",
-			formatter:  dbaasv1alpha1.DOTENV,
+			formatter:  appsv1alpha1.DOTENV,
 		},
 		err: nil,
 	}, {
@@ -76,7 +76,7 @@ func TestSchemaValidatorWithCue(t *testing.T) {
 		args: args{
 			cueFile:    "cue_testdata/clickhouse.cue",
 			configFile: "cue_testdata/clickhouse.xml",
-			formatter:  dbaasv1alpha1.XML,
+			formatter:  appsv1alpha1.XML,
 		},
 		err: nil,
 	}, {
@@ -84,7 +84,7 @@ func TestSchemaValidatorWithCue(t *testing.T) {
 		args: args{
 			cueFile:    "cue_testdata/mysql.cue",
 			configFile: "cue_testdata/mysql.cnf",
-			formatter:  dbaasv1alpha1.INI,
+			formatter:  appsv1alpha1.INI,
 		},
 		err: nil,
 	}, {
@@ -92,7 +92,7 @@ func TestSchemaValidatorWithCue(t *testing.T) {
 		args: args{
 			cueFile:    "cue_testdata/mysql.cue",
 			configFile: "cue_testdata/mysql_err.cnf",
-			formatter:  dbaasv1alpha1.INI,
+			formatter:  appsv1alpha1.INI,
 		},
 		err: errors.New(`failed to cue template render configure: [mysqld.innodb_autoinc_lock_mode: 3 errors in empty disjunction:
 mysqld.innodb_autoinc_lock_mode: conflicting values 0 and 100:
@@ -120,7 +120,7 @@ func TestSchemaValidatorWithOpenSchema(t *testing.T) {
 	type args struct {
 		cueFile        string
 		configFile     string
-		formatter      dbaasv1alpha1.ConfigurationFormatter
+		formatter      appsv1alpha1.ConfigurationFormatter
 		SchemaTypeName string
 	}
 	tests := []struct {
@@ -132,7 +132,7 @@ func TestSchemaValidatorWithOpenSchema(t *testing.T) {
 		args: args{
 			cueFile:    "cue_testdata/mysql.cue",
 			configFile: "cue_testdata/mysql.cnf",
-			formatter:  dbaasv1alpha1.INI,
+			formatter:  appsv1alpha1.INI,
 		},
 		err: nil,
 	}}

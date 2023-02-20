@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package dbaastest
+package appstest
 
 import (
 	"context"
@@ -29,10 +29,10 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
-	"github.com/apecloud/kubeblocks/controllers/dbaas/components/util"
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
-	testdbaas "github.com/apecloud/kubeblocks/internal/testutil/dbaas"
+	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 	testk8s "github.com/apecloud/kubeblocks/internal/testutil/k8s"
 )
 
@@ -60,16 +60,16 @@ var _ = Describe("MySQL High-Availability function", func() {
 		By("clean resources")
 
 		// delete cluster(and all dependent sub-resources), clusterversion and clusterdef
-		testdbaas.ClearClusterResources(&testCtx)
+		testapps.ClearClusterResources(&testCtx)
 
 		// delete rest configurations
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 		// namespaced
-		testdbaas.ClearResources(&testCtx, intctrlutil.ConfigMapSignature, inNS, ml)
+		testapps.ClearResources(&testCtx, intctrlutil.ConfigMapSignature, inNS, ml)
 		// non-namespaced
-		testdbaas.ClearResources(&testCtx, intctrlutil.ConfigConstraintSignature, ml)
-		testdbaas.ClearResources(&testCtx, intctrlutil.BackupPolicyTemplateSignature, ml)
+		testapps.ClearResources(&testCtx, intctrlutil.ConfigConstraintSignature, ml)
+		testapps.ClearResources(&testCtx, intctrlutil.BackupPolicyTemplateSignature, ml)
 
 	}
 
@@ -80,9 +80,9 @@ var _ = Describe("MySQL High-Availability function", func() {
 	// Testcases
 
 	var (
-		clusterDefObj     *dbaasv1alpha1.ClusterDefinition
-		clusterVersionObj *dbaasv1alpha1.ClusterVersion
-		clusterObj        *dbaasv1alpha1.Cluster
+		clusterDefObj     *appsv1alpha1.ClusterDefinition
+		clusterVersionObj *appsv1alpha1.ClusterVersion
+		clusterObj        *appsv1alpha1.Cluster
 		clusterKey        types.NamespacedName
 	)
 
@@ -117,15 +117,15 @@ var _ = Describe("MySQL High-Availability function", func() {
 				},
 			},
 		}
-		clusterObj = testdbaas.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
+		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
 			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
 			AddComponent(mysqlCompName, mysqlCompType).
-			SetReplicas(3).AddVolumeClaimTemplate(testdbaas.DataVolumeName, pvcSpec).
+			SetReplicas(3).AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
 			Create(&testCtx).GetObject()
 		clusterKey = client.ObjectKeyFromObject(clusterObj)
 
 		By("Waiting the cluster is created")
-		Eventually(testdbaas.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(dbaasv1alpha1.RunningPhase))
+		Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.RunningPhase))
 
 		By("Checking pods' role label")
 		stsList := testk8s.ListAndCheckStatefulSet(&testCtx, clusterKey)
@@ -178,7 +178,7 @@ var _ = Describe("MySQL High-Availability function", func() {
 		Expect(k8sClient.Delete(ctx, leaderPod)).Should(Succeed())
 
 		By("Waiting for pod recovered and new leader elected")
-		Eventually(testdbaas.CheckObj(&testCtx, client.ObjectKeyFromObject(sts),
+		Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(sts),
 			func(g Gomega, sts *appsv1.StatefulSet) {
 				g.Expect(sts.Status.AvailableReplicas == 3).To(BeTrue())
 			})).Should(Succeed())
@@ -193,21 +193,21 @@ var _ = Describe("MySQL High-Availability function", func() {
 	Context("with MySQL defined as Consensus type and three replicas", func() {
 		BeforeEach(func() {
 			By("Create configmap")
-			_ = testdbaas.CreateCustomizedObj(&testCtx, "resources/mysql_scripts.yaml", &corev1.ConfigMap{},
-				testdbaas.WithName(scriptConfigName), testCtx.UseDefaultNamespace())
+			_ = testapps.CreateCustomizedObj(&testCtx, "resources/mysql_scripts.yaml", &corev1.ConfigMap{},
+				testapps.WithName(scriptConfigName), testCtx.UseDefaultNamespace())
 
 			By("Create a clusterDef obj")
 			mode := int32(0755)
-			clusterDefObj = testdbaas.NewClusterDefFactory(clusterDefName, testdbaas.MySQLType).
+			clusterDefObj = testapps.NewClusterDefFactory(clusterDefName).
 				SetConnectionCredential(map[string]string{"username": "root", "password": ""}).
-				AddComponent(testdbaas.ConsensusMySQLComponent, mysqlCompType).
-				AddConfigTemplate(scriptConfigName, scriptConfigName, "", testdbaas.ScriptsVolumeName, &mode).
-				AddContainerEnv(testdbaas.DefaultMySQLContainerName, corev1.EnvVar{Name: "MYSQL_ALLOW_EMPTY_PASSWORD", Value: "yes"}).
+				AddComponent(testapps.ConsensusMySQLComponent, mysqlCompType).
+				AddConfigTemplate(scriptConfigName, scriptConfigName, "", testCtx.DefaultNamespace, testapps.ScriptsVolumeName, &mode).
+				AddContainerEnv(testapps.DefaultMySQLContainerName, corev1.EnvVar{Name: "MYSQL_ALLOW_EMPTY_PASSWORD", Value: "yes"}).
 				Create(&testCtx).GetObject()
 
 			By("Create a clusterVersion obj")
-			clusterVersionObj = testdbaas.NewClusterVersionFactory(clusterVersionName, clusterDefObj.GetName()).
-				AddComponent(mysqlCompType).AddContainerShort(testdbaas.DefaultMySQLContainerName, testdbaas.ApeCloudMySQLImage).
+			clusterVersionObj = testapps.NewClusterVersionFactory(clusterVersionName, clusterDefObj.GetName()).
+				AddComponent(mysqlCompType).AddContainerShort(testapps.DefaultMySQLContainerName, testapps.ApeCloudMySQLImage).
 				Create(&testCtx).GetObject()
 
 		})

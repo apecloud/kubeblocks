@@ -16,6 +16,7 @@ The KubeBlocks log enhancement function uses methods similar to kubectl exec and
      kbcli cluster create mycluster --cluster-definition='apecloud-mysql' --enable-all-logs=true 
      ```
    - If you create a cluster by applying a YAML file, add the log type you need in `spec.components.enabledLogs`. As for MySQL, error logs, slow logs, and general logs are supported.
+
      ```YAML
      apiVersion: dbaas.kubeblocks.io/v1alpha1
      kind: Cluster

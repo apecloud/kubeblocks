@@ -18,19 +18,21 @@ package configuration
 
 import (
 	"bytes"
-	"reflect"
-
+	"encoding/json"
 	"os"
 	"path"
 	"path/filepath"
+	"reflect"
 	"strings"
 
+	"github.com/StudioSol/set"
+	"github.com/spf13/cast"
 	"github.com/spf13/viper"
 	appv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -54,22 +56,22 @@ type PolicyExecStatus struct {
 type ConfigEventContext struct {
 	Client  client.Client
 	ReqCtx  intctrlutil.RequestCtx
-	Cluster *dbaasv1alpha1.Cluster
+	Cluster *appsv1alpha1.Cluster
 
-	ClusterComponent *dbaasv1alpha1.ClusterComponent
-	Component        *dbaasv1alpha1.ClusterDefinitionComponent
+	ClusterComponent *appsv1alpha1.ClusterComponentSpec
+	Component        *appsv1alpha1.ClusterComponentDefinition
 	ComponentUnits   []appv1.StatefulSet
 
 	TplName          string
 	ConfigPatch      *ConfigPatchInfo
 	CfgCM            *corev1.ConfigMap
-	ConfigConstraint *dbaasv1alpha1.ConfigConstraintSpec
+	ConfigConstraint *appsv1alpha1.ConfigConstraintSpec
 
 	PolicyStatus PolicyExecStatus
 }
 
 type ConfigEventHandler interface {
-	Handle(eventContext ConfigEventContext, lastOpsRequest string, phase dbaasv1alpha1.Phase, err error) error
+	Handle(eventContext ConfigEventContext, lastOpsRequest string, phase appsv1alpha1.Phase, err error) error
 }
 
 const (
@@ -397,4 +399,94 @@ func CreateMergePatch(oldcfg, target interface{}, option CfgOption) (*ConfigPatc
 	}
 
 	return old.Diff(new.cfgWrapper)
+}
+
+func GenerateVisualizedParamsList(configPatch *ConfigPatchInfo, formatConfig *appsv1alpha1.FormatterConfig, sets *set.LinkedHashSetString) []VisualizedParam {
+	if !configPatch.IsModify {
+		return nil
+	}
+
+	var trimPrefix = ""
+	if formatConfig != nil && formatConfig.Formatter == appsv1alpha1.INI && formatConfig.IniConfig != nil {
+		trimPrefix = formatConfig.IniConfig.SectionName
+	}
+
+	r := make([]VisualizedParam, 0)
+	r = append(r, generateUpdateParam(configPatch.UpdateConfig, trimPrefix, sets)...)
+	r = append(r, generateUpdateKeyParam(configPatch.AddConfig, trimPrefix, AddedType, sets)...)
+	r = append(r, generateUpdateKeyParam(configPatch.DeleteConfig, trimPrefix, DeletedType, sets)...)
+	return r
+}
+
+func generateUpdateParam(updatedParams map[string][]byte, trimPrefix string, sets *set.LinkedHashSetString) []VisualizedParam {
+	r := make([]VisualizedParam, 0, len(updatedParams))
+
+	for key, b := range updatedParams {
+		// TODO support keys
+		if sets != nil && sets.Length() > 0 && !sets.InArray(key) {
+			continue
+		}
+		var v any
+		if err := json.Unmarshal(b, &v); err != nil {
+			return nil
+		}
+		if params := checkAndFlattenMap(v, trimPrefix); params != nil {
+			r = append(r, VisualizedParam{
+				Key:        key,
+				Parameters: params,
+				UpdateType: UpdatedType,
+			})
+		}
+	}
+	return r
+}
+
+func checkAndFlattenMap(v any, trim string) []ParameterPair {
+	m := cast.ToStringMap(v)
+	if m != nil && trim != "" {
+		m = cast.ToStringMap(m[trim])
+	}
+	if m != nil {
+		return flattenMap(m, "")
+	}
+	return nil
+}
+
+func flattenMap(m map[string]interface{}, prefix string) []ParameterPair {
+	if prefix != "" {
+		prefix += cfgKeyDelimiter
+	}
+
+	r := make([]ParameterPair, 0)
+	for k, val := range m {
+		fullKey := prefix + k
+		switch m2 := val.(type) {
+		case map[string]interface{}:
+			r = append(r, flattenMap(m2, fullKey)...)
+		default:
+			r = append(r, ParameterPair{
+				Key:   fullKey,
+				Value: cast.ToString(val),
+			})
+		}
+	}
+	return r
+}
+
+func generateUpdateKeyParam(files map[string]interface{}, trimPrefix string, updatedType ParameterUpdateType, sets *set.LinkedHashSetString) []VisualizedParam {
+	r := make([]VisualizedParam, 0, len(files))
+
+	for key, params := range files {
+		if sets != nil && sets.Length() > 0 && !sets.InArray(key) {
+			continue
+		}
+		if params := checkAndFlattenMap(params, trimPrefix); params != nil {
+			r = append(r, VisualizedParam{
+				Key:        key,
+				Parameters: params,
+				UpdateType: updatedType,
+			})
+		}
+	}
+	return r
 }

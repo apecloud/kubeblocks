@@ -32,7 +32,7 @@ import (
 
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/apecloud/kubeblocks/internal/testutil"
-	testdbaas "github.com/apecloud/kubeblocks/internal/testutil/dbaas"
+	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 )
 
 const (
@@ -164,10 +164,10 @@ func ListAndCheckStatefulSet(testCtx *testutil.TestContext, key types.Namespaced
 
 func PatchStatefulSetStatus(testCtx *testutil.TestContext, stsName string, status apps.StatefulSetStatus) {
 	objectKey := client.ObjectKey{Name: stsName, Namespace: testCtx.DefaultNamespace}
-	gomega.Expect(testdbaas.GetAndChangeObjStatus(testCtx, objectKey, func(newSts *apps.StatefulSet) {
+	gomega.Expect(testapps.GetAndChangeObjStatus(testCtx, objectKey, func(newSts *apps.StatefulSet) {
 		newSts.Status = status
 	})()).Should(gomega.Succeed())
-	gomega.Eventually(testdbaas.CheckObj(testCtx, objectKey, func(g gomega.Gomega, newSts *apps.StatefulSet) {
+	gomega.Eventually(testapps.CheckObj(testCtx, objectKey, func(g gomega.Gomega, newSts *apps.StatefulSet) {
 		g.Expect(reflect.DeepEqual(newSts.Status, status)).Should(gomega.BeTrue())
 	})).Should(gomega.Succeed())
 }

@@ -23,7 +23,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-func TestDbaas(t *testing.T) {
+func TestApps(t *testing.T) {
 	RegisterFailHandler(Fail)
 	RunSpecs(t, "BackupConfig Suite")
 }

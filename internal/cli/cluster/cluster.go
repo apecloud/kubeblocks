@@ -30,7 +30,7 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/kubectl/pkg/util/resource"
 
-	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 )
@@ -56,7 +56,7 @@ type ObjectsGetter struct {
 
 func NewClusterObjects() *ClusterObjects {
 	return &ClusterObjects{
-		Cluster: &dbaasv1alpha1.Cluster{},
+		Cluster: &appsv1alpha1.Cluster{},
 		Nodes:   []*corev1.Node{},
 	}
 }
@@ -88,7 +88,7 @@ func (o *ObjectsGetter) Get() (*ClusterObjects, error) {
 
 	// get cluster definition
 	if o.WithClusterDef {
-		cd := &dbaasv1alpha1.ClusterDefinition{}
+		cd := &appsv1alpha1.ClusterDefinition{}
 		if err = getResource(types.ClusterDefGVR(), objs.Cluster.Spec.ClusterDefRef, "", cd); err != nil {
 			return nil, err
 		}
@@ -97,7 +97,7 @@ func (o *ObjectsGetter) Get() (*ClusterObjects, error) {
 
 	// get cluster version
 	if o.WithClusterVersion {
-		v := &dbaasv1alpha1.ClusterVersion{}
+		v := &appsv1alpha1.ClusterVersion{}
 		if err = getResource(types.ClusterVersionGVR(), objs.Cluster.Spec.ClusterVersionRef, "", v); err != nil {
 			return nil, err
 		}
@@ -200,7 +200,7 @@ func (o *ClusterObjects) GetClusterInfo() *ClusterInfo {
 		return cluster
 	}
 
-	primaryComponent := FindClusterComp(o.Cluster, o.ClusterDef.Spec.Components[0].TypeName)
+	primaryComponent := FindClusterComp(o.Cluster, o.ClusterDef.Spec.ComponentDefs[0].Name)
 	internalEndpoints, externalEndpoints := GetComponentEndpoints(o.Services, primaryComponent)
 	if len(internalEndpoints) > 0 {
 		cluster.InternalEP = strings.Join(internalEndpoints, ",")
@@ -213,7 +213,7 @@ func (o *ClusterObjects) GetClusterInfo() *ClusterInfo {
 
 func (o *ClusterObjects) GetComponentInfo() []*ComponentInfo {
 	var comps []*ComponentInfo
-	for _, c := range o.Cluster.Spec.Components {
+	for _, c := range o.Cluster.Spec.ComponentSpecs {
 		// get all pods belonging to current component
 		var pods []*corev1.Pod
 		for _, p := range o.Pods.Items {
@@ -236,9 +236,9 @@ func (o *ClusterObjects) GetComponentInfo() []*ComponentInfo {
 		comp := &ComponentInfo{
 			Name:      c.Name,
 			NameSpace: o.Cluster.Namespace,
-			Type:      c.Type,
+			Type:      c.ComponentDefRef,
 			Cluster:   o.Cluster.Name,
-			Replicas:  fmt.Sprintf("%d / %d", *c.Replicas, len(pods)),
+			Replicas:  fmt.Sprintf("%d / %d", c.Replicas, len(pods)),
 			Status:    fmt.Sprintf("%d / %d / %d / %d ", running, waiting, succeeded, failed),
 			Image:     image,
 		}
@@ -263,10 +263,10 @@ func (o *ClusterObjects) GetInstanceInfo() []*InstanceInfo {
 			CreatedTime: util.TimeFormat(&pod.CreationTimestamp),
 		}
 
-		var component *dbaasv1alpha1.ClusterComponent
-		for i, c := range o.Cluster.Spec.Components {
+		var component *appsv1alpha1.ClusterComponentSpec
+		for i, c := range o.Cluster.Spec.ComponentSpecs {
 			if c.Name == instance.Component {
-				component = &o.Cluster.Spec.Components[i]
+				component = &o.Cluster.Spec.ComponentSpecs[i]
 			}
 		}
 		instance.Storage = o.getStorageInfo(component)
@@ -277,12 +277,12 @@ func (o *ClusterObjects) GetInstanceInfo() []*InstanceInfo {
 	return instances
 }
 
-func (o *ClusterObjects) getStorageInfo(component *dbaasv1alpha1.ClusterComponent) []StorageInfo {
+func (o *ClusterObjects) getStorageInfo(component *appsv1alpha1.ClusterComponentSpec) []StorageInfo {
 	if component == nil {
 		return nil
 	}
 
-	getClassName := func(vcTpl *dbaasv1alpha1.ClusterComponentVolumeClaimTemplate) string {
+	getClassName := func(vcTpl *appsv1alpha1.ClusterComponentVolumeClaimTemplate) string {
 		if vcTpl.Spec.StorageClassName != nil {
 			return *vcTpl.Spec.StorageClassName
 		}

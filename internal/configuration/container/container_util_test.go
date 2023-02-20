@@ -28,7 +28,7 @@ import (
 	"github.com/docker/docker/api/types"
 	"github.com/stretchr/testify/require"
 
-	testdbaas "github.com/apecloud/kubeblocks/internal/testutil/dbaas"
+	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 )
 
 func testContainer(service string, id string, state string) types.Container {
@@ -37,7 +37,7 @@ func testContainer(service string, id string, state string) types.Container {
 	return types.Container{
 		ID:    id,
 		Names: []string{name},
-		Labels: testdbaas.WithMap("service", service,
+		Labels: testapps.WithMap("service", service,
 			"working_dir", workingDir,
 			"project", "test_project"),
 		State: state,

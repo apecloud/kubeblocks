@@ -4,11 +4,11 @@ When there is an exception during your operation, you can perform the following 
 ***Steps:***
 
 1. Check the cluster status. Fill in the name of the cluster you want to check and run the command below.
-   ```
-   kbcli cluster list NAME
+   ```bash
+   kbcli cluster list <name>
    ```
    ***Example***
-   ```
+   ```bash
    kbcli cluster list mysql-cluster
    ```
 2. Handle the exception according to the status information.

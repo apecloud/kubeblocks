@@ -69,7 +69,6 @@ func rollingStatefulSets(param reconfigureParams) (ReturnedStatus, error) {
 		}
 	}
 
-	// TODO Check whether the restart is complete.
 	pods, err := GetComponentPods(param)
 	if err != nil {
 		return makeReturnedStatus(ESAndRetryFailed), err

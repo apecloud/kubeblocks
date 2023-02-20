@@ -105,14 +105,12 @@ func HandleCRDeletion(reqCtx RequestCtx,
 		// The object is not being deleted, so if it does not have our finalizer,
 		// then lets add the finalizer and update the object. This is equivalent
 		// registering our finalizer.
-		if controllerutil.ContainsFinalizer(cr, finalizer) {
-			return nil, nil
-		}
-
-		controllerutil.AddFinalizer(cr, finalizer)
-		if err := r.Update(reqCtx.Ctx, cr); err != nil {
-			res, err := CheckedRequeueWithError(err, reqCtx.Log, "")
-			return &res, err
+		if !controllerutil.ContainsFinalizer(cr, finalizer) {
+			controllerutil.AddFinalizer(cr, finalizer)
+			if err := r.Update(reqCtx.Ctx, cr); err != nil {
+				res, err := CheckedRequeueWithError(err, reqCtx.Log, "")
+				return &res, err
+			}
 		}
 	} else {
 		// The object is being deleted

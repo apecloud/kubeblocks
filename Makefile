@@ -15,13 +15,13 @@
 # Variables                                                                    #
 ################################################################################
 
-export GO111MODULE ?= on
-# export GOPROXY ?= https://proxy.golang.org
-export GOPROXY ?= https://goproxy.cn
-export GOSUMDB ?= sum.golang.org
-export GONOPROXY ?= github.com/apecloud
-export GONOSUMDB ?= github.com/apecloud
-export GOPRIVATE ?= github.com/apecloud
+export GO111MODULE = auto
+# export GOPROXY = https://proxy.golang.org
+export GOPROXY = https://goproxy.cn
+export GOSUMDB = sum.golang.org
+export GONOPROXY = github.com/apecloud
+export GONOSUMDB = github.com/apecloud
+export GOPRIVATE = github.com/apecloud
 
 
 GITHUB_PROXY ?= https://github.91chi.fun/
@@ -51,6 +51,7 @@ CHART_PATH = deploy/helm
 WEBHOOK_CERT_DIR ?= /tmp/k8s-webhook-server/serving-certs
 
 GO ?= go
+GOFMT ?= gofmt
 GOOS ?= $(shell $(GO) env GOOS)
 GOARCH ?= $(shell $(GO) env GOARCH)
 # Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
@@ -58,13 +59,6 @@ ifeq (,$(shell $(GO) env GOBIN))
 GOBIN=$(shell $(GO) env GOPATH)/bin
 else
 GOBIN=$(shell $(GO) env GOBIN)
-endif
-
-# Go module support: set `-mod=vendor` to use the vendored sources.
-# See also hack/make.sh.
-ifeq ($(shell go help mod >/dev/null 2>&1 && echo true), true)
-  GO:=GO111MODULE=on $(GO)
-  MOD_VENDOR=-mod=vendor
 endif
 
 BUILDX_ENABLED ?= false
@@ -165,7 +159,7 @@ test-go-generate: ## Run go generate against test code.
 
 .PHONY: fmt
 fmt: ## Run go fmt against code.
-	$(GO) fmt ./...
+	$(GOFMT) -l -w -s $$(git ls-files | grep "\.go$$")
 
 .PHONY: vet
 vet: ## Run go vet against code.

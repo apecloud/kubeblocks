@@ -11,6 +11,7 @@ spec:
   componentDefs:
     - name: replication
       workloadType: Replication
+      characterType: redis
       service:
         ports:
           - protocol: TCP

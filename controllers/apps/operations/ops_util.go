@@ -321,9 +321,10 @@ func isOpsRequestFailedPhase(opsRequestPhase appsv1alpha1.Phase) bool {
 
 func updateReconfigureStatusByCM(reconfiguringStatus *appsv1alpha1.ReconfiguringStatus, tplName string,
 	handleReconfigureStatus handleReconfigureOpsStatus) error {
-	for _, cmStatus := range reconfiguringStatus.ConfigurationStatus {
+	for i, cmStatus := range reconfiguringStatus.ConfigurationStatus {
 		if cmStatus.Name == tplName {
-			return handleReconfigureStatus(&cmStatus)
+			// update cmStatus
+			return handleReconfigureStatus(&reconfiguringStatus.ConfigurationStatus[i])
 		}
 	}
 	cmCount := len(reconfiguringStatus.ConfigurationStatus)

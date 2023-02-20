@@ -205,7 +205,7 @@ func (o *CreateOptions) Validate() error {
 			return err
 		}
 		o.ClusterVersionRef = version
-		fmt.Fprintf(o.Out, "Cluster version is not specified, use the recently created ClusterVersion %s\n", o.ClusterVersionRef)
+		printer.Warning(o.Out, "cluster version is not specified, use the recently created ClusterVersion %s\n", o.ClusterVersionRef)
 	}
 
 	if len(o.Values) > 0 && len(o.SetFile) > 0 {
@@ -471,11 +471,11 @@ func buildClusterComp(cd *appsv1alpha1.ClusterDefinition, setsMap map[string]map
 // specified in the set, use the cluster definition default component name.
 func buildCompSetsMap(values []string, cd *appsv1alpha1.ClusterDefinition) (map[string]map[setKey]string, error) {
 	allSets := map[string]map[setKey]string{}
+	keys := []string{string(keyCPU), string(keyType), string(keyStorage), string(keyMemory), string(keyReplicas)}
 	parseKey := func(key string) setKey {
-		keys := []setKey{keyCPU, keyType, keyStorage, keyMemory, keyReplicas}
 		for _, k := range keys {
-			if k == setKey(key) {
-				return setKey(key)
+			if strings.EqualFold(k, key) {
+				return setKey(k)
 			}
 		}
 		return keyUnknown
@@ -485,16 +485,17 @@ func buildCompSetsMap(values []string, cd *appsv1alpha1.ClusterDefinition) (map[
 		for _, set := range sets {
 			kv := strings.Split(set, "=")
 			if len(kv) != 2 {
+				printer.Warning(os.Stdout, "unknown set format \"%s\", ignore it, should be like key1=value1\n", set)
 				continue
 			}
 
 			// only record the supported key
 			k := parseKey(kv[0])
 			if k == keyUnknown {
-				printer.Warning(os.Stdout, "unknown set key %s, ignore it\n", kv[0])
+				printer.Warning(os.Stdout, "unknown set key \"%s\", ignore it, should be one of [%s]\n", kv[0], strings.Join(keys, ","))
 				continue
 			}
-			res[setKey(kv[0])] = kv[1]
+			res[k] = kv[1]
 		}
 		return res
 	}

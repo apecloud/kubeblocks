@@ -372,7 +372,7 @@ func (o *CreateRestoreOptions) Complete() error {
 		return err
 	}
 
-	if err = json.Unmarshal(componentByte, &o.Components); err != nil {
+	if err = json.Unmarshal(componentByte, &o.ComponentSpecs); err != nil {
 		return err
 	}
 

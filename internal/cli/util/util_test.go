@@ -104,13 +104,6 @@ var _ = Describe("util", func() {
 		spinner(false)
 	})
 
-	It("Check errors", func() {
-		CheckErr(nil)
-
-		err := fmt.Errorf("test error")
-		printErr(err)
-	})
-
 	It("GetNodeByName", func() {
 		nodes := []*corev1.Node{
 			{

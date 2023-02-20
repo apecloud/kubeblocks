@@ -24,6 +24,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
@@ -69,6 +70,36 @@ func IsStsAndPodsRevisionConsistent(ctx context.Context, cli client.Client, sts 
 		}
 	}
 	return revisionConsistent, nil
+}
+
+// RestartSts restarts pods of the StatefulSet manually
+func RestartSts(ctx context.Context, cli client.Client, sts *appsv1.StatefulSet) error {
+	if sts.Spec.UpdateStrategy.Type == appsv1.RollingUpdateStatefulSetStrategyType {
+		return nil
+	}
+
+	pods, err := GetPodListByStatefulSet(ctx, cli, sts)
+	if err != nil {
+		return err
+	}
+
+	for _, pod := range pods {
+		// if DeletionTimestamp is not nil, it's terminating.
+		if pod.DeletionTimestamp != nil {
+			continue
+		}
+
+		// do nothing if pod is the latest version
+		if GetPodRevision(&pod) == sts.Status.UpdateRevision {
+			continue
+		}
+
+		// delete the pod to trigger associate StatefulSet to re-create it
+		if err := cli.Delete(ctx, &pod); err != nil && !apierrors.IsNotFound(err) {
+			return err
+		}
+	}
+	return nil
 }
 
 // StatefulSetIsReady checks if statefulSet is ready.

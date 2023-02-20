@@ -108,6 +108,10 @@ func (stateless *Stateless) GetPhaseWhenPodsNotReady(componentName string) (apps
 	return util.GetComponentPhase(isFailed, isAbnormal), nil
 }
 
+func (stateless *Stateless) HandleUpdate(obj client.Object) error {
+	return nil
+}
+
 func NewStateless(ctx context.Context,
 	cli client.Client,
 	cluster *appsv1alpha1.Cluster,

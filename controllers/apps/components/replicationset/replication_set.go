@@ -62,7 +62,7 @@ func (rs *ReplicationSet) IsRunning(obj client.Object) (bool, error) {
 		stsIsReady := util.StatefulSetIsReady(&stsObj, isRevisionConsistent, nil)
 		availableReplicas += stsObj.Status.AvailableReplicas
 		if !stsIsReady {
-			componentStatusIsRunning = false
+			return false, nil
 		}
 	}
 	if availableReplicas != targetReplicas {
@@ -178,6 +178,30 @@ func (rs *ReplicationSet) GetPhaseWhenPodsNotReady(componentName string) (appsv1
 		return "", nil
 	}
 	return util.GetComponentPhase(isFailed, isAbnormal), nil
+}
+
+func (rs *ReplicationSet) HandleUpdate(obj client.Object) error {
+	var componentStsList = &appsv1.StatefulSetList{}
+	sts := util.CovertToStatefulSet(obj)
+	if err := util.GetObjectListByComponentName(rs.Ctx, rs.Cli, rs.Cluster, componentStsList, sts.Labels[intctrlutil.AppComponentLabelKey]); err != nil {
+		return err
+	}
+	for _, sts := range componentStsList.Items {
+		if sts.Generation != sts.Status.ObservedGeneration {
+			continue
+		}
+		pods, err := util.GetPodListByStatefulSet(rs.Ctx, rs.Cli, &sts)
+		if err != nil {
+			return err
+		}
+		if len(pods) != int(*sts.Spec.Replicas) {
+			continue
+		}
+		if err := util.RestartSts(rs.Ctx, rs.Cli, &sts); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // NewReplicationSet creates a new ReplicationSet object.

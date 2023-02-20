@@ -103,6 +103,10 @@ func (stateful *Stateful) GetPhaseWhenPodsNotReady(componentName string) (appsv1
 	return util.GetComponentPhase(isFailed, isAbnormal), nil
 }
 
+func (stateful *Stateful) HandleUpdate(obj client.Object) error {
+	return nil
+}
+
 func NewStateful(ctx context.Context,
 	cli client.Client,
 	cluster *appsv1alpha1.Cluster,

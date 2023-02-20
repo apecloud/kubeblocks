@@ -92,7 +92,7 @@ func newInitCmd(streams genericclioptions.IOStreams) *cobra.Command {
 
 	cmd.Flags().StringVar(&o.clusterDef, "cluster-definition", defaultClusterDef, "Cluster definition")
 	cmd.Flags().StringVar(&o.clusterVersion, "cluster-version", "", "Cluster definition")
-	cmd.Flags().StringVar(&o.kbVersion, "kubeblocks-version", version.DefaultKubeBlocksVersion, "KubeBlocks version")
+	cmd.Flags().StringVar(&o.kbVersion, "version", version.DefaultKubeBlocksVersion, "KubeBlocks version")
 	cmd.Flags().StringVar(&o.CloudProvider, "cloud-provider", defaultCloudProvider, "Cloud provider type")
 	cmd.Flags().StringVar(&o.AccessKey, "access-key", "", "Cloud provider access key")
 	cmd.Flags().StringVar(&o.AccessSecret, "access-secret", "", "Cloud provider access secret")
@@ -375,6 +375,7 @@ func newCreateOptions(cd string, version string) (*cmdcluster.CreateOptions, err
 		UpdatableFlags: cmdcluster.UpdatableFlags{
 			TerminationPolicy: "WipeOut",
 			Monitor:           true,
+			PodAntiAffinity:   "Preferred",
 		},
 		ClusterDefRef:     cd,
 		ClusterVersionRef: version,

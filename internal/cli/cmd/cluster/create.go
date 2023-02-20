@@ -139,7 +139,7 @@ type CreateOptions struct {
 	ClusterDefRef     string                   `json:"clusterDefRef"`
 	ClusterVersionRef string                   `json:"clusterVersionRef"`
 	Tolerations       []interface{}            `json:"tolerations,omitempty"`
-	Components        []map[string]interface{} `json:"components"`
+	ComponentSpecs    []map[string]interface{} `json:"componentSpecs"`
 
 	SetFile string   `json:"-"`
 	Values  []string `json:"-"`
@@ -236,7 +236,7 @@ func (o *CreateOptions) Complete() error {
 	if err := setBackup(o, components); err != nil {
 		return err
 	}
-	o.Components = components
+	o.ComponentSpecs = components
 
 	// TolerationsRaw looks like `["key=engineType,value=mongo,operator=Equal,effect=NoSchedule"]` after parsing by cmd
 	tolerations := buildTolerations(o.TolerationsRaw)
@@ -254,7 +254,7 @@ func (o *CreateOptions) buildComponents() ([]map[string]interface{}, error) {
 	)
 
 	// build components from file
-	components := o.Components
+	components := o.ComponentSpecs
 	if len(o.SetFile) > 0 {
 		if componentByte, err = MultipleSourceComponents(o.SetFile, o.IOStreams.In); err != nil {
 			return nil, err

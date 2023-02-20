@@ -18,7 +18,7 @@ options: {
 	namespace:         string
 	clusterDefRef:     string
 	clusterVersionRef: string
-	components: [...]
+	componentSpecs: [...]
 	terminationPolicy: string
 	podAntiAffinity:   string
 	topologyKeys: [...]
@@ -43,7 +43,7 @@ content: {
 			nodeLabels:      options.nodeLabels
 		}
 		tolerations:       options.tolerations
-		components:        options.components
+		componentSpecs:    options.componentSpecs
 		terminationPolicy: options.terminationPolicy
 	}
 }

@@ -17,13 +17,13 @@ limitations under the License.
 package component
 
 import (
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
 	corev1 "k8s.io/api/core/v1"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 var _ = Describe("probe_utils", func() {

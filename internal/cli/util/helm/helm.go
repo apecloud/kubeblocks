@@ -43,6 +43,8 @@ import (
 	"helm.sh/helm/v3/pkg/repo"
 	"helm.sh/helm/v3/pkg/storage"
 	"helm.sh/helm/v3/pkg/storage/driver"
+
+	"github.com/apecloud/kubeblocks/internal/cli/types"
 )
 
 const defaultTimeout = time.Second * 600
@@ -84,15 +86,15 @@ func AddRepo(r *repo.Entry) error {
 
 	// Check if the repo Name is legal
 	if strings.Contains(r.Name, "/") {
-		return errors.Errorf("repository Name (%s) contains '/', please specify a different Name without '/'", r.Name)
+		return errors.Errorf("repository name (%s) contains '/', please specify a different name without '/'", r.Name)
 	}
 
 	if f.Has(r.Name) {
 		existing := f.Get(r.Name)
-		if *r != *existing {
+		if *r != *existing && r.Name != types.KubeBlocksChartName {
 			// The input coming in for the Name is different from what is already
 			// configured. Return an error.
-			return errors.Errorf("repository Name (%s) already exists, please specify a different Name", r.Name)
+			return errors.Errorf("repository name (%s) already exists, please specify a different name", r.Name)
 		}
 	}
 

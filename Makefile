@@ -166,7 +166,7 @@ vet: ## Run go vet against code.
 	GOOS=linux $(GO) vet ./...
 
 .PHONY: cue-fmt
-cue-fmt: cuetool ## Run cue fmt against code
+cue-fmt: cuetool ## Run cue fmt against code.
 	git ls-files | grep "\.cue$$" | xargs $(CUE) fmt
 	git ls-files | grep "\.cue$$" | xargs $(CUE) fix
 

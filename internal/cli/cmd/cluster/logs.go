@@ -234,7 +234,7 @@ func (o *LogsOptions) createFileTypeCommand(pod *corev1.Pod, obj *cluster.Cluste
 		}
 	}
 	if len(compDefName) == 0 {
-		return command, fmt.Errorf("get pod component type in cluster.yaml fail")
+		return command, fmt.Errorf("get pod component definition name in cluster.yaml fail")
 	}
 	var filePathPattern string
 	for _, com := range obj.ClusterDef.Spec.ComponentDefs {

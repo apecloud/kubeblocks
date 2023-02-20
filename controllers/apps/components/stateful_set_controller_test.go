@@ -129,9 +129,9 @@ var _ = Describe("StatefulSet Controller", func() {
 		By("wait for component podsReady to be true and phase to be 'Rebooting'")
 		clusterKey := client.ObjectKey{Name: clusterName, Namespace: testCtx.DefaultNamespace}
 		Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1alpha1.Cluster) {
-			statusComponent := cluster.Status.Components[consensusCompName]
-			g.Expect(statusComponent.Phase).Should(Equal(appsv1alpha1.RebootingPhase))
-			g.Expect(*statusComponent.PodsReady).Should(BeTrue())
+			compStatus := cluster.Status.Components[consensusCompName]
+			g.Expect(compStatus.Phase).Should(Equal(appsv1alpha1.RebootingPhase))
+			g.Expect(*compStatus.PodsReady).Should(BeTrue())
 		})).Should(Succeed())
 
 		By("add leader role label for leaderPod to mock consensus component to be Running")

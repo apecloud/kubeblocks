@@ -121,7 +121,7 @@ func (r *ClusterVersion) validateConfigTemplate() error {
 	return nil
 }
 
-// GetInconsistentComponentsInfo get clusterVersion invalid component type and no containers component compared with clusterDefinitionDef
+// GetInconsistentComponentsInfo get clusterVersion invalid component name and no containers component compared with clusterDefinitionDef
 func (r *ClusterVersion) GetInconsistentComponentsInfo(clusterDef *ClusterDefinition) ([]string, []string) {
 
 	var (
@@ -138,7 +138,7 @@ func (r *ClusterVersion) GetInconsistentComponentsInfo(clusterDef *ClusterDefini
 			componentMap[v.Name] = true
 		}
 	}
-	// get not found component type in clusterDefinition
+	// get not found component name in clusterDefinition
 	for _, v := range r.Spec.ComponentVersions {
 		if _, ok := componentMap[v.ComponentDefRef]; !ok {
 			notFoundComponentDefNames = append(notFoundComponentDefNames, v.ComponentDefRef)

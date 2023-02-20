@@ -177,7 +177,7 @@ func (r *Cluster) validateClusterVersionRef(allErrs *field.ErrorList) {
 // ValidateComponents validate spec.components is legal
 func (r *Cluster) validateComponents(allErrs *field.ErrorList, clusterDef *ClusterDefinition) {
 	var (
-		// invalid component type slice
+		// invalid component slice
 		invalidComponentDefs = make([]string, 0)
 		componentNameMap     = make(map[string]struct{})
 		componentDefMap      = make(map[string]struct{})

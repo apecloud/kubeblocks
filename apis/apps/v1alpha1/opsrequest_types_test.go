@@ -156,7 +156,7 @@ func TestGetUpgradeComponentNameMap(t *testing.T) {
 	ops.Spec.Upgrade = &Upgrade{
 		ClusterVersionRef: "test-version",
 	}
-	ops.Status.Components = map[string]OpsRequestStatusComponent{
+	ops.Status.Components = map[string]OpsRequestComponentStatus{
 		componentName: {},
 	}
 

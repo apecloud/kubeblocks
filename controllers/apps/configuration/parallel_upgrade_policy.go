@@ -68,7 +68,7 @@ func (p *parallelUpgradePolicy) restartPods(params reconfigureParams) (bool, err
 	case appsv1alpha1.Stateful:
 		funcs = GetStatefulSetRollingUpgradeFuncs()
 	default:
-		return false, cfgcore.MakeError("not support component type[%s]", cType)
+		return false, cfgcore.MakeError("not support component workload type[%s]", cType)
 	}
 
 	pods, err := funcs.GetPodsFunc(params)

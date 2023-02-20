@@ -230,7 +230,7 @@ var _ = Describe("Reconfigure RollingPolicy", func() {
 
 			status, err := rollingPolicy.Upgrade(createReconfigureParam(appsv1alpha1.Stateless, defaultReplica))
 			Expect(err).ShouldNot(Succeed())
-			Expect(err.Error()).Should(ContainSubstring("not support component type"))
+			Expect(err.Error()).Should(ContainSubstring("not support component workload type"))
 			Expect(status.Status).Should(BeEquivalentTo(ESNotSupport))
 		})
 	})

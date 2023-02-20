@@ -109,17 +109,17 @@ func (ve volumeExpansionOpsHandler) ReconcileAction(opsRes *OpsResource) (appsv1
 	patch := client.MergeFrom(opsRequest.DeepCopy())
 	clusterPatch := client.MergeFrom(opsRes.Cluster.DeepCopy())
 	if opsRequest.Status.Components == nil {
-		ve.initStatusComponents(opsRequest)
+		ve.initComponentStatus(opsRequest)
 	}
 	storageMap := ve.getRequestStorageMap(opsRequest)
 	// reconcile the status.components. when the volume expansion is successful,
 	// sync the volumeClaimTemplate status and component phase On the OpsRequest and Cluster.
 	for _, v := range opsRequest.Spec.VolumeExpansionList {
-		statusComponent := opsRequest.Status.Components[v.ComponentName]
+		compStatus := opsRequest.Status.Components[v.ComponentName]
 		completedOnComponent := true
 		for _, vct := range v.VolumeClaimTemplates {
 			succeedCount, expectCount, isCompleted, err := ve.handleVCTExpansionProgress(opsRes,
-				&statusComponent, storageMap, v.ComponentName, vct.Name)
+				&compStatus, storageMap, v.ComponentName, vct.Name)
 			if err != nil {
 				return "", requeueAfter, err
 			}
@@ -132,8 +132,8 @@ func (ve volumeExpansionOpsHandler) ReconcileAction(opsRes *OpsResource) (appsv1
 			}
 		}
 		// when component expand volume completed, do it.
-		ve.setComponentPhaseForClusterAndOpsRequest(&statusComponent, opsRes.Cluster, v.ComponentName, completedOnComponent)
-		opsRequest.Status.Components[v.ComponentName] = statusComponent
+		ve.setComponentPhaseForClusterAndOpsRequest(&compStatus, opsRes.Cluster, v.ComponentName, completedOnComponent)
+		opsRequest.Status.Components[v.ComponentName] = compStatus
 	}
 	opsRequest.Status.Progress = fmt.Sprintf("%d/%d", succeedProgressCount, expectProgressCount)
 
@@ -211,7 +211,7 @@ func (ve volumeExpansionOpsHandler) checkIsTimeOut(opsRequest *appsv1alpha1.OpsR
 }
 
 // setClusterComponentPhaseToRunning when component expand volume completed, check whether change the component status.
-func (ve volumeExpansionOpsHandler) setComponentPhaseForClusterAndOpsRequest(component *appsv1alpha1.OpsRequestStatusComponent,
+func (ve volumeExpansionOpsHandler) setComponentPhaseForClusterAndOpsRequest(component *appsv1alpha1.OpsRequestComponentStatus,
 	cluster *appsv1alpha1.Cluster,
 	componentName string,
 	completedOnComponent bool) {
@@ -276,11 +276,11 @@ func (ve volumeExpansionOpsHandler) getRequestStorageMap(opsRequest *appsv1alpha
 	return storageMap
 }
 
-// initVolumeExpansionStatus init status.components for the VolumeExpansion OpsRequest
-func (ve volumeExpansionOpsHandler) initStatusComponents(opsRequest *appsv1alpha1.OpsRequest) {
-	opsRequest.Status.Components = map[string]appsv1alpha1.OpsRequestStatusComponent{}
+// initComponentStatus init status.components for the VolumeExpansion OpsRequest
+func (ve volumeExpansionOpsHandler) initComponentStatus(opsRequest *appsv1alpha1.OpsRequest) {
+	opsRequest.Status.Components = map[string]appsv1alpha1.OpsRequestComponentStatus{}
 	for _, v := range opsRequest.Spec.VolumeExpansionList {
-		opsRequest.Status.Components[v.ComponentName] = appsv1alpha1.OpsRequestStatusComponent{
+		opsRequest.Status.Components[v.ComponentName] = appsv1alpha1.OpsRequestComponentStatus{
 			Phase: appsv1alpha1.VolumeExpandingPhase,
 		}
 	}
@@ -288,7 +288,7 @@ func (ve volumeExpansionOpsHandler) initStatusComponents(opsRequest *appsv1alpha
 
 // handleVCTExpansionProgress check whether the pvc of the volume claim template is resizing/expansion succeeded/expansion completed.
 func (ve volumeExpansionOpsHandler) handleVCTExpansionProgress(opsRes *OpsResource,
-	statusComponent *appsv1alpha1.OpsRequestStatusComponent,
+	compStatus *appsv1alpha1.OpsRequestComponentStatus,
 	storageMap map[string]resource.Quantity,
 	componentName, vctName string) (succeedCount int, expectCount int, isCompleted bool, err error) {
 	pvcList := &corev1.PersistentVolumeClaimList{}
@@ -312,7 +312,7 @@ func (ve volumeExpansionOpsHandler) handleVCTExpansionProgress(opsRes *OpsResour
 			completedCount += 1
 			message := fmt.Sprintf("Successfully expand volume: %s in Component: %s ", objectKey, componentName)
 			progressDetail.SetStatusAndMessage(appsv1alpha1.SucceedProgressStatus, message)
-			SetStatusComponentProgressDetail(opsRes.Recorder, opsRes.OpsRequest, &statusComponent.ProgressDetails, progressDetail)
+			SetComponentStatusProgressDetail(opsRes.Recorder, opsRes.OpsRequest, &compStatus.ProgressDetails, progressDetail)
 			continue
 		}
 		if ve.pvcIsResizing(&v) {
@@ -322,7 +322,7 @@ func (ve volumeExpansionOpsHandler) handleVCTExpansionProgress(opsRes *OpsResour
 			message := fmt.Sprintf("Waiting for an external controller to process the pvc: %s in Component: %s ", objectKey, componentName)
 			progressDetail.SetStatusAndMessage(appsv1alpha1.PendingProgressStatus, message)
 		}
-		SetStatusComponentProgressDetail(opsRes.Recorder, opsRes.OpsRequest, &statusComponent.ProgressDetails, progressDetail)
+		SetComponentStatusProgressDetail(opsRes.Recorder, opsRes.OpsRequest, &compStatus.ProgressDetails, progressDetail)
 		if ve.isExpansionCompleted(progressDetail.Status) {
 			completedCount += 1
 		}

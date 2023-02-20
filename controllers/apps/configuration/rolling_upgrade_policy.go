@@ -57,7 +57,7 @@ func (r *rollingUpgradePolicy) Upgrade(params reconfigureParams) (ReturnedStatus
 	case appsv1alpha1.Stateful:
 		funcs = GetStatefulSetRollingUpgradeFuncs()
 	default:
-		return makeReturnedStatus(ESNotSupport), cfgcore.MakeError("not support component type[%s]", cType)
+		return makeReturnedStatus(ESNotSupport), cfgcore.MakeError("not support component workload type[%s]", cType)
 	}
 	return performRollingUpgrade(params, funcs)
 }

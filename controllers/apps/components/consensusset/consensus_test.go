@@ -65,7 +65,7 @@ var _ = Describe("Consensus Component", func() {
 	AfterEach(cleanAll)
 
 	mockClusterStatusProbeTimeout := func(cluster *appsv1alpha1.Cluster) {
-		// mock pods ready in status component and probe timed out
+		// mock pods ready in component status and probe timed out
 		Eventually(testapps.ChangeObjStatus(&testCtx, cluster, func() {
 			podsReady := true
 			cluster.Status.Components = map[string]appsv1alpha1.ClusterComponentStatus{

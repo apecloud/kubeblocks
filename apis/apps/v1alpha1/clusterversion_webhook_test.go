@@ -62,7 +62,7 @@ var _ = Describe("clusterVersion webhook", func() {
 			Expect(testCtx.CreateObj(ctx, clusterDef)).Should(Succeed())
 
 			Eventually(func() bool {
-				By("By testing component type is not found in cluserDefinition")
+				By("By testing component name is not found in cluserDefinition")
 				clusterVersion.Spec.ComponentVersions[1].ComponentDefRef = "proxy1"
 				Expect(testCtx.CheckedCreateObj(ctx, clusterVersion)).ShouldNot(Succeed())
 

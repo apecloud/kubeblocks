@@ -130,7 +130,7 @@ func GetAllCluster(client dynamic.Interface, namespace string, clusters *appsv1a
 	return runtime.DefaultUnstructuredConverter.FromUnstructured(objs.UnstructuredContent(), clusters)
 }
 
-// FindClusterComp finds component in cluster object based on the component type name
+// FindClusterComp finds component in cluster object based on the component definition name
 func FindClusterComp(cluster *appsv1alpha1.Cluster, compDefName string) *appsv1alpha1.ClusterComponentSpec {
 	for i, c := range cluster.Spec.ComponentSpecs {
 		if c.ComponentDefRef == compDefName {
@@ -218,7 +218,7 @@ func GetDefaultCompName(cd *appsv1alpha1.ClusterDefinition) (string, error) {
 	if len(cd.Spec.ComponentDefs) == 1 {
 		return cd.Spec.ComponentDefs[0].Name, nil
 	}
-	return "", fmt.Errorf("failed to get the default component type")
+	return "", fmt.Errorf("failed to get the default component definition name")
 }
 
 func GetClusterByName(dynamic dynamic.Interface, name string, namespace string) (*appsv1alpha1.Cluster, error) {

@@ -79,7 +79,7 @@ func GetComponentPodList(ctx context.Context, cli client.Client, cluster *appsv1
 	return podList, err
 }
 
-func GetStatusComponentMessageKey(kind, name string) string {
+func GetComponentStatusMessageKey(kind, name string) string {
 	return fmt.Sprintf("%s/%s", kind, name)
 }
 

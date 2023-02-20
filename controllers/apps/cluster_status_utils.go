@@ -98,12 +98,12 @@ func getFinalEventMessageForRecorder(event *corev1.Event) string {
 }
 
 // isExistsEventMsg checks whether the event is exists
-func isExistsEventMsg(statusComponentMessage map[string]string, event *corev1.Event) bool {
-	if statusComponentMessage == nil {
+func isExistsEventMsg(compStatusMessage map[string]string, event *corev1.Event) bool {
+	if compStatusMessage == nil {
 		return false
 	}
-	messageKey := util.GetStatusComponentMessageKey(event.InvolvedObject.Kind, event.InvolvedObject.Name)
-	if message, ok := statusComponentMessage[messageKey]; !ok {
+	messageKey := util.GetComponentStatusMessageKey(event.InvolvedObject.Kind, event.InvolvedObject.Name)
+	if message, ok := compStatusMessage[messageKey]; !ok {
 		return false
 	} else {
 		return strings.Contains(message, event.Message)
@@ -111,31 +111,31 @@ func isExistsEventMsg(statusComponentMessage map[string]string, event *corev1.Ev
 
 }
 
-// updateStatusComponentMessage updates status component message map
-func updateStatusComponentMessage(statusComponent *appsv1alpha1.ClusterComponentStatus, event *corev1.Event) {
+// updateComponentStatusMessage updates component status message map
+func updateComponentStatusMessage(compStatus *appsv1alpha1.ClusterComponentStatus, event *corev1.Event) {
 	var (
 		kind = event.InvolvedObject.Kind
 		name = event.InvolvedObject.Name
 	)
-	if statusComponent.Message == nil {
-		statusComponent.Message = appsv1alpha1.ComponentMessageMap{}
-		statusComponent.Message.SetObjectMessage(kind, name, event.Message)
+	if compStatus.Message == nil {
+		compStatus.Message = appsv1alpha1.ComponentMessageMap{}
+		compStatus.Message.SetObjectMessage(kind, name, event.Message)
 		return
 	}
-	message := statusComponent.Message.GetObjectMessage(kind, name)
+	message := compStatus.Message.GetObjectMessage(kind, name)
 	// if the event message is not exists in message map, merge them.
 	if !strings.Contains(message, event.Message) {
 		message += event.Message + ";"
 	}
-	statusComponent.Message.SetObjectMessage(kind, name, message)
+	compStatus.Message.SetObjectMessage(kind, name, message)
 }
 
 // needSyncComponentStatusForEvent checks whether the component status needs to be synchronized the cluster status by event
 func needSyncComponentStatusForEvent(cluster *appsv1alpha1.Cluster, componentName string, phase appsv1alpha1.Phase, event *corev1.Event) bool {
 	var (
-		status          = &cluster.Status
-		statusComponent appsv1alpha1.ClusterComponentStatus
-		ok              bool
+		status     = &cluster.Status
+		compStatus appsv1alpha1.ClusterComponentStatus
+		ok         bool
 	)
 	if phase == "" {
 		return false
@@ -143,22 +143,22 @@ func needSyncComponentStatusForEvent(cluster *appsv1alpha1.Cluster, componentNam
 	if cluster.Status.Components == nil {
 		status.Components = map[string]appsv1alpha1.ClusterComponentStatus{}
 	}
-	if statusComponent, ok = cluster.Status.Components[componentName]; !ok {
-		statusComponent = appsv1alpha1.ClusterComponentStatus{Phase: phase}
-		updateStatusComponentMessage(&statusComponent, event)
-		status.Components[componentName] = statusComponent
+	if compStatus, ok = cluster.Status.Components[componentName]; !ok {
+		compStatus = appsv1alpha1.ClusterComponentStatus{Phase: phase}
+		updateComponentStatusMessage(&compStatus, event)
+		status.Components[componentName] = compStatus
 		return true
 	}
-	if statusComponent.Phase != phase {
-		statusComponent.Phase = phase
-		updateStatusComponentMessage(&statusComponent, event)
-		status.Components[componentName] = statusComponent
+	if compStatus.Phase != phase {
+		compStatus.Phase = phase
+		updateComponentStatusMessage(&compStatus, event)
+		status.Components[componentName] = compStatus
 		return true
 	}
 	// check whether it is a new warning event and the component phase is running
-	if !isExistsEventMsg(statusComponent.Message, event) && phase != appsv1alpha1.RunningPhase {
-		updateStatusComponentMessage(&statusComponent, event)
-		status.Components[componentName] = statusComponent
+	if !isExistsEventMsg(compStatus.Message, event) && phase != appsv1alpha1.RunningPhase {
+		updateComponentStatusMessage(&compStatus, event)
+		status.Components[componentName] = compStatus
 		return true
 	}
 	return false
@@ -297,7 +297,7 @@ func handleClusterStatusByEvent(ctx context.Context, cli client.Client, recorder
 		return err
 	}
 	componentName := labels[intctrlutil.AppComponentLabelKey]
-	// get the component phase by component type and sync to Cluster.status.components
+	// get the component phase by component name and sync to Cluster.status.components
 	patch := client.MergeFrom(cluster.DeepCopy())
 	componentMap, clusterAvailabilityEffectMap, componentDef := getComponentRelatedInfo(cluster, clusterDef, componentName)
 	clusterComponent := cluster.GetComponentByName(componentName)
@@ -480,10 +480,10 @@ func syncComponentPhaseWhenSpecUpdating(cluster *appsv1alpha1.Cluster,
 		}
 		return
 	}
-	statusComponent := cluster.Status.Components[componentName]
+	compStatus := cluster.Status.Components[componentName]
 	// if component phase is not the phase of operations, sync component phase to 'SpecUpdating'
-	if util.IsCompleted(statusComponent.Phase) {
-		statusComponent.Phase = appsv1alpha1.SpecUpdatingPhase
-		cluster.Status.Components[componentName] = statusComponent
+	if util.IsCompleted(compStatus.Phase) {
+		compStatus.Phase = appsv1alpha1.SpecUpdatingPhase
+		cluster.Status.Components[componentName] = compStatus
 	}
 }

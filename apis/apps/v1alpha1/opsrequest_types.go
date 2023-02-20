@@ -226,7 +226,7 @@ type OpsRequestStatus struct {
 
 	// components defines the recorded the status information of changed components for operation request.
 	// +optional
-	Components map[string]OpsRequestStatusComponent `json:"components,omitempty"`
+	Components map[string]OpsRequestComponentStatus `json:"components,omitempty"`
 
 	// startTimestamp The time when the OpsRequest started processing.
 	// +optional
@@ -303,7 +303,7 @@ type LastConfiguration struct {
 	Components map[string]LastComponentConfiguration `json:"components,omitempty"`
 }
 
-type OpsRequestStatusComponent struct {
+type OpsRequestComponentStatus struct {
 	// phase describes the component phase, reference Cluster.status.component.phase.
 	// +kubebuilder:validation:Enum={Running,Failed,Abnormal,Creating,SpecUpdating,Deleting,Deleted,VolumeExpanding,Reconfiguring,HorizontalScaling,VerticalScaling,VersionUpgrading,Rebooting}
 	// +optional
@@ -313,11 +313,7 @@ type OpsRequestStatusComponent struct {
 	// +optional
 	ProgressDetails []ProgressDetail `json:"progressDetails,omitempty"`
 
-	// type name of the component.
-	// +optional
-	Type string `json:"type,omitempty"`
-
-	// workloadType references component type of component in ClusterDefinition.
+	// workloadType references workload type of component in ClusterDefinition.
 	// +optional
 	WorkloadType WorkloadType `json:"workloadType,omitempty"`
 }

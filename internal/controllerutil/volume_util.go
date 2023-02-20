@@ -38,7 +38,7 @@ func findVolumeWithVolumeName(volumes []corev1.Volume, volumeName string) int {
 	return -1
 }
 
-func CheckAndUpdateVolume(volumes []corev1.Volume, volumeName string, createFn createVolumeFn, updateFn updateVolumeFn) ([]corev1.Volume, error) {
+func CreateOrUpdateVolume(volumes []corev1.Volume, volumeName string, createFn createVolumeFn, updateFn updateVolumeFn) ([]corev1.Volume, error) {
 	// for update volume
 	if existIndex := findVolumeWithVolumeName(volumes, volumeName); existIndex >= 0 {
 		if updateFn == nil {
@@ -54,7 +54,7 @@ func CheckAndUpdateVolume(volumes []corev1.Volume, volumeName string, createFn c
 	return append(volumes, createFn(volumeName)), nil
 }
 
-func CheckAndUpdatePodVolumes(podSpec *corev1.PodSpec, volumes map[string]appsv1alpha1.ConfigTemplate) error {
+func CreateOrUpdatePodVolumes(podSpec *corev1.PodSpec, volumes map[string]appsv1alpha1.ConfigTemplate) error {
 	var (
 		err        error
 		podVolumes = podSpec.Volumes
@@ -65,7 +65,7 @@ func CheckAndUpdatePodVolumes(podSpec *corev1.PodSpec, volumes map[string]appsv1
 	// Update PodTemplate Volumes
 	for _, cmName := range volumeKeys {
 		tpl := volumes[cmName]
-		if podVolumes, err = CheckAndUpdateVolume(podVolumes, tpl.VolumeName, func(volumeName string) corev1.Volume {
+		if podVolumes, err = CreateOrUpdateVolume(podVolumes, tpl.VolumeName, func(volumeName string) corev1.Volume {
 			return corev1.Volume{
 				Name: volumeName,
 				VolumeSource: corev1.VolumeSource{

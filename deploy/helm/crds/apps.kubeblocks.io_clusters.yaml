@@ -689,7 +689,7 @@ spec:
                         is unavailable, i.e, all pods are not ready for Stateless/Stateful
                         component; Leader/Primary pod is not ready for Consensus/Replication
                         component. Abnormal: component available but part of its pods
-                        are not ready. If the component type is Consensus/Replication,
+                        are not ready. If the component workload type is Consensus/Replication,
                         the Leader/Primary pod must be ready in Abnormal phase. Other
                         phases behave the same as the cluster phase.'
                       enum:
@@ -905,7 +905,7 @@ spec:
                   reconfiguration operation is running. Deleting/Deleted: deleting
                   Cluster/Cluster is deleted. Failed: Cluster is unavailable. Abnormal:
                   Cluster is still available, but part of its components are Abnormal.
-                  if the component type is Consensus/Replication, the Leader/Primary
+                  if the component workload type is Consensus/Replication, the Leader/Primary
                   pod must be ready in Abnormal phase. ConditionsError: Cluster and
                   all the components are still healthy, but some update/create API
                   fails due to invalid parameters.'

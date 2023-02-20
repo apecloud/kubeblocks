@@ -92,7 +92,7 @@ var DefaultLeader = ConsensusMember{
 	AccessMode: ReadWrite,
 }
 
-// WorkloadType defines ClusterDefinition's component type.
+// WorkloadType defines ClusterDefinition's component workload type.
 // +enum
 type WorkloadType string
 

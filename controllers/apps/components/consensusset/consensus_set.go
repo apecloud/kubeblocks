@@ -73,21 +73,21 @@ func (consensusSet *ConsensusSet) PodIsAvailable(pod *corev1.Pod, minReadySecond
 
 func (consensusSet *ConsensusSet) HandleProbeTimeoutWhenPodsReady(recorder record.EventRecorder) (bool, error) {
 	var (
-		statusComponent appsv1alpha1.ClusterComponentStatus
-		ok              bool
-		cluster         = consensusSet.Cluster
-		componentName   = consensusSet.Component.Name
+		compStatus    appsv1alpha1.ClusterComponentStatus
+		ok            bool
+		cluster       = consensusSet.Cluster
+		componentName = consensusSet.Component.Name
 	)
 	if cluster.Status.Components == nil {
 		return true, nil
 	}
-	if statusComponent, ok = cluster.Status.Components[componentName]; !ok {
+	if compStatus, ok = cluster.Status.Components[componentName]; !ok {
 		return true, nil
 	}
-	if statusComponent.PodsReadyTime == nil {
+	if compStatus.PodsReadyTime == nil {
 		return true, nil
 	}
-	if !util.IsProbeTimeout(consensusSet.ComponentDef, statusComponent.PodsReadyTime) {
+	if !util.IsProbeTimeout(consensusSet.ComponentDef, compStatus.PodsReadyTime) {
 		return true, nil
 	}
 
@@ -108,10 +108,10 @@ func (consensusSet *ConsensusSet) HandleProbeTimeoutWhenPodsReady(recorder recor
 		}
 		if role == "" {
 			isAbnormal = true
-			if statusComponent.Message == nil {
-				statusComponent.Message = appsv1alpha1.ComponentMessageMap{}
+			if compStatus.Message == nil {
+				compStatus.Message = appsv1alpha1.ComponentMessageMap{}
 			}
-			statusComponent.Message.SetObjectMessage(pod.Kind, pod.Name, "Role probe timeout, check whether the application is available")
+			compStatus.Message.SetObjectMessage(pod.Kind, pod.Name, "Role probe timeout, check whether the application is available")
 			needPatch = true
 		}
 		// TODO clear up the message of ready pod in component.message.
@@ -120,11 +120,11 @@ func (consensusSet *ConsensusSet) HandleProbeTimeoutWhenPodsReady(recorder recor
 		return true, nil
 	}
 	if isFailed {
-		statusComponent.Phase = appsv1alpha1.FailedPhase
+		compStatus.Phase = appsv1alpha1.FailedPhase
 	} else if isAbnormal {
-		statusComponent.Phase = appsv1alpha1.AbnormalPhase
+		compStatus.Phase = appsv1alpha1.AbnormalPhase
 	}
-	cluster.Status.Components[componentName] = statusComponent
+	cluster.Status.Components[componentName] = compStatus
 	if err = consensusSet.Cli.Status().Patch(consensusSet.Ctx, cluster, patch); err != nil {
 		return false, err
 	}

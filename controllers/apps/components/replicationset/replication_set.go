@@ -114,7 +114,7 @@ func (rs *ReplicationSet) GetPhaseWhenPodsNotReady(componentName string) (appsv1
 		componentStsList = &appsv1.StatefulSetList{}
 		allPodIsReady    = true
 		cluster          = rs.Cluster
-		statusComponent  appsv1alpha1.ClusterComponentStatus
+		compStatus       appsv1alpha1.ClusterComponentStatus
 		needPatch        bool
 		err              error
 		ok               bool
@@ -132,10 +132,10 @@ func (rs *ReplicationSet) GetPhaseWhenPodsNotReady(componentName string) (appsv1
 	if cluster.Status.Components == nil {
 		return "", fmt.Errorf("%s cluster.Status.ComponentDefs is nil", cluster.Name)
 	}
-	if statusComponent, ok = cluster.Status.Components[componentName]; !ok {
+	if compStatus, ok = cluster.Status.Components[componentName]; !ok {
 		return "", fmt.Errorf("%s cluster.Status.ComponentDefs[%s] is nil", cluster.Name, componentName)
-	} else if statusComponent.Message == nil {
-		statusComponent.Message = appsv1alpha1.ComponentMessageMap{}
+	} else if compStatus.Message == nil {
+		compStatus.Message = appsv1alpha1.ComponentMessageMap{}
 	}
 	for _, v := range podList.Items {
 		// if the pod is terminating, ignore the warning event.
@@ -145,7 +145,7 @@ func (rs *ReplicationSet) GetPhaseWhenPodsNotReady(componentName string) (appsv1
 		labelValue := v.Labels[intctrlutil.RoleLabelKey]
 		if labelValue == "" {
 			isAbnormal = true
-			statusComponent.Message.SetObjectMessage(v.Kind, v.Name, "empty label for pod, please check.")
+			compStatus.Message.SetObjectMessage(v.Kind, v.Name, "empty label for pod, please check.")
 			needPatch = true
 		}
 		if !intctrlutil.PodIsReady(&v) {
@@ -160,7 +160,7 @@ func (rs *ReplicationSet) GetPhaseWhenPodsNotReady(componentName string) (appsv1
 		isFailed = false
 		if v.Status.AvailableReplicas < *v.Spec.Replicas {
 			isAbnormal = true
-			statusComponent.Message.SetObjectMessage(v.Kind, v.Name, "statefulSet's AvailableReplicas is not expected, please check.")
+			compStatus.Message.SetObjectMessage(v.Kind, v.Name, "statefulSet's AvailableReplicas is not expected, please check.")
 			needPatch = true
 		}
 	}
@@ -168,7 +168,7 @@ func (rs *ReplicationSet) GetPhaseWhenPodsNotReady(componentName string) (appsv1
 	// patch abnormal reason to cluster.status.ComponentDefs.
 	if needPatch {
 		patch := client.MergeFrom(cluster.DeepCopy())
-		cluster.Status.Components[componentName] = statusComponent
+		cluster.Status.Components[componentName] = compStatus
 		if err = rs.Cli.Status().Patch(rs.Ctx, cluster, patch); err != nil {
 			return "", err
 		}

@@ -467,8 +467,8 @@ func buildClusterComp(cd *appsv1alpha1.ClusterDefinition, setsMap map[string]map
 	return comps, nil
 }
 
-// buildCompSetsMap builds the map between component type name and its set values, if the type name is not
-// specified in the set, use the cluster definition default component type name.
+// buildCompSetsMap builds the map between component definition name and its set values, if the name is not
+// specified in the set, use the cluster definition default component name.
 func buildCompSetsMap(values []string, cd *appsv1alpha1.ClusterDefinition) (map[string]map[setKey]string, error) {
 	allSets := map[string]map[setKey]string{}
 	parseKey := func(key string) setKey {
@@ -506,10 +506,10 @@ func buildCompSetsMap(values []string, cd *appsv1alpha1.ClusterDefinition) (map[
 			continue
 		}
 
-		// get the component type name
+		// get the component definition name
 		compDefName := sets[keyType]
 
-		// type is not specified by user, use the default component type name, now only
+		// type is not specified by user, use the default component definition name, now only
 		// support cluster definition with one component
 		if len(compDefName) == 0 {
 			name, err := cluster.GetDefaultCompName(cd)

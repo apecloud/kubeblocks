@@ -282,6 +282,10 @@ type ClusterDefinitionComponent struct {
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	TypeName string `json:"typeName"`
 
+	// migratableComponentDefs defines componentDefs that are migratable.
+	// +optional
+	MigratableComponentDefs []string `json:"migratableComponentDefs"`
+
 	// componentType defines type of the component.
 	// Stateless is a stateless component type used to describe stateless applications.
 	// Stateful is a stateful component type used to describe common stateful applications.

@@ -328,6 +328,12 @@ spec:
                       format: int32
                       minimum: 0
                       type: integer
+                    migratableComponentDefs:
+                      description: migratableComponentDefs defines componentDefs that
+                        are migratable.
+                      items:
+                        type: string
+                      type: array
                     minReplicas:
                       default: 0
                       description: minReplicas minimum replicas for component pod

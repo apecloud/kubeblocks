@@ -41,7 +41,7 @@ mysql-cluster        default          apecloud-mysql            ac-mysql-8.0.30 
    Run the command below to expand the volume of a cluster.
    ```bash
    kubectl apply -f - <<EOF
-   apiVersion: dbaas.kubeblocks.io/v1alpha1
+   apiVersion: apps.kubeblocks.io/v1alpha1
    kind: OpsRequest
    metadata:
      name: ops-volume-expansion
@@ -63,7 +63,7 @@ mysql-cluster        default          apecloud-mysql            ac-mysql-8.0.30 
    ***Example***
 
    ```YAML
-   apiVersion: dbaas.kubeblocks.io/v1alpha1
+   apiVersion: apps.kubeblocks.io/v1alpha1
    kind: Cluster
    metadata:
      name: mysql-01

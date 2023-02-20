@@ -71,6 +71,7 @@ const (
 	ResourceClusterVersions          = "clusterversions"
 	ResourceOpsRequests              = "opsrequests"
 	ResourceConfigConstraintVersions = "configconstraints"
+	ResourceClassFamily              = "classfamilies"
 	KindCluster                      = "Cluster"
 	KindClusterDef                   = "ClusterDefinition"
 	KindClusterVersion               = "ClusterVersion"
@@ -83,6 +84,11 @@ const (
 
 // Annotations
 const (
+	ClassLevelLabelKey          = "class.kubeblocks.io/level"
+	ClassProviderLabelKey       = "class.kubeblocks.io/provider"
+	ClassFamilyProviderLabelKey = "classfamily.kubeblocks.io/provider"
+
+	ComponentClassAnnotationKey    = "cluster.kubeblocks.io/component-class"
 	ServiceLBTypeAnnotationKey     = "service.kubernetes.io/kubeblocks-loadbalancer-type"
 	ServiceLBTypeAnnotationValue   = "private-ip"
 	ServiceFloatingIPAnnotationKey = "service.kubernetes.io/kubeblocks-loadbalancer-floating-ip"
@@ -185,6 +191,10 @@ func RestoreJobGVR() schema.GroupVersionResource {
 
 func AddonGVR() schema.GroupVersionResource {
 	return schema.GroupVersionResource{Group: ExtensionsAPIGroup, Version: ExtensionsAPIVersion, Resource: ResourceAddons}
+}
+
+func ClassFamilyGVR() schema.GroupVersionResource {
+	return schema.GroupVersionResource{Group: AppsAPIGroup, Version: AppsAPIVersion, Resource: ResourceClassFamily}
 }
 
 func CRDGVR() schema.GroupVersionResource {

@@ -62,6 +62,7 @@ type OperationsOptions struct {
 	// VerticalScaling options
 	CPU    string `json:"cpu"`
 	Memory string `json:"memory"`
+	Class  string `json:"class"`
 
 	// HorizontalScaling options
 	Replicas int `json:"replicas"`
@@ -626,6 +627,7 @@ func NewVerticalScalingCmd(f cmdutil.Factory, streams genericclioptions.IOStream
 		o.buildCommonFlags(cmd)
 		cmd.Flags().StringVar(&o.CPU, "cpu", "", "Requested and limited size of component cpu")
 		cmd.Flags().StringVar(&o.Memory, "memory", "", "Requested and limited size of component memory")
+		cmd.Flags().StringVar(&o.Class, "class", "", "Component class")
 	}
 	return create.BuildCommand(inputs)
 }

@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"sort"
 	"time"
 
 	"github.com/spf13/viper"
@@ -29,8 +30,10 @@ import (
 	policyv1 "k8s.io/api/policy/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -99,6 +102,9 @@ import (
 // dataprotection get list and delete
 // +kubebuilder:rbac:groups=dataprotection.kubeblocks.io,resources=backuppolicies,verbs=get;list;delete;deletecollection
 // +kubebuilder:rbac:groups=dataprotection.kubeblocks.io,resources=backups,verbs=get;list;delete;deletecollection
+
+// classfamily get list
+// +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=classfamilies,verbs=get;list
 
 // ClusterReconciler reconciles a Cluster object
 type ClusterReconciler struct {
@@ -289,6 +295,12 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return intctrlutil.RequeueWithError(err, reqCtx.Log, "")
 	} else if res != nil {
 		return *res, nil
+	}
+
+	// fill class
+	if err := r.fillClass(reqCtx, cluster); err != nil {
+		_ = clusterConditionMgr.setPreCheckErrorCondition(err)
+		return intctrlutil.RequeueAfter(time.Millisecond*requeueDuration, reqCtx.Log, err.Error())
 	}
 
 	// preCheck succeed, starting the cluster provisioning
@@ -571,6 +583,118 @@ func (r *ClusterReconciler) checkReferencedCRStatus(
 		return intctrlutil.ResultToP(intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, ""))
 	}
 	return intctrlutil.ResultToP(intctrlutil.RequeueAfter(requeueDuration, reqCtx.Log, ""))
+}
+
+func (r *ClusterReconciler) fillClass(reqCtx intctrlutil.RequestCtx, cluster *appsv1alpha1.Cluster) error {
+	var (
+		value                 = cluster.GetAnnotations()[classAnnotationKey]
+		componentClassMapping = make(map[string]string)
+	)
+	if value != "" {
+		if err := json.Unmarshal([]byte(value), &componentClassMapping); err != nil {
+			return err
+		}
+	}
+	var cmList corev1.ConfigMapList
+	if err := r.Client.List(reqCtx.Ctx, &cmList); err != nil {
+		return err
+	}
+	compClasses, err := component.ParseClasses(&cmList)
+	if err != nil {
+		return err
+	}
+
+	var classFamilyList appsv1alpha1.ClassFamilyList
+	if err = r.Client.List(reqCtx.Ctx, &classFamilyList); err != nil {
+		return err
+	}
+
+	matchClassFamilies := func(comp appsv1alpha1.ClusterComponentSpec) *appsv1alpha1.ComponentClass {
+		var candidates []appsv1alpha1.ClassModelWithFamilyName
+		for _, family := range classFamilyList.Items {
+			models := family.FindMatchingModels(&comp.Resources)
+			for _, model := range models {
+				candidates = append(candidates, appsv1alpha1.ClassModelWithFamilyName{Family: family.Name, Model: model})
+			}
+		}
+		if len(candidates) == 0 {
+			return nil
+		}
+		sort.Sort(appsv1alpha1.ByModelList(candidates))
+		candidate := candidates[0]
+		cpu, memory := appsv1alpha1.GetMinCPUAndMemory(candidate.Model)
+		cls := &appsv1alpha1.ComponentClass{
+			Name:   fmt.Sprintf("%s-%vc%vg", candidate.Family, cpu.AsDec().String(), memory.AsDec().String()),
+			CPU:    *cpu,
+			Memory: *memory,
+		}
+		return cls
+	}
+
+	matchComponentClass := func(comp appsv1alpha1.ClusterComponentSpec, classes map[string]*appsv1alpha1.ComponentClass) *appsv1alpha1.ComponentClass {
+		filters := appsv1alpha1.Filters(make(map[string]resource.Quantity))
+		if comp.Resources.Requests.Cpu() != nil {
+			filters[corev1.ResourceCPU.String()] = *comp.Resources.Requests.Cpu()
+		}
+		if comp.Resources.Requests.Memory() != nil {
+			filters[corev1.ResourceMemory.String()] = *comp.Resources.Requests.Memory()
+		}
+		return component.ChooseComponentClasses(classes, filters)
+	}
+
+	patch := client.MergeFrom(cluster.DeepCopy())
+	for idx, comp := range cluster.Spec.ComponentSpecs {
+		classes := compClasses[comp.ComponentDefRef]
+
+		var cls *appsv1alpha1.ComponentClass
+		className, ok := componentClassMapping[comp.Name]
+		switch {
+		case ok:
+			cls = classes[className]
+			if cls == nil {
+				return fmt.Errorf("unknown component class %s", className)
+			}
+		case classes != nil:
+			cls = matchComponentClass(comp, classes)
+			if cls == nil {
+				return fmt.Errorf("can not find matching class for component %s", comp.Name)
+			}
+		case len(classFamilyList.Items) > 0:
+			cls = matchClassFamilies(comp)
+			if cls == nil {
+				return fmt.Errorf("can not find matching class family for component %s", comp.Name)
+			}
+		}
+		if cls == nil {
+			// TODO reconsider handling policy for this case
+			continue
+		}
+		componentClassMapping[comp.Name] = cls.Name
+		corev1.ResourceList{
+			corev1.ResourceCPU:    cls.CPU,
+			corev1.ResourceMemory: cls.Memory,
+		}.DeepCopyInto(&comp.Resources.Requests)
+		var volumes []appsv1alpha1.ClusterComponentVolumeClaimTemplate
+		for _, disk := range cls.Storage {
+			volume := appsv1alpha1.ClusterComponentVolumeClaimTemplate{
+				Name: disk.Name,
+				Spec: &corev1.PersistentVolumeClaimSpec{
+					Resources: corev1.ResourceRequirements{
+						Requests: corev1.ResourceList{
+							corev1.ResourceStorage: disk.Size,
+						},
+					},
+				},
+			}
+			volumes = append(volumes, volume)
+		}
+		comp.VolumeClaimTemplates = volumes
+		cluster.Spec.ComponentSpecs[idx] = comp
+	}
+	if err = r.Client.Patch(reqCtx.Ctx, cluster, patch); err != nil {
+		return err
+	}
+	return nil
 }
 
 // updateClusterPhaseWithOperations updates cluster.status.phase according to operations

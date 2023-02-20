@@ -27,7 +27,6 @@ import (
 	. "github.com/onsi/gomega"
 	"github.com/spf13/viper"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 
@@ -133,12 +132,11 @@ var _ = Describe("create", func() {
 		})
 	})
 
-	checkComponent := func(comps []map[string]interface{}, storage string, replicas int32, cpu string, memory string) {
+	checkComponent := func(comps []*appsv1alpha1.ClusterComponentSpec, storage string, replicas int32, cpu string, memory string) {
 		Expect(comps).ShouldNot(BeNil())
 		Expect(len(comps)).Should(Equal(2))
 
-		comp := &appsv1alpha1.ClusterComponentSpec{}
-		_ = runtime.DefaultUnstructuredConverter.FromUnstructured(comps[0], comp)
+		comp := comps[0]
 		Expect(getResource(comp.VolumeClaimTemplates[0].Spec.Resources, corev1.ResourceStorage)).Should(Equal(storage))
 		Expect(comp.Replicas).Should(BeEquivalentTo(replicas))
 
@@ -221,13 +219,14 @@ var _ = Describe("create", func() {
 				true,
 			},
 			{
-				[]string{"cpu=1,memory=2Gi,storage=10Gi"},
+				[]string{"cpu=1,memory=2Gi,storage=10Gi,class=general-1c2g"},
 				[]string{"my-comp"},
 				map[string]map[setKey]string{
 					"my-comp": {
 						keyCPU:     "1",
 						keyMemory:  "2Gi",
 						keyStorage: "10Gi",
+						keyClass:   "general-1c2g",
 					},
 				},
 				true,
@@ -286,18 +285,20 @@ var _ = Describe("create", func() {
 				true,
 			},
 			{
-				[]string{"type=comp1,cpu=1,memory=2Gi", "type=comp2,storage=10Gi,cpu=2"},
+				[]string{"type=comp1,cpu=1,memory=2Gi,class=general-2c4g", "type=comp2,storage=10Gi,cpu=2,class=mo-1c8g"},
 				[]string{"my-comp"},
 				map[string]map[setKey]string{
 					"comp1": {
 						keyType:   "comp1",
 						keyCPU:    "1",
 						keyMemory: "2Gi",
+						keyClass:  "general-2c4g",
 					},
 					"comp2": {
 						keyType:    "comp2",
 						keyCPU:     "2",
 						keyStorage: "10Gi",
+						keyClass:   "mo-1c8g",
 					},
 				},
 				true,

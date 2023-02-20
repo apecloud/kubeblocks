@@ -1,30 +1,34 @@
 ---
-title: kbcli cluster vscale
+title: kbcli class create
 ---
 
-Vertically scale the specified components in the cluster.
+Create a class
 
 ```
-kbcli cluster vscale [flags]
+kbcli class create [NAME] [flags]
 ```
 
 ### Examples
 
 ```
-  # scale the computing resources of specified components, separate with commas when <component-name> more than one
-  kbcli cluster vscale <my-cluster> --component-names=<component-name> --cpu=500m --memory=500Mi
+  # Create a class following class family kubeblocks-general-classes for component mysql in cluster definition apecloud-mysql, which have 1 cpu core, 2Gi memory and storage is 10Gi
+  kbcli class create custom-1c2g --cluster-definition apecloud-mysql --type mysql --class-family kubeblocks-general-classes --cpu 1 --memory 2Gi --storage name=data,size=10Gi
+  
+  # Create classes for component mysql in cluster definition apecloud-mysql, where classes is defined in file
+  kbcli class create --cluster-definition apecloud-mysql --type mysql --file ./classes.yaml
 ```
 
 ### Options
 
 ```
-      --class string                 Component class
-      --component-names strings       Component names to this operations
-      --cpu string                   Requested and limited size of component cpu
-  -h, --help                         help for vscale
-      --memory string                Requested and limited size of component memory
-      --name string                  OpsRequest name. if not specified, it will be randomly generated 
-      --ttlSecondsAfterSucceed int   Time to live after the OpsRequest succeed
+      --class-family string         Specify class family
+      --cluster-definition string   Specify cluster definition, run "kbcli cluster-definition list" to show all available cluster definition
+      --cpu string                  Specify component cpu cores
+      --file string                 Specify file path which contains YAML definition of class
+  -h, --help                        help for create
+      --memory string               Specify component memory size
+      --storage stringArray         Specify component storage disks
+      --type string                 Specify component type
 ```
 
 ### Options inherited from parent commands
@@ -53,7 +57,7 @@ kbcli cluster vscale [flags]
 
 ### SEE ALSO
 
-* [kbcli cluster](kbcli_cluster.md)	 - Cluster command.
+* [kbcli class](kbcli_class.md)	 - Manage classes
 
 #### Go Back to [CLI Overview](cli.md) Homepage.
 

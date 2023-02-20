@@ -1,30 +1,25 @@
 ---
-title: kbcli cluster vscale
+title: kbcli class list
 ---
 
-Vertically scale the specified components in the cluster.
+List classes
 
 ```
-kbcli cluster vscale [flags]
+kbcli class list [flags]
 ```
 
 ### Examples
 
 ```
-  # scale the computing resources of specified components, separate with commas when <component-name> more than one
-  kbcli cluster vscale <my-cluster> --component-names=<component-name> --cpu=500m --memory=500Mi
+  # List all components classes in cluster definition apecloud-mysql
+  kbcli class list --cluster-definition apecloud-mysql
 ```
 
 ### Options
 
 ```
-      --class string                 Component class
-      --component-names strings       Component names to this operations
-      --cpu string                   Requested and limited size of component cpu
-  -h, --help                         help for vscale
-      --memory string                Requested and limited size of component memory
-      --name string                  OpsRequest name. if not specified, it will be randomly generated 
-      --ttlSecondsAfterSucceed int   Time to live after the OpsRequest succeed
+      --cluster-definition string   Specify cluster definition, run "kbcli cluster-definition list" to show all available cluster definition
+  -h, --help                        help for list
 ```
 
 ### Options inherited from parent commands
@@ -53,7 +48,7 @@ kbcli cluster vscale [flags]
 
 ### SEE ALSO
 
-* [kbcli cluster](kbcli_cluster.md)	 - Cluster command.
+* [kbcli class](kbcli_class.md)	 - Manage classes
 
 #### Go Back to [CLI Overview](cli.md) Homepage.
 

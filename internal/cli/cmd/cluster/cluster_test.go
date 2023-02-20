@@ -17,6 +17,8 @@ limitations under the License.
 package cluster
 
 import (
+	"os"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
@@ -31,6 +33,7 @@ import (
 
 var _ = Describe("Cluster", func() {
 	const testComponentPath = "../../testing/testdata/component.yaml"
+	const testClassDefsPath = "../../testing/testdata/class.yaml"
 
 	var streams genericclioptions.IOStreams
 	var tf *cmdtesting.TestFactory
@@ -38,7 +41,8 @@ var _ = Describe("Cluster", func() {
 	BeforeEach(func() {
 		streams, _, _, _ = genericclioptions.NewTestIOStreams()
 		tf = cmdtesting.NewTestFactory().WithNamespace("default")
-		tf.FakeDynamicClient = testing.FakeDynamicClient(testing.FakeClusterDef(), testing.FakeClusterVersion())
+		cd := testing.FakeClusterDef()
+		tf.FakeDynamicClient = testing.FakeDynamicClient(cd, testing.FakeClusterVersion())
 		tf.Client = &clientfake.RESTClient{}
 	})
 
@@ -77,9 +81,13 @@ var _ = Describe("Cluster", func() {
 		})
 
 		It("run", func() {
-			tf.FakeDynamicClient = testing.FakeDynamicClient(testing.FakeClusterDef())
+			clusterDef := testing.FakeClusterDef()
+			tf.FakeDynamicClient = testing.FakeDynamicClient(clusterDef)
+			data, err := os.ReadFile(testClassDefsPath)
+			Expect(err).NotTo(HaveOccurred())
+			clientSet := testing.FakeClientSet(testing.FakeComponentClassDef(clusterDef, data))
 			o := &CreateOptions{
-				BaseOptions:       create.BaseOptions{IOStreams: streams, Name: "test", Dynamic: tf.FakeDynamicClient},
+				BaseOptions:       create.BaseOptions{IOStreams: streams, Name: "test", Dynamic: tf.FakeDynamicClient, ClientSet: clientSet},
 				SetFile:           "",
 				ClusterDefRef:     testing.ClusterDefName,
 				ClusterVersionRef: "cluster-version",

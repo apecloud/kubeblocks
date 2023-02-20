@@ -106,6 +106,7 @@ type setKey string
 const (
 	keyType     setKey = "type"
 	keyCPU      setKey = "cpu"
+	keyClass    setKey = "class"
 	keyMemory   setKey = "memory"
 	keyReplicas setKey = "replicas"
 	keyStorage  setKey = "storage"
@@ -292,11 +293,47 @@ func (o *CreateOptions) buildComponents() ([]map[string]interface{}, error) {
 			return nil, err
 		}
 
-		if components, err = buildClusterComp(cd, compSets); err != nil {
+		componentObjs, err := buildClusterComp(cd, compSets)
+		if err != nil {
+			return nil, err
+		}
+		for _, compObj := range componentObjs {
+			comp, err := runtime.DefaultUnstructuredConverter.ToUnstructured(compObj)
+			if err != nil {
+				return nil, err
+			}
+			components = append(components, comp)
+		}
+
+		if err = o.buildClassMappings(componentObjs, compSets); err != nil {
 			return nil, err
 		}
 	}
 	return components, nil
+}
+
+func (o *CreateOptions) buildClassMappings(components []*appsv1alpha1.ClusterComponentSpec, setsMap map[string]map[setKey]string) error {
+	classMappings := make(map[string]string)
+	for _, comp := range components {
+		sets, ok := setsMap[comp.ComponentDefRef]
+		if !ok {
+			continue
+		}
+		class, ok := sets[keyClass]
+		if !ok {
+			continue
+		}
+		classMappings[comp.Name] = class
+	}
+	if o.Annotations == nil {
+		o.Annotations = make(map[string]string)
+	}
+	bytes, err := json.Marshal(classMappings)
+	if err != nil {
+		return err
+	}
+	o.Annotations[types.ComponentClassAnnotationKey] = string(bytes)
+	return nil
 }
 
 // MultipleSourceComponents get component data from multiple source, such as stdin, URI and local file
@@ -411,7 +448,7 @@ func setEnableAllLogs(c *appsv1alpha1.Cluster, cd *appsv1alpha1.ClusterDefinitio
 	}
 }
 
-func buildClusterComp(cd *appsv1alpha1.ClusterDefinition, setsMap map[string]map[setKey]string) ([]map[string]interface{}, error) {
+func buildClusterComp(cd *appsv1alpha1.ClusterDefinition, setsMap map[string]map[setKey]string) ([]*appsv1alpha1.ClusterComponentSpec, error) {
 	getVal := func(key setKey, sets map[setKey]string) string {
 		// get value from set values
 		if sets != nil {
@@ -429,7 +466,7 @@ func buildClusterComp(cd *appsv1alpha1.ClusterDefinition, setsMap map[string]map
 		return val
 	}
 
-	var comps []map[string]interface{}
+	var comps []*appsv1alpha1.ClusterComponentSpec
 	for _, c := range cd.Spec.ComponentDefs {
 
 		sets := map[setKey]string{}
@@ -470,11 +507,7 @@ func buildClusterComp(cd *appsv1alpha1.ClusterDefinition, setsMap map[string]map
 				},
 			}},
 		}
-		comp, err := runtime.DefaultUnstructuredConverter.ToUnstructured(compObj)
-		if err != nil {
-			return nil, err
-		}
-		comps = append(comps, comp)
+		comps = append(comps, compObj)
 	}
 	return comps, nil
 }
@@ -483,7 +516,7 @@ func buildClusterComp(cd *appsv1alpha1.ClusterDefinition, setsMap map[string]map
 // specified in the set, use the cluster definition default component name.
 func buildCompSetsMap(values []string, cd *appsv1alpha1.ClusterDefinition) (map[string]map[setKey]string, error) {
 	allSets := map[string]map[setKey]string{}
-	keys := []string{string(keyCPU), string(keyType), string(keyStorage), string(keyMemory), string(keyReplicas)}
+	keys := []string{string(keyCPU), string(keyType), string(keyStorage), string(keyMemory), string(keyReplicas), string(keyClass)}
 	parseKey := func(key string) setKey {
 		for _, k := range keys {
 			if strings.EqualFold(k, key) {

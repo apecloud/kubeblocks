@@ -1,5 +1,5 @@
 - name: test
-  type: mysql
+  ComponentDefRef: mysql
   monitor: false
   volumeClaimTemplates:
     - name: data

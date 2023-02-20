@@ -67,7 +67,7 @@ var _ = Describe("lifecycle_utils", func() {
 
 		It("should succeed in corner case where input volumes is nil, which means no volume is added", func() {
 			ps := &sts.Spec.Template.Spec
-			err := CheckAndUpdatePodVolumes(ps, volumes)
+			err := CreateOrUpdatePodVolumes(ps, volumes)
 			Expect(err).Should(BeNil())
 			Expect(len(ps.Volumes)).To(Equal(1))
 		})
@@ -80,7 +80,7 @@ var _ = Describe("lifecycle_utils", func() {
 				VolumeName:          "myConfigVolume",
 			}
 			ps := &sts.Spec.Template.Spec
-			err := CheckAndUpdatePodVolumes(ps, volumes)
+			err := CreateOrUpdatePodVolumes(ps, volumes)
 			Expect(err).Should(BeNil())
 			Expect(len(ps.Volumes)).To(Equal(2))
 		})
@@ -99,7 +99,7 @@ var _ = Describe("lifecycle_utils", func() {
 				VolumeName:          "myConfigVolume2",
 			}
 			ps := &sts.Spec.Template.Spec
-			err := CheckAndUpdatePodVolumes(ps, volumes)
+			err := CreateOrUpdatePodVolumes(ps, volumes)
 			Expect(err).Should(BeNil())
 			Expect(len(ps.Volumes)).To(Equal(3))
 		})
@@ -123,7 +123,7 @@ var _ = Describe("lifecycle_utils", func() {
 				VolumeName:          replicaVolumeName,
 			}
 			ps := &sts.Spec.Template.Spec
-			Expect(CheckAndUpdatePodVolumes(ps, volumes)).ShouldNot(Succeed())
+			Expect(CreateOrUpdatePodVolumes(ps, volumes)).ShouldNot(Succeed())
 		})
 
 		It("should succeed if updated volume contains ConfigMap", func() {
@@ -150,7 +150,7 @@ var _ = Describe("lifecycle_utils", func() {
 				VolumeName:          replicaVolumeName,
 			}
 			ps := &sts.Spec.Template.Spec
-			err := CheckAndUpdatePodVolumes(ps, volumes)
+			err := CreateOrUpdatePodVolumes(ps, volumes)
 			Expect(err).Should(BeNil())
 			Expect(len(sts.Spec.Template.Spec.Volumes)).To(Equal(2))
 			volume := GetVolumeMountName(sts.Spec.Template.Spec.Volumes, cmName)

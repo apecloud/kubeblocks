@@ -66,7 +66,7 @@ func (u upgradeOpsHandler) GetRealAffectedComponentMap(opsRequest *appsv1alpha1.
 
 // SaveLastConfiguration records last configuration to the OpsRequest.status.lastConfiguration
 func (u upgradeOpsHandler) SaveLastConfiguration(opsRes *OpsResource) error {
-	statusComponents, err := u.getUpgradeStatusComponents(opsRes)
+	compsStatus, err := u.getUpgradeComponentsStatus(opsRes)
 	if err != nil {
 		return err
 	}
@@ -74,53 +74,53 @@ func (u upgradeOpsHandler) SaveLastConfiguration(opsRes *OpsResource) error {
 	opsRes.OpsRequest.Status.LastConfiguration = appsv1alpha1.LastConfiguration{
 		ClusterVersionRef: opsRes.Cluster.Spec.ClusterVersionRef,
 	}
-	opsRes.OpsRequest.Status.Components = statusComponents
+	opsRes.OpsRequest.Status.Components = compsStatus
 	return opsRes.Client.Status().Patch(opsRes.Ctx, opsRes.OpsRequest, patch)
 }
 
-// getUpgradeStatusComponents compares the ClusterVersions before and after upgrade, and get the changed components map.
-func (u upgradeOpsHandler) getUpgradeStatusComponents(opsRes *OpsResource) (map[string]appsv1alpha1.OpsRequestStatusComponent, error) {
-	lastClusterVersionCompMap, err := u.getClusterVersionComponentMap(opsRes.Ctx, opsRes.Client,
+// getUpgradeComponentsStatus compares the ClusterVersions before and after upgrade, and get the changed components map.
+func (u upgradeOpsHandler) getUpgradeComponentsStatus(opsRes *OpsResource) (map[string]appsv1alpha1.OpsRequestComponentStatus, error) {
+	lastComponents, err := u.getClusterComponentVersionMap(opsRes.Ctx, opsRes.Client,
 		opsRes.Cluster.Spec.ClusterVersionRef)
 	if err != nil {
 		return nil, err
 	}
-	clusterVersionCompMap, err := u.getClusterVersionComponentMap(opsRes.Ctx, opsRes.Client,
+	components, err := u.getClusterComponentVersionMap(opsRes.Ctx, opsRes.Client,
 		opsRes.OpsRequest.Spec.Upgrade.ClusterVersionRef)
 	if err != nil {
 		return nil, err
 	}
-	// get the changed components type map
+	// get the changed components map
 	changedComponentMap := map[string]struct{}{}
-	for k, v := range clusterVersionCompMap {
-		lastComp := lastClusterVersionCompMap[k]
+	for k, v := range components {
+		lastComp := lastComponents[k]
 		if !reflect.DeepEqual(v, lastComp) {
 			changedComponentMap[k] = struct{}{}
 		}
 	}
 	// get the changed components name map, and record the components infos to OpsRequest.status.
-	statusComponentMap := map[string]appsv1alpha1.OpsRequestStatusComponent{}
+	compStatusMap := map[string]appsv1alpha1.OpsRequestComponentStatus{}
 	for _, comp := range opsRes.Cluster.Spec.ComponentSpecs {
 		if _, ok := changedComponentMap[comp.ComponentDefRef]; !ok {
 			continue
 		}
-		statusComponentMap[comp.Name] = appsv1alpha1.OpsRequestStatusComponent{
+		compStatusMap[comp.Name] = appsv1alpha1.OpsRequestComponentStatus{
 			Phase: appsv1alpha1.VersionUpgradingPhase,
 		}
 	}
-	return statusComponentMap, nil
+	return compStatusMap, nil
 }
 
-// getClusterVersionComponentMap gets the ClusterVersion and coverts the component list to map.
-func (u upgradeOpsHandler) getClusterVersionComponentMap(ctx context.Context,
+// getClusterComponentVersionMap gets the components of ClusterVersion and coverts the component list to map.
+func (u upgradeOpsHandler) getClusterComponentVersionMap(ctx context.Context,
 	cli client.Client, clusterVersionName string) (map[string]appsv1alpha1.ClusterComponentVersion, error) {
 	clusterVersion := &appsv1alpha1.ClusterVersion{}
 	if err := cli.Get(ctx, client.ObjectKey{Name: clusterVersionName}, clusterVersion); err != nil {
 		return nil, client.IgnoreNotFound(err)
 	}
-	clusterVersionComponentMap := map[string]appsv1alpha1.ClusterComponentVersion{}
+	components := map[string]appsv1alpha1.ClusterComponentVersion{}
 	for _, v := range clusterVersion.Spec.ComponentVersions {
-		clusterVersionComponentMap[v.ComponentDefRef] = v
+		components[v.ComponentDefRef] = v
 	}
-	return clusterVersionComponentMap, nil
+	return components, nil
 }

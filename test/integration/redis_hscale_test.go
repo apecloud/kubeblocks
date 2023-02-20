@@ -191,9 +191,9 @@ var _ = Describe("Redis Horizontal Scale function", func() {
 			mode := int32(0755)
 			clusterDefObj = testapps.NewClusterDefFactory(clusterDefName).
 				AddComponent(testapps.ReplicationRedisComponent, testapps.DefaultRedisCompType).
-				AddConfigTemplate(scriptConfigName, scriptConfigName, "", testapps.ScriptsVolumeName, &mode).
-				AddConfigTemplate(primaryConfigName, primaryConfigName, "", string(replicationset.Primary), &mode).
-				AddConfigTemplate(secondaryConfigName, secondaryConfigName, "", string(replicationset.Secondary), &mode).
+				AddConfigTemplate(scriptConfigName, scriptConfigName, "", testCtx.DefaultNamespace, testapps.ScriptsVolumeName, &mode).
+				AddConfigTemplate(primaryConfigName, primaryConfigName, "", testCtx.DefaultNamespace, string(replicationset.Primary), &mode).
+				AddConfigTemplate(secondaryConfigName, secondaryConfigName, "", testCtx.DefaultNamespace, string(replicationset.Secondary), &mode).
 				AddInitContainerVolumeMounts(testapps.DefaultRedisInitContainerName, replicationRedisConfigVolumeMounts).
 				AddContainerVolumeMounts(testapps.DefaultRedisContainerName, replicationRedisConfigVolumeMounts).
 				Create(&testCtx).GetObject()

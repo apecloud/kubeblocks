@@ -164,8 +164,8 @@ func (pvcEventHandler PersistentVolumeClaimEventHandler) handlePVCFailedStatusOn
 	if err = cli.Get(reqCtx.Ctx, client.ObjectKey{Name: opsRequestName, Namespace: pvc.Namespace}, opsRequest); err != nil {
 		return err
 	}
-	statusComponents := opsRequest.Status.Components
-	if statusComponents == nil {
+	compsStatus := opsRequest.Status.Components
+	if compsStatus == nil {
 		return nil
 	}
 	componentName := pvc.Labels[intctrlutil.AppComponentLabelKey]
@@ -173,7 +173,7 @@ func (pvcEventHandler PersistentVolumeClaimEventHandler) handlePVCFailedStatusOn
 	patch := client.MergeFrom(opsRequest.DeepCopy())
 	var isChanged bool
 	// change the pvc status to Failed in OpsRequest.status.components.
-	for cName, component := range statusComponents {
+	for cName, component := range compsStatus {
 		if cName != componentName {
 			continue
 		}
@@ -190,8 +190,8 @@ func (pvcEventHandler PersistentVolumeClaimEventHandler) handlePVCFailedStatusOn
 			Message:   event.Message,
 		}
 
-		SetStatusComponentProgressDetail(recorder, opsRequest, &component.ProgressDetails, *progressDetail)
-		statusComponents[cName] = component
+		SetComponentStatusProgressDetail(recorder, opsRequest, &component.ProgressDetails, *progressDetail)
+		compsStatus[cName] = component
 		break
 	}
 	if !isChanged {

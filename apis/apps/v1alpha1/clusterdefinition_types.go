@@ -276,10 +276,10 @@ type ClusterComponentDefinition struct {
 	Name string `json:"name"`
 
 	// workloadType defines type of the workload.
-	// Stateless is a stateless component type used to describe stateless applications.
-	// Stateful is a stateful component type used to describe common stateful applications.
-	// Consensus is a stateful component type used to describe applications based on consensus protocols, common consensus protocols such as raft and paxos.
-	// Replication is a stateful component type used to describe applications based on the primary-secondary data replication protocol.
+	// Stateless is a stateless workload type used to describe stateless applications.
+	// Stateful is a stateful workload type used to describe common stateful applications.
+	// Consensus is a stateful workload type used to describe applications based on consensus protocols, common consensus protocols such as raft and paxos.
+	// Replication is a stateful workload type used to describe applications based on the primary-secondary data replication protocol.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Enum={Stateless,Stateful,Consensus,Replication}
 	WorkloadType WorkloadType `json:"workloadType"`
@@ -472,7 +472,7 @@ type ConsensusMember struct {
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
 //+kubebuilder:resource:categories={kubeblocks},scope=Cluster,shortName=cd
-//+kubebuilder:printcolumn:name="MAIN-COMPONENT-TYPE",type="string",JSONPath=".spec.componentDefs[0].name",description="main component types"
+//+kubebuilder:printcolumn:name="MAIN-COMPONENT-NAME",type="string",JSONPath=".spec.componentDefs[0].name",description="main component names"
 //+kubebuilder:printcolumn:name="STATUS",type="string",JSONPath=".status.phase",description="status phase"
 //+kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
 

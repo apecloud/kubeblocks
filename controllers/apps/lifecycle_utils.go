@@ -41,21 +41,22 @@ import (
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
 	"github.com/apecloud/kubeblocks/internal/controller/plan"
+	intctrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 func mergeComponentsList(reqCtx intctrlutil.RequestCtx,
 	cluster *appsv1alpha1.Cluster,
 	clusterDef *appsv1alpha1.ClusterDefinition,
-	clusterDefCompList []appsv1alpha1.ClusterComponentDefinition,
-	clusterCompList []appsv1alpha1.ClusterComponentSpec) []component.SynthesizedComponent {
+	clusterCompDefList []appsv1alpha1.ClusterComponentDefinition,
+	clusterCompSpecList []appsv1alpha1.ClusterComponentSpec) []component.SynthesizedComponent {
 	var compList []component.SynthesizedComponent
-	for _, clusterDefComp := range clusterDefCompList {
-		for _, clusterComp := range clusterCompList {
-			if clusterComp.ComponentDefRef != clusterDefComp.Name {
+	for _, compDef := range clusterCompDefList {
+		for _, compSpec := range clusterCompSpecList {
+			if compSpec.ComponentDefRef != compDef.Name {
 				continue
 			}
-			comp := component.BuildComponent(reqCtx, cluster, clusterDef, &clusterDefComp, nil, &clusterComp)
+			comp := component.BuildComponent(reqCtx, cluster, clusterDef, &compDef, nil, &compSpec)
 			compList = append(compList, *comp)
 		}
 	}
@@ -74,68 +75,56 @@ func getComponent(componentList []component.SynthesizedComponent, name string) *
 func reconcileClusterWorkloads(
 	reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
-	clusterDefinition *appsv1alpha1.ClusterDefinition,
-	clusterVersion *appsv1alpha1.ClusterVersion,
+	clusterDef *appsv1alpha1.ClusterDefinition,
+	clusterVer *appsv1alpha1.ClusterVersion,
 	cluster *appsv1alpha1.Cluster) (shouldRequeue bool, err error) {
 
-	applyObjs := make([]client.Object, 0, 3)
-	cacheCtx := map[string]interface{}{}
-	params := plan.CreateParams{
+	resourcesQueue := make([]client.Object, 0, 3)
+	task := intctrltypes.ReconcileTask{
 		Cluster:           cluster,
-		ClusterDefinition: clusterDefinition,
-		ApplyObjs:         &applyObjs,
-		CacheCtx:          &cacheCtx,
-		ClusterVersion:    clusterVersion,
+		ClusterDefinition: clusterDef,
+		ClusterVersion:    clusterVer,
+		Resources:         &resourcesQueue,
 	}
-	if err := prepareSecretObjs(reqCtx, cli, &params); err != nil {
+	if err := prepareSecretObjs(reqCtx, cli, &task); err != nil {
 		return false, err
 	}
 
-	clusterDefComps := clusterDefinition.Spec.ComponentDefs
-	clusterCompMap := cluster.GetTypeMappingComponents()
-	clusterVersionCompMap := clusterVersion.GetTypeMappingComponents()
+	clusterCompSpecMap := cluster.GetDefNameMappingComponents()
+	clusterCompVerMap := clusterVer.GetDefNameMappingComponents()
 
 	prepareComp := func(component *component.SynthesizedComponent) error {
-		iParams := params
+		iParams := task
 		iParams.Component = component
-		return plan.PrepareComponentObjs(reqCtx, cli, &iParams)
+		return plan.PrepareComponentResources(reqCtx, cli, &iParams)
 	}
 
-	for _, c := range clusterDefComps {
+	for _, c := range clusterDef.Spec.ComponentDefs {
 		compDefName := c.Name
-		clusterVersionComp := clusterVersionCompMap[compDefName]
-		clusterComps := clusterCompMap[compDefName]
-		for _, clusterComp := range clusterComps {
-			if err := prepareComp(component.BuildComponent(reqCtx, cluster, clusterDefinition, &c, clusterVersionComp, &clusterComp)); err != nil {
+		compVer := clusterCompVerMap[compDefName]
+		compSpecs := clusterCompSpecMap[compDefName]
+		for _, compSpec := range compSpecs {
+			if err := prepareComp(component.BuildComponent(reqCtx, cluster, clusterDef, &c, compVer, &compSpec)); err != nil {
 				return false, err
 			}
 		}
 	}
 
-	return checkedCreateObjs(reqCtx, cli, &params)
+	return checkedCreateObjs(reqCtx, cli, &task)
 }
 
-func checkedCreateObjs(reqCtx intctrlutil.RequestCtx, cli client.Client, obj interface{}) (shouldRequeue bool, err error) {
-	params, ok := obj.(*plan.CreateParams)
-	if !ok {
-		return false, fmt.Errorf("invalid arg")
-	}
+func checkedCreateObjs(reqCtx intctrlutil.RequestCtx, cli client.Client, task *intctrltypes.ReconcileTask) (shouldRequeue bool, err error) {
 	// TODO when deleting a component of the cluster, clean up the corresponding k8s resources.
-	return createOrReplaceResources(reqCtx, cli, params.Cluster, params.ClusterDefinition, *params.ApplyObjs)
+	return createOrReplaceResources(reqCtx, cli, task.Cluster, task.ClusterDefinition, *task.Resources)
 }
 
-func prepareSecretObjs(reqCtx intctrlutil.RequestCtx, cli client.Client, obj interface{}) error {
-	params, ok := obj.(*plan.CreateParams)
-	if !ok {
-		return fmt.Errorf("invalid arg")
-	}
-
-	secret, err := builder.BuildConnCredential(params.ToBuilderParams())
+func prepareSecretObjs(reqCtx intctrlutil.RequestCtx, cli client.Client, task *intctrltypes.ReconcileTask) error {
+	secret, err := builder.BuildConnCredential(task.GetBuilderParams())
 	if err != nil {
 		return err
 	}
 	// must make sure secret resources are created before others
-	*params.ApplyObjs = append(*params.ApplyObjs, secret)
+	task.AppendResource(secret)
 	return nil
 }
 

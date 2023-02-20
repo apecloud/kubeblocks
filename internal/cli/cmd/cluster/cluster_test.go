@@ -148,7 +148,7 @@ var _ = Describe("Cluster", func() {
 			TTLSecondsAfterSucceed: 30,
 		}
 		By("validate o.name is null")
-		Expect(o.Validate()).To(MatchError("missing cluster name"))
+		Expect(o.Validate()).To(MatchError(missingClusterArgErrMassage))
 
 		By("validate upgrade when cluster-version is null")
 		o.Name = "test"
@@ -203,7 +203,7 @@ var _ = Describe("Cluster", func() {
 		By("Create a clusterDefinition obj")
 		clusterDefObj := testapps.NewClusterDefFactory(clusterDefName).
 			AddComponent(testapps.StatefulMySQLComponent, statefulCompType).
-			AddConfigTemplate(configTplName, configmap.Name, constraint.Name, configVolumeName, nil).
+			AddConfigTemplate(configTplName, configmap.Name, constraint.Name, ns, configVolumeName, nil).
 			GetObject()
 		By("Create a clusterVersion obj")
 		clusterVersionObj := testapps.NewClusterVersionFactory(clusterVersionName, clusterDefObj.GetName()).

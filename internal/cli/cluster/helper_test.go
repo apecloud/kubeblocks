@@ -64,7 +64,7 @@ var _ = Describe("helper", func() {
 		Expect(compDefName).Should(Equal(""))
 	})
 
-	It("find component in cluster by type name", func() {
+	It("find component in cluster by name", func() {
 		cluster := testing.FakeCluster("test", "test")
 		component := FindClusterComp(cluster, "test")
 		Expect(component).Should(BeNil())

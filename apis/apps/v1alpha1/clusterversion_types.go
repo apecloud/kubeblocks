@@ -112,8 +112,8 @@ func init() {
 	SchemeBuilder.Register(&ClusterVersion{}, &ClusterVersionList{})
 }
 
-// GetTypeMappingComponents return ComponentDefRef name mapping ClusterComponentVersion.
-func (r *ClusterVersion) GetTypeMappingComponents() map[string]*ClusterComponentVersion {
+// GetDefNameMappingComponents returns ComponentDefRef name mapping ClusterComponentVersion.
+func (r *ClusterVersion) GetDefNameMappingComponents() map[string]*ClusterComponentVersion {
 	m := map[string]*ClusterComponentVersion{}
 	for i, c := range r.Spec.ComponentVersions {
 		m[c.ComponentDefRef] = &r.Spec.ComponentVersions[i]

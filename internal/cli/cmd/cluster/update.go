@@ -82,7 +82,7 @@ func NewUpdateCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 func (o *updateOptions) complete(cmd *cobra.Command, args []string) error {
 	var err error
 	if len(args) == 0 {
-		return fmt.Errorf("missing updated cluster name")
+		return makeMissingClusterNameErr()
 	}
 	if len(args) > 1 {
 		return fmt.Errorf("only support to update one cluster")

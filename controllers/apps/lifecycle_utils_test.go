@@ -190,11 +190,11 @@ spec:
 			cluster, clusterDef, clusterVersion, _ := newAllFieldsClusterObj(nil, nil, false)
 			component := component.BuildComponent(
 				reqCtx,
-				cluster,
-				clusterDef,
-				&clusterDef.Spec.ComponentDefs[0],
-				&clusterVersion.Spec.ComponentVersions[0],
-				&cluster.Spec.ComponentSpecs[0])
+				*cluster,
+				*clusterDef,
+				clusterDef.Spec.ComponentDefs[0],
+				cluster.Spec.ComponentSpecs[0],
+				&clusterVersion.Spec.ComponentVersions[0])
 			Expect(component).ShouldNot(BeNil())
 			component.HorizontalScalePolicy = &appsv1alpha1.HorizontalScalePolicy{
 				Type:             appsv1alpha1.HScaleDataClonePolicyFromSnapshot,

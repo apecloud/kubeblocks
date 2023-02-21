@@ -76,11 +76,31 @@ type ClusterComponentVersion struct {
 	// +listMapKey=name
 	ConfigTemplateRefs []ConfigTemplate `json:"configTemplateRefs,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
 
-	// TODO: refactor podSpec
-	// PodSpec is pod spec, if not nil, will replace ClusterDefinitionSpec.PodSpec in ClusterDefinition.
+	// versionContext defines containers images' context for component versions,
+	// this value replaces ClusterDefinition.spec.componentDefs.podSpec.[initContainers | containers]
+	VersionsCtx VersionsContext `json:"versionContext"`
+}
+
+type VersionsContext struct {
+	// Provide ClusterDefinition.spec.componentDefs.podSpec.initContainers override
+	// values, typical scenarios are application container image updates.
 	// +kubebuilder:pruning:PreserveUnknownFields
+	// +patchMergeKey=name
+	// +patchStrategy=merge
+	// +listType=map
+	// +listMapKey=name
 	// +optional
-	PodSpec *corev1.PodSpec `json:"podSpec,omitempty"`
+	InitContainers []corev1.Container `json:"initContainers,omitempty"`
+
+	// Provide ClusterDefinition.spec.componentDefs.podSpec.containers override
+	// values, typical scenarios are application container image updates.
+	// +kubebuilder:pruning:PreserveUnknownFields
+	// +patchMergeKey=name
+	// +patchStrategy=merge
+	// +listType=map
+	// +listMapKey=name
+	// +optional
+	Containers []corev1.Container `json:"containers,omitempty"`
 }
 
 //+kubebuilder:object:root=true

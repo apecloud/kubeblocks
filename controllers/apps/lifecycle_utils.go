@@ -25,7 +25,7 @@ import (
 
 	"github.com/pkg/errors"
 	appsv1 "k8s.io/api/apps/v1"
-	v1 "k8s.io/api/batch/v1"
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -56,7 +56,7 @@ func mergeComponentsList(reqCtx intctrlutil.RequestCtx,
 			if compSpec.ComponentDefRef != compDef.Name {
 				continue
 			}
-			comp := component.BuildComponent(reqCtx, cluster, clusterDef, &compDef, nil, &compSpec)
+			comp := component.BuildComponent(reqCtx, *cluster, *clusterDef, compDef, compSpec)
 			compList = append(compList, *comp)
 		}
 	}
@@ -104,7 +104,7 @@ func reconcileClusterWorkloads(
 		compVer := clusterCompVerMap[compDefName]
 		compSpecs := clusterCompSpecMap[compDefName]
 		for _, compSpec := range compSpecs {
-			if err := prepareComp(component.BuildComponent(reqCtx, cluster, clusterDef, &c, compVer, &compSpec)); err != nil {
+			if err := prepareComp(component.BuildComponent(reqCtx, *cluster, *clusterDef, c, compSpec, compVer)); err != nil {
 				return false, err
 			}
 		}
@@ -832,7 +832,7 @@ func deleteDeletePVCCronJob(cli client.Client,
 	pvcKey types.NamespacedName) error {
 	cronJobKey := pvcKey
 	cronJobKey.Name = "delete-pvc-" + pvcKey.Name
-	cronJob := v1.CronJob{}
+	cronJob := batchv1.CronJob{}
 	if err := cli.Get(ctx, cronJobKey, &cronJob); err != nil {
 		return client.IgnoreNotFound(err)
 	}

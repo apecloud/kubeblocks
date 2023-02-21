@@ -8,19 +8,19 @@ spec:
   clusterDefinitionRef: apecloud-mongodb
   componentVersions:
     - componentDefRef: mongos
-      podSpec:
+      versionsContext:
         containers:
           - name: mongos
             image: {{ .Values.image.repository }}:{{ default .Chart.AppVersion .Values.image.tag }}
             imagePullPolicy: {{ default .Values.image.pullPolicy "IfNotPresent" }}
     - componentDefRef: configsvr
-      podSpec:
+      versionsContext:
         containers:
           - name: configsvr
             image: {{ .Values.image.repository }}:{{ default .Chart.AppVersion .Values.image.tag }}
             imagePullPolicy: {{ default .Values.image.pullPolicy "IfNotPresent" }}
     - componentDefRef: shard
-      podSpec:
+      versionsContext:
         containers:
           - name: shard
             image: {{ .Values.image.repository }}:{{ default .Chart.AppVersion .Values.image.tag }}

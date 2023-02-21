@@ -6,7 +6,7 @@ spec:
   clusterDefinitionRef: wesql
   components:
   - type: replicasets
-    podSpec:
+    versionsContext:
       containers:
       - name: mysql
         image: docker.io/apecloud/apecloud-mysql-server:latest

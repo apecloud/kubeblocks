@@ -149,11 +149,11 @@ var _ = Describe("builder", func() {
 		By("assign every available fields")
 		component := component.BuildComponent(
 			reqCtx,
-			cluster,
-			clusterDef,
-			&clusterDef.Spec.ComponentDefs[0],
-			&clusterVersion.Spec.ComponentVersions[0],
-			&cluster.Spec.ComponentSpecs[0])
+			*cluster,
+			*clusterDef,
+			clusterDef.Spec.ComponentDefs[0],
+			cluster.Spec.ComponentSpecs[0],
+			&clusterVersion.Spec.ComponentVersions[0])
 		Expect(component).ShouldNot(BeNil())
 		return component
 	}

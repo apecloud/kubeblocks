@@ -56,6 +56,9 @@ func NewStatefulSetFactory(namespace, name string, clusterName string, component
 						},
 					},
 				},
+				UpdateStrategy: appsv1.StatefulSetUpdateStrategy{
+					Type: appsv1.OnDeleteStatefulSetStrategyType,
+				},
 			},
 		}, f)
 	return f

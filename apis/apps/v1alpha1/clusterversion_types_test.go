@@ -38,16 +38,16 @@ spec:
   clusterDefinitionRef: cluster-definition-1
   componentVersions:
   - componentDefRef: component1
-    podSpec: 
+    versionsContext:
       containers:
       - name: container1.a
       - name: container1.b
   - componentDefRef: component2
-    podSpec: 
+    versionsContext:
       containers:
       - name: container2
   - componentDefRef: component3
-    podSpec: 
+    versionsContext:
       containers:
 `
 	g.Expect(yaml.Unmarshal([]byte(clusterVersionYaml), clusterVersion)).To(Succeed())
@@ -66,10 +66,10 @@ spec:
       containers:
       - name: container1.c
   - name: component2
-    podSpec: 
+    podSpec:
       containers:
   - name: component3
-    podSpec: 
+    podSpec:
       containers:
       - name: container3
 `

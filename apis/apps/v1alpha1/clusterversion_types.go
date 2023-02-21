@@ -78,7 +78,7 @@ type ClusterComponentVersion struct {
 
 	// versionContext defines containers images' context for component versions,
 	// this value replaces ClusterDefinition.spec.componentDefs.podSpec.[initContainers | containers]
-	VersionsCtx VersionsContext `json:"versionContext"`
+	VersionsCtx VersionsContext `json:"versionsContext"`
 }
 
 type VersionsContext struct {

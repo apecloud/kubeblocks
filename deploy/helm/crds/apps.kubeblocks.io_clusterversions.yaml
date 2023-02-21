@@ -128,7 +128,7 @@ spec:
                       x-kubernetes-list-map-keys:
                       - name
                       x-kubernetes-list-type: map
-                    versionContext:
+                    versionsContext:
                       description: versionContext defines containers images' context
                         for component versions, this value replaces ClusterDefinition.spec.componentDefs.podSpec.[initContainers
                         | containers]
@@ -2844,7 +2844,7 @@ spec:
                       type: object
                   required:
                   - componentDefRef
-                  - versionContext
+                  - versionsContext
                   type: object
                 minItems: 1
                 type: array

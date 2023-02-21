@@ -87,18 +87,22 @@ func RestartSts(ctx context.Context, cli client.Client, sts *appsv1.StatefulSet)
 	if err != nil {
 		return err
 	}
+	// Delete pods when all pods are ready
+	for _, pod := range pods {
+		if !PodIsReady(pod) {
+			return nil
+		}
+	}
 
 	for _, pod := range pods {
 		// if DeletionTimestamp is not nil, it's terminating.
 		if pod.DeletionTimestamp != nil {
 			continue
 		}
-
 		// do nothing if pod is the latest version
 		if GetPodRevision(&pod) == sts.Status.UpdateRevision {
 			continue
 		}
-
 		// delete the pod to trigger associate StatefulSet to re-create it
 		if err := cli.Delete(ctx, &pod); err != nil && !apierrors.IsNotFound(err) {
 			return err

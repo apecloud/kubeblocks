@@ -45,7 +45,7 @@ func (consensusSet *ConsensusSet) IsRunning(obj client.Object) (bool, error) {
 	if obj == nil {
 		return false, nil
 	}
-	sts := util.CovertToStatefulSet(obj)
+	sts := util.ConvertToStatefulSet(obj)
 	isRevisionConsistent, err := util.IsStsAndPodsRevisionConsistent(consensusSet.Ctx, consensusSet.Cli, sts)
 	if err != nil {
 		return false, err
@@ -59,7 +59,7 @@ func (consensusSet *ConsensusSet) PodsReady(obj client.Object) (bool, error) {
 	if obj == nil {
 		return false, nil
 	}
-	sts := util.CovertToStatefulSet(obj)
+	sts := util.ConvertToStatefulSet(obj)
 	return util.StatefulSetPodsIsReady(sts), nil
 }
 
@@ -189,7 +189,7 @@ func (consensusSet *ConsensusSet) HandleUpdate(obj client.Object) error {
 		ctx     = consensusSet.Ctx
 		cli     = consensusSet.Cli
 	)
-	stsObj := util.CovertToStatefulSet(obj)
+	stsObj := util.ConvertToStatefulSet(obj)
 	// get compDefName from stsObj.name
 	compDefName := cluster.GetComponentDefRefName(stsObj.Labels[intctrlutil.AppComponentLabelKey])
 

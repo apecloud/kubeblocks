@@ -77,15 +77,15 @@ func TestStatefulSetPodsIsReady(t *testing.T) {
 	if !ready {
 		t.Errorf("StatefulSet pods should be ready")
 	}
-	covertSts := CovertToStatefulSet(sts)
+	covertSts := ConvertToStatefulSet(sts)
 	if covertSts == nil {
 		t.Errorf("Covert to statefulSet should be succeed")
 	}
-	covertSts = CovertToStatefulSet(&apps.Deployment{})
+	covertSts = ConvertToStatefulSet(&apps.Deployment{})
 	if covertSts != nil {
 		t.Errorf("Covert to statefulSet should be failed")
 	}
-	covertSts = CovertToStatefulSet(nil)
+	covertSts = ConvertToStatefulSet(nil)
 	if covertSts != nil {
 		t.Errorf("Covert to statefulSet should be failed")
 	}

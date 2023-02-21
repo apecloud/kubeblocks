@@ -93,18 +93,18 @@ func (stateless *Stateless) GetPhaseWhenPodsNotReady(componentName string) (apps
 	if podCount == 0 || deploy.Status.AvailableReplicas == 0 {
 		return util.GetPhaseWithNoAvailableReplicas(componentReplicas), nil
 	}
-	var existFailedPodOfNewRs bool
+	var existFailedPodOfNewRS bool
 	for _, v := range podList.Items {
 		// if the pod is terminating, ignore it
 		if v.DeletionTimestamp != nil {
 			return "", nil
 		}
 		if !intctrlutil.PodIsReady(&v) && belongToNewReplicaSet(deploy, &v) {
-			existFailedPodOfNewRs = true
+			existFailedPodOfNewRS = true
 		}
 	}
 	// if the failed pod is not controlled by new ReplicaSet, ignore it.
-	if !existFailedPodOfNewRs {
+	if !existFailedPodOfNewRS {
 		return "", nil
 	}
 	// checks if the available replicas of component and workload are consistent.

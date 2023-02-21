@@ -17,8 +17,6 @@ limitations under the License.
 package util
 
 import (
-	testk8s "github.com/apecloud/kubeblocks/internal/testutil/k8s"
-	corev1 "k8s.io/api/core/v1"
 	"testing"
 	"time"
 
@@ -26,12 +24,14 @@ import (
 	. "github.com/onsi/gomega"
 
 	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
+	testk8s "github.com/apecloud/kubeblocks/internal/testutil/k8s"
 )
 
 func checkCompletedPhase(t *testing.T, phase appsv1alpha1.Phase) {

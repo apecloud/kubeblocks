@@ -38,12 +38,7 @@ service: {
 		namespace: cluster.metadata.namespace
 		name:      "\(cluster.metadata.name)-\(component.name)-headless"
 		labels: {
-			if component.characterType != _|_ {
-				"app.kubernetes.io/name": "\(component.characterType)-\(component.clusterDefName)"
-			}
-			if component.characterType == _|_ {
-				"app.kubernetes.io/name": "\(component.clusterDefName)"
-			}
+			"app.kubernetes.io/name": "\(component.clusterDefName)"
 			"app.kubernetes.io/instance":       cluster.metadata.name
 			"app.kubernetes.io/component-name": "\(component.name)"
 			"app.kubernetes.io/managed-by":     "kubeblocks"

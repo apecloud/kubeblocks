@@ -85,6 +85,28 @@ func TestGetComponentPhase(t *testing.T) {
 	}
 }
 
+func TestGetPhaseWithNoAvailableReplicas(t *testing.T) {
+	status := GetPhaseWithNoAvailableReplicas(int32(0))
+	if status != "" {
+		t.Error(`function GetComponentPhase should return ""`)
+	}
+	status = GetPhaseWithNoAvailableReplicas(int32(2))
+	if status != appsv1alpha1.FailedPhase {
+		t.Error(`function GetComponentPhase should return "Failed"`)
+	}
+}
+
+func TestAvailableReplicasAreConsistent(t *testing.T) {
+	isConsistent := AvailableReplicasAreConsistent(int32(1), int32(1), int32(1))
+	if !isConsistent {
+		t.Error(`function GetComponentPhase should return "true"`)
+	}
+	isConsistent = AvailableReplicasAreConsistent(int32(1), int32(2), int32(1))
+	if isConsistent {
+		t.Error(`function GetComponentPhase should return "false"`)
+	}
+}
+
 var _ = Describe("Consensus Component", func() {
 	var (
 		randomStr          = testCtx.GetRandomStr()
@@ -94,9 +116,9 @@ var _ = Describe("Consensus Component", func() {
 	)
 
 	const (
-		consensusCompType = "consensus"
-		consensusCompName = "consensus"
-		statelessCompName = "stateless"
+		consensusCompDefRef = "consensus"
+		consensusCompName   = "consensus"
+		statelessCompName   = "stateless"
 	)
 
 	cleanAll := func() {
@@ -130,7 +152,7 @@ var _ = Describe("Consensus Component", func() {
 			_ = testapps.MockConsensusComponentPods(testCtx, sts, clusterName, consensusCompName)
 
 			By("test GetComponentDefByCluster function")
-			componentDef, _ := GetComponentDefByCluster(ctx, k8sClient, cluster, consensusCompType)
+			componentDef, _ := GetComponentDefByCluster(ctx, k8sClient, cluster, consensusCompDefRef)
 			Expect(componentDef != nil).Should(BeTrue())
 
 			By("test GetClusterByObject function")
@@ -158,6 +180,11 @@ var _ = Describe("Consensus Component", func() {
 			minReadySeconds, _ = GetComponentWorkloadMinReadySeconds(ctx, k8sClient, cluster,
 				appsv1alpha1.Consensus, statelessCompName)
 			Expect(minReadySeconds).To(Equal(int32(0)))
+
+			By("test GetCompRelatedObjectList function")
+			stsList = &appsv1.StatefulSetList{}
+			podList, _ := GetCompRelatedObjectList(ctx, k8sClient, cluster, consensusCompName, stsList)
+			Expect(len(stsList.Items) > 0 && len(podList.Items) > 0).Should(BeTrue())
 		})
 	})
 })

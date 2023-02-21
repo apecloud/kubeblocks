@@ -136,26 +136,21 @@ func (consensusSet *ConsensusSet) HandleProbeTimeoutWhenPodsReady(recorder recor
 }
 
 func (consensusSet *ConsensusSet) GetPhaseWhenPodsNotReady(componentName string) (appsv1alpha1.Phase, error) {
-	podList, err := util.GetComponentPodList(consensusSet.Ctx, consensusSet.Cli, consensusSet.Cluster, componentName)
-	if err != nil {
+	stsList := &appsv1.StatefulSetList{}
+	podList, err := util.GetCompRelatedObjectList(consensusSet.Ctx, consensusSet.Cli, consensusSet.Cluster, componentName, stsList)
+	if err != nil || len(stsList.Items) == 0 {
 		return "", err
 	}
+	stsObj := stsList.Items[0]
 	podCount := len(podList.Items)
 	componentReplicas := consensusSet.Component.Replicas
-	if podCount == 0 && componentReplicas != 0 {
-		return appsv1alpha1.FailedPhase, nil
+	if podCount == 0 || stsObj.Status.AvailableReplicas == 0 {
+		return util.GetPhaseWithNoAvailableReplicas(componentReplicas), nil
 	}
 	// get the statefulSet of component
-	stsList := &appsv1.StatefulSetList{}
-	if err = util.GetObjectListByComponentName(consensusSet.Ctx,
-		consensusSet.Cli, consensusSet.Cluster, stsList, componentName); err != nil || len(stsList.Items) == 0 {
-		return "", err
-	}
 	var (
-		stsObj                       = stsList.Items[0]
 		existLatestRevisionFailedPod bool
-		isFailed                     = true
-		isAbnormal                   bool
+		leaderIsReady                bool
 	)
 	for _, v := range podList.Items {
 		// if the pod is terminating, ignore it
@@ -164,12 +159,8 @@ func (consensusSet *ConsensusSet) GetPhaseWhenPodsNotReady(componentName string)
 		}
 		labelValue := v.Labels[intctrlutil.RoleLabelKey]
 		if labelValue == consensusSet.ComponentDef.ConsensusSpec.Leader.Name && intctrlutil.PodIsReady(&v) {
-			isFailed = false
+			leaderIsReady = true
 			continue
-		}
-		// if no role label, the pod is not ready
-		if labelValue == "" {
-			isAbnormal = true
 		}
 		if !intctrlutil.PodIsReady(&v) && util.PodIsControlledByLatestRevision(&v, &stsObj) {
 			existLatestRevisionFailedPod = true
@@ -179,12 +170,14 @@ func (consensusSet *ConsensusSet) GetPhaseWhenPodsNotReady(componentName string)
 	if !existLatestRevisionFailedPod {
 		return "", nil
 	}
-	// check if pod count equals to the number of component replicas
-	if stsObj.Status.AvailableReplicas != componentReplicas ||
-		componentReplicas != int32(podCount) {
-		isAbnormal = true
+	if !leaderIsReady {
+		return appsv1alpha1.FailedPhase, nil
 	}
-	return util.GetComponentPhase(isFailed, isAbnormal), nil
+	// checks if the available replicas of component and workload are consistent.
+	if !util.AvailableReplicasAreConsistent(componentReplicas, int32(podCount), stsObj.Status.AvailableReplicas) {
+		return appsv1alpha1.AbnormalPhase, nil
+	}
+	return "", nil
 }
 
 func NewConsensusSet(ctx context.Context,

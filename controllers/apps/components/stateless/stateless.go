@@ -82,26 +82,18 @@ func (stateless *Stateless) HandleProbeTimeoutWhenPodsReady(recorder record.Even
 }
 
 func (stateless *Stateless) GetPhaseWhenPodsNotReady(componentName string) (appsv1alpha1.Phase, error) {
-	podList, err := util.GetComponentPodList(stateless.Ctx, stateless.Cli, stateless.Cluster, componentName)
-	if err != nil {
+	deployList := &appsv1.DeploymentList{}
+	podList, err := util.GetCompRelatedObjectList(stateless.Ctx, stateless.Cli, stateless.Cluster, componentName, deployList)
+	if err != nil || len(deployList.Items) == 0 {
 		return "", err
 	}
+	deploy := &deployList.Items[0]
 	podCount := len(podList.Items)
 	componentReplicas := stateless.Component.Replicas
-	if podCount == 0 && componentReplicas != 0 {
-		return appsv1alpha1.FailedPhase, nil
+	if podCount == 0 || deploy.Status.AvailableReplicas == 0 {
+		return util.GetPhaseWithNoAvailableReplicas(componentReplicas), nil
 	}
-	deployList := &appsv1.DeploymentList{}
-	if err = util.GetObjectListByComponentName(stateless.Ctx,
-		stateless.Cli, stateless.Cluster, deployList, componentName); err != nil || len(deployList.Items) == 0 {
-		return "", err
-	}
-	var (
-		isFailed              = true
-		isAbnormal            bool
-		existFailedPodOfNewRs bool
-		deploy                = &deployList.Items[0]
-	)
+	var existFailedPodOfNewRs bool
 	for _, v := range podList.Items {
 		// if the pod is terminating, ignore it
 		if v.DeletionTimestamp != nil {
@@ -115,14 +107,11 @@ func (stateless *Stateless) GetPhaseWhenPodsNotReady(componentName string) (apps
 	if !existFailedPodOfNewRs {
 		return "", nil
 	}
-	if deploy.Status.AvailableReplicas > 0 {
-		isFailed = false
+	// checks if the available replicas of component and workload are consistent.
+	if !util.AvailableReplicasAreConsistent(componentReplicas, int32(podCount), deploy.Status.AvailableReplicas) {
+		return appsv1alpha1.AbnormalPhase, nil
 	}
-	if deploy.Status.AvailableReplicas != componentReplicas ||
-		int32(podCount) != componentReplicas {
-		isAbnormal = true
-	}
-	return util.GetComponentPhase(isFailed, isAbnormal), nil
+	return "", nil
 }
 
 func NewStateless(ctx context.Context,

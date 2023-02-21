@@ -231,3 +231,33 @@ func GetComponentInfoByPod(ctx context.Context,
 	}
 	return componentName, componentDef, nil
 }
+
+// GetCompRelatedObjectList gets the related pods and workloads of the component
+func GetCompRelatedObjectList(ctx context.Context,
+	cli client.Client,
+	cluster *appsv1alpha1.Cluster,
+	compName string,
+	relatedWorkloads client.ObjectList) (*corev1.PodList, error) {
+	podList, err := GetComponentPodList(ctx, cli, cluster, compName)
+	if err != nil {
+		return nil, err
+	}
+	if err = GetObjectListByComponentName(ctx,
+		cli, cluster, relatedWorkloads, compName); err != nil {
+		return nil, err
+	}
+	return podList, nil
+}
+
+// AvailableReplicasAreConsistent checks if the available replicas of component and workload are consistent.
+func AvailableReplicasAreConsistent(componentReplicas, podCount, workloadAvailableReplicas int32) bool {
+	return workloadAvailableReplicas == componentReplicas && componentReplicas == podCount
+}
+
+// GetPhaseWithNoAvailableReplicas gets the component phase when the workload of component has no available replicas.
+func GetPhaseWithNoAvailableReplicas(componentReplicas int32) appsv1alpha1.Phase {
+	if componentReplicas == 0 {
+		return ""
+	}
+	return appsv1alpha1.FailedPhase
+}

@@ -43,7 +43,7 @@ var _ = Describe("Stateful Component", func() {
 	)
 	const (
 		statelessCompName      = "stateless"
-		statelessCompType      = "stateless"
+		statelessCompDefRef    = "stateless"
 		defaultMinReadySeconds = 10
 	)
 
@@ -71,10 +71,10 @@ var _ = Describe("Stateful Component", func() {
 		It("Stateless Component test", func() {
 			By(" init cluster, deployment")
 			clusterDef := testapps.NewClusterDefFactory(clusterDefName).
-				AddComponent(testapps.StatelessNginxComponent, statelessCompType).
+				AddComponent(testapps.StatelessNginxComponent, statelessCompDefRef).
 				Create(&testCtx).GetObject()
 			cluster := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefName, clusterVersionName).
-				AddComponent(statelessCompName, statelessCompType).SetReplicas(2).Create(&testCtx).GetObject()
+				AddComponent(statelessCompName, statelessCompDefRef).SetReplicas(2).Create(&testCtx).GetObject()
 			deploy := testapps.MockStatelessComponentDeploy(testCtx, clusterName, statelessCompName)
 			clusterComponent := cluster.GetComponentByName(statelessCompName)
 			componentDef := clusterDef.GetComponentDefByName(clusterComponent.ComponentDefRef)

@@ -77,26 +77,18 @@ func (stateful *Stateful) HandleProbeTimeoutWhenPodsReady(recorder record.EventR
 
 // GetPhaseWhenPodsNotReady gets the component phase when the pods of component are not ready.
 func (stateful *Stateful) GetPhaseWhenPodsNotReady(componentName string) (appsv1alpha1.Phase, error) {
-	podList, err := util.GetComponentPodList(stateful.Ctx, stateful.Cli, stateful.Cluster, componentName)
-	if err != nil {
+	stsList := &appsv1.StatefulSetList{}
+	podList, err := util.GetCompRelatedObjectList(stateful.Ctx, stateful.Cli, stateful.Cluster, componentName, stsList)
+	if err != nil || len(stsList.Items) == 0 {
 		return "", err
 	}
 	podCount := len(podList.Items)
+	stsObj := stsList.Items[0]
 	componentReplicas := stateful.Component.Replicas
-	if podCount == 0 && componentReplicas != 0 {
-		return appsv1alpha1.FailedPhase, nil
+	if podCount == 0 || stsObj.Status.AvailableReplicas == 0 {
+		return util.GetPhaseWithNoAvailableReplicas(componentReplicas), nil
 	}
-	stsList := &appsv1.StatefulSetList{}
-	if err = util.GetObjectListByComponentName(stateful.Ctx,
-		stateful.Cli, stateful.Cluster, stsList, componentName); err != nil || len(stsList.Items) == 0 {
-		return "", err
-	}
-	var (
-		stsObj                       = stsList.Items[0]
-		existLatestRevisionFailedPod bool
-		isFailed                     = true
-		isAbnormal                   bool
-	)
+	var existLatestRevisionFailedPod bool
 	for _, v := range podList.Items {
 		// if the pod is terminating, ignore it
 		if v.DeletionTimestamp != nil {
@@ -110,14 +102,11 @@ func (stateful *Stateful) GetPhaseWhenPodsNotReady(componentName string) (appsv1
 	if !existLatestRevisionFailedPod {
 		return "", nil
 	}
-	if stsObj.Status.AvailableReplicas > 0 {
-		isFailed = false
+	// checks if the available replicas of component and workload are consistent.
+	if !util.AvailableReplicasAreConsistent(componentReplicas, int32(podCount), stsObj.Status.AvailableReplicas) {
+		return appsv1alpha1.AbnormalPhase, nil
 	}
-	if stsObj.Status.AvailableReplicas != componentReplicas ||
-		int32(podCount) != componentReplicas {
-		isAbnormal = true
-	}
-	return util.GetComponentPhase(isFailed, isAbnormal), nil
+	return "", nil
 }
 
 func NewStateful(ctx context.Context,

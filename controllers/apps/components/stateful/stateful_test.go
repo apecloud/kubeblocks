@@ -42,7 +42,7 @@ var _ = Describe("Stateful Component", func() {
 	)
 	const (
 		defaultMinReadySeconds = 10
-		statefulCompType       = "stateful"
+		statefulCompDefRef     = "stateful"
 		statefulCompName       = "stateful"
 	)
 	cleanAll := func() {
@@ -70,7 +70,7 @@ var _ = Describe("Stateful Component", func() {
 		It("Stateful Component test", func() {
 			By(" init cluster, statefulSet, pods")
 			clusterDef, _, cluster := testapps.InitConsensusMysql(testCtx, clusterDefName,
-				clusterVersionName, clusterName, statefulCompType, statefulCompName)
+				clusterVersionName, clusterName, statefulCompDefRef, statefulCompName)
 			_ = testapps.MockConsensusComponentStatefulSet(testCtx, clusterName, statefulCompName)
 			stsList := &appsv1.StatefulSetList{}
 			Eventually(func() bool {

@@ -346,6 +346,12 @@ var _ = Describe("Cluster Controller", func() {
 		return fmt.Sprintf("%s-%s-%s-%d", testapps.DataVolumeName, clusterKey.Name, compName, i)
 	}
 
+	createPVC := func(clusterName, pvcName, compName string) {
+		// Note: in real k8s cluster, it maybe fails when pvc created by k8s controller.
+		testapps.NewPersistentVolumeClaimFactory(testCtx.DefaultNamespace, pvcName, clusterName,
+			compName, "data").SetStorage("1Gi").Create(&testCtx)
+	}
+
 	testHorizontalScale := func() {
 		initialReplicas := int32(1)
 		updatedReplicas := int32(3)
@@ -390,17 +396,11 @@ var _ = Describe("Cluster Controller", func() {
 
 		By("Mocking PVC for the first replica")
 		for i := 0; i < int(initialReplicas); i++ {
-			pvc := &corev1.PersistentVolumeClaim{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      getPVCName(mysqlCompName, i),
-					Namespace: clusterKey.Namespace,
-					Labels: map[string]string{
-						intctrlutil.AppInstanceLabelKey:  clusterKey.Name,
-						intctrlutil.AppComponentLabelKey: mysqlCompName,
-					}},
-				Spec: pvcSpec,
+			pvcKey := types.NamespacedName{
+				Namespace: clusterKey.Namespace,
+				Name:      getPVCName(mysqlCompName, i),
 			}
-			Expect(testCtx.CreateObj(testCtx.Ctx, pvc)).Should(Succeed())
+			createPVC(clusterKey.Name, pvcKey.Name, mysqlCompName)
 		}
 
 		By("Mock second component PVCs to make reconcile success")
@@ -409,17 +409,7 @@ var _ = Describe("Cluster Controller", func() {
 				Namespace: clusterKey.Namespace,
 				Name:      getPVCName(secondMysqlCompName, i),
 			}
-			pvc := &corev1.PersistentVolumeClaim{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      pvcKey.Name,
-					Namespace: pvcKey.Namespace,
-					Labels: map[string]string{
-						intctrlutil.AppInstanceLabelKey:  clusterKey.Name,
-						intctrlutil.AppComponentLabelKey: secondMysqlCompName,
-					}},
-				Spec: pvcSpec,
-			}
-			Expect(testCtx.CreateObj(testCtx.Ctx, pvc)).Should(Succeed())
+			createPVC(clusterKey.Name, pvcKey.Name, mysqlCompName)
 			Eventually(testapps.CheckObjExists(&testCtx, pvcKey, &corev1.PersistentVolumeClaim{}, true)).Should(Succeed())
 			Eventually(testapps.GetAndChangeObjStatus(&testCtx, pvcKey, func(pvc *corev1.PersistentVolumeClaim) {
 				pvc.Status.Phase = corev1.ClaimBound

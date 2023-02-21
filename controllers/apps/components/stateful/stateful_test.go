@@ -17,6 +17,7 @@ limitations under the License.
 package stateful
 
 import (
+	"fmt"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -41,8 +42,8 @@ var _ = Describe("Stateful Component", func() {
 	)
 	const (
 		defaultMinReadySeconds = 10
-		consensusCompType      = "consensus"
-		consensusCompName      = "consensus"
+		statefulCompDefRef     = "stateful"
+		statefulCompName       = "stateful"
 	)
 	cleanAll := func() {
 		// must wait until resources deleted and no longer exist before the testcases start,
@@ -69,46 +70,69 @@ var _ = Describe("Stateful Component", func() {
 		It("Stateful Component test", func() {
 			By(" init cluster, statefulSet, pods")
 			clusterDef, _, cluster := testapps.InitConsensusMysql(testCtx, clusterDefName,
-				clusterVersionName, clusterName, consensusCompType, consensusCompName)
-			_ = testapps.MockConsensusComponentStatefulSet(testCtx, clusterName, consensusCompName)
+				clusterVersionName, clusterName, statefulCompDefRef, statefulCompName)
+			_ = testapps.MockConsensusComponentStatefulSet(testCtx, clusterName, statefulCompName)
 			stsList := &appsv1.StatefulSetList{}
 			Eventually(func() bool {
 				_ = k8sClient.List(ctx, stsList, client.InNamespace(testCtx.DefaultNamespace), client.MatchingLabels{
 					intctrlutil.AppInstanceLabelKey:  clusterName,
-					intctrlutil.AppComponentLabelKey: consensusCompName,
+					intctrlutil.AppComponentLabelKey: statefulCompName,
 				}, client.Limit(1))
 				return len(stsList.Items) > 0
 			}).Should(BeTrue())
-			sts := &stsList.Items[0]
 
-			By("test pods are not ready")
-			clusterComponent := cluster.GetComponentByName(consensusCompName)
+			By("test pods number of sts is 0")
+			sts := &stsList.Items[0]
+			clusterComponent := cluster.GetComponentByName(statefulCompName)
 			componentDef := clusterDef.GetComponentDefByName(clusterComponent.ComponentDefRef)
 			stateful := NewStateful(ctx, k8sClient, cluster, clusterComponent, componentDef)
-			patch := client.MergeFrom(sts.DeepCopy())
-			availableReplicas := *sts.Spec.Replicas - 1
-			sts.Status.AvailableReplicas = availableReplicas
-			sts.Status.ReadyReplicas = availableReplicas
-			sts.Status.Replicas = availableReplicas
+			phase, _ := stateful.GetPhaseWhenPodsNotReady(statefulCompName)
+			Expect(phase == appsv1alpha1.FailedPhase).Should(BeTrue())
+
+			By("test pods are not ready")
+			updateRevison := fmt.Sprintf("%s-%s-%s", clusterName, statefulCompName, "6fdd48d9cd")
+			Expect(testapps.ChangeObjStatus(&testCtx, sts, func() {
+				availableReplicas := *sts.Spec.Replicas - 1
+				sts.Status.AvailableReplicas = availableReplicas
+				sts.Status.ReadyReplicas = availableReplicas
+				sts.Status.Replicas = availableReplicas
+				sts.Status.ObservedGeneration = 1
+				sts.Status.UpdateRevision = updateRevison
+			})).Should(Succeed())
 			podsReady, _ := stateful.PodsReady(sts)
 			Expect(podsReady == false).Should(BeTrue())
 
-			podList := testapps.MockConsensusComponentPods(testCtx, sts, clusterName, consensusCompName)
-			phase, _ := stateful.GetPhaseWhenPodsNotReady(consensusCompName)
-			Expect(phase == appsv1alpha1.FailedPhase).Should(BeTrue())
-			Expect(k8sClient.Status().Patch(ctx, sts, patch)).Should(Succeed())
+			By("create pods of sts")
+			podList := testapps.MockConsensusComponentPods(testCtx, sts, clusterName, statefulCompName)
 
 			By("test stateful component is abnormal")
-			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(sts), func(g Gomega, tmpSts *appsv1.StatefulSet) {
-				g.Expect(tmpSts.Status.AvailableReplicas == availableReplicas).Should(BeTrue())
+			// mock pod is not ready
+			pod := podList[0]
+			Expect(testapps.ChangeObjStatus(&testCtx, pod, func() {
+				pod.Status.Conditions = nil
 			})).Should(Succeed())
-			phase, _ = stateful.GetPhaseWhenPodsNotReady(consensusCompName)
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(sts), func(g Gomega, tmpSts *appsv1.StatefulSet) {
+				g.Expect(tmpSts.Status.AvailableReplicas == *sts.Spec.Replicas-1).Should(BeTrue())
+			})).Should(Succeed())
+			phase, _ = stateful.GetPhaseWhenPodsNotReady(statefulCompName)
 			Expect(phase == appsv1alpha1.AbnormalPhase).Should(BeTrue())
 
-			By("test pod is ready")
+			By("not ready pod is not controlled by latest revision, should return empty string")
+			// mock pod is not controlled by latest revision
+			Expect(testapps.ChangeObj(&testCtx, pod, func() {
+				pod.Labels[appsv1.ControllerRevisionHashLabelKey] = fmt.Sprintf("%s-%s-%s", clusterName, statefulCompName, "5wdsd8d9fs")
+			})).Should(Succeed())
+			phase, _ = stateful.GetPhaseWhenPodsNotReady(statefulCompName)
+			Expect(len(phase) == 0).Should(BeTrue())
+			// reset updateRevision
+			Expect(testapps.ChangeObj(&testCtx, pod, func() {
+				pod.Labels[appsv1.ControllerRevisionHashLabelKey] = updateRevison
+			})).Should(Succeed())
+
+			By("test pod is available")
 			lastTransTime := metav1.NewTime(time.Now().Add(-1 * (defaultMinReadySeconds + 1) * time.Second))
-			testk8s.MockPodAvailable(podList[0], lastTransTime)
-			Expect(stateful.PodIsAvailable(podList[0], defaultMinReadySeconds)).Should(BeTrue())
+			testk8s.MockPodAvailable(pod, lastTransTime)
+			Expect(stateful.PodIsAvailable(pod, defaultMinReadySeconds)).Should(BeTrue())
 
 			By("test pods are ready")
 			// mock sts is ready

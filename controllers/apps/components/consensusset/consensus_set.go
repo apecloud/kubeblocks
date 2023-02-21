@@ -19,6 +19,7 @@ package consensusset
 import (
 	"context"
 
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -51,8 +52,7 @@ func (consensusSet *ConsensusSet) IsRunning(obj client.Object) (bool, error) {
 	if statefulStatusRevisionIsEquals, err := handleConsensusSetUpdate(consensusSet.Ctx, consensusSet.Cli, consensusSet.Cluster, sts); err != nil {
 		return false, err
 	} else {
-		targetReplicas := util.GetComponentReplicas(consensusSet.Component, consensusSet.ComponentDef)
-		return util.StatefulSetIsReady(sts, statefulStatusRevisionIsEquals, &targetReplicas), nil
+		return util.StatefulSetOfComponentIsReady(sts, statefulStatusRevisionIsEquals, &consensusSet.Component.Replicas), nil
 	}
 }
 
@@ -61,7 +61,7 @@ func (consensusSet *ConsensusSet) PodsReady(obj client.Object) (bool, error) {
 		return false, nil
 	}
 	sts := util.CovertToStatefulSet(obj)
-	return util.StatefulSetPodsIsReady(sts), nil
+	return util.StatefulSetPodsAreReady(sts, consensusSet.Component.Replicas), nil
 }
 
 func (consensusSet *ConsensusSet) PodIsAvailable(pod *corev1.Pod, minReadySeconds int32) bool {
@@ -136,52 +136,49 @@ func (consensusSet *ConsensusSet) HandleProbeTimeoutWhenPodsReady(recorder recor
 }
 
 func (consensusSet *ConsensusSet) GetPhaseWhenPodsNotReady(componentName string) (appsv1alpha1.Phase, error) {
-	var (
-		isFailed      = true
-		isAbnormal    bool
-		podList       *corev1.PodList
-		allPodIsReady = true
-		cluster       = consensusSet.Cluster
-		err           error
-	)
-
-	if podList, err = util.GetComponentPodList(consensusSet.Ctx, consensusSet.Cli, cluster, componentName); err != nil {
+	stsList := &appsv1.StatefulSetList{}
+	podList, err := util.GetCompRelatedObjectList(consensusSet.Ctx, consensusSet.Cli, consensusSet.Cluster, componentName, stsList)
+	if err != nil || len(stsList.Items) == 0 {
 		return "", err
 	}
-
+	stsObj := stsList.Items[0]
 	podCount := len(podList.Items)
-	if podCount == 0 {
-		return appsv1alpha1.FailedPhase, nil
+	componentReplicas := consensusSet.Component.Replicas
+	if podCount == 0 || stsObj.Status.AvailableReplicas == 0 {
+		return util.GetPhaseWithNoAvailableReplicas(componentReplicas), nil
 	}
+	// get the statefulSet of component
+	var (
+		existLatestRevisionFailedPod bool
+		leaderIsReady                bool
+		consensusSpec                = consensusSet.ComponentDef.ConsensusSpec
+	)
 	for _, v := range podList.Items {
-		// if the pod is terminating, ignore the warning event
+		// if the pod is terminating, ignore it
 		if v.DeletionTimestamp != nil {
 			return "", nil
 		}
 		labelValue := v.Labels[intctrlutil.RoleLabelKey]
-		if labelValue == consensusSet.ComponentDef.ConsensusSpec.Leader.Name && intctrlutil.PodIsReady(&v) {
-			isFailed = false
+		if consensusSpec != nil && labelValue == consensusSpec.Leader.Name && intctrlutil.PodIsReady(&v) {
+			leaderIsReady = true
 			continue
 		}
-		// if no role label, the pod is not ready
-		if labelValue == "" {
-			isAbnormal = true
-		}
-		if !intctrlutil.PodIsReady(&v) {
-			allPodIsReady = false
+		if !intctrlutil.PodIsReady(&v) && util.PodIsControlledByLatestRevision(&v, &stsObj) {
+			existLatestRevisionFailedPod = true
 		}
 	}
-	// check pod count is equals to the component replicas
-	componentReplicas := util.GetComponentReplicas(consensusSet.Component, consensusSet.ComponentDef)
-	if componentReplicas != int32(podCount) {
-		isAbnormal = true
-		allPodIsReady = false
-	}
-	// if all pod is ready, ignore the warning event
-	if allPodIsReady {
+	// if the failed pod is not controlled by the latest revision, ignore it.
+	if !existLatestRevisionFailedPod {
 		return "", nil
 	}
-	return util.GetComponentPhase(isFailed, isAbnormal), nil
+	if !leaderIsReady {
+		return appsv1alpha1.FailedPhase, nil
+	}
+	// checks if the available replicas of component and workload are consistent.
+	if !util.AvailableReplicasAreConsistent(componentReplicas, int32(podCount), stsObj.Status.AvailableReplicas) {
+		return appsv1alpha1.AbnormalPhase, nil
+	}
+	return "", nil
 }
 
 func NewConsensusSet(ctx context.Context,

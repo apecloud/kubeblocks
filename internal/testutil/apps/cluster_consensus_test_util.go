@@ -93,9 +93,9 @@ func MockConsensusComponentStsPod(
 	consensusCompName,
 	podName,
 	podRole, accessMode string) *corev1.Pod {
-	stsUpdateRevison := ""
+	var stsUpdateRevision string
 	if sts != nil {
-		stsUpdateRevison = sts.Status.UpdateRevision
+		stsUpdateRevision = sts.Status.UpdateRevision
 	}
 	pod := NewPodFactory(testCtx.DefaultNamespace, podName).SetOwnerReferences("apps/v1", intctrlutil.StatefulSetKind, sts).AddLabelsInMap(map[string]string{
 		intctrlutil.AppInstanceLabelKey:            clusterName,
@@ -103,7 +103,7 @@ func MockConsensusComponentStsPod(
 		intctrlutil.AppManagedByLabelKey:           intctrlutil.AppName,
 		intctrlutil.RoleLabelKey:                   podRole,
 		intctrlutil.ConsensusSetAccessModeLabelKey: accessMode,
-		appsv1.ControllerRevisionHashLabelKey:      stsUpdateRevison,
+		appsv1.ControllerRevisionHashLabelKey:      stsUpdateRevision,
 	}).AddContainer(corev1.Container{Name: DefaultMySQLContainerName, Image: ApeCloudMySQLImage}).Create(&testCtx).GetObject()
 	patch := client.MergeFrom(pod.DeepCopy())
 	pod.Status.Conditions = []corev1.PodCondition{

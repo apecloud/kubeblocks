@@ -183,13 +183,9 @@ func getLabelsForSecretsAndJobs(key componentUniqueKey) client.MatchingLabels {
 	}
 }
 
-func renderJob(engine *customizedEngine, key componentUniqueKey, username string, statement []string, endpoint string, debugModeOn bool) *batchv1.Job {
+func renderJob(engine *customizedEngine, key componentUniqueKey, statement []string, endpoint string) *batchv1.Job {
 	randomStr, _ := password.Generate(6, 0, 0, true, false)
 	jobName := key.clusterName + "-" + randomStr
-
-	// label
-	ml := getLabelsForSecretsAndJobs(key)
-	ml[clusterAccountLabelKey] = username
 
 	// inject one more system env variables
 	statementEnv := corev1.EnvVar{
@@ -209,7 +205,6 @@ func renderJob(engine *customizedEngine, key componentUniqueKey, username string
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: key.namespace,
 			Name:      jobName,
-			Labels:    ml,
 		},
 		Spec: batchv1.JobSpec{
 			Template: corev1.PodTemplateSpec{
@@ -232,11 +227,7 @@ func renderJob(engine *customizedEngine, key componentUniqueKey, username string
 			},
 		},
 	}
-	// if debug mode is on, jobs will retain after execution.
-	if !debugModeOn {
-		defaultTTLZero := (int32)(0)
-		job.Spec.TTLSecondsAfterFinished = &defaultTTLZero
-	}
+
 	return job
 }
 
@@ -378,4 +369,25 @@ func getDefaultAccounts() appsv1alpha1.KBAccountType {
 func getDebugMode(annotatedDebug string) bool {
 	debugOn, _ := strconv.ParseBool(annotatedDebug)
 	return viper.GetBool(systemAccountsDebugMode) || debugOn
+}
+
+func calibrateJobMetaAndSpec(job *batchv1.Job, cluster *appsv1alpha1.Cluster, compKey componentUniqueKey, account appsv1alpha1.AccountName) {
+	debugModeOn := getDebugMode(cluster.Annotations[debugClusterAnnotationKey])
+	// add label
+	ml := getLabelsForSecretsAndJobs(compKey)
+	ml[clusterAccountLabelKey] = (string)(account)
+	job.ObjectMeta.Labels = ml
+
+	// if debug mode is on, jobs will retain after execution.
+	if debugModeOn {
+		job.Spec.TTLSecondsAfterFinished = nil
+	} else {
+		defaultTTLZero := (int32)(0)
+		job.Spec.TTLSecondsAfterFinished = &defaultTTLZero
+	}
+	// add toleration
+	tolerations := cluster.Spec.Tolerations
+	if len(tolerations) > 0 {
+		job.Spec.Template.Spec.Tolerations = cluster.Spec.Tolerations
+	}
 }

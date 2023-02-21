@@ -169,7 +169,6 @@ func (r *SystemAccountReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 			toCreate      appsv1alpha1.KBAccountType
 			detectedFacts appsv1alpha1.KBAccountType
 			engine        *customizedEngine
-			debugModeOn   = getDebugMode(cluster.Annotations[debugClusterAnnotationKey])
 			compKey       = componentUniqueKey{
 				namespace:     cluster.Namespace,
 				clusterName:   cluster.Name,
@@ -206,7 +205,7 @@ func (r *SystemAccountReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 					execConfig := compDef.SystemAccounts.CmdExecutorConfig
 					engine = newCustomizedEngine(execConfig, cluster, compDecl.Name)
 				}
-				if err := r.createByStmt(reqCtx, cluster, compDef, compKey, engine, account, svcEP, headlessEP, debugModeOn); err != nil {
+				if err := r.createByStmt(reqCtx, cluster, compDef, compKey, engine, account, svcEP, headlessEP); err != nil {
 					return err
 				}
 			case appsv1alpha1.ReferToExisting:
@@ -270,7 +269,7 @@ func (r *SystemAccountReconciler) createByStmt(reqCtx intctrlutil.RequestCtx,
 	compKey componentUniqueKey,
 	engine *customizedEngine,
 	account appsv1alpha1.SystemAccountConfig,
-	svcEP *corev1.Endpoints, headlessEP *corev1.Endpoints, debugModeOn bool) error {
+	svcEP *corev1.Endpoints, headlessEP *corev1.Endpoints) error {
 	// render statements
 	scheme, _ := appsv1alpha1.SchemeBuilder.Build()
 	policy := account.ProvisionPolicy
@@ -284,15 +283,19 @@ func (r *SystemAccountReconciler) createByStmt(reqCtx intctrlutil.RequestCtx,
 
 	for _, ep := range retrieveEndpoints(policy.Scope, svcEP, headlessEP) {
 		// render a job object
-		job := renderJob(engine, compKey, (string)(account.Name), stmts, ep, debugModeOn)
+		job := renderJob(engine, compKey, stmts, ep)
+		// before create job, we adjust job's attributes, such as labels, tolerations w.r.t cluster info.
+		calibrateJobMetaAndSpec(job, cluster, compKey, account.Name)
+		// update owner reference
 		if err := controllerutil.SetOwnerReference(cluster, job, scheme); err != nil {
 			return err
 		}
+		// create job
 		if err := r.Client.Create(reqCtx.Ctx, job); err != nil {
 			return err
 		}
 	}
-	// push secret to global SecretMapStore, and secret will be create not until job succeeds.
+	// push secret to global SecretMapStore, and secret will not be created until job succeeds.
 	key := concatSecretName(compKey, (string)(account.Name))
 	return r.SecretMapStore.addSecret(key, secret)
 }

@@ -18,11 +18,13 @@ package apps
 
 import (
 	"math/rand"
+	"reflect"
 	"strings"
 	"testing"
 
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
+	corev1 "k8s.io/api/core/v1"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
@@ -156,6 +158,9 @@ func TestRenderJob(t *testing.T) {
 	cluster := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix, clusterDef.Name, clusterVersionName).
 		AddComponent(mysqlCompType, mysqlCompName).GetObject()
 	assert.NotNil(t, cluster)
+	if cluster.Annotations == nil {
+		cluster.Annotations = make(map[string]string, 0)
+	}
 
 	accountsSetting := clusterDef.Spec.ComponentDefs[0].SystemAccounts
 	replaceEnvsValues(cluster.Name, accountsSetting)
@@ -170,6 +175,20 @@ func TestRenderJob(t *testing.T) {
 		componentName: mysqlCompName,
 	}
 
+	generateToleration := func() corev1.Toleration {
+		operators := []corev1.TolerationOperator{corev1.TolerationOpEqual, corev1.TolerationOpExists}
+		effects := []corev1.TaintEffect{corev1.TaintEffectNoSchedule, corev1.TaintEffectPreferNoSchedule, corev1.TaintEffectNoExecute}
+
+		toleration := corev1.Toleration{
+			Key:   testCtx.GetRandomStr(),
+			Value: testCtx.GetRandomStr(),
+		}
+		toss := rand.Intn(10)
+		toleration.Operator = operators[toss%len(operators)]
+		toleration.Effect = effects[toss%len(effects)]
+		return toleration
+	}
+
 	for _, acc := range accountsSetting.Accounts {
 		switch acc.ProvisionPolicy.Type {
 		case appsv1alpha1.CreateByStmt:
@@ -180,18 +199,35 @@ func TestRenderJob(t *testing.T) {
 				assert.False(t, strings.Contains(stmt, "$(PASSWD)"))
 			}
 			// render job with debug mode off
-			job := renderJob(engine, compKey, string(acc.Name), creationStmt, "10.0.0.1", false)
+			endpoint := "10.0.0.1"
+			job := renderJob(engine, compKey, creationStmt, endpoint)
 			assert.NotNil(t, job)
+			calibrateJobMetaAndSpec(job, cluster, compKey, acc.Name)
 			assert.NotNil(t, job.Spec.TTLSecondsAfterFinished)
 			assert.Equal(t, (int32)(0), *job.Spec.TTLSecondsAfterFinished)
 			envList := job.Spec.Template.Spec.Containers[0].Env
 			assert.GreaterOrEqual(t, len(envList), 1)
 			assert.Equal(t, job.Spec.Template.Spec.Containers[0].Image, cmdExecutorConfig.Image)
 			// render job with debug mode on
-			job = renderJob(engine, compKey, string(acc.Name), creationStmt, "10.0.0.1", true)
+			job = renderJob(engine, compKey, creationStmt, endpoint)
 			assert.NotNil(t, job)
+			// set debug mode on
+			cluster.Annotations[debugClusterAnnotationKey] = "True"
+			calibrateJobMetaAndSpec(job, cluster, compKey, acc.Name)
 			assert.Nil(t, job.Spec.TTLSecondsAfterFinished)
 			assert.NotNil(t, secrets)
+			// set debug mode off
+			cluster.Annotations[debugClusterAnnotationKey] = "False"
+			// add toleration to cluster
+			toleration := make([]corev1.Toleration, 0)
+			toleration = append(toleration, generateToleration())
+			cluster.Spec.Tolerations = toleration
+			job = renderJob(engine, compKey, creationStmt, endpoint)
+			assert.NotNil(t, job)
+			calibrateJobMetaAndSpec(job, cluster, compKey, acc.Name)
+			jobToleration := job.Spec.Template.Spec.Tolerations
+			assert.Equal(t, 1, len(jobToleration))
+			assert.True(t, reflect.DeepEqual(toleration[0], jobToleration[0]))
 		case appsv1alpha1.ReferToExisting:
 			assert.False(t, strings.Contains(acc.ProvisionPolicy.SecretRef.Name, constant.ConnCredentialPlaceHolder))
 		}

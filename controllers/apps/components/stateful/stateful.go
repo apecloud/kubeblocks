@@ -82,31 +82,14 @@ func (stateful *Stateful) GetPhaseWhenPodsNotReady(componentName string) (appsv1
 	if err != nil || len(stsList.Items) == 0 {
 		return "", err
 	}
-	podCount := len(podList.Items)
+	// if the failed pod is not controlled by the latest revision
+	checkExistFailedPodOfLatestRevision := func(pod *corev1.Pod, workload metav1.Object) bool {
+		sts := workload.(*appsv1.StatefulSet)
+		return !intctrlutil.PodIsReady(pod) && util.PodIsControlledByLatestRevision(pod, sts)
+	}
 	stsObj := stsList.Items[0]
-	componentReplicas := stateful.Component.Replicas
-	if podCount == 0 || stsObj.Status.AvailableReplicas == 0 {
-		return util.GetPhaseWithNoAvailableReplicas(componentReplicas), nil
-	}
-	var existLatestRevisionFailedPod bool
-	for _, v := range podList.Items {
-		// if the pod is terminating, ignore it
-		if v.DeletionTimestamp != nil {
-			return "", nil
-		}
-		if !intctrlutil.PodIsReady(&v) && util.PodIsControlledByLatestRevision(&v, &stsObj) {
-			existLatestRevisionFailedPod = true
-		}
-	}
-	//  if pod is not controlled by the latest controller revision, ignore it.
-	if !existLatestRevisionFailedPod {
-		return "", nil
-	}
-	// checks if the available replicas of component and workload are consistent.
-	if !util.AvailableReplicasAreConsistent(componentReplicas, int32(podCount), stsObj.Status.AvailableReplicas) {
-		return appsv1alpha1.AbnormalPhase, nil
-	}
-	return "", nil
+	return util.GetComponentPhaseWhenPodsNotReady(podList, &stsObj, stateful.Component.Replicas,
+		stsObj.Status.AvailableReplicas, checkExistFailedPodOfLatestRevision), nil
 }
 
 func NewStateful(ctx context.Context,

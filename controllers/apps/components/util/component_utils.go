@@ -261,3 +261,34 @@ func GetPhaseWithNoAvailableReplicas(componentReplicas int32) appsv1alpha1.Phase
 	}
 	return appsv1alpha1.FailedPhase
 }
+
+// GetComponentPhaseWhenPodsNotReady gets the component phase when pods of component are not ready.
+func GetComponentPhaseWhenPodsNotReady(podList *corev1.PodList,
+	workload metav1.Object,
+	componentReplicas,
+	availableReplicas int32,
+	checkFailedPodRevision func(pod *corev1.Pod, workload metav1.Object) bool) appsv1alpha1.Phase {
+	podCount := len(podList.Items)
+	if podCount == 0 || availableReplicas == 0 {
+		return GetPhaseWithNoAvailableReplicas(componentReplicas)
+	}
+	var existLatestRevisionFailedPod bool
+	for _, v := range podList.Items {
+		// if the pod is terminating, ignore it
+		if v.DeletionTimestamp != nil {
+			return ""
+		}
+		if checkFailedPodRevision != nil && checkFailedPodRevision(&v, workload) {
+			existLatestRevisionFailedPod = true
+		}
+	}
+	// if the failed pod is not controlled by the latest revision, ignore it.
+	if !existLatestRevisionFailedPod {
+		return ""
+	}
+	// checks if the available replicas of component and workload are consistent.
+	if !AvailableReplicasAreConsistent(componentReplicas, int32(podCount), availableReplicas) {
+		return appsv1alpha1.AbnormalPhase
+	}
+	return ""
+}

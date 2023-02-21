@@ -81,37 +81,21 @@ func (stateless *Stateless) HandleProbeTimeoutWhenPodsReady(recorder record.Even
 	return false, nil
 }
 
+// GetPhaseWhenPodsNotReady gets the component phase when the pods of component are not ready.
 func (stateless *Stateless) GetPhaseWhenPodsNotReady(componentName string) (appsv1alpha1.Phase, error) {
 	deployList := &appsv1.DeploymentList{}
 	podList, err := util.GetCompRelatedObjectList(stateless.Ctx, stateless.Cli, stateless.Cluster, componentName, deployList)
 	if err != nil || len(deployList.Items) == 0 {
 		return "", err
 	}
+	// if the failed pod is not controlled by the new ReplicaSet
+	checkExistFailedPodOfNewRS := func(pod *corev1.Pod, workload metav1.Object) bool {
+		d := workload.(*appsv1.Deployment)
+		return !intctrlutil.PodIsReady(pod) && belongToNewReplicaSet(d, pod)
+	}
 	deploy := &deployList.Items[0]
-	podCount := len(podList.Items)
-	componentReplicas := stateless.Component.Replicas
-	if podCount == 0 || deploy.Status.AvailableReplicas == 0 {
-		return util.GetPhaseWithNoAvailableReplicas(componentReplicas), nil
-	}
-	var existFailedPodOfNewRS bool
-	for _, v := range podList.Items {
-		// if the pod is terminating, ignore it
-		if v.DeletionTimestamp != nil {
-			return "", nil
-		}
-		if !intctrlutil.PodIsReady(&v) && belongToNewReplicaSet(deploy, &v) {
-			existFailedPodOfNewRS = true
-		}
-	}
-	// if the failed pod is not controlled by new ReplicaSet, ignore it.
-	if !existFailedPodOfNewRS {
-		return "", nil
-	}
-	// checks if the available replicas of component and workload are consistent.
-	if !util.AvailableReplicasAreConsistent(componentReplicas, int32(podCount), deploy.Status.AvailableReplicas) {
-		return appsv1alpha1.AbnormalPhase, nil
-	}
-	return "", nil
+	return util.GetComponentPhaseWhenPodsNotReady(podList, deploy, stateless.Component.Replicas,
+		deploy.Status.AvailableReplicas, checkExistFailedPodOfNewRS), nil
 }
 
 func NewStateless(ctx context.Context,

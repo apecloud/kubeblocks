@@ -151,6 +151,7 @@ func (consensusSet *ConsensusSet) GetPhaseWhenPodsNotReady(componentName string)
 	var (
 		existLatestRevisionFailedPod bool
 		leaderIsReady                bool
+		consensusSpec                = consensusSet.ComponentDef.ConsensusSpec
 	)
 	for _, v := range podList.Items {
 		// if the pod is terminating, ignore it
@@ -158,7 +159,7 @@ func (consensusSet *ConsensusSet) GetPhaseWhenPodsNotReady(componentName string)
 			return "", nil
 		}
 		labelValue := v.Labels[intctrlutil.RoleLabelKey]
-		if labelValue == consensusSet.ComponentDef.ConsensusSpec.Leader.Name && intctrlutil.PodIsReady(&v) {
+		if consensusSpec != nil && labelValue == consensusSpec.Leader.Name && intctrlutil.PodIsReady(&v) {
 			leaderIsReady = true
 			continue
 		}

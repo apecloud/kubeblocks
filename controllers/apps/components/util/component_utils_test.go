@@ -17,6 +17,8 @@ limitations under the License.
 package util
 
 import (
+	testk8s "github.com/apecloud/kubeblocks/internal/testutil/k8s"
+	corev1 "k8s.io/api/core/v1"
 	"testing"
 	"time"
 
@@ -185,6 +187,38 @@ var _ = Describe("Consensus Component", func() {
 			stsList = &appsv1.StatefulSetList{}
 			podList, _ := GetCompRelatedObjectList(ctx, k8sClient, cluster, consensusCompName, stsList)
 			Expect(len(stsList.Items) > 0 && len(podList.Items) > 0).Should(BeTrue())
+
+			By("test GetComponentPhaseWhenPodsNotReady function")
+			consensusComp := cluster.GetComponentByName(consensusCompName)
+			checkExistFailedPodOfLatestRevision := func(pod *corev1.Pod, workload metav1.Object) bool {
+				sts := workload.(*appsv1.StatefulSet)
+				return !intctrlutil.PodIsReady(pod) && PodIsControlledByLatestRevision(pod, sts)
+			}
+			// component phase should be Failed when available replicas is 0
+			phase := GetComponentPhaseWhenPodsNotReady(podList, sts, consensusComp.Replicas,
+				sts.Status.AvailableReplicas, checkExistFailedPodOfLatestRevision)
+			Expect(phase).Should(Equal(appsv1alpha1.FailedPhase))
+
+			// mock available replicas to component replicas
+			Expect(testapps.ChangeObjStatus(&testCtx, sts, func() {
+				testk8s.MockStatefulSetReady(sts)
+			})).Should(Succeed())
+			phase = GetComponentPhaseWhenPodsNotReady(podList, sts, consensusComp.Replicas,
+				sts.Status.AvailableReplicas, checkExistFailedPodOfLatestRevision)
+			Expect(len(phase) == 0).Should(BeTrue())
+
+			// mock component is abnormal
+			pod := &podList.Items[0]
+			Expect(testapps.ChangeObjStatus(&testCtx, pod, func() {
+				pod.Status.Conditions = nil
+			})).Should(Succeed())
+			Expect(testapps.ChangeObjStatus(&testCtx, sts, func() {
+				sts.Status.AvailableReplicas = *sts.Spec.Replicas - 1
+			})).Should(Succeed())
+			phase = GetComponentPhaseWhenPodsNotReady(podList, sts, consensusComp.Replicas,
+				sts.Status.AvailableReplicas, checkExistFailedPodOfLatestRevision)
+			Expect(phase).Should(Equal(appsv1alpha1.AbnormalPhase))
+
 		})
 	})
 })

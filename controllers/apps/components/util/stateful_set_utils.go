@@ -62,7 +62,12 @@ func IsStsAndPodsRevisionConsistent(ctx context.Context, cli client.Client, sts 
 	if err != nil {
 		return false, err
 	}
+
 	revisionConsistent := true
+	if len(pods) != int(*sts.Spec.Replicas) {
+		return false, nil
+	}
+
 	for _, pod := range pods {
 		if GetPodRevision(&pod) != sts.Status.UpdateRevision {
 			revisionConsistent = false

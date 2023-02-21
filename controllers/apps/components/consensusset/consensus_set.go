@@ -52,6 +52,9 @@ func (consensusSet *ConsensusSet) IsRunning(obj client.Object) (bool, error) {
 	}
 	targetReplicas := util.GetComponentReplicas(consensusSet.Component, consensusSet.ComponentDef)
 	pods, err := util.GetPodListByStatefulSet(consensusSet.Ctx, consensusSet.Cli, sts)
+	if err != nil {
+		return false, err
+	}
 	for _, pod := range pods {
 		if !util.PodIsReady(pod) {
 			return false, nil

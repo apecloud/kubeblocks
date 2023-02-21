@@ -19,10 +19,11 @@ package apps
 import (
 	"context"
 	"fmt"
-	"golang.org/x/exp/maps"
 	"reflect"
 	"strings"
 	"time"
+
+	"golang.org/x/exp/maps"
 
 	"github.com/pkg/errors"
 	appsv1 "k8s.io/api/apps/v1"

@@ -8409,7 +8409,6 @@ spec:
                                         type: string
                                     required:
                                     - creation
-                                    - deletion
                                     type: object
                                   type:
                                     description: type defines the way to provision

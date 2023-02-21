@@ -148,7 +148,7 @@ type ProvisionStatements struct {
 	// +kubebuilder:validation:Required
 	CreationStatement string `json:"creation"`
 	// deletion specifies statement how to delete this account.
-	// +kubebuilder:validation:Required
+	// +optional
 	DeletionStatement string `json:"deletion"`
 }
 

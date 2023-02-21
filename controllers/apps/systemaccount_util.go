@@ -190,7 +190,7 @@ func renderJob(engine *customizedEngine, key componentUniqueKey, statement []str
 	// inject one more system env variables
 	statementEnv := corev1.EnvVar{
 		Name:  kbAccountStmtEnvName,
-		Value: strings.Join(statement, ";"),
+		Value: strings.Join(statement, " "),
 	}
 	endpointEnv := corev1.EnvVar{
 		Name:  kbAccountEndPointEnvName,
@@ -337,11 +337,11 @@ func getCreationStmtForAccount(key componentUniqueKey, passConfig appsv1alpha1.P
 	creationStmt := make([]string, 0)
 	// drop if exists + create if not exists
 	statements := accountConfig.ProvisionPolicy.Statements
-
-	stmt := replaceNamedVars(namedVars, statements.DeletionStatement, -1, true)
-	creationStmt = append(creationStmt, stmt)
-
-	stmt = replaceNamedVars(namedVars, statements.CreationStatement, -1, true)
+	if len(statements.DeletionStatement) > 0 {
+		stmt := replaceNamedVars(namedVars, statements.DeletionStatement, -1, true)
+		creationStmt = append(creationStmt, stmt)
+	}
+	stmt := replaceNamedVars(namedVars, statements.CreationStatement, -1, true)
 	creationStmt = append(creationStmt, stmt)
 
 	secret := renderSecretWithPwd(key, userName, passwd)

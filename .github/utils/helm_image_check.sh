@@ -28,7 +28,7 @@ check_image_exists() {
     image=$1
     exists_flag=$(docker manifest inspect "$image" | grep digest)
     if [[ -z "$exists_flag" ]]; then
-        echo "$image is not exists."
+        echo "$(tput setaf 1)$image is not exists.$(tput sgr 0)"
         EXIT_STATUS=1
     fi
 }

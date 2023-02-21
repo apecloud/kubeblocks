@@ -293,6 +293,7 @@ type ClusterComponentDefinition struct {
 	// Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%).
 	// Absolute number is calculated from percentage by rounding down. This value is ignored
 	// if workloadType is Consensus.
+	// +kubebuilder:validation:XIntOrString
 	// +optional
 	MaxUnavailable *intstr.IntOrString `json:"maxUnavailable,omitempty"`
 

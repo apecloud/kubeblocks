@@ -826,6 +826,10 @@ func (r *BackupReconciler) BuildBackupToolPodSpec(reqCtx intctrlutil.RequestCtx,
 	podSpec.Volumes = append(podSpec.Volumes, backupPolicy.Spec.RemoteVolume)
 	podSpec.RestartPolicy = corev1.RestartPolicyNever
 
+	// the pod of job needs to be scheduled on the same node as the workload pod, because it needs to share one pvc
+	// see: https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/#nodename
+	podSpec.NodeName = clusterPod.Spec.NodeName
+
 	return podSpec, nil
 }
 
@@ -872,17 +876,13 @@ func (r *BackupReconciler) BuildSnapshotPodSpec(
 		container.Image = viper.GetString("KUBEBLOCKS_IMAGE")
 		container.ImagePullPolicy = corev1.PullPolicy(viper.GetString("KUBEBLOCKS_IMAGE_PULL_POLICY"))
 	}
-	container.VolumeMounts = clusterPod.Spec.Containers[0].VolumeMounts
 	allowPrivilegeEscalation := false
 	runAsUser := int64(0)
 	container.SecurityContext = &corev1.SecurityContext{
 		AllowPrivilegeEscalation: &allowPrivilegeEscalation,
 		RunAsUser:                &runAsUser}
-	// container.Env = backupTool.Spec.Env
 
 	podSpec.Containers = []corev1.Container{container}
-
-	podSpec.Volumes = clusterPod.Spec.Volumes
 	podSpec.RestartPolicy = corev1.RestartPolicyNever
 	podSpec.ServiceAccountName = viper.GetString("KUBEBLOCKS_SERVICEACCOUNT_NAME")
 

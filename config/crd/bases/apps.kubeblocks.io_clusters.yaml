@@ -581,7 +581,6 @@ spec:
                 x-kubernetes-preserve-unknown-fields: true
             required:
             - clusterDefinitionRef
-            - clusterVersionRef
             - terminationPolicy
             type: object
           status:

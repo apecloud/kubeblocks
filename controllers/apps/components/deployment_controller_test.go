@@ -127,8 +127,11 @@ var _ = Describe("Deployment Controller", func() {
 					},
 				}
 			})).Should(Succeed())
-			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(pod), func(g Gomega, tmpPod *corev1.Pod) {
-				g.Expect(len(tmpPod.Status.Conditions) == 1).Should(BeTrue())
+			// mark deployment to reconcile
+			Expect(testapps.ChangeObj(&testCtx, deploy, func() {
+				deploy.Annotations = map[string]string{
+					"reconcile": "1",
+				}
 			})).Should(Succeed())
 
 			// wait for component.message contains pod message.
@@ -141,7 +144,7 @@ var _ = Describe("Deployment Controller", func() {
 			newDeployment := &appsv1.Deployment{}
 			Expect(k8sClient.Get(context.Background(), newDeploymentKey, newDeployment)).Should(Succeed())
 			Expect(testapps.ChangeObjStatus(&testCtx, newDeployment, func() {
-				testk8s.MockDeploymentReady(newDeployment, stateless.NewRSAvailableReason)
+				testk8s.MockDeploymentReady(newDeployment, stateless.NewRSAvailableReason, deploy.Name+"-5847cb795c")
 			})).Should(Succeed())
 
 			By("test deployment status is ready")

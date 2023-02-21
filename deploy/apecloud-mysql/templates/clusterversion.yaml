@@ -8,7 +8,7 @@ spec:
   clusterDefinitionRef: apecloud-mysql
   componentVersions:
   - componentDefRef: mysql
-    podSpec:
+    versionsContext:
       containers:
       - name: mysql
         image: {{ .Values.image.repository }}:{{ .Values.image.tag }}

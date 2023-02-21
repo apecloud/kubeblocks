@@ -8,7 +8,7 @@ spec:
   clusterDefinitionRef: apecloud-postgresql
   componentVersions:
   - componentDefRef: postgresql
-    podSpec:
+    versionsContext:
       containers:
       - name: postgresql
         image: {{ .Values.image.repository }}:{{ default .Values.image.tag .Chart.AppVersion }}
@@ -23,7 +23,7 @@ spec:
   clusterDefinitionRef: apecloud-postgresql
   componentVersions:
   - componentDefRef: postgresql
-    podSpec:
+    versionsContext:
       containers:
       - name: postgresql
         image: {{ .Values.image.repository }}:15.1.0

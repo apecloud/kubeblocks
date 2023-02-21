@@ -104,24 +104,17 @@ func RestartSts(ctx context.Context, cli client.Client, sts *appsv1.StatefulSet)
 	return nil
 }
 
-// StatefulSetIsReady checks if statefulSet is ready.
-func StatefulSetIsReady(sts *appsv1.StatefulSet, statefulStatusRevisionIsEquals bool, targetReplicas *int32) bool {
+// StatefulSetOfComponentIsReady checks if statefulSet of component is ready.
+func StatefulSetOfComponentIsReady(sts *appsv1.StatefulSet, statefulStatusRevisionIsEquals bool, targetReplicas *int32) bool {
 	if targetReplicas == nil {
 		targetReplicas = sts.Spec.Replicas
 	}
 	// judge whether statefulSet is ready
-	if sts.Status.AvailableReplicas != *targetReplicas ||
-		sts.Status.Replicas != *targetReplicas ||
-		sts.Status.ObservedGeneration != sts.Generation ||
-		!statefulStatusRevisionIsEquals {
-		return false
-	}
-	return true
+	return StatefulSetPodsAreReady(sts, *targetReplicas) && statefulStatusRevisionIsEquals
 }
 
-// StatefulSetPodsIsReady checks if pods of statefulSet are ready.
-func StatefulSetPodsIsReady(sts *appsv1.StatefulSet) bool {
-	targetReplicas := *sts.Spec.Replicas
+// StatefulSetPodsAreReady checks if all pods of statefulSet are ready.
+func StatefulSetPodsAreReady(sts *appsv1.StatefulSet, targetReplicas int32) bool {
 	return sts.Status.AvailableReplicas == targetReplicas &&
 		sts.Status.Replicas == targetReplicas &&
 		sts.Status.ObservedGeneration == sts.Generation
@@ -190,9 +183,4 @@ func GetPodListByStatefulSet(ctx context.Context, cli client.Client, stsObj *app
 		}
 	}
 	return pods, nil
-}
-
-// StatefulSetSpecIsUpdated checks if the statefulSet spec has updated.
-func StatefulSetSpecIsUpdated(sts *appsv1.StatefulSet) bool {
-	return sts.Generation != sts.Status.ObservedGeneration
 }

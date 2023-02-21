@@ -27,18 +27,19 @@ import (
 )
 
 var (
-	colTitleIndex     = "#"
-	colTitleFirstName = "First Name"
-	colTitleLastName  = "Last Name"
-	colTitleSalary    = "Salary"
+	header = []string{"NAME", "NAMESPACE", "CLUSTER-DEFINITION", "VERSION", "TERMINATION-POLICY", "CREATED-TIME"}
 )
 
 func TestPrintTable(t *testing.T) {
 	printer := NewTablePrinter(os.Stdout)
-	printer.SetHeader(colTitleIndex, colTitleFirstName, colTitleLastName, colTitleSalary)
+	headerRow := make([]interface{}, len(header))
+	for i, h := range header {
+		headerRow[i] = h
+	}
+	printer.SetHeader(headerRow...)
 	for _, r := range [][]string{
-		{"1", "Arya", "Stark", "3000"},
-		{"20", "Jon", "Snow", "2000"},
+		{"brier63", "default", "apecloud-mysql", "ac-mysql-8.0.30", "Delete", "Feb 20,2023 16:39 UTC+0800"},
+		{"cedar51", "default", "apecloud-mysql", "ac-mysql-8.0.30", "Delete", "Feb 20,2023 16:39 UTC+0800"},
 	} {
 		row := make([]interface{}, len(r))
 		for i, rr := range r {

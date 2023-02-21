@@ -8,7 +8,7 @@ spec:
   clusterDefinitionRef: apecloud-redis
   componentVersions:
   - componentDefRef: replication
-    podSpec:
+    versionsContext:
       containers:
       - name: redis
         image: {{ .Values.image.repository }}:{{ .Values.image.tag }}

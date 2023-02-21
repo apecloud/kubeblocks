@@ -149,11 +149,11 @@ var _ = Describe("builder", func() {
 		By("assign every available fields")
 		component := component.BuildComponent(
 			reqCtx,
-			cluster,
-			clusterDef,
-			&clusterDef.Spec.ComponentDefs[0],
-			&clusterVersion.Spec.ComponentVersions[0],
-			&cluster.Spec.ComponentSpecs[0])
+			*cluster,
+			*clusterDef,
+			clusterDef.Spec.ComponentDefs[0],
+			cluster.Spec.ComponentSpecs[0],
+			&clusterVersion.Spec.ComponentVersions[0])
 		Expect(component).ShouldNot(BeNil())
 		return component
 	}
@@ -214,6 +214,7 @@ var _ = Describe("builder", func() {
 			newParams := params
 			newComponent := *params.Component
 			newComponent.Replicas = 0
+			newComponent.CharacterType = ""
 			newParams.Component = &newComponent
 			sts, err := BuildSts(reqCtx, *newParams, envConfigName)
 			Expect(err).Should(BeNil())
@@ -240,7 +241,15 @@ var _ = Describe("builder", func() {
 
 		It("builds Env Config correctly", func() {
 			params := newParams()
+			noCharacterTypeParams := params
+			noCharacterTypeComponent := *params.Component
+			noCharacterTypeComponent.CharacterType = ""
+			noCharacterTypeParams.Component = &noCharacterTypeComponent
 			cfg, err := BuildEnvConfig(*params)
+			Expect(err).Should(BeNil())
+			Expect(cfg).ShouldNot(BeNil())
+			Expect(len(cfg.Data) == 2).Should(BeTrue())
+			cfg, err = BuildEnvConfig(*noCharacterTypeParams)
 			Expect(err).Should(BeNil())
 			Expect(cfg).ShouldNot(BeNil())
 			Expect(len(cfg.Data) == 2).Should(BeTrue())

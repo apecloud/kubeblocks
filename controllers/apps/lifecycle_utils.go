@@ -19,6 +19,7 @@ package apps
 import (
 	"context"
 	"fmt"
+	"golang.org/x/exp/maps"
 	"reflect"
 	"strings"
 	"time"
@@ -138,6 +139,22 @@ func mergeAnnotations(originalAnnotations, targetAnnotations map[string]string) 
 		targetAnnotations[intctrlutil.RestartAnnotationKey] = restartAnnotation
 	}
 	return targetAnnotations
+}
+
+// mergeServiceAnnotations keeps the original annotations except prometheus scrape annotations.
+// if annotations exist and are replaced, the Service will be updated.
+func mergeServiceAnnotations(originalAnnotations, targetAnnotations map[string]string) map[string]string {
+	if len(originalAnnotations) == 0 {
+		return targetAnnotations
+	}
+	tmpAnnotations := make(map[string]string, len(originalAnnotations)+len(targetAnnotations))
+	for k, v := range originalAnnotations {
+		if !strings.HasPrefix(k, "prometheus.io") {
+			tmpAnnotations[k] = v
+		}
+	}
+	maps.Copy(tmpAnnotations, targetAnnotations)
+	return tmpAnnotations
 }
 
 func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
@@ -427,6 +444,7 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 			return err
 		}
 		svcObj.Spec = svcProto.Spec
+		svcObj.Annotations = mergeServiceAnnotations(svcObj.Annotations, svcProto.Annotations)
 		if err := cli.Update(ctx, svcObj); err != nil {
 			return err
 		}

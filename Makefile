@@ -698,6 +698,7 @@ endif
 K8S_IMAGE_REPO ?= k8s.gcr.io
 SIGSTORAGE_IMAGE_REPO ?= k8s.gcr.io/sig-storage
 
+KICBASE_IMG := kicbase/stable:v0.0.36
 ETCT_IMG := $(K8S_IMAGE_REPO)/etcd:3.5.6-0
 COREDNS_IMG := $(K8S_IMAGE_REPO)/coredns/coredns:v1.8.6
 KUBE_APISERVER_IMG := $(K8S_IMAGE_REPO)/kube-apiserver:$(K8S_VERSION)
@@ -765,6 +766,7 @@ endif
 pull-all-images: DOCKER_PULLQ=docker pull -q
 pull-all-images: DOCKER_TAG=docker tag
 pull-all-images: ## Pull K8s & minikube required container images.
+	$(DOCKER_PULLQ) $(KICBASE_IMG)
 	$(DOCKER_PULLQ) $(KUBE_APISERVER_IMG)
 	$(DOCKER_PULLQ) $(KUBE_SCHEDULER_IMG)
 	$(DOCKER_PULLQ) $(KUBE_CTLR_MGR_IMG)
@@ -809,7 +811,7 @@ minikube-start: IMG_CACHE_CMD=image load --daemon=true
 minikube-start: minikube ## Start minikube cluster.
 ifneq (, $(shell which minikube))
 ifeq (, $(shell $(MINIKUBE) status -n minikube -ojson 2>/dev/null| jq -r '.Host' | grep Running))
-	$(MINIKUBE) start --kubernetes-version=$(K8S_VERSION) $(MINIKUBE_START_ARGS)
+	$(MINIKUBE) start --kubernetes-version=$(K8S_VERSION) $(MINIKUBE_START_ARGS) --base-image=$(KICBASE_IMG)
 endif
 endif
 	$(MINIKUBE) update-context

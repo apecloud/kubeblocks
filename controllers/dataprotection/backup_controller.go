@@ -148,7 +148,7 @@ func (r *BackupReconciler) doNewPhaseAction(
 	if err := r.Get(reqCtx.Ctx, backupPolicyNameSpaceName, backupPolicy); err != nil {
 		r.Recorder.Eventf(backup, corev1.EventTypeWarning, "CreatingBackup",
 			"Unable to get backupPolicy for backup %s.", backupPolicyNameSpaceName)
-		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+		return r.updateStatusIfFailed(reqCtx, backup, err)
 	}
 
 	labels := backupPolicy.Spec.Target.LabelsSelector.MatchLabels
@@ -158,7 +158,7 @@ func (r *BackupReconciler) doNewPhaseAction(
 	}
 	labels[dataProtectionLabelBackupTypeKey] = string(backup.Spec.BackupType)
 	if err := r.patchBackupLabels(reqCtx, backup, labels); err != nil {
-		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+		return r.updateStatusIfFailed(reqCtx, backup, err)
 	}
 
 	// update Phase to InProgress
@@ -185,18 +185,18 @@ func (r *BackupReconciler) doInProgressPhaseAction(
 		// 3. create and ensure post-command job completed
 		isOK, err := r.createPreCommandJobAndEnsure(reqCtx, backup)
 		if err != nil {
-			return r.updateStatusIfJobFailed(reqCtx, backup, err)
+			return r.updateStatusIfFailed(reqCtx, backup, err)
 		}
 		if !isOK {
 			return intctrlutil.RequeueAfter(reconcileInterval, reqCtx.Log, "")
 		}
 		if err = r.createVolumeSnapshot(reqCtx, backup); err != nil {
-			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+			return r.updateStatusIfFailed(reqCtx, backup, err)
 		}
 		key := types.NamespacedName{Namespace: reqCtx.Req.Namespace, Name: backup.Name}
 		isOK, err = r.ensureVolumeSnapshotReady(reqCtx, key)
 		if err != nil {
-			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+			return r.updateStatusIfFailed(reqCtx, backup, err)
 		}
 		if !isOK {
 			return intctrlutil.RequeueAfter(reconcileInterval, reqCtx.Log, "")
@@ -206,7 +206,7 @@ func (r *BackupReconciler) doInProgressPhaseAction(
 
 		isOK, err = r.createPostCommandJobAndEnsure(reqCtx, backup)
 		if err != nil {
-			return r.updateStatusIfJobFailed(reqCtx, backup, err)
+			return r.updateStatusIfFailed(reqCtx, backup, err)
 		}
 		if !isOK {
 			return intctrlutil.RequeueAfter(reconcileInterval, reqCtx.Log, "")
@@ -224,19 +224,19 @@ func (r *BackupReconciler) doInProgressPhaseAction(
 		// 2. get job phase and update
 		err := r.createBackupToolJob(reqCtx, backup)
 		if err != nil {
-			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+			return r.updateStatusIfFailed(reqCtx, backup, err)
 		}
 		key := types.NamespacedName{Namespace: backup.Namespace, Name: backup.Name}
 		isOK, err := r.ensureBatchV1JobCompleted(reqCtx, key)
 		if err != nil {
-			return r.updateStatusIfJobFailed(reqCtx, backup, err)
+			return r.updateStatusIfFailed(reqCtx, backup, err)
 		}
 		if !isOK {
 			return intctrlutil.RequeueAfter(reconcileInterval, reqCtx.Log, "")
 		}
 		job, err := r.getBatchV1Job(reqCtx, backup)
 		if err != nil {
-			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+			return r.updateStatusIfFailed(reqCtx, backup, err)
 		}
 		jobStatusConditions := job.Status.Conditions
 		if jobStatusConditions[0].Type == batchv1.JobComplete {
@@ -275,15 +275,14 @@ func (r *BackupReconciler) doCompletedPhaseAction(
 	return intctrlutil.Reconciled()
 }
 
-func (r *BackupReconciler) updateStatusIfJobFailed(reqCtx intctrlutil.RequestCtx,
+func (r *BackupReconciler) updateStatusIfFailed(reqCtx intctrlutil.RequestCtx,
 	backup *dataprotectionv1alpha1.Backup, err error) (ctrl.Result, error) {
-	if err.Error() == errorJobFailed {
-		r.Recorder.Event(backup, corev1.EventTypeWarning, "FailedCreatedBackup", "Failed creating backup.")
-		backup.Status.Phase = dataprotectionv1alpha1.BackupFailed
-		backup.Status.FailureReason = err.Error()
-		if err := r.Client.Status().Update(reqCtx.Ctx, backup); err != nil {
-			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-		}
+	r.Recorder.Eventf(backup, corev1.EventTypeWarning, "FailedCreatedBackup",
+		"Failed creating backup, error: %s", err.Error())
+	backup.Status.Phase = dataprotectionv1alpha1.BackupFailed
+	backup.Status.FailureReason = err.Error()
+	if errUpdate := r.Client.Status().Update(reqCtx.Ctx, backup); errUpdate != nil {
+		return intctrlutil.CheckedRequeueWithError(errUpdate, reqCtx.Log, "")
 	}
 	return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 }

@@ -231,10 +231,10 @@ func (r *BackupPolicyReconciler) mergeBackupPolicyTemplate(
 	}
 	if template.Spec.CredentialKeyword != nil {
 		if backupPolicy.Spec.Target.Secret.UserKeyword == "" {
-			backupPolicy.Spec.BackupToolName = template.Spec.CredentialKeyword.UserKeyword
+			backupPolicy.Spec.Target.Secret.UserKeyword = template.Spec.CredentialKeyword.UserKeyword
 		}
 		if backupPolicy.Spec.Target.Secret.PasswordKeyword == "" {
-			backupPolicy.Spec.BackupToolName = template.Spec.CredentialKeyword.PasswordKeyword
+			backupPolicy.Spec.Target.Secret.PasswordKeyword = template.Spec.CredentialKeyword.PasswordKeyword
 		}
 	}
 	if backupPolicy.Spec.TTL == nil {

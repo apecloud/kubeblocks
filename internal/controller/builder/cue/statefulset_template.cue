@@ -35,7 +35,7 @@ statefulset: {
 		namespace: cluster.metadata.namespace
 		name:      "\(cluster.metadata.name)-\(component.name)"
 		labels: {
-			"app.kubernetes.io/name": "\(component.clusterDefName)"
+			"app.kubernetes.io/name":       "\(component.clusterDefName)"
 			"app.kubernetes.io/instance":   cluster.metadata.name
 			"app.kubernetes.io/managed-by": "kubeblocks"
 			// "app.kubernetes.io/version" : # TODO
@@ -45,7 +45,7 @@ statefulset: {
 	spec: {
 		selector:
 			matchLabels: {
-				"app.kubernetes.io/name": "\(component.clusterDefName)"
+				"app.kubernetes.io/name":           "\(component.clusterDefName)"
 				"app.kubernetes.io/instance":       "\(cluster.metadata.name)"
 				"app.kubernetes.io/component-name": "\(component.name)"
 				"app.kubernetes.io/managed-by":     "kubeblocks"
@@ -62,7 +62,7 @@ statefulset: {
 		template: {
 			metadata: {
 				labels: {
-					"app.kubernetes.io/name": "\(component.clusterDefName)"
+					"app.kubernetes.io/name":           "\(component.clusterDefName)"
 					"app.kubernetes.io/instance":       "\(cluster.metadata.name)"
 					"app.kubernetes.io/component-name": "\(component.name)"
 					"app.kubernetes.io/managed-by":     "kubeblocks"

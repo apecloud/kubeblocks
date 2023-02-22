@@ -17,6 +17,10 @@ limitations under the License.
 package configuration
 
 import (
+	"context"
+
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 )
 
@@ -108,4 +112,17 @@ func MergeConfigTemplates(clusterVersionTpl []appsv1alpha1.ConfigTemplate,
 	}
 
 	return mergedCfgTpl
+}
+
+func GetClusterVersionResource(cvName string, cv *appsv1alpha1.ClusterVersion, cli client.Client, ctx context.Context) error {
+	if cvName == "" {
+		return nil
+	}
+	if err := cli.Get(ctx, client.ObjectKey{
+		Namespace: "",
+		Name:      cvName,
+	}, cv); err != nil {
+		return WrapError(err, "failed to get clusterversion[%s]", cvName)
+	}
+	return nil
 }

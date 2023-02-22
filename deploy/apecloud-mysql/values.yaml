@@ -68,6 +68,7 @@ roleChangedProbe:
 
 metrics:
   image:
-    repository: docker.io/apecloud/kubeblocks
-    tag: latest
-    pullPolicy: Always
+    registry: docker.io
+    repository: apecloud/mysqld-exporter
+    tag: 0.14.1
+    pullPolicy: IfNotPresent

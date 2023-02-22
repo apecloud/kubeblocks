@@ -45,16 +45,36 @@ func init() {
 	opsManager.RegisterOps(appsv1alpha1.ReconfiguringType, reconfigureBehaviour)
 }
 
+// ActionStartedCondition the started condition when handle the reconfiguring request.
 func (r *reconfigureAction) ActionStartedCondition(opsRequest *appsv1alpha1.OpsRequest) *metav1.Condition {
 	return appsv1alpha1.NewReconfigureCondition(opsRequest)
 }
 
-func (r *reconfigureAction) SaveLastConfiguration(_ *OpsResource) error {
-	return nil
+// SaveLastConfiguration this operation can not change in Cluster.spec.
+// fill cluster component implementation here.
+func (r *reconfigureAction) SaveLastConfiguration(opsRes *OpsResource) error {
+	opsRequest := opsRes.OpsRequest
+	lastComponentInfo := map[string]appsv1alpha1.LastComponentConfiguration{}
+	componentNameMap := opsRequest.GetReconfiguringComponentNameMap()
+	for _, v := range opsRes.Cluster.Spec.ComponentSpecs {
+		if _, ok := componentNameMap[v.Name]; ok {
+			lastComponentInfo[v.Name] = appsv1alpha1.LastComponentConfiguration{
+				Replicas:             v.Replicas,
+				ResourceRequirements: v.Resources,
+			}
+			break
+		}
+	}
+	patch := client.MergeFrom(opsRequest.DeepCopy())
+	opsRequest.Status.LastConfiguration = appsv1alpha1.LastConfiguration{
+		Components: lastComponentInfo,
+	}
+	return opsRes.Client.Status().Patch(opsRes.Ctx, opsRequest, patch)
 }
 
+// GetRealAffectedComponentMap gets the real affected component map for the operation
 func (r *reconfigureAction) GetRealAffectedComponentMap(opsRequest *appsv1alpha1.OpsRequest) realAffectedComponentMap {
-	return make(map[string]struct{})
+	return opsRequest.GetReconfiguringComponentNameMap()
 }
 
 func (r *reconfigureAction) Handle(eventContext cfgcore.ConfigEventContext, lastOpsRequest string, phase appsv1alpha1.Phase, err error) error {

@@ -422,6 +422,8 @@ func (r *OpsRequest) GetComponentNameMap() map[string]struct{} {
 		return r.GetVolumeExpansionComponentNameMap()
 	case UpgradeType:
 		return r.GetUpgradeComponentNameMap()
+	case ReconfiguringType:
+		return r.GetReconfiguringComponentNameMap()
 	default:
 		return map[string]struct{}{}
 	}
@@ -500,6 +502,16 @@ func (r *OpsRequest) GetUpgradeComponentNameMap() map[string]struct{} {
 		componentNameMap[k] = struct{}{}
 	}
 	return componentNameMap
+}
+
+// GetReconfiguringComponentNameMap gets the component name map with reconfiguring operation.
+func (r *OpsRequest) GetReconfiguringComponentNameMap() map[string]struct{} {
+	if r.Spec.Reconfigure == nil {
+		return nil
+	}
+	return map[string]struct{}{
+		r.Spec.Reconfigure.ComponentName: {},
+	}
 }
 
 func (p *ProgressStatusDetail) SetStatusAndMessage(status ProgressStatus, message string) {

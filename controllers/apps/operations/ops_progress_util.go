@@ -132,8 +132,8 @@ func updateProgressDetailTime(progressDetail *appsv1alpha1.ProgressDetail) {
 	}
 }
 
-// covertPodObjectKeyMap coverts the object key map from the pod list.
-func covertPodObjectKeyMap(podList *corev1.PodList) map[string]struct{} {
+// convertPodObjectKeyMap converts the object key map from the pod list.
+func convertPodObjectKeyMap(podList *corev1.PodList) map[string]struct{} {
 	podObjectKeyMap := map[string]struct{}{}
 	for _, v := range podList.Items {
 		objectKey := GetProgressObjectKey(v.Kind, v.Name)
@@ -147,7 +147,7 @@ func covertPodObjectKeyMap(podList *corev1.PodList) map[string]struct{} {
 // so some pod may be expired, we should clear them.
 func removeStatelessExpiredPod(podList *corev1.PodList,
 	progressDetails []appsv1alpha1.ProgressDetail) []appsv1alpha1.ProgressDetail {
-	podObjectKeyMap := covertPodObjectKeyMap(podList)
+	podObjectKeyMap := convertPodObjectKeyMap(podList)
 	newProgressDetails := make([]appsv1alpha1.ProgressDetail, 0)
 	for _, v := range progressDetails {
 		if _, ok := podObjectKeyMap[v.ObjectKey]; ok {

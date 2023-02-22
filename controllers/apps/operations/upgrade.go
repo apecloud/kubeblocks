@@ -111,7 +111,7 @@ func (u upgradeOpsHandler) getUpgradeComponentsStatus(opsRes *OpsResource) (map[
 	return compStatusMap, nil
 }
 
-// getClusterComponentVersionMap gets the components of ClusterVersion and coverts the component list to map.
+// getClusterComponentVersionMap gets the components of ClusterVersion and converts the component list to map.
 func (u upgradeOpsHandler) getClusterComponentVersionMap(ctx context.Context,
 	cli client.Client, clusterVersionName string) (map[string]appsv1alpha1.ClusterComponentVersion, error) {
 	clusterVersion := &appsv1alpha1.ClusterVersion{}

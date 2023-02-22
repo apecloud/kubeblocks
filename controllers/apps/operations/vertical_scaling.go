@@ -49,7 +49,7 @@ func (vs verticalScalingHandler) ActionStartedCondition(opsRequest *appsv1alpha1
 // Action modifies cluster component resources according to
 // the definition of opsRequest with spec.componentNames and spec.componentOps.verticalScaling
 func (vs verticalScalingHandler) Action(opsRes *OpsResource) error {
-	verticalScalingMap := opsRes.OpsRequest.CovertVerticalScalingListToMap()
+	verticalScalingMap := opsRes.OpsRequest.ConvertVerticalScalingListToMap()
 	for index, component := range opsRes.Cluster.Spec.ComponentSpecs {
 		if verticalScaling, ok := verticalScalingMap[component.Name]; ok {
 			component.Resources = verticalScaling.ResourceRequirements
@@ -87,7 +87,7 @@ func (vs verticalScalingHandler) SaveLastConfiguration(opsRes *OpsResource) erro
 // GetRealAffectedComponentMap gets the real affected component map for the operation
 func (vs verticalScalingHandler) GetRealAffectedComponentMap(opsRequest *appsv1alpha1.OpsRequest) realAffectedComponentMap {
 	realChangedMap := realAffectedComponentMap{}
-	vsMap := opsRequest.CovertVerticalScalingListToMap()
+	vsMap := opsRequest.ConvertVerticalScalingListToMap()
 	for k, v := range opsRequest.Status.LastConfiguration.Components {
 		currVs, ok := vsMap[k]
 		if !ok {

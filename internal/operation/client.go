@@ -33,7 +33,7 @@ type OperationClient struct {
 }
 
 type Order struct {
-	OrderId  int     `json:"orderid"`
+	OrderID  int     `json:"orderid"`
 	Customer string  `json:"customer"`
 	Price    float64 `json:"price"`
 }
@@ -68,10 +68,10 @@ func (cli *OperationClient) GetRole() (string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 
-	// Insert order using Dapr output binding via Dapr SDK
+	// Request sql channel via Dapr SDK
 	in := &dapr.InvokeBindingRequest{
 		Name:      cli.CharacterType,
-		Operation: "roleGet",
+		Operation: "getRole",
 		Data:      []byte(""),
 		Metadata:  map[string]string{},
 	}

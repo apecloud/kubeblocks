@@ -151,7 +151,7 @@ func updateComponentStatusInClusterStatus(compCtx componentContext,
 	}
 
 	if err = componentStatusSynchronizer.UpdateComponentsPhase(isRunning,
-		*podsReady, hasFailedAndTimedOutPod); err != nil {
+		podsReady, hasFailedAndTimedOutPod); err != nil {
 		return 0, err
 	}
 

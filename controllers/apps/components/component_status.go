@@ -30,12 +30,14 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
+// ComponentStatusSynchronizer gathers running status from Cluster, component's Workload and Pod objects,
+// then fills status of component (e.g. abnormalities or failures) into the Cluster.Status.Components map.
+//
 // Although it works to use warning event to determine whether the component is abnormal or failed.
 // In some conditions, the warning events are possible to be throttled and dropped due to K8s event rate control.
 // For example, after the kubelet fails to pull the image, it will put the image into the backoff cache
 // and send the BackOff (Normal) event. If it has already consumed the 25 burst quota to send event, event can only be
 // sent in the rate of once per 300s, in this way, the subsequent warning events of ImagePullError would be dropped.
-
 type ComponentStatusSynchronizer struct {
 	cluster       *appsv1alpha1.Cluster
 	component     types.Component
@@ -43,6 +45,8 @@ type ComponentStatusSynchronizer struct {
 	podList       *corev1.PodList
 }
 
+// NewClusterStatusSynchronizer creates and initializes a ComponentStatusSynchronizer objects.
+// It represents a snapshot of cluster status, including workloads and pods.
 func NewClusterStatusSynchronizer(ctx context.Context, cli client.Client, cluster *appsv1alpha1.Cluster, component types.Component, componentSpec *appsv1alpha1.ClusterComponentSpec) *ComponentStatusSynchronizer {
 	podList, err := util.GetComponentPodList(ctx, cli, cluster, componentSpec.Name)
 	if err != nil {
@@ -76,24 +80,24 @@ func (cs *ComponentStatusSynchronizer) HasFailedAndTimedOutPod() (hasFailedAndTi
 	return
 }
 
-// UpdateMessage updates the component status message in Cluster.Status.
+// UpdateMessage updates the component status message in the Cluster.Status.Components map.
 func (cs *ComponentStatusSynchronizer) UpdateMessage(message appsv1alpha1.ComponentMessageMap) {
 	compStatus := cs.getInitializedStatus()
 	compStatus.Message = message
 	cs.setStatus(compStatus)
 }
 
-// UpdateComponentsPhase updates the component status Phase etc. into cluster.Status.
+// UpdateComponentsPhase updates the component status Phase etc. into the cluster.Status.Components map.
 func (cs *ComponentStatusSynchronizer) UpdateComponentsPhase(
-	componentIsRunning,
-	podsAreReady,
+	componentIsRunning bool,
+	podsAreReady *bool,
 	hasFailedPodTimedOut bool) error {
 	var (
 		status        = &cs.cluster.Status
 		podsReadyTime *metav1.Time
 		componentName = cs.componentSpec.Name
 	)
-	if podsAreReady {
+	if podsAreReady != nil && *podsAreReady {
 		podsReadyTime = &metav1.Time{Time: time.Now()}
 	}
 	componentStatus := cs.getInitializedStatus()
@@ -119,12 +123,13 @@ func (cs *ComponentStatusSynchronizer) UpdateComponentsPhase(
 		componentStatus.SetMessage(nil)
 	}
 	componentStatus.PodsReadyTime = podsReadyTime
-	componentStatus.PodsReady = &podsAreReady
+	componentStatus.PodsReady = podsAreReady
 	status.Components[componentName] = componentStatus
 	return nil
 }
 
-// getInitializedStatus gets the component status from cluster.Status, initializes it if the entry doesn't exist
+// getInitializedStatus is an internal helper method which gets the component status from the
+// Cluster.Status.Components map, and initializes the entry if it doesn't exist
 func (cs *ComponentStatusSynchronizer) getInitializedStatus() appsv1alpha1.ClusterComponentStatus {
 	var (
 		componentStatus appsv1alpha1.ClusterComponentStatus
@@ -143,6 +148,7 @@ func (cs *ComponentStatusSynchronizer) getInitializedStatus() appsv1alpha1.Clust
 	return componentStatus
 }
 
+// setStatus is an internal helper method which sets component status in Cluster.Status.Components map.
 func (cs *ComponentStatusSynchronizer) setStatus(compStatus appsv1alpha1.ClusterComponentStatus) {
 	cs.cluster.Status.Components[cs.componentSpec.Name] = compStatus
 }

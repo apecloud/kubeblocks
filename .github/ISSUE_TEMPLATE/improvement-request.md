@@ -1,13 +1,13 @@
 ---
-name: Function request
-about: Suggest a function for this project
-title: "[Function]"
+name: Improvement request
+about: Suggest a improvement idea for this project
+title: "[Improvement]"
 labels: kind/function
 assignees: nayutah
 
 ---
 
-Is your function request related to a problem? Please describe.
+Is your improvement request related to a problem? Please describe.
 A clear and concise description of what the problem is. Ex. I'm always frustrated when [...]
 
 If this is a new function, please describe the motivation and goals.
@@ -20,4 +20,4 @@ Describe alternatives you've considered
 A clear and concise description of any alternative solutions or fuctions you've considered.
 
 Additional context
-Add any other context or screenshots about the function request here.
+Add any other context or screenshots about the improvement request here.

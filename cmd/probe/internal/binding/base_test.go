@@ -152,7 +152,7 @@ func mockFakeOperations() *fakeOperations {
 }
 
 // Init initializes the fake binding.
-func (fakeOps *fakeOperations) Init(metadata bindings.Metadata) error {
+func (fakeOps *fakeOperations) Init(metadata bindings.Metadata) {
 	fakeOps.BaseOperations.Init(metadata)
 	fakeOps.Logger.Debug("Initializing MySQL binding")
 	fakeOps.DBType = "mysql"
@@ -160,20 +160,20 @@ func (fakeOps *fakeOperations) Init(metadata bindings.Metadata) error {
 	fakeOps.BaseOperations.GetRole = fakeOps.GetRole
 	fakeOps.DBPort = fakeOps.GetRunningPort()
 	fakeOps.RegisterOperation(CheckStatusOperation, fakeOps.CheckStatusOps)
-	return nil
 }
-func (f *fakeOperations) initIfNeed() bool {
+
+func (fakeOps *fakeOperations) initIfNeed() bool {
 	return false
 }
 
-func (f *fakeOperations) GetRunningPort() int {
+func (fakeOps *fakeOperations) GetRunningPort() int {
 	return testDBPort
 }
 
-func (f *fakeOperations) CheckStatusOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
+func (fakeOps *fakeOperations) CheckStatusOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
 	return OpsResult{}, nil
 }
 
-func (f *fakeOperations) GetRole(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (string, error) {
+func (fakeOps *fakeOperations) GetRole(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (string, error) {
 	return testRole, nil
 }

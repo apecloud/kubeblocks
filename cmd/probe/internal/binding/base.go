@@ -95,6 +95,8 @@ const (
 	CheckStatusOperation  bindings.OperationKind = "checkStatus"
 	CheckRoleOperation    bindings.OperationKind = "checkRole"
 	GetRoleOperation      bindings.OperationKind = "getRole"
+
+	OperationNotImplemented = "OperationNotImplemented"
 )
 
 func init() {
@@ -131,7 +133,6 @@ func (ops *BaseOperations) Init(metadata bindings.Metadata) {
 	}
 }
 
-// register Operation, overwrite if exists.
 func (ops *BaseOperations) RegisterOperation(opsKind bindings.OperationKind, operation Operation) {
 	if ops.OperationMap == nil {
 		ops.OperationMap = map[bindings.OperationKind]Operation{}
@@ -177,7 +178,7 @@ func (ops *BaseOperations) Invoke(ctx context.Context, req *bindings.InvokeReque
 		message := fmt.Sprintf("%v operation is not implemented for %v", req.Operation, ops.DBType)
 		ops.Logger.Errorf(message)
 		opsRes := OpsResult{}
-		opsRes["event"] = "OperationNotImplemented"
+		opsRes["event"] = OperationNotImplemented
 		opsRes["message"] = message
 		resp.Metadata[StatusCode] = OperationNotFoundHTTPCode
 		res, _ := json.Marshal(opsRes)
@@ -206,7 +207,7 @@ func (ops *BaseOperations) CheckRoleOps(ctx context.Context, req *bindings.Invok
 	if ops.GetRole == nil {
 		message := fmt.Sprintf("roleCheck operation is not implemented for %v", ops.DBType)
 		ops.Logger.Errorf(message)
-		opsRes["event"] = "OperationNotImplemented"
+		opsRes["event"] = OperationNotImplemented
 		opsRes["message"] = message
 		resp.Metadata[StatusCode] = OperationNotFoundHTTPCode
 		return opsRes, nil
@@ -259,7 +260,7 @@ func (ops *BaseOperations) GetRoleOps(ctx context.Context, req *bindings.InvokeR
 	if ops.GetRole == nil {
 		message := fmt.Sprintf("roleCheck operation is not implemented for %v", ops.DBType)
 		ops.Logger.Errorf(message)
-		opsRes["event"] = "OperationNotImplemented"
+		opsRes["event"] = OperationNotImplemented
 		opsRes["message"] = message
 		resp.Metadata[StatusCode] = OperationNotFoundHTTPCode
 		return opsRes, nil

@@ -75,7 +75,6 @@ func (cli *OperationClient) GetRole() (string, error) {
 		Data:      []byte(""),
 		Metadata:  map[string]string{},
 	}
-	//var resp *dapr.BindingEvent
 	resp, err := cli.InvokeBinding(ctx, in)
 	if err != nil {
 		return "", err

@@ -137,7 +137,7 @@ type UpdatableFlags struct {
 	// TopologyKeys if TopologyKeys is nil, add omitempty json tag, because CueLang can not covert null to list.
 	TopologyKeys   []string          `json:"topologyKeys,omitempty"`
 	NodeLabels     map[string]string `json:"nodeLabels,omitempty"`
-	Tenancy        string            `json:"tenancy,omitempty"`
+	Tenancy        string            `json:"tenancy"`
 	TolerationsRaw []string          `json:"-"`
 }
 

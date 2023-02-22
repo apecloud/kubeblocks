@@ -379,19 +379,19 @@ func handleComponentProgressForScalingReplicas(opsRes *OpsResource,
 	if *lastComponentReplicas == *expectReplicas {
 		return
 	}
-	dValue := *expectReplicas - *lastComponentReplicas
-	if dValue > 0 {
-		expectProgressCount = dValue
-		isScaleOut = true
-	} else {
-		expectProgressCount = dValue * -1
-	}
 	if podList, err = util.GetComponentPodList(opsRes.Ctx, opsRes.Client, opsRes.Cluster, clusterComponent.Name); err != nil {
 		return
 	}
 	if compStatus.Phase == appsv1alpha1.RunningPhase && pgRes.clusterComponent.Replicas != int32(len(podList.Items)) {
 		err = fmt.Errorf("wait for the pods of deployment to be synchronized to client-go cache")
 		return
+	}
+	dValue := *expectReplicas - *lastComponentReplicas
+	if dValue > 0 {
+		expectProgressCount = dValue
+		isScaleOut = true
+	} else {
+		expectProgressCount = dValue * -1
 	}
 	if !isScaleOut {
 		completedCount, err = handleScaleDownProgress(opsRes, pgRes, podList, compStatus)

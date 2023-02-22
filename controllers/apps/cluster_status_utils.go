@@ -487,20 +487,3 @@ func syncComponentPhaseWhenSpecUpdating(cluster *appsv1alpha1.Cluster,
 		cluster.Status.Components[componentName] = compStatus
 	}
 }
-
-// sendEventAndNotifyOpsAtPhaseChanged sends an event and notifies the running opsRequest to reconcile when cluster phase is changed.
-func sendEventAndNotifyOpsAtPhaseChanged(ctx context.Context,
-	cli client.Client,
-	recorder record.EventRecorder,
-	cluster *appsv1alpha1.Cluster,
-	oldPhase appsv1alpha1.Phase,
-	eventType string,
-	eventMsg string) error {
-	curPhase := cluster.Status.Phase
-	if oldPhase != curPhase {
-		// send an event when Cluster.status.phase is changed.
-		recorder.Event(cluster, eventType, string(curPhase), eventMsg)
-	}
-	// when cluster phase changes to Running, need to mark OpsRequest annotation to reconcile for running OpsRequest.
-	return opsutil.MarkRunningOpsRequestAnnotation(ctx, cli, cluster)
-}

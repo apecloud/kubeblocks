@@ -653,8 +653,7 @@ func (r *ClusterReconciler) reconcileClusterStatus(ctx context.Context,
 	}
 
 	var (
-		clusterIsRunning          bool
-		clusterIsStopped          bool
+		currentClusterPhase       appsv1alpha1.Phase
 		existsAbnormalOrFailed    bool
 		replicasNotReadyCompNames = map[string]struct{}{}
 		notReadyCompNames         = map[string]struct{}{}
@@ -688,28 +687,25 @@ func (r *ClusterReconciler) reconcileClusterStatus(ctx context.Context,
 				replicasNotReadyCompNames[k] = struct{}{}
 				notReadyCompNames[k] = struct{}{}
 			}
-			if util.IsFailedOrAbnormal(v.Phase) {
+			switch v.Phase {
+			case appsv1alpha1.AbnormalPhase, appsv1alpha1.FailedPhase:
 				existsAbnormalOrFailed = true
 				notReadyCompNames[k] = struct{}{}
-				continue
-			}
-			if v.Phase == appsv1alpha1.RunningPhase {
+			case appsv1alpha1.RunningPhase:
 				runningCompCount += 1
-				continue
-			}
-			if v.Phase == appsv1alpha1.StoppedPhase {
+			case appsv1alpha1.StoppedPhase:
 				stoppedCompCount += 1
 			}
 		}
-		componentCount := len(cluster.Status.Components)
-		if componentCount == 0 {
+		switch len(cluster.Status.Components) {
+		case 0:
+			// if no components, return
 			return
-		}
-		if runningCompCount == componentCount {
-			clusterIsRunning = true
-		} else if componentCount == runningCompCount+stoppedCompCount {
+		case runningCompCount:
+			currentClusterPhase = appsv1alpha1.RunningPhase
+		case runningCompCount + stoppedCompCount:
 			// cluster is Stopped when cluster is not Running and all components are Stopped or Running
-			clusterIsStopped = true
+			currentClusterPhase = appsv1alpha1.StoppedPhase
 		}
 		return false, nil
 	}
@@ -740,33 +736,33 @@ func (r *ClusterReconciler) reconcileClusterStatus(ctx context.Context,
 
 	// handle the Cluster.status when cluster is Stopped.
 	handleClusterIsStopped := func(cluster *appsv1alpha1.Cluster) (needPatch bool, postFunc postHandler) {
-		if !clusterIsStopped {
+		if currentClusterPhase != appsv1alpha1.StoppedPhase &&
+			currentClusterPhase == cluster.Status.Phase {
 			return
 		}
-		oldClusterPhase := cluster.Status.Phase
-		cluster.Status.Phase = appsv1alpha1.StoppedPhase
+		cluster.Status.Phase = currentClusterPhase
 		return true, func(cluster *appsv1alpha1.Cluster) error {
 			message := fmt.Sprintf("Cluster: %s stopped successfully.", cluster.Name)
-			return sendEventAndNotifyOpsAtPhaseChanged(ctx, r.Client, r.Recorder,
-				cluster, oldClusterPhase, corev1.EventTypeNormal, message)
+			r.Recorder.Event(cluster, corev1.EventTypeNormal, string(currentClusterPhase), message)
+			// when cluster phase changes to Running, need to mark OpsRequest annotation to reconcile for running OpsRequest.
+			return opsutil.MarkRunningOpsRequestAnnotation(ctx, r.Client, cluster)
 		}
 	}
 
 	// handle the Cluster.status when cluster is Running.
 	handleClusterIsRunning := func(cluster *appsv1alpha1.Cluster) (needPatch bool, postFunc postHandler) {
-		if !clusterIsRunning {
+		if currentClusterPhase != appsv1alpha1.RunningPhase &&
+			currentClusterPhase == cluster.Status.Phase {
 			return
 		}
-		oldClusterPhase := cluster.Status.Phase
-		cluster.Status.Phase = appsv1alpha1.RunningPhase
+		cluster.Status.Phase = currentClusterPhase
 		cluster.SetStatusCondition(newClusterReadyCondition(cluster.Name))
 		return true, func(cluster *appsv1alpha1.Cluster) error {
 			message := fmt.Sprintf("Cluster: %s is ready, current phase is Running.", cluster.Name)
-			return sendEventAndNotifyOpsAtPhaseChanged(ctx, r.Client, r.Recorder,
-				cluster, oldClusterPhase, corev1.EventTypeNormal, message)
+			r.Recorder.Event(cluster, corev1.EventTypeNormal, string(currentClusterPhase), message)
+			return opsutil.MarkRunningOpsRequestAnnotation(ctx, r.Client, cluster)
 		}
 	}
-
 	return doChainClusterStatusHandler(ctx, r.Client, cluster, removeInvalidComponent, analysisComponentsStatus,
 		handleClusterReadyCondition, handleExistAbnormalOrFailed, handleClusterIsStopped, handleClusterIsRunning)
 }

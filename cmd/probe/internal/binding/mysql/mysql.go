@@ -210,15 +210,6 @@ func (mysqlOps *MysqlOperations) GetRole(ctx context.Context, request *bindings.
 	}
 	return role, nil
 }
-func (mysqlOps *MysqlOperations) GetRoleOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
-	role, err := mysqlOps.GetRole(ctx, req, resp)
-	if err != nil {
-		return nil, err
-	}
-	opsRes := OpsResult{}
-	opsRes["role"] = role
-	return opsRes, nil
-}
 
 // StatusCheckOps design details: https://infracreate.feishu.cn/wiki/wikcndch7lMZJneMnRqaTvhQpwb#doxcnOUyQ4Mu0KiUo232dOr5aad
 func (mysqlOps *MysqlOperations) CheckStatusOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {

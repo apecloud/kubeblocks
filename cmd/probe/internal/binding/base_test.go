@@ -18,9 +18,9 @@ package binding
 
 import (
 	"context"
+	"encoding/json"
 	"net"
 	"strconv"
-	"strings"
 	"testing"
 
 	"github.com/dapr/components-contrib/bindings"
@@ -28,7 +28,9 @@ import (
 	"github.com/spf13/viper"
 )
 
-type fakeBinding struct{}
+type fakeOperations struct {
+	BaseOperations
+}
 
 const (
 	testDBPort = 34521
@@ -36,87 +38,105 @@ const (
 )
 
 func TestInit(t *testing.T) {
-	p := mockProbeBase()
-	p.Init()
-	if p.oriRole != "" {
-		t.Errorf("p.oriRole init failed: %s", p.oriRole)
+	p := mockFakeOperations()
+	p.Init(bindings.Metadata{})
+	if p.OriRole != "" {
+		t.Errorf("p.oriRole init failed: %s", p.OriRole)
 	}
-	if p.runningCheckFailedCount != 0 {
-		t.Errorf("p.runningCheckFailedCount init failed: %d", p.runningCheckFailedCount)
+	if p.CheckRunningFailedCount != 0 {
+		t.Errorf("p.CheckRunningFailedCount init failed: %d", p.CheckRunningFailedCount)
 	}
-	if p.roleCheckFailedCount != 0 {
-		t.Errorf("p.roleCheckFailedCount init failed: %d", p.roleCheckFailedCount)
+	if p.CheckRoleFailedCount != 0 {
+		t.Errorf("p.CheckRoleFailedCount init failed: %d", p.CheckRoleFailedCount)
 	}
-	if p.roleUnchangedCount != 0 {
-		t.Errorf("p.roleUnchangedCount init failed: %d", p.roleUnchangedCount)
+	if p.RoleUnchangedCount != 0 {
+		t.Errorf("p.RoleUnchangedCount init failed: %d", p.RoleUnchangedCount)
 	}
-	if p.checkFailedThreshold != defaultCheckFailedThreshold {
-		t.Errorf("p.checkFailedThreshold init failed: %d", p.checkFailedThreshold)
+	if p.CheckFailedThreshold != defaultCheckFailedThreshold {
+		t.Errorf("p.CheckFailedThreshold init failed: %d", p.CheckFailedThreshold)
 	}
-	if p.roleDetectionThreshold != defaultRoleDetectionThreshold {
-		t.Errorf("p.roleDetectionThreshold init failed: %d", p.roleDetectionThreshold)
+	if p.RoleDetectionThreshold != defaultRoleDetectionThreshold {
+		t.Errorf("p.RoleDetectionThreshold init failed: %d", p.RoleDetectionThreshold)
 	}
-	if p.dbPort != testDBPort {
-		t.Errorf("p.dbPort init failed: %d", p.dbPort)
+	if p.DBPort != testDBPort {
+		t.Errorf("p.DBPort init failed: %d", p.DBPort)
 	}
 }
 
 func TestInvoke(t *testing.T) {
-	p := mockProbeBase()
 	viper.SetDefault("KB_SERVICE_ROLES", "{\"follower\":\"Readonly\",\"leader\":\"ReadWrite\"}")
-	p.Init()
+	p := mockFakeOperations()
+	p.Init(bindings.Metadata{})
 
-	t.Run("runningCheck", func(t *testing.T) {
+	t.Run("CheckRunning", func(t *testing.T) {
+		opsRes := OpsResult{}
 		metadata := map[string]string{"sql": ""}
 		req := &bindings.InvokeRequest{
 			Data:      nil,
 			Metadata:  metadata,
-			Operation: RunningCheckOperation,
+			Operation: CheckRunningOperation,
 		}
 		resp, err := p.Invoke(context.Background(), req)
 		if err != nil {
-			t.Errorf("runningCheck failed: %s", err)
+			t.Errorf("CheckRunning failed: %s", err)
 		}
-		if !strings.Contains(string(resp.Data), "{\"event\":\"runningCheckFailed\"") {
+		err = json.Unmarshal(resp.Data, &opsRes)
+		if err != nil {
+			t.Errorf("CheckRunning failed: %s", err)
+		}
+		if opsRes["event"] != "CheckRunningFailed" {
 			t.Errorf("unexpected response: %s", string(resp.Data))
 		}
 
-		message := "{\"message\":\"TCP Connection Established Successfully!\"}"
-		server := startFooServer(p.dbPort, t)
+		server := startFooServer(p.DBPort, t)
 		defer stopFooServer(server)
 		resp, _ = p.Invoke(context.Background(), req)
-		if string(resp.Data) != message {
+		err = json.Unmarshal(resp.Data, &opsRes)
+		if err != nil {
+			t.Errorf("CheckRunning failed: %s", err)
+		}
+		if opsRes["event"] != "CheckRunningSuccess" {
 			t.Errorf("unexpected response: %s", string(resp.Data))
 		}
 	})
 
 	t.Run("roleCheck", func(t *testing.T) {
+		opsRes := OpsResult{}
 		metadata := map[string]string{"sql": ""}
 		req := &bindings.InvokeRequest{
 			Data:      nil,
 			Metadata:  metadata,
-			Operation: RoleCheckOperation,
+			Operation: CheckRoleOperation,
 		}
 
 		resp, err := p.Invoke(context.Background(), req)
 		if err != nil {
 			t.Errorf("roleCheck error: %s", err)
 		}
-		if p.oriRole != testRole {
-			t.Errorf("getRole error: %s", p.oriRole)
+		err = json.Unmarshal(resp.Data, &opsRes)
+		if err != nil {
+			t.Errorf("CheckRunning failed: %s", err)
 		}
-		if string(resp.Data) != "{\"event\":\"roleChanged\",\"role\":\""+testRole+"\"}" {
+		if p.OriRole != testRole {
+			t.Errorf("getRole error: %s", p.OriRole)
+		}
+		if opsRes["role"] != testRole {
 			t.Errorf("roleCheck response error: %s", resp.Data)
 		}
 	})
 }
 
 func startFooServer(port int, t *testing.T) net.Listener {
-	server, err := net.Listen("tcp", ":"+strconv.Itoa(port))
-	if server == nil {
-		t.Errorf("couldn't start listening: %s", err)
+	for i := 0; i < 3; i++ {
+		server, err := net.Listen("tcp", ":"+strconv.Itoa(port))
+		if server == nil {
+			t.Errorf("couldn't start listening: %s", err)
+		} else {
+			return server
+		}
+		port++
 	}
-	return server
+	return nil
 }
 
 func stopFooServer(server net.Listener) {
@@ -125,26 +145,35 @@ func stopFooServer(server net.Listener) {
 	}
 }
 
-func mockProbeBase() *ProbeBase {
-	p := &ProbeBase{}
-	p.Logger = logger.NewLogger("base_binding_test")
-	p.Operation = &fakeBinding{}
-
-	return p
+func mockFakeOperations() *fakeOperations {
+	log := logger.NewLogger("base_test")
+	p := BaseOperations{Logger: log}
+	return &fakeOperations{BaseOperations: p}
 }
 
-func (f *fakeBinding) InitIfNeed() error {
+// Init initializes the fake binding.
+func (fakeOps *fakeOperations) Init(metadata bindings.Metadata) error {
+	fakeOps.BaseOperations.Init(metadata)
+	fakeOps.Logger.Debug("Initializing MySQL binding")
+	fakeOps.DBType = "mysql"
+	fakeOps.InitIfNeed = fakeOps.initIfNeed
+	fakeOps.BaseOperations.GetRole = fakeOps.GetRole
+	fakeOps.DBPort = fakeOps.GetRunningPort()
+	fakeOps.RegisterOperation(CheckStatusOperation, fakeOps.CheckStatusOps)
 	return nil
 }
+func (f *fakeOperations) initIfNeed() bool {
+	return false
+}
 
-func (f *fakeBinding) GetRunningPort() int {
+func (f *fakeOperations) GetRunningPort() int {
 	return testDBPort
 }
 
-func (f *fakeBinding) StatusCheck(ctx context.Context, cmd string, response *bindings.InvokeResponse) ([]byte, error) {
-	return nil, nil
+func (f *fakeOperations) CheckStatusOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
+	return OpsResult{}, nil
 }
 
-func (f *fakeBinding) GetRole(ctx context.Context, cmd string) (string, error) {
+func (f *fakeOperations) GetRole(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (string, error) {
 	return testRole, nil
 }

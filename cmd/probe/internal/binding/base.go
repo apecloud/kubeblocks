@@ -39,9 +39,9 @@ type OpsResult map[string]interface{}
 type AccessMode string
 
 type BaseOperations struct {
-	RunningCheckFailedCount int
-	StatusCheckFailedCount  int
-	RoleCheckFailedCount    int
+	CheckRunningFailedCount int
+	CheckStatusFailedCount  int
+	CheckRoleFailedCount    int
 	RoleUnchangedCount      int
 	CheckFailedThreshold    int
 	// RoleDetectionThreshold is used to set the report duration of role event after role changed,
@@ -57,7 +57,7 @@ type BaseOperations struct {
 	Logger                 logger.Logger
 	Metadata               bindings.Metadata
 	InitIfNeed             func() bool
-	GetRole                func(ctx context.Context, request *bindings.InvokeRequest, response *bindings.InvokeResponse) (string, error)
+	GetRole                func(context.Context, *bindings.InvokeRequest, *bindings.InvokeResponse) (string, error)
 	OperationMap           map[bindings.OperationKind]Operation
 }
 
@@ -91,10 +91,10 @@ const (
 	StatusCheckType
 	RoleChangedCheckType
 
-	CheckRunningOperation bindings.OperationKind = "runningCheck"
-	CheckStatusOperation  bindings.OperationKind = "statusCheck"
-	CheckRoleOperation    bindings.OperationKind = "roleCheck"
-	GetRoleOperation      bindings.OperationKind = "roleGet"
+	CheckRunningOperation bindings.OperationKind = "checkRunning"
+	CheckStatusOperation  bindings.OperationKind = "checkStatus"
+	CheckRoleOperation    bindings.OperationKind = "checkRole"
+	GetRoleOperation      bindings.OperationKind = "getRole"
 )
 
 func init() {
@@ -127,6 +127,7 @@ func (ops *BaseOperations) Init(metadata bindings.Metadata) {
 	ops.OperationMap = map[bindings.OperationKind]Operation{
 		CheckRunningOperation: ops.CheckRunningOps,
 		CheckRoleOperation:    ops.CheckRoleOps,
+		GetRoleOperation:      ops.GetRoleOps,
 	}
 }
 
@@ -199,7 +200,7 @@ func (ops *BaseOperations) Invoke(ctx context.Context, req *bindings.InvokeReque
 	return updateRespMetadata()
 }
 
-func (ops *BaseOperations) CheckRoleOps(ctx context.Context, request *bindings.InvokeRequest, response *bindings.InvokeResponse) (OpsResult, error) {
+func (ops *BaseOperations) CheckRoleOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
 	opsRes := OpsResult{}
 	opsRes["originalRole"] = ops.OriRole
 	if ops.GetRole == nil {
@@ -207,24 +208,24 @@ func (ops *BaseOperations) CheckRoleOps(ctx context.Context, request *bindings.I
 		ops.Logger.Errorf(message)
 		opsRes["event"] = "OperationNotImplemented"
 		opsRes["message"] = message
-		response.Metadata[StatusCode] = OperationNotFoundHTTPCode
+		resp.Metadata[StatusCode] = OperationNotFoundHTTPCode
 		return opsRes, nil
 	}
 
-	role, err := ops.GetRole(ctx, request, response)
+	role, err := ops.GetRole(ctx, req, resp)
 	if err != nil {
 		ops.Logger.Infof("error executing roleCheck: %v", err)
 		opsRes["event"] = "roleCheckFailed"
 		opsRes["message"] = err.Error()
-		if ops.RoleCheckFailedCount%ops.CheckFailedThreshold == 0 {
-			ops.Logger.Infof("role checks failed %v times continuously", ops.RoleCheckFailedCount)
-			response.Metadata[StatusCode] = OperationFailedHTTPCode
+		if ops.CheckRoleFailedCount%ops.CheckFailedThreshold == 0 {
+			ops.Logger.Infof("role checks failed %v times continuously", ops.CheckRoleFailedCount)
+			resp.Metadata[StatusCode] = OperationFailedHTTPCode
 		}
-		ops.RoleCheckFailedCount++
+		ops.CheckRoleFailedCount++
 		return opsRes, nil
 	}
 
-	ops.RoleCheckFailedCount = 0
+	ops.CheckRoleFailedCount = 0
 	if isValid, message := ops.roleValidate(role); !isValid {
 		opsRes["event"] = "roleInvalid"
 		opsRes["message"] = message
@@ -248,8 +249,35 @@ func (ops *BaseOperations) CheckRoleOps(ctx context.Context, request *bindings.I
 	// 1 roleChanged event loss;
 	// 2 pod role label deleted or updated incorrectly.
 	if ops.RoleUnchangedCount < ops.RoleDetectionThreshold && ops.RoleUnchangedCount%roleEventRecordFrequency == 0 {
-		response.Metadata[StatusCode] = OperationFailedHTTPCode
+		resp.Metadata[StatusCode] = OperationFailedHTTPCode
 	}
+	return opsRes, nil
+}
+
+func (ops *BaseOperations) GetRoleOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
+	opsRes := OpsResult{}
+	if ops.GetRole == nil {
+		message := fmt.Sprintf("roleCheck operation is not implemented for %v", ops.DBType)
+		ops.Logger.Errorf(message)
+		opsRes["event"] = "OperationNotImplemented"
+		opsRes["message"] = message
+		resp.Metadata[StatusCode] = OperationNotFoundHTTPCode
+		return opsRes, nil
+	}
+
+	role, err := ops.GetRole(ctx, req, resp)
+	if err != nil {
+		ops.Logger.Infof("error executing roleCheck: %v", err)
+		opsRes["event"] = "roleCheckFailed"
+		opsRes["message"] = err.Error()
+		if ops.CheckRoleFailedCount%ops.CheckFailedThreshold == 0 {
+			ops.Logger.Infof("role checks failed %v times continuously", ops.CheckRoleFailedCount)
+			resp.Metadata[StatusCode] = OperationFailedHTTPCode
+		}
+		ops.CheckRoleFailedCount++
+		return opsRes, nil
+	}
+	opsRes["role"] = role
 	return opsRes, nil
 }
 
@@ -289,23 +317,23 @@ func (ops *BaseOperations) CheckRunningOps(ctx context.Context, req *bindings.In
 	if err != nil {
 		message = fmt.Sprintf("running check %s error: %v", host, err)
 		ops.Logger.Errorf(message)
-		opsRes["event"] = "runningCheckFailed"
+		opsRes["event"] = "CheckRunningFailed"
 		opsRes["message"] = message
-		if ops.RunningCheckFailedCount%ops.CheckFailedThreshold == 0 {
-			ops.Logger.Infof("running checks failed %v times continuously", ops.RunningCheckFailedCount)
+		if ops.CheckRunningFailedCount%ops.CheckFailedThreshold == 0 {
+			ops.Logger.Infof("running checks failed %v times continuously", ops.CheckRunningFailedCount)
 			resp.Metadata[StatusCode] = OperationFailedHTTPCode
 		}
-		ops.RunningCheckFailedCount++
+		ops.CheckRunningFailedCount++
 		return opsRes, nil
 	}
 	defer conn.Close()
-	ops.RunningCheckFailedCount = 0
+	ops.CheckRunningFailedCount = 0
 	message = "TCP Connection Established Successfully!"
 	if tcpCon, ok := conn.(*net.TCPConn); ok {
 		err := tcpCon.SetLinger(0)
 		ops.Logger.Infof("running check, set tcp linger failed: %v", err)
 	}
-	opsRes["event"] = "runningCheckSuccess"
+	opsRes["event"] = "CheckRunningSuccess"
 	opsRes["message"] = message
 	return opsRes, nil
 }

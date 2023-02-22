@@ -17,6 +17,7 @@ require (
 	github.com/coreos/go-iptables v0.5.0
 	github.com/dapr/components-contrib v1.9.6
 	github.com/dapr/dapr v1.9.5
+	github.com/dapr/go-sdk v1.7.0
 	github.com/dapr/kit v0.0.3
 	github.com/docker/docker v20.10.21+incompatible
 	github.com/docker/go-connections v0.4.0
@@ -419,7 +420,7 @@ require (
 	gomodules.xyz/jsonpatch/v2 v2.2.0 // indirect
 	google.golang.org/api v0.103.0 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
-	google.golang.org/genproto v0.0.0-20221207170731-23e4bf6bdc37 // indirect
+	google.golang.org/genproto v0.0.0-20230104163317-caabf589fcbf // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/ini.v1 v1.67.0
 	gopkg.in/yaml.v2 v2.4.0

@@ -1,0 +1,91 @@
+/*
+Copyright ApeCloud, Inc.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package operation
+
+import (
+	"context"
+	"fmt"
+	"net"
+	"time"
+	"encoding/json"
+
+	dapr "github.com/dapr/go-sdk/client"
+	"github.com/spf13/viper"
+	corev1 "k8s.io/api/core/v1"
+)
+
+var (
+	probeSvcGRPCPort = viper.GetString("PROBE_SERVICE_GRPC_PORT")
+)
+
+type OperationClient struct {
+	dapr.Client
+	CharacterType string
+}
+
+type Order struct {
+	OrderId  int     `json:"orderid"`
+	Customer string  `json:"customer"`
+	Price    float64 `json:"price"`
+}
+
+func NewClientWithPod(pod *corev1.Pod, characterType string) (*OperationClient, error) {
+	if characterType == "" {
+		return nil, fmt.Errorf("pod %v chacterType must be set", pod)
+	}
+
+	ip := pod.Status.PodIP
+	if ip == "" {
+		return nil, fmt.Errorf("pod %v has no ip", pod)
+	}
+
+	client, err := dapr.NewClientWithAddress(net.JoinHostPort(ip, probeSvcGRPCPort))
+	if err != nil {
+		return nil, err
+	}
+
+	operationClient := &OperationClient{
+		Client: client,
+		CharacterType: characterType,
+	}
+	return operationClient, nil
+}
+
+func (cli *OperationClient) GetRole() (string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+
+	// Insert order using Dapr output binding via Dapr SDK
+	in := &dapr.InvokeBindingRequest{
+		Name:      cli.CharacterType,
+		Operation: "roleGet",
+		Data:      []byte(""),
+		Metadata:  map[string]string{},
+	}
+	//var resp *dapr.BindingEvent
+	resp, err := cli.InvokeBinding(ctx, in)
+	if err != nil {
+		return "", err
+	}
+	result := map[string]string{}
+	err = json.Unmarshal(resp.Data, result)
+	if err != nil {
+		return "", err
+	}
+
+	return result["role"], nil
+}

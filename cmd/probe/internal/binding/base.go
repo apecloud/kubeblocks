@@ -87,9 +87,9 @@ const (
 	defaultRoleDetectionThreshold = 300
 
 	// types for probe
-	RunningCheckType = iota
-	StatusCheckType
-	RoleChangedCheckType
+	CheckRunningType = iota
+	CheckStatusType
+	CheckRoleChangedType
 
 	CheckRunningOperation bindings.OperationKind = "checkRunning"
 	CheckStatusOperation  bindings.OperationKind = "checkStatus"

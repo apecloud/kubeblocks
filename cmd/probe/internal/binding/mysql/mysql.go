@@ -211,14 +211,14 @@ func (mysqlOps *MysqlOperations) GetRole(ctx context.Context, request *bindings.
 	return role, nil
 }
 
-// StatusCheckOps design details: https://infracreate.feishu.cn/wiki/wikcndch7lMZJneMnRqaTvhQpwb#doxcnOUyQ4Mu0KiUo232dOr5aad
+// CheckStatusOps design details: https://infracreate.feishu.cn/wiki/wikcndch7lMZJneMnRqaTvhQpwb#doxcnOUyQ4Mu0KiUo232dOr5aad
 func (mysqlOps *MysqlOperations) CheckStatusOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
 	rwSql := fmt.Sprintf(`begin;
 	create table if not exists kb_health_check(type int, check_ts bigint, primary key(type));
 	insert into kb_health_check values(%d, now()) on duplicate key update check_ts = now();
 	commit;
-	select check_ts from kb_health_check where type=%d limit 1;`, StatusCheckType, StatusCheckType)
-	roSql := fmt.Sprintf(`select check_ts from kb_health_check where type=%d limit 1;`, StatusCheckType)
+	select check_ts from kb_health_check where type=%d limit 1;`, CheckStatusType, CheckStatusType)
+	roSql := fmt.Sprintf(`select check_ts from kb_health_check where type=%d limit 1;`, CheckStatusType)
 	var err error
 	var data []byte
 	switch mysqlOps.DBRoles[strings.ToLower(mysqlOps.OriRole)] {
@@ -237,17 +237,17 @@ func (mysqlOps *MysqlOperations) CheckStatusOps(ctx context.Context, req *bindin
 	result := OpsResult{}
 	if err != nil {
 		mysqlOps.Logger.Infof("CheckStatus error: %v", err)
-		result["event"] = "statusCheckFailed"
+		result["event"] = "CheckStatusFailed"
 		result["message"] = err.Error()
-		if mysqlOps.StatusCheckFailedCount%mysqlOps.CheckFailedThreshold == 0 {
-			mysqlOps.Logger.Infof("status checks failed %v times continuously", mysqlOps.StatusCheckFailedCount)
+		if mysqlOps.CheckStatusFailedCount%mysqlOps.CheckFailedThreshold == 0 {
+			mysqlOps.Logger.Infof("status checks failed %v times continuously", mysqlOps.CheckStatusFailedCount)
 			resp.Metadata[StatusCode] = OperationFailedHTTPCode
 		}
-		mysqlOps.StatusCheckFailedCount++
+		mysqlOps.CheckStatusFailedCount++
 	} else {
-		result["event"] = "statusCheckSuccess"
+		result["event"] = "CheckStatusSuccess"
 		result["message"] = string(data)
-		mysqlOps.StatusCheckFailedCount = 0
+		mysqlOps.CheckStatusFailedCount = 0
 	}
 	return result, nil
 }

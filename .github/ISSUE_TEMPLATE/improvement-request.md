@@ -2,7 +2,7 @@
 name: Improvement request
 about: Suggest a improvement idea for this project
 title: "[Improvement]"
-labels: kind/function
+labels: kind/enhancement
 assignees: nayutah
 
 ---

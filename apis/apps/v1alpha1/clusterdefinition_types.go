@@ -109,7 +109,6 @@ type PasswordConfig struct {
 type SystemAccountConfig struct {
 	// name is the name of a system account.
 	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:Enum={kbadmin,kbdataprotection,kbprobe,kbmonitoring,kbreplicator}
 	Name AccountName `json:"name"`
 	// provisionPolicy defines how to create account.
 	// +kubebuilder:validation:Required
@@ -281,7 +280,6 @@ type ClusterComponentDefinition struct {
 	// Consensus is a stateful workload type used to describe applications based on consensus protocols, common consensus protocols such as raft and paxos.
 	// Replication is a stateful workload type used to describe applications based on the primary-secondary data replication protocol.
 	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:Enum={Stateless,Stateful,Consensus,Replication}
 	WorkloadType WorkloadType `json:"workloadType"`
 
 	// characterType defines well-known database component name, such as mongos(mongodb), proxy(redis), mariadb(mysql)
@@ -352,7 +350,6 @@ type HorizontalScalePolicy struct {
 	//           the first volumeMount of first container (i.e. clusterdefinition.spec.components.podSpec.containers[0].volumeMounts[0]),
 	//           since take multiple snapshots at one time might cause consistency problem.
 	// +kubebuilder:default=None
-	// +kubebuilder:validation:Enum={None,Snapshot}
 	// +optional
 	Type HScaleDataClonePolicyType `json:"type,omitempty"`
 
@@ -443,7 +440,6 @@ type ConsensusSetSpec struct {
 	//		Learner, Follower(minority) in parallel -> Follower(majority) -> Leader, keep majority online all the time.
 	// parallel: force parallel
 	// +kubebuilder:default=Serial
-	// +kubebuilder:validation:Enum={Serial,BestEffortParallel,Parallel}
 	// +optional
 	UpdateStrategy UpdateStrategy `json:"updateStrategy,omitempty"`
 }
@@ -457,7 +453,6 @@ type ConsensusMember struct {
 	// AccessMode, what service this member capable.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:default=ReadWrite
-	// +kubebuilder:validation:Enum={None, Readonly, ReadWrite}
 	AccessMode AccessMode `json:"accessMode"`
 
 	// Replicas, number of Pods of this role.

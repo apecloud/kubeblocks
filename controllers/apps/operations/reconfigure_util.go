@@ -76,7 +76,7 @@ func updateCfgParams(config appsv1alpha1.Configuration,
 		return makeReconfiguringResult(err, withFailed(true))
 	}
 
-	configPatch, err := createConfigPatch(client.ObjectKeyFromObject(cm), cm.Data, newCfg, fc.Formatter)
+	configPatch, err := createConfigPatch(client.ObjectKeyFromObject(cm), cm.Data, newCfg, fc.Format)
 	if err != nil {
 		return makeReconfiguringResult(err)
 	}
@@ -110,7 +110,7 @@ func fromKeyValuePair(parameters []appsv1alpha1.ParameterPair) map[string]interf
 
 func createConfigPatch(cfgKey client.ObjectKey,
 	old, updated map[string]string,
-	formatter appsv1alpha1.ConfigurationFormatter) (*cfgcore.ConfigPatchInfo, error) {
+	formatter appsv1alpha1.CfgFileFormat) (*cfgcore.ConfigPatchInfo, error) {
 	option := cfgcore.CfgOption{
 		Type:    cfgcore.CfgTplType,
 		CfgType: formatter,

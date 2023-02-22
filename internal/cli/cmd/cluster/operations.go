@@ -268,7 +268,7 @@ func (o *OperationsOptions) parseUpdatedParams() error {
 		for _, p := range pp {
 			fields := strings.SplitN(p, "=", 2)
 			if len(fields) != 2 {
-				return cfgcore.MakeError("updated parameter formatter: key=value")
+				return cfgcore.MakeError("updated parameter format: key=value")
 			}
 			o.KeyValues[fields[0]] = fields[1]
 		}

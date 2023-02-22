@@ -64,7 +64,7 @@ func CueValidate(cueTpl string) error {
 	return tpl.Validate()
 }
 
-func ValidateConfigurationWithCue(cueTpl string, cfgType appsv1alpha1.ConfigurationFormatter, rawData string) error {
+func ValidateConfigurationWithCue(cueTpl string, cfgType appsv1alpha1.CfgFileFormat, rawData string) error {
 	cfg, err := loadConfiguration(cfgType, rawData)
 	if err != nil {
 		return WrapError(err, "failed to load configuration. [%s]", rawData)
@@ -73,7 +73,7 @@ func ValidateConfigurationWithCue(cueTpl string, cfgType appsv1alpha1.Configurat
 	return cfgDataValidateByCue(cueTpl, cfg)
 }
 
-func loadConfiguration(cfgType appsv1alpha1.ConfigurationFormatter, rawData string) (map[string]interface{}, error) {
+func loadConfiguration(cfgType appsv1alpha1.CfgFileFormat, rawData string) (map[string]interface{}, error) {
 	// viper not support xml
 	if cfgType == appsv1alpha1.XML {
 		return mxjv2.NewMapXml([]byte(rawData), true)

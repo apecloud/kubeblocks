@@ -167,7 +167,7 @@ func TestGetUpgradeComponentNameMap(t *testing.T) {
 }
 
 func TestSetStatusAndMessage(t *testing.T) {
-	p := ProgressDetail{}
+	p := ProgressStatusDetail{}
 	message := "handle successfully"
 	p.SetStatusAndMessage(SucceedProgressStatus, message)
 	if p.Status != SucceedProgressStatus && p.Message != message {

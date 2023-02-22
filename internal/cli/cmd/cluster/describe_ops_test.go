@@ -134,7 +134,7 @@ var _ = Describe("Expose", func() {
 			Components: map[string]appsv1alpha1.OpsRequestComponentStatus{
 				componentName: {
 					Phase: appsv1alpha1.FailedPhase,
-					ProgressDetails: []appsv1alpha1.ProgressDetail{
+					ProgressDetails: []appsv1alpha1.ProgressStatusDetail{
 						{
 							ObjectKey: objectKey,
 							Status:    appsv1alpha1.SucceedProgressStatus,

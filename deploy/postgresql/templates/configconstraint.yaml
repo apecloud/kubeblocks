@@ -41,6 +41,6 @@ spec:
    {{- end }}
  {{- end}}
 
-    # mysql configuration file format
+  # configuration file format
   formatterConfig:
-    formatter: dotenv
+    format: dotenv

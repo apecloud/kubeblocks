@@ -332,8 +332,6 @@ spec:
                       description: progressDetails describes the progress details
                         of the component for this operation.
                       items:
-                        description: ProgressDetail contains the details for the component
-                          processing progress.
                         properties:
                           endTime:
                             description: endTime is the completion time of object
@@ -373,6 +371,11 @@ spec:
                     workloadType:
                       description: workloadType references workload type of component
                         in ClusterDefinition.
+                      enum:
+                      - Stateless
+                      - Stateful
+                      - Consensus
+                      - Replication
                       type: string
                   type: object
                 description: components defines the recorded the status information

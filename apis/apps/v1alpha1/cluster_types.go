@@ -44,7 +44,6 @@ type ClusterSpec struct {
 	// Delete is based on Halt and deletes PVCs.
 	// WipeOut is based on Delete and wipe out all volume snapshots and snapshot data from backup storage location.
 	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:Enum={DoNotTerminate,Halt,Delete,WipeOut}
 	TerminationPolicy TerminationPolicyType `json:"terminationPolicy"`
 
 	// List of componentSpecs you want to replace in ClusterDefinition and ClusterVersion. It will replace the field in ClusterDefinition's and ClusterVersion's component if type is matching.
@@ -251,7 +250,6 @@ type ConsensusMemberStatus struct {
 
 	// accessMode, what service this pod provides.
 	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:Enum={None, Readonly, ReadWrite}
 	// +kubebuilder:default=ReadWrite
 	AccessMode AccessMode `json:"accessMode"`
 
@@ -290,10 +288,9 @@ type ClusterComponentVolumeClaimTemplate struct {
 
 type Affinity struct {
 	// podAntiAffinity defines pods of component anti-affnity.
-	// Defaults to Preferred
+	// Defaults to Preferred.
 	// Preferred means try spread pods by topologyKey.
 	// Required means must spread pods by topologyKey.
-	// +kubebuilder:validation:Enum={Preferred,Required}
 	// +optional
 	PodAntiAffinity PodAntiAffinity `json:"podAntiAffinity,omitempty"`
 

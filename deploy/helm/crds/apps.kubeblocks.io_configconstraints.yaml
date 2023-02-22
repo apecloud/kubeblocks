@@ -76,9 +76,9 @@ spec:
                   file, the controller 1. parses configuration file 2. analyzes the
                   modified parameters 3. applies corresponding policies.
                 properties:
-                  formatter:
-                    description: formatter describes the format of the configuration
-                      file Formatter ConfigurationFormatter `json:"formatter"`
+                  format:
+                    description: The configuration file format. Valid values are ini,
+                      yaml, json, xml, hcl, and dotenv.
                     enum:
                     - xml
                     - ini
@@ -94,7 +94,7 @@ spec:
                         type: string
                     type: object
                 required:
-                - formatter
+                - format
                 type: object
               immutableParameters:
                 description: immutableParameters describes parameters that prohibit

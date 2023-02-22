@@ -32,7 +32,6 @@ type OpsRequestSpec struct {
 
 	// type defines the operation type.
 	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:Enum={Upgrade,VerticalScaling,VolumeExpansion,HorizontalScaling,Restart,Reconfiguring}
 	Type OpsType `json:"type"`
 
 	// ttlSecondsAfterSucceed OpsRequest will be deleted after TTLSecondsAfterSucceed second when OpsRequest.status.phase is Succeed.
@@ -249,8 +248,7 @@ type OpsRequestStatus struct {
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
 }
 
-// ProgressDetail contains the details for the component processing progress.
-type ProgressDetail struct {
+type ProgressStatusDetail struct {
 	// group describes which group the current object belongs to.
 	// if the objects of a component belong to the same group, we can ignore it.
 	// +optional
@@ -261,7 +259,6 @@ type ProgressDetail struct {
 	ObjectKey string `json:"objectKey"`
 
 	// status describes the state of processing the object.
-	// +kubebuilder:validation:Enum={Processing,Pending,Failed,Succeed}
 	// +kubebuilder:validation:Required
 	Status ProgressStatus `json:"status"`
 
@@ -311,7 +308,7 @@ type OpsRequestComponentStatus struct {
 
 	// progressDetails describes the progress details of the component for this operation.
 	// +optional
-	ProgressDetails []ProgressDetail `json:"progressDetails,omitempty"`
+	ProgressDetails []ProgressStatusDetail `json:"progressDetails,omitempty"`
 
 	// workloadType references workload type of component in ClusterDefinition.
 	// +optional
@@ -337,7 +334,6 @@ type ConfigurationStatus struct {
 	Name string `json:"name"`
 
 	// updatePolicy describes the policy of reconfiguring.
-	// +kubebuilder:validation:Enum={simple,parallel,rolling,autoReload}
 	// +optional
 	UpdatePolicy UpgradePolicy `json:"updatePolicy,omitempty"`
 
@@ -506,7 +502,7 @@ func (r *OpsRequest) GetUpgradeComponentNameMap() map[string]struct{} {
 	return componentNameMap
 }
 
-func (p *ProgressDetail) SetStatusAndMessage(status ProgressStatus, message string) {
+func (p *ProgressStatusDetail) SetStatusAndMessage(status ProgressStatus, message string) {
 	p.Message = message
 	p.Status = status
 }

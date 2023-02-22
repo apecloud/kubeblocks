@@ -56,6 +56,7 @@ const (
 
 // OpsType defines operation types.
 // +enum
+// +kubebuilder:validation:Enum={Upgrade,VerticalScaling,VolumeExpansion,HorizontalScaling,Restart,Reconfiguring}
 type OpsType string
 
 const (
@@ -69,6 +70,7 @@ const (
 
 // AccessMode define SVC access mode enums.
 // +enum
+// +kubebuilder:validation:Enum={None,Readonly,ReadWrite}
 type AccessMode string
 
 const (
@@ -79,6 +81,7 @@ const (
 
 // UpdateStrategy define Cluster Component update strategy.
 // +enum
+// +kubebuilder:validation:Enum={Serial,BestEffortParallel,Parallel}
 type UpdateStrategy string
 
 const (
@@ -94,6 +97,7 @@ var DefaultLeader = ConsensusMember{
 
 // WorkloadType defines ClusterDefinition's component workload type.
 // +enum
+// +kubebuilder:validation:Enum={Stateless,Stateful,Consensus,Replication}
 type WorkloadType string
 
 const (
@@ -107,6 +111,7 @@ var WorkloadTypes = []string{"Stateless", "Stateful", "Consensus", "Replication"
 
 // TerminationPolicyType define termination policy types.
 // +enum
+// +kubebuilder:validation:Enum={DoNotTerminate,Halt,Delete,WipeOut}
 type TerminationPolicyType string
 
 const (
@@ -118,6 +123,7 @@ const (
 
 // HScaleDataClonePolicyType defines data clone policy when horizontal scaling.
 // +enum
+// +kubebuilder:validation:Enum={None,Snapshot}
 type HScaleDataClonePolicyType string
 
 const (
@@ -128,6 +134,7 @@ const (
 
 // PodAntiAffinity define pod anti-affinity strategy.
 // +enum
+// +kubebuilder:validation:Enum={Preferred,Required}
 type PodAntiAffinity string
 
 const (
@@ -135,6 +142,9 @@ const (
 	Required  PodAntiAffinity = "Required"
 )
 
+// TenancyType for cluster tenant resources.
+// +enum
+// +kubebuilder:validation:Enum={SharedNode,DedicatedNode}
 type TenancyType string
 
 const (
@@ -142,6 +152,9 @@ const (
 	DedicatedNode TenancyType = "DedicatedNode"
 )
 
+// ProgressStatus defined
+// +enum
+// +kubebuilder:validation:Enum={Processing,Pending,Failed,Succeed}
 type ProgressStatus string
 
 const (
@@ -204,6 +217,7 @@ const (
 
 // AccountName defines system account names.
 // +enum
+// +kubebuilder:validation:Enum={kbadmin,kbdataprotection,kbprobe,kbmonitoring,kbreplicator}
 type AccountName string
 
 const (
@@ -246,21 +260,23 @@ type webhookManager struct {
 	client client.Client
 }
 
-// ConfigurationFormatter defines formatter of configuration files.
+// CfgFileFormat defines formatter of configuration files.
 // +enum
-type ConfigurationFormatter string
+// +kubebuilder:validation:Enum={xml,ini,yaml,json,dotenv}
+type CfgFileFormat string
 
 const (
-	INI    ConfigurationFormatter = "ini"
-	YAML   ConfigurationFormatter = "yaml"
-	JSON   ConfigurationFormatter = "json"
-	XML    ConfigurationFormatter = "xml"
-	HCL    ConfigurationFormatter = "hcl"
-	DOTENV ConfigurationFormatter = "dotenv"
+	INI    CfgFileFormat = "ini"
+	YAML   CfgFileFormat = "yaml"
+	JSON   CfgFileFormat = "json"
+	XML    CfgFileFormat = "xml"
+	HCL    CfgFileFormat = "hcl"
+	DOTENV CfgFileFormat = "dotenv"
 )
 
 // UpgradePolicy defines the policy of reconfiguring.
 // +enum
+// +kubebuilder:validation:Enum={simple,parallel,rolling,autoReload}
 type UpgradePolicy string
 
 const (
@@ -283,6 +299,7 @@ const (
 
 // SignalType defines which signals are valid.
 // +enum
+// +kubebuilder:validation:Enum={SIGHUP,SIGINT,SIGQUIT,SIGILL,SIGTRAP,SIGABRT,SIGBUS,SIGFPE,SIGKILL,SIGUSR1,SIGSEGV,SIGUSR2,SIGPIPE,SIGALRM,SIGTERM,SIGSTKFLT,SIGCHLD,SIGCONT,SIGSTOP,SIGTSTP,SIGTTIN,SIGTTOU,SIGURG,SIGXCPU,SIGXFSZ,SIGVTALRM,SIGPROF,SIGWINCH,SIGIO,SIGPWR,SIGSYS}
 type SignalType string
 
 const (

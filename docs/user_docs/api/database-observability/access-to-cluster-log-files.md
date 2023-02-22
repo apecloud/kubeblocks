@@ -14,7 +14,7 @@ Add the log-related specification to the API file to enable this function for a 
 
 The `enabledLogs` string is added in `spec.components` to mark whether to enable the log-related function of a cluster.
 
-_Example_
+***Example***
 
 Add the `enabledLogs` key and fill its value with a log type defined by the provider to enable the log function.
 
@@ -54,7 +54,7 @@ spec:
 The `logsConfigs` string is used to search log files. Fill the `name` with the custom log type and `filePathPattern` with the path of the log file. `name` can be defined by providers and is the only identifier. 
 Fill the value of `configTemplateRefs` with the kernel parameters.
 
-_Example_
+***Example***
 
 Here is an example of configuring the error log and slow log.
 
@@ -173,7 +173,7 @@ spec:
 
 When opening a certain log of a certain engine, write the related kernel configuration in `ConfigTemplate` to make sure the log file can be output correctly.
 
-_Example_
+***Example***
 
 Here is an example.
 

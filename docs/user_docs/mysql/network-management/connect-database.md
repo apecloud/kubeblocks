@@ -31,7 +31,7 @@ Use "kbcli options" for a list of global command-line options (applies to all co
 ```
 You can use the `kbcli cluster describe` command to query the Component Floating IP. The example is as follows. In the following example, the external address is the floating IP address. If the component does not expose services to the outside of the cluster, the External field does not display.
 
-*Example*
+***Example***
 TODO This example needs to be rewritten
 
 ```

@@ -736,8 +736,10 @@ func (r *ClusterReconciler) reconcileClusterStatus(ctx context.Context,
 
 	// handle the Cluster.status when cluster is Stopped.
 	handleClusterIsStopped := func(cluster *appsv1alpha1.Cluster) (needPatch bool, postFunc postHandler) {
-		if currentClusterPhase != appsv1alpha1.StoppedPhase &&
-			currentClusterPhase == cluster.Status.Phase {
+		if currentClusterPhase != appsv1alpha1.StoppedPhase {
+			return
+		}
+		if currentClusterPhase == cluster.Status.Phase {
 			return
 		}
 		cluster.Status.Phase = currentClusterPhase
@@ -751,8 +753,10 @@ func (r *ClusterReconciler) reconcileClusterStatus(ctx context.Context,
 
 	// handle the Cluster.status when cluster is Running.
 	handleClusterIsRunning := func(cluster *appsv1alpha1.Cluster) (needPatch bool, postFunc postHandler) {
-		if currentClusterPhase != appsv1alpha1.RunningPhase &&
-			currentClusterPhase == cluster.Status.Phase {
+		if currentClusterPhase != appsv1alpha1.RunningPhase {
+			return
+		}
+		if currentClusterPhase == cluster.Status.Phase {
 			return
 		}
 		cluster.Status.Phase = currentClusterPhase

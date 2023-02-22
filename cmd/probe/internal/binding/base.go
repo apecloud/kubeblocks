@@ -74,7 +74,7 @@ const (
 	RespDurationKey     = "duration"
 	StatusCode          = "status-code"
 	// 451 Unavailable For Legal Reasons, used to indicate operation failed.
-	OperationFailedHTTPCode   = "451"
+	OperationFailedHTTPCode = "451"
 	// 404 Not Found, used to indicate operation not found.
 	OperationNotFoundHTTPCode = "404"
 

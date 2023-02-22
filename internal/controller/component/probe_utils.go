@@ -57,10 +57,11 @@ func buildProbeContainers(reqCtx intctrlutil.RequestCtx, component *SynthesizedC
 		return nil
 	}
 
-	probeSvcHTTPPort := viper.GetInt32("PROBE_SERVICE_PORT")
-	availablePorts, err := getAvailableContainerPorts(component.PodSpec.Containers, []int32{probeSvcHTTPPort, 50001})
+	probeSvcHTTPPort := viper.GetInt32("PROBE_SERVICE_HTTP_PORT")
+	probeSvcGRPCPort := viper.GetInt32("PROBE_SERVICE_GRPC_PORT")
+	availablePorts, err := getAvailableContainerPorts(component.PodSpec.Containers, []int32{probeSvcHTTPPort, probeSvcGRPCPort})
 	probeSvcHTTPPort = availablePorts[0]
-	probeServiceGrpcPort := availablePorts[1]
+	probeSvcGRPCPort = availablePorts[1]
 	if err != nil {
 		reqCtx.Log.Info("get probe container port failed", "error", err)
 		return err
@@ -86,7 +87,7 @@ func buildProbeContainers(reqCtx intctrlutil.RequestCtx, component *SynthesizedC
 
 	if len(probeContainers) >= 1 {
 		container := &probeContainers[0]
-		buildProbeServiceContainer(component, container, int(probeSvcHTTPPort), int(probeServiceGrpcPort))
+		buildProbeServiceContainer(component, container, int(probeSvcHTTPPort), int(probeSvcGRPCPort))
 	}
 
 	reqCtx.Log.Info("probe", "containers", probeContainers)
@@ -119,7 +120,7 @@ func buildProbeServiceContainer(component *SynthesizedComponent, container *core
 	logLevel := viper.GetString("PROBE_SERVICE_LOG_LEVEL")
 	container.Command = []string{"probe", "--app-id", "batch-sdk",
 		"--dapr-http-port", strconv.Itoa(probeSvcHTTPPort),
-		"--dapr-grpc-port", strconv.Itoa(probeServiceGrpcPort),
+		"--dapr-grpc-port", strconv.Itoa(probeSvcGRPCPort),
 		"--app-protocol", "http",
 		"--log-level", logLevel,
 		"--config", "/config/probe/config.yaml",

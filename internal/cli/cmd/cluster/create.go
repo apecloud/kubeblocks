@@ -90,6 +90,9 @@ var clusterCreateExample = templates.Examples(`
 
 	# Create a Cluster with two tolerations 
 	kbcli cluster create --cluster-definition apecloud-mysql --tolerations '"key=engineType,value=mongo,operator=Equal,effect=NoSchedule","key=diskType,value=ssd,operator=Equal,effect=NoSchedule"'
+
+    # Create a cluster, with each pod runs on their own dedicated node
+    kbcli cluster create --tenancy=DedicatedNode
 `)
 
 const (
@@ -122,15 +125,19 @@ var setKeyEnvMap = map[setKey]envSet{
 
 // UpdatableFlags is the flags that cat be updated by update command
 type UpdatableFlags struct {
+	// Options for cluster termination policy
 	TerminationPolicy string `json:"terminationPolicy"`
-	PodAntiAffinity   string `json:"podAntiAffinity"`
-	Monitor           bool   `json:"monitor"`
-	EnableAllLogs     bool   `json:"enableAllLogs"`
 
-	// TopologyKeys if TopologyKeys is nil, add omitempty json tag.
-	// because CueLang can not covert null to list.
+	// Add-on switches for cluster observability
+	Monitor       bool `json:"monitor"`
+	EnableAllLogs bool `json:"enableAllLogs"`
+
+	// Configuration and options for cluster affinity and tolerations
+	PodAntiAffinity string `json:"podAntiAffinity"`
+	// TopologyKeys if TopologyKeys is nil, add omitempty json tag, because CueLang can not covert null to list.
 	TopologyKeys   []string          `json:"topologyKeys,omitempty"`
 	NodeLabels     map[string]string `json:"nodeLabels,omitempty"`
+	Tenancy        string            `json:"tenancy,omitempty"`
 	TolerationsRaw []string          `json:"-"`
 }
 
@@ -564,13 +571,14 @@ func generateClusterName(dynamic dynamic.Interface, namespace string) (string, e
 }
 
 func (f *UpdatableFlags) addFlags(cmd *cobra.Command) {
-	cmd.Flags().StringVar(&f.PodAntiAffinity, "pod-anti-affinity", "Preferred", "Pod anti-affinity type")
+	cmd.Flags().StringVar(&f.PodAntiAffinity, "pod-anti-affinity", "Preferred", "Pod anti-affinity type, one of: (Preferred, Required)")
 	cmd.Flags().BoolVar(&f.Monitor, "monitor", true, "Set monitor enabled and inject metrics exporter")
 	cmd.Flags().BoolVar(&f.EnableAllLogs, "enable-all-logs", true, "Enable advanced application all log extraction, and true will ignore enabledLogs of component level")
 	cmd.Flags().StringVar(&f.TerminationPolicy, "termination-policy", "Delete", "Termination policy, one of: (DoNotTerminate, Halt, Delete, WipeOut)")
 	cmd.Flags().StringArrayVar(&f.TopologyKeys, "topology-keys", nil, "Topology keys for affinity")
 	cmd.Flags().StringToStringVar(&f.NodeLabels, "node-labels", nil, "Node label selector")
 	cmd.Flags().StringSliceVar(&f.TolerationsRaw, "tolerations", nil, `Tolerations for cluster, such as '"key=engineType,value=mongo,operator=Equal,effect=NoSchedule"'`)
+	cmd.Flags().StringVar(&f.Tenancy, "tenancy", "SharedNode", "Tenancy options, one of: (SharedNode, DedicatedNode)")
 
 	util.CheckErr(cmd.RegisterFlagCompletionFunc(
 		"termination-policy",

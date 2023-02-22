@@ -145,12 +145,14 @@ var _ = Describe("Cluster Controller", func() {
 				intctrlutil.AppInstanceLabelKey: clusterKey.Name,
 			}, client.InNamespace(clusterKey.Namespace))).Should(Equal(0))
 
-		By("Check created sts pods template without tolerations")
-		Expect(len(stsList.Items[0].Spec.Template.Spec.Tolerations) == 0).Should(BeTrue())
-
-		By("Checking the Affinity and the TopologySpreadConstraints")
 		podSpec := stsList.Items[0].Spec.Template.Spec
+		By("Checking created sts pods template without tolerations")
+		Expect(len(podSpec.Tolerations) == 0).Should(BeTrue())
+
+		By("Checking created sts pods template without Affinity")
 		Expect(podSpec.Affinity).Should(BeNil())
+
+		By("Checking created sts pods template without TopologySpreadConstraints")
 		Expect(len(podSpec.TopologySpreadConstraints) == 0).Should(BeTrue())
 
 		By("Check should create env configmap")
@@ -566,6 +568,7 @@ var _ = Describe("Cluster Controller", func() {
 			NodeLabels: map[string]string{
 				lableKey: labelValue,
 			},
+			Tenancy: appsv1alpha1.SharedNode,
 		}
 
 		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
@@ -584,6 +587,7 @@ var _ = Describe("Cluster Controller", func() {
 		Expect(podSpec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions[0].Key).To(Equal(lableKey))
 		Expect(podSpec.TopologySpreadConstraints[0].WhenUnsatisfiable).To(Equal(corev1.DoNotSchedule))
 		Expect(podSpec.TopologySpreadConstraints[0].TopologyKey).To(Equal(topologyKey))
+		Expect(len(podSpec.Affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution)).To(Equal(1))
 		Expect(podSpec.Affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution[0].TopologyKey).To(Equal(topologyKey))
 	}
 
@@ -595,10 +599,12 @@ var _ = Describe("Cluster Controller", func() {
 		affinity := &appsv1alpha1.Affinity{
 			PodAntiAffinity: appsv1alpha1.Required,
 			TopologyKeys:    []string{clusterTopologyKey},
+			Tenancy:         appsv1alpha1.SharedNode,
 		}
 		compAffinity := &appsv1alpha1.Affinity{
 			PodAntiAffinity: appsv1alpha1.Preferred,
 			TopologyKeys:    []string{compTopologyKey},
+			Tenancy:         appsv1alpha1.DedicatedNode,
 		}
 		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
 			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().SetClusterAffinity(affinity).
@@ -615,6 +621,8 @@ var _ = Describe("Cluster Controller", func() {
 		Expect(podSpec.TopologySpreadConstraints[0].WhenUnsatisfiable).To(Equal(corev1.ScheduleAnyway))
 		Expect(podSpec.TopologySpreadConstraints[0].TopologyKey).To(Equal(compTopologyKey))
 		Expect(podSpec.Affinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution[0].Weight).ShouldNot(BeNil())
+		Expect(len(podSpec.Affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution)).To(Equal(1))
+		Expect(podSpec.Affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution[0].TopologyKey).To(Equal(corev1.LabelHostname))
 	}
 
 	testClusterToleration := func() {

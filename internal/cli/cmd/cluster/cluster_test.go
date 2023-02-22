@@ -96,6 +96,7 @@ var _ = Describe("Cluster", func() {
 					TopologyKeys:    []string{"kubernetes.io/hostname"},
 					NodeLabels:      map[string]string{"testLabelKey": "testLabelValue"},
 					TolerationsRaw:  []string{"key=engineType,value=mongo,operator=Equal,effect=NoSchedule"},
+					Tenancy:         "SharedNode",
 				},
 			}
 

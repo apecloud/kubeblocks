@@ -914,6 +914,13 @@ func doBackup(reqCtx intctrlutil.RequestCtx,
 					break
 				}
 			}
+			// sync vct.spec.resources from component
+			for _, tmpVct := range component.VolumeClaimTemplates {
+				if vct.Name == tmpVct.Name {
+					vct.Spec.Resources = tmpVct.Spec.Resources
+					break
+				}
+			}
 			pvcKey := types.NamespacedName{
 				Namespace: stsObj.Namespace,
 				Name: fmt.Sprintf("%s-%s-%d",

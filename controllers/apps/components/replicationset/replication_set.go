@@ -202,7 +202,7 @@ func (rs *ReplicationSet) HandleUpdate(obj client.Object) error {
 		if len(pods) != int(*sts.Spec.Replicas) {
 			continue
 		}
-		if err := util.RestartSts(rs.Ctx, rs.Cli, &sts); err != nil {
+		if err := util.DeleteStsPods(rs.Ctx, rs.Cli, &sts); err != nil {
 			return err
 		}
 	}

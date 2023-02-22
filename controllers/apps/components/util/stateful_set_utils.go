@@ -77,8 +77,8 @@ func IsStsAndPodsRevisionConsistent(ctx context.Context, cli client.Client, sts 
 	return revisionConsistent, nil
 }
 
-// RestartSts restarts pods of the StatefulSet manually
-func RestartSts(ctx context.Context, cli client.Client, sts *appsv1.StatefulSet) error {
+// DeleteStsPods deletes pods of the StatefulSet manually
+func DeleteStsPods(ctx context.Context, cli client.Client, sts *appsv1.StatefulSet) error {
 	if sts.Spec.UpdateStrategy.Type == appsv1.RollingUpdateStatefulSetStrategyType {
 		return nil
 	}

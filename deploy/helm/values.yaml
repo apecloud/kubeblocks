@@ -6,7 +6,8 @@
 replicaCount: 1
 
 image:
-  repository: docker.io/apecloud/kubeblocks
+  registry: registry.cn-hangzhou.aliyuncs.com
+  repository: apecloud/kubeblocks
   pullPolicy: IfNotPresent
   # Overrides the image tag whose default is the chart appVersion.
   tag: ""
@@ -176,7 +177,7 @@ prometheus:
     ## alertmanager container image
     ##
     image:
-      repository: docker.io/apecloud/alertmanager
+      repository: registry.cn-hangzhou.aliyuncs.com/apecloud/alertmanager
       tag: v0.24.0
 
     ## Node tolerations for alertmanager scheduling to nodes with taints
@@ -259,8 +260,22 @@ prometheus:
     ## node-exporter container image
     ##
     image:
-      repository: docker.io/apecloud/node-exporter
+      repository: registry.cn-hangzhou.aliyuncs.com/apecloud/node-exporter
       tag: v1.3.1
+
+  configmapReload:
+    prometheus:
+      ## configmap-reload container image
+      ##
+      image:
+        repository: registry.cn-hangzhou.aliyuncs.com/apecloud/configmap-reload
+        tag: v0.5.0
+    alertmanager:
+      ## configmap-reload container image
+      ##
+      image:
+        repository: registry.cn-hangzhou.aliyuncs.com/apecloud/configmap-reload
+        tag: v0.5.0
 
   server:
     ## Prometheus server container name
@@ -270,7 +285,7 @@ prometheus:
     ## Prometheus server container image
     ##
     image:
-      repository: docker.io/apecloud/prometheus
+      repository: registry.cn-hangzhou.aliyuncs.com/apecloud/prometheus
       tag: v2.39.1
 
     global:
@@ -936,6 +951,11 @@ grafana:
 
   replicas: 1
 
+  image:
+    repository: registry.cn-hangzhou.aliyuncs.com/apecloud/grafana
+    # Overrides the Grafana image tag whose default is the chart appVersion
+    tag: 9.2.4
+
   ## Grafana server resource requests and limits
   ## Ref: http://kubernetes.io/docs/user-guide/compute-resources/
   ##
@@ -966,7 +986,7 @@ grafana:
 
   sidecar:
     image:
-      repository: docker.io/apecloud/k8s-sidecar
+      repository: registry.cn-hangzhou.aliyuncs.com/apecloud/k8s-sidecar
       tag: 1.19.2
 
     dashboards:
@@ -1022,7 +1042,8 @@ snapshot-controller:
   ## @param snapshot-controller.image.repository -- Repository to pull the image from.
   ##
   image:
-    repository: registry.aliyuncs.com/google_containers/snapshot-controller
+    repository: registry.cn-hangzhou.aliyuncs.com/apecloud/snapshot-controller
+    tag: v6.2.1
 
 ## csi-s3 settings
 ## ref: https://artifacthub.io/packages/helm/cloudve/csi-s3#configuration

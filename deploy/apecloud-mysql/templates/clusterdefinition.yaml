@@ -150,7 +150,7 @@ spec:
                 port: http-metrics
       systemAccounts:
         cmdExecutorConfig:
-          image: docker.io/mysql:8.0.30
+          image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ .Values.image.tag }}
           command: ["mysql"]
           args:
           - -h$(KB_ACCOUNT_ENDPOINT) 

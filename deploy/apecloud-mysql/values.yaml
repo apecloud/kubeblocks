@@ -3,11 +3,11 @@
 # Declare variables to be passed into your templates.
 
 image:
-  registry: 
-  repository: docker.io/apecloud/apecloud-mysql-server
+  registry: registry.cn-hangzhou.aliyuncs.com
+  repository: apecloud/apecloud-mysql-server
   pullPolicy: IfNotPresent
   # Overrides the image tag whose default is the chart appVersion.
-  tag: 8.0.30-5.alpha2.20230105.gd6b8719.1
+  tag: 8.0.30-5.alpha2.20230105.gd6b8719.2
 
 ## MySQL Cluster parameters
 cluster:

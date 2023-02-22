@@ -36,6 +36,7 @@ DEV_CONTAINER_IMAGE_NAME = docker.io/apecloud/$(APP_NAME)-dev
 
 DEV_CONTAINER_DOCKERFILE = Dockerfile-dev
 DOCKERFILE_DIR = ./docker
+BUILDX_ARGS ?=
 
 .PHONY: build-dev-image
 build-dev-image: DOCKER_BUILD_ARGS += --build-arg DEBIAN_MIRROR=$(DEBIAN_MIRROR) --build-arg GITHUB_PROXY=$(GITHUB_PROXY) --build-arg GOPROXY=$(GOPROXY)
@@ -43,7 +44,7 @@ build-dev-image: ## Build dev container image.
 ifneq ($(BUILDX_ENABLED), true)
 	docker build $(DOCKERFILE_DIR)/. $(DOCKER_BUILD_ARGS) -f $(DOCKERFILE_DIR)/${DEV_CONTAINER_DOCKERFILE} -t $(DEV_CONTAINER_IMAGE_NAME):$(DEV_CONTAINER_VERSION_TAG)
 else
-	docker buildx build $(DOCKERFILE_DIR)/.  $(DOCKER_BUILD_ARGS) --platform $(BUILDX_PLATFORMS) -f $(DOCKERFILE_DIR)/$(DEV_CONTAINER_DOCKERFILE) -t $(DEV_CONTAINER_IMAGE_NAME):$(DEV_CONTAINER_VERSION_TAG)
+	docker buildx build $(DOCKERFILE_DIR)/.  $(DOCKER_BUILD_ARGS) --platform $(BUILDX_PLATFORMS) -f $(DOCKERFILE_DIR)/$(DEV_CONTAINER_DOCKERFILE) -t $(DEV_CONTAINER_IMAGE_NAME):$(DEV_CONTAINER_VERSION_TAG) $(BUILDX_ARGS)
 endif
 
 
@@ -53,7 +54,7 @@ push-dev-image: ## Push dev container image.
 ifneq ($(BUILDX_ENABLED), true)
 	docker push $(DEV_CONTAINER_IMAGE_NAME):$(DEV_CONTAINER_VERSION_TAG)
 else
-	docker buildx build . $(DOCKER_BUILD_ARGS) --platform $(BUILDX_PLATFORMS) -f $(DOCKERFILE_DIR)/$(DEV_CONTAINER_DOCKERFILE) -t $(DEV_CONTAINER_IMAGE_NAME):$(DEV_CONTAINER_VERSION_TAG) --push
+	docker buildx build . $(DOCKER_BUILD_ARGS) --platform $(BUILDX_PLATFORMS) -f $(DOCKERFILE_DIR)/$(DEV_CONTAINER_DOCKERFILE) -t $(DEV_CONTAINER_IMAGE_NAME):$(DEV_CONTAINER_VERSION_TAG) --push $(BUILDX_ARGS)
 endif
 
 
@@ -67,20 +68,20 @@ push-cli-image: clean-kbcli build-checks bin/kbcli.linux.amd64 bin/kbcli.linux.a
 
 
 .PHONY: build-manager-image
-build-manager-image: test ## Build Operator manager container image.
+build-manager-image: ## Build Operator manager container image.
 ifneq ($(BUILDX_ENABLED), true)
 	docker build . -t ${IMG}:${VERSION} -f $(DOCKERFILE_DIR)/Dockerfile -t ${IMG}:latest
 else
 ifeq ($(TAG_LATEST), true)
-	docker buildx build . -f $(DOCKERFILE_DIR)/Dockerfile $(DOCKER_BUILD_ARGS) --platform $(BUILDX_PLATFORMS) -t ${IMG}:latest
+	docker buildx build . -f $(DOCKERFILE_DIR)/Dockerfile $(DOCKER_BUILD_ARGS) --platform $(BUILDX_PLATFORMS) -t ${IMG}:latest $(BUILDX_ARGS)
 else
-	docker buildx build . -f $(DOCKERFILE_DIR)/Dockerfile $(DOCKER_BUILD_ARGS) --platform $(BUILDX_PLATFORMS) -t ${IMG}:${VERSION}
+	docker buildx build . -f $(DOCKERFILE_DIR)/Dockerfile $(DOCKER_BUILD_ARGS) --platform $(BUILDX_PLATFORMS) -t ${IMG}:${VERSION} $(BUILDX_ARGS)
 endif
 endif
 
 
 .PHONY: push-manager-image
-push-manager-image: ## Push Operator manager container image.
+push-manager-image: test ## Push Operator manager container image.
 ifneq ($(BUILDX_ENABLED), true)
 ifeq ($(TAG_LATEST), true)
 	docker push ${IMG}:latest
@@ -89,9 +90,9 @@ else
 endif
 else
 ifeq ($(TAG_LATEST), true)
-	docker buildx build . -f $(DOCKERFILE_DIR)/Dockerfile $(DOCKER_BUILD_ARGS) --platform $(BUILDX_PLATFORMS) -t ${IMG}:latest --push
+	docker buildx build . -f $(DOCKERFILE_DIR)/Dockerfile $(DOCKER_BUILD_ARGS) --platform $(BUILDX_PLATFORMS) -t ${IMG}:latest --push $(BUILDX_ARGS)
 else
-	docker buildx build . -f $(DOCKERFILE_DIR)/Dockerfile $(DOCKER_BUILD_ARGS) --platform $(BUILDX_PLATFORMS) -t ${IMG}:${VERSION} --push
+	docker buildx build . -f $(DOCKERFILE_DIR)/Dockerfile $(DOCKER_BUILD_ARGS) --platform $(BUILDX_PLATFORMS) -t ${IMG}:${VERSION} --push $(BUILDX_ARGS)
 endif
 endif
 
@@ -101,9 +102,9 @@ ifneq ($(BUILDX_ENABLED), true)
 	docker build . -t ${LB_IMG}:${LB_TAG} -t ${LB_IMG}:latest -f $(DOCKERFILE_DIR)/Dockerfile-loadbalancer
 else
 ifeq ($(TAG_LATEST), true)
-	docker buildx build . $(DOCKER_BUILD_ARGS) --platform $(BUILDX_PLATFORMS) -t ${LB_IMG}:latest -f $(DOCKERFILE_DIR)/Dockerfile-loadbalancer
+	docker buildx build . $(DOCKER_BUILD_ARGS) --platform $(BUILDX_PLATFORMS) -t ${LB_IMG}:latest -f $(DOCKERFILE_DIR)/Dockerfile-loadbalancer $(BUILDX_ARGS)
 else
-	docker buildx build . $(DOCKER_BUILD_ARGS) --platform $(BUILDX_PLATFORMS) -t ${LB_IMG}:${LB_TAG} -f $(DOCKERFILE_DIR)/Dockerfile-loadbalancer
+	docker buildx build . $(DOCKER_BUILD_ARGS) --platform $(BUILDX_PLATFORMS) -t ${LB_IMG}:${LB_TAG} -f $(DOCKERFILE_DIR)/Dockerfile-loadbalancer $(BUILDX_ARGS)
 endif
 endif
 
@@ -117,9 +118,9 @@ else
 endif
 else
 ifeq ($(TAG_LATEST), true)
-	docker buildx build . $(DOCKER_BUILD_ARGS) --platform $(BUILDX_PLATFORMS) -t ${LB_IMG}:latest -f $(DOCKERFILE_DIR)/Dockerfile-loadbalancer --push
+	docker buildx build . $(DOCKER_BUILD_ARGS) --platform $(BUILDX_PLATFORMS) -t ${LB_IMG}:latest -f $(DOCKERFILE_DIR)/Dockerfile-loadbalancer --push $(BUILDX_ARGS)
 else
-	docker buildx build . $(DOCKER_BUILD_ARGS) --platform $(BUILDX_PLATFORMS) -t ${LB_IMG}:${LB_TAG} -f $(DOCKERFILE_DIR)/Dockerfile-loadbalancer --push
+	docker buildx build . $(DOCKER_BUILD_ARGS) --platform $(BUILDX_PLATFORMS) -t ${LB_IMG}:${LB_TAG} -f $(DOCKERFILE_DIR)/Dockerfile-loadbalancer --push $(BUILDX_ARGS)
 endif
 endif
 

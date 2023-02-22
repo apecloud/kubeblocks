@@ -708,7 +708,7 @@ func (r *ClusterReconciler) reconcileClusterStatus(ctx context.Context,
 		if runningCompCount == componentCount {
 			clusterIsRunning = true
 		} else if componentCount == runningCompCount+stoppedCompCount {
-			// if cluster is not running and all components are Stopped or Running
+			// cluster is Stopped when cluster is not Running and all components are Stopped or Running
 			clusterIsStopped = true
 		}
 		return false, nil

@@ -100,3 +100,9 @@ const (
 	// BackupDelete (default) deletes backup immediately when cluster's terminationPolicy is WipeOut
 	BackupDelete = "Delete"
 )
+
+const (
+	// Container port name
+	ProbeHTTPPortName = "probe-http-port"
+	ProbeGRPCPortName = "probe-grpc-port"
+)

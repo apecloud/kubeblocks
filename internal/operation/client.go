@@ -18,18 +18,13 @@ package operation
 
 import (
 	"context"
-	"fmt"
-	"net"
-	"time"
 	"encoding/json"
+	"fmt"
+	"time"
 
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	dapr "github.com/dapr/go-sdk/client"
-	"github.com/spf13/viper"
 	corev1 "k8s.io/api/core/v1"
-)
-
-var (
-	probeSvcGRPCPort = viper.GetString("PROBE_SERVICE_GRPC_PORT")
 )
 
 type OperationClient struct {
@@ -52,14 +47,18 @@ func NewClientWithPod(pod *corev1.Pod, characterType string) (*OperationClient, 
 	if ip == "" {
 		return nil, fmt.Errorf("pod %v has no ip", pod)
 	}
+	port, err := intctrlutil.GetProbeGRPCPort(pod)
+	if err != nil {
+		return nil, err
+	}
 
-	client, err := dapr.NewClientWithAddress(net.JoinHostPort(ip, probeSvcGRPCPort))
+	client, err := dapr.NewClientWithAddress(fmt.Sprintf("%s:%d", ip, port))
 	if err != nil {
 		return nil, err
 	}
 
 	operationClient := &OperationClient{
-		Client: client,
+		Client:        client,
 		CharacterType: characterType,
 	}
 	return operationClient, nil

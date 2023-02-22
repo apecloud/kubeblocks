@@ -155,9 +155,14 @@ func buildProbeServiceContainer(component *SynthesizedComponent, container *core
 
 	container.Ports = []corev1.ContainerPort{{
 		ContainerPort: int32(probeSvcHTTPPort),
-		Name:          "probe-port",
+		Name:          intctrlutil.ProbeHTTPPortName,
 		Protocol:      "TCP",
-	}}
+	},
+		{
+			ContainerPort: int32(probeSvcGRPCPort),
+			Name:          intctrlutil.ProbeGRPCPortName,
+			Protocol:      "TCP",
+		}}
 }
 
 func getComponentRoles(component *SynthesizedComponent) map[string]string {

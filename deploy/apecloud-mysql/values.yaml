@@ -68,7 +68,7 @@ roleChangedProbe:
 
 metrics:
   image:
-    registry: docker.io
+    registry: registry.cn-hangzhou.aliyuncs.com
     repository: apecloud/mysqld-exporter
     tag: 0.14.1
     pullPolicy: IfNotPresent

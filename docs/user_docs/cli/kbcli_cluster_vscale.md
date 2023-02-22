@@ -10,20 +10,17 @@ kbcli cluster vscale [flags]
 
 ```
   # scale the computing resources of specified components, separate with commas when <component-name> more than one
-  kbcli cluster vscale <my-cluster> --component-names=<component-name> --requests.cpu=500m \
-  --requests.memory=500Mi --limits.cpu=500m --limits.memory=500Mi
+  kbcli cluster vscale <my-cluster> --component-names=<component-name> --cpu=500m --memory=500Mi
 ```
 
 ### Options
 
 ```
       --component-names strings       Component names to this operations
+      --cpu string                   Requested and limited size of component cpu
   -h, --help                         help for vscale
-      --limits.cpu string            CPU size limited by the component
-      --limits.memory string         Memory size limited by the component
+      --memory string                Requested and limited size of component memory
       --ops-request string           OpsRequest name. if not specified, it will be randomly generated 
-      --requests.cpu string          CPU size requested by the component
-      --requests.memory string       Memory size requested by the component
       --ttlSecondsAfterSucceed int   Time to live after the OpsRequest succeed
 ```
 

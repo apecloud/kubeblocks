@@ -83,7 +83,7 @@ type ClusterStatus struct {
 	// VersionUpgrading: upgrade operation is running.
 	// Rebooting: restart operation is running.
 	// Stopping: stop operation is running.
-	// Stopped: the replicas of some or all components are 0.
+	// Stopped: all components are stopped, or some components are stopped and other components are running.
 	// Starting: start operation is running.
 	// Reconfiguring: reconfiguration operation is running.
 	// Deleting/Deleted: deleting Cluster/Cluster is deleted.
@@ -203,6 +203,7 @@ type ClusterComponentStatus struct {
 	// Failed: component is unavailable, i.e, all pods are not ready for Stateless/Stateful component;
 	// Leader/Primary pod is not ready for Consensus/Replication component.
 	// Abnormal: component available but part of its pods are not ready.
+	// Stopped: replicas number of component is 0.
 	// If the component workload type is Consensus/Replication, the Leader/Primary pod must be ready in Abnormal phase.
 	// Other phases behave the same as the cluster phase.
 	// +kubebuilder:validation:Enum={Running,Failed,Abnormal,Creating,SpecUpdating,Deleting,Deleted,VolumeExpanding,Reconfiguring,HorizontalScaling,VerticalScaling,VersionUpgrading,Rebooting,Stopped,Stopping,Starting}

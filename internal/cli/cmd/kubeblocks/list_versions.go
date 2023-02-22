@@ -40,7 +40,7 @@ var (
 	# list KubeBlocks release version
 	kbcli kubeblocks list-versions
 	
-	# list KubeBlocks versions that including development versions, such as alpha, beta and release candidate
+	# list KubeBlocks versions including development versions, such as alpha, beta and release candidate
 	kbcli kubeblocks list-versions --devel`)
 )
 
@@ -56,7 +56,7 @@ func newListVersionsCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) 
 	o := listVersionsOption{IOStreams: streams}
 	cmd := &cobra.Command{
 		Use:     "list-versions",
-		Short:   "List all KubeBlocks versions",
+		Short:   "List KubeBlocks versions",
 		Aliases: []string{"ls-versions"},
 		Args:    cobra.NoArgs,
 		Example: listVersionsExample,

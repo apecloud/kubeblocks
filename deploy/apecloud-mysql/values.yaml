@@ -65,3 +65,9 @@ roleChangedProbe:
   failureThreshold: 2
   periodSeconds: 1
   timeoutSeconds: 1
+
+metrics:
+  image:
+    repository: docker.io/apecloud/kubeblocks
+    tag: latest
+    pullPolicy: Always

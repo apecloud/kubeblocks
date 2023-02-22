@@ -17,7 +17,10 @@ spec:
           periodSeconds: {{ .Values.roleChangedProbe.periodSeconds }}
           timeoutSeconds: {{ .Values.roleChangedProbe.timeoutSeconds }}
       monitor:
-        builtIn: true
+        builtIn: false
+        exporterConfig:
+          scrapePath: /metrics
+          scrapePort: 9104
       logConfigs:
         {{- range $name,$pattern := .Values.logConfigs }}
         - name: {{ $name }}
@@ -102,6 +105,49 @@ spec:
               - name: MYSQL_DYNAMIC_CONFIG
                 value: {{ if .Values.cluster.dynamicConfig }}{{ .Values.cluster.dynamicConfig }}{{ end }}
             command: ["/scripts/setup.sh"]
+          - name: metrics
+            image:  {{ .Values.metrics.image.repository }}:{{ .Values.metrics.image.tag }}
+            imagePullPolicy: {{ .Values.metrics.image.pullPolicy | quote }}
+            securityContext:
+              runAsNonRoot: true
+              runAsUser: 1001
+            env:
+              - name: MYSQL_USER
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: username
+              - name: MYSQL_PASSWORD
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: password
+              - name: DATA_SOURCE_NAME
+                value: "$(MYSQL_USER):$(MYSQL_PASSWORD)@(localhost:3306)/"
+            command:
+              - "/bin/agamotto"
+              - "--collect.info_schema.wesql_consensus"
+            ports:
+              - name: http-metrics
+                containerPort: 9104
+            livenessProbe:
+              failureThreshold: 6
+              initialDelaySeconds: 5
+              periodSeconds: 10
+              successThreshold: 1
+              timeoutSeconds: 5
+              httpGet:
+                path: /
+                port: http-metrics
+            readinessProbe:
+              failureThreshold: 6
+              initialDelaySeconds: 5
+              periodSeconds: 10
+              successThreshold: 1
+              timeoutSeconds: 5
+              httpGet:
+                path: /
+                port: http-metrics
       systemAccounts:
         cmdExecutorConfig:
           image: docker.io/mysql:8.0.30

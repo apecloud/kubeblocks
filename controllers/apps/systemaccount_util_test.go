@@ -294,3 +294,50 @@ func TestAccountDebugMode(t *testing.T) {
 		}
 	}
 }
+
+func TestRenderCreationStmt(t *testing.T) {
+	var (
+		clusterDefName = "test-clusterdef"
+		clusterName    = "test-cluster"
+		mysqlCompType  = "replicasets"
+		mysqlCompName  = "mysql"
+	)
+
+	systemAccount := mockSystemAccountsSpec()
+	clusterDef := testapps.NewClusterDefFactory(clusterDefName).
+		AddComponent(testapps.StatefulMySQLComponent, mysqlCompType).
+		AddSystemAccountSpec(systemAccount).
+		GetObject()
+	assert.NotNil(t, clusterDef)
+
+	compDef := clusterDef.GetComponentDefByName(mysqlCompType)
+	assert.NotNil(t, compDef.SystemAccounts)
+
+	accountsSetting := compDef.SystemAccounts
+	replaceEnvsValues(clusterName, accountsSetting)
+
+	compKey := componentUniqueKey{
+		namespace:     testCtx.DefaultNamespace,
+		clusterName:   clusterName,
+		componentName: mysqlCompName,
+	}
+
+	for _, account := range accountsSetting.Accounts {
+		// for each accounts, we randomly remove deletion stmt
+		if account.ProvisionPolicy.Type == appsv1alpha1.CreateByStmt {
+			toss := rand.Intn(10) % 2
+			if toss == 1 {
+				// mock optional deletion statement
+				account.ProvisionPolicy.Statements.DeletionStatement = ""
+			}
+
+			stmts, secret := getCreationStmtForAccount(compKey, compDef.SystemAccounts.PasswordConfig, account)
+			if toss == 1 {
+				assert.Equal(t, 1, len(stmts))
+			} else {
+				assert.Equal(t, 2, len(stmts))
+			}
+			assert.NotNil(t, secret)
+		}
+	}
+}

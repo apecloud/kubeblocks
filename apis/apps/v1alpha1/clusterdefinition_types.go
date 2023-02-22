@@ -149,7 +149,7 @@ type ProvisionStatements struct {
 	CreationStatement string `json:"creation"`
 	// deletion specifies statement how to delete this account.
 	// +optional
-	DeletionStatement string `json:"deletion"`
+	DeletionStatement string `json:"deletion,omitempty"`
 }
 
 // ClusterDefinitionStatus defines the observed state of ClusterDefinition

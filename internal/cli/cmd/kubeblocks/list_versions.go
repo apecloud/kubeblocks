@@ -17,24 +17,31 @@ limitations under the License.
 package kubeblocks
 
 import (
-	"os"
-	"path/filepath"
+	"fmt"
 	"sort"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"helm.sh/helm/v3/pkg/action"
-	"helm.sh/helm/v3/pkg/cli"
-	"helm.sh/helm/v3/pkg/helmpath"
 	"helm.sh/helm/v3/pkg/repo"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
+	"k8s.io/kubectl/pkg/util/templates"
 
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 	"github.com/apecloud/kubeblocks/internal/cli/util/helm"
+)
+
+var (
+	listVersionsExample = templates.Examples(`
+	# list KubeBlocks release version
+	kbcli kubeblocks list-versions
+	
+	# list KubeBlocks versions that including development versions, such as alpha, beta and release candidate
+	kbcli kubeblocks list-versions --devel`)
 )
 
 type listVersionsOption struct {
@@ -52,7 +59,7 @@ func newListVersionsCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) 
 		Short:   "List all KubeBlocks versions",
 		Aliases: []string{"ls-versions"},
 		Args:    cobra.NoArgs,
-		Example: installExample,
+		Example: listVersionsExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			util.CheckErr(o.complete(f, cmd))
 			util.CheckErr(o.listVersions())
@@ -86,44 +93,19 @@ func (o *listVersionsOption) complete(f cmdutil.Factory, cmd *cobra.Command) err
 }
 
 func (o *listVersionsOption) listVersions() error {
+	// add repo, if exists, will update it
+	if err := helm.AddRepo(&repo.Entry{Name: types.KubeBlocksChartName, URL: util.GetHelmChartRepoURL()}); err != nil {
+		return err
+	}
+
+	// get chart versions
+	versions, err := helm.GetChartVersions(types.KubeBlocksChartName)
+	if err != nil {
+		return err
+	}
+
+	// sort version descending
 	o.setupSearchedVersion()
-
-	settings := cli.New()
-	rf, err := repo.LoadFile(settings.RepositoryConfig)
-	if os.IsNotExist(errors.Cause(err)) || len(rf.Repositories) == 0 {
-		return errors.New("no helm repositories configured")
-	}
-
-	var ind *repo.IndexFile
-	for _, re := range rf.Repositories {
-		n := re.Name
-		if n != types.KubeBlocksChartName {
-			continue
-		}
-
-		// load index file
-		f := filepath.Join(settings.RepositoryCache, helmpath.CacheIndexFile(n))
-		ind, err = repo.LoadIndexFile(f)
-		if err != nil {
-			return err
-		}
-		break
-	}
-
-	var versions []*semver.Version
-	for _, ref := range ind.Entries {
-		if len(ref) == 0 {
-			continue
-		}
-		for _, rr := range ref {
-			ver, err := semver.NewVersion(rr.Version)
-			if err != nil {
-				return err
-			}
-			versions = append(versions, ver)
-		}
-	}
-
 	sort.Sort(sort.Reverse(semver.Collection(versions)))
 	versions, err = o.applyConstraint(versions)
 	if err != nil {
@@ -132,9 +114,9 @@ func (o *listVersionsOption) listVersions() error {
 
 	// print result
 	tbl := printer.NewTablePrinter(o.Out)
-	tbl.SetHeader("VERSION")
+	tbl.SetHeader("VERSION", "RELEASE-NOTE")
 	for _, v := range versions {
-		tbl.AddRow(v.String())
+		tbl.AddRow(v.String(), fmt.Sprintf("https://github.com/apecloud/kubeblocks/releases/tag/v%s", v))
 	}
 	tbl.Print()
 	return nil

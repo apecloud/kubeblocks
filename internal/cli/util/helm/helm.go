@@ -23,10 +23,12 @@ import (
 	"io"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
 
+	"github.com/Masterminds/semver/v3"
 	"github.com/containers/common/pkg/retry"
 	"github.com/ghodss/yaml"
 	"github.com/pkg/errors"
@@ -37,6 +39,7 @@ import (
 	"helm.sh/helm/v3/pkg/cli"
 	"helm.sh/helm/v3/pkg/cli/values"
 	"helm.sh/helm/v3/pkg/getter"
+	"helm.sh/helm/v3/pkg/helmpath"
 	kubefake "helm.sh/helm/v3/pkg/kube/fake"
 	"helm.sh/helm/v3/pkg/registry"
 	"helm.sh/helm/v3/pkg/release"
@@ -426,6 +429,45 @@ func (i *InstallOpts) tryUpgrade(cfg *action.Configuration) (string, error) {
 		return "", err
 	}
 	return released.Info.Notes, nil
+}
+
+func GetChartVersions(chartName string) ([]*semver.Version, error) {
+	settings := cli.New()
+	rf, err := repo.LoadFile(settings.RepositoryConfig)
+	if os.IsNotExist(errors.Cause(err)) || len(rf.Repositories) == 0 {
+		return nil, errors.New("no helm repositories configured")
+	}
+
+	var ind *repo.IndexFile
+	for _, re := range rf.Repositories {
+		n := re.Name
+		if n != types.KubeBlocksChartName {
+			continue
+		}
+
+		// load index file
+		f := filepath.Join(settings.RepositoryCache, helmpath.CacheIndexFile(n))
+		ind, err = repo.LoadIndexFile(f)
+		if err != nil {
+			return nil, err
+		}
+		break
+	}
+
+	var versions []*semver.Version
+	for _, ref := range ind.Entries {
+		if len(ref) == 0 {
+			continue
+		}
+		for _, rr := range ref {
+			ver, err := semver.NewVersion(rr.Version)
+			if err != nil {
+				return nil, err
+			}
+			versions = append(versions, ver)
+		}
+	}
+	return versions, nil
 }
 
 // AddValueOptionsFlags add helm value flags

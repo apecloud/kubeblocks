@@ -21,18 +21,21 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"database/sql"
+	"database/sql/driver"
+	"encoding/json"
 	"fmt"
 	"os"
+	"reflect"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/dapr/components-contrib/bindings"
+	"github.com/dapr/kit/logger"
+	"github.com/go-sql-driver/mysql"
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
-	"github.com/go-sql-driver/mysql"
-	"github.com/dapr/kit/logger"
-	"github.com/dapr/components-contrib/bindings"
 
 	. "github.com/apecloud/kubeblocks/cmd/probe/internal"
 	. "github.com/apecloud/kubeblocks/cmd/probe/internal/binding"
@@ -40,8 +43,8 @@ import (
 
 // MysqlOperations represents MySQL output bindings.
 type MysqlOperations struct {
-	db       *sql.DB
-	mu       sync.Mutex
+	db *sql.DB
+	mu sync.Mutex
 	BaseOperations
 }
 
@@ -91,7 +94,7 @@ func (mysqlOps *MysqlOperations) Init(metadata bindings.Metadata) error {
 	mysqlOps.DBType = "mysql"
 	mysqlOps.InitIfNeed = mysqlOps.initIfNeed
 	mysqlOps.BaseOperations.GetRole = mysqlOps.GetRole
-	mysqlOps.DbPort = mysqlOps.GetRunningPort()
+	mysqlOps.DBPort = mysqlOps.GetRunningPort()
 	mysqlOps.OperationMap[GetRoleOperation] = mysqlOps.GetRoleOps
 	return nil
 }
@@ -217,46 +220,45 @@ func (mysqlOps *MysqlOperations) GetRoleOps(ctx context.Context, req *bindings.I
 	return opsRes, nil
 }
 
-// StatusCheck function design details: https://infracreate.feishu.cn/wiki/wikcndch7lMZJneMnRqaTvhQpwb#doxcnOUyQ4Mu0KiUo232dOr5aad
-func (mysqlOps *MysqlOperations) StatusCheck(ctx context.Context, sql string, resp *bindings.InvokeResponse) ([]byte, error) {
-	// rwSql := fmt.Sprintf(`begin;
-	// create table if not exists kb_health_check(type int, check_ts bigint, primary key(type));
-	// insert into kb_health_check values(%d, now()) on duplicate key update check_ts = now();
-	// commit;
-	// select check_ts from kb_health_check where type=%d limit 1;`, statusCheckType, statusCheckType)
-	// roSql := fmt.Sprintf(`select check_ts from kb_health_check where type=%d limit 1;`, statusCheckType)
-	// var err error
-	// var data []byte
-	// switch mysqlOps.base.dbRoles[strings.ToLower(oriRole)] {
-	// case ReadWrite:
-	// 	var count int64
-	// 	count, err = mysqlOps.exec(ctx, rwSql)
-	// 	data = []byte(strconv.FormatInt(count, 10))
-	// case Readonly:
-	// 	data, err = mysqlOps.query(ctx, roSql)
-	// default:
-	// 	msg := fmt.Sprintf("unknown access mode for role %s: %v", oriRole, mysqlOps.base.dbRoles)
-	// 	mysqlOps.Logger.Info(msg)
-	// 	data = []byte(msg)
-	// }
+// StatusCheckOps design details: https://infracreate.feishu.cn/wiki/wikcndch7lMZJneMnRqaTvhQpwb#doxcnOUyQ4Mu0KiUo232dOr5aad
+func (mysqlOps *MysqlOperations) StatusCheckOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
+	rwSql := fmt.Sprintf(`begin;
+	create table if not exists kb_health_check(type int, check_ts bigint, primary key(type));
+	insert into kb_health_check values(%d, now()) on duplicate key update check_ts = now();
+	commit;
+	select check_ts from kb_health_check where type=%d limit 1;`, StatusCheckType, StatusCheckType)
+	roSql := fmt.Sprintf(`select check_ts from kb_health_check where type=%d limit 1;`, StatusCheckType)
+	var err error
+	var data []byte
+	switch mysqlOps.DBRoles[strings.ToLower(mysqlOps.OriRole)] {
+	case ReadWrite:
+		var count int64
+		count, err = mysqlOps.exec(ctx, rwSql)
+		data = []byte(strconv.FormatInt(count, 10))
+	case Readonly:
+		data, err = mysqlOps.query(ctx, roSql)
+	default:
+		msg := fmt.Sprintf("unknown access mode for role %s: %v", mysqlOps.OriRole, mysqlOps.DBRoles)
+		mysqlOps.Logger.Info(msg)
+		data = []byte(msg)
+	}
 
-	// result := ProbeMessage{}
-	// if err != nil {
-	// 	mysqlOps.Logger.Infof("statusCheck error: %v", err)
-	// 	result.Event = "statusCheckFailed"
-	// 	result.Message = err.Error()
-	// 	if statusCheckFailedCount++; statusCheckFailedCount%eventAggregationNum == 1 {
-	// 		mysqlOps.Logger.Infof("status checks failed %v times continuously", statusCheckFailedCount)
-	// 		resp.Metadata[statusCode] = OperationFailedHTTPCode
-	// 	}
-	// } else {
-	// 	result.Message = string(data)
-	// 	statusCheckFailedCount = 0
-	// }
-	// msg, _ := json.Marshal(result)
-	// return msg, nil
-	return []byte("Not supported yet"), nil
-
+	result := OpsResult{}
+	if err != nil {
+		mysqlOps.Logger.Infof("statusCheck error: %v", err)
+		result["event"] = "statusCheckFailed"
+		result["message"] = err.Error()
+		if mysqlOps.StatusCheckFailedCount%mysqlOps.CheckFailedThreshold == 0 {
+			mysqlOps.Logger.Infof("status checks failed %v times continuously", mysqlOps.StatusCheckFailedCount)
+			resp.Metadata[StatusCode] = OperationFailedHTTPCode
+		}
+		mysqlOps.StatusCheckFailedCount++
+	} else {
+		result["event"] = "statusCheckSuccess"
+		result["message"] = string(data)
+		mysqlOps.StatusCheckFailedCount = 0
+	}
+	return result, nil
 }
 
 func propertyToInt(props map[string]string, key string, setter func(int)) error {
@@ -317,57 +319,82 @@ func initDB(url, pemPath string) (*sql.DB, error) {
 	return db, nil
 }
 
-// func (mysqlOps *MysqlOperations) jsonify(rows *sql.Rows) ([]byte, error) {
-// 	columnTypes, err := rows.ColumnTypes()
-// 	if err != nil {
-// 		return nil, err
-// 	}
-// 	var ret []interface{}
-// 	for rows.Next() {
-// 		values := prepareValues(columnTypes)
-// 		err := rows.Scan(values...)
-// 		if err != nil {
-// 			return nil, err
-// 		}
-// 		r := mysqlOps.convert(columnTypes, values)
-// 		ret = append(ret, r)
-// 	}
-// 	return json.Marshal(ret)
-// }
+func (mysqlOps *MysqlOperations) query(ctx context.Context, sql string) ([]byte, error) {
+	mysqlOps.Logger.Debugf("query: %s", sql)
+	rows, err := mysqlOps.db.QueryContext(ctx, sql)
+	if err != nil {
+		return nil, errors.Wrapf(err, "error executing %s", sql)
+	}
+	defer func() {
+		_ = rows.Close()
+		_ = rows.Err()
+	}()
+	result, err := mysqlOps.jsonify(rows)
+	if err != nil {
+		return nil, errors.Wrapf(err, "error marshalling query result for %s", sql)
+	}
+	return result, nil
+}
+func (mysqlOps *MysqlOperations) exec(ctx context.Context, sql string) (int64, error) {
+	mysqlOps.Logger.Debugf("exec: %s", sql)
+	res, err := mysqlOps.db.ExecContext(ctx, sql)
+	if err != nil {
+		return 0, errors.Wrapf(err, "error executing %s", sql)
+	}
+	return res.RowsAffected()
+}
 
-// func prepareValues(columnTypes []*sql.ColumnType) []interface{} {
-// 	types := make([]reflect.ComponentDefRef, len(columnTypes))
-// 	for i, tp := range columnTypes {
-// 		types[i] = tp.ScanType()
-// 	}
-// 	values := make([]interface{}, len(columnTypes))
-// 	for i := range values {
-// 		values[i] = reflect.New(types[i]).Interface()
-// 	}
-// 	return values
-// }
+func (mysqlOps *MysqlOperations) jsonify(rows *sql.Rows) ([]byte, error) {
+	columnTypes, err := rows.ColumnTypes()
+	if err != nil {
+		return nil, err
+	}
+	var ret []interface{}
+	for rows.Next() {
+		values := prepareValues(columnTypes)
+		err := rows.Scan(values...)
+		if err != nil {
+			return nil, err
+		}
+		r := mysqlOps.convert(columnTypes, values)
+		ret = append(ret, r)
+	}
+	return json.Marshal(ret)
+}
 
-// func (mysqlOps *MysqlOperations) convert(columnTypes []*sql.ColumnType, values []interface{}) map[string]interface{} {
-// 	r := map[string]interface{}{}
-// 	for i, ct := range columnTypes {
-// 		value := values[i]
-// 		switch v := values[i].(type) {
-// 		case driver.Valuer:
-// 			if vv, err := v.Value(); err == nil {
-// 				value = interface{}(vv)
-// 			} else {
-// 				mysqlOps.Logger.Warnf("error to convert value: %v", err)
-// 			}
-// 		case *sql.RawBytes:
-// 			// special case for sql.RawBytes, see https://github.com/go-sql-driver/mysql/blob/master/fields.go#L178
-// 			switch ct.DatabaseTypeName() {
-// 			case "VARCHAR", "CHAR", "TEXT", "LONGTEXT":
-// 				value = string(*v)
-// 			}
-// 		}
-// 		if value != nil {
-// 			r[ct.Name()] = value
-// 		}
-// 	}
-// 	return r
-// }
+func prepareValues(columnTypes []*sql.ColumnType) []interface{} {
+	types := make([]reflect.Type, len(columnTypes))
+	for i, tp := range columnTypes {
+		types[i] = tp.ScanType()
+	}
+	values := make([]interface{}, len(columnTypes))
+	for i := range values {
+		values[i] = reflect.New(types[i]).Interface()
+	}
+	return values
+}
+
+func (mysqlOps *MysqlOperations) convert(columnTypes []*sql.ColumnType, values []interface{}) map[string]interface{} {
+	r := map[string]interface{}{}
+	for i, ct := range columnTypes {
+		value := values[i]
+		switch v := values[i].(type) {
+		case driver.Valuer:
+			if vv, err := v.Value(); err == nil {
+				value = interface{}(vv)
+			} else {
+				mysqlOps.Logger.Warnf("error to convert value: %v", err)
+			}
+		case *sql.RawBytes:
+			// special case for sql.RawBytes, see https://github.com/go-sql-driver/mysql/blob/master/fields.go#L178
+			switch ct.DatabaseTypeName() {
+			case "VARCHAR", "CHAR", "TEXT", "LONGTEXT":
+				value = string(*v)
+			}
+		}
+		if value != nil {
+			r[ct.Name()] = value
+		}
+	}
+	return r
+}

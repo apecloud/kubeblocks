@@ -45,25 +45,31 @@ const (
 	roleEventRecordFrequency      = int(1 / roleEventRecordQPS)
 	defaultCheckFailedThreshold   = 1800
 	defaultRoleDetectionThreshold = 300
+
+	// types for probe
+	RunningCheckType = iota
+	StatusCheckType
+	RoleChangedCheckType
 )
 
 type Operation func(ctx context.Context, request *bindings.InvokeRequest, response *bindings.InvokeResponse) (OpsResult, error)
 
 type BaseOperations struct {
-	oriRole                 string
-	dbRoles                 map[string]AccessMode
-	runningCheckFailedCount int
-	roleCheckFailedCount    int
-	roleUnchangedCount      int
-	checkFailedThreshold    int
-	// roleDetectionThreshold is used to set the report duration of role event after role changed,
+	RunningCheckFailedCount int
+	StatusCheckFailedCount  int
+	RoleCheckFailedCount    int
+	RoleUnchangedCount      int
+	CheckFailedThreshold    int
+	// RoleDetectionThreshold is used to set the report duration of role event after role changed,
 	// then event controller can always get rolechanged events to maintain pod label accurately
 	// in cases of:
 	// 1 rolechanged event lost;
 	// 2 pod role label deleted or updated incorrectly.
-	roleDetectionThreshold int
-	DbPort                 int
+	RoleDetectionThreshold int
+	DBPort                 int
 	DBType                 string
+	OriRole                string
+	DBRoles                map[string]AccessMode
 	Logger                 logger.Logger
 	Metadata               bindings.Metadata
 	InitIfNeed             func() bool
@@ -77,23 +83,23 @@ func init() {
 }
 
 func (ops *BaseOperations) Init(metadata bindings.Metadata) {
-	ops.checkFailedThreshold = viper.GetInt("KB_CHECK_FAILED_THRESHOLD")
-	if ops.checkFailedThreshold < 300 {
-		ops.checkFailedThreshold = 300
-	} else if ops.checkFailedThreshold > 3600 {
-		ops.checkFailedThreshold = 3600
+	ops.CheckFailedThreshold = viper.GetInt("KB_CHECK_FAILED_THRESHOLD")
+	if ops.CheckFailedThreshold < 300 {
+		ops.CheckFailedThreshold = 300
+	} else if ops.CheckFailedThreshold > 3600 {
+		ops.CheckFailedThreshold = 3600
 	}
 
-	ops.roleDetectionThreshold = viper.GetInt("KB_ROLE_DETECTION_THRESHOLD")
-	if ops.roleDetectionThreshold < 60 {
-		ops.roleDetectionThreshold = 60
-	} else if ops.roleDetectionThreshold > 300 {
-		ops.roleDetectionThreshold = 300
+	ops.RoleDetectionThreshold = viper.GetInt("KB_ROLE_DETECTION_THRESHOLD")
+	if ops.RoleDetectionThreshold < 60 {
+		ops.RoleDetectionThreshold = 60
+	} else if ops.RoleDetectionThreshold > 300 {
+		ops.RoleDetectionThreshold = 300
 	}
 
 	val := viper.GetString("KB_SERVICE_ROLES")
 	if val != "" {
-		if err := json.Unmarshal([]byte(val), &ops.dbRoles); err != nil {
+		if err := json.Unmarshal([]byte(val), &ops.DBRoles); err != nil {
 			fmt.Println(errors.Wrap(err, "KB_DB_ROLES env format error").Error())
 		}
 	}
@@ -168,12 +174,12 @@ func (ops *BaseOperations) Invoke(ctx context.Context, req *bindings.InvokeReque
 
 func (ops *BaseOperations) CheckRoleOps(ctx context.Context, request *bindings.InvokeRequest, response *bindings.InvokeResponse) (OpsResult, error) {
 	opsRes := OpsResult{}
-	opsRes["originalRole"] = ops.oriRole
+	opsRes["originalRole"] = ops.OriRole
 	if ops.GetRole == nil {
 		message := fmt.Sprintf("roleCheck operation is not implemented for %v", ops.DBType)
 		ops.Logger.Errorf(message)
 		opsRes["event"] = "OperationNotImplemented"
-		opsRes["message"]= message
+		opsRes["message"] = message
 		response.Metadata[StatusCode] = OperationFailedHTTPCode
 		return opsRes, nil
 	}
@@ -183,15 +189,15 @@ func (ops *BaseOperations) CheckRoleOps(ctx context.Context, request *bindings.I
 		ops.Logger.Infof("error executing roleCheck: %v", err)
 		opsRes["event"] = "roleCheckFailed"
 		opsRes["message"] = err.Error()
-		if ops.roleCheckFailedCount%ops.checkFailedThreshold == 0 {
-			ops.Logger.Infof("role checks failed %v times continuously", ops.roleCheckFailedCount)
+		if ops.RoleCheckFailedCount%ops.CheckFailedThreshold == 0 {
+			ops.Logger.Infof("role checks failed %v times continuously", ops.RoleCheckFailedCount)
 			response.Metadata[StatusCode] = OperationFailedHTTPCode
 		}
-		ops.roleCheckFailedCount++
+		ops.RoleCheckFailedCount++
 		return opsRes, nil
 	}
 
-	ops.roleCheckFailedCount = 0
+	ops.RoleCheckFailedCount = 0
 	if isValid, message := ops.roleValidate(role); !isValid {
 		opsRes["event"] = "roleInvalid"
 		opsRes["message"] = message
@@ -199,22 +205,22 @@ func (ops *BaseOperations) CheckRoleOps(ctx context.Context, request *bindings.I
 	}
 
 	opsRes["role"] = role
-	if ops.oriRole != role {
+	if ops.OriRole != role {
 		opsRes["Event"] = "roleChanged"
-		ops.oriRole = role
-		ops.roleUnchangedCount = 0
+		ops.OriRole = role
+		ops.RoleUnchangedCount = 0
 	} else {
 		opsRes["Event"] = "roleUnchanged"
-		ops.roleUnchangedCount++
+		ops.RoleUnchangedCount++
 	}
 
-	// roleUnchangedCount is the count of consecutive role unchanged checks.
-	// if observed role unchanged consecutively in roleDetectionThreshold times after role changed,
+	// RoleUnchangedCount is the count of consecutive role unchanged checks.
+	// if observed role unchanged consecutively in RoleDetectionThreshold times after role changed,
 	// we emit the current role again，then event controller can always get
 	// roleChanged events to maintain pod label accurately in cases of:
 	// 1 roleChanged event loss;
 	// 2 pod role label deleted or updated incorrectly.
-	if ops.roleUnchangedCount < ops.roleDetectionThreshold && ops.roleUnchangedCount%roleEventRecordFrequency == 0 {
+	if ops.RoleUnchangedCount < ops.RoleDetectionThreshold && ops.RoleUnchangedCount%roleEventRecordFrequency == 0 {
 		response.Metadata[StatusCode] = OperationFailedHTTPCode
 	}
 	return opsRes, nil
@@ -226,31 +232,31 @@ func (ops *BaseOperations) CheckRoleOps(ctx context.Context, request *bindings.I
 // of report events to reduce the possibility of event conflicts.
 func (ops *BaseOperations) roleValidate(role string) (bool, string) {
 	// do not validate when db roles setting is missing
-	if len(ops.dbRoles) == 0 {
+	if len(ops.DBRoles) == 0 {
 		return true, ""
 	}
 
 	var msg string
 	isValid := false
-	for r := range ops.dbRoles {
+	for r := range ops.DBRoles {
 		if strings.EqualFold(r, role) {
 			isValid = true
 			break
 		}
 	}
 	if !isValid {
-		msg = fmt.Sprintf("role %s is not configured in cluster definition %v", role, ops.dbRoles)
+		msg = fmt.Sprintf("role %s is not configured in cluster definition %v", role, ops.DBRoles)
 	}
 	return isValid, msg
 }
 
 // CheckRunningOps checks whether the binding service is in running status:
-// the port is open or is close consecutively in checkFailedThreshold times
+// the port is open or is close consecutively in CheckFailedThreshold times
 func (ops *BaseOperations) CheckRunningOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
 	var message string
 	opsRes := OpsResult{}
 
-	host := fmt.Sprintf("127.0.0.1:%d", ops.DbPort)
+	host := fmt.Sprintf("127.0.0.1:%d", ops.DBPort)
 	// sql exec timeout need to be less than httpget's timeout which default is 1s.
 	conn, err := net.DialTimeout("tcp", host, 500*time.Millisecond)
 	if err != nil {
@@ -258,14 +264,15 @@ func (ops *BaseOperations) CheckRunningOps(ctx context.Context, req *bindings.In
 		ops.Logger.Errorf(message)
 		opsRes["event"] = "runningCheckFailed"
 		opsRes["message"] = message
-		if ops.runningCheckFailedCount++; ops.runningCheckFailedCount%ops.checkFailedThreshold == 0 {
-			ops.Logger.Infof("running checks failed %v times continuously", ops.runningCheckFailedCount)
+		if ops.RunningCheckFailedCount%ops.CheckFailedThreshold == 0 {
+			ops.Logger.Infof("running checks failed %v times continuously", ops.RunningCheckFailedCount)
 			resp.Metadata[StatusCode] = OperationFailedHTTPCode
 		}
+		ops.RunningCheckFailedCount++
 		return opsRes, nil
 	}
 	defer conn.Close()
-	ops.runningCheckFailedCount = 0
+	ops.RunningCheckFailedCount = 0
 	message = "TCP Connection Established Successfully!"
 	if tcpCon, ok := conn.(*net.TCPConn); ok {
 		err := tcpCon.SetLinger(0)

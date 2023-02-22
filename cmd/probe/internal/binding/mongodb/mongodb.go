@@ -140,7 +140,7 @@ func (m *MongoDB) Init(metadata bindings.Metadata) error {
 
 	m.DBType = "mongodb"
 	m.InitIfNeed = m.initIfNeed
-	m.DbPort = m.GetRunningPort()
+	m.DBPort = m.GetRunningPort()
 	m.OperationMap[GetRoleOperation] = m.GetRoleOps
 	return nil
 }
@@ -241,7 +241,7 @@ func (m *MongoDB) GetRoleOps(ctx context.Context, req *bindings.InvokeRequest, r
 	opsRes["role"] = role
 	return opsRes, nil
 }
-	
+
 func (m *MongoDB) StatusCheck(ctx context.Context, cmd string, response *bindings.InvokeResponse) (OpsResult, error) {
 	// TODO implement me when proposal is passed
 	// proposal: https://infracreate.feishu.cn/wiki/wikcndch7lMZJneMnRqaTvhQpwb#doxcnOUyQ4Mu0KiUo232dOr5aad

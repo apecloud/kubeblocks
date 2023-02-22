@@ -24,6 +24,7 @@ type ProbeMessage struct {
 }
 
 type OpsResult map[string]interface{}
+
 // AccessMode define SVC access mode enums.
 // +enum
 type AccessMode string

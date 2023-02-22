@@ -205,7 +205,7 @@ func TestGetRole(t *testing.T) {
 		database: mt.Client.Database(adminDatabase),
 		logger:   logger.NewLogger("mongodb-test"),
 	}
-	role, err := m.GetRole(context.Background(), "")
+	role, err := m.GetRole(context.Background(), &bindings.InvokeRequest{}, &bindings.InvokeResponse{})
 	if err != nil {
 		t.Errorf("getRole error: %s", err)
 	}

@@ -120,7 +120,7 @@ func (mysqlOps *MysqlOperations) InitDelay() error {
 	p := mysqlOps.Metadata.Properties
 	url, ok := p[connectionURLKey]
 	if !ok || url == "" {
-		return fmt.Errorf("missing MySql connection string")
+		return fmt.Errorf("missing MySQL connection string")
 	}
 
 	db, err := initDB(url, mysqlOps.Metadata.Properties[pemPathKey])
@@ -213,21 +213,21 @@ func (mysqlOps *MysqlOperations) GetRole(ctx context.Context, request *bindings.
 
 // CheckStatusOps design details: https://infracreate.feishu.cn/wiki/wikcndch7lMZJneMnRqaTvhQpwb#doxcnOUyQ4Mu0KiUo232dOr5aad
 func (mysqlOps *MysqlOperations) CheckStatusOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
-	rwSql := fmt.Sprintf(`begin;
+	rwSQL := fmt.Sprintf(`begin;
 	create table if not exists kb_health_check(type int, check_ts bigint, primary key(type));
 	insert into kb_health_check values(%d, now()) on duplicate key update check_ts = now();
 	commit;
 	select check_ts from kb_health_check where type=%d limit 1;`, CheckStatusType, CheckStatusType)
-	roSql := fmt.Sprintf(`select check_ts from kb_health_check where type=%d limit 1;`, CheckStatusType)
+	roSQL := fmt.Sprintf(`select check_ts from kb_health_check where type=%d limit 1;`, CheckStatusType)
 	var err error
 	var data []byte
 	switch mysqlOps.DBRoles[strings.ToLower(mysqlOps.OriRole)] {
 	case ReadWrite:
 		var count int64
-		count, err = mysqlOps.exec(ctx, rwSql)
+		count, err = mysqlOps.exec(ctx, rwSQL)
 		data = []byte(strconv.FormatInt(count, 10))
 	case Readonly:
-		data, err = mysqlOps.query(ctx, roSql)
+		data, err = mysqlOps.query(ctx, roSQL)
 	default:
 		msg := fmt.Sprintf("unknown access mode for role %s: %v", mysqlOps.OriRole, mysqlOps.DBRoles)
 		mysqlOps.Logger.Info(msg)

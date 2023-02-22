@@ -334,18 +334,18 @@ func getCreationStmtForAccount(key componentUniqueKey, passConfig appsv1alpha1.P
 
 	namedVars := getEnvReplacementMapForAccount(userName, passwd)
 
-	creationStmt := make([]string, 0)
+	execStmts := make([]string, 0)
 	// drop if exists + create if not exists
 	statements := accountConfig.ProvisionPolicy.Statements
 	if len(statements.DeletionStatement) > 0 {
 		stmt := replaceNamedVars(namedVars, statements.DeletionStatement, -1, true)
-		creationStmt = append(creationStmt, stmt)
+		execStmts = append(execStmts, stmt)
 	}
 	stmt := replaceNamedVars(namedVars, statements.CreationStatement, -1, true)
-	creationStmt = append(creationStmt, stmt)
+	execStmts = append(execStmts, stmt)
 
 	secret := renderSecretWithPwd(key, userName, passwd)
-	return creationStmt, secret
+	return execStmts, secret
 }
 
 func getAllSysAccounts() []appsv1alpha1.AccountName {

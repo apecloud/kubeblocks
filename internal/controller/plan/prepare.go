@@ -507,8 +507,9 @@ func updateConfigurationManagerWithComponent(
 	ctx context.Context,
 	cli client.Client) error {
 	var (
-		firstCfg        = 0
-		usingContainers []*corev1.Container
+		volumeDirs     []corev1.VolumeMount
+		managerSidecar *cfgcm.ConfigManagerSidecar
+		err            error
 
 		defaultVarRunVolumePath = "/var/run"
 		criEndpointVolumeName   = "cri-runtime-endpoint"
@@ -516,20 +517,50 @@ func updateConfigurationManagerWithComponent(
 		// criType                 = viper.GetString(cfgcore.ConfigCRIType)
 	)
 
-	reloadOptions, err := cfgutil.GetReloadOptions(cli, ctx, cfgTemplates)
-	if err != nil {
-		return err
-	}
-	if reloadOptions == nil {
+	if volumeDirs = getUsingVolumesByCfgTemplates(podSpec, cfgTemplates); len(volumeDirs) == 0 {
 		return nil
 	}
-	if reloadOptions.UnixSignalTrigger == nil {
-		// TODO support other reload type
-		log.Log.Info("only unix signal type is supported!")
+	if managerSidecar, err = buildConfigManagerParams(cli, ctx, cfgTemplates, volumeDirs, defaultVarRunVolumePath, criEndpointVolumeName); err != nil {
+		return err
+	}
+	if managerSidecar == nil {
 		return nil
 	}
 
-	// Ignore useless configtemplate
+	container, err := builder.BuildCfgManagerContainer(managerSidecar)
+	if err != nil {
+		return err
+	}
+	updateCRIContainerVolume(podSpec, defaultVarRunVolumePath, criEndpointVolumeName)
+
+	// Add sidecar to podTemplate
+	podSpec.Containers = append(podSpec.Containers, *container)
+
+	// This sidecar container will be able to view and signal processes from other containers
+	podSpec.ShareProcessNamespace = func() *bool { b := true; return &b }()
+	return nil
+}
+
+func updateCRIContainerVolume(podSpec *corev1.PodSpec, volumePath string, volumeName string) {
+	podVolumes := podSpec.Volumes
+	podVolumes, _ = intctrlutil.CreateOrUpdateVolume(podVolumes, volumeName, func(volumeName string) corev1.Volume {
+		return corev1.Volume{
+			Name: volumeName,
+			VolumeSource: corev1.VolumeSource{
+				HostPath: &corev1.HostPathVolumeSource{
+					Path: volumePath,
+				},
+			},
+		}
+	}, nil)
+	podSpec.Volumes = podVolumes
+}
+
+func getUsingVolumesByCfgTemplates(podSpec *corev1.PodSpec, cfgTemplates []appsv1alpha1.ConfigTemplate) []corev1.VolumeMount {
+	var usingContainers []*corev1.Container
+
+	// Ignore useless configTemplate
+	firstCfg := 0
 	for i, tpl := range cfgTemplates {
 		usingContainers = intctrlutil.GetPodContainerWithVolumeMount(podSpec, tpl.VolumeName)
 		if len(usingContainers) > 0 {
@@ -559,49 +590,34 @@ func updateConfigurationManagerWithComponent(
 			volumeDirs = append(volumeDirs, *volume)
 		}
 	}
+	return volumeDirs
+}
 
-	// If you do not need to watch any configmap volume
-	if len(volumeDirs) == 0 {
-		log.Log.Info(fmt.Sprintf("volume for configmap is not used by any container, and pass. cm name: %v", cfgTemplates[firstCfg]))
-		return nil
+func buildConfigManagerParams(cli client.Client, ctx context.Context, cfgTemplates []appsv1alpha1.ConfigTemplate, volumeDirs []corev1.VolumeMount, volumePath string, volumeName string) (*cfgcm.ConfigManagerSidecar, error) {
+	var (
+		err               error
+		reloadOptions     *appsv1alpha1.ReloadOptions
+		configManagerArgs []string
+	)
+
+	if reloadOptions, err = cfgutil.GetReloadOptions(cli, ctx, cfgTemplates); err != nil {
+		return nil, err
+	}
+	if reloadOptions == nil || reloadOptions.UnixSignalTrigger == nil {
+		return nil, nil
 	}
 
 	unixSignalOption := reloadOptions.UnixSignalTrigger
-	configManagerArgs := cfgcm.BuildSignalArgs(*unixSignalOption, volumeDirs)
-
-	mountPath := defaultVarRunVolumePath
-	managerSidecar := &cfgcm.ConfigManagerSidecar{
+	configManagerArgs = cfgcm.BuildSignalArgs(*unixSignalOption, volumeDirs)
+	configManager := &cfgcm.ConfigManagerSidecar{
 		ManagerName: cfgcore.ConfigSidecarName,
 		Image:       viper.GetString(cfgcore.ConfigSidecarIMAGE),
 		Args:        configManagerArgs,
 		// add cri sock path
 		Volumes: append(volumeDirs, corev1.VolumeMount{
-			Name:      criEndpointVolumeName,
-			MountPath: mountPath,
+			Name:      volumeName,
+			MountPath: volumePath,
 		}),
 	}
-
-	if container, err = builder.BuildCfgManagerContainer(managerSidecar); err != nil {
-		return err
-	}
-
-	podVolumes := podSpec.Volumes
-	podVolumes, _ = intctrlutil.CreateOrUpdateVolume(podVolumes, criEndpointVolumeName, func(volumeName string) corev1.Volume {
-		return corev1.Volume{
-			Name: volumeName,
-			VolumeSource: corev1.VolumeSource{
-				HostPath: &corev1.HostPathVolumeSource{
-					Path: mountPath,
-				},
-			},
-		}
-	}, nil)
-	podSpec.Volumes = podVolumes
-
-	// Add sidecar to podTemplate
-	podSpec.Containers = append(podSpec.Containers, *container)
-
-	// This sidecar container will be able to view and signal processes from other containers
-	podSpec.ShareProcessNamespace = func() *bool { b := true; return &b }()
-	return nil
+	return configManager, nil
 }

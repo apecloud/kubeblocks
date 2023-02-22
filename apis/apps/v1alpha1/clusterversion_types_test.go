@@ -31,23 +31,23 @@ func TestGetInconsistentComponentsInfoWithoutResult(t *testing.T) {
 	clusterVersion := &ClusterVersion{}
 	clusterVersionYaml := `
 apiVersion: apps.kubeblocks.io/v1alpha1
-kind:       ClusterVersion
+kind: ClusterVersion
 metadata:
-  name:     clusterversion-1
+  name: clusterversion-1
 spec:
   clusterDefinitionRef: cluster-definition-1
   componentVersions:
   - componentDefRef: component1
-    podSpec: 
+    versionsContext:
       containers:
       - name: container1.a
       - name: container1.b
   - componentDefRef: component2
-    podSpec: 
+    versionsContext:
       containers:
       - name: container2
   - componentDefRef: component3
-    podSpec: 
+    versionsContext:
       containers:
 `
 	g.Expect(yaml.Unmarshal([]byte(clusterVersionYaml), clusterVersion)).To(Succeed())
@@ -56,9 +56,9 @@ spec:
 	clusterDef := &ClusterDefinition{}
 	clusterDefYaml := `
 apiVersion: apps.kubeblocks.io/v1alpha1
-kind:       ClusterDefinition
+kind: ClusterDefinition
 metadata:
-  name:     cluster-definition-1
+  name: cluster-definition-1
 spec:
   componentDefs:
   - name: component1
@@ -66,10 +66,10 @@ spec:
       containers:
       - name: container1.c
   - name: component2
-    podSpec: 
+    podSpec:
       containers:
   - name: component3
-    podSpec: 
+    podSpec:
       containers:
       - name: container3
 `
@@ -87,21 +87,21 @@ func TestGetInconsistentComponentsInfoWithResults(t *testing.T) {
 	clusterVersion := &ClusterVersion{}
 	clusterVersionYaml := `
 apiVersion: apps.kubeblocks.io/v1alpha1
-kind:       ClusterVersion
+kind: ClusterVersion
 metadata:
-  name:     clusterversion-2
+  name: clusterversion-2
 spec:
   clusterDefinitionRef: cluster-definition-2
   componentVersions:
   - componentDefRef: component1
-    podSpec: 
+    versionsContext:
       containers:
       - name: container1
   - componentDefRef: component2
-    podSpec: 
+    versionsContext:
       containers:
   - componentDefRef: component3
-    podSpec: 
+    versionsContext:
       containers:
       - name: container3
 `
@@ -111,9 +111,9 @@ spec:
 	clusterDef := &ClusterDefinition{}
 	clusterDefYaml := `
 apiVersion: apps.kubeblocks.io/v1alpha1
-kind:       ClusterDefinition
+kind: ClusterDefinition
 metadata:
-  name:     cluster-definition-2
+  name: cluster-definition-2
 spec:
   componentDefs:
   - name: component1

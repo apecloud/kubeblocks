@@ -34,9 +34,9 @@ type ClusterSpec struct {
 	ClusterDefRef string `json:"clusterDefinitionRef"`
 
 	// Cluster referenced ClusterVersion name.
-	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
-	ClusterVersionRef string `json:"clusterVersionRef"`
+	// +optional
+	ClusterVersionRef string `json:"clusterVersionRef,omitempty"`
 
 	// Cluster termination policy. One of DoNotTerminate, Halt, Delete, WipeOut.
 	// DoNotTerminate will block delete operation.

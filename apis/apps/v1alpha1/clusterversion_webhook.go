@@ -142,7 +142,8 @@ func (r *ClusterVersion) GetInconsistentComponentsInfo(clusterDef *ClusterDefini
 	for _, v := range r.Spec.ComponentVersions {
 		if _, ok := componentMap[v.ComponentDefRef]; !ok {
 			notFoundComponentDefNames = append(notFoundComponentDefNames, v.ComponentDefRef)
-		} else if v.PodSpec.Containers != nil && len(v.PodSpec.Containers) > 0 {
+		} else if (len(v.VersionsCtx.Containers) > 0) ||
+			(len(v.VersionsCtx.InitContainers) > 0) {
 			componentMap[v.ComponentDefRef] = true
 		}
 	}

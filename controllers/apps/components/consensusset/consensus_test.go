@@ -17,6 +17,7 @@ limitations under the License.
 package consensusset
 
 import (
+	"fmt"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -41,6 +42,7 @@ var _ = Describe("Consensus Component", func() {
 	const (
 		consensusCompName            = "consensus"
 		defaultMinReadySeconds int32 = 10
+		revisionID                   = "6fdd48d9cd"
 	)
 
 	cleanAll := func() {
@@ -107,7 +109,13 @@ var _ = Describe("Consensus Component", func() {
 
 			By("test pods are ready")
 			// mock sts is ready
-			testk8s.MockStatefulSetReady(sts)
+			Expect(testapps.ChangeObjStatus(&testCtx, sts, func() {
+				controllerRevision := fmt.Sprintf("%s-%s-%s", clusterName, consensusCompName, revisionID)
+				sts.Status.CurrentRevision = controllerRevision
+				sts.Status.UpdateRevision = controllerRevision
+				testk8s.MockStatefulSetReady(sts)
+			})).Should(Succeed())
+
 			podsReady, _ = consensusComponent.PodsReady(sts)
 			Expect(podsReady == true).Should(BeTrue())
 
@@ -133,9 +141,17 @@ var _ = Describe("Consensus Component", func() {
 			isRunning, _ = consensusComponent.IsRunning(sts)
 			Expect(isRunning == false).Should(BeTrue())
 
-			By("test component phase when pods not ready")
+			By("expect component phase is Failed when pod of component is failed")
 			phase, _ := consensusComponent.GetPhaseWhenPodsNotReady(consensusCompName)
 			Expect(phase == appsv1alpha1.FailedPhase).Should(BeTrue())
+
+			By("not ready pod is not controlled by latest revision, should return empty string")
+			// mock pod is not controlled by latest revision
+			Expect(testapps.ChangeObjStatus(&testCtx, sts, func() {
+				sts.Status.UpdateRevision = fmt.Sprintf("%s-%s-%s", clusterName, consensusCompName, "6fdd48d9cd1")
+			})).Should(Succeed())
+			phase, _ = consensusComponent.GetPhaseWhenPodsNotReady(consensusCompName)
+			Expect(len(phase) == 0).Should(BeTrue())
 		})
 	})
 })

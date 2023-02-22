@@ -45,14 +45,12 @@ import (
 	"golang.org/x/crypto/ssh"
 	corev1 "k8s.io/api/core/v1"
 	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/duration"
-	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -291,46 +289,6 @@ func GVRToString(gvr schema.GroupVersionResource) string {
 	return strings.Join([]string{gvr.Resource, gvr.Version, gvr.Group}, ".")
 }
 
-// CheckErr prints a user-friendly error to STDERR and exits with a non-zero exit code.
-func CheckErr(err error) {
-	// unwrap aggregates of 1
-	if agg, ok := err.(utilerrors.Aggregate); ok && len(agg.Errors()) == 1 {
-		err = agg.Errors()[0]
-	}
-
-	if err == nil {
-		return
-	}
-
-	// ErrExit and other valid api errors will be checked by cmdutil.CheckErr, now
-	// we only check invalid api errors that can not be converted to StatusError.
-	if err != cmdutil.ErrExit && apierrors.IsInvalid(err) {
-		if _, ok := err.(*apierrors.StatusError); !ok {
-			printErr(err)
-			os.Exit(cmdutil.DefaultErrorExitCode)
-		}
-	}
-
-	cmdutil.CheckErr(err)
-}
-
-func printErr(err error) {
-	msg, ok := cmdutil.StandardErrorMessage(err)
-	if !ok {
-		msg = err.Error()
-		if !strings.HasPrefix(msg, "error: ") {
-			msg = fmt.Sprintf("error: %s", msg)
-		}
-	}
-	if len(msg) > 0 {
-		// add newline if needed
-		if !strings.HasSuffix(msg, "\n") {
-			msg += "\n"
-		}
-		fmt.Fprint(os.Stderr, msg)
-	}
-}
-
 // GetNodeByName choose node by name from a node array
 func GetNodeByName(nodes []*corev1.Node, name string) *corev1.Node {
 	for _, node := range nodes {
@@ -478,18 +436,20 @@ func GetConfigTemplateList(clusterName string, namespace string, cli dynamic.Int
 	}
 
 	clusterDefName := clusterObj.Spec.ClusterDefRef
-	clusterVersionName := clusterObj.Spec.ClusterVersionRef
 	if err := GetResourceObjectFromGVR(types.ClusterDefGVR(), client.ObjectKey{
 		Namespace: "",
 		Name:      clusterDefName,
 	}, cli, &clusterDefObj); err != nil {
 		return nil, err
 	}
-	if err := GetResourceObjectFromGVR(types.ClusterVersionGVR(), client.ObjectKey{
-		Namespace: "",
-		Name:      clusterVersionName,
-	}, cli, &clusterVersionObj); err != nil {
-		return nil, err
+	clusterVersionName := clusterObj.Spec.ClusterVersionRef
+	if clusterVersionName != "" {
+		if err := GetResourceObjectFromGVR(types.ClusterVersionGVR(), client.ObjectKey{
+			Namespace: "",
+			Name:      clusterVersionName,
+		}, cli, &clusterVersionObj); err != nil {
+			return nil, err
+		}
 	}
 
 	tpls, err := cfgcore.GetConfigTemplatesFromComponent(clusterObj.Spec.ComponentSpecs, clusterDefObj.Spec.ComponentDefs, clusterVersionObj.Spec.ComponentVersions, componentName)

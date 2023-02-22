@@ -44,9 +44,7 @@ backup_policy: {
 		"target": {
 			"databaseEngine": "mysql"
 			"labelsSelector": {
-				"matchLabels": {
-					"app.kubernetes.io/instance": sts.metadata.labels."app.kubernetes.io/instance"
-				}
+				"matchLabels": sts.metadata.labels
 			}
 			"secret": {
 				"name": "wesql-cluster"

@@ -391,7 +391,7 @@ func (r *BackupReconciler) createVolumeSnapshot(
 	}
 
 	// build env value for access target cluster
-	target, err := r.GetTargetCluster(reqCtx, backupPolicy)
+	target, err := r.getTargetCluster(reqCtx, backupPolicy)
 	if err != nil {
 		return err
 	}
@@ -462,12 +462,12 @@ func (r *BackupReconciler) createBackupToolJob(
 		return nil
 	}
 
-	toolPodSpec, err := r.BuildBackupToolPodSpec(reqCtx, backup)
+	toolPodSpec, err := r.buildBackupToolPodSpec(reqCtx, backup)
 	if err != nil {
 		return err
 	}
 
-	if err = r.CreateBatchV1Job(reqCtx, key, backup, toolPodSpec); err != nil {
+	if err = r.createBatchV1Job(reqCtx, key, backup, toolPodSpec); err != nil {
 		return err
 	}
 	msg := fmt.Sprintf("Waiting for a job %s to be created.", key.Name)
@@ -532,7 +532,7 @@ func (r *BackupReconciler) createHooksCommandJob(
 		return nil
 	}
 
-	jobPodSpec, err := r.BuildSnapshotPodSpec(reqCtx, backup, preCommand)
+	jobPodSpec, err := r.buildSnapshotPodSpec(reqCtx, backup, preCommand)
 	if err != nil {
 		return err
 	}
@@ -540,7 +540,7 @@ func (r *BackupReconciler) createHooksCommandJob(
 	msg := fmt.Sprintf("Waiting for a job %s to be created.", key.Name)
 	r.Recorder.Event(backup, corev1.EventTypeNormal, "CreatingJob-"+key.Name, msg)
 
-	return r.CreateBatchV1Job(reqCtx, key, backup, jobPodSpec)
+	return r.createBatchV1Job(reqCtx, key, backup, jobPodSpec)
 }
 
 func buildBackupLabels(backup *dataprotectionv1alpha1.Backup) map[string]string {
@@ -552,7 +552,7 @@ func buildBackupLabels(backup *dataprotectionv1alpha1.Backup) map[string]string 
 	return labels
 }
 
-func (r *BackupReconciler) CreateBatchV1Job(
+func (r *BackupReconciler) createBatchV1Job(
 	reqCtx intctrlutil.RequestCtx,
 	key types.NamespacedName,
 	backup *dataprotectionv1alpha1.Backup,
@@ -659,7 +659,7 @@ func (r *BackupReconciler) deleteExternalResources(reqCtx intctrlutil.RequestCtx
 	return nil
 }
 
-func (r *BackupReconciler) GetTargetCluster(
+func (r *BackupReconciler) getTargetCluster(
 	reqCtx intctrlutil.RequestCtx, backupPolicy *dataprotectionv1alpha1.BackupPolicy) (*appv1.StatefulSet, error) {
 	// get stateful service
 	reqCtx.Log.Info("Get cluster from label", "label", backupPolicy.Spec.Target.LabelsSelector.MatchLabels)
@@ -680,7 +680,7 @@ func (r *BackupReconciler) GetTargetCluster(
 	return &clusterTarget.Items[0], nil
 }
 
-func (r *BackupReconciler) GetTargetClusterPod(
+func (r *BackupReconciler) getTargetClusterPod(
 	reqCtx intctrlutil.RequestCtx, clusterStatefulSet *appv1.StatefulSet) (*corev1.Pod, error) {
 	// get stateful service
 	clusterPod := &corev1.Pod{}
@@ -697,7 +697,7 @@ func (r *BackupReconciler) GetTargetClusterPod(
 	return clusterPod, nil
 }
 
-func (r *BackupReconciler) BuildBackupToolPodSpec(reqCtx intctrlutil.RequestCtx, backup *dataprotectionv1alpha1.Backup) (corev1.PodSpec, error) {
+func (r *BackupReconciler) buildBackupToolPodSpec(reqCtx intctrlutil.RequestCtx, backup *dataprotectionv1alpha1.Backup) (corev1.PodSpec, error) {
 	podSpec := corev1.PodSpec{}
 	logger := reqCtx.Log
 
@@ -725,12 +725,12 @@ func (r *BackupReconciler) BuildBackupToolPodSpec(reqCtx intctrlutil.RequestCtx,
 	}
 
 	// build env value for access target cluster
-	clusterStatefulset, err := r.GetTargetCluster(reqCtx, backupPolicy)
+	clusterStatefulset, err := r.getTargetCluster(reqCtx, backupPolicy)
 	if err != nil {
 		return podSpec, err
 	}
 
-	clusterPod, err := r.GetTargetClusterPod(reqCtx, clusterStatefulset)
+	clusterPod, err := r.getTargetClusterPod(reqCtx, clusterStatefulset)
 	if err != nil {
 		return podSpec, err
 	}
@@ -826,10 +826,14 @@ func (r *BackupReconciler) BuildBackupToolPodSpec(reqCtx intctrlutil.RequestCtx,
 	podSpec.Volumes = append(podSpec.Volumes, backupPolicy.Spec.RemoteVolume)
 	podSpec.RestartPolicy = corev1.RestartPolicyNever
 
+	// the pod of job needs to be scheduled on the same node as the workload pod, because it needs to share one pvc
+	// see: https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/#nodename
+	podSpec.NodeName = clusterPod.Spec.NodeName
+
 	return podSpec, nil
 }
 
-func (r *BackupReconciler) BuildSnapshotPodSpec(
+func (r *BackupReconciler) buildSnapshotPodSpec(
 	reqCtx intctrlutil.RequestCtx,
 	backup *dataprotectionv1alpha1.Backup,
 	preCommand bool) (corev1.PodSpec, error) {
@@ -849,12 +853,12 @@ func (r *BackupReconciler) BuildSnapshotPodSpec(
 	}
 
 	// build env value for access target cluster
-	clusterStatefulset, err := r.GetTargetCluster(reqCtx, backupPolicy)
+	clusterStatefulset, err := r.getTargetCluster(reqCtx, backupPolicy)
 	if err != nil {
 		return podSpec, err
 	}
 
-	clusterPod, err := r.GetTargetClusterPod(reqCtx, clusterStatefulset)
+	clusterPod, err := r.getTargetClusterPod(reqCtx, clusterStatefulset)
 	if err != nil {
 		return podSpec, err
 	}
@@ -872,17 +876,13 @@ func (r *BackupReconciler) BuildSnapshotPodSpec(
 		container.Image = viper.GetString("KUBEBLOCKS_IMAGE")
 		container.ImagePullPolicy = corev1.PullPolicy(viper.GetString("KUBEBLOCKS_IMAGE_PULL_POLICY"))
 	}
-	container.VolumeMounts = clusterPod.Spec.Containers[0].VolumeMounts
 	allowPrivilegeEscalation := false
 	runAsUser := int64(0)
 	container.SecurityContext = &corev1.SecurityContext{
 		AllowPrivilegeEscalation: &allowPrivilegeEscalation,
 		RunAsUser:                &runAsUser}
-	// container.Env = backupTool.Spec.Env
 
 	podSpec.Containers = []corev1.Container{container}
-
-	podSpec.Volumes = clusterPod.Spec.Volumes
 	podSpec.RestartPolicy = corev1.RestartPolicyNever
 	podSpec.ServiceAccountName = viper.GetString("KUBEBLOCKS_SERVICEACCOUNT_NAME")
 

@@ -40,7 +40,9 @@ config: {
 		name:      meta.component.configName
 		namespace: meta.cluster.namespace
 		labels: {
-			"app.kubernetes.io/name": "\(meta.component.characterType)-\(meta.clusterDefinition.name)"
+
+			"app.kubernetes.io/name": "\(meta.clusterDefinition.name)"
+
 			// cluster name
 			"app.kubernetes.io/instance": meta.cluster.name
 			// component name

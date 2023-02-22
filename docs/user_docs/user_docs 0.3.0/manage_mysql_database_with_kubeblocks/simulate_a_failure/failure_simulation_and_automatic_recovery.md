@@ -26,12 +26,12 @@ As an open-source data management platform, Kubeblocks supports two database for
 ***Steps:***
 
 1. Run the command below to view the ApeCloud MySQL Paxos group information. View the leader pod name in `Topology`. In this example, the leader pod's name is mysql-cluster.
-   ```
+   ```bash
    kbcli cluster describe mysql-cluster
    ```
    ![describe_cluster](../../image/describe_cluster.png)
-2. Delete the leader pod `wesql-replicasets-1` to simulate a pod fault.
-   ```
+2. Delete the leader pod `mysql-cluster-mysql-1` to simulate a pod fault.
+   ```bash
    kubectl delete pod mysql-cluster-mysql-1
    ```
 
@@ -40,44 +40,44 @@ As an open-source data management platform, Kubeblocks supports two database for
    
    ***Results***
 
-   The following example shows that the roles of pods have changed after the old leader pod was deleted and `xxx` is elected as the new leader pod.
-   ```
+   The following example shows that the roles of pods have changed after the old leader pod was deleted and `mysql-cluster-mysql-2` is elected as the new leader pod.
+   ```bash
    kbcli cluster describe mysql-cluster
    ```
    ![describe_cluster_after](../../image/describe_cluster_after.png)
    It shows that this ApeCloud MySQL Paxos group can be connected within seconds.
-   ```
+   ```bash
    kbcli cluster connect mysql-cluster
    ```
    ![connect_cluster_after](../../image/connect_cluster_after.png)
 
    ***How the automatic recovery works***
 
-   After the leader pod is deleted, the ApeCloud MySQL Paxos group elects a new leader. In this example, `xxx` is elected as the new leader. Kubeblocks detects that the leader has changed, and sends a notification to update the access link. The original exception node automatically rebuilds and recovers to the normal Paxos group state. It normally takes 30 seconds from exception to recovery.
+   After the leader pod is deleted, the ApeCloud MySQL Paxos group elects a new leader. In this example, `mysql-cluster-mysql-2` is elected as the new leader. Kubeblocks detects that the leader has changed, and sends a notification to update the access link. The original exception node automatically rebuilds and recovers to the normal Paxos group state. It normally takes 30 seconds from exception to recovery.
 
 ### Single follower pod exception
 
 ***Steps:***
 
-1. Run the command below to view the ApeCloud MySQL Paxos group information and view the follower pod name in `Topology`. In this example, the follower pods are xxx and xxx.
-   ```
+1. Run the command below to view the ApeCloud MySQL Paxos group information and view the follower pod name in `Topology`. In this example, the follower pods are mysql-cluster-mysql-0 and mysql-cluster-mysql-2.
+   ```bash
    kbcli cluster describe mysql-cluster
    ```
    ![describe_cluster](../../image/describe_cluster.png)
-2. Delete the follower pod xxx.
-   ```
+2. Delete the follower pod mysql-cluster-mysql-0.
+   ```bash
    kubectl delete pod mysql-cluster-mysql-0
    ```
 
    ![delete_follower_pod](../../image/delete_follower_pod.png)
 3. Run the command below to view the Paxos group status and you can find the follower pod is being terminated in `Component.Instance`.
-   ```
+   ```bash
    kbcli cluster describe mysql-cluster
    ```
 
    ![describe_cluster_follower](../../image/describe_cluster_follower.png)
 4. Run the command below to connect to the Paxos group and you can find this single follower exception doesn't affect the R/W of the cluster.
-   ```
+   ```bash
    kbcli cluster connect mysql-cluster
    ```
 
@@ -94,25 +94,25 @@ Therefore, whether exceptions occur to one leader and one follower or exceptions
 
 ***Steps:***
 
-1. Run the command below to view the ApeCloud MySQL Paxos group information and view the follower pod name in `Topology`. In this example, the follower pods are xxx and xxx.
-   ```
+1. Run the command below to view the ApeCloud MySQL Paxos group information and view the follower pod name in `Topology`. In this example, the follower pods are mysql-cluster-mysql-1 and mysql-cluster-mysql-0.
+   ```bash
    kbcli cluster describe mysql-cluster
    ```
-   ![describe_cluster](../../image/describe_cluster.png)
+   ![describe_cluster](../../image/describe_cluster_2.png)
 2. Delete these two follower pods.
-   ```
+   ```bash
    kubectl delete pod mysql-cluster-mysql-1 mysql-cluster-mysql-0
    ```
 
    ![delete_two_pods](../../image/delete_two_pods.png)
 3. Run the command below to view the Paxos group status and you can find the follower pods are being terminated in `Component.Instance`.
-   ```
+   ```bash
    kbcli cluster describe mysql-cluster
    ```
 
    ![describe_two_clusters](../../image/describe_two_clusters.png)
-4. Run `kbcli cluster describe xxx` again after a few seconds and you can find the pods in the Paxos group work normally again in `Component.Instance`.
-   ```
+4. Run `kbcli cluster connect mysql-cluster` again after a few seconds and you can find the pods in the Paxos group work normally again in `Component.Instance`.
+   ```bash
    kbcli cluster connect mysql-cluster
    ```
 
@@ -127,24 +127,24 @@ Therefore, whether exceptions occur to one leader and one follower or exceptions
 ***Steps:***
 
 1. Run the command below to view the ApeCloud MySQL Paxos group information and view the pods' names in `Topology`.
-   ```
+   ```bash
    kbcli cluster describe mysql-cluster
    ```
    ![describe_cluster](../../image/describe_cluster.png)
 2. Delete all pods.
-   ```
+   ```bash
    kubectl delete pod mysql-cluster-mysql-1 mysql-cluster-mysql-0 mysql-cluster-mysql-2
    ```
 
    ![delete_three_pods](../../image/delete_three_pods.png)
 3. Run the command below to view the deleting process. You can find the pods are being deleted in `Component.Instance` and the follower pod is the last one to be deleted.
-   ```
+   ```bash
    kbcli cluster describe mysql-cluster
    ```
 
    ![describe_three_clusters](../../image/describe_three_clusters.png)
-4. Run `kbcli cluster describe xxx` again after a few seconds and you can find the pods in the Paxos group work normally again in `Component.Instance`.
-   ```
+4. Run `kbcli cluster connect mysql-cluster` again after a few seconds and you can find the pods in the Paxos group work normally again in `Component.Instance`.
+   ```bash
    kbcli cluster connect mysql-cluster
    ```
 

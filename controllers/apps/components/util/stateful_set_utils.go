@@ -24,6 +24,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
@@ -61,7 +62,12 @@ func IsStsAndPodsRevisionConsistent(ctx context.Context, cli client.Client, sts 
 	if err != nil {
 		return false, err
 	}
+
 	revisionConsistent := true
+	if len(pods) != int(*sts.Spec.Replicas) {
+		return false, nil
+	}
+
 	for _, pod := range pods {
 		if GetPodRevision(&pod) != sts.Status.UpdateRevision {
 			revisionConsistent = false
@@ -71,24 +77,44 @@ func IsStsAndPodsRevisionConsistent(ctx context.Context, cli client.Client, sts 
 	return revisionConsistent, nil
 }
 
-// StatefulSetIsReady checks if statefulSet is ready.
-func StatefulSetIsReady(sts *appsv1.StatefulSet, statefulStatusRevisionIsEquals bool, targetReplicas *int32) bool {
+// DeleteStsPods deletes pods of the StatefulSet manually
+func DeleteStsPods(ctx context.Context, cli client.Client, sts *appsv1.StatefulSet) error {
+	if sts.Spec.UpdateStrategy.Type == appsv1.RollingUpdateStatefulSetStrategyType {
+		return nil
+	}
+
+	pods, err := GetPodListByStatefulSet(ctx, cli, sts)
+	if err != nil {
+		return err
+	}
+	for _, pod := range pods {
+		// do nothing if the pod is terminating
+		if pod.DeletionTimestamp != nil {
+			continue
+		}
+		// do nothing if the pod has the latest version
+		if GetPodRevision(&pod) == sts.Status.UpdateRevision {
+			continue
+		}
+		// delete the pod to trigger associate StatefulSet to re-create it
+		if err := cli.Delete(ctx, &pod); err != nil && !apierrors.IsNotFound(err) {
+			return err
+		}
+	}
+	return nil
+}
+
+// StatefulSetOfComponentIsReady checks if statefulSet of component is ready.
+func StatefulSetOfComponentIsReady(sts *appsv1.StatefulSet, statefulStatusRevisionIsEquals bool, targetReplicas *int32) bool {
 	if targetReplicas == nil {
 		targetReplicas = sts.Spec.Replicas
 	}
 	// judge whether statefulSet is ready
-	if sts.Status.AvailableReplicas != *targetReplicas ||
-		sts.Status.Replicas != *targetReplicas ||
-		sts.Status.ObservedGeneration != sts.Generation ||
-		!statefulStatusRevisionIsEquals {
-		return false
-	}
-	return true
+	return StatefulSetPodsAreReady(sts, *targetReplicas) && statefulStatusRevisionIsEquals
 }
 
-// StatefulSetPodsIsReady checks if pods of statefulSet are ready.
-func StatefulSetPodsIsReady(sts *appsv1.StatefulSet) bool {
-	targetReplicas := *sts.Spec.Replicas
+// StatefulSetPodsAreReady checks if all pods of statefulSet are ready.
+func StatefulSetPodsAreReady(sts *appsv1.StatefulSet, targetReplicas int32) bool {
 	return sts.Status.AvailableReplicas == targetReplicas &&
 		sts.Status.Replicas == targetReplicas &&
 		sts.Status.ObservedGeneration == sts.Generation
@@ -157,9 +183,4 @@ func GetPodListByStatefulSet(ctx context.Context, cli client.Client, stsObj *app
 		}
 	}
 	return pods, nil
-}
-
-// StatefulSetSpecIsUpdated checks if the statefulSet spec has updated.
-func StatefulSetSpecIsUpdated(sts *appsv1.StatefulSet) bool {
-	return sts.Generation != sts.Status.ObservedGeneration
 }

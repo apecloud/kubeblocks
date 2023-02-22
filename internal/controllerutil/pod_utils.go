@@ -288,9 +288,9 @@ func GetPodCondition(status *corev1.PodStatus, conditionType corev1.PodCondition
 		return nil
 	}
 
-	for _, condition := range status.Conditions {
+	for i, condition := range status.Conditions {
 		if condition.Type == conditionType {
-			return &condition
+			return &status.Conditions[i]
 		}
 	}
 	return nil

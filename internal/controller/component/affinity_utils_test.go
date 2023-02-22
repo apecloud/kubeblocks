@@ -75,11 +75,11 @@ var _ = Describe("affinity utils", func() {
 			}
 			component = BuildComponent(
 				reqCtx,
-				clusterObj,
-				clusterDefObj,
-				&clusterDefObj.Spec.ComponentDefs[0],
-				&clusterVersionObj.Spec.ComponentVersions[0],
-				&clusterObj.Spec.ComponentSpecs[0])
+				*clusterObj,
+				*clusterDefObj,
+				clusterDefObj.Spec.ComponentDefs[0],
+				clusterObj.Spec.ComponentSpecs[0],
+				&clusterVersionObj.Spec.ComponentVersions[0])
 			Expect(component).ShouldNot(BeNil())
 		})
 
@@ -128,11 +128,12 @@ var _ = Describe("affinity utils", func() {
 			}
 			component = BuildComponent(
 				reqCtx,
-				clusterObj,
-				clusterDefObj,
-				&clusterDefObj.Spec.ComponentDefs[0],
+				*clusterObj,
+				*clusterDefObj,
+				clusterDefObj.Spec.ComponentDefs[0],
+				clusterObj.Spec.ComponentSpecs[0],
 				&clusterVersionObj.Spec.ComponentVersions[0],
-				&clusterObj.Spec.ComponentSpecs[0])
+			)
 			Expect(component).ShouldNot(BeNil())
 		})
 

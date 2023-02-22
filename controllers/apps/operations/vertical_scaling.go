@@ -43,7 +43,7 @@ func init() {
 
 // ActionStartedCondition the started condition when handle the vertical scaling request.
 func (vs verticalScalingHandler) ActionStartedCondition(opsRequest *appsv1alpha1.OpsRequest) *metav1.Condition {
-	return appsv1alpha1.NewHorizontalScalingCondition(opsRequest)
+	return appsv1alpha1.NewVerticalScalingCondition(opsRequest)
 }
 
 // Action modifies cluster component resources according to

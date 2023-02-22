@@ -13,12 +13,13 @@
 // limitations under the License.
 
 options: {
-	name:       string
-	namespace:  string
-	cluster:    string
-	schedule:   string
-	backupType: string
-	ttl:        string
+	name:           string
+	namespace:      string
+	cluster:        string
+	schedule:       string
+	backupType:     string
+	ttl:            string
+	serviceAccount: string
 }
 
 cronjob: {
@@ -37,8 +38,7 @@ cronjob: {
 		concurrencyPolicy:          "Forbid"
 		jobTemplate: spec: template: spec: {
 			restartPolicy:      "Never"
-			serviceAccount:     "kubeblocks"
-			serviceAccountName: "kubeblocks"
+			serviceAccountName: options.serviceAccount
 			containers: [{
 				name:            "backup-policy"
 				image:           "appscode/kubectl:1.25"

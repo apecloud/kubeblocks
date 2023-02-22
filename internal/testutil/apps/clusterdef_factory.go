@@ -158,7 +158,7 @@ func (factory *MockClusterDefFactory) AddInitContainerVolumeMounts(containerName
 	comps := factory.get().Spec.ComponentDefs
 	if len(comps) > 0 {
 		comp := comps[len(comps)-1]
-		comp.PodSpec.InitContainers = setContainerVolumeMounts(comp.PodSpec.InitContainers, containerName, volumeMounts)
+		comp.PodSpec.InitContainers = appendContainerVolumeMounts(comp.PodSpec.InitContainers, containerName, volumeMounts)
 		comps[len(comps)-1] = comp
 	}
 	factory.get().Spec.ComponentDefs = comps
@@ -169,14 +169,14 @@ func (factory *MockClusterDefFactory) AddContainerVolumeMounts(containerName str
 	comps := factory.get().Spec.ComponentDefs
 	if len(comps) > 0 {
 		comp := comps[len(comps)-1]
-		comp.PodSpec.Containers = setContainerVolumeMounts(comp.PodSpec.Containers, containerName, volumeMounts)
+		comp.PodSpec.Containers = appendContainerVolumeMounts(comp.PodSpec.Containers, containerName, volumeMounts)
 		comps[len(comps)-1] = comp
 	}
 	factory.get().Spec.ComponentDefs = comps
 	return factory
 }
 
-func setContainerVolumeMounts(containers []corev1.Container, targetContainerName string, volumeMounts []corev1.VolumeMount) []corev1.Container {
+func appendContainerVolumeMounts(containers []corev1.Container, targetContainerName string, volumeMounts []corev1.VolumeMount) []corev1.Container {
 	for index := range containers {
 		c := containers[index]
 		if c.Name == targetContainerName {

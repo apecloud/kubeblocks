@@ -211,7 +211,7 @@ var _ = Describe("Cluster", func() {
 			GetObject()
 		By("creating a cluster")
 		clusterObj := testapps.NewClusterFactory(ns, clusterName,
-			clusterDefObj.Name, clusterVersionObj.Name).
+			clusterDefObj.Name, "").
 			AddComponent(statefulCompName, statefulCompType).GetObject()
 
 		objs := []runtime.Object{configmap, constraint, clusterDefObj, clusterVersionObj, clusterObj, componentConfig}

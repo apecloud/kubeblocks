@@ -19,6 +19,8 @@ package consensusset
 import (
 	"context"
 
+	"github.com/google/go-cmp/cmp"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -41,19 +43,25 @@ type ConsensusSet struct {
 var _ types.Component = &ConsensusSet{}
 
 func (consensusSet *ConsensusSet) IsRunning(obj client.Object) (bool, error) {
-	// TODO The function name (IsRunning) sounds like it should be side-effect free,
-	// TODO however, a lot of changes are done here, including setting cluster status,
-	// TODO it may even delete some pod. Should be revised.
 	if obj == nil {
 		return false, nil
 	}
 	sts := util.ConvertToStatefulSet(obj)
-	if statefulStatusRevisionIsEquals, err := handleConsensusSetUpdate(consensusSet.Ctx, consensusSet.Cli, consensusSet.Cluster, sts); err != nil {
+	isRevisionConsistent, err := util.IsStsAndPodsRevisionConsistent(consensusSet.Ctx, consensusSet.Cli, sts)
+	if err != nil {
 		return false, err
-	} else {
-		targetReplicas := util.GetComponentReplicas(consensusSet.Component, consensusSet.ComponentDef)
-		return util.StatefulSetIsReady(sts, statefulStatusRevisionIsEquals, &targetReplicas), nil
 	}
+	pods, err := util.GetPodListByStatefulSet(consensusSet.Ctx, consensusSet.Cli, sts)
+	if err != nil {
+		return false, err
+	}
+	for _, pod := range pods {
+		if !util.PodIsReady(pod) {
+			return false, nil
+		}
+	}
+
+	return util.StatefulSetOfComponentIsReady(sts, isRevisionConsistent, &consensusSet.Component.Replicas), nil
 }
 
 func (consensusSet *ConsensusSet) PodsReady(obj client.Object) (bool, error) {
@@ -61,7 +69,7 @@ func (consensusSet *ConsensusSet) PodsReady(obj client.Object) (bool, error) {
 		return false, nil
 	}
 	sts := util.ConvertToStatefulSet(obj)
-	return util.StatefulSetPodsIsReady(sts), nil
+	return util.StatefulSetPodsAreReady(sts, consensusSet.Component.Replicas), nil
 }
 
 func (consensusSet *ConsensusSet) PodIsAvailable(pod *corev1.Pod, minReadySeconds int32) bool {
@@ -136,54 +144,135 @@ func (consensusSet *ConsensusSet) HandleProbeTimeoutWhenPodsReady(recorder recor
 }
 
 func (consensusSet *ConsensusSet) GetPhaseWhenPodsNotReady(componentName string) (appsv1alpha1.Phase, error) {
-	var (
-		isFailed      = true
-		isAbnormal    bool
-		podList       *corev1.PodList
-		allPodIsReady = true
-		cluster       = consensusSet.Cluster
-		err           error
-	)
-
-	if podList, err = util.GetComponentPodList(consensusSet.Ctx, consensusSet.Cli, cluster, componentName); err != nil {
+	stsList := &appsv1.StatefulSetList{}
+	podList, err := util.GetCompRelatedObjectList(consensusSet.Ctx, consensusSet.Cli, consensusSet.Cluster, componentName, stsList)
+	if err != nil || len(stsList.Items) == 0 {
 		return "", err
 	}
-
+	stsObj := stsList.Items[0]
 	podCount := len(podList.Items)
-	if podCount == 0 {
-		return appsv1alpha1.FailedPhase, nil
+	componentReplicas := consensusSet.Component.Replicas
+	if podCount == 0 || stsObj.Status.AvailableReplicas == 0 {
+		return util.GetPhaseWithNoAvailableReplicas(componentReplicas), nil
 	}
+	// get the statefulSet of component
+	var (
+		existLatestRevisionFailedPod bool
+		leaderIsReady                bool
+		consensusSpec                = consensusSet.ComponentDef.ConsensusSpec
+	)
 	for _, v := range podList.Items {
-		// if the pod is terminating, ignore the warning event
+		// if the pod is terminating, ignore it
 		if v.DeletionTimestamp != nil {
 			return "", nil
 		}
 		labelValue := v.Labels[intctrlutil.RoleLabelKey]
-		if labelValue == consensusSet.ComponentDef.ConsensusSpec.Leader.Name && intctrlutil.PodIsReady(&v) {
-			isFailed = false
+		if consensusSpec != nil && labelValue == consensusSpec.Leader.Name && intctrlutil.PodIsReady(&v) {
+			leaderIsReady = true
 			continue
 		}
-		// if no role label, the pod is not ready
-		if labelValue == "" {
-			isAbnormal = true
-		}
-		if !intctrlutil.PodIsReady(&v) {
-			allPodIsReady = false
+		if !intctrlutil.PodIsReady(&v) && util.PodIsControlledByLatestRevision(&v, &stsObj) {
+			existLatestRevisionFailedPod = true
 		}
 	}
-	// check pod count is equals to the component replicas
-	componentReplicas := util.GetComponentReplicas(consensusSet.Component, consensusSet.ComponentDef)
-	if componentReplicas != int32(podCount) {
-		isAbnormal = true
-		allPodIsReady = false
-	}
-	// if all pod is ready, ignore the warning event
-	if allPodIsReady {
+	// if the failed pod is not controlled by the latest revision, ignore it.
+	if !existLatestRevisionFailedPod {
 		return "", nil
 	}
-	return util.GetComponentPhase(isFailed, isAbnormal), nil
+	if !leaderIsReady {
+		return appsv1alpha1.FailedPhase, nil
+	}
+	// checks if the available replicas of component and workload are consistent.
+	if !util.AvailableReplicasAreConsistent(componentReplicas, int32(podCount), stsObj.Status.AvailableReplicas) {
+		return appsv1alpha1.AbnormalPhase, nil
+	}
+	return "", nil
 }
 
+func (consensusSet *ConsensusSet) HandleUpdate(obj client.Object) error {
+	var (
+		cluster = consensusSet.Cluster
+		ctx     = consensusSet.Ctx
+		cli     = consensusSet.Cli
+	)
+	stsObj := util.ConvertToStatefulSet(obj)
+	// get compDefName from stsObj.name
+	compDefName := cluster.GetComponentDefRefName(stsObj.Labels[intctrlutil.AppComponentLabelKey])
+
+	// get component from ClusterDefinition by compDefName
+	component, err := util.GetComponentDefByCluster(ctx, cli, cluster, compDefName)
+	if err != nil {
+		return err
+	}
+
+	if component == nil || component.WorkloadType != appsv1alpha1.Consensus {
+		return nil
+	}
+	pods, err := util.GetPodListByStatefulSet(ctx, cli, stsObj)
+	if err != nil {
+		return err
+	}
+
+	// update cluster.status.component.consensusSetStatus based on all pods currently exist
+	componentName := stsObj.Labels[intctrlutil.AppComponentLabelKey]
+
+	// first, get the old status
+	var oldConsensusSetStatus *appsv1alpha1.ConsensusSetStatus
+	if cluster.Status.Components != nil {
+		if v, ok := cluster.Status.Components[componentName]; ok {
+			oldConsensusSetStatus = v.ConsensusSetStatus
+		}
+	}
+	// create the initial status
+	newConsensusSetStatus := &appsv1alpha1.ConsensusSetStatus{
+		Leader: appsv1alpha1.ConsensusMemberStatus{
+			Name:       "",
+			Pod:        util.ComponentStatusDefaultPodName,
+			AccessMode: appsv1alpha1.None,
+		},
+	}
+	// then, calculate the new status
+	setConsensusSetStatusRoles(newConsensusSetStatus, *component, pods)
+	// if status changed, do update
+	if !cmp.Equal(newConsensusSetStatus, oldConsensusSetStatus) {
+		patch := client.MergeFrom(cluster.DeepCopy())
+		util.InitClusterComponentStatusIfNeed(cluster, componentName, component)
+		componentStatus := cluster.Status.Components[componentName]
+		componentStatus.ConsensusSetStatus = newConsensusSetStatus
+		cluster.Status.Components[componentName] = componentStatus
+		if err = cli.Status().Patch(ctx, cluster, patch); err != nil {
+			return err
+		}
+		// add consensus role info to pod env
+		if err := updateConsensusRoleInfo(ctx, cli, cluster, *component, componentName, pods); err != nil {
+			return err
+		}
+	}
+
+	// prepare to do pods Deletion, that's the only thing we should do.
+	// the stateful set reconciler will do the others.
+	// to simplify the process, wo do pods Delete after stateful set reconcile done,
+	// that is stsObj.Generation == stsObj.Status.ObservedGeneration
+	if stsObj.Generation != stsObj.Status.ObservedGeneration {
+		return nil
+	}
+
+	// then we wait all pods' presence, that is len(pods) == stsObj.Spec.Replicas
+	// only then, we have enough info about the previous pods before delete the current one
+	if len(pods) != int(*stsObj.Spec.Replicas) {
+		return nil
+	}
+
+	// we don't check whether pod role label present: prefer stateful set's Update done than role probing ready
+
+	// generate the pods Deletion plan
+	plan := generateConsensusUpdatePlan(ctx, cli, stsObj, pods, *component)
+	// execute plan
+	if _, err := plan.WalkOneStep(); err != nil {
+		return err
+	}
+	return nil
+}
 func NewConsensusSet(ctx context.Context,
 	cli client.Client,
 	cluster *appsv1alpha1.Cluster,

@@ -17,6 +17,7 @@ limitations under the License.
 package util
 
 import (
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
@@ -44,4 +45,9 @@ func PodIsReady(pod corev1.Pod) bool {
 	}
 
 	return false
+}
+
+// PodIsControlledByLatestRevision checks if the pod is controlled by latest controller revision.
+func PodIsControlledByLatestRevision(pod *corev1.Pod, sts *appsv1.StatefulSet) bool {
+	return GetPodRevision(pod) == sts.Status.UpdateRevision && sts.Status.ObservedGeneration == sts.Generation
 }

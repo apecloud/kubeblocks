@@ -4,7 +4,7 @@ main() {
     local EXIT_STATUS=0
     images=`helm get manifest kubeblocks | grep 'image:' | awk '{print $2}' | sort -u | sed 's/"//g'`
     for image in $images; do
-        if [[ "$image" == "docker.io/apecloud/kubeblocks"* ]]; then
+        if [[ "$image" == "docker.io/apecloud/kubeblocks"* || "$image" == "registry.cn-hangzhou.aliyuncs.com/apecloud/kubeblocks"* ]]; then
             continue
         fi
         echo "check image: $image"

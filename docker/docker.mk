@@ -81,7 +81,7 @@ endif
 
 
 .PHONY: push-manager-image
-push-manager-image: test ## Push Operator manager container image.
+push-manager-image: ## Push Operator manager container image.
 ifneq ($(BUILDX_ENABLED), true)
 ifeq ($(TAG_LATEST), true)
 	docker push ${IMG}:latest
@@ -109,7 +109,7 @@ endif
 endif
 
 .PHONY: push-loadbalancer-image
-push-loadbalancer-image: test ## Push docker image with the loadbalancer.
+push-loadbalancer-image: ## Push docker image with the loadbalancer.
 ifneq ($(BUILDX_ENABLED), true)
 ifeq ($(TAG_LATEST), true)
 	docker push ${LB_IMG}:latest

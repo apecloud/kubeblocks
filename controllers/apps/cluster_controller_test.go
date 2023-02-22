@@ -855,7 +855,7 @@ var _ = Describe("Cluster Controller", func() {
 						intctrlutil.RoleLabelKey:              sts.Labels[intctrlutil.RoleLabelKey],
 						intctrlutil.AppInstanceLabelKey:       clusterName,
 						intctrlutil.AppComponentLabelKey:      componentName,
-						appsv1.ControllerRevisionHashLabelKey: "mock-version",
+						appsv1.ControllerRevisionHashLabelKey: sts.Status.UpdateRevision,
 					},
 				},
 				Spec: corev1.PodSpec{
@@ -909,17 +909,6 @@ var _ = Describe("Cluster Controller", func() {
 			}
 		}
 
-		By("Creating mock pods in StatefulSet")
-		pods := mockPodsForReplicationTest(clusterObj, stsList.Items)
-		for _, pod := range pods {
-			Expect(testCtx.CreateObj(testCtx.Ctx, &pod)).Should(Succeed())
-			pod.Status.Conditions = []corev1.PodCondition{{
-				Type:   corev1.PodReady,
-				Status: corev1.ConditionTrue,
-			}}
-			Expect(k8sClient.Status().Update(ctx, &pod)).Should(Succeed())
-		}
-
 		By("Updating StatefulSet's status")
 		status := appsv1.StatefulSetStatus{
 			AvailableReplicas:  1,
@@ -933,6 +922,18 @@ var _ = Describe("Cluster Controller", func() {
 		for _, sts := range stsList.Items {
 			status.ObservedGeneration = sts.Generation
 			testk8s.PatchStatefulSetStatus(&testCtx, sts.Name, status)
+		}
+
+		By("Creating mock pods in StatefulSet")
+		stsList = testk8s.ListAndCheckStatefulSet(&testCtx, clusterKey)
+		pods := mockPodsForReplicationTest(clusterObj, stsList.Items)
+		for _, pod := range pods {
+			Expect(testCtx.CreateObj(testCtx.Ctx, &pod)).Should(Succeed())
+			pod.Status.Conditions = []corev1.PodCondition{{
+				Type:   corev1.PodReady,
+				Status: corev1.ConditionTrue,
+			}}
+			Expect(k8sClient.Status().Update(ctx, &pod)).Should(Succeed())
 		}
 
 		By("Checking pods' role are updated in cluster status")

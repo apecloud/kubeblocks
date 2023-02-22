@@ -105,6 +105,9 @@ func handleComponentStatusAndSyncCluster(compCtx componentContext,
 	if podsReady, err = component.PodsReady(obj); err != nil {
 		return
 	}
+	if err = component.HandleUpdate(obj); err != nil {
+		return
+	}
 	if isRunning, err = component.IsRunning(obj); err != nil {
 		return
 	}

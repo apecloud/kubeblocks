@@ -47,7 +47,7 @@ func (stateful *Stateful) IsRunning(obj client.Object) (bool, error) {
 	if obj == nil {
 		return false, nil
 	}
-	sts := util.CovertToStatefulSet(obj)
+	sts := util.ConvertToStatefulSet(obj)
 	isRevisionConsistent, err := util.IsStsAndPodsRevisionConsistent(stateful.Ctx, stateful.Cli, sts)
 	if err != nil {
 		return false, err
@@ -59,7 +59,7 @@ func (stateful *Stateful) PodsReady(obj client.Object) (bool, error) {
 	if obj == nil {
 		return false, nil
 	}
-	sts := util.CovertToStatefulSet(obj)
+	sts := util.ConvertToStatefulSet(obj)
 	return util.StatefulSetPodsAreReady(sts, stateful.Component.Replicas), nil
 }
 
@@ -90,6 +90,10 @@ func (stateful *Stateful) GetPhaseWhenPodsNotReady(componentName string) (appsv1
 	stsObj := stsList.Items[0]
 	return util.GetComponentPhaseWhenPodsNotReady(podList, &stsObj, stateful.Component.Replicas,
 		stsObj.Status.AvailableReplicas, checkExistFailedPodOfLatestRevision), nil
+}
+
+func (stateful *Stateful) HandleUpdate(obj client.Object) error {
+	return nil
 }
 
 func NewStateful(ctx context.Context,

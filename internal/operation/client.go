@@ -81,7 +81,7 @@ func (cli *OperationClient) GetRole() (string, error) {
 		return "", err
 	}
 	result := map[string]string{}
-	err = json.Unmarshal(resp.Data, result)
+	err = json.Unmarshal(resp.Data, &result)
 	if err != nil {
 		return "", err
 	}

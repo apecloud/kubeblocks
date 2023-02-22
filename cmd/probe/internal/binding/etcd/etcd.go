@@ -18,6 +18,7 @@ package etcd
 
 import (
 	"context"
+	"encoding/json"
 	"strconv"
 	"strings"
 	"sync"
@@ -27,15 +28,14 @@ import (
 	"github.com/dapr/kit/logger"
 	v3 "go.etcd.io/etcd/client/v3"
 
-	"github.com/apecloud/kubeblocks/cmd/probe/internal"
+	. "github.com/apecloud/kubeblocks/cmd/probe/internal/binding"
 )
 
 type Etcd struct {
 	lock     sync.Mutex
 	etcd     *v3.Client
 	endpoint string
-	logger   logger.Logger
-	base     internal.ProbeBase
+	BaseOperations
 }
 
 const (
@@ -47,33 +47,25 @@ const (
 
 // NewEtcd returns a new etcd binding instance.
 func NewEtcd(logger logger.Logger) bindings.OutputBinding {
-	return &Etcd{logger: logger}
+	return &Etcd{BaseOperations: BaseOperations{Logger: logger}}
 }
 
 func (e *Etcd) Init(metadata bindings.Metadata) error {
 	e.endpoint = metadata.Properties[endpoint]
-	e.base = internal.ProbeBase{
-		Logger:    e.logger,
-		Operation: e,
-	}
-	e.base.Init()
+	e.BaseOperations.Init(metadata)
+	e.DBType = "etcd"
+	e.InitIfNeed = e.initIfNeed
+	e.DbPort = e.GetRunningPort()
+	e.OperationMap[GetRoleOperation] = e.GetRoleOps
 	return nil
 }
 
-func (e *Etcd) Operations() []bindings.OperationKind {
-	return e.base.Operations()
-}
-
-func (e *Etcd) Invoke(ctx context.Context, req *bindings.InvokeRequest) (*bindings.InvokeResponse, error) {
-	return e.base.Invoke(ctx, req)
-}
-
-func (e *Etcd) InitIfNeed() error {
+func (e *Etcd) initIfNeed() bool {
 	e.lock.Lock()
 	defer e.lock.Unlock()
 
 	if e.etcd != nil {
-		return nil
+		return false
 	}
 
 	cli, err := v3.New(v3.Config{
@@ -81,7 +73,7 @@ func (e *Etcd) InitIfNeed() error {
 		DialTimeout: defaultDialTimeout,
 	})
 	if err != nil {
-		return err
+		return true
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), defaultDialTimeout)
@@ -89,29 +81,38 @@ func (e *Etcd) InitIfNeed() error {
 	cancel()
 	if err != nil {
 		cli.Close()
-		return err
+		return true
 	}
 
 	e.etcd = cli
 
-	return nil
+	return true
 }
 
-func (e *Etcd) GetRole(ctx context.Context, cmd string) (string, error) {
-	resp, err := e.etcd.Status(ctx, e.endpoint)
+func (e *Etcd) GetRole(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (string, error) {
+	etcdResp, err := e.etcd.Status(ctx, e.endpoint)
 	if err != nil {
 		return "", err
 	}
 
 	role := "follower"
 	switch {
-	case resp.Leader == resp.Header.MemberId:
+	case etcdResp.Leader == etcdResp.Header.MemberId:
 		role = "leader"
-	case resp.IsLearner:
+	case etcdResp.IsLearner:
 		role = "learner"
 	}
 
 	return role, nil
+}
+
+func (e *Etcd) GetRoleOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) ([]byte, error) {
+	role, err := e.GetRole(ctx, req, resp)
+	if err != nil {
+		return nil, err
+	}
+	res, _ := json.Marshal(role)
+	return res, nil
 }
 
 func (e *Etcd) GetRunningPort() int {

@@ -17,10 +17,10 @@ limitations under the License.
 package kubeblocks
 
 import (
-	"github.com/Masterminds/semver/v3"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	"github.com/Masterminds/semver/v3"
 	"github.com/spf13/cobra"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	clientfake "k8s.io/client-go/rest/fake"
@@ -28,7 +28,6 @@ import (
 
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
-	"github.com/apecloud/kubeblocks/internal/cli/util/helm"
 )
 
 var _ = Describe("kubeblocks list versions", func() {
@@ -51,26 +50,13 @@ var _ = Describe("kubeblocks list versions", func() {
 	})
 
 	It("list versions command", func() {
-		var cfg string
 		cmd = newListVersionsCmd(tf, streams)
 		Expect(cmd).ShouldNot(BeNil())
-
-		cmd.Flags().StringVar(&cfg, "kubeconfig", "", "Path to the kubeconfig file to use for CLI requests.")
-		cmd.Flags().StringVar(&cfg, "context", "", "The name of the kubeconfig context to use.")
-
-		o := &Options{
-			IOStreams: streams,
-		}
-		Expect(o.complete(tf, cmd)).Should(Succeed())
-		Expect(o.Namespace).Should(Equal(namespace))
-		Expect(o.HelmCfg).ShouldNot(BeNil())
 	})
 
 	It("run list-versions", func() {
 		o := listVersionsOption{
 			IOStreams: streams,
-			HelmCfg:   helm.FakeActionConfig(),
-			Namespace: namespace,
 		}
 		By("setup searched version")
 		o.setupSearchedVersion()
@@ -95,6 +81,7 @@ var _ = Describe("kubeblocks list versions", func() {
 		Expect(err).Should(Succeed())
 		Expect(len(res)).Should(Equal(2))
 
+		// TODO: use a mock helm chart to test
 		By("list versions")
 		Expect(o.listVersions()).Should(HaveOccurred())
 	})

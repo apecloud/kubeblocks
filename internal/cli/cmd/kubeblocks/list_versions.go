@@ -23,7 +23,6 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
-	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/repo"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
@@ -46,10 +45,8 @@ var (
 
 type listVersionsOption struct {
 	genericclioptions.IOStreams
-	HelmCfg   *action.Configuration
-	Namespace string
-	version   string
-	devel     bool
+	version string
+	devel   bool
 }
 
 func newListVersionsCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
@@ -61,35 +58,12 @@ func newListVersionsCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) 
 		Args:    cobra.NoArgs,
 		Example: listVersionsExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			util.CheckErr(o.complete(f, cmd))
 			util.CheckErr(o.listVersions())
 		},
 	}
 
 	cmd.Flags().BoolVar(&o.devel, "devel", false, "use development versions (alpha, beta, and release candidate releases), too. Equivalent to version '>0.0.0-0'.")
 	return cmd
-}
-
-func (o *listVersionsOption) complete(f cmdutil.Factory, cmd *cobra.Command) error {
-	var err error
-	if o.Namespace, _, err = f.ToRawKubeConfigLoader().Namespace(); err != nil {
-		return err
-	}
-
-	config, err := cmd.Flags().GetString("kubeconfig")
-	if err != nil {
-		return err
-	}
-
-	ctx, err := cmd.Flags().GetString("context")
-	if err != nil {
-		return err
-	}
-
-	if o.HelmCfg, err = helm.NewActionConfig(o.Namespace, config, helm.WithContext(ctx)); err != nil {
-		return err
-	}
-	return nil
 }
 
 func (o *listVersionsOption) listVersions() error {

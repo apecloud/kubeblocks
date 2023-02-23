@@ -50,7 +50,6 @@ func buildMonitorConfig(
 
 	// TODO: builtin will support by an independent agent soon
 	disableMonitor(component)
-	return
 }
 
 func disableMonitor(component *SynthesizedComponent) {

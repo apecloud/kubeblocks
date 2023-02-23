@@ -744,7 +744,7 @@ func (r *ClusterReconciler) reconcileClusterStatus(ctx context.Context,
 		oldPhase := cluster.Status.Phase
 		componentMap, clusterAvailabilityEffectMap, _ := getComponentRelatedInfo(cluster, clusterDef, "")
 		// handle the cluster status when some components are not ready.
-		handleClusterAbnormalOrFailedPhase(cluster, componentMap, clusterAvailabilityEffectMap)
+		handleClusterPhaseWhenCompsNotReady(cluster, componentMap, clusterAvailabilityEffectMap)
 		currPhase := cluster.Status.Phase
 		if !util.IsFailedOrAbnormal(currPhase) {
 			return false, nil

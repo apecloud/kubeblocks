@@ -87,58 +87,69 @@ func NewComponentByType(
 	return nil
 }
 
+// podsOfComponentAreReady checks if the pods of component are ready.
+func podsOfComponentAreReady(compCtx componentContext) (*bool, error) {
+	if compCtx.componentSpec.Replicas == 0 {
+		// if replicas number of component is 0, ignore it and return nil.
+		return nil, nil
+	}
+	podsReadyForComponent, err := compCtx.component.PodsReady(compCtx.obj)
+	if err != nil {
+		return nil, err
+	}
+	return &podsReadyForComponent, nil
+}
+
 // handleComponentStatusAndSyncCluster handles component status. if the component status changed, sync cluster.status.components
 func handleComponentStatusAndSyncCluster(compCtx componentContext,
-	cluster *appsv1alpha1.Cluster) (requeueAfter time.Duration, err error) {
+	cluster *appsv1alpha1.Cluster) (time.Duration, error) {
 	var (
-		obj                  = compCtx.obj
-		component            = compCtx.component
-		podsReady            *bool
-		isRunning            bool
+		obj       = compCtx.obj
+		component = compCtx.component
+	)
+	if component == nil {
+		return 0, nil
+	}
+	// handle the components changes
+	err := component.HandleUpdate(obj)
+	if err != nil {
+		return 0, err
+	}
+	// handle the component status
+	isRunning, err := component.IsRunning(obj)
+	if err != nil {
+		return 0, err
+	}
+	podsReady, err := podsOfComponentAreReady(compCtx)
+	if err != nil {
+		return 0, err
+	}
+	var (
+		requeueAfter         time.Duration
 		requeueWhenPodsReady bool
 		hasFailedPodTimedOut bool
+		// snapshot cluster
+		clusterDeepCopy = cluster.DeepCopy()
 	)
-
-	if component == nil {
-		return
-	}
-	if compCtx.componentSpec.Replicas == 0 {
-		podsReady = nil
-	} else {
-		podsReadyForComponent, err := component.PodsReady(obj)
-		if err != nil {
-			return 0, err
-		}
-		podsReady = &podsReadyForComponent
-	}
-	if err = component.HandleUpdate(obj); err != nil {
-		return
-	}
-	if isRunning, err = component.IsRunning(obj); err != nil {
-		return
-	}
-	// snapshot cluster
-	clusterDeepCopy := cluster.DeepCopy()
 	if !isRunning {
 		if podsReady != nil && *podsReady {
 			// check if the role probe timed out when component phase is not Running but all pods of component are ready.
 			if requeueWhenPodsReady, err = component.HandleProbeTimeoutWhenPodsReady(compCtx.recorder); err != nil {
-				return
+				return 0, err
 			} else if requeueWhenPodsReady {
 				requeueAfter = time.Minute
 			}
 		} else {
 			// check whether there is a failed pod of component that has timed out
 			if hasFailedPodTimedOut, requeueAfter, err = hasPodFailedTimedOut(compCtx, cluster); err != nil {
-				return
+				return 0, err
 			}
 		}
 	}
 
 	if err = handleClusterComponentStatus(compCtx, clusterDeepCopy, cluster, podsReady, isRunning, hasFailedPodTimedOut); err != nil {
-		return
+		return 0, err
 	}
-
 	return requeueAfter, opsutil.MarkRunningOpsRequestAnnotation(compCtx.reqCtx.Ctx, compCtx.cli, cluster)
 }
 

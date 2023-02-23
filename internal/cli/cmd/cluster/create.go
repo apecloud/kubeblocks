@@ -128,7 +128,7 @@ type UpdatableFlags struct {
 	EnableAllLogs     bool   `json:"enableAllLogs"`
 
 	// TopologyKeys if TopologyKeys is nil, add omitempty json tag.
-	// because CueLang can not covert null to list.
+	// because CueLang can not convert null to list.
 	TopologyKeys   []string          `json:"topologyKeys,omitempty"`
 	NodeLabels     map[string]string `json:"nodeLabels,omitempty"`
 	TolerationsRaw []string          `json:"-"`

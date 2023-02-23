@@ -13,14 +13,16 @@ We would like to extend our appreciation to all contributors who helped make thi
   ```yaml
   # ClusterDefinition API
   kind: ClusterDefinition
+    metadata:
+    name: my-clusterdefinition
   spec:
     connectionCredential:
       username: "admin" 
       "admin-password": "$(RANDOM_PASSWD)"
       endpoint: "http://$(SVC_FQDN):$(SVC_PORT_http)"
 
-    components:
-      - typeName: my-comp-type
+    componentsDefs:
+      - name: my-comp-type
         service:
           ports:
             - name: http
@@ -32,7 +34,8 @@ We would like to extend our appreciation to all contributors who helped make thi
     name: my-cluster
     namespace: my-ns
   spec:
-    components:
+    clusterDefinitionRef: my-clusterdefinition
+    componentSpecs:
       - name: my-comp
         type: my-comp-type
 

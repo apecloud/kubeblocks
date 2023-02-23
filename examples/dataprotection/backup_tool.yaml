@@ -9,7 +9,7 @@ metadata:
 
 spec:
   # backup tool image
-  image: percona/percona-xtrabackup
+  image: registry.cn-hangzhou.aliyuncs.com/apecloud/percona-xtrabackup
 
   # database engine to support in the backup.
   # Required.

@@ -30,7 +30,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/util/helm"
 )
 
-var _ = Describe("kubeblocks", func() {
+var _ = Describe("kubeblocks uninstall", func() {
 	var cmd *cobra.Command
 	var streams genericclioptions.IOStreams
 	var tf *cmdtesting.TestFactory

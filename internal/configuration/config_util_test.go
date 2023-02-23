@@ -53,7 +53,7 @@ var _ = Describe("config_util", func() {
 						}
 					}
 					cc.Spec.FormatterConfig = &v1alpha1.FormatterConfig{
-						Formatter: v1alpha1.Properties,
+						Format: v1alpha1.Properties,
 					}
 				})
 
@@ -91,7 +91,7 @@ var _ = Describe("config_util", func() {
 
 				option := CfgOption{
 					Type:    CfgTplType,
-					CfgType: tt.args.configConstraint.FormatterConfig.Formatter,
+					CfgType: tt.args.configConstraint.FormatterConfig.Format,
 				}
 
 				patch, err := CreateMergePatch(&K8sConfig{

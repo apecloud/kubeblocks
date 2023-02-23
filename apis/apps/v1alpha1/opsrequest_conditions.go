@@ -36,7 +36,9 @@ const (
 	ConditionTypeHorizontalScaling = "HorizontalScaling"
 	ConditionTypeVolumeExpanding   = "VolumeExpanding"
 	ConditionTypeReconfigure       = "Reconfigure"
-	ConditionTypeUpgrading         = "Upgrading"
+	ConditionTypeStop              = "Stopping"
+	ConditionTypeStart             = "Starting"
+	ConditionTypeVersionUpgrading  = "VersionUpgrading"
 
 	// condition and event reasons
 
@@ -123,7 +125,7 @@ func NewRestartingCondition(ops *OpsRequest) *metav1.Condition {
 	return &metav1.Condition{
 		Type:               ConditionTypeRestarting,
 		Status:             metav1.ConditionTrue,
-		Reason:             "RestartingStarted",
+		Reason:             "RestartStarted",
 		LastTransitionTime: metav1.NewTime(time.Now()),
 		Message:            fmt.Sprintf("Start to restart database in Cluster: %s", ops.Spec.ClusterRef),
 	}
@@ -136,7 +138,7 @@ func NewVerticalScalingCondition(ops *OpsRequest) *metav1.Condition {
 		Status:             metav1.ConditionTrue,
 		Reason:             "VerticalScalingStarted",
 		LastTransitionTime: metav1.NewTime(time.Now()),
-		Message:            fmt.Sprintf("Start to vertical scale in Cluster: %s", ops.Spec.ClusterRef),
+		Message:            fmt.Sprintf("Start to vertical scale resources in Cluster: %s", ops.Spec.ClusterRef),
 	}
 }
 
@@ -147,7 +149,7 @@ func NewHorizontalScalingCondition(ops *OpsRequest) *metav1.Condition {
 		Status:             metav1.ConditionTrue,
 		Reason:             "HorizontalScalingStarted",
 		LastTransitionTime: metav1.NewTime(time.Now()),
-		Message:            fmt.Sprintf("Start to horizontal scale in Cluster: %s", ops.Spec.ClusterRef),
+		Message:            fmt.Sprintf("Start to horizontal scale replicas in Cluster: %s", ops.Spec.ClusterRef),
 	}
 }
 
@@ -156,24 +158,46 @@ func NewVolumeExpandingCondition(ops *OpsRequest) *metav1.Condition {
 	return &metav1.Condition{
 		Type:               ConditionTypeVolumeExpanding,
 		Status:             metav1.ConditionTrue,
-		Reason:             "VolumeExpandingStarted",
+		Reason:             "VolumeExpansionStarted",
 		LastTransitionTime: metav1.NewTime(time.Now()),
-		Message:            fmt.Sprintf("Start to expand the volume in Cluster: %s", ops.Spec.ClusterRef),
+		Message:            fmt.Sprintf("Start to expand the volumes in Cluster: %s", ops.Spec.ClusterRef),
 	}
 }
 
-// NewUpgradingCondition creates a condition that the OpsRequest starts to upgrade cluster
+// NewUpgradingCondition creates a condition that the OpsRequest starts to upgrade the cluster version
 func NewUpgradingCondition(ops *OpsRequest) *metav1.Condition {
 	return &metav1.Condition{
-		Type:               ConditionTypeUpgrading,
+		Type:               ConditionTypeVersionUpgrading,
 		Status:             metav1.ConditionTrue,
-		Reason:             "UpgradingStarted",
+		Reason:             "VersionUpgradeStarted",
 		LastTransitionTime: metav1.NewTime(time.Now()),
-		Message:            fmt.Sprintf("Start to upgrade in Cluster: %s", ops.Spec.ClusterRef),
+		Message:            fmt.Sprintf("Start to upgrade the version in Cluster: %s", ops.Spec.ClusterRef),
 	}
 }
 
-// NewReconfigureCondition new a condition that the OpsRequest updating component configuration
+// NewStopCondition creates a condition that the OpsRequest starts to stop the cluster.
+func NewStopCondition(ops *OpsRequest) *metav1.Condition {
+	return &metav1.Condition{
+		Type:               ConditionTypeStop,
+		Status:             metav1.ConditionTrue,
+		Reason:             "StopStarted",
+		LastTransitionTime: metav1.NewTime(time.Now()),
+		Message:            fmt.Sprintf("Start to stop the Cluster: %s", ops.Spec.ClusterRef),
+	}
+}
+
+// NewStartCondition creates a condition that the OpsRequest starts the cluster.
+func NewStartCondition(ops *OpsRequest) *metav1.Condition {
+	return &metav1.Condition{
+		Type:               ConditionTypeStart,
+		Status:             metav1.ConditionTrue,
+		Reason:             "StartCluster",
+		LastTransitionTime: metav1.NewTime(time.Now()),
+		Message:            fmt.Sprintf("Start the Cluster: %s", ops.Spec.ClusterRef),
+	}
+}
+
+// NewReconfigureCondition creates a condition that the OpsRequest updating component configuration
 func NewReconfigureCondition(ops *OpsRequest) *metav1.Condition {
 	return &metav1.Condition{
 		Type:               ConditionTypeReconfigure,
@@ -186,7 +210,7 @@ func NewReconfigureCondition(ops *OpsRequest) *metav1.Condition {
 	}
 }
 
-// NewReconfigureRunningCondition new a condition that the OpsRequest reconfigure workflow
+// NewReconfigureRunningCondition creates a condition that the OpsRequest reconfigure workflow
 func NewReconfigureRunningCondition(ops *OpsRequest, conditionType string, tplName string, info ...string) *metav1.Condition {
 	status := metav1.ConditionTrue
 	if conditionType == ReasonReconfigureFailed {

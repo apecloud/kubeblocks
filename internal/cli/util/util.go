@@ -436,18 +436,20 @@ func GetConfigTemplateList(clusterName string, namespace string, cli dynamic.Int
 	}
 
 	clusterDefName := clusterObj.Spec.ClusterDefRef
-	clusterVersionName := clusterObj.Spec.ClusterVersionRef
 	if err := GetResourceObjectFromGVR(types.ClusterDefGVR(), client.ObjectKey{
 		Namespace: "",
 		Name:      clusterDefName,
 	}, cli, &clusterDefObj); err != nil {
 		return nil, err
 	}
-	if err := GetResourceObjectFromGVR(types.ClusterVersionGVR(), client.ObjectKey{
-		Namespace: "",
-		Name:      clusterVersionName,
-	}, cli, &clusterVersionObj); err != nil {
-		return nil, err
+	clusterVersionName := clusterObj.Spec.ClusterVersionRef
+	if clusterVersionName != "" {
+		if err := GetResourceObjectFromGVR(types.ClusterVersionGVR(), client.ObjectKey{
+			Namespace: "",
+			Name:      clusterVersionName,
+		}, cli, &clusterVersionObj); err != nil {
+			return nil, err
+		}
 	}
 
 	tpls, err := cfgcore.GetConfigTemplatesFromComponent(clusterObj.Spec.ComponentSpecs, clusterDefObj.Spec.ComponentDefs, clusterVersionObj.Spec.ComponentVersions, componentName)

@@ -121,7 +121,7 @@ func BuildComponent(
 	//	 }
 	// }
 
-	buildMonitorConfig(&cluster, &clusterDef, &clusterCompDef, &clusterCompSpec, component)
+	buildMonitorConfig(&clusterCompDef, &clusterCompSpec, component)
 	err := buildProbeContainers(reqCtx, component)
 	if err != nil {
 		reqCtx.Log.Error(err, "build probe container failed.")

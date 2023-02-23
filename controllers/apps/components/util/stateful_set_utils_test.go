@@ -20,9 +20,15 @@ package util
 import (
 	"testing"
 
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
+	corev1 "k8s.io/api/core/v1"
+
 	apps "k8s.io/api/apps/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 	testk8s "github.com/apecloud/kubeblocks/internal/testutil/k8s"
 )
 
@@ -77,17 +83,17 @@ func TestStatefulSetPodsAreReady(t *testing.T) {
 	if !ready {
 		t.Errorf("StatefulSet pods should be ready")
 	}
-	covertSts := CovertToStatefulSet(sts)
-	if covertSts == nil {
-		t.Errorf("Covert to statefulSet should be succeed")
+	convertSts := ConvertToStatefulSet(sts)
+	if convertSts == nil {
+		t.Errorf("Convert to statefulSet should be succeed")
 	}
-	covertSts = CovertToStatefulSet(&apps.Deployment{})
-	if covertSts != nil {
-		t.Errorf("Covert to statefulSet should be failed")
+	convertSts = ConvertToStatefulSet(&apps.Deployment{})
+	if convertSts != nil {
+		t.Errorf("Convert to statefulSet should be failed")
 	}
-	covertSts = CovertToStatefulSet(nil)
-	if covertSts != nil {
-		t.Errorf("Covert to statefulSet should be failed")
+	convertSts = ConvertToStatefulSet(nil)
+	if convertSts != nil {
+		t.Errorf("Convert to statefulSet should be failed")
 	}
 }
 
@@ -103,3 +109,60 @@ func TestSStatefulSetOfComponentIsReady(t *testing.T) {
 		t.Errorf("StatefulSet should not be ready")
 	}
 }
+
+var _ = Describe("StatefulSet utils test", func() {
+	var (
+		clusterName = "test-replication-cluster"
+		stsName     = "test-sts"
+		role        = "Primary"
+	)
+	cleanAll := func() {
+		By("Cleaning resources")
+		// delete cluster(and all dependent sub-resources), clusterversion and clusterdef
+		testapps.ClearClusterResources(&testCtx)
+		// clear rest resources
+		inNS := client.InNamespace(testCtx.DefaultNamespace)
+		ml := client.HasLabels{testCtx.TestObjLabelKey}
+		// namespaced resources
+		testapps.ClearResources(&testCtx, intctrlutil.StatefulSetSignature, inNS, ml)
+		testapps.ClearResources(&testCtx, intctrlutil.PodSignature, inNS, ml, client.GracePeriodSeconds(0))
+	}
+
+	BeforeEach(cleanAll)
+	AfterEach(cleanAll)
+
+	When("Updating a StatefulSet with `OnDelete` UpdateStrategy", func() {
+		It("will not update pods of the StatefulSet util the pods have been manually deleted", func() {
+			By("Creating a StatefulSet")
+			sts := testapps.NewStatefulSetFactory(testCtx.DefaultNamespace, stsName, clusterName, testapps.DefaultRedisCompName).
+				AddContainer(corev1.Container{Name: testapps.DefaultRedisContainerName, Image: testapps.DefaultRedisImageName}).
+				AddLabels(intctrlutil.AppInstanceLabelKey, clusterName,
+					intctrlutil.AppComponentLabelKey, testapps.DefaultRedisCompName,
+					intctrlutil.AppManagedByLabelKey, testapps.KubeBlocks,
+					intctrlutil.RoleLabelKey, role).
+				SetReplicas(1).
+				Create(&testCtx).GetObject()
+
+			By("Creating pods by the StatefulSet")
+			testapps.MockReplicationComponentPods(testCtx, sts, clusterName, testapps.DefaultRedisCompName, role)
+			Expect(IsStsAndPodsRevisionConsistent(testCtx.Ctx, k8sClient, sts)).Should(BeTrue())
+
+			By("Updating the StatefulSet's UpdateRevision")
+			sts.Status.UpdateRevision = "new-mock-revision"
+			testk8s.PatchStatefulSetStatus(&testCtx, sts.Name, sts.Status)
+			podList, err := GetPodListByStatefulSet(ctx, k8sClient, sts)
+			Expect(err).To(Succeed())
+			Expect(len(podList)).To(Equal(1))
+
+			By("Deleting the pods of StatefulSet")
+			Expect(DeleteStsPods(testCtx.Ctx, k8sClient, sts)).Should(Succeed())
+			podList, err = GetPodListByStatefulSet(ctx, k8sClient, sts)
+			Expect(err).To(Succeed())
+			Expect(len(podList)).To(Equal(0))
+
+			By("Creating new pods by StatefulSet with new UpdateRevision")
+			testapps.MockReplicationComponentPods(testCtx, sts, clusterName, testapps.DefaultRedisCompName, role)
+			Expect(IsStsAndPodsRevisionConsistent(testCtx.Ctx, k8sClient, sts)).Should(BeTrue())
+		})
+	})
+})

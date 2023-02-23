@@ -5,7 +5,7 @@ metadata:
   labels:
     {{- include "apecloud-mysql.labels" . | nindent 4 }}
 spec:
-  image: percona/percona-xtrabackup
+  image: registry.cn-hangzhou.aliyuncs.com/apecloud/percona-xtrabackup
   databaseEngine: mysql
   deployKind: job
   resources:

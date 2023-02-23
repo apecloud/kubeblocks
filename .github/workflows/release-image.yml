@@ -58,11 +58,11 @@ jobs:
           docker login --username ${{ secrets.DOCKER_REGISTRY_USER }} \
             --password ${{ secrets.DOCKER_REGISTRY_PASSWORD }} ${{ env.DOCKER_REGISTRY_URL }}
           
-          BUILDX_ENABLED=true VERSION=$RELEASE_VERSION make push-manager-image
+          BUILDX_ARGS="--sbom=false --provenance=false" BUILDX_ENABLED=true VERSION=$RELEASE_VERSION make push-manager-image
           
           docker login --username ${{ secrets.ALIYUN_REGISTRY_USER }} \
             --password ${{ secrets.ALIYUN_REGISTRY_PASSWORD }} ${{ env.ALIYUN_REGISTRY_URL }}
           
-          BUILDX_ENABLED=true VERSION=$RELEASE_VERSION \
+          BUILDX_ENABLED=true VERSION=$RELEASE_VERSION BUILDX_ARGS="--sbom=false --provenance=false" \
             IMG=${{ env.ALIYUN_REGISTRY_URL }}/apecloud/kubeblocks \
             make push-manager-image

@@ -23,6 +23,8 @@ import (
 	"strings"
 	"time"
 
+	"golang.org/x/exp/maps"
+
 	"github.com/pkg/errors"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
@@ -138,6 +140,22 @@ func mergeAnnotations(originalAnnotations, targetAnnotations map[string]string) 
 		targetAnnotations[intctrlutil.RestartAnnotationKey] = restartAnnotation
 	}
 	return targetAnnotations
+}
+
+// mergeServiceAnnotations keeps the original annotations except prometheus scrape annotations.
+// if annotations exist and are replaced, the Service will be updated.
+func mergeServiceAnnotations(originalAnnotations, targetAnnotations map[string]string) map[string]string {
+	if len(originalAnnotations) == 0 {
+		return targetAnnotations
+	}
+	tmpAnnotations := make(map[string]string, len(originalAnnotations)+len(targetAnnotations))
+	for k, v := range originalAnnotations {
+		if !strings.HasPrefix(k, "prometheus.io") {
+			tmpAnnotations[k] = v
+		}
+	}
+	maps.Copy(tmpAnnotations, targetAnnotations)
+	return tmpAnnotations
 }
 
 func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
@@ -427,6 +445,7 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 			return err
 		}
 		svcObj.Spec = svcProto.Spec
+		svcObj.Annotations = mergeServiceAnnotations(svcObj.Annotations, svcProto.Annotations)
 		if err := cli.Update(ctx, svcObj); err != nil {
 			return err
 		}
@@ -911,6 +930,13 @@ func doBackup(reqCtx intctrlutil.RequestCtx,
 			for _, tmpVct := range stsObj.Spec.VolumeClaimTemplates {
 				if tmpVct.Name == component.HorizontalScalePolicy.VolumeMountsName {
 					vct = tmpVct
+					break
+				}
+			}
+			// sync vct.spec.resources from component
+			for _, tmpVct := range component.VolumeClaimTemplates {
+				if vct.Name == tmpVct.Name {
+					vct.Spec.Resources = tmpVct.Spec.Resources
 					break
 				}
 			}

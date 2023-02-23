@@ -107,7 +107,6 @@ type UnixSignalTrigger struct {
 	// e.g: SIGHUP
 	// url: ../../internal/configuration/configmap/handler.go:allUnixSignals
 	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:Enum={SIGHUP,SIGINT,SIGQUIT,SIGILL,SIGTRAP,SIGABRT,SIGBUS,SIGFPE,SIGKILL,SIGUSR1,SIGSEGV,SIGUSR2,SIGPIPE,SIGALRM,SIGTERM,SIGSTKFLT,SIGCHLD,SIGCONT,SIGSTOP,SIGTSTP,SIGTTIN,SIGTTOU,SIGURG,SIGXCPU,SIGXFSZ,SIGVTALRM,SIGPROF,SIGWINCH,SIGIO,SIGPWR,SIGSYS}
 	Signal SignalType `json:"signal"`
 
 	// processName is process name, sends unix signal to proc.
@@ -123,9 +122,13 @@ type ShellTrigger struct {
 }
 
 type FormatterConfig struct {
-	// formatter describes the format of the configuration file
-	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:Enum={xml,ini,yaml,json,dotenv,hcl,properties,toml}
+	// The FormatterOptions represents the special options of configuration file.
+	// This is optional for now. If not specified.
+	// +optional
+	FormatterOptions `json:",inline"`
+
+	// The configuration file format. Valid values are ini, xml, yaml, json,
+	// hcl, dotenv, properties and toml.
 	//
 	// ini: a configuration file that consists of a text-based content with a structure and syntax comprising key–value pairs for properties, reference wiki: https://en.wikipedia.org/wiki/INI_file
 	// xml: reference wiki: https://en.wikipedia.org/wiki/XML
@@ -135,12 +138,8 @@ type FormatterConfig struct {
 	// dotenv: this was a plain text file with simple key–value pairs, reference wiki: https://en.wikipedia.org/wiki/Configuration_file#MS-DOS
 	// properties: a file extension mainly used in Java, reference wiki: https://en.wikipedia.org/wiki/.properties
 	// toml: reference wiki: https://en.wikipedia.org/wiki/TOML
-	Formatter ConfigurationFormatter `json:"formatter"`
-
-	// The FormatterOptions represents the special options of configuration file.
-	// This is optional for now. If not specified.
-	// +optional
-	FormatterOptions `json:",inline"`
+	// +kubebuilder:validation:Required
+	Format CfgFileFormat `json:"format"`
 }
 
 // FormatterOptions represents the special options of configuration file.

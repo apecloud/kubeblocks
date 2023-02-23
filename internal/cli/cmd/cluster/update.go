@@ -138,6 +138,7 @@ func (o *updateOptions) buildPatch(flags []*pflag.Flag) error {
 		"topology-keys":      {field: "topologyKeys", obj: affinity, fn: buildFlagObj},
 		"node-labels":        {field: "nodeLabels", obj: affinity, fn: buildFlagObj},
 		"tolerations":        {field: "tolerations", obj: spec, fn: buildTolObj},
+		"tenancy":            {field: "tenancy", obj: affinity, fn: buildFlagObj},
 		"monitor":            {field: "monitor", obj: nil, fn: buildComps},
 		"enable-all-logs":    {field: "enable-all-logs", obj: nil, fn: buildComps},
 	}

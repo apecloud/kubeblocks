@@ -43,7 +43,7 @@ func MergeAndValidateConfiguration(configConstraint appsv1alpha1.ConfigConstrain
 	if configOperator, err = NewConfigLoader(CfgOption{
 		Type:    CfgCmType,
 		Log:     log.FromContext(context.TODO()),
-		CfgType: fc.Formatter,
+		CfgType: fc.Format,
 		K8sKey: &K8sConfig{
 			CfgKey: client.ObjectKey{},
 			ResourceFn: func(key client.ObjectKey) (map[string]string, error) {
@@ -56,7 +56,7 @@ func MergeAndValidateConfiguration(configConstraint appsv1alpha1.ConfigConstrain
 	// process special formatter options
 	mergedOptions := func(ctx *CfgOpOption) {
 		// process special formatter
-		if fc.Formatter == appsv1alpha1.INI && fc.IniConfig != nil {
+		if fc.Format == appsv1alpha1.INI && fc.IniConfig != nil {
 			ctx.IniContext = &IniContext{
 				SectionName: fc.IniConfig.SectionName,
 			}

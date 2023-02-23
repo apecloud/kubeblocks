@@ -299,7 +299,7 @@ func (c *cfgWrapper) Diff(target *cfgWrapper) (*ConfigPatchInfo, error) {
 	return reconfigureInfo, nil
 }
 
-func NewCfgViper(cfgType appsv1alpha1.ConfigurationFormatter) *viper.Viper {
+func NewCfgViper(cfgType appsv1alpha1.CfgFileFormat) *viper.Viper {
 	defaultKeySep := delimiterDot
 	if cfgType == appsv1alpha1.Properties || cfgType == appsv1alpha1.Dotenv {
 		defaultKeySep = cfgDelimiterPlaceholder
@@ -420,7 +420,7 @@ func GenerateVisualizedParamsList(configPatch *ConfigPatchInfo, formatConfig *ap
 	}
 
 	var trimPrefix = ""
-	if formatConfig != nil && formatConfig.Formatter == appsv1alpha1.INI && formatConfig.IniConfig != nil {
+	if formatConfig != nil && formatConfig.Format == appsv1alpha1.INI && formatConfig.IniConfig != nil {
 		trimPrefix = formatConfig.IniConfig.SectionName
 	}
 

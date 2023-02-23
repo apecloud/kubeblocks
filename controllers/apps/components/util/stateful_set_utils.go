@@ -24,6 +24,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
@@ -61,7 +62,12 @@ func IsStsAndPodsRevisionConsistent(ctx context.Context, cli client.Client, sts 
 	if err != nil {
 		return false, err
 	}
+
 	revisionConsistent := true
+	if len(pods) != int(*sts.Spec.Replicas) {
+		return false, nil
+	}
+
 	for _, pod := range pods {
 		if GetPodRevision(&pod) != sts.Status.UpdateRevision {
 			revisionConsistent = false
@@ -69,6 +75,33 @@ func IsStsAndPodsRevisionConsistent(ctx context.Context, cli client.Client, sts 
 		}
 	}
 	return revisionConsistent, nil
+}
+
+// DeleteStsPods deletes pods of the StatefulSet manually
+func DeleteStsPods(ctx context.Context, cli client.Client, sts *appsv1.StatefulSet) error {
+	if sts.Spec.UpdateStrategy.Type == appsv1.RollingUpdateStatefulSetStrategyType {
+		return nil
+	}
+
+	pods, err := GetPodListByStatefulSet(ctx, cli, sts)
+	if err != nil {
+		return err
+	}
+	for _, pod := range pods {
+		// do nothing if the pod is terminating
+		if pod.DeletionTimestamp != nil {
+			continue
+		}
+		// do nothing if the pod has the latest version
+		if GetPodRevision(&pod) == sts.Status.UpdateRevision {
+			continue
+		}
+		// delete the pod to trigger associate StatefulSet to re-create it
+		if err := cli.Delete(ctx, &pod); err != nil && !apierrors.IsNotFound(err) {
+			return err
+		}
+	}
+	return nil
 }
 
 // StatefulSetOfComponentIsReady checks if statefulSet of component is ready.
@@ -87,7 +120,7 @@ func StatefulSetPodsAreReady(sts *appsv1.StatefulSet, targetReplicas int32) bool
 		sts.Status.ObservedGeneration == sts.Generation
 }
 
-func CovertToStatefulSet(obj client.Object) *appsv1.StatefulSet {
+func ConvertToStatefulSet(obj client.Object) *appsv1.StatefulSet {
 	if obj == nil {
 		return nil
 	}

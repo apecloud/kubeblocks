@@ -162,6 +162,18 @@ func ListAndCheckStatefulSet(testCtx *testutil.TestContext, key types.Namespaced
 	return stsList
 }
 
+func ListAndCheckStatefulSetWithComponent(testCtx *testutil.TestContext, key types.NamespacedName, componentName string) *apps.StatefulSetList {
+	stsList := &apps.StatefulSetList{}
+	gomega.Eventually(func(g gomega.Gomega) {
+		g.Expect(testCtx.Cli.List(testCtx.Ctx, stsList, client.MatchingLabels{
+			intctrlutil.AppInstanceLabelKey:  key.Name,
+			intctrlutil.AppComponentLabelKey: componentName,
+		}, client.InNamespace(key.Namespace))).Should(gomega.Succeed())
+		g.Expect(len(stsList.Items) > 0).To(gomega.BeTrue())
+	}).Should(gomega.Succeed())
+	return stsList
+}
+
 func PatchStatefulSetStatus(testCtx *testutil.TestContext, stsName string, status apps.StatefulSetStatus) {
 	objectKey := client.ObjectKey{Name: stsName, Namespace: testCtx.DefaultNamespace}
 	gomega.Expect(testapps.GetAndChangeObjStatus(testCtx, objectKey, func(newSts *apps.StatefulSet) {

@@ -102,10 +102,10 @@ type SwitchStatus struct {
 	Message string
 }
 
-// SwitchPhaseStatus defines the status of switching.
+// SwitchPhaseStatus defines the status of switching phase.
 type SwitchPhaseStatus string
 
-// SwitchPhase defines the status of switching.
+// SwitchPhase defines the phase of switching.
 type SwitchPhase string
 
 // SwitchDetectManager is an interface to implement various detections that HA relies on, including health detection, role detection, data delay detection, etc.
@@ -306,7 +306,7 @@ func (s *Switch) Decision() bool {
 		}
 		// Regardless of whether the primary is alive or not, if the data consistency cannot be judged, the switch will not be performed.
 		s.SwitchStatus.SwitchPhaseStatus = SwitchPhaseStatusFailed
-		s.SwitchStatus.Reason = fmt.Sprintf("component %s  primary and secondary data consistency cannot be judged, so the switch will not be performed with MaximumAvailability switchPolicy", s.SwitchResource.CompSpec.Name)
+		s.SwitchStatus.Reason = fmt.Sprintf("component %s primary and secondary data consistency cannot be judged, so the switch will not be performed with MaximumAvailability switchPolicy", s.SwitchResource.CompSpec.Name)
 		return false
 	}
 
@@ -349,6 +349,8 @@ func (s *Switch) UpdateRoleLabel() error {
 	if s.SwitchInstance == nil {
 		return fmt.Errorf("switch target instance cannot be nil")
 	}
+
+	// TODO(xingran) exchange the role of old primary and new primary
 
 	return nil
 }

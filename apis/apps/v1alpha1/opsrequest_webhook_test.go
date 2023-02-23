@@ -238,21 +238,6 @@ var _ = Describe("OpsRequest webhook", func() {
 	}
 
 	testHorizontalScaling := func(cluster *Cluster) {
-		// set cluster support horizontalScaling
-		patch := client.MergeFrom(cluster.DeepCopy())
-		cluster.Status.Operations.HorizontalScalable = []OperationComponent{
-			{
-				Name: replicaSetComponentName,
-			},
-		}
-		Expect(k8sClient.Status().Patch(ctx, cluster, patch)).Should(Succeed())
-		// wait until patch succeed
-		Eventually(func() bool {
-			tmpCluster := &Cluster{}
-			_ = k8sClient.Get(context.Background(), client.ObjectKey{Name: cluster.Name, Namespace: cluster.Namespace}, tmpCluster)
-			return len(cluster.Status.Operations.HorizontalScalable) > 0
-		}, timeout, interval).Should(BeTrue())
-
 		By("By testing horizontalScaling. if api is legal, it will create successfully")
 		opsRequest := createTestOpsRequest(clusterName, opsRequestName, HorizontalScalingType)
 		Eventually(func() bool {
@@ -267,15 +252,6 @@ var _ = Describe("OpsRequest webhook", func() {
 		}, timeout, interval).Should(BeTrue())
 
 		By("test min, max is zero")
-		tmpCluster := &Cluster{}
-		Expect(k8sClient.Get(ctx, client.ObjectKey{Name: clusterName, Namespace: cluster.Namespace}, tmpCluster)).Should(Succeed())
-		patch = client.MergeFrom(tmpCluster.DeepCopy())
-		tmpCluster.Status.Operations.HorizontalScalable = []OperationComponent{
-			{
-				Name: "proxy",
-			},
-		}
-		Expect(k8sClient.Status().Patch(ctx, tmpCluster, patch)).Should(Succeed())
 		opsRequest = createTestOpsRequest(clusterName, opsRequestName, HorizontalScalingType)
 		Eventually(func() bool {
 			opsRequest.Spec.HorizontalScalingList = []HorizontalScaling{

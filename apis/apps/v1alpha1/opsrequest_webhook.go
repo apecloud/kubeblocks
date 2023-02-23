@@ -300,22 +300,14 @@ func (r *OpsRequest) validateHorizontalScaling(cluster *Cluster, allErrs *field.
 		addInvalidError(allErrs, "spec.horizontalScaling", horizontalScalingList, "can not be empty")
 		return
 	}
-	// validate whether the cluster support horizontal scaling
-	supportedComponentMap := convertOperationComponentsToMap(cluster.Status.Operations.HorizontalScalable)
-	if err := r.validateClusterIsSupported(supportedComponentMap); err != nil {
-		*allErrs = append(*allErrs, err)
-		return
-	}
-	// validate replicas and get component name slice
+
 	componentNames := make([]string, len(horizontalScalingList))
 	for i, v := range horizontalScalingList {
 		componentNames[i] = v.ComponentName
-		operationComponent := supportedComponentMap[v.ComponentName]
-		if operationComponent == nil {
-			continue
-		}
 	}
-	r.validateComponentName(allErrs, cluster, supportedComponentMap, componentNames)
+
+	// TODO(leon): whether to check against cluster definition?
+	r.checkComponentExistence(allErrs, cluster, componentNames)
 }
 
 // validateVolumeExpansion validates volumeExpansion api when spec.type is VolumeExpansion

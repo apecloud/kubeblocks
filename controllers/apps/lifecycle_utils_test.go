@@ -234,6 +234,14 @@ spec:
 		})
 	})
 
+	Context("utils test", func() {
+		It("should successfully delete object with cascade=orphan", func() {
+			sts := newStsObj()
+			Expect(k8sClient.Create(ctx, sts)).Should(Succeed())
+			Expect(deleteObjectOrphan(k8sClient, ctx, sts)).Should(Succeed())
+		})
+	})
+
 	Context("test mergeServiceAnnotations", func() {
 		It("original and target annotations are nil", func() {
 			Expect(mergeServiceAnnotations(nil, nil)).Should(BeNil())

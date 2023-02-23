@@ -30,6 +30,7 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -980,4 +981,17 @@ func getBackupMatchingLabels(clusterName string, componentName string) client.Ma
 		intctrlutil.AppComponentLabelKey: componentName,
 		intctrlutil.AppCreatedByLabelKey: intctrlutil.AppName,
 	}
+}
+
+// deleteObjectOrphan delete the object with cascade=orphan.
+func deleteObjectOrphan(cli client.Client, ctx context.Context, obj client.Object) error {
+	deletePropagation := metav1.DeletePropagationOrphan
+	deleteOptions := &client.DeleteOptions{
+		PropagationPolicy: &deletePropagation,
+	}
+
+	if err := cli.Delete(ctx, obj, deleteOptions); err != nil {
+		return err
+	}
+	return nil
 }

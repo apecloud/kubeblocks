@@ -8014,8 +8014,8 @@ spec:
                       type: object
                     replicationSpec:
                       description: replicationSpec defines replication related spec
-                        if componentType is Replication, required if componentType
-                        is Replication.
+                        if workloadType is Replication, required if workloadType is
+                        Replication.
                       properties:
                         switchCmdExecutorConfig:
                           description: switchCmdExecutorConfig configs how to get

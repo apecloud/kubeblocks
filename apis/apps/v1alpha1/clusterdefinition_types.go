@@ -343,7 +343,7 @@ type ClusterComponentDefinition struct {
 	// +optional
 	ConsensusSpec *ConsensusSetSpec `json:"consensusSpec,omitempty"`
 
-	// replicationSpec defines replication related spec if componentType is Replication, required if componentType is Replication.
+	// replicationSpec defines replication related spec if workloadType is Replication, required if workloadType is Replication.
 	// +optional
 	ReplicationSpec *ReplicationSpec `json:"replicationSpec,omitempty"`
 

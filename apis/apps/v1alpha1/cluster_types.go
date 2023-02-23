@@ -190,8 +190,8 @@ type ClusterComponentSpec struct {
 	// +kubebuilder:validation:Minimum=0
 	// +optional
 	PrimaryIndex *int32 `json:"primaryIndex,omitempty"`
-	
-	// switchPolicy defines the strategy for switchover and failover when componentType is Replication.
+
+	// switchPolicy defines the strategy for switchover and failover when workloadType is Replication.
 	// +optional
 	SwitchPolicy *ClusterSwitchPolicy `json:"switchPolicy,omitempty"`
 
@@ -296,7 +296,7 @@ type ClusterSwitchPolicy struct {
 	// +kubebuilder:validation:Enum={MaximumAvailability, MaximumDataProtection, Manual}
 	// +kubebuilder:default=MaximumAvailability
 	// +optional
-	Type SwitchPolicyType `json:"componentType"`
+	Type SwitchPolicyType `json:"switchPolicyType"`
 }
 
 type ClusterComponentVolumeClaimTemplate struct {

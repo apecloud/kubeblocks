@@ -458,7 +458,6 @@ var _ = Describe("OpsRequest Controller", func() {
 		Expect(opsRes.Cluster.Status.Phase).Should(BeEquivalentTo(appsv1alpha1.ReconfiguringType))
 
 		By("Reconfigure operation success")
-		//eventContext.PolicyStatus.SucceedCount = 3
 		Expect(reAction.Handle(eventContext, ops.Name, appsv1alpha1.SucceedPhase, nil)).Should(Succeed())
 		Expect(opsRes.Client.Get(opsRes.Ctx, client.ObjectKeyFromObject(opsRes.OpsRequest), opsRes.OpsRequest)).Should(Succeed())
 		_, _ = opsManager.Reconcile(opsRes)

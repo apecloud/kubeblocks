@@ -281,6 +281,16 @@ var _ = Describe("Cluster Controller", func() {
 		Eventually(testapps.CheckObjExists(&testCtx, clusterKey, &appsv1alpha1.Cluster{}, false)).Should(Succeed())
 	}
 
+	changeCompReplicas := func(clusterName types.NamespacedName, replicas int32, comp *appsv1alpha1.ClusterComponentSpec) {
+		Eventually(testapps.GetAndChangeObj(&testCtx, clusterName, func(cluster *appsv1alpha1.Cluster) {
+			for i, clusterComp := range cluster.Spec.ComponentSpecs {
+				if clusterComp.Name == comp.Name {
+					cluster.Spec.ComponentSpecs[i].Replicas = replicas
+				}
+			}
+		})).Should(Succeed())
+	}
+
 	changeStatefulSetReplicas := func(clusterName types.NamespacedName, replicas int32) {
 		Eventually(testapps.GetAndChangeObj(&testCtx, clusterName, func(cluster *appsv1alpha1.Cluster) {
 			if cluster.Spec.ComponentSpecs == nil || len(cluster.Spec.ComponentSpecs) == 0 {
@@ -349,30 +359,94 @@ var _ = Describe("Cluster Controller", func() {
 	}
 
 	createPVC := func(clusterName, pvcName, compName string) {
-		// Note: in real k8s cluster, it maybe fails when pvc created by k8s controller.
 		testapps.NewPersistentVolumeClaimFactory(testCtx.DefaultNamespace, pvcName, clusterName,
-			compName, "data").SetStorage("1Gi").Create(&testCtx)
+			compName, "data").SetStorage("1Gi").CheckedCreate(&testCtx)
 	}
 
-	testHorizontalScale := func() {
-		initialReplicas := int32(1)
-		updatedReplicas := int32(3)
+	horizontalScaleComp := func(updatedReplicas int, comp *appsv1alpha1.ClusterComponentSpec) {
+		By("Mocking components' PVCs to bound")
+		for i := 0; i < int(comp.Replicas); i++ {
+			pvcKey := types.NamespacedName{
+				Namespace: clusterKey.Namespace,
+				Name:      getPVCName(comp.Name, i),
+			}
+			createPVC(clusterKey.Name, pvcKey.Name, comp.Name)
+			Eventually(testapps.CheckObjExists(&testCtx, pvcKey, &corev1.PersistentVolumeClaim{}, true)).Should(Succeed())
+			Eventually(testapps.GetAndChangeObjStatus(&testCtx, pvcKey, func(pvc *corev1.PersistentVolumeClaim) {
+				pvc.Status.Phase = corev1.ClaimBound
+			})).Should(Succeed())
+		}
 
-		secondMysqlCompName := mysqlCompName + "1"
+		By("Checking sts replicas right")
+		stsList := testk8s.ListAndCheckStatefulSetWithComponent(&testCtx, clusterKey, comp.Name)
+		Expect(int(*stsList.Items[0].Spec.Replicas)).To(BeEquivalentTo(comp.Replicas))
 
-		By("Creating a multi components cluster with VolumeClaimTemplate")
-		pvcSpec := testapps.NewPVC("1Gi")
-		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
-			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
-			AddComponent(mysqlCompName, mysqlCompType).
-			AddVolumeClaimTemplate(testapps.DataVolumeName, &pvcSpec).
-			SetReplicas(initialReplicas).
-			AddComponent(secondMysqlCompName, mysqlCompType).
-			AddVolumeClaimTemplate(testapps.DataVolumeName, &pvcSpec).
-			SetReplicas(initialReplicas).
-			Create(&testCtx).GetObject()
-		clusterKey = client.ObjectKeyFromObject(clusterObj)
-		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
+		By(fmt.Sprintf("Changing replicas to %d", updatedReplicas))
+		changeCompReplicas(clusterKey, int32(updatedReplicas), comp)
+
+		By("Checking Backup created")
+		Eventually(testapps.GetListLen(&testCtx, intctrlutil.BackupSignature,
+			client.MatchingLabels{
+				intctrlutil.AppInstanceLabelKey:  clusterKey.Name,
+				intctrlutil.AppComponentLabelKey: comp.Name,
+			}, client.InNamespace(clusterKey.Namespace))).Should(Equal(1))
+
+		By("Mocking VolumeSnapshot and set it as ReadyToUse")
+		snapshotKey := types.NamespacedName{Name: fmt.Sprintf("%s-%s-scaling",
+			clusterKey.Name, comp.Name),
+			Namespace: testCtx.DefaultNamespace}
+		pvcName := getPVCName(comp.Name, 0)
+		volumeSnapshot := &snapshotv1.VolumeSnapshot{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      snapshotKey.Name,
+				Namespace: snapshotKey.Namespace,
+				Labels: map[string]string{
+					intctrlutil.AppCreatedByLabelKey: intctrlutil.AppName,
+					intctrlutil.AppInstanceLabelKey:  clusterKey.Name,
+					intctrlutil.AppComponentLabelKey: comp.Name,
+				}},
+			Spec: snapshotv1.VolumeSnapshotSpec{
+				Source: snapshotv1.VolumeSnapshotSource{
+					PersistentVolumeClaimName: &pvcName,
+				},
+			},
+		}
+		Expect(testCtx.CreateObj(testCtx.Ctx, volumeSnapshot)).Should(Succeed())
+		readyToUse := true
+		volumeSnapshotStatus := snapshotv1.VolumeSnapshotStatus{ReadyToUse: &readyToUse}
+		volumeSnapshot.Status = &volumeSnapshotStatus
+		Expect(k8sClient.Status().Update(testCtx.Ctx, volumeSnapshot)).Should(Succeed())
+
+		By("Mock PVCs status to bound")
+		for i := 0; i < updatedReplicas; i++ {
+			pvcKey := types.NamespacedName{
+				Namespace: clusterKey.Namespace,
+				Name:      getPVCName(comp.Name, i),
+			}
+			Eventually(testapps.CheckObjExists(&testCtx, pvcKey, &corev1.PersistentVolumeClaim{}, true)).Should(Succeed())
+			Eventually(testapps.GetAndChangeObjStatus(&testCtx, pvcKey, func(pvc *corev1.PersistentVolumeClaim) {
+				pvc.Status.Phase = corev1.ClaimBound
+			})).Should(Succeed())
+		}
+
+		By("Check backup job cleanup")
+		Eventually(testapps.GetListLen(&testCtx, intctrlutil.BackupSignature,
+			client.MatchingLabels{
+				intctrlutil.AppInstanceLabelKey:  clusterKey.Name,
+				intctrlutil.AppComponentLabelKey: comp.Name,
+			}, client.InNamespace(clusterKey.Namespace))).Should(Equal(0))
+		Eventually(testapps.CheckObjExists(&testCtx, snapshotKey, &snapshotv1.VolumeSnapshot{}, false)).Should(Succeed())
+
+		By("Checking updated sts replicas")
+		stsList = testk8s.ListAndCheckStatefulSetWithComponent(&testCtx, clusterKey, comp.Name)
+		Expect(*stsList.Items[0].Spec.Replicas).To(BeEquivalentTo(updatedReplicas))
+	}
+
+	horizontalScale := func(updatedReplicas int) {
+
+		cluster := &appsv1alpha1.Cluster{}
+		Expect(testCtx.Cli.Get(testCtx.Ctx, clusterKey, cluster)).Should(Succeed())
+		initialGeneration := int(cluster.Status.ObservedGeneration)
 
 		By("Set HorizontalScalePolicy")
 		Eventually(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(clusterDefObj),
@@ -396,90 +470,35 @@ var _ = Describe("Cluster Controller", func() {
 		}
 		Expect(testCtx.CreateObj(testCtx.Ctx, backupPolicyTpl)).Should(Succeed())
 
-		By("Mocking PVC for the first replica")
-		for i := 0; i < int(initialReplicas); i++ {
-			pvcKey := types.NamespacedName{
-				Namespace: clusterKey.Namespace,
-				Name:      getPVCName(mysqlCompName, i),
-			}
-			createPVC(clusterKey.Name, pvcKey.Name, mysqlCompName)
+		for i := range clusterObj.Spec.ComponentSpecs {
+			horizontalScaleComp(updatedReplicas, &clusterObj.Spec.ComponentSpecs[i])
 		}
-
-		By("Mock second component PVCs to make reconcile success")
-		for i := 0; i < int(initialReplicas); i++ {
-			pvcKey := types.NamespacedName{
-				Namespace: clusterKey.Namespace,
-				Name:      getPVCName(secondMysqlCompName, i),
-			}
-			createPVC(clusterKey.Name, pvcKey.Name, mysqlCompName)
-			Eventually(testapps.CheckObjExists(&testCtx, pvcKey, &corev1.PersistentVolumeClaim{}, true)).Should(Succeed())
-			Eventually(testapps.GetAndChangeObjStatus(&testCtx, pvcKey, func(pvc *corev1.PersistentVolumeClaim) {
-				pvc.Status.Phase = corev1.ClaimBound
-			})).Should(Succeed())
-		}
-
-		stsList := testk8s.ListAndCheckStatefulSet(&testCtx, clusterKey)
-		Expect(int(*stsList.Items[0].Spec.Replicas)).To(BeEquivalentTo(initialReplicas))
-
-		By(fmt.Sprintf("Changing replicas to %d", updatedReplicas))
-		changeStatefulSetReplicas(clusterKey, updatedReplicas)
-
-		By("Checking Backup created")
-		Eventually(testapps.GetListLen(&testCtx, intctrlutil.BackupSignature,
-			client.MatchingLabels{
-				intctrlutil.AppInstanceLabelKey:  clusterKey.Name,
-				intctrlutil.AppComponentLabelKey: mysqlCompName,
-			}, client.InNamespace(clusterKey.Namespace))).Should(Equal(1))
-
-		By("Mocking VolumeSnapshot and set it as ReadyToUse")
-		snapshotKey := types.NamespacedName{Name: fmt.Sprintf("%s-%s-scaling",
-			clusterKey.Name, mysqlCompName),
-			Namespace: testCtx.DefaultNamespace}
-		pvcName := getPVCName(mysqlCompName, 0)
-		volumeSnapshot := &snapshotv1.VolumeSnapshot{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      snapshotKey.Name,
-				Namespace: snapshotKey.Namespace,
-				Labels: map[string]string{
-					intctrlutil.AppCreatedByLabelKey: intctrlutil.AppName,
-					intctrlutil.AppInstanceLabelKey:  clusterKey.Name,
-					intctrlutil.AppComponentLabelKey: mysqlCompName,
-				}},
-			Spec: snapshotv1.VolumeSnapshotSpec{
-				Source: snapshotv1.VolumeSnapshotSource{
-					PersistentVolumeClaimName: &pvcName,
-				},
-			},
-		}
-		Expect(testCtx.CreateObj(testCtx.Ctx, volumeSnapshot)).Should(Succeed())
-		readyToUse := true
-		volumeSnapshotStatus := snapshotv1.VolumeSnapshotStatus{ReadyToUse: &readyToUse}
-		volumeSnapshot.Status = &volumeSnapshotStatus
-		Expect(k8sClient.Status().Update(testCtx.Ctx, volumeSnapshot)).Should(Succeed())
-
-		By("Mock PVCs status to bound")
-		for i := 0; i < int(updatedReplicas); i++ {
-			pvcKey := types.NamespacedName{
-				Namespace: clusterKey.Namespace,
-				Name:      getPVCName(mysqlCompName, i),
-			}
-			Eventually(testapps.CheckObjExists(&testCtx, pvcKey, &corev1.PersistentVolumeClaim{}, true)).Should(Succeed())
-			Eventually(testapps.GetAndChangeObjStatus(&testCtx, pvcKey, func(pvc *corev1.PersistentVolumeClaim) {
-				pvc.Status.Phase = corev1.ClaimBound
-			})).Should(Succeed())
-		}
-
-		By("Check backup job cleanup")
-		Eventually(testapps.GetListLen(&testCtx, intctrlutil.BackupSignature,
-			client.MatchingLabels{
-				intctrlutil.AppInstanceLabelKey: clusterKey.Name,
-			}, client.InNamespace(clusterKey.Namespace))).Should(Equal(0))
-		Eventually(testapps.CheckObjExists(&testCtx, snapshotKey, &snapshotv1.VolumeSnapshot{}, false)).Should(Succeed())
 
 		By("Checking cluster status and the number of replicas changed")
-		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(2))
-		stsList = testk8s.ListAndCheckStatefulSet(&testCtx, clusterKey)
-		Expect(*stsList.Items[0].Spec.Replicas).To(BeEquivalentTo(updatedReplicas))
+		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(initialGeneration + len(clusterObj.Spec.ComponentSpecs)))
+	}
+
+	testHorizontalScale := func() {
+		initialReplicas := int32(1)
+		updatedReplicas := int32(3)
+
+		secondMysqlCompName := mysqlCompName + "1"
+
+		By("Creating a multi components cluster with VolumeClaimTemplate")
+		pvcSpec := testapps.NewPVC("1Gi")
+		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
+			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
+			AddComponent(mysqlCompName, mysqlCompType).
+			AddVolumeClaimTemplate(testapps.DataVolumeName, &pvcSpec).
+			SetReplicas(initialReplicas).
+			AddComponent(secondMysqlCompName, mysqlCompType).
+			AddVolumeClaimTemplate(testapps.DataVolumeName, &pvcSpec).
+			SetReplicas(initialReplicas).
+			Create(&testCtx).GetObject()
+		clusterKey = client.ObjectKeyFromObject(clusterObj)
+		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
+
+		horizontalScale(int(updatedReplicas))
 	}
 
 	testVerticalScale := func() {
@@ -1084,6 +1103,13 @@ var _ = Describe("Cluster Controller", func() {
 		Context("with pvc and dynamic-provisioning storage class", func() {
 			It("should update PVC request storage size accordingly when vertical scale the cluster", func() {
 				testVerticalScale()
+			})
+		})
+
+		Context("with horizontalScale after verticalScale", func() {
+			It("should succeed", func() {
+				testVerticalScale()
+				horizontalScale(5)
 			})
 		})
 	})

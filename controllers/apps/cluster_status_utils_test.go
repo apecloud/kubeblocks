@@ -26,6 +26,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -126,7 +127,7 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 			}
 			compStatus := newCluster.Status.Components[componentName]
 			g.Expect(compStatus.Phase == expectPhase).Should(BeTrue())
-		}))
+		})).Should(Succeed())
 	}
 
 	setInvolvedObject := func(event *corev1.Event, kind, objectName string) {
@@ -203,9 +204,15 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 			handleAndCheckComponentStatus(consensusMySQLCompName, event, appsv1alpha1.FailedPhase, false)
 
 			By("test Abnormal phase for consensus component")
-			patch := client.MergeFrom(pod.DeepCopy())
-			testk8s.MockPodAvailable(pod, metav1.NewTime(time.Now()))
-			Expect(k8sClient.Status().Patch(ctx, pod, patch)).Should(Succeed())
+			// mock leader pod ready and sts.status.availableReplicas is 1
+			Expect(testapps.ChangeObjStatus(&testCtx, pod, func() {
+				testk8s.MockPodAvailable(pod, metav1.NewTime(time.Now()))
+			})).Should(Succeed())
+			Expect(testapps.GetAndChangeObjStatus(&testCtx, types.NamespacedName{Name: stsName,
+				Namespace: testCtx.DefaultNamespace}, func(tmpSts *appsv1.StatefulSet) {
+				testk8s.MockStatefulSetReady(tmpSts)
+				tmpSts.Status.AvailableReplicas = *tmpSts.Spec.Replicas - 1
+			})()).Should(Succeed())
 			handleAndCheckComponentStatus(consensusMySQLCompName, event, appsv1alpha1.AbnormalPhase, false)
 
 			By("watch warning event from Deployment and component workload type is Stateless")

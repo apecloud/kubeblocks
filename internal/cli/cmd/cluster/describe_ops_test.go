@@ -284,10 +284,11 @@ var _ = Describe("Expose", func() {
 			"REQUEST-CPU", "REQUEST-MEMORY", "LIMIT-CPU", "LIMIT-MEMORY")
 
 		By("test HorizontalScaling last configuration")
+		replicas := int32(2)
 		testPrintLastConfiguration(appsv1alpha1.LastConfiguration{
 			Components: map[string]appsv1alpha1.LastComponentConfiguration{
 				componentName: {
-					Replicas: 2,
+					Replicas: &replicas,
 				},
 			},
 		}, appsv1alpha1.HorizontalScalingType, "COMPONENT", "REPLICAS", componentName, "2")

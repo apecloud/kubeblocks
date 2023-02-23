@@ -44,7 +44,7 @@ type componentContext struct {
 	recorder      record.EventRecorder
 	component     types.Component
 	obj           client.Object
-	componentName string
+	componentSpec *appsv1alpha1.ClusterComponentSpec
 }
 
 // newComponentContext creates a componentContext object.
@@ -53,14 +53,14 @@ func newComponentContext(reqCtx intctrlutil.RequestCtx,
 	recorder record.EventRecorder,
 	component types.Component,
 	obj client.Object,
-	componentName string) componentContext {
+	componentSpec *appsv1alpha1.ClusterComponentSpec) componentContext {
 	return componentContext{
 		reqCtx:        reqCtx,
 		cli:           cli,
 		recorder:      recorder,
 		component:     component,
 		obj:           obj,
-		componentName: componentName,
+		componentSpec: componentSpec,
 	}
 }
 
@@ -87,52 +87,69 @@ func NewComponentByType(
 	return nil
 }
 
+// podsOfComponentAreReady checks if the pods of component are ready.
+func podsOfComponentAreReady(compCtx componentContext) (*bool, error) {
+	if compCtx.componentSpec.Replicas == 0 {
+		// if replicas number of component is 0, ignore it and return nil.
+		return nil, nil
+	}
+	podsReadyForComponent, err := compCtx.component.PodsReady(compCtx.obj)
+	if err != nil {
+		return nil, err
+	}
+	return &podsReadyForComponent, nil
+}
+
 // handleComponentStatusAndSyncCluster handles component status. if the component status changed, sync cluster.status.components
 func handleComponentStatusAndSyncCluster(compCtx componentContext,
-	cluster *appsv1alpha1.Cluster) (requeueAfter time.Duration, err error) {
+	cluster *appsv1alpha1.Cluster) (time.Duration, error) {
 	var (
-		obj                  = compCtx.obj
-		component            = compCtx.component
-		podsReady            bool
-		isRunning            bool
+		obj       = compCtx.obj
+		component = compCtx.component
+	)
+	if component == nil {
+		return 0, nil
+	}
+	// handle the components changes
+	err := component.HandleUpdate(obj)
+	if err != nil {
+		return 0, err
+	}
+	// handle the component status
+	isRunning, err := component.IsRunning(obj)
+	if err != nil {
+		return 0, err
+	}
+	podsReady, err := podsOfComponentAreReady(compCtx)
+	if err != nil {
+		return 0, err
+	}
+	var (
+		requeueAfter         time.Duration
 		requeueWhenPodsReady bool
 		hasFailedPodTimedOut bool
+		// snapshot cluster
+		clusterDeepCopy = cluster.DeepCopy()
 	)
-
-	if component == nil {
-		return
-	}
-	if podsReady, err = component.PodsReady(obj); err != nil {
-		return
-	}
-	if err = component.HandleUpdate(obj); err != nil {
-		return
-	}
-	if isRunning, err = component.IsRunning(obj); err != nil {
-		return
-	}
-	// snapshot cluster
-	clusterDeepCopy := cluster.DeepCopy()
 	if !isRunning {
-		if podsReady {
+		if podsReady != nil && *podsReady {
 			// check if the role probe timed out when component phase is not Running but all pods of component are ready.
 			if requeueWhenPodsReady, err = component.HandleProbeTimeoutWhenPodsReady(compCtx.recorder); err != nil {
-				return
+				return 0, err
 			} else if requeueWhenPodsReady {
 				requeueAfter = time.Minute
 			}
 		} else {
 			// check whether there is a failed pod of component that has timed out
 			if hasFailedPodTimedOut, requeueAfter, err = hasPodFailedTimedOut(compCtx, cluster); err != nil {
-				return
+				return 0, err
 			}
 		}
 	}
 
-	if err = handleClusterComponentStatus(compCtx, clusterDeepCopy, cluster, isRunning, podsReady, hasFailedPodTimedOut); err != nil {
-		return
+	if err = handleClusterComponentStatus(compCtx, clusterDeepCopy, cluster, podsReady, isRunning, hasFailedPodTimedOut); err != nil {
+		return 0, err
 	}
-
 	return requeueAfter, opsutil.MarkRunningOpsRequestAnnotation(compCtx.reqCtx.Ctx, compCtx.cli, cluster)
 }
 
@@ -141,36 +158,37 @@ func handleClusterComponentStatus(
 	compCtx componentContext,
 	clusterDeepCopy *appsv1alpha1.Cluster,
 	cluster *appsv1alpha1.Cluster,
+	podsAreReady *bool,
 	componentIsRunning,
-	podsAreReady,
 	hasFailedPodTimedOut bool) error {
+	// when component phase is changed, set needSyncStatusComponent to true, then patch cluster.status
 	patch := client.MergeFrom(clusterDeepCopy)
-	if err := syncComponentsStatus(compCtx, cluster, componentIsRunning,
-		podsAreReady, hasFailedPodTimedOut); err != nil {
+	if err := syncComponentsStatus(compCtx, cluster, podsAreReady, componentIsRunning, hasFailedPodTimedOut); err != nil {
 		return err
 	}
-	oldComponentStatus := clusterDeepCopy.Status.Components[compCtx.componentName]
-	componentStatus := cluster.Status.Components[compCtx.componentName]
+	componentName := compCtx.componentSpec.Name
+	oldComponentStatus := clusterDeepCopy.Status.Components[componentName]
+	componentStatus := cluster.Status.Components[componentName]
 	if reflect.DeepEqual(oldComponentStatus, componentStatus) {
 		return nil
 	}
-	compCtx.reqCtx.Log.Info("component status changed", "componentName", compCtx.componentName, "phase",
-		cluster.Status.Components[compCtx.componentName].Phase, "componentIsRunning", componentIsRunning, "podsAreReady", podsAreReady)
+	compCtx.reqCtx.Log.Info("component status changed", "componentName", componentName, "phase",
+		cluster.Status.Components[componentName].Phase, "componentIsRunning", componentIsRunning, "podsAreReady", podsAreReady)
 	return compCtx.cli.Status().Patch(compCtx.reqCtx.Ctx, cluster, patch)
 }
 
 // syncComponentsStatus syncs the component status.
 func syncComponentsStatus(compCtx componentContext,
 	cluster *appsv1alpha1.Cluster,
+	podsAreReady *bool,
 	componentIsRunning,
-	podsAreReady,
 	hasFailedPodTimedOut bool) error {
 	var (
 		status        = &cluster.Status
 		podsReadyTime *metav1.Time
-		componentName = compCtx.componentName
+		componentName = compCtx.componentSpec.Name
 	)
-	if podsAreReady {
+	if podsAreReady != nil && *podsAreReady {
 		podsReadyTime = &metav1.Time{Time: time.Now()}
 	}
 	componentStatus := getClusterComponentStatus(cluster, componentName)
@@ -185,16 +203,18 @@ func syncComponentsStatus(compCtx componentContext,
 			}
 		}
 	} else {
-		if componentStatus.Phase != appsv1alpha1.RunningPhase {
+		if compCtx.componentSpec.Replicas == 0 {
+			// if replicas number of component is zero, the component has stopped.
+			// 'Stopped' is a special 'Running' for workload(StatefulSet/Deployment).
+			componentStatus.Phase = appsv1alpha1.StoppedPhase
+		} else {
 			// change component phase to Running when workloads of component are running.
 			componentStatus.Phase = appsv1alpha1.RunningPhase
-			componentStatus.SetMessage(nil)
 		}
+		componentStatus.SetMessage(nil)
 	}
-	if componentStatus.PodsReady == nil || *componentStatus.PodsReady != podsAreReady {
-		componentStatus.PodsReadyTime = podsReadyTime
-	}
-	componentStatus.PodsReady = &podsAreReady
+	componentStatus.PodsReadyTime = podsReadyTime
+	componentStatus.PodsReady = podsAreReady
 	status.Components[componentName] = componentStatus
 	return nil
 }
@@ -236,11 +256,12 @@ func updateComponentStatusMessage(compStatus *appsv1alpha1.ClusterComponentStatu
 // and send the BackOff (Normal) event first which consumes the quota of 1/300s when the 25 burst quota of event are consumed.
 // so the warning event of ImagePullError will be lost all the time.
 func hasPodFailedTimedOut(compCtx componentContext, cluster *appsv1alpha1.Cluster) (failedAndTimedOut bool, requeueAfter time.Duration, err error) {
-	podList, err := util.GetComponentPodList(compCtx.reqCtx.Ctx, compCtx.cli, cluster, compCtx.componentName)
+	componentName := compCtx.componentSpec.Name
+	podList, err := util.GetComponentPodList(compCtx.reqCtx.Ctx, compCtx.cli, cluster, componentName)
 	if err != nil {
 		return
 	}
-	componentStatus := getClusterComponentStatus(cluster, compCtx.componentName)
+	componentStatus := getClusterComponentStatus(cluster, componentName)
 	for _, v := range podList.Items {
 		isFailed, isTimedOut, message := podFailedAndTimedOut(&v)
 		if !isFailed {
@@ -251,7 +272,7 @@ func hasPodFailedTimedOut(compCtx componentContext, cluster *appsv1alpha1.Cluste
 		}
 		if isTimedOut {
 			updateComponentStatusMessage(&componentStatus, &v, message)
-			cluster.Status.Components[compCtx.componentName] = componentStatus
+			cluster.Status.Components[componentName] = componentStatus
 			failedAndTimedOut = true
 			return
 		}

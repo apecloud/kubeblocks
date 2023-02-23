@@ -63,6 +63,8 @@ const (
 
 	// BackupProtectionLabelKey Backup delete protection policy label
 	BackupProtectionLabelKey = "kubeblocks.io/backup-protection"
+
+	SnapShotForStartAnnotationKey = "kubeblocks.io/snapshot-for-start"
 )
 
 const (

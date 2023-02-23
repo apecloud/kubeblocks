@@ -83,16 +83,16 @@ func (r *StatefulSetReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 
 	// create a component object
 	componentName := sts.GetLabels()[intctrlutil.AppComponentLabelKey]
-	clusterComponent := cluster.GetComponentByName(componentName)
-	if clusterComponent == nil {
+	componentSpec := cluster.GetComponentByName(componentName)
+	if componentSpec == nil {
 		return intctrlutil.Reconciled()
 	}
-	componentDef := clusterDef.GetComponentDefByName(clusterComponent.ComponentDefRef)
-	component := NewComponentByType(ctx, r.Client, cluster, componentDef, clusterComponent)
+	componentDef := clusterDef.GetComponentDefByName(componentSpec.ComponentDefRef)
+	component := NewComponentByType(ctx, r.Client, cluster, componentDef, componentSpec)
 	if component == nil {
 		return intctrlutil.Reconciled()
 	}
-	compCtx := newComponentContext(reqCtx, r.Client, r.Recorder, component, sts, componentName)
+	compCtx := newComponentContext(reqCtx, r.Client, r.Recorder, component, sts, componentSpec)
 	reqCtx.Log.Info("before handleComponentStatusAndSyncCluster",
 		"generation", sts.Generation, "observed generation", sts.Status.ObservedGeneration,
 		"replicas", sts.Status.Replicas)

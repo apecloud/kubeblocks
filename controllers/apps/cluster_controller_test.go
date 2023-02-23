@@ -357,7 +357,6 @@ var _ = Describe("Cluster Controller", func() {
 	}
 
 	createPVC := func(clusterName, pvcName, compName string) {
-		// Note: in real k8s cluster, it maybe fails when pvc created by k8s controller.
 		testapps.NewPersistentVolumeClaimFactory(testCtx.DefaultNamespace, pvcName, clusterName,
 			compName, "data").SetStorage("1Gi").CheckedCreate(&testCtx)
 	}

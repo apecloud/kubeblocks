@@ -60,18 +60,19 @@ func (opsMgr *OpsManager) Do(opsRes *OpsResource) error {
 	}
 
 	if opsRequest.Status.Phase != appsv1alpha1.RunningPhase {
+		opsDeepCopy := opsRequest.DeepCopy()
 		// save last configuration into status.lastConfiguration
 		if err = opsBehaviour.OpsHandler.SaveLastConfiguration(opsRes); err != nil {
 			return err
 		}
 
-		if err = patchOpsRequestToRunning(opsRes, opsBehaviour.OpsHandler); err != nil {
+		if err = patchOpsRequestToRunning(opsRes, opsDeepCopy, opsBehaviour.OpsHandler); err != nil {
 			return err
 		}
 	}
 
 	// If the operation cause the cluster state to change, the cluster needs to be locked.
-	// At the same time, only one operation is running if these operations is mutex(exists same opsBehaviour.ToClusterPhase).
+	// At the same time, only one operation is running if these operations are mutex(exist opsBehaviour.ToClusterPhase).
 	if err = addOpsRequestAnnotationToCluster(opsRes, opsBehaviour.ToClusterPhase); err != nil {
 		return err
 	}
@@ -80,8 +81,8 @@ func (opsMgr *OpsManager) Do(opsRes *OpsResource) error {
 		return err
 	}
 
-	// patch cluster.status after update cluster.spec
-	// because cluster controller probably reconciled status.phase to Running if cluster no updating
+	// patch cluster.status after updating cluster.spec.
+	// because cluster controller probably reconciles status.phase to Running if cluster is not updated.
 	return patchClusterStatus(opsRes, opsBehaviour)
 }
 

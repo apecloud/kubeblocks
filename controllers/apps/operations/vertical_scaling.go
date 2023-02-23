@@ -21,7 +21,6 @@ import (
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 )
@@ -77,11 +76,10 @@ func (vs verticalScalingHandler) SaveLastConfiguration(opsRes *OpsResource) erro
 			ResourceRequirements: v.Resources,
 		}
 	}
-	patch := client.MergeFrom(opsRes.OpsRequest.DeepCopy())
 	opsRes.OpsRequest.Status.LastConfiguration = appsv1alpha1.LastConfiguration{
 		Components: lastComponentInfo,
 	}
-	return opsRes.Client.Status().Patch(opsRes.Ctx, opsRes.OpsRequest, patch)
+	return nil
 }
 
 // GetRealAffectedComponentMap gets the real affected component map for the operation

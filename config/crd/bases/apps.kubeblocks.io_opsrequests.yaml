@@ -183,6 +183,8 @@ spec:
                 - HorizontalScaling
                 - Restart
                 - Reconfiguring
+                - Start
+                - Stop
                 type: string
               upgrade:
                 description: upgrade specifies the cluster version by specifying clusterVersionRef.
@@ -327,6 +329,9 @@ spec:
                       - VerticalScaling
                       - VersionUpgrading
                       - Rebooting
+                      - Stopped
+                      - Stopping
+                      - Starting
                       type: string
                     progressDetails:
                       description: progressDetails describes the progress details

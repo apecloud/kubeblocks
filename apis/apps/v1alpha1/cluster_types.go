@@ -82,13 +82,16 @@ type ClusterStatus struct {
 	// VerticalScaling: vertical scaling operation is running.
 	// VersionUpgrading: upgrade operation is running.
 	// Rebooting: restart operation is running.
+	// Stopping: stop operation is running.
+	// Stopped: all components are stopped, or some components are stopped and other components are running.
+	// Starting: start operation is running.
 	// Reconfiguring: reconfiguration operation is running.
 	// Deleting/Deleted: deleting Cluster/Cluster is deleted.
 	// Failed: Cluster is unavailable.
 	// Abnormal: Cluster is still available, but part of its components are Abnormal.
 	// if the component workload type is Consensus/Replication, the Leader/Primary pod must be ready in Abnormal phase.
 	// ConditionsError: Cluster and all the components are still healthy, but some update/create API fails due to invalid parameters.
-	// +kubebuilder:validation:Enum={Running,Failed,Abnormal,ConditionsError,Creating,SpecUpdating,Deleting,Deleted,VolumeExpanding,Reconfiguring,HorizontalScaling,VerticalScaling,VersionUpgrading,Rebooting}
+	// +kubebuilder:validation:Enum={Running,Failed,Abnormal,ConditionsError,Creating,SpecUpdating,Deleting,Deleted,VolumeExpanding,Reconfiguring,HorizontalScaling,VerticalScaling,VersionUpgrading,Rebooting,Stopped,Stopping,Starting}
 	// +optional
 	Phase Phase `json:"phase,omitempty"`
 
@@ -200,9 +203,10 @@ type ClusterComponentStatus struct {
 	// Failed: component is unavailable, i.e, all pods are not ready for Stateless/Stateful component;
 	// Leader/Primary pod is not ready for Consensus/Replication component.
 	// Abnormal: component available but part of its pods are not ready.
+	// Stopped: replicas number of component is 0.
 	// If the component workload type is Consensus/Replication, the Leader/Primary pod must be ready in Abnormal phase.
 	// Other phases behave the same as the cluster phase.
-	// +kubebuilder:validation:Enum={Running,Failed,Abnormal,Creating,SpecUpdating,Deleting,Deleted,VolumeExpanding,Reconfiguring,HorizontalScaling,VerticalScaling,VersionUpgrading,Rebooting}
+	// +kubebuilder:validation:Enum={Running,Failed,Abnormal,Creating,SpecUpdating,Deleting,Deleted,VolumeExpanding,Reconfiguring,HorizontalScaling,VerticalScaling,VersionUpgrading,Rebooting,Stopped,Stopping,Starting}
 	Phase Phase `json:"phase,omitempty"`
 
 	// message records the component details message in current phase.

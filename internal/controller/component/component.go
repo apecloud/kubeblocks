@@ -128,9 +128,8 @@ func BuildComponent(
 		return nil
 	}
 
-	replacePlaceholderTokens(component, map[string]string{
-		constant.ConnCredentialPlaceHolder: GenerateConnCredential(cluster.GetName()),
-	})
+	replaceContainerPlaceholderTokens(component, GetEnvReplacementMapForConnCredential(cluster.GetName()))
+	
 	return component
 }
 
@@ -207,29 +206,50 @@ func doContainerAttrOverride(compContainer *corev1.Container, container corev1.C
 	}
 }
 
-func replacePlaceholderTokens(component *SynthesizedComponent, namedValues map[string]string) {
+// GetEnvReplacementMapForConnCredential gets the replacement map for connect credential
+func GetEnvReplacementMapForConnCredential(clusterName string) map[string]string {
+	return map[string]string{
+		constant.ConnCredentialPlaceHolder: GenerateConnCredential(clusterName),
+	}
+}
+
+func replaceContainerPlaceholderTokens(component *SynthesizedComponent, namedValuesMap map[string]string) {
 	// replace env[].valueFrom.secretKeyRef.name variables
 	for _, cc := range [][]corev1.Container{component.PodSpec.InitContainers, component.PodSpec.Containers} {
 		for _, c := range cc {
-			for _, e := range c.Env {
-				if e.ValueFrom == nil {
-					continue
-				}
-				if e.ValueFrom.SecretKeyRef == nil {
-					continue
-				}
-				secretRef := e.ValueFrom.SecretKeyRef
-				for k, v := range namedValues {
-					r := strings.Replace(secretRef.Name, k, v, 1)
-					if r == secretRef.Name {
-						continue
-					}
-					secretRef.Name = r
-					break
-				}
-			}
+			c.Env = ReplaceSecretEnvVars(namedValuesMap, c.Env)
 		}
 	}
+}
+
+// ReplaceNamedVars replaces the value in needle with namedValues and returns new needle
+func ReplaceNamedVars(namedValuesMap map[string]string, needle string, limits int, matchAll bool) string {
+	for k, v := range namedValuesMap {
+		r := strings.Replace(needle, k, v, limits)
+		// early termination on matching, when matchAll = false
+		if r != needle && !matchAll {
+			return r
+		}
+		needle = r
+	}
+	return needle
+}
+
+// ReplaceSecretEnvVars replaces the env secret value with namedValues and returns new envs
+func ReplaceSecretEnvVars(namedValuesMap map[string]string, envs []corev1.EnvVar) []corev1.EnvVar {
+	newEnvs := make([]corev1.EnvVar, len(envs))
+	for _, e := range envs {
+		if e.ValueFrom == nil || e.ValueFrom.SecretKeyRef == nil {
+			continue
+		}
+		secretRef := e.ValueFrom.SecretKeyRef
+		name := ReplaceNamedVars(namedValuesMap, secretRef.Name, 1, false)
+		if name != secretRef.Name {
+			secretRef.Name = name
+		}
+		newEnvs = append(newEnvs, e)
+	}
+	return newEnvs
 }
 
 func GetClusterDefCompByName(clusterDef appsv1alpha1.ClusterDefinition,

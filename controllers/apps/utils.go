@@ -16,17 +16,6 @@ limitations under the License.
 
 package apps
 
-import (
-	"github.com/apecloud/kubeblocks/internal/constant"
-	"github.com/apecloud/kubeblocks/internal/controller/component"
-)
-
-func getEnvReplacementMapForConnCredential(clusterName string) map[string]string {
-	return map[string]string{
-		constant.ConnCredentialPlaceHolder: component.GenerateConnCredential(clusterName),
-	}
-}
-
 func getEnvReplacementMapForAccount(name, passwd string) map[string]string {
 	return map[string]string{
 		"$(USERNAME)": name,

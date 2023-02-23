@@ -343,6 +343,10 @@ type ClusterComponentDefinition struct {
 	// +optional
 	ConsensusSpec *ConsensusSetSpec `json:"consensusSpec,omitempty"`
 
+	// replicationSpec defines replication related spec if componentType is Replication, required if componentType is Replication.
+	// +optional
+	ReplicationSpec *ReplicationSpec `json:"replicationSpec,omitempty"`
+
 	// horizontalScalePolicy controls the behavior of horizontal scale.
 	// +optional
 	HorizontalScalePolicy *HorizontalScalePolicy `json:"horizontalScalePolicy,omitempty"`
@@ -483,6 +487,83 @@ type ConsensusMember struct {
 // +kubebuilder:printcolumn:name="MAIN-COMPONENT-NAME",type="string",JSONPath=".spec.componentDefs[0].name",description="main component names"
 // +kubebuilder:printcolumn:name="STATUS",type="string",JSONPath=".status.phase",description="status phase"
 // +kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
+
+type ReplicationSpec struct {
+	// switchPolicies defines a collection of different types of switchPolicy, and each type of switchPolicy is limited to one.
+	// +kubebuilder:validation:Required
+	SwitchPolicies []SwitchPolicy `json:"switchPolicies,omitempty"`
+
+	// switchCmdExecutorConfig configs how to get client SDK and perform switch statements.
+	// +kubebuilder:validation:Required
+	SwitchCmdExecutorConfig *SwitchCmdExecutorConfig `json:"switchCmdExecutorConfig"`
+}
+
+type SwitchPolicy struct {
+	// switchPolicyType defines type of the switchPolicy.
+	// MaximumAvailability: when the primary is active, do switch if the synchronization delay = 0 in the user-defined lagProbe data delay detection logic, otherwise do not switch. The primary is down, switch immediately.
+	// MaximumDataProtection: when the primary is active, do switch if synchronization delay = 0 in the user-defined lagProbe data lag detection logic, otherwise do not switch. If the primary is down, if it can be judged that the primary and secondary data are consistent, then do the switch, otherwise do not switch.
+	// Manual: KubeBlocks will not perform high-availability switching on components. Users need to implement HA by themselves.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:Enum={MaximumAvailability, MaximumDataProtection, Manual}
+	// +kubebuilder:default=MaximumAvailability
+	Type SwitchPolicyType `json:"switchPolicyType"`
+
+	// switchStatements defines switching actions according to their respective roles, We divide all pods into three switchStatement role:Enum={Promote,Demote,Follow}.
+	// Promote: candidate primary after elected, which to be promoted
+	// Demote: primary before switch, which to be demoted
+	// Follow: the other secondaries that are not selected as the primary, which to follow the new primary
+	// if switchStatements is not set，we will try to use the built-in switchStatements for the database engine with built-in support.
+	// +optional
+	SwitchStatements *SwitchStatements `json:"switchStatements,omitempty"`
+}
+
+type SwitchStatements struct {
+	// promote defines the switching actions for the candidate primary which to be promoted.
+	// +optional
+	Promote []string `json:"promote,omitempty"`
+
+	// demote defines the switching actions for the old primary which to be demoted.
+	// +optional
+	Demote []string `json:"demote,omitempty"`
+
+	// follow defines the switching actions for the other secondaries which are not selected as the primary.
+	// +optional
+	Follow []string `json:"follow,omitempty"`
+}
+
+type SwitchCmdExecutorConfig struct {
+	// image for Connector when executing the switch command.
+	// +kubebuilder:validation:Required
+	Image string `json:"image"`
+	// switchSteps definition, users can customize the switching steps on the provided three roles - newPrimary, oldPrimary, and secondary.
+	// the same role can customize multiple steps in the order of the list, and KubeBlocks will perform switching operations in the defined order.
+	// if switchStep is not set, we will try to use the built-in switchStep for the database engine with built-in support.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MinItems=1
+	// +optional
+	SwitchSteps []map[SwitchStepRole]SwitchStepCmd `json:"switchSteps"`
+	// envs is a list of environment variables.
+	// +kubebuilder:pruning:PreserveUnknownFields
+	// +patchMergeKey=name
+	// +patchStrategy=merge,retainKeys
+	// +optional
+	Env []corev1.EnvVar `json:"env,omitempty" patchStrategy:"merge" patchMergeKey:"name"`
+}
+
+type SwitchStepCmd struct {
+	// command to perform switch statements.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MinItems=1
+	Command []string `json:"command"`
+	// args is used to perform switch statements.
+	// +optional
+	Args []string `json:"args,omitempty"`
+	// envs is a list of environment variables.
+	// +kubebuilder:pruning:PreserveUnknownFields
+	// +patchMergeKey=name
+	// +patchStrategy=merge,retainKeys
+	// +optional
+}
 
 // ClusterDefinition is the Schema for the clusterdefinitions API
 type ClusterDefinition struct {

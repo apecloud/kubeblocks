@@ -96,10 +96,13 @@ var _ = Describe("ReplicationSet Util", func() {
 				AddRoleLabel(k).
 				SetReplicas(1).
 				Create(&testCtx).GetObject()
+			isStsPrimary, err := checkObjRoleLabelIsPrimary(sts)
 			if k == string(Primary) {
-				Expect(CheckStsIsPrimary(sts)).Should(BeTrue())
+				Expect(err).To(Succeed())
+				Expect(isStsPrimary).Should(BeTrue())
 			} else {
-				Expect(CheckStsIsPrimary(sts)).ShouldNot(BeTrue())
+				Expect(err).To(Succeed())
+				Expect(isStsPrimary).ShouldNot(BeTrue())
 			}
 			stsList = append(stsList, sts)
 		}

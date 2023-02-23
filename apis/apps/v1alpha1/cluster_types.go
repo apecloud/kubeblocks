@@ -190,6 +190,10 @@ type ClusterComponentSpec struct {
 	// +kubebuilder:validation:Minimum=0
 	// +optional
 	PrimaryIndex *int32 `json:"primaryIndex,omitempty"`
+	
+	// switchPolicy defines the strategy for switchover and failover when componentType is Replication.
+	// +optional
+	SwitchPolicy *ClusterSwitchPolicy `json:"switchPolicy,omitempty"`
 
 	// TLS should be enabled or not
 	// +optional
@@ -284,6 +288,15 @@ type ReplicationMemberStatus struct {
 	// +kubebuilder:validation:Required
 	// +kubebuilder:default=Unknown
 	Pod string `json:"pod"`
+}
+
+type ClusterSwitchPolicy struct {
+	// clusterSwitchPolicy type defined by Provider in ClusterDefinition, refer components[i].replicationSpec.switchPolicies[x].type
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:Enum={MaximumAvailability, MaximumDataProtection, Manual}
+	// +kubebuilder:default=MaximumAvailability
+	// +optional
+	Type SwitchPolicyType `json:"componentType"`
 }
 
 type ClusterComponentVolumeClaimTemplate struct {

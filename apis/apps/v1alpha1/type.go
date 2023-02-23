@@ -355,6 +355,26 @@ const (
 	IssuerUserProvided IssuerName = "UserProvided"
 )
 
+// SwitchPolicyType defines switchPolicy type.
+// +enum
+type SwitchPolicyType string
+
+const (
+	MaximumAvailability   SwitchPolicyType = "MaximumAvailability"
+	MaximumDataProtection SwitchPolicyType = "MaximumDataProtection"
+	Manual                SwitchPolicyType = "Manual"
+)
+
+// SwitchStepRole defines the role to execute the switch command.
+// +enum
+type SwitchStepRole string
+
+const (
+	NewPrimary  SwitchStepRole = "NewPrimary"
+	OldPrimary  SwitchStepRole = "OldPrimary"
+	Secondaries SwitchStepRole = "Secondaries"
+)
+
 func RegisterWebhookManager(mgr manager.Manager) {
 	webhookMgr = &webhookManager{mgr.GetClient()}
 }

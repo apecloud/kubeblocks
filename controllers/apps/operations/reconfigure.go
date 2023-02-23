@@ -37,6 +37,7 @@ func init() {
 			appsv1alpha1.RunningPhase,
 			appsv1alpha1.FailedPhase,
 			appsv1alpha1.AbnormalPhase,
+			appsv1alpha1.ReconfiguringPhase,
 		},
 		ToClusterPhase: appsv1alpha1.ReconfiguringPhase,
 		OpsHandler:     &reAction,
@@ -171,13 +172,30 @@ func (r reconfigureAction) ReconcileAction(opsRes *OpsResource) (appsv1alpha1.Ph
 		return status.Phase, 30 * time.Second, nil
 	}
 	condition := status.Conditions[len(status.Conditions)-1]
-	if condition.Type == appsv1alpha1.ConditionTypeSucceed && condition.Status == metav1.ConditionTrue {
+	if isSucceedPhase(condition) {
 		return appsv1alpha1.SucceedPhase, 0, nil
 	}
-	if condition.Type == appsv1alpha1.ConditionTypeFailed && condition.Status == metav1.ConditionFalse {
+	if isFailedPhase(condition) {
 		return appsv1alpha1.FailedPhase, 0, nil
 	}
 	return appsv1alpha1.RunningPhase, 30 * time.Second, nil
+}
+
+func isExpectedPhase(condition metav1.Condition, expectedTypes []string, expectedStatus metav1.ConditionStatus) bool {
+	for _, t := range expectedTypes {
+		if t == condition.Type && condition.Status == expectedStatus {
+			return true
+		}
+	}
+	return false
+}
+
+func isSucceedPhase(condition metav1.Condition) bool {
+	return isExpectedPhase(condition, []string{appsv1alpha1.ConditionTypeSucceed, appsv1alpha1.ReasonReconfigureSucceed}, metav1.ConditionTrue)
+}
+
+func isFailedPhase(condition metav1.Condition) bool {
+	return isExpectedPhase(condition, []string{appsv1alpha1.ConditionTypeFailed, appsv1alpha1.ReasonReconfigureFailed}, metav1.ConditionFalse)
 }
 
 func (r *reconfigureAction) Action(resource *OpsResource) error {

@@ -437,22 +437,41 @@ var _ = Describe("OpsRequest Controller", func() {
 			}},
 			ComponentOps: appsv1alpha1.ComponentOps{ComponentName: consensusComp},
 		}
+
+		By("Init Reconfiguring opsrequest")
 		opsRes.OpsRequest = ops
 		Expect(testCtx.CheckedCreateObj(ctx, ops)).Should(Succeed())
+		initClusterForOps(opsRes)
 
+		opsManager := GetOpsManager()
 		reAction := reconfigureAction{}
+		By("Reconfigure configure")
 		Expect(reAction.Action(opsRes)).Should(Succeed())
+		By("configuration Reconcile callback")
 		Expect(reAction.Handle(eventContext, ops.Name, appsv1alpha1.ReconfiguringPhase, nil)).Should(Succeed())
 		Expect(opsRes.Client.Get(opsRes.Ctx, client.ObjectKeyFromObject(opsRes.OpsRequest), opsRes.OpsRequest)).Should(Succeed())
-		_, _ = GetOpsManager().Reconcile(opsRes)
+		_, _ = opsManager.Reconcile(opsRes)
 		Expect(opsRes.OpsRequest.Status.Phase).Should(BeEquivalentTo(appsv1alpha1.RunningPhase))
+
+		By("Validate cluster status")
+		Expect(opsManager.Do(opsRes)).Should(Succeed())
+		Expect(opsRes.Cluster.Status.Phase).Should(BeEquivalentTo(appsv1alpha1.ReconfiguringType))
+
+		By("Reconfigure operation success")
+		//eventContext.PolicyStatus.SucceedCount = 3
 		Expect(reAction.Handle(eventContext, ops.Name, appsv1alpha1.SucceedPhase, nil)).Should(Succeed())
 		Expect(opsRes.Client.Get(opsRes.Ctx, client.ObjectKeyFromObject(opsRes.OpsRequest), opsRes.OpsRequest)).Should(Succeed())
-		_, _ = GetOpsManager().Reconcile(opsRes)
+		_, _ = opsManager.Reconcile(opsRes)
 		Expect(opsRes.OpsRequest.Status.Phase).Should(BeEquivalentTo(appsv1alpha1.SucceedPhase))
 
-		// TODO add failed ut
-		By("mock reconfigure failed")
+		By("Validate opsrequest status")
+		Expect(opsManager.Do(opsRes)).Should(Succeed())
+		compStatus, ok := opsRes.OpsRequest.Status.LastConfiguration.Components[consensusComp]
+		Expect(ok).Should(BeTrue())
+		clusterMeta := opsRes.Cluster.GetComponentByName(consensusComp)
+		Expect(clusterMeta).ShouldNot(BeNil())
+		Expect(compStatus.Replicas).Should(BeEquivalentTo(clusterMeta.Replicas))
+		Expect(compStatus.ResourceRequirements).Should(BeEquivalentTo(clusterMeta.Resources))
 	}
 
 	Context("Test OpsRequest", func() {

@@ -117,10 +117,10 @@ func (f *SwitchElectionHealthFilter) Name() string {
 func (f *SwitchElectionHealthFilter) Filter(podInfoList []*SwitchPodInfo) ([]*SwitchPodInfo, error) {
 	var filterPods []*SwitchPodInfo
 	for _, podInfo := range podInfoList {
-		if podInfo.HealthDetectIno == nil {
-			return nil, fmt.Errorf("pod %s HealthDetectIno is nil, pls check", podInfo.Pod.Name)
+		if podInfo.HealthDetectInfo == nil {
+			return nil, fmt.Errorf("pod %s HealthDetectInfo is nil, pls check", podInfo.Pod.Name)
 		}
-		if *podInfo.HealthDetectIno {
+		if *podInfo.HealthDetectInfo {
 			filterPods = append(filterPods, podInfo)
 		}
 	}

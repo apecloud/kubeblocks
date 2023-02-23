@@ -82,8 +82,8 @@ type SwitchInstance struct {
 type SwitchPodInfo struct {
 	// k8s pod obj
 	Pod *corev1.Pod
-	// HealthDetectIno stores the results of health detection
-	HealthDetectIno *HealthDetectResult
+	// HealthDetectInfo stores the results of health detection
+	HealthDetectInfo *HealthDetectResult
 	// RoleDetectInfo stores the results of kernel role detection
 	RoleDetectInfo *RoleDetectResult
 	// LagDetectInfo stores the results of data delay detection
@@ -108,7 +108,7 @@ type SwitchPhaseStatus string
 // SwitchPhase defines the phase of switching.
 type SwitchPhase string
 
-// SwitchDetectManager is an interface to implement various detections that HA relies on, including health detection, role detection, data delay detection, etc.
+// SwitchDetectManager is an interface to implement various detections that high-availability relies on, including health detection, role detection, data delay detection, etc.
 type SwitchDetectManager interface {
 	// HealthDetect is used to implement Pod health detection
 	HealthDetect(pod *corev1.Pod) (*HealthDetectResult, error)
@@ -161,7 +161,7 @@ func (s *Switch) Detection(skipSecondary bool) {
 			s.SwitchStatus.Reason = err.Error()
 			return
 		}
-		spi.HealthDetectIno = hd
+		spi.HealthDetectInfo = hd
 
 		rd, err := s.SwitchDetectManager.RoleDetect(spi.Pod)
 		if err != nil {
@@ -255,7 +255,7 @@ func (s *Switch) Decision() bool {
 	}
 
 	// candidate primary healthy check
-	if !*s.SwitchInstance.CandidatePrimaryPod.HealthDetectIno {
+	if !*s.SwitchInstance.CandidatePrimaryPod.HealthDetectInfo {
 		s.SwitchStatus.SwitchPhaseStatus = SwitchPhaseStatusFailed
 		s.SwitchStatus.Reason = fmt.Sprintf("component %s new primary pod %s is not healthy, can not do switch", s.SwitchResource.CompSpec.Name, s.SwitchInstance.CandidatePrimaryPod.Pod.Name)
 		return false
@@ -283,7 +283,7 @@ func (s *Switch) Decision() bool {
 
 	makeMaxAvailabilityDecision := func() bool {
 		// old primary is healthy,
-		if *s.SwitchInstance.OldPrimaryPod.HealthDetectIno {
+		if *s.SwitchInstance.OldPrimaryPod.HealthDetectInfo {
 			// The LagDetectInfo is 0, which means that the primary and the secondary data are consistent and can be switched
 			if *s.SwitchInstance.CandidatePrimaryPod.LagDetectInfo == 0 {
 				s.SwitchStatus.SwitchPhaseStatus = SwitchPhaseStatusSucceed
@@ -375,10 +375,10 @@ func (s *Switch) InitSwitchInstance(oldPrimaryIndex, newPrimaryIndex int32) erro
 			return err
 		}
 		switchPodInfo := &SwitchPodInfo{
-			Pod:             pod,
-			HealthDetectIno: nil,
-			RoleDetectInfo:  nil,
-			LagDetectInfo:   nil,
+			Pod:              pod,
+			HealthDetectInfo: nil,
+			RoleDetectInfo:   nil,
+			LagDetectInfo:    nil,
 		}
 		switch int32(utils.GetOrdinalSts(&sts)) {
 		case oldPrimaryIndex:

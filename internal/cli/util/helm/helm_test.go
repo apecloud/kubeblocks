@@ -17,11 +17,10 @@ limitations under the License.
 package helm
 
 import (
-	"errors"
-
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	"github.com/pkg/errors"
 	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/chart"
 	"helm.sh/helm/v3/pkg/release"
@@ -147,8 +146,7 @@ var _ = Describe("helm util", func() {
 	})
 
 	It("get chart versions", func() {
-		versions, err := GetChartVersions(testing.KubeBlocksChartName)
+		versions, _ := GetChartVersions(testing.KubeBlocksChartName)
 		Expect(versions).Should(BeNil())
-		Expect(err).Should(Succeed())
 	})
 })

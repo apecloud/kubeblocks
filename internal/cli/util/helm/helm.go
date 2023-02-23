@@ -434,8 +434,12 @@ func (i *InstallOpts) tryUpgrade(cfg *action.Configuration) (string, error) {
 func GetChartVersions(chartName string) ([]*semver.Version, error) {
 	settings := cli.New()
 	rf, err := repo.LoadFile(settings.RepositoryConfig)
-	if os.IsNotExist(errors.Cause(err)) || len(rf.Repositories) == 0 {
-		return nil, errors.New("no helm repositories configured")
+	if err != nil {
+		if os.IsNotExist(errors.Cause(err)) {
+			return nil, nil
+		} else {
+			return nil, err
+		}
 	}
 
 	var ind *repo.IndexFile

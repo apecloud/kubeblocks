@@ -135,7 +135,7 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 		event.InvolvedObject.Name = objectName
 	}
 
-	testHandleClusterAbnormalOrFailedPhase := func(clusterObj *appsv1alpha1.Cluster, componentPhase,
+	testHandleClusterPhaseWhenCompsNotReady := func(clusterObj *appsv1alpha1.Cluster, componentPhase,
 		expectClusterPhase appsv1alpha1.Phase) {
 		// mock Stateful component is Abnormal
 		clusterObj.Status.Components = map[string]appsv1alpha1.ClusterComponentStatus{
@@ -143,7 +143,7 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 				Phase: componentPhase,
 			},
 		}
-		handleClusterAbnormalOrFailedPhase(clusterObj, nil, nil)
+		handleClusterPhaseWhenCompsNotReady(clusterObj, nil, nil)
 		Expect(clusterObj.Status.Phase).Should(Equal(expectClusterPhase))
 	}
 
@@ -259,10 +259,10 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 			clusterObj := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefName, clusterVersionName).
 				AddComponent(statefulMySQLCompName, statefulMySQLCompType).SetReplicas(3).GetObject()
 			// mock Stateful component is Failed and expect cluster phase is FailedPhase
-			testHandleClusterAbnormalOrFailedPhase(clusterObj, appsv1alpha1.FailedPhase, appsv1alpha1.FailedPhase)
+			testHandleClusterPhaseWhenCompsNotReady(clusterObj, appsv1alpha1.FailedPhase, appsv1alpha1.FailedPhase)
 
 			// mock Stateful component is Abnormal and expect cluster phase is Abnormal
-			testHandleClusterAbnormalOrFailedPhase(clusterObj, appsv1alpha1.AbnormalPhase, appsv1alpha1.AbnormalPhase)
+			testHandleClusterPhaseWhenCompsNotReady(clusterObj, appsv1alpha1.AbnormalPhase, appsv1alpha1.AbnormalPhase)
 		})
 
 		It("test the consistency of status.components and spec.components", func() {

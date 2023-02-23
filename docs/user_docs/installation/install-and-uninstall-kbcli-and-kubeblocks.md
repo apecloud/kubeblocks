@@ -1,6 +1,6 @@
 ---
 title: Install and uninstall `kbcli` and KubeBlocks
-description: Install KubeBlocks and kbcli by ApeCloud
+description: Install KubeBlocks and kbcli developed by ApeCloud
 sidebar_position: 1
 ---
 

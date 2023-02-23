@@ -76,7 +76,7 @@ func updateCfgParams(config appsv1alpha1.Configuration,
 		return makeReconfiguringResult(err, withFailed(true))
 	}
 
-	configPatch, err := createConfigPatch(client.ObjectKeyFromObject(cm), cm.Data, newCfg, fc.Format)
+	configPatch, err := createConfigPatch(client.ObjectKeyFromObject(cm), cm.Data, newCfg, fc.Format, tpl.Keys)
 	if err != nil {
 		return makeReconfiguringResult(err)
 	}
@@ -108,22 +108,23 @@ func fromKeyValuePair(parameters []appsv1alpha1.ParameterPair) map[string]interf
 	return m
 }
 
-func createConfigPatch(cfgKey client.ObjectKey,
-	old, updated map[string]string,
-	formatter appsv1alpha1.CfgFileFormat) (*cfgcore.ConfigPatchInfo, error) {
+func createConfigPatch(cfgKey client.ObjectKey, old, updated map[string]string, formatter appsv1alpha1.CfgFileFormat, keys []string) (*cfgcore.ConfigPatchInfo, error) {
 	option := cfgcore.CfgOption{
 		Type:    cfgcore.CfgTplType,
 		CfgType: formatter,
 		Log:     log.Log,
 	}
 
+	cmKeySet := cfgcore.FromCMKeysSelector(keys)
 	return cfgcore.CreateMergePatch(
 		&cfgcore.K8sConfig{
 			CfgKey:         cfgKey,
 			Configurations: old,
+			CMKeys:         cmKeySet,
 		}, &cfgcore.K8sConfig{
 			CfgKey:         cfgKey,
 			Configurations: updated,
+			CMKeys:         cmKeySet,
 		}, option)
 }
 

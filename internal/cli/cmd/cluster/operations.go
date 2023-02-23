@@ -179,10 +179,6 @@ func (o *OperationsOptions) validateReconfiguring() error {
 }
 
 func (o *OperationsOptions) validateConfigParams(tpl *appsv1alpha1.ConfigTemplate, componentName string) error {
-	var (
-		configConstraint = appsv1alpha1.ConfigConstraint{}
-	)
-
 	transKeyPair := func(pts map[string]string) map[string]interface{} {
 		m := make(map[string]interface{}, len(pts))
 		for key, value := range pts {
@@ -191,6 +187,7 @@ func (o *OperationsOptions) validateConfigParams(tpl *appsv1alpha1.ConfigTemplat
 		return m
 	}
 
+	configConstraint := appsv1alpha1.ConfigConstraint{}
 	if err := util.GetResourceObjectFromGVR(types.ConfigConstraintGVR(), client.ObjectKey{
 		Namespace: "",
 		Name:      tpl.ConfigConstraintRef,
@@ -247,11 +244,8 @@ func (o *OperationsOptions) validateConfigMapKey(tpl *appsv1alpha1.ConfigTemplat
 	}
 
 	// Autofill ConfigMap key
-	if len(o.CfgFile) == 0 && len(cmObj.Data) == 1 {
-		for k := range cmObj.Data {
-			o.CfgFile = k
-			return nil
-		}
+	if o.CfgFile == "" && len(cmObj.Data) > 0 {
+		o.fillKeyForReconfiguring(tpl, cmObj.Data)
 	}
 	if _, ok := cmObj.Data[o.CfgFile]; !ok {
 		return cfgcore.MakeError("specify file name[%s] is not exist.", o.CfgFile)
@@ -284,6 +278,11 @@ func (o *OperationsOptions) Validate() error {
 		return makeMissingClusterNameErr()
 	}
 
+	// not require confirm for reconfigure
+	if o.OpsType == appsv1alpha1.ReconfiguringType {
+		return o.validateReconfiguring()
+	}
+
 	// common validate for componentOps
 	if o.HasComponentNamesFlag && len(o.ComponentNames) == 0 {
 		return fmt.Errorf("missing component-names")
@@ -296,10 +295,6 @@ func (o *OperationsOptions) Validate() error {
 		}
 	case appsv1alpha1.HorizontalScalingType:
 		if err := o.validateHorizontalScaling(); err != nil {
-			return err
-		}
-	case appsv1alpha1.ReconfiguringType:
-		if err := o.validateReconfiguring(); err != nil {
 			return err
 		}
 	case appsv1alpha1.UpgradeType:
@@ -398,6 +393,18 @@ func (o *OperationsOptions) printConfigureTips() {
 		printer.NewPair("  ConfigureFile", printer.BoldYellow(o.CfgFile)),
 		printer.NewPair("ComponentName", o.ComponentNames[0]),
 		printer.NewPair("ClusterName", o.Name))
+}
+
+func (o *OperationsOptions) fillKeyForReconfiguring(tpl *appsv1alpha1.ConfigTemplate, data map[string]string) {
+	keys := make([]string, 0, len(data))
+	for k := range data {
+		if cfgcore.CheckConfigTemplateReconfigureKey(*tpl, k) {
+			keys = append(keys, k)
+		}
+	}
+	if len(keys) == 1 {
+		o.CfgFile = keys[0]
+	}
 }
 
 // buildOperationsInputs builds operations inputs

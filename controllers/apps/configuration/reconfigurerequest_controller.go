@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	appv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -144,7 +145,12 @@ func (r *ReconfigureRequestReconciler) sync(reqCtx intctrlutil.RequestCtx, confi
 		configTplLabelKey:                config.GetName(),
 	}
 
-	configPatch, err := createConfigurePatch(config, reqCtx, &tpl.Spec)
+	var keySelector []string
+	if keysLabel, ok := config.Labels[cfgcore.CMConfigurationCMKeysLabelKey]; ok && keysLabel != "" {
+		keySelector = strings.Split(keysLabel, ",")
+	}
+
+	configPatch, forceRestart, err := createConfigurePatch(config, reqCtx, &tpl.Spec, keySelector)
 	if err != nil {
 		return intctrlutil.RequeueWithErrorAndRecordEvent(config, r.Recorder, err, reqCtx.Log)
 	}
@@ -225,7 +231,7 @@ func (r *ReconfigureRequestReconciler) sync(reqCtx intctrlutil.RequestCtx, confi
 		ComponentUnits:           sts,
 		Component:                component,
 		ClusterComponent:         clusterComponent,
-		Restart:                  !cfgcm.IsSupportReload(tpl.Spec.ReloadOptions),
+		Restart:                  forceRestart || !cfgcm.IsSupportReload(tpl.Spec.ReloadOptions),
 		ReconfigureClientFactory: GetClientFactory(),
 	})
 }

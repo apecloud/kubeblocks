@@ -238,7 +238,7 @@ func (r *reconfigureOptions) printDescribeReconfigure() error {
 		r.printConfigureContext(configs)
 	}
 	printer.PrintComponentConfigMeta(configs, r.clusterName, r.componentName, r.Out)
-	return r.printConfigureHistory(configs)
+	return r.printConfigureHistory()
 }
 
 func (r *reconfigureOptions) printAllExplainConfigure() error {
@@ -284,8 +284,8 @@ func (r *reconfigureOptions) printExplainConfigure(tplName string) error {
 	return r.printConfigConstraint(schema.Schema, set.NewLinkedHashSetString(confSpec.StaticParameters...), set.NewLinkedHashSetString(confSpec.DynamicParameters...))
 }
 
-func (r *reconfigureOptions) getReconfigureMeta() (map[appsv1alpha1.ConfigTemplate]*corev1.ConfigMap, error) {
-	configs := make(map[appsv1alpha1.ConfigTemplate]*corev1.ConfigMap)
+func (r *reconfigureOptions) getReconfigureMeta() ([]types.ConfigTemplateInfo, error) {
+	configs := make([]types.ConfigTemplateInfo, 0)
 	for _, tplName := range r.templateNames {
 		// checked by validate
 		tpl, _ := r.findTemplateByName(tplName)
@@ -298,27 +298,31 @@ func (r *reconfigureOptions) getReconfigureMeta() (map[appsv1alpha1.ConfigTempla
 		}, r.dynamic, cmObj); err != nil {
 			return nil, cfgcore.WrapError(err, "template config instance is not exist, template name: %s, cfg name: %s", tplName, cmName)
 		}
-		configs[*tpl] = cmObj
+		configs = append(configs, types.ConfigTemplateInfo{
+			Name:  tplName,
+			TPL:   *tpl,
+			CMObj: cmObj,
+		})
 	}
 	return configs, nil
 }
 
-func (r *reconfigureOptions) printConfigureContext(configs map[appsv1alpha1.ConfigTemplate]*corev1.ConfigMap) {
+func (r *reconfigureOptions) printConfigureContext(configs []types.ConfigTemplateInfo) {
 	printer.PrintTitle("Configures Context[${component-name}/${template-name}/${file-name}]")
 
 	keys := set.NewLinkedHashSetString(r.keys...)
-	for tpl, cm := range configs {
-		for key, context := range cm.Data {
+	for _, info := range configs {
+		for key, context := range info.CMObj.Data {
 			if keys.Length() != 0 && !keys.InArray(key) {
 				continue
 			}
 			fmt.Fprintf(r.Out, "%s%s\n",
-				printer.BoldYellow(fmt.Sprintf("%s/%s/%s:\n", r.componentName, tpl.Name, key)), context)
+				printer.BoldYellow(fmt.Sprintf("%s/%s/%s:\n", r.componentName, info.Name, key)), context)
 		}
 	}
 }
 
-func (r *reconfigureOptions) printConfigureHistory(configs map[appsv1alpha1.ConfigTemplate]*corev1.ConfigMap) error {
+func (r *reconfigureOptions) printConfigureHistory() error {
 	printer.PrintTitle("History modifications")
 
 	// filter reconfigure
@@ -639,12 +643,15 @@ func (o *opsRequestDiffOptions) diffConfig(tplName string) ([]cfgcore.Visualized
 	base := findTemplateStatusByName(o.baseVersion.Status.ReconfiguringStatus, tplName)
 	diff := findTemplateStatusByName(o.diffVersion.Status.ReconfiguringStatus, tplName)
 
+	cmKeySet := cfgcore.FromCMKeysSelector(tpl.Keys)
 	patch, err := cfgcore.CreateMergePatch(&cfgcore.K8sConfig{
 		CfgKey:         client.ObjectKeyFromObject(o.baseVersion),
 		Configurations: base.LastAppliedConfiguration,
+		CMKeys:         cmKeySet,
 	}, &cfgcore.K8sConfig{
 		CfgKey:         client.ObjectKeyFromObject(o.diffVersion),
 		Configurations: diff.LastAppliedConfiguration,
+		CMKeys:         cmKeySet,
 	}, patchOption)
 	if err != nil {
 		return nil, err

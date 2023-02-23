@@ -20,6 +20,8 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 )
 
 const (
@@ -132,6 +134,12 @@ type BackupSnapInfo struct {
 	SourcePVC     string
 	SnapshotClass string
 	Labels        string
+}
+
+type ConfigTemplateInfo struct {
+	Name  string
+	TPL   appsv1alpha1.ConfigTemplate
+	CMObj *corev1.ConfigMap
 }
 
 func ClusterGVR() schema.GroupVersionResource {

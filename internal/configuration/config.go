@@ -140,6 +140,9 @@ func init() {
 
 		var index = 0
 		for fileName, content := range ctx.Configurations {
+			if ctx.CMKeys != nil && !ctx.CMKeys.InArray(fileName) {
+				continue
+			}
 			v := viper.NewWithOptions(viper.KeyDelimiter(cfgKeyDelimiter))
 			v.SetConfigType(string(option.CfgType))
 			if err := v.ReadConfig(bytes.NewReader([]byte(content))); err != nil {
@@ -375,6 +378,14 @@ func DumpCfgContent(v *viper.Viper, tmpPath string) (string, error) {
 	}
 
 	return string(content), nil
+}
+
+func FromCMKeysSelector(keys []string) *set.LinkedHashSetString {
+	var cmKeySet *set.LinkedHashSetString
+	if len(keys) > 0 {
+		cmKeySet = set.NewLinkedHashSetString(keys...)
+	}
+	return cmKeySet
 }
 
 func CreateMergePatch(oldcfg, target interface{}, option CfgOption) (*ConfigPatchInfo, error) {

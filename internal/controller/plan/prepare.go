@@ -358,6 +358,7 @@ func buildCfg(task *intctrltypes.ReconcileTask,
 		if err != nil {
 			return nil, err
 		}
+		updateCMConfigSelectorLabels(cm, tpl)
 
 		// The owner of the configmap object is a cluster of users,
 		// in order to manage the life cycle of configmap
@@ -380,6 +381,16 @@ func buildCfg(task *intctrltypes.ReconcileTask,
 	}
 
 	return configs, nil
+}
+
+func updateCMConfigSelectorLabels(cm *corev1.ConfigMap, tpl appsv1alpha1.ConfigTemplate) {
+	if len(tpl.Keys) == 0 {
+		return
+	}
+	if cm.Labels == nil {
+		cm.Labels = make(map[string]string)
+	}
+	cm.Labels[cfgcore.CMConfigurationCMKeysLabelKey] = strings.Join(tpl.Keys, ",")
 }
 
 func isConfigMapExists(cmName string, namespace string, ctx context.Context, cli client.Client) (bool, error) {

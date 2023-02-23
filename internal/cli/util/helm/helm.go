@@ -441,7 +441,7 @@ func GetChartVersions(chartName string) ([]*semver.Version, error) {
 	var ind *repo.IndexFile
 	for _, re := range rf.Repositories {
 		n := re.Name
-		if n != types.KubeBlocksChartName {
+		if n != chartName {
 			continue
 		}
 
@@ -454,13 +454,18 @@ func GetChartVersions(chartName string) ([]*semver.Version, error) {
 		break
 	}
 
+	// do not find any index file
+	if ind == nil {
+		return nil, nil
+	}
+
 	var versions []*semver.Version
-	for _, ref := range ind.Entries {
-		if len(ref) == 0 {
+	for _, entry := range ind.Entries {
+		if len(entry) == 0 {
 			continue
 		}
-		for _, rr := range ref {
-			ver, err := semver.NewVersion(rr.Version)
+		for _, v := range entry {
+			ver, err := semver.NewVersion(v.Version)
 			if err != nil {
 				return nil, err
 			}

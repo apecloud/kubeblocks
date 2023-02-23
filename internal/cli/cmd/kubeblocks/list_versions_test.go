@@ -17,6 +17,7 @@ limitations under the License.
 package kubeblocks
 
 import (
+	"github.com/Masterminds/semver/v3"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -30,7 +31,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/util/helm"
 )
 
-var _ = Describe("kubeblocks uninstall", func() {
+var _ = Describe("kubeblocks list versions", func() {
 	var cmd *cobra.Command
 	var streams genericclioptions.IOStreams
 	var tf *cmdtesting.TestFactory
@@ -49,14 +50,13 @@ var _ = Describe("kubeblocks uninstall", func() {
 		tf.Cleanup()
 	})
 
-	It("check uninstall", func() {
+	It("list versions command", func() {
 		var cfg string
-		cmd = newUninstallCmd(tf, streams)
+		cmd = newListVersionsCmd(tf, streams)
 		Expect(cmd).ShouldNot(BeNil())
 
 		cmd.Flags().StringVar(&cfg, "kubeconfig", "", "Path to the kubeconfig file to use for CLI requests.")
 		cmd.Flags().StringVar(&cfg, "context", "", "The name of the kubeconfig context to use.")
-		Expect(cmd.HasSubCommands()).Should(BeFalse())
 
 		o := &Options{
 			IOStreams: streams,
@@ -66,15 +66,36 @@ var _ = Describe("kubeblocks uninstall", func() {
 		Expect(o.HelmCfg).ShouldNot(BeNil())
 	})
 
-	It("run uninstall", func() {
-		o := uninstallOptions{Options{
+	It("run list-versions", func() {
+		o := listVersionsOption{
 			IOStreams: streams,
 			HelmCfg:   helm.FakeActionConfig(),
-			Namespace: "default",
-			Client:    testing.FakeClientSet(),
-			Dynamic:   testing.FakeDynamicClient(testing.FakeVolumeSnapshotClass()),
-		}}
+			Namespace: namespace,
+		}
+		By("setup searched version")
+		o.setupSearchedVersion()
+		Expect(o.version).ShouldNot(BeEmpty())
 
-		Expect(o.uninstall()).Should(Succeed())
+		By("search version")
+		versions := []string{"0.1.0", "0.1.0-alpha.0"}
+		semverVersions := make([]*semver.Version, len(versions))
+		for i, v := range versions {
+			semVer, _ := semver.NewVersion(v)
+			semverVersions[i] = semVer
+		}
+		res, err := o.applyConstraint(semverVersions)
+		Expect(err).Should(Succeed())
+		Expect(len(res)).Should(Equal(1))
+		Expect(res[0].String()).Should(Equal("0.1.0"))
+
+		By("search version with devel")
+		o.devel = true
+		o.setupSearchedVersion()
+		res, err = o.applyConstraint(semverVersions)
+		Expect(err).Should(Succeed())
+		Expect(len(res)).Should(Equal(2))
+
+		By("list versions")
+		Expect(o.listVersions()).Should(HaveOccurred())
 	})
 })

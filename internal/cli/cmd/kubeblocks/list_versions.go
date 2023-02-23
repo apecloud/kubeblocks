@@ -104,7 +104,7 @@ func (o *listVersionsOption) listVersions() error {
 		return err
 	}
 
-	// sort version descending
+	// sort version descending and select the versions that meet the constraint
 	o.setupSearchedVersion()
 	sort.Sort(sort.Reverse(semver.Collection(versions)))
 	versions, err = o.applyConstraint(versions)

@@ -33,7 +33,7 @@ import (
 )
 
 var _ = Describe("helm util", func() {
-	It("repo", func() {
+	It("add and remove repo", func() {
 		r := repo.Entry{
 			Name: "test-repo",
 			URL:  "https://test-kubebllcks.com/test-repo",
@@ -83,7 +83,7 @@ var _ = Describe("helm util", func() {
 			Expect(o.Uninstall(cfg)).Should(BeNil()) // release exists
 		})
 
-		It("should failed when chart is failed installed", func() {
+		It("should fail when chart is failed installed", func() {
 			err := cfg.Releases.Create(&release.Release{
 				Name:    o.Name,
 				Version: 1,
@@ -117,7 +117,7 @@ var _ = Describe("helm util", func() {
 			Expect(o.Uninstall(cfg)).Should(HaveOccurred()) // release not found
 		})
 
-		It("should failed at fetching charts when release is already deployed", func() {
+		It("should fail at fetching charts when release is already deployed", func() {
 			err := cfg.Releases.Create(&release.Release{
 				Name:    o.Name,
 				Version: 1,
@@ -144,7 +144,11 @@ var _ = Describe("helm util", func() {
 			Expect(errors.Is(o.Upgrade(cfg), ErrReleaseNotDeployed)).Should(BeTrue())
 			Expect(o.Uninstall(cfg)).Should(BeNil()) // release exists
 		})
-
 	})
 
+	It("get chart versions", func() {
+		versions, err := GetChartVersions(testing.KubeBlocksChartName)
+		Expect(versions).Should(BeNil())
+		Expect(err).Should(Succeed())
+	})
 })

@@ -69,11 +69,20 @@ spec:
                     type: object
                   podAntiAffinity:
                     description: podAntiAffinity defines pods of component anti-affnity.
-                      Defaults to Preferred Preferred means try spread pods by topologyKey
-                      Required means must spread pods by topologyKey
+                      Defaults to Preferred Preferred means try spread pods by topologyKey.
+                      Required means must spread pods by topologyKey.
                     enum:
                     - Preferred
                     - Required
+                    type: string
+                  tenancy:
+                    default: SharedNode
+                    description: tenancy defines how pods are distributed across node.
+                      SharedNode means multiple pods may share the same node. DedicatedNode
+                      means each pod runs on their own dedicated node.
+                    enum:
+                    - SharedNode
+                    - DedicatedNode
                     type: string
                   topologyKeys:
                     description: topologyKeys describe topologyKeys for `topologySpreadConstraint`
@@ -111,10 +120,20 @@ spec:
                         podAntiAffinity:
                           description: podAntiAffinity defines pods of component anti-affnity.
                             Defaults to Preferred Preferred means try spread pods
-                            by topologyKey Required means must spread pods by topologyKey
+                            by topologyKey. Required means must spread pods by topologyKey.
                           enum:
                           - Preferred
                           - Required
+                          type: string
+                        tenancy:
+                          default: SharedNode
+                          description: tenancy defines how pods are distributed across
+                            node. SharedNode means multiple pods may share the same
+                            node. DedicatedNode means each pod runs on their own dedicated
+                            node.
+                          enum:
+                          - SharedNode
+                          - DedicatedNode
                           type: string
                         topologyKeys:
                           description: topologyKeys describe topologyKeys for `topologySpreadConstraint`

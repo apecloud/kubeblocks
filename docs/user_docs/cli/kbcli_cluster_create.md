@@ -48,6 +48,9 @@ kbcli cluster create [NAME] [flags]
   
   # Create a Cluster with two tolerations
   kbcli cluster create --cluster-definition apecloud-mysql --tolerations '"key=engineType,value=mongo,operator=Equal,effect=NoSchedule","key=diskType,value=ssd,operator=Equal,effect=NoSchedule"'
+  
+  # Create a cluster, with each pod runs on their own dedicated node
+  kbcli cluster create --tenancy=DedicatedNode
 ```
 
 ### Options
@@ -60,9 +63,10 @@ kbcli cluster create [NAME] [flags]
   -h, --help                         help for create
       --monitor                      Set monitor enabled and inject metrics exporter (default true)
       --node-labels stringToString   Node label selector (default [])
-      --pod-anti-affinity string     Pod anti-affinity type (default "Preferred")
+      --pod-anti-affinity string     Pod anti-affinity type, one of: (Preferred, Required) (default "Preferred")
       --set stringArray              Set the cluster resource including cpu, memory, replicas and storage, each set corresponds to a component.(e.g. --set cpu=1000m,memory=1Gi,replicas=3,storage=10Gi)
   -f, --set-file string              Use yaml file, URL, or stdin to set the cluster resource
+      --tenancy string               Tenancy options, one of: (SharedNode, DedicatedNode) (default "SharedNode")
       --termination-policy string    Termination policy, one of: (DoNotTerminate, Halt, Delete, WipeOut) (default "Delete")
       --tolerations strings          Tolerations for cluster, such as '"key=engineType,value=mongo,operator=Equal,effect=NoSchedule"'
       --topology-keys stringArray    Topology keys for affinity

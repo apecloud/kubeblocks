@@ -103,6 +103,8 @@ const (
 	Replication WorkloadType = "Replication"
 )
 
+var WorkloadTypes = []string{"Stateless", "Stateful", "Consensus", "Replication"}
+
 // TerminationPolicyType define termination policy types.
 // +enum
 type TerminationPolicyType string
@@ -131,6 +133,13 @@ type PodAntiAffinity string
 const (
 	Preferred PodAntiAffinity = "Preferred"
 	Required  PodAntiAffinity = "Required"
+)
+
+type TenancyType string
+
+const (
+	SharedNode    TenancyType = "SharedNode"
+	DedicatedNode TenancyType = "DedicatedNode"
 )
 
 type ProgressStatus string

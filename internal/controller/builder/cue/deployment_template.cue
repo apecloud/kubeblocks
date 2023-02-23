@@ -23,6 +23,7 @@ component: {
 	characterType:  string
 	type:           string
 	name:           string
+	workloadType:   string
 	replicas:       int
 	podSpec: containers: [...]
 	volumeClaimTemplates: [...]
@@ -60,6 +61,7 @@ deployment: {
 					"app.kubernetes.io/instance":       "\(cluster.metadata.name)"
 					"app.kubernetes.io/component-name": "\(component.name)"
 					"app.kubernetes.io/managed-by":     "kubeblocks"
+					"kubeblocks.io/workload-type":      "\(component.workloadType)"
 					// "app.kubernetes.io/version" : # TODO
 				}
 			}

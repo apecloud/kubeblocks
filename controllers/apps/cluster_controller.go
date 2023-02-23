@@ -803,9 +803,6 @@ func (r *ClusterReconciler) reconcileStatusOperations(ctx context.Context, clust
 	}
 	// determine whether to support horizontalScaling
 	operations.HorizontalScalable = getSupportHorizontalScalingComponents(cluster, clusterDef)
-	// set default supported operations
-	clusterComponentNames := getComponentsNames(cluster)
-	operations.VerticalScalable = clusterComponentNames
 
 	// Determine whether to support upgrade
 	if err = r.Client.List(ctx, clusterVersionList, client.MatchingLabels{clusterDefLabelKey: cluster.Spec.ClusterDefRef}); err != nil {
@@ -823,16 +820,6 @@ func (r *ClusterReconciler) reconcileStatusOperations(ctx context.Context, clust
 	patch := client.MergeFrom(cluster.DeepCopy())
 	cluster.Status.Operations = &operations
 	return r.Client.Status().Patch(ctx, cluster, patch)
-}
-
-// getComponentsNames get all components' names
-func getComponentsNames(
-	cluster *appsv1alpha1.Cluster) []string {
-	clusterComponentNames := make([]string, 0)
-	for _, v := range cluster.Spec.ComponentSpecs {
-		clusterComponentNames = append(clusterComponentNames, v.Name)
-	}
-	return clusterComponentNames
 }
 
 // getSupportHorizontalScalingComponents gets the components that support horizontalScaling

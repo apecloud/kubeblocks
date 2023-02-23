@@ -155,17 +155,6 @@ var _ = Describe("OpsRequest webhook", func() {
 	}
 
 	testVerticalScaling := func(cluster *Cluster) {
-		// set cluster support verticalScaling
-		patch := client.MergeFrom(cluster.DeepCopy())
-		cluster.Status.Operations.VerticalScalable = []string{replicaSetComponentName}
-		Expect(k8sClient.Status().Patch(ctx, cluster, patch)).Should(Succeed())
-		// wait until patch succeed
-		Eventually(func() bool {
-			tmpCluster := &Cluster{}
-			_ = k8sClient.Get(context.Background(), client.ObjectKey{Name: cluster.Name, Namespace: cluster.Namespace}, tmpCluster)
-			return len(cluster.Status.Operations.VerticalScalable) > 0
-		}, timeout, interval).Should(BeTrue())
-
 		By("By testing verticalScaling opsRequest components is not consistent")
 		opsRequest := createTestOpsRequest(clusterName, opsRequestName, VerticalScalingType)
 		verticalScaling := VerticalScaling{}

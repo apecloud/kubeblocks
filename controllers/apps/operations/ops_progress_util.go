@@ -50,8 +50,8 @@ func isCompletedProgressStatus(status appsv1alpha1.ProgressStatus) bool {
 func SetComponentStatusProgressDetail(
 	recorder record.EventRecorder,
 	opsRequest *appsv1alpha1.OpsRequest,
-	progressDetails *[]appsv1alpha1.ProgressDetail,
-	newProgressDetail appsv1alpha1.ProgressDetail) {
+	progressDetails *[]appsv1alpha1.ProgressStatusDetail,
+	newProgressDetail appsv1alpha1.ProgressStatusDetail) {
 	if progressDetails == nil {
 		return
 	}
@@ -77,8 +77,8 @@ func SetComponentStatusProgressDetail(
 }
 
 // FindStatusProgressDetail finds the progressDetail of the specified objectKey in progressDetails.
-func FindStatusProgressDetail(progressDetails []appsv1alpha1.ProgressDetail,
-	objectKey string) *appsv1alpha1.ProgressDetail {
+func FindStatusProgressDetail(progressDetails []appsv1alpha1.ProgressStatusDetail,
+	objectKey string) *appsv1alpha1.ProgressStatusDetail {
 	for i := range progressDetails {
 		if progressDetails[i].ObjectKey == objectKey {
 			return &progressDetails[i]
@@ -111,7 +111,7 @@ func getProgressDetailEventReason(status appsv1alpha1.ProgressStatus) string {
 // sendProgressDetailEvent sends the progress detail changed events.
 func sendProgressDetailEvent(recorder record.EventRecorder,
 	opsRequest *appsv1alpha1.OpsRequest,
-	progressDetail appsv1alpha1.ProgressDetail) {
+	progressDetail appsv1alpha1.ProgressStatusDetail) {
 	status := progressDetail.Status
 	if status == appsv1alpha1.PendingProgressStatus {
 		return
@@ -121,7 +121,7 @@ func sendProgressDetailEvent(recorder record.EventRecorder,
 }
 
 // updateProgressDetailTime updates the progressDetail startTime or endTime according to the status.
-func updateProgressDetailTime(progressDetail *appsv1alpha1.ProgressDetail) {
+func updateProgressDetailTime(progressDetail *appsv1alpha1.ProgressStatusDetail) {
 	if progressDetail.Status == appsv1alpha1.ProcessingProgressStatus &&
 		progressDetail.StartTime.IsZero() {
 		progressDetail.StartTime = metav1.NewTime(time.Now())
@@ -146,9 +146,9 @@ func convertPodObjectKeyMap(podList *corev1.PodList) map[string]struct{} {
 // For example, a replicaSet may attempt to create a pod multiple times till it succeeds.
 // so some pod may be expired, we should clear them.
 func removeStatelessExpiredPod(podList *corev1.PodList,
-	progressDetails []appsv1alpha1.ProgressDetail) []appsv1alpha1.ProgressDetail {
+	progressDetails []appsv1alpha1.ProgressStatusDetail) []appsv1alpha1.ProgressStatusDetail {
 	podObjectKeyMap := convertPodObjectKeyMap(podList)
-	newProgressDetails := make([]appsv1alpha1.ProgressDetail, 0)
+	newProgressDetails := make([]appsv1alpha1.ProgressStatusDetail, 0)
 	for _, v := range progressDetails {
 		if _, ok := podObjectKeyMap[v.ObjectKey]; ok {
 			newProgressDetails = append(newProgressDetails, v)
@@ -209,7 +209,7 @@ func handleStatelessProgress(opsRes *OpsResource,
 	opsStartTime := opsRequest.Status.StartTimestamp
 	for _, v := range podList.Items {
 		objectKey := GetProgressObjectKey(v.Kind, v.Name)
-		progressDetail := appsv1alpha1.ProgressDetail{ObjectKey: objectKey}
+		progressDetail := appsv1alpha1.ProgressStatusDetail{ObjectKey: objectKey}
 		if podIsPendingDuringOperation(opsStartTime, &v, compStatus.Phase) {
 			handlePendingProgressDetail(opsRes, compStatus, progressDetail)
 			continue
@@ -246,7 +246,7 @@ func handleStatefulSetProgress(opsRes *OpsResource,
 	opsStartTime := opsRequest.Status.StartTimestamp
 	for _, v := range podList.Items {
 		objectKey := GetProgressObjectKey(v.Kind, v.Name)
-		progressDetail := appsv1alpha1.ProgressDetail{ObjectKey: objectKey}
+		progressDetail := appsv1alpha1.ProgressStatusDetail{ObjectKey: objectKey}
 		if podIsPendingDuringOperation(opsStartTime, &v, compStatus.Phase) {
 			handlePendingProgressDetail(opsRes, compStatus, progressDetail)
 			continue
@@ -264,7 +264,7 @@ func handleStatefulSetProgress(opsRes *OpsResource,
 // handlePendingProgressDetail handles the pending progressDetail and sets it to progressDetails.
 func handlePendingProgressDetail(opsRes *OpsResource,
 	compStatus *appsv1alpha1.OpsRequestComponentStatus,
-	progressDetail appsv1alpha1.ProgressDetail,
+	progressDetail appsv1alpha1.ProgressStatusDetail,
 ) {
 	progressDetail.Status = appsv1alpha1.PendingProgressStatus
 	SetComponentStatusProgressDetail(opsRes.Recorder, opsRes.OpsRequest,
@@ -275,7 +275,7 @@ func handlePendingProgressDetail(opsRes *OpsResource,
 func handleSucceedProgressDetail(opsRes *OpsResource,
 	pgRes progressResource,
 	compStatus *appsv1alpha1.OpsRequestComponentStatus,
-	progressDetail appsv1alpha1.ProgressDetail,
+	progressDetail appsv1alpha1.ProgressStatusDetail,
 ) {
 	progressDetail.SetStatusAndMessage(appsv1alpha1.SucceedProgressStatus,
 		getProgressSucceedMessage(pgRes.opsMessageKey, progressDetail.ObjectKey, pgRes.clusterComponent.Name))
@@ -287,7 +287,7 @@ func handleSucceedProgressDetail(opsRes *OpsResource,
 func handleFailedOrProcessingProgressDetail(opsRes *OpsResource,
 	pgRes progressResource,
 	compStatus *appsv1alpha1.OpsRequestComponentStatus,
-	progressDetail appsv1alpha1.ProgressDetail,
+	progressDetail appsv1alpha1.ProgressStatusDetail,
 	pod *corev1.Pod) (completedCount int32) {
 	componentName := pgRes.clusterComponent.Name
 	if util.IsFailedOrAbnormal(compStatus.Phase) {

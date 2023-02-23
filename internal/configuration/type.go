@@ -36,7 +36,7 @@ const (
 
 type RawConfig struct {
 	// formatter
-	Type appsv1alpha1.ConfigurationFormatter
+	Type appsv1alpha1.CfgFileFormat
 
 	RawData string
 }
@@ -116,7 +116,7 @@ type CfgOption struct {
 	Log  logr.Logger
 
 	// formatter
-	CfgType appsv1alpha1.ConfigurationFormatter
+	CfgType appsv1alpha1.CfgFileFormat
 
 	// Path for CfgLocalType test
 	Path    string

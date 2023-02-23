@@ -227,7 +227,7 @@ var _ = Describe("Cluster", func() {
 		Expect(o.parseUpdatedParams().Error()).To(ContainSubstring("reconfiguring required configure file or updated parameters"))
 		o.Parameters = []string{"abcd"}
 
-		Expect(o.parseUpdatedParams().Error()).To(ContainSubstring("updated parameter formatter"))
+		Expect(o.parseUpdatedParams().Error()).To(ContainSubstring("updated parameter format"))
 		o.Parameters = []string{"abcd=test"}
 		o.CfgTemplateName = configTplName
 		o.IOStreams = streams

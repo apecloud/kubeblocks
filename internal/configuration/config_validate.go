@@ -33,7 +33,7 @@ type ConfigValidator interface {
 type configCueValidator struct {
 	// cue describe configuration template
 	cueScript string
-	cfgType   appsv1alpha1.ConfigurationFormatter
+	cfgType   appsv1alpha1.CfgFileFormat
 }
 
 func (c *configCueValidator) Validate(cfg map[string]string) error {
@@ -51,7 +51,7 @@ func (c *configCueValidator) Validate(cfg map[string]string) error {
 type schemaValidator struct {
 	typeName string
 	schema   *apiext.JSONSchemaProps
-	cfgType  appsv1alpha1.ConfigurationFormatter
+	cfgType  appsv1alpha1.CfgFileFormat
 }
 
 func (s schemaValidator) Validate(cfg map[string]string) error {
@@ -88,13 +88,13 @@ func NewConfigValidator(configTemplate *appsv1alpha1.ConfigConstraintSpec) Confi
 		validator = &EmptyValidator{}
 	case len(configSchema.CUE) != 0:
 		validator = &configCueValidator{
-			cfgType:   configTemplate.FormatterConfig.Formatter,
+			cfgType:   configTemplate.FormatterConfig.Format,
 			cueScript: configSchema.CUE,
 		}
 	case configSchema.Schema != nil:
 		validator = &schemaValidator{
 			typeName: configTemplate.CfgSchemaTopLevelName,
-			cfgType:  configTemplate.FormatterConfig.Formatter,
+			cfgType:  configTemplate.FormatterConfig.Format,
 			schema:   configSchema.Schema,
 		}
 	default:

@@ -183,7 +183,7 @@ func (pvcEventHandler PersistentVolumeClaimEventHandler) handlePVCFailedStatusOn
 		if progressDetail == nil || progressDetail.Message != event.Message {
 			isChanged = true
 		}
-		progressDetail = &appsv1alpha1.ProgressDetail{
+		progressDetail = &appsv1alpha1.ProgressStatusDetail{
 			Group:     vctName,
 			ObjectKey: objectKey,
 			Status:    appsv1alpha1.FailedProgressStatus,

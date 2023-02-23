@@ -201,7 +201,7 @@ func (hs horizontalScalingOpsHandler) handleScaleOutProgress(
 			continue
 		}
 		objectKey := GetProgressObjectKey(v.Kind, v.Name)
-		progressDetail := appsv1alpha1.ProgressDetail{ObjectKey: objectKey}
+		progressDetail := appsv1alpha1.ProgressStatusDetail{ObjectKey: objectKey}
 		if currComponent.PodIsAvailable(&v, minReadySeconds) {
 			completedCount += 1
 			message := fmt.Sprintf("Successfully created pod: %s in Component: %s", objectKey, componentName)
@@ -239,7 +239,7 @@ func (hs horizontalScalingOpsHandler) handleScaleDownProgress(opsRes *OpsResourc
 		if v.DeletionTimestamp.IsZero() {
 			continue
 		}
-		progressDetail := appsv1alpha1.ProgressDetail{
+		progressDetail := appsv1alpha1.ProgressStatusDetail{
 			ObjectKey: objectKey,
 			Status:    appsv1alpha1.ProcessingProgressStatus,
 			Message:   fmt.Sprintf("Start to delete pod: %s in Component: %s", objectKey, pgRes.clusterComponent.Name),
@@ -261,7 +261,7 @@ func (hs horizontalScalingOpsHandler) handleScaleDownProgress(opsRes *OpsResourc
 			continue
 		}
 		// if the pod object of progressDetail is not existing in podMap, means successfully deleted.
-		progressDetail := appsv1alpha1.ProgressDetail{
+		progressDetail := appsv1alpha1.ProgressStatusDetail{
 			ObjectKey: v.ObjectKey,
 			Status:    appsv1alpha1.SucceedProgressStatus,
 			Message:   fmt.Sprintf("Successfully deleted pod: %s in Component: %s", v.ObjectKey, pgRes.clusterComponent.Name),

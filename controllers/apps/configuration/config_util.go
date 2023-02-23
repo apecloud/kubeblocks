@@ -431,7 +431,7 @@ func createConfigurePatch(cfg *corev1.ConfigMap, ctx intctrlutil.RequestCtx, tpl
 
 	option := cfgcore.CfgOption{
 		Type:    cfgcore.CfgTplType,
-		CfgType: tpl.FormatterConfig.Formatter,
+		CfgType: tpl.FormatterConfig.Format,
 		Log:     ctx.Log,
 	}
 

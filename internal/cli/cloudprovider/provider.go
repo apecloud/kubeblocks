@@ -26,25 +26,16 @@ import (
 	"github.com/pkg/errors"
 )
 
-const (
-	AWS = "aws"
-)
-
-type CloudProvider interface {
+type Interface interface {
+	// Name return the cloud provider name
 	Name() string
 
-	Apply(destroy bool) error
+	// CreateK8sCluster creates a kubernetes cluster
+	CreateK8sCluster(name string) error
 
-	Instance() (Instance, error)
+	// DeleteK8sCluster deletes a kubernetes cluster
+	DeleteK8sCluster(name string) error
 }
-
-type Instance interface {
-	GetIP() string
-}
-
-var (
-	defaultProvider CloudProvider
-)
 
 type Config struct {
 	Name         string `json:"name"`
@@ -52,6 +43,10 @@ type Config struct {
 	AccessSecret string `json:"access_secret"`
 	Region       string `json:"region"`
 }
+
+var (
+	defaultProvider Interface
+)
 
 func init() {
 	defaultProvider = &localCloudProvider{}
@@ -66,7 +61,7 @@ func initProvider() error {
 			panic(errors.Wrap(err, fmt.Sprintf("Failed to check if %s exists", providerCfg)))
 		}
 
-		defaultProvider, _ = NewProvider(Local, "", "", "")
+		defaultProvider, _ = New(Local, "", "", "")
 		return nil
 	}
 	content, err := os.ReadFile(providerCfg)
@@ -78,7 +73,7 @@ func initProvider() error {
 		return errors.Wrap(err, "Invalid cloud provider config, please destroy and try init playground again")
 	}
 
-	provider, err := NewProvider(cfg.Name, cfg.AccessKey, cfg.AccessSecret, cfg.Region)
+	provider, err := New(cfg.Name, cfg.AccessKey, cfg.AccessSecret, cfg.Region)
 	if err != nil {
 		return errors.Wrap(err, "Failed to init cloud provider")
 	}
@@ -86,12 +81,12 @@ func initProvider() error {
 	return nil
 }
 
-func Get() (CloudProvider, error) {
+func Get() (Interface, error) {
 	err := initProvider()
 	return defaultProvider, err
 }
 
-func InitProvider(provider, accessKey, accessSecret, region string) (CloudProvider, error) {
+func InitProvider(provider, accessKey, accessSecret, region string) (Interface, error) {
 	if err := initProvider(); err != nil {
 		return nil, err
 	}
@@ -114,10 +109,10 @@ func InitProvider(provider, accessKey, accessSecret, region string) (CloudProvid
 	if err := ioutils.AtomicWriteFile(providerCfg, result, os.FileMode(0600)); err != nil {
 		return nil, errors.Wrap(err, "Failed to write cloud provider config")
 	}
-	return NewProvider(provider, accessKey, accessSecret, region)
+	return New(provider, accessKey, accessSecret, region)
 }
 
-func NewProvider(provider, accessKey, accessSecret, region string) (CloudProvider, error) {
+func New(provider, accessKey, accessSecret, region string) (Interface, error) {
 	switch provider {
 	case AWS:
 		return NewAWSCloudProvider(accessKey, accessSecret, region)

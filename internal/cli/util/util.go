@@ -276,15 +276,6 @@ func NewFactory() cmdutil.Factory {
 	return cmdutil.NewFactory(getter)
 }
 
-func PlaygroundDir() (string, error) {
-	cliPath, err := GetCliHomeDir()
-	if err != nil {
-		return "", err
-	}
-
-	return filepath.Join(cliPath, "playground"), nil
-}
-
 func GVRToString(gvr schema.GroupVersionResource) string {
 	return strings.Join([]string{gvr.Resource, gvr.Version, gvr.Group}, ".")
 }

@@ -181,11 +181,6 @@ var _ = Describe("util", func() {
 		Expect(SetKubeConfig("test")).Should(Succeed())
 		Expect(NewFactory()).ShouldNot(BeNil())
 
-		By("playground dir")
-		dir, err := PlaygroundDir()
-		Expect(err).ShouldNot(HaveOccurred())
-		Expect(dir).ShouldNot(Equal(""))
-
 		By("resource is empty")
 		res := resource.Quantity{}
 		Expect(ResourceIsEmpty(&res)).Should(BeTrue())

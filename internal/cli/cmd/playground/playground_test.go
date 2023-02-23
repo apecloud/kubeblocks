@@ -17,9 +17,12 @@ limitations under the License.
 package playground
 
 import (
+	"fmt"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 
 	"github.com/apecloud/kubeblocks/internal/cli/cloudprovider"
@@ -50,7 +53,7 @@ var _ = Describe("playground", func() {
 
 		o := &initOptions{
 			clusterDef:    "test-cd",
-			CloudProvider: defaultCloudProvider,
+			cloudProvider: defaultCloudProvider,
 			IOStreams:     streams,
 		}
 		Expect(o.validate()).Should(Succeed())
@@ -63,7 +66,7 @@ var _ = Describe("playground", func() {
 	It("init at remote cloud", func() {
 		o := &initOptions{
 			IOStreams:     streams,
-			CloudProvider: cloudprovider.AWS,
+			cloudProvider: cloudprovider.AWS,
 		}
 		Expect(o.run()).Should(HaveOccurred())
 	})
@@ -83,5 +86,9 @@ var _ = Describe("playground", func() {
 		cmd := newGuideCmd()
 		Expect(cmd).ShouldNot(BeNil())
 		Expect(runGuide()).Should(HaveOccurred())
+	})
+
+	It("test", func() {
+		fmt.Println(rand.String(10))
 	})
 })

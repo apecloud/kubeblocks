@@ -20,23 +20,24 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"path"
 	"strings"
 
-	"github.com/docker/docker/pkg/ioutils"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
+	"golang.org/x/exp/slices"
 	"helm.sh/helm/v3/pkg/action"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 
-	"github.com/apecloud/kubeblocks/internal/cli/cloudprovider"
+	cp "github.com/apecloud/kubeblocks/internal/cli/cloudprovider"
 	"github.com/apecloud/kubeblocks/internal/cli/cluster"
 	cmdcluster "github.com/apecloud/kubeblocks/internal/cli/cmd/cluster"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/kubeblocks"
 	"github.com/apecloud/kubeblocks/internal/cli/create"
+	"github.com/apecloud/kubeblocks/internal/cli/printer"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 	"github.com/apecloud/kubeblocks/internal/cli/util/helm"
+	"github.com/apecloud/kubeblocks/internal/cli/util/prompt"
 	"github.com/apecloud/kubeblocks/version"
 )
 
@@ -49,10 +50,10 @@ type initOptions struct {
 	kbVersion      string
 	clusterVersion string
 
-	CloudProvider string
-	AccessKey     string
-	AccessSecret  string
-	Region        string
+	cloudProvider string
+	accessKey     string
+	accessSecret  string
+	region        string
 }
 
 type destroyOptions struct {
@@ -93,11 +94,17 @@ func newInitCmd(streams genericclioptions.IOStreams) *cobra.Command {
 	cmd.Flags().StringVar(&o.clusterDef, "cluster-definition", defaultClusterDef, "Cluster definition")
 	cmd.Flags().StringVar(&o.clusterVersion, "cluster-version", "", "Cluster definition")
 	cmd.Flags().StringVar(&o.kbVersion, "version", version.DefaultKubeBlocksVersion, "KubeBlocks version")
-	cmd.Flags().StringVar(&o.CloudProvider, "cloud-provider", defaultCloudProvider, "Cloud provider type")
-	cmd.Flags().StringVar(&o.AccessKey, "access-key", "", "Cloud provider access key")
-	cmd.Flags().StringVar(&o.AccessSecret, "access-secret", "", "Cloud provider access secret")
-	cmd.Flags().StringVar(&o.Region, "region", "", "Cloud provider region")
+	cmd.Flags().StringVar(&o.cloudProvider, "cloud-provider", defaultCloudProvider, fmt.Sprintf("Cloud provider type, one of [%s]", strings.Join(cp.CloudProviders(), ",")))
+	cmd.Flags().StringVar(&o.accessKey, "access-key", "", "Cloud provider access key")
+	cmd.Flags().StringVar(&o.accessSecret, "access-secret", "", "Cloud provider access secret")
+	cmd.Flags().StringVar(&o.region, "region", "", "Cloud provider region")
 	cmd.Flags().BoolVar(&o.verbose, "verbose", false, "Output more log info")
+
+	util.CheckErr(cmd.RegisterFlagCompletionFunc(
+		"cloud-provider",
+		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+			return cp.CloudProviders(), cobra.ShellCompDirectiveNoFileComp
+		}))
 	return cmd
 }
 
@@ -131,6 +138,13 @@ func (o *initOptions) validate() error {
 		return fmt.Errorf("a valid cluster definition is needed, use --cluster-definition to specify one")
 	}
 
+	if !slices.Contains(cp.CloudProviders(), o.cloudProvider) {
+		return fmt.Errorf("%s is not a valid cloud provider", o.cloudProvider)
+	}
+
+	if o.cloudProvider != cp.Local && o.cloudProvider != cp.AWS {
+		return fmt.Errorf("cloud provider %s is not supported yet", o.cloudProvider)
+	}
 	return nil
 }
 
@@ -139,10 +153,10 @@ func (o *initOptions) run() error {
 		return err
 	}
 
-	if o.CloudProvider != cloudprovider.Local {
-		return o.remote()
+	if o.cloudProvider == cp.Local {
+		return o.local()
 	}
-	return o.local()
+	return o.cloud()
 }
 
 // local bootstraps a playground in the local host
@@ -207,28 +221,54 @@ func (o *initOptions) local() error {
 	return nil
 }
 
-// remote bootstraps a playground in the remote cloud
-func (o *initOptions) remote() error {
-	// apply changes
-	cp, err := cloudprovider.InitProvider(o.CloudProvider, o.AccessKey, o.AccessSecret, o.Region)
+// bootstraps a playground in the remote cloud
+func (o *initOptions) cloud() error {
+	printer.Warning(o.Out, `Cloud provider kubernetes clusters may incur charges by running this playground.
+    Be sure to delete your infrastructure promptly to avoid additional charges. We are not
+    responsible for any charges you may incur.
+`)
+
+	// confirm to run
+	fmt.Fprintf(o.Out, "\nDo you want to perform this actions?\n  Only 'yes' will be accepted to approve.\n\n")
+	entered, err := prompt.NewPrompt("", "Enter a value:", o.In).GetInput()
 	if err != nil {
-		return errors.Wrap(err, "failed to create cloud provider")
+		return err
 	}
-	if err = cp.Apply(false); err != nil {
-		return errors.Wrap(err, "failed to apply changes")
+	if entered != "yes" {
+		fmt.Fprintf(o.Out, "\nPlayground init cancelled.\n")
+		return nil
 	}
-	instance, err := cp.Instance()
+
+	fmt.Fprintln(o.Out)
+	// clone apecloud/cloud-provider repo to local path
+	cpPath, err := cp.GitRepoLocalPath()
 	if err != nil {
-		return errors.Wrap(err, "failed to query cloud instance")
+		return err
 	}
-	kubeConfig := strings.ReplaceAll(kubeConfig, "${KUBERNETES_API_SERVER_ADDRESS}", instance.GetIP())
-	kubeConfigPath := path.Join(util.GetKubeconfigDir(), "kubeblocks-playground")
-	if err = ioutils.AtomicWriteFile(kubeConfigPath, []byte(kubeConfig), 0700); err != nil {
-		return errors.Wrap(err, "failed to update kube config")
+	spinner := util.Spinner(o.Out, "Clone cloud provider terraform script to %s", cpPath)
+	defer spinner(false)
+	if err = util.CloneGitRepo(cp.GitRepoURL, cpPath); err != nil {
+		return err
 	}
-	if err = printGuide(cp.Name(), instance.GetIP(), true); err != nil {
-		return errors.Wrap(err, "failed to print user guide")
+	spinner(true)
+
+	// create cloud kubernetes cluster
+	provider, err := cp.New(o.cloudProvider, o.accessKey, o.accessSecret, o.region)
+	if err != nil {
+		return err
 	}
+	clusterName := generateK8sClusterName(o.cloudProvider)
+	fmt.Fprintf(o.Out, "Creating %s %s cluster %s ... \n", o.cloudProvider, cp.K8sService(o.cloudProvider), clusterName)
+	if err = provider.CreateK8sCluster(clusterName); err != nil {
+		return err
+	}
+
+	// update kube config
+
+	// install KubeBlocks
+
+	// create cluster
+
 	return nil
 }
 
@@ -242,23 +282,7 @@ func (o *destroyOptions) destroyPlayground() error {
 	spinner := util.Spinner(o.Out, "Destroy KubeBlocks playground")
 	defer spinner(false)
 
-	// remote playground, just destroy all cloud resources
-	cp, _ := cloudprovider.Get()
-	if cp.Name() != cloudprovider.Local {
-		var err error
-		// remove playground cluster kubeconfig
-		if err = util.RemoveConfig(k8sClusterName); err != nil {
-			return errors.Wrap(err, "failed to remove playground kubeconfig file")
-		}
-		if cp, err = cloudprovider.Get(); err != nil {
-			return err
-		}
-		if err = cp.Apply(true); err != nil {
-			return err
-		}
-		spinner(true)
-		return nil
-	}
+	// TODO: remote playground, just destroy all cloud resources
 
 	// uninstall k3d cluster
 	if err := ins.uninstall(); err != nil {
@@ -274,12 +298,7 @@ func (o *destroyOptions) destroyPlayground() error {
 }
 
 func runGuide() error {
-	cp, _ := cloudprovider.Get()
-	instance, err := cp.Instance()
-	if err != nil {
-		return err
-	}
-	return printGuide(cp.Name(), instance.GetIP(), false)
+	return printGuide("", "", false)
 }
 
 func printGuide(cloudProvider string, hostIP string, init bool) error {
@@ -388,27 +407,27 @@ func newCreateOptions(cd string, version string) (*cmdcluster.CreateOptions, err
 }
 
 func initPlaygroundDir() error {
-	playgroundDir, err := util.PlaygroundDir()
+	dir, err := playgroundDir()
 	if err != nil {
 		return err
 	}
 
-	if _, err = os.Stat(playgroundDir); err != nil && os.IsNotExist(err) {
-		return os.MkdirAll(playgroundDir, 0750)
+	if _, err = os.Stat(dir); err != nil && os.IsNotExist(err) {
+		return os.MkdirAll(dir, 0750)
 	}
 
 	return nil
 }
 
 func removePlaygroundDir() (string, error) {
-	playgroundDir, err := util.PlaygroundDir()
+	dir, err := playgroundDir()
 	if err != nil {
-		return playgroundDir, err
+		return dir, err
 	}
 
-	if _, err = os.Stat(playgroundDir); err != nil && os.IsNotExist(err) {
-		return playgroundDir, nil
+	if _, err = os.Stat(dir); err != nil && os.IsNotExist(err) {
+		return dir, nil
 	}
 
-	return playgroundDir, os.RemoveAll(playgroundDir)
+	return dir, os.RemoveAll(dir)
 }

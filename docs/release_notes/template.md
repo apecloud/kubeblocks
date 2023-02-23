@@ -5,7 +5,7 @@ We're happy to announce the release of KubeBlocks $kubeblocks_version! 🚀 🎉
 We would like to extend our appreciation to all contributors who helped make this release happen.
 
 **Highlights**
-  * ClusterDefinition API `spec.conectionCredential` add following placeholder name:
+  * ClusterDefinition API `spec.connectionCredential` add following placeholder name:
     * Service FQDN `$(SVC_FQDN)` placeholder, value pattern - $(CLUSTER_NAME)-$(1ST_COMP_NAME).$(NAMESPACE).svc, where 1ST_COMP_NAME is the 1st component that provide `ClusterDefinition.spec.componentDefs[].service` attribute
     * Service ports `$(SVC_PORT_<NAME>)` placeholder
     * example usage:

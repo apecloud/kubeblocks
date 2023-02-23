@@ -240,7 +240,7 @@ var _ = Describe("builder", func() {
 			}
 			Expect(credential.StringData["svcFQDN"]).Should(Equal(svcFQDN))
 			Expect(credential.StringData["tcpEndpoint"]).Should(Equal(fmt.Sprintf("tcp:%s:%d", svcFQDN, mysqlPort.Port)))
-			Expect(credential.StringData["paxosEndpoint"]).Should(Equal(fmt.Sprintf("tcp:%s:%d", svcFQDN, paxosPort.Port)))
+			Expect(credential.StringData["paxosEndpoint"]).Should(Equal(fmt.Sprintf("paxos:%s:%d", svcFQDN, paxosPort.Port)))
 		})
 
 		It("builds StatefulSet correctly", func() {

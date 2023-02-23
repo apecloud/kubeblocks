@@ -69,11 +69,11 @@ var _ = Describe("kubeblocks install", func() {
 		}
 
 		By("command without kubeconfig flag")
-		Expect(o.complete(tf, cmd)).Should(HaveOccurred())
+		Expect(o.Complete(tf, cmd)).Should(HaveOccurred())
 
 		cmd.Flags().StringVar(&cfg, "kubeconfig", "", "Path to the kubeconfig file to use for CLI requests.")
 		cmd.Flags().StringVar(&cfg, "context", "", "The name of the kubeconfig context to use.")
-		Expect(o.complete(tf, cmd)).To(Succeed())
+		Expect(o.Complete(tf, cmd)).To(Succeed())
 		Expect(o.HelmCfg).ShouldNot(BeNil())
 		Expect(o.Namespace).To(Equal("test"))
 	})
@@ -112,7 +112,7 @@ var _ = Describe("kubeblocks install", func() {
 			CreateNamespace: true,
 			ValueOpts:       values.Options{Values: []string{"snapshot-controller.enabled=true"}},
 		}
-		Expect(o.postInstall()).Should(HaveOccurred())
+		Expect(o.PostInstall()).Should(HaveOccurred())
 	})
 
 	It("preCheck", func() {

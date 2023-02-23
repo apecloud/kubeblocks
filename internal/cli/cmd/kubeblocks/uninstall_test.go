@@ -61,7 +61,7 @@ var _ = Describe("kubeblocks uninstall", func() {
 		o := &Options{
 			IOStreams: streams,
 		}
-		Expect(o.complete(tf, cmd)).Should(Succeed())
+		Expect(o.Complete(tf, cmd)).Should(Succeed())
 		Expect(o.Namespace).Should(Equal(namespace))
 		Expect(o.HelmCfg).ShouldNot(BeNil())
 	})

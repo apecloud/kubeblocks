@@ -21,9 +21,9 @@ import (
 	. "github.com/onsi/gomega"
 
 	"github.com/spf13/viper"
-	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -31,10 +31,20 @@ import (
 
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
-	testdbaas "github.com/apecloud/kubeblocks/internal/testutil/dbaas"
+	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 )
 
 var _ = Describe("Backup for a StatefulSet", func() {
+	const clusterName = "wesql-cluster"
+	const componentName = "replicasets-primary"
+	const containerName = "mysql"
+	const defaultPVCSize = "1Gi"
+	const backupPolicyName = "test-backup-policy"
+	const backupRemoteVolumeName = "backup-remote-volume"
+	const backupRemotePVCName = "backup-remote-pvc"
+	const defaultSchedule = "0 3 * * *"
+	const defaultTTL = "168h0m0s"
+	const backupName = "test-backup-job"
 
 	cleanEnv := func() {
 		// must wait until resources deleted and no longer exist before the testcases start,
@@ -47,24 +57,34 @@ var _ = Describe("Backup for a StatefulSet", func() {
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 		// namespaced
-		testdbaas.ClearResources(&testCtx, intctrlutil.StatefulSetSignature, inNS, ml)
-		testdbaas.ClearResources(&testCtx, intctrlutil.PodSignature, inNS, ml)
-		testdbaas.ClearResources(&testCtx, intctrlutil.BackupSignature, inNS, ml)
-		testdbaas.ClearResources(&testCtx, intctrlutil.BackupPolicySignature, inNS, ml)
-		testdbaas.ClearResources(&testCtx, intctrlutil.JobSignature, inNS, ml)
-		testdbaas.ClearResources(&testCtx, intctrlutil.CronJobSignature, inNS, ml)
+		testapps.ClearResources(&testCtx, intctrlutil.StatefulSetSignature, inNS, ml)
+		testapps.ClearResources(&testCtx, intctrlutil.PodSignature, inNS, ml)
+		testapps.ClearResources(&testCtx, intctrlutil.BackupSignature, inNS, ml)
+		testapps.ClearResources(&testCtx, intctrlutil.BackupPolicySignature, inNS, ml)
+		testapps.ClearResources(&testCtx, intctrlutil.JobSignature, inNS, ml)
+		testapps.ClearResources(&testCtx, intctrlutil.CronJobSignature, inNS, ml)
 		// non-namespaced
-		testdbaas.ClearResources(&testCtx, intctrlutil.BackupToolSignature, ml)
+		testapps.ClearResources(&testCtx, intctrlutil.BackupToolSignature, ml)
 	}
+	var nodeName string
 
 	BeforeEach(func() {
 		cleanEnv()
 
-		By("By creating a statefulset")
-		_ = testdbaas.CreateCustomizedObj(&testCtx, "backup/statefulset.yaml", &appsv1.StatefulSet{},
-			testCtx.UseDefaultNamespace())
-		_ = testdbaas.CreateCustomizedObj(&testCtx, "backup/statefulset_pod.yaml", &corev1.Pod{},
-			testCtx.UseDefaultNamespace())
+		By("By mocking a statefulset")
+		sts := testapps.NewStatefulSetFactory(testCtx.DefaultNamespace, clusterName+"-"+componentName, clusterName, componentName).
+			AddLabels(intctrlutil.AppInstanceLabelKey, clusterName).
+			AddContainer(corev1.Container{Name: containerName, Image: testapps.ApeCloudMySQLImage}).
+			AddVolumeClaimTemplate(corev1.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{Name: testapps.DataVolumeName},
+				Spec:       testapps.NewPVC(defaultPVCSize),
+			}).Create(&testCtx).GetObject()
+
+		By("By mocking a pod belonging to the statefulset")
+		pod := testapps.NewPodFactory(testCtx.DefaultNamespace, sts.Name+"-0").
+			AddContainer(corev1.Container{Name: containerName, Image: testapps.ApeCloudMySQLImage}).
+			Create(&testCtx)
+		nodeName = pod.GetObject().Spec.NodeName
 	})
 
 	AfterEach(func() {
@@ -72,20 +92,22 @@ var _ = Describe("Backup for a StatefulSet", func() {
 	})
 
 	When("with default settings", func() {
-		var backupPolicyName string
-
 		BeforeEach(func() {
 			By("By creating a backupTool")
-			backupTool := testdbaas.CreateCustomizedObj(&testCtx, "backup/backuptool.yaml",
-				&dataprotectionv1alpha1.BackupTool{}, testdbaas.RandomizedObjName())
+			backupTool := testapps.CreateCustomizedObj(&testCtx, "backup/backuptool.yaml",
+				&dataprotectionv1alpha1.BackupTool{}, testapps.RandomizedObjName())
 
 			By("By creating a backupPolicy from backupTool: " + backupTool.Name)
-			backupPolicy := testdbaas.CreateCustomizedObj(&testCtx, "backup/backuppolicy.yaml",
-				&dataprotectionv1alpha1.BackupPolicy{}, testdbaas.RandomizedObjName(), testCtx.UseDefaultNamespace(),
-				func(backupPolicy *dataprotectionv1alpha1.BackupPolicy) {
-					backupPolicy.Spec.BackupToolName = backupTool.Name
-				})
-			backupPolicyName = backupPolicy.Name
+			_ = testapps.NewBackupPolicyFactory(testCtx.DefaultNamespace, backupPolicyName).
+				SetBackupToolName(backupTool.Name).
+				SetSchedule(defaultSchedule).
+				SetTTL(defaultTTL).
+				AddMatchLabels(intctrlutil.AppInstanceLabelKey, clusterName).
+				SetTargetSecretName(clusterName).
+				AddHookPreCommand("touch /data/mysql/.restore;sync").
+				AddHookPostCommand("rm -f /data/mysql/.restore;sync").
+				SetRemoteVolumePVC(backupRemoteVolumeName, backupRemotePVCName).
+				Create(&testCtx).GetObject()
 		})
 
 		Context("creates a full backup", func() {
@@ -93,26 +115,33 @@ var _ = Describe("Backup for a StatefulSet", func() {
 
 			BeforeEach(func() {
 				By("By creating a backup from backupPolicy: " + backupPolicyName)
-				backup := testdbaas.CreateCustomizedObj(&testCtx, "backup/backup.yaml",
-					&dataprotectionv1alpha1.Backup{}, testdbaas.RandomizedObjName(), testCtx.UseDefaultNamespace(),
-					func(backup *dataprotectionv1alpha1.Backup) {
-						backup.Spec.BackupPolicyName = backupPolicyName
-					})
+				backup := testapps.NewBackupFactory(testCtx.DefaultNamespace, backupName).
+					SetTTL(defaultTTL).
+					SetBackupPolicyName(backupPolicyName).
+					SetBackupType(dataprotectionv1alpha1.BackupTypeFull).
+					Create(&testCtx).GetObject()
 				backupKey = client.ObjectKeyFromObject(backup)
 			})
 
 			It("should succeed after job completes", func() {
 				patchK8sJobStatus(backupKey, batchv1.JobComplete)
 
-				Eventually(testdbaas.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dataprotectionv1alpha1.Backup) {
+				By("Check backup job completed")
+				Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dataprotectionv1alpha1.Backup) {
 					g.Expect(fetched.Status.Phase).To(Equal(dataprotectionv1alpha1.BackupCompleted))
+				})).Should(Succeed())
+
+				By("Check backup job's nodeName equals pod's nodeName")
+				Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *batchv1.Job) {
+					g.Expect(fetched.Spec.Template.Spec.NodeName).To(Equal(nodeName))
 				})).Should(Succeed())
 			})
 
 			It("should fail after job fails", func() {
 				patchK8sJobStatus(backupKey, batchv1.JobFailed)
 
-				Eventually(testdbaas.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dataprotectionv1alpha1.Backup) {
+				By("Check backup job failed")
+				Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dataprotectionv1alpha1.Backup) {
 					g.Expect(fetched.Status.Phase).To(Equal(dataprotectionv1alpha1.BackupFailed))
 				})).Should(Succeed())
 			})
@@ -125,11 +154,11 @@ var _ = Describe("Backup for a StatefulSet", func() {
 				viper.Set("VOLUMESNAPSHOT", "true")
 
 				By("By creating a backup from backupPolicy: " + backupPolicyName)
-				backup := testdbaas.CreateCustomizedObj(&testCtx, "backup/backup_snapshot.yaml",
-					&dataprotectionv1alpha1.Backup{}, testdbaas.RandomizedObjName(), testCtx.UseDefaultNamespace(),
-					func(backup *dataprotectionv1alpha1.Backup) {
-						backup.Spec.BackupPolicyName = backupPolicyName
-					})
+				backup := testapps.NewBackupFactory(testCtx.DefaultNamespace, backupName).
+					SetTTL(defaultTTL).
+					SetBackupPolicyName(backupPolicyName).
+					SetBackupType(dataprotectionv1alpha1.BackupTypeSnapshot).
+					Create(&testCtx).GetObject()
 				backupKey = client.ObjectKeyFromObject(backup)
 			})
 
@@ -138,19 +167,28 @@ var _ = Describe("Backup for a StatefulSet", func() {
 			})
 
 			It("should success after all jobs complete", func() {
-				patchK8sJobStatus(types.NamespacedName{Name: backupKey.Name + "-pre", Namespace: backupKey.Namespace}, batchv1.JobComplete)
+				preJobKey := types.NamespacedName{Name: backupKey.Name + "-pre", Namespace: backupKey.Namespace}
+				postJobKey := types.NamespacedName{Name: backupKey.Name + "-post", Namespace: backupKey.Namespace}
+				patchK8sJobStatus(preJobKey, batchv1.JobComplete)
 				patchVolumeSnapshotStatus(backupKey, true)
-				patchK8sJobStatus(types.NamespacedName{Name: backupKey.Name + "-post", Namespace: backupKey.Namespace}, batchv1.JobComplete)
+				patchK8sJobStatus(postJobKey, batchv1.JobComplete)
 
-				Eventually(testdbaas.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dataprotectionv1alpha1.Backup) {
+				By("Check backup job completed")
+				Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dataprotectionv1alpha1.Backup) {
 					g.Expect(fetched.Status.Phase).To(Equal(dataprotectionv1alpha1.BackupCompleted))
 				})).Should(Succeed())
+
+				By("Check pre job cleaned")
+				Eventually(testapps.CheckObjExists(&testCtx, preJobKey, &batchv1.Job{}, false)).Should(Succeed())
+				By("Check post job cleaned")
+				Eventually(testapps.CheckObjExists(&testCtx, postJobKey, &batchv1.Job{}, false)).Should(Succeed())
 			})
 
 			It("should fail after pre-job fails", func() {
 				patchK8sJobStatus(types.NamespacedName{Name: backupKey.Name + "-pre", Namespace: backupKey.Namespace}, batchv1.JobFailed)
 
-				Eventually(testdbaas.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dataprotectionv1alpha1.Backup) {
+				By("Check backup job failed")
+				Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dataprotectionv1alpha1.Backup) {
 					g.Expect(fetched.Status.Phase).To(Equal(dataprotectionv1alpha1.BackupFailed))
 				})).Should(Succeed())
 			})
@@ -163,32 +201,38 @@ var _ = Describe("Backup for a StatefulSet", func() {
 
 			BeforeEach(func() {
 				By("By creating a backupTool")
-				backupTool := testdbaas.CreateCustomizedObj(&testCtx, "backup/backuptool.yaml",
-					&dataprotectionv1alpha1.BackupTool{}, testdbaas.RandomizedObjName(),
+				backupTool := testapps.CreateCustomizedObj(&testCtx, "backup/backuptool.yaml",
+					&dataprotectionv1alpha1.BackupTool{}, testapps.RandomizedObjName(),
 					func(backupTool *dataprotectionv1alpha1.BackupTool) {
 						backupTool.Spec.Resources = nil
 					})
 
 				By("By creating a backupPolicy from backupTool: " + backupTool.Name)
-				backupPolicy := testdbaas.CreateCustomizedObj(&testCtx, "backup/backuppolicy.yaml",
-					&dataprotectionv1alpha1.BackupPolicy{}, testdbaas.RandomizedObjName(), testCtx.UseDefaultNamespace(),
-					func(backupPolicy *dataprotectionv1alpha1.BackupPolicy) {
-						backupPolicy.Spec.BackupToolName = backupTool.Name
-					})
+				_ = testapps.NewBackupPolicyFactory(testCtx.DefaultNamespace, backupPolicyName).
+					SetBackupToolName(backupTool.Name).
+					SetSchedule(defaultSchedule).
+					SetTTL(defaultTTL).
+					AddMatchLabels(intctrlutil.AppInstanceLabelKey, clusterName).
+					SetTargetSecretName(clusterName).
+					AddHookPreCommand("touch /data/mysql/.restore;sync").
+					AddHookPostCommand("rm -f /data/mysql/.restore;sync").
+					SetRemoteVolumePVC(backupRemoteVolumeName, backupRemotePVCName).
+					Create(&testCtx).GetObject()
 
-				By("By creating a backup from backupPolicy: " + backupPolicy.Name)
-				backup := testdbaas.CreateCustomizedObj(&testCtx, "backup/backup.yaml",
-					&dataprotectionv1alpha1.Backup{}, testdbaas.RandomizedObjName(), testCtx.UseDefaultNamespace(),
-					func(backup *dataprotectionv1alpha1.Backup) {
-						backup.Spec.BackupPolicyName = backupPolicy.Name
-					})
+				By("By creating a backup from backupPolicy: " + backupPolicyName)
+				backup := testapps.NewBackupFactory(testCtx.DefaultNamespace, backupName).
+					SetTTL(defaultTTL).
+					SetBackupPolicyName(backupPolicyName).
+					SetBackupType(dataprotectionv1alpha1.BackupTypeFull).
+					Create(&testCtx).GetObject()
 				backupKey = client.ObjectKeyFromObject(backup)
 			})
 
 			It("should succeed after job completes", func() {
 				patchK8sJobStatus(backupKey, batchv1.JobComplete)
 
-				Eventually(testdbaas.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dataprotectionv1alpha1.Backup) {
+				By("Check backup job completed")
+				Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dataprotectionv1alpha1.Backup) {
 					g.Expect(fetched.Status.Phase).To(Equal(dataprotectionv1alpha1.BackupCompleted))
 				})).Should(Succeed())
 			})
@@ -197,14 +241,14 @@ var _ = Describe("Backup for a StatefulSet", func() {
 })
 
 func patchK8sJobStatus(key types.NamespacedName, jobStatus batchv1.JobConditionType) {
-	Eventually(testdbaas.GetAndChangeObjStatus(&testCtx, key, func(fetched *batchv1.Job) {
+	Eventually(testapps.GetAndChangeObjStatus(&testCtx, key, func(fetched *batchv1.Job) {
 		jobCondition := batchv1.JobCondition{Type: jobStatus}
 		fetched.Status.Conditions = append(fetched.Status.Conditions, jobCondition)
 	})).Should(Succeed())
 }
 
 func patchVolumeSnapshotStatus(key types.NamespacedName, readyToUse bool) {
-	Eventually(testdbaas.GetAndChangeObjStatus(&testCtx, key, func(fetched *snapshotv1.VolumeSnapshot) {
+	Eventually(testapps.GetAndChangeObjStatus(&testCtx, key, func(fetched *snapshotv1.VolumeSnapshot) {
 		snapStatus := snapshotv1.VolumeSnapshotStatus{ReadyToUse: &readyToUse}
 		fetched.Status = &snapStatus
 	})).Should(Succeed())

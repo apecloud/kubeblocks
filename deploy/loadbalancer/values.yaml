@@ -3,7 +3,8 @@
 # Declare variables to be passed into your templates.
 
 image:
-  repository: docker.io/apecloud/loadbalancer
+  registry: registry.cn-hangzhou.aliyuncs.com
+  repository: apecloud/loadbalancer
   pullPolicy: Always
   # Overrides the image tag whose default is the chart appVersion.
   tag: ""

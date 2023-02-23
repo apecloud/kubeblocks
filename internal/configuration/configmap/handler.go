@@ -25,7 +25,7 @@ import (
 	"github.com/shirou/gopsutil/v3/process"
 	"go.uber.org/zap"
 
-	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	cfgutil "github.com/apecloud/kubeblocks/internal/configuration"
 )
 
@@ -74,7 +74,7 @@ func findParentPidFromProcessName(processName string) (PID, error) {
 	return InvalidPID, cfgutil.MakeError("not find pid of process name: [%s]", processName)
 }
 
-func CreateSignalHandler(sig dbaasv1alpha1.SignalType, processName string) WatchEventHandler {
+func CreateSignalHandler(sig appsv1alpha1.SignalType, processName string) WatchEventHandler {
 	signal, ok := allUnixSignals[sig]
 	if !ok {
 		logger.Error(cfgutil.MakeError("not support unix signal: %s", signal), "failed to create signal handler")
@@ -89,7 +89,7 @@ func CreateSignalHandler(sig dbaasv1alpha1.SignalType, processName string) Watch
 	}
 }
 
-func IsValidUnixSignal(sig dbaasv1alpha1.SignalType) bool {
+func IsValidUnixSignal(sig appsv1alpha1.SignalType) bool {
 	_, ok := allUnixSignals[sig]
 	return ok
 }

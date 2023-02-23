@@ -162,7 +162,7 @@ func NewListUsersCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *co
 		Short:             "List cluster users",
 		Example:           listUsersExample,
 		Aliases:           []string{"ls-users"},
-		ValidArgsFunction: util.ResourceNameCompletionFunc(f, o.GVR),
+		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.ClusterGVR()),
 		Run: func(cmd *cobra.Command, args []string) {
 			util.CheckErr(listUsers(o, args))
 		},

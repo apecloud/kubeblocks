@@ -37,7 +37,7 @@ import (
 	mockagent "github.com/apecloud/kubeblocks/internal/loadbalancer/agent/mocks"
 	mockcloud "github.com/apecloud/kubeblocks/internal/loadbalancer/cloud/mocks"
 	"github.com/apecloud/kubeblocks/internal/loadbalancer/protocol"
-	testdbaas "github.com/apecloud/kubeblocks/internal/testutil/dbaas"
+	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 )
 
 const (
@@ -113,9 +113,9 @@ var _ = Describe("ServiceController", Ordered, func() {
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 		// namespaced
-		testdbaas.ClearResources(&testCtx, intctrlutil.ServiceSignature, inNS, ml)
-		testdbaas.ClearResources(&testCtx, intctrlutil.EndpointsSignature, inNS, ml)
-		testdbaas.ClearResources(&testCtx, intctrlutil.PodSignature, inNS, ml)
+		testapps.ClearResources(&testCtx, intctrlutil.ServiceSignature, inNS, ml)
+		testapps.ClearResources(&testCtx, intctrlutil.EndpointsSignature, inNS, ml)
+		testapps.ClearResources(&testCtx, intctrlutil.PodSignature, inNS, ml)
 	}
 
 	BeforeEach(cleanEnv)

@@ -222,23 +222,23 @@ func (o *LogsOptions) validate() error {
 // createFileTypeCommand creates command against log file type
 func (o *LogsOptions) createFileTypeCommand(pod *corev1.Pod, obj *cluster.ClusterObjects) (string, error) {
 	var command string
-	componentName, ok := pod.Labels[types.ComponentLabelKey]
+	componentName, ok := pod.Labels[types.KBComponentLabelKey]
 	if !ok {
 		return command, fmt.Errorf("get component name from pod labels fail")
 	}
-	var comTypeName string
-	for _, comCluster := range obj.Cluster.Spec.Components {
+	var compDefName string
+	for _, comCluster := range obj.Cluster.Spec.ComponentSpecs {
 		if strings.EqualFold(comCluster.Name, componentName) {
-			comTypeName = comCluster.Type
+			compDefName = comCluster.ComponentDefRef
 			break
 		}
 	}
-	if len(comTypeName) == 0 {
-		return command, fmt.Errorf("get pod component type in cluster.yaml fail")
+	if len(compDefName) == 0 {
+		return command, fmt.Errorf("get pod component definition name in cluster.yaml fail")
 	}
 	var filePathPattern string
-	for _, com := range obj.ClusterDef.Spec.Components {
-		if strings.EqualFold(com.TypeName, comTypeName) {
+	for _, com := range obj.ClusterDef.Spec.ComponentDefs {
+		if strings.EqualFold(com.Name, compDefName) {
 			for _, logConfig := range com.LogConfigs {
 				if strings.EqualFold(logConfig.Name, o.fileType) {
 					filePathPattern = logConfig.FilePathPattern

@@ -40,6 +40,8 @@ ENVTEST_K8S_VERSION = 1.24.1
 
 ENABLE_WEBHOOKS ?= false
 
+SKIP_GO_GEN ?= true
+
 APP_NAME = kubeblocks
 
 
@@ -49,6 +51,7 @@ CHART_PATH = deploy/helm
 WEBHOOK_CERT_DIR ?= /tmp/k8s-webhook-server/serving-certs
 
 GO ?= go
+GOFMT ?= gofmt
 GOOS ?= $(shell $(GO) env GOOS)
 GOARCH ?= $(shell $(GO) env GOARCH)
 # Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
@@ -121,13 +124,13 @@ help: ## Display this help.
 	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage:\n  make \033[36m<target>\033[0m\n"} /^[a-zA-Z_0-9-]+:.*?##/ { printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
 
 .PHONY: all
-all: manager kbcli probe agamotto reloader loadbalancer ## Make all cmd binaries.
+all: manager kbcli probe reloader loadbalancer ## Make all cmd binaries.
 
 ##@ Development
 
 .PHONY: manifests
-manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
-	$(CONTROLLER_GEN) rbac:roleName=manager-role crd:generateEmbeddedObjectMeta=true webhook paths="./apis/...;./controllers/dbaas/...;./controllers/dataprotection/...;./controllers/k8score/...;./cmd/manager/...;./internal/..." output:crd:artifacts:config=config/crd/bases
+manifests: test-go-generate controller-gen ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
+	$(CONTROLLER_GEN) rbac:roleName=manager-role crd:generateEmbeddedObjectMeta=true webhook paths="./apis/...;./controllers/apps/...;./controllers/dataprotection/...;./controllers/k8score/...;./cmd/manager/...;./internal/..." output:crd:artifacts:config=config/crd/bases
 	@cp config/crd/bases/* $(CHART_PATH)/crds
 	@cp config/rbac/role.yaml $(CHART_PATH)/config/rbac/role.yaml
 	$(CONTROLLER_GEN) rbac:roleName=loadbalancer-role  paths="./controllers/loadbalancer;./cmd/loadbalancer/controller" output:dir=config/loadbalancer
@@ -136,13 +139,27 @@ manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and Cust
 generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./apis/..."
 
-.PHONY: go-generate
-go-generate: ## Run go generate against code.
-	$(GO) generate -x ./...
+.PHONY: manager-go-generate
+manager-go-generate: ## Run go generate against lifecycle manager code.
+ifeq ($(SKIP_GO_GEN), false)
+	$(GO) generate -x ./internal/configuration/proto
+endif
+
+.PHONY: loadbalancer-go-generate
+loadbalancer-go-generate: ## Run go generate against loadbalancer code.
+ifeq ($(SKIP_GO_GEN), false)
+	$(GO) generate -x ./internal/loadbalancer/...
+endif
+
+.PHONY: test-go-generate
+test-go-generate: ## Run go generate against test code.
+	$(GO) generate -x ./internal/testutil/k8s/mocks/...
+	$(GO) generate -x ./internal/configuration/container/mocks/...
+	$(GO) generate -x ./internal/configuration/proto/mocks/...
 
 .PHONY: fmt
 fmt: ## Run go fmt against code.
-	$(GO) fmt -mod=mod ./...
+	$(GOFMT) -l -w -s $$(git ls-files | grep "\.go$$")
 
 .PHONY: vet
 vet: ## Run go vet against code.
@@ -158,7 +175,7 @@ fast-lint: golangci staticcheck  # [INTERNAL] fast lint
 	$(GOLANGCILINT) run ./...
 
 .PHONY: lint
-lint: generate ## Run golangci-lint against code.
+lint: test-go-generate generate ## Run golangci-lint against code.
 	$(MAKE) fast-lint
 
 .PHONY: staticcheck
@@ -201,7 +218,7 @@ test-current-ctx: manifests generate fmt vet add-k8s-host ## Run operator contro
 	USE_EXISTING_CLUSTER=true KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" $(GO) test  -p 1 -coverprofile cover.out $(TEST_PACKAGES)
 
 .PHONY: test
-test: manifests generate fmt vet envtest add-k8s-host ## Run tests. if existing k8s cluster is k3d or minikube, specify EXISTING_CLUSTER_TYPE.
+test: manifests generate test-go-generate fmt vet envtest add-k8s-host ## Run tests. if existing k8s cluster is k3d or minikube, specify EXISTING_CLUSTER_TYPE.
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" $(GO) test -short -coverprofile cover.out $(TEST_PACKAGES)
 
 .PHONY: test-integration
@@ -253,7 +270,7 @@ bin/kbcli.%: ## Cross build bin/kbcli.$(OS).$(ARCH).
 .PHONY: kbcli
 kbcli: OS=$(shell $(GO) env GOOS)
 kbcli: ARCH=$(shell $(GO) env GOARCH)
-kbcli: build-checks ## Build bin/kbcli.
+kbcli: test-go-generate build-checks ## Build bin/kbcli.
 	$(MAKE) bin/kbcli.$(OS).$(ARCH)
 	mv bin/kbcli.$(OS).$(ARCH) bin/kbcli
 
@@ -268,14 +285,14 @@ kbcli-doc: build-checks ## generate CLI command reference manual.
 ##@ Load Balancer
 
 .PHONY: loadbalancer
-loadbalancer: go-generate build-checks  ## Build loadbalancer binary.
+loadbalancer: loadbalancer-go-generate test-go-generate build-checks  ## Build loadbalancer binary.
 	$(GO) build -ldflags=${LD_FLAGS} -o bin/loadbalancer-controller ./cmd/loadbalancer/controller
 	$(GO) build -ldflags=${LD_FLAGS} -o bin/loadbalancer-agent ./cmd/loadbalancer/agent
 
 ##@ Operator Controller Manager
 
 .PHONY: manager
-manager: cue-fmt generate go-generate build-checks ## Build manager binary.
+manager: cue-fmt generate manager-go-generate test-go-generate build-checks ## Build manager binary.
 	$(GO) build -ldflags=${LD_FLAGS} -o bin/manager ./cmd/manager/main.go
 
 CERT_ROOT_CA ?= $(WEBHOOK_CERT_DIR)/rootCA.key
@@ -304,29 +321,6 @@ DEBUG_PORT=2345
 run-delve: manifests generate fmt vet  ## Run Delve debugger.
 	dlv --listen=:$(DEBUG_PORT) --headless=true --api-version=2 --accept-multiclient debug $(GO_PACKAGE) -- $(ARGUMENTS)
 
-
-##@ agamotto cmd
-
-AGAMOTTO_LD_FLAGS = "-s -w \
-    -X github.com/prometheus/common/version.Version=$(VERSION) \
-    -X github.com/prometheus/common/version.Revision=$(GIT_COMMIT) \
-    -X github.com/prometheus/common/version.BuildUser=apecloud \
-    -X github.com/prometheus/common/version.BuildDate=`date -u +'%Y-%m-%dT%H:%M:%SZ'`"
-
-bin/agamotto.%: ## Cross build bin/agamotto.$(OS).$(ARCH) .
-	GOOS=$(word 2,$(subst ., ,$@)) GOARCH=$(word 3,$(subst ., ,$@)) $(GO) build -ldflags=${AGAMOTTO_LD_FLAGS} -o $@ ./cmd/agamotto/main.go
-
-.PHONY: agamotto
-agamotto: OS=$(shell $(GO) env GOOS)
-agamotto: ARCH=$(shell $(GO) env GOARCH)
-agamotto: build-checks ## Build agamotto related binaries
-	$(MAKE) bin/agamotto.${OS}.${ARCH}
-	mv bin/agamotto.${OS}.${ARCH} bin/agamotto
-
-.PHONY: clean
-clean-agamotto: ## Clean bin/agamotto.
-	rm -f bin/agamotto
-
 ##@ reloader cmd
 
 RELOADER_LD_FLAGS = "-s -w"
@@ -337,7 +331,7 @@ bin/reloader.%: ## Cross build bin/reloader.$(OS).$(ARCH) .
 .PHONY: reloader
 reloader: OS=$(shell $(GO) env GOOS)
 reloader: ARCH=$(shell $(GO) env GOARCH)
-reloader: build-checks ## Build reloader related binaries
+reloader: test-go-generate build-checks ## Build reloader related binaries
 	$(MAKE) bin/reloader.${OS}.${ARCH}
 	mv bin/reloader.${OS}.${ARCH} bin/reloader
 
@@ -355,7 +349,7 @@ bin/cue-helper.%: ## Cross build bin/cue-helper.$(OS).$(ARCH) .
 .PHONY: cue-helper
 cue-helper: OS=$(shell $(GO) env GOOS)
 cue-helper: ARCH=$(shell $(GO) env GOARCH)
-cue-helper: build-checks ## Build cue-helper related binaries
+cue-helper: test-go-generate build-checks ## Build cue-helper related binaries
 	$(MAKE) bin/cue-helper.${OS}.${ARCH}
 	mv bin/cue-helper.${OS}.${ARCH} bin/cue-helper
 
@@ -374,7 +368,7 @@ bin/probe.%: ## Cross build bin/probe.$(OS).$(ARCH) .
 .PHONY: probe
 probe: OS=$(shell $(GO) env GOOS)
 probe: ARCH=$(shell $(GO) env GOARCH)
-probe: build-checks ## Build probe related binaries
+probe: test-go-generate build-checks ## Build probe related binaries
 	$(MAKE) bin/probe.${OS}.${ARCH}
 	mv bin/probe.${OS}.${ARCH} bin/probe
 
@@ -681,6 +675,7 @@ endif
 K8S_IMAGE_REPO ?= k8s.gcr.io
 SIGSTORAGE_IMAGE_REPO ?= k8s.gcr.io/sig-storage
 
+KICBASE_IMG := kicbase/stable:v0.0.36
 ETCT_IMG := $(K8S_IMAGE_REPO)/etcd:3.5.6-0
 COREDNS_IMG := $(K8S_IMAGE_REPO)/coredns/coredns:v1.8.6
 KUBE_APISERVER_IMG := $(K8S_IMAGE_REPO)/kube-apiserver:$(K8S_VERSION)
@@ -748,6 +743,7 @@ endif
 pull-all-images: DOCKER_PULLQ=docker pull -q
 pull-all-images: DOCKER_TAG=docker tag
 pull-all-images: ## Pull K8s & minikube required container images.
+	$(DOCKER_PULLQ) $(KICBASE_IMG)
 	$(DOCKER_PULLQ) $(KUBE_APISERVER_IMG)
 	$(DOCKER_PULLQ) $(KUBE_SCHEDULER_IMG)
 	$(DOCKER_PULLQ) $(KUBE_CTLR_MGR_IMG)
@@ -792,7 +788,7 @@ minikube-start: IMG_CACHE_CMD=image load --daemon=true
 minikube-start: minikube ## Start minikube cluster.
 ifneq (, $(shell which minikube))
 ifeq (, $(shell $(MINIKUBE) status -n minikube -ojson 2>/dev/null| jq -r '.Host' | grep Running))
-	$(MINIKUBE) start --kubernetes-version=$(K8S_VERSION) $(MINIKUBE_START_ARGS)
+	$(MINIKUBE) start --kubernetes-version=$(K8S_VERSION) $(MINIKUBE_START_ARGS) --base-image=$(KICBASE_IMG)
 endif
 endif
 	$(MINIKUBE) update-context

@@ -24,23 +24,8 @@ import (
 )
 
 var (
-	boxStyle = table.BoxStyle{
-		PaddingLeft:   "",
-		PaddingRight:  "\t",
-		PageSeparator: "\n",
-		UnfinishedRow: " ~",
-	}
-
-	// StyleKubeCtl renders a Table like kubectl
-	StyleKubeCtl = table.Style{
-		Name:    "StyleKubeCtl",
-		Box:     boxStyle,
-		Color:   table.ColorOptionsDefault,
-		Format:  table.FormatOptionsDefault,
-		HTML:    table.DefaultHTMLOptions,
-		Options: table.OptionsNoBordersAndSeparators,
-		Title:   table.TitleOptionsDefault,
-	}
+	// KubeCtlStyle renders a Table like kubectl
+	KubeCtlStyle table.Style
 
 	// TerminalStyle renders a Table like below:
 	//  +-----+------------+-----------+--------+-----------------------------+
@@ -67,9 +52,24 @@ type TablePrinter struct {
 	tbl table.Writer
 }
 
+func init() {
+	boxStyle := table.StyleBoxDefault
+	boxStyle.PaddingLeft = ""
+	boxStyle.PaddingRight = "   "
+	KubeCtlStyle = table.Style{
+		Name:    "StyleKubeCtl",
+		Box:     boxStyle,
+		Color:   table.ColorOptionsDefault,
+		Format:  table.FormatOptionsDefault,
+		HTML:    table.DefaultHTMLOptions,
+		Options: table.OptionsNoBordersAndSeparators,
+		Title:   table.TitleOptionsDefault,
+	}
+}
+
 func NewTablePrinter(out io.Writer) *TablePrinter {
 	t := table.NewWriter()
-	t.SetStyle(StyleKubeCtl)
+	t.SetStyle(KubeCtlStyle)
 	t.SetOutputMirror(out)
 	return &TablePrinter{tbl: t}
 }

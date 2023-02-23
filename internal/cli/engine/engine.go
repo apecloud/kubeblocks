@@ -22,11 +22,10 @@ import (
 	"strings"
 )
 
-// ClusterDefinition Type Const Define
+// ClusterDefinition ComponentDefRef Const Define
 const (
-	stateMysql      = "state.mysql"
-	stateMysql8     = "state.mysql8"
-	statePostgreSQL = "state.postgresql"
+	stateMysql      = "mysql"
+	statePostgreSQL = "postgresql"
 )
 
 type Interface interface {
@@ -55,7 +54,7 @@ type buildConnectExample func(info *ConnectionInfo) string
 
 func New(typeName string) (Interface, error) {
 	switch typeName {
-	case stateMysql, stateMysql8:
+	case stateMysql:
 		return newMySQL(), nil
 	case statePostgreSQL:
 		return newPostgreSQL(), nil

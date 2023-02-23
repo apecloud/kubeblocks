@@ -27,7 +27,7 @@ _Steps_:
 1. Run the command below to install `kbcli`. `kbcli` can run on macOS, Linux, and Windows.
 
     ```
-    curl -fsSL http://161.189.136.182:8000/apecloud/kubeblocks/install_cli.sh |bash    
+    curl -fsSL https://kubeblocks.io/installer/install_cli.sh | bash
     ```
 
 2. Run this command to check the version after installation.

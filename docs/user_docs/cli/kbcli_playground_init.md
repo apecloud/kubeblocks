@@ -15,9 +15,9 @@ kbcli playground init [flags]
       --cluster-definition string   Cluster definition (default "apecloud-mysql")
       --cluster-version string      Cluster definition
   -h, --help                        help for init
-      --kubeblocks-version string   KubeBlocks version
       --region string               Cloud provider region
       --verbose                     Output more log info
+      --version string              KubeBlocks version
 ```
 
 ### Options inherited from parent commands

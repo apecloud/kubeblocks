@@ -70,6 +70,8 @@ func NewClusterCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 				NewDescribeReconfigureCmd(f, streams),
 				NewExplainReconfigureCmd(f, streams),
 				NewDiffConfigureCmd(f, streams),
+				NewStopCmd(f, streams),
+				NewStartCmd(f, streams),
 			},
 		},
 		{
@@ -84,7 +86,7 @@ func NewClusterCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 			},
 		},
 		{
-			Message: "Trouble shooting Commands:",
+			Message: "Troubleshooting Commands:",
 			Commands: []*cobra.Command{
 				NewLogsCmd(f, streams),
 				NewListLogsCmd(f, streams),

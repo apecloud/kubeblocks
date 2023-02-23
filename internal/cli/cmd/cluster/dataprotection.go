@@ -34,7 +34,7 @@ import (
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
 
-	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/create"
 	"github.com/apecloud/kubeblocks/internal/cli/delete"
 	"github.com/apecloud/kubeblocks/internal/cli/list"
@@ -352,7 +352,7 @@ func (o *CreateRestoreOptions) Complete() error {
 	if err != nil {
 		return err
 	}
-	cluster := dbaasv1alpha1.Cluster{}
+	cluster := appsv1alpha1.Cluster{}
 	err = runtime.DefaultUnstructuredConverter.
 		FromUnstructured(clusterObj.UnstructuredContent(), &cluster)
 	if err != nil {
@@ -366,13 +366,13 @@ func (o *CreateRestoreOptions) Complete() error {
 	if cluster.Spec.Affinity != nil {
 		o.PodAntiAffinity = string(cluster.Spec.Affinity.PodAntiAffinity)
 	}
-	o.Monitor = cluster.Spec.Components[0].Monitor
-	componentByte, err := json.Marshal(cluster.Spec.Components)
+	o.Monitor = cluster.Spec.ComponentSpecs[0].Monitor
+	componentByte, err := json.Marshal(cluster.Spec.ComponentSpecs)
 	if err != nil {
 		return err
 	}
 
-	if err = json.Unmarshal(componentByte, &o.Components); err != nil {
+	if err = json.Unmarshal(componentByte, &o.ComponentSpecs); err != nil {
 		return err
 	}
 

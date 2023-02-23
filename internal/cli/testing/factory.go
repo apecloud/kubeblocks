@@ -102,12 +102,12 @@ func testDynamicResources() []*restmapper.APIGroupResources {
 		// KubeBlocks objects
 		{
 			Group: metav1.APIGroup{
-				Name: "dbaas.kubeblocks.io",
+				Name: "apps.kubeblocks.io",
 				Versions: []metav1.GroupVersionForDiscovery{
-					{GroupVersion: "dbaas.kubeblocks.io/v1alpha1", Version: "v1alpha1"},
+					{GroupVersion: "apps.kubeblocks.io/v1alpha1", Version: "v1alpha1"},
 				},
 				PreferredVersion: metav1.GroupVersionForDiscovery{
-					GroupVersion: "dbaas.kubeblocks.io/v1alpha1",
+					GroupVersion: "apps.kubeblocks.io/v1alpha1",
 					Version:      "v1alpha1"},
 			},
 			VersionedResources: map[string][]metav1.APIResource{

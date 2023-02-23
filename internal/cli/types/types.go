@@ -36,7 +36,7 @@ const (
 	GoosWindows = "windows"
 
 	// Group api group
-	Group = "dbaas.kubeblocks.io"
+	Group = "apps.kubeblocks.io"
 
 	// AppsGroup k8s apps group
 	AppsGroup = "apps"
@@ -79,16 +79,17 @@ const (
 
 	NameLabelKey                   = "app.kubernetes.io/name"
 	InstanceLabelKey               = "app.kubernetes.io/instance"
-	ConsensusSetAccessModeLabelKey = "cs.dbaas.kubeblocks.io/access-mode"
-	ComponentLabelKey              = "app.kubernetes.io/component-name"
-	RegionLabelKey                 = "topology.kubernetes.io/region"
-	ZoneLabelKey                   = "topology.kubernetes.io/zone"
-	ClusterDefLabelKey             = "clusterdefinition.kubeblocks.io/name"
-	RoleLabelKey                   = "kubeblocks.io/role"
+	ConsensusSetAccessModeLabelKey = "cs.apps.kubeblocks.io/access-mode"
+	KBComponentLabelKey            = "app.kubeblocks.io/component-name"
+	// ComponentLabelKey              = "app.kubernetes.io/component"
+	RegionLabelKey     = "topology.kubernetes.io/region"
+	ZoneLabelKey       = "topology.kubernetes.io/zone"
+	ClusterDefLabelKey = "clusterdefinition.kubeblocks.io/name"
+	RoleLabelKey       = "kubeblocks.io/role"
 
-	ServiceLBTypeAnnotationKey     = "service.kubernetes.io/apecloud-loadbalancer-type"
+	ServiceLBTypeAnnotationKey     = "service.kubernetes.io/kubeblocks-loadbalancer-type"
 	ServiceLBTypeAnnotationValue   = "private-ip"
-	ServiceFloatingIPAnnotationKey = "service.kubernetes.io/apecloud-loadbalancer-floating-ip"
+	ServiceFloatingIPAnnotationKey = "service.kubernetes.io/kubeblocks-loadbalancer-floating-ip"
 	StorageClassAnnotationKey      = "kubeblocks.io/storage-class"
 
 	// DataProtection definitions

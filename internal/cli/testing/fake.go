@@ -27,8 +27,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/pointer"
 
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
-	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
@@ -39,7 +39,7 @@ const (
 	ClusterVersionName = "fake-cluster-version"
 	ClusterDefName     = "fake-cluster-definition"
 	ComponentName      = "fake-component-name"
-	ComponentType      = "fake-component-type"
+	ComponentDefName   = "fake-component-type"
 	NodeName           = "fake-node-name"
 	SecretName         = "fake-secret-name"
 	StorageClassName   = "fake-storage-class"
@@ -56,8 +56,9 @@ func GetRandomStr() string {
 	return seq
 }
 
-func FakeCluster(name string, namespace string) *dbaasv1alpha1.Cluster {
-	return &dbaasv1alpha1.Cluster{
+func FakeCluster(name string, namespace string) *appsv1alpha1.Cluster {
+	var replicas int32 = 1
+	return &appsv1alpha1.Cluster{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       types.KindCluster,
 			APIVersion: fmt.Sprintf("%s/%s", types.Group, types.Version),
@@ -66,28 +67,29 @@ func FakeCluster(name string, namespace string) *dbaasv1alpha1.Cluster {
 			Name:      name,
 			Namespace: namespace,
 		},
-		Status: dbaasv1alpha1.ClusterStatus{
-			Phase: dbaasv1alpha1.RunningPhase,
-			Components: map[string]dbaasv1alpha1.ClusterStatusComponent{
+		Status: appsv1alpha1.ClusterStatus{
+			Phase: appsv1alpha1.RunningPhase,
+			Components: map[string]appsv1alpha1.ClusterComponentStatus{
 				ComponentName: {
-					ConsensusSetStatus: &dbaasv1alpha1.ConsensusSetStatus{
-						Leader: dbaasv1alpha1.ConsensusMemberStatus{
+					ConsensusSetStatus: &appsv1alpha1.ConsensusSetStatus{
+						Leader: appsv1alpha1.ConsensusMemberStatus{
 							Name:       "leader",
-							AccessMode: dbaasv1alpha1.ReadWrite,
+							AccessMode: appsv1alpha1.ReadWrite,
 							Pod:        fmt.Sprintf("%s-pod-0", name),
 						},
 					},
 				},
 			},
 		},
-		Spec: dbaasv1alpha1.ClusterSpec{
+		Spec: appsv1alpha1.ClusterSpec{
 			ClusterDefRef:     ClusterDefName,
 			ClusterVersionRef: ClusterVersionName,
-			TerminationPolicy: dbaasv1alpha1.WipeOut,
-			Components: []dbaasv1alpha1.ClusterComponent{
+			TerminationPolicy: appsv1alpha1.WipeOut,
+			ComponentSpecs: []appsv1alpha1.ClusterComponentSpec{
 				{
-					Name: ComponentName,
-					Type: ComponentType,
+					Name:            ComponentName,
+					ComponentDefRef: ComponentDefName,
+					Replicas:        replicas,
 					Resources: corev1.ResourceRequirements{
 						Requests: corev1.ResourceList{
 							corev1.ResourceCPU:    resource.MustParse("100m"),
@@ -98,7 +100,33 @@ func FakeCluster(name string, namespace string) *dbaasv1alpha1.Cluster {
 							corev1.ResourceMemory: resource.MustParse("2Gi"),
 						},
 					},
-					VolumeClaimTemplates: []dbaasv1alpha1.ClusterComponentVolumeClaimTemplate{
+					VolumeClaimTemplates: []appsv1alpha1.ClusterComponentVolumeClaimTemplate{
+						{
+							Name: "data",
+							Spec: &corev1.PersistentVolumeClaimSpec{
+								AccessModes: []corev1.PersistentVolumeAccessMode{
+									corev1.ReadWriteOnce,
+								},
+								Resources: corev1.ResourceRequirements{
+									Requests: corev1.ResourceList{
+										corev1.ResourceStorage: resource.MustParse("1Gi"),
+									},
+								},
+							},
+						},
+					},
+				},
+				{
+					Name:            ComponentName + "-1",
+					ComponentDefRef: ComponentDefName,
+					Replicas:        replicas,
+					Resources: corev1.ResourceRequirements{
+						Requests: corev1.ResourceList{
+							corev1.ResourceCPU:    resource.MustParse("100m"),
+							corev1.ResourceMemory: resource.MustParse("100Mi"),
+						},
+					},
+					VolumeClaimTemplates: []appsv1alpha1.ClusterComponentVolumeClaimTemplate{
 						{
 							Name: "data",
 							Spec: &corev1.PersistentVolumeClaimSpec{
@@ -132,10 +160,10 @@ func FakePods(replicas int, namespace string, cluster string) *corev1.PodList {
 		}
 
 		pod.Labels = map[string]string{
-			types.InstanceLabelKey:  cluster,
-			types.RoleLabelKey:      role,
-			types.ComponentLabelKey: ComponentName,
-			types.NameLabelKey:      "state.mysql-apecloud-mysql",
+			types.InstanceLabelKey:    cluster,
+			types.RoleLabelKey:        role,
+			types.KBComponentLabelKey: ComponentName,
+			types.NameLabelKey:        "mysql-apecloud-mysql",
 		}
 		pod.Spec.NodeName = NodeName
 		pod.Spec.Containers = []corev1.Container{
@@ -179,25 +207,24 @@ func FakeNode() *corev1.Node {
 	return node
 }
 
-func FakeClusterDef() *dbaasv1alpha1.ClusterDefinition {
-	clusterDef := &dbaasv1alpha1.ClusterDefinition{}
+func FakeClusterDef() *appsv1alpha1.ClusterDefinition {
+	clusterDef := &appsv1alpha1.ClusterDefinition{}
 	clusterDef.Name = ClusterDefName
-	clusterDef.Spec.Components = []dbaasv1alpha1.ClusterDefinitionComponent{
+	clusterDef.Spec.ComponentDefs = []appsv1alpha1.ClusterComponentDefinition{
 		{
-			TypeName:        ComponentType,
-			DefaultReplicas: 2,
+			Name:          ComponentDefName,
+			CharacterType: "mysql",
 		},
 		{
-			TypeName:        fmt.Sprintf("%s-%d", ComponentType, 1),
-			DefaultReplicas: 2,
+			Name:          fmt.Sprintf("%s-%d", ComponentDefName, 1),
+			CharacterType: "mysql",
 		},
 	}
-	clusterDef.Spec.Type = "state.mysql"
 	return clusterDef
 }
 
-func FakeClusterVersion() *dbaasv1alpha1.ClusterVersion {
-	cv := &dbaasv1alpha1.ClusterVersion{}
+func FakeClusterVersion() *appsv1alpha1.ClusterVersion {
+	cv := &appsv1alpha1.ClusterVersion{}
 	cv.Name = ClusterVersionName
 	cv.SetLabels(map[string]string{types.ClusterDefLabelKey: ClusterDefName})
 	cv.Spec.ClusterDefinitionRef = ClusterDefName
@@ -243,8 +270,8 @@ func FakeServices() *corev1.ServiceList {
 				Name:      fmt.Sprintf("svc-%d", idx),
 				Namespace: Namespace,
 				Labels: map[string]string{
-					types.InstanceLabelKey:  ClusterName,
-					types.ComponentLabelKey: ComponentName,
+					types.InstanceLabelKey:    ClusterName,
+					types.KBComponentLabelKey: ComponentName,
 				},
 			},
 			Spec: corev1.ServiceSpec{
@@ -280,8 +307,8 @@ func FakePVCs() *corev1.PersistentVolumeClaimList {
 			Namespace: Namespace,
 			Name:      PVCName,
 			Labels: map[string]string{
-				types.InstanceLabelKey:  ClusterName,
-				types.ComponentLabelKey: ComponentName,
+				types.InstanceLabelKey:    ClusterName,
+				types.KBComponentLabelKey: ComponentName,
 			},
 		},
 		Spec: corev1.PersistentVolumeClaimSpec{

@@ -19,11 +19,12 @@ package printer
 import (
 	"fmt"
 	"io"
+	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 )
 
@@ -63,16 +64,31 @@ func PrintConditions(conditions []metav1.Condition, out io.Writer) {
 }
 
 // PrintComponentConfigMeta prints the conditions of resource.
-func PrintComponentConfigMeta(cfgTplMap map[dbaasv1alpha1.ConfigTemplate]*corev1.ConfigMap, clusterName, componentName string, out io.Writer) {
+func PrintComponentConfigMeta(cfgTplMap map[appsv1alpha1.ConfigTemplate]*corev1.ConfigMap, clusterName, componentName string, out io.Writer) {
 	if len(cfgTplMap) == 0 {
 		return
 	}
 	tbl := NewTablePrinter(out)
 	PrintTitle("Configures Meta")
-	tbl.SetHeader("CONFIGURATION-FILE", "CONFIGMAP", "COMPONENT", "CLUSTER", "TEMPLATE-NAME", "CONFIG-TEMPLATE", "CONFIG-CONSTRAINT", "NAMESPACE")
+	enableReconfiguring := func(tpl appsv1alpha1.ConfigTemplate) string {
+		if len(tpl.ConfigConstraintRef) > 0 {
+			return "enable"
+		}
+		return "disable"
+	}
+	tbl.SetHeader("TEMPLATE-NAME", "CONFIG-FILE", "ENABLE-RECONFIGURE", "CONFIG-TEMPLATE", "CONFIG-CONSTRAINT", "CONFIG-INSTANCE", "COMPONENT", "CLUSTER", "NAMESPACE")
 	for tpl, cm := range cfgTplMap {
 		for key := range cm.Data {
-			tbl.AddRow(key, cm.Name, componentName, clusterName, tpl.Name, tpl.ConfigTplRef, tpl.ConfigConstraintRef, tpl.Namespace)
+			tbl.AddRow(
+				BoldYellow(tpl.Name),
+				key,
+				tpl.ConfigTplRef,
+				tpl.ConfigConstraintRef,
+				BoldYellow(strings.ToUpper(enableReconfiguring(tpl))),
+				cm.Name,
+				componentName,
+				clusterName,
+				tpl.Namespace)
 		}
 	}
 	tbl.Print()

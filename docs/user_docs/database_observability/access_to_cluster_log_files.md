@@ -20,7 +20,7 @@ _Example_
 Add the `enabledLogs` key and fill its value with a log type defined by the provider to enable the log function.
 
 ```
-apiVersion: dbaas.kubeblocks.io/v1alpha1
+apiVersion: apps.kubeblocks.io/v1alpha1
 kind: Cluster
 metadata:
   name: mysql-cluster-01
@@ -60,14 +60,13 @@ _Example_
 Here is an example of configuring the error log and slow log.
 
 ```
-apiVersion: dbaas.kubeblocks.io/v1alpha1
-kind:       ClusterDefinition
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: ClusterDefinition
 metadata:
-  name:     mysql-cluster-definition
+  name: mysql-cluster-definition
 spec:
-  type: state.mysql
-  components:
-  - typeName: replicasets
+  componentDefs:
+  - name: replicasets
     characterType: mysql
     monitor:
       builtIn: true
@@ -79,7 +78,7 @@ spec:
     configTemplateRefs: 
       - name: mysql-tree-node-template-8.0
         volumeName: mysql-config
-    componentType: Consensus
+    workloadType: Consensus
     consensusSpec:
       leader:
         name: leader
@@ -87,7 +86,6 @@ spec:
       followers:
         - name: follower
           accessMode: Readonly
-    defaultReplicas: 3
     podSpec:
       containers:
       - name: mysql
@@ -150,7 +148,7 @@ spec:
   ```
   logsConfig: 
     
-    # `name` is customized by the provider and is the only indentifier.
+    # `name` is customized by the provider and is the only identifier.
     - name: audit
       # The path information of the log file.
       filePath: /postgresql/log/postgresql_[0-2]_audit.log
@@ -163,7 +161,7 @@ spec:
   ```
   logsConfig: 
     # The following is the audit log of configuring multiple paths.
-    # `name` is customized by the provider and is the only indentifier.
+    # `name` is customized by the provider and is the only identifier.
     - name: audit1
       # The path information of the log file.
       filePath: /var/log1/postgresql_*_audit.log
@@ -216,7 +214,7 @@ data:
 The log-related function, similar to a warning, neither affects the main flow of control and management nor changes `Phase` or `Generation`. It adds a `conditions` field in `cluster API status` to store the warning of a cluster.
 
 ```
-apiVersion: dbaas.kubeblocks.io/v1alpha1
+apiVersion: apps.kubeblocks.io/v1alpha1
 kind: Cluster
 metadata:
   ...
@@ -245,7 +243,7 @@ Status:
       Phase:  Running
   Conditions:
     Last Transition Time:  2022-11-11T03:57:42Z
-    Message:               EnabledLogs of cluster component replicasets has invalid value [errora slowa] which isn't definded in cluster definition component replicasets
+    Message:               EnabledLogs of cluster component replicasets has invalid value [errora slowa] which isn't defined in cluster definition component replicasets
     Reason:                EnabledLogsListValidateFail
     Status:                False
     Type:                  ValidateEnabledLogs
@@ -262,7 +260,7 @@ Events:
   Type     Reason                      Age   From                Message
   ----     ------                      ----  ----                -------
   Normal   Creating                    49s   cluster-controller  Start Creating in Cluster: release-name-error
-  Warning  EnabledLogsListValidateFail  49s   cluster-controller  EnabledLogs of cluster component replicasets has invalid value [errora slowa] which isn't definded in cluster definition component replicasets
+  Warning  EnabledLogsListValidateFail  49s   cluster-controller  EnabledLogs of cluster component replicasets has invalid value [errora slowa] which isn't defined in cluster definition component replicasets
   Normal   Running                     36s   cluster-controller  Cluster: release-name-error is ready, current phase is Running
 ```
 

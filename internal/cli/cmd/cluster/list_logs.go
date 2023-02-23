@@ -30,7 +30,7 @@ import (
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
 
-	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/cluster"
 	"github.com/apecloud/kubeblocks/internal/cli/exec"
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
@@ -163,34 +163,34 @@ type logFileInfo struct {
 }
 
 // gatherLogFilesData gathers all log files data from every instance of the cluster.
-func (o *ListLogsOptions) gatherLogFilesData(c *dbaasv1alpha1.Cluster, cd *dbaasv1alpha1.ClusterDefinition, pods *corev1.PodList) []logFileInfo {
+func (o *ListLogsOptions) gatherLogFilesData(c *appsv1alpha1.Cluster, cd *appsv1alpha1.ClusterDefinition, pods *corev1.PodList) []logFileInfo {
 	logFileInfoList := make([]logFileInfo, 0, len(pods.Items))
 	for _, p := range pods.Items {
 		if len(o.instName) > 0 && !strings.EqualFold(p.Name, o.instName) {
 			continue
 		}
-		componentName, ok := p.Labels[types.ComponentLabelKey]
+		componentName, ok := p.Labels[types.KBComponentLabelKey]
 		if !ok || (len(o.componentName) > 0 && !strings.EqualFold(o.componentName, componentName)) {
 			continue
 		}
-		var comTypeName string
+		var compDefName string
 		logTypeMap := make(map[string]struct{})
-		// find component typeName and enabledLogs config against componentName in pod's label.
-		for _, comCluster := range c.Spec.Components {
+		// find component compDefName and enabledLogs config against componentName in pod's label.
+		for _, comCluster := range c.Spec.ComponentSpecs {
 			if !strings.EqualFold(comCluster.Name, componentName) {
 				continue
 			}
-			comTypeName = comCluster.Type
+			compDefName = comCluster.ComponentDefRef
 			for _, logType := range comCluster.EnabledLogs {
 				logTypeMap[logType] = struct{}{}
 			}
 			break
 		}
-		if len(comTypeName) == 0 || len(logTypeMap) == 0 {
+		if len(compDefName) == 0 || len(logTypeMap) == 0 {
 			continue
 		}
-		for _, com := range cd.Spec.Components {
-			if !strings.EqualFold(com.TypeName, comTypeName) {
+		for _, com := range cd.Spec.ComponentDefs {
+			if !strings.EqualFold(com.Name, compDefName) {
 				continue
 			}
 			for _, logConfig := range com.LogConfigs {

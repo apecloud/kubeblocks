@@ -6,7 +6,7 @@ We would like to extend our appreciation to all contributors who helped make thi
 
 **Highlights**
   * ClusterDefinition API `spec.conectionCredential` add following placeholder name:
-    * Service FQDN `$(SVC_FQDN)` placeholder, value pattern - $(CLUSTER_NAME)-$(1ST_COMP_NAME).$(NAMESPACE).svc, where 1ST_COMP_NAME is the 1st component that provide `ClusterDefinition.spec.components[].service` attribute
+    * Service FQDN `$(SVC_FQDN)` placeholder, value pattern - $(CLUSTER_NAME)-$(1ST_COMP_NAME).$(NAMESPACE).svc, where 1ST_COMP_NAME is the 1st component that provide `ClusterDefinition.spec.componentDefs[].service` attribute
     * Service ports `$(SVC_PORT_<NAME>)` placeholder
     * example usage:
     
@@ -100,6 +100,8 @@ Release Notes for `v0.3.0`:
     ```
     kubectl apply -f clusters.yaml
       ```
+- Rename group name `dbaas.kubeblocks.io` to `apps.kubeblocks.io`
+    - upgrade kubeblocks to create new CRDs, after that, you can delete the CRDs with group name`dbaas.kubeblocks.io`
 ## Breaking Changes
 
 $kubeblocks_breaking_changes

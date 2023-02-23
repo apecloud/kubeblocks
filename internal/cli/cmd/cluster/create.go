@@ -42,7 +42,7 @@ import (
 	utilcomp "k8s.io/kubectl/pkg/util/completion"
 	"k8s.io/kubectl/pkg/util/templates"
 
-	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/cluster"
 	"github.com/apecloud/kubeblocks/internal/cli/create"
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
@@ -51,45 +51,48 @@ import (
 )
 
 var clusterCreateExample = templates.Examples(`
-	# Create a cluster using cluster definition my-cluster-def and cluster version my-version
-	kbcli cluster create mycluster --cluster-definition=my-cluster-def --cluster-version=my-version
+	# Create a cluster with cluster definition apecloud-mysql and cluster version ac-mysql-8.0.30
+	kbcli cluster create mycluster --cluster-definition apecloud-mysql --cluster-version ac-mysql-8.0.30
 
 	# --cluster-definition is required, if --cluster-version is not specified, will use the most recently created version
-	kbcli cluster create mycluster --cluster-definition=my-cluster-def
+	kbcli cluster create mycluster --cluster-definition apecloud-mysql
 
-	# Create a cluster and set termination policy DoNotDelete that will prevent the cluster from being deleted
-	kbcli cluster create mycluster --cluster-definition=my-cluster-def --termination-policy=DoNotDelete
+	# Create a cluster and set termination policy DoNotTerminate that will prevent the cluster from being deleted
+	kbcli cluster create mycluster --cluster-definition apecloud-mysql --termination-policy DoNotTerminate
 
 	# In scenarios where you want to delete resources such as statements, deployments, services, pdb, but keep PVCs
 	# when deleting the cluster, use termination policy Halt
-	kbcli cluster create mycluster --cluster-definition=my-cluster-def --termination-policy=Halt
+	kbcli cluster create mycluster --cluster-definition apecloud-mysql --termination-policy Halt
 
 	# In scenarios where you want to delete resource such as statements, deployments, services, pdb, and including
 	# PVCs when deleting the cluster, use termination policy Delete
-	kbcli cluster create mycluster --cluster-definition=my-cluster-def --termination-policy=Delete
+	kbcli cluster create mycluster --cluster-definition apecloud-mysql --termination-policy Delete
 
 	# In scenarios where you want to delete all resources including all snapshots and snapshot data when deleting
 	# the cluster, use termination policy WipeOut
-	kbcli cluster create mycluster --cluster-definition=my-cluster-def --termination-policy=WipeOut
+	kbcli cluster create mycluster --cluster-definition apecloud-mysql --termination-policy WipeOut
 
-	# Create a cluster and set cpu to 1000m, memory to 1Gi, storage size to 10Gi and replicas to 2
-	kbcli cluster create mycluster --cluster-definition=my-cluster-def --set cpu=1000m,memory=1Gi,storage=10Gi,replicas=2
+	# Create a cluster and set cpu to 1000m, memory to 1Gi, storage size to 10Gi and replicas to 3
+	kbcli cluster create mycluster --cluster-definition apecloud-mysql --set cpu=1000m,memory=1Gi,storage=10Gi,replicas=3
 
 	# Create a cluster and use a URL to set cluster resource
-	kbcli cluster create mycluster --cluster-definition=my-cluster-def --set-file=https://kubeblocks.io/yamls/my.yaml
+	kbcli cluster create mycluster --cluster-definition apecloud-mysql --set-file https://kubeblocks.io/yamls/my.yaml
 
 	# Create a cluster and load cluster resource set from stdin
-	cat << EOF | kbcli cluster create mycluster --cluster-definition=my-cluster-def --set-file -
+	cat << EOF | kbcli cluster create mycluster --cluster-definition apecloud-mysql --set-file -
 	- name: my-test ...
 
 	# Create a cluster forced to scatter by node
-	kbcli cluster create --cluster-definition=my-cluster-def --topology-keys=kubernetes.io/hostname --pod-anti-affinity=Required
+	kbcli cluster create --cluster-definition apecloud-mysql --topology-keys kubernetes.io/hostname --pod-anti-affinity Required
 
 	# Create a cluster in specific labels nodes
-	kbcli cluster create --cluster-definition=my-cluster-def --node-labels='"topology.kubernetes.io/zone=us-east-1a","disktype=ssd,essd"'
+	kbcli cluster create --cluster-definition apecloud-mysql --node-labels '"topology.kubernetes.io/zone=us-east-1a","disktype=ssd,essd"'
 
 	# Create a Cluster with two tolerations 
-	kbcli cluster create --cluster-definition=my-cluster-def --tolerations='"key=engineType,value=mongo,operator=Equal,effect=NoSchedule","key=diskType,value=ssd,operator=Equal,effect=NoSchedule"'
+	kbcli cluster create --cluster-definition apecloud-mysql --tolerations '"key=engineType,value=mongo,operator=Equal,effect=NoSchedule","key=diskType,value=ssd,operator=Equal,effect=NoSchedule"'
+
+    # Create a cluster, with each pod runs on their own dedicated node
+    kbcli cluster create --tenancy=DedicatedNode
 `)
 
 const (
@@ -122,15 +125,19 @@ var setKeyEnvMap = map[setKey]envSet{
 
 // UpdatableFlags is the flags that cat be updated by update command
 type UpdatableFlags struct {
+	// Options for cluster termination policy
 	TerminationPolicy string `json:"terminationPolicy"`
-	PodAntiAffinity   string `json:"podAntiAffinity"`
-	Monitor           bool   `json:"monitor"`
-	EnableAllLogs     bool   `json:"enableAllLogs"`
 
-	// TopologyKeys if TopologyKeys is nil, add omitempty json tag.
-	// because CueLang can not covert null to list.
+	// Add-on switches for cluster observability
+	Monitor       bool `json:"monitor"`
+	EnableAllLogs bool `json:"enableAllLogs"`
+
+	// Configuration and options for cluster affinity and tolerations
+	PodAntiAffinity string `json:"podAntiAffinity"`
+	// TopologyKeys if TopologyKeys is nil, add omitempty json tag, because CueLang can not covert null to list.
 	TopologyKeys   []string          `json:"topologyKeys,omitempty"`
 	NodeLabels     map[string]string `json:"nodeLabels,omitempty"`
+	Tenancy        string            `json:"tenancy"`
 	TolerationsRaw []string          `json:"-"`
 }
 
@@ -139,11 +146,10 @@ type CreateOptions struct {
 	ClusterDefRef     string                   `json:"clusterDefRef"`
 	ClusterVersionRef string                   `json:"clusterVersionRef"`
 	Tolerations       []interface{}            `json:"tolerations,omitempty"`
-	Components        []map[string]interface{} `json:"components"`
+	ComponentSpecs    []map[string]interface{} `json:"componentSpecs"`
 
-	SetFile        string   `json:"-"`
-	Values         []string `json:"-"`
-	TolerationsRaw []string `json:"-"`
+	SetFile string   `json:"-"`
+	Values  []string `json:"-"`
 
 	// backup name to restore in creation
 	Backup string `json:"backup,omitempty"`
@@ -206,7 +212,7 @@ func (o *CreateOptions) Validate() error {
 			return err
 		}
 		o.ClusterVersionRef = version
-		fmt.Fprintf(o.Out, "Cluster version is not specified, use the recently created ClusterVersion %s\n", o.ClusterVersionRef)
+		printer.Warning(o.Out, "cluster version is not specified, use the recently created ClusterVersion %s\n", o.ClusterVersionRef)
 	}
 
 	if len(o.Values) > 0 && len(o.SetFile) > 0 {
@@ -237,7 +243,7 @@ func (o *CreateOptions) Complete() error {
 	if err := setBackup(o, components); err != nil {
 		return err
 	}
-	o.Components = components
+	o.ComponentSpecs = components
 
 	// TolerationsRaw looks like `["key=engineType,value=mongo,operator=Equal,effect=NoSchedule"]` after parsing by cmd
 	tolerations := buildTolerations(o.TolerationsRaw)
@@ -255,7 +261,7 @@ func (o *CreateOptions) buildComponents() ([]map[string]interface{}, error) {
 	)
 
 	// build components from file
-	components := o.Components
+	components := o.ComponentSpecs
 	if len(o.SetFile) > 0 {
 		if componentByte, err = MultipleSourceComponents(o.SetFile, o.IOStreams.In); err != nil {
 			return nil, err
@@ -366,7 +372,7 @@ func (o *CreateOptions) PreCreate(obj *unstructured.Unstructured) error {
 		// EnableAllLogs is false, nothing will change
 		return nil
 	}
-	c := &dbaasv1alpha1.Cluster{}
+	c := &appsv1alpha1.Cluster{}
 	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, c); err != nil {
 		return err
 	}
@@ -385,22 +391,22 @@ func (o *CreateOptions) PreCreate(obj *unstructured.Unstructured) error {
 }
 
 // setEnableAllLog set enable all logs, and ignore enabledLogs of component level.
-func setEnableAllLogs(c *dbaasv1alpha1.Cluster, cd *dbaasv1alpha1.ClusterDefinition) {
-	for idx, comCluster := range c.Spec.Components {
-		for _, com := range cd.Spec.Components {
-			if !strings.EqualFold(comCluster.Type, com.TypeName) {
+func setEnableAllLogs(c *appsv1alpha1.Cluster, cd *appsv1alpha1.ClusterDefinition) {
+	for idx, comCluster := range c.Spec.ComponentSpecs {
+		for _, com := range cd.Spec.ComponentDefs {
+			if !strings.EqualFold(comCluster.ComponentDefRef, com.Name) {
 				continue
 			}
 			typeList := make([]string, 0, len(com.LogConfigs))
 			for _, logConf := range com.LogConfigs {
 				typeList = append(typeList, logConf.Name)
 			}
-			c.Spec.Components[idx].EnabledLogs = typeList
+			c.Spec.ComponentSpecs[idx].EnabledLogs = typeList
 		}
 	}
 }
 
-func buildClusterComp(cd *dbaasv1alpha1.ClusterDefinition, setsMap map[string]map[setKey]string) ([]map[string]interface{}, error) {
+func buildClusterComp(cd *appsv1alpha1.ClusterDefinition, setsMap map[string]map[setKey]string) ([]map[string]interface{}, error) {
 	getVal := func(key setKey, sets map[setKey]string) string {
 		// get value from set values
 		if sets != nil {
@@ -419,17 +425,11 @@ func buildClusterComp(cd *dbaasv1alpha1.ClusterDefinition, setsMap map[string]ma
 	}
 
 	var comps []map[string]interface{}
-	for _, c := range cd.Spec.Components {
-		// if cluster definition component default replicas greater than 0, build a cluster component
-		// by cluster definition component.
-		replicas := c.DefaultReplicas
-		if replicas <= 0 {
-			continue
-		}
+	for _, c := range cd.Spec.ComponentDefs {
 
 		sets := map[setKey]string{}
 		if setsMap != nil {
-			sets = setsMap[c.TypeName]
+			sets = setsMap[c.Name]
 		}
 
 		// get replicas
@@ -437,21 +437,21 @@ func buildClusterComp(cd *dbaasv1alpha1.ClusterDefinition, setsMap map[string]ma
 		if err != nil {
 			return nil, fmt.Errorf("repicas is illegal " + err.Error())
 		}
-		replicas = int32(setReplicas)
+		replicas := int32(setReplicas)
 
 		resourceList := corev1.ResourceList{
 			corev1.ResourceCPU:    resource.MustParse(getVal(keyCPU, sets)),
 			corev1.ResourceMemory: resource.MustParse(getVal(keyMemory, sets)),
 		}
-		compObj := &dbaasv1alpha1.ClusterComponent{
-			Name:     c.TypeName,
-			Type:     c.TypeName,
-			Replicas: &replicas,
+		compObj := &appsv1alpha1.ClusterComponentSpec{
+			Name:            c.Name,
+			ComponentDefRef: c.Name,
+			Replicas:        replicas,
 			Resources: corev1.ResourceRequirements{
 				Requests: resourceList,
 				Limits:   resourceList,
 			},
-			VolumeClaimTemplates: []dbaasv1alpha1.ClusterComponentVolumeClaimTemplate{{
+			VolumeClaimTemplates: []appsv1alpha1.ClusterComponentVolumeClaimTemplate{{
 				Name: "data",
 				Spec: &corev1.PersistentVolumeClaimSpec{
 					AccessModes: []corev1.PersistentVolumeAccessMode{
@@ -474,15 +474,15 @@ func buildClusterComp(cd *dbaasv1alpha1.ClusterDefinition, setsMap map[string]ma
 	return comps, nil
 }
 
-// buildCompSetsMap builds the map between component type name and its set values, if the type name is not
-// specified in the set, use the cluster definition default component type name.
-func buildCompSetsMap(values []string, cd *dbaasv1alpha1.ClusterDefinition) (map[string]map[setKey]string, error) {
+// buildCompSetsMap builds the map between component definition name and its set values, if the name is not
+// specified in the set, use the cluster definition default component name.
+func buildCompSetsMap(values []string, cd *appsv1alpha1.ClusterDefinition) (map[string]map[setKey]string, error) {
 	allSets := map[string]map[setKey]string{}
+	keys := []string{string(keyCPU), string(keyType), string(keyStorage), string(keyMemory), string(keyReplicas)}
 	parseKey := func(key string) setKey {
-		keys := []setKey{keyCPU, keyType, keyStorage, keyMemory, keyReplicas}
 		for _, k := range keys {
-			if k == setKey(key) {
-				return setKey(key)
+			if strings.EqualFold(k, key) {
+				return setKey(k)
 			}
 		}
 		return keyUnknown
@@ -492,16 +492,17 @@ func buildCompSetsMap(values []string, cd *dbaasv1alpha1.ClusterDefinition) (map
 		for _, set := range sets {
 			kv := strings.Split(set, "=")
 			if len(kv) != 2 {
+				printer.Warning(os.Stdout, "unknown set format \"%s\", it will be ignored, should be like key1=value1\n", set)
 				continue
 			}
 
 			// only record the supported key
 			k := parseKey(kv[0])
 			if k == keyUnknown {
-				printer.Warning(os.Stdout, "unknown set key %s, ignore it\n", kv[0])
+				printer.Warning(os.Stdout, "unknown set key \"%s\", it will be ignored, should be one of [%s]\n", kv[0], strings.Join(keys, ","))
 				continue
 			}
-			res[setKey(kv[0])] = kv[1]
+			res[k] = kv[1]
 		}
 		return res
 	}
@@ -513,27 +514,27 @@ func buildCompSetsMap(values []string, cd *dbaasv1alpha1.ClusterDefinition) (map
 			continue
 		}
 
-		// get the component type name
-		typeName := sets[keyType]
+		// get the component definition name
+		compDefName := sets[keyType]
 
-		// type is not specified by user, use the default component type name, now only
+		// type is not specified by user, use the default component definition name, now only
 		// support cluster definition with one component
-		if len(typeName) == 0 {
-			name, err := cluster.GetDefaultCompTypeName(cd)
+		if len(compDefName) == 0 {
+			name, err := cluster.GetDefaultCompName(cd)
 			if err != nil {
 				return nil, err
 			}
-			typeName = name
+			compDefName = name
 		}
 
 		// if already set by other value, later values override earlier values
-		if old, ok := allSets[typeName]; ok {
+		if old, ok := allSets[compDefName]; ok {
 			for k, v := range sets {
 				old[k] = v
 			}
 			sets = old
 		}
-		allSets[typeName] = sets
+		allSets[compDefName] = sets
 	}
 	return allSets, nil
 }
@@ -570,13 +571,14 @@ func generateClusterName(dynamic dynamic.Interface, namespace string) (string, e
 }
 
 func (f *UpdatableFlags) addFlags(cmd *cobra.Command) {
-	cmd.Flags().StringVar(&f.PodAntiAffinity, "pod-anti-affinity", "Preferred", "Pod anti-affinity type")
+	cmd.Flags().StringVar(&f.PodAntiAffinity, "pod-anti-affinity", "Preferred", "Pod anti-affinity type, one of: (Preferred, Required)")
 	cmd.Flags().BoolVar(&f.Monitor, "monitor", true, "Set monitor enabled and inject metrics exporter")
 	cmd.Flags().BoolVar(&f.EnableAllLogs, "enable-all-logs", true, "Enable advanced application all log extraction, and true will ignore enabledLogs of component level")
 	cmd.Flags().StringVar(&f.TerminationPolicy, "termination-policy", "Delete", "Termination policy, one of: (DoNotTerminate, Halt, Delete, WipeOut)")
 	cmd.Flags().StringArrayVar(&f.TopologyKeys, "topology-keys", nil, "Topology keys for affinity")
 	cmd.Flags().StringToStringVar(&f.NodeLabels, "node-labels", nil, "Node label selector")
 	cmd.Flags().StringSliceVar(&f.TolerationsRaw, "tolerations", nil, `Tolerations for cluster, such as '"key=engineType,value=mongo,operator=Equal,effect=NoSchedule"'`)
+	cmd.Flags().StringVar(&f.Tenancy, "tenancy", "SharedNode", "Tenancy options, one of: (SharedNode, DedicatedNode)")
 
 	util.CheckErr(cmd.RegisterFlagCompletionFunc(
 		"termination-policy",
@@ -586,6 +588,22 @@ func (f *UpdatableFlags) addFlags(cmd *cobra.Command) {
 				"Halt\tdelete workload resources such as statefulset, deployment workloads but keep PVCs",
 				"Delete\tbased on Halt and deletes PVCs",
 				"WipeOut\tbased on Delete and wipe out all volume snapshots and snapshot data from backup storage location",
+			}, cobra.ShellCompDirectiveNoFileComp
+		}))
+	util.CheckErr(cmd.RegisterFlagCompletionFunc(
+		"pod-anti-affinity",
+		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+			return []string{
+				"Preferred\ttry to spread pods of the cluster by the specified topology-keys",
+				"Required\tmust spread pods of the cluster by the specified topology-keys",
+			}, cobra.ShellCompDirectiveNoFileComp
+		}))
+	util.CheckErr(cmd.RegisterFlagCompletionFunc(
+		"tenancy",
+		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+			return []string{
+				"SharedNode\tpods of the cluster may share the same node",
+				"DedicatedNode\teach pod of the cluster will runs on their own dedicated node",
 			}, cobra.ShellCompDirectiveNoFileComp
 		}))
 }

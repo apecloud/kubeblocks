@@ -50,12 +50,13 @@ type BackupPolicyReconciler struct {
 }
 
 type backupPolicyOptions struct {
-	Name       string           `json:"name"`
-	Namespace  string           `json:"namespace"`
-	Cluster    string           `json:"cluster"`
-	Schedule   string           `json:"schedule"`
-	BackupType string           `json:"backupType"`
-	TTL        *metav1.Duration `json:"ttl,omitempty"`
+	Name           string           `json:"name"`
+	Namespace      string           `json:"namespace"`
+	Cluster        string           `json:"cluster"`
+	Schedule       string           `json:"schedule"`
+	BackupType     string           `json:"backupType"`
+	TTL            *metav1.Duration `json:"ttl,omitempty"`
+	ServiceAccount string           `json:"serviceAccount"`
 }
 
 var (
@@ -271,12 +272,13 @@ func (r *BackupPolicyReconciler) buildCronJob(backupPolicy *dataprotectionv1alph
 	}
 	cueValue := intctrlutil.NewCUEBuilder(*cueTpl)
 	options := backupPolicyOptions{
-		Name:       backupPolicy.Name,
-		Namespace:  backupPolicy.Namespace,
-		Cluster:    backupPolicy.Spec.Target.LabelsSelector.MatchLabels[intctrlutil.AppInstanceLabelKey],
-		Schedule:   backupPolicy.Spec.Schedule,
-		TTL:        backupPolicy.Spec.TTL,
-		BackupType: backupPolicy.Spec.BackupType,
+		Name:           backupPolicy.Name,
+		Namespace:      backupPolicy.Namespace,
+		Cluster:        backupPolicy.Spec.Target.LabelsSelector.MatchLabels[intctrlutil.AppInstanceLabelKey],
+		Schedule:       backupPolicy.Spec.Schedule,
+		TTL:            backupPolicy.Spec.TTL,
+		BackupType:     backupPolicy.Spec.BackupType,
+		ServiceAccount: viper.GetString("KUBEBLOCKS_SERVICEACCOUNT_NAME"),
 	}
 	backupPolicyOptionsByte, err := json.Marshal(options)
 	if err != nil {
@@ -326,7 +328,7 @@ func (r *BackupPolicyReconciler) removeExpiredBackups(reqCtx intctrlutil.Request
 			continue
 		}
 		if item.Status.Expiration != nil && item.Status.Expiration.Before(&now) {
-			if err := DeleteObjectBackground(r.Client, reqCtx.Ctx, &item); err != nil {
+			if err := intctrlutil.BackgroundDeleteObject(r.Client, reqCtx.Ctx, &item); err != nil {
 				// failed delete backups, return error info.
 				return err
 			}
@@ -360,7 +362,7 @@ func (r *BackupPolicyReconciler) removeOldestBackups(reqCtx intctrlutil.RequestC
 	backupItems := backups.Items
 	sort.Sort(byBackupStartTime(backupItems))
 	for i := 0; i < numToDelete; i++ {
-		if err := DeleteObjectBackground(r.Client, reqCtx.Ctx, &backupItems[i]); err != nil {
+		if err := intctrlutil.BackgroundDeleteObject(r.Client, reqCtx.Ctx, &backupItems[i]); err != nil {
 			// failed delete backups, return error info.
 			return err
 		}
@@ -396,7 +398,7 @@ func (r *BackupPolicyReconciler) deleteExternalResources(reqCtx intctrlutil.Requ
 			return err
 		}
 	}
-	if err := DeleteObjectBackground(r.Client, reqCtx.Ctx, cronjob); err != nil {
+	if err := intctrlutil.BackgroundDeleteObject(r.Client, reqCtx.Ctx, cronjob); err != nil {
 		// failed delete k8s job, return error info.
 		return err
 	}

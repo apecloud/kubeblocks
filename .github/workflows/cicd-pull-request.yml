@@ -4,46 +4,11 @@ on:
   pull_request_review:
     types: [submitted]
 
-env:
-  GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
-
 
 jobs:
-  pre-pull-request:
-    if: github.event.review.state == 'approved'
-    runs-on: ubuntu-latest
-    name: PR Pre-Check
-    steps:
-      - uses: actions/checkout@v3
-      - name: install pcregrep
-        run: |
-          sudo apt-get update
-          sudo apt-get install pcregrep
-
-      - name: gen pcregrep
-        run: |
-          pcregrep --exclude-dir=mtr -r -n -I '[^\x00-\x7f]' . > pcregrep.out
-
-      - name: pcregrep Chinese
-        run: |
-          SHA=${{ github.sha }}
-          
-          git fetch
-          git checkout origin/main
-          MAIN_SHA=`git rev-parse HEAD`
-          
-          git reset --hard $SHA
-          
-          FILE_PATH=`git diff --name-only $SHA $MAIN_SHA`
-          
-          python ${{ github.workspace }}/.github/utils/pcregrep.py \
-            --source="${{ github.workspace }}/pcregrep.out" \
-            --filter="$FILE_PATH"
-
   make-test:
     if: github.event.review.state == 'approved'
     name: make test
-    needs: pre-pull-request
     runs-on: [ self-hosted, eks-fargate-runner ]
     steps:
       - uses: apecloud/checkout@main

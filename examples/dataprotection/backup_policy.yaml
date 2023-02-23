@@ -25,7 +25,7 @@ spec:
   # database cluster service selector
   target:
     databaseEngine: mysql
-    # ref definition is more general, but need to integrate with dbaas, define labelsSelector instead.
+    # ref definition is more general, but need to integrate with apps, define labelsSelector instead.
     labelsSelector:
       matchLabels:
         app.kubernetes.io/instance: wesql-cluster

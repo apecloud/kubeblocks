@@ -52,7 +52,7 @@ The pull request title must follow the format outlined in the [conventional comm
 
 The following are all good examples of pull request titles:
 ```shell
-feat(dbaas): add foo bar baz feature
+feat(apps): add foo bar baz feature
 fix(kbcli): fix foo bar baz bug
 chore: tidy up Makefile
 docs: fix typos

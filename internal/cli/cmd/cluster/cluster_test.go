@@ -22,17 +22,19 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 
-	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/create"
 	"github.com/apecloud/kubeblocks/internal/cli/delete"
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
-	testutil "github.com/apecloud/kubeblocks/internal/testutil/k8s"
-	"github.com/apecloud/kubeblocks/test/testdata"
+	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
+	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 )
 
 var _ = Describe("Cluster", func() {
@@ -93,9 +95,14 @@ var _ = Describe("Cluster", func() {
 					PodAntiAffinity: "Preferred",
 					TopologyKeys:    []string{"kubernetes.io/hostname"},
 					NodeLabels:      map[string]string{"testLabelKey": "testLabelValue"},
+					TolerationsRaw:  []string{"key=engineType,value=mongo,operator=Equal,effect=NoSchedule"},
+					Tenancy:         string(appsv1alpha1.SharedNode),
 				},
 			}
 
+			Expect(len(o.TolerationsRaw)).Should(Equal(1))
+			Expect(o.Complete()).Should(Succeed())
+			Expect(len(o.Tolerations)).Should(Equal(1))
 			Expect(o.Validate()).Should(HaveOccurred())
 
 			o.TerminationPolicy = "WipeOut"
@@ -137,23 +144,21 @@ var _ = Describe("Cluster", func() {
 	})
 
 	It("operations", func() {
-		o := &OperationsOptions{
-			BaseOptions:            create.BaseOptions{IOStreams: streams},
-			TTLSecondsAfterSucceed: 30,
-		}
+		o := newBaseOperationsOptions(streams, appsv1alpha1.UpgradeType, false)
 		By("validate o.name is null")
-		Expect(o.Validate()).To(MatchError("missing cluster name"))
+		Expect(o.Validate()).To(MatchError(missingClusterArgErrMassage))
 
 		By("validate upgrade when cluster-version is null")
 		o.Name = "test"
-		o.OpsType = dbaasv1alpha1.UpgradeType
+		o.OpsType = appsv1alpha1.UpgradeType
 		Expect(o.Validate()).To(MatchError("missing cluster-version"))
 		o.ClusterVersionRef = "test-cluster-version"
 		in.Write([]byte(o.Name + "\n"))
 		Expect(o.Validate()).Should(Succeed())
 
 		By("validate volumeExpansion when components is null")
-		o.OpsType = dbaasv1alpha1.VolumeExpansionType
+		o.HasComponentNamesFlag = true
+		o.OpsType = appsv1alpha1.VolumeExpansionType
 		Expect(o.Validate()).To(MatchError("missing component-names"))
 
 		By("validate volumeExpansion when vct-names is null")
@@ -168,54 +173,71 @@ var _ = Describe("Cluster", func() {
 		Expect(o.Validate()).Should(Succeed())
 
 		By("validate horizontalScaling when replicas less than -1 ")
-		o.OpsType = dbaasv1alpha1.HorizontalScalingType
+		o.OpsType = appsv1alpha1.HorizontalScalingType
 		o.Replicas = -2
 		Expect(o.Validate()).To(MatchError("replicas required natural number"))
 
 		o.Replicas = 1
 		in.Write([]byte(o.Name + "\n"))
 		Expect(o.Validate()).Should(Succeed())
+
+		By("test CompleteRestartOps function")
+		inputs := buildOperationsInputs(tf, o)
+		Expect(o.Complete(inputs, []string{"test"}))
+		o.ComponentNames = nil
+		o.Namespace = "default"
+		Expect(o.CompleteRestartOps().Error()).Should(ContainSubstring("not found"))
 	})
 
 	It("check params for reconfiguring operations", func() {
 		const (
-			ns                  = "default"
-			componentName       = "wesql"
-			cdComponentTypeName = "replicasets"
+			ns                 = "default"
+			clusterDefName     = "test-clusterdef"
+			clusterVersionName = "test-clusterversion"
+			clusterName        = "test-cluster"
+			statefulCompType   = "replicasets"
+			statefulCompName   = "mysql"
+			configTplName      = "mysql-config-tpl"
+			configVolumeName   = "mysql-config"
 		)
 
-		randomNamer := testutil.CreateRandomResourceNamer(ns)
-		mockHelper := testutil.NewFakeResourceObjectHelper("cli_testdata",
-			testutil.WithCustomResource(types.ClusterGVR(), NewFakeClusterResource(randomNamer, componentName, cdComponentTypeName)),
-			testutil.WithCustomResource(types.CMGVR(), testutil.NewFakeConfigCMResource(randomNamer, componentName, randomNamer.VolumeName,
-				testdata.WithCMData(testdata.WithNewFakeCMData("my.cnf", "")))),
-			testutil.WithResourceKind(types.ConfigConstraintGVR(), types.KindConfigConstraint, testdata.WithName(randomNamer.CCName)),
-			testutil.WithResourceKind(types.CMGVR(), types.KindCM, testdata.WithNamespacedName(randomNamer.TPLName, randomNamer.NS)),
-			testutil.WithResourceKind(types.ClusterVersionGVR(), types.KindClusterVersion, testdata.WithName(randomNamer.CVName)),
-			testutil.WithResourceKind(types.ClusterDefGVR(), types.KindClusterDef,
-				testdata.WithName(randomNamer.CDName),
-				testdata.WithConfigTemplate(testutil.GenerateConfigTemplate(randomNamer), testdata.ComponentTypeSelector(dbaasv1alpha1.Stateful)),
-				testdata.WithUpdateComponent(testdata.ComponentTypeSelector(dbaasv1alpha1.Stateful),
-					func(component *dbaasv1alpha1.ClusterDefinitionComponent) {
-						component.TypeName = cdComponentTypeName
-					}),
-			),
-		)
-		ttf, o := NewFakeOperationsOptions(randomNamer.NS, randomNamer.ClusterName, dbaasv1alpha1.ReconfiguringType, mockHelper.CreateObjects()...)
+		By("Create configmap and config constraint obj")
+		configmap := testapps.NewCustomizedObj("resources/mysql_config_cm.yaml", &corev1.ConfigMap{}, testapps.WithNamespace(ns))
+		constraint := testapps.NewCustomizedObj("resources/mysql_config_template.yaml",
+			&appsv1alpha1.ConfigConstraint{})
+		componentConfig := testapps.NewConfigMap(ns, cfgcore.GetComponentCfgName(clusterName, statefulCompName, configVolumeName), testapps.SetConfigMapData("my.cnf", ""))
+		By("Create a clusterDefinition obj")
+		clusterDefObj := testapps.NewClusterDefFactory(clusterDefName).
+			AddComponent(testapps.StatefulMySQLComponent, statefulCompType).
+			AddConfigTemplate(configTplName, configmap.Name, constraint.Name, ns, configVolumeName, nil).
+			GetObject()
+		By("Create a clusterVersion obj")
+		clusterVersionObj := testapps.NewClusterVersionFactory(clusterVersionName, clusterDefObj.GetName()).
+			AddComponent(statefulCompType).
+			GetObject()
+		By("creating a cluster")
+		clusterObj := testapps.NewClusterFactory(ns, clusterName,
+			clusterDefObj.Name, "").
+			AddComponent(statefulCompName, statefulCompType).GetObject()
+
+		objs := []runtime.Object{configmap, constraint, clusterDefObj, clusterVersionObj, clusterObj, componentConfig}
+		ttf, o := NewFakeOperationsOptions(ns, clusterObj.Name, appsv1alpha1.ReconfiguringType, objs...)
 		defer ttf.Cleanup()
 		o.ComponentNames = []string{"replicasets", "proxy"}
 		By("validate reconfiguring when multi components")
 		Expect(o.Validate()).To(MatchError("reconfiguring only support one component."))
 
 		By("validate reconfiguring parameter")
-		o.ComponentNames = []string{componentName}
-		Expect(o.Validate().Error()).To(ContainSubstring("reconfiguring required configure file or updated parameters"))
+		o.ComponentNames = []string{statefulCompName}
+		Expect(o.parseUpdatedParams().Error()).To(ContainSubstring("reconfiguring required configure file or updated parameters"))
 		o.Parameters = []string{"abcd"}
-		Expect(o.Validate().Error()).To(ContainSubstring("updated parameter formatter"))
+
+		Expect(o.parseUpdatedParams().Error()).To(ContainSubstring("updated parameter format"))
 		o.Parameters = []string{"abcd=test"}
-		o.CfgTemplateName = randomNamer.TPLName
+		o.CfgTemplateName = configTplName
 		o.IOStreams = streams
 		in.Write([]byte(o.Name + "\n"))
+
 		Expect(o.Validate()).Should(Succeed())
 	})
 

@@ -1,16 +1,15 @@
-apiVersion: dbaas.kubeblocks.io/v1alpha1
+apiVersion: apps.kubeblocks.io/v1alpha1
 kind: ClusterDefinition
 metadata:
   name: apecloud-mysql
   labels:
     {{- include "apecloud-mysql.labels" . | nindent 4 }}
 spec:
-  type: state.mysql
   connectionCredential:
     username: root
     password: "$(RANDOM_PASSWD)"
-  components:
-    - typeName: mysql
+  componentDefs:
+    - name: mysql
       characterType: mysql
       probes:
         roleChangedProbe:
@@ -18,7 +17,10 @@ spec:
           periodSeconds: {{ .Values.roleChangedProbe.periodSeconds }}
           timeoutSeconds: {{ .Values.roleChangedProbe.timeoutSeconds }}
       monitor:
-        builtIn: true
+        builtIn: false
+        exporterConfig:
+          scrapePath: /metrics
+          scrapePort: 9104
       logConfigs:
         {{- range $name,$pattern := .Values.logConfigs }}
         - name: {{ $name }}
@@ -36,8 +38,7 @@ spec:
             namespace: {{ .Release.Namespace }}
             volumeName: scripts
             defaultMode: 493
-      defaultReplicas: 3
-      componentType: Consensus
+      workloadType: Consensus
       consensusSpec:
         leader:
           name: leader
@@ -104,9 +105,52 @@ spec:
               - name: MYSQL_DYNAMIC_CONFIG
                 value: {{ if .Values.cluster.dynamicConfig }}{{ .Values.cluster.dynamicConfig }}{{ end }}
             command: ["/scripts/setup.sh"]
+          - name: metrics
+            image:  {{ .Values.metrics.image.registry | default "docker.io" }}/{{ .Values.metrics.image.repository }}:{{ .Values.metrics.image.tag }}
+            imagePullPolicy: {{ .Values.metrics.image.pullPolicy | quote }}
+            securityContext:
+              runAsNonRoot: true
+              runAsUser: 1001
+            env:
+              - name: MYSQL_USER
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: username
+              - name: MYSQL_PASSWORD
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: password
+              - name: DATA_SOURCE_NAME
+                value: "$(MYSQL_USER):$(MYSQL_PASSWORD)@(localhost:3306)/"
+            command:
+              - "/bin/mysqld_exporter"
+              - "--collect.info_schema.wesql_consensus"
+            ports:
+              - name: http-metrics
+                containerPort: 9104
+            livenessProbe:
+              failureThreshold: 6
+              initialDelaySeconds: 5
+              periodSeconds: 10
+              successThreshold: 1
+              timeoutSeconds: 5
+              httpGet:
+                path: /
+                port: http-metrics
+            readinessProbe:
+              failureThreshold: 6
+              initialDelaySeconds: 5
+              periodSeconds: 10
+              successThreshold: 1
+              timeoutSeconds: 5
+              httpGet:
+                path: /
+                port: http-metrics
       systemAccounts:
         cmdExecutorConfig:
-          image: docker.io/mysql:8.0.30
+          image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ .Values.image.tag }}
           command: ["mysql"]
           args:
           - -h$(KB_ACCOUNT_ENDPOINT) 

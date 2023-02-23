@@ -35,7 +35,7 @@ import (
 	cmdlogs "k8s.io/kubectl/pkg/cmd/logs"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 
-	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/cluster"
 	"github.com/apecloud/kubeblocks/internal/cli/exec"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
@@ -146,8 +146,8 @@ var _ = Describe("logs", func() {
 				Namespace:       "test",
 				ResourceVersion: "10",
 				Labels: map[string]string{
-					"app.kubernetes.io/name": "state.mysql-apecloud-mysql",
-					types.ComponentLabelKey:  "component-name",
+					"app.kubernetes.io/name":  "mysql-apecloud-mysql",
+					types.KBComponentLabelKey: "component-name",
 				},
 			},
 		}
@@ -158,22 +158,22 @@ var _ = Describe("logs", func() {
 		Expect(cmd).Should(Equal(""))
 		Expect(err).Should(HaveOccurred())
 		// normal case
-		obj.Cluster = &dbaasv1alpha1.Cluster{
-			Spec: dbaasv1alpha1.ClusterSpec{
-				Components: []dbaasv1alpha1.ClusterComponent{
+		obj.Cluster = &appsv1alpha1.Cluster{
+			Spec: appsv1alpha1.ClusterSpec{
+				ComponentSpecs: []appsv1alpha1.ClusterComponentSpec{
 					{
-						Name: "component-name",
-						Type: "component-type",
+						Name:            "component-name",
+						ComponentDefRef: "component-type",
 					},
 				},
 			},
 		}
-		obj.ClusterDef = &dbaasv1alpha1.ClusterDefinition{
-			Spec: dbaasv1alpha1.ClusterDefinitionSpec{
-				Components: []dbaasv1alpha1.ClusterDefinitionComponent{
+		obj.ClusterDef = &appsv1alpha1.ClusterDefinition{
+			Spec: appsv1alpha1.ClusterDefinitionSpec{
+				ComponentDefs: []appsv1alpha1.ClusterComponentDefinition{
 					{
-						TypeName: "component-type",
-						LogConfigs: []dbaasv1alpha1.LogConfig{
+						Name: "component-type",
+						LogConfigs: []appsv1alpha1.LogConfig{
 							{
 								Name:            "slow",
 								FilePathPattern: "/log/mysql/*slow.log",

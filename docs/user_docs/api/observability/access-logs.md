@@ -60,9 +60,9 @@ Here is an example of configuring the error log and slow log.
 
 ```
 apiVersion: apps.kubeblocks.io/v1alpha1
-kind:       ClusterDefinition
+kind: ClusterDefinition
 metadata:
-  name:     mysql-cluster-definition
+  name: mysql-cluster-definition
 spec:
   componentDefs:
   - name: replicasets

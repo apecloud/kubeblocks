@@ -38,6 +38,7 @@ const (
 
 	AppInstanceLabelKey             = "app.kubernetes.io/instance"
 	AppComponentLabelKey            = "app.kubernetes.io/component-name"
+	WorkloadTypeLabelKey            = "kubeblocks.io/workload-type"
 	AppNameLabelKey                 = "app.kubernetes.io/name"
 	AppManagedByLabelKey            = "app.kubernetes.io/managed-by"
 	AppCreatedByLabelKey            = "app.kubernetes.io/created-by" // resources created temporarily by kubeblocks
@@ -87,6 +88,7 @@ const (
 	PodKind                   = "Pod"
 	PersistentVolumeClaimKind = "PersistentVolumeClaim"
 	CronJob                   = "CronJob"
+	ReplicaSet                = "ReplicaSet"
 )
 
 const (

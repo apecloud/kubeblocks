@@ -66,6 +66,7 @@ var _ = Describe("Backup for a StatefulSet", func() {
 		// non-namespaced
 		testapps.ClearResources(&testCtx, intctrlutil.BackupToolSignature, ml)
 	}
+	var nodeName string
 
 	BeforeEach(func() {
 		cleanEnv()
@@ -80,9 +81,10 @@ var _ = Describe("Backup for a StatefulSet", func() {
 			}).Create(&testCtx).GetObject()
 
 		By("By mocking a pod belonging to the statefulset")
-		_ = testapps.NewPodFactory(testCtx.DefaultNamespace, sts.Name+"-0").
+		pod := testapps.NewPodFactory(testCtx.DefaultNamespace, sts.Name+"-0").
 			AddContainer(corev1.Container{Name: containerName, Image: testapps.ApeCloudMySQLImage}).
 			Create(&testCtx)
+		nodeName = pod.GetObject().Spec.NodeName
 	})
 
 	AfterEach(func() {
@@ -127,6 +129,11 @@ var _ = Describe("Backup for a StatefulSet", func() {
 				By("Check backup job completed")
 				Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dataprotectionv1alpha1.Backup) {
 					g.Expect(fetched.Status.Phase).To(Equal(dataprotectionv1alpha1.BackupCompleted))
+				})).Should(Succeed())
+
+				By("Check backup job's nodeName equals pod's nodeName")
+				Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *batchv1.Job) {
+					g.Expect(fetched.Spec.Template.Spec.NodeName).To(Equal(nodeName))
 				})).Should(Succeed())
 			})
 

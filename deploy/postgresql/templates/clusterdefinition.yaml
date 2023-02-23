@@ -167,7 +167,7 @@ spec:
               {{- end }}
             {{- end }}
           - name: metrics
-            image:  {{ .Values.metrics.image.repository }}:{{ .Values.metrics.image.tag }}
+            image:  {{ .Values.metrics.image.registry | default "docker.io" }}/{{ .Values.metrics.image.repository }}:{{ .Values.metrics.image.tag }}
             imagePullPolicy: {{ .Values.metrics.image.pullPolicy | quote }}
             securityContext:
               runAsNonRoot: true
@@ -226,7 +226,7 @@ spec:
               {{- end }}
       systemAccounts:
         cmdExecutorConfig:
-          image: docker.io/postgres:alpine
+          image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ default .Values.image.tag .Chart.AppVersion }}
           command: ["psql"]
           args:
           - -h$(KB_ACCOUNT_ENDPOINT) 

@@ -449,8 +449,8 @@ func (r *OpsRequest) GetVerticalScalingComponentNameMap() map[string]struct{} {
 	return componentNameMap
 }
 
-// CovertVerticalScalingListToMap coverts OpsRequest.spec.verticalScaling list to map
-func (r *OpsRequest) CovertVerticalScalingListToMap() map[string]VerticalScaling {
+// ConvertVerticalScalingListToMap converts OpsRequest.spec.verticalScaling list to map
+func (r *OpsRequest) ConvertVerticalScalingListToMap() map[string]VerticalScaling {
 	verticalScalingMap := make(map[string]VerticalScaling)
 	for _, v := range r.Spec.VerticalScalingList {
 		verticalScalingMap[v.ComponentName] = v
@@ -467,8 +467,8 @@ func (r *OpsRequest) GetHorizontalScalingComponentNameMap() map[string]struct{} 
 	return componentNameMap
 }
 
-// CovertHorizontalScalingListToMap coverts OpsRequest.spec.horizontalScaling list to map
-func (r *OpsRequest) CovertHorizontalScalingListToMap() map[string]HorizontalScaling {
+// ConvertHorizontalScalingListToMap converts OpsRequest.spec.horizontalScaling list to map
+func (r *OpsRequest) ConvertHorizontalScalingListToMap() map[string]HorizontalScaling {
 	verticalScalingMap := make(map[string]HorizontalScaling)
 	for _, v := range r.Spec.HorizontalScalingList {
 		verticalScalingMap[v.ComponentName] = v
@@ -485,8 +485,8 @@ func (r *OpsRequest) GetVolumeExpansionComponentNameMap() map[string]struct{} {
 	return componentNameMap
 }
 
-// CovertVolumeExpansionListToMap coverts volumeExpansionList to map
-func (r *OpsRequest) CovertVolumeExpansionListToMap() map[string]VolumeExpansion {
+// ConvertVolumeExpansionListToMap converts volumeExpansionList to map
+func (r *OpsRequest) ConvertVolumeExpansionListToMap() map[string]VolumeExpansion {
 	volumeExpansionMap := make(map[string]VolumeExpansion)
 	for _, v := range r.Spec.VolumeExpansionList {
 		volumeExpansionMap[v.ComponentName] = v

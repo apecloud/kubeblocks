@@ -106,3 +106,47 @@ spec:
                 - path: "labels"
                   fieldRef:
                     fieldPath: metadata.labels['kubeblocks.io/role']
+      systemAccounts:
+        cmdExecutorConfig:
+          image: docker.io/redis:7.0.5
+          command:
+          - /bin/sh
+          - -c
+          args:
+          - redis-cli -h $(KB_ACCOUNT_ENDPOINT) $(KB_ACCOUNT_STATEMENT)
+        passwordConfig:
+          length: 10
+          numDigits: 5
+          numSymbols: 0
+          letterCase: MixedCases
+        accounts:
+          - name: kbadmin
+            provisionPolicy:
+              type: CreateByStmt
+              scope: AnyPods
+              statements:
+                creation: ACL SETUSER $(USERNAME) ON >$(PASSWD) allcommands allkeys
+          - name: kbdataprotection
+            provisionPolicy:
+              type: CreateByStmt
+              scope: AnyPods
+              statements:
+                creation: ACL SETUSER $(USERNAME) ON >$(PASSWD) allcommands allkeys
+          - name: kbmonitoring
+            provisionPolicy:
+              type: CreateByStmt
+              scope: AnyPods
+              statements:
+                creation: ACL SETUSER $(USERNAME) ON >$(PASSWD) allkeys +get                    
+          - name: kbprobe
+            provisionPolicy:
+              type: CreateByStmt
+              scope: AnyPods
+              statements:
+                creation: ACL SETUSER $(USERNAME) ON >$(PASSWD) allkeys +get                
+          - name: kbreplicator
+            provisionPolicy:
+              type: CreateByStmt
+              scope: AnyPods
+              statements:
+                creation: ACL SETUSER $(USERNAME) ON >$(PASSWD) +psync +replconf +ping

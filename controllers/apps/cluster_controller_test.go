@@ -145,12 +145,14 @@ var _ = Describe("Cluster Controller", func() {
 				intctrlutil.AppInstanceLabelKey: clusterKey.Name,
 			}, client.InNamespace(clusterKey.Namespace))).Should(Equal(0))
 
-		By("Check created sts pods template without tolerations")
-		Expect(len(stsList.Items[0].Spec.Template.Spec.Tolerations) == 0).Should(BeTrue())
-
-		By("Checking the Affinity and the TopologySpreadConstraints")
 		podSpec := stsList.Items[0].Spec.Template.Spec
+		By("Checking created sts pods template without tolerations")
+		Expect(len(podSpec.Tolerations) == 0).Should(BeTrue())
+
+		By("Checking created sts pods template without Affinity")
 		Expect(podSpec.Affinity).Should(BeNil())
+
+		By("Checking created sts pods template without TopologySpreadConstraints")
 		Expect(len(podSpec.TopologySpreadConstraints) == 0).Should(BeTrue())
 
 		By("Check should create env configmap")
@@ -342,19 +344,30 @@ var _ = Describe("Cluster Controller", func() {
 		Expect(int(*stsList.Items[0].Spec.Replicas)).To(BeEquivalentTo(1))
 	}
 
-	getPVCName := func(i int) string {
-		return fmt.Sprintf("%s-%s-%s-%d", testapps.DataVolumeName, clusterKey.Name, mysqlCompName, i)
+	getPVCName := func(compName string, i int) string {
+		return fmt.Sprintf("%s-%s-%s-%d", testapps.DataVolumeName, clusterKey.Name, compName, i)
+	}
+
+	createPVC := func(clusterName, pvcName, compName string) {
+		// Note: in real k8s cluster, it maybe fails when pvc created by k8s controller.
+		testapps.NewPersistentVolumeClaimFactory(testCtx.DefaultNamespace, pvcName, clusterName,
+			compName, "data").SetStorage("1Gi").Create(&testCtx)
 	}
 
 	testHorizontalScale := func() {
 		initialReplicas := int32(1)
 		updatedReplicas := int32(3)
 
-		By("Creating a cluster with VolumeClaimTemplate")
+		secondMysqlCompName := mysqlCompName + "1"
+
+		By("Creating a multi components cluster with VolumeClaimTemplate")
 		pvcSpec := testapps.NewPVC("1Gi")
 		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
 			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
 			AddComponent(mysqlCompName, mysqlCompType).
+			AddVolumeClaimTemplate(testapps.DataVolumeName, &pvcSpec).
+			SetReplicas(initialReplicas).
+			AddComponent(secondMysqlCompName, mysqlCompType).
 			AddVolumeClaimTemplate(testapps.DataVolumeName, &pvcSpec).
 			SetReplicas(initialReplicas).
 			Create(&testCtx).GetObject()
@@ -385,16 +398,24 @@ var _ = Describe("Cluster Controller", func() {
 
 		By("Mocking PVC for the first replica")
 		for i := 0; i < int(initialReplicas); i++ {
-			pvc := &corev1.PersistentVolumeClaim{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      getPVCName(i),
-					Namespace: clusterKey.Namespace,
-					Labels: map[string]string{
-						intctrlutil.AppInstanceLabelKey: clusterKey.Name,
-					}},
-				Spec: pvcSpec,
+			pvcKey := types.NamespacedName{
+				Namespace: clusterKey.Namespace,
+				Name:      getPVCName(mysqlCompName, i),
 			}
-			Expect(testCtx.CreateObj(testCtx.Ctx, pvc)).Should(Succeed())
+			createPVC(clusterKey.Name, pvcKey.Name, mysqlCompName)
+		}
+
+		By("Mock second component PVCs to make reconcile success")
+		for i := 0; i < int(initialReplicas); i++ {
+			pvcKey := types.NamespacedName{
+				Namespace: clusterKey.Namespace,
+				Name:      getPVCName(secondMysqlCompName, i),
+			}
+			createPVC(clusterKey.Name, pvcKey.Name, mysqlCompName)
+			Eventually(testapps.CheckObjExists(&testCtx, pvcKey, &corev1.PersistentVolumeClaim{}, true)).Should(Succeed())
+			Eventually(testapps.GetAndChangeObjStatus(&testCtx, pvcKey, func(pvc *corev1.PersistentVolumeClaim) {
+				pvc.Status.Phase = corev1.ClaimBound
+			})).Should(Succeed())
 		}
 
 		stsList := testk8s.ListAndCheckStatefulSet(&testCtx, clusterKey)
@@ -403,17 +424,18 @@ var _ = Describe("Cluster Controller", func() {
 		By(fmt.Sprintf("Changing replicas to %d", updatedReplicas))
 		changeStatefulSetReplicas(clusterKey, updatedReplicas)
 
-		By("Checking BackupJob created")
+		By("Checking Backup created")
 		Eventually(testapps.GetListLen(&testCtx, intctrlutil.BackupSignature,
 			client.MatchingLabels{
-				intctrlutil.AppInstanceLabelKey: clusterKey.Name,
+				intctrlutil.AppInstanceLabelKey:  clusterKey.Name,
+				intctrlutil.AppComponentLabelKey: mysqlCompName,
 			}, client.InNamespace(clusterKey.Namespace))).Should(Equal(1))
 
 		By("Mocking VolumeSnapshot and set it as ReadyToUse")
 		snapshotKey := types.NamespacedName{Name: fmt.Sprintf("%s-%s-scaling",
 			clusterKey.Name, mysqlCompName),
 			Namespace: testCtx.DefaultNamespace}
-		pvcName := getPVCName(0)
+		pvcName := getPVCName(mysqlCompName, 0)
 		volumeSnapshot := &snapshotv1.VolumeSnapshot{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      snapshotKey.Name,
@@ -439,7 +461,7 @@ var _ = Describe("Cluster Controller", func() {
 		for i := 0; i < int(updatedReplicas); i++ {
 			pvcKey := types.NamespacedName{
 				Namespace: clusterKey.Namespace,
-				Name:      getPVCName(i),
+				Name:      getPVCName(mysqlCompName, i),
 			}
 			Eventually(testapps.CheckObjExists(&testCtx, pvcKey, &corev1.PersistentVolumeClaim{}, true)).Should(Succeed())
 			Eventually(testapps.GetAndChangeObjStatus(&testCtx, pvcKey, func(pvc *corev1.PersistentVolumeClaim) {
@@ -498,7 +520,7 @@ var _ = Describe("Cluster Controller", func() {
 		for i := 0; i < replicas; i++ {
 			pvc := &corev1.PersistentVolumeClaim{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      getPVCName(i),
+					Name:      getPVCName(mysqlCompName, i),
 					Namespace: clusterKey.Namespace,
 					Labels: map[string]string{
 						intctrlutil.AppInstanceLabelKey: clusterKey.Name,
@@ -527,7 +549,7 @@ var _ = Describe("Cluster Controller", func() {
 			pvc := &corev1.PersistentVolumeClaim{}
 			pvcKey := types.NamespacedName{
 				Namespace: clusterKey.Namespace,
-				Name:      getPVCName(int(i)),
+				Name:      getPVCName(mysqlCompName, int(i)),
 			}
 			Expect(k8sClient.Get(testCtx.Ctx, pvcKey, pvc)).Should(Succeed())
 			Expect(pvc.Spec.Resources.Requests[corev1.ResourceStorage]).To(Equal(newStorageValue))
@@ -546,6 +568,7 @@ var _ = Describe("Cluster Controller", func() {
 			NodeLabels: map[string]string{
 				lableKey: labelValue,
 			},
+			Tenancy: appsv1alpha1.SharedNode,
 		}
 
 		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
@@ -564,6 +587,7 @@ var _ = Describe("Cluster Controller", func() {
 		Expect(podSpec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions[0].Key).To(Equal(lableKey))
 		Expect(podSpec.TopologySpreadConstraints[0].WhenUnsatisfiable).To(Equal(corev1.DoNotSchedule))
 		Expect(podSpec.TopologySpreadConstraints[0].TopologyKey).To(Equal(topologyKey))
+		Expect(len(podSpec.Affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution)).To(Equal(1))
 		Expect(podSpec.Affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution[0].TopologyKey).To(Equal(topologyKey))
 	}
 
@@ -575,10 +599,12 @@ var _ = Describe("Cluster Controller", func() {
 		affinity := &appsv1alpha1.Affinity{
 			PodAntiAffinity: appsv1alpha1.Required,
 			TopologyKeys:    []string{clusterTopologyKey},
+			Tenancy:         appsv1alpha1.SharedNode,
 		}
 		compAffinity := &appsv1alpha1.Affinity{
 			PodAntiAffinity: appsv1alpha1.Preferred,
 			TopologyKeys:    []string{compTopologyKey},
+			Tenancy:         appsv1alpha1.DedicatedNode,
 		}
 		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
 			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().SetClusterAffinity(affinity).
@@ -595,6 +621,8 @@ var _ = Describe("Cluster Controller", func() {
 		Expect(podSpec.TopologySpreadConstraints[0].WhenUnsatisfiable).To(Equal(corev1.ScheduleAnyway))
 		Expect(podSpec.TopologySpreadConstraints[0].TopologyKey).To(Equal(compTopologyKey))
 		Expect(podSpec.Affinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution[0].Weight).ShouldNot(BeNil())
+		Expect(len(podSpec.Affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution)).To(Equal(1))
+		Expect(podSpec.Affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution[0].TopologyKey).To(Equal(corev1.LabelHostname))
 	}
 
 	testClusterToleration := func() {
@@ -835,7 +863,7 @@ var _ = Describe("Cluster Controller", func() {
 						intctrlutil.RoleLabelKey:              sts.Labels[intctrlutil.RoleLabelKey],
 						intctrlutil.AppInstanceLabelKey:       clusterName,
 						intctrlutil.AppComponentLabelKey:      componentName,
-						appsv1.ControllerRevisionHashLabelKey: "mock-version",
+						appsv1.ControllerRevisionHashLabelKey: sts.Status.UpdateRevision,
 					},
 				},
 				Spec: corev1.PodSpec{
@@ -889,17 +917,6 @@ var _ = Describe("Cluster Controller", func() {
 			}
 		}
 
-		By("Creating mock pods in StatefulSet")
-		pods := mockPodsForReplicationTest(clusterObj, stsList.Items)
-		for _, pod := range pods {
-			Expect(testCtx.CreateObj(testCtx.Ctx, &pod)).Should(Succeed())
-			pod.Status.Conditions = []corev1.PodCondition{{
-				Type:   corev1.PodReady,
-				Status: corev1.ConditionTrue,
-			}}
-			Expect(k8sClient.Status().Update(ctx, &pod)).Should(Succeed())
-		}
-
 		By("Updating StatefulSet's status")
 		status := appsv1.StatefulSetStatus{
 			AvailableReplicas:  1,
@@ -913,6 +930,18 @@ var _ = Describe("Cluster Controller", func() {
 		for _, sts := range stsList.Items {
 			status.ObservedGeneration = sts.Generation
 			testk8s.PatchStatefulSetStatus(&testCtx, sts.Name, status)
+		}
+
+		By("Creating mock pods in StatefulSet")
+		stsList = testk8s.ListAndCheckStatefulSet(&testCtx, clusterKey)
+		pods := mockPodsForReplicationTest(clusterObj, stsList.Items)
+		for _, pod := range pods {
+			Expect(testCtx.CreateObj(testCtx.Ctx, &pod)).Should(Succeed())
+			pod.Status.Conditions = []corev1.PodCondition{{
+				Type:   corev1.PodReady,
+				Status: corev1.ConditionTrue,
+			}}
+			Expect(k8sClient.Status().Update(ctx, &pod)).Should(Succeed())
 		}
 
 		By("Checking pods' role are updated in cluster status")

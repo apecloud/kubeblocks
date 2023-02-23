@@ -37,7 +37,7 @@ import (
 
 const namespace = "test"
 
-var _ = Describe("kubeblocks", func() {
+var _ = Describe("kubeblocks install", func() {
 	var cmd *cobra.Command
 	var streams genericclioptions.IOStreams
 	var tf *cmdtesting.TestFactory

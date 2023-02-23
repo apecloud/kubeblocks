@@ -50,10 +50,7 @@ func (factory *MockClusterVersionFactory) AddInitContainer(container corev1.Cont
 	comps := factory.get().Spec.ComponentVersions
 	if len(comps) > 0 {
 		comp := comps[len(comps)-1]
-		if comp.PodSpec == nil {
-			comp.PodSpec = &corev1.PodSpec{}
-		}
-		comp.PodSpec.InitContainers = append(comp.PodSpec.InitContainers, container)
+		comp.VersionsCtx.InitContainers = append(comp.VersionsCtx.InitContainers, container)
 		comps[len(comps)-1] = comp
 	}
 	factory.get().Spec.ComponentVersions = comps
@@ -71,10 +68,7 @@ func (factory *MockClusterVersionFactory) AddContainer(container corev1.Containe
 	comps := factory.get().Spec.ComponentVersions
 	if len(comps) > 0 {
 		comp := comps[len(comps)-1]
-		if comp.PodSpec == nil {
-			comp.PodSpec = &corev1.PodSpec{}
-		}
-		comp.PodSpec.Containers = append(comp.PodSpec.Containers, container)
+		comp.VersionsCtx.Containers = append(comp.VersionsCtx.Containers, container)
 		comps[len(comps)-1] = comp
 	}
 	factory.get().Spec.ComponentVersions = comps

@@ -96,6 +96,7 @@ var _ = Describe("Cluster", func() {
 					TopologyKeys:    []string{"kubernetes.io/hostname"},
 					NodeLabels:      map[string]string{"testLabelKey": "testLabelValue"},
 					TolerationsRaw:  []string{"key=engineType,value=mongo,operator=Equal,effect=NoSchedule"},
+					Tenancy:         string(appsv1alpha1.SharedNode),
 				},
 			}
 
@@ -211,7 +212,7 @@ var _ = Describe("Cluster", func() {
 			GetObject()
 		By("creating a cluster")
 		clusterObj := testapps.NewClusterFactory(ns, clusterName,
-			clusterDefObj.Name, clusterVersionObj.Name).
+			clusterDefObj.Name, "").
 			AddComponent(statefulCompName, statefulCompType).GetObject()
 
 		objs := []runtime.Object{configmap, constraint, clusterDefObj, clusterVersionObj, clusterObj, componentConfig}

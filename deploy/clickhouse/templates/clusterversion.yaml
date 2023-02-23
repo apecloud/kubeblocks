@@ -14,19 +14,19 @@ spec:
   clusterDefinitionRef: apecloud-clickhouse
   componentVersions:
     - componentDefRef: clickhouse
-      podSpec:
+      versionsContext:
         containers:
           - name: clickhouse
             image: {{ .Values.image.repository }}:{{ default .Chart.AppVersion .Values.image.tag }}
             imagePullPolicy: {{ default .Values.image.pullPolicy "IfNotPresent" }}
     - componentDefRef: ch-keeper
-      podSpec:
+      versionsContext:
         containers:
           - name: clickhouse
             image: {{ .Values.image.repository }}:{{ default .Chart.AppVersion .Values.image.tag }}
             imagePullPolicy: {{ default .Values.image.pullPolicy "IfNotPresent" }}
     - componentDefRef: zookeeper
-      podSpec:
+      versionsContext:
         containers:
           - name: zookeeper
             image: {{ .Values.zookeeper.image.repository }}:{{ .Values.zookeeper.image.tag }}

@@ -26,15 +26,6 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
-func buildAffinityLabelSelector(clusterName string, componentName string) *metav1.LabelSelector {
-	return &metav1.LabelSelector{
-		MatchLabels: map[string]string{
-			intctrlutil.AppInstanceLabelKey:  clusterName,
-			intctrlutil.AppComponentLabelKey: componentName,
-		},
-	}
-}
-
 func buildPodTopologySpreadConstraints(
 	cluster *appsv1alpha1.Cluster,
 	clusterOrCompAffinity *appsv1alpha1.Affinity,
@@ -53,7 +44,12 @@ func buildPodTopologySpreadConstraints(
 			MaxSkew:           1,
 			WhenUnsatisfiable: whenUnsatisfiable,
 			TopologyKey:       topologyKey,
-			LabelSelector:     buildAffinityLabelSelector(cluster.Name, component.Name),
+			LabelSelector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					intctrlutil.AppInstanceLabelKey:  cluster.Name,
+					intctrlutil.AppComponentLabelKey: component.Name,
+				},
+			},
 		})
 	}
 	return topologySpreadConstraints
@@ -90,8 +86,13 @@ func buildPodAffinity(
 	var podAffinityTerms []corev1.PodAffinityTerm
 	for _, topologyKey := range clusterOrCompAffinity.TopologyKeys {
 		podAffinityTerms = append(podAffinityTerms, corev1.PodAffinityTerm{
-			TopologyKey:   topologyKey,
-			LabelSelector: buildAffinityLabelSelector(cluster.Name, component.Name),
+			TopologyKey: topologyKey,
+			LabelSelector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					intctrlutil.AppInstanceLabelKey:  cluster.Name,
+					intctrlutil.AppComponentLabelKey: component.Name,
+				},
+			},
 		})
 	}
 	if clusterOrCompAffinity.PodAntiAffinity == appsv1alpha1.Required {
@@ -109,6 +110,21 @@ func buildPodAffinity(
 		podAntiAffinity = &corev1.PodAntiAffinity{
 			PreferredDuringSchedulingIgnoredDuringExecution: weightedPodAffinityTerms,
 		}
+	}
+	// Add pod PodAffinityTerm for dedicated node
+	if clusterOrCompAffinity.Tenancy == appsv1alpha1.DedicatedNode {
+		var labelSelectorReqs []metav1.LabelSelectorRequirement
+		labelSelectorReqs = append(labelSelectorReqs, metav1.LabelSelectorRequirement{
+			Key:      intctrlutil.WorkloadTypeLabelKey,
+			Operator: metav1.LabelSelectorOpIn,
+			Values:   appsv1alpha1.WorkloadTypes,
+		})
+		podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = append(podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution, corev1.PodAffinityTerm{
+			TopologyKey: corev1.LabelHostname,
+			LabelSelector: &metav1.LabelSelector{
+				MatchExpressions: labelSelectorReqs,
+			},
+		})
 	}
 	affinity.PodAntiAffinity = podAntiAffinity
 	return affinity

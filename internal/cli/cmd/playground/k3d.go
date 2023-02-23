@@ -232,6 +232,7 @@ func buildClusterConfig(clusterName string, opts k3d.ClusterCreateOpts) (k3d.Clu
 		Role:       k3d.ServerRole,
 		Image:      K3sImage,
 		ServerOpts: k3d.ServerOpts{},
+		Args:       []string{"--disable=metrics-server", "--disable=traefik"},
 	}
 
 	nodes = append(nodes, &serverNode)

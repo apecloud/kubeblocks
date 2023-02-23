@@ -25,7 +25,7 @@ import (
 
 	"golang.org/x/exp/slices"
 	appsv1 "k8s.io/api/apps/v1"
-	v1 "k8s.io/api/batch/v1"
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
@@ -421,7 +421,7 @@ func handleDeletePVCCronJobEvent(ctx context.Context,
 
 func checkedDeleteDeletePVCCronJob(ctx context.Context, cli client.Client, name string, namespace string) error {
 	// label check
-	cronJob := v1.CronJob{}
+	cronJob := batchv1.CronJob{}
 	if err := cli.Get(ctx, types.NamespacedName{
 		Namespace: namespace,
 		Name:      name,

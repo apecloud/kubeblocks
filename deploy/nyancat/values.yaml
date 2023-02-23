@@ -5,7 +5,8 @@
 replicaCount: 2
 
 image:
-  repository: docker.io/apecloud/nyancat
+  registry: registry.cn-hangzhou.aliyuncs.com
+  repository: apecloud/nyancat
   pullPolicy: IfNotPresent
   # Overrides the image tag whose default is the chart appVersion.
   tag: "latest"

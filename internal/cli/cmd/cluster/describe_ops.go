@@ -92,7 +92,7 @@ func NewDescribeOpsCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *
 
 // getCommandFlagsSlice returns the targetName slice by getName function and opsObject slice, their lengths are equal.
 func getCommandFlagsSlice[T opsObject](opsSt []T,
-	covertObject func(t T) any,
+	convertObject func(t T) any,
 	getName func(t T) string) ([][]string, []any) {
 	// returns the index of the first occurrence of v in s,s or -1 if not present.
 	indexFromAnySlice := func(s []any, v any) int {
@@ -106,9 +106,9 @@ func getCommandFlagsSlice[T opsObject](opsSt []T,
 	opsObjectSlice := make([]any, 0, len(opsSt))
 	targetNameSlice := make([][]string, 0, len(opsSt))
 	for _, v := range opsSt {
-		index := indexFromAnySlice(opsObjectSlice, covertObject(v))
+		index := indexFromAnySlice(opsObjectSlice, convertObject(v))
 		if index == -1 {
-			opsObjectSlice = append(opsObjectSlice, covertObject(v))
+			opsObjectSlice = append(opsObjectSlice, convertObject(v))
 			targetNameSlice = append(targetNameSlice, []string{getName(v)})
 			continue
 		}
@@ -264,14 +264,14 @@ func (o *describeOpsOptions) getVerticalScalingCommand(spec appsv1alpha1.OpsRequ
 	if len(spec.VerticalScalingList) == 0 {
 		return nil
 	}
-	covertObject := func(h appsv1alpha1.VerticalScaling) any {
+	convertObject := func(h appsv1alpha1.VerticalScaling) any {
 		return h.ResourceRequirements
 	}
 	getCompName := func(h appsv1alpha1.VerticalScaling) string {
 		return h.ComponentName
 	}
 	componentNameSlice, resourceSlice := getCommandFlagsSlice[appsv1alpha1.VerticalScaling](
-		spec.VerticalScalingList, covertObject, getCompName)
+		spec.VerticalScalingList, convertObject, getCompName)
 	commands := make([]string, len(componentNameSlice))
 	for i := range componentNameSlice {
 		resource := resourceSlice[i].(corev1.ResourceRequirements)
@@ -290,14 +290,14 @@ func (o *describeOpsOptions) getHorizontalScalingCommand(spec appsv1alpha1.OpsRe
 	if len(spec.HorizontalScalingList) == 0 {
 		return nil
 	}
-	covertObject := func(h appsv1alpha1.HorizontalScaling) any {
+	convertObject := func(h appsv1alpha1.HorizontalScaling) any {
 		return h.Replicas
 	}
 	getCompName := func(h appsv1alpha1.HorizontalScaling) string {
 		return h.ComponentName
 	}
 	componentNameSlice, replicasSlice := getCommandFlagsSlice[appsv1alpha1.HorizontalScaling](
-		spec.HorizontalScalingList, covertObject, getCompName)
+		spec.HorizontalScalingList, convertObject, getCompName)
 	commands := make([]string, len(componentNameSlice))
 	for i := range componentNameSlice {
 		commands[i] = fmt.Sprintf("kbcli cluster horizontal-scale %s --component-names=%s --replicas=%d",
@@ -308,7 +308,7 @@ func (o *describeOpsOptions) getHorizontalScalingCommand(spec appsv1alpha1.OpsRe
 
 // getVolumeExpansionCommand gets the command of the VolumeExpansion command.
 func (o *describeOpsOptions) getVolumeExpansionCommand(spec appsv1alpha1.OpsRequestSpec) []string {
-	covertObject := func(v appsv1alpha1.OpsRequestVolumeClaimTemplate) any {
+	convertObject := func(v appsv1alpha1.OpsRequestVolumeClaimTemplate) any {
 		return v.Storage
 	}
 	getVCTName := func(v appsv1alpha1.OpsRequestVolumeClaimTemplate) string {
@@ -317,7 +317,7 @@ func (o *describeOpsOptions) getVolumeExpansionCommand(spec appsv1alpha1.OpsRequ
 	commands := make([]string, 0)
 	for _, v := range spec.VolumeExpansionList {
 		vctNameSlice, storageSlice := getCommandFlagsSlice[appsv1alpha1.OpsRequestVolumeClaimTemplate](
-			v.VolumeClaimTemplates, covertObject, getVCTName)
+			v.VolumeClaimTemplates, convertObject, getVCTName)
 		for i := range vctNameSlice {
 			storage := storageSlice[i].(resource.Quantity)
 			commands = append(commands, fmt.Sprintf("kbcli cluster volume-expand %s --component-names=%s --volume-claim-template-names=%s --storage=%s",

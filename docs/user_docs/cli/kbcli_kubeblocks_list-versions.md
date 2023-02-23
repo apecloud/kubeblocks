@@ -1,11 +1,26 @@
-## kbcli kubeblocks
+## kbcli kubeblocks list-versions
 
-KubeBlocks operation commands
+List KubeBlocks versions
+
+```
+kbcli kubeblocks list-versions [flags]
+```
+
+### Examples
+
+```
+  # list KubeBlocks release version
+  kbcli kubeblocks list-versions
+  
+  # list KubeBlocks versions including development versions, such as alpha, beta and release candidate
+  kbcli kubeblocks list-versions --devel
+```
 
 ### Options
 
 ```
-  -h, --help   help for kubeblocks
+      --devel   use development versions (alpha, beta, and release candidate releases), too. Equivalent to version '>0.0.0-0'.
+  -h, --help    help for list-versions
 ```
 
 ### Options inherited from parent commands
@@ -34,9 +49,5 @@ KubeBlocks operation commands
 
 ### SEE ALSO
 
-* [kbcli](kbcli.md)	 - KubeBlocks CLI
-* [kbcli kubeblocks install](kbcli_kubeblocks_install.md)	 - Install KubeBlocks
-* [kbcli kubeblocks list-versions](kbcli_kubeblocks_list-versions.md)	 - List KubeBlocks versions
-* [kbcli kubeblocks uninstall](kbcli_kubeblocks_uninstall.md)	 - Uninstall KubeBlocks
-* [kbcli kubeblocks upgrade](kbcli_kubeblocks_upgrade.md)	 - Upgrade KubeBlocks
+* [kbcli kubeblocks](kbcli_kubeblocks.md)	 - KubeBlocks operation commands
 

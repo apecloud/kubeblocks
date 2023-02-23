@@ -148,8 +148,8 @@ type ProvisionStatements struct {
 	// +kubebuilder:validation:Required
 	CreationStatement string `json:"creation"`
 	// deletion specifies statement how to delete this account.
-	// +kubebuilder:validation:Required
-	DeletionStatement string `json:"deletion"`
+	// +optional
+	DeletionStatement string `json:"deletion,omitempty"`
 }
 
 // ClusterDefinitionStatus defines the observed state of ClusterDefinition
@@ -293,6 +293,7 @@ type ClusterComponentDefinition struct {
 	// Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%).
 	// Absolute number is calculated from percentage by rounding down. This value is ignored
 	// if workloadType is Consensus.
+	// +kubebuilder:validation:XIntOrString
 	// +optional
 	MaxUnavailable *intstr.IntOrString `json:"maxUnavailable,omitempty"`
 

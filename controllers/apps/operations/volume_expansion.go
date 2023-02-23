@@ -65,7 +65,7 @@ func (ve volumeExpansionOpsHandler) ActionStartedCondition(opsRequest *appsv1alp
 // Action modifies Cluster.spec.components[*].VolumeClaimTemplates[*].spec.resources
 func (ve volumeExpansionOpsHandler) Action(opsRes *OpsResource) error {
 	var (
-		volumeExpansionMap = opsRes.OpsRequest.CovertVolumeExpansionListToMap()
+		volumeExpansionMap = opsRes.OpsRequest.ConvertVolumeExpansionListToMap()
 		volumeExpansionOps appsv1alpha1.VolumeExpansion
 		ok                 bool
 	)

@@ -34,9 +34,9 @@ type ClusterSpec struct {
 	ClusterDefRef string `json:"clusterDefinitionRef"`
 
 	// Cluster referenced ClusterVersion name.
-	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
-	ClusterVersionRef string `json:"clusterVersionRef"`
+	// +optional
+	ClusterVersionRef string `json:"clusterVersionRef,omitempty"`
 
 	// Cluster termination policy. One of DoNotTerminate, Halt, Delete, WipeOut.
 	// DoNotTerminate will block delete operation.
@@ -291,8 +291,8 @@ type ClusterComponentVolumeClaimTemplate struct {
 type Affinity struct {
 	// podAntiAffinity defines pods of component anti-affnity.
 	// Defaults to Preferred
-	// Preferred means try spread pods by topologyKey
-	// Required means must spread pods by topologyKey
+	// Preferred means try spread pods by topologyKey.
+	// Required means must spread pods by topologyKey.
 	// +kubebuilder:validation:Enum={Preferred,Required}
 	// +optional
 	PodAntiAffinity PodAntiAffinity `json:"podAntiAffinity,omitempty"`
@@ -305,6 +305,14 @@ type Affinity struct {
 	// nodeLabels describe constrain which nodes pod can be scheduled on based on node labels.
 	// +optional
 	NodeLabels map[string]string `json:"nodeLabels,omitempty"`
+
+	// tenancy defines how pods are distributed across node.
+	// SharedNode means multiple pods may share the same node.
+	// DedicatedNode means each pod runs on their own dedicated node.
+	// +kubebuilder:validation:Enum={SharedNode,DedicatedNode}
+	// +kubebuilder:default=SharedNode
+	// +optional
+	Tenancy TenancyType `json:"tenancy,omitempty"`
 }
 
 type Operations struct {

@@ -120,8 +120,9 @@ func (r *BackupPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request
 func (r *BackupPolicyReconciler) doNewPhaseAction(
 	reqCtx intctrlutil.RequestCtx, backupPolicy *dataprotectionv1alpha1.BackupPolicy) (ctrl.Result, error) {
 	// update status phase
+	patch := client.MergeFrom(backupPolicy.DeepCopy())
 	backupPolicy.Status.Phase = dataprotectionv1alpha1.ConfigInProgress
-	if err := r.Client.Status().Update(reqCtx.Ctx, backupPolicy); err != nil {
+	if err := r.Client.Status().Patch(reqCtx.Ctx, backupPolicy, patch); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 	return intctrlutil.RequeueAfter(reconcileInterval, reqCtx.Log, "")
@@ -190,7 +191,7 @@ func (r *BackupPolicyReconciler) doInProgressPhaseAction(
 
 	// update status phase
 	backupPolicy.Status.Phase = dataprotectionv1alpha1.ConfigAvailable
-	if err := r.Client.Status().Update(reqCtx.Ctx, backupPolicy); err != nil {
+	if err := r.Client.Status().Patch(reqCtx.Ctx, backupPolicy, patch); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 	return intctrlutil.RequeueAfter(reconcileInterval, reqCtx.Log, "")

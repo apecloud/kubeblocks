@@ -129,11 +129,12 @@ func (r *BackupReconciler) doNewPhaseAction(
 	reqCtx intctrlutil.RequestCtx,
 	backup *dataprotectionv1alpha1.Backup) (ctrl.Result, error) {
 
+	patch := client.MergeFrom(backup.DeepCopy())
 	// HACK/TODO: ought to move following check to validation webhook
 	if backup.Spec.BackupType == dataprotectionv1alpha1.BackupTypeSnapshot && !viper.GetBool("VOLUMESNAPSHOT") {
 		backup.Status.Phase = dataprotectionv1alpha1.BackupFailed
 		backup.Status.FailureReason = "VolumeSnapshot feature disabled."
-		if err := r.Client.Status().Update(reqCtx.Ctx, backup); err != nil {
+		if err := r.Client.Status().Patch(reqCtx.Ctx, backup, patch); err != nil {
 			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 		}
 		return intctrlutil.Reconciled()
@@ -169,7 +170,7 @@ func (r *BackupReconciler) doNewPhaseAction(
 			Time: backup.Status.StartTimestamp.Add(backup.Spec.TTL.Duration),
 		}
 	}
-	if err := r.Client.Status().Update(reqCtx.Ctx, backup); err != nil {
+	if err := r.Client.Status().Patch(reqCtx.Ctx, backup, patch); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 	return intctrlutil.Reconciled()
@@ -178,7 +179,7 @@ func (r *BackupReconciler) doNewPhaseAction(
 func (r *BackupReconciler) doInProgressPhaseAction(
 	reqCtx intctrlutil.RequestCtx,
 	backup *dataprotectionv1alpha1.Backup) (ctrl.Result, error) {
-
+	patch := client.MergeFrom(backup.DeepCopy())
 	if backup.Spec.BackupType == dataprotectionv1alpha1.BackupTypeSnapshot {
 		// 1. create and ensure pre-command job completed
 		// 2. create and ensure volume snapshot ready
@@ -256,7 +257,7 @@ func (r *BackupReconciler) doInProgressPhaseAction(
 		duration := backup.Status.CompletionTimestamp.Sub(backup.Status.StartTimestamp.Time).Round(time.Second)
 		backup.Status.Duration = &metav1.Duration{Duration: duration}
 	}
-	if err := r.Client.Status().Update(reqCtx.Ctx, backup); err != nil {
+	if err := r.Client.Status().Patch(reqCtx.Ctx, backup, patch); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 
@@ -277,11 +278,12 @@ func (r *BackupReconciler) doCompletedPhaseAction(
 
 func (r *BackupReconciler) updateStatusIfFailed(reqCtx intctrlutil.RequestCtx,
 	backup *dataprotectionv1alpha1.Backup, err error) (ctrl.Result, error) {
+	patch := client.MergeFrom(backup.DeepCopy())
 	r.Recorder.Eventf(backup, corev1.EventTypeWarning, "FailedCreatedBackup",
 		"Failed creating backup, error: %s", err.Error())
 	backup.Status.Phase = dataprotectionv1alpha1.BackupFailed
 	backup.Status.FailureReason = err.Error()
-	if errUpdate := r.Client.Status().Update(reqCtx.Ctx, backup); errUpdate != nil {
+	if errUpdate := r.Client.Status().Patch(reqCtx.Ctx, backup, patch); errUpdate != nil {
 		return intctrlutil.CheckedRequeueWithError(errUpdate, reqCtx.Log, "")
 	}
 	return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")

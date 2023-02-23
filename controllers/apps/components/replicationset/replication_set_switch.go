@@ -140,7 +140,7 @@ type SwitchElectionFilter interface {
 	Name() string
 
 	// Filter implements the filtering logic and returns the filtered PodInfoList List
-	Filter(PodInfoList []*SwitchPodInfo) ([]*SwitchPodInfo, error)
+	Filter(podInfoList []*SwitchPodInfo) ([]*SwitchPodInfo, error)
 }
 
 // Detection implements the detection logic and saves the detection results to the SwitchPodInfo of the corresponding role pod of the SwitchInstance,

@@ -88,9 +88,9 @@ func (f *SwitchElectionRoleFilter) Name() string {
 	return SwitchElectionRoleFilterName
 }
 
-func (f *SwitchElectionRoleFilter) Filter(PodInfoList []*SwitchPodInfo) ([]*SwitchPodInfo, error) {
+func (f *SwitchElectionRoleFilter) Filter(podInfoList []*SwitchPodInfo) ([]*SwitchPodInfo, error) {
 	var filterPods []*SwitchPodInfo
-	for _, podInfo := range PodInfoList {
+	for _, podInfo := range podInfoList {
 		if podInfo.RoleDetectInfo == nil {
 			return nil, fmt.Errorf("pod %s RoleDetectInfo is nil, pls check", podInfo.Pod.Name)
 		}
@@ -114,9 +114,9 @@ func (f *SwitchElectionHealthFilter) Name() string {
 	return SwitchElectionHealthFilterName
 }
 
-func (f *SwitchElectionHealthFilter) Filter(PodInfoList []*SwitchPodInfo) ([]*SwitchPodInfo, error) {
+func (f *SwitchElectionHealthFilter) Filter(podInfoList []*SwitchPodInfo) ([]*SwitchPodInfo, error) {
 	var filterPods []*SwitchPodInfo
-	for _, podInfo := range PodInfoList {
+	for _, podInfo := range podInfoList {
 		if podInfo.HealthDetectIno == nil {
 			return nil, fmt.Errorf("pod %s HealthDetectIno is nil, pls check", podInfo.Pod.Name)
 		}

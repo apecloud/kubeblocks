@@ -249,46 +249,54 @@ func BuildConnCredential(params BuilderParams) (*corev1.Secret, error) {
 		return &connCredential, nil
 	}
 
+	replaceVarObjects := func(k, v *string, i int, origValue string, varObjectsMap map[string]string) {
+		toReplace := origValue
+		for {
+			if !strings.Contains(toReplace, "$(") {
+				break
+			}
+
+			for j, r := range varObjectsMap {
+				replaced := strings.Replace(toReplace, j, r, 1)
+				if replaced == toReplace {
+					continue
+				}
+				toReplace = replaced
+				// replace key
+				if i == 0 {
+					delete(connCredential.StringData, origValue)
+					*k = replaced
+				} else {
+					*v = replaced
+				}
+			}
+		}
+	}
+
 	// REVIEW: perhaps handles value replacement at `func mergeComponents`
-	replaceData := func(placeHolderMap map[string]string) {
+	replaceData := func(varObjectsMap map[string]string) {
 		copyStringData := connCredential.DeepCopy().StringData
 		for k, v := range copyStringData {
 			for i, vv := range []string{k, v} {
-				if !strings.HasPrefix(vv, "$(") {
-					continue
-				}
-				for j, r := range placeHolderMap {
-					replaced := strings.Replace(vv, j, r, 1)
-					if replaced == vv {
-						continue
-					}
-					// replace key
-					if i == 0 {
-						delete(connCredential.StringData, vv)
-						k = replaced
-					} else {
-						v = replaced
-					}
-					break
-				}
+				replaceVarObjects(&k, &v, i, vv, varObjectsMap)
 			}
 			connCredential.StringData[k] = v
 		}
 	}
 
-	// 1st pass replace primary placeholder
+	// 1st pass replace variables
 	m := map[string]string{
 		"$(RANDOM_PASSWD)": randomString(8),
 		"$(SVC_FQDN)":      fmt.Sprintf("%s-%s.%s.svc", params.Cluster.Name, params.Component.Name, params.Cluster.Namespace),
 	}
 	if params.Component.Service != nil {
 		for _, p := range params.Component.Service.Ports {
-			m[fmt.Sprintf("$(SVC_PORT_%s", p.Name)] = strconv.Itoa(int(p.Port))
+			m[fmt.Sprintf("$(SVC_PORT_%s)", p.Name)] = strconv.Itoa(int(p.Port))
 		}
 	}
 	replaceData(m)
 
-	// 2nd pass replace $(CONN_CREDENTIAL) holding values
+	// 2nd pass replace $(CONN_CREDENTIAL) variables
 	m = map[string]string{}
 
 	for k, v := range connCredential.StringData {

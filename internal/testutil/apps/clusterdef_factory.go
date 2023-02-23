@@ -137,8 +137,7 @@ func (factory *MockClusterDefFactory) AddContainerEnv(containerName string, envV
 
 func (factory *MockClusterDefFactory) SetConnectionCredential(
 	connectionCredential map[string]string, svc *corev1.ServiceSpec) *MockClusterDefFactory {
-	spec := &factory.get().Spec
-	spec.ConnectionCredential = connectionCredential
+	factory.get().Spec.ConnectionCredential = connectionCredential
 	factory.SetServiceSpec(svc)
 	return factory
 }

@@ -175,10 +175,6 @@ func (r *OpsRequest) validateOps(ctx context.Context,
 	k8sClient client.Client,
 	cluster *Cluster,
 	allErrs *field.ErrorList) {
-	if cluster.Status.Operations == nil {
-		cluster.Status.Operations = &Operations{}
-	}
-
 	// Check whether the corresponding attribute is legal according to the operation type
 	switch r.Spec.Type {
 	case UpgradeType:
@@ -208,9 +204,8 @@ func (r *OpsRequest) validateRestart(allErrs *field.ErrorList, cluster *Cluster)
 	for i, v := range restartList {
 		componentNames[i] = v.ComponentName
 	}
-	// validate component name is legal
-	supportedComponentMap := convertComponentNamesToMap(cluster.Status.Operations.Restartable)
-	r.validateComponentName(allErrs, cluster, supportedComponentMap, componentNames)
+	// validate whether restartable for each component
+	r.validateComponentRestartable(allErrs, cluster, componentNames)
 }
 
 // validateUpgrade validates spec.clusterOps.upgrade
@@ -218,7 +213,7 @@ func (r *OpsRequest) validateUpgrade(ctx context.Context,
 	k8sClient client.Client,
 	allErrs *field.ErrorList,
 	cluster *Cluster) {
-	if !cluster.Status.Operations.Upgradable {
+	if !cluster.Upgradable(ctx, k8sClient) {
 		addInvalidError(allErrs, "spec.type", r.Spec.Type, fmt.Sprintf("not supported in Cluster: %s, ClusterVersion must be greater than 1", r.Spec.ClusterRef))
 		return
 	}
@@ -241,8 +236,10 @@ func (r *OpsRequest) validateVerticalScaling(allErrs *field.ErrorList, cluster *
 		addInvalidError(allErrs, "spec.verticalScaling", verticalScalingList, "can not be empty")
 		return
 	}
+
+	// TODO(leon): use Cluster.VerticalScalable to impl it
 	// validate whether the cluster support vertical scaling
-	supportedComponentMap := convertComponentNamesToMap(cluster.Status.Operations.VerticalScalable)
+	supportedComponentMap := convertComponentNamesToMapForScaling(cluster)
 	if err := r.validateClusterIsSupported(supportedComponentMap); err != nil {
 		*allErrs = append(*allErrs, err)
 		return
@@ -266,7 +263,6 @@ func (r *OpsRequest) validateVerticalScaling(allErrs *field.ErrorList, cluster *
 
 	// validate component name is legal
 	r.validateComponentName(allErrs, cluster, supportedComponentMap, componentNames)
-
 }
 
 // validateVerticalScaling validate api is legal when spec.type is VerticalScaling
@@ -309,8 +305,10 @@ func (r *OpsRequest) validateHorizontalScaling(cluster *Cluster, allErrs *field.
 		addInvalidError(allErrs, "spec.horizontalScaling", horizontalScalingList, "can not be empty")
 		return
 	}
+
+	// TODO(leon): use cluster.HorizontalScalable to imple it
 	// validate whether the cluster support horizontal scaling
-	supportedComponentMap := convertOperationComponentsToMap(cluster.Status.Operations.HorizontalScalable)
+	supportedComponentMap := convertComponentNamesToMapForScaling(cluster)
 	if err := r.validateClusterIsSupported(supportedComponentMap); err != nil {
 		*allErrs = append(*allErrs, err)
 		return
@@ -319,10 +317,6 @@ func (r *OpsRequest) validateHorizontalScaling(cluster *Cluster, allErrs *field.
 	componentNames := make([]string, len(horizontalScalingList))
 	for i, v := range horizontalScalingList {
 		componentNames[i] = v.ComponentName
-		operationComponent := supportedComponentMap[v.ComponentName]
-		if operationComponent == nil {
-			continue
-		}
 	}
 	r.validateComponentName(allErrs, cluster, supportedComponentMap, componentNames)
 }
@@ -334,8 +328,10 @@ func (r *OpsRequest) validateVolumeExpansion(allErrs *field.ErrorList, cluster *
 		addInvalidError(allErrs, "spec.volumeExpansion", volumeExpansionList, "can not be empty")
 		return
 	}
+
+	// TODO(leon) use Cluster.VolumeExpandable to imple it
 	// validate whether the cluster support volume expansion
-	supportedComponentMap := convertOperationComponentsToMap(cluster.Status.Operations.VolumeExpandable)
+	supportedComponentMap := convertComponentNamesToMapForVolumeExpansion(cluster)
 	if err := r.validateClusterIsSupported(supportedComponentMap); err != nil {
 		*allErrs = append(*allErrs, err)
 		return
@@ -348,14 +344,15 @@ func (r *OpsRequest) validateVolumeExpansion(allErrs *field.ErrorList, cluster *
 			invalidVCTNames []string
 		)
 		componentNames[i] = v.ComponentName
-		operationComponent := supportedComponentMap[v.ComponentName]
-		if operationComponent == nil {
-			continue
-		}
-		// convert slice to map
-		for _, vctName := range operationComponent.VolumeClaimTemplateNames {
-			supportedVCTMap[vctName] = struct{}{}
-		}
+		// TODO(leon)
+		//operationComponent := supportedComponentMap[v.ComponentName]
+		//if operationComponent == nil {
+		//	continue
+		//}
+		//// convert slice to map
+		//for _, vctName := range operationComponent.VolumeClaimTemplateNames {
+		//	supportedVCTMap[vctName] = struct{}{}
+		//}
 		// check the volumeClaimTemplate is support volumeExpansion
 		for _, vct := range v.VolumeClaimTemplates {
 			if _, ok := supportedVCTMap[vct.Name]; !ok {
@@ -372,7 +369,7 @@ func (r *OpsRequest) validateVolumeExpansion(allErrs *field.ErrorList, cluster *
 }
 
 // validateClusterIsSupported validates whether cluster supports the operation when it in component scope
-func (r *OpsRequest) validateClusterIsSupported(supportedComponentMap map[string]*OperationComponent) *field.Error {
+func (r *OpsRequest) validateClusterIsSupported(supportedComponentMap map[string]bool) *field.Error {
 	if len(supportedComponentMap) > 0 {
 		return nil
 	}
@@ -392,7 +389,7 @@ func (r *OpsRequest) validateClusterIsSupported(supportedComponentMap map[string
 // commonValidateWithComponentOps does common validation, when the operation in component scope
 func (r *OpsRequest) validateComponentName(allErrs *field.ErrorList,
 	cluster *Cluster,
-	supportedComponentMap map[string]*OperationComponent,
+	supportedComponentMap map[string]bool,
 	operationComponentNames []string) {
 	var (
 		clusterComponentNameMap    = map[string]struct{}{}
@@ -427,25 +424,53 @@ func (r *OpsRequest) validateComponentName(allErrs *field.ErrorList,
 	}
 }
 
+func (r *OpsRequest) validateComponentRestartable(allErrs *field.ErrorList, cluster *Cluster, comps []string) {
+	var (
+		notfound     []string
+		notsupported []string
+		opsType      = r.Spec.Type
+	)
+
+	for _, comp := range comps {
+		if cluster.GetComponentByName(comp) == nil {
+			notfound = append(notfound, comp)
+			continue
+		}
+		if !cluster.Restartable(comp) {
+			notsupported = append(notsupported, comp)
+		}
+	}
+
+	if len(notfound) > 0 {
+		addInvalidError(allErrs, fmt.Sprintf("spec.%s[*].componentName", lowercaseInitial(opsType)),
+			notfound, "not found in Cluster.spec.components[*].name")
+	}
+
+	if len(notsupported) > 0 {
+		addInvalidError(allErrs, fmt.Sprintf("spec.%s[*].componentName", lowercaseInitial(opsType)),
+			notsupported, fmt.Sprintf("not supported the %s operation", opsType))
+	}
+}
+
 func lowercaseInitial(opsType OpsType) string {
 	str := string(opsType)
 	return strings.ToLower(str[:1]) + str[1:]
 }
 
-// convertComponentNamesToMap converts supportedComponent slice to map
-func convertComponentNamesToMap(componentNames []string) map[string]*OperationComponent {
-	supportedComponentMap := map[string]*OperationComponent{}
-	for _, v := range componentNames {
-		supportedComponentMap[v] = nil
+// convertComponentNamesToMapForScaling converts supportedComponent slice to map
+func convertComponentNamesToMapForScaling(cluster *Cluster) map[string]bool {
+	supportedComponentMap := map[string]bool{}
+	for _, v := range cluster.Spec.ComponentSpecs {
+		supportedComponentMap[v.Name] = true
 	}
 	return supportedComponentMap
 }
 
-// convertOperationComponentsToMap converts supportedOperationComponent slice to map
-func convertOperationComponentsToMap(componentNames []OperationComponent) map[string]*OperationComponent {
-	supportedComponentMap := map[string]*OperationComponent{}
-	for _, v := range componentNames {
-		supportedComponentMap[v.Name] = &v
+// convertComponentNamesToMapForVolumeExpansion converts supportedComponent slice to map
+func convertComponentNamesToMapForVolumeExpansion(cluster *Cluster) map[string]bool {
+	supportedComponentMap := map[string]bool{}
+	for _, v := range cluster.Spec.ComponentSpecs {
+		supportedComponentMap[v.Name] = true
 	}
 	return supportedComponentMap
 }

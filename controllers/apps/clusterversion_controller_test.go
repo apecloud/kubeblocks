@@ -83,8 +83,7 @@ var _ = Describe("test clusterVersion controller", func() {
 				Create(&testCtx).GetObject()
 
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(cluster), func(g Gomega, tmpCluster *appsv1alpha1.Cluster) {
-				operations := tmpCluster.Status.Operations
-				g.Expect(operations != nil && operations.Upgradable).Should(BeTrue())
+				g.Expect(tmpCluster.Upgradable(testCtx.Ctx, testCtx.Cli)).Should(BeTrue())
 			})).Should(Succeed())
 
 		})

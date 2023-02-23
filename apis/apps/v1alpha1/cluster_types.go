@@ -17,6 +17,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -24,6 +25,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // ClusterSpec defines the desired state of Cluster
@@ -100,10 +102,6 @@ type ClusterStatus struct {
 	// components record the current status information of all components of the cluster.
 	// +optional
 	Components map[string]ClusterComponentStatus `json:"components,omitempty"`
-
-	// operations declare what operations the cluster supports.
-	// +optional
-	Operations *Operations `json:"operations,omitempty"`
 
 	// clusterDefGeneration represents the generation number of ClusterDefinition referenced.
 	// +optional
@@ -315,44 +313,6 @@ type Affinity struct {
 	Tenancy TenancyType `json:"tenancy,omitempty"`
 }
 
-type Operations struct {
-	// upgradable whether the cluster supports upgrade. if multiple clusterVersions existed, it is true.
-	// +optional
-	Upgradable bool `json:"upgradable,omitempty"`
-
-	// verticalScalable which components of the cluster support verticalScaling.
-	// +listType=set
-	// +optional
-	VerticalScalable []string `json:"verticalScalable,omitempty"`
-
-	// restartable which components of the cluster support restart.
-	// +listType=set
-	// +optional
-	Restartable []string `json:"restartable,omitempty"`
-
-	// volumeExpandable which components of the cluster and its volumeClaimTemplates support volumeExpansion.
-	// +listType=map
-	// +listMapKey=name
-	// +optional
-	VolumeExpandable []OperationComponent `json:"volumeExpandable,omitempty"`
-
-	// horizontalScalable which components of the cluster support horizontalScaling, and the replicas range limit.
-	// +listType=map
-	// +listMapKey=name
-	// +optional
-	HorizontalScalable []OperationComponent `json:"horizontalScalable,omitempty"`
-}
-
-type OperationComponent struct {
-	// name reference component name.
-	// +kubebuilder:validation:Required
-	Name string `json:"name"`
-
-	// volumeClaimTemplateNames which VolumeClaimTemplate of the component support volumeExpansion.
-	// +optional
-	VolumeClaimTemplateNames []string `json:"volumeClaimTemplateNames,omitempty"`
-}
-
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
 //+kubebuilder:resource:categories={kubeblocks,all}
@@ -481,6 +441,36 @@ func (r *Cluster) GetComponentDefRefName(componentName string) string {
 		}
 	}
 	return ""
+}
+
+// Restartable checks whether the specified component supports to do restart.
+func (r *Cluster) Restartable(compName string) bool {
+	return r.GetComponentByName(compName) != nil
+}
+
+// Upgradable checks whether the specified component supports to do upgrade.
+func (r *Cluster) Upgradable(ctx context.Context, cli client.Client) bool {
+	cvList := &ClusterVersionList{}
+	// TODO: use clusterDefLabelKey = "clusterdefinition.kubeblocks.io/name"
+	label := "clusterdefinition.kubeblocks.io/name"
+	if err := cli.List(ctx, cvList, client.MatchingLabels{label: r.Spec.ClusterDefRef}); err != nil {
+		return false
+	}
+	return len(cvList.Items) > 1
+}
+
+func (r *Cluster) VerticalScalable(compName string) bool {
+	return r.GetComponentByName(compName) != nil
+}
+
+func (r *Cluster) HorizontalScalable(compName string) bool {
+	// TODO(leon): use CD to cross check the component.
+	return r.GetComponentByName(compName) != nil
+}
+
+func (r *Cluster) VolumeExpandable() error {
+	// TODO(leon): check whether the used storageclass supports expansion
+	return nil
 }
 
 func ToVolumeClaimTemplate(template ClusterComponentVolumeClaimTemplate) corev1.PersistentVolumeClaimTemplate {

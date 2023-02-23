@@ -81,19 +81,8 @@ var _ = Describe("OpsRequest webhook", func() {
 
 		By("By testing when cluster not support upgrade")
 		Expect(testCtx.CreateObj(ctx, opsRequest).Error()).To(ContainSubstring("ClusterVersion must be greater than 1"))
-		// set cluster support upgrade
-		patch := client.MergeFrom(cluster.DeepCopy())
-		if cluster.Status.Operations == nil {
-			cluster.Status.Operations = &Operations{}
-		}
-		cluster.Status.Operations.Upgradable = true
-		Expect(k8sClient.Status().Patch(ctx, cluster, patch)).Should(Succeed())
-		// wait until patch succeed
-		Eventually(func() bool {
-			tmpCluster := &Cluster{}
-			_ = k8sClient.Get(context.Background(), client.ObjectKey{Name: cluster.Name, Namespace: cluster.Namespace}, tmpCluster)
-			return tmpCluster.Status.Operations.Upgradable
-		}, timeout, interval).Should(BeTrue())
+
+		// TODO(leon): test support upgrade by add a new clusterversion
 
 		By("By testing when spec.upgrade is null")
 		Expect(testCtx.CreateObj(ctx, opsRequest).Error()).To(ContainSubstring("spec.upgrade"))
@@ -144,7 +133,7 @@ var _ = Describe("OpsRequest webhook", func() {
 		// if running in real cluster, the opsRequest will reconcile all the time.
 		// so we should add eventually block.
 		Eventually(func() bool {
-			patch = client.MergeFrom(opsRequest.DeepCopy())
+			patch := client.MergeFrom(opsRequest.DeepCopy())
 			opsRequest.Status.Phase = SucceedPhase
 			Expect(k8sClient.Status().Patch(ctx, opsRequest, patch)).Should(Succeed())
 
@@ -155,16 +144,16 @@ var _ = Describe("OpsRequest webhook", func() {
 	}
 
 	testVerticalScaling := func(cluster *Cluster) {
-		// set cluster support verticalScaling
-		patch := client.MergeFrom(cluster.DeepCopy())
-		cluster.Status.Operations.VerticalScalable = []string{replicaSetComponentName}
-		Expect(k8sClient.Status().Patch(ctx, cluster, patch)).Should(Succeed())
-		// wait until patch succeed
-		Eventually(func() bool {
-			tmpCluster := &Cluster{}
-			_ = k8sClient.Get(context.Background(), client.ObjectKey{Name: cluster.Name, Namespace: cluster.Namespace}, tmpCluster)
-			return len(cluster.Status.Operations.VerticalScalable) > 0
-		}, timeout, interval).Should(BeTrue())
+		// TODO(leon): test cluster support verticalScaling
+		//patch := client.MergeFrom(cluster.DeepCopy())
+		//cluster.Status.Operations.VerticalScalable = []string{replicaSetComponentName}
+		//Expect(k8sClient.Status().Patch(ctx, cluster, patch)).Should(Succeed())
+		//// wait until patch succeed
+		//Eventually(func() bool {
+		//	tmpCluster := &Cluster{}
+		//	_ = k8sClient.Get(context.Background(), client.ObjectKey{Name: cluster.Name, Namespace: cluster.Namespace}, tmpCluster)
+		//	return len(cluster.Status.Operations.VerticalScalable) > 0
+		//}, timeout, interval).Should(BeTrue())
 
 		By("By testing verticalScaling opsRequest components is not consistent")
 		opsRequest := createTestOpsRequest(clusterName, opsRequestName, VerticalScalingType)
@@ -224,15 +213,6 @@ var _ = Describe("OpsRequest webhook", func() {
 			},
 		}
 		Expect(testCtx.CreateObj(ctx, opsRequest).Error()).To(ContainSubstring(`Invalid value: "VolumeExpansion": not supported in Cluster`))
-		// set cluster support volumeExpansion
-		patch := client.MergeFrom(cluster.DeepCopy())
-		cluster.Status.Operations.VolumeExpandable = []OperationComponent{
-			{
-				Name:                     replicaSetComponentName,
-				VolumeClaimTemplateNames: []string{"data"},
-			},
-		}
-		Expect(k8sClient.Status().Patch(ctx, cluster, patch)).Should(Succeed())
 
 		By("By testing volumeExpansion volumeClaimTemplate name is not consistent")
 		Eventually(func(g Gomega) {
@@ -249,20 +229,20 @@ var _ = Describe("OpsRequest webhook", func() {
 	}
 
 	testHorizontalScaling := func(cluster *Cluster) {
-		// set cluster support horizontalScaling
-		patch := client.MergeFrom(cluster.DeepCopy())
-		cluster.Status.Operations.HorizontalScalable = []OperationComponent{
-			{
-				Name: replicaSetComponentName,
-			},
-		}
-		Expect(k8sClient.Status().Patch(ctx, cluster, patch)).Should(Succeed())
-		// wait until patch succeed
-		Eventually(func() bool {
-			tmpCluster := &Cluster{}
-			_ = k8sClient.Get(context.Background(), client.ObjectKey{Name: cluster.Name, Namespace: cluster.Namespace}, tmpCluster)
-			return len(cluster.Status.Operations.HorizontalScalable) > 0
-		}, timeout, interval).Should(BeTrue())
+		// TODO(leon): test cluster support horizontalScaling
+		//patch := client.MergeFrom(cluster.DeepCopy())
+		//cluster.Status.Operations.HorizontalScalable = []OperationComponent{
+		//	{
+		//		Name: replicaSetComponentName,
+		//	},
+		//}
+		//Expect(k8sClient.Status().Patch(ctx, cluster, patch)).Should(Succeed())
+		//// wait until patch succeed
+		//Eventually(func() bool {
+		//	tmpCluster := &Cluster{}
+		//	_ = k8sClient.Get(context.Background(), client.ObjectKey{Name: cluster.Name, Namespace: cluster.Namespace}, tmpCluster)
+		//	return len(cluster.Status.Operations.HorizontalScalable) > 0
+		//}, timeout, interval).Should(BeTrue())
 
 		By("By testing horizontalScaling. if api is legal, it will create successfully")
 		opsRequest := createTestOpsRequest(clusterName, opsRequestName, HorizontalScalingType)
@@ -280,13 +260,6 @@ var _ = Describe("OpsRequest webhook", func() {
 		By("test min, max is zero")
 		tmpCluster := &Cluster{}
 		Expect(k8sClient.Get(ctx, client.ObjectKey{Name: clusterName, Namespace: cluster.Namespace}, tmpCluster)).Should(Succeed())
-		patch = client.MergeFrom(tmpCluster.DeepCopy())
-		tmpCluster.Status.Operations.HorizontalScalable = []OperationComponent{
-			{
-				Name: "proxy",
-			},
-		}
-		Expect(k8sClient.Status().Patch(ctx, tmpCluster, patch)).Should(Succeed())
 		opsRequest = createTestOpsRequest(clusterName, opsRequestName, HorizontalScalingType)
 		Eventually(func() bool {
 			opsRequest.Spec.HorizontalScalingList = []HorizontalScaling{
@@ -319,16 +292,16 @@ var _ = Describe("OpsRequest webhook", func() {
 	}
 
 	testRestart := func(cluster *Cluster) *OpsRequest {
-		// set cluster support restart
-		patch := client.MergeFrom(cluster.DeepCopy())
-		cluster.Status.Operations.Restartable = []string{replicaSetComponentName}
-		Expect(k8sClient.Status().Patch(ctx, cluster, patch)).Should(Succeed())
-		// wait until patch succeed
-		Eventually(func() bool {
-			tmpCluster := &Cluster{}
-			_ = k8sClient.Get(context.Background(), client.ObjectKey{Name: cluster.Name, Namespace: cluster.Namespace}, tmpCluster)
-			return len(cluster.Status.Operations.Restartable) > 0
-		}, timeout, interval).Should(BeTrue())
+		// TODO(leon): test cluster restartable
+		//patch := client.MergeFrom(cluster.DeepCopy())
+		//cluster.Status.Operations.Restartable = []string{replicaSetComponentName}
+		//Expect(k8sClient.Status().Patch(ctx, cluster, patch)).Should(Succeed())
+		//// wait until patch succeed
+		//Eventually(func() bool {
+		//	tmpCluster := &Cluster{}
+		//	_ = k8sClient.Get(context.Background(), client.ObjectKey{Name: cluster.Name, Namespace: cluster.Namespace}, tmpCluster)
+		//	return len(cluster.Status.Operations.Restartable) > 0
+		//}, timeout, interval).Should(BeTrue())
 
 		By("By testing restart when componentNames is not correct")
 		opsRequest := createTestOpsRequest(clusterName, opsRequestName, RestartType)

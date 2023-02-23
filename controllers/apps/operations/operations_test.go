@@ -476,19 +476,6 @@ var _ = Describe("OpsRequest Controller", func() {
 						Phase: appsv1alpha1.RunningPhase,
 					},
 				}
-				clusterObject.Status.Operations = &appsv1alpha1.Operations{
-					Upgradable:       true,
-					Restartable:      []string{consensusComp, statelessComp},
-					VerticalScalable: []string{consensusComp, statelessComp},
-					HorizontalScalable: []appsv1alpha1.OperationComponent{
-						{
-							Name: consensusComp,
-						},
-						{
-							Name: statelessComp,
-						},
-					},
-				}
 			})).Should(Succeed())
 			opsRes.Cluster = clusterObject
 

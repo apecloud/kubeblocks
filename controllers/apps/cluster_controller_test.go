@@ -468,7 +468,7 @@ var _ = Describe("Cluster Controller", func() {
 		}
 		Expect(testCtx.CreateObj(testCtx.Ctx, backupPolicyTpl)).Should(Succeed())
 
-		for i, _ := range clusterObj.Spec.ComponentSpecs {
+		for i := range clusterObj.Spec.ComponentSpecs {
 			horizontalScaleComp(updatedReplicas, &clusterObj.Spec.ComponentSpecs[i])
 		}
 

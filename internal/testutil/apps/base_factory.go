@@ -82,6 +82,11 @@ func (factory *BaseFactory[T, PT, F]) SetOwnerReferences(ownerAPIVersion string,
 	return factory.concreteFactory
 }
 
+func (factory *BaseFactory[T, PT, F]) CheckedCreate(testCtx *testutil.TestContext) *F {
+	gomega.Expect(testCtx.CheckedCreateObj(testCtx.Ctx, factory.get())).Should(gomega.Succeed())
+	return factory.concreteFactory
+}
+
 func (factory *BaseFactory[T, PT, F]) Create(testCtx *testutil.TestContext) *F {
 	gomega.Expect(testCtx.CreateObj(testCtx.Ctx, factory.get())).Should(gomega.Succeed())
 	return factory.concreteFactory

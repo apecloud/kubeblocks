@@ -155,38 +155,20 @@ var _ = Describe("OpsRequest webhook", func() {
 	}
 
 	testVerticalScaling := func(cluster *Cluster) {
-		// set cluster support verticalScaling
-		patch := client.MergeFrom(cluster.DeepCopy())
-		cluster.Status.Operations.VerticalScalable = []string{replicaSetComponentName}
-		Expect(k8sClient.Status().Patch(ctx, cluster, patch)).Should(Succeed())
-		// wait until patch succeed
-		Eventually(func() bool {
-			tmpCluster := &Cluster{}
-			_ = k8sClient.Get(context.Background(), client.ObjectKey{Name: cluster.Name, Namespace: cluster.Namespace}, tmpCluster)
-			return len(cluster.Status.Operations.VerticalScalable) > 0
-		}, timeout, interval).Should(BeTrue())
-
-		By("By testing verticalScaling opsRequest components is not consistent")
-		opsRequest := createTestOpsRequest(clusterName, opsRequestName, VerticalScalingType)
-		verticalScaling := VerticalScaling{}
-		verticalScaling.ComponentName = "proxy"
-		verticalScaling.ResourceRequirements = corev1.ResourceRequirements{
-			Requests: corev1.ResourceList{
-				"cpu":    resource.MustParse("100m"),
-				"memory": resource.MustParse("100Mi"),
+		verticalScalingList := []VerticalScaling{
+			{
+				ComponentOps:         ComponentOps{ComponentName: "vscale-not-exist-component"},
+				ResourceRequirements: corev1.ResourceRequirements{},
 			},
-		}
-		opsRequest.Spec.VerticalScalingList = []VerticalScaling{verticalScaling}
-		Expect(testCtx.CreateObj(ctx, opsRequest).Error()).To(ContainSubstring("not supported the VerticalScaling operation"))
-		Eventually(func() bool {
-			opsRequest.Spec.VerticalScalingList[0].ComponentName = replicaSetComponentName
-			err := testCtx.CheckedCreateObj(ctx, opsRequest)
-			return err == nil
-		}, timeout, interval).Should(BeTrue())
-
-		By("By testing requests cpu less than limits cpu")
-		opsRequest = createTestOpsRequest(clusterName, opsRequestName, VerticalScalingType)
-		opsRequest.Spec.VerticalScalingList = []VerticalScaling{
+			{
+				ComponentOps: ComponentOps{ComponentName: "proxy"},
+				ResourceRequirements: corev1.ResourceRequirements{
+					Requests: corev1.ResourceList{
+						"cpu":    resource.MustParse("100m"),
+						"memory": resource.MustParse("100Mi"),
+					},
+				},
+			},
 			{
 				ComponentOps: ComponentOps{ComponentName: replicaSetComponentName},
 				ResourceRequirements: corev1.ResourceRequirements{
@@ -201,6 +183,26 @@ var _ = Describe("OpsRequest webhook", func() {
 				},
 			},
 		}
+
+		By("By testing verticalScaling opsRequest components is not exist")
+		opsRequest := createTestOpsRequest(clusterName, opsRequestName, VerticalScalingType)
+		opsRequest.Spec.VerticalScalingList = []VerticalScaling{verticalScalingList[0]}
+		Expect(testCtx.CreateObj(ctx, opsRequest).Error()).To(ContainSubstring("not found in Cluster.spec.components[*].name"))
+
+		By("By testing verticalScaling opsRequest components is not consistent")
+		opsRequest = createTestOpsRequest(clusterName, opsRequestName, VerticalScalingType)
+		// [0] is not exist, and [1] is valid.
+		opsRequest.Spec.VerticalScalingList = []VerticalScaling{verticalScalingList[0], verticalScalingList[1]}
+		Expect(testCtx.CreateObj(ctx, opsRequest).Error()).To(ContainSubstring("not found in Cluster.spec.components[*].name"))
+
+		By("By testing verticalScaling opsRequest components partly")
+		opsRequest = createTestOpsRequest(clusterName, opsRequestName, VerticalScalingType)
+		opsRequest.Spec.VerticalScalingList = []VerticalScaling{verticalScalingList[1]}
+		Expect(testCtx.CreateObj(ctx, opsRequest) == nil).Should(BeTrue())
+
+		By("By testing requests cpu less than limits cpu")
+		opsRequest = createTestOpsRequest(clusterName, opsRequestName, VerticalScalingType)
+		opsRequest.Spec.VerticalScalingList = []VerticalScaling{verticalScalingList[2]}
 		Expect(testCtx.CreateObj(ctx, opsRequest).Error()).To(ContainSubstring("must be less than or equal to cpu limit"))
 		Eventually(func() bool {
 			opsRequest.Spec.VerticalScalingList[0].Requests[corev1.ResourceCPU] = resource.MustParse("100m")

@@ -32,7 +32,6 @@ RUN go mod download
 
 # Copy the go source
 COPY cmd/manager/main.go cmd/manager/main.go
-COPY cmd/agamotto/ cmd/agamotto/
 COPY cmd/reloader/ cmd/reloader/
 COPY cmd/probe/ cmd/probe/
 COPY apis/ apis/
@@ -44,7 +43,6 @@ COPY test/testdata/testdata.go test/testdata/testdata.go
 RUN curl -L https://dl.k8s.io/release/v1.24.2/bin/${TARGETOS}/${TARGETARCH}/kubectl -o kubectl && chmod +x kubectl
 
 # Build
-RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="${LD_FLAGS}" -a -o agamotto cmd/agamotto/main.go
 RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="${LD_FLAGS}" -a -o reloader cmd/reloader/main.go
 RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="${LD_FLAGS}" -a -o killer cmd/reloader/container_killer/killer.go
 RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="${LD_FLAGS}" -a -o probe cmd/probe/main.go
@@ -64,7 +62,6 @@ COPY --from=binary-downloader /bin/curl /bin
 COPY --from=builder /workspace/kubectl /bin
 COPY --from=builder /workspace/probe /bin
 COPY config/probe config/probe
-COPY --from=builder /workspace/agamotto /bin
 COPY --from=builder /workspace/manager .
 COPY --from=builder /workspace/reloader /bin
 COPY --from=builder /workspace/killer /bin

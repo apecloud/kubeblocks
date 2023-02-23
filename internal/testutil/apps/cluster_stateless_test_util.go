@@ -19,6 +19,7 @@ package apps
 import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/apecloud/kubeblocks/internal/testutil"
@@ -33,7 +34,16 @@ func MockStatelessComponentDeploy(testCtx testutil.TestContext, clusterName, com
 
 // MockStatelessPod mocks the pods of the deployment workload.
 func MockStatelessPod(testCtx testutil.TestContext, deploy *appsv1.Deployment, clusterName, componentName, podName string) *corev1.Pod {
-	return NewPodFactory(testCtx.DefaultNamespace, podName).SetOwnerReferences("apps/v1", intctrlutil.DeploymentKind, deploy).AddLabelsInMap(map[string]string{
+	var newRs *appsv1.ReplicaSet
+	if deploy != nil {
+		newRs = &appsv1.ReplicaSet{
+			ObjectMeta: metav1.ObjectMeta{
+				UID:  "ss-456",
+				Name: deploy.Name + "-5847cb795c",
+			},
+		}
+	}
+	return NewPodFactory(testCtx.DefaultNamespace, podName).SetOwnerReferences("apps/v1", intctrlutil.ReplicaSet, newRs).AddLabelsInMap(map[string]string{
 		intctrlutil.AppInstanceLabelKey:  clusterName,
 		intctrlutil.AppComponentLabelKey: componentName,
 		intctrlutil.AppManagedByLabelKey: intctrlutil.AppName,

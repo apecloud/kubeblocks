@@ -178,11 +178,8 @@ func (r *reconfigureAction) Action(resource *OpsResource) error {
 		return cfgcore.WrapError(err, "failed to get clusterdefinition[%s]", cluster.Spec.ClusterDefRef)
 	}
 
-	if err := resource.Client.Get(resource.Ctx, client.ObjectKey{
-		Name:      cluster.Spec.ClusterVersionRef,
-		Namespace: cluster.Namespace,
-	}, clusterVersion); err != nil {
-		return cfgcore.WrapError(err, "failed to get clusterversion[%s]", cluster.Spec.ClusterVersionRef)
+	if err := cfgcore.GetClusterVersionResource(cluster.Spec.ClusterVersionRef, clusterVersion, resource.Client, resource.Ctx); err != nil {
+		return err
 	}
 
 	if opsRequest.Status.ObservedGeneration == opsRequest.ObjectMeta.Generation {

@@ -52,7 +52,7 @@ func (hs horizontalScalingOpsHandler) ActionStartedCondition(opsRequest *appsv1a
 // Action modifies Cluster.spec.components[*].replicas from the opsRequest
 func (hs horizontalScalingOpsHandler) Action(opsRes *OpsResource) error {
 	var (
-		horizontalScalingMap = opsRes.OpsRequest.CovertHorizontalScalingListToMap()
+		horizontalScalingMap = opsRes.OpsRequest.ConvertHorizontalScalingListToMap()
 		horizontalScaling    appsv1alpha1.HorizontalScaling
 		ok                   bool
 	)
@@ -78,7 +78,7 @@ func (hs horizontalScalingOpsHandler) ReconcileAction(opsRes *OpsResource) (apps
 // GetRealAffectedComponentMap gets the real affected component map for the operation
 func (hs horizontalScalingOpsHandler) GetRealAffectedComponentMap(opsRequest *appsv1alpha1.OpsRequest) realAffectedComponentMap {
 	realChangedMap := realAffectedComponentMap{}
-	hsMap := opsRequest.CovertHorizontalScalingListToMap()
+	hsMap := opsRequest.ConvertHorizontalScalingListToMap()
 	for k, v := range opsRequest.Status.LastConfiguration.Components {
 		currHs, ok := hsMap[k]
 		if !ok {
@@ -95,18 +95,13 @@ func (hs horizontalScalingOpsHandler) GetRealAffectedComponentMap(opsRequest *ap
 func (hs horizontalScalingOpsHandler) SaveLastConfiguration(opsRes *OpsResource) error {
 	opsRequest := opsRes.OpsRequest
 	lastComponentInfo := map[string]appsv1alpha1.LastComponentConfiguration{}
-	clusterDef, err := GetClusterDefByName(opsRes.Ctx, opsRes.Client, opsRes.Cluster.Spec.ClusterDefRef)
-	if err != nil {
-		return err
-	}
 	componentNameMap := opsRequest.GetComponentNameMap()
 	for _, v := range opsRes.Cluster.Spec.ComponentSpecs {
 		if _, ok := componentNameMap[v.Name]; !ok {
 			continue
 		}
-		clusterComponentDef := clusterDef.GetComponentDefByName(v.ComponentDefRef)
 		lastComponentInfo[v.Name] = appsv1alpha1.LastComponentConfiguration{
-			Replicas: util.GetComponentReplicas(&v, clusterComponentDef),
+			Replicas: v.Replicas,
 		}
 	}
 	patch := client.MergeFrom(opsRequest.DeepCopy())
@@ -137,7 +132,7 @@ func (hs horizontalScalingOpsHandler) getComponentLastReplicas(opsRequest *appsv
 // handleComponentProgressDetails handles the component progressDetails when horizontal scale the replicas.
 func (hs horizontalScalingOpsHandler) handleComponentProgressDetails(opsRes *OpsResource,
 	pgRes progressResource,
-	compStatus *appsv1alpha1.OpsRequestComponentStatus) (expectProgressCount int32, succeedCount int32, err error) {
+	compStatus *appsv1alpha1.OpsRequestComponentStatus) (expectProgressCount int32, completedCount int32, err error) {
 	var (
 		podList          *corev1.PodList
 		clusterComponent = pgRes.clusterComponent
@@ -170,16 +165,17 @@ func (hs horizontalScalingOpsHandler) handleComponentProgressDetails(opsRes *Ops
 		return
 	}
 	if !isScaleOut {
-		succeedCount, err = hs.handleScaleDownProgress(opsRes, pgRes, podList, compStatus)
+		completedCount, err = hs.handleScaleDownProgress(opsRes, pgRes, podList, compStatus)
+		expectProgressCount = getFinalExpectCount(compStatus, expectProgressCount)
 		return
 	}
-	succeedCount, err = hs.handleScaleOutProgress(opsRes, pgRes, podList, compStatus)
-	// if the component workload type is Stateless, remove the progressDetails of the expired pods.
+	completedCount, err = hs.handleScaleOutProgress(opsRes, pgRes, podList, compStatus)
+	// if the workload type is Stateless, remove the progressDetails of the expired pods.
 	// because a replicaSet may attempt to create a pod multiple times till it succeeds when scale out the replicas.
 	if pgRes.clusterComponentDef.WorkloadType == appsv1alpha1.Stateless {
 		compStatus.ProgressDetails = removeStatelessExpiredPod(podList, compStatus.ProgressDetails)
 	}
-	return expectProgressCount, succeedCount, err
+	return getFinalExpectCount(compStatus, expectProgressCount), completedCount, err
 }
 
 // handleScaleOutProgress handles the progressDetails of scaled out replicas.
@@ -187,7 +183,7 @@ func (hs horizontalScalingOpsHandler) handleScaleOutProgress(
 	opsRes *OpsResource,
 	pgRes progressResource,
 	podList *corev1.PodList,
-	compStatus *appsv1alpha1.OpsRequestComponentStatus) (succeedCount int32, err error) {
+	compStatus *appsv1alpha1.OpsRequestComponentStatus) (completedCount int32, err error) {
 	var componentName = pgRes.clusterComponent.Name
 	currComponent := components.NewComponentByType(opsRes.Ctx, opsRes.Client,
 		opsRes.Cluster, pgRes.clusterComponentDef, pgRes.clusterComponent)
@@ -207,7 +203,7 @@ func (hs horizontalScalingOpsHandler) handleScaleOutProgress(
 		objectKey := GetProgressObjectKey(v.Kind, v.Name)
 		progressDetail := appsv1alpha1.ProgressDetail{ObjectKey: objectKey}
 		if currComponent.PodIsAvailable(&v, minReadySeconds) {
-			succeedCount += 1
+			completedCount += 1
 			message := fmt.Sprintf("Successfully created pod: %s in Component: %s", objectKey, componentName)
 			progressDetail.SetStatusAndMessage(appsv1alpha1.SucceedProgressStatus, message)
 			SetComponentStatusProgressDetail(opsRes.Recorder, opsRes.OpsRequest,
@@ -220,20 +216,21 @@ func (hs horizontalScalingOpsHandler) handleScaleOutProgress(
 			podMessage := getFailedPodMessage(opsRes.Cluster, componentName, &v)
 			message := fmt.Sprintf("Failed to create pod: %s in Component: %s, message: %s", objectKey, componentName, podMessage)
 			progressDetail.SetStatusAndMessage(appsv1alpha1.FailedProgressStatus, message)
+			completedCount += 1
 		} else {
 			progressDetail.SetStatusAndMessage(appsv1alpha1.ProcessingProgressStatus, "Start to create pod: "+objectKey)
 		}
 		SetComponentStatusProgressDetail(opsRes.Recorder, opsRes.OpsRequest,
 			&compStatus.ProgressDetails, progressDetail)
 	}
-	return succeedCount, nil
+	return completedCount, nil
 }
 
 // handleScaleDownProgress handles the progressDetails of scaled down replicas.
 func (hs horizontalScalingOpsHandler) handleScaleDownProgress(opsRes *OpsResource,
 	pgRes progressResource,
 	podList *corev1.PodList,
-	compStatus *appsv1alpha1.OpsRequestComponentStatus) (succeedCount int32, err error) {
+	compStatus *appsv1alpha1.OpsRequestComponentStatus) (completedCount int32, err error) {
 	podMap := map[string]struct{}{}
 	// record the deleting pod progressDetail
 	for _, v := range podList.Items {
@@ -269,9 +266,18 @@ func (hs horizontalScalingOpsHandler) handleScaleDownProgress(opsRes *OpsResourc
 			Status:    appsv1alpha1.SucceedProgressStatus,
 			Message:   fmt.Sprintf("Successfully deleted pod: %s in Component: %s", v.ObjectKey, pgRes.clusterComponent.Name),
 		}
-		succeedCount += 1
+		completedCount += 1
 		SetComponentStatusProgressDetail(opsRes.Recorder, opsRes.OpsRequest,
 			&compStatus.ProgressDetails, progressDetail)
 	}
-	return succeedCount, nil
+	return completedCount, nil
+}
+
+// getFinalExpectCount gets the number of pods which has been processed by controller.
+func getFinalExpectCount(compStatus *appsv1alpha1.OpsRequestComponentStatus, expectProgressCount int32) int32 {
+	progressDetailsLen := int32(len(compStatus.ProgressDetails))
+	if progressDetailsLen > expectProgressCount {
+		expectProgressCount = progressDetailsLen
+	}
+	return expectProgressCount
 }

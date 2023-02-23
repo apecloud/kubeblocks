@@ -50,12 +50,13 @@ type BackupPolicyReconciler struct {
 }
 
 type backupPolicyOptions struct {
-	Name       string           `json:"name"`
-	Namespace  string           `json:"namespace"`
-	Cluster    string           `json:"cluster"`
-	Schedule   string           `json:"schedule"`
-	BackupType string           `json:"backupType"`
-	TTL        *metav1.Duration `json:"ttl,omitempty"`
+	Name           string           `json:"name"`
+	Namespace      string           `json:"namespace"`
+	Cluster        string           `json:"cluster"`
+	Schedule       string           `json:"schedule"`
+	BackupType     string           `json:"backupType"`
+	TTL            *metav1.Duration `json:"ttl,omitempty"`
+	ServiceAccount string           `json:"serviceAccount"`
 }
 
 var (
@@ -271,12 +272,13 @@ func (r *BackupPolicyReconciler) buildCronJob(backupPolicy *dataprotectionv1alph
 	}
 	cueValue := intctrlutil.NewCUEBuilder(*cueTpl)
 	options := backupPolicyOptions{
-		Name:       backupPolicy.Name,
-		Namespace:  backupPolicy.Namespace,
-		Cluster:    backupPolicy.Spec.Target.LabelsSelector.MatchLabels[intctrlutil.AppInstanceLabelKey],
-		Schedule:   backupPolicy.Spec.Schedule,
-		TTL:        backupPolicy.Spec.TTL,
-		BackupType: backupPolicy.Spec.BackupType,
+		Name:           backupPolicy.Name,
+		Namespace:      backupPolicy.Namespace,
+		Cluster:        backupPolicy.Spec.Target.LabelsSelector.MatchLabels[intctrlutil.AppInstanceLabelKey],
+		Schedule:       backupPolicy.Spec.Schedule,
+		TTL:            backupPolicy.Spec.TTL,
+		BackupType:     backupPolicy.Spec.BackupType,
+		ServiceAccount: viper.GetString("KUBEBLOCKS_SERVICEACCOUNT_NAME"),
 	}
 	backupPolicyOptionsByte, err := json.Marshal(options)
 	if err != nil {

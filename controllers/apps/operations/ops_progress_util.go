@@ -28,6 +28,7 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/apps/components"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/stateless"
+	"github.com/apecloud/kubeblocks/controllers/apps/components/types"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
 )
 
@@ -131,8 +132,8 @@ func updateProgressDetailTime(progressDetail *appsv1alpha1.ProgressDetail) {
 	}
 }
 
-// covertPodObjectKeyMap coverts the object key map from the pod list.
-func covertPodObjectKeyMap(podList *corev1.PodList) map[string]struct{} {
+// convertPodObjectKeyMap converts the object key map from the pod list.
+func convertPodObjectKeyMap(podList *corev1.PodList) map[string]struct{} {
 	podObjectKeyMap := map[string]struct{}{}
 	for _, v := range podList.Items {
 		objectKey := GetProgressObjectKey(v.Kind, v.Name)
@@ -146,7 +147,7 @@ func covertPodObjectKeyMap(podList *corev1.PodList) map[string]struct{} {
 // so some pod may be expired, we should clear them.
 func removeStatelessExpiredPod(podList *corev1.PodList,
 	progressDetails []appsv1alpha1.ProgressDetail) []appsv1alpha1.ProgressDetail {
-	podObjectKeyMap := covertPodObjectKeyMap(podList)
+	podObjectKeyMap := convertPodObjectKeyMap(podList)
 	newProgressDetails := make([]appsv1alpha1.ProgressDetail, 0)
 	for _, v := range progressDetails {
 		if _, ok := podObjectKeyMap[v.ObjectKey]; ok {
@@ -161,7 +162,7 @@ func removeStatelessExpiredPod(podList *corev1.PodList,
 func handleComponentStatusProgress(
 	opsRes *OpsResource,
 	pgRes progressResource,
-	compStatus *appsv1alpha1.OpsRequestComponentStatus) (expectProgressCount int32, succeedCount int32, err error) {
+	compStatus *appsv1alpha1.OpsRequestComponentStatus) (expectProgressCount int32, completedCount int32, err error) {
 	var (
 		podList             *corev1.PodList
 		clusterComponentDef = pgRes.clusterComponentDef
@@ -170,17 +171,16 @@ func handleComponentStatusProgress(
 	if clusterComponent == nil || clusterComponentDef == nil {
 		return
 	}
-	expectProgressCount = util.GetComponentReplicas(clusterComponent, clusterComponentDef)
 	if podList, err = util.GetComponentPodList(opsRes.Ctx, opsRes.Client, opsRes.Cluster, clusterComponent.Name); err != nil {
 		return
 	}
 	switch clusterComponentDef.WorkloadType {
 	case appsv1alpha1.Stateless:
-		succeedCount, err = handleStatelessProgress(opsRes, podList, pgRes, compStatus)
+		completedCount, err = handleStatelessProgress(opsRes, podList, pgRes, compStatus)
 	default:
-		succeedCount, err = handleStatefulSetProgress(opsRes, podList, pgRes, compStatus)
+		completedCount, err = handleStatefulSetProgress(opsRes, podList, pgRes, compStatus)
 	}
-	return expectProgressCount, succeedCount, err
+	return clusterComponent.Replicas, completedCount, err
 }
 
 // handleStatelessProgress handles the stateless component progressDetails.
@@ -188,7 +188,12 @@ func handleComponentStatusProgress(
 func handleStatelessProgress(opsRes *OpsResource,
 	podList *corev1.PodList,
 	pgRes progressResource,
-	compStatus *appsv1alpha1.OpsRequestComponentStatus) (succeedCount int32, err error) {
+	compStatus *appsv1alpha1.OpsRequestComponentStatus) (completedCount int32, err error) {
+	if compStatus.Phase == appsv1alpha1.RunningPhase && pgRes.clusterComponent.Replicas != int32(len(podList.Items)) {
+		err = fmt.Errorf("wait for the pods of deployment to be synchronized to client-go cache")
+		return
+	}
+
 	currComponent := stateless.NewStateless(opsRes.Ctx, opsRes.Client, opsRes.Cluster,
 		pgRes.clusterComponent, pgRes.clusterComponentDef)
 	if currComponent == nil {
@@ -201,37 +206,31 @@ func handleStatelessProgress(opsRes *OpsResource,
 		return
 	}
 	opsRequest := opsRes.OpsRequest
+	opsStartTime := opsRequest.Status.StartTimestamp
 	for _, v := range podList.Items {
-		// maybe the resources are equal with last resources and the pod is not updated, then the pod will not be rebuilt.
-		// and the component status also is already Running/Failed/Abnormal, the progressDetails are already completed.
-		if v.CreationTimestamp.Before(&opsRequest.Status.StartTimestamp) &&
-			!util.IsCompleted(compStatus.Phase) {
-			continue
-		}
-		// if the DeletionTimestamp of the stateless component pod is not zero,
-		// means the pod is discarded and can ignore it.
-		if !v.DeletionTimestamp.IsZero() {
+		objectKey := GetProgressObjectKey(v.Kind, v.Name)
+		progressDetail := appsv1alpha1.ProgressDetail{ObjectKey: objectKey}
+		if podIsPendingDuringOperation(opsStartTime, &v, compStatus.Phase) {
+			handlePendingProgressDetail(opsRes, compStatus, progressDetail)
 			continue
 		}
 
-		objectKey := GetProgressObjectKey(v.Kind, v.Name)
-		progressDetail := appsv1alpha1.ProgressDetail{ObjectKey: objectKey}
-		if currComponent.PodIsAvailable(&v, minReadySeconds) && v.DeletionTimestamp.IsZero() {
-			succeedCount += 1
+		if podProcessedSuccessful(currComponent, opsStartTime, &v, minReadySeconds, compStatus.Phase) {
+			completedCount += 1
 			handleSucceedProgressDetail(opsRes, pgRes, compStatus, progressDetail)
 			continue
 		}
-		handleFailedOrProcessingProgressDetail(opsRes, pgRes, compStatus, progressDetail, &v)
+		completedCount += handleFailedOrProcessingProgressDetail(opsRes, pgRes, compStatus, progressDetail, &v)
 	}
 	compStatus.ProgressDetails = removeStatelessExpiredPod(podList, compStatus.ProgressDetails)
-	return succeedCount, err
+	return completedCount, err
 }
 
 // handleStatefulSetProgress handles the component progressDetails which using statefulSet workloads.
 func handleStatefulSetProgress(opsRes *OpsResource,
 	podList *corev1.PodList,
 	pgRes progressResource,
-	compStatus *appsv1alpha1.OpsRequestComponentStatus) (succeedCount int32, err error) {
+	compStatus *appsv1alpha1.OpsRequestComponentStatus) (completedCount int32, err error) {
 	currComponent := components.NewComponentByType(opsRes.Ctx, opsRes.Client,
 		opsRes.Cluster, pgRes.clusterComponentDef, pgRes.clusterComponent)
 	if currComponent == nil {
@@ -244,27 +243,32 @@ func handleStatefulSetProgress(opsRes *OpsResource,
 		return
 	}
 	opsRequest := opsRes.OpsRequest
+	opsStartTime := opsRequest.Status.StartTimestamp
 	for _, v := range podList.Items {
 		objectKey := GetProgressObjectKey(v.Kind, v.Name)
 		progressDetail := appsv1alpha1.ProgressDetail{ObjectKey: objectKey}
-		// maybe the resources is equals last resources and the pod is not updated, then the pod will not rebuild too.
-		// and the component status also is already Running/Failed/Abnormal, the progressDetails are already completed.
-		if v.CreationTimestamp.Before(&opsRequest.Status.StartTimestamp) &&
-			v.DeletionTimestamp.IsZero() && !util.IsCompleted(compStatus.Phase) {
-			progressDetail.Status = appsv1alpha1.PendingProgressStatus
-			SetComponentStatusProgressDetail(opsRes.Recorder, opsRes.OpsRequest,
-				&compStatus.ProgressDetails, progressDetail)
+		if podIsPendingDuringOperation(opsStartTime, &v, compStatus.Phase) {
+			handlePendingProgressDetail(opsRes, compStatus, progressDetail)
 			continue
 		}
-		if currComponent.PodIsAvailable(&v, minReadySeconds) {
-			succeedCount += 1
+		if podProcessedSuccessful(currComponent, opsStartTime, &v, minReadySeconds, compStatus.Phase) {
+			completedCount += 1
 			handleSucceedProgressDetail(opsRes, pgRes, compStatus, progressDetail)
 			continue
 		}
-
-		handleFailedOrProcessingProgressDetail(opsRes, pgRes, compStatus, progressDetail, &v)
+		completedCount += handleFailedOrProcessingProgressDetail(opsRes, pgRes, compStatus, progressDetail, &v)
 	}
-	return succeedCount, err
+	return completedCount, err
+}
+
+// handlePendingProgressDetail handles the pending progressDetail and sets it to progressDetails.
+func handlePendingProgressDetail(opsRes *OpsResource,
+	compStatus *appsv1alpha1.OpsRequestComponentStatus,
+	progressDetail appsv1alpha1.ProgressDetail,
+) {
+	progressDetail.Status = appsv1alpha1.PendingProgressStatus
+	SetComponentStatusProgressDetail(opsRes.Recorder, opsRes.OpsRequest,
+		&compStatus.ProgressDetails, progressDetail)
 }
 
 // handleSucceedProgressDetail handles the successful progressDetail and sets it to progressDetails.
@@ -284,19 +288,41 @@ func handleFailedOrProcessingProgressDetail(opsRes *OpsResource,
 	pgRes progressResource,
 	compStatus *appsv1alpha1.OpsRequestComponentStatus,
 	progressDetail appsv1alpha1.ProgressDetail,
-	pod *corev1.Pod) {
+	pod *corev1.Pod) (completedCount int32) {
 	componentName := pgRes.clusterComponent.Name
 	if util.IsFailedOrAbnormal(compStatus.Phase) {
-		// means the pod is failed.
 		podMessage := getFailedPodMessage(opsRes.Cluster, componentName, pod)
+		// if the pod is not failed, return
+		if len(podMessage) == 0 {
+			return
+		}
 		message := getProgressFailedMessage(pgRes.opsMessageKey, progressDetail.ObjectKey, componentName, podMessage)
 		progressDetail.SetStatusAndMessage(appsv1alpha1.FailedProgressStatus, message)
+		completedCount = 1
 	} else {
 		progressDetail.SetStatusAndMessage(appsv1alpha1.ProcessingProgressStatus,
 			getProgressProcessingMessage(pgRes.opsMessageKey, progressDetail.ObjectKey, componentName))
 	}
 	SetComponentStatusProgressDetail(opsRes.Recorder, opsRes.OpsRequest,
 		&compStatus.ProgressDetails, progressDetail)
+	return completedCount
+}
+
+// podIsPendingDuringOperation checks if pod is pending during the component is doing operation.
+func podIsPendingDuringOperation(opsStartTime metav1.Time, pod *corev1.Pod, componentPhase appsv1alpha1.Phase) bool {
+	return pod.CreationTimestamp.Before(&opsStartTime) && !util.IsCompleted(componentPhase) && pod.DeletionTimestamp.IsZero()
+}
+
+// podProcessedSuccessful checks if the pod has been processed successfully:
+// 1. the pod is recreated after OpsRequest.status.startTime and pod is available.
+// 2. the component is running and pod is available.
+func podProcessedSuccessful(componentImpl types.Component,
+	opsStartTime metav1.Time,
+	pod *corev1.Pod,
+	minReadySeconds int32,
+	componentPhase appsv1alpha1.Phase) bool {
+	return (!pod.CreationTimestamp.Before(&opsStartTime) || componentPhase == appsv1alpha1.RunningPhase) &&
+		componentImpl.PodIsAvailable(pod, minReadySeconds)
 }
 
 func getProgressProcessingMessage(opsMessageKey, objectKey, componentName string) string {

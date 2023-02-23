@@ -52,25 +52,8 @@ func (r *reconfigureAction) ActionStartedCondition(opsRequest *appsv1alpha1.OpsR
 }
 
 // SaveLastConfiguration this operation can not change in Cluster.spec.
-// fill cluster component implementation here.
 func (r *reconfigureAction) SaveLastConfiguration(opsRes *OpsResource) error {
-	opsRequest := opsRes.OpsRequest
-	lastComponentInfo := map[string]appsv1alpha1.LastComponentConfiguration{}
-	componentNameMap := opsRequest.GetReconfiguringComponentNameMap()
-	for _, v := range opsRes.Cluster.Spec.ComponentSpecs {
-		if _, ok := componentNameMap[v.Name]; ok {
-			lastComponentInfo[v.Name] = appsv1alpha1.LastComponentConfiguration{
-				Replicas:             v.Replicas,
-				ResourceRequirements: v.Resources,
-			}
-			break
-		}
-	}
-	patch := client.MergeFrom(opsRequest.DeepCopy())
-	opsRequest.Status.LastConfiguration = appsv1alpha1.LastConfiguration{
-		Components: lastComponentInfo,
-	}
-	return opsRes.Client.Status().Patch(opsRes.Ctx, opsRequest, patch)
+	return nil
 }
 
 // GetRealAffectedComponentMap gets the real affected component map for the operation

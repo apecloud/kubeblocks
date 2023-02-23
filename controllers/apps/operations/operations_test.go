@@ -462,15 +462,6 @@ var _ = Describe("OpsRequest Controller", func() {
 		Expect(opsRes.Client.Get(opsRes.Ctx, client.ObjectKeyFromObject(opsRes.OpsRequest), opsRes.OpsRequest)).Should(Succeed())
 		_, _ = opsManager.Reconcile(opsRes)
 		Expect(opsRes.OpsRequest.Status.Phase).Should(BeEquivalentTo(appsv1alpha1.SucceedPhase))
-
-		By("Validate opsrequest status")
-		Expect(opsManager.Do(opsRes)).Should(Succeed())
-		compStatus, ok := opsRes.OpsRequest.Status.LastConfiguration.Components[consensusComp]
-		Expect(ok).Should(BeTrue())
-		clusterMeta := opsRes.Cluster.GetComponentByName(consensusComp)
-		Expect(clusterMeta).ShouldNot(BeNil())
-		Expect(compStatus.Replicas).Should(BeEquivalentTo(clusterMeta.Replicas))
-		Expect(compStatus.ResourceRequirements).Should(BeEquivalentTo(clusterMeta.Resources))
 	}
 
 	Context("Test OpsRequest", func() {

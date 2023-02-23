@@ -112,7 +112,6 @@ var _ = Describe("Replication Component", func() {
 					AddRoleLabel(k).
 					SetReplicas(1).
 					Create(&testCtx).GetObject()
-				testapps.MockReplicationComponentPods(testCtx, sts, clusterName, testapps.DefaultRedisCompName, k)
 				isStsPrimary, err := checkObjRoleLabelIsPrimary(sts)
 				if k == string(Primary) {
 					Expect(err).To(Succeed())

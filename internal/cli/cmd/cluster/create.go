@@ -590,4 +590,20 @@ func (f *UpdatableFlags) addFlags(cmd *cobra.Command) {
 				"WipeOut\tbased on Delete and wipe out all volume snapshots and snapshot data from backup storage location",
 			}, cobra.ShellCompDirectiveNoFileComp
 		}))
+	util.CheckErr(cmd.RegisterFlagCompletionFunc(
+		"pod-anti-affinity",
+		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+			return []string{
+				"Preferred\ttry to spread pods of the cluster by the specified topology-keys",
+				"Required\tmust spread pods of the cluster by the specified topology-keys",
+			}, cobra.ShellCompDirectiveNoFileComp
+		}))
+	util.CheckErr(cmd.RegisterFlagCompletionFunc(
+		"tenancy",
+		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+			return []string{
+				"SharedNode\tpods of the cluster may share the same node",
+				"DedicatedNode\teach pod of the cluster will runs on their own dedicated node",
+			}, cobra.ShellCompDirectiveNoFileComp
+		}))
 }

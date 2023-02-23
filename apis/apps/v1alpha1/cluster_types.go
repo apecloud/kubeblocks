@@ -325,11 +325,6 @@ type Operations struct {
 	// +optional
 	VerticalScalable []string `json:"verticalScalable,omitempty"`
 
-	// restartable which components of the cluster support restart.
-	// +listType=set
-	// +optional
-	Restartable []string `json:"restartable,omitempty"`
-
 	// volumeExpandable which components of the cluster and its volumeClaimTemplates support volumeExpansion.
 	// +listType=map
 	// +listMapKey=name

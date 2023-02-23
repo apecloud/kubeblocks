@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/apecloud/kubeblocks/internal/controller/lifecycle"
 	"reflect"
 	"regexp"
 	"strings"
@@ -321,6 +322,17 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	if err = clusterConditionMgr.setProvisioningStartedCondition(); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
+	// ---- start refactor ----
+	planBuilder := lifecycle.NewClusterPlanBuilder(ctx, r.Client, *cluster, *clusterDefinition, *clusterVersion)
+	plan, err := planBuilder.Build()
+	if err != nil {
+		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+	}
+	if err := plan.Execute(); err != nil {
+		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+	}
+	// return intctrlutil.Reconciled()
+	// ---- end refactor ----
 	clusterDeepCopy := cluster.DeepCopy()
 	shouldRequeue, err := reconcileClusterWorkloads(reqCtx, r.Client, clusterDefinition, clusterVersion, cluster)
 	if err != nil {

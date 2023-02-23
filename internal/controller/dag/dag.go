@@ -16,98 +16,151 @@ limitations under the License.
 
 package dag
 
+import "errors"
+
 type DAG struct {
-	Nodes map[string]*Node
-	Edges []*Edge
+	vertices map[Vertex]Vertex
+	edges    map[Edge]Edge
 }
 
-type Node struct {
-	Obj interface{}
-	Immutable bool
-	Action *Action
+type Vertex interface {}
+
+type Edge interface {
+	From() Vertex
+	To() Vertex
 }
 
-type Action string
-const (
-	CREATE = "CREATE"
-	UPDATE = "UPDATE"
-	DELETE = "DELETE"
-)
-
-type Edge struct {
-	From string
-	To string
+type realEdge struct {
+	F, T Vertex
 }
 
-type WalkFunc func(node Node) error
+type WalkFunc func(v Vertex) error
 
-func (d *DAG) AddNode(key string, obj interface{}) bool {
-	if len(key) == 0 || obj == nil {
+func (d *DAG) AddVertex(v Vertex) bool {
+	if v == nil {
 		return false
 	}
-	node := &Node{
-		Obj: obj,
-		Immutable: false,
-	}
-	d.Nodes[key] = node
+	d.vertices[v] = v
 	return true
 }
 
-func (d *DAG) RemoveNode(key string) bool {
-	if len(key) == 0 {
+func (d *DAG) RemoveVertex(v Vertex) bool {
+	if v == 0 {
 		return true
 	}
-	edges := make([]*Edge, 0)
-	for i := range d.Edges {
-		if d.Edges[i].From != key && d.Edges[i].To != key {
-			edges = append(edges, d.Edges[i])
+	for k := range d.edges {
+		if k.From() == v || k.To() == v {
+			delete(d.edges, k)
 		}
 	}
-	d.Edges = edges
 	return true
 }
 
-func (d *DAG) AddEdge(from, to string) bool {
-	if len(from) == 0 || len(to) == 0 {
+func (d *DAG) AddEdge(e Edge) bool {
+	if e.From() == nil || e.To() == nil {
 		return false
 	}
-	if d.Nodes[from] == nil || d.Nodes[to] == nil {
-		return false
+	for k := range d.edges {
+		if k.From() == e.From() && k.To() == e.To() {
+			return true
+		}
 	}
-	edge := &Edge{
-		From: from,
-		To: to,
-	}
-	d.Edges = append(d.Edges, edge)
+	d.edges[e]= e
 	return true
 }
 
-func (d *DAG) RemoveEdge(from, to string) bool {
-	if len(from) == 0 || len(to) == 0 {
-		return true
-	}
-	edges := make([]*Edge, 0)
-	for i := range d.Edges {
-		if d.Edges[i].From == from && d.Edges[i].To == to {
-			continue
+func (d *DAG) RemoveEdge(e Edge) bool {
+	for k := range d.edges {
+		if k.From() == e.From() && k.To() == e.To() {
+			delete(d.edges, k)
 		}
-		edges = append(edges, d.Edges[i])
 	}
+	return true
+}
+
+func (d *DAG) Connect(from, to Vertex) bool {
+	if from == nil || to == nil {
+		return false
+	}
+	for k := range d.edges {
+		if k.From() == from && k.To() == to {
+			return true
+		}
+	}
+	edge :=RealEdge(from, to)
+	d.edges[edge] = edge
 	return true
 }
 
 func (d *DAG) WalkDepthFirst(walkFunc WalkFunc) error {
+	root := d.root()
+	if root == nil {
+		return errors.New("can't find single root")
+	}
+	return d.dfs([]Vertex{root}, walkFunc)
+}
+
+func (d *DAG) root() Vertex {
+	roots := make([]Vertex, 0)
+	for n := range d.vertices {
+		if d.hasNoInbound(n) {
+			roots = append(roots, n)
+		}
+	}
+	if len(roots) != 1 {
+		return nil
+	}
+	return roots[0]
+}
+
+func (d *DAG) hasNoInbound(v Vertex) bool  {
+	for e := range d.edges {
+		if e.To() == v {
+			return false
+		}
+	}
+	return true
+}
+
+func (d *DAG) dfs(start []Vertex, walkFunc WalkFunc) error {
+	for _, v := range start {
+		adjacent := d.adjacent(v)
+		if err := d.dfs(adjacent, walkFunc); err != nil {
+			return err
+		}
+		if err := walkFunc(v); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
-func (d *DAG) WalkBreadthFirst(walkFunc WalkFunc) error {
-	return nil
+func (d *DAG) adjacent(v Vertex) []Vertex {
+	vertices := make([]Vertex, 0)
+	for e := range d.edges {
+		if e.From() == v {
+			vertices = append(vertices, e.To())
+		}
+	}
+	return vertices
+}
+
+func (r *realEdge) From() Vertex {
+	return r.F
+}
+
+func (r *realEdge) To() Vertex {
+	return r.T
 }
 
 func New() *DAG {
 	dag := &DAG{
-		Nodes: make(map[string]*Node, 0),
-		Edges: make([]*Edge, 0),
+		vertices: make(map[Vertex]Vertex),
+		edges:    make(map[Edge]Edge),
 	}
 	return dag
+}
+
+func RealEdge(from, to Vertex) Edge {
+	return &realEdge{F: from, T: to}
 }

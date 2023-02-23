@@ -18,7 +18,7 @@ package lifecycle
 
 import "github.com/apecloud/kubeblocks/internal/controller/dag"
 
-// CacheDiffTransformer reads all Node.Obj in cache and compute the diff DAG.
+// CacheDiffTransformer reads all Vertex.Obj in cache and compute the diff DAG.
 type CacheDiffTransformer struct {
 
 }

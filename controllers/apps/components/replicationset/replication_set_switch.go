@@ -151,7 +151,7 @@ func (s *Switch) Detection(skipSecondary bool) {
 	s.SwitchStatus.SwitchPhaseStatus = SwitchPhaseStatusExecuting
 	if s.SwitchInstance == nil {
 		s.SwitchStatus.SwitchPhaseStatus = SwitchPhaseStatusFailed
-		s.SwitchStatus.Reason = fmt.Sprintf("detection failed because switchInstance is nil, pls check")
+		s.SwitchStatus.Reason = fmt.Sprintf("component %s detection failed because switchInstance is nil, pls check", s.SwitchResource.CompSpec.Name)
 		return
 	}
 	doDetection := func(spi *SwitchPodInfo) {
@@ -207,7 +207,7 @@ func (s *Switch) Election() *SwitchPodInfo {
 	s.SwitchStatus.SwitchPhaseStatus = SwitchPhaseStatusExecuting
 	if s.SwitchInstance == nil || len(s.SwitchInstance.SecondariesPod) == 0 {
 		s.SwitchStatus.SwitchPhaseStatus = SwitchPhaseStatusFailed
-		s.SwitchStatus.Reason = fmt.Sprintf("election failed because there is no available secondary")
+		s.SwitchStatus.Reason = fmt.Sprintf("component %s election failed because there is no available secondary", s.SwitchResource.CompSpec.Name)
 		return nil
 	}
 
@@ -218,14 +218,14 @@ func (s *Switch) Election() *SwitchPodInfo {
 		filterPods, err = filter.Filter(filterPods)
 		if err != nil {
 			s.SwitchStatus.SwitchPhaseStatus = SwitchPhaseStatusFailed
-			s.SwitchStatus.Reason = fmt.Sprintf("switch election filter %s failed, err: %s, pls check", filter.Name(), err.Error())
+			s.SwitchStatus.Reason = fmt.Sprintf("component %s switch election filter %s failed, err: %s, pls check", s.SwitchResource.CompSpec.Name, filter.Name(), err.Error())
 			return nil
 		}
 	}
 
 	if len(filterPods) == 0 {
 		s.SwitchStatus.SwitchPhaseStatus = SwitchPhaseStatusFailed
-		s.SwitchStatus.Reason = fmt.Sprintf("election failed because there is no available secondary after filter")
+		s.SwitchStatus.Reason = fmt.Sprintf("component %s election failed because there is no available secondary after filter", s.SwitchResource.CompSpec.Name)
 		return nil
 	}
 
@@ -250,14 +250,14 @@ func (s *Switch) Decision() bool {
 	s.SwitchStatus.SwitchPhaseStatus = SwitchPhaseStatusExecuting
 	if s.SwitchInstance.OldPrimaryPod == nil || s.SwitchInstance.CandidatePrimaryPod == nil {
 		s.SwitchStatus.SwitchPhaseStatus = SwitchPhaseStatusFailed
-		s.SwitchStatus.Reason = fmt.Sprintf("switchInstance oldPrimaryPod or NewPrimaryPod is nil, pls check")
+		s.SwitchStatus.Reason = fmt.Sprintf("component %s switchInstance oldPrimaryPod or NewPrimaryPod is nil, pls check", s.SwitchResource.CompSpec.Name)
 		return false
 	}
 
 	// candidate primary healthy check
 	if !*s.SwitchInstance.CandidatePrimaryPod.HealthDetectIno {
 		s.SwitchStatus.SwitchPhaseStatus = SwitchPhaseStatusFailed
-		s.SwitchStatus.Reason = fmt.Sprintf("new primary pod %s is not healthy, can not do switch", s.SwitchInstance.CandidatePrimaryPod.Pod.Name)
+		s.SwitchStatus.Reason = fmt.Sprintf("component %s new primary pod %s is not healthy, can not do switch", s.SwitchResource.CompSpec.Name, s.SwitchInstance.CandidatePrimaryPod.Pod.Name)
 		return false
 	}
 
@@ -265,19 +265,19 @@ func (s *Switch) Decision() bool {
 	isPrimary, err := checkObjRoleLabelIsPrimary(s.SwitchInstance.CandidatePrimaryPod.Pod)
 	if err != nil {
 		s.SwitchStatus.SwitchPhaseStatus = SwitchPhaseStatusFailed
-		s.SwitchStatus.Reason = fmt.Sprintf("candidate primary %s check role label failed, err %s", s.SwitchInstance.CandidatePrimaryPod.Pod.Name, err.Error())
+		s.SwitchStatus.Reason = fmt.Sprintf("component %s candidate primary %s check role label failed, err %s", s.SwitchResource.CompSpec.Name, s.SwitchInstance.CandidatePrimaryPod.Pod.Name, err.Error())
 		return false
 	}
 	if isPrimary {
 		s.SwitchStatus.SwitchPhaseStatus = SwitchPhaseStatusFailed
-		s.SwitchStatus.Reason = fmt.Sprintf("the role label of the candidate primary has changed to primary, and the expectation is secondary")
+		s.SwitchStatus.Reason = fmt.Sprintf("component %s the role label of the candidate primary has changed to primary, and the expectation is secondary", s.SwitchResource.CompSpec.Name)
 		return false
 	}
 
 	// candidate primary role in kernel check
 	if string(*s.SwitchInstance.CandidatePrimaryPod.RoleDetectInfo) != string(Secondary) {
 		s.SwitchStatus.SwitchPhaseStatus = SwitchPhaseStatusFailed
-		s.SwitchStatus.Reason = fmt.Sprintf("the role of the candidate primary in the kernel is not secondary")
+		s.SwitchStatus.Reason = fmt.Sprintf("component %s the role of the candidate primary in the kernel is not secondary", s.SwitchResource.CompSpec.Name)
 		return false
 	}
 
@@ -290,7 +290,7 @@ func (s *Switch) Decision() bool {
 				return true
 			}
 			s.SwitchStatus.SwitchPhaseStatus = SwitchPhaseStatusFailed
-			s.SwitchStatus.Reason = fmt.Sprintf("old primary is still alive, primary and secondary data are not consistent, can not do switch")
+			s.SwitchStatus.Reason = fmt.Sprintf("component %s old primary is still alive, primary and secondary data are not consistent, can not do switch", s.SwitchResource.CompSpec.Name)
 			return false
 		}
 		// old primary is down, perform high-availability switching immediately
@@ -306,7 +306,7 @@ func (s *Switch) Decision() bool {
 		}
 		// Regardless of whether the primary is alive or not, if the data consistency cannot be judged, the switch will not be performed.
 		s.SwitchStatus.SwitchPhaseStatus = SwitchPhaseStatusFailed
-		s.SwitchStatus.Reason = fmt.Sprintf("primary and secondary data consistency cannot be judged, so the switch will not be performed with MaximumAvailability switchPolicy")
+		s.SwitchStatus.Reason = fmt.Sprintf("component %s  primary and secondary data consistency cannot be judged, so the switch will not be performed with MaximumAvailability switchPolicy", s.SwitchResource.CompSpec.Name)
 		return false
 	}
 
@@ -317,11 +317,11 @@ func (s *Switch) Decision() bool {
 		return makeMaxDataProtectionDecision()
 	case appsv1alpha1.Manual:
 		s.SwitchStatus.SwitchPhaseStatus = SwitchPhaseStatusFailed
-		s.SwitchStatus.Reason = fmt.Sprintf("manual switch policy will not perform high-availability switching")
+		s.SwitchStatus.Reason = fmt.Sprintf("component %s manual switch policy will not perform high-availability switching", s.SwitchResource.CompSpec.Name)
 		return false
 	default:
 		s.SwitchStatus.SwitchPhaseStatus = SwitchPhaseStatusFailed
-		s.SwitchStatus.Reason = fmt.Sprintf("switch policy type is not supported, pls check")
+		s.SwitchStatus.Reason = fmt.Sprintf("component %s switch policy type is not supported, pls check", s.SwitchResource.CompSpec.Name)
 		return false
 	}
 }

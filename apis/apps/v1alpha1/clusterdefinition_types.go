@@ -491,6 +491,7 @@ type ConsensusMember struct {
 type ReplicationSpec struct {
 	// switchPolicies defines a collection of different types of switchPolicy, and each type of switchPolicy is limited to one.
 	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MinItems=1
 	SwitchPolicies []SwitchPolicy `json:"switchPolicies,omitempty"`
 
 	// switchCmdExecutorConfig configs how to get client SDK and perform switch statements.
@@ -504,11 +505,10 @@ type SwitchPolicy struct {
 	// MaximumDataProtection: when the primary is active, do switch if synchronization delay = 0 in the user-defined lagProbe data lag detection logic, otherwise do not switch. If the primary is down, if it can be judged that the primary and secondary data are consistent, then do the switch, otherwise do not switch.
 	// Manual: KubeBlocks will not perform high-availability switching on components. Users need to implement HA by themselves.
 	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:Enum={MaximumAvailability, MaximumDataProtection, Manual}
 	// +kubebuilder:default=MaximumAvailability
 	Type SwitchPolicyType `json:"switchPolicyType"`
 
-	// switchStatements defines switching actions according to their respective roles, We divide all pods into three switchStatement role:Enum={Promote,Demote,Follow}.
+	// switchStatements defines switching actions according to their respective roles, We divide all pods into three switchStatement role={Promote,Demote,Follow}.
 	// Promote: candidate primary after elected, which to be promoted
 	// Demote: primary before switch, which to be demoted
 	// Follow: the other secondaries that are not selected as the primary, which to follow the new primary
@@ -558,11 +558,6 @@ type SwitchStepCmd struct {
 	// args is used to perform switch statements.
 	// +optional
 	Args []string `json:"args,omitempty"`
-	// envs is a list of environment variables.
-	// +kubebuilder:pruning:PreserveUnknownFields
-	// +patchMergeKey=name
-	// +patchStrategy=merge,retainKeys
-	// +optional
 }
 
 // ClusterDefinition is the Schema for the clusterdefinitions API

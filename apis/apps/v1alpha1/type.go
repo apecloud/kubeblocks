@@ -357,6 +357,7 @@ const (
 
 // SwitchPolicyType defines switchPolicy type.
 // +enum
+// +kubebuilder:validation:Enum={MaximumAvailability, MaximumDataProtection, Manual}
 type SwitchPolicyType string
 
 const (
@@ -367,6 +368,7 @@ const (
 
 // SwitchStepRole defines the role to execute the switch command.
 // +enum
+// +kubebuilder:validation:Enum={NewPrimary, OldPrimary, Secondaries}
 type SwitchStepRole string
 
 const (

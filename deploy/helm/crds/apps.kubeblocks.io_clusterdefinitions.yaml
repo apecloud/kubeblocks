@@ -8207,7 +8207,7 @@ spec:
                               switchStatements:
                                 description: 'switchStatements defines switching actions
                                   according to their respective roles, We divide all
-                                  pods into three switchStatement role:Enum={Promote,Demote,Follow}.
+                                  pods into three switchStatement role={Promote,Demote,Follow}.
                                   Promote: candidate primary after elected, which
                                   to be promoted Demote: primary before switch, which
                                   to be demoted Follow: the other secondaries that
@@ -8239,6 +8239,7 @@ spec:
                             required:
                             - switchPolicyType
                             type: object
+                          minItems: 1
                           type: array
                       required:
                       - switchCmdExecutorConfig

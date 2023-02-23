@@ -306,7 +306,6 @@ type Affinity struct {
 	// tenancy defines how pods are distributed across node.
 	// SharedNode means multiple pods may share the same node.
 	// DedicatedNode means each pod runs on their own dedicated node.
-	// +kubebuilder:validation:Enum={SharedNode,DedicatedNode}
 	// +kubebuilder:default=SharedNode
 	// +optional
 	Tenancy TenancyType `json:"tenancy,omitempty"`

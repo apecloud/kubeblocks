@@ -59,7 +59,7 @@ const (
 
 // OpsType defines operation types.
 // +enum
-// +kubebuilder:validation:Enum={Upgrade,VerticalScaling,VolumeExpansion,HorizontalScaling,Restart,Reconfiguring}
+// +kubebuilder:validation:Enum={Upgrade,VerticalScaling,VolumeExpansion,HorizontalScaling,Restart,Reconfiguring,Start,Stop}
 type OpsType string
 
 const (

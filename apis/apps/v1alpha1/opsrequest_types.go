@@ -278,7 +278,7 @@ type ProgressStatusDetail struct {
 type LastComponentConfiguration struct {
 	// replicas are the last replicas of the component.
 	// +optional
-	Replicas int32 `json:"replicas,omitempty"`
+	Replicas *int32 `json:"replicas,omitempty"`
 
 	// the last resources of the component.
 	// +kubebuilder:pruning:PreserveUnknownFields

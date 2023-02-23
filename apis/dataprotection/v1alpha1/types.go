@@ -21,15 +21,11 @@ package v1alpha1
 // +kubebuilder:validation:Enum={New,InProgress,Completed,Failed}
 type BackupPhase string
 
-// These are the valid statuses of Backup.
 const (
-	BackupNew BackupPhase = "New"
-
+	BackupNew        BackupPhase = "New"
 	BackupInProgress BackupPhase = "InProgress"
-
-	BackupCompleted BackupPhase = "Completed"
-
-	BackupFailed BackupPhase = "Failed"
+	BackupCompleted  BackupPhase = "Completed"
+	BackupFailed     BackupPhase = "Failed"
 )
 
 // BackupType the backup type, marked backup set is full or incremental or snapshot.
@@ -38,11 +34,9 @@ const (
 type BackupType string
 
 const (
-	BackupTypeFull BackupType = "full"
-
+	BackupTypeFull        BackupType = "full"
 	BackupTypeIncremental BackupType = "incremental"
-
-	BackupTypeSnapshot BackupType = "snapshot"
+	BackupTypeSnapshot    BackupType = "snapshot"
 )
 
 // BackupPolicyTemplatePhase defines phases for BackupPolicyTemplate CR.
@@ -50,15 +44,11 @@ const (
 // +kubebuilder:validation:Enum={New,Available,InProgress,Failed}
 type BackupPolicyTemplatePhase string
 
-// These are the valid statuses of BackupPolicyTemplate.
 const (
-	ConfigNew BackupPolicyTemplatePhase = "New"
-
-	ConfigAvailable BackupPolicyTemplatePhase = "Available"
-
+	ConfigNew        BackupPolicyTemplatePhase = "New"
+	ConfigAvailable  BackupPolicyTemplatePhase = "Available"
 	ConfigInProgress BackupPolicyTemplatePhase = "InProgress"
-
-	ConfigFailed BackupPolicyTemplatePhase = "Failed"
+	ConfigFailed     BackupPolicyTemplatePhase = "Failed"
 )
 
 // RestoreJobPhase The current phase. Valid values are New, InProgressPhy, InProgressLogic, Completed, Failed.
@@ -66,15 +56,10 @@ const (
 // +kubebuilder:validation:Enum={New,InProgressPhy,InProgressLogic,Completed,Failed}
 type RestoreJobPhase string
 
-// These are the valid statuses of RestoreJob.
 const (
-	RestoreJobNew RestoreJobPhase = "New"
-
-	RestoreJobInProgressPhy RestoreJobPhase = "InProgressPhy"
-
+	RestoreJobNew             RestoreJobPhase = "New"
+	RestoreJobInProgressPhy   RestoreJobPhase = "InProgressPhy"
 	RestoreJobInProgressLogic RestoreJobPhase = "InProgressLogic"
-
-	RestoreJobCompleted RestoreJobPhase = "Completed"
-
-	RestoreJobFailed RestoreJobPhase = "Failed"
+	RestoreJobCompleted       RestoreJobPhase = "Completed"
+	RestoreJobFailed          RestoreJobPhase = "Failed"
 )

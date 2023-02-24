@@ -104,6 +104,11 @@ spec:
                 value: /postgresql
               - name: PGDATA
                 value: /postgresql/data
+              - name: PGUSER
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: username
               # Authentication
               - name: POSTGRES_USER
                 valueFrom:

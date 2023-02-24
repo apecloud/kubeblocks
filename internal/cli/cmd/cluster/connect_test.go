@@ -17,6 +17,7 @@ limitations under the License.
 package cluster
 
 import (
+	"fmt"
 	"net/http"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -32,6 +33,7 @@ import (
 	clientfake "k8s.io/client-go/rest/fake"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 
+	"github.com/apecloud/kubeblocks/internal/cli/engine"
 	"github.com/apecloud/kubeblocks/internal/cli/exec"
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
@@ -100,17 +102,6 @@ var _ = Describe("connection", func() {
 		Expect(o.Pod).ShouldNot(BeNil())
 	})
 
-	It("getEngineByPod", func() {
-		pod := mockPod()
-		e, err := getEngineByPod(pod)
-		Expect(err).Should(Succeed())
-		Expect(e.Container()).Should(Equal("mysql"))
-
-		pod.SetLabels(nil)
-		_, err = getEngineByPod(pod)
-		Expect(err).Should(HaveOccurred())
-	})
-
 	It("show example", func() {
 		o := &ConnectOptions{ExecOptions: exec.NewExecOptions(tf, streams)}
 		Expect(o.ExecOptions.Complete()).Should(Succeed())
@@ -137,10 +128,18 @@ var _ = Describe("connection", func() {
 		}
 		secretList := &corev1.SecretList{}
 		secretList.Items = []corev1.Secret{secret}
-		u, p, err := getUserAndPassword(secretList)
+		u, p, err := getUserAndPassword(testing.FakeClusterDef(), secretList)
 		Expect(err).Should(Succeed())
 		Expect(u).Should(Equal(user))
 		Expect(p).Should(Equal(password))
+	})
+
+	It("build connect command", func() {
+		info := &engine.ConnectionInfo{
+			Command: []string{"mysql"},
+			Args:    []string{"-h$(KB_ACCOUNT_ENDPOINT)", "-u$(MYSQL_USER)", "-p$(MYSQL_PASSWORD)", "-e $(KB_ACCOUNT_STATEMENT)"},
+		}
+		fmt.Println(buildCommand(info))
 	})
 })
 

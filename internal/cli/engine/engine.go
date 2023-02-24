@@ -40,6 +40,8 @@ type ConnectionInfo struct {
 	Password string
 	Database string
 	Port     string
+	Command  []string
+	Args     []string
 }
 
 type EngineInfo struct {

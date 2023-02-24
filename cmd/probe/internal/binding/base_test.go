@@ -19,6 +19,7 @@ package binding
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net"
 	"strconv"
 	"testing"
@@ -32,7 +33,7 @@ type fakeOperations struct {
 	BaseOperations
 }
 
-const (
+var (
 	testDBPort = 34521
 	testRole   = "leader"
 )
@@ -63,6 +64,16 @@ func TestInit(t *testing.T) {
 	}
 }
 
+func TestOperations(t *testing.T) {
+	p := mockFakeOperations()
+	p.Init(bindings.Metadata{})
+	ops := p.Operations()
+
+	if len(ops) != 4 {
+		t.Errorf("p.OperationMap init failed: %s", p.OriRole)
+	}
+}
+
 func TestInvoke(t *testing.T) {
 	viper.SetDefault("KB_SERVICE_ROLES", "{\"follower\":\"Readonly\",\"leader\":\"ReadWrite\"}")
 	p := mockFakeOperations()
@@ -76,31 +87,35 @@ func TestInvoke(t *testing.T) {
 			Metadata:  metadata,
 			Operation: CheckRunningOperation,
 		}
-		resp, err := p.Invoke(context.Background(), req)
-		if err != nil {
-			t.Errorf("CheckRunning failed: %s", err)
-		}
-		err = json.Unmarshal(resp.Data, &opsRes)
-		if err != nil {
-			t.Errorf("CheckRunning failed: %s", err)
-		}
-		if opsRes["event"] != "CheckRunningFailed" {
-			t.Errorf("unexpected response: %s", string(resp.Data))
-		}
+		t.Run("Failed", func(t *testing.T) {
+			resp, err := p.Invoke(context.Background(), req)
+			if err != nil {
+				t.Errorf("CheckRunning failed: %s", err)
+			}
+			err = json.Unmarshal(resp.Data, &opsRes)
+			if err != nil {
+				t.Errorf("CheckRunning failed: %s", err)
+			}
+			if opsRes["event"] != "CheckRunningFailed" {
+				t.Errorf("unexpected response: %s", string(resp.Data))
+			}
+		})
 
-		server := startFooServer(p.DBPort, t)
-		defer stopFooServer(server)
-		resp, _ = p.Invoke(context.Background(), req)
-		err = json.Unmarshal(resp.Data, &opsRes)
-		if err != nil {
-			t.Errorf("CheckRunning failed: %s", err)
-		}
-		if opsRes["event"] != "CheckRunningSuccess" {
-			t.Errorf("unexpected response: %s", string(resp.Data))
-		}
+		t.Run("Success", func(t *testing.T) {
+			server := p.startFooServer(t)
+			defer stopFooServer(server)
+			resp, _ := p.Invoke(context.Background(), req)
+			err := json.Unmarshal(resp.Data, &opsRes)
+			if err != nil {
+				t.Errorf("CheckRunning failed: %s", err)
+			}
+			if opsRes["event"] != "CheckRunningSuccess" {
+				t.Errorf("unexpected response: %s", string(resp.Data))
+			}
+		})
 	})
 
-	t.Run("roleCheck", func(t *testing.T) {
+	t.Run("CheckRole", func(t *testing.T) {
 		opsRes := OpsResult{}
 		metadata := map[string]string{"sql": ""}
 		req := &bindings.InvokeRequest{
@@ -109,34 +124,124 @@ func TestInvoke(t *testing.T) {
 			Operation: CheckRoleOperation,
 		}
 
-		resp, err := p.Invoke(context.Background(), req)
-		if err != nil {
-			t.Errorf("roleCheck error: %s", err)
-		}
-		err = json.Unmarshal(resp.Data, &opsRes)
-		if err != nil {
-			t.Errorf("CheckRunning failed: %s", err)
-		}
-		if p.OriRole != testRole {
-			t.Errorf("getRole error: %s", p.OriRole)
-		}
-		if opsRes["role"] != testRole {
-			t.Errorf("roleCheck response error: %s", resp.Data)
-		}
-	})
-}
+		t.Run("Success", func(t *testing.T) {
+			p.BaseOperations.GetRole = p.GetRole
+			resp, err := p.Invoke(context.Background(), req)
+			if err != nil {
+				t.Errorf("CheckRole error: %s", err)
+			}
+			err = json.Unmarshal(resp.Data, &opsRes)
+			if err != nil {
+				t.Errorf("CheckRole failed: %s", err)
+			}
+			if p.OriRole != testRole {
+				t.Errorf("CheckRole error: %s", p.OriRole)
+			}
+			if opsRes["role"] != testRole {
+				t.Errorf("CheckRole response error: %s", resp.Data)
+			}
+		})
 
-func startFooServer(port int, t *testing.T) net.Listener {
-	for i := 0; i < 3; i++ {
-		server, err := net.Listen("tcp", ":"+strconv.Itoa(port))
-		if server == nil {
-			t.Errorf("couldn't start listening: %s", err)
-		} else {
-			return server
+		t.Run("roleInvalid", func(t *testing.T) {
+			testRole = "leader1"
+			resp, err := p.Invoke(context.Background(), req)
+			if err != nil {
+				t.Errorf("CheckRole error: %s", err)
+			}
+			err = json.Unmarshal(resp.Data, &opsRes)
+			if err != nil {
+				t.Errorf("CheckRole failed: %s", err)
+			}
+			if opsRes["event"] != "roleInvalid" {
+				t.Errorf("CheckRole response error: %s", resp.Data)
+			}
+		})
+
+		t.Run("NotImplemented", func(t *testing.T) {
+			p.BaseOperations.GetRole = nil
+			resp, err := p.Invoke(context.Background(), req)
+			if err != nil {
+				t.Errorf("GetRole error: %s", err)
+			}
+			err = json.Unmarshal(resp.Data, &opsRes)
+			if err != nil {
+				t.Errorf("GetRole failed: %s", err)
+			}
+			if opsRes["event"] != OperationNotImplemented {
+				t.Errorf("GetRole response error: %s", resp.Data)
+			}
+		})
+
+		t.Run("Failed", func(t *testing.T) {
+			p.BaseOperations.GetRole = p.GetRoleFailed
+			resp, err := p.Invoke(context.Background(), req)
+			if err != nil {
+				t.Errorf("GetRole error: %s", err)
+			}
+			err = json.Unmarshal(resp.Data, &opsRes)
+			if err != nil {
+				t.Errorf("GetRole failed: %s", err)
+			}
+			if opsRes["event"] != "checkRoleFailed" {
+				t.Errorf("GetRole response error: %s", resp.Data)
+			}
+		})
+	})
+
+	t.Run("GetRole", func(t *testing.T) {
+		opsRes := OpsResult{}
+		metadata := map[string]string{"sql": ""}
+		req := &bindings.InvokeRequest{
+			Data:      nil,
+			Metadata:  metadata,
+			Operation: GetRoleOperation,
 		}
-		port++
-	}
-	return nil
+
+		t.Run("Success", func(t *testing.T) {
+			p.BaseOperations.GetRole = p.GetRole
+			resp, err := p.Invoke(context.Background(), req)
+			if err != nil {
+				t.Errorf("GetRole error: %s", err)
+			}
+			err = json.Unmarshal(resp.Data, &opsRes)
+			if err != nil {
+				t.Errorf("GetRole failed: %s", err)
+			}
+			if opsRes["role"] != testRole {
+				t.Errorf("GetRole response error: %s", resp.Data)
+			}
+		})
+
+		t.Run("NotImplemented", func(t *testing.T) {
+			p.BaseOperations.GetRole = nil
+			resp, err := p.Invoke(context.Background(), req)
+			if err != nil {
+				t.Errorf("GetRole error: %s", err)
+			}
+			err = json.Unmarshal(resp.Data, &opsRes)
+			if err != nil {
+				t.Errorf("GetRole failed: %s", err)
+			}
+			if opsRes["event"] != OperationNotImplemented {
+				t.Errorf("GetRole response error: %s", resp.Data)
+			}
+		})
+
+		t.Run("Failed", func(t *testing.T) {
+			p.BaseOperations.GetRole = p.GetRoleFailed
+			resp, err := p.Invoke(context.Background(), req)
+			if err != nil {
+				t.Errorf("GetRole error: %s", err)
+			}
+			err = json.Unmarshal(resp.Data, &opsRes)
+			if err != nil {
+				t.Errorf("GetRole failed: %s", err)
+			}
+			if opsRes["event"] != "getRoleFailed" {
+				t.Errorf("GetRole response error: %s", resp.Data)
+			}
+		})
+	})
 }
 
 func stopFooServer(server net.Listener) {
@@ -176,4 +281,21 @@ func (fakeOps *fakeOperations) CheckStatusOps(ctx context.Context, req *bindings
 
 func (fakeOps *fakeOperations) GetRole(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (string, error) {
 	return testRole, nil
+}
+
+func (fakeOps *fakeOperations) GetRoleFailed(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (string, error) {
+	return testRole, fmt.Errorf("mock error")
+}
+
+func (fakeOps *fakeOperations) startFooServer(t *testing.T) net.Listener {
+	for i := 0; i < 3; i++ {
+		server, err := net.Listen("tcp", ":"+strconv.Itoa(fakeOps.DBPort))
+		if server == nil {
+			t.Errorf("couldn't start listening: %s", err)
+		} else {
+			return server
+		}
+		fakeOps.DBPort++
+	}
+	return nil
 }

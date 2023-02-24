@@ -216,7 +216,7 @@ func (ops *BaseOperations) CheckRoleOps(ctx context.Context, req *bindings.Invok
 	role, err := ops.GetRole(ctx, req, resp)
 	if err != nil {
 		ops.Logger.Infof("error executing roleCheck: %v", err)
-		opsRes["event"] = "roleCheckFailed"
+		opsRes["event"] = "checkRoleFailed"
 		opsRes["message"] = err.Error()
 		if ops.CheckRoleFailedCount%ops.FailedEventReportFrequency == 0 {
 			ops.Logger.Infof("role checks failed %v times continuously", ops.CheckRoleFailedCount)
@@ -269,7 +269,7 @@ func (ops *BaseOperations) GetRoleOps(ctx context.Context, req *bindings.InvokeR
 	role, err := ops.GetRole(ctx, req, resp)
 	if err != nil {
 		ops.Logger.Infof("error executing roleCheck: %v", err)
-		opsRes["event"] = "roleCheckFailed"
+		opsRes["event"] = "getRoleFailed"
 		opsRes["message"] = err.Error()
 		if ops.CheckRoleFailedCount%ops.FailedEventReportFrequency == 0 {
 			ops.Logger.Infof("role checks failed %v times continuously", ops.CheckRoleFailedCount)

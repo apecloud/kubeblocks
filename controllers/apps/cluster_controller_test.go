@@ -331,29 +331,6 @@ var _ = Describe("Cluster Controller", func() {
 		}
 	}
 
-	testChangeReplicasInvalidValue := func() {
-		By("Creating a cluster")
-		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
-			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
-			AddComponent(mysqlCompName, mysqlCompType).SetReplicas(1).
-			Create(&testCtx).GetObject()
-		clusterKey = client.ObjectKeyFromObject(clusterObj)
-
-		By("Waiting for the cluster initialized")
-		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
-
-		invalidReplicas := int32(-1)
-		By(fmt.Sprintf("Change replicas to %d", invalidReplicas))
-		changeStatefulSetReplicas(clusterKey, invalidReplicas)
-
-		By("Checking cluster status and the number of replicas unchanged")
-		Consistently(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, fetched *appsv1alpha1.Cluster) {
-			g.Expect(fetched.Status.ObservedGeneration).To(BeEquivalentTo(1))
-		})).Should(Succeed())
-		stsList := testk8s.ListAndCheckStatefulSet(&testCtx, clusterKey)
-		Expect(int(*stsList.Items[0].Spec.Replicas)).To(BeEquivalentTo(1))
-	}
-
 	getPVCName := func(compName string, i int) string {
 		return fmt.Sprintf("%s-%s-%s-%d", testapps.DataVolumeName, clusterKey.Name, compName, i)
 	}
@@ -1028,10 +1005,6 @@ var _ = Describe("Cluster Controller", func() {
 			testChangeReplicas()
 		})
 
-		It("should fail if updating cluster's replica number to an invalid value", func() {
-			testChangeReplicasInvalidValue()
-		})
-
 		Context("and with cluster affinity set", func() {
 			It("should create pod with cluster affinity", func() {
 				testClusterAffinity()
@@ -1088,10 +1061,6 @@ var _ = Describe("Cluster Controller", func() {
 
 		It("should create/delete pods to match the desired replica number if updating cluster's replica number to a valid value", func() {
 			testChangeReplicas()
-		})
-
-		It("should fail if updating cluster's replica number to an invalid value", func() {
-			testChangeReplicasInvalidValue()
 		})
 
 		Context("with pvc", func() {

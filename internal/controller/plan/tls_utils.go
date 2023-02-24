@@ -67,9 +67,9 @@ func CreateOrCheckTLSCerts(reqCtx controllerutil.RequestCtx,
 		var err error
 		var secret *v1.Secret
 		switch comp.Issuer.Name {
-		case dbaasv1alpha1.IssuerSelfProvided:
+		case dbaasv1alpha1.IssuerUserProvided:
 			err = checkTLSSecretRef(reqCtx, cli, cluster.Namespace, comp.Issuer.SecretRef)
-		case dbaasv1alpha1.IssuerSelfSigned:
+		case dbaasv1alpha1.IssuerKubeBlocks:
 			secret, err = createTLSSecret(reqCtx, cli, cluster, comp.Name, scheme, finalizer)
 			if secret != nil {
 				secretList = append(secretList, *secret)
@@ -158,7 +158,7 @@ func buildFromTemplate(tpl string, vars interface{}) (string, error) {
 
 func checkTLSSecretRef(reqCtx controllerutil.RequestCtx, cli client.Client, namespace string, secretRef *dbaasv1alpha1.TLSSecretRef) error {
 	if secretRef == nil {
-		return errors.New("issuer.secretRef shouldn't be nil when issuer is SelfProvided")
+		return errors.New("issuer.secretRef shouldn't be nil when issuer is UserProvided")
 	}
 
 	secret := &v1.Secret{}
@@ -210,18 +210,18 @@ func composeTLSVolume(clusterName string, component component.SynthesizedCompone
 	if component.Issuer == nil {
 		return nil, errors.New("issuer shouldn't be nil when TLS enabled")
 	}
-	if component.Issuer.Name == dbaasv1alpha1.IssuerSelfProvided && component.Issuer.SecretRef == nil {
-		return nil, errors.New("secret ref shouldn't be nil when issuer is SelfProvided")
+	if component.Issuer.Name == dbaasv1alpha1.IssuerUserProvided && component.Issuer.SecretRef == nil {
+		return nil, errors.New("secret ref shouldn't be nil when issuer is UserProvided")
 	}
 
 	var secretName, ca, cert, key string
 	switch component.Issuer.Name {
-	case dbaasv1alpha1.IssuerSelfSigned:
+	case dbaasv1alpha1.IssuerKubeBlocks:
 		secretName = GenerateTLSSecretName(clusterName, component.Name)
 		ca = CAName
 		cert = CertName
 		key = KeyName
-	case dbaasv1alpha1.IssuerSelfProvided:
+	case dbaasv1alpha1.IssuerUserProvided:
 		secretName = component.Issuer.SecretRef.Name
 		ca = component.Issuer.SecretRef.CA
 		cert = component.Issuer.SecretRef.Cert

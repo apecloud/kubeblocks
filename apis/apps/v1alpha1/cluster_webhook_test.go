@@ -231,14 +231,14 @@ var _ = Describe("cluster webhook", func() {
 			Expect(testCtx.CreateObj(ctx, cluster)).ShouldNot(Succeed())
 
 			By("creating cluster with nil secret ref")
-			cluster.Spec.ComponentSpecs[0].Issuer = &Issuer{Name: IssuerSelfProvided}
+			cluster.Spec.ComponentSpecs[0].Issuer = &Issuer{Name: IssuerUserProvided}
 			Expect(testCtx.CreateObj(ctx, cluster)).ShouldNot(Succeed())
 
-			By("creating cluster with SelfSigned issuer")
-			cluster.Spec.ComponentSpecs[0].Issuer = &Issuer{Name: IssuerSelfSigned}
+			By("creating cluster with KubeBlocks issuer")
+			cluster.Spec.ComponentSpecs[0].Issuer = &Issuer{Name: IssuerKubeBlocks}
 			Expect(testCtx.CreateObj(ctx, cluster)).Should(Succeed())
 
-			By("creating cluster with SelfProvided issuer and secret ref provided")
+			By("creating cluster with UserProvided issuer and secret ref provided")
 			Expect(k8sClient.Delete(ctx, cluster)).Should(Succeed())
 			Eventually(func() bool {
 				err := k8sClient.Get(ctx, client.ObjectKeyFromObject(cluster), &Cluster{})
@@ -247,7 +247,7 @@ var _ = Describe("cluster webhook", func() {
 			cluster, _ = createTestCluster(clusterDefinitionName, clusterVersionName, clusterName)
 			cluster.Spec.ComponentSpecs[0].TLS = true
 			cluster.Spec.ComponentSpecs[0].Issuer = &Issuer{
-				Name: IssuerSelfProvided,
+				Name: IssuerUserProvided,
 				SecretRef: &TLSSecretRef{
 					Name: "test-tls-secret",
 					CA:   "ca.crt",

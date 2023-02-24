@@ -230,8 +230,8 @@ func (r *Cluster) validateComponentTLSSettings(allErrs *field.ErrorList) {
 			*allErrs = append(*allErrs, field.Required(field.NewPath(fmt.Sprintf("spec.components[%d].issuer", index)), "Issuer must be set when Tls enabled"))
 			continue
 		}
-		if component.Issuer.Name == IssuerSelfProvided && component.Issuer.SecretRef == nil {
-			*allErrs = append(*allErrs, field.Required(field.NewPath(fmt.Sprintf("spec.components[%d].issuer.secretRef", index)), "Secret must provide when issuer name is SelfProvided"))
+		if component.Issuer.Name == IssuerUserProvided && component.Issuer.SecretRef == nil {
+			*allErrs = append(*allErrs, field.Required(field.NewPath(fmt.Sprintf("spec.components[%d].issuer.secretRef", index)), "Secret must provide when issuer name is UserProvided"))
 		}
 	}
 }

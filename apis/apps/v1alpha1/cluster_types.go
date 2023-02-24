@@ -366,15 +366,15 @@ type OperationComponent struct {
 type Issuer struct {
 	// Name of issuer
 	// options supported:
-	// - SelfSigned, certs self-signed by KubeBlocks
-	// - SelfProvided, certs provided by user in Secret
-	// +kubebuilder:validation:Enum={SelfSigned, SelfProvided}
-	// +kubebuilder:default=SelfSigned
+	// - KubeBlocks - Certificates signed by KubeBlocks Operator.
+	// - UserProvided - User provided own CA-signed certificates.
+	// +kubebuilder:validation:Enum={KubeBlocks, UserProvided}
+	// +kubebuilder:default=KubeBlocks
 	// +kubebuilder:validation:Required
 	Name IssuerName `json:"name"`
 
 	// SecretRef, Tls certs Secret reference
-	// required when from is SelfProvided
+	// required when from is UserProvided
 	// +optional
 	SecretRef *TLSSecretRef `json:"secretRef,omitempty"`
 }

@@ -346,10 +346,10 @@ const (
 type IssuerName string
 
 const (
-	// IssuerSelfSigned certs self-signed by KubeBlocks
-	IssuerSelfSigned IssuerName = "SelfSigned"
-	// IssuerSelfProvided certs provided by user
-	IssuerSelfProvided IssuerName = "SelfProvided"
+	// IssuerKubeBlocks Certificates signed by KubeBlocks Operator.
+	IssuerKubeBlocks IssuerName = "KubeBlocks"
+	// IssuerUserProvided User provided own CA-signed certificates.
+	IssuerUserProvided IssuerName = "UserProvided"
 )
 
 func RegisterWebhookManager(mgr manager.Manager) {

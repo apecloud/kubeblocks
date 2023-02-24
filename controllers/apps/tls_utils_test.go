@@ -104,12 +104,12 @@ var _ = Describe("TLS self-signed cert function", func() {
 
 		})
 
-		Context("when issuer is SelfSigned", func() {
+		Context("when issuer is KubeBlocks", func() {
 			var tlsIssuer *appsv1alpha1.Issuer
 
 			BeforeEach(func() {
 				tlsIssuer = &appsv1alpha1.Issuer{
-					Name: appsv1alpha1.IssuerSelfSigned,
+					Name: appsv1alpha1.IssuerKubeBlocks,
 				}
 			})
 
@@ -155,31 +155,31 @@ var _ = Describe("TLS self-signed cert function", func() {
 			})
 		})
 
-		Context("when issuer is SelfProvided", func() {
-			var selfProvidedTLSSecretObj *corev1.Secret
+		Context("when issuer is UserProvided", func() {
+			var userProvidedTLSSecretObj *corev1.Secret
 
 			BeforeEach(func() {
 				// prepare self provided tls certs secret
 				var err error
-				selfProvidedTLSSecretObj, err = plan.ComposeTLSSecret(testCtx.DefaultNamespace, "test", "self-provided")
+				userProvidedTLSSecretObj, err = plan.ComposeTLSSecret(testCtx.DefaultNamespace, "test", "self-provided")
 				Expect(err).Should(BeNil())
-				Expect(k8sClient.Create(ctx, selfProvidedTLSSecretObj)).Should(Succeed())
+				Expect(k8sClient.Create(ctx, userProvidedTLSSecretObj)).Should(Succeed())
 			})
 			AfterEach(func() {
 				// delete self provided tls certs secret
-				Expect(k8sClient.Delete(ctx, selfProvidedTLSSecretObj)).Should(Succeed())
+				Expect(k8sClient.Delete(ctx, userProvidedTLSSecretObj)).Should(Succeed())
 				Eventually(func() bool {
 					err := k8sClient.Get(ctx,
-						client.ObjectKeyFromObject(selfProvidedTLSSecretObj),
-						selfProvidedTLSSecretObj)
+						client.ObjectKeyFromObject(userProvidedTLSSecretObj),
+						userProvidedTLSSecretObj)
 					return apierrors.IsNotFound(err)
 				}).Should(BeTrue())
 			})
 			It("should create the cluster when secret referenced exist", func() {
 				tlsIssuer := &appsv1alpha1.Issuer{
-					Name: appsv1alpha1.IssuerSelfProvided,
+					Name: appsv1alpha1.IssuerUserProvided,
 					SecretRef: &appsv1alpha1.TLSSecretRef{
-						Name: selfProvidedTLSSecretObj.Name,
+						Name: userProvidedTLSSecretObj.Name,
 						CA:   "ca.crt",
 						Cert: "tls.crt",
 						Key:  "tls.key",
@@ -201,7 +201,7 @@ var _ = Describe("TLS self-signed cert function", func() {
 			})
 			It("should not create the cluster when secret referenced not exist", func() {
 				tlsIssuer := &appsv1alpha1.Issuer{
-					Name: appsv1alpha1.IssuerSelfProvided,
+					Name: appsv1alpha1.IssuerUserProvided,
 					SecretRef: &appsv1alpha1.TLSSecretRef{
 						Name: "secret-name-not-exist",
 						CA:   "ca.crt",
@@ -259,7 +259,7 @@ var _ = Describe("TLS self-signed cert function", func() {
 				Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(clusterObj), clusterObj)).Should(Succeed())
 				patch := client.MergeFrom(clusterObj.DeepCopy())
 				clusterObj.Spec.ComponentSpecs[0].TLS = true
-				clusterObj.Spec.ComponentSpecs[0].Issuer = &appsv1alpha1.Issuer{Name: appsv1alpha1.IssuerSelfSigned}
+				clusterObj.Spec.ComponentSpecs[0].Issuer = &appsv1alpha1.Issuer{Name: appsv1alpha1.IssuerKubeBlocks}
 				Expect(k8sClient.Patch(ctx, clusterObj, patch)).Should(Succeed())
 				Eventually(hasTLSSettings).WithPolling(time.Second).WithTimeout(10 * time.Second).Should(BeTrue())
 

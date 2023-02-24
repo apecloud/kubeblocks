@@ -43,7 +43,7 @@ const (
 	DefaultNginxContainerName = "nginx"
 
 	RedisType                     = "state.redis"
-	DefaultRedisCompType          = "replication"
+	DefaultRedisCompType          = "redis"
 	DefaultRedisCompName          = "redis-rsts"
 	DefaultRedisImageName         = "redis:7.0.5"
 	DefaultRedisContainerName     = "redis"

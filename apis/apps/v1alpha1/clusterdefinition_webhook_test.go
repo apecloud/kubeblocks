@@ -403,7 +403,7 @@ metadata:
   name: %s
 spec:
   componentDefs:
-    - name: replication
+    - name: redis
       maxUnavailable: 1
       workloadType: Replication
 `, name)

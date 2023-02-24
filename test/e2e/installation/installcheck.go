@@ -30,8 +30,6 @@ import (
 	. "github.com/apecloud/kubeblocks/test/e2e"
 
 	"github.com/apecloud/kubeblocks/internal/cli/util/helm"
-
-	. "github.com/apecloud/kubeblocks/test/e2e"
 )
 
 const releaseName = "kubeblocks"

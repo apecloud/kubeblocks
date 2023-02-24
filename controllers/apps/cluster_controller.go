@@ -758,11 +758,9 @@ func (r *ClusterReconciler) reconcileStatusOperations(ctx context.Context, clust
 
 	var (
 		err                       error
-		upgradable                bool
 		volumeExpansionComponents []appsv1alpha1.OperationComponent
 		oldOperations             = cluster.Status.Operations.DeepCopy()
 		operations                = *cluster.Status.Operations
-		clusterVersionList        = &appsv1alpha1.ClusterVersionList{}
 	)
 	// determine whether to support volumeExpansion when creating the cluster or add/delete component.
 	// because volumeClaimTemplates are forbidden to update except for storage size when component created.
@@ -773,19 +771,11 @@ func (r *ClusterReconciler) reconcileStatusOperations(ctx context.Context, clust
 		operations.VolumeExpandable = volumeExpansionComponents
 	}
 
-	// Determine whether to support upgrade
-	if err = r.Client.List(ctx, clusterVersionList, client.MatchingLabels{clusterDefLabelKey: cluster.Spec.ClusterDefRef}); err != nil {
-		return err
-	}
-	if len(clusterVersionList.Items) > 1 {
-		upgradable = true
-	}
-	operations.Upgradable = upgradable
-
 	// check whether status.operations is changed
 	if reflect.DeepEqual(oldOperations, operations) {
 		return nil
 	}
+
 	patch := client.MergeFrom(cluster.DeepCopy())
 	cluster.Status.Operations = &operations
 	return r.Client.Status().Patch(ctx, cluster, patch)

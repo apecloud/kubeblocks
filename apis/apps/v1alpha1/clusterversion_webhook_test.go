@@ -110,6 +110,9 @@ func createTestClusterVersionObj(clusterDefinitionName, clusterVersionName strin
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      clusterVersionName,
 			Namespace: "default",
+			Labels: map[string]string{
+				"clusterdefinition.kubeblocks.io/name": clusterDefinitionName,
+			},
 		},
 		Spec: ClusterVersionSpec{
 			ClusterDefinitionRef: clusterDefinitionName,

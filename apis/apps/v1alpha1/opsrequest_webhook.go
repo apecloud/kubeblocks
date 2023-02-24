@@ -216,20 +216,30 @@ func (r *OpsRequest) validateUpgrade(ctx context.Context,
 	k8sClient client.Client,
 	allErrs *field.ErrorList,
 	cluster *Cluster) {
-	if !cluster.Status.Operations.Upgradable {
-		addInvalidError(allErrs, "spec.type", r.Spec.Type, fmt.Sprintf("not supported in Cluster: %s, ClusterVersion must be greater than 1", r.Spec.ClusterRef))
-		return
-	}
 	if r.Spec.Upgrade == nil {
 		addNotFoundError(allErrs, "spec.upgrade", "")
 		return
 	}
 
-	clusterVersion := &ClusterVersion{}
-	clusterVersionRef := r.Spec.Upgrade.ClusterVersionRef
-	if err := k8sClient.Get(ctx, types.NamespacedName{Name: clusterVersionRef}, clusterVersion); err != nil {
-		addInvalidError(allErrs, "spec.upgrade.clusterVersionRef", clusterVersionRef, err.Error())
+	cvList := &ClusterVersionList{}
+	labelKey := "clusterdefinition.kubeblocks.io/name" // TODO(leon)
+	if err := k8sClient.List(ctx, cvList, client.MatchingLabels{labelKey: cluster.Spec.ClusterDefRef}); err != nil {
+		addInvalidError(allErrs, "spec.type", r.Spec.Type, err.Error())
+		return
 	}
+
+	if len(cvList.Items) <= 1 {
+		addInvalidError(allErrs, "spec.type", r.Spec.Type, fmt.Sprintf("not supported in Cluster: %s, ClusterVersion must be greater than 1", r.Spec.ClusterRef))
+		return
+	}
+
+	targetClusterVersion := r.Spec.Upgrade.ClusterVersionRef
+	for _, cv := range cvList.Items {
+		if cv.Name == targetClusterVersion {
+			return
+		}
+	}
+	addInvalidError(allErrs, "spec.upgrade.clusterVersionRef", targetClusterVersion, fmt.Sprintf("target CluterVersion to upgrade not found"))
 }
 
 // validateVerticalScaling validates api when spec.type is VerticalScaling
@@ -433,15 +443,6 @@ func (r *OpsRequest) checkComponentExistence(errs *field.ErrorList, cluster *Clu
 func lowercaseInitial(opsType OpsType) string {
 	str := string(opsType)
 	return strings.ToLower(str[:1]) + str[1:]
-}
-
-// convertComponentNamesToMap converts supportedComponent slice to map
-func convertComponentNamesToMap(componentNames []string) map[string]*OperationComponent {
-	supportedComponentMap := map[string]*OperationComponent{}
-	for _, v := range componentNames {
-		supportedComponentMap[v] = nil
-	}
-	return supportedComponentMap
 }
 
 // convertOperationComponentsToMap converts supportedOperationComponent slice to map

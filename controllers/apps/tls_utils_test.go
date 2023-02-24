@@ -31,6 +31,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
+	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	"github.com/apecloud/kubeblocks/internal/controller/plan"
 	"github.com/apecloud/kubeblocks/internal/controllerutil"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
@@ -46,7 +47,6 @@ var _ = Describe("TLS self-signed cert function", func() {
 		statefulCompName   = "mysql"
 		mysqlContainerName = "mysql"
 		configTplName      = "mysql-config-tpl"
-		configVolumeName   = "mysql-config"
 	)
 
 	ctx := context.Background()
@@ -136,7 +136,7 @@ var _ = Describe("TLS self-signed cert function", func() {
 				sts := stsList.Items[0]
 				hasTLSVolume := false
 				for _, volume := range sts.Spec.Template.Spec.Volumes {
-					if volume.Name == plan.VolumeName {
+					if volume.Name == builder.VolumeName {
 						hasTLSVolume = true
 						break
 					}
@@ -145,7 +145,7 @@ var _ = Describe("TLS self-signed cert function", func() {
 				for _, container := range sts.Spec.Template.Spec.Containers {
 					hasTLSVolumeMount := false
 					for _, mount := range container.VolumeMounts {
-						if mount.Name == plan.VolumeName {
+						if mount.Name == builder.VolumeName {
 							hasTLSVolumeMount = true
 							break
 						}

@@ -20,10 +20,10 @@ import (
 	"embed"
 	"encoding/json"
 	"fmt"
-	"github.com/apecloud/kubeblocks/internal/controller/plan"
 	"strconv"
 	"strings"
 
+	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	"github.com/leaanthony/debme"
 	"github.com/sethvargo/go-password/password"
 	"github.com/spf13/viper"
@@ -32,8 +32,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
 	"k8s.io/apimachinery/pkg/types"
-
-	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
@@ -62,6 +60,14 @@ type componentPathedName struct {
 	ClusterName string `json:"clusterName,omitempty"`
 	Name        string `json:"name,omitempty"`
 }
+
+const (
+	VolumeName = "tls"
+	CAName     = "ca.crt"
+	CertName   = "tls.crt"
+	KeyName    = "tls.key"
+	MountPath  = "/etc/pki/tls"
+)
 
 var (
 	//go:embed cue/*
@@ -163,14 +169,14 @@ func injectEnvs(params BuilderParams, envConfigName string, c *corev1.Container)
 
 	if params.Component.TLS {
 		tlsEnv := []envVar{
-			{name: "_TLS_CERT_PATH", value: plan.MountPath},
-			{name: "_TLS_CA_FILE", value: plan.CAName},
-			{name: "_TLS_CERT_FILE", value: plan.CertName},
-			{name: "_TLS_KEY_FILE", value: plan.KeyName},
+			{name: "_TLS_CERT_PATH", value: MountPath},
+			{name: "_TLS_CA_FILE", value: CAName},
+			{name: "_TLS_CERT_FILE", value: CertName},
+			{name: "_TLS_KEY_FILE", value: KeyName},
 		}
 		for _, v := range tlsEnv {
 			toInjectEnv = append(toInjectEnv, corev1.EnvVar{
-				Name: constant.KBPrefix + v.name,
+				Name:  constant.KBPrefix + v.name,
 				Value: v.value,
 			})
 		}

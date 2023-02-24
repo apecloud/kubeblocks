@@ -35,14 +35,6 @@ import (
 	"github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
-const (
-	VolumeName = "tls"
-	CAName     = "ca.crt"
-	CertName   = "tls.crt"
-	KeyName    = "tls.key"
-	MountPath  = "/etc/pki/tls"
-)
-
 func CreateOrCheckTLSCerts(reqCtx controllerutil.RequestCtx,
 	cli client.Client,
 	cluster *dbaasv1alpha1.Cluster,
@@ -134,9 +126,9 @@ func ComposeTLSSecret(namespace, clusterName, componentName string) (*v1.Secret,
 	}
 	cert := out[:index]
 	key := out[index:]
-	secret.StringData[CAName] = cert
-	secret.StringData[CertName] = cert
-	secret.StringData[KeyName] = key
+	secret.StringData[builder.CAName] = cert
+	secret.StringData[builder.CertName] = cert
+	secret.StringData[builder.KeyName] = key
 
 	return secret, nil
 }
@@ -218,9 +210,9 @@ func composeTLSVolume(clusterName string, component component.SynthesizedCompone
 	switch component.Issuer.Name {
 	case dbaasv1alpha1.IssuerKubeBlocks:
 		secretName = GenerateTLSSecretName(clusterName, component.Name)
-		ca = CAName
-		cert = CertName
-		key = KeyName
+		ca = builder.CAName
+		cert = builder.CertName
+		key = builder.KeyName
 	case dbaasv1alpha1.IssuerUserProvided:
 		secretName = component.Issuer.SecretRef.Name
 		ca = component.Issuer.SecretRef.CA
@@ -228,14 +220,14 @@ func composeTLSVolume(clusterName string, component component.SynthesizedCompone
 		key = component.Issuer.SecretRef.Key
 	}
 	volume := v1.Volume{
-		Name: VolumeName,
+		Name: builder.VolumeName,
 		VolumeSource: v1.VolumeSource{
 			Secret: &v1.SecretVolumeSource{
 				SecretName: secretName,
 				Items: []v1.KeyToPath{
-					{Key: ca, Path: CAName},
-					{Key: cert, Path: CertName},
-					{Key: key, Path: KeyName},
+					{Key: ca, Path: builder.CAName},
+					{Key: cert, Path: builder.CertName},
+					{Key: key, Path: builder.KeyName},
 				},
 				Optional: func() *bool { o := false; return &o }(),
 			},
@@ -247,8 +239,8 @@ func composeTLSVolume(clusterName string, component component.SynthesizedCompone
 
 func composeTLSVolumeMount() v1.VolumeMount {
 	return v1.VolumeMount{
-		Name:      VolumeName,
-		MountPath: MountPath,
+		Name:      builder.VolumeName,
+		MountPath: builder.MountPath,
 		ReadOnly:  true,
 	}
 }

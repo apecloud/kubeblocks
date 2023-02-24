@@ -186,12 +186,12 @@ func (r *ReconfigureRequestReconciler) sync(reqCtx intctrlutil.RequestCtx, confi
 	}
 
 	// Find ClusterDefinition Component  from ClusterDefinition CR
-	component, err := getComponentFromClusterDefinition(reqCtx.Ctx, r.Client, &cluster, componentName)
+	component, err := getComponentFromClusterDefinition(reqCtx.Ctx, r.Client, &cluster, clusterComponent.ComponentDefRef)
 	if err != nil {
 		return intctrlutil.RequeueWithErrorAndRecordEvent(config,
 			r.Recorder,
 			cfgcore.WrapError(err,
-				"failed to get component from cluster definition. type[%s]", componentName),
+				"failed to get component from cluster definition. type[%s]", clusterComponent.ComponentDefRef),
 			reqCtx.Log)
 	} else if component == nil {
 		reqCtx.Log.Error(cfgcore.MakeError("failed to find component which the configuration is associated."), "ignore the configmap")

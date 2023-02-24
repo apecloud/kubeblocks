@@ -28,7 +28,7 @@ import (
 func CreateConfigurePatch(oldVersion, newVersion map[string]string, format appsv1alpha1.CfgFileFormat, keys []string, enableExcludeDiff bool) (*ConfigPatchInfo, bool, error) {
 	var isExcludeDiff = false
 
-	if enableExcludeDiff {
+	if enableExcludeDiff && len(keys) > 0 {
 		isExcludeDiff = checkExcludeConfigDifference(oldVersion, newVersion, keys)
 	}
 

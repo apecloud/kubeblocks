@@ -202,6 +202,37 @@ max_connections=666
 		excludeDiff bool
 		wantErr     bool
 	}{{
+		name: "patchTestWithoutKeys",
+		args: args{
+			oldVersion: map[string]string{
+				"my.cnf": v1,
+			},
+			newVersion: map[string]string{
+				"my.cnf": v2,
+			},
+			format:            v1alpha1.INI,
+			enableExcludeDiff: true,
+		},
+		want:        &ConfigPatchInfo{IsModify: true},
+		excludeDiff: false,
+	}, {
+		name: "failedPatchTestWithoutKeys",
+		args: args{
+			oldVersion: map[string]string{
+				"my.cnf":    v1,
+				"other.cnf": "context",
+			},
+			newVersion: map[string]string{
+				"my.cnf":    v2,
+				"other.cnf": "context",
+			},
+			format:            v1alpha1.INI,
+			enableExcludeDiff: true,
+		},
+		want:        &ConfigPatchInfo{IsModify: true},
+		excludeDiff: false,
+		wantErr:     true,
+	}, {
 		name: "patchTest",
 		args: args{
 			oldVersion: map[string]string{
@@ -212,8 +243,9 @@ max_connections=666
 				"my.cnf":    v2,
 				"other.cnf": "context",
 			},
-			keys:   []string{"my.cnf"},
-			format: v1alpha1.INI,
+			keys:              []string{"my.cnf"},
+			format:            v1alpha1.INI,
+			enableExcludeDiff: true,
 		},
 		want:        &ConfigPatchInfo{IsModify: true},
 		excludeDiff: false,
@@ -259,7 +291,7 @@ max_connections=666
 				t.Errorf("CreateConfigurePatch() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			if got.IsModify != tt.want.IsModify {
+			if !tt.wantErr && got.IsModify != tt.want.IsModify {
 				t.Errorf("CreateConfigurePatch() got = %v, want %v", got, tt.want)
 			}
 			if excludeDiff != tt.excludeDiff {

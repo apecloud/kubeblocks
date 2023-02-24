@@ -17,13 +17,16 @@ limitations under the License.
 package lifecycle
 
 import (
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"fmt"
+	"reflect"
+
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
-	"reflect"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
@@ -50,16 +53,16 @@ func ownKinds() []client.ObjectList {
 }
 
 // read all objects owned by our cluster
-// using a brute search algorithm as all info we have is owner ref
-// TODO: design a more efficient algorithm, such as label selector
 func (c *cacheDiffTransformer) readCacheSnapshot() (clusterSnapshot, error) {
 	scheme, _ := appsv1alpha1.SchemeBuilder.Build()
 
 	// list what kinds of object cluster owns
 	kinds := ownKinds()
 	snapshot := make(clusterSnapshot)
+	ml := client.MatchingLabels{intctrlutil.AppInstanceLabelKey: c.cc.cluster.GetName()}
+	inNS := client.InNamespace(c.cc.cluster.Namespace)
 	for _, list := range kinds {
-		if err := c.cli.List(c.ctx.Ctx, list); err != nil {
+		if err := c.cli.List(c.ctx.Ctx, list, inNS, ml); err != nil {
 			return nil, err
 		}
 		// reflect get list.Items
@@ -69,23 +72,19 @@ func (c *cacheDiffTransformer) readCacheSnapshot() (clusterSnapshot, error) {
 			// get the underlying object
 			object := items.Index(i).Addr().Interface().(client.Object)
 			// put to snapshot if owned by our cluster
-			if intctrlutil.IsOwnerOf(c.cc.cluster, object, scheme) {
+			if isOwnerOf(c.cc.cluster, object, scheme) {
 				name := getGVKName(object)
 				snapshot[name] = object
 			}
 		}
 	}
 
-	// put the cluster itself
-	name := getGVKName(c.cc.cluster)
-	snapshot[name] = c.cc.cluster
-
 	return snapshot, nil
 }
 
 func (c *cacheDiffTransformer) Transform(dag *graph.DAG) error {
 	// get the old snapshot
-	snapshot, err := c.readCacheSnapshot()
+	oldSnapshot, err := c.readCacheSnapshot()
 	if err != nil {
 		return err
 	}
@@ -93,6 +92,46 @@ func (c *cacheDiffTransformer) Transform(dag *graph.DAG) error {
 	// we have target snapshot in dag
 	// now do the heavy lift:
 	// compute the diff between cache and target spec and generate the plan
+	newNameVertices := make(map[gvkName]graph.Vertex)
+	for _, vertex := range dag.Vertices() {
+		v, _ := vertex.(*lifecycleVertex)
+		name := getGVKName(v.obj)
+		newNameVertices[name] = vertex
+	}
 
+	oldNameSet := sets.KeySet(oldSnapshot)
+	newNameSet := sets.KeySet(newNameVertices)
+
+	// case cluster Deletion
+	if !c.cc.cluster.DeletionTimestamp.IsZero() {
+		// TODO: handle deletion
+		return nil
+	}
+	// case cluster Creation or Update
+	deleteSet := oldNameSet.Difference(newNameSet)
+	createSet := newNameSet.Difference(oldNameSet)
+	updateSet := newNameSet.Intersection(oldNameSet)
+	root := dag.Root()
+	if root == nil {
+		return fmt.Errorf("root vertex not found: %v", dag)
+	}
+	for name := range deleteSet {
+		v := &lifecycleVertex{
+			obj:    oldSnapshot[name],
+			action: actionPtr(DELETE),
+		}
+		dag.AddVertex(v)
+		dag.Connect(root, v)
+	}
+	for name := range createSet {
+		v, _ := newNameVertices[name].(*lifecycleVertex)
+		v.action = actionPtr(CREATE)
+	}
+	for name := range updateSet {
+		v, _ := newNameVertices[name].(*lifecycleVertex)
+		v.action = actionPtr(UPDATE)
+	}
+	v, _ := root.(*lifecycleVertex)
+	v.action = actionPtr(STATUS)
 	return nil
 }

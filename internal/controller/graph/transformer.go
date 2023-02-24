@@ -16,7 +16,18 @@ limitations under the License.
 
 package graph
 
-// GraphTransformer transforms a DAG to a new version
-type GraphTransformer interface {
+// DAGTransformer transforms a DAG to a new version
+type DAGTransformer interface {
 	Transform(dag *DAG) error
+}
+
+type TransformerChain []DAGTransformer
+
+func (t *TransformerChain) WalkThrough(dag *DAG) error {
+	for _, transformer := range *t {
+		if err := transformer.Transform(dag); err != nil {
+			return err
+		}
+	}
+	return nil
 }

@@ -16,7 +16,7 @@ limitations under the License.
 
 package graph
 
-// PlanBuilder builds a Plan by applying a group of GraphTransformer to an empty DAG.
+// PlanBuilder builds a Plan by applying a group of DAGTransformer to an empty DAG.
 type PlanBuilder interface {
 	Build() (Plan, error)
 }

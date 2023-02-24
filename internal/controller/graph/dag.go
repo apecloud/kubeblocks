@@ -129,12 +129,25 @@ func (d *DAG) WalkReverseTopoOrder(walkFunc WalkFunc) error {
 	return nil
 }
 
-// validate 'd' has single root and has no cycles
+func (d *DAG) Root() Vertex {
+	roots := make([]Vertex, 0)
+	for n := range d.vertices {
+		if len(d.inAdj(n)) == 0 {
+			roots = append(roots, n)
+		}
+	}
+	if len(roots) != 1 {
+		return nil
+	}
+	return roots[0]
+}
+
+// validate 'd' has single Root and has no cycles
 func (d *DAG) validate() error {
-	// single root validation
-	root := d.root()
+	// single Root validation
+	root := d.Root()
 	if root == nil {
-		return errors.New("no single root found")
+		return errors.New("no single Root found")
 	}
 
 	// self-cycle validation
@@ -205,19 +218,6 @@ func (d *DAG) topologicalOrder(reverse bool) []Vertex {
 	}
 
 	return orders
-}
-
-func (d *DAG) root() Vertex {
-	roots := make([]Vertex, 0)
-	for n := range d.vertices {
-		if len(d.inAdj(n)) == 0 {
-			roots = append(roots, n)
-		}
-	}
-	if len(roots) != 1 {
-		return nil
-	}
-	return roots[0]
 }
 
 // outAdj returns all adjacent vertices that v points to

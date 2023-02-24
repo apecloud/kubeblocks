@@ -28,12 +28,18 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
+const (
+	// TODO: deduplicate
+	dbClusterFinalizerName = "cluster.kubeblocks.io/finalizer"
+)
 
 type Action string
+
 const (
-	CREATE = "CREATE"
-	UPDATE = "UPDATE"
-	DELETE = "DELETE"
+	CREATE = Action("CREATE")
+	UPDATE = Action("UPDATE")
+	DELETE = Action("DELETE")
+	STATUS = Action("STATUS")
 )
 
 type clusterPlanBuilder struct {
@@ -89,18 +95,23 @@ func (b *clusterPlanBuilder) Build() (graph.Plan, error) {
 		return nil, err
 	}
 	dag := graph.NewDAG()
-	transformers := []graph.GraphTransformer{
+	chain := &graph.TransformerChain{
+		// cluster to K8s objects and put them into dag
 		&clusterTransformer{cc: *cc, cli: b.cli, ctx: b.ctx},
+		// add our finalizer to all objects
+		&finalizerSetterTransformer{finalizer: dbClusterFinalizerName},
+		// make all workload objects depending on credential secret
 		&credentialTransformer{},
+		// make config configmap immutable
 		&configTransformer{},
+		// read old snapshot from cache, and generate diff plan
 		&cacheDiffTransformer{cc: *cc, cli: b.cli, ctx: b.ctx},
+		// finally, update cluster status
 		&ClusterStatusTransformer{},
 	}
-	for _, transformer := range transformers {
-		if err := transformer.Transform(dag);  err != nil {
+	if err := chain.WalkThrough(dag);  err != nil {
 			return nil, err
 		}
-	}
 
 	walkFunc := func(node graph.Vertex) error {
 		obj, ok := node.(*lifecycleVertex)

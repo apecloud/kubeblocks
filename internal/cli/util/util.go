@@ -45,14 +45,12 @@ import (
 	"golang.org/x/crypto/ssh"
 	corev1 "k8s.io/api/core/v1"
 	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/duration"
-	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -61,7 +59,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/kustomize/kyaml/yaml"
 
-	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
@@ -291,46 +289,6 @@ func GVRToString(gvr schema.GroupVersionResource) string {
 	return strings.Join([]string{gvr.Resource, gvr.Version, gvr.Group}, ".")
 }
 
-// CheckErr prints a user-friendly error to STDERR and exits with a non-zero exit code.
-func CheckErr(err error) {
-	// unwrap aggregates of 1
-	if agg, ok := err.(utilerrors.Aggregate); ok && len(agg.Errors()) == 1 {
-		err = agg.Errors()[0]
-	}
-
-	if err == nil {
-		return
-	}
-
-	// ErrExit and other valid api errors will be checked by cmdutil.CheckErr, now
-	// we only check invalid api errors that can not be converted to StatusError.
-	if err != cmdutil.ErrExit && apierrors.IsInvalid(err) {
-		if _, ok := err.(*apierrors.StatusError); !ok {
-			printErr(err)
-			os.Exit(cmdutil.DefaultErrorExitCode)
-		}
-	}
-
-	cmdutil.CheckErr(err)
-}
-
-func printErr(err error) {
-	msg, ok := cmdutil.StandardErrorMessage(err)
-	if !ok {
-		msg = err.Error()
-		if !strings.HasPrefix(msg, "error: ") {
-			msg = fmt.Sprintf("error: %s", msg)
-		}
-	}
-	if len(msg) > 0 {
-		// add newline if needed
-		if !strings.HasSuffix(msg, "\n") {
-			msg += "\n"
-		}
-		fmt.Fprint(os.Stderr, msg)
-	}
-}
-
 // GetNodeByName choose node by name from a node array
 func GetNodeByName(nodes []*corev1.Node, name string) *corev1.Node {
 	for _, node := range nodes {
@@ -392,7 +350,7 @@ func TimeFormat(t *metav1.Time) string {
 	return t.Format(layout)
 }
 
-// GetHumanReadableDuration returns a succint representation of the provided startTime and endTime
+// GetHumanReadableDuration returns a succinct representation of the provided startTime and endTime
 // with limited precision for consumption by humans.
 func GetHumanReadableDuration(startTime metav1.Time, endTime metav1.Time) string {
 	if startTime.IsZero() {
@@ -463,11 +421,11 @@ func GetEventObject(e *corev1.Event) string {
 }
 
 // GetConfigTemplateList returns ConfigTemplate list used by the component.
-func GetConfigTemplateList(clusterName string, namespace string, cli dynamic.Interface, componentName string, reloadTpl bool) ([]dbaasv1alpha1.ConfigTemplate, error) {
+func GetConfigTemplateList(clusterName string, namespace string, cli dynamic.Interface, componentName string, reloadTpl bool) ([]appsv1alpha1.ConfigTemplate, error) {
 	var (
-		clusterObj        = dbaasv1alpha1.Cluster{}
-		clusterDefObj     = dbaasv1alpha1.ClusterDefinition{}
-		clusterVersionObj = dbaasv1alpha1.ClusterVersion{}
+		clusterObj        = appsv1alpha1.Cluster{}
+		clusterDefObj     = appsv1alpha1.ClusterDefinition{}
+		clusterVersionObj = appsv1alpha1.ClusterVersion{}
 	)
 
 	if err := GetResourceObjectFromGVR(types.ClusterGVR(), client.ObjectKey{
@@ -478,28 +436,30 @@ func GetConfigTemplateList(clusterName string, namespace string, cli dynamic.Int
 	}
 
 	clusterDefName := clusterObj.Spec.ClusterDefRef
-	clusterVersionName := clusterObj.Spec.ClusterVersionRef
 	if err := GetResourceObjectFromGVR(types.ClusterDefGVR(), client.ObjectKey{
 		Namespace: "",
 		Name:      clusterDefName,
 	}, cli, &clusterDefObj); err != nil {
 		return nil, err
 	}
-	if err := GetResourceObjectFromGVR(types.ClusterVersionGVR(), client.ObjectKey{
-		Namespace: "",
-		Name:      clusterVersionName,
-	}, cli, &clusterVersionObj); err != nil {
-		return nil, err
+	clusterVersionName := clusterObj.Spec.ClusterVersionRef
+	if clusterVersionName != "" {
+		if err := GetResourceObjectFromGVR(types.ClusterVersionGVR(), client.ObjectKey{
+			Namespace: "",
+			Name:      clusterVersionName,
+		}, cli, &clusterVersionObj); err != nil {
+			return nil, err
+		}
 	}
 
-	tpls, err := cfgcore.GetConfigTemplatesFromComponent(clusterObj.Spec.Components, clusterDefObj.Spec.Components, clusterVersionObj.Spec.Components, componentName)
+	tpls, err := cfgcore.GetConfigTemplatesFromComponent(clusterObj.Spec.ComponentSpecs, clusterDefObj.Spec.ComponentDefs, clusterVersionObj.Spec.ComponentVersions, componentName)
 	if err != nil {
 		return nil, err
 	} else if !reloadTpl {
 		return tpls, nil
 	}
 
-	validTpls := make([]dbaasv1alpha1.ConfigTemplate, 0, len(tpls))
+	validTpls := make([]appsv1alpha1.ConfigTemplate, 0, len(tpls))
 	for _, tpl := range tpls {
 		if len(tpl.ConfigConstraintRef) > 0 && len(tpl.ConfigTplRef) > 0 {
 			validTpls = append(validTpls, tpl)
@@ -522,8 +482,8 @@ func GetResourceObjectFromGVR(gvr schema.GroupVersionResource, key client.Object
 
 // GetComponentsFromClusterCR returns name of component.
 func GetComponentsFromClusterCR(key client.ObjectKey, cli dynamic.Interface) ([]string, error) {
-	clusterObj := dbaasv1alpha1.Cluster{}
-	clusterDefObj := dbaasv1alpha1.ClusterDefinition{}
+	clusterObj := appsv1alpha1.Cluster{}
+	clusterDefObj := appsv1alpha1.ClusterDefinition{}
 	if err := GetResourceObjectFromGVR(types.ClusterGVR(), key, cli, &clusterObj); err != nil {
 		return nil, err
 	}
@@ -535,9 +495,9 @@ func GetComponentsFromClusterCR(key client.ObjectKey, cli dynamic.Interface) ([]
 		return nil, err
 	}
 
-	componentNames := make([]string, 0, len(clusterObj.Spec.Components))
-	for _, component := range clusterObj.Spec.Components {
-		cdComponent := clusterDefObj.GetComponentDefByTypeName(component.Type)
+	componentNames := make([]string, 0, len(clusterObj.Spec.ComponentSpecs))
+	for _, component := range clusterObj.Spec.ComponentSpecs {
+		cdComponent := clusterDefObj.GetComponentDefByName(component.ComponentDefRef)
 		if enableReconfiguring(cdComponent) {
 			componentNames = append(componentNames, component.Name)
 		}
@@ -545,7 +505,7 @@ func GetComponentsFromClusterCR(key client.ObjectKey, cli dynamic.Interface) ([]
 	return componentNames, nil
 }
 
-func enableReconfiguring(component *dbaasv1alpha1.ClusterDefinitionComponent) bool {
+func enableReconfiguring(component *appsv1alpha1.ClusterComponentDefinition) bool {
 	if component == nil || component.ConfigSpec == nil {
 		return false
 	}
@@ -558,10 +518,10 @@ func enableReconfiguring(component *dbaasv1alpha1.ClusterDefinitionComponent) bo
 }
 
 // IsSupportConfigureParams check whether all updated parameters belong to config template parameters.
-func IsSupportConfigureParams(tpl dbaasv1alpha1.ConfigTemplate, values map[string]string, cli dynamic.Interface) (bool, error) {
+func IsSupportConfigureParams(tpl appsv1alpha1.ConfigTemplate, values map[string]string, cli dynamic.Interface) (bool, error) {
 	var (
 		err              error
-		configConstraint = dbaasv1alpha1.ConfigConstraint{}
+		configConstraint = appsv1alpha1.ConfigConstraint{}
 	)
 
 	if err := GetResourceObjectFromGVR(types.ConfigConstraintGVR(), client.ObjectKey{

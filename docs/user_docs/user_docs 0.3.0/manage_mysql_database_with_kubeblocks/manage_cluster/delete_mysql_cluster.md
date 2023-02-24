@@ -12,8 +12,9 @@ terminationPolicy | Deleting Operation|
 `WipeOut`|`WipeOut` deletes workload resources and PVCs and wipes out all volume snapshots and snapshot data from backup storage location.
 
 To check the termination policy, execute the following command.
-```
-$ kbcli cluster list mysql-cluster
+```bash
+kbcli cluster list mysql-cluster
+>
 NAME   	        NAMESPACE	CLUSTER-DEFINITION	VERSION        	TERMINATION-POLICY	STATUS 	CREATED-TIME
 mysql-cluster	default  	apecloud-mysql    	ac-mysql-8.0.30	Delete            	Running	Feb 06,2023 18:27 UTC+0800
 ```
@@ -22,13 +23,13 @@ mysql-cluster	default  	apecloud-mysql    	ac-mysql-8.0.30	Delete            	Ru
 **Option 1.** Use `kbcli`.
 
 Configure the cluster name and run the command below to delete the specified cluster.
-```
+```bash
 kbcli cluster delete mysql-cluster
 ```
 
 **Option 2.** Use `kubectl`.
 
 Configure the cluster name and run the command below to delete the specified cluster.
-```
+```bash
 kubectl delete cluster mysql-cluster
 ```

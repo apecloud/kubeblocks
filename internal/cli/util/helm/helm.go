@@ -23,10 +23,12 @@ import (
 	"io"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
 
+	"github.com/Masterminds/semver/v3"
 	"github.com/containers/common/pkg/retry"
 	"github.com/ghodss/yaml"
 	"github.com/pkg/errors"
@@ -37,12 +39,15 @@ import (
 	"helm.sh/helm/v3/pkg/cli"
 	"helm.sh/helm/v3/pkg/cli/values"
 	"helm.sh/helm/v3/pkg/getter"
+	"helm.sh/helm/v3/pkg/helmpath"
 	kubefake "helm.sh/helm/v3/pkg/kube/fake"
 	"helm.sh/helm/v3/pkg/registry"
 	"helm.sh/helm/v3/pkg/release"
 	"helm.sh/helm/v3/pkg/repo"
 	"helm.sh/helm/v3/pkg/storage"
 	"helm.sh/helm/v3/pkg/storage/driver"
+
+	"github.com/apecloud/kubeblocks/internal/cli/types"
 )
 
 const defaultTimeout = time.Second * 600
@@ -84,15 +89,15 @@ func AddRepo(r *repo.Entry) error {
 
 	// Check if the repo Name is legal
 	if strings.Contains(r.Name, "/") {
-		return errors.Errorf("repository Name (%s) contains '/', please specify a different Name without '/'", r.Name)
+		return errors.Errorf("repository name (%s) contains '/', please specify a different name without '/'", r.Name)
 	}
 
 	if f.Has(r.Name) {
 		existing := f.Get(r.Name)
-		if *r != *existing {
+		if *r != *existing && r.Name != types.KubeBlocksChartName {
 			// The input coming in for the Name is different from what is already
 			// configured. Return an error.
-			return errors.Errorf("repository Name (%s) already exists, please specify a different Name", r.Name)
+			return errors.Errorf("repository name (%s) already exists, please specify a different name", r.Name)
 		}
 	}
 
@@ -424,6 +429,54 @@ func (i *InstallOpts) tryUpgrade(cfg *action.Configuration) (string, error) {
 		return "", err
 	}
 	return released.Info.Notes, nil
+}
+
+func GetChartVersions(chartName string) ([]*semver.Version, error) {
+	settings := cli.New()
+	rf, err := repo.LoadFile(settings.RepositoryConfig)
+	if err != nil {
+		if os.IsNotExist(errors.Cause(err)) {
+			return nil, nil
+		} else {
+			return nil, err
+		}
+	}
+
+	var ind *repo.IndexFile
+	for _, re := range rf.Repositories {
+		n := re.Name
+		if n != chartName {
+			continue
+		}
+
+		// load index file
+		f := filepath.Join(settings.RepositoryCache, helmpath.CacheIndexFile(n))
+		ind, err = repo.LoadIndexFile(f)
+		if err != nil {
+			return nil, err
+		}
+		break
+	}
+
+	// do not find any index file
+	if ind == nil {
+		return nil, nil
+	}
+
+	var versions []*semver.Version
+	for _, entry := range ind.Entries {
+		if len(entry) == 0 {
+			continue
+		}
+		for _, v := range entry {
+			ver, err := semver.NewVersion(v.Version)
+			if err != nil {
+				return nil, err
+			}
+			versions = append(versions, ver)
+		}
+	}
+	return versions, nil
 }
 
 // AddValueOptionsFlags add helm value flags

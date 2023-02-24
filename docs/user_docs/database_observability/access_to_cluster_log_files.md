@@ -20,7 +20,7 @@ _Example_
 Add the `enabledLogs` key and fill its value with a log type defined by the provider to enable the log function.
 
 ```
-apiVersion: dbaas.kubeblocks.io/v1alpha1
+apiVersion: apps.kubeblocks.io/v1alpha1
 kind: Cluster
 metadata:
   name: mysql-cluster-01
@@ -60,14 +60,13 @@ _Example_
 Here is an example of configuring the error log and slow log.
 
 ```
-apiVersion: dbaas.kubeblocks.io/v1alpha1
-kind:       ClusterDefinition
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: ClusterDefinition
 metadata:
-  name:     mysql-cluster-definition
+  name: mysql-cluster-definition
 spec:
-  type: state.mysql
-  components:
-  - typeName: replicasets
+  componentDefs:
+  - name: replicasets
     characterType: mysql
     monitor:
       builtIn: true
@@ -79,7 +78,7 @@ spec:
     configTemplateRefs: 
       - name: mysql-tree-node-template-8.0
         volumeName: mysql-config
-    componentType: Consensus
+    workloadType: Consensus
     consensusSpec:
       leader:
         name: leader
@@ -87,7 +86,6 @@ spec:
       followers:
         - name: follower
           accessMode: Readonly
-    defaultReplicas: 3
     podSpec:
       containers:
       - name: mysql
@@ -216,7 +214,7 @@ data:
 The log-related function, similar to a warning, neither affects the main flow of control and management nor changes `Phase` or `Generation`. It adds a `conditions` field in `cluster API status` to store the warning of a cluster.
 
 ```
-apiVersion: dbaas.kubeblocks.io/v1alpha1
+apiVersion: apps.kubeblocks.io/v1alpha1
 kind: Cluster
 metadata:
   ...

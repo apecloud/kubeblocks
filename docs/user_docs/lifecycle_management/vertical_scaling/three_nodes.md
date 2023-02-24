@@ -39,7 +39,7 @@ _Steps_:
 1. Prepare a YAML file for a single-node cluster. Below is the YAML file of the three-node cluster. 
 
 ```
-apiVersion: dbaas.kubeblocks.io/v1alpha1
+apiVersion: apps.kubeblocks.io/v1alpha1
 kind: Cluster
 metadata:
   name: wesql-3nodes
@@ -67,7 +67,7 @@ spec:
 
 ```
 kubectl apply -f cluster_three_nodes.yaml
-cluster.dbaas.kubeblocks.io/wesql-3nodes created
+cluster.apps.kubeblocks.io/wesql-3nodes created
 ```
 
 ### Result
@@ -114,7 +114,7 @@ _Steps_:
 1. Prepare a YAML file for vertically scaling a three-node cluster. Below is the YAML file of the `OpsRequest` CR. 
 
 ```
-apiVersion: dbaas.kubeblocks.io/v1alpha1
+apiVersion: apps.kubeblocks.io/v1alpha1
 kind: OpsRequest
 metadata:
   name: ops-vertical-scaling-threenodes-demo
@@ -136,7 +136,7 @@ spec:
 
 ```
 kubectl apply -f verticalscaling-threenode.yaml
-opsrequest.dbaas.kubeblocks.io/ops-vertical-scaling-threenodes-demo created
+opsrequest.apps.kubeblocks.io/ops-vertical-scaling-threenodes-demo created
 ```
 
 3. View the `OpsRequest` phase and cluster phase:
@@ -178,7 +178,7 @@ Name:         ops-vertical-scaling-threenodes-demo
 Namespace:    default
 Labels:       cluster.kubeblocks.io/name=wesql-3nodes
 Annotations:  <none>
-API Version:  dbaas.kubeblocks.io/v1alpha1
+API Version:  apps.kubeblocks.io/v1alpha1
 Kind:         OpsRequest
 Metadata:
   Creation Timestamp:  2022-11-17T07:01:39Z
@@ -186,7 +186,7 @@ Metadata:
     opsrequest.kubeblocks.io/finalizer
   Generation:  1
   Managed Fields:
-    API Version:  dbaas.kubeblocks.io/v1alpha1
+    API Version:  apps.kubeblocks.io/v1alpha1
     Fields Type:  FieldsV1
     fieldsV1:
       f:metadata:
@@ -201,7 +201,7 @@ Metadata:
     Manager:      kubectl-client-side-apply
     Operation:    Update
     Time:         2022-11-17T07:01:39Z
-    API Version:  dbaas.kubeblocks.io/v1alpha1
+    API Version:  apps.kubeblocks.io/v1alpha1
     Fields Type:  FieldsV1
     fieldsV1:
       f:metadata:
@@ -217,7 +217,7 @@ Metadata:
     Manager:      manager
     Operation:    Update
     Time:         2022-11-17T07:01:39Z
-    API Version:  dbaas.kubeblocks.io/v1alpha1
+    API Version:  apps.kubeblocks.io/v1alpha1
     Fields Type:  FieldsV1
     fieldsV1:
       f:status:
@@ -237,7 +237,7 @@ Metadata:
     Subresource:  status
     Time:         2022-11-17T07:03:09Z
   Owner References:
-    API Version:     dbaas.kubeblocks.io/v1alpha1
+    API Version:     apps.kubeblocks.io/v1alpha1
     Kind:            Cluster
     Name:            wesql-3nodes
     UID:             fef1ca58-2529-4058-864c-5dcaf9938ed3

@@ -22,7 +22,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 
-	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
@@ -32,107 +32,86 @@ import (
 // component-related configs from input Cluster, ClusterDef and ClusterVersion.
 func BuildComponent(
 	reqCtx intctrlutil.RequestCtx,
-	cluster *dbaasv1alpha1.Cluster,
-	clusterDef *dbaasv1alpha1.ClusterDefinition,
-	clusterDefComp *dbaasv1alpha1.ClusterDefinitionComponent,
-	clusterVersionComp *dbaasv1alpha1.ClusterVersionComponent,
-	clusterComp *dbaasv1alpha1.ClusterComponent) *SynthesizedComponent {
-	if clusterDefComp == nil {
-		reqCtx.Log.Error(nil, "build probe container failed.")
-		return nil
-	}
+	cluster appsv1alpha1.Cluster,
+	clusterDef appsv1alpha1.ClusterDefinition,
+	clusterCompDef appsv1alpha1.ClusterComponentDefinition,
+	clusterCompSpec appsv1alpha1.ClusterComponentSpec,
+	clusterCompVers ...*appsv1alpha1.ClusterComponentVersion,
+) *SynthesizedComponent {
 
-	clusterDefCompObj := clusterDefComp.DeepCopy()
-	name := clusterDefCompObj.TypeName // initial name for the component will be same as TypeName
-	if clusterComp != nil {
-		name = clusterComp.Name // component name gets overridden
-	}
+	clusterCompDefObj := clusterCompDef.DeepCopy()
 	component := &SynthesizedComponent{
 		ClusterDefName:        clusterDef.Name,
-		ClusterType:           clusterDef.Spec.Type,
-		Name:                  name,
-		Type:                  clusterDefCompObj.TypeName,
-		CharacterType:         clusterDefCompObj.CharacterType,
-		MinReplicas:           clusterDefCompObj.MinReplicas,
-		MaxReplicas:           clusterDefCompObj.MaxReplicas,
-		DefaultReplicas:       clusterDefCompObj.DefaultReplicas,
-		Replicas:              clusterDefCompObj.DefaultReplicas,
-		ComponentType:         clusterDefCompObj.ComponentType,
-		ConsensusSpec:         clusterDefCompObj.ConsensusSpec,
-		PodSpec:               clusterDefCompObj.PodSpec,
-		Service:               clusterDefCompObj.Service,
-		Probes:                clusterDefCompObj.Probes,
-		LogConfigs:            clusterDefCompObj.LogConfigs,
-		HorizontalScalePolicy: clusterDefCompObj.HorizontalScalePolicy,
+		Name:                  clusterCompSpec.Name,
+		Type:                  clusterCompDefObj.Name,
+		CharacterType:         clusterCompDefObj.CharacterType,
+		MaxUnavailable:        clusterCompDefObj.MaxUnavailable,
+		Replicas:              0,
+		WorkloadType:          clusterCompDefObj.WorkloadType,
+		ConsensusSpec:         clusterCompDefObj.ConsensusSpec,
+		PodSpec:               clusterCompDefObj.PodSpec,
+		Service:               clusterCompDefObj.Service,
+		Probes:                clusterCompDefObj.Probes,
+		LogConfigs:            clusterCompDefObj.LogConfigs,
+		HorizontalScalePolicy: clusterCompDefObj.HorizontalScalePolicy,
 	}
 
 	// resolve component.ConfigTemplates
-	if clusterDefCompObj.ConfigSpec != nil {
-		component.ConfigTemplates = clusterDefCompObj.ConfigSpec.ConfigTemplateRefs
-	}
-	if clusterVersionComp != nil {
-		component.ConfigTemplates = cfgcore.MergeConfigTemplates(clusterVersionComp.ConfigTemplateRefs, component.ConfigTemplates)
+	if clusterCompDefObj.ConfigSpec != nil {
+		component.ConfigTemplates = clusterCompDefObj.ConfigSpec.ConfigTemplateRefs
 	}
 
-	// set component.PodSpec.InitContainers and component.PodSpec.Containers
-	if clusterVersionComp != nil {
-		if clusterVersionComp.PodSpec != nil {
-			for _, c := range clusterVersionComp.PodSpec.InitContainers {
-				component.PodSpec.InitContainers = appendOrOverrideContainerAttr(component.PodSpec.InitContainers, c)
-			}
-			for _, c := range clusterVersionComp.PodSpec.Containers {
-				component.PodSpec.Containers = appendOrOverrideContainerAttr(component.PodSpec.Containers, c)
-			}
+	if len(clusterCompVers) > 0 && clusterCompVers[0] != nil {
+		// only accept 1st ClusterVersion override context
+		clusterCompVer := clusterCompVers[0]
+		component.ConfigTemplates = cfgcore.MergeConfigTemplates(clusterCompVer.ConfigTemplateRefs, component.ConfigTemplates)
+		// override component.PodSpec.InitContainers and component.PodSpec.Containers
+		for _, c := range clusterCompVer.VersionsCtx.InitContainers {
+			component.PodSpec.InitContainers = appendOrOverrideContainerAttr(component.PodSpec.InitContainers, c)
+		}
+		for _, c := range clusterCompVer.VersionsCtx.Containers {
+			component.PodSpec.Containers = appendOrOverrideContainerAttr(component.PodSpec.Containers, c)
 		}
 	}
 
 	// set affinity and tolerations
 	affinity := cluster.Spec.Affinity
 	tolerations := cluster.Spec.Tolerations
-	if clusterComp != nil {
-		if clusterComp.Affinity != nil {
-			affinity = clusterComp.Affinity
-		}
-		if len(clusterComp.Tolerations) != 0 {
-			tolerations = clusterComp.Tolerations
-		}
+	if clusterCompSpec.Affinity != nil {
+		affinity = clusterCompSpec.Affinity
+	}
+	if len(clusterCompSpec.Tolerations) != 0 {
+		tolerations = clusterCompSpec.Tolerations
 	}
 	if affinity != nil {
-		component.PodSpec.Affinity = buildPodAffinity(cluster, affinity, component)
-		component.PodSpec.TopologySpreadConstraints = buildPodTopologySpreadConstraints(cluster, affinity, component)
+		component.PodSpec.Affinity = buildPodAffinity(&cluster, affinity, component)
+		component.PodSpec.TopologySpreadConstraints = buildPodTopologySpreadConstraints(&cluster, affinity, component)
 	}
 	if tolerations != nil {
 		component.PodSpec.Tolerations = tolerations
 	}
 
 	// set others
-	if clusterComp != nil {
-		component.EnabledLogs = clusterComp.EnabledLogs
+	component.EnabledLogs = clusterCompSpec.EnabledLogs
+	component.Replicas = clusterCompSpec.Replicas
+	component.TLS = clusterCompSpec.TLS
+	component.Issuer = clusterCompSpec.Issuer
 
-		// user can scale in replicas to 0
-		if clusterComp.Replicas != nil {
-			component.Replicas = *clusterComp.Replicas
-		}
-
-		if clusterComp.VolumeClaimTemplates != nil {
-			component.VolumeClaimTemplates = dbaasv1alpha1.ToVolumeClaimTemplates(clusterComp.VolumeClaimTemplates)
-		}
-
-		if clusterComp.Resources.Requests != nil || clusterComp.Resources.Limits != nil {
-			component.PodSpec.Containers[0].Resources = clusterComp.Resources
-		}
-
-		if clusterComp.ServiceType != "" {
-			if component.Service == nil {
-				component.Service = &corev1.ServiceSpec{}
-			}
-			component.Service.Type = clusterComp.ServiceType
-		}
-		component.PrimaryIndex = clusterComp.PrimaryIndex
-
-		component.TLS = clusterComp.TLS
-		component.Issuer = clusterComp.Issuer
+	if clusterCompSpec.VolumeClaimTemplates != nil {
+		component.VolumeClaimTemplates = appsv1alpha1.ToVolumeClaimTemplates(clusterCompSpec.VolumeClaimTemplates)
 	}
+
+	if clusterCompSpec.Resources.Requests != nil || clusterCompSpec.Resources.Limits != nil {
+		component.PodSpec.Containers[0].Resources = clusterCompSpec.Resources
+	}
+
+	if clusterCompSpec.ServiceType != "" {
+		if component.Service == nil {
+			component.Service = &corev1.ServiceSpec{}
+		}
+		component.Service.Type = clusterCompSpec.ServiceType
+	}
+	component.PrimaryIndex = clusterCompSpec.PrimaryIndex
 
 	// TODO(zhixu.zt) We need to reserve the VolumeMounts of the container for ConfigMap or Secret,
 	// At present, it is possible to distinguish between ConfigMap volume and normal volume,
@@ -144,7 +123,7 @@ func BuildComponent(
 	//	 }
 	// }
 
-	buildMonitorConfig(cluster, clusterDef, clusterDefComp, clusterComp, component)
+	buildMonitorConfig(&clusterCompDef, &clusterCompSpec, component)
 	err := buildProbeContainers(reqCtx, component)
 	if err != nil {
 		reqCtx.Log.Error(err, "build probe container failed.")
@@ -255,15 +234,15 @@ func replacePlaceholderTokens(component *SynthesizedComponent, namedValues map[s
 	}
 }
 
-func GetClusterDefCompByName(clusterDef dbaasv1alpha1.ClusterDefinition,
-	cluster dbaasv1alpha1.Cluster,
-	compName string) *dbaasv1alpha1.ClusterDefinitionComponent {
-	for _, comp := range cluster.Spec.Components {
+func GetClusterDefCompByName(clusterDef appsv1alpha1.ClusterDefinition,
+	cluster appsv1alpha1.Cluster,
+	compName string) *appsv1alpha1.ClusterComponentDefinition {
+	for _, comp := range cluster.Spec.ComponentSpecs {
 		if comp.Name != compName {
 			continue
 		}
-		for _, compDef := range clusterDef.Spec.Components {
-			if compDef.TypeName == comp.Type {
+		for _, compDef := range clusterDef.Spec.ComponentDefs {
+			if compDef.Name == comp.ComponentDefRef {
 				return &compDef
 			}
 		}

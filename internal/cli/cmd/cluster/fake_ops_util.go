@@ -24,12 +24,12 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 
-	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/create"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 )
 
-func NewFakeOperationsOptions(ns, cName string, opsType dbaasv1alpha1.OpsType, objs ...runtime.Object) (*cmdtesting.TestFactory, *OperationsOptions) {
+func NewFakeOperationsOptions(ns, cName string, opsType appsv1alpha1.OpsType, objs ...runtime.Object) (*cmdtesting.TestFactory, *OperationsOptions) {
 	streams, _, _, _ := genericclioptions.NewTestIOStreams()
 	tf := cmdtesting.NewTestFactory().WithNamespace(ns)
 	o := &OperationsOptions{
@@ -42,7 +42,7 @@ func NewFakeOperationsOptions(ns, cName string, opsType dbaasv1alpha1.OpsType, o
 		OpsType:                opsType,
 	}
 
-	err := dbaasv1alpha1.AddToScheme(scheme.Scheme)
+	err := appsv1alpha1.AddToScheme(scheme.Scheme)
 	if err != nil {
 		panic(err)
 	}

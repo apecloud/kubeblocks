@@ -17,6 +17,7 @@ limitations under the License.
 package component
 
 import (
+	"embed"
 	"encoding/json"
 	"fmt"
 	"strconv"
@@ -27,7 +28,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
-	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
@@ -42,6 +43,11 @@ const (
 	ProbeRoleChangedCheckPath = "spec.containers{" + roleProbeContainerName + "}"
 	ProbeStatusCheckPath      = "spec.containers{" + statusProbeContainerName + "}"
 	ProbeRunningCheckPath     = "spec.containers{" + runningProbeContainerName + "}"
+)
+
+var (
+	//go:embed cue/*
+	cueTemplates embed.FS
 )
 
 func buildProbeContainers(reqCtx intctrlutil.RequestCtx, component *SynthesizedComponent) error {
@@ -177,7 +183,7 @@ func getComponentRoles(component *SynthesizedComponent) map[string]string {
 }
 
 func buildRoleChangedProbeContainer(characterType string, roleChangedContainer *corev1.Container,
-	probeSetting *dbaasv1alpha1.ClusterDefinitionProbe, probeSvcHTTPPort int) {
+	probeSetting *appsv1alpha1.ClusterDefinitionProbe, probeSvcHTTPPort int) {
 	roleChangedContainer.Name = roleProbeContainerName
 	probe := roleChangedContainer.ReadinessProbe
 	bindingType := strings.ToLower(characterType)
@@ -187,7 +193,7 @@ func buildRoleChangedProbeContainer(characterType string, roleChangedContainer *
 		"curl", "-X", "POST",
 		"--max-time", strconv.Itoa(int(probeSetting.TimeoutSeconds)),
 		"--fail-with-body", "--silent",
-		"-H", "Content-Type: application/json",
+		"-H", "Content-ComponentDefRef: application/json",
 		roleObserveURI,
 		"-d", "{\"operation\": \"roleCheck\", \"metadata\":{\"sql\":\"\"}}",
 	}
@@ -198,7 +204,7 @@ func buildRoleChangedProbeContainer(characterType string, roleChangedContainer *
 }
 
 func buildStatusProbeContainer(statusProbeContainer *corev1.Container,
-	probeSetting *dbaasv1alpha1.ClusterDefinitionProbe, probeSvcHTTPPort int) {
+	probeSetting *appsv1alpha1.ClusterDefinitionProbe, probeSvcHTTPPort int) {
 	statusProbeContainer.Name = statusProbeContainerName
 	probe := statusProbeContainer.ReadinessProbe
 	httpGet := &corev1.HTTPGetAction{}
@@ -213,7 +219,7 @@ func buildStatusProbeContainer(statusProbeContainer *corev1.Container,
 }
 
 func buildRunningProbeContainer(runningProbeContainer *corev1.Container,
-	probeSetting *dbaasv1alpha1.ClusterDefinitionProbe, probeSvcHTTPPort int) {
+	probeSetting *appsv1alpha1.ClusterDefinitionProbe, probeSvcHTTPPort int) {
 	runningProbeContainer.Name = runningProbeContainerName
 	probe := runningProbeContainer.ReadinessProbe
 	httpGet := &corev1.HTTPGetAction{}

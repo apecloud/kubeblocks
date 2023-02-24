@@ -18,14 +18,19 @@ package configuration
 
 import (
 	"context"
+	"encoding/json"
+	"sort"
+	"strings"
 	"testing"
+
+	"github.com/StudioSol/set"
 
 	"github.com/bhmj/jsonslice"
 	"github.com/stretchr/testify/require"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 )
 
 var iniConfig = `
@@ -65,7 +70,7 @@ func TestRawConfig(t *testing.T) {
 	cfg, err := NewConfigLoader(CfgOption{
 		Type:    CfgRawType,
 		Log:     log.FromContext(context.Background()),
-		CfgType: dbaasv1alpha1.INI,
+		CfgType: appsv1alpha1.INI,
 		RawData: []byte(iniConfig),
 	})
 
@@ -128,7 +133,7 @@ func TestConfigMapConfig(t *testing.T) {
 	cfg, err := NewConfigLoader(CfgOption{
 		Type:    CfgCmType,
 		Log:     log.FromContext(context.Background()),
-		CfgType: dbaasv1alpha1.INI,
+		CfgType: appsv1alpha1.INI,
 		K8sKey: &K8sConfig{
 			CfgKey: client.ObjectKey{
 				Name:      "xxxx",    // set cm name
@@ -206,5 +211,157 @@ func TestConfigMapConfig(t *testing.T) {
 		// update general_log 0
 		res, _ = jsonslice.Get(updated, "$.mysqld.general_log")
 		require.Equal(t, []byte(`"0"`), res)
+	}
+}
+
+func TestGenerateVisualizedParamsList(t *testing.T) {
+	type args struct {
+		configPatch  *ConfigPatchInfo
+		formatConfig *appsv1alpha1.FormatterConfig
+		sets         *set.LinkedHashSetString
+	}
+
+	var (
+		testJSON          any
+		fileUpdatedParams = []byte(`{"mysqld": { "max_connections": "666", "read_buffer_size": "55288" }}`)
+		testUpdatedParams = []byte(`{"mysqld": { "max_connections": "666", "read_buffer_size": "55288", "delete_params": null }}`)
+	)
+
+	require.Nil(t, json.Unmarshal(fileUpdatedParams, &testJSON))
+	tests := []struct {
+		name string
+		args args
+		want []VisualizedParam
+	}{{
+		name: "visualizedParamsTest",
+		args: args{
+			configPatch: &ConfigPatchInfo{
+				IsModify: false,
+			},
+		},
+		want: nil,
+	}, {
+		name: "visualizedParamsTest",
+		args: args{
+			configPatch: &ConfigPatchInfo{
+				IsModify:     true,
+				UpdateConfig: map[string][]byte{"key": testUpdatedParams}},
+		},
+		want: []VisualizedParam{{
+			Key:        "key",
+			UpdateType: UpdatedType,
+			Parameters: []ParameterPair{
+				{
+					Key:   "mysqld.max_connections",
+					Value: "666",
+				}, {
+					Key:   "mysqld.read_buffer_size",
+					Value: "55288",
+				}, {
+					Key:   "mysqld.delete_params",
+					Value: "",
+				}},
+		}},
+	}, {
+		name: "visualizedParamsTest",
+		args: args{
+			configPatch: &ConfigPatchInfo{
+				IsModify:     true,
+				UpdateConfig: map[string][]byte{"key": testUpdatedParams}},
+			formatConfig: &appsv1alpha1.FormatterConfig{
+				Format: appsv1alpha1.INI,
+				FormatterOptions: appsv1alpha1.FormatterOptions{IniConfig: &appsv1alpha1.IniConfig{
+					SectionName: "mysqld",
+				}},
+			},
+		},
+		want: []VisualizedParam{{
+			Key:        "key",
+			UpdateType: UpdatedType,
+			Parameters: []ParameterPair{
+				{
+					Key:   "max_connections",
+					Value: "666",
+				}, {
+					Key:   "read_buffer_size",
+					Value: "55288",
+				}, {
+					Key:   "delete_params",
+					Value: "",
+				}},
+		}},
+	}, {
+		name: "addFileTest",
+		args: args{
+			configPatch: &ConfigPatchInfo{
+				IsModify:  true,
+				AddConfig: map[string]interface{}{"key": testJSON},
+			},
+			formatConfig: &appsv1alpha1.FormatterConfig{
+				Format: appsv1alpha1.INI,
+				FormatterOptions: appsv1alpha1.FormatterOptions{IniConfig: &appsv1alpha1.IniConfig{
+					SectionName: "mysqld",
+				}},
+			},
+		},
+		want: []VisualizedParam{{
+			Key:        "key",
+			UpdateType: AddedType,
+			Parameters: []ParameterPair{
+				{
+					Key:   "max_connections",
+					Value: "666",
+				}, {
+					Key:   "read_buffer_size",
+					Value: "55288",
+				}},
+		}},
+	}, {
+		name: "deleteFileTest",
+		args: args{
+			configPatch: &ConfigPatchInfo{
+				IsModify:     true,
+				DeleteConfig: map[string]interface{}{"key": testJSON},
+			},
+			formatConfig: &appsv1alpha1.FormatterConfig{
+				Format: appsv1alpha1.INI,
+				FormatterOptions: appsv1alpha1.FormatterOptions{IniConfig: &appsv1alpha1.IniConfig{
+					SectionName: "mysqld",
+				}},
+			},
+		},
+		want: []VisualizedParam{{
+			Key:        "key",
+			UpdateType: DeletedType,
+			Parameters: []ParameterPair{
+				{
+					Key:   "max_connections",
+					Value: "666",
+				}, {
+					Key:   "read_buffer_size",
+					Value: "55288",
+				}},
+		}},
+	}}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := GenerateVisualizedParamsList(tt.args.configPatch, tt.args.formatConfig, tt.args.sets)
+			sortParams(got)
+			sortParams(tt.want)
+			require.Equal(t, got, tt.want)
+		})
+	}
+}
+
+func sortParams(param []VisualizedParam) {
+	for _, v := range param {
+		sort.SliceStable(v.Parameters, func(i, j int) bool {
+			return strings.Compare(v.Parameters[i].Key, v.Parameters[j].Key) <= 0
+		})
+	}
+	if len(param) > 0 {
+		sort.SliceStable(param, func(i, j int) bool {
+			return strings.Compare(param[i].Key, param[j].Key) <= 0
+		})
 	}
 }

@@ -22,16 +22,17 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 
-	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 var _ = Describe("probe_utils", func() {
 
-	Context("has the buildProbeContainers method", func() {
+	Context("build probe containers", func() {
 		var container *corev1.Container
 		var component *SynthesizedComponent
 		var probeServiceHTTPPort, probeServiceGrpcPort int
-		var clusterDefProbe *dbaasv1alpha1.ClusterDefinitionProbe
+		var clusterDefProbe *appsv1alpha1.ClusterDefinitionProbe
 
 		BeforeEach(func() {
 			var err error
@@ -39,12 +40,50 @@ var _ = Describe("probe_utils", func() {
 			Expect(err).NotTo(HaveOccurred())
 			probeServiceHTTPPort, probeServiceGrpcPort = 3501, 50001
 
-			clusterDefProbe = &dbaasv1alpha1.ClusterDefinitionProbe{}
+			clusterDefProbe = &appsv1alpha1.ClusterDefinitionProbe{}
 			clusterDefProbe.PeriodSeconds = 1
 			clusterDefProbe.TimeoutSeconds = 1
 			clusterDefProbe.FailureThreshold = 1
 			component = &SynthesizedComponent{}
 			component.CharacterType = "mysql"
+			component.Service = &corev1.ServiceSpec{
+				Ports: []corev1.ServicePort{{
+					Protocol: corev1.ProtocolTCP,
+					Port:     3306,
+				}},
+			}
+			component.ConsensusSpec = &appsv1alpha1.ConsensusSetSpec{
+				Leader: appsv1alpha1.ConsensusMember{
+					Name:       "leader",
+					AccessMode: appsv1alpha1.ReadWrite,
+				},
+				Followers: []appsv1alpha1.ConsensusMember{{
+					Name:       "follower",
+					AccessMode: appsv1alpha1.Readonly,
+				}},
+				Learner: &appsv1alpha1.ConsensusMember{
+					Name:       "learner",
+					AccessMode: appsv1alpha1.Readonly,
+				},
+			}
+			component.Probes = &appsv1alpha1.ClusterDefinitionProbes{
+				RunningProbe:     &appsv1alpha1.ClusterDefinitionProbe{},
+				StatusProbe:      &appsv1alpha1.ClusterDefinitionProbe{},
+				RoleChangedProbe: &appsv1alpha1.ClusterDefinitionProbe{},
+			}
+			component.PodSpec = &corev1.PodSpec{
+				Containers: []corev1.Container{},
+			}
+		})
+
+		It("should build multiple probe containers", func() {
+			reqCtx := intctrlutil.RequestCtx{
+				Ctx: ctx,
+				Log: logger,
+			}
+			Expect(buildProbeContainers(reqCtx, component)).Should(Succeed())
+			Expect(len(component.PodSpec.Containers)).Should(Equal(3))
+			Expect(component.PodSpec.Containers[0].Command).ShouldNot(BeEmpty())
 		})
 
 		It("should build role changed probe container", func() {
@@ -62,7 +101,7 @@ var _ = Describe("probe_utils", func() {
 			Expect(container.ReadinessProbe.HTTPGet).ShouldNot(BeNil())
 		})
 
-		It("should build status probe container", func() {
+		It("should build running probe container", func() {
 			buildRunningProbeContainer(container, clusterDefProbe, probeServiceHTTPPort)
 			Expect(container.ReadinessProbe.HTTPGet).ShouldNot(BeNil())
 		})

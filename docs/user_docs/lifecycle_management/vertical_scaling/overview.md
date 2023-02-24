@@ -23,7 +23,7 @@ The vertical scaling process consists of the following steps:
 5. The cluster controller watches for the Cluster `CR`.
 6. The cluster controller applies vertical scaling parameters to the StatefulSet.
 7. The cluster controller watches for StatefulSet and pods.
-8. When the component type is `Stateful`/`Stateless`, Kubernetes StatefulSet controller performs a rolling update on the pods. When the component type is `consensus`/`replicationset`, the component controller vertically scales the pods.
+8. When the component workload type is `Stateful`/`Stateless`, Kubernetes StatefulSet controller performs a rolling update on the pods. When the component workload type is `consensus`/`replicationset`, the component controller vertically scales the pods.
 9. When the vertical scaling is completed, the component controller changes the component phase to `Running`.
 10. The cluster controller watches for the component phase and changes the cluster phase to `Running`.
 11. The OpsRequest controller reconciles the OpsRequest status when the component status of the Cluster changes.

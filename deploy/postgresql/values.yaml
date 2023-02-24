@@ -12,8 +12,8 @@
 ## @param image.debug Specify if debug values should be set
 ##
 image:
-  registry: docker.io
-  repository: bitnami/postgresql
+  registry: registry.cn-hangzhou.aliyuncs.com
+  repository: apecloud/postgresql
   tag: 14.6.0-debian-11-r22
   digest: ""
   ## Specify a imagePullPolicy
@@ -112,8 +112,8 @@ metrics:
   ## @param metrics.image.pullSecrets Specify image pull secrets
   ##
   image:
-    registry: docker.io
-    repository: bitnami/postgres-exporter
+    registry: registry.cn-hangzhou.aliyuncs.com
+    repository: apecloud/postgres-exporter
     tag: 0.11.1-debian-11-r49
     digest: ""
     pullPolicy: IfNotPresent

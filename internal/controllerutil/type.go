@@ -38,11 +38,12 @@ const (
 
 	AppInstanceLabelKey             = "app.kubernetes.io/instance"
 	AppComponentLabelKey            = "app.kubernetes.io/component-name"
+	WorkloadTypeLabelKey            = "kubeblocks.io/workload-type"
 	AppNameLabelKey                 = "app.kubernetes.io/name"
 	AppManagedByLabelKey            = "app.kubernetes.io/managed-by"
 	AppCreatedByLabelKey            = "app.kubernetes.io/created-by" // resources created temporarily by kubeblocks
 	AppConfigTypeLabelKey           = "app.kubernetes.io/config-type"
-	ConsensusSetAccessModeLabelKey  = "cs.dbaas.kubeblocks.io/access-mode"
+	ConsensusSetAccessModeLabelKey  = "cs.apps.kubeblocks.io/access-mode"
 	VolumeClaimTemplateNameLabelKey = "vct.kubeblocks.io/name"
 
 	// OpsRequestAnnotationKey OpsRequest annotation key in Cluster
@@ -62,6 +63,8 @@ const (
 
 	// BackupProtectionLabelKey Backup delete protection policy label
 	BackupProtectionLabelKey = "kubeblocks.io/backup-protection"
+
+	SnapShotForStartAnnotationKey = "kubeblocks.io/snapshot-for-start"
 )
 
 const (
@@ -87,6 +90,7 @@ const (
 	PodKind                   = "Pod"
 	PersistentVolumeClaimKind = "PersistentVolumeClaim"
 	CronJob                   = "CronJob"
+	ReplicaSet                = "ReplicaSet"
 )
 
 const (

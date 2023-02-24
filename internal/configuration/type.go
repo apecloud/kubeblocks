@@ -22,7 +22,7 @@ import (
 	"github.com/go-logr/logr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 )
 
 type ConfigType string
@@ -36,7 +36,7 @@ const (
 
 type RawConfig struct {
 	// formatter
-	Type dbaasv1alpha1.ConfigurationFormatter
+	Type appsv1alpha1.CfgFileFormat
 
 	RawData string
 }
@@ -63,6 +63,27 @@ type CfgOpOption struct {
 	IniContext *IniContext
 	// optional
 	XMLContext *XMLContext
+}
+
+type ParameterPair struct {
+	Key   string
+	Value string
+}
+
+// ParameterUpdateType describes how to update the parameters.
+// +enum
+type ParameterUpdateType string
+
+const (
+	AddedType   ParameterUpdateType = "add"
+	DeletedType ParameterUpdateType = "delete"
+	UpdatedType ParameterUpdateType = "update"
+)
+
+type VisualizedParam struct {
+	Key        string
+	UpdateType ParameterUpdateType
+	Parameters []ParameterPair
 }
 
 type ConfigOperator interface {
@@ -95,7 +116,7 @@ type CfgOption struct {
 	Log  logr.Logger
 
 	// formatter
-	CfgType dbaasv1alpha1.ConfigurationFormatter
+	CfgType appsv1alpha1.CfgFileFormat
 
 	// Path for CfgLocalType test
 	Path    string
@@ -123,7 +144,7 @@ func GenerateConstraintsUniqLabelKeyWithConfig(configKey string) string {
 }
 
 // GetInstanceCMName  {{statefull.Name}}-{{clusterVersion.Name}}-{{tpl.Name}}-"config"
-func GetInstanceCMName(obj client.Object, tpl *dbaasv1alpha1.ConfigTemplate) string {
+func GetInstanceCMName(obj client.Object, tpl *appsv1alpha1.ConfigTemplate) string {
 	return getInstanceCfgCMName(obj.GetName(), tpl.VolumeName)
 	// return fmt.Sprintf("%s-%s-config", sts.GetName(), tpl.VolumeName)
 }

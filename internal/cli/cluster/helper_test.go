@@ -25,7 +25,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 )
@@ -53,30 +53,30 @@ var _ = Describe("helper", func() {
 			return pod
 		}
 
-		pod := mockPod("state.mysql-apecloud-mysql")
-		typeName, err := GetClusterTypeByPod(pod)
+		pod := mockPod("mysql-apecloud-mysql")
+		compDefName, err := GetClusterTypeByPod(pod)
 		Expect(err).ShouldNot(HaveOccurred())
-		Expect(typeName).Should(Equal("state.mysql"))
+		Expect(compDefName).Should(Equal("mysql"))
 
 		pod = mockPod("")
-		typeName, err = GetClusterTypeByPod(pod)
+		compDefName, err = GetClusterTypeByPod(pod)
 		Expect(err).Should(HaveOccurred())
-		Expect(typeName).Should(Equal(""))
+		Expect(compDefName).Should(Equal(""))
 	})
 
-	It("find component in cluster by type name", func() {
+	It("find component in cluster by name", func() {
 		cluster := testing.FakeCluster("test", "test")
 		component := FindClusterComp(cluster, "test")
 		Expect(component).Should(BeNil())
 
-		component = FindClusterComp(cluster, testing.ComponentType)
+		component = FindClusterComp(cluster, testing.ComponentDefName)
 		Expect(component).ShouldNot(BeNil())
 	})
 
 	It("get all clusters", func() {
 		cluster := testing.FakeCluster("test", "test")
 		dynamic := testing.FakeDynamicClient(cluster)
-		clusters := &dbaasv1alpha1.ClusterList{}
+		clusters := &appsv1alpha1.ClusterList{}
 
 		By("get clusters from specified namespace")
 		Expect(GetAllCluster(dynamic, "test", clusters)).ShouldNot(HaveOccurred())
@@ -96,7 +96,7 @@ var _ = Describe("helper", func() {
 	It("get cluster endpoints", func() {
 		cluster := testing.FakeCluster("test", "test")
 		svcs := testing.FakeServices()
-		internalEPs, externalEPs := GetComponentEndpoints(svcs, &cluster.Spec.Components[0])
+		internalEPs, externalEPs := GetComponentEndpoints(svcs, &cluster.Spec.ComponentSpecs[0])
 		Expect(len(internalEPs)).Should(Equal(3))
 		Expect(len(externalEPs)).Should(Equal(1))
 	})
@@ -133,15 +133,15 @@ var _ = Describe("helper", func() {
 
 	It("find latest version", func() {
 		const clusterDefName = "test-cluster-def"
-		genVersion := func(name string, t time.Time) dbaasv1alpha1.ClusterVersion {
-			v := dbaasv1alpha1.ClusterVersion{}
+		genVersion := func(name string, t time.Time) appsv1alpha1.ClusterVersion {
+			v := appsv1alpha1.ClusterVersion{}
 			v.Name = name
 			v.SetLabels(map[string]string{types.ClusterDefLabelKey: clusterDefName})
 			v.SetCreationTimestamp(metav1.NewTime(t))
 			return v
 		}
 
-		versionList := &dbaasv1alpha1.ClusterVersionList{}
+		versionList := &appsv1alpha1.ClusterVersionList{}
 		versionList.Items = append(versionList.Items,
 			genVersion("old-version", time.Now().AddDate(0, 0, -1)),
 			genVersion("now-version", time.Now()))

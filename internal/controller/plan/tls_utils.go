@@ -29,7 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
 	"github.com/apecloud/kubeblocks/internal/controllerutil"
@@ -55,7 +55,7 @@ func CreateOrCheckTLSCerts(reqCtx controllerutil.RequestCtx,
 	// secretList contains all secrets successfully created
 	var secretList []v1.Secret
 
-	for _, comp := range cluster.Spec.Components {
+	for _, comp := range cluster.Spec.ComponentSpecs {
 		if !comp.TLS {
 			continue
 		}

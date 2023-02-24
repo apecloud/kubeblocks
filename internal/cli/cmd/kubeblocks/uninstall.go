@@ -60,7 +60,7 @@ func newUninstallCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *co
 		Args:    cobra.NoArgs,
 		Example: uninstallExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			util.CheckErr(o.complete(f, cmd))
+			util.CheckErr(o.Complete(f, cmd))
 			util.CheckErr(o.preCheck())
 			util.CheckErr(o.uninstall())
 		},
@@ -77,7 +77,7 @@ func (o *uninstallOptions) preCheck() error {
 	}
 
 	preCheckList := []string{
-		"clusters.dbaas.kubeblocks.io",
+		"clusters.apps.kubeblocks.io",
 	}
 	ctx := context.Background()
 	// delete crds

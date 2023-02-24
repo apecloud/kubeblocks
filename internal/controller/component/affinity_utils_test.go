@@ -22,9 +22,9 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 
-	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
-	testdbaas "github.com/apecloud/kubeblocks/internal/testutil/dbaas"
+	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 )
 
 var _ = Describe("affinity utils", func() {
@@ -38,7 +38,7 @@ var _ = Describe("affinity utils", func() {
 	)
 
 	var (
-		clusterObj *dbaasv1alpha1.Cluster
+		clusterObj *appsv1alpha1.Cluster
 		component  *SynthesizedComponent
 	)
 
@@ -48,22 +48,22 @@ var _ = Describe("affinity utils", func() {
 		const labelValue = "testLabelValue"
 
 		BeforeEach(func() {
-			clusterDefObj := testdbaas.NewClusterDefFactory(clusterDefName, testdbaas.MySQLType).
-				AddComponent(testdbaas.StatefulMySQLComponent, mysqlCompType).
+			clusterDefObj := testapps.NewClusterDefFactory(clusterDefName).
+				AddComponent(testapps.StatefulMySQLComponent, mysqlCompType).
 				GetObject()
 
-			clusterVersionObj := testdbaas.NewClusterVersionFactory(clusterVersionName, clusterDefObj.Name).
-				AddComponent(mysqlCompType).AddContainerShort("mysql", testdbaas.ApeCloudMySQLImage).
+			clusterVersionObj := testapps.NewClusterVersionFactory(clusterVersionName, clusterDefObj.Name).
+				AddComponent(mysqlCompType).AddContainerShort("mysql", testapps.ApeCloudMySQLImage).
 				GetObject()
 
-			affinity := &dbaasv1alpha1.Affinity{
-				PodAntiAffinity: dbaasv1alpha1.Required,
+			affinity := &appsv1alpha1.Affinity{
+				PodAntiAffinity: appsv1alpha1.Required,
 				TopologyKeys:    []string{topologyKey},
 				NodeLabels: map[string]string{
 					lableKey: labelValue,
 				},
 			}
-			clusterObj = testdbaas.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
+			clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
 				clusterDefObj.Name, clusterVersionObj.Name).
 				AddComponent(mysqlCompName, mysqlCompType).
 				SetClusterAffinity(affinity).
@@ -75,11 +75,11 @@ var _ = Describe("affinity utils", func() {
 			}
 			component = BuildComponent(
 				reqCtx,
-				clusterObj,
-				clusterDefObj,
-				&clusterDefObj.Spec.Components[0],
-				&clusterVersionObj.Spec.Components[0],
-				&clusterObj.Spec.Components[0])
+				*clusterObj,
+				*clusterDefObj,
+				clusterDefObj.Spec.ComponentDefs[0],
+				clusterObj.Spec.ComponentSpecs[0],
+				&clusterVersionObj.Spec.ComponentVersions[0])
 			Expect(component).ShouldNot(BeNil())
 		})
 
@@ -101,22 +101,22 @@ var _ = Describe("affinity utils", func() {
 		const labelValue = "testLabelValue"
 
 		BeforeEach(func() {
-			clusterDefObj := testdbaas.NewClusterDefFactory(clusterDefName, testdbaas.MySQLType).
-				AddComponent(testdbaas.StatefulMySQLComponent, mysqlCompType).
+			clusterDefObj := testapps.NewClusterDefFactory(clusterDefName).
+				AddComponent(testapps.StatefulMySQLComponent, mysqlCompType).
 				GetObject()
 
-			clusterVersionObj := testdbaas.NewClusterVersionFactory(clusterVersionName, clusterDefObj.Name).
-				AddComponent(mysqlCompType).AddContainerShort("mysql", testdbaas.ApeCloudMySQLImage).
+			clusterVersionObj := testapps.NewClusterVersionFactory(clusterVersionName, clusterDefObj.Name).
+				AddComponent(mysqlCompType).AddContainerShort("mysql", testapps.ApeCloudMySQLImage).
 				GetObject()
 
-			affinity := &dbaasv1alpha1.Affinity{
-				PodAntiAffinity: dbaasv1alpha1.Preferred,
+			affinity := &appsv1alpha1.Affinity{
+				PodAntiAffinity: appsv1alpha1.Preferred,
 				TopologyKeys:    []string{topologyKey},
 				NodeLabels: map[string]string{
 					lableKey: labelValue,
 				},
 			}
-			clusterObj = testdbaas.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
+			clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
 				clusterDefObj.Name, clusterVersionObj.Name).
 				AddComponent(mysqlCompName, mysqlCompType).
 				SetClusterAffinity(affinity).
@@ -128,11 +128,12 @@ var _ = Describe("affinity utils", func() {
 			}
 			component = BuildComponent(
 				reqCtx,
-				clusterObj,
-				clusterDefObj,
-				&clusterDefObj.Spec.Components[0],
-				&clusterVersionObj.Spec.Components[0],
-				&clusterObj.Spec.Components[0])
+				*clusterObj,
+				*clusterDefObj,
+				clusterDefObj.Spec.ComponentDefs[0],
+				clusterObj.Spec.ComponentSpecs[0],
+				&clusterVersionObj.Spec.ComponentVersions[0],
+			)
 			Expect(component).ShouldNot(BeNil())
 		})
 

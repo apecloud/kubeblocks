@@ -13,22 +13,22 @@
 // limitations under the License.
 
 pathedName: {
-	namespace:			string
-	clusterName:		string
-	componentName:	string
+	namespace:     string
+	clusterName:   string
+	componentName: string
 	certs: {...}
 }
 secret: {
 	apiVersion: "v1"
 	kind:       "Secret"
 	metadata: {
-		name: "placeholder"
+		name:      "placeholder"
 		namespace: pathedName.namespace
 		labels: {
 			"app.kubernetes.io/instance":   pathedName.clusterName
 			"app.kubernetes.io/managed-by": "kubeblocks"
 		}
 	}
-	type: "kubernetes.io/tls"
+	type:       "kubernetes.io/tls"
 	stringData: pathedName.certs
 }

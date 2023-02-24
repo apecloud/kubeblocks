@@ -19,8 +19,10 @@ cluster: {
 	}
 }
 component: {
-	name: string
-	type: string
+	name:           string
+	type:           string
+	clusterDefName: string
+	characterType:  string
 }
 
 config: {
@@ -30,7 +32,7 @@ config: {
 		name:      "\(cluster.metadata.name)-\(component.name)-env"
 		namespace: cluster.metadata.namespace
 		labels: {
-			"app.kubernetes.io/name":           "\(component.clusterType)-\(component.clusterDefName)"
+			"app.kubernetes.io/name":           "\(component.clusterDefName)"
 			"app.kubernetes.io/instance":       cluster.metadata.name
 			"app.kubernetes.io/component-name": component.name
 			"app.kubernetes.io/component":      "\(component.type)-\(component.name)"

@@ -121,7 +121,7 @@ func (o *options) install() error {
 	spinner := util.Spinner(o.Out, "Installing application %s", o.AppName)
 	defer spinner(false)
 
-	if err := helm.AddRepo(&repo.Entry{Name: o.AppName, URL: util.GetHelmChartRepoURL()}); err != nil {
+	if err := helm.AddRepo(&repo.Entry{Name: types.KubeBlocksChartName, URL: util.GetHelmChartRepoURL()}); err != nil {
 		return err
 	}
 	notes, err := o.installChart()

@@ -34,9 +34,9 @@ import (
 
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
-	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
-	componentutil "github.com/apecloud/kubeblocks/controllers/dbaas/components/util"
+	componentutil "github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	cfgcm "github.com/apecloud/kubeblocks/internal/configuration/configmap"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
@@ -44,9 +44,9 @@ import (
 )
 
 type BuilderParams struct {
-	ClusterDefinition *dbaasv1alpha1.ClusterDefinition
-	ClusterVersion    *dbaasv1alpha1.ClusterVersion
-	Cluster           *dbaasv1alpha1.Cluster
+	ClusterDefinition *appsv1alpha1.ClusterDefinition
+	ClusterVersion    *appsv1alpha1.ClusterVersion
+	Cluster           *appsv1alpha1.Cluster
 	Component         *component.SynthesizedComponent
 }
 
@@ -480,7 +480,7 @@ func BuildConfigMapWithTemplate(
 	configs map[string]string,
 	params BuilderParams,
 	cmName string,
-	tplCfg dbaasv1alpha1.ConfigTemplate) (*corev1.ConfigMap, error) {
+	tplCfg appsv1alpha1.ConfigTemplate) (*corev1.ConfigMap, error) {
 	const tplFile = "config_template.cue"
 	cueFS, _ := debme.FS(cueTemplates, "cue")
 	cueTpl, err := getCacheCUETplValue(tplFile, func() (*intctrlutil.CUETpl, error) {
@@ -495,7 +495,6 @@ func BuildConfigMapWithTemplate(
 	configMeta := map[string]map[string]string{
 		"clusterDefinition": {
 			"name": params.ClusterDefinition.GetName(),
-			"type": params.ClusterDefinition.Spec.Type,
 		},
 		"cluster": {
 			"name":      params.Cluster.GetName(),
@@ -504,6 +503,7 @@ func BuildConfigMapWithTemplate(
 		"component": {
 			"name":                  params.Component.Name,
 			"type":                  params.Component.Type,
+			"characterType":         params.Component.CharacterType,
 			"configName":            cmName,
 			"templateName":          tplCfg.ConfigTplRef,
 			"configConstraintsName": tplCfg.ConfigConstraintRef,

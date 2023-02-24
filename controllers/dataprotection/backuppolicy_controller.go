@@ -354,11 +354,18 @@ func (r *BackupPolicyReconciler) removeOldestBackups(reqCtx intctrlutil.RequestC
 		client.MatchingLabels(buildBackupLabelsForRemove(backupPolicy))); err != nil {
 		return err
 	}
-	numToDelete := len(backups.Items) - int(backupPolicy.Spec.BackupsHistoryLimit)
+	// filter final state backups only
+	backupItems := []dataprotectionv1alpha1.Backup{}
+	for _, item := range backups.Items {
+		if item.Status.Phase == dataprotectionv1alpha1.BackupCompleted ||
+			item.Status.Phase == dataprotectionv1alpha1.BackupFailed {
+			backupItems = append(backupItems, item)
+		}
+	}
+	numToDelete := len(backupItems) - int(backupPolicy.Spec.BackupsHistoryLimit)
 	if numToDelete <= 0 {
 		return nil
 	}
-	backupItems := backups.Items
 	sort.Sort(byBackupStartTime(backupItems))
 	for i := 0; i < numToDelete; i++ {
 		if err := intctrlutil.BackgroundDeleteObject(r.Client, reqCtx.Ctx, &backupItems[i]); err != nil {

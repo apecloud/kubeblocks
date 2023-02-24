@@ -17,17 +17,68 @@ limitations under the License.
 package lifecycle
 
 import (
-	"github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	"github.com/apecloud/kubeblocks/internal/controller/builder"
+	"github.com/apecloud/kubeblocks/internal/controller/component"
 	"github.com/apecloud/kubeblocks/internal/controller/dag"
+	"github.com/apecloud/kubeblocks/internal/controller/plan"
+	intctrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
-// ClusterTransformer mutate an empty DAG to a K8s object DAG
-type ClusterTransformer struct {
-	Cluster v1alpha1.Cluster
-	ClusterDef v1alpha1.ClusterDefinition
-	ClusterVersion v1alpha1.ClusterVersion
+// clusterTransformer transforms a Cluster to a K8s objects DAG
+// TODO: remove cli and ctx, we should read all objects needed, and then do pure objects computation
+type clusterTransformer struct {
+	cc compoundCluster
+	cli client.Client
+	ctx intctrlutil.RequestCtx
 }
 
-func (c *ClusterTransformer) Transform(dag *dag.DAG) error {
+func (c *clusterTransformer) Transform(dag *dag.DAG) error {
+	// put the cluster object first, it will be root vertex of DAG
+	dag.AddVertex(&lifecycleVertex{obj: c.cc.cluster})
+
+	// we copy the K8s objects prepare stage directly first
+	// TODO: refactor plan.PrepareComponentResources
+	resourcesQueue := make([]client.Object, 0, 3)
+	task := intctrltypes.ReconcileTask{
+		Cluster:           c.cc.cluster,
+		ClusterDefinition: &c.cc.cd,
+		ClusterVersion:    &c.cc.cv,
+		Resources:         &resourcesQueue,
+	}
+
+	secret, err := builder.BuildConnCredential(task.GetBuilderParams())
+	if err != nil {
+		return err
+	}
+	dag.AddVertex(&lifecycleVertex{obj: secret})
+
+	clusterCompSpecMap := c.cc.cluster.GetDefNameMappingComponents()
+	clusterCompVerMap := c.cc.cv.GetDefNameMappingComponents()
+
+	prepareComp := func(component *component.SynthesizedComponent) error {
+		iParams := task
+		iParams.Component = component
+		return plan.PrepareComponentResources(c.ctx, c.cli, &iParams)
+	}
+
+	for _, compDef := range c.cc.cd.Spec.ComponentDefs {
+		compDefName := compDef.Name
+		compVer := clusterCompVerMap[compDefName]
+		compSpecs := clusterCompSpecMap[compDefName]
+		for _, compSpec := range compSpecs {
+			if err := prepareComp(component.BuildComponent(c.ctx, c.cc.cluster, &c.cc.cd, &compDef, compVer, &compSpec)); err != nil {
+				return err
+			}
+		}
+	}
+
+	// now task.Resources to DAG vertices
+	for _, object := range *task.Resources {
+		vertex := &lifecycleVertex{obj: object}
+		dag.AddVertex(vertex)
+	}
 	return nil
 }

@@ -323,7 +323,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 	// ---- start refactor ----
-	planBuilder := lifecycle.NewClusterPlanBuilder(ctx, r.Client, *cluster, *clusterDefinition, *clusterVersion)
+	planBuilder := lifecycle.NewClusterPlanBuilder(reqCtx, r.Client, cluster)
 	plan, err := planBuilder.Build()
 	if err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")

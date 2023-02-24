@@ -18,10 +18,10 @@ package lifecycle
 
 import "github.com/apecloud/kubeblocks/internal/controller/dag"
 
-// credentialTransformer puts the credential Secret at the beginning of the DAG
-type credentialTransformer struct {}
+type ClusterStatusTransformer struct {
 
-func (c *credentialTransformer) Transform(dag *dag.DAG) error {
+}
 
+func (c *ClusterStatusTransformer) Transform(dag *dag.DAG) error {
 	return nil
 }

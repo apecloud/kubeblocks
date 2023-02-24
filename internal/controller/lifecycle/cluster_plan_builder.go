@@ -17,14 +17,15 @@ limitations under the License.
 package lifecycle
 
 import (
-	"context"
 	"errors"
 	"fmt"
+	"k8s.io/apimachinery/pkg/types"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/controller/dag"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 
@@ -35,12 +36,10 @@ const (
 	DELETE = "DELETE"
 )
 
-type ClusterPlanBuilder struct {
-	Ctx context.Context
-	Cli client.Client
-	Cluster v1alpha1.Cluster
-	ClusterDef v1alpha1.ClusterDefinition
-	ClusterVersion v1alpha1.ClusterVersion
+type clusterPlanBuilder struct {
+	ctx     intctrlutil.RequestCtx
+	cli     client.Client
+	cluster *appsv1alpha1.Cluster
 }
 
 type ClusterPlan struct {
@@ -48,19 +47,54 @@ type ClusterPlan struct {
 	walkFunc dag.WalkFunc
 }
 
-type planObject struct {
+type compoundCluster struct {
+	cluster *appsv1alpha1.Cluster
+	cd appsv1alpha1.ClusterDefinition
+	cv appsv1alpha1.ClusterVersion
+}
+
+type lifecycleVertex struct {
 	obj client.Object
 	immutable bool
 	action *Action
 }
 
-func (b *ClusterPlanBuilder) Build() (dag.Plan, error) {
+func (b *clusterPlanBuilder) getCompoundCluster() (*compoundCluster, error) {
+	cd := &appsv1alpha1.ClusterDefinition{}
+	if err := b.cli.Get(b.ctx.Ctx, types.NamespacedName{
+		Name: b.cluster.Spec.ClusterDefRef,
+	}, cd); err != nil {
+		return nil, err
+	}
+	cv := &appsv1alpha1.ClusterVersion{}
+	if err := b.cli.Get(b.ctx.Ctx, types.NamespacedName{
+		Name: b.cluster.Spec.ClusterVersionRef,
+	}, cv); err != nil {
+		return nil, err
+	}
+
+	cc := &compoundCluster{
+		cluster: b.cluster,
+		cd:      *cd,
+		cv:      *cv,
+	}
+	return cc, nil
+}
+
+// Build only cluster Creation, Update and Deletion supported.
+// TODO: Validations and Corrections (cluster labels correction, primaryIndex spec validation etc.)
+func (b *clusterPlanBuilder) Build() (dag.Plan, error) {
+	cc, err := b.getCompoundCluster()
+	if err != nil {
+		return nil, err
+	}
 	graph := dag.New()
 	transformers := []dag.GraphTransformer{
-		&ClusterTransformer{},
-		&CredentialTransformer{},
+		&clusterTransformer{cc: *cc, cli: b.cli, ctx: b.ctx},
+		&credentialTransformer{},
 		&ConfigTransformer{},
 		&CacheDiffTransformer{},
+		&ClusterStatusTransformer{},
 	}
 	for _, transformer := range transformers {
 		if err := transformer.Transform(graph);  err != nil {
@@ -69,7 +103,7 @@ func (b *ClusterPlanBuilder) Build() (dag.Plan, error) {
 	}
 
 	walkFunc := func(node dag.Vertex) error {
-		obj, ok := node.(*planObject)
+		obj, ok := node.(*lifecycleVertex)
 		if !ok {
 			return fmt.Errorf("wrong node type %v", node)
 		}
@@ -78,11 +112,11 @@ func (b *ClusterPlanBuilder) Build() (dag.Plan, error) {
 		}
 		switch *obj.action {
 		case CREATE:
-			return b.Cli.Create(b.Ctx, obj.obj)
+			return b.cli.Create(b.ctx.Ctx, obj.obj)
 		case UPDATE:
-			return b.Cli.Update(b.Ctx, obj.obj)
+			return b.cli.Update(b.ctx.Ctx, obj.obj)
 		case DELETE:
-			return b.Cli.Delete(b.Ctx, obj.obj)
+			return b.cli.Delete(b.ctx.Ctx, obj.obj)
 		}
 		return nil
 	}
@@ -97,13 +131,12 @@ func (p *ClusterPlan) Execute() error {
 	return p.dag.WalkReverseTopoOrder(p.walkFunc)
 }
 
-func NewClusterPlanBuilder(
-	ctx context.Context, cli client.Client, cluster v1alpha1.Cluster, clusterDef v1alpha1.ClusterDefinition, version v1alpha1.ClusterVersion) ClusterPlanBuilder {
-	return ClusterPlanBuilder{
-		Ctx: ctx,
-		Cli: cli,
-		Cluster: cluster,
-		ClusterDef: clusterDef,
-		ClusterVersion: version,
+// NewClusterPlanBuilder returns a clusterPlanBuilder powered PlanBuilder
+// TODO: change ctx to context.Context
+func NewClusterPlanBuilder(ctx intctrlutil.RequestCtx, cli client.Client, cluster *appsv1alpha1.Cluster) dag.PlanBuilder {
+	return &clusterPlanBuilder{
+		ctx:     ctx,
+		cli:     cli,
+		cluster: cluster,
 	}
 }

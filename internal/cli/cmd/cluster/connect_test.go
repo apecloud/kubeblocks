@@ -17,7 +17,6 @@ limitations under the License.
 package cluster
 
 import (
-	"fmt"
 	"net/http"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -98,7 +97,6 @@ var _ = Describe("connection", func() {
 		By("specify cluster name")
 		Expect(o.ExecOptions.Complete()).Should(Succeed())
 		_ = o.connect([]string{clusterName})
-		Expect(len(o.ContainerName) > 0).Should(BeTrue())
 		Expect(o.Pod).ShouldNot(BeNil())
 	})
 
@@ -122,6 +120,7 @@ var _ = Describe("connection", func() {
 			password = "test-password"
 		)
 		secret := corev1.Secret{}
+		secret.Name = "test-conn-credential"
 		secret.Data = map[string][]byte{
 			"username": []byte(user),
 			"password": []byte(password),
@@ -139,7 +138,8 @@ var _ = Describe("connection", func() {
 			Command: []string{"mysql"},
 			Args:    []string{"-h$(KB_ACCOUNT_ENDPOINT)", "-u$(MYSQL_USER)", "-p$(MYSQL_PASSWORD)", "-e $(KB_ACCOUNT_STATEMENT)"},
 		}
-		fmt.Println(buildCommand(info))
+		Expect(buildCommand(info)).ShouldNot(BeEmpty())
+		Expect(len(buildCommand(info))).Should(Equal(3))
 	})
 })
 

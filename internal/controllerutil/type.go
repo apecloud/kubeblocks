@@ -103,3 +103,10 @@ const (
 	// BackupDelete (default) deletes backup immediately when cluster's terminationPolicy is WipeOut
 	BackupDelete = "Delete"
 )
+
+const (
+	KubeBlocksDataNodeLabelKey        = "kb-data"
+	KubeBlocksDataNodeLabelValue      = "true"
+	KubeBlocksDataNodeTolerationKey   = "kb-data"
+	KubeBlocksDataNodeTolerationValue = "true"
+)

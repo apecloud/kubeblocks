@@ -76,20 +76,19 @@ func BuildComponent(
 
 	// set affinity and tolerations
 	affinity := cluster.Spec.Affinity
-	tolerations := cluster.Spec.Tolerations
 	if clusterCompSpec.Affinity != nil {
 		affinity = clusterCompSpec.Affinity
 	}
+	podAffinity := buildPodAffinity(&cluster, affinity, component)
+	component.PodSpec.Affinity = patchBuiltInAffinity(podAffinity)
+	component.PodSpec.TopologySpreadConstraints = buildPodTopologySpreadConstraints(&cluster, affinity, component)
+
+	tolerations := cluster.Spec.Tolerations
 	if len(clusterCompSpec.Tolerations) != 0 {
 		tolerations = clusterCompSpec.Tolerations
 	}
-	if affinity != nil {
-		component.PodSpec.Affinity = buildPodAffinity(&cluster, affinity, component)
-		component.PodSpec.TopologySpreadConstraints = buildPodTopologySpreadConstraints(&cluster, affinity, component)
-	}
-	if tolerations != nil {
-		component.PodSpec.Tolerations = tolerations
-	}
+	podTolerations := tolerations
+	component.PodSpec.Tolerations = patchBuiltInToleration(podTolerations)
 
 	// set others
 	component.EnabledLogs = clusterCompSpec.EnabledLogs

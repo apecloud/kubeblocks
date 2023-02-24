@@ -105,8 +105,12 @@ const (
 )
 
 const (
-	KubeBlocksDataNodeLabelKey        = "kb-data"
-	KubeBlocksDataNodeLabelValue      = "true"
-	KubeBlocksDataNodeTolerationKey   = "kb-data"
+	// KubeBlocksDataNodeLabelKey is the node label key of the built-in data node label
+	KubeBlocksDataNodeLabelKey = "kb-data"
+	// KubeBlocksDataNodeLabelValue is the node label value of the built-in data node label
+	KubeBlocksDataNodeLabelValue = "true"
+	// KubeBlocksDataNodeTolerationKey is the taint label key of the built-in data node taint
+	KubeBlocksDataNodeTolerationKey = "kb-data"
+	// KubeBlocksDataNodeTolerationValue is the taint label value of the built-in data node taint
 	KubeBlocksDataNodeTolerationValue = "true"
 )

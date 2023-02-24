@@ -87,8 +87,7 @@ func BuildComponent(
 	if len(clusterCompSpec.Tolerations) != 0 {
 		tolerations = clusterCompSpec.Tolerations
 	}
-	podTolerations := tolerations
-	component.PodSpec.Tolerations = patchBuiltInToleration(podTolerations)
+	component.PodSpec.Tolerations = patchBuiltInToleration(tolerations)
 
 	// set others
 	component.EnabledLogs = clusterCompSpec.EnabledLogs

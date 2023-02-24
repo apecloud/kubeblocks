@@ -70,19 +70,22 @@ func (r *ReconfigureRequestReconciler) Reconcile(ctx context.Context, req ctrl.R
 	reqCtx := intctrlutil.RequestCtx{
 		Ctx:      ctx,
 		Req:      req,
-		Log:      log.FromContext(ctx).WithValues("Configuration", req.NamespacedName),
+		Log:      log.FromContext(ctx).WithName("ReconfigureRequestReconcile").WithValues("ConfigMap", req.NamespacedName),
 		Recorder: r.Recorder,
 	}
 
 	config := &corev1.ConfigMap{}
 	if err := r.Client.Get(reqCtx.Ctx, reqCtx.Req.NamespacedName, config); err != nil {
-		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "not find configmap", "key", req.NamespacedName)
+		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "not find configmap")
 	}
 
 	if !checkConfigurationObject(config) {
 		return intctrlutil.Reconciled()
 	}
 
+	reqCtx.Log = reqCtx.Log.
+		WithValues("ClusterName", config.Labels[intctrlutil.AppInstanceLabelKey]).
+		WithValues("ComponentName", config.Labels[intctrlutil.AppComponentLabelKey])
 	if hash, ok := config.Labels[cfgcore.CMInsConfigurationHashLabelKey]; ok && hash == config.ResourceVersion {
 		return intctrlutil.Reconciled()
 	}
@@ -95,7 +98,7 @@ func (r *ReconfigureRequestReconciler) Reconcile(ctx context.Context, req ctrl.R
 	}
 
 	if cfgConstraintsName, ok := config.Labels[cfgcore.CMConfigurationConstraintsNameLabelKey]; !ok || len(cfgConstraintsName) == 0 {
-		reqCtx.Log.Info("configuration not set ConfigConstraints, not support reconfigure.", "config cm", client.ObjectKeyFromObject(config))
+		reqCtx.Log.V(1).Info("configuration not set ConfigConstraints, not support reconfigure.")
 		return intctrlutil.Reconciled()
 	}
 
@@ -134,6 +137,7 @@ func (r *ReconfigureRequestReconciler) sync(reqCtx intctrlutil.RequestCtx, confi
 
 		configKey = client.ObjectKeyFromObject(config)
 
+		componentName     = config.Labels[intctrlutil.AppComponentLabelKey]
 		configTplName     = config.Labels[cfgcore.CMConfigurationISVTplLabelKey]
 		configTplLabelKey = cfgcore.GenerateTPLUniqLabelKeyWithConfig(configTplName)
 	)
@@ -160,7 +164,7 @@ func (r *ReconfigureRequestReconciler) sync(reqCtx intctrlutil.RequestCtx, confi
 		return r.updateConfigCMStatus(reqCtx, config, ReconfigureNoChangeType)
 	}
 
-	reqCtx.Log.Info(fmt.Sprintf("reconfigure params: \n\tadd: %s\n\tdelete: %s\n\tupdate: %s",
+	reqCtx.Log.V(1).Info(fmt.Sprintf("reconfigure params: \n\tadd: %s\n\tdelete: %s\n\tupdate: %s",
 		configPatch.AddConfig,
 		configPatch.DeleteConfig,
 		configPatch.UpdateConfig))
@@ -169,20 +173,16 @@ func (r *ReconfigureRequestReconciler) sync(reqCtx intctrlutil.RequestCtx, confi
 	if err := r.Client.Get(reqCtx.Ctx, clusterKey, &cluster); err != nil {
 		return intctrlutil.RequeueWithErrorAndRecordEvent(config,
 			r.Recorder,
-			cfgcore.WrapError(err,
-				"failed to get cluster. name[%s]", clusterKey),
+			cfgcore.WrapError(err, "failed to get cluster. name[%s]", clusterKey),
 			reqCtx.Log)
 	}
 
 	// Find ClusterComponentSpec from cluster cr
-	componentName := config.Labels[intctrlutil.AppComponentLabelKey]
-	clusterComponent := getClusterComponentsByName(cluster.Spec.ComponentSpecs, componentName)
-	// fix cluster maybe not any component
+	clusterComponent := cluster.GetComponentByName(componentName)
+	// Assumption: It is required that the cluster must have a component.
 	if clusterComponent == nil {
-		reqCtx.Log.Info("not found component.", "componentName", componentName,
-			"clusterName", cluster.GetName())
-	} else {
-		componentName = clusterComponent.ComponentDefRef
+		reqCtx.Log.Info("not found component.")
+		return intctrlutil.Reconciled()
 	}
 
 	// Find ClusterDefinition Component  from ClusterDefinition CR
@@ -194,7 +194,7 @@ func (r *ReconfigureRequestReconciler) sync(reqCtx intctrlutil.RequestCtx, confi
 				"failed to get component from cluster definition. type[%s]", componentName),
 			reqCtx.Log)
 	} else if component == nil {
-		reqCtx.Log.Info(fmt.Sprintf("failed to find component which the configuration is associated, component name: %s", componentName))
+		reqCtx.Log.Error(cfgcore.MakeError("failed to find component which the configuration is associated."), "ignore the configmap")
 		return intctrlutil.Reconciled()
 	}
 
@@ -215,7 +215,7 @@ func (r *ReconfigureRequestReconciler) sync(reqCtx intctrlutil.RequestCtx, confi
 	// configmap has never been used
 	sts, containersList := getRelatedComponentsByConfigmap(&stsLists, configKey)
 	if len(sts) == 0 {
-		reqCtx.Log.Info("configmap is not used by any container.", "cm name", configKey)
+		reqCtx.Log.Info("configmap is not used by any container.")
 		return intctrlutil.Reconciled()
 	}
 

@@ -413,16 +413,6 @@ func getRelatedComponentsByConfigmap(stsList *appv1.StatefulSetList, cfg client.
 	return sts, containers.AsSlice()
 }
 
-func getClusterComponentsByName(components []appsv1alpha1.ClusterComponentSpec, componentName string) *appsv1alpha1.ClusterComponentSpec {
-	for i := range components {
-		component := &components[i]
-		if component.Name == componentName {
-			return component
-		}
-	}
-	return nil
-}
-
 func createConfigurePatch(cfg *corev1.ConfigMap, format appsv1alpha1.CfgFileFormat, cmKeys []string) (*cfgcore.ConfigPatchInfo, bool, error) {
 	lastConfig, err := getLastVersionConfig(cfg)
 	if err != nil {

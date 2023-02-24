@@ -17,6 +17,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -53,6 +54,10 @@ type BackupPolicyTemplateSpec struct {
 	// define how to update metadata for backup status.
 	// +optional
 	BackupStatusUpdates []BackupStatusUpdate `json:"backupStatusUpdates,omitempty"`
+
+	// PointInTimeRecovery determines scripts and configurations of the recovery point in time.
+	// +optional
+	PointInTimeRecovery *BackupPointInTimeRecovery `json:"pointInTimeRecovery,omitempty"`
 }
 
 // BackupPolicyCredentialKeyword defined for the target database secret that backup tool can connect.
@@ -66,6 +71,15 @@ type BackupPolicyCredentialKeyword struct {
 	// +kubebuilder:default=password
 	// +optional
 	PasswordKeyword string `json:"passwordKeyword,omitempty"`
+}
+
+// BackupPointInTimeRecovery defines the backup point in time recovery info of BackupPolicyTemplate
+type BackupPointInTimeRecovery struct {
+	// +optional
+	Scripts *corev1.Container `json:"scripts,omitempty"`
+
+	// +optional
+	Config map[string]string `json:"config,omitempty"`
 }
 
 // BackupPolicyTemplateStatus defines the observed state of BackupPolicyTemplate

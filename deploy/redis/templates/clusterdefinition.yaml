@@ -8,6 +8,9 @@ spec:
   connectionCredential:
     username: ""
     password: ""
+    endpoint: "$(SVC_FQDN):$(SVC_PORT_redis)"
+    host: "$(SVC_FQDN)"
+    port: "$(SVC_PORT_redis)"
   componentDefs:
     - name: replication
       workloadType: Replication

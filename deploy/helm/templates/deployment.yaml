@@ -24,8 +24,10 @@ spec:
       labels:
         {{- include "kubeblocks.selectorLabels" . | nindent 8 }}
     spec:
-      priorityClassName: system-cluster-critical
-      {{- with .Values.imagePullSecrets }}
+      {{- with .Values.priorityClassName }}
+      priorityClassName: .Values.priorityClassName
+      {{- end }}
+      {{- with .Values.image.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}

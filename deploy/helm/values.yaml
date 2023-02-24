@@ -7,7 +7,7 @@
 ## @param image.repository KubeBlocks image repository
 ## @param image.pullPolicy KubeBlocks image pull policy
 ## @param image.tag KubeBlocks image tag (immutable tags are recommended)
-## @param image.pullSecrets KubeBlocks image pull secrets
+## @param image.imagePullSecrets KubeBlocks image pull secrets
 image:
   registry: registry.cn-hangzhou.aliyuncs.com
   repository: apecloud/kubeblocks

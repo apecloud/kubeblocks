@@ -91,7 +91,7 @@ func needSyncClusterStatusOperations(reqCtx intctrlutil.RequestCtx, cli client.C
 		if *v.Spec.StorageClassName != storageClass.Name {
 			continue
 		}
-		componentName := v.Labels[intctrlutil.AppComponentLabelKey]
+		componentName := v.Labels[intctrlutil.KBAppComponentLabelKey]
 		volumeClaimTemplateName := getVolumeClaimTemplateName(v.Name, cluster.Name, componentName)
 		componentVolumeClaimName := fmt.Sprintf("%s-%s", componentName, volumeClaimTemplateName)
 		if _, ok := handledPVCMap[componentVolumeClaimName]; ok {
@@ -116,7 +116,7 @@ func clusterContainsStorageClass(cluster *appsv1alpha1.Cluster, storageClassName
 }
 
 func isDefaultStorageClassAnnotation(storageClass *storagev1.StorageClass) bool {
-	return storageClass.Annotations != nil && storageClass.Annotations[storage.IsDefaultStorageClassAnnotation] == "true"
+	return storageClass.Annotations != nil && storageClass.Annotations[storage.IsDefaultStorageClassAnnotation] == trueStr
 }
 
 func isSupportVolumeExpansion(storageClass *storagev1.StorageClass) bool {

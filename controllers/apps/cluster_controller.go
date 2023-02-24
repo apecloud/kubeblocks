@@ -156,7 +156,7 @@ func (r *ClusterReconciler) Handle(cli client.Client, reqCtx intctrlutil.Request
 		annotations = event.GetAnnotations()
 	)
 	// filter role changed event that has been handled
-	if annotations != nil && annotations[CSRoleChangedAnnotKey] == CSRoleChangedAnnotHandled {
+	if annotations != nil && annotations[csRoleChangedAnnotKey] == trueStr {
 		return nil
 	}
 
@@ -169,7 +169,7 @@ func (r *ClusterReconciler) Handle(cli client.Client, reqCtx intctrlutil.Request
 	if event.Annotations == nil {
 		event.Annotations = make(map[string]string, 0)
 	}
-	event.Annotations[CSRoleChangedAnnotKey] = CSRoleChangedAnnotHandled
+	event.Annotations[csRoleChangedAnnotKey] = trueStr
 	if err = cli.Patch(reqCtx.Ctx, event, patch); err != nil {
 		return err
 	}

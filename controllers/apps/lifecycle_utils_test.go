@@ -18,7 +18,6 @@ package apps
 
 import (
 	"context"
-	"fmt"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -140,7 +139,7 @@ var _ = Describe("lifecycle_utils", func() {
 		return testapps.NewStatefulSetFactory(testCtx.DefaultNamespace, "mock-sts", clusterName, mysqlCompName).
 			AddLabels(intctrlutil.AppNameLabelKey, "mock-app",
 				intctrlutil.AppInstanceLabelKey, clusterName,
-				intctrlutil.AppComponentLabelKey, mysqlCompName,
+				intctrlutil.KBAppComponentLabelKey, mysqlCompName,
 			).SetReplicas(1).AddContainer(container).
 			AddVolumeClaimTemplate(corev1.PersistentVolumeClaim{
 				ObjectMeta: metav1.ObjectMeta{Name: testapps.DataVolumeName},
@@ -158,15 +157,11 @@ var _ = Describe("lifecycle_utils", func() {
 	}
 
 	newVolumeSnapshot := func(clusterName, componentName string) *snapshotv1.VolumeSnapshot {
-		vsYAML := fmt.Sprintf(`
+		vsYAML := `
 apiVersion: snapshot.storage.k8s.io/v1
 kind: VolumeSnapshot
 metadata:
   labels:
-    app.kubernetes.io/component-name: %s
-    app.kubernetes.io/created-by: kubeblocks
-    app.kubernetes.io/instance: %s
-    app.kubernetes.io/managed-by: kubeblocks
     app.kubernetes.io/name: mysql-apecloud-mysql
     backupjobs.dataprotection.kubeblocks.io/name: wesql-01-replicasets-scaling-qf6cr
     backuppolicies.dataprotection.kubeblocks.io/name: wesql-01-replicasets-scaling-hcxps
@@ -177,9 +172,17 @@ spec:
   source:
     persistentVolumeClaimName: data-wesql-01-replicasets-0
   volumeSnapshotClassName: csi-aws-ebs-snapclass
-`, componentName, clusterName)
+`
 		vs := snapshotv1.VolumeSnapshot{}
 		Expect(yaml.Unmarshal([]byte(vsYAML), &vs)).Should(Succeed())
+		labels := map[string]string{
+			intctrlutil.AppCreatedByLabelKey:   intctrlutil.AppName,
+			intctrlutil.AppInstanceLabelKey:    clusterName,
+			intctrlutil.KBAppComponentLabelKey: componentName,
+		}
+		for k, v := range labels {
+			vs.Labels[k] = v
+		}
 		return &vs
 	}
 

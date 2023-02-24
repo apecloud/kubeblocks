@@ -281,7 +281,7 @@ func handleClusterStatusByEvent(ctx context.Context, cli client.Client, recorder
 	if err = cli.Get(ctx, client.ObjectKey{Name: cluster.Spec.ClusterDefRef}, clusterDef); err != nil {
 		return err
 	}
-	componentName := labels[intctrlutil.AppComponentLabelKey]
+	componentName := labels[intctrlutil.KBAppComponentLabelKey]
 	// get the component phase by component name and sync to Cluster.status.components
 	patch := client.MergeFrom(cluster.DeepCopy())
 	componentMap, clusterAvailabilityEffectMap, componentDef := getComponentRelatedInfo(cluster, clusterDef, componentName)
@@ -389,7 +389,7 @@ func handleDeletePVCCronJobEvent(ctx context.Context,
 		Namespace: object.GetNamespace()}, &cluster); err != nil {
 		return err
 	}
-	componentName := labels[intctrlutil.AppComponentLabelKey]
+	componentName := labels[intctrlutil.KBAppComponentLabelKey]
 	// update component phase to abnormal
 	if err = updateComponentStatusPhase(cli,
 		ctx,

@@ -125,7 +125,7 @@ type ClusterComponentSpec struct {
 
 	// ComponentDefRef reference componentDef defined in ClusterDefinition spec.
 	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:MaxLength=12
+	// +kubebuilder:validation:MaxLength=18
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	ComponentDefRef string `json:"componentDefRef"`
 
@@ -146,6 +146,7 @@ type ClusterComponentSpec struct {
 
 	// Component replicas, use default value in ClusterDefinition spec. if not specified.
 	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:Minimum=0
 	// +kubebuilder:default=1
 	Replicas int32 `json:"replicas"`
 

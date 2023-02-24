@@ -45,6 +45,8 @@ type MongoDB struct {
 	base             internal.ProbeBase
 }
 
+var _ internal.ProbeOperation = &MongoDB{}
+
 type mongoDBMetadata struct {
 	host             string
 	username         string

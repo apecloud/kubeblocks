@@ -81,7 +81,7 @@ func (r *DeploymentReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 
-	componentName := deploy.GetLabels()[intctrlutil.AppComponentLabelKey]
+	componentName := deploy.GetLabels()[intctrlutil.KBAppComponentLabelKey]
 	componentSpec := cluster.GetComponentByName(componentName)
 	if componentSpec == nil {
 		return intctrlutil.Reconciled()

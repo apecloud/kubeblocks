@@ -51,7 +51,7 @@ func HandleReplicationSet(ctx context.Context,
 	stsList []*appsv1.StatefulSet) error {
 
 	filter := func(stsObj *appsv1.StatefulSet) (bool, error) {
-		compDefName := cluster.GetComponentDefRefName(stsObj.Labels[intctrlutil.AppComponentLabelKey])
+		compDefName := cluster.GetComponentDefRefName(stsObj.Labels[intctrlutil.KBAppComponentLabelKey])
 		component, err := util.GetComponentDefByCluster(ctx, cli, cluster, compDefName)
 		if err != nil {
 			return false, err
@@ -79,7 +79,7 @@ func HandleReplicationSet(ctx context.Context,
 		if skip {
 			continue
 		}
-		compOwnsStsMap[stsObj.Labels[intctrlutil.AppComponentLabelKey]] = append(compOwnsStsMap[stsObj.Labels[intctrlutil.AppComponentLabelKey]], stsObj)
+		compOwnsStsMap[stsObj.Labels[intctrlutil.KBAppComponentLabelKey]] = append(compOwnsStsMap[stsObj.Labels[intctrlutil.KBAppComponentLabelKey]], stsObj)
 	}
 
 	// compOwnsPodToSyncMap is used to record the list of component pods to be synchronized to cluster.status except for horizontal scale-in
@@ -214,7 +214,7 @@ func RemoveReplicationSetClusterStatus(cli client.Client, ctx context.Context, s
 		return err
 	}
 	patch := client.MergeFrom(cluster.DeepCopy())
-	componentName := stsList[0].Labels[intctrlutil.AppComponentLabelKey]
+	componentName := stsList[0].Labels[intctrlutil.KBAppComponentLabelKey]
 	replicationSetStatus := cluster.Status.Components[componentName].ReplicationSetStatus
 	needRemove, err := needRemoveReplicationSetStatus(replicationSetStatus, allPodList)
 	if err != nil {

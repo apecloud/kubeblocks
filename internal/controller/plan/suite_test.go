@@ -18,7 +18,6 @@ package plan
 
 import (
 	"context"
-	"go/build"
 	"path/filepath"
 	"testing"
 
@@ -82,11 +81,14 @@ var _ = BeforeSuite(func() {
 
 	By("bootstrapping test environment")
 	testEnv = &envtest.Environment{
-		CRDDirectoryPaths: []string{filepath.Join("..", "..", "..", "config", "crd", "bases"),
+		CRDDirectoryPaths: []string{
+			filepath.Join("..", "..", "..", "config", "crd", "bases"),
 			// use dependent external CRDs.
 			// resolved by ref: https://github.com/operator-framework/operator-sdk/issues/4434#issuecomment-786794418
-			filepath.Join(build.Default.GOPATH, "pkg", "mod", "github.com", "kubernetes-csi/external-snapshotter/",
-				"client/v6@v6.0.1", "config", "crd")},
+			// filepath.Join(build.Default.GOPATH, "pkg", "mod", "github.com", "kubernetes-csi/external-snapshotter/",
+			//	"client/v6@v6.2.0", "config", "crd"),
+		},
+
 		ErrorIfCRDPathMissing: true,
 	}
 

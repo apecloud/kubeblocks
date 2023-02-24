@@ -183,6 +183,7 @@ spec:
                       description: Component replicas, use default value in ClusterDefinition
                         spec. if not specified.
                       format: int32
+                      minimum: 0
                       type: integer
                     resources:
                       description: resources requests and limits of workload.

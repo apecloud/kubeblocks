@@ -146,6 +146,7 @@ type ClusterComponentSpec struct {
 
 	// Component replicas, use default value in ClusterDefinition spec. if not specified.
 	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:Minimum=0
 	// +kubebuilder:default=1
 	Replicas int32 `json:"replicas"`
 

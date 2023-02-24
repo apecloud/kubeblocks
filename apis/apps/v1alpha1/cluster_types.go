@@ -393,7 +393,7 @@ type TLSSecretRef struct {
 	// +kubebuilder:validation:Required
 	Cert string `json:"cert"`
 
-	// Key of Tls private key in Secret
+	// Key of TLS private key in Secret
 	// +kubebuilder:validation:Required
 	Key string `json:"key"`
 }

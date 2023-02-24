@@ -889,11 +889,18 @@ func doBackup(reqCtx intctrlutil.RequestCtx,
 			"scale with backup tool not support yet")
 	// use volume snapshot
 	case appsv1alpha1.HScaleDataClonePolicyFromSnapshot:
-		if !isSnapshotAvailable(cli, ctx) || len(stsObj.Spec.VolumeClaimTemplates) == 0 {
+		if !isSnapshotAvailable(cli, ctx) {
 			reqCtx.Recorder.Eventf(cluster,
 				corev1.EventTypeWarning,
 				"HorizontalScaleFailed",
 				"volume snapshot not support")
+			return false, errors.Errorf("volume snapshot not support")
+		}
+		if len(stsObj.Spec.VolumeClaimTemplates) == 0 {
+			reqCtx.Recorder.Eventf(cluster,
+				corev1.EventTypeNormal,
+				"HorizontalScale",
+				"no VolumeClaimTemplates, no need to do data clone.")
 			break
 		}
 		vsExists, err := isVolumeSnapshotExists(cli, ctx, cluster, component)

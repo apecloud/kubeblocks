@@ -67,10 +67,10 @@ loggerSettings:
   developmentMode: false
   # log encoding (one of 'json' or 'console')
   encoder: console
-  # log level, can be one of 'debug', 'info', 'error', or any integer value > 0 
+  # log level, can be one of 'debug', 'info', 'error', or any integer value > 0
   # which corresponds to custom debug levels of increasing verbosity.
   level:
-  # Zap time encoding (one of 'epoch', 'millis', 'nano', 'iso8601', 'rfc3339' or 
+  # Zap time encoding (one of 'epoch', 'millis', 'nano', 'iso8601', 'rfc3339' or
   # 'rfc3339nano'). Defaults to 'iso8601'.
   timeEncoding: 'iso8601'
 
@@ -195,11 +195,24 @@ nodeSelector: {}
 
 ## @param tolerations
 ##
-tolerations: []
+tolerations:
+  - key: kb-controller
+    operator: Equal
+    value: "true"
+    effect: NoSchedule
 
 ## @param affinity
 ##
-affinity: {}
+affinity:
+  nodeAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        preference:
+          matchExpressions:
+            - key: kb-controller
+              operator: In
+              values:
+                - "true"
 
 ## PDB settings
 ##
@@ -216,7 +229,6 @@ podDisruptionBudget:
 admissionWebhooks:
   enabled: true
   createSelfSignedCert: true
-
 
 ## Data protection settings
 ##
@@ -263,11 +275,22 @@ prometheus:
     ## Node tolerations for alertmanager scheduling to nodes with taints
     ## Ref: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/
     ##
-    tolerations: [ ]
-      # - key: "key"
-      #   operator: "Equal|Exists"
-      #   value: "value"
-      #   effect: "NoSchedule|PreferNoSchedule|NoExecute(1.6 only)"
+    tolerations:
+      - key: kb-controller
+        operator: Equal
+        value: "true"
+        effect: NoSchedule
+
+    affinity:
+      nodeAffinity:
+        preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            preference:
+              matchExpressions:
+                - key: kb-controller
+                  operator: In
+                  values:
+                    - "true"
 
     persistentVolume:
       ## If true, alertmanager will create/use a Persistent Volume Claim
@@ -391,11 +414,22 @@ prometheus:
     ## Node tolerations for server scheduling to nodes with taints
     ## Ref: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/
     ##
-    tolerations: [ ]
-      # - key: "key"
-      #   operator: "Equal|Exists"
-      #   value: "value"
-      #   effect: "NoSchedule|PreferNoSchedule|NoExecute(1.6 only)"
+    tolerations:
+      - key: kb-controller
+        operator: Equal
+        value: "true"
+        effect: NoSchedule
+
+    affinity:
+      nodeAffinity:
+        preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            preference:
+              matchExpressions:
+                - key: kb-controller
+                  operator: In
+                  values:
+                    - "true"
 
     persistentVolume:
       ## If true, Prometheus server will create/use a Persistent Volume Claim
@@ -1050,11 +1084,22 @@ grafana:
   ## Node tolerations for grafana scheduling to nodes with taints
   ## Ref: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/
   ##
-  tolerations: [ ]
-    # - key: "key"
-    #   operator: "Equal|Exists"
-    #   value: "value"
-    #   effect: "NoSchedule|PreferNoSchedule|NoExecute(1.6 only)"
+  tolerations:
+    - key: kb-controller
+      operator: Equal
+      value: "true"
+      effect: NoSchedule
+
+  affinity:
+    nodeAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          preference:
+            matchExpressions:
+              - key: kb-controller
+                operator: In
+                values:
+                  - "true"
 
   ## Timezone for the default dashboards
   ## Other options are: browser or a specific timezone, i.e. Europe/Luxembourg
@@ -1124,6 +1169,23 @@ snapshot-controller:
   image:
     repository: registry.cn-hangzhou.aliyuncs.com/apecloud/snapshot-controller
     tag: v6.2.1
+
+  tolerations:
+    - key: kb-controller
+      operator: Equal
+      value: "true"
+      effect: NoSchedule
+
+  affinity:
+    nodeAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          preference:
+            matchExpressions:
+              - key: kb-controller
+                operator: In
+                values:
+                  - "true"
 
 ## csi-s3 settings
 ## ref: https://artifacthub.io/packages/helm/cloudve/csi-s3#configuration

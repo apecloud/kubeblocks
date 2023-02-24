@@ -146,11 +146,15 @@ var _ = Describe("Cluster Controller", func() {
 			}, client.InNamespace(clusterKey.Namespace))).Should(Equal(0))
 
 		podSpec := stsList.Items[0].Spec.Template.Spec
-		By("Checking created sts pods template without tolerations")
-		Expect(len(podSpec.Tolerations) == 0).Should(BeTrue())
+		By("Checking created sts pods template with built-in toleration")
+		Expect(len(podSpec.Tolerations) == 1).Should(BeTrue())
+		Expect(podSpec.Tolerations[0].Key).To(Equal(intctrlutil.KubeBlocksDataNodeTolerationKey))
 
-		By("Checking created sts pods template without Affinity")
-		Expect(podSpec.Affinity).Should(BeNil())
+		By("Checking created sts pods template with built-in Affinity")
+		Expect(podSpec.Affinity.PodAntiAffinity == nil && podSpec.Affinity.PodAffinity == nil).Should(BeTrue())
+		Expect(podSpec.Affinity.NodeAffinity).ShouldNot(BeNil())
+		Expect(podSpec.Affinity.NodeAffinity.PreferredDuringSchedulingIgnoredDuringExecution[0].Preference.MatchExpressions[0].Key).To(
+			Equal(intctrlutil.KubeBlocksDataNodeLabelKey))
 
 		By("Checking created sts pods template without TopologySpreadConstraints")
 		Expect(len(podSpec.TopologySpreadConstraints) == 0).Should(BeTrue())
@@ -667,7 +671,7 @@ var _ = Describe("Cluster Controller", func() {
 		By("Checking the tolerations")
 		stsList := testk8s.ListAndCheckStatefulSet(&testCtx, clusterKey)
 		podSpec := stsList.Items[0].Spec.Template.Spec
-		Expect(len(podSpec.Tolerations) == 1).Should(BeTrue())
+		Expect(len(podSpec.Tolerations)).To(Equal(2))
 		toleration = podSpec.Tolerations[0]
 		Expect(toleration.Key == tolerationKey &&
 			toleration.Value == tolerationValue).Should(BeTrue())
@@ -704,7 +708,7 @@ var _ = Describe("Cluster Controller", func() {
 		By("Checking the tolerations")
 		stsList := testk8s.ListAndCheckStatefulSet(&testCtx, clusterKey)
 		podSpec := stsList.Items[0].Spec.Template.Spec
-		Expect(len(podSpec.Tolerations) == 1).Should(BeTrue())
+		Expect(len(podSpec.Tolerations)).To(Equal(2))
 		toleration = podSpec.Tolerations[0]
 		Expect(toleration.Key == compTolerationKey &&
 			toleration.Value == compTolerationValue).Should(BeTrue())

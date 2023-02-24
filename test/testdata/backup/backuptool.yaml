@@ -4,7 +4,6 @@ metadata:
   name: backup-tool-
 spec:
   image: registry.cn-hangzhou.aliyuncs.com/apecloud/percona-xtrabackup
-  databaseEngine: mysql
   deployKind: job
   resources:
     limits:

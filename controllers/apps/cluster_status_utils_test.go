@@ -97,12 +97,12 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 	}
 
 	createStsPod := func(podName, podRole, componentName string) *corev1.Pod {
-		return testapps.NewPodFactory(testCtx.DefaultNamespace, podName).AddLabelsInMap(map[string]string{
-			intctrlutil.AppInstanceLabelKey:    clusterName,
-			intctrlutil.KBAppComponentLabelKey: componentName,
-			intctrlutil.RoleLabelKey:           podRole,
-			intctrlutil.AppManagedByLabelKey:   intctrlutil.AppName,
-		}).AddContainer(corev1.Container{Name: testapps.DefaultMySQLContainerName, Image: testapps.ApeCloudMySQLImage}).
+		return testapps.NewPodFactory(testCtx.DefaultNamespace, podName).
+			AddAppInstanceLabel(clusterName).
+			AddAppComponentLabel(componentName).
+			AddRoleLabel(podRole).
+			AddAppManangedByLabel().
+			AddContainer(corev1.Container{Name: testapps.DefaultMySQLContainerName, Image: testapps.ApeCloudMySQLImage}).
 			Create(&testCtx).GetObject()
 	}
 

@@ -136,10 +136,10 @@ var _ = Describe("StatefulSet utils test", func() {
 			By("Creating a StatefulSet")
 			sts := testapps.NewStatefulSetFactory(testCtx.DefaultNamespace, stsName, clusterName, testapps.DefaultRedisCompName).
 				AddContainer(corev1.Container{Name: testapps.DefaultRedisContainerName, Image: testapps.DefaultRedisImageName}).
-				AddLabels(intctrlutil.AppInstanceLabelKey, clusterName,
-					intctrlutil.KBAppComponentLabelKey, testapps.DefaultRedisCompName,
-					intctrlutil.AppManagedByLabelKey, testapps.KubeBlocks,
-					intctrlutil.RoleLabelKey, role).
+				AddAppInstanceLabel(clusterName).
+				AddAppComponentLabel(testapps.DefaultRedisCompName).
+				AddAppManangedByLabel().
+				AddRoleLabel(role).
 				SetReplicas(1).
 				Create(&testCtx).GetObject()
 

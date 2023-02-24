@@ -114,7 +114,6 @@ type probeMessage struct {
 
 func init() {
 	k8score.EventHandlerMap["cluster-controller"] = &ClusterReconciler{}
-	k8score.StorageClassHandlerMap["cluster-controller"] = handleClusterVolumeExpansion
 }
 
 func (r *ClusterReconciler) Handle(cli client.Client, reqCtx intctrlutil.RequestCtx, recorder record.EventRecorder, event *corev1.Event) error {
@@ -273,12 +272,6 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return *res, err
 	}
 
-	if err = r.reconcileStatusOperations(ctx, cluster, clusterDefinition); err != nil {
-		// this is a block to handle error.
-		// so when update cluster conditions failed, we can ignore it.
-		_ = clusterConditionMgr.setPreCheckErrorCondition(err)
-		return intctrlutil.RequeueAfter(ControllerErrorRequeueTime, reqCtx.Log, "")
-	}
 	// validate config and send warning event log necessarily
 	if err = cluster.ValidateEnabledLogs(clusterDefinition); err != nil {
 		_ = clusterConditionMgr.setPreCheckErrorCondition(err)
@@ -748,35 +741,4 @@ func (r *ClusterReconciler) reconcileClusterStatus(ctx context.Context,
 	}
 	return doChainClusterStatusHandler(ctx, r.Client, cluster, removeInvalidComponentsAndAnalysis,
 		handleClusterReadyCondition, handleExistAbnormalOrFailed, handleClusterIsStopped, handleClusterIsRunning)
-}
-
-// reconcileStatusOperations when Cluster.spec updated, we need reconcile the Cluster.status.operations.
-func (r *ClusterReconciler) reconcileStatusOperations(ctx context.Context, cluster *appsv1alpha1.Cluster, clusterDef *appsv1alpha1.ClusterDefinition) error {
-	if cluster.Status.Operations == nil {
-		cluster.Status.Operations = &appsv1alpha1.Operations{}
-	}
-
-	var (
-		err                       error
-		volumeExpansionComponents []appsv1alpha1.OperationComponent
-		oldOperations             = cluster.Status.Operations.DeepCopy()
-		operations                = *cluster.Status.Operations
-	)
-	// determine whether to support volumeExpansion when creating the cluster or add/delete component.
-	// because volumeClaimTemplates are forbidden to update except for storage size when component created.
-	if cluster.Status.ObservedGeneration == 0 || len(cluster.Spec.ComponentSpecs) != len(cluster.Status.Components) {
-		if volumeExpansionComponents, err = getSupportVolumeExpansionComponents(ctx, r.Client, cluster); err != nil {
-			return err
-		}
-		operations.VolumeExpandable = volumeExpansionComponents
-	}
-
-	// check whether status.operations is changed
-	if reflect.DeepEqual(oldOperations, operations) {
-		return nil
-	}
-
-	patch := client.MergeFrom(cluster.DeepCopy())
-	cluster.Status.Operations = &operations
-	return r.Client.Status().Patch(ctx, cluster, patch)
 }

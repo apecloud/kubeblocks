@@ -205,18 +205,8 @@ var _ = Describe("OpsRequest webhook", func() {
 			},
 		}
 		Expect(testCtx.CreateObj(ctx, opsRequest).Error()).To(ContainSubstring(`Invalid value: "VolumeExpansion": not supported in Cluster`))
-		// set cluster support volumeExpansion
-		patch := client.MergeFrom(cluster.DeepCopy())
-		if cluster.Status.Operations == nil {
-			cluster.Status.Operations = &Operations{}
-		}
-		cluster.Status.Operations.VolumeExpandable = []OperationComponent{
-			{
-				Name:                     replicaSetComponentName,
-				VolumeClaimTemplateNames: []string{"data"},
-			},
-		}
-		Expect(k8sClient.Status().Patch(ctx, cluster, patch)).Should(Succeed())
+
+		// TODO(leon): refactor test cases
 
 		By("By testing volumeExpansion volumeClaimTemplate name is not consistent")
 		Eventually(func(g Gomega) {

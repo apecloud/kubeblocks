@@ -109,17 +109,8 @@ var _ = Describe("OpsRequest Controller Volume Expansion Handler", func() {
 			},
 		}
 		opsRes.OpsRequest = ops
-		// mock cluster to support volume expansion
-		Expect(testapps.ChangeObjStatus(&testCtx, clusterObject, func() {
-			clusterObject.Status.Operations = &appsv1alpha1.Operations{
-				VolumeExpandable: []appsv1alpha1.OperationComponent{
-					{
-						VolumeClaimTemplateNames: []string{vctName},
-						Name:                     consensusCompName,
-					},
-				},
-			}
-		})).Should(Succeed())
+
+		// TODO(leon): mock cluster to support volume expansion, refactor the test cases
 
 		// create opsRequest
 		ops = testapps.CreateOpsRequest(ctx, testCtx, ops)
@@ -282,14 +273,6 @@ var _ = Describe("OpsRequest Controller Volume Expansion Handler", func() {
 				clusterObject.Status.Components = map[string]appsv1alpha1.ClusterComponentStatus{
 					consensusCompName: {
 						Phase: appsv1alpha1.RunningPhase,
-					},
-				}
-				clusterObject.Status.Operations = &appsv1alpha1.Operations{
-					VolumeExpandable: []appsv1alpha1.OperationComponent{
-						{
-							Name:                     consensusCompName,
-							VolumeClaimTemplateNames: []string{vctName},
-						},
 					},
 				}
 			})).Should(Succeed())

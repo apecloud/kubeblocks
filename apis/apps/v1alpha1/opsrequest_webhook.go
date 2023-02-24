@@ -175,10 +175,6 @@ func (r *OpsRequest) validateOps(ctx context.Context,
 	k8sClient client.Client,
 	cluster *Cluster,
 	allErrs *field.ErrorList) {
-	if cluster.Status.Operations == nil {
-		cluster.Status.Operations = &Operations{}
-	}
-
 	// Check whether the corresponding attribute is legal according to the operation type
 	switch r.Spec.Type {
 	case UpgradeType:
@@ -315,7 +311,6 @@ func (r *OpsRequest) validateHorizontalScaling(cluster *Cluster, allErrs *field.
 	for i, v := range horizontalScalingList {
 		componentNames[i] = v.ComponentName
 	}
-
 	// TODO(leon): whether to check against cluster definition?
 	r.checkComponentExistence(allErrs, cluster, componentNames)
 }
@@ -327,97 +322,20 @@ func (r *OpsRequest) validateVolumeExpansion(allErrs *field.ErrorList, cluster *
 		addInvalidError(allErrs, "spec.volumeExpansion", volumeExpansionList, "can not be empty")
 		return
 	}
-	// validate whether the cluster support volume expansion
-	supportedComponentMap := convertOperationComponentsToMap(cluster.Status.Operations.VolumeExpandable)
-	if err := r.validateClusterIsSupported(supportedComponentMap); err != nil {
-		*allErrs = append(*allErrs, err)
-		return
-	}
-	// validate volumeClaimTemplates is legal and get component name slice
+
 	componentNames := make([]string, len(volumeExpansionList))
 	for i, v := range volumeExpansionList {
-		var (
-			supportedVCTMap = map[string]struct{}{}
-			invalidVCTNames []string
-		)
 		componentNames[i] = v.ComponentName
-		operationComponent := supportedComponentMap[v.ComponentName]
-		if operationComponent == nil {
-			continue
-		}
-		// convert slice to map
-		for _, vctName := range operationComponent.VolumeClaimTemplateNames {
-			supportedVCTMap[vctName] = struct{}{}
-		}
-		// check the volumeClaimTemplate is support volumeExpansion
-		for _, vct := range v.VolumeClaimTemplates {
-			if _, ok := supportedVCTMap[vct.Name]; !ok {
-				invalidVCTNames = append(invalidVCTNames, vct.Name)
-			}
-		}
-		if len(invalidVCTNames) > 0 {
-			message := "not support volume expansion, check the StorageClass whether allow volume expansion."
-			addInvalidError(allErrs, fmt.Sprintf("spec.volumeExpansion[%d].volumeClaimTemplates[*].name", i), invalidVCTNames, message)
-		}
 	}
+	r.checkComponentExistence(allErrs, cluster, componentNames)
 
-	r.validateComponentName(allErrs, cluster, supportedComponentMap, componentNames)
-}
-
-// validateClusterIsSupported validates whether cluster supports the operation when it in component scope
-func (r *OpsRequest) validateClusterIsSupported(supportedComponentMap map[string]*OperationComponent) *field.Error {
-	if len(supportedComponentMap) > 0 {
-		return nil
-	}
-	var (
-		opsType = r.Spec.Type
-		message string
-	)
-	switch opsType {
-	case VolumeExpansionType:
-		message = fmt.Sprintf("not supported in Cluster: %s, check the StorageClass whether allow volume expansion.", r.Spec.ClusterRef)
-	default:
-		message = fmt.Sprintf("not supported in Cluster: %s", r.Spec.ClusterRef)
-	}
-	return field.Invalid(field.NewPath("spec.type"), opsType, message)
-}
-
-// commonValidateWithComponentOps does common validation, when the operation in component scope
-func (r *OpsRequest) validateComponentName(allErrs *field.ErrorList,
-	cluster *Cluster,
-	supportedComponentMap map[string]*OperationComponent,
-	operationComponentNames []string) {
-	var (
-		clusterComponentNameMap    = map[string]struct{}{}
-		notFoundComponentNames     []string
-		notSupportedComponentNames []string
-		ok                         bool
-		opsType                    = r.Spec.Type
-	)
-	for _, v := range cluster.Spec.ComponentSpecs {
-		clusterComponentNameMap[v.Name] = struct{}{}
-	}
-	for _, v := range operationComponentNames {
-		// check component name whether exist in Cluster.spec.components[*].name
-		if _, ok = clusterComponentNameMap[v]; !ok {
-			notFoundComponentNames = append(notFoundComponentNames, v)
-			continue
-		}
-		// check if the component supports the operation
-		if _, ok = supportedComponentMap[v]; !ok {
-			notSupportedComponentNames = append(notSupportedComponentNames, v)
-		}
-	}
-
-	if len(notFoundComponentNames) > 0 {
-		addInvalidError(allErrs, fmt.Sprintf("spec.%s[*].componentName", lowercaseInitial(opsType)),
-			notFoundComponentNames, "not found in Cluster.spec.components[*].name")
-	}
-
-	if len(notSupportedComponentNames) > 0 {
-		addInvalidError(allErrs, fmt.Sprintf("spec.%s[*].componentName", lowercaseInitial(opsType)),
-			notSupportedComponentNames, fmt.Sprintf("not supported the %s operation", opsType))
-	}
+	// TODO(leon): check each vct's SC whether supports expansion
+	// The error message:
+	//foreach comp in volumeExpansionList:
+	//	var invalidVCTNames []string
+	//	...
+	//	message := "not support volume expansion, check the StorageClass whether allow volume expansion."
+	//	addInvalidError(allErrs, fmt.Sprintf("spec.volumeExpansion[%d].volumeClaimTemplates[*].name", i), invalidVCTNames, message)
 }
 
 // checkComponentExistence checks whether components to be operated exist in cluster spec.
@@ -445,16 +363,7 @@ func lowercaseInitial(opsType OpsType) string {
 	return strings.ToLower(str[:1]) + str[1:]
 }
 
-// convertOperationComponentsToMap converts supportedOperationComponent slice to map
-func convertOperationComponentsToMap(componentNames []OperationComponent) map[string]*OperationComponent {
-	supportedComponentMap := map[string]*OperationComponent{}
-	for _, v := range componentNames {
-		supportedComponentMap[v.Name] = &v
-	}
-	return supportedComponentMap
-}
-
-// checkResourceList checks if k8s resourceList is legal
+// validateVerticalResourceList checks if k8s resourceList is legal
 func validateVerticalResourceList(resourceList map[corev1.ResourceName]resource.Quantity) (string, error) {
 	for k := range resourceList {
 		if k != corev1.ResourceCPU && k != corev1.ResourceMemory && !strings.HasPrefix(k.String(), corev1.ResourceHugePagesPrefix) {

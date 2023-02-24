@@ -341,7 +341,7 @@ spec:
                       type: object
                     name:
                       description: Name of the component, it can be any valid string.
-                      maxLength: 12
+                      maxLength: 18
                       pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                       type: string
                     podSpec:

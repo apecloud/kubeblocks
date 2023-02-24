@@ -88,9 +88,6 @@ func reconcileClusterWorkloads(
 		ClusterVersion:    clusterVer,
 		Resources:         &resourcesQueue,
 	}
-	if err := prepareConnCredential(reqCtx, cli, &task); err != nil {
-		return false, err
-	}
 
 	clusterCompSpecMap := cluster.GetDefNameMappingComponents()
 	clusterCompVerMap := clusterVer.GetDefNameMappingComponents()

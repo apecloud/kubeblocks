@@ -239,7 +239,7 @@ func (mysqlOps *MysqlOperations) CheckStatusOps(ctx context.Context, req *bindin
 		mysqlOps.Logger.Infof("CheckStatus error: %v", err)
 		result["event"] = "CheckStatusFailed"
 		result["message"] = err.Error()
-		if mysqlOps.CheckStatusFailedCount%mysqlOps.CheckFailedThreshold == 0 {
+		if mysqlOps.CheckStatusFailedCount%mysqlOps.FailedEventReportFrequency == 0 {
 			mysqlOps.Logger.Infof("status checks failed %v times continuously", mysqlOps.CheckStatusFailedCount)
 			resp.Metadata[StatusCode] = OperationFailedHTTPCode
 		}

@@ -39,11 +39,11 @@ type OpsResult map[string]interface{}
 type AccessMode string
 
 type BaseOperations struct {
-	CheckRunningFailedCount int
-	CheckStatusFailedCount  int
-	CheckRoleFailedCount    int
-	RoleUnchangedCount      int
-	CheckFailedThreshold    int
+	CheckRunningFailedCount    int
+	CheckStatusFailedCount     int
+	CheckRoleFailedCount       int
+	RoleUnchangedCount         int
+	FailedEventReportFrequency int
 	// RoleDetectionThreshold is used to set the report duration of role event after role changed,
 	// then event controller can always get rolechanged events to maintain pod label accurately
 	// in cases of:
@@ -81,10 +81,10 @@ const (
 	// CommandSQLKey keys from request's metadata.
 	CommandSQLKey = "sql"
 
-	roleEventRecordQPS            = 1. / 60.
-	roleEventRecordFrequency      = int(1 / roleEventRecordQPS)
-	defaultCheckFailedThreshold   = 1800
-	defaultRoleDetectionThreshold = 300
+	roleEventRecordQPS                = 1. / 60.
+	roleEventReportFrequency          = int(1 / roleEventRecordQPS)
+	defaultFailedEventReportFrequency = 1800
+	defaultRoleDetectionThreshold     = 300
 
 	// types for probe
 	CheckRunningType = iota
@@ -100,16 +100,16 @@ const (
 )
 
 func init() {
-	viper.SetDefault("KB_CHECK_FAILED_THRESHOLD", defaultCheckFailedThreshold)
+	viper.SetDefault("KB_FAILED_EVENT_REPORT_FREQUENCY", defaultFailedEventReportFrequency)
 	viper.SetDefault("KB_ROLE_DETECTION_THRESHOLD", defaultRoleDetectionThreshold)
 }
 
 func (ops *BaseOperations) Init(metadata bindings.Metadata) {
-	ops.CheckFailedThreshold = viper.GetInt("KB_CHECK_FAILED_THRESHOLD")
-	if ops.CheckFailedThreshold < 300 {
-		ops.CheckFailedThreshold = 300
-	} else if ops.CheckFailedThreshold > 3600 {
-		ops.CheckFailedThreshold = 3600
+	ops.FailedEventReportFrequency = viper.GetInt("KB_FAILED_EVENT_REPORT_FREQUENCY")
+	if ops.FailedEventReportFrequency < 300 {
+		ops.FailedEventReportFrequency = 300
+	} else if ops.FailedEventReportFrequency > 3600 {
+		ops.FailedEventReportFrequency = 3600
 	}
 
 	ops.RoleDetectionThreshold = viper.GetInt("KB_ROLE_DETECTION_THRESHOLD")
@@ -218,7 +218,7 @@ func (ops *BaseOperations) CheckRoleOps(ctx context.Context, req *bindings.Invok
 		ops.Logger.Infof("error executing roleCheck: %v", err)
 		opsRes["event"] = "roleCheckFailed"
 		opsRes["message"] = err.Error()
-		if ops.CheckRoleFailedCount%ops.CheckFailedThreshold == 0 {
+		if ops.CheckRoleFailedCount%ops.FailedEventReportFrequency == 0 {
 			ops.Logger.Infof("role checks failed %v times continuously", ops.CheckRoleFailedCount)
 			resp.Metadata[StatusCode] = OperationFailedHTTPCode
 		}
@@ -249,7 +249,7 @@ func (ops *BaseOperations) CheckRoleOps(ctx context.Context, req *bindings.Invok
 	// roleChanged events to maintain pod label accurately in cases of:
 	// 1 roleChanged event loss;
 	// 2 pod role label deleted or updated incorrectly.
-	if ops.RoleUnchangedCount < ops.RoleDetectionThreshold && ops.RoleUnchangedCount%roleEventRecordFrequency == 0 {
+	if ops.RoleUnchangedCount < ops.RoleDetectionThreshold && ops.RoleUnchangedCount%roleEventReportFrequency == 0 {
 		resp.Metadata[StatusCode] = OperationFailedHTTPCode
 	}
 	return opsRes, nil
@@ -271,7 +271,7 @@ func (ops *BaseOperations) GetRoleOps(ctx context.Context, req *bindings.InvokeR
 		ops.Logger.Infof("error executing roleCheck: %v", err)
 		opsRes["event"] = "roleCheckFailed"
 		opsRes["message"] = err.Error()
-		if ops.CheckRoleFailedCount%ops.CheckFailedThreshold == 0 {
+		if ops.CheckRoleFailedCount%ops.FailedEventReportFrequency == 0 {
 			ops.Logger.Infof("role checks failed %v times continuously", ops.CheckRoleFailedCount)
 			resp.Metadata[StatusCode] = OperationFailedHTTPCode
 		}
@@ -306,8 +306,8 @@ func (ops *BaseOperations) roleValidate(role string) (bool, string) {
 	return isValid, msg
 }
 
-// CheckRunningOps checks whether the binding service is in running status:
-// the port is open or is close consecutively in CheckFailedThreshold times
+// CheckRunningOps checks whether the binding service is in running status,
+// If check fails continuously, report an event at FailedEventReportFrequency frequency
 func (ops *BaseOperations) CheckRunningOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
 	var message string
 	opsRes := OpsResult{}
@@ -320,7 +320,7 @@ func (ops *BaseOperations) CheckRunningOps(ctx context.Context, req *bindings.In
 		ops.Logger.Errorf(message)
 		opsRes["event"] = "CheckRunningFailed"
 		opsRes["message"] = message
-		if ops.CheckRunningFailedCount%ops.CheckFailedThreshold == 0 {
+		if ops.CheckRunningFailedCount%ops.FailedEventReportFrequency == 0 {
 			ops.Logger.Infof("running checks failed %v times continuously", ops.CheckRunningFailedCount)
 			resp.Metadata[StatusCode] = OperationFailedHTTPCode
 		}

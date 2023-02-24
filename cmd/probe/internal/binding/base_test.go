@@ -52,8 +52,8 @@ func TestInit(t *testing.T) {
 	if p.RoleUnchangedCount != 0 {
 		t.Errorf("p.RoleUnchangedCount init failed: %d", p.RoleUnchangedCount)
 	}
-	if p.CheckFailedThreshold != defaultCheckFailedThreshold {
-		t.Errorf("p.CheckFailedThreshold init failed: %d", p.CheckFailedThreshold)
+	if p.FailedEventReportFrequency != defaultFailedEventReportFrequency {
+		t.Errorf("p.FailedEventReportFrequency init failed: %d", p.FailedEventReportFrequency)
 	}
 	if p.RoleDetectionThreshold != defaultRoleDetectionThreshold {
 		t.Errorf("p.RoleDetectionThreshold init failed: %d", p.RoleDetectionThreshold)

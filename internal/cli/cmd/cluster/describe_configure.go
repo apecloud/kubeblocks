@@ -343,7 +343,7 @@ func (r *reconfigureOptions) printConfigureHistory(configs map[appsv1alpha1.Conf
 		if ops.Spec.Type != appsv1alpha1.ReconfiguringType {
 			continue
 		}
-		components := getComponentNameFromOps(ops.Spec)
+		components := getComponentNameFromOps(ops)
 		if !strings.Contains(components, r.componentName) {
 			continue
 		}

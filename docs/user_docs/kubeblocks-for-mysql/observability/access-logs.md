@@ -1,7 +1,7 @@
 ---
 title: Access logs
 description: How to access cluster log files
-sidebar_position: 2
+sidebar_position: 1
 ---
 
 # Access logs

@@ -1,6 +1,6 @@
 ---
-title: Monitor MySQL database
-description: How to monitor your MySQL database
+title: Monitor database
+description: How to monitor your database
 sidebar_position: 1
 ---
 

@@ -30,6 +30,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 	"github.com/apecloud/kubeblocks/internal/controller/plan"
 	"github.com/apecloud/kubeblocks/internal/controllerutil"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
@@ -38,8 +39,8 @@ import (
 
 var _ = Describe("TLS self-signed cert function", func() {
 	const (
-		clusterDefName     = "test-clusterdef"
-		clusterVersionName = "test-clusterversion"
+		clusterDefName     = "test-clusterdef-tls"
+		clusterVersionName = "test-clusterversion-tls"
 		clusterNamePrefix  = "test-cluster"
 		statefulCompType   = "replicasets"
 		statefulCompName   = "mysql"
@@ -92,7 +93,7 @@ var _ = Describe("TLS self-signed cert function", func() {
 			testapps.NewClusterDefFactory(clusterDefName).
 				SetConnectionCredential(map[string]string{"username": "root", "password": ""}).
 				AddComponent(testapps.ConsensusMySQLComponent, statefulCompType).
-				AddConfigTemplate(configTplName, configMapObj.Name, configConstraintObj.Name, configVolumeName, testapps.ConfVolumeName, &mode).
+				AddConfigTemplate(configTplName, configMapObj.Name, configConstraintObj.Name, testCtx.DefaultNamespace, testapps.ConfVolumeName, &mode).
 				AddContainerEnv(mysqlContainerName, corev1.EnvVar{Name: "MYSQL_ALLOW_EMPTY_PASSWORD", Value: "yes"}).
 				CheckedCreate(&testCtx).GetObject()
 
@@ -235,7 +236,9 @@ var _ = Describe("TLS self-signed cert function", func() {
 					GetObject()
 				stsList := testk8s.ListAndCheckStatefulSet(&testCtx, client.ObjectKeyFromObject(clusterObj))
 				sts := stsList.Items[0]
-				cmName := sts.Name + "-" + configVolumeName
+				cd := &appsv1alpha1.ClusterDefinition{}
+				Expect(k8sClient.Get(ctx, types.NamespacedName{Name: clusterDefName, Namespace: testCtx.DefaultNamespace}, cd)).Should(Succeed())
+				cmName := cfgcore.GetInstanceCMName(&sts, &cd.Spec.ComponentDefs[0].ConfigSpec.ConfigTemplateRefs[0])
 				cmKey := client.ObjectKey{Namespace: sts.Namespace, Name: cmName}
 				hasTLSSettings := func() bool {
 					cm := &corev1.ConfigMap{}

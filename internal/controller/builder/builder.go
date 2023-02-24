@@ -722,3 +722,21 @@ func BuildBackupManifestsJob(key types.NamespacedName, backup *dataprotectionv1a
 	}
 	return job, nil
 }
+
+func BuildPITRJob(cluster *appsv1alpha1.Cluster, image string, commands []string,
+	volumes []corev1.Volume, volumeMounts []corev1.VolumeMount) (*batchv1.Job, error) {
+	const tplFile = "pitr_job_template.cue"
+	job := &batchv1.Job{}
+	if err := buildFromCUE(tplFile, map[string]any{
+		"job.metadata.name":              "pitr-prepare-" + cluster.Name,
+		"job.metadata.namespace":         cluster.Namespace,
+		"job.spec.template.spec.volumes": volumes,
+		"container.image":                image,
+		"container.args":                 commands,
+		"container.volumeMounts":         volumeMounts,
+	}, "job", job); err != nil {
+		return nil, err
+	}
+
+	return job, nil
+}

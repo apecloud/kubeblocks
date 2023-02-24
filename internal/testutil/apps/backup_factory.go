@@ -57,3 +57,8 @@ func (factory *MockBackupFactory) SetTTL(duration string) *MockBackupFactory {
 	factory.get().Spec.TTL = &d
 	return factory
 }
+
+func (factory *MockBackupFactory) SetLabels(labels map[string]string) *MockBackupFactory {
+	factory.get().SetLabels(labels)
+	return factory
+}

@@ -37,6 +37,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	"github.com/apecloud/kubeblocks/controllers/k8score"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
@@ -94,6 +95,9 @@ var _ = BeforeSuite(func() {
 	Expect(cfg).NotTo(BeNil())
 
 	err = appsv1alpha1.AddToScheme(scheme.Scheme)
+	Expect(err).NotTo(HaveOccurred())
+
+	err = dpv1alpha1.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
 
 	// +kubebuilder:scaffold:scheme

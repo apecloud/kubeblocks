@@ -42,7 +42,6 @@ backup_policy: {
 	spec: {
 		"backupPolicyTemplateName": template
 		"target": {
-			"databaseEngine": "mysql"
 			"labelsSelector": {
 				"matchLabels": sts.metadata.labels
 			}

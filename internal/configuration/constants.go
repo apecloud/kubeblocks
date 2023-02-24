@@ -34,7 +34,7 @@ const (
 	CMConfigurationTplNameLabelKey         = "configuration.kubeblocks.io/configuration-tpl-name"
 	CMConfigurationConstraintsNameLabelKey = "configuration.kubeblocks.io/configuration-constraints-name"
 	CMInsConfigurationHashLabelKey         = "configuration.kubeblocks.io/configuration-hash"
-	CMConfigurationISVTplLabelKey          = "configuration.kubeblocks.io/configtemplate-name"
+	CMConfigurationProviderTplLabelKey     = "configuration.kubeblocks.io/configtemplate-name"
 
 	// CMConfigurationCMKeysLabelKey Specify keys
 	CMConfigurationCMKeysLabelKey = "configuration.kubeblocks.io/configmap-keys"

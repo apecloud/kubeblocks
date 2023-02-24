@@ -27,15 +27,6 @@ type BackupToolSpec struct {
 	// +kubebuilder:validation:Required
 	Image string `json:"image"`
 
-	// database engine to support in the backup.
-	// +kubebuilder:validation:Enum={mysql}
-	DatabaseEngine string `json:"databaseEngine,omitempty"`
-
-	// database engine to support in the backup.
-	// +kubebuilder:validation:Enum={"5.6","5.7","8.0"}
-	// +listType=set
-	DatabaseEngineVersions []string `json:"databaseEngineVersions,omitempty"`
-
 	// which kind for run a backup tool.
 	// +kubebuilder:validation:Enum={job,daemon}
 	// +kubebuilder:default=job

@@ -25,7 +25,6 @@ import (
 	"github.com/spf13/viper"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -116,6 +115,11 @@ func PrepareComponentResources(reqCtx intctrlutil.RequestCtx, cli client.Client,
 			task.AppendResource(configs...)
 		}
 		// end render config
+
+		// tls certs secret volume and volumeMount
+		if err := updateTLSVolumeAndVolumeMount(podSpec, task.Cluster.Name, *task.Component); err != nil {
+			return err
+		}
 		return nil
 	}
 
@@ -340,18 +344,10 @@ func buildCfg(task *intctrltypes.ReconcileTask,
 	scheme, _ := appsv1alpha1.SchemeBuilder.Build()
 	cfgLables := make(map[string]string, len(tpls))
 	for _, tpl := range tpls {
-		// Check config cm already exists
 		cmName := cfgcore.GetInstanceCMName(obj, &tpl)
 		volumes[cmName] = tpl
 		// Configuration.kubeblocks.io/cfg-tpl-${ctpl-name}: ${cm-instance-name}
 		cfgLables[cfgcore.GenerateTPLUniqLabelKeyWithConfig(tpl.Name)] = cmName
-		isExist, err := isConfigMapExists(cmName, task.Cluster.Namespace, ctx, cli)
-		if err != nil {
-			return nil, err
-		}
-		if isExist {
-			continue
-		}
 
 		// Generate ConfigMap objects for config files
 		cm, err := generateConfigMapFromTpl(cfgTemplateBuilder, cmName, tpl, task, ctx, cli)
@@ -391,26 +387,6 @@ func updateCMConfigSelectorLabels(cm *corev1.ConfigMap, tpl appsv1alpha1.ConfigT
 		cm.Labels = make(map[string]string)
 	}
 	cm.Labels[cfgcore.CMConfigurationCMKeysLabelKey] = strings.Join(tpl.Keys, ",")
-}
-
-func isConfigMapExists(cmName string, namespace string, ctx context.Context, cli client.Client) (bool, error) {
-	cmKey := client.ObjectKey{
-		Name:      cmName,
-		Namespace: namespace,
-	}
-
-	cmObj := &corev1.ConfigMap{}
-	cmErr := cli.Get(ctx, cmKey, cmObj)
-	if cmErr != nil && apierrors.IsNotFound(cmErr) {
-		// Config is not exists
-		return false, nil
-	} else if cmErr != nil {
-		// An unexpected error occurs
-		// TODO process unexpected error
-		return true, cmErr
-	}
-
-	return true, nil
 }
 
 // generateConfigMapFromTpl render config file by config template provided by provider.

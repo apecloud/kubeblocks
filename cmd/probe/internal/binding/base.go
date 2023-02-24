@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
+	"strconv"
 	"strings"
 	"time"
 
@@ -51,6 +52,7 @@ type BaseOperations struct {
 	// 2 pod role label deleted or updated incorrectly.
 	RoleDetectionThreshold int
 	DBPort                 int
+	DBAddress              string
 	DBType                 string
 	OriRole                string
 	DBRoles                map[string]AccessMode
@@ -131,6 +133,7 @@ func (ops *BaseOperations) Init(metadata bindings.Metadata) {
 		CheckRoleOperation:    ops.CheckRoleOps,
 		GetRoleOperation:      ops.GetRoleOps,
 	}
+	ops.DBAddress = ops.getAddress()
 }
 
 func (ops *BaseOperations) RegisterOperation(opsKind bindings.OperationKind, operation Operation) {
@@ -149,6 +152,12 @@ func (ops *BaseOperations) Operations() []bindings.OperationKind {
 		i++
 	}
 	return opsKinds
+}
+
+// getAddress returns component srervice address, if component it not listening on
+// 127.0.0.1, the Operation need to overwrite this function and set ops.DBAddress
+func (ops *BaseOperations) getAddress() string {
+	return "127.0.0.1"
 }
 
 // Invoke handles all invoke operations.
@@ -244,11 +253,10 @@ func (ops *BaseOperations) CheckRoleOps(ctx context.Context, req *bindings.Invok
 	}
 
 	// RoleUnchangedCount is the count of consecutive role unchanged checks.
-	// if observed role unchanged consecutively in RoleDetectionThreshold times after role changed,
-	// we emit the current role again，then event controller can always get
-	// roleChanged events to maintain pod label accurately in cases of:
-	// 1 roleChanged event loss;
-	// 2 pod role label deleted or updated incorrectly.
+	// If the role remains unchanged consecutively in RoleDetectionThreshold checks after it has changed,
+	// then the roleCheck event will be reported at roleEventReportFrequency so that the event controller
+	// can always get relevant roleCheck events in order to maintain the pod label accurately, even in cases
+	// of roleChanged events being lost or the pod role label being deleted or updated incorrectly.
 	if ops.RoleUnchangedCount < ops.RoleDetectionThreshold && ops.RoleUnchangedCount%roleEventReportFrequency == 0 {
 		resp.Metadata[StatusCode] = OperationFailedHTTPCode
 	}
@@ -282,8 +290,8 @@ func (ops *BaseOperations) GetRoleOps(ctx context.Context, req *bindings.InvokeR
 	return opsRes, nil
 }
 
-// DB may have some internal roles that need not be exposed to end user,
-// and not configured in cluster definition, e.g. apecloud-mysql's Candidate.
+// Component may have some internal roles that need not be exposed to end user,
+// and not configured in cluster definition, e.g. ETCD's Candidate.
 // roleValidate is used to filter the internal roles and decrease the number
 // of report events to reduce the possibility of event conflicts.
 func (ops *BaseOperations) roleValidate(role string) (bool, string) {
@@ -312,7 +320,7 @@ func (ops *BaseOperations) CheckRunningOps(ctx context.Context, req *bindings.In
 	var message string
 	opsRes := OpsResult{}
 
-	host := fmt.Sprintf("127.0.0.1:%d", ops.DBPort)
+	host := net.JoinHostPort(ops.DBAddress, strconv.Itoa(ops.DBPort))
 	// sql exec timeout need to be less than httpget's timeout which default is 1s.
 	conn, err := net.DialTimeout("tcp", host, 500*time.Millisecond)
 	if err != nil {

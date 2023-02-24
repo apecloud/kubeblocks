@@ -55,6 +55,20 @@ type envVar struct {
 	value     string
 }
 
+type componentPathedName struct {
+	Namespace   string `json:"namespace,omitempty"`
+	ClusterName string `json:"clusterName,omitempty"`
+	Name        string `json:"name,omitempty"`
+}
+
+const (
+	VolumeName = "tls"
+	CAName     = "ca.crt"
+	CertName   = "tls.crt"
+	KeyName    = "tls.key"
+	MountPath  = "/etc/pki/tls"
+)
+
 var (
 	//go:embed cue/*
 	cueTemplates embed.FS
@@ -151,6 +165,21 @@ func injectEnvs(params BuilderParams, envConfigName string, c *corev1.Container)
 			Name:  constant.KBPrefix + v.name,
 			Value: v.value,
 		})
+	}
+
+	if params.Component.TLS {
+		tlsEnv := []envVar{
+			{name: "_TLS_CERT_PATH", value: MountPath},
+			{name: "_TLS_CA_FILE", value: CAName},
+			{name: "_TLS_CERT_FILE", value: CertName},
+			{name: "_TLS_KEY_FILE", value: KeyName},
+		}
+		for _, v := range tlsEnv {
+			toInjectEnv = append(toInjectEnv, corev1.EnvVar{
+				Name:  constant.KBPrefix + v.name,
+				Value: v.value,
+			})
+		}
 	}
 
 	// have injected variables placed at the front of the slice
@@ -567,4 +596,19 @@ func BuildCfgManagerContainer(sidecarRenderedParam *cfgcm.ConfigManagerSidecar) 
 		return nil, err
 	}
 	return &container, nil
+}
+
+func BuildTLSSecret(namespace, clusterName, componentName string) (*corev1.Secret, error) {
+	const tplFile = "tls_certs_secret_template.cue"
+
+	secret := &corev1.Secret{}
+	pathedName := componentPathedName{
+		Namespace:   namespace,
+		ClusterName: clusterName,
+		Name:        componentName,
+	}
+	if err := buildFromCUE(tplFile, map[string]any{"pathedName": pathedName}, "secret", secret); err != nil {
+		return nil, err
+	}
+	return secret, nil
 }

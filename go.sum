@@ -1793,8 +1793,8 @@ github.com/vmihailenco/msgpack/v4 v4.3.12 h1:07s4sz9IReOgdikxLTKNbBdqDMLsjPKXwvC
 github.com/vmihailenco/msgpack/v4 v4.3.12/go.mod h1:gborTTJjAo/GWTqqRjrLCn9pgNN+NXzzngzBKDPIqw4=
 github.com/vmihailenco/tagparser v0.1.1 h1:quXMXlA39OCbd2wAdTsGDlK9RkOk6Wuw+x37wVyIuWY=
 github.com/vmihailenco/tagparser v0.1.1/go.mod h1:OeAg3pn3UbLjkWt+rN9oFYB6u/cQgqMEUPoW2WPyhdI=
-github.com/vmware-tanzu/velero v1.10.0 h1:32A6yxH9zmMnNUT9HO7P5Y3GscUNZVqozDEb+mC2jCg=
-github.com/vmware-tanzu/velero v1.10.0/go.mod h1:k/1NPNxfhAeUeBuIL6HJuKtTFPgmpiWP+cHa3zi3ZQM=
+github.com/vmware-tanzu/velero v1.10.1 h1:6WYOolZIygHb8FOZtpp8vCqCuy5Mk3qBF1S65L5cjuo=
+github.com/vmware-tanzu/velero v1.10.1/go.mod h1:N0J+j8xGSmanGpy1zCRMH2DMGPpwkUj9EZIUXfOlanY=
 github.com/willf/bitset v1.1.11-0.20200630133818-d5bec3311243/go.mod h1:RjeCKbqT1RxIR/KWY6phxZiaY1IyutSBfGjNPySAYV4=
 github.com/willf/bitset v1.1.11/go.mod h1:83CECat5yLh5zVOf4P1ErAgKA5UDvKtgyUABdr3+MjI=
 github.com/xanzy/ssh-agent v0.3.1 h1:AmzO1SSWxw73zxFZPRwaMN1MohDw8UyHnmuxyceTEGo=

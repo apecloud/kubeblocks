@@ -200,6 +200,8 @@ func (r *Cluster) validateComponents(allErrs *field.ErrorList, clusterDef *Clust
 
 	r.validatePrimaryIndex(allErrs)
 
+	r.validateComponentTLSSettings(allErrs)
+
 	if len(invalidComponentDefs) > 0 {
 		*allErrs = append(*allErrs, field.NotFound(field.NewPath("spec.components[*].type"),
 			getComponentDefNotFoundMsg(invalidComponentDefs, r.Spec.ClusterDefRef)))
@@ -216,5 +218,20 @@ func (r *Cluster) validateComponentResources(allErrs *field.ErrorList, resources
 	}
 	if invalidValue, err := compareRequestsAndLimits(resources); err != nil {
 		*allErrs = append(*allErrs, field.Invalid(field.NewPath(fmt.Sprintf("spec.components[%d].resources.requests", index)), invalidValue, err.Error()))
+	}
+}
+
+func (r *Cluster) validateComponentTLSSettings(allErrs *field.ErrorList) {
+	for index, component := range r.Spec.ComponentSpecs {
+		if !component.TLS {
+			continue
+		}
+		if component.Issuer == nil {
+			*allErrs = append(*allErrs, field.Required(field.NewPath(fmt.Sprintf("spec.components[%d].issuer", index)), "Issuer must be set when Tls enabled"))
+			continue
+		}
+		if component.Issuer.Name == IssuerUserProvided && component.Issuer.SecretRef == nil {
+			*allErrs = append(*allErrs, field.Required(field.NewPath(fmt.Sprintf("spec.components[%d].issuer.secretRef", index)), "Secret must provide when issuer name is UserProvided"))
+		}
 	}
 }

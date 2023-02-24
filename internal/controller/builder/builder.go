@@ -20,6 +20,7 @@ import (
 	"embed"
 	"encoding/json"
 	"fmt"
+	"github.com/apecloud/kubeblocks/internal/controller/plan"
 	"strconv"
 	"strings"
 
@@ -158,6 +159,21 @@ func injectEnvs(params BuilderParams, envConfigName string, c *corev1.Container)
 			Name:  constant.KBPrefix + v.name,
 			Value: v.value,
 		})
+	}
+
+	if params.Component.TLS {
+		tlsEnv := []envVar{
+			{name: "_TLS_CERT_PATH", value: plan.MountPath},
+			{name: "_TLS_CA_FILE", value: plan.CAName},
+			{name: "_TLS_CERT_FILE", value: plan.CertName},
+			{name: "_TLS_KEY_FILE", value: plan.KeyName},
+		}
+		for _, v := range tlsEnv {
+			toInjectEnv = append(toInjectEnv, corev1.EnvVar{
+				Name: constant.KBPrefix + v.name,
+				Value: v.value,
+			})
+		}
 	}
 
 	// have injected variables placed at the front of the slice

@@ -28,11 +28,13 @@ import (
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
 
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/cluster"
 	"github.com/apecloud/kubeblocks/internal/cli/engine"
 	"github.com/apecloud/kubeblocks/internal/cli/exec"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
+	"github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 var connectExample = templates.Examples(`
@@ -56,6 +58,10 @@ type ConnectOptions struct {
 	clientType  string
 	showExample bool
 	engine      engine.Interface
+
+	privateEndPoint bool
+	svc             *corev1.Service
+
 	*exec.ExecOptions
 }
 
@@ -108,6 +114,14 @@ func (o *ConnectOptions) runShowExample(args []string) error {
 		return err
 	}
 
+	// if cluster does not have public endpoints, tell user to use port-forward command and
+	// connect cluster from local host
+	if o.privateEndPoint {
+		fmt.Fprintf(o.Out, "# cluster %s does not have public endpoints, you can run following command and connect cluster from local host\n"+
+			"kubectl port-forward service/%s %s:%s\n\n", o.name, o.svc.Name, info.Port, info.Port)
+		info.Host = "127.0.0.1"
+	}
+
 	fmt.Fprint(o.Out, o.engine.ConnectExample(info, o.clientType))
 	return nil
 }
@@ -139,14 +153,21 @@ func (o *ConnectOptions) connect(args []string) error {
 		return err
 	}
 
-	// get the connect command and the target container
-	engine, err := getEngineByPod(pod)
+	// cluster name is not specified, get from pod label
+	if o.name == "" {
+		if name, ok := pod.Annotations[controllerutil.AppInstanceLabelKey]; !ok {
+			return fmt.Errorf("failed to find the cluster to which the instance belongs")
+		} else {
+			o.name = name
+		}
+	}
+
+	info, err := o.getConnectionInfo()
 	if err != nil {
 		return err
 	}
 
-	o.Command = engine.ConnectCommand()
-	o.ContainerName = engine.Container()
+	o.Command = buildCommand(info)
 	o.Pod = pod
 	return o.ExecOptions.Run()
 }
@@ -179,20 +200,6 @@ func (o *ConnectOptions) getTargetPod() error {
 	return nil
 }
 
-func getEngineByPod(pod *corev1.Pod) (engine.Interface, error) {
-	typeName, err := cluster.GetClusterTypeByPod(pod)
-	if err != nil {
-		return nil, err
-	}
-
-	engine, err := engine.New(typeName)
-	if err != nil {
-		return nil, err
-	}
-
-	return engine, nil
-}
-
 func (o *ConnectOptions) getConnectionInfo() (*engine.ConnectionInfo, error) {
 	info := &engine.ConnectionInfo{}
 	getter := cluster.ObjectsGetter{
@@ -213,44 +220,38 @@ func (o *ConnectOptions) getConnectionInfo() (*engine.ConnectionInfo, error) {
 	}
 
 	// get username and password
-	if info.User, info.Password, err = getUserAndPassword(objs.Secrets); err != nil {
+	if info.User, info.Password, err = getUserAndPassword(objs.ClusterDef, objs.Secrets); err != nil {
 		return nil, err
 	}
 
 	// get host and port, use external endpoints first, if external endpoints are empty,
 	// use internal endpoints
-	var (
-		private = false
-		svc     *corev1.Service
-	)
 
 	// TODO: now the primary component is the first component, that may not be correct,
 	// maybe show all components connection info in the future.
-	primaryComponent := cluster.FindClusterComp(objs.Cluster, objs.ClusterDef.Spec.ComponentDefs[0].Name)
-	internalSvcs, externalSvcs := cluster.GetComponentServices(objs.Services, primaryComponent)
+	primaryCompDef := objs.ClusterDef.Spec.ComponentDefs[0]
+	primaryComp := cluster.FindClusterComp(objs.Cluster, primaryCompDef.Name)
+	internalSvcs, externalSvcs := cluster.GetComponentServices(objs.Services, primaryComp)
 	switch {
 	case len(externalSvcs) > 0:
 		// cluster has public endpoint
-		svc = externalSvcs[0]
-		info.Host = cluster.GetExternalIP(svc)
-		info.Port = fmt.Sprintf("%d", svc.Spec.Ports[0].Port)
+		o.svc = externalSvcs[0]
+		info.Host = cluster.GetExternalIP(o.svc)
+		info.Port = fmt.Sprintf("%d", o.svc.Spec.Ports[0].Port)
 	case len(internalSvcs) > 0:
 		// cluster does not have public endpoint
-		svc = internalSvcs[0]
-		info.Host = svc.Spec.ClusterIP
-		info.Port = fmt.Sprintf("%d", svc.Spec.Ports[0].Port)
-		private = true
+		o.svc = internalSvcs[0]
+		info.Host = o.svc.Spec.ClusterIP
+		info.Port = fmt.Sprintf("%d", o.svc.Spec.Ports[0].Port)
+		o.privateEndPoint = true
 	default:
 		// does not find any endpoints
 		return nil, fmt.Errorf("failed to find any cluster endpoints")
 	}
 
-	// if cluster does not have public endpoints, tell user to use port-forward command and
-	// connect cluster from local host
-	if private {
-		fmt.Fprintf(o.Out, "# cluster %s does not have public endpoints, you can run following command and connect cluster from local host\n"+
-			"kubectl port-forward service/%s %s:%s\n\n", objs.Cluster.Name, svc.Name, info.Port, info.Port)
-		info.Host = "127.0.0.1"
+	info.Command, info.Args, err = getCompCommandArgs(&primaryCompDef)
+	if err != nil {
+		return nil, err
 	}
 
 	// get engine
@@ -263,7 +264,7 @@ func (o *ConnectOptions) getConnectionInfo() (*engine.ConnectionInfo, error) {
 }
 
 // get cluster user and password from secrets
-func getUserAndPassword(secrets *corev1.SecretList) (string, string, error) {
+func getUserAndPassword(clusterDef *appsv1alpha1.ClusterDefinition, secrets *corev1.SecretList) (string, string, error) {
 	var (
 		user, password = "", ""
 		err            error
@@ -271,6 +272,15 @@ func getUserAndPassword(secrets *corev1.SecretList) (string, string, error) {
 
 	if len(secrets.Items) == 0 {
 		return user, password, fmt.Errorf("failed to find the cluster username and password")
+	}
+
+	getPasswordKey := func(connectionCredential map[string]string) string {
+		for k := range connectionCredential {
+			if strings.Contains(k, "password") {
+				return k
+			}
+		}
+		return "password"
 	}
 
 	getSecretVal := func(secret *corev1.Secret, key string) (string, error) {
@@ -282,12 +292,49 @@ func getUserAndPassword(secrets *corev1.SecretList) (string, string, error) {
 	}
 
 	// now, we only use the first secret
-	secret := secrets.Items[0]
+	var secret corev1.Secret
+	for i, s := range secrets.Items {
+		if strings.Contains(s.Name, "conn-credential") {
+			secret = secrets.Items[i]
+		}
+	}
 	user, err = getSecretVal(&secret, "username")
 	if err != nil {
 		return user, password, err
 	}
 
-	password, err = getSecretVal(&secret, "password")
+	passwordKey := getPasswordKey(clusterDef.Spec.ConnectionCredential)
+	password, err = getSecretVal(&secret, passwordKey)
 	return user, password, err
+}
+
+func getCompCommandArgs(compDef *appsv1alpha1.ClusterComponentDefinition) ([]string, []string, error) {
+	failErr := fmt.Errorf("failed to find the connection command")
+	if compDef == nil || compDef.SystemAccounts == nil ||
+		compDef.SystemAccounts.CmdExecutorConfig == nil {
+		return nil, nil, failErr
+	}
+
+	execCfg := compDef.SystemAccounts.CmdExecutorConfig
+	command := execCfg.Command
+	if len(command) == 0 {
+		return nil, nil, failErr
+	}
+	return command, execCfg.Args, nil
+}
+
+func buildCommand(info *engine.ConnectionInfo) []string {
+	command := []string{"sh", "-c"}
+	args := info.Command
+	for _, arg := range info.Args {
+		if strings.Contains(arg, "$(KB_ACCOUNT_ENDPOINT)") {
+			args = append(args, strings.Replace(arg, "$(KB_ACCOUNT_ENDPOINT)", "127.0.0.1", 1))
+			continue
+		}
+		if strings.Contains(arg, "$(KB_ACCOUNT_STATEMENT)") {
+			continue
+		}
+		args = append(args, strings.Replace(strings.Replace(arg, "(", "", 1), ")", "", 1))
+	}
+	return append(command, strings.Join(args, " "))
 }

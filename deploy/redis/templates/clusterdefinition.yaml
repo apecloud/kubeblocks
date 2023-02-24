@@ -9,7 +9,7 @@ spec:
     username: ""
     password: ""
   componentDefs:
-    - name: redis
+    - name: replication
       workloadType: Replication
       characterType: redis
       service:

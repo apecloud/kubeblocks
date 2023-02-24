@@ -89,7 +89,7 @@ func (r *DeploymentReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	componentDef := clusterDef.GetComponentDefByName(componentSpec.ComponentDefRef)
 	statelessComp := stateless.NewStateless(reqCtx.Ctx, r.Client, cluster, componentSpec, componentDef)
 	compCtx := newComponentContext(reqCtx, r.Client, r.Recorder, statelessComp, deploy, componentSpec)
-	if requeueAfter, err := handleComponentStatusAndSyncCluster(compCtx, cluster); err != nil {
+	if requeueAfter, err := updateComponentStatusInClusterStatus(compCtx, cluster); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	} else if requeueAfter != 0 {
 		// if the reconcileAction need requeue, do it

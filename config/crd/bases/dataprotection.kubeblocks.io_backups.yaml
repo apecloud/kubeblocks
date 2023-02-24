@@ -107,6 +107,11 @@ spec:
               phase:
                 description: BackupPhase The current phase. Valid values are New,
                   InProgress, Completed, Failed.
+                enum:
+                - New
+                - InProgress
+                - Completed
+                - Failed
                 type: string
               startTimestamp:
                 description: Date/time when the backup started being processed.

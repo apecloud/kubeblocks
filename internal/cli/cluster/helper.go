@@ -86,8 +86,6 @@ func GetSimpleInstanceInfos(dynamic dynamic.Interface, name string, namespace st
 				buildInfoByStatus(&f)
 			}
 		}
-
-		// TODO: now we only support consensus set
 	}
 
 	// if cluster status does not contain what we need, try to get all instances

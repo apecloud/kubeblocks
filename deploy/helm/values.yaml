@@ -1,46 +1,66 @@
-# Default values for kubeblocks
-# This is a YAML-formatted file.
-# Declare variables to be passed into your templates.
+## @section Common parameters
+##
 
-# Enabled this if you wish to install controller deployment
-replicaCount: 1
-
+## KubeBlocks container image settings
+##
+## @param image.registry KubeBlocks image registry
+## @param image.repository KubeBlocks image repository
+## @param image.pullPolicy KubeBlocks image pull policy
+## @param image.tag KubeBlocks image tag (immutable tags are recommended)
+## @param image.pullSecrets KubeBlocks image pull secrets
 image:
   registry: registry.cn-hangzhou.aliyuncs.com
   repository: apecloud/kubeblocks
   pullPolicy: IfNotPresent
   # Overrides the image tag whose default is the chart appVersion.
   tag: ""
+  imagePullSecrets: []
 
-# runtime:
-  # cri type: auto/containerd/docker
-  # criType: auto
-  # /var/run/docker.sock
-  # runtimeEndpoint:
+## @param replicaCount
+##
+replicaCount: 1
 
-imagePullSecrets: []
+## @param nameOverride
+##
 nameOverride: ""
+
+## @param fullnameOverride
+##
 fullnameOverride: ""
 
-# -- Deployment update strategy.
-# Ref: https://kubernetes.io/docs/concepts/workloads/controllers/deployment/#strategy
-# @default -- See [values.yaml](values.yaml)
+## Deployment update strategy.
+## Ref: https://kubernetes.io/docs/concepts/workloads/controllers/deployment/#strategy
+##
+## @param updateStrategy.rollingUpdate
+## @param updateStrategy.type
 updateStrategy:
   rollingUpdate:
     maxSurge: 1
     maxUnavailable: 40%
   type: RollingUpdate
 
-# -- Change `hostNetwork` to `true` when you want the KubeBlocks's pod to share its host's network namespace.
-# Useful for situations like when you end up dealing with a custom CNI over Amazon EKS.
-# Update the `dnsPolicy` accordingly as well to suit the host network mode.
+## Change `hostNetwork` to `true` when you want the KubeBlocks's pod to share its host's network namespace.
+## Useful for situations like when you end up dealing with a custom CNI over Amazon EKS.
+## Update the `dnsPolicy` accordingly as well to suit the host network mode.
+##
+## @param hostNetwork
+##
 hostNetwork: false
 
-# -- `dnsPolicy` determines the manner in which DNS resolution happens in the cluster.
-# In case of `hostNetwork: true`, usually, the `dnsPolicy` is suitable to be `ClusterFirstWithHostNet`.
-# For further reference: https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/#pod-s-dns-policy.
+## `dnsPolicy` determines the manner in which DNS resolution happens in the cluster.
+## In case of `hostNetwork: true`, usually, the `dnsPolicy` is suitable to be `ClusterFirstWithHostNet`.
+## For further reference: https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/#pod-s-dns-policy.
+##
+## @param dnsPolicy
+##
 dnsPolicy: ClusterFirst
 
+## Logger settings
+##
+## @param loggerSettings.developmentMode
+## @param loggerSettings.encoder
+## @param loggerSettings.level
+## @param loggerSettings.timeEncoding
 loggerSettings:
   # Development Mode defaults(encoder=consoleEncoder,logLevel=Debug,stackTraceLevel=Warn).
   # Production Mode defaults(encoder=jsonEncoder,logLevel=Info,stackTraceLevel=Error) (default false)
@@ -54,6 +74,11 @@ loggerSettings:
   # 'rfc3339nano'). Defaults to 'iso8601'.
   timeEncoding: 'iso8601'
 
+## ServiceAccount settings
+##
+## @param serviceAccount.create
+## @param serviceAccount.annotations
+## @param serviceAccount.name
 serviceAccount:
   # Specifies whether a service account should be created
   create: true
@@ -63,14 +88,27 @@ serviceAccount:
   # If not set and create is true, a name is generated using the fullname template
   name: ""
 
+## @param podAnnotations
+##
 podAnnotations: {}
 
+## Security context settings
+##
+## @param securityContext.allowPrivilegeEscalation
+## @param securityContext.capabilities
 securityContext:
   allowPrivilegeEscalation: false
   capabilities:
     drop:
     - ALL
 
+## Pod security context settings
+##
+## @param podSecurityContext.runAsNonRoot
+## @param podSecurityContext.readOnlyRootFilesystem
+## @param podSecurityContext.runAsUser
+## @param podSecurityContext.fsGroup
+## @param podSecurityContext.seccompProfile
 podSecurityContext:
   runAsNonRoot: true
   # readOnlyRootFilesystem: true
@@ -84,6 +122,11 @@ podSecurityContext:
   # seccompProfile:
   #   type: RuntimeDefault
 
+## Service settings
+##
+## @param service.type
+## @param service.port
+## @param service.nodePort
 service:
   type: ClusterIP
   port: 9443
@@ -95,6 +138,9 @@ service:
 ## Metrics serviceMonitor parameters
 ## Enable this if you're using Prometheus Operator
 ##
+## @param serviceMonitor.enabled
+## @param serviceMonitor.port
+## @param serviceMonitor.nodePort
 serviceMonitor:
   enabled: false
   # metrics server will be exposed at this port.
@@ -102,9 +148,15 @@ serviceMonitor:
   # Only used if `service.type` is `NodePort`.
   nodePort:
 
-# -- Topology spread constraints.
+## @param topologySpreadConstraints
+##
 topologySpreadConstraints: []
 
+
+## Resource settings
+##
+## @param topologySpreadConstraints.limits
+## @param topologySpreadConstraints.requests
 resources: {}
   # We usually recommend not to specify default resources and to leave this as a conscious
   # choice for the user. This also increases chances charts run on environments with little
@@ -119,6 +171,17 @@ resources: {}
   #   cpu: 10m
   #   memory: 64Mi
 
+## @param priorityClassName
+##
+priorityClassName:
+
+## Autoscaling settings
+##
+## @param autoscaling.enabled
+## @param autoscaling.minReplicas
+## @param autoscaling.maxReplicas
+## @param autoscaling.targetCPUUtilizationPercentage
+## @param autoscaling.targetMemoryUtilizationPercentage
 autoscaling:
   enabled: false
   minReplicas: 1
@@ -126,24 +189,34 @@ autoscaling:
   targetCPUUtilizationPercentage: 80
   # targetMemoryUtilizationPercentage: 80
 
+## @param nodeSelector
+##
 nodeSelector: {}
 
+## @param tolerations
+##
 tolerations: []
 
+## @param affinity
+##
 affinity: {}
 
+## PDB settings
+##
+## @param podDisruptionBudget.minAvailable
+## @param podDisruptionBudget.maxUnavailable
 podDisruptionBudget:
   minAvailable: 1
   maxUnavailable:
 
+## AdmissionWebhooks settings
+##
+## @param admissionWebhooks.enabled
+## @param admissionWebhooks.createSelfSignedCert
 admissionWebhooks:
   enabled: true
   createSelfSignedCert: true
 
-dashboards:
-  ## If false, dashboards will not be installed
-  ##
-  enabled: false
 
 ## Data protection settings
 ##
@@ -162,6 +235,13 @@ dataProtection:
   ##
   backupTTL: ""
 
+
+## Dashboards settings
+##
+dashboards:
+  ## If false, dashboards will not be installed
+  ##
+  enabled: false
 
 # Sub-charts
 prometheus:

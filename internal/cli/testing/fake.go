@@ -41,7 +41,7 @@ const (
 	ComponentName      = "fake-component-name"
 	ComponentDefName   = "fake-component-type"
 	NodeName           = "fake-node-name"
-	SecretName         = "fake-secret-name"
+	SecretName         = "fake-secret-conn-credential"
 	StorageClassName   = "fake-storage-class"
 	PVCName            = "fake-pvc"
 
@@ -214,6 +214,15 @@ func FakeClusterDef() *appsv1alpha1.ClusterDefinition {
 		{
 			Name:          ComponentDefName,
 			CharacterType: "mysql",
+			SystemAccounts: &appsv1alpha1.SystemAccountSpec{
+				CmdExecutorConfig: &appsv1alpha1.CmdExecutorConfig{
+					Image:   "",
+					Command: []string{"mysql"},
+					Args:    []string{"-h$(KB_ACCOUNT_ENDPOINT)", "-e $(KB_ACCOUNT_STATEMENT)"},
+				},
+				PasswordConfig: appsv1alpha1.PasswordConfig{},
+				Accounts:       []appsv1alpha1.SystemAccountConfig{},
+			},
 		},
 		{
 			Name:          fmt.Sprintf("%s-%d", ComponentDefName, 1),

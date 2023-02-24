@@ -70,7 +70,7 @@ func TestRawConfig(t *testing.T) {
 	cfg, err := NewConfigLoader(CfgOption{
 		Type:    CfgRawType,
 		Log:     log.FromContext(context.Background()),
-		CfgType: appsv1alpha1.INI,
+		CfgType: appsv1alpha1.Ini,
 		RawData: []byte(iniConfig),
 	})
 
@@ -133,7 +133,7 @@ func TestConfigMapConfig(t *testing.T) {
 	cfg, err := NewConfigLoader(CfgOption{
 		Type:    CfgCmType,
 		Log:     log.FromContext(context.Background()),
-		CfgType: appsv1alpha1.INI,
+		CfgType: appsv1alpha1.Ini,
 		K8sKey: &K8sConfig{
 			CfgKey: client.ObjectKey{
 				Name:      "xxxx",    // set cm name
@@ -269,7 +269,7 @@ func TestGenerateVisualizedParamsList(t *testing.T) {
 				IsModify:     true,
 				UpdateConfig: map[string][]byte{"key": testUpdatedParams}},
 			formatConfig: &appsv1alpha1.FormatterConfig{
-				Format: appsv1alpha1.INI,
+				Format: appsv1alpha1.Ini,
 				FormatterOptions: appsv1alpha1.FormatterOptions{IniConfig: &appsv1alpha1.IniConfig{
 					SectionName: "mysqld",
 				}},
@@ -298,7 +298,7 @@ func TestGenerateVisualizedParamsList(t *testing.T) {
 				AddConfig: map[string]interface{}{"key": testJSON},
 			},
 			formatConfig: &appsv1alpha1.FormatterConfig{
-				Format: appsv1alpha1.INI,
+				Format: appsv1alpha1.Ini,
 				FormatterOptions: appsv1alpha1.FormatterOptions{IniConfig: &appsv1alpha1.IniConfig{
 					SectionName: "mysqld",
 				}},
@@ -324,7 +324,7 @@ func TestGenerateVisualizedParamsList(t *testing.T) {
 				DeleteConfig: map[string]interface{}{"key": testJSON},
 			},
 			formatConfig: &appsv1alpha1.FormatterConfig{
-				Format: appsv1alpha1.INI,
+				Format: appsv1alpha1.Ini,
 				FormatterOptions: appsv1alpha1.FormatterOptions{IniConfig: &appsv1alpha1.IniConfig{
 					SectionName: "mysqld",
 				}},

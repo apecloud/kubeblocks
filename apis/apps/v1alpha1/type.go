@@ -271,7 +271,7 @@ type webhookManager struct {
 type CfgFileFormat string
 
 const (
-	INI        CfgFileFormat = "ini"
+	Ini        CfgFileFormat = "ini"
 	YAML       CfgFileFormat = "yaml"
 	JSON       CfgFileFormat = "json"
 	XML        CfgFileFormat = "xml"

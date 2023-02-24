@@ -420,7 +420,7 @@ func GenerateVisualizedParamsList(configPatch *ConfigPatchInfo, formatConfig *ap
 	}
 
 	var trimPrefix = ""
-	if formatConfig != nil && formatConfig.Format == appsv1alpha1.INI && formatConfig.IniConfig != nil {
+	if formatConfig != nil && formatConfig.Format == appsv1alpha1.Ini && formatConfig.IniConfig != nil {
 		trimPrefix = formatConfig.IniConfig.SectionName
 	}
 

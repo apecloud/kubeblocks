@@ -93,7 +93,7 @@ func (b *clusterPlanBuilder) Build() (graph.Plan, error) {
 		&clusterTransformer{cc: *cc, cli: b.cli, ctx: b.ctx},
 		&credentialTransformer{},
 		&configTransformer{},
-		&CacheDiffTransformer{},
+		&cacheDiffTransformer{cc: *cc, cli: b.cli, ctx: b.ctx},
 		&ClusterStatusTransformer{},
 	}
 	for _, transformer := range transformers {

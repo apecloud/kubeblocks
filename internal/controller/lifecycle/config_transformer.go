@@ -31,6 +31,9 @@ func (c *configTransformer) Transform(dag *graph.DAG) error {
 		return err
 	}
 	isConfig := func(cm *corev1.ConfigMap) bool {
+		// TODO: we should find a way to know if cm is a true config
+		// TODO: the main problem is we can't separate script from config,
+		// TODO: as componentDef.ConfigSpec defines them in same way
 		return false
 	}
 	for _, vertex := range cmVertices {

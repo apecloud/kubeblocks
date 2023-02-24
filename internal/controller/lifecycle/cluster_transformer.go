@@ -70,7 +70,7 @@ func (c *clusterTransformer) Transform(dag *graph.DAG) error {
 		compVer := clusterCompVerMap[compDefName]
 		compSpecs := clusterCompSpecMap[compDefName]
 		for _, compSpec := range compSpecs {
-			if err := prepareComp(component.BuildComponent(c.ctx, c.cc.cluster, &c.cc.cd, &compDef, compVer, &compSpec)); err != nil {
+			if err := prepareComp(component.BuildComponent(c.ctx, *c.cc.cluster, c.cc.cd, compDef, compSpec, compVer)); err != nil {
 				return err
 			}
 		}

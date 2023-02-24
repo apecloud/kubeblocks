@@ -18,9 +18,14 @@ package lifecycle
 
 import (
 	"fmt"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 )
+
+type gvkName struct {
+	kind, ns, name string
+}
 
 func findAll[T interface{}](dag *graph.DAG) ([]graph.Vertex, error) {
 	vertices := make([]graph.Vertex, 0)
@@ -48,4 +53,12 @@ func findAllNot[T interface{}](dag *graph.DAG) ([]graph.Vertex, error) {
 		}
 	}
 	return vertices, nil
+}
+
+func getGVKName(object client.Object) gvkName {
+	return gvkName{
+		kind: object.GetObjectKind().GroupVersionKind().Kind,
+		ns: object.GetNamespace(),
+		name: object.GetName(),
+	}
 }

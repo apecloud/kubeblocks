@@ -250,24 +250,18 @@ func BuildConnCredential(params BuilderParams) (*corev1.Secret, error) {
 
 	replaceVarObjects := func(k, v *string, i int, origValue string, varObjectsMap map[string]string) {
 		toReplace := origValue
-		for {
-			if !strings.Contains(toReplace, "$(") {
-				break
+		for j, r := range varObjectsMap {
+			replaced := strings.ReplaceAll(toReplace, j, r)
+			if replaced == toReplace {
+				continue
 			}
-
-			for j, r := range varObjectsMap {
-				replaced := strings.Replace(toReplace, j, r, 1)
-				if replaced == toReplace {
-					continue
-				}
-				toReplace = replaced
-				// replace key
-				if i == 0 {
-					delete(connCredential.StringData, origValue)
-					*k = replaced
-				} else {
-					*v = replaced
-				}
+			toReplace = replaced
+			// replace key
+			if i == 0 {
+				delete(connCredential.StringData, origValue)
+				*k = replaced
+			} else {
+				*v = replaced
 			}
 		}
 	}
@@ -277,6 +271,9 @@ func BuildConnCredential(params BuilderParams) (*corev1.Secret, error) {
 		copyStringData := connCredential.DeepCopy().StringData
 		for k, v := range copyStringData {
 			for i, vv := range []string{k, v} {
+				if !strings.Contains(vv, "$(") {
+					continue
+				}
 				replaceVarObjects(&k, &v, i, vv, varObjectsMap)
 			}
 			connCredential.StringData[k] = v

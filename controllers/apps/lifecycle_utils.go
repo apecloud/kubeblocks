@@ -80,7 +80,6 @@ func reconcileClusterWorkloads(
 	clusterDef *appsv1alpha1.ClusterDefinition,
 	clusterVer *appsv1alpha1.ClusterVersion,
 	cluster *appsv1alpha1.Cluster) (shouldRequeue bool, err error) {
-
 	resourcesQueue := make([]client.Object, 0, 3)
 	task := intctrltypes.ReconcileTask{
 		Cluster:           cluster,
@@ -88,10 +87,8 @@ func reconcileClusterWorkloads(
 		ClusterVersion:    clusterVer,
 		Resources:         &resourcesQueue,
 	}
-
 	clusterCompSpecMap := cluster.GetDefNameMappingComponents()
 	clusterCompVerMap := clusterVer.GetDefNameMappingComponents()
-
 	process1stComp := true
 
 	prepareComp := func(component *component.SynthesizedComponent) error {

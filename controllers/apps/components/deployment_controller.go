@@ -20,11 +20,9 @@ import (
 	"context"
 
 	appsv1 "k8s.io/api/apps/v1"
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
@@ -84,14 +82,14 @@ func (r *DeploymentReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	}
 
 	componentName := deploy.GetLabels()[intctrlutil.AppComponentLabelKey]
-	clusterComponent := cluster.GetComponentByName(componentName)
-	if clusterComponent == nil {
+	componentSpec := cluster.GetComponentByName(componentName)
+	if componentSpec == nil {
 		return intctrlutil.Reconciled()
 	}
-	componentDef := clusterDef.GetComponentDefByName(clusterComponent.ComponentDefRef)
-	statelessComp := stateless.NewStateless(reqCtx.Ctx, r.Client, cluster, clusterComponent, componentDef)
-	compCtx := newComponentContext(reqCtx, r.Client, r.Recorder, statelessComp, deploy, componentName)
-	if requeueAfter, err := handleComponentStatusAndSyncCluster(compCtx, cluster); err != nil {
+	componentDef := clusterDef.GetComponentDefByName(componentSpec.ComponentDefRef)
+	statelessComp := stateless.NewStateless(reqCtx.Ctx, r.Client, cluster, componentSpec, componentDef)
+	compCtx := newComponentContext(reqCtx, r.Client, r.Recorder, statelessComp, deploy, componentSpec)
+	if requeueAfter, err := updateComponentStatusInClusterStatus(compCtx, cluster); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	} else if requeueAfter != 0 {
 		// if the reconcileAction need requeue, do it
@@ -104,7 +102,8 @@ func (r *DeploymentReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 // SetupWithManager sets up the controller with the Manager.
 func (r *DeploymentReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&appsv1.Deployment{}, builder.WithPredicates(predicate.NewPredicateFuncs(intctrlutil.WorkloadFilterPredicate))).
-		Owns(&corev1.Pod{}).
+		For(&appsv1.Deployment{}).
+		Owns(&appsv1.ReplicaSet{}).
+		WithEventFilter(predicate.NewPredicateFuncs(intctrlutil.WorkloadFilterPredicate)).
 		Complete(r)
 }

@@ -190,11 +190,11 @@ spec:
 			cluster, clusterDef, clusterVersion, _ := newAllFieldsClusterObj(nil, nil, false)
 			component := component.BuildComponent(
 				reqCtx,
-				cluster,
-				clusterDef,
-				&clusterDef.Spec.ComponentDefs[0],
-				&clusterVersion.Spec.ComponentVersions[0],
-				&cluster.Spec.ComponentSpecs[0])
+				*cluster,
+				*clusterDef,
+				clusterDef.Spec.ComponentDefs[0],
+				cluster.Spec.ComponentSpecs[0],
+				&clusterVersion.Spec.ComponentVersions[0])
 			Expect(component).ShouldNot(BeNil())
 			component.HorizontalScalePolicy = &appsv1alpha1.HorizontalScalePolicy{
 				Type:             appsv1alpha1.HScaleDataClonePolicyFromSnapshot,
@@ -239,6 +239,32 @@ spec:
 			sts := newStsObj()
 			Expect(k8sClient.Create(ctx, sts)).Should(Succeed())
 			Expect(deleteObjectOrphan(k8sClient, ctx, sts)).Should(Succeed())
+		})
+	})
+
+	Context("test mergeServiceAnnotations", func() {
+		It("original and target annotations are nil", func() {
+			Expect(mergeServiceAnnotations(nil, nil)).Should(BeNil())
+		})
+		It("target annotations is nil", func() {
+			originalAnnotations := map[string]string{"k1": "v1"}
+			Expect(mergeServiceAnnotations(originalAnnotations, nil)).To(Equal(originalAnnotations))
+		})
+		It("original annotations is nil", func() {
+			targetAnnotations := map[string]string{"k1": "v1"}
+			Expect(mergeServiceAnnotations(nil, targetAnnotations)).To(Equal(targetAnnotations))
+		})
+		It("original annotations have prometheus annotations which should be removed", func() {
+			originalAnnotations := map[string]string{"k1": "v1", "prometheus.io/path": "/metrics"}
+			targetAnnotations := map[string]string{"k2": "v2"}
+			expectAnnotations := map[string]string{"k1": "v1", "k2": "v2"}
+			Expect(mergeServiceAnnotations(originalAnnotations, targetAnnotations)).To(Equal(expectAnnotations))
+		})
+		It("target annotations should override original annotations", func() {
+			originalAnnotations := map[string]string{"k1": "v1", "prometheus.io/path": "/metrics"}
+			targetAnnotations := map[string]string{"k1": "v11"}
+			expectAnnotations := map[string]string{"k1": "v11"}
+			Expect(mergeServiceAnnotations(originalAnnotations, targetAnnotations)).To(Equal(expectAnnotations))
 		})
 	})
 })

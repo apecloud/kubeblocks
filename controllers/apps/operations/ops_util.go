@@ -56,7 +56,7 @@ func ReconcileActionWithComponentOps(opsRes *OpsResource,
 		err                      error
 		ok                       bool
 		expectProgressCount      int32
-		succeedProgressCount     int32
+		completedProgressCount   int32
 		checkAllClusterComponent bool
 	)
 	componentNameMap := opsRequest.GetComponentNameMap()
@@ -66,7 +66,7 @@ func ReconcileActionWithComponentOps(opsRes *OpsResource,
 	}
 	if clusterDef, err = GetClusterDefByName(opsRes.Ctx, opsRes.Client,
 		opsRes.Cluster.Spec.ClusterDefRef); err != nil {
-		return opsRequestPhase, 0, nil
+		return opsRequestPhase, 0, err
 	}
 
 	patch := client.MergeFrom(opsRequest.DeepCopy())
@@ -92,19 +92,19 @@ func ReconcileActionWithComponentOps(opsRes *OpsResource,
 			compStatus.Phase = v.Phase
 		}
 		clusterComponent := opsRes.Cluster.GetComponentByName(k)
-		expectCount, succeedCount, err := handleStatusProgress(opsRes, progressResource{
+		expectCount, completedCount, err := handleStatusProgress(opsRes, progressResource{
 			opsMessageKey:       opsMessageKey,
 			clusterComponent:    clusterComponent,
 			clusterComponentDef: clusterDef.GetComponentDefByName(clusterComponent.ComponentDefRef),
 		}, &compStatus)
 		if err != nil {
-			return opsRequestPhase, 0, nil
+			return opsRequestPhase, 0, err
 		}
 		expectProgressCount += expectCount
-		succeedProgressCount += succeedCount
+		completedProgressCount += completedCount
 		opsRequest.Status.Components[k] = compStatus
 	}
-	opsRequest.Status.Progress = fmt.Sprintf("%d/%d", succeedProgressCount, expectProgressCount)
+	opsRequest.Status.Progress = fmt.Sprintf("%d/%d", completedProgressCount, expectProgressCount)
 	if !reflect.DeepEqual(opsRequest.Status, oldOpsRequestStatus) {
 		if err = opsRes.Client.Status().Patch(opsRes.Ctx, opsRequest, patch); err != nil {
 			return opsRequestPhase, 0, err
@@ -136,13 +136,13 @@ func opsRequestIsCompleted(phase appsv1alpha1.Phase) bool {
 	return slices.Index([]appsv1alpha1.Phase{appsv1alpha1.FailedPhase, appsv1alpha1.SucceedPhase}, phase) != -1
 }
 
-// PatchOpsStatus patches OpsRequest.status
-func PatchOpsStatus(opsRes *OpsResource,
+func PatchOpsStatusWithOpsDeepCopy(opsRes *OpsResource,
+	opsRequestDeepCopy *appsv1alpha1.OpsRequest,
 	phase appsv1alpha1.Phase,
 	condition ...*metav1.Condition) error {
 
 	opsRequest := opsRes.OpsRequest
-	patch := client.MergeFrom(opsRequest.DeepCopy())
+	patch := client.MergeFrom(opsRequestDeepCopy)
 	for _, v := range condition {
 		if v == nil {
 			continue
@@ -167,6 +167,13 @@ func PatchOpsStatus(opsRes *OpsResource,
 	}
 	opsRequest.Status.Phase = phase
 	return opsRes.Client.Status().Patch(opsRes.Ctx, opsRequest, patch)
+}
+
+// PatchOpsStatus patches OpsRequest.status
+func PatchOpsStatus(opsRes *OpsResource,
+	phase appsv1alpha1.Phase,
+	condition ...*metav1.Condition) error {
+	return PatchOpsStatusWithOpsDeepCopy(opsRes, opsRes.OpsRequest.DeepCopy(), phase, condition...)
 }
 
 // PatchClusterNotFound patches ClusterNotFound condition to the OpsRequest.status.conditions.
@@ -219,11 +226,11 @@ func GetOpsRecorderFromSlice(opsRequestSlice []appsv1alpha1.OpsRecorder,
 }
 
 // patchOpsRequestToRunning patches OpsRequest.status.phase to Running
-func patchOpsRequestToRunning(opsRes *OpsResource, opsHandler OpsHandler) error {
+func patchOpsRequestToRunning(opsRes *OpsResource, opsDeepCoy *appsv1alpha1.OpsRequest, opsHandler OpsHandler) error {
 	var condition *metav1.Condition
 	validatePassCondition := appsv1alpha1.NewValidatePassedCondition(opsRes.OpsRequest.Name)
 	condition = opsHandler.ActionStartedCondition(opsRes.OpsRequest)
-	return PatchOpsStatus(opsRes, appsv1alpha1.RunningPhase, validatePassCondition, condition)
+	return PatchOpsStatusWithOpsDeepCopy(opsRes, opsDeepCoy, appsv1alpha1.RunningPhase, validatePassCondition, condition)
 }
 
 // patchClusterStatus updates Cluster.status to record cluster and components information

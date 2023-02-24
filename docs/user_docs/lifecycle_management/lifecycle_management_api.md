@@ -204,14 +204,14 @@ You can check `phase` and `message` to view the executing status and result.
 
 ```
 apiVersion: apps.kubeblocks.io/v1alpha1
-kind:       ClusterVersion
+kind: ClusterVersion
 metadata:
-  name:     ac-mysql-8.0.30
+  name: ac-mysql-8.0.30
 spec:
   clusterDefinitionRef: apecloud-mysql
   components:
     - type: wesql
-      podSpec:
+      versionsContext:
         containers:
           - name: mysql
             image: apecloud/apecloud-mysql-server:8.0.30-4.alpha1.20221031.g1aa54a3

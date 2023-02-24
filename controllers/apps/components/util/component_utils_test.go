@@ -24,12 +24,14 @@ import (
 	. "github.com/onsi/gomega"
 
 	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
+	testk8s "github.com/apecloud/kubeblocks/internal/testutil/k8s"
 )
 
 func checkCompletedPhase(t *testing.T, phase appsv1alpha1.Phase) {
@@ -85,6 +87,28 @@ func TestGetComponentPhase(t *testing.T) {
 	}
 }
 
+func TestGetPhaseWithNoAvailableReplicas(t *testing.T) {
+	status := GetPhaseWithNoAvailableReplicas(int32(0))
+	if status != "" {
+		t.Error(`function GetComponentPhase should return ""`)
+	}
+	status = GetPhaseWithNoAvailableReplicas(int32(2))
+	if status != appsv1alpha1.FailedPhase {
+		t.Error(`function GetComponentPhase should return "Failed"`)
+	}
+}
+
+func TestAvailableReplicasAreConsistent(t *testing.T) {
+	isConsistent := AvailableReplicasAreConsistent(int32(1), int32(1), int32(1))
+	if !isConsistent {
+		t.Error(`function GetComponentPhase should return "true"`)
+	}
+	isConsistent = AvailableReplicasAreConsistent(int32(1), int32(2), int32(1))
+	if isConsistent {
+		t.Error(`function GetComponentPhase should return "false"`)
+	}
+}
+
 var _ = Describe("Consensus Component", func() {
 	var (
 		randomStr          = testCtx.GetRandomStr()
@@ -94,9 +118,9 @@ var _ = Describe("Consensus Component", func() {
 	)
 
 	const (
-		consensusCompType = "consensus"
-		consensusCompName = "consensus"
-		statelessCompName = "stateless"
+		consensusCompDefRef = "consensus"
+		consensusCompName   = "consensus"
+		statelessCompName   = "stateless"
 	)
 
 	cleanAll := func() {
@@ -130,7 +154,7 @@ var _ = Describe("Consensus Component", func() {
 			_ = testapps.MockConsensusComponentPods(testCtx, sts, clusterName, consensusCompName)
 
 			By("test GetComponentDefByCluster function")
-			componentDef, _ := GetComponentDefByCluster(ctx, k8sClient, cluster, consensusCompType)
+			componentDef, _ := GetComponentDefByCluster(ctx, k8sClient, cluster, consensusCompDefRef)
 			Expect(componentDef != nil).Should(BeTrue())
 
 			By("test GetClusterByObject function")
@@ -148,16 +172,8 @@ var _ = Describe("Consensus Component", func() {
 			_ = GetObjectListByComponentName(ctx, k8sClient, cluster, stsList, consensusCompName)
 			Expect(len(stsList.Items) > 0).Should(BeTrue())
 
-			By("test CheckRelatedPodIsTerminating function")
-			isTerminating, _ := CheckRelatedPodIsTerminating(ctx, k8sClient, cluster, consensusCompName)
-			Expect(isTerminating).Should(BeFalse())
-
 			By("test GetComponentStatusMessageKey function")
 			Expect(GetComponentStatusMessageKey("Pod", "mysql-01")).To(Equal("Pod/mysql-01"))
-
-			By("test GetComponentReplicas function")
-			component := cluster.GetComponentByName(consensusCompName)
-			Expect(GetComponentReplicas(component, componentDef)).To(Equal(int32(3)))
 
 			By("test GetComponentStsMinReadySeconds")
 			minReadySeconds, _ := GetComponentWorkloadMinReadySeconds(ctx, k8sClient, cluster,
@@ -166,6 +182,43 @@ var _ = Describe("Consensus Component", func() {
 			minReadySeconds, _ = GetComponentWorkloadMinReadySeconds(ctx, k8sClient, cluster,
 				appsv1alpha1.Consensus, statelessCompName)
 			Expect(minReadySeconds).To(Equal(int32(0)))
+
+			By("test GetCompRelatedObjectList function")
+			stsList = &appsv1.StatefulSetList{}
+			podList, _ := GetCompRelatedObjectList(ctx, k8sClient, cluster, consensusCompName, stsList)
+			Expect(len(stsList.Items) > 0 && len(podList.Items) > 0).Should(BeTrue())
+
+			By("test GetComponentPhaseWhenPodsNotReady function")
+			consensusComp := cluster.GetComponentByName(consensusCompName)
+			checkExistFailedPodOfLatestRevision := func(pod *corev1.Pod, workload metav1.Object) bool {
+				sts := workload.(*appsv1.StatefulSet)
+				return !intctrlutil.PodIsReady(pod) && PodIsControlledByLatestRevision(pod, sts)
+			}
+			// component phase should be Failed when available replicas is 0
+			phase := GetComponentPhaseWhenPodsNotReady(podList, sts, consensusComp.Replicas,
+				sts.Status.AvailableReplicas, checkExistFailedPodOfLatestRevision)
+			Expect(phase).Should(Equal(appsv1alpha1.FailedPhase))
+
+			// mock available replicas to component replicas
+			Expect(testapps.ChangeObjStatus(&testCtx, sts, func() {
+				testk8s.MockStatefulSetReady(sts)
+			})).Should(Succeed())
+			phase = GetComponentPhaseWhenPodsNotReady(podList, sts, consensusComp.Replicas,
+				sts.Status.AvailableReplicas, checkExistFailedPodOfLatestRevision)
+			Expect(len(phase) == 0).Should(BeTrue())
+
+			// mock component is abnormal
+			pod := &podList.Items[0]
+			Expect(testapps.ChangeObjStatus(&testCtx, pod, func() {
+				pod.Status.Conditions = nil
+			})).Should(Succeed())
+			Expect(testapps.ChangeObjStatus(&testCtx, sts, func() {
+				sts.Status.AvailableReplicas = *sts.Spec.Replicas - 1
+			})).Should(Succeed())
+			phase = GetComponentPhaseWhenPodsNotReady(podList, sts, consensusComp.Replicas,
+				sts.Status.AvailableReplicas, checkExistFailedPodOfLatestRevision)
+			Expect(phase).Should(Equal(appsv1alpha1.AbnormalPhase))
+
 		})
 	})
 })

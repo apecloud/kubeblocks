@@ -8,7 +8,7 @@ spec:
   clusterDefinitionRef: apecloud-etcd
   componentSpecs:
     - componentDefRef: etcd
-      podSpec:
+      versionsContext:
         containers:
           - name: etcd
             image: {{ .Values.image.repository }}:{{ default .Chart.AppVersion .Values.image.tag }}

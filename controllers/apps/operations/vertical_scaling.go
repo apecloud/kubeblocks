@@ -21,7 +21,6 @@ import (
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 )
@@ -43,13 +42,13 @@ func init() {
 
 // ActionStartedCondition the started condition when handle the vertical scaling request.
 func (vs verticalScalingHandler) ActionStartedCondition(opsRequest *appsv1alpha1.OpsRequest) *metav1.Condition {
-	return appsv1alpha1.NewHorizontalScalingCondition(opsRequest)
+	return appsv1alpha1.NewVerticalScalingCondition(opsRequest)
 }
 
 // Action modifies cluster component resources according to
 // the definition of opsRequest with spec.componentNames and spec.componentOps.verticalScaling
 func (vs verticalScalingHandler) Action(opsRes *OpsResource) error {
-	verticalScalingMap := opsRes.OpsRequest.CovertVerticalScalingListToMap()
+	verticalScalingMap := opsRes.OpsRequest.ConvertVerticalScalingListToMap()
 	for index, component := range opsRes.Cluster.Spec.ComponentSpecs {
 		if verticalScaling, ok := verticalScalingMap[component.Name]; ok {
 			component.Resources = verticalScaling.ResourceRequirements
@@ -77,17 +76,16 @@ func (vs verticalScalingHandler) SaveLastConfiguration(opsRes *OpsResource) erro
 			ResourceRequirements: v.Resources,
 		}
 	}
-	patch := client.MergeFrom(opsRes.OpsRequest.DeepCopy())
 	opsRes.OpsRequest.Status.LastConfiguration = appsv1alpha1.LastConfiguration{
 		Components: lastComponentInfo,
 	}
-	return opsRes.Client.Status().Patch(opsRes.Ctx, opsRes.OpsRequest, patch)
+	return nil
 }
 
 // GetRealAffectedComponentMap gets the real affected component map for the operation
 func (vs verticalScalingHandler) GetRealAffectedComponentMap(opsRequest *appsv1alpha1.OpsRequest) realAffectedComponentMap {
 	realChangedMap := realAffectedComponentMap{}
-	vsMap := opsRequest.CovertVerticalScalingListToMap()
+	vsMap := opsRequest.ConvertVerticalScalingListToMap()
 	for k, v := range opsRequest.Status.LastConfiguration.Components {
 		currVs, ok := vsMap[k]
 		if !ok {

@@ -70,12 +70,11 @@ func (u upgradeOpsHandler) SaveLastConfiguration(opsRes *OpsResource) error {
 	if err != nil {
 		return err
 	}
-	patch := client.MergeFrom(opsRes.OpsRequest.DeepCopy())
 	opsRes.OpsRequest.Status.LastConfiguration = appsv1alpha1.LastConfiguration{
 		ClusterVersionRef: opsRes.Cluster.Spec.ClusterVersionRef,
 	}
 	opsRes.OpsRequest.Status.Components = compsStatus
-	return opsRes.Client.Status().Patch(opsRes.Ctx, opsRes.OpsRequest, patch)
+	return nil
 }
 
 // getUpgradeComponentsStatus compares the ClusterVersions before and after upgrade, and get the changed components map.
@@ -111,7 +110,7 @@ func (u upgradeOpsHandler) getUpgradeComponentsStatus(opsRes *OpsResource) (map[
 	return compStatusMap, nil
 }
 
-// getClusterComponentVersionMap gets the components of ClusterVersion and coverts the component list to map.
+// getClusterComponentVersionMap gets the components of ClusterVersion and converts the component list to map.
 func (u upgradeOpsHandler) getClusterComponentVersionMap(ctx context.Context,
 	cli client.Client, clusterVersionName string) (map[string]appsv1alpha1.ClusterComponentVersion, error) {
 	clusterVersion := &appsv1alpha1.ClusterVersion{}

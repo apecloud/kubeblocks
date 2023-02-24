@@ -55,7 +55,8 @@ func GetClusterByObject(ctx context.Context,
 
 // IsCompleted checks whether the component has completed the operation
 func IsCompleted(phase appsv1alpha1.Phase) bool {
-	return slices.Index([]appsv1alpha1.Phase{appsv1alpha1.RunningPhase, appsv1alpha1.FailedPhase, appsv1alpha1.AbnormalPhase}, phase) != -1
+	return slices.Index([]appsv1alpha1.Phase{appsv1alpha1.RunningPhase, appsv1alpha1.FailedPhase,
+		appsv1alpha1.AbnormalPhase, appsv1alpha1.StoppedPhase}, phase) != -1
 }
 
 func IsFailedOrAbnormal(phase appsv1alpha1.Phase) bool {
@@ -116,22 +117,6 @@ func GetObjectListByComponentName(ctx context.Context, cli client.Client, cluste
 	return cli.List(ctx, objectList, matchLabels, inNamespace)
 }
 
-// CheckRelatedPodIsTerminating checks related pods is terminating for Stateless/Stateful
-func CheckRelatedPodIsTerminating(ctx context.Context, cli client.Client, cluster *appsv1alpha1.Cluster, componentName string) (bool, error) {
-	podList := &corev1.PodList{}
-	if err := cli.List(ctx, podList, client.InNamespace(cluster.Namespace),
-		GetComponentMatchLabels(cluster.Name, componentName)); err != nil {
-		return false, err
-	}
-	for _, v := range podList.Items {
-		// if the pod is terminating, ignore the warning event
-		if v.DeletionTimestamp != nil {
-			return true, nil
-		}
-	}
-	return false, nil
-}
-
 // GetComponentDefByCluster gets component from ClusterDefinition with compDefName
 func GetComponentDefByCluster(ctx context.Context, cli client.Client, cluster *appsv1alpha1.Cluster, compDefName string) (*appsv1alpha1.ClusterComponentDefinition, error) {
 	clusterDef := &appsv1alpha1.ClusterDefinition{}
@@ -180,12 +165,6 @@ func InitClusterComponentStatusIfNeed(cluster *appsv1alpha1.Cluster,
 		}
 	}
 	cluster.Status.Components[componentName] = componentStatus
-}
-
-// GetComponentReplicas gets the actual replicas of component
-func GetComponentReplicas(component *appsv1alpha1.ClusterComponentSpec,
-	componentDef *appsv1alpha1.ClusterComponentDefinition) int32 {
-	return component.Replicas
 }
 
 // GetComponentDeployMinReadySeconds gets the deployment minReadySeconds of the component.
@@ -252,4 +231,65 @@ func GetComponentInfoByPod(ctx context.Context,
 		return componentName, componentDef, err
 	}
 	return componentName, componentDef, nil
+}
+
+// GetCompRelatedObjectList gets the related pods and workloads of the component
+func GetCompRelatedObjectList(ctx context.Context,
+	cli client.Client,
+	cluster *appsv1alpha1.Cluster,
+	compName string,
+	relatedWorkloads client.ObjectList) (*corev1.PodList, error) {
+	podList, err := GetComponentPodList(ctx, cli, cluster, compName)
+	if err != nil {
+		return nil, err
+	}
+	if err = GetObjectListByComponentName(ctx,
+		cli, cluster, relatedWorkloads, compName); err != nil {
+		return nil, err
+	}
+	return podList, nil
+}
+
+// AvailableReplicasAreConsistent checks if the available replicas of component and workload are consistent.
+func AvailableReplicasAreConsistent(componentReplicas, podCount, workloadAvailableReplicas int32) bool {
+	return workloadAvailableReplicas == componentReplicas && componentReplicas == podCount
+}
+
+// GetPhaseWithNoAvailableReplicas gets the component phase when the workload of component has no available replicas.
+func GetPhaseWithNoAvailableReplicas(componentReplicas int32) appsv1alpha1.Phase {
+	if componentReplicas == 0 {
+		return ""
+	}
+	return appsv1alpha1.FailedPhase
+}
+
+// GetComponentPhaseWhenPodsNotReady gets the component phase when pods of component are not ready.
+func GetComponentPhaseWhenPodsNotReady(podList *corev1.PodList,
+	workload metav1.Object,
+	componentReplicas,
+	availableReplicas int32,
+	checkFailedPodRevision func(pod *corev1.Pod, workload metav1.Object) bool) appsv1alpha1.Phase {
+	podCount := len(podList.Items)
+	if podCount == 0 || availableReplicas == 0 {
+		return GetPhaseWithNoAvailableReplicas(componentReplicas)
+	}
+	var existLatestRevisionFailedPod bool
+	for _, v := range podList.Items {
+		// if the pod is terminating, ignore it
+		if v.DeletionTimestamp != nil {
+			return ""
+		}
+		if checkFailedPodRevision != nil && checkFailedPodRevision(&v, workload) {
+			existLatestRevisionFailedPod = true
+		}
+	}
+	// if the failed pod is not controlled by the latest revision, ignore it.
+	if !existLatestRevisionFailedPod {
+		return ""
+	}
+	// checks if the available replicas of component and workload are consistent.
+	if !AvailableReplicasAreConsistent(componentReplicas, int32(podCount), availableReplicas) {
+		return appsv1alpha1.AbnormalPhase
+	}
+	return ""
 }

@@ -70,6 +70,8 @@ func NewClusterCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 				NewDescribeReconfigureCmd(f, streams),
 				NewExplainReconfigureCmd(f, streams),
 				NewDiffConfigureCmd(f, streams),
+				NewStopCmd(f, streams),
+				NewStartCmd(f, streams),
 			},
 		},
 		{

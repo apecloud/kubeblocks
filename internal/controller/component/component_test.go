@@ -27,10 +27,6 @@ import (
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 )
 
-const (
-	kFake = "fake"
-)
-
 var tlog = ctrl.Log.WithName("component_testing")
 
 var _ = Describe("component module", func() {
@@ -79,63 +75,44 @@ var _ = Describe("component module", func() {
 			}
 			component := BuildComponent(
 				reqCtx,
-				cluster,
-				clusterDef,
-				&clusterDef.Spec.ComponentDefs[0],
-				&clusterVersion.Spec.ComponentVersions[0],
-				&cluster.Spec.ComponentSpecs[0])
+				*cluster,
+				*clusterDef,
+				clusterDef.Spec.ComponentDefs[0],
+				cluster.Spec.ComponentSpecs[0],
+				&clusterVersion.Spec.ComponentVersions[0])
 			Expect(component).ShouldNot(BeNil())
 
-			By("leave clusterVersion.podSpec nil")
-			clusterVersion.Spec.ComponentVersions[0].PodSpec = nil
+			By("leave clusterVersion.versionCtx empty initContains and conainers")
+			clusterVersion.Spec.ComponentVersions[0].VersionsCtx.Containers = nil
+			clusterVersion.Spec.ComponentVersions[0].VersionsCtx.InitContainers = nil
 			component = BuildComponent(
 				reqCtx,
-				cluster,
-				clusterDef,
-				&clusterDef.Spec.ComponentDefs[0],
-				&clusterVersion.Spec.ComponentVersions[0],
-				&cluster.Spec.ComponentSpecs[0])
+				*cluster,
+				*clusterDef,
+				clusterDef.Spec.ComponentDefs[0],
+				cluster.Spec.ComponentSpecs[0],
+				&clusterVersion.Spec.ComponentVersions[0])
 			Expect(component).ShouldNot(BeNil())
 
 			By("new container in clusterVersion not in clusterDefinition")
 			component = BuildComponent(
 				reqCtx,
-				cluster,
-				clusterDef,
-				&clusterDef.Spec.ComponentDefs[0],
-				&clusterVersion.Spec.ComponentVersions[1],
-				&cluster.Spec.ComponentSpecs[0])
+				*cluster,
+				*clusterDef,
+				clusterDef.Spec.ComponentDefs[0],
+				cluster.Spec.ComponentSpecs[0],
+				&clusterVersion.Spec.ComponentVersions[1])
 			Expect(len(component.PodSpec.Containers)).Should(Equal(2))
 
 			By("new init container in clusterVersion not in clusterDefinition")
 			component = BuildComponent(
 				reqCtx,
-				cluster,
-				clusterDef,
-				&clusterDef.Spec.ComponentDefs[0],
-				&clusterVersion.Spec.ComponentVersions[1],
-				&cluster.Spec.ComponentSpecs[0])
+				*cluster,
+				*clusterDef,
+				clusterDef.Spec.ComponentDefs[0],
+				cluster.Spec.ComponentSpecs[0],
+				&clusterVersion.Spec.ComponentVersions[1])
 			Expect(len(component.PodSpec.InitContainers)).Should(Equal(1))
-
-			By("leave clusterComp nil")
-			component = BuildComponent(
-				reqCtx,
-				cluster,
-				clusterDef,
-				&clusterDef.Spec.ComponentDefs[0],
-				&clusterVersion.Spec.ComponentVersions[0],
-				nil)
-			Expect(component).ShouldNot(BeNil())
-
-			By("leave clusterCompDef nil")
-			component = BuildComponent(
-				reqCtx,
-				cluster,
-				clusterDef,
-				nil,
-				&clusterVersion.Spec.ComponentVersions[0],
-				&cluster.Spec.ComponentSpecs[0])
-			Expect(component).Should(BeNil())
 		})
 	})
 })

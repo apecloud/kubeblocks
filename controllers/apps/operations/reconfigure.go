@@ -37,6 +37,7 @@ func init() {
 			appsv1alpha1.RunningPhase,
 			appsv1alpha1.FailedPhase,
 			appsv1alpha1.AbnormalPhase,
+			appsv1alpha1.ReconfiguringPhase,
 		},
 		ToClusterPhase: appsv1alpha1.ReconfiguringPhase,
 		OpsHandler:     &reAction,
@@ -45,16 +46,19 @@ func init() {
 	opsManager.RegisterOps(appsv1alpha1.ReconfiguringType, reconfigureBehaviour)
 }
 
+// ActionStartedCondition the started condition when handle the reconfiguring request.
 func (r *reconfigureAction) ActionStartedCondition(opsRequest *appsv1alpha1.OpsRequest) *metav1.Condition {
 	return appsv1alpha1.NewReconfigureCondition(opsRequest)
 }
 
-func (r *reconfigureAction) SaveLastConfiguration(_ *OpsResource) error {
+// SaveLastConfiguration this operation can not change in Cluster.spec.
+func (r *reconfigureAction) SaveLastConfiguration(opsRes *OpsResource) error {
 	return nil
 }
 
+// GetRealAffectedComponentMap gets the real affected component map for the operation
 func (r *reconfigureAction) GetRealAffectedComponentMap(opsRequest *appsv1alpha1.OpsRequest) realAffectedComponentMap {
-	return make(map[string]struct{})
+	return opsRequest.GetReconfiguringComponentNameMap()
 }
 
 func (r *reconfigureAction) Handle(eventContext cfgcore.ConfigEventContext, lastOpsRequest string, phase appsv1alpha1.Phase, err error) error {
@@ -151,13 +155,30 @@ func (r reconfigureAction) ReconcileAction(opsRes *OpsResource) (appsv1alpha1.Ph
 		return status.Phase, 30 * time.Second, nil
 	}
 	condition := status.Conditions[len(status.Conditions)-1]
-	if condition.Type == appsv1alpha1.ConditionTypeSucceed && condition.Status == metav1.ConditionTrue {
+	if isSucceedPhase(condition) {
 		return appsv1alpha1.SucceedPhase, 0, nil
 	}
-	if condition.Type == appsv1alpha1.ConditionTypeFailed && condition.Status == metav1.ConditionFalse {
+	if isFailedPhase(condition) {
 		return appsv1alpha1.FailedPhase, 0, nil
 	}
 	return appsv1alpha1.RunningPhase, 30 * time.Second, nil
+}
+
+func isExpectedPhase(condition metav1.Condition, expectedTypes []string, expectedStatus metav1.ConditionStatus) bool {
+	for _, t := range expectedTypes {
+		if t == condition.Type && condition.Status == expectedStatus {
+			return true
+		}
+	}
+	return false
+}
+
+func isSucceedPhase(condition metav1.Condition) bool {
+	return isExpectedPhase(condition, []string{appsv1alpha1.ConditionTypeSucceed, appsv1alpha1.ReasonReconfigureSucceed}, metav1.ConditionTrue)
+}
+
+func isFailedPhase(condition metav1.Condition) bool {
+	return isExpectedPhase(condition, []string{appsv1alpha1.ConditionTypeFailed, appsv1alpha1.ReasonReconfigureFailed}, metav1.ConditionFalse)
 }
 
 func (r *reconfigureAction) Action(resource *OpsResource) error {
@@ -178,11 +199,8 @@ func (r *reconfigureAction) Action(resource *OpsResource) error {
 		return cfgcore.WrapError(err, "failed to get clusterdefinition[%s]", cluster.Spec.ClusterDefRef)
 	}
 
-	if err := resource.Client.Get(resource.Ctx, client.ObjectKey{
-		Name:      cluster.Spec.ClusterVersionRef,
-		Namespace: cluster.Namespace,
-	}, clusterVersion); err != nil {
-		return cfgcore.WrapError(err, "failed to get clusterversion[%s]", cluster.Spec.ClusterVersionRef)
+	if err := cfgcore.GetClusterVersionResource(cluster.Spec.ClusterVersionRef, clusterVersion, resource.Client, resource.Ctx); err != nil {
+		return err
 	}
 
 	if opsRequest.Status.ObservedGeneration == opsRequest.ObjectMeta.Generation {

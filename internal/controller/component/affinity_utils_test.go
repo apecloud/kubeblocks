@@ -75,11 +75,11 @@ var _ = Describe("affinity utils", func() {
 			}
 			component = BuildComponent(
 				reqCtx,
-				clusterObj,
-				clusterDefObj,
-				&clusterDefObj.Spec.ComponentDefs[0],
-				&clusterVersionObj.Spec.ComponentVersions[0],
-				&clusterObj.Spec.ComponentSpecs[0])
+				*clusterObj,
+				*clusterDefObj,
+				clusterDefObj.Spec.ComponentDefs[0],
+				clusterObj.Spec.ComponentSpecs[0],
+				&clusterVersionObj.Spec.ComponentVersions[0])
 			Expect(component).ShouldNot(BeNil())
 		})
 
@@ -88,6 +88,10 @@ var _ = Describe("affinity utils", func() {
 			Expect(affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions[0].Key).Should(Equal(lableKey))
 			Expect(affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution[0].TopologyKey).Should(Equal(topologyKey))
 			Expect(affinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution).Should(BeEmpty())
+
+			affinity = patchBuiltInAffinity(affinity)
+			Expect(affinity.NodeAffinity.PreferredDuringSchedulingIgnoredDuringExecution[0].Preference.MatchExpressions[0].Key).Should(
+				Equal(intctrlutil.KubeBlocksDataNodeLabelKey))
 
 			topologySpreadConstraints := buildPodTopologySpreadConstraints(clusterObj, clusterObj.Spec.Affinity, component)
 			Expect(topologySpreadConstraints[0].WhenUnsatisfiable).Should(Equal(corev1.DoNotSchedule))
@@ -128,11 +132,12 @@ var _ = Describe("affinity utils", func() {
 			}
 			component = BuildComponent(
 				reqCtx,
-				clusterObj,
-				clusterDefObj,
-				&clusterDefObj.Spec.ComponentDefs[0],
+				*clusterObj,
+				*clusterDefObj,
+				clusterDefObj.Spec.ComponentDefs[0],
+				clusterObj.Spec.ComponentSpecs[0],
 				&clusterVersionObj.Spec.ComponentVersions[0],
-				&clusterObj.Spec.ComponentSpecs[0])
+			)
 			Expect(component).ShouldNot(BeNil())
 		})
 

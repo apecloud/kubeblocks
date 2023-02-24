@@ -34,7 +34,7 @@ spec:
             - "-zap-encoder=console"
             - "-zap-time-encoding=iso8601"
             - "-zap-devel={{ .Values.enableDebugLog }}"
-          image: "{{ .Values.image.repository }}:v{{ .Values.image.tag | default .Chart.AppVersion }}"
+          image: "{{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:v{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           ports:
             - name: health

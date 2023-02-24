@@ -23,6 +23,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 
+	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -243,4 +244,19 @@ func getPortByName(args interface{}, portName string) (interface{}, error) {
 	}
 
 	return nil, nil
+}
+
+// getCAFile for general builtIn
+func getCAFile() string {
+	return builder.MountPath + "/" + builder.CAName
+}
+
+// getCertFile for general builtIn
+func getCertFile() string {
+	return builder.MountPath + "/" + builder.CertName
+}
+
+// getKeyFile for general builtIn
+func getKeyFile() string {
+	return builder.MountPath + "/" + builder.KeyName
 }

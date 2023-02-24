@@ -17,51 +17,23 @@ limitations under the License.
 package component
 
 import (
-	"testing"
-
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-
-	corev1 "k8s.io/api/core/v1"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 )
 
-func TestIsSupportedCharacterType(t *testing.T) {
-	if !isSupportedCharacterType("mysql") {
-		t.Error("mysql is supported characterType")
-	}
-
-	if isSupportedCharacterType("redis") {
-		t.Error("redis is not supported characterType")
-	}
-
-	if isSupportedCharacterType("other") {
-		t.Error("other is not supported characterType")
-	}
-}
-
 var _ = Describe("monitor_utils", func() {
 	Context("has the buildMonitorConfig function", func() {
 		var component *SynthesizedComponent
-		var cluster *appsv1alpha1.Cluster
 		var clusterCompSpec *appsv1alpha1.ClusterComponentSpec
-		var clusterDef *appsv1alpha1.ClusterDefinition
 		var clusterCompDef *appsv1alpha1.ClusterComponentDefinition
 
 		BeforeEach(func() {
 			component = &SynthesizedComponent{}
-			component.PodSpec = &corev1.PodSpec{}
-			cluster = &appsv1alpha1.Cluster{}
-			cluster.Name = "mysql-instance-3"
 			clusterCompSpec = &appsv1alpha1.ClusterComponentSpec{}
 			clusterCompSpec.Monitor = true
-			cluster.Spec.ComponentSpecs = append(cluster.Spec.ComponentSpecs, *clusterCompSpec)
-			clusterCompSpec = &cluster.Spec.ComponentSpecs[0]
-
-			clusterDef = &appsv1alpha1.ClusterDefinition{}
 			clusterCompDef = &appsv1alpha1.ClusterComponentDefinition{}
-			clusterCompDef.CharacterType = kMysql
 			clusterCompDef.Monitor = &appsv1alpha1.MonitorConfig{
 				BuiltIn: false,
 				Exporter: &appsv1alpha1.ExporterConfig{
@@ -69,98 +41,47 @@ var _ = Describe("monitor_utils", func() {
 					ScrapePath: "/metrics",
 				},
 			}
-			clusterDef.Spec.ComponentDefs = append(clusterDef.Spec.ComponentDefs, *clusterCompDef)
-			clusterCompDef = &clusterDef.Spec.ComponentDefs[0]
 		})
 
 		It("should disable monitor if ClusterComponentSpec.Monitor is false", func() {
 			clusterCompSpec.Monitor = false
-			buildMonitorConfig(cluster, clusterDef, clusterCompDef, clusterCompSpec, component)
+			buildMonitorConfig(clusterCompDef, clusterCompSpec, component)
 			monitorConfig := component.Monitor
 			Expect(monitorConfig.Enable).Should(BeFalse())
 			Expect(monitorConfig.ScrapePort).To(BeEquivalentTo(0))
 			Expect(monitorConfig.ScrapePath).To(Equal(""))
-			if component.PodSpec != nil {
-				Expect(len(component.PodSpec.Containers)).To(BeEquivalentTo(0))
-			}
 		})
 
 		It("should disable builtin monitor if ClusterComponentDefinition.Monitor.BuiltIn is false and has valid ExporterConfig", func() {
 			clusterCompSpec.Monitor = true
-			clusterCompDef.CharacterType = kFake
 			clusterCompDef.Monitor.BuiltIn = false
-			buildMonitorConfig(cluster, clusterDef, clusterCompDef, clusterCompSpec, component)
+			buildMonitorConfig(clusterCompDef, clusterCompSpec, component)
 			monitorConfig := component.Monitor
 			Expect(monitorConfig.Enable).Should(BeTrue())
 			Expect(monitorConfig.ScrapePort).To(BeEquivalentTo(9144))
 			Expect(monitorConfig.ScrapePath).To(Equal("/metrics"))
-			if component.PodSpec != nil {
-				Expect(len(component.PodSpec.Containers)).To(BeEquivalentTo(0))
-			}
 		})
 
 		It("should disable monitor if ClusterComponentDefinition.Monitor.BuiltIn is false and lacks ExporterConfig", func() {
 			clusterCompSpec.Monitor = true
-			clusterCompDef.CharacterType = kFake
 			clusterCompDef.Monitor.BuiltIn = false
 			clusterCompDef.Monitor.Exporter = nil
-			buildMonitorConfig(cluster, clusterDef, clusterCompDef, clusterCompSpec, component)
+			buildMonitorConfig(clusterCompDef, clusterCompSpec, component)
 			monitorConfig := component.Monitor
 			Expect(monitorConfig.Enable).Should(BeFalse())
 			Expect(monitorConfig.ScrapePort).To(BeEquivalentTo(0))
 			Expect(monitorConfig.ScrapePath).To(Equal(""))
-			if component.PodSpec != nil {
-				Expect(len(component.PodSpec.Containers)).To(Equal(0))
-			}
 		})
 
-		It("should disable monitor if ClusterComponentDefinition.Monitor.BuiltIn is true and CharacterType isn't recognizable", func() {
+		It("should disable monitor if ClusterComponentDefinition.Monitor.BuiltIn is true", func() {
 			clusterCompSpec.Monitor = true
-			clusterCompDef.CharacterType = kFake
 			clusterCompDef.Monitor.BuiltIn = true
 			clusterCompDef.Monitor.Exporter = nil
-			buildMonitorConfig(cluster, clusterDef, clusterCompDef, clusterCompSpec, component)
+			buildMonitorConfig(clusterCompDef, clusterCompSpec, component)
 			monitorConfig := component.Monitor
 			Expect(monitorConfig.Enable).Should(BeFalse())
 			Expect(monitorConfig.ScrapePort).To(BeEquivalentTo(0))
 			Expect(monitorConfig.ScrapePath).To(Equal(""))
-			if component.PodSpec != nil {
-				Expect(len(component.PodSpec.Containers)).To(Equal(0))
-			}
-		})
-
-		It("should disable monitor if ClusterComponentDefinition's CharacterType is empty", func() {
-			// TODO fixme: seems setting clusterDef.Spec.Type has no effect to buildMonitorConfig
-			clusterCompSpec.Monitor = true
-			clusterCompDef.CharacterType = ""
-			clusterCompDef.Monitor.BuiltIn = true
-			clusterCompDef.Monitor.Exporter = nil
-			buildMonitorConfig(cluster, clusterDef, clusterCompDef, clusterCompSpec, component)
-			monitorConfig := component.Monitor
-			Expect(monitorConfig.Enable).Should(BeFalse())
-			Expect(monitorConfig.ScrapePort).To(BeEquivalentTo(0))
-			Expect(monitorConfig.ScrapePath).To(Equal(""))
-			if component.PodSpec != nil {
-				Expect(len(component.PodSpec.Containers)).To(Equal(0))
-			}
-		})
-	})
-
-	Context("has the setMysqlComponent function ", func() {
-		It("which could check against other containers for port conflicts", func() {
-			component := &SynthesizedComponent{
-				PodSpec: &corev1.PodSpec{
-					Containers: []corev1.Container{{
-						Ports: []corev1.ContainerPort{{
-							ContainerPort: defaultMonitorPort,
-						}},
-					}},
-				}}
-			cluster := &appsv1alpha1.Cluster{}
-			cluster.SetName("mock-cluster")
-			Expect(setMysqlComponent(cluster, component)).Should(Succeed())
-			monitor := component.Monitor
-			Expect(monitor.ScrapePort).Should(BeEquivalentTo(defaultMonitorPort + 1))
 		})
 	})
 })

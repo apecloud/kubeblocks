@@ -34,9 +34,9 @@ type ClusterSpec struct {
 	ClusterDefRef string `json:"clusterDefinitionRef"`
 
 	// Cluster referenced ClusterVersion name.
-	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
-	ClusterVersionRef string `json:"clusterVersionRef"`
+	// +optional
+	ClusterVersionRef string `json:"clusterVersionRef,omitempty"`
 
 	// Cluster termination policy. One of DoNotTerminate, Halt, Delete, WipeOut.
 	// DoNotTerminate will block delete operation.
@@ -44,7 +44,6 @@ type ClusterSpec struct {
 	// Delete is based on Halt and deletes PVCs.
 	// WipeOut is based on Delete and wipe out all volume snapshots and snapshot data from backup storage location.
 	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:Enum={DoNotTerminate,Halt,Delete,WipeOut}
 	TerminationPolicy TerminationPolicyType `json:"terminationPolicy"`
 
 	// List of componentSpecs you want to replace in ClusterDefinition and ClusterVersion. It will replace the field in ClusterDefinition's and ClusterVersion's component if type is matching.
@@ -83,13 +82,16 @@ type ClusterStatus struct {
 	// VerticalScaling: vertical scaling operation is running.
 	// VersionUpgrading: upgrade operation is running.
 	// Rebooting: restart operation is running.
+	// Stopping: stop operation is running.
+	// Stopped: all components are stopped, or some components are stopped and other components are running.
+	// Starting: start operation is running.
 	// Reconfiguring: reconfiguration operation is running.
 	// Deleting/Deleted: deleting Cluster/Cluster is deleted.
 	// Failed: Cluster is unavailable.
 	// Abnormal: Cluster is still available, but part of its components are Abnormal.
 	// if the component workload type is Consensus/Replication, the Leader/Primary pod must be ready in Abnormal phase.
 	// ConditionsError: Cluster and all the components are still healthy, but some update/create API fails due to invalid parameters.
-	// +kubebuilder:validation:Enum={Running,Failed,Abnormal,ConditionsError,Creating,SpecUpdating,Deleting,Deleted,VolumeExpanding,Reconfiguring,HorizontalScaling,VerticalScaling,VersionUpgrading,Rebooting}
+	// +kubebuilder:validation:Enum={Running,Failed,Abnormal,ConditionsError,Creating,SpecUpdating,Deleting,Deleted,VolumeExpanding,Reconfiguring,HorizontalScaling,VerticalScaling,VersionUpgrading,Rebooting,Stopped,Stopping,Starting}
 	// +optional
 	Phase Phase `json:"phase,omitempty"`
 
@@ -191,6 +193,15 @@ type ClusterComponentSpec struct {
 	// +kubebuilder:validation:Minimum=0
 	// +optional
 	PrimaryIndex *int32 `json:"primaryIndex,omitempty"`
+
+	// TLS should be enabled or not
+	// +optional
+	TLS bool `json:"tls,omitempty"`
+
+	// Issuer who provides tls certs
+	// required when TLS enabled
+	// +optional
+	Issuer *Issuer `json:"issuer,omitempty"`
 }
 
 type ComponentMessageMap map[string]string
@@ -201,9 +212,10 @@ type ClusterComponentStatus struct {
 	// Failed: component is unavailable, i.e, all pods are not ready for Stateless/Stateful component;
 	// Leader/Primary pod is not ready for Consensus/Replication component.
 	// Abnormal: component available but part of its pods are not ready.
+	// Stopped: replicas number of component is 0.
 	// If the component workload type is Consensus/Replication, the Leader/Primary pod must be ready in Abnormal phase.
 	// Other phases behave the same as the cluster phase.
-	// +kubebuilder:validation:Enum={Running,Failed,Abnormal,Creating,SpecUpdating,Deleting,Deleted,VolumeExpanding,Reconfiguring,HorizontalScaling,VerticalScaling,VersionUpgrading,Rebooting}
+	// +kubebuilder:validation:Enum={Running,Failed,Abnormal,Creating,SpecUpdating,Deleting,Deleted,VolumeExpanding,Reconfiguring,HorizontalScaling,VerticalScaling,VersionUpgrading,Rebooting,Stopped,Stopping,Starting}
 	Phase Phase `json:"phase,omitempty"`
 
 	// message records the component details message in current phase.
@@ -251,7 +263,6 @@ type ConsensusMemberStatus struct {
 
 	// accessMode, what service this pod provides.
 	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:Enum={None, Readonly, ReadWrite}
 	// +kubebuilder:default=ReadWrite
 	AccessMode AccessMode `json:"accessMode"`
 
@@ -290,10 +301,9 @@ type ClusterComponentVolumeClaimTemplate struct {
 
 type Affinity struct {
 	// podAntiAffinity defines pods of component anti-affnity.
-	// Defaults to Preferred
-	// Preferred means try spread pods by topologyKey
-	// Required means must spread pods by topologyKey
-	// +kubebuilder:validation:Enum={Preferred,Required}
+	// Defaults to Preferred.
+	// Preferred means try spread pods by topologyKey.
+	// Required means must spread pods by topologyKey.
 	// +optional
 	PodAntiAffinity PodAntiAffinity `json:"podAntiAffinity,omitempty"`
 
@@ -305,6 +315,13 @@ type Affinity struct {
 	// nodeLabels describe constrain which nodes pod can be scheduled on based on node labels.
 	// +optional
 	NodeLabels map[string]string `json:"nodeLabels,omitempty"`
+
+	// tenancy defines how pods are distributed across node.
+	// SharedNode means multiple pods may share the same node.
+	// DedicatedNode means each pod runs on their own dedicated node.
+	// +kubebuilder:default=SharedNode
+	// +optional
+	Tenancy TenancyType `json:"tenancy,omitempty"`
 }
 
 type Operations struct {
@@ -343,6 +360,42 @@ type OperationComponent struct {
 	// volumeClaimTemplateNames which VolumeClaimTemplate of the component support volumeExpansion.
 	// +optional
 	VolumeClaimTemplateNames []string `json:"volumeClaimTemplateNames,omitempty"`
+}
+
+// Issuer defines Tls certs issuer
+type Issuer struct {
+	// Name of issuer
+	// options supported:
+	// - KubeBlocks - Certificates signed by KubeBlocks Operator.
+	// - UserProvided - User provided own CA-signed certificates.
+	// +kubebuilder:validation:Enum={KubeBlocks, UserProvided}
+	// +kubebuilder:default=KubeBlocks
+	// +kubebuilder:validation:Required
+	Name IssuerName `json:"name"`
+
+	// SecretRef, Tls certs Secret reference
+	// required when from is UserProvided
+	// +optional
+	SecretRef *TLSSecretRef `json:"secretRef,omitempty"`
+}
+
+// TLSSecretRef defines Secret contains Tls certs
+type TLSSecretRef struct {
+	// Name of the Secret
+	// +kubebuilder:validation:Required
+	Name string `json:"name"`
+
+	// CA cert key in Secret
+	// +kubebuilder:validation:Required
+	CA string `json:"ca"`
+
+	// Cert key in Secret
+	// +kubebuilder:validation:Required
+	Cert string `json:"cert"`
+
+	// Key of TLS private key in Secret
+	// +kubebuilder:validation:Required
+	Key string `json:"key"`
 }
 
 //+kubebuilder:object:root=true

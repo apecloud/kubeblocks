@@ -113,9 +113,9 @@ func checkComponentMap(t *testing.T, componentNameMap map[string]struct{}, expec
 	}
 }
 
-func TestCovertVerticalScalingListToMap(t *testing.T) {
+func TestConvertVerticalScalingListToMap(t *testing.T) {
 	ops := mockVerticalScalingOps()
-	verticalScalingMap := ops.CovertVerticalScalingListToMap()
+	verticalScalingMap := ops.ConvertVerticalScalingListToMap()
 	if len(verticalScalingMap) != len(ops.Spec.VerticalScalingList) {
 		t.Error(`Expected vertical scaling map length equals list length`)
 	}
@@ -124,9 +124,9 @@ func TestCovertVerticalScalingListToMap(t *testing.T) {
 	}
 }
 
-func TestCovertVolumeExpansionListToMap(t *testing.T) {
+func TestConvertVolumeExpansionListToMap(t *testing.T) {
 	ops := mockVolumeExpansionOps()
-	volumeExpansionMap := ops.CovertVolumeExpansionListToMap()
+	volumeExpansionMap := ops.ConvertVolumeExpansionListToMap()
 	if len(volumeExpansionMap) != len(ops.Spec.VolumeExpansionList) {
 		t.Error(`Expected volume expansion map length equals list length`)
 	}
@@ -135,9 +135,9 @@ func TestCovertVolumeExpansionListToMap(t *testing.T) {
 	}
 }
 
-func TestCovertHorizontalScalingListToMap(t *testing.T) {
+func TestConvertHorizontalScalingListToMap(t *testing.T) {
 	ops := mockHorizontalScalingOps()
-	horizontalScalingMap := ops.CovertHorizontalScalingListToMap()
+	horizontalScalingMap := ops.ConvertHorizontalScalingListToMap()
 	if len(horizontalScalingMap) != len(ops.Spec.HorizontalScalingList) {
 		t.Error(`Expected horizontal scaling map length equals list length`)
 	}
@@ -167,7 +167,7 @@ func TestGetUpgradeComponentNameMap(t *testing.T) {
 }
 
 func TestSetStatusAndMessage(t *testing.T) {
-	p := ProgressDetail{}
+	p := ProgressStatusDetail{}
 	message := "handle successfully"
 	p.SetStatusAndMessage(SucceedProgressStatus, message)
 	if p.Status != SucceedProgressStatus && p.Message != message {

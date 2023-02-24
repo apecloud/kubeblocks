@@ -23,9 +23,13 @@ import (
 	"strings"
 	"time"
 
+	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
+
+	"golang.org/x/exp/maps"
+
 	"github.com/pkg/errors"
 	appsv1 "k8s.io/api/apps/v1"
-	v1 "k8s.io/api/batch/v1"
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -56,7 +60,7 @@ func mergeComponentsList(reqCtx intctrlutil.RequestCtx,
 			if compSpec.ComponentDefRef != compDef.Name {
 				continue
 			}
-			comp := component.BuildComponent(reqCtx, cluster, clusterDef, &compDef, nil, &compSpec)
+			comp := component.BuildComponent(reqCtx, *cluster, *clusterDef, compDef, compSpec)
 			compList = append(compList, *comp)
 		}
 	}
@@ -104,7 +108,7 @@ func reconcileClusterWorkloads(
 		compVer := clusterCompVerMap[compDefName]
 		compSpecs := clusterCompSpecMap[compDefName]
 		for _, compSpec := range compSpecs {
-			if err := prepareComp(component.BuildComponent(reqCtx, cluster, clusterDef, &c, compVer, &compSpec)); err != nil {
+			if err := prepareComp(component.BuildComponent(reqCtx, *cluster, *clusterDef, c, compSpec, compVer)); err != nil {
 				return false, err
 			}
 		}
@@ -138,6 +142,22 @@ func mergeAnnotations(originalAnnotations, targetAnnotations map[string]string) 
 		targetAnnotations[intctrlutil.RestartAnnotationKey] = restartAnnotation
 	}
 	return targetAnnotations
+}
+
+// mergeServiceAnnotations keeps the original annotations except prometheus scrape annotations.
+// if annotations exist and are replaced, the Service will be updated.
+func mergeServiceAnnotations(originalAnnotations, targetAnnotations map[string]string) map[string]string {
+	if len(originalAnnotations) == 0 {
+		return targetAnnotations
+	}
+	tmpAnnotations := make(map[string]string, len(originalAnnotations)+len(targetAnnotations))
+	for k, v := range originalAnnotations {
+		if !strings.HasPrefix(k, "prometheus.io") {
+			tmpAnnotations[k] = v
+		}
+	}
+	maps.Copy(tmpAnnotations, targetAnnotations)
+	return tmpAnnotations
 }
 
 func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
@@ -384,10 +404,28 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 	}
 
 	handleConfigMap := func(cm *corev1.ConfigMap) error {
-		// if configmap is env config, should update
-		if len(cm.Labels[intctrlutil.AppConfigTypeLabelKey]) > 0 {
+		switch {
+		case len(cm.Labels[intctrlutil.AppConfigTypeLabelKey]) > 0:
+			// if configmap is env config, should update
 			if err := cli.Update(ctx, cm); err != nil {
 				return err
+			}
+		case len(cm.Labels[cfgcore.CMConfigurationProviderTplLabelKey]) > 0:
+			// if tls settings updated, do Update
+			// FIXME: very hacky way. should allow config to be updated
+			oldCm := &corev1.ConfigMap{}
+			if err := cli.Get(ctx, client.ObjectKeyFromObject(cm), oldCm); err != nil {
+				return err
+			}
+			compName := cm.Labels[intctrlutil.AppComponentLabelKey]
+			clusterDefComp := component.GetClusterDefCompByName(*clusterDef, *cluster, compName)
+			if clusterDefComp == nil {
+				return errors.New("clusterDefComp not found")
+			}
+			if plan.IsTLSSettingsUpdated(clusterDefComp.CharacterType, *oldCm, *cm) {
+				if err := cli.Update(ctx, cm); err != nil {
+					return err
+				}
 			}
 		}
 		return nil
@@ -427,24 +465,25 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 			return err
 		}
 		svcObj.Spec = svcProto.Spec
+		svcObj.Annotations = mergeServiceAnnotations(svcObj.Annotations, svcProto.Annotations)
 		if err := cli.Update(ctx, svcObj); err != nil {
 			return err
 		}
 		return nil
 	}
 
+	// why create tls certs here? or why not use prepare-checkedCreate pattern?
+	// tls certs generation is very time-consuming, if using prepare-checkedCreate pattern,
+	// we shall generate certs in every component Update which will slow down the cluster reconcile loop
+	if err := plan.CreateOrCheckTLSCerts(reqCtx, cli, cluster, scheme, dbClusterFinalizerName); err != nil {
+		return false, err
+	}
+
 	var stsList []*appsv1.StatefulSet
 	for _, obj := range objs {
 		logger.Info("create or update", "objs", obj)
-		if err := controllerutil.SetOwnerReference(cluster, obj, scheme); err != nil {
+		if err := intctrlutil.SetOwnership(cluster, obj, scheme, dbClusterFinalizerName); err != nil {
 			return false, err
-		}
-		if !controllerutil.ContainsFinalizer(obj, dbClusterFinalizerName) {
-			// pvc objects do not need to add finalizer
-			_, ok := obj.(*corev1.PersistentVolumeClaim)
-			if !ok {
-				controllerutil.AddFinalizer(obj, dbClusterFinalizerName)
-			}
 		}
 		// appendToStsList is used to handle statefulSets horizontal scaling when workloadType is replication
 		appendToStsList := func(stsList []*appsv1.StatefulSet) []*appsv1.StatefulSet {
@@ -832,7 +871,7 @@ func deleteDeletePVCCronJob(cli client.Client,
 	pvcKey types.NamespacedName) error {
 	cronJobKey := pvcKey
 	cronJobKey.Name = "delete-pvc-" + pvcKey.Name
-	cronJob := v1.CronJob{}
+	cronJob := batchv1.CronJob{}
 	if err := cli.Get(ctx, cronJobKey, &cronJob); err != nil {
 		return client.IgnoreNotFound(err)
 	}
@@ -911,6 +950,13 @@ func doBackup(reqCtx intctrlutil.RequestCtx,
 			for _, tmpVct := range stsObj.Spec.VolumeClaimTemplates {
 				if tmpVct.Name == component.HorizontalScalePolicy.VolumeMountsName {
 					vct = tmpVct
+					break
+				}
+			}
+			// sync vct.spec.resources from component
+			for _, tmpVct := range component.VolumeClaimTemplates {
+				if vct.Name == tmpVct.Name {
+					vct.Spec.Resources = tmpVct.Spec.Resources
 					break
 				}
 			}

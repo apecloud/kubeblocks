@@ -17,7 +17,6 @@ limitations under the License.
 package components
 
 import (
-	"context"
 	"fmt"
 	"time"
 
@@ -96,7 +95,7 @@ var _ = Describe("Deployment Controller", func() {
 			By("check stateless component phase is Failed")
 			Eventually(testapps.GetClusterComponentPhase(testCtx, clusterName, statelessCompName)).Should(Equal(appsv1alpha1.FailedPhase))
 
-			By("test when a pod of deployment is failed")
+			By("mock error message and PodCondition about some pod's failure")
 			podName := fmt.Sprintf("%s-%s-%s", clusterName, statelessCompName, testCtx.GetRandomStr())
 			pod := testapps.MockStatelessPod(testCtx, deploy, clusterName, statelessCompName, podName)
 			// mock pod container is failed
@@ -113,10 +112,6 @@ var _ = Describe("Deployment Controller", func() {
 					},
 				}
 			})).Should(Succeed())
-			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(pod), func(g Gomega, tmpPod *corev1.Pod) {
-				g.Expect(len(tmpPod.Status.ContainerStatuses) == 1).Should(BeTrue())
-			})).Should(Succeed())
-
 			// mock failed container timed out
 			Expect(testapps.ChangeObjStatus(&testCtx, pod, func() {
 				pod.Status.Conditions = []corev1.PodCondition{
@@ -127,31 +122,25 @@ var _ = Describe("Deployment Controller", func() {
 					},
 				}
 			})).Should(Succeed())
-			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(pod), func(g Gomega, tmpPod *corev1.Pod) {
-				g.Expect(len(tmpPod.Status.Conditions) == 1).Should(BeTrue())
+			// mark deployment to reconcile
+			Expect(testapps.ChangeObj(&testCtx, deploy, func() {
+				deploy.Annotations = map[string]string{
+					"reconcile": "1",
+				}
 			})).Should(Succeed())
 
-			// wait for component.message contains pod message.
+			By("check component.Status.Message contains pod error message")
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(cluster), func(g Gomega, tmpCluster *appsv1alpha1.Cluster) {
 				compStatus := tmpCluster.Status.Components[statelessCompName]
 				g.Expect(compStatus.Message.GetObjectMessage("Pod", pod.Name)).Should(Equal(errMessage))
 			})).Should(Succeed())
 
 			By("mock deployment is ready")
-			newDeployment := &appsv1.Deployment{}
-			Expect(k8sClient.Get(context.Background(), newDeploymentKey, newDeployment)).Should(Succeed())
-			Expect(testapps.ChangeObjStatus(&testCtx, newDeployment, func() {
-				testk8s.MockDeploymentReady(newDeployment, stateless.NewRSAvailableReason)
+			Expect(testapps.ChangeObjStatus(&testCtx, deploy, func() {
+				testk8s.MockDeploymentReady(deploy, stateless.NewRSAvailableReason, deploy.Name+"-5847cb795c")
 			})).Should(Succeed())
 
-			By("test deployment status is ready")
-			Eventually(testapps.CheckObj(&testCtx, newDeploymentKey, func(g Gomega, deploy *appsv1.Deployment) {
-				g.Expect(deploy.Status.AvailableReplicas == newDeployment.Status.AvailableReplicas &&
-					deploy.Status.ReadyReplicas == newDeployment.Status.ReadyReplicas &&
-					deploy.Status.Replicas == newDeployment.Status.Replicas).Should(BeTrue())
-			})).Should(Succeed())
-
-			By("waiting the component is Running")
+			By("waiting for the component to be running")
 			Eventually(testapps.GetClusterComponentPhase(testCtx, clusterName, statelessCompName)).Should(Equal(appsv1alpha1.RunningPhase))
 		})
 	})

@@ -15,13 +15,13 @@
 # Variables                                                                    #
 ################################################################################
 
-export GO111MODULE ?= on
-# export GOPROXY ?= https://proxy.golang.org
-export GOPROXY ?= https://goproxy.cn
-export GOSUMDB ?= sum.golang.org
-export GONOPROXY ?= github.com/apecloud
-export GONOSUMDB ?= github.com/apecloud
-export GOPRIVATE ?= github.com/apecloud
+export GO111MODULE = auto
+# export GOPROXY = https://proxy.golang.org
+export GOPROXY = https://goproxy.cn
+export GOSUMDB = sum.golang.org
+export GONOPROXY = github.com/apecloud
+export GONOSUMDB = github.com/apecloud
+export GOPRIVATE = github.com/apecloud
 
 
 GITHUB_PROXY ?= https://github.91chi.fun/
@@ -51,6 +51,7 @@ CHART_PATH = deploy/helm
 WEBHOOK_CERT_DIR ?= /tmp/k8s-webhook-server/serving-certs
 
 GO ?= go
+GOFMT ?= gofmt
 GOOS ?= $(shell $(GO) env GOOS)
 GOARCH ?= $(shell $(GO) env GOARCH)
 # Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
@@ -58,13 +59,6 @@ ifeq (,$(shell $(GO) env GOBIN))
 GOBIN=$(shell $(GO) env GOPATH)/bin
 else
 GOBIN=$(shell $(GO) env GOBIN)
-endif
-
-# Go module support: set `-mod=vendor` to use the vendored sources.
-# See also hack/make.sh.
-ifeq ($(shell go help mod >/dev/null 2>&1 && echo true), true)
-  GO:=GO111MODULE=on $(GO)
-  MOD_VENDOR=-mod=vendor
 endif
 
 BUILDX_ENABLED ?= false
@@ -130,7 +124,7 @@ help: ## Display this help.
 	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage:\n  make \033[36m<target>\033[0m\n"} /^[a-zA-Z_0-9-]+:.*?##/ { printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
 
 .PHONY: all
-all: manager kbcli probe agamotto reloader loadbalancer ## Make all cmd binaries.
+all: manager kbcli probe reloader loadbalancer ## Make all cmd binaries.
 
 ##@ Development
 
@@ -165,7 +159,7 @@ test-go-generate: ## Run go generate against test code.
 
 .PHONY: fmt
 fmt: ## Run go fmt against code.
-	$(GO) fmt ./...
+	$(GOFMT) -l -w -s $$(git ls-files | grep "\.go$$")
 
 .PHONY: vet
 vet: ## Run go vet against code.
@@ -326,29 +320,6 @@ ARGUMENTS=
 DEBUG_PORT=2345
 run-delve: manifests generate fmt vet  ## Run Delve debugger.
 	dlv --listen=:$(DEBUG_PORT) --headless=true --api-version=2 --accept-multiclient debug $(GO_PACKAGE) -- $(ARGUMENTS)
-
-
-##@ agamotto cmd
-
-AGAMOTTO_LD_FLAGS = "-s -w \
-    -X github.com/prometheus/common/version.Version=$(VERSION) \
-    -X github.com/prometheus/common/version.Revision=$(GIT_COMMIT) \
-    -X github.com/prometheus/common/version.BuildUser=apecloud \
-    -X github.com/prometheus/common/version.BuildDate=`date -u +'%Y-%m-%dT%H:%M:%SZ'`"
-
-bin/agamotto.%: ## Cross build bin/agamotto.$(OS).$(ARCH) .
-	GOOS=$(word 2,$(subst ., ,$@)) GOARCH=$(word 3,$(subst ., ,$@)) $(GO) build -ldflags=${AGAMOTTO_LD_FLAGS} -o $@ ./cmd/agamotto/main.go
-
-.PHONY: agamotto
-agamotto: OS=$(shell $(GO) env GOOS)
-agamotto: ARCH=$(shell $(GO) env GOARCH)
-agamotto: test-go-generate build-checks ## Build agamotto related binaries
-	$(MAKE) bin/agamotto.${OS}.${ARCH}
-	mv bin/agamotto.${OS}.${ARCH} bin/agamotto
-
-.PHONY: clean
-clean-agamotto: ## Clean bin/agamotto.
-	rm -f bin/agamotto
 
 ##@ reloader cmd
 
@@ -704,6 +675,7 @@ endif
 K8S_IMAGE_REPO ?= k8s.gcr.io
 SIGSTORAGE_IMAGE_REPO ?= k8s.gcr.io/sig-storage
 
+KICBASE_IMG := kicbase/stable:v0.0.36
 ETCT_IMG := $(K8S_IMAGE_REPO)/etcd:3.5.6-0
 COREDNS_IMG := $(K8S_IMAGE_REPO)/coredns/coredns:v1.8.6
 KUBE_APISERVER_IMG := $(K8S_IMAGE_REPO)/kube-apiserver:$(K8S_VERSION)
@@ -771,6 +743,7 @@ endif
 pull-all-images: DOCKER_PULLQ=docker pull -q
 pull-all-images: DOCKER_TAG=docker tag
 pull-all-images: ## Pull K8s & minikube required container images.
+	$(DOCKER_PULLQ) $(KICBASE_IMG)
 	$(DOCKER_PULLQ) $(KUBE_APISERVER_IMG)
 	$(DOCKER_PULLQ) $(KUBE_SCHEDULER_IMG)
 	$(DOCKER_PULLQ) $(KUBE_CTLR_MGR_IMG)
@@ -815,7 +788,7 @@ minikube-start: IMG_CACHE_CMD=image load --daemon=true
 minikube-start: minikube ## Start minikube cluster.
 ifneq (, $(shell which minikube))
 ifeq (, $(shell $(MINIKUBE) status -n minikube -ojson 2>/dev/null| jq -r '.Host' | grep Running))
-	$(MINIKUBE) start --kubernetes-version=$(K8S_VERSION) $(MINIKUBE_START_ARGS)
+	$(MINIKUBE) start --kubernetes-version=$(K8S_VERSION) $(MINIKUBE_START_ARGS) --base-image=$(KICBASE_IMG)
 endif
 endif
 	$(MINIKUBE) update-context

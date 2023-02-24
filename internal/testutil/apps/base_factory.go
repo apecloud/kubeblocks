@@ -87,6 +87,11 @@ func (factory *BaseFactory[T, PT, F]) Create(testCtx *testutil.TestContext) *F {
 	return factory.concreteFactory
 }
 
+func (factory *BaseFactory[T, PT, F]) CheckedCreate(testCtx *testutil.TestContext) *F {
+	gomega.Expect(testCtx.CheckedCreateObj(testCtx.Ctx, factory.get())).Should(gomega.Succeed())
+	return factory.concreteFactory
+}
+
 func (factory *BaseFactory[T, PT, F]) CreateCli(ctx context.Context, cli client.Client) *F {
 	gomega.Expect(cli.Create(ctx, factory.get())).Should(gomega.Succeed())
 	return factory.concreteFactory

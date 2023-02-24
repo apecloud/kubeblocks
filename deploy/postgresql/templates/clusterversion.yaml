@@ -8,10 +8,10 @@ spec:
   clusterDefinitionRef: apecloud-postgresql
   componentVersions:
   - componentDefRef: postgresql
-    podSpec:
+    versionsContext:
       containers:
       - name: postgresql
-        image: {{ .Values.image.repository }}:{{ default .Values.image.tag .Chart.AppVersion }}
+        image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ default .Values.image.tag .Chart.AppVersion }}
 ---
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: ClusterVersion
@@ -23,7 +23,7 @@ spec:
   clusterDefinitionRef: apecloud-postgresql
   componentVersions:
   - componentDefRef: postgresql
-    podSpec:
+    versionsContext:
       containers:
       - name: postgresql
-        image: {{ .Values.image.repository }}:15.1.0
+        image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:15.1.0

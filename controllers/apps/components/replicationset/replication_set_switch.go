@@ -70,16 +70,16 @@ type SwitchResource struct {
 
 // SwitchInstance is used to record the instance information of switching.
 type SwitchInstance struct {
-	// OldPrimaryPod stores the old primary pod information
-	OldPrimaryPod *SwitchPodInfo
-	// CandidatePrimaryPod stores the new candidate primary pod information after election, if no new primary is elected, it would be nil
-	CandidatePrimaryPod *SwitchPodInfo
-	// SecondariesPod stores the information of secondary pods
-	SecondariesPod []*SwitchPodInfo
+	// OldPrimaryRole stores the old primary role information
+	OldPrimaryRole *SwitchRoleInfo
+	// CandidatePrimaryRole stores the new candidate primary role information after election, if no new primary is elected, it would be nil
+	CandidatePrimaryRole *SwitchRoleInfo
+	// SecondariesRole stores the information of secondary roles
+	SecondariesRole []*SwitchRoleInfo
 }
 
-// SwitchPodInfo is used to record the pod information including health detection, role detection, data delay detection info, etc.
-type SwitchPodInfo struct {
+// SwitchRoleInfo is used to record the role information including health detection, role detection, data delay detection info, etc.
+type SwitchRoleInfo struct {
 	// k8s pod obj
 	Pod *corev1.Pod
 	// HealthDetectInfo stores the results of health detection
@@ -108,7 +108,7 @@ type SwitchPhaseStatus string
 // SwitchPhase defines the phase of switching.
 type SwitchPhase string
 
-// SwitchDetectManager is an interface to implement various detections that high-availability relies on, including health detection, role detection, data delay detection, etc.
+// SwitchDetectManager is an interface to implement various detections that high-availability depends on, including health detection, role detection, data delay detection, etc.
 type SwitchDetectManager interface {
 	// HealthDetect is used to implement Pod health detection
 	HealthDetect(pod *corev1.Pod) (*HealthDetectResult, error)
@@ -140,10 +140,10 @@ type SwitchElectionFilter interface {
 	Name() string
 
 	// Filter implements the filtering logic and returns the filtered PodInfoList List
-	Filter(podInfoList []*SwitchPodInfo) ([]*SwitchPodInfo, error)
+	Filter(roleInfoList []*SwitchRoleInfo) ([]*SwitchRoleInfo, error)
 }
 
-// Detection implements the detection logic and saves the detection results to the SwitchPodInfo of the corresponding role pod of the SwitchInstance,
+// Detection implements the detection logic and saves the detection results to the SwitchRoleInfo of the corresponding role pod of the SwitchInstance,
 // if skipSecondary is true, the detection logic of the secondaries will be skipped, which is used in some scenarios where there is no need to detect the secondary,
 // currently supported detection types are health detection, role detection, and delay detection.
 func (s *Switch) Detection(skipSecondary bool) {
@@ -154,40 +154,40 @@ func (s *Switch) Detection(skipSecondary bool) {
 		s.SwitchStatus.Reason = fmt.Sprintf("component %s detection failed because switchInstance is nil, pls check", s.SwitchResource.CompSpec.Name)
 		return
 	}
-	doDetection := func(spi *SwitchPodInfo) {
-		hd, err := s.SwitchDetectManager.HealthDetect(spi.Pod)
+	doDetection := func(sri *SwitchRoleInfo) {
+		hd, err := s.SwitchDetectManager.HealthDetect(sri.Pod)
 		if err != nil {
 			s.SwitchStatus.SwitchPhaseStatus = SwitchPhaseStatusFailed
 			s.SwitchStatus.Reason = err.Error()
 			return
 		}
-		spi.HealthDetectInfo = hd
+		sri.HealthDetectInfo = hd
 
-		rd, err := s.SwitchDetectManager.RoleDetect(spi.Pod)
+		rd, err := s.SwitchDetectManager.RoleDetect(sri.Pod)
 		if err != nil {
 			s.SwitchStatus.SwitchPhaseStatus = SwitchPhaseStatusFailed
 			s.SwitchStatus.Reason = err.Error()
 			return
 		}
-		spi.RoleDetectInfo = rd
+		sri.RoleDetectInfo = rd
 
-		ld, err := s.SwitchDetectManager.LagDetect(spi.Pod)
+		ld, err := s.SwitchDetectManager.LagDetect(sri.Pod)
 		if err != nil {
 			s.SwitchStatus.SwitchPhaseStatus = SwitchPhaseStatusFailed
 			s.SwitchStatus.Reason = err.Error()
 			return
 		}
-		spi.LagDetectInfo = ld
+		sri.LagDetectInfo = ld
 	}
-	if s.SwitchInstance.OldPrimaryPod != nil {
-		doDetection(s.SwitchInstance.OldPrimaryPod)
+	if s.SwitchInstance.OldPrimaryRole != nil {
+		doDetection(s.SwitchInstance.OldPrimaryRole)
 	}
-	if s.SwitchInstance.CandidatePrimaryPod != nil {
-		doDetection(s.SwitchInstance.CandidatePrimaryPod)
+	if s.SwitchInstance.CandidatePrimaryRole != nil {
+		doDetection(s.SwitchInstance.CandidatePrimaryRole)
 	}
-	if len(s.SwitchInstance.SecondariesPod) > 0 && !skipSecondary {
-		for _, secondaryPod := range s.SwitchInstance.SecondariesPod {
-			doDetection(secondaryPod)
+	if len(s.SwitchInstance.SecondariesRole) > 0 && !skipSecondary {
+		for _, secondaryRole := range s.SwitchInstance.SecondariesRole {
+			doDetection(secondaryRole)
 		}
 	}
 	if s.SwitchStatus.SwitchPhaseStatus != SwitchPhaseStatusFailed {
@@ -198,24 +198,24 @@ func (s *Switch) Detection(skipSecondary bool) {
 // Election implements the logic of candidate primary selection.
 // election is divided into two stages: filter and priority, The filter filters the candidate primary according to the rules,
 // and the priority selects the most suitable candidate primary according to the priority and return it.
-func (s *Switch) Election() *SwitchPodInfo {
+func (s *Switch) Election() *SwitchRoleInfo {
 	var (
-		filterPods []*SwitchPodInfo
-		err        error
+		filterRoles []*SwitchRoleInfo
+		err         error
 	)
 	s.SwitchStatus.SwitchPhase = SwitchPhaseElect
 	s.SwitchStatus.SwitchPhaseStatus = SwitchPhaseStatusExecuting
-	if s.SwitchInstance == nil || len(s.SwitchInstance.SecondariesPod) == 0 {
+	if s.SwitchInstance == nil || len(s.SwitchInstance.SecondariesRole) == 0 {
 		s.SwitchStatus.SwitchPhaseStatus = SwitchPhaseStatusFailed
 		s.SwitchStatus.Reason = fmt.Sprintf("component %s election failed because there is no available secondary", s.SwitchResource.CompSpec.Name)
 		return nil
 	}
 
 	// do election filter
-	filterPods = s.SwitchInstance.SecondariesPod
+	filterRoles = s.SwitchInstance.SecondariesRole
 	for _, filterFunc := range defaultSwitchElectionFilters {
 		filter := filterFunc()
-		filterPods, err = filter.Filter(filterPods)
+		filterRoles, err = filter.Filter(filterRoles)
 		if err != nil {
 			s.SwitchStatus.SwitchPhaseStatus = SwitchPhaseStatusFailed
 			s.SwitchStatus.Reason = fmt.Sprintf("component %s switch election filter %s failed, err: %s, pls check", s.SwitchResource.CompSpec.Name, filter.Name(), err.Error())
@@ -223,22 +223,22 @@ func (s *Switch) Election() *SwitchPodInfo {
 		}
 	}
 
-	if len(filterPods) == 0 {
+	if len(filterRoles) == 0 {
 		s.SwitchStatus.SwitchPhaseStatus = SwitchPhaseStatusFailed
 		s.SwitchStatus.Reason = fmt.Sprintf("component %s election failed because there is no available secondary after filter", s.SwitchResource.CompSpec.Name)
 		return nil
 	}
 
-	if len(filterPods) == 1 {
+	if len(filterRoles) == 1 {
 		s.SwitchStatus.SwitchPhaseStatus = SwitchPhaseStatusSucceed
-		return filterPods[0]
+		return filterRoles[0]
 	}
 
 	// do election priority
 	// TODO(xingran): the secondary with the smallest data delay is selected as the candidate primary currently, and more rules can be added in the future
-	sort.Sort(SwitchPodInfoList(filterPods))
+	sort.Sort(SwitchRoleInfoList(filterRoles))
 	s.SwitchStatus.SwitchPhaseStatus = SwitchPhaseStatusSucceed
-	return filterPods[0]
+	return filterRoles[0]
 }
 
 // Decision implements HA decision logic. decision will judge whether HA switching can be performed based on
@@ -247,25 +247,24 @@ func (s *Switch) Election() *SwitchPodInfo {
 // When returns true, it means switching is allowed, otherwise it fails and exits.
 func (s *Switch) Decision() bool {
 	s.SwitchStatus.SwitchPhase = SwitchPhaseDecision
-	s.SwitchStatus.SwitchPhaseStatus = SwitchPhaseStatusExecuting
-	if s.SwitchInstance.OldPrimaryPod == nil || s.SwitchInstance.CandidatePrimaryPod == nil {
+	if s.SwitchInstance.OldPrimaryRole == nil || s.SwitchInstance.CandidatePrimaryRole == nil {
 		s.SwitchStatus.SwitchPhaseStatus = SwitchPhaseStatusFailed
-		s.SwitchStatus.Reason = fmt.Sprintf("component %s switchInstance oldPrimaryPod or NewPrimaryPod is nil, pls check", s.SwitchResource.CompSpec.Name)
+		s.SwitchStatus.Reason = fmt.Sprintf("component %s switchInstance OldPrimaryRole or NewPrimaryPod is nil, pls check", s.SwitchResource.CompSpec.Name)
 		return false
 	}
 
 	// candidate primary healthy check
-	if !*s.SwitchInstance.CandidatePrimaryPod.HealthDetectInfo {
+	if !*s.SwitchInstance.CandidatePrimaryRole.HealthDetectInfo {
 		s.SwitchStatus.SwitchPhaseStatus = SwitchPhaseStatusFailed
-		s.SwitchStatus.Reason = fmt.Sprintf("component %s new primary pod %s is not healthy, can not do switch", s.SwitchResource.CompSpec.Name, s.SwitchInstance.CandidatePrimaryPod.Pod.Name)
+		s.SwitchStatus.Reason = fmt.Sprintf("component %s new primary pod %s is not healthy, can not do switch", s.SwitchResource.CompSpec.Name, s.SwitchInstance.CandidatePrimaryRole.Pod.Name)
 		return false
 	}
 
 	// candidate primary role label check
-	isPrimary, err := checkObjRoleLabelIsPrimary(s.SwitchInstance.CandidatePrimaryPod.Pod)
+	isPrimary, err := checkObjRoleLabelIsPrimary(s.SwitchInstance.CandidatePrimaryRole.Pod)
 	if err != nil {
 		s.SwitchStatus.SwitchPhaseStatus = SwitchPhaseStatusFailed
-		s.SwitchStatus.Reason = fmt.Sprintf("component %s candidate primary %s check role label failed, err %s", s.SwitchResource.CompSpec.Name, s.SwitchInstance.CandidatePrimaryPod.Pod.Name, err.Error())
+		s.SwitchStatus.Reason = fmt.Sprintf("component %s candidate primary %s check role label failed, err %s", s.SwitchResource.CompSpec.Name, s.SwitchInstance.CandidatePrimaryRole.Pod.Name, err.Error())
 		return false
 	}
 	if isPrimary {
@@ -275,17 +274,17 @@ func (s *Switch) Decision() bool {
 	}
 
 	// candidate primary role in kernel check
-	if string(*s.SwitchInstance.CandidatePrimaryPod.RoleDetectInfo) != string(Secondary) {
+	if string(*s.SwitchInstance.CandidatePrimaryRole.RoleDetectInfo) != string(Secondary) {
 		s.SwitchStatus.SwitchPhaseStatus = SwitchPhaseStatusFailed
 		s.SwitchStatus.Reason = fmt.Sprintf("component %s the role of the candidate primary in the kernel is not secondary", s.SwitchResource.CompSpec.Name)
 		return false
 	}
 
 	makeMaxAvailabilityDecision := func() bool {
-		// old primary is healthy,
-		if *s.SwitchInstance.OldPrimaryPod.HealthDetectInfo {
+		// old primary is alive, check the data delay of candidate primary
+		if *s.SwitchInstance.OldPrimaryRole.HealthDetectInfo {
 			// The LagDetectInfo is 0, which means that the primary and the secondary data are consistent and can be switched
-			if *s.SwitchInstance.CandidatePrimaryPod.LagDetectInfo == 0 {
+			if *s.SwitchInstance.CandidatePrimaryRole.LagDetectInfo == 0 {
 				s.SwitchStatus.SwitchPhaseStatus = SwitchPhaseStatusSucceed
 				return true
 			}
@@ -300,13 +299,13 @@ func (s *Switch) Decision() bool {
 
 	makeMaxDataProtectionDecision := func() bool {
 		// The LagDetectInfo is 0, which means that the primary and the secondary data are consistent and can be switched
-		if *s.SwitchInstance.CandidatePrimaryPod.LagDetectInfo == 0 {
+		if *s.SwitchInstance.CandidatePrimaryRole.LagDetectInfo == 0 {
 			s.SwitchStatus.SwitchPhaseStatus = SwitchPhaseStatusSucceed
 			return true
 		}
 		// Regardless of whether the primary is alive or not, if the data consistency cannot be judged, the switch will not be performed.
 		s.SwitchStatus.SwitchPhaseStatus = SwitchPhaseStatusFailed
-		s.SwitchStatus.Reason = fmt.Sprintf("component %s primary and secondary data consistency cannot be judged, so the switch will not be performed with MaximumAvailability switchPolicy", s.SwitchResource.CompSpec.Name)
+		s.SwitchStatus.Reason = fmt.Sprintf("component %s primary and secondary data consistency cannot be judged, so the switch will not be performed with MaximumDataProtection switchPolicy", s.SwitchResource.CompSpec.Name)
 		return false
 	}
 
@@ -364,9 +363,9 @@ func (s *Switch) InitSwitchInstance(oldPrimaryIndex, newPrimaryIndex int32) erro
 	}
 	if s.SwitchInstance == nil {
 		s.SwitchInstance = &SwitchInstance{
-			OldPrimaryPod:       nil,
-			CandidatePrimaryPod: nil,
-			SecondariesPod:      make([]*SwitchPodInfo, len(stsList.Items)-1),
+			OldPrimaryRole:       nil,
+			CandidatePrimaryRole: nil,
+			SecondariesRole:      make([]*SwitchRoleInfo, len(stsList.Items)-1),
 		}
 	}
 	for _, sts := range stsList.Items {
@@ -374,7 +373,7 @@ func (s *Switch) InitSwitchInstance(oldPrimaryIndex, newPrimaryIndex int32) erro
 		if err != nil {
 			return err
 		}
-		switchPodInfo := &SwitchPodInfo{
+		SwitchRoleInfo := &SwitchRoleInfo{
 			Pod:              pod,
 			HealthDetectInfo: nil,
 			RoleDetectInfo:   nil,
@@ -382,11 +381,11 @@ func (s *Switch) InitSwitchInstance(oldPrimaryIndex, newPrimaryIndex int32) erro
 		}
 		switch int32(utils.GetOrdinalSts(&sts)) {
 		case oldPrimaryIndex:
-			s.SwitchInstance.OldPrimaryPod = switchPodInfo
+			s.SwitchInstance.OldPrimaryRole = SwitchRoleInfo
 		case newPrimaryIndex:
-			s.SwitchInstance.CandidatePrimaryPod = switchPodInfo
+			s.SwitchInstance.CandidatePrimaryRole = SwitchRoleInfo
 		default:
-			s.SwitchInstance.SecondariesPod = append(s.SwitchInstance.SecondariesPod, switchPodInfo)
+			s.SwitchInstance.SecondariesRole = append(s.SwitchInstance.SecondariesRole, SwitchRoleInfo)
 		}
 	}
 	return nil

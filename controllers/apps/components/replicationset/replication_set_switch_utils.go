@@ -38,8 +38,8 @@ const (
 	KBSwitchDemoteStmtEnvName  = "KB_SWITCH_DEMOTE_STATEMENT"
 	KBSwitchFollowStmtEnvName  = "KB_SWITCH_FOLLOW_STATEMENT"
 
-	KBSwitchOldPrimaryPodName = "KB_OLD_PRIMARY_POD_NAME"
-	KBSwitchNewPrimaryPodName = "KB_NEW_PRIMARY_POD_NAME"
+	KBSwitchOldPrimaryRoleName = "KB_OLD_PRIMARY_ROLE_NAME"
+	KBSwitchNewPrimaryRoleName = "KB_NEW_PRIMARY_ROLE_NAME"
 )
 
 var defaultSwitchElectionFilters = []func() SwitchElectionFilter{
@@ -56,53 +56,54 @@ type ProbeDetectManager struct{}
 // SwitchActionWithJobHandler implements the SwitchActionHandler interface with executing switch commands by k8s Job.
 type SwitchActionWithJobHandler struct{}
 
-// SwitchElectionRoleFilter implements the SwitchElectionFilter interface and is used to filter the pods which role cannot be elected as candidate primary.
+// SwitchElectionRoleFilter implements the SwitchElectionFilter interface and is used to filter the instances which role cannot be elected as candidate primary.
 type SwitchElectionRoleFilter struct{}
 
-// SwitchElectionHealthFilter implements the SwitchElectionFilter interface and is used to filter unhealthy pods that cannot be selected as candidate primary.
+// SwitchElectionHealthFilter implements the SwitchElectionFilter interface and is used to filter unhealthy instances that cannot be selected as candidate primary.
 type SwitchElectionHealthFilter struct{}
 
-// SwitchPodInfoList is a sort.Interface that Sorts a list of SwitchPodInfo based on LagDetectInfo value.
-type SwitchPodInfoList []*SwitchPodInfo
+// SwitchRoleInfoList is a sort.Interface that Sorts a list of SwitchRoleInfo based on LagDetectInfo value.
+type SwitchRoleInfoList []*SwitchRoleInfo
 
 var _ SwitchDetectManager = &ProbeDetectManager{}
 
 var _ SwitchActionHandler = &SwitchActionWithJobHandler{}
 
-// Len is the implementation of the sort.Interface, calculate the length of the list of SwitchPodInfoList.
-func (dos SwitchPodInfoList) Len() int {
-	return len(dos)
+// Len is the implementation of the sort.Interface, calculate the length of the list of SwitchRoleInfoList.
+func (sl SwitchRoleInfoList) Len() int {
+	return len(sl)
 }
 
-// Swap is the implementation of the sort.Interface, exchange two items in SwitchPodInfoList.
-func (dos SwitchPodInfoList) Swap(i, j int) {
-	dos[i], dos[j] = dos[j], dos[i]
+// Swap is the implementation of the sort.Interface, exchange two items in SwitchRoleInfoList.
+func (sl SwitchRoleInfoList) Swap(i, j int) {
+	sl[i], sl[j] = sl[j], sl[i]
 }
 
-// Less is the implementation of the sort.Interface, sort the switchPodInfo with LagDetectInfo.
-func (dos SwitchPodInfoList) Less(i, j int) bool {
-	return *dos[i].LagDetectInfo < *dos[j].LagDetectInfo
+// Less is the implementation of the sort.Interface, sort the SwitchRoleInfo with LagDetectInfo.
+func (sl SwitchRoleInfoList) Less(i, j int) bool {
+	return *sl[i].LagDetectInfo < *sl[j].LagDetectInfo
 }
 
 func (f *SwitchElectionRoleFilter) Name() string {
 	return SwitchElectionRoleFilterName
 }
 
-func (f *SwitchElectionRoleFilter) Filter(podInfoList []*SwitchPodInfo) ([]*SwitchPodInfo, error) {
-	var filterPods []*SwitchPodInfo
-	for _, podInfo := range podInfoList {
-		if podInfo.RoleDetectInfo == nil {
-			return nil, fmt.Errorf("pod %s RoleDetectInfo is nil, pls check", podInfo.Pod.Name)
+// Filter is used to filter the instance which role cannot be elected as candidate primary.
+func (f *SwitchElectionRoleFilter) Filter(roleInfoList []*SwitchRoleInfo) ([]*SwitchRoleInfo, error) {
+	var filterRoles []*SwitchRoleInfo
+	for _, roleInfo := range roleInfoList {
+		if roleInfo.RoleDetectInfo == nil {
+			return nil, fmt.Errorf("pod %s RoleDetectInfo is nil, pls check", roleInfo.Pod.Name)
 		}
-		isPrimaryPod, err := checkObjRoleLabelIsPrimary(podInfo.Pod)
+		isPrimaryPod, err := checkObjRoleLabelIsPrimary(roleInfo.Pod)
 		if err != nil {
-			return filterPods, err
+			return filterRoles, err
 		}
-		if string(*podInfo.RoleDetectInfo) != string(Primary) && !isPrimaryPod {
-			filterPods = append(filterPods, podInfo)
+		if string(*roleInfo.RoleDetectInfo) != string(Primary) && !isPrimaryPod {
+			filterRoles = append(filterRoles, roleInfo)
 		}
 	}
-	return filterPods, nil
+	return filterRoles, nil
 }
 
 // NewSwitchElectionRoleFilter initializes a SwitchElectionRoleFilter and returns it.
@@ -114,17 +115,18 @@ func (f *SwitchElectionHealthFilter) Name() string {
 	return SwitchElectionHealthFilterName
 }
 
-func (f *SwitchElectionHealthFilter) Filter(podInfoList []*SwitchPodInfo) ([]*SwitchPodInfo, error) {
-	var filterPods []*SwitchPodInfo
-	for _, podInfo := range podInfoList {
-		if podInfo.HealthDetectInfo == nil {
-			return nil, fmt.Errorf("pod %s HealthDetectInfo is nil, pls check", podInfo.Pod.Name)
+// Filter is used to filter unhealthy instances that cannot be selected as candidate primary.
+func (f *SwitchElectionHealthFilter) Filter(roleInfoList []*SwitchRoleInfo) ([]*SwitchRoleInfo, error) {
+	var filterRoles []*SwitchRoleInfo
+	for _, roleInfo := range roleInfoList {
+		if roleInfo.HealthDetectInfo == nil {
+			return nil, fmt.Errorf("pod %s HealthDetectInfo is nil, pls check", roleInfo.Pod.Name)
 		}
-		if *podInfo.HealthDetectInfo {
-			filterPods = append(filterPods, podInfo)
+		if *roleInfo.HealthDetectInfo {
+			filterRoles = append(filterRoles, roleInfo)
 		}
 	}
-	return filterPods, nil
+	return filterRoles, nil
 }
 
 // NewSwitchElectionHealthFilter initializes a SwitchElectionHealthFilter and returns it.
@@ -163,18 +165,19 @@ func (handler *SwitchActionWithJobHandler) BuildExecSwitchCommandEnvs(s *Switch)
 	svcName := strings.Join([]string{s.SwitchResource.Cluster.Name, s.SwitchResource.CompSpec.Name, "headless"}, "-")
 	primaryEnvs := []corev1.EnvVar{
 		{
-			Name:  KBSwitchOldPrimaryPodName,
-			Value: fmt.Sprintf("%s.%s", s.SwitchInstance.OldPrimaryPod.Pod.Name, svcName),
+			Name:  KBSwitchOldPrimaryRoleName,
+			Value: fmt.Sprintf("%s.%s", s.SwitchInstance.OldPrimaryRole.Pod.Name, svcName),
 		},
 		{
-			Name:  KBSwitchNewPrimaryPodName,
-			Value: fmt.Sprintf("%s.%s", s.SwitchInstance.CandidatePrimaryPod.Pod.Name, svcName),
+			Name:  KBSwitchNewPrimaryRoleName,
+			Value: fmt.Sprintf("%s.%s", s.SwitchInstance.CandidatePrimaryRole.Pod.Name, svcName),
 		},
 	}
 	switchEnvs = append(switchEnvs, primaryEnvs...)
 	return switchEnvs, nil
 }
 
+// ExecSwitchCommands executes switch commands with k8s job.
 func (handler *SwitchActionWithJobHandler) ExecSwitchCommands(switchEnvs []corev1.EnvVar,
 	switchCmdExecutorConfig *appsv1alpha1.SwitchCmdExecutorConfig) error {
 	if switchCmdExecutorConfig == nil || len(switchCmdExecutorConfig.SwitchSteps) == 0 {

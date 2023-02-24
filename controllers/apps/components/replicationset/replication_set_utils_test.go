@@ -120,6 +120,10 @@ var _ = Describe("ReplicationSet Util", func() {
 				Create(&testCtx).GetObject()
 		}
 
+		By("Test ReplicationSet pod number of sts equals 1")
+		_, err = GetAndCheckReplicationPodByStatefulSet(ctx, k8sClient, stsList[0])
+		Expect(err).Should(Succeed())
+
 		By("Test handleReplicationSet success when stsList count equal cluster.replicas.")
 		err = HandleReplicationSet(ctx, k8sClient, clusterObj, stsList)
 		Expect(err).Should(Succeed())

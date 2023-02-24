@@ -298,18 +298,13 @@ spec:
                         and failover when workloadType is Replication.
                       properties:
                         switchPolicyType:
-                          allOf:
-                          - enum:
-                            - MaximumAvailability
-                            - MaximumDataProtection
-                            - Manual
-                          - enum:
-                            - MaximumAvailability
-                            - MaximumDataProtection
-                            - Manual
                           default: MaximumAvailability
                           description: clusterSwitchPolicy type defined by Provider
                             in ClusterDefinition, refer components[i].replicationSpec.switchPolicies[x].type
+                          enum:
+                          - MaximumAvailability
+                          - MaximumDataProtection
+                          - Manual
                           type: string
                       type: object
                     tls:

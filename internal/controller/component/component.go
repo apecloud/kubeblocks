@@ -237,7 +237,7 @@ func ReplaceNamedVars(namedValuesMap map[string]string, needle string, limits in
 
 // ReplaceSecretEnvVars replaces the env secret value with namedValues and returns new envs
 func ReplaceSecretEnvVars(namedValuesMap map[string]string, envs []corev1.EnvVar) []corev1.EnvVar {
-	newEnvs := make([]corev1.EnvVar, len(envs))
+	newEnvs := make([]corev1.EnvVar, 0, len(envs))
 	for _, e := range envs {
 		if e.ValueFrom == nil || e.ValueFrom.SecretKeyRef == nil {
 			continue

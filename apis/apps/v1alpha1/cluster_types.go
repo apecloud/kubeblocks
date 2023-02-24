@@ -293,7 +293,6 @@ type ReplicationMemberStatus struct {
 type ClusterSwitchPolicy struct {
 	// clusterSwitchPolicy type defined by Provider in ClusterDefinition, refer components[i].replicationSpec.switchPolicies[x].type
 	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:Enum={MaximumAvailability, MaximumDataProtection, Manual}
 	// +kubebuilder:default=MaximumAvailability
 	// +optional
 	Type SwitchPolicyType `json:"switchPolicyType"`

@@ -24,7 +24,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/controller/dag"
+	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -43,8 +43,8 @@ type clusterPlanBuilder struct {
 }
 
 type ClusterPlan struct {
-	dag *dag.DAG
-	walkFunc dag.WalkFunc
+	dag      *graph.DAG
+	walkFunc graph.WalkFunc
 }
 
 type compoundCluster struct {
@@ -83,26 +83,26 @@ func (b *clusterPlanBuilder) getCompoundCluster() (*compoundCluster, error) {
 
 // Build only cluster Creation, Update and Deletion supported.
 // TODO: Validations and Corrections (cluster labels correction, primaryIndex spec validation etc.)
-func (b *clusterPlanBuilder) Build() (dag.Plan, error) {
+func (b *clusterPlanBuilder) Build() (graph.Plan, error) {
 	cc, err := b.getCompoundCluster()
 	if err != nil {
 		return nil, err
 	}
-	graph := dag.New()
-	transformers := []dag.GraphTransformer{
+	dag := graph.NewDAG()
+	transformers := []graph.GraphTransformer{
 		&clusterTransformer{cc: *cc, cli: b.cli, ctx: b.ctx},
 		&credentialTransformer{},
-		&ConfigTransformer{},
+		&configTransformer{},
 		&CacheDiffTransformer{},
 		&ClusterStatusTransformer{},
 	}
 	for _, transformer := range transformers {
-		if err := transformer.Transform(graph);  err != nil {
+		if err := transformer.Transform(dag);  err != nil {
 			return nil, err
 		}
 	}
 
-	walkFunc := func(node dag.Vertex) error {
+	walkFunc := func(node graph.Vertex) error {
 		obj, ok := node.(*lifecycleVertex)
 		if !ok {
 			return fmt.Errorf("wrong node type %v", node)
@@ -121,7 +121,7 @@ func (b *clusterPlanBuilder) Build() (dag.Plan, error) {
 		return nil
 	}
 	plan := &ClusterPlan{
-		dag: graph,
+		dag: dag,
 		walkFunc: walkFunc,
 	}
 	return plan, nil
@@ -133,7 +133,7 @@ func (p *ClusterPlan) Execute() error {
 
 // NewClusterPlanBuilder returns a clusterPlanBuilder powered PlanBuilder
 // TODO: change ctx to context.Context
-func NewClusterPlanBuilder(ctx intctrlutil.RequestCtx, cli client.Client, cluster *appsv1alpha1.Cluster) dag.PlanBuilder {
+func NewClusterPlanBuilder(ctx intctrlutil.RequestCtx, cli client.Client, cluster *appsv1alpha1.Cluster) graph.PlanBuilder {
 	return &clusterPlanBuilder{
 		ctx:     ctx,
 		cli:     cli,

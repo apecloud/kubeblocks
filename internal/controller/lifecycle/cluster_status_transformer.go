@@ -16,12 +16,12 @@ limitations under the License.
 
 package lifecycle
 
-import "github.com/apecloud/kubeblocks/internal/controller/dag"
+import "github.com/apecloud/kubeblocks/internal/controller/graph"
 
 type ClusterStatusTransformer struct {
 
 }
 
-func (c *ClusterStatusTransformer) Transform(dag *dag.DAG) error {
+func (c *ClusterStatusTransformer) Transform(dag *graph.DAG) error {
 	return nil
 }

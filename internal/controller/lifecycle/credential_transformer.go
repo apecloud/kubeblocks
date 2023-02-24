@@ -16,12 +16,31 @@ limitations under the License.
 
 package lifecycle
 
-import "github.com/apecloud/kubeblocks/internal/controller/dag"
+import (
+	corev1 "k8s.io/api/core/v1"
+
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/controller/graph"
+)
 
 // credentialTransformer puts the credential Secret at the beginning of the DAG
 type credentialTransformer struct {}
 
-func (c *credentialTransformer) Transform(dag *dag.DAG) error {
-
+func (c *credentialTransformer) Transform(dag *graph.DAG) error {
+	var secretVertices, noneRootVertices []graph.Vertex
+	var err error
+	secretVertices, err = findAll[*corev1.Secret](dag)
+	if err != nil {
+		return err
+	}
+	noneRootVertices, err = findAllNot[*appsv1alpha1.Cluster](dag)
+	if err != nil {
+		return err
+	}
+	for _, secretVertex := range secretVertices {
+		for _, vertex := range noneRootVertices {
+			dag.Connect(vertex, secretVertex)
+		}
+	}
 	return nil
 }

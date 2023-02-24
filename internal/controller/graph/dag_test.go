@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package dag
+package graph
 
 import (
 	"fmt"
@@ -22,7 +22,7 @@ import (
 )
 
 func TestWalkTopoOrder(t *testing.T) {
-	dag := New()
+	dag := NewDAG()
 	for i := 0; i < 13; i++ {
 		dag.AddVertex(i)
 	}

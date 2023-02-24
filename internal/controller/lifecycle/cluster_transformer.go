@@ -21,7 +21,7 @@ import (
 
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
-	"github.com/apecloud/kubeblocks/internal/controller/dag"
+	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	"github.com/apecloud/kubeblocks/internal/controller/plan"
 	intctrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
@@ -35,9 +35,10 @@ type clusterTransformer struct {
 	ctx intctrlutil.RequestCtx
 }
 
-func (c *clusterTransformer) Transform(dag *dag.DAG) error {
+func (c *clusterTransformer) Transform(dag *graph.DAG) error {
 	// put the cluster object first, it will be root vertex of DAG
-	dag.AddVertex(&lifecycleVertex{obj: c.cc.cluster})
+	rootVertex := &lifecycleVertex{obj: c.cc.cluster}
+	dag.AddVertex(rootVertex)
 
 	// we copy the K8s objects prepare stage directly first
 	// TODO: refactor plan.PrepareComponentResources
@@ -79,6 +80,7 @@ func (c *clusterTransformer) Transform(dag *dag.DAG) error {
 	for _, object := range *task.Resources {
 		vertex := &lifecycleVertex{obj: object}
 		dag.AddVertex(vertex)
+		dag.Connect(rootVertex, vertex)
 	}
 	return nil
 }

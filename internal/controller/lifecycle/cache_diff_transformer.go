@@ -16,13 +16,13 @@ limitations under the License.
 
 package lifecycle
 
-import "github.com/apecloud/kubeblocks/internal/controller/dag"
+import "github.com/apecloud/kubeblocks/internal/controller/graph"
 
 // CacheDiffTransformer reads all Vertex.Obj in cache and compute the diff DAG.
 type CacheDiffTransformer struct {
 
 }
 
-func (c *CacheDiffTransformer) Transform(dag *dag.DAG) error {
+func (c *CacheDiffTransformer) Transform(dag *graph.DAG) error {
 	return nil
 }

@@ -16,11 +16,29 @@ limitations under the License.
 
 package lifecycle
 
-import "github.com/apecloud/kubeblocks/internal/controller/dag"
+import (
+	corev1 "k8s.io/api/core/v1"
 
-// ConfigTransformer makes all config related ConfigMaps immutable
-type ConfigTransformer struct {}
+	"github.com/apecloud/kubeblocks/internal/controller/graph"
+)
 
-func (c *ConfigTransformer) Transform(dag *dag.DAG) error {
+// configTransformer makes all config related ConfigMaps immutable
+type configTransformer struct {}
+
+func (c *configTransformer) Transform(dag *graph.DAG) error {
+	cmVertices, err := findAll[*corev1.ConfigMap](dag)
+	if err != nil {
+		return err
+	}
+	isConfig := func(cm *corev1.ConfigMap) bool {
+		return false
+	}
+	for _, vertex := range cmVertices {
+		v, _ := vertex.(*lifecycleVertex)
+		cm, _ := v.obj.(*corev1.ConfigMap)
+		if isConfig(cm) {
+			v.immutable = true
+		}
+	}
 	return nil
 }

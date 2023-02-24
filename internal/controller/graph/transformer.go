@@ -14,14 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package dag
+package graph
 
-// PlanBuilder builds a Plan by applying a group of GraphTransformer to an empty DAG.
-type PlanBuilder interface {
-	Build() (Plan, error)
-}
-
-// Plan defines the final actions should be executed.
-type Plan interface {
-	Execute() error
+// GraphTransformer transforms a DAG to a new version
+type GraphTransformer interface {
+	Transform(dag *DAG) error
 }

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package dag
+package graph
 
 import (
 	"errors"
@@ -57,6 +57,14 @@ func (d *DAG) RemoveVertex(v Vertex) bool {
 		}
 	}
 	return true
+}
+
+func (d *DAG) Vertices() []Vertex {
+	vertices := make([]Vertex, len(d.vertices))
+	for v := range d.vertices {
+		vertices = append(vertices, v)
+	}
+	return vertices
 }
 
 func (d *DAG) AddEdge(e Edge) bool {
@@ -242,7 +250,7 @@ func (r *realEdge) To() Vertex {
 	return r.T
 }
 
-func New() *DAG {
+func NewDAG() *DAG {
 	dag := &DAG{
 		vertices: make(map[Vertex]Vertex),
 		edges:    make(map[Edge]Edge),

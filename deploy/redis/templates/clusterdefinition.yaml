@@ -137,13 +137,13 @@ spec:
               type: CreateByStmt
               scope: AnyPods
               statements:
-                creation: ACL SETUSER $(USERNAME) ON >$(PASSWD) allkeys +get                    
+                creation: ACL SETUSER $(USERNAME) ON >$(PASSWD) allkeys +get
           - name: kbprobe
             provisionPolicy:
               type: CreateByStmt
               scope: AnyPods
               statements:
-                creation: ACL SETUSER $(USERNAME) ON >$(PASSWD) allkeys +get                
+                creation: ACL SETUSER $(USERNAME) ON >$(PASSWD) allkeys +get
           - name: kbreplicator
             provisionPolicy:
               type: CreateByStmt

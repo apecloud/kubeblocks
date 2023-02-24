@@ -55,7 +55,8 @@ func GetClusterByObject(ctx context.Context,
 
 // IsCompleted checks whether the component has completed the operation
 func IsCompleted(phase appsv1alpha1.Phase) bool {
-	return slices.Index([]appsv1alpha1.Phase{appsv1alpha1.RunningPhase, appsv1alpha1.FailedPhase, appsv1alpha1.AbnormalPhase}, phase) != -1
+	return slices.Index([]appsv1alpha1.Phase{appsv1alpha1.RunningPhase, appsv1alpha1.FailedPhase,
+		appsv1alpha1.AbnormalPhase, appsv1alpha1.StoppedPhase}, phase) != -1
 }
 
 func IsFailedOrAbnormal(phase appsv1alpha1.Phase) bool {

@@ -22,7 +22,6 @@ require (
 	github.com/docker/docker v20.10.21+incompatible
 	github.com/docker/go-connections v0.4.0
 	github.com/ghodss/yaml v1.0.0
-	github.com/go-kit/log v0.2.0
 	github.com/go-logr/logr v1.2.3
 	github.com/go-logr/zapr v1.2.3
 	github.com/go-redis/redis/v8 v8.11.5
@@ -36,13 +35,11 @@ require (
 	github.com/manifoldco/promptui v0.9.0
 	github.com/onsi/ginkgo/v2 v2.6.1
 	github.com/onsi/gomega v1.24.2
+	github.com/opencontainers/image-spec v1.1.0-rc2
 	github.com/pingcap/go-tpc v1.0.9
 	github.com/pkg/errors v0.9.1
-	github.com/prometheus/exporter-toolkit v0.7.3
-	github.com/prometheus/mysqld_exporter v0.14.0
 	github.com/replicatedhq/termui/v3 v3.1.1-0.20200811145416-f40076d26851
 	github.com/replicatedhq/troubleshoot v0.53.0
-	github.com/samuel/go-zookeeper v0.0.0-20190923202752-2cc03de413da
 	github.com/sethvargo/go-password v0.2.0
 	github.com/shirou/gopsutil/v3 v3.22.11
 	github.com/spf13/cast v1.5.0
@@ -54,7 +51,7 @@ require (
 	github.com/tj/go-spin v1.1.0
 	github.com/valyala/fasthttp v1.41.0
 	github.com/vishvananda/netlink v1.1.1-0.20210330154013-f5de75959ad5
-	github.com/vmware-tanzu/velero v1.10.0
+	github.com/vmware-tanzu/velero v1.10.1
 	go.etcd.io/etcd/client/v3 v3.5.6
 	go.etcd.io/etcd/server/v3 v3.5.6
 	go.mongodb.org/mongo-driver v1.10.3
@@ -65,7 +62,6 @@ require (
 	golang.org/x/sys v0.5.0
 	google.golang.org/grpc v1.51.0
 	google.golang.org/protobuf v1.28.1
-	gopkg.in/alecthomas/kingpin.v2 v2.2.6
 	helm.sh/helm/v3 v3.11.1
 	k8s.io/api v0.26.1
 	k8s.io/apimachinery v0.26.1
@@ -85,8 +81,6 @@ require (
 	github.com/Azure/azure-sdk-for-go v65.0.0+incompatible // indirect
 	github.com/PuerkitoBio/purell v1.1.1 // indirect
 	github.com/PuerkitoBio/urlesc v0.0.0-20170810143723-de5bf2ad4578 // indirect
-	github.com/alecthomas/template v0.0.0-20190718012654-fb15b899a751 // indirect
-	github.com/alecthomas/units v0.0.0-20210927113745-59d0afb8317a // indirect
 	github.com/alicebob/gopher-json v0.0.0-20200520072559-a9ecdc9d1d3a // indirect
 	github.com/andybalholm/brotli v1.0.4 // indirect
 	github.com/antlr/antlr4/runtime/Go/antlr v1.4.10 // indirect
@@ -111,6 +105,7 @@ require (
 	github.com/evanphx/json-patch/v5 v5.6.0 // indirect
 	github.com/fasthttp/router v1.4.12 // indirect
 	github.com/felixge/httpsnoop v1.0.3 // indirect
+	github.com/go-kit/log v0.2.0 // indirect
 	github.com/go-logfmt/logfmt v0.5.1 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-ole/go-ole v1.2.6 // indirect
@@ -134,7 +129,6 @@ require (
 	github.com/jackc/pgx/v5 v5.2.0 // indirect
 	github.com/jhump/protoreflect v1.13.0 // indirect
 	github.com/jonboulle/clockwork v0.3.0 // indirect
-	github.com/jpillora/backoff v1.0.0 // indirect
 	github.com/klauspost/pgzip v1.2.5 // indirect
 	github.com/kopia/kopia v0.10.7 // indirect
 	github.com/kubernetes-csi/external-snapshotter/client/v4 v4.2.0 // indirect
@@ -144,10 +138,8 @@ require (
 	github.com/minio/blake2b-simd v0.0.0-20160723061019-3f5f724cb5b1 // indirect
 	github.com/mistifyio/go-zfs/v3 v3.0.0 // indirect
 	github.com/montanaflynn/stats v0.0.0-20171201202039-1bf9dbcd8cbe // indirect
-	github.com/mwitkow/go-conntrack v0.0.0-20190716064945-2f068394615f // indirect
 	github.com/nsf/termbox-go v0.0.0-20190121233118-02980233997d // indirect
 	github.com/olekukonko/tablewriter v0.0.5 // indirect
-	github.com/opencontainers/image-spec v1.1.0-rc2 // indirect
 	github.com/opencontainers/runtime-spec v1.0.3-0.20210326190908-1c3f411f0417 // indirect
 	github.com/opencontainers/selinux v1.10.2 // indirect
 	github.com/openzipkin/zipkin-go v0.4.0 // indirect
@@ -220,7 +212,7 @@ require (
 	github.com/HdrHistogram/hdrhistogram-go v1.0.0 // indirect
 	github.com/MakeNowJust/heredoc v1.0.0 // indirect
 	github.com/Masterminds/goutils v1.1.1 // indirect
-	github.com/Masterminds/semver/v3 v3.2.0 // indirect
+	github.com/Masterminds/semver/v3 v3.2.0
 	github.com/Masterminds/squirrel v1.5.3 // indirect
 	github.com/Microsoft/go-winio v0.5.2 // indirect
 	github.com/Microsoft/hcsshim v0.9.6 // indirect
@@ -298,7 +290,7 @@ require (
 	github.com/hashicorp/go-getter v1.7.0 // indirect
 	github.com/hashicorp/go-hclog v1.3.1 // indirect
 	github.com/hashicorp/go-immutable-radix v1.3.1 // indirect
-	github.com/hashicorp/go-multierror v1.1.1
+	github.com/hashicorp/go-multierror v1.1.1 // indirect
 	github.com/hashicorp/go-plugin v1.4.3 // indirect
 	github.com/hashicorp/go-retryablehttp v0.7.1 // indirect
 	github.com/hashicorp/go-rootcerts v1.0.2 // indirect
@@ -323,7 +315,7 @@ require (
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
 	github.com/jmoiron/sqlx v1.3.5 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
-	github.com/json-iterator/go v1.1.12
+	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/kardianos/osext v0.0.0-20190222173326-2bc1f35cddc0 // indirect
 	github.com/klauspost/compress v1.15.11 // indirect
 	github.com/kubernetes-csi/external-snapshotter/client/v6 v6.0.1
@@ -374,9 +366,9 @@ require (
 	github.com/peterbourgon/diskv v2.0.1+incompatible // indirect
 	github.com/pkg/browser v0.0.0-20210115035449-ce105d075bb4 // indirect
 	github.com/posener/complete v1.2.3 // indirect
-	github.com/prometheus/client_golang v1.14.0
-	github.com/prometheus/client_model v0.3.0
-	github.com/prometheus/common v0.37.0
+	github.com/prometheus/client_golang v1.14.0 // indirect
+	github.com/prometheus/client_model v0.3.0 // indirect
+	github.com/prometheus/common v0.37.0 // indirect
 	github.com/prometheus/procfs v0.8.0 // indirect
 	github.com/rivo/uniseg v0.2.0 // indirect
 	github.com/rubenv/sql-migrate v1.2.0 // indirect
@@ -422,7 +414,7 @@ require (
 	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/genproto v0.0.0-20230104163317-caabf589fcbf // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
-	gopkg.in/ini.v1 v1.67.0
+	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	inet.af/netaddr v0.0.0-20211027220019-c74959edd3b6 // indirect

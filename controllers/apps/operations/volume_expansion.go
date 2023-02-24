@@ -18,7 +18,6 @@ package operations
 
 import (
 	"fmt"
-
 	"reflect"
 	"time"
 
@@ -65,7 +64,7 @@ func (ve volumeExpansionOpsHandler) ActionStartedCondition(opsRequest *appsv1alp
 // Action modifies Cluster.spec.components[*].VolumeClaimTemplates[*].spec.resources
 func (ve volumeExpansionOpsHandler) Action(opsRes *OpsResource) error {
 	var (
-		volumeExpansionMap = opsRes.OpsRequest.CovertVolumeExpansionListToMap()
+		volumeExpansionMap = opsRes.OpsRequest.ConvertVolumeExpansionListToMap()
 		volumeExpansionOps appsv1alpha1.VolumeExpansion
 		ok                 bool
 	)
@@ -198,11 +197,10 @@ func (ve volumeExpansionOpsHandler) SaveLastConfiguration(opsRes *OpsResource) e
 			VolumeClaimTemplates: lastVCTs,
 		}
 	}
-	patch := client.MergeFrom(opsRequest.DeepCopy())
 	opsRequest.Status.LastConfiguration = appsv1alpha1.LastConfiguration{
 		Components: lastComponentInfo,
 	}
-	return opsRes.Client.Status().Patch(opsRes.Ctx, opsRequest, patch)
+	return nil
 }
 
 // checkIsTimeOut check whether the volume expansion operation has timed out
@@ -305,7 +303,7 @@ func (ve volumeExpansionOpsHandler) handleVCTExpansionProgress(opsRes *OpsResour
 	var completedCount int
 	for _, v := range pvcList.Items {
 		objectKey := getPVCProgressObjectKey(v.Name)
-		progressDetail := appsv1alpha1.ProgressDetail{ObjectKey: objectKey, Group: vctName}
+		progressDetail := appsv1alpha1.ProgressStatusDetail{ObjectKey: objectKey, Group: vctName}
 		// if the volume expand succeed
 		if v.Status.Capacity.Storage().Cmp(requestStorage) >= 0 {
 			succeedCount += 1

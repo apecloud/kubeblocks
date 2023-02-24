@@ -106,7 +106,7 @@ spec:
                 value: {{ if .Values.cluster.dynamicConfig }}{{ .Values.cluster.dynamicConfig }}{{ end }}
             command: ["/scripts/setup.sh"]
           - name: metrics
-            image:  {{ .Values.metrics.image.repository }}:{{ .Values.metrics.image.tag }}
+            image:  {{ .Values.metrics.image.registry | default "docker.io" }}/{{ .Values.metrics.image.repository }}:{{ .Values.metrics.image.tag }}
             imagePullPolicy: {{ .Values.metrics.image.pullPolicy | quote }}
             securityContext:
               runAsNonRoot: true
@@ -125,7 +125,7 @@ spec:
               - name: DATA_SOURCE_NAME
                 value: "$(MYSQL_USER):$(MYSQL_PASSWORD)@(localhost:3306)/"
             command:
-              - "/bin/agamotto"
+              - "/bin/mysqld_exporter"
               - "--collect.info_schema.wesql_consensus"
             ports:
               - name: http-metrics

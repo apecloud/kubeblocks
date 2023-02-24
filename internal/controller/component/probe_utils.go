@@ -17,6 +17,7 @@ limitations under the License.
 package component
 
 import (
+	"embed"
 	"encoding/json"
 	"fmt"
 	"strconv"
@@ -42,6 +43,11 @@ const (
 	ProbeRoleChangedCheckPath = "spec.containers{" + roleProbeContainerName + "}"
 	ProbeStatusCheckPath      = "spec.containers{" + statusProbeContainerName + "}"
 	ProbeRunningCheckPath     = "spec.containers{" + runningProbeContainerName + "}"
+)
+
+var (
+	//go:embed cue/*
+	cueTemplates embed.FS
 )
 
 func buildProbeContainers(reqCtx intctrlutil.RequestCtx, component *SynthesizedComponent) error {

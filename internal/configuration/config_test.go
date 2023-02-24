@@ -269,7 +269,7 @@ func TestGenerateVisualizedParamsList(t *testing.T) {
 				IsModify:     true,
 				UpdateConfig: map[string][]byte{"key": testUpdatedParams}},
 			formatConfig: &appsv1alpha1.FormatterConfig{
-				Formatter: appsv1alpha1.INI,
+				Format: appsv1alpha1.INI,
 				FormatterOptions: appsv1alpha1.FormatterOptions{IniConfig: &appsv1alpha1.IniConfig{
 					SectionName: "mysqld",
 				}},
@@ -298,7 +298,7 @@ func TestGenerateVisualizedParamsList(t *testing.T) {
 				AddConfig: map[string]interface{}{"key": testJSON},
 			},
 			formatConfig: &appsv1alpha1.FormatterConfig{
-				Formatter: appsv1alpha1.INI,
+				Format: appsv1alpha1.INI,
 				FormatterOptions: appsv1alpha1.FormatterOptions{IniConfig: &appsv1alpha1.IniConfig{
 					SectionName: "mysqld",
 				}},
@@ -324,7 +324,7 @@ func TestGenerateVisualizedParamsList(t *testing.T) {
 				DeleteConfig: map[string]interface{}{"key": testJSON},
 			},
 			formatConfig: &appsv1alpha1.FormatterConfig{
-				Formatter: appsv1alpha1.INI,
+				Format: appsv1alpha1.INI,
 				FormatterOptions: appsv1alpha1.FormatterOptions{IniConfig: &appsv1alpha1.IniConfig{
 					SectionName: "mysqld",
 				}},

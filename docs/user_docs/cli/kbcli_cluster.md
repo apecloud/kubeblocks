@@ -61,6 +61,8 @@ Cluster command
 * [kbcli cluster logs](kbcli_cluster_logs.md)	 - Access cluster log file
 * [kbcli cluster restart](kbcli_cluster_restart.md)	 - Restart the specified components in the cluster
 * [kbcli cluster restore](kbcli_cluster_restore.md)	 - Restore a new cluster from backup
+* [kbcli cluster start](kbcli_cluster_start.md)	 - start the cluster when cluster is stopped
+* [kbcli cluster stop](kbcli_cluster_stop.md)	 - stop the cluster and release all the pods of the cluster
 * [kbcli cluster update](kbcli_cluster_update.md)	 - Update the cluster settings, such as enable or disable monitor or log
 * [kbcli cluster upgrade](kbcli_cluster_upgrade.md)	 - Upgrade the cluster version
 * [kbcli cluster volume-expand](kbcli_cluster_volume-expand.md)	 - Expand volume with the specified components and volumeClaimTemplates in the cluster

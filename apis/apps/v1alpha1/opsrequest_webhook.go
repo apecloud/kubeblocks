@@ -209,7 +209,7 @@ func (r *OpsRequest) validateRestart(allErrs *field.ErrorList, cluster *Cluster)
 		componentNames[i] = v.ComponentName
 	}
 	// validate component name is legal
-	supportedComponentMap := covertComponentNamesToMap(cluster.Status.Operations.Restartable)
+	supportedComponentMap := convertComponentNamesToMap(cluster.Status.Operations.Restartable)
 	r.validateComponentName(allErrs, cluster, supportedComponentMap, componentNames)
 }
 
@@ -242,7 +242,7 @@ func (r *OpsRequest) validateVerticalScaling(allErrs *field.ErrorList, cluster *
 		return
 	}
 	// validate whether the cluster support vertical scaling
-	supportedComponentMap := covertComponentNamesToMap(cluster.Status.Operations.VerticalScalable)
+	supportedComponentMap := convertComponentNamesToMap(cluster.Status.Operations.VerticalScalable)
 	if err := r.validateClusterIsSupported(supportedComponentMap); err != nil {
 		*allErrs = append(*allErrs, err)
 		return
@@ -310,7 +310,7 @@ func (r *OpsRequest) validateHorizontalScaling(cluster *Cluster, allErrs *field.
 		return
 	}
 	// validate whether the cluster support horizontal scaling
-	supportedComponentMap := covertOperationComponentsToMap(cluster.Status.Operations.HorizontalScalable)
+	supportedComponentMap := convertOperationComponentsToMap(cluster.Status.Operations.HorizontalScalable)
 	if err := r.validateClusterIsSupported(supportedComponentMap); err != nil {
 		*allErrs = append(*allErrs, err)
 		return
@@ -335,7 +335,7 @@ func (r *OpsRequest) validateVolumeExpansion(allErrs *field.ErrorList, cluster *
 		return
 	}
 	// validate whether the cluster support volume expansion
-	supportedComponentMap := covertOperationComponentsToMap(cluster.Status.Operations.VolumeExpandable)
+	supportedComponentMap := convertOperationComponentsToMap(cluster.Status.Operations.VolumeExpandable)
 	if err := r.validateClusterIsSupported(supportedComponentMap); err != nil {
 		*allErrs = append(*allErrs, err)
 		return
@@ -352,7 +352,7 @@ func (r *OpsRequest) validateVolumeExpansion(allErrs *field.ErrorList, cluster *
 		if operationComponent == nil {
 			continue
 		}
-		// covert slice to map
+		// convert slice to map
 		for _, vctName := range operationComponent.VolumeClaimTemplateNames {
 			supportedVCTMap[vctName] = struct{}{}
 		}
@@ -432,8 +432,8 @@ func lowercaseInitial(opsType OpsType) string {
 	return strings.ToLower(str[:1]) + str[1:]
 }
 
-// covertComponentNamesToMap coverts supportedComponent slice to map
-func covertComponentNamesToMap(componentNames []string) map[string]*OperationComponent {
+// convertComponentNamesToMap converts supportedComponent slice to map
+func convertComponentNamesToMap(componentNames []string) map[string]*OperationComponent {
 	supportedComponentMap := map[string]*OperationComponent{}
 	for _, v := range componentNames {
 		supportedComponentMap[v] = nil
@@ -441,8 +441,8 @@ func covertComponentNamesToMap(componentNames []string) map[string]*OperationCom
 	return supportedComponentMap
 }
 
-// covertOperationComponentsToMap coverts supportedOperationComponent slice to map
-func covertOperationComponentsToMap(componentNames []OperationComponent) map[string]*OperationComponent {
+// convertOperationComponentsToMap converts supportedOperationComponent slice to map
+func convertOperationComponentsToMap(componentNames []OperationComponent) map[string]*OperationComponent {
 	supportedComponentMap := map[string]*OperationComponent{}
 	for _, v := range componentNames {
 		supportedComponentMap[v.Name] = &v

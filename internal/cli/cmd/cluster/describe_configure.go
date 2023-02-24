@@ -632,7 +632,7 @@ func (o *opsRequestDiffOptions) diffConfig(tplName string) ([]cfgcore.Visualized
 	formatCfg := configConstraint.Spec.FormatterConfig
 	patchOption := cfgcore.CfgOption{
 		Type:    cfgcore.CfgTplType,
-		CfgType: formatCfg.Formatter,
+		CfgType: formatCfg.Format,
 		Log:     log.FromContext(context.TODO()),
 	}
 

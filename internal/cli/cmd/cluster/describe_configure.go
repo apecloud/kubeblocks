@@ -36,7 +36,6 @@ import (
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
@@ -634,25 +633,10 @@ func (o *opsRequestDiffOptions) diffConfig(tplName string) ([]cfgcore.Visualized
 	}
 
 	formatCfg := configConstraint.Spec.FormatterConfig
-	patchOption := cfgcore.CfgOption{
-		Type:    cfgcore.CfgTplType,
-		CfgType: formatCfg.Format,
-		Log:     log.FromContext(context.TODO()),
-	}
 
 	base := findTemplateStatusByName(o.baseVersion.Status.ReconfiguringStatus, tplName)
 	diff := findTemplateStatusByName(o.diffVersion.Status.ReconfiguringStatus, tplName)
-
-	cmKeySet := cfgcore.FromCMKeysSelector(tpl.Keys)
-	patch, err := cfgcore.CreateMergePatch(&cfgcore.K8sConfig{
-		CfgKey:         client.ObjectKeyFromObject(o.baseVersion),
-		Configurations: base.LastAppliedConfiguration,
-		CMKeys:         cmKeySet,
-	}, &cfgcore.K8sConfig{
-		CfgKey:         client.ObjectKeyFromObject(o.diffVersion),
-		Configurations: diff.LastAppliedConfiguration,
-		CMKeys:         cmKeySet,
-	}, patchOption)
+	patch, _, err := cfgcore.CreateConfigurePatch(base.LastAppliedConfiguration, diff.LastAppliedConfiguration, formatCfg.Format, tpl.Keys, false)
 	if err != nil {
 		return nil, err
 	}

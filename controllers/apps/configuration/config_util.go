@@ -423,51 +423,13 @@ func getClusterComponentsByName(components []appsv1alpha1.ClusterComponentSpec, 
 	return nil
 }
 
-func createConfigurePatch(cfg *corev1.ConfigMap, ctx intctrlutil.RequestCtx, tpl *appsv1alpha1.ConfigConstraintSpec, cmKeys []string) (*cfgcore.ConfigPatchInfo, bool, error) {
+func createConfigurePatch(cfg *corev1.ConfigMap, format appsv1alpha1.CfgFileFormat, cmKeys []string) (*cfgcore.ConfigPatchInfo, bool, error) {
 	lastConfig, err := getLastVersionConfig(cfg)
 	if err != nil {
 		return nil, false, cfgcore.WrapError(err, "failed to get last version data. config[%v]", client.ObjectKeyFromObject(cfg))
 	}
 
-	if len(cmKeys) > 0 && checkExcludeConfigDifference(lastConfig, cfg.Data, cmKeys) {
-		return nil, true, nil
-	}
-
-	option := cfgcore.CfgOption{
-		Type:    cfgcore.CfgTplType,
-		CfgType: tpl.FormatterConfig.Format,
-		Log:     ctx.Log,
-	}
-
-	cmKeySet := cfgcore.FromCMKeysSelector(cmKeys)
-	patch, err := cfgcore.CreateMergePatch(
-		&cfgcore.K8sConfig{
-			CfgKey:         client.ObjectKeyFromObject(cfg),
-			Configurations: lastConfig,
-			CMKeys:         cmKeySet,
-		}, &cfgcore.K8sConfig{
-			CfgKey:         client.ObjectKeyFromObject(cfg),
-			Configurations: cfg.Data,
-			CMKeys:         cmKeySet,
-		}, option)
-	return patch, false, err
-}
-
-func checkExcludeConfigDifference(oldConfig map[string]string, newConfig map[string]string, keys []string) bool {
-	keySet := set.NewLinkedHashSetString(keys...)
-	leftOldKey := cfgcore.Difference(cfgcore.ToSet(oldConfig), keySet)
-	leftNewKey := cfgcore.Difference(cfgcore.ToSet(newConfig), keySet)
-
-	if !cfgcore.EqSet(leftOldKey, leftNewKey) {
-		return true
-	}
-
-	for e := range leftOldKey.Iter() {
-		if oldConfig[e] != newConfig[e] {
-			return true
-		}
-	}
-	return false
+	return cfgcore.CreateConfigurePatch(lastConfig, cfg.Data, format, cmKeys, true)
 }
 
 func updateConfigurationSchema(tpl *appsv1alpha1.ConfigConstraintSpec) error {

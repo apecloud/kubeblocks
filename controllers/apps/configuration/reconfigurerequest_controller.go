@@ -150,7 +150,7 @@ func (r *ReconfigureRequestReconciler) sync(reqCtx intctrlutil.RequestCtx, confi
 		keySelector = strings.Split(keysLabel, ",")
 	}
 
-	configPatch, forceRestart, err := createConfigurePatch(config, reqCtx, &tpl.Spec, keySelector)
+	configPatch, forceRestart, err := createConfigurePatch(config, tpl.Spec.FormatterConfig.Format, keySelector)
 	if err != nil {
 		return intctrlutil.RequeueWithErrorAndRecordEvent(config, r.Recorder, err, reqCtx.Log)
 	}

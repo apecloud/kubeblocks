@@ -127,9 +127,9 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 				pod = testapps.NewPodFactory(testCtx.DefaultNamespace, podName).
 					SetOwnerReferences("apps/v1", intctrlutil.DeploymentKind, deployment).
 					AddLabelsInMap(map[string]string{
-						intctrlutil.AppInstanceLabelKey:  clusterName,
-						intctrlutil.AppComponentLabelKey: compName,
-						intctrlutil.AppManagedByLabelKey: intctrlutil.AppName,
+						intctrlutil.AppInstanceLabelKey:    clusterName,
+						intctrlutil.KBAppComponentLabelKey: compName,
+						intctrlutil.AppManagedByLabelKey:   intctrlutil.AppName,
 					}).AddContainer(corev1.Container{Name: testapps.DefaultNginxContainerName, Image: testapps.NginxImage}).
 					Create(&testCtx).GetObject()
 			})
@@ -236,7 +236,7 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 						SetOwnerReferences("apps/v1", intctrlutil.StatefulSetKind, statefulset).
 						AddLabelsInMap(map[string]string{
 							intctrlutil.AppInstanceLabelKey:       clusterName,
-							intctrlutil.AppComponentLabelKey:      compName,
+							intctrlutil.KBAppComponentLabelKey:    compName,
 							intctrlutil.AppManagedByLabelKey:      intctrlutil.AppName,
 							appsv1.ControllerRevisionHashLabelKey: stsUpdateRevison,
 						}).AddContainer(corev1.Container{Name: testapps.DefaultMySQLContainerName, Image: testapps.ApeCloudMySQLImage}).
@@ -353,7 +353,7 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 						SetOwnerReferences("apps/v1", intctrlutil.StatefulSetKind, statefulset).
 						AddLabelsInMap(map[string]string{
 							intctrlutil.AppInstanceLabelKey:       clusterName,
-							intctrlutil.AppComponentLabelKey:      compName,
+							intctrlutil.KBAppComponentLabelKey:    compName,
 							intctrlutil.AppManagedByLabelKey:      intctrlutil.AppName,
 							appsv1.ControllerRevisionHashLabelKey: stsUpdateRevison,
 						}).AddContainer(corev1.Container{Name: testapps.DefaultMySQLContainerName, Image: testapps.ApeCloudMySQLImage}).
@@ -471,7 +471,7 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 					podName := fmt.Sprintf("%s-%s-%d", clusterName, compName, i)
 					pod := testapps.NewPodFactory(testCtx.DefaultNamespace, podName).SetOwnerReferences("apps/v1", intctrlutil.StatefulSetKind, statefulset).AddLabelsInMap(map[string]string{
 						intctrlutil.AppInstanceLabelKey:       clusterName,
-						intctrlutil.AppComponentLabelKey:      compName,
+						intctrlutil.KBAppComponentLabelKey:    compName,
 						intctrlutil.AppManagedByLabelKey:      intctrlutil.AppName,
 						intctrlutil.RoleLabelKey:              "leader",
 						appsv1.ControllerRevisionHashLabelKey: statefulset.Status.UpdateRevision,

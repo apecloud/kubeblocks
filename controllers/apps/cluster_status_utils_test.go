@@ -98,10 +98,10 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 
 	createStsPod := func(podName, podRole, componentName string) *corev1.Pod {
 		return testapps.NewPodFactory(testCtx.DefaultNamespace, podName).AddLabelsInMap(map[string]string{
-			intctrlutil.AppInstanceLabelKey:  clusterName,
-			intctrlutil.AppComponentLabelKey: componentName,
-			intctrlutil.RoleLabelKey:         podRole,
-			intctrlutil.AppManagedByLabelKey: intctrlutil.AppName,
+			intctrlutil.AppInstanceLabelKey:    clusterName,
+			intctrlutil.KBAppComponentLabelKey: componentName,
+			intctrlutil.RoleLabelKey:           podRole,
+			intctrlutil.AppManagedByLabelKey:   intctrlutil.AppName,
 		}).AddContainer(corev1.Container{Name: testapps.DefaultMySQLContainerName, Image: testapps.ApeCloudMySQLImage}).
 			Create(&testCtx).GetObject()
 	}
@@ -110,8 +110,8 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 		deployList := &appsv1.DeploymentList{}
 		Eventually(func() bool {
 			Expect(k8sClient.List(ctx, deployList, client.MatchingLabels{
-				intctrlutil.AppComponentLabelKey: componentName,
-				intctrlutil.AppInstanceLabelKey:  clusterName}, client.Limit(1))).Should(Succeed())
+				intctrlutil.KBAppComponentLabelKey: componentName,
+				intctrlutil.AppInstanceLabelKey:    clusterName}, client.Limit(1))).Should(Succeed())
 			return len(deployList.Items) == 1
 		}).Should(BeTrue())
 		return &deployList.Items[0]

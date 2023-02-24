@@ -94,7 +94,7 @@ var _ = Describe("Reconfigure OpsRequest", func() {
 				testapps.WithLabels(
 					intctrlutil.AppNameLabelKey, clusterName,
 					intctrlutil.AppInstanceLabelKey, clusterName,
-					intctrlutil.AppComponentLabelKey, componentName,
+					intctrlutil.KBAppComponentLabelKey, componentName,
 					cfgcore.CMConfigurationTplNameLabelKey, tpl.ConfigTplRef,
 					cfgcore.CMConfigurationConstraintsNameLabelKey, tpl.ConfigConstraintRef,
 					cfgcore.CMConfigurationProviderTplLabelKey, tpl.Name,

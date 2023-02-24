@@ -44,8 +44,8 @@ func MockStatelessPod(testCtx testutil.TestContext, deploy *appsv1.Deployment, c
 		}
 	}
 	return NewPodFactory(testCtx.DefaultNamespace, podName).SetOwnerReferences("apps/v1", intctrlutil.ReplicaSet, newRs).AddLabelsInMap(map[string]string{
-		intctrlutil.AppInstanceLabelKey:  clusterName,
-		intctrlutil.AppComponentLabelKey: componentName,
-		intctrlutil.AppManagedByLabelKey: intctrlutil.AppName,
+		intctrlutil.AppInstanceLabelKey:    clusterName,
+		intctrlutil.KBAppComponentLabelKey: componentName,
+		intctrlutil.AppManagedByLabelKey:   intctrlutil.AppName,
 	}).AddContainer(corev1.Container{Name: DefaultNginxContainerName, Image: NginxImage}).Create(&testCtx).GetObject()
 }

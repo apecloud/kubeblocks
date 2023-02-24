@@ -33,6 +33,7 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 type GetOptions struct {
@@ -77,7 +78,7 @@ func (o *ObjectsGetter) Get() (*ClusterObjects, error) {
 
 	listOpts := func() metav1.ListOptions {
 		return metav1.ListOptions{
-			LabelSelector: fmt.Sprintf("%s=%s", types.InstanceLabelKey, o.Name),
+			LabelSelector: fmt.Sprintf("%s=%s", intctrlutil.AppInstanceLabelKey, o.Name),
 		}
 	}
 
@@ -217,7 +218,7 @@ func (o *ClusterObjects) GetComponentInfo() []*ComponentInfo {
 		// get all pods belonging to current component
 		var pods []*corev1.Pod
 		for _, p := range o.Pods.Items {
-			if n, ok := p.Labels[types.KBComponentLabelKey]; ok && n == c.Name {
+			if n, ok := p.Labels[intctrlutil.KBAppComponentLabelKey]; ok && n == c.Name {
 				pods = append(pods, &p)
 			}
 		}
@@ -255,11 +256,11 @@ func (o *ClusterObjects) GetInstanceInfo() []*InstanceInfo {
 		instance := &InstanceInfo{
 			Name:        pod.Name,
 			Namespace:   pod.Namespace,
-			Cluster:     getLabelVal(pod.Labels, types.InstanceLabelKey),
-			Component:   getLabelVal(pod.Labels, types.KBComponentLabelKey),
+			Cluster:     getLabelVal(pod.Labels, intctrlutil.AppInstanceLabelKey),
+			Component:   getLabelVal(pod.Labels, intctrlutil.KBAppComponentLabelKey),
 			Status:      string(pod.Status.Phase),
-			Role:        getLabelVal(pod.Labels, types.RoleLabelKey),
-			AccessMode:  getLabelVal(pod.Labels, types.ConsensusSetAccessModeLabelKey),
+			Role:        getLabelVal(pod.Labels, intctrlutil.RoleLabelKey),
+			AccessMode:  getLabelVal(pod.Labels, intctrlutil.ConsensusSetAccessModeLabelKey),
 			CreatedTime: util.TimeFormat(&pod.CreationTimestamp),
 		}
 
@@ -321,8 +322,8 @@ func getInstanceNodeInfo(nodes []*corev1.Node, pod *corev1.Pod, i *InstanceInfo)
 		return
 	}
 
-	i.Region = getLabelVal(node.Labels, types.RegionLabelKey)
-	i.AZ = getLabelVal(node.Labels, types.ZoneLabelKey)
+	i.Region = getLabelVal(node.Labels, intctrlutil.RegionLabelKey)
+	i.AZ = getLabelVal(node.Labels, intctrlutil.ZoneLabelKey)
 }
 
 func getResourceInfo(reqs, limits corev1.ResourceList) (string, string) {

@@ -177,9 +177,9 @@ func replaceEnvsValues(clusterName string, sysAccounts *appsv1alpha1.SystemAccou
 // This is consistent with that of secrets created during cluster initialization.
 func getLabelsForSecretsAndJobs(key componentUniqueKey) client.MatchingLabels {
 	return client.MatchingLabels{
-		intctrlutil.AppInstanceLabelKey:  key.clusterName,
-		intctrlutil.AppComponentLabelKey: key.componentName,
-		intctrlutil.AppManagedByLabelKey: intctrlutil.AppName,
+		intctrlutil.AppInstanceLabelKey:    key.clusterName,
+		intctrlutil.KBAppComponentLabelKey: key.componentName,
+		intctrlutil.AppManagedByLabelKey:   intctrlutil.AppName,
 	}
 }
 

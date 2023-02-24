@@ -77,16 +77,6 @@ const (
 	KindCM                   = "ConfigMap"
 	KindSTS                  = "StatefulSet"
 
-	NameLabelKey                   = "app.kubernetes.io/name"
-	InstanceLabelKey               = "app.kubernetes.io/instance"
-	ConsensusSetAccessModeLabelKey = "cs.apps.kubeblocks.io/access-mode"
-	KBComponentLabelKey            = "app.kubeblocks.io/component-name"
-	// ComponentLabelKey              = "app.kubernetes.io/component"
-	RegionLabelKey     = "topology.kubernetes.io/region"
-	ZoneLabelKey       = "topology.kubernetes.io/zone"
-	ClusterDefLabelKey = "clusterdefinition.kubeblocks.io/name"
-	RoleLabelKey       = "kubeblocks.io/role"
-
 	ServiceLBTypeAnnotationKey     = "service.kubernetes.io/kubeblocks-loadbalancer-type"
 	ServiceLBTypeAnnotationValue   = "private-ip"
 	ServiceFloatingIPAnnotationKey = "service.kubernetes.io/kubeblocks-loadbalancer-floating-ip"

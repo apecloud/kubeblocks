@@ -139,7 +139,7 @@ var _ = Describe("lifecycle_utils", func() {
 		return testapps.NewStatefulSetFactory(testCtx.DefaultNamespace, "mock-sts", clusterName, mysqlCompName).
 			AddLabels(intctrlutil.AppNameLabelKey, "mock-app",
 				intctrlutil.AppInstanceLabelKey, clusterName,
-				intctrlutil.AppComponentLabelKey, mysqlCompName,
+				intctrlutil.KBAppComponentLabelKey, mysqlCompName,
 			).SetReplicas(1).AddContainer(container).
 			AddVolumeClaimTemplate(corev1.PersistentVolumeClaim{
 				ObjectMeta: metav1.ObjectMeta{Name: testapps.DataVolumeName},
@@ -176,9 +176,9 @@ spec:
 		vs := snapshotv1.VolumeSnapshot{}
 		Expect(yaml.Unmarshal([]byte(vsYAML), &vs)).Should(Succeed())
 		labels := map[string]string{
-			intctrlutil.AppCreatedByLabelKey: intctrlutil.AppName,
-			intctrlutil.AppInstanceLabelKey:  clusterName,
-			intctrlutil.AppComponentLabelKey: componentName,
+			intctrlutil.AppCreatedByLabelKey:   intctrlutil.AppName,
+			intctrlutil.AppInstanceLabelKey:    clusterName,
+			intctrlutil.KBAppComponentLabelKey: componentName,
 		}
 		for k, v := range labels {
 			vs.Labels[k] = v

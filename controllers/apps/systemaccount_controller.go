@@ -393,7 +393,7 @@ func (r *jobCompletitionPredicate) Delete(e event.DeleteEvent) bool {
 	if !ok {
 		return false
 	}
-	componentName, ok := ml[intctrlutil.AppComponentLabelKey]
+	componentName, ok := ml[intctrlutil.KBAppComponentLabelKey]
 	if !ok {
 		return false
 	}

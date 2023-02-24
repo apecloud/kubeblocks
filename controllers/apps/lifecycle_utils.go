@@ -183,7 +183,7 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 			Name:      stsObj.Name + "-scaling",
 		}
 		// find component of current statefulset
-		componentName := stsObj.Labels[intctrlutil.AppComponentLabelKey]
+		componentName := stsObj.Labels[intctrlutil.KBAppComponentLabelKey]
 		components := mergeComponentsList(reqCtx,
 			cluster,
 			clusterDef,
@@ -416,7 +416,7 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 			if err := cli.Get(ctx, client.ObjectKeyFromObject(cm), oldCm); err != nil {
 				return err
 			}
-			compName := cm.Labels[intctrlutil.AppComponentLabelKey]
+			compName := cm.Labels[intctrlutil.KBAppComponentLabelKey]
 			clusterDefComp := component.GetClusterDefCompByName(*clusterDef, *cluster, compName)
 			if clusterDefComp == nil {
 				return errors.New("clusterDefComp not found")
@@ -448,7 +448,7 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 		}
 		if !reflect.DeepEqual(&deployObjCopy.Spec, &deployObj.Spec) {
 			// sync component phase
-			componentName := deployObj.Labels[intctrlutil.AppComponentLabelKey]
+			componentName := deployObj.Labels[intctrlutil.KBAppComponentLabelKey]
 			syncComponentPhaseWhenSpecUpdating(cluster, componentName)
 		}
 		return nil
@@ -567,7 +567,7 @@ func createBackup(reqCtx intctrlutil.RequestCtx,
 	createBackupPolicy := func() (backupPolicyName string, err error) {
 		backupPolicyName = ""
 		backupPolicyList := dataprotectionv1alpha1.BackupPolicyList{}
-		ml := getBackupMatchingLabels(cluster.Name, sts.Labels[intctrlutil.AppComponentLabelKey])
+		ml := getBackupMatchingLabels(cluster.Name, sts.Labels[intctrlutil.KBAppComponentLabelKey])
 		if err = cli.List(ctx, &backupPolicyList, ml); err != nil {
 			return
 		}
@@ -598,7 +598,7 @@ func createBackup(reqCtx intctrlutil.RequestCtx,
 
 	createBackup := func(backupPolicyName string) error {
 		backupList := dataprotectionv1alpha1.BackupList{}
-		ml := getBackupMatchingLabels(cluster.Name, sts.Labels[intctrlutil.AppComponentLabelKey])
+		ml := getBackupMatchingLabels(cluster.Name, sts.Labels[intctrlutil.KBAppComponentLabelKey])
 		if err := cli.List(ctx, &backupList, ml); err != nil {
 			return err
 		}
@@ -996,9 +996,9 @@ func isPVCExists(cli client.Client,
 
 func getBackupMatchingLabels(clusterName string, componentName string) client.MatchingLabels {
 	return client.MatchingLabels{
-		intctrlutil.AppInstanceLabelKey:  clusterName,
-		intctrlutil.AppComponentLabelKey: componentName,
-		intctrlutil.AppCreatedByLabelKey: intctrlutil.AppName,
+		intctrlutil.AppInstanceLabelKey:    clusterName,
+		intctrlutil.KBAppComponentLabelKey: componentName,
+		intctrlutil.AppCreatedByLabelKey:   intctrlutil.AppName,
 	}
 }
 

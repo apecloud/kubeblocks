@@ -21,7 +21,7 @@ import (
 	"testing"
 )
 
-func TestWalkDepthFirst(t *testing.T) {
+func TestWalkTopoOrder(t *testing.T) {
 	dag := New()
 	for i := 0; i < 13; i++ {
 		dag.AddVertex(i)
@@ -35,17 +35,44 @@ func TestWalkDepthFirst(t *testing.T) {
 	dag.Connect(9, 10)
 	dag.Connect(9, 11)
 	dag.Connect(3, 5)
-	dag.Connect(7, 8)
+	dag.Connect(8, 7)
 	dag.Connect(5, 4)
 	dag.Connect(0, 5)
 	dag.Connect(6, 4)
 	dag.Connect(6, 9)
-	dag.Connect(6, 7)
+	dag.Connect(7, 6)
+	dag.Connect(7, 2)
+	dag.Connect(3, 0)
+	dag.Connect(12, 10)
+	dag.Connect(10, 1)
+	dag.Connect(1, 5)
+
+	expected := []int{4, 5, 1, 10, 12, 11, 9, 6, 0, 3, 2, 7, 8}
+	walkOrder := make([]int, 0, len(expected))
+
 	walkFunc := func(v Vertex) error {
+		walkOrder = append(walkOrder, v.(int))
 		fmt.Printf("%v ", v)
 		return nil
 	}
-	if err := dag.WalkDepthFirst(walkFunc); err != nil {
+	if err := dag.WalkReverseTopoOrder(walkFunc); err != nil {
 		t.Error(err)
+	}
+	for i := range expected {
+		if walkOrder[i] != expected[i] {
+			t.Errorf("unexpected order, index %d\n expected: %v\nactual: %v\n", i, expected, walkOrder)
+		}
+	}
+	fmt.Println("")
+
+	expected = []int{8, 7, 2, 3, 0, 6, 9, 11, 12, 10, 1, 5, 4}
+	walkOrder = make([]int, 0, len(expected))
+	if err := dag.WalkTopoOrder(walkFunc); err != nil {
+		t.Error(err)
+	}
+	for i := range expected {
+		if walkOrder[i] != expected[i] {
+			t.Errorf("unexpected order, index %d\n expected: %v\nactual: %v\n", i, expected, walkOrder)
+		}
 	}
 }

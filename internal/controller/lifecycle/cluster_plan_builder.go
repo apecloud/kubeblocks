@@ -94,7 +94,7 @@ func (b *ClusterPlanBuilder) Build() (dag.Plan, error) {
 }
 
 func (p *ClusterPlan) Execute() error {
-	return p.dag.WalkDepthFirst(p.walkFunc)
+	return p.dag.WalkReverseTopoOrder(p.walkFunc)
 }
 
 func NewClusterPlanBuilder(

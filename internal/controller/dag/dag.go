@@ -16,7 +16,10 @@ limitations under the License.
 
 package dag
 
-import "errors"
+import (
+	"errors"
+	"fmt"
+)
 
 type DAG struct {
 	vertices map[Vertex]Vertex
@@ -92,18 +95,114 @@ func (d *DAG) Connect(from, to Vertex) bool {
 	return true
 }
 
-func (d *DAG) WalkDepthFirst(walkFunc WalkFunc) error {
+func (d *DAG) WalkTopoOrder(walkFunc WalkFunc) error {
+	if err := d.validate(); err != nil {
+		return err
+	}
+	orders := d.topologicalOrder(false)
+	for _, v := range orders {
+		if err := walkFunc(v); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (d *DAG) WalkReverseTopoOrder(walkFunc WalkFunc) error {
+	if err := d.validate(); err != nil {
+		return err
+	}
+	orders := d.topologicalOrder(true)
+	for _, v := range orders {
+		if err := walkFunc(v); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// validate 'd' has single root and has no cycles
+func (d *DAG) validate() error {
+	// single root validation
 	root := d.root()
 	if root == nil {
-		return errors.New("can't find single root")
+		return errors.New("no single root found")
 	}
-	return d.dfs([]Vertex{root}, walkFunc)
+
+	// self-cycle validation
+	for e := range d.edges {
+		if e.From() == e.To() {
+			return fmt.Errorf("self-cycle found: %v", e.From())
+		}
+	}
+
+	// cycle validation
+	// use a DFS func to find cycles
+	walked := make(map[Vertex]bool)
+	marked := make(map[Vertex]bool)
+	var walk func(v Vertex) error
+	walk = func(v Vertex) error {
+		if walked[v] {
+			return nil
+		}
+		if marked[v] {
+			return errors.New("cycle found")
+		}
+
+		marked[v] = true
+		adjacent := d.outAdj(v)
+		for _, vertex := range adjacent {
+			walk(vertex)
+		}
+		marked[v] = false
+		walked[v] = true
+		return nil
+	}
+	for v := range d.vertices {
+		if err := walk(v); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// topologicalOrder assumes 'd' is a legal DAG
+func (d *DAG) topologicalOrder(reverse bool) []Vertex {
+	// orders is what we want, a (reverse) topological order of this DAG
+	orders := make([]Vertex, 0)
+
+	// walked marks vertex has been walked, to stop recursive func call
+	walked := make(map[Vertex]bool)
+
+	// walk is a DFS func
+	var walk func(v Vertex)
+	walk = func(v Vertex) {
+		if walked[v] {
+			return
+		}
+		var adjacent []Vertex
+		if reverse {
+			adjacent = d.outAdj(v)
+		} else {
+			adjacent = d.inAdj(v)
+		}
+		for _, vertex := range adjacent {
+			walk(vertex)
+		}
+		walked[v] = true
+		orders = append(orders, v)
+	}
+	for v := range d.vertices {
+		walk(v)
+	}
+
+	return orders
 }
 
 func (d *DAG) root() Vertex {
 	roots := make([]Vertex, 0)
 	for n := range d.vertices {
-		if d.hasNoInbound(n) {
+		if len(d.inAdj(n)) == 0 {
 			roots = append(roots, n)
 		}
 	}
@@ -113,33 +212,23 @@ func (d *DAG) root() Vertex {
 	return roots[0]
 }
 
-func (d *DAG) hasNoInbound(v Vertex) bool  {
-	for e := range d.edges {
-		if e.To() == v {
-			return false
-		}
-	}
-	return true
-}
-
-func (d *DAG) dfs(start []Vertex, walkFunc WalkFunc) error {
-	for _, v := range start {
-		adjacent := d.adjacent(v)
-		if err := d.dfs(adjacent, walkFunc); err != nil {
-			return err
-		}
-		if err := walkFunc(v); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (d *DAG) adjacent(v Vertex) []Vertex {
+// outAdj returns all adjacent vertices that v points to
+func (d *DAG) outAdj(v Vertex) []Vertex {
 	vertices := make([]Vertex, 0)
 	for e := range d.edges {
 		if e.From() == v {
 			vertices = append(vertices, e.To())
+		}
+	}
+	return vertices
+}
+
+// inAdj returns all adjacent vertices that point to v
+func (d *DAG) inAdj(v Vertex) []Vertex {
+	vertices := make([]Vertex, 0)
+	for e := range d.edges {
+		if e.To() == v {
+			vertices = append(vertices, e.From())
 		}
 	}
 	return vertices

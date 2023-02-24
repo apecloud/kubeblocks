@@ -283,18 +283,19 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	clusterVersion := &appsv1alpha1.ClusterVersion{}
-	if err := r.Client.Get(reqCtx.Ctx, types.NamespacedName{
-		Name: cluster.Spec.ClusterVersionRef,
-	}, clusterVersion); err != nil {
-		// this is a block to handle error.
-		// so when update cluster conditions failed, we can ignore it.
-		_ = clusterConditionMgr.setPreCheckErrorCondition(err)
-		return intctrlutil.RequeueAfter(ControllerErrorRequeueTime, reqCtx.Log, "")
-	}
-
-	if res, err = r.checkReferencedCRStatus(reqCtx, clusterConditionMgr, clusterVersion.Status.Phase,
-		appsv1alpha1.ClusterVersionKind, clusterVersion.Name); res != nil {
-		return *res, err
+	if len(cluster.Spec.ClusterVersionRef) > 0 {
+		if err := r.Client.Get(reqCtx.Ctx, types.NamespacedName{
+			Name: cluster.Spec.ClusterVersionRef,
+		}, clusterVersion); err != nil {
+			// this is a block to handle error.
+			// so when update cluster conditions failed, we can ignore it.
+			_ = clusterConditionMgr.setPreCheckErrorCondition(err)
+			return intctrlutil.RequeueAfter(ControllerErrorRequeueTime, reqCtx.Log, "")
+		}
+		if res, err = r.checkReferencedCRStatus(reqCtx, clusterConditionMgr, clusterVersion.Status.Phase,
+			appsv1alpha1.ClusterVersionKind, clusterVersion.Name); res != nil {
+			return *res, err
+		}
 	}
 
 	if res, err = r.checkReferencedCRStatus(reqCtx, clusterConditionMgr, clusterDefinition.Status.Phase,

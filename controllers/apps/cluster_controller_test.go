@@ -997,6 +997,27 @@ var _ = Describe("Cluster Controller", func() {
 
 	// Scenarios
 
+	Context("when creating cluster without clusterversion", func() {
+		BeforeEach(func() {
+			By("Create a clusterDefinition obj")
+			clusterDefObj = testapps.NewClusterDefFactory(clusterDefName).
+				AddComponent(testapps.StatefulMySQLComponent, mysqlCompType).
+				Create(&testCtx).GetObject()
+		})
+
+		It("should reconcile to create cluster with no error", func() {
+			By("Creating a cluster")
+			clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
+				clusterDefObj.Name, "").
+				AddComponent(mysqlCompName, mysqlCompType).SetReplicas(3).
+				WithRandomName().Create(&testCtx).GetObject()
+			clusterKey = client.ObjectKeyFromObject(clusterObj)
+
+			By("Waiting for the cluster initialized")
+			Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
+		})
+	})
+
 	Context("when creating cluster with multiple kinds of components", func() {
 		BeforeEach(func() {
 			By("Create a clusterDefinition obj")

@@ -23,6 +23,8 @@ import (
 	"strings"
 	"time"
 
+	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
+
 	"golang.org/x/exp/maps"
 
 	"github.com/pkg/errors"
@@ -402,10 +404,28 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 	}
 
 	handleConfigMap := func(cm *corev1.ConfigMap) error {
-		// if configmap is env config, should update
-		if len(cm.Labels[intctrlutil.AppConfigTypeLabelKey]) > 0 {
+		switch {
+		case len(cm.Labels[intctrlutil.AppConfigTypeLabelKey]) > 0:
+			// if configmap is env config, should update
 			if err := cli.Update(ctx, cm); err != nil {
 				return err
+			}
+		case len(cm.Labels[cfgcore.CMConfigurationProviderTplLabelKey]) > 0:
+			// if tls settings updated, do Update
+			// FIXME: very hacky way. should allow config to be updated
+			oldCm := &corev1.ConfigMap{}
+			if err := cli.Get(ctx, client.ObjectKeyFromObject(cm), oldCm); err != nil {
+				return err
+			}
+			compName := cm.Labels[intctrlutil.AppComponentLabelKey]
+			clusterDefComp := component.GetClusterDefCompByName(*clusterDef, *cluster, compName)
+			if clusterDefComp == nil {
+				return errors.New("clusterDefComp not found")
+			}
+			if plan.IsTLSSettingsUpdated(clusterDefComp.CharacterType, *oldCm, *cm) {
+				if err := cli.Update(ctx, cm); err != nil {
+					return err
+				}
 			}
 		}
 		return nil
@@ -452,18 +472,18 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 		return nil
 	}
 
+	// why create tls certs here? or why not use prepare-checkedCreate pattern?
+	// tls certs generation is very time-consuming, if using prepare-checkedCreate pattern,
+	// we shall generate certs in every component Update which will slow down the cluster reconcile loop
+	if err := plan.CreateOrCheckTLSCerts(reqCtx, cli, cluster, scheme, dbClusterFinalizerName); err != nil {
+		return false, err
+	}
+
 	var stsList []*appsv1.StatefulSet
 	for _, obj := range objs {
 		logger.Info("create or update", "objs", obj)
-		if err := controllerutil.SetOwnerReference(cluster, obj, scheme); err != nil {
+		if err := intctrlutil.SetOwnership(cluster, obj, scheme, dbClusterFinalizerName); err != nil {
 			return false, err
-		}
-		if !controllerutil.ContainsFinalizer(obj, dbClusterFinalizerName) {
-			// pvc objects do not need to add finalizer
-			_, ok := obj.(*corev1.PersistentVolumeClaim)
-			if !ok {
-				controllerutil.AddFinalizer(obj, dbClusterFinalizerName)
-			}
 		}
 		// appendToStsList is used to handle statefulSets horizontal scaling when workloadType is replication
 		appendToStsList := func(stsList []*appsv1.StatefulSet) []*appsv1.StatefulSet {

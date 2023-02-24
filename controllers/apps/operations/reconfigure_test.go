@@ -97,7 +97,7 @@ var _ = Describe("Reconfigure OpsRequest", func() {
 					intctrlutil.AppComponentLabelKey, componentName,
 					cfgcore.CMConfigurationTplNameLabelKey, tpl.ConfigTplRef,
 					cfgcore.CMConfigurationConstraintsNameLabelKey, tpl.ConfigConstraintRef,
-					cfgcore.CMConfigurationISVTplLabelKey, tpl.Name,
+					cfgcore.CMConfigurationProviderTplLabelKey, tpl.Name,
 					cfgcore.CMConfigurationTypeLabelKey, cfgcore.ConfigInstanceType,
 				),
 			)

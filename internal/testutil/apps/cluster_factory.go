@@ -149,3 +149,21 @@ func (factory *MockClusterFactory) SetPrimaryIndex(primaryIndex int32) *MockClus
 	factory.get().Spec.ComponentSpecs = comps
 	return factory
 }
+
+func (factory *MockClusterFactory) SetTLS(tls bool) *MockClusterFactory {
+	comps := factory.get().Spec.ComponentSpecs
+	if len(comps) > 0 {
+		comps[len(comps)-1].TLS = tls
+	}
+	factory.get().Spec.ComponentSpecs = comps
+	return factory
+}
+
+func (factory *MockClusterFactory) SetIssuer(issuer *appsv1alpha1.Issuer) *MockClusterFactory {
+	comps := factory.get().Spec.ComponentSpecs
+	if len(comps) > 0 {
+		comps[len(comps)-1].Issuer = issuer
+	}
+	factory.get().Spec.ComponentSpecs = comps
+	return factory
+}

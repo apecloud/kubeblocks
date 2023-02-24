@@ -155,6 +155,17 @@ relay_log_index=relay-bin.index
 pid-file=/var/run/mysqld/mysqld.pid
 socket=/var/run/mysqld/mysqld.sock
 
+{{- if $.component.tls }}
+{{- $ca_file := getCAFile }}
+{{- $cert_file := getCertFile }}
+{{- $key_file := getKeyFile }}
+# tls
+# require_secure_transport=ON
+ssl_ca={{ $ca_file }}
+ssl_cert={{ $cert_file }}
+ssl_key={{ $key_file }}
+{{- end }}
+
 [client]
 port={{ $mysql_port }}
 socket=/var/run/mysqld/mysqld.sock

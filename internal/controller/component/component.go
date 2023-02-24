@@ -92,6 +92,8 @@ func BuildComponent(
 	// set others
 	component.EnabledLogs = clusterCompSpec.EnabledLogs
 	component.Replicas = clusterCompSpec.Replicas
+	component.TLS = clusterCompSpec.TLS
+	component.Issuer = clusterCompSpec.Issuer
 
 	if clusterCompSpec.VolumeClaimTemplates != nil {
 		component.VolumeClaimTemplates = appsv1alpha1.ToVolumeClaimTemplates(clusterCompSpec.VolumeClaimTemplates)
@@ -228,4 +230,20 @@ func replacePlaceholderTokens(component *SynthesizedComponent, namedValues map[s
 			}
 		}
 	}
+}
+
+func GetClusterDefCompByName(clusterDef appsv1alpha1.ClusterDefinition,
+	cluster appsv1alpha1.Cluster,
+	compName string) *appsv1alpha1.ClusterComponentDefinition {
+	for _, comp := range cluster.Spec.ComponentSpecs {
+		if comp.Name != compName {
+			continue
+		}
+		for _, compDef := range clusterDef.Spec.ComponentDefs {
+			if compDef.Name == comp.ComponentDefRef {
+				return &compDef
+			}
+		}
+	}
+	return nil
 }

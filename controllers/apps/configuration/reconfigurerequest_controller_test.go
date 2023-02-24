@@ -85,7 +85,7 @@ var _ = Describe("Reconfigure Controller", func() {
 					intctrlutil.AppComponentLabelKey, statefulCompName,
 					cfgcore.CMConfigurationTplNameLabelKey, configTplName,
 					cfgcore.CMConfigurationConstraintsNameLabelKey, cmName,
-					cfgcore.CMConfigurationISVTplLabelKey, configTplName,
+					cfgcore.CMConfigurationProviderTplLabelKey, configTplName,
 					cfgcore.CMConfigurationTypeLabelKey, cfgcore.ConfigInstanceType,
 				))
 

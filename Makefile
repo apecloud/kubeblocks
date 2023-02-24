@@ -213,11 +213,16 @@ ifeq (, $(shell sed -n "/^127.0.0.1[[:space:]]*host.$(EXISTING_CLUSTER_TYPE).int
 endif
 endif
 
+## NOTES: ./internal/cli/cmd/playground package required ASSUME_NO_MOVING_GC_UNSAFE_RISK_IT_WITH=go1.19 environment set,
+##   need to investigate why, temp. add to following test jobs.
+
 .PHONY: test-current-ctx
+test-current-ctx: ASSUME_NO_MOVING_GC_UNSAFE_RISK_IT_WITH=go1.19
 test-current-ctx: manifests generate fmt vet add-k8s-host ## Run operator controller tests with current $KUBECONFIG context. if existing k8s cluster is k3d or minikube, specify EXISTING_CLUSTER_TYPE.
 	USE_EXISTING_CLUSTER=true KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" $(GO) test  -p 1 -coverprofile cover.out $(TEST_PACKAGES)
 
 .PHONY: test
+test: ASSUME_NO_MOVING_GC_UNSAFE_RISK_IT_WITH=go1.19
 test: manifests generate test-go-generate fmt vet envtest add-k8s-host ## Run tests. if existing k8s cluster is k3d or minikube, specify EXISTING_CLUSTER_TYPE.
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" $(GO) test -short -coverprofile cover.out $(TEST_PACKAGES)
 
@@ -226,6 +231,7 @@ test-integration: manifests generate fmt vet envtest add-k8s-host ## Run tests. 
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" $(GO) test ./test/integration
 
 .PHONY: test-delve
+test-delve: ASSUME_NO_MOVING_GC_UNSAFE_RISK_IT_WITH=go1.19
 test-delve: manifests generate fmt vet envtest ## Run tests.
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" dlv --listen=:$(DEBUG_PORT) --headless=true --api-version=2 --accept-multiclient test $(TEST_PACKAGES)
 

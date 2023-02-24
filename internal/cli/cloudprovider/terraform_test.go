@@ -16,25 +16,11 @@ limitations under the License.
 
 package cloudprovider
 
-type localCloudProvider struct {
-}
+import (
+	. "github.com/onsi/ginkgo/v2"
+)
 
-func (p *localCloudProvider) Name() string {
-	return Local
-}
-
-func (p *localCloudProvider) CreateK8sCluster(name string, init bool) error {
-	return nil
-}
-
-func (p *localCloudProvider) DeleteK8sCluster(name string) error {
-	return nil
-}
-
-func (p *localCloudProvider) GetClusterName() (string, error) {
-	return "", nil
-}
-
-func (p *localCloudProvider) UpdateKubeConfig(name string) (string, error) {
-	return "", nil
-}
+var _ = Describe("terraform", func() {
+	It("check terraform exists", func() {
+	})
+})

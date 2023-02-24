@@ -17,12 +17,9 @@ limitations under the License.
 package playground
 
 import (
-	"fmt"
 	"path/filepath"
 
-	"k8s.io/apimachinery/pkg/util/rand"
-
-	"github.com/apecloud/kubeblocks/internal/cli/cloudprovider"
+	cp "github.com/apecloud/kubeblocks/internal/cli/cloudprovider"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 )
 
@@ -34,7 +31,11 @@ func playgroundDir() (string, error) {
 	return filepath.Join(cliPath, "playground"), nil
 }
 
-func generateK8sClusterName(provider string) string {
-	kubeSvcName := cloudprovider.K8sService(provider)
-	return fmt.Sprintf("%s-%s-%s", k8sClusterName, kubeSvcName, rand.String(5))
+// cpDir cloud provider repo directory
+func cpDir() (string, error) {
+	dir, err := playgroundDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(dir, cp.GitRepoName), err
 }

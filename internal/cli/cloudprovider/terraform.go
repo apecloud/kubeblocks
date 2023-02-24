@@ -18,12 +18,20 @@ package cloudprovider
 
 import (
 	"context"
-	"os"
+	"io"
+	"path/filepath"
+	"time"
 
 	"github.com/hashicorp/go-version"
 	"github.com/hashicorp/hc-install/product"
 	"github.com/hashicorp/hc-install/releases"
 	"github.com/hashicorp/terraform-exec/tfexec"
+
+	"github.com/apecloud/kubeblocks/internal/cli/util"
+)
+
+const (
+	tfStateFileName = "terraform.tfstate"
 )
 
 type TFPlugin struct {
@@ -34,16 +42,29 @@ type TFPlugin struct {
 }
 
 var (
-	TFExecPath  string
-	TFBaseDir   string
-	TFPluginDir string
-	providerCfg string
+	TFExecPath string
 )
 
 func initTerraform() error {
+	cliHomeDir, err := util.GetCliHomeDir()
+	if err != nil {
+		return err
+	}
+
+	// check if terraform exists
+	TFExecPath = filepath.Join(cliHomeDir, product.Terraform.BinaryName())
+	v, err := product.Terraform.GetVersion(context.Background(), TFExecPath)
+	if err == nil && v != nil {
+		return nil
+	}
+
+	// does not exist, install it to cli home dir
 	installer := &releases.ExactVersion{
-		Product: product.Terraform,
-		Version: version.Must(version.NewVersion("1.0.6")),
+		Product:                  product.Terraform,
+		Version:                  version.Must(version.NewVersion("1.3.9")),
+		Timeout:                  180 * time.Second,
+		SkipChecksumVerification: true,
+		InstallDir:               cliHomeDir,
 	}
 	execPath, err := installer.Install(context.Background())
 	if err != nil {
@@ -53,19 +74,17 @@ func initTerraform() error {
 	return nil
 }
 
-func tfInitAndApply(workingDir string, opts ...tfexec.ApplyOption) error {
+func tfInitAndApply(workingDir string, init bool, stdout, stderr io.Writer, opts ...tfexec.ApplyOption) error {
 	ctx := context.Background()
-
-	tf, err := tfexec.NewTerraform(workingDir, TFExecPath)
+	tf, err := newTerraform(workingDir, stdout, stderr)
 	if err != nil {
 		return err
 	}
 
-	tf.SetStdout(os.Stdout)
-	tf.SetStderr(os.Stderr)
-
-	if err = tf.Init(ctx, tfexec.Upgrade(true)); err != nil {
-		return err
+	if init {
+		if err = tf.Init(ctx, tfexec.Upgrade(true)); err != nil {
+			return err
+		}
 	}
 
 	if err = tf.Apply(ctx, opts...); err != nil {
@@ -74,10 +93,22 @@ func tfInitAndApply(workingDir string, opts ...tfexec.ApplyOption) error {
 	return nil
 }
 
-func tfDestroy(workingDir string) error {
-	tf, err := tfexec.NewTerraform(workingDir, TFExecPath)
+func tfDestroy(workingDir string, stdout, stderr io.Writer, opts ...tfexec.DestroyOption) error {
+	ctx := context.Background()
+	tf, err := newTerraform(workingDir, stdout, stderr)
 	if err != nil {
 		return err
 	}
-	return tf.Destroy(context.Background())
+	return tf.Destroy(ctx, opts...)
+}
+
+func newTerraform(workingDir string, stdout, stderr io.Writer) (*tfexec.Terraform, error) {
+	tf, err := tfexec.NewTerraform(workingDir, TFExecPath)
+	if err != nil {
+		return nil, err
+	}
+
+	tf.SetStdout(stdout)
+	tf.SetStderr(stderr)
+	return tf, nil
 }

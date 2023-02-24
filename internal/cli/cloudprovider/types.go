@@ -35,7 +35,7 @@ var (
 )
 
 const (
-	gitRepoName = "cloud-provider"
+	GitRepoName = "cloud-provider"
 	GitRepoURL  = "https://github.com/apecloud/cloud-provider"
 )
 

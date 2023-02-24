@@ -17,12 +17,9 @@ limitations under the License.
 package cloudprovider
 
 import (
-	"encoding/json"
 	"fmt"
-	"os"
-	"path"
+	"io"
 
-	"github.com/docker/docker/pkg/ioutils"
 	"github.com/pkg/errors"
 )
 
@@ -31,91 +28,22 @@ type Interface interface {
 	Name() string
 
 	// CreateK8sCluster creates a kubernetes cluster
-	CreateK8sCluster(name string) error
+	CreateK8sCluster(name string, init bool) error
 
 	// DeleteK8sCluster deletes a kubernetes cluster
 	DeleteK8sCluster(name string) error
+
+	// GetClusterName get existed cluster name
+	GetClusterName() (string, error)
+
+	// GenKubeConfig generate kubeconfig, return the new context
+	UpdateKubeConfig(name string) (string, error)
 }
 
-type Config struct {
-	Name         string `json:"name"`
-	AccessKey    string `json:"access_key"`
-	AccessSecret string `json:"access_secret"`
-	Region       string `json:"region"`
-}
-
-var (
-	defaultProvider Interface
-)
-
-func init() {
-	defaultProvider = &localCloudProvider{}
-}
-
-func initProvider() error {
-	if err := os.MkdirAll(path.Dir(providerCfg), os.FileMode(0700)); err != nil {
-		panic(errors.Wrap(err, "Failed to make provider config directory"))
-	}
-	if _, err := os.Stat(providerCfg); err != nil {
-		if !os.IsNotExist(err) {
-			panic(errors.Wrap(err, fmt.Sprintf("Failed to check if %s exists", providerCfg)))
-		}
-
-		defaultProvider, _ = New(Local, "", "", "")
-		return nil
-	}
-	content, err := os.ReadFile(providerCfg)
-	if err != nil {
-		return errors.Wrap(err, "Failed to read provider configs")
-	}
-	cfg := Config{}
-	if err := json.Unmarshal(content, &cfg); err != nil {
-		return errors.Wrap(err, "Invalid cloud provider config, please destroy and try init playground again")
-	}
-
-	provider, err := New(cfg.Name, cfg.AccessKey, cfg.AccessSecret, cfg.Region)
-	if err != nil {
-		return errors.Wrap(err, "Failed to init cloud provider")
-	}
-	defaultProvider = provider
-	return nil
-}
-
-func Get() (Interface, error) {
-	err := initProvider()
-	return defaultProvider, err
-}
-
-func InitProvider(provider, accessKey, accessSecret, region string) (Interface, error) {
-	if err := initProvider(); err != nil {
-		return nil, err
-	}
-	if defaultProvider.Name() != Local {
-		fmt.Printf("Cloud Provider %s has already inited, skip", provider)
-		return defaultProvider, nil
-	}
-
-	cfg := &Config{
-		Name:         provider,
-		AccessKey:    accessKey,
-		AccessSecret: accessSecret,
-		Region:       region,
-	}
-
-	result, err := json.Marshal(cfg)
-	if err != nil {
-		return nil, errors.Wrap(err, "Failed to serialize cloud provider config")
-	}
-	if err := ioutils.AtomicWriteFile(providerCfg, result, os.FileMode(0600)); err != nil {
-		return nil, errors.Wrap(err, "Failed to write cloud provider config")
-	}
-	return New(provider, accessKey, accessSecret, region)
-}
-
-func New(provider, accessKey, accessSecret, region string) (Interface, error) {
+func New(provider, region, tfRootPath string, stdout, stderr io.Writer) (Interface, error) {
 	switch provider {
 	case AWS:
-		return NewAWSCloudProvider(accessKey, accessSecret, region)
+		return NewAWSCloudProvider(region, tfRootPath, stdout, stderr)
 	case Local:
 		return &localCloudProvider{}, nil
 	default:

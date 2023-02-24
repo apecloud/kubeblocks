@@ -26,6 +26,7 @@ import (
 	"github.com/spf13/cobra"
 	"golang.org/x/exp/slices"
 	"helm.sh/helm/v3/pkg/action"
+	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 
 	cp "github.com/apecloud/kubeblocks/internal/cli/cloudprovider"
@@ -41,6 +42,15 @@ import (
 	"github.com/apecloud/kubeblocks/version"
 )
 
+const (
+	yesStr = "yes"
+)
+
+type baseOptions struct {
+	cloudProvider string
+	region        string
+}
+
 type initOptions struct {
 	genericclioptions.IOStreams
 	helmCfg *action.Configuration
@@ -50,14 +60,12 @@ type initOptions struct {
 	kbVersion      string
 	clusterVersion string
 
-	cloudProvider string
-	accessKey     string
-	accessSecret  string
-	region        string
+	baseOptions
 }
 
 type destroyOptions struct {
 	genericclioptions.IOStreams
+	baseOptions
 }
 
 // NewPlaygroundCmd creates the playground command
@@ -95,8 +103,6 @@ func newInitCmd(streams genericclioptions.IOStreams) *cobra.Command {
 	cmd.Flags().StringVar(&o.clusterVersion, "cluster-version", "", "Cluster definition")
 	cmd.Flags().StringVar(&o.kbVersion, "version", version.DefaultKubeBlocksVersion, "KubeBlocks version")
 	cmd.Flags().StringVar(&o.cloudProvider, "cloud-provider", defaultCloudProvider, fmt.Sprintf("Cloud provider type, one of [%s]", strings.Join(cp.CloudProviders(), ",")))
-	cmd.Flags().StringVar(&o.accessKey, "access-key", "", "Cloud provider access key")
-	cmd.Flags().StringVar(&o.accessSecret, "access-secret", "", "Cloud provider access secret")
 	cmd.Flags().StringVar(&o.region, "region", "", "Cloud provider region")
 	cmd.Flags().BoolVar(&o.verbose, "verbose", false, "Output more log info")
 
@@ -119,6 +125,9 @@ func newDestroyCmd(streams genericclioptions.IOStreams) *cobra.Command {
 			util.CheckErr(o.destroyPlayground())
 		},
 	}
+
+	cmd.Flags().StringVar(&o.cloudProvider, "cloud-provider", defaultCloudProvider, fmt.Sprintf("Cloud provider type, one of [%s]", strings.Join(cp.CloudProviders(), ",")))
+	cmd.Flags().StringVar(&o.region, "region", "", "Cloud provider region")
 	return cmd
 }
 
@@ -190,8 +199,13 @@ func (o *initOptions) local() error {
 	}
 	spinner(true)
 
+	return o.installKBAndCluster(configPath)
+}
+
+func (o *initOptions) installKBAndCluster(configPath string) error {
+	var err error
 	// Init helm client
-	if o.helmCfg, err = helm.NewActionConfig("", util.ConfigPath(k8sClusterName)); err != nil {
+	if o.helmCfg, err = helm.NewActionConfig("", configPath); err != nil {
 		return errors.Wrap(err, "failed to init helm client")
 	}
 
@@ -205,7 +219,7 @@ func (o *initOptions) local() error {
 		return err
 	}
 
-	spinner = util.Spinner(o.Out, "Create cluster %s (ClusterDefinition: %s, ClusterVersion: %s)",
+	spinner := util.Spinner(o.Out, "Create cluster %s (ClusterDefinition: %s, ClusterVersion: %s)",
 		kbClusterName, o.clusterDef, o.clusterVersion)
 	defer spinner(false)
 	if err = o.installCluster(); err != nil {
@@ -217,15 +231,14 @@ func (o *initOptions) local() error {
 	if err = printGuide(defaultCloudProvider, localHost, true); err != nil {
 		return errors.Wrap(err, "failed to print user guide")
 	}
-
 	return nil
 }
 
 // bootstraps a playground in the remote cloud
 func (o *initOptions) cloud() error {
-	printer.Warning(o.Out, `Cloud provider kubernetes clusters may incur charges by running this playground.
-    Be sure to delete your infrastructure promptly to avoid additional charges. We are not
-    responsible for any charges you may incur.
+	printer.Warning(o.Out, `This action will create a kubernetes clusters on the cloud that may
+  incur charges. Be sure to delete your infrastructure promptly to avoid
+  additional charges. We are not responsible for any charges you may incur.
 `)
 
 	// confirm to run
@@ -234,17 +247,19 @@ func (o *initOptions) cloud() error {
 	if err != nil {
 		return err
 	}
-	if entered != "yes" {
+	if entered != yesStr {
 		fmt.Fprintf(o.Out, "\nPlayground init cancelled.\n")
 		return nil
 	}
 
 	fmt.Fprintln(o.Out)
-	// clone apecloud/cloud-provider repo to local path
-	cpPath, err := cp.GitRepoLocalPath()
+
+	cpPath, err := cpDir()
 	if err != nil {
 		return err
 	}
+
+	// clone apecloud/cloud-provider repo to local path
 	spinner := util.Spinner(o.Out, "Clone cloud provider terraform script to %s", cpPath)
 	defer spinner(false)
 	if err = util.CloneGitRepo(cp.GitRepoURL, cpPath); err != nil {
@@ -253,26 +268,60 @@ func (o *initOptions) cloud() error {
 	spinner(true)
 
 	// create cloud kubernetes cluster
-	provider, err := cp.New(o.cloudProvider, o.accessKey, o.accessSecret, o.region)
+	provider, err := cp.New(o.cloudProvider, o.region, cpPath, o.Out, o.ErrOut)
 	if err != nil {
 		return err
 	}
-	clusterName := generateK8sClusterName(o.cloudProvider)
-	fmt.Fprintf(o.Out, "Creating %s %s cluster %s ... \n", o.cloudProvider, cp.K8sService(o.cloudProvider), clusterName)
-	if err = provider.CreateK8sCluster(clusterName); err != nil {
+
+	// check if previous cluster exists
+	var init bool
+	clusterName, err := provider.GetClusterName()
+	if err != nil {
+		return fmt.Errorf("failed to find the existed %s %s cluster in %s", o.cloudProvider, cp.K8sService(o.cloudProvider), cpPath)
+	}
+
+	// if cluster exists, continue or not, if not, user should destroy the old cluster first
+	if clusterName != "" {
+		fmt.Fprintf(o.Out, "Found an existed cluster %s, do you want to continue to initialize this cluster?\n  Only 'yes' will be accepted to confirm.\n\n", clusterName)
+		entered, err = prompt.NewPrompt("", "Enter a value:", o.In).GetInput()
+		if err != nil {
+			return err
+		}
+		if entered != yesStr {
+			fmt.Fprintf(o.Out, "\nPlayground init cancelled, please destroy the old cluster first.\n")
+			return nil
+		}
+		fmt.Fprintf(o.Out, "Continue to initialize %s %s cluster %s ... \n", o.cloudProvider, cp.K8sService(o.cloudProvider), clusterName)
+	} else {
+		init = true
+		clusterName = fmt.Sprintf("%s-%s", k8sClusterName, rand.String(5))
+		fmt.Fprintf(o.Out, "Creating %s %s cluster %s ... \n", o.cloudProvider, cp.K8sService(o.cloudProvider), clusterName)
+	}
+
+	if err = provider.CreateK8sCluster(clusterName, init); err != nil {
 		return err
 	}
 
 	// update kube config
+	kubeCtx, err := provider.UpdateKubeConfig(clusterName)
+	if err != nil {
+		return err
+	}
+	configPath := util.ConfigPath("config")
+	fmt.Fprintf(o.Out, "\nUpdate and switch kubeconfig to %s in %s\n", kubeCtx, configPath)
 
-	// install KubeBlocks
-
-	// create cluster
-
-	return nil
+	// install KubeBlocks and create cluster
+	return o.installKBAndCluster(configPath)
 }
 
 func (o *destroyOptions) destroyPlayground() error {
+	if o.cloudProvider == cp.Local {
+		return o.destroyLocal()
+	}
+	return o.destroyCloud()
+}
+
+func (o *destroyOptions) destroyLocal() error {
 	ins := &installer{
 		ctx:         context.Background(),
 		clusterName: k8sClusterName,
@@ -281,8 +330,6 @@ func (o *destroyOptions) destroyPlayground() error {
 	ins.verboseLog(false)
 	spinner := util.Spinner(o.Out, "Destroy KubeBlocks playground")
 	defer spinner(false)
-
-	// TODO: remote playground, just destroy all cloud resources
 
 	// uninstall k3d cluster
 	if err := ins.uninstall(); err != nil {
@@ -295,6 +342,46 @@ func (o *destroyOptions) destroyPlayground() error {
 	}
 	spinner(true)
 	return nil
+}
+
+func (o *destroyOptions) destroyCloud() error {
+	cpPath, err := cpDir()
+	if err != nil {
+		return err
+	}
+
+	// create cloud kubernetes cluster
+	provider, err := cp.New(o.cloudProvider, o.region, cpPath, o.Out, o.ErrOut)
+	if err != nil {
+		return err
+	}
+
+	// get cluster name to delete
+	name, err := provider.GetClusterName()
+	if err != nil {
+		return fmt.Errorf("failed to find the existed %s %s cluster in %s", o.cloudProvider, cp.K8sService(o.cloudProvider), cpPath)
+	}
+
+	// do not find any existed cluster
+	if name == "" {
+		fmt.Fprintf(o.Out, "Do not find any %s %s cluster in %s\n", o.cloudProvider, cp.K8sService(o.cloudProvider), cpPath)
+		return nil
+	}
+
+	// start to destroy cluster
+	printer.Warning(o.Out, "Do you really want to destroy the cluster %s?\n  This is no undo. Only 'yes' will be accepted to confirm.\n\n", name)
+
+	// confirm to destroy
+	entered, err := prompt.NewPrompt("", "Enter a value:", o.In).GetInput()
+	if err != nil {
+		return err
+	}
+	if entered != yesStr {
+		fmt.Fprintf(o.Out, "\nPlayground destroy cancelled.\n")
+		return nil
+	}
+
+	return provider.DeleteK8sCluster(name)
 }
 
 func runGuide() error {

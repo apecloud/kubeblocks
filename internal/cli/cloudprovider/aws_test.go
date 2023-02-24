@@ -16,25 +16,22 @@ limitations under the License.
 
 package cloudprovider
 
-type localCloudProvider struct {
-}
+import (
+	"fmt"
 
-func (p *localCloudProvider) Name() string {
-	return Local
-}
+	. "github.com/onsi/ginkgo/v2"
+)
 
-func (p *localCloudProvider) CreateK8sCluster(name string, init bool) error {
-	return nil
-}
+var _ = Describe("aws cloud provider", func() {
+	It("get cluster name from state file", func() {
+		name, _ := getClusterNameFromStateFile("/Users/ldm/.kbcli/playground/cloud-provider/aws/")
+		fmt.Println(name)
+	})
 
-func (p *localCloudProvider) DeleteK8sCluster(name string) error {
-	return nil
-}
-
-func (p *localCloudProvider) GetClusterName() (string, error) {
-	return "", nil
-}
-
-func (p *localCloudProvider) UpdateKubeConfig(name string) (string, error) {
-	return "", nil
-}
+	It("update kube config", func() {
+		provider := awsCloudProvider{
+			region: "cn-northwest-1",
+		}
+		_, _ = provider.UpdateKubeConfig("liutang-eks-nx")
+	})
+})

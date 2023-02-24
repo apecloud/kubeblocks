@@ -27,5 +27,5 @@ func GitRepoLocalPath() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(cliHome, gitRepoName), nil
+	return filepath.Join(cliHome, GitRepoName), nil
 }

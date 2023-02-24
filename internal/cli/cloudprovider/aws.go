@@ -17,11 +17,16 @@ limitations under the License.
 package cloudprovider
 
 import (
+	"encoding/json"
 	"fmt"
+	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
 
 	"github.com/hashicorp/terraform-exec/tfexec"
+	"github.com/pkg/errors"
 )
 
 const (
@@ -29,28 +34,32 @@ const (
 )
 
 type awsCloudProvider struct {
-	region       string
-	accessKey    string
-	accessSecret string
+	region string
+	stdout io.Writer
+	stderr io.Writer
 
+	tfRootPath  string
 	awsPath     string
 	clusterName string
 }
 
-func NewAWSCloudProvider(accessKey, accessSecret, region string) (Interface, error) {
-	if accessKey == "" {
-		return nil, fmt.Errorf("access key should be specified")
-	}
-	if accessSecret == "" {
-		return nil, fmt.Errorf("access secret should be specified")
-	}
+func NewAWSCloudProvider(region, tfRootPath string, stdout, stderr io.Writer) (Interface, error) {
 	if region == "" {
 		region = AWSDefaultRegion
 	}
+
+	// check aws path exists
+	awsPath := filepath.Join(tfRootPath, "aws")
+	if _, err := os.Stat(awsPath); err != nil {
+		return nil, err
+	}
+
 	provider := &awsCloudProvider{
-		region:       region,
-		accessKey:    accessKey,
-		accessSecret: accessSecret,
+		region:     region,
+		stdout:     stdout,
+		stderr:     stderr,
+		awsPath:    awsPath,
+		tfRootPath: tfRootPath,
 	}
 	return provider, nil
 }
@@ -60,12 +69,7 @@ func (p *awsCloudProvider) Name() string {
 }
 
 // CreateK8sCluster create a EKS cluster
-func (p *awsCloudProvider) CreateK8sCluster(name string) error {
-	cpPath, err := GitRepoLocalPath()
-	if err != nil {
-		return err
-	}
-	p.awsPath = filepath.Join(cpPath, "aws")
+func (p *awsCloudProvider) CreateK8sCluster(name string, init bool) error {
 	p.clusterName = name
 
 	subPaths, err := getSubPaths(p.awsPath, []string{"eks", "lb"})
@@ -74,37 +78,80 @@ func (p *awsCloudProvider) CreateK8sCluster(name string) error {
 	}
 
 	// init terraform
+	fmt.Fprintf(p.stdout, "Check and install terraform ... \n")
 	if err = initTerraform(); err != nil {
 		return err
 	}
 
 	// create EKS cluster
-	if err = tfInitAndApply(subPaths[0], tfexec.Var("cluster_name="+p.clusterName), tfexec.Var("region="+p.region)); err != nil {
+	fmt.Fprintf(p.stdout, "\nInit and apply eks in %s\n", subPaths[0])
+	if err = tfInitAndApply(subPaths[0], init, p.stdout, p.stderr, p.buildApplyOpts()...); err != nil {
 		return err
 	}
 
 	// install load balancer
-	return tfInitAndApply(subPaths[1])
+	fmt.Fprintf(p.stdout, "\nInit and apply loadbalancer in %s\n", subPaths[1])
+	return tfInitAndApply(subPaths[1], init, p.stdout, p.stderr, tfexec.Var("cluster_name="+p.clusterName))
 }
 
 func (p *awsCloudProvider) DeleteK8sCluster(name string) error {
+	p.clusterName = name
 	subPaths, err := getSubPaths(p.awsPath, []string{"eks", "lb"})
 	if err != nil {
 		return err
 	}
 
 	// init terraform
+	fmt.Fprintf(p.stdout, "Check and install terraform ... \n")
 	if err = initTerraform(); err != nil {
 		return err
 	}
 
 	// destroy load balancer
-	if err = tfInitAndApply(subPaths[1]); err != nil {
+	fmt.Fprintf(p.stdout, "\nDestroy loadbalancer in %s\n", subPaths[1])
+	if err = tfDestroy(subPaths[1], p.stdout, p.stderr, tfexec.Var("cluster_name="+p.clusterName)); err != nil {
 		return err
 	}
 
 	// destroy EKS cluster
-	return tfDestroy(subPaths[0])
+	fmt.Fprintf(p.stdout, "\nDestroy eks cluster in %s\n", subPaths[0])
+	return tfDestroy(subPaths[0], p.stdout, p.stderr, p.buildDestroyOpts()...)
+}
+
+func (p *awsCloudProvider) GetClusterName() (string, error) {
+	subPaths, err := getSubPaths(p.awsPath, []string{"eks", "lb"})
+	if err != nil {
+		return "", err
+	}
+
+	preClusterName, err := getClusterNameFromStateFile(subPaths[0])
+	if err != nil {
+		return "", err
+	}
+
+	// previous cluster exists, try to destroy it
+	if preClusterName == "" {
+		return "", nil
+	}
+	return preClusterName, nil
+}
+
+// UpdateKubeConfig exec aws eks update-kubeconfig command
+func (p *awsCloudProvider) UpdateKubeConfig(name string) (string, error) {
+	cmd := exec.Command("aws", "eks", "update-kubeconfig", "--region="+p.region, "--name="+name)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return "", err
+	}
+	return strings.Split(string(out), " ")[2], nil
+}
+
+func (p *awsCloudProvider) buildApplyOpts() []tfexec.ApplyOption {
+	return []tfexec.ApplyOption{tfexec.Var("cluster_name=" + p.clusterName), tfexec.Var("region=" + p.region)}
+}
+
+func (p *awsCloudProvider) buildDestroyOpts() []tfexec.DestroyOption {
+	return []tfexec.DestroyOption{tfexec.Var("cluster_name=" + p.clusterName), tfexec.Var("region=" + p.region)}
 }
 
 func getSubPaths(parent string, names []string) ([]string, error) {
@@ -117,4 +164,26 @@ func getSubPaths(parent string, names []string) ([]string, error) {
 		subPaths[i] = subPath
 	}
 	return subPaths, nil
+}
+
+func getClusterNameFromStateFile(tfPath string) (string, error) {
+	stateFile := filepath.Join(tfPath, tfStateFileName)
+	content, err := os.ReadFile(stateFile)
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return "", err
+	}
+
+	var state map[string]interface{}
+	if err = json.Unmarshal(content, &state); err != nil {
+		return "", err
+	}
+	outputs, ok := state["outputs"].(map[string]interface{})
+	if !ok {
+		return "", nil
+	}
+	clusterName, ok := outputs["cluster_name"].(map[string]interface{})
+	if !ok {
+		return "", nil
+	}
+	return clusterName["value"].(string), nil
 }

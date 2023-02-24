@@ -31,7 +31,6 @@ import (
 	"github.com/onsi/ginkgo/v2/reporters"
 	"github.com/spf13/viper"
 	"go.uber.org/zap/zapcore"
-
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
@@ -40,6 +39,7 @@ import (
 	. "github.com/apecloud/kubeblocks/test/e2e"
 	. "github.com/apecloud/kubeblocks/test/e2e/envcheck"
 	. "github.com/apecloud/kubeblocks/test/e2e/installation"
+	. "github.com/apecloud/kubeblocks/test/e2e/testdata/smoketest"
 )
 
 var cfg *rest.Config
@@ -127,11 +127,14 @@ var _ = AfterSuite(func() {
 	Cancel()
 })
 
-var _ = Describe("Check healthy Kubernetes cluster status", EnvCheckTest)
+var _ = Describe("e2e test", func() {
+	var _ = Describe("Check healthy Kubernetes cluster status", EnvCheckTest)
 
-var _ = Describe("KubeBlocks operator installation", InstallationTest)
+	var _ = Describe("KubeBlocks operator installation", InstallationTest)
 
-// uninstallation tests, should have this in last Describe
-var _ = Describe("KubeBlocks operator uninstallation", UninstallationTest)
+	var _ = Describe("KubeBlocks somektest run", SmokeTest)
+	// uninstallation tests, should have this in last Describe
+	var _ = Describe("KubeBlocks operator uninstallation", UninstallationTest)
 
-// var _ = Describe("Check environment has been cleaned", EnvGotCleanedTest)
+	var _ = Describe("Check environment has been cleaned", EnvGotCleanedTest)
+})

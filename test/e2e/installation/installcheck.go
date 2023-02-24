@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package envcheck
+package installation
 
 import (
 	"context"
@@ -30,6 +30,8 @@ import (
 	. "github.com/apecloud/kubeblocks/test/e2e"
 
 	"github.com/apecloud/kubeblocks/internal/cli/util/helm"
+
+	. "github.com/apecloud/kubeblocks/test/e2e"
 )
 
 const releaseName = "kubeblocks"

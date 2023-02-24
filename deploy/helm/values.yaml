@@ -144,6 +144,7 @@ affinity:
               operator: In
               values:
                 - "true"
+
 podDisruptionBudget:
   minAvailable: 1
   maxUnavailable:

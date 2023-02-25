@@ -107,7 +107,7 @@ var _ = Describe("Replication Component", func() {
 				sts := testapps.NewStatefulSetFactory(testCtx.DefaultNamespace, v, clusterObj.Name, testapps.DefaultRedisCompName).
 					AddContainer(corev1.Container{Name: testapps.DefaultRedisContainerName, Image: testapps.DefaultRedisImageName}).
 					AddLabels(intctrlutil.AppInstanceLabelKey, clusterObj.Name,
-						intctrlutil.AppComponentLabelKey, testapps.DefaultRedisCompName,
+						intctrlutil.KBAppComponentLabelKey, testapps.DefaultRedisCompName,
 						intctrlutil.AppManagedByLabelKey, testapps.KubeBlocks,
 						intctrlutil.RoleLabelKey, k).
 					SetReplicas(1).

@@ -8,6 +8,9 @@ spec:
   connectionCredential:
     username: root
     password: "$(RANDOM_PASSWD)"
+    endpoint: "$(SVC_FQDN):$(SVC_PORT_mysql)"
+    host: "$(SVC_FQDN)"
+    port: "$(SVC_PORT_mysql)"
   componentDefs:
     - name: mysql
       characterType: mysql
@@ -192,14 +195,14 @@ spec:
             provisionPolicy:
               type: CreateByStmt
               scope: AnyPods
-              statements:        
+              statements:
                 creation: CREATE USER IF NOT EXISTS $(USERNAME) IDENTIFIED BY "$(PASSWD)"; GRANT REPLICATION CLIENT, PROCESS ON *.* TO $(USERNAME); GRANT SELECT ON performance_schema.* TO $(USERNAME);
                 deletion: DROP USER IF EXISTS $(USERNAME);              
           - name: kbmonitoring
             provisionPolicy:
               type: CreateByStmt
               scope: AnyPods
-              statements:        
+              statements:
                 creation: CREATE USER IF NOT EXISTS $(USERNAME) IDENTIFIED BY "$(PASSWD)"; GRANT REPLICATION CLIENT, PROCESS ON *.* TO $(USERNAME); GRANT SELECT ON performance_schema.* TO $(USERNAME);
                 deletion: DROP USER IF EXISTS $(USERNAME);            
           - name: kbreplicator

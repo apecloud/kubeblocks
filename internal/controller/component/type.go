@@ -50,4 +50,6 @@ type SynthesizedComponent struct {
 	LogConfigs              []v1alpha1.LogConfig                `json:"logConfigs,omitempty"`
 	ConfigTemplates         []v1alpha1.ConfigTemplate           `json:"configTemplates,omitempty"`
 	HorizontalScalePolicy   *v1alpha1.HorizontalScalePolicy     `json:"horizontalScalePolicy,omitempty"`
+	TLS                     bool                                `json:"tls"`
+	Issuer                  *v1alpha1.Issuer                    `json:"issuer,omitempty"`
 }

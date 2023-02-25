@@ -190,50 +190,35 @@ func getEventInvolvedObject(ctx context.Context, cli client.Client, event *corev
 	return nil, err
 }
 
-// handleClusterAbnormalOrFailedPhase handles the Cluster.status.phase when components phase of cluster are Abnormal or Failed.
-func handleClusterAbnormalOrFailedPhase(cluster *appsv1alpha1.Cluster, componentMap map[string]string, clusterAvailabilityMap map[string]bool) {
+// handleClusterPhaseWhenCompsNotReady handles the Cluster.status.phase when some components are Abnormal or Failed.
+func handleClusterPhaseWhenCompsNotReady(cluster *appsv1alpha1.Cluster,
+	componentMap map[string]string,
+	clusterAvailabilityEffectMap map[string]bool) {
 	var (
-		isFailed                       bool
-		needSyncClusterPhase           = true
-		replicasNotReadyComponentNames = map[string]struct{}{}
-		notReadyComponentNames         = map[string]struct{}{}
+		clusterIsFailed bool
+		failedCompCount int
 	)
 	for k, v := range cluster.Status.Components {
-		componentDefName := componentMap[k]
-		clusterAvailabilityEffect := clusterAvailabilityMap[componentDefName]
-		// if the component is in Failed phase and the component can affect cluster availability, set Cluster.status.phase to Failed
-		if clusterAvailabilityEffect && v.Phase == appsv1alpha1.FailedPhase {
-			isFailed = true
-		}
 		// determine whether other components are still doing operation, i.e., create/restart/scaling.
-		// if exists operations, it will be handled by cluster controller to sync Cluster.status.phase.
-		// but volumeExpansion operation is ignored, because this operation will not affect cluster availability.
+		// waiting for operation to complete except for volumeExpansion operation.
+		// because this operation will not affect cluster availability.
 		if !util.IsCompleted(v.Phase) && v.Phase != appsv1alpha1.VolumeExpandingPhase {
-			needSyncClusterPhase = false
+			return
 		}
-		if v.PodsReady == nil || !*v.PodsReady {
-			replicasNotReadyComponentNames[k] = struct{}{}
-			notReadyComponentNames[k] = struct{}{}
+		if v.Phase == appsv1alpha1.FailedPhase {
+			failedCompCount += 1
+			componentDefName := componentMap[k]
+			// if the component can affect cluster availability, set Cluster.status.phase to Failed
+			if clusterAvailabilityEffectMap[componentDefName] {
+				clusterIsFailed = true
+				break
+			}
 		}
-		if util.IsFailedOrAbnormal(v.Phase) {
-			notReadyComponentNames[k] = struct{}{}
-		}
 	}
-	// record the not ready conditions in cluster
-	if len(replicasNotReadyComponentNames) > 0 {
-		cluster.SetStatusCondition(newReplicasNotReadyCondition(replicasNotReadyComponentNames))
-	}
-	// record the not ready conditions in cluster
-	if len(notReadyComponentNames) > 0 {
-		cluster.SetStatusCondition(newComponentsNotReadyCondition(notReadyComponentNames))
-	}
-	if !needSyncClusterPhase {
-		return
-	}
-	// if the cluster is not in Failed phase, set Cluster.status.phase to Abnormal
-	if isFailed {
+	// If all components fail or there are failed components that affect the availability of the cluster, set phase to Failed
+	if failedCompCount == len(cluster.Status.Components) || clusterIsFailed {
 		cluster.Status.Phase = appsv1alpha1.FailedPhase
-	} else if cluster.Status.Phase != appsv1alpha1.FailedPhase {
+	} else {
 		cluster.Status.Phase = appsv1alpha1.AbnormalPhase
 	}
 }
@@ -296,7 +281,7 @@ func handleClusterStatusByEvent(ctx context.Context, cli client.Client, recorder
 	if err = cli.Get(ctx, client.ObjectKey{Name: cluster.Spec.ClusterDefRef}, clusterDef); err != nil {
 		return err
 	}
-	componentName := labels[intctrlutil.AppComponentLabelKey]
+	componentName := labels[intctrlutil.KBAppComponentLabelKey]
 	// get the component phase by component name and sync to Cluster.status.components
 	patch := client.MergeFrom(cluster.DeepCopy())
 	componentMap, clusterAvailabilityEffectMap, componentDef := getComponentRelatedInfo(cluster, clusterDef, componentName)
@@ -313,8 +298,8 @@ func handleClusterStatusByEvent(ctx context.Context, cli client.Client, recorder
 	if !needSyncComponentStatusForEvent(cluster, componentName, phase, event) {
 		return nil
 	}
-	// handle Cluster.status.phase
-	handleClusterAbnormalOrFailedPhase(cluster, componentMap, clusterAvailabilityEffectMap)
+	// handle Cluster.status.phase when some components are not ready.
+	handleClusterPhaseWhenCompsNotReady(cluster, componentMap, clusterAvailabilityEffectMap)
 	if err = cli.Status().Patch(ctx, cluster, patch); err != nil {
 		return err
 	}
@@ -404,7 +389,7 @@ func handleDeletePVCCronJobEvent(ctx context.Context,
 		Namespace: object.GetNamespace()}, &cluster); err != nil {
 		return err
 	}
-	componentName := labels[intctrlutil.AppComponentLabelKey]
+	componentName := labels[intctrlutil.KBAppComponentLabelKey]
 	// update component phase to abnormal
 	if err = updateComponentStatusPhase(cli,
 		ctx,

@@ -125,7 +125,7 @@ type ClusterComponentSpec struct {
 
 	// ComponentDefRef reference componentDef defined in ClusterDefinition spec.
 	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:MaxLength=12
+	// +kubebuilder:validation:MaxLength=18
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	ComponentDefRef string `json:"componentDefRef"`
 
@@ -146,6 +146,7 @@ type ClusterComponentSpec struct {
 
 	// Component replicas, use default value in ClusterDefinition spec. if not specified.
 	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:Minimum=0
 	// +kubebuilder:default=1
 	Replicas int32 `json:"replicas"`
 
@@ -193,6 +194,15 @@ type ClusterComponentSpec struct {
 	// +kubebuilder:validation:Minimum=0
 	// +optional
 	PrimaryIndex *int32 `json:"primaryIndex,omitempty"`
+
+	// TLS should be enabled or not
+	// +optional
+	TLS bool `json:"tls,omitempty"`
+
+	// Issuer who provides tls certs
+	// required when TLS enabled
+	// +optional
+	Issuer *Issuer `json:"issuer,omitempty"`
 }
 
 type ComponentMessageMap map[string]string
@@ -341,6 +351,42 @@ type OperationComponent struct {
 	// volumeClaimTemplateNames which VolumeClaimTemplate of the component support volumeExpansion.
 	// +optional
 	VolumeClaimTemplateNames []string `json:"volumeClaimTemplateNames,omitempty"`
+}
+
+// Issuer defines Tls certs issuer
+type Issuer struct {
+	// Name of issuer
+	// options supported:
+	// - KubeBlocks - Certificates signed by KubeBlocks Operator.
+	// - UserProvided - User provided own CA-signed certificates.
+	// +kubebuilder:validation:Enum={KubeBlocks, UserProvided}
+	// +kubebuilder:default=KubeBlocks
+	// +kubebuilder:validation:Required
+	Name IssuerName `json:"name"`
+
+	// SecretRef, Tls certs Secret reference
+	// required when from is UserProvided
+	// +optional
+	SecretRef *TLSSecretRef `json:"secretRef,omitempty"`
+}
+
+// TLSSecretRef defines Secret contains Tls certs
+type TLSSecretRef struct {
+	// Name of the Secret
+	// +kubebuilder:validation:Required
+	Name string `json:"name"`
+
+	// CA cert key in Secret
+	// +kubebuilder:validation:Required
+	CA string `json:"ca"`
+
+	// Cert key in Secret
+	// +kubebuilder:validation:Required
+	Cert string `json:"cert"`
+
+	// Key of TLS private key in Secret
+	// +kubebuilder:validation:Required
+	Key string `json:"key"`
 }
 
 //+kubebuilder:object:root=true

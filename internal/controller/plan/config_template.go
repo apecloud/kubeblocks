@@ -52,6 +52,11 @@ const (
 	// BuiltinMysqlCalBufferFunctionName Mysql Built-in
 	// TODO: This function migrate to configuration template
 	builtInMysqlCalBufferFunctionName = "callBufferSizeByResource"
+
+	// TLS Built-in
+	builtInGetCAFile   = "getCAFile"
+	builtInGetCertFile = "getCertFile"
+	builtInGetKeyFile  = "getKeyFile"
 )
 
 type ResourceDefinition struct {
@@ -173,6 +178,9 @@ func (c *configTemplateBuilder) injectBuiltInFunctions(component *component.Synt
 		builtInGetArgFunctionName:             getArgByName,
 		builtInGetContainerFunctionName:       getPodContainerByName,
 		builtInGetContainerMemoryFunctionName: getContainerMemory,
+		builtInGetCAFile:                      getCAFile,
+		builtInGetCertFile:                    getCertFile,
+		builtInGetKeyFile:                     getKeyFile,
 	}
 	return nil
 }

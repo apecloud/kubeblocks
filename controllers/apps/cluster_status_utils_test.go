@@ -98,10 +98,10 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 
 	createStsPod := func(podName, podRole, componentName string) *corev1.Pod {
 		return testapps.NewPodFactory(testCtx.DefaultNamespace, podName).AddLabelsInMap(map[string]string{
-			intctrlutil.AppInstanceLabelKey:  clusterName,
-			intctrlutil.AppComponentLabelKey: componentName,
-			intctrlutil.RoleLabelKey:         podRole,
-			intctrlutil.AppManagedByLabelKey: intctrlutil.AppName,
+			intctrlutil.AppInstanceLabelKey:    clusterName,
+			intctrlutil.KBAppComponentLabelKey: componentName,
+			intctrlutil.RoleLabelKey:           podRole,
+			intctrlutil.AppManagedByLabelKey:   intctrlutil.AppName,
 		}).AddContainer(corev1.Container{Name: testapps.DefaultMySQLContainerName, Image: testapps.ApeCloudMySQLImage}).
 			Create(&testCtx).GetObject()
 	}
@@ -110,8 +110,8 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 		deployList := &appsv1.DeploymentList{}
 		Eventually(func() bool {
 			Expect(k8sClient.List(ctx, deployList, client.MatchingLabels{
-				intctrlutil.AppComponentLabelKey: componentName,
-				intctrlutil.AppInstanceLabelKey:  clusterName}, client.Limit(1))).Should(Succeed())
+				intctrlutil.KBAppComponentLabelKey: componentName,
+				intctrlutil.AppInstanceLabelKey:    clusterName}, client.Limit(1))).Should(Succeed())
 			return len(deployList.Items) == 1
 		}).Should(BeTrue())
 		return &deployList.Items[0]
@@ -135,7 +135,19 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 		event.InvolvedObject.Name = objectName
 	}
 
-	Context("test cluster Failed/Abnormal phase ", func() {
+	testHandleClusterPhaseWhenCompsNotReady := func(clusterObj *appsv1alpha1.Cluster, componentPhase,
+		expectClusterPhase appsv1alpha1.Phase) {
+		// mock Stateful component is Abnormal
+		clusterObj.Status.Components = map[string]appsv1alpha1.ClusterComponentStatus{
+			statefulMySQLCompName: {
+				Phase: componentPhase,
+			},
+		}
+		handleClusterPhaseWhenCompsNotReady(clusterObj, nil, nil)
+		Expect(clusterObj.Status.Phase).Should(Equal(expectClusterPhase))
+	}
+
+	Context("test cluster Failed/Abnormal phase", func() {
 		It("test cluster Failed/Abnormal phase", func() {
 			By("create cluster related resources")
 			createClusterDef()
@@ -220,7 +232,6 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 			setInvolvedObject(event, intctrlutil.DeploymentKind, deploy.Name)
 			handleAndCheckComponentStatus(nginxCompName, event, appsv1alpha1.FailedPhase, false)
 
-			By("test the cluster phase when component Failed/Abnormal in Running phase")
 			// mock cluster is running.
 			Expect(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(cluster), func(tmpCluster *appsv1alpha1.Cluster) {
 				tmpCluster.Status.Phase = appsv1alpha1.RunningPhase
@@ -231,6 +242,7 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 				}
 			})()).Should(Succeed())
 
+			By("test the cluster phase when stateless component is Failed and other components are Running")
 			// set nginx component phase to Failed
 			Expect(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(cluster), func(tmpCluster *appsv1alpha1.Cluster) {
 				compStatus := tmpCluster.Status.Components[nginxCompName]
@@ -242,6 +254,15 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(cluster), func(g Gomega, tmpCluster *appsv1alpha1.Cluster) {
 				g.Expect(tmpCluster.Status.Phase == appsv1alpha1.AbnormalPhase).Should(BeTrue())
 			})).Should(Succeed())
+
+			By("test the cluster phase when cluster only contains a component of Stateful workload, and the component is Failed or Abnormal")
+			clusterObj := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefName, clusterVersionName).
+				AddComponent(statefulMySQLCompName, statefulMySQLCompType).SetReplicas(3).GetObject()
+			// mock Stateful component is Failed and expect cluster phase is FailedPhase
+			testHandleClusterPhaseWhenCompsNotReady(clusterObj, appsv1alpha1.FailedPhase, appsv1alpha1.FailedPhase)
+
+			// mock Stateful component is Abnormal and expect cluster phase is Abnormal
+			testHandleClusterPhaseWhenCompsNotReady(clusterObj, appsv1alpha1.AbnormalPhase, appsv1alpha1.AbnormalPhase)
 		})
 
 		It("test the consistency of status.components and spec.components", func() {

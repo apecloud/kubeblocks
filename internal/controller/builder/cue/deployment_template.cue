@@ -36,11 +36,11 @@ deployment: {
 		namespace: cluster.metadata.namespace
 		name:      "\(cluster.metadata.name)-\(component.name)"
 		labels: {
-			"app.kubernetes.io/name":     "\(component.clusterDefName)"
-			"app.kubernetes.io/instance": cluster.metadata.name
-			// "app.kubernetes.io/version" : # TODO
-			"app.kubernetes.io/component-name": "\(component.name)"
-			"app.kubernetes.io/managed-by":     "kubeblocks"
+			"app.kubernetes.io/name":       "\(component.clusterDefName)"
+			"app.kubernetes.io/instance":   cluster.metadata.name
+			"app.kubernetes.io/managed-by": "kubeblocks"
+
+			"app.kubeblocks.io/component-name": "\(component.name)"
 		}
 	}
 	"spec": {
@@ -48,21 +48,22 @@ deployment: {
 		minReadySeconds: 10
 		selector: {
 			matchLabels: {
-				"app.kubernetes.io/name":           "\(component.clusterDefName)"
-				"app.kubernetes.io/instance":       "\(cluster.metadata.name)"
-				"app.kubernetes.io/component-name": "\(component.name)"
-				"app.kubernetes.io/managed-by":     "kubeblocks"
+				"app.kubernetes.io/name":       "\(component.clusterDefName)"
+				"app.kubernetes.io/instance":   "\(cluster.metadata.name)"
+				"app.kubernetes.io/managed-by": "kubeblocks"
+
+				"app.kubeblocks.io/component-name": "\(component.name)"
 			}
 		}
 		template: {
 			metadata: {
 				labels: {
-					"app.kubernetes.io/name":           "\(component.clusterDefName)"
-					"app.kubernetes.io/instance":       "\(cluster.metadata.name)"
-					"app.kubernetes.io/component-name": "\(component.name)"
-					"app.kubernetes.io/managed-by":     "kubeblocks"
-					"kubeblocks.io/workload-type":      "\(component.workloadType)"
-					// "app.kubernetes.io/version" : # TODO
+					"app.kubernetes.io/name":       "\(component.clusterDefName)"
+					"app.kubernetes.io/instance":   "\(cluster.metadata.name)"
+					"app.kubernetes.io/managed-by": "kubeblocks"
+
+					"app.kubeblocks.io/component-name": "\(component.name)"
+					"app.kubeblocks.io/workload-type":  "\(component.workloadType)"
 				}
 			}
 			spec: component.podSpec

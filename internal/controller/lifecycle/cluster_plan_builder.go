@@ -68,7 +68,8 @@ func (b *clusterPlanBuilder) Build() (graph.Plan, error) {
 	if err != nil {
 		return nil, err
 	}
-	dag := graph.NewDAG()
+
+	// build transformer chain
 	chain := &graph.TransformerChain{
 		// cluster to K8s objects and put them into dag
 		&clusterTransformer{cc: *cc, cli: b.cli, ctx: b.ctx},
@@ -83,10 +84,14 @@ func (b *clusterPlanBuilder) Build() (graph.Plan, error) {
 		// finally, update cluster status
 		&clusterStatusTransformer{},
 	}
-	if err := chain.WalkThrough(dag);  err != nil {
-			return nil, err
-		}
 
+	// new a DAG and apply chain on it, after that we should get the final Plan
+	dag := graph.NewDAG()
+	if err := chain.WalkThrough(dag); err != nil {
+		return nil, err
+	}
+
+	// prepare the action func we want to apply to each DAG vertex
 	walkFunc := func(node graph.Vertex) error {
 		obj, ok := node.(*lifecycleVertex)
 		if !ok {
@@ -105,6 +110,8 @@ func (b *clusterPlanBuilder) Build() (graph.Plan, error) {
 		}
 		return nil
 	}
+
+	// we got the execution plan
 	plan := &clusterPlan{
 		dag: dag,
 		walkFunc: walkFunc,

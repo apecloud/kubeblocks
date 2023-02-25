@@ -917,13 +917,6 @@ spec:
                     x-kubernetes-list-map-keys:
                     - name
                     x-kubernetes-list-type: map
-                  restartable:
-                    description: restartable which components of the cluster support
-                      restart.
-                    items:
-                      type: string
-                    type: array
-                    x-kubernetes-list-type: set
                   upgradable:
                     description: upgradable whether the cluster supports upgrade.
                       if multiple clusterVersions existed, it is true.

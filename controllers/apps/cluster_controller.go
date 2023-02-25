@@ -805,7 +805,6 @@ func (r *ClusterReconciler) reconcileStatusOperations(ctx context.Context, clust
 	operations.HorizontalScalable = getSupportHorizontalScalingComponents(cluster, clusterDef)
 	// set default supported operations
 	clusterComponentNames := getComponentsNames(cluster)
-	operations.Restartable = clusterComponentNames
 	operations.VerticalScalable = clusterComponentNames
 
 	// Determine whether to support upgrade

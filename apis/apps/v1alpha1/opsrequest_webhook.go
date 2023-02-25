@@ -203,14 +203,12 @@ func (r *OpsRequest) validateRestart(allErrs *field.ErrorList, cluster *Cluster)
 		addInvalidError(allErrs, "spec.restart", restartList, "can not be empty")
 		return
 	}
-	// get component name slice
-	componentNames := make([]string, len(restartList))
+
+	compNames := make([]string, len(restartList))
 	for i, v := range restartList {
-		componentNames[i] = v.ComponentName
+		compNames[i] = v.ComponentName
 	}
-	// validate component name is legal
-	supportedComponentMap := convertComponentNamesToMap(cluster.Status.Operations.Restartable)
-	r.validateComponentName(allErrs, cluster, supportedComponentMap, componentNames)
+	r.checkComponentExistence(allErrs, cluster, compNames)
 }
 
 // validateUpgrade validates spec.clusterOps.upgrade
@@ -424,6 +422,26 @@ func (r *OpsRequest) validateComponentName(allErrs *field.ErrorList,
 	if len(notSupportedComponentNames) > 0 {
 		addInvalidError(allErrs, fmt.Sprintf("spec.%s[*].componentName", lowercaseInitial(opsType)),
 			notSupportedComponentNames, fmt.Sprintf("not supported the %s operation", opsType))
+	}
+}
+
+// checkComponentExistence checks whether components to be operated exist in cluster spec.
+func (r *OpsRequest) checkComponentExistence(errs *field.ErrorList, cluster *Cluster, compNames []string) {
+	compSpecNameMap := make(map[string]bool)
+	for _, compSpec := range cluster.Spec.ComponentSpecs {
+		compSpecNameMap[compSpec.Name] = true
+	}
+
+	var notFoundCompNames []string
+	for _, compName := range compNames {
+		if _, ok := compSpecNameMap[compName]; !ok {
+			notFoundCompNames = append(notFoundCompNames, compName)
+		}
+	}
+
+	if len(notFoundCompNames) > 0 {
+		addInvalidError(errs, fmt.Sprintf("spec.%s[*].componentName", lowercaseInitial(r.Spec.Type)),
+			notFoundCompNames, "not found in Cluster.spec.components[*].name")
 	}
 }
 

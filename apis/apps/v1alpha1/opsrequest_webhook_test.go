@@ -319,17 +319,6 @@ var _ = Describe("OpsRequest webhook", func() {
 	}
 
 	testRestart := func(cluster *Cluster) *OpsRequest {
-		// set cluster support restart
-		patch := client.MergeFrom(cluster.DeepCopy())
-		cluster.Status.Operations.Restartable = []string{replicaSetComponentName}
-		Expect(k8sClient.Status().Patch(ctx, cluster, patch)).Should(Succeed())
-		// wait until patch succeed
-		Eventually(func() bool {
-			tmpCluster := &Cluster{}
-			_ = k8sClient.Get(context.Background(), client.ObjectKey{Name: cluster.Name, Namespace: cluster.Namespace}, tmpCluster)
-			return len(cluster.Status.Operations.Restartable) > 0
-		}, timeout, interval).Should(BeTrue())
-
 		By("By testing restart when componentNames is not correct")
 		opsRequest := createTestOpsRequest(clusterName, opsRequestName, RestartType)
 		opsRequest.Spec.RestartList = []ComponentOps{

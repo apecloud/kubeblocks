@@ -435,15 +435,6 @@ func lowercaseInitial(opsType OpsType) string {
 	return strings.ToLower(str[:1]) + str[1:]
 }
 
-// convertComponentNamesToMap converts supportedComponent slice to map
-func convertComponentNamesToMap(componentNames []string) map[string]*OperationComponent {
-	supportedComponentMap := map[string]*OperationComponent{}
-	for _, v := range componentNames {
-		supportedComponentMap[v] = nil
-	}
-	return supportedComponentMap
-}
-
 // convertOperationComponentsToMap converts supportedOperationComponent slice to map
 func convertOperationComponentsToMap(componentNames []OperationComponent) map[string]*OperationComponent {
 	supportedComponentMap := map[string]*OperationComponent{}

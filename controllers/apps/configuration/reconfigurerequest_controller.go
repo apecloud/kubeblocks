@@ -47,10 +47,10 @@ type ReconfigureRequestReconciler struct {
 var ConfigurationRequiredLabels = []string{
 	intctrlutil.AppNameLabelKey,
 	intctrlutil.AppInstanceLabelKey,
-	intctrlutil.AppComponentLabelKey,
+	intctrlutil.KBAppComponentLabelKey,
 	cfgcore.CMConfigurationTplNameLabelKey,
 	cfgcore.CMConfigurationTypeLabelKey,
-	cfgcore.CMConfigurationISVTplLabelKey,
+	cfgcore.CMConfigurationProviderTplLabelKey,
 }
 
 //+kubebuilder:rbac:groups=core,resources=configmap,verbs=get;list;watch;create;update;patch;delete
@@ -133,15 +133,15 @@ func (r *ReconfigureRequestReconciler) sync(reqCtx intctrlutil.RequestCtx, confi
 
 		configKey = client.ObjectKeyFromObject(config)
 
-		configTplName     = config.Labels[cfgcore.CMConfigurationISVTplLabelKey]
+		configTplName     = config.Labels[cfgcore.CMConfigurationProviderTplLabelKey]
 		configTplLabelKey = cfgcore.GenerateTPLUniqLabelKeyWithConfig(configTplName)
 	)
 
 	componentLabels := map[string]string{
-		intctrlutil.AppNameLabelKey:      config.Labels[intctrlutil.AppNameLabelKey],
-		intctrlutil.AppInstanceLabelKey:  config.Labels[intctrlutil.AppInstanceLabelKey],
-		intctrlutil.AppComponentLabelKey: config.Labels[intctrlutil.AppComponentLabelKey],
-		configTplLabelKey:                config.GetName(),
+		intctrlutil.AppNameLabelKey:        config.Labels[intctrlutil.AppNameLabelKey],
+		intctrlutil.AppInstanceLabelKey:    config.Labels[intctrlutil.AppInstanceLabelKey],
+		intctrlutil.KBAppComponentLabelKey: config.Labels[intctrlutil.KBAppComponentLabelKey],
+		configTplLabelKey:                  config.GetName(),
 	}
 
 	configPatch, err := createConfigurePatch(config, reqCtx, &tpl.Spec)
@@ -169,7 +169,7 @@ func (r *ReconfigureRequestReconciler) sync(reqCtx intctrlutil.RequestCtx, confi
 	}
 
 	// Find ClusterComponentSpec from cluster cr
-	componentName := config.Labels[intctrlutil.AppComponentLabelKey]
+	componentName := config.Labels[intctrlutil.KBAppComponentLabelKey]
 	clusterComponent := getClusterComponentsByName(cluster.Spec.ComponentSpecs, componentName)
 	// fix cluster maybe not any component
 	if clusterComponent == nil {

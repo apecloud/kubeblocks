@@ -82,10 +82,10 @@ var _ = Describe("Reconfigure Controller", func() {
 				testapps.WithLabels(
 					intctrlutil.AppNameLabelKey, clusterName,
 					intctrlutil.AppInstanceLabelKey, clusterName,
-					intctrlutil.AppComponentLabelKey, statefulCompName,
+					intctrlutil.KBAppComponentLabelKey, statefulCompName,
 					cfgcore.CMConfigurationTplNameLabelKey, configTplName,
 					cfgcore.CMConfigurationConstraintsNameLabelKey, cmName,
-					cfgcore.CMConfigurationISVTplLabelKey, configTplName,
+					cfgcore.CMConfigurationProviderTplLabelKey, configTplName,
 					cfgcore.CMConfigurationTypeLabelKey, cfgcore.ConfigInstanceType,
 				))
 
@@ -125,7 +125,7 @@ var _ = Describe("Reconfigure Controller", func() {
 				AddContainer(container).
 				AddLabels(intctrlutil.AppNameLabelKey, clusterName,
 					intctrlutil.AppInstanceLabelKey, clusterName,
-					intctrlutil.AppComponentLabelKey, statefulCompName,
+					intctrlutil.KBAppComponentLabelKey, statefulCompName,
 					cfgcore.GenerateTPLUniqLabelKeyWithConfig(configTplName), configmap.Name,
 				).Create(&testCtx).GetObject()
 

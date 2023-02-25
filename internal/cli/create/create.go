@@ -98,6 +98,10 @@ type BaseOptions struct {
 	Name string `json:"name"`
 
 	Client dynamic.Interface `json:"-"`
+
+	// Quiet minimize unnecessary output
+	Quiet bool
+
 	genericclioptions.IOStreams
 }
 
@@ -196,7 +200,9 @@ func (o *BaseOptions) Run(inputs Inputs) error {
 	if unstructuredObj, err = o.Client.Resource(gvr).Namespace(o.Namespace).Create(context.TODO(), unstructuredObj, metav1.CreateOptions{}); err != nil {
 		return err
 	}
-	fmt.Fprintf(o.Out, "%s %s created\n", unstructuredObj.GetKind(), unstructuredObj.GetName())
+	if !o.Quiet {
+		fmt.Fprintf(o.Out, "%s %s created\n", unstructuredObj.GetKind(), unstructuredObj.GetName())
+	}
 	return nil
 }
 

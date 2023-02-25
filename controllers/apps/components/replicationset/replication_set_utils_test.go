@@ -91,7 +91,7 @@ var _ = Describe("ReplicationSet Util", func() {
 			sts := testapps.NewStatefulSetFactory(testCtx.DefaultNamespace, v, clusterObj.Name, testapps.DefaultRedisCompName).
 				AddContainer(container).
 				AddLabels(intctrlutil.AppInstanceLabelKey, clusterObj.Name,
-					intctrlutil.AppComponentLabelKey, testapps.DefaultRedisCompName,
+					intctrlutil.KBAppComponentLabelKey, testapps.DefaultRedisCompName,
 					intctrlutil.AppManagedByLabelKey, testapps.KubeBlocks,
 					intctrlutil.RoleLabelKey, k).
 				SetReplicas(1).

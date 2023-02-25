@@ -137,7 +137,7 @@ var _ = Describe("StatefulSet utils test", func() {
 			sts := testapps.NewStatefulSetFactory(testCtx.DefaultNamespace, stsName, clusterName, testapps.DefaultRedisCompName).
 				AddContainer(corev1.Container{Name: testapps.DefaultRedisContainerName, Image: testapps.DefaultRedisImageName}).
 				AddLabels(intctrlutil.AppInstanceLabelKey, clusterName,
-					intctrlutil.AppComponentLabelKey, testapps.DefaultRedisCompName,
+					intctrlutil.KBAppComponentLabelKey, testapps.DefaultRedisCompName,
 					intctrlutil.AppManagedByLabelKey, testapps.KubeBlocks,
 					intctrlutil.RoleLabelKey, role).
 				SetReplicas(1).

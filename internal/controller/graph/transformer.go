@@ -16,12 +16,12 @@ limitations under the License.
 
 package graph
 
-// DAGTransformer transforms a DAG to a new version
-type DAGTransformer interface {
+// Transformer transforms a DAG to a new version
+type Transformer interface {
 	Transform(dag *DAG) error
 }
 
-type TransformerChain []DAGTransformer
+type TransformerChain []Transformer
 
 func (t *TransformerChain) WalkThrough(dag *DAG) error {
 	for _, transformer := range *t {

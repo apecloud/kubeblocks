@@ -921,13 +921,6 @@ spec:
                     description: upgradable whether the cluster supports upgrade.
                       if multiple clusterVersions existed, it is true.
                     type: boolean
-                  verticalScalable:
-                    description: verticalScalable which components of the cluster
-                      support verticalScaling.
-                    items:
-                      type: string
-                    type: array
-                    x-kubernetes-list-type: set
                   volumeExpandable:
                     description: volumeExpandable which components of the cluster
                       and its volumeClaimTemplates support volumeExpansion.

@@ -239,12 +239,7 @@ func (r *OpsRequest) validateVerticalScaling(allErrs *field.ErrorList, cluster *
 		addInvalidError(allErrs, "spec.verticalScaling", verticalScalingList, "can not be empty")
 		return
 	}
-	// validate whether the cluster support vertical scaling
-	supportedComponentMap := convertComponentNamesToMap(cluster.Status.Operations.VerticalScalable)
-	if err := r.validateClusterIsSupported(supportedComponentMap); err != nil {
-		*allErrs = append(*allErrs, err)
-		return
-	}
+
 	// validate resources is legal and get component name slice
 	componentNames := make([]string, len(verticalScalingList))
 	for i, v := range verticalScalingList {
@@ -262,9 +257,7 @@ func (r *OpsRequest) validateVerticalScaling(allErrs *field.ErrorList, cluster *
 		}
 	}
 
-	// validate component name is legal
-	r.validateComponentName(allErrs, cluster, supportedComponentMap, componentNames)
-
+	r.checkComponentExistence(allErrs, cluster, componentNames)
 }
 
 // validateVerticalScaling validate api is legal when spec.type is VerticalScaling
@@ -448,15 +441,6 @@ func (r *OpsRequest) checkComponentExistence(errs *field.ErrorList, cluster *Clu
 func lowercaseInitial(opsType OpsType) string {
 	str := string(opsType)
 	return strings.ToLower(str[:1]) + str[1:]
-}
-
-// convertComponentNamesToMap converts supportedComponent slice to map
-func convertComponentNamesToMap(componentNames []string) map[string]*OperationComponent {
-	supportedComponentMap := map[string]*OperationComponent{}
-	for _, v := range componentNames {
-		supportedComponentMap[v] = nil
-	}
-	return supportedComponentMap
 }
 
 // convertOperationComponentsToMap converts supportedOperationComponent slice to map

@@ -330,11 +330,6 @@ type Operations struct {
 	// +optional
 	Upgradable bool `json:"upgradable,omitempty"`
 
-	// verticalScalable which components of the cluster support verticalScaling.
-	// +listType=set
-	// +optional
-	VerticalScalable []string `json:"verticalScalable,omitempty"`
-
 	// volumeExpandable which components of the cluster and its volumeClaimTemplates support volumeExpansion.
 	// +listType=map
 	// +listMapKey=name

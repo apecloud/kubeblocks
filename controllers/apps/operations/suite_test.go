@@ -168,8 +168,7 @@ func initOperationsResources(clusterDefinitionName,
 			},
 		}
 		clusterObject.Status.Operations = &appsv1alpha1.Operations{
-			Upgradable:       true,
-			VerticalScalable: []string{consensusComp, statelessComp, statefulComp},
+			Upgradable: true,
 			HorizontalScalable: []appsv1alpha1.OperationComponent{
 				{
 					Name: consensusComp,

@@ -18,10 +18,11 @@ package lifecycle
 
 import "github.com/apecloud/kubeblocks/internal/controller/graph"
 
-type ClusterStatusTransformer struct {
+type clusterStatusTransformer struct {}
 
-}
-
-func (c *ClusterStatusTransformer) Transform(dag *graph.DAG) error {
+func (c *clusterStatusTransformer) Transform(dag *graph.DAG) error {
+	// get root(cluster) vertex
+	// update generation
+	// update other status field
 	return nil
 }

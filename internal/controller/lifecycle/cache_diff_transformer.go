@@ -38,8 +38,6 @@ type cacheDiffTransformer struct {
 	ctx intctrlutil.RequestCtx
 }
 
-type clusterSnapshot map[gvkName]client.Object
-
 func ownKinds() []client.ObjectList {
 	return []client.ObjectList{
 		&appsv1.StatefulSetList{},
@@ -111,6 +109,7 @@ func (c *cacheDiffTransformer) Transform(dag *graph.DAG) error {
 	deleteSet := oldNameSet.Difference(newNameSet)
 	createSet := newNameSet.Difference(oldNameSet)
 	updateSet := newNameSet.Intersection(oldNameSet)
+	// dag root is our cluster object
 	root := dag.Root()
 	if root == nil {
 		return fmt.Errorf("root vertex not found: %v", dag)
@@ -131,7 +130,6 @@ func (c *cacheDiffTransformer) Transform(dag *graph.DAG) error {
 		v, _ := newNameVertices[name].(*lifecycleVertex)
 		v.action = actionPtr(UPDATE)
 	}
-	v, _ := root.(*lifecycleVertex)
-	v.action = actionPtr(STATUS)
+
 	return nil
 }

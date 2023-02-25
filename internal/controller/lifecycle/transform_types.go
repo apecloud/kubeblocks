@@ -17,30 +17,39 @@ limitations under the License.
 package lifecycle
 
 import (
-	"fmt"
-	v1 "k8s.io/api/apps/v1"
-	"reflect"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"testing"
+
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 )
 
-func TestReflect(t *testing.T) {
-	var list client.ObjectList
-	sts := v1.StatefulSet{}
-	sts.SetName("hello")
-	list = &v1.StatefulSetList{Items: []v1.StatefulSet{sts}}
-	v := reflect.ValueOf(list).Elem().FieldByName("Items")
-	if v.Kind() != reflect.Slice {
-		t.Error("not slice")
-	}
-	c := v.Len()
-	objects := make([]client.Object, c)
-	for i := 0; i < c; i++ {
-		var st interface{}
-		st = v.Index(i).Addr().Interface()
-		objects[i] = st.(client.Object)
-	}
-	for _, e := range objects {
-		fmt.Println(e)
-	}
+const (
+	// TODO: deduplicate
+	dbClusterFinalizerName = "cluster.kubeblocks.io/finalizer"
+)
+
+type Action string
+
+const (
+	CREATE = Action("CREATE")
+	UPDATE = Action("UPDATE")
+	DELETE = Action("DELETE")
+	STATUS = Action("STATUS")
+)
+
+type gvkName struct {
+	kind, ns, name string
 }
+
+type compoundCluster struct {
+	cluster *appsv1alpha1.Cluster
+	cd appsv1alpha1.ClusterDefinition
+	cv appsv1alpha1.ClusterVersion
+}
+
+type lifecycleVertex struct {
+	obj client.Object
+	immutable bool
+	action *Action
+}
+
+type clusterSnapshot map[gvkName]client.Object

@@ -28,41 +28,15 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
-const (
-	// TODO: deduplicate
-	dbClusterFinalizerName = "cluster.kubeblocks.io/finalizer"
-)
-
-type Action string
-
-const (
-	CREATE = Action("CREATE")
-	UPDATE = Action("UPDATE")
-	DELETE = Action("DELETE")
-	STATUS = Action("STATUS")
-)
-
 type clusterPlanBuilder struct {
 	ctx     intctrlutil.RequestCtx
 	cli     client.Client
 	cluster *appsv1alpha1.Cluster
 }
 
-type ClusterPlan struct {
+type clusterPlan struct {
 	dag      *graph.DAG
 	walkFunc graph.WalkFunc
-}
-
-type compoundCluster struct {
-	cluster *appsv1alpha1.Cluster
-	cd appsv1alpha1.ClusterDefinition
-	cv appsv1alpha1.ClusterVersion
-}
-
-type lifecycleVertex struct {
-	obj client.Object
-	immutable bool
-	action *Action
 }
 
 func (b *clusterPlanBuilder) getCompoundCluster() (*compoundCluster, error) {
@@ -107,7 +81,7 @@ func (b *clusterPlanBuilder) Build() (graph.Plan, error) {
 		// read old snapshot from cache, and generate diff plan
 		&cacheDiffTransformer{cc: *cc, cli: b.cli, ctx: b.ctx},
 		// finally, update cluster status
-		&ClusterStatusTransformer{},
+		&clusterStatusTransformer{},
 	}
 	if err := chain.WalkThrough(dag);  err != nil {
 			return nil, err
@@ -131,15 +105,11 @@ func (b *clusterPlanBuilder) Build() (graph.Plan, error) {
 		}
 		return nil
 	}
-	plan := &ClusterPlan{
+	plan := &clusterPlan{
 		dag: dag,
 		walkFunc: walkFunc,
 	}
 	return plan, nil
-}
-
-func (p *ClusterPlan) Execute() error {
-	return p.dag.WalkReverseTopoOrder(p.walkFunc)
 }
 
 // NewClusterPlanBuilder returns a clusterPlanBuilder powered PlanBuilder
@@ -150,4 +120,8 @@ func NewClusterPlanBuilder(ctx intctrlutil.RequestCtx, cli client.Client, cluste
 		cli:     cli,
 		cluster: cluster,
 	}
+}
+
+func (p *clusterPlan) Execute() error {
+	return p.dag.WalkReverseTopoOrder(p.walkFunc)
 }

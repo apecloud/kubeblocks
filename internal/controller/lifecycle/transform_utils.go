@@ -28,10 +28,6 @@ import (
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 )
 
-type gvkName struct {
-	kind, ns, name string
-}
-
 func findAll[T interface{}](dag *graph.DAG) ([]graph.Vertex, error) {
 	vertices := make([]graph.Vertex, 0)
 	for _, vertex := range dag.Vertices() {

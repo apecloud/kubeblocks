@@ -34,7 +34,7 @@ import (
 	componentutil "github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	cfgutil "github.com/apecloud/kubeblocks/controllers/apps/configuration"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
-	cfgcm "github.com/apecloud/kubeblocks/internal/configuration/configmap"
+	cfgcm "github.com/apecloud/kubeblocks/internal/configuration/config_manager"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
@@ -570,30 +570,27 @@ func getUsingVolumesByCfgTemplates(podSpec *corev1.PodSpec, cfgTemplates []appsv
 }
 
 func buildConfigManagerParams(cli client.Client, ctx context.Context, cfgTemplates []appsv1alpha1.ConfigTemplate, volumeDirs []corev1.VolumeMount, volumePath string, volumeName string) (*cfgcm.ConfigManagerSidecar, error) {
-	var (
-		err               error
-		reloadOptions     *appsv1alpha1.ReloadOptions
-		configManagerArgs []string
-	)
-
-	if reloadOptions, err = cfgutil.GetReloadOptions(cli, ctx, cfgTemplates); err != nil {
-		return nil, err
-	}
-	if reloadOptions == nil || reloadOptions.UnixSignalTrigger == nil {
-		return nil, nil
-	}
-
-	unixSignalOption := reloadOptions.UnixSignalTrigger
-	configManagerArgs = cfgcm.BuildSignalArgs(*unixSignalOption, volumeDirs)
 	configManager := &cfgcm.ConfigManagerSidecar{
+		// Args:        configManagerArgs,
 		ManagerName: cfgcore.ConfigSidecarName,
 		Image:       viper.GetString(cfgcore.ConfigSidecarIMAGE),
-		Args:        configManagerArgs,
 		// add cri sock path
 		Volumes: append(volumeDirs, corev1.VolumeMount{
 			Name:      volumeName,
 			MountPath: volumePath,
 		}),
+	}
+
+	var err error
+	var reloadOptions *appsv1alpha1.ReloadOptions
+	if reloadOptions, err = cfgutil.GetReloadOptions(cli, ctx, cfgTemplates); err != nil {
+		return nil, err
+	}
+	if reloadOptions == nil {
+		return nil, nil
+	}
+	if err = cfgcm.BuildConfigManagerContainerArgs(reloadOptions, volumeDirs, cli, ctx, configManager); err != nil {
+		return nil, err
 	}
 	return configManager, nil
 }

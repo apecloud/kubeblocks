@@ -28,7 +28,7 @@ import (
 	"go.uber.org/zap/zapcore"
 
 	cfgutil "github.com/apecloud/kubeblocks/internal/configuration"
-	cfgcore "github.com/apecloud/kubeblocks/internal/configuration/configmap"
+	cfgcore "github.com/apecloud/kubeblocks/internal/configuration/config_manager"
 )
 
 var logger *zap.SugaredLogger

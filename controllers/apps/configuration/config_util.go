@@ -32,7 +32,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
-	cfgcm "github.com/apecloud/kubeblocks/internal/configuration/configmap"
+	cfgcm "github.com/apecloud/kubeblocks/internal/configuration/config_manager"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -370,7 +370,7 @@ func validateConfigTPLs(cli client.Client, ctx intctrlutil.RequestCtx, configTpl
 		if tpl == nil {
 			continue
 		}
-		if err := cfgcm.NeedBuildConfigSidecar(tpl.Spec.ReloadOptions); err != nil {
+		if err := cfgcm.ValidateReloadOptions(tpl.Spec.ReloadOptions, cli, ctx.Ctx); err != nil {
 			return false, err
 		}
 		if !validateConfTplStatus(tpl.Status) {

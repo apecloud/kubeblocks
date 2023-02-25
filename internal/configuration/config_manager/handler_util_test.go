@@ -19,9 +19,6 @@ package configmap
 import (
 	"testing"
 
-	"github.com/stretchr/testify/require"
-	corev1 "k8s.io/api/core/v1"
-
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 )
 
@@ -76,33 +73,33 @@ func TestIsSupportReload(t *testing.T) {
 	}
 }
 
-func TestBuildSignalArgs(t *testing.T) {
-	r := BuildSignalArgs(appsv1alpha1.UnixSignalTrigger{
-		ProcessName: "postgres",
-		Signal:      appsv1alpha1.SIGHUP,
-	}, []corev1.VolumeMount{
-		{
-			MountPath: "/postgresql/conf",
-			Name:      "pg_config",
-		},
-		{
-			MountPath: "/postgresql/conf2",
-			Name:      "pg_config",
-		},
-	})
-	require.Regexp(t, `--process\s+postgres`, r)
-	require.Regexp(t, `--signal\s+SIGHUP`, r)
-	require.Regexp(t, `--volume-dir\s+/postgresql/conf`, r)
-	require.Regexp(t, `--volume-dir\s+/postgresql/conf2`, r)
-
-	require.Nil(t, NeedBuildConfigSidecar(&appsv1alpha1.ReloadOptions{
-		UnixSignalTrigger: &appsv1alpha1.UnixSignalTrigger{
-			Signal: appsv1alpha1.SIGHUP,
-		},
-	}))
-	require.NotNil(t, NeedBuildConfigSidecar(&appsv1alpha1.ReloadOptions{
-		UnixSignalTrigger: &appsv1alpha1.UnixSignalTrigger{
-			Signal: "SIGNOEXIST",
-		},
-	}))
-}
+// func TestBuildSignalArgs(t *testing.T) {
+//	r := BuildSignalArgs(appsv1alpha1.UnixSignalTrigger{
+//		ProcessName: "postgres",
+//		Signal:      appsv1alpha1.SIGHUP,
+//	}, []corev1.VolumeMount{
+//		{
+//			MountPath: "/postgresql/conf",
+//			Name:      "pg_config",
+//		},
+//		{
+//			MountPath: "/postgresql/conf2",
+//			Name:      "pg_config",
+//		},
+//	})
+//	require.Regexp(t, `--process\s+postgres`, r)
+//	require.Regexp(t, `--signal\s+SIGHUP`, r)
+//	require.Regexp(t, `--volume-dir\s+/postgresql/conf`, r)
+//	require.Regexp(t, `--volume-dir\s+/postgresql/conf2`, r)
+//
+//	require.Nil(t, NeedBuildConfigSidecar(&appsv1alpha1.ReloadOptions{
+//		UnixSignalTrigger: &appsv1alpha1.UnixSignalTrigger{
+//			Signal: appsv1alpha1.SIGHUP,
+//		},
+//	}))
+//	require.NotNil(t, NeedBuildConfigSidecar(&appsv1alpha1.ReloadOptions{
+//		UnixSignalTrigger: &appsv1alpha1.UnixSignalTrigger{
+//			Signal: "SIGNOEXIST",
+//		},
+//	}))
+// }

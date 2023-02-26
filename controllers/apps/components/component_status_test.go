@@ -251,12 +251,15 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 
 			It("should set component status to failed if container is not ready and have error message", func() {
 				Expect(mockContainerError(pods[0])).Should(Succeed())
+				Expect(mockContainerError(pods[1])).Should(Succeed())
 
 				synchronizer := NewClusterStatusSynchronizer(testCtx.Ctx, testCtx.Cli, cluster, component, cluster.GetComponentByName(compName))
 				Expect(synchronizer).ShouldNot(BeNil())
 
 				hasFailedAndTimedoutPod, hasFailedPod := synchronizer.hasFailedAndTimedOutPod()
 				Expect(hasFailedAndTimedoutPod).Should(BeTrue())
+				// two pod failed message
+				Expect(len(cluster.Status.Components[compName].Message)).Should(Equal(2))
 				Expect(hasFailedPod).Should(BeTrue())
 
 				isPodReady, err := component.PodsReady(statefulset)

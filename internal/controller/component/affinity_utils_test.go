@@ -89,6 +89,10 @@ var _ = Describe("affinity utils", func() {
 			Expect(affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution[0].TopologyKey).Should(Equal(topologyKey))
 			Expect(affinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution).Should(BeEmpty())
 
+			affinity = patchBuiltInAffinity(affinity)
+			Expect(affinity.NodeAffinity.PreferredDuringSchedulingIgnoredDuringExecution[0].Preference.MatchExpressions[0].Key).Should(
+				Equal(intctrlutil.KubeBlocksDataNodeLabelKey))
+
 			topologySpreadConstraints := buildPodTopologySpreadConstraints(clusterObj, clusterObj.Spec.Affinity, component)
 			Expect(topologySpreadConstraints[0].WhenUnsatisfiable).Should(Equal(corev1.DoNotSchedule))
 			Expect(topologySpreadConstraints[0].TopologyKey).Should(Equal(topologyKey))

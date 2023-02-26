@@ -166,8 +166,8 @@ func ListAndCheckStatefulSetWithComponent(testCtx *testutil.TestContext, key typ
 	stsList := &apps.StatefulSetList{}
 	gomega.Eventually(func(g gomega.Gomega) {
 		g.Expect(testCtx.Cli.List(testCtx.Ctx, stsList, client.MatchingLabels{
-			intctrlutil.AppInstanceLabelKey:  key.Name,
-			intctrlutil.AppComponentLabelKey: componentName,
+			intctrlutil.AppInstanceLabelKey:    key.Name,
+			intctrlutil.KBAppComponentLabelKey: componentName,
 		}, client.InNamespace(key.Namespace))).Should(gomega.Succeed())
 		g.Expect(len(stsList.Items) > 0).To(gomega.BeTrue())
 	}).Should(gomega.Succeed())

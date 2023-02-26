@@ -49,7 +49,7 @@ func (rs *ReplicationSet) IsRunning(obj client.Object) (bool, error) {
 	var componentStsList = &appsv1.StatefulSetList{}
 	var componentStatusIsRunning = true
 	sts := util.ConvertToStatefulSet(obj)
-	if err := util.GetObjectListByComponentName(rs.Ctx, rs.Cli, rs.Cluster, componentStsList, sts.Labels[intctrlutil.AppComponentLabelKey]); err != nil {
+	if err := util.GetObjectListByComponentName(rs.Ctx, rs.Cli, rs.Cluster, componentStsList, sts.Labels[intctrlutil.KBAppComponentLabelKey]); err != nil {
 		return false, err
 	}
 	var availableReplicas int32
@@ -76,7 +76,7 @@ func (rs *ReplicationSet) PodsReady(obj client.Object) (bool, error) {
 	var podsReady = true
 	var componentStsList = &appsv1.StatefulSetList{}
 	sts := util.ConvertToStatefulSet(obj)
-	if err := util.GetObjectListByComponentName(rs.Ctx, rs.Cli, rs.Cluster, componentStsList, sts.Labels[intctrlutil.AppComponentLabelKey]); err != nil {
+	if err := util.GetObjectListByComponentName(rs.Ctx, rs.Cli, rs.Cluster, componentStsList, sts.Labels[intctrlutil.KBAppComponentLabelKey]); err != nil {
 		return false, err
 	}
 	var availableReplicas int32
@@ -188,7 +188,7 @@ func (rs *ReplicationSet) GetPhaseWhenPodsNotReady(componentName string) (appsv1
 func (rs *ReplicationSet) HandleUpdate(obj client.Object) error {
 	var componentStsList = &appsv1.StatefulSetList{}
 	sts := util.ConvertToStatefulSet(obj)
-	if err := util.GetObjectListByComponentName(rs.Ctx, rs.Cli, rs.Cluster, componentStsList, sts.Labels[intctrlutil.AppComponentLabelKey]); err != nil {
+	if err := util.GetObjectListByComponentName(rs.Ctx, rs.Cli, rs.Cluster, componentStsList, sts.Labels[intctrlutil.KBAppComponentLabelKey]); err != nil {
 		return err
 	}
 	for _, sts := range componentStsList.Items {

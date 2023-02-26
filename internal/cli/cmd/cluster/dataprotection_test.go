@@ -36,6 +36,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 var _ = Describe("DataProtection", func() {
@@ -70,7 +71,7 @@ var _ = Describe("DataProtection", func() {
 		It("run backup command", func() {
 			cluster := testing.FakeCluster(testing.ClusterName, testing.Namespace)
 			clusterDefLabel := map[string]string{
-				types.ClusterDefLabelKey: "apecloud-mysql",
+				intctrlutil.ClusterDefLabelKey: "apecloud-mysql",
 			}
 			cluster.SetLabels(clusterDefLabel)
 
@@ -154,7 +155,7 @@ var _ = Describe("DataProtection", func() {
 		newClusterName := "new-cluster-" + timestamp
 		secrets := testing.FakeSecrets(testing.Namespace, clusterName)
 		clusterDefLabel := map[string]string{
-			types.ClusterDefLabelKey: "apecloud-mysql",
+			intctrlutil.ClusterDefLabelKey: "apecloud-mysql",
 		}
 
 		cluster := testing.FakeCluster(clusterName, testing.Namespace)

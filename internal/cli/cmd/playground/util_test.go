@@ -21,9 +21,10 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("playground", func() {
-	By("playground dir")
-	dir, err := playgroundDir()
-	Expect(err).ShouldNot(HaveOccurred())
-	Expect(dir).ShouldNot(Equal(""))
+var _ = Describe("util", func() {
+	It("playground dir", func() {
+		dir, err := playgroundDir()
+		Expect(err).Should(Succeed())
+		Expect(dir).ShouldNot(Equal(""))
+	})
 })

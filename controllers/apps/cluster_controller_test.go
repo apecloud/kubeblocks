@@ -1319,6 +1319,7 @@ var _ = Describe("Cluster Controller", func() {
 				backup.Status.RemoteVolume = &corev1.Volume{
 					Name: "backup-pvc",
 				}
+				backup.Status.Phase = dataprotectionv1alpha1.BackupCompleted
 			})).Should(Succeed())
 			restoreFromBackup := fmt.Sprintf(`{"%s":"%s"}`, mysqlCompName, backupName)
 			clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,

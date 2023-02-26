@@ -18,6 +18,7 @@ package dataprotection
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -41,7 +42,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -157,15 +160,19 @@ func (r *BackupReconciler) doNewPhaseAction(
 		return intctrlutil.RequeueAfter(reconcileInterval, reqCtx.Log, "")
 	}
 
-	labels := backupPolicy.Spec.Target.LabelsSelector.MatchLabels
-	if labels == nil {
-		labels = map[string]string{}
-		backupPolicy.Spec.Target.LabelsSelector.MatchLabels = labels
-	}
-	labels[dataProtectionLabelBackupTypeKey] = string(backup.Spec.BackupType)
-	if err := r.patchBackupLabels(reqCtx, backup, labels); err != nil {
+	// get target cluster.
+	target, err := r.getTargetCluster(reqCtx, backupPolicy)
+	if err != nil {
 		return r.updateStatusIfFailed(reqCtx, backup, err)
 	}
+	clusterName := target.Labels[constant.AppInstanceLabelKey]
+	if err := r.patchBackupLabelsAndAnnotations(reqCtx, backup, backupPolicy.Spec.Target.LabelsSelector.MatchLabels, clusterName); err != nil {
+		return r.updateStatusIfFailed(reqCtx, backup, err)
+	}
+
+	// save cluster name and componentName
+	backup.Status.ClusterName = clusterName
+	backup.Status.ComponentName = target.Labels[constant.KBAppComponentLabelKey]
 
 	// save the backup message for restore
 	backup.Status.RemoteVolume = &backupPolicy.Spec.RemoteVolume
@@ -297,19 +304,23 @@ func (r *BackupReconciler) updateStatusIfFailed(reqCtx intctrlutil.RequestCtx,
 }
 
 // patchBackupLabels patch backup labels
-func (r *BackupReconciler) patchBackupLabels(
+func (r *BackupReconciler) patchBackupLabelsAndAnnotations(
 	reqCtx intctrlutil.RequestCtx,
 	backup *dataprotectionv1alpha1.Backup,
-	labels map[string]string) error {
-
+	labelSelector map[string]string,
+	clusterName string) error {
 	patch := client.MergeFrom(backup.DeepCopy())
-	if len(labels) > 0 {
-		if backup.Labels == nil {
-			backup.Labels = map[string]string{}
+	if len(clusterName) > 0 {
+		if err := r.setClusterSnapshotAnnotation(reqCtx, backup, types.NamespacedName{Name: clusterName, Namespace: backup.Namespace}); err != nil {
+			return err
 		}
-		for k, v := range labels {
-			backup.Labels[k] = v
-		}
+	}
+	if backup.Labels == nil {
+		backup.Labels = map[string]string{}
+	}
+	backup.Labels[dataProtectionLabelBackupTypeKey] = string(backup.Spec.BackupType)
+	for k, v := range labelSelector {
+		backup.Labels[k] = v
 	}
 	return r.Client.Patch(reqCtx.Ctx, backup, patch)
 }
@@ -677,7 +688,7 @@ func (r *BackupReconciler) getTargetCluster(
 		client.MatchingLabels(backupPolicy.Spec.Target.LabelsSelector.MatchLabels)); err != nil {
 		return nil, err
 	}
-	reqCtx.Log.Info("Get cluster target finish", "target", clusterTarget)
+	reqCtx.Log.Info("Get cluster target finish")
 	clusterItemsLen := len(clusterTarget.Items)
 	if clusterItemsLen != 1 {
 		if clusterItemsLen <= 0 {
@@ -895,4 +906,43 @@ func (r *BackupReconciler) buildSnapshotPodSpec(
 	podSpec.ServiceAccountName = viper.GetString("KUBEBLOCKS_SERVICEACCOUNT_NAME")
 
 	return podSpec, nil
+}
+
+// getClusterObjectString gets the cluster object and convert it to string.
+func (r *BackupReconciler) getClusterObjectString(reqCtx intctrlutil.RequestCtx, name types.NamespacedName) (*string, error) {
+	cluster := &appsv1alpha1.Cluster{}
+	if err := r.Client.Get(reqCtx.Ctx, name, cluster); err != nil {
+		return nil, client.IgnoreNotFound(err)
+	}
+	// maintain only the cluster's spec and name/namespace.
+	newCluster := &appsv1alpha1.Cluster{
+		Spec: cluster.Spec,
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: cluster.Namespace,
+			Name:      cluster.Name,
+		},
+		TypeMeta: cluster.TypeMeta,
+	}
+	clusterBytes, err := json.Marshal(newCluster)
+	if err != nil {
+		return nil, err
+	}
+	clusterString := string(clusterBytes)
+	return &clusterString, nil
+}
+
+// setClusterSnapshotAnnotation sets the snapshot of cluster to the backup's annotations.
+func (r *BackupReconciler) setClusterSnapshotAnnotation(reqCtx intctrlutil.RequestCtx, backup *dataprotectionv1alpha1.Backup, name types.NamespacedName) error {
+	clusterString, err := r.getClusterObjectString(reqCtx, name)
+	if err != nil {
+		return err
+	}
+	if clusterString == nil {
+		return nil
+	}
+	if backup.Annotations == nil {
+		backup.Annotations = map[string]string{}
+	}
+	backup.Annotations[constant.ClusterSnapshotAnnotationKey] = *clusterString
+	return nil
 }

@@ -95,14 +95,24 @@ type BackupStatus struct {
 	// +optional
 	RemoteVolume *corev1.Volume `json:"remoteVolume,omitempty"`
 
-	// backupToolName referenced backup tool name..
+	// backupToolName referenced backup tool name.
 	// +optional
 	BackupToolName string `json:"backupToolName,omitempty"`
+
+	// clusterName referenced cluster name.
+	// +optional
+	ClusterName string `json:"clusterName,omitempty"`
+
+	// componentName name of the component which performs the backup job.
+	// +optional
+	ComponentName string `json:"componentName,omitempty"`
 }
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:categories={kubeblocks},scope=Namespaced
+// +kubebuilder:printcolumn:name="CLUSTER",type=string,JSONPath=`.status.clusterName`
+// +kubebuilder:printcolumn:name="TYPE",type=string,JSONPath=`.spec.backupType`
 // +kubebuilder:printcolumn:name="STATUS",type=string,JSONPath=`.status.phase`
 // +kubebuilder:printcolumn:name="TOTAL-SIZE",type=string,JSONPath=`.status.totalSize`
 // +kubebuilder:printcolumn:name="DURATION",type=string,JSONPath=`.status.duration`

@@ -99,12 +99,12 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 			synchronizer := NewClusterStatusSynchronizer(testCtx.Ctx, testCtx.Cli, cluster, component, cluster.GetComponentByName(compName))
 			Expect(synchronizer).ShouldNot(BeNil())
 
-			hasFailedAndTimedoutPod, hasFailedPod, _ := synchronizer.HasFailedAndTimedOutPod()
+			hasFailedAndTimedoutPod, hasFailedPod := synchronizer.hasFailedAndTimedOutPod()
 			Expect(hasFailedAndTimedoutPod).Should(BeFalse())
 			Expect(hasFailedPod).Should(BeFalse())
 
 			podsAreReady := false
-			err := synchronizer.UpdateComponentsPhase(false, &podsAreReady, hasFailedAndTimedoutPod)
+			err := synchronizer.updateComponentsPhase(false, &podsAreReady, hasFailedAndTimedoutPod)
 			Expect(err).Should(Succeed())
 			Expect(cluster.Status.Components[compName].Phase).Should(BeEmpty())
 		})
@@ -140,7 +140,7 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 				synchronizer := NewClusterStatusSynchronizer(testCtx.Ctx, testCtx.Cli, cluster, component, cluster.GetComponentByName(compName))
 				Expect(synchronizer).ShouldNot(BeNil())
 
-				hasFailedAndTimedoutPod, hasFailedPod, _ := synchronizer.HasFailedAndTimedOutPod()
+				hasFailedAndTimedoutPod, hasFailedPod := synchronizer.hasFailedAndTimedOutPod()
 				Expect(hasFailedAndTimedoutPod).Should(BeTrue())
 				Expect(hasFailedPod).Should(BeTrue())
 
@@ -151,7 +151,7 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 				Expect(err).ShouldNot(HaveOccurred())
 				Expect(isRunning).Should(BeFalse())
 
-				Expect(synchronizer.UpdateComponentsPhase(isRunning, &isPodReady, hasFailedAndTimedoutPod)).Should(Succeed())
+				Expect(synchronizer.updateComponentsPhase(isRunning, &isPodReady, hasFailedAndTimedoutPod)).Should(Succeed())
 				Expect(cluster.Status.Components[compName].Phase).Should(Equal(appsv1alpha1.FailedPhase))
 			})
 
@@ -163,7 +163,7 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 				synchronizer := NewClusterStatusSynchronizer(testCtx.Ctx, testCtx.Cli, cluster, component, cluster.GetComponentByName(compName))
 				Expect(synchronizer).ShouldNot(BeNil())
 
-				hasFailedAndTimedoutPod, hasFailedPod, _ := synchronizer.HasFailedAndTimedOutPod()
+				hasFailedAndTimedoutPod, hasFailedPod := synchronizer.hasFailedAndTimedOutPod()
 				Expect(hasFailedAndTimedoutPod).Should(BeFalse())
 				Expect(hasFailedPod).Should(BeFalse())
 
@@ -174,7 +174,7 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 				Expect(err).ShouldNot(HaveOccurred())
 				Expect(isRunning).Should(BeTrue())
 
-				Expect(synchronizer.UpdateComponentsPhase(isRunning, &isPodReady, hasFailedAndTimedoutPod)).Should(Succeed())
+				Expect(synchronizer.updateComponentsPhase(isRunning, &isPodReady, hasFailedAndTimedoutPod)).Should(Succeed())
 				Expect(cluster.Status.Components[compName].Phase).Should(Equal(appsv1alpha1.RunningPhase))
 			})
 		})
@@ -206,12 +206,12 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 			synchronizer := NewClusterStatusSynchronizer(testCtx.Ctx, testCtx.Cli, cluster, component, cluster.GetComponentByName(compName))
 			Expect(synchronizer).ShouldNot(BeNil())
 
-			hasFailedAndTimedoutPod, hasFailedPod, _ := synchronizer.HasFailedAndTimedOutPod()
+			hasFailedAndTimedoutPod, hasFailedPod := synchronizer.hasFailedAndTimedOutPod()
 			Expect(hasFailedAndTimedoutPod).Should(BeFalse())
 			Expect(hasFailedPod).Should(BeFalse())
 
 			podsAreReady := false
-			err := synchronizer.UpdateComponentsPhase(false, &podsAreReady, hasFailedAndTimedoutPod)
+			err := synchronizer.updateComponentsPhase(false, &podsAreReady, hasFailedAndTimedoutPod)
 			Expect(err).Should(Succeed())
 			Expect(cluster.Status.Components[compName].Phase).Should(BeEmpty())
 		})
@@ -257,7 +257,7 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 				synchronizer := NewClusterStatusSynchronizer(testCtx.Ctx, testCtx.Cli, cluster, component, cluster.GetComponentByName(compName))
 				Expect(synchronizer).ShouldNot(BeNil())
 
-				hasFailedAndTimedoutPod, hasFailedPod, _ := synchronizer.HasFailedAndTimedOutPod()
+				hasFailedAndTimedoutPod, hasFailedPod := synchronizer.hasFailedAndTimedOutPod()
 				Expect(hasFailedAndTimedoutPod).Should(BeTrue())
 				Expect(hasFailedPod).Should(BeTrue())
 
@@ -268,7 +268,7 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 				Expect(err).ShouldNot(HaveOccurred())
 				Expect(isRunning).Should(BeFalse())
 
-				Expect(synchronizer.UpdateComponentsPhase(isRunning, &isPodReady, hasFailedAndTimedoutPod)).Should(Succeed())
+				Expect(synchronizer.updateComponentsPhase(isRunning, &isPodReady, hasFailedAndTimedoutPod)).Should(Succeed())
 				Expect(cluster.Status.Components[compName].Phase).Should(Equal(appsv1alpha1.FailedPhase))
 			})
 
@@ -280,7 +280,7 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 				synchronizer := NewClusterStatusSynchronizer(testCtx.Ctx, testCtx.Cli, cluster, component, cluster.GetComponentByName(compName))
 				Expect(synchronizer).ShouldNot(BeNil())
 
-				hasFailedAndTimedoutPod, hasFailedPod, _ := synchronizer.HasFailedAndTimedOutPod()
+				hasFailedAndTimedoutPod, hasFailedPod := synchronizer.hasFailedAndTimedOutPod()
 				Expect(hasFailedAndTimedoutPod).Should(BeFalse())
 				Expect(hasFailedPod).Should(BeFalse())
 
@@ -291,7 +291,7 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 				Expect(err).ShouldNot(HaveOccurred())
 				Expect(isRunning).Should(BeTrue())
 
-				Expect(synchronizer.UpdateComponentsPhase(isRunning, &isPodReady, hasFailedAndTimedoutPod)).Should(Succeed())
+				Expect(synchronizer.updateComponentsPhase(isRunning, &isPodReady, hasFailedAndTimedoutPod)).Should(Succeed())
 				Expect(cluster.Status.Components[compName].Phase).Should(Equal(appsv1alpha1.RunningPhase))
 			})
 		})
@@ -323,12 +323,12 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 			synchronizer := NewClusterStatusSynchronizer(testCtx.Ctx, testCtx.Cli, cluster, component, cluster.GetComponentByName(compName))
 			Expect(synchronizer).ShouldNot(BeNil())
 
-			hasFailedAndTimedoutPod, hasFailedPod, _ := synchronizer.HasFailedAndTimedOutPod()
+			hasFailedAndTimedoutPod, hasFailedPod := synchronizer.hasFailedAndTimedOutPod()
 			Expect(hasFailedAndTimedoutPod).Should(BeFalse())
 			Expect(hasFailedPod).Should(BeFalse())
 
 			podsAreReady := false
-			err := synchronizer.UpdateComponentsPhase(false, &podsAreReady, hasFailedAndTimedoutPod)
+			err := synchronizer.updateComponentsPhase(false, &podsAreReady, hasFailedAndTimedoutPod)
 			Expect(err).Should(Succeed())
 			Expect(cluster.Status.Components[compName].Phase).Should(BeEmpty())
 		})
@@ -374,7 +374,7 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 				synchronizer := NewClusterStatusSynchronizer(testCtx.Ctx, testCtx.Cli, cluster, component, cluster.GetComponentByName(compName))
 				Expect(synchronizer).ShouldNot(BeNil())
 
-				hasFailedAndTimedoutPod, hasFailedPod, _ := synchronizer.HasFailedAndTimedOutPod()
+				hasFailedAndTimedoutPod, hasFailedPod := synchronizer.hasFailedAndTimedOutPod()
 				Expect(hasFailedAndTimedoutPod).Should(BeTrue())
 				Expect(hasFailedPod).Should(BeTrue())
 
@@ -385,7 +385,7 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 				Expect(err).ShouldNot(HaveOccurred())
 				Expect(isRunning).Should(BeFalse())
 
-				Expect(synchronizer.UpdateComponentsPhase(isRunning, &isPodReady, hasFailedAndTimedoutPod)).Should(Succeed())
+				Expect(synchronizer.updateComponentsPhase(isRunning, &isPodReady, hasFailedAndTimedoutPod)).Should(Succeed())
 				Expect(cluster.Status.Components[compName].Phase).Should(Equal(appsv1alpha1.FailedPhase))
 			})
 
@@ -401,7 +401,7 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 				synchronizer := NewClusterStatusSynchronizer(testCtx.Ctx, testCtx.Cli, cluster, component, cluster.GetComponentByName(compName))
 				Expect(synchronizer).ShouldNot(BeNil())
 
-				hasFailedAndTimedoutPod, hasFailedPod, _ := synchronizer.HasFailedAndTimedOutPod()
+				hasFailedAndTimedoutPod, hasFailedPod := synchronizer.hasFailedAndTimedOutPod()
 				Expect(hasFailedAndTimedoutPod).Should(BeFalse())
 				Expect(hasFailedPod).Should(BeFalse())
 
@@ -412,7 +412,7 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 				Expect(err).ShouldNot(HaveOccurred())
 				Expect(isRunning).Should(BeTrue())
 
-				Expect(synchronizer.UpdateComponentsPhase(isRunning, &isPodReady, hasFailedAndTimedoutPod)).Should(Succeed())
+				Expect(synchronizer.updateComponentsPhase(isRunning, &isPodReady, hasFailedAndTimedoutPod)).Should(Succeed())
 				Expect(cluster.Status.Components[compName].Phase).Should(Equal(appsv1alpha1.RunningPhase))
 			})
 		})
@@ -444,12 +444,12 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 			synchronizer := NewClusterStatusSynchronizer(testCtx.Ctx, testCtx.Cli, cluster, component, cluster.GetComponentByName(compName))
 			Expect(synchronizer).ShouldNot(BeNil())
 
-			hasFailedAndTimedoutPod, hasFailedPod, _ := synchronizer.HasFailedAndTimedOutPod()
+			hasFailedAndTimedoutPod, hasFailedPod := synchronizer.hasFailedAndTimedOutPod()
 			Expect(hasFailedAndTimedoutPod).Should(BeFalse())
 			Expect(hasFailedPod).Should(BeFalse())
 
 			podsAreReady := false
-			err := synchronizer.UpdateComponentsPhase(false, &podsAreReady, hasFailedAndTimedoutPod)
+			err := synchronizer.updateComponentsPhase(false, &podsAreReady, hasFailedAndTimedoutPod)
 			Expect(err).Should(Succeed())
 			Expect(cluster.Status.Components[compName].Phase).Should(BeEmpty())
 		})
@@ -494,7 +494,7 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 				synchronizer := NewClusterStatusSynchronizer(testCtx.Ctx, testCtx.Cli, cluster, component, cluster.GetComponentByName(compName))
 				Expect(synchronizer).ShouldNot(BeNil())
 
-				hasFailedAndTimedoutPod, hasFailedPod, _ := synchronizer.HasFailedAndTimedOutPod()
+				hasFailedAndTimedoutPod, hasFailedPod := synchronizer.hasFailedAndTimedOutPod()
 				Expect(hasFailedAndTimedoutPod).Should(BeTrue())
 				Expect(hasFailedPod).Should(BeTrue())
 
@@ -505,7 +505,7 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 				Expect(err).ShouldNot(HaveOccurred())
 				Expect(isRunning).Should(BeFalse())
 
-				Expect(synchronizer.UpdateComponentsPhase(isRunning, &isPodReady, hasFailedAndTimedoutPod)).Should(Succeed())
+				Expect(synchronizer.updateComponentsPhase(isRunning, &isPodReady, hasFailedAndTimedoutPod)).Should(Succeed())
 				Expect(cluster.Status.Components[compName].Phase).Should(Equal(appsv1alpha1.FailedPhase))
 			})
 
@@ -517,7 +517,7 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 				synchronizer := NewClusterStatusSynchronizer(testCtx.Ctx, testCtx.Cli, cluster, component, cluster.GetComponentByName(compName))
 				Expect(synchronizer).ShouldNot(BeNil())
 
-				hasFailedAndTimedoutPod, hasFailedPod, _ := synchronizer.HasFailedAndTimedOutPod()
+				hasFailedAndTimedoutPod, hasFailedPod := synchronizer.hasFailedAndTimedOutPod()
 				Expect(hasFailedAndTimedoutPod).Should(BeFalse())
 				Expect(hasFailedPod).Should(BeFalse())
 
@@ -528,7 +528,7 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 				Expect(err).ShouldNot(HaveOccurred())
 				Expect(isRunning).Should(BeTrue())
 
-				Expect(synchronizer.UpdateComponentsPhase(isRunning, &isPodReady, hasFailedAndTimedoutPod)).Should(Succeed())
+				Expect(synchronizer.updateComponentsPhase(isRunning, &isPodReady, hasFailedAndTimedoutPod)).Should(Succeed())
 				Expect(cluster.Status.Components[compName].Phase).Should(Equal(appsv1alpha1.RunningPhase))
 			})
 		})

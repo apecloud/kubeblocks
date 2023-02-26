@@ -67,50 +67,53 @@ func HandleReplicationSetHASwitch(ctx context.Context,
 	cluster *appsv1alpha1.Cluster) error {
 
 	for _, clusterComp := range cluster.Spec.ComponentSpecs {
-		compDef, skip, err := filterReplicationWorkload(ctx, cli, cluster, clusterComp.Name)
+		compDef, err := filterReplicationWorkload(ctx, cli, cluster, clusterComp.Name)
 		if err != nil {
 			return err
 		}
-		if skip {
+		if compDef == nil {
 			continue
 		}
 
-		// Get the statefulSet object whose current role label is primary
+		// get the statefulSet object whose current role label is primary
 		primarySts, err := GetReplicationSetPrimaryObj(ctx, cli, cluster, intctrlutil.StatefulSetSignature, clusterComp.Name)
 		if err != nil {
 			return err
 		}
 
 		currentPrimaryIndex := int32(util.GetOrdinalSts(primarySts))
-		if *clusterComp.PrimaryIndex != currentPrimaryIndex {
 
-			// create a new Switch object
-			s := NewSwitch(ctx, cli, cluster, compDef, &clusterComp, nil, nil, nil, nil, nil)
+		// there is no need to perform HA operation when primaryIndex has not changed
+		if *clusterComp.PrimaryIndex == currentPrimaryIndex {
+			continue
+		}
 
-			// Initialize switchInstance according to the primaryIndex
-			if err := s.InitSwitchInstance(currentPrimaryIndex, *clusterComp.PrimaryIndex); err != nil {
+		// create a new Switch object
+		s := NewSwitch(ctx, cli, cluster, compDef, &clusterComp, nil, nil, nil, nil, nil)
+
+		// initialize switchInstance according to the primaryIndex
+		if err := s.InitSwitchInstance(currentPrimaryIndex, *clusterComp.PrimaryIndex); err != nil {
+			return err
+		}
+
+		// health detection, role detection, delay detection of oldPrimaryIndex and newPrimaryIndex
+		s.Detection(true)
+		if err := checkSwitchStatus(s.SwitchStatus); err != nil {
+			return err
+		}
+
+		// make switch decision, if returns true, then start to do switch action, otherwise returns fail
+		if s.Decision() {
+			if err := s.DoSwitch(); err != nil {
 				return err
 			}
+		} else {
+			return checkSwitchStatus(s.SwitchStatus)
+		}
 
-			// Health detection, role detection, delay detection of oldPrimaryIndex and newPrimaryIndex
-			s.Detection(true)
-			if err := checkSwitchStatus(s.SwitchStatus); err != nil {
-				return err
-			}
-
-			// make switch decision, if returns true, then start to do switch action, otherwise returns fail
-			if s.Decision() {
-				if err := s.DoSwitch(); err != nil {
-					return err
-				}
-			} else {
-				return checkSwitchStatus(s.SwitchStatus)
-			}
-
-			// switch succeed, update role labels
-			if err := s.UpdateRoleLabel(); err != nil {
-				return err
-			}
+		// switch succeed, update role labels
+		if err := s.UpdateRoleLabel(); err != nil {
+			return err
 		}
 	}
 	return nil
@@ -132,11 +135,11 @@ func HandleReplicationSetHorizontalScale(ctx context.Context,
 	// compOwnsStsMap is used to divide stsList into sts list under each replicationSet component according to componentLabelKey
 	compOwnsStsMap := make(map[string][]*appsv1.StatefulSet)
 	for _, stsObj := range stsList {
-		_, skip, err := filterReplicationWorkload(ctx, cli, cluster, stsObj.Labels[intctrlutil.KBAppComponentLabelKey])
+		compDef, err := filterReplicationWorkload(ctx, cli, cluster, stsObj.Labels[intctrlutil.KBAppComponentLabelKey])
 		if err != nil {
 			return err
 		}
-		if skip {
+		if compDef == nil {
 			continue
 		}
 		compOwnsStsMap[stsObj.Labels[intctrlutil.KBAppComponentLabelKey]] = append(compOwnsStsMap[stsObj.Labels[intctrlutil.KBAppComponentLabelKey]], stsObj)
@@ -391,23 +394,23 @@ func GetPersistentVolumeClaimName(sts *appsv1.StatefulSet, claimTpl *corev1.Pers
 	return fmt.Sprintf("%s-%s-%d", claimTpl.Name, sts.Name, ordinal)
 }
 
-// filterReplicationWorkload checks whether workloadType is skipped, if component workloadType is not Replication, skip return true.
+// filterReplicationWorkload filters workload which workloadType is not Replication.
 func filterReplicationWorkload(ctx context.Context,
 	cli client.Client,
 	cluster *appsv1alpha1.Cluster,
-	compSpecName string) (compDef *appsv1alpha1.ClusterComponentDefinition, skip bool, err error) {
+	compSpecName string) (*appsv1alpha1.ClusterComponentDefinition, error) {
 	if compSpecName == "" {
-		return nil, true, fmt.Errorf("cluster's compSpecName is nil, pls check")
+		return nil, fmt.Errorf("cluster's compSpecName is nil, pls check")
 	}
 	compDefName := cluster.GetComponentDefRefName(compSpecName)
-	compDef, err = util.GetComponentDefByCluster(ctx, cli, cluster, compDefName)
+	compDef, err := util.GetComponentDefByCluster(ctx, cli, cluster, compDefName)
 	if err != nil {
-		return compDef, false, err
+		return compDef, err
 	}
 	if compDef == nil || compDef.WorkloadType != appsv1alpha1.Replication {
-		return compDef, true, nil
+		return nil, nil
 	}
-	return compDef, false, nil
+	return compDef, nil
 }
 
 // GetAndCheckReplicationPodByStatefulSet checks the number of replication statefulSet equal 1 and returns it.

@@ -185,7 +185,7 @@ func (s *Switch) Detection(skipSecondary bool) {
 	if s.SwitchInstance.CandidatePrimaryRole != nil {
 		doDetection(s.SwitchInstance.CandidatePrimaryRole)
 	}
-	if len(s.SwitchInstance.SecondariesRole) > 0 && !skipSecondary {
+	if !skipSecondary {
 		for _, secondaryRole := range s.SwitchInstance.SecondariesRole {
 			doDetection(secondaryRole)
 		}
@@ -329,9 +329,6 @@ func (s *Switch) Decision() bool {
 func (s *Switch) DoSwitch() error {
 	s.SwitchStatus.SwitchPhase = SwitchPhaseDoAction
 	s.SwitchStatus.SwitchPhaseStatus = SwitchPhaseStatusExecuting
-	if s.SwitchInstance == nil {
-		return fmt.Errorf("switch target instance cannot be nil")
-	}
 	switchEnvs, _ := s.SwitchActionHandler.BuildExecSwitchCommandEnvs(s)
 	if err := s.SwitchActionHandler.ExecSwitchCommands(switchEnvs, s.SwitchResource.CompDef.ReplicationSpec.SwitchCmdExecutorConfig); err != nil {
 		s.SwitchStatus.SwitchPhaseStatus = SwitchPhaseStatusFailed

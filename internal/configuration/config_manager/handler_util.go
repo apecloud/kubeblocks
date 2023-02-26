@@ -29,7 +29,7 @@ import (
 	cfgutil "github.com/apecloud/kubeblocks/internal/configuration"
 )
 
-type ConfigManagerSidecar struct {
+type ConfigManagerParams struct {
 	ManagerName string          `json:"name"`
 	Image       string          `json:"sidecarImage"`
 	Args        []string        `json:"args"`

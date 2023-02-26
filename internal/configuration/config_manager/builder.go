@@ -28,7 +28,7 @@ import (
 	cfgutil "github.com/apecloud/kubeblocks/internal/configuration"
 )
 
-func BuildConfigManagerContainerArgs(reloadOptions *appsv1alpha1.ReloadOptions, volumeDirs []corev1.VolumeMount, cli client.Client, ctx context.Context, manager *ConfigManagerSidecar) error {
+func BuildConfigManagerContainerArgs(reloadOptions *appsv1alpha1.ReloadOptions, volumeDirs []corev1.VolumeMount, cli client.Client, ctx context.Context, manager *ConfigManagerParams) error {
 	switch {
 	case reloadOptions.UnixSignalTrigger != nil:
 		manager.Args = buildSignalArgs(*reloadOptions.UnixSignalTrigger, volumeDirs)
@@ -41,7 +41,7 @@ func BuildConfigManagerContainerArgs(reloadOptions *appsv1alpha1.ReloadOptions, 
 	return cfgutil.MakeError("not support reload.")
 }
 
-func buildTPLScriptArgs(options *appsv1alpha1.TPLScriptTrigger, volumeDirs []corev1.VolumeMount, cli client.Client, ctx context.Context, manager *ConfigManagerSidecar) error {
+func buildTPLScriptArgs(options *appsv1alpha1.TPLScriptTrigger, volumeDirs []corev1.VolumeMount, cli client.Client, ctx context.Context, manager *ConfigManagerParams) error {
 	const (
 		scriptName       = "reload.tpl"
 		tplConfigName    = "reload.yaml"
@@ -79,7 +79,7 @@ func buildTPLScriptArgs(options *appsv1alpha1.TPLScriptTrigger, volumeDirs []cor
 	return nil
 }
 
-func buildShellArgs(options appsv1alpha1.ShellTrigger, volumeDirs []corev1.VolumeMount, manager *ConfigManagerSidecar) error {
+func buildShellArgs(options appsv1alpha1.ShellTrigger, volumeDirs []corev1.VolumeMount, manager *ConfigManagerParams) error {
 	command := strings.Trim(options.Exec, " \t")
 	if command == "" {
 		return cfgutil.MakeError("invalid command: [%s]", options.Exec)

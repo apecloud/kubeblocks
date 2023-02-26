@@ -17,9 +17,17 @@ limitations under the License.
 package configmap
 
 import (
+	"context"
 	"testing"
 
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
+
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	cfgutil "github.com/apecloud/kubeblocks/internal/configuration"
+	testutil "github.com/apecloud/kubeblocks/internal/testutil/k8s"
 )
 
 func TestIsSupportReload(t *testing.T) {
@@ -63,6 +71,17 @@ func TestIsSupportReload(t *testing.T) {
 			},
 		},
 		want: true,
+	}, {
+		name: "reload_test",
+		args: args{
+			reload: &appsv1alpha1.ReloadOptions{
+				TPLScriptTrigger: &appsv1alpha1.TPLScriptTrigger{
+					Namespace:          "default",
+					ScriptConfigMapRef: "cm",
+				},
+			},
+		},
+		want: true,
 	}}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -73,33 +92,99 @@ func TestIsSupportReload(t *testing.T) {
 	}
 }
 
-// func TestBuildSignalArgs(t *testing.T) {
-//	r := BuildSignalArgs(appsv1alpha1.UnixSignalTrigger{
-//		ProcessName: "postgres",
-//		Signal:      appsv1alpha1.SIGHUP,
-//	}, []corev1.VolumeMount{
-//		{
-//			MountPath: "/postgresql/conf",
-//			Name:      "pg_config",
-//		},
-//		{
-//			MountPath: "/postgresql/conf2",
-//			Name:      "pg_config",
-//		},
-//	})
-//	require.Regexp(t, `--process\s+postgres`, r)
-//	require.Regexp(t, `--signal\s+SIGHUP`, r)
-//	require.Regexp(t, `--volume-dir\s+/postgresql/conf`, r)
-//	require.Regexp(t, `--volume-dir\s+/postgresql/conf2`, r)
-//
-//	require.Nil(t, NeedBuildConfigSidecar(&appsv1alpha1.ReloadOptions{
-//		UnixSignalTrigger: &appsv1alpha1.UnixSignalTrigger{
-//			Signal: appsv1alpha1.SIGHUP,
-//		},
-//	}))
-//	require.NotNil(t, NeedBuildConfigSidecar(&appsv1alpha1.ReloadOptions{
-//		UnixSignalTrigger: &appsv1alpha1.UnixSignalTrigger{
-//			Signal: "SIGNOEXIST",
-//		},
-//	}))
-// }
+var _ = Describe("Hander Util Test", func() {
+
+	var mockK8sCli *testutil.K8sClientMockHelper
+
+	BeforeEach(func() {
+		// Add any setup steps that needs to be executed before each test
+		mockK8sCli = testutil.NewK8sMockClient()
+
+		mockK8sCli.MockGetMethod(
+			testutil.WithFailed(cfgutil.MakeError("failed to get resource."), testutil.WithTimes(1)),
+			testutil.WithSucceed(testutil.WithTimes(1)),
+		)
+	})
+
+	AfterEach(func() {
+		DeferCleanup(mockK8sCli.Finish)
+	})
+
+	Context("TestValidateReloadOptions", func() {
+		It("Should success with no error", func() {
+			type args struct {
+				reloadOptions *appsv1alpha1.ReloadOptions
+				cli           client.Client
+				ctx           context.Context
+			}
+			tests := []struct {
+				name    string
+				args    args
+				wantErr bool
+			}{{
+				name: "unixSignalTest",
+				args: args{
+					reloadOptions: &appsv1alpha1.ReloadOptions{
+						UnixSignalTrigger: &appsv1alpha1.UnixSignalTrigger{
+							Signal: appsv1alpha1.SIGHUP,
+						}},
+				},
+				wantErr: false,
+			}, {
+				name: "unixSignalTest",
+				args: args{
+					reloadOptions: &appsv1alpha1.ReloadOptions{
+						UnixSignalTrigger: &appsv1alpha1.UnixSignalTrigger{
+							Signal: "SIGNOEXIST",
+						}},
+				},
+				wantErr: true,
+			}, {
+				name: "shellTest",
+				args: args{
+					reloadOptions: &appsv1alpha1.ReloadOptions{
+						ShellTrigger: &appsv1alpha1.ShellTrigger{
+							Exec: "",
+						}},
+				},
+				wantErr: true,
+			}, {
+				name: "shellTest",
+				args: args{
+					reloadOptions: &appsv1alpha1.ReloadOptions{
+						ShellTrigger: &appsv1alpha1.ShellTrigger{
+							Exec: "go",
+						}},
+				},
+				wantErr: false,
+			}, {
+				name: "TPLScriptTest",
+				args: args{
+					reloadOptions: &appsv1alpha1.ReloadOptions{
+						TPLScriptTrigger: &appsv1alpha1.TPLScriptTrigger{
+							ScriptConfigMapRef: "test",
+						}},
+					cli: mockK8sCli.Client(),
+					ctx: context.TODO(),
+				},
+				wantErr: true,
+			}, {
+				name: "TPLScriptTest",
+				args: args{
+					reloadOptions: &appsv1alpha1.ReloadOptions{
+						TPLScriptTrigger: &appsv1alpha1.TPLScriptTrigger{
+							ScriptConfigMapRef: "test",
+						}},
+					cli: mockK8sCli.Client(),
+					ctx: context.TODO(),
+				},
+				wantErr: false,
+			}}
+			for _, tt := range tests {
+				By(tt.name)
+				err := ValidateReloadOptions(tt.args.reloadOptions, tt.args.cli, tt.args.ctx)
+				Expect(err != nil).Should(BeEquivalentTo(tt.wantErr))
+			}
+		})
+	})
+})

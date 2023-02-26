@@ -395,7 +395,7 @@ var _ = Describe("builder", func() {
 		})
 
 		It("builds config manager sidecar container correctly", func() {
-			sidecarRenderedParam := &cfgcm.ConfigManagerSidecar{
+			sidecarRenderedParam := &cfgcm.ConfigManagerParams{
 				ManagerName: "cfgmgr",
 				Image:       constant.KBImage,
 				Args:        []string{},

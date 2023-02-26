@@ -33,11 +33,14 @@ type Interface interface {
 	// DeleteK8sCluster deletes a kubernetes cluster
 	DeleteK8sCluster(name string) error
 
-	// GetClusterName get existed cluster name
-	GetClusterName() (string, error)
+	// GetExistedClusters get existed clusters
+	GetExistedClusters() ([]string, error)
 
-	// GenKubeConfig generate kubeconfig, return the new context
-	UpdateKubeConfig(name string) (string, error)
+	// UpdateKubeconfig generate kubeconfig, return the new context name
+	UpdateKubeconfig(name string) (string, error)
+
+	// RemoveKubeconfig remove the cluster from kubeconfig
+	RemoveKubeconfig(name string) error
 }
 
 func New(provider, region, tfRootPath string, stdout, stderr io.Writer) (Interface, error) {
@@ -45,7 +48,7 @@ func New(provider, region, tfRootPath string, stdout, stderr io.Writer) (Interfa
 	case AWS:
 		return NewAWSCloudProvider(region, tfRootPath, stdout, stderr)
 	case Local:
-		return &localCloudProvider{}, nil
+		return NewLocalCloudProvider(stdout, stderr), nil
 	default:
 		return nil, errors.New(fmt.Sprintf("Unknown cloud provider %s", provider))
 	}

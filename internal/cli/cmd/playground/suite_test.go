@@ -32,9 +32,4 @@ var _ = BeforeSuite(func() {
 	// set default cluster name to test
 	k8sClusterName = "playground-test"
 	kbClusterName = "playground-test-cluster"
-
-	// set fake image info
-	K3sImage = "fake-k3s-image"
-	K3dToolsImage = "fake-k3s-tools-image"
-	K3dProxyImage = "fake-k3d-proxy-image"
 })

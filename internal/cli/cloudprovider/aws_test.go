@@ -32,6 +32,6 @@ var _ = Describe("aws cloud provider", func() {
 		provider := awsCloudProvider{
 			region: "cn-northwest-1",
 		}
-		_, _ = provider.UpdateKubeConfig("liutang-eks-nx")
+		_, _ = provider.UpdateKubeconfig("liutang-eks-nx")
 	})
 })

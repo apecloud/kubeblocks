@@ -120,7 +120,7 @@ var _ = Describe("kubeblocks", func() {
 			Options: Options{
 				IOStreams: genericclioptions.NewTestIOStreamsDiscard(),
 			},
-			check: true,
+			Check: true,
 		}
 		By("kubernetes version is empty")
 		versionInfo := map[util.AppName]string{}

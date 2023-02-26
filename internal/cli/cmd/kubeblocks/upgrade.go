@@ -65,7 +65,7 @@ func newUpgradeCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 
 	cmd.Flags().BoolVar(&o.Monitor, "monitor", true, "Set monitor enabled and install Prometheus, AlertManager and Grafana")
 	cmd.Flags().StringVar(&o.Version, "version", "", "Set KubeBlocks version")
-	cmd.Flags().BoolVar(&o.check, "check", true, "Check kubernetes environment before upgrade")
+	cmd.Flags().BoolVar(&o.Check, "check", true, "Check kubernetes environment before upgrade")
 	cmd.Flags().DurationVar(&o.timeout, "timeout", 1800*time.Second, "Time to wait for upgrading KubeBlocks")
 	helm.AddValueOptionsFlags(cmd.Flags(), &o.ValueOpts)
 

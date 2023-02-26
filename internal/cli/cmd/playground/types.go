@@ -18,21 +18,14 @@ package playground
 
 import (
 	"github.com/apecloud/kubeblocks/internal/cli/cloudprovider"
-	"github.com/apecloud/kubeblocks/version"
 )
 
 const (
 	defaultCloudProvider = cloudprovider.Local
 	defaultClusterDef    = "apecloud-mysql"
 
-	localHost = "127.0.0.1"
-
 	// defaultNamespace is the namespace of playground cluster
 	defaultNamespace = "default"
-
-	// CliDockerNetwork is docker network for k3d cluster when `kbcli playground`
-	// all cluster will be created in this network, so they can communicate with each other
-	CliDockerNetwork = "k3d-kbcli-playground"
 )
 
 var (
@@ -40,33 +33,17 @@ var (
 	kbClusterName = "mycluster"
 	// k8sClusterName is the k3d cluster name for playground
 	k8sClusterName = "kb-playground"
-
-	// K3sImage is k3s image repo
-	K3sImage = "rancher/k3s:" + version.K3sImageTag
-	// K3dToolsImage is k3d tools image repo
-	K3dToolsImage = "docker.io/apecloud/k3d-tools:" + version.K3dVersion
-	// K3dProxyImage is k3d proxy image repo
-	K3dProxyImage = "docker.io/apecloud/k3d-proxy:" + version.K3dVersion
 )
 
-type clusterInfo struct {
-	Name          string
-	HostIP        string
-	KubeConfig    string
-	CloudProvider string
-}
-
-var guideTmpl = `
+var guideStr = `
 1. Basic commands for cluster:
 
-  export KUBECONFIG={{.KubeConfig}}
-
   kbcli cluster list                     # list database cluster and check its status
-  kbcli cluster describe {{.Name}}       # get cluster information
+  kbcli cluster describe %[1]s       # get cluster information
 
 2. Connect to database
 
-  kbcli cluster connect {{.Name}}
+  kbcli cluster connect %[1]s
   
 3. View the Grafana:
 
@@ -77,9 +54,6 @@ var guideTmpl = `
   kbcli playground destroy
 
 --------------------------------------------------------------------
-To view this guide: kbcli playground guide
 To get more help: kbcli help
-{{if ne .CloudProvider "local"}}To login to remote host:              ssh -i ~/.kubeblocks/ssh/id_rsa ec2-user@{{.HostIP}}{{end}}
 Use "kbcli [command] --help" for more information about a command.
-
 `

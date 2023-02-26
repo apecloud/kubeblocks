@@ -27,6 +27,8 @@ import (
 
 	"github.com/hashicorp/terraform-exec/tfexec"
 	"github.com/pkg/errors"
+
+	"github.com/apecloud/kubeblocks/internal/cli/util"
 )
 
 const (
@@ -42,6 +44,8 @@ type awsCloudProvider struct {
 	awsPath     string
 	clusterName string
 }
+
+var _ Interface = &awsCloudProvider{}
 
 func NewAWSCloudProvider(region, tfRootPath string, stdout, stderr io.Writer) (Interface, error) {
 	if region == "" {
@@ -118,32 +122,39 @@ func (p *awsCloudProvider) DeleteK8sCluster(name string) error {
 	return tfDestroy(subPaths[0], p.stdout, p.stderr, p.buildDestroyOpts()...)
 }
 
-func (p *awsCloudProvider) GetClusterName() (string, error) {
+// GetExistedClusters get existed clusters
+func (p *awsCloudProvider) GetExistedClusters() ([]string, error) {
 	subPaths, err := getSubPaths(p.awsPath, []string{"eks", "lb"})
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	preClusterName, err := getClusterNameFromStateFile(subPaths[0])
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	// previous cluster exists, try to destroy it
 	if preClusterName == "" {
-		return "", nil
+		return nil, nil
 	}
-	return preClusterName, nil
+	return []string{preClusterName}, nil
 }
 
-// UpdateKubeConfig exec aws eks update-kubeconfig command
-func (p *awsCloudProvider) UpdateKubeConfig(name string) (string, error) {
+// UpdateKubeconfig exec aws eks update-kubeconfig command
+func (p *awsCloudProvider) UpdateKubeconfig(name string) (string, error) {
 	cmd := exec.Command("aws", "eks", "update-kubeconfig", "--region="+p.region, "--name="+name)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return "", err
 	}
 	return strings.Split(string(out), " ")[2], nil
+}
+
+func (p *awsCloudProvider) RemoveKubeconfig(name string) error {
+	// TODO: get the real context name by cluster name
+	// the cluster name is different with the context name in kubeconfig
+	return util.KubeconfigRemoveClusterFromDefaultConfig(name)
 }
 
 func (p *awsCloudProvider) buildApplyOpts() []tfexec.ApplyOption {

@@ -31,8 +31,8 @@ func playgroundDir() (string, error) {
 	return filepath.Join(cliPath, "playground"), nil
 }
 
-// cpDir cloud provider repo directory
-func cpDir() (string, error) {
+// cloudProviderRepoDir cloud provider repo directory
+func cloudProviderRepoDir() (string, error) {
 	dir, err := playgroundDir()
 	if err != nil {
 		return "", err

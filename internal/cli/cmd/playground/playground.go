@@ -17,7 +17,6 @@ limitations under the License.
 package playground
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"strings"
@@ -136,7 +135,7 @@ func newGuideCmd() *cobra.Command {
 		Use:   "guide",
 		Short: "Display playground cluster user guide.",
 		Run: func(cmd *cobra.Command, args []string) {
-			util.CheckErr(runGuide())
+			runGuide()
 		},
 	}
 	return cmd
@@ -171,32 +170,28 @@ func (o *initOptions) run() error {
 // local bootstraps a playground in the local host
 func (o *initOptions) local() error {
 	var err error
-	installer := &installer{
-		ctx:         context.Background(),
-		clusterName: k8sClusterName,
-		IOStreams:   o.IOStreams,
-	}
-	installer.verboseLog(o.verbose)
+	provider := cp.NewLocalCloudProvider(o.Out, o.ErrOut)
+	provider.VerboseLog(o.verbose)
 
 	// Set up K3s as KubeBlocks control plane cluster
 	spinner := util.Spinner(o.Out, "Create playground k3d cluster: %s", k8sClusterName)
 	defer spinner(false)
-	if err = installer.install(); err != nil {
+	if err = provider.CreateK8sCluster(k8sClusterName, true); err != nil {
 		return errors.Wrap(err, "failed to set up k3d cluster")
 	}
 	spinner(true)
 
 	// Deal with KUBECONFIG
-	configPath := util.ConfigPath(k8sClusterName)
-	spinner = util.Spinner(o.Out, "Generate kubernetes config %s", configPath)
+	configPath := util.ConfigPath("config")
+	spinner = util.Spinner(o.Out, "Generate kubernetes config to %s", configPath)
 	defer spinner(false)
-	if err = installer.genKubeconfig(); err != nil {
+	newContext, err := provider.UpdateKubeconfig(k8sClusterName)
+	if err != nil {
 		return errors.Wrap(err, "failed to generate kubeconfig")
 	}
+	spinner(true)
 
-	if err = util.SetKubeConfig(configPath); err != nil {
-		return errors.Wrap(err, "failed to set KUBECONFIG env")
-	}
+	spinner = util.Spinner(o.Out, "Switch to new k3d cluster context %s", newContext)
 	spinner(true)
 
 	return o.installKBAndCluster(configPath)
@@ -211,7 +206,7 @@ func (o *initOptions) installKBAndCluster(configPath string) error {
 
 	// Install KubeBlocks
 	if err = o.installKubeBlocks(); err != nil {
-		return errors.Wrap(err, "failed to install KubeBlocks")
+		return errors.Wrap(err, "failed to CreateK8sCluster KubeBlocks")
 	}
 
 	// Install database cluster
@@ -228,15 +223,13 @@ func (o *initOptions) installKBAndCluster(configPath string) error {
 	spinner(true)
 
 	// Print guide information
-	if err = printGuide(defaultCloudProvider, localHost, true); err != nil {
-		return errors.Wrap(err, "failed to print user guide")
-	}
+	printGuide(true, "")
 	return nil
 }
 
 // bootstraps a playground in the remote cloud
 func (o *initOptions) cloud() error {
-	printer.Warning(o.Out, `This action will create a kubernetes clusters on the cloud that may
+	printer.Warning(o.Out, `This action will create a kubernetes cluster on the cloud that may
   incur charges. Be sure to delete your infrastructure promptly to avoid
   additional charges. We are not responsible for any charges you may incur.
 `)
@@ -254,7 +247,7 @@ func (o *initOptions) cloud() error {
 
 	fmt.Fprintln(o.Out)
 
-	cpPath, err := cpDir()
+	cpPath, err := cloudProviderRepoDir()
 	if err != nil {
 		return err
 	}
@@ -273,12 +266,9 @@ func (o *initOptions) cloud() error {
 		return err
 	}
 
-	// check if previous cluster exists
 	var init bool
-	clusterName, err := provider.GetClusterName()
-	if err != nil {
-		return fmt.Errorf("failed to find the existed %s %s cluster in %s", o.cloudProvider, cp.K8sService(o.cloudProvider), cpPath)
-	}
+	// check if previous cluster exists
+	clusterName, _ := getExistedCluster(provider, cpPath)
 
 	// if cluster exists, continue or not, if not, user should destroy the old cluster first
 	if clusterName != "" {
@@ -303,14 +293,14 @@ func (o *initOptions) cloud() error {
 	}
 
 	// update kube config
-	kubeCtx, err := provider.UpdateKubeConfig(clusterName)
+	kubeCtx, err := provider.UpdateKubeconfig(clusterName)
 	if err != nil {
 		return err
 	}
 	configPath := util.ConfigPath("config")
 	fmt.Fprintf(o.Out, "\nUpdate and switch kubeconfig to %s in %s\n", kubeCtx, configPath)
 
-	// install KubeBlocks and create cluster
+	// CreateK8sCluster KubeBlocks and create cluster
 	return o.installKBAndCluster(configPath)
 }
 
@@ -322,30 +312,21 @@ func (o *destroyOptions) destroyPlayground() error {
 }
 
 func (o *destroyOptions) destroyLocal() error {
-	ins := &installer{
-		ctx:         context.Background(),
-		clusterName: k8sClusterName,
-	}
+	provider := cp.NewLocalCloudProvider(o.Out, o.ErrOut)
+	provider.VerboseLog(false)
 
-	ins.verboseLog(false)
-	spinner := util.Spinner(o.Out, "Destroy KubeBlocks playground")
+	spinner := util.Spinner(o.Out, "Destroy KubeBlocks playground k3d cluster %s", k8sClusterName)
 	defer spinner(false)
-
-	// uninstall k3d cluster
-	if err := ins.uninstall(); err != nil {
+	// DeleteK8sCluster k3d cluster
+	if err := provider.DeleteK8sCluster(k8sClusterName); err != nil {
 		return err
-	}
-
-	// remove playground directory
-	if dir, err := removePlaygroundDir(); err != nil {
-		fmt.Fprintf(o.ErrOut, "Failed to remove playground temporary directory %s, you can remove it munally", dir)
 	}
 	spinner(true)
 	return nil
 }
 
 func (o *destroyOptions) destroyCloud() error {
-	cpPath, err := cpDir()
+	cpPath, err := cloudProviderRepoDir()
 	if err != nil {
 		return err
 	}
@@ -357,14 +338,14 @@ func (o *destroyOptions) destroyCloud() error {
 	}
 
 	// get cluster name to delete
-	name, err := provider.GetClusterName()
+	name, err := getExistedCluster(provider, cpPath)
 	if err != nil {
-		return fmt.Errorf("failed to find the existed %s %s cluster in %s", o.cloudProvider, cp.K8sService(o.cloudProvider), cpPath)
+		return err
 	}
 
 	// do not find any existed cluster
 	if name == "" {
-		fmt.Fprintf(o.Out, "Do not find any %s %s cluster in %s\n", o.cloudProvider, cp.K8sService(o.cloudProvider), cpPath)
+		fmt.Fprintf(o.Out, "Do not find playground %s %s cluster in %s\n", o.cloudProvider, cp.K8sService(o.cloudProvider), cpPath)
 		return nil
 	}
 
@@ -381,33 +362,39 @@ func (o *destroyOptions) destroyCloud() error {
 		return nil
 	}
 
-	return provider.DeleteK8sCluster(name)
-}
-
-func runGuide() error {
-	return printGuide("", "", false)
-}
-
-func printGuide(cloudProvider string, hostIP string, init bool) error {
-	var info = &clusterInfo{
-		HostIP:        hostIP,
-		CloudProvider: cloudProvider,
-		KubeConfig:    util.ConfigPath(k8sClusterName),
-		Name:          kbClusterName,
-	}
-
-	// check if config file exists
-	if _, err := os.Stat(info.KubeConfig); err != nil && os.IsNotExist(err) {
-		fmt.Fprintf(os.Stderr, "Try to initialize a playground cluster by running:\n"+
-			"\tkbcli playground init\n")
+	fmt.Fprintf(o.Out, "Destroy %s %s cluster %s...\n", o.cloudProvider, cp.K8sService(o.cloudProvider), name)
+	if err = provider.DeleteK8sCluster(name); err != nil {
 		return err
 	}
 
-	if init {
-		fmt.Fprintf(os.Stdout, "\nKubeBlocks playground init SUCCESSFULLY!\n"+
-			"Cluster \"%s\" has been CREATED!\n", kbClusterName)
+	kubeconfigPath, err := util.GetDefaultKubeconfigPath()
+	if err != nil {
+		return err
 	}
-	return util.PrintGoTemplate(os.Stdout, guideTmpl, info)
+
+	spanner := util.Spinner(o.Out, "Remove cluster config from %s", kubeconfigPath)
+	defer spanner(false)
+	if err = provider.RemoveKubeconfig(name); err != nil {
+		return err
+	}
+	spanner(true)
+
+	return nil
+}
+
+func runGuide() {
+	printGuide(false, "")
+}
+
+func printGuide(init bool, k8sClusterName string) {
+	if init {
+		fmt.Fprintf(os.Stdout, "\nKubeBlocks playground init SUCCESSFULLY!\n")
+		if k8sClusterName != "" {
+			fmt.Fprintf(os.Stdout, "Kubernetes cluster %s has been created.\n", k8sClusterName)
+		}
+		fmt.Fprintf(os.Stdout, "Cluster \"%s\" has been created.\n", kbClusterName)
+	}
+	fmt.Fprintf(os.Stdout, guideStr, kbClusterName)
 }
 
 func (o *initOptions) installKubeBlocks() error {
@@ -431,6 +418,7 @@ func (o *initOptions) installKubeBlocks() error {
 		Version: o.kbVersion,
 		Monitor: true,
 		Quiet:   true,
+		Check:   true,
 	}
 	return insOpts.Install()
 }
@@ -506,15 +494,14 @@ func initPlaygroundDir() error {
 	return nil
 }
 
-func removePlaygroundDir() (string, error) {
-	dir, err := playgroundDir()
+// getExistedCluster get existed playground kubernetes cluster, we should only have one cluster
+func getExistedCluster(provider cp.Interface, path string) (string, error) {
+	clusterNames, err := provider.GetExistedClusters()
 	if err != nil {
-		return dir, err
+		return "", fmt.Errorf("failed to find the existed %s %s cluster in %s", provider.Name(), cp.K8sService(provider.Name()), path)
 	}
-
-	if _, err = os.Stat(dir); err != nil && os.IsNotExist(err) {
-		return dir, nil
+	if len(clusterNames) > 1 {
+		return "", fmt.Errorf("found more than one cluster have been created, check it again, %v", clusterNames)
 	}
-
-	return dir, os.RemoveAll(dir)
+	return clusterNames[0], nil
 }

@@ -18,10 +18,13 @@ package components
 
 import (
 	"context"
+	"reflect"
 	"time"
 
+	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -39,6 +42,8 @@ import (
 // and send the BackOff (Normal) event. If it has already consumed the 25 burst quota to send event, event can only be
 // sent in the rate of once per 300s, in this way, the subsequent warning events of ImagePullError would be dropped.
 type ComponentStatusSynchronizer struct {
+	ctx           context.Context
+	cli           client.Client
 	cluster       *appsv1alpha1.Cluster
 	component     types.Component
 	componentSpec *appsv1alpha1.ClusterComponentSpec
@@ -53,6 +58,8 @@ func NewClusterStatusSynchronizer(ctx context.Context, cli client.Client, cluste
 		return nil
 	}
 	return &ComponentStatusSynchronizer{
+		ctx:           ctx,
+		cli:           cli,
 		cluster:       cluster,
 		component:     component,
 		componentSpec: componentSpec,
@@ -60,9 +67,79 @@ func NewClusterStatusSynchronizer(ctx context.Context, cli client.Client, cluste
 	}
 }
 
-// HasFailedAndTimedOutPod returns whether the pod of components is still failed after a PodFailedTimeout period.
+func (cs *ComponentStatusSynchronizer) Update(obj client.Object, logger *logr.Logger, recorder record.EventRecorder) (bool, error) {
+	var (
+		component = cs.component
+		wait      = false
+	)
+
+	if component == nil {
+		return false, nil
+	}
+	// handle the components changes
+	err := component.HandleUpdate(obj)
+	if err != nil {
+		return false, nil
+	}
+
+	isRunning, err := component.IsRunning(obj)
+	if err != nil {
+		return false, err
+	}
+
+	var podsReady *bool
+	if cs.componentSpec.Replicas > 0 {
+		podsReadyForComponent, err := component.PodsReady(obj)
+		if err != nil {
+			return false, err
+		}
+		podsReady = &podsReadyForComponent
+	}
+
+	cluster := cs.cluster
+	hasFailedAndTimedOutPod := false
+	clusterDeepCopy := cluster.DeepCopy()
+	if !isRunning {
+		if podsReady != nil && *podsReady {
+			// check if the role probe timed out when component phase is not Running but all pods of component are ready.
+			if requeueWhenPodsReady, err := component.HandleProbeTimeoutWhenPodsReady(recorder); err != nil {
+				return false, err
+			} else if requeueWhenPodsReady {
+				wait = true
+			}
+		} else {
+			// check whether there is a failed pod of component that has timed out
+			var hasFailedPod bool
+			hasFailedAndTimedOutPod, hasFailedPod = cs.hasFailedAndTimedOutPod()
+			if !hasFailedAndTimedOutPod && hasFailedPod {
+				wait = true
+			}
+		}
+	}
+
+	if err = cs.updateComponentsPhase(isRunning,
+		podsReady, hasFailedAndTimedOutPod); err != nil {
+		return wait, err
+	}
+
+	componentName := cs.componentSpec.Name
+	oldComponentStatus := clusterDeepCopy.Status.Components[componentName]
+	componentStatus := cluster.Status.Components[componentName]
+	if !reflect.DeepEqual(oldComponentStatus, componentStatus) {
+		logger.Info("component status changed", "componentName", componentName, "phase",
+			cluster.Status.Components[componentName].Phase, "componentIsRunning", isRunning, "podsAreReady", podsReady)
+		patch := client.MergeFrom(clusterDeepCopy)
+		if err = cs.cli.Status().Patch(cs.ctx, cluster, patch); err != nil {
+			return false, err
+		}
+	}
+
+	return wait, nil
+}
+
+// hasFailedAndTimedOutPod returns whether the pod of components is still failed after a PodFailedTimeout period.
 // if return ture, component phase will be set to Failed/Abnormal.
-func (cs *ComponentStatusSynchronizer) HasFailedAndTimedOutPod() (hasFailedAndTimedoutPod bool, hasFailedPod bool, message appsv1alpha1.ComponentMessageMap) {
+func (cs *ComponentStatusSynchronizer) hasFailedAndTimedOutPod() (hasFailedAndTimedoutPod bool, hasFailedPod bool) {
 	for _, pod := range cs.podList.Items {
 		isFailed, isTimedOut, messageStr := isPodFailedAndTimedOut(&pod)
 		if !isFailed {
@@ -72,23 +149,17 @@ func (cs *ComponentStatusSynchronizer) HasFailedAndTimedOutPod() (hasFailedAndTi
 
 		if isTimedOut {
 			hasFailedAndTimedoutPod = true
-			message = appsv1alpha1.ComponentMessageMap{}
+			message := appsv1alpha1.ComponentMessageMap{}
 			message.SetObjectMessage(pod.Kind, pod.Name, messageStr)
+			cs.updateMessage(message)
 			return
 		}
 	}
 	return
 }
 
-// UpdateMessage updates the component status message in the Cluster.Status.Components map.
-func (cs *ComponentStatusSynchronizer) UpdateMessage(message appsv1alpha1.ComponentMessageMap) {
-	compStatus := cs.getInitializedStatus()
-	compStatus.Message = message
-	cs.setStatus(compStatus)
-}
-
-// UpdateComponentsPhase updates the component status Phase etc. into the cluster.Status.Components map.
-func (cs *ComponentStatusSynchronizer) UpdateComponentsPhase(
+// updateComponentsPhase updates the component status Phase etc. into the cluster.Status.Components map.
+func (cs *ComponentStatusSynchronizer) updateComponentsPhase(
 	componentIsRunning bool,
 	podsAreReady *bool,
 	hasFailedPodTimedOut bool) error {
@@ -146,6 +217,13 @@ func (cs *ComponentStatusSynchronizer) getInitializedStatus() appsv1alpha1.Clust
 		cs.setStatus(componentStatus)
 	}
 	return componentStatus
+}
+
+// updateMessage is an internal helper method which updates the component status message in the Cluster.Status.Components map.
+func (cs *ComponentStatusSynchronizer) updateMessage(message appsv1alpha1.ComponentMessageMap) {
+	compStatus := cs.getInitializedStatus()
+	compStatus.Message = message
+	cs.setStatus(compStatus)
 }
 
 // setStatus is an internal helper method which sets component status in Cluster.Status.Components map.

@@ -119,7 +119,7 @@ func (o *opsListOptions) printOpsList() error {
 			continue
 		}
 		hasResources = true
-		tbl.AddRow(ops.Name, opsType, ops.Spec.ClusterRef, getComponentNameFromOps(ops.Spec), phase, ops.Status.Progress, util.TimeFormat(&ops.CreationTimestamp))
+		tbl.AddRow(ops.Name, opsType, ops.Spec.ClusterRef, getComponentNameFromOps(ops), phase, ops.Status.Progress, util.TimeFormat(&ops.CreationTimestamp))
 	}
 	if hasResources {
 		tbl.Print()
@@ -129,27 +129,33 @@ func (o *opsListOptions) printOpsList() error {
 	return nil
 }
 
-func getComponentNameFromOps(ops appsv1alpha1.OpsRequestSpec) string {
+func getComponentNameFromOps(ops *appsv1alpha1.OpsRequest) string {
 	components := make([]string, 0)
-	switch ops.Type {
+	opsSpec := ops.Spec
+	switch opsSpec.Type {
 	case appsv1alpha1.ReconfiguringType:
-		components = append(components, ops.Reconfigure.ComponentName)
+		components = append(components, opsSpec.Reconfigure.ComponentName)
 	case appsv1alpha1.HorizontalScalingType:
-		for _, item := range ops.HorizontalScalingList {
+		for _, item := range opsSpec.HorizontalScalingList {
 			components = append(components, item.ComponentName)
 		}
 	case appsv1alpha1.VolumeExpansionType:
-		for _, item := range ops.VolumeExpansionList {
+		for _, item := range opsSpec.VolumeExpansionList {
 			components = append(components, item.ComponentName)
 		}
 	case appsv1alpha1.RestartType:
-		for _, item := range ops.RestartList {
+		for _, item := range opsSpec.RestartList {
 			components = append(components, item.ComponentName)
 		}
 	case appsv1alpha1.VerticalScalingType:
-		for _, item := range ops.VerticalScalingList {
+		for _, item := range opsSpec.VerticalScalingList {
 			components = append(components, item.ComponentName)
 		}
+	case appsv1alpha1.UpgradeType:
+		for k := range ops.Status.Components {
+			components = append(components, k)
+		}
+		slices.Sort(components)
 	}
 	return strings.Join(components, ",")
 }

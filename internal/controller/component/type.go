@@ -21,6 +21,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 
 	"github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 )
 
 type MonitorConfig struct {
@@ -50,4 +51,7 @@ type SynthesizedComponent struct {
 	HorizontalScalePolicy *v1alpha1.HorizontalScalePolicy     `json:"horizontalScalePolicy,omitempty"`
 	TLS                   bool                                `json:"tls"`
 	Issuer                *v1alpha1.Issuer                    `json:"issuer,omitempty"`
+	// BackupSourceName restores the component from specified backup
+	BackupSourceName string                            `json:"backupSourceName,omitempty"`
+	BackupType       dataprotectionv1alpha1.BackupType `json:"backupType,omitempty"`
 }

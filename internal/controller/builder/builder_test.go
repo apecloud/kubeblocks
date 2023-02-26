@@ -54,6 +54,17 @@ func TestReadCUETplFromEmbeddedFS(t *testing.T) {
 	tlog.Info("", "cueValue", cueTpl)
 }
 
+func TestGetRestoreFromBackupEnvValue(t *testing.T) {
+	restoreFromBackup := getRestoreFromBackupEnvValue("")
+	if restoreFromBackup != "false" {
+		t.Error("Expected return false")
+	}
+	restoreFromBackup = getRestoreFromBackupEnvValue("test-backup")
+	if restoreFromBackup != "true" {
+		t.Error("Expected return true")
+	}
+}
+
 var _ = Describe("builder", func() {
 	const clusterDefName = "test-clusterdef"
 	const clusterVersionName = "test-clusterversion"

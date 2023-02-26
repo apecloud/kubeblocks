@@ -60,6 +60,7 @@ const (
 	StorageClassAnnotationKey        = "kubeblocks.io/storage-class" // StorageClassAnnotationKey StorageClass annotation key in Cluster
 	RestartAnnotationKey             = "kubeblocks.io/restart"       // RestartAnnotationKey the annotation which notices the StatefulSet/DeploySet to restart
 	SnapShotForStartAnnotationKey    = "kubeblocks.io/snapshot-for-start"
+	RestoreFromBackUpAnnotationKey   = "kubeblocks.io/restore-from-backup" // RestoreFromBackUpAnnotationKey specifies the component to recover from the backup.
 )
 
 const (
@@ -86,6 +87,7 @@ const (
 	PersistentVolumeClaimKind = "PersistentVolumeClaim"
 	CronJob                   = "CronJob"
 	ReplicaSet                = "ReplicaSet"
+	VolumeSnapshotKind        = "VolumeSnapshot"
 )
 
 const (

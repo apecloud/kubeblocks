@@ -42,6 +42,9 @@ func (factory *BaseFactory[T, PT, F]) init(namespace, name string, obj PT, f *F)
 	if obj.GetLabels() == nil {
 		obj.SetLabels(map[string]string{})
 	}
+	if obj.GetAnnotations() == nil {
+		obj.SetAnnotations(map[string]string{})
+	}
 	factory.object = obj
 	factory.concreteFactory = f
 }
@@ -92,6 +95,19 @@ func (factory *BaseFactory[T, PT, F]) AddConsensusSetAccessModeLabel(value strin
 
 func (factory *BaseFactory[T, PT, F]) AddRoleLabel(value string) *F {
 	return factory.AddLabels(intctrlutil.RoleLabelKey, value)
+}
+
+func (factory *BaseFactory[T, PT, F]) AddAnnotations(keysAndValues ...string) *F {
+	factory.AddAnnotationsInMap(WithMap(keysAndValues...))
+	return factory.concreteFactory
+}
+func (factory *BaseFactory[T, PT, F]) AddAnnotationsInMap(annotations map[string]string) *F {
+	a := factory.object.GetAnnotations()
+	for k, v := range annotations {
+		a[k] = v
+	}
+	factory.object.SetAnnotations(a)
+	return factory.concreteFactory
 }
 
 func (factory *BaseFactory[T, PT, F]) AddControllerRevisionHashLabel(value string) *F {

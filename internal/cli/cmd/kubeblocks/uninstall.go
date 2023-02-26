@@ -74,10 +74,9 @@ func newUninstallCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *co
 }
 
 func (o *uninstallOptions) preCheck() error {
-	printer.Warning(o.Out, "uninstall will remove all KubeBlocks resources.\n")
-
 	// wait user to confirm
 	if !o.autoApprove {
+		printer.Warning(o.Out, "uninstall will remove all KubeBlocks resources.\n")
 		if err := confirmUninstall(o.In); err != nil {
 			return err
 		}

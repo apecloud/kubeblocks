@@ -236,7 +236,7 @@ func (o *OperationsOptions) validateConfigMapKey(tpl *appsv1alpha1.ConfigTemplat
 		cmName = cfgcore.GetComponentCfgName(o.Name, componentName, tpl.VolumeName)
 	)
 
-	if err := util.GetResourceObjectFromGVR(types.CMGVR(), client.ObjectKey{
+	if err := util.GetResourceObjectFromGVR(types.ConfigmapGVR(), client.ObjectKey{
 		Name:      cmName,
 		Namespace: o.Namespace,
 	}, o.Client, &cmObj); err != nil {

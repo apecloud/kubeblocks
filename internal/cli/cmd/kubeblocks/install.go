@@ -369,7 +369,7 @@ func (o *InstallOptions) checkRemainedResource() error {
 		return nil
 	}
 
-	objs, err := getKBObjects(o.Client, o.Dynamic, o.Namespace)
+	objs, err := getKBObjects(o.Dynamic, o.Namespace)
 	if err != nil {
 		fmt.Fprintf(o.ErrOut, "Check whether there are resources left by KubeBlocks before: %s\n", err.Error())
 	}

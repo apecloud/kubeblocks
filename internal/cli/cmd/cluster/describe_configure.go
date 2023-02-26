@@ -293,7 +293,7 @@ func (r *reconfigureOptions) getReconfigureMeta() (map[appsv1alpha1.ConfigTempla
 		// fetch config configmap
 		cmObj := &corev1.ConfigMap{}
 		cmName := cfgcore.GetComponentCfgName(r.clusterName, r.componentName, tpl.VolumeName)
-		if err := util.GetResourceObjectFromGVR(types.CMGVR(), client.ObjectKey{
+		if err := util.GetResourceObjectFromGVR(types.ConfigmapGVR(), client.ObjectKey{
 			Name:      cmName,
 			Namespace: r.namespace,
 		}, r.dynamic, cmObj); err != nil {

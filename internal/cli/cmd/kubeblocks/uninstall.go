@@ -45,6 +45,7 @@ var (
 )
 
 type uninstallOptions struct {
+	factory cmdutil.Factory
 	Options
 }
 
@@ -53,6 +54,7 @@ func newUninstallCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *co
 		Options: Options{
 			IOStreams: streams,
 		},
+		factory: f,
 	}
 	cmd := &cobra.Command{
 		Use:     "uninstall",
@@ -146,30 +148,42 @@ func (o *uninstallOptions) uninstall() error {
 	printErr(spinner, helm.RemoveRepo(&repo.Entry{Name: types.KubeBlocksChartName}))
 
 	// get KubeBlocks objects and try to remove them
-	objs, err := getKBObjects(o.Client, o.Dynamic, o.Namespace)
+	objs, err := getKBObjects(o.Dynamic, o.Namespace)
 	if err != nil {
 		fmt.Fprintf(o.ErrOut, "Failed to get KubeBlocks objects %s", err.Error())
 	}
 
-	// remove finalizers
+	// remove finalizers of custom resources, then that will be deleted
 	spinner = newSpinner("Remove built-in custom resources")
 	printErr(spinner, removeFinalizers(o.Dynamic, objs))
 
-	// delete CRDs
+	mapper, err := o.factory.ToRESTMapper()
+	if err != nil {
+		return err
+	}
+	// helm uninstall will node delete CRDs, now delete CRDs
 	spinner = newSpinner("Remove custom resource definitions")
-	printErr(spinner, deleteCRDs(o.Dynamic, objs.crds))
+	printErr(spinner, deleteObjects(o.Dynamic, mapper, &objs.crds))
 
 	// delete deployments
 	spinner = newSpinner("Remove deployments")
-	printErr(spinner, deleteDeploys(o.Client, objs.deploys))
+	printErr(spinner, deleteObjects(o.Dynamic, mapper, &objs.deploys))
+
+	// delete statefulsets
+	spinner = newSpinner("Remove statefulsets")
+	printErr(spinner, deleteObjects(o.Dynamic, mapper, &objs.stss))
 
 	// delete services
 	spinner = newSpinner("Remove services")
-	printErr(spinner, deleteServices(o.Client, objs.svcs))
+	printErr(spinner, deleteObjects(o.Dynamic, mapper, &objs.svcs))
 
 	// delete configmaps
 	spinner = newSpinner("Remove configmaps")
-	printErr(spinner, deleteConfigMaps(o.Client, objs.cms))
+	printErr(spinner, deleteObjects(o.Dynamic, mapper, &objs.cms))
+
+	// delete pvcs
+	spinner = newSpinner("Remove PVCs")
+	printErr(spinner, deleteObjects(o.Dynamic, mapper, &objs.pvcs))
 
 	fmt.Fprintln(o.Out, "Uninstall KubeBlocks done")
 	return nil

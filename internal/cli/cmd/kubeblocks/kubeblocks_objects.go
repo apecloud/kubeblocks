@@ -21,16 +21,15 @@ import (
 	"fmt"
 	"strings"
 
-	appv1 "k8s.io/api/apps/v1"
-	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	k8sapitypes "k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/client-go/dynamic"
-	"k8s.io/client-go/kubernetes"
+	"k8s.io/klog/v2"
 
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
@@ -38,18 +37,22 @@ import (
 
 type kbObjects struct {
 	// custom resources
-	crs map[schema.GroupVersionResource]*unstructured.UnstructuredList
+	crs map[schema.GroupVersionResource]unstructured.UnstructuredList
 	// custom resource definitions
-	crds *unstructured.UnstructuredList
+	crds unstructured.UnstructuredList
 	// deployments
-	deploys *appv1.DeploymentList
+	deploys unstructured.UnstructuredList
+	// statefulsets
+	stss unstructured.UnstructuredList
 	// services
-	svcs *corev1.ServiceList
+	svcs unstructured.UnstructuredList
 	// configMaps
-	cms *corev1.ConfigMapList
+	cms unstructured.UnstructuredList
+	// PVCs
+	pvcs unstructured.UnstructuredList
 }
 
-func getKBObjects(client kubernetes.Interface, dynamic dynamic.Interface, namespace string) (*kbObjects, error) {
+func getKBObjects(dynamic dynamic.Interface, namespace string) (*kbObjects, error) {
 	var (
 		err     error
 		allErrs []error
@@ -62,19 +65,18 @@ func getKBObjects(client kubernetes.Interface, dynamic dynamic.Interface, namesp
 		allErrs = append(allErrs, err)
 	}
 
-	objs := &kbObjects{}
+	kbObjs := &kbObjects{}
 	ctx := context.TODO()
 
 	// get CRDs
 	crds, err := dynamic.Resource(types.CRDGVR()).List(ctx, metav1.ListOptions{})
 	appendErr(err)
-	objs.crds = &unstructured.UnstructuredList{}
-	objs.crs = map[schema.GroupVersionResource]*unstructured.UnstructuredList{}
+	kbObjs.crs = map[schema.GroupVersionResource]unstructured.UnstructuredList{}
 	for i, crd := range crds.Items {
 		if !strings.Contains(crd.GetName(), "kubeblocks.io") {
 			continue
 		}
-		objs.crds.Items = append(objs.crds.Items, crds.Items[i])
+		kbObjs.crds.Items = append(kbObjs.crds.Items, crds.Items[i])
 
 		// get built-in CRs belonging to this CRD
 		gvr, err := getGVRByCRD(&crd)
@@ -86,90 +88,44 @@ func getKBObjects(client kubernetes.Interface, dynamic dynamic.Interface, namesp
 			appendErr(err)
 			continue
 		} else {
-			objs.crs[*gvr] = crs
+			kbObjs.crs[*gvr] = *crs
 		}
 	}
 
 	// get deployments
-	getDeploys := func(labelSelector string) {
-		deploys, err := client.AppsV1().Deployments(namespace).List(context.TODO(), metav1.ListOptions{
+	getObjects := func(labelSelector string, gvr schema.GroupVersionResource, target *unstructured.UnstructuredList) {
+		objs, err := dynamic.Resource(gvr).Namespace(namespace).List(context.TODO(), metav1.ListOptions{
 			LabelSelector: labelSelector,
 		})
 		if err != nil {
 			appendErr(err)
 			return
 		}
-		if objs.deploys == nil {
-			objs.deploys = deploys
-		} else {
-			objs.deploys.Items = append(objs.deploys.Items, deploys.Items...)
-		}
+		target.Items = append(target.Items, objs.Items...)
 	}
 
-	// get all deployments which label matches app.kubernetes.io/instance=kubeblocks
-	getDeploys(fmt.Sprintf("%s=%s", intctrlutil.AppInstanceLabelKey, types.KubeBlocksChartName))
+	// build label selector
+	instanceLabelSelector := fmt.Sprintf("%s=%s", intctrlutil.AppInstanceLabelKey, types.KubeBlocksChartName)
+	releaseLabelSelector := fmt.Sprintf("release=%s", types.KubeBlocksChartName)
 
-	// get all deployments which label matches release=kubeblocks, like prometheus-server
-	getDeploys(fmt.Sprintf("release=%s", types.KubeBlocksChartName))
-
-	// get services
-	getSvcs := func(labelSelector string) {
-		svcs, err := client.CoreV1().Services(namespace).List(ctx, metav1.ListOptions{
-			LabelSelector: labelSelector,
-		})
-		if err != nil {
-			appendErr(err)
-			return
-		}
-		if objs.svcs == nil {
-			objs.svcs = svcs
-		} else {
-			objs.svcs.Items = append(objs.svcs.Items, svcs.Items...)
-		}
+	// get resources which label matches app.kubernetes.io/instance=kubeblocks or
+	// label matches release=kubeblocks, like prometheus-server
+	for _, labelSelector := range []string{instanceLabelSelector, releaseLabelSelector} {
+		getObjects(labelSelector, types.DeployGVR(), &kbObjs.deploys)
+		getObjects(labelSelector, types.StatefulGVR(), &kbObjs.stss)
+		getObjects(labelSelector, types.ServiceGVR(), &kbObjs.svcs)
+		getObjects(labelSelector, types.ConfigmapGVR(), &kbObjs.cms)
+		getObjects(labelSelector, types.PVCGVR(), &kbObjs.pvcs)
 	}
 
-	// get all services which label matches app.kubernetes.io/instance=kubeblocks
-	getSvcs(fmt.Sprintf("%s=%s", intctrlutil.AppInstanceLabelKey, types.KubeBlocksChartName))
-
-	// get all services which label matches release=kubeblocks, like prometheus-server
-	getSvcs(fmt.Sprintf("release=%s", types.KubeBlocksChartName))
-
-	// get configMap
-	getConfigMap := func(labelSelector string) {
-		cms, err := client.CoreV1().ConfigMaps(namespace).List(ctx, metav1.ListOptions{
-			LabelSelector: labelSelector,
-		})
-		if err != nil {
-			appendErr(err)
-			return
-		}
-		if objs.cms == nil {
-			objs.cms = cms
-		} else {
-			objs.cms.Items = append(objs.cms.Items, cms.Items...)
-		}
+	// get volume snapshot class
+	if _, ok := kbObjs.crs[types.VolumeSnapshotClassGVR()]; !ok {
+		kbObjs.crs[types.VolumeSnapshotClassGVR()] = unstructured.UnstructuredList{}
 	}
+	vscs := kbObjs.crs[types.VolumeSnapshotClassGVR()]
+	getObjects(instanceLabelSelector, types.VolumeSnapshotClassGVR(), &vscs)
 
-	// get all configmaps that belong to KubeBlocks
-	getConfigMap("configuration.kubeblocks.io/configuration-template=true")
-	getConfigMap("configuration.kubeblocks.io/configuration-type=tpl")
-
-	getVolumeSnapshotClass := func(labelSelector string) {
-		vscs, err := dynamic.Resource(types.VolumeSnapshotClassGVR()).List(context.TODO(), metav1.ListOptions{
-			LabelSelector: labelSelector,
-		})
-		if err != nil {
-			appendErr(err)
-			return
-		}
-		if objs.crs == nil {
-			objs.crs = map[schema.GroupVersionResource]*unstructured.UnstructuredList{}
-		}
-		objs.crs[types.VolumeSnapshotClassGVR()] = vscs
-	}
-	getVolumeSnapshotClass(fmt.Sprintf("%s=%s", intctrlutil.AppInstanceLabelKey, types.KubeBlocksChartName))
-
-	return objs, utilerrors.NewAggregate(allErrs)
+	return kbObjs, utilerrors.NewAggregate(allErrs)
 }
 
 func removeFinalizers(client dynamic.Interface, objs *kbObjects) error {
@@ -192,67 +148,38 @@ func removeFinalizers(client dynamic.Interface, objs *kbObjects) error {
 	}
 
 	for k, v := range objs.crs {
-		if err := removeFn(k, v); err != nil {
+		if err := removeFn(k, &v); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func deleteCRDs(cli dynamic.Interface, crds *unstructured.UnstructuredList) error {
-	if crds == nil {
+func deleteObjects(dynamic dynamic.Interface, mapper meta.RESTMapper, objects *unstructured.UnstructuredList) error {
+	if objects == nil {
 		return nil
 	}
 
-	for _, crd := range crds.Items {
-		if strings.Contains(crd.GetName(), "kubeblocks.io") {
-			if err := cli.Resource(types.CRDGVR()).Delete(context.TODO(), crd.GetName(), newDeleteOpts()); err != nil {
+	var (
+		err error
+		gvr schema.GroupVersionResource
+	)
+	for _, s := range objects.Items {
+		if gvr.Empty() {
+			gvr, err = getUnstructuredGVR(&s, mapper)
+			if err != nil {
 				return err
 			}
 		}
-	}
-	return nil
-}
 
-func deleteDeploys(client kubernetes.Interface, deploys *appv1.DeploymentList) error {
-	if deploys == nil {
-		return nil
-	}
-
-	for _, d := range deploys.Items {
-		if err := client.AppsV1().Deployments(d.Namespace).Delete(context.TODO(), d.Name, newDeleteOpts()); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func deleteServices(client kubernetes.Interface, svcs *corev1.ServiceList) error {
-	if svcs == nil {
-		return nil
-	}
-
-	for _, s := range svcs.Items {
-		if err := client.CoreV1().Services(s.Namespace).Delete(context.TODO(), s.Name, newDeleteOpts()); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func deleteConfigMaps(client kubernetes.Interface, cms *corev1.ConfigMapList) error {
-	if cms == nil {
-		return nil
-	}
-
-	for _, s := range cms.Items {
 		// delete object
-		if err := client.CoreV1().ConfigMaps(s.Namespace).Delete(context.TODO(), s.Name, newDeleteOpts()); err != nil {
+		klog.V(1).Infof("delete %s %s", gvr.String(), s.GetName())
+		if err = dynamic.Resource(gvr).Namespace(s.GetNamespace()).Delete(context.TODO(), s.GetName(), newDeleteOpts()); err != nil {
 			return err
 		}
 
 		// remove finalizers
-		if _, err := client.CoreV1().ConfigMaps(s.Namespace).Patch(context.TODO(), s.Name, k8sapitypes.JSONPatchType,
+		if _, err = dynamic.Resource(gvr).Namespace(s.GetNamespace()).Patch(context.TODO(), s.GetName(), k8sapitypes.JSONPatchType,
 			[]byte("[{\"op\": \"remove\", \"path\": \"/metadata/finalizers\"}]"), metav1.PatchOptions{}); err != nil {
 			return err
 		}
@@ -268,25 +195,23 @@ func getRemainedResource(objs *kbObjects) map[string][]string {
 		}
 	}
 
-	if objs.crds != nil {
-		appendItems("CRDs", objs.crds)
-	}
+	appendItems("CRDs", &objs.crds)
 
+	// custom resources
 	for k, v := range objs.crs {
-		appendItems(k.Resource, v)
+		appendItems(k.Resource, &v)
 	}
 
-	if objs.svcs != nil {
-		for _, item := range objs.svcs.Items {
-			res["services"] = append(res["services"], item.GetName())
-		}
+	// services
+	for _, item := range objs.svcs.Items {
+		res["services"] = append(res["services"], item.GetName())
 	}
 
-	if objs.deploys != nil {
-		for _, item := range objs.deploys.Items {
-			res["deployments"] = append(res["deployments"], item.GetName())
-		}
+	// deployments
+	for _, item := range objs.deploys.Items {
+		res["deployments"] = append(res["deployments"], item.GetName())
 	}
+
 	return res
 }
 
@@ -295,4 +220,13 @@ func newDeleteOpts() metav1.DeleteOptions {
 	return metav1.DeleteOptions{
 		GracePeriodSeconds: &gracePeriod,
 	}
+}
+
+func getUnstructuredGVR(objs *unstructured.Unstructured, mapper meta.RESTMapper) (schema.GroupVersionResource, error) {
+	gvk := objs.GroupVersionKind()
+	mapping, err := mapper.RESTMapping(gvk.GroupKind(), gvk.Version)
+	if err != nil {
+		return schema.GroupVersionResource{}, err
+	}
+	return mapping.Resource, nil
 }

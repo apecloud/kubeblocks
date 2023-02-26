@@ -19,9 +19,9 @@ package kubeblocks
 import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 
 	appsv1 "k8s.io/api/apps/v1"
-	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -34,9 +34,11 @@ import (
 )
 
 var _ = Describe("kubeblocks objects", func() {
-	It("deleteDeploys", func() {
-		client := testing.FakeClientSet()
-		Expect(deleteDeploys(client, nil)).Should(Succeed())
+	It("delete objects", func() {
+		factory := cmdtesting.NewTestFactory()
+		dynamic := testing.FakeDynamicClient()
+		mapper, _ := factory.ToRESTMapper()
+		Expect(deleteObjects(dynamic, mapper, nil)).Should(Succeed())
 
 		mockDeploy := func(label map[string]string) *appsv1.Deployment {
 			deploy := &appsv1.Deployment{}
@@ -50,35 +52,11 @@ var _ = Describe("kubeblocks objects", func() {
 			"release":                types.KubeBlocksChartName,
 		}
 		for k, v := range labels {
-			client = testing.FakeClientSet(mockDeploy(map[string]string{
+			dynamic = testing.FakeDynamicClient(mockDeploy(map[string]string{
 				k: v,
 			}))
-			objs, _ := getKBObjects(client, testing.FakeDynamicClient(testing.FakeVolumeSnapshotClass()), namespace)
-			Expect(deleteDeploys(client, objs.deploys)).Should(Succeed())
-		}
-	})
-
-	It("deleteServices", func() {
-		client := testing.FakeClientSet()
-		Expect(deleteServices(client, nil)).Should(Succeed())
-
-		mockService := func(label map[string]string) *corev1.Service {
-			svc := &corev1.Service{}
-			svc.SetLabels(label)
-			svc.SetNamespace(namespace)
-			return svc
-		}
-
-		labels := map[string]string{
-			"types.InstanceLabelKey": types.KubeBlocksChartName,
-			"release":                types.KubeBlocksChartName,
-		}
-		for k, v := range labels {
-			client = testing.FakeClientSet(mockService(map[string]string{
-				k: v,
-			}))
-			objs, _ := getKBObjects(client, testing.FakeDynamicClient(testing.FakeVolumeSnapshotClass()), namespace)
-			Expect(deleteServices(client, objs.svcs)).Should(Succeed())
+			objs, _ := getKBObjects(testing.FakeDynamicClient(testing.FakeVolumeSnapshotClass()), namespace)
+			Expect(deleteObjects(dynamic, mapper, &objs.deploys)).Should(Succeed())
 		}
 	})
 
@@ -123,7 +101,7 @@ var _ = Describe("kubeblocks objects", func() {
 
 		for _, c := range testCases {
 			client := mockDynamicClientWithCRD(c.clusterDef, c.clusterVersion, c.backupTool)
-			objs, _ := getKBObjects(testing.FakeClientSet(), client, "")
+			objs, _ := getKBObjects(client, "")
 			if c.expected != "" {
 				Expect(removeFinalizers(client, objs)).Should(MatchError(MatchRegexp(c.expected)))
 			} else {
@@ -133,9 +111,11 @@ var _ = Describe("kubeblocks objects", func() {
 	})
 
 	It("delete crd", func() {
-		client := mockDynamicClientWithCRD()
-		objs, _ := getKBObjects(testing.FakeClientSet(), client, "")
-		Expect(deleteCRDs(client, objs.crds)).Should(Succeed())
+		dynamic := mockDynamicClientWithCRD()
+		objs, _ := getKBObjects(dynamic, "")
+		factory := cmdtesting.NewTestFactory()
+		mapper, _ := factory.ToRESTMapper()
+		Expect(deleteObjects(dynamic, mapper, &objs.crds)).Should(Succeed())
 	})
 })
 

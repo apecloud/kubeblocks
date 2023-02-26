@@ -76,24 +76,24 @@ func BuildComponent(
 
 	// set affinity and tolerations
 	affinity := cluster.Spec.Affinity
-	tolerations := cluster.Spec.Tolerations
 	if clusterCompSpec.Affinity != nil {
 		affinity = clusterCompSpec.Affinity
 	}
+	podAffinity := buildPodAffinity(&cluster, affinity, component)
+	component.PodSpec.Affinity = patchBuiltInAffinity(podAffinity)
+	component.PodSpec.TopologySpreadConstraints = buildPodTopologySpreadConstraints(&cluster, affinity, component)
+
+	tolerations := cluster.Spec.Tolerations
 	if len(clusterCompSpec.Tolerations) != 0 {
 		tolerations = clusterCompSpec.Tolerations
 	}
-	if affinity != nil {
-		component.PodSpec.Affinity = buildPodAffinity(&cluster, affinity, component)
-		component.PodSpec.TopologySpreadConstraints = buildPodTopologySpreadConstraints(&cluster, affinity, component)
-	}
-	if tolerations != nil {
-		component.PodSpec.Tolerations = tolerations
-	}
+	component.PodSpec.Tolerations = patchBuiltInToleration(tolerations)
 
 	// set others
 	component.EnabledLogs = clusterCompSpec.EnabledLogs
 	component.Replicas = clusterCompSpec.Replicas
+	component.TLS = clusterCompSpec.TLS
+	component.Issuer = clusterCompSpec.Issuer
 
 	if clusterCompSpec.VolumeClaimTemplates != nil {
 		component.VolumeClaimTemplates = appsv1alpha1.ToVolumeClaimTemplates(clusterCompSpec.VolumeClaimTemplates)
@@ -230,4 +230,20 @@ func replacePlaceholderTokens(component *SynthesizedComponent, namedValues map[s
 			}
 		}
 	}
+}
+
+func GetClusterDefCompByName(clusterDef appsv1alpha1.ClusterDefinition,
+	cluster appsv1alpha1.Cluster,
+	compName string) *appsv1alpha1.ClusterComponentDefinition {
+	for _, comp := range cluster.Spec.ComponentSpecs {
+		if comp.Name != compName {
+			continue
+		}
+		for _, compDef := range clusterDef.Spec.ComponentDefs {
+			if compDef.Name == comp.ComponentDefRef {
+				return &compDef
+			}
+		}
+	}
+	return nil
 }

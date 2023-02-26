@@ -82,7 +82,7 @@ func (r *StatefulSetReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	}
 
 	// create a component object
-	componentName := sts.GetLabels()[intctrlutil.AppComponentLabelKey]
+	componentName := sts.GetLabels()[intctrlutil.KBAppComponentLabelKey]
 	componentSpec := cluster.GetComponentByName(componentName)
 	if componentSpec == nil {
 		return intctrlutil.Reconciled()
@@ -93,10 +93,10 @@ func (r *StatefulSetReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		return intctrlutil.Reconciled()
 	}
 	compCtx := newComponentContext(reqCtx, r.Client, r.Recorder, component, sts, componentSpec)
-	reqCtx.Log.Info("before handleComponentStatusAndSyncCluster",
+	reqCtx.Log.Info("before updateComponentStatusInClusterStatus",
 		"generation", sts.Generation, "observed generation", sts.Status.ObservedGeneration,
 		"replicas", sts.Status.Replicas)
-	if requeueAfter, err := handleComponentStatusAndSyncCluster(compCtx, cluster); err != nil {
+	if requeueAfter, err := updateComponentStatusInClusterStatus(compCtx, cluster); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	} else if requeueAfter != 0 {
 		// if the reconcileAction need requeue, do it

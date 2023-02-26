@@ -31,6 +31,10 @@ func buildPodTopologySpreadConstraints(
 	clusterOrCompAffinity *appsv1alpha1.Affinity,
 	component *SynthesizedComponent,
 ) []corev1.TopologySpreadConstraint {
+	if clusterOrCompAffinity == nil {
+		return nil
+	}
+
 	var topologySpreadConstraints []corev1.TopologySpreadConstraint
 
 	var whenUnsatisfiable corev1.UnsatisfiableConstraintAction
@@ -46,8 +50,8 @@ func buildPodTopologySpreadConstraints(
 			TopologyKey:       topologyKey,
 			LabelSelector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
-					intctrlutil.AppInstanceLabelKey:  cluster.Name,
-					intctrlutil.AppComponentLabelKey: component.Name,
+					intctrlutil.AppInstanceLabelKey:    cluster.Name,
+					intctrlutil.KBAppComponentLabelKey: component.Name,
 				},
 			},
 		})
@@ -60,6 +64,9 @@ func buildPodAffinity(
 	clusterOrCompAffinity *appsv1alpha1.Affinity,
 	component *SynthesizedComponent,
 ) *corev1.Affinity {
+	if clusterOrCompAffinity == nil {
+		return nil
+	}
 	affinity := new(corev1.Affinity)
 	// Build NodeAffinity
 	var matchExpressions []corev1.NodeSelectorRequirement
@@ -89,8 +96,8 @@ func buildPodAffinity(
 			TopologyKey: topologyKey,
 			LabelSelector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
-					intctrlutil.AppInstanceLabelKey:  cluster.Name,
-					intctrlutil.AppComponentLabelKey: component.Name,
+					intctrlutil.AppInstanceLabelKey:    cluster.Name,
+					intctrlutil.KBAppComponentLabelKey: component.Name,
 				},
 			},
 		})
@@ -119,13 +126,54 @@ func buildPodAffinity(
 			Operator: metav1.LabelSelectorOpIn,
 			Values:   appsv1alpha1.WorkloadTypes,
 		})
-		podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = append(podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution, corev1.PodAffinityTerm{
-			TopologyKey: corev1.LabelHostname,
-			LabelSelector: &metav1.LabelSelector{
-				MatchExpressions: labelSelectorReqs,
-			},
-		})
+		podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = append(
+			podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution, corev1.PodAffinityTerm{
+				TopologyKey: corev1.LabelHostname,
+				LabelSelector: &metav1.LabelSelector{
+					MatchExpressions: labelSelectorReqs,
+				},
+			})
 	}
 	affinity.PodAntiAffinity = podAntiAffinity
 	return affinity
+}
+
+// patchBuiltInAffinity patches built-in affinity configuration
+func patchBuiltInAffinity(affinity *corev1.Affinity) *corev1.Affinity {
+	var matchExpressions []corev1.NodeSelectorRequirement
+	matchExpressions = append(matchExpressions, corev1.NodeSelectorRequirement{
+		Key:      intctrlutil.KubeBlocksDataNodeLabelKey,
+		Operator: corev1.NodeSelectorOpIn,
+		Values:   []string{intctrlutil.KubeBlocksDataNodeLabelValue},
+	})
+	preferredSchedulingTerm := corev1.PreferredSchedulingTerm{
+		Preference: corev1.NodeSelectorTerm{
+			MatchExpressions: matchExpressions,
+		},
+		Weight: 100,
+	}
+	if affinity != nil && affinity.NodeAffinity != nil {
+		affinity.NodeAffinity.PreferredDuringSchedulingIgnoredDuringExecution = append(
+			affinity.NodeAffinity.PreferredDuringSchedulingIgnoredDuringExecution, preferredSchedulingTerm)
+	} else {
+		if affinity == nil {
+			affinity = new(corev1.Affinity)
+		}
+		affinity.NodeAffinity = &corev1.NodeAffinity{
+			PreferredDuringSchedulingIgnoredDuringExecution: []corev1.PreferredSchedulingTerm{preferredSchedulingTerm},
+		}
+	}
+
+	return affinity
+}
+
+// patchBuiltInToleration patches built-in tolerations configuration
+func patchBuiltInToleration(tolerations []corev1.Toleration) []corev1.Toleration {
+	tolerations = append(tolerations, corev1.Toleration{
+		Key:      intctrlutil.KubeBlocksDataNodeTolerationKey,
+		Operator: corev1.TolerationOpEqual,
+		Value:    intctrlutil.KubeBlocksDataNodeTolerationValue,
+		Effect:   corev1.TaintEffectNoSchedule,
+	})
+	return tolerations
 }

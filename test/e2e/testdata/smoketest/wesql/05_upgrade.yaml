@@ -1,0 +1,9 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: OpsRequest
+metadata:
+  name: ops-upgrade
+spec:
+  clusterRef: mycluster
+  type: Upgrade
+  upgrade:
+    clusterVersionRef: ac-mysql-8.0.30-latest

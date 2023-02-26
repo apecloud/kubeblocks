@@ -99,7 +99,7 @@ func MockConsensusComponentStsPod(
 	}
 	pod := NewPodFactory(testCtx.DefaultNamespace, podName).SetOwnerReferences("apps/v1", intctrlutil.StatefulSetKind, sts).AddLabelsInMap(map[string]string{
 		intctrlutil.AppInstanceLabelKey:            clusterName,
-		intctrlutil.AppComponentLabelKey:           consensusCompName,
+		intctrlutil.KBAppComponentLabelKey:         consensusCompName,
 		intctrlutil.AppManagedByLabelKey:           intctrlutil.AppName,
 		intctrlutil.RoleLabelKey:                   podRole,
 		intctrlutil.ConsensusSetAccessModeLabelKey: accessMode,

@@ -66,11 +66,11 @@ var _ = Describe("kubeblocks", func() {
 		}
 
 		By("command without kubeconfig flag")
-		Expect(o.complete(tf, cmd)).Should(HaveOccurred())
+		Expect(o.Complete(tf, cmd)).Should(HaveOccurred())
 
 		cmd.Flags().StringVar(&cfg, "kubeconfig", "", "Path to the kubeconfig file to use for CLI requests.")
 		cmd.Flags().StringVar(&cfg, "context", "", "The name of the kubeconfig context to use.")
-		Expect(o.complete(tf, cmd)).To(Succeed())
+		Expect(o.Complete(tf, cmd)).To(Succeed())
 		Expect(o.HelmCfg).ShouldNot(BeNil())
 		Expect(o.Namespace).To(Equal("test"))
 	})
@@ -99,7 +99,7 @@ var _ = Describe("kubeblocks", func() {
 		}
 		cmd := newUpgradeCmd(tf, streams)
 		_ = cmd.Flags().Set("monitor", "true")
-		Expect(o.upgrade(cmd)).Should(HaveOccurred())
+		Expect(o.Upgrade(cmd)).Should(HaveOccurred())
 		Expect(len(o.ValueOpts.Values)).To(Equal(1))
 		Expect(o.ValueOpts.Values[0]).To(Equal(fmt.Sprintf(kMonitorParam, true)))
 		Expect(o.upgradeChart()).Should(HaveOccurred())

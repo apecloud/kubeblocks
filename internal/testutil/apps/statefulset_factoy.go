@@ -34,27 +34,30 @@ func NewStatefulSetFactory(namespace, name string, clusterName string, component
 		&appsv1.StatefulSet{
 			ObjectMeta: metav1.ObjectMeta{
 				Labels: map[string]string{
-					intctrlutil.AppInstanceLabelKey:  clusterName,
-					intctrlutil.AppComponentLabelKey: componentName,
-					intctrlutil.AppManagedByLabelKey: intctrlutil.AppName,
+					intctrlutil.AppInstanceLabelKey:    clusterName,
+					intctrlutil.KBAppComponentLabelKey: componentName,
+					intctrlutil.AppManagedByLabelKey:   intctrlutil.AppName,
 				},
 			},
 			Spec: appsv1.StatefulSetSpec{
 				Selector: &metav1.LabelSelector{
 					MatchLabels: map[string]string{
-						intctrlutil.AppInstanceLabelKey:  clusterName,
-						intctrlutil.AppComponentLabelKey: componentName,
-						intctrlutil.AppManagedByLabelKey: intctrlutil.AppName,
+						intctrlutil.AppInstanceLabelKey:    clusterName,
+						intctrlutil.KBAppComponentLabelKey: componentName,
+						intctrlutil.AppManagedByLabelKey:   intctrlutil.AppName,
 					},
 				},
 				Template: corev1.PodTemplateSpec{
 					ObjectMeta: metav1.ObjectMeta{
 						Labels: map[string]string{
-							intctrlutil.AppInstanceLabelKey:  clusterName,
-							intctrlutil.AppComponentLabelKey: componentName,
-							intctrlutil.AppManagedByLabelKey: intctrlutil.AppName,
+							intctrlutil.AppInstanceLabelKey:    clusterName,
+							intctrlutil.KBAppComponentLabelKey: componentName,
+							intctrlutil.AppManagedByLabelKey:   intctrlutil.AppName,
 						},
 					},
+				},
+				UpdateStrategy: appsv1.StatefulSetUpdateStrategy{
+					Type: appsv1.OnDeleteStatefulSetStrategyType,
 				},
 			},
 		}, f)

@@ -39,7 +39,7 @@ func MockReplicationComponentStsPod(
 	roleName string) *corev1.Pod {
 	pod := NewPodFactory(testCtx.DefaultNamespace, podName).SetOwnerReferences("apps/v1", intctrlutil.StatefulSetKind, sts).AddLabelsInMap(map[string]string{
 		intctrlutil.AppInstanceLabelKey:       clusterName,
-		intctrlutil.AppComponentLabelKey:      compName,
+		intctrlutil.KBAppComponentLabelKey:    compName,
 		intctrlutil.AppManagedByLabelKey:      intctrlutil.AppName,
 		intctrlutil.RoleLabelKey:              roleName,
 		appsv1.ControllerRevisionHashLabelKey: sts.Status.UpdateRevision,

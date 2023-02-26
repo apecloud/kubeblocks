@@ -37,7 +37,7 @@ func NewPersistentVolumeClaimFactory(namespace, name, clusterName, componentName
 			ObjectMeta: metav1.ObjectMeta{
 				Labels: map[string]string{
 					intctrlutil.AppInstanceLabelKey:             clusterName,
-					intctrlutil.AppComponentLabelKey:            componentName,
+					intctrlutil.KBAppComponentLabelKey:          componentName,
 					intctrlutil.AppManagedByLabelKey:            intctrlutil.AppName,
 					intctrlutil.VolumeClaimTemplateNameLabelKey: vctName,
 				},
@@ -64,5 +64,10 @@ func (factory *MockPersistentVolumeClaimFactory) SetStorage(storageSize string) 
 			corev1.ResourceStorage: resource.MustParse(storageSize),
 		},
 	}
+	return factory
+}
+
+func (factory *MockPersistentVolumeClaimFactory) SetAnnotations(annotations map[string]string) *MockPersistentVolumeClaimFactory {
+	factory.get().Annotations = annotations
 	return factory
 }

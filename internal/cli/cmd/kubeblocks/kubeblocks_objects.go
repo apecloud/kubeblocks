@@ -33,6 +33,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 
 	"github.com/apecloud/kubeblocks/internal/cli/types"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 type kbObjects struct {
@@ -106,7 +107,7 @@ func getKBObjects(client kubernetes.Interface, dynamic dynamic.Interface, namesp
 	}
 
 	// get all deployments which label matches app.kubernetes.io/instance=kubeblocks
-	getDeploys(fmt.Sprintf("%s=%s", types.InstanceLabelKey, types.KubeBlocksChartName))
+	getDeploys(fmt.Sprintf("%s=%s", intctrlutil.AppInstanceLabelKey, types.KubeBlocksChartName))
 
 	// get all deployments which label matches release=kubeblocks, like prometheus-server
 	getDeploys(fmt.Sprintf("release=%s", types.KubeBlocksChartName))
@@ -128,7 +129,7 @@ func getKBObjects(client kubernetes.Interface, dynamic dynamic.Interface, namesp
 	}
 
 	// get all services which label matches app.kubernetes.io/instance=kubeblocks
-	getSvcs(fmt.Sprintf("%s=%s", types.InstanceLabelKey, types.KubeBlocksChartName))
+	getSvcs(fmt.Sprintf("%s=%s", intctrlutil.AppInstanceLabelKey, types.KubeBlocksChartName))
 
 	// get all services which label matches release=kubeblocks, like prometheus-server
 	getSvcs(fmt.Sprintf("release=%s", types.KubeBlocksChartName))
@@ -166,7 +167,7 @@ func getKBObjects(client kubernetes.Interface, dynamic dynamic.Interface, namesp
 		}
 		objs.crs[types.VolumeSnapshotClassGVR()] = vscs
 	}
-	getVolumeSnapshotClass(fmt.Sprintf("%s=%s", types.InstanceLabelKey, types.KubeBlocksChartName))
+	getVolumeSnapshotClass(fmt.Sprintf("%s=%s", intctrlutil.AppInstanceLabelKey, types.KubeBlocksChartName))
 
 	return objs, utilerrors.NewAggregate(allErrs)
 }

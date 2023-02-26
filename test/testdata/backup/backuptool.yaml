@@ -3,8 +3,7 @@ kind: BackupTool
 metadata:
   name: backup-tool-
 spec:
-  image: percona/percona-xtrabackup
-  databaseEngine: mysql
+  image: registry.cn-hangzhou.aliyuncs.com/apecloud/percona-xtrabackup
   deployKind: job
   resources:
     limits:

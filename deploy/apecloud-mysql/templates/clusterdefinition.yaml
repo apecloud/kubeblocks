@@ -8,6 +8,9 @@ spec:
   connectionCredential:
     username: root
     password: "$(RANDOM_PASSWD)"
+    endpoint: "$(SVC_FQDN):$(SVC_PORT_mysql)"
+    host: "$(SVC_FQDN)"
+    port: "$(SVC_PORT_mysql)"
   componentDefs:
     - name: mysql
       characterType: mysql
@@ -106,7 +109,7 @@ spec:
                 value: {{ if .Values.cluster.dynamicConfig }}{{ .Values.cluster.dynamicConfig }}{{ end }}
             command: ["/scripts/setup.sh"]
           - name: metrics
-            image:  {{ .Values.metrics.image.repository }}:{{ .Values.metrics.image.tag }}
+            image:  {{ .Values.metrics.image.registry | default "docker.io" }}/{{ .Values.metrics.image.repository }}:{{ .Values.metrics.image.tag }}
             imagePullPolicy: {{ .Values.metrics.image.pullPolicy | quote }}
             securityContext:
               runAsNonRoot: true
@@ -125,7 +128,7 @@ spec:
               - name: DATA_SOURCE_NAME
                 value: "$(MYSQL_USER):$(MYSQL_PASSWORD)@(localhost:3306)/"
             command:
-              - "/bin/agamotto"
+              - "/bin/mysqld_exporter"
               - "--collect.info_schema.wesql_consensus"
             ports:
               - name: http-metrics
@@ -150,7 +153,7 @@ spec:
                 port: http-metrics
       systemAccounts:
         cmdExecutorConfig:
-          image: docker.io/mysql:8.0.30
+          image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ .Values.image.tag }}
           command: ["mysql"]
           args:
           - -h$(KB_ACCOUNT_ENDPOINT) 
@@ -192,14 +195,14 @@ spec:
             provisionPolicy:
               type: CreateByStmt
               scope: AnyPods
-              statements:        
+              statements:
                 creation: CREATE USER IF NOT EXISTS $(USERNAME) IDENTIFIED BY "$(PASSWD)"; GRANT REPLICATION CLIENT, PROCESS ON *.* TO $(USERNAME); GRANT SELECT ON performance_schema.* TO $(USERNAME);
                 deletion: DROP USER IF EXISTS $(USERNAME);              
           - name: kbmonitoring
             provisionPolicy:
               type: CreateByStmt
               scope: AnyPods
-              statements:        
+              statements:
                 creation: CREATE USER IF NOT EXISTS $(USERNAME) IDENTIFIED BY "$(PASSWD)"; GRANT REPLICATION CLIENT, PROCESS ON *.* TO $(USERNAME); GRANT SELECT ON performance_schema.* TO $(USERNAME);
                 deletion: DROP USER IF EXISTS $(USERNAME);            
           - name: kbreplicator

@@ -98,6 +98,10 @@ type BaseOptions struct {
 	Name string `json:"name"`
 
 	Client dynamic.Interface `json:"-"`
+
+	// Quiet minimize unnecessary output
+	Quiet bool
+
 	genericclioptions.IOStreams
 }
 
@@ -173,7 +177,7 @@ func (o *BaseOptions) Run(inputs Inputs) error {
 		return err
 	}
 
-	if unstructuredObj, err = covertContentToUnstructured(cueValue); err != nil {
+	if unstructuredObj, err = convertContentToUnstructured(cueValue); err != nil {
 		return err
 	}
 
@@ -196,7 +200,9 @@ func (o *BaseOptions) Run(inputs Inputs) error {
 	if unstructuredObj, err = o.Client.Resource(gvr).Namespace(o.Namespace).Create(context.TODO(), unstructuredObj, metav1.CreateOptions{}); err != nil {
 		return err
 	}
-	fmt.Fprintf(o.Out, "%s %s created\n", unstructuredObj.GetKind(), unstructuredObj.GetName())
+	if !o.Quiet {
+		fmt.Fprintf(o.Out, "%s %s created\n", unstructuredObj.GetKind(), unstructuredObj.GetName())
+	}
 	return nil
 }
 
@@ -222,7 +228,7 @@ func (o *BaseOptions) RunAsApply(inputs Inputs) error {
 		return err
 	}
 
-	if unstructuredObj, err = covertContentToUnstructured(cueValue); err != nil {
+	if unstructuredObj, err = convertContentToUnstructured(cueValue); err != nil {
 		return err
 	}
 
@@ -262,7 +268,7 @@ func (o *BaseOptions) RunAsApply(inputs Inputs) error {
 	return nil
 }
 
-// NewCueValue covert cue template  to cue Value which holds any value like Boolean,Struct,String and more cue type.
+// NewCueValue convert cue template  to cue Value which holds any value like Boolean,Struct,String and more cue type.
 func newCueValue(cueTemplateName string) (cue.Value, error) {
 	tmplFs, _ := debme.FS(cueTemplate, "template")
 	if tmlBytes, err := tmplFs.ReadFile(cueTemplateName); err != nil {
@@ -286,8 +292,8 @@ func fillOptions(cueValue cue.Value, optionsByte []byte) (cue.Value, error) {
 	return cueValue, nil
 }
 
-// covertContentToUnstructured get content object in cue template file and covert it to Unstructured
-func covertContentToUnstructured(cueValue cue.Value) (*unstructured.Unstructured, error) {
+// convertContentToUnstructured get content object in cue template file and convert it to Unstructured
+func convertContentToUnstructured(cueValue cue.Value) (*unstructured.Unstructured, error) {
 	var (
 		contentByte     []byte
 		err             error

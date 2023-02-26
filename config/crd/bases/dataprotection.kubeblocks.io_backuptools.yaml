@@ -44,21 +44,6 @@ spec:
                 items:
                   type: string
                 type: array
-              databaseEngine:
-                description: database engine to support in the backup.
-                enum:
-                - mysql
-                type: string
-              databaseEngineVersions:
-                description: database engine to support in the backup.
-                enum:
-                - "5.6"
-                - "5.7"
-                - "8.0"
-                items:
-                  type: string
-                type: array
-                x-kubernetes-list-type: set
               deployKind:
                 default: job
                 description: which kind for run a backup tool.

@@ -32,7 +32,6 @@ type OpsRequestSpec struct {
 
 	// type defines the operation type.
 	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:Enum={Upgrade,VerticalScaling,VolumeExpansion,HorizontalScaling,Restart,Reconfiguring}
 	Type OpsType `json:"type"`
 
 	// ttlSecondsAfterSucceed OpsRequest will be deleted after TTLSecondsAfterSucceed second when OpsRequest.status.phase is Succeed.
@@ -249,8 +248,7 @@ type OpsRequestStatus struct {
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
 }
 
-// ProgressDetail contains the details for the component processing progress.
-type ProgressDetail struct {
+type ProgressStatusDetail struct {
 	// group describes which group the current object belongs to.
 	// if the objects of a component belong to the same group, we can ignore it.
 	// +optional
@@ -261,7 +259,6 @@ type ProgressDetail struct {
 	ObjectKey string `json:"objectKey"`
 
 	// status describes the state of processing the object.
-	// +kubebuilder:validation:Enum={Processing,Pending,Failed,Succeed}
 	// +kubebuilder:validation:Required
 	Status ProgressStatus `json:"status"`
 
@@ -281,7 +278,7 @@ type ProgressDetail struct {
 type LastComponentConfiguration struct {
 	// replicas are the last replicas of the component.
 	// +optional
-	Replicas int32 `json:"replicas,omitempty"`
+	Replicas *int32 `json:"replicas,omitempty"`
 
 	// the last resources of the component.
 	// +kubebuilder:pruning:PreserveUnknownFields
@@ -305,13 +302,13 @@ type LastConfiguration struct {
 
 type OpsRequestComponentStatus struct {
 	// phase describes the component phase, reference Cluster.status.component.phase.
-	// +kubebuilder:validation:Enum={Running,Failed,Abnormal,Creating,SpecUpdating,Deleting,Deleted,VolumeExpanding,Reconfiguring,HorizontalScaling,VerticalScaling,VersionUpgrading,Rebooting}
+	// +kubebuilder:validation:Enum={Running,Failed,Abnormal,Creating,SpecUpdating,Deleting,Deleted,VolumeExpanding,Reconfiguring,HorizontalScaling,VerticalScaling,VersionUpgrading,Rebooting,Stopped,Stopping,Starting}
 	// +optional
 	Phase Phase `json:"phase,omitempty"`
 
 	// progressDetails describes the progress details of the component for this operation.
 	// +optional
-	ProgressDetails []ProgressDetail `json:"progressDetails,omitempty"`
+	ProgressDetails []ProgressStatusDetail `json:"progressDetails,omitempty"`
 
 	// workloadType references workload type of component in ClusterDefinition.
 	// +optional
@@ -337,7 +334,6 @@ type ConfigurationStatus struct {
 	Name string `json:"name"`
 
 	// updatePolicy describes the policy of reconfiguring.
-	// +kubebuilder:validation:Enum={simple,parallel,rolling,autoReload}
 	// +optional
 	UpdatePolicy UpgradePolicy `json:"updatePolicy,omitempty"`
 
@@ -426,6 +422,8 @@ func (r *OpsRequest) GetComponentNameMap() map[string]struct{} {
 		return r.GetVolumeExpansionComponentNameMap()
 	case UpgradeType:
 		return r.GetUpgradeComponentNameMap()
+	case ReconfiguringType:
+		return r.GetReconfiguringComponentNameMap()
 	default:
 		return map[string]struct{}{}
 	}
@@ -449,8 +447,8 @@ func (r *OpsRequest) GetVerticalScalingComponentNameMap() map[string]struct{} {
 	return componentNameMap
 }
 
-// CovertVerticalScalingListToMap coverts OpsRequest.spec.verticalScaling list to map
-func (r *OpsRequest) CovertVerticalScalingListToMap() map[string]VerticalScaling {
+// ConvertVerticalScalingListToMap converts OpsRequest.spec.verticalScaling list to map
+func (r *OpsRequest) ConvertVerticalScalingListToMap() map[string]VerticalScaling {
 	verticalScalingMap := make(map[string]VerticalScaling)
 	for _, v := range r.Spec.VerticalScalingList {
 		verticalScalingMap[v.ComponentName] = v
@@ -467,8 +465,8 @@ func (r *OpsRequest) GetHorizontalScalingComponentNameMap() map[string]struct{} 
 	return componentNameMap
 }
 
-// CovertHorizontalScalingListToMap coverts OpsRequest.spec.horizontalScaling list to map
-func (r *OpsRequest) CovertHorizontalScalingListToMap() map[string]HorizontalScaling {
+// ConvertHorizontalScalingListToMap converts OpsRequest.spec.horizontalScaling list to map
+func (r *OpsRequest) ConvertHorizontalScalingListToMap() map[string]HorizontalScaling {
 	verticalScalingMap := make(map[string]HorizontalScaling)
 	for _, v := range r.Spec.HorizontalScalingList {
 		verticalScalingMap[v.ComponentName] = v
@@ -485,8 +483,8 @@ func (r *OpsRequest) GetVolumeExpansionComponentNameMap() map[string]struct{} {
 	return componentNameMap
 }
 
-// CovertVolumeExpansionListToMap coverts volumeExpansionList to map
-func (r *OpsRequest) CovertVolumeExpansionListToMap() map[string]VolumeExpansion {
+// ConvertVolumeExpansionListToMap converts volumeExpansionList to map
+func (r *OpsRequest) ConvertVolumeExpansionListToMap() map[string]VolumeExpansion {
 	volumeExpansionMap := make(map[string]VolumeExpansion)
 	for _, v := range r.Spec.VolumeExpansionList {
 		volumeExpansionMap[v.ComponentName] = v
@@ -506,7 +504,17 @@ func (r *OpsRequest) GetUpgradeComponentNameMap() map[string]struct{} {
 	return componentNameMap
 }
 
-func (p *ProgressDetail) SetStatusAndMessage(status ProgressStatus, message string) {
+// GetReconfiguringComponentNameMap gets the component name map with reconfiguring operation.
+func (r *OpsRequest) GetReconfiguringComponentNameMap() map[string]struct{} {
+	if r.Spec.Reconfigure == nil {
+		return nil
+	}
+	return map[string]struct{}{
+		r.Spec.Reconfigure.ComponentName: {},
+	}
+}
+
+func (p *ProgressStatusDetail) SetStatusAndMessage(status ProgressStatus, message string) {
 	p.Message = message
 	p.Status = status
 }

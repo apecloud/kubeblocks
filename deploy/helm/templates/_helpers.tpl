@@ -216,3 +216,17 @@ If release name contains chart name it will be used as a full name.
 {{- end -}}
 {{- end -}}
 {{- end -}}
+
+{{/*
+Specify KubeBlocks Operator deployment with priorityClassName=system-cluster-critical, if deployed to "kube-system"
+namespace and unspecified priorityClassName.
+*/}}
+{{- define "kubeblocks.priorityClassName" -}}
+{{- if .Values.priorityClassName -}}
+{{- .Values.priorityClassName }}
+{{- else if ( eq ( include "kubeblocks.namespace" . ) "kube-system" ) -}}
+{{- "system-cluster-critical" -}}
+{{- else -}}
+{{- "" -}}
+{{- end -}}
+{{- end -}}

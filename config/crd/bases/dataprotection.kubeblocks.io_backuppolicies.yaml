@@ -1732,6 +1732,11 @@ spec:
               phase:
                 description: 'backup policy phase valid value: available, failed,
                   new.'
+                enum:
+                - New
+                - Available
+                - InProgress
+                - Failed
                 type: string
             type: object
         type: object

@@ -96,6 +96,7 @@ var _ = Describe("Cluster", func() {
 					TopologyKeys:    []string{"kubernetes.io/hostname"},
 					NodeLabels:      map[string]string{"testLabelKey": "testLabelValue"},
 					TolerationsRaw:  []string{"key=engineType,value=mongo,operator=Equal,effect=NoSchedule"},
+					Tenancy:         string(appsv1alpha1.SharedNode),
 				},
 			}
 
@@ -143,10 +144,7 @@ var _ = Describe("Cluster", func() {
 	})
 
 	It("operations", func() {
-		o := &OperationsOptions{
-			BaseOptions:            create.BaseOptions{IOStreams: streams},
-			TTLSecondsAfterSucceed: 30,
-		}
+		o := newBaseOperationsOptions(streams, appsv1alpha1.UpgradeType, false)
 		By("validate o.name is null")
 		Expect(o.Validate()).To(MatchError(missingClusterArgErrMassage))
 
@@ -159,6 +157,7 @@ var _ = Describe("Cluster", func() {
 		Expect(o.Validate()).Should(Succeed())
 
 		By("validate volumeExpansion when components is null")
+		o.HasComponentNamesFlag = true
 		o.OpsType = appsv1alpha1.VolumeExpansionType
 		Expect(o.Validate()).To(MatchError("missing component-names"))
 
@@ -181,6 +180,13 @@ var _ = Describe("Cluster", func() {
 		o.Replicas = 1
 		in.Write([]byte(o.Name + "\n"))
 		Expect(o.Validate()).Should(Succeed())
+
+		By("test CompleteRestartOps function")
+		inputs := buildOperationsInputs(tf, o)
+		Expect(o.Complete(inputs, []string{"test"}))
+		o.ComponentNames = nil
+		o.Namespace = "default"
+		Expect(o.CompleteRestartOps().Error()).Should(ContainSubstring("not found"))
 	})
 
 	It("check params for reconfiguring operations", func() {
@@ -226,7 +232,7 @@ var _ = Describe("Cluster", func() {
 		Expect(o.parseUpdatedParams().Error()).To(ContainSubstring("reconfiguring required configure file or updated parameters"))
 		o.Parameters = []string{"abcd"}
 
-		Expect(o.parseUpdatedParams().Error()).To(ContainSubstring("updated parameter formatter"))
+		Expect(o.parseUpdatedParams().Error()).To(ContainSubstring("updated parameter format"))
 		o.Parameters = []string{"abcd=test"}
 		o.CfgTemplateName = configTplName
 		o.IOStreams = streams

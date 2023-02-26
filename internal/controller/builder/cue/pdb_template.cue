@@ -36,11 +36,11 @@ pdb: {
 		namespace: cluster.metadata.namespace
 		name:      "\(cluster.metadata.name)-\(component.name)"
 		labels: {
-			"app.kubernetes.io/name": "\(component.clusterDefName)"
-			"app.kubernetes.io/instance": cluster.metadata.name
-			// "app.kubernetes.io/version" : # TODO
-			"app.kubernetes.io/component-name": "\(component.name)"
-			"app.kubernetes.io/managed-by":     "kubeblocks"
+			"app.kubernetes.io/name":       "\(component.clusterDefName)"
+			"app.kubernetes.io/instance":   cluster.metadata.name
+			"app.kubernetes.io/managed-by": "kubeblocks"
+
+			"app.kubeblocks.io/component-name": "\(component.name)"
 		}
 	}
 	"spec": {
@@ -49,10 +49,11 @@ pdb: {
 		}
 		selector: {
 			matchLabels: {
-				"app.kubernetes.io/name":           "\(component.clusterDefName)"
-				"app.kubernetes.io/instance":       "\(cluster.metadata.name)-\(component.name)"
-				"app.kubernetes.io/component-name": "\(component.name)"
-				"app.kubernetes.io/managed-by":     "kubeblocks"
+				"app.kubernetes.io/name":       "\(component.clusterDefName)"
+				"app.kubernetes.io/instance":   "\(cluster.metadata.name)-\(component.name)"
+				"app.kubernetes.io/managed-by": "kubeblocks"
+
+				"app.kubeblocks.io/component-name": "\(component.name)"
 			}
 		}
 	}

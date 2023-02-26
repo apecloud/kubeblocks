@@ -36,7 +36,14 @@ type ClusterDefinitionSpec struct {
 	// +listMapKey=name
 	ComponentDefs []ClusterComponentDefinition `json:"componentDefs" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
 
-	// Default connection credential used for connecting to cluster service.
+	// Connection credential template used for creating a connection credential
+	// secret for Cluster.app.kubeblock.io object. Built-in objects are:
+	// `$(RANDOM_PASSWD)` - random 8 characters
+	// `$(SVC_FQDN)` - service FQDN  placeholder, value pattern - $(CLUSTER_NAME)-$(1ST_COMP_NAME).$(NAMESPACE).svc,
+	//    where 1ST_COMP_NAME is the 1st component that provide `ClusterDefinition.spec.componentDefs[].service` attribute
+	// `$(SVC_PORT_<PORT-NAME>)` - a ServicePort's port value with specified port name, i.e, a servicePort JSON struct:
+	//    { "name": "mysql", "targetPort": "mysqlContainerPort", "port": 3306 }, and "$(SVC_PORT_mysql)" in the
+	//    connection credential value is 3306.
 	// +optional
 	ConnectionCredential map[string]string `json:"connectionCredential,omitempty"`
 }
@@ -109,7 +116,6 @@ type PasswordConfig struct {
 type SystemAccountConfig struct {
 	// name is the name of a system account.
 	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:Enum={kbadmin,kbdataprotection,kbprobe,kbmonitoring,kbreplicator}
 	Name AccountName `json:"name"`
 	// provisionPolicy defines how to create account.
 	// +kubebuilder:validation:Required
@@ -148,8 +154,8 @@ type ProvisionStatements struct {
 	// +kubebuilder:validation:Required
 	CreationStatement string `json:"creation"`
 	// deletion specifies statement how to delete this account.
-	// +kubebuilder:validation:Required
-	DeletionStatement string `json:"deletion"`
+	// +optional
+	DeletionStatement string `json:"deletion,omitempty"`
 }
 
 // ClusterDefinitionStatus defines the observed state of ClusterDefinition
@@ -229,8 +235,8 @@ type ExporterConfig struct {
 
 type MonitorConfig struct {
 	// builtIn is a switch to enable KubeBlocks builtIn monitoring.
-	// If BuiltIn is true and CharacterType is well-known, ExporterConfig and Sidecar container will generate automatically.
-	// Otherwise, provider should set builtIn to false and provide ExporterConfig and Sidecar container own.
+	// If BuiltIn is set to false, the provider should set ExporterConfig and Sidecar container own.
+	// BuiltIn set to true is not currently supported but will be soon.
 	// +kubebuilder:default=false
 	// +optional
 	BuiltIn bool `json:"builtIn,omitempty"`
@@ -271,7 +277,7 @@ type ConfigurationSpec struct {
 type ClusterComponentDefinition struct {
 	// Name of the component, it can be any valid string.
 	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:MaxLength=12
+	// +kubebuilder:validation:MaxLength=18
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	Name string `json:"name"`
 
@@ -281,7 +287,6 @@ type ClusterComponentDefinition struct {
 	// Consensus is a stateful workload type used to describe applications based on consensus protocols, common consensus protocols such as raft and paxos.
 	// Replication is a stateful workload type used to describe applications based on the primary-secondary data replication protocol.
 	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:Enum={Stateless,Stateful,Consensus,Replication}
 	WorkloadType WorkloadType `json:"workloadType"`
 
 	// characterType defines well-known database component name, such as mongos(mongodb), proxy(redis), mariadb(mysql)
@@ -352,7 +357,6 @@ type HorizontalScalePolicy struct {
 	//           the first volumeMount of first container (i.e. clusterdefinition.spec.components.podSpec.containers[0].volumeMounts[0]),
 	//           since take multiple snapshots at one time might cause consistency problem.
 	// +kubebuilder:default=None
-	// +kubebuilder:validation:Enum={None,Snapshot}
 	// +optional
 	Type HScaleDataClonePolicyType `json:"type,omitempty"`
 
@@ -443,7 +447,6 @@ type ConsensusSetSpec struct {
 	//		Learner, Follower(minority) in parallel -> Follower(majority) -> Leader, keep majority online all the time.
 	// parallel: force parallel
 	// +kubebuilder:default=Serial
-	// +kubebuilder:validation:Enum={Serial,BestEffortParallel,Parallel}
 	// +optional
 	UpdateStrategy UpdateStrategy `json:"updateStrategy,omitempty"`
 }
@@ -457,7 +460,6 @@ type ConsensusMember struct {
 	// AccessMode, what service this member capable.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:default=ReadWrite
-	// +kubebuilder:validation:Enum={None, Readonly, ReadWrite}
 	AccessMode AccessMode `json:"accessMode"`
 
 	// Replicas, number of Pods of this role.

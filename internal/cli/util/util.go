@@ -63,6 +63,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 var (
@@ -373,7 +374,7 @@ func BuildLabelSelectorByNames(selector string, names []string) string {
 		return ""
 	}
 
-	label := fmt.Sprintf("%s in (%s)", types.InstanceLabelKey, strings.Join(names, ","))
+	label := fmt.Sprintf("%s in (%s)", intctrlutil.AppInstanceLabelKey, strings.Join(names, ","))
 	if len(selector) == 0 {
 		return label
 	} else {

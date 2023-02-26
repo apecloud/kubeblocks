@@ -228,7 +228,7 @@ func newComponentsNotReadyCondition(notReadyComponentNames map[string]struct{}) 
 	return metav1.Condition{
 		Type:    ConditionTypeReady,
 		Status:  metav1.ConditionFalse,
-		Message: fmt.Sprintf("pods are unavailable in ComponentDefs: %v, refer to related component message in Cluster.status.components", cNameSlice),
+		Message: fmt.Sprintf("pods are unavailable in Components: %v, refer to related component message in Cluster.status.components", cNameSlice),
 		Reason:  ReasonComponentsNotReady,
 	}
 }
@@ -242,17 +242,28 @@ func checkConditionIsChanged(oldCondition *metav1.Condition, newCondition metav1
 }
 
 // handleClusterReadyCondition handles the cluster conditions with ClusterReady and ReplicasReady type.
-// if conditions changed, return true.
 func handleNotReadyConditionForCluster(cluster *appsv1alpha1.Cluster,
+	recorder record.EventRecorder,
 	replicasNotReadyCompNames map[string]struct{},
-	notReadyCompNames map[string]struct{}) bool {
-	var conditionsChanged bool
-	if len(replicasNotReadyCompNames) > 0 {
-		oldReplicasReadyCondition := meta.FindStatusCondition(cluster.Status.Conditions, ConditionTypeReplicasReady)
+	notReadyCompNames map[string]struct{}) (needPatch bool, postFunc postHandler) {
+	oldReplicasReadyCondition := meta.FindStatusCondition(cluster.Status.Conditions, ConditionTypeReplicasReady)
+	if len(replicasNotReadyCompNames) == 0 {
+		// if all replicas of cluster are ready, set ReasonAllReplicasReady to status.conditions
+		readyCondition := newAllReplicasPodsReadyConditions()
+		if checkConditionIsChanged(oldReplicasReadyCondition, readyCondition) {
+			cluster.SetStatusCondition(readyCondition)
+			needPatch = true
+			postFunc = func(cluster *appsv1alpha1.Cluster) error {
+				// send an event when all pods of the components are ready.
+				recorder.Event(cluster, corev1.EventTypeNormal, readyCondition.Reason, readyCondition.Message)
+				return nil
+			}
+		}
+	} else {
 		replicasNotReadyCond := newReplicasNotReadyCondition(replicasNotReadyCompNames)
 		if checkConditionIsChanged(oldReplicasReadyCondition, replicasNotReadyCond) {
 			cluster.SetStatusCondition(replicasNotReadyCond)
-			conditionsChanged = true
+			needPatch = true
 		}
 	}
 
@@ -261,8 +272,8 @@ func handleNotReadyConditionForCluster(cluster *appsv1alpha1.Cluster,
 		clusterNotReadyCondition := newComponentsNotReadyCondition(notReadyCompNames)
 		if checkConditionIsChanged(oldClusterReadyCondition, clusterNotReadyCondition) {
 			cluster.SetStatusCondition(clusterNotReadyCondition)
-			conditionsChanged = true
+			needPatch = true
 		}
 	}
-	return conditionsChanged
+	return needPatch, postFunc
 }

@@ -18,6 +18,7 @@ package apps
 
 import (
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
@@ -68,8 +69,34 @@ var (
 	}
 
 	defaultConnectionCredential = map[string]string{
-		"username": "root",
-		"password": "$(RANDOM_PASSWD)",
+		"username":      "root",
+		"svcFQDN":       "$(SVC_FQDN)",
+		"password":      "$(RANDOM_PASSWD)",
+		"tcpEndpoint":   "tcp:$(SVC_FQDN):$(SVC_PORT_mysql)",
+		"paxosEndpoint": "paxos:$(SVC_FQDN):$(SVC_PORT_paxos)",
+	}
+
+	// defaultSvc value are corresponding to defaultMySQLContainer.Ports name mapping and
+	// corresponding to defaultConnectionCredential variable placeholder
+	defaultSvcSpec = corev1.ServiceSpec{
+		Ports: []corev1.ServicePort{
+			{
+				Name: "mysql",
+				TargetPort: intstr.IntOrString{
+					Type:   intstr.String,
+					StrVal: "mysql",
+				},
+				Port: 3306,
+			},
+			{
+				Name: "paxos",
+				TargetPort: intstr.IntOrString{
+					Type:   intstr.String,
+					StrVal: "paxos",
+				},
+				Port: 13306,
+			},
+		},
 	}
 
 	defaultMySQLContainer = corev1.Container{

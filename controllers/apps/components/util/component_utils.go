@@ -55,7 +55,8 @@ func GetClusterByObject(ctx context.Context,
 
 // IsCompleted checks whether the component has completed the operation
 func IsCompleted(phase appsv1alpha1.Phase) bool {
-	return slices.Index([]appsv1alpha1.Phase{appsv1alpha1.RunningPhase, appsv1alpha1.FailedPhase, appsv1alpha1.AbnormalPhase}, phase) != -1
+	return slices.Index([]appsv1alpha1.Phase{appsv1alpha1.RunningPhase, appsv1alpha1.FailedPhase,
+		appsv1alpha1.AbnormalPhase, appsv1alpha1.StoppedPhase}, phase) != -1
 }
 
 func IsFailedOrAbnormal(phase appsv1alpha1.Phase) bool {
@@ -65,9 +66,9 @@ func IsFailedOrAbnormal(phase appsv1alpha1.Phase) bool {
 // GetComponentMatchLabels gets the labels for matching the cluster component
 func GetComponentMatchLabels(clusterName, componentName string) client.ListOption {
 	return client.MatchingLabels{
-		intctrlutil.AppInstanceLabelKey:  clusterName,
-		intctrlutil.AppComponentLabelKey: componentName,
-		intctrlutil.AppManagedByLabelKey: intctrlutil.AppName,
+		intctrlutil.AppInstanceLabelKey:    clusterName,
+		intctrlutil.KBAppComponentLabelKey: componentName,
+		intctrlutil.AppManagedByLabelKey:   intctrlutil.AppName,
 	}
 }
 
@@ -220,9 +221,9 @@ func GetComponentInfoByPod(ctx context.Context,
 	if pod == nil || pod.Labels == nil {
 		return "", nil, fmt.Errorf("pod %s or pod's label is nil", pod.Name)
 	}
-	componentName, ok := pod.Labels[intctrlutil.AppComponentLabelKey]
+	componentName, ok := pod.Labels[intctrlutil.KBAppComponentLabelKey]
 	if !ok {
-		return "", nil, fmt.Errorf("pod %s component name label %s is nil", pod.Name, intctrlutil.AppComponentLabelKey)
+		return "", nil, fmt.Errorf("pod %s component name label %s is nil", pod.Name, intctrlutil.KBAppComponentLabelKey)
 	}
 	compDefName := cluster.GetComponentDefRefName(componentName)
 	componentDef, err = GetComponentDefByCluster(ctx, cli, cluster, compDefName)

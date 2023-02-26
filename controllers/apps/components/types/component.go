@@ -52,6 +52,9 @@ type Component interface {
 	// GetPhaseWhenPodsNotReady when the pods of component are not ready, calculate the component phase is Failed or Abnormal.
 	// if return an empty phase, means the pods of component are ready and skips it.
 	GetPhaseWhenPodsNotReady(componentName string) (appsv1alpha1.Phase, error)
+
+	// HandleUpdate handles component updating when basic workloads of the components are updated
+	HandleUpdate(obj client.Object) error
 }
 
 const (

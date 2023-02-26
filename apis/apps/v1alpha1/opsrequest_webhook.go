@@ -203,14 +203,12 @@ func (r *OpsRequest) validateRestart(allErrs *field.ErrorList, cluster *Cluster)
 		addInvalidError(allErrs, "spec.restart", restartList, "can not be empty")
 		return
 	}
-	// get component name slice
-	componentNames := make([]string, len(restartList))
+
+	compNames := make([]string, len(restartList))
 	for i, v := range restartList {
-		componentNames[i] = v.ComponentName
+		compNames[i] = v.ComponentName
 	}
-	// validate component name is legal
-	supportedComponentMap := covertComponentNamesToMap(cluster.Status.Operations.Restartable)
-	r.validateComponentName(allErrs, cluster, supportedComponentMap, componentNames)
+	r.checkComponentExistence(allErrs, cluster, compNames)
 }
 
 // validateUpgrade validates spec.clusterOps.upgrade
@@ -241,12 +239,7 @@ func (r *OpsRequest) validateVerticalScaling(allErrs *field.ErrorList, cluster *
 		addInvalidError(allErrs, "spec.verticalScaling", verticalScalingList, "can not be empty")
 		return
 	}
-	// validate whether the cluster support vertical scaling
-	supportedComponentMap := covertComponentNamesToMap(cluster.Status.Operations.VerticalScalable)
-	if err := r.validateClusterIsSupported(supportedComponentMap); err != nil {
-		*allErrs = append(*allErrs, err)
-		return
-	}
+
 	// validate resources is legal and get component name slice
 	componentNames := make([]string, len(verticalScalingList))
 	for i, v := range verticalScalingList {
@@ -264,9 +257,7 @@ func (r *OpsRequest) validateVerticalScaling(allErrs *field.ErrorList, cluster *
 		}
 	}
 
-	// validate component name is legal
-	r.validateComponentName(allErrs, cluster, supportedComponentMap, componentNames)
-
+	r.checkComponentExistence(allErrs, cluster, componentNames)
 }
 
 // validateVerticalScaling validate api is legal when spec.type is VerticalScaling
@@ -310,7 +301,7 @@ func (r *OpsRequest) validateHorizontalScaling(cluster *Cluster, allErrs *field.
 		return
 	}
 	// validate whether the cluster support horizontal scaling
-	supportedComponentMap := covertOperationComponentsToMap(cluster.Status.Operations.HorizontalScalable)
+	supportedComponentMap := convertOperationComponentsToMap(cluster.Status.Operations.HorizontalScalable)
 	if err := r.validateClusterIsSupported(supportedComponentMap); err != nil {
 		*allErrs = append(*allErrs, err)
 		return
@@ -335,7 +326,7 @@ func (r *OpsRequest) validateVolumeExpansion(allErrs *field.ErrorList, cluster *
 		return
 	}
 	// validate whether the cluster support volume expansion
-	supportedComponentMap := covertOperationComponentsToMap(cluster.Status.Operations.VolumeExpandable)
+	supportedComponentMap := convertOperationComponentsToMap(cluster.Status.Operations.VolumeExpandable)
 	if err := r.validateClusterIsSupported(supportedComponentMap); err != nil {
 		*allErrs = append(*allErrs, err)
 		return
@@ -352,7 +343,7 @@ func (r *OpsRequest) validateVolumeExpansion(allErrs *field.ErrorList, cluster *
 		if operationComponent == nil {
 			continue
 		}
-		// covert slice to map
+		// convert slice to map
 		for _, vctName := range operationComponent.VolumeClaimTemplateNames {
 			supportedVCTMap[vctName] = struct{}{}
 		}
@@ -427,22 +418,33 @@ func (r *OpsRequest) validateComponentName(allErrs *field.ErrorList,
 	}
 }
 
+// checkComponentExistence checks whether components to be operated exist in cluster spec.
+func (r *OpsRequest) checkComponentExistence(errs *field.ErrorList, cluster *Cluster, compNames []string) {
+	compSpecNameMap := make(map[string]bool)
+	for _, compSpec := range cluster.Spec.ComponentSpecs {
+		compSpecNameMap[compSpec.Name] = true
+	}
+
+	var notFoundCompNames []string
+	for _, compName := range compNames {
+		if _, ok := compSpecNameMap[compName]; !ok {
+			notFoundCompNames = append(notFoundCompNames, compName)
+		}
+	}
+
+	if len(notFoundCompNames) > 0 {
+		addInvalidError(errs, fmt.Sprintf("spec.%s[*].componentName", lowercaseInitial(r.Spec.Type)),
+			notFoundCompNames, "not found in Cluster.spec.components[*].name")
+	}
+}
+
 func lowercaseInitial(opsType OpsType) string {
 	str := string(opsType)
 	return strings.ToLower(str[:1]) + str[1:]
 }
 
-// covertComponentNamesToMap coverts supportedComponent slice to map
-func covertComponentNamesToMap(componentNames []string) map[string]*OperationComponent {
-	supportedComponentMap := map[string]*OperationComponent{}
-	for _, v := range componentNames {
-		supportedComponentMap[v] = nil
-	}
-	return supportedComponentMap
-}
-
-// covertOperationComponentsToMap coverts supportedOperationComponent slice to map
-func covertOperationComponentsToMap(componentNames []OperationComponent) map[string]*OperationComponent {
+// convertOperationComponentsToMap converts supportedOperationComponent slice to map
+func convertOperationComponentsToMap(componentNames []OperationComponent) map[string]*OperationComponent {
 	supportedComponentMap := map[string]*OperationComponent{}
 	for _, v := range componentNames {
 		supportedComponentMap[v.Name] = &v

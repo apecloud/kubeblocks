@@ -27,6 +27,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/conversion"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -225,8 +226,23 @@ func BackgroundDeleteObject(cli client.Client, ctx context.Context, obj client.O
 		PropagationPolicy: &deletePropagation,
 	}
 
-	if err := cli.Delete(ctx, obj, deleteOptions); err != nil {
+	if err := cli.Delete(ctx, obj, deleteOptions); err != nil && !apierrors.IsNotFound(err) {
 		return err
+	}
+	return nil
+}
+
+// SetOwnership set owner reference and add finalizer if not exists
+func SetOwnership(owner, obj client.Object, scheme *runtime.Scheme, finalizer string) error {
+	if err := controllerutil.SetOwnerReference(owner, obj, scheme); err != nil {
+		return err
+	}
+	if !controllerutil.ContainsFinalizer(obj, finalizer) {
+		// pvc objects do not need to add finalizer
+		_, ok := obj.(*corev1.PersistentVolumeClaim)
+		if !ok {
+			controllerutil.AddFinalizer(obj, finalizer)
+		}
 	}
 	return nil
 }

@@ -48,8 +48,8 @@ var _ types.Component = &ReplicationSet{}
 func (rs *ReplicationSet) IsRunning(obj client.Object) (bool, error) {
 	var componentStsList = &appsv1.StatefulSetList{}
 	var componentStatusIsRunning = true
-	sts := util.CovertToStatefulSet(obj)
-	if err := util.GetObjectListByComponentName(rs.Ctx, rs.Cli, rs.Cluster, componentStsList, sts.Labels[intctrlutil.AppComponentLabelKey]); err != nil {
+	sts := util.ConvertToStatefulSet(obj)
+	if err := util.GetObjectListByComponentName(rs.Ctx, rs.Cli, rs.Cluster, componentStsList, sts.Labels[intctrlutil.KBAppComponentLabelKey]); err != nil {
 		return false, err
 	}
 	var availableReplicas int32
@@ -61,7 +61,7 @@ func (rs *ReplicationSet) IsRunning(obj client.Object) (bool, error) {
 		stsIsReady := util.StatefulSetOfComponentIsReady(&stsObj, isRevisionConsistent, nil)
 		availableReplicas += stsObj.Status.AvailableReplicas
 		if !stsIsReady {
-			componentStatusIsRunning = false
+			return false, nil
 		}
 	}
 	if availableReplicas != rs.Component.Replicas {
@@ -75,8 +75,8 @@ func (rs *ReplicationSet) IsRunning(obj client.Object) (bool, error) {
 func (rs *ReplicationSet) PodsReady(obj client.Object) (bool, error) {
 	var podsReady = true
 	var componentStsList = &appsv1.StatefulSetList{}
-	sts := util.CovertToStatefulSet(obj)
-	if err := util.GetObjectListByComponentName(rs.Ctx, rs.Cli, rs.Cluster, componentStsList, sts.Labels[intctrlutil.AppComponentLabelKey]); err != nil {
+	sts := util.ConvertToStatefulSet(obj)
+	if err := util.GetObjectListByComponentName(rs.Ctx, rs.Cli, rs.Cluster, componentStsList, sts.Labels[intctrlutil.KBAppComponentLabelKey]); err != nil {
 		return false, err
 	}
 	var availableReplicas int32
@@ -183,6 +183,30 @@ func (rs *ReplicationSet) GetPhaseWhenPodsNotReady(componentName string) (appsv1
 		return "", nil
 	}
 	return util.GetComponentPhase(isFailed, isAbnormal), nil
+}
+
+func (rs *ReplicationSet) HandleUpdate(obj client.Object) error {
+	var componentStsList = &appsv1.StatefulSetList{}
+	sts := util.ConvertToStatefulSet(obj)
+	if err := util.GetObjectListByComponentName(rs.Ctx, rs.Cli, rs.Cluster, componentStsList, sts.Labels[intctrlutil.KBAppComponentLabelKey]); err != nil {
+		return err
+	}
+	for _, sts := range componentStsList.Items {
+		if sts.Generation != sts.Status.ObservedGeneration {
+			continue
+		}
+		pods, err := util.GetPodListByStatefulSet(rs.Ctx, rs.Cli, &sts)
+		if err != nil {
+			return err
+		}
+		if len(pods) != int(*sts.Spec.Replicas) {
+			continue
+		}
+		if err := util.DeleteStsPods(rs.Ctx, rs.Cli, &sts); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // NewReplicationSet creates a new ReplicationSet object.

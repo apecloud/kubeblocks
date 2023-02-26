@@ -124,7 +124,7 @@ help: ## Display this help.
 	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage:\n  make \033[36m<target>\033[0m\n"} /^[a-zA-Z_0-9-]+:.*?##/ { printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
 
 .PHONY: all
-all: manager kbcli probe agamotto reloader loadbalancer ## Make all cmd binaries.
+all: manager kbcli probe reloader loadbalancer ## Make all cmd binaries.
 
 ##@ Development
 
@@ -163,7 +163,7 @@ fmt: ## Run go fmt against code.
 
 .PHONY: vet
 vet: ## Run go vet against code.
-	GOOS=linux $(GO) vet ./...
+	GOOS=linux $(GO) vet -mod=mod ./...
 
 .PHONY: cue-fmt
 cue-fmt: cuetool ## Run cue fmt against code.
@@ -320,29 +320,6 @@ ARGUMENTS=
 DEBUG_PORT=2345
 run-delve: manifests generate fmt vet  ## Run Delve debugger.
 	dlv --listen=:$(DEBUG_PORT) --headless=true --api-version=2 --accept-multiclient debug $(GO_PACKAGE) -- $(ARGUMENTS)
-
-
-##@ agamotto cmd
-
-AGAMOTTO_LD_FLAGS = "-s -w \
-    -X github.com/prometheus/common/version.Version=$(VERSION) \
-    -X github.com/prometheus/common/version.Revision=$(GIT_COMMIT) \
-    -X github.com/prometheus/common/version.BuildUser=apecloud \
-    -X github.com/prometheus/common/version.BuildDate=`date -u +'%Y-%m-%dT%H:%M:%SZ'`"
-
-bin/agamotto.%: ## Cross build bin/agamotto.$(OS).$(ARCH) .
-	GOOS=$(word 2,$(subst ., ,$@)) GOARCH=$(word 3,$(subst ., ,$@)) $(GO) build -ldflags=${AGAMOTTO_LD_FLAGS} -o $@ ./cmd/agamotto/main.go
-
-.PHONY: agamotto
-agamotto: OS=$(shell $(GO) env GOOS)
-agamotto: ARCH=$(shell $(GO) env GOARCH)
-agamotto: test-go-generate build-checks ## Build agamotto related binaries
-	$(MAKE) bin/agamotto.${OS}.${ARCH}
-	mv bin/agamotto.${OS}.${ARCH} bin/agamotto
-
-.PHONY: clean
-clean-agamotto: ## Clean bin/agamotto.
-	rm -f bin/agamotto
 
 ##@ reloader cmd
 
@@ -845,11 +822,18 @@ minikube-delete: minikube ## Delete minikube cluster.
 	$(MINIKUBE) delete
 
 ##@ Test E2E
+GINKGO=$(shell which ginkgo)
 .PHONY: test-e2e
 test-e2e: ## Test End-to-end.
-	$(MAKE) -e VERSION=$(VERSION) -C test/e2e run
-
+	$(HELM) template mycluster deploy/apecloud-mysql-cluster > test/e2e/testdata/smoketest/wesql/00_wesqlcluster.yaml
+	# $(HELM) template mycluster deploy/mongodb > test/e2e/testdata/smoketest/mongodb/00_mongodbcluster.yaml
+	# $(HELM) template mycluster deploy/mongodb-cluster >> test/e2e/testdata/smoketest/mongodb/00_mongodbcluster.yaml
+	# $(HELM) template mycluster deploy/postgresqlcluster > test/e2e/testdata/smoketest/postgresql/00_postgresqlcluster.yaml
+	# $(HELM) template mycluster deploy/redis > test/e2e/testdata/smoketest/redis/00_rediscluster.yaml
+	# $(HELM) template mycluster deploy/redis-rep-cluster >> test/e2e/testdata/smoketest/redis/00_rediscluster.yaml
+	$(GINKGO) test -process -ginkgo.v test/e2e
 
 # NOTE: include must be at the end
 ##@ Docker containers
 include docker/docker.mk
+

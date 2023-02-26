@@ -276,7 +276,6 @@ var _ = Describe("OpsRequest webhook", func() {
 			err := testCtx.CheckedCreateObj(ctx, opsRequest)
 			return err == nil
 		}, timeout, interval).Should(BeTrue())
-
 	}
 
 	testWhenClusterDeleted := func(cluster *Cluster, opsRequest *OpsRequest) {

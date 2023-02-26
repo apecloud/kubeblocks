@@ -212,16 +212,27 @@ var _ = Describe("builder", func() {
 			params := newParams()
 			envConfigName := "test-env-config-name"
 			newParams := params
+
+			sts, err := BuildSts(reqCtx, *params, envConfigName)
+			Expect(err).Should(BeNil())
+			Expect(sts).ShouldNot(BeNil())
+			// test  replicas = 0
 			newComponent := *params.Component
 			newComponent.Replicas = 0
-			newComponent.CharacterType = ""
 			newParams.Component = &newComponent
-			sts, err := BuildSts(reqCtx, *newParams, envConfigName)
+			sts, err = BuildSts(reqCtx, *newParams, envConfigName)
 			Expect(err).Should(BeNil())
 			Expect(sts).ShouldNot(BeNil())
-			sts, err = BuildSts(reqCtx, *params, envConfigName)
+			Expect(*sts.Spec.Replicas).Should(Equal(int32(0)))
+			// test workload type replication
+			replComponent := *params.Component
+			replComponent.Replicas = 2
+			replComponent.WorkloadType = appsv1alpha1.Replication
+			newParams.Component = &replComponent
+			sts, err = BuildSts(reqCtx, *newParams, envConfigName)
 			Expect(err).Should(BeNil())
 			Expect(sts).ShouldNot(BeNil())
+			Expect(*sts.Spec.Replicas).Should(Equal(int32(1)))
 		})
 
 		It("builds Deploy correctly", func() {

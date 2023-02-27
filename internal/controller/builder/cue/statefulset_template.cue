@@ -53,10 +53,10 @@ statefulset: {
 				"app.kubeblocks.io/component-name": "\(component.name)"
 			}
 		serviceName: "\(cluster.metadata.name)-\(component.name)-headless"
-		if component.type != "replication" {
+		if component.workloadType != "Replication" {
 			replicas: component.replicas
 		}
-		if component.type == "replication" {
+		if component.workloadType == "Replication" {
 			replicas: 1
 		}
 		minReadySeconds:     10
@@ -74,7 +74,7 @@ statefulset: {
 			}
 			spec: component.podSpec
 		}
-		if component.type != "replication" {
+		if component.workloadType != "Replication" {
 			volumeClaimTemplates: component.volumeClaimTemplates
 		}
 	}

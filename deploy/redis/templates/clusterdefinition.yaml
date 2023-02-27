@@ -12,7 +12,7 @@ spec:
     host: "$(SVC_FQDN)"
     port: "$(SVC_PORT_redis)"
   componentDefs:
-    - name: replication
+    - name: redis
       workloadType: Replication
       characterType: redis
       service:

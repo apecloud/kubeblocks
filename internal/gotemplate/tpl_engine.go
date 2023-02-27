@@ -40,6 +40,10 @@ const (
 	buildInSystemCallName   = "call"
 )
 
+const (
+	goTemplateExtendBuildInRegexSubString = "regexStringSubmatch"
+)
+
 type TplValues map[string]interface{}
 type BuiltInObjectsFunc map[string]interface{}
 
@@ -148,6 +152,9 @@ func (t *TplEngine) initSystemFunMap(funcs template.FuncMap) {
 		})
 		return engine.Render(fn.tpl)
 	}
+
+	// Wrap regex.FindStringSubmatch
+	funcs[goTemplateExtendBuildInRegexSubString] = regexStringSubmatch
 
 	t.tpl.Option(DefaultTemplateOps)
 	t.tpl.Funcs(funcs)

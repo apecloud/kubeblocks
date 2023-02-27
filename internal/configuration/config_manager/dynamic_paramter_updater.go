@@ -48,6 +48,7 @@ const (
 func NewCommandChannel(dbType string) (DynamicParamUpdater, error) {
 	// TODO using dapper command channel
 
+	logger.V(1).Info("new command channel. [%s]", dbType)
 	switch dbType {
 	case MYSQL:
 		return NewMysqlConnection()

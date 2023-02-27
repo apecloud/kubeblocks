@@ -21,6 +21,6 @@ data:
     scripts: reload.tpl
     fileRegex: my.cnf
     formatterConfig:
-      formatter: ini
+      format: ini
       iniConfig:
         sectionName: mysqld

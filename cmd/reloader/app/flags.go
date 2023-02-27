@@ -45,9 +45,7 @@ const (
 
 var allNotifyType = map[NotifyEventType]appsv1alpha1.CfgReloadType{
 	UnixSignal: appsv1alpha1.UnixSignalType,
-	WebHook:    appsv1alpha1.HTTPType,
 	ShellTool:  appsv1alpha1.ShellType,
-	SQL:        appsv1alpha1.SQLType,
 	TPLScript:  appsv1alpha1.TPLScriptType,
 }
 

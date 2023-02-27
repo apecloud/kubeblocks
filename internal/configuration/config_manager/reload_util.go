@@ -63,12 +63,12 @@ func constructReloadBuiltinFuncs(cc DynamicParamUpdater) *gotemplate.BuiltInObje
 		builtInExecFunctionName: func(command string, args ...string) (string, error) {
 			execCommand := exec.Command(command, args...)
 			stdout, err := cfgcontainer.ExecShellCommand(execCommand)
-			logger.V(4).Info(fmt.Sprintf("command: [%s], output: %s, err: %v", execCommand.String(), stdout, err))
+			logger.V(1).Info(fmt.Sprintf("command: [%s], output: %s, err: %v", execCommand.String(), stdout, err))
 			return stdout, err
 		},
 		builtInUpdateVariableFunctionName: func(sql string) error {
 			r, err := cc.ExecCommand(sql)
-			logger.V(4).Info(fmt.Sprintf("sql: [%s], result: [%v]", sql, r))
+			logger.V(1).Info(fmt.Sprintf("sql: [%s], result: [%v]", sql, r))
 			return err
 		},
 	}
@@ -81,7 +81,7 @@ func createUpdatedParamsPatch(newVersion []string, oldVersion []string, formatCf
 		Log:     logger,
 	}
 
-	logger.V(4).Info(fmt.Sprintf("new version files: %v, old version files: %v", newVersion, oldVersion))
+	logger.V(1).Info(fmt.Sprintf("new version files: %v, old version files: %v", newVersion, oldVersion))
 	oldData, err := fromConfigFiles(oldVersion)
 	if err != nil {
 		return nil, err

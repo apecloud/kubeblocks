@@ -19,6 +19,7 @@ package configmanager
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"os"
 	"strconv"
 	"time"
@@ -48,7 +49,7 @@ const (
 func NewCommandChannel(dbType string) (DynamicParamUpdater, error) {
 	// TODO using dapper command channel
 
-	logger.V(1).Info("new command channel. [%s]", dbType)
+	logger.V(1).Info(fmt.Sprintf("new command channel. [%s]", dbType))
 	switch dbType {
 	case MYSQL:
 		return NewMysqlConnection()

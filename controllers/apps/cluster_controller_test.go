@@ -977,6 +977,94 @@ var _ = Describe("Cluster Controller", func() {
 
 	}
 
+	testBackupError := func() {
+
+		initialReplicas := int32(1)
+		updatedReplicas := int32(3)
+
+		By("Creating a cluster with VolumeClaimTemplate")
+		pvcSpec := testapps.NewPVC("1Gi")
+		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
+			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
+			AddComponent(mysqlCompName, mysqlCompType).
+			AddVolumeClaimTemplate(testapps.DataVolumeName, &pvcSpec).
+			SetReplicas(initialReplicas).
+			Create(&testCtx).GetObject()
+		clusterKey = client.ObjectKeyFromObject(clusterObj)
+		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
+
+		By("Creating backup")
+		backupKey := types.NamespacedName{
+			Namespace: testCtx.DefaultNamespace,
+			Name:      "test-backup",
+		}
+		backup := dataprotectionv1alpha1.Backup{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      backupKey.Name,
+				Namespace: backupKey.Namespace,
+				Labels: map[string]string{
+					intctrlutil.AppInstanceLabelKey:    clusterKey.Name,
+					intctrlutil.KBAppComponentLabelKey: mysqlCompName,
+					intctrlutil.AppCreatedByLabelKey:   intctrlutil.AppName,
+				},
+			},
+			Spec: dataprotectionv1alpha1.BackupSpec{
+				BackupPolicyName: "test-backup-policy",
+				BackupType:       "snapshot",
+			},
+		}
+		Expect(testCtx.Cli.Create(ctx, &backup)).Should(Succeed())
+
+		By("Mocking backup to failed status")
+		backup.Status.Phase = dataprotectionv1alpha1.BackupFailed
+		Expect(testCtx.Cli.Status().Update(ctx, &backup)).Should(Succeed())
+
+		By("Checking backup status to failed")
+		Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, backup *dataprotectionv1alpha1.Backup) {
+			g.Expect(backup.Status.Phase).Should(Equal(dataprotectionv1alpha1.BackupFailed))
+		})).Should(Succeed())
+
+		By("Creating a BackupPolicyTemplate")
+		backupPolicyTplKey := types.NamespacedName{Name: "test-backup-policy-template-mysql"}
+		backupPolicyTpl := &dataprotectionv1alpha1.BackupPolicyTemplate{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: backupPolicyTplKey.Name,
+				Labels: map[string]string{
+					clusterDefLabelKey: clusterDefObj.Name,
+				},
+			},
+			Spec: dataprotectionv1alpha1.BackupPolicyTemplateSpec{
+				BackupToolName: "mysql-xtrabackup",
+			},
+		}
+		Expect(testCtx.CreateObj(testCtx.Ctx, backupPolicyTpl)).Should(Succeed())
+
+		By("Set HorizontalScalePolicy")
+		Eventually(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(clusterDefObj),
+			func(clusterDef *appsv1alpha1.ClusterDefinition) {
+				clusterDef.Spec.ComponentDefs[0].HorizontalScalePolicy =
+					&appsv1alpha1.HorizontalScalePolicy{Type: appsv1alpha1.HScaleDataClonePolicyFromSnapshot, BackupTemplateSelector: map[string]string{
+						clusterDefLabelKey: clusterDefObj.Name,
+					}}
+			})).Should(Succeed())
+
+		By(fmt.Sprintf("Changing replicas to %d", updatedReplicas))
+		changeCompReplicas(clusterKey, updatedReplicas, &clusterObj.Spec.ComponentSpecs[0])
+
+		By("Checking cluster status failed with backup error")
+		Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1alpha1.Cluster) {
+			g.Expect(cluster.Status.Phase).Should(Equal(appsv1alpha1.ConditionsErrorPhase))
+			hasBackupError := false
+			for _, cond := range cluster.Status.Conditions {
+				if strings.Contains(cond.Message, "backup error") {
+					hasBackupError = true
+					break
+				}
+			}
+			g.Expect(hasBackupError).Should(BeTrue())
+		}), 20*time.Second, time.Second).Should(Succeed())
+	}
+
 	// Scenarios
 
 	Context("when creating cluster without clusterversion", func() {
@@ -1131,91 +1219,7 @@ var _ = Describe("Cluster Controller", func() {
 		})
 
 		It("should report error if backup error during h-scale", func() {
-
-			initialReplicas := int32(1)
-			updatedReplicas := int32(3)
-
-			By("Creating a cluster with VolumeClaimTemplate")
-			pvcSpec := testapps.NewPVC("1Gi")
-			clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
-				clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
-				AddComponent(mysqlCompName, mysqlCompType).
-				AddVolumeClaimTemplate(testapps.DataVolumeName, &pvcSpec).
-				SetReplicas(initialReplicas).
-				Create(&testCtx).GetObject()
-			clusterKey = client.ObjectKeyFromObject(clusterObj)
-			Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
-
-			By("Creating backup")
-			backupKey := types.NamespacedName{
-				Namespace: testCtx.DefaultNamespace,
-				Name:      "test-backup",
-			}
-			backup := dataprotectionv1alpha1.Backup{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      backupKey.Name,
-					Namespace: backupKey.Namespace,
-					Labels: map[string]string{
-						intctrlutil.AppInstanceLabelKey:    clusterKey.Name,
-						intctrlutil.KBAppComponentLabelKey: mysqlCompName,
-						intctrlutil.AppCreatedByLabelKey:   intctrlutil.AppName,
-					},
-				},
-				Spec: dataprotectionv1alpha1.BackupSpec{
-					BackupPolicyName: "test-backup-policy",
-					BackupType:       "snapshot",
-				},
-			}
-			Expect(testCtx.Cli.Create(ctx, &backup)).Should(Succeed())
-
-			By("Mocking backup to failed status")
-			backup.Status.Phase = dataprotectionv1alpha1.BackupFailed
-			Expect(testCtx.Cli.Status().Update(ctx, &backup)).Should(Succeed())
-
-			By("Checking backup status to failed")
-			Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, backup *dataprotectionv1alpha1.Backup) {
-				g.Expect(backup.Status.Phase).Should(Equal(dataprotectionv1alpha1.BackupFailed))
-			})).Should(Succeed())
-
-			By("Creating a BackupPolicyTemplate")
-			backupPolicyTplKey := types.NamespacedName{Name: "test-backup-policy-template-mysql"}
-			backupPolicyTpl := &dataprotectionv1alpha1.BackupPolicyTemplate{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: backupPolicyTplKey.Name,
-					Labels: map[string]string{
-						clusterDefLabelKey: clusterDefObj.Name,
-					},
-				},
-				Spec: dataprotectionv1alpha1.BackupPolicyTemplateSpec{
-					BackupToolName: "mysql-xtrabackup",
-				},
-			}
-			Expect(testCtx.CreateObj(testCtx.Ctx, backupPolicyTpl)).Should(Succeed())
-
-			By("Set HorizontalScalePolicy")
-			Eventually(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(clusterDefObj),
-				func(clusterDef *appsv1alpha1.ClusterDefinition) {
-					clusterDef.Spec.ComponentDefs[0].HorizontalScalePolicy =
-						&appsv1alpha1.HorizontalScalePolicy{Type: appsv1alpha1.HScaleDataClonePolicyFromSnapshot, BackupTemplateSelector: map[string]string{
-							clusterDefLabelKey: clusterDefObj.Name,
-						}}
-				})).Should(Succeed())
-
-			By(fmt.Sprintf("Changing replicas to %d", updatedReplicas))
-			changeCompReplicas(clusterKey, updatedReplicas, &clusterObj.Spec.ComponentSpecs[0])
-
-			By("Checking cluster status failed with backup error")
-			Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1alpha1.Cluster) {
-				g.Expect(cluster.Status.Phase).Should(Equal(appsv1alpha1.ConditionsErrorPhase))
-				hasBackupError := false
-				for _, cond := range cluster.Status.Conditions {
-					if strings.Contains(cond.Message, "backup error") {
-						hasBackupError = true
-						break
-					}
-				}
-				g.Expect(hasBackupError).Should(BeTrue())
-			}), 20*time.Second, time.Second).Should(Succeed())
+			testBackupError()
 		})
 	})
 

@@ -326,21 +326,11 @@ type Affinity struct {
 }
 
 type Operations struct {
-	// upgradable whether the cluster supports upgrade. if multiple clusterVersions existed, it is true.
-	// +optional
-	Upgradable bool `json:"upgradable,omitempty"`
-
 	// volumeExpandable which components of the cluster and its volumeClaimTemplates support volumeExpansion.
 	// +listType=map
 	// +listMapKey=name
 	// +optional
 	VolumeExpandable []OperationComponent `json:"volumeExpandable,omitempty"`
-
-	// horizontalScalable which components of the cluster support horizontalScaling, and the replicas range limit.
-	// +listType=map
-	// +listMapKey=name
-	// +optional
-	HorizontalScalable []OperationComponent `json:"horizontalScalable,omitempty"`
 }
 
 type OperationComponent struct {

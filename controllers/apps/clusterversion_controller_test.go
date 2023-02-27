@@ -32,7 +32,6 @@ var _ = Describe("test clusterVersion controller", func() {
 		randomStr          = testCtx.GetRandomStr()
 		clusterVersionName = "mysql-version-" + randomStr
 		clusterDefName     = "mysql-definition-" + randomStr
-		clusterNamePrefix  = "mysql-cluster"
 	)
 
 	const statefulCompType = "stateful"
@@ -72,21 +71,6 @@ var _ = Describe("test clusterVersion controller", func() {
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(clusterVersionObj), func(g Gomega, tmpCV *appsv1alpha1.ClusterVersion) {
 				g.Expect(tmpCV.Status.Phase).Should(Equal(appsv1alpha1.AvailablePhase))
 			})).Should(Succeed())
-
-			By("test sync cluster.status.operations")
-			cluster := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
-				clusterDefName, clusterVersionName).WithRandomName().Create(&testCtx).GetObject()
-
-			// create a new ClusterVersion
-			testapps.NewClusterVersionFactory(clusterVersionName+"1", clusterDefName).
-				AddComponent(statefulCompType).AddContainerShort("mysql", testapps.ApeCloudMySQLImage).
-				Create(&testCtx).GetObject()
-
-			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(cluster), func(g Gomega, tmpCluster *appsv1alpha1.Cluster) {
-				operations := tmpCluster.Status.Operations
-				g.Expect(operations != nil && operations.Upgradable).Should(BeTrue())
-			})).Should(Succeed())
-
 		})
 	})
 

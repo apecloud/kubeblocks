@@ -16,7 +16,8 @@ kbcli kubeblocks uninstall [flags]
 ### Options
 
 ```
-  -h, --help   help for uninstall
+      --auto-approve   Skip interactive approval before uninstalling KubeBlocks
+  -h, --help           help for uninstall
 ```
 
 ### Options inherited from parent commands

@@ -310,11 +310,11 @@ $(CERT_ROOT_CA):
 			--san $(APP_NAME)-svc --san $(APP_NAME)-svc.$(APP_NAME) --san $(APP_NAME)-svc.$(APP_NAME).svc --not-after 43200h --insecure --no-password
 
 .PHONY: run
-run: # manifests generate fmt vet ## Run a controller from your host.
+run: manifests generate fmt vet ## Run a controller from your host.
 ifeq ($(ENABLE_WEBHOOKS), true)
 	$(MAKE) webhook-cert
 endif
-	HEALTH_PROBE_BIND_ADDRESS=":9090" $(GO) run ./cmd/manager/main.go --zap-devel=false --zap-encoder=console --zap-time-encoding=iso8601
+	$(GO) run ./cmd/manager/main.go --zap-devel=false --zap-encoder=console --zap-time-encoding=iso8601
 
 # Run with Delve for development purposes against the configured Kubernetes cluster in ~/.kube/config
 # Delve is a debugger for the Go programming language. More info: https://github.com/go-delve/delve

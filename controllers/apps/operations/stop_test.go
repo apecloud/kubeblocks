@@ -59,7 +59,7 @@ var _ = Describe("Stop OpsRequest", func() {
 
 	Context("Test OpsRequest", func() {
 		It("Test stop OpsRequest", func() {
-			opsRes, _, _, _ := initOperationsResources(clusterDefinitionName, clusterVersionName, clusterName)
+			opsRes, _, _ := initOperationsResources(clusterDefinitionName, clusterVersionName, clusterName)
 			By("create Stop opsRequest")
 			ops := testapps.NewOpsRequestObj("stop-ops-"+randomStr, testCtx.DefaultNamespace,
 				clusterName, appsv1alpha1.StopType)

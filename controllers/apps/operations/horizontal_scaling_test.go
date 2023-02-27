@@ -70,7 +70,7 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 	Context("Test OpsRequest", func() {
 		It("Test HorizontalScaling OpsRequest", func() {
 			By("init operations resources ")
-			opsRes, _, _, _ := initOperationsResources(clusterDefinitionName, clusterVersionName, clusterName)
+			opsRes, _, _ := initOperationsResources(clusterDefinitionName, clusterVersionName, clusterName)
 
 			By("Test HorizontalScaling with scale down replicas")
 			opsRes.OpsRequest = createHorizontalScaling(clusterName, 1)

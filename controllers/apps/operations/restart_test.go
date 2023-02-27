@@ -60,7 +60,7 @@ var _ = Describe("Restart OpsRequest", func() {
 	Context("Test OpsRequest", func() {
 		It("Test restart OpsRequest", func() {
 			By("init operations resources ")
-			opsRes, _, _, _ := initOperationsResources(clusterDefinitionName, clusterVersionName, clusterName)
+			opsRes, _, _ := initOperationsResources(clusterDefinitionName, clusterVersionName, clusterName)
 
 			By("create Restart opsRequest")
 			opsRes.OpsRequest = createRestartOpsObj(clusterName, "restart-ops-"+randomStr)

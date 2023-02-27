@@ -60,21 +60,11 @@ var _ = Describe("Upgrade OpsRequest", func() {
 	Context("Test OpsRequest", func() {
 		It("Test upgrade OpsRequest", func() {
 			By("init operations resources ")
-			opsRes, _, clusterVer, clusterObject := initOperationsResources(clusterDefinitionName, clusterVersionName, clusterName)
-
-			By("update cluster version to add label that reference cluster definition")
-			if clusterVer.Labels == nil {
-				clusterVer.Labels = make(map[string]string)
-			}
-			if _, ok := clusterVer.Labels[intctrlutil.ClusterDefLabelKey]; !ok {
-				clusterVer.Labels[intctrlutil.ClusterDefLabelKey] = clusterDefinitionName
-				Expect(testCtx.Cli.Update(testCtx.Ctx, clusterVer)).Should(BeNil())
-			}
+			opsRes, _, clusterObject := initOperationsResources(clusterDefinitionName, clusterVersionName, clusterName)
 
 			By("create Upgrade Ops")
 			newClusterVersionName := "clusterversion-upgrade-" + randomStr
 			_ = testapps.NewClusterVersionFactory(newClusterVersionName, clusterDefinitionName).
-				AddLabels(intctrlutil.ClusterDefLabelKey, clusterDefinitionName).
 				AddComponent(statelessComp).AddContainerShort(testapps.DefaultNginxContainerName, "nginx:1.14.2").
 				AddComponent(consensusComp).AddContainerShort(testapps.DefaultMySQLContainerName, mysqlImageForUpdate).
 				AddComponent(statefulComp).AddContainerShort(testapps.DefaultMySQLContainerName, mysqlImageForUpdate).

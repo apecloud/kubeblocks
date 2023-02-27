@@ -17,9 +17,11 @@ limitations under the License.
 package operation
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"sort"
 	"time"
 
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
@@ -29,7 +31,17 @@ import (
 
 type OperationClient struct {
 	dapr.Client
-	CharacterType string
+	CharacterType    string
+	cache            map[string]*OperationResult
+	CacheTTL         time.Duration
+	ReconcileTimeout time.Duration
+	RequestTimeout   time.Duration
+}
+
+type OperationResult struct {
+	response *dapr.BindingEvent
+	err      error
+	respTime time.Time
 }
 
 type Order struct {
@@ -58,24 +70,27 @@ func NewClientWithPod(pod *corev1.Pod, characterType string) (*OperationClient, 
 	}
 
 	operationClient := &OperationClient{
-		Client:        client,
-		CharacterType: characterType,
+		Client:           client,
+		CharacterType:    characterType,
+		CacheTTL:         60 * time.Second,
+		RequestTimeout:   30 * time.Second,
+		ReconcileTimeout: 100 * time.Millisecond,
 	}
 	return operationClient, nil
 }
 
 func (cli *OperationClient) GetRole() (string, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	ctxWithReconcileTimeout, cancel := context.WithTimeout(context.Background(), cli.ReconcileTimeout)
 	defer cancel()
 
 	// Request sql channel via Dapr SDK
-	in := &dapr.InvokeBindingRequest{
+	req := &dapr.InvokeBindingRequest{
 		Name:      cli.CharacterType,
 		Operation: "getRole",
 		Data:      []byte(""),
 		Metadata:  map[string]string{},
 	}
-	resp, err := cli.InvokeBinding(ctx, in)
+	resp, err := cli.InvokeComponentInRoutine(ctxWithReconcileTimeout, req)
 	if err != nil {
 		return "", err
 	}
@@ -86,4 +101,62 @@ func (cli *OperationClient) GetRole() (string, error) {
 	}
 
 	return result["role"], nil
+}
+
+func (cli *OperationClient) InvokeComponentInRoutine(ctxWithReconcileTimeout context.Context, req *dapr.InvokeBindingRequest) (*dapr.BindingEvent, error) {
+	ch := make(chan *OperationResult, 1)
+	go cli.InvokeComponent(ctxWithReconcileTimeout, req, ch)
+	var resp *dapr.BindingEvent
+	var err error
+	select {
+	case <-ctxWithReconcileTimeout.Done():
+		err = fmt.Errorf("invoke error : %v", ctxWithReconcileTimeout.Err())
+	case result := <-ch:
+		resp = result.response
+		err = result.err
+	}
+	return resp, err
+}
+
+func (cli *OperationClient) InvokeComponent(ctxWithReconcileTimeout context.Context, req *dapr.InvokeBindingRequest, ch chan *OperationResult) {
+	ctxWithRequestTimeout, cancel := context.WithTimeout(context.Background(), cli.RequestTimeout)
+	defer cancel()
+	mapKey := GetMapKeyFromRequest(req)
+	operationRes, ok := cli.cache[mapKey]
+	if ok {
+		delete(cli.cache, mapKey)
+		if time.Since(operationRes.respTime) <= cli.CacheTTL {
+			ch <- operationRes
+			return
+		}
+	}
+
+	resp, err := cli.InvokeBinding(ctxWithRequestTimeout, req)
+	operationRes = &OperationResult{
+		response: resp,
+		err:      err,
+		respTime: time.Now(),
+	}
+	select {
+	case <-ctxWithReconcileTimeout.Done():
+		cli.cache[mapKey] = operationRes
+	default:
+		ch <- operationRes
+	}
+}
+
+func GetMapKeyFromRequest(req *dapr.InvokeBindingRequest) string {
+	var buf bytes.Buffer
+	buf.WriteString(req.Name)
+	buf.WriteString(req.Operation)
+	buf.Write(req.Data)
+	keys := make([]string, 0, len(req.Metadata))
+	for k := range req.Metadata {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	for _, k := range keys {
+		buf.WriteString(fmt.Sprintf("%s:%s", k, req.Metadata[k]))
+	}
+	return buf.String()
 }

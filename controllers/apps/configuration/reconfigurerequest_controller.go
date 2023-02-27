@@ -85,7 +85,7 @@ func (r *ReconfigureRequestReconciler) Reconcile(ctx context.Context, req ctrl.R
 
 	reqCtx.Log = reqCtx.Log.
 		WithValues("ClusterName", config.Labels[intctrlutil.AppInstanceLabelKey]).
-		WithValues("ComponentName", config.Labels[intctrlutil.AppComponentLabelKey])
+		WithValues("ComponentName", config.Labels[intctrlutil.KBAppComponentLabelKey])
 	if hash, ok := config.Labels[cfgcore.CMInsConfigurationHashLabelKey]; ok && hash == config.ResourceVersion {
 		return intctrlutil.Reconciled()
 	}

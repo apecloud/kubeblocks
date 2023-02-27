@@ -34,25 +34,25 @@ func NewDeploymentFactory(namespace, name, clusterName, componentName string) *M
 		&appsv1.Deployment{
 			ObjectMeta: metav1.ObjectMeta{
 				Labels: map[string]string{
-					intctrlutil.AppInstanceLabelKey:  clusterName,
-					intctrlutil.AppComponentLabelKey: componentName,
-					intctrlutil.AppManagedByLabelKey: intctrlutil.AppName,
+					intctrlutil.AppInstanceLabelKey:    clusterName,
+					intctrlutil.KBAppComponentLabelKey: componentName,
+					intctrlutil.AppManagedByLabelKey:   intctrlutil.AppName,
 				},
 			},
 			Spec: appsv1.DeploymentSpec{
 				Selector: &metav1.LabelSelector{
 					MatchLabels: map[string]string{
-						intctrlutil.AppInstanceLabelKey:  clusterName,
-						intctrlutil.AppComponentLabelKey: componentName,
-						intctrlutil.AppManagedByLabelKey: intctrlutil.AppName,
+						intctrlutil.AppInstanceLabelKey:    clusterName,
+						intctrlutil.KBAppComponentLabelKey: componentName,
+						intctrlutil.AppManagedByLabelKey:   intctrlutil.AppName,
 					},
 				},
 				Template: corev1.PodTemplateSpec{
 					ObjectMeta: metav1.ObjectMeta{
 						Labels: map[string]string{
-							intctrlutil.AppInstanceLabelKey:  clusterName,
-							intctrlutil.AppComponentLabelKey: componentName,
-							intctrlutil.AppManagedByLabelKey: intctrlutil.AppName,
+							intctrlutil.AppInstanceLabelKey:    clusterName,
+							intctrlutil.KBAppComponentLabelKey: componentName,
+							intctrlutil.AppManagedByLabelKey:   intctrlutil.AppName,
 						},
 					},
 				},

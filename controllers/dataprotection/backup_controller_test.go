@@ -73,7 +73,7 @@ var _ = Describe("Backup for a StatefulSet", func() {
 
 		By("By mocking a statefulset")
 		sts := testapps.NewStatefulSetFactory(testCtx.DefaultNamespace, clusterName+"-"+componentName, clusterName, componentName).
-			AddLabels(intctrlutil.AppInstanceLabelKey, clusterName).
+			AddAppInstanceLabel(clusterName).
 			AddContainer(corev1.Container{Name: containerName, Image: testapps.ApeCloudMySQLImage}).
 			AddVolumeClaimTemplate(corev1.PersistentVolumeClaim{
 				ObjectMeta: metav1.ObjectMeta{Name: testapps.DataVolumeName},

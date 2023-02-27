@@ -62,6 +62,14 @@ func CreateK8sResource(testCtx testutil.TestContext, obj client.Object) client.O
 	return obj
 }
 
+func CheckedCreateK8sResource(testCtx testutil.TestContext, obj client.Object) client.Object {
+	gomega.Expect(testCtx.CheckedCreateObj(testCtx.Ctx, obj)).Should(gomega.Succeed())
+	// wait until cluster created
+	gomega.Eventually(CheckObjExists(&testCtx, client.ObjectKeyFromObject(obj),
+		obj, true)).Should(gomega.Succeed())
+	return obj
+}
+
 // GetClusterComponentPhase gets the component phase of testing cluster for verification.
 func GetClusterComponentPhase(testCtx testutil.TestContext, clusterName, componentName string) func(g gomega.Gomega) appsv1alpha1.Phase {
 	return func(g gomega.Gomega) appsv1alpha1.Phase {

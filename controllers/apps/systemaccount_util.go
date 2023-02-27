@@ -177,9 +177,9 @@ func replaceEnvsValues(clusterName string, sysAccounts *appsv1alpha1.SystemAccou
 // This is consistent with that of secrets created during cluster initialization.
 func getLabelsForSecretsAndJobs(key componentUniqueKey) client.MatchingLabels {
 	return client.MatchingLabels{
-		intctrlutil.AppInstanceLabelKey:  key.clusterName,
-		intctrlutil.AppComponentLabelKey: key.componentName,
-		intctrlutil.AppManagedByLabelKey: intctrlutil.AppName,
+		intctrlutil.AppInstanceLabelKey:    key.clusterName,
+		intctrlutil.KBAppComponentLabelKey: key.componentName,
+		intctrlutil.AppManagedByLabelKey:   intctrlutil.AppName,
 	}
 }
 
@@ -190,7 +190,7 @@ func renderJob(engine *customizedEngine, key componentUniqueKey, statement []str
 	// inject one more system env variables
 	statementEnv := corev1.EnvVar{
 		Name:  kbAccountStmtEnvName,
-		Value: strings.Join(statement, ";"),
+		Value: strings.Join(statement, " "),
 	}
 	endpointEnv := corev1.EnvVar{
 		Name:  kbAccountEndPointEnvName,
@@ -334,18 +334,18 @@ func getCreationStmtForAccount(key componentUniqueKey, passConfig appsv1alpha1.P
 
 	namedVars := getEnvReplacementMapForAccount(userName, passwd)
 
-	creationStmt := make([]string, 0)
+	execStmts := make([]string, 0)
 	// drop if exists + create if not exists
 	statements := accountConfig.ProvisionPolicy.Statements
-
-	stmt := replaceNamedVars(namedVars, statements.DeletionStatement, -1, true)
-	creationStmt = append(creationStmt, stmt)
-
-	stmt = replaceNamedVars(namedVars, statements.CreationStatement, -1, true)
-	creationStmt = append(creationStmt, stmt)
+	if len(statements.DeletionStatement) > 0 {
+		stmt := replaceNamedVars(namedVars, statements.DeletionStatement, -1, true)
+		execStmts = append(execStmts, stmt)
+	}
+	stmt := replaceNamedVars(namedVars, statements.CreationStatement, -1, true)
+	execStmts = append(execStmts, stmt)
 
 	secret := renderSecretWithPwd(key, userName, passwd)
-	return creationStmt, secret
+	return execStmts, secret
 }
 
 func getAllSysAccounts() []appsv1alpha1.AccountName {

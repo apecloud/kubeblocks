@@ -98,6 +98,10 @@ func (stateless *Stateless) GetPhaseWhenPodsNotReady(componentName string) (apps
 		deploy.Status.AvailableReplicas, checkExistFailedPodOfNewRS), nil
 }
 
+func (stateless *Stateless) HandleUpdate(obj client.Object) error {
+	return nil
+}
+
 func NewStateless(ctx context.Context,
 	cli client.Client,
 	cluster *appsv1alpha1.Cluster,

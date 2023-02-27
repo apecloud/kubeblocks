@@ -3,7 +3,8 @@
 # Declare variables to be passed into your templates.
 
 image:
-  repository: docker.io/apecloud/loadbalancer
+  registry: registry.cn-hangzhou.aliyuncs.com
+  repository: apecloud/loadbalancer
   pullPolicy: Always
   # Overrides the image tag whose default is the chart appVersion.
   tag: ""
@@ -57,9 +58,22 @@ imagePullSecrets: []
 
 podAnnotations: {}
 
-tolerations: []
+tolerations:
+  - key: kb-controller
+    operator: Equal
+    value: "true"
+    effect: NoSchedule
 
 affinity:
+  nodeAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        preference:
+          matchExpressions:
+            - key: kb-controller
+              operator: In
+              values:
+                - "true"
   podAntiAffinity:
     requiredDuringSchedulingIgnoredDuringExecution:
       - labelSelector:

@@ -43,6 +43,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 type reconfigureOptions struct {
@@ -324,7 +325,7 @@ func (r *reconfigureOptions) printConfigureHistory(configs map[appsv1alpha1.Conf
 	// filter reconfigure
 	// kubernetes not support fieldSelector with CRD: https://github.com/kubernetes/kubernetes/issues/51046
 	listOptions := metav1.ListOptions{
-		LabelSelector: strings.Join([]string{types.InstanceLabelKey, r.clusterName}, "="),
+		LabelSelector: strings.Join([]string{intctrlutil.AppInstanceLabelKey, r.clusterName}, "="),
 	}
 
 	opsList, err := r.dynamic.Resource(types.OpsGVR()).Namespace(r.namespace).List(context.TODO(), listOptions)
@@ -343,7 +344,7 @@ func (r *reconfigureOptions) printConfigureHistory(configs map[appsv1alpha1.Conf
 		if ops.Spec.Type != appsv1alpha1.ReconfiguringType {
 			continue
 		}
-		components := getComponentNameFromOps(ops.Spec)
+		components := getComponentNameFromOps(ops)
 		if !strings.Contains(components, r.componentName) {
 			continue
 		}
@@ -576,7 +577,7 @@ func (o *opsRequestDiffOptions) maybeCompareOps(base *appsv1alpha1.OpsRequest, d
 		if len(labels) == 0 {
 			return ""
 		}
-		return labels[types.InstanceLabelKey]
+		return labels[intctrlutil.AppInstanceLabelKey]
 	}
 	getComponentName := func(ops appsv1alpha1.OpsRequestSpec) string {
 		return ops.Reconfigure.ComponentName
@@ -632,7 +633,7 @@ func (o *opsRequestDiffOptions) diffConfig(tplName string) ([]cfgcore.Visualized
 	formatCfg := configConstraint.Spec.FormatterConfig
 	patchOption := cfgcore.CfgOption{
 		Type:    cfgcore.CfgTplType,
-		CfgType: formatCfg.Formatter,
+		CfgType: formatCfg.Format,
 		Log:     log.FromContext(context.TODO()),
 	}
 

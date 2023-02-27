@@ -90,10 +90,10 @@ var _ = Describe("ReplicationSet Util", func() {
 		} {
 			sts := testapps.NewStatefulSetFactory(testCtx.DefaultNamespace, v, clusterObj.Name, testapps.DefaultRedisCompName).
 				AddContainer(container).
-				AddLabels(intctrlutil.AppInstanceLabelKey, clusterObj.Name,
-					intctrlutil.AppComponentLabelKey, testapps.DefaultRedisCompName,
-					intctrlutil.AppManagedByLabelKey, testapps.KubeBlocks,
-					intctrlutil.RoleLabelKey, k).
+				AddAppInstanceLabel(clusterObj.Name).
+				AddAppComponentLabel(testapps.DefaultRedisCompName).
+				AddAppManangedByLabel().
+				AddRoleLabel(k).
 				SetReplicas(1).
 				Create(&testCtx).GetObject()
 			if k == string(Primary) {
@@ -162,7 +162,7 @@ var _ = Describe("ReplicationSet Util", func() {
 		sts := testk8s.NewFakeStatefulSet(clusterObj.Name+testapps.DefaultRedisCompName+"-3", 3)
 		pod := testapps.NewPodFactory(testCtx.DefaultNamespace, sts.Name+"-0").
 			AddContainer(corev1.Container{Name: testapps.DefaultRedisContainerName, Image: testapps.DefaultRedisImageName}).
-			AddLabels(intctrlutil.RoleLabelKey, string(Secondary)).
+			AddRoleLabel(string(Secondary)).
 			Create(&testCtx).GetObject()
 		podList = append(podList, pod)
 		Expect(needUpdateReplicationSetStatus(clusterObj.Status.Components[testapps.DefaultRedisCompName].ReplicationSetStatus, podList)).Should(BeTrue())
@@ -172,7 +172,7 @@ var _ = Describe("ReplicationSet Util", func() {
 		sts = testk8s.NewFakeStatefulSet(clusterObj.Name+testapps.DefaultRedisCompName+"-2", 3)
 		pod = testapps.NewPodFactory(testCtx.DefaultNamespace, sts.Name+"-0").
 			AddContainer(corev1.Container{Name: testapps.DefaultRedisContainerName, Image: testapps.DefaultRedisImageName}).
-			AddLabels(intctrlutil.RoleLabelKey, string(Secondary)).
+			AddRoleLabel(string(Secondary)).
 			Create(&testCtx).GetObject()
 		podRemoveList = append(podRemoveList, *pod)
 		Expect(needRemoveReplicationSetStatus(clusterObj.Status.Components[testapps.DefaultRedisCompName].ReplicationSetStatus, podRemoveList)).Should(BeTrue())

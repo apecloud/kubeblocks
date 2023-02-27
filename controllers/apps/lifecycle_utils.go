@@ -23,7 +23,9 @@ import (
 	"strings"
 	"time"
 
+	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	"github.com/pkg/errors"
+	"golang.org/x/exp/maps"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -33,11 +35,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
-	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
-
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/replicationset"
+	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
 	"github.com/apecloud/kubeblocks/internal/controller/plan"
@@ -78,7 +79,6 @@ func reconcileClusterWorkloads(
 	clusterDef *appsv1alpha1.ClusterDefinition,
 	clusterVer *appsv1alpha1.ClusterVersion,
 	cluster *appsv1alpha1.Cluster) (shouldRequeue bool, err error) {
-
 	resourcesQueue := make([]client.Object, 0, 3)
 	task := intctrltypes.ReconcileTask{
 		Cluster:           cluster,
@@ -86,16 +86,19 @@ func reconcileClusterWorkloads(
 		ClusterVersion:    clusterVer,
 		Resources:         &resourcesQueue,
 	}
-	if err := prepareSecretObjs(reqCtx, cli, &task); err != nil {
-		return false, err
-	}
-
 	clusterCompSpecMap := cluster.GetDefNameMappingComponents()
 	clusterCompVerMap := clusterVer.GetDefNameMappingComponents()
+	process1stComp := true
 
 	prepareComp := func(component *component.SynthesizedComponent) error {
 		iParams := task
 		iParams.Component = component
+		if process1stComp && component.Service != nil {
+			if err := prepareConnCredential(reqCtx, cli, &iParams); err != nil {
+				return err
+			}
+			process1stComp = false
+		}
 		return plan.PrepareComponentResources(reqCtx, cli, &iParams)
 	}
 
@@ -118,13 +121,13 @@ func checkedCreateObjs(reqCtx intctrlutil.RequestCtx, cli client.Client, task *i
 	return createOrReplaceResources(reqCtx, cli, task.Cluster, task.ClusterDefinition, *task.Resources)
 }
 
-func prepareSecretObjs(reqCtx intctrlutil.RequestCtx, cli client.Client, task *intctrltypes.ReconcileTask) error {
+func prepareConnCredential(reqCtx intctrlutil.RequestCtx, cli client.Client, task *intctrltypes.ReconcileTask) error {
 	secret, err := builder.BuildConnCredential(task.GetBuilderParams())
 	if err != nil {
 		return err
 	}
 	// must make sure secret resources are created before others
-	task.AppendResource(secret)
+	task.InsertResource(secret)
 	return nil
 }
 
@@ -138,6 +141,22 @@ func mergeAnnotations(originalAnnotations, targetAnnotations map[string]string) 
 		targetAnnotations[intctrlutil.RestartAnnotationKey] = restartAnnotation
 	}
 	return targetAnnotations
+}
+
+// mergeServiceAnnotations keeps the original annotations except prometheus scrape annotations.
+// if annotations exist and are replaced, the Service will be updated.
+func mergeServiceAnnotations(originalAnnotations, targetAnnotations map[string]string) map[string]string {
+	if len(originalAnnotations) == 0 {
+		return targetAnnotations
+	}
+	tmpAnnotations := make(map[string]string, len(originalAnnotations)+len(targetAnnotations))
+	for k, v := range originalAnnotations {
+		if !strings.HasPrefix(k, "prometheus.io") {
+			tmpAnnotations[k] = v
+		}
+	}
+	maps.Copy(tmpAnnotations, targetAnnotations)
+	return tmpAnnotations
 }
 
 func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
@@ -164,7 +183,7 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 			Name:      stsObj.Name + "-scaling",
 		}
 		// find component of current statefulset
-		componentName := stsObj.Labels[intctrlutil.AppComponentLabelKey]
+		componentName := stsObj.Labels[intctrlutil.KBAppComponentLabelKey]
 		components := mergeComponentsList(reqCtx,
 			cluster,
 			clusterDef,
@@ -384,10 +403,28 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 	}
 
 	handleConfigMap := func(cm *corev1.ConfigMap) error {
-		// if configmap is env config, should update
-		if len(cm.Labels[intctrlutil.AppConfigTypeLabelKey]) > 0 {
+		switch {
+		case len(cm.Labels[intctrlutil.AppConfigTypeLabelKey]) > 0:
+			// if configmap is env config, should update
 			if err := cli.Update(ctx, cm); err != nil {
 				return err
+			}
+		case len(cm.Labels[cfgcore.CMConfigurationProviderTplLabelKey]) > 0:
+			// if tls settings updated, do Update
+			// FIXME: very hacky way. should allow config to be updated
+			oldCm := &corev1.ConfigMap{}
+			if err := cli.Get(ctx, client.ObjectKeyFromObject(cm), oldCm); err != nil {
+				return err
+			}
+			compName := cm.Labels[intctrlutil.KBAppComponentLabelKey]
+			clusterDefComp := component.GetClusterDefCompByName(*clusterDef, *cluster, compName)
+			if clusterDefComp == nil {
+				return errors.New("clusterDefComp not found")
+			}
+			if plan.IsTLSSettingsUpdated(clusterDefComp.CharacterType, *oldCm, *cm) {
+				if err := cli.Update(ctx, cm); err != nil {
+					return err
+				}
 			}
 		}
 		return nil
@@ -411,7 +448,7 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 		}
 		if !reflect.DeepEqual(&deployObjCopy.Spec, &deployObj.Spec) {
 			// sync component phase
-			componentName := deployObj.Labels[intctrlutil.AppComponentLabelKey]
+			componentName := deployObj.Labels[intctrlutil.KBAppComponentLabelKey]
 			syncComponentPhaseWhenSpecUpdating(cluster, componentName)
 		}
 		return nil
@@ -427,24 +464,25 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 			return err
 		}
 		svcObj.Spec = svcProto.Spec
+		svcObj.Annotations = mergeServiceAnnotations(svcObj.Annotations, svcProto.Annotations)
 		if err := cli.Update(ctx, svcObj); err != nil {
 			return err
 		}
 		return nil
 	}
 
+	// why create tls certs here? or why not use prepare-checkedCreate pattern?
+	// tls certs generation is very time-consuming, if using prepare-checkedCreate pattern,
+	// we shall generate certs in every component Update which will slow down the cluster reconcile loop
+	if err := plan.CreateOrCheckTLSCerts(reqCtx, cli, cluster, scheme, dbClusterFinalizerName); err != nil {
+		return false, err
+	}
+
 	var stsList []*appsv1.StatefulSet
 	for _, obj := range objs {
 		logger.Info("create or update", "objs", obj)
-		if err := controllerutil.SetOwnerReference(cluster, obj, scheme); err != nil {
+		if err := intctrlutil.SetOwnership(cluster, obj, scheme, dbClusterFinalizerName); err != nil {
 			return false, err
-		}
-		if !controllerutil.ContainsFinalizer(obj, dbClusterFinalizerName) {
-			// pvc objects do not need to add finalizer
-			_, ok := obj.(*corev1.PersistentVolumeClaim)
-			if !ok {
-				controllerutil.AddFinalizer(obj, dbClusterFinalizerName)
-			}
 		}
 		// appendToStsList is used to handle statefulSets horizontal scaling when workloadType is replication
 		appendToStsList := func(stsList []*appsv1.StatefulSet) []*appsv1.StatefulSet {
@@ -529,7 +567,7 @@ func createBackup(reqCtx intctrlutil.RequestCtx,
 	createBackupPolicy := func() (backupPolicyName string, err error) {
 		backupPolicyName = ""
 		backupPolicyList := dataprotectionv1alpha1.BackupPolicyList{}
-		ml := getBackupMatchingLabels(cluster.Name, sts.Labels[intctrlutil.AppComponentLabelKey])
+		ml := getBackupMatchingLabels(cluster.Name, sts.Labels[intctrlutil.KBAppComponentLabelKey])
 		if err = cli.List(ctx, &backupPolicyList, ml); err != nil {
 			return
 		}
@@ -560,7 +598,7 @@ func createBackup(reqCtx intctrlutil.RequestCtx,
 
 	createBackup := func(backupPolicyName string) error {
 		backupList := dataprotectionv1alpha1.BackupList{}
-		ml := getBackupMatchingLabels(cluster.Name, sts.Labels[intctrlutil.AppComponentLabelKey])
+		ml := getBackupMatchingLabels(cluster.Name, sts.Labels[intctrlutil.KBAppComponentLabelKey])
 		if err := cli.List(ctx, &backupList, ml); err != nil {
 			return err
 		}
@@ -914,6 +952,13 @@ func doBackup(reqCtx intctrlutil.RequestCtx,
 					break
 				}
 			}
+			// sync vct.spec.resources from component
+			for _, tmpVct := range component.VolumeClaimTemplates {
+				if vct.Name == tmpVct.Name {
+					vct.Spec.Resources = tmpVct.Spec.Resources
+					break
+				}
+			}
 			pvcKey := types.NamespacedName{
 				Namespace: stsObj.Namespace,
 				Name: fmt.Sprintf("%s-%s-%d",
@@ -951,9 +996,9 @@ func isPVCExists(cli client.Client,
 
 func getBackupMatchingLabels(clusterName string, componentName string) client.MatchingLabels {
 	return client.MatchingLabels{
-		intctrlutil.AppInstanceLabelKey:  clusterName,
-		intctrlutil.AppComponentLabelKey: componentName,
-		intctrlutil.AppCreatedByLabelKey: intctrlutil.AppName,
+		intctrlutil.AppInstanceLabelKey:    clusterName,
+		intctrlutil.KBAppComponentLabelKey: componentName,
+		intctrlutil.AppCreatedByLabelKey:   intctrlutil.AppName,
 	}
 }
 

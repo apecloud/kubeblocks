@@ -82,21 +82,21 @@ func (r *StatefulSetReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	}
 
 	// create a component object
-	componentName := sts.GetLabels()[intctrlutil.AppComponentLabelKey]
-	clusterComponent := cluster.GetComponentByName(componentName)
-	if clusterComponent == nil {
+	componentName := sts.GetLabels()[intctrlutil.KBAppComponentLabelKey]
+	componentSpec := cluster.GetComponentByName(componentName)
+	if componentSpec == nil {
 		return intctrlutil.Reconciled()
 	}
-	componentDef := clusterDef.GetComponentDefByName(clusterComponent.ComponentDefRef)
-	component := NewComponentByType(ctx, r.Client, cluster, componentDef, clusterComponent)
+	componentDef := clusterDef.GetComponentDefByName(componentSpec.ComponentDefRef)
+	component := NewComponentByType(ctx, r.Client, cluster, componentDef, componentSpec)
 	if component == nil {
 		return intctrlutil.Reconciled()
 	}
-	compCtx := newComponentContext(reqCtx, r.Client, r.Recorder, component, sts, componentName)
-	reqCtx.Log.Info("before handleComponentStatusAndSyncCluster",
+	compCtx := newComponentContext(reqCtx, r.Client, r.Recorder, component, sts, componentSpec)
+	reqCtx.Log.Info("before updateComponentStatusInClusterStatus",
 		"generation", sts.Generation, "observed generation", sts.Status.ObservedGeneration,
 		"replicas", sts.Status.Replicas)
-	if requeueAfter, err := handleComponentStatusAndSyncCluster(compCtx, cluster); err != nil {
+	if requeueAfter, err := updateComponentStatusInClusterStatus(compCtx, cluster); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	} else if requeueAfter != 0 {
 		// if the reconcileAction need requeue, do it

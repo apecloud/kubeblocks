@@ -45,6 +45,6 @@ spec:
 
   # mysql configuration file format
   formatterConfig:
-    formatter: ini
+    format: ini
     iniConfig:
       sectionName: mysqld

@@ -3,6 +3,7 @@ GOPATH ?= $(shell $(GO) env GOPATH)
 
 GINKGO_VERSION = 2.6.1
 GINKGO = $(GOPATH)/bin/ginkgo
+HELM_VERSION ?= v3.9.0
 
 # The help target prints out all targets with their descriptions organized
 # beneath their categories. The categories are represented by '##@' and the
@@ -32,3 +33,15 @@ run: ginkgo ## Run end-to-end tests.
 
 build: ginkgo ## Run ginkgo build e2e test suite binary.
 	$(GINKGO) build .
+
+.PHONY: helmtool
+helmtool: ## Download helm locally if necessary.
+ifeq (, $(shell which helm))
+	@{ \
+	set -e ;\
+	go install github.com/helm/helm@$(HELM_VERSION);\
+	}
+HELM=$(GOBIN)/helm
+else
+HELM=$(shell which helm)
+endif

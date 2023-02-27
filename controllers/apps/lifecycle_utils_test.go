@@ -18,7 +18,6 @@ package apps
 
 import (
 	"context"
-	"fmt"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -138,10 +137,11 @@ var _ = Describe("lifecycle_utils", func() {
 			}},
 		}
 		return testapps.NewStatefulSetFactory(testCtx.DefaultNamespace, "mock-sts", clusterName, mysqlCompName).
-			AddLabels(intctrlutil.AppNameLabelKey, "mock-app",
-				intctrlutil.AppInstanceLabelKey, clusterName,
-				intctrlutil.AppComponentLabelKey, mysqlCompName,
-			).SetReplicas(1).AddContainer(container).
+			AddAppNameLabel("mock-app").
+			AddAppInstanceLabel(clusterName).
+			AddAppComponentLabel(mysqlCompName).
+			SetReplicas(1).
+			AddContainer(container).
 			AddVolumeClaimTemplate(corev1.PersistentVolumeClaim{
 				ObjectMeta: metav1.ObjectMeta{Name: testapps.DataVolumeName},
 				Spec:       testapps.NewPVC("1Gi"),
@@ -158,15 +158,11 @@ var _ = Describe("lifecycle_utils", func() {
 	}
 
 	newVolumeSnapshot := func(clusterName, componentName string) *snapshotv1.VolumeSnapshot {
-		vsYAML := fmt.Sprintf(`
+		vsYAML := `
 apiVersion: snapshot.storage.k8s.io/v1
 kind: VolumeSnapshot
 metadata:
   labels:
-    app.kubernetes.io/component-name: %s
-    app.kubernetes.io/created-by: kubeblocks
-    app.kubernetes.io/instance: %s
-    app.kubernetes.io/managed-by: kubeblocks
     app.kubernetes.io/name: mysql-apecloud-mysql
     backupjobs.dataprotection.kubeblocks.io/name: wesql-01-replicasets-scaling-qf6cr
     backuppolicies.dataprotection.kubeblocks.io/name: wesql-01-replicasets-scaling-hcxps
@@ -177,9 +173,17 @@ spec:
   source:
     persistentVolumeClaimName: data-wesql-01-replicasets-0
   volumeSnapshotClassName: csi-aws-ebs-snapclass
-`, componentName, clusterName)
+`
 		vs := snapshotv1.VolumeSnapshot{}
 		Expect(yaml.Unmarshal([]byte(vsYAML), &vs)).Should(Succeed())
+		labels := map[string]string{
+			intctrlutil.AppCreatedByLabelKey:   intctrlutil.AppName,
+			intctrlutil.AppInstanceLabelKey:    clusterName,
+			intctrlutil.KBAppComponentLabelKey: componentName,
+		}
+		for k, v := range labels {
+			vs.Labels[k] = v
+		}
 		return &vs
 	}
 
@@ -239,6 +243,32 @@ spec:
 			sts := newStsObj()
 			Expect(k8sClient.Create(ctx, sts)).Should(Succeed())
 			Expect(deleteObjectOrphan(k8sClient, ctx, sts)).Should(Succeed())
+		})
+	})
+
+	Context("test mergeServiceAnnotations", func() {
+		It("original and target annotations are nil", func() {
+			Expect(mergeServiceAnnotations(nil, nil)).Should(BeNil())
+		})
+		It("target annotations is nil", func() {
+			originalAnnotations := map[string]string{"k1": "v1"}
+			Expect(mergeServiceAnnotations(originalAnnotations, nil)).To(Equal(originalAnnotations))
+		})
+		It("original annotations is nil", func() {
+			targetAnnotations := map[string]string{"k1": "v1"}
+			Expect(mergeServiceAnnotations(nil, targetAnnotations)).To(Equal(targetAnnotations))
+		})
+		It("original annotations have prometheus annotations which should be removed", func() {
+			originalAnnotations := map[string]string{"k1": "v1", "prometheus.io/path": "/metrics"}
+			targetAnnotations := map[string]string{"k2": "v2"}
+			expectAnnotations := map[string]string{"k1": "v1", "k2": "v2"}
+			Expect(mergeServiceAnnotations(originalAnnotations, targetAnnotations)).To(Equal(expectAnnotations))
+		})
+		It("target annotations should override original annotations", func() {
+			originalAnnotations := map[string]string{"k1": "v1", "prometheus.io/path": "/metrics"}
+			targetAnnotations := map[string]string{"k1": "v11"}
+			expectAnnotations := map[string]string{"k1": "v11"}
+			Expect(mergeServiceAnnotations(originalAnnotations, targetAnnotations)).To(Equal(expectAnnotations))
 		})
 	})
 })

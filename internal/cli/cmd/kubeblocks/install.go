@@ -102,11 +102,11 @@ func newInstallCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 		Args:    cobra.NoArgs,
 		Example: installExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			util.CheckErr(o.complete(f, cmd))
+			util.CheckErr(o.Complete(f, cmd))
 			util.CheckErr(o.Install())
 		},
 		PostRun: func(cmd *cobra.Command, args []string) {
-			util.CheckErr(o.postInstall())
+			util.CheckErr(o.PostInstall())
 		},
 	}
 
@@ -120,7 +120,7 @@ func newInstallCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 	return cmd
 }
 
-func (o *Options) complete(f cmdutil.Factory, cmd *cobra.Command) error {
+func (o *Options) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 	var err error
 	if o.Namespace, _, err = f.ToRawKubeConfigLoader().Namespace(); err != nil {
 		return err
@@ -423,7 +423,7 @@ Notes: Monitor components(Grafana/Prometheus/AlertManager) is not installed,
 	}
 }
 
-func (o *InstallOptions) postInstall() error {
+func (o *InstallOptions) PostInstall() error {
 	var sets []string
 	for _, set := range o.ValueOpts.Values {
 		splitSet := strings.Split(set, ",")
@@ -447,6 +447,7 @@ func (o *InstallOptions) createVolumeSnapshotClass() error {
 	options := cluster.CreateVolumeSnapshotClassOptions{}
 	options.BaseOptions.Client = o.Dynamic
 	options.BaseOptions.IOStreams = o.IOStreams
+	options.BaseOptions.Quiet = true
 
 	spinner := util.Spinner(o.Out, "%-40s", "Configure VolumeSnapshotClass")
 	defer spinner(false)

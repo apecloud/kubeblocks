@@ -23,6 +23,11 @@ component: {
 	characterType:  string
 	type:           string
 	name:           string
+	monitor: {
+		enable:     bool
+		scrapePort: int
+		scrapePath: string
+	}
 	service: {
 		ports: [...]
 		type: string
@@ -38,19 +43,28 @@ service: {
 		namespace: cluster.metadata.namespace
 		name:      "\(cluster.metadata.name)-\(component.name)-headless"
 		labels: {
-			"app.kubernetes.io/name": "\(component.clusterDefName)"
-			"app.kubernetes.io/instance":       cluster.metadata.name
-			"app.kubernetes.io/component-name": "\(component.name)"
-			"app.kubernetes.io/managed-by":     "kubeblocks"
-			// "app.kubernetes.io/version" : # TODO
+			"app.kubernetes.io/name":       "\(component.clusterDefName)"
+			"app.kubernetes.io/instance":   cluster.metadata.name
+			"app.kubernetes.io/managed-by": "kubeblocks"
+
+			"app.kubeblocks.io/component-name": "\(component.name)"
+		}
+		annotations: {
+			"prometheus.io/scrape": "\(component.monitor.enable)"
+			if component.monitor.enable == true {
+				"prometheus.io/path":   component.monitor.scrapePath
+				"prometheus.io/port":   "\(component.monitor.scrapePort)"
+				"prometheus.io/scheme": "http"
+			}
 		}
 	}
 	"spec": {
 		"clusterIP": "None"
 		"selector": {
-			"app.kubernetes.io/instance":       "\(cluster.metadata.name)"
-			"app.kubernetes.io/component-name": "\(component.name)"
-			"app.kubernetes.io/managed-by":     "kubeblocks"
+			"app.kubernetes.io/instance":   "\(cluster.metadata.name)"
+			"app.kubernetes.io/managed-by": "kubeblocks"
+
+			"app.kubeblocks.io/component-name": "\(component.name)"
 		}
 		ports: [
 			for _, container in component.podSpec.containers if container.ports != _|_

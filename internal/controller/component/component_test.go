@@ -27,10 +27,6 @@ import (
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 )
 
-const (
-	kFake = "fake"
-)
-
 var tlog = ctrl.Log.WithName("component_testing")
 
 var _ = Describe("component module", func() {

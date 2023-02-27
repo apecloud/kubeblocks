@@ -107,7 +107,6 @@ type UnixSignalTrigger struct {
 	// e.g: SIGHUP
 	// url: ../../internal/configuration/configmap/handler.go:allUnixSignals
 	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:Enum={SIGHUP,SIGINT,SIGQUIT,SIGILL,SIGTRAP,SIGABRT,SIGBUS,SIGFPE,SIGKILL,SIGUSR1,SIGSEGV,SIGUSR2,SIGPIPE,SIGALRM,SIGTERM,SIGSTKFLT,SIGCHLD,SIGCONT,SIGSTOP,SIGTSTP,SIGTTIN,SIGTTOU,SIGURG,SIGXCPU,SIGXFSZ,SIGVTALRM,SIGPROF,SIGWINCH,SIGIO,SIGPWR,SIGSYS}
 	Signal SignalType `json:"signal"`
 
 	// processName is process name, sends unix signal to proc.
@@ -123,16 +122,15 @@ type ShellTrigger struct {
 }
 
 type FormatterConfig struct {
-	// formatter describes the format of the configuration file
-	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:Enum={xml,ini,yaml,json,dotenv}
-	// Formatter ConfigurationFormatter `json:"formatter"`
-	Formatter ConfigurationFormatter `json:"formatter"`
-
 	// The FormatterOptions represents the special options of configuration file.
 	// This is optional for now. If not specified.
 	// +optional
 	FormatterOptions `json:",inline"`
+
+	// The configuration file format. Valid values are ini, yaml, json, xml,
+	// hcl, and dotenv.
+	// +kubebuilder:validation:Required
+	Format CfgFileFormat `json:"format"`
 }
 
 // FormatterOptions represents the special options of configuration file.

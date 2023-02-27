@@ -110,3 +110,14 @@ wal_receiver_timeout = '60s'
 wal_writer_delay = '20ms'
 wal_writer_flush_after = '1MB'
 work_mem = '32MB'
+
+{{- if $.component.tls }}
+{{- $ca_file := getCAFile }}
+{{- $cert_file := getCertFile }}
+{{- $key_file := getKeyFile }}
+# tls
+ssl=ON
+ssl_ca_file={{ $ca_file }}
+ssl_cert_file={{ $cert_file }}
+ssl_key_file={{ $key_file }}
+{{- end }}

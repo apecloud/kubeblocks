@@ -20,6 +20,12 @@ import (
 	"context"
 	"path/filepath"
 	"testing"
+	"time"
+
+	corev1 "k8s.io/api/core/v1"
+
+	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
+	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -55,6 +61,12 @@ var cancel context.CancelFunc
 var k8sManager ctrl.Manager
 var testCtx testutil.TestContext
 var eventRecorder record.EventRecorder
+
+const (
+	statelessComp = "stateless"
+	statefulComp  = "stateful"
+	consensusComp = "consensus"
+)
 
 func init() {
 	viper.AutomaticEnv()
@@ -128,3 +140,59 @@ var _ = AfterSuite(func() {
 	err := testEnv.Stop()
 	Expect(err).NotTo(HaveOccurred())
 })
+
+// initOperationsResources inits the operations resources.
+func initOperationsResources(clusterDefinitionName,
+	clusterVersionName,
+	clusterName string) (*OpsResource, *appsv1alpha1.ClusterDefinition, *appsv1alpha1.Cluster) {
+	clusterDef, _, clusterObject := testapps.InitClusterWithHybridComps(testCtx, clusterDefinitionName,
+		clusterVersionName, clusterName, statelessComp, statefulComp, consensusComp)
+	opsRes := &OpsResource{
+		Ctx:      context.Background(),
+		Cluster:  clusterObject,
+		Client:   k8sClient,
+		Recorder: k8sManager.GetEventRecorderFor("opsrequest-controller"),
+	}
+	By("mock cluster is Running and the status operations")
+	Expect(testapps.ChangeObjStatus(&testCtx, clusterObject, func() {
+		clusterObject.Status.Phase = appsv1alpha1.RunningPhase
+		clusterObject.Status.Components = map[string]appsv1alpha1.ClusterComponentStatus{
+			consensusComp: {
+				Phase: appsv1alpha1.RunningPhase,
+			},
+			statelessComp: {
+				Phase: appsv1alpha1.RunningPhase,
+			},
+			statefulComp: {
+				Phase: appsv1alpha1.RunningPhase,
+			},
+		}
+		clusterObject.Status.Operations = &appsv1alpha1.Operations{
+			Upgradable: true,
+			HorizontalScalable: []appsv1alpha1.OperationComponent{
+				{
+					Name: consensusComp,
+				},
+				{
+					Name: statelessComp,
+				},
+				{
+					Name: statefulComp,
+				},
+			},
+		}
+	})).Should(Succeed())
+	opsRes.Cluster = clusterObject
+	return opsRes, clusterDef, clusterObject
+}
+
+func initConsensusPods(opsRes *OpsResource, clusterName string) []corev1.Pod {
+	// mock the pods of consensusSet component
+	testapps.MockConsensusComponentPods(testCtx, nil, clusterName, consensusComp)
+	podList, err := util.GetComponentPodList(opsRes.Ctx, opsRes.Client, opsRes.Cluster, consensusComp)
+	Expect(err).Should(Succeed())
+	// the opsRequest will use startTime to check some condition.
+	// if there is no sleep for 1 second, unstable error may occur.
+	time.Sleep(time.Second)
+	return podList.Items
+}

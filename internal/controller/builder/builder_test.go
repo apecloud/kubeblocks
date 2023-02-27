@@ -17,6 +17,7 @@ limitations under the License.
 package builder
 
 import (
+	"fmt"
 	"testing"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -126,10 +127,10 @@ var _ = Describe("builder", func() {
 			}},
 		}
 		return testapps.NewStatefulSetFactory(testCtx.DefaultNamespace, "mock-sts", clusterName, mysqlCompName).
-			AddLabels(intctrlutil.AppNameLabelKey, "mock-app",
-				intctrlutil.AppInstanceLabelKey, clusterName,
-				intctrlutil.AppComponentLabelKey, mysqlCompName,
-			).SetReplicas(1).AddContainer(container).
+			AddAppNameLabel("mock-app").
+			AddAppInstanceLabel(clusterName).
+			AddAppComponentLabel(mysqlCompName).
+			SetReplicas(1).AddContainer(container).
 			AddVolumeClaimTemplate(corev1.PersistentVolumeClaim{
 				ObjectMeta: metav1.ObjectMeta{Name: testapps.DataVolumeName},
 				Spec:       testapps.NewPVC("1Gi"),
@@ -143,8 +144,8 @@ var _ = Describe("builder", func() {
 		}
 		return reqCtx
 	}
-	newAllFieldsComponent := func() *component.SynthesizedComponent {
-		cluster, clusterDef, clusterVersion, _ := newAllFieldsClusterObj(nil, nil, false)
+	newAllFieldsComponent := func(clusterDef *appsv1alpha1.ClusterDefinition, clusterVersion *appsv1alpha1.ClusterVersion) *component.SynthesizedComponent {
+		cluster, clusterDef, clusterVersion, _ := newAllFieldsClusterObj(clusterDef, clusterVersion, false)
 		reqCtx := newReqCtx()
 		By("assign every available fields")
 		component := component.BuildComponent(
@@ -163,10 +164,22 @@ var _ = Describe("builder", func() {
 			ClusterDefinition: clusterDef,
 			ClusterVersion:    clusterVersion,
 			Cluster:           cluster,
-			Component:         newAllFieldsComponent(),
+			Component:         newAllFieldsComponent(clusterDef, clusterVersion),
 		}
 		return &params
 	}
+
+	newParamsWithClusterDef := func(clusterDefObj *appsv1alpha1.ClusterDefinition) *BuilderParams {
+		cluster, clusterDef, clusterVersion, _ := newAllFieldsClusterObj(clusterDefObj, nil, false)
+		params := BuilderParams{
+			ClusterDefinition: clusterDef,
+			ClusterVersion:    clusterVersion,
+			Cluster:           cluster,
+			Component:         newAllFieldsComponent(clusterDef, clusterVersion),
+		}
+		return &params
+	}
+
 	newBackupPolicyTemplate := func() *dataprotectionv1alpha1.BackupPolicyTemplate {
 		return testapps.NewBackupPolicyTemplateFactory("backup-policy-template-mysql").
 			SetBackupToolName("mysql-xtrabackup").
@@ -200,11 +213,34 @@ var _ = Describe("builder", func() {
 			Expect(svc).ShouldNot(BeNil())
 		})
 
-		It("builds ConnCredential correctly", func() {
-			params := newParams()
+		It("builds Conn. Credential correctly", func() {
+			params := newParamsWithClusterDef(testapps.NewClusterDefFactoryWithConnCredential("conn-cred").GetObject())
 			credential, err := BuildConnCredential(*params)
 			Expect(err).Should(BeNil())
 			Expect(credential).ShouldNot(BeNil())
+			// "username":      "root",
+			// "svcFQDN":       "$(SVC_FQDN)",
+			// "password":      "$(RANDOM_PASSWD)",
+			// "tcpEndpoint":   "tcp:$(SVC_FQDN):$(SVC_PORT_mysql)",
+			// "paxosEndpoint": "paxos:$(SVC_FQDN):$(SVC_PORT_paxos)",
+			Expect(credential.StringData).ShouldNot(BeEmpty())
+			Expect(credential.StringData["username"]).Should(Equal("root"))
+			Expect(credential.StringData["password"]).Should(HaveLen(8))
+			svcFQDN := fmt.Sprintf("%s-%s.%s.svc", params.Cluster.Name, params.Component.Name,
+				params.Cluster.Namespace)
+			var mysqlPort corev1.ServicePort
+			var paxosPort corev1.ServicePort
+			for _, s := range params.Component.Service.Ports {
+				switch s.Name {
+				case "mysql":
+					mysqlPort = s
+				case "paxos":
+					paxosPort = s
+				}
+			}
+			Expect(credential.StringData["svcFQDN"]).Should(Equal(svcFQDN))
+			Expect(credential.StringData["tcpEndpoint"]).Should(Equal(fmt.Sprintf("tcp:%s:%d", svcFQDN, mysqlPort.Port)))
+			Expect(credential.StringData["paxosEndpoint"]).Should(Equal(fmt.Sprintf("paxos:%s:%d", svcFQDN, paxosPort.Port)))
 		})
 
 		It("builds StatefulSet correctly", func() {

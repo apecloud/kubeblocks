@@ -313,10 +313,9 @@ spec:
                         builtIn:
                           default: false
                           description: builtIn is a switch to enable KubeBlocks builtIn
-                            monitoring. If BuiltIn is true and CharacterType is well-known,
-                            ExporterConfig and Sidecar container will generate automatically.
-                            Otherwise, provider should set builtIn to false and provide
-                            ExporterConfig and Sidecar container own.
+                            monitoring. If BuiltIn is set to false, the provider should
+                            set ExporterConfig and Sidecar container own. BuiltIn
+                            set to true is not currently supported but will be soon.
                           type: boolean
                         exporterConfig:
                           description: exporterConfig provided by provider, which
@@ -342,7 +341,7 @@ spec:
                       type: object
                     name:
                       description: Name of the component, it can be any valid string.
-                      maxLength: 12
+                      maxLength: 18
                       pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                       type: string
                     podSpec:
@@ -8409,7 +8408,6 @@ spec:
                                         type: string
                                     required:
                                     - creation
-                                    - deletion
                                     type: object
                                   type:
                                     description: type defines the way to provision
@@ -8632,8 +8630,15 @@ spec:
               connectionCredential:
                 additionalProperties:
                   type: string
-                description: Default connection credential used for connecting to
-                  cluster service.
+                description: 'Connection credential template used for creating a connection
+                  credential secret for Cluster.app.kubeblock.io object. Built-in
+                  objects are: `$(RANDOM_PASSWD)` - random 8 characters `$(SVC_FQDN)`
+                  - service FQDN  placeholder, value pattern - $(CLUSTER_NAME)-$(1ST_COMP_NAME).$(NAMESPACE).svc,
+                  where 1ST_COMP_NAME is the 1st component that provide `ClusterDefinition.spec.componentDefs[].service`
+                  attribute `$(SVC_PORT_<PORT-NAME>)` - a ServicePort''s port value
+                  with specified port name, i.e, a servicePort JSON struct: { "name":
+                  "mysql", "targetPort": "mysqlContainerPort", "port": 3306 }, and
+                  "$(SVC_PORT_mysql)" in the connection credential value is 3306.'
                 type: object
             required:
             - componentDefs

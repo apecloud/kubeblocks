@@ -21,7 +21,6 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/google/go-cmp/cmp"
 	"github.com/pkg/errors"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -60,84 +59,6 @@ const (
 	emptyPriority             = 1 << 0
 	// unknownPriority           = 0
 )
-
-// handleConsensusSetUpdate handle ConsensusSet component when it to do updating
-// return true means stateful set reconcile done
-func handleConsensusSetUpdate(ctx context.Context, cli client.Client, cluster *appsv1alpha1.Cluster, stsObj *appsv1.StatefulSet) (bool, error) {
-	// get compDefName from stsObj.name
-	compDefName := cluster.GetComponentDefRefName(stsObj.Labels[intctrlutil.AppComponentLabelKey])
-
-	// get component from ClusterDefinition by compDefName
-	component, err := util.GetComponentDefByCluster(ctx, cli, cluster, compDefName)
-	if err != nil {
-		return false, err
-	}
-
-	if component == nil || component.WorkloadType != appsv1alpha1.Consensus {
-		return true, nil
-	}
-	pods, err := util.GetPodListByStatefulSet(ctx, cli, stsObj)
-	if err != nil {
-		return false, err
-	}
-
-	// update cluster.status.component.consensusSetStatus based on all pods currently exist
-	componentName := stsObj.Labels[intctrlutil.AppComponentLabelKey]
-
-	// first, get the old status
-	var oldConsensusSetStatus *appsv1alpha1.ConsensusSetStatus
-	if cluster.Status.Components != nil {
-		if v, ok := cluster.Status.Components[componentName]; ok {
-			oldConsensusSetStatus = v.ConsensusSetStatus
-		}
-	}
-	// create the initial status
-	newConsensusSetStatus := &appsv1alpha1.ConsensusSetStatus{
-		Leader: appsv1alpha1.ConsensusMemberStatus{
-			Name:       "",
-			Pod:        util.ComponentStatusDefaultPodName,
-			AccessMode: appsv1alpha1.None,
-		},
-	}
-	// then, calculate the new status
-	setConsensusSetStatusRoles(newConsensusSetStatus, *component, pods)
-	// if status changed, do update
-	if !cmp.Equal(newConsensusSetStatus, oldConsensusSetStatus) {
-		patch := client.MergeFrom(cluster.DeepCopy())
-		util.InitClusterComponentStatusIfNeed(cluster, componentName, component)
-		componentStatus := cluster.Status.Components[componentName]
-		componentStatus.ConsensusSetStatus = newConsensusSetStatus
-		cluster.Status.Components[componentName] = componentStatus
-		if err = cli.Status().Patch(ctx, cluster, patch); err != nil {
-			return false, err
-		}
-		// add consensus role info to pod env
-		if err := updateConsensusRoleInfo(ctx, cli, cluster, *component, componentName, pods); err != nil {
-			return false, err
-		}
-	}
-
-	// prepare to do pods Deletion, that's the only thing we should do.
-	// the stateful set reconciler will do the others.
-	// to simplify the process, wo do pods Delete after stateful set reconcile done,
-	// that is stsObj.Generation == stsObj.Status.ObservedGeneration
-	if stsObj.Generation != stsObj.Status.ObservedGeneration {
-		return false, nil
-	}
-
-	// then we wait all pods' presence, that is len(pods) == stsObj.Spec.Replicas
-	// only then, we have enough info about the previous pods before delete the current one
-	if len(pods) != int(*stsObj.Spec.Replicas) {
-		return false, nil
-	}
-
-	// we don't check whether pod role label present: prefer stateful set's Update done than role probing ready
-
-	// generate the pods Deletion plan
-	plan := generateConsensusUpdatePlan(ctx, cli, stsObj, pods, *component)
-	// execute plan
-	return plan.WalkOneStep()
-}
 
 // SortPods sorts pods by their role priority
 func SortPods(pods []corev1.Pod, rolePriorityMap map[string]int) {
@@ -321,7 +242,7 @@ func UpdateConsensusSetRoleLabel(cli client.Client, reqCtx intctrlutil.RequestCt
 	}
 
 	// get componentDef this pod belongs to
-	componentName := pod.Labels[intctrlutil.AppComponentLabelKey]
+	componentName := pod.Labels[intctrlutil.KBAppComponentLabelKey]
 	compDefName := cluster.GetComponentDefRefName(componentName)
 	componentDef, err := util.GetComponentDefByCluster(ctx, cli, cluster, compDefName)
 	if err != nil {
@@ -528,9 +449,9 @@ func updateConsensusRoleInfo(ctx context.Context, cli client.Client, cluster *ap
 	}
 
 	ml := client.MatchingLabels{
-		intctrlutil.AppInstanceLabelKey:   cluster.GetName(),
-		intctrlutil.AppComponentLabelKey:  componentName,
-		intctrlutil.AppConfigTypeLabelKey: "kubeblocks-env",
+		intctrlutil.AppInstanceLabelKey:    cluster.GetName(),
+		intctrlutil.KBAppComponentLabelKey: componentName,
+		intctrlutil.AppConfigTypeLabelKey:  "kubeblocks-env",
 	}
 
 	configList := &corev1.ConfigMapList{}

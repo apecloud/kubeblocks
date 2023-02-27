@@ -46,7 +46,6 @@ func wrapGoTemplateRun(tplName string, tplContent string, updatedParams map[stri
 		commandChannel DynamicParamUpdater
 	)
 
-	// TODO using dapper command channel
 	if commandChannel, err = NewCommandChannel(viper.GetString(DBType)); err != nil {
 		return err
 	}

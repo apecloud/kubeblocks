@@ -1,4 +1,38 @@
 {
+  "__inputs": [],
+  "__elements": {},
+  "__requires": [
+    {
+      "type": "grafana",
+      "id": "grafana",
+      "name": "Grafana",
+      "version": "9.2.4"
+    },
+    {
+      "type": "datasource",
+      "id": "prometheus",
+      "name": "Prometheus",
+      "version": "1.0.0"
+    },
+    {
+      "type": "panel",
+      "id": "stat",
+      "name": "Stat",
+      "version": ""
+    },
+    {
+      "type": "panel",
+      "id": "table",
+      "name": "Table",
+      "version": ""
+    },
+    {
+      "type": "panel",
+      "id": "timeseries",
+      "name": "Time series",
+      "version": ""
+    }
+  ],
   "annotations": {
     "list": [
       {
@@ -26,7 +60,7 @@
   "fiscalYearStartMonth": 0,
   "gnetId": 763,
   "graphTooltip": 1,
-  "id": 6,
+  "id": null,
   "links": [],
   "liveNow": false,
   "panels": [
@@ -46,7 +80,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "prometheus"
+        "uid": "$datasource"
       },
       "fieldConfig": {
         "defaults": {
@@ -94,7 +128,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "prometheus"
+            "uid": "$datasource"
           },
           "editorMode": "code",
           "expr": "count(sum by(namespace, app_kubernetes_io_instance)(redis_up{namespace=~\"$namespace\"}))",
@@ -109,7 +143,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "prometheus"
+        "uid": "$datasource"
       },
       "description": "",
       "fieldConfig": {
@@ -423,7 +457,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "prometheus"
+            "uid": "$datasource"
           },
           "editorMode": "code",
           "exemplar": false,
@@ -438,7 +472,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "prometheus"
+            "uid": "$datasource"
           },
           "editorMode": "code",
           "exemplar": false,
@@ -453,7 +487,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "prometheus"
+            "uid": "$datasource"
           },
           "editorMode": "code",
           "exemplar": false,
@@ -468,7 +502,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "prometheus"
+            "uid": "$datasource"
           },
           "editorMode": "code",
           "exemplar": false,
@@ -483,7 +517,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "prometheus"
+            "uid": "$datasource"
           },
           "editorMode": "code",
           "exemplar": false,
@@ -498,7 +532,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "prometheus"
+            "uid": "$datasource"
           },
           "editorMode": "code",
           "exemplar": false,
@@ -513,7 +547,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "prometheus"
+            "uid": "$datasource"
           },
           "editorMode": "code",
           "exemplar": false,
@@ -528,7 +562,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "prometheus"
+            "uid": "$datasource"
           },
           "editorMode": "code",
           "exemplar": false,
@@ -543,7 +577,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "prometheus"
+            "uid": "$datasource"
           },
           "editorMode": "code",
           "exemplar": false,
@@ -558,7 +592,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "prometheus"
+            "uid": "$datasource"
           },
           "editorMode": "code",
           "exemplar": false,
@@ -653,7 +687,7 @@
       "collapsed": false,
       "datasource": {
         "type": "prometheus",
-        "uid": "prometheus"
+        "uid": "$datasource"
       },
       "gridPos": {
         "h": 1,
@@ -667,7 +701,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "prometheus"
+            "uid": "$datasource"
           },
           "refId": "A"
         }
@@ -678,7 +712,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "prometheus"
+        "uid": "$datasource"
       },
       "description": "Sum taken across instances",
       "fieldConfig": {
@@ -790,7 +824,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "prometheus"
+        "uid": "$datasource"
       },
       "description": "Sum taken across instances",
       "fieldConfig": {
@@ -907,7 +941,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "prometheus"
+        "uid": "$datasource"
       },
       "description": "Sum taken across instances",
       "fieldConfig": {
@@ -1020,7 +1054,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "prometheus"
+            "uid": "$datasource"
           },
           "editorMode": "code",
           "expr": "sum(redis_evicted_keys_total{pod=~\"$instance\"})",
@@ -1036,7 +1070,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "prometheus"
+        "uid": "$datasource"
       },
       "description": "This metric will only be non-zero if the instance is a master",
       "fieldConfig": {
@@ -1132,7 +1166,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "prometheus"
+        "uid": "$datasource"
       },
       "description": "This metric is only exported if the instance is a slave.",
       "fieldConfig": {
@@ -1229,7 +1263,7 @@
       "collapsed": false,
       "datasource": {
         "type": "prometheus",
-        "uid": "prometheus"
+        "uid": "$datasource"
       },
       "gridPos": {
         "h": 1,
@@ -1243,7 +1277,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "prometheus"
+            "uid": "$datasource"
           },
           "refId": "A"
         }
@@ -1254,7 +1288,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "prometheus"
+        "uid": "$datasource"
       },
       "description": "Total taken across instances",
       "fieldConfig": {
@@ -1432,7 +1466,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "prometheus"
+        "uid": "$datasource"
       },
       "fieldConfig": {
         "defaults": {
@@ -1578,7 +1612,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "prometheus"
+        "uid": "$datasource"
       },
       "fieldConfig": {
         "defaults": {
@@ -1769,7 +1803,7 @@
       "collapsed": false,
       "datasource": {
         "type": "prometheus",
-        "uid": "prometheus"
+        "uid": "$datasource"
       },
       "gridPos": {
         "h": 1,
@@ -1783,7 +1817,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "prometheus"
+            "uid": "$datasource"
           },
           "refId": "A"
         }
@@ -1794,7 +1828,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "prometheus"
+        "uid": "$datasource"
       },
       "description": "Average taken across instances",
       "fieldConfig": {
@@ -1880,7 +1914,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "prometheus"
+            "uid": "$datasource"
           },
           "editorMode": "code",
           "expr": "sum(irate(redis_commands_total{pod=~\"$instance\"} [$__rate_interval])) by (cmd)",
@@ -1900,7 +1934,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "prometheus"
+        "uid": "$datasource"
       },
       "description": "Hit rate shows the percentage of key space lookups that hit a key.",
       "fieldConfig": {
@@ -2062,7 +2096,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "prometheus"
+        "uid": "$datasource"
       },
       "description": "Average taken across instances",
       "fieldConfig": {
@@ -2167,7 +2201,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "prometheus"
+        "uid": "$datasource"
       },
       "fieldConfig": {
         "defaults": {
@@ -2252,7 +2286,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "prometheus"
+            "uid": "$datasource"
           },
           "editorMode": "code",
           "expr": "sum(irate(redis_commands_duration_seconds_total{pod=~\"$instance\"}[$__rate_interval])) by (cmd) != 0",
@@ -2282,12 +2316,27 @@
       {
         "current": {
           "selected": false,
-          "text": "default",
-          "value": "default"
+          "text": "Prometheus",
+          "value": "Prometheus"
         },
+        "hide": 0,
+        "includeAll": false,
+        "label": "Data source",
+        "multi": false,
+        "name": "datasource",
+        "options": [],
+        "query": "prometheus",
+        "queryValue": "",
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "type": "datasource"
+      },
+      {
+        "current": {},
         "datasource": {
           "type": "prometheus",
-          "uid": "prometheus"
+          "uid": "$datasource"
         },
         "definition": "label_values(redis_up, namespace)",
         "hide": 0,
@@ -2307,14 +2356,10 @@
         "type": "query"
       },
       {
-        "current": {
-          "selected": true,
-          "text": "redis1",
-          "value": "redis1"
-        },
+        "current": {},
         "datasource": {
           "type": "prometheus",
-          "uid": "prometheus"
+          "uid": "$datasource"
         },
         "definition": "label_values(redis_up, app_kubernetes_io_instance)",
         "hide": 0,
@@ -2334,14 +2379,10 @@
         "type": "query"
       },
       {
-        "current": {
-          "selected": false,
-          "text": "redis1-redis-1-0",
-          "value": "redis1-redis-1-0"
-        },
+        "current": {},
         "datasource": {
           "type": "prometheus",
-          "uid": "prometheus"
+          "uid": "$datasource"
         },
         "definition": "label_values(redis_up{namespace=~\"$namespace\",app_kubernetes_io_instance=~\"$cluster\"}, pod)",
         "hide": 0,

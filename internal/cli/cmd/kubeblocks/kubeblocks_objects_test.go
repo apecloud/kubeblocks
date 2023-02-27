@@ -115,7 +115,7 @@ func mockDynamicClientWithCRD(objects ...runtime.Object) dynamic.Interface {
 			Name: "clusters.apps.kubeblocks.io",
 		},
 		Spec: v1.CustomResourceDefinitionSpec{
-			Group: types.Group,
+			Group: types.AppsAPIGroup,
 		},
 		Status: v1.CustomResourceDefinitionStatus{},
 	}
@@ -128,7 +128,7 @@ func mockDynamicClientWithCRD(objects ...runtime.Object) dynamic.Interface {
 			Name: "clusterdefinitions.apps.kubeblocks.io",
 		},
 		Spec: v1.CustomResourceDefinitionSpec{
-			Group: types.Group,
+			Group: types.AppsAPIGroup,
 		},
 		Status: v1.CustomResourceDefinitionStatus{},
 	}
@@ -141,7 +141,7 @@ func mockDynamicClientWithCRD(objects ...runtime.Object) dynamic.Interface {
 			Name: "clusterversions.apps.kubeblocks.io",
 		},
 		Spec: v1.CustomResourceDefinitionSpec{
-			Group: types.Group,
+			Group: types.AppsAPIGroup,
 		},
 		Status: v1.CustomResourceDefinitionStatus{},
 	}
@@ -155,7 +155,7 @@ func mockDynamicClientWithCRD(objects ...runtime.Object) dynamic.Interface {
 			Name: "backuptools.dataprotection.kubeblocks.io",
 		},
 		Spec: v1.CustomResourceDefinitionSpec{
-			Group: types.DPGroup,
+			Group: types.DPAPIGroup,
 		},
 		Status: v1.CustomResourceDefinitionStatus{},
 	}

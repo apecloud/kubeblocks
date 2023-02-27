@@ -1,31 +1,42 @@
-## kbcli
+## kbcli addon enable
 
-KubeBlocks CLI
-
-### Synopsis
+Enable an addon
 
 ```
-
-=============================================
- __    __ _______   ______  __       ______ 
-|  \  /  \       \ /      \|  \     |      \
-| ▓▓ /  ▓▓ ▓▓▓▓▓▓▓\  ▓▓▓▓▓▓\ ▓▓      \▓▓▓▓▓▓
-| ▓▓/  ▓▓| ▓▓__/ ▓▓ ▓▓   \▓▓ ▓▓       | ▓▓  
-| ▓▓  ▓▓ | ▓▓    ▓▓ ▓▓     | ▓▓       | ▓▓  
-| ▓▓▓▓▓\ | ▓▓▓▓▓▓▓\ ▓▓   __| ▓▓       | ▓▓  
-| ▓▓ \▓▓\| ▓▓__/ ▓▓ ▓▓__/  \ ▓▓_____ _| ▓▓_ 
-| ▓▓  \▓▓\ ▓▓    ▓▓\▓▓    ▓▓ ▓▓     \   ▓▓ \
- \▓▓   \▓▓\▓▓▓▓▓▓▓  \▓▓▓▓▓▓ \▓▓▓▓▓▓▓▓\▓▓▓▓▓▓
-
-=============================================
-A Command Line Interface for KubeBlocks
+kbcli addon enable ADDON_NAME [flags]
 ```
 
+### Examples
+
 ```
-kbcli [flags]
+  # Enabled "prometheus" addon
+  kbcli addon enable prometheus
+  
+  # Enabled "prometheus" addon with custom resources settings
+  kbcli addon enable prometheus --memory 512Mi:4Gi --storage 8Gi --replicas 2
+  
+  # Enabled "prometheus" addon and its extra alertmanager component with custom resources settings
+  kbcli addon enable prometheus --memory 512Mi:4Gi --storage 8Gi --replicas 2 \
+  --memory alertmanager:16Mi:256Mi --storage: alertmanager:1Gi --replicas alertmanager:2
+  
+  # Enabled "prometheus" addon with tolerations
+  kbcli addon enable prometheus --tolerations '[[{"key":"taintkey","operator":"Equal","effect":"NoSchedule","value":"true"}]]' \
+  --tolerations 'alertmanager:[[{"key":"taintkey","operator":"Equal","effect":"NoSchedule","value":"true"}]]'
 ```
 
 ### Options
+
+```
+      ----cpu stringArray             Sets addon CPU resource values (--cpu [extraName:]<request>:<limit>) (can specify multiple if has extra items))
+      ----memory stringArray          Sets addon memory resource values (--memory [extraName:]<request>:<limit>) (can specify multiple if has extra items))
+      ----replicas stringArray        Sets addon component replica count (--replicas [extraName:]<N>) (can specify multiple if has extra items))
+      ----storage stringArray         Sets addon storage size (--storage [extraName:]<request>) (can specify multiple if has extra items))
+      ----storage-class stringArray   Sets addon storage class name (--storage-class [extraName:]<SC name>) (can specify multiple if has extra items))
+      ----tolerations stringArray     Sets addon pod tolerations (--tolerations [extraName:]<toleration JSON list items>) (can specify multiple if has extra items))
+  -h, --help                          help for enable
+```
+
+### Options inherited from parent commands
 
 ```
       --as string                      Username to impersonate for the operation. User could be a regular user or a service account in a namespace.
@@ -38,7 +49,6 @@ kbcli [flags]
       --cluster string                 The name of the kubeconfig cluster to use
       --context string                 The name of the kubeconfig context to use
       --disable-compression            If true, opt-out of response compression for all requests to the server
-  -h, --help                           help for kbcli
       --insecure-skip-tls-verify       If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure
       --kubeconfig string              Path to the kubeconfig file to use for CLI requests.
       --match-server-version           Require server version to match client version
@@ -53,16 +63,4 @@ kbcli [flags]
 ### SEE ALSO
 
 * [kbcli addon](kbcli_addon.md)	 - Addon command
-* [kbcli alert](kbcli_alert.md)	 - Manage alert receivers
-* [kbcli app](kbcli_app.md)	 - Manage external applications related to KubeBlocks
-* [kbcli backup-config](kbcli_backup-config.md)	 - KubeBlocks backup config
-* [kbcli bench](kbcli_bench.md)	 - Run a benchmark
-* [kbcli cluster](kbcli_cluster.md)	 - Cluster command
-* [kbcli clusterdefinition](kbcli_clusterdefinition.md)	 - ClusterDefinition command
-* [kbcli clusterversion](kbcli_clusterversion.md)	 - ClusterVersion command
-* [kbcli dashboard](kbcli_dashboard.md)	 - List and open the KubeBlocks dashboards
-* [kbcli kubeblocks](kbcli_kubeblocks.md)	 - KubeBlocks operation commands
-* [kbcli options](kbcli_options.md)	 - Print the list of flags inherited by all commands
-* [kbcli playground](kbcli_playground.md)	 - Bootstrap a playground KubeBlocks in local host or cloud
-* [kbcli version](kbcli_version.md)	 - Print the version information
 

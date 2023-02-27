@@ -194,7 +194,7 @@ func run(o *list.ListOptions, printType cluster.PrintType) error {
 	}
 
 	if len(infos) == 0 {
-		fmt.Fprintln(o.IOStreams.Out, "No clusters found")
+		fmt.Fprintln(o.IOStreams.Out, "No cluster found")
 		return nil
 	}
 

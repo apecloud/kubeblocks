@@ -107,22 +107,6 @@ func (r flagName) viperName() string {
 	return strings.ReplaceAll(r.String(), "-", "_")
 }
 
-type flagName string
-
-const (
-	probeAddrFlagKey   flagName = "health-probe-bind-address"
-	metricsAddrFlagKey flagName = "metrics-bind-address"
-	leaderElectFlagKey flagName = "leader-elect"
-)
-
-func (r flagName) String() string {
-	return string(r)
-}
-
-func (r flagName) viperName() string {
-	return strings.ReplaceAll(r.String(), "-", "_")
-}
-
 func main() {
 	var metricsAddr string
 	var enableLeaderElection bool
@@ -311,24 +295,7 @@ func main() {
 			os.Exit(1)
 		}
 	}
-	// +kubebuilder:scaffold:builder
 
-	if err = (&configuration.ReconfigureRequestReconciler{
-		Client:   mgr.GetClient(),
-		Scheme:   mgr.GetScheme(),
-		Recorder: mgr.GetEventRecorderFor("reconfigure-controller"),
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "ReconfigureRequest")
-		os.Exit(1)
-	}
-
-	if err = (&extensionscontrollers.AddonSpecReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "AddonSpec")
-		os.Exit(1)
-	}
 	// +kubebuilder:scaffold:builder
 
 	if err = (&configuration.ReconfigureRequestReconciler{

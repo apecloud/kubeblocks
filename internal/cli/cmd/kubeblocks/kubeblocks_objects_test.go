@@ -19,8 +19,6 @@ package kubeblocks
 import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
-
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -35,10 +33,8 @@ import (
 
 var _ = Describe("kubeblocks objects", func() {
 	It("delete objects", func() {
-		factory := cmdtesting.NewTestFactory()
 		dynamic := testing.FakeDynamicClient()
-		mapper, _ := factory.ToRESTMapper()
-		Expect(deleteObjects(dynamic, mapper, nil)).Should(Succeed())
+		Expect(deleteObjects(dynamic, types.DeployGVR(), nil)).Should(Succeed())
 
 		mockDeploy := func(label map[string]string) *appsv1.Deployment {
 			deploy := &appsv1.Deployment{}
@@ -56,7 +52,7 @@ var _ = Describe("kubeblocks objects", func() {
 				k: v,
 			}))
 			objs, _ := getKBObjects(testing.FakeDynamicClient(testing.FakeVolumeSnapshotClass()), namespace)
-			Expect(deleteObjects(dynamic, mapper, &objs.deploys)).Should(Succeed())
+			Expect(deleteObjects(dynamic, types.DeployGVR(), objs[types.DeployGVR()])).Should(Succeed())
 		}
 	})
 
@@ -113,9 +109,7 @@ var _ = Describe("kubeblocks objects", func() {
 	It("delete crd", func() {
 		dynamic := mockDynamicClientWithCRD()
 		objs, _ := getKBObjects(dynamic, "")
-		factory := cmdtesting.NewTestFactory()
-		mapper, _ := factory.ToRESTMapper()
-		Expect(deleteObjects(dynamic, mapper, &objs.crds)).Should(Succeed())
+		Expect(deleteObjects(dynamic, types.CRDGVR(), objs[types.CRDGVR()])).Should(Succeed())
 	})
 })
 

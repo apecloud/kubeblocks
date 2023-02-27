@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -27,6 +28,7 @@ import (
 	"helm.sh/helm/v3/pkg/repo"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
@@ -157,33 +159,20 @@ func (o *uninstallOptions) uninstall() error {
 	spinner = newSpinner("Remove built-in custom resources")
 	printErr(spinner, removeCustomResources(o.Dynamic, objs))
 
-	mapper, err := o.factory.ToRESTMapper()
-	if err != nil {
-		return err
+	var gvrs []schema.GroupVersionResource
+	for k := range objs {
+		gvrs = append(gvrs, k)
 	}
-	// helm uninstall will node delete CRDs, now delete CRDs
-	spinner = newSpinner("Remove custom resource definitions")
-	printErr(spinner, deleteObjects(o.Dynamic, mapper, &objs.crds))
+	sort.SliceStable(gvrs, func(i, j int) bool {
+		g1 := gvrs[i]
+		g2 := gvrs[j]
+		return strings.Compare(g1.Resource, g2.Resource) < 0
+	})
 
-	// delete deployments
-	spinner = newSpinner("Remove deployments")
-	printErr(spinner, deleteObjects(o.Dynamic, mapper, &objs.deploys))
-
-	// delete statefulsets
-	spinner = newSpinner("Remove statefulsets")
-	printErr(spinner, deleteObjects(o.Dynamic, mapper, &objs.stss))
-
-	// delete services
-	spinner = newSpinner("Remove services")
-	printErr(spinner, deleteObjects(o.Dynamic, mapper, &objs.svcs))
-
-	// delete configmaps
-	spinner = newSpinner("Remove configmaps")
-	printErr(spinner, deleteObjects(o.Dynamic, mapper, &objs.cms))
-
-	// delete pvcs
-	spinner = newSpinner("Remove PVCs")
-	printErr(spinner, deleteObjects(o.Dynamic, mapper, &objs.pvcs))
+	for _, gvr := range gvrs {
+		spinner = newSpinner(fmt.Sprintf("Remove %s", gvr.Resource))
+		printErr(spinner, deleteObjects(o.Dynamic, gvr, objs[gvr]))
+	}
 
 	fmt.Fprintln(o.Out, "Uninstall KubeBlocks done.")
 	return nil

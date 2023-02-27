@@ -100,6 +100,12 @@ spec:
                               and the result can be other mode bits set.'
                             format: int32
                             type: integer
+                          keys:
+                            description: Specify a list of keys. If empty, ConfigConstraint
+                              takes effect for all keys in configmap.
+                            items:
+                              type: string
+                            type: array
                           name:
                             description: Specify the name of configuration template.
                             maxLength: 63

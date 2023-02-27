@@ -270,19 +270,19 @@ func main() {
 	if err = (&configuration.ConfigConstraintReconciler{
 		Client:   mgr.GetClient(),
 		Scheme:   mgr.GetScheme(),
-		Recorder: mgr.GetEventRecorderFor("configuration-template-controller"),
+		Recorder: mgr.GetEventRecorderFor("config-constraint-controller"),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "ConfigConstraint")
 		os.Exit(1)
 	}
 	if !viper.GetBool("DISABLE_ADDON_CTRLER") {
-		if err = (&extensionscontrollers.AddonSpecReconciler{
+		if err = (&extensionscontrollers.AddonReconciler{
 			Client:     mgr.GetClient(),
 			Scheme:     mgr.GetScheme(),
-			Recorder:   mgr.GetEventRecorderFor("addonspec-controller"),
+			Recorder:   mgr.GetEventRecorderFor("addon-controller"),
 			RestConfig: mgr.GetConfig(),
 		}).SetupWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create controller", "controller", "AddonSpec")
+			setupLog.Error(err, "unable to create controller", "controller", "Addon")
 			os.Exit(1)
 		}
 	}

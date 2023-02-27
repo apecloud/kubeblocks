@@ -130,7 +130,7 @@ all: manager kbcli probe reloader loadbalancer ## Make all cmd binaries.
 
 .PHONY: manifests
 manifests: test-go-generate controller-gen ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
-	$(CONTROLLER_GEN) rbac:roleName=manager-role crd:generateEmbeddedObjectMeta=true webhook paths="./apis/...;./controllers/apps/...;./controllers/dataprotection/...;./controllers/k8score/...;./cmd/manager/...;./internal/..." output:crd:artifacts:config=config/crd/bases
+	$(CONTROLLER_GEN) rbac:roleName=manager-role crd:generateEmbeddedObjectMeta=true webhook paths="./apis/...;./controllers/apps/...;./controllers/dataprotection/...;./controllers/extensions/...;./controllers/k8score/...;./cmd/manager/...;./internal/..." output:crd:artifacts:config=config/crd/bases
 	@cp config/crd/bases/* $(CHART_PATH)/crds
 	@cp config/rbac/role.yaml $(CHART_PATH)/config/rbac/role.yaml
 	$(CONTROLLER_GEN) rbac:roleName=loadbalancer-role  paths="./controllers/loadbalancer;./cmd/loadbalancer/controller" output:dir=config/loadbalancer
@@ -277,7 +277,7 @@ kbcli: test-go-generate build-checks ## Build bin/kbcli.
 	$(MAKE) bin/kbcli.$(OS).$(ARCH)
 	mv bin/kbcli.$(OS).$(ARCH) bin/kbcli
 
-.PHONY: clean
+.PHONY: clean-kbcli
 clean-kbcli: ## Clean bin/kbcli*.
 	rm -f bin/kbcli*
 

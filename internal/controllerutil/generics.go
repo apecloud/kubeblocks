@@ -91,5 +91,5 @@ var BackupToolSignature = func(_ dataprotectionv1alpha1.BackupTool, _ dataprotec
 }
 var RestoreJobSignature = func(_ dataprotectionv1alpha1.RestoreJob, _ dataprotectionv1alpha1.RestoreJobList) {
 }
-var AddonSpecSignature = func(_ extensionsv1alpha1.AddonSpec, _ extensionsv1alpha1.AddonSpecList) {
+var AddonSignature = func(_ extensionsv1alpha1.Addon, _ extensionsv1alpha1.AddonList) {
 }

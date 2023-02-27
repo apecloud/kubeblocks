@@ -106,7 +106,7 @@ resources:
   controller: true
   domain: kubeblocks.io
   group: extensions
-  kind: AddonSpec
+  kind: Addon
   path: github.com/apecloud/kubeblocks/apis/extensions/v1alpha1
   version: v1alpha1
 version: "3"

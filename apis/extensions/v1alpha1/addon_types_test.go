@@ -251,7 +251,7 @@ func TestHelmInstallSpecBuildMergedValues(t *testing.T) {
 		}
 	}
 
-	helmInstallSpec := &HelmInstallSpec{
+	helmValues := &HelmTypeInstallSpec{
 		InstallValues: HelmInstallValues{
 			SetValues:     []string{},
 			SetJSONValues: []string{},
@@ -296,7 +296,7 @@ func TestHelmInstallSpecBuildMergedValues(t *testing.T) {
 		}
 	}
 
-	addonSpec := AddonInstallSpec{
+	installSpec := AddonInstallSpec{
 		AddonInstallSpecItem: bulidInstallSpecItem(),
 		ExtraItems: []AddonInstallExtraItem{
 			{
@@ -306,11 +306,11 @@ func TestHelmInstallSpecBuildMergedValues(t *testing.T) {
 		},
 	}
 
-	mergedValues := helmInstallSpec.BuildMergedValues(&addonSpec)
+	mergedValues := helmValues.BuildMergedValues(&installSpec)
 
 	m := map[string]*AddonInstallSpecItem{
-		"primary": &addonSpec.AddonInstallSpecItem,
-		"extra":   &addonSpec.ExtraItems[0].AddonInstallSpecItem,
+		"primary": &installSpec.AddonInstallSpecItem,
+		"extra":   &installSpec.ExtraItems[0].AddonInstallSpecItem,
 	}
 
 	for k, v := range m {
@@ -337,8 +337,8 @@ func TestHelmInstallSpecBuildMergedValues(t *testing.T) {
 	}
 
 	// test unset storageClass
-	addonSpec.StorageClass = "-"
-	mergedValues = helmInstallSpec.BuildMergedValues(&addonSpec)
+	installSpec.StorageClass = "-"
+	mergedValues = helmValues.BuildMergedValues(&installSpec)
 	g.Expect(fmt.Sprintf("%s=null",
 		mappingName("primary", sc))).Should(BeElementOf(mergedValues.SetValues))
 }

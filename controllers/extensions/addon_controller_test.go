@@ -61,7 +61,7 @@ var _ = Describe("Addon controller", func() {
 		testapps.ClearResources(&testCtx, intctrlutil.SecretSignature, inNS, ml)
 
 		// non-namespaced
-		testapps.ClearResources(&testCtx, intctrlutil.AddonSpecSignature, ml)
+		testapps.ClearResources(&testCtx, intctrlutil.AddonSignature, ml)
 	}
 
 	BeforeEach(func() {
@@ -73,7 +73,7 @@ var _ = Describe("Addon controller", func() {
 	})
 
 	Context("Addon controller test", func() {
-		var addonSpec *extensionsv1alpha1.AddonSpec
+		var addon *extensionsv1alpha1.Addon
 		var key types.NamespacedName
 		BeforeEach(func() {
 			const distro = "kubeblocks"
@@ -104,61 +104,61 @@ var _ = Describe("Addon controller", func() {
 		fakeIntallationCompletedJob := func(expectedObservedGeneration int) {
 			jobKey := client.ObjectKey{
 				Namespace: viper.GetString("CM_NAMESPACE"),
-				Name:      getInstallJobName(addonSpec),
+				Name:      getInstallJobName(addon),
 			}
 			Eventually(func(g Gomega) {
 				fakeCompletedJob(g, jobKey)
 			}, timeout, interval).Should(Succeed())
 			Eventually(func(g Gomega) {
-				addonSpec = &extensionsv1alpha1.AddonSpec{}
-				g.Expect(testCtx.Cli.Get(ctx, key, addonSpec)).Should(Succeed())
-				g.Expect(addonSpec.Status.Phase).Should(Equal(extensionsv1alpha1.AddonEnabled))
-				g.Expect(addonSpec.Status.ObservedGeneration).Should(BeEquivalentTo(expectedObservedGeneration))
+				addon = &extensionsv1alpha1.Addon{}
+				g.Expect(testCtx.Cli.Get(ctx, key, addon)).Should(Succeed())
+				g.Expect(addon.Status.Phase).Should(Equal(extensionsv1alpha1.AddonEnabled))
+				g.Expect(addon.Status.ObservedGeneration).Should(BeEquivalentTo(expectedObservedGeneration))
 				checkedJobDeletion(g, jobKey)
 			}, timeout, interval).Should(Succeed())
 		}
 
-		createAddonSpecWithRequiredAttributes := func(modifiers func(newOjb *extensionsv1alpha1.AddonSpec)) {
+		createAddonSpecWithRequiredAttributes := func(modifiers func(newOjb *extensionsv1alpha1.Addon)) {
 			if modifiers != nil {
-				addonSpec = testapps.CreateCustomizedObj(&testCtx, "addonspec/addonspec.yaml",
-					&extensionsv1alpha1.AddonSpec{}, modifiers)
+				addon = testapps.CreateCustomizedObj(&testCtx, "addon/addon.yaml",
+					&extensionsv1alpha1.Addon{}, modifiers)
 			} else {
-				addonSpec = testapps.CreateCustomizedObj(&testCtx, "addonspec/addonspec.yaml",
-					&extensionsv1alpha1.AddonSpec{})
+				addon = testapps.CreateCustomizedObj(&testCtx, "addon/addon.yaml",
+					&extensionsv1alpha1.Addon{})
 			}
 			key = types.NamespacedName{
-				Name: addonSpec.Name,
+				Name: addon.Name,
 			}
-			Expect(addonSpec.Spec.DefaultInstallValues).ShouldNot(BeEmpty())
+			Expect(addon.Spec.DefaultInstallValues).ShouldNot(BeEmpty())
 		}
 
 		enablingPhaseCheck := func(genID int) {
 			Eventually(func(g Gomega) {
-				addonSpec = &extensionsv1alpha1.AddonSpec{}
-				g.Expect(testCtx.Cli.Get(ctx, key, addonSpec)).Should(Succeed())
-				g.Expect(addonSpec.Generation).Should(BeEquivalentTo(genID))
-				g.Expect(addonSpec.Spec.InstallSpec).ShouldNot(BeNil())
-				g.Expect(addonSpec.Status.ObservedGeneration).Should(BeEquivalentTo(genID))
-				g.Expect(addonSpec.Status.Phase).Should(Equal(extensionsv1alpha1.AddonEnabling))
+				addon = &extensionsv1alpha1.Addon{}
+				g.Expect(testCtx.Cli.Get(ctx, key, addon)).Should(Succeed())
+				g.Expect(addon.Generation).Should(BeEquivalentTo(genID))
+				g.Expect(addon.Spec.InstallSpec).ShouldNot(BeNil())
+				g.Expect(addon.Status.ObservedGeneration).Should(BeEquivalentTo(genID))
+				g.Expect(addon.Status.Phase).Should(Equal(extensionsv1alpha1.AddonEnabling))
 			}, timeout, interval).Should(Succeed())
 		}
 
-		It("should successfully reconcile a custom resource for AddonSpec", func() {
-			By("By create an addonSpec")
+		It("should successfully reconcile a custom resource for Addon", func() {
+			By("By create an addon")
 			createAddonSpecWithRequiredAttributes(nil)
 
 			By("By checking status.observedGeneration and status.phase=disabled")
 			Eventually(func(g Gomega) {
-				addonSpec = &extensionsv1alpha1.AddonSpec{}
-				g.Expect(testCtx.Cli.Get(ctx, key, addonSpec)).Should(Succeed())
-				g.Expect(addonSpec.Status.ObservedGeneration).Should(BeEquivalentTo(1))
-				g.Expect(addonSpec.Status.Phase).Should(Equal(extensionsv1alpha1.AddonDisabled))
+				addon = &extensionsv1alpha1.Addon{}
+				g.Expect(testCtx.Cli.Get(ctx, key, addon)).Should(Succeed())
+				g.Expect(addon.Status.ObservedGeneration).Should(BeEquivalentTo(1))
+				g.Expect(addon.Status.Phase).Should(Equal(extensionsv1alpha1.AddonDisabled))
 			}, timeout, interval).Should(Succeed())
 
 			By("By enabling addon with default install")
-			defaultInstall := addonSpec.Spec.DefaultInstallValues[0].AddonInstallSpec
-			addonSpec.Spec.InstallSpec = &defaultInstall
-			Expect(testCtx.Cli.Update(ctx, addonSpec)).Should(Succeed())
+			defaultInstall := addon.Spec.DefaultInstallValues[0].AddonInstallSpec
+			addon.Spec.InstallSpec = &defaultInstall
+			Expect(testCtx.Cli.Update(ctx, addon)).Should(Succeed())
 			enablingPhaseCheck(2)
 
 			By("By enabled addon with fake completed install job status")
@@ -168,51 +168,51 @@ var _ = Describe("Addon controller", func() {
 			// create fake helm release
 			helmRelease := &corev1.Secret{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      fmt.Sprintf("sh.helm.release.v1.%s.v1", addonSpec.Name),
+					Name:      fmt.Sprintf("sh.helm.release.v1.%s.v1", addon.Name),
 					Namespace: viper.GetString("CM_NAMESPACE"),
 					Labels: map[string]string{
 						"owner": "helm",
-						"name":  getHelmReleaseName(addonSpec),
+						"name":  getHelmReleaseName(addon),
 					},
 				},
 				Type: "helm.sh/release.v1",
 			}
 			Expect(testCtx.Cli.Create(ctx, helmRelease)).Should(Succeed())
-			addonSpec.Spec.InstallSpec = nil
-			Expect(testCtx.Cli.Update(ctx, addonSpec)).Should(Succeed())
+			addon.Spec.InstallSpec = nil
+			Expect(testCtx.Cli.Update(ctx, addon)).Should(Succeed())
 			Eventually(func(g Gomega) {
-				addonSpec = &extensionsv1alpha1.AddonSpec{}
-				g.Expect(testCtx.Cli.Get(ctx, key, addonSpec)).Should(Succeed())
-				g.Expect(addonSpec.Status.ObservedGeneration).Should(BeEquivalentTo(3))
-				//g.Expect(addonSpec.Status.Phase).Should(BeElementOf(
+				addon = &extensionsv1alpha1.Addon{}
+				g.Expect(testCtx.Cli.Get(ctx, key, addon)).Should(Succeed())
+				g.Expect(addon.Status.ObservedGeneration).Should(BeEquivalentTo(3))
+				// g.Expect(addon.Status.Phase).Should(BeElementOf(
 				//	[]extensionsv1alpha1.AddonPhase{
 				//		extensionsv1alpha1.AddonDisabling,
 				//		extensionsv1alpha1.AddonDisabled,
 				//	}))
-				g.Expect(addonSpec.Status.Phase).Should(Equal(extensionsv1alpha1.AddonDisabling))
+				g.Expect(addon.Status.Phase).Should(Equal(extensionsv1alpha1.AddonDisabling))
 			}, timeout, interval).Should(Succeed())
 
 			By("By disabled enabled addon with fake completed uninstall job status")
 			jobKey := client.ObjectKey{
 				Namespace: viper.GetString("CM_NAMESPACE"),
-				Name:      getUninstallJobName(addonSpec),
+				Name:      getUninstallJobName(addon),
 			}
 			Eventually(func(g Gomega) {
 				fakeCompletedJob(g, jobKey)
 			}, timeout, interval).Should(Succeed())
 			Eventually(func(g Gomega) {
-				addonSpec = &extensionsv1alpha1.AddonSpec{}
-				g.Expect(testCtx.Cli.Get(ctx, key, addonSpec)).Should(Succeed())
-				g.Expect(addonSpec.Status.ObservedGeneration).Should(BeEquivalentTo(3))
-				g.Expect(addonSpec.Status.Phase).Should(Equal(extensionsv1alpha1.AddonDisabled))
+				addon = &extensionsv1alpha1.Addon{}
+				g.Expect(testCtx.Cli.Get(ctx, key, addon)).Should(Succeed())
+				g.Expect(addon.Status.ObservedGeneration).Should(BeEquivalentTo(3))
+				g.Expect(addon.Status.Phase).Should(Equal(extensionsv1alpha1.AddonDisabled))
 				checkedJobDeletion(g, jobKey)
 			}, timeout, interval).Should(Succeed())
 
 		})
 
-		It("should successfully reconcile a custom resource for AddonSpec with autoInstall=true", func() {
-			By("By create an addonSpec with auto-install")
-			createAddonSpecWithRequiredAttributes(func(newOjb *extensionsv1alpha1.AddonSpec) {
+		It("should successfully reconcile a custom resource for Addon with autoInstall=true", func() {
+			By("By create an addon with auto-install")
+			createAddonSpecWithRequiredAttributes(func(newOjb *extensionsv1alpha1.Addon) {
 				newOjb.Spec.Installable.AutoInstall = true
 			})
 
@@ -223,36 +223,36 @@ var _ = Describe("Addon controller", func() {
 			fakeIntallationCompletedJob(2)
 		})
 
-		It("should successfully reconcile a custom resource for AddonSpec with no matching installable selector", func() {
-			By("By create an addonSpec with no matching installable selector")
-			createAddonSpecWithRequiredAttributes(func(newOjb *extensionsv1alpha1.AddonSpec) {
+		It("should successfully reconcile a custom resource for Addon with no matching installable selector", func() {
+			By("By create an addon with no matching installable selector")
+			createAddonSpecWithRequiredAttributes(func(newOjb *extensionsv1alpha1.Addon) {
 				newOjb.Spec.Installable.Selectors[0].Values = []string{"some-others"}
 			})
 
 			By("By checking status.observedGeneration and status.phase=disabled")
 			Eventually(func(g Gomega) {
-				addonSpec = &extensionsv1alpha1.AddonSpec{}
-				g.Expect(testCtx.Cli.Get(ctx, key, addonSpec)).Should(Succeed())
-				g.Expect(addonSpec.Status.Phase).Should(Equal(extensionsv1alpha1.AddonDisabled))
-				g.Expect(addonSpec.Status.Conditions).ShouldNot(BeEmpty())
-				g.Expect(addonSpec.Status.ObservedGeneration).Should(BeEquivalentTo(1))
+				addon = &extensionsv1alpha1.Addon{}
+				g.Expect(testCtx.Cli.Get(ctx, key, addon)).Should(Succeed())
+				g.Expect(addon.Status.Phase).Should(Equal(extensionsv1alpha1.AddonDisabled))
+				g.Expect(addon.Status.Conditions).ShouldNot(BeEmpty())
+				g.Expect(addon.Status.ObservedGeneration).Should(BeEquivalentTo(1))
 			}, timeout, interval).Should(Succeed())
 
 			By("By addon with failed installable check")
 			// "extensions.kubeblocks.io/skip-installable-check"
 		})
 
-		It("should successfully reconcile a custom resource for AddonSpec with CM and secret values", func() {
-			By("By create an addonSpec with spec.helm.installValues.configMapRefs set")
-			cm := testapps.CreateCustomizedObj(&testCtx, "addonspec/cm-values.yaml",
+		It("should successfully reconcile a custom resource for Addon with CM and secret values", func() {
+			By("By create an addon with spec.helm.installValues.configMapRefs set")
+			cm := testapps.CreateCustomizedObj(&testCtx, "addon/cm-values.yaml",
 				&corev1.ConfigMap{}, func(newCM *corev1.ConfigMap) {
 					newCM.Namespace = viper.GetString("CM_NAMESPACE")
 				})
-			secret := testapps.CreateCustomizedObj(&testCtx, "addonspec/secret-values.yaml",
+			secret := testapps.CreateCustomizedObj(&testCtx, "addon/secret-values.yaml",
 				&corev1.Secret{}, func(newSecret *corev1.Secret) {
 					newSecret.Namespace = viper.GetString("CM_NAMESPACE")
 				})
-			createAddonSpecWithRequiredAttributes(func(newOjb *extensionsv1alpha1.AddonSpec) {
+			createAddonSpecWithRequiredAttributes(func(newOjb *extensionsv1alpha1.Addon) {
 				newOjb.Spec.Installable.AutoInstall = true
 				for k := range cm.Data {
 					newOjb.Spec.Helm.InstallValues.ConfigMapRefs = append(newOjb.Spec.Helm.InstallValues.ConfigMapRefs,

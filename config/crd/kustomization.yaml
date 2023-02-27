@@ -12,7 +12,7 @@ resources:
 - bases/dataprotection.kubeblocks.io_backups.yaml
 - bases/dataprotection.kubeblocks.io_restorejobs.yaml
 - bases/dataprotection.kubeblocks.io_backuppolicytemplates.yaml
-- bases/extensions.kubeblocks.io_addonspecs.yaml
+- bases/extensions.kubeblocks.io_addons.yaml
 #+kubebuilder:scaffold:crdkustomizeresource
 
 patchesStrategicMerge:
@@ -29,7 +29,7 @@ patchesStrategicMerge:
 #- patches/webhook_in_opsrequests.yaml
 #- patches/webhook_in_reconfigurerequests.yaml
 #- patches/webhook_in_configconstraints.yaml
-#- patches/webhook_in_addonspecs.yaml
+#- patches/webhook_in_addons.yaml
 #+kubebuilder:scaffold:crdkustomizewebhookpatch
 
 # [CERTMANAGER] To enable cert-manager, uncomment all the sections with [CERTMANAGER] prefix.

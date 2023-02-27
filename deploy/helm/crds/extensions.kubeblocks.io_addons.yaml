@@ -5,16 +5,16 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.9.0
   creationTimestamp: null
-  name: addonspecs.extensions.kubeblocks.io
+  name: addons.extensions.kubeblocks.io
 spec:
   group: extensions.kubeblocks.io
   names:
     categories:
     - kubeblocks
-    kind: AddonSpec
-    listKind: AddonSpecList
-    plural: addonspecs
-    singular: addonspec
+    kind: Addon
+    listKind: AddonList
+    plural: addons
+    singular: addon
   scope: Cluster
   versions:
   - additionalPrinterColumns:
@@ -32,7 +32,7 @@ spec:
     name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: AddonSpec is the Schema for the addonspecs API
+        description: Addon is the Schema for the addons API
         properties:
           apiVersion:
             description: 'APIVersion defines the versioned schema of this representation
@@ -47,7 +47,7 @@ spec:
           metadata:
             type: object
           spec:
-            description: AddonSpecSpec defines the desired state of AddonSpec
+            description: AddonSpec defines the desired state of Addon
             properties:
               defaultInstallValues:
                 description: Default installation parameters.
@@ -165,7 +165,7 @@ spec:
                               values: `\"Contains\"` line contains string (symbol:
                               \"|=\"） `\"DoesNotContain\"` line does not contain string
                               (symbol: \"!=\") `\"MatchRegex\"` line contains a match
-                              to the regular expression (symbol: \"|~\"） `\"DoesNoteMatchRegex\"`
+                              to the regular expression (symbol: \"|~\"） `\"DoesNotMatchRegex\"`
                               line does not contain a match to the regular expression
                               (symbol: \"!~\")"
                             enum:
@@ -509,7 +509,7 @@ spec:
                             `\"Contains\"` line contains string (symbol: \"|=\"） `\"DoesNotContain\"`
                             line does not contain string (symbol: \"!=\") `\"MatchRegex\"`
                             line contains a match to the regular expression (symbol:
-                            \"|~\"） `\"DoesNoteMatchRegex\"` line does not contain
+                            \"|~\"） `\"DoesNotMatchRegex\"` line does not contain
                             a match to the regular expression (symbol: \"!~\")"
                           enum:
                           - Contains
@@ -540,11 +540,10 @@ spec:
             - type
             type: object
           status:
-            description: AddonSpecStatus defines the observed state of AddonSpec
+            description: AddonSpecStatus defines the observed state of Addon
             properties:
               conditions:
-                description: Describe current state of AddonSpec API installation
-                  conditions.
+                description: Describe current state of Addon API installation conditions.
                 items:
                   description: "Condition contains details for one aspect of the current
                     state of this API Resource. --- This struct is intended for direct
@@ -614,12 +613,12 @@ spec:
                 type: array
               observedGeneration:
                 description: observedGeneration is the most recent generation observed
-                  for this AddonSpec. It corresponds to the AddonSpec's generation,
-                  which is updated on mutation by the API Server.
+                  for this Addon. It corresponds to the Addon's generation, which
+                  is updated on mutation by the API Server.
                 format: int64
                 type: integer
               phase:
-                description: Addon installation phases. Value values are Disabled,
+                description: Addon installation phases. Valid values are Disabled,
                   Enabled, Failed, Enabling, Disabling.
                 enum:
                 - Disabled

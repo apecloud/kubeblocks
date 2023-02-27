@@ -24,6 +24,7 @@ import (
 	ctrlerihandler "github.com/authzed/controller-idioms/handler"
 	"github.com/spf13/viper"
 	batchv1 "k8s.io/api/batch/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/record"
@@ -36,8 +37,8 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
-// AddonSpecReconciler reconciles a AddonSpec object
-type AddonSpecReconciler struct {
+// AddonReconciler reconciles a Addon object
+type AddonReconciler struct {
 	client.Client
 	Scheme     *k8sruntime.Scheme
 	Recorder   record.EventRecorder
@@ -53,9 +54,9 @@ func init() {
 	viper.SetDefault(maxConcurrentReconcilesKey, runtime.NumCPU()*2)
 }
 
-//+kubebuilder:rbac:groups=extensions.kubeblocks.io,resources=addonspecs,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=extensions.kubeblocks.io,resources=addonspecs/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=extensions.kubeblocks.io,resources=addonspecs/finalizers,verbs=update
+//+kubebuilder:rbac:groups=extensions.kubeblocks.io,resources=addons,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=extensions.kubeblocks.io,resources=addons/status,verbs=get;update;patch
+//+kubebuilder:rbac:groups=extensions.kubeblocks.io,resources=addons/finalizers,verbs=update
 
 //+kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;watch;create;update;patch;delete;deletecollection
 
@@ -64,12 +65,11 @@ func init() {
 //
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.14.1/pkg/reconcile
-func (r *AddonSpecReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-
+func (r *AddonReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	reqCtx := intctrlutil.RequestCtx{
 		Ctx:      ctx,
 		Req:      req,
-		Log:      log.FromContext(ctx).WithValues("addonspec", req.NamespacedName),
+		Log:      log.FromContext(ctx).WithValues("addon", req.NamespacedName),
 		Recorder: r.Recorder,
 	}
 
@@ -128,9 +128,9 @@ func (r *AddonSpecReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 }
 
 // SetupWithManager sets up the controller with the Manager.
-func (r *AddonSpecReconciler) SetupWithManager(mgr ctrl.Manager) error {
+func (r *AddonReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&extensionsv1alpha1.AddonSpec{}).
+		For(&extensionsv1alpha1.Addon{}).
 		WithOptions(controller.Options{
 			MaxConcurrentReconciles: viper.GetInt(maxConcurrentReconcilesKey),
 		}).
@@ -138,7 +138,32 @@ func (r *AddonSpecReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
-func (r *AddonSpecReconciler) deleteExternalResources(reqCtx intctrlutil.RequestCtx, addonSpec *extensionsv1alpha1.AddonSpec) (*ctrl.Result, error) {
+func (r *AddonReconciler) deleteExternalResources(reqCtx intctrlutil.RequestCtx, addon *extensionsv1alpha1.Addon) (*ctrl.Result, error) {
+	deleteJobIfExist := func(jobName string) error {
+		key := client.ObjectKey{
+			Namespace: viper.GetString("CM_NAMESPACE"),
+			Name:      jobName,
+		}
+		job := &batchv1.Job{}
+		if err := r.Get(reqCtx.Ctx, key, job); err != nil {
+			if apierrors.IsNotFound(err) {
+				return nil
+			}
+			return err
+		}
+		if !job.DeletionTimestamp.IsZero() {
+			return nil
+		}
+		if err := r.Delete(reqCtx.Ctx, job); err != nil {
+			return client.IgnoreNotFound(err)
+		}
+		return nil
+	}
+	for _, j := range []string{getInstallJobName(addon), getUninstallJobName(addon)} {
+		if err := deleteJobIfExist(j); err != nil {
+			return nil, err
+		}
+	}
 	return nil, nil
 }
 
@@ -150,7 +175,7 @@ const (
 
 type stageCtx struct {
 	reqCtx     *intctrlutil.RequestCtx
-	reconciler *AddonSpecReconciler
+	reconciler *AddonReconciler
 	next       ctrlerihandler.Handler
 }
 
@@ -185,11 +210,11 @@ func (r *stageCtx) doReturn() (*ctrl.Result, error) {
 	return res, err
 }
 
-func (r *stageCtx) process(processor func(*extensionsv1alpha1.AddonSpec)) {
+func (r *stageCtx) process(processor func(*extensionsv1alpha1.Addon)) {
 	res, _ := r.doReturn()
 	if res != nil {
 		return
 	}
-	addonSpec := r.reqCtx.Ctx.Value(operandValueKey).(*extensionsv1alpha1.AddonSpec)
-	processor(addonSpec)
+	addon := r.reqCtx.Ctx.Value(operandValueKey).(*extensionsv1alpha1.Addon)
+	processor(addon)
 }

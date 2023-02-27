@@ -28,8 +28,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// AddonSpecSpec defines the desired state of AddonSpec
-type AddonSpecSpec struct {
+// AddonSpec defines the desired state of Addon
+type AddonSpec struct {
 	// Addon description.
 	// +optional
 	Description string `json:"description,omitempty"`
@@ -40,7 +40,7 @@ type AddonSpecSpec struct {
 
 	// Helm installation spec., it's only being processed if type=helm.
 	// +optional
-	Helm *HelmInstallSpec `json:"helm,omitempty"`
+	Helm *HelmTypeInstallSpec `json:"helm,omitempty"`
 
 	// Default installation parameters.
 	// +kubebuilder:validation:Required
@@ -56,19 +56,18 @@ type AddonSpecSpec struct {
 	Installable *InstallableSpec `json:"installable,omitempty"`
 }
 
-
-// AddonSpecStatus defines the observed state of AddonSpec
+// AddonSpecStatus defines the observed state of Addon
 type AddonSpecStatus struct {
-	// Addon installation phases. Value values are Disabled, Enabled, Failed, Enabling, Disabling.
+	// Addon installation phases. Valid values are Disabled, Enabled, Failed, Enabling, Disabling.
 	// +kubebuilder:validation:Enum={Disabled,Enabled,Failed,Enabling,Disabling}
 	Phase AddonPhase `json:"phase,omitempty"`
 
-	// Describe current state of AddonSpec API installation conditions.
+	// Describe current state of Addon API installation conditions.
 	// +optional
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
 
 	// observedGeneration is the most recent generation observed for this
-	// AddonSpec. It corresponds to the AddonSpec's generation, which is
+	// Addon. It corresponds to the Addon's generation, which is
 	// updated on mutation by the API Server.
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
@@ -100,7 +99,7 @@ type SelectorRequirement struct {
 	// `"Contains"` line contains string (symbol: "|="）
 	// `"DoesNotContain"` line does not contain string (symbol: "!=")
 	// `"MatchRegex"` line contains a match to the regular expression (symbol: "|~"）
-	// `"DoesNoteMatchRegex"` line does not contain a match to the regular expression (symbol: "!~")
+	// `"DoesNotMatchRegex"` line does not contain a match to the regular expression (symbol: "!~")
 	// +kubebuilder:validation:Required
 	Operator LineSelectorOperator `json:"operator"`
 
@@ -109,8 +108,8 @@ type SelectorRequirement struct {
 	Values []string `json:"values,omitempty" protobuf:"bytes,3,rep,name=values"`
 }
 
-// HelmInstallSpec defines a Helm release installation spec.
-type HelmInstallSpec struct {
+// HelmTypeInstallSpec defines a Helm release installation spec.
+type HelmTypeInstallSpec struct {
 
 	// A Helm Chart repository URL.
 	// +kubebuilder:validation:Required
@@ -304,26 +303,26 @@ type ResourceRequirements struct {
 //+kubebuilder:printcolumn:name="STATUS",type="string",JSONPath=".status.phase",description="status phase"
 //+kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
 
-// AddonSpec is the Schema for the addonspecs API
-type AddonSpec struct {
+// Addon is the Schema for the addons API
+type Addon struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   AddonSpecSpec   `json:"spec,omitempty"`
+	Spec   AddonSpec       `json:"spec,omitempty"`
 	Status AddonSpecStatus `json:"status,omitempty"`
 }
 
 //+kubebuilder:object:root=true
 
-// AddonSpecList contains a list of AddonSpec
-type AddonSpecList struct {
+// AddonList contains a list of Addon
+type AddonList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []AddonSpec `json:"items"`
+	Items           []Addon `json:"items"`
 }
 
 func init() {
-	SchemeBuilder.Register(&AddonSpec{}, &AddonSpecList{})
+	SchemeBuilder.Register(&Addon{}, &AddonList{})
 }
 
 func (r *SelectorRequirement) String() string {
@@ -400,7 +399,7 @@ func (r *SelectorRequirement) matchesLine(line string) bool {
 }
 
 // BuildMergedValues merge values from a AddonInstallSpec and pre-set values.
-func (r *HelmInstallSpec) BuildMergedValues(spec *AddonInstallSpec) HelmInstallValues {
+func (r *HelmTypeInstallSpec) BuildMergedValues(spec *AddonInstallSpec) HelmInstallValues {
 	installValues := r.InstallValues
 	processor := func(specItem AddonInstallSpecItem, valueMapping HelmValuesMappingItem) {
 		if specItem.Replicas != nil && *specItem.Replicas >= 0 {
@@ -486,7 +485,7 @@ func (r *HelmInstallSpec) BuildMergedValues(spec *AddonInstallSpec) HelmInstallV
 
 // GetSortedDefaultInstallValues return DefaultInstallValues items with items that has
 // provided selector first.
-func (r *AddonSpecSpec) GetSortedDefaultInstallValues() []AddonDefaultInstallSpecItem {
+func (r *AddonSpec) GetSortedDefaultInstallValues() []AddonDefaultInstallSpecItem {
 	values := make([]AddonDefaultInstallSpecItem, 0, len(r.DefaultInstallValues))
 	nvalues := make([]AddonDefaultInstallSpecItem, 0, len(r.DefaultInstallValues))
 	for _, i := range r.DefaultInstallValues {

@@ -1,5 +1,5 @@
 apiVersion: extensions.kubeblocks.io/v1alpha1
-kind: AddonSpec
+kind: Addon
 metadata:
   name: prometheus
 spec:

@@ -35,7 +35,11 @@ type ConfigManagerParams struct {
 	Args        []string        `json:"args"`
 	Envs        []corev1.EnvVar `json:"envs"`
 
-	Volumes      []corev1.VolumeMount `json:"volumes"`
+	Volumes       []corev1.VolumeMount `json:"volumes"`
+	CharacterType string               `json:"characterType"`
+	SecreteName   string               `json:"secreteName"`
+
+	// add volume to pod
 	ScriptVolume *corev1.Volume
 }
 

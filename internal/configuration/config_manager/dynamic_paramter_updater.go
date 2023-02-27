@@ -23,7 +23,7 @@ type DynamicParamUpdater interface {
 }
 
 const (
-	DBType string = "DbType"
+	DBType string = "DB_TYPE"
 )
 
 func NewCommandChannel(dbType string) (DynamicParamUpdater, error) {

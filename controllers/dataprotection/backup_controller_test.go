@@ -238,6 +238,26 @@ var _ = Describe("Backup for a StatefulSet", func() {
 			})
 		})
 	})
+	When("with exceptional settings", func() {
+		Context("creates a backup with non existent backup policy", func() {
+			var backupKey types.NamespacedName
+			BeforeEach(func() {
+				By("By creating a backup from backupPolicy: " + backupPolicyName)
+				backup := testapps.NewBackupFactory(testCtx.DefaultNamespace, backupName).
+					SetTTL(defaultTTL).
+					SetBackupPolicyName(backupPolicyName).
+					SetBackupType(dataprotectionv1alpha1.BackupTypeFull).
+					Create(&testCtx).GetObject()
+				backupKey = client.ObjectKeyFromObject(backup)
+			})
+			It("Should fail", func() {
+				By("Check backup status failed")
+				Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dataprotectionv1alpha1.Backup) {
+					g.Expect(fetched.Status.Phase).To(Equal(dataprotectionv1alpha1.BackupFailed))
+				})).Should(Succeed())
+			})
+		})
+	})
 })
 
 func patchK8sJobStatus(key types.NamespacedName, jobStatus batchv1.JobConditionType) {

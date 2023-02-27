@@ -20,6 +20,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"golang.org/x/exp/maps"
+	storagev1 "k8s.io/api/storage/v1"
+	"k8s.io/kubectl/pkg/util/storage"
 	"reflect"
 	"strings"
 
@@ -192,7 +195,7 @@ func (r *OpsRequest) validateOps(ctx context.Context,
 	case HorizontalScalingType:
 		r.validateHorizontalScaling(ctx, k8sClient, cluster, allErrs)
 	case VolumeExpansionType:
-		r.validateVolumeExpansion(cluster, allErrs)
+		r.validateVolumeExpansion(ctx, k8sClient, cluster, allErrs)
 	case RestartType:
 		r.validateRestart(cluster, allErrs)
 	case ReconfiguringType:
@@ -315,7 +318,7 @@ func (r *OpsRequest) validateHorizontalScaling(ctx context.Context, cli client.C
 }
 
 // validateVolumeExpansion validates volumeExpansion api when spec.type is VolumeExpansion
-func (r *OpsRequest) validateVolumeExpansion(cluster *Cluster, allErrs *field.ErrorList) {
+func (r *OpsRequest) validateVolumeExpansion(ctx context.Context, cli client.Client, cluster *Cluster, allErrs *field.ErrorList) {
 	volumeExpansionList := r.Spec.VolumeExpansionList
 	if len(volumeExpansionList) == 0 {
 		addInvalidError(allErrs, "spec.volumeExpansion", volumeExpansionList, "can not be empty")
@@ -328,13 +331,7 @@ func (r *OpsRequest) validateVolumeExpansion(cluster *Cluster, allErrs *field.Er
 	}
 	r.checkComponentExistence(nil, cluster, componentNames, allErrs)
 
-	// TODO(leon): check each vct's SC whether supports expansion
-	// The error message:
-	//foreach comp in volumeExpansionList:
-	//	var invalidVCTNames []string
-	//	...
-	//	message := "not support volume expansion, check the StorageClass whether allow volume expansion."
-	//	addInvalidError(allErrs, fmt.Sprintf("spec.volumeExpansion[%d].volumeClaimTemplates[*].name", i), invalidVCTNames, message)
+	r.checkVolumesAllowExpansion(ctx, cli, cluster, allErrs)
 }
 
 // checkComponentExistence checks whether components to be operated exist in cluster spec.
@@ -380,6 +377,95 @@ func (r *OpsRequest) checkComponentExistence(clusterDef *ClusterDefinition, clus
 		addInvalidError(errs, fmt.Sprintf("spec.%s[*].componentName", lowercaseInitial(r.Spec.Type)),
 			notSupportCompNames, fmt.Sprintf("not supported the %s operation", r.Spec.Type))
 	}
+}
+
+func (r *OpsRequest) checkVolumesAllowExpansion(ctx context.Context, cli client.Client, cluster *Cluster, errs *field.ErrorList) {
+	type Entity struct {
+		existInSpec      bool
+		storageClassName *string
+		allowExpansion   bool
+	}
+
+	// component name -> vct name -> entity
+	vols := make(map[string]map[string]Entity)
+	for _, comp := range r.Spec.VolumeExpansionList {
+		for _, vct := range comp.VolumeClaimTemplates {
+			if _, ok := vols[comp.ComponentName]; !ok {
+				vols[comp.ComponentName] = make(map[string]Entity)
+			}
+			vols[comp.ComponentName][vct.Name] = Entity{false, nil, false}
+		}
+	}
+
+	// traverse the spec to update volumes
+	for _, comp := range cluster.Spec.ComponentSpecs {
+		if _, ok := vols[comp.Name]; !ok {
+			continue // ignore not-exist component
+		}
+		for _, vct := range comp.VolumeClaimTemplates {
+			if _, ok := vols[comp.Name][vct.Name]; !ok {
+				continue
+			}
+			vols[comp.Name][vct.Name] = Entity{true, vct.Spec.StorageClassName, false}
+		}
+	}
+
+	// check all used storage classes
+	for cname, compVols := range vols {
+		for vname := range compVols {
+			e := vols[cname][vname]
+			if allowExpansion, err := checkStorageClassAllowExpansion(ctx, cli, e.storageClassName); err != nil {
+				continue // TODO(leon)
+			} else {
+				vols[cname][vname] = Entity{e.existInSpec, e.storageClassName, allowExpansion}
+			}
+		}
+	}
+
+	for i, v := range maps.Values(vols) {
+		invalid := make([]string, 0)
+		for vct, e := range v {
+			if !e.existInSpec || !e.allowExpansion {
+				invalid = append(invalid, vct)
+			}
+		}
+		if len(invalid) > 0 {
+			message := "not support volume expansion, check the StorageClass whether allow volume expansion."
+			addInvalidError(errs, fmt.Sprintf("spec.volumeExpansion[%d].volumeClaimTemplates[*].name", i), invalid, message)
+		}
+	}
+}
+
+// checkStorageClassAllowExpansion checks whether the specified storage class supports volume expansion.
+func checkStorageClassAllowExpansion(ctx context.Context, cli client.Client, storageClassName *string) (bool, error) {
+	if storageClassName == nil {
+		return checkDefaultStorageClassAllowExpansion(ctx, cli)
+	}
+
+	storageClass := &storagev1.StorageClass{}
+	// take not found error as unsupported
+	if err := cli.Get(ctx, types.NamespacedName{Name: *storageClassName}, storageClass); err != nil && !apierrors.IsNotFound(err) {
+		return false, err
+	}
+	if storageClass == nil || storageClass.AllowVolumeExpansion == nil {
+		return false, nil
+	}
+	return *storageClass.AllowVolumeExpansion, nil
+}
+
+// checkDefaultStorageClassAllowExpansion checks whether the default storage class supports volume expansion.
+func checkDefaultStorageClassAllowExpansion(ctx context.Context, cli client.Client) (bool, error) {
+	storageClassList := &storagev1.StorageClassList{}
+	if err := cli.List(ctx, storageClassList); err != nil {
+		return false, err
+	}
+	for _, sc := range storageClassList.Items {
+		if sc.Annotations == nil || sc.Annotations[storage.IsDefaultStorageClassAnnotation] != "true" {
+			continue
+		}
+		return sc.AllowVolumeExpansion != nil && *sc.AllowVolumeExpansion, nil
+	}
+	return false, nil
 }
 
 func lowercaseInitial(opsType OpsType) string {

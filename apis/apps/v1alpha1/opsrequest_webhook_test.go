@@ -215,7 +215,7 @@ var _ = Describe("OpsRequest webhook", func() {
 				},
 			},
 		}
-		Expect(testCtx.CreateObj(ctx, opsRequest).Error()).To(ContainSubstring(`Invalid value: "VolumeExpansion": not supported in Cluster`))
+		Expect(testCtx.CreateObj(ctx, opsRequest).Error()).To(ContainSubstring("not support volume expansion, check the StorageClass whether allow volume expansion"))
 
 		// TODO(leon): refactor test cases
 

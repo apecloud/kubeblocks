@@ -52,12 +52,12 @@ type Order struct {
 
 func NewClientWithPod(pod *corev1.Pod, characterType string) (*OperationClient, error) {
 	if characterType == "" {
-		return nil, fmt.Errorf("pod %v chacterType must be set", pod)
+		return nil, fmt.Errorf("pod %v chacterType must be set", pod.Name)
 	}
 
 	ip := pod.Status.PodIP
 	if ip == "" {
-		return nil, fmt.Errorf("pod %v has no ip", pod)
+		return nil, fmt.Errorf("pod %v has no ip", pod.Name)
 	}
 	port, err := intctrlutil.GetProbeGRPCPort(pod)
 	if err != nil {
@@ -75,6 +75,7 @@ func NewClientWithPod(pod *corev1.Pod, characterType string) (*OperationClient, 
 		CacheTTL:         60 * time.Second,
 		RequestTimeout:   30 * time.Second,
 		ReconcileTimeout: 100 * time.Millisecond,
+		cache:            make(map[string]*OperationResult),
 	}
 	return operationClient, nil
 }

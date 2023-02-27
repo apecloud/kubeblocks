@@ -272,6 +272,12 @@ prometheus:
       repository: registry.cn-hangzhou.aliyuncs.com/apecloud/alertmanager
       tag: v0.24.0
 
+    ## ConfigMap override where fullname is {{.Release.Name}}-{{.Values.alertmanager.configMapOverrideName}}
+    ## Defining configMapOverrideName will cause templates/alertmanager-configmap.yaml
+    ## to NOT generate a ConfigMap resource
+    ##
+    configMapOverrideName: ""
+
     ## Node tolerations for alertmanager scheduling to nodes with taints
     ## Ref: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/
     ##
@@ -485,6 +491,23 @@ prometheus:
 
     containerSecurityContext:
       allowPrivilegeEscalation: false
+
+  ## AlertManager ConfigMap Entries
+  ## NOTE: Please review these carefully as thresholds and behavior may not meet
+  ##       your SLOs or labels.
+  ##
+  alertmanagerFiles:
+    alertmanager.yml:
+      global: { }
+
+      receivers:
+        - name: default-receiver
+
+      route:
+        receiver: default-receiver
+        group_wait: 5s
+        group_interval: 30s
+        repeat_interval: 10m
 
   ## Sample prometheus rules/alerts
   ## NOTE: Please review these carefully as thresholds and behavior may not meet

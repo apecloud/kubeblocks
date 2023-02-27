@@ -77,7 +77,7 @@ var _ = Describe("Backup Policy Controller", func() {
 
 		By("By mocking a statefulset")
 		sts := testapps.NewStatefulSetFactory(testCtx.DefaultNamespace, clusterName+"-"+componentName, clusterName, componentName).
-			AddLabels(intctrlutil.AppInstanceLabelKey, clusterName).
+			AddAppInstanceLabel(clusterName).
 			AddContainer(corev1.Container{Name: containerName, Image: testapps.ApeCloudMySQLImage}).
 			AddVolumeClaimTemplate(corev1.PersistentVolumeClaim{
 				ObjectMeta: metav1.ObjectMeta{Name: testapps.DataVolumeName},
@@ -139,47 +139,61 @@ var _ = Describe("Backup Policy Controller", func() {
 					dataProtectionLabelAutoBackupKey: "true",
 				}
 
+				By("create a expired backup")
 				backupExpired := testapps.NewBackupFactory(testCtx.DefaultNamespace, backupNamePrefix).
 					WithRandomName().AddLabelsInMap(autoBackupLabel).
 					SetTTL(defaultTTL).
 					SetBackupPolicyName(backupPolicyName).
 					SetBackupType(dpv1alpha1.BackupTypeFull).
 					Create(&testCtx).GetObject()
-				Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(backupExpired),
-					func(g Gomega, fetched *dpv1alpha1.Backup) {
-						g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupInProgress))
-					})).Should(Succeed())
-
-				backupStatus.Expiration = &metav1.Time{Time: now.Add(-time.Hour * 24)}
-				backupStatus.StartTimestamp = backupStatus.Expiration
-				patchBackupStatus(backupStatus, client.ObjectKeyFromObject(backupExpired))
-
+				By("create 1st limit backup")
 				backupOutLimit1 := testapps.NewBackupFactory(testCtx.DefaultNamespace, backupNamePrefix).
 					WithRandomName().AddLabelsInMap(autoBackupLabel).
 					SetTTL(defaultTTL).
 					SetBackupPolicyName(backupPolicyName).
 					SetBackupType(dpv1alpha1.BackupTypeFull).
 					Create(&testCtx).GetObject()
-				Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(backupOutLimit1),
-					func(g Gomega, fetched *dpv1alpha1.Backup) {
-						g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupInProgress))
-					})).Should(Succeed())
-
-				backupStatus.Expiration = &metav1.Time{Time: now.Add(time.Hour * 24)}
-				backupStatus.StartTimestamp = &metav1.Time{Time: now.Add(time.Hour)}
-				patchBackupStatus(backupStatus, client.ObjectKeyFromObject(backupOutLimit1))
-
+				By("create 2nd limit backup")
 				backupOutLimit2 := testapps.NewBackupFactory(testCtx.DefaultNamespace, backupNamePrefix).
 					WithRandomName().AddLabelsInMap(autoBackupLabel).
 					SetTTL(defaultTTL).
 					SetBackupPolicyName(backupPolicyName).
 					SetBackupType(dpv1alpha1.BackupTypeFull).
 					Create(&testCtx).GetObject()
-				Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(backupOutLimit2),
+
+				By("mock jobs completed")
+				backupExpiredKey := client.ObjectKeyFromObject(backupExpired)
+				patchK8sJobStatus(backupExpiredKey, batchv1.JobComplete)
+				backupOutLimit1Key := client.ObjectKeyFromObject(backupOutLimit1)
+				patchK8sJobStatus(backupOutLimit1Key, batchv1.JobComplete)
+				backupOutLimit2Key := client.ObjectKeyFromObject(backupOutLimit2)
+				patchK8sJobStatus(backupOutLimit2Key, batchv1.JobComplete)
+
+				By("waiting expired backup completed")
+				Eventually(testapps.CheckObj(&testCtx, backupExpiredKey,
 					func(g Gomega, fetched *dpv1alpha1.Backup) {
-						g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupInProgress))
+						g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupCompleted))
+					})).Should(Succeed())
+				By("waiting 1st limit backup completed")
+				Eventually(testapps.CheckObj(&testCtx, backupOutLimit1Key,
+					func(g Gomega, fetched *dpv1alpha1.Backup) {
+						g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupCompleted))
+					})).Should(Succeed())
+				By("waiting 2nd limit backup completed")
+				Eventually(testapps.CheckObj(&testCtx, backupOutLimit2Key,
+					func(g Gomega, fetched *dpv1alpha1.Backup) {
+						g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupCompleted))
 					})).Should(Succeed())
 
+				By("mock update expired backup status to expire")
+				backupStatus.Expiration = &metav1.Time{Time: now.Add(-time.Hour * 24)}
+				backupStatus.StartTimestamp = backupStatus.Expiration
+				patchBackupStatus(backupStatus, client.ObjectKeyFromObject(backupExpired))
+				By("mock update 1st limit backup NOT to expire")
+				backupStatus.Expiration = &metav1.Time{Time: now.Add(time.Hour * 24)}
+				backupStatus.StartTimestamp = &metav1.Time{Time: now.Add(time.Hour)}
+				patchBackupStatus(backupStatus, client.ObjectKeyFromObject(backupOutLimit1))
+				By("mock update 2nd limit backup NOT to expire")
 				backupStatus.Expiration = &metav1.Time{Time: now.Add(time.Hour * 24)}
 				backupStatus.StartTimestamp = &metav1.Time{Time: now.Add(time.Hour * 2)}
 				patchBackupStatus(backupStatus, client.ObjectKeyFromObject(backupOutLimit2))

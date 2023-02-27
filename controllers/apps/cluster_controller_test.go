@@ -182,8 +182,8 @@ var _ = Describe("Cluster Controller", func() {
 		By("Checking proxy should have external ClusterIP service")
 		svcList1 := &corev1.ServiceList{}
 		Expect(k8sClient.List(testCtx.Ctx, svcList1, client.MatchingLabels{
-			intctrlutil.AppInstanceLabelKey:  clusterKey.Name,
-			intctrlutil.AppComponentLabelKey: nginxCompName,
+			intctrlutil.AppInstanceLabelKey:    clusterKey.Name,
+			intctrlutil.KBAppComponentLabelKey: nginxCompName,
 		}, client.InNamespace(clusterKey.Namespace))).Should(Succeed())
 		// TODO fix me later, proxy should not have internal headless service
 		// Expect(len(svcList1.Items) == 1).Should(BeTrue())
@@ -223,8 +223,8 @@ var _ = Describe("Cluster Controller", func() {
 
 		svcList2 := &corev1.ServiceList{}
 		Expect(k8sClient.List(testCtx.Ctx, svcList2, client.MatchingLabels{
-			intctrlutil.AppInstanceLabelKey:  clusterKey.Name,
-			intctrlutil.AppComponentLabelKey: mysqlCompName,
+			intctrlutil.AppInstanceLabelKey:    clusterKey.Name,
+			intctrlutil.KBAppComponentLabelKey: mysqlCompName,
 		}, client.InNamespace(clusterKey.Namespace))).Should(Succeed())
 		Expect(len(svcList2.Items)).Should(BeEquivalentTo(1))
 		Expect(svcList2.Items[0].Spec.Type == corev1.ServiceTypeClusterIP).To(BeTrue())
@@ -335,29 +335,6 @@ var _ = Describe("Cluster Controller", func() {
 		}
 	}
 
-	testChangeReplicasInvalidValue := func() {
-		By("Creating a cluster")
-		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
-			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
-			AddComponent(mysqlCompName, mysqlCompType).SetReplicas(1).
-			Create(&testCtx).GetObject()
-		clusterKey = client.ObjectKeyFromObject(clusterObj)
-
-		By("Waiting for the cluster initialized")
-		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
-
-		invalidReplicas := int32(-1)
-		By(fmt.Sprintf("Change replicas to %d", invalidReplicas))
-		changeStatefulSetReplicas(clusterKey, invalidReplicas)
-
-		By("Checking cluster status and the number of replicas unchanged")
-		Consistently(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, fetched *appsv1alpha1.Cluster) {
-			g.Expect(fetched.Status.ObservedGeneration).To(BeEquivalentTo(1))
-		})).Should(Succeed())
-		stsList := testk8s.ListAndCheckStatefulSet(&testCtx, clusterKey)
-		Expect(int(*stsList.Items[0].Spec.Replicas)).To(BeEquivalentTo(1))
-	}
-
 	getPVCName := func(compName string, i int) string {
 		return fmt.Sprintf("%s-%s-%s-%d", testapps.DataVolumeName, clusterKey.Name, compName, i)
 	}
@@ -391,8 +368,8 @@ var _ = Describe("Cluster Controller", func() {
 		By("Checking Backup created")
 		Eventually(testapps.GetListLen(&testCtx, intctrlutil.BackupSignature,
 			client.MatchingLabels{
-				intctrlutil.AppInstanceLabelKey:  clusterKey.Name,
-				intctrlutil.AppComponentLabelKey: comp.Name,
+				intctrlutil.AppInstanceLabelKey:    clusterKey.Name,
+				intctrlutil.KBAppComponentLabelKey: comp.Name,
 			}, client.InNamespace(clusterKey.Namespace))).Should(Equal(1))
 
 		By("Mocking VolumeSnapshot and set it as ReadyToUse")
@@ -405,9 +382,9 @@ var _ = Describe("Cluster Controller", func() {
 				Name:      snapshotKey.Name,
 				Namespace: snapshotKey.Namespace,
 				Labels: map[string]string{
-					intctrlutil.AppCreatedByLabelKey: intctrlutil.AppName,
-					intctrlutil.AppInstanceLabelKey:  clusterKey.Name,
-					intctrlutil.AppComponentLabelKey: comp.Name,
+					intctrlutil.AppCreatedByLabelKey:   intctrlutil.AppName,
+					intctrlutil.AppInstanceLabelKey:    clusterKey.Name,
+					intctrlutil.KBAppComponentLabelKey: comp.Name,
 				}},
 			Spec: snapshotv1.VolumeSnapshotSpec{
 				Source: snapshotv1.VolumeSnapshotSource{
@@ -436,8 +413,8 @@ var _ = Describe("Cluster Controller", func() {
 		By("Check backup job cleanup")
 		Eventually(testapps.GetListLen(&testCtx, intctrlutil.BackupSignature,
 			client.MatchingLabels{
-				intctrlutil.AppInstanceLabelKey:  clusterKey.Name,
-				intctrlutil.AppComponentLabelKey: comp.Name,
+				intctrlutil.AppInstanceLabelKey:    clusterKey.Name,
+				intctrlutil.KBAppComponentLabelKey: comp.Name,
 			}, client.InNamespace(clusterKey.Namespace))).Should(Equal(0))
 		Eventually(testapps.CheckObjExists(&testCtx, snapshotKey, &snapshotv1.VolumeSnapshot{}, false)).Should(Succeed())
 
@@ -483,6 +460,24 @@ var _ = Describe("Cluster Controller", func() {
 	}
 
 	testHorizontalScale := func() {
+		initialReplicas := int32(1)
+		updatedReplicas := int32(3)
+
+		By("Creating a single component cluster with VolumeClaimTemplate")
+		pvcSpec := testapps.NewPVC("1Gi")
+		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
+			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
+			AddComponent(mysqlCompName, mysqlCompType).
+			AddVolumeClaimTemplate(testapps.DataVolumeName, &pvcSpec).
+			SetReplicas(initialReplicas).
+			Create(&testCtx).GetObject()
+		clusterKey = client.ObjectKeyFromObject(clusterObj)
+		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
+
+		horizontalScale(int(updatedReplicas))
+	}
+
+	testMultiCompHScale := func() {
 		initialReplicas := int32(1)
 		updatedReplicas := int32(3)
 
@@ -728,7 +723,7 @@ var _ = Describe("Cluster Controller", func() {
 					Namespace: testCtx.DefaultNamespace,
 					Labels: map[string]string{
 						intctrlutil.AppInstanceLabelKey:       clusterName,
-						intctrlutil.AppComponentLabelKey:      componentName,
+						intctrlutil.KBAppComponentLabelKey:    componentName,
 						appsv1.ControllerRevisionHashLabelKey: "mock-version",
 					},
 				},
@@ -885,7 +880,7 @@ var _ = Describe("Cluster Controller", func() {
 					Labels: map[string]string{
 						intctrlutil.RoleLabelKey:              sts.Labels[intctrlutil.RoleLabelKey],
 						intctrlutil.AppInstanceLabelKey:       clusterName,
-						intctrlutil.AppComponentLabelKey:      componentName,
+						intctrlutil.KBAppComponentLabelKey:    componentName,
 						appsv1.ControllerRevisionHashLabelKey: sts.Status.UpdateRevision,
 					},
 				},
@@ -983,6 +978,27 @@ var _ = Describe("Cluster Controller", func() {
 
 	// Scenarios
 
+	Context("when creating cluster without clusterversion", func() {
+		BeforeEach(func() {
+			By("Create a clusterDefinition obj")
+			clusterDefObj = testapps.NewClusterDefFactory(clusterDefName).
+				AddComponent(testapps.StatefulMySQLComponent, mysqlCompType).
+				Create(&testCtx).GetObject()
+		})
+
+		It("should reconcile to create cluster with no error", func() {
+			By("Creating a cluster")
+			clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
+				clusterDefObj.Name, "").
+				AddComponent(mysqlCompName, mysqlCompType).SetReplicas(3).
+				WithRandomName().Create(&testCtx).GetObject()
+			clusterKey = client.ObjectKeyFromObject(clusterObj)
+
+			By("Waiting for the cluster initialized")
+			Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
+		})
+	})
+
 	Context("when creating cluster with multiple kinds of components", func() {
 		BeforeEach(func() {
 			By("Create a clusterDefinition obj")
@@ -1004,6 +1020,10 @@ var _ = Describe("Cluster Controller", func() {
 
 		It("should create corresponding services correctly", func() {
 			checkAllServicesCreate()
+		})
+
+		It("should successfully h-scale with multiple components", func() {
+			testMultiCompHScale()
 		})
 	})
 
@@ -1030,10 +1050,6 @@ var _ = Describe("Cluster Controller", func() {
 
 		It("should create/delete pods to match the desired replica number if updating cluster's replica number to a valid value", func() {
 			testChangeReplicas()
-		})
-
-		It("should fail if updating cluster's replica number to an invalid value", func() {
-			testChangeReplicasInvalidValue()
 		})
 
 		Context("and with cluster affinity set", func() {
@@ -1092,10 +1108,6 @@ var _ = Describe("Cluster Controller", func() {
 
 		It("should create/delete pods to match the desired replica number if updating cluster's replica number to a valid value", func() {
 			testChangeReplicas()
-		})
-
-		It("should fail if updating cluster's replica number to an invalid value", func() {
-			testChangeReplicasInvalidValue()
 		})
 
 		Context("with pvc", func() {

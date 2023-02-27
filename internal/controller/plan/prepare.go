@@ -191,12 +191,9 @@ func PrepareComponentResources(reqCtx intctrlutil.RequestCtx, cli client.Client,
 
 // needBuildPDB check whether the PodDisruptionBudget needs to be built
 func needBuildPDB(task *intctrltypes.ReconcileTask) bool {
-	if task.Component.WorkloadType == appsv1alpha1.Consensus {
-		// if MinReplicas is non-zero, build pdb
-		// TODO: add ut
-		return task.Component.MaxUnavailable != nil
-	}
-	return intctrlutil.ExistsPDBSpec(task.Component.PodDisruptionBudgetSpec)
+	// TODO: add ut
+	comp := task.Component
+	return comp.WorkloadType == appsv1alpha1.Consensus && comp.MaxUnavailable != nil
 }
 
 // TODO multi roles with same accessMode support

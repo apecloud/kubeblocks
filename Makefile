@@ -163,7 +163,7 @@ fmt: ## Run go fmt against code.
 
 .PHONY: vet
 vet: ## Run go vet against code.
-	GOOS=linux $(GO) vet ./...
+	GOOS=linux $(GO) vet -mod=mod ./...
 
 .PHONY: cue-fmt
 cue-fmt: cuetool ## Run cue fmt against code.
@@ -822,11 +822,18 @@ minikube-delete: minikube ## Delete minikube cluster.
 	$(MINIKUBE) delete
 
 ##@ Test E2E
+GINKGO=$(shell which ginkgo)
 .PHONY: test-e2e
 test-e2e: ## Test End-to-end.
-	$(MAKE) -e VERSION=$(VERSION) -C test/e2e run
-
+	$(HELM) template mycluster deploy/apecloud-mysql-cluster > test/e2e/testdata/smoketest/wesql/00_wesqlcluster.yaml
+	# $(HELM) template mycluster deploy/mongodb > test/e2e/testdata/smoketest/mongodb/00_mongodbcluster.yaml
+	# $(HELM) template mycluster deploy/mongodb-cluster >> test/e2e/testdata/smoketest/mongodb/00_mongodbcluster.yaml
+	# $(HELM) template mycluster deploy/postgresqlcluster > test/e2e/testdata/smoketest/postgresql/00_postgresqlcluster.yaml
+	# $(HELM) template mycluster deploy/redis > test/e2e/testdata/smoketest/redis/00_rediscluster.yaml
+	# $(HELM) template mycluster deploy/redis-rep-cluster >> test/e2e/testdata/smoketest/redis/00_rediscluster.yaml
+	$(GINKGO) test -process -ginkgo.v test/e2e
 
 # NOTE: include must be at the end
 ##@ Docker containers
 include docker/docker.mk
+

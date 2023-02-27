@@ -23,11 +23,9 @@ import (
 	"strings"
 	"time"
 
-	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
-
-	"golang.org/x/exp/maps"
-
+	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	"github.com/pkg/errors"
+	"golang.org/x/exp/maps"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -37,11 +35,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
-	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
-
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/replicationset"
+	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
 	"github.com/apecloud/kubeblocks/internal/controller/plan"
@@ -82,7 +79,6 @@ func reconcileClusterWorkloads(
 	clusterDef *appsv1alpha1.ClusterDefinition,
 	clusterVer *appsv1alpha1.ClusterVersion,
 	cluster *appsv1alpha1.Cluster) (shouldRequeue bool, err error) {
-
 	resourcesQueue := make([]client.Object, 0, 3)
 	task := intctrltypes.ReconcileTask{
 		Cluster:           cluster,
@@ -90,16 +86,19 @@ func reconcileClusterWorkloads(
 		ClusterVersion:    clusterVer,
 		Resources:         &resourcesQueue,
 	}
-	if err := prepareSecretObjs(reqCtx, cli, &task); err != nil {
-		return false, err
-	}
-
 	clusterCompSpecMap := cluster.GetDefNameMappingComponents()
 	clusterCompVerMap := clusterVer.GetDefNameMappingComponents()
+	process1stComp := true
 
 	prepareComp := func(component *component.SynthesizedComponent) error {
 		iParams := task
 		iParams.Component = component
+		if process1stComp && component.Service != nil {
+			if err := prepareConnCredential(reqCtx, cli, &iParams); err != nil {
+				return err
+			}
+			process1stComp = false
+		}
 		return plan.PrepareComponentResources(reqCtx, cli, &iParams)
 	}
 
@@ -122,13 +121,13 @@ func checkedCreateObjs(reqCtx intctrlutil.RequestCtx, cli client.Client, task *i
 	return createOrReplaceResources(reqCtx, cli, task.Cluster, task.ClusterDefinition, *task.Resources)
 }
 
-func prepareSecretObjs(reqCtx intctrlutil.RequestCtx, cli client.Client, task *intctrltypes.ReconcileTask) error {
+func prepareConnCredential(reqCtx intctrlutil.RequestCtx, cli client.Client, task *intctrltypes.ReconcileTask) error {
 	secret, err := builder.BuildConnCredential(task.GetBuilderParams())
 	if err != nil {
 		return err
 	}
 	// must make sure secret resources are created before others
-	task.AppendResource(secret)
+	task.InsertResource(secret)
 	return nil
 }
 
@@ -184,7 +183,7 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 			Name:      stsObj.Name + "-scaling",
 		}
 		// find component of current statefulset
-		componentName := stsObj.Labels[intctrlutil.AppComponentLabelKey]
+		componentName := stsObj.Labels[intctrlutil.KBAppComponentLabelKey]
 		components := mergeComponentsList(reqCtx,
 			cluster,
 			clusterDef,
@@ -417,7 +416,7 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 			if err := cli.Get(ctx, client.ObjectKeyFromObject(cm), oldCm); err != nil {
 				return err
 			}
-			compName := cm.Labels[intctrlutil.AppComponentLabelKey]
+			compName := cm.Labels[intctrlutil.KBAppComponentLabelKey]
 			clusterDefComp := component.GetClusterDefCompByName(*clusterDef, *cluster, compName)
 			if clusterDefComp == nil {
 				return errors.New("clusterDefComp not found")
@@ -449,7 +448,7 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 		}
 		if !reflect.DeepEqual(&deployObjCopy.Spec, &deployObj.Spec) {
 			// sync component phase
-			componentName := deployObj.Labels[intctrlutil.AppComponentLabelKey]
+			componentName := deployObj.Labels[intctrlutil.KBAppComponentLabelKey]
 			syncComponentPhaseWhenSpecUpdating(cluster, componentName)
 		}
 		return nil
@@ -568,7 +567,7 @@ func createBackup(reqCtx intctrlutil.RequestCtx,
 	createBackupPolicy := func() (backupPolicyName string, err error) {
 		backupPolicyName = ""
 		backupPolicyList := dataprotectionv1alpha1.BackupPolicyList{}
-		ml := getBackupMatchingLabels(cluster.Name, sts.Labels[intctrlutil.AppComponentLabelKey])
+		ml := getBackupMatchingLabels(cluster.Name, sts.Labels[intctrlutil.KBAppComponentLabelKey])
 		if err = cli.List(ctx, &backupPolicyList, ml); err != nil {
 			return
 		}
@@ -599,7 +598,7 @@ func createBackup(reqCtx intctrlutil.RequestCtx,
 
 	createBackup := func(backupPolicyName string) error {
 		backupList := dataprotectionv1alpha1.BackupList{}
-		ml := getBackupMatchingLabels(cluster.Name, sts.Labels[intctrlutil.AppComponentLabelKey])
+		ml := getBackupMatchingLabels(cluster.Name, sts.Labels[intctrlutil.KBAppComponentLabelKey])
 		if err := cli.List(ctx, &backupList, ml); err != nil {
 			return err
 		}
@@ -672,7 +671,7 @@ func deleteBackup(ctx context.Context, cli client.Client, clusterName string, co
 
 func createPVCFromSnapshot(ctx context.Context,
 	cli client.Client,
-	vct corev1.PersistentVolumeClaim,
+	vct corev1.PersistentVolumeClaimTemplate,
 	sts *appsv1.StatefulSet,
 	pvcKey types.NamespacedName,
 	snapshotName string) error {
@@ -734,6 +733,7 @@ func doSnapshot(cli client.Client,
 	cluster *appsv1alpha1.Cluster,
 	snapshotKey types.NamespacedName,
 	stsObj *appsv1.StatefulSet,
+	vcts []corev1.PersistentVolumeClaimTemplate,
 	backupTemplateSelector map[string]string) error {
 
 	ctx := reqCtx.Ctx
@@ -753,7 +753,7 @@ func doSnapshot(cli client.Client,
 		}
 	} else {
 		// no backuppolicytemplate, then try native volumesnapshot
-		pvcName := strings.Join([]string{stsObj.Spec.VolumeClaimTemplates[0].Name, stsObj.Name, "0"}, "-")
+		pvcName := strings.Join([]string{vcts[0].Name, stsObj.Name, "0"}, "-")
 		snapshot, err := builder.BuildVolumeSnapshot(snapshotKey, pvcName, stsObj)
 		if err != nil {
 			return err
@@ -775,7 +775,7 @@ func checkedCreatePVCFromSnapshot(cli client.Client,
 	pvcKey types.NamespacedName,
 	cluster *appsv1alpha1.Cluster,
 	componentName string,
-	vct corev1.PersistentVolumeClaim,
+	vct corev1.PersistentVolumeClaimTemplate,
 	stsObj *appsv1.StatefulSet) error {
 	pvc := corev1.PersistentVolumeClaim{}
 	// check pvc existence
@@ -909,11 +909,20 @@ func doBackup(reqCtx intctrlutil.RequestCtx,
 			"scale with backup tool not support yet")
 	// use volume snapshot
 	case appsv1alpha1.HScaleDataClonePolicyFromSnapshot:
-		if !isSnapshotAvailable(cli, ctx) || len(stsObj.Spec.VolumeClaimTemplates) == 0 {
+		if !isSnapshotAvailable(cli, ctx) {
 			reqCtx.Recorder.Eventf(cluster,
 				corev1.EventTypeWarning,
 				"HorizontalScaleFailed",
 				"volume snapshot not support")
+			// TODO: add ut
+			return false, errors.Errorf("volume snapshot not support")
+		}
+		vcts := component.VolumeClaimTemplates
+		if len(vcts) == 0 {
+			reqCtx.Recorder.Eventf(cluster,
+				corev1.EventTypeNormal,
+				"HorizontalScale",
+				"no VolumeClaimTemplates, no need to do data clone.")
 			break
 		}
 		vsExists, err := isVolumeSnapshotExists(cli, ctx, cluster, component)
@@ -927,6 +936,7 @@ func doBackup(reqCtx intctrlutil.RequestCtx,
 				cluster,
 				snapshotKey,
 				stsObj,
+				vcts,
 				component.HorizontalScalePolicy.BackupTemplateSelector); err != nil {
 				return shouldRequeue, err
 			}
@@ -946,8 +956,8 @@ func doBackup(reqCtx intctrlutil.RequestCtx,
 		// if volumesnapshot ready,
 		// create pvc from snapshot for every new pod
 		for i := *stsObj.Spec.Replicas; i < *stsProto.Spec.Replicas; i++ {
-			vct := stsObj.Spec.VolumeClaimTemplates[0]
-			for _, tmpVct := range stsObj.Spec.VolumeClaimTemplates {
+			vct := vcts[0]
+			for _, tmpVct := range vcts {
 				if tmpVct.Name == component.HorizontalScalePolicy.VolumeMountsName {
 					vct = tmpVct
 					break
@@ -997,9 +1007,9 @@ func isPVCExists(cli client.Client,
 
 func getBackupMatchingLabels(clusterName string, componentName string) client.MatchingLabels {
 	return client.MatchingLabels{
-		intctrlutil.AppInstanceLabelKey:  clusterName,
-		intctrlutil.AppComponentLabelKey: componentName,
-		intctrlutil.AppCreatedByLabelKey: intctrlutil.AppName,
+		intctrlutil.AppInstanceLabelKey:    clusterName,
+		intctrlutil.KBAppComponentLabelKey: componentName,
+		intctrlutil.AppCreatedByLabelKey:   intctrlutil.AppName,
 	}
 }
 

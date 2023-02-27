@@ -327,6 +327,12 @@ func buildCommand(info *engine.ConnectionInfo) []string {
 	command := []string{"sh", "-c"}
 	args := info.Command
 	for _, arg := range info.Args {
+		if strings.Contains(arg, "$(KB_ACCOUNT_ENDPOINT)") && strings.Contains(arg, "$(KB_ACCOUNT_STATEMENT)") {
+			arg = strings.Replace(arg, "$(KB_ACCOUNT_ENDPOINT)", "127.0.0.1", 1)
+			arg = strings.Replace(arg, "$(KB_ACCOUNT_STATEMENT)", "", 1)
+			args = append(args, arg)
+			continue
+		}
 		if strings.Contains(arg, "$(KB_ACCOUNT_ENDPOINT)") {
 			args = append(args, strings.Replace(arg, "$(KB_ACCOUNT_ENDPOINT)", "127.0.0.1", 1))
 			continue

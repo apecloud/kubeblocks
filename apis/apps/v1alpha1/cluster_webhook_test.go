@@ -302,7 +302,7 @@ spec:
   clusterVersionRef: %s
   componentSpecs:
   - name: replication
-    componentDefRef: replication
+    componentDefRef: redis
     monitor: false
     primaryIndex: 0
     replicas: 2

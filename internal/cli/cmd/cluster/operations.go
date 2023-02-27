@@ -57,10 +57,8 @@ type OperationsOptions struct {
 	ClusterVersionRef string `json:"clusterVersionRef"`
 
 	// VerticalScaling options
-	RequestCPU    string `json:"requestCPU"`
-	RequestMemory string `json:"requestMemory"`
-	LimitCPU      string `json:"limitCPU"`
-	LimitMemory   string `json:"limitMemory"`
+	CPU    string `json:"cpu"`
+	Memory string `json:"memory"`
 
 	// HorizontalScaling options
 	Replicas int `json:"replicas"`
@@ -456,8 +454,7 @@ func NewUpgradeCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 
 var verticalScalingExample = templates.Examples(`
 		# scale the computing resources of specified components, separate with commas when <component-name> more than one
-		kbcli cluster vscale <my-cluster> --component-names=<component-name> --requests.cpu=500m \
-        --requests.memory=500Mi --limits.cpu=500m --limits.memory=500Mi
+		kbcli cluster vscale <my-cluster> --component-names=<component-name> --cpu=500m --memory=500Mi 
 `)
 
 // NewVerticalScalingCmd creates a vertical scaling command
@@ -469,10 +466,8 @@ func NewVerticalScalingCmd(f cmdutil.Factory, streams genericclioptions.IOStream
 	inputs.Example = verticalScalingExample
 	inputs.BuildFlags = func(cmd *cobra.Command) {
 		o.buildCommonFlags(cmd)
-		cmd.Flags().StringVar(&o.RequestCPU, "requests.cpu", "", "CPU size requested by the component")
-		cmd.Flags().StringVar(&o.RequestMemory, "requests.memory", "", "Memory size requested by the component")
-		cmd.Flags().StringVar(&o.LimitCPU, "limits.cpu", "", "CPU size limited by the component")
-		cmd.Flags().StringVar(&o.LimitMemory, "limits.memory", "", "Memory size limited by the component")
+		cmd.Flags().StringVar(&o.CPU, "cpu", "", "Requested and limited size of component cpu")
+		cmd.Flags().StringVar(&o.Memory, "memory", "", "Requested and limited size of component memory")
 	}
 	return create.BuildCommand(inputs)
 }

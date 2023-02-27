@@ -20,13 +20,16 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/spf13/cobra"
 	zaplogfmt "github.com/sykesm/zap-logfmt"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
+	"k8s.io/apimachinery/pkg/util/yaml"
 
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	cfgutil "github.com/apecloud/kubeblocks/internal/configuration"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration/config_manager"
 )
@@ -64,17 +67,22 @@ func runVolumeWatchCommand(ctx context.Context, opt *VolumeWatcherOpts) error {
 	// new volume watcher
 	watcher := cfgcore.NewVolumeWatcher(opt.VolumeDirs, ctx, logger)
 
-	// set regex filter
-	if len(opt.FileRegex) > 0 {
-		filter, err := cfgcore.CreateCfgRegexFilter(opt.FileRegex)
+	if opt.NotifyHandType == TPLScript && opt.BackupPath == "" {
+		tmpDir, err := os.MkdirTemp(os.TempDir(), "reload-backup-")
 		if err != nil {
 			return err
 		}
-		watcher.AddFilter(filter)
+		opt.BackupPath = tmpDir
+		defer os.RemoveAll(tmpDir)
 	}
-
 	defer watcher.Close()
-	err := watcher.AddHandler(createHandlerWithWatchType(opt)).Run()
+
+	logger.Info("config backup path: ", opt.BackupPath)
+	eventHandle, err := createHandlerWithWatchType(opt)
+	if err != nil {
+		logger.Error(err, "failed to create event handle.")
+	}
+	err = watcher.AddHandler(eventHandle).Run()
 	if err != nil {
 		logger.Error(err, "failed to handle VolumeWatcher.")
 		return err
@@ -88,14 +96,51 @@ func runVolumeWatchCommand(ctx context.Context, opt *VolumeWatcherOpts) error {
 }
 
 func checkOptions(opt *VolumeWatcherOpts) error {
-	if len(opt.ProcessName) == 0 {
-		return cfgutil.MakeError("require process name is null.")
-	}
-
 	if len(opt.VolumeDirs) == 0 {
 		return cfgutil.MakeError("require volume directory is null.")
 	}
 
+	if opt.NotifyHandType == TPLScript {
+		return checkTPLScriptOptions(opt)
+	}
+
+	if opt.NotifyHandType == ShellTool && opt.Command == "" {
+		return cfgutil.MakeError("require command is null.")
+	}
+
+	if len(opt.ProcessName) == 0 {
+		return cfgutil.MakeError("require process name is null.")
+	}
+	return nil
+}
+
+type TplScriptConfig struct {
+	Scripts         string                       `json:"scripts"`
+	FileRegex       string                       `json:"fileRegex"`
+	FormatterConfig appsv1alpha1.FormatterConfig `json:"formatterConfig"`
+}
+
+func checkTPLScriptOptions(opt *VolumeWatcherOpts) error {
+	if opt.TPLConfig == "" {
+		return cfgutil.MakeError("require tpl config is not null")
+	}
+
+	if _, err := os.Stat(opt.TPLConfig); err != nil {
+		return err
+	}
+
+	b, err := os.ReadFile(opt.TPLConfig)
+	if err != nil {
+		return err
+	}
+	tplConfig := TplScriptConfig{}
+	if err := yaml.Unmarshal(b, &tplConfig); err != nil {
+		return err
+	}
+
+	opt.FormatterConfig = &tplConfig.FormatterConfig
+	opt.FileRegex = tplConfig.FileRegex
+	opt.TPLScriptPath = filepath.Join(filepath.Dir(opt.TPLConfig), tplConfig.Scripts)
 	return nil
 }
 
@@ -127,15 +172,18 @@ func initLog(level string) *zap.Logger {
 	return zapLog
 }
 
-func createHandlerWithWatchType(opt *VolumeWatcherOpts) cfgcore.WatchEventHandler {
+func createHandlerWithWatchType(opt *VolumeWatcherOpts) (cfgcore.WatchEventHandler, error) {
 	logger.Infof("access info: [%d] [%s]", opt.NotifyHandType, opt.ProcessName)
 	switch opt.NotifyHandType {
 	case UnixSignal:
 		return cfgcore.CreateSignalHandler(opt.Signal, opt.ProcessName)
-	case SQL, ShellTool, WebHook:
-		logger.Fatalf("event type[%s]: not yet, but in the future", opt.NotifyHandType.String())
+	case ShellTool:
+		return cfgcore.CreateExecHandler(opt.Command)
+	case TPLScript:
+		return cfgcore.CreateTPLScriptHandler(opt.TPLScriptPath, opt.VolumeDirs, opt.FileRegex, opt.BackupPath, opt.FormatterConfig)
+	case SQL, WebHook:
+		return nil, cfgutil.MakeError("event type[%s]: not yet, but in the future", opt.NotifyHandType.String())
 	default:
-		logger.Fatal("not support event type.")
+		return nil, cfgutil.MakeError("not support event type.")
 	}
-	return nil
 }

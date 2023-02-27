@@ -18,6 +18,11 @@ package configmanager
 
 import (
 	"fmt"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
+	"text/template/parse"
 
 	"github.com/fsnotify/fsnotify"
 	"github.com/go-logr/logr"
@@ -27,6 +32,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	cfgutil "github.com/apecloud/kubeblocks/internal/configuration"
+	cfgcontainer "github.com/apecloud/kubeblocks/internal/configuration/container"
 )
 
 var (
@@ -74,22 +80,90 @@ func findParentPidFromProcessName(processName string) (PID, error) {
 	return InvalidPID, cfgutil.MakeError("not find pid of process name: [%s]", processName)
 }
 
-func CreateSignalHandler(sig appsv1alpha1.SignalType, processName string) WatchEventHandler {
+func CreateSignalHandler(sig appsv1alpha1.SignalType, processName string) (WatchEventHandler, error) {
 	signal, ok := allUnixSignals[sig]
 	if !ok {
-		logger.Error(cfgutil.MakeError("not support unix signal: %s", signal), "failed to create signal handler")
+		err := cfgutil.MakeError("not support unix signal: %s", sig)
+		logger.Error(err, "failed to create signal handler")
+		return nil, err
 	}
 	return func(event fsnotify.Event) error {
 		pid, err := findParentPidFromProcessName(processName)
 		if err != nil {
 			return err
 		}
-		logger.Info(fmt.Sprintf("find pid: %d from process name[%s]", pid, processName))
+		logger.V(1).Info(fmt.Sprintf("find pid: %d from process name[%s]", pid, processName))
 		return sendSignal(pid, signal)
+	}, nil
+}
+
+func CreateExecHandler(command string) (WatchEventHandler, error) {
+	args := strings.Fields(command)
+	if len(args) == 0 {
+		return nil, cfgutil.MakeError("invalid command: %s", command)
 	}
+	cmd := exec.Command(args[0], args[1:]...)
+	return func(_ fsnotify.Event) error {
+		stdout, err := cfgcontainer.ExecShellCommand(cmd)
+		if err == nil {
+			logger.V(1).Info(fmt.Sprintf("exec: [%s], result: [%s]", command, stdout))
+		}
+		return err
+	}, nil
 }
 
 func IsValidUnixSignal(sig appsv1alpha1.SignalType) bool {
 	_, ok := allUnixSignals[sig]
 	return ok
+}
+
+func CreateTPLScriptHandler(tplScripts string, dirs []string, fileRegex string, backupPath string, formatConfig *appsv1alpha1.FormatterConfig) (WatchEventHandler, error) {
+	logger.V(1).Info(fmt.Sprintf("config file regex: %s", fileRegex))
+	logger.V(1).Info(fmt.Sprintf("config file reload script: %s", tplScripts))
+	if _, err := os.Stat(tplScripts); err != nil {
+		return nil, err
+	}
+	tplContent, err := os.ReadFile(tplScripts)
+	if err != nil {
+		return nil, err
+	}
+	if err := checkTPLScript(tplScripts, string(tplContent)); err != nil {
+		return nil, err
+	}
+	filter, err := createFileRegex(fileRegex)
+	if err != nil {
+		return nil, err
+	}
+	if err := backupConfigurationFiles(dirs, filter, backupPath); err != nil {
+		return nil, err
+	}
+	return func(event fsnotify.Event) error {
+		var (
+			lastVersion = []string{backupPath}
+			currVersion = []string{filepath.Dir(event.Name)}
+		)
+		currFiles, err := scanConfigurationFiles(currVersion, filter)
+		if err != nil {
+			return err
+		}
+		lastFiles, err := scanConfigurationFiles(lastVersion, filter)
+		if err != nil {
+			return err
+		}
+		updatedParams, err := createUpdatedParamsPatch(currFiles, lastFiles, formatConfig)
+		if err != nil {
+			return err
+		}
+		if err := wrapGoTemplateRun(tplScripts, string(tplContent), updatedParams); err != nil {
+			return err
+		}
+		return backupLastConfigurationFiles(currFiles, backupPath)
+	}, nil
+}
+
+func checkTPLScript(tplName string, tplContent string) error {
+	tr := parse.New(tplName)
+	tr.Mode = parse.SkipFuncCheck
+	_, err := tr.Parse(tplContent, "", "", make(map[string]*parse.Tree))
+	return err
 }

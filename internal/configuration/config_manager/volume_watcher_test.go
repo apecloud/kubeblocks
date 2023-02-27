@@ -89,32 +89,9 @@ func TestConfigMapVolumeWatcher(t *testing.T) {
 
 	// mock kubelet create configmapVolume
 	go func() {
-		var (
-			tmpVolumeDir   = filepath.Join(mockVolume, "..2023_02_16_06_06_06.1234567")
-			configFilePath = filepath.Join(tmpVolumeDir, "test.conf")
-			tmpDataDir     = filepath.Join(mockVolume, "..data_tmp")
-			watchedDataDir = filepath.Join(mockVolume, "..data")
-
-			configFileContext = []byte("empty!!!")
-		)
-
 		// wait inotify ready
 		<-started
-		if err := os.MkdirAll(tmpVolumeDir, fs.ModePerm); err != nil {
-			t.Errorf("failed to create directory: %s", tmpVolumeDir)
-		}
-		if err := os.WriteFile(configFilePath, configFileContext, fs.ModePerm); err != nil {
-			t.Errorf("failed to  write file: %s", configFilePath)
-		}
-		if err := os.Chmod(configFilePath, fs.ModePerm); err != nil {
-			t.Errorf("failed to chmod file: %s", configFilePath)
-		}
-		if err := os.Symlink(tmpVolumeDir, tmpDataDir); err != nil {
-			t.Errorf("failed to create symbolic link for atomic update: %v", err)
-		}
-		if err := os.Rename(tmpDataDir, watchedDataDir); err != nil {
-			t.Errorf("failed to rename symbolic link for data directory %s: %v", tmpDataDir, err)
-		}
+		createTestConfigureDirectory(t, mockVolume, "test.conf", "empty!!!")
 	}()
 
 	// wait inotify to run...

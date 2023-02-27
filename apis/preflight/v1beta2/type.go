@@ -28,8 +28,6 @@ type ExtendAnalyze struct {
 	ClusterAccess *ClusterAccess `json:"clusterAccess,omitempty" yaml:"clusterAccess,omitempty"`
 }
 
-// 这上面要不要添加kubebuilder的校验
-
 type HostUtility struct {
 	troubleshootv1beta2.HostCollectorMeta `json:",inline" yaml:",inline"`
 	// +kubebuilder:validation:Required

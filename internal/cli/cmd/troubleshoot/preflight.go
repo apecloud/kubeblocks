@@ -121,7 +121,6 @@ func (p *PreflightOptions) validate() error {
 	if len(p.yamlCheckFiles) < 1 {
 		return fmt.Errorf("must specify at least one checks yaml")
 	}
-	// 这里添加默认的yaml
 	return nil
 }
 

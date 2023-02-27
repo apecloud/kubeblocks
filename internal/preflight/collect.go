@@ -50,14 +50,12 @@ type KBHostCollectResult struct {
 	KbAnalyzerSpecs []*preflightv1beta2.ExtendHostAnalyze
 }
 
-// 最上层的collect函数
-
 func CollectPreflight(ctx context.Context, kbPreflight *preflightv1beta2.Preflight, kbHostPreflight *preflightv1beta2.HostPreflight, progressCh chan interface{}) ([]preflight.CollectResult, error) {
 	var (
 		collectResults []preflight.CollectResult
 		err            error
 	)
-	// preflight处理
+	// deal with preflight
 	if kbPreflight != nil && (len(kbPreflight.Spec.ExtendCollectors) > 0 || len(kbPreflight.Spec.Collectors) > 0) {
 		res, err := CollectClusterData(ctx, kbPreflight, progressCh)
 		if err != nil {
@@ -65,7 +63,7 @@ func CollectPreflight(ctx context.Context, kbPreflight *preflightv1beta2.Preflig
 		}
 		collectResults = append(collectResults, *res)
 	}
-	// host preflight处理
+	// deal with hostPreflight
 	if kbHostPreflight != nil {
 		if len(kbHostPreflight.Spec.ExtendCollectors) > 0 || len(kbHostPreflight.Spec.Collectors) > 0 {
 			// ExtendCollectors处理
@@ -85,8 +83,6 @@ func CollectPreflight(ctx context.Context, kbPreflight *preflightv1beta2.Preflig
 	}
 	return collectResults, err
 }
-
-// 中间层: host
 
 // CollectHostData transforms the specs of hostPreflight to HostCollector, and sets the collectOpts
 func CollectHostData(ctx context.Context, hostPreflight *preflightv1beta2.HostPreflight, progressCh chan interface{}) (*preflight.CollectResult, error) {
@@ -112,8 +108,6 @@ func CollectHostData(ctx context.Context, hostPreflight *preflightv1beta2.HostPr
 	}
 	return &collectResults, nil
 }
-
-// 底层：host
 
 // CollectHost collects host data against by HostCollector，and returns the collected data which is encapsulated in CollectResult struct
 func CollectHost(ctx context.Context, opts preflight.CollectOpts, collectors []pkgcollector.HostCollector, hostPreflight *preflightv1beta2.HostPreflight) (preflight.CollectResult, error) {
@@ -143,8 +137,6 @@ func CollectHost(ctx context.Context, opts preflight.CollectOpts, collectors []p
 	collectResult.AllCollectedData = allCollectedData
 	return collectResult, nil
 }
-
-// 中间层: cluster
 
 // CollectClusterData transforms the specs of Preflight to Collector, and sets the collectOpts, such as restConfig, Namespace, and ProgressChan
 func CollectClusterData(ctx context.Context, kbPreflight *preflightv1beta2.Preflight, progressCh chan interface{}) (*preflight.CollectResult, error) {
@@ -209,8 +201,6 @@ func CollectClusterData(ctx context.Context, kbPreflight *preflightv1beta2.Prefl
 	collectResults, err := CollectCluster(ctx, collectOpts, collectors, allCollectorsMap, kbPreflight)
 	return &collectResults, err
 }
-
-// 底层：cluster
 
 // CollectCluster collects ciuster data against by Collector，and returns the collected data which is encapsulated in CollectResult struct
 func CollectCluster(ctx context.Context, opts preflight.CollectOpts, allCollectors []pkgcollector.Collector, allCollectorsMap map[reflect.Type][]pkgcollector.Collector, kbPreflight *preflightv1beta2.Preflight) (preflight.CollectResult, error) {

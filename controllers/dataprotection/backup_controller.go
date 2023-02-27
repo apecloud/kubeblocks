@@ -151,6 +151,14 @@ func (r *BackupReconciler) doNewPhaseAction(
 			"Unable to get backupPolicy for backup %s.", backupPolicyNameSpaceName)
 		return r.updateStatusIfFailed(reqCtx, backup, err)
 	}
+	if backupPolicy.Status.Phase != dataprotectionv1alpha1.ConfigAvailable {
+		if backupPolicy.Status.Phase == dataprotectionv1alpha1.ConfigFailed {
+			err := fmt.Errorf("backupPolicy %s status is failed", backupPolicy.Name)
+			return r.updateStatusIfFailed(reqCtx, backup, err)
+		}
+		// requeue to wait backupPolicy available
+		return intctrlutil.RequeueAfter(reconcileInterval, reqCtx.Log, "")
+	}
 
 	labels := backupPolicy.Spec.Target.LabelsSelector.MatchLabels
 	if labels == nil {

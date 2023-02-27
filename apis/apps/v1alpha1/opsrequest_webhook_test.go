@@ -76,31 +76,20 @@ var _ = Describe("OpsRequest webhook", func() {
 
 	testUpgrade := func(cluster *Cluster) {
 		opsRequest := createTestOpsRequest(clusterName, opsRequestName+"-upgrade", UpgradeType)
-		By("By creating a clusterVersion for upgrade")
-		newClusterVersion := createTestClusterVersionObj(clusterDefinitionName, clusterVersionNameForUpgrade)
-		Expect(testCtx.CreateObj(ctx, newClusterVersion)).Should(Succeed())
-
-		By("By testing when cluster not support upgrade")
-		Expect(testCtx.CreateObj(ctx, opsRequest).Error()).To(ContainSubstring("ClusterVersion must be greater than 1"))
-		// set cluster support upgrade
-		patch := client.MergeFrom(cluster.DeepCopy())
-		if cluster.Status.Operations == nil {
-			cluster.Status.Operations = &Operations{}
-		}
-		cluster.Status.Operations.Upgradable = true
-		Expect(k8sClient.Status().Patch(ctx, cluster, patch)).Should(Succeed())
-		// wait until patch succeed
-		Eventually(func() bool {
-			tmpCluster := &Cluster{}
-			_ = k8sClient.Get(context.Background(), client.ObjectKey{Name: cluster.Name, Namespace: cluster.Namespace}, tmpCluster)
-			return tmpCluster.Status.Operations.Upgradable
-		}, timeout, interval).Should(BeTrue())
 
 		By("By testing when spec.upgrade is null")
 		Expect(testCtx.CreateObj(ctx, opsRequest).Error()).To(ContainSubstring("spec.upgrade"))
-		opsRequest.Spec.Upgrade = &Upgrade{ClusterVersionRef: clusterVersionName}
+
+		By("By creating a new clusterVersion for upgrade")
+		newClusterVersion := createTestClusterVersionObj(clusterDefinitionName, clusterVersionNameForUpgrade)
+		Expect(testCtx.CreateObj(ctx, newClusterVersion)).Should(Succeed())
+
+		By("By testing when target cluster version not exist")
+		opsRequest.Spec.Upgrade = &Upgrade{ClusterVersionRef: clusterVersionName + "-not-exist"}
+		Expect(testCtx.CreateObj(ctx, opsRequest).Error()).To(ContainSubstring("not found"))
 
 		By("Test Cluster Phase")
+		opsRequest.Spec.Upgrade = &Upgrade{ClusterVersionRef: clusterVersionName}
 		OpsRequestBehaviourMapper[UpgradeType] = OpsRequestBehaviour{
 			FromClusterPhases: []Phase{RunningPhase},
 			ToClusterPhase:    VersionUpgradingPhase,
@@ -145,7 +134,7 @@ var _ = Describe("OpsRequest webhook", func() {
 		// if running in real cluster, the opsRequest will reconcile all the time.
 		// so we should add eventually block.
 		Eventually(func() bool {
-			patch = client.MergeFrom(opsRequest.DeepCopy())
+			patch := client.MergeFrom(opsRequest.DeepCopy())
 			opsRequest.Status.Phase = SucceedPhase
 			Expect(k8sClient.Status().Patch(ctx, opsRequest, patch)).Should(Succeed())
 
@@ -229,6 +218,9 @@ var _ = Describe("OpsRequest webhook", func() {
 		Expect(testCtx.CreateObj(ctx, opsRequest).Error()).To(ContainSubstring(`Invalid value: "VolumeExpansion": not supported in Cluster`))
 		// set cluster support volumeExpansion
 		patch := client.MergeFrom(cluster.DeepCopy())
+		if cluster.Status.Operations == nil {
+			cluster.Status.Operations = &Operations{}
+		}
 		cluster.Status.Operations.VolumeExpandable = []OperationComponent{
 			{
 				Name:                     replicaSetComponentName,

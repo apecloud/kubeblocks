@@ -1,9 +1,9 @@
 apiVersion: extensions.kubeblocks.io/v1alpha1
-kind: AddonSpec
+kind: Addon
 metadata:
   labels:
-    app.kubernetes.io/name: addonspec
-    app.kubernetes.io/instance: addonspec-sample
+    app.kubernetes.io/name: addon
+    app.kubernetes.io/instance: addon-sample
     app.kubernetes.io/part-of: kubeblocks
     app.kubernetes.io/managed-by: kustomize
     app.kubernetes.io/created-by: kubeblocks

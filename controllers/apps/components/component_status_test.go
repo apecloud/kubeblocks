@@ -126,11 +126,10 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 				podName := fmt.Sprintf("%s-%s-%s", clusterName, compName, testCtx.GetRandomStr())
 				pod = testapps.NewPodFactory(testCtx.DefaultNamespace, podName).
 					SetOwnerReferences("apps/v1", intctrlutil.DeploymentKind, deployment).
-					AddLabelsInMap(map[string]string{
-						intctrlutil.AppInstanceLabelKey:    clusterName,
-						intctrlutil.KBAppComponentLabelKey: compName,
-						intctrlutil.AppManagedByLabelKey:   intctrlutil.AppName,
-					}).AddContainer(corev1.Container{Name: testapps.DefaultNginxContainerName, Image: testapps.NginxImage}).
+					AddAppInstanceLabel(clusterName).
+					AddAppComponentLabel(compName).
+					AddAppManangedByLabel().
+					AddContainer(corev1.Container{Name: testapps.DefaultNginxContainerName, Image: testapps.NginxImage}).
 					Create(&testCtx).GetObject()
 			})
 
@@ -234,12 +233,11 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 					podName := fmt.Sprintf("%s-%s-%d", clusterName, compName, i)
 					pod := testapps.NewPodFactory(testCtx.DefaultNamespace, podName).
 						SetOwnerReferences("apps/v1", intctrlutil.StatefulSetKind, statefulset).
-						AddLabelsInMap(map[string]string{
-							intctrlutil.AppInstanceLabelKey:       clusterName,
-							intctrlutil.KBAppComponentLabelKey:    compName,
-							intctrlutil.AppManagedByLabelKey:      intctrlutil.AppName,
-							appsv1.ControllerRevisionHashLabelKey: stsUpdateRevison,
-						}).AddContainer(corev1.Container{Name: testapps.DefaultMySQLContainerName, Image: testapps.ApeCloudMySQLImage}).
+						AddAppInstanceLabel(clusterName).
+						AddAppComponentLabel(compName).
+						AddAppManangedByLabel().
+						AddControllerRevisionHashLabel(stsUpdateRevison).
+						AddContainer(corev1.Container{Name: testapps.DefaultMySQLContainerName, Image: testapps.ApeCloudMySQLImage}).
 						Create(&testCtx).GetObject()
 					Expect(testapps.ChangeObjStatus(&testCtx, pod, func() {
 						pod.Status.Conditions = []corev1.PodCondition{{
@@ -351,12 +349,11 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 					stsUpdateRevison := statefulset.Status.UpdateRevision
 					pod := testapps.NewPodFactory(testCtx.DefaultNamespace, podName).
 						SetOwnerReferences("apps/v1", intctrlutil.StatefulSetKind, statefulset).
-						AddLabelsInMap(map[string]string{
-							intctrlutil.AppInstanceLabelKey:       clusterName,
-							intctrlutil.KBAppComponentLabelKey:    compName,
-							intctrlutil.AppManagedByLabelKey:      intctrlutil.AppName,
-							appsv1.ControllerRevisionHashLabelKey: stsUpdateRevison,
-						}).AddContainer(corev1.Container{Name: testapps.DefaultMySQLContainerName, Image: testapps.ApeCloudMySQLImage}).
+						AddAppInstanceLabel(clusterName).
+						AddAppComponentLabel(compName).
+						AddAppManangedByLabel().
+						AddControllerRevisionHashLabel(stsUpdateRevison).
+						AddContainer(corev1.Container{Name: testapps.DefaultMySQLContainerName, Image: testapps.ApeCloudMySQLImage}).
 						Create(&testCtx).GetObject()
 					Expect(testapps.ChangeObjStatus(&testCtx, pod, func() {
 						pod.Status.Conditions = []corev1.PodCondition{{
@@ -469,13 +466,15 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 
 				for i := 0; i < 2; i++ {
 					podName := fmt.Sprintf("%s-%s-%d", clusterName, compName, i)
-					pod := testapps.NewPodFactory(testCtx.DefaultNamespace, podName).SetOwnerReferences("apps/v1", intctrlutil.StatefulSetKind, statefulset).AddLabelsInMap(map[string]string{
-						intctrlutil.AppInstanceLabelKey:       clusterName,
-						intctrlutil.KBAppComponentLabelKey:    compName,
-						intctrlutil.AppManagedByLabelKey:      intctrlutil.AppName,
-						intctrlutil.RoleLabelKey:              "leader",
-						appsv1.ControllerRevisionHashLabelKey: statefulset.Status.UpdateRevision,
-					}).AddContainer(corev1.Container{Name: testapps.DefaultRedisContainerName, Image: testapps.DefaultRedisImageName}).Create(&testCtx).GetObject()
+					pod := testapps.NewPodFactory(testCtx.DefaultNamespace, podName).
+						SetOwnerReferences("apps/v1", intctrlutil.StatefulSetKind, statefulset).
+						AddAppInstanceLabel(clusterName).
+						AddAppComponentLabel(compName).
+						AddAppManangedByLabel().
+						AddRoleLabel("leader").
+						AddControllerRevisionHashLabel(statefulset.Status.UpdateRevision).
+						AddContainer(corev1.Container{Name: testapps.DefaultRedisContainerName, Image: testapps.DefaultRedisImageName}).
+						Create(&testCtx).GetObject()
 					patch := client.MergeFrom(pod.DeepCopy())
 					pod.Status.Conditions = []corev1.PodCondition{
 						{

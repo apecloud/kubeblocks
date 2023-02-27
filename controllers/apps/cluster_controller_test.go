@@ -463,6 +463,24 @@ var _ = Describe("Cluster Controller", func() {
 		initialReplicas := int32(1)
 		updatedReplicas := int32(3)
 
+		By("Creating a single component cluster with VolumeClaimTemplate")
+		pvcSpec := testapps.NewPVC("1Gi")
+		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
+			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
+			AddComponent(mysqlCompName, mysqlCompType).
+			AddVolumeClaimTemplate(testapps.DataVolumeName, &pvcSpec).
+			SetReplicas(initialReplicas).
+			Create(&testCtx).GetObject()
+		clusterKey = client.ObjectKeyFromObject(clusterObj)
+		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
+
+		horizontalScale(int(updatedReplicas))
+	}
+
+	testMultiCompHScale := func() {
+		initialReplicas := int32(1)
+		updatedReplicas := int32(3)
+
 		secondMysqlCompName := mysqlCompName + "1"
 
 		By("Creating a multi components cluster with VolumeClaimTemplate")
@@ -960,6 +978,27 @@ var _ = Describe("Cluster Controller", func() {
 
 	// Scenarios
 
+	Context("when creating cluster without clusterversion", func() {
+		BeforeEach(func() {
+			By("Create a clusterDefinition obj")
+			clusterDefObj = testapps.NewClusterDefFactory(clusterDefName).
+				AddComponent(testapps.StatefulMySQLComponent, mysqlCompType).
+				Create(&testCtx).GetObject()
+		})
+
+		It("should reconcile to create cluster with no error", func() {
+			By("Creating a cluster")
+			clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
+				clusterDefObj.Name, "").
+				AddComponent(mysqlCompName, mysqlCompType).SetReplicas(3).
+				WithRandomName().Create(&testCtx).GetObject()
+			clusterKey = client.ObjectKeyFromObject(clusterObj)
+
+			By("Waiting for the cluster initialized")
+			Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
+		})
+	})
+
 	Context("when creating cluster with multiple kinds of components", func() {
 		BeforeEach(func() {
 			By("Create a clusterDefinition obj")
@@ -981,6 +1020,10 @@ var _ = Describe("Cluster Controller", func() {
 
 		It("should create corresponding services correctly", func() {
 			checkAllServicesCreate()
+		})
+
+		It("should successfully h-scale with multiple components", func() {
+			testMultiCompHScale()
 		})
 	})
 

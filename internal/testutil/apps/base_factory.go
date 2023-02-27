@@ -21,6 +21,7 @@ import (
 	"reflect"
 
 	"github.com/onsi/gomega"
+	appsv1 "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -67,6 +68,34 @@ func (factory *BaseFactory[T, PT, F]) AddLabelsInMap(labels map[string]string) *
 	}
 	factory.object.SetLabels(l)
 	return factory.concreteFactory
+}
+
+func (factory *BaseFactory[T, PT, F]) AddAppNameLabel(value string) *F {
+	return factory.AddLabels(intctrlutil.AppNameLabelKey, value)
+}
+
+func (factory *BaseFactory[T, PT, F]) AddAppInstanceLabel(value string) *F {
+	return factory.AddLabels(intctrlutil.AppInstanceLabelKey, value)
+}
+
+func (factory *BaseFactory[T, PT, F]) AddAppComponentLabel(value string) *F {
+	return factory.AddLabels(intctrlutil.KBAppComponentLabelKey, value)
+}
+
+func (factory *BaseFactory[T, PT, F]) AddAppManangedByLabel() *F {
+	return factory.AddLabels(intctrlutil.AppManagedByLabelKey, intctrlutil.AppName)
+}
+
+func (factory *BaseFactory[T, PT, F]) AddConsensusSetAccessModeLabel(value string) *F {
+	return factory.AddLabels(intctrlutil.ConsensusSetAccessModeLabelKey, value)
+}
+
+func (factory *BaseFactory[T, PT, F]) AddRoleLabel(value string) *F {
+	return factory.AddLabels(intctrlutil.RoleLabelKey, value)
+}
+
+func (factory *BaseFactory[T, PT, F]) AddControllerRevisionHashLabel(value string) *F {
+	return factory.AddLabels(appsv1.ControllerRevisionHashLabelKey, value)
 }
 
 func (factory *BaseFactory[T, PT, F]) SetOwnerReferences(ownerAPIVersion string, ownerKind string, owner client.Object) *F {

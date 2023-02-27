@@ -137,10 +137,11 @@ var _ = Describe("lifecycle_utils", func() {
 			}},
 		}
 		return testapps.NewStatefulSetFactory(testCtx.DefaultNamespace, "mock-sts", clusterName, mysqlCompName).
-			AddLabels(intctrlutil.AppNameLabelKey, "mock-app",
-				intctrlutil.AppInstanceLabelKey, clusterName,
-				intctrlutil.KBAppComponentLabelKey, mysqlCompName,
-			).SetReplicas(1).AddContainer(container).
+			AddAppNameLabel("mock-app").
+			AddAppInstanceLabel(clusterName).
+			AddAppComponentLabel(mysqlCompName).
+			SetReplicas(1).
+			AddContainer(container).
 			AddVolumeClaimTemplate(corev1.PersistentVolumeClaim{
 				ObjectMeta: metav1.ObjectMeta{Name: testapps.DataVolumeName},
 				Spec:       testapps.NewPVC("1Gi"),

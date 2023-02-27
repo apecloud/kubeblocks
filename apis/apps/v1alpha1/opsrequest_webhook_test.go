@@ -79,17 +79,13 @@ var _ = Describe("OpsRequest webhook", func() {
 		By("By testing when spec.upgrade is null")
 		Expect(testCtx.CreateObj(ctx, opsRequest).Error()).To(ContainSubstring("spec.upgrade"))
 
-		By("By testing when only one cluster version exist")
-		opsRequest.Spec.Upgrade = &Upgrade{ClusterVersionRef: clusterVersionName}
-		Expect(testCtx.CreateObj(ctx, opsRequest).Error()).To(ContainSubstring("ClusterVersion must be greater than 1"))
-
 		By("By creating a new clusterVersion for upgrade")
 		newClusterVersion := createTestClusterVersionObj(clusterDefinitionName, clusterVersionNameForUpgrade)
 		Expect(testCtx.CreateObj(ctx, newClusterVersion)).Should(Succeed())
 
 		By("By testing when target cluster version not exist")
 		opsRequest.Spec.Upgrade = &Upgrade{ClusterVersionRef: clusterVersionName + "-not-exist"}
-		Expect(testCtx.CreateObj(ctx, opsRequest).Error()).To(ContainSubstring("target CluterVersion to upgrade not found"))
+		Expect(testCtx.CreateObj(ctx, opsRequest).Error()).To(ContainSubstring("not found"))
 
 		By("Test Cluster Phase")
 		opsRequest.Spec.Upgrade = &Upgrade{ClusterVersionRef: clusterVersionName}
@@ -250,6 +246,15 @@ var _ = Describe("OpsRequest webhook", func() {
 				ComponentOps: ComponentOps{ComponentName: replicaSetComponentName},
 				Replicas:     2,
 			},
+		}
+
+		By("By testing horizontalScaling - delete component proxy from cluster definition which is exist in cluster")
+		patch := client.MergeFrom(clusterDef.DeepCopy())
+		// delete component proxy from cluster definition
+		if clusterDef.Spec.ComponentDefs[0].Name == proxyComponentName {
+			clusterDef.Spec.ComponentDefs = clusterDef.Spec.ComponentDefs[1:]
+		} else {
+			clusterDef.Spec.ComponentDefs = clusterDef.Spec.ComponentDefs[:1]
 		}
 
 		By("By testing horizontalScaling - delete component proxy from cluster definition which is exist in cluster")

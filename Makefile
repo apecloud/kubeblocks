@@ -133,7 +133,7 @@ manifests: test-go-generate controller-gen ## Generate WebhookConfiguration, Clu
 	$(CONTROLLER_GEN) rbac:roleName=manager-role crd:generateEmbeddedObjectMeta=true webhook paths="./apis/...;./controllers/apps/...;./controllers/dataprotection/...;./controllers/k8score/...;./cmd/manager/...;./internal/..." output:crd:artifacts:config=config/crd/bases
 	@cp config/crd/bases/* $(CHART_PATH)/crds
 	@cp config/rbac/role.yaml $(CHART_PATH)/config/rbac/role.yaml
-	@rm -rf $(CHART_PATH)/crds/troubleshoot.sh_*.yaml
+	@rm -f $(CHART_PATH)/crds/troubleshoot.sh_*.yaml
 	$(CONTROLLER_GEN) rbac:roleName=loadbalancer-role  paths="./controllers/loadbalancer;./cmd/loadbalancer/controller" output:dir=config/loadbalancer
 
 .PHONY: generate

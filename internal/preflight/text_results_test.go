@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package troubleshoot
+package preflight
 
 import (
 	"time"
@@ -25,7 +25,7 @@ import (
 	analyzerunner "github.com/replicatedhq/troubleshoot/pkg/analyze"
 )
 
-var _ = Describe("Results Stdout Test", func() {
+var _ = Describe("text_results_test", func() {
 	var (
 		timeout       = time.Second * 10
 		preflightName = "stdoutPreflightName"
@@ -34,7 +34,7 @@ var _ = Describe("Results Stdout Test", func() {
 		yamlFormat    = "yaml"
 		unknownFormat = "unknown"
 	)
-	It("showStdoutResults test", func() {
+	It("ShowStdoutResults Test", func() {
 		analyzeResults := []*analyzerunner.AnalyzeResult{
 			{
 				IsPass:  true,
@@ -57,22 +57,22 @@ var _ = Describe("Results Stdout Test", func() {
 			},
 		}
 		Eventually(func(g Gomega) {
-			err := showStdoutResults(preflightName, analyzeResults, humanFormat)
+			err := ShowStdoutResults(preflightName, analyzeResults, humanFormat)
 			g.Expect(err).NotTo(HaveOccurred())
 		}, timeout).Should(Succeed())
 
 		Eventually(func(g Gomega) {
-			err := showStdoutResults(preflightName, analyzeResults, jsonFormat)
+			err := ShowStdoutResults(preflightName, analyzeResults, jsonFormat)
 			g.Expect(err).NotTo(HaveOccurred())
 		}, timeout).Should(Succeed())
 
 		Eventually(func(g Gomega) {
-			err := showStdoutResults(preflightName, analyzeResults, yamlFormat)
+			err := ShowStdoutResults(preflightName, analyzeResults, yamlFormat)
 			g.Expect(err).NotTo(HaveOccurred())
 		}, timeout).Should(Succeed())
 
 		Eventually(func(g Gomega) {
-			err := showStdoutResults(preflightName, analyzeResults, unknownFormat)
+			err := ShowStdoutResults(preflightName, analyzeResults, unknownFormat)
 			g.Expect(err).To(HaveOccurred())
 		}, timeout).Should(Succeed())
 	})

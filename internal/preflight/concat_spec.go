@@ -14,16 +14,20 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package troubleshoot
+package preflight
 
-import troubleshootv1beta2 "github.com/replicatedhq/troubleshoot/pkg/apis/troubleshoot/v1beta2"
+import (
+	troubleshootv1beta2 "github.com/replicatedhq/troubleshoot/pkg/apis/troubleshoot/v1beta2"
+
+	preflightv1beta2 "github.com/apecloud/kubeblocks/apis/preflight/v1beta2"
+)
 
 // ConcatPreflightSpec splices multiple PreflightSpec into one Preflight object
-func ConcatPreflightSpec(target *troubleshootv1beta2.Preflight, source *troubleshootv1beta2.Preflight) *troubleshootv1beta2.Preflight {
+func ConcatPreflightSpec(target *preflightv1beta2.Preflight, source *preflightv1beta2.Preflight) *preflightv1beta2.Preflight {
 	if source == nil {
 		return target
 	}
-	var newSpec *troubleshootv1beta2.Preflight
+	var newSpec *preflightv1beta2.Preflight
 	if target == nil {
 		newSpec = source
 	} else {
@@ -31,16 +35,18 @@ func ConcatPreflightSpec(target *troubleshootv1beta2.Preflight, source *troubles
 		newSpec.Spec.Collectors = append(newSpec.Spec.Collectors, source.Spec.Collectors...)
 		newSpec.Spec.RemoteCollectors = append(newSpec.Spec.RemoteCollectors, source.Spec.RemoteCollectors...)
 		newSpec.Spec.Analyzers = append(newSpec.Spec.Analyzers, source.Spec.Analyzers...)
+		newSpec.Spec.ExtendCollectors = append(newSpec.Spec.ExtendCollectors, source.Spec.ExtendCollectors...)
+		newSpec.Spec.ExtendAnalyzers = append(newSpec.Spec.ExtendAnalyzers, source.Spec.ExtendAnalyzers...)
 	}
 	return newSpec
 }
 
 // ConcatHostPreflightSpec splices multiple HostPreflightSpec into one HostPreflight object
-func ConcatHostPreflightSpec(target *troubleshootv1beta2.HostPreflight, source *troubleshootv1beta2.HostPreflight) *troubleshootv1beta2.HostPreflight {
+func ConcatHostPreflightSpec(target *preflightv1beta2.HostPreflight, source *preflightv1beta2.HostPreflight) *preflightv1beta2.HostPreflight {
 	if source == nil {
 		return target
 	}
-	var newSpec *troubleshootv1beta2.HostPreflight
+	var newSpec *preflightv1beta2.HostPreflight
 	if target == nil {
 		newSpec = source
 	} else {
@@ -48,6 +54,24 @@ func ConcatHostPreflightSpec(target *troubleshootv1beta2.HostPreflight, source *
 		newSpec.Spec.Collectors = append(newSpec.Spec.Collectors, source.Spec.Collectors...)
 		newSpec.Spec.RemoteCollectors = append(newSpec.Spec.RemoteCollectors, source.Spec.RemoteCollectors...)
 		newSpec.Spec.Analyzers = append(newSpec.Spec.Analyzers, source.Spec.Analyzers...)
+		newSpec.Spec.ExtendCollectors = append(newSpec.Spec.ExtendCollectors, source.Spec.ExtendCollectors...)
+		newSpec.Spec.ExtendAnalyzers = append(newSpec.Spec.ExtendAnalyzers, source.Spec.ExtendAnalyzers...)
 	}
 	return newSpec
+}
+
+// ExtractHostPreflightSpec extracts spec of troubleshootv1beta2.HostPreflight from preflightv1beta2.HostPreflight
+func ExtractHostPreflightSpec(kb *preflightv1beta2.HostPreflight) *troubleshootv1beta2.HostPreflight {
+	if kb != nil {
+		return &troubleshootv1beta2.HostPreflight{
+			TypeMeta:   kb.TypeMeta,
+			ObjectMeta: kb.ObjectMeta,
+			Spec: troubleshootv1beta2.HostPreflightSpec{
+				Collectors:       kb.Spec.Collectors,
+				RemoteCollectors: kb.Spec.RemoteCollectors,
+				Analyzers:        kb.Spec.Analyzers,
+			},
+		}
+	}
+	return nil
 }

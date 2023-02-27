@@ -1,0 +1,17 @@
+apiVersion: troubleshoot.sh/v1beta2
+kind: HostPreflight
+metadata:
+  name: host-utility
+spec:
+  extendCollectors:
+    - hostUtility :
+        collectorName: helmCheck
+        utilityName: helm
+  extendAnalyzers:
+    - hostUtility:
+        collectorName: helmCheck
+        outcomes:
+          - pass:
+              message: ok.
+          - fail:
+              message: no helm

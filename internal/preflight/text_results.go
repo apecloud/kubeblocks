@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package troubleshoot
+package preflight
 
 import (
 	"encoding/json"
@@ -25,8 +25,8 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-// showStdoutResults shadows interactive mode, and exports results by customized format
-func showStdoutResults(preflightName string, analyzeResults []*analyzerunner.AnalyzeResult, format string) error {
+// ShowStdoutResults shadows interactive mode, and exports results by customized format
+func ShowStdoutResults(preflightName string, analyzeResults []*analyzerunner.AnalyzeResult, format string) error {
 	switch format {
 	case "human":
 		return showStdoutResultsHuman(preflightName, analyzeResults)

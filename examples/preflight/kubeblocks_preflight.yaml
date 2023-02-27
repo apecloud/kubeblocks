@@ -85,3 +85,11 @@ spec:
               message: The metrics-server deployment does not have any ready replicas.
           - pass:
               message: The metrics-server deployment is ready.
+  extendAnalyzers:
+    - clusterAccess:
+        checkName: check-k8s-access
+        outcomes:
+          - fail:
+              message: access fail
+          - pass:
+              message: access ok

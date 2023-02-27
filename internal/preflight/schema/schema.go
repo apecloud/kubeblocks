@@ -14,12 +14,13 @@ limitations under the License.
 package schema
 
 import (
-	preflightv1beta2 "github.com/apecloud/kubeblocks/apis/preflight/v1beta2"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+
+	preflightv1beta2 "github.com/apecloud/kubeblocks/apis/preflight/v1beta2"
 )
 
 var Scheme = runtime.NewScheme()

@@ -78,6 +78,10 @@ func TestCreateUpdatedParamsPatch(t *testing.T) {
 	}
 }
 
+func TestConstructReloadBuiltinFuncs(t *testing.T) {
+	require.NotNil(t, constructReloadBuiltinFuncs(nil))
+}
+
 func prepareTestData(t *testing.T, dir1 string, dir2 string) string {
 	tmpDir, err := os.MkdirTemp(os.TempDir(), "reload-test-")
 	require.Nil(t, err)

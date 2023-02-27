@@ -325,7 +325,7 @@ func BuildDeploy(reqCtx intctrlutil.RequestCtx, params BuilderParams) (*appsv1.D
 }
 
 func BuildPVCFromSnapshot(sts *appsv1.StatefulSet,
-	vct corev1.PersistentVolumeClaim,
+	vct corev1.PersistentVolumeClaimTemplate,
 	pvcKey types.NamespacedName,
 	snapshotName string) (*corev1.PersistentVolumeClaim, error) {
 

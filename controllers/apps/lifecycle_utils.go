@@ -652,7 +652,7 @@ func deleteBackup(ctx context.Context, cli client.Client, clusterName string, co
 
 func createPVCFromSnapshot(ctx context.Context,
 	cli client.Client,
-	vct corev1.PersistentVolumeClaim,
+	vct corev1.PersistentVolumeClaimTemplate,
 	sts *appsv1.StatefulSet,
 	pvcKey types.NamespacedName,
 	snapshotName string) error {
@@ -714,6 +714,7 @@ func doSnapshot(cli client.Client,
 	cluster *appsv1alpha1.Cluster,
 	snapshotKey types.NamespacedName,
 	stsObj *appsv1.StatefulSet,
+	vcts []corev1.PersistentVolumeClaimTemplate,
 	backupTemplateSelector map[string]string) error {
 
 	ctx := reqCtx.Ctx
@@ -733,7 +734,7 @@ func doSnapshot(cli client.Client,
 		}
 	} else {
 		// no backuppolicytemplate, then try native volumesnapshot
-		pvcName := strings.Join([]string{stsObj.Spec.VolumeClaimTemplates[0].Name, stsObj.Name, "0"}, "-")
+		pvcName := strings.Join([]string{vcts[0].Name, stsObj.Name, "0"}, "-")
 		snapshot, err := builder.BuildVolumeSnapshot(snapshotKey, pvcName, stsObj)
 		if err != nil {
 			return err
@@ -755,7 +756,7 @@ func checkedCreatePVCFromSnapshot(cli client.Client,
 	pvcKey types.NamespacedName,
 	cluster *appsv1alpha1.Cluster,
 	componentName string,
-	vct corev1.PersistentVolumeClaim,
+	vct corev1.PersistentVolumeClaimTemplate,
 	stsObj *appsv1.StatefulSet) error {
 	pvc := corev1.PersistentVolumeClaim{}
 	// check pvc existence
@@ -896,7 +897,8 @@ func doBackup(reqCtx intctrlutil.RequestCtx,
 				"volume snapshot not support")
 			return false, errors.Errorf("volume snapshot not support")
 		}
-		if len(stsObj.Spec.VolumeClaimTemplates) == 0 {
+		vcts := component.VolumeClaimTemplates
+		if len(vcts) == 0 {
 			reqCtx.Recorder.Eventf(cluster,
 				corev1.EventTypeNormal,
 				"HorizontalScale",
@@ -914,6 +916,7 @@ func doBackup(reqCtx intctrlutil.RequestCtx,
 				cluster,
 				snapshotKey,
 				stsObj,
+				vcts,
 				component.HorizontalScalePolicy.BackupTemplateSelector); err != nil {
 				return shouldRequeue, err
 			}
@@ -933,8 +936,8 @@ func doBackup(reqCtx intctrlutil.RequestCtx,
 		// if volumesnapshot ready,
 		// create pvc from snapshot for every new pod
 		for i := *stsObj.Spec.Replicas; i < *stsProto.Spec.Replicas; i++ {
-			vct := stsObj.Spec.VolumeClaimTemplates[0]
-			for _, tmpVct := range stsObj.Spec.VolumeClaimTemplates {
+			vct := vcts[0]
+			for _, tmpVct := range vcts {
 				if tmpVct.Name == component.HorizontalScalePolicy.VolumeMountsName {
 					vct = tmpVct
 					break

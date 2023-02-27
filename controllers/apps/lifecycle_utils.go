@@ -895,6 +895,7 @@ func doBackup(reqCtx intctrlutil.RequestCtx,
 				corev1.EventTypeWarning,
 				"HorizontalScaleFailed",
 				"volume snapshot not support")
+			// TODO: add ut
 			return false, errors.Errorf("volume snapshot not support")
 		}
 		vcts := component.VolumeClaimTemplates

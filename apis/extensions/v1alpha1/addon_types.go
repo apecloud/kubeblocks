@@ -45,7 +45,7 @@ type AddonSpec struct {
 	// Default installation parameters.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MinItems=1
-	DefaultInstallValues []AddonDefaultInstallSpecItem `json:"defaultInstallValues,omitempty"`
+	DefaultInstallValues []AddonDefaultInstallSpecItem `json:"defaultInstallValues"`
 
 	// Installation parameters.
 	// +optional
@@ -323,6 +323,33 @@ type AddonList struct {
 
 func init() {
 	SchemeBuilder.Register(&Addon{}, &AddonList{})
+}
+
+func (r *Addon) GetExtraNames() []string {
+	if r == nil || len(r.Spec.DefaultInstallValues) == 0 {
+		return nil
+	}
+	// r.Spec.DefaultInstallValues has minItem=1 constraint
+	names := make([]string, 0, len(r.Spec.DefaultInstallValues[0].ExtraItems))
+	for _, i := range r.Spec.DefaultInstallValues[0].ExtraItems {
+		names = append(names, i.Name)
+	}
+	return names
+}
+
+func (r *InstallableSpec) GetSelectorsStrings() []string {
+	if r == nil {
+		return nil
+	}
+	l := len(r.Selectors)
+	if l == 0 {
+		return nil
+	}
+	sl := make([]string, 0, l)
+	for _, req := range r.Selectors {
+		sl = append(sl, req.String())
+	}
+	return sl
 }
 
 func (r *SelectorRequirement) String() string {

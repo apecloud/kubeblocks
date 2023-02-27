@@ -44,14 +44,12 @@ const (
 	// GoosWindows is os.GOOS windows string
 	GoosWindows = "windows"
 
-	// Group api group
-	Group = "apps.kubeblocks.io"
+	// AppsAPIGroup api group
+	AppsAPIGroup = "apps.kubeblocks.io"
 
 	// Version api version
-	Version = "v1alpha1"
-
+	Version   = "v1alpha1"
 	VersionV1 = "v1"
-
 	// ResourceClusters clusters resource
 	ResourceClusters = "clusters"
 	// ResourceClusterDefs clusterDefinition resource
@@ -89,13 +87,18 @@ const (
 	StorageClassAnnotationKey      = "kubeblocks.io/storage-class"
 
 	// DataProtection definitions
-	DPGroup                       = "dataprotection.kubeblocks.io"
+	DPAPIGroup                    = "dataprotection.kubeblocks.io"
 	DPVersion                     = "v1alpha1"
 	ResourceBackups               = "backups"
 	ResourceBackupTools           = "backuptools"
 	ResourceRestoreJobs           = "restorejobs"
 	ResourceBackupPolicies        = "backuppolicies"
 	ResourceBackupPolicyTemplates = "backuppolicytemplates"
+
+	// Extensions definitions
+	ExtensionsAPIGroup   = "extensions.kubeblocks.io"
+	ExtensionsAPIVersion = "v1alpha1"
+	ResourceAddons       = "addons"
 
 	None = "<none>"
 )
@@ -153,35 +156,39 @@ type ConfigTemplateInfo struct {
 }
 
 func ClusterGVR() schema.GroupVersionResource {
-	return schema.GroupVersionResource{Group: Group, Version: Version, Resource: ResourceClusters}
+	return schema.GroupVersionResource{Group: AppsAPIGroup, Version: Version, Resource: ResourceClusters}
 }
 
 func ClusterDefGVR() schema.GroupVersionResource {
-	return schema.GroupVersionResource{Group: Group, Version: Version, Resource: ResourceClusterDefs}
+	return schema.GroupVersionResource{Group: AppsAPIGroup, Version: Version, Resource: ResourceClusterDefs}
 }
 
 func ClusterVersionGVR() schema.GroupVersionResource {
-	return schema.GroupVersionResource{Group: Group, Version: Version, Resource: ResourceClusterVersions}
-}
-
-func BackupGVR() schema.GroupVersionResource {
-	return schema.GroupVersionResource{Group: DPGroup, Version: DPVersion, Resource: ResourceBackups}
-}
-
-func BackupPolicyTemplateGVR() schema.GroupVersionResource {
-	return schema.GroupVersionResource{Group: DPGroup, Version: DPVersion, Resource: ResourceBackupPolicyTemplates}
-}
-
-func BackupToolGVR() schema.GroupVersionResource {
-	return schema.GroupVersionResource{Group: DPGroup, Version: DPVersion, Resource: ResourceBackupTools}
-}
-
-func RestoreJobGVR() schema.GroupVersionResource {
-	return schema.GroupVersionResource{Group: DPGroup, Version: DPVersion, Resource: ResourceRestoreJobs}
+	return schema.GroupVersionResource{Group: AppsAPIGroup, Version: Version, Resource: ResourceClusterVersions}
 }
 
 func OpsGVR() schema.GroupVersionResource {
-	return schema.GroupVersionResource{Group: Group, Version: Version, Resource: ResourceOpsRequests}
+	return schema.GroupVersionResource{Group: AppsAPIGroup, Version: Version, Resource: ResourceOpsRequests}
+}
+
+func BackupGVR() schema.GroupVersionResource {
+	return schema.GroupVersionResource{Group: DPAPIGroup, Version: DPVersion, Resource: ResourceBackups}
+}
+
+func BackupPolicyTemplateGVR() schema.GroupVersionResource {
+	return schema.GroupVersionResource{Group: DPAPIGroup, Version: DPVersion, Resource: ResourceBackupPolicyTemplates}
+}
+
+func BackupToolGVR() schema.GroupVersionResource {
+	return schema.GroupVersionResource{Group: DPAPIGroup, Version: DPVersion, Resource: ResourceBackupTools}
+}
+
+func RestoreJobGVR() schema.GroupVersionResource {
+	return schema.GroupVersionResource{Group: DPAPIGroup, Version: DPVersion, Resource: ResourceRestoreJobs}
+}
+
+func AddonGVR() schema.GroupVersionResource {
+	return schema.GroupVersionResource{Group: ExtensionsAPIGroup, Version: ExtensionsAPIVersion, Resource: ResourceAddons}
 }
 
 func CRDGVR() schema.GroupVersionResource {
@@ -221,7 +228,7 @@ func PVGVR() schema.GroupVersionResource {
 }
 
 func ConfigConstraintGVR() schema.GroupVersionResource {
-	return schema.GroupVersionResource{Group: Group, Version: Version, Resource: ResourceConfigConstraintVersions}
+	return schema.GroupVersionResource{Group: AppsAPIGroup, Version: Version, Resource: ResourceConfigConstraintVersions}
 }
 
 func StorageClassGVR() schema.GroupVersionResource {

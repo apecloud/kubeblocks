@@ -1,31 +1,14 @@
-## kbcli
+## kbcli addon
 
-KubeBlocks CLI
-
-### Synopsis
-
-```
-
-=============================================
- __    __ _______   ______  __       ______ 
-|  \  /  \       \ /      \|  \     |      \
-| ▓▓ /  ▓▓ ▓▓▓▓▓▓▓\  ▓▓▓▓▓▓\ ▓▓      \▓▓▓▓▓▓
-| ▓▓/  ▓▓| ▓▓__/ ▓▓ ▓▓   \▓▓ ▓▓       | ▓▓  
-| ▓▓  ▓▓ | ▓▓    ▓▓ ▓▓     | ▓▓       | ▓▓  
-| ▓▓▓▓▓\ | ▓▓▓▓▓▓▓\ ▓▓   __| ▓▓       | ▓▓  
-| ▓▓ \▓▓\| ▓▓__/ ▓▓ ▓▓__/  \ ▓▓_____ _| ▓▓_ 
-| ▓▓  \▓▓\ ▓▓    ▓▓\▓▓    ▓▓ ▓▓     \   ▓▓ \
- \▓▓   \▓▓\▓▓▓▓▓▓▓  \▓▓▓▓▓▓ \▓▓▓▓▓▓▓▓\▓▓▓▓▓▓
-
-=============================================
-A Command Line Interface for KubeBlocks
-```
-
-```
-kbcli [flags]
-```
+Addon command
 
 ### Options
+
+```
+  -h, --help   help for addon
+```
+
+### Options inherited from parent commands
 
 ```
       --as string                      Username to impersonate for the operation. User could be a regular user or a service account in a namespace.
@@ -38,7 +21,6 @@ kbcli [flags]
       --cluster string                 The name of the kubeconfig cluster to use
       --context string                 The name of the kubeconfig context to use
       --disable-compression            If true, opt-out of response compression for all requests to the server
-  -h, --help                           help for kbcli
       --insecure-skip-tls-verify       If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure
       --kubeconfig string              Path to the kubeconfig file to use for CLI requests.
       --match-server-version           Require server version to match client version
@@ -52,18 +34,9 @@ kbcli [flags]
 
 ### SEE ALSO
 
-* [kbcli addon](kbcli_addon.md)	 - Addon command
-* [kbcli alert](kbcli_alert.md)	 - Manage alert receivers
-* [kbcli app](kbcli_app.md)	 - Manage external applications related to KubeBlocks
-* [kbcli backup-config](kbcli_backup-config.md)	 - KubeBlocks backup config
-* [kbcli bench](kbcli_bench.md)	 - Run a benchmark
-* [kbcli cluster](kbcli_cluster.md)	 - Cluster command
-* [kbcli clusterdefinition](kbcli_clusterdefinition.md)	 - ClusterDefinition command
-* [kbcli clusterversion](kbcli_clusterversion.md)	 - ClusterVersion command
-* [kbcli dashboard](kbcli_dashboard.md)	 - List and open the KubeBlocks dashboards
-* [kbcli kubeblocks](kbcli_kubeblocks.md)	 - KubeBlocks operation commands
-* [kbcli options](kbcli_options.md)	 - Print the list of flags inherited by all commands
-* [kbcli playground](kbcli_playground.md)	 - Bootstrap a playground KubeBlocks in local host or cloud
-* [kbcli troubleshoot](kbcli_troubleshoot.md)	 - Troubleshooting for KubeBlocks
-* [kbcli version](kbcli_version.md)	 - Print the version information
+* [kbcli](kbcli.md)	 - KubeBlocks CLI
+* [kbcli addon describe](kbcli_addon_describe.md)	 - Describe an addon specification
+* [kbcli addon disable](kbcli_addon_disable.md)	 - Disable an addon
+* [kbcli addon enable](kbcli_addon_enable.md)	 - Enable an addon
+* [kbcli addon list](kbcli_addon_list.md)	 - List addons
 

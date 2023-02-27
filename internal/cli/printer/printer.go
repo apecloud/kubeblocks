@@ -67,6 +67,21 @@ func init() {
 	}
 }
 
+func PrintTable(out io.Writer, customSettings func(*TablePrinter), rowFeeder func(*TablePrinter) error, header ...interface{}) error {
+	t := NewTablePrinter(out)
+	t.SetHeader(header...)
+	if customSettings != nil {
+		customSettings(t)
+	}
+	if rowFeeder != nil {
+		if err := rowFeeder(t); err != nil {
+			return err
+		}
+	}
+	t.Print()
+	return nil
+}
+
 func NewTablePrinter(out io.Writer) *TablePrinter {
 	t := table.NewWriter()
 	t.SetStyle(KubeCtlStyle)

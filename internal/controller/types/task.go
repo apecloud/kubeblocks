@@ -44,15 +44,22 @@ func InitReconcileTask(clusterDef *appsv1alpha1.ClusterDefinition, clusterVer *a
 	}
 }
 
-func (task *ReconcileTask) GetBuilderParams() builder.BuilderParams {
+func (r *ReconcileTask) GetBuilderParams() builder.BuilderParams {
 	return builder.BuilderParams{
-		ClusterDefinition: task.ClusterDefinition,
-		ClusterVersion:    task.ClusterVersion,
-		Cluster:           task.Cluster,
-		Component:         task.Component,
+		ClusterDefinition: r.ClusterDefinition,
+		ClusterVersion:    r.ClusterVersion,
+		Cluster:           r.Cluster,
+		Component:         r.Component,
 	}
 }
 
-func (task *ReconcileTask) AppendResource(objs ...client.Object) {
-	*task.Resources = append(*task.Resources, objs...)
+func (r *ReconcileTask) AppendResource(objs ...client.Object) {
+	*r.Resources = append(*r.Resources, objs...)
+}
+
+func (r *ReconcileTask) InsertResource(objs ...client.Object) {
+	resources := make([]client.Object, 0, len(*r.Resources)+len(objs))
+	resources = append(resources, objs...)
+	resources = append(resources, *r.Resources...)
+	*r.Resources = resources
 }

@@ -48,7 +48,7 @@ type ReconfigureRequestReconciler struct {
 var ConfigurationRequiredLabels = []string{
 	intctrlutil.AppNameLabelKey,
 	intctrlutil.AppInstanceLabelKey,
-	intctrlutil.AppComponentLabelKey,
+	intctrlutil.KBAppComponentLabelKey,
 	cfgcore.CMConfigurationTplNameLabelKey,
 	cfgcore.CMConfigurationTypeLabelKey,
 	cfgcore.CMConfigurationProviderTplLabelKey,
@@ -137,16 +137,16 @@ func (r *ReconfigureRequestReconciler) sync(reqCtx intctrlutil.RequestCtx, confi
 
 		configKey = client.ObjectKeyFromObject(config)
 
-		componentName     = config.Labels[intctrlutil.AppComponentLabelKey]
+		componentName     = config.Labels[intctrlutil.KBAppComponentLabelKey]
 		configTplName     = config.Labels[cfgcore.CMConfigurationProviderTplLabelKey]
 		configTplLabelKey = cfgcore.GenerateTPLUniqLabelKeyWithConfig(configTplName)
 	)
 
 	componentLabels := map[string]string{
-		intctrlutil.AppNameLabelKey:      config.Labels[intctrlutil.AppNameLabelKey],
-		intctrlutil.AppInstanceLabelKey:  config.Labels[intctrlutil.AppInstanceLabelKey],
-		intctrlutil.AppComponentLabelKey: config.Labels[intctrlutil.AppComponentLabelKey],
-		configTplLabelKey:                config.GetName(),
+		intctrlutil.AppNameLabelKey:        config.Labels[intctrlutil.AppNameLabelKey],
+		intctrlutil.AppInstanceLabelKey:    config.Labels[intctrlutil.AppInstanceLabelKey],
+		intctrlutil.KBAppComponentLabelKey: config.Labels[intctrlutil.KBAppComponentLabelKey],
+		configTplLabelKey:                  config.GetName(),
 	}
 
 	var keySelector []string

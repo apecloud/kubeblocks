@@ -37,7 +37,7 @@ func NewPersistentVolumeClaimFactory(namespace, name, clusterName, componentName
 			ObjectMeta: metav1.ObjectMeta{
 				Labels: map[string]string{
 					intctrlutil.AppInstanceLabelKey:             clusterName,
-					intctrlutil.AppComponentLabelKey:            componentName,
+					intctrlutil.KBAppComponentLabelKey:          componentName,
 					intctrlutil.AppManagedByLabelKey:            intctrlutil.AppName,
 					intctrlutil.VolumeClaimTemplateNameLabelKey: vctName,
 				},

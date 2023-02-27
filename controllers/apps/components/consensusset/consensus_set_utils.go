@@ -242,7 +242,7 @@ func UpdateConsensusSetRoleLabel(cli client.Client, reqCtx intctrlutil.RequestCt
 	}
 
 	// get componentDef this pod belongs to
-	componentName := pod.Labels[intctrlutil.AppComponentLabelKey]
+	componentName := pod.Labels[intctrlutil.KBAppComponentLabelKey]
 	compDefName := cluster.GetComponentDefRefName(componentName)
 	componentDef, err := util.GetComponentDefByCluster(ctx, cli, cluster, compDefName)
 	if err != nil {
@@ -449,9 +449,9 @@ func updateConsensusRoleInfo(ctx context.Context, cli client.Client, cluster *ap
 	}
 
 	ml := client.MatchingLabels{
-		intctrlutil.AppInstanceLabelKey:   cluster.GetName(),
-		intctrlutil.AppComponentLabelKey:  componentName,
-		intctrlutil.AppConfigTypeLabelKey: "kubeblocks-env",
+		intctrlutil.AppInstanceLabelKey:    cluster.GetName(),
+		intctrlutil.KBAppComponentLabelKey: componentName,
+		intctrlutil.AppConfigTypeLabelKey:  "kubeblocks-env",
 	}
 
 	configList := &corev1.ConfigMapList{}

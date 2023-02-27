@@ -91,7 +91,7 @@ var _ = Describe("TLS self-signed cert function", func() {
 			By("Create a clusterDef obj")
 			mode := int32(0755)
 			testapps.NewClusterDefFactory(clusterDefName).
-				SetConnectionCredential(map[string]string{"username": "root", "password": ""}).
+				SetConnectionCredential(map[string]string{"username": "root", "password": ""}, nil).
 				AddComponent(testapps.ConsensusMySQLComponent, statefulCompType).
 				AddConfigTemplate(configTplName, configMapObj.Name, configConstraintObj.Name, testCtx.DefaultNamespace, testapps.ConfVolumeName, &mode).
 				AddContainerEnv(mysqlContainerName, corev1.EnvVar{Name: "MYSQL_ALLOW_EMPTY_PASSWORD", Value: "yes"}).

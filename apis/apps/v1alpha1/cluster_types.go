@@ -125,7 +125,7 @@ type ClusterComponentSpec struct {
 
 	// ComponentDefRef reference componentDef defined in ClusterDefinition spec.
 	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:MaxLength=12
+	// +kubebuilder:validation:MaxLength=18
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	ComponentDefRef string `json:"componentDefRef"`
 
@@ -146,6 +146,7 @@ type ClusterComponentSpec struct {
 
 	// Component replicas, use default value in ClusterDefinition spec. if not specified.
 	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:Minimum=0
 	// +kubebuilder:default=1
 	Replicas int32 `json:"replicas"`
 
@@ -329,27 +330,11 @@ type Operations struct {
 	// +optional
 	Upgradable bool `json:"upgradable,omitempty"`
 
-	// verticalScalable which components of the cluster support verticalScaling.
-	// +listType=set
-	// +optional
-	VerticalScalable []string `json:"verticalScalable,omitempty"`
-
-	// restartable which components of the cluster support restart.
-	// +listType=set
-	// +optional
-	Restartable []string `json:"restartable,omitempty"`
-
 	// volumeExpandable which components of the cluster and its volumeClaimTemplates support volumeExpansion.
 	// +listType=map
 	// +listMapKey=name
 	// +optional
 	VolumeExpandable []OperationComponent `json:"volumeExpandable,omitempty"`
-
-	// horizontalScalable which components of the cluster support horizontalScaling, and the replicas range limit.
-	// +listType=map
-	// +listMapKey=name
-	// +optional
-	HorizontalScalable []OperationComponent `json:"horizontalScalable,omitempty"`
 }
 
 type OperationComponent struct {

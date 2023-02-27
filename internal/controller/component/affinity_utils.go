@@ -50,8 +50,8 @@ func buildPodTopologySpreadConstraints(
 			TopologyKey:       topologyKey,
 			LabelSelector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
-					intctrlutil.AppInstanceLabelKey:  cluster.Name,
-					intctrlutil.AppComponentLabelKey: component.Name,
+					intctrlutil.AppInstanceLabelKey:    cluster.Name,
+					intctrlutil.KBAppComponentLabelKey: component.Name,
 				},
 			},
 		})
@@ -96,8 +96,8 @@ func buildPodAffinity(
 			TopologyKey: topologyKey,
 			LabelSelector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
-					intctrlutil.AppInstanceLabelKey:  cluster.Name,
-					intctrlutil.AppComponentLabelKey: component.Name,
+					intctrlutil.AppInstanceLabelKey:    cluster.Name,
+					intctrlutil.KBAppComponentLabelKey: component.Name,
 				},
 			},
 		})

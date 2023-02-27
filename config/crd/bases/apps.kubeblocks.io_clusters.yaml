@@ -146,7 +146,7 @@ spec:
                     componentDefRef:
                       description: ComponentDefRef reference componentDef defined
                         in ClusterDefinition spec.
-                      maxLength: 12
+                      maxLength: 18
                       pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                       type: string
                     enabledLogs:
@@ -221,6 +221,7 @@ spec:
                       description: Component replicas, use default value in ClusterDefinition
                         spec. if not specified.
                       format: int32
+                      minimum: 0
                       type: integer
                     resources:
                       description: resources requests and limits of workload.
@@ -895,45 +896,10 @@ spec:
               operations:
                 description: operations declare what operations the cluster supports.
                 properties:
-                  horizontalScalable:
-                    description: horizontalScalable which components of the cluster
-                      support horizontalScaling, and the replicas range limit.
-                    items:
-                      properties:
-                        name:
-                          description: name reference component name.
-                          type: string
-                        volumeClaimTemplateNames:
-                          description: volumeClaimTemplateNames which VolumeClaimTemplate
-                            of the component support volumeExpansion.
-                          items:
-                            type: string
-                          type: array
-                      required:
-                      - name
-                      type: object
-                    type: array
-                    x-kubernetes-list-map-keys:
-                    - name
-                    x-kubernetes-list-type: map
-                  restartable:
-                    description: restartable which components of the cluster support
-                      restart.
-                    items:
-                      type: string
-                    type: array
-                    x-kubernetes-list-type: set
                   upgradable:
                     description: upgradable whether the cluster supports upgrade.
                       if multiple clusterVersions existed, it is true.
                     type: boolean
-                  verticalScalable:
-                    description: verticalScalable which components of the cluster
-                      support verticalScaling.
-                    items:
-                      type: string
-                    type: array
-                    x-kubernetes-list-type: set
                   volumeExpandable:
                     description: volumeExpandable which components of the cluster
                       and its volumeClaimTemplates support volumeExpansion.

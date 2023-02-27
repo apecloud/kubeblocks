@@ -292,7 +292,7 @@ func (ve volumeExpansionOpsHandler) handleVCTExpansionProgress(opsRes *OpsResour
 	pvcList := &corev1.PersistentVolumeClaimList{}
 	if err = opsRes.Client.List(opsRes.Ctx, pvcList, client.MatchingLabels{
 		intctrlutil.AppInstanceLabelKey:             opsRes.Cluster.Name,
-		intctrlutil.AppComponentLabelKey:            componentName,
+		intctrlutil.KBAppComponentLabelKey:          componentName,
 		intctrlutil.VolumeClaimTemplateNameLabelKey: vctName,
 	}, client.InNamespace(opsRes.Cluster.Namespace)); err != nil {
 		return

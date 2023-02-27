@@ -26,6 +26,7 @@ import (
 const (
 	stateMysql      = "mysql"
 	statePostgreSQL = "postgresql"
+	stateRedis      = "redis"
 )
 
 type Interface interface {
@@ -60,6 +61,8 @@ func New(typeName string) (Interface, error) {
 		return newMySQL(), nil
 	case statePostgreSQL:
 		return newPostgreSQL(), nil
+	case stateRedis:
+		return newRedis(), nil
 	default:
 		return nil, fmt.Errorf("unsupported engine type: %s", typeName)
 	}

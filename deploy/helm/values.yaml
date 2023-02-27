@@ -830,6 +830,91 @@ prometheus:
                 summary: "PostgreSQL table {{ $labels.relname }} in database {{ $labels.datname }} has too many dead tuples (namespace: {{ $labels.namespace }}, cluster: {{ $labels.app_kubernetes_io_instance }}, instance: {{ $labels.pod }})"
                 description: "Table {{ $labels.relname }} in database {{ $labels.datname }} dead tuples is too large\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
 
+    redis_alert_rules.yml: |
+      groups:
+        - name: RedisExporter
+          rules:
+            - alert: RedisDown
+              expr: 'redis_up == 0'
+              for: 5m
+              labels:
+                severity: critical
+              annotations:
+                summary: "Redis down (namespace: {{ $labels.namespace }}, cluster: {{ $labels.app_kubernetes_io_instance }}, instance: {{ $labels.pod }})"
+                description: "Redis instance is down\n  VALUE = {{ $value }}\n  LABELS: {{ $labels }}"
+
+            - alert: RedisCPUHigh
+              expr: '(rate(redis_cpu_sys_seconds_total[1m]) + rate(redis_cpu_user_seconds_total[1m])) * 100 > 80'
+              for: 2m
+              labels:
+                severity: warning
+              annotations:
+                summary: "Out of CPU (namespace: {{ $labels.namespace }}, cluster: {{ $labels.app_kubernetes_io_instance }}, instance: {{ $labels.pod }})"
+                description: "Redis is running out of CPU (> 90%)\n  VALUE = {{ $value }}\n  LABELS: {{ $labels }}"
+
+            - alert: RedisMemoryHigh
+              expr: '(redis_memory_max_bytes == 0 or redis_memory_used_bytes * 100 / redis_memory_max_bytes) > 90'
+              for: 5m
+              labels:
+                severity: warning
+              annotations:
+                summary: "Out of memory (namespace: {{ $labels.namespace }}, cluster: {{ $labels.app_kubernetes_io_instance }}, instance: {{ $labels.pod }})"
+                description: "Redis is running out of memory (> 90%)\n  VALUE = {{ $value }}\n  LABELS: {{ $labels }}"
+
+            - alert: RedisTooManyConnections
+              expr: 'redis_connected_clients * 100 / redis_config_maxclients > 80'
+              for: 1m
+              labels:
+                severity: warning
+              annotations:
+                summary: "Too many connections (namespace: {{ $labels.namespace }}, cluster: {{ $labels.app_kubernetes_io_instance }}, instance: {{ $labels.pod }})"
+                description: "Redis instance has too many connections\n  VALUE = {{ $value }}\n  LABELS: {{ $labels }}"
+
+            - alert: RedisRejectedConnections
+              expr: 'increase(redis_rejected_connections_total[1m]) > 0'
+              for: 5m
+              labels:
+                severity: error
+              annotations:
+                summary: "Rejected connections (namespace: {{ $labels.namespace }}, cluster: {{ $labels.app_kubernetes_io_instance }}, instance: {{ $labels.pod }})"
+                description: "Some connections to Redis has been rejected\n  VALUE = {{ $value }}\n  LABELS: {{ $labels }}"
+
+            - alert: RedisKeyEviction
+              expr: 'increase(redis_evicted_keys_total[5m]) > 0'
+              for: 1s
+              labels:
+                severity: error
+              annotations:
+                summary: "Redis has evicted keys (namespace: {{ $labels.namespace }}, cluster: {{ $labels.app_kubernetes_io_instance }}, instance: {{ $labels.pod }})"
+                description: "Redis has evicted keys in the last 5 minutes\n  VALUE = {{ $value }}\n  LABELS: {{ $labels }}"
+
+            - alert: RedisMissingMaster
+              expr: 'count by (app_kubernetes_io_instance) (redis_instance_info{role="master"}) < 1'
+              for: 30s
+              labels:
+                severity: critical
+              annotations:
+                summary: "Redis missing master (namespace: {{ $labels.namespace }}, cluster: {{ $labels.app_kubernetes_io_instance }}, instance: {{ $labels.pod }})"
+                description: "Redis cluster has no node marked as master.\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+
+            - alert: RedisDisconnectedSlaves
+              expr: 'count without (instance, job) (redis_connected_slaves) - sum without (instance, job) (redis_connected_slaves) - 1 > 1'
+              for: 0m
+              labels:
+                severity: critical
+              annotations:
+                summary: "Redis disconnected slaves (namespace: {{ $labels.namespace }}, cluster: {{ $labels.app_kubernetes_io_instance }}, instance: {{ $labels.pod }})"
+                description: "Redis not replicating for all slaves. Consider reviewing the redis replication status.\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+
+            - alert: RedisReplicationBroken
+              expr: 'delta(redis_connected_slaves[1m]) < 0'
+              for: 0m
+              labels:
+                severity: critical
+              annotations:
+                summary: "Redis replication broken (namespace: {{ $labels.namespace }}, cluster: {{ $labels.app_kubernetes_io_instance }}, instance: {{ $labels.pod }})"
+                description: "Redis instance lost a slave\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+
   serverFiles:
     prometheus.yml:
       rule_files:
@@ -838,6 +923,7 @@ prometheus:
         - /etc/config/cadvisor_alert_rules.yml
         - /etc/config/mysql_alert_rules.yml
         - /etc/config/postgresql_alert_rules.yml
+        - /etc/config/redis_alert_rules.yml
 
       scrape_configs:
         - job_name: prometheus

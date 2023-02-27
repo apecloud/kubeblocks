@@ -42,7 +42,9 @@ content: {
 			podAntiAffinity: options.podAntiAffinity
 			topologyKeys:    options.topologyKeys
 			nodeLabels:      options.nodeLabels
-			tenancy:         options.tenancy
+			if options.tenancy != "" {
+				tenancy: options.tenancy
+			}
 		}
 		tolerations:       options.tolerations
 		componentSpecs:    options.componentSpecs

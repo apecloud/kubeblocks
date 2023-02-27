@@ -288,8 +288,10 @@ func (fakeOps *fakeOperations) GetRoleFailed(ctx context.Context, req *bindings.
 }
 
 func (fakeOps *fakeOperations) startFooServer(t *testing.T) net.Listener {
+	var server net.Listener
+	var err error
 	for i := 0; i < 3; i++ {
-		server, err := net.Listen("tcp", ":"+strconv.Itoa(fakeOps.DBPort))
+		server, err = net.Listen("tcp", ":"+strconv.Itoa(fakeOps.DBPort))
 		if server != nil {
 			return server
 		}
@@ -297,7 +299,7 @@ func (fakeOps *fakeOperations) startFooServer(t *testing.T) net.Listener {
 	}
 
 	if server == nil {
-		t.Errorf("couldn't start listening")
+		t.Errorf("couldn't start listening: %v", err)
 	}
 	return nil
 }

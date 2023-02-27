@@ -1,0 +1,22 @@
+# permissions for end users to view addonspecs.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "kubeblocks.fullname" . }}-viewer-role
+  labels:
+    {{- include "kubeblocks.labels" . | nindent 4 }}
+rules:
+- apiGroups:
+  - extensions.kubeblocks.io
+  resources:
+  - addonspecs
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - extensions.kubeblocks.io
+  resources:
+  - addonspecs/status
+  verbs:
+  - get

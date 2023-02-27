@@ -11,7 +11,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package schema
+package util
 
 import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"

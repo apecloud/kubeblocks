@@ -24,7 +24,7 @@ import (
 
 	preflightv1beta2 "github.com/apecloud/kubeblocks/apis/preflight/v1beta2"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/cluster"
-	kbschema "github.com/apecloud/kubeblocks/internal/preflight/schema"
+	"github.com/apecloud/kubeblocks/internal/preflight/util"
 )
 
 // LoadPreflightSpec loads content of preflightSpec and hostPreflightSpec against yamlFiles from args
@@ -58,7 +58,7 @@ func LoadPreflightSpec(yamlCheckFiles []string) (*preflightv1beta2.Preflight, *p
 
 func init() {
 	// register the scheme of troubleshoot API and decode function
-	if err := kbschema.AddToScheme(scheme.Scheme); err != nil {
+	if err := util.AddToScheme(scheme.Scheme); err != nil {
 		return
 	}
 }

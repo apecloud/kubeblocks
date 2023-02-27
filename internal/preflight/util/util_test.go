@@ -14,16 +14,29 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package preflight
+package util
 
 import (
-	"testing"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
+	"github.com/replicatedhq/troubleshoot/pkg/multitype"
 )
 
-func TestTroubleshoot(t *testing.T) {
-	RegisterFailHandler(Fail)
-	RunSpecs(t, "preflight Suite")
-}
+var _ = Describe("util_test", func() {
+	var timeout = time.Second * 10
+	It("IsExcluded test", func() {
+		Eventually(func(g Gomega) {
+			tests := []*multitype.BoolOrString{nil, {1, true, ""}, {0, false, "true"}}
+			var resList []bool
+			for _, test := range tests {
+				res, err := IsExcluded(test)
+				g.Expect(err).NotTo(HaveOccurred())
+				resList = append(resList, res)
+			}
+			g.Expect(resList).Should(Equal([]bool{false, true, true}))
+		}, timeout).Should(Succeed())
+	})
+})

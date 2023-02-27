@@ -66,7 +66,6 @@ func CollectPreflight(ctx context.Context, kbPreflight *preflightv1beta2.Preflig
 	// deal with hostPreflight
 	if kbHostPreflight != nil {
 		if len(kbHostPreflight.Spec.ExtendCollectors) > 0 || len(kbHostPreflight.Spec.Collectors) > 0 {
-			// ExtendCollectors处理
 			res, err := CollectHostData(ctx, kbHostPreflight, progressCh)
 			if err != nil {
 				return collectResults, errors.Wrap(err, "failed to collect data from extend host")

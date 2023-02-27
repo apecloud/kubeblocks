@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package preflight
+package util
 
 import (
 	"testing"
@@ -25,5 +25,5 @@ import (
 
 func TestTroubleshoot(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "preflight Suite")
+	RunSpecs(t, "util Suite")
 }

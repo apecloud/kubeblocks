@@ -98,9 +98,7 @@ func NewClusterCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 	groups.Add(cmd)
 	templates.ActsAsRootCommand(cmd, nil, groups...)
 
-	if viper.GetString(EnvExperimentalExpose) == "1" {
-		cmd.AddCommand(NewExposeCmd(f, streams))
-	}
+	cmd.AddCommand(NewExposeCmd(f, streams))
 
 	return cmd
 }

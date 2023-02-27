@@ -21,29 +21,43 @@ import (
 	"fmt"
 	"time"
 
-	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
-
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 var _ = Describe("cluster webhook", func() {
+	const (
+		timeout  = time.Second * 10
+		interval = time.Second
+	)
+
 	var (
-		randomStr               = testCtx.GetRandomStr()
-		clusterName             = "cluster-webhook-mysql-" + randomStr
-		rsClusterName           = "cluster-webhook-rs-" + randomStr
-		clusterDefinitionName   = "cluster-webhook-mysql-definition-" + randomStr
+		randomStr               string
+		clusterName             string
+		rsClusterName           string
+		clusterDefinitionName   string
+		rsClusterDefinitionName string
+		secondClusterDefinition string
+		clusterVersionName      string
+		rsClusterVersionName    string
+	)
+
+	initParams := func() {
+		randomStr = testCtx.GetRandomStr()
+		clusterName = "cluster-webhook-mysql-" + randomStr
+		rsClusterName = "cluster-webhook-rs-" + randomStr
+		clusterDefinitionName = "cluster-webhook-mysql-definition-" + randomStr
 		rsClusterDefinitionName = "cluster-webhook-rs-definition-" + randomStr
 		secondClusterDefinition = "cluster-webhook-mysql-definition2-" + randomStr
-		clusterVersionName      = "cluster-webhook-mysql-clusterversion-" + randomStr
-		rsClusterVersionName    = "cluster-webhook-rs-clusterversion-" + randomStr
-		timeout                 = time.Second * 10
-		interval                = time.Second
-	)
+		clusterVersionName = "cluster-webhook-mysql-clusterversion-" + randomStr
+		rsClusterVersionName = "cluster-webhook-rs-clusterversion-" + randomStr
+	}
 	cleanupObjects := func() {
 		// Add any setup steps that needs to be executed before each test
 		err := k8sClient.DeleteAllOf(ctx, &Cluster{}, client.InNamespace(testCtx.DefaultNamespace), client.HasLabels{testCtx.TestObjLabelKey})
@@ -54,12 +68,11 @@ var _ = Describe("cluster webhook", func() {
 		Expect(err).NotTo(HaveOccurred())
 	}
 	BeforeEach(func() {
-		// Add any setup steps that needs to be executed before each test
+		initParams()
 		cleanupObjects()
 	})
 
 	AfterEach(func() {
-		// Add any teardown steps that needs to be executed after each test
 		cleanupObjects()
 	})
 
@@ -189,6 +202,62 @@ var _ = Describe("cluster webhook", func() {
 			Expect(k8sClient.Patch(ctx, rsCluster, patch)).ShouldNot(Succeed())
 		})
 	})
+
+	Context("tls validation", func() {
+		BeforeEach(func() {
+			By("By creating a new clusterDefinition")
+			clusterDef, _ := createTestClusterDefinitionObj(clusterDefinitionName)
+			Expect(testCtx.CreateObj(ctx, clusterDef)).Should(Succeed())
+
+			// wait until ClusterDefinition created
+			Eventually(func() bool {
+				err := k8sClient.Get(context.Background(), client.ObjectKey{Name: clusterDefinitionName}, clusterDef)
+				return err == nil
+			}, timeout, interval).Should(BeTrue())
+
+			By("By creating a new clusterVersion")
+			clusterVersion := createTestClusterVersionObj(clusterDefinitionName, clusterVersionName)
+			Expect(testCtx.CreateObj(ctx, clusterVersion)).Should(Succeed())
+			// wait until ClusterVersion created
+			Eventually(func() bool {
+				err := k8sClient.Get(context.Background(), client.ObjectKey{Name: clusterVersionName}, clusterVersion)
+				return err == nil
+			}, timeout, interval).Should(BeTrue())
+		})
+		It("should assure tls fields setting properly", func() {
+			By("creating cluster with nil issuer")
+			cluster, _ := createTestCluster(clusterDefinitionName, clusterVersionName, clusterName)
+			cluster.Spec.ComponentSpecs[0].TLS = true
+			Expect(testCtx.CreateObj(ctx, cluster)).ShouldNot(Succeed())
+
+			By("creating cluster with nil secret ref")
+			cluster.Spec.ComponentSpecs[0].Issuer = &Issuer{Name: IssuerUserProvided}
+			Expect(testCtx.CreateObj(ctx, cluster)).ShouldNot(Succeed())
+
+			By("creating cluster with KubeBlocks issuer")
+			cluster.Spec.ComponentSpecs[0].Issuer = &Issuer{Name: IssuerKubeBlocks}
+			Expect(testCtx.CreateObj(ctx, cluster)).Should(Succeed())
+
+			By("creating cluster with UserProvided issuer and secret ref provided")
+			Expect(k8sClient.Delete(ctx, cluster)).Should(Succeed())
+			Eventually(func() bool {
+				err := k8sClient.Get(ctx, client.ObjectKeyFromObject(cluster), &Cluster{})
+				return apierrors.IsNotFound(err)
+			}).WithTimeout(timeout).WithPolling(interval).Should(BeTrue())
+			cluster, _ = createTestCluster(clusterDefinitionName, clusterVersionName, clusterName)
+			cluster.Spec.ComponentSpecs[0].TLS = true
+			cluster.Spec.ComponentSpecs[0].Issuer = &Issuer{
+				Name: IssuerUserProvided,
+				SecretRef: &TLSSecretRef{
+					Name: "test-tls-secret",
+					CA:   "ca.crt",
+					Cert: "cert.crt",
+					Key:  "key.crt",
+				},
+			}
+			Expect(testCtx.CreateObj(ctx, cluster)).Should(Succeed())
+		})
+	})
 })
 
 func createTestCluster(clusterDefinitionName, clusterVersionName, clusterName string) (*Cluster, error) {
@@ -233,7 +302,7 @@ spec:
   clusterVersionRef: %s
   componentSpecs:
   - name: replication
-    componentDefRef: replication
+    componentDefRef: redis
     monitor: false
     primaryIndex: 0
     replicas: 2

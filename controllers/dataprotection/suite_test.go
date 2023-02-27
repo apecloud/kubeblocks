@@ -84,7 +84,7 @@ var _ = BeforeSuite(func() {
 			// use dependent external CRDs.
 			// resolved by ref: https://github.com/operator-framework/operator-sdk/issues/4434#issuecomment-786794418
 			filepath.Join(build.Default.GOPATH, "pkg", "mod", "github.com", "kubernetes-csi/external-snapshotter/",
-				"client/v6@v6.0.1", "config", "crd"),
+				"client/v6@v6.2.0", "config", "crd"),
 		},
 		ErrorIfCRDPathMissing: true,
 	}
@@ -109,10 +109,18 @@ var _ = BeforeSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 	Expect(k8sClient).NotTo(BeNil())
 
+	uncachedObjects := []client.Object{
+		&dataprotectionv1alpha1.BackupPolicyTemplate{},
+		&dataprotectionv1alpha1.BackupPolicy{},
+		&dataprotectionv1alpha1.BackupTool{},
+		&dataprotectionv1alpha1.Backup{},
+		&dataprotectionv1alpha1.RestoreJob{},
+	}
 	// run reconcile
 	k8sManager, err := ctrl.NewManager(cfg, ctrl.Options{
-		Scheme:             scheme,
-		MetricsBindAddress: "0",
+		Scheme:                scheme,
+		MetricsBindAddress:    "0",
+		ClientDisableCacheFor: uncachedObjects,
 	})
 	Expect(err).ToNot(HaveOccurred())
 

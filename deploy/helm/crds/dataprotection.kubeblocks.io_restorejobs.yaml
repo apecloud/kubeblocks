@@ -1752,7 +1752,13 @@ spec:
                 type: string
               phase:
                 description: RestoreJobPhase The current phase. Valid values are New,
-                  InProgress, Completed, Failed.
+                  InProgressPhy, InProgressLogic, Completed, Failed.
+                enum:
+                - New
+                - InProgressPhy
+                - InProgressLogic
+                - Completed
+                - Failed
                 type: string
               startTimestamp:
                 description: Date/time when the backup started being processed.

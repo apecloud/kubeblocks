@@ -197,7 +197,7 @@ func (consensusSet *ConsensusSet) HandleUpdate(obj client.Object) error {
 	)
 	stsObj := util.ConvertToStatefulSet(obj)
 	// get compDefName from stsObj.name
-	compDefName := cluster.GetComponentDefRefName(stsObj.Labels[intctrlutil.AppComponentLabelKey])
+	compDefName := cluster.GetComponentDefRefName(stsObj.Labels[intctrlutil.KBAppComponentLabelKey])
 
 	// get component from ClusterDefinition by compDefName
 	component, err := util.GetComponentDefByCluster(ctx, cli, cluster, compDefName)
@@ -214,7 +214,7 @@ func (consensusSet *ConsensusSet) HandleUpdate(obj client.Object) error {
 	}
 
 	// update cluster.status.component.consensusSetStatus based on all pods currently exist
-	componentName := stsObj.Labels[intctrlutil.AppComponentLabelKey]
+	componentName := stsObj.Labels[intctrlutil.KBAppComponentLabelKey]
 
 	// first, get the old status
 	var oldConsensusSetStatus *appsv1alpha1.ConsensusSetStatus

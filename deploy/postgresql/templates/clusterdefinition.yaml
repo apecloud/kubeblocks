@@ -8,6 +8,9 @@ spec:
   connectionCredential:
     username: postgres
     postgres-password: {{ (include "postgresql.postgresPassword" .) | quote  }}
+    endpoint: "$(SVC_FQDN):$(SVC_PORT_tcp-postgresql)"
+    host: "$(SVC_FQDN)"
+    port: "$(SVC_PORT_tcp-postgresql)"
   componentDefs:
     - name: postgresql
       workloadType: Stateful
@@ -28,6 +31,8 @@ spec:
           - name: postgresql-configuration
             configTplRef: postgresql-configuration
             configConstraintRef: postgresql14-cc
+            keys:
+              - postgresql.conf
             namespace: {{ .Release.Namespace }}
             volumeName: postgresql-config
             defaultMode: 0777
@@ -105,6 +110,11 @@ spec:
                 value: /postgresql
               - name: PGDATA
                 value: /postgresql/data
+              - name: PGUSER
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: username
               # Authentication
               - name: POSTGRES_USER
                 valueFrom:

@@ -34,37 +34,36 @@ type RequestCtx struct {
 
 const (
 	AppName = "kubeblocks"
-	// common label and annotation keys
 
-	AppInstanceLabelKey             = "app.kubernetes.io/instance"
-	AppComponentLabelKey            = "app.kubernetes.io/component-name"
-	WorkloadTypeLabelKey            = "kubeblocks.io/workload-type"
-	AppNameLabelKey                 = "app.kubernetes.io/name"
-	AppManagedByLabelKey            = "app.kubernetes.io/managed-by"
-	AppCreatedByLabelKey            = "app.kubernetes.io/created-by" // resources created temporarily by kubeblocks
-	AppConfigTypeLabelKey           = "app.kubernetes.io/config-type"
+	// common and well known label and annotation keys
+	AppInstanceLabelKey   = "app.kubernetes.io/instance"
+	WorkloadTypeLabelKey  = "app.kubeblocks.io/workload-type"
+	AppNameLabelKey       = "app.kubernetes.io/name"
+	AppManagedByLabelKey  = "app.kubernetes.io/managed-by"
+	AppCreatedByLabelKey  = "app.kubernetes.io/created-by" // resources created temporarily by kubeblocks, this is a deprecated label
+	AppConfigTypeLabelKey = "app.kubernetes.io/config-type"
+	RegionLabelKey        = "topology.kubernetes.io/region"
+	ZoneLabelKey          = "topology.kubernetes.io/zone"
+
+	// NameLabelKey                   = "app.kubernetes.io/name"
+	// InstanceLabelKey               = "app.kubernetes.io/instance"
+	// KBComponentLabelKey            = "app.kubeblocks.io/component-name"
+	// ComponentLabelKey              = "app.kubernetes.io/component"
+
+	// kubeblocks.io labels
+	ClusterDefLabelKey              = "clusterdefinition.kubeblocks.io/name"
+	KBAppComponentLabelKey          = "app.kubeblocks.io/component-name"
 	ConsensusSetAccessModeLabelKey  = "cs.apps.kubeblocks.io/access-mode"
 	VolumeClaimTemplateNameLabelKey = "vct.kubeblocks.io/name"
+	RoleLabelKey                    = "kubeblocks.io/role"              // RoleLabelKey consensusSet and replicationSet role label key
+	BackupProtectionLabelKey        = "kubeblocks.io/backup-protection" // BackupProtectionLabelKey Backup delete protection policy label
 
-	// OpsRequestAnnotationKey OpsRequest annotation key in Cluster
-	OpsRequestAnnotationKey = "kubeblocks.io/ops-request"
-
-	// OpsRequestReconcileAnnotationKey Notify OpsRequest to reconcile
-	OpsRequestReconcileAnnotationKey = "kubeblocks.io/reconcile"
-
-	// StorageClassAnnotationKey StorageClass annotation key in Cluster
-	StorageClassAnnotationKey = "kubeblocks.io/storage-class"
-
-	// RoleLabelKey consensusSet and replicationSet role label key
-	RoleLabelKey = "kubeblocks.io/role"
-
-	// RestartAnnotationKey the annotation which notices the StatefulSet/DeploySet to restart
-	RestartAnnotationKey = "kubeblocks.io/restart"
-
-	// BackupProtectionLabelKey Backup delete protection policy label
-	BackupProtectionLabelKey = "kubeblocks.io/backup-protection"
-
-	SnapShotForStartAnnotationKey = "kubeblocks.io/snapshot-for-start"
+	// kubeblocks.io annotations
+	OpsRequestAnnotationKey          = "kubeblocks.io/ops-request"   // OpsRequestAnnotationKey OpsRequest annotation key in Cluster
+	OpsRequestReconcileAnnotationKey = "kubeblocks.io/reconcile"     // OpsRequestReconcileAnnotationKey Notify OpsRequest to reconcile
+	StorageClassAnnotationKey        = "kubeblocks.io/storage-class" // StorageClassAnnotationKey StorageClass annotation key in Cluster
+	RestartAnnotationKey             = "kubeblocks.io/restart"       // RestartAnnotationKey the annotation which notices the StatefulSet/DeploySet to restart
+	SnapShotForStartAnnotationKey    = "kubeblocks.io/snapshot-for-start"
 )
 
 const (
@@ -102,4 +101,15 @@ const (
 
 	// BackupDelete (default) deletes backup immediately when cluster's terminationPolicy is WipeOut
 	BackupDelete = "Delete"
+)
+
+const (
+	// KubeBlocksDataNodeLabelKey is the node label key of the built-in data node label
+	KubeBlocksDataNodeLabelKey = "kb-data"
+	// KubeBlocksDataNodeLabelValue is the node label value of the built-in data node label
+	KubeBlocksDataNodeLabelValue = "true"
+	// KubeBlocksDataNodeTolerationKey is the taint label key of the built-in data node taint
+	KubeBlocksDataNodeTolerationKey = "kb-data"
+	// KubeBlocksDataNodeTolerationValue is the taint label value of the built-in data node taint
+	KubeBlocksDataNodeTolerationValue = "true"
 )

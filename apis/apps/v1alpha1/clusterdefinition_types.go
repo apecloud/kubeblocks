@@ -36,7 +36,14 @@ type ClusterDefinitionSpec struct {
 	// +listMapKey=name
 	ComponentDefs []ClusterComponentDefinition `json:"componentDefs" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
 
-	// Default connection credential used for connecting to cluster service.
+	// Connection credential template used for creating a connection credential
+	// secret for Cluster.app.kubeblock.io object. Built-in objects are:
+	// `$(RANDOM_PASSWD)` - random 8 characters
+	// `$(SVC_FQDN)` - service FQDN  placeholder, value pattern - $(CLUSTER_NAME)-$(1ST_COMP_NAME).$(NAMESPACE).svc,
+	//    where 1ST_COMP_NAME is the 1st component that provide `ClusterDefinition.spec.componentDefs[].service` attribute
+	// `$(SVC_PORT_<PORT-NAME>)` - a ServicePort's port value with specified port name, i.e, a servicePort JSON struct:
+	//    { "name": "mysql", "targetPort": "mysqlContainerPort", "port": 3306 }, and "$(SVC_PORT_mysql)" in the
+	//    connection credential value is 3306.
 	// +optional
 	ConnectionCredential map[string]string `json:"connectionCredential,omitempty"`
 }
@@ -182,6 +189,11 @@ type ConfigTemplate struct {
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	ConfigTplRef string `json:"configTplRef"`
 
+	// Specify a list of keys.
+	// If empty, ConfigConstraint takes effect for all keys in configmap.
+	// +optional
+	Keys []string `json:"keys,omitempty"`
+
 	// Specify the name of the referenced the configuration constraints object.
 	// +kubebuilder:validation:MaxLength=63
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
@@ -270,7 +282,7 @@ type ConfigurationSpec struct {
 type ClusterComponentDefinition struct {
 	// Name of the component, it can be any valid string.
 	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:MaxLength=12
+	// +kubebuilder:validation:MaxLength=18
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	Name string `json:"name"`
 

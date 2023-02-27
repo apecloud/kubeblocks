@@ -55,11 +55,11 @@ func newUpgradeCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 		Args:    cobra.NoArgs,
 		Example: upgradeExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			util.CheckErr(o.complete(f, cmd))
-			util.CheckErr(o.upgrade(cmd))
+			util.CheckErr(o.Complete(f, cmd))
+			util.CheckErr(o.Upgrade(cmd))
 		},
 		PostRun: func(cmd *cobra.Command, args []string) {
-			util.CheckErr(o.postInstall())
+			util.CheckErr(o.PostInstall())
 		},
 	}
 
@@ -72,7 +72,7 @@ func newUpgradeCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 	return cmd
 }
 
-func (o *InstallOptions) upgrade(cmd *cobra.Command) error {
+func (o *InstallOptions) Upgrade(cmd *cobra.Command) error {
 	// check whether monitor flag is set by user
 	monitorIsSet := false
 	cmd.Flags().Visit(func(flag *pflag.Flag) {

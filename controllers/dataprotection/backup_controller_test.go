@@ -73,7 +73,7 @@ var _ = Describe("Backup for a StatefulSet", func() {
 
 		By("By mocking a statefulset")
 		sts := testapps.NewStatefulSetFactory(testCtx.DefaultNamespace, clusterName+"-"+componentName, clusterName, componentName).
-			AddLabels(intctrlutil.AppInstanceLabelKey, clusterName).
+			AddAppInstanceLabel(clusterName).
 			AddContainer(corev1.Container{Name: containerName, Image: testapps.ApeCloudMySQLImage}).
 			AddVolumeClaimTemplate(corev1.PersistentVolumeClaim{
 				ObjectMeta: metav1.ObjectMeta{Name: testapps.DataVolumeName},
@@ -234,6 +234,26 @@ var _ = Describe("Backup for a StatefulSet", func() {
 				By("Check backup job completed")
 				Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dataprotectionv1alpha1.Backup) {
 					g.Expect(fetched.Status.Phase).To(Equal(dataprotectionv1alpha1.BackupCompleted))
+				})).Should(Succeed())
+			})
+		})
+	})
+	When("with exceptional settings", func() {
+		Context("creates a backup with non existent backup policy", func() {
+			var backupKey types.NamespacedName
+			BeforeEach(func() {
+				By("By creating a backup from backupPolicy: " + backupPolicyName)
+				backup := testapps.NewBackupFactory(testCtx.DefaultNamespace, backupName).
+					SetTTL(defaultTTL).
+					SetBackupPolicyName(backupPolicyName).
+					SetBackupType(dataprotectionv1alpha1.BackupTypeFull).
+					Create(&testCtx).GetObject()
+				backupKey = client.ObjectKeyFromObject(backup)
+			})
+			It("Should fail", func() {
+				By("Check backup status failed")
+				Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dataprotectionv1alpha1.Backup) {
+					g.Expect(fetched.Status.Phase).To(Equal(dataprotectionv1alpha1.BackupFailed))
 				})).Should(Succeed())
 			})
 		})

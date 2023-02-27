@@ -25,6 +25,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	opsutil "github.com/apecloud/kubeblocks/controllers/apps/operations/util"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
@@ -63,6 +64,11 @@ var _ = Describe("Reconfigure OpsRequest", func() {
 
 	AfterEach(cleanEnv)
 
+	initClusterForOps := func(opsRes *OpsResource) {
+		Expect(opsutil.PatchClusterOpsAnnotations(ctx, k8sClient, opsRes.Cluster, nil)).Should(Succeed())
+		opsRes.Cluster.Status.Phase = appsv1alpha1.RunningPhase
+	}
+
 	assureCfgTplObj := func(tplName, cmName, ns string) (*corev1.ConfigMap, *appsv1alpha1.ConfigConstraint) {
 		By("Assuring an cm obj")
 		cfgCM := testapps.NewCustomizedObj("operations_config/configcm.yaml",
@@ -88,10 +94,10 @@ var _ = Describe("Reconfigure OpsRequest", func() {
 				testapps.WithLabels(
 					intctrlutil.AppNameLabelKey, clusterName,
 					intctrlutil.AppInstanceLabelKey, clusterName,
-					intctrlutil.AppComponentLabelKey, componentName,
+					intctrlutil.KBAppComponentLabelKey, componentName,
 					cfgcore.CMConfigurationTplNameLabelKey, tpl.ConfigTplRef,
 					cfgcore.CMConfigurationConstraintsNameLabelKey, tpl.ConfigConstraintRef,
-					cfgcore.CMConfigurationISVTplLabelKey, tpl.Name,
+					cfgcore.CMConfigurationProviderTplLabelKey, tpl.Name,
 					cfgcore.CMConfigurationTypeLabelKey, cfgcore.ConfigInstanceType,
 				),
 			)
@@ -194,22 +200,32 @@ var _ = Describe("Reconfigure OpsRequest", func() {
 				}},
 				ComponentOps: appsv1alpha1.ComponentOps{ComponentName: consensusComp},
 			}
+
+			By("Init Reconfiguring opsrequest")
 			opsRes.OpsRequest = ops
 			Expect(testCtx.CheckedCreateObj(ctx, ops)).Should(Succeed())
+			initClusterForOps(opsRes)
 
+			opsManager := GetOpsManager()
 			reAction := reconfigureAction{}
+			By("Reconfigure configure")
 			Expect(reAction.Action(opsRes)).Should(Succeed())
+			By("configuration Reconcile callback")
 			Expect(reAction.Handle(eventContext, ops.Name, appsv1alpha1.ReconfiguringPhase, nil)).Should(Succeed())
 			Expect(opsRes.Client.Get(opsRes.Ctx, client.ObjectKeyFromObject(opsRes.OpsRequest), opsRes.OpsRequest)).Should(Succeed())
-			_, _ = GetOpsManager().Reconcile(opsRes)
+			_, _ = opsManager.Reconcile(opsRes)
 			Expect(opsRes.OpsRequest.Status.Phase).Should(BeEquivalentTo(appsv1alpha1.RunningPhase))
+
+			By("Validate cluster status")
+			Expect(opsManager.Do(opsRes)).Should(Succeed())
+			Expect(opsRes.Cluster.Status.Phase).Should(BeEquivalentTo(appsv1alpha1.ReconfiguringType))
+
+			By("Reconfigure operation success")
 			Expect(reAction.Handle(eventContext, ops.Name, appsv1alpha1.SucceedPhase, nil)).Should(Succeed())
 			Expect(opsRes.Client.Get(opsRes.Ctx, client.ObjectKeyFromObject(opsRes.OpsRequest), opsRes.OpsRequest)).Should(Succeed())
-			_, _ = GetOpsManager().Reconcile(opsRes)
+			_, _ = opsManager.Reconcile(opsRes)
 			Expect(opsRes.OpsRequest.Status.Phase).Should(BeEquivalentTo(appsv1alpha1.SucceedPhase))
 
-			// TODO add failed ut
-			By("mock reconfigure failed")
 		})
 
 	})

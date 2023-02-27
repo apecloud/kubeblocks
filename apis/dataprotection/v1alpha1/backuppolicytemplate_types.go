@@ -64,21 +64,6 @@ type BackupPolicyCredentialKeyword struct {
 	PasswordKeyword string `json:"passwordKeyword,omitempty"`
 }
 
-// BackupPolicyTemplatePhase defines phases for BackupPolicyTemplate CR, valid values are New, Available, InProgress, Failed.
-// +enum
-type BackupPolicyTemplatePhase string
-
-// These are the valid statuses of BackupPolicyTemplate.
-const (
-	ConfigNew BackupPolicyTemplatePhase = "New"
-
-	ConfigAvailable BackupPolicyTemplatePhase = "Available"
-
-	ConfigInProgress BackupPolicyTemplatePhase = "InProgress"
-
-	ConfigFailed BackupPolicyTemplatePhase = "Failed"
-)
-
 // BackupPolicyTemplateStatus defines the observed state of BackupPolicyTemplate
 type BackupPolicyTemplateStatus struct {
 	// +optional

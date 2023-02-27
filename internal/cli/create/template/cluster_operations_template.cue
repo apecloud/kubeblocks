@@ -22,12 +22,10 @@ options: {
 	ttlSecondsAfterSucceed: int
 	clusterVersionRef:      string
 	componentNames: [...string]
-	requestCPU:    string
-	requestMemory: string
-	limitCPU:      string
-	limitMemory:   string
-	replicas:      int
-	storage:       string
+	cpu:      string
+	memory:   string
+	replicas: int
+	storage:  string
 	vctNames: [...string]
 	keyValues: [string]: string
 	cfgTemplateName: string
@@ -84,19 +82,19 @@ content: {
 			verticalScaling: [ for _, cName in options.componentNames {
 				componentName: cName
 				requests: {
-					if options.requestMemory != "" {
-						memory: options.requestMemory
+					if options.memory != "" {
+						memory: options.memory
 					}
-					if options.requestCPU != "" {
-						cpu: options.requestCPU
+					if options.cpu != "" {
+						cpu: options.cpu
 					}
 				}
 				limits: {
-					if options.limitMemory != "" {
-						memory: options.limitMemory
+					if options.memory != "" {
+						memory: options.memory
 					}
-					if options.limitCPU != "" {
-						cpu: options.limitCPU
+					if options.cpu != "" {
+						cpu: options.cpu
 					}
 				}
 			}]

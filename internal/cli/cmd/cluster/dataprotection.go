@@ -231,7 +231,7 @@ func (o *CreateBackupOptions) getDefaultBackupPolicyTemplate() (string, error) {
 	// find backupPolicyTemplate from cluster label
 	opts := metav1.ListOptions{
 		LabelSelector: fmt.Sprintf("%s=%s",
-			types.ClusterDefLabelKey, clusterObj.GetLabels()[types.ClusterDefLabelKey]),
+			intctrlutil.ClusterDefLabelKey, clusterObj.GetLabels()[intctrlutil.ClusterDefLabelKey]),
 	}
 	objs, err := o.Client.
 		Resource(types.BackupPolicyTemplateGVR()).
@@ -365,6 +365,9 @@ func (o *CreateRestoreOptions) Complete() error {
 
 	if cluster.Spec.Affinity != nil {
 		o.PodAntiAffinity = string(cluster.Spec.Affinity.PodAntiAffinity)
+		o.NodeLabels = cluster.Spec.Affinity.NodeLabels
+		o.TopologyKeys = cluster.Spec.Affinity.TopologyKeys
+		o.Tenancy = string(cluster.Spec.Affinity.Tenancy)
 	}
 	o.Monitor = cluster.Spec.ComponentSpecs[0].Monitor
 	componentByte, err := json.Marshal(cluster.Spec.ComponentSpecs)

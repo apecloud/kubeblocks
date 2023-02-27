@@ -25,7 +25,6 @@ import (
 	"github.com/spf13/viper"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -116,6 +115,11 @@ func PrepareComponentResources(reqCtx intctrlutil.RequestCtx, cli client.Client,
 			task.AppendResource(configs...)
 		}
 		// end render config
+
+		// tls certs secret volume and volumeMount
+		if err := updateTLSVolumeAndVolumeMount(podSpec, task.Cluster.Name, *task.Component); err != nil {
+			return err
+		}
 		return nil
 	}
 
@@ -187,12 +191,9 @@ func PrepareComponentResources(reqCtx intctrlutil.RequestCtx, cli client.Client,
 
 // needBuildPDB check whether the PodDisruptionBudget needs to be built
 func needBuildPDB(task *intctrltypes.ReconcileTask) bool {
-	if task.Component.WorkloadType == appsv1alpha1.Consensus {
-		// if MinReplicas is non-zero, build pdb
-		// TODO: add ut
-		return task.Component.MaxUnavailable != nil
-	}
-	return intctrlutil.ExistsPDBSpec(task.Component.PodDisruptionBudgetSpec)
+	// TODO: add ut
+	comp := task.Component
+	return comp.WorkloadType == appsv1alpha1.Consensus && comp.MaxUnavailable != nil
 }
 
 // TODO multi roles with same accessMode support
@@ -340,24 +341,17 @@ func buildCfg(task *intctrltypes.ReconcileTask,
 	scheme, _ := appsv1alpha1.SchemeBuilder.Build()
 	cfgLables := make(map[string]string, len(tpls))
 	for _, tpl := range tpls {
-		// Check config cm already exists
 		cmName := cfgcore.GetInstanceCMName(obj, &tpl)
 		volumes[cmName] = tpl
 		// Configuration.kubeblocks.io/cfg-tpl-${ctpl-name}: ${cm-instance-name}
 		cfgLables[cfgcore.GenerateTPLUniqLabelKeyWithConfig(tpl.Name)] = cmName
-		isExist, err := isConfigMapExists(cmName, task.Cluster.Namespace, ctx, cli)
-		if err != nil {
-			return nil, err
-		}
-		if isExist {
-			continue
-		}
 
 		// Generate ConfigMap objects for config files
 		cm, err := generateConfigMapFromTpl(cfgTemplateBuilder, cmName, tpl, task, ctx, cli)
 		if err != nil {
 			return nil, err
 		}
+		updateCMConfigSelectorLabels(cm, tpl)
 
 		// The owner of the configmap object is a cluster of users,
 		// in order to manage the life cycle of configmap
@@ -382,24 +376,14 @@ func buildCfg(task *intctrltypes.ReconcileTask,
 	return configs, nil
 }
 
-func isConfigMapExists(cmName string, namespace string, ctx context.Context, cli client.Client) (bool, error) {
-	cmKey := client.ObjectKey{
-		Name:      cmName,
-		Namespace: namespace,
+func updateCMConfigSelectorLabels(cm *corev1.ConfigMap, tpl appsv1alpha1.ConfigTemplate) {
+	if len(tpl.Keys) == 0 {
+		return
 	}
-
-	cmObj := &corev1.ConfigMap{}
-	cmErr := cli.Get(ctx, cmKey, cmObj)
-	if cmErr != nil && apierrors.IsNotFound(cmErr) {
-		// Config is not exists
-		return false, nil
-	} else if cmErr != nil {
-		// An unexpected error occurs
-		// TODO process unexpected error
-		return true, cmErr
+	if cm.Labels == nil {
+		cm.Labels = make(map[string]string)
 	}
-
-	return true, nil
+	cm.Labels[cfgcore.CMConfigurationCMKeysLabelKey] = strings.Join(tpl.Keys, ",")
 }
 
 // generateConfigMapFromTpl render config file by config template provided by provider.

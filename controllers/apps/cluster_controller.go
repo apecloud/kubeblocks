@@ -30,7 +30,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
@@ -114,36 +113,8 @@ type probeMessage struct {
 }
 
 func init() {
-	clusterDefUpdateHandlers["cluster"] = clusterUpdateHandler
 	k8score.EventHandlerMap["cluster-controller"] = &ClusterReconciler{}
 	k8score.StorageClassHandlerMap["cluster-controller"] = handleClusterVolumeExpansion
-}
-
-func clusterUpdateHandler(cli client.Client, ctx context.Context, clusterDef *appsv1alpha1.ClusterDefinition) error {
-	labelSelector, err := labels.Parse("clusterdefinition.kubeblocks.io/name=" + clusterDef.GetName())
-	if err != nil {
-		return err
-	}
-	o := &client.ListOptions{LabelSelector: labelSelector}
-
-	list := &appsv1alpha1.ClusterList{}
-	if err := cli.List(ctx, list, o); err != nil {
-		return err
-	}
-	for _, cluster := range list.Items {
-		if cluster.Status.ClusterDefGeneration != clusterDef.Generation {
-			patch := client.MergeFrom(cluster.DeepCopy())
-			if cluster.Status.Operations == nil {
-				cluster.Status.Operations = &appsv1alpha1.Operations{}
-			}
-			cluster.Status.Operations.HorizontalScalable =
-				getSupportHorizontalScalingComponents(&cluster, clusterDef)
-			if err = cli.Status().Patch(ctx, &cluster, patch); err != nil {
-				return err
-			}
-		}
-	}
-	return nil
 }
 
 func (r *ClusterReconciler) Handle(cli client.Client, reqCtx intctrlutil.RequestCtx, recorder record.EventRecorder, event *corev1.Event) error {
@@ -801,8 +772,6 @@ func (r *ClusterReconciler) reconcileStatusOperations(ctx context.Context, clust
 		}
 		operations.VolumeExpandable = volumeExpansionComponents
 	}
-	// determine whether to support horizontalScaling
-	operations.HorizontalScalable = getSupportHorizontalScalingComponents(cluster, clusterDef)
 
 	// Determine whether to support upgrade
 	if err = r.Client.List(ctx, clusterVersionList, client.MatchingLabels{clusterDefLabelKey: cluster.Spec.ClusterDefRef}); err != nil {
@@ -820,26 +789,4 @@ func (r *ClusterReconciler) reconcileStatusOperations(ctx context.Context, clust
 	patch := client.MergeFrom(cluster.DeepCopy())
 	cluster.Status.Operations = &operations
 	return r.Client.Status().Patch(ctx, cluster, patch)
-}
-
-// getSupportHorizontalScalingComponents gets the components that support horizontalScaling
-func getSupportHorizontalScalingComponents(
-	cluster *appsv1alpha1.Cluster,
-	clusterDef *appsv1alpha1.ClusterDefinition) []appsv1alpha1.OperationComponent {
-	horizontalScalableComponents := make([]appsv1alpha1.OperationComponent, 0)
-
-	// determine whether to support horizontalScaling
-	for _, v := range cluster.Spec.ComponentSpecs {
-		for _, component := range clusterDef.Spec.ComponentDefs {
-			if v.ComponentDefRef != component.Name {
-				continue
-			}
-			horizontalScalableComponents = append(horizontalScalableComponents, appsv1alpha1.OperationComponent{
-				Name: v.Name,
-			})
-			break
-		}
-	}
-
-	return horizontalScalableComponents
 }

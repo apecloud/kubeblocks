@@ -896,27 +896,6 @@ spec:
               operations:
                 description: operations declare what operations the cluster supports.
                 properties:
-                  horizontalScalable:
-                    description: horizontalScalable which components of the cluster
-                      support horizontalScaling, and the replicas range limit.
-                    items:
-                      properties:
-                        name:
-                          description: name reference component name.
-                          type: string
-                        volumeClaimTemplateNames:
-                          description: volumeClaimTemplateNames which VolumeClaimTemplate
-                            of the component support volumeExpansion.
-                          items:
-                            type: string
-                          type: array
-                      required:
-                      - name
-                      type: object
-                    type: array
-                    x-kubernetes-list-map-keys:
-                    - name
-                    x-kubernetes-list-type: map
                   upgradable:
                     description: upgradable whether the cluster supports upgrade.
                       if multiple clusterVersions existed, it is true.

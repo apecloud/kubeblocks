@@ -87,7 +87,7 @@ func getKBObjects(dynamic dynamic.Interface, namespace string) (kbObjects, error
 		}
 	}
 
-	// get deployments
+	// get objects by group version resource
 	getObjects := func(labelSelector string, gvr schema.GroupVersionResource) {
 		objs, err := dynamic.Resource(gvr).Namespace(namespace).List(context.TODO(), metav1.ListOptions{
 			LabelSelector: labelSelector,

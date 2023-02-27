@@ -73,36 +73,28 @@ var _ = Describe("kubeblocks objects", func() {
 			clusterDef     *appsv1alpha1.ClusterDefinition
 			clusterVersion *appsv1alpha1.ClusterVersion
 			backupTool     *dpv1alpha1.BackupTool
-			expected       string
 		}{
 			{
 				clusterDef:     testing.FakeClusterDef(),
 				clusterVersion: testing.FakeClusterVersion(),
 				backupTool:     testing.FakeBackupTool(),
-				expected:       "Unable to remove nonexistent key: finalizers",
 			},
 			{
 				clusterDef:     clusterDef,
 				clusterVersion: testing.FakeClusterVersion(),
 				backupTool:     testing.FakeBackupTool(),
-				expected:       "Unable to remove nonexistent key: finalizers",
 			},
 			{
 				clusterDef:     clusterDef,
 				clusterVersion: clusterVersion,
 				backupTool:     backupTool,
-				expected:       "",
 			},
 		}
 
 		for _, c := range testCases {
 			client := mockDynamicClientWithCRD(c.clusterDef, c.clusterVersion, c.backupTool)
 			objs, _ := getKBObjects(client, "")
-			if c.expected != "" {
-				Expect(removeCustomResources(client, objs)).Should(MatchError(MatchRegexp(c.expected)))
-			} else {
-				Expect(removeCustomResources(client, objs)).Should(Succeed())
-			}
+			Expect(removeCustomResources(client, objs)).Should(Succeed())
 		}
 	})
 

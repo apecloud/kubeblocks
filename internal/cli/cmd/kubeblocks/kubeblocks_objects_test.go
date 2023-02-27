@@ -103,9 +103,9 @@ var _ = Describe("kubeblocks objects", func() {
 			client := mockDynamicClientWithCRD(c.clusterDef, c.clusterVersion, c.backupTool)
 			objs, _ := getKBObjects(client, "")
 			if c.expected != "" {
-				Expect(removeFinalizers(client, objs)).Should(MatchError(MatchRegexp(c.expected)))
+				Expect(removeCustomResources(client, objs)).Should(MatchError(MatchRegexp(c.expected)))
 			} else {
-				Expect(removeFinalizers(client, objs)).Should(Succeed())
+				Expect(removeCustomResources(client, objs)).Should(Succeed())
 			}
 		}
 	})

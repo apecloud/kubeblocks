@@ -155,7 +155,7 @@ func (o *uninstallOptions) uninstall() error {
 
 	// remove finalizers of custom resources, then that will be deleted
 	spinner = newSpinner("Remove built-in custom resources")
-	printErr(spinner, removeFinalizers(o.Dynamic, objs))
+	printErr(spinner, removeCustomResources(o.Dynamic, objs))
 
 	mapper, err := o.factory.ToRESTMapper()
 	if err != nil {
@@ -185,6 +185,6 @@ func (o *uninstallOptions) uninstall() error {
 	spinner = newSpinner("Remove PVCs")
 	printErr(spinner, deleteObjects(o.Dynamic, mapper, &objs.pvcs))
 
-	fmt.Fprintln(o.Out, "Uninstall KubeBlocks done")
+	fmt.Fprintln(o.Out, "Uninstall KubeBlocks done.")
 	return nil
 }

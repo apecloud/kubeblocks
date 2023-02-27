@@ -128,7 +128,7 @@ func getKBObjects(dynamic dynamic.Interface, namespace string) (*kbObjects, erro
 	return kbObjs, utilerrors.NewAggregate(allErrs)
 }
 
-func removeFinalizers(client dynamic.Interface, objs *kbObjects) error {
+func removeCustomResources(client dynamic.Interface, objs *kbObjects) error {
 	removeFn := func(gvr schema.GroupVersionResource, crs *unstructured.UnstructuredList) error {
 		if crs == nil {
 			return nil
@@ -140,7 +140,7 @@ func removeFinalizers(client dynamic.Interface, objs *kbObjects) error {
 				}
 			}
 			if _, err := client.Resource(gvr).Patch(context.TODO(), cr.GetName(), k8sapitypes.JSONPatchType,
-				[]byte("[{\"op\": \"remove\", \"path\": \"/metadata/finalizers\"}]"), metav1.PatchOptions{}); err != nil {
+				[]byte("[{\"op\": \"remove\", \"path\": \"/metadata/finalizers\"}]"), metav1.PatchOptions{}); err != nil && !apierrors.IsNotFound(err) {
 				return err
 			}
 		}
@@ -178,9 +178,13 @@ func deleteObjects(dynamic dynamic.Interface, mapper meta.RESTMapper, objects *u
 			return err
 		}
 
-		// remove finalizers
+		// if object has finalizers, remove it
+		if len(s.GetFinalizers()) == 0 {
+			continue
+		}
+
 		if _, err = dynamic.Resource(gvr).Namespace(s.GetNamespace()).Patch(context.TODO(), s.GetName(), k8sapitypes.JSONPatchType,
-			[]byte("[{\"op\": \"remove\", \"path\": \"/metadata/finalizers\"}]"), metav1.PatchOptions{}); err != nil {
+			[]byte("[{\"op\": \"remove\", \"path\": \"/metadata/finalizers\"}]"), metav1.PatchOptions{}); err != nil && !apierrors.IsNotFound(err) {
 			return err
 		}
 	}
@@ -202,15 +206,12 @@ func getRemainedResource(objs *kbObjects) map[string][]string {
 		appendItems(k.Resource, &v)
 	}
 
-	// services
-	for _, item := range objs.svcs.Items {
-		res["services"] = append(res["services"], item.GetName())
-	}
-
-	// deployments
-	for _, item := range objs.deploys.Items {
-		res["deployments"] = append(res["deployments"], item.GetName())
-	}
+	// get all resources
+	appendItems("deployments", &objs.deploys)
+	appendItems("statefulsets", &objs.stss)
+	appendItems("services", &objs.svcs)
+	appendItems("configmaps", &objs.svcs)
+	appendItems("PVCs", &objs.svcs)
 
 	return res
 }

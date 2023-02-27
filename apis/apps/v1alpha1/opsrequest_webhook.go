@@ -225,25 +225,11 @@ func (r *OpsRequest) validateUpgrade(ctx context.Context,
 		return
 	}
 
-	cvList := &ClusterVersionList{}
-	labelKey := "clusterdefinition.kubeblocks.io/name" // TODO(leon)
-	if err := k8sClient.List(ctx, cvList, client.MatchingLabels{labelKey: cluster.Spec.ClusterDefRef}); err != nil {
-		addInvalidError(allErrs, "spec.type", r.Spec.Type, err.Error())
-		return
+	clusterVersion := &ClusterVersion{}
+	clusterVersionRef := r.Spec.Upgrade.ClusterVersionRef
+	if err := k8sClient.Get(ctx, types.NamespacedName{Name: clusterVersionRef}, clusterVersion); err != nil {
+		addInvalidError(allErrs, "spec.upgrade.clusterVersionRef", clusterVersionRef, err.Error())
 	}
-
-	if len(cvList.Items) <= 1 {
-		addInvalidError(allErrs, "spec.type", r.Spec.Type, fmt.Sprintf("not supported in Cluster: %s, ClusterVersion must be greater than 1", r.Spec.ClusterRef))
-		return
-	}
-
-	targetClusterVersion := r.Spec.Upgrade.ClusterVersionRef
-	for _, cv := range cvList.Items {
-		if cv.Name == targetClusterVersion {
-			return
-		}
-	}
-	addInvalidError(allErrs, "spec.upgrade.clusterVersionRef", targetClusterVersion, fmt.Sprintf("target CluterVersion to upgrade not found"))
 }
 
 // validateVerticalScaling validates api when spec.type is VerticalScaling
@@ -340,7 +326,7 @@ func (r *OpsRequest) validateVolumeExpansion(cluster *Cluster, allErrs *field.Er
 	for i, v := range volumeExpansionList {
 		componentNames[i] = v.ComponentName
 	}
-	r.checkComponentExistence(allErrs, cluster, componentNames)
+	r.checkComponentExistence(nil, cluster, componentNames, allErrs)
 
 	// TODO(leon): check each vct's SC whether supports expansion
 	// The error message:

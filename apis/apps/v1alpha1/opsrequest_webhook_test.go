@@ -25,6 +25,7 @@ import (
 	. "github.com/onsi/gomega"
 
 	"github.com/sethvargo/go-password/password"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -256,15 +257,6 @@ var _ = Describe("OpsRequest webhook", func() {
 		} else {
 			clusterDef.Spec.ComponentDefs = clusterDef.Spec.ComponentDefs[:1]
 		}
-
-		By("By testing horizontalScaling - delete component proxy from cluster definition which is exist in cluster")
-		patch := client.MergeFrom(clusterDef.DeepCopy())
-		// delete component proxy from cluster definition
-		if clusterDef.Spec.ComponentDefs[0].Name == proxyComponentName {
-			clusterDef.Spec.ComponentDefs = clusterDef.Spec.ComponentDefs[1:]
-		} else {
-			clusterDef.Spec.ComponentDefs = clusterDef.Spec.ComponentDefs[:1]
-		}
 		Expect(k8sClient.Patch(ctx, clusterDef, patch)).Should(Succeed())
 		Eventually(func() bool {
 			tmp := &ClusterDefinition{}
@@ -378,7 +370,7 @@ var _ = Describe("OpsRequest webhook", func() {
 
 			testUpgrade(cluster)
 
-			//testVerticalScaling(cluster)
+			testVerticalScaling(cluster)
 
 			testVolumeExpansion(cluster)
 

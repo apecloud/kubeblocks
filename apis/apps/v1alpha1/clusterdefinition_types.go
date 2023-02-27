@@ -506,7 +506,7 @@ type SwitchPolicy struct {
 	// Manual: KubeBlocks will not perform high-availability switching on components. Users need to implement HA by themselves.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:default=MaximumAvailability
-	Type SwitchPolicyType `json:"switchPolicyType"`
+	Type SwitchPolicyType `json:"type"`
 
 	// switchStatements defines switching actions according to their respective roles, We divide all pods into three switchStatement role={Promote,Demote,Follow}.
 	// Promote: candidate primary after elected, which to be promoted

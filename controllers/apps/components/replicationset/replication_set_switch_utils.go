@@ -17,12 +17,18 @@ limitations under the License.
 package replicationset
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	componetutil "github.com/apecloud/kubeblocks/internal/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
@@ -40,6 +46,13 @@ const (
 
 	KBSwitchOldPrimaryRoleName = "KB_OLD_PRIMARY_ROLE_NAME"
 	KBSwitchNewPrimaryRoleName = "KB_NEW_PRIMARY_ROLE_NAME"
+
+	KBSwitchRoleEndPoint = "KB_SWITCH_ROLE_ENDPOINT"
+)
+
+const (
+	KBSwitchJobNamePrefix    = "kb-switch-job"
+	KBSwitchJobContainerName = "switch-job-container"
 )
 
 var defaultSwitchElectionFilters = []func() SwitchElectionFilter{
@@ -68,6 +81,62 @@ type SwitchRoleInfoList []*SwitchRoleInfo
 var _ SwitchDetectManager = &ProbeDetectManager{}
 
 var _ SwitchActionHandler = &SwitchActionWithJobHandler{}
+
+// HandleReplicationSetHASwitch handles high-availability switching of a single replication workload under current cluster.
+func HandleReplicationSetHASwitch(ctx context.Context,
+	cli client.Client,
+	cluster *appsv1alpha1.Cluster,
+	clusterCompSpec *appsv1alpha1.ClusterComponentSpec) error {
+	if clusterCompSpec == nil {
+		return fmt.Errorf("cluster componentSpec can not be nil")
+	}
+
+	compDef, err := filterReplicationWorkload(ctx, cli, cluster, clusterCompSpec.Name)
+	if err != nil {
+		return err
+	}
+	if compDef == nil {
+		return nil
+	}
+
+	primaryIndexChanged, currentPrimaryIndex, err := CheckPrimaryIndexChanged(ctx, cli, cluster, clusterCompSpec.Name, clusterCompSpec.PrimaryIndex)
+	if err != nil {
+		return err
+	}
+	// there is no need to perform HA operation when primaryIndex has not changed
+	if !primaryIndexChanged {
+		return nil
+	}
+
+	// create a new Switch object
+	s := NewSwitch(ctx, cli, cluster, compDef, clusterCompSpec, nil, nil, nil, nil, nil)
+
+	// initialize switchInstance according to the primaryIndex
+	if err := s.InitSwitchInstance(currentPrimaryIndex, *clusterCompSpec.PrimaryIndex); err != nil {
+		return err
+	}
+
+	// health detection, role detection, delay detection of oldPrimaryIndex and newPrimaryIndex
+	s.Detection(true)
+	if err := checkSwitchStatus(s.SwitchStatus); err != nil {
+		return err
+	}
+
+	// make switch decision, if returns true, then start to do switch action, otherwise returns fail
+	if s.Decision() {
+		if err := s.DoSwitch(); err != nil {
+			return err
+		}
+	} else {
+		return checkSwitchStatus(s.SwitchStatus)
+	}
+
+	// switch succeed, update role labels
+	if err := s.UpdateRoleLabel(); err != nil {
+		return err
+	}
+	return nil
+}
 
 // Len is the implementation of the sort.Interface, calculate the length of the list of SwitchRoleInfoList.
 func (sl SwitchRoleInfoList) Len() int {
@@ -138,25 +207,6 @@ func NewSwitchElectionHealthFilter() SwitchElectionFilter {
 func (handler *SwitchActionWithJobHandler) BuildExecSwitchCommandEnvs(s *Switch) ([]corev1.EnvVar, error) {
 	var switchEnvs []corev1.EnvVar
 
-	// inject switchStatements as env variables
-	switchStatements, err := getSwitchStatementsBySwitchPolicyType(s.SwitchResource.CompSpec.SwitchPolicy.Type, s.SwitchResource.CompDef.ReplicationSpec)
-	if err != nil {
-		return nil, err
-	}
-	promoteStmtEnv := corev1.EnvVar{
-		Name:  KBSwitchPromoteStmtEnvName,
-		Value: strings.Join(switchStatements.Promote, ";"),
-	}
-	demoteStmtEnv := corev1.EnvVar{
-		Name:  KBSwitchDemoteStmtEnvName,
-		Value: strings.Join(switchStatements.Demote, ";"),
-	}
-	followStmtEnv := corev1.EnvVar{
-		Name:  KBSwitchFollowStmtEnvName,
-		Value: strings.Join(switchStatements.Follow, ";"),
-	}
-	switchEnvs = append(switchEnvs, promoteStmtEnv, demoteStmtEnv, followStmtEnv)
-
 	// replace secret env and merge envs defined in switchCmdExecutorConfig
 	replaceSwitchCmdExecutorConfigEnv(s.SwitchResource.Cluster.Name, s.SwitchResource.CompDef.ReplicationSpec.SwitchCmdExecutorConfig)
 	switchEnvs = append(switchEnvs, s.SwitchResource.CompDef.ReplicationSpec.SwitchCmdExecutorConfig.Env...)
@@ -174,17 +224,44 @@ func (handler *SwitchActionWithJobHandler) BuildExecSwitchCommandEnvs(s *Switch)
 		},
 	}
 	switchEnvs = append(switchEnvs, primaryEnvs...)
+
+	// inject switchStatements as env variables
+	switchStatements, err := getSwitchStatementsBySwitchPolicyType(s.SwitchResource.CompSpec.SwitchPolicy.Type, s.SwitchResource.CompDef.ReplicationSpec)
+	if err != nil {
+		return nil, err
+	}
+	promoteStmtEnv := corev1.EnvVar{
+		Name:  KBSwitchPromoteStmtEnvName,
+		Value: strings.Join(switchStatements.Promote, " "),
+	}
+	demoteStmtEnv := corev1.EnvVar{
+		Name:  KBSwitchDemoteStmtEnvName,
+		Value: strings.Join(switchStatements.Demote, " "),
+	}
+	followStmtEnv := corev1.EnvVar{
+		Name:  KBSwitchFollowStmtEnvName,
+		Value: strings.Join(switchStatements.Follow, " "),
+	}
+	switchEnvs = append(switchEnvs, promoteStmtEnv, demoteStmtEnv, followStmtEnv)
+
 	return switchEnvs, nil
 }
 
 // ExecSwitchCommands executes switch commands with k8s job.
-func (handler *SwitchActionWithJobHandler) ExecSwitchCommands(switchEnvs []corev1.EnvVar,
-	switchCmdExecutorConfig *appsv1alpha1.SwitchCmdExecutorConfig) error {
-	if switchCmdExecutorConfig == nil || len(switchCmdExecutorConfig.SwitchSteps) == 0 {
+func (handler *SwitchActionWithJobHandler) ExecSwitchCommands(s *Switch, switchEnvs []corev1.EnvVar) error {
+	if s.SwitchResource.CompDef.ReplicationSpec.SwitchCmdExecutorConfig == nil {
 		return fmt.Errorf("switchCmdExecutorConfig and SwitchSteps can not be nil")
 	}
-	for range switchCmdExecutorConfig.SwitchSteps {
-		// TODO(xingran) render a job with to switchEnvs execute switch commands
+	for _, switchRoleCmdMap := range s.SwitchResource.CompDef.ReplicationSpec.SwitchCmdExecutorConfig.SwitchSteps {
+		for switchRole, switchCmd := range switchRoleCmdMap {
+			cmdJobs, err := renderAndCreateSwitchCmdJobs(s, switchRole, switchEnvs, switchCmd)
+			if err != nil {
+				return err
+			}
+			if err := checkSwitchCmdJobSucceed(s, cmdJobs); err != nil {
+				return err
+			}
+		}
 	}
 	return nil
 }
@@ -243,4 +320,118 @@ func checkSwitchStatus(status *SwitchStatus) error {
 		return fmt.Errorf(status.Reason)
 	}
 	return nil
+}
+
+// renderAndCreateSwitchCmdJobs renders and creates jobs to execute the switch command.
+func renderAndCreateSwitchCmdJobs(s *Switch, stepRole appsv1alpha1.SwitchStepRole,
+	switchEnvs []corev1.EnvVar, switchCmd appsv1alpha1.SwitchStepCmd) ([]*batchv1.Job, error) {
+	var enginePods []*corev1.Pod
+	var cmdJobs []*batchv1.Job
+	switch stepRole {
+	case appsv1alpha1.NewPrimary:
+		enginePods = append(enginePods, s.SwitchInstance.CandidatePrimaryRole.Pod)
+	case appsv1alpha1.OldPrimary:
+		enginePods = append(enginePods, s.SwitchInstance.OldPrimaryRole.Pod)
+	case appsv1alpha1.Secondaries:
+		for _, pod := range s.SwitchInstance.SecondariesRole {
+			enginePods = append(enginePods, pod.Pod)
+		}
+	}
+
+	renderJob := func(jobName string, switchEnvs []corev1.EnvVar) *batchv1.Job {
+		job := &batchv1.Job{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: s.SwitchResource.Cluster.Namespace,
+				Name:      jobName,
+			},
+			Spec: batchv1.JobSpec{
+				Template: corev1.PodTemplateSpec{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: s.SwitchResource.Cluster.Namespace,
+						Name:      jobName},
+					Spec: corev1.PodSpec{
+						RestartPolicy: corev1.RestartPolicyNever,
+						Containers: []corev1.Container{
+							{
+								Name:            KBSwitchJobContainerName,
+								Image:           s.SwitchResource.CompDef.ReplicationSpec.SwitchCmdExecutorConfig.Image,
+								ImagePullPolicy: corev1.PullIfNotPresent,
+								Command:         switchCmd.Command,
+								Args:            switchCmd.Args,
+								Env:             switchEnvs,
+							},
+						},
+					},
+				},
+			},
+		}
+		if len(s.SwitchResource.Cluster.Spec.Tolerations) > 0 {
+			job.Spec.Template.Spec.Tolerations = s.SwitchResource.Cluster.Spec.Tolerations
+		}
+		return job
+	}
+
+	for index, enginePod := range enginePods {
+		jobName := fmt.Sprintf("%s-%s-%s-%d", KBSwitchJobNamePrefix, s.SwitchResource.CompSpec.Name, strings.ToLower(string(stepRole)), index)
+		svcName := strings.Join([]string{s.SwitchResource.Cluster.Name, s.SwitchResource.CompSpec.Name, "headless"}, "-")
+		switchEnvs = append(switchEnvs, corev1.EnvVar{
+			Name:  KBSwitchRoleEndPoint,
+			Value: fmt.Sprintf("%s.%s", enginePod.Name, svcName),
+		})
+		job := renderJob(jobName, switchEnvs)
+		cmdJobs = append(cmdJobs, job)
+
+		key := types.NamespacedName{Namespace: s.SwitchResource.Cluster.Namespace, Name: jobName}
+		exists, _ := intctrlutil.CheckResourceExists(s.SwitchResource.Ctx, s.SwitchResource.Cli, key, &batchv1.Job{})
+		if exists {
+			continue
+		}
+
+		// if job not exist, create a job
+		if err := s.SwitchResource.Cli.Create(s.SwitchResource.Ctx, job); err != nil {
+			return nil, err
+		}
+	}
+	return cmdJobs, nil
+}
+
+// checkSwitchCmdJobSucceed checks the result of switch command job execution.
+func checkSwitchCmdJobSucceed(s *Switch, cmdJobs []*batchv1.Job) error {
+	for _, cmdJob := range cmdJobs {
+		key := types.NamespacedName{Namespace: s.SwitchResource.Cluster.Namespace, Name: cmdJob.Name}
+		exists, err := intctrlutil.CheckResourceExists(s.SwitchResource.Ctx, s.SwitchResource.Cli, key, &batchv1.Job{})
+		if err != nil {
+			return err
+		}
+		if !exists {
+			return fmt.Errorf("switch command job %s not exist", cmdJob.Name)
+		}
+		jobStatusConditions := cmdJob.Status.Conditions
+		if len(jobStatusConditions) > 0 {
+			switch jobStatusConditions[0].Type {
+			case batchv1.JobComplete:
+				continue
+			case batchv1.JobFailed:
+				return fmt.Errorf("switch command job %s failed", cmdJob.Name)
+			default:
+				return fmt.Errorf("switch command job %s unfinished", cmdJob.Name)
+			}
+		}
+	}
+	return nil
+}
+
+// CheckPrimaryIndexChanged checks whether primaryIndex has changed and returns current primaryIndex.
+func CheckPrimaryIndexChanged(ctx context.Context,
+	cli client.Client,
+	cluster *appsv1alpha1.Cluster,
+	compName string,
+	primaryIndex *int32) (bool, int32, error) {
+	// get the statefulSet object whose current role label is primary
+	primarySts, err := GetReplicationSetPrimaryObj(ctx, cli, cluster, intctrlutil.StatefulSetSignature, compName)
+	if err != nil {
+		return false, -1, err
+	}
+	currentPrimaryIndex := int32(util.GetOrdinalSts(primarySts))
+	return *primaryIndex != currentPrimaryIndex, currentPrimaryIndex, nil
 }

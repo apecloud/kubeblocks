@@ -132,6 +132,16 @@ func GetComponentDefByCluster(ctx context.Context, cli client.Client, cluster *a
 	return nil, nil
 }
 
+// GetClusterComponentSpecByName gets componentSpec from cluster with compSpecName.
+func GetClusterComponentSpecByName(cluster *appsv1alpha1.Cluster, compSpecName string) *appsv1alpha1.ClusterComponentSpec {
+	for _, compSpec := range cluster.Spec.ComponentSpecs {
+		if compSpec.Name == compSpecName {
+			return &compSpec
+		}
+	}
+	return nil
+}
+
 // InitClusterComponentStatusIfNeed Initialize the state of the corresponding component in cluster.status.components
 func InitClusterComponentStatusIfNeed(cluster *appsv1alpha1.Cluster,
 	componentName string,

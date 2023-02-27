@@ -42,80 +42,17 @@ const (
 	DBClusterFinalizerName                 = "cluster.kubeblocks.io/finalizer"
 )
 
-// HandleReplicationSet handles the replication workload life cycle process, including HA, horizontal scaling, etc.
+// HandleReplicationSet handles the replication workload life cycle process, including horizontal scaling, etc.
 func HandleReplicationSet(ctx context.Context,
 	cli client.Client,
 	cluster *appsv1alpha1.Cluster,
 	stsList []*appsv1.StatefulSet) error {
-
-	// handle replication workload high-availability switch
-	if err := HandleReplicationSetHASwitch(ctx, cli, cluster); err != nil {
-		return err
-	}
 
 	// handle replication workload horizontal scaling
 	if err := HandleReplicationSetHorizontalScale(ctx, cli, cluster, stsList); err != nil {
 		return err
 	}
 
-	return nil
-}
-
-// HandleReplicationSetHASwitch handles high-availability switching of replication workloads
-func HandleReplicationSetHASwitch(ctx context.Context,
-	cli client.Client,
-	cluster *appsv1alpha1.Cluster) error {
-
-	for _, clusterComp := range cluster.Spec.ComponentSpecs {
-		compDef, err := filterReplicationWorkload(ctx, cli, cluster, clusterComp.Name)
-		if err != nil {
-			return err
-		}
-		if compDef == nil {
-			continue
-		}
-
-		// get the statefulSet object whose current role label is primary
-		primarySts, err := GetReplicationSetPrimaryObj(ctx, cli, cluster, intctrlutil.StatefulSetSignature, clusterComp.Name)
-		if err != nil {
-			return err
-		}
-
-		currentPrimaryIndex := int32(util.GetOrdinalSts(primarySts))
-
-		// there is no need to perform HA operation when primaryIndex has not changed
-		if *clusterComp.PrimaryIndex == currentPrimaryIndex {
-			continue
-		}
-
-		// create a new Switch object
-		s := NewSwitch(ctx, cli, cluster, compDef, &clusterComp, nil, nil, nil, nil, nil)
-
-		// initialize switchInstance according to the primaryIndex
-		if err := s.InitSwitchInstance(currentPrimaryIndex, *clusterComp.PrimaryIndex); err != nil {
-			return err
-		}
-
-		// health detection, role detection, delay detection of oldPrimaryIndex and newPrimaryIndex
-		s.Detection(true)
-		if err := checkSwitchStatus(s.SwitchStatus); err != nil {
-			return err
-		}
-
-		// make switch decision, if returns true, then start to do switch action, otherwise returns fail
-		if s.Decision() {
-			if err := s.DoSwitch(); err != nil {
-				return err
-			}
-		} else {
-			return checkSwitchStatus(s.SwitchStatus)
-		}
-
-		// switch succeed, update role labels
-		if err := s.UpdateRoleLabel(); err != nil {
-			return err
-		}
-	}
 	return nil
 }
 
@@ -371,6 +308,18 @@ func GetReplicationSetPrimaryObj[T intctrlutil.Object, PT intctrlutil.PObject[T]
 		return nil, fmt.Errorf("the number of current replicationSet primary obj is not 1, pls check")
 	}
 	return &objListItems[0], nil
+}
+
+// UpdateObjRoleLabel updates the value of the role label of the object.
+func UpdateObjRoleLabel[T intctrlutil.Object, PT intctrlutil.PObject[T]](
+	ctx context.Context, cli client.Client, obj T, role string) error {
+	pObj := PT(&obj)
+	patch := client.MergeFrom(PT(pObj.DeepCopy()))
+	pObj.GetLabels()[intctrlutil.RoleLabelKey] = role
+	if err := cli.Patch(ctx, pObj, patch); err != nil {
+		return err
+	}
+	return nil
 }
 
 // GeneratePVCFromVolumeClaimTemplates generates the required pvc object according to the name of statefulSet and volumeClaimTemplates.

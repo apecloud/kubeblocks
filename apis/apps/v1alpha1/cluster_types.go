@@ -295,7 +295,7 @@ type ClusterSwitchPolicy struct {
 	// +kubebuilder:validation:Required
 	// +kubebuilder:default=MaximumAvailability
 	// +optional
-	Type SwitchPolicyType `json:"switchPolicyType"`
+	Type SwitchPolicyType `json:"type"`
 }
 
 type ClusterComponentVolumeClaimTemplate struct {

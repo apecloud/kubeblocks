@@ -131,7 +131,7 @@ type SwitchActionHandler interface {
 	BuildExecSwitchCommandEnvs(s *Switch) ([]corev1.EnvVar, error)
 
 	// ExecSwitchCommands executes the specific switching commands defined by the user in the clusterDefinition API, and the execution channel is determined by the specific implementation
-	ExecSwitchCommands(switchEnvs []corev1.EnvVar, switchCmdExecutorConfig *appsv1alpha1.SwitchCmdExecutorConfig) error
+	ExecSwitchCommands(s *Switch, switchEnvs []corev1.EnvVar) error
 }
 
 // SwitchElectionFilter is an interface used to filter the candidate primary during the election process.
@@ -330,7 +330,7 @@ func (s *Switch) DoSwitch() error {
 	s.SwitchStatus.SwitchPhase = SwitchPhaseDoAction
 	s.SwitchStatus.SwitchPhaseStatus = SwitchPhaseStatusExecuting
 	switchEnvs, _ := s.SwitchActionHandler.BuildExecSwitchCommandEnvs(s)
-	if err := s.SwitchActionHandler.ExecSwitchCommands(switchEnvs, s.SwitchResource.CompDef.ReplicationSpec.SwitchCmdExecutorConfig); err != nil {
+	if err := s.SwitchActionHandler.ExecSwitchCommands(s, switchEnvs); err != nil {
 		s.SwitchStatus.SwitchPhaseStatus = SwitchPhaseStatusFailed
 		return err
 	}
@@ -342,12 +342,30 @@ func (s *Switch) DoSwitch() error {
 func (s *Switch) UpdateRoleLabel() error {
 	s.SwitchStatus.SwitchPhase = SwitchPhaseUpdateRole
 	s.SwitchStatus.SwitchPhaseStatus = SwitchPhaseStatusExecuting
-	if s.SwitchInstance == nil {
-		return fmt.Errorf("switch target instance cannot be nil")
+
+	var stsList = &appsv1.StatefulSetList{}
+	if err := utils.GetObjectListByComponentName(s.SwitchResource.Ctx, s.SwitchResource.Cli, s.SwitchResource.Cluster, stsList, s.SwitchResource.CompSpec.Name); err != nil {
+		return err
 	}
 
-	// TODO(xingran) exchange the role of old primary and new primary
-
+	for _, sts := range stsList.Items {
+		if utils.IsMemberOf(&sts, s.SwitchInstance.OldPrimaryRole.Pod) {
+			if err := UpdateObjRoleLabel(s.SwitchResource.Ctx, s.SwitchResource.Cli, sts, string(Secondary)); err != nil {
+				return err
+			}
+			if err := UpdateObjRoleLabel(s.SwitchResource.Ctx, s.SwitchResource.Cli, *s.SwitchInstance.OldPrimaryRole.Pod, string(Secondary)); err != nil {
+				return err
+			}
+		}
+		if utils.IsMemberOf(&sts, s.SwitchInstance.CandidatePrimaryRole.Pod) {
+			if err := UpdateObjRoleLabel(s.SwitchResource.Ctx, s.SwitchResource.Cli, sts, string(Primary)); err != nil {
+				return err
+			}
+			if err := UpdateObjRoleLabel(s.SwitchResource.Ctx, s.SwitchResource.Cli, *s.SwitchInstance.CandidatePrimaryRole.Pod, string(Primary)); err != nil {
+				return err
+			}
+		}
+	}
 	return nil
 }
 
@@ -362,7 +380,7 @@ func (s *Switch) InitSwitchInstance(oldPrimaryIndex, newPrimaryIndex int32) erro
 		s.SwitchInstance = &SwitchInstance{
 			OldPrimaryRole:       nil,
 			CandidatePrimaryRole: nil,
-			SecondariesRole:      make([]*SwitchRoleInfo, len(stsList.Items)-1),
+			SecondariesRole:      make([]*SwitchRoleInfo, 0),
 		}
 	}
 	for _, sts := range stsList.Items {
@@ -370,7 +388,7 @@ func (s *Switch) InitSwitchInstance(oldPrimaryIndex, newPrimaryIndex int32) erro
 		if err != nil {
 			return err
 		}
-		SwitchRoleInfo := &SwitchRoleInfo{
+		sri := &SwitchRoleInfo{
 			Pod:              pod,
 			HealthDetectInfo: nil,
 			RoleDetectInfo:   nil,
@@ -378,11 +396,11 @@ func (s *Switch) InitSwitchInstance(oldPrimaryIndex, newPrimaryIndex int32) erro
 		}
 		switch int32(utils.GetOrdinalSts(&sts)) {
 		case oldPrimaryIndex:
-			s.SwitchInstance.OldPrimaryRole = SwitchRoleInfo
+			s.SwitchInstance.OldPrimaryRole = sri
 		case newPrimaryIndex:
-			s.SwitchInstance.CandidatePrimaryRole = SwitchRoleInfo
+			s.SwitchInstance.CandidatePrimaryRole = sri
 		default:
-			s.SwitchInstance.SecondariesRole = append(s.SwitchInstance.SecondariesRole, SwitchRoleInfo)
+			s.SwitchInstance.SecondariesRole = append(s.SwitchInstance.SecondariesRole, sri)
 		}
 	}
 	return nil

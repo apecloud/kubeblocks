@@ -61,7 +61,7 @@ var _ = Describe("VerticalScaling OpsRequest", func() {
 	Context("Test OpsRequest", func() {
 		It("Test verticalScaling OpsRequest", func() {
 			By("init operations resources ")
-			opsRes, _, _ := initOperationsResources(clusterDefinitionName, clusterVersionName, clusterName)
+			opsRes, _, _, _ := initOperationsResources(clusterDefinitionName, clusterVersionName, clusterName)
 
 			By("create VerticalScaling ops")
 			ops := testapps.NewOpsRequestObj("verticalscaling-ops-"+randomStr, testCtx.DefaultNamespace,

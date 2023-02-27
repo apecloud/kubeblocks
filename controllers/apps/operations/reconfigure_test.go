@@ -110,7 +110,7 @@ var _ = Describe("Reconfigure OpsRequest", func() {
 	Context("Test OpsRequest", func() {
 		It("Test Reconfigure OpsRequest", func() {
 			By("init operations resources ")
-			opsRes, clusterDef, clusterObject := initOperationsResources(clusterDefinitionName, clusterVersionName, clusterName)
+			opsRes, clusterDef, _, clusterObject := initOperationsResources(clusterDefinitionName, clusterVersionName, clusterName)
 
 			var (
 				cfgObj       *corev1.ConfigMap

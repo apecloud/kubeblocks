@@ -144,13 +144,13 @@ var _ = AfterSuite(func() {
 // initOperationsResources inits the operations resources.
 func initOperationsResources(clusterDefinitionName,
 	clusterVersionName,
-	clusterName string) (*OpsResource, *appsv1alpha1.ClusterDefinition, *appsv1alpha1.Cluster) {
-	clusterDef, _, clusterObject := testapps.InitClusterWithHybridComps(testCtx, clusterDefinitionName,
+	clusterName string) (*OpsResource, *appsv1alpha1.ClusterDefinition, *appsv1alpha1.ClusterVersion, *appsv1alpha1.Cluster) {
+	clusterDef, clusterVer, clusterObject := testapps.InitClusterWithHybridComps(testCtx, clusterDefinitionName,
 		clusterVersionName, clusterName, statelessComp, statefulComp, consensusComp)
 	opsRes := &OpsResource{
 		Ctx:      context.Background(),
-		Cluster:  clusterObject,
 		Client:   k8sClient,
+		Cluster:  clusterObject,
 		Recorder: k8sManager.GetEventRecorderFor("opsrequest-controller"),
 	}
 	By("mock cluster is Running and the status operations")
@@ -170,7 +170,7 @@ func initOperationsResources(clusterDefinitionName,
 		clusterObject.Status.Operations = &appsv1alpha1.Operations{}
 	})).Should(Succeed())
 	opsRes.Cluster = clusterObject
-	return opsRes, clusterDef, clusterObject
+	return opsRes, clusterDef, clusterVer, clusterObject
 }
 
 func initConsensusPods(opsRes *OpsResource, clusterName string) []corev1.Pod {

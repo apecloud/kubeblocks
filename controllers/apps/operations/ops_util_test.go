@@ -60,7 +60,7 @@ var _ = Describe("OpsUtil functions", func() {
 	Context("Test ops_util functions", func() {
 		It("Test ops_util functions", func() {
 			By("init operations resources ")
-			opsRes, _, _ := initOperationsResources(clusterDefinitionName, clusterVersionName, clusterName)
+			opsRes, _, _, _ := initOperationsResources(clusterDefinitionName, clusterVersionName, clusterName)
 
 			By("Test the functions in ops_util.go")
 			opsRes.OpsRequest = createHorizontalScaling(clusterName, 1)

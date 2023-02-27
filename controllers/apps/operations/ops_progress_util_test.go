@@ -112,7 +112,7 @@ var _ = Describe("Ops ProgressDetails", func() {
 	Context("Test Ops ProgressDetails", func() {
 		It("Test Ops ProgressDetails", func() {
 			By("init operations resources ")
-			opsRes, _, _ := initOperationsResources(clusterDefinitionName, clusterVersionName, clusterName)
+			opsRes, _, _, _ := initOperationsResources(clusterDefinitionName, clusterVersionName, clusterName)
 
 			By("create restart ops and pods of consensus component")
 			opsRes.OpsRequest = createRestartOpsObj(clusterName, "restart-"+randomStr)

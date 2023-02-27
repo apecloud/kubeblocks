@@ -144,7 +144,7 @@ func replaceNamedVars(namedValues map[string]string, needle string, limits int, 
 }
 
 func replaceEnvsValues(clusterName string, sysAccounts *appsv1alpha1.SystemAccountSpec) {
-	namedValues := getEnvReplacementMapForConnCrential(clusterName)
+	namedValues := getEnvReplacementMapForConnCredential(clusterName)
 	// replace systemAccounts.cmdExecutorConfig.env[].valueFrom.secretKeyRef.name variables
 	cmdConfig := sysAccounts.CmdExecutorConfig
 	if cmdConfig != nil {

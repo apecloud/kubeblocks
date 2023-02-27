@@ -111,7 +111,7 @@ var _ = Describe("RestoreJob Controller", func() {
 	assureStatefulSetObj := func() *appsv1.StatefulSet {
 		By("By assure an stateful obj")
 		return testapps.NewStatefulSetFactory(testCtx.DefaultNamespace, "mycluster", "mycluster", "replicasets").
-			AddLabels(intctrlutil.AppInstanceLabelKey, "mycluster").
+			AddAppInstanceLabel("mycluster").
 			AddContainer(corev1.Container{Name: "mysql", Image: testapps.ApeCloudMySQLImage}).
 			AddVolumeClaimTemplate(corev1.PersistentVolumeClaim{
 				ObjectMeta: metav1.ObjectMeta{Name: testapps.DataVolumeName},

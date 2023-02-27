@@ -111,7 +111,7 @@ func createTestClusterVersionObj(clusterDefinitionName, clusterVersionName strin
 			Name:      clusterVersionName,
 			Namespace: "default",
 			Labels: map[string]string{
-				"clusterdefinition.kubeblocks.io/name": clusterDefinitionName,
+				"clusterdefinition.kubeblocks.io/name": clusterDefinitionName, // TODO(leon)
 			},
 		},
 		Spec: ClusterVersionSpec{
@@ -145,7 +145,7 @@ func createTestReplicationSetClusterVersionObj(clusterDefinitionName, clusterVer
 			ClusterDefinitionRef: clusterDefinitionName,
 			ComponentVersions: []ClusterComponentVersion{
 				{
-					ComponentDefRef: "replication",
+					ComponentDefRef: "redis",
 					VersionsCtx: VersionsContext{
 						Containers: []corev1.Container{
 							{Name: "main"},

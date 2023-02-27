@@ -247,7 +247,7 @@ func (r *OpsRequest) validateUpgrade(ctx context.Context,
 			return
 		}
 	}
-	addInvalidError(allErrs, "spec.upgrade.clusterVersionRef", targetClusterVersion, fmt.Sprintf("target CluterVersion to upgrade not found"))
+	addInvalidError(allErrs, "spec.upgrade.clusterVersionRef", targetClusterVersion, "target CluterVersion to upgrade not found")
 }
 
 // validateVerticalScaling validates api when spec.type is VerticalScaling

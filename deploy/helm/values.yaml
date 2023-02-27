@@ -564,7 +564,7 @@ prometheus:
           rules:
             - alert: MysqlDown
               expr: 'max_over_time(mysql_up[1m]) == 0'
-              for: 1m
+              for: 0m
               labels:
                 severity: critical
               annotations:
@@ -640,12 +640,21 @@ prometheus:
           rules:
             - alert: PostgreSQLDown
               expr: 'max_over_time(pg_up[1m]) == 0'
-              for: 1m
+              for: 0m
               labels:
                 severity: critical
               annotations:
                 summary: "PostgreSQL is down (namespace: {{ $labels.namespace }}, cluster: {{ $labels.app_kubernetes_io_instance }}, instance: {{ $labels.pod }})"
                 description: "PostgreSQL instance is down on {{ $labels.instance }}\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+
+            - alert: PostgreSQLRestarted
+              expr: 'time() - pg_postmaster_start_time_seconds < 60'
+              for: 0m
+              labels:
+                severity: info
+              annotations:
+                summary: "PostgreSQL restarted (namespace: {{ $labels.namespace }}, cluster: {{ $labels.app_kubernetes_io_instance }}, instance: {{ $labels.pod }})"
+                description: "PostgreSQL has just been restarted, less than one minute ago on {{ $labels.instance }}\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
 
             - alert: PostgreSQLExporterError
               expr: 'pg_exporter_last_scrape_error > 0'

@@ -45,11 +45,6 @@ const (
 	RegionLabelKey        = "topology.kubernetes.io/region"
 	ZoneLabelKey          = "topology.kubernetes.io/zone"
 
-	// NameLabelKey                   = "app.kubernetes.io/name"
-	// InstanceLabelKey               = "app.kubernetes.io/instance"
-	// KBComponentLabelKey            = "apps.kubeblocks.io/component-name"
-	// ComponentLabelKey              = "app.kubernetes.io/component"
-
 	// kubeblocks.io labels
 	ClusterDefLabelKey              = "clusterdefinition.kubeblocks.io/name"
 	KBAppComponentLabelKey          = "apps.kubeblocks.io/component-name"

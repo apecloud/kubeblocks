@@ -540,7 +540,7 @@ spec:
             - type
             type: object
           status:
-            description: AddonSpecStatus defines the observed state of Addon
+            description: AddonStatus defines the observed state of Addon
             properties:
               conditions:
                 description: Describe current state of Addon API installation conditions.

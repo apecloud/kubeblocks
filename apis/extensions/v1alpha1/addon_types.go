@@ -56,8 +56,8 @@ type AddonSpec struct {
 	Installable *InstallableSpec `json:"installable,omitempty"`
 }
 
-// AddonSpecStatus defines the observed state of Addon
-type AddonSpecStatus struct {
+// AddonStatus defines the observed state of Addon
+type AddonStatus struct {
 	// Addon installation phases. Valid values are Disabled, Enabled, Failed, Enabling, Disabling.
 	// +kubebuilder:validation:Enum={Disabled,Enabled,Failed,Enabling,Disabling}
 	Phase AddonPhase `json:"phase,omitempty"`
@@ -308,8 +308,8 @@ type Addon struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   AddonSpec       `json:"spec,omitempty"`
-	Status AddonSpecStatus `json:"status,omitempty"`
+	Spec   AddonSpec   `json:"spec,omitempty"`
+	Status AddonStatus `json:"status,omitempty"`
 }
 
 //+kubebuilder:object:root=true

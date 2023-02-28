@@ -69,7 +69,7 @@ spec:
                     type: object
                   podAntiAffinity:
                     description: podAntiAffinity defines pods of component anti-affnity.
-                      Defaults to Preferred. Preferred means try spread pods by topologyKey.
+                      Defaults is Preferred. Preferred means try spread pods by topologyKey.
                       Required means must spread pods by topologyKey.
                     enum:
                     - Preferred
@@ -119,7 +119,7 @@ spec:
                           type: object
                         podAntiAffinity:
                           description: podAntiAffinity defines pods of component anti-affnity.
-                            Defaults to Preferred. Preferred means try spread pods
+                            Defaults is Preferred. Preferred means try spread pods
                             by topologyKey. Required means must spread pods by topologyKey.
                           enum:
                           - Preferred
@@ -893,31 +893,6 @@ spec:
                   is updated on mutation by the API Server.
                 format: int64
                 type: integer
-              operations:
-                description: operations declare what operations the cluster supports.
-                properties:
-                  volumeExpandable:
-                    description: volumeExpandable which components of the cluster
-                      and its volumeClaimTemplates support volumeExpansion.
-                    items:
-                      properties:
-                        name:
-                          description: name reference component name.
-                          type: string
-                        volumeClaimTemplateNames:
-                          description: volumeClaimTemplateNames which VolumeClaimTemplate
-                            of the component support volumeExpansion.
-                          items:
-                            type: string
-                          type: array
-                      required:
-                      - name
-                      type: object
-                    type: array
-                    x-kubernetes-list-map-keys:
-                    - name
-                    x-kubernetes-list-type: map
-                type: object
               phase:
                 description: 'phase describes the phase of the Cluster. the detail
                   information of phase is as follows: Creating: creating Cluster.

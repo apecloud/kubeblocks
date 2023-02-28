@@ -34,6 +34,7 @@ import (
 	//+kubebuilder:scaffold:imports
 	"github.com/spf13/viper"
 	"go.uber.org/zap/zapcore"
+	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -105,6 +106,9 @@ var _ = BeforeSuite(func() {
 	err = admissionregv1.AddToScheme(scheme)
 	Expect(err).NotTo(HaveOccurred())
 
+	err = storagev1.AddToScheme(scheme)
+	Expect(err).NotTo(HaveOccurred())
+
 	//+kubebuilder:scaffold:scheme
 
 	k8sClient, err = client.New(cfg, client.Options{Scheme: scheme})
@@ -123,6 +127,7 @@ var _ = BeforeSuite(func() {
 		LeaderElection:     false,
 		MetricsBindAddress: "0",
 		ClientDisableCacheFor: []client.Object{
+			&storagev1.StorageClass{},
 			&ClusterDefinition{},
 			&Cluster{},
 			&ClusterVersion{},

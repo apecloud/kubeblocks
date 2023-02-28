@@ -21,6 +21,10 @@ import (
 	"fmt"
 	"time"
 
+	storagev1 "k8s.io/api/storage/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/kubectl/pkg/util/storage"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -55,6 +59,8 @@ var _ = Describe("OpsRequest webhook", func() {
 		Expect(err).NotTo(HaveOccurred())
 		err = k8sClient.DeleteAllOf(ctx, &ClusterDefinition{}, client.HasLabels{testCtx.TestObjLabelKey})
 		Expect(err).NotTo(HaveOccurred())
+		err = k8sClient.DeleteAllOf(ctx, &storagev1.StorageClass{})
+		Expect(err).NotTo(HaveOccurred())
 	}
 	BeforeEach(func() {
 		// Add any setup steps that needs to be executed before each test
@@ -72,6 +78,25 @@ var _ = Describe("OpsRequest webhook", func() {
 			opsRequestAnnotationKey: fmt.Sprintf(`[{"name":"%s","clusterPhase":"%s"}]`, opsName, toClusterPhase),
 		}
 		Expect(k8sClient.Patch(ctx, cluster, clusterPatch)).Should(Succeed())
+	}
+
+	createStorageClass := func(ctx context.Context, storageClassName string, isDefault string, allowVolumeExpansion bool) *storagev1.StorageClass {
+		storageClass := &storagev1.StorageClass{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: storageClassName,
+				Annotations: map[string]string{
+					storage.IsDefaultStorageClassAnnotation: isDefault,
+				},
+			},
+			Provisioner:          "kubernetes.io/no-provisioner",
+			AllowVolumeExpansion: &allowVolumeExpansion,
+		}
+		err := testCtx.CheckedCreateObj(ctx, storageClass)
+		if err != nil {
+			fmt.Printf("create storage class error: %s\n", err.Error())
+		}
+		Expect(err).Should(BeNil())
+		return storageClass
 	}
 
 	testUpgrade := func(cluster *Cluster) {
@@ -202,9 +227,29 @@ var _ = Describe("OpsRequest webhook", func() {
 	}
 
 	testVolumeExpansion := func(cluster *Cluster) {
-		By("test not support volume expansion")
-		opsRequest := createTestOpsRequest(clusterName, opsRequestName, VolumeExpansionType)
-		opsRequest.Spec.VolumeExpansionList = []VolumeExpansion{
+		volumeExpansionList := []VolumeExpansion{
+			{
+				ComponentOps: ComponentOps{ComponentName: "ve-not-exist"},
+				VolumeClaimTemplates: []OpsRequestVolumeClaimTemplate{
+					{
+						Name:    "data",
+						Storage: resource.MustParse("2Gi"),
+					},
+				},
+			},
+			{
+				ComponentOps: ComponentOps{ComponentName: replicaSetComponentName},
+				VolumeClaimTemplates: []OpsRequestVolumeClaimTemplate{
+					{
+						Name:    "log",
+						Storage: resource.MustParse("2Gi"),
+					},
+					{
+						Name:    "data",
+						Storage: resource.MustParse("2Gi"),
+					},
+				},
+			},
 			{
 				ComponentOps: ComponentOps{ComponentName: replicaSetComponentName},
 				VolumeClaimTemplates: []OpsRequestVolumeClaimTemplate{
@@ -214,33 +259,59 @@ var _ = Describe("OpsRequest webhook", func() {
 					},
 				},
 			},
-		}
-		Expect(testCtx.CreateObj(ctx, opsRequest).Error()).To(ContainSubstring(`Invalid value: "VolumeExpansion": not supported in Cluster`))
-		// set cluster support volumeExpansion
-		patch := client.MergeFrom(cluster.DeepCopy())
-		if cluster.Status.Operations == nil {
-			cluster.Status.Operations = &Operations{}
-		}
-		cluster.Status.Operations.VolumeExpandable = []OperationComponent{
 			{
-				Name:                     replicaSetComponentName,
-				VolumeClaimTemplateNames: []string{"data"},
+				ComponentOps: ComponentOps{ComponentName: replicaSetComponentName},
+				VolumeClaimTemplates: []OpsRequestVolumeClaimTemplate{
+					{
+						Name:    "log",
+						Storage: resource.MustParse("2Gi"),
+					},
+					{
+						Name:    "data",
+						Storage: resource.MustParse("2Gi"),
+					},
+				},
 			},
 		}
-		Expect(k8sClient.Status().Patch(ctx, cluster, patch)).Should(Succeed())
 
-		By("By testing volumeExpansion volumeClaimTemplate name is not consistent")
-		Eventually(func(g Gomega) {
-			opsRequest.Spec.VolumeExpansionList[0].VolumeClaimTemplates[0].Name = "data1"
-			g.Expect(testCtx.CreateObj(ctx, opsRequest).Error()).To(ContainSubstring("not support volume expansion"))
-		}, timeout, interval).Should(Succeed())
+		By("By testing volumeExpansion - target component not exist")
+		opsRequest := createTestOpsRequest(clusterName, opsRequestName, VolumeExpansionType)
+		opsRequest.Spec.VolumeExpansionList = []VolumeExpansion{volumeExpansionList[0]}
+		Expect(testCtx.CreateObj(ctx, opsRequest).Error()).To(ContainSubstring("not found in Cluster.spec.components[*].name"))
 
-		By("By testing volumeExpansion. if api is legal, it will create successfully")
+		By("By testing volumeExpansion - target volume not exist")
+		opsRequest.Spec.VolumeExpansionList = []VolumeExpansion{volumeExpansionList[1]}
+		Expect(testCtx.CreateObj(ctx, opsRequest).Error()).To(ContainSubstring("not support volume expansion, check the StorageClass whether allow volume expansion"))
+
+		By("By testing volumeExpansion - create a new storage class")
+		storageClassName := "sc-test-volume-expansion"
+		storageClass := createStorageClass(testCtx.Ctx, storageClassName, "false", true)
+		Expect(storageClass != nil).Should(BeTrue())
+
+		By("By testing volumeExpansion - has no default storage class")
+		for _, compSpec := range cluster.Spec.ComponentSpecs {
+			for _, vct := range compSpec.VolumeClaimTemplates {
+				Expect(vct.Spec.StorageClassName == nil).Should(BeTrue())
+			}
+		}
+		Expect(testCtx.CreateObj(ctx, opsRequest).Error()).To(ContainSubstring("not support volume expansion, check the StorageClass whether allow volume expansion."))
+
+		By("By testing volumeExpansion - patch it as default and use it to re-create")
+		if storageClass.Annotations == nil {
+			storageClass.Annotations = make(map[string]string)
+		}
+		storageClass.Annotations[storage.IsDefaultStorageClassAnnotation] = "true"
+		Expect(testCtx.Cli.Update(testCtx.Ctx, storageClass)).Should(BeNil())
 		Eventually(func() bool {
-			opsRequest.Spec.VolumeExpansionList[0].VolumeClaimTemplates[0].Name = "data"
-			err := testCtx.CheckedCreateObj(ctx, opsRequest)
-			return err == nil
+			opsRequest.Spec.VolumeExpansionList = []VolumeExpansion{volumeExpansionList[2]}
+			return testCtx.CheckedCreateObj(ctx, opsRequest) == nil
 		}, timeout, interval).Should(BeTrue())
+
+		By("By testing volumeExpansion - (TODO)use specified storage class")
+		// Eventually(func() bool {
+		// 	 opsRequest.Spec.VolumeExpansionList = []VolumeExpansion{volumeExpansionList[3]}
+		// 	 Expect(testCtx.CheckedCreateObj(ctx, opsRequest)).Should(BeNil())
+		// }, timeout, interval).Should(BeTrue())
 	}
 
 	testHorizontalScaling := func(clusterDef *ClusterDefinition, cluster *Cluster) {

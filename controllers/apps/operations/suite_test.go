@@ -167,7 +167,6 @@ func initOperationsResources(clusterDefinitionName,
 				Phase: appsv1alpha1.RunningPhase,
 			},
 		}
-		clusterObject.Status.Operations = &appsv1alpha1.Operations{}
 	})).Should(Succeed())
 	opsRes.Cluster = clusterObject
 	return opsRes, clusterDef, clusterObject

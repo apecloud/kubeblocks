@@ -19,6 +19,7 @@ package configuration
 import (
 	"fmt"
 
+	"github.com/StudioSol/set"
 	"github.com/go-logr/logr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -109,6 +110,7 @@ type K8sConfig struct {
 
 	// configmap data
 	Configurations map[string]string
+	CMKeys         *set.LinkedHashSetString
 }
 
 type CfgOption struct {

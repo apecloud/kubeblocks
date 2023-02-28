@@ -189,6 +189,11 @@ type ConfigTemplate struct {
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	ConfigTplRef string `json:"configTplRef"`
 
+	// Specify a list of keys.
+	// If empty, ConfigConstraint takes effect for all keys in configmap.
+	// +optional
+	Keys []string `json:"keys,omitempty"`
+
 	// Specify the name of the referenced the configuration constraints object.
 	// +kubebuilder:validation:MaxLength=63
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`

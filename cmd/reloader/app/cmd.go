@@ -82,7 +82,7 @@ func runVolumeWatchCommand(ctx context.Context, opt *VolumeWatcherOpts) error {
 
 	logger.Info("reload started.")
 	<-ctx.Done()
-	logger.Info("reload started shutdown.")
+	logger.Info("reload shutdown.")
 
 	return nil
 }

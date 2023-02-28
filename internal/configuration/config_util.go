@@ -56,7 +56,7 @@ func MergeAndValidateConfiguration(configConstraint appsv1alpha1.ConfigConstrain
 	// process special formatter options
 	mergedOptions := func(ctx *CfgOpOption) {
 		// process special formatter
-		if fc.Format == appsv1alpha1.INI && fc.IniConfig != nil {
+		if fc.Format == appsv1alpha1.Ini && fc.IniConfig != nil {
 			ctx.IniContext = &IniContext{
 				SectionName: fc.IniConfig.SectionName,
 			}

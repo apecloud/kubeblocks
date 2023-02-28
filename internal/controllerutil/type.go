@@ -37,7 +37,7 @@ const (
 
 	// common and well known label and annotation keys
 	AppInstanceLabelKey   = "app.kubernetes.io/instance"
-	WorkloadTypeLabelKey  = "app.kubeblocks.io/workload-type"
+	WorkloadTypeLabelKey  = "apps.kubeblocks.io/workload-type"
 	AppNameLabelKey       = "app.kubernetes.io/name"
 	AppManagedByLabelKey  = "app.kubernetes.io/managed-by"
 	AppCreatedByLabelKey  = "app.kubernetes.io/created-by" // resources created temporarily by kubeblocks, this is a deprecated label
@@ -45,14 +45,9 @@ const (
 	RegionLabelKey        = "topology.kubernetes.io/region"
 	ZoneLabelKey          = "topology.kubernetes.io/zone"
 
-	// NameLabelKey                   = "app.kubernetes.io/name"
-	// InstanceLabelKey               = "app.kubernetes.io/instance"
-	// KBComponentLabelKey            = "app.kubeblocks.io/component-name"
-	// ComponentLabelKey              = "app.kubernetes.io/component"
-
 	// kubeblocks.io labels
 	ClusterDefLabelKey              = "clusterdefinition.kubeblocks.io/name"
-	KBAppComponentLabelKey          = "app.kubeblocks.io/component-name"
+	KBAppComponentLabelKey          = "apps.kubeblocks.io/component-name"
 	ConsensusSetAccessModeLabelKey  = "cs.apps.kubeblocks.io/access-mode"
 	VolumeClaimTemplateNameLabelKey = "vct.kubeblocks.io/name"
 	RoleLabelKey                    = "kubeblocks.io/role"              // RoleLabelKey consensusSet and replicationSet role label key

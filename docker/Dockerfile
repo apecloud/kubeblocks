@@ -44,9 +44,8 @@ COPY controllers/ controllers/
 COPY test/testdata/testdata.go test/testdata/testdata.go
 
 # Download binaries
-RUN curl -LO https://dl.k8s.io/release/v1.24.2/bin/${TARGETOS}/${TARGETARCH}/kubectl &&  \
-    chmod +x kubectl
-RUN curl -LO https://get.helm.sh/helm-v3.11.1-${TARGETOS}-${TARGETARCH}.tar.gz -o helm.tgz &&  \
+RUN curl -LO https://dl.k8s.io/release/v1.24.2/bin/${TARGETOS}/${TARGETARCH}/kubectl && chmod +x kubectl
+RUN curl -L https://get.helm.sh/helm-v3.11.1-${TARGETOS}-${TARGETARCH}.tar.gz -o helm.tar.gz && \
     tar xvf helm.tar.gz && \
     mv ./${TARGETOS}-${TARGETARCH}/helm ./helm
 
@@ -70,9 +69,9 @@ COPY --from=builder /workspace/kubectl /bin
 COPY --from=builder /workspace/helm /bin
 COPY config/probe config/probe
 COPY --from=builder /workspace/probe /bin
-COPY --from=builder /workspace/manager .
 COPY --from=builder /workspace/reloader /bin
 COPY --from=builder /workspace/killer /bin
+COPY --from=builder /workspace/manager .
 USER 65532:65532
 
 ENTRYPOINT ["/manager"]

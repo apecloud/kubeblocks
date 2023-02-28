@@ -45,7 +45,7 @@ config: {
 			"app.kubernetes.io/instance":   meta.cluster.name
 			"app.kubernetes.io/managed-by": "kubeblocks"
 
-			"app.kubeblocks.io/component-name": "\(meta.component.name)"
+			"apps.kubeblocks.io/component-name": "\(meta.component.name)"
 			// configmap selector for ConfigureController
 			"configuration.kubeblocks.io/configuration-type": "instance"
 			// config template name

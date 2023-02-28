@@ -108,10 +108,18 @@ var _ = BeforeSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 	Expect(k8sClient).NotTo(BeNil())
 
+	uncachedObjects := []client.Object{
+		&dataprotectionv1alpha1.BackupPolicyTemplate{},
+		&dataprotectionv1alpha1.BackupPolicy{},
+		&dataprotectionv1alpha1.BackupTool{},
+		&dataprotectionv1alpha1.Backup{},
+		&dataprotectionv1alpha1.RestoreJob{},
+	}
 	// run reconcile
 	k8sManager, err := ctrl.NewManager(cfg, ctrl.Options{
-		Scheme:             scheme,
-		MetricsBindAddress: "0",
+		Scheme:                scheme,
+		MetricsBindAddress:    "0",
+		ClientDisableCacheFor: uncachedObjects,
 	})
 	Expect(err).ToNot(HaveOccurred())
 

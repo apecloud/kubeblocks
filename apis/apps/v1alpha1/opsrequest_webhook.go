@@ -224,10 +224,6 @@ func (r *OpsRequest) validateUpgrade(ctx context.Context,
 	k8sClient client.Client,
 	cluster *Cluster,
 	allErrs *field.ErrorList) {
-	if !cluster.Status.Operations.Upgradable {
-		addInvalidError(allErrs, "spec.type", r.Spec.Type, fmt.Sprintf("not supported in Cluster: %s, ClusterVersion must be greater than 1", r.Spec.ClusterRef))
-		return
-	}
 	if r.Spec.Upgrade == nil {
 		addNotFoundError(allErrs, "spec.upgrade", "")
 		return

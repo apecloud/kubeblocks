@@ -25,7 +25,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
+	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 )
 
 const NoneString = "<none>"
@@ -64,31 +66,31 @@ func PrintConditions(conditions []metav1.Condition, out io.Writer) {
 }
 
 // PrintComponentConfigMeta prints the conditions of resource.
-func PrintComponentConfigMeta(cfgTplMap map[appsv1alpha1.ConfigTemplate]*corev1.ConfigMap, clusterName, componentName string, out io.Writer) {
-	if len(cfgTplMap) == 0 {
+func PrintComponentConfigMeta(tplInfos []types.ConfigTemplateInfo, clusterName, componentName string, out io.Writer) {
+	if len(tplInfos) == 0 {
 		return
 	}
 	tbl := NewTablePrinter(out)
 	PrintTitle("Configures Meta")
-	enableReconfiguring := func(tpl appsv1alpha1.ConfigTemplate) string {
-		if len(tpl.ConfigConstraintRef) > 0 {
+	enableReconfiguring := func(tpl appsv1alpha1.ConfigTemplate, key string) string {
+		if len(tpl.ConfigConstraintRef) > 0 && cfgcore.CheckConfigTemplateReconfigureKey(tpl, key) {
 			return "enable"
 		}
 		return "disable"
 	}
 	tbl.SetHeader("TEMPLATE-NAME", "CONFIG-FILE", "ENABLE-RECONFIGURE", "CONFIG-TEMPLATE", "CONFIG-CONSTRAINT", "CONFIG-INSTANCE", "COMPONENT", "CLUSTER", "NAMESPACE")
-	for tpl, cm := range cfgTplMap {
-		for key := range cm.Data {
+	for _, info := range tplInfos {
+		for key := range info.CMObj.Data {
 			tbl.AddRow(
-				BoldYellow(tpl.Name),
+				BoldYellow(info.Name),
 				key,
-				tpl.ConfigTplRef,
-				tpl.ConfigConstraintRef,
-				BoldYellow(strings.ToUpper(enableReconfiguring(tpl))),
-				cm.Name,
+				BoldYellow(strings.ToUpper(enableReconfiguring(info.TPL, key))),
+				info.TPL.ConfigTplRef,
+				info.TPL.ConfigConstraintRef,
+				info.CMObj.Name,
 				componentName,
 				clusterName,
-				tpl.Namespace)
+				info.TPL.Namespace)
 		}
 	}
 	tbl.Print()

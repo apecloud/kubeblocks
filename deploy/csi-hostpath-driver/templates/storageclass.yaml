@@ -1,0 +1,11 @@
+{{- if .Values.storageClass.create -}}
+kind: StorageClass
+apiVersion: storage.k8s.io/v1
+metadata:
+  name: csi-hostpath-sc
+  annotations:
+    storageclass.kubernetes.io/is-default-class: {{ .Values.storageClass.default | quote }}
+provisioner: hostpath.csi.k8s.io
+allowVolumeExpansion: true
+volumeBindingMode: WaitForFirstConsumer
+{{- end }}

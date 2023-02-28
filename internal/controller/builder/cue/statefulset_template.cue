@@ -40,7 +40,7 @@ statefulset: {
 			"app.kubernetes.io/instance":   cluster.metadata.name
 			"app.kubernetes.io/managed-by": "kubeblocks"
 
-			"app.kubeblocks.io/component-name": "\(component.name)"
+			"apps.kubeblocks.io/component-name": "\(component.name)"
 		}
 	}
 	spec: {
@@ -50,7 +50,7 @@ statefulset: {
 				"app.kubernetes.io/instance":   "\(cluster.metadata.name)"
 				"app.kubernetes.io/managed-by": "kubeblocks"
 
-				"app.kubeblocks.io/component-name": "\(component.name)"
+				"apps.kubeblocks.io/component-name": "\(component.name)"
 			}
 		serviceName: "\(cluster.metadata.name)-\(component.name)-headless"
 		if component.workloadType != "Replication" {
@@ -68,8 +68,8 @@ statefulset: {
 					"app.kubernetes.io/instance":   "\(cluster.metadata.name)"
 					"app.kubernetes.io/managed-by": "kubeblocks"
 
-					"app.kubeblocks.io/component-name": "\(component.name)"
-					"app.kubeblocks.io/workload-type":  "\(component.workloadType)"
+					"apps.kubeblocks.io/component-name": "\(component.name)"
+					"apps.kubeblocks.io/workload-type":  "\(component.workloadType)"
 				}
 			}
 			spec: component.podSpec

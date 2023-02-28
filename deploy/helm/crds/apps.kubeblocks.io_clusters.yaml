@@ -896,10 +896,6 @@ spec:
               operations:
                 description: operations declare what operations the cluster supports.
                 properties:
-                  upgradable:
-                    description: upgradable whether the cluster supports upgrade.
-                      if multiple clusterVersions existed, it is true.
-                    type: boolean
                   volumeExpandable:
                     description: volumeExpandable which components of the cluster
                       and its volumeClaimTemplates support volumeExpansion.

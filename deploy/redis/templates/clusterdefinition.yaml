@@ -39,6 +39,11 @@ spec:
         exporterConfig:
           scrapePort: 9121
           scrapePath: "/metrics"
+      logConfigs:
+        {{- range $name,$pattern := .Values.logConfigs }}
+        - name: {{ $name }}
+          filePathPattern: {{ $pattern }}
+        {{- end }}
       podSpec:
         initContainers:
           - name: redis-init-container

@@ -33,7 +33,7 @@ type AnalyzeHostUtility struct {
 }
 
 func (a *AnalyzeHostUtility) Title() string {
-	return util.AnalyzerTitleOrDefault(a.hostAnalyzer.AnalyzeMeta, "Host Utility Info")
+	return util.TitleOrDefault(a.hostAnalyzer.AnalyzeMeta, "Host "+a.hostAnalyzer.CollectorName+" Utility Info")
 }
 
 func (a *AnalyzeHostUtility) IsExcluded() (bool, error) {

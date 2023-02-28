@@ -7,6 +7,9 @@ spec:
     - hostUtility :
         collectorName: helmCheck
         utilityName: helm
+    - hostUtility :
+        collectorName: awsCheck
+        utilityName: aws
   extendAnalyzers:
     - hostUtility:
         collectorName: helmCheck
@@ -15,3 +18,10 @@ spec:
               message: ok.
           - fail:
               message: no helm
+    - hostUtility:
+        collectorName: awsCheck
+        outcomes:
+          - pass:
+              message: ok.
+          - fail:
+              message: no aws

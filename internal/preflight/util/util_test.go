@@ -19,6 +19,8 @@ package util
 import (
 	"time"
 
+	troubleshootv1beta2 "github.com/replicatedhq/troubleshoot/pkg/apis/troubleshoot/v1beta2"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -27,16 +29,37 @@ import (
 
 var _ = Describe("util_test", func() {
 	var timeout = time.Second * 10
+
 	It("IsExcluded test", func() {
 		Eventually(func(g Gomega) {
-			tests := []*multitype.BoolOrString{nil, {1, true, ""}, {0, false, "true"}}
+			By("tests with normal case, and expect success")
+			tests := []*multitype.BoolOrString{nil, {Type: 1, BoolVal: true, StrVal: ""}, {Type: 0, BoolVal: false, StrVal: "true"}, {Type: 0, BoolVal: false, StrVal: ""}}
 			var resList []bool
 			for _, test := range tests {
 				res, err := IsExcluded(test)
 				g.Expect(err).NotTo(HaveOccurred())
 				resList = append(resList, res)
 			}
-			g.Expect(resList).Should(Equal([]bool{false, true, true}))
+			g.Expect(resList).Should(Equal([]bool{false, true, true, false}))
+			By("test with corner case, and expect error")
+			cornerTest := &multitype.BoolOrString{Type: 0, BoolVal: false, StrVal: "i am true"}
+			res, err := IsExcluded(cornerTest)
+			g.Expect(err).To(HaveOccurred())
+			g.Expect(res).Should(Equal(false))
 		}, timeout).Should(Succeed())
 	})
+
+	It("TitleOrDefault test", func() {
+		Eventually(func(g Gomega) {
+			res := TitleOrDefault(troubleshootv1beta2.HostCollectorMeta{}, "default")
+			g.Expect(res).Should(Equal("default"))
+			res = TitleOrDefault(troubleshootv1beta2.HostCollectorMeta{CollectorName: "collectName"}, "default")
+			g.Expect(res).Should(Equal("collectName"))
+			res = TitleOrDefault(troubleshootv1beta2.AnalyzeMeta{}, "default")
+			g.Expect(res).Should(Equal("default"))
+			res = TitleOrDefault(troubleshootv1beta2.AnalyzeMeta{CheckName: "checkName"}, "default")
+			g.Expect(res).Should(Equal("checkName"))
+		}, timeout).Should(Succeed())
+	})
+
 })

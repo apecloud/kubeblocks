@@ -166,10 +166,11 @@ func (p *PreflightOptions) run() error {
 	if err := progressCollections.Wait(); err != nil {
 		return err
 	}
+	// 4. display analyzed data
+	if len(analyzeResults) == 0 {
+		return errors.New("no data has been collected")
+	}
 	if *p.Interactive {
-		if len(analyzeResults) == 0 {
-			return errors.New("no data has been collected")
-		}
 		return kbinteractive.ShowInteractiveResults(preflightName, analyzeResults, *p.Output)
 	} else {
 		return kbpreflight.ShowStdoutResults(preflightName, analyzeResults, *p.Format)

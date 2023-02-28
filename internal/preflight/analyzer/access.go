@@ -33,7 +33,7 @@ type AnalyzeClusterAccess struct {
 }
 
 func (a *AnalyzeClusterAccess) Title() string {
-	return util.AnalyzerTitleOrDefault(a.analyzer.AnalyzeMeta, "Cluster Access")
+	return util.TitleOrDefault(a.analyzer.AnalyzeMeta, "Cluster Access")
 }
 
 func (a *AnalyzeClusterAccess) IsExcluded() (bool, error) {

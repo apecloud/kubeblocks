@@ -24,18 +24,21 @@ import (
 	"github.com/replicatedhq/troubleshoot/pkg/multitype"
 )
 
-func HostCollectorTitleOrDefault(meta troubleshootv1beta2.HostCollectorMeta, defaultTitle string) string {
-	if meta.CollectorName != "" {
-		return meta.CollectorName
+func TitleOrDefault[T troubleshootv1beta2.HostCollectorMeta | troubleshootv1beta2.AnalyzeMeta](meta T, defaultTitle string) string {
+	var title string
+	iMeta := (interface{})(meta)
+	switch tmp := iMeta.(type) {
+	case troubleshootv1beta2.HostCollectorMeta:
+		title = tmp.CollectorName
+	case troubleshootv1beta2.AnalyzeMeta:
+		title = tmp.CheckName
+	default:
+		title = ""
 	}
-	return defaultTitle
-}
-
-func AnalyzerTitleOrDefault(meta troubleshootv1beta2.AnalyzeMeta, defaultTitle string) string {
-	if meta.CheckName != "" {
-		return meta.CheckName
+	if title == "" {
+		title = defaultTitle
 	}
-	return defaultTitle
+	return title
 }
 
 func IsExcluded(excludeVal *multitype.BoolOrString) (bool, error) {

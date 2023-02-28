@@ -38,18 +38,6 @@ import (
 	kbcollector "github.com/apecloud/kubeblocks/internal/preflight/collector"
 )
 
-type KBClusterCollectResult struct {
-	preflight.ClusterCollectResult
-	AnalyzerSpecs   []*troubleshootv1beta2.Analyze
-	KbAnalyzerSpecs []*preflightv1beta2.ExtendAnalyze
-}
-
-type KBHostCollectResult struct {
-	preflight.HostCollectResult
-	AnalyzerSpecs   []*troubleshootv1beta2.HostAnalyze
-	KbAnalyzerSpecs []*preflightv1beta2.ExtendHostAnalyze
-}
-
 func CollectPreflight(ctx context.Context, kbPreflight *preflightv1beta2.Preflight, kbHostPreflight *preflightv1beta2.HostPreflight, progressCh chan interface{}) ([]preflight.CollectResult, error) {
 	var (
 		collectResults []preflight.CollectResult
@@ -154,7 +142,7 @@ func CollectClusterData(ctx context.Context, kbPreflight *preflightv1beta2.Prefl
 	}
 
 	if v.GetString("since") != "" || v.GetString("since-time") != "" {
-		err := parseTimeFlags(v, kbPreflight.Spec.Collectors)
+		err := ParseTimeFlags(v.GetString("since-time"), v.GetString("since"), kbPreflight.Spec.Collectors)
 		if err != nil {
 			return nil, err
 		}
@@ -357,21 +345,21 @@ func CollectRemoteData(ctx context.Context, preflightSpec *preflightv1beta2.Host
 	return &collectResults, nil
 }
 
-func parseTimeFlags(v *viper.Viper, collectors []*troubleshootv1beta2.Collect) error {
+func ParseTimeFlags(sinceTimeStr, sinceStr string, collectors []*troubleshootv1beta2.Collect) error {
 	var (
 		sinceTime time.Time
 		err       error
 	)
-	if v.GetString("since-time") != "" {
-		if v.GetString("since") != "" {
+	if sinceTimeStr != "" {
+		if sinceStr != "" {
 			return errors.Errorf("at most one of `sinceTime` or `since` may be specified")
 		}
-		sinceTime, err = time.Parse(time.RFC3339, v.GetString("since-time"))
+		sinceTime, err = time.Parse(time.RFC3339, sinceTimeStr)
 		if err != nil {
 			return errors.Wrap(err, "unable to parse --since-time flag")
 		}
 	} else {
-		parsedDuration, err := time.ParseDuration(v.GetString("since"))
+		parsedDuration, err := time.ParseDuration(sinceStr)
 		if err != nil {
 			return errors.Wrap(err, "unable to parse --since flag")
 		}

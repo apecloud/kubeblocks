@@ -44,7 +44,7 @@ type CollectHostUtility struct {
 }
 
 func (c *CollectHostUtility) Title() string {
-	return util.HostCollectorTitleOrDefault(c.HostCollector.HostCollectorMeta, "Host Utility")
+	return util.TitleOrDefault(c.HostCollector.HostCollectorMeta, "Host Utility")
 }
 
 func (c *CollectHostUtility) IsExcluded() (bool, error) {

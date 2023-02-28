@@ -14,22 +14,22 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package preflight
+package collector
 
 import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
+	preflightv1beta2 "github.com/apecloud/kubeblocks/apis/preflight/v1beta2"
 )
 
-var _ = Describe("load_spec_test", func() {
-	It("LoadPreflightSpec test, and expect success", func() {
-		yamlCheckFiles := []string{"../cli/testing/testdata/preflight.yaml", "../cli/testing/testdata/hostpreflight.yaml"}
-		Eventually(func(g Gomega) {
-			preflightSpec, hostPreflightSpec, preflightName, err := LoadPreflightSpec(yamlCheckFiles)
-			g.Expect(err).NotTo(HaveOccurred())
-			g.Expect(len(preflightSpec.Spec.Analyzers)).Should(Equal(1))
-			g.Expect(len(hostPreflightSpec.Spec.Analyzers)).Should(Equal(1))
-			g.Expect(preflightName).NotTo(BeNil())
-		}).Should(Succeed())
+var _ = Describe("host_collector_test", func() {
+	It("GetExtendHostCollector test", func() {
+		collector, ok := GetExtendHostCollector(&preflightv1beta2.ExtendHostCollect{HostUtility: &preflightv1beta2.HostUtility{}}, "bundlePath")
+		Expect(collector).ShouldNot(BeNil())
+		Expect(ok).Should(BeTrue())
+		collector, ok = GetExtendHostCollector(&preflightv1beta2.ExtendHostCollect{}, "bundlePath")
+		Expect(collector).Should(BeNil())
+		Expect(ok).Should(BeFalse())
 	})
 })

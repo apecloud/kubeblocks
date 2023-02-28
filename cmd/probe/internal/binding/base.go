@@ -154,8 +154,8 @@ func (ops *BaseOperations) Operations() []bindings.OperationKind {
 	return opsKinds
 }
 
-// getAddress returns component srervice address, if component it not listening on
-// 127.0.0.1, the Operation need to overwrite this function and set ops.DBAddress
+// getAddress returns component service address, if component is not listening on
+// 127.0.0.1, the Operation needs to overwrite this function and set ops.DBAddress
 func (ops *BaseOperations) getAddress() string {
 	return "127.0.0.1"
 }

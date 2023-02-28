@@ -30,6 +30,7 @@ spec:
         configTemplateRefs:
           - name: postgresql-configuration
             configTplRef: postgresql-configuration
+            configConstraintRef: postgresql14-cc
             keys:
               - postgresql.conf
             namespace: {{ .Release.Namespace }}

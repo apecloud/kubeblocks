@@ -60,7 +60,7 @@ func TestSchemaValidatorWithCue(t *testing.T) {
 		args: args{
 			cueFile:    "cue_testdata/wesql.cue",
 			configFile: "cue_testdata/wesql.cnf",
-			format:     appsv1alpha1.INI,
+			format:     appsv1alpha1.Ini,
 		},
 		err: nil,
 	}, {
@@ -68,7 +68,7 @@ func TestSchemaValidatorWithCue(t *testing.T) {
 		args: args{
 			cueFile:    "cue_testdata/pg14.cue",
 			configFile: "cue_testdata/pg14.conf",
-			format:     appsv1alpha1.DOTENV,
+			format:     appsv1alpha1.Properties,
 		},
 		err: nil,
 	}, {
@@ -84,7 +84,7 @@ func TestSchemaValidatorWithCue(t *testing.T) {
 		args: args{
 			cueFile:    "cue_testdata/mysql.cue",
 			configFile: "cue_testdata/mysql.cnf",
-			format:     appsv1alpha1.INI,
+			format:     appsv1alpha1.Ini,
 		},
 		err: nil,
 	}, {
@@ -92,7 +92,7 @@ func TestSchemaValidatorWithCue(t *testing.T) {
 		args: args{
 			cueFile:    "cue_testdata/mysql.cue",
 			configFile: "cue_testdata/mysql_err.cnf",
-			format:     appsv1alpha1.INI,
+			format:     appsv1alpha1.Ini,
 		},
 		err: errors.New(`failed to cue template render configure: [mysqld.innodb_autoinc_lock_mode: 3 errors in empty disjunction:
 mysqld.innodb_autoinc_lock_mode: conflicting values 0 and 100:
@@ -132,7 +132,7 @@ func TestSchemaValidatorWithOpenSchema(t *testing.T) {
 		args: args{
 			cueFile:    "cue_testdata/mysql.cue",
 			configFile: "cue_testdata/mysql.cnf",
-			format:     appsv1alpha1.INI,
+			format:     appsv1alpha1.Ini,
 		},
 		err: nil,
 	}}

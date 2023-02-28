@@ -1,7 +1,6 @@
 name: RELEASE-CHART
 
 on:
-  push:
   release:
     types:
       - published
@@ -9,8 +8,7 @@ on:
 env:
   CR_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
   CHART_RELEASER_VERSION: "v1.4.1"
-#  RELEASE_VERSION: ${{ github.ref_name }}
-  RELEASE_VERSION: "v0.4.0-beta.0"
+  RELEASE_VERSION: ${{ github.ref_name }}
   K3S_VERSION: v1.23
   GITLAB_HELM_CHARTS_PROJECT_ID: 85949
 

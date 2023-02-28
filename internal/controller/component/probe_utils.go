@@ -201,7 +201,7 @@ func buildRoleChangedProbeContainer(characterType string, roleChangedContainer *
 		"--fail-with-body", "--silent",
 		"-H", "Content-ComponentDefRef: application/json",
 		roleObserveURI,
-		"-d", "{\"operation\": \"roleCheck\", \"metadata\":{\"sql\":\"\"}}",
+		"-d", "{\"operation\": \"checkRole\", \"metadata\":{\"sql\":\"\"}}",
 	}
 	probe.PeriodSeconds = probeSetting.PeriodSeconds
 	probe.TimeoutSeconds = probeSetting.TimeoutSeconds
@@ -214,7 +214,7 @@ func buildStatusProbeContainer(statusProbeContainer *corev1.Container,
 	statusProbeContainer.Name = statusProbeContainerName
 	probe := statusProbeContainer.ReadinessProbe
 	httpGet := &corev1.HTTPGetAction{}
-	httpGet.Path = "/v1.0/bindings/probe?operation=statusCheck"
+	httpGet.Path = "/v1.0/bindings/probe?operation=checkStatus"
 	httpGet.Port = intstr.FromInt(probeSvcHTTPPort)
 	probe.Exec = nil
 	probe.HTTPGet = httpGet
@@ -229,7 +229,7 @@ func buildRunningProbeContainer(runningProbeContainer *corev1.Container,
 	runningProbeContainer.Name = runningProbeContainerName
 	probe := runningProbeContainer.ReadinessProbe
 	httpGet := &corev1.HTTPGetAction{}
-	httpGet.Path = "/v1.0/bindings/probe?operation=runningCheck"
+	httpGet.Path = "/v1.0/bindings/probe?operation=checkRunning"
 	httpGet.Port = intstr.FromInt(probeSvcHTTPPort)
 	probe.Exec = nil
 	probe.HTTPGet = httpGet

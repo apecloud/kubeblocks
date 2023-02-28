@@ -24,7 +24,7 @@ import (
 	"github.com/spf13/cobra"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
@@ -115,12 +115,20 @@ func (o *OperationsOptions) CompleteRestartOps() error {
 		return nil
 	}
 	gvr := schema.GroupVersionResource{Group: types.Group, Version: types.Version, Resource: types.ResourceClusters}
-	if unstructuredObj, err := o.Client.Resource(gvr).Namespace(o.Namespace).Get(context.TODO(), o.Name, metav1.GetOptions{}); err != nil {
+	unstructuredObj, err := o.Client.Resource(gvr).Namespace(o.Namespace).Get(context.TODO(), o.Name, metav1.GetOptions{})
+	if err != nil {
 		return err
-	} else {
-		if o.ComponentNames, _, err = unstructured.NestedStringSlice(unstructuredObj.Object, "status", "operations", "restartable"); err != nil {
-			return err
-		}
+	}
+	cluster := appsv1alpha1.Cluster{}
+	err = runtime.DefaultUnstructuredConverter.
+		FromUnstructured(unstructuredObj.UnstructuredContent(), &cluster)
+	if err != nil {
+		return err
+	}
+	componentSpecs := cluster.Spec.ComponentSpecs
+	o.ComponentNames = make([]string, len(componentSpecs))
+	for i := range componentSpecs {
+		o.ComponentNames[i] = componentSpecs[i].Name
 	}
 	return nil
 }

@@ -161,7 +161,7 @@ func GetComponentEndpoints(svcList *corev1.ServiceList, c *appsv1alpha1.ClusterC
 	}
 
 	for _, svc := range externalSvcs {
-		externalEndpoints = append(externalEndpoints, getEndpoints(GetExternalIP(svc), svc.Spec.Ports)...)
+		externalEndpoints = append(externalEndpoints, getEndpoints(GetExternalAddr(svc), svc.Spec.Ports)...)
 	}
 	return internalEndpoints, externalEndpoints
 }
@@ -179,21 +179,30 @@ func GetComponentServices(svcList *corev1.ServiceList, c *appsv1alpha1.ClusterCo
 		}
 
 		var (
-			internalIP = svc.Spec.ClusterIP
-			externalIP = GetExternalIP(&svc)
+			internalIP   = svc.Spec.ClusterIP
+			externalAddr = GetExternalAddr(&svc)
 		)
 		if internalIP != "" && internalIP != "None" {
 			internalSvcs = append(internalSvcs, &svcList.Items[i])
 		}
-		if externalIP != "" && externalIP != "None" {
+		if externalAddr != "" {
 			externalSvcs = append(externalSvcs, &svcList.Items[i])
 		}
 	}
 	return internalSvcs, externalSvcs
 }
 
-// GetExternalIP get external IP from service annotation
-func GetExternalIP(svc *corev1.Service) string {
+// GetExternalAddr get external IP from service annotation
+func GetExternalAddr(svc *corev1.Service) string {
+	for _, ingress := range svc.Status.LoadBalancer.Ingress {
+		if ingress.Hostname != "" {
+			return ingress.Hostname
+		}
+
+		if ingress.IP != "" {
+			return ingress.IP
+		}
+	}
 	if svc.GetAnnotations()[types.ServiceLBTypeAnnotationKey] != types.ServiceLBTypeAnnotationValue {
 		return ""
 	}

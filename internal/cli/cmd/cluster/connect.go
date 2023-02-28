@@ -236,7 +236,7 @@ func (o *ConnectOptions) getConnectionInfo() (*engine.ConnectionInfo, error) {
 	case len(externalSvcs) > 0:
 		// cluster has public endpoint
 		o.svc = externalSvcs[0]
-		info.Host = cluster.GetExternalIP(o.svc)
+		info.Host = cluster.GetExternalAddr(o.svc)
 		info.Port = fmt.Sprintf("%d", o.svc.Spec.Ports[0].Port)
 	case len(internalSvcs) > 0:
 		// cluster does not have public endpoint

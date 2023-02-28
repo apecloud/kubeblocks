@@ -603,6 +603,13 @@ func createBackup(reqCtx intctrlutil.RequestCtx,
 			return err
 		}
 		if len(backupList.Items) > 0 {
+			// check backup status, if failed return error
+			if backupList.Items[0].Status.Phase == dataprotectionv1alpha1.BackupFailed {
+				reqCtx.Recorder.Eventf(cluster, corev1.EventTypeWarning,
+					"HorizontalScaleFailed", "backup %s status failed", backupKey.Name)
+				return errors.Errorf("cluster %s h-scale failed, backup error: %s",
+					cluster.Name, backupList.Items[0].Status.FailureReason)
+			}
 			return nil
 		}
 		backup, err := builder.BuildBackup(sts, backupPolicyName, backupKey)

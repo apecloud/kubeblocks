@@ -1,9 +1,9 @@
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: ClusterDefinition
 metadata:
-  name: clickhouse
+  name: apecloud-clickhouse
   labels:
-    {{- include "clickhouse.labels" . | nindent 4 }}
+    {{- include "kafka.labels" . | nindent 4 }}
     {{- if .Values.commonLabels }}
     {{- include "common.tplvalues.render" ( dict "value" .Values.commonLabels "context" $ ) | nindent 4 }}
     {{- end }}
@@ -12,145 +12,279 @@ metadata:
   {{- end }}
 spec:
   connectionCredential:
-    username: "admin"
-    admin-password: "$(RANDOM_PASSWD)"
-    endpoint: "http://$(SVC_FQDN):$(SVC_PORT_http)"
-    tcpEndpoint: "$(SVC_FQDN):$(SVC_PORT_tcp)"
-    mysqlEndpoint: "$(SVC_FQDN):$(SVC_PORT_tcp-mysql)"
-    pgEndpoint: "$(SVC_FQDN):$(SVC_PORT_tcp-postgresql)"
   componentDefs:
-    - name: clickhouse
+    - name: kafka
       workloadType: Stateful
-      characterType: clickhouse
+      characterType: kafka
       probes:
       monitor:
         builtIn: false
         exporterConfig:
           scrapePath: /metrics
-          scrapePort: 8001
-      logConfigs:
-        {{- range $name,$pattern := .Values.logConfigs }}
-        - name: {{ $name }}
-          filePathPattern: {{ $pattern }}
-        {{- end }}
-      configSpec:
-        configTemplateRefs:
-          - name: clickhouse-tpl
-            configTplRef: clickhouse-tpl
-            volumeName: config
-            namespace: {{ .Release.Namespace }}
+          scrapePort: 5556
+
+{{/*      configSpec:*/}}
+{{/*        configTemplateRefs:*/}}
+{{/*          - name: clickhouse-tpl*/}}
+{{/*            configTplRef: clickhouse-tpl*/}}
+{{/*            volumeName: config*/}}
+{{/*            namespace: {{ .Release.Namespace }}*/}}
       service:
         ports:
-          - name: http
-            targetPort: http
-            port: 8123
+          - name: kafka-client
+            targetPort: kafka-client
+            port: 9092
             nodePort: null
-          - name: tcp
-            targetPort: tcp
-            port: 9000
+          - name: metrics
+            targetPort: metrics
+            port: 5556
             nodePort: null
-          - name: tcp-mysql
-            targetPort: tcp-mysql
-            port: 9004
-            nodePort: null
-          - name: tcp-postgresql
-            targetPort: tcp-postgresql
-            port: 9005
-            nodePort: null
-          - name: http-intersrv
-            targetPort: http-intersrv
-            port: 9009
-            nodePort: null
-          - name: http-metrics
-            targetPort: http-metrics
-            port: 8001
-            nodePort: null
+
       podSpec:
+        volumes:
+          - name: scripts
+            configMap:
+              name: my-kafka-scripts
+              defaultMode: 0755
+          - name: jmx-config
+            configMap:
+              name: my-kafka-jmx-configuration
+          - name: logs
+            emptyDir: {}
+
         securityContext:
           fsGroup: 1001
-          seccompProfile:
-            type: RuntimeDefault
+          
         containers:
-          - name: clickhouse
+          - name: kafka
+            image: docker.io/bitnami/kafka:3.4.0-debian-11-r2
+            imagePullPolicy: {{ default .Values.images.pullPolicy "IfNotPresent" }}
             securityContext:
               allowPrivilegeEscalation: false
-              capabilities:
-                drop:
-                  - ALL
               runAsNonRoot: true
               runAsUser: 1001
+
+            command:
+              - /scripts/setup.sh
             env:
-              - name: CLICKHOUSE_ADMIN_PASSWORD
-                valueFrom:
-                  secretKeyRef:
-                    # notes: could also reference the secret's 'password' key,
-                    # just keeping the same secret keys as bitnami Clickhouse chart
-                    name: $(CONN_CREDENTIAL_SECRET_NAME)
-                    key: admin-password
               - name: BITNAMI_DEBUG
                 value: "false"
-              - name: CLICKHOUSE_HTTP_PORT
-                value: "8123"
-              - name: CLICKHOUSE_TCP_PORT
-                value: "9000"
-              - name: CLICKHOUSE_MYSQL_PORT
-                value: "9004"
-              - name: CLICKHOUSE_POSTGRESQL_PORT
-                value: "9005"
-              - name: CLICKHOUSE_INTERSERVER_HTTP_PORT
-                value: "9009"
-              - name: CLICKHOUSE_METRICS_PORT
-                value: "8001"
-              - name: CLICKHOUSE_ADMIN_USER
-                value: "default"
-              - name: CLICKHOUSE_SHARD_ID
-                value: "$(KB_COMP_NAME)"
-              - name: CLICKHOUSE_REPLICA_ID
+              - name: MY_POD_IP
+                valueFrom:
+                  fieldRef:
+                    fieldPath: status.podIP
+              - name: MY_POD_NAME
                 valueFrom:
                   fieldRef:
                     fieldPath: metadata.name
+              - name: KAFKA_CFG_ZOOKEEPER_CONNECT
+                value: "my-kafka-zookeeper"
+              - name: KAFKA_INTER_BROKER_LISTENER_NAME
+                value: "INTERNAL"
+              - name: KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP
+                value: "INTERNAL:PLAINTEXT,CLIENT:PLAINTEXT"
+              - name: KAFKA_CFG_LISTENERS
+                value: "INTERNAL://:9093,CLIENT://:9092"
+              - name: KAFKA_CFG_ADVERTISED_LISTENERS
+                value: "INTERNAL://$(MY_POD_NAME).my-kafka-headless.kafka-system.svc.cluster.local:9093,CLIENT://$(MY_POD_NAME).my-kafka-headless.kafka-system.svc.cluster.local:9092"
+              - name: ALLOW_PLAINTEXT_LISTENER
+                value: "yes"
+              - name: KAFKA_ZOOKEEPER_PROTOCOL
+                value: PLAINTEXT
+              - name: JMX_PORT
+                value: "5555"
+              - name: KAFKA_VOLUME_DIR
+                value: "/bitnami/kafka"
+              - name: KAFKA_LOG_DIR
+                value: "/opt/bitnami/kafka/logs"
+              - name: KAFKA_CFG_DELETE_TOPIC_ENABLE
+                value: "false"
+              - name: KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE
+                value: "true"
+              - name: KAFKA_HEAP_OPTS
+                value: "-Xmx1024m -Xms1024m"
+              - name: KAFKA_CFG_LOG_FLUSH_INTERVAL_MESSAGES
+                value: "10000"
+              - name: KAFKA_CFG_LOG_FLUSH_INTERVAL_MS
+                value: "1000"
+              - name: KAFKA_CFG_LOG_RETENTION_BYTES
+                value: "1073741824"
+              - name: KAFKA_CFG_LOG_RETENTION_CHECK_INTERVAL_MS
+                value: "300000"
+              - name: KAFKA_CFG_LOG_RETENTION_HOURS
+                value: "168"
+              - name: KAFKA_CFG_MESSAGE_MAX_BYTES
+                value: "1000012"
+              - name: KAFKA_CFG_LOG_SEGMENT_BYTES
+                value: "1073741824"
+              - name: KAFKA_CFG_LOG_DIRS
+                value: "/bitnami/kafka/data"
+              - name: KAFKA_CFG_DEFAULT_REPLICATION_FACTOR
+                value: "1"
+              - name: KAFKA_CFG_OFFSETS_TOPIC_REPLICATION_FACTOR
+                value: "1"
+              - name: KAFKA_CFG_TRANSACTION_STATE_LOG_REPLICATION_FACTOR
+                value: "1"
+              - name: KAFKA_CFG_TRANSACTION_STATE_LOG_MIN_ISR
+                value: "1"
+              - name: KAFKA_CFG_NUM_IO_THREADS
+                value: "8"
+              - name: KAFKA_CFG_NUM_NETWORK_THREADS
+                value: "3"
+              - name: KAFKA_CFG_NUM_PARTITIONS
+                value: "1"
+              - name: KAFKA_CFG_NUM_RECOVERY_THREADS_PER_DATA_DIR
+                value: "1"
+              - name: KAFKA_CFG_SOCKET_RECEIVE_BUFFER_BYTES
+                value: "102400"
+              - name: KAFKA_CFG_SOCKET_REQUEST_MAX_BYTES
+                value: "104857600"
+              - name: KAFKA_CFG_SOCKET_SEND_BUFFER_BYTES
+                value: "102400"
+              - name: KAFKA_CFG_ZOOKEEPER_CONNECTION_TIMEOUT_MS
+                value: "6000"
+              - name: KAFKA_CFG_AUTHORIZER_CLASS_NAME
+                value: ""
+              - name: KAFKA_CFG_ALLOW_EVERYONE_IF_NO_ACL_FOUND
+                value: "true"
+              - name: KAFKA_CFG_SUPER_USERS
+                value: "User:admin"
             ports:
-              - name: http
-                containerPort: 8123
-                # protocol: TCP
-              - name: tcp
-                containerPort: 9000
-                # protocol: TCP
-              - name: tcp-postgresql
-                containerPort: 9005
-                # protocol: TCP
-              - name: tcp-mysql
-                containerPort: 9004
-                # protocol: TCP
-              - name: http-intersrv
-                containerPort: 9009
-                # protocol: TCP
-              - name: http-metrics
-                containerPort: 8001
-                # protocol: TCP
+              - name: kafka-client
+                containerPort: 9092
+              - name: kafka-internal
+                containerPort: 9093
             livenessProbe:
               failureThreshold: 3
               initialDelaySeconds: 10
               periodSeconds: 10
               successThreshold: 1
-              timeoutSeconds: 1
-              httpGet:
-                path: /ping
-                port: http
+              timeoutSeconds: 5
+              tcpSocket:
+                port: kafka-client
             readinessProbe:
-              failureThreshold: 3
-              initialDelaySeconds: 10
+              failureThreshold: 6
+              initialDelaySeconds: 5
               periodSeconds: 10
               successThreshold: 1
-              timeoutSeconds: 1
-              httpGet:
-                path: /ping
-                port: http
+              timeoutSeconds: 5
+              tcpSocket:
+                port: kafka-client
             volumeMounts:
               - name: data
-                mountPath: /bitnami/clickhouse
-              - name: config
-                mountPath: /bitnami/clickhouse/etc/conf.d/default
+                mountPath: /bitnami/kafka
+              - name: logs
+                mountPath: /opt/bitnami/kafka/logs
+              - name: scripts
+                mountPath: /scripts/setup.sh
+                subPath: setup.sh
+
+          - name: jmx-exporter
+            image: docker.io/bitnami/jmx-exporter:0.17.2-debian-11-r49
+            imagePullPolicy: {{ default .Values.images.pullPolicy "IfNotPresent" }}
+            securityContext:
+              runAsNonRoot: true
+              runAsUser: 1001
+            command:
+              - java
+            args:
+              - -XX:MaxRAMPercentage=100
+              - -XshowSettings:vm
+              - -jar
+              - jmx_prometheus_httpserver.jar
+              - "5556"
+              - /etc/jmx-kafka/jmx-kafka-prometheus.yml
+            ports:
+              - name: metrics
+                containerPort: 5556
+            volumeMounts:
+              - name: jmx-config
+                mountPath: /etc/jmx-kafka
+
+    - name: kraft
+      workloadType: Stateful # Consensus
+      monitor:
+        builtIn: false
+        exporterConfig:
+          scrapePath: /metrics
+          scrapePort: 5556
+
+      service:
+        ports:
+          - name: kafka-client
+            targetPort: kafka-client
+            port: 9092
+            nodePort: null
+          - name: metrics
+            targetPort: metrics
+            port: 5556
+            nodePort: null
+
+      podSpec:
+        volumes:
+          - name: scripts
+            configMap:
+              name: my-kafka-scripts
+              defaultMode: 0755
+          - name: jmx-config
+            configMap:
+              name: my-kafka-jmx-configuration
+          - name: logs
+            emptyDir: {}
+
+        securityContext:
+          fsGroup: 1001
+
+        containers:
+          - name: kafka
+            image: docker.io/bitnami/kafka:3.4.0-debian-11-r2
+            imagePullPolicy: {{ default .Values.images.pullPolicy "IfNotPresent" }}
+            securityContext:
+              allowPrivilegeEscalation: false
+              runAsNonRoot: true
+              runAsUser: 1001
+
+
+    - name: kafka-exporter
+      workloadType: Stateless
+      probes:
+      monitor:
+        builtIn: false
+        exporterConfig:
+          scrapePath: /metrics
+          scrapePort: 9308
+      service:
+        ports:
+          - name: metrics
+            targetPort: metrics
+            port: 9308
+      podSpec:
+        securityContext:
+          fsGroup: 1001
+        containers:
+          - name: kafka-exporter
+            image: docker.io/bitnami/kafka-exporter:1.6.0-debian-11-r61
+            imagePullPolicy: {{ default .Values.images.pullPolicy "IfNotPresent" }}
+            securityContext:
+              runAsNonRoot: true
+              runAsUser: 1001
+            command:
+              - bash
+            args:
+              - -ce
+              # TODO: render entrypoint script
+              - |
+                kafka_exporter \
+                --kafka.server=my-kafka-0.my-kafka-headless.kafka-system.svc.cluster.local:9092 \
+                --kafka.server=my-kafka-1.my-kafka-headless.kafka-system.svc.cluster.local:9092 \
+                --kafka.server=my-kafka-2.my-kafka-headless.kafka-system.svc.cluster.local:9092 \
+                --web.listen-address=:9308
+            ports:
+              - name: metrics
+                containerPort: 9308
+
+
+
 
     - name: ch-keeper
       workloadType: Stateful # Consensus
@@ -161,11 +295,7 @@ spec:
         exporterConfig:
           scrapePath: /metrics
           scrapePort: 8001
-      logConfigs:
-        {{- range $name,$pattern := .Values.logConfigs }}
-        - name: {{ $name }}
-          filePathPattern: {{ $pattern }}
-        {{- end }}
+
       configSpec:
         configTemplateRefs:
           - name: clickhouse-keeper-tpl
@@ -190,7 +320,7 @@ spec:
           seccompProfile:
             type: RuntimeDefault
         containers:
-          - name: clickhouse
+          - name: ch-keeper
             securityContext:
               allowPrivilegeEscalation: false
               capabilities:
@@ -247,12 +377,6 @@ spec:
     - name: zookeeper
       workloadType: Stateful #Consensus
       characterType: zookeeper
-      # probes:
-      #   roleChangedProbe:
-      #     cmd: "stat | grep 'Leader'"
-      #     failureThreshold: {{ .Values.zookeeper.roleChangedProbe.failureThreshold }}
-      #     periodSeconds: {{ .Values.zookeeper.roleChangedProbe.periodSeconds }}
-      #     successThreshold: {{ .Values.zookeeper.roleChangedProbe.successThreshold }}
       monitor:
         builtIn: false
         exporterConfig:

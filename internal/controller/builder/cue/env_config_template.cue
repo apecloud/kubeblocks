@@ -39,7 +39,7 @@ config: {
 			// configmap selector for env update
 			"app.kubernetes.io/config-type": "kubeblocks-env"
 
-			"app.kubeblocks.io/component-name": component.name
+			"apps.kubeblocks.io/component-name": component.name
 		}
 	}
 	data: [string]: string

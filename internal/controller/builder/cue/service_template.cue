@@ -42,7 +42,7 @@ service: {
 			"app.kubernetes.io/instance":   cluster.metadata.name
 			"app.kubernetes.io/managed-by": "kubeblocks"
 
-			"app.kubeblocks.io/component-name": "\(component.name)"
+			"apps.kubeblocks.io/component-name": "\(component.name)"
 		}
 	}
 	"spec": {
@@ -50,7 +50,7 @@ service: {
 			"app.kubernetes.io/instance":   "\(cluster.metadata.name)"
 			"app.kubernetes.io/managed-by": "kubeblocks"
 
-			"app.kubeblocks.io/component-name": "\(component.name)"
+			"apps.kubeblocks.io/component-name": "\(component.name)"
 		}
 		ports: component.service.ports
 		if component.service.type != _|_ {

@@ -185,7 +185,7 @@ func deleteObjects(dynamic dynamic.Interface, gvr schema.GroupVersionResource, o
 		// the object is not being deleted, delete it
 		if s.GetDeletionTimestamp().IsZero() {
 			klog.V(1).Infof("delete %s %s", gvr.String(), s.GetName())
-			if err := dynamic.Resource(gvr).Namespace(s.GetNamespace()).Delete(context.TODO(), s.GetName(), newDeleteOpts()); err != nil {
+			if err := dynamic.Resource(gvr).Namespace(s.GetNamespace()).Delete(context.TODO(), s.GetName(), newDeleteOpts()); err != nil && !apierrors.IsNotFound(err) {
 				return err
 			}
 		}

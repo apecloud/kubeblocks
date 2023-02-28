@@ -19,6 +19,11 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
+func init() {
+	viper.SetDefault(addonJobImagePullPolicyKey, corev1.PullIfNotPresent)
+	viper.SetDefault(addonSANameKey, "kubeblocks-addon-installer")
+}
+
 type fetchNDeletionCheckStage struct {
 	stageCtx
 }
@@ -64,7 +69,7 @@ type terminalStateStage struct {
 }
 
 func (r *fetchNDeletionCheckStage) Handle(ctx context.Context) {
-	r.reqCtx.Log.Info("get addon", "addon", r.reqCtx.Req.NamespacedName)
+	r.reqCtx.Log.V(1).Info("get addon", "addon", r.reqCtx.Req.NamespacedName)
 	addon := &extensionsv1alpha1.Addon{}
 	if err := r.reconciler.Client.Get(ctx, r.reqCtx.Req.NamespacedName, addon); err != nil {
 		res, err := intctrlutil.CheckedRequeueWithError(err, r.reqCtx.Log, "")
@@ -232,7 +237,7 @@ func getUninstallJobName(addon *extensionsv1alpha1.Addon) string {
 }
 
 func getHelmReleaseName(addon *extensionsv1alpha1.Addon) string {
-	return fmt.Sprintf("KB_ADDON_%s", addon.Name)
+	return fmt.Sprintf("kb-addon-%s", addon.Name)
 }
 
 func (r *helmTypeInstallStage) Handle(ctx context.Context) {
@@ -254,7 +259,7 @@ func (r *helmTypeInstallStage) Handle(ctx context.Context) {
 			}
 
 			if helmInstallJob.Status.Active > 0 {
-				r.setRequeueAfter(time.Second, "")
+				r.setRequeueAfter(time.Second, fmt.Sprintf("running Helm install job %s", key.Name))
 				return
 			}
 			// there are situations that job.status.[Active | Failed | Succeeded ] are all
@@ -613,17 +618,19 @@ func createHelmJobProto(addon *extensionsv1alpha1.Addon) (*batchv1.Job, error) {
 						{
 							Name:            strings.ToLower(string(addon.Spec.Type)),
 							Image:           viper.GetString("KUBEBLOCKS_IMAGE"),
-							ImagePullPolicy: corev1.PullIfNotPresent,
-							SecurityContext: &corev1.SecurityContext{
-								RunAsNonRoot:             &[]bool{true}[0],
-								RunAsUser:                &[]int64{1001}[0],
-								AllowPrivilegeEscalation: &[]bool{false}[0],
-								Capabilities: &corev1.Capabilities{
-									Drop: []corev1.Capability{
-										"ALL",
-									},
-								},
-							},
+							ImagePullPolicy: corev1.PullPolicy(viper.GetString(addonJobImagePullPolicyKey)),
+							// TODO: need have image that is capable of following settings, current settings
+							// may expose potential security risk, as this pod is using cluster-admin clusterrole.
+							//SecurityContext: &corev1.SecurityContext{
+							//	RunAsNonRoot:             &[]bool{true}[0],
+							//	RunAsUser:                &[]int64{1001}[0],
+							//	AllowPrivilegeEscalation: &[]bool{false}[0],
+							//	Capabilities: &corev1.Capabilities{
+							//		Drop: []corev1.Capability{
+							//			"ALL",
+							//		},
+							//	},
+							//},
 							Command: []string{"helm"},
 							Env: []corev1.EnvVar{
 								{

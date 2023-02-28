@@ -48,6 +48,8 @@ type AddonReconciler struct {
 const (
 	// settings keys
 	maxConcurrentReconcilesKey = "MAXCONCURRENTRECONCILES_ADDON"
+	addonJobImagePullPolicyKey = "ADDON_JOB_IMAGE_PULL_POLICY"
+	addonSANameKey             = "KUBEBLOCKS_ADDON_SA_NAME"
 )
 
 func init() {

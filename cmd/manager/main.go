@@ -87,6 +87,7 @@ func init() {
 	viper.SetDefault("PROBE_SERVICE_PORT", 3501)
 	viper.SetDefault("PROBE_SERVICE_LOG_LEVEL", "info")
 	viper.SetDefault("KUBEBLOCKS_SERVICEACCOUNT_NAME", "kubeblocks")
+	viper.SetDefault("CM_NAMESPACE", "default")
 }
 
 type flagName string
@@ -134,8 +135,7 @@ func main() {
 
 	err := viper.ReadInConfig() // Find and read the config file
 	if err != nil {             // Handle errors reading the config file
-		setupLog.Error(err, "unable read in config")
-		os.Exit(1)
+		setupLog.Info("unable read in config, errors ignored")
 	}
 	setupLog.Info(fmt.Sprintf("config file: %s", viper.GetViper().ConfigFileUsed()))
 

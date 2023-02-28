@@ -41,7 +41,21 @@ spec:
 #        - name:
 #          namepsace:
 #          key:
-      setValues: []
+      setValues:
+        - "alertmanager.image.repository=registry.cn-hangzhou.aliyuncs.com/apecloud/alertmanager"
+        - "alertmanager.image.tag=v0.24.0"
+        - "kubeStateMetrics.enabled=false"
+        - "nodeExporter.enabled=false"
+        - "nodeExporter.image.repository=registry.cn-hangzhou.aliyuncs.com/apecloud/node-exporter"
+        - "nodeExporter.image.tag=v1.3.1"
+        - "configmapReload.prometheus.image.repository=registry.cn-hangzhou.aliyuncs.com/apecloud/configmap-reload"
+        - "configmapReload.prometheus.image.tag=v0.5.0"
+        - "configmapReload.alertmanager.image.repository=registry.cn-hangzhou.aliyuncs.com/apecloud/configmap-reload"
+        - "configmapReload.alertmanager.image.tag=v0.5.0"
+        - "server.image.repository=registry.cn-hangzhou.aliyuncs.com/apecloud/prometheus"
+        - "server.image.tag=v2.39.1"
+        - "pushgateway.enabled=false"
+
       setJSONValues: []
 
     # values mapping specific to resources related context, i.e., replicaCount, storage, CPU & Memory.
@@ -128,33 +142,30 @@ spec:
             requests:
               storage: 20Gi
 
-
-
-
-  # addon enabled install spec, if its empty for disabled addon.
-  install:
-    # primary component resources attributes.
-    replicas: 2
-    storageClass:
-    # JSON array string
-    tolerations: '[]'
-    resources:
-      requests:
-        storage: 8Gi
-        memory: 512Mi
-      limits:
-        memory: 4Gi
-    # extra components resources attributes.
-    extras:
-      - name: alertmanager
-        replicas: 2
-        storageClass:
-        resources:
-          requests:
-            storage: 1Gi
-            memory: 16Mi
-          limits:
-            memory: 256Mi
+#  # addon enabled install spec, if its empty for disabled addon.
+#  install:
+#    # primary component resources attributes.
+#    replicas: 1
+##    storageClass:
+##    # JSON array string
+##    tolerations: '[]'
+##    resources:
+##      requests:
+##        storage: 8Gi
+##        memory: 512Mi
+##      limits:
+##        memory: 4Gi
+#    # extra components resources attributes.
+#    extras:
+#      - name: alertmanager
+##        replicas: 1
+##        storageClass:
+##        resources:
+##          requests:
+##            storage: 1Gi
+##            memory: 16Mi
+##          limits:
+##            memory: 256Mi
 
   # Addon installable spec., provide selector and auto-install settings.
   installable:

@@ -20,11 +20,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"reflect"
+	"strings"
+
 	"golang.org/x/exp/maps"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/kubectl/pkg/util/storage"
-	"reflect"
-	"strings"
 
 	"github.com/pkg/errors"
 	"golang.org/x/exp/slices"
@@ -414,8 +415,11 @@ func (r *OpsRequest) checkVolumesAllowExpansion(ctx context.Context, cli client.
 	for cname, compVols := range vols {
 		for vname := range compVols {
 			e := vols[cname][vname]
+			if !e.existInSpec {
+				continue
+			}
 			if allowExpansion, err := checkStorageClassAllowExpansion(ctx, cli, e.storageClassName); err != nil {
-				continue // TODO(leon)
+				continue // ignore the error and take it as not-supported
 			} else {
 				vols[cname][vname] = Entity{e.existInSpec, e.storageClassName, allowExpansion}
 			}

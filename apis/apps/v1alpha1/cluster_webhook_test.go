@@ -274,7 +274,7 @@ spec:
   - name: replicasets
     componentDefRef: replicasets
     replicas: 1
-    volumeClaimTemplates: 
+    volumeClaimTemplates:
     - name: data
       spec:
         resources:

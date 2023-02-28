@@ -110,8 +110,6 @@ var _ = Describe("OpsRequest Controller Volume Expansion Handler", func() {
 		}
 		opsRes.OpsRequest = ops
 
-		// TODO(leon): mock cluster to support volume expansion, refactor the test cases
-
 		// create opsRequest
 		ops = testapps.CreateOpsRequest(ctx, testCtx, ops)
 

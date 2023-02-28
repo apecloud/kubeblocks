@@ -302,6 +302,7 @@ const (
 	SQLType        CfgReloadType = "sql"
 	ShellType      CfgReloadType = "exec"
 	HTTPType       CfgReloadType = "http"
+	TPLScriptType  CfgReloadType = "tpl"
 )
 
 // SignalType defines which signals are valid.

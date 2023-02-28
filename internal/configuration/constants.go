@@ -46,7 +46,7 @@ const (
 
 	// ConfigSidecarIMAGE for config manager sidecar
 	ConfigSidecarIMAGE       = "KUBEBLOCKS_IMAGE"
-	ConfigSidecarName        = "config-manager-sidecar"
+	ConfigSidecarName        = "config-manager"
 	CRIRuntimeEndpoint       = "CONTAINER_RUNTIME_ENDPOINT"
 	ConfigCRIType            = "CRI_TYPE"
 	ConfigManagerGPRCPortEnv = "CONFIG_MANAGER_GRPC_PORT"

@@ -132,6 +132,22 @@ spec:
                     required:
                     - exec
                     type: object
+                  tplScriptTrigger:
+                    description: goTplTrigger performs the reload command.
+                    properties:
+                      namespace:
+                        default: default
+                        description: Specify the namespace of the referenced the tpl
+                          script ConfigMap object. An empty namespace is equivalent
+                          to the "default" namespace.
+                        maxLength: 63
+                        type: string
+                      scriptConfigMapRef:
+                        description: scriptConfigMapRef used to execute for reload.
+                        type: string
+                    required:
+                    - scriptConfigMapRef
+                    type: object
                   unixSignalTrigger:
                     description: unixSignalTrigger used to reload by sending a signal.
                     properties:

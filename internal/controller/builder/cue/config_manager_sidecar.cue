@@ -13,7 +13,7 @@
 // limitations under the License.
 
 template: {
-	name: "config-manager-sidecar"
+	name: parameter.name
 	command: [
 		"/bin/reloader",
 	]

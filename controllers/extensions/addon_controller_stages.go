@@ -621,7 +621,7 @@ func createHelmJobProto(addon *extensionsv1alpha1.Addon) (*batchv1.Job, error) {
 							ImagePullPolicy: corev1.PullPolicy(viper.GetString(addonJobImagePullPolicyKey)),
 							// TODO: need have image that is capable of following settings, current settings
 							// may expose potential security risk, as this pod is using cluster-admin clusterrole.
-							//SecurityContext: &corev1.SecurityContext{
+							// SecurityContext: &corev1.SecurityContext{
 							//	RunAsNonRoot:             &[]bool{true}[0],
 							//	RunAsUser:                &[]int64{1001}[0],
 							//	AllowPrivilegeEscalation: &[]bool{false}[0],
@@ -630,7 +630,7 @@ func createHelmJobProto(addon *extensionsv1alpha1.Addon) (*batchv1.Job, error) {
 							//			"ALL",
 							//		},
 							//	},
-							//},
+							// },
 							Command: []string{"helm"},
 							Env: []corev1.EnvVar{
 								{

@@ -28,4 +28,4 @@ persistence:
     storageClassName:
     size: 1Gi
 enabledLogs:
-  - run
+  - running

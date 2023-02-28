@@ -23,6 +23,7 @@ import (
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -51,6 +52,8 @@ const (
 )
 
 const (
+	KBSwitchJobLabelKey      = "kubeblocks.io/switch-job"
+	KBSwitchJobLabelValue    = "kb-switch-job"
 	KBSwitchJobNamePrefix    = "kb-switch-job"
 	KBSwitchJobContainerName = "switch-job-container"
 )
@@ -135,6 +138,12 @@ func HandleReplicationSetHASwitch(ctx context.Context,
 	if err := s.UpdateRoleLabel(); err != nil {
 		return err
 	}
+
+	// clean job if execute switch commands by k8s job.
+	if err := cleanSwitchCmdJobs(s); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -343,6 +352,7 @@ func renderAndCreateSwitchCmdJobs(s *Switch, stepRole appsv1alpha1.SwitchStepRol
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: s.SwitchResource.Cluster.Namespace,
 				Name:      jobName,
+				Labels:    getSwitchCmdJobLabel(s.SwitchResource.Cluster.Name, s.SwitchResource.CompSpec.Name),
 			},
 			Spec: batchv1.JobSpec{
 				Template: corev1.PodTemplateSpec{
@@ -399,14 +409,15 @@ func renderAndCreateSwitchCmdJobs(s *Switch, stepRole appsv1alpha1.SwitchStepRol
 func checkSwitchCmdJobSucceed(s *Switch, cmdJobs []*batchv1.Job) error {
 	for _, cmdJob := range cmdJobs {
 		key := types.NamespacedName{Namespace: s.SwitchResource.Cluster.Namespace, Name: cmdJob.Name}
-		exists, err := intctrlutil.CheckResourceExists(s.SwitchResource.Ctx, s.SwitchResource.Cli, key, &batchv1.Job{})
+		currentJob := batchv1.Job{}
+		exists, err := intctrlutil.CheckResourceExists(s.SwitchResource.Ctx, s.SwitchResource.Cli, key, &currentJob)
 		if err != nil {
 			return err
 		}
 		if !exists {
 			return fmt.Errorf("switch command job %s not exist", cmdJob.Name)
 		}
-		jobStatusConditions := cmdJob.Status.Conditions
+		jobStatusConditions := currentJob.Status.Conditions
 		if len(jobStatusConditions) > 0 {
 			switch jobStatusConditions[0].Type {
 			case batchv1.JobComplete:
@@ -416,9 +427,38 @@ func checkSwitchCmdJobSucceed(s *Switch, cmdJobs []*batchv1.Job) error {
 			default:
 				return fmt.Errorf("switch command job %s unfinished", cmdJob.Name)
 			}
+		} else {
+			return fmt.Errorf("switch command job %s check status conditions failed", cmdJob.Name)
 		}
 	}
 	return nil
+}
+
+// cleanSwitchCmdJobs cleans up the job tasks that execute the switch commands.
+func cleanSwitchCmdJobs(s *Switch) error {
+	jobList := &batchv1.JobList{}
+	if err := s.SwitchResource.Cli.List(s.SwitchResource.Ctx, jobList, client.InNamespace(s.SwitchResource.Cluster.Namespace),
+		client.MatchingLabels(getSwitchCmdJobLabel(s.SwitchResource.Cluster.Name, s.SwitchResource.CompSpec.Name))); err != nil {
+		return err
+	}
+	for _, job := range jobList.Items {
+		err := s.SwitchResource.Cli.Delete(s.SwitchResource.Ctx, &job)
+		if err == nil || apierrors.IsNotFound(err) {
+			continue
+		}
+		return err
+	}
+	return nil
+}
+
+// getSwitchCmdJobLabel gets the labels for job that execute the switch commands.
+func getSwitchCmdJobLabel(clusterName, componentName string) map[string]string {
+	return map[string]string{
+		intctrlutil.AppInstanceLabelKey:    clusterName,
+		intctrlutil.KBAppComponentLabelKey: componentName,
+		intctrlutil.AppManagedByLabelKey:   intctrlutil.AppName,
+		KBSwitchJobLabelKey:                KBSwitchJobLabelValue,
+	}
 }
 
 // CheckPrimaryIndexChanged checks whether primaryIndex has changed and returns current primaryIndex.

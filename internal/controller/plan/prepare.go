@@ -239,8 +239,8 @@ func buildReplicationSet(reqCtx intctrlutil.RequestCtx,
 	if err != nil {
 		return nil, err
 	}
-	// inject replicationSet pod env.
-	if sts, err = injectReplicationSetPodEnv(task, sts, stsIndex); err != nil {
+	// inject replicationSet pod env and role label.
+	if sts, err = injectReplicationSetPodEnvAndLabel(task, sts, stsIndex); err != nil {
 		return nil, err
 	}
 	// sts.Name rename and add role label.
@@ -291,7 +291,7 @@ func buildReplicationSetPVC(task *intctrltypes.ReconcileTask, sts *appsv1.Statef
 	return nil
 }
 
-func injectReplicationSetPodEnv(task *intctrltypes.ReconcileTask, sts *appsv1.StatefulSet, index int32) (*appsv1.StatefulSet, error) {
+func injectReplicationSetPodEnvAndLabel(task *intctrltypes.ReconcileTask, sts *appsv1.StatefulSet, index int32) (*appsv1.StatefulSet, error) {
 	if task.Component.PrimaryIndex == nil {
 		return nil, fmt.Errorf("component %s PrimaryIndex can not be nil", task.Component.Name)
 	}
@@ -303,6 +303,11 @@ func injectReplicationSetPodEnv(task *intctrltypes.ReconcileTask, sts *appsv1.St
 			Value:     fmt.Sprintf("%s-%d-%d.%s", sts.Name, *task.Component.PrimaryIndex, 0, svcName),
 			ValueFrom: nil,
 		})
+	}
+	if index != *task.Component.PrimaryIndex {
+		sts.Spec.Template.Labels[intctrlutil.RoleLabelKey] = string(replicationset.Secondary)
+	} else {
+		sts.Spec.Template.Labels[intctrlutil.RoleLabelKey] = string(replicationset.Primary)
 	}
 	return sts, nil
 }

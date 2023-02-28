@@ -17,12 +17,15 @@ limitations under the License.
 package playground
 
 import (
+	"fmt"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 
-	"github.com/apecloud/kubeblocks/internal/cli/cloudprovider"
+	cp "github.com/apecloud/kubeblocks/internal/cli/cloudprovider"
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 )
@@ -49,23 +52,27 @@ var _ = Describe("playground", func() {
 		Expect(cmd != nil).Should(BeTrue())
 
 		o := &initOptions{
-			clusterDef:    "test-cd",
-			CloudProvider: defaultCloudProvider,
-			IOStreams:     streams,
+			clusterDef: "test-cd",
+			IOStreams:  streams,
+			baseOptions: baseOptions{
+				cloudProvider: defaultCloudProvider,
+			},
 		}
 		Expect(o.validate()).Should(Succeed())
 		Expect(o.run()).To(MatchError(MatchRegexp("failed to set up k3d cluster")))
-
 		Expect(o.installKubeBlocks()).Should(HaveOccurred())
 		Expect(o.installCluster()).Should(HaveOccurred())
 	})
 
 	It("init at remote cloud", func() {
 		o := &initOptions{
-			IOStreams:     streams,
-			CloudProvider: cloudprovider.AWS,
+			IOStreams: streams,
+			baseOptions: baseOptions{
+				cloudProvider: cp.AWS,
+			},
+			clusterDef: "test-cd",
 		}
-		Expect(o.run()).Should(HaveOccurred())
+		Expect(o.validate()).Should(HaveOccurred())
 	})
 
 	It("destroy command", func() {
@@ -76,12 +83,15 @@ var _ = Describe("playground", func() {
 			IOStreams: streams,
 		}
 		Expect(o.destroyPlayground()).Should(HaveOccurred())
-		_, _ = removePlaygroundDir()
 	})
 
 	It("guide", func() {
 		cmd := newGuideCmd()
 		Expect(cmd).ShouldNot(BeNil())
-		Expect(runGuide()).Should(HaveOccurred())
+		printGuide(false, "")
+	})
+
+	It("test", func() {
+		fmt.Println(rand.String(10))
 	})
 })

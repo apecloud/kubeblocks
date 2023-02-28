@@ -14,11 +14,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package playground
+package cloudprovider
 
 import (
 	"context"
 	"fmt"
+	"io"
 	"net"
 	"os"
 	"strconv"
@@ -32,43 +33,75 @@ import (
 	k3d "github.com/k3d-io/k3d/v5/pkg/types"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
 
 	"github.com/apecloud/kubeblocks/internal/cli/util"
+	"github.com/apecloud/kubeblocks/version"
 )
 
-// installer will handle the playground cluster creation and management
-type installer struct {
-	cfg         config.ClusterConfig
-	ctx         context.Context
-	clusterName string
-	genericclioptions.IOStreams
+var (
+	// CliDockerNetwork is docker network for k3d cluster when `kbcli playground`
+	// all cluster will be created in this network, so they can communicate with each other
+	CliDockerNetwork = "k3d-kbcli-playground"
+
+	// K3sImage is k3s image repo
+	K3sImage = "rancher/k3s:" + version.K3sImageTag
+
+	// K3dToolsImage is k3d tools image repo
+	K3dToolsImage = "docker.io/apecloud/k3d-tools:" + version.K3dVersion
+
+	// K3dProxyImage is k3d proxy image repo
+	K3dProxyImage = "docker.io/apecloud/k3d-proxy:" + version.K3dVersion
+)
+
+// localCloudProvider will handle the k3d playground cluster creation and management
+type localCloudProvider struct {
+	cfg config.ClusterConfig
+	ctx context.Context
+
+	stdout io.Writer
+	stderr io.Writer
 }
 
-func (i *installer) verboseLog(v bool) {
+// localCloudProvider should be an implementation of cloud provider
+var _ Interface = &localCloudProvider{}
+
+func NewLocalCloudProvider(stdout, stderr io.Writer) *localCloudProvider {
+	return &localCloudProvider{
+		ctx:    context.Background(),
+		stdout: stdout,
+		stderr: stderr,
+	}
+}
+
+func (p *localCloudProvider) VerboseLog(v bool) {
 	if !v {
 		// set k3d log level to warning to avoid so much info log
 		l.Log().SetLevel(logrus.WarnLevel)
 	}
 }
 
-// Install install a k3d cluster
-func (i *installer) install() error {
+func (p *localCloudProvider) Name() string {
+	return Local
+}
+
+// CreateK8sCluster create a local kubernetes cluster using k3d
+func (p *localCloudProvider) CreateK8sCluster(name string, init bool) error {
 	var err error
 
-	if i.cfg, err = buildClusterRunConfig(i.clusterName); err != nil {
+	if p.cfg, err = buildClusterRunConfig(name); err != nil {
 		return err
 	}
 
-	if err = setUpK3d(i.ctx, &i.cfg); err != nil {
-		return errors.Wrap(err, "failed to setup k3d cluster")
+	if err = setUpK3d(p.ctx, &p.cfg); err != nil {
+		return errors.Wrapf(err, "failed to create k3d cluster %s", name)
 	}
-	return nil
+
+	return p.UpdateKubeconfig(name)
 }
 
-// uninstall remove the k3d cluster
-func (i *installer) uninstall() error {
-	clusters, err := k3dClient.ClusterList(i.ctx, runtimes.SelectedRuntime)
+// DeleteK8sCluster remove the k3d cluster
+func (p *localCloudProvider) DeleteK8sCluster(name string) error {
+	clusters, err := k3dClient.ClusterList(p.ctx, runtimes.SelectedRuntime)
 	if err != nil {
 		return errors.Wrap(err, "fail to get k3d cluster list")
 	}
@@ -77,22 +110,22 @@ func (i *installer) uninstall() error {
 		return errors.New("no cluster found")
 	}
 
-	// find playground cluster
-	var playgroundCluster *k3d.Cluster
+	// find cluster that matches the name
+	var cluster *k3d.Cluster
 	for _, c := range clusters {
-		if c.Name == i.clusterName {
-			playgroundCluster = c
+		if c.Name == name {
+			cluster = c
 			break
 		}
 	}
 
 	//	extra handling to clean up tools nodes
 	defer func() {
-		if nl, err := k3dClient.NodeList(i.ctx, runtimes.SelectedRuntime); err == nil {
-			toolNode := fmt.Sprintf("k3d-%s-tools", i.clusterName)
+		if nl, err := k3dClient.NodeList(p.ctx, runtimes.SelectedRuntime); err == nil {
+			toolNode := fmt.Sprintf("k3d-%s-tools", name)
 			for _, n := range nl {
 				if n.Name == toolNode {
-					if err := k3dClient.NodeDelete(i.ctx, runtimes.SelectedRuntime, n, k3d.NodeDeleteOpts{}); err != nil {
+					if err := k3dClient.NodeDelete(p.ctx, runtimes.SelectedRuntime, n, k3d.NodeDeleteOpts{}); err != nil {
 						fmt.Printf("Delete node %s failed.", toolNode)
 					}
 					break
@@ -101,33 +134,29 @@ func (i *installer) uninstall() error {
 		}
 	}()
 
-	if playgroundCluster == nil {
-		return fmt.Errorf("playground k3d cluster does not exist")
+	if cluster == nil {
+		return fmt.Errorf("k3d cluster %s does not exist", name)
 	}
 
 	// delete playground cluster
-	if err = k3dClient.ClusterDelete(i.ctx, runtimes.SelectedRuntime, playgroundCluster,
+	if err = k3dClient.ClusterDelete(p.ctx, runtimes.SelectedRuntime, cluster,
 		k3d.ClusterDeleteOpts{SkipRegistryCheck: false}); err != nil {
-		return errors.Wrap(err, "failed to delete playground cluster")
+		return errors.Wrapf(err, "failed to delete playground cluster %s", name)
 	}
 
-	// remove playground cluster kubeconfig
-	if err = util.RemoveConfig(i.clusterName); err != nil {
-		return errors.Wrap(err, "failed to remove playground kubeconfig file")
-	}
-
-	return nil
+	// remove cluster info from kubeconfig
+	return k3dClient.KubeconfigRemoveClusterFromDefaultConfig(p.ctx, cluster)
 }
 
-// genKubeconfig generate a kubeconfig to access the k3d cluster
-func (i *installer) genKubeconfig() error {
+// UpdateKubeconfig generate a kubeconfig to access the k3d cluster
+func (p *localCloudProvider) UpdateKubeconfig(name string) error {
 	var err error
 
-	configPath := util.ConfigPath(i.clusterName)
-	_, err = k3dClient.KubeconfigGetWrite(i.ctx, runtimes.SelectedRuntime, &i.cfg.Cluster, configPath,
+	configPath := util.ConfigPath("config")
+	_, err = k3dClient.KubeconfigGetWrite(p.ctx, runtimes.SelectedRuntime, &p.cfg.Cluster, configPath,
 		&k3dClient.WriteKubeConfigOptions{UpdateExisting: true, OverwriteExisting: false, UpdateCurrentContext: true})
 	if err != nil {
-		return errors.Wrap(err, "failed to generate kubeconfig")
+		return errors.Wrapf(err, "failed to generate kubeconfig for cluster %s", name)
 	}
 
 	_cfgContent, err := os.ReadFile(configPath)
@@ -154,8 +183,20 @@ func (i *installer) genKubeconfig() error {
 	if err = os.WriteFile(configPath, []byte(cfgHostContent), 0600); err != nil {
 		fmt.Println("Fail to re-write host kubeconfig")
 	}
-
 	return nil
+}
+
+func (p *localCloudProvider) GetExistedClusters() ([]string, error) {
+	clusters, err := k3dClient.ClusterList(p.ctx, runtimes.SelectedRuntime)
+	if err != nil {
+		return nil, errors.Wrap(err, "fail to get k3d cluster list")
+	}
+
+	names := make([]string, len(clusters))
+	for i, c := range clusters {
+		names[i] = c.Name
+	}
+	return names, nil
 }
 
 // buildClusterRunConfig returns the run-config for the k3d cluster

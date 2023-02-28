@@ -17,19 +17,14 @@ limitations under the License.
 package playground
 
 import (
-	"testing"
-
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
 
-func TestPlayground(t *testing.T) {
-	RegisterFailHandler(Fail)
-	RunSpecs(t, "PlayGround Suite")
-}
-
-var _ = BeforeSuite(func() {
-	// set default cluster name to test
-	k8sClusterName = "playground-test"
-	kbClusterName = "playground-test-cluster"
+var _ = Describe("util", func() {
+	It("playground dir", func() {
+		dir, err := playgroundDir()
+		Expect(err).Should(Succeed())
+		Expect(dir).ShouldNot(Equal(""))
+	})
 })

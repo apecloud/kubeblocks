@@ -17,27 +17,32 @@ limitations under the License.
 package cloudprovider
 
 const (
-	Local = "local"
+	Local        = "local"
+	AWS          = "aws"
+	AlibabaCloud = "alibaba-cloud"
+	Azure        = "azure"
+	GCP          = "gcp"
 )
 
-type localCloudProvider struct {
+var (
+	cloudProviderK8sServiceMap = map[string]string{
+		Local:        "k3s",
+		AWS:          "eks",
+		AlibabaCloud: "ack",
+		Azure:        "aks",
+		GCP:          "gke",
+	}
+)
+
+const (
+	GitRepoName = "cloud-provider"
+	GitRepoURL  = "https://github.com/apecloud/cloud-provider"
+)
+
+func CloudProviders() []string {
+	return []string{Local, AWS, Azure, GCP, AlibabaCloud}
 }
 
-func (p *localCloudProvider) Name() string {
-	return Local
-}
-
-func (p *localCloudProvider) Apply(destroy bool) error {
-	return nil
-}
-
-func (p *localCloudProvider) Instance() (Instance, error) {
-	return &localInstance{}, nil
-}
-
-type localInstance struct {
-}
-
-func (l *localInstance) GetIP() string {
-	return "127.0.0.1"
+func K8sService(provider string) string {
+	return cloudProviderK8sServiceMap[provider]
 }

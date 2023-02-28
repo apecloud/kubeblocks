@@ -75,6 +75,6 @@ var _ = Describe("backupconfig", func() {
 		}
 		cmd := NewBackupConfigCmd(tf, streams)
 		Expect(cmd).ShouldNot(BeNil())
-		Expect(o.PostInstall()).Should(HaveOccurred())
+		Expect(o.Install()).Should(Succeed())
 	})
 })

@@ -169,12 +169,28 @@ func CRDGVR() schema.GroupVersionResource {
 	}
 }
 
-func CMGVR() schema.GroupVersionResource {
+func ConfigmapGVR() schema.GroupVersionResource {
 	return schema.GroupVersionResource{Group: corev1.GroupName, Version: VersionV1, Resource: ResourceConfigmaps}
 }
 
-func STSGVR() schema.GroupVersionResource {
+func StatefulSetGVR() schema.GroupVersionResource {
 	return schema.GroupVersionResource{Group: appsv1.GroupName, Version: VersionV1, Resource: ResourceStatefulSets}
+}
+
+func DeployGVR() schema.GroupVersionResource {
+	return schema.GroupVersionResource{Group: appsv1.GroupName, Version: VersionV1, Resource: ResourceDeployments}
+}
+
+func ServiceGVR() schema.GroupVersionResource {
+	return schema.GroupVersionResource{Group: corev1.GroupName, Version: VersionV1, Resource: "services"}
+}
+
+func PVCGVR() schema.GroupVersionResource {
+	return schema.GroupVersionResource{Group: corev1.GroupName, Version: VersionV1, Resource: "persistentvolumeclaims"}
+}
+
+func PVGVR() schema.GroupVersionResource {
+	return schema.GroupVersionResource{Group: corev1.GroupName, Version: VersionV1, Resource: "persistentvolumes"}
 }
 
 func ConfigConstraintGVR() schema.GroupVersionResource {

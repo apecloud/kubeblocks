@@ -323,10 +323,18 @@ func getCompCommandArgs(compDef *appsv1alpha1.ClusterComponentDefinition) ([]str
 	return command, execCfg.Args, nil
 }
 
+// buildCommand build connection command by SystemAccounts.CmdExecutorConfig.
+// CLI should not be coupled to a specific engine, so read command info from
+// clusterDefinition, but now these information is used to create system
+// accounts, we need to do some special handling.
+//
+// TODO: Refactoring using command channel
 func buildCommand(info *engine.ConnectionInfo) []string {
 	command := []string{"sh", "-c"}
 	args := info.Command
 	for _, arg := range info.Args {
+		// KB_ACCOUNT_STATEMENT is used to create system accounts, ignore it
+		// replace KB_ACCOUNT_ENDPOINT with local host IP
 		if strings.Contains(arg, "$(KB_ACCOUNT_ENDPOINT)") && strings.Contains(arg, "$(KB_ACCOUNT_STATEMENT)") {
 			arg = strings.Replace(arg, "$(KB_ACCOUNT_ENDPOINT)", "127.0.0.1", 1)
 			arg = strings.Replace(arg, "$(KB_ACCOUNT_STATEMENT)", "", 1)

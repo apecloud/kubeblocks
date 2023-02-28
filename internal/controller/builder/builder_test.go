@@ -33,7 +33,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
-	cfgcm "github.com/apecloud/kubeblocks/internal/configuration/configmap"
+	cfgcm "github.com/apecloud/kubeblocks/internal/configuration/config_manager"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
@@ -406,7 +406,7 @@ var _ = Describe("builder", func() {
 		})
 
 		It("builds config manager sidecar container correctly", func() {
-			sidecarRenderedParam := &cfgcm.ConfigManagerSidecar{
+			sidecarRenderedParam := &cfgcm.ConfigManagerParams{
 				ManagerName: "cfgmgr",
 				Image:       constant.KBImage,
 				Args:        []string{},

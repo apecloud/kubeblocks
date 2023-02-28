@@ -121,7 +121,7 @@ var _ = Describe("list", func() {
 	})
 
 	It("list users", func() {
-		cmd := NewListUsersCmd(tf, streams)
+		cmd := NewListAccountsCmd(tf, streams)
 		Expect(cmd).ShouldNot(BeNil())
 
 		cmd.Run(cmd, []string{"test"})

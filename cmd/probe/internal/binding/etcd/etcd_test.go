@@ -26,6 +26,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dapr/components-contrib/bindings"
 	"github.com/dapr/kit/logger"
 	"github.com/pkg/errors"
 	clientv3 "go.etcd.io/etcd/client/v3"
@@ -47,7 +48,7 @@ func TestGetRole(t *testing.T) {
 		t.Errorf("start embedded etcd server error: %s", err)
 	}
 	e := mockEtcd(etcdServer)
-	role, err := e.GetRole(context.Background(), "")
+	role, err := e.GetRole(context.Background(), &bindings.InvokeRequest{}, &bindings.InvokeResponse{})
 	if err != nil {
 		t.Errorf("get role error: %s", err)
 	}
@@ -56,14 +57,14 @@ func TestGetRole(t *testing.T) {
 	}
 }
 
-func TestInitIfNeed(t *testing.T) {
+func TestInitDelay(t *testing.T) {
 	etcdServer, err := startEtcdServer(testEndpoint)
 	defer stopEtcdServer(etcdServer)
 	if err != nil {
 		t.Errorf("start embedded etcd server error: %s", err)
 	}
 	e := &Etcd{endpoint: testEndpoint}
-	err = e.InitIfNeed()
+	err = e.InitDelay()
 	if err != nil {
 		t.Errorf("etcd client init error: %s", err)
 	}

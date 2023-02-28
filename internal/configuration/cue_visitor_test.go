@@ -284,7 +284,7 @@ func TestTransNumberOrBoolType(t *testing.T) {
 			for i := 0; i < len(tt.args.objs); i++ {
 				if err := transNumberOrBoolType(tt.args.t, reflect.ValueOf(tt.args.objs[i]), func(v interface{}) {
 					require.EqualValues(t, v, tt.args.expected[i])
-				}, tt.args.expand); (err != nil) != tt.wantErr {
+				}, tt.args.expand, false); (err != nil) != tt.wantErr {
 					t.Errorf("transNumberOrBoolType() error = %v, wantErr %v", err, tt.wantErr)
 				}
 			}

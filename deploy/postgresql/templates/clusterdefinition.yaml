@@ -239,7 +239,7 @@ spec:
           image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ default .Values.image.tag .Chart.AppVersion }}
           command: ["psql"]
           args:
-          - -h$(KB_ACCOUNT_ENDPOINT) 
+          - -h$(KB_ACCOUNT_ENDPOINT)
           - -c $(KB_ACCOUNT_STATEMENT)
           env:
           - name: PGUSER
@@ -251,7 +251,7 @@ spec:
             valueFrom:
               secretKeyRef:
                 name: $(CONN_CREDENTIAL_SECRET_NAME)
-                key: postgres-password     
+                key: postgres-password
         passwordConfig:
           length: 10
           numDigits: 5

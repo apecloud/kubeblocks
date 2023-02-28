@@ -1,27 +1,25 @@
-## kbcli kubeblocks list-versions
+## kbcli cluster list-accounts
 
-List KubeBlocks versions
+List cluster accounts
 
 ```
-kbcli kubeblocks list-versions [flags]
+kbcli cluster list-accounts NAME [flags]
 ```
 
 ### Examples
 
 ```
-  # list KubeBlocks release version
-  kbcli kubeblocks list-versions
-  
-  # list KubeBlocks versions including development versions, such as alpha, beta and release candidate
-  kbcli kubeblocks list-versions --devel
+  # list all accounts of a specified cluster
+  kbcli cluster list-accounts mycluster
 ```
 
 ### Options
 
 ```
-      --devel       Use development versions (alpha, beta, and release candidate releases), too. Equivalent to version '>0.0.0-0'.
-  -h, --help        help for list-versions
-      --limit int   Maximum rows of versions to return, 0 means no limit (default 10) (default 10)
+  -A, --all-namespace     If present, list the requested object(s) across all namespaces. Namespace in current context is ignored even if specified with --namespace.
+  -h, --help              help for list-accounts
+  -o, --output format     prints the output in the specified format. Allowed values: table, json, yaml, wide (default table)
+  -l, --selector string   Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2). Matching objects must satisfy all of the specified label constraints.
 ```
 
 ### Options inherited from parent commands
@@ -50,5 +48,5 @@ kbcli kubeblocks list-versions [flags]
 
 ### SEE ALSO
 
-* [kbcli kubeblocks](kbcli_kubeblocks.md)	 - KubeBlocks operation commands
+* [kbcli cluster](kbcli_cluster.md)	 - Cluster command
 

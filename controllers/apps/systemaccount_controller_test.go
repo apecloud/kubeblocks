@@ -31,6 +31,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 )
@@ -256,7 +257,7 @@ var _ = Describe("SystemAccount Controller", func() {
 
 			By("Make sure cluster root conn credential is ready.")
 			Eventually(func(g Gomega) {
-				rootSecretName := clusterKey.Name + "-conn-credential"
+				rootSecretName := component.GenerateConnCredential(clusterKey.Name)
 				rootSecret := &corev1.Secret{}
 				g.Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: clusterKey.Namespace, Name: rootSecretName}, rootSecret)).To(Succeed())
 			}, timeout, interval).Should(Succeed())

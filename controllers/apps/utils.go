@@ -17,14 +17,13 @@ limitations under the License.
 package apps
 
 import (
-	"fmt"
-
 	"github.com/apecloud/kubeblocks/internal/constant"
+	"github.com/apecloud/kubeblocks/internal/controller/component"
 )
 
-func getEnvReplacementMapForConnCrential(clusterName string) map[string]string {
+func getEnvReplacementMapForConnCredential(clusterName string) map[string]string {
 	return map[string]string{
-		constant.ConnCredentialPlaceHolder: fmt.Sprintf("%s-conn-credential", clusterName),
+		constant.ConnCredentialPlaceHolder: component.GenerateConnCredential(clusterName),
 	}
 }
 

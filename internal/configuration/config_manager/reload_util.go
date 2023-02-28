@@ -46,7 +46,6 @@ func wrapGoTemplateRun(tplName string, tplContent string, updatedParams map[stri
 		commandChannel DynamicParamUpdater
 	)
 
-	// TODO using dapper command channel
 	if commandChannel, err = NewCommandChannel(viper.GetString(DBType)); err != nil {
 		return err
 	}
@@ -64,12 +63,12 @@ func constructReloadBuiltinFuncs(cc DynamicParamUpdater) *gotemplate.BuiltInObje
 		builtInExecFunctionName: func(command string, args ...string) (string, error) {
 			execCommand := exec.Command(command, args...)
 			stdout, err := cfgcontainer.ExecShellCommand(execCommand)
-			logger.V(4).Info(fmt.Sprintf("command: [%s], output: %s, err: %v", execCommand.String(), stdout, err))
+			logger.V(1).Info(fmt.Sprintf("command: [%s], output: %s, err: %v", execCommand.String(), stdout, err))
 			return stdout, err
 		},
 		builtInUpdateVariableFunctionName: func(sql string) error {
 			r, err := cc.ExecCommand(sql)
-			logger.V(4).Info(fmt.Sprintf("sql: [%s], result: [%v]", sql, r))
+			logger.V(1).Info(fmt.Sprintf("sql: [%s], result: [%v]", sql, r))
 			return err
 		},
 	}
@@ -82,7 +81,7 @@ func createUpdatedParamsPatch(newVersion []string, oldVersion []string, formatCf
 		Log:     logger,
 	}
 
-	logger.V(4).Info(fmt.Sprintf("new version files: %v, old version files: %v", newVersion, oldVersion))
+	logger.V(1).Info(fmt.Sprintf("new version files: %v, old version files: %v", newVersion, oldVersion))
 	oldData, err := fromConfigFiles(oldVersion)
 	if err != nil {
 		return nil, err
@@ -123,7 +122,7 @@ func fromConfigFiles(files []string) (map[string]string, error) {
 }
 
 func resolveLink(path string) (string, error) {
-	logger.Info(fmt.Sprintf("resolveLink : %s", path))
+	logger.V(1).Info(fmt.Sprintf("resolveLink : %s", path))
 
 	realPath, err := os.Readlink(path)
 	if err != nil {
@@ -132,7 +131,7 @@ func resolveLink(path string) (string, error) {
 	if !filepath.IsAbs(realPath) {
 		realPath = filepath.Join(filepath.Dir(path), realPath)
 	}
-	logger.V(4).Info(fmt.Sprintf("real path: %s", realPath))
+	logger.V(1).Info(fmt.Sprintf("real path: %s", realPath))
 	fileInfo, err := os.Stat(realPath)
 	if err != nil {
 		return "", err
@@ -186,9 +185,9 @@ func scanConfigurationFiles(dirs []string, filter regexFilter) ([]string, error)
 		if err != nil {
 			return nil, err
 		}
-		logger.Info(fmt.Sprintf("scan watch directory: %s", dir))
+		logger.V(1).Info(fmt.Sprintf("scan watch directory: %s", dir))
 		for _, f := range files {
-			logger.Info(fmt.Sprintf("scan file: %s", f.Name()))
+			logger.V(1).Info(fmt.Sprintf("scan file: %s", f.Name()))
 			if realPath, err := readlink(dir, f, filter); err == nil && realPath != "" {
 				logger.Info(fmt.Sprintf("find valid config file: %s", realPath))
 				configs = append(configs, realPath)

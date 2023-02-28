@@ -375,7 +375,7 @@ func validateConfigTPLs(cli client.Client, ctx intctrlutil.RequestCtx, configTpl
 		}
 		if !validateConfTplStatus(tpl.Status) {
 			errMsg := fmt.Sprintf("Configuration template CR[%s] status not ready! current status: %s", tpl.Name, tpl.Status.Phase)
-			ctx.Log.V(4).Info(errMsg)
+			ctx.Log.V(1).Info(errMsg)
 			return false, fmt.Errorf(errMsg)
 		}
 	}

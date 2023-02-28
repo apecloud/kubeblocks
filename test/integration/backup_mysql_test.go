@@ -25,6 +25,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 )
@@ -137,7 +138,7 @@ var _ = Describe("MySQL data protection function", func() {
 			WithRandomName().
 			SetBackupPolicyTplName(backupPolicyTemplateName).
 			AddMatchLabels(intctrlutil.AppInstanceLabelKey, clusterKey.Name).
-			SetTargetSecretName(clusterKey.Name+"-conn-credential").
+			SetTargetSecretName(component.GenerateConnCredential(clusterKey.Name)).
 			SetRemoteVolumePVC(backupRemoteVolumeName, backupRemotePVCName).
 			Create(&testCtx).GetObject()
 		backupPolicyKey := client.ObjectKeyFromObject(backupPolicyObj)

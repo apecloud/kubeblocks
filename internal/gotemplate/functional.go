@@ -18,6 +18,7 @@ package gotemplate
 
 import (
 	"fmt"
+	"regexp"
 	"strconv"
 
 	corev1 "k8s.io/api/core/v1"
@@ -56,4 +57,12 @@ func constructArgsValueKey(i int) string {
 
 func failed(errMessage string, args ...interface{}) (string, error) {
 	return "", cfgcore.MakeError(errMessage, args...)
+}
+
+func regexStringSubmatch(regex string, s string) ([]string, error) {
+	r, err := regexp.Compile(regex)
+	if err != nil {
+		return nil, err
+	}
+	return r.FindStringSubmatch(s), nil
 }

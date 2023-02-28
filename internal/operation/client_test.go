@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"net"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
@@ -181,9 +180,8 @@ func newTCPServer(t *testing.T, port int) (int, func()) {
 
 type testDaprServer struct {
 	pb.UnimplementedDaprServer
-	state                             map[string][]byte
-	configurationSubscriptionIDMapLoc sync.Mutex
-	configurationSubscriptionID       map[string]chan struct{}
+	state                       map[string][]byte
+	configurationSubscriptionID map[string]chan struct{}
 }
 
 func (s *testDaprServer) InvokeBinding(ctx context.Context, req *pb.InvokeBindingRequest) (*pb.InvokeBindingResponse, error) {

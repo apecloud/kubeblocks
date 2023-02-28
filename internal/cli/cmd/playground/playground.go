@@ -121,6 +121,7 @@ func newDestroyCmd(streams genericclioptions.IOStreams) *cobra.Command {
 		Use:   "destroy",
 		Short: "Destroy the playground cluster.",
 		Run: func(cmd *cobra.Command, args []string) {
+
 			util.CheckErr(o.destroyPlayground())
 		},
 	}
@@ -228,7 +229,7 @@ func (o *initOptions) cloud() error {
 `)
 
 	// confirm to run
-	fmt.Fprintf(o.Out, "\nDo you want to perform this actions?\n  Only 'yes' will be accepted to approve.\n\n")
+	fmt.Fprintf(o.Out, "\nDo you want to perform this action?\n  Only 'yes' will be accepted to approve.\n\n")
 	entered, err := prompt.NewPrompt("", "Enter a value:", o.In).GetInput()
 	if err != nil {
 		return err

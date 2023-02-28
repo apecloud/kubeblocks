@@ -56,11 +56,11 @@ func init() {
 	viper.SetDefault(maxConcurrentReconcilesKey, runtime.NumCPU()*2)
 }
 
-//+kubebuilder:rbac:groups=extensions.kubeblocks.io,resources=addons,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=extensions.kubeblocks.io,resources=addons/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=extensions.kubeblocks.io,resources=addons/finalizers,verbs=update
+// +kubebuilder:rbac:groups=extensions.kubeblocks.io,resources=addons,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=extensions.kubeblocks.io,resources=addons/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=extensions.kubeblocks.io,resources=addons/finalizers,verbs=update
 
-//+kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;watch;create;update;patch;delete;deletecollection
+// +kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;watch;create;update;patch;delete;deletecollection
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.

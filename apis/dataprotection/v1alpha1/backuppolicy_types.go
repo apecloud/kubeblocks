@@ -156,7 +156,7 @@ type BackupPolicy struct {
 	Status BackupPolicyStatus `json:"status,omitempty"`
 }
 
-//+kubebuilder:object:root=true
+// +kubebuilder:object:root=true
 
 // BackupPolicyList contains a list of BackupPolicy
 type BackupPolicyList struct {

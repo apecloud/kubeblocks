@@ -52,6 +52,7 @@ func NewClusterCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 				NewListEventsCmd(f, streams),
 				NewListAccountsCmd(f, streams),
 				NewDeleteCmd(f, streams),
+				NewExposeCmd(f, streams),
 			},
 		},
 		{
@@ -97,8 +98,6 @@ func NewClusterCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 	// add subcommands
 	groups.Add(cmd)
 	templates.ActsAsRootCommand(cmd, nil, groups...)
-
-	cmd.AddCommand(NewExposeCmd(f, streams))
 
 	return cmd
 }

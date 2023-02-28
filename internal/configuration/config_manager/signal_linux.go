@@ -1,4 +1,4 @@
-//go:build darwin
+//go:build linux
 
 /*
 Copyright ApeCloud, Inc.
@@ -16,7 +16,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package configmap
+package configmanager
 
 import (
 	"os"
@@ -26,22 +26,22 @@ import (
 )
 
 var allUnixSignals = map[appsv1alpha1.SignalType]os.Signal{
-	appsv1alpha1.SIGHUP:  syscall.SIGHUP, // reload signal for mysql 8.x.xxx
-	appsv1alpha1.SIGINT:  syscall.SIGINT,
-	appsv1alpha1.SIGQUIT: syscall.SIGQUIT,
-	appsv1alpha1.SIGILL:  syscall.SIGILL,
-	appsv1alpha1.SIGTRAP: syscall.SIGTRAP,
-	appsv1alpha1.SIGABRT: syscall.SIGABRT,
-	appsv1alpha1.SIGBUS:  syscall.SIGBUS,
-	appsv1alpha1.SIGFPE:  syscall.SIGFPE,
-	appsv1alpha1.SIGKILL: syscall.SIGKILL,
-	appsv1alpha1.SIGUSR1: syscall.SIGUSR1,
-	appsv1alpha1.SIGSEGV: syscall.SIGSEGV,
-	appsv1alpha1.SIGUSR2: syscall.SIGUSR2,
-	appsv1alpha1.SIGPIPE: syscall.SIGPIPE,
-	appsv1alpha1.SIGALRM: syscall.SIGALRM,
-	appsv1alpha1.SIGTERM: syscall.SIGTERM,
-	// appsv1alpha1.SIGSTKFLT: syscall.SIGSTKFLT,
+	appsv1alpha1.SIGHUP:    syscall.SIGHUP, // reload signal for mysql 8.x.xxx
+	appsv1alpha1.SIGINT:    syscall.SIGINT,
+	appsv1alpha1.SIGQUIT:   syscall.SIGQUIT,
+	appsv1alpha1.SIGILL:    syscall.SIGILL,
+	appsv1alpha1.SIGTRAP:   syscall.SIGTRAP,
+	appsv1alpha1.SIGABRT:   syscall.SIGABRT,
+	appsv1alpha1.SIGBUS:    syscall.SIGBUS,
+	appsv1alpha1.SIGFPE:    syscall.SIGFPE,
+	appsv1alpha1.SIGKILL:   syscall.SIGKILL,
+	appsv1alpha1.SIGUSR1:   syscall.SIGUSR1,
+	appsv1alpha1.SIGSEGV:   syscall.SIGSEGV,
+	appsv1alpha1.SIGUSR2:   syscall.SIGUSR2,
+	appsv1alpha1.SIGPIPE:   syscall.SIGPIPE,
+	appsv1alpha1.SIGALRM:   syscall.SIGALRM,
+	appsv1alpha1.SIGTERM:   syscall.SIGTERM,
+	appsv1alpha1.SIGSTKFLT: syscall.SIGSTKFLT,
 	appsv1alpha1.SIGCHLD:   syscall.SIGCHLD,
 	appsv1alpha1.SIGCONT:   syscall.SIGCONT,
 	appsv1alpha1.SIGSTOP:   syscall.SIGSTOP,
@@ -55,6 +55,6 @@ var allUnixSignals = map[appsv1alpha1.SignalType]os.Signal{
 	appsv1alpha1.SIGPROF:   syscall.SIGPROF,
 	appsv1alpha1.SIGWINCH:  syscall.SIGWINCH,
 	appsv1alpha1.SIGIO:     syscall.SIGIO,
-	// appsv1alpha1.SIGPWR:    syscall.SIGPWR,
-	appsv1alpha1.SIGSYS: syscall.SIGSYS,
+	appsv1alpha1.SIGPWR:    syscall.SIGPWR,
+	appsv1alpha1.SIGSYS:    syscall.SIGSYS,
 }

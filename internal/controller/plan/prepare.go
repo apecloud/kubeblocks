@@ -34,7 +34,7 @@ import (
 	componentutil "github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	cfgutil "github.com/apecloud/kubeblocks/controllers/apps/configuration"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
-	cfgcm "github.com/apecloud/kubeblocks/internal/configuration/configmap"
+	cfgcm "github.com/apecloud/kubeblocks/internal/configuration/config_manager"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
@@ -491,9 +491,9 @@ func updateConfigurationManagerWithComponent(
 	ctx context.Context,
 	cli client.Client) error {
 	var (
-		volumeDirs     []corev1.VolumeMount
-		managerSidecar *cfgcm.ConfigManagerSidecar
-		err            error
+		volumeDirs          []corev1.VolumeMount
+		configManagerParams *cfgcm.ConfigManagerParams
+		err                 error
 
 		defaultVarRunVolumePath = "/var/run"
 		criEndpointVolumeName   = "cri-runtime-endpoint"
@@ -504,14 +504,14 @@ func updateConfigurationManagerWithComponent(
 	if volumeDirs = getUsingVolumesByCfgTemplates(podSpec, cfgTemplates); len(volumeDirs) == 0 {
 		return nil
 	}
-	if managerSidecar, err = buildConfigManagerParams(cli, ctx, cfgTemplates, volumeDirs, defaultVarRunVolumePath, criEndpointVolumeName); err != nil {
+	if configManagerParams, err = buildConfigManagerParams(cli, ctx, cfgTemplates, volumeDirs, defaultVarRunVolumePath, criEndpointVolumeName); err != nil {
 		return err
 	}
-	if managerSidecar == nil {
+	if configManagerParams == nil {
 		return nil
 	}
 
-	container, err := builder.BuildCfgManagerContainer(managerSidecar)
+	container, err := builder.BuildCfgManagerContainer(configManagerParams)
 	if err != nil {
 		return err
 	}
@@ -577,31 +577,27 @@ func getUsingVolumesByCfgTemplates(podSpec *corev1.PodSpec, cfgTemplates []appsv
 	return volumeDirs
 }
 
-func buildConfigManagerParams(cli client.Client, ctx context.Context, cfgTemplates []appsv1alpha1.ConfigTemplate, volumeDirs []corev1.VolumeMount, volumePath string, volumeName string) (*cfgcm.ConfigManagerSidecar, error) {
-	var (
-		err               error
-		reloadOptions     *appsv1alpha1.ReloadOptions
-		configManagerArgs []string
-	)
-
-	if reloadOptions, err = cfgutil.GetReloadOptions(cli, ctx, cfgTemplates); err != nil {
-		return nil, err
-	}
-	if reloadOptions == nil || reloadOptions.UnixSignalTrigger == nil {
-		return nil, nil
-	}
-
-	unixSignalOption := reloadOptions.UnixSignalTrigger
-	configManagerArgs = cfgcm.BuildSignalArgs(*unixSignalOption, volumeDirs)
-	configManager := &cfgcm.ConfigManagerSidecar{
+func buildConfigManagerParams(cli client.Client, ctx context.Context, cfgTemplates []appsv1alpha1.ConfigTemplate, volumeDirs []corev1.VolumeMount, volumePath string, volumeName string) (*cfgcm.ConfigManagerParams, error) {
+	configManagerParams := &cfgcm.ConfigManagerParams{
 		ManagerName: cfgcore.ConfigSidecarName,
 		Image:       viper.GetString(cfgcore.ConfigSidecarIMAGE),
-		Args:        configManagerArgs,
 		// add cri sock path
 		Volumes: append(volumeDirs, corev1.VolumeMount{
 			Name:      volumeName,
 			MountPath: volumePath,
 		}),
 	}
-	return configManager, nil
+
+	var err error
+	var reloadOptions *appsv1alpha1.ReloadOptions
+	if reloadOptions, err = cfgutil.GetReloadOptions(cli, ctx, cfgTemplates); err != nil {
+		return nil, err
+	}
+	if reloadOptions == nil {
+		return nil, nil
+	}
+	if err = cfgcm.BuildConfigManagerContainerArgs(reloadOptions, volumeDirs, cli, ctx, configManagerParams); err != nil {
+		return nil, err
+	}
+	return configManagerParams, nil
 }

@@ -1,3 +1,5 @@
+//go:build linux || darwin
+
 /*
 Copyright ApeCloud, Inc.
 
@@ -14,33 +16,30 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package configmap
+package configmanager
 
 import (
 	"fmt"
 	"os"
-	"testing"
-
-	"github.com/shirou/gopsutil/v3/process"
-	"github.com/stretchr/testify/require"
 )
 
-func TestFindParentPidFromProcessName(t *testing.T) {
-	processName := getProcName()
-	fmt.Printf("current test program name: %s\n", processName)
-	pid, err := findParentPidFromProcessName(processName)
-	require.Nil(t, err)
-	require.Equal(t, PID(os.Getpid()), pid)
-}
+type PID int32
 
-func getProcName() string {
-	pid := int32(os.Getpid())
-	procs, _ := process.Processes()
-	for _, proc := range procs {
-		if pid == proc.Pid {
-			name, _ := proc.Name()
-			return name
-		}
+const (
+	InvalidPID PID = 0
+)
+
+func sendSignal(pid PID, sig os.Signal) error {
+	process, err := os.FindProcess(int(pid))
+	if err != nil {
+		return err
 	}
-	return ""
+
+	logger.Info(fmt.Sprintf("send pid[%d] to signal: %s", pid, sig.String()))
+	err = process.Signal(sig)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

@@ -1,25 +1,30 @@
-## kbcli kubeblocks uninstall
+## kbcli cluster expose
 
-Uninstall KubeBlocks
+Expose a database cluster
 
 ```
-kbcli kubeblocks uninstall [flags]
+kbcli cluster expose NAME [flags]
 ```
 
 ### Examples
 
 ```
-  # uninstall KubeBlocks
-  kbcli kubeblocks uninstall
+  # Expose a cluster to vpc
+  kbcli cluster expose mycluster --type vpc --enable=true
+  
+  # Expose a cluster to internet
+  kbcli cluster expose mycluster --type internet --enable=true
+  
+  # Stop exposing a cluster
+  kbcli cluster expose mycluster --type vpc --enable=false
 ```
 
 ### Options
 
 ```
-      --auto-approve   Skip interactive approval before uninstalling KubeBlocks
-  -h, --help           help for uninstall
-      --remove-pvcs    Remove PersistentVolumeClaim or not
-      --remove-pvs     Remove PersistentVolume or not
+      --enable string   Enable or disable the expose, values can be true or false
+  -h, --help            help for expose
+      --type string     Expose type, currently supported types are 'vpc', 'internet'
 ```
 
 ### Options inherited from parent commands
@@ -48,5 +53,5 @@ kbcli kubeblocks uninstall [flags]
 
 ### SEE ALSO
 
-* [kbcli kubeblocks](kbcli_kubeblocks.md)	 - KubeBlocks operation commands
+* [kbcli cluster](kbcli_cluster.md)	 - Cluster command
 

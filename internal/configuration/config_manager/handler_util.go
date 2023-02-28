@@ -14,56 +14,68 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package configmap
+package configmanager
 
 import (
+	"context"
 	"path/filepath"
 	"regexp"
 
 	"github.com/fsnotify/fsnotify"
 	corev1 "k8s.io/api/core/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	cfgutil "github.com/apecloud/kubeblocks/internal/configuration"
 )
 
-type ConfigManagerSidecar struct {
+type ConfigManagerParams struct {
 	ManagerName string          `json:"name"`
 	Image       string          `json:"sidecarImage"`
 	Args        []string        `json:"args"`
 	Envs        []corev1.EnvVar `json:"envs"`
 
-	Volumes []corev1.VolumeMount `json:"volumes"`
+	Volumes      []corev1.VolumeMount `json:"volumes"`
+	ScriptVolume *corev1.Volume
 }
 
 func IsSupportReload(reload *appsv1alpha1.ReloadOptions) bool {
-	return reload != nil && (reload.ShellTrigger != nil || reload.UnixSignalTrigger != nil)
+	return reload != nil && (reload.ShellTrigger != nil || reload.UnixSignalTrigger != nil || reload.TPLScriptTrigger != nil)
 }
 
-func NeedBuildConfigSidecar(reloadOptions *appsv1alpha1.ReloadOptions) error {
+func ValidateReloadOptions(reloadOptions *appsv1alpha1.ReloadOptions, cli client.Client, ctx context.Context) error {
 	switch {
 	case reloadOptions.UnixSignalTrigger != nil:
-		signal := reloadOptions.UnixSignalTrigger.Signal
-		if !IsValidUnixSignal(signal) {
-			return cfgutil.MakeError("this special signal [%s] is not supported for now!", signal)
-		}
-		return nil
-	default:
-		// TODO support sql or http
-		return cfgutil.MakeError("this special reload type [%s] is not supported for now!", appsv1alpha1.SQLType)
+		return checkSignalTrigger(reloadOptions.UnixSignalTrigger)
+	case reloadOptions.ShellTrigger != nil:
+		return checkShellTrigger(reloadOptions.ShellTrigger)
+	case reloadOptions.TPLScriptTrigger != nil:
+		return checkTPLScriptTrigger(reloadOptions.TPLScriptTrigger, cli, ctx)
 	}
+	return cfgutil.MakeError("require special reload type!")
 }
 
-func BuildSignalArgs(configuration appsv1alpha1.UnixSignalTrigger, volumeDirs []corev1.VolumeMount) []string {
-	args := make([]string, 0)
-	args = append(args, "--process", configuration.ProcessName)
-	args = append(args, "--signal", string(configuration.Signal))
-	// set grpc port
-	// args = append(args, "--tcp", viper.GetString(cfgutil.ConfigManagerGPRCPortEnv))
-	for _, volume := range volumeDirs {
-		args = append(args, "--volume-dir", volume.MountPath)
+func checkTPLScriptTrigger(options *appsv1alpha1.TPLScriptTrigger, cli client.Client, ctx context.Context) error {
+	cm := corev1.ConfigMap{}
+	return cli.Get(ctx, client.ObjectKey{
+		Namespace: options.Namespace,
+		Name:      options.ScriptConfigMapRef,
+	}, &cm)
+}
+
+func checkShellTrigger(options *appsv1alpha1.ShellTrigger) error {
+	if options.Exec == "" {
+		return cfgutil.MakeError("shell trigger require exec not empty!")
 	}
-	return args
+	return nil
+}
+
+func checkSignalTrigger(options *appsv1alpha1.UnixSignalTrigger) error {
+	signal := options.Signal
+	if !IsValidUnixSignal(signal) {
+		return cfgutil.MakeError("this special signal [%s] is not supported for now!", signal)
+	}
+	return nil
 }
 
 func CreateCfgRegexFilter(regexString string) (NotifyEventFilter, error) {

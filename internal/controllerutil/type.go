@@ -100,6 +100,10 @@ const (
 )
 
 const (
+	// Container port name
+	ProbeHTTPPortName = "probe-http-port"
+	ProbeGRPCPortName = "probe-grpc-port"
+
 	// KubeBlocksDataNodeLabelKey is the node label key of the built-in data node label
 	KubeBlocksDataNodeLabelKey = "kb-data"
 	// KubeBlocksDataNodeLabelValue is the node label value of the built-in data node label

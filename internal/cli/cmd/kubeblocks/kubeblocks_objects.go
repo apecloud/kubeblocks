@@ -41,7 +41,7 @@ type kbObjects map[schema.GroupVersionResource]*unstructured.UnstructuredList
 var (
 	resourceGVRs = []schema.GroupVersionResource{
 		types.DeployGVR(),
-		types.StatefulGVR(),
+		types.StatefulSetGVR(),
 		types.ServiceGVR(),
 		types.ConfigmapGVR(),
 		types.PVCGVR(),

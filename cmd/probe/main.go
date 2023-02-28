@@ -49,6 +49,7 @@ import (
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/binding/etcd"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/binding/mongodb"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/binding/mysql"
+	"github.com/apecloud/kubeblocks/cmd/probe/internal/binding/redis"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/middleware/http/probe"
 )
 
@@ -62,6 +63,7 @@ func init() {
 	bindingsLoader.DefaultRegistry.RegisterOutputBinding(mysql.NewMysql, "mysql")
 	bindingsLoader.DefaultRegistry.RegisterOutputBinding(etcd.NewEtcd, "etcd")
 	bindingsLoader.DefaultRegistry.RegisterOutputBinding(mongodb.NewMongoDB, "mongodb")
+	bindingsLoader.DefaultRegistry.RegisterOutputBinding(redis.NewRedis, "redis")
 	bindingsLoader.DefaultRegistry.RegisterOutputBinding(dhttp.NewHTTP, "http")
 	bindingsLoader.DefaultRegistry.RegisterOutputBinding(localstorage.NewLocalStorage, "localstorage")
 	nrLoader.DefaultRegistry.RegisterComponent(mdns.NewResolver, "mdns")

@@ -185,6 +185,7 @@ func (rs *ReplicationSet) GetPhaseWhenPodsNotReady(componentName string) (appsv1
 	return util.GetComponentPhase(isFailed, isAbnormal), nil
 }
 
+// HandleUpdate is the implementation of the type Component interface method, handles replicationSet workload Pod updates.
 func (rs *ReplicationSet) HandleUpdate(obj client.Object) error {
 	var componentStsList = &appsv1.StatefulSetList{}
 	sts := util.ConvertToStatefulSet(obj)
@@ -195,12 +196,15 @@ func (rs *ReplicationSet) HandleUpdate(obj client.Object) error {
 		if sts.Generation != sts.Status.ObservedGeneration {
 			continue
 		}
-		pods, err := util.GetPodListByStatefulSet(rs.Ctx, rs.Cli, &sts)
+		pod, err := GetAndCheckReplicationPodByStatefulSet(rs.Ctx, rs.Cli, &sts)
 		if err != nil {
 			return err
 		}
-		if len(pods) != int(*sts.Spec.Replicas) {
-			continue
+		// if there is no role label on the Pod, it needs to be updated with statefulSet's role label.
+		if _, ok := pod.Labels[intctrlutil.RoleLabelKey]; !ok {
+			if err := UpdateObjRoleLabel(rs.Ctx, rs.Cli, *pod, sts.Labels[intctrlutil.RoleLabelKey]); err != nil {
+				return err
+			}
 		}
 		if err := util.DeleteStsPods(rs.Ctx, rs.Cli, &sts); err != nil {
 			return err

@@ -291,6 +291,8 @@ type ReplicationMemberStatus struct {
 }
 
 type ClusterSwitchPolicy struct {
+	// TODO other attribute extensions
+
 	// clusterSwitchPolicy type defined by Provider in ClusterDefinition, refer components[i].replicationSpec.switchPolicies[x].type
 	// +kubebuilder:validation:Required
 	// +kubebuilder:default=MaximumAvailability

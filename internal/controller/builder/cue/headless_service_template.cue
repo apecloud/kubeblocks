@@ -27,7 +27,6 @@ component: {
 		scrapePath: string
 	}
 	podSpec: containers: [...]
-	volumeClaimTemplates: [...]
 }
 
 service: {

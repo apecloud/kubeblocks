@@ -25,11 +25,13 @@ import (
 )
 
 const (
-	KubeBlocks        = "kubeblocks"
-	LogVolumeName     = "log"
-	ConfVolumeName    = "conf"
-	DataVolumeName    = "data"
-	ScriptsVolumeName = "scripts"
+	KubeBlocks          = "kubeblocks"
+	LogVolumeName       = "log"
+	ConfVolumeName      = "conf"
+	DataVolumeName      = "data"
+	ScriptsVolumeName   = "scripts"
+	ServiceVPCName      = "a-vpc-lb-service-for-app"
+	ServiceInternetName = "a-internet-lb-service-for-app"
 
 	ReplicationPodRoleVolume       = "pod-role"
 	ReplicationRoleLabelFieldPath  = "metadata.labels['kubeblocks.io/role']"
@@ -149,6 +151,7 @@ var (
 	statefulMySQLComponent = appsv1alpha1.ClusterComponentDefinition{
 		WorkloadType:  appsv1alpha1.Stateful,
 		CharacterType: "mysql",
+		Service:       &defaultMySQLService,
 		PodSpec: &corev1.PodSpec{
 			Containers: []corev1.Container{defaultMySQLContainer},
 		},

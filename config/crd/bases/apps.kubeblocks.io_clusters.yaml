@@ -285,27 +285,45 @@ spec:
                           type: object
                       type: object
                       x-kubernetes-preserve-unknown-fields: true
-                    serviceType:
-                      default: ClusterIP
-                      description: 'serviceType determines how the Service is exposed.
-                        Valid options are ClusterIP, NodePort, and LoadBalancer. "ClusterIP"
-                        allocates a cluster-internal IP address for load-balancing
-                        to endpoints. Endpoints are determined by the selector or
-                        if that is not specified, by manual construction of an Endpoints
-                        object or EndpointSlice objects. If clusterIP is "None", no
-                        virtual IP is allocated and the endpoints are published as
-                        a set of endpoints rather than a virtual IP. "NodePort" builds
-                        on ClusterIP and allocates a port on every node which routes
-                        to the same endpoints as the clusterIP. "LoadBalancer" builds
-                        on NodePort and creates an external load-balancer (if supported
-                        in the current cloud) which routes to the same endpoints as
-                        the clusterIP. More info: https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types'
-                      enum:
-                      - ClusterIP
-                      - NodePort
-                      - LoadBalancer
-                      type: string
-                      x-kubernetes-preserve-unknown-fields: true
+                    services:
+                      description: Services expose endpoints can be accessed by clients
+                      items:
+                        properties:
+                          annotations:
+                            additionalProperties:
+                              type: string
+                            description: 'If ServiceType is LoadBalancer, cloud provider
+                              related parameters can be put here More info: https://kubernetes.io/docs/concepts/services-networking/service/#loadbalancer'
+                            type: object
+                          name:
+                            description: Service name
+                            type: string
+                          serviceType:
+                            default: ClusterIP
+                            description: 'serviceType determines how the Service is
+                              exposed. Valid options are ClusterIP, NodePort, and
+                              LoadBalancer. "ClusterIP" allocates a cluster-internal
+                              IP address for load-balancing to endpoints. Endpoints
+                              are determined by the selector or if that is not specified,
+                              by manual construction of an Endpoints object or EndpointSlice
+                              objects. If clusterIP is "None", no virtual IP is allocated
+                              and the endpoints are published as a set of endpoints
+                              rather than a virtual IP. "NodePort" builds on ClusterIP
+                              and allocates a port on every node which routes to the
+                              same endpoints as the clusterIP. "LoadBalancer" builds
+                              on NodePort and creates an external load-balancer (if
+                              supported in the current cloud) which routes to the
+                              same endpoints as the clusterIP. More info: https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types'
+                            enum:
+                            - ClusterIP
+                            - NodePort
+                            - LoadBalancer
+                            type: string
+                            x-kubernetes-preserve-unknown-fields: true
+                        required:
+                        - name
+                        type: object
+                      type: array
                     switchPolicy:
                       description: switchPolicy defines the strategy for switchover
                         and failover when workloadType is Replication.

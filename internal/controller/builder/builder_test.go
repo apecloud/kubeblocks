@@ -109,6 +109,8 @@ var _ = Describe("builder", func() {
 			clusterDefObj.Name, clusterVersionObj.Name).
 			AddComponent(mysqlCompName, mysqlCompType).SetReplicas(1).
 			AddVolumeClaimTemplate(testapps.DataVolumeName, &pvcSpec).
+			AddService(testapps.ServiceVPCName, corev1.ServiceTypeLoadBalancer).
+			AddService(testapps.ServiceInternetName, corev1.ServiceTypeLoadBalancer).
 			GetObject()
 		key := client.ObjectKeyFromObject(clusterObj)
 		if needCreate {
@@ -208,9 +210,9 @@ var _ = Describe("builder", func() {
 
 		It("builds Service correctly", func() {
 			params := newParams()
-			svc, err := BuildSvc(*params, true)
+			svcList, err := BuildSvcList(*params)
 			Expect(err).Should(BeNil())
-			Expect(svc).ShouldNot(BeNil())
+			Expect(svcList).ShouldNot(BeEmpty())
 		})
 
 		It("builds Conn. Credential correctly", func() {
@@ -245,7 +247,7 @@ var _ = Describe("builder", func() {
 				params.Cluster.Namespace)
 			var mysqlPort corev1.ServicePort
 			var paxosPort corev1.ServicePort
-			for _, s := range params.Component.Service.Ports {
+			for _, s := range params.Component.Services[0].Spec.Ports {
 				switch s.Name {
 				case "mysql":
 					mysqlPort = s

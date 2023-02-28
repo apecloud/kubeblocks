@@ -1,0 +1,24 @@
+dependencies:
+- name: apecloud-mysql
+  repository: file://../apecloud-mysql
+  version: 0.1.8
+- name: postgresql
+  repository: file://../postgresql
+  version: 0.1.1
+- name: grafana
+  repository: https://grafana.github.io/helm-charts
+  version: 6.43.5
+- name: prometheus
+  repository: https://prometheus-community.github.io/helm-charts
+  version: 15.16.1
+- name: loadbalancer
+  repository: file://../loadbalancer
+  version: 0.1.0
+- name: snapshot-controller
+  repository: https://piraeus.io/helm-charts
+  version: 1.7.2
+- name: csi-s3
+  repository: https://github.com/CloudVE/helm-charts/raw/master
+  version: 0.31.3
+digest: sha256:0d075af40701c7faf66b3eb42881a24e8815050732a20940a5012ac63ce73409
+generated: "2023-02-28T17:46:16.977192+08:00"

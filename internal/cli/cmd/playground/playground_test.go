@@ -25,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 
+	cp "github.com/apecloud/kubeblocks/internal/cli/cloudprovider"
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 )
@@ -59,7 +60,6 @@ var _ = Describe("playground", func() {
 		}
 		Expect(o.validate()).Should(Succeed())
 		Expect(o.run()).To(MatchError(MatchRegexp("failed to set up k3d cluster")))
-
 		Expect(o.installKubeBlocks()).Should(HaveOccurred())
 		Expect(o.installCluster()).Should(HaveOccurred())
 	})
@@ -68,10 +68,11 @@ var _ = Describe("playground", func() {
 		o := &initOptions{
 			IOStreams: streams,
 			baseOptions: baseOptions{
-				cloudProvider: defaultCloudProvider,
+				cloudProvider: cp.AWS,
 			},
+			clusterDef: "test-cd",
 		}
-		Expect(o.run()).Should(HaveOccurred())
+		Expect(o.validate()).Should(HaveOccurred())
 	})
 
 	It("destroy command", func() {

@@ -27,10 +27,6 @@ import (
 	"github.com/pkg/errors"
 )
 
-const (
-	AWSDefaultRegion = "cn-northwest-1"
-)
-
 type awsCloudProvider struct {
 	region string
 	stdout io.Writer
@@ -44,10 +40,6 @@ type awsCloudProvider struct {
 var _ Interface = &awsCloudProvider{}
 
 func NewAWSCloudProvider(region, tfRootPath string, stdout, stderr io.Writer) (Interface, error) {
-	if region == "" {
-		region = AWSDefaultRegion
-	}
-
 	// check aws path exists
 	awsPath := filepath.Join(tfRootPath, "aws")
 	if _, err := os.Stat(awsPath); err != nil {

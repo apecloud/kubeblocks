@@ -153,6 +153,10 @@ func (o *initOptions) validate() error {
 	if o.cloudProvider != cp.Local && o.cloudProvider != cp.AWS {
 		return fmt.Errorf("cloud provider %s is not supported yet", o.cloudProvider)
 	}
+
+	if o.cloudProvider != cp.Local && o.region == "" {
+		return fmt.Errorf("when cloud provider %s is specified, region should be specified", o.cloudProvider)
+	}
 	return nil
 }
 

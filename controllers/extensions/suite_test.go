@@ -14,33 +14,32 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package dataprotection
+package extensions
 
 import (
 	"context"
 	"fmt"
-	"go/build"
 	"path/filepath"
 	"testing"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	batchv1 "k8s.io/api/batch/v1"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
-	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
+	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
 	//+kubebuilder:scaffold:imports
 
-	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	"github.com/spf13/viper"
 	"go.uber.org/zap/zapcore"
+	ctrl "sigs.k8s.io/controller-runtime"
 
-	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/testutil"
 )
 
@@ -61,7 +60,7 @@ func init() {
 func TestAPIs(t *testing.T) {
 	RegisterFailHandler(Fail)
 
-	RunSpecs(t, "Data Protection Controller Suite")
+	RunSpecs(t, "Controller Suite")
 }
 
 var _ = BeforeSuite(func() {
@@ -73,18 +72,13 @@ var _ = BeforeSuite(func() {
 
 	ctx, cancel = context.WithCancel(context.TODO())
 
+	viper.SetDefault("CM_NAMESPACE", "default")
 	viper.SetDefault("KUBEBLOCKS_IMAGE", "apecloud/kubeblocks:latest")
 	fmt.Printf("config settings: %v\n", viper.AllSettings())
 
 	By("bootstrapping test environment")
 	testEnv = &envtest.Environment{
-		CRDDirectoryPaths: []string{
-			filepath.Join("..", "..", "config", "crd", "bases"),
-			// use dependent external CRDs.
-			// resolved by ref: https://github.com/operator-framework/operator-sdk/issues/4434#issuecomment-786794418
-			filepath.Join(build.Default.GOPATH, "pkg", "mod", "github.com", "kubernetes-csi/external-snapshotter/",
-				"client/v6@v6.2.0", "config", "crd"),
-		},
+		CRDDirectoryPaths:     []string{filepath.Join("..", "..", "config", "crd", "bases")},
 		ErrorIfCRDPathMissing: true,
 	}
 
@@ -94,75 +88,28 @@ var _ = BeforeSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 	Expect(cfg).NotTo(BeNil())
 
-	scheme := scheme.Scheme
-
-	err = snapshotv1.AddToScheme(scheme)
+	err = batchv1.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
 
-	err = dataprotectionv1alpha1.AddToScheme(scheme)
+	err = extensionsv1alpha1.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
 
 	//+kubebuilder:scaffold:scheme
 
-	k8sClient, err = client.New(cfg, client.Options{Scheme: scheme})
+	k8sClient, err = client.New(cfg, client.Options{Scheme: scheme.Scheme})
 	Expect(err).NotTo(HaveOccurred())
 	Expect(k8sClient).NotTo(BeNil())
-
-	uncachedObjects := []client.Object{
-		&dataprotectionv1alpha1.BackupPolicyTemplate{},
-		&dataprotectionv1alpha1.BackupPolicy{},
-		&dataprotectionv1alpha1.BackupTool{},
-		&dataprotectionv1alpha1.Backup{},
-		&dataprotectionv1alpha1.RestoreJob{},
-	}
-	// run reconcile
+	scheme := scheme.Scheme
 	k8sManager, err := ctrl.NewManager(cfg, ctrl.Options{
-		Scheme:                scheme,
-		MetricsBindAddress:    "0",
-		ClientDisableCacheFor: uncachedObjects,
+		Scheme:             scheme,
+		MetricsBindAddress: "0",
 	})
 	Expect(err).ToNot(HaveOccurred())
 
-	err = (&BackupReconciler{
+	err = (&AddonReconciler{
 		Client:   k8sManager.GetClient(),
 		Scheme:   k8sManager.GetScheme(),
-		Recorder: k8sManager.GetEventRecorderFor("backup-controller"),
-	}).SetupWithManager(k8sManager)
-	Expect(err).ToNot(HaveOccurred())
-	Expect(err).ToNot(HaveOccurred())
-
-	err = (&BackupPolicyReconciler{
-		Client:   k8sManager.GetClient(),
-		Scheme:   k8sManager.GetScheme(),
-		Recorder: k8sManager.GetEventRecorderFor("backup-policy-controller"),
-	}).SetupWithManager(k8sManager)
-	Expect(err).ToNot(HaveOccurred())
-
-	err = (&BackupPolicyTemplateReconciler{
-		Client:   k8sManager.GetClient(),
-		Scheme:   k8sManager.GetScheme(),
-		Recorder: k8sManager.GetEventRecorderFor("backup-policy-template-controller"),
-	}).SetupWithManager(k8sManager)
-	Expect(err).ToNot(HaveOccurred())
-
-	err = (&BackupToolReconciler{
-		Client:   k8sManager.GetClient(),
-		Scheme:   k8sManager.GetScheme(),
-		Recorder: k8sManager.GetEventRecorderFor("backup-tool-controller"),
-	}).SetupWithManager(k8sManager)
-	Expect(err).ToNot(HaveOccurred())
-
-	err = (&RestoreJobReconciler{
-		Client:   k8sManager.GetClient(),
-		Scheme:   k8sManager.GetScheme(),
-		Recorder: k8sManager.GetEventRecorderFor("restore-job-controller"),
-	}).SetupWithManager(k8sManager)
-	Expect(err).ToNot(HaveOccurred())
-
-	err = (&CronJobReconciler{
-		Client:   k8sManager.GetClient(),
-		Scheme:   k8sManager.GetScheme(),
-		Recorder: k8sManager.GetEventRecorderFor("cronjob-controller"),
+		Recorder: k8sManager.GetEventRecorderFor("addon-controller"),
 	}).SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 
@@ -173,11 +120,13 @@ var _ = BeforeSuite(func() {
 		err = k8sManager.Start(ctx)
 		Expect(err).ToNot(HaveOccurred(), "failed to run manager")
 	}()
+
 })
 
 var _ = AfterSuite(func() {
-	cancel()
 	By("tearing down the test environment")
-	err := testEnv.Stop()
-	Expect(err).NotTo(HaveOccurred())
+	Eventually(func(g Gomega) {
+		err := testEnv.Stop()
+		Expect(err).NotTo(HaveOccurred())
+	})
 })

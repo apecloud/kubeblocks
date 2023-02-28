@@ -130,7 +130,7 @@ all: manager kbcli probe reloader loadbalancer ## Make all cmd binaries.
 
 .PHONY: manifests
 manifests: test-go-generate controller-gen ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
-	$(CONTROLLER_GEN) rbac:roleName=manager-role crd:generateEmbeddedObjectMeta=true webhook paths="./apis/...;./controllers/apps/...;./controllers/dataprotection/...;./controllers/k8score/...;./cmd/manager/...;./internal/..." output:crd:artifacts:config=config/crd/bases
+	$(CONTROLLER_GEN) rbac:roleName=manager-role crd:generateEmbeddedObjectMeta=true webhook paths="./apis/...;./controllers/apps/...;./controllers/dataprotection/...;./controllers/extensions/...;./controllers/k8score/...;./cmd/manager/...;./internal/..." output:crd:artifacts:config=config/crd/bases
 	@cp config/crd/bases/* $(CHART_PATH)/crds
 	@cp config/rbac/role.yaml $(CHART_PATH)/config/rbac/role.yaml
 	$(CONTROLLER_GEN) rbac:roleName=loadbalancer-role  paths="./controllers/loadbalancer;./cmd/loadbalancer/controller" output:dir=config/loadbalancer
@@ -217,9 +217,12 @@ endif
 test-current-ctx: manifests generate fmt vet add-k8s-host ## Run operator controller tests with current $KUBECONFIG context. if existing k8s cluster is k3d or minikube, specify EXISTING_CLUSTER_TYPE.
 	USE_EXISTING_CLUSTER=true KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" $(GO) test  -p 1 -coverprofile cover.out $(TEST_PACKAGES)
 
-.PHONY: test
-test: manifests generate test-go-generate fmt vet envtest add-k8s-host ## Run tests. if existing k8s cluster is k3d or minikube, specify EXISTING_CLUSTER_TYPE.
+.PHONY: test-fast
+test-fast: envtest
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" $(GO) test -short -coverprofile cover.out $(TEST_PACKAGES)
+
+.PHONY: test
+test: manifests generate test-go-generate fmt vet add-k8s-host test-fast ## Run tests. if existing k8s cluster is k3d or minikube, specify EXISTING_CLUSTER_TYPE.
 
 .PHONY: test-integration
 test-integration: manifests generate fmt vet envtest add-k8s-host ## Run tests. if existing k8s cluster is k3d or minikube, specify EXISTING_CLUSTER_TYPE.
@@ -274,7 +277,7 @@ kbcli: test-go-generate build-checks ## Build bin/kbcli.
 	$(MAKE) bin/kbcli.$(OS).$(ARCH)
 	mv bin/kbcli.$(OS).$(ARCH) bin/kbcli
 
-.PHONY: clean
+.PHONY: clean-kbcli
 clean-kbcli: ## Clean bin/kbcli*.
 	rm -f bin/kbcli*
 
@@ -311,7 +314,7 @@ run: manifests generate fmt vet ## Run a controller from your host.
 ifeq ($(ENABLE_WEBHOOKS), true)
 	$(MAKE) webhook-cert
 endif
-	$(GO) run ./cmd/manager/main.go -zap-devel=false -zap-encoder=console -zap-time-encoding=iso8601
+	$(GO) run ./cmd/manager/main.go --zap-devel=false --zap-encoder=console --zap-time-encoding=iso8601
 
 # Run with Delve for development purposes against the configured Kubernetes cluster in ~/.kube/config
 # Delve is a debugger for the Go programming language. More info: https://github.com/go-delve/delve
@@ -734,7 +737,7 @@ endif
 ifeq ($(MINIKUBE_IMAGE_MIRROR_COUNTRY), cn)
 	TAG_K8S_IMAGE_REPO := k8s.gcr.io
 	TAG_SIGSTORAGE_IMAGE_REPO := k8s.gcr.io/sig-storage
-ifeq ($(K8S_VERSION), v1.26.1) 
+ifeq ($(K8S_VERSION_MAJOR_MINOR), v1.26)
 	TAG_K8S_IMAGE_REPO := registry.k8s.io
 endif
 endif

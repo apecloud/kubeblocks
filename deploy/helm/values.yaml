@@ -247,6 +247,11 @@ dataProtection:
   ##
   backupTTL: ""
 
+## Addon controller settings, this will require cluster-admin clusterrole.
+addonController:
+  enabled: true
+  jobImagePullPolicy: IfNotPresent
+
 
 ## Dashboards settings
 ##

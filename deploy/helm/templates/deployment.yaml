@@ -38,17 +38,23 @@ spec:
             - "--health-probe-bind-address=:8081"
             - "--metrics-bind-address=:8080"
             - "--leader-elect"
-            - "-zap-devel={{- default "false" .Values.loggerSettings.developmentMode }}"
-            - "-zap-time-encoding={{- default "iso8601" .Values.loggerSettings.timeEncoding }}"
+            - "--zap-devel={{- default "false" .Values.loggerSettings.developmentMode }}"
+            - "--zap-time-encoding={{- default "iso8601" .Values.loggerSettings.timeEncoding }}"
             {{- with .Values.loggerSettings.level }}
-            - "-zap-log-level={{ . }}"
+            - "--zap-log-level={{ . }}"
             {{- end }}
             {{- with .Values.loggerSettings.encoder }}
-            - "-zap-encoder={{ . }}"
+            - "--zap-encoder={{ . }}"
             {{- end }}
           env:
             - name: CM_NAMESPACE
               value: {{ .Release.Namespace }}
+            - name: KUBEBLOCKS_IMAGE_PULL_POLICY
+              value: {{ .Values.image.pullPolicy }}
+            - name: KUBEBLOCKS_IMAGE
+              value: "{{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+            - name: KUBEBLOCKS_SERVICEACCOUNT_NAME
+              value: {{ include "kubeblocks.serviceAccountName" . }}
             {{- if or .Values.dataProtection.enableVolumeSnapshot (index .Values "snapshot-controller" "enabled") }}
             - name: VOLUMESNAPSHOT
               value: "true"
@@ -65,12 +71,15 @@ spec:
             - name: ENABLE_WEBHOOKS
               value: "true"
             {{- end }}
-            - name: KUBEBLOCKS_IMAGE_PULL_POLICY
-              value: {{ .Values.image.pullPolicy }}
-            - name: KUBEBLOCKS_IMAGE
-              value: "{{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
-            - name: KUBEBLOCKS_SERVICEACCOUNT_NAME
-              value: {{ include "kubeblocks.serviceAccountName" . }}
+            {{- if not .Values.addonController.enabled }}
+            - name: DISABLE_ADDON_CTRLER
+              value: "true"
+            {{- else }}
+            - name: ADDON_JOB_IMAGE_PULL_POLICY
+              value: {{ .Values.addonController.jobImagePullPolicy | default "IfNotPresent" }}
+            - name: KUBEBLOCKS_ADDON_SA_NAME
+              value: {{ include "kubeblocks.addonSAName" . }}
+            {{- end }}
           {{- with .Values.securityContext }}
           securityContext:
             {{- toYaml . | nindent 12 }}

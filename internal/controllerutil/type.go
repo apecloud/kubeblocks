@@ -52,6 +52,7 @@ const (
 	VolumeClaimTemplateNameLabelKey = "vct.kubeblocks.io/name"
 	RoleLabelKey                    = "kubeblocks.io/role"              // RoleLabelKey consensusSet and replicationSet role label key
 	BackupProtectionLabelKey        = "kubeblocks.io/backup-protection" // BackupProtectionLabelKey Backup delete protection policy label
+	AddonNameLabelKey               = "extensions.kubeblocks.io/addon-name"
 
 	// kubeblocks.io annotations
 	OpsRequestAnnotationKey          = "kubeblocks.io/ops-request"   // OpsRequestAnnotationKey OpsRequest annotation key in Cluster
@@ -112,3 +113,10 @@ const (
 	// KubeBlocksDataNodeTolerationValue is the taint label value of the built-in data node taint
 	KubeBlocksDataNodeTolerationValue = "true"
 )
+
+// UpdateCtxValue update Context value, return parent Context.
+func (r *RequestCtx) UpdateCtxValue(key, val any) context.Context {
+	p := r.Ctx
+	r.Ctx = context.WithValue(r.Ctx, key, val)
+	return p
+}

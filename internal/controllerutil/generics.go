@@ -28,6 +28,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
 )
 
 // Object a generic representation of various resource object types
@@ -89,4 +90,6 @@ var BackupSignature = func(_ dataprotectionv1alpha1.Backup, _ dataprotectionv1al
 var BackupToolSignature = func(_ dataprotectionv1alpha1.BackupTool, _ dataprotectionv1alpha1.BackupToolList) {
 }
 var RestoreJobSignature = func(_ dataprotectionv1alpha1.RestoreJob, _ dataprotectionv1alpha1.RestoreJobList) {
+}
+var AddonSignature = func(_ extensionsv1alpha1.Addon, _ extensionsv1alpha1.AddonList) {
 }

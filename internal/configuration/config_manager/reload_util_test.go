@@ -53,7 +53,7 @@ func TestCreateUpdatedParamsPatch(t *testing.T) {
 			newVersion: filepath.Join(rootPath, "currentVersion"),
 			oldVersion: filepath.Join(rootPath, "lastVersion"),
 			formatCfg: &appsv1alpha1.FormatterConfig{
-				Format: appsv1alpha1.INI,
+				Format: appsv1alpha1.Ini,
 				FormatterOptions: appsv1alpha1.FormatterOptions{IniConfig: &appsv1alpha1.IniConfig{
 					SectionName: "mysqld",
 				}},

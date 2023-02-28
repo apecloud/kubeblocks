@@ -87,7 +87,7 @@ var _ = Describe("playground", func() {
 	It("guide", func() {
 		cmd := newGuideCmd()
 		Expect(cmd).ShouldNot(BeNil())
-		runGuide()
+		printGuide(false, "")
 	})
 
 	It("test", func() {

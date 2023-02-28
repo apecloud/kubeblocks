@@ -143,7 +143,9 @@ func (p *localCloudProvider) DeleteK8sCluster(name string) error {
 		k3d.ClusterDeleteOpts{SkipRegistryCheck: false}); err != nil {
 		return errors.Wrapf(err, "failed to delete playground cluster %s", name)
 	}
-	return nil
+
+	// remove cluster info from kubeconfig
+	return k3dClient.KubeconfigRemoveClusterFromDefaultConfig(p.ctx, cluster)
 }
 
 // UpdateKubeconfig generate a kubeconfig to access the k3d cluster
@@ -195,12 +197,6 @@ func (p *localCloudProvider) GetExistedClusters() ([]string, error) {
 		names[i] = c.Name
 	}
 	return names, nil
-}
-
-// RemoveKubeconfig remove cluster details from default kubeconfig
-func (p *localCloudProvider) RemoveKubeconfig(name string) error {
-	cluster := &k3d.Cluster{Name: name}
-	return k3dClient.KubeconfigRemoveClusterFromDefaultConfig(p.ctx, cluster)
 }
 
 // buildClusterRunConfig returns the run-config for the k3d cluster

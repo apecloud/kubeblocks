@@ -135,7 +135,7 @@ func newGuideCmd() *cobra.Command {
 		Use:   "guide",
 		Short: "Display playground cluster user guide.",
 		Run: func(cmd *cobra.Command, args []string) {
-			runGuide()
+			printGuide(false, "")
 		},
 	}
 	return cmd
@@ -181,10 +181,10 @@ func (o *initOptions) local() error {
 	}
 	spinner(true)
 
-	return o.installKBAndCluster()
+	return o.installKBAndCluster(k8sClusterName)
 }
 
-func (o *initOptions) installKBAndCluster() error {
+func (o *initOptions) installKBAndCluster(k8sClusterName string) error {
 	var err error
 	configPath := util.ConfigPath("config")
 
@@ -212,7 +212,7 @@ func (o *initOptions) installKBAndCluster() error {
 	spinner(true)
 
 	// Print guide information
-	printGuide(true, "")
+	printGuide(true, k8sClusterName)
 	return nil
 }
 
@@ -282,7 +282,7 @@ func (o *initOptions) cloud() error {
 	}
 
 	// CreateK8sCluster KubeBlocks and create cluster
-	return o.installKBAndCluster()
+	return o.installKBAndCluster(clusterName)
 }
 
 func (o *destroyOptions) destroyPlayground() error {
@@ -351,15 +351,11 @@ func (o *destroyOptions) destroyCloud() error {
 	return nil
 }
 
-func runGuide() {
-	printGuide(false, "")
-}
-
 func printGuide(init bool, k8sClusterName string) {
 	if init {
-		fmt.Fprintf(os.Stdout, "\nKubeBlocks playground init SUCCESSFULLY!\n")
+		fmt.Fprintf(os.Stdout, "\nKubeBlocks playground init SUCCESSFULLY!\n\n")
 		if k8sClusterName != "" {
-			fmt.Fprintf(os.Stdout, "Kubernetes cluster %s has been created.\n", k8sClusterName)
+			fmt.Fprintf(os.Stdout, "Kubernetes cluster \"%s\" has been created.\n", k8sClusterName)
 		}
 		fmt.Fprintf(os.Stdout, "Cluster \"%s\" has been created.\n", kbClusterName)
 	}
@@ -472,6 +468,9 @@ func getExistedCluster(provider cp.Interface, path string) (string, error) {
 	}
 	if len(clusterNames) > 1 {
 		return "", fmt.Errorf("found more than one cluster have been created, check it again, %v", clusterNames)
+	}
+	if len(clusterNames) == 0 {
+		return "", nil
 	}
 	return clusterNames[0], nil
 }

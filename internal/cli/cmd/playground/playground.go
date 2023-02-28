@@ -470,6 +470,7 @@ func newCreateOptions(cd string, version string) (*cmdcluster.CreateOptions, err
 			TerminationPolicy: "WipeOut",
 			Monitor:           true,
 			PodAntiAffinity:   "Preferred",
+			Tenancy:           "SharedNode",
 		},
 		ClusterDefRef:     cd,
 		ClusterVersionRef: version,

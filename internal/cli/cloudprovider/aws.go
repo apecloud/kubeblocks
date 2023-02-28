@@ -32,7 +32,7 @@ import (
 )
 
 const (
-	AWSDefaultRegion = "cn-north-1"
+	AWSDefaultRegion = "cn-northwest-1"
 )
 
 type awsCloudProvider struct {

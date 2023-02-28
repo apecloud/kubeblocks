@@ -5,7 +5,7 @@ metadata:
   labels:
     {{- include "postgresql.labels" . | nindent 4 }}
 spec:
-  clusterDefinitionRef: apecloud-postgresql
+  clusterDefinitionRef: postgresql
   componentVersions:
   - componentDefRef: postgresql
     versionsContext:
@@ -20,7 +20,7 @@ metadata:
   labels:
     {{- include "postgresql.labels" . | nindent 4 }}
 spec:
-  clusterDefinitionRef: apecloud-postgresql
+  clusterDefinitionRef: postgresql
   componentVersions:
   - componentDefRef: postgresql
     versionsContext:

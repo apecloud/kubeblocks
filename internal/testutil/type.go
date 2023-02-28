@@ -18,14 +18,15 @@ package testutil
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"time"
 
 	"github.com/onsi/gomega"
 	"github.com/sethvargo/go-password/password"
-
 	"github.com/spf13/viper"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/version"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 )
@@ -137,4 +138,24 @@ func (testCtx TestContext) UseDefaultNamespace() func(client.Object) {
 	return func(obj client.Object) {
 		obj.SetNamespace(testCtx.DefaultNamespace)
 	}
+}
+
+// SetKubeServerVersionWithDistro provide "_KUBE_SERVER_INFO" viper settings helper function.
+func SetKubeServerVersionWithDistro(major, minor, patch, distro string) {
+	ver := version.Info{
+		Major:      major,
+		Minor:      minor,
+		GitVersion: fmt.Sprintf("v%s.%s.%s+%s", major, minor, patch, distro),
+	}
+	viper.Set("_KUBE_SERVER_INFO", ver)
+}
+
+// SetKubeServerVersion provide "_KUBE_SERVER_INFO" viper settings helper function.
+func SetKubeServerVersion(major, minor, patch string) {
+	ver := version.Info{
+		Major:      major,
+		Minor:      minor,
+		GitVersion: fmt.Sprintf("v%s.%s.%s", major, minor, patch),
+	}
+	viper.Set("_KUBE_SERVER_INFO", ver)
 }

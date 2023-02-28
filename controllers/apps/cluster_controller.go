@@ -30,7 +30,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
@@ -114,36 +113,7 @@ type probeMessage struct {
 }
 
 func init() {
-	clusterDefUpdateHandlers["cluster"] = clusterUpdateHandler
 	k8score.EventHandlerMap["cluster-controller"] = &ClusterReconciler{}
-	k8score.StorageClassHandlerMap["cluster-controller"] = handleClusterVolumeExpansion
-}
-
-func clusterUpdateHandler(cli client.Client, ctx context.Context, clusterDef *appsv1alpha1.ClusterDefinition) error {
-	labelSelector, err := labels.Parse("clusterdefinition.kubeblocks.io/name=" + clusterDef.GetName())
-	if err != nil {
-		return err
-	}
-	o := &client.ListOptions{LabelSelector: labelSelector}
-
-	list := &appsv1alpha1.ClusterList{}
-	if err := cli.List(ctx, list, o); err != nil {
-		return err
-	}
-	for _, cluster := range list.Items {
-		if cluster.Status.ClusterDefGeneration != clusterDef.Generation {
-			patch := client.MergeFrom(cluster.DeepCopy())
-			if cluster.Status.Operations == nil {
-				cluster.Status.Operations = &appsv1alpha1.Operations{}
-			}
-			cluster.Status.Operations.HorizontalScalable =
-				getSupportHorizontalScalingComponents(&cluster, clusterDef)
-			if err = cli.Status().Patch(ctx, &cluster, patch); err != nil {
-				return err
-			}
-		}
-	}
-	return nil
 }
 
 func (r *ClusterReconciler) Handle(cli client.Client, reqCtx intctrlutil.RequestCtx, recorder record.EventRecorder, event *corev1.Event) error {
@@ -217,10 +187,6 @@ func handleRoleChangedEvent(cli client.Client, reqCtx intctrlutil.RequestCtx, re
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
-// TODO(user): Modify the Reconcile function to compare the state specified by
-// the Cluster object against the actual cluster state, and then
-// perform operations to make the cluster state reflect the state specified by
-// the user.
 //
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.12.2/pkg/reconcile
@@ -283,18 +249,19 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	clusterVersion := &appsv1alpha1.ClusterVersion{}
-	if err := r.Client.Get(reqCtx.Ctx, types.NamespacedName{
-		Name: cluster.Spec.ClusterVersionRef,
-	}, clusterVersion); err != nil {
-		// this is a block to handle error.
-		// so when update cluster conditions failed, we can ignore it.
-		_ = clusterConditionMgr.setPreCheckErrorCondition(err)
-		return intctrlutil.RequeueAfter(ControllerErrorRequeueTime, reqCtx.Log, "")
-	}
-
-	if res, err = r.checkReferencedCRStatus(reqCtx, clusterConditionMgr, clusterVersion.Status.Phase,
-		appsv1alpha1.ClusterVersionKind, clusterVersion.Name); res != nil {
-		return *res, err
+	if len(cluster.Spec.ClusterVersionRef) > 0 {
+		if err := r.Client.Get(reqCtx.Ctx, types.NamespacedName{
+			Name: cluster.Spec.ClusterVersionRef,
+		}, clusterVersion); err != nil {
+			// this is a block to handle error.
+			// so when update cluster conditions failed, we can ignore it.
+			_ = clusterConditionMgr.setPreCheckErrorCondition(err)
+			return intctrlutil.RequeueAfter(ControllerErrorRequeueTime, reqCtx.Log, "")
+		}
+		if res, err = r.checkReferencedCRStatus(reqCtx, clusterConditionMgr, clusterVersion.Status.Phase,
+			appsv1alpha1.ClusterVersionKind, clusterVersion.Name); res != nil {
+			return *res, err
+		}
 	}
 
 	if res, err = r.checkReferencedCRStatus(reqCtx, clusterConditionMgr, clusterDefinition.Status.Phase,
@@ -302,12 +269,6 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return *res, err
 	}
 
-	if err = r.reconcileStatusOperations(ctx, cluster, clusterDefinition); err != nil {
-		// this is a block to handle error.
-		// so when update cluster conditions failed, we can ignore it.
-		_ = clusterConditionMgr.setPreCheckErrorCondition(err)
-		return intctrlutil.RequeueAfter(ControllerErrorRequeueTime, reqCtx.Log, "")
-	}
 	// validate config and send warning event log necessarily
 	if err = cluster.ValidateEnabledLogs(clusterDefinition); err != nil {
 		_ = clusterConditionMgr.setPreCheckErrorCondition(err)
@@ -777,69 +738,4 @@ func (r *ClusterReconciler) reconcileClusterStatus(ctx context.Context,
 	}
 	return doChainClusterStatusHandler(ctx, r.Client, cluster, removeInvalidComponentsAndAnalysis,
 		handleClusterReadyCondition, handleExistAbnormalOrFailed, handleClusterIsStopped, handleClusterIsRunning)
-}
-
-// reconcileStatusOperations when Cluster.spec updated, we need reconcile the Cluster.status.operations.
-func (r *ClusterReconciler) reconcileStatusOperations(ctx context.Context, cluster *appsv1alpha1.Cluster, clusterDef *appsv1alpha1.ClusterDefinition) error {
-	if cluster.Status.Operations == nil {
-		cluster.Status.Operations = &appsv1alpha1.Operations{}
-	}
-
-	var (
-		err                       error
-		upgradable                bool
-		volumeExpansionComponents []appsv1alpha1.OperationComponent
-		oldOperations             = cluster.Status.Operations.DeepCopy()
-		operations                = *cluster.Status.Operations
-		clusterVersionList        = &appsv1alpha1.ClusterVersionList{}
-	)
-	// determine whether to support volumeExpansion when creating the cluster or add/delete component.
-	// because volumeClaimTemplates are forbidden to update except for storage size when component created.
-	if cluster.Status.ObservedGeneration == 0 || len(cluster.Spec.ComponentSpecs) != len(cluster.Status.Components) {
-		if volumeExpansionComponents, err = getSupportVolumeExpansionComponents(ctx, r.Client, cluster); err != nil {
-			return err
-		}
-		operations.VolumeExpandable = volumeExpansionComponents
-	}
-	// determine whether to support horizontalScaling
-	operations.HorizontalScalable = getSupportHorizontalScalingComponents(cluster, clusterDef)
-
-	// Determine whether to support upgrade
-	if err = r.Client.List(ctx, clusterVersionList, client.MatchingLabels{clusterDefLabelKey: cluster.Spec.ClusterDefRef}); err != nil {
-		return err
-	}
-	if len(clusterVersionList.Items) > 1 {
-		upgradable = true
-	}
-	operations.Upgradable = upgradable
-
-	// check whether status.operations is changed
-	if reflect.DeepEqual(oldOperations, operations) {
-		return nil
-	}
-	patch := client.MergeFrom(cluster.DeepCopy())
-	cluster.Status.Operations = &operations
-	return r.Client.Status().Patch(ctx, cluster, patch)
-}
-
-// getSupportHorizontalScalingComponents gets the components that support horizontalScaling
-func getSupportHorizontalScalingComponents(
-	cluster *appsv1alpha1.Cluster,
-	clusterDef *appsv1alpha1.ClusterDefinition) []appsv1alpha1.OperationComponent {
-	horizontalScalableComponents := make([]appsv1alpha1.OperationComponent, 0)
-
-	// determine whether to support horizontalScaling
-	for _, v := range cluster.Spec.ComponentSpecs {
-		for _, component := range clusterDef.Spec.ComponentDefs {
-			if v.ComponentDefRef != component.Name {
-				continue
-			}
-			horizontalScalableComponents = append(horizontalScalableComponents, appsv1alpha1.OperationComponent{
-				Name: v.Name,
-			})
-			break
-		}
-	}
-
-	return horizontalScalableComponents
 }

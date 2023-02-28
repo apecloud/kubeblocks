@@ -40,7 +40,7 @@ deployment: {
 			"app.kubernetes.io/instance":   cluster.metadata.name
 			"app.kubernetes.io/managed-by": "kubeblocks"
 
-			"app.kubeblocks.io/component-name": "\(component.name)"
+			"apps.kubeblocks.io/component-name": "\(component.name)"
 		}
 	}
 	"spec": {
@@ -52,7 +52,7 @@ deployment: {
 				"app.kubernetes.io/instance":   "\(cluster.metadata.name)"
 				"app.kubernetes.io/managed-by": "kubeblocks"
 
-				"app.kubeblocks.io/component-name": "\(component.name)"
+				"apps.kubeblocks.io/component-name": "\(component.name)"
 			}
 		}
 		template: {
@@ -62,8 +62,8 @@ deployment: {
 					"app.kubernetes.io/instance":   "\(cluster.metadata.name)"
 					"app.kubernetes.io/managed-by": "kubeblocks"
 
-					"app.kubeblocks.io/component-name": "\(component.name)"
-					"app.kubeblocks.io/workload-type":  "\(component.workloadType)"
+					"apps.kubeblocks.io/component-name": "\(component.name)"
+					"apps.kubeblocks.io/workload-type":  "\(component.workloadType)"
 				}
 			}
 			spec: component.podSpec

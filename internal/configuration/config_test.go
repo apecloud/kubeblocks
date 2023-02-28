@@ -70,7 +70,7 @@ func TestRawConfig(t *testing.T) {
 	cfg, err := NewConfigLoader(CfgOption{
 		Type:    CfgRawType,
 		Log:     log.FromContext(context.Background()),
-		CfgType: appsv1alpha1.INI,
+		CfgType: appsv1alpha1.Ini,
 		RawData: []byte(iniConfig),
 	})
 
@@ -133,7 +133,7 @@ func TestConfigMapConfig(t *testing.T) {
 	cfg, err := NewConfigLoader(CfgOption{
 		Type:    CfgCmType,
 		Log:     log.FromContext(context.Background()),
-		CfgType: appsv1alpha1.INI,
+		CfgType: appsv1alpha1.Ini,
 		K8sKey: &K8sConfig{
 			CfgKey: client.ObjectKey{
 				Name:      "xxxx",    // set cm name
@@ -269,7 +269,7 @@ func TestGenerateVisualizedParamsList(t *testing.T) {
 				IsModify:     true,
 				UpdateConfig: map[string][]byte{"key": testUpdatedParams}},
 			formatConfig: &appsv1alpha1.FormatterConfig{
-				Format: appsv1alpha1.INI,
+				Format: appsv1alpha1.Ini,
 				FormatterOptions: appsv1alpha1.FormatterOptions{IniConfig: &appsv1alpha1.IniConfig{
 					SectionName: "mysqld",
 				}},
@@ -298,7 +298,7 @@ func TestGenerateVisualizedParamsList(t *testing.T) {
 				AddConfig: map[string]interface{}{"key": testJSON},
 			},
 			formatConfig: &appsv1alpha1.FormatterConfig{
-				Format: appsv1alpha1.INI,
+				Format: appsv1alpha1.Ini,
 				FormatterOptions: appsv1alpha1.FormatterOptions{IniConfig: &appsv1alpha1.IniConfig{
 					SectionName: "mysqld",
 				}},
@@ -324,7 +324,7 @@ func TestGenerateVisualizedParamsList(t *testing.T) {
 				DeleteConfig: map[string]interface{}{"key": testJSON},
 			},
 			formatConfig: &appsv1alpha1.FormatterConfig{
-				Format: appsv1alpha1.INI,
+				Format: appsv1alpha1.Ini,
 				FormatterOptions: appsv1alpha1.FormatterOptions{IniConfig: &appsv1alpha1.IniConfig{
 					SectionName: "mysqld",
 				}},
@@ -362,6 +362,69 @@ func sortParams(param []VisualizedParam) {
 	if len(param) > 0 {
 		sort.SliceStable(param, func(i, j int) bool {
 			return strings.Compare(param[i].Key, param[j].Key) <= 0
+		})
+	}
+}
+
+func TestIsQuotesString(t *testing.T) {
+	tests := []struct {
+		name string
+		arg  string
+		want bool
+	}{{
+		name: "quotes_test",
+		arg:  ``,
+		want: false,
+	}, {
+		name: "quotes_test",
+		arg:  `''`,
+		want: true,
+	}, {
+		name: "quotes_test",
+		arg:  `""`,
+		want: true,
+	}, {
+		name: "quotes_test",
+		arg:  `'`,
+		want: false,
+	}, {
+		name: "quotes_test",
+		arg:  `"`,
+		want: false,
+	}, {
+		name: "quotes_test",
+		arg:  `for test`,
+		want: false,
+	}, {
+		name: "quotes_test",
+		arg:  `'test'`,
+		want: true,
+	}, {
+		name: "quotes_test",
+		arg:  `'test`,
+		want: false,
+	}, {
+		name: "quotes_test",
+		arg:  `test'`,
+		want: false,
+	}, {
+		name: "quotes_test",
+		arg:  `"test"`,
+		want: true,
+	}, {
+		name: "quotes_test",
+		arg:  `test"`,
+		want: false,
+	}, {
+		name: "quotes_test",
+		arg:  `"test`,
+		want: false,
+	}}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := isQuotesString(tt.arg); got != tt.want {
+				t.Errorf("isQuotesString() = %v, want %v", got, tt.want)
+			}
 		})
 	}
 }

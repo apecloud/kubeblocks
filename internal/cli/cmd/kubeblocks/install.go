@@ -105,9 +105,6 @@ func newInstallCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 			util.CheckErr(o.Complete(f, cmd))
 			util.CheckErr(o.Install())
 		},
-		PostRun: func(cmd *cobra.Command, args []string) {
-			util.CheckErr(o.PostInstall())
-		},
 	}
 
 	cmd.Flags().BoolVar(&o.Monitor, "monitor", true, "Set monitor enabled and install Prometheus, AlertManager and Grafana (default true)")
@@ -156,7 +153,8 @@ func (o *InstallOptions) Install() error {
 	}
 
 	if v := versionInfo[util.KubeBlocksApp]; len(v) > 0 {
-		fmt.Fprintf(o.Out, "KubeBlocks %s already exists\n", v)
+		printer.Warning(o.Out, "KubeBlocks %s already exists, repeated installation is not supported.\n\n", v)
+		fmt.Fprintln(o.Out, "If you want to upgrade it, please use \"kbcli kubeblocks upgrade\".")
 		return nil
 	}
 
@@ -180,22 +178,31 @@ func (o *InstallOptions) Install() error {
 	// add monitor parameters
 	o.ValueOpts.Values = append(o.ValueOpts.Values, fmt.Sprintf(kMonitorParam, o.Monitor))
 
-	spinner := util.Spinner(o.Out, "%-40s", "Install KubeBlocks "+o.Version)
+	// add helm repo
+	spinner := util.Spinner(o.Out, "%-40s", "Add and update repo "+types.KubeBlocksChartName)
 	defer spinner(false)
-
 	// Add repo, if exists, will update it
 	if err = helm.AddRepo(&repo.Entry{Name: types.KubeBlocksChartName, URL: util.GetHelmChartRepoURL()}); err != nil {
 		return err
 	}
+	spinner(true)
 
 	// install KubeBlocks chart
+	spinner = util.Spinner(o.Out, "%-40s", "Install KubeBlocks "+o.Version)
+	defer spinner(false)
 	if err = o.installChart(); err != nil {
 		return err
 	}
-
-	// successfully installed
 	spinner(true)
 
+	// create VolumeSnapshotClass
+	if err = o.createVolumeSnapshotClass(); err != nil {
+		return err
+	}
+
+	if !o.Quiet {
+		o.printNotes()
+	}
 	return nil
 }
 
@@ -369,7 +376,7 @@ func (o *InstallOptions) checkRemainedResource() error {
 		return nil
 	}
 
-	objs, err := getKBObjects(o.Client, o.Dynamic, o.Namespace)
+	objs, err := getKBObjects(o.Dynamic, o.Namespace)
 	if err != nil {
 		fmt.Fprintf(o.ErrOut, "Check whether there are resources left by KubeBlocks before: %s\n", err.Error())
 	}
@@ -444,21 +451,42 @@ func (o *InstallOptions) PostInstall() error {
 }
 
 func (o *InstallOptions) createVolumeSnapshotClass() error {
-	options := cluster.CreateVolumeSnapshotClassOptions{}
-	options.BaseOptions.Client = o.Dynamic
-	options.BaseOptions.IOStreams = o.IOStreams
-	options.BaseOptions.Quiet = true
+	createFunc := func() error {
+		options := cluster.CreateVolumeSnapshotClassOptions{}
+		options.BaseOptions.Client = o.Dynamic
+		options.BaseOptions.IOStreams = o.IOStreams
+		options.BaseOptions.Quiet = true
 
-	spinner := util.Spinner(o.Out, "%-40s", "Configure VolumeSnapshotClass")
-	defer spinner(false)
+		spinner := util.Spinner(o.Out, "%-40s", "Configure VolumeSnapshotClass")
+		defer spinner(false)
 
-	if err := options.Complete(); err != nil {
-		return err
+		if err := options.Complete(); err != nil {
+			return err
+		}
+		if err := options.Create(); err != nil {
+			return err
+		}
+		spinner(true)
+		return nil
 	}
-	if err := options.Create(); err != nil {
-		return err
+
+	var sets []string
+	for _, set := range o.ValueOpts.Values {
+		splitSet := strings.Split(set, ",")
+		sets = append(sets, splitSet...)
 	}
-	spinner(true)
+	for _, set := range sets {
+		if set != "snapshot-controller.enabled=true" {
+			continue
+		}
+
+		if err := createFunc(); err != nil {
+			return err
+		} else {
+			// only need to create once
+			return nil
+		}
+	}
 	return nil
 }
 

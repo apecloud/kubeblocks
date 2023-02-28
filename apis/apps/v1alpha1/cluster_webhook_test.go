@@ -274,7 +274,7 @@ spec:
   - name: replicasets
     componentDefRef: replicasets
     replicas: 1
-    volumeClaimTemplates: 
+    volumeClaimTemplates:
     - name: data
       spec:
         resources:
@@ -302,7 +302,7 @@ spec:
   clusterVersionRef: %s
   componentSpecs:
   - name: replication
-    componentDefRef: replication
+    componentDefRef: redis
     monitor: false
     primaryIndex: 0
     replicas: 2

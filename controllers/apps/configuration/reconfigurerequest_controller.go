@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	appv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -33,7 +34,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
-	cfgcm "github.com/apecloud/kubeblocks/internal/configuration/configmap"
+	cfgcm "github.com/apecloud/kubeblocks/internal/configuration/config_manager"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -69,19 +70,22 @@ func (r *ReconfigureRequestReconciler) Reconcile(ctx context.Context, req ctrl.R
 	reqCtx := intctrlutil.RequestCtx{
 		Ctx:      ctx,
 		Req:      req,
-		Log:      log.FromContext(ctx).WithValues("Configuration", req.NamespacedName),
+		Log:      log.FromContext(ctx).WithName("ReconfigureRequestReconcile").WithValues("ConfigMap", req.NamespacedName),
 		Recorder: r.Recorder,
 	}
 
 	config := &corev1.ConfigMap{}
 	if err := r.Client.Get(reqCtx.Ctx, reqCtx.Req.NamespacedName, config); err != nil {
-		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "not find configmap", "key", req.NamespacedName)
+		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "not find configmap")
 	}
 
 	if !checkConfigurationObject(config) {
 		return intctrlutil.Reconciled()
 	}
 
+	reqCtx.Log = reqCtx.Log.
+		WithValues("ClusterName", config.Labels[intctrlutil.AppInstanceLabelKey]).
+		WithValues("ComponentName", config.Labels[intctrlutil.KBAppComponentLabelKey])
 	if hash, ok := config.Labels[cfgcore.CMInsConfigurationHashLabelKey]; ok && hash == config.ResourceVersion {
 		return intctrlutil.Reconciled()
 	}
@@ -94,7 +98,7 @@ func (r *ReconfigureRequestReconciler) Reconcile(ctx context.Context, req ctrl.R
 	}
 
 	if cfgConstraintsName, ok := config.Labels[cfgcore.CMConfigurationConstraintsNameLabelKey]; !ok || len(cfgConstraintsName) == 0 {
-		reqCtx.Log.Info("configuration not set ConfigConstraints, not support reconfigure.", "config cm", client.ObjectKeyFromObject(config))
+		reqCtx.Log.V(1).Info("configuration not set ConfigConstraints, not support reconfigure.")
 		return intctrlutil.Reconciled()
 	}
 
@@ -133,6 +137,7 @@ func (r *ReconfigureRequestReconciler) sync(reqCtx intctrlutil.RequestCtx, confi
 
 		configKey = client.ObjectKeyFromObject(config)
 
+		componentName     = config.Labels[intctrlutil.KBAppComponentLabelKey]
 		configTplName     = config.Labels[cfgcore.CMConfigurationProviderTplLabelKey]
 		configTplLabelKey = cfgcore.GenerateTPLUniqLabelKeyWithConfig(configTplName)
 	)
@@ -144,7 +149,12 @@ func (r *ReconfigureRequestReconciler) sync(reqCtx intctrlutil.RequestCtx, confi
 		configTplLabelKey:                  config.GetName(),
 	}
 
-	configPatch, err := createConfigurePatch(config, reqCtx, &tpl.Spec)
+	var keySelector []string
+	if keysLabel, ok := config.Labels[cfgcore.CMConfigurationCMKeysLabelKey]; ok && keysLabel != "" {
+		keySelector = strings.Split(keysLabel, ",")
+	}
+
+	configPatch, forceRestart, err := createConfigurePatch(config, tpl.Spec.FormatterConfig.Format, keySelector)
 	if err != nil {
 		return intctrlutil.RequeueWithErrorAndRecordEvent(config, r.Recorder, err, reqCtx.Log)
 	}
@@ -154,7 +164,7 @@ func (r *ReconfigureRequestReconciler) sync(reqCtx intctrlutil.RequestCtx, confi
 		return r.updateConfigCMStatus(reqCtx, config, ReconfigureNoChangeType)
 	}
 
-	reqCtx.Log.Info(fmt.Sprintf("reconfigure params: \n\tadd: %s\n\tdelete: %s\n\tupdate: %s",
+	reqCtx.Log.V(1).Info(fmt.Sprintf("reconfigure params: \n\tadd: %s\n\tdelete: %s\n\tupdate: %s",
 		configPatch.AddConfig,
 		configPatch.DeleteConfig,
 		configPatch.UpdateConfig))
@@ -163,32 +173,28 @@ func (r *ReconfigureRequestReconciler) sync(reqCtx intctrlutil.RequestCtx, confi
 	if err := r.Client.Get(reqCtx.Ctx, clusterKey, &cluster); err != nil {
 		return intctrlutil.RequeueWithErrorAndRecordEvent(config,
 			r.Recorder,
-			cfgcore.WrapError(err,
-				"failed to get cluster. name[%s]", clusterKey),
+			cfgcore.WrapError(err, "failed to get cluster. name[%s]", clusterKey),
 			reqCtx.Log)
 	}
 
 	// Find ClusterComponentSpec from cluster cr
-	componentName := config.Labels[intctrlutil.KBAppComponentLabelKey]
-	clusterComponent := getClusterComponentsByName(cluster.Spec.ComponentSpecs, componentName)
-	// fix cluster maybe not any component
+	clusterComponent := cluster.GetComponentByName(componentName)
+	// Assumption: It is required that the cluster must have a component.
 	if clusterComponent == nil {
-		reqCtx.Log.Info("not found component.", "componentName", componentName,
-			"clusterName", cluster.GetName())
-	} else {
-		componentName = clusterComponent.ComponentDefRef
+		reqCtx.Log.Info("not found component.")
+		return intctrlutil.Reconciled()
 	}
 
 	// Find ClusterDefinition Component  from ClusterDefinition CR
-	component, err := getComponentFromClusterDefinition(reqCtx.Ctx, r.Client, &cluster, componentName)
+	component, err := getComponentFromClusterDefinition(reqCtx.Ctx, r.Client, &cluster, clusterComponent.ComponentDefRef)
 	if err != nil {
 		return intctrlutil.RequeueWithErrorAndRecordEvent(config,
 			r.Recorder,
 			cfgcore.WrapError(err,
-				"failed to get component from cluster definition. type[%s]", componentName),
+				"failed to get component from cluster definition. type[%s]", clusterComponent.ComponentDefRef),
 			reqCtx.Log)
 	} else if component == nil {
-		reqCtx.Log.Info(fmt.Sprintf("failed to find component which the configuration is associated, component name: %s", componentName))
+		reqCtx.Log.Error(cfgcore.MakeError("failed to find component which the configuration is associated."), "ignore the configmap")
 		return intctrlutil.Reconciled()
 	}
 
@@ -209,7 +215,7 @@ func (r *ReconfigureRequestReconciler) sync(reqCtx intctrlutil.RequestCtx, confi
 	// configmap has never been used
 	sts, containersList := getRelatedComponentsByConfigmap(&stsLists, configKey)
 	if len(sts) == 0 {
-		reqCtx.Log.Info("configmap is not used by any container.", "cm name", configKey)
+		reqCtx.Log.Info("configmap is not used by any container.")
 		return intctrlutil.Reconciled()
 	}
 
@@ -225,7 +231,7 @@ func (r *ReconfigureRequestReconciler) sync(reqCtx intctrlutil.RequestCtx, confi
 		ComponentUnits:           sts,
 		Component:                component,
 		ClusterComponent:         clusterComponent,
-		Restart:                  !cfgcm.IsSupportReload(tpl.Spec.ReloadOptions),
+		Restart:                  forceRestart || !cfgcm.IsSupportReload(tpl.Spec.ReloadOptions),
 		ReconfigureClientFactory: GetClientFactory(),
 	})
 }

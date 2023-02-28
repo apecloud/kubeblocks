@@ -21,35 +21,34 @@ import (
 	"fmt"
 	"strings"
 
-	appv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	apiruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	k8sapitypes "k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/client-go/dynamic"
-	"k8s.io/client-go/kubernetes"
+	"k8s.io/klog/v2"
 
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
-type kbObjects struct {
-	// custom resources
-	crs map[schema.GroupVersionResource]*unstructured.UnstructuredList
-	// custom resource definitions
-	crds *unstructured.UnstructuredList
-	// deployments
-	deploys *appv1.DeploymentList
-	// services
-	svcs *corev1.ServiceList
-	// configMaps
-	cms *corev1.ConfigMapList
-}
+type kbObjects map[schema.GroupVersionResource]*unstructured.UnstructuredList
 
-func getKBObjects(client kubernetes.Interface, dynamic dynamic.Interface, namespace string) (*kbObjects, error) {
+var (
+	resourceGVRs = []schema.GroupVersionResource{
+		types.DeployGVR(),
+		types.StatefulSetGVR(),
+		types.ServiceGVR(),
+		types.ConfigmapGVR(),
+		types.PVCGVR(),
+	}
+)
+
+func getKBObjects(dynamic dynamic.Interface, namespace string) (kbObjects, error) {
 	var (
 		err     error
 		allErrs []error
@@ -62,19 +61,19 @@ func getKBObjects(client kubernetes.Interface, dynamic dynamic.Interface, namesp
 		allErrs = append(allErrs, err)
 	}
 
-	objs := &kbObjects{}
+	kbObjs := kbObjects{}
 	ctx := context.TODO()
 
 	// get CRDs
 	crds, err := dynamic.Resource(types.CRDGVR()).List(ctx, metav1.ListOptions{})
 	appendErr(err)
-	objs.crds = &unstructured.UnstructuredList{}
-	objs.crs = map[schema.GroupVersionResource]*unstructured.UnstructuredList{}
+	kbObjs[types.CRDGVR()] = &unstructured.UnstructuredList{}
 	for i, crd := range crds.Items {
 		if !strings.Contains(crd.GetName(), "kubeblocks.io") {
 			continue
 		}
-		objs.crds.Items = append(objs.crds.Items, crds.Items[i])
+		crdObjs := kbObjs[types.CRDGVR()]
+		crdObjs.Items = append(crdObjs.Items, crds.Items[i])
 
 		// get built-in CRs belonging to this CRD
 		gvr, err := getGVRByCRD(&crd)
@@ -86,181 +85,126 @@ func getKBObjects(client kubernetes.Interface, dynamic dynamic.Interface, namesp
 			appendErr(err)
 			continue
 		} else {
-			objs.crs[*gvr] = crs
+			kbObjs[*gvr] = crs
 		}
 	}
 
-	// get deployments
-	getDeploys := func(labelSelector string) {
-		deploys, err := client.AppsV1().Deployments(namespace).List(context.TODO(), metav1.ListOptions{
+	// get objects by label selector
+	getObjects := func(labelSelector string, gvr schema.GroupVersionResource) {
+		objs, err := dynamic.Resource(gvr).Namespace(namespace).List(context.TODO(), metav1.ListOptions{
 			LabelSelector: labelSelector,
 		})
 		if err != nil {
 			appendErr(err)
 			return
 		}
-		if objs.deploys == nil {
-			objs.deploys = deploys
-		} else {
-			objs.deploys.Items = append(objs.deploys.Items, deploys.Items...)
+
+		if _, ok := kbObjs[gvr]; !ok {
+			kbObjs[gvr] = &unstructured.UnstructuredList{}
 		}
+		target := kbObjs[gvr]
+		target.Items = append(target.Items, objs.Items...)
 	}
 
-	// get all deployments which label matches app.kubernetes.io/instance=kubeblocks
-	getDeploys(fmt.Sprintf("%s=%s", intctrlutil.AppInstanceLabelKey, types.KubeBlocksChartName))
-
-	// get all deployments which label matches release=kubeblocks, like prometheus-server
-	getDeploys(fmt.Sprintf("release=%s", types.KubeBlocksChartName))
-
-	// get services
-	getSvcs := func(labelSelector string) {
-		svcs, err := client.CoreV1().Services(namespace).List(ctx, metav1.ListOptions{
-			LabelSelector: labelSelector,
-		})
+	// get object by name
+	getObject := func(name string, gvr schema.GroupVersionResource) {
+		obj, err := dynamic.Resource(gvr).Namespace(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 		if err != nil {
 			appendErr(err)
 			return
 		}
-		if objs.svcs == nil {
-			objs.svcs = svcs
-		} else {
-			objs.svcs.Items = append(objs.svcs.Items, svcs.Items...)
+		if _, ok := kbObjs[gvr]; !ok {
+			kbObjs[gvr] = &unstructured.UnstructuredList{}
+		}
+		target := kbObjs[gvr]
+		target.Items = append(target.Items, *obj)
+	}
+
+	// build label selector
+	instanceLabelSelector := fmt.Sprintf("%s=%s", intctrlutil.AppInstanceLabelKey, types.KubeBlocksChartName)
+	releaseLabelSelector := fmt.Sprintf("release=%s", types.KubeBlocksChartName)
+
+	// get resources which label matches app.kubernetes.io/instance=kubeblocks or
+	// label matches release=kubeblocks, like prometheus-server
+	for _, labelSelector := range []string{instanceLabelSelector, releaseLabelSelector} {
+		for _, gvr := range resourceGVRs {
+			getObjects(labelSelector, gvr)
 		}
 	}
 
-	// get all services which label matches app.kubernetes.io/instance=kubeblocks
-	getSvcs(fmt.Sprintf("%s=%s", intctrlutil.AppInstanceLabelKey, types.KubeBlocksChartName))
+	// get volume snapshot class
+	getObjects(instanceLabelSelector, types.VolumeSnapshotClassGVR())
 
-	// get all services which label matches release=kubeblocks, like prometheus-server
-	getSvcs(fmt.Sprintf("release=%s", types.KubeBlocksChartName))
-
-	// get configMap
-	getConfigMap := func(labelSelector string) {
-		cms, err := client.CoreV1().ConfigMaps(namespace).List(ctx, metav1.ListOptions{
-			LabelSelector: labelSelector,
-		})
-		if err != nil {
-			appendErr(err)
-			return
-		}
-		if objs.cms == nil {
-			objs.cms = cms
-		} else {
-			objs.cms.Items = append(objs.cms.Items, cms.Items...)
+	// get PVs by PVC
+	if pvcs, ok := kbObjs[types.PVCGVR()]; ok {
+		for _, obj := range pvcs.Items {
+			pvc := &corev1.PersistentVolumeClaim{}
+			if err = apiruntime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, pvc); err != nil {
+				appendErr(err)
+				continue
+			}
+			getObject(pvc.Spec.VolumeName, types.PVGVR())
 		}
 	}
 
-	// get all configmaps that belong to KubeBlocks
-	getConfigMap("configuration.kubeblocks.io/configuration-template=true")
-	getConfigMap("configuration.kubeblocks.io/configuration-type=tpl")
-
-	getVolumeSnapshotClass := func(labelSelector string) {
-		vscs, err := dynamic.Resource(types.VolumeSnapshotClassGVR()).List(context.TODO(), metav1.ListOptions{
-			LabelSelector: labelSelector,
-		})
-		if err != nil {
-			appendErr(err)
-			return
-		}
-		if objs.crs == nil {
-			objs.crs = map[schema.GroupVersionResource]*unstructured.UnstructuredList{}
-		}
-		objs.crs[types.VolumeSnapshotClassGVR()] = vscs
-	}
-	getVolumeSnapshotClass(fmt.Sprintf("%s=%s", intctrlutil.AppInstanceLabelKey, types.KubeBlocksChartName))
-
-	return objs, utilerrors.NewAggregate(allErrs)
+	return kbObjs, utilerrors.NewAggregate(allErrs)
 }
 
-func removeFinalizers(client dynamic.Interface, objs *kbObjects) error {
-	removeFn := func(gvr schema.GroupVersionResource, crs *unstructured.UnstructuredList) error {
-		if crs == nil {
-			return nil
-		}
-		for _, cr := range crs.Items {
-			if gvr == types.VolumeSnapshotClassGVR() {
-				if err := client.Resource(gvr).Delete(context.TODO(), cr.GetName(), newDeleteOpts()); err != nil {
-					return err
-				}
-			}
-			if _, err := client.Resource(gvr).Patch(context.TODO(), cr.GetName(), k8sapitypes.JSONPatchType,
-				[]byte("[{\"op\": \"remove\", \"path\": \"/metadata/finalizers\"}]"), metav1.PatchOptions{}); err != nil {
-				return err
-			}
-		}
+func removeCustomResources(dynamic dynamic.Interface, objs kbObjects) error {
+	// get all CRDs
+	crds, ok := objs[types.CRDGVR()]
+	if !ok {
 		return nil
 	}
 
-	for k, v := range objs.crs {
-		if err := removeFn(k, v); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func deleteCRDs(cli dynamic.Interface, crds *unstructured.UnstructuredList) error {
-	if crds == nil {
-		return nil
-	}
-
+	// get CRs for every CRD
 	for _, crd := range crds.Items {
-		if strings.Contains(crd.GetName(), "kubeblocks.io") {
-			if err := cli.Resource(types.CRDGVR()).Delete(context.TODO(), crd.GetName(), newDeleteOpts()); err != nil {
+		// get built-in CRs belonging to this CRD
+		gvr, err := getGVRByCRD(&crd)
+		if err != nil {
+			return err
+		}
+
+		crs, ok := objs[*gvr]
+		if !ok {
+			continue
+		}
+		if err = deleteObjects(dynamic, *gvr, crs); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func deleteObjects(dynamic dynamic.Interface, gvr schema.GroupVersionResource, objects *unstructured.UnstructuredList) error {
+	if objects == nil {
+		return nil
+	}
+
+	for _, s := range objects.Items {
+		// the object is not being deleted, delete it
+		if s.GetDeletionTimestamp().IsZero() {
+			klog.V(1).Infof("delete %s %s", gvr.String(), s.GetName())
+			if err := dynamic.Resource(gvr).Namespace(s.GetNamespace()).Delete(context.TODO(), s.GetName(), newDeleteOpts()); err != nil && !apierrors.IsNotFound(err) {
 				return err
 			}
 		}
-	}
-	return nil
-}
 
-func deleteDeploys(client kubernetes.Interface, deploys *appv1.DeploymentList) error {
-	if deploys == nil {
-		return nil
-	}
+		// if object has finalizers, remove it
+		if len(s.GetFinalizers()) == 0 {
+			continue
+		}
 
-	for _, d := range deploys.Items {
-		if err := client.AppsV1().Deployments(d.Namespace).Delete(context.TODO(), d.Name, newDeleteOpts()); err != nil {
+		klog.V(1).Infof("remove finalizers of %s %s", gvr.String(), s.GetName())
+		if _, err := dynamic.Resource(gvr).Namespace(s.GetNamespace()).Patch(context.TODO(), s.GetName(), k8sapitypes.JSONPatchType,
+			[]byte("[{\"op\": \"remove\", \"path\": \"/metadata/finalizers\"}]"), metav1.PatchOptions{}); err != nil && !apierrors.IsNotFound(err) {
 			return err
 		}
 	}
 	return nil
 }
 
-func deleteServices(client kubernetes.Interface, svcs *corev1.ServiceList) error {
-	if svcs == nil {
-		return nil
-	}
-
-	for _, s := range svcs.Items {
-		if err := client.CoreV1().Services(s.Namespace).Delete(context.TODO(), s.Name, newDeleteOpts()); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func deleteConfigMaps(client kubernetes.Interface, cms *corev1.ConfigMapList) error {
-	if cms == nil {
-		return nil
-	}
-
-	for _, s := range cms.Items {
-		// delete object
-		if err := client.CoreV1().ConfigMaps(s.Namespace).Delete(context.TODO(), s.Name, newDeleteOpts()); err != nil {
-			return err
-		}
-
-		// remove finalizers
-		if _, err := client.CoreV1().ConfigMaps(s.Namespace).Patch(context.TODO(), s.Name, k8sapitypes.JSONPatchType,
-			[]byte("[{\"op\": \"remove\", \"path\": \"/metadata/finalizers\"}]"), metav1.PatchOptions{}); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func getRemainedResource(objs *kbObjects) map[string][]string {
+func getRemainedResource(objs kbObjects) map[string][]string {
 	res := map[string][]string{}
 	appendItems := func(key string, l *unstructured.UnstructuredList) {
 		for _, item := range l.Items {
@@ -268,25 +212,10 @@ func getRemainedResource(objs *kbObjects) map[string][]string {
 		}
 	}
 
-	if objs.crds != nil {
-		appendItems("CRDs", objs.crds)
-	}
-
-	for k, v := range objs.crs {
+	for k, v := range objs {
 		appendItems(k.Resource, v)
 	}
 
-	if objs.svcs != nil {
-		for _, item := range objs.svcs.Items {
-			res["services"] = append(res["services"], item.GetName())
-		}
-	}
-
-	if objs.deploys != nil {
-		for _, item := range objs.deploys.Items {
-			res["deployments"] = append(res["deployments"], item.GetName())
-		}
-	}
 	return res
 }
 

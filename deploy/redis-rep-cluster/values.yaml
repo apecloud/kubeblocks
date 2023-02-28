@@ -39,3 +39,6 @@ topologyKeys:
 ## ref: https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/
 ##
 tolerations: [ ]
+
+enabledLogs:
+  - running

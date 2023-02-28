@@ -56,7 +56,7 @@ func (r *ConfigConstraintReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	reqCtx := intctrlutil.RequestCtx{
 		Ctx:      ctx,
 		Req:      req,
-		Log:      log.FromContext(ctx).WithValues("clusterDefinition", req.NamespacedName),
+		Log:      log.FromContext(ctx).WithName("ConfigConstraintReconcile").WithValues("ConfigConstraint", req.NamespacedName.Name),
 		Recorder: r.Recorder,
 	}
 

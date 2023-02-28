@@ -204,9 +204,10 @@ func WithAnnotations(keysAndValues ...string) func(client.Object) {
 	}
 }
 
+// CreateObj calls CreateCustomizedObj with CustomizeObjYAML wrapper for any optional modify actions.
 func CreateObj[T intctrlutil.Object, PT intctrlutil.PObject[T]](testCtx *testutil.TestContext,
-	filePath string, pobj PT, a ...any) PT {
-	return CreateCustomizedObj(testCtx, filePath, pobj, CustomizeObjYAML(a...))
+	filePath string, pobj PT, actions ...any) PT {
+	return CreateCustomizedObj(testCtx, filePath, pobj, CustomizeObjYAML(actions...))
 }
 
 func NewCustomizedObj[T intctrlutil.Object, PT intctrlutil.PObject[T]](
@@ -215,6 +216,9 @@ func NewCustomizedObj[T intctrlutil.Object, PT intctrlutil.PObject[T]](
 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
 	objYAML := string(objBytes)
 	for _, action := range actions {
+		if action == nil {
+			continue
+		}
 		switch f := action.(type) {
 		case func(string) string:
 			objYAML = f(objYAML)
@@ -223,6 +227,9 @@ func NewCustomizedObj[T intctrlutil.Object, PT intctrlutil.PObject[T]](
 	}
 	gomega.Expect(yaml.Unmarshal([]byte(objYAML), pobj)).Should(gomega.Succeed())
 	for _, action := range actions {
+		if action == nil {
+			continue
+		}
 		switch f := action.(type) {
 		case func(client.Object):
 			f(pobj)

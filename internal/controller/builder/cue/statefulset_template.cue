@@ -40,7 +40,7 @@ statefulset: {
 			"app.kubernetes.io/instance":   cluster.metadata.name
 			"app.kubernetes.io/managed-by": "kubeblocks"
 
-			"app.kubeblocks.io/component-name": "\(component.name)"
+			"apps.kubeblocks.io/component-name": "\(component.name)"
 		}
 	}
 	spec: {
@@ -50,13 +50,13 @@ statefulset: {
 				"app.kubernetes.io/instance":   "\(cluster.metadata.name)"
 				"app.kubernetes.io/managed-by": "kubeblocks"
 
-				"app.kubeblocks.io/component-name": "\(component.name)"
+				"apps.kubeblocks.io/component-name": "\(component.name)"
 			}
 		serviceName: "\(cluster.metadata.name)-\(component.name)-headless"
-		if component.type != "replication" {
+		if component.workloadType != "Replication" {
 			replicas: component.replicas
 		}
-		if component.type == "replication" {
+		if component.workloadType == "Replication" {
 			replicas: 1
 		}
 		minReadySeconds:     10
@@ -68,13 +68,13 @@ statefulset: {
 					"app.kubernetes.io/instance":   "\(cluster.metadata.name)"
 					"app.kubernetes.io/managed-by": "kubeblocks"
 
-					"app.kubeblocks.io/component-name": "\(component.name)"
-					"app.kubeblocks.io/workload-type":  "\(component.workloadType)"
+					"apps.kubeblocks.io/component-name": "\(component.name)"
+					"apps.kubeblocks.io/workload-type":  "\(component.workloadType)"
 				}
 			}
 			spec: component.podSpec
 		}
-		if component.type != "replication" {
+		if component.workloadType != "Replication" {
 			volumeClaimTemplates: component.volumeClaimTemplates
 		}
 	}

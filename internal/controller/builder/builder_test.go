@@ -33,7 +33,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
-	cfgcm "github.com/apecloud/kubeblocks/internal/configuration/configmap"
+	cfgcm "github.com/apecloud/kubeblocks/internal/configuration/config_manager"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
@@ -127,10 +127,10 @@ var _ = Describe("builder", func() {
 			}},
 		}
 		return testapps.NewStatefulSetFactory(testCtx.DefaultNamespace, "mock-sts", clusterName, mysqlCompName).
-			AddLabels(intctrlutil.AppNameLabelKey, "mock-app",
-				intctrlutil.AppInstanceLabelKey, clusterName,
-				intctrlutil.KBAppComponentLabelKey, mysqlCompName,
-			).SetReplicas(1).AddContainer(container).
+			AddAppNameLabel("mock-app").
+			AddAppInstanceLabel(clusterName).
+			AddAppComponentLabel(mysqlCompName).
+			SetReplicas(1).AddContainer(container).
 			AddVolumeClaimTemplate(corev1.PersistentVolumeClaim{
 				ObjectMeta: metav1.ObjectMeta{Name: testapps.DataVolumeName},
 				Spec:       testapps.NewPVC("1Gi"),
@@ -199,7 +199,7 @@ var _ = Describe("builder", func() {
 				Namespace: "default",
 				Name:      "data-mysql-01-replicasets-0",
 			}
-			pvc, err := BuildPVCFromSnapshot(sts, sts.Spec.VolumeClaimTemplates[0], pvcKey, snapshotName)
+			pvc, err := BuildPVCFromSnapshot(sts, params.Component.VolumeClaimTemplates[0], pvcKey, snapshotName)
 			Expect(err).Should(BeNil())
 			Expect(pvc).ShouldNot(BeNil())
 			Expect(pvc.Spec.AccessModes).Should(Equal(sts.Spec.VolumeClaimTemplates[0].Spec.AccessModes))
@@ -248,16 +248,27 @@ var _ = Describe("builder", func() {
 			params := newParams()
 			envConfigName := "test-env-config-name"
 			newParams := params
+
+			sts, err := BuildSts(reqCtx, *params, envConfigName)
+			Expect(err).Should(BeNil())
+			Expect(sts).ShouldNot(BeNil())
+			// test  replicas = 0
 			newComponent := *params.Component
 			newComponent.Replicas = 0
-			newComponent.CharacterType = ""
 			newParams.Component = &newComponent
-			sts, err := BuildSts(reqCtx, *newParams, envConfigName)
+			sts, err = BuildSts(reqCtx, *newParams, envConfigName)
 			Expect(err).Should(BeNil())
 			Expect(sts).ShouldNot(BeNil())
-			sts, err = BuildSts(reqCtx, *params, envConfigName)
+			Expect(*sts.Spec.Replicas).Should(Equal(int32(0)))
+			// test workload type replication
+			replComponent := *params.Component
+			replComponent.Replicas = 2
+			replComponent.WorkloadType = appsv1alpha1.Replication
+			newParams.Component = &replComponent
+			sts, err = BuildSts(reqCtx, *newParams, envConfigName)
 			Expect(err).Should(BeNil())
 			Expect(sts).ShouldNot(BeNil())
+			Expect(*sts.Spec.Replicas).Should(Equal(int32(1)))
 		})
 
 		It("builds Deploy correctly", func() {
@@ -395,12 +406,14 @@ var _ = Describe("builder", func() {
 		})
 
 		It("builds config manager sidecar container correctly", func() {
-			sidecarRenderedParam := &cfgcm.ConfigManagerSidecar{
-				ManagerName: "cfgmgr",
-				Image:       constant.KBImage,
-				Args:        []string{},
-				Envs:        []corev1.EnvVar{},
-				Volumes:     []corev1.VolumeMount{},
+			sidecarRenderedParam := &cfgcm.ConfigManagerParams{
+				ManagerName:   "cfgmgr",
+				CharacterType: "mysql",
+				SecreteName:   "test-secret",
+				Image:         constant.KBImage,
+				Args:          []string{},
+				Envs:          []corev1.EnvVar{},
+				Volumes:       []corev1.VolumeMount{},
 			}
 			configmap, err := BuildCfgManagerContainer(sidecarRenderedParam)
 			Expect(err).Should(BeNil())

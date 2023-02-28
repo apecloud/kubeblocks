@@ -34,7 +34,7 @@ import (
 	componentutil "github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	cfgutil "github.com/apecloud/kubeblocks/controllers/apps/configuration"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
-	cfgcm "github.com/apecloud/kubeblocks/internal/configuration/configmap"
+	cfgcm "github.com/apecloud/kubeblocks/internal/configuration/config_manager"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
@@ -191,12 +191,9 @@ func PrepareComponentResources(reqCtx intctrlutil.RequestCtx, cli client.Client,
 
 // needBuildPDB check whether the PodDisruptionBudget needs to be built
 func needBuildPDB(task *intctrltypes.ReconcileTask) bool {
-	if task.Component.WorkloadType == appsv1alpha1.Consensus {
-		// if MinReplicas is non-zero, build pdb
-		// TODO: add ut
-		return task.Component.MaxUnavailable != nil
-	}
-	return intctrlutil.ExistsPDBSpec(task.Component.PodDisruptionBudgetSpec)
+	// TODO: add ut
+	comp := task.Component
+	return comp.WorkloadType == appsv1alpha1.Consensus && comp.MaxUnavailable != nil
 }
 
 // TODO multi roles with same accessMode support
@@ -354,6 +351,7 @@ func buildCfg(task *intctrltypes.ReconcileTask,
 		if err != nil {
 			return nil, err
 		}
+		updateCMConfigSelectorLabels(cm, tpl)
 
 		// The owner of the configmap object is a cluster of users,
 		// in order to manage the life cycle of configmap
@@ -371,11 +369,21 @@ func buildCfg(task *intctrltypes.ReconcileTask,
 		return nil, cfgcore.WrapError(err, "failed to generate pod volume")
 	}
 
-	if err := updateConfigurationManagerWithComponent(podSpec, tpls, ctx, cli); err != nil {
+	if err := updateConfigurationManagerWithComponent(podSpec, tpls, ctx, cli, task.GetBuilderParams()); err != nil {
 		return nil, cfgcore.WrapError(err, "failed to generate sidecar for configmap's reloader")
 	}
 
 	return configs, nil
+}
+
+func updateCMConfigSelectorLabels(cm *corev1.ConfigMap, tpl appsv1alpha1.ConfigTemplate) {
+	if len(tpl.Keys) == 0 {
+		return
+	}
+	if cm.Labels == nil {
+		cm.Labels = make(map[string]string)
+	}
+	cm.Labels[cfgcore.CMConfigurationCMKeysLabelKey] = strings.Join(tpl.Keys, ",")
 }
 
 // generateConfigMapFromTpl render config file by config template provided by provider.
@@ -477,15 +485,11 @@ func updateStatefulLabelsWithTemplate(sts *appsv1.StatefulSet, allLabels map[str
 
 // updateConfigurationManagerWithComponent build the configmgr sidecar container and update it
 // into PodSpec if configuration reload option is on
-func updateConfigurationManagerWithComponent(
-	podSpec *corev1.PodSpec,
-	cfgTemplates []appsv1alpha1.ConfigTemplate,
-	ctx context.Context,
-	cli client.Client) error {
+func updateConfigurationManagerWithComponent(podSpec *corev1.PodSpec, cfgTemplates []appsv1alpha1.ConfigTemplate, ctx context.Context, cli client.Client, params builder.BuilderParams) error {
 	var (
-		volumeDirs     []corev1.VolumeMount
-		managerSidecar *cfgcm.ConfigManagerSidecar
-		err            error
+		volumeDirs          []corev1.VolumeMount
+		configManagerParams *cfgcm.ConfigManagerParams
+		err                 error
 
 		defaultVarRunVolumePath = "/var/run"
 		criEndpointVolumeName   = "cri-runtime-endpoint"
@@ -496,18 +500,19 @@ func updateConfigurationManagerWithComponent(
 	if volumeDirs = getUsingVolumesByCfgTemplates(podSpec, cfgTemplates); len(volumeDirs) == 0 {
 		return nil
 	}
-	if managerSidecar, err = buildConfigManagerParams(cli, ctx, cfgTemplates, volumeDirs, defaultVarRunVolumePath, criEndpointVolumeName); err != nil {
+	if configManagerParams, err = buildConfigManagerParams(cli, ctx, cfgTemplates, volumeDirs, defaultVarRunVolumePath, criEndpointVolumeName, params); err != nil {
 		return err
 	}
-	if managerSidecar == nil {
+	if configManagerParams == nil {
 		return nil
 	}
 
-	container, err := builder.BuildCfgManagerContainer(managerSidecar)
+	container, err := builder.BuildCfgManagerContainer(configManagerParams)
 	if err != nil {
 		return err
 	}
 	updateCRIContainerVolume(podSpec, defaultVarRunVolumePath, criEndpointVolumeName)
+	updateTPLScriptVolume(podSpec, configManagerParams)
 
 	// Add sidecar to podTemplate
 	podSpec.Containers = append(podSpec.Containers, *container)
@@ -528,6 +533,20 @@ func updateCRIContainerVolume(podSpec *corev1.PodSpec, volumePath string, volume
 				},
 			},
 		}
+	}, nil)
+	podSpec.Volumes = podVolumes
+}
+
+func updateTPLScriptVolume(podSpec *corev1.PodSpec, configManager *cfgcm.ConfigManagerParams) {
+	scriptVolume := configManager.ScriptVolume
+	if scriptVolume == nil {
+		return
+	}
+
+	// Ignore useless configtemplate
+	podVolumes := podSpec.Volumes
+	podVolumes, _ = intctrlutil.CreateOrUpdateVolume(podVolumes, scriptVolume.Name, func(volumeName string) corev1.Volume {
+		return *scriptVolume
 	}, nil)
 	podSpec.Volumes = podVolumes
 }
@@ -569,31 +588,29 @@ func getUsingVolumesByCfgTemplates(podSpec *corev1.PodSpec, cfgTemplates []appsv
 	return volumeDirs
 }
 
-func buildConfigManagerParams(cli client.Client, ctx context.Context, cfgTemplates []appsv1alpha1.ConfigTemplate, volumeDirs []corev1.VolumeMount, volumePath string, volumeName string) (*cfgcm.ConfigManagerSidecar, error) {
-	var (
-		err               error
-		reloadOptions     *appsv1alpha1.ReloadOptions
-		configManagerArgs []string
-	)
-
-	if reloadOptions, err = cfgutil.GetReloadOptions(cli, ctx, cfgTemplates); err != nil {
-		return nil, err
-	}
-	if reloadOptions == nil || reloadOptions.UnixSignalTrigger == nil {
-		return nil, nil
-	}
-
-	unixSignalOption := reloadOptions.UnixSignalTrigger
-	configManagerArgs = cfgcm.BuildSignalArgs(*unixSignalOption, volumeDirs)
-	configManager := &cfgcm.ConfigManagerSidecar{
-		ManagerName: cfgcore.ConfigSidecarName,
-		Image:       viper.GetString(cfgcore.ConfigSidecarIMAGE),
-		Args:        configManagerArgs,
+func buildConfigManagerParams(cli client.Client, ctx context.Context, cfgTemplates []appsv1alpha1.ConfigTemplate, volumeDirs []corev1.VolumeMount, volumePath string, volumeName string, params builder.BuilderParams) (*cfgcm.ConfigManagerParams, error) {
+	configManagerParams := &cfgcm.ConfigManagerParams{
+		ManagerName:   cfgcore.ConfigSidecarName,
+		CharacterType: params.Component.CharacterType,
+		SecreteName:   component.GenerateConnCredential(params.Cluster.Name),
+		Image:         viper.GetString(cfgcore.ConfigSidecarIMAGE),
 		// add cri sock path
 		Volumes: append(volumeDirs, corev1.VolumeMount{
 			Name:      volumeName,
 			MountPath: volumePath,
 		}),
 	}
-	return configManager, nil
+
+	var err error
+	var reloadOptions *appsv1alpha1.ReloadOptions
+	if reloadOptions, err = cfgutil.GetReloadOptions(cli, ctx, cfgTemplates); err != nil {
+		return nil, err
+	}
+	if reloadOptions == nil {
+		return nil, nil
+	}
+	if err = cfgcm.BuildConfigManagerContainerArgs(reloadOptions, volumeDirs, cli, ctx, configManagerParams); err != nil {
+		return nil, err
+	}
+	return configManagerParams, nil
 }

@@ -21,7 +21,6 @@ import (
 	. "github.com/onsi/gomega"
 
 	appsv1 "k8s.io/api/apps/v1"
-	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -34,9 +33,9 @@ import (
 )
 
 var _ = Describe("kubeblocks objects", func() {
-	It("deleteDeploys", func() {
-		client := testing.FakeClientSet()
-		Expect(deleteDeploys(client, nil)).Should(Succeed())
+	It("delete objects", func() {
+		dynamic := testing.FakeDynamicClient()
+		Expect(deleteObjects(dynamic, types.DeployGVR(), nil)).Should(Succeed())
 
 		mockDeploy := func(label map[string]string) *appsv1.Deployment {
 			deploy := &appsv1.Deployment{}
@@ -50,35 +49,11 @@ var _ = Describe("kubeblocks objects", func() {
 			"release":                types.KubeBlocksChartName,
 		}
 		for k, v := range labels {
-			client = testing.FakeClientSet(mockDeploy(map[string]string{
+			dynamic = testing.FakeDynamicClient(mockDeploy(map[string]string{
 				k: v,
 			}))
-			objs, _ := getKBObjects(client, testing.FakeDynamicClient(testing.FakeVolumeSnapshotClass()), namespace)
-			Expect(deleteDeploys(client, objs.deploys)).Should(Succeed())
-		}
-	})
-
-	It("deleteServices", func() {
-		client := testing.FakeClientSet()
-		Expect(deleteServices(client, nil)).Should(Succeed())
-
-		mockService := func(label map[string]string) *corev1.Service {
-			svc := &corev1.Service{}
-			svc.SetLabels(label)
-			svc.SetNamespace(namespace)
-			return svc
-		}
-
-		labels := map[string]string{
-			"types.InstanceLabelKey": types.KubeBlocksChartName,
-			"release":                types.KubeBlocksChartName,
-		}
-		for k, v := range labels {
-			client = testing.FakeClientSet(mockService(map[string]string{
-				k: v,
-			}))
-			objs, _ := getKBObjects(client, testing.FakeDynamicClient(testing.FakeVolumeSnapshotClass()), namespace)
-			Expect(deleteServices(client, objs.svcs)).Should(Succeed())
+			objs, _ := getKBObjects(testing.FakeDynamicClient(testing.FakeVolumeSnapshotClass()), namespace)
+			Expect(deleteObjects(dynamic, types.DeployGVR(), objs[types.DeployGVR()])).Should(Succeed())
 		}
 	})
 
@@ -99,43 +74,35 @@ var _ = Describe("kubeblocks objects", func() {
 			clusterDef     *appsv1alpha1.ClusterDefinition
 			clusterVersion *appsv1alpha1.ClusterVersion
 			backupTool     *dpv1alpha1.BackupTool
-			expected       string
 		}{
 			{
 				clusterDef:     testing.FakeClusterDef(),
 				clusterVersion: testing.FakeClusterVersion(),
 				backupTool:     testing.FakeBackupTool(),
-				expected:       "Unable to remove nonexistent key: finalizers",
 			},
 			{
 				clusterDef:     clusterDef,
 				clusterVersion: testing.FakeClusterVersion(),
 				backupTool:     testing.FakeBackupTool(),
-				expected:       "Unable to remove nonexistent key: finalizers",
 			},
 			{
 				clusterDef:     clusterDef,
 				clusterVersion: clusterVersion,
 				backupTool:     backupTool,
-				expected:       "",
 			},
 		}
 
 		for _, c := range testCases {
 			client := mockDynamicClientWithCRD(c.clusterDef, c.clusterVersion, c.backupTool)
-			objs, _ := getKBObjects(testing.FakeClientSet(), client, "")
-			if c.expected != "" {
-				Expect(removeFinalizers(client, objs)).Should(MatchError(MatchRegexp(c.expected)))
-			} else {
-				Expect(removeFinalizers(client, objs)).Should(Succeed())
-			}
+			objs, _ := getKBObjects(client, "")
+			Expect(removeCustomResources(client, objs)).Should(Succeed())
 		}
 	})
 
 	It("delete crd", func() {
-		client := mockDynamicClientWithCRD()
-		objs, _ := getKBObjects(testing.FakeClientSet(), client, "")
-		Expect(deleteCRDs(client, objs.crds)).Should(Succeed())
+		dynamic := mockDynamicClientWithCRD()
+		objs, _ := getKBObjects(dynamic, "")
+		Expect(deleteObjects(dynamic, types.CRDGVR(), objs[types.CRDGVR()])).Should(Succeed())
 	})
 })
 

@@ -27,7 +27,7 @@ const (
 	// name of our custom finalizer
 	dataProtectionFinalizerName = "dataprotection.kubeblocks.io/finalizer"
 
-	reconcileInterval = time.Second * 5
+	reconcileInterval = time.Second
 
 	// settings keys
 	maxConcurDataProtectionReconKey = "MAXCONCURRENTRECONCILES_DATAPROTECTION"

@@ -20,6 +20,8 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 )
 
 const (
@@ -125,6 +127,12 @@ type BackupSnapInfo struct {
 	Labels        string
 }
 
+type ConfigTemplateInfo struct {
+	Name  string
+	TPL   appsv1alpha1.ConfigTemplate
+	CMObj *corev1.ConfigMap
+}
+
 func ClusterGVR() schema.GroupVersionResource {
 	return schema.GroupVersionResource{Group: Group, Version: Version, Resource: ResourceClusters}
 }
@@ -161,12 +169,28 @@ func CRDGVR() schema.GroupVersionResource {
 	}
 }
 
-func CMGVR() schema.GroupVersionResource {
+func ConfigmapGVR() schema.GroupVersionResource {
 	return schema.GroupVersionResource{Group: corev1.GroupName, Version: VersionV1, Resource: ResourceConfigmaps}
 }
 
-func STSGVR() schema.GroupVersionResource {
+func StatefulSetGVR() schema.GroupVersionResource {
 	return schema.GroupVersionResource{Group: appsv1.GroupName, Version: VersionV1, Resource: ResourceStatefulSets}
+}
+
+func DeployGVR() schema.GroupVersionResource {
+	return schema.GroupVersionResource{Group: appsv1.GroupName, Version: VersionV1, Resource: ResourceDeployments}
+}
+
+func ServiceGVR() schema.GroupVersionResource {
+	return schema.GroupVersionResource{Group: corev1.GroupName, Version: VersionV1, Resource: "services"}
+}
+
+func PVCGVR() schema.GroupVersionResource {
+	return schema.GroupVersionResource{Group: corev1.GroupName, Version: VersionV1, Resource: "persistentvolumeclaims"}
+}
+
+func PVGVR() schema.GroupVersionResource {
+	return schema.GroupVersionResource{Group: corev1.GroupName, Version: VersionV1, Resource: "persistentvolumes"}
 }
 
 func ConfigConstraintGVR() schema.GroupVersionResource {

@@ -24,7 +24,6 @@ import (
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
-	policyv1 "k8s.io/api/policy/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	metautil "k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -326,12 +325,22 @@ func GetIntOrPercentValue(intOrStr *metautil.IntOrString) (int, bool, error) {
 	return v, true, nil
 }
 
-func ExistsPDBSpec(pdbSpec *policyv1.PodDisruptionBudgetSpec) bool {
-	if pdbSpec == nil {
-		return false
+// GetPortByPortName find the Port from pod by name
+func GetPortByPortName(pod *corev1.Pod, portName string) (int32, error) {
+	for _, container := range pod.Spec.Containers {
+		for _, port := range container.Ports {
+			if port.Name == portName {
+				return port.ContainerPort, nil
+			}
+		}
 	}
-	if pdbSpec.MinAvailable == nil && pdbSpec.MaxUnavailable == nil {
-		return false
-	}
-	return true
+	return 0, fmt.Errorf("port %s not found", portName)
+}
+
+func GetProbeGRPCPort(pod *corev1.Pod) (int32, error) {
+	return GetPortByPortName(pod, ProbeGRPCPortName)
+}
+
+func GetProbeHTTPPort(pod *corev1.Pod) (int32, error) {
+	return GetPortByPortName(pod, ProbeHTTPPortName)
 }

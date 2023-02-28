@@ -155,7 +155,7 @@ mysqld.innodb_autoinc_lock_mode: conflicting values 2 and 100:
 				Expect(r.err).Should(Succeed())
 				option := cfgcore.CfgOption{
 					Type:    cfgcore.CfgTplType,
-					CfgType: appsv1alpha1.INI,
+					CfgType: appsv1alpha1.Ini,
 					Log:     log.FromContext(context.Background()),
 				}
 				diff, err := cfgcore.CreateMergePatch(&cfgcore.K8sConfig{

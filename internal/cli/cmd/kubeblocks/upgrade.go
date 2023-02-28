@@ -58,9 +58,6 @@ func newUpgradeCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 			util.CheckErr(o.Complete(f, cmd))
 			util.CheckErr(o.Upgrade(cmd))
 		},
-		PostRun: func(cmd *cobra.Command, args []string) {
-			util.CheckErr(o.PostInstall())
-		},
 	}
 
 	cmd.Flags().BoolVar(&o.Monitor, "monitor", true, "Set monitor enabled and install Prometheus, AlertManager and Grafana")
@@ -132,6 +129,14 @@ func (o *InstallOptions) Upgrade(cmd *cobra.Command) error {
 	// successfully upgraded
 	spinner(true)
 
+	// create VolumeSnapshotClass
+	if err = o.createVolumeSnapshotClass(); err != nil {
+		return err
+	}
+
+	if !o.Quiet {
+		o.printNotes()
+	}
 	return nil
 }
 

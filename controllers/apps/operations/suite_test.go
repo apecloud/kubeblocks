@@ -149,8 +149,8 @@ func initOperationsResources(clusterDefinitionName,
 		clusterVersionName, clusterName, statelessComp, statefulComp, consensusComp)
 	opsRes := &OpsResource{
 		Ctx:      context.Background(),
-		Cluster:  clusterObject,
 		Client:   k8sClient,
+		Cluster:  clusterObject,
 		Recorder: k8sManager.GetEventRecorderFor("opsrequest-controller"),
 	}
 	By("mock cluster is Running and the status operations")
@@ -165,20 +165,6 @@ func initOperationsResources(clusterDefinitionName,
 			},
 			statefulComp: {
 				Phase: appsv1alpha1.RunningPhase,
-			},
-		}
-		clusterObject.Status.Operations = &appsv1alpha1.Operations{
-			Upgradable: true,
-			HorizontalScalable: []appsv1alpha1.OperationComponent{
-				{
-					Name: consensusComp,
-				},
-				{
-					Name: statelessComp,
-				},
-				{
-					Name: statefulComp,
-				},
 			},
 		}
 	})).Should(Succeed())

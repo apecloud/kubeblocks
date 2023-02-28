@@ -76,9 +76,9 @@ var (
 		# list all events of a specified cluster
 		kbcli cluster list-events mycluster`)
 
-	listUsersExample = templates.Examples(`
-		# list all users of a specified cluster
-		kbcli cluster list-users mycluster`)
+	listAccountsExample = templates.Examples(`
+		# list all accounts of a specified cluster
+		kbcli cluster list-accounts mycluster`)
 )
 
 func NewListCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
@@ -156,16 +156,16 @@ func NewListEventsCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *c
 	return cmd
 }
 
-func NewListUsersCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewListAccountsCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := list.NewListOptions(f, streams, schema.GroupVersionResource{Group: corev1.GroupName, Resource: "secrets", Version: "v1"})
 	cmd := &cobra.Command{
-		Use:               "list-users NAME",
-		Short:             "List cluster users",
-		Example:           listUsersExample,
-		Aliases:           []string{"ls-users"},
+		Use:               "list-accounts NAME",
+		Short:             "List cluster accounts",
+		Example:           listAccountsExample,
+		Aliases:           []string{"ls-accounts"},
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.ClusterGVR()),
 		Run: func(cmd *cobra.Command, args []string) {
-			util.CheckErr(listUsers(o, args))
+			util.CheckErr(listAccount(o, args))
 		},
 	}
 	cmd.Flags().BoolVarP(&o.AllNamespaces, "all-namespace", "A", o.AllNamespaces, "If present, list the requested object(s) across all namespaces. Namespace in current context is ignored even if specified with --namespace.")
@@ -237,7 +237,7 @@ func addRow(dynamic dynamic.Interface, client *kubernetes.Clientset,
 	return nil
 }
 
-func listUsers(o *list.ListOptions, args []string) error {
+func listAccount(o *list.ListOptions, args []string) error {
 	if len(args) == 0 {
 		return fmt.Errorf("missing cluster name")
 	}
@@ -262,7 +262,7 @@ func listUsers(o *list.ListOptions, args []string) error {
 	}
 
 	tbl := printer.NewTablePrinter(o.Out)
-	tbl.SetHeader("NAMESPACE", "CLUSTER", "USERNAME", "SECRET", "CREATED-TIME")
+	tbl.SetHeader("NAMESPACE", "CLUSTER", "NAME", "SECRET", "CREATED-TIME")
 	for _, info := range infos {
 		s := &corev1.Secret{}
 		obj := info.Object.(*unstructured.Unstructured)

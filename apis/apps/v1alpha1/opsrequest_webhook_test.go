@@ -21,6 +21,10 @@ import (
 	"fmt"
 	"time"
 
+	storagev1 "k8s.io/api/storage/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/kubectl/pkg/util/storage"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -43,6 +47,7 @@ var _ = Describe("OpsRequest webhook", func() {
 		timeout                      = time.Second * 10
 		interval                     = time.Second
 		replicaSetComponentName      = "replicasets"
+		proxyComponentName           = "proxy"
 	)
 	cleanupObjects := func() {
 		// Add any setup steps that needs to be executed before each test
@@ -53,6 +58,8 @@ var _ = Describe("OpsRequest webhook", func() {
 		err = k8sClient.DeleteAllOf(ctx, &ClusterVersion{}, client.HasLabels{testCtx.TestObjLabelKey})
 		Expect(err).NotTo(HaveOccurred())
 		err = k8sClient.DeleteAllOf(ctx, &ClusterDefinition{}, client.HasLabels{testCtx.TestObjLabelKey})
+		Expect(err).NotTo(HaveOccurred())
+		err = k8sClient.DeleteAllOf(ctx, &storagev1.StorageClass{})
 		Expect(err).NotTo(HaveOccurred())
 	}
 	BeforeEach(func() {
@@ -73,33 +80,41 @@ var _ = Describe("OpsRequest webhook", func() {
 		Expect(k8sClient.Patch(ctx, cluster, clusterPatch)).Should(Succeed())
 	}
 
+	createStorageClass := func(ctx context.Context, storageClassName string, isDefault string, allowVolumeExpansion bool) *storagev1.StorageClass {
+		storageClass := &storagev1.StorageClass{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: storageClassName,
+				Annotations: map[string]string{
+					storage.IsDefaultStorageClassAnnotation: isDefault,
+				},
+			},
+			Provisioner:          "kubernetes.io/no-provisioner",
+			AllowVolumeExpansion: &allowVolumeExpansion,
+		}
+		err := testCtx.CheckedCreateObj(ctx, storageClass)
+		if err != nil {
+			fmt.Printf("create storage class error: %s\n", err.Error())
+		}
+		Expect(err).Should(BeNil())
+		return storageClass
+	}
+
 	testUpgrade := func(cluster *Cluster) {
 		opsRequest := createTestOpsRequest(clusterName, opsRequestName+"-upgrade", UpgradeType)
-		By("By creating a clusterVersion for upgrade")
-		newClusterVersion := createTestClusterVersionObj(clusterDefinitionName, clusterVersionNameForUpgrade)
-		Expect(testCtx.CreateObj(ctx, newClusterVersion)).Should(Succeed())
-
-		By("By testing when cluster not support upgrade")
-		Expect(testCtx.CreateObj(ctx, opsRequest).Error()).To(ContainSubstring("ClusterVersion must be greater than 1"))
-		// set cluster support upgrade
-		patch := client.MergeFrom(cluster.DeepCopy())
-		if cluster.Status.Operations == nil {
-			cluster.Status.Operations = &Operations{}
-		}
-		cluster.Status.Operations.Upgradable = true
-		Expect(k8sClient.Status().Patch(ctx, cluster, patch)).Should(Succeed())
-		// wait until patch succeed
-		Eventually(func() bool {
-			tmpCluster := &Cluster{}
-			_ = k8sClient.Get(context.Background(), client.ObjectKey{Name: cluster.Name, Namespace: cluster.Namespace}, tmpCluster)
-			return tmpCluster.Status.Operations.Upgradable
-		}, timeout, interval).Should(BeTrue())
 
 		By("By testing when spec.upgrade is null")
 		Expect(testCtx.CreateObj(ctx, opsRequest).Error()).To(ContainSubstring("spec.upgrade"))
-		opsRequest.Spec.Upgrade = &Upgrade{ClusterVersionRef: clusterVersionName}
+
+		By("By creating a new clusterVersion for upgrade")
+		newClusterVersion := createTestClusterVersionObj(clusterDefinitionName, clusterVersionNameForUpgrade)
+		Expect(testCtx.CreateObj(ctx, newClusterVersion)).Should(Succeed())
+
+		By("By testing when target cluster version not exist")
+		opsRequest.Spec.Upgrade = &Upgrade{ClusterVersionRef: clusterVersionName + "-not-exist"}
+		Expect(testCtx.CreateObj(ctx, opsRequest).Error()).To(ContainSubstring("not found"))
 
 		By("Test Cluster Phase")
+		opsRequest.Spec.Upgrade = &Upgrade{ClusterVersionRef: clusterVersionName}
 		OpsRequestBehaviourMapper[UpgradeType] = OpsRequestBehaviour{
 			FromClusterPhases: []Phase{RunningPhase},
 			ToClusterPhase:    VersionUpgradingPhase,
@@ -144,7 +159,7 @@ var _ = Describe("OpsRequest webhook", func() {
 		// if running in real cluster, the opsRequest will reconcile all the time.
 		// so we should add eventually block.
 		Eventually(func() bool {
-			patch = client.MergeFrom(opsRequest.DeepCopy())
+			patch := client.MergeFrom(opsRequest.DeepCopy())
 			opsRequest.Status.Phase = SucceedPhase
 			Expect(k8sClient.Status().Patch(ctx, opsRequest, patch)).Should(Succeed())
 
@@ -157,11 +172,11 @@ var _ = Describe("OpsRequest webhook", func() {
 	testVerticalScaling := func(cluster *Cluster) {
 		verticalScalingList := []VerticalScaling{
 			{
-				ComponentOps:         ComponentOps{ComponentName: "vscale-not-exist-component"},
+				ComponentOps:         ComponentOps{ComponentName: "vs-not-exist"},
 				ResourceRequirements: corev1.ResourceRequirements{},
 			},
 			{
-				ComponentOps: ComponentOps{ComponentName: "proxy"},
+				ComponentOps: ComponentOps{ComponentName: proxyComponentName},
 				ResourceRequirements: corev1.ResourceRequirements{
 					Requests: corev1.ResourceList{
 						"cpu":    resource.MustParse("100m"),
@@ -212,9 +227,29 @@ var _ = Describe("OpsRequest webhook", func() {
 	}
 
 	testVolumeExpansion := func(cluster *Cluster) {
-		By("test not support volume expansion")
-		opsRequest := createTestOpsRequest(clusterName, opsRequestName, VolumeExpansionType)
-		opsRequest.Spec.VolumeExpansionList = []VolumeExpansion{
+		volumeExpansionList := []VolumeExpansion{
+			{
+				ComponentOps: ComponentOps{ComponentName: "ve-not-exist"},
+				VolumeClaimTemplates: []OpsRequestVolumeClaimTemplate{
+					{
+						Name:    "data",
+						Storage: resource.MustParse("2Gi"),
+					},
+				},
+			},
+			{
+				ComponentOps: ComponentOps{ComponentName: replicaSetComponentName},
+				VolumeClaimTemplates: []OpsRequestVolumeClaimTemplate{
+					{
+						Name:    "log",
+						Storage: resource.MustParse("2Gi"),
+					},
+					{
+						Name:    "data",
+						Storage: resource.MustParse("2Gi"),
+					},
+				},
+			},
 			{
 				ComponentOps: ComponentOps{ComponentName: replicaSetComponentName},
 				VolumeClaimTemplates: []OpsRequestVolumeClaimTemplate{
@@ -224,83 +259,133 @@ var _ = Describe("OpsRequest webhook", func() {
 					},
 				},
 			},
-		}
-		Expect(testCtx.CreateObj(ctx, opsRequest).Error()).To(ContainSubstring(`Invalid value: "VolumeExpansion": not supported in Cluster`))
-		// set cluster support volumeExpansion
-		patch := client.MergeFrom(cluster.DeepCopy())
-		cluster.Status.Operations.VolumeExpandable = []OperationComponent{
 			{
-				Name:                     replicaSetComponentName,
-				VolumeClaimTemplateNames: []string{"data"},
+				ComponentOps: ComponentOps{ComponentName: replicaSetComponentName},
+				VolumeClaimTemplates: []OpsRequestVolumeClaimTemplate{
+					{
+						Name:    "log",
+						Storage: resource.MustParse("2Gi"),
+					},
+					{
+						Name:    "data",
+						Storage: resource.MustParse("2Gi"),
+					},
+				},
 			},
 		}
-		Expect(k8sClient.Status().Patch(ctx, cluster, patch)).Should(Succeed())
 
-		By("By testing volumeExpansion volumeClaimTemplate name is not consistent")
-		Eventually(func(g Gomega) {
-			opsRequest.Spec.VolumeExpansionList[0].VolumeClaimTemplates[0].Name = "data1"
-			g.Expect(testCtx.CreateObj(ctx, opsRequest).Error()).To(ContainSubstring("not support volume expansion"))
-		}, timeout, interval).Should(Succeed())
+		By("By testing volumeExpansion - target component not exist")
+		opsRequest := createTestOpsRequest(clusterName, opsRequestName, VolumeExpansionType)
+		opsRequest.Spec.VolumeExpansionList = []VolumeExpansion{volumeExpansionList[0]}
+		Expect(testCtx.CreateObj(ctx, opsRequest).Error()).To(ContainSubstring("not found in Cluster.spec.components[*].name"))
 
-		By("By testing volumeExpansion. if api is legal, it will create successfully")
+		By("By testing volumeExpansion - target volume not exist")
+		opsRequest.Spec.VolumeExpansionList = []VolumeExpansion{volumeExpansionList[1]}
+		Expect(testCtx.CreateObj(ctx, opsRequest).Error()).To(ContainSubstring("not support volume expansion, check the StorageClass whether allow volume expansion"))
+
+		By("By testing volumeExpansion - create a new storage class")
+		storageClassName := "sc-test-volume-expansion"
+		storageClass := createStorageClass(testCtx.Ctx, storageClassName, "false", true)
+		Expect(storageClass != nil).Should(BeTrue())
+
+		By("By testing volumeExpansion - has no default storage class")
+		for _, compSpec := range cluster.Spec.ComponentSpecs {
+			for _, vct := range compSpec.VolumeClaimTemplates {
+				Expect(vct.Spec.StorageClassName == nil).Should(BeTrue())
+			}
+		}
+		Expect(testCtx.CreateObj(ctx, opsRequest).Error()).To(ContainSubstring("not support volume expansion, check the StorageClass whether allow volume expansion."))
+
+		By("By testing volumeExpansion - patch it as default and use it to re-create")
+		if storageClass.Annotations == nil {
+			storageClass.Annotations = make(map[string]string)
+		}
+		storageClass.Annotations[storage.IsDefaultStorageClassAnnotation] = "true"
+		Expect(testCtx.Cli.Update(testCtx.Ctx, storageClass)).Should(BeNil())
 		Eventually(func() bool {
-			opsRequest.Spec.VolumeExpansionList[0].VolumeClaimTemplates[0].Name = "data"
-			err := testCtx.CheckedCreateObj(ctx, opsRequest)
-			return err == nil
+			opsRequest.Spec.VolumeExpansionList = []VolumeExpansion{volumeExpansionList[2]}
+			return testCtx.CheckedCreateObj(ctx, opsRequest) == nil
 		}, timeout, interval).Should(BeTrue())
+
+		By("By testing volumeExpansion - (TODO)use specified storage class")
+		// Eventually(func() bool {
+		// 	 opsRequest.Spec.VolumeExpansionList = []VolumeExpansion{volumeExpansionList[3]}
+		// 	 Expect(testCtx.CheckedCreateObj(ctx, opsRequest)).Should(BeNil())
+		// }, timeout, interval).Should(BeTrue())
 	}
 
-	testHorizontalScaling := func(cluster *Cluster) {
-		// set cluster support horizontalScaling
-		patch := client.MergeFrom(cluster.DeepCopy())
-		cluster.Status.Operations.HorizontalScalable = []OperationComponent{
+	testHorizontalScaling := func(clusterDef *ClusterDefinition, cluster *Cluster) {
+		hScalingList := []HorizontalScaling{
 			{
-				Name: replicaSetComponentName,
+				ComponentOps: ComponentOps{ComponentName: "hs-not-exist"},
+				Replicas:     2,
+			},
+			{
+				ComponentOps: ComponentOps{ComponentName: proxyComponentName},
+				Replicas:     2,
+			},
+			{
+				ComponentOps: ComponentOps{ComponentName: replicaSetComponentName},
+				Replicas:     2,
 			},
 		}
-		Expect(k8sClient.Status().Patch(ctx, cluster, patch)).Should(Succeed())
-		// wait until patch succeed
+
+		By("By testing horizontalScaling - delete component proxy from cluster definition which is exist in cluster")
+		patch := client.MergeFrom(clusterDef.DeepCopy())
+		// delete component proxy from cluster definition
+		if clusterDef.Spec.ComponentDefs[0].Name == proxyComponentName {
+			clusterDef.Spec.ComponentDefs = clusterDef.Spec.ComponentDefs[1:]
+		} else {
+			clusterDef.Spec.ComponentDefs = clusterDef.Spec.ComponentDefs[:1]
+		}
+		Expect(k8sClient.Patch(ctx, clusterDef, patch)).Should(Succeed())
 		Eventually(func() bool {
-			tmpCluster := &Cluster{}
-			_ = k8sClient.Get(context.Background(), client.ObjectKey{Name: cluster.Name, Namespace: cluster.Namespace}, tmpCluster)
-			return len(cluster.Status.Operations.HorizontalScalable) > 0
+			tmp := &ClusterDefinition{}
+			_ = k8sClient.Get(context.Background(), client.ObjectKey{Name: clusterDef.Name, Namespace: clusterDef.Namespace}, tmp)
+			return len(tmp.Spec.ComponentDefs) == 1
 		}, timeout, interval).Should(BeTrue())
 
-		By("By testing horizontalScaling. if api is legal, it will create successfully")
+		By("By testing horizontalScaling - target component not exist")
 		opsRequest := createTestOpsRequest(clusterName, opsRequestName, HorizontalScalingType)
+		opsRequest.Spec.HorizontalScalingList = []HorizontalScaling{hScalingList[0]}
+		Expect(testCtx.CreateObj(ctx, opsRequest).Error()).To(ContainSubstring("not found in Cluster.spec.components[*].name"))
+
+		By("By testing horizontalScaling - target component not exist partly")
+		opsRequest = createTestOpsRequest(clusterName, opsRequestName, HorizontalScalingType)
+		opsRequest.Spec.HorizontalScalingList = []HorizontalScaling{hScalingList[0], hScalingList[2]}
+		Expect(testCtx.CreateObj(ctx, opsRequest).Error()).To(ContainSubstring("not found in Cluster.spec.components[*].name"))
+
+		By("By testing horizontalScaling - target component not supported")
+		opsRequest = createTestOpsRequest(clusterName, opsRequestName, HorizontalScalingType)
+		opsRequest.Spec.HorizontalScalingList = []HorizontalScaling{hScalingList[1]}
+		Expect(testCtx.CreateObj(ctx, opsRequest).Error()).To(ContainSubstring("not supported the HorizontalScaling operation"))
+
+		By("By testing horizontalScaling - target component not supported partly")
+		opsRequest = createTestOpsRequest(clusterName, opsRequestName, HorizontalScalingType)
+		opsRequest.Spec.HorizontalScalingList = []HorizontalScaling{hScalingList[1], hScalingList[2]}
+		Expect(testCtx.CreateObj(ctx, opsRequest).Error()).To(ContainSubstring("not supported the HorizontalScaling operation"))
+
+		By("By testing horizontalScaling - target component not exist and not supported partly")
+		opsRequest = createTestOpsRequest(clusterName, opsRequestName, HorizontalScalingType)
+		opsRequest.Spec.HorizontalScalingList = []HorizontalScaling{hScalingList[0], hScalingList[1], hScalingList[2]}
+		err := testCtx.CreateObj(ctx, opsRequest)
+		Expect(err.Error()).To(ContainSubstring("not found in Cluster.spec.components[*].name"))
+		Expect(err.Error()).To(ContainSubstring("not supported the HorizontalScaling operation"))
+
+		By("By testing horizontalScaling. if api is legal, it will create successfully")
+		opsRequest = createTestOpsRequest(clusterName, opsRequestName, HorizontalScalingType)
 		Eventually(func() bool {
-			opsRequest.Spec.HorizontalScalingList = []HorizontalScaling{
-				{
-					ComponentOps: ComponentOps{ComponentName: replicaSetComponentName},
-					Replicas:     2,
-				},
-			}
-			err := testCtx.CheckedCreateObj(ctx, opsRequest)
-			return err == nil
+			opsRequest.Spec.HorizontalScalingList = []HorizontalScaling{hScalingList[2]}
+			return testCtx.CheckedCreateObj(ctx, opsRequest) == nil
 		}, timeout, interval).Should(BeTrue())
 
 		By("test min, max is zero")
-		tmpCluster := &Cluster{}
-		Expect(k8sClient.Get(ctx, client.ObjectKey{Name: clusterName, Namespace: cluster.Namespace}, tmpCluster)).Should(Succeed())
-		patch = client.MergeFrom(tmpCluster.DeepCopy())
-		tmpCluster.Status.Operations.HorizontalScalable = []OperationComponent{
-			{
-				Name: "proxy",
-			},
-		}
-		Expect(k8sClient.Status().Patch(ctx, tmpCluster, patch)).Should(Succeed())
 		opsRequest = createTestOpsRequest(clusterName, opsRequestName, HorizontalScalingType)
 		Eventually(func() bool {
-			opsRequest.Spec.HorizontalScalingList = []HorizontalScaling{
-				{
-					ComponentOps: ComponentOps{ComponentName: "proxy"},
-					Replicas:     5,
-				},
-			}
-			err := testCtx.CheckedCreateObj(ctx, opsRequest)
-			return err == nil
+			opsRequest.Spec.HorizontalScalingList = []HorizontalScaling{hScalingList[2]}
+			opsRequest.Spec.HorizontalScalingList[0].Replicas = 5
+			return testCtx.CheckedCreateObj(ctx, opsRequest) == nil
 		}, timeout, interval).Should(BeTrue())
-
 	}
 
 	testWhenClusterDeleted := func(cluster *Cluster, opsRequest *OpsRequest) {
@@ -341,9 +426,10 @@ var _ = Describe("OpsRequest webhook", func() {
 		It("Should webhook validate passed", func() {
 			By("By create a clusterDefinition")
 
+			clusterDef := &ClusterDefinition{}
 			// wait until ClusterDefinition and ClusterVersion created
 			Eventually(func() bool {
-				clusterDef, _ := createTestClusterDefinitionObj(clusterDefinitionName)
+				clusterDef, _ = createTestClusterDefinitionObj(clusterDefinitionName)
 				Expect(testCtx.CheckedCreateObj(ctx, clusterDef)).Should(Succeed())
 				By("By creating a clusterVersion")
 				clusterVersion := createTestClusterVersionObj(clusterDefinitionName, clusterVersionName)
@@ -369,7 +455,7 @@ var _ = Describe("OpsRequest webhook", func() {
 
 			testVolumeExpansion(cluster)
 
-			testHorizontalScaling(cluster)
+			testHorizontalScaling(clusterDef, cluster)
 
 			opsRequest = testRestart(cluster)
 

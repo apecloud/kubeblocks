@@ -37,7 +37,7 @@ const (
 
 	// common and well known label and annotation keys
 	AppInstanceLabelKey   = "app.kubernetes.io/instance"
-	WorkloadTypeLabelKey  = "app.kubeblocks.io/workload-type"
+	WorkloadTypeLabelKey  = "apps.kubeblocks.io/workload-type"
 	AppNameLabelKey       = "app.kubernetes.io/name"
 	AppManagedByLabelKey  = "app.kubernetes.io/managed-by"
 	AppCreatedByLabelKey  = "app.kubernetes.io/created-by" // resources created temporarily by kubeblocks, this is a deprecated label
@@ -45,18 +45,14 @@ const (
 	RegionLabelKey        = "topology.kubernetes.io/region"
 	ZoneLabelKey          = "topology.kubernetes.io/zone"
 
-	// NameLabelKey                   = "app.kubernetes.io/name"
-	// InstanceLabelKey               = "app.kubernetes.io/instance"
-	// KBComponentLabelKey            = "app.kubeblocks.io/component-name"
-	// ComponentLabelKey              = "app.kubernetes.io/component"
-
 	// kubeblocks.io labels
 	ClusterDefLabelKey              = "clusterdefinition.kubeblocks.io/name"
-	KBAppComponentLabelKey          = "app.kubeblocks.io/component-name"
+	KBAppComponentLabelKey          = "apps.kubeblocks.io/component-name"
 	ConsensusSetAccessModeLabelKey  = "cs.apps.kubeblocks.io/access-mode"
 	VolumeClaimTemplateNameLabelKey = "vct.kubeblocks.io/name"
 	RoleLabelKey                    = "kubeblocks.io/role"              // RoleLabelKey consensusSet and replicationSet role label key
 	BackupProtectionLabelKey        = "kubeblocks.io/backup-protection" // BackupProtectionLabelKey Backup delete protection policy label
+	AddonNameLabelKey               = "extensions.kubeblocks.io/addon-name"
 
 	// kubeblocks.io annotations
 	OpsRequestAnnotationKey          = "kubeblocks.io/ops-request"   // OpsRequestAnnotationKey OpsRequest annotation key in Cluster
@@ -104,6 +100,10 @@ const (
 )
 
 const (
+	// Container port name
+	ProbeHTTPPortName = "probe-http-port"
+	ProbeGRPCPortName = "probe-grpc-port"
+
 	// KubeBlocksDataNodeLabelKey is the node label key of the built-in data node label
 	KubeBlocksDataNodeLabelKey = "kb-data"
 	// KubeBlocksDataNodeLabelValue is the node label value of the built-in data node label
@@ -113,3 +113,10 @@ const (
 	// KubeBlocksDataNodeTolerationValue is the taint label value of the built-in data node taint
 	KubeBlocksDataNodeTolerationValue = "true"
 )
+
+// UpdateCtxValue update Context value, return parent Context.
+func (r *RequestCtx) UpdateCtxValue(key, val any) context.Context {
+	p := r.Ctx
+	r.Ctx = context.WithValue(r.Ctx, key, val)
+	return p
+}

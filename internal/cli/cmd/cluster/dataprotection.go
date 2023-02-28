@@ -365,6 +365,9 @@ func (o *CreateRestoreOptions) Complete() error {
 
 	if cluster.Spec.Affinity != nil {
 		o.PodAntiAffinity = string(cluster.Spec.Affinity.PodAntiAffinity)
+		o.NodeLabels = cluster.Spec.Affinity.NodeLabels
+		o.TopologyKeys = cluster.Spec.Affinity.TopologyKeys
+		o.Tenancy = string(cluster.Spec.Affinity.Tenancy)
 	}
 	o.Monitor = cluster.Spec.ComponentSpecs[0].Monitor
 	componentByte, err := json.Marshal(cluster.Spec.ComponentSpecs)

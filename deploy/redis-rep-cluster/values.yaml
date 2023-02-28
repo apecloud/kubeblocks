@@ -41,4 +41,4 @@ topologyKeys:
 tolerations: [ ]
 
 enabledLogs:
-  - run
+  - running

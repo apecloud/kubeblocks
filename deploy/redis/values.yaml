@@ -23,7 +23,7 @@ primary:
       daemonize no
       pidfile /var/run/redis_6379.pid
       loglevel notice
-      logfile "/data/run.log"
+      logfile "/data/running.log"
       databases 16
       always-show-logo no
       set-proc-title yes
@@ -102,7 +102,7 @@ secondary:
       daemonize no
       pidfile /var/run/redis_6379.pid
       loglevel notice
-      logfile "/data/run.log"
+      logfile "/data/running.log"
       databases 16
       always-show-logo no
       set-proc-title yes
@@ -171,4 +171,4 @@ fullnameOverride: ""
 clusterVersionOverride: ""
 
 logConfigs:
-  run: /data/run.log
+  running: /data/running.log

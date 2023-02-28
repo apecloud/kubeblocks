@@ -1,9 +1,19 @@
 ## kbcli playground init
 
-Bootstrap a KubeBlocks for playground
+Bootstrap a kubernetes cluster and install KubeBlocks for playground
 
 ```
 kbcli playground init [flags]
+```
+
+### Examples
+
+```
+  # create a k3d cluster on local host and install KubeBlocks
+  kbcli playground init
+  
+  # create an AWS EKS cluster and install KubeBlocks, the region is required
+  kbcli playground init --cloud-provider aws --region cn-northwest-1
 ```
 
 ### Options
@@ -13,7 +23,7 @@ kbcli playground init [flags]
       --cluster-definition string   Cluster definition (default "apecloud-mysql")
       --cluster-version string      Cluster definition
   -h, --help                        help for init
-      --region string               Cloud provider region
+      --region string               The region to create kubernetes cluster
       --verbose                     Output more log info
       --version string              KubeBlocks version
 ```
@@ -44,5 +54,5 @@ kbcli playground init [flags]
 
 ### SEE ALSO
 
-* [kbcli playground](kbcli_playground.md)	 - Bootstrap a KubeBlocks in local host
+* [kbcli playground](kbcli_playground.md)	 - Bootstrap a playground KubeBlocks in local host or cloud
 

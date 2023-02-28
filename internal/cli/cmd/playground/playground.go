@@ -27,6 +27,7 @@ import (
 	"helm.sh/helm/v3/pkg/action"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/kubectl/pkg/util/templates"
 
 	cp "github.com/apecloud/kubeblocks/internal/cli/cloudprovider"
 	"github.com/apecloud/kubeblocks/internal/cli/cluster"
@@ -43,6 +44,22 @@ import (
 
 const (
 	yesStr = "yes"
+)
+
+var (
+	initExample = templates.Examples(`
+		# create a k3d cluster on local host and install KubeBlocks 
+		kbcli playground init
+
+		# create an AWS EKS cluster and install KubeBlocks, the region is required
+		kbcli playground init --cloud-provider aws --region cn-northwest-1`)
+
+	destroyExample = templates.Examples(`
+		# destroy local host playground cluster
+		kbcli playground destroy
+
+		# destroy the AWS EKS cluster, the region is required
+		kbcli playground destroy --cloud-provider aws --region cn-northwest-1`)
 )
 
 type baseOptions struct {
@@ -71,7 +88,7 @@ type destroyOptions struct {
 func NewPlaygroundCmd(streams genericclioptions.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "playground [init | destroy | guide]",
-		Short: "Bootstrap a KubeBlocks in local host",
+		Short: "Bootstrap a playground KubeBlocks in local host or cloud",
 	}
 
 	// add subcommands
@@ -90,8 +107,9 @@ func newInitCmd(streams genericclioptions.IOStreams) *cobra.Command {
 	}
 
 	cmd := &cobra.Command{
-		Use:   "init",
-		Short: "Bootstrap a KubeBlocks for playground",
+		Use:     "init",
+		Short:   "Bootstrap a kubernetes cluster and install KubeBlocks for playground",
+		Example: initExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			util.CheckErr(o.validate())
 			util.CheckErr(o.run())
@@ -102,7 +120,7 @@ func newInitCmd(streams genericclioptions.IOStreams) *cobra.Command {
 	cmd.Flags().StringVar(&o.clusterVersion, "cluster-version", "", "Cluster definition")
 	cmd.Flags().StringVar(&o.kbVersion, "version", version.DefaultKubeBlocksVersion, "KubeBlocks version")
 	cmd.Flags().StringVar(&o.cloudProvider, "cloud-provider", defaultCloudProvider, fmt.Sprintf("Cloud provider type, one of [%s]", strings.Join(cp.CloudProviders(), ",")))
-	cmd.Flags().StringVar(&o.region, "region", "", "Cloud provider region")
+	cmd.Flags().StringVar(&o.region, "region", "", "The region to create kubernetes cluster")
 	cmd.Flags().BoolVar(&o.verbose, "verbose", false, "Output more log info")
 
 	util.CheckErr(cmd.RegisterFlagCompletionFunc(
@@ -118,16 +136,17 @@ func newDestroyCmd(streams genericclioptions.IOStreams) *cobra.Command {
 		IOStreams: streams,
 	}
 	cmd := &cobra.Command{
-		Use:   "destroy",
-		Short: "Destroy the playground cluster.",
+		Use:     "destroy",
+		Short:   "Destroy the playground kubernetes cluster",
+		Example: destroyExample,
 		Run: func(cmd *cobra.Command, args []string) {
-
+			util.CheckErr(o.validate())
 			util.CheckErr(o.destroyPlayground())
 		},
 	}
 
 	cmd.Flags().StringVar(&o.cloudProvider, "cloud-provider", defaultCloudProvider, fmt.Sprintf("Cloud provider type, one of [%s]", strings.Join(cp.CloudProviders(), ",")))
-	cmd.Flags().StringVar(&o.region, "region", "", "Cloud provider region")
+	cmd.Flags().StringVar(&o.region, "region", "", "The region to create kubernetes cluster")
 	return cmd
 }
 
@@ -142,11 +161,7 @@ func newGuideCmd() *cobra.Command {
 	return cmd
 }
 
-func (o *initOptions) validate() error {
-	if o.clusterDef == "" {
-		return fmt.Errorf("a valid cluster definition is needed, use --cluster-definition to specify one")
-	}
-
+func (o *baseOptions) validate() error {
 	if !slices.Contains(cp.CloudProviders(), o.cloudProvider) {
 		return fmt.Errorf("%s is not a valid cloud provider", o.cloudProvider)
 	}
@@ -159,6 +174,14 @@ func (o *initOptions) validate() error {
 		return fmt.Errorf("when cloud provider %s is specified, region should be specified", o.cloudProvider)
 	}
 	return nil
+}
+
+func (o *initOptions) validate() error {
+	if o.clusterDef == "" {
+		return fmt.Errorf("a valid cluster definition is needed, use --cluster-definition to specify one")
+	}
+
+	return o.baseOptions.validate()
 }
 
 func (o *initOptions) run() error {

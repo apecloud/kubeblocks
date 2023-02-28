@@ -61,6 +61,9 @@ type ExposeType string
 const (
 	ExposeToVPC      ExposeType = "vpc"
 	ExposeToInternet ExposeType = "internet"
+
+	EnableValue  string = "true"
+	DisableValue string = "false"
 )
 
 const (
@@ -123,11 +126,11 @@ func (o *ExposeOptions) Validate(args []string) error {
 	o.exposeType = ExposeType(o.Type)
 
 	switch strings.ToLower(o.Enable) {
-	case "true", "false":
+	case EnableValue, DisableValue:
 	default:
 		return fmt.Errorf("invalid value for enable flag: %s", o.Enable)
 	}
-	o.enabled = o.Enable == "true"
+	o.enabled = o.Enable == EnableValue
 
 	return nil
 }

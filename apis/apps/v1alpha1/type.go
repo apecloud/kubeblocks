@@ -267,7 +267,7 @@ type webhookManager struct {
 
 // CfgFileFormat defines formatter of configuration files.
 // +enum
-// +kubebuilder:validation:Enum={xml,ini,yaml,json,dotenv}
+// +kubebuilder:validation:Enum={xml,ini,yaml,json,hcl,dotenv,toml,properties}
 type CfgFileFormat string
 
 const (

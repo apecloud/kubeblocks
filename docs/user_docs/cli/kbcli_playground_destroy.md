@@ -9,7 +9,9 @@ kbcli playground destroy [flags]
 ### Options
 
 ```
-  -h, --help   help for destroy
+      --cloud-provider string   Cloud provider type, one of [local,aws,azure,gcp,alibaba-cloud] (default "local")
+  -h, --help                    help for destroy
+      --region string           Cloud provider region
 ```
 
 ### Options inherited from parent commands

@@ -9,9 +9,7 @@ kbcli playground init [flags]
 ### Options
 
 ```
-      --access-key string           Cloud provider access key
-      --access-secret string        Cloud provider access secret
-      --cloud-provider string       Cloud provider type (default "local")
+      --cloud-provider string       Cloud provider type, one of [local,aws,azure,gcp,alibaba-cloud] (default "local")
       --cluster-definition string   Cluster definition (default "apecloud-mysql")
       --cluster-version string      Cluster definition
   -h, --help                        help for init

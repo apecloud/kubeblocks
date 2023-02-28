@@ -1,6 +1,6 @@
 ## kbcli cluster expose
 
-Expose a database cluster
+Expose a cluster
 
 ```
 kbcli cluster expose NAME [flags]

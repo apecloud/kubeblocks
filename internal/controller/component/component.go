@@ -21,264 +21,95 @@ import (
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
+	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
-func getContainerByName(containers []corev1.Container, name string) (int, *corev1.Container) {
-	for i, container := range containers {
-		if container.Name == name {
-			return i, &container
-		}
-	}
-	return -1, nil
-}
-
-func toK8sVolumeClaimTemplate(template dbaasv1alpha1.ClusterComponentVolumeClaimTemplate) corev1.PersistentVolumeClaimTemplate {
-	t := corev1.PersistentVolumeClaimTemplate{}
-	t.ObjectMeta.Name = template.Name
-	if template.Spec != nil {
-		t.Spec = *template.Spec
-	}
-	return t
-}
-
-func toK8sVolumeClaimTemplates(templates []dbaasv1alpha1.ClusterComponentVolumeClaimTemplate) []corev1.PersistentVolumeClaimTemplate {
-	ts := []corev1.PersistentVolumeClaimTemplate{}
-	for _, template := range templates {
-		ts = append(ts, toK8sVolumeClaimTemplate(template))
-	}
-	return ts
-}
-
-func buildAffinityLabelSelector(clusterName string, componentName string) *metav1.LabelSelector {
-	return &metav1.LabelSelector{
-		MatchLabels: map[string]string{
-			intctrlutil.AppInstanceLabelKey:  clusterName,
-			intctrlutil.AppComponentLabelKey: componentName,
-		},
-	}
-}
-
-func buildPodTopologySpreadConstraints(
-	cluster *dbaasv1alpha1.Cluster,
-	comAffinity *dbaasv1alpha1.Affinity,
-	component *Component,
-) []corev1.TopologySpreadConstraint {
-	var topologySpreadConstraints []corev1.TopologySpreadConstraint
-
-	var whenUnsatisfiable corev1.UnsatisfiableConstraintAction
-	if comAffinity.PodAntiAffinity == dbaasv1alpha1.Required {
-		whenUnsatisfiable = corev1.DoNotSchedule
-	} else {
-		whenUnsatisfiable = corev1.ScheduleAnyway
-	}
-	for _, topologyKey := range comAffinity.TopologyKeys {
-		topologySpreadConstraints = append(topologySpreadConstraints, corev1.TopologySpreadConstraint{
-			MaxSkew:           1,
-			WhenUnsatisfiable: whenUnsatisfiable,
-			TopologyKey:       topologyKey,
-			LabelSelector:     buildAffinityLabelSelector(cluster.Name, component.Name),
-		})
-	}
-	return topologySpreadConstraints
-}
-
-func buildPodAffinity(
-	cluster *dbaasv1alpha1.Cluster,
-	comAffinity *dbaasv1alpha1.Affinity,
-	component *Component,
-) *corev1.Affinity {
-	affinity := new(corev1.Affinity)
-	// Build NodeAffinity
-	var matchExpressions []corev1.NodeSelectorRequirement
-	for key, value := range comAffinity.NodeLabels {
-		values := strings.Split(value, ",")
-		matchExpressions = append(matchExpressions, corev1.NodeSelectorRequirement{
-			Key:      key,
-			Operator: corev1.NodeSelectorOpIn,
-			Values:   values,
-		})
-	}
-	if len(matchExpressions) > 0 {
-		nodeSelectorTerm := corev1.NodeSelectorTerm{
-			MatchExpressions: matchExpressions,
-		}
-		affinity.NodeAffinity = &corev1.NodeAffinity{
-			RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{
-				NodeSelectorTerms: []corev1.NodeSelectorTerm{nodeSelectorTerm},
-			},
-		}
-	}
-	// Build PodAntiAffinity
-	var podAntiAffinity *corev1.PodAntiAffinity
-	var podAffinityTerms []corev1.PodAffinityTerm
-	for _, topologyKey := range comAffinity.TopologyKeys {
-		podAffinityTerms = append(podAffinityTerms, corev1.PodAffinityTerm{
-			TopologyKey:   topologyKey,
-			LabelSelector: buildAffinityLabelSelector(cluster.Name, component.Name),
-		})
-	}
-	if comAffinity.PodAntiAffinity == dbaasv1alpha1.Required {
-		podAntiAffinity = &corev1.PodAntiAffinity{
-			RequiredDuringSchedulingIgnoredDuringExecution: podAffinityTerms,
-		}
-	} else {
-		var weightedPodAffinityTerms []corev1.WeightedPodAffinityTerm
-		for _, podAffinityTerm := range podAffinityTerms {
-			weightedPodAffinityTerms = append(weightedPodAffinityTerms, corev1.WeightedPodAffinityTerm{
-				Weight:          100,
-				PodAffinityTerm: podAffinityTerm,
-			})
-		}
-		podAntiAffinity = &corev1.PodAntiAffinity{
-			PreferredDuringSchedulingIgnoredDuringExecution: weightedPodAffinityTerms,
-		}
-	}
-	affinity.PodAntiAffinity = podAntiAffinity
-	return affinity
-}
-
-func disableMonitor(component *Component) {
-	component.Monitor = &MonitorConfig{
-		Enable: false,
-	}
-}
-
-func mergeMonitorConfig(
-	cluster *dbaasv1alpha1.Cluster,
-	clusterDef *dbaasv1alpha1.ClusterDefinition,
-	clusterDefComp *dbaasv1alpha1.ClusterDefinitionComponent,
-	clusterComp *dbaasv1alpha1.ClusterComponent,
-	component *Component) {
-	monitorEnable := false
-	if clusterComp != nil {
-		monitorEnable = clusterComp.Monitor
-	}
-
-	monitorConfig := clusterDefComp.Monitor
-	if !monitorEnable || monitorConfig == nil {
-		disableMonitor(component)
-		return
-	}
-
-	if !monitorConfig.BuiltIn {
-		if monitorConfig.Exporter == nil {
-			disableMonitor(component)
-			return
-		}
-		component.Monitor = &MonitorConfig{
-			Enable:     true,
-			ScrapePath: monitorConfig.Exporter.ScrapePath,
-			ScrapePort: monitorConfig.Exporter.ScrapePort,
-		}
-		return
-	}
-
-	characterType := clusterDefComp.CharacterType
-	if !isSupportedCharacterType(characterType) {
-		disableMonitor(component)
-		return
-	}
-
-	if err := supportedCharacterTypeFunc[characterType](cluster, component); err != nil {
-		disableMonitor(component)
-	}
-}
-
-// MergeComponents generates a new Component object, which is a mixture of
+// BuildComponent generates a new Component object, which is a mixture of
 // component-related configs from input Cluster, ClusterDef and ClusterVersion.
-func MergeComponents(
+func BuildComponent(
 	reqCtx intctrlutil.RequestCtx,
-	cluster *dbaasv1alpha1.Cluster,
-	clusterDef *dbaasv1alpha1.ClusterDefinition,
-	clusterDefComp *dbaasv1alpha1.ClusterDefinitionComponent,
-	clusterVersionComp *dbaasv1alpha1.ClusterVersionComponent,
-	clusterComp *dbaasv1alpha1.ClusterComponent) *Component {
-	if clusterDefComp == nil {
-		return nil
-	}
+	cluster appsv1alpha1.Cluster,
+	clusterDef appsv1alpha1.ClusterDefinition,
+	clusterCompDef appsv1alpha1.ClusterComponentDefinition,
+	clusterCompSpec appsv1alpha1.ClusterComponentSpec,
+	clusterCompVers ...*appsv1alpha1.ClusterComponentVersion,
+) *SynthesizedComponent {
 
-	clusterDefCompObj := clusterDefComp.DeepCopy()
-	component := &Component{
+	clusterCompDefObj := clusterCompDef.DeepCopy()
+	component := &SynthesizedComponent{
 		ClusterDefName:        clusterDef.Name,
-		ClusterType:           clusterDef.Spec.Type,
-		Name:                  clusterDefCompObj.TypeName, // initial name for the component will be same as TypeName
-		Type:                  clusterDefCompObj.TypeName,
-		CharacterType:         clusterDefCompObj.CharacterType,
-		MinReplicas:           clusterDefCompObj.MinReplicas,
-		MaxReplicas:           clusterDefCompObj.MaxReplicas,
-		DefaultReplicas:       clusterDefCompObj.DefaultReplicas,
-		Replicas:              clusterDefCompObj.DefaultReplicas,
-		ComponentType:         clusterDefCompObj.ComponentType,
-		ConsensusSpec:         clusterDefCompObj.ConsensusSpec,
-		PodSpec:               clusterDefCompObj.PodSpec,
-		Service:               clusterDefCompObj.Service,
-		Probes:                clusterDefCompObj.Probes,
-		LogConfigs:            clusterDefCompObj.LogConfigs,
-		HorizontalScalePolicy: clusterDefCompObj.HorizontalScalePolicy,
+		Name:                  clusterCompSpec.Name,
+		Type:                  clusterCompDefObj.Name,
+		CharacterType:         clusterCompDefObj.CharacterType,
+		MaxUnavailable:        clusterCompDefObj.MaxUnavailable,
+		Replicas:              0,
+		WorkloadType:          clusterCompDefObj.WorkloadType,
+		ConsensusSpec:         clusterCompDefObj.ConsensusSpec,
+		PodSpec:               clusterCompDefObj.PodSpec,
+		Service:               clusterCompDefObj.Service,
+		Probes:                clusterCompDefObj.Probes,
+		LogConfigs:            clusterCompDefObj.LogConfigs,
+		HorizontalScalePolicy: clusterCompDefObj.HorizontalScalePolicy,
 	}
 
-	if clusterDefCompObj.ConfigSpec != nil {
-		component.ConfigTemplates = clusterDefCompObj.ConfigSpec.ConfigTemplateRefs
+	// resolve component.ConfigTemplates
+	if clusterCompDefObj.ConfigSpec != nil {
+		component.ConfigTemplates = clusterCompDefObj.ConfigSpec.ConfigTemplateRefs
 	}
 
-	if clusterVersionComp != nil {
-		component.ConfigTemplates = cfgcore.MergeConfigTemplates(clusterVersionComp.ConfigTemplateRefs, component.ConfigTemplates)
-		if clusterVersionComp.PodSpec != nil {
-			for _, c := range clusterVersionComp.PodSpec.InitContainers {
-				component.PodSpec.InitContainers = appendOrOverrideContainerAttr(component.PodSpec.InitContainers, c)
-			}
-			for _, c := range clusterVersionComp.PodSpec.Containers {
-				component.PodSpec.Containers = appendOrOverrideContainerAttr(component.PodSpec.Containers, c)
-			}
+	if len(clusterCompVers) > 0 && clusterCompVers[0] != nil {
+		// only accept 1st ClusterVersion override context
+		clusterCompVer := clusterCompVers[0]
+		component.ConfigTemplates = cfgcore.MergeConfigTemplates(clusterCompVer.ConfigTemplateRefs, component.ConfigTemplates)
+		// override component.PodSpec.InitContainers and component.PodSpec.Containers
+		for _, c := range clusterCompVer.VersionsCtx.InitContainers {
+			component.PodSpec.InitContainers = appendOrOverrideContainerAttr(component.PodSpec.InitContainers, c)
+		}
+		for _, c := range clusterCompVer.VersionsCtx.Containers {
+			component.PodSpec.Containers = appendOrOverrideContainerAttr(component.PodSpec.Containers, c)
 		}
 	}
+
+	// set affinity and tolerations
 	affinity := cluster.Spec.Affinity
+	if clusterCompSpec.Affinity != nil {
+		affinity = clusterCompSpec.Affinity
+	}
+	podAffinity := buildPodAffinity(&cluster, affinity, component)
+	component.PodSpec.Affinity = patchBuiltInAffinity(podAffinity)
+	component.PodSpec.TopologySpreadConstraints = buildPodTopologySpreadConstraints(&cluster, affinity, component)
+
 	tolerations := cluster.Spec.Tolerations
-	if clusterComp != nil {
-		component.Name = clusterComp.Name // component name gets overrided
-		component.EnabledLogs = clusterComp.EnabledLogs
-
-		// user can scale in replicas to 0
-		if clusterComp.Replicas != nil {
-			component.Replicas = *clusterComp.Replicas
-		}
-
-		if clusterComp.VolumeClaimTemplates != nil {
-			component.VolumeClaimTemplates = toK8sVolumeClaimTemplates(clusterComp.VolumeClaimTemplates)
-		}
-
-		if clusterComp.Resources.Requests != nil || clusterComp.Resources.Limits != nil {
-			component.PodSpec.Containers[0].Resources = clusterComp.Resources
-		}
-
-		if clusterComp.ServiceType != "" {
-			if component.Service == nil {
-				component.Service = &corev1.ServiceSpec{}
-			}
-			component.Service.Type = clusterComp.ServiceType
-		}
-
-		if clusterComp.Affinity != nil {
-			affinity = clusterComp.Affinity
-		}
-		if len(clusterComp.Tolerations) != 0 {
-			tolerations = clusterComp.Tolerations
-		}
-
-		component.PrimaryIndex = clusterComp.PrimaryIndex
+	if len(clusterCompSpec.Tolerations) != 0 {
+		tolerations = clusterCompSpec.Tolerations
 	}
-	if affinity != nil {
-		component.PodSpec.Affinity = buildPodAffinity(cluster, affinity, component)
-		component.PodSpec.TopologySpreadConstraints = buildPodTopologySpreadConstraints(cluster, affinity, component)
+	component.PodSpec.Tolerations = patchBuiltInToleration(tolerations)
+
+	// set others
+	component.EnabledLogs = clusterCompSpec.EnabledLogs
+	component.Replicas = clusterCompSpec.Replicas
+	component.TLS = clusterCompSpec.TLS
+	component.Issuer = clusterCompSpec.Issuer
+
+	if clusterCompSpec.VolumeClaimTemplates != nil {
+		component.VolumeClaimTemplates = appsv1alpha1.ToVolumeClaimTemplates(clusterCompSpec.VolumeClaimTemplates)
 	}
-	if tolerations != nil {
-		component.PodSpec.Tolerations = tolerations
+
+	if clusterCompSpec.Resources.Requests != nil || clusterCompSpec.Resources.Limits != nil {
+		component.PodSpec.Containers[0].Resources = clusterCompSpec.Resources
 	}
+
+	if clusterCompSpec.ServiceType != "" {
+		if component.Service == nil {
+			component.Service = &corev1.ServiceSpec{}
+		}
+		component.Service.Type = clusterCompSpec.ServiceType
+	}
+	component.PrimaryIndex = clusterCompSpec.PrimaryIndex
 
 	// TODO(zhixu.zt) We need to reserve the VolumeMounts of the container for ConfigMap or Secret,
 	// At present, it is possible to distinguish between ConfigMap volume and normal volume,
@@ -290,20 +121,23 @@ func MergeComponents(
 	//	 }
 	// }
 
-	mergeMonitorConfig(cluster, clusterDef, clusterDefComp, clusterComp, component)
+	buildMonitorConfig(&clusterCompDef, &clusterCompSpec, component)
 	err := buildProbeContainers(reqCtx, component)
 	if err != nil {
 		reqCtx.Log.Error(err, "build probe container failed.")
+		return nil
 	}
-	replacePlaceholderTokens(cluster, component)
 
+	replacePlaceholderTokens(component, map[string]string{
+		constant.ConnCredentialPlaceHolder: fmt.Sprintf("%s-conn-credential", cluster.GetName()),
+	})
 	return component
 }
 
 // appendOrOverrideContainerAttr is used to append targetContainer to compContainers or override the attributes of compContainers with a given targetContainer,
 // if targetContainer does not exist in compContainers, it will be appended. otherwise it will be updated with the attributes of the target container.
 func appendOrOverrideContainerAttr(compContainers []corev1.Container, targetContainer corev1.Container) []corev1.Container {
-	index, compContainer := getContainerByName(compContainers, targetContainer.Name)
+	index, compContainer := intctrlutil.GetContainerByName(compContainers, targetContainer.Name)
 	if compContainer == nil {
 		compContainers = append(compContainers, targetContainer)
 	} else {
@@ -373,9 +207,7 @@ func doContainerAttrOverride(compContainer *corev1.Container, container corev1.C
 	}
 }
 
-func replacePlaceholderTokens(cluster *dbaasv1alpha1.Cluster, component *Component) {
-	namedValues := getEnvReplacementMapForConnCredential(cluster.GetName())
-
+func replacePlaceholderTokens(component *SynthesizedComponent, namedValues map[string]string) {
 	// replace env[].valueFrom.secretKeyRef.name variables
 	for _, cc := range [][]corev1.Container{component.PodSpec.InitContainers, component.PodSpec.Containers} {
 		for _, c := range cc {
@@ -400,8 +232,18 @@ func replacePlaceholderTokens(cluster *dbaasv1alpha1.Cluster, component *Compone
 	}
 }
 
-func getEnvReplacementMapForConnCredential(clusterName string) map[string]string {
-	return map[string]string{
-		"$(CONN_CREDENTIAL_SECRET_NAME)": fmt.Sprintf("%s-conn-credential", clusterName),
+func GetClusterDefCompByName(clusterDef appsv1alpha1.ClusterDefinition,
+	cluster appsv1alpha1.Cluster,
+	compName string) *appsv1alpha1.ClusterComponentDefinition {
+	for _, comp := range cluster.Spec.ComponentSpecs {
+		if comp.Name != compName {
+			continue
+		}
+		for _, compDef := range clusterDef.Spec.ComponentDefs {
+			if compDef.Name == comp.ComponentDefRef {
+				return &compDef
+			}
+		}
 	}
+	return nil
 }

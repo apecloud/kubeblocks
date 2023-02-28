@@ -1,4 +1,4 @@
-apiVersion: dbaas.kubeblocks.io/v1alpha1
+apiVersion: apps.kubeblocks.io/v1alpha1
 kind: ClusterVersion
 metadata:
   name: postgresql-{{ default .Chart.AppVersion .Values.clusterVersionOverride }}
@@ -6,14 +6,14 @@ metadata:
     {{- include "postgresql.labels" . | nindent 4 }}
 spec:
   clusterDefinitionRef: postgresql
-  components:
-  - type: postgresql
-    podSpec:
+  componentVersions:
+  - componentDefRef: postgresql
+    versionsContext:
       containers:
       - name: postgresql
-        image: {{ .Values.image.repository }}:{{ default .Values.image.tag .Chart.AppVersion }}
+        image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ default .Values.image.tag .Chart.AppVersion }}
 ---
-apiVersion: dbaas.kubeblocks.io/v1alpha1
+apiVersion: apps.kubeblocks.io/v1alpha1
 kind: ClusterVersion
 metadata:
   name: postgresql-15.1.0
@@ -21,9 +21,9 @@ metadata:
     {{- include "postgresql.labels" . | nindent 4 }}
 spec:
   clusterDefinitionRef: postgresql
-  components:
-  - type: postgresql
-    podSpec:
+  componentVersions:
+  - componentDefRef: postgresql
+    versionsContext:
       containers:
       - name: postgresql
-        image: {{ .Values.image.repository }}:15.1.0
+        image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:15.1.0

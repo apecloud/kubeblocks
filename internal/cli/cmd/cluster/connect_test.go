@@ -32,6 +32,7 @@ import (
 	clientfake "k8s.io/client-go/rest/fake"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 
+	"github.com/apecloud/kubeblocks/internal/cli/engine"
 	"github.com/apecloud/kubeblocks/internal/cli/exec"
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
@@ -96,19 +97,7 @@ var _ = Describe("connection", func() {
 		By("specify cluster name")
 		Expect(o.ExecOptions.Complete()).Should(Succeed())
 		_ = o.connect([]string{clusterName})
-		Expect(len(o.ContainerName) > 0).Should(BeTrue())
 		Expect(o.Pod).ShouldNot(BeNil())
-	})
-
-	It("getEngineByPod", func() {
-		pod := mockPod()
-		e, err := getEngineByPod(pod)
-		Expect(err).Should(Succeed())
-		Expect(e.Container()).Should(Equal("mysql"))
-
-		pod.SetLabels(nil)
-		_, err = getEngineByPod(pod)
-		Expect(err).Should(HaveOccurred())
 	})
 
 	It("show example", func() {
@@ -131,16 +120,26 @@ var _ = Describe("connection", func() {
 			password = "test-password"
 		)
 		secret := corev1.Secret{}
+		secret.Name = "test-conn-credential"
 		secret.Data = map[string][]byte{
 			"username": []byte(user),
 			"password": []byte(password),
 		}
 		secretList := &corev1.SecretList{}
 		secretList.Items = []corev1.Secret{secret}
-		u, p, err := getUserAndPassword(secretList)
+		u, p, err := getUserAndPassword(testing.FakeClusterDef(), secretList)
 		Expect(err).Should(Succeed())
 		Expect(u).Should(Equal(user))
 		Expect(p).Should(Equal(password))
+	})
+
+	It("build connect command", func() {
+		info := &engine.ConnectionInfo{
+			Command: []string{"mysql"},
+			Args:    []string{"-h$(KB_ACCOUNT_ENDPOINT)", "-u$(MYSQL_USER)", "-p$(MYSQL_PASSWORD)", "-e $(KB_ACCOUNT_STATEMENT)"},
+		}
+		Expect(buildCommand(info)).ShouldNot(BeEmpty())
+		Expect(len(buildCommand(info))).Should(Equal(3))
 	})
 })
 
@@ -151,7 +150,7 @@ func mockPod() *corev1.Pod {
 			Namespace:       "test",
 			ResourceVersion: "10",
 			Labels: map[string]string{
-				"app.kubernetes.io/name": "state.mysql-apecloud-mysql",
+				"app.kubernetes.io/name": "mysql-apecloud-mysql",
 			},
 		},
 		Spec: corev1.PodSpec{

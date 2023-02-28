@@ -35,6 +35,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 var (
@@ -162,7 +163,7 @@ func NewListUsersCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *co
 		Short:             "List cluster users",
 		Example:           listUsersExample,
 		Aliases:           []string{"ls-users"},
-		ValidArgsFunction: util.ResourceNameCompletionFunc(f, o.GVR),
+		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.ClusterGVR()),
 		Run: func(cmd *cobra.Command, args []string) {
 			util.CheckErr(listUsers(o, args))
 		},
@@ -268,7 +269,7 @@ func listUsers(o *list.ListOptions, args []string) error {
 		if err = runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, s); err != nil {
 			return err
 		}
-		tbl.AddRow(s.Namespace, s.Labels[types.InstanceLabelKey], string(s.Data["username"]), s.Name, util.TimeFormat(&s.CreationTimestamp))
+		tbl.AddRow(s.Namespace, s.Labels[intctrlutil.AppInstanceLabelKey], string(s.Data["username"]), s.Name, util.TimeFormat(&s.CreationTimestamp))
 	}
 	tbl.Print()
 	return nil

@@ -18,7 +18,6 @@ package kubeblocks
 
 import (
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/pkg/errors"
@@ -56,24 +55,24 @@ func newUpgradeCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 		Args:    cobra.NoArgs,
 		Example: upgradeExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			util.CheckErr(o.complete(f, cmd))
-			util.CheckErr(o.upgrade(cmd))
+			util.CheckErr(o.Complete(f, cmd))
+			util.CheckErr(o.Upgrade(cmd))
 		},
 		PostRun: func(cmd *cobra.Command, args []string) {
-			util.CheckErr(o.postInstall())
+			util.CheckErr(o.PostInstall())
 		},
 	}
 
 	cmd.Flags().BoolVar(&o.Monitor, "monitor", true, "Set monitor enabled and install Prometheus, AlertManager and Grafana")
 	cmd.Flags().StringVar(&o.Version, "version", "", "Set KubeBlocks version")
-	cmd.Flags().StringArrayVar(&o.Sets, "set", []string{}, "Set values on the command line (can specify multiple or separate values with commas: key1=val1,key2=val2)")
 	cmd.Flags().BoolVar(&o.check, "check", true, "Check kubernetes environment before upgrade")
 	cmd.Flags().DurationVar(&o.timeout, "timeout", 1800*time.Second, "Time to wait for upgrading KubeBlocks")
+	helm.AddValueOptionsFlags(cmd.Flags(), &o.ValueOpts)
 
 	return cmd
 }
 
-func (o *InstallOptions) upgrade(cmd *cobra.Command) error {
+func (o *InstallOptions) Upgrade(cmd *cobra.Command) error {
 	// check whether monitor flag is set by user
 	monitorIsSet := false
 	cmd.Flags().Visit(func(flag *pflag.Flag) {
@@ -83,12 +82,12 @@ func (o *InstallOptions) upgrade(cmd *cobra.Command) error {
 	})
 
 	// check flags already been set
-	if !monitorIsSet && len(o.Version) == 0 && len(o.Sets) == 0 {
+	if !monitorIsSet && len(o.Version) == 0 && helm.ValueOptsIsEmpty(&o.ValueOpts) {
 		fmt.Fprint(o.Out, "Nothing to upgrade, --set, --version or --monitor should be specified.\n")
 		return nil
 	}
 	if monitorIsSet {
-		o.Sets = append(o.Sets, fmt.Sprintf(kMonitorParam, o.Monitor))
+		o.ValueOpts.Values = append(o.ValueOpts.Values, fmt.Sprintf(kMonitorParam, o.Monitor))
 	}
 
 	// check if KubeBlocks has been installed
@@ -101,7 +100,7 @@ func (o *InstallOptions) upgrade(cmd *cobra.Command) error {
 	v := versionInfo[util.KubeBlocksApp]
 	if len(v) > 0 {
 		if len(o.Version) > 0 {
-			if v == o.Version && len(o.Sets) == 0 {
+			if v == o.Version && helm.ValueOptsIsEmpty(&o.ValueOpts) {
 				fmt.Fprintf(o.Out, "Current version %s is the same as the upgraded version, no need to upgrade.\n", o.Version)
 				return nil
 			}
@@ -137,21 +136,5 @@ func (o *InstallOptions) upgrade(cmd *cobra.Command) error {
 }
 
 func (o *InstallOptions) upgradeChart() error {
-	var sets []string
-	for _, set := range o.Sets {
-		splitSet := strings.Split(set, ",")
-		sets = append(sets, splitSet...)
-	}
-	chart := helm.InstallOpts{
-		Name:      types.KubeBlocksChartName,
-		Chart:     types.KubeBlocksChartName + "/" + types.KubeBlocksChartName,
-		Wait:      true,
-		Version:   o.Version,
-		Namespace: o.Namespace,
-		Sets:      sets,
-		Login:     true,
-		TryTimes:  2,
-		Timeout:   o.timeout,
-	}
-	return chart.Upgrade(o.HelmCfg)
+	return o.buildChart().Upgrade(o.HelmCfg)
 }

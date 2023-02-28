@@ -13,7 +13,7 @@ The following are sample `OpsRequest` CRs for different operations:
 ### Sample `OpsRequest` for restarting a KubeBlocks cluster
 
 ```
-apiVersion: dbaas.infracreate.com/v1alpha1
+apiVersion: apps.kubeblocks.io/v1alpha1
 kind: OpsRequest
 metadata:
   name: mysql-restart
@@ -60,7 +60,7 @@ status:
 ### Sample `OpsRequest` for vertical scaling
 
 ```
-apiVersion: dbaas.infracreate.com/v1alpha1
+apiVersion: apps.kubeblocks.io/v1alpha1
 kind: OpsRequest
 metadata:
   generate-name: verticalscaling-
@@ -81,7 +81,7 @@ spec:
 ### Sample `OpsRequest` for horizontal scaling
 
 ```
-apiVersion: dbaas.kubeblocks.io/v1alpha1
+apiVersion: apps.kubeblocks.io/v1alpha1
 kind: OpsRequest
 metadata:
   name: ops-xxxx
@@ -98,7 +98,7 @@ spec:
 ### Sample `OpsRequest` for upgrading a KubeBlocks cluster
 
 ```
-apiVersion: dbaas.infracreate.com/v1alpha1
+apiVersion: apps.kubeblocks.io/v1alpha1
 kind: OpsRequest
 metadata:
   name: ops-xxxx
@@ -114,7 +114,7 @@ spec:
 ### Sample `OpsRequest` for volume expansion
 
 ```
-apiVersion: dbaas.infracreate.com/v1alpha1
+apiVersion: apps.kubeblocks.io/v1alpha1
 kind: OpsRequest
 metadata:
   name: ops-xxxx

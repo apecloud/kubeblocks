@@ -20,129 +20,18 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	corev1 "k8s.io/api/core/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 
-	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
-	testdbaas "github.com/apecloud/kubeblocks/internal/testutil/dbaas"
-)
-
-const (
-	kFake = "fake"
+	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 )
 
 var tlog = ctrl.Log.WithName("component_testing")
 
 var _ = Describe("component module", func() {
 
-	Context("has the mergeMonitorConfig function", func() {
-		var component *Component
-		var cluster *dbaasv1alpha1.Cluster
-		var clusterComp *dbaasv1alpha1.ClusterComponent
-		var clusterDef *dbaasv1alpha1.ClusterDefinition
-		var clusterDefComp *dbaasv1alpha1.ClusterDefinitionComponent
-
-		BeforeEach(func() {
-			component = &Component{}
-			component.PodSpec = &corev1.PodSpec{}
-			cluster = &dbaasv1alpha1.Cluster{}
-			cluster.Name = "mysql-instance-3"
-			clusterComp = &dbaasv1alpha1.ClusterComponent{}
-			clusterComp.Monitor = true
-			cluster.Spec.Components = append(cluster.Spec.Components, *clusterComp)
-			clusterComp = &cluster.Spec.Components[0]
-
-			clusterDef = &dbaasv1alpha1.ClusterDefinition{}
-			clusterDef.Spec.Type = "state.mysql"
-			clusterDefComp = &dbaasv1alpha1.ClusterDefinitionComponent{}
-			clusterDefComp.CharacterType = kMysql
-			clusterDefComp.Monitor = &dbaasv1alpha1.MonitorConfig{
-				BuiltIn: false,
-				Exporter: &dbaasv1alpha1.ExporterConfig{
-					ScrapePort: 9144,
-					ScrapePath: "/metrics",
-				},
-			}
-			clusterDef.Spec.Components = append(clusterDef.Spec.Components, *clusterDefComp)
-			clusterDefComp = &clusterDef.Spec.Components[0]
-		})
-
-		It("should disable monitor if ClusterComponent.Monitor is false", func() {
-			clusterComp.Monitor = false
-			mergeMonitorConfig(cluster, clusterDef, clusterDefComp, clusterComp, component)
-			monitorConfig := component.Monitor
-			Expect(monitorConfig.Enable).Should(BeFalse())
-			Expect(monitorConfig.ScrapePort).To(BeEquivalentTo(0))
-			Expect(monitorConfig.ScrapePath).To(Equal(""))
-			if component.PodSpec != nil {
-				Expect(len(component.PodSpec.Containers)).To(BeEquivalentTo(0))
-			}
-		})
-
-		It("should disable builtin monitor if ClusterDefinitionComponent.Monitor.BuiltIn is false and has valid ExporterConfig", func() {
-			clusterComp.Monitor = true
-			clusterDefComp.CharacterType = kFake
-			clusterDefComp.Monitor.BuiltIn = false
-			mergeMonitorConfig(cluster, clusterDef, clusterDefComp, clusterComp, component)
-			monitorConfig := component.Monitor
-			Expect(monitorConfig.Enable).Should(BeTrue())
-			Expect(monitorConfig.ScrapePort).To(BeEquivalentTo(9144))
-			Expect(monitorConfig.ScrapePath).To(Equal("/metrics"))
-			if component.PodSpec != nil {
-				Expect(len(component.PodSpec.Containers)).To(BeEquivalentTo(0))
-			}
-		})
-
-		It("should disable monitor if ClusterDefinitionComponent.Monitor.BuiltIn is false and lacks ExporterConfig", func() {
-			clusterComp.Monitor = true
-			clusterDefComp.CharacterType = kFake
-			clusterDefComp.Monitor.BuiltIn = false
-			clusterDefComp.Monitor.Exporter = nil
-			mergeMonitorConfig(cluster, clusterDef, clusterDefComp, clusterComp, component)
-			monitorConfig := component.Monitor
-			Expect(monitorConfig.Enable).Should(BeFalse())
-			Expect(monitorConfig.ScrapePort).To(BeEquivalentTo(0))
-			Expect(monitorConfig.ScrapePath).To(Equal(""))
-			if component.PodSpec != nil {
-				Expect(len(component.PodSpec.Containers)).To(Equal(0))
-			}
-		})
-
-		It("should disable monitor if ClusterDefinitionComponent.Monitor.BuiltIn is true and CharacterType isn't recognizable", func() {
-			clusterComp.Monitor = true
-			clusterDefComp.CharacterType = kFake
-			clusterDefComp.Monitor.BuiltIn = true
-			clusterDefComp.Monitor.Exporter = nil
-			mergeMonitorConfig(cluster, clusterDef, clusterDefComp, clusterComp, component)
-			monitorConfig := component.Monitor
-			Expect(monitorConfig.Enable).Should(BeFalse())
-			Expect(monitorConfig.ScrapePort).To(BeEquivalentTo(0))
-			Expect(monitorConfig.ScrapePath).To(Equal(""))
-			if component.PodSpec != nil {
-				Expect(len(component.PodSpec.Containers)).To(Equal(0))
-			}
-		})
-
-		It("should disable monitor if ClusterDefinitionComponent's CharacterType is empty", func() {
-			// TODO fixme: seems setting clusterDef.Spec.Type has no effect to mergeMonitorConfig
-			clusterComp.Monitor = true
-			clusterDef.Spec.Type = kFake
-			clusterDefComp.CharacterType = ""
-			clusterDefComp.Monitor.BuiltIn = true
-			clusterDefComp.Monitor.Exporter = nil
-			mergeMonitorConfig(cluster, clusterDef, clusterDefComp, clusterComp, component)
-			monitorConfig := component.Monitor
-			Expect(monitorConfig.Enable).Should(BeFalse())
-			Expect(monitorConfig.ScrapePort).To(BeEquivalentTo(0))
-			Expect(monitorConfig.ScrapePath).To(Equal(""))
-			if component.PodSpec != nil {
-				Expect(len(component.PodSpec.Containers)).To(Equal(0))
-			}
-		})
-	})
-
-	Context("has the MergeComponents function", func() {
+	Context("has the BuildComponent function", func() {
 		const (
 			clusterDefName     = "test-clusterdef"
 			clusterVersionName = "test-clusterversion"
@@ -153,28 +42,28 @@ var _ = Describe("component module", func() {
 		)
 
 		var (
-			clusterDef     *dbaasv1alpha1.ClusterDefinition
-			clusterVersion *dbaasv1alpha1.ClusterVersion
-			cluster        *dbaasv1alpha1.Cluster
+			clusterDef     *appsv1alpha1.ClusterDefinition
+			clusterVersion *appsv1alpha1.ClusterVersion
+			cluster        *appsv1alpha1.Cluster
 		)
 
 		BeforeEach(func() {
-			clusterDef = testdbaas.NewClusterDefFactory(clusterDefName, testdbaas.MySQLType).
-				AddComponent(testdbaas.StatefulMySQLComponent, mysqlCompType).
-				AddComponent(testdbaas.StatelessNginxComponent, nginxCompType).
+			clusterDef = testapps.NewClusterDefFactory(clusterDefName).
+				AddComponent(testapps.StatefulMySQLComponent, mysqlCompType).
+				AddComponent(testapps.StatelessNginxComponent, nginxCompType).
 				GetObject()
-			clusterVersion = testdbaas.NewClusterVersionFactory(clusterVersionName, clusterDefName).
+			clusterVersion = testapps.NewClusterVersionFactory(clusterVersionName, clusterDefName).
 				AddComponent(mysqlCompType).
-				AddContainerShort("mysql", testdbaas.ApeCloudMySQLImage).
+				AddContainerShort("mysql", testapps.ApeCloudMySQLImage).
 				AddComponent(nginxCompType).
-				AddInitContainerShort("nginx-init", testdbaas.NginxImage).
-				AddContainerShort("nginx", testdbaas.NginxImage).
+				AddInitContainerShort("nginx-init", testapps.NginxImage).
+				AddContainerShort("nginx", testapps.NginxImage).
 				GetObject()
-			pvcSpec := testdbaas.NewPVC("1Gi")
-			cluster = testdbaas.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
+			pvcSpec := testapps.NewPVC("1Gi")
+			cluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
 				clusterDef.Name, clusterVersion.Name).
 				AddComponent(mysqlCompName, mysqlCompType).
-				AddVolumeClaimTemplate(testdbaas.DataVolumeName, &pvcSpec).
+				AddVolumeClaimTemplate(testapps.DataVolumeName, &pvcSpec).
 				GetObject()
 		})
 
@@ -184,65 +73,46 @@ var _ = Describe("component module", func() {
 				Ctx: ctx,
 				Log: tlog,
 			}
-			component := MergeComponents(
+			component := BuildComponent(
 				reqCtx,
-				cluster,
-				clusterDef,
-				&clusterDef.Spec.Components[0],
-				&clusterVersion.Spec.Components[0],
-				&cluster.Spec.Components[0])
+				*cluster,
+				*clusterDef,
+				clusterDef.Spec.ComponentDefs[0],
+				cluster.Spec.ComponentSpecs[0],
+				&clusterVersion.Spec.ComponentVersions[0])
 			Expect(component).ShouldNot(BeNil())
 
-			By("leave clusterVersion.podSpec nil")
-			clusterVersion.Spec.Components[0].PodSpec = nil
-			component = MergeComponents(
+			By("leave clusterVersion.versionCtx empty initContains and conainers")
+			clusterVersion.Spec.ComponentVersions[0].VersionsCtx.Containers = nil
+			clusterVersion.Spec.ComponentVersions[0].VersionsCtx.InitContainers = nil
+			component = BuildComponent(
 				reqCtx,
-				cluster,
-				clusterDef,
-				&clusterDef.Spec.Components[0],
-				&clusterVersion.Spec.Components[0],
-				&cluster.Spec.Components[0])
+				*cluster,
+				*clusterDef,
+				clusterDef.Spec.ComponentDefs[0],
+				cluster.Spec.ComponentSpecs[0],
+				&clusterVersion.Spec.ComponentVersions[0])
 			Expect(component).ShouldNot(BeNil())
 
 			By("new container in clusterVersion not in clusterDefinition")
-			component = MergeComponents(
+			component = BuildComponent(
 				reqCtx,
-				cluster,
-				clusterDef,
-				&clusterDef.Spec.Components[0],
-				&clusterVersion.Spec.Components[1],
-				&cluster.Spec.Components[0])
+				*cluster,
+				*clusterDef,
+				clusterDef.Spec.ComponentDefs[0],
+				cluster.Spec.ComponentSpecs[0],
+				&clusterVersion.Spec.ComponentVersions[1])
 			Expect(len(component.PodSpec.Containers)).Should(Equal(2))
 
 			By("new init container in clusterVersion not in clusterDefinition")
-			component = MergeComponents(
+			component = BuildComponent(
 				reqCtx,
-				cluster,
-				clusterDef,
-				&clusterDef.Spec.Components[0],
-				&clusterVersion.Spec.Components[1],
-				&cluster.Spec.Components[0])
+				*cluster,
+				*clusterDef,
+				clusterDef.Spec.ComponentDefs[0],
+				cluster.Spec.ComponentSpecs[0],
+				&clusterVersion.Spec.ComponentVersions[1])
 			Expect(len(component.PodSpec.InitContainers)).Should(Equal(1))
-
-			By("leave clusterComp nil")
-			component = MergeComponents(
-				reqCtx,
-				cluster,
-				clusterDef,
-				&clusterDef.Spec.Components[0],
-				&clusterVersion.Spec.Components[0],
-				nil)
-			Expect(component).ShouldNot(BeNil())
-
-			By("leave clusterDefComp nil")
-			component = MergeComponents(
-				reqCtx,
-				cluster,
-				clusterDef,
-				nil,
-				&clusterVersion.Spec.Components[0],
-				&cluster.Spec.Components[0])
-			Expect(component).Should(BeNil())
 		})
 	})
 })

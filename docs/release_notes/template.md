@@ -5,7 +5,54 @@ We're happy to announce the release of KubeBlocks $kubeblocks_version! 🚀 🎉
 We would like to extend our appreciation to all contributors who helped make this release happen.
 
 **Highlights**
+  * ClusterDefinition API `spec.connectionCredential` add following built-in variables:
+    * Service FQDN `$(SVC_FQDN)` placeholder, value pattern - $(CLUSTER_NAME)-$(1ST_COMP_NAME).$(NAMESPACE).svc, where 1ST_COMP_NAME is the 1st component that provide `ClusterDefinition.spec.componentDefs[].service` attribute
+    * Service ports `$(SVC_PORT_<NAME>)` placeholder
+    * example usage:
+    
+  ```yaml
+  # ClusterDefinition API
+  kind: ClusterDefinition
+    metadata:
+    name: my-clusterdefinition
+  spec:
+    connectionCredential:
+      username: "admin" 
+      "admin-password": "$(RANDOM_PASSWD)"
+      endpoint: "http://$(SVC_FQDN):$(SVC_PORT_http)"
 
+    componentsDefs:
+      - name: my-comp-type
+        service:
+          ports:
+            - name: http
+              port: 8123
+
+  # Cluster API
+  kind: Cluster
+  metadata:
+    name: my-cluster
+    namespace: my-ns
+  spec:
+    clusterDefinitionRef: my-clusterdefinition
+    componentSpecs:
+      - name: my-comp
+        type: my-comp-type
+
+  # output:
+  kind: Secret
+  metadata:
+    name: my-cluster-conn-credential
+    namespace: my-ns
+    labels:
+      "app.kubernetes.io/instance": my-cluster
+  stringData:
+    username: "admin"
+    admin-password: "<some random 8 characters password>"
+    endpoint: "http://my-cluster-my-comp.my-ns.svc:8123"
+  ```
+
+**Known Issues**
   * Limitations of cluster's horizontal scale operation:
     * Only support VolumeSnapshot API to make a clone of Cluster's PV for syncing data when horizontal scaling.
     * Only 1st pod container and 1st volume mount associated PV will be processed for VolumeSnapshot, do assure that data volume is placed in 1st pod container's 1st volume mount.
@@ -56,6 +103,8 @@ Release Notes for `v0.3.0`:
     ```
     kubectl apply -f clusters.yaml
       ```
+- Rename group name `dbaas.kubeblocks.io` to `apps.kubeblocks.io`
+    - upgrade kubeblocks to create new CRDs, after that, you can delete the CRDs with group name`dbaas.kubeblocks.io`
 ## Breaking Changes
 
 $kubeblocks_breaking_changes

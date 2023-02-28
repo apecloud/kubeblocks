@@ -18,13 +18,13 @@ options: {
 	namespace:         string
 	clusterDefRef:     string
 	clusterVersionRef: string
-	components: [...]
+	componentSpecs: [...]
 	terminationPolicy: string
 }
 
 // required, k8s api resource content
 content: {
-	apiVersion: "dbaas.kubeblocks.io/v1alpha1"
+	apiVersion: "apps.kubeblocks.io/v1alpha1"
 	kind:       "Cluster"
 	metadata: {
 		name:      options.name
@@ -33,7 +33,7 @@ content: {
 	spec: {
 		clusterDefinitionRef: options.clusterDefRef
 		clusterVersionRef:    options.clusterVersionRef
-		components:           options.components
+		componentSpecs:       options.componentSpecs
 		terminationPolicy:    options.terminationPolicy
 	}
 }

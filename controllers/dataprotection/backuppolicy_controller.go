@@ -50,12 +50,13 @@ type BackupPolicyReconciler struct {
 }
 
 type backupPolicyOptions struct {
-	Name       string           `json:"name"`
-	Namespace  string           `json:"namespace"`
-	Cluster    string           `json:"cluster"`
-	Schedule   string           `json:"schedule"`
-	BackupType string           `json:"backupType"`
-	TTL        *metav1.Duration `json:"ttl,omitempty"`
+	Name           string           `json:"name"`
+	Namespace      string           `json:"namespace"`
+	Cluster        string           `json:"cluster"`
+	Schedule       string           `json:"schedule"`
+	BackupType     string           `json:"backupType"`
+	TTL            *metav1.Duration `json:"ttl,omitempty"`
+	ServiceAccount string           `json:"serviceAccount"`
 }
 
 var (
@@ -120,8 +121,9 @@ func (r *BackupPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request
 func (r *BackupPolicyReconciler) doNewPhaseAction(
 	reqCtx intctrlutil.RequestCtx, backupPolicy *dataprotectionv1alpha1.BackupPolicy) (ctrl.Result, error) {
 	// update status phase
+	patch := client.MergeFrom(backupPolicy.DeepCopy())
 	backupPolicy.Status.Phase = dataprotectionv1alpha1.ConfigInProgress
-	if err := r.Client.Status().Update(reqCtx.Ctx, backupPolicy); err != nil {
+	if err := r.Client.Status().Patch(reqCtx.Ctx, backupPolicy, patch); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 	return intctrlutil.RequeueAfter(reconcileInterval, reqCtx.Log, "")
@@ -190,7 +192,7 @@ func (r *BackupPolicyReconciler) doInProgressPhaseAction(
 
 	// update status phase
 	backupPolicy.Status.Phase = dataprotectionv1alpha1.ConfigAvailable
-	if err := r.Client.Status().Update(reqCtx.Ctx, backupPolicy); err != nil {
+	if err := r.Client.Status().Patch(reqCtx.Ctx, backupPolicy, patch); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 	return intctrlutil.RequeueAfter(reconcileInterval, reqCtx.Log, "")
@@ -231,10 +233,10 @@ func (r *BackupPolicyReconciler) mergeBackupPolicyTemplate(
 	}
 	if template.Spec.CredentialKeyword != nil {
 		if backupPolicy.Spec.Target.Secret.UserKeyword == "" {
-			backupPolicy.Spec.BackupToolName = template.Spec.CredentialKeyword.UserKeyword
+			backupPolicy.Spec.Target.Secret.UserKeyword = template.Spec.CredentialKeyword.UserKeyword
 		}
 		if backupPolicy.Spec.Target.Secret.PasswordKeyword == "" {
-			backupPolicy.Spec.BackupToolName = template.Spec.CredentialKeyword.PasswordKeyword
+			backupPolicy.Spec.Target.Secret.PasswordKeyword = template.Spec.CredentialKeyword.PasswordKeyword
 		}
 	}
 	if backupPolicy.Spec.TTL == nil {
@@ -271,12 +273,13 @@ func (r *BackupPolicyReconciler) buildCronJob(backupPolicy *dataprotectionv1alph
 	}
 	cueValue := intctrlutil.NewCUEBuilder(*cueTpl)
 	options := backupPolicyOptions{
-		Name:       backupPolicy.Name,
-		Namespace:  backupPolicy.Namespace,
-		Cluster:    backupPolicy.Spec.Target.LabelsSelector.MatchLabels[intctrlutil.AppInstanceLabelKey],
-		Schedule:   backupPolicy.Spec.Schedule,
-		TTL:        backupPolicy.Spec.TTL,
-		BackupType: backupPolicy.Spec.BackupType,
+		Name:           backupPolicy.Name,
+		Namespace:      backupPolicy.Namespace,
+		Cluster:        backupPolicy.Spec.Target.LabelsSelector.MatchLabels[intctrlutil.AppInstanceLabelKey],
+		Schedule:       backupPolicy.Spec.Schedule,
+		TTL:            backupPolicy.Spec.TTL,
+		BackupType:     backupPolicy.Spec.BackupType,
+		ServiceAccount: viper.GetString("KUBEBLOCKS_SERVICEACCOUNT_NAME"),
 	}
 	backupPolicyOptionsByte, err := json.Marshal(options)
 	if err != nil {
@@ -353,11 +356,18 @@ func (r *BackupPolicyReconciler) removeOldestBackups(reqCtx intctrlutil.RequestC
 		client.MatchingLabels(buildBackupLabelsForRemove(backupPolicy))); err != nil {
 		return err
 	}
-	numToDelete := len(backups.Items) - int(backupPolicy.Spec.BackupsHistoryLimit)
+	// filter final state backups only
+	backupItems := []dataprotectionv1alpha1.Backup{}
+	for _, item := range backups.Items {
+		if item.Status.Phase == dataprotectionv1alpha1.BackupCompleted ||
+			item.Status.Phase == dataprotectionv1alpha1.BackupFailed {
+			backupItems = append(backupItems, item)
+		}
+	}
+	numToDelete := len(backupItems) - int(backupPolicy.Spec.BackupsHistoryLimit)
 	if numToDelete <= 0 {
 		return nil
 	}
-	backupItems := backups.Items
 	sort.Sort(byBackupStartTime(backupItems))
 	for i := 0; i < numToDelete; i++ {
 		if err := intctrlutil.BackgroundDeleteObject(r.Client, reqCtx.Ctx, &backupItems[i]); err != nil {

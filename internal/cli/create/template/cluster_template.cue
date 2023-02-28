@@ -18,9 +18,10 @@ options: {
 	namespace:         string
 	clusterDefRef:     string
 	clusterVersionRef: string
-	components: [...]
+	componentSpecs: [...]
 	terminationPolicy: string
 	podAntiAffinity:   string
+	tenancy:           string
 	topologyKeys: [...]
 	nodeLabels: {}
 	tolerations: [...]
@@ -28,7 +29,7 @@ options: {
 
 // required, k8s api resource content
 content: {
-	apiVersion: "dbaas.kubeblocks.io/v1alpha1"
+	apiVersion: "apps.kubeblocks.io/v1alpha1"
 	kind:       "Cluster"
 	metadata: {
 		name:      options.name
@@ -41,9 +42,10 @@ content: {
 			podAntiAffinity: options.podAntiAffinity
 			topologyKeys:    options.topologyKeys
 			nodeLabels:      options.nodeLabels
+			tenancy:         options.tenancy
 		}
 		tolerations:       options.tolerations
-		components:        options.components
+		componentSpecs:    options.componentSpecs
 		terminationPolicy: options.terminationPolicy
 	}
 }

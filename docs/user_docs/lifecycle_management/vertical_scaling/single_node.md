@@ -40,7 +40,7 @@ _Steps_:
 
 
   ```
-  apiVersion: dbaas.kubeblocks.io/v1alpha1
+  apiVersion: apps.kubeblocks.io/v1alpha1
   kind: Cluster
   metadata:
     name: wesql
@@ -68,7 +68,7 @@ _Steps_:
 
   ```
   $ kubectl apply -f cluster.yaml
-  cluster.dbaas.kubeblocks.io/wesql created
+  cluster.apps.kubeblocks.io/wesql created
   ```
 
 ### Result 
@@ -118,7 +118,7 @@ _Steps_:
 1. Prepare a YAML file for vertically scaling a single-node cluster. Below is the YAML file of the `OpsRequest` CR. 
 
   ```
-  apiVersion: dbaas.kubeblocks.io/v1alpha1
+  apiVersion: apps.kubeblocks.io/v1alpha1
   kind: OpsRequest
   metadata:
     name: ops-vertical-scaling-demo
@@ -140,7 +140,7 @@ _Steps_:
 
   ```
   $ kubectl apply -f vertical_scaling.yaml
-  opsrequest.dbaas.kubeblocks.io/ops-vertical-scaling-demo created
+  opsrequest.apps.kubeblocks.io/ops-vertical-scaling-demo created
   ```
 
 3. View the `OpsRequest` phase and cluster phase:
@@ -182,7 +182,7 @@ And the cluster also changes:
   Namespace:    default
   Labels:       cluster.kubeblocks.io/name=wesql
   Annotations:  <none>
-  API Version:  dbaas.kubeblocks.io/v1alpha1
+  API Version:  apps.kubeblocks.io/v1alpha1
   Kind:         OpsRequest
   Metadata:
     Creation Timestamp:  2022-11-17T06:23:31Z
@@ -190,7 +190,7 @@ And the cluster also changes:
       opsrequest.kubeblocks.io/finalizer
     Generation:  1
     Managed Fields:
-      API Version:  dbaas.kubeblocks.io/v1alpha1
+      API Version:  apps.kubeblocks.io/v1alpha1
       Fields Type:  FieldsV1
       fieldsV1:
         f:metadata:
@@ -205,7 +205,7 @@ And the cluster also changes:
       Manager:      kubectl-client-side-apply
       Operation:    Update
       Time:         2022-11-17T06:23:31Z
-      API Version:  dbaas.kubeblocks.io/v1alpha1
+      API Version:  apps.kubeblocks.io/v1alpha1
       Fields Type:  FieldsV1
       fieldsV1:
         f:metadata:
@@ -221,7 +221,7 @@ And the cluster also changes:
       Manager:      manager
       Operation:    Update
       Time:         2022-11-17T06:23:31Z
-      API Version:  dbaas.kubeblocks.io/v1alpha1
+      API Version:  apps.kubeblocks.io/v1alpha1
       Fields Type:  FieldsV1
       fieldsV1:
         f:status:
@@ -241,7 +241,7 @@ And the cluster also changes:
       Subresource:  status
       Time:         2022-11-17T06:24:22Z
     Owner References:
-      API Version:     dbaas.kubeblocks.io/v1alpha1
+      API Version:     apps.kubeblocks.io/v1alpha1
       Kind:            Cluster
       Name:            wesql
       UID:             a0293dcd-0e78-44f0-89b7-cf2c1768fb66

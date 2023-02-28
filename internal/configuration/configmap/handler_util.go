@@ -23,7 +23,7 @@ import (
 	"github.com/fsnotify/fsnotify"
 	corev1 "k8s.io/api/core/v1"
 
-	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	cfgutil "github.com/apecloud/kubeblocks/internal/configuration"
 )
 
@@ -36,11 +36,11 @@ type ConfigManagerSidecar struct {
 	Volumes []corev1.VolumeMount `json:"volumes"`
 }
 
-func IsSupportReload(reload *dbaasv1alpha1.ReloadOptions) bool {
+func IsSupportReload(reload *appsv1alpha1.ReloadOptions) bool {
 	return reload != nil && (reload.ShellTrigger != nil || reload.UnixSignalTrigger != nil)
 }
 
-func NeedBuildConfigSidecar(reloadOptions *dbaasv1alpha1.ReloadOptions) error {
+func NeedBuildConfigSidecar(reloadOptions *appsv1alpha1.ReloadOptions) error {
 	switch {
 	case reloadOptions.UnixSignalTrigger != nil:
 		signal := reloadOptions.UnixSignalTrigger.Signal
@@ -50,11 +50,11 @@ func NeedBuildConfigSidecar(reloadOptions *dbaasv1alpha1.ReloadOptions) error {
 		return nil
 	default:
 		// TODO support sql or http
-		return cfgutil.MakeError("this special reload type [%s] is not supported for now!", dbaasv1alpha1.SQLType)
+		return cfgutil.MakeError("this special reload type [%s] is not supported for now!", appsv1alpha1.SQLType)
 	}
 }
 
-func BuildSignalArgs(configuration dbaasv1alpha1.UnixSignalTrigger, volumeDirs []corev1.VolumeMount) []string {
+func BuildSignalArgs(configuration appsv1alpha1.UnixSignalTrigger, volumeDirs []corev1.VolumeMount) []string {
 	args := make([]string, 0)
 	args = append(args, "--process", configuration.ProcessName)
 	args = append(args, "--signal", string(configuration.Signal))

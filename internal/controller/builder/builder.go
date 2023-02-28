@@ -23,30 +23,30 @@ import (
 	"strconv"
 	"strings"
 
+	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	"github.com/leaanthony/debme"
-	"github.com/sethvargo/go-password/password"
 	"github.com/spf13/viper"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/rand"
 
-	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
-
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
-	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
-	componentutil "github.com/apecloud/kubeblocks/controllers/dbaas/components/util"
+	componentutil "github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	cfgcm "github.com/apecloud/kubeblocks/internal/configuration/configmap"
+	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 type BuilderParams struct {
-	ClusterDefinition *dbaasv1alpha1.ClusterDefinition
-	ClusterVersion    *dbaasv1alpha1.ClusterVersion
-	Cluster           *dbaasv1alpha1.Cluster
-	Component         *component.Component
+	ClusterDefinition *appsv1alpha1.ClusterDefinition
+	ClusterVersion    *appsv1alpha1.ClusterVersion
+	Cluster           *appsv1alpha1.Cluster
+	Component         *component.SynthesizedComponent
 }
 
 type envVar struct {
@@ -54,6 +54,20 @@ type envVar struct {
 	fieldPath string
 	value     string
 }
+
+type componentPathedName struct {
+	Namespace   string `json:"namespace,omitempty"`
+	ClusterName string `json:"clusterName,omitempty"`
+	Name        string `json:"name,omitempty"`
+}
+
+const (
+	VolumeName = "tls"
+	CAName     = "ca.crt"
+	CertName   = "tls.crt"
+	KeyName    = "tls.key"
+	MountPath  = "/etc/pki/tls"
+)
 
 var (
 	//go:embed cue/*
@@ -137,7 +151,7 @@ func injectEnvs(params BuilderParams, envConfigName string, c *corev1.Container)
 	toInjectEnv := make([]corev1.EnvVar, 0, len(envFieldPathSlice)+len(c.Env))
 	for _, v := range envFieldPathSlice {
 		toInjectEnv = append(toInjectEnv, corev1.EnvVar{
-			Name: component.KBPrefix + v.name,
+			Name: constant.KBPrefix + v.name,
 			ValueFrom: &corev1.EnvVarSource{
 				FieldRef: &corev1.ObjectFieldSelector{
 					FieldPath: v.fieldPath,
@@ -148,9 +162,24 @@ func injectEnvs(params BuilderParams, envConfigName string, c *corev1.Container)
 
 	for _, v := range clusterEnv {
 		toInjectEnv = append(toInjectEnv, corev1.EnvVar{
-			Name:  component.KBPrefix + v.name,
+			Name:  constant.KBPrefix + v.name,
 			Value: v.value,
 		})
+	}
+
+	if params.Component.TLS {
+		tlsEnv := []envVar{
+			{name: "_TLS_CERT_PATH", value: MountPath},
+			{name: "_TLS_CA_FILE", value: CAName},
+			{name: "_TLS_CERT_FILE", value: CertName},
+			{name: "_TLS_KEY_FILE", value: KeyName},
+		}
+		for _, v := range tlsEnv {
+			toInjectEnv = append(toInjectEnv, corev1.EnvVar{
+				Name:  constant.KBPrefix + v.name,
+				Value: v.value,
+			})
+		}
 	}
 
 	// have injected variables placed at the front of the slice
@@ -230,8 +259,7 @@ func BuildSts(reqCtx intctrlutil.RequestCtx, params BuilderParams, envConfigName
 }
 
 func randomString(length int) string {
-	res, _ := password.Generate(length, 0, 0, false, false)
-	return res
+	return rand.String(length)
 }
 
 func BuildConnCredential(params BuilderParams) (*corev1.Secret, error) {
@@ -249,40 +277,51 @@ func BuildConnCredential(params BuilderParams) (*corev1.Secret, error) {
 		return &connCredential, nil
 	}
 
+	replaceVarObjects := func(k, v *string, i int, origValue string, varObjectsMap map[string]string) {
+		toReplace := origValue
+		for j, r := range varObjectsMap {
+			replaced := strings.ReplaceAll(toReplace, j, r)
+			if replaced == toReplace {
+				continue
+			}
+			toReplace = replaced
+			// replace key
+			if i == 0 {
+				delete(connCredential.StringData, origValue)
+				*k = replaced
+			} else {
+				*v = replaced
+			}
+		}
+	}
+
 	// REVIEW: perhaps handles value replacement at `func mergeComponents`
-	replaceData := func(placeHolderMap map[string]string) {
+	replaceData := func(varObjectsMap map[string]string) {
 		copyStringData := connCredential.DeepCopy().StringData
 		for k, v := range copyStringData {
 			for i, vv := range []string{k, v} {
-				if !strings.HasPrefix(vv, "$(") {
+				if !strings.Contains(vv, "$(") {
 					continue
 				}
-				for j, r := range placeHolderMap {
-					replaced := strings.Replace(vv, j, r, 1)
-					if replaced == vv {
-						continue
-					}
-					// replace key
-					if i == 0 {
-						delete(connCredential.StringData, vv)
-						k = replaced
-					} else {
-						v = replaced
-					}
-					break
-				}
+				replaceVarObjects(&k, &v, i, vv, varObjectsMap)
 			}
 			connCredential.StringData[k] = v
 		}
 	}
 
-	// 1st pass replace primary placeholder
+	// 1st pass replace variables
 	m := map[string]string{
 		"$(RANDOM_PASSWD)": randomString(8),
+		"$(SVC_FQDN)":      fmt.Sprintf("%s-%s.%s.svc", params.Cluster.Name, params.Component.Name, params.Cluster.Namespace),
+	}
+	if params.Component.Service != nil {
+		for _, p := range params.Component.Service.Ports {
+			m[fmt.Sprintf("$(SVC_PORT_%s)", p.Name)] = strconv.Itoa(int(p.Port))
+		}
 	}
 	replaceData(m)
 
-	// 2nd pass replace $(CONN_CREDENTIAL) holding values
+	// 2nd pass replace $(CONN_CREDENTIAL) variables
 	m = map[string]string{}
 
 	for k, v := range connCredential.StringData {
@@ -324,7 +363,7 @@ func BuildDeploy(reqCtx intctrlutil.RequestCtx, params BuilderParams) (*appsv1.D
 }
 
 func BuildPVCFromSnapshot(sts *appsv1.StatefulSet,
-	vct corev1.PersistentVolumeClaim,
+	vct corev1.PersistentVolumeClaimTemplate,
 	pvcKey types.NamespacedName,
 	snapshotName string) (*corev1.PersistentVolumeClaim, error) {
 
@@ -344,7 +383,7 @@ func BuildPVCFromSnapshot(sts *appsv1.StatefulSet,
 func BuildEnvConfig(params BuilderParams) (*corev1.ConfigMap, error) {
 	const tplFile = "env_config_template.cue"
 
-	prefix := component.KBPrefix + "_" + strings.ToUpper(params.Component.Type) + "_"
+	prefix := constant.KBPrefix + "_" + strings.ToUpper(params.Component.Type) + "_"
 	svcName := strings.Join([]string{params.Cluster.Name, params.Component.Name, "headless"}, "-")
 	envData := map[string]string{}
 	envData[prefix+"N"] = strconv.Itoa(int(params.Component.Replicas))
@@ -473,7 +512,7 @@ func BuildConfigMapWithTemplate(
 	configs map[string]string,
 	params BuilderParams,
 	cmName string,
-	tplCfg dbaasv1alpha1.ConfigTemplate) (*corev1.ConfigMap, error) {
+	tplCfg appsv1alpha1.ConfigTemplate) (*corev1.ConfigMap, error) {
 	const tplFile = "config_template.cue"
 	cueFS, _ := debme.FS(cueTemplates, "cue")
 	cueTpl, err := getCacheCUETplValue(tplFile, func() (*intctrlutil.CUETpl, error) {
@@ -488,7 +527,6 @@ func BuildConfigMapWithTemplate(
 	configMeta := map[string]map[string]string{
 		"clusterDefinition": {
 			"name": params.ClusterDefinition.GetName(),
-			"type": params.ClusterDefinition.Spec.Type,
 		},
 		"cluster": {
 			"name":      params.Cluster.GetName(),
@@ -497,6 +535,7 @@ func BuildConfigMapWithTemplate(
 		"component": {
 			"name":                  params.Component.Name,
 			"type":                  params.Component.Type,
+			"characterType":         params.Component.CharacterType,
 			"configName":            cmName,
 			"templateName":          tplCfg.ConfigTplRef,
 			"configConstraintsName": tplCfg.ConfigConstraintRef,
@@ -557,4 +596,19 @@ func BuildCfgManagerContainer(sidecarRenderedParam *cfgcm.ConfigManagerSidecar) 
 		return nil, err
 	}
 	return &container, nil
+}
+
+func BuildTLSSecret(namespace, clusterName, componentName string) (*corev1.Secret, error) {
+	const tplFile = "tls_certs_secret_template.cue"
+
+	secret := &corev1.Secret{}
+	pathedName := componentPathedName{
+		Namespace:   namespace,
+		ClusterName: clusterName,
+		Name:        componentName,
+	}
+	if err := buildFromCUE(tplFile, map[string]any{"pathedName": pathedName}, "secret", secret); err != nil {
+		return nil, err
+	}
+	return secret, nil
 }

@@ -11,7 +11,7 @@ This guide introduces how to install KubeBlocks by `kbcli`, the command line too
 ## Step 1. Install KubeBlocks by `kbcli`
 
 1. Run the command below to install `kbcli`. `kbcli` can run on macOS and Linux.
-   ```
+   ```bash
    curl -fsSL https://kubeblocks.io/installer/install_cli.sh | bash
    ```
 
@@ -19,11 +19,11 @@ This guide introduces how to install KubeBlocks by `kbcli`, the command line too
    > 
    > Please try again if a time-out exception occurs during installation. It may relate to your network condition.
 2. Run this command to check the version and verify whether kbcli is installed successfully.
-   ```
+   ```bash
    kbcli version
    ```
 3. Run the command below to uninstall kbcli after your trial.
-   ```
+   ```bash
    sudo rm /usr/local/bin/kbcli
    ```
 
@@ -31,7 +31,7 @@ This guide introduces how to install KubeBlocks by `kbcli`, the command line too
 
 `kbcli` supports automatic command line completion. You can run the command below to enable this function.
 
-```
+```bash
 # Configure SHELL-TYPE as one type from bash, fish, PowerShell, and zsh
 kbcli completion SHELL-TYPE -h
 ```
@@ -39,31 +39,44 @@ kbcli completion SHELL-TYPE -h
 Here we take zsh as an example.
 
 1. Run the command below.
-```
-kbcli completion zsh -h
-```
+   ```bash
+   kbcli completion zsh -h
+   ```
 2. Enable the completion function of your terminal first.
-```
-$ echo "autoload -U compinit; compinit" >> ~/.zshrc
-```
+   ```bash
+   echo "autoload -U compinit; compinit" >> ~/.zshrc
+   ```
 3. Run the command below to enable the kbcli automatic completion function.
-```
-$ echo "source <(kbcli completion zsh); compdef _kbcli kbcli" >> ~/.zshrc
-```
+   ```bash
+   echo "source <(kbcli completion zsh); compdef _kbcli kbcli" >> ~/.zshrc
+   ```
 
 ## Step 3. Install KubeBlocks
 
 1. Run the command below to install KubeBlocks.
-   ```
+   ```bash
    kbcli kubeblocks install
    ```
+   
+   | **Option**       | **Usage**         |
+   | :--              | :--               |
+   | `--namespace` | If you want to specify a namespace, use the global command line option `--namespace` or the abbreviated `-n` to name your namespace and configure `--create-namespace` as `true` to create a namespace if it does not exist. For example, <br />```kbcli kubeblocks install -n kubeblocks --create-namespace=true``` |
+   | `--create-namespace` | Use `create-namespace` to specify whether to create a namespace if it does not exist.|
+   | `--monitor`      | Use `monitor` to specify whether to install the addons relevant to database monitoring and visualization.|
+   | `--version`      | Use `version` to specify the version you want to install. Find the supported version in [KubeBlocks Helm Charts](https://github.com/apecloud/helm-charts).|
+   | `--set snapshot-controller.enabled=true` | When this parameter is set as `true`, the snapshot backup function of the database instance is enabled (only applied to the EKS environment). Refer to [Backup and restore for MySQL single node](../manage_mysql_database_with_kubeblocks/backup_restore/backup_and_restore_for_MySQL_standalone.md) for details.|
+   | `--set loadbalancer.enabled=true` | When this parameter is set as `true`, the loadbalancer function is enabled (only applied to the EKS environment). This function provides a stable virtual IP address externally to facilitate client access within the same VPC but outside the Kubernetes cluster.|
+
+   > ***Note:***
+   > 
+   > For global command line options, run `kbcli options` to list all options (applies to all commands).
 
    ***Result***
    
    This command installs the latest version in your Kubernetes environment since your `kubectl` can connect to your Kubernetes clusters.
    You can also run the command below to check the parameters that can be specified during installation.
-   ```
-   $ kbcli kubeblocks install --help
+   ```bash
+   kbcli kubeblocks install --help
 
    Install KubeBlocks
 
@@ -95,16 +108,8 @@ $ echo "source <(kbcli completion zsh); compdef _kbcli kbcli" >> ~/.zshrc
 
    Use "kbcli options" for a list of global command-line options (applies to all commands).
    ```
-
-   | **Option**       | **Usage**         |
-   | :--              | :--               |
-   | `create-namespace` | Use `create-namespace` to specify whether to create a namespace.|
-   | `monitor`      | Use `monitor` to specify whether to install the addons relevant to database monitoring and visualization.|
-   | `version`      | User `version` to specify the version you want to install. Find the supported version in [KubeBlocks Helm Charts](https://github.com/apecloud/helm-charts).|
-   | `set snapshot-controller.enabled=true` | When this parameter is set as `true`, the snapshot backup function of the database instance is enabled (only applied to the EKS environment). Refer to [Backup and restore for MySQL single node](../manage_mysql_database_with_kubeblocks/backup_restore/backup_and_restore_for_MySQL_standalone.md) for details.|
-   | `set loadbalancer.enabled=true` | When this parameter is set as `true`, the loadbalancer function is enabled (only applied to the EKS environment). This function provides a stable virtual IP address externally to facilitate client access within the same VPC but outside the Kubernetes cluster.|
 2. Run the command below to verify whether KubeBlocks is installed successfully.
-   ```
+   ```bash
    kubectl get pod
    ```
 
@@ -117,7 +122,8 @@ $ echo "source <(kbcli completion zsh); compdef _kbcli kbcli" >> ~/.zshrc
    kubeblocks-grafana-b765d544f-wj6c6                    3/3     Running   0          3m33s
    kubeblocks-prometheus-alertmanager-7c558865f5-hsfn5   2/2     Running   0          3m33s
    kubeblocks-prometheus-server-5c89c8bc89-mwrx7         2/2     Running   0          3m33s
-3. Run the command below to uninstall KubeBlocks if you want to delete KubeBlocks after your trial.
    ```
+3. Run the command below to uninstall KubeBlocks if you want to delete KubeBlocks after your trial.
+   ```bash
    kbcli kubeblocks uninstall
    ```

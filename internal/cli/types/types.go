@@ -20,6 +20,8 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 )
 
 const (
@@ -36,7 +38,7 @@ const (
 	GoosWindows = "windows"
 
 	// Group api group
-	Group = "dbaas.kubeblocks.io"
+	Group = "apps.kubeblocks.io"
 
 	// AppsGroup k8s apps group
 	AppsGroup = "apps"
@@ -76,15 +78,6 @@ const (
 	KindOps                  = "OpsRequest"
 	KindCM                   = "ConfigMap"
 	KindSTS                  = "StatefulSet"
-
-	NameLabelKey                   = "app.kubernetes.io/name"
-	InstanceLabelKey               = "app.kubernetes.io/instance"
-	ConsensusSetAccessModeLabelKey = "cs.dbaas.kubeblocks.io/access-mode"
-	ComponentLabelKey              = "app.kubernetes.io/component-name"
-	RegionLabelKey                 = "topology.kubernetes.io/region"
-	ZoneLabelKey                   = "topology.kubernetes.io/zone"
-	ClusterDefLabelKey             = "clusterdefinition.kubeblocks.io/name"
-	RoleLabelKey                   = "kubeblocks.io/role"
 
 	ServiceLBTypeAnnotationKey     = "service.kubernetes.io/kubeblocks-loadbalancer-type"
 	ServiceLBTypeAnnotationValue   = "private-ip"
@@ -132,6 +125,12 @@ type BackupSnapInfo struct {
 	SourcePVC     string
 	SnapshotClass string
 	Labels        string
+}
+
+type ConfigTemplateInfo struct {
+	Name  string
+	TPL   appsv1alpha1.ConfigTemplate
+	CMObj *corev1.ConfigMap
 }
 
 func ClusterGVR() schema.GroupVersionResource {

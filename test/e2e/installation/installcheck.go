@@ -14,19 +14,20 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package envcheck
+package installation
 
 import (
 	"context"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
 	"helm.sh/helm/v3/pkg/action"
-
-	. "github.com/apecloud/kubeblocks/test/e2e"
-
+	"helm.sh/helm/v3/pkg/cli/values"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	. "github.com/apecloud/kubeblocks/test/e2e"
 
 	"github.com/apecloud/kubeblocks/internal/cli/util/helm"
 )
@@ -39,10 +40,12 @@ var chart = helm.InstallOpts{
 	Chart:     "../../deploy/helm",
 	Wait:      true,
 	Namespace: releaseNS,
-	Sets: []string{
-		"image.tag=latest",
-		"image.pullPolicy=Always",
-		"wesql.enabled=false",
+	ValueOpts: &values.Options{
+		Values: []string{
+			"image.tag=latest",
+			"image.pullPolicy=Always",
+			"wesql.enabled=false",
+		},
 	},
 	Login:           true,
 	TryTimes:        2,

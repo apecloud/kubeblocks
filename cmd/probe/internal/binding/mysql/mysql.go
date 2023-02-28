@@ -46,6 +46,8 @@ type Mysql struct {
 	base     internal.ProbeBase
 }
 
+var _ internal.ProbeOperation = &Mysql{}
+
 const (
 	// configurations to connect to Mysql, either a data source name represent by URL.
 	connectionURLKey = "url"
@@ -343,7 +345,7 @@ func initDB(url, pemPath string) (*sql.DB, error) {
 // }
 
 // func prepareValues(columnTypes []*sql.ColumnType) []interface{} {
-// 	types := make([]reflect.Type, len(columnTypes))
+// 	types := make([]reflect.ComponentDefRef, len(columnTypes))
 // 	for i, tp := range columnTypes {
 // 		types[i] = tp.ScanType()
 // 	}

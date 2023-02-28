@@ -34,7 +34,10 @@ const (
 	CMConfigurationTplNameLabelKey         = "configuration.kubeblocks.io/configuration-tpl-name"
 	CMConfigurationConstraintsNameLabelKey = "configuration.kubeblocks.io/configuration-constraints-name"
 	CMInsConfigurationHashLabelKey         = "configuration.kubeblocks.io/configuration-hash"
-	CMConfigurationISVTplLabelKey          = "configuration.kubeblocks.io/configtemplate-name"
+	CMConfigurationProviderTplLabelKey     = "configuration.kubeblocks.io/configtemplate-name"
+
+	// CMConfigurationCMKeysLabelKey Specify keys
+	CMConfigurationCMKeysLabelKey = "configuration.kubeblocks.io/configmap-keys"
 
 	// CMInsConfigurationLabelKey configmap is configuration file for component
 	// CMInsConfigurationLabelKey = "configuration.kubeblocks.io/ins-configure"

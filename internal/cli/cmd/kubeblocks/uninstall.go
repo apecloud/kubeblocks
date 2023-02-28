@@ -46,6 +46,9 @@ var (
 
 type uninstallOptions struct {
 	Options
+
+	// autoApprove if true, skip interactive approval
+	autoApprove bool
 }
 
 func newUninstallCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
@@ -60,24 +63,27 @@ func newUninstallCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *co
 		Args:    cobra.NoArgs,
 		Example: uninstallExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			util.CheckErr(o.complete(f, cmd))
+			util.CheckErr(o.Complete(f, cmd))
 			util.CheckErr(o.preCheck())
 			util.CheckErr(o.uninstall())
 		},
 	}
+
+	cmd.Flags().BoolVar(&o.autoApprove, "auto-approve", false, "Skip interactive approval before uninstalling KubeBlocks")
 	return cmd
 }
 
 func (o *uninstallOptions) preCheck() error {
-	printer.Warning(o.Out, "uninstall will remove all KubeBlocks resources.\n")
-
 	// wait user to confirm
-	if err := confirmUninstall(o.In); err != nil {
-		return err
+	if !o.autoApprove {
+		printer.Warning(o.Out, "uninstall will remove all KubeBlocks resources.\n")
+		if err := confirmUninstall(o.In); err != nil {
+			return err
+		}
 	}
 
 	preCheckList := []string{
-		"clusters.dbaas.kubeblocks.io",
+		"clusters.apps.kubeblocks.io",
 	}
 	ctx := context.Background()
 	// delete crds

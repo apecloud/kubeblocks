@@ -17,6 +17,7 @@ limitations under the License.
 package component
 
 import (
+	"embed"
 	"encoding/json"
 	"fmt"
 	"strconv"
@@ -27,7 +28,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
-	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -43,26 +45,12 @@ const (
 	ProbeRunningCheckPath     = "spec.containers{" + runningProbeContainerName + "}"
 )
 
-func buildProbeContainer() (*corev1.Container, error) {
-	cueFS, _ := debme.FS(cueTemplates, "cue")
+var (
+	//go:embed cue/*
+	cueTemplates embed.FS
+)
 
-	cueTpl, err := intctrlutil.NewCUETplFromBytes(cueFS.ReadFile("probe_template.cue"))
-	if err != nil {
-		return nil, err
-	}
-	cueValue := intctrlutil.NewCUEBuilder(*cueTpl)
-	probeContainerByte, err := cueValue.Lookup("probeContainer")
-	if err != nil {
-		return nil, err
-	}
-	container := &corev1.Container{}
-	if err = json.Unmarshal(probeContainerByte, container); err != nil {
-		return nil, err
-	}
-	return container, nil
-}
-
-func buildProbeContainers(reqCtx intctrlutil.RequestCtx, component *Component) error {
+func buildProbeContainers(reqCtx intctrlutil.RequestCtx, component *SynthesizedComponent) error {
 	container, err := buildProbeContainer()
 	if err != nil {
 		return err
@@ -112,9 +100,28 @@ func buildProbeContainers(reqCtx intctrlutil.RequestCtx, component *Component) e
 	return nil
 }
 
-func buildProbeServiceContainer(component *Component, container *corev1.Container, probeSvcHTTPPort int, probeServiceGrpcPort int) {
-	container.Image = viper.GetString(intctrlutil.KBImage)
-	container.ImagePullPolicy = corev1.PullPolicy(viper.GetString(intctrlutil.KBImagePullPolicy))
+func buildProbeContainer() (*corev1.Container, error) {
+	cueFS, _ := debme.FS(cueTemplates, "cue")
+
+	cueTpl, err := intctrlutil.NewCUETplFromBytes(cueFS.ReadFile("probe_template.cue"))
+	if err != nil {
+		return nil, err
+	}
+	cueValue := intctrlutil.NewCUEBuilder(*cueTpl)
+	probeContainerByte, err := cueValue.Lookup("probeContainer")
+	if err != nil {
+		return nil, err
+	}
+	container := &corev1.Container{}
+	if err = json.Unmarshal(probeContainerByte, container); err != nil {
+		return nil, err
+	}
+	return container, nil
+}
+
+func buildProbeServiceContainer(component *SynthesizedComponent, container *corev1.Container, probeSvcHTTPPort int, probeServiceGrpcPort int) {
+	container.Image = viper.GetString(constant.KBImage)
+	container.ImagePullPolicy = corev1.PullPolicy(viper.GetString(constant.KBImagePullPolicy))
 	logLevel := viper.GetString("PROBE_SERVICE_LOG_LEVEL")
 	container.Command = []string{"probe", "--app-id", "batch-sdk",
 		"--dapr-http-port", strconv.Itoa(probeSvcHTTPPort),
@@ -131,7 +138,7 @@ func buildProbeServiceContainer(component *Component, container *corev1.Containe
 			dbPort = int(port.Port)
 		}
 		container.Env = append(container.Env, corev1.EnvVar{
-			Name:      KBPrefix + "_SERVICE_PORT",
+			Name:      constant.KBPrefix + "_SERVICE_PORT",
 			Value:     strconv.Itoa(dbPort),
 			ValueFrom: nil,
 		})
@@ -140,13 +147,13 @@ func buildProbeServiceContainer(component *Component, container *corev1.Containe
 	roles := getComponentRoles(component)
 	rolesJSON, _ := json.Marshal(roles)
 	container.Env = append(container.Env, corev1.EnvVar{
-		Name:      KBPrefix + "_SERVICE_ROLES",
+		Name:      constant.KBPrefix + "_SERVICE_ROLES",
 		Value:     string(rolesJSON),
 		ValueFrom: nil,
 	})
 
 	container.Env = append(container.Env, corev1.EnvVar{
-		Name:      KBPrefix + "_SERVICE_CHARACTER_TYPE",
+		Name:      constant.KBPrefix + "_SERVICE_CHARACTER_TYPE",
 		Value:     component.CharacterType,
 		ValueFrom: nil,
 	})
@@ -158,7 +165,7 @@ func buildProbeServiceContainer(component *Component, container *corev1.Containe
 	}}
 }
 
-func getComponentRoles(component *Component) map[string]string {
+func getComponentRoles(component *SynthesizedComponent) map[string]string {
 	var roles = map[string]string{}
 	if component.ConsensusSpec == nil {
 		return roles
@@ -176,7 +183,7 @@ func getComponentRoles(component *Component) map[string]string {
 }
 
 func buildRoleChangedProbeContainer(characterType string, roleChangedContainer *corev1.Container,
-	probeSetting *dbaasv1alpha1.ClusterDefinitionProbe, probeSvcHTTPPort int) {
+	probeSetting *appsv1alpha1.ClusterDefinitionProbe, probeSvcHTTPPort int) {
 	roleChangedContainer.Name = roleProbeContainerName
 	probe := roleChangedContainer.ReadinessProbe
 	bindingType := strings.ToLower(characterType)
@@ -186,7 +193,7 @@ func buildRoleChangedProbeContainer(characterType string, roleChangedContainer *
 		"curl", "-X", "POST",
 		"--max-time", strconv.Itoa(int(probeSetting.TimeoutSeconds)),
 		"--fail-with-body", "--silent",
-		"-H", "Content-Type: application/json",
+		"-H", "Content-ComponentDefRef: application/json",
 		roleObserveURI,
 		"-d", "{\"operation\": \"roleCheck\", \"metadata\":{\"sql\":\"\"}}",
 	}
@@ -197,7 +204,7 @@ func buildRoleChangedProbeContainer(characterType string, roleChangedContainer *
 }
 
 func buildStatusProbeContainer(statusProbeContainer *corev1.Container,
-	probeSetting *dbaasv1alpha1.ClusterDefinitionProbe, probeSvcHTTPPort int) {
+	probeSetting *appsv1alpha1.ClusterDefinitionProbe, probeSvcHTTPPort int) {
 	statusProbeContainer.Name = statusProbeContainerName
 	probe := statusProbeContainer.ReadinessProbe
 	httpGet := &corev1.HTTPGetAction{}
@@ -212,7 +219,7 @@ func buildStatusProbeContainer(statusProbeContainer *corev1.Container,
 }
 
 func buildRunningProbeContainer(runningProbeContainer *corev1.Container,
-	probeSetting *dbaasv1alpha1.ClusterDefinitionProbe, probeSvcHTTPPort int) {
+	probeSetting *appsv1alpha1.ClusterDefinitionProbe, probeSvcHTTPPort int) {
 	runningProbeContainer.Name = runningProbeContainerName
 	probe := runningProbeContainer.ReadinessProbe
 	httpGet := &corev1.HTTPGetAction{}

@@ -22,13 +22,13 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	. "github.com/apecloud/kubeblocks/test/e2e"
-
 	corev1 "k8s.io/api/core/v1"
 	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
-	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+
+	. "github.com/apecloud/kubeblocks/test/e2e"
 )
 
 func EnvCheckTest() {
@@ -72,7 +72,7 @@ func EnvGotCleanedTest() {
 func CheckNoKubeBlocksCRDs() {
 	apiGroups := []string{
 		dataprotectionv1alpha1.GroupVersion.Group,
-		dbaasv1alpha1.GroupVersion.Group,
+		appsv1alpha1.GroupVersion.Group,
 	}
 
 	crdList := &apiextv1.CustomResourceDefinitionList{}

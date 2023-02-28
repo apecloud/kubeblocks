@@ -18,13 +18,9 @@ package component
 
 import (
 	v12 "k8s.io/api/core/v1"
-	v1 "k8s.io/api/policy/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 
-	"github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
-)
-
-const (
-	KBPrefix = "KB"
+	"github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 )
 
 type MonitorConfig struct {
@@ -33,27 +29,25 @@ type MonitorConfig struct {
 	ScrapePath string `json:"scrapePath,omitempty"`
 }
 
-type Component struct {
-	ClusterDefName          string                              `json:"clusterDefName,omitempty"`
-	ClusterType             string                              `json:"clusterType,omitempty"`
-	Name                    string                              `json:"name,omitempty"`
-	Type                    string                              `json:"type,omitempty"`
-	CharacterType           string                              `json:"characterType,omitempty"`
-	MinReplicas             int32                               `json:"minReplicas"`
-	MaxReplicas             int32                               `json:"maxReplicas"`
-	DefaultReplicas         int32                               `json:"defaultReplicas"`
-	Replicas                int32                               `json:"replicas"`
-	PodDisruptionBudgetSpec *v1.PodDisruptionBudgetSpec         `json:"podDisruptionBudgetSpec,omitempty"`
-	ComponentType           v1alpha1.ComponentType              `json:"componentType,omitempty"`
-	ConsensusSpec           *v1alpha1.ConsensusSetSpec          `json:"consensusSpec,omitempty"`
-	PrimaryIndex            *int32                              `json:"primaryIndex,omitempty"`
-	PodSpec                 *v12.PodSpec                        `json:"podSpec,omitempty"`
-	Service                 *v12.ServiceSpec                    `json:"service,omitempty"`
-	Probes                  *v1alpha1.ClusterDefinitionProbes   `json:"probes,omitempty"`
-	VolumeClaimTemplates    []v12.PersistentVolumeClaimTemplate `json:"volumeClaimTemplates,omitempty"`
-	Monitor                 *MonitorConfig                      `json:"monitor,omitempty"`
-	EnabledLogs             []string                            `json:"enabledLogs,omitempty"`
-	LogConfigs              []v1alpha1.LogConfig                `json:"logConfigs,omitempty"`
-	ConfigTemplates         []v1alpha1.ConfigTemplate           `json:"configTemplates,omitempty"`
-	HorizontalScalePolicy   *v1alpha1.HorizontalScalePolicy     `json:"horizontalScalePolicy,omitempty"`
+type SynthesizedComponent struct {
+	ClusterDefName        string                              `json:"clusterDefName,omitempty"`
+	Name                  string                              `json:"name,omitempty"`
+	Type                  string                              `json:"type,omitempty"`
+	CharacterType         string                              `json:"characterType,omitempty"`
+	MaxUnavailable        *intstr.IntOrString                 `json:"maxUnavailable,omitempty"`
+	Replicas              int32                               `json:"replicas"`
+	WorkloadType          v1alpha1.WorkloadType               `json:"workloadType,omitempty"`
+	ConsensusSpec         *v1alpha1.ConsensusSetSpec          `json:"consensusSpec,omitempty"`
+	PrimaryIndex          *int32                              `json:"primaryIndex,omitempty"`
+	PodSpec               *v12.PodSpec                        `json:"podSpec,omitempty"`
+	Service               *v12.ServiceSpec                    `json:"service,omitempty"`
+	Probes                *v1alpha1.ClusterDefinitionProbes   `json:"probes,omitempty"`
+	VolumeClaimTemplates  []v12.PersistentVolumeClaimTemplate `json:"volumeClaimTemplates,omitempty"`
+	Monitor               *MonitorConfig                      `json:"monitor,omitempty"`
+	EnabledLogs           []string                            `json:"enabledLogs,omitempty"`
+	LogConfigs            []v1alpha1.LogConfig                `json:"logConfigs,omitempty"`
+	ConfigTemplates       []v1alpha1.ConfigTemplate           `json:"configTemplates,omitempty"`
+	HorizontalScalePolicy *v1alpha1.HorizontalScalePolicy     `json:"horizontalScalePolicy,omitempty"`
+	TLS                   bool                                `json:"tls"`
+	Issuer                *v1alpha1.Issuer                    `json:"issuer,omitempty"`
 }

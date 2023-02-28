@@ -35,9 +35,10 @@ kbcli cluster update NAME [flags]
       --monitor                        Set monitor enabled and inject metrics exporter (default true)
       --node-labels stringToString     Node label selector (default [])
   -o, --output string                  Output format. One of: (json, yaml, name, go-template, go-template-file, template, templatefile, jsonpath, jsonpath-as-json, jsonpath-file).
-      --pod-anti-affinity string       Pod anti-affinity type (default "Preferred")
+      --pod-anti-affinity string       Pod anti-affinity type, one of: (Preferred, Required) (default "Preferred")
       --show-managed-fields            If true, keep the managedFields when printing objects in JSON or YAML format.
       --template string                Template string or path to template file to use when -o=go-template, -o=go-template-file. The template format is golang templates [http://golang.org/pkg/text/template/#pkg-overview].
+      --tenancy string                 Tenancy options, one of: (SharedNode, DedicatedNode) (default "SharedNode")
       --termination-policy string      Termination policy, one of: (DoNotTerminate, Halt, Delete, WipeOut) (default "Delete")
       --tolerations strings            Tolerations for cluster, such as '"key=engineType,value=mongo,operator=Equal,effect=NoSchedule"'
       --topology-keys stringArray      Topology keys for affinity

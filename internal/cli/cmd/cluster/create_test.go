@@ -32,12 +32,12 @@ import (
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 
-	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/cluster"
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
 )
 
-func generateComponents(component dbaasv1alpha1.ClusterComponent, count int) []map[string]interface{} {
+func generateComponents(component appsv1alpha1.ClusterComponentSpec, count int) []map[string]interface{} {
 	var componentVals []map[string]interface{}
 	byteVal, err := json.Marshal(component)
 	Expect(err).ShouldNot(HaveOccurred())
@@ -59,7 +59,7 @@ var _ = Describe("create", func() {
 	Context("setMonitor", func() {
 		var components []map[string]interface{}
 		BeforeEach(func() {
-			var component dbaasv1alpha1.ClusterComponent
+			var component appsv1alpha1.ClusterComponentSpec
 			component.Monitor = true
 			components = generateComponents(component, 3)
 		})
@@ -80,19 +80,19 @@ var _ = Describe("create", func() {
 	})
 
 	Context("setEnableAllLogs Test", func() {
-		var cluster *dbaasv1alpha1.Cluster
-		var clusterDef *dbaasv1alpha1.ClusterDefinition
+		var cluster *appsv1alpha1.Cluster
+		var clusterDef *appsv1alpha1.ClusterDefinition
 		BeforeEach(func() {
 			cluster = testing.FakeCluster("log", "test")
 			clusterDef = testing.FakeClusterDef()
-			Expect(cluster.Spec.Components[0].EnabledLogs).Should(BeNil())
+			Expect(cluster.Spec.ComponentSpecs[0].EnabledLogs).Should(BeNil())
 		})
 		It("no logConfigs in ClusterDef", func() {
 			setEnableAllLogs(cluster, clusterDef)
-			Expect(len(cluster.Spec.Components[0].EnabledLogs)).Should(Equal(0))
+			Expect(len(cluster.Spec.ComponentSpecs[0].EnabledLogs)).Should(Equal(0))
 		})
 		It("set logConfigs in ClusterDef", func() {
-			clusterDef.Spec.Components[0].LogConfigs = []dbaasv1alpha1.LogConfig{
+			clusterDef.Spec.ComponentDefs[0].LogConfigs = []appsv1alpha1.LogConfig{
 				{
 					Name:            "error",
 					FilePathPattern: "/log/mysql/mysqld.err",
@@ -103,7 +103,7 @@ var _ = Describe("create", func() {
 				},
 			}
 			setEnableAllLogs(cluster, clusterDef)
-			Expect(cluster.Spec.Components[0].EnabledLogs).Should(Equal([]string{"error", "slow"}))
+			Expect(cluster.Spec.ComponentSpecs[0].EnabledLogs).Should(Equal([]string{"error", "slow"}))
 		})
 	})
 
@@ -138,10 +138,10 @@ var _ = Describe("create", func() {
 		Expect(comps).ShouldNot(BeNil())
 		Expect(len(comps)).Should(Equal(2))
 
-		comp := &dbaasv1alpha1.ClusterComponent{}
+		comp := &appsv1alpha1.ClusterComponentSpec{}
 		_ = runtime.DefaultUnstructuredConverter.FromUnstructured(comps[0], comp)
 		Expect(getResource(comp.VolumeClaimTemplates[0].Spec.Resources, corev1.ResourceStorage)).Should(Equal(storage))
-		Expect(*comp.Replicas).Should(BeEquivalentTo(replicas))
+		Expect(comp.Replicas).Should(BeEquivalentTo(replicas))
 
 		resources := comp.Resources
 		Expect(resources).ShouldNot(BeNil())
@@ -173,7 +173,7 @@ var _ = Describe("create", func() {
 		dynamic := testing.FakeDynamicClient(testing.FakeClusterDef())
 		cd, _ := cluster.GetClusterDefByName(dynamic, testing.ClusterDefName)
 		setsMap := map[string]map[setKey]string{
-			testing.ComponentType: {
+			testing.ComponentDefName: {
 				keyCPU:      "10",
 				keyMemory:   "2Gi",
 				keyStorage:  "10Gi",
@@ -186,23 +186,23 @@ var _ = Describe("create", func() {
 	})
 
 	It("build component and set values map", func() {
-		mockCD := func(typeNames []string) *dbaasv1alpha1.ClusterDefinition {
-			cd := &dbaasv1alpha1.ClusterDefinition{}
-			var comps []dbaasv1alpha1.ClusterDefinitionComponent
-			for _, n := range typeNames {
-				comp := dbaasv1alpha1.ClusterDefinitionComponent{
-					TypeName: n,
+		mockCD := func(compDefNames []string) *appsv1alpha1.ClusterDefinition {
+			cd := &appsv1alpha1.ClusterDefinition{}
+			var comps []appsv1alpha1.ClusterComponentDefinition
+			for _, n := range compDefNames {
+				comp := appsv1alpha1.ClusterComponentDefinition{
+					Name: n,
 				}
 				comps = append(comps, comp)
 			}
-			cd.Spec.Components = comps
+			cd.Spec.ComponentDefs = comps
 			return cd
 		}
 
 		testCases := []struct {
-			values    []string
-			typeNames []string
-			expected  map[string]map[setKey]string
+			values       []string
+			compDefNames []string
+			expected     map[string]map[setKey]string
 		}{
 			{
 				nil,
@@ -298,7 +298,7 @@ var _ = Describe("create", func() {
 
 		for _, t := range testCases {
 			By(strings.Join(t.values, " "))
-			res, err := buildCompSetsMap(t.values, mockCD(t.typeNames))
+			res, err := buildCompSetsMap(t.values, mockCD(t.compDefNames))
 			Expect(err).Should(Succeed())
 			Expect(reflect.DeepEqual(res, t.expected)).Should(BeTrue())
 		}

@@ -17,6 +17,7 @@ limitations under the License.
 package builder
 
 import (
+	"fmt"
 	"testing"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -30,11 +31,13 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
-	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	cfgcm "github.com/apecloud/kubeblocks/internal/configuration/configmap"
+	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
-	testdbaas "github.com/apecloud/kubeblocks/internal/testutil/dbaas"
+	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 )
 
 var tlog = ctrl.Log.WithName("builder_testing")
@@ -61,11 +64,11 @@ var _ = Describe("builder", func() {
 
 	const nginxCompType = "proxy"
 
-	allFieldsClusterDefObj := func(needCreate bool) *dbaasv1alpha1.ClusterDefinition {
+	allFieldsClusterDefObj := func(needCreate bool) *appsv1alpha1.ClusterDefinition {
 		By("By assure an clusterDefinition obj")
-		clusterDefObj := testdbaas.NewClusterDefFactory(clusterDefName, testdbaas.MySQLType).
-			AddComponent(testdbaas.StatefulMySQLComponent, mysqlCompType).
-			AddComponent(testdbaas.StatelessNginxComponent, nginxCompType).
+		clusterDefObj := testapps.NewClusterDefFactory(clusterDefName).
+			AddComponent(testapps.StatefulMySQLComponent, mysqlCompType).
+			AddComponent(testapps.StatelessNginxComponent, nginxCompType).
 			GetObject()
 		if needCreate {
 			Expect(testCtx.CreateObj(testCtx.Ctx, clusterDefObj)).Should(Succeed())
@@ -73,14 +76,14 @@ var _ = Describe("builder", func() {
 		return clusterDefObj
 	}
 
-	allFieldsClusterVersionObj := func(needCreate bool) *dbaasv1alpha1.ClusterVersion {
+	allFieldsClusterVersionObj := func(needCreate bool) *appsv1alpha1.ClusterVersion {
 		By("By assure an clusterVersion obj")
-		clusterVersionObj := testdbaas.NewClusterVersionFactory(clusterVersionName, clusterDefName).
+		clusterVersionObj := testapps.NewClusterVersionFactory(clusterVersionName, clusterDefName).
 			AddComponent(mysqlCompType).
-			AddContainerShort("mysql", testdbaas.ApeCloudMySQLImage).
+			AddContainerShort("mysql", testapps.ApeCloudMySQLImage).
 			AddComponent(nginxCompType).
-			AddInitContainerShort("nginx-init", testdbaas.NginxImage).
-			AddContainerShort("nginx", testdbaas.NginxImage).
+			AddInitContainerShort("nginx-init", testapps.NginxImage).
+			AddContainerShort("nginx", testapps.NginxImage).
 			GetObject()
 		if needCreate {
 			Expect(testCtx.CreateObj(testCtx.Ctx, clusterVersionObj)).Should(Succeed())
@@ -89,10 +92,10 @@ var _ = Describe("builder", func() {
 	}
 
 	newAllFieldsClusterObj := func(
-		clusterDefObj *dbaasv1alpha1.ClusterDefinition,
-		clusterVersionObj *dbaasv1alpha1.ClusterVersion,
+		clusterDefObj *appsv1alpha1.ClusterDefinition,
+		clusterVersionObj *appsv1alpha1.ClusterVersion,
 		needCreate bool,
-	) (*dbaasv1alpha1.Cluster, *dbaasv1alpha1.ClusterDefinition, *dbaasv1alpha1.ClusterVersion, types.NamespacedName) {
+	) (*appsv1alpha1.Cluster, *appsv1alpha1.ClusterDefinition, *appsv1alpha1.ClusterVersion, types.NamespacedName) {
 		// setup Cluster obj required default ClusterDefinition and ClusterVersion objects if not provided
 		if clusterDefObj == nil {
 			clusterDefObj = allFieldsClusterDefObj(needCreate)
@@ -101,11 +104,11 @@ var _ = Describe("builder", func() {
 			clusterVersionObj = allFieldsClusterVersionObj(needCreate)
 		}
 
-		pvcSpec := testdbaas.NewPVC("1Gi")
-		clusterObj := testdbaas.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
+		pvcSpec := testapps.NewPVC("1Gi")
+		clusterObj := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
 			clusterDefObj.Name, clusterVersionObj.Name).
-			AddComponent(mysqlCompName, mysqlCompType).
-			AddVolumeClaimTemplate(testdbaas.DataVolumeName, &pvcSpec).
+			AddComponent(mysqlCompName, mysqlCompType).SetReplicas(1).
+			AddVolumeClaimTemplate(testapps.DataVolumeName, &pvcSpec).
 			GetObject()
 		key := client.ObjectKeyFromObject(clusterObj)
 		if needCreate {
@@ -123,14 +126,14 @@ var _ = Describe("builder", func() {
 				MountPath: "/mnt/config",
 			}},
 		}
-		return testdbaas.NewStatefulSetFactory(testCtx.DefaultNamespace, "mock-sts", clusterName, mysqlCompName).
-			AddLabels(intctrlutil.AppNameLabelKey, "mock-app",
-				intctrlutil.AppInstanceLabelKey, clusterName,
-				intctrlutil.AppComponentLabelKey, mysqlCompName,
-			).SetReplicas(1).AddContainer(container).
+		return testapps.NewStatefulSetFactory(testCtx.DefaultNamespace, "mock-sts", clusterName, mysqlCompName).
+			AddAppNameLabel("mock-app").
+			AddAppInstanceLabel(clusterName).
+			AddAppComponentLabel(mysqlCompName).
+			SetReplicas(1).AddContainer(container).
 			AddVolumeClaimTemplate(corev1.PersistentVolumeClaim{
-				ObjectMeta: metav1.ObjectMeta{Name: testdbaas.DataVolumeName},
-				Spec:       testdbaas.NewPVC("1Gi"),
+				ObjectMeta: metav1.ObjectMeta{Name: testapps.DataVolumeName},
+				Spec:       testapps.NewPVC("1Gi"),
 			}).GetObject()
 	}
 	newReqCtx := func() intctrlutil.RequestCtx {
@@ -141,17 +144,17 @@ var _ = Describe("builder", func() {
 		}
 		return reqCtx
 	}
-	newAllFieldsComponent := func() *component.Component {
-		cluster, clusterDef, clusterVersion, _ := newAllFieldsClusterObj(nil, nil, false)
+	newAllFieldsComponent := func(clusterDef *appsv1alpha1.ClusterDefinition, clusterVersion *appsv1alpha1.ClusterVersion) *component.SynthesizedComponent {
+		cluster, clusterDef, clusterVersion, _ := newAllFieldsClusterObj(clusterDef, clusterVersion, false)
 		reqCtx := newReqCtx()
 		By("assign every available fields")
-		component := component.MergeComponents(
+		component := component.BuildComponent(
 			reqCtx,
-			cluster,
-			clusterDef,
-			&clusterDef.Spec.Components[0],
-			&clusterVersion.Spec.Components[0],
-			&cluster.Spec.Components[0])
+			*cluster,
+			*clusterDef,
+			clusterDef.Spec.ComponentDefs[0],
+			cluster.Spec.ComponentSpecs[0],
+			&clusterVersion.Spec.ComponentVersions[0])
 		Expect(component).ShouldNot(BeNil())
 		return component
 	}
@@ -161,12 +164,24 @@ var _ = Describe("builder", func() {
 			ClusterDefinition: clusterDef,
 			ClusterVersion:    clusterVersion,
 			Cluster:           cluster,
-			Component:         newAllFieldsComponent(),
+			Component:         newAllFieldsComponent(clusterDef, clusterVersion),
 		}
 		return &params
 	}
+
+	newParamsWithClusterDef := func(clusterDefObj *appsv1alpha1.ClusterDefinition) *BuilderParams {
+		cluster, clusterDef, clusterVersion, _ := newAllFieldsClusterObj(clusterDefObj, nil, false)
+		params := BuilderParams{
+			ClusterDefinition: clusterDef,
+			ClusterVersion:    clusterVersion,
+			Cluster:           cluster,
+			Component:         newAllFieldsComponent(clusterDef, clusterVersion),
+		}
+		return &params
+	}
+
 	newBackupPolicyTemplate := func() *dataprotectionv1alpha1.BackupPolicyTemplate {
-		return testdbaas.NewBackupPolicyTemplateFactory("backup-policy-template-mysql").
+		return testapps.NewBackupPolicyTemplateFactory("backup-policy-template-mysql").
 			SetBackupToolName("mysql-xtrabackup").
 			SetSchedule("0 2 * * *").
 			SetTTL("168h0m0s").
@@ -184,7 +199,7 @@ var _ = Describe("builder", func() {
 				Namespace: "default",
 				Name:      "data-mysql-01-replicasets-0",
 			}
-			pvc, err := BuildPVCFromSnapshot(sts, sts.Spec.VolumeClaimTemplates[0], pvcKey, snapshotName)
+			pvc, err := BuildPVCFromSnapshot(sts, params.Component.VolumeClaimTemplates[0], pvcKey, snapshotName)
 			Expect(err).Should(BeNil())
 			Expect(pvc).ShouldNot(BeNil())
 			Expect(pvc.Spec.AccessModes).Should(Equal(sts.Spec.VolumeClaimTemplates[0].Spec.AccessModes))
@@ -198,11 +213,34 @@ var _ = Describe("builder", func() {
 			Expect(svc).ShouldNot(BeNil())
 		})
 
-		It("builds ConnCredential correctly", func() {
-			params := newParams()
+		It("builds Conn. Credential correctly", func() {
+			params := newParamsWithClusterDef(testapps.NewClusterDefFactoryWithConnCredential("conn-cred").GetObject())
 			credential, err := BuildConnCredential(*params)
 			Expect(err).Should(BeNil())
 			Expect(credential).ShouldNot(BeNil())
+			// "username":      "root",
+			// "svcFQDN":       "$(SVC_FQDN)",
+			// "password":      "$(RANDOM_PASSWD)",
+			// "tcpEndpoint":   "tcp:$(SVC_FQDN):$(SVC_PORT_mysql)",
+			// "paxosEndpoint": "paxos:$(SVC_FQDN):$(SVC_PORT_paxos)",
+			Expect(credential.StringData).ShouldNot(BeEmpty())
+			Expect(credential.StringData["username"]).Should(Equal("root"))
+			Expect(credential.StringData["password"]).Should(HaveLen(8))
+			svcFQDN := fmt.Sprintf("%s-%s.%s.svc", params.Cluster.Name, params.Component.Name,
+				params.Cluster.Namespace)
+			var mysqlPort corev1.ServicePort
+			var paxosPort corev1.ServicePort
+			for _, s := range params.Component.Service.Ports {
+				switch s.Name {
+				case "mysql":
+					mysqlPort = s
+				case "paxos":
+					paxosPort = s
+				}
+			}
+			Expect(credential.StringData["svcFQDN"]).Should(Equal(svcFQDN))
+			Expect(credential.StringData["tcpEndpoint"]).Should(Equal(fmt.Sprintf("tcp:%s:%d", svcFQDN, mysqlPort.Port)))
+			Expect(credential.StringData["paxosEndpoint"]).Should(Equal(fmt.Sprintf("paxos:%s:%d", svcFQDN, paxosPort.Port)))
 		})
 
 		It("builds StatefulSet correctly", func() {
@@ -210,15 +248,27 @@ var _ = Describe("builder", func() {
 			params := newParams()
 			envConfigName := "test-env-config-name"
 			newParams := params
+
+			sts, err := BuildSts(reqCtx, *params, envConfigName)
+			Expect(err).Should(BeNil())
+			Expect(sts).ShouldNot(BeNil())
+			// test  replicas = 0
 			newComponent := *params.Component
 			newComponent.Replicas = 0
 			newParams.Component = &newComponent
-			sts, err := BuildSts(reqCtx, *newParams, envConfigName)
+			sts, err = BuildSts(reqCtx, *newParams, envConfigName)
 			Expect(err).Should(BeNil())
 			Expect(sts).ShouldNot(BeNil())
-			sts, err = BuildSts(reqCtx, *params, envConfigName)
+			Expect(*sts.Spec.Replicas).Should(Equal(int32(0)))
+			// test workload type replication
+			replComponent := *params.Component
+			replComponent.Replicas = 2
+			replComponent.WorkloadType = appsv1alpha1.Replication
+			newParams.Component = &replComponent
+			sts, err = BuildSts(reqCtx, *newParams, envConfigName)
 			Expect(err).Should(BeNil())
 			Expect(sts).ShouldNot(BeNil())
+			Expect(*sts.Spec.Replicas).Should(Equal(int32(1)))
 		})
 
 		It("builds Deploy correctly", func() {
@@ -238,10 +288,60 @@ var _ = Describe("builder", func() {
 
 		It("builds Env Config correctly", func() {
 			params := newParams()
+			noCharacterTypeParams := params
+			noCharacterTypeComponent := *params.Component
+			noCharacterTypeComponent.CharacterType = ""
+			noCharacterTypeParams.Component = &noCharacterTypeComponent
 			cfg, err := BuildEnvConfig(*params)
 			Expect(err).Should(BeNil())
 			Expect(cfg).ShouldNot(BeNil())
 			Expect(len(cfg.Data) == 2).Should(BeTrue())
+			cfg, err = BuildEnvConfig(*noCharacterTypeParams)
+			Expect(err).Should(BeNil())
+			Expect(cfg).ShouldNot(BeNil())
+			Expect(len(cfg.Data) == 2).Should(BeTrue())
+		})
+
+		It("builds Env Config with ConsensusSet status correctly", func() {
+			params := newParams()
+			params.Cluster.Status.Components = map[string]appsv1alpha1.ClusterComponentStatus{
+				params.Component.Name: {
+					ConsensusSetStatus: &appsv1alpha1.ConsensusSetStatus{
+						Leader: appsv1alpha1.ConsensusMemberStatus{
+							Pod: "pod1",
+						},
+						Followers: []appsv1alpha1.ConsensusMemberStatus{{
+							Pod: "pod2",
+						}, {
+							Pod: "pod3",
+						}},
+					},
+				}}
+			cfg, err := BuildEnvConfig(*params)
+			Expect(err).Should(BeNil())
+			Expect(cfg).ShouldNot(BeNil())
+			Expect(len(cfg.Data) == 4).Should(BeTrue())
+		})
+
+		It("builds Env Config with Replication status correctly", func() {
+			params := newParams()
+			params.Cluster.Status.Components = map[string]appsv1alpha1.ClusterComponentStatus{
+				params.Component.Name: {
+					ReplicationSetStatus: &appsv1alpha1.ReplicationSetStatus{
+						Primary: appsv1alpha1.ReplicationMemberStatus{
+							Pod: "pod1",
+						},
+						Secondaries: []appsv1alpha1.ReplicationMemberStatus{{
+							Pod: "pod2",
+						}, {
+							Pod: "pod3",
+						}},
+					},
+				}}
+			cfg, err := BuildEnvConfig(*params)
+			Expect(err).Should(BeNil())
+			Expect(cfg).ShouldNot(BeNil())
+			Expect(len(cfg.Data) == 4).Should(BeTrue())
 		})
 
 		It("builds BackupPolicy correctly", func() {
@@ -290,6 +390,32 @@ var _ = Describe("builder", func() {
 			cronJob, err := BuildCronJob(pvcKey, schedule, sts)
 			Expect(err).Should(BeNil())
 			Expect(cronJob).ShouldNot(BeNil())
+		})
+
+		It("builds ConfigMap with template correctly", func() {
+			config := map[string]string{}
+			params := newParams()
+			tplCfg := appsv1alpha1.ConfigTemplate{
+				Name:                "test-config-tpl",
+				ConfigTplRef:        "test-config-tpl",
+				ConfigConstraintRef: "test-config-constraint",
+			}
+			configmap, err := BuildConfigMapWithTemplate(config, *params, "test-cm", tplCfg)
+			Expect(err).Should(BeNil())
+			Expect(configmap).ShouldNot(BeNil())
+		})
+
+		It("builds config manager sidecar container correctly", func() {
+			sidecarRenderedParam := &cfgcm.ConfigManagerSidecar{
+				ManagerName: "cfgmgr",
+				Image:       constant.KBImage,
+				Args:        []string{},
+				Envs:        []corev1.EnvVar{},
+				Volumes:     []corev1.VolumeMount{},
+			}
+			configmap, err := BuildCfgManagerContainer(sidecarRenderedParam)
+			Expect(err).Should(BeNil())
+			Expect(configmap).ShouldNot(BeNil())
 		})
 	})
 

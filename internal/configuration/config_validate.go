@@ -23,7 +23,7 @@ import (
 	"k8s.io/kube-openapi/pkg/validation/strfmt"
 	"k8s.io/kube-openapi/pkg/validation/validate"
 
-	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 )
 
 type ConfigValidator interface {
@@ -33,7 +33,7 @@ type ConfigValidator interface {
 type configCueValidator struct {
 	// cue describe configuration template
 	cueScript string
-	cfgType   dbaasv1alpha1.ConfigurationFormatter
+	cfgType   appsv1alpha1.CfgFileFormat
 }
 
 func (c *configCueValidator) Validate(cfg map[string]string) error {
@@ -51,7 +51,7 @@ func (c *configCueValidator) Validate(cfg map[string]string) error {
 type schemaValidator struct {
 	typeName string
 	schema   *apiext.JSONSchemaProps
-	cfgType  dbaasv1alpha1.ConfigurationFormatter
+	cfgType  appsv1alpha1.CfgFileFormat
 }
 
 func (s schemaValidator) Validate(cfg map[string]string) error {
@@ -77,7 +77,7 @@ func (e EmptyValidator) Validate(_ map[string]string) error {
 	return nil
 }
 
-func NewConfigValidator(configTemplate *dbaasv1alpha1.ConfigConstraintSpec) ConfigValidator {
+func NewConfigValidator(configTemplate *appsv1alpha1.ConfigConstraintSpec) ConfigValidator {
 	var (
 		validator    ConfigValidator
 		configSchema = configTemplate.ConfigurationSchema
@@ -88,13 +88,13 @@ func NewConfigValidator(configTemplate *dbaasv1alpha1.ConfigConstraintSpec) Conf
 		validator = &EmptyValidator{}
 	case len(configSchema.CUE) != 0:
 		validator = &configCueValidator{
-			cfgType:   configTemplate.FormatterConfig.Formatter,
+			cfgType:   configTemplate.FormatterConfig.Format,
 			cueScript: configSchema.CUE,
 		}
 	case configSchema.Schema != nil:
 		validator = &schemaValidator{
 			typeName: configTemplate.CfgSchemaTopLevelName,
-			cfgType:  configTemplate.FormatterConfig.Formatter,
+			cfgType:  configTemplate.FormatterConfig.Format,
 			schema:   configSchema.Schema,
 		}
 	default:

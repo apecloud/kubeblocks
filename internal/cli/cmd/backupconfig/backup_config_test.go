@@ -20,73 +20,61 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"github.com/spf13/cobra"
-	"helm.sh/helm/v3/pkg/repo"
+	"helm.sh/helm/v3/pkg/cli/values"
+	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	clientfake "k8s.io/client-go/rest/fake"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 
+	"github.com/apecloud/kubeblocks/internal/cli/cmd/kubeblocks"
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util/helm"
+	"github.com/apecloud/kubeblocks/version"
 )
 
-var _ = Describe("backup_config", func() {
-	var (
-		cmd     *cobra.Command
-		streams genericclioptions.IOStreams
-		tf      *cmdtesting.TestFactory
-	)
+var _ = Describe("backupconfig", func() {
+	var streams genericclioptions.IOStreams
+	var tf *cmdtesting.TestFactory
 
 	BeforeEach(func() {
 		streams, _, _, _ = genericclioptions.NewTestIOStreams()
-		tf = cmdtesting.NewTestFactory().WithNamespace("test")
+		tf = cmdtesting.NewTestFactory().WithNamespace(testing.Namespace)
+		tf.Client = &clientfake.RESTClient{}
+
+		// use a fake URL to test
+		types.KubeBlocksChartName = testing.KubeBlocksChartName
+		types.KubeBlocksChartURL = testing.KubeBlocksChartURL
 	})
 
 	AfterEach(func() {
 		tf.Cleanup()
 	})
 
-	It("backup_config", func() {
-		cmd = NewBackupConfigCmd(tf, streams)
+	It("run cmd", func() {
+		mockDeploy := func() *appsv1.Deployment {
+			deploy := &appsv1.Deployment{}
+			deploy.SetLabels(map[string]string{
+				"app.kubernetes.io/name":    types.KubeBlocksChartName,
+				"app.kubernetes.io/version": "0.3.0",
+			})
+			return deploy
+		}
+
+		o := &kubeblocks.InstallOptions{
+			Options: kubeblocks.Options{
+				IOStreams: streams,
+				HelmCfg:   helm.FakeActionConfig(),
+				Namespace: "default",
+				Client:    testing.FakeClientSet(mockDeploy()),
+				Dynamic:   testing.FakeDynamicClient(),
+			},
+			Version:   version.DefaultKubeBlocksVersion,
+			Monitor:   true,
+			ValueOpts: values.Options{Values: []string{"snapshot-controller.enabled=true"}},
+		}
+		cmd := NewBackupConfigCmd(tf, streams)
 		Expect(cmd).ShouldNot(BeNil())
-	})
-
-	It("check backup_config", func() {
-		var cfg string
-		cmd = NewBackupConfigCmd(tf, streams)
-		cmd.Flags().StringVar(&cfg, "kubeconfig", "", "Path to the kubeconfig file to use for CLI requests.")
-
-		Expect(cmd).ShouldNot(BeNil())
-		Expect(cmd.HasSubCommands()).Should(BeFalse())
-
-		o := &upgradeOptions{
-			IOStreams: streams,
-		}
-		Expect(o.complete(tf, cmd)).To(Succeed())
-		Expect(o.Namespace).To(Equal("test"))
-		Expect(o.cfg).ShouldNot(BeNil())
-	})
-
-	It("run backup_config", func() {
-		// use a fake URL to test
-		types.KubeBlocksChartName = testing.KubeBlocksChartName
-		types.KubeBlocksChartURL = testing.KubeBlocksChartURL
-
-		// mock helm chart function for test
-		old := helmAddRepo
-		defer func() { helmAddRepo = old }()
-		helmAddRepo = func(r *repo.Entry) error {
-			return nil
-		}
-
-		o := &upgradeOptions{
-			IOStreams: streams,
-			cfg:       helm.FakeActionConfig(),
-			Namespace: "default",
-			Sets:      []string{"dataProtection=test"},
-		}
-		Expect(o.run()).Should(HaveOccurred())
-		Expect(len(o.Sets)).To(Equal(1))
-		Expect(o.Sets[0]).To(Equal("dataProtection=test"))
+		Expect(o.PostInstall()).Should(HaveOccurred())
 	})
 })

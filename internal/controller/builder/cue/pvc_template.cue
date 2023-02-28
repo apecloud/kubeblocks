@@ -18,13 +18,13 @@ sts: {
 	}
 }
 volumeClaimTemplate: {
-            metadata: {
-            	name: string
-            }
-			spec: {
-				accessModes: [string]
-				resources: {}
-			}
+	metadata: {
+		name: string
+	}
+	spec: {
+		accessModes: [string]
+		resources: {}
+	}
 }
 snapshot_name: string
 pvc_key: {
@@ -39,7 +39,7 @@ pvc: {
 		namespace: pvc_key.Namespace
 		labels: {
 			"app.kubernetes.io/created-by": "kubeblocks"
-			"vct.kubeblocks.io/name": volumeClaimTemplate.metadata.name
+			"vct.kubeblocks.io/name":       volumeClaimTemplate.metadata.name
 			for k, v in sts.metadata.labels {
 				"\(k)": "\(v)"
 			}

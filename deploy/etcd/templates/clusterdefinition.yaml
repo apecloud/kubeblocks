@@ -1,15 +1,14 @@
-apiVersion: dbaas.kubeblocks.io/v1alpha1
+apiVersion: apps.kubeblocks.io/v1alpha1
 kind: ClusterDefinition
 metadata:
   name: apecloud-etcd
   labels:
     {{- include "etcd.labels" . | nindent 4}}
 spec:
-  type: state.etcd
-  components:
-    - typeName: etcd
+  componentDefs:
+    - name: etcd
       characterType: etcd
-      componentType: Consensus
+      workloadType: Consensus
       consensusSpec:
         leader:
           name: "leader"
@@ -26,7 +25,6 @@ spec:
         ports:
           - protocol: TCP
             port: 2379
-      defaultReplicas: 3
       podSpec:
         containers:
           - name: etcd

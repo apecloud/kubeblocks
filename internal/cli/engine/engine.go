@@ -22,11 +22,11 @@ import (
 	"strings"
 )
 
-// ClusterDefinition Type Const Define
+// ClusterDefinition ComponentDefRef Const Define
 const (
-	stateMysql      = "state.mysql"
-	stateMysql8     = "state.mysql8"
-	statePostgreSQL = "state.postgresql"
+	stateMysql      = "mysql"
+	statePostgreSQL = "postgresql"
+	stateRedis      = "redis"
 )
 
 type Interface interface {
@@ -41,6 +41,8 @@ type ConnectionInfo struct {
 	Password string
 	Database string
 	Port     string
+	Command  []string
+	Args     []string
 }
 
 type EngineInfo struct {
@@ -55,10 +57,12 @@ type buildConnectExample func(info *ConnectionInfo) string
 
 func New(typeName string) (Interface, error) {
 	switch typeName {
-	case stateMysql, stateMysql8:
+	case stateMysql:
 		return newMySQL(), nil
 	case statePostgreSQL:
 		return newPostgreSQL(), nil
+	case stateRedis:
+		return newRedis(), nil
 	default:
 		return nil, fmt.Errorf("unsupported engine type: %s", typeName)
 	}

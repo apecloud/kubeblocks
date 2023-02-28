@@ -1,15 +1,12 @@
-apiVersion: dbaas.kubeblocks.io/v1alpha1
+apiVersion: apps.kubeblocks.io/v1alpha1
 kind: ClusterDefinition
 metadata:
   name: apecloud-mongodb
   labels:
     {{- include "mongodb.labels" . | nindent 4 }}
 spec:
-  type: state.mongodb
-  components:
-    - typeName: mongos
-      defaultReplicas: 1
-      minReplicas: 0
+  componentDefs:
+    - name: mongos
       configSpec:
         configTemplateRefs:
           - name: mongodb-scripts
@@ -17,7 +14,7 @@ spec:
             volumeName: scripts
             namespace: {{ .Release.Namespace }}
             defaultMode: 493
-      componentType: Stateless
+      workloadType: Stateless
       service:
         ports:
           - protocol: TCP
@@ -35,9 +32,7 @@ spec:
               - name: scripts
                 mountPath: /scripts/mongos-setup.sh
                 subPath: mongos-setup.sh
-    - typeName: configsvr
-      defaultReplicas: 3
-      minReplicas: 0
+    - name: configsvr
       configSpec:
         configTemplateRefs:
           - name: mongodb-scripts
@@ -46,7 +41,7 @@ spec:
             namespace: {{ .Release.Namespace }}
             defaultMode: 493
       characterType: mongodb
-      componentType: Consensus
+      workloadType: Consensus
       consensusSpec:
         leader:
           name: "primary"
@@ -87,9 +82,7 @@ spec:
               - name: scripts
                 mountPath: /scripts/replicaset-post-start.sh
                 subPath: replicaset-post-start.sh
-    - typeName: shard
-      defaultReplicas: 3
-      minReplicas: 3
+    - name: shard
       configSpec:
         configTemplateRefs:
           - name: mongodb-scripts
@@ -98,7 +91,7 @@ spec:
             namespace: {{ .Release.Namespace }}
             defaultMode: 493
       characterType: mongodb
-      componentType: Consensus
+      workloadType: Consensus
       consensusSpec:
         leader:
           name: "primary"

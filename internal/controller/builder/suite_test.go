@@ -29,7 +29,7 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	//+kubebuilder:scaffold:imports
 
 	. "github.com/onsi/ginkgo/v2"
@@ -88,7 +88,7 @@ var _ = BeforeSuite(func() {
 			// use dependent external CRDs.
 			// resolved by ref: https://github.com/operator-framework/operator-sdk/issues/4434#issuecomment-786794418
 			filepath.Join(build.Default.GOPATH, "pkg", "mod", "github.com", "kubernetes-csi/external-snapshotter/",
-				"client/v6@v6.0.1", "config", "crd")},
+				"client/v6@v6.2.0", "config", "crd")},
 		ErrorIfCRDPathMissing: true,
 	}
 
@@ -98,7 +98,7 @@ var _ = BeforeSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 	Expect(cfg).NotTo(BeNil())
 
-	err = dbaasv1alpha1.AddToScheme(scheme.Scheme)
+	err = appsv1alpha1.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
 
 	err = dataprotectionv1alpha1.AddToScheme(scheme.Scheme)

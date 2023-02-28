@@ -23,6 +23,7 @@ import (
 	. "github.com/onsi/gomega"
 
 	"github.com/spf13/cobra"
+	"helm.sh/helm/v3/pkg/cli/values"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	clientfake "k8s.io/client-go/rest/fake"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
@@ -36,7 +37,7 @@ import (
 
 const namespace = "test"
 
-var _ = Describe("kubeblocks", func() {
+var _ = Describe("kubeblocks install", func() {
 	var cmd *cobra.Command
 	var streams genericclioptions.IOStreams
 	var tf *cmdtesting.TestFactory
@@ -68,11 +69,11 @@ var _ = Describe("kubeblocks", func() {
 		}
 
 		By("command without kubeconfig flag")
-		Expect(o.complete(tf, cmd)).Should(HaveOccurred())
+		Expect(o.Complete(tf, cmd)).Should(HaveOccurred())
 
 		cmd.Flags().StringVar(&cfg, "kubeconfig", "", "Path to the kubeconfig file to use for CLI requests.")
 		cmd.Flags().StringVar(&cfg, "context", "", "The name of the kubeconfig context to use.")
-		Expect(o.complete(tf, cmd)).To(Succeed())
+		Expect(o.Complete(tf, cmd)).To(Succeed())
 		Expect(o.HelmCfg).ShouldNot(BeNil())
 		Expect(o.Namespace).To(Equal("test"))
 	})
@@ -91,8 +92,8 @@ var _ = Describe("kubeblocks", func() {
 			CreateNamespace: true,
 		}
 		Expect(o.Install()).Should(HaveOccurred())
-		Expect(len(o.Sets)).To(Equal(1))
-		Expect(o.Sets[0]).To(Equal(fmt.Sprintf(kMonitorParam, true)))
+		Expect(len(o.ValueOpts.Values)).To(Equal(1))
+		Expect(o.ValueOpts.Values[0]).To(Equal(fmt.Sprintf(kMonitorParam, true)))
 		Expect(o.installChart()).Should(HaveOccurred())
 		o.printNotes()
 	})
@@ -109,9 +110,9 @@ var _ = Describe("kubeblocks", func() {
 			Version:         version.DefaultKubeBlocksVersion,
 			Monitor:         true,
 			CreateNamespace: true,
-			Sets:            []string{"snapshot-controller.enabled=true"},
+			ValueOpts:       values.Options{Values: []string{"snapshot-controller.enabled=true"}},
 		}
-		Expect(o.postInstall()).Should(HaveOccurred())
+		Expect(o.PostInstall()).Should(HaveOccurred())
 	})
 
 	It("preCheck", func() {
@@ -228,9 +229,9 @@ var _ = Describe("kubeblocks", func() {
 		for _, c := range cases {
 			By(c.desc)
 			for _, p := range []util.K8sProvider{util.UnknownProvider, util.EKSProvider} {
-				o.Sets = c.sets
+				o.ValueOpts.Values = c.sets
 				o.disableOrEnableSets(p)
-				Expect(o.Sets).Should(Equal(c.expected[p]))
+				Expect(o.ValueOpts.Values).Should(Equal(c.expected[p]))
 			}
 		}
 	})

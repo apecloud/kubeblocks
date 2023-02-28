@@ -1,22 +1,20 @@
-apiVersion: dbaas.kubeblocks.io/v1alpha1
+apiVersion: apps.kubeblocks.io/v1alpha1
 kind: ClusterDefinition
 metadata:
   name: postgresql
   labels:
     {{- include "postgresql.labels" . | nindent 4 }}
 spec:
-  type: state.postgresql
   connectionCredential:
     username: postgres
     postgres-password: {{ (include "postgresql.postgresPassword" .) | quote  }}
-  components:
-    - typeName: postgresql
-      componentType: Stateful
+    endpoint: "$(SVC_FQDN):$(SVC_PORT_tcp-postgresql)"
+    host: "$(SVC_FQDN)"
+    port: "$(SVC_PORT_tcp-postgresql)"
+  componentDefs:
+    - name: postgresql
+      workloadType: Stateful
       characterType: postgresql
-      defaultReplicas: 1
-      minReplicas: 0
-      ## standalone only
-      maxReplicas: 1
       probes:
       monitor:
         builtIn: false
@@ -32,6 +30,8 @@ spec:
         configTemplateRefs:
           - name: postgresql-configuration
             configTplRef: postgresql-configuration
+            keys:
+              - postgresql.conf
             namespace: {{ .Release.Namespace }}
             volumeName: postgresql-config
             defaultMode: 0777
@@ -61,7 +61,7 @@ spec:
           - name: postgresql
             imagePullPolicy: {{ default .Values.image.pullPolicy "IfNotPresent" }}
             securityContext:
-              runAsUser: 0            
+              runAsUser: 0
             volumeMounts:
               - name: dshm
                 mountPath: /dev/shm
@@ -109,6 +109,11 @@ spec:
                 value: /postgresql
               - name: PGDATA
                 value: /postgresql/data
+              - name: PGUSER
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: username
               # Authentication
               - name: POSTGRES_USER
                 valueFrom:
@@ -172,7 +177,7 @@ spec:
               {{- end }}
             {{- end }}
           - name: metrics
-            image:  {{ .Values.metrics.image.repository }}:{{ .Values.metrics.image.tag }}
+            image:  {{ .Values.metrics.image.registry | default "docker.io" }}/{{ .Values.metrics.image.repository }}:{{ .Values.metrics.image.tag }}
             imagePullPolicy: {{ .Values.metrics.image.pullPolicy | quote }}
             securityContext:
               runAsUser: 0
@@ -230,7 +235,7 @@ spec:
               {{- end }}
       systemAccounts:
         cmdExecutorConfig:
-          image: {{ .Values.image.repository }}:{{ default .Values.image.tag .Chart.AppVersion }}
+          image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ default .Values.image.tag .Chart.AppVersion }}
           command: ["psql"]
           args:
           - -h$(KB_ACCOUNT_ENDPOINT) 

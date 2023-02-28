@@ -20,7 +20,7 @@ cluster: {
 }
 component: {
 	clusterDefName: string
-	clusterType:    string
+	characterType:  string
 	type:           string
 	name:           string
 	service: {
@@ -38,18 +38,19 @@ service: {
 		namespace: cluster.metadata.namespace
 		name:      "\(cluster.metadata.name)-\(component.name)"
 		labels: {
-			"app.kubernetes.io/name":     "\(component.clusterType)-\(component.clusterDefName)"
-			"app.kubernetes.io/instance": cluster.metadata.name
-			// "app.kubernetes.io/version" : # TODO
-			"app.kubernetes.io/component-name": "\(component.name)"
-			"app.kubernetes.io/managed-by":     "kubeblocks"
+			"app.kubernetes.io/name":       "\(component.clusterDefName)"
+			"app.kubernetes.io/instance":   cluster.metadata.name
+			"app.kubernetes.io/managed-by": "kubeblocks"
+
+			"app.kubeblocks.io/component-name": "\(component.name)"
 		}
 	}
 	"spec": {
 		"selector": {
-			"app.kubernetes.io/instance":       "\(cluster.metadata.name)"
-			"app.kubernetes.io/component-name": "\(component.name)"
-			"app.kubernetes.io/managed-by":     "kubeblocks"
+			"app.kubernetes.io/instance":   "\(cluster.metadata.name)"
+			"app.kubernetes.io/managed-by": "kubeblocks"
+
+			"app.kubeblocks.io/component-name": "\(component.name)"
 		}
 		ports: component.service.ports
 		if component.service.type != _|_ {

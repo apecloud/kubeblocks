@@ -27,7 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	ctrlcomp "github.com/apecloud/kubeblocks/internal/controller/component"
 )
 
@@ -44,8 +44,8 @@ var _ = Describe("tpl template", func() {
 
 	var (
 		podSpec     *corev1.PodSpec
-		cfgTemplate []dbaasv1alpha1.ConfigTemplate
-		component   *ctrlcomp.Component
+		cfgTemplate []appsv1alpha1.ConfigTemplate
+		component   *ctrlcomp.SynthesizedComponent
 	)
 
 	const (
@@ -149,14 +149,13 @@ single_thread_memory = 294912
 				},
 			},
 		}
-		component = &ctrlcomp.Component{
+		component = &ctrlcomp.SynthesizedComponent{
 			ClusterDefName: "mysql-three-node-definition",
-			ClusterType:    "state.mysql",
 			Name:           "replicasets",
 			Type:           "replicasets",
 			Replicas:       5,
 		}
-		cfgTemplate = []dbaasv1alpha1.ConfigTemplate{
+		cfgTemplate = []appsv1alpha1.ConfigTemplate{
 			{
 				Name:                "mysql-config-8.0.2",
 				ConfigTplRef:        "mysql-config-8.0.2",
@@ -172,7 +171,7 @@ single_thread_memory = 294912
 			cfgBuilder := newCfgTemplateBuilder(
 				"my_test",
 				"default",
-				&dbaasv1alpha1.Cluster{
+				&appsv1alpha1.Cluster{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "my_test",
 						Namespace: "default",
@@ -200,7 +199,7 @@ single_thread_memory = 294912
 			cfgBuilder := newCfgTemplateBuilder(
 				"my_test",
 				"default",
-				&dbaasv1alpha1.Cluster{
+				&appsv1alpha1.Cluster{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "my_test",
 						Namespace: "default",
@@ -261,7 +260,7 @@ single_thread_memory = 294912
 			cfgBuilder := newCfgTemplateBuilder(
 				"my_test",
 				"default",
-				&dbaasv1alpha1.Cluster{
+				&appsv1alpha1.Cluster{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "my_test",
 						Namespace: "default",

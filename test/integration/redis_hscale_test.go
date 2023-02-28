@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package dbaastest
+package appstest
 
 import (
 	"fmt"
@@ -28,11 +28,11 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
-	"github.com/apecloud/kubeblocks/controllers/dbaas/components/replicationset"
-	"github.com/apecloud/kubeblocks/controllers/dbaas/components/util"
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/controllers/apps/components/replicationset"
+	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
-	testdbaas "github.com/apecloud/kubeblocks/internal/testutil/dbaas"
+	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 	testk8s "github.com/apecloud/kubeblocks/internal/testutil/k8s"
 )
 
@@ -58,16 +58,16 @@ var _ = Describe("Redis Horizontal Scale function", func() {
 		By("clean resources")
 
 		// delete cluster(and all dependent sub-resources), clusterversion and clusterdef
-		testdbaas.ClearClusterResources(&testCtx)
+		testapps.ClearClusterResources(&testCtx)
 
 		// delete rest configurations
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 		// namespaced
-		testdbaas.ClearResources(&testCtx, intctrlutil.ConfigMapSignature, inNS, ml)
+		testapps.ClearResources(&testCtx, intctrlutil.ConfigMapSignature, inNS, ml)
 		// non-namespaced
-		testdbaas.ClearResources(&testCtx, intctrlutil.ConfigConstraintSignature, ml)
-		testdbaas.ClearResources(&testCtx, intctrlutil.BackupPolicyTemplateSignature, ml)
+		testapps.ClearResources(&testCtx, intctrlutil.ConfigConstraintSignature, ml)
+		testapps.ClearResources(&testCtx, intctrlutil.BackupPolicyTemplateSignature, ml)
 
 	}
 
@@ -78,29 +78,29 @@ var _ = Describe("Redis Horizontal Scale function", func() {
 	// Testcases
 
 	var (
-		clusterDefObj     *dbaasv1alpha1.ClusterDefinition
-		clusterVersionObj *dbaasv1alpha1.ClusterVersion
-		clusterObj        *dbaasv1alpha1.Cluster
+		clusterDefObj     *appsv1alpha1.ClusterDefinition
+		clusterVersionObj *appsv1alpha1.ClusterVersion
+		clusterObj        *appsv1alpha1.Cluster
 		clusterKey        types.NamespacedName
 	)
 
 	testReplicationRedisHorizontalScale := func() {
 
-		By("Mock a cluster obj with replication componentType.")
-		pvcSpec := testdbaas.NewPVC("1Gi")
-		clusterObj = testdbaas.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
+		By("Mock a cluster obj with replication workloadType.")
+		pvcSpec := testapps.NewPVC("1Gi")
+		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
 			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
-			AddComponent(testdbaas.DefaultRedisCompName, testdbaas.DefaultRedisCompType).
-			SetPrimaryIndex(testdbaas.DefaultReplicationPrimaryIndex).
-			SetReplicas(replicas).AddVolumeClaimTemplate(testdbaas.DataVolumeName, &pvcSpec).
+			AddComponent(testapps.DefaultRedisCompName, testapps.DefaultRedisCompType).
+			SetPrimaryIndex(testapps.DefaultReplicationPrimaryIndex).
+			SetReplicas(replicas).AddVolumeClaimTemplate(testapps.DataVolumeName, &pvcSpec).
 			Create(&testCtx).GetObject()
 		clusterKey = client.ObjectKeyFromObject(clusterObj)
 
 		By("Waiting for cluster creation")
-		Eventually(testdbaas.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
+		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
 
 		By("Waiting for the cluster to be running")
-		Eventually(testdbaas.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(dbaasv1alpha1.RunningPhase))
+		Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.RunningPhase))
 
 		By("Checking statefulSet number")
 		stsList := testk8s.ListAndCheckStatefulSet(&testCtx, clusterKey)
@@ -108,7 +108,7 @@ var _ = Describe("Redis Horizontal Scale function", func() {
 
 		By("Checking statefulSet role label")
 		for _, sts := range stsList.Items {
-			if strings.HasSuffix(sts.Name, strconv.Itoa(testdbaas.DefaultReplicationPrimaryIndex)) {
+			if strings.HasSuffix(sts.Name, strconv.Itoa(testapps.DefaultReplicationPrimaryIndex)) {
 				Expect(sts.Labels[intctrlutil.RoleLabelKey]).Should(BeEquivalentTo(replicationset.Primary))
 			} else {
 				Expect(sts.Labels[intctrlutil.RoleLabelKey]).Should(BeEquivalentTo(replicationset.Secondary))
@@ -120,7 +120,7 @@ var _ = Describe("Redis Horizontal Scale function", func() {
 			podList, err := util.GetPodListByStatefulSet(ctx, k8sClient, &sts)
 			Expect(err).To(Succeed())
 			Expect(len(podList)).Should(BeEquivalentTo(1))
-			if strings.HasSuffix(sts.Name, strconv.Itoa(testdbaas.DefaultReplicationPrimaryIndex)) {
+			if strings.HasSuffix(sts.Name, strconv.Itoa(testapps.DefaultReplicationPrimaryIndex)) {
 				Expect(podList[0].Labels[intctrlutil.RoleLabelKey]).Should(BeEquivalentTo(replicationset.Primary))
 			} else {
 				Expect(podList[0].Labels[intctrlutil.RoleLabelKey]).Should(BeEquivalentTo(replicationset.Secondary))
@@ -144,16 +144,16 @@ var _ = Describe("Redis Horizontal Scale function", func() {
 
 		for _, newReplicas := range []int32{4, 2, 7, 1} {
 			By(fmt.Sprintf("horizontal scale out to %d", newReplicas))
-			Expect(testdbaas.ChangeObj(&testCtx, clusterObj, func() {
-				*clusterObj.Spec.Components[0].Replicas = newReplicas
+			Expect(testapps.ChangeObj(&testCtx, clusterObj, func() {
+				clusterObj.Spec.ComponentSpecs[0].Replicas = newReplicas
 			})).Should(Succeed())
 
 			By("Wait for the cluster to be running")
-			Consistently(testdbaas.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(dbaasv1alpha1.RunningPhase))
+			Consistently(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.RunningPhase))
 
 			By("Checking pods' status and count are updated in cluster status after scale-out")
-			Eventually(testdbaas.CheckObj(&testCtx, clusterKey, func(g Gomega, fetched *dbaasv1alpha1.Cluster) {
-				compName := fetched.Spec.Components[0].Name
+			Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, fetched *appsv1alpha1.Cluster) {
+				compName := fetched.Spec.ComponentSpecs[0].Name
 				g.Expect(fetched.Status.Components).NotTo(BeNil())
 				g.Expect(fetched.Status.Components).To(HaveKey(compName))
 				replicationStatus := fetched.Status.Components[compName].ReplicationSetStatus
@@ -167,14 +167,14 @@ var _ = Describe("Redis Horizontal Scale function", func() {
 
 	Context("with Redis defined as replication Type and doing Horizontal scale", func() {
 		BeforeEach(func() {
-			_ = testdbaas.CreateCustomizedObj(&testCtx, "resources/redis_scripts.yaml", &corev1.ConfigMap{},
-				testdbaas.WithName(scriptConfigName), testCtx.UseDefaultNamespace())
+			_ = testapps.CreateCustomizedObj(&testCtx, "resources/redis_scripts.yaml", &corev1.ConfigMap{},
+				testapps.WithName(scriptConfigName), testCtx.UseDefaultNamespace())
 
-			_ = testdbaas.CreateCustomizedObj(&testCtx, "resources/redis_primary_config_cm.yaml", &corev1.ConfigMap{},
-				testdbaas.WithName(primaryConfigName), testCtx.UseDefaultNamespace())
+			_ = testapps.CreateCustomizedObj(&testCtx, "resources/redis_primary_config_cm.yaml", &corev1.ConfigMap{},
+				testapps.WithName(primaryConfigName), testCtx.UseDefaultNamespace())
 
-			_ = testdbaas.CreateCustomizedObj(&testCtx, "resources/redis_secondary_config_cm.yaml", &corev1.ConfigMap{},
-				testdbaas.WithName(secondaryConfigName), testCtx.UseDefaultNamespace())
+			_ = testapps.CreateCustomizedObj(&testCtx, "resources/redis_secondary_config_cm.yaml", &corev1.ConfigMap{},
+				testapps.WithName(secondaryConfigName), testCtx.UseDefaultNamespace())
 
 			replicationRedisConfigVolumeMounts := []corev1.VolumeMount{
 				{
@@ -187,22 +187,22 @@ var _ = Describe("Redis Horizontal Scale function", func() {
 				},
 			}
 
-			By("Create a clusterDefinition obj with replication componentType.")
+			By("Create a clusterDefinition obj with replication workloadType.")
 			mode := int32(0755)
-			clusterDefObj = testdbaas.NewClusterDefFactory(clusterDefName, testdbaas.RedisType).
-				AddComponent(testdbaas.ReplicationRedisComponent, testdbaas.DefaultRedisCompType).
-				AddConfigTemplate(scriptConfigName, scriptConfigName, "", testdbaas.ScriptsVolumeName, &mode).
-				AddConfigTemplate(primaryConfigName, primaryConfigName, "", string(replicationset.Primary), &mode).
-				AddConfigTemplate(secondaryConfigName, secondaryConfigName, "", string(replicationset.Secondary), &mode).
-				AddInitContainerVolumeMounts(testdbaas.DefaultRedisInitContainerName, replicationRedisConfigVolumeMounts).
-				AddContainerVolumeMounts(testdbaas.DefaultRedisContainerName, replicationRedisConfigVolumeMounts).
+			clusterDefObj = testapps.NewClusterDefFactory(clusterDefName).
+				AddComponent(testapps.ReplicationRedisComponent, testapps.DefaultRedisCompType).
+				AddConfigTemplate(scriptConfigName, scriptConfigName, "", testCtx.DefaultNamespace, testapps.ScriptsVolumeName, &mode).
+				AddConfigTemplate(primaryConfigName, primaryConfigName, "", testCtx.DefaultNamespace, string(replicationset.Primary), &mode).
+				AddConfigTemplate(secondaryConfigName, secondaryConfigName, "", testCtx.DefaultNamespace, string(replicationset.Secondary), &mode).
+				AddInitContainerVolumeMounts(testapps.DefaultRedisInitContainerName, replicationRedisConfigVolumeMounts).
+				AddContainerVolumeMounts(testapps.DefaultRedisContainerName, replicationRedisConfigVolumeMounts).
 				Create(&testCtx).GetObject()
 
-			By("Create a clusterVersion obj with replication componentType.")
-			clusterVersionObj = testdbaas.NewClusterVersionFactory(clusterVersionName, clusterDefObj.Name).
-				AddComponent(testdbaas.DefaultRedisCompType).
-				AddInitContainerShort(testdbaas.DefaultRedisInitContainerName, testdbaas.DefaultRedisImageName).
-				AddContainerShort(testdbaas.DefaultRedisContainerName, testdbaas.DefaultRedisImageName).
+			By("Create a clusterVersion obj with replication workloadType.")
+			clusterVersionObj = testapps.NewClusterVersionFactory(clusterVersionName, clusterDefObj.Name).
+				AddComponent(testapps.DefaultRedisCompType).
+				AddInitContainerShort(testapps.DefaultRedisInitContainerName, testapps.DefaultRedisImageName).
+				AddContainerShort(testapps.DefaultRedisContainerName, testapps.DefaultRedisImageName).
 				Create(&testCtx).GetObject()
 		})
 

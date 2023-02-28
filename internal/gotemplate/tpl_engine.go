@@ -137,7 +137,7 @@ func (t *TplEngine) initSystemFunMap(funcs template.FuncMap) {
 			return "", cfgcore.MakeError("not exist func: %s", funcName)
 		}
 
-		values := constructFunctionArgList(args...)
+		values := ConstructFunctionArgList(args...)
 		engine := NewTplEngine(&values, nil, types.NamespacedName{
 			Name:      fn.name,
 			Namespace: fn.namespace,

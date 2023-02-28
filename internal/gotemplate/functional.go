@@ -42,7 +42,7 @@ func isSystemFuncsCM(cm *corev1.ConfigMap) bool {
 	return err == nil && b
 }
 
-func constructFunctionArgList(args ...interface{}) TplValues {
+func ConstructFunctionArgList(args ...interface{}) TplValues {
 	values := TplValues{}
 	for i, arg := range args {
 		values[constructArgsValueKey(i)] = arg

@@ -189,6 +189,10 @@ func PVCGVR() schema.GroupVersionResource {
 	return schema.GroupVersionResource{Group: corev1.GroupName, Version: VersionV1, Resource: "persistentvolumeclaims"}
 }
 
+func PVGVR() schema.GroupVersionResource {
+	return schema.GroupVersionResource{Group: corev1.GroupName, Version: VersionV1, Resource: "persistentvolumes"}
+}
+
 func ConfigConstraintGVR() schema.GroupVersionResource {
 	return schema.GroupVersionResource{Group: Group, Version: Version, Resource: ResourceConfigConstraintVersions}
 }

@@ -52,6 +52,9 @@ type uninstallOptions struct {
 
 	// autoApprove if true, skip interactive approval
 	autoApprove bool
+
+	removePVs  bool
+	removePVCs bool
 }
 
 func newUninstallCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
@@ -74,6 +77,8 @@ func newUninstallCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *co
 	}
 
 	cmd.Flags().BoolVar(&o.autoApprove, "auto-approve", false, "Skip interactive approval before uninstalling KubeBlocks")
+	cmd.Flags().BoolVar(&o.removePVs, "remove-pvs", false, "Remove PersistentVolume or not")
+	cmd.Flags().BoolVar(&o.removePVCs, "remove-pvcs", false, "Remove PersistentVolumeClaim or not")
 	return cmd
 }
 
@@ -176,6 +181,15 @@ func (o *uninstallOptions) uninstall() error {
 	})
 
 	for _, gvr := range gvrs {
+		if gvr == types.PVCGVR() && !o.removePVCs {
+			continue
+		}
+		if gvr == types.PVGVR() && !o.removePVs {
+			continue
+		}
+		if v, ok := objs[gvr]; !ok || len(v.Items) == 0 {
+			continue
+		}
 		spinner = newSpinner(fmt.Sprintf("Remove %s", gvr.Resource))
 		printErr(spinner, deleteObjects(o.Dynamic, gvr, objs[gvr]))
 	}

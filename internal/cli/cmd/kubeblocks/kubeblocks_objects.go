@@ -21,9 +21,11 @@ import (
 	"fmt"
 	"strings"
 
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	apiruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	k8sapitypes "k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -87,7 +89,7 @@ func getKBObjects(dynamic dynamic.Interface, namespace string) (kbObjects, error
 		}
 	}
 
-	// get objects by group version resource
+	// get objects by label selector
 	getObjects := func(labelSelector string, gvr schema.GroupVersionResource) {
 		objs, err := dynamic.Resource(gvr).Namespace(namespace).List(context.TODO(), metav1.ListOptions{
 			LabelSelector: labelSelector,
@@ -104,6 +106,20 @@ func getKBObjects(dynamic dynamic.Interface, namespace string) (kbObjects, error
 		target.Items = append(target.Items, objs.Items...)
 	}
 
+	// get object by name
+	getObject := func(name string, gvr schema.GroupVersionResource) {
+		obj, err := dynamic.Resource(gvr).Namespace(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+		if err != nil {
+			appendErr(err)
+			return
+		}
+		if _, ok := kbObjs[gvr]; !ok {
+			kbObjs[gvr] = &unstructured.UnstructuredList{}
+		}
+		target := kbObjs[gvr]
+		target.Items = append(target.Items, *obj)
+	}
+
 	// build label selector
 	instanceLabelSelector := fmt.Sprintf("%s=%s", intctrlutil.AppInstanceLabelKey, types.KubeBlocksChartName)
 	releaseLabelSelector := fmt.Sprintf("release=%s", types.KubeBlocksChartName)
@@ -117,10 +133,19 @@ func getKBObjects(dynamic dynamic.Interface, namespace string) (kbObjects, error
 	}
 
 	// get volume snapshot class
-	if _, ok := kbObjs[types.VolumeSnapshotClassGVR()]; !ok {
-		kbObjs[types.VolumeSnapshotClassGVR()] = &unstructured.UnstructuredList{}
-	}
 	getObjects(instanceLabelSelector, types.VolumeSnapshotClassGVR())
+
+	// get PVs by PVC
+	if pvcs, ok := kbObjs[types.PVCGVR()]; ok {
+		for _, obj := range pvcs.Items {
+			pvc := &corev1.PersistentVolumeClaim{}
+			if err = apiruntime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, pvc); err != nil {
+				appendErr(err)
+				continue
+			}
+			getObject(pvc.Spec.VolumeName, types.PVGVR())
+		}
+	}
 
 	return kbObjs, utilerrors.NewAggregate(allErrs)
 }

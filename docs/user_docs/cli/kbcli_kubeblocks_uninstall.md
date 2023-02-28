@@ -18,6 +18,8 @@ kbcli kubeblocks uninstall [flags]
 ```
       --auto-approve   Skip interactive approval before uninstalling KubeBlocks
   -h, --help           help for uninstall
+      --remove-pvcs    Remove PersistentVolumeClaim or not
+      --remove-pvs     Remove PersistentVolume or not
 ```
 
 ### Options inherited from parent commands

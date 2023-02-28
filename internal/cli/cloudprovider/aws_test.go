@@ -17,21 +17,19 @@ limitations under the License.
 package cloudprovider
 
 import (
-	"fmt"
-
 	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 )
 
 var _ = Describe("aws cloud provider", func() {
+	const (
+		tfPath      = "../testing/testdata"
+		clusterName = "kb-playground-test"
+		clusterArn  = "arn-kb-playground-test"
+	)
 	It("get cluster name from state file", func() {
-		name, _ := getClusterNameFromStateFile("/Users/ldm/.kbcli/playground/cloud-provider/aws/")
-		fmt.Println(name)
-	})
-
-	It("update kube config", func() {
-		provider := awsCloudProvider{
-			region: "cn-northwest-1",
-		}
-		_, _ = provider.UpdateKubeconfig("liutang-eks-nx")
+		name, err := getClusterNameFromStateFile(tfPath)
+		Expect(err).Should(Succeed())
+		Expect(name).Should(Equal(clusterName))
 	})
 })

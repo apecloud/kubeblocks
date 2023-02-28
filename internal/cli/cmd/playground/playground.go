@@ -181,24 +181,13 @@ func (o *initOptions) local() error {
 	}
 	spinner(true)
 
-	// Deal with KUBECONFIG
-	configPath := util.ConfigPath("config")
-	spinner = util.Spinner(o.Out, "Generate kubernetes config to %s", configPath)
-	defer spinner(false)
-	newContext, err := provider.UpdateKubeconfig(k8sClusterName)
-	if err != nil {
-		return errors.Wrap(err, "failed to generate kubeconfig")
-	}
-	spinner(true)
-
-	spinner = util.Spinner(o.Out, "Switch to new k3d cluster context %s", newContext)
-	spinner(true)
-
-	return o.installKBAndCluster(configPath)
+	return o.installKBAndCluster()
 }
 
-func (o *initOptions) installKBAndCluster(configPath string) error {
+func (o *initOptions) installKBAndCluster() error {
 	var err error
+	configPath := util.ConfigPath("config")
+
 	// Init helm client
 	if o.helmCfg, err = helm.NewActionConfig("", configPath); err != nil {
 		return errors.Wrap(err, "failed to init helm client")
@@ -292,16 +281,8 @@ func (o *initOptions) cloud() error {
 		return err
 	}
 
-	// update kube config
-	kubeCtx, err := provider.UpdateKubeconfig(clusterName)
-	if err != nil {
-		return err
-	}
-	configPath := util.ConfigPath("config")
-	fmt.Fprintf(o.Out, "\nUpdate and switch kubeconfig to %s in %s\n", kubeCtx, configPath)
-
 	// CreateK8sCluster KubeBlocks and create cluster
-	return o.installKBAndCluster(configPath)
+	return o.installKBAndCluster()
 }
 
 func (o *destroyOptions) destroyPlayground() error {
@@ -366,18 +347,6 @@ func (o *destroyOptions) destroyCloud() error {
 	if err = provider.DeleteK8sCluster(name); err != nil {
 		return err
 	}
-
-	kubeconfigPath, err := util.GetDefaultKubeconfigPath()
-	if err != nil {
-		return err
-	}
-
-	spanner := util.Spinner(o.Out, "Remove cluster config from %s", kubeconfigPath)
-	defer spanner(false)
-	if err = provider.RemoveKubeconfig(name); err != nil {
-		return err
-	}
-	spanner(true)
 
 	return nil
 }

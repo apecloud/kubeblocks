@@ -95,7 +95,8 @@ func (p *localCloudProvider) CreateK8sCluster(name string, init bool) error {
 	if err = setUpK3d(p.ctx, &p.cfg); err != nil {
 		return errors.Wrapf(err, "failed to create k3d cluster %s", name)
 	}
-	return nil
+
+	return p.UpdateKubeconfig(name)
 }
 
 // DeleteK8sCluster remove the k3d cluster
@@ -146,19 +147,19 @@ func (p *localCloudProvider) DeleteK8sCluster(name string) error {
 }
 
 // UpdateKubeconfig generate a kubeconfig to access the k3d cluster
-func (p *localCloudProvider) UpdateKubeconfig(name string) (string, error) {
+func (p *localCloudProvider) UpdateKubeconfig(name string) error {
 	var err error
 
 	configPath := util.ConfigPath("config")
 	_, err = k3dClient.KubeconfigGetWrite(p.ctx, runtimes.SelectedRuntime, &p.cfg.Cluster, configPath,
 		&k3dClient.WriteKubeConfigOptions{UpdateExisting: true, OverwriteExisting: false, UpdateCurrentContext: true})
 	if err != nil {
-		return "", errors.Wrapf(err, "failed to generate kubeconfig for cluster %s", name)
+		return errors.Wrapf(err, "failed to generate kubeconfig for cluster %s", name)
 	}
 
 	_cfgContent, err := os.ReadFile(configPath)
 	if err != nil {
-		return "", errors.Wrap(err, "read kubeconfig")
+		return errors.Wrap(err, "read kubeconfig")
 	}
 
 	var (
@@ -172,7 +173,7 @@ func (p *localCloudProvider) UpdateKubeconfig(name string) (string, error) {
 	case strings.Contains(kubeConfig, "host.docker.internal"):
 		hostToReplace = "host.docker.internal"
 	default:
-		return "", errors.Wrap(err, "unrecognized kubeconfig format")
+		return errors.Wrap(err, "unrecognized kubeconfig format")
 	}
 
 	// Replace host config with loop back address
@@ -180,7 +181,7 @@ func (p *localCloudProvider) UpdateKubeconfig(name string) (string, error) {
 	if err = os.WriteFile(configPath, []byte(cfgHostContent), 0600); err != nil {
 		fmt.Println("Fail to re-write host kubeconfig")
 	}
-	return name, nil
+	return nil
 }
 
 func (p *localCloudProvider) GetExistedClusters() ([]string, error) {

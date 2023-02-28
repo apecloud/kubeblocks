@@ -35,12 +35,6 @@ type Interface interface {
 
 	// GetExistedClusters get existed clusters
 	GetExistedClusters() ([]string, error)
-
-	// UpdateKubeconfig generate kubeconfig, return the new context name
-	UpdateKubeconfig(name string) (string, error)
-
-	// RemoveKubeconfig remove the cluster from kubeconfig
-	RemoveKubeconfig(name string) error
 }
 
 func New(provider, region, tfRootPath string, stdout, stderr io.Writer) (Interface, error) {

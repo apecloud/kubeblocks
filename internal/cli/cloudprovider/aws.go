@@ -21,14 +21,10 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
-	"strings"
 
 	"github.com/hashicorp/terraform-exec/tfexec"
 	"github.com/pkg/errors"
-
-	"github.com/apecloud/kubeblocks/internal/cli/util"
 )
 
 const (
@@ -129,32 +125,16 @@ func (p *awsCloudProvider) GetExistedClusters() ([]string, error) {
 		return nil, err
 	}
 
-	preClusterName, err := getClusterNameFromStateFile(subPaths[0])
+	clusterName, err := getClusterNameFromStateFile(subPaths[0])
 	if err != nil {
 		return nil, err
 	}
 
 	// previous cluster exists, try to destroy it
-	if preClusterName == "" {
+	if clusterName == "" {
 		return nil, nil
 	}
-	return []string{preClusterName}, nil
-}
-
-// UpdateKubeconfig exec aws eks update-kubeconfig command
-func (p *awsCloudProvider) UpdateKubeconfig(name string) (string, error) {
-	cmd := exec.Command("aws", "eks", "update-kubeconfig", "--region="+p.region, "--name="+name)
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		return "", err
-	}
-	return strings.Split(string(out), " ")[2], nil
-}
-
-func (p *awsCloudProvider) RemoveKubeconfig(name string) error {
-	// TODO: get the real context name by cluster name
-	// the cluster name is different with the context name in kubeconfig
-	return util.KubeconfigRemoveClusterFromDefaultConfig(name)
+	return []string{clusterName}, nil
 }
 
 func (p *awsCloudProvider) buildApplyOpts() []tfexec.ApplyOption {
@@ -178,6 +158,10 @@ func getSubPaths(parent string, names []string) ([]string, error) {
 }
 
 func getClusterNameFromStateFile(tfPath string) (string, error) {
+	return getOutputValue("cluster_name", tfPath)
+}
+
+func getOutputValue(key string, tfPath string) (string, error) {
 	stateFile := filepath.Join(tfPath, tfStateFileName)
 	content, err := os.ReadFile(stateFile)
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
@@ -192,9 +176,10 @@ func getClusterNameFromStateFile(tfPath string) (string, error) {
 	if !ok {
 		return "", nil
 	}
-	clusterName, ok := outputs["cluster_name"].(map[string]interface{})
+
+	value, ok := outputs[key].(map[string]interface{})
 	if !ok {
 		return "", nil
 	}
-	return clusterName["value"].(string), nil
+	return value["value"].(string), nil
 }

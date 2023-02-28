@@ -29,11 +29,6 @@ var _ = Describe("playground", func() {
 		clusterName = "k3d-test"
 	)
 
-	It("kubeconfig", func() {
-		_, err := provider.UpdateKubeconfig(clusterName)
-		Expect(err).Should(HaveOccurred())
-	})
-
 	It("k3d util function", func() {
 		config, err := buildClusterRunConfig("test")
 		Expect(err).ShouldNot(HaveOccurred())

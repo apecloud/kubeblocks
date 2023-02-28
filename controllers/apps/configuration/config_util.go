@@ -413,36 +413,13 @@ func getRelatedComponentsByConfigmap(stsList *appv1.StatefulSetList, cfg client.
 	return sts, containers.AsSlice()
 }
 
-func getClusterComponentsByName(components []appsv1alpha1.ClusterComponentSpec, componentName string) *appsv1alpha1.ClusterComponentSpec {
-	for i := range components {
-		component := &components[i]
-		if component.Name == componentName {
-			return component
-		}
-	}
-	return nil
-}
-
-func createConfigurePatch(cfg *corev1.ConfigMap, ctx intctrlutil.RequestCtx, tpl *appsv1alpha1.ConfigConstraintSpec) (*cfgcore.ConfigPatchInfo, error) {
+func createConfigurePatch(cfg *corev1.ConfigMap, format appsv1alpha1.CfgFileFormat, cmKeys []string) (*cfgcore.ConfigPatchInfo, bool, error) {
 	lastConfig, err := getLastVersionConfig(cfg)
 	if err != nil {
-		return nil, cfgcore.WrapError(err, "failed to get last version data. config[%v]", client.ObjectKeyFromObject(cfg))
+		return nil, false, cfgcore.WrapError(err, "failed to get last version data. config[%v]", client.ObjectKeyFromObject(cfg))
 	}
 
-	option := cfgcore.CfgOption{
-		Type:    cfgcore.CfgTplType,
-		CfgType: tpl.FormatterConfig.Format,
-		Log:     ctx.Log,
-	}
-
-	return cfgcore.CreateMergePatch(
-		&cfgcore.K8sConfig{
-			CfgKey:         client.ObjectKeyFromObject(cfg),
-			Configurations: lastConfig,
-		}, &cfgcore.K8sConfig{
-			CfgKey:         client.ObjectKeyFromObject(cfg),
-			Configurations: cfg.Data,
-		}, option)
+	return cfgcore.CreateConfigurePatch(lastConfig, cfg.Data, format, cmKeys, true)
 }
 
 func updateConfigurationSchema(tpl *appsv1alpha1.ConfigConstraintSpec) error {

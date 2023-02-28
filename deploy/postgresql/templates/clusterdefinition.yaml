@@ -30,6 +30,8 @@ spec:
         configTemplateRefs:
           - name: postgresql-configuration
             configTplRef: postgresql-configuration
+            keys:
+              - postgresql.conf
             namespace: {{ .Release.Namespace }}
             volumeName: postgresql-config
             defaultMode: 0777

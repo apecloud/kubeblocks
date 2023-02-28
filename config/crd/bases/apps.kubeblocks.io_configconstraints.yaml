@@ -97,7 +97,10 @@ spec:
                     - ini
                     - yaml
                     - json
+                    - hcl
                     - dotenv
+                    - toml
+                    - properties
                     type: string
                   iniConfig:
                     description: iniConfig represents the ini options.

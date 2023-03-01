@@ -221,7 +221,7 @@ var _ = Describe("ReplicationSet Switch", func() {
 		s.SwitchResource.CompSpec.SwitchPolicy.Type = appsv1alpha1.Manual
 		doSwitch = s.Decision()
 		Expect(doSwitch).Should(BeFalse())
-		Expect(s.SwitchStatus.SwitchPhaseStatus).Should(Equal(SwitchPhaseStatusFailed))
+		Expect(s.SwitchStatus.SwitchPhaseStatus).Should(Equal(SwitchPhaseStatusSucceed))
 
 		By("Test do switch action with MockSwitchActionHandler should be true.")
 		s.SwitchResource.CompSpec.SwitchPolicy.Type = appsv1alpha1.MaximumAvailability

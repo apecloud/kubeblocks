@@ -315,7 +315,7 @@ func (s *Switch) Decision() bool {
 	case appsv1alpha1.MaximumDataProtection:
 		return makeMaxDataProtectionDecision()
 	case appsv1alpha1.Manual:
-		s.SwitchStatus.SwitchPhaseStatus = SwitchPhaseStatusFailed
+		s.SwitchStatus.SwitchPhaseStatus = SwitchPhaseStatusSucceed
 		s.SwitchStatus.Reason = fmt.Sprintf("component %s manual switch policy will not perform high-availability switching", s.SwitchResource.CompSpec.Name)
 		return false
 	}

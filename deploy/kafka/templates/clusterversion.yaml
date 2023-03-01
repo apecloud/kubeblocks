@@ -1,7 +1,7 @@
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: ClusterVersion
 metadata:
-  name: kafka-{{ .Chart.AppVersion .Values.clusterVersionOverride }}
+  name: kafka-{{ default .Chart.AppVersion .Values.clusterVersionOverride }}
   labels:
     {{- include "kafka.labels" . | nindent 4 }}
     {{- if .Values.commonLabels }}
@@ -13,11 +13,25 @@ metadata:
 spec:
   clusterDefinitionRef: kafka
   componentVersions:
-    - componentDefRef: kafka
+    - componentDefRef: kafka-controller
       versionsContext:
         containers:
           - name: kafka
-            image: {{ .Values.images.kafka.repository }}:{{ default .Values.images.kafka.tag .Chart.AppVersion  }}
+            image: {{ .Values.images.kafka.repository }}:{{ default .Chart.AppVersion .Values.images.kafka.tag }}
+          - name: jmx-exporter
+            image: {{ .Values.images.jmxExporter.repository }}:{{ .Values.images.jmxExporter.tag }}
+    - componentDefRef: kafka-broker
+      versionsContext:
+        containers:
+          - name: kafka
+            image: {{ .Values.images.kafka.repository }}:{{ default .Chart.AppVersion .Values.images.kafka.tag }}
+          - name: jmx-exporter
+            image: {{ .Values.images.jmxExporter.repository }}:{{ .Values.images.jmxExporter.tag }}
+    - componentDefRef: kafka-server
+      versionsContext:
+        containers:
+          - name: kafka
+            image: {{ .Values.images.kafka.repository }}:{{ default .Chart.AppVersion .Values.images.kafka.tag }}
           - name: jmx-exporter
             image: {{ .Values.images.jmxExporter.repository }}:{{ .Values.images.jmxExporter.tag }}
 

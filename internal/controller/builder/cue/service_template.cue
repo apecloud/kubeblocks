@@ -39,7 +39,6 @@ service: {
 			"app.kubernetes.io/name":       "\(component.clusterDefName)"
 			"app.kubernetes.io/instance":   cluster.metadata.name
 			"app.kubernetes.io/managed-by": "kubeblocks"
-
 			"apps.kubeblocks.io/component-name": "\(component.name)"
 		}
 	}
@@ -47,7 +46,6 @@ service: {
 		"selector": {
 			"app.kubernetes.io/instance":   "\(cluster.metadata.name)"
 			"app.kubernetes.io/managed-by": "kubeblocks"
-
 			"apps.kubeblocks.io/component-name": "\(component.name)"
 		}
 		ports: component.service.ports

@@ -49,12 +49,6 @@ type BuilderParams struct {
 	Component         *component.SynthesizedComponent
 }
 
-type envVar struct {
-	name      string
-	fieldPath string
-	value     string
-}
-
 type componentPathedName struct {
 	Namespace   string `json:"namespace,omitempty"`
 	ClusterName string `json:"clusterName,omitempty"`
@@ -133,25 +127,27 @@ func processContainersInjection(reqCtx intctrlutil.RequestCtx,
 
 func injectEnvs(params BuilderParams, envConfigName string, c *corev1.Container) {
 	// can not use map, it is unordered
-	envFieldPathSlice := []envVar{
-		{name: "_POD_NAME", fieldPath: "metadata.name"},
-		{name: "_NAMESPACE", fieldPath: "metadata.namespace"},
-		{name: "_SA_NAME", fieldPath: "spec.serviceAccountName"},
-		{name: "_NODENAME", fieldPath: "spec.nodeName"},
-		{name: "_HOSTIP", fieldPath: "status.hostIP"},
-		{name: "_PODIP", fieldPath: "status.podIP"},
-		{name: "_PODIPS", fieldPath: "status.podIPs"},
+	envFieldPathSlice := []struct {
+		name      string
+		fieldPath string
+	}{
+		{name: "KB_POD_NAME", fieldPath: "metadata.name"},
+		{name: "KB_NAMESPACE", fieldPath: "metadata.namespace"},
+		{name: "KB_SA_NAME", fieldPath: "spec.serviceAccountName"},
+		{name: "KB_NODENAME", fieldPath: "spec.nodeName"},
+		{name: "KB_HOST_IP", fieldPath: "status.hostIP"},
+		{name: "KB_POD_IP", fieldPath: "status.podIP"},
+		{name: "KB_POD_IPS", fieldPath: "status.podIPs"},
+		// TODO: need to deprecate following
+		{name: "KB_HOSTIP", fieldPath: "status.hostIP"},
+		{name: "KB_PODIP", fieldPath: "status.podIP"},
+		{name: "KB_PODIPS", fieldPath: "status.podIPs"},
 	}
 
-	clusterEnv := []envVar{
-		{name: "_CLUSTER_NAME", value: params.Cluster.Name},
-		{name: "_COMP_NAME", value: params.Component.Name},
-		{name: "_CLUSTER_COMP_NAME", value: params.Cluster.Name + "-" + params.Component.Name},
-	}
 	toInjectEnv := make([]corev1.EnvVar, 0, len(envFieldPathSlice)+len(c.Env))
 	for _, v := range envFieldPathSlice {
 		toInjectEnv = append(toInjectEnv, corev1.EnvVar{
-			Name: constant.KBPrefix + v.name,
+			Name: v.name,
 			ValueFrom: &corev1.EnvVarSource{
 				FieldRef: &corev1.ObjectFieldSelector{
 					FieldPath: v.fieldPath,
@@ -160,40 +156,30 @@ func injectEnvs(params BuilderParams, envConfigName string, c *corev1.Container)
 		})
 	}
 
-	for _, v := range clusterEnv {
-		toInjectEnv = append(toInjectEnv, corev1.EnvVar{
-			Name:  constant.KBPrefix + v.name,
-			Value: v.value,
-		})
-	}
+	toInjectEnv = append(toInjectEnv, []corev1.EnvVar{
+		{Name: "KB_CLUSTER_NAME", Value: params.Cluster.Name},
+		{Name: "KB_COMP_NAME", Value: params.Component.Name},
+		{Name: "KB_CLUSTER_COMP_NAME", Value: params.Cluster.Name + "-" + params.Component.Name},
+		{Name: "KB_POD_FQDN", Value: fmt.Sprintf("%s.%s-headless.%s.svc", "$(KB_POD_NAME)",
+			"$(KB_CLUSTER_COMP_NAME)", "$(KB_NAMESPACE)")},
+	}...)
 
 	if params.Component.TLS {
-		tlsEnv := []envVar{
-			{name: "_TLS_CERT_PATH", value: MountPath},
-			{name: "_TLS_CA_FILE", value: CAName},
-			{name: "_TLS_CERT_FILE", value: CertName},
-			{name: "_TLS_KEY_FILE", value: KeyName},
-		}
-		for _, v := range tlsEnv {
-			toInjectEnv = append(toInjectEnv, corev1.EnvVar{
-				Name:  constant.KBPrefix + v.name,
-				Value: v.value,
-			})
-		}
+		toInjectEnv = append(toInjectEnv, []corev1.EnvVar{
+			{Name: "KB_TLS_CERT_PATH", Value: MountPath},
+			{Name: "KB_TLS_CA_FILE", Value: CAName},
+			{Name: "KB_TLS_CERT_FILE", Value: CertName},
+			{Name: "KB_TLS_KEY_FILE", Value: KeyName},
+		}...)
 	}
-
 	// have injected variables placed at the front of the slice
-	if c.Env == nil {
+	if len(c.Env) == 0 {
 		c.Env = toInjectEnv
 	} else {
 		c.Env = append(toInjectEnv, c.Env...)
 	}
-
 	if envConfigName == "" {
 		return
-	}
-	if c.EnvFrom == nil {
-		c.EnvFrom = []corev1.EnvFromSource{}
 	}
 	c.EnvFrom = append(c.EnvFrom, corev1.EnvFromSource{
 		ConfigMapRef: &corev1.ConfigMapEnvSource{
@@ -380,6 +366,8 @@ func BuildPVCFromSnapshot(sts *appsv1.StatefulSet,
 	return &pvc, nil
 }
 
+// BuildEnvConfig build cluster component context ConfigMap object, which is to be used in workload container's
+// envFrom.configMapRef with name of "$(cluster.metadata.name)-$(component.name)-env" pattern.
 func BuildEnvConfig(params BuilderParams) (*corev1.ConfigMap, error) {
 	const tplFile = "env_config_template.cue"
 

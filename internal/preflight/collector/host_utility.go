@@ -31,6 +31,8 @@ import (
 )
 
 const UtilityPathFormat = "host-collectors/utility/%s.json"
+const DefaultHostUtilityName = "Host Utility"
+const DefaultHostUtilityPath = "utility"
 
 type HostUtilityInfo struct {
 	Name  string `json:"name"`
@@ -44,7 +46,7 @@ type CollectHostUtility struct {
 }
 
 func (c *CollectHostUtility) Title() string {
-	return util.TitleOrDefault(c.HostCollector.HostCollectorMeta, "Host Utility")
+	return util.TitleOrDefault(c.HostCollector.HostCollectorMeta, DefaultHostUtilityName)
 }
 
 func (c *CollectHostUtility) IsExcluded() (bool, error) {
@@ -67,12 +69,9 @@ func (c *CollectHostUtility) Collect(progressChan chan<- interface{}) (map[strin
 		return nil, errors.Wrap(err, "failed to marshal host utility info")
 	}
 
-	collectorName := hostCollector.CollectorName
-	if collectorName == "" {
-		collectorName = "utility"
-	}
+	resPath := util.TitleOrDefault(hostCollector.HostCollectorMeta, DefaultHostUtilityPath)
 
 	output := pkgcollector.NewResult()
-	_ = output.SaveResult(c.BundlePath, fmt.Sprintf(UtilityPathFormat, collectorName), bytes.NewBuffer(b))
+	_ = output.SaveResult(c.BundlePath, fmt.Sprintf(UtilityPathFormat, resPath), bytes.NewBuffer(b))
 	return output, nil
 }

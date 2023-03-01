@@ -23,7 +23,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-func TestTroubleshoot(t *testing.T) {
+func TestUtil(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "util Suite")
+	RunSpecs(t, "Util Suite")
 }

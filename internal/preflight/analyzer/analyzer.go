@@ -18,6 +18,7 @@ package analyzer
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/pkg/errors"
 	analyze "github.com/replicatedhq/troubleshoot/pkg/analyze"
@@ -35,14 +36,19 @@ type KBAnalyzer interface {
 type GetCollectedFileContents func(string) ([]byte, error)
 type GetChildCollectedFileContents func(string, []string) (map[string][]byte, error)
 
+func GetAnalyzer(analyzer *preflightv1beta2.ExtendAnalyze) (KBAnalyzer, bool) {
+	switch {
+	case analyzer.ClusterAccess != nil:
+		return &AnalyzeClusterAccess{analyzer: analyzer.ClusterAccess}, true
+	default:
+		return nil, false
+	}
+}
+
 func KBAnalyze(ctx context.Context, kbAnalyzer *preflightv1beta2.ExtendAnalyze, getFile func(string) ([]byte, error), findFiles func(string, []string) (map[string][]byte, error)) []*analyze.AnalyzeResult {
 	analyzer, ok := GetAnalyzer(kbAnalyzer)
 	if !ok {
-		return []*analyze.AnalyzeResult{{
-			IsFail:  true,
-			Title:   "nonexistent analyzer",
-			Message: "Analyzer not found",
-		}}
+		return NewAnalyzeResultError(analyzer, errors.New("invalid analyzer"))
 	}
 	isExcluded, _ := analyzer.IsExcluded()
 	if isExcluded {
@@ -51,18 +57,9 @@ func KBAnalyze(ctx context.Context, kbAnalyzer *preflightv1beta2.ExtendAnalyze, 
 	}
 	results, err := analyzer.Analyze(getFile, findFiles)
 	if err != nil {
-		return nil
+		return NewAnalyzeResultError(analyzer, errors.Wrap(err, "analyze"))
 	}
 	return results
-}
-
-func GetAnalyzer(analyzer *preflightv1beta2.ExtendAnalyze) (KBAnalyzer, bool) {
-	switch {
-	case analyzer.ClusterAccess != nil:
-		return &AnalyzeClusterAccess{analyzer: analyzer.ClusterAccess}, true
-	default:
-		return nil, false
-	}
 }
 
 func HostKBAnalyze(ctx context.Context, kbHostAnalyzer *preflightv1beta2.ExtendHostAnalyze, getFile func(string) ([]byte, error), findFiles func(string, []string) (map[string][]byte, error)) []*analyze.AnalyzeResult {
@@ -80,4 +77,19 @@ func HostKBAnalyze(ctx context.Context, kbHostAnalyzer *preflightv1beta2.ExtendH
 		return analyze.NewAnalyzeResultError(hostAnalyzer, errors.Wrap(err, "analyze"))
 	}
 	return results
+}
+
+func NewAnalyzeResultError(analyzer KBAnalyzer, err error) []*analyze.AnalyzeResult {
+	if analyzer != nil {
+		return []*analyze.AnalyzeResult{{
+			IsFail:  true,
+			Title:   analyzer.Title(),
+			Message: fmt.Sprintf("Analyzer Failed: %v", err),
+		}}
+	}
+	return []*analyze.AnalyzeResult{{
+		IsFail:  true,
+		Title:   "nil analyzer",
+		Message: fmt.Sprintf("Analyzer Failed: %v", err),
+	}}
 }

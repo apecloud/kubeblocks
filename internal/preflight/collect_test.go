@@ -84,6 +84,35 @@ var _ = Describe("collect_test", func() {
 		tf.Cleanup()
 	})
 
+	It("CollectPreflight test, and expect success ", func() {
+		hostByte := `
+apiVersion: troubleshoot.sh/v1beta2
+kind: HostPreflight
+metadata:
+  name: hostCheckTest
+spec:
+  collectors:
+    - cpu: {}
+  extendCollectors:
+    - hostUtility :
+        collectorName: helmCheck
+        utilityName: helm
+`
+		hostSpec := new(preflightv1beta2.HostPreflight)
+		Eventually(func(g Gomega) {
+			g.Expect(yaml.Unmarshal([]byte(hostByte), hostSpec)).Should(Succeed())
+			progressCh := make(chan interface{})
+			go func() {
+				for {
+					g.Expect(<-progressCh).NotTo(BeNil())
+				}
+			}()
+			results, err := CollectPreflight(context.TODO(), nil, hostSpec, progressCh)
+			g.Expect(err).NotTo(HaveOccurred())
+			g.Expect(len(results)).Should(Equal(1))
+		}).WithTimeout(timeOut).Should(Succeed())
+	})
+
 	It("CollectHostData Test, and expect success", func() {
 		hostByte := `
 apiVersion: troubleshoot.sh/v1beta2
@@ -94,19 +123,7 @@ spec:
 collectors:
   - cpu: {}
 analyzers:
-  - cpu:
-      outcomes:
-        - fail:
-            when: "physical < 4"
-            message: At least 4 physical CPU cores are required
-        - fail:
-            when: "logical < 8"
-            message: At least 8 CPU cores are required
-        - warn:
-            when: "count < 16"
-            message: At least 16 CPU cores preferred
-        - pass:
-            message: This server has sufficient CPU cores.`
+`
 		hostSpec := new(preflightv1beta2.HostPreflight)
 		Eventually(func(g Gomega) {
 			g.Expect(yaml.Unmarshal([]byte(hostByte), hostSpec)).Should(Succeed())

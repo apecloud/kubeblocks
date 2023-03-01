@@ -87,7 +87,7 @@ spec:
               message: The metrics-server deployment is ready.
   extendAnalyzers:
     - clusterAccess:
-        checkName: check-k8s-access
+        checkName: Check-K8S-Access
         outcomes:
           - fail:
               message: access fail

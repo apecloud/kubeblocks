@@ -24,6 +24,7 @@ import (
 	"github.com/replicatedhq/troubleshoot/pkg/multitype"
 )
 
+// TitleOrDefault extracts titleName from metaInfo, and returns default if metaInfo is unhelpful
 func TitleOrDefault[T troubleshootv1beta2.HostCollectorMeta | troubleshootv1beta2.AnalyzeMeta](meta T, defaultTitle string) string {
 	var title string
 	iMeta := (interface{})(meta)
@@ -33,7 +34,6 @@ func TitleOrDefault[T troubleshootv1beta2.HostCollectorMeta | troubleshootv1beta
 	case troubleshootv1beta2.AnalyzeMeta:
 		title = tmp.CheckName
 	default:
-		title = ""
 	}
 	if title == "" {
 		title = defaultTitle

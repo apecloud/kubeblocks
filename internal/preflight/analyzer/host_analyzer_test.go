@@ -14,16 +14,22 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package collector
+package analyzer
 
 import (
-	"testing"
-
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
+	preflightv1beta2 "github.com/apecloud/kubeblocks/apis/preflight/v1beta2"
 )
 
-func TestCollector(t *testing.T) {
-	RegisterFailHandler(Fail)
-	RunSpecs(t, "Collector Suite")
-}
+var _ = Describe("host_analyzer_test", func() {
+	It("GetHostAnalyzer test", func() {
+		collector, ok := GetHostAnalyzer(&preflightv1beta2.ExtendHostAnalyze{HostUtility: &preflightv1beta2.HostUtilityAnalyze{}})
+		Expect(collector).ShouldNot(BeNil())
+		Expect(ok).Should(BeTrue())
+		collector, ok = GetHostAnalyzer(&preflightv1beta2.ExtendHostAnalyze{})
+		Expect(collector).Should(BeNil())
+		Expect(ok).Should(BeFalse())
+	})
+})

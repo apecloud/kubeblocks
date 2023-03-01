@@ -40,15 +40,15 @@ func (a *AnalyzeHostUtility) IsExcluded() (bool, error) {
 	return util.IsExcluded(a.hostAnalyzer.Exclude)
 }
 
-func (a *AnalyzeHostUtility) collectorName() string {
+func (a *AnalyzeHostUtility) utilityPath() string {
 	if a.hostAnalyzer.CollectorName != "" {
 		return a.hostAnalyzer.CollectorName
 	}
-	return "utility"
+	return kbcollector.DefaultHostUtilityPath
 }
 
 func (a *AnalyzeHostUtility) Analyze(getCollectedFileContents func(string) ([]byte, error)) ([]*analyzer.AnalyzeResult, error) {
-	fullPath := fmt.Sprintf(kbcollector.UtilityPathFormat, a.collectorName())
+	fullPath := fmt.Sprintf(kbcollector.UtilityPathFormat, a.utilityPath())
 	collected, err := getCollectedFileContents(fullPath)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to get collected file name: %s", fullPath)

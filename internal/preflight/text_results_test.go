@@ -27,7 +27,7 @@ import (
 
 var _ = Describe("text_results_test", func() {
 	var (
-		timeout       = time.Second * 10
+		timeOut       = time.Second * 10
 		preflightName = "stdoutPreflightName"
 		humanFormat   = "human"
 		jsonFormat    = "json"
@@ -59,21 +59,12 @@ var _ = Describe("text_results_test", func() {
 		Eventually(func(g Gomega) {
 			err := ShowStdoutResults(preflightName, analyzeResults, humanFormat)
 			g.Expect(err).NotTo(HaveOccurred())
-		}, timeout).Should(Succeed())
-
-		Eventually(func(g Gomega) {
-			err := ShowStdoutResults(preflightName, analyzeResults, jsonFormat)
+			err = ShowStdoutResults(preflightName, analyzeResults, jsonFormat)
 			g.Expect(err).NotTo(HaveOccurred())
-		}, timeout).Should(Succeed())
-
-		Eventually(func(g Gomega) {
-			err := ShowStdoutResults(preflightName, analyzeResults, yamlFormat)
+			err = ShowStdoutResults(preflightName, analyzeResults, yamlFormat)
 			g.Expect(err).NotTo(HaveOccurred())
-		}, timeout).Should(Succeed())
-
-		Eventually(func(g Gomega) {
-			err := ShowStdoutResults(preflightName, analyzeResults, unknownFormat)
+			err = ShowStdoutResults(preflightName, analyzeResults, unknownFormat)
 			g.Expect(err).To(HaveOccurred())
-		}, timeout).Should(Succeed())
+		}, timeOut).Should(Succeed())
 	})
 })

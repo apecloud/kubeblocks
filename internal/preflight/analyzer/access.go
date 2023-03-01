@@ -50,6 +50,7 @@ func (a *AnalyzeClusterAccess) Analyze(getFile GetCollectedFileContents, findFil
 			isAccess = false
 		}
 	}
+
 	result := analyze.AnalyzeResult{
 		Title: a.Title(),
 	}

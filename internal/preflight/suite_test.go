@@ -23,7 +23,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-func TestTroubleshoot(t *testing.T) {
+func TestPreflight(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "preflight Suite")
+	RunSpecs(t, "Preflight Suite")
 }

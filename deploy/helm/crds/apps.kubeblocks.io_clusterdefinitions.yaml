@@ -9,13 +9,29 @@ metadata:
 spec:
   group: apps.kubeblocks.io
   names:
+    categories:
+    - kubeblocks
     kind: ClusterDefinition
     listKind: ClusterDefinitionList
     plural: clusterdefinitions
+    shortNames:
+    - cd
     singular: clusterdefinition
-  scope: Namespaced
+  scope: Cluster
   versions:
-  - name: v1alpha1
+  - additionalPrinterColumns:
+    - description: main component names
+      jsonPath: .spec.componentDefs[0].name
+      name: MAIN-COMPONENT-NAME
+      type: string
+    - description: status phase
+      jsonPath: .status.phase
+      name: STATUS
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: AGE
+      type: date
+    name: v1alpha1
     schema:
       openAPIV3Schema:
         description: ClusterDefinition is the Schema for the clusterdefinitions API
@@ -8894,3 +8910,5 @@ spec:
         type: object
     served: true
     storage: true
+    subresources:
+      status: {}

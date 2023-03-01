@@ -83,6 +83,35 @@ var ProviderExposeAnnotations = map[util.K8sProvider]map[ExposeType]map[string]s
 			"service.beta.kubernetes.io/aws-load-balancer-internal": "false",
 		},
 	},
+	util.GKEProvider: {
+		ExposeToVPC: map[string]string{
+			ServiceAnnotationExposeType:            string(ExposeToVPC),
+			"networking.gke.io/load-balancer-type": "Internal",
+		},
+		ExposeToInternet: map[string]string{
+			ServiceAnnotationExposeType: string(ExposeToInternet),
+		},
+	},
+	util.AKSProvider: {
+		ExposeToVPC: map[string]string{
+			ServiceAnnotationExposeType:                               string(ExposeToVPC),
+			"service.beta.kubernetes.io/azure-load-balancer-internal": "true",
+		},
+		ExposeToInternet: map[string]string{
+			ServiceAnnotationExposeType:                               string(ExposeToInternet),
+			"service.beta.kubernetes.io/azure-load-balancer-internal": "false",
+		},
+	},
+	util.ACKProvider: {
+		ExposeToVPC: map[string]string{
+			ServiceAnnotationExposeType: string(ExposeToVPC),
+			"service.beta.kubernetes.io/alibaba-cloud-loadbalancer-address-type": "intranet",
+		},
+		ExposeToInternet: map[string]string{
+			ServiceAnnotationExposeType: string(ExposeToInternet),
+			"service.beta.kubernetes.io/alibaba-cloud-loadbalancer-address-type": "internet",
+		},
+	},
 }
 
 func NewExposeCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {

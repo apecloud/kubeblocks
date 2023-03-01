@@ -82,7 +82,6 @@ var _ = Describe("Expose", func() {
 		streams, _, _, _ = genericclioptions.NewTestIOStreams()
 
 		o = &ExposeOptions{IOStreams: streams, Name: clusterName, Namespace: namespace}
-		o.client = testing.FakeClientSet(genServices())
 	})
 
 	AfterEach(func() {
@@ -105,30 +104,33 @@ var _ = Describe("Expose", func() {
 	})
 
 	It("should succeed to expose to vpc/internet", func() {
-		for _, exposeType := range []ExposeType{ExposeToVPC, ExposeToInternet} {
-			o.exposeType = exposeType
-			o.enabled = true
+		for provider := range ProviderExposeAnnotations {
+			o.client = testing.FakeClientSet(genServices())
+			for _, exposeType := range []ExposeType{ExposeToVPC, ExposeToInternet} {
+				o.exposeType = exposeType
+				o.enabled = true
 
-			By("enable expose")
-			err := o.run(util.EKSProvider)
-			Expect(err).ShouldNot(HaveOccurred())
-			checkExposeAsExpected(util.EKSProvider, true, o.exposeType)
+				By("enable expose")
+				err := o.run(provider)
+				Expect(err).ShouldNot(HaveOccurred())
+				checkExposeAsExpected(provider, true, o.exposeType)
 
-			By("modify expose type")
-			switch exposeType {
-			case ExposeToVPC:
-				o.exposeType = ExposeToInternet
-			case ExposeToInternet:
-				o.exposeType = ExposeToVPC
+				By("modify expose type")
+				switch exposeType {
+				case ExposeToVPC:
+					o.exposeType = ExposeToInternet
+				case ExposeToInternet:
+					o.exposeType = ExposeToVPC
+				}
+				err = o.run(provider)
+				Expect(err).Should(HaveOccurred())
+
+				By("disable expose")
+				o.enabled = false
+				err = o.run(provider)
+				Expect(err).ShouldNot(HaveOccurred())
+				checkExposeAsExpected(provider, false, o.exposeType)
 			}
-			err = o.run(util.EKSProvider)
-			Expect(err).Should(HaveOccurred())
-
-			By("disable expose")
-			o.enabled = false
-			err = o.run(util.EKSProvider)
-			Expect(err).ShouldNot(HaveOccurred())
-			checkExposeAsExpected(util.EKSProvider, false, o.exposeType)
 		}
 	})
 })

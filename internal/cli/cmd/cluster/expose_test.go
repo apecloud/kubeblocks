@@ -17,122 +17,119 @@ limitations under the License.
 package cluster
 
 import (
-	"fmt"
+	"context"
+	"reflect"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/client-go/dynamic/fake"
-	"k8s.io/client-go/kubernetes/scheme"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 
-	"github.com/apecloud/kubeblocks/internal/cli/types"
+	"github.com/apecloud/kubeblocks/internal/cli/testing"
+	"github.com/apecloud/kubeblocks/internal/cli/util"
 )
 
 var _ = Describe("Expose", func() {
 
 	const (
 		namespace   = "default"
-		svcKind     = "service"
-		svcVersion  = "v1"
-		svcResource = "services"
 		clusterName = "test-cluster"
 	)
 
-	newUnstructured := func(apiVersion, kind, namespace, name string, annotations map[string]interface{}, labels map[string]interface{}) *unstructured.Unstructured {
-		obj := &unstructured.Unstructured{
-			Object: map[string]interface{}{
-				"apiVersion": apiVersion,
-				"kind":       kind,
-				"metadata": map[string]interface{}{
-					"namespace":   namespace,
-					"name":        name,
-					"annotations": annotations,
-					"labels":      labels,
+	var (
+		tf      *cmdtesting.TestFactory
+		streams genericclioptions.IOStreams
+		o       *ExposeOptions
+	)
+
+	checkExposeAsExpected := func(provider util.K8sProvider, enabled bool, exposeType ExposeType) {
+		svcList, err := o.client.CoreV1().Services(namespace).List(context.TODO(), metav1.ListOptions{})
+		Expect(err).ShouldNot(HaveOccurred())
+		for _, svc := range svcList.Items {
+			if enabled {
+				expected := ProviderExposeAnnotations[provider][exposeType]
+				actual := svc.GetAnnotations()
+				Expect(reflect.DeepEqual(actual, expected)).Should(BeTrue())
+				Expect(svc.Spec.Type).Should(Equal(corev1.ServiceTypeLoadBalancer))
+			} else {
+				// if expose is disabled, the service should not have any expose related annotations
+				Expect(svc.Spec.Type).Should(Equal(corev1.ServiceTypeClusterIP))
+			}
+		}
+	}
+
+	genServices := func() *corev1.ServiceList {
+		svc := corev1.Service{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-svc",
+				Namespace: namespace,
+				Labels: map[string]string{
+					"app.kubernetes.io/instance": clusterName,
 				},
 			},
+			Spec: corev1.ServiceSpec{
+				Type:      corev1.ServiceTypeClusterIP,
+				ClusterIP: "169.254.1.1",
+			},
 		}
-		return obj
+		return &corev1.ServiceList{Items: []corev1.Service{svc}}
 	}
 
-	newSvc := func(name string, clusterIP string, exposed bool) *unstructured.Unstructured {
-		annotations := make(map[string]interface{})
-		if exposed {
-			annotations = map[string]interface{}{
-				types.ServiceLBTypeAnnotationKey: types.ServiceLBTypeAnnotationValue,
+	BeforeEach(func() {
+		tf = cmdtesting.NewTestFactory().WithNamespace(namespace)
+		streams, _, _, _ = genericclioptions.NewTestIOStreams()
+
+		o = &ExposeOptions{IOStreams: streams, Name: clusterName, Namespace: namespace}
+		o.client = testing.FakeClientSet(genServices())
+	})
+
+	AfterEach(func() {
+		defer tf.Cleanup()
+	})
+
+	It("should succeed to new command", func() {
+		cmd := NewExposeCmd(tf, streams)
+		Expect(cmd).ShouldNot(BeNil())
+	})
+
+	It("should fail with invalid expose type", func() {
+		err := o.Validate([]string{"--type", "fake-expose-type"})
+		Expect(err).Should(HaveOccurred())
+	})
+
+	It("should fail with invalid enable value", func() {
+		err := o.Validate([]string{"--enable", "fake-enable-value"})
+		Expect(err).Should(HaveOccurred())
+	})
+
+	It("should succeed to expose to vpc/internet", func() {
+		for _, exposeType := range []ExposeType{ExposeToVPC, ExposeToInternet} {
+			o.exposeType = exposeType
+			o.enabled = true
+
+			By("enable expose")
+			err := o.run(util.EKSProvider)
+			Expect(err).ShouldNot(HaveOccurred())
+			checkExposeAsExpected(util.EKSProvider, true, o.exposeType)
+
+			By("modify expose type")
+			switch exposeType {
+			case ExposeToVPC:
+				o.exposeType = ExposeToInternet
+			case ExposeToInternet:
+				o.exposeType = ExposeToVPC
 			}
+			err = o.run(util.EKSProvider)
+			Expect(err).Should(HaveOccurred())
+
+			By("disable expose")
+			o.enabled = false
+			err = o.run(util.EKSProvider)
+			Expect(err).ShouldNot(HaveOccurred())
+			checkExposeAsExpected(util.EKSProvider, false, o.exposeType)
 		}
-
-		labels := map[string]interface{}{
-			"app.kubernetes.io/instance": clusterName,
-		}
-		obj := newUnstructured(svcVersion, svcKind, namespace, name, annotations, labels)
-		if clusterIP != "" {
-			_ = unstructured.SetNestedField(obj.Object, clusterIP, "spec", "clusterIP")
-		}
-		return obj
-	}
-
-	Context("Expose cluster and reverse", func() {
-		var tf *cmdtesting.TestFactory
-		var streams genericclioptions.IOStreams
-
-		BeforeEach(func() {
-			tf = cmdtesting.NewTestFactory().WithNamespace(namespace)
-			streams, _, _, _ = genericclioptions.NewTestIOStreams()
-		})
-
-		AfterEach(func() {
-			defer tf.Cleanup()
-		})
-
-		It("expose command", func() {
-			cmd := NewExposeCmd(tf, streams)
-			Expect(cmd).ShouldNot(BeNil())
-		})
-
-		It("Expose cluster and reverse", func() {
-			var (
-				o    = &ExposeOptions{IOStreams: streams}
-				objs []runtime.Object
-			)
-			Expect(o.Validate([]string{})).Should(HaveOccurred())
-			Expect(o.Validate([]string{clusterName})).Should(HaveOccurred())
-			o.on = true
-			Expect(o.Validate([]string{clusterName})).Should(Succeed())
-			Expect(o.Complete(tf, []string{clusterName})).Should(Succeed())
-
-			clusterObj := newUnstructured(fmt.Sprintf("%s/%s", types.Group, types.Version), types.KindCluster, namespace, clusterName, nil, nil)
-			objs = append(objs, clusterObj)
-
-			cases := []struct {
-				exposed  bool
-				headless bool
-			}{
-				// expose on normal service
-				{false, false},
-
-				// expose on headless service
-				{false, true},
-			}
-
-			for idx, item := range cases {
-				svcName := fmt.Sprintf("svc-%d", idx)
-
-				var clusterIP string
-				if !item.headless {
-					clusterIP = fmt.Sprintf("192.168.0.%d", idx)
-				}
-				obj := newSvc(svcName, clusterIP, item.exposed)
-				objs = append(objs, obj)
-			}
-
-			o.client = fake.NewSimpleDynamicClient(scheme.Scheme, objs...)
-
-			Expect(o.Run()).Should(Succeed())
-		})
 	})
 })

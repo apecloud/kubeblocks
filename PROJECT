@@ -103,6 +103,15 @@ resources:
 - api:
     crdVersion: v1
     namespaced: true
+  controller: true
+  domain: kubeblocks.io
+  group: extensions
+  kind: Addon
+  path: github.com/apecloud/kubeblocks/apis/extensions/v1alpha1
+  version: v1alpha1
+- api:
+    crdVersion: v1
+    namespaced: true
   domain: troubleshoot.sh
   group:
   kind: HostPreflight

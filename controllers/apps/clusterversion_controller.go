@@ -40,9 +40,9 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
-//+kubebuilder:rbac:groups=apps.kubeblocks.io,resources=clusterversions,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=apps.kubeblocks.io,resources=clusterversions/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=apps.kubeblocks.io,resources=clusterversions/finalizers,verbs=update
+// +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=clusterversions,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=clusterversions/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=clusterversions/finalizers,verbs=update
 
 // ClusterVersionReconciler reconciles a ClusterVersion object
 type ClusterVersionReconciler struct {
@@ -90,10 +90,6 @@ func clusterVersionUpdateHandler(cli client.Client, ctx context.Context, cluster
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
-// TODO(user): Modify the Reconcile function to compare the state specified by
-// the ClusterVersion object against the actual cluster state, and then
-// perform operations to make the cluster state reflect the state specified by
-// the user.
 //
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.12.2/pkg/reconcile
@@ -122,10 +118,6 @@ func (r *ClusterVersionReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		return nil, r.deleteExternalResources(reqCtx, clusterVersion)
 	})
 	if res != nil {
-		// when clusterVersion deleted, sync cluster.status.operations.upgradable
-		if err := r.syncClusterStatusOperationsWithUpgrade(ctx, clusterVersion); err != nil {
-			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-		}
 		return *res, err
 	}
 
@@ -162,10 +154,6 @@ func (r *ClusterVersionReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	}
 	clusterVersion.ObjectMeta.Labels[clusterDefLabelKey] = clusterdefinition.Name
 	if err = r.Client.Patch(reqCtx.Ctx, clusterVersion, patch); err != nil {
-		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-	}
-	// when clusterVersion created, sync cluster.status.operations.upgradable
-	if err = r.syncClusterStatusOperationsWithUpgrade(ctx, clusterVersion); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 
@@ -225,41 +213,4 @@ func (r *ClusterVersionReconciler) deleteExternalResources(reqCtx intctrlutil.Re
 	// Ensure that delete implementation is idempotent and safe to invoke
 	// multiple times for same object.
 	return appsconfig.DeleteCVConfigMapFinalizer(r.Client, reqCtx, clusterVersion)
-}
-
-// SyncClusterStatusOperationsWithUpgrade syncs cluster status.operations.upgradable when delete or create ClusterVersion
-func (r *ClusterVersionReconciler) syncClusterStatusOperationsWithUpgrade(ctx context.Context, clusterVersion *appsv1alpha1.ClusterVersion) error {
-	var (
-		clusterList        = &appsv1alpha1.ClusterList{}
-		clusterVersionList = &appsv1alpha1.ClusterVersionList{}
-		upgradable         bool
-		err                error
-	)
-	// if not delete or create ClusterVersion, return
-	if clusterVersion.Status.ObservedGeneration != 0 && clusterVersion.GetDeletionTimestamp().IsZero() {
-		return nil
-	}
-	if err = r.Client.List(ctx, clusterList, client.MatchingLabels{clusterDefLabelKey: clusterVersion.Spec.ClusterDefinitionRef}); err != nil {
-		return err
-	}
-	if err = r.Client.List(ctx, clusterVersionList, client.MatchingLabels{clusterDefLabelKey: clusterVersion.Spec.ClusterDefinitionRef}); err != nil {
-		return err
-	}
-	if len(clusterVersionList.Items) > 1 {
-		upgradable = true
-	}
-	for _, v := range clusterList.Items {
-		if v.Status.Operations == nil {
-			v.Status.Operations = &appsv1alpha1.Operations{}
-		}
-		if v.Status.Operations.Upgradable == upgradable {
-			continue
-		}
-		patch := client.MergeFrom(v.DeepCopy())
-		v.Status.Operations.Upgradable = upgradable
-		if err = r.Client.Status().Patch(ctx, &v, patch); err != nil {
-			return err
-		}
-	}
-	return nil
 }

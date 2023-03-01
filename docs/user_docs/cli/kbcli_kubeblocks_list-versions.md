@@ -19,8 +19,9 @@ kbcli kubeblocks list-versions [flags]
 ### Options
 
 ```
-      --devel   use development versions (alpha, beta, and release candidate releases), too. Equivalent to version '>0.0.0-0'.
-  -h, --help    help for list-versions
+      --devel       Use development versions (alpha, beta, and release candidate releases), too. Equivalent to version '>0.0.0-0'.
+  -h, --help        help for list-versions
+      --limit int   Maximum rows of versions to return, 0 means no limit (default 10) (default 10)
 ```
 
 ### Options inherited from parent commands

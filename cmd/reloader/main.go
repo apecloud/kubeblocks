@@ -25,6 +25,7 @@ import (
 	"syscall"
 
 	"github.com/pkg/errors"
+	"github.com/spf13/viper"
 
 	"github.com/apecloud/kubeblocks/cmd/reloader/app"
 )
@@ -42,6 +43,7 @@ func main() {
 		cancel()
 	}()
 
+	viper.AutomaticEnv()
 	cmd := app.NewConfigReloadCommand(ctx, filepath.Base(os.Args[0]))
 	if err := cmd.Execute(); err != nil && errors.Cause(err) != context.Canceled {
 		fmt.Println(err)

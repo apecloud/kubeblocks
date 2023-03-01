@@ -1,0 +1,55 @@
+/*
+Copyright ApeCloud, Inc.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+syntax = "proto3";
+
+package probe.proto.v1;
+
+// Probe service provides APIs to kubeblocks operator to exec component operation.
+service Probe {
+  // InvokesComponent take a specify operation to a component
+  rpc InvokeComponent(InvokeComponentRequest) returns (stream InvokeComponentResponse) {}
+}
+
+// InvokeComponentRequest is the message to send data to output bindings
+message InvokeComponentRequest {
+  // The name of the output binding to invoke.
+  string name = 1;
+
+  // The data which will be sent to output binding.
+  bytes data = 2;
+
+  // The metadata passing to output binding components
+  // 
+  // Common metadata property:
+  // - ttlInSeconds : the time to live in seconds for the message. 
+  // If set in the binding definition will cause all messages to 
+  // have a default time to live. The message ttl overrides any value
+  // in the binding definition.
+  map<string, string> metadata = 3;
+
+  // The name of the operation type for the binding to invoke
+  string operation = 4;
+}
+
+// InvokeComponentResponse is the message returned from an output binding invocation
+message InvokeComponentResponse {
+  // The data which will be sent to output binding.
+  bytes data = 1;
+
+  // The metadata returned from an external system
+  map<string, string> metadata = 2;
+}

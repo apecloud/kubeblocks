@@ -50,7 +50,7 @@ var _ = Describe("kubeblocks list versions", func() {
 	})
 
 	It("list versions command", func() {
-		cmd = newListVersionsCmd(tf, streams)
+		cmd = newListVersionsCmd(streams)
 		Expect(cmd).ShouldNot(BeNil())
 	})
 

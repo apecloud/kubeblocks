@@ -23,15 +23,16 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
-	"helm.sh/helm/v3/pkg/repo"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
 
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
-	"github.com/apecloud/kubeblocks/internal/cli/util/helm"
+)
+
+const (
+	defaultLimit = 10
 )
 
 var (
@@ -47,9 +48,10 @@ type listVersionsOption struct {
 	genericclioptions.IOStreams
 	version string
 	devel   bool
+	limit   int
 }
 
-func newListVersionsCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func newListVersionsCmd(streams genericclioptions.IOStreams) *cobra.Command {
 	o := listVersionsOption{IOStreams: streams}
 	cmd := &cobra.Command{
 		Use:     "list-versions",
@@ -62,18 +64,18 @@ func newListVersionsCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) 
 		},
 	}
 
-	cmd.Flags().BoolVar(&o.devel, "devel", false, "use development versions (alpha, beta, and release candidate releases), too. Equivalent to version '>0.0.0-0'.")
+	cmd.Flags().BoolVar(&o.devel, "devel", false, "Use development versions (alpha, beta, and release candidate releases), too. Equivalent to version '>0.0.0-0'.")
+	cmd.Flags().IntVar(&o.limit, "limit", defaultLimit, fmt.Sprintf("Maximum rows of versions to return, 0 means no limit (default %d)", defaultLimit))
 	return cmd
 }
 
 func (o *listVersionsOption) listVersions() error {
-	// add repo, if exists, will update it
-	if err := helm.AddRepo(&repo.Entry{Name: types.KubeBlocksChartName, URL: util.GetHelmChartRepoURL()}); err != nil {
-		return err
+	if o.limit < 0 {
+		return fmt.Errorf("limit shoul be greater than or equal to 0")
 	}
 
 	// get chart versions
-	versions, err := helm.GetChartVersions(types.KubeBlocksChartName)
+	versions, err := getHelmChartVersions(types.KubeBlocksChartName)
 	if err != nil {
 		return err
 	}
@@ -87,10 +89,15 @@ func (o *listVersionsOption) listVersions() error {
 	}
 
 	// print result
+	num := 0
 	tbl := printer.NewTablePrinter(o.Out)
 	tbl.SetHeader("VERSION", "RELEASE-NOTE")
 	for _, v := range versions {
 		tbl.AddRow(v.String(), fmt.Sprintf("https://github.com/apecloud/kubeblocks/releases/tag/v%s", v))
+		num += 1
+		if num == o.limit {
+			break
+		}
 	}
 	tbl.Print()
 	return nil

@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"reflect"
 	"strconv"
+	"strings"
 
 	"cuelang.org/go/cue"
 	"github.com/spf13/viper"
@@ -115,32 +116,55 @@ func (c *cueTypeExtractor) addFieldUnits(path string, t CueType, base string) {
 	}
 }
 
-func transNumberOrBoolType(t CueType, obj reflect.Value, fn UpdateFn, expand string) error {
+func transNumberOrBoolType(t CueType, obj reflect.Value, fn UpdateFn, expand string, trimString bool) error {
 	switch t {
 	case IntType:
-		return processTypeTrans[int](obj, strconv.Atoi, fn)
+		return processTypeTrans[int](obj, strconv.Atoi, fn, trimString)
 	case BoolType:
-		return processTypeTrans[bool](obj, strconv.ParseBool, fn)
+		return processTypeTrans[bool](obj, strconv.ParseBool, fn, trimString)
 	case FloatType:
 		return processTypeTrans[float64](obj, func(s string) (float64, error) {
 			return strconv.ParseFloat(s, 64)
-		}, fn)
+		}, fn, trimString)
 	case K8SQuantityType:
-		return processTypeTrans[int64](obj, handleK8sQuantityType, fn)
+		return processTypeTrans[int64](obj, handleK8sQuantityType, fn, trimString)
 	case ClassicStorageType:
-		return processTypeTrans[int64](obj, handleClassicStorageType(expand), fn)
+		return processTypeTrans[int64](obj, handleClassicStorageType(expand), fn, trimString)
 	case ClassicTimeDurationType:
-		return processTypeTrans[int64](obj, handleClassicTimeDurationType(expand), fn)
+		return processTypeTrans[int64](obj, handleClassicTimeDurationType(expand), fn, trimString)
+	case StringType:
+		if trimString {
+			trimStringQuotes(obj, fn)
+		}
 	default:
 		// pass
 	}
 	return nil
 }
 
-func processTypeTrans[T int | int64 | float64 | float32 | bool](obj reflect.Value, transFn func(s string) (T, error), updateFn UpdateFn) error {
+func trimStringQuotes(obj reflect.Value, fn UpdateFn) {
+	if obj.Type().Kind() != reflect.String {
+		return
+	}
+	str := obj.String()
+	if !isQuotesString(str) {
+		return
+	}
+
+	trimStr := strings.Trim(str, "'\"")
+	if str != trimStr {
+		fn(trimStr)
+	}
+}
+
+func processTypeTrans[T int | int64 | float64 | float32 | bool](obj reflect.Value, transFn func(s string) (T, error), updateFn UpdateFn, trimString bool) error {
 	switch obj.Type().Kind() {
 	case reflect.String:
-		v, err := transFn(obj.String())
+		str := obj.String()
+		if trimString {
+			str = strings.Trim(str, "'\"")
+		}
+		v, err := transFn(str)
 		if err != nil {
 			return err
 		}
@@ -152,7 +176,7 @@ func processTypeTrans[T int | int64 | float64 | float32 | bool](obj reflect.Valu
 	return nil
 }
 
-func processCfgNotStringParam(data interface{}, context *cue.Context, tpl cue.Value) error {
+func processCfgNotStringParam(data interface{}, context *cue.Context, tpl cue.Value, trimString bool) error {
 	if disableAutoTransfer {
 		return nil
 	}
@@ -167,7 +191,7 @@ func processCfgNotStringParam(data interface{}, context *cue.Context, tpl cue.Va
 				return nil
 			}
 			if t, exist := typeTransformer.fieldTypes[cur]; exist {
-				err := transNumberOrBoolType(t, obj, fn, typeTransformer.fieldUnits[cur])
+				err := transNumberOrBoolType(t, obj, fn, typeTransformer.fieldUnits[cur], trimString)
 				if err != nil {
 					return WrapError(err, "failed to type convertor, field[%s]", cur)
 				}

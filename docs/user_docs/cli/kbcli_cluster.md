@@ -48,8 +48,10 @@ Cluster command
 * [kbcli cluster describe-ops](kbcli_cluster_describe-ops.md)	 - Show details of a specific OpsRequest
 * [kbcli cluster diff-configure](kbcli_cluster_diff-configure.md)	 - List the constraint for supported configuration params
 * [kbcli cluster explain-configure](kbcli_cluster_explain-configure.md)	 - List the constraint for supported configuration params
+* [kbcli cluster expose](kbcli_cluster_expose.md)	 - Expose a cluster
 * [kbcli cluster hscale](kbcli_cluster_hscale.md)	 - Horizontally scale the specified components in the cluster
 * [kbcli cluster list](kbcli_cluster_list.md)	 - List clusters
+* [kbcli cluster list-accounts](kbcli_cluster_list-accounts.md)	 - List cluster accounts
 * [kbcli cluster list-backups](kbcli_cluster_list-backups.md)	 - List backups
 * [kbcli cluster list-components](kbcli_cluster_list-components.md)	 - List cluster components
 * [kbcli cluster list-events](kbcli_cluster_list-events.md)	 - List cluster events
@@ -57,7 +59,6 @@ Cluster command
 * [kbcli cluster list-logs](kbcli_cluster_list-logs.md)	 - List supported log files in cluster
 * [kbcli cluster list-ops](kbcli_cluster_list-ops.md)	 - List all opsRequests
 * [kbcli cluster list-restores](kbcli_cluster_list-restores.md)	 - List all restore jobs
-* [kbcli cluster list-users](kbcli_cluster_list-users.md)	 - List cluster users
 * [kbcli cluster logs](kbcli_cluster_logs.md)	 - Access cluster log file
 * [kbcli cluster restart](kbcli_cluster_restart.md)	 - Restart the specified components in the cluster
 * [kbcli cluster restore](kbcli_cluster_restore.md)	 - Restore a new cluster from backup

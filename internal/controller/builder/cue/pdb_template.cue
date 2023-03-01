@@ -40,7 +40,7 @@ pdb: {
 			"app.kubernetes.io/instance":   cluster.metadata.name
 			"app.kubernetes.io/managed-by": "kubeblocks"
 
-			"app.kubeblocks.io/component-name": "\(component.name)"
+			"apps.kubeblocks.io/component-name": "\(component.name)"
 		}
 	}
 	"spec": {
@@ -53,7 +53,7 @@ pdb: {
 				"app.kubernetes.io/instance":   "\(cluster.metadata.name)-\(component.name)"
 				"app.kubernetes.io/managed-by": "kubeblocks"
 
-				"app.kubeblocks.io/component-name": "\(component.name)"
+				"apps.kubeblocks.io/component-name": "\(component.name)"
 			}
 		}
 	}

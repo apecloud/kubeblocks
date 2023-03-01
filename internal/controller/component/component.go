@@ -129,7 +129,7 @@ func BuildComponent(
 	}
 
 	replacePlaceholderTokens(component, map[string]string{
-		constant.ConnCredentialPlaceHolder: fmt.Sprintf("%s-conn-credential", cluster.GetName()),
+		constant.ConnCredentialPlaceHolder: GenerateConnCredential(cluster.GetName()),
 	})
 	return component
 }
@@ -246,4 +246,8 @@ func GetClusterDefCompByName(clusterDef appsv1alpha1.ClusterDefinition,
 		}
 	}
 	return nil
+}
+
+func GenerateConnCredential(clusterName string) string {
+	return fmt.Sprintf("%s-conn-credential", clusterName)
 }

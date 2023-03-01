@@ -103,10 +103,6 @@ type ClusterStatus struct {
 	// +optional
 	Components map[string]ClusterComponentStatus `json:"components,omitempty"`
 
-	// operations declare what operations the cluster supports.
-	// +optional
-	Operations *Operations `json:"operations,omitempty"`
-
 	// clusterDefGeneration represents the generation number of ClusterDefinition referenced.
 	// +optional
 	ClusterDefGeneration int64 `json:"clusterDefGeneration,omitempty"`
@@ -302,7 +298,7 @@ type ClusterComponentVolumeClaimTemplate struct {
 
 type Affinity struct {
 	// podAntiAffinity defines pods of component anti-affnity.
-	// Defaults to Preferred.
+	// Defaults is Preferred.
 	// Preferred means try spread pods by topologyKey.
 	// Required means must spread pods by topologyKey.
 	// +optional
@@ -323,34 +319,6 @@ type Affinity struct {
 	// +kubebuilder:default=SharedNode
 	// +optional
 	Tenancy TenancyType `json:"tenancy,omitempty"`
-}
-
-type Operations struct {
-	// upgradable whether the cluster supports upgrade. if multiple clusterVersions existed, it is true.
-	// +optional
-	Upgradable bool `json:"upgradable,omitempty"`
-
-	// volumeExpandable which components of the cluster and its volumeClaimTemplates support volumeExpansion.
-	// +listType=map
-	// +listMapKey=name
-	// +optional
-	VolumeExpandable []OperationComponent `json:"volumeExpandable,omitempty"`
-
-	// horizontalScalable which components of the cluster support horizontalScaling, and the replicas range limit.
-	// +listType=map
-	// +listMapKey=name
-	// +optional
-	HorizontalScalable []OperationComponent `json:"horizontalScalable,omitempty"`
-}
-
-type OperationComponent struct {
-	// name reference component name.
-	// +kubebuilder:validation:Required
-	Name string `json:"name"`
-
-	// volumeClaimTemplateNames which VolumeClaimTemplate of the component support volumeExpansion.
-	// +optional
-	VolumeClaimTemplateNames []string `json:"volumeClaimTemplateNames,omitempty"`
 }
 
 // Issuer defines Tls certs issuer
@@ -389,14 +357,14 @@ type TLSSecretRef struct {
 	Key string `json:"key"`
 }
 
-//+kubebuilder:object:root=true
-//+kubebuilder:subresource:status
-//+kubebuilder:resource:categories={kubeblocks,all}
-//+kubebuilder:printcolumn:name="CLUSTER-DEFINITION",type="string",JSONPath=".spec.clusterDefinitionRef",description="ClusterDefinition referenced by cluster."
-//+kubebuilder:printcolumn:name="VERSION",type="string",JSONPath=".spec.clusterVersionRef",description="Cluster Application Version."
-//+kubebuilder:printcolumn:name="TERMINATION-POLICY",type="string",JSONPath=".spec.terminationPolicy",description="Cluster termination policy."
-//+kubebuilder:printcolumn:name="STATUS",type="string",JSONPath=".status.phase",description="Cluster Status."
-//+kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
+// +kubebuilder:object:root=true
+// +kubebuilder:subresource:status
+// +kubebuilder:resource:categories={kubeblocks,all}
+// +kubebuilder:printcolumn:name="CLUSTER-DEFINITION",type="string",JSONPath=".spec.clusterDefinitionRef",description="ClusterDefinition referenced by cluster."
+// +kubebuilder:printcolumn:name="VERSION",type="string",JSONPath=".spec.clusterVersionRef",description="Cluster Application Version."
+// +kubebuilder:printcolumn:name="TERMINATION-POLICY",type="string",JSONPath=".spec.terminationPolicy",description="Cluster termination policy."
+// +kubebuilder:printcolumn:name="STATUS",type="string",JSONPath=".status.phase",description="Cluster Status."
+// +kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
 
 // Cluster is the Schema for the clusters API
 type Cluster struct {
@@ -407,7 +375,7 @@ type Cluster struct {
 	Status ClusterStatus `json:"status,omitempty"`
 }
 
-//+kubebuilder:object:root=true
+// +kubebuilder:object:root=true
 
 // ClusterList contains a list of Cluster
 type ClusterList struct {

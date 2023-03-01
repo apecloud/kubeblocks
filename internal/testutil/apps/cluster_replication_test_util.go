@@ -37,13 +37,15 @@ func MockReplicationComponentStsPod(
 	compName,
 	podName,
 	roleName string) *corev1.Pod {
-	pod := NewPodFactory(testCtx.DefaultNamespace, podName).SetOwnerReferences("apps/v1", intctrlutil.StatefulSetKind, sts).AddLabelsInMap(map[string]string{
-		intctrlutil.AppInstanceLabelKey:       clusterName,
-		intctrlutil.KBAppComponentLabelKey:    compName,
-		intctrlutil.AppManagedByLabelKey:      intctrlutil.AppName,
-		intctrlutil.RoleLabelKey:              roleName,
-		appsv1.ControllerRevisionHashLabelKey: sts.Status.UpdateRevision,
-	}).AddContainer(corev1.Container{Name: DefaultRedisContainerName, Image: DefaultRedisImageName}).Create(&testCtx).GetObject()
+	pod := NewPodFactory(testCtx.DefaultNamespace, podName).
+		SetOwnerReferences("apps/v1", intctrlutil.StatefulSetKind, sts).
+		AddAppInstanceLabel(clusterName).
+		AddAppComponentLabel(compName).
+		AddAppManangedByLabel().
+		AddRoleLabel(roleName).
+		AddControllerRevisionHashLabel(sts.Status.UpdateRevision).
+		AddContainer(corev1.Container{Name: DefaultRedisContainerName, Image: DefaultRedisImageName}).
+		Create(&testCtx).GetObject()
 	patch := client.MergeFrom(pod.DeepCopy())
 	pod.Status.Conditions = []corev1.PodCondition{
 		{

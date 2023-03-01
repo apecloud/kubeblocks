@@ -16,8 +16,9 @@ spec:
   {{- end }}
   componentSpecs:
     - name: redis-repl # user-defined
-      componentDefRef: replication # ref clusterDefinition componentDefs.name
+      componentDefRef: redis # ref clusterDefinition componentDefs.name
       monitor: {{ .Values.monitor.enabled | default false }}
+      enabledLogs: {{ .Values.enabledLogs | toJson | indent 4 }}
       replicas: {{ .Values.replicaCount | default 2 }}
       primaryIndex: {{ .Values.primaryIndex | default 0 }}
       {{- with  .Values.resources }}

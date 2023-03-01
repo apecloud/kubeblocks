@@ -38,5 +38,5 @@ kbcli playground guide [flags]
 
 ### SEE ALSO
 
-* [kbcli playground](kbcli_playground.md)	 - Bootstrap a KubeBlocks in local host
+* [kbcli playground](kbcli_playground.md)	 - Bootstrap a playground KubeBlocks in local host or cloud
 

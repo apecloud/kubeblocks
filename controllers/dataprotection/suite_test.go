@@ -34,7 +34,7 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	//+kubebuilder:scaffold:imports
+	// +kubebuilder:scaffold:imports
 
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	"github.com/spf13/viper"
@@ -73,7 +73,6 @@ var _ = BeforeSuite(func() {
 
 	ctx, cancel = context.WithCancel(context.TODO())
 
-	viper.AutomaticEnv()
 	viper.SetDefault("KUBEBLOCKS_IMAGE", "apecloud/kubeblocks:latest")
 	fmt.Printf("config settings: %v\n", viper.AllSettings())
 
@@ -103,16 +102,24 @@ var _ = BeforeSuite(func() {
 	err = dataprotectionv1alpha1.AddToScheme(scheme)
 	Expect(err).NotTo(HaveOccurred())
 
-	//+kubebuilder:scaffold:scheme
+	// +kubebuilder:scaffold:scheme
 
 	k8sClient, err = client.New(cfg, client.Options{Scheme: scheme})
 	Expect(err).NotTo(HaveOccurred())
 	Expect(k8sClient).NotTo(BeNil())
 
+	uncachedObjects := []client.Object{
+		&dataprotectionv1alpha1.BackupPolicyTemplate{},
+		&dataprotectionv1alpha1.BackupPolicy{},
+		&dataprotectionv1alpha1.BackupTool{},
+		&dataprotectionv1alpha1.Backup{},
+		&dataprotectionv1alpha1.RestoreJob{},
+	}
 	// run reconcile
 	k8sManager, err := ctrl.NewManager(cfg, ctrl.Options{
-		Scheme:             scheme,
-		MetricsBindAddress: "0",
+		Scheme:                scheme,
+		MetricsBindAddress:    "0",
+		ClientDisableCacheFor: uncachedObjects,
 	})
 	Expect(err).ToNot(HaveOccurred())
 

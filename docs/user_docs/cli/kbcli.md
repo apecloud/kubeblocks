@@ -61,7 +61,7 @@ kbcli [flags]
 * [kbcli dashboard](kbcli_dashboard.md)	 - List and open the KubeBlocks dashboards
 * [kbcli kubeblocks](kbcli_kubeblocks.md)	 - KubeBlocks operation commands
 * [kbcli options](kbcli_options.md)	 - Print the list of flags inherited by all commands
-* [kbcli playground](kbcli_playground.md)	 - Bootstrap a KubeBlocks in local host
+* [kbcli playground](kbcli_playground.md)	 - Bootstrap a playground KubeBlocks in local host or cloud
 * [kbcli troubleshoot](kbcli_troubleshoot.md)	 - Troubleshooting for KubeBlocks
 * [kbcli version](kbcli_version.md)	 - Print the version information
 

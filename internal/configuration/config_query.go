@@ -40,7 +40,7 @@ func GetParameterFromConfiguration(configMap *corev1.ConfigMap, allFiles bool, f
 	wrapCfg, err := NewConfigLoader(CfgOption{
 		Type:    CfgCmType,
 		Log:     log.FromContext(context.Background()),
-		CfgType: appsv1alpha1.INI,
+		CfgType: appsv1alpha1.Ini,
 		K8sKey: &K8sConfig{
 			ResourceFn: func(key client.ObjectKey) (map[string]string, error) {
 				return configMap.Data, nil

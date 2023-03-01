@@ -32,7 +32,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
-	cfgcm "github.com/apecloud/kubeblocks/internal/configuration/configmap"
+	cfgcm "github.com/apecloud/kubeblocks/internal/configuration/config_manager"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -370,12 +370,12 @@ func validateConfigTPLs(cli client.Client, ctx intctrlutil.RequestCtx, configTpl
 		if tpl == nil {
 			continue
 		}
-		if err := cfgcm.NeedBuildConfigSidecar(tpl.Spec.ReloadOptions); err != nil {
+		if err := cfgcm.ValidateReloadOptions(tpl.Spec.ReloadOptions, cli, ctx.Ctx); err != nil {
 			return false, err
 		}
 		if !validateConfTplStatus(tpl.Status) {
 			errMsg := fmt.Sprintf("Configuration template CR[%s] status not ready! current status: %s", tpl.Name, tpl.Status.Phase)
-			ctx.Log.V(4).Info(errMsg)
+			ctx.Log.V(1).Info(errMsg)
 			return false, fmt.Errorf(errMsg)
 		}
 	}
@@ -413,36 +413,13 @@ func getRelatedComponentsByConfigmap(stsList *appv1.StatefulSetList, cfg client.
 	return sts, containers.AsSlice()
 }
 
-func getClusterComponentsByName(components []appsv1alpha1.ClusterComponentSpec, componentName string) *appsv1alpha1.ClusterComponentSpec {
-	for i := range components {
-		component := &components[i]
-		if component.Name == componentName {
-			return component
-		}
-	}
-	return nil
-}
-
-func createConfigurePatch(cfg *corev1.ConfigMap, ctx intctrlutil.RequestCtx, tpl *appsv1alpha1.ConfigConstraintSpec) (*cfgcore.ConfigPatchInfo, error) {
+func createConfigurePatch(cfg *corev1.ConfigMap, format appsv1alpha1.CfgFileFormat, cmKeys []string) (*cfgcore.ConfigPatchInfo, bool, error) {
 	lastConfig, err := getLastVersionConfig(cfg)
 	if err != nil {
-		return nil, cfgcore.WrapError(err, "failed to get last version data. config[%v]", client.ObjectKeyFromObject(cfg))
+		return nil, false, cfgcore.WrapError(err, "failed to get last version data. config[%v]", client.ObjectKeyFromObject(cfg))
 	}
 
-	option := cfgcore.CfgOption{
-		Type:    cfgcore.CfgTplType,
-		CfgType: tpl.FormatterConfig.Format,
-		Log:     ctx.Log,
-	}
-
-	return cfgcore.CreateMergePatch(
-		&cfgcore.K8sConfig{
-			CfgKey:         client.ObjectKeyFromObject(cfg),
-			Configurations: lastConfig,
-		}, &cfgcore.K8sConfig{
-			CfgKey:         client.ObjectKeyFromObject(cfg),
-			Configurations: cfg.Data,
-		}, option)
+	return cfgcore.CreateConfigurePatch(lastConfig, cfg.Data, format, cmKeys, true)
 }
 
 func updateConfigurationSchema(tpl *appsv1alpha1.ConfigConstraintSpec) error {

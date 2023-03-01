@@ -279,6 +279,13 @@ func WithConstructSequenceResult(mockObjs map[client.ObjectKey][]MockGetReturned
 	}
 }
 
+func WithConstructGetResult(mockObj client.Object) HandleGetReturnedObject {
+	return func(key client.ObjectKey, obj client.Object) error {
+		SetGetReturnedObject(obj, mockObj)
+		return nil
+	}
+}
+
 func WithConstructSimpleGetResult(mockObjs []client.Object) HandleGetReturnedObject {
 	mockMap := make(map[client.ObjectKey]client.Object, len(mockObjs))
 	for _, obj := range mockObjs {

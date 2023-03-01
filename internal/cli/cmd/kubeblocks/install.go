@@ -33,6 +33,7 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/klog/v2"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
 
@@ -72,7 +73,7 @@ type InstallOptions struct {
 	Monitor         bool
 	Quiet           bool
 	CreateNamespace bool
-	check           bool
+	Check           bool
 	ValueOpts       values.Options
 	timeout         time.Duration
 }
@@ -105,15 +106,12 @@ func newInstallCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 			util.CheckErr(o.Complete(f, cmd))
 			util.CheckErr(o.Install())
 		},
-		PostRun: func(cmd *cobra.Command, args []string) {
-			util.CheckErr(o.PostInstall())
-		},
 	}
 
 	cmd.Flags().BoolVar(&o.Monitor, "monitor", true, "Set monitor enabled and install Prometheus, AlertManager and Grafana (default true)")
 	cmd.Flags().StringVar(&o.Version, "version", version.DefaultKubeBlocksVersion, "KubeBlocks version")
 	cmd.Flags().BoolVar(&o.CreateNamespace, "create-namespace", false, "Create the namespace if not present")
-	cmd.Flags().BoolVar(&o.check, "check", true, "Check kubernetes environment before install")
+	cmd.Flags().BoolVar(&o.Check, "check", true, "Check kubernetes environment before install")
 	cmd.Flags().DurationVar(&o.timeout, "timeout", 1800*time.Second, "Time to wait for installing KubeBlocks")
 	helm.AddValueOptionsFlags(cmd.Flags(), &o.ValueOpts)
 
@@ -156,7 +154,8 @@ func (o *InstallOptions) Install() error {
 	}
 
 	if v := versionInfo[util.KubeBlocksApp]; len(v) > 0 {
-		fmt.Fprintf(o.Out, "KubeBlocks %s already exists\n", v)
+		printer.Warning(o.Out, "KubeBlocks %s already exists, repeated installation is not supported.\n\n", v)
+		fmt.Fprintln(o.Out, "If you want to upgrade it, please use \"kbcli kubeblocks upgrade\".")
 		return nil
 	}
 
@@ -180,28 +179,45 @@ func (o *InstallOptions) Install() error {
 	// add monitor parameters
 	o.ValueOpts.Values = append(o.ValueOpts.Values, fmt.Sprintf(kMonitorParam, o.Monitor))
 
-	spinner := util.Spinner(o.Out, "%-40s", "Install KubeBlocks "+o.Version)
+	// add helm repo
+	spinner := util.Spinner(o.Out, "%-40s", "Add and update repo "+types.KubeBlocksChartName)
 	defer spinner(false)
-
 	// Add repo, if exists, will update it
 	if err = helm.AddRepo(&repo.Entry{Name: types.KubeBlocksChartName, URL: util.GetHelmChartRepoURL()}); err != nil {
 		return err
 	}
+	spinner(true)
 
 	// install KubeBlocks chart
+	spinner = util.Spinner(o.Out, "%-40s", "Install KubeBlocks "+o.Version)
+	defer spinner(false)
 	if err = o.installChart(); err != nil {
 		return err
 	}
-
-	// successfully installed
 	spinner(true)
 
+	// create VolumeSnapshotClass
+	if err = o.createVolumeSnapshotClass(); err != nil {
+		return err
+	}
+
+	if !o.Quiet {
+		o.printNotes()
+	}
 	return nil
 }
 
 func (o *InstallOptions) preCheck(versionInfo map[util.AppName]string) error {
-	if !o.check {
+	if !o.Check {
 		return nil
+	}
+
+	// check installing version exists
+	if exists, err := versionExists(o.Version); !exists {
+		if err != nil {
+			klog.V(1).Infof(err.Error())
+		}
+		return fmt.Errorf("version %s does not exist, please use \"kbcli kubeblocks list-versions --devel\" to show the available versions", o.Version)
 	}
 
 	versionErr := fmt.Errorf("failed to get kubernetes version")
@@ -365,11 +381,11 @@ func (o *InstallOptions) disableSets(sets []string) {
 }
 
 func (o *InstallOptions) checkRemainedResource() error {
-	if !o.check {
+	if !o.Check {
 		return nil
 	}
 
-	objs, err := getKBObjects(o.Client, o.Dynamic, o.Namespace)
+	objs, err := getKBObjects(o.Dynamic, o.Namespace)
 	if err != nil {
 		fmt.Fprintf(o.ErrOut, "Check whether there are resources left by KubeBlocks before: %s\n", err.Error())
 	}
@@ -444,21 +460,42 @@ func (o *InstallOptions) PostInstall() error {
 }
 
 func (o *InstallOptions) createVolumeSnapshotClass() error {
-	options := cluster.CreateVolumeSnapshotClassOptions{}
-	options.BaseOptions.Client = o.Dynamic
-	options.BaseOptions.IOStreams = o.IOStreams
-	options.BaseOptions.Quiet = true
+	createFunc := func() error {
+		options := cluster.CreateVolumeSnapshotClassOptions{}
+		options.BaseOptions.Client = o.Dynamic
+		options.BaseOptions.IOStreams = o.IOStreams
+		options.BaseOptions.Quiet = true
 
-	spinner := util.Spinner(o.Out, "%-40s", "Configure VolumeSnapshotClass")
-	defer spinner(false)
+		spinner := util.Spinner(o.Out, "%-40s", "Configure VolumeSnapshotClass")
+		defer spinner(false)
 
-	if err := options.Complete(); err != nil {
-		return err
+		if err := options.Complete(); err != nil {
+			return err
+		}
+		if err := options.Create(); err != nil {
+			return err
+		}
+		spinner(true)
+		return nil
 	}
-	if err := options.Create(); err != nil {
-		return err
+
+	var sets []string
+	for _, set := range o.ValueOpts.Values {
+		splitSet := strings.Split(set, ",")
+		sets = append(sets, splitSet...)
 	}
-	spinner(true)
+	for _, set := range sets {
+		if set != "snapshot-controller.enabled=true" {
+			continue
+		}
+
+		if err := createFunc(); err != nil {
+			return err
+		} else {
+			// only need to create once
+			return nil
+		}
+	}
 	return nil
 }
 
@@ -475,4 +512,22 @@ func (o *InstallOptions) buildChart() *helm.InstallOpts {
 		CreateNamespace: o.CreateNamespace,
 		Timeout:         o.timeout,
 	}
+}
+
+func versionExists(version string) (bool, error) {
+	if version == "" {
+		return true, nil
+	}
+
+	allVers, err := getHelmChartVersions(types.KubeBlocksChartName)
+	if err != nil {
+		return false, err
+	}
+
+	for _, v := range allVers {
+		if v.String() == version {
+			return true, nil
+		}
+	}
+	return false, nil
 }

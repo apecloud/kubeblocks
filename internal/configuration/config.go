@@ -80,8 +80,14 @@ const (
 )
 
 const (
-	cfgKeyDelimiter = "."
-	emptyJSON       = "{}"
+	delimiterDot = "."
+	emptyJSON    = "{}"
+
+	// In order to verify a configuration file, the configuration file is converted to a UnstructuredObject.
+	// When there is a special character '.' in the parameter will cause the parameter of the configuration file parsing to be messed up.
+	//   e.g. pg parameters: auto_explain.log_analyze = 'True'
+	// To solve this problem, the cfgDelimiterPlaceholder variable is introduced to ensure that no such string exists in a configuration file.
+	cfgDelimiterPlaceholder = "@#@"
 )
 
 var (
@@ -103,9 +109,7 @@ func init() {
 			indexer:   make(map[string]*viper.Viper, 1),
 		}
 
-		v := viper.NewWithOptions(viper.KeyDelimiter(cfgKeyDelimiter))
-
-		v.SetConfigType(string(option.CfgType))
+		v := NewCfgViper(option.CfgType)
 		if err := v.ReadConfig(bytes.NewReader(option.RawData)); err != nil {
 			option.Log.Error(err, "failed to parse config!", "context", option.RawData)
 			return nil, err
@@ -140,8 +144,10 @@ func init() {
 
 		var index = 0
 		for fileName, content := range ctx.Configurations {
-			v := viper.NewWithOptions(viper.KeyDelimiter(cfgKeyDelimiter))
-			v.SetConfigType(string(option.CfgType))
+			if ctx.CMKeys != nil && !ctx.CMKeys.InArray(fileName) {
+				continue
+			}
+			v := NewCfgViper(option.CfgType)
 			if err := v.ReadConfig(bytes.NewReader([]byte(content))); err != nil {
 				return nil, WrapError(err, "failed to load config: filename[%s]", fileName)
 			}
@@ -296,6 +302,16 @@ func (c *cfgWrapper) Diff(target *cfgWrapper) (*ConfigPatchInfo, error) {
 	return reconfigureInfo, nil
 }
 
+func NewCfgViper(cfgType appsv1alpha1.CfgFileFormat) *viper.Viper {
+	defaultKeySep := delimiterDot
+	if cfgType == appsv1alpha1.Properties || cfgType == appsv1alpha1.Dotenv {
+		defaultKeySep = cfgDelimiterPlaceholder
+	}
+	v := viper.NewWithOptions(viper.KeyDelimiter(defaultKeySep))
+	v.SetConfigType(strings.ToLower(string(cfgType)))
+	return v
+}
+
 func NewCfgOptions(filename string, options ...Option) CfgOpOption {
 	context := CfgOpOption{
 		FileName: filename,
@@ -356,7 +372,7 @@ func (c cfgWrapper) getCfgViper(option CfgOpOption) *viper.Viper {
 
 func (c *cfgWrapper) generateKey(paramKey string, option CfgOpOption, v *viper.Viper) string {
 	if option.IniContext != nil && len(option.IniContext.SectionName) > 0 {
-		return strings.Join([]string{option.IniContext.SectionName, paramKey}, cfgKeyDelimiter)
+		return strings.Join([]string{option.IniContext.SectionName, paramKey}, delimiterDot)
 	}
 
 	return paramKey
@@ -375,6 +391,14 @@ func DumpCfgContent(v *viper.Viper, tmpPath string) (string, error) {
 	}
 
 	return string(content), nil
+}
+
+func FromCMKeysSelector(keys []string) *set.LinkedHashSetString {
+	var cmKeySet *set.LinkedHashSetString
+	if len(keys) > 0 {
+		cmKeySet = set.NewLinkedHashSetString(keys...)
+	}
+	return cmKeySet
 }
 
 func CreateMergePatch(oldcfg, target interface{}, option CfgOption) (*ConfigPatchInfo, error) {
@@ -407,7 +431,7 @@ func GenerateVisualizedParamsList(configPatch *ConfigPatchInfo, formatConfig *ap
 	}
 
 	var trimPrefix = ""
-	if formatConfig != nil && formatConfig.Format == appsv1alpha1.INI && formatConfig.IniConfig != nil {
+	if formatConfig != nil && formatConfig.Format == appsv1alpha1.Ini && formatConfig.IniConfig != nil {
 		trimPrefix = formatConfig.IniConfig.SectionName
 	}
 
@@ -454,7 +478,7 @@ func checkAndFlattenMap(v any, trim string) []ParameterPair {
 
 func flattenMap(m map[string]interface{}, prefix string) []ParameterPair {
 	if prefix != "" {
-		prefix += cfgKeyDelimiter
+		prefix += delimiterDot
 	}
 
 	r := make([]ParameterPair, 0)
@@ -489,4 +513,20 @@ func generateUpdateKeyParam(files map[string]interface{}, trimPrefix string, upd
 		}
 	}
 	return r
+}
+
+// isQuotesString check whether a string is quoted.
+func isQuotesString(str string) bool {
+	const (
+		singleQuotes = '\''
+		doubleQuotes = '"'
+	)
+
+	if len(str) < 2 {
+		return false
+	}
+
+	firstChar := str[0]
+	lastChar := str[len(str)-1]
+	return (firstChar == singleQuotes && lastChar == singleQuotes) || (firstChar == doubleQuotes && lastChar == doubleQuotes)
 }

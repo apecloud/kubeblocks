@@ -17,10 +17,10 @@ limitations under the License.
 package loadbalancer
 
 // read + update access
-//+kubebuilder:rbac:groups=core,resources=services,verbs=get;list;watch;update
+// +kubebuilder:rbac:groups=core,resources=services,verbs=get;list;watch;update
 
 // read only + watch access
-//+kubebuilder:rbac:groups=core,resources=pods;endpoints,verbs=get;list;watch
+// +kubebuilder:rbac:groups=core,resources=pods;endpoints,verbs=get;list;watch
 
 // read only access
-//+kubebuilder:rbac:groups=core,resources=nodes,verbs=get;list
+// +kubebuilder:rbac:groups=core,resources=nodes,verbs=get;list

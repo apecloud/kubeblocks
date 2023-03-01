@@ -50,8 +50,9 @@ func NewClusterCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 				NewListInstancesCmd(f, streams),
 				NewListComponentsCmd(f, streams),
 				NewListEventsCmd(f, streams),
-				NewListUsersCmd(f, streams),
+				NewListAccountsCmd(f, streams),
 				NewDeleteCmd(f, streams),
+				NewExposeCmd(f, streams),
 			},
 		},
 		{
@@ -97,10 +98,6 @@ func NewClusterCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 	// add subcommands
 	groups.Add(cmd)
 	templates.ActsAsRootCommand(cmd, nil, groups...)
-
-	if viper.GetString(EnvExperimentalExpose) == "1" {
-		cmd.AddCommand(NewExposeCmd(f, streams))
-	}
 
 	return cmd
 }

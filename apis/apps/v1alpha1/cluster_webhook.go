@@ -41,8 +41,35 @@ func (r *Cluster) SetupWebhookWithManager(mgr ctrl.Manager) error {
 		Complete()
 }
 
+//+kubebuilder:webhook:path=/mutate-apps-kubeblocks-io-v1alpha1-cluster,mutating=true,failurePolicy=fail,sideEffects=None,groups=apps.kubeblocks.io,resources=clusters,verbs=create;update,versions=v1alpha1,name=mcluster.kb.io,admissionReviewVersions=v1
+
+var _ webhook.Defaulter = &Cluster{}
+
+// Default set default value by implements webhook.Defaulter so a webhook will be registered for the type
+func (r *Cluster) Default() {
+	clusterlog.Info("default", "name", r.Name)
+	var (
+		ctx        = context.Background()
+		clusterDef = &ClusterDefinition{}
+	)
+
+	_ = webhookMgr.client.Get(ctx, types.NamespacedName{Name: r.Spec.ClusterDefRef}, clusterDef)
+	for i := range r.Spec.ComponentSpecs {
+		comSpec := &r.Spec.ComponentSpecs[i]
+		if comSpec.PrimaryIndex != nil {
+			continue
+		}
+		for _, compDef := range clusterDef.Spec.ComponentDefs {
+			if compDef.WorkloadType != Replication || comSpec.ComponentDefRef != compDef.Name {
+				continue
+			}
+			comSpec.PrimaryIndex = new(int32)
+		}
+	}
+}
+
 // TODO(user): change verbs to "verbs=create;update;delete" if you want to enable deletion validation.
-//+kubebuilder:webhook:path=/validate-apps-kubeblocks-io-v1alpha1-cluster,mutating=false,failurePolicy=fail,sideEffects=None,groups=apps.kubeblocks.io,resources=clusters,verbs=create;update,versions=v1alpha1,name=vcluster.kb.io,admissionReviewVersions=v1
+// +kubebuilder:webhook:path=/validate-apps-kubeblocks-io-v1alpha1-cluster,mutating=false,failurePolicy=fail,sideEffects=None,groups=apps.kubeblocks.io,resources=clusters,verbs=create;update,versions=v1alpha1,name=vcluster.kb.io,admissionReviewVersions=v1
 
 var _ webhook.Validator = &Cluster{}
 

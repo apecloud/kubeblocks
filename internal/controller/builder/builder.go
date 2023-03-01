@@ -36,7 +36,7 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	componentutil "github.com/apecloud/kubeblocks/controllers/apps/components/util"
-	cfgcm "github.com/apecloud/kubeblocks/internal/configuration/configmap"
+	cfgcm "github.com/apecloud/kubeblocks/internal/configuration/config_manager"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
@@ -363,7 +363,7 @@ func BuildDeploy(reqCtx intctrlutil.RequestCtx, params BuilderParams) (*appsv1.D
 }
 
 func BuildPVCFromSnapshot(sts *appsv1.StatefulSet,
-	vct corev1.PersistentVolumeClaim,
+	vct corev1.PersistentVolumeClaimTemplate,
 	pvcKey types.NamespacedName,
 	snapshotName string) (*corev1.PersistentVolumeClaim, error) {
 
@@ -567,7 +567,7 @@ func BuildConfigMapWithTemplate(
 	return &cm, nil
 }
 
-func BuildCfgManagerContainer(sidecarRenderedParam *cfgcm.ConfigManagerSidecar) (*corev1.Container, error) {
+func BuildCfgManagerContainer(sidecarRenderedParam *cfgcm.ConfigManagerParams) (*corev1.Container, error) {
 	const tplFile = "config_manager_sidecar.cue"
 	cueFS, _ := debme.FS(cueTemplates, "cue")
 	cueTpl, err := getCacheCUETplValue(tplFile, func() (*intctrlutil.CUETpl, error) {

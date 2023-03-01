@@ -95,7 +95,7 @@ var _ = Describe("kubeblocks", func() {
 			},
 			Version: version.DefaultKubeBlocksVersion,
 			Monitor: true,
-			check:   false,
+			Check:   false,
 		}
 		cmd := newUpgradeCmd(tf, streams)
 		_ = cmd.Flags().Set("monitor", "true")

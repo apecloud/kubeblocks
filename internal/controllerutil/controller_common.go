@@ -18,6 +18,7 @@ package controllerutil
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 	"strings"
 	"time"
@@ -73,11 +74,14 @@ func RequeueWithError(err error, logger logr.Logger, msg string, keysAndValues .
 }
 
 func RequeueAfter(duration time.Duration, logger logr.Logger, msg string, keysAndValues ...interface{}) (reconcile.Result, error) {
+	keysAndValues = append(keysAndValues, "duration")
+	keysAndValues = append(keysAndValues, duration)
 	if msg != "" {
-		logger.Info(msg, keysAndValues...)
+		msg = fmt.Sprintf("reason: %s; retry-after", msg)
 	} else {
-		logger.V(1).Info("retry-after", "duration", duration)
+		msg = "retry-after"
 	}
+	logger.V(1).Info(msg, keysAndValues...)
 	return reconcile.Result{
 		Requeue:      true,
 		RequeueAfter: duration,
@@ -85,11 +89,10 @@ func RequeueAfter(duration time.Duration, logger logr.Logger, msg string, keysAn
 }
 
 func Requeue(logger logr.Logger, msg string, keysAndValues ...interface{}) (reconcile.Result, error) {
-	if msg != "" {
-		logger.Info(msg, keysAndValues...)
-	} else {
-		logger.V(1).Info("requeue")
+	if msg == "" {
+		msg = "requeue"
 	}
+	logger.V(1).Info(msg, keysAndValues...)
 	return reconcile.Result{Requeue: true}, nil
 }
 

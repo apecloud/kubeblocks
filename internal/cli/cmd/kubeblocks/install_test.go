@@ -98,7 +98,7 @@ var _ = Describe("kubeblocks install", func() {
 		o.printNotes()
 	})
 
-	It("run post install", func() {
+	It("create volumeSnapshotClass", func() {
 		o := &InstallOptions{
 			Options: Options{
 				IOStreams: streams,
@@ -112,7 +112,7 @@ var _ = Describe("kubeblocks install", func() {
 			CreateNamespace: true,
 			ValueOpts:       values.Options{Values: []string{"snapshot-controller.enabled=true"}},
 		}
-		Expect(o.PostInstall()).Should(HaveOccurred())
+		Expect(o.createVolumeSnapshotClass()).Should(HaveOccurred())
 	})
 
 	It("preCheck", func() {
@@ -120,7 +120,7 @@ var _ = Describe("kubeblocks install", func() {
 			Options: Options{
 				IOStreams: genericclioptions.NewTestIOStreamsDiscard(),
 			},
-			check: true,
+			Check: true,
 		}
 		By("kubernetes version is empty")
 		versionInfo := map[util.AppName]string{}

@@ -267,16 +267,18 @@ type webhookManager struct {
 
 // CfgFileFormat defines formatter of configuration files.
 // +enum
-// +kubebuilder:validation:Enum={xml,ini,yaml,json,dotenv}
+// +kubebuilder:validation:Enum={xml,ini,yaml,json,hcl,dotenv,toml,properties}
 type CfgFileFormat string
 
 const (
-	INI    CfgFileFormat = "ini"
-	YAML   CfgFileFormat = "yaml"
-	JSON   CfgFileFormat = "json"
-	XML    CfgFileFormat = "xml"
-	HCL    CfgFileFormat = "hcl"
-	DOTENV CfgFileFormat = "dotenv"
+	Ini        CfgFileFormat = "ini"
+	YAML       CfgFileFormat = "yaml"
+	JSON       CfgFileFormat = "json"
+	XML        CfgFileFormat = "xml"
+	HCL        CfgFileFormat = "hcl"
+	Dotenv     CfgFileFormat = "dotenv"
+	TOML       CfgFileFormat = "toml"
+	Properties CfgFileFormat = "properties"
 )
 
 // UpgradePolicy defines the policy of reconfiguring.
@@ -300,6 +302,7 @@ const (
 	SQLType        CfgReloadType = "sql"
 	ShellType      CfgReloadType = "exec"
 	HTTPType       CfgReloadType = "http"
+	TPLScriptType  CfgReloadType = "tpl"
 )
 
 // SignalType defines which signals are valid.

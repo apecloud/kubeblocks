@@ -1,7 +1,7 @@
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: ClusterDefinition
 metadata:
-  name: apecloud-postgresql
+  name: postgresql
   labels:
     {{- include "postgresql.labels" . | nindent 4 }}
 spec:
@@ -30,6 +30,9 @@ spec:
         configTemplateRefs:
           - name: postgresql-configuration
             configTplRef: postgresql-configuration
+            configConstraintRef: postgresql14-cc
+            keys:
+              - postgresql.conf
             namespace: {{ .Release.Namespace }}
             volumeName: postgresql-config
             defaultMode: 0777
@@ -59,7 +62,7 @@ spec:
           - name: postgresql
             imagePullPolicy: {{ default .Values.image.pullPolicy "IfNotPresent" }}
             securityContext:
-              runAsUser: 1001            
+              runAsUser: 0
             volumeMounts:
               - name: dshm
                 mountPath: /dev/shm
@@ -72,7 +75,7 @@ spec:
             ports:
               - name: tcp-postgresql
                 containerPort: 5432
-           
+
             livenessProbe:
               failureThreshold: 6
               initialDelaySeconds: 30
@@ -112,6 +115,11 @@ spec:
                   secretKeyRef:
                     name: $(CONN_CREDENTIAL_SECRET_NAME)
                     key: username
+              - name: PGPASSWORD
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: postgres-password
               # Authentication
               - name: POSTGRES_USER
                 valueFrom:
@@ -178,8 +186,7 @@ spec:
             image:  {{ .Values.metrics.image.registry | default "docker.io" }}/{{ .Values.metrics.image.repository }}:{{ .Values.metrics.image.tag }}
             imagePullPolicy: {{ .Values.metrics.image.pullPolicy | quote }}
             securityContext:
-              runAsNonRoot: true
-              runAsUser: 1001
+              runAsUser: 0
             env:
               {{- $database := "postgres" }}
               {{- $sslmode := "disable" }}
@@ -212,7 +219,7 @@ spec:
               timeoutSeconds: 5
               httpGet:
                 path: /
-                port: http-metrics        
+                port: http-metrics
             readinessProbe:
               failureThreshold: 6
               initialDelaySeconds: 5
@@ -228,7 +235,7 @@ spec:
         volumes:
           - name: dshm
             emptyDir:
-              medium: Memory       
+              medium: Memory
               {{- with .Values.shmVolume.sizeLimit }}
               sizeLimit: {{ . }}
               {{- end }}
@@ -237,7 +244,7 @@ spec:
           image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ default .Values.image.tag .Chart.AppVersion }}
           command: ["psql"]
           args:
-          - -h$(KB_ACCOUNT_ENDPOINT) 
+          - -h$(KB_ACCOUNT_ENDPOINT)
           - -c $(KB_ACCOUNT_STATEMENT)
           env:
           - name: PGUSER
@@ -249,7 +256,7 @@ spec:
             valueFrom:
               secretKeyRef:
                 name: $(CONN_CREDENTIAL_SECRET_NAME)
-                key: postgres-password     
+                key: postgres-password
         passwordConfig:
           length: 10
           numDigits: 5
@@ -274,20 +281,20 @@ spec:
             provisionPolicy:
               type: CreateByStmt
               scope: AnyPods
-              statements:        
+              statements:
                 creation: CREATE USER $(USERNAME) WITH PASSWORD '$(PASSWD)';  GRANT pg_monitor TO $(USERNAME);
                 deletion: DROP USER IF EXISTS $(USERNAME);
           - name: kbmonitoring
             provisionPolicy:
               type: CreateByStmt
               scope: AnyPods
-              statements:        
+              statements:
                 creation: CREATE USER $(USERNAME) WITH PASSWORD '$(PASSWD)';  GRANT pg_monitor TO $(USERNAME);
                 deletion: DROP USER IF EXISTS $(USERNAME);
           - name: kbreplicator
             provisionPolicy:
               type: CreateByStmt
               scope: AnyPods
-              statements:        
+              statements:
                 creation: CREATE USER $(USERNAME) WITH REPLICATION PASSWORD '$(PASSWD)';
                 deletion: DROP USER IF EXISTS $(USERNAME);                     

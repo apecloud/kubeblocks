@@ -157,20 +157,20 @@ spec:
           command: ["mysql"]
           args:
           - -h$(KB_ACCOUNT_ENDPOINT) 
-          - -u$(MYSQL_USER) 
-          - -p$(MYSQL_PASSWORD)        
+          - -u$(MYSQL_ROOT_USER)
+          - -p$(MYSQL_ROOT_PASSWORD)
           - -e $(KB_ACCOUNT_STATEMENT)
           env:
-          - name: MYSQL_USER
+          - name: MYSQL_ROOT_USER
             valueFrom:
               secretKeyRef:
                 name: $(CONN_CREDENTIAL_SECRET_NAME)
                 key: username
-          - name: MYSQL_PASSWORD
+          - name: MYSQL_ROOT_PASSWORD
             valueFrom:
               secretKeyRef:
                 name: $(CONN_CREDENTIAL_SECRET_NAME)
-                key: password   
+                key: password
         passwordConfig:
           length: 10
           numDigits: 5

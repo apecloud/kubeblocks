@@ -39,7 +39,7 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	//+kubebuilder:scaffold:imports
+	// +kubebuilder:scaffold:imports
 
 	"github.com/spf13/viper"
 	"go.uber.org/zap/zapcore"
@@ -102,7 +102,7 @@ var _ = BeforeSuite(func() {
 	err = appsv1alpha1.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
 
-	//+kubebuilder:scaffold:scheme
+	// +kubebuilder:scaffold:scheme
 
 	k8sClient, err = client.New(cfg, client.Options{Scheme: scheme.Scheme})
 	Expect(err).NotTo(HaveOccurred())
@@ -149,8 +149,8 @@ func initOperationsResources(clusterDefinitionName,
 		clusterVersionName, clusterName, statelessComp, statefulComp, consensusComp)
 	opsRes := &OpsResource{
 		Ctx:      context.Background(),
-		Cluster:  clusterObject,
 		Client:   k8sClient,
+		Cluster:  clusterObject,
 		Recorder: k8sManager.GetEventRecorderFor("opsrequest-controller"),
 	}
 	By("mock cluster is Running and the status operations")
@@ -165,20 +165,6 @@ func initOperationsResources(clusterDefinitionName,
 			},
 			statefulComp: {
 				Phase: appsv1alpha1.RunningPhase,
-			},
-		}
-		clusterObject.Status.Operations = &appsv1alpha1.Operations{
-			Upgradable: true,
-			HorizontalScalable: []appsv1alpha1.OperationComponent{
-				{
-					Name: consensusComp,
-				},
-				{
-					Name: statelessComp,
-				},
-				{
-					Name: statefulComp,
-				},
 			},
 		}
 	})).Should(Succeed())

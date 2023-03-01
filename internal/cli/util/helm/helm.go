@@ -112,7 +112,7 @@ func AddRepo(r *repo.Entry) error {
 
 	f.Update(r)
 
-	if err := f.WriteFile(repoFile, 0644); err != nil {
+	if err = f.WriteFile(repoFile, 0644); err != nil {
 		return err
 	}
 	return nil
@@ -445,7 +445,7 @@ func GetChartVersions(chartName string) ([]*semver.Version, error) {
 	var ind *repo.IndexFile
 	for _, re := range rf.Repositories {
 		n := re.Name
-		if n != chartName {
+		if n != types.KubeBlocksRepoName {
 			continue
 		}
 
@@ -464,8 +464,8 @@ func GetChartVersions(chartName string) ([]*semver.Version, error) {
 	}
 
 	var versions []*semver.Version
-	for _, entry := range ind.Entries {
-		if len(entry) == 0 {
+	for chart, entry := range ind.Entries {
+		if len(entry) == 0 || chart != chartName {
 			continue
 		}
 		for _, v := range entry {

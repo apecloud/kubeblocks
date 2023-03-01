@@ -22,7 +22,6 @@ import (
 
 	"github.com/pkg/errors"
 	analyze "github.com/replicatedhq/troubleshoot/pkg/analyze"
-	"github.com/replicatedhq/troubleshoot/pkg/logger"
 
 	preflightv1beta2 "github.com/apecloud/kubeblocks/apis/preflight/v1beta2"
 )
@@ -52,7 +51,7 @@ func KBAnalyze(ctx context.Context, kbAnalyzer *preflightv1beta2.ExtendAnalyze, 
 	}
 	isExcluded, _ := analyzer.IsExcluded()
 	if isExcluded {
-		logger.Printf("Excluding %q analyzer", analyzer.Title())
+		// logger.Printf("Excluding %q analyzer", analyzer.Title())
 		return nil
 	}
 	results, err := analyzer.Analyze(getFile, findFiles)
@@ -69,7 +68,7 @@ func HostKBAnalyze(ctx context.Context, kbHostAnalyzer *preflightv1beta2.ExtendH
 	}
 	isExcluded, _ := hostAnalyzer.IsExcluded()
 	if isExcluded {
-		logger.Printf("Excluding %q analyzer", hostAnalyzer.Title())
+		// logger.Printf("Excluding %q analyzer", hostAnalyzer.Title())
 		return nil
 	}
 	results, err := hostAnalyzer.Analyze(getFile)

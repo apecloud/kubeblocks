@@ -13,7 +13,7 @@
 // limitations under the License.
 
 template: {
-	name: "config-manager-sidecar"
+	name: parameter.name
 	command: [
 		"/bin/reloader",
 	]
@@ -25,6 +25,41 @@ template: {
 				fieldRef:
 					fieldPath: "status.podIP"
 		},
+		if parameter.characterType != "" {
+			{
+				name:  "DB_TYPE"
+				value: parameter.characterType
+			}
+		},
+		if parameter.characterType == "mysql" {
+			{
+				name: "MYSQL_USER"
+				valueFrom: {
+					secretKeyRef: {
+						key:  "username"
+						name: parameter.secreteName
+					}
+				}
+			}
+		},
+		if parameter.characterType == "mysql" {
+			{
+				name: "MYSQL_PASSWORD"
+				valueFrom: {
+					secretKeyRef: {
+						key:  "password"
+						name: parameter.secreteName
+					}
+				}
+			}
+		},
+		if parameter.characterType == "mysql" {
+			{
+				name:  "DATA_SOURCE_NAME"
+				value: "$(MYSQL_USER):$(MYSQL_PASSWORD)@(localhost:3306)/"
+			}
+		},
+		// other type
 	]
 
 	image:           parameter.sidecarImage
@@ -45,8 +80,10 @@ template: {
 }
 
 parameter: {
-	name:         string
-	sidecarImage: string
+	name:          string
+	characterType: string
+	sidecarImage:  string
+	secreteName:   string
 	args: [...#ArgType]
 	// envs?: [...#EnvType]
 	volumes: [...]

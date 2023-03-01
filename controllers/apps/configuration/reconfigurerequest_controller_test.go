@@ -123,11 +123,11 @@ var _ = Describe("Reconfigure Controller", func() {
 			_ = testapps.NewStatefulSetFactory(testCtx.DefaultNamespace, statefulSetName, clusterObj.Name, statefulCompName).
 				AddConfigmapVolume(configVolumeName, configmap.Name).
 				AddContainer(container).
-				AddLabels(intctrlutil.AppNameLabelKey, clusterName,
-					intctrlutil.AppInstanceLabelKey, clusterName,
-					intctrlutil.KBAppComponentLabelKey, statefulCompName,
-					cfgcore.GenerateTPLUniqLabelKeyWithConfig(configTplName), configmap.Name,
-				).Create(&testCtx).GetObject()
+				AddAppNameLabel(clusterName).
+				AddAppInstanceLabel(clusterName).
+				AddAppComponentLabel(statefulCompName).
+				AddLabels(cfgcore.GenerateTPLUniqLabelKeyWithConfig(configTplName), configmap.Name).
+				Create(&testCtx).GetObject()
 
 			By("check config constraint")
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(constraint), func(g Gomega, tpl *appsv1alpha1.ConfigConstraint) {

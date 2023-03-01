@@ -21,6 +21,8 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
+	cp "github.com/apecloud/kubeblocks/internal/cli/cloudprovider"
 )
 
 func TestPlayground(t *testing.T) {
@@ -29,12 +31,12 @@ func TestPlayground(t *testing.T) {
 }
 
 var _ = BeforeSuite(func() {
+	// set fake image info
+	cp.K3sImage = "fake-k3s-image"
+	cp.K3dToolsImage = "fake-k3s-tools-image"
+	cp.K3dProxyImage = "fake-k3d-proxy-image"
+
 	// set default cluster name to test
 	k8sClusterName = "playground-test"
 	kbClusterName = "playground-test-cluster"
-
-	// set fake image info
-	K3sImage = "fake-k3s-image"
-	K3dToolsImage = "fake-k3s-tools-image"
-	K3dProxyImage = "fake-k3d-proxy-image"
 })

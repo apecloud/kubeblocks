@@ -34,6 +34,7 @@ const (
 	WebHook                           // "http"
 	ShellTool                         // "exec"
 	SQL                               // "sql"
+	TPLScript                         // "tpl"
 )
 
 const (
@@ -44,9 +45,8 @@ const (
 
 var allNotifyType = map[NotifyEventType]appsv1alpha1.CfgReloadType{
 	UnixSignal: appsv1alpha1.UnixSignalType,
-	WebHook:    appsv1alpha1.HTTPType,
 	ShellTool:  appsv1alpha1.ShellType,
-	SQL:        appsv1alpha1.SQLType,
+	TPLScript:  appsv1alpha1.TPLScriptType,
 }
 
 func init() {
@@ -101,6 +101,15 @@ type VolumeWatcherOpts struct {
 	// Signal is valid for UnixSignal
 	Signal appsv1alpha1.SignalType
 
+	// Exec command for reload
+	Command string
+
+	// Exec command for reload
+	TPLConfig       string
+	BackupPath      string
+	FormatterConfig *appsv1alpha1.FormatterConfig
+	TPLScriptPath   string
+
 	LogLevel       string
 	NotifyHandType NotifyEventType
 
@@ -133,6 +142,8 @@ func InstallFlags(flags *pflag.FlagSet, opt *VolumeWatcherOpts) {
 		"notify-type",
 		"the config describe how to process notification messages.",
 	)
+
+	// for signal handle
 	flags.StringVar(&opt.ProcessName,
 		"process",
 		opt.ProcessName,
@@ -141,6 +152,23 @@ func InstallFlags(flags *pflag.FlagSet, opt *VolumeWatcherOpts) {
 		"signal",
 		string(opt.Signal),
 		"the config describe reload unix signal.")
+
+	// for exec handle
+	flags.StringVar(&opt.Command,
+		"command",
+		opt.Command,
+		"the config describe reload command. ")
+
+	// for exec tpl scripts
+	flags.StringVar(&opt.TPLConfig,
+		"tpl-config",
+		opt.TPLConfig,
+		"the config describe reload by tpl script.")
+	flags.StringVar(&opt.BackupPath,
+		"backup-path",
+		opt.BackupPath,
+		"the config describe.")
+
 	flags.StringVar(&opt.LogLevel,
 		"log-level",
 		opt.LogLevel,

@@ -218,6 +218,9 @@ func (o *ExposeOptions) EnableExpose(svc corev1.Service, provider util.K8sProvid
 
 	// remove orphan annotations
 	kvs, err = GetExposeAnnotations(provider, exposeType)
+	if err != nil {
+		return err
+	}
 	for k := range kvs {
 		delete(annotations, k)
 	}

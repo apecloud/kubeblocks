@@ -296,12 +296,12 @@ type ResourceRequirements struct {
 	Requests corev1.ResourceList `json:"requests,omitempty"`
 }
 
-//+kubebuilder:object:root=true
-//+kubebuilder:subresource:status
-//+kubebuilder:resource:categories={kubeblocks},scope=Cluster
-//+kubebuilder:printcolumn:name="TYPE",type="string",JSONPath=".spec.type",description="addon types"
-//+kubebuilder:printcolumn:name="STATUS",type="string",JSONPath=".status.phase",description="status phase"
-//+kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
+// +kubebuilder:object:root=true
+// +kubebuilder:subresource:status
+// +kubebuilder:resource:categories={kubeblocks},scope=Cluster
+// +kubebuilder:printcolumn:name="TYPE",type="string",JSONPath=".spec.type",description="addon types"
+// +kubebuilder:printcolumn:name="STATUS",type="string",JSONPath=".status.phase",description="status phase"
+// +kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
 
 // Addon is the Schema for the addons API
 type Addon struct {
@@ -312,7 +312,7 @@ type Addon struct {
 	Status AddonStatus `json:"status,omitempty"`
 }
 
-//+kubebuilder:object:root=true
+// +kubebuilder:object:root=true
 
 // AddonList contains a list of Addon
 type AddonList struct {

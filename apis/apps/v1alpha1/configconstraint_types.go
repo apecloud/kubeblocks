@@ -176,11 +176,11 @@ type IniConfig struct {
 	SectionName string `json:"sectionName,omitempty"`
 }
 
-//+kubebuilder:object:root=true
-//+kubebuilder:subresource:status
-//+kubebuilder:resource:categories={kubeblocks},scope=Cluster,shortName=cc
-//+kubebuilder:printcolumn:name="PHASE",type="string",JSONPath=".status.phase",description="status phase"
-//+kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
+// +kubebuilder:object:root=true
+// +kubebuilder:subresource:status
+// +kubebuilder:resource:categories={kubeblocks},scope=Cluster,shortName=cc
+// +kubebuilder:printcolumn:name="PHASE",type="string",JSONPath=".status.phase",description="status phase"
+// +kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
 
 // ConfigConstraint is the Schema for the configconstraint API
 type ConfigConstraint struct {
@@ -191,7 +191,7 @@ type ConfigConstraint struct {
 	Status ConfigConstraintStatus `json:"status,omitempty"`
 }
 
-//+kubebuilder:object:root=true
+// +kubebuilder:object:root=true
 
 // ConfigConstraintList contains a list of ConfigConstraints.
 type ConfigConstraintList struct {

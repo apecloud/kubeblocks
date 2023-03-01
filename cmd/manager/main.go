@@ -42,7 +42,7 @@ import (
 	dataprotectioncontrollers "github.com/apecloud/kubeblocks/controllers/dataprotection"
 	extensionscontrollers "github.com/apecloud/kubeblocks/controllers/extensions"
 
-	//+kubebuilder:scaffold:imports
+	// +kubebuilder:scaffold:imports
 
 	discoverycli "k8s.io/client-go/discovery"
 
@@ -54,7 +54,7 @@ import (
 )
 
 // added lease.coordination.k8s.io for leader election
-//+kubebuilder:rbac:groups=coordination.k8s.io,resources=leases,verbs=get;list;watch;create;update;patch
+// +kubebuilder:rbac:groups=coordination.k8s.io,resources=leases,verbs=get;list;watch;create;update;patch
 
 const (
 	appName = "kubeblocks"
@@ -72,7 +72,7 @@ func init() {
 	utilruntime.Must(dataprotectionv1alpha1.AddToScheme(scheme))
 	utilruntime.Must(snapshotv1.AddToScheme(scheme))
 	utilruntime.Must(extensionsv1alpha1.AddToScheme(scheme))
-	//+kubebuilder:scaffold:scheme
+	// +kubebuilder:scaffold:scheme
 
 	viper.SetConfigName("config")                          // name of config file (without extension)
 	viper.SetConfigType("yaml")                            // REQUIRED if the config file does not have the extension in the name
@@ -287,7 +287,7 @@ func main() {
 			os.Exit(1)
 		}
 	}
-	//+kubebuilder:scaffold:builder
+	// +kubebuilder:scaffold:builder
 
 	if err = (&configuration.ReconfigureRequestReconciler{
 		Client:   mgr.GetClient(),

@@ -58,7 +58,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	//+kubebuilder:scaffold:imports
+	// +kubebuilder:scaffold:imports
 
 	lb "github.com/apecloud/kubeblocks/controllers/loadbalancer"
 	"github.com/apecloud/kubeblocks/internal/loadbalancer/agent"
@@ -67,7 +67,7 @@ import (
 )
 
 // added lease.coordination.k8s.io for leader election
-//+kubebuilder:rbac:groups=coordination.k8s.io,resources=leases,verbs=get;list;watch;create;update;patch
+// +kubebuilder:rbac:groups=coordination.k8s.io,resources=leases,verbs=get;list;watch;create;update;patch
 
 const (
 	appName      = "loadbalancer-controller"
@@ -104,7 +104,7 @@ func (l OnLeaderAction) Start(ctx context.Context) error {
 
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
-	//+kubebuilder:scaffold:scheme
+	// +kubebuilder:scaffold:scheme
 
 	viper.SetConfigName("config")                          // name of config file (without extension)
 	viper.SetConfigType("yaml")                            // REQUIRED if the config file does not have the extension in the name
@@ -223,7 +223,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	//+kubebuilder:scaffold:builder
+	// +kubebuilder:scaffold:builder
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
 		setupLog.Error(err, "Failed to set up health check")

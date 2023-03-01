@@ -8638,10 +8638,10 @@ spec:
                   type: string
                 description: 'Connection credential template used for creating a connection
                   credential secret for cluster.apps.kubeblock.io object. Built-in
-                  objects are: `$(RANDOM_PASSWD)` - random 8 characters `$(SVC_FQDN)`
+                  objects are: `$(RANDOM_PASSWD)` - random 8 characters. `$(SVC_FQDN)`
                   - service FQDN  placeholder, value pattern - $(CLUSTER_NAME)-$(1ST_COMP_NAME).$(NAMESPACE).svc,
                   where 1ST_COMP_NAME is the 1st component that provide `ClusterDefinition.spec.componentDefs[].service`
-                  attribute `$(SVC_PORT_<PORT-NAME>)` - a ServicePort''s port value
+                  attribute; `$(SVC_PORT_<PORT-NAME>)` - a ServicePort''s port value
                   with specified port name, i.e, a servicePort JSON struct: { "name":
                   "mysql", "targetPort": "mysqlContainerPort", "port": 3306 }, and
                   "$(SVC_PORT_mysql)" in the connection credential value is 3306.'

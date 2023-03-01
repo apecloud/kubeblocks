@@ -23,7 +23,7 @@ import (
 	"testing"
 	"time"
 
-	//+kubebuilder:scaffold:imports
+	// +kubebuilder:scaffold:imports
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -116,7 +116,7 @@ var _ = BeforeSuite(func() {
 	err = snapshotv1.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
 
-	//+kubebuilder:scaffold:scheme
+	// +kubebuilder:scaffold:scheme
 
 	k8sClient, err = client.New(cfg, client.Options{Scheme: scheme.Scheme})
 	Expect(err).NotTo(HaveOccurred())

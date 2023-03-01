@@ -108,7 +108,7 @@ type Backup struct {
 	Status BackupStatus `json:"status,omitempty"`
 }
 
-//+kubebuilder:object:root=true
+// +kubebuilder:object:root=true
 
 // BackupList contains a list of Backup
 type BackupList struct {

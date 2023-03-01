@@ -86,7 +86,7 @@ type RestoreJob struct {
 	Status RestoreJobStatus `json:"status,omitempty"`
 }
 
-//+kubebuilder:object:root=true
+// +kubebuilder:object:root=true
 
 // RestoreJobList contains a list of RestoreJob
 type RestoreJobList struct {

@@ -17,8 +17,5 @@ dependencies:
 - name: snapshot-controller
   repository: https://piraeus.io/helm-charts
   version: 1.7.2
-- name: csi-s3
-  repository: file://../csi-s3
-  version: 0.31.3
-digest: sha256:b459198cb162a1d789fe8f84e94abc066ad61c1b3f3469983a70191cbecaa666
-generated: "2023-03-01T17:59:44.161508+08:00"
+digest: sha256:9ec0c202f302fbe2ce121644a7ffbaafe5abf5d19629157990bfad5003f89e34
+generated: "2023-03-01T18:59:05.889221+08:00"

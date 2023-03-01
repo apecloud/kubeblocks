@@ -100,7 +100,6 @@ func NewExposeCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 		},
 	}
 	cmd.Flags().StringVar(&o.Type, "type", "", "Expose type, currently supported types are 'vpc', 'internet'")
-	_ = cmd.MarkFlagRequired("type")
 	util.CheckErr(cmd.RegisterFlagCompletionFunc("type", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		return []string{string(ExposeToVPC), string(ExposeToInternet)}, cobra.ShellCompDirectiveNoFileComp
 	}))
@@ -120,10 +119,12 @@ func (o *ExposeOptions) Validate(args []string) error {
 
 	switch ExposeType(o.Type) {
 	case ExposeToVPC, ExposeToInternet:
+		o.exposeType = ExposeType(o.Type)
+	case "":
+		o.exposeType = ExposeToInternet
 	default:
 		return fmt.Errorf("invalid expose type %q", o.Type)
 	}
-	o.exposeType = ExposeType(o.Type)
 
 	switch strings.ToLower(o.Enable) {
 	case EnableValue, DisableValue:
@@ -157,6 +158,9 @@ func (o *ExposeOptions) Run() error {
 	provider, err := GetK8SProvider(o.client)
 	if err != nil {
 		return err
+	}
+	if provider == util.UnknownProvider {
+		return fmt.Errorf("unknown k8s provider")
 	}
 	return o.run(provider)
 }
@@ -197,10 +201,9 @@ func (o *ExposeOptions) run(provider util.K8sProvider) error {
 
 func (o *ExposeOptions) EnableExpose(svc corev1.Service, provider util.K8sProvider) error {
 	// check if the service is already exposed
-	exposeType := svc.GetLabels()[ServiceAnnotationExposeType]
-	if ExposeType(exposeType) == o.exposeType {
-		_, _ = fmt.Fprintf(o.Out, "service %s is already exposed to %s\n", svc.Name, exposeType)
-		return nil
+	exposeType := ExposeType(svc.GetAnnotations()[ServiceAnnotationExposeType])
+	if svc.Spec.Type == corev1.ServiceTypeLoadBalancer && exposeType != o.exposeType {
+		return fmt.Errorf("cluster is already exposed to %s, please disable it first", exposeType)
 	}
 
 	annotations := svc.GetAnnotations()
@@ -208,15 +211,13 @@ func (o *ExposeOptions) EnableExpose(svc corev1.Service, provider util.K8sProvid
 		annotations = make(map[string]string)
 	}
 
-	// remove current expose annotations
 	var (
 		kvs map[string]string
 		err error
 	)
-	kvs, err = GetExposeAnnotations(provider, o.exposeType)
-	if err != nil {
-		return err
-	}
+
+	// remove orphan annotations
+	kvs, _ = GetExposeAnnotations(provider, exposeType)
 	for k := range kvs {
 		delete(annotations, k)
 	}
@@ -239,31 +240,36 @@ func (o *ExposeOptions) EnableExpose(svc corev1.Service, provider util.K8sProvid
 func (o *ExposeOptions) DisableExpose(svc corev1.Service, provider util.K8sProvider) (ExposeType, error) {
 	// check if the service is exposed
 	exposeType, ok := svc.GetAnnotations()[ServiceAnnotationExposeType]
-	if !ok {
+	if svc.Spec.Type != corev1.ServiceTypeLoadBalancer && !ok {
 		return "", fmt.Errorf("service %s is not exposed", svc.Name)
 	}
 	annotations := svc.GetAnnotations()
 	if annotations == nil {
 		annotations = make(map[string]string)
 	}
-	kvs, err := GetExposeAnnotations(provider, ExposeType(exposeType))
-	if err != nil {
-		return "", err
-	}
-	for k := range kvs {
-		delete(annotations, k)
-	}
+
+	// EKS load balancer controller does not delete LB instances if we modify service annotations and type simultaneously.
+	// So we just modify the service type here and delete the orphan annotations when the service is exposed next time.
+	/*
+		kvs, err := GetExposeAnnotations(provider, ExposeType(exposeType))
+		if err != nil {
+			return "", err
+		}
+		for k := range kvs {
+			delete(annotations, k)
+		}
+	*/
 
 	svc.SetAnnotations(annotations)
 	svc.Spec.Type = corev1.ServiceTypeClusterIP
-	if _, err = o.client.CoreV1().Services(o.Namespace).Update(context.TODO(), &svc, metav1.UpdateOptions{}); err != nil {
+	if _, err := o.client.CoreV1().Services(o.Namespace).Update(context.TODO(), &svc, metav1.UpdateOptions{}); err != nil {
 		return "", err
 	}
 	return ExposeType(exposeType), nil
 }
 
 func GetExposeAnnotations(provider util.K8sProvider, exposeType ExposeType) (map[string]string, error) {
-	exposeAnnotations, ok := ProviderExposeAnnotations[util.EKSProvider]
+	exposeAnnotations, ok := ProviderExposeAnnotations[provider]
 	if !ok {
 		return nil, fmt.Errorf("unsupported provider: %s", provider)
 	}

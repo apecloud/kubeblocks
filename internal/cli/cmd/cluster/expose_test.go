@@ -57,10 +57,6 @@ var _ = Describe("Expose", func() {
 			} else {
 				// if expose is disabled, the service should not have any expose related annotations
 				Expect(svc.Spec.Type).Should(Equal(corev1.ServiceTypeClusterIP))
-				Expect(svc.GetAnnotations()[ServiceAnnotationExposeType]).Should(BeEmpty())
-				for k := range ProviderExposeAnnotations[provider][exposeType] {
-					Expect(svc.GetAnnotations()[k]).Should(BeEmpty())
-				}
 			}
 		}
 	}
@@ -127,8 +123,7 @@ var _ = Describe("Expose", func() {
 				o.exposeType = ExposeToVPC
 			}
 			err = o.run(util.EKSProvider)
-			Expect(err).ShouldNot(HaveOccurred())
-			checkExposeAsExpected(util.EKSProvider, true, o.exposeType)
+			Expect(err).Should(HaveOccurred())
 
 			By("disable expose")
 			o.enabled = false

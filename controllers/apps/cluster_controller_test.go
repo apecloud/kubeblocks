@@ -383,7 +383,7 @@ var _ = Describe("Cluster Controller", func() {
 				Name:      snapshotKey.Name,
 				Namespace: snapshotKey.Namespace,
 				Labels: map[string]string{
-					intctrlutil.AppCreatedByLabelKey:   intctrlutil.AppName,
+					intctrlutil.AppManagedByLabelKey:   intctrlutil.AppName,
 					intctrlutil.AppInstanceLabelKey:    clusterKey.Name,
 					intctrlutil.KBAppComponentLabelKey: comp.Name,
 				}},
@@ -1005,7 +1005,7 @@ var _ = Describe("Cluster Controller", func() {
 				Labels: map[string]string{
 					intctrlutil.AppInstanceLabelKey:    clusterKey.Name,
 					intctrlutil.KBAppComponentLabelKey: mysqlCompName,
-					intctrlutil.AppCreatedByLabelKey:   intctrlutil.AppName,
+					intctrlutil.AppManagedByLabelKey:   intctrlutil.AppName,
 				},
 			},
 			Spec: dataprotectionv1alpha1.BackupSpec{

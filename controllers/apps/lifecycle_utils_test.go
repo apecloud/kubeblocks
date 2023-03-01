@@ -177,7 +177,7 @@ spec:
 		vs := snapshotv1.VolumeSnapshot{}
 		Expect(yaml.Unmarshal([]byte(vsYAML), &vs)).Should(Succeed())
 		labels := map[string]string{
-			intctrlutil.AppCreatedByLabelKey:   intctrlutil.AppName,
+			intctrlutil.AppManagedByLabelKey:   intctrlutil.AppName,
 			intctrlutil.AppInstanceLabelKey:    clusterName,
 			intctrlutil.KBAppComponentLabelKey: componentName,
 		}

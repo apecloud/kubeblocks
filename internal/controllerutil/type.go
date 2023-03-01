@@ -40,7 +40,6 @@ const (
 	WorkloadTypeLabelKey  = "apps.kubeblocks.io/workload-type"
 	AppNameLabelKey       = "app.kubernetes.io/name"
 	AppManagedByLabelKey  = "app.kubernetes.io/managed-by"
-	AppCreatedByLabelKey  = "app.kubernetes.io/created-by" // resources created temporarily by kubeblocks, this is a deprecated label
 	AppConfigTypeLabelKey = "app.kubernetes.io/config-type"
 	RegionLabelKey        = "topology.kubernetes.io/region"
 	ZoneLabelKey          = "topology.kubernetes.io/zone"

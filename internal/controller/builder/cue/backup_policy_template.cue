@@ -33,7 +33,7 @@ backup_policy: {
 		generateName: "\(backup_key.Name)-"
 		namespace:    backup_key.Namespace
 		labels: {
-			"app.kubernetes.io/created-by": "kubeblocks"
+			"app.kubernetes.io/managed-by": "kubeblocks"
 			for k, v in sts.metadata.labels {
 				"\(k)": "\(v)"
 			}

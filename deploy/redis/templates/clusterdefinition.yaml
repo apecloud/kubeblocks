@@ -37,24 +37,24 @@ spec:
         switchCmdExecutorConfig:
           image: redis:7.0.5
           switchSteps:
-          - NewPrimary:
-              command:
-                - /bin/sh
-                - -c
-              args:
-                - redis-cli -h $(KB_SWITCH_ROLE_ENDPOINT) -p 6379 $(KB_SWITCH_PROMOTE_STATEMENT)
-          - Secondaries:
-              command:
-                - /bin/sh
-                - -c
-              args:
-                - redis-cli -h $(KB_SWITCH_ROLE_ENDPOINT) -p 6379 $(KB_SWITCH_FOLLOW_STATEMENT)
-          - OldPrimary:
-              command:
-                - /bin/sh
-                - -c
-              args:
-                - redis-cli -h $(KB_SWITCH_ROLE_ENDPOINT) -p 6379 $(KB_SWITCH_DEMOTE_STATEMENT)
+          - role: NewPrimary
+            command:
+              - /bin/sh
+              - -c
+            args:
+              - redis-cli -h $(KB_SWITCH_ROLE_ENDPOINT) -p 6379 $(KB_SWITCH_PROMOTE_STATEMENT)
+          - role: Secondaries
+            command:
+              - /bin/sh
+              - -c
+            args:
+              - redis-cli -h $(KB_SWITCH_ROLE_ENDPOINT) -p 6379 $(KB_SWITCH_FOLLOW_STATEMENT)
+          - role: OldPrimary
+            command:
+              - /bin/sh
+              - -c
+            args:
+              - redis-cli -h $(KB_SWITCH_ROLE_ENDPOINT) -p 6379 $(KB_SWITCH_DEMOTE_STATEMENT)
       service:
         ports:
           - protocol: TCP

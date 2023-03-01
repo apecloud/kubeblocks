@@ -23,7 +23,6 @@ import (
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -52,10 +51,11 @@ const (
 )
 
 const (
-	KBSwitchJobLabelKey      = "kubeblocks.io/switch-job"
-	KBSwitchJobLabelValue    = "kb-switch-job"
-	KBSwitchJobNamePrefix    = "kb-switch-job"
-	KBSwitchJobContainerName = "switch-job-container"
+	KBSwitchJobLabelKey                = "kubeblocks.io/switch-job"
+	KBSwitchJobLabelValue              = "kb-switch-job"
+	KBSwitchJobNamePrefix              = "kb-switch-job"
+	KBSwitchJobContainerName           = "switch-job-container"
+	KBSwitchJobTTLSecondsAfterFinished = 5
 )
 
 var defaultSwitchElectionFilters = []func() SwitchElectionFilter{
@@ -261,15 +261,13 @@ func (handler *SwitchActionWithJobHandler) ExecSwitchCommands(s *Switch, switchE
 	if s.SwitchResource.CompDef.ReplicationSpec.SwitchCmdExecutorConfig == nil {
 		return fmt.Errorf("switchCmdExecutorConfig and SwitchSteps can not be nil")
 	}
-	for _, switchRoleCmdMap := range s.SwitchResource.CompDef.ReplicationSpec.SwitchCmdExecutorConfig.SwitchSteps {
-		for switchRole, switchCmd := range switchRoleCmdMap {
-			cmdJobs, err := renderAndCreateSwitchCmdJobs(s, switchRole, switchEnvs, switchCmd)
-			if err != nil {
-				return err
-			}
-			if err := checkSwitchCmdJobSucceed(s, cmdJobs); err != nil {
-				return err
-			}
+	for i, switchStep := range s.SwitchResource.CompDef.ReplicationSpec.SwitchCmdExecutorConfig.SwitchSteps {
+		cmdJobs, err := renderAndCreateSwitchCmdJobs(s, switchEnvs, switchStep, i)
+		if err != nil {
+			return err
+		}
+		if err := checkSwitchCmdJobSucceed(s, cmdJobs); err != nil {
+			return err
 		}
 	}
 	return nil
@@ -332,11 +330,11 @@ func checkSwitchStatus(status *SwitchStatus) error {
 }
 
 // renderAndCreateSwitchCmdJobs renders and creates jobs to execute the switch command.
-func renderAndCreateSwitchCmdJobs(s *Switch, stepRole appsv1alpha1.SwitchStepRole,
-	switchEnvs []corev1.EnvVar, switchCmd appsv1alpha1.SwitchStepCmd) ([]*batchv1.Job, error) {
+func renderAndCreateSwitchCmdJobs(s *Switch, switchEnvs []corev1.EnvVar,
+	switchStep appsv1alpha1.SwitchStep, switchStepIndex int) ([]*batchv1.Job, error) {
 	var enginePods []*corev1.Pod
 	var cmdJobs []*batchv1.Job
-	switch stepRole {
+	switch switchStep.Role {
 	case appsv1alpha1.NewPrimary:
 		enginePods = append(enginePods, s.SwitchInstance.CandidatePrimaryRole.Pod)
 	case appsv1alpha1.OldPrimary:
@@ -366,8 +364,8 @@ func renderAndCreateSwitchCmdJobs(s *Switch, stepRole appsv1alpha1.SwitchStepRol
 								Name:            KBSwitchJobContainerName,
 								Image:           s.SwitchResource.CompDef.ReplicationSpec.SwitchCmdExecutorConfig.Image,
 								ImagePullPolicy: corev1.PullIfNotPresent,
-								Command:         switchCmd.Command,
-								Args:            switchCmd.Args,
+								Command:         switchStep.Command,
+								Args:            switchStep.Args,
 								Env:             switchEnvs,
 							},
 						},
@@ -382,7 +380,8 @@ func renderAndCreateSwitchCmdJobs(s *Switch, stepRole appsv1alpha1.SwitchStepRol
 	}
 
 	for index, enginePod := range enginePods {
-		jobName := fmt.Sprintf("%s-%s-%s-%d", KBSwitchJobNamePrefix, s.SwitchResource.CompSpec.Name, strings.ToLower(string(stepRole)), index)
+		jobName := fmt.Sprintf("%s-%s-%s-%d-%d", KBSwitchJobNamePrefix,
+			s.SwitchResource.CompSpec.Name, strings.ToLower(string(switchStep.Role)), switchStepIndex, index)
 		svcName := strings.Join([]string{s.SwitchResource.Cluster.Name, s.SwitchResource.CompSpec.Name, "headless"}, "-")
 		switchEnvs = append(switchEnvs, corev1.EnvVar{
 			Name:  KBSwitchRoleEndPoint,
@@ -442,11 +441,12 @@ func cleanSwitchCmdJobs(s *Switch) error {
 		return err
 	}
 	for _, job := range jobList.Items {
-		err := s.SwitchResource.Cli.Delete(s.SwitchResource.Ctx, &job)
-		if err == nil || apierrors.IsNotFound(err) {
-			continue
+		var ttl = int32(KBSwitchJobTTLSecondsAfterFinished)
+		patch := client.MergeFrom(job.DeepCopy())
+		job.Spec.TTLSecondsAfterFinished = &ttl
+		if err := s.SwitchResource.Cli.Patch(s.SwitchResource.Ctx, &job, patch); err != nil {
+			return err
 		}
-		return err
 	}
 	return nil
 }

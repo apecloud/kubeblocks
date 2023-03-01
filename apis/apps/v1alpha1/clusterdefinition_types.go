@@ -535,13 +535,13 @@ type SwitchCmdExecutorConfig struct {
 	// image for Connector when executing the switch command.
 	// +kubebuilder:validation:Required
 	Image string `json:"image"`
-	// switchSteps definition, users can customize the switching steps on the provided three roles - newPrimary, oldPrimary, and secondary.
+	// switchSteps definition, users can customize the switching steps on the provided three roles - NewPrimary, OldPrimary, and Secondaries.
 	// the same role can customize multiple steps in the order of the list, and KubeBlocks will perform switching operations in the defined order.
 	// if switchStep is not set, we will try to use the built-in switchStep for the database engine with built-in support.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MinItems=1
 	// +optional
-	SwitchSteps []map[SwitchStepRole]SwitchStepCmd `json:"switchSteps"`
+	SwitchSteps []SwitchStep `json:"switchSteps"`
 	// envs is a list of environment variables.
 	// +kubebuilder:pruning:PreserveUnknownFields
 	// +patchMergeKey=name
@@ -550,7 +550,9 @@ type SwitchCmdExecutorConfig struct {
 	Env []corev1.EnvVar `json:"env,omitempty" patchStrategy:"merge" patchMergeKey:"name"`
 }
 
-type SwitchStepCmd struct {
+type SwitchStep struct {
+	// role determines which role to execute the command on, role is divided into three roles NewPrimary, OldPrimary, and Secondaries.
+	Role SwitchStepRole `json:"role"`
 	// command to perform switch statements.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MinItems=1

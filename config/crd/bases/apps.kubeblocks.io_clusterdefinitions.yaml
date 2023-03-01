@@ -8147,30 +8147,37 @@ spec:
                             switchSteps:
                               description: switchSteps definition, users can customize
                                 the switching steps on the provided three roles -
-                                newPrimary, oldPrimary, and secondary. the same role
-                                can customize multiple steps in the order of the list,
-                                and KubeBlocks will perform switching operations in
-                                the defined order. if switchStep is not set, we will
-                                try to use the built-in switchStep for the database
+                                NewPrimary, OldPrimary, and Secondaries. the same
+                                role can customize multiple steps in the order of
+                                the list, and KubeBlocks will perform switching operations
+                                in the defined order. if switchStep is not set, we
+                                will try to use the built-in switchStep for the database
                                 engine with built-in support.
                               items:
-                                additionalProperties:
-                                  properties:
-                                    args:
-                                      description: args is used to perform switch
-                                        statements.
-                                      items:
-                                        type: string
-                                      type: array
-                                    command:
-                                      description: command to perform switch statements.
-                                      items:
-                                        type: string
-                                      minItems: 1
-                                      type: array
-                                  required:
-                                  - command
-                                  type: object
+                                properties:
+                                  args:
+                                    description: args is used to perform switch statements.
+                                    items:
+                                      type: string
+                                    type: array
+                                  command:
+                                    description: command to perform switch statements.
+                                    items:
+                                      type: string
+                                    minItems: 1
+                                    type: array
+                                  role:
+                                    description: role determines which role to execute
+                                      the command on, role is divided into three roles
+                                      NewPrimary, OldPrimary, and Secondaries.
+                                    enum:
+                                    - NewPrimary
+                                    - OldPrimary
+                                    - Secondaries
+                                    type: string
+                                required:
+                                - command
+                                - role
                                 type: object
                               minItems: 1
                               type: array

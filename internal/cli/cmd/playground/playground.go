@@ -141,7 +141,7 @@ func newDestroyCmd(streams genericclioptions.IOStreams) *cobra.Command {
 		Example: destroyExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			util.CheckErr(o.validate())
-			util.CheckErr(o.destroyPlayground())
+			util.CheckErr(o.destroy())
 		},
 	}
 
@@ -223,7 +223,7 @@ func (o *initOptions) installKBAndCluster(k8sClusterName string) error {
 
 	// Install KubeBlocks
 	if err = o.installKubeBlocks(); err != nil {
-		return errors.Wrap(err, "failed to CreateK8sCluster KubeBlocks")
+		return errors.Wrap(err, "failed to install KubeBlocks")
 	}
 
 	// Install database cluster
@@ -234,8 +234,8 @@ func (o *initOptions) installKBAndCluster(k8sClusterName string) error {
 	spinner := util.Spinner(o.Out, "Create cluster %s (ClusterDefinition: %s, ClusterVersion: %s)",
 		kbClusterName, o.clusterDef, o.clusterVersion)
 	defer spinner(false)
-	if err = o.installCluster(); err != nil {
-		return err
+	if err = o.createCluster(); err != nil {
+		return errors.Wrapf(err, "failed to create cluster %s", kbClusterName)
 	}
 	spinner(true)
 
@@ -270,12 +270,10 @@ func (o *initOptions) cloud() error {
 	}
 
 	// clone apecloud/cloud-provider repo to local path
-	spinner := util.Spinner(o.Out, "Clone cloud provider terraform script to %s", cpPath)
-	defer spinner(false)
+	fmt.Fprintf(o.Out, "Clone cloud provider terraform script to %s...", cpPath)
 	if err = util.CloneGitRepo(cp.GitRepoURL, cpPath); err != nil {
 		return err
 	}
-	spinner(true)
 
 	// create cloud kubernetes cluster
 	provider, err := cp.New(o.cloudProvider, o.region, cpPath, o.Out, o.ErrOut)
@@ -298,7 +296,7 @@ func (o *initOptions) cloud() error {
 			fmt.Fprintf(o.Out, "\nPlayground init cancelled, please destroy the old cluster first.\n")
 			return nil
 		}
-		fmt.Fprintf(o.Out, "Continue to initialize %s %s cluster %s ... \n", o.cloudProvider, cp.K8sService(o.cloudProvider), clusterName)
+		fmt.Fprintf(o.Out, "Continue to initialize %s %s cluster %s... \n", o.cloudProvider, cp.K8sService(o.cloudProvider), clusterName)
 	} else {
 		init = true
 		clusterName = fmt.Sprintf("%s-%s", k8sClusterName, rand.String(5))
@@ -313,7 +311,7 @@ func (o *initOptions) cloud() error {
 	return o.installKBAndCluster(clusterName)
 }
 
-func (o *destroyOptions) destroyPlayground() error {
+func (o *destroyOptions) destroy() error {
 	if o.cloudProvider == cp.Local {
 		return o.destroyLocal()
 	}
@@ -348,18 +346,34 @@ func (o *destroyOptions) destroyCloud() error {
 
 	// get cluster name to delete
 	name, err := getExistedCluster(provider, cpPath)
-	if err != nil {
-		return err
-	}
-
 	// do not find any existed cluster
 	if name == "" {
-		fmt.Fprintf(o.Out, "Do not find playground %s %s cluster in %s\n", o.cloudProvider, cp.K8sService(o.cloudProvider), cpPath)
-		return nil
+		fmt.Fprintf(o.Out, "Failed to find playground %s %s cluster in %s\n", o.cloudProvider, cp.K8sService(o.cloudProvider), cpPath)
+		if err != nil {
+			fmt.Fprintf(o.Out, "  error: %s", err.Error())
+		}
 	}
 
 	// start to destroy cluster
-	printer.Warning(o.Out, "Do you really want to destroy the cluster %s?\n  This is no undo. Only 'yes' will be accepted to confirm.\n\n", name)
+	printer.Warning(o.Out, `This action will directly delete the kubernetes cluster, which may
+  result in some residual resources, such as Volume, please confirm and manually
+  clean up related resources after this action.
+
+  In order to minimize resource residue, you can use the following commands
+  to clean up the clusters and uninstall KubeBlocks before this action.
+  
+  # list all clusters created by KubeBlocks
+  kbcli cluster list -A
+
+  # delete clusters
+  kbcli cluster delete <cluster-1> <cluster-2>
+
+  # uninstall KubeBlocks and remove PVC and PV
+  kbcli kubeblocks uninstall --remove-pvcs --remove-pvs
+
+`)
+
+	fmt.Fprintf(o.Out, "Do you really want to destroy the kubernetes cluster %s?\n  This is no undo. Only 'yes' will be accepted to confirm.\n\n", name)
 
 	// confirm to destroy
 	entered, err := prompt.NewPrompt("", "Enter a value:", o.In).GetInput()
@@ -416,7 +430,7 @@ func (o *initOptions) installKubeBlocks() error {
 	return insOpts.Install()
 }
 
-func (o *initOptions) installCluster() error {
+func (o *initOptions) createCluster() error {
 	// construct a cluster create options and run
 	options, err := newCreateOptions(o.clusterDef, o.clusterVersion)
 	if err != nil {
@@ -492,7 +506,7 @@ func initPlaygroundDir() error {
 func getExistedCluster(provider cp.Interface, path string) (string, error) {
 	clusterNames, err := provider.GetExistedClusters()
 	if err != nil {
-		return "", fmt.Errorf("failed to find the existed %s %s cluster in %s", provider.Name(), cp.K8sService(provider.Name()), path)
+		return "", err
 	}
 	if len(clusterNames) > 1 {
 		return "", fmt.Errorf("found more than one cluster have been created, check it again, %v", clusterNames)

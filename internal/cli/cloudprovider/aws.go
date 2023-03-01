@@ -102,7 +102,7 @@ func (p *awsCloudProvider) DeleteK8sCluster(name string) error {
 	// destroy load balancer
 	fmt.Fprintf(p.stdout, "\nDestroy loadbalancer in %s\n", subPaths[1])
 	if err = tfDestroy(subPaths[1], p.stdout, p.stderr, tfexec.Var("cluster_name="+p.clusterName)); err != nil {
-		return err
+		fmt.Fprintln(p.stdout, err.Error())
 	}
 
 	// destroy EKS cluster

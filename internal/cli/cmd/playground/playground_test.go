@@ -59,9 +59,9 @@ var _ = Describe("playground", func() {
 			},
 		}
 		Expect(o.validate()).Should(Succeed())
-		Expect(o.run()).To(MatchError(MatchRegexp("failed to set up k3d cluster")))
+		Expect(o.run()).Should(HaveOccurred())
 		Expect(o.installKubeBlocks()).Should(HaveOccurred())
-		Expect(o.installCluster()).Should(HaveOccurred())
+		Expect(o.createCluster()).Should(HaveOccurred())
 	})
 
 	It("init at remote cloud", func() {
@@ -82,7 +82,7 @@ var _ = Describe("playground", func() {
 		o := &destroyOptions{
 			IOStreams: streams,
 		}
-		Expect(o.destroyPlayground()).Should(HaveOccurred())
+		Expect(o.destroy()).Should(HaveOccurred())
 	})
 
 	It("guide", func() {

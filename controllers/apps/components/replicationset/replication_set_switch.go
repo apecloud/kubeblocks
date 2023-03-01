@@ -318,11 +318,8 @@ func (s *Switch) Decision() bool {
 		s.SwitchStatus.SwitchPhaseStatus = SwitchPhaseStatusFailed
 		s.SwitchStatus.Reason = fmt.Sprintf("component %s manual switch policy will not perform high-availability switching", s.SwitchResource.CompSpec.Name)
 		return false
-	default:
-		s.SwitchStatus.SwitchPhaseStatus = SwitchPhaseStatusFailed
-		s.SwitchStatus.Reason = fmt.Sprintf("component %s switch policy type is not supported, pls check", s.SwitchResource.CompSpec.Name)
-		return false
 	}
+	return false
 }
 
 // DoSwitch performs the specific action of high-availability switching.
@@ -366,12 +363,13 @@ func (s *Switch) UpdateRoleLabel() error {
 			}
 		}
 	}
+	s.SwitchStatus.SwitchPhaseStatus = SwitchPhaseStatusSucceed
 	return nil
 }
 
 // InitSwitchInstance initializes the switchInstance object without detection info according to the pod list under the component,
 // and the detection information will be filled in the detection phase.
-func (s *Switch) InitSwitchInstance(oldPrimaryIndex, newPrimaryIndex int32) error {
+func (s *Switch) InitSwitchInstance(oldPrimaryIndex, newPrimaryIndex *int32) error {
 	var stsList = &appsv1.StatefulSetList{}
 	if err := utils.GetObjectListByComponentName(s.SwitchResource.Ctx, s.SwitchResource.Cli, s.SwitchResource.Cluster, stsList, s.SwitchResource.CompSpec.Name); err != nil {
 		return err
@@ -395,9 +393,9 @@ func (s *Switch) InitSwitchInstance(oldPrimaryIndex, newPrimaryIndex int32) erro
 			LagDetectInfo:    nil,
 		}
 		switch int32(utils.GetOrdinalSts(&sts)) {
-		case oldPrimaryIndex:
+		case *oldPrimaryIndex:
 			s.SwitchInstance.OldPrimaryRole = sri
-		case newPrimaryIndex:
+		case *newPrimaryIndex:
 			s.SwitchInstance.CandidatePrimaryRole = sri
 		default:
 			s.SwitchInstance.SecondariesRole = append(s.SwitchInstance.SecondariesRole, sri)

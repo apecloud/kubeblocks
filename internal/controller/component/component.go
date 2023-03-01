@@ -129,7 +129,7 @@ func BuildComponent(
 	}
 
 	replaceContainerPlaceholderTokens(component, GetEnvReplacementMapForConnCredential(cluster.GetName()))
-	
+
 	return component
 }
 

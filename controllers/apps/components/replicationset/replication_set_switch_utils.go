@@ -115,7 +115,7 @@ func HandleReplicationSetHASwitch(ctx context.Context,
 	s := NewSwitch(ctx, cli, cluster, compDef, clusterCompSpec, nil, nil, nil, nil, nil)
 
 	// initialize switchInstance according to the primaryIndex
-	if err := s.InitSwitchInstance(currentPrimaryIndex, *clusterCompSpec.PrimaryIndex); err != nil {
+	if err := s.InitSwitchInstance(&currentPrimaryIndex, clusterCompSpec.PrimaryIndex); err != nil {
 		return err
 	}
 

@@ -62,7 +62,9 @@ deployment: {
 					"app.kubernetes.io/name":       "\(component.clusterDefName)"
 					"app.kubernetes.io/instance":   "\(cluster.metadata.name)"
 					"app.kubernetes.io/managed-by": "kubeblocks"
-					"app.kubernetes.io/version": "\(cluster.spec.clusterVersionRef)"
+					if cluster.spec.clusterVersionRef != _|_ {
+						"app.kubernetes.io/version": "\(cluster.spec.clusterVersionRef)"
+					}
 					"apps.kubeblocks.io/component-name": "\(component.name)"
 					"apps.kubeblocks.io/workload-type":  "\(component.workloadType)"
 				}

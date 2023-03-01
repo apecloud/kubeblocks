@@ -23,6 +23,7 @@ cluster: {
 }
 component: {
 	clusterDefName: string
+	type:           string
 	name:           string
 	workloadType:   string
 	replicas:       int
@@ -66,6 +67,7 @@ statefulset: {
 					"app.kubernetes.io/name":       "\(component.clusterDefName)"
 					"app.kubernetes.io/instance":   "\(cluster.metadata.name)"
 					"app.kubernetes.io/managed-by": "kubeblocks"
+					"app.kubernetes.io/component":"\(component.type)"
 					if cluster.spec.clusterVersionRef != _|_ {
 						"app.kubernetes.io/version": "\(cluster.spec.clusterVersionRef)"
 					}

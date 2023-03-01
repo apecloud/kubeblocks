@@ -192,9 +192,6 @@ func (o *InstallOptions) Install() error {
 	spinner = util.Spinner(o.Out, "%-40s", "Install KubeBlocks "+o.Version)
 	defer spinner(false)
 	if err = o.installChart(); err != nil {
-		if strings.Contains(err.Error(), "not found in kubeblocks index") {
-			return fmt.Errorf("curernt version %s may not exist, please use \"kbcli kubeblocks list-versions --devel\" to show the available versions", o.Version)
-		}
 		return err
 	}
 	spinner(true)

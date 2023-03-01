@@ -244,6 +244,9 @@ spec:
                       required:
                       - leader
                       type: object
+                    description:
+                      description: The description of component definition.
+                      type: string
                     horizontalScalePolicy:
                       description: horizontalScalePolicy controls the behavior of
                         horizontal scale.

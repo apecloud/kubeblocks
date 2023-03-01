@@ -273,6 +273,10 @@ type ClusterComponentDefinition struct {
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	Name string `json:"name"`
 
+	// The description of component definition.
+	// +optional
+	Description string `json:"description,omitempty"`
+
 	// workloadType defines type of the workload.
 	// Stateless is a stateless workload type used to describe stateless applications.
 	// Stateful is a stateful workload type used to describe common stateful applications.

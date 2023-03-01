@@ -159,7 +159,7 @@ spec:
                     componentDefRef:
                       description: ComponentDefRef reference componentDef defined
                         in ClusterDefinition spec.
-                      maxLength: 18
+                      maxLength: 63
                       pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                       type: string
                     enabledLogs:

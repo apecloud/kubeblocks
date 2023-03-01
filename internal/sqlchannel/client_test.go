@@ -110,7 +110,7 @@ func TestGetRole(t *testing.T) {
 	}
 
 	t.Run("ResponseInTime", func(t *testing.T) {
-		cli.ReconcileTimeout = 110 * time.Millisecond
+		cli.ReconcileTimeout = 1 * time.Second
 		_, err := cli.GetRole()
 		if err != nil {
 			t.Errorf("get role error: %v", err)

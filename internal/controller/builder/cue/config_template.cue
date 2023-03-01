@@ -25,7 +25,6 @@ meta: {
 	component: {
 		name:                  string
 		type:                  string
-		characterType:         string
 		configName:            string
 		templateName:          string
 		configConstraintsName: string

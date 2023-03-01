@@ -22,7 +22,6 @@ component: {
 	name:           string
 	type:           string
 	clusterDefName: string
-	characterType:  string
 }
 
 config: {

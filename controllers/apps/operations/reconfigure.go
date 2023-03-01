@@ -149,19 +149,67 @@ func handleNewReconfigureRequest(configPatch *cfgcore.ConfigPatchInfo, lastAppli
 	}
 }
 
-func (r reconfigureAction) ReconcileAction(opsRes *OpsResource) (appsv1alpha1.Phase, time.Duration, error) {
+func (r *reconfigureAction) ReconcileAction(opsRes *OpsResource) (appsv1alpha1.Phase, time.Duration, error) {
 	status := opsRes.OpsRequest.Status
 	if len(status.Conditions) == 0 {
 		return status.Phase, 30 * time.Second, nil
 	}
 	condition := status.Conditions[len(status.Conditions)-1]
 	if isSucceedPhase(condition) {
-		return appsv1alpha1.SucceedPhase, 0, nil
+		// TODO Sync reload progress from config manager.
+		return r.syncReconfigureComponentStatus(opsRes, false)
 	}
 	if isFailedPhase(condition) {
-		return appsv1alpha1.FailedPhase, 0, nil
+		return r.syncReconfigureComponentStatus(opsRes, true)
 	}
 	return appsv1alpha1.RunningPhase, 30 * time.Second, nil
+}
+
+func (r *reconfigureAction) syncReconfigureComponentStatus(res *OpsResource, failed bool) (appsv1alpha1.Phase, time.Duration, error) {
+	var (
+		phase      = appsv1alpha1.SucceedPhase
+		cluster    = res.Cluster
+		opsRequest = res.OpsRequest
+	)
+
+	if failed {
+		phase = appsv1alpha1.FailedPhase
+	}
+
+	if !isReloadPolicy(opsRequest.Status.ReconfiguringStatus) {
+		return phase, 0, nil
+	}
+
+	if opsRequest.Spec.Reconfigure == nil {
+		return phase, 0, nil
+	}
+
+	componentName := opsRequest.Spec.Reconfigure.ComponentName
+	c, ok := cluster.Status.Components[componentName]
+	if !ok || c.Phase != appsv1alpha1.ReconfiguringPhase {
+		return phase, 0, nil
+	}
+
+	clusterPatch := client.MergeFrom(cluster.DeepCopy())
+	c.Phase = appsv1alpha1.RunningPhase
+	cluster.Status.Components[componentName] = c
+	if err := res.Client.Status().Patch(res.Ctx, cluster, clusterPatch); err != nil {
+		return "", time.Second, err
+	}
+	return phase, 0, nil
+}
+
+func isReloadPolicy(status *appsv1alpha1.ReconfiguringStatus) bool {
+	if status == nil {
+		return false
+	}
+
+	for _, cmStatus := range status.ConfigurationStatus {
+		if cmStatus.UpdatePolicy != appsv1alpha1.AutoReload {
+			return false
+		}
+	}
+	return true
 }
 
 func isExpectedPhase(condition metav1.Condition, expectedTypes []string, expectedStatus metav1.ConditionStatus) bool {

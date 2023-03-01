@@ -9905,6 +9905,64 @@ spec:
                       type: object
                   type: object
                 type: array
+              extendAnalyzers:
+                description: extendAnalyzers extends user defined analyzers by ApeCloud.
+                items:
+                  properties:
+                    clusterAccess:
+                      properties:
+                        annotations:
+                          additionalProperties:
+                            type: string
+                          type: object
+                        checkName:
+                          type: string
+                        exclude:
+                          type: BoolString
+                        outcomes:
+                          items:
+                            properties:
+                              fail:
+                                properties:
+                                  message:
+                                    type: string
+                                  uri:
+                                    type: string
+                                  when:
+                                    type: string
+                                type: object
+                              pass:
+                                properties:
+                                  message:
+                                    type: string
+                                  uri:
+                                    type: string
+                                  when:
+                                    type: string
+                                type: object
+                              warn:
+                                properties:
+                                  message:
+                                    type: string
+                                  uri:
+                                    type: string
+                                  when:
+                                    type: string
+                                type: object
+                            type: object
+                          type: array
+                        strict:
+                          type: BoolString
+                      required:
+                      - outcomes
+                      type: object
+                  type: object
+                type: array
+              extendCollectors:
+                description: extendCollectors extends user defined collectors by ApeCloud.
+                items:
+                  type: object
+                type: array
               remoteCollectors:
                 items:
                   properties:
@@ -20092,64 +20150,6 @@ spec:
                       - image
                       - namespace
                       type: object
-                  type: object
-                type: array
-              extendAnalyzers:
-                description: extendAnalyzers extends user defined analyzers by ApeCloud.
-                items:
-                  properties:
-                    clusterAccess:
-                      properties:
-                        annotations:
-                          additionalProperties:
-                            type: string
-                          type: object
-                        checkName:
-                          type: string
-                        exclude:
-                          type: BoolString
-                        outcomes:
-                          items:
-                            properties:
-                              fail:
-                                properties:
-                                  message:
-                                    type: string
-                                  uri:
-                                    type: string
-                                  when:
-                                    type: string
-                                type: object
-                              pass:
-                                properties:
-                                  message:
-                                    type: string
-                                  uri:
-                                    type: string
-                                  when:
-                                    type: string
-                                type: object
-                              warn:
-                                properties:
-                                  message:
-                                    type: string
-                                  uri:
-                                    type: string
-                                  when:
-                                    type: string
-                                type: object
-                            type: object
-                          type: array
-                        strict:
-                          type: BoolString
-                      required:
-                      - outcomes
-                      type: object
-                  type: object
-                type: array
-              extendCollectors:
-                description: extendCollectors extends user defined collectors by ApeCloud.
-                items:
                   type: object
                 type: array
               remoteCollectors:

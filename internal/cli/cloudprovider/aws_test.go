@@ -14,22 +14,22 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package playground
+package cloudprovider
 
 import (
-	"testing"
-
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
 
-func TestPlayground(t *testing.T) {
-	RegisterFailHandler(Fail)
-	RunSpecs(t, "PlayGround Suite")
-}
-
-var _ = BeforeSuite(func() {
-	// set default cluster name to test
-	k8sClusterName = "playground-test"
-	kbClusterName = "playground-test-cluster"
+var _ = Describe("aws cloud provider", func() {
+	const (
+		tfPath      = "../testing/testdata"
+		clusterName = "kb-playground-test"
+		clusterArn  = "arn-kb-playground-test"
+	)
+	It("get cluster name from state file", func() {
+		name, err := getClusterNameFromStateFile(tfPath)
+		Expect(err).Should(Succeed())
+		Expect(name).Should(Equal(clusterName))
+	})
 })

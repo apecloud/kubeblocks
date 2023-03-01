@@ -72,7 +72,7 @@ type InstallOptions struct {
 	Monitor         bool
 	Quiet           bool
 	CreateNamespace bool
-	check           bool
+	Check           bool
 	ValueOpts       values.Options
 	timeout         time.Duration
 }
@@ -110,7 +110,7 @@ func newInstallCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 	cmd.Flags().BoolVar(&o.Monitor, "monitor", true, "Set monitor enabled and install Prometheus, AlertManager and Grafana (default true)")
 	cmd.Flags().StringVar(&o.Version, "version", version.DefaultKubeBlocksVersion, "KubeBlocks version")
 	cmd.Flags().BoolVar(&o.CreateNamespace, "create-namespace", false, "Create the namespace if not present")
-	cmd.Flags().BoolVar(&o.check, "check", true, "Check kubernetes environment before install")
+	cmd.Flags().BoolVar(&o.Check, "check", true, "Check kubernetes environment before install")
 	cmd.Flags().DurationVar(&o.timeout, "timeout", 1800*time.Second, "Time to wait for installing KubeBlocks")
 	helm.AddValueOptionsFlags(cmd.Flags(), &o.ValueOpts)
 
@@ -207,7 +207,7 @@ func (o *InstallOptions) Install() error {
 }
 
 func (o *InstallOptions) preCheck(versionInfo map[util.AppName]string) error {
-	if !o.check {
+	if !o.Check {
 		return nil
 	}
 
@@ -372,7 +372,7 @@ func (o *InstallOptions) disableSets(sets []string) {
 }
 
 func (o *InstallOptions) checkRemainedResource() error {
-	if !o.check {
+	if !o.Check {
 		return nil
 	}
 

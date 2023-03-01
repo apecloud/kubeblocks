@@ -1,15 +1,27 @@
 ## kbcli playground destroy
 
-Destroy the playground cluster.
+Destroy the playground kubernetes cluster
 
 ```
 kbcli playground destroy [flags]
 ```
 
+### Examples
+
+```
+  # destroy local host playground cluster
+  kbcli playground destroy
+  
+  # destroy the AWS EKS cluster, the region is required
+  kbcli playground destroy --cloud-provider aws --region cn-northwest-1
+```
+
 ### Options
 
 ```
-  -h, --help   help for destroy
+      --cloud-provider string   Cloud provider type, one of [local,aws,azure,gcp,alibaba-cloud] (default "local")
+  -h, --help                    help for destroy
+      --region string           The region to create kubernetes cluster
 ```
 
 ### Options inherited from parent commands
@@ -38,5 +50,5 @@ kbcli playground destroy [flags]
 
 ### SEE ALSO
 
-* [kbcli playground](kbcli_playground.md)	 - Bootstrap a KubeBlocks in local host
+* [kbcli playground](kbcli_playground.md)	 - Bootstrap a playground KubeBlocks in local host or cloud
 

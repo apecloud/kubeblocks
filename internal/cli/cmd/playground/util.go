@@ -17,19 +17,25 @@ limitations under the License.
 package playground
 
 import (
-	"testing"
+	"path/filepath"
 
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
+	cp "github.com/apecloud/kubeblocks/internal/cli/cloudprovider"
+	"github.com/apecloud/kubeblocks/internal/cli/util"
 )
 
-func TestPlayground(t *testing.T) {
-	RegisterFailHandler(Fail)
-	RunSpecs(t, "PlayGround Suite")
+func playgroundDir() (string, error) {
+	cliPath, err := util.GetCliHomeDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(cliPath, "playground"), nil
 }
 
-var _ = BeforeSuite(func() {
-	// set default cluster name to test
-	k8sClusterName = "playground-test"
-	kbClusterName = "playground-test-cluster"
-})
+// cloudProviderRepoDir cloud provider repo directory
+func cloudProviderRepoDir() (string, error) {
+	dir, err := playgroundDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(dir, cp.GitRepoName), err
+}

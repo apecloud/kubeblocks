@@ -14,33 +14,26 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package playground
+package cloudprovider
 
 import (
-	"context"
+	"os"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-
-	config "github.com/k3d-io/k3d/v5/pkg/config/v1alpha4"
 )
 
 var _ = Describe("playground", func() {
-	installer := &installer{
-		ctx:         context.Background(),
-		cfg:         config.ClusterConfig{},
-		clusterName: "k3d-test",
-	}
-
-	It("kubeconfig", func() {
-		Expect(installer.genKubeconfig()).Should(HaveOccurred())
-	})
+	var (
+		provider    = NewLocalCloudProvider(os.Stdout, os.Stderr)
+		clusterName = "k3d-test"
+	)
 
 	It("k3d util function", func() {
 		config, err := buildClusterRunConfig("test")
 		Expect(err).ShouldNot(HaveOccurred())
 		Expect(config.Name).Should(ContainSubstring("test"))
-		Expect(setUpK3d(installer.ctx, nil)).Should(HaveOccurred())
-		Expect(installer.uninstall()).Should(HaveOccurred())
+		Expect(setUpK3d(provider.ctx, nil)).Should(HaveOccurred())
+		Expect(provider.DeleteK8sCluster(clusterName)).Should(HaveOccurred())
 	})
 })

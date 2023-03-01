@@ -112,7 +112,7 @@ func AddRepo(r *repo.Entry) error {
 
 	f.Update(r)
 
-	if err := f.WriteFile(repoFile, 0644); err != nil {
+	if err = f.WriteFile(repoFile, 0644); err != nil {
 		return err
 	}
 	return nil

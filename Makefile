@@ -159,7 +159,7 @@ test-go-generate: ## Run go generate against test code.
 
 .PHONY: fmt
 fmt: ## Run go fmt against code.
-	$(GOFMT) -l -w -s $$(git ls-files | grep "\.go$$")
+	$(GOFMT) -l -w -s $$(git ls-files --exclude-standard | grep "\.go$$")
 
 .PHONY: vet
 vet: ## Run go vet against code.
@@ -167,8 +167,8 @@ vet: ## Run go vet against code.
 
 .PHONY: cue-fmt
 cue-fmt: cuetool ## Run cue fmt against code.
-	git ls-files | grep "\.cue$$" | xargs $(CUE) fmt
-	git ls-files | grep "\.cue$$" | xargs $(CUE) fix
+	git ls-files --exclude-standard | grep "\.cue$$" | xargs $(CUE) fmt
+	git ls-files --exclude-standard | grep "\.cue$$" | xargs $(CUE) fix
 
 .PHONY: fast-lint
 fast-lint: golangci staticcheck  # [INTERNAL] fast lint

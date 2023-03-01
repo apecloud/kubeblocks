@@ -75,7 +75,7 @@ spec:
             ports:
               - name: tcp-postgresql
                 containerPort: 5432
-           
+
             livenessProbe:
               failureThreshold: 6
               initialDelaySeconds: 30
@@ -115,6 +115,11 @@ spec:
                   secretKeyRef:
                     name: $(CONN_CREDENTIAL_SECRET_NAME)
                     key: username
+              - name: PGPASSWORD
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: postgres-password
               # Authentication
               - name: POSTGRES_USER
                 valueFrom:
@@ -214,7 +219,7 @@ spec:
               timeoutSeconds: 5
               httpGet:
                 path: /
-                port: http-metrics        
+                port: http-metrics
             readinessProbe:
               failureThreshold: 6
               initialDelaySeconds: 5
@@ -230,7 +235,7 @@ spec:
         volumes:
           - name: dshm
             emptyDir:
-              medium: Memory       
+              medium: Memory
               {{- with .Values.shmVolume.sizeLimit }}
               sizeLimit: {{ . }}
               {{- end }}
@@ -276,20 +281,20 @@ spec:
             provisionPolicy:
               type: CreateByStmt
               scope: AnyPods
-              statements:        
+              statements:
                 creation: CREATE USER $(USERNAME) WITH PASSWORD '$(PASSWD)';  GRANT pg_monitor TO $(USERNAME);
                 deletion: DROP USER IF EXISTS $(USERNAME);
           - name: kbmonitoring
             provisionPolicy:
               type: CreateByStmt
               scope: AnyPods
-              statements:        
+              statements:
                 creation: CREATE USER $(USERNAME) WITH PASSWORD '$(PASSWD)';  GRANT pg_monitor TO $(USERNAME);
                 deletion: DROP USER IF EXISTS $(USERNAME);
           - name: kbreplicator
             provisionPolicy:
               type: CreateByStmt
               scope: AnyPods
-              statements:        
+              statements:
                 creation: CREATE USER $(USERNAME) WITH REPLICATION PASSWORD '$(PASSWD)';
                 deletion: DROP USER IF EXISTS $(USERNAME);                     

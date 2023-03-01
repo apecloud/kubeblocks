@@ -220,7 +220,7 @@ func (o *InstallOptions) preCheck(versionInfo map[util.AppName]string) error {
 		if err != nil {
 			klog.V(1).Infof(err.Error())
 		}
-		return fmt.Errorf("curernt version %s does not exist, please use \"kbcli kubeblocks list-versions --devel\" to show the available versions", o.Version)
+		return fmt.Errorf("version %s does not exist, please use \"kbcli kubeblocks list-versions --devel\" to show the available versions", o.Version)
 	}
 
 	versionErr := fmt.Errorf("failed to get kubernetes version")

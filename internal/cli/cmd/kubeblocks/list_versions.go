@@ -23,14 +23,12 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
-	"helm.sh/helm/v3/pkg/repo"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/kubectl/pkg/util/templates"
 
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
-	"github.com/apecloud/kubeblocks/internal/cli/util/helm"
 )
 
 const (
@@ -76,13 +74,8 @@ func (o *listVersionsOption) listVersions() error {
 		return fmt.Errorf("limit shoul be greater than or equal to 0")
 	}
 
-	// add repo, if exists, will update it
-	if err := helm.AddRepo(&repo.Entry{Name: types.KubeBlocksChartName, URL: util.GetHelmChartRepoURL()}); err != nil {
-		return err
-	}
-
 	// get chart versions
-	versions, err := helm.GetChartVersions(types.KubeBlocksChartName)
+	versions, err := getHelmChartVersions(types.KubeBlocksChartName)
 	if err != nil {
 		return err
 	}

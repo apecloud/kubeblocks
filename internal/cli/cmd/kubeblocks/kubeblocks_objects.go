@@ -213,6 +213,10 @@ func getRemainedResource(objs kbObjects) map[string][]string {
 	}
 
 	for k, v := range objs {
+		// ignore PVC and PV
+		if k == types.PVCGVR() || k == types.PVGVR() {
+			continue
+		}
 		appendItems(k.Resource, v)
 	}
 

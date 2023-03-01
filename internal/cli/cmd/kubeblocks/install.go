@@ -33,6 +33,7 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/klog/v2"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
 
@@ -191,6 +192,9 @@ func (o *InstallOptions) Install() error {
 	spinner = util.Spinner(o.Out, "%-40s", "Install KubeBlocks "+o.Version)
 	defer spinner(false)
 	if err = o.installChart(); err != nil {
+		if strings.Contains(err.Error(), "not found in kubeblocks index") {
+			return fmt.Errorf("curernt version %s may not exist, please use \"kbcli kubeblocks list-versions --devel\" to show the available versions", o.Version)
+		}
 		return err
 	}
 	spinner(true)
@@ -209,6 +213,14 @@ func (o *InstallOptions) Install() error {
 func (o *InstallOptions) preCheck(versionInfo map[util.AppName]string) error {
 	if !o.Check {
 		return nil
+	}
+
+	// check installing version exists
+	if exists, err := versionExists(o.Version); !exists {
+		if err != nil {
+			klog.V(1).Infof(err.Error())
+		}
+		return fmt.Errorf("curernt version %s does not exist, please use \"kbcli kubeblocks list-versions --devel\" to show the available versions", o.Version)
 	}
 
 	versionErr := fmt.Errorf("failed to get kubernetes version")
@@ -503,4 +515,22 @@ func (o *InstallOptions) buildChart() *helm.InstallOpts {
 		CreateNamespace: o.CreateNamespace,
 		Timeout:         o.timeout,
 	}
+}
+
+func versionExists(version string) (bool, error) {
+	if version == "" {
+		return true, nil
+	}
+
+	allVers, err := getHelmChartVersions(types.KubeBlocksChartName)
+	if err != nil {
+		return false, err
+	}
+
+	for _, v := range allVers {
+		if v.String() == version {
+			return true, nil
+		}
+	}
+	return false, nil
 }

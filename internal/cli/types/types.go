@@ -97,7 +97,10 @@ const (
 )
 
 var (
-	// KubeBlocksChartName helm name for installing kubeblocks
+	// KubeBlocksRepoName helm repo name for kubeblocks
+	KubeBlocksRepoName = "kubeblocks"
+
+	// KubeBlocksChartName helm chart name for kubeblocks
 	KubeBlocksChartName = "kubeblocks"
 
 	// KubeBlocksChartURL the helm chart repo for installing kubeblocks

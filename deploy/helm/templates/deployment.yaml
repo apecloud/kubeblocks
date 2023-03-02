@@ -71,14 +71,16 @@ spec:
             - name: ENABLE_WEBHOOKS
               value: "true"
             {{- end }}
-            {{- if not .Values.addonController.enabled }}
+            {{- with .Values.addonController }}
+            {{- if not .enabled }}
             - name: DISABLE_ADDON_CTRLER
               value: "true"
             {{- else }}
             - name: ADDON_JOB_IMAGE_PULL_POLICY
-              value: {{ .Values.addonController.jobImagePullPolicy | default "IfNotPresent" }}
+              value: {{ .jobImagePullPolicy | default "IfNotPresent" }}
             - name: KUBEBLOCKS_ADDON_SA_NAME
               value: {{ include "kubeblocks.addonSAName" . }}
+            {{- end }}
             {{- end }}
           {{- with .Values.securityContext }}
           securityContext:

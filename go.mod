@@ -15,6 +15,7 @@ require (
 	github.com/bhmj/jsonslice v1.1.2
 	github.com/briandowns/spinner v1.18.1
 	github.com/clbanning/mxj/v2 v2.5.7
+	github.com/containerd/stargz-snapshotter/estargz v0.13.0
 	github.com/containers/common v0.49.1
 	github.com/coreos/go-iptables v0.5.0
 	github.com/dapr/components-contrib v1.9.6
@@ -87,6 +88,7 @@ require (
 	k8s.io/klog/v2 v2.90.0
 	k8s.io/kube-openapi v0.0.0-20221012153701-172d655c2280
 	k8s.io/kubectl v0.26.0
+	k8s.io/metrics v0.26.0
 	k8s.io/utils v0.0.0-20221128185143-99ec85e7a448
 	sigs.k8s.io/controller-runtime v0.14.4
 	sigs.k8s.io/kustomize/kyaml v0.13.9
@@ -130,7 +132,6 @@ require (
 	github.com/cockroachdb/apd/v2 v2.0.1 // indirect
 	github.com/containerd/cgroups v1.0.4 // indirect
 	github.com/containerd/containerd v1.6.15 // indirect
-	github.com/containerd/stargz-snapshotter/estargz v0.13.0 // indirect
 	github.com/containers/image/v5 v5.24.0 // indirect
 	github.com/containers/libtrust v0.0.0-20230121012942-c1716e8a8d01 // indirect
 	github.com/containers/ocicrypt v1.1.7 // indirect

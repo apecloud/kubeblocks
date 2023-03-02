@@ -1,0 +1,338 @@
+package kubeblocks
+
+import (
+	"context"
+	"fmt"
+	"strings"
+
+	"github.com/containerd/stargz-snapshotter/estargz/errorutil"
+	"github.com/spf13/cobra"
+
+	"github.com/apecloud/kubeblocks/internal/cli/printer"
+	"github.com/apecloud/kubeblocks/internal/cli/types"
+	"github.com/apecloud/kubeblocks/internal/cli/util"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+
+	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/kubernetes"
+	cmdutil "k8s.io/kubectl/pkg/cmd/util"
+	"k8s.io/kubectl/pkg/util/templates"
+	"k8s.io/metrics/pkg/apis/metrics/v1beta1"
+	metrics "k8s.io/metrics/pkg/client/clientset/versioned"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+)
+
+var (
+	infoExample = templates.Examples(`
+	# list workloads ownered by Kubeblocks
+	kbcli kubeblocks status
+	
+	# list all resources owned by KubeBlocks, such as workloads, cluster definitions, backup template.
+	kbcli kubeblocks status --all`)
+)
+
+var (
+	// app.kubernetes.io/instance=kubeblocks, hit most workloads and configuration
+	instanceLabelSelector = fmt.Sprintf("%s=%s", intctrlutil.AppInstanceLabelKey, types.KubeBlocksChartName)
+	// release=kubeblocs, for prometheus-alertmanager and prometheus-server
+	releaseLabelSelector = fmt.Sprintf("release=%s", types.KubeBlocksChartName)
+	// name=kubeblocks,owner-helm, for helm secret
+	helmLabel = fmt.Sprintf("%s=%s,%s=%s", "name", types.KubeBlocksChartName, "owner", "helm")
+
+	selectorList = []metav1.ListOptions{{LabelSelector: instanceLabelSelector}, {LabelSelector: releaseLabelSelector}}
+
+	kubeBlocksWorkloads = []schema.GroupVersionResource{
+		types.DeployGVR(),
+		types.StatefulSetGVR(),
+	}
+
+	kubeBlocksGlobalCustomResources = []schema.GroupVersionResource{
+		types.BackupPolicyTemplateGVR(),
+		types.BackupToolGVR(),
+		types.ClusterDefGVR(),
+		types.ClusterVersionGVR(),
+		types.ConfigConstraintGVR(),
+	}
+
+	kubeBlocksConfigurations = []schema.GroupVersionResource{
+		types.ConfigmapGVR(),
+		types.SecretGVR(),
+		types.ServiceGVR(),
+		types.PVCGVR(),
+	}
+
+	kubeBlocksStorages = []schema.GroupVersionResource{
+		types.PVCGVR(),
+	}
+
+	helmConfigurations = []schema.GroupVersionResource{
+		types.ConfigmapGVR(),
+		types.SecretGVR(),
+	}
+)
+
+type infoOptions struct {
+	genericclioptions.IOStreams
+	client  kubernetes.Interface
+	dynamic dynamic.Interface
+	mc      *metrics.Clientset
+	showAll bool
+	ns      string
+}
+
+func NewStatusCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+	o := infoOptions{IOStreams: streams}
+	cmd := &cobra.Command{
+		Use:     "status",
+		Short:   "Show status of resource created by KubeBlocks",
+		Args:    cobra.NoArgs,
+		Example: infoExample,
+		Run: func(cmd *cobra.Command, args []string) {
+			util.CheckErr(o.complete(f, cmd))
+			util.CheckErr(o.run(f, cmd))
+		},
+	}
+	cmd.Flags().BoolVar(&o.showAll, "all", false, "Show all resources.")
+	return cmd
+}
+
+func (o *infoOptions) complete(f cmdutil.Factory, cmd *cobra.Command) error {
+	var err error
+
+	o.dynamic, err = f.DynamicClient()
+	if err != nil {
+		return err
+	}
+
+	o.client, err = f.KubernetesClientSet()
+	if err != nil {
+		return err
+	}
+
+	config, err := f.ToRESTConfig()
+	if err != nil {
+		return err
+	}
+
+	o.mc, err = metrics.NewForConfig(config)
+	if err != nil {
+		return err
+	}
+	o.ns = metav1.NamespaceAll
+	return nil
+}
+
+func (o *infoOptions) run(f cmdutil.Factory, cmd *cobra.Command) error {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	// infer namespace from secrets
+	secrets, err := o.client.CoreV1().Secrets(metav1.NamespaceAll).List(ctx, metav1.ListOptions{LabelSelector: helmLabel})
+	if err == nil && len(secrets.Items) == 1 {
+		o.ns = secrets.Items[0].Namespace
+	}
+
+	fmt.Fprintf(o.Out, "Kuberblocks deployed under namespace: %s\n", o.ns)
+
+	allErrs := make([]error, 0)
+	o.showWorkloads(ctx, &allErrs)
+
+	if o.showAll {
+		o.showKubeBlocksResources(ctx, &allErrs)
+		o.showKubeBlocksConfig(ctx, &allErrs)
+		o.showKubeBlocksStorage(ctx, &allErrs)
+		o.showHelmResources(ctx, &allErrs)
+	}
+	return errorutil.Aggregate(allErrs)
+}
+
+func (o *infoOptions) showKubeBlocksResources(ctx context.Context, allErrs *[]error) {
+	fmt.Fprintln(o.Out, "\nKubeBlocks Global Custom Resources:")
+	tblPrinter := printer.NewTablePrinter(o.Out)
+	tblPrinter.SetHeader("KIND", "NAME")
+
+	unstructuredList := listResourceByGVR(ctx, o.dynamic, metav1.NamespaceAll, kubeBlocksGlobalCustomResources, selectorList, allErrs)
+	for _, resourceList := range unstructuredList {
+		for _, resource := range resourceList.Items {
+			tblPrinter.AddRow(resource.GetKind(), resource.GetName())
+		}
+	}
+	tblPrinter.Print()
+}
+
+func (o *infoOptions) showKubeBlocksConfig(ctx context.Context, allErrs *[]error) {
+	fmt.Fprintln(o.Out, "\nKubeBlocks Configurations:")
+	tblPrinter := printer.NewTablePrinter(o.Out)
+	tblPrinter.SetHeader("NAMESPACE", "KIND", "NAME")
+	unstructuredList := listResourceByGVR(ctx, o.dynamic, o.ns, kubeBlocksConfigurations, selectorList, allErrs)
+	for _, resourceList := range unstructuredList {
+		for _, resource := range resourceList.Items {
+			tblPrinter.AddRow(resource.GetNamespace(), resource.GetKind(), resource.GetName())
+		}
+	}
+	tblPrinter.Print()
+}
+
+func (o *infoOptions) showKubeBlocksStorage(ctx context.Context, allErrs *[]error) {
+	fmt.Fprintln(o.Out, "\nKubeBlocks Storage:")
+	tblPrinter := printer.NewTablePrinter(o.Out)
+	tblPrinter.SetHeader("NAMESPACE", "KIND", "NAME", "CAPACITY")
+
+	renderPVC := func(raw *unstructured.Unstructured) {
+		pvc := &corev1.PersistentVolumeClaim{}
+		err := runtime.DefaultUnstructuredConverter.FromUnstructured(raw.Object, pvc)
+		if err != nil {
+			appendErrIgnoreNotFound(allErrs, err)
+			return
+		}
+		tblPrinter.AddRow(pvc.GetNamespace(), pvc.Kind, pvc.GetName(), pvc.Status.Capacity.Storage())
+	}
+
+	unstructuredList := listResourceByGVR(ctx, o.dynamic, o.ns, kubeBlocksStorages, selectorList, allErrs)
+	for _, resourceList := range unstructuredList {
+		for _, resource := range resourceList.Items {
+			switch resource.GetKind() {
+			case intctrlutil.PersistentVolumeClaimKind:
+				renderPVC(&resource)
+			default:
+				err := fmt.Errorf("unsupported resources: %s", resource.GetKind())
+				appendErrIgnoreNotFound(allErrs, err)
+			}
+		}
+	}
+	tblPrinter.Print()
+}
+
+func (o *infoOptions) showHelmResources(ctx context.Context, allErrs *[]error) {
+	fmt.Fprintln(o.Out, "\nHelm Resources:")
+	tblPrinter := printer.NewTablePrinter(o.Out)
+	tblPrinter.SetHeader("NAMESPACE", "KIND", "NAME", "STATUS")
+
+	helmSelector := metav1.ListOptions{LabelSelector: helmLabel}
+	unstructuredList := listResourceByGVR(ctx, o.dynamic, o.ns, helmConfigurations, []metav1.ListOptions{helmSelector}, allErrs)
+	for _, resourceList := range unstructuredList {
+		for _, resource := range resourceList.Items {
+			deployedStatus := resource.GetLabels()["status"]
+			tblPrinter.AddRow(resource.GetNamespace(), resource.GetKind(), resource.GetName(), deployedStatus)
+		}
+	}
+	tblPrinter.Print()
+}
+
+func (o *infoOptions) showWorkloads(ctx context.Context, allErrs *[]error) {
+	fmt.Fprintln(o.Out, "Kubeblocks Workloads:")
+	tblPrinter := printer.NewTablePrinter(o.Out)
+	tblPrinter.SetHeader("NAMESPACE", "KIND", "NAME", "READY PODS", "CPU(cores)", "MEMORY(bytes)")
+
+	unstructuredList := listResourceByGVR(ctx, o.dynamic, o.ns, kubeBlocksWorkloads, selectorList, allErrs)
+
+	cpuMap, memMap := computeMetricByWorkloads(ctx, o.ns, unstructuredList, o.mc, allErrs)
+
+	renderDeploy := func(raw *unstructured.Unstructured) {
+		deploy := &appsv1.Deployment{}
+		err := runtime.DefaultUnstructuredConverter.FromUnstructured(raw.Object, deploy)
+		if err != nil {
+			appendErrIgnoreNotFound(allErrs, err)
+			return
+		}
+		objKey := client.ObjectKeyFromObject(deploy).String()
+		tblPrinter.AddRow(deploy.GetNamespace(), deploy.Kind, deploy.GetName(),
+			fmt.Sprintf("%d/%d", deploy.Status.ReadyReplicas, deploy.Status.Replicas),
+			cpuMap[objKey], memMap[objKey])
+	}
+
+	renderStatefulSet := func(raw *unstructured.Unstructured) {
+		sts := &appsv1.StatefulSet{}
+		err := runtime.DefaultUnstructuredConverter.FromUnstructured(raw.Object, sts)
+		if err != nil {
+			appendErrIgnoreNotFound(allErrs, err)
+			return
+		}
+		objKey := client.ObjectKeyFromObject(sts).String()
+		tblPrinter.AddRow(sts.GetNamespace(), sts.Kind, sts.GetName(),
+			fmt.Sprintf("%d/%d", sts.Status.ReadyReplicas, sts.Status.Replicas),
+			cpuMap[objKey], memMap[objKey])
+	}
+
+	for _, workload := range unstructuredList {
+		for _, resource := range workload.Items {
+			switch resource.GetKind() {
+			case intctrlutil.DeploymentKind:
+				renderDeploy(&resource)
+			case intctrlutil.StatefulSetKind:
+				renderStatefulSet(&resource)
+			default:
+				err := fmt.Errorf("unsupported worklkoad type: %s", resource.GetKind())
+				appendErrIgnoreNotFound(allErrs, err)
+			}
+		}
+	}
+	tblPrinter.Print()
+}
+
+func computeMetricByWorkloads(ctx context.Context, ns string, workloads []*unstructured.UnstructuredList, mc *metrics.Clientset, allErrs *[]error) (cpuMetricMap, memMetricMap map[string]string) {
+	cpuMetricMap = make(map[string]string)
+	memMetricMap = make(map[string]string)
+
+	podsMetrics, err := mc.MetricsV1beta1().PodMetricses(ns).List(ctx, metav1.ListOptions{})
+	if err != nil {
+		appendErrIgnoreNotFound(allErrs, err)
+		return
+	}
+
+	computeResources := func(name string, podsMetrics *v1beta1.PodMetricsList) {
+		cpuUsage, memUsage := int64(0), int64(0)
+		for _, pod := range podsMetrics.Items {
+			if strings.HasPrefix(pod.Name, name) {
+				for _, container := range pod.Containers {
+					cpuUsage += container.Usage.Cpu().MilliValue()
+					memUsage += container.Usage.Memory().Value() / (1024 * 1024)
+				}
+			}
+		}
+		cpuMetricMap[name] = fmt.Sprintf("%dm", cpuUsage)
+		memMetricMap[name] = fmt.Sprintf("%dMi", memUsage)
+	}
+
+	for _, workload := range workloads {
+		for _, resource := range workload.Items {
+			name := resource.GetName()
+			if podsMetrics == nil {
+				cpuMetricMap[name] = "N/A"
+				memMetricMap[name] = "N/A"
+				continue
+			}
+			computeResources(name, podsMetrics)
+		}
+	}
+	return cpuMetricMap, memMetricMap
+}
+
+func listResourceByGVR(ctx context.Context, client dynamic.Interface, namespace string, gvrlist []schema.GroupVersionResource, selector []metav1.ListOptions, allErrs *[]error) []*unstructured.UnstructuredList {
+	unstructuredList := make([]*unstructured.UnstructuredList, 0)
+	for _, gvr := range gvrlist {
+		for _, lableSelector := range selector {
+			resource, err := client.Resource(gvr).Namespace(namespace).List(ctx, lableSelector)
+			if err != nil {
+				appendErrIgnoreNotFound(allErrs, err)
+				continue
+			}
+			unstructuredList = append(unstructuredList, resource)
+		}
+	}
+	return unstructuredList
+}
+
+func appendErrIgnoreNotFound(allErrs *[]error, err error) {
+	if err == nil || apierrors.IsNotFound(err) {
+		return
+	}
+	*allErrs = append(*allErrs, err)
+}

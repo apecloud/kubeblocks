@@ -64,6 +64,8 @@ const (
 	ResourceStatefulSets = "statefulsets"
 	// ResourceConfigConstraintVersions clusterVersion resource
 	ResourceConfigConstraintVersions = "configconstraints"
+	// ResourceSecrets secret resources
+	ResourceSecrets = "secrets"
 
 	// KindCluster cluster king
 	KindCluster = "Cluster"
@@ -156,6 +158,10 @@ func BackupPolicyTemplateGVR() schema.GroupVersionResource {
 	return schema.GroupVersionResource{Group: DPGroup, Version: DPVersion, Resource: ResourceBackupPolicyTemplates}
 }
 
+func BackupToolGVR() schema.GroupVersionResource {
+	return schema.GroupVersionResource{Group: DPGroup, Version: DPVersion, Resource: ResourceBackupTools}
+}
+
 func RestoreJobGVR() schema.GroupVersionResource {
 	return schema.GroupVersionResource{Group: DPGroup, Version: DPVersion, Resource: ResourceRestoreJobs}
 }
@@ -174,6 +180,10 @@ func CRDGVR() schema.GroupVersionResource {
 
 func ConfigmapGVR() schema.GroupVersionResource {
 	return schema.GroupVersionResource{Group: corev1.GroupName, Version: VersionV1, Resource: ResourceConfigmaps}
+}
+
+func SecretGVR() schema.GroupVersionResource {
+	return schema.GroupVersionResource{Group: corev1.GroupName, Version: VersionV1, Resource: ResourceSecrets}
 }
 
 func StatefulSetGVR() schema.GroupVersionResource {

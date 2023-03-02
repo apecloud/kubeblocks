@@ -222,17 +222,17 @@ func replaceContainerPlaceholderTokens(component *SynthesizedComponent, namedVal
 	}
 }
 
-// ReplaceNamedVars replaces the value in needle with namedValuesMap and returns new needle
-func ReplaceNamedVars(namedValuesMap map[string]string, needle string, limits int, matchAll bool) string {
-	for k, v := range namedValuesMap {
-		r := strings.Replace(needle, k, v, limits)
+// ReplaceNamedVars replaces the placeholder in targetVar if it is match and returns the replaced result
+func ReplaceNamedVars(namedValuesMap map[string]string, targetVar string, limits int, matchAll bool) string {
+	for placeHolderKey, mappingValue := range namedValuesMap {
+		r := strings.Replace(targetVar, placeHolderKey, mappingValue, limits)
 		// early termination on matching, when matchAll = false
-		if r != needle && !matchAll {
+		if r != targetVar && !matchAll {
 			return r
 		}
-		needle = r
+		targetVar = r
 	}
-	return needle
+	return targetVar
 }
 
 // ReplaceSecretEnvVars replaces the env secret value with namedValues and returns new envs

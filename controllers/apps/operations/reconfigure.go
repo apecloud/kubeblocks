@@ -157,53 +157,48 @@ func (r *reconfigureAction) ReconcileAction(opsRes *OpsResource) (appsv1alpha1.P
 	condition := status.Conditions[len(status.Conditions)-1]
 	if isSucceedPhase(condition) {
 		// TODO Sync reload progress from config manager.
-		return r.syncReconfigureComponentStatus(opsRes, false)
+		if err := r.syncReconfigureComponentStatus(opsRes); err != nil {
+			return "", time.Second, err
+		}
+		return appsv1alpha1.SucceedPhase, 0, nil
 	}
 	if isFailedPhase(condition) {
-		return r.syncReconfigureComponentStatus(opsRes, true)
+		// TODO Sync reload progress from config manager.
+		if err := r.syncReconfigureComponentStatus(opsRes); err != nil {
+			return "", time.Second, err
+		}
+		return appsv1alpha1.FailedPhase, 0, nil
 	}
 	return appsv1alpha1.RunningPhase, 30 * time.Second, nil
 }
 
-func (r *reconfigureAction) syncReconfigureComponentStatus(res *OpsResource, failed bool) (appsv1alpha1.Phase, time.Duration, error) {
-	var (
-		phase      = appsv1alpha1.SucceedPhase
-		cluster    = res.Cluster
-		opsRequest = res.OpsRequest
-	)
+func (r *reconfigureAction) syncReconfigureComponentStatus(res *OpsResource) error {
+	cluster := res.Cluster
+	opsRequest := res.OpsRequest
 
-	if failed {
-		phase = appsv1alpha1.FailedPhase
+	if opsRequest.Spec.Reconfigure == nil || opsRequest.Status.ReconfiguringStatus == nil {
+		return nil
 	}
-
 	if !isReloadPolicy(opsRequest.Status.ReconfiguringStatus) {
-		return phase, 0, nil
-	}
-
-	if opsRequest.Spec.Reconfigure == nil {
-		return phase, 0, nil
+		return nil
 	}
 
 	componentName := opsRequest.Spec.Reconfigure.ComponentName
 	c, ok := cluster.Status.Components[componentName]
 	if !ok || c.Phase != appsv1alpha1.ReconfiguringPhase {
-		return phase, 0, nil
+		return nil
 	}
 
 	clusterPatch := client.MergeFrom(cluster.DeepCopy())
 	c.Phase = appsv1alpha1.RunningPhase
 	cluster.Status.Components[componentName] = c
-	if err := res.Client.Status().Patch(res.Ctx, cluster, clusterPatch); err != nil {
-		return "", time.Second, err
-	}
-	return phase, 0, nil
+	return res.Client.Status().Patch(res.Ctx, cluster, clusterPatch)
 }
 
 func isReloadPolicy(status *appsv1alpha1.ReconfiguringStatus) bool {
-	if status == nil {
+	if status.ConfigurationStatus == nil {
 		return false
 	}
-
 	for _, cmStatus := range status.ConfigurationStatus {
 		if cmStatus.UpdatePolicy != appsv1alpha1.AutoReload {
 			return false

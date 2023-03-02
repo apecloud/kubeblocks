@@ -251,15 +251,6 @@ func isRunning(pod *corev1.Pod) bool {
 	return pod.Status.Phase == corev1.PodRunning && pod.DeletionTimestamp == nil
 }
 
-func IsReady(pod *corev1.Pod) bool {
-	if !isRunning(pod) {
-		return false
-	}
-
-	condition := GetPodCondition(&pod.Status, corev1.PodReady)
-	return condition != nil && condition.Status == corev1.ConditionTrue
-}
-
 func IsAvailable(pod *corev1.Pod, minReadySeconds int32) bool {
 	if !isRunning(pod) {
 		return false

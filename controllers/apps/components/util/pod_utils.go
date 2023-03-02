@@ -26,25 +26,11 @@ import (
 // PodIsReady checks whether pod is ready or not if the component is ConsensusSet or ReplicationSet,
 // it will be available when the pod is ready and labeled with its role.
 func PodIsReady(pod corev1.Pod) bool {
-	if pod.Status.Conditions == nil {
-		return false
-	}
-
-	if pod.DeletionTimestamp != nil {
-		return false
-	}
-
 	if _, ok := pod.Labels[intctrlutil.RoleLabelKey]; !ok {
 		return false
 	}
 
-	for _, condition := range pod.Status.Conditions {
-		if condition.Type == corev1.PodReady && condition.Status == corev1.ConditionTrue {
-			return true
-		}
-	}
-
-	return false
+	return intctrlutil.PodIsReady(&pod)
 }
 
 // PodIsControlledByLatestRevision checks if the pod is controlled by latest controller revision.

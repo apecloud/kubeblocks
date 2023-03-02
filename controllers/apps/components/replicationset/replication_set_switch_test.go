@@ -262,19 +262,27 @@ var _ = Describe("ReplicationSet Switch", func() {
 					},
 				},
 				SwitchCmdExecutorConfig: &appsv1alpha1.SwitchCmdExecutorConfig{
-					Image: testapps.DefaultRedisImageName,
+					CommandExecutorEnvItem: appsv1alpha1.CommandExecutorEnvItem{
+						Image: testapps.DefaultRedisImageName,
+					},
 					SwitchSteps: []appsv1alpha1.SwitchStep{
 						{
-							Role:    appsv1alpha1.NewPrimary,
-							Command: []string{"echo $(KB_SWITCH_ROLE_ENDPOINT) $(KB_SWITCH_PROMOTE_STATEMENT)"},
+							Role: appsv1alpha1.NewPrimary,
+							CommandExecutorItem: appsv1alpha1.CommandExecutorItem{
+								Command: []string{"echo $(KB_SWITCH_ROLE_ENDPOINT) $(KB_SWITCH_PROMOTE_STATEMENT)"},
+							},
 						},
 						{
-							Role:    appsv1alpha1.OldPrimary,
-							Command: []string{"echo $(KB_SWITCH_ROLE_ENDPOINT) $(KB_SWITCH_DEMOTE_STATEMENT)"},
+							Role: appsv1alpha1.OldPrimary,
+							CommandExecutorItem: appsv1alpha1.CommandExecutorItem{
+								Command: []string{"echo $(KB_SWITCH_ROLE_ENDPOINT) $(KB_SWITCH_DEMOTE_STATEMENT)"},
+							},
 						},
 						{
-							Role:    appsv1alpha1.Secondaries,
-							Command: []string{"echo $(KB_SWITCH_ROLE_ENDPOINT) $(KB_SWITCH_FOLLOW_STATEMENT)"},
+							Role: appsv1alpha1.Secondaries,
+							CommandExecutorItem: appsv1alpha1.CommandExecutorItem{
+								Command: []string{"echo $(KB_SWITCH_ROLE_ENDPOINT) $(KB_SWITCH_FOLLOW_STATEMENT)"},
+							},
 						},
 					},
 				},

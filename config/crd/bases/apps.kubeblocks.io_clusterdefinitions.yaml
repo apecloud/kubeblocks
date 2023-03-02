@@ -8142,7 +8142,7 @@ spec:
                               x-kubernetes-preserve-unknown-fields: true
                             image:
                               description: image for Connector when executing the
-                                switch command.
+                                command.
                               type: string
                             switchSteps:
                               description: switchSteps definition, users can customize
@@ -8156,12 +8156,12 @@ spec:
                               items:
                                 properties:
                                   args:
-                                    description: args is used to perform switch statements.
+                                    description: args is used to perform statements.
                                     items:
                                       type: string
                                     type: array
                                   command:
-                                    description: command to perform switch statements.
+                                    description: command to perform statements.
                                     items:
                                       type: string
                                     minItems: 1
@@ -8806,7 +8806,8 @@ spec:
                               type: array
                               x-kubernetes-preserve-unknown-fields: true
                             image:
-                              description: image for Connector.
+                              description: image for Connector when executing the
+                                command.
                               type: string
                           required:
                           - command

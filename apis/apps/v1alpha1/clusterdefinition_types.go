@@ -68,22 +68,9 @@ type SystemAccountSpec struct {
 
 // CmdExecutorConfig specifies how to perform creation and deletion statements.
 type CmdExecutorConfig struct {
-	// image for Connector.
-	// +kubebuilder:validation:Required
-	Image string `json:"image"`
-	// command to perform statements.
-	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:MinItems=1
-	Command []string `json:"command"`
-	// args is used to perform statements.
-	// +optional
-	Args []string `json:"args,omitempty"`
-	// envs is a list of environment variables.
-	// +kubebuilder:pruning:PreserveUnknownFields
-	// +patchMergeKey=name
-	// +patchStrategy=merge,retainKeys
-	// +optional
-	Env []corev1.EnvVar `json:"env,omitempty" patchStrategy:"merge" patchMergeKey:"name"`
+	CommandExecutorEnvItem `json:",inline"`
+
+	CommandExecutorItem `json:",inline"`
 }
 
 // PasswordConfig helps provide to customize complexity of password generation pattern.
@@ -525,9 +512,8 @@ type SwitchStatements struct {
 }
 
 type SwitchCmdExecutorConfig struct {
-	// image for Connector when executing the switch command.
-	// +kubebuilder:validation:Required
-	Image string `json:"image"`
+	CommandExecutorEnvItem `json:",inline"`
+
 	// switchSteps definition, users can customize the switching steps on the provided three roles - NewPrimary, OldPrimary, and Secondaries.
 	// the same role can customize multiple steps in the order of the list, and KubeBlocks will perform switching operations in the defined order.
 	// if switchStep is not set, we will try to use the built-in switchStep for the database engine with built-in support.
@@ -535,6 +521,19 @@ type SwitchCmdExecutorConfig struct {
 	// +kubebuilder:validation:MinItems=1
 	// +optional
 	SwitchSteps []SwitchStep `json:"switchSteps"`
+}
+
+type SwitchStep struct {
+	CommandExecutorItem `json:",inline"`
+
+	// role determines which role to execute the command on, role is divided into three roles NewPrimary, OldPrimary, and Secondaries.
+	Role SwitchStepRole `json:"role"`
+}
+
+type CommandExecutorEnvItem struct {
+	// image for Connector when executing the command.
+	// +kubebuilder:validation:Required
+	Image string `json:"image"`
 	// envs is a list of environment variables.
 	// +kubebuilder:pruning:PreserveUnknownFields
 	// +patchMergeKey=name
@@ -543,14 +542,12 @@ type SwitchCmdExecutorConfig struct {
 	Env []corev1.EnvVar `json:"env,omitempty" patchStrategy:"merge" patchMergeKey:"name"`
 }
 
-type SwitchStep struct {
-	// role determines which role to execute the command on, role is divided into three roles NewPrimary, OldPrimary, and Secondaries.
-	Role SwitchStepRole `json:"role"`
-	// command to perform switch statements.
+type CommandExecutorItem struct {
+	// command to perform statements.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MinItems=1
 	Command []string `json:"command"`
-	// args is used to perform switch statements.
+	// args is used to perform statements.
 	// +optional
 	Args []string `json:"args,omitempty"`
 }

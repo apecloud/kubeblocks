@@ -23,7 +23,27 @@ data:
     echo "create extension pg_stat_statements."
     psql -Upostgres -c "CREATE EXTENSION IF NOT EXISTS pg_stat_statements;" >/dev/null 2>&1
     if [ $? -eq 0 ];then
-       echo "create extension pg_stat_statements success."
+        echo "create extension pg_stat_statements success."
     else
         exit 1
     fi
+  setup.sh: |
+    #!/bin/sh
+    set -o errexit
+    set -o nounset
+    set -o pipefail
+    SECONDARY_ROLE=secondary
+    KB_ROLE_NAME=`cat /etc/conf/role/labels`
+    if [ "$KB_ROLE_NAME" = "$SECONDARY_ROLE" ]; then
+      export POSTGRES_REPLICATION_MODE=slave
+      export POSTGRES_REPLICATION_USER=kbreplicator
+      export POSTGRES_REPLICATION_PASSWORD=eIah735n61
+      export POSTGRES_CLUSTER_APP_NAME=my-application
+      export POSTGRES_MASTER_HOST=pg-pg
+      export POSTGRES_MASTER_PORT_NUMBER="5432"
+      . /opt/bitnami/scripts/libpostgresql.sh
+      . /opt/bitnami/scripts/postgresql-env.sh
+      postgresql_slave_init_db
+    fi
+    /scripts/post_start.sh &
+    /opt/bitnami/scripts/postgresql/entrypoint.sh /opt/bitnami/scripts/postgresql/run.sh

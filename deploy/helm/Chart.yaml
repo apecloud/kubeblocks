@@ -74,7 +74,3 @@ dependencies:
     name: snapshot-controller
     repository: https://piraeus.io/helm-charts
     version: 1.*
-  - condition: csi-s3.enabled
-    name: csi-s3
-    repository: https://github.com/CloudVE/helm-charts/raw/master
-    version: 0.*

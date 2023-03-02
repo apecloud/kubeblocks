@@ -77,6 +77,13 @@ var _ = Describe("OpsRequest Controller", func() {
 		Eventually(testapps.GetAndChangeObjStatus(&testCtx, namespacedName,
 			func(fetched *appsv1alpha1.Cluster) {
 				fetched.Status.Phase = appsv1alpha1.RunningPhase
+				if len(fetched.Status.Components) == 0 {
+					fetched.Status.Components = map[string]appsv1alpha1.ClusterComponentStatus{}
+					for _, v := range fetched.Spec.ComponentSpecs {
+						fetched.Status.Components[v.Name] = appsv1alpha1.ClusterComponentStatus{Phase: appsv1alpha1.RunningPhase}
+					}
+					return
+				}
 				for componentKey, componentStatus := range fetched.Status.Components {
 					componentStatus.Phase = appsv1alpha1.RunningPhase
 					fetched.Status.Components[componentKey] = componentStatus

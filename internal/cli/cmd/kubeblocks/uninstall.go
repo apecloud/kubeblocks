@@ -79,6 +79,7 @@ func newUninstallCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *co
 	cmd.Flags().BoolVar(&o.autoApprove, "auto-approve", false, "Skip interactive approval before uninstalling KubeBlocks")
 	cmd.Flags().BoolVar(&o.removePVs, "remove-pvs", false, "Remove PersistentVolume or not")
 	cmd.Flags().BoolVar(&o.removePVCs, "remove-pvcs", false, "Remove PersistentVolumeClaim or not")
+	cmd.Flags().BoolVar(&o.verbose, "verbose", false, "Show logs in detail.")
 	return cmd
 }
 

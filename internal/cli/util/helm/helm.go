@@ -46,6 +46,7 @@ import (
 	"helm.sh/helm/v3/pkg/repo"
 	"helm.sh/helm/v3/pkg/storage"
 	"helm.sh/helm/v3/pkg/storage/driver"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 )
@@ -63,6 +64,7 @@ type InstallOpts struct {
 	CreateNamespace bool
 	ValueOpts       *values.Options
 	Timeout         time.Duration
+	Atomic          bool
 }
 
 type Option func(*cli.EnvSettings)
@@ -204,6 +206,7 @@ func (i *InstallOpts) tryInstall(cfg *action.Configuration) (string, error) {
 	client.Wait = i.Wait
 	client.Timeout = i.Timeout
 	client.Version = i.Version
+	client.Atomic = i.Atomic
 
 	if client.Timeout == 0 {
 		client.Timeout = defaultTimeout
@@ -293,6 +296,10 @@ func (i *InstallOpts) tryUninstall(cfg *action.Configuration) error {
 }
 
 func NewActionConfig(ns string, config string, opts ...Option) (*action.Configuration, error) {
+	return NewActionConfigWithLog(ns, config, GetQuiteLog(), opts...)
+}
+
+func NewActionConfigWithLog(ns string, config string, logFn action.DebugLog, opts ...Option) (*action.Configuration, error) {
 	var err error
 	settings := cli.New()
 	cfg := new(action.Configuration)
@@ -311,8 +318,7 @@ func NewActionConfig(ns string, config string, opts ...Option) (*action.Configur
 		return nil, err
 	}
 	if err = cfg.Init(settings.RESTClientGetter(), settings.Namespace(),
-		os.Getenv("HELM_DRIVER"),
-		func(format string, v ...interface{}) {}); err != nil {
+		os.Getenv("HELM_DRIVER"), logFn); err != nil {
 		return nil, err
 	}
 	return cfg, nil
@@ -497,4 +503,14 @@ func ValueOptsIsEmpty(valueOpts *values.Options) bool {
 		len(valueOpts.Values) == 0 &&
 		len(valueOpts.FileValues) == 0 &&
 		len(valueOpts.JSONValues) == 0
+}
+
+func GetQuiteLog() action.DebugLog {
+	return func(format string, v ...interface{}) {}
+}
+
+func GetVerboseLog(log genericclioptions.IOStreams) action.DebugLog {
+	return func(format string, v ...interface{}) {
+		fmt.Fprintf(log.Out, format+"\n", v...)
+	}
 }

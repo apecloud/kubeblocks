@@ -4,6 +4,13 @@ We're happy to announce the release of KubeBlocks $kubeblocks_version! 🚀 🎉
 
 We would like to extend our appreciation to all contributors who helped make this release happen.
 
+**Breaking changes**
+* Reconstructed existing "dbaas.kubeblocks.io" API group to new "apps.kubeblocks.io" API group, affected following APIs:
+  - ClusterDefinition
+  - ClusterVersion
+  - Cluster
+* Existing API will no longer functional, please make sure you have deleted them and delete CRDs before upgrade
+
 **Highlights**
     * New addons.extensions.kubeblocks.io API, with Addon management controller, where KubeBlocks allow addon extensions instead of using Helm sub-charts dependencies.
     * ClusterDefinition API `spec.connectionCredential` add following built-in variables:

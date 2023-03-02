@@ -102,7 +102,7 @@ type statusOptions struct {
 	ns      string
 }
 
-func NewStatusCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func newStatusCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := statusOptions{IOStreams: streams}
 	cmd := &cobra.Command{
 		Use:     "status",

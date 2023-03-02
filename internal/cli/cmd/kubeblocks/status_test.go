@@ -54,7 +54,7 @@ var _ = Describe("kubeblocks status", func() {
 
 	It("pre-run status", func() {
 		var cfg string
-		cmd = NewStatusCmd(tf, streams)
+		cmd = newStatusCmd(tf, streams)
 		Expect(cmd).ShouldNot(BeNil())
 		Expect(cmd.HasSubCommands()).Should(BeFalse())
 

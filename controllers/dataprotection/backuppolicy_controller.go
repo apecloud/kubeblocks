@@ -178,15 +178,7 @@ func (r *BackupPolicyReconciler) doInProgressPhaseAction(
 	}
 
 	// create cronjob from cue template.
-	cronjob, err := r.buildCronJob(backupPolicy)
-	if err != nil {
-		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-	}
-	err = r.Client.Create(reqCtx.Ctx, cronjob)
-	// ignore already exists.
-	if err != nil && !errors.IsAlreadyExists(err) {
-		r.Recorder.Eventf(backupPolicy, corev1.EventTypeWarning, "CreatingBackupPolicy",
-			"Failed to create cronjob %s.", err.Error())
+	if err := r.createCronJob(reqCtx, backupPolicy); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 
@@ -411,6 +403,32 @@ func (r *BackupPolicyReconciler) deleteExternalResources(reqCtx intctrlutil.Requ
 		return err
 	}
 
+	return nil
+}
+
+// createCronJob create cronjob spec if backup policy set schedule
+func (r *BackupPolicyReconciler) createCronJob(
+	reqCtx intctrlutil.RequestCtx,
+	backupPolicy *dataprotectionv1alpha1.BackupPolicy) error {
+
+	if backupPolicy.Spec.Schedule == "" {
+		r.Recorder.Eventf(backupPolicy, corev1.EventTypeNormal, "BackupPolicy",
+			"Backups will not be automatically scheduled due to lack of schedule configuration.")
+		return nil
+	}
+
+	// create cronjob from cue template.
+	cronjob, err := r.buildCronJob(backupPolicy)
+	if err != nil {
+		return err
+	}
+	err = r.Client.Create(reqCtx.Ctx, cronjob)
+	// ignore already exists.
+	if err != nil && !errors.IsAlreadyExists(err) {
+		r.Recorder.Eventf(backupPolicy, corev1.EventTypeWarning, "CreatingBackupPolicy",
+			"Failed to create cronjob %s.", err.Error())
+		return err
+	}
 	return nil
 }
 

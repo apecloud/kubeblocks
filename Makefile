@@ -135,9 +135,13 @@ manifests: test-go-generate controller-gen ## Generate WebhookConfiguration, Clu
 	@cp config/rbac/role.yaml $(CHART_PATH)/config/rbac/role.yaml
 	$(CONTROLLER_GEN) rbac:roleName=loadbalancer-role  paths="./controllers/loadbalancer;./cmd/loadbalancer/controller" output:dir=config/loadbalancer
 
+.PHONY: preflight-manifests
+preflight-manifests: generate ## Generate external Preflight API
+	$(CONTROLLER_GEN) rbac:roleName=manager-role crd:generateEmbeddedObjectMeta=true webhook paths="./externalapis/preflight/..." output:crd:artifacts:config=config/crd/preflight
+
 .PHONY: generate
 generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
-	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./apis/..."
+	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./apis/...;./externalapis/..."
 
 .PHONY: manager-go-generate
 manager-go-generate: ## Run go generate against lifecycle manager code.

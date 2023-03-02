@@ -14,17 +14,17 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package troubleshoot
+package preflight
 
 import (
+	"context"
 	"net/http"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	troubleshootv1beta2 "github.com/replicatedhq/troubleshoot/pkg/apis/troubleshoot/v1beta2"
-	"github.com/replicatedhq/troubleshoot/pkg/preflight"
+	troubleshoot "github.com/replicatedhq/troubleshoot/pkg/apis/troubleshoot/v1beta2"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -35,23 +35,23 @@ import (
 	clientfake "k8s.io/client-go/rest/fake"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 
+	preflightv1beta2 "github.com/apecloud/kubeblocks/externalapis/preflight/v1beta2"
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 )
 
-var _ = Describe("Collect Test", func() {
+var _ = Describe("collect_test", func() {
 	var (
 		timeOut     = 10 * time.Second
 		namespace   = "test"
 		clusterName = "test"
-		streams     genericclioptions.IOStreams
 		tf          *cmdtesting.TestFactory
 		cluster     = testing.FakeCluster(clusterName, namespace)
 		pods        = testing.FakePods(3, namespace, clusterName)
 	)
 
 	BeforeEach(func() {
-		streams, _, _, _ = genericclioptions.NewTestIOStreams()
+		_, _, _, _ = genericclioptions.NewTestIOStreams()
 		tf = testing.NewTestFactory(namespace)
 		codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 		httpResp := func(obj runtime.Object) *http.Response {
@@ -84,56 +84,21 @@ var _ = Describe("Collect Test", func() {
 		tf.Cleanup()
 	})
 
-	It("parseTimeFlags Test", func() {
-		sinceStr := "5m"
-		sinceTimeStr := "2023-01-09T15:18:46+08:00"
-		Expect(parseTimeFlags(sinceStr, sinceTimeStr, []*troubleshootv1beta2.Collect{})).Should(HaveOccurred())
-		Expect(parseTimeFlags("", sinceTimeStr, []*troubleshootv1beta2.Collect{})).Should(Succeed())
-		Expect(parseTimeFlags(sinceStr, "", []*troubleshootv1beta2.Collect{})).Should(Succeed())
-	})
-	It("collectRemoteData Test", func() {
-		Eventually(func(g Gomega) {
-			progressCh := make(chan interface{})
-			go func() {
-				for {
-					g.Expect(<-progressCh).NotTo(BeNil())
-				}
-			}()
-			p := &preflightOptions{
-				factory:        tf,
-				IOStreams:      streams,
-				PreflightFlags: preflight.NewPreflightFlags(),
-			}
-			collectResult, err := collectRemoteData(&troubleshootv1beta2.HostPreflight{}, progressCh, *p)
-			g.Expect(err).NotTo(HaveOccurred())
-			g.Expect(collectResult).NotTo(BeNil())
-		}).WithTimeout(timeOut).Should(Succeed())
-	})
-
-	It("collectHostData Test", func() {
+	It("CollectPreflight test, and expect success ", func() {
 		hostByte := `
 apiVersion: troubleshoot.sh/v1beta2
 kind: HostPreflight
 metadata:
-  name: cpu
+  name: hostCheckTest
 spec:
   collectors:
     - cpu: {}
-  analyzers:
-    - cpu:
-        outcomes:
-          - fail:
-              when: "physical < 4"
-              message: At least 4 physical CPU cores are required
-          - fail:
-              when: "logical < 8"
-              message: At least 8 CPU cores are required
-          - warn:
-              when: "count < 16"
-              message: At least 16 CPU cores preferred
-          - pass:
-              message: This server has sufficient CPU cores.`
-		hostSpec := new(troubleshootv1beta2.HostPreflight)
+  extendCollectors:
+    - hostUtility :
+        collectorName: helmCheck
+        utilityName: helm
+`
+		hostSpec := new(preflightv1beta2.HostPreflight)
 		Eventually(func(g Gomega) {
 			g.Expect(yaml.Unmarshal([]byte(hostByte), hostSpec)).Should(Succeed())
 			progressCh := make(chan interface{})
@@ -142,10 +107,67 @@ spec:
 					g.Expect(<-progressCh).NotTo(BeNil())
 				}
 			}()
-			results, err := collectHostData(hostSpec, progressCh)
+			results, err := CollectPreflight(context.TODO(), nil, hostSpec, progressCh)
 			g.Expect(err).NotTo(HaveOccurred())
-			_, ok := (*results).(preflight.HostCollectResult)
+			g.Expect(len(results)).Should(Equal(1))
+		}).WithTimeout(timeOut).Should(Succeed())
+	})
+
+	It("CollectHostData Test, and expect success", func() {
+		hostByte := `
+apiVersion: troubleshoot.sh/v1beta2
+kind: HostPreflight
+metadata:
+name: cpu
+spec:
+collectors:
+  - cpu: {}
+analyzers:
+`
+		hostSpec := new(preflightv1beta2.HostPreflight)
+		Eventually(func(g Gomega) {
+			g.Expect(yaml.Unmarshal([]byte(hostByte), hostSpec)).Should(Succeed())
+			progressCh := make(chan interface{})
+			go func() {
+				for {
+					g.Expect(<-progressCh).NotTo(BeNil())
+				}
+			}()
+			results, err := CollectHostData(context.TODO(), hostSpec, progressCh)
+			g.Expect(err).NotTo(HaveOccurred())
+			_, ok := (*results).(KBHostCollectResult)
 			g.Expect(ok).Should(BeTrue())
 		}).WithTimeout(timeOut).Should(Succeed())
+	})
+
+	It("CollectRemoteData test, and expect success", func() {
+		Eventually(func(g Gomega) {
+			progressCh := make(chan interface{})
+			go func() {
+				for {
+					g.Expect(<-progressCh).NotTo(BeNil())
+				}
+			}()
+			collectResult, err := CollectRemoteData(context.TODO(), &preflightv1beta2.HostPreflight{}, progressCh)
+			g.Expect(err).NotTo(HaveOccurred())
+			g.Expect(collectResult).NotTo(BeNil())
+		}).WithTimeout(timeOut).Should(Succeed())
+	})
+
+	It("ParseTimeFlags test, and expect success", func() {
+		sinceStr := "5m"
+		sinceTimeStr := "2023-01-09T15:18:46+08:00"
+		Expect(ParseTimeFlags(sinceStr, sinceTimeStr, []*troubleshoot.Collect{})).Should(HaveOccurred())
+		Expect(ParseTimeFlags(sinceTimeStr, "", []*troubleshoot.Collect{})).Should(Succeed())
+		Expect(ParseTimeFlags("", sinceStr, []*troubleshoot.Collect{})).Should(Succeed())
+	})
+
+	It("ParseTimeFlags test, and expect error", func() {
+		sinceStr := "5error-m"
+		sinceTimeStr := "2023-01-09T15:46+:00"
+		Expect(ParseTimeFlags("", "", []*troubleshoot.Collect{})).Should(HaveOccurred())
+		Expect(ParseTimeFlags(sinceStr, "", []*troubleshoot.Collect{})).Should(HaveOccurred())
+		Expect(ParseTimeFlags("", sinceTimeStr, []*troubleshoot.Collect{})).Should(HaveOccurred())
+
 	})
 })

@@ -109,4 +109,20 @@ resources:
   kind: Addon
   path: github.com/apecloud/kubeblocks/apis/extensions/v1alpha1
   version: v1alpha1
+- api:
+    crdVersion: v1
+    namespaced: true
+  domain: troubleshoot.sh
+  group:
+  kind: HostPreflight
+  path: github.com/apecloud/kubeblocks/externalapis/preflight/v1beta2
+  version: v1beta2
+- api:
+    crdVersion: v1
+    namespaced: true
+  domain: troubleshoot.sh
+  group:
+  kind: Preflight
+  path: github.com/apecloud/kubeblocks/externalapis/preflight/v1beta2
+  version: v1beta2
 version: "3"

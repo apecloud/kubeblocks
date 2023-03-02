@@ -304,15 +304,11 @@ type Affinity struct {
 	// +optional
 	PodAntiAffinity PodAntiAffinity `json:"podAntiAffinity,omitempty"`
 
-	// TopologyKey is the key of node labels. Nodes that have a label with this key
-	// and identical values are considered to be in the same topology.
-	// We consider each <key, value> as a "bucket", and try to put balanced number
-	// of pods into each bucket.
-	// We define a domain as a particular instance of a topology.
-	// Also, we define an eligible domain as a domain whose nodes meet the requirements of
-	// nodeAffinityPolicy and nodeTaintsPolicy.
-	// e.g. If TopologyKey is "kubernetes.io/hostname", each Node is a domain of that topology.
-	// And, if TopologyKey is "topology.kubernetes.io/zone", each zone is a domain of that topology.
+	// TopologyKey is the key of node labels.
+	// Nodes that have a label with this key and identical values are considered to be in the same topology.
+	// It's used as the topology domain for pod anti-affinity and pod spread constraint.
+	// Some well-known label keys, such as "kubernetes.io/hostname" and "topology.kubernetes.io/zone"
+	// are often used as TopologyKey, as well as any other custom label key.
 	// +listType=set
 	// +optional
 	TopologyKeys []string `json:"topologyKeys,omitempty"`

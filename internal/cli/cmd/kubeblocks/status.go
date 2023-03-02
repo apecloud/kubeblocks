@@ -43,7 +43,6 @@ import (
 	"k8s.io/kubectl/pkg/util/templates"
 	"k8s.io/metrics/pkg/apis/metrics/v1beta1"
 	metrics "k8s.io/metrics/pkg/client/clientset/versioned"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 var (
@@ -82,7 +81,6 @@ var (
 		types.ConfigmapGVR(),
 		types.SecretGVR(),
 		types.ServiceGVR(),
-		types.PVCGVR(),
 	}
 
 	kubeBlocksStorages = []schema.GroupVersionResource{
@@ -258,10 +256,10 @@ func (o *statusOptions) showWorkloads(ctx context.Context, allErrs *[]error) {
 			appendErrIgnoreNotFound(allErrs, err)
 			return
 		}
-		objKey := client.ObjectKeyFromObject(deploy).String()
+		name := deploy.GetName()
 		tblPrinter.AddRow(deploy.GetNamespace(), deploy.Kind, deploy.GetName(),
 			fmt.Sprintf("%d/%d", deploy.Status.ReadyReplicas, deploy.Status.Replicas),
-			cpuMap[objKey], memMap[objKey])
+			cpuMap[name], memMap[name])
 	}
 
 	renderStatefulSet := func(raw *unstructured.Unstructured) {
@@ -271,10 +269,10 @@ func (o *statusOptions) showWorkloads(ctx context.Context, allErrs *[]error) {
 			appendErrIgnoreNotFound(allErrs, err)
 			return
 		}
-		objKey := client.ObjectKeyFromObject(sts).String()
+		name := sts.GetName()
 		tblPrinter.AddRow(sts.GetNamespace(), sts.Kind, sts.GetName(),
 			fmt.Sprintf("%d/%d", sts.Status.ReadyReplicas, sts.Status.Replicas),
-			cpuMap[objKey], memMap[objKey])
+			cpuMap[name], memMap[name])
 	}
 
 	for _, workload := range unstructuredList {

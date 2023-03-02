@@ -33,11 +33,11 @@ type ParamPairs struct {
 // MergeAndValidateConfiguration does merge configuration files and validate
 func MergeAndValidateConfiguration(configConstraint appsv1alpha1.ConfigConstraintSpec, baseCfg map[string]string, updatedParams []ParamPairs) (map[string]string, error) {
 	var (
-		err            error
+		err error
+		fc  = configConstraint.FormatterConfig
+
 		newCfg         map[string]string
 		configOperator ConfigOperator
-
-		fc = configConstraint.FormatterConfig
 	)
 
 	if configOperator, err = NewConfigLoader(CfgOption{

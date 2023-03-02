@@ -14,16 +14,28 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package app
+package alert
 
 import (
-	"testing"
+	"fmt"
 
 	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
+	"sigs.k8s.io/yaml"
 )
 
-func TestApp(t *testing.T) {
-	RegisterFailHandler(Fail)
-	RunSpecs(t, "App Test Suite")
-}
+var _ = Describe("alter", func() {
+	It("parse data to json", func() {
+		str := `global: {}
+receivers:
+- name: default-receiver
+route:
+  group_interval: 30s
+  group_wait: 5s
+  receiver: default-receiver
+  repeat_interval: 10m
+`
+		var data map[string]interface{}
+		_ = yaml.Unmarshal([]byte(str), &data)
+		fmt.Println(data)
+	})
+})

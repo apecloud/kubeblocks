@@ -53,6 +53,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/duration"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	cmdget "k8s.io/kubectl/pkg/cmd/get"
@@ -585,4 +586,13 @@ func GetHelmChartRepoURL() string {
 		return types.GitLabHelmChartRepo
 	}
 	return types.KubeBlocksChartURL
+}
+
+// GetKubeBlocksNamespace get the namespace of KubeBlocks
+func GetKubeBlocksNamespace(client kubernetes.Interface) (string, error) {
+	deploy, err := getKubeBlocksDeploy(client)
+	if err != nil {
+		return "", err
+	}
+	return deploy.Namespace, nil
 }

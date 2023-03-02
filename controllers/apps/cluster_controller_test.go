@@ -1235,6 +1235,9 @@ var _ = Describe("Cluster Controller", func() {
 				Create(&testCtx).GetObject()
 			Expect(testapps.ChangeObjStatus(&testCtx, backup, func() {
 				backup.Status.BackupToolName = backupTool.Name
+				backup.Status.RemoteVolume = &corev1.Volume{
+					Name: "backup-pvc",
+				}
 			})).Should(Succeed())
 			restoreFromBackup := fmt.Sprintf(`{"%s":"%s"}`, mysqlCompName, backupName)
 			clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,

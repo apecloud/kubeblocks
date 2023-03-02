@@ -249,9 +249,9 @@ func (consensusSet *ConsensusSet) HandleUpdate(obj client.Object) error {
 		}
 	}
 
-	// prepare to do pods Deletion, that's the only thing we should do.
-	// the stateful set reconciler will do the others.
-	// to simplify the process, wo do pods Delete after stateful set reconcile done,
+	// prepare to do pods Deletion, that's the only thing we should do,
+	// the statefulset reconciler will do the others.
+	// to simplify the process, we do pods Deletion after statefulset reconcile done,
 	// that is stsObj.Generation == stsObj.Status.ObservedGeneration
 	if stsObj.Generation != stsObj.Status.ObservedGeneration {
 		return nil

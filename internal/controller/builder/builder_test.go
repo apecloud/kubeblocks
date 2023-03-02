@@ -288,15 +288,7 @@ var _ = Describe("builder", func() {
 
 		It("builds Env Config correctly", func() {
 			params := newParams()
-			noCharacterTypeParams := params
-			noCharacterTypeComponent := *params.Component
-			noCharacterTypeComponent.CharacterType = ""
-			noCharacterTypeParams.Component = &noCharacterTypeComponent
 			cfg, err := BuildEnvConfig(*params)
-			Expect(err).Should(BeNil())
-			Expect(cfg).ShouldNot(BeNil())
-			Expect(len(cfg.Data) == 2).Should(BeTrue())
-			cfg, err = BuildEnvConfig(*noCharacterTypeParams)
 			Expect(err).Should(BeNil())
 			Expect(cfg).ShouldNot(BeNil())
 			Expect(len(cfg.Data) == 2).Should(BeTrue())

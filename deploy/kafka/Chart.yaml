@@ -16,7 +16,7 @@ home: https://kubeblocks.io/
 icon: https://bitnami.com/assets/stacks/kafka/img/kafka-stack-220x234.png
 keywords:
   - kafka
-  - zookeeper
+  - kraft
   - streaming
   - producer
   - consumer

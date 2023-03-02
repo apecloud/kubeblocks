@@ -13,20 +13,6 @@ metadata:
 spec:
   clusterDefinitionRef: kafka
   componentVersions:
-    - componentDefRef: kafka-controller
-      versionsContext:
-        containers:
-          - name: kafka
-            image: {{ .Values.images.kafka.repository }}:{{ default .Chart.AppVersion .Values.images.kafka.tag }}
-          - name: jmx-exporter
-            image: {{ .Values.images.jmxExporter.repository }}:{{ .Values.images.jmxExporter.tag }}
-    - componentDefRef: kafka-broker
-      versionsContext:
-        containers:
-          - name: kafka
-            image: {{ .Values.images.kafka.repository }}:{{ default .Chart.AppVersion .Values.images.kafka.tag }}
-          - name: jmx-exporter
-            image: {{ .Values.images.jmxExporter.repository }}:{{ .Values.images.jmxExporter.tag }}
     - componentDefRef: kafka-server
       versionsContext:
         containers:
@@ -34,6 +20,20 @@ spec:
             image: {{ .Values.images.kafka.repository }}:{{ default .Chart.AppVersion .Values.images.kafka.tag }}
           - name: jmx-exporter
             image: {{ .Values.images.jmxExporter.repository }}:{{ .Values.images.jmxExporter.tag }}
+    # - componentDefRef: kafka-controller
+    #   versionsContext:
+    #     containers:
+    #       - name: kafka
+    #         image: {{ .Values.images.kafka.repository }}:{{ default .Chart.AppVersion .Values.images.kafka.tag }}
+    #       - name: jmx-exporter
+    #         image: {{ .Values.images.jmxExporter.repository }}:{{ .Values.images.jmxExporter.tag }}
+    # - componentDefRef: kafka-broker
+    #   versionsContext:
+    #     containers:
+    #       - name: kafka
+    #         image: {{ .Values.images.kafka.repository }}:{{ default .Chart.AppVersion .Values.images.kafka.tag }}
+    #       - name: jmx-exporter
+    #         image: {{ .Values.images.jmxExporter.repository }}:{{ .Values.images.jmxExporter.tag }}
 
     - componentDefRef: kafka-exporter
       versionsContext:
@@ -41,14 +41,3 @@ spec:
           - name: kafka-exporter
             image: {{ .Values.images.kafkaExporter.repository }}:{{ .Values.images.kafkaExporter.tag }}
 
-    - componentDefRef: ch-keeper
-      versionsContext:
-        containers:
-          - name: ch-keeper
-            image: {{ .Values.images.chKeeper.repository }}:{{ .Values.images.chKeeper.tag }}
-
-    - componentDefRef: zookeeper
-      versionsContext:
-        containers:
-          - name: zookeeper
-            image: {{ .Values.images.zookeeper.repository }}:{{ .Values.images.zookeeper.tag }}

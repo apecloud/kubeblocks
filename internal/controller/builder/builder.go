@@ -18,11 +18,14 @@ package builder
 
 import (
 	"embed"
+	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"strconv"
 	"strings"
 
+	"github.com/google/uuid"
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	"github.com/leaanthony/debme"
 	"github.com/spf13/viper"
@@ -144,9 +147,9 @@ func injectEnvs(params BuilderParams, envConfigName string, c *corev1.Container)
 		{name: "KB_PODIPS", fieldPath: "status.podIPs"},
 	}
 
-	toInjectEnv := make([]corev1.EnvVar, 0, len(envFieldPathSlice)+len(c.Env))
+	toInjectEnvs := make([]corev1.EnvVar, 0, len(envFieldPathSlice)+len(c.Env))
 	for _, v := range envFieldPathSlice {
-		toInjectEnv = append(toInjectEnv, corev1.EnvVar{
+		toInjectEnvs = append(toInjectEnvs, corev1.EnvVar{
 			Name: v.name,
 			ValueFrom: &corev1.EnvVarSource{
 				FieldRef: &corev1.ObjectFieldSelector{
@@ -156,7 +159,7 @@ func injectEnvs(params BuilderParams, envConfigName string, c *corev1.Container)
 		})
 	}
 
-	toInjectEnv = append(toInjectEnv, []corev1.EnvVar{
+	toInjectEnvs = append(toInjectEnvs, []corev1.EnvVar{
 		{Name: "KB_CLUSTER_NAME", Value: params.Cluster.Name},
 		{Name: "KB_COMP_NAME", Value: params.Component.Name},
 		{Name: "KB_CLUSTER_COMP_NAME", Value: params.Cluster.Name + "-" + params.Component.Name},
@@ -165,7 +168,7 @@ func injectEnvs(params BuilderParams, envConfigName string, c *corev1.Container)
 	}...)
 
 	if params.Component.TLS {
-		toInjectEnv = append(toInjectEnv, []corev1.EnvVar{
+		toInjectEnvs = append(toInjectEnvs, []corev1.EnvVar{
 			{Name: "KB_TLS_CERT_PATH", Value: MountPath},
 			{Name: "KB_TLS_CA_FILE", Value: CAName},
 			{Name: "KB_TLS_CERT_FILE", Value: CertName},
@@ -174,9 +177,9 @@ func injectEnvs(params BuilderParams, envConfigName string, c *corev1.Container)
 	}
 	// have injected variables placed at the front of the slice
 	if len(c.Env) == 0 {
-		c.Env = toInjectEnv
+		c.Env = toInjectEnvs
 	} else {
-		c.Env = append(toInjectEnv, c.Env...)
+		c.Env = append(toInjectEnvs, c.Env...)
 	}
 	if envConfigName == "" {
 		return
@@ -295,11 +298,23 @@ func BuildConnCredential(params BuilderParams) (*corev1.Secret, error) {
 		}
 	}
 
+	// TODO: do JIT value generation for lower CPU resources
 	// 1st pass replace variables
+	uuidVal := uuid.New()
+	uuidBytes := uuidVal[:]
+	uuidStr := uuidVal.String()
+	uuidB64 := base64.RawStdEncoding.EncodeToString(uuidBytes)
+	uuidStrB64 := base64.RawStdEncoding.EncodeToString([]byte(strings.ReplaceAll(uuidStr, "-", "")))
+	uuidHex := hex.EncodeToString(uuidBytes)
 	m := map[string]string{
 		"$(RANDOM_PASSWD)": randomString(8),
+		"$(UUID)":          uuidStr,
+		"$(UUID_B64)":      uuidB64,
+		"$(UUID_STR_B64)":  uuidStrB64,
+		"$(UUID_HEX)":      uuidHex,
 		"$(SVC_FQDN)":      fmt.Sprintf("%s-%s.%s.svc", params.Cluster.Name, params.Component.Name, params.Cluster.Namespace),
 	}
+
 	if params.Component.Service != nil {
 		for _, p := range params.Component.Service.Ports {
 			m[fmt.Sprintf("$(SVC_PORT_%s)", p.Name)] = strconv.Itoa(int(p.Port))

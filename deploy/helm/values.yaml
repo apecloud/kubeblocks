@@ -930,7 +930,7 @@ prometheus:
                 labels:
                   severity: critical
                 annotations:
-                  summary: Kafka topics replicas (instance {{ $labels.instance }})
+                  summary: Kafka topics replicas (instance {{ $labels.app_kubernetes_io_instance }})
                   description: "Kafka topic in-sync partition\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
             - alert: KafkaConsumersGroup
                 expr: sum(kafka_consumergroup_lag) by (consumergroup) > 50
@@ -938,7 +938,7 @@ prometheus:
                 labels:
                   severity: critical
                 annotations:
-                  summary: Kafka consumers group (instance {{ $labels.instance }})
+                  summary: Kafka consumers group (instance {{ $labels.app_kubernetes_io_instance }})
                   description: "Kafka consumers group\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
             - alert: KafkaBrokerDown
                 expr: kafka_brokers < 3
@@ -946,8 +946,8 @@ prometheus:
                 labels:
                   severity: critical
                 annotations:
-                  Summary: "Kafka broker *{{ $labels.instance }}* alert status"
-                  description: "One of the Kafka broker *{{ $labels.instance }}* is down."
+                  Summary: "Kafka broker *{{ $labels.app_kubernetes_io_instance }}* alert status"
+                  description: "One of the Kafka broker *{{ $labels.app_kubernetes_io_instance }}* is down."
 
   serverFiles:
     prometheus.yml:

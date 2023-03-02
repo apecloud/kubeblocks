@@ -22,9 +22,13 @@ We would like to extend our appreciation to all contributors who helped make thi
     * KB_CLUSTER_COMP_NAME - Running pod's KubeBlock Cluster API object's `<.metadata.name>-<.spec.components.name>`, same name is used for Deployment or StatefulSet workload name, and Service object name
   * New addons.extensions.kubeblocks.io API, with Addon management controller, where KubeBlocks allow addon extensions instead of using Helm sub-charts dependencies.
   * ClusterDefinition API `spec.connectionCredential` add following built-in variables:
-  * Service FQDN `$(SVC_FQDN)` placeholder, value pattern - $(CLUSTER_NAME)-$(1ST_COMP_NAME).$(NAMESPACE).svc, where 1ST_COMP_NAME is the 1st component that provide `ClusterDefinition.spec.componentDefs[].service` attribute
-  * Service ports `$(SVC_PORT_<NAME>)` placeholder
-  * example usage:
+    * A random UUID v4 generator `$(UUID)`
+    * A random UUID v4 generator with BASE64 encoded `$(UUID_B64)`
+    * A random UUID v4 generator in UUID string then BASE64 encoded `$(UUID_STR_B64)`
+    * A random UUID v4 generator in HEX representation `$(UUID_HEX)`
+    * Service FQDN `$(SVC_FQDN)` placeholder, value pattern - $(CLUSTER_NAME)-$(1ST_COMP_NAME).$(NAMESPACE).svc, where 1ST_COMP_NAME is the 1st component that provide `ClusterDefinition.spec.componentDefs[].service` attribute
+    * Service ports `$(SVC_PORT_<NAME>)` placeholder
+    * example usage:
     
   ```yaml
   # ClusterDefinition API

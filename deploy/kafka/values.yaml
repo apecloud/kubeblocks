@@ -26,9 +26,8 @@ images:
   jmxExporter:
     repository: docker.io/bitnami/jmx-exporter
     tag: 0.17.2-debian-11-r49
-  chKeeper:
-    repository: docker.io/bitnami/clickhouse
-    tag: 22.9.4-debian-11-r1
-  zookeeper:
-    repository: docker.io/bitnami/zookeeper
-    tag: 3.8.0-debian-11-r47
+
+
+## @param debugEnabled enables containers' debug logging
+##
+debugEnabled: true

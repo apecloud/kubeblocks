@@ -493,7 +493,7 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 
 	var stsList []*appsv1.StatefulSet
 	for _, obj := range objs {
-		logger.Info("create or update", "objs", obj)
+		logger.V(1).Info("create or update", "objs", obj)
 		if err := intctrlutil.SetOwnership(cluster, obj, scheme, dbClusterFinalizerName); err != nil {
 			return false, err
 		}

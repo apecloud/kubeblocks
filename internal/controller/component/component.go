@@ -222,7 +222,7 @@ func replaceContainerPlaceholderTokens(component *SynthesizedComponent, namedVal
 	}
 }
 
-// ReplaceNamedVars replaces the value in needle with namedValues and returns new needle
+// ReplaceNamedVars replaces the value in needle with namedValuesMap and returns new needle
 func ReplaceNamedVars(namedValuesMap map[string]string, needle string, limits int, matchAll bool) string {
 	for k, v := range namedValuesMap {
 		r := strings.Replace(needle, k, v, limits)
@@ -242,10 +242,9 @@ func ReplaceSecretEnvVars(namedValuesMap map[string]string, envs []corev1.EnvVar
 		if e.ValueFrom == nil || e.ValueFrom.SecretKeyRef == nil {
 			continue
 		}
-		secretRef := e.ValueFrom.SecretKeyRef
-		name := ReplaceNamedVars(namedValuesMap, secretRef.Name, 1, false)
-		if name != secretRef.Name {
-			secretRef.Name = name
+		name := ReplaceNamedVars(namedValuesMap, e.ValueFrom.SecretKeyRef.Name, 1, false)
+		if name != e.ValueFrom.SecretKeyRef.Name {
+			e.ValueFrom.SecretKeyRef.Name = name
 		}
 		newEnvs = append(newEnvs, e)
 	}

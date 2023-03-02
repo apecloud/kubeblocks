@@ -253,16 +253,11 @@ func SetOwnership(owner, obj client.Object, scheme *runtime.Scheme, finalizer st
 // CheckResourceExists checks whether resource exist or not.
 func CheckResourceExists(
 	ctx context.Context,
-	client client.Client,
+	cli client.Client,
 	key client.ObjectKey,
 	obj client.Object) (bool, error) {
-
-	if err := client.Get(ctx, key, obj); err != nil {
-		if apierrors.IsNotFound(err) {
-			return false, nil
-		}
-		// if err is NOT "not found", that means unknown error.
-		return false, err
+	if err := cli.Get(ctx, key, obj); err != nil {
+		return false, client.IgnoreNotFound(err)
 	}
 	// if found, return true
 	return true, nil

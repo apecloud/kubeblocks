@@ -33,7 +33,6 @@ spec:
                 - replicaof no one
               follow:
                 - replicaof $KB_NEW_PRIMARY_ROLE_NAME 6379
-          - type: Manual
         switchCmdExecutorConfig:
           image: redis:7.0.5
           switchSteps:

@@ -17,7 +17,7 @@ limitations under the License.
 package preflight
 
 import (
-	troubleshootv1beta2 "github.com/replicatedhq/troubleshoot/pkg/apis/troubleshoot/v1beta2"
+	troubleshoot "github.com/replicatedhq/troubleshoot/pkg/apis/troubleshoot/v1beta2"
 
 	preflightv1beta2 "github.com/apecloud/kubeblocks/apis/preflight/v1beta2"
 )
@@ -61,12 +61,12 @@ func ConcatHostPreflightSpec(target *preflightv1beta2.HostPreflight, source *pre
 }
 
 // ExtractHostPreflightSpec extracts spec of troubleshootv1beta2.HostPreflight from preflightv1beta2.HostPreflight
-func ExtractHostPreflightSpec(kb *preflightv1beta2.HostPreflight) *troubleshootv1beta2.HostPreflight {
+func ExtractHostPreflightSpec(kb *preflightv1beta2.HostPreflight) *troubleshoot.HostPreflight {
 	if kb != nil {
-		return &troubleshootv1beta2.HostPreflight{
+		return &troubleshoot.HostPreflight{
 			TypeMeta:   kb.TypeMeta,
 			ObjectMeta: kb.ObjectMeta,
-			Spec: troubleshootv1beta2.HostPreflightSpec{
+			Spec: troubleshoot.HostPreflightSpec{
 				Collectors:       kb.Spec.Collectors,
 				RemoteCollectors: kb.Spec.RemoteCollectors,
 				Analyzers:        kb.Spec.Analyzers,

@@ -23,7 +23,7 @@ import (
 	"strings"
 
 	analyze "github.com/replicatedhq/troubleshoot/pkg/analyze"
-	troubleshootv1beta2 "github.com/replicatedhq/troubleshoot/pkg/apis/troubleshoot/v1beta2"
+	troubleshoot "github.com/replicatedhq/troubleshoot/pkg/apis/troubleshoot/v1beta2"
 	"github.com/replicatedhq/troubleshoot/pkg/preflight"
 
 	preflightv1beta2 "github.com/apecloud/kubeblocks/apis/preflight/v1beta2"
@@ -32,13 +32,13 @@ import (
 
 type KBClusterCollectResult struct {
 	preflight.ClusterCollectResult
-	AnalyzerSpecs   []*troubleshootv1beta2.Analyze
+	AnalyzerSpecs   []*troubleshoot.Analyze
 	KbAnalyzerSpecs []*preflightv1beta2.ExtendAnalyze
 }
 
 type KBHostCollectResult struct {
 	preflight.HostCollectResult
-	AnalyzerSpecs   []*troubleshootv1beta2.HostAnalyze
+	AnalyzerSpecs   []*troubleshoot.HostAnalyze
 	KbAnalyzerSpecs []*preflightv1beta2.ExtendHostAnalyze
 }
 
@@ -52,9 +52,9 @@ func (c KBHostCollectResult) Analyze() []*analyze.AnalyzeResult {
 
 func doAnalyze(ctx context.Context,
 	allCollectedData map[string][]byte,
-	analyzers []*troubleshootv1beta2.Analyze,
+	analyzers []*troubleshoot.Analyze,
 	kbAnalyzers []*preflightv1beta2.ExtendAnalyze,
-	hostAnalyzers []*troubleshootv1beta2.HostAnalyze,
+	hostAnalyzers []*troubleshoot.HostAnalyze,
 	kbhHostAnalyzers []*preflightv1beta2.ExtendHostAnalyze,
 ) []*analyze.AnalyzeResult {
 	getCollectedFileContents := func(fileName string) ([]byte, error) {

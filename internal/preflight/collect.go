@@ -23,7 +23,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	troubleshootv1beta2 "github.com/replicatedhq/troubleshoot/pkg/apis/troubleshoot/v1beta2"
+	troubleshoot "github.com/replicatedhq/troubleshoot/pkg/apis/troubleshoot/v1beta2"
 	pkgcollector "github.com/replicatedhq/troubleshoot/pkg/collect"
 	"github.com/replicatedhq/troubleshoot/pkg/constants"
 	"github.com/replicatedhq/troubleshoot/pkg/k8sutil"
@@ -148,13 +148,13 @@ func CollectClusterData(ctx context.Context, kbPreflight *preflightv1beta2.Prefl
 		}
 	}
 
-	collectSpecs := make([]*troubleshootv1beta2.Collect, 0, len(kbPreflight.Spec.Collectors))
+	collectSpecs := make([]*troubleshoot.Collect, 0, len(kbPreflight.Spec.Collectors))
 	collectSpecs = append(collectSpecs, kbPreflight.Spec.Collectors...)
 	collectSpecs = pkgcollector.EnsureCollectorInList(
-		collectSpecs, troubleshootv1beta2.Collect{ClusterInfo: &troubleshootv1beta2.ClusterInfo{}},
+		collectSpecs, troubleshoot.Collect{ClusterInfo: &troubleshoot.ClusterInfo{}},
 	)
 	collectSpecs = pkgcollector.EnsureCollectorInList(
-		collectSpecs, troubleshootv1beta2.Collect{ClusterResources: &troubleshootv1beta2.ClusterResources{}},
+		collectSpecs, troubleshoot.Collect{ClusterResources: &troubleshoot.ClusterResources{}},
 	)
 	collectSpecs = pkgcollector.DedupCollectors(collectSpecs)
 	collectSpecs = pkgcollector.EnsureClusterResourcesFirst(collectSpecs)
@@ -345,7 +345,7 @@ func CollectRemoteData(ctx context.Context, preflightSpec *preflightv1beta2.Host
 	return &collectResults, nil
 }
 
-func ParseTimeFlags(sinceTimeStr, sinceStr string, collectors []*troubleshootv1beta2.Collect) error {
+func ParseTimeFlags(sinceTimeStr, sinceStr string, collectors []*troubleshoot.Collect) error {
 	var (
 		sinceTime time.Time
 		err       error
@@ -369,7 +369,7 @@ func ParseTimeFlags(sinceTimeStr, sinceStr string, collectors []*troubleshootv1b
 	for _, collector := range collectors {
 		if collector.Logs != nil {
 			if collector.Logs.Limits == nil {
-				collector.Logs.Limits = new(troubleshootv1beta2.LogLimits)
+				collector.Logs.Limits = new(troubleshoot.LogLimits)
 			}
 			collector.Logs.Limits.SinceTime = metav1.NewTime(sinceTime)
 		}

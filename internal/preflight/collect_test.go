@@ -24,7 +24,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	troubleshootv1beta2 "github.com/replicatedhq/troubleshoot/pkg/apis/troubleshoot/v1beta2"
+	troubleshoot "github.com/replicatedhq/troubleshoot/pkg/apis/troubleshoot/v1beta2"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -157,17 +157,17 @@ analyzers:
 	It("ParseTimeFlags test, and expect success", func() {
 		sinceStr := "5m"
 		sinceTimeStr := "2023-01-09T15:18:46+08:00"
-		Expect(ParseTimeFlags(sinceStr, sinceTimeStr, []*troubleshootv1beta2.Collect{})).Should(HaveOccurred())
-		Expect(ParseTimeFlags(sinceTimeStr, "", []*troubleshootv1beta2.Collect{})).Should(Succeed())
-		Expect(ParseTimeFlags("", sinceStr, []*troubleshootv1beta2.Collect{})).Should(Succeed())
+		Expect(ParseTimeFlags(sinceStr, sinceTimeStr, []*troubleshoot.Collect{})).Should(HaveOccurred())
+		Expect(ParseTimeFlags(sinceTimeStr, "", []*troubleshoot.Collect{})).Should(Succeed())
+		Expect(ParseTimeFlags("", sinceStr, []*troubleshoot.Collect{})).Should(Succeed())
 	})
 
 	It("ParseTimeFlags test, and expect error", func() {
 		sinceStr := "5error-m"
 		sinceTimeStr := "2023-01-09T15:46+:00"
-		Expect(ParseTimeFlags("", "", []*troubleshootv1beta2.Collect{})).Should(HaveOccurred())
-		Expect(ParseTimeFlags(sinceStr, "", []*troubleshootv1beta2.Collect{})).Should(HaveOccurred())
-		Expect(ParseTimeFlags("", sinceTimeStr, []*troubleshootv1beta2.Collect{})).Should(HaveOccurred())
+		Expect(ParseTimeFlags("", "", []*troubleshoot.Collect{})).Should(HaveOccurred())
+		Expect(ParseTimeFlags(sinceStr, "", []*troubleshoot.Collect{})).Should(HaveOccurred())
+		Expect(ParseTimeFlags("", sinceTimeStr, []*troubleshoot.Collect{})).Should(HaveOccurred())
 
 	})
 })

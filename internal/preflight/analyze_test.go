@@ -23,7 +23,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	troubleshootv1beta2 "github.com/replicatedhq/troubleshoot/pkg/apis/troubleshoot/v1beta2"
+	troubleshoot "github.com/replicatedhq/troubleshoot/pkg/apis/troubleshoot/v1beta2"
 
 	preflightv1beta2 "github.com/apecloud/kubeblocks/apis/preflight/v1beta2"
 )
@@ -32,9 +32,9 @@ var _ = Describe("analyze_test", func() {
 	var (
 		ctx              context.Context
 		allCollectedData map[string][]byte
-		analyzers        []*troubleshootv1beta2.Analyze
+		analyzers        []*troubleshoot.Analyze
 		kbAnalyzers      []*preflightv1beta2.ExtendAnalyze
-		hostAnalyzers    []*troubleshootv1beta2.HostAnalyze
+		hostAnalyzers    []*troubleshoot.HostAnalyze
 		kbhHostAnalyzers []*preflightv1beta2.ExtendHostAnalyze
 		timeout          = time.Second * 10
 		clusterVersion   = `
@@ -57,19 +57,19 @@ var _ = Describe("analyze_test", func() {
 	BeforeEach(func() {
 		ctx = context.TODO()
 		allCollectedData = map[string][]byte{"cluster-info/cluster_version.json": []byte(clusterVersion)}
-		analyzers = []*troubleshootv1beta2.Analyze{
-			{ClusterVersion: &troubleshootv1beta2.ClusterVersion{
-				AnalyzeMeta: troubleshootv1beta2.AnalyzeMeta{
+		analyzers = []*troubleshoot.Analyze{
+			{ClusterVersion: &troubleshoot.ClusterVersion{
+				AnalyzeMeta: troubleshoot.AnalyzeMeta{
 					CheckName: "ClusterVersionCheck",
 				},
-				Outcomes: []*troubleshootv1beta2.Outcome{
+				Outcomes: []*troubleshoot.Outcome{
 					{
-						Pass: &troubleshootv1beta2.SingleOutcome{
+						Pass: &troubleshoot.SingleOutcome{
 							Message: "version is ok.",
 						}}}}},
 		}
 		kbAnalyzers = []*preflightv1beta2.ExtendAnalyze{{}}
-		hostAnalyzers = []*troubleshootv1beta2.HostAnalyze{{}}
+		hostAnalyzers = []*troubleshoot.HostAnalyze{{}}
 		kbhHostAnalyzers = []*preflightv1beta2.ExtendHostAnalyze{{}}
 	})
 

@@ -20,18 +20,18 @@ import (
 	"strconv"
 
 	"github.com/pkg/errors"
-	troubleshootv1beta2 "github.com/replicatedhq/troubleshoot/pkg/apis/troubleshoot/v1beta2"
+	troubleshoot "github.com/replicatedhq/troubleshoot/pkg/apis/troubleshoot/v1beta2"
 	"github.com/replicatedhq/troubleshoot/pkg/multitype"
 )
 
 // TitleOrDefault extracts titleName from metaInfo, and returns default if metaInfo is unhelpful
-func TitleOrDefault[T troubleshootv1beta2.HostCollectorMeta | troubleshootv1beta2.AnalyzeMeta](meta T, defaultTitle string) string {
+func TitleOrDefault[T troubleshoot.HostCollectorMeta | troubleshoot.AnalyzeMeta](meta T, defaultTitle string) string {
 	var title string
 	iMeta := (interface{})(meta)
 	switch tmp := iMeta.(type) {
-	case troubleshootv1beta2.HostCollectorMeta:
+	case troubleshoot.HostCollectorMeta:
 		title = tmp.CollectorName
-	case troubleshootv1beta2.AnalyzeMeta:
+	case troubleshoot.AnalyzeMeta:
 		title = tmp.CheckName
 	default:
 	}

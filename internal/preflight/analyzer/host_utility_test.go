@@ -24,7 +24,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	troubleshootv1beta2 "github.com/replicatedhq/troubleshoot/pkg/apis/troubleshoot/v1beta2"
+	troubleshoot "github.com/replicatedhq/troubleshoot/pkg/apis/troubleshoot/v1beta2"
 
 	preflightv1beta2 "github.com/apecloud/kubeblocks/apis/preflight/v1beta2"
 	kbcollector "github.com/apecloud/kubeblocks/internal/preflight/collector"
@@ -41,12 +41,12 @@ var _ = Describe("host_utility_test", func() {
 		BeforeEach(func() {
 			hostUtilityAnalyzer = AnalyzeHostUtility{
 				hostAnalyzer: &preflightv1beta2.HostUtilityAnalyze{
-					Outcomes: []*troubleshootv1beta2.Outcome{
+					Outcomes: []*troubleshoot.Outcome{
 						{
-							Pass: &troubleshootv1beta2.SingleOutcome{
+							Pass: &troubleshoot.SingleOutcome{
 								Message: "utility already installed",
 							},
-							Fail: &troubleshootv1beta2.SingleOutcome{
+							Fail: &troubleshoot.SingleOutcome{
 								Message: "utility isn't installed",
 							},
 						},

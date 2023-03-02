@@ -24,7 +24,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	troubleshootv1beta2 "github.com/replicatedhq/troubleshoot/pkg/apis/troubleshoot/v1beta2"
+	troubleshoot "github.com/replicatedhq/troubleshoot/pkg/apis/troubleshoot/v1beta2"
 
 	preflightv1beta2 "github.com/apecloud/kubeblocks/apis/preflight/v1beta2"
 )
@@ -38,7 +38,7 @@ var _ = Describe("host_utility_test", func() {
 	BeforeEach(func() {
 		hostUtility = CollectHostUtility{
 			HostCollector: &preflightv1beta2.HostUtility{
-				HostCollectorMeta: troubleshootv1beta2.HostCollectorMeta{
+				HostCollectorMeta: troubleshoot.HostCollectorMeta{
 					CollectorName: testName},
 				UtilityName: "UtilityName"},
 			BundlePath: "",

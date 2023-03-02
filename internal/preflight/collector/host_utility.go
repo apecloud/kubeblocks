@@ -22,12 +22,11 @@ import (
 	"fmt"
 	"os/exec"
 
-	"github.com/apecloud/kubeblocks/internal/preflight/util"
-
 	"github.com/pkg/errors"
 	pkgcollector "github.com/replicatedhq/troubleshoot/pkg/collect"
 
 	preflightv1beta2 "github.com/apecloud/kubeblocks/apis/preflight/v1beta2"
+	"github.com/apecloud/kubeblocks/internal/preflight/util"
 )
 
 const UtilityPathFormat = "host-collectors/utility/%s.json"

@@ -23,15 +23,13 @@ import (
 	"os/signal"
 	"time"
 
-	"github.com/pkg/errors"
-
-	"github.com/fatih/color"
-	"github.com/tj/go-spin"
-
 	"github.com/ahmetalpbalkan/go-cursor"
+	"github.com/fatih/color"
+	"github.com/pkg/errors"
 	analyze "github.com/replicatedhq/troubleshoot/pkg/analyze"
 	"github.com/replicatedhq/troubleshoot/pkg/preflight"
 	"github.com/spf13/cobra"
+	"github.com/tj/go-spin"
 	"golang.org/x/sync/errgroup"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"

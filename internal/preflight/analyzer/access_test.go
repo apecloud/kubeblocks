@@ -24,7 +24,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	troubleshootv1beta2 "github.com/replicatedhq/troubleshoot/pkg/apis/troubleshoot/v1beta2"
+	troubleshoot "github.com/replicatedhq/troubleshoot/pkg/apis/troubleshoot/v1beta2"
 	"github.com/replicatedhq/troubleshoot/pkg/collect"
 	"k8s.io/apimachinery/pkg/version"
 
@@ -41,12 +41,12 @@ var _ = Describe("access_test", func() {
 		BeforeEach(func() {
 			analyzer = AnalyzeClusterAccess{
 				analyzer: &preflightv1beta2.ClusterAccess{
-					Outcomes: []*troubleshootv1beta2.Outcome{
+					Outcomes: []*troubleshoot.Outcome{
 						{
-							Pass: &troubleshootv1beta2.SingleOutcome{
+							Pass: &troubleshoot.SingleOutcome{
 								Message: "k8s cluster access success",
 							},
-							Fail: &troubleshootv1beta2.SingleOutcome{
+							Fail: &troubleshoot.SingleOutcome{
 								Message: "k8s cluster access fail",
 							},
 						},

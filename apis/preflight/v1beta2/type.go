@@ -13,41 +13,51 @@ limitations under the License.
 
 package v1beta2
 
-import troubleshootv1beta2 "github.com/replicatedhq/troubleshoot/pkg/apis/troubleshoot/v1beta2"
+import troubleshoot "github.com/replicatedhq/troubleshoot/pkg/apis/troubleshoot/v1beta2"
 
 type ExtendCollect struct {
 }
 
 type ClusterAccess struct {
-	troubleshootv1beta2.AnalyzeMeta `json:",inline" yaml:",inline"`
+	// analyzeMeta is defined in troubleshoot.sh.
+	troubleshoot.AnalyzeMeta `json:",inline"`
+	// outcomes are expected user defined results.
 	// +kubebuilder:validation:Required
-	Outcomes []*troubleshootv1beta2.Outcome `json:"outcomes" yaml:"outcomes"`
+	Outcomes []*troubleshoot.Outcome `json:"outcomes"`
 }
 
 type ExtendAnalyze struct {
-	ClusterAccess *ClusterAccess `json:"clusterAccess,omitempty" yaml:"clusterAccess,omitempty"`
+	// clusterAccess is to determine the accessibility of target K8S cluster.
+	// +optional
+	ClusterAccess *ClusterAccess `json:"clusterAccess,omitempty"`
 }
 
 type HostUtility struct {
-	troubleshootv1beta2.HostCollectorMeta `json:",inline" yaml:",inline"`
+	// hostCollectorMeta is defined in troubleshoot.sh.
+	troubleshoot.HostCollectorMeta `json:",inline"`
+	// utilityName will be checked in local host.
 	// +kubebuilder:validation:Required
-	UtilityName string `json:"utilityName" yaml:"utilityName"`
+	UtilityName string `json:"utilityName"`
 }
 
 type ExtendHostCollect struct {
+	// hostUtility is to collect the info of target utility.
 	// +optional
-	HostUtility *HostUtility `json:"hostUtility,omitempty" yaml:"hostUtility,omitempty"`
+	HostUtility *HostUtility `json:"hostUtility,omitempty"`
 }
 
 type HostUtilityAnalyze struct {
-	troubleshootv1beta2.AnalyzeMeta `json:",inline" yaml:",inline"`
+	troubleshoot.AnalyzeMeta `json:",inline"`
+	// collectorName indicates which collect data will be analyzed
 	// +optional
-	CollectorName string `json:"collectorName,omitempty" yaml:"collectorName,omitempty"`
+	CollectorName string `json:"collectorName,omitempty"`
+	// outcomes are expected user defined results.
 	// +kubebuilder:validation:Required
-	Outcomes []*troubleshootv1beta2.Outcome `json:"outcomes" yaml:"outcomes"`
+	Outcomes []*troubleshoot.Outcome `json:"outcomes"`
 }
 
 type ExtendHostAnalyze struct {
+	// hostUtility is to analyze the presence of target utility.
 	// +optional
-	HostUtility *HostUtilityAnalyze `json:"hostUtility,omitempty" yaml:"hostUtility,omitempty"`
+	HostUtility *HostUtilityAnalyze `json:"hostUtility,omitempty"`
 }

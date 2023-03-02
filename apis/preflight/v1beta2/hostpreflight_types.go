@@ -17,14 +17,14 @@ limitations under the License.
 package v1beta2
 
 import (
-	"github.com/replicatedhq/troubleshoot/pkg/apis/troubleshoot/v1beta2"
+	troubleshoot "github.com/replicatedhq/troubleshoot/pkg/apis/troubleshoot/v1beta2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // HostPreflightSpec defines the desired state of HostPreflight
 type HostPreflightSpec struct {
 	// hostPreflightSpec is defined by troubleshoot.sh and inherited by ApeCloud.
-	v1beta2.HostPreflightSpec `json:",inline"`
+	troubleshoot.HostPreflightSpec `json:",inline"`
 	// extendCollectors extends user defined hostCollectors by ApeCloud.
 	// +optional
 	ExtendCollectors []*ExtendHostCollect `json:"extendCollectors,omitempty"`
@@ -36,7 +36,7 @@ type HostPreflightSpec struct {
 // HostPreflightStatus defines the observed state of HostPreflight
 type HostPreflightStatus struct {
 	// hostPreflightStatus is defined by troubleshoot.sh and inherited by ApeCloud.
-	v1beta2.HostPreflightStatus `json:",inline"`
+	troubleshoot.HostPreflightStatus `json:",inline"`
 }
 
 //+kubebuilder:object:root=true

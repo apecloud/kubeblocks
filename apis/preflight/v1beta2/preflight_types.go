@@ -14,14 +14,14 @@ limitations under the License.
 package v1beta2
 
 import (
-	"github.com/replicatedhq/troubleshoot/pkg/apis/troubleshoot/v1beta2"
+	troubleshoot "github.com/replicatedhq/troubleshoot/pkg/apis/troubleshoot/v1beta2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // PreflightSpec defines the desired state of Preflight
 type PreflightSpec struct {
 	// preflightSpec is defined by troubleshoot.sh and inherited by ApeCloud.
-	v1beta2.PreflightSpec `json:",inline"`
+	troubleshoot.PreflightSpec `json:",inline"`
 	// extendCollectors extends user defined collectors by ApeCloud.
 	// +optional
 	ExtendCollectors []*ExtendCollect `json:"extendCollectors,omitempty"`
@@ -33,7 +33,7 @@ type PreflightSpec struct {
 // PreflightStatus defines the observed state of Preflight
 type PreflightStatus struct {
 	// preflightStatus is defined by troubleshoot.sh and inherited by ApeCloud.
-	v1beta2.PreflightStatus `json:",inline"`
+	troubleshoot.PreflightStatus `json:",inline"`
 }
 
 //+kubebuilder:object:root=true

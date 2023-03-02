@@ -192,9 +192,10 @@ func (o *ExposeOptions) run(provider util.K8sProvider) error {
 	}
 
 	if o.enabled {
-		fmt.Fprintf(o.Out, "Cluster %s is exposed to %s\n", o.Name, o.exposeType)
+		fmt.Fprintf(o.Out, "Cluster %s is exposed to %s.\n", o.Name, o.exposeType)
+		fmt.Fprintf(o.Out, "It may take a minute or two for the address to take effect, please wait a moment.\n")
 	} else {
-		fmt.Fprintf(o.Out, "Cluster %s stopped exposing to %s\n", o.Name, disabledType)
+		fmt.Fprintf(o.Out, "Cluster %s stopped exposing to %s.\n", o.Name, disabledType)
 	}
 	return nil
 }
@@ -233,6 +234,10 @@ func (o *ExposeOptions) EnableExpose(svc corev1.Service, provider util.K8sProvid
 
 	svc.SetAnnotations(annotations)
 	svc.Spec.Type = corev1.ServiceTypeLoadBalancer
+	// Set externalTrafficPolicy to Local has two benefits:
+	// 1. preserve client IP
+	// 2. improve network performance by reducing one hop
+	svc.Spec.ExternalTrafficPolicy = corev1.ServiceExternalTrafficPolicyTypeLocal
 	_, err = o.client.CoreV1().Services(o.Namespace).Update(context.TODO(), &svc, metav1.UpdateOptions{})
 	return err
 }
@@ -261,6 +266,7 @@ func (o *ExposeOptions) DisableExpose(svc corev1.Service, provider util.K8sProvi
 	*/
 
 	svc.SetAnnotations(annotations)
+	// Service externalTrafficPolicy can only be set when the type is NodePort or LoadBalancer, so we just recover type to ClusterIP here.
 	svc.Spec.Type = corev1.ServiceTypeClusterIP
 	if _, err := o.client.CoreV1().Services(o.Namespace).Update(context.TODO(), &svc, metav1.UpdateOptions{}); err != nil {
 		return "", err

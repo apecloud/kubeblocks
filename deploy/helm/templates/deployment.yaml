@@ -71,8 +71,7 @@ spec:
             - name: ENABLE_WEBHOOKS
               value: "true"
             {{- end }}
-            {{- with .Values.addonController }}
-            {{- if not .enabled }}
+            {{- if not ( include "kubeblocks.addonControllerEnabled" . ) }}
             - name: DISABLE_ADDON_CTRLER
               value: "true"
             {{- else }}
@@ -80,7 +79,6 @@ spec:
               value: {{ .jobImagePullPolicy | default "IfNotPresent" }}
             - name: KUBEBLOCKS_ADDON_SA_NAME
               value: {{ include "kubeblocks.addonSAName" . }}
-            {{- end }}
             {{- end }}
           {{- with .Values.securityContext }}
           securityContext:

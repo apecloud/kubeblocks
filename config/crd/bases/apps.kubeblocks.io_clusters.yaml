@@ -304,7 +304,7 @@ spec:
                           enum:
                           - MaximumAvailability
                           - MaximumDataProtection
-                          - Manual
+                          - Noop
                           type: string
                       type: object
                     tls:

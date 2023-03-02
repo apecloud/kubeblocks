@@ -30,25 +30,6 @@ import (
 	utils "github.com/apecloud/kubeblocks/controllers/apps/components/util"
 )
 
-const (
-	SwitchPhasePrepare    SwitchPhase = "prepare"
-	SwitchPhaseElect      SwitchPhase = "election"
-	SwitchPhaseDetect     SwitchPhase = "detection"
-	SwitchPhaseDecision   SwitchPhase = "decision"
-	SwitchPhaseDoAction   SwitchPhase = "doAction"
-	SwitchPhaseUpdateRole SwitchPhase = "updateRole"
-
-	SwitchPhaseStatusExecuting SwitchPhaseStatus = "executing"
-	SwitchPhaseStatusFailed    SwitchPhaseStatus = "failed"
-	SwitchPhaseStatusSucceed   SwitchPhaseStatus = "succeed"
-	SwitchPhaseStatusUnknown   SwitchPhaseStatus = "unknown"
-)
-
-const (
-	DetectRolePrimary   RoleDetectResult = "primary"
-	DetectRoleSecondary RoleDetectResult = "secondary"
-)
-
 // Switch is the main high-availability switching implementation.
 type Switch struct {
 	SwitchResource      *SwitchResource
@@ -110,12 +91,12 @@ type SwitchPhase string
 
 // SwitchDetectManager is an interface to implement various detections that high-availability depends on, including health detection, role detection, data delay detection, etc.
 type SwitchDetectManager interface {
-	// HealthDetect is used to implement Pod health detection
-	HealthDetect(pod *corev1.Pod) (*HealthDetectResult, error)
-	// RoleDetect is used to detect the role of the Pod in the database kernel
-	RoleDetect(pod *corev1.Pod) (*RoleDetectResult, error)
-	// LagDetect is used to detect the data delay between the secondary and the primary
-	LagDetect(pod *corev1.Pod) (*LagDetectResult, error)
+	// healthDetect is used to implement Pod health detection
+	healthDetect(pod *corev1.Pod) (*HealthDetectResult, error)
+	// roleDetect is used to detect the role of the Pod in the database kernel
+	roleDetect(pod *corev1.Pod) (*RoleDetectResult, error)
+	// lagDetect is used to detect the data delay between the secondary and the primary
+	lagDetect(pod *corev1.Pod) (*LagDetectResult, error)
 }
 
 type HealthDetectResult bool
@@ -126,27 +107,46 @@ type LagDetectResult int32
 
 // SwitchActionHandler is a handler interface for performing switching actions
 type SwitchActionHandler interface {
-	// BuildExecSwitchCommandEnvs builds the environment variables that switchActionHandler depends on,
+	// buildExecSwitchCommandEnvs builds the environment variables that switchActionHandler depends on,
 	// including the database account and password, the candidate primary information after the election, the switchStatement declared by the user, etc.
-	BuildExecSwitchCommandEnvs(s *Switch) ([]corev1.EnvVar, error)
+	buildExecSwitchCommandEnvs(s *Switch) ([]corev1.EnvVar, error)
 
-	// ExecSwitchCommands executes the specific switching commands defined by the user in the clusterDefinition API, and the execution channel is determined by the specific implementation
-	ExecSwitchCommands(s *Switch, switchEnvs []corev1.EnvVar) error
+	// execSwitchCommands executes the specific switching commands defined by the user in the clusterDefinition API, and the execution channel is determined by the specific implementation
+	execSwitchCommands(s *Switch, switchEnvs []corev1.EnvVar) error
 }
 
 // SwitchElectionFilter is an interface used to filter the candidate primary during the election process.
 type SwitchElectionFilter interface {
-	// Name defines the name of the election filter
-	Name() string
+	// name defines the name of the election filter
+	name() string
 
-	// Filter implements the filtering logic and returns the filtered PodInfoList List
-	Filter(roleInfoList []*SwitchRoleInfo) ([]*SwitchRoleInfo, error)
+	// filter implements the filtering logic and returns the filtered PodInfoList List
+	filter(roleInfoList []*SwitchRoleInfo) ([]*SwitchRoleInfo, error)
 }
 
-// Detection implements the detection logic and saves the detection results to the SwitchRoleInfo of the corresponding role pod of the SwitchInstance,
+const (
+	SwitchPhasePrepare    SwitchPhase = "prepare"
+	SwitchPhaseElect      SwitchPhase = "election"
+	SwitchPhaseDetect     SwitchPhase = "detection"
+	SwitchPhaseDecision   SwitchPhase = "decision"
+	SwitchPhaseDoAction   SwitchPhase = "doAction"
+	SwitchPhaseUpdateRole SwitchPhase = "updateRole"
+
+	SwitchPhaseStatusExecuting SwitchPhaseStatus = "executing"
+	SwitchPhaseStatusFailed    SwitchPhaseStatus = "failed"
+	SwitchPhaseStatusSucceed   SwitchPhaseStatus = "succeed"
+	SwitchPhaseStatusUnknown   SwitchPhaseStatus = "unknown"
+)
+
+const (
+	DetectRolePrimary   RoleDetectResult = "primary"
+	DetectRoleSecondary RoleDetectResult = "secondary"
+)
+
+// detection implements the detection logic and saves the detection results to the SwitchRoleInfo of the corresponding role pod of the SwitchInstance,
 // if skipSecondary is true, the detection logic of the secondaries will be skipped, which is used in some scenarios where there is no need to detect the secondary,
 // currently supported detection types are health detection, role detection, and delay detection.
-func (s *Switch) Detection(skipSecondary bool) {
+func (s *Switch) detection(skipSecondary bool) {
 	s.SwitchStatus.SwitchPhase = SwitchPhaseDetect
 	s.SwitchStatus.SwitchPhaseStatus = SwitchPhaseStatusExecuting
 	if s.SwitchInstance == nil {
@@ -155,7 +155,7 @@ func (s *Switch) Detection(skipSecondary bool) {
 		return
 	}
 	doDetection := func(sri *SwitchRoleInfo) {
-		hd, err := s.SwitchDetectManager.HealthDetect(sri.Pod)
+		hd, err := s.SwitchDetectManager.healthDetect(sri.Pod)
 		if err != nil {
 			s.SwitchStatus.SwitchPhaseStatus = SwitchPhaseStatusFailed
 			s.SwitchStatus.Reason = err.Error()
@@ -163,7 +163,7 @@ func (s *Switch) Detection(skipSecondary bool) {
 		}
 		sri.HealthDetectInfo = hd
 
-		rd, err := s.SwitchDetectManager.RoleDetect(sri.Pod)
+		rd, err := s.SwitchDetectManager.roleDetect(sri.Pod)
 		if err != nil {
 			s.SwitchStatus.SwitchPhaseStatus = SwitchPhaseStatusFailed
 			s.SwitchStatus.Reason = err.Error()
@@ -171,7 +171,7 @@ func (s *Switch) Detection(skipSecondary bool) {
 		}
 		sri.RoleDetectInfo = rd
 
-		ld, err := s.SwitchDetectManager.LagDetect(sri.Pod)
+		ld, err := s.SwitchDetectManager.lagDetect(sri.Pod)
 		if err != nil {
 			s.SwitchStatus.SwitchPhaseStatus = SwitchPhaseStatusFailed
 			s.SwitchStatus.Reason = err.Error()
@@ -195,10 +195,10 @@ func (s *Switch) Detection(skipSecondary bool) {
 	}
 }
 
-// Election implements the logic of candidate primary selection.
+// election implements the logic of candidate primary selection.
 // election is divided into two stages: filter and priority, The filter filters the candidate primary according to the rules,
 // and the priority selects the most suitable candidate primary according to the priority and return it.
-func (s *Switch) Election() *SwitchRoleInfo {
+func (s *Switch) election() *SwitchRoleInfo {
 	var (
 		filterRoles []*SwitchRoleInfo
 		err         error
@@ -215,10 +215,10 @@ func (s *Switch) Election() *SwitchRoleInfo {
 	filterRoles = s.SwitchInstance.SecondariesRole
 	for _, filterFunc := range defaultSwitchElectionFilters {
 		filter := filterFunc()
-		filterRoles, err = filter.Filter(filterRoles)
+		filterRoles, err = filter.filter(filterRoles)
 		if err != nil {
 			s.SwitchStatus.SwitchPhaseStatus = SwitchPhaseStatusFailed
-			s.SwitchStatus.Reason = fmt.Sprintf("component %s switch election filter %s failed, err: %s, pls check", s.SwitchResource.CompSpec.Name, filter.Name(), err.Error())
+			s.SwitchStatus.Reason = fmt.Sprintf("component %s switch election filter %s failed, err: %s, pls check", s.SwitchResource.CompSpec.Name, filter.name(), err.Error())
 			return nil
 		}
 	}
@@ -241,11 +241,11 @@ func (s *Switch) Election() *SwitchRoleInfo {
 	return filterRoles[0]
 }
 
-// Decision implements HA decision logic. decision will judge whether HA switching can be performed based on
+// decision implements HA decision logic. decision will judge whether HA switching can be performed based on
 // instance detection information (health detection, role detection, delay detection),
 // user-defined switchPolicy strategy and other information.
 // When returns true, it means switching is allowed, otherwise it fails and exits.
-func (s *Switch) Decision() bool {
+func (s *Switch) decision() bool {
 	s.SwitchStatus.SwitchPhase = SwitchPhaseDecision
 	if s.SwitchInstance.OldPrimaryRole == nil || s.SwitchInstance.CandidatePrimaryRole == nil {
 		s.SwitchStatus.SwitchPhaseStatus = SwitchPhaseStatusFailed
@@ -314,20 +314,20 @@ func (s *Switch) Decision() bool {
 		return makeMaxAvailabilityDecision()
 	case appsv1alpha1.MaximumDataProtection:
 		return makeMaxDataProtectionDecision()
-	case appsv1alpha1.Manual:
+	case appsv1alpha1.Noop:
 		s.SwitchStatus.SwitchPhaseStatus = SwitchPhaseStatusSucceed
-		s.SwitchStatus.Reason = fmt.Sprintf("component %s manual switch policy will not perform high-availability switching", s.SwitchResource.CompSpec.Name)
+		s.SwitchStatus.Reason = fmt.Sprintf("component %s Noop switch policy will not perform high-availability switching", s.SwitchResource.CompSpec.Name)
 		return false
 	}
 	return false
 }
 
-// DoSwitch performs the specific action of high-availability switching.
-func (s *Switch) DoSwitch() error {
+// doSwitch performs the specific action of high-availability switching.
+func (s *Switch) doSwitch() error {
 	s.SwitchStatus.SwitchPhase = SwitchPhaseDoAction
 	s.SwitchStatus.SwitchPhaseStatus = SwitchPhaseStatusExecuting
-	switchEnvs, _ := s.SwitchActionHandler.BuildExecSwitchCommandEnvs(s)
-	if err := s.SwitchActionHandler.ExecSwitchCommands(s, switchEnvs); err != nil {
+	switchEnvs, _ := s.SwitchActionHandler.buildExecSwitchCommandEnvs(s)
+	if err := s.SwitchActionHandler.execSwitchCommands(s, switchEnvs); err != nil {
 		s.SwitchStatus.SwitchPhaseStatus = SwitchPhaseStatusFailed
 		return err
 	}
@@ -335,8 +335,8 @@ func (s *Switch) DoSwitch() error {
 	return nil
 }
 
-// UpdateRoleLabel is used to update the role label of statefulSets and Pods after the switching is completed.
-func (s *Switch) UpdateRoleLabel() error {
+// updateRoleLabel is used to update the role label of statefulSets and Pods after the switching is completed.
+func (s *Switch) updateRoleLabel() error {
 	s.SwitchStatus.SwitchPhase = SwitchPhaseUpdateRole
 	s.SwitchStatus.SwitchPhaseStatus = SwitchPhaseStatusExecuting
 
@@ -347,18 +347,18 @@ func (s *Switch) UpdateRoleLabel() error {
 
 	for _, sts := range stsList.Items {
 		if utils.IsMemberOf(&sts, s.SwitchInstance.OldPrimaryRole.Pod) {
-			if err := UpdateObjRoleLabel(s.SwitchResource.Ctx, s.SwitchResource.Cli, sts, string(Secondary)); err != nil {
+			if err := updateObjRoleLabel(s.SwitchResource.Ctx, s.SwitchResource.Cli, sts, string(Secondary)); err != nil {
 				return err
 			}
-			if err := UpdateObjRoleLabel(s.SwitchResource.Ctx, s.SwitchResource.Cli, *s.SwitchInstance.OldPrimaryRole.Pod, string(Secondary)); err != nil {
+			if err := updateObjRoleLabel(s.SwitchResource.Ctx, s.SwitchResource.Cli, *s.SwitchInstance.OldPrimaryRole.Pod, string(Secondary)); err != nil {
 				return err
 			}
 		}
 		if utils.IsMemberOf(&sts, s.SwitchInstance.CandidatePrimaryRole.Pod) {
-			if err := UpdateObjRoleLabel(s.SwitchResource.Ctx, s.SwitchResource.Cli, sts, string(Primary)); err != nil {
+			if err := updateObjRoleLabel(s.SwitchResource.Ctx, s.SwitchResource.Cli, sts, string(Primary)); err != nil {
 				return err
 			}
-			if err := UpdateObjRoleLabel(s.SwitchResource.Ctx, s.SwitchResource.Cli, *s.SwitchInstance.CandidatePrimaryRole.Pod, string(Primary)); err != nil {
+			if err := updateObjRoleLabel(s.SwitchResource.Ctx, s.SwitchResource.Cli, *s.SwitchInstance.CandidatePrimaryRole.Pod, string(Primary)); err != nil {
 				return err
 			}
 		}
@@ -367,9 +367,9 @@ func (s *Switch) UpdateRoleLabel() error {
 	return nil
 }
 
-// InitSwitchInstance initializes the switchInstance object without detection info according to the pod list under the component,
+// initSwitchInstance initializes the switchInstance object without detection info according to the pod list under the component,
 // and the detection information will be filled in the detection phase.
-func (s *Switch) InitSwitchInstance(oldPrimaryIndex, newPrimaryIndex *int32) error {
+func (s *Switch) initSwitchInstance(oldPrimaryIndex, newPrimaryIndex *int32) error {
 	var stsList = &appsv1.StatefulSetList{}
 	if err := utils.GetObjectListByComponentName(s.SwitchResource.Ctx, s.SwitchResource.Cli, s.SwitchResource.Cluster, stsList, s.SwitchResource.CompSpec.Name); err != nil {
 		return err
@@ -404,8 +404,8 @@ func (s *Switch) InitSwitchInstance(oldPrimaryIndex, newPrimaryIndex *int32) err
 	return nil
 }
 
-// NewSwitch creates a new Switch obj.
-func NewSwitch(ctx context.Context,
+// newSwitch creates a new Switch obj.
+func newSwitch(ctx context.Context,
 	cli client.Client,
 	cluster *appsv1alpha1.Cluster,
 	compDef *appsv1alpha1.ClusterComponentDefinition,

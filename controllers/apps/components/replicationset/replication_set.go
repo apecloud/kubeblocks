@@ -202,7 +202,7 @@ func (rs *ReplicationSet) HandleUpdate(obj client.Object) error {
 		}
 		// if there is no role label on the Pod, it needs to be updated with statefulSet's role label.
 		if _, ok := pod.Labels[intctrlutil.RoleLabelKey]; !ok {
-			if err := UpdateObjRoleLabel(rs.Ctx, rs.Cli, *pod, sts.Labels[intctrlutil.RoleLabelKey]); err != nil {
+			if err := updateObjRoleLabel(rs.Ctx, rs.Cli, *pod, sts.Labels[intctrlutil.RoleLabelKey]); err != nil {
 				return err
 			}
 		}

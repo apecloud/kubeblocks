@@ -135,8 +135,8 @@ var _ = Describe("ReplicationSet Switch Util", func() {
 		By("Test new Switch obj and init SwitchInstance should be successful.")
 		clusterObj.Spec.ComponentSpecs[0].PrimaryIndex = &DefaultPrimaryIndexDiffWithStsOrdinal
 		clusterComponentSpec.PrimaryIndex = &DefaultPrimaryIndexDiffWithStsOrdinal
-		s := NewSwitch(testCtx.Ctx, k8sClient, clusterObj, &clusterDefObj.Spec.ComponentDefs[0], clusterComponentSpec, nil, nil, nil, nil, nil)
-		err = s.InitSwitchInstance(&DefaultReplicationPrimaryIndex, &DefaultPrimaryIndexDiffWithStsOrdinal)
+		s := newSwitch(testCtx.Ctx, k8sClient, clusterObj, &clusterDefObj.Spec.ComponentDefs[0], clusterComponentSpec, nil, nil, nil, nil, nil)
+		err = s.initSwitchInstance(&DefaultReplicationPrimaryIndex, &DefaultPrimaryIndexDiffWithStsOrdinal)
 		Expect(err).Should(Succeed())
 
 		By("Test HandleReplicationSetHASwitch failed when primaryIndex has changed because controller reconciles many times, and switch job has not finished.")
@@ -174,7 +174,7 @@ var _ = Describe("ReplicationSet Switch Util", func() {
 						},
 					},
 					{
-						Type: appsv1alpha1.Manual,
+						Type: appsv1alpha1.Noop,
 					},
 				},
 				SwitchCmdExecutorConfig: &appsv1alpha1.SwitchCmdExecutorConfig{

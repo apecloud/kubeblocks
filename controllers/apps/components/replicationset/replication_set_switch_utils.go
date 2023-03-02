@@ -33,6 +33,21 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
+// ProbeDetectManager implements the SwitchDetectManager interface with KubeBlocks Probe.
+type ProbeDetectManager struct{}
+
+// SwitchActionWithJobHandler implements the SwitchActionHandler interface with executing switch commands by k8s Job.
+type SwitchActionWithJobHandler struct{}
+
+// SwitchElectionRoleFilter implements the SwitchElectionFilter interface and is used to filter the instances which role cannot be elected as candidate primary.
+type SwitchElectionRoleFilter struct{}
+
+// SwitchElectionHealthFilter implements the SwitchElectionFilter interface and is used to filter unhealthy instances that cannot be selected as candidate primary.
+type SwitchElectionHealthFilter struct{}
+
+// SwitchRoleInfoList is a sort.Interface that Sorts a list of SwitchRoleInfo based on LagDetectInfo value.
+type SwitchRoleInfoList []*SwitchRoleInfo
+
 const (
 	SwitchElectionRoleFilterName   = "SwitchElectionRoleFilter"
 	SwitchElectionHealthFilterName = "SwitchElectionHealthFilter"
@@ -58,32 +73,14 @@ const (
 	KBSwitchJobTTLSecondsAfterFinished = 5
 )
 
-var defaultSwitchElectionFilters = []func() SwitchElectionFilter{
-	NewSwitchElectionHealthFilter,
-	NewSwitchElectionRoleFilter,
-}
-
-// SwitchHelper helps to build the switching dependencies
-type SwitchHelper struct{}
-
-// ProbeDetectManager implements the SwitchDetectManager interface with KubeBlocks Probe.
-type ProbeDetectManager struct{}
-
-// SwitchActionWithJobHandler implements the SwitchActionHandler interface with executing switch commands by k8s Job.
-type SwitchActionWithJobHandler struct{}
-
-// SwitchElectionRoleFilter implements the SwitchElectionFilter interface and is used to filter the instances which role cannot be elected as candidate primary.
-type SwitchElectionRoleFilter struct{}
-
-// SwitchElectionHealthFilter implements the SwitchElectionFilter interface and is used to filter unhealthy instances that cannot be selected as candidate primary.
-type SwitchElectionHealthFilter struct{}
-
-// SwitchRoleInfoList is a sort.Interface that Sorts a list of SwitchRoleInfo based on LagDetectInfo value.
-type SwitchRoleInfoList []*SwitchRoleInfo
-
 var _ SwitchDetectManager = &ProbeDetectManager{}
 
 var _ SwitchActionHandler = &SwitchActionWithJobHandler{}
+
+var defaultSwitchElectionFilters = []func() SwitchElectionFilter{
+	newSwitchElectionHealthFilter,
+	newSwitchElectionRoleFilter,
+}
 
 // HandleReplicationSetHASwitch handles high-availability switching of a single replication workload under current cluster.
 func HandleReplicationSetHASwitch(ctx context.Context,
@@ -112,22 +109,22 @@ func HandleReplicationSetHASwitch(ctx context.Context,
 	}
 
 	// create a new Switch object
-	s := NewSwitch(ctx, cli, cluster, compDef, clusterCompSpec, nil, nil, nil, nil, nil)
+	s := newSwitch(ctx, cli, cluster, compDef, clusterCompSpec, nil, nil, nil, nil, nil)
 
 	// initialize switchInstance according to the primaryIndex
-	if err := s.InitSwitchInstance(&currentPrimaryIndex, clusterCompSpec.PrimaryIndex); err != nil {
+	if err := s.initSwitchInstance(&currentPrimaryIndex, clusterCompSpec.PrimaryIndex); err != nil {
 		return err
 	}
 
 	// health detection, role detection, delay detection of oldPrimaryIndex and newPrimaryIndex
-	s.Detection(true)
+	s.detection(true)
 	if err := checkSwitchStatus(s.SwitchStatus); err != nil {
 		return err
 	}
 
 	// make switch decision, if returns true, then start to do switch action, otherwise returns fail
-	if s.Decision() {
-		if err := s.DoSwitch(); err != nil {
+	if s.decision() {
+		if err := s.doSwitch(); err != nil {
 			return err
 		}
 	} else {
@@ -135,7 +132,7 @@ func HandleReplicationSetHASwitch(ctx context.Context,
 	}
 
 	// switch succeed, update role labels
-	if err := s.UpdateRoleLabel(); err != nil {
+	if err := s.updateRoleLabel(); err != nil {
 		return err
 	}
 
@@ -162,12 +159,12 @@ func (sl SwitchRoleInfoList) Less(i, j int) bool {
 	return *sl[i].LagDetectInfo < *sl[j].LagDetectInfo
 }
 
-func (f *SwitchElectionRoleFilter) Name() string {
+func (f *SwitchElectionRoleFilter) name() string {
 	return SwitchElectionRoleFilterName
 }
 
-// Filter is used to filter the instance which role cannot be elected as candidate primary.
-func (f *SwitchElectionRoleFilter) Filter(roleInfoList []*SwitchRoleInfo) ([]*SwitchRoleInfo, error) {
+// filter is used to filter the instance which role cannot be elected as candidate primary.
+func (f *SwitchElectionRoleFilter) filter(roleInfoList []*SwitchRoleInfo) ([]*SwitchRoleInfo, error) {
 	var filterRoles []*SwitchRoleInfo
 	for _, roleInfo := range roleInfoList {
 		if roleInfo.RoleDetectInfo == nil {
@@ -184,17 +181,17 @@ func (f *SwitchElectionRoleFilter) Filter(roleInfoList []*SwitchRoleInfo) ([]*Sw
 	return filterRoles, nil
 }
 
-// NewSwitchElectionRoleFilter initializes a SwitchElectionRoleFilter and returns it.
-func NewSwitchElectionRoleFilter() SwitchElectionFilter {
+// newSwitchElectionRoleFilter initializes a SwitchElectionRoleFilter and returns it.
+func newSwitchElectionRoleFilter() SwitchElectionFilter {
 	return &SwitchElectionHealthFilter{}
 }
 
-func (f *SwitchElectionHealthFilter) Name() string {
+func (f *SwitchElectionHealthFilter) name() string {
 	return SwitchElectionHealthFilterName
 }
 
-// Filter is used to filter unhealthy instances that cannot be selected as candidate primary.
-func (f *SwitchElectionHealthFilter) Filter(roleInfoList []*SwitchRoleInfo) ([]*SwitchRoleInfo, error) {
+// filter is used to filter unhealthy instances that cannot be selected as candidate primary.
+func (f *SwitchElectionHealthFilter) filter(roleInfoList []*SwitchRoleInfo) ([]*SwitchRoleInfo, error) {
 	var filterRoles []*SwitchRoleInfo
 	for _, roleInfo := range roleInfoList {
 		if roleInfo.HealthDetectInfo == nil {
@@ -207,13 +204,13 @@ func (f *SwitchElectionHealthFilter) Filter(roleInfoList []*SwitchRoleInfo) ([]*
 	return filterRoles, nil
 }
 
-// NewSwitchElectionHealthFilter initializes a SwitchElectionHealthFilter and returns it.
-func NewSwitchElectionHealthFilter() SwitchElectionFilter {
+// newSwitchElectionHealthFilter initializes a SwitchElectionHealthFilter and returns it.
+func newSwitchElectionHealthFilter() SwitchElectionFilter {
 	return &SwitchElectionHealthFilter{}
 }
 
-// BuildExecSwitchCommandEnvs builds a series of envs for subsequent switching actions.
-func (handler *SwitchActionWithJobHandler) BuildExecSwitchCommandEnvs(s *Switch) ([]corev1.EnvVar, error) {
+// buildExecSwitchCommandEnvs builds a series of envs for subsequent switching actions.
+func (handler *SwitchActionWithJobHandler) buildExecSwitchCommandEnvs(s *Switch) ([]corev1.EnvVar, error) {
 	var switchEnvs []corev1.EnvVar
 
 	// replace secret env and merge envs defined in switchCmdExecutorConfig
@@ -256,8 +253,8 @@ func (handler *SwitchActionWithJobHandler) BuildExecSwitchCommandEnvs(s *Switch)
 	return switchEnvs, nil
 }
 
-// ExecSwitchCommands executes switch commands with k8s job.
-func (handler *SwitchActionWithJobHandler) ExecSwitchCommands(s *Switch, switchEnvs []corev1.EnvVar) error {
+// execSwitchCommands executes switch commands with k8s job.
+func (handler *SwitchActionWithJobHandler) execSwitchCommands(s *Switch, switchEnvs []corev1.EnvVar) error {
 	if s.SwitchResource.CompDef.ReplicationSpec.SwitchCmdExecutorConfig == nil {
 		return fmt.Errorf("switchCmdExecutorConfig and SwitchSteps can not be nil")
 	}
@@ -273,16 +270,16 @@ func (handler *SwitchActionWithJobHandler) ExecSwitchCommands(s *Switch, switchE
 	return nil
 }
 
-// HealthDetect is the implementation of the SwitchDetectManager interface, which gets health detection information by actively calling the API provided by the probe
+// healthDetect is the implementation of the SwitchDetectManager interface, which gets health detection information by actively calling the API provided by the probe
 // TODO(xingran) Wait for the probe interface to be ready before implementation
-func (pdm *ProbeDetectManager) HealthDetect(pod *corev1.Pod) (*HealthDetectResult, error) {
+func (pdm *ProbeDetectManager) healthDetect(pod *corev1.Pod) (*HealthDetectResult, error) {
 	var res HealthDetectResult = true
 	return &res, nil
 }
 
-// RoleDetect is the implementation of the SwitchDetectManager interface, which gets role detection information by actively calling the API provided by the probe
+// roleDetect is the implementation of the SwitchDetectManager interface, which gets role detection information by actively calling the API provided by the probe
 // TODO(xingran) Wait for the probe interface to be ready before implementation
-func (pdm *ProbeDetectManager) RoleDetect(pod *corev1.Pod) (*RoleDetectResult, error) {
+func (pdm *ProbeDetectManager) roleDetect(pod *corev1.Pod) (*RoleDetectResult, error) {
 	var res RoleDetectResult
 	role := pod.Labels[intctrlutil.RoleLabelKey]
 	res = DetectRoleSecondary
@@ -292,9 +289,9 @@ func (pdm *ProbeDetectManager) RoleDetect(pod *corev1.Pod) (*RoleDetectResult, e
 	return &res, nil
 }
 
-// LagDetect is the implementation of the SwitchDetectManager interface, which gets data delay detection information by actively calling the API provided by the probe
+// lagDetect is the implementation of the SwitchDetectManager interface, which gets data delay detection information by actively calling the API provided by the probe
 // TODO(xingran) Wait for the probe interface to be ready before implementation
-func (pdm *ProbeDetectManager) LagDetect(pod *corev1.Pod) (*LagDetectResult, error) {
+func (pdm *ProbeDetectManager) lagDetect(pod *corev1.Pod) (*LagDetectResult, error) {
 	var res LagDetectResult = 0
 	return &res, nil
 }

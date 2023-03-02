@@ -32,14 +32,14 @@ import (
 // MockSwitchActionHandler mocks the implementation of the SwitchActionHandler interface for testing.
 type MockSwitchActionHandler struct{}
 
-// MockSwitchActionHandler builds a series of envs for test switching actions.
-func (handler *MockSwitchActionHandler) BuildExecSwitchCommandEnvs(s *Switch) ([]corev1.EnvVar, error) {
+// buildExecSwitchCommandEnvs builds a series of envs for test switching actions.
+func (handler *MockSwitchActionHandler) buildExecSwitchCommandEnvs(s *Switch) ([]corev1.EnvVar, error) {
 	switchJobHandler := &SwitchActionWithJobHandler{}
-	return switchJobHandler.BuildExecSwitchCommandEnvs(s)
+	return switchJobHandler.buildExecSwitchCommandEnvs(s)
 }
 
-// ExecSwitchCommands mocks the result of executes the specific switching commands.
-func (handler *MockSwitchActionHandler) ExecSwitchCommands(s *Switch, switchEnvs []corev1.EnvVar) error {
+// execSwitchCommands mocks the result of executes the specific switching commands.
+func (handler *MockSwitchActionHandler) execSwitchCommands(s *Switch, switchEnvs []corev1.EnvVar) error {
 	return nil
 }
 
@@ -147,18 +147,18 @@ var _ = Describe("ReplicationSet Switch", func() {
 
 		mockSwitchHandler := &MockSwitchActionHandler{}
 		By("Test create new Switch obj should be successful.")
-		s := NewSwitch(testCtx.Ctx, k8sClient, clusterObj, &clusterDefObj.Spec.ComponentDefs[0], clusterComponentSpec, nil, nil, nil, nil, mockSwitchHandler)
+		s := newSwitch(testCtx.Ctx, k8sClient, clusterObj, &clusterDefObj.Spec.ComponentDefs[0], clusterComponentSpec, nil, nil, nil, nil, mockSwitchHandler)
 
 		By("Test switch detection when switchInstance is nil should be false.")
-		s.Detection(false)
+		s.detection(false)
 		Expect(s.SwitchStatus.SwitchPhaseStatus).Should(Equal(SwitchPhaseStatusFailed))
 
 		By("Test switch detection should be successful.")
-		err := s.InitSwitchInstance(&DefaultReplicationPrimaryIndex, &DefaultPrimaryIndexDiffWithStsOrdinal)
+		err := s.initSwitchInstance(&DefaultReplicationPrimaryIndex, &DefaultPrimaryIndexDiffWithStsOrdinal)
 		Expect(err).Should(Succeed())
 
 		By("Test switch detection should be successful.")
-		s.Detection(false)
+		s.detection(false)
 		Expect(s.SwitchStatus.SwitchPhaseStatus).Should(Equal(SwitchPhaseStatusSucceed))
 
 		By("Test switch election with multi secondaries should be successful, and the candidate primary should be the priorityPod.")
@@ -168,68 +168,68 @@ var _ = Describe("ReplicationSet Switch", func() {
 				sri.LagDetectInfo = &lagNotZero
 			}
 		}
-		sri := s.Election()
+		sri := s.election()
 		Expect(sri.Pod.Name).Should(Equal(priorityPod))
 
 		By("Test switch decision when candidate primary is not healthy should be false.")
 		s.SwitchInstance.CandidatePrimaryRole.HealthDetectInfo = &notHealthy
-		doSwitch := s.Decision()
-		Expect(doSwitch).Should(BeFalse())
+		decision := s.decision()
+		Expect(decision).Should(BeFalse())
 		Expect(s.SwitchStatus.SwitchPhaseStatus).Should(Equal(SwitchPhaseStatusFailed))
 		s.SwitchInstance.CandidatePrimaryRole.HealthDetectInfo = &healthy
 
 		By("Test switch decision when candidate primary role label is primary should be false.")
 		s.SwitchInstance.CandidatePrimaryRole.RoleDetectInfo = &rolePrimary
-		doSwitch = s.Decision()
-		Expect(doSwitch).Should(BeFalse())
+		decision = s.decision()
+		Expect(decision).Should(BeFalse())
 		Expect(s.SwitchStatus.SwitchPhaseStatus).Should(Equal(SwitchPhaseStatusFailed))
 		s.SwitchInstance.CandidatePrimaryRole.RoleDetectInfo = &roleSecondary
 
 		By("Test switch decision when switchPolicy is MaximumAvailability and old primary, candidate primary are healthy and candidate primary data lag is 0 should be true.")
-		doSwitch = s.Decision()
-		Expect(doSwitch).Should(BeTrue())
+		decision = s.decision()
+		Expect(decision).Should(BeTrue())
 
 		By("Test switch decision when switchPolicy is MaximumAvailability and old primary is not healthy should be true.")
 		s.SwitchInstance.OldPrimaryRole.HealthDetectInfo = &notHealthy
-		doSwitch = s.Decision()
-		Expect(doSwitch).Should(BeTrue())
+		decision = s.decision()
+		Expect(decision).Should(BeTrue())
 		Expect(s.SwitchStatus.SwitchPhaseStatus).Should(Equal(SwitchPhaseStatusSucceed))
 		s.SwitchInstance.OldPrimaryRole.HealthDetectInfo = &healthy
 
 		By("Test switch decision when switchPolicy is MaximumAvailability and old primary is healthy and candidate primary data lag is not 0 should be false.")
 		s.SwitchInstance.CandidatePrimaryRole.LagDetectInfo = &lagNotZero
-		doSwitch = s.Decision()
-		Expect(doSwitch).Should(BeFalse())
+		decision = s.decision()
+		Expect(decision).Should(BeFalse())
 		Expect(s.SwitchStatus.SwitchPhaseStatus).Should(Equal(SwitchPhaseStatusFailed))
 		s.SwitchInstance.CandidatePrimaryRole.LagDetectInfo = &lagZero
 
 		By("Test switch decision when switchPolicy is MaximumDataProtection and candidate primary data lag is 0 should be true.")
 		s.SwitchResource.CompSpec.SwitchPolicy.Type = appsv1alpha1.MaximumDataProtection
-		doSwitch = s.Decision()
-		Expect(doSwitch).Should(BeTrue())
+		decision = s.decision()
+		Expect(decision).Should(BeTrue())
 		Expect(s.SwitchStatus.SwitchPhaseStatus).Should(Equal(SwitchPhaseStatusSucceed))
 
 		By("Test switch decision when switchPolicy is MaximumDataProtection and candidate primary data lag is not 0 should be false.")
 		s.SwitchInstance.CandidatePrimaryRole.LagDetectInfo = &lagNotZero
 		s.SwitchResource.CompSpec.SwitchPolicy.Type = appsv1alpha1.MaximumDataProtection
-		doSwitch = s.Decision()
-		Expect(doSwitch).Should(BeFalse())
+		decision = s.decision()
+		Expect(decision).Should(BeFalse())
 		Expect(s.SwitchStatus.SwitchPhaseStatus).Should(Equal(SwitchPhaseStatusFailed))
 		s.SwitchInstance.CandidatePrimaryRole.LagDetectInfo = &lagZero
 
-		By("Test switch decision  when switchPolicy is Manual should be false.")
-		s.SwitchResource.CompSpec.SwitchPolicy.Type = appsv1alpha1.Manual
-		doSwitch = s.Decision()
-		Expect(doSwitch).Should(BeFalse())
+		By("Test switch decision  when switchPolicy is Noop should be false.")
+		s.SwitchResource.CompSpec.SwitchPolicy.Type = appsv1alpha1.Noop
+		decision = s.decision()
+		Expect(decision).Should(BeFalse())
 		Expect(s.SwitchStatus.SwitchPhaseStatus).Should(Equal(SwitchPhaseStatusSucceed))
 
 		By("Test do switch action with MockSwitchActionHandler should be true.")
 		s.SwitchResource.CompSpec.SwitchPolicy.Type = appsv1alpha1.MaximumAvailability
-		err = s.DoSwitch()
+		err = s.doSwitch()
 		Expect(err).Should(Succeed())
 
 		By("Test switch update role label should be successful.")
-		err = s.UpdateRoleLabel()
+		err = s.updateRoleLabel()
 		Expect(err).Should(Succeed())
 	}
 
@@ -258,7 +258,7 @@ var _ = Describe("ReplicationSet Switch", func() {
 						},
 					},
 					{
-						Type: appsv1alpha1.Manual,
+						Type: appsv1alpha1.Noop,
 					},
 				},
 				SwitchCmdExecutorConfig: &appsv1alpha1.SwitchCmdExecutorConfig{

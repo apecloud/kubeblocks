@@ -310,8 +310,8 @@ func GetReplicationSetPrimaryObj[T intctrlutil.Object, PT intctrlutil.PObject[T]
 	return &objListItems[0], nil
 }
 
-// UpdateObjRoleLabel updates the value of the role label of the object.
-func UpdateObjRoleLabel[T intctrlutil.Object, PT intctrlutil.PObject[T]](
+// updateObjRoleLabel updates the value of the role label of the object.
+func updateObjRoleLabel[T intctrlutil.Object, PT intctrlutil.PObject[T]](
 	ctx context.Context, cli client.Client, obj T, role string) error {
 	pObj := PT(&obj)
 	patch := client.MergeFrom(PT(pObj.DeepCopy()))

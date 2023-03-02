@@ -496,7 +496,7 @@ type SwitchPolicy struct {
 	// switchPolicyType defines type of the switchPolicy.
 	// MaximumAvailability: when the primary is active, do switch if the synchronization delay = 0 in the user-defined lagProbe data delay detection logic, otherwise do not switch. The primary is down, switch immediately.
 	// MaximumDataProtection: when the primary is active, do switch if synchronization delay = 0 in the user-defined lagProbe data lag detection logic, otherwise do not switch. If the primary is down, if it can be judged that the primary and secondary data are consistent, then do the switch, otherwise do not switch.
-	// Manual: KubeBlocks will not perform high-availability switching on components. Users need to implement HA by themselves.
+	// Noop: KubeBlocks will not perform high-availability switching on components. Users need to implement HA by themselves.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:default=MaximumAvailability
 	Type SwitchPolicyType `json:"type"`

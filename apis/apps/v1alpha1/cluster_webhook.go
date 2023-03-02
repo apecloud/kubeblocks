@@ -176,11 +176,6 @@ func (r *Cluster) validateClusterVersionRef(allErrs *field.ErrorList) {
 
 // ValidateComponents validate spec.components is legal
 func (r *Cluster) validateComponents(allErrs *field.ErrorList, clusterDef *ClusterDefinition) {
-	if len(r.Spec.ComponentSpecs) == 0 {
-		*allErrs = append(*allErrs, field.Invalid(field.NewPath("spec.componentSpecs"),
-			r.Spec.ComponentSpecs, "cannot be empty"))
-		return
-	}
 	var (
 		// invalid component slice
 		invalidComponentDefs = make([]string, 0)

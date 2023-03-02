@@ -196,15 +196,12 @@ func (r *reconfigureAction) syncReconfigureComponentStatus(res *OpsResource) err
 }
 
 func isReloadPolicy(status *appsv1alpha1.ReconfiguringStatus) bool {
-	if status.ConfigurationStatus == nil {
-		return false
-	}
 	for _, cmStatus := range status.ConfigurationStatus {
-		if cmStatus.UpdatePolicy != appsv1alpha1.AutoReload {
-			return false
+		if cmStatus.UpdatePolicy == appsv1alpha1.AutoReload {
+			return true
 		}
 	}
-	return true
+	return false
 }
 
 func isExpectedPhase(condition metav1.Condition, expectedTypes []string, expectedStatus metav1.ConditionStatus) bool {

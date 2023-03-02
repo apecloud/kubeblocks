@@ -194,7 +194,7 @@ func staticPodStats(pods []corev1.Pod, targetReplicas int, minReadySeconds int32
 		switch {
 		case podutil.IsAvailable(pod, minReadySeconds):
 			podsStats.available[pod.Name] = pod
-		case podutil.IsReady(pod):
+		case podutil.PodIsReady(pod):
 			podsStats.ready[pod.Name] = pod
 		default:
 		}

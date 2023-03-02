@@ -28,21 +28,25 @@ data:
         exit 1
     fi
   setup.sh: |
-    #!/bin/sh
+    #!/bin/bash
     set -o errexit
     set -o nounset
-    set -o pipefail
     SECONDARY_ROLE=secondary
     KB_ROLE_NAME=`cat /etc/conf/role/labels`
     if [ "$KB_ROLE_NAME" = "$SECONDARY_ROLE" ]; then
       export POSTGRES_REPLICATION_MODE=slave
-      export POSTGRES_REPLICATION_USER=kbreplicator
-      export POSTGRES_REPLICATION_PASSWORD=eIah735n61
+      # TODO: use replicator instead
+      export POSTGRES_REPLICATION_USER=$POSTGRES_USER
+      export POSTGRES_REPLICATION_PASSWORD=$POSTGRES_PASSWORD
       export POSTGRES_CLUSTER_APP_NAME=my-application
-      export POSTGRES_MASTER_HOST=pg-pg
+      export POSTGRES_MASTER_HOST=$KB_PRIMARY_POD_NAME
       export POSTGRES_MASTER_PORT_NUMBER="5432"
+      . /opt/bitnami/scripts/libos.sh
       . /opt/bitnami/scripts/libpostgresql.sh
       . /opt/bitnami/scripts/postgresql-env.sh
+      # Ensure 'daemon' user exists when running as 'root'
+      am_i_root && ensure_user_exists "$POSTGRESQL_DAEMON_USER" --group "$POSTGRESQL_DAEMON_GROUP"
+      # pg_basebackup
       postgresql_slave_init_db
     fi
     /scripts/post_start.sh &

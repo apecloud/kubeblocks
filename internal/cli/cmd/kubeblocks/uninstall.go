@@ -95,6 +95,7 @@ func (o *uninstallOptions) preCheck() error {
 		"clusters.apps.kubeblocks.io",
 	}
 	ctx := context.Background()
+
 	// delete crds
 	crs := map[string][]string{}
 	crdList, err := o.Dynamic.Resource(types.CRDGVR()).List(ctx, metav1.ListOptions{})
@@ -127,7 +128,22 @@ func (o *uninstallOptions) preCheck() error {
 		}
 		return errors.Errorf(errMsg.String())
 	}
-
+	{
+		// verify where kubeblocks is installed
+		var msg bytes.Buffer
+		secrets, err := o.Client.CoreV1().Secrets(metav1.NamespaceAll).List(ctx, metav1.ListOptions{LabelSelector: helmLabel})
+		if err != nil || len(secrets.Items) == 0 {
+			msg.WriteString("failed to locate release, please use `kbcli kubeblocks status` to get information in more details")
+			return errors.New(msg.String())
+		} else {
+			kbNamespace := secrets.Items[0].Namespace
+			if o.Namespace != kbNamespace {
+				msg.WriteString(fmt.Sprintf("KubeBlocks is deployed in namespace: '%s'.", kbNamespace))
+				msg.WriteString(fmt.Sprintf("please specify namespace to uninstall `kbcli kubeblocks uninstall -n %s`", kbNamespace))
+				return errors.New(msg.String())
+			}
+		}
+	}
 	return nil
 }
 

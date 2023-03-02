@@ -1,3 +1,19 @@
+/*
+Copyright ApeCloud, Inc.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
 package kubeblocks
 
 import (
@@ -79,32 +95,32 @@ var (
 	}
 )
 
-type infoOptions struct {
+type statusOptions struct {
 	genericclioptions.IOStreams
 	client  kubernetes.Interface
 	dynamic dynamic.Interface
-	mc      *metrics.Clientset
+	mc      metrics.Interface
 	showAll bool
 	ns      string
 }
 
 func NewStatusCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
-	o := infoOptions{IOStreams: streams}
+	o := statusOptions{IOStreams: streams}
 	cmd := &cobra.Command{
 		Use:     "status",
-		Short:   "Show status of resource created by KubeBlocks",
+		Short:   "Show list of resource KubeBlocks uses or owns",
 		Args:    cobra.NoArgs,
 		Example: infoExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			util.CheckErr(o.complete(f, cmd))
-			util.CheckErr(o.run(f, cmd))
+			util.CheckErr(o.complete(f))
+			util.CheckErr(o.run(f))
 		},
 	}
-	cmd.Flags().BoolVar(&o.showAll, "all", false, "Show all resources.")
+	cmd.Flags().BoolVar(&o.showAll, "all", false, "Show all resources, including configurations, storages, etc")
 	return cmd
 }
 
-func (o *infoOptions) complete(f cmdutil.Factory, cmd *cobra.Command) error {
+func (o *statusOptions) complete(f cmdutil.Factory) error {
 	var err error
 
 	o.dynamic, err = f.DynamicClient()
@@ -130,7 +146,7 @@ func (o *infoOptions) complete(f cmdutil.Factory, cmd *cobra.Command) error {
 	return nil
 }
 
-func (o *infoOptions) run(f cmdutil.Factory, cmd *cobra.Command) error {
+func (o *statusOptions) run(f cmdutil.Factory) error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	// infer namespace from secrets
@@ -139,7 +155,7 @@ func (o *infoOptions) run(f cmdutil.Factory, cmd *cobra.Command) error {
 		o.ns = secrets.Items[0].Namespace
 	}
 
-	fmt.Fprintf(o.Out, "Kuberblocks deployed under namespace: %s\n", o.ns)
+	fmt.Fprintf(o.Out, "Kuberblocks is deployed in namespace: %s\n", o.ns)
 
 	allErrs := make([]error, 0)
 	o.showWorkloads(ctx, &allErrs)
@@ -153,7 +169,7 @@ func (o *infoOptions) run(f cmdutil.Factory, cmd *cobra.Command) error {
 	return errorutil.Aggregate(allErrs)
 }
 
-func (o *infoOptions) showKubeBlocksResources(ctx context.Context, allErrs *[]error) {
+func (o *statusOptions) showKubeBlocksResources(ctx context.Context, allErrs *[]error) {
 	fmt.Fprintln(o.Out, "\nKubeBlocks Global Custom Resources:")
 	tblPrinter := printer.NewTablePrinter(o.Out)
 	tblPrinter.SetHeader("KIND", "NAME")
@@ -167,7 +183,7 @@ func (o *infoOptions) showKubeBlocksResources(ctx context.Context, allErrs *[]er
 	tblPrinter.Print()
 }
 
-func (o *infoOptions) showKubeBlocksConfig(ctx context.Context, allErrs *[]error) {
+func (o *statusOptions) showKubeBlocksConfig(ctx context.Context, allErrs *[]error) {
 	fmt.Fprintln(o.Out, "\nKubeBlocks Configurations:")
 	tblPrinter := printer.NewTablePrinter(o.Out)
 	tblPrinter.SetHeader("NAMESPACE", "KIND", "NAME")
@@ -180,7 +196,7 @@ func (o *infoOptions) showKubeBlocksConfig(ctx context.Context, allErrs *[]error
 	tblPrinter.Print()
 }
 
-func (o *infoOptions) showKubeBlocksStorage(ctx context.Context, allErrs *[]error) {
+func (o *statusOptions) showKubeBlocksStorage(ctx context.Context, allErrs *[]error) {
 	fmt.Fprintln(o.Out, "\nKubeBlocks Storage:")
 	tblPrinter := printer.NewTablePrinter(o.Out)
 	tblPrinter.SetHeader("NAMESPACE", "KIND", "NAME", "CAPACITY")
@@ -210,7 +226,7 @@ func (o *infoOptions) showKubeBlocksStorage(ctx context.Context, allErrs *[]erro
 	tblPrinter.Print()
 }
 
-func (o *infoOptions) showHelmResources(ctx context.Context, allErrs *[]error) {
+func (o *statusOptions) showHelmResources(ctx context.Context, allErrs *[]error) {
 	fmt.Fprintln(o.Out, "\nHelm Resources:")
 	tblPrinter := printer.NewTablePrinter(o.Out)
 	tblPrinter.SetHeader("NAMESPACE", "KIND", "NAME", "STATUS")
@@ -226,7 +242,7 @@ func (o *infoOptions) showHelmResources(ctx context.Context, allErrs *[]error) {
 	tblPrinter.Print()
 }
 
-func (o *infoOptions) showWorkloads(ctx context.Context, allErrs *[]error) {
+func (o *statusOptions) showWorkloads(ctx context.Context, allErrs *[]error) {
 	fmt.Fprintln(o.Out, "Kubeblocks Workloads:")
 	tblPrinter := printer.NewTablePrinter(o.Out)
 	tblPrinter.SetHeader("NAMESPACE", "KIND", "NAME", "READY PODS", "CPU(cores)", "MEMORY(bytes)")
@@ -277,7 +293,7 @@ func (o *infoOptions) showWorkloads(ctx context.Context, allErrs *[]error) {
 	tblPrinter.Print()
 }
 
-func computeMetricByWorkloads(ctx context.Context, ns string, workloads []*unstructured.UnstructuredList, mc *metrics.Clientset, allErrs *[]error) (cpuMetricMap, memMetricMap map[string]string) {
+func computeMetricByWorkloads(ctx context.Context, ns string, workloads []*unstructured.UnstructuredList, mc metrics.Interface, allErrs *[]error) (cpuMetricMap, memMetricMap map[string]string) {
 	cpuMetricMap = make(map[string]string)
 	memMetricMap = make(map[string]string)
 

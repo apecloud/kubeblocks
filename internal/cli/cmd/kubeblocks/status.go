@@ -23,12 +23,6 @@ import (
 
 	"github.com/containerd/stargz-snapshotter/estargz/errorutil"
 	"github.com/spf13/cobra"
-
-	"github.com/apecloud/kubeblocks/internal/cli/printer"
-	"github.com/apecloud/kubeblocks/internal/cli/types"
-	"github.com/apecloud/kubeblocks/internal/cli/util"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
-
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -43,6 +37,11 @@ import (
 	"k8s.io/kubectl/pkg/util/templates"
 	"k8s.io/metrics/pkg/apis/metrics/v1beta1"
 	metrics "k8s.io/metrics/pkg/client/clientset/versioned"
+
+	"github.com/apecloud/kubeblocks/internal/cli/printer"
+	"github.com/apecloud/kubeblocks/internal/cli/types"
+	"github.com/apecloud/kubeblocks/internal/cli/util"
+	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
 var (
@@ -56,7 +55,7 @@ var (
 
 var (
 	// app.kubernetes.io/instance=kubeblocks, hit most workloads and configuration
-	instanceLabelSelector = fmt.Sprintf("%s=%s", intctrlutil.AppInstanceLabelKey, types.KubeBlocksChartName)
+	instanceLabelSelector = fmt.Sprintf("%s=%s", constant.AppInstanceLabelKey, types.KubeBlocksChartName)
 	// release=kubeblocs, for prometheus-alertmanager and prometheus-server
 	releaseLabelSelector = fmt.Sprintf("release=%s", types.KubeBlocksChartName)
 	// name=kubeblocks,owner-helm, for helm secret
@@ -213,7 +212,7 @@ func (o *statusOptions) showKubeBlocksStorage(ctx context.Context, allErrs *[]er
 	for _, resourceList := range unstructuredList {
 		for _, resource := range resourceList.Items {
 			switch resource.GetKind() {
-			case intctrlutil.PersistentVolumeClaimKind:
+			case constant.PersistentVolumeClaimKind:
 				renderPVC(&resource)
 			default:
 				err := fmt.Errorf("unsupported resources: %s", resource.GetKind())
@@ -278,9 +277,9 @@ func (o *statusOptions) showWorkloads(ctx context.Context, allErrs *[]error) {
 	for _, workload := range unstructuredList {
 		for _, resource := range workload.Items {
 			switch resource.GetKind() {
-			case intctrlutil.DeploymentKind:
+			case constant.DeploymentKind:
 				renderDeploy(&resource)
-			case intctrlutil.StatefulSetKind:
+			case constant.StatefulSetKind:
 				renderStatefulSet(&resource)
 			default:
 				err := fmt.Errorf("unsupported worklkoad type: %s", resource.GetKind())

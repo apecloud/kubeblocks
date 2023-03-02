@@ -14,16 +14,23 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package app
+package alert
 
 import (
-	"testing"
-
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
+	"github.com/spf13/cobra"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
+	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 )
 
-func TestApp(t *testing.T) {
-	RegisterFailHandler(Fail)
-	RunSpecs(t, "App Test Suite")
+func NewAlertCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "alert [add-receiver|list-receivers|delete-receiver]",
+		Short: "Manage alert receivers",
+	}
+	cmd.AddCommand(
+		newAddReceiverCmd(f, streams),
+		newDeleteReceiverCmd(f, streams),
+		newListReceiversCmd(f, streams),
+	)
+	return cmd
 }

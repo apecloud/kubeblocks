@@ -92,6 +92,7 @@ require (
 	k8s.io/utils v0.0.0-20221128185143-99ec85e7a448
 	sigs.k8s.io/controller-runtime v0.14.4
 	sigs.k8s.io/kustomize/kyaml v0.13.9
+	sigs.k8s.io/yaml v1.3.0
 )
 
 require (
@@ -369,7 +370,6 @@ require (
 	sigs.k8s.io/json v0.0.0-20220713155537-f223a00ba0e2 // indirect
 	sigs.k8s.io/kustomize/api v0.12.1 // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.2.3 // indirect
-	sigs.k8s.io/yaml v1.3.0 // indirect
 )
 
 replace (

@@ -515,7 +515,6 @@ func (o *InstallOptions) buildChart() *helm.InstallOpts {
 		Version:         o.Version,
 		Namespace:       o.HelmCfg.Namespace(),
 		ValueOpts:       &o.ValueOpts,
-		Login:           true,
 		TryTimes:        2,
 		CreateNamespace: o.CreateNamespace,
 		Timeout:         o.timeout,

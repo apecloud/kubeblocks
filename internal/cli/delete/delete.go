@@ -43,6 +43,7 @@ type DeleteOptions struct {
 	Force         bool
 	GracePeriod   int
 	Now           bool
+	AutoApprove   bool
 
 	// Names are the resource names
 	Names []string
@@ -99,12 +100,14 @@ func (o *DeleteOptions) complete() error {
 	}
 
 	// confirm names to delete, use ConfirmedNames first, if it is empty, use Names
-	names := o.ConfirmedNames
-	if len(names) == 0 {
-		names = o.Names
-	}
-	if err = Confirm(names, o.In); err != nil {
-		return err
+	if !o.AutoApprove {
+		names := o.ConfirmedNames
+		if len(names) == 0 {
+			names = o.Names
+		}
+		if err = Confirm(names, o.In); err != nil {
+			return err
+		}
 	}
 
 	// get the resources to delete
@@ -132,6 +135,7 @@ func (o *DeleteOptions) AddFlags(cmd *cobra.Command) {
 	cmd.Flags().BoolVar(&o.Force, "force", false, "If true, immediately remove resources from API and bypass graceful deletion. Note that immediate deletion of some resources may result in inconsistency or data loss and requires confirmation.")
 	cmd.Flags().BoolVar(&o.Now, "now", false, "If true, resources are signaled for immediate shutdown (same as --grace-period=1).")
 	cmd.Flags().IntVar(&o.GracePeriod, "grace-period", -1, "Period of time in seconds given to the resource to terminate gracefully. Ignored if negative. Set to 1 for immediate shutdown. Can only be set to 0 when --force is true (force deletion).")
+	cmd.Flags().BoolVar(&o.AutoApprove, "auto-approve", false, "Skip interactive approval before deleting")
 }
 
 func (o *DeleteOptions) deleteResult(r *resource.Result) error {
@@ -190,7 +194,7 @@ func Confirm(names []string, in io.Reader) error {
 	sort.Strings(names)
 	sort.Strings(enteredNames)
 	if !slices.Equal(names, enteredNames) {
-		return fmt.Errorf("the entered \"%s\" does not match \"%s\"", entered, strings.Join(names, " "))
+		return fmt.Errorf("typed \"%s\" does not match \"%s\"", entered, strings.Join(names, " "))
 	}
 	return nil
 }

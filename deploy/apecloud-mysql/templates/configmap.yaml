@@ -7,3 +7,20 @@ metadata:
 data:
   my.cnf: |-
     {{- .Files.Get "config/mysql8.cnf.tpl" | nindent 4 }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mysql-reload-script
+  labels:
+    {{- include "apecloud-mysql.labels" . | nindent 4 }}
+data:
+  reload.tpl: |-
+    {{- .Files.Get "scripts/reload.tpl" | nindent 4 }}
+  reload.yaml: |-
+    scripts: reload.tpl
+    fileRegex: my.cnf
+    formatterConfig:
+      format: ini
+      iniConfig:
+        sectionName: mysqld

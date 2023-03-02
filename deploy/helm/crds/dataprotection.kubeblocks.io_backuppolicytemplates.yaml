@@ -66,7 +66,6 @@ spec:
                     description: which container can exec command
                     type: string
                   image:
-                    default: docker.io/apecloud/kubeblocks
                     description: exec command with image
                     type: string
                   postCommands:
@@ -103,7 +102,12 @@ spec:
                 type: string
               phase:
                 description: BackupPolicyTemplatePhase defines phases for BackupPolicyTemplate
-                  CR, valid values are New, Available, InProgress, Failed.
+                  CR.
+                enum:
+                - New
+                - Available
+                - InProgress
+                - Failed
                 type: string
             type: object
         type: object

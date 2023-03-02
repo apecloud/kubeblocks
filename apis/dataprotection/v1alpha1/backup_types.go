@@ -28,7 +28,6 @@ type BackupSpec struct {
 	BackupPolicyName string `json:"backupPolicyName"`
 
 	// Backup Type. full or incremental or snapshot. if unset, default is full.
-	// +kubebuilder:validation:Enum={full,incremental,snapshot}
 	// +kubebuilder:default=full
 	BackupType BackupType `json:"backupType"`
 
@@ -41,33 +40,6 @@ type BackupSpec struct {
 	// +optional
 	TTL *metav1.Duration `json:"ttl,omitempty"`
 }
-
-// BackupPhase The current phase. Valid values are New, InProgress, Completed, Failed.
-// +enum
-type BackupPhase string
-
-// These are the valid statuses of Backup.
-const (
-	BackupNew BackupPhase = "New"
-
-	BackupInProgress BackupPhase = "InProgress"
-
-	BackupCompleted BackupPhase = "Completed"
-
-	BackupFailed BackupPhase = "Failed"
-)
-
-// BackupType the job type, marked job is full or incremental.
-// +enum
-type BackupType string
-
-const (
-	BackupTypeFull BackupType = "full"
-
-	BackupTypeIncremental BackupType = "incremental"
-
-	BackupTypeSnapshot BackupType = "snapshot"
-)
 
 // BackupStatus defines the observed state of Backup
 type BackupStatus struct {
@@ -136,7 +108,7 @@ type Backup struct {
 	Status BackupStatus `json:"status,omitempty"`
 }
 
-//+kubebuilder:object:root=true
+// +kubebuilder:object:root=true
 
 // BackupList contains a list of Backup
 type BackupList struct {

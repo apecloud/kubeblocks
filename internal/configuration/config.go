@@ -18,19 +18,21 @@ package configuration
 
 import (
 	"bytes"
-	"reflect"
-
+	"encoding/json"
 	"os"
 	"path"
 	"path/filepath"
+	"reflect"
 	"strings"
 
+	"github.com/StudioSol/set"
+	"github.com/spf13/cast"
 	"github.com/spf13/viper"
 	appv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -54,22 +56,22 @@ type PolicyExecStatus struct {
 type ConfigEventContext struct {
 	Client  client.Client
 	ReqCtx  intctrlutil.RequestCtx
-	Cluster *dbaasv1alpha1.Cluster
+	Cluster *appsv1alpha1.Cluster
 
-	ClusterComponent *dbaasv1alpha1.ClusterComponent
-	Component        *dbaasv1alpha1.ClusterDefinitionComponent
+	ClusterComponent *appsv1alpha1.ClusterComponentSpec
+	Component        *appsv1alpha1.ClusterComponentDefinition
 	ComponentUnits   []appv1.StatefulSet
 
 	TplName          string
 	ConfigPatch      *ConfigPatchInfo
 	CfgCM            *corev1.ConfigMap
-	ConfigConstraint *dbaasv1alpha1.ConfigConstraintSpec
+	ConfigConstraint *appsv1alpha1.ConfigConstraintSpec
 
 	PolicyStatus PolicyExecStatus
 }
 
 type ConfigEventHandler interface {
-	Handle(eventContext ConfigEventContext, lastOpsRequest string, phase dbaasv1alpha1.Phase, err error) error
+	Handle(eventContext ConfigEventContext, lastOpsRequest string, phase appsv1alpha1.Phase, err error) error
 }
 
 const (
@@ -78,8 +80,14 @@ const (
 )
 
 const (
-	cfgKeyDelimiter = "."
-	emptyJSON       = "{}"
+	delimiterDot = "."
+	emptyJSON    = "{}"
+
+	// In order to verify a configuration file, the configuration file is converted to a UnstructuredObject.
+	// When there is a special character '.' in the parameter will cause the parameter of the configuration file parsing to be messed up.
+	//   e.g. pg parameters: auto_explain.log_analyze = 'True'
+	// To solve this problem, the cfgDelimiterPlaceholder variable is introduced to ensure that no such string exists in a configuration file.
+	cfgDelimiterPlaceholder = "@#@"
 )
 
 var (
@@ -101,9 +109,7 @@ func init() {
 			indexer:   make(map[string]*viper.Viper, 1),
 		}
 
-		v := viper.NewWithOptions(viper.KeyDelimiter(cfgKeyDelimiter))
-
-		v.SetConfigType(string(option.CfgType))
+		v := NewCfgViper(option.CfgType)
 		if err := v.ReadConfig(bytes.NewReader(option.RawData)); err != nil {
 			option.Log.Error(err, "failed to parse config!", "context", option.RawData)
 			return nil, err
@@ -138,8 +144,10 @@ func init() {
 
 		var index = 0
 		for fileName, content := range ctx.Configurations {
-			v := viper.NewWithOptions(viper.KeyDelimiter(cfgKeyDelimiter))
-			v.SetConfigType(string(option.CfgType))
+			if ctx.CMKeys != nil && !ctx.CMKeys.InArray(fileName) {
+				continue
+			}
+			v := NewCfgViper(option.CfgType)
 			if err := v.ReadConfig(bytes.NewReader([]byte(content))); err != nil {
 				return nil, WrapError(err, "failed to load config: filename[%s]", fileName)
 			}
@@ -294,6 +302,16 @@ func (c *cfgWrapper) Diff(target *cfgWrapper) (*ConfigPatchInfo, error) {
 	return reconfigureInfo, nil
 }
 
+func NewCfgViper(cfgType appsv1alpha1.CfgFileFormat) *viper.Viper {
+	defaultKeySep := delimiterDot
+	if cfgType == appsv1alpha1.Properties || cfgType == appsv1alpha1.Dotenv {
+		defaultKeySep = cfgDelimiterPlaceholder
+	}
+	v := viper.NewWithOptions(viper.KeyDelimiter(defaultKeySep))
+	v.SetConfigType(strings.ToLower(string(cfgType)))
+	return v
+}
+
 func NewCfgOptions(filename string, options ...Option) CfgOpOption {
 	context := CfgOpOption{
 		FileName: filename,
@@ -354,7 +372,7 @@ func (c cfgWrapper) getCfgViper(option CfgOpOption) *viper.Viper {
 
 func (c *cfgWrapper) generateKey(paramKey string, option CfgOpOption, v *viper.Viper) string {
 	if option.IniContext != nil && len(option.IniContext.SectionName) > 0 {
-		return strings.Join([]string{option.IniContext.SectionName, paramKey}, cfgKeyDelimiter)
+		return strings.Join([]string{option.IniContext.SectionName, paramKey}, delimiterDot)
 	}
 
 	return paramKey
@@ -373,6 +391,14 @@ func DumpCfgContent(v *viper.Viper, tmpPath string) (string, error) {
 	}
 
 	return string(content), nil
+}
+
+func FromCMKeysSelector(keys []string) *set.LinkedHashSetString {
+	var cmKeySet *set.LinkedHashSetString
+	if len(keys) > 0 {
+		cmKeySet = set.NewLinkedHashSetString(keys...)
+	}
+	return cmKeySet
 }
 
 func CreateMergePatch(oldcfg, target interface{}, option CfgOption) (*ConfigPatchInfo, error) {
@@ -397,4 +423,110 @@ func CreateMergePatch(oldcfg, target interface{}, option CfgOption) (*ConfigPatc
 	}
 
 	return old.Diff(new.cfgWrapper)
+}
+
+func GenerateVisualizedParamsList(configPatch *ConfigPatchInfo, formatConfig *appsv1alpha1.FormatterConfig, sets *set.LinkedHashSetString) []VisualizedParam {
+	if !configPatch.IsModify {
+		return nil
+	}
+
+	var trimPrefix = ""
+	if formatConfig != nil && formatConfig.Format == appsv1alpha1.Ini && formatConfig.IniConfig != nil {
+		trimPrefix = formatConfig.IniConfig.SectionName
+	}
+
+	r := make([]VisualizedParam, 0)
+	r = append(r, generateUpdateParam(configPatch.UpdateConfig, trimPrefix, sets)...)
+	r = append(r, generateUpdateKeyParam(configPatch.AddConfig, trimPrefix, AddedType, sets)...)
+	r = append(r, generateUpdateKeyParam(configPatch.DeleteConfig, trimPrefix, DeletedType, sets)...)
+	return r
+}
+
+func generateUpdateParam(updatedParams map[string][]byte, trimPrefix string, sets *set.LinkedHashSetString) []VisualizedParam {
+	r := make([]VisualizedParam, 0, len(updatedParams))
+
+	for key, b := range updatedParams {
+		// TODO support keys
+		if sets != nil && sets.Length() > 0 && !sets.InArray(key) {
+			continue
+		}
+		var v any
+		if err := json.Unmarshal(b, &v); err != nil {
+			return nil
+		}
+		if params := checkAndFlattenMap(v, trimPrefix); params != nil {
+			r = append(r, VisualizedParam{
+				Key:        key,
+				Parameters: params,
+				UpdateType: UpdatedType,
+			})
+		}
+	}
+	return r
+}
+
+func checkAndFlattenMap(v any, trim string) []ParameterPair {
+	m := cast.ToStringMap(v)
+	if m != nil && trim != "" {
+		m = cast.ToStringMap(m[trim])
+	}
+	if m != nil {
+		return flattenMap(m, "")
+	}
+	return nil
+}
+
+func flattenMap(m map[string]interface{}, prefix string) []ParameterPair {
+	if prefix != "" {
+		prefix += delimiterDot
+	}
+
+	r := make([]ParameterPair, 0)
+	for k, val := range m {
+		fullKey := prefix + k
+		switch m2 := val.(type) {
+		case map[string]interface{}:
+			r = append(r, flattenMap(m2, fullKey)...)
+		default:
+			r = append(r, ParameterPair{
+				Key:   fullKey,
+				Value: cast.ToString(val),
+			})
+		}
+	}
+	return r
+}
+
+func generateUpdateKeyParam(files map[string]interface{}, trimPrefix string, updatedType ParameterUpdateType, sets *set.LinkedHashSetString) []VisualizedParam {
+	r := make([]VisualizedParam, 0, len(files))
+
+	for key, params := range files {
+		if sets != nil && sets.Length() > 0 && !sets.InArray(key) {
+			continue
+		}
+		if params := checkAndFlattenMap(params, trimPrefix); params != nil {
+			r = append(r, VisualizedParam{
+				Key:        key,
+				Parameters: params,
+				UpdateType: updatedType,
+			})
+		}
+	}
+	return r
+}
+
+// isQuotesString check whether a string is quoted.
+func isQuotesString(str string) bool {
+	const (
+		singleQuotes = '\''
+		doubleQuotes = '"'
+	)
+
+	if len(str) < 2 {
+		return false
+	}
+
+	firstChar := str[0]
+	lastChar := str[len(str)-1]
+	return (firstChar == singleQuotes && lastChar == singleQuotes) || (firstChar == doubleQuotes && lastChar == doubleQuotes)
 }

@@ -8,9 +8,44 @@ on:
     tags-ignore:
       - '*'
 
+env:
+  GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+
 
 jobs:
+  pre-push:
+    runs-on: ubuntu-latest
+    name: Push Pre-Check
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 2
+      - name: install pcregrep
+        run: |
+          sudo apt-get update
+          sudo apt-get install pcregrep
+
+      - name: gen pcregrep
+        run: |
+          pcregrep --exclude-dir=mtr -r -n -I '[^\x00-\x7f]' . > pcregrep.out
+
+      - name: pcregrep Chinese
+        run: |
+          FILE_PATH=`git diff --name-only HEAD HEAD^`
+          
+          python ${{ github.workspace }}/.github/utils/pcregrep.py \
+            --source="${{ github.workspace }}/pcregrep.out" \
+            --filter="$FILE_PATH"
+
+      - name: Spell Check with Typos
+        uses: crate-ci/typos@v1.13.14
+        with:
+          files: ${{ github.workspace }}/docs/
+          config: ${{ github.workspace }}/.github/utils/typos.toml
+
+
   make-test:
+    needs: pre-push
     runs-on: [self-hosted, eks-fargate-runner ]
     steps:
       - uses: apecloud/checkout@main
@@ -29,8 +64,7 @@ jobs:
           mkdir -p ./bin
           cp -r /go/bin/controller-gen ./bin/controller-gen
           cp -r /go/bin/setup-envtest ./bin/setup-envtest
-          make mod-vendor
-          make lint
+          make mod-vendor lint
 
       - name: make test
         run: |

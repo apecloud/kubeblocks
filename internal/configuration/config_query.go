@@ -23,13 +23,13 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 )
 
 // GetParameterFromConfiguration get configure parameter
 // ctx: apiserver context
 // cli: apiserver client
-// cluster: dbaasv1alpha1.Cluster
+// cluster: appsv1alpha1.Cluster
 // component: component name
 func GetParameterFromConfiguration(configMap *corev1.ConfigMap, allFiles bool, fieldPath ...string) ([]string, error) {
 	if configMap == nil || len(configMap.Data) == 0 {
@@ -40,7 +40,7 @@ func GetParameterFromConfiguration(configMap *corev1.ConfigMap, allFiles bool, f
 	wrapCfg, err := NewConfigLoader(CfgOption{
 		Type:    CfgCmType,
 		Log:     log.FromContext(context.Background()),
-		CfgType: dbaasv1alpha1.INI,
+		CfgType: appsv1alpha1.Ini,
 		K8sKey: &K8sConfig{
 			ResourceFn: func(key client.ObjectKey) (map[string]string, error) {
 				return configMap.Data, nil

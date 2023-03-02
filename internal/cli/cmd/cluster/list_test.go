@@ -33,7 +33,7 @@ import (
 	clientfake "k8s.io/client-go/rest/fake"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 
-	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 )
@@ -54,7 +54,7 @@ var _ = Describe("list", func() {
 		streams, _, out, _ = genericclioptions.NewTestIOStreams()
 		tf = testing.NewTestFactory(namespace)
 
-		_ = dbaasv1alpha1.AddToScheme(scheme.Scheme)
+		_ = appsv1alpha1.AddToScheme(scheme.Scheme)
 		codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 		cluster := testing.FakeCluster(clusterName, namespace)
 		pods := testing.FakePods(3, namespace, clusterName)
@@ -68,7 +68,7 @@ var _ = Describe("list", func() {
 			Client: clientfake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 				urlPrefix := "/api/v1/namespaces/" + namespace
 				return map[string]*http.Response{
-					"/namespaces/" + namespace + "/clusters":      httpResp(&dbaasv1alpha1.ClusterList{Items: []dbaasv1alpha1.Cluster{*cluster}}),
+					"/namespaces/" + namespace + "/clusters":      httpResp(&appsv1alpha1.ClusterList{Items: []appsv1alpha1.Cluster{*cluster}}),
 					"/namespaces/" + namespace + "/clusters/test": httpResp(cluster),
 					"/namespaces/" + namespace + "/secrets":       httpResp(testing.FakeSecrets(namespace, clusterName)),
 					"/api/v1/nodes/" + testing.NodeName:           httpResp(testing.FakeNode()),
@@ -121,7 +121,7 @@ var _ = Describe("list", func() {
 	})
 
 	It("list users", func() {
-		cmd := NewListUsersCmd(tf, streams)
+		cmd := NewListAccountsCmd(tf, streams)
 		Expect(cmd).ShouldNot(BeNil())
 
 		cmd.Run(cmd, []string{"test"})

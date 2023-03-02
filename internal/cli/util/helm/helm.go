@@ -23,25 +23,31 @@ import (
 	"io"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
 
+	"github.com/Masterminds/semver/v3"
 	"github.com/containers/common/pkg/retry"
 	"github.com/ghodss/yaml"
 	"github.com/pkg/errors"
+	"github.com/spf13/pflag"
 	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/chart/loader"
 	"helm.sh/helm/v3/pkg/chartutil"
 	"helm.sh/helm/v3/pkg/cli"
 	"helm.sh/helm/v3/pkg/cli/values"
 	"helm.sh/helm/v3/pkg/getter"
+	"helm.sh/helm/v3/pkg/helmpath"
 	kubefake "helm.sh/helm/v3/pkg/kube/fake"
 	"helm.sh/helm/v3/pkg/registry"
 	"helm.sh/helm/v3/pkg/release"
 	"helm.sh/helm/v3/pkg/repo"
 	"helm.sh/helm/v3/pkg/storage"
 	"helm.sh/helm/v3/pkg/storage/driver"
+
+	"github.com/apecloud/kubeblocks/internal/cli/types"
 )
 
 const defaultTimeout = time.Second * 600
@@ -50,12 +56,12 @@ type InstallOpts struct {
 	Name            string
 	Chart           string
 	Namespace       string
-	Sets            []string
 	Wait            bool
 	Version         string
 	TryTimes        int
 	Login           bool
 	CreateNamespace bool
+	ValueOpts       *values.Options
 	Timeout         time.Duration
 }
 
@@ -83,15 +89,15 @@ func AddRepo(r *repo.Entry) error {
 
 	// Check if the repo Name is legal
 	if strings.Contains(r.Name, "/") {
-		return errors.Errorf("repository Name (%s) contains '/', please specify a different Name without '/'", r.Name)
+		return errors.Errorf("repository name (%s) contains '/', please specify a different name without '/'", r.Name)
 	}
 
 	if f.Has(r.Name) {
 		existing := f.Get(r.Name)
-		if *r != *existing {
+		if *r != *existing && r.Name != types.KubeBlocksChartName {
 			// The input coming in for the Name is different from what is already
 			// configured. Return an error.
-			return errors.Errorf("repository Name (%s) already exists, please specify a different Name", r.Name)
+			return errors.Errorf("repository name (%s) already exists, please specify a different name", r.Name)
 		}
 	}
 
@@ -106,7 +112,7 @@ func AddRepo(r *repo.Entry) error {
 
 	f.Update(r)
 
-	if err := f.WriteFile(repoFile, 0644); err != nil {
+	if err = f.WriteFile(repoFile, 0644); err != nil {
 		return err
 	}
 	return nil
@@ -208,12 +214,8 @@ func (i *InstallOpts) tryInstall(cfg *action.Configuration) (string, error) {
 		return "", err
 	}
 
-	setOpts := values.Options{
-		Values: i.Sets,
-	}
-
 	p := getter.All(settings)
-	vals, err := setOpts.MergeValues(p)
+	vals, err := i.ValueOpts.MergeValues(p)
 	if err != nil {
 		return "", err
 	}
@@ -379,12 +381,8 @@ func (i *InstallOpts) tryUpgrade(cfg *action.Configuration) (string, error) {
 		return "", err
 	}
 
-	setOpts := values.Options{
-		Values: i.Sets,
-	}
-
 	p := getter.All(settings)
-	vals, err := setOpts.MergeValues(p)
+	vals, err := i.ValueOpts.MergeValues(p)
 	if err != nil {
 		return "", err
 	}
@@ -431,4 +429,72 @@ func (i *InstallOpts) tryUpgrade(cfg *action.Configuration) (string, error) {
 		return "", err
 	}
 	return released.Info.Notes, nil
+}
+
+func GetChartVersions(chartName string) ([]*semver.Version, error) {
+	settings := cli.New()
+	rf, err := repo.LoadFile(settings.RepositoryConfig)
+	if err != nil {
+		if os.IsNotExist(errors.Cause(err)) {
+			return nil, nil
+		} else {
+			return nil, err
+		}
+	}
+
+	var ind *repo.IndexFile
+	for _, re := range rf.Repositories {
+		n := re.Name
+		if n != types.KubeBlocksRepoName {
+			continue
+		}
+
+		// load index file
+		f := filepath.Join(settings.RepositoryCache, helmpath.CacheIndexFile(n))
+		ind, err = repo.LoadIndexFile(f)
+		if err != nil {
+			return nil, err
+		}
+		break
+	}
+
+	// do not find any index file
+	if ind == nil {
+		return nil, nil
+	}
+
+	var versions []*semver.Version
+	for chart, entry := range ind.Entries {
+		if len(entry) == 0 || chart != chartName {
+			continue
+		}
+		for _, v := range entry {
+			ver, err := semver.NewVersion(v.Version)
+			if err != nil {
+				return nil, err
+			}
+			versions = append(versions, ver)
+		}
+	}
+	return versions, nil
+}
+
+// AddValueOptionsFlags add helm value flags
+func AddValueOptionsFlags(f *pflag.FlagSet, v *values.Options) {
+	f.StringSliceVarP(&v.ValueFiles, "values", "f", []string{}, "Specify values in a YAML file or a URL (can specify multiple)")
+	f.StringArrayVar(&v.Values, "set", []string{}, "Set values on the command line (can specify multiple or separate values with commas: key1=val1,key2=val2)")
+	f.StringArrayVar(&v.StringValues, "set-string", []string{}, "Set STRING values on the command line (can specify multiple or separate values with commas: key1=val1,key2=val2)")
+	f.StringArrayVar(&v.FileValues, "set-file", []string{}, "Set values from respective files specified via the command line (can specify multiple or separate values with commas: key1=path1,key2=path2)")
+	f.StringArrayVar(&v.JSONValues, "set-json", []string{}, "Set JSON values on the command line (can specify multiple or separate values with commas: key1=jsonval1,key2=jsonval2)")
+}
+
+func ValueOptsIsEmpty(valueOpts *values.Options) bool {
+	if valueOpts == nil {
+		return true
+	}
+	return len(valueOpts.ValueFiles) == 0 &&
+		len(valueOpts.StringValues) == 0 &&
+		len(valueOpts.Values) == 0 &&
+		len(valueOpts.FileValues) == 0 &&
+		len(valueOpts.JSONValues) == 0
 }

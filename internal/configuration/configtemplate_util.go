@@ -17,11 +17,15 @@ limitations under the License.
 package configuration
 
 import (
-	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	"context"
+
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 )
 
 type ComponentsType interface {
-	dbaasv1alpha1.ClusterVersionComponent | dbaasv1alpha1.ClusterDefinitionComponent | dbaasv1alpha1.ClusterComponent
+	appsv1alpha1.ClusterComponentVersion | appsv1alpha1.ClusterComponentDefinition | appsv1alpha1.ClusterComponentSpec
 }
 
 type filterFn[T ComponentsType] func(o T) bool
@@ -37,12 +41,12 @@ func filter[T ComponentsType](components []T, f filterFn[T]) *T {
 
 // GetConfigTemplatesFromComponent returns ConfigTemplate list used by the component.
 func GetConfigTemplatesFromComponent(
-	cComponents []dbaasv1alpha1.ClusterComponent,
-	dComponents []dbaasv1alpha1.ClusterDefinitionComponent,
-	aComponents []dbaasv1alpha1.ClusterVersionComponent,
-	componentName string) ([]dbaasv1alpha1.ConfigTemplate, error) {
-	findCompTypeByName := func(comName string) *dbaasv1alpha1.ClusterComponent {
-		return filter(cComponents, func(o dbaasv1alpha1.ClusterComponent) bool {
+	cComponents []appsv1alpha1.ClusterComponentSpec,
+	dComponents []appsv1alpha1.ClusterComponentDefinition,
+	aComponents []appsv1alpha1.ClusterComponentVersion,
+	componentName string) ([]appsv1alpha1.ConfigTemplate, error) {
+	findCompTypeByName := func(comName string) *appsv1alpha1.ClusterComponentSpec {
+		return filter(cComponents, func(o appsv1alpha1.ClusterComponentSpec) bool {
 			return o.Name == comName
 		})
 	}
@@ -51,16 +55,16 @@ func GetConfigTemplatesFromComponent(
 	if cCom == nil {
 		return nil, MakeError("failed to find component[%s]", componentName)
 	}
-	aCom := filter(aComponents, func(o dbaasv1alpha1.ClusterVersionComponent) bool {
-		return o.Type == cCom.Type
+	aCom := filter(aComponents, func(o appsv1alpha1.ClusterComponentVersion) bool {
+		return o.ComponentDefRef == cCom.ComponentDefRef
 	})
-	dCom := filter(dComponents, func(o dbaasv1alpha1.ClusterDefinitionComponent) bool {
-		return o.TypeName == cCom.Type
+	dCom := filter(dComponents, func(o appsv1alpha1.ClusterComponentDefinition) bool {
+		return o.Name == cCom.ComponentDefRef
 	})
 
 	var (
-		avTpls []dbaasv1alpha1.ConfigTemplate
-		cdTpls []dbaasv1alpha1.ConfigTemplate
+		avTpls []appsv1alpha1.ConfigTemplate
+		cdTpls []appsv1alpha1.ConfigTemplate
 	)
 
 	if aCom != nil {
@@ -73,9 +77,9 @@ func GetConfigTemplatesFromComponent(
 	return MergeConfigTemplates(avTpls, cdTpls), nil
 }
 
-// MergeConfigTemplates merge ClusterVersion.Components[*].ConfigTemplateRefs and ClusterDefinition.Components[*].ConfigTemplateRefs
-func MergeConfigTemplates(clusterVersionTpl []dbaasv1alpha1.ConfigTemplate,
-	cdTpl []dbaasv1alpha1.ConfigTemplate) []dbaasv1alpha1.ConfigTemplate {
+// MergeConfigTemplates merge ClusterVersion.ComponentDefs[*].ConfigTemplateRefs and ClusterDefinition.ComponentDefs[*].ConfigTemplateRefs
+func MergeConfigTemplates(clusterVersionTpl []appsv1alpha1.ConfigTemplate,
+	cdTpl []appsv1alpha1.ConfigTemplate) []appsv1alpha1.ConfigTemplate {
 	if len(clusterVersionTpl) == 0 {
 		return cdTpl
 	}
@@ -84,28 +88,53 @@ func MergeConfigTemplates(clusterVersionTpl []dbaasv1alpha1.ConfigTemplate,
 		return clusterVersionTpl
 	}
 
-	mergedCfgTpl := make([]dbaasv1alpha1.ConfigTemplate, 0, len(clusterVersionTpl)+len(cdTpl))
+	mergedCfgTpl := make([]appsv1alpha1.ConfigTemplate, 0, len(clusterVersionTpl)+len(cdTpl))
 	mergedTplMap := make(map[string]struct{}, cap(mergedCfgTpl))
 
 	for _, tpl := range clusterVersionTpl {
-		volumeName := tpl.VolumeName
-		if _, ok := (mergedTplMap)[volumeName]; ok {
+		tplName := tpl.Name
+		if _, ok := (mergedTplMap)[tplName]; ok {
 			// It's been checked in validation webhook
 			continue
 		}
 		mergedCfgTpl = append(mergedCfgTpl, tpl)
-		mergedTplMap[volumeName] = struct{}{}
+		mergedTplMap[tplName] = struct{}{}
 	}
 
 	for _, tpl := range cdTpl {
 		// ClusterVersion replace clusterDefinition
-		volumeName := tpl.VolumeName
-		if _, ok := (mergedTplMap)[volumeName]; ok {
+		tplName := tpl.Name
+		if _, ok := (mergedTplMap)[tplName]; ok {
 			continue
 		}
 		mergedCfgTpl = append(mergedCfgTpl, tpl)
-		mergedTplMap[volumeName] = struct{}{}
+		mergedTplMap[tplName] = struct{}{}
 	}
 
 	return mergedCfgTpl
+}
+
+func GetClusterVersionResource(cvName string, cv *appsv1alpha1.ClusterVersion, cli client.Client, ctx context.Context) error {
+	if cvName == "" {
+		return nil
+	}
+	if err := cli.Get(ctx, client.ObjectKey{
+		Namespace: "",
+		Name:      cvName,
+	}, cv); err != nil {
+		return WrapError(err, "failed to get clusterversion[%s]", cvName)
+	}
+	return nil
+}
+
+func CheckConfigTemplateReconfigureKey(tpl appsv1alpha1.ConfigTemplate, key string) bool {
+	if len(tpl.Keys) == 0 {
+		return true
+	}
+	for _, keySelector := range tpl.Keys {
+		if keySelector == key {
+			return true
+		}
+	}
+	return false
 }

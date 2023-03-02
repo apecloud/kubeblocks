@@ -20,6 +20,8 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 )
 
 const (
@@ -36,7 +38,7 @@ const (
 	GoosWindows = "windows"
 
 	// Group api group
-	Group = "dbaas.kubeblocks.io"
+	Group = "apps.kubeblocks.io"
 
 	// AppsGroup k8s apps group
 	AppsGroup = "apps"
@@ -77,18 +79,9 @@ const (
 	KindCM                   = "ConfigMap"
 	KindSTS                  = "StatefulSet"
 
-	NameLabelKey                   = "app.kubernetes.io/name"
-	InstanceLabelKey               = "app.kubernetes.io/instance"
-	ConsensusSetAccessModeLabelKey = "cs.dbaas.kubeblocks.io/access-mode"
-	ComponentLabelKey              = "app.kubernetes.io/component-name"
-	RegionLabelKey                 = "topology.kubernetes.io/region"
-	ZoneLabelKey                   = "topology.kubernetes.io/zone"
-	ClusterDefLabelKey             = "clusterdefinition.kubeblocks.io/name"
-	RoleLabelKey                   = "kubeblocks.io/role"
-
-	ServiceLBTypeAnnotationKey     = "service.kubernetes.io/apecloud-loadbalancer-type"
+	ServiceLBTypeAnnotationKey     = "service.kubernetes.io/kubeblocks-loadbalancer-type"
 	ServiceLBTypeAnnotationValue   = "private-ip"
-	ServiceFloatingIPAnnotationKey = "service.kubernetes.io/apecloud-loadbalancer-floating-ip"
+	ServiceFloatingIPAnnotationKey = "service.kubernetes.io/kubeblocks-loadbalancer-floating-ip"
 	StorageClassAnnotationKey      = "kubeblocks.io/storage-class"
 
 	// DataProtection definitions
@@ -104,7 +97,10 @@ const (
 )
 
 var (
-	// KubeBlocksChartName helm name for installing kubeblocks
+	// KubeBlocksRepoName helm repo name for kubeblocks
+	KubeBlocksRepoName = "kubeblocks"
+
+	// KubeBlocksChartName helm chart name for kubeblocks
 	KubeBlocksChartName = "kubeblocks"
 
 	// KubeBlocksChartURL the helm chart repo for installing kubeblocks
@@ -132,6 +128,12 @@ type BackupSnapInfo struct {
 	SourcePVC     string
 	SnapshotClass string
 	Labels        string
+}
+
+type ConfigTemplateInfo struct {
+	Name  string
+	TPL   appsv1alpha1.ConfigTemplate
+	CMObj *corev1.ConfigMap
 }
 
 func ClusterGVR() schema.GroupVersionResource {
@@ -170,12 +172,28 @@ func CRDGVR() schema.GroupVersionResource {
 	}
 }
 
-func CMGVR() schema.GroupVersionResource {
+func ConfigmapGVR() schema.GroupVersionResource {
 	return schema.GroupVersionResource{Group: corev1.GroupName, Version: VersionV1, Resource: ResourceConfigmaps}
 }
 
-func STSGVR() schema.GroupVersionResource {
+func StatefulSetGVR() schema.GroupVersionResource {
 	return schema.GroupVersionResource{Group: appsv1.GroupName, Version: VersionV1, Resource: ResourceStatefulSets}
+}
+
+func DeployGVR() schema.GroupVersionResource {
+	return schema.GroupVersionResource{Group: appsv1.GroupName, Version: VersionV1, Resource: ResourceDeployments}
+}
+
+func ServiceGVR() schema.GroupVersionResource {
+	return schema.GroupVersionResource{Group: corev1.GroupName, Version: VersionV1, Resource: "services"}
+}
+
+func PVCGVR() schema.GroupVersionResource {
+	return schema.GroupVersionResource{Group: corev1.GroupName, Version: VersionV1, Resource: "persistentvolumeclaims"}
+}
+
+func PVGVR() schema.GroupVersionResource {
+	return schema.GroupVersionResource{Group: corev1.GroupName, Version: VersionV1, Resource: "persistentvolumes"}
 }
 
 func ConfigConstraintGVR() schema.GroupVersionResource {

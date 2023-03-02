@@ -1,10 +1,10 @@
-apiVersion: dbaas.kubeblocks.io/v1alpha1
+apiVersion: apps.kubeblocks.io/v1alpha1
 kind: Cluster
 metadata:
   name: {{ .Release.Name }}
   labels: {{ include "postgresqlcluster.labels" . | nindent 4 }}
 spec:
-  clusterDefinitionRef: apecloud-postgresql # ref clusterdefinition.name
+  clusterDefinitionRef: postgresql # ref clusterdefinition.name
   clusterVersionRef: postgresql-{{ default .Chart.AppVersion .Values.clusterVersionOverride }} # ref clusterversion.name
   terminationPolicy: {{ .Values.terminationPolicy }}
   affinity:
@@ -14,10 +14,12 @@ spec:
   {{- with $.Values.tolerations }}
   tolerations: {{ . | toYaml | nindent 4 }}
   {{- end }}
-  components:
+  componentSpecs:
     - name: postgresql # user-defined
-      type: postgresql # ref clusterdefinition components.typename
+      componentDefRef: postgresql # ref clusterdefinition components.name
       monitor: {{ .Values.monitor.enabled | default false }}
+      replicas: {{ .Values.replicaCount | default 1 }}
+      enabledLogs: {{ .Values.enabledLogs | toJson | indent 4 }}
       {{- with  .Values.resources }}
       resources:
         {{- with .limits }}

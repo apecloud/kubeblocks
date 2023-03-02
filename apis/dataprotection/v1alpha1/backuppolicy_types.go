@@ -32,7 +32,7 @@ type BackupPolicySpec struct {
 	// +optional
 	Schedule string `json:"schedule,omitempty"`
 
-	// Backup Type. full or incremental or snapshot. if unset, default is snapshot.
+	// Backup ComponentDefRef. full or incremental or snapshot. if unset, default is snapshot.
 	// +kubebuilder:validation:Enum={full,incremental,snapshot}
 	// +kubebuilder:default=snapshot
 	// +optional
@@ -112,7 +112,6 @@ type BackupPolicyHook struct {
 	PostCommands []string `json:"postCommands,omitempty"`
 
 	// exec command with image
-	// +kubebuilder:default="docker.io/apecloud/kubeblocks"
 	// +optional
 	Image string `json:"image,omitempty"`
 
@@ -157,7 +156,7 @@ type BackupPolicy struct {
 	Status BackupPolicyStatus `json:"status,omitempty"`
 }
 
-//+kubebuilder:object:root=true
+// +kubebuilder:object:root=true
 
 // BackupPolicyList contains a list of BackupPolicy
 type BackupPolicyList struct {

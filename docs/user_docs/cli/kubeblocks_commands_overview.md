@@ -1,4 +1,10 @@
-# KubeBlcoks commands overview
+---
+title: KubeBlocks commands overview
+description: KubeBlocks commands overview, CLI
+sidebar_position: 1
+---
+
+# KubeBlocks commands overview
 
 This section lists all the KubeBlocks commands for configuring and managing a database cluster. 
 

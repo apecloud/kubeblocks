@@ -31,10 +31,17 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	dynamicfakeclient "k8s.io/client-go/dynamic/fake"
+	"k8s.io/client-go/kubernetes/scheme"
+	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
+	"github.com/apecloud/kubeblocks/test/testdata"
 )
 
 var _ = Describe("util", func() {
@@ -98,13 +105,6 @@ var _ = Describe("util", func() {
 		spinner(false)
 	})
 
-	It("Check errors", func() {
-		CheckErr(nil)
-
-		err := fmt.Errorf("test error")
-		printErr(err)
-	})
-
 	It("GetNodeByName", func() {
 		nodes := []*corev1.Node{
 			{
@@ -159,7 +159,7 @@ var _ = Describe("util", func() {
 		Expect(BuildLabelSelectorByNames("", nil)).Should(Equal(""))
 
 		names := []string{"n1", "n2"}
-		expected := fmt.Sprintf("%s in (%s)", types.InstanceLabelKey, strings.Join(names, ","))
+		expected := fmt.Sprintf("%s in (%s)", intctrlutil.AppInstanceLabelKey, strings.Join(names, ","))
 		Expect(BuildLabelSelectorByNames("", names)).Should(Equal(expected))
 		Expect(BuildLabelSelectorByNames("label1", names)).Should(Equal("label1," + expected))
 	})
@@ -182,11 +182,6 @@ var _ = Describe("util", func() {
 		Expect(SetKubeConfig("test")).Should(Succeed())
 		Expect(NewFactory()).ShouldNot(BeNil())
 
-		By("playground dir")
-		dir, err := PlaygroundDir()
-		Expect(err).ShouldNot(HaveOccurred())
-		Expect(dir).ShouldNot(Equal(""))
-
 		By("resource is empty")
 		res := resource.Quantity{}
 		Expect(ResourceIsEmpty(&res)).Should(BeTrue())
@@ -195,6 +190,62 @@ var _ = Describe("util", func() {
 
 		By("GVRToString")
 		Expect(len(GVRToString(types.ClusterGVR())) > 0).Should(BeTrue())
+	})
+
+	It("IsSupportConfigureParams", func() {
+		const (
+			ccName = "mysql_cc"
+			testNS = "default"
+		)
+
+		configConstraintObj := testapps.NewCustomizedObj("resources/mysql_config_template.yaml",
+			&appsv1alpha1.ConfigConstraint{}, testapps.WithNamespacedName(ccName, ""), func(cc *appsv1alpha1.ConfigConstraint) {
+				if ccContext, err := testdata.GetTestDataFileContent("/cue_testdata/mysql_for_cli.cue"); err == nil {
+					cc.Spec.ConfigurationSchema = &appsv1alpha1.CustomParametersValidation{
+						CUE: string(ccContext),
+					}
+				}
+			})
+
+		tf := cmdtesting.NewTestFactory().WithNamespace(testNS)
+		defer tf.Cleanup()
+
+		Expect(appsv1alpha1.AddToScheme(scheme.Scheme)).Should(Succeed())
+		mockClient := dynamicfakeclient.NewSimpleDynamicClientWithCustomListKinds(scheme.Scheme, nil, configConstraintObj)
+		tpl := appsv1alpha1.ConfigTemplate{
+			Name:                "for_test",
+			ConfigConstraintRef: ccName,
+			ConfigTplRef:        ccName,
+			VolumeName:          "config",
+		}
+
+		type args struct {
+			tpl           appsv1alpha1.ConfigTemplate
+			updatedParams map[string]string
+		}
+		tests := []struct {
+			name     string
+			args     args
+			expected bool
+		}{{
+			name: "normal test",
+			args: args{
+				tpl:           tpl,
+				updatedParams: testapps.WithMap("automatic_sp_privileges", "OFF", "innodb_autoinc_lock_mode", "1"),
+			},
+			expected: true,
+		}, {
+			name: "not match test",
+			args: args{
+				tpl:           tpl,
+				updatedParams: testapps.WithMap("not_exist_field", "1"),
+			},
+			expected: false,
+		}}
+
+		for _, tt := range tests {
+			Expect(IsSupportConfigureParams(tt.args.tpl, tt.args.updatedParams, mockClient)).Should(BeEquivalentTo(tt.expected))
+		}
 	})
 
 	It("get IP location", func() {

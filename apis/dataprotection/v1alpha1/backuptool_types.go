@@ -27,15 +27,6 @@ type BackupToolSpec struct {
 	// +kubebuilder:validation:Required
 	Image string `json:"image"`
 
-	// database engine to support in the backup.
-	// +kubebuilder:validation:Enum={mysql}
-	DatabaseEngine string `json:"databaseEngine,omitempty"`
-
-	// database engine to support in the backup.
-	// +kubebuilder:validation:Enum={"5.6","5.7","8.0"}
-	// +listType=set
-	DatabaseEngineVersions []string `json:"databaseEngineVersions,omitempty"`
-
 	// which kind for run a backup tool.
 	// +kubebuilder:validation:Enum={job,daemon}
 	// +kubebuilder:default=job
@@ -62,13 +53,13 @@ type BackupToolSpec struct {
 	// +optional
 	EnvFrom []corev1.EnvFromSource `json:"envFrom,omitempty"`
 
-	// Array of command that dbaas can do database backup.
+	// Array of command that apps can do database backup.
 	// from invoke args
 	// the order of commands follows the order of array.
 	// +kubebuilder:validation:Required
 	BackupCommands []string `json:"backupCommands"`
 
-	// Array of command that dbaas can do database incremental backup.
+	// Array of command that apps can do database incremental backup.
 	// like xtrabackup, that can performs an incremental backup file.
 	// +optional
 	IncrementalBackupCommands []string `json:"incrementalBackupCommands,omitempty"`
@@ -84,7 +75,7 @@ type BackupToolSpec struct {
 
 // BackupToolRestoreCommand defines the restore commands of BackupTool
 type BackupToolRestoreCommand struct {
-	// Array of command that dbaas can perform database restore.
+	// Array of command that apps can perform database restore.
 	// like xtrabackup, that can performs restore mysql from files.
 	// +optional
 	RestoreCommands []string `json:"restoreCommands"`
@@ -112,7 +103,7 @@ type BackupTool struct {
 	Status BackupToolStatus `json:"status,omitempty"`
 }
 
-//+kubebuilder:object:root=true
+// +kubebuilder:object:root=true
 
 // BackupToolList contains a list of BackupTool
 type BackupToolList struct {

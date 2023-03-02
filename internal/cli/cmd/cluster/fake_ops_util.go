@@ -17,7 +17,6 @@ limitations under the License.
 package cluster
 
 import (
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
@@ -25,14 +24,12 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 
-	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/create"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
-	testutil "github.com/apecloud/kubeblocks/internal/testutil/k8s"
-	"github.com/apecloud/kubeblocks/test/testdata"
 )
 
-func NewFakeOperationsOptions(ns, cName string, opsType dbaasv1alpha1.OpsType, objs ...runtime.Object) (*cmdtesting.TestFactory, *OperationsOptions) {
+func NewFakeOperationsOptions(ns, cName string, opsType appsv1alpha1.OpsType, objs ...runtime.Object) (*cmdtesting.TestFactory, *OperationsOptions) {
 	streams, _, _, _ := genericclioptions.NewTestIOStreams()
 	tf := cmdtesting.NewTestFactory().WithNamespace(ns)
 	o := &OperationsOptions{
@@ -45,7 +42,7 @@ func NewFakeOperationsOptions(ns, cName string, opsType dbaasv1alpha1.OpsType, o
 		OpsType:                opsType,
 	}
 
-	err := dbaasv1alpha1.AddToScheme(scheme.Scheme)
+	err := appsv1alpha1.AddToScheme(scheme.Scheme)
 	if err != nil {
 		panic(err)
 	}
@@ -62,31 +59,4 @@ func NewFakeOperationsOptions(ns, cName string, opsType dbaasv1alpha1.OpsType, o
 	}
 	o.Client = dynamicfakeclient.NewSimpleDynamicClientWithCustomListKinds(scheme.Scheme, listMapping, objs...)
 	return tf, o
-}
-
-func NewFakeClusterResource(namer testutil.ResourceNamer, componentName, componentType string, options ...testdata.ResourceOptions) testutil.CreateResourceObject {
-	return func() runtime.Object {
-		cluster := &dbaasv1alpha1.Cluster{
-			TypeMeta: metav1.TypeMeta{
-				APIVersion: dbaasv1alpha1.APIVersion,
-				Kind:       dbaasv1alpha1.ClusterKind,
-			},
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      namer.ClusterName,
-				Namespace: namer.NS,
-			},
-			Spec: dbaasv1alpha1.ClusterSpec{
-				ClusterDefRef:     namer.CDName,
-				ClusterVersionRef: namer.CVName,
-				Components: []dbaasv1alpha1.ClusterComponent{{
-					Name: componentName,
-					Type: componentType,
-				}},
-			},
-		}
-		for _, option := range options {
-			option(cluster)
-		}
-		return cluster
-	}
 }

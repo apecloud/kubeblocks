@@ -9,7 +9,7 @@ metadata:
 
 spec:
   # backup tool image
-  image: percona/percona-xtrabackup
+  image: registry.cn-hangzhou.aliyuncs.com/apecloud/percona-xtrabackup
 
   # database engine to support in the backup.
   # Required.
@@ -70,14 +70,14 @@ spec:
     # Optional
     incrementalRestoreCommands: [ ]
 
-  # Array of command that dbaas can do database backup.
+  # Array of command that apps can do database backup.
   # from invoke args
   # the order of commands follows the order of array.
   backupCommands:
     - #echo "DB_HOST=${DB_HOST} DB_USER=${DB_USER} DB_PASSWORD=${DB_PASSWORD} DATA_DIR=${DATA_DIR} BACKUP_DIR=${BACKUP_DIR} BACKUP_NAME=${BACKUP_NAME}";
       xtrabackup --compress --backup  --safe-slave-backup --slave-info --stream=xbstream --host=${DB_HOST} --user=${DB_USER} --datadir=${DATA_DIR} > /${BACKUP_DIR}/${BACKUP_NAME}.xbstream
 
-  # Array of command that dbaas can do database incremental backup.
+  # Array of command that apps can do database incremental backup.
   # like xtrabackup, that can performs an incremental backup file.
   # Required if spec.backupType is defined "incremental".
   # Optional

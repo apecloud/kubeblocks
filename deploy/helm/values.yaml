@@ -1,39 +1,84 @@
-# Default values for kubeblocks
-# This is a YAML-formatted file.
-# Declare variables to be passed into your templates.
+## @section Common parameters
+##
 
-# Enabled this if you wish to install controller deployment
-replicaCount: 1
-
+## KubeBlocks container image settings
+##
+## @param image.registry KubeBlocks image registry
+## @param image.repository KubeBlocks image repository
+## @param image.pullPolicy KubeBlocks image pull policy
+## @param image.tag KubeBlocks image tag (immutable tags are recommended)
+## @param image.imagePullSecrets KubeBlocks image pull secrets
 image:
-  repository: docker.io/apecloud/kubeblocks
+  registry: registry.cn-hangzhou.aliyuncs.com
+  repository: apecloud/kubeblocks
   pullPolicy: IfNotPresent
   # Overrides the image tag whose default is the chart appVersion.
   tag: ""
+  imagePullSecrets: []
 
-# runtime:
-  # cri type: auto/containerd/docker
-  # criType: auto
-  # /var/run/docker.sock
-  # runtimeEndpoint:
+## @param replicaCount
+##
+replicaCount: 1
 
-imagePullSecrets: []
+## @param nameOverride
+##
 nameOverride: ""
+
+## @param fullnameOverride
+##
 fullnameOverride: ""
 
+## Deployment update strategy.
+## Ref: https://kubernetes.io/docs/concepts/workloads/controllers/deployment/#strategy
+##
+## @param updateStrategy.rollingUpdate
+## @param updateStrategy.type
+updateStrategy:
+  rollingUpdate:
+    maxSurge: 1
+    maxUnavailable: 40%
+  type: RollingUpdate
+
+## Change `hostNetwork` to `true` when you want the KubeBlocks's pod to share its host's network namespace.
+## Useful for situations like when you end up dealing with a custom CNI over Amazon EKS.
+## Update the `dnsPolicy` accordingly as well to suit the host network mode.
+##
+## @param hostNetwork
+##
+hostNetwork: false
+
+## `dnsPolicy` determines the manner in which DNS resolution happens in the cluster.
+## In case of `hostNetwork: true`, usually, the `dnsPolicy` is suitable to be `ClusterFirstWithHostNet`.
+## For further reference: https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/#pod-s-dns-policy.
+##
+## @param dnsPolicy
+##
+dnsPolicy: ClusterFirst
+
+## Logger settings
+##
+## @param loggerSettings.developmentMode
+## @param loggerSettings.encoder
+## @param loggerSettings.level
+## @param loggerSettings.timeEncoding
 loggerSettings:
   # Development Mode defaults(encoder=consoleEncoder,logLevel=Debug,stackTraceLevel=Warn).
   # Production Mode defaults(encoder=jsonEncoder,logLevel=Info,stackTraceLevel=Error) (default false)
   developmentMode: false
   # log encoding (one of 'json' or 'console')
   encoder: console
-  # log level, can be one of 'debug', 'info', 'error', or any integer value > 0 
+  # log level, can be one of 'debug', 'info', 'error', or any integer value > 0
   # which corresponds to custom debug levels of increasing verbosity.
   level:
-  # Zap time encoding (one of 'epoch', 'millis', 'nano', 'iso8601', 'rfc3339' or 
+  # Zap time encoding (one of 'epoch', 'millis', 'nano', 'iso8601', 'rfc3339' or
   # 'rfc3339nano'). Defaults to 'iso8601'.
   timeEncoding: 'iso8601'
 
+## ServiceAccount settings
+##
+## @param serviceAccount.create
+## @param serviceAccount.annotations
+## @param serviceAccount.name
 serviceAccount:
   # Specifies whether a service account should be created
   create: true
@@ -43,14 +88,27 @@ serviceAccount:
   # If not set and create is true, a name is generated using the fullname template
   name: ""
 
+## @param podAnnotations
+##
 podAnnotations: {}
 
+## Security context settings
+##
+## @param securityContext.allowPrivilegeEscalation
+## @param securityContext.capabilities
 securityContext:
   allowPrivilegeEscalation: false
   capabilities:
     drop:
     - ALL
 
+## Pod security context settings
+##
+## @param podSecurityContext.runAsNonRoot
+## @param podSecurityContext.readOnlyRootFilesystem
+## @param podSecurityContext.runAsUser
+## @param podSecurityContext.fsGroup
+## @param podSecurityContext.seccompProfile
 podSecurityContext:
   runAsNonRoot: true
   # readOnlyRootFilesystem: true
@@ -64,6 +122,11 @@ podSecurityContext:
   # seccompProfile:
   #   type: RuntimeDefault
 
+## Service settings
+##
+## @param service.type
+## @param service.port
+## @param service.nodePort
 service:
   type: ClusterIP
   port: 9443
@@ -75,6 +138,9 @@ service:
 ## Metrics serviceMonitor parameters
 ## Enable this if you're using Prometheus Operator
 ##
+## @param serviceMonitor.enabled
+## @param serviceMonitor.port
+## @param serviceMonitor.nodePort
 serviceMonitor:
   enabled: false
   # metrics server will be exposed at this port.
@@ -82,9 +148,15 @@ serviceMonitor:
   # Only used if `service.type` is `NodePort`.
   nodePort:
 
-# -- Topology spread constraints.
+## @param topologySpreadConstraints
+##
 topologySpreadConstraints: []
 
+
+## Resource settings
+##
+## @param topologySpreadConstraints.limits
+## @param topologySpreadConstraints.requests
 resources: {}
   # We usually recommend not to specify default resources and to leave this as a conscious
   # choice for the user. This also increases chances charts run on environments with little
@@ -99,6 +171,17 @@ resources: {}
   #   cpu: 10m
   #   memory: 64Mi
 
+## @param priorityClassName
+##
+priorityClassName:
+
+## Autoscaling settings
+##
+## @param autoscaling.enabled
+## @param autoscaling.minReplicas
+## @param autoscaling.maxReplicas
+## @param autoscaling.targetCPUUtilizationPercentage
+## @param autoscaling.targetMemoryUtilizationPercentage
 autoscaling:
   enabled: false
   minReplicas: 1
@@ -106,24 +189,46 @@ autoscaling:
   targetCPUUtilizationPercentage: 80
   # targetMemoryUtilizationPercentage: 80
 
+## @param nodeSelector
+##
 nodeSelector: {}
 
-tolerations: []
+## @param tolerations
+##
+tolerations:
+  - key: kb-controller
+    operator: Equal
+    value: "true"
+    effect: NoSchedule
 
-affinity: {}
+## @param affinity
+##
+affinity:
+  nodeAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        preference:
+          matchExpressions:
+            - key: kb-controller
+              operator: In
+              values:
+                - "true"
 
+## PDB settings
+##
+## @param podDisruptionBudget.minAvailable
+## @param podDisruptionBudget.maxUnavailable
 podDisruptionBudget:
   minAvailable: 1
   maxUnavailable:
 
+## AdmissionWebhooks settings
+##
+## @param admissionWebhooks.enabled
+## @param admissionWebhooks.createSelfSignedCert
 admissionWebhooks:
   enabled: true
   createSelfSignedCert: true
-
-dashboards:
-  ## If false, dashboards will not be installed
-  ##
-  enabled: false
 
 ## Data protection settings
 ##
@@ -142,6 +247,18 @@ dataProtection:
   ##
   backupTTL: ""
 
+## Addon controller settings, this will require cluster-admin clusterrole.
+addonController:
+  enabled: true
+  jobImagePullPolicy: IfNotPresent
+
+
+## Dashboards settings
+##
+dashboards:
+  ## If false, dashboards will not be installed
+  ##
+  enabled: false
 
 # Sub-charts
 prometheus:
@@ -157,8 +274,34 @@ prometheus:
     ## alertmanager container image
     ##
     image:
-      repository: docker.io/apecloud/alertmanager
+      repository: registry.cn-hangzhou.aliyuncs.com/apecloud/alertmanager
       tag: v0.24.0
+
+    ## ConfigMap override where fullname is {{.Release.Name}}-{{.Values.alertmanager.configMapOverrideName}}
+    ## Defining configMapOverrideName will cause templates/alertmanager-configmap.yaml
+    ## to NOT generate a ConfigMap resource
+    ##
+    configMapOverrideName: ""
+
+    ## Node tolerations for alertmanager scheduling to nodes with taints
+    ## Ref: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/
+    ##
+    tolerations:
+      - key: kb-controller
+        operator: Equal
+        value: "true"
+        effect: NoSchedule
+
+    affinity:
+      nodeAffinity:
+        preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            preference:
+              matchExpressions:
+                - key: kb-controller
+                  operator: In
+                  values:
+                    - "true"
 
     persistentVolume:
       ## If true, alertmanager will create/use a Persistent Volume Claim
@@ -207,6 +350,17 @@ prometheus:
       #   cpu: 10m
       #   memory: 32Mi
 
+    ## Security context to be added to alertmanager pods
+    ##
+    securityContext:
+      runAsUser: 0
+      runAsNonRoot: false
+      runAsGroup: 65534
+      fsGroup: 65534
+
+    containerSecurityContext:
+      allowPrivilegeEscalation: false
+
   kubeStateMetrics:
     ## If false, kube-state-metrics sub-chart will not be installed
     ##
@@ -220,8 +374,22 @@ prometheus:
     ## node-exporter container image
     ##
     image:
-      repository: docker.io/apecloud/node-exporter
+      repository: registry.cn-hangzhou.aliyuncs.com/apecloud/node-exporter
       tag: v1.3.1
+
+  configmapReload:
+    prometheus:
+      ## configmap-reload container image
+      ##
+      image:
+        repository: registry.cn-hangzhou.aliyuncs.com/apecloud/configmap-reload
+        tag: v0.5.0
+    alertmanager:
+      ## configmap-reload container image
+      ##
+      image:
+        repository: registry.cn-hangzhou.aliyuncs.com/apecloud/configmap-reload
+        tag: v0.5.0
 
   server:
     ## Prometheus server container name
@@ -231,7 +399,7 @@ prometheus:
     ## Prometheus server container image
     ##
     image:
-      repository: docker.io/apecloud/prometheus
+      repository: registry.cn-hangzhou.aliyuncs.com/apecloud/prometheus
       tag: v2.39.1
 
     global:
@@ -253,6 +421,26 @@ prometheus:
     ## Useful for proxies that rewrite URLs.
     ##
     routePrefix: /
+
+    ## Node tolerations for server scheduling to nodes with taints
+    ## Ref: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/
+    ##
+    tolerations:
+      - key: kb-controller
+        operator: Equal
+        value: "true"
+        effect: NoSchedule
+
+    affinity:
+      nodeAffinity:
+        preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            preference:
+              matchExpressions:
+                - key: kb-controller
+                  operator: In
+                  values:
+                    - "true"
 
     persistentVolume:
       ## If true, Prometheus server will create/use a Persistent Volume Claim
@@ -297,6 +485,34 @@ prometheus:
     ## Prometheus' data retention period (default if not specified is 15 days)
     ##
     retention: "3d"
+
+    ## Security context to be added to server pods
+    ##
+    securityContext:
+      runAsUser: 0
+      runAsNonRoot: false
+      runAsGroup: 65534
+      fsGroup: 65534
+
+    containerSecurityContext:
+      allowPrivilegeEscalation: false
+
+  ## AlertManager ConfigMap Entries
+  ## NOTE: Please review these carefully as thresholds and behavior may not meet
+  ##       your SLOs or labels.
+  ##
+  alertmanagerFiles:
+    alertmanager.yml:
+      global: { }
+
+      receivers:
+        - name: default-receiver
+
+      route:
+        receiver: default-receiver
+        group_wait: 5s
+        group_interval: 30s
+        repeat_interval: 10m
 
   ## Sample prometheus rules/alerts
   ## NOTE: Please review these carefully as thresholds and behavior may not meet
@@ -376,7 +592,7 @@ prometheus:
           rules:
             - alert: MysqlDown
               expr: 'max_over_time(mysql_up[1m]) == 0'
-              for: 1m
+              for: 0m
               labels:
                 severity: critical
               annotations:
@@ -452,12 +668,21 @@ prometheus:
           rules:
             - alert: PostgreSQLDown
               expr: 'max_over_time(pg_up[1m]) == 0'
-              for: 1m
+              for: 0m
               labels:
                 severity: critical
               annotations:
                 summary: "PostgreSQL is down (namespace: {{ $labels.namespace }}, cluster: {{ $labels.app_kubernetes_io_instance }}, instance: {{ $labels.pod }})"
                 description: "PostgreSQL instance is down on {{ $labels.instance }}\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+
+            - alert: PostgreSQLRestarted
+              expr: 'time() - pg_postmaster_start_time_seconds < 60'
+              for: 0m
+              labels:
+                severity: info
+              annotations:
+                summary: "PostgreSQL restarted (namespace: {{ $labels.namespace }}, cluster: {{ $labels.app_kubernetes_io_instance }}, instance: {{ $labels.pod }})"
+                description: "PostgreSQL has just been restarted, less than one minute ago on {{ $labels.instance }}\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
 
             - alert: PostgreSQLExporterError
               expr: 'pg_exporter_last_scrape_error > 0'
@@ -571,6 +796,130 @@ prometheus:
                 summary: "PostgreSQL high error rate in WAL files archiver (namespace: {{ $labels.namespace }}, cluster: {{ $labels.app_kubernetes_io_instance }}, instance: {{ $labels.pod }})"
                 description: "PostgreSQL high error rate in WAL files archiver\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
 
+            - alert: PostgreSQLTableNotAutoVacuumed
+              expr: |
+                (pg_stat_user_tables_last_autovacuum > 0)
+                and
+                (time() - pg_stat_user_tables_last_autovacuum)
+                > 24 * 60 * 60 * 10
+              for: 0m
+              labels:
+                severity: warning
+              annotations:
+                summary: "PostgreSQL table {{ $labels.relname }} in database {{ $labels.datname }} not auto vacuumed (namespace: {{ $labels.namespace }}, cluster: {{ $labels.app_kubernetes_io_instance }}, instance: {{ $labels.pod }})"
+                description: "Table {{ $labels.relname }} in database {{ $labels.datname }} has not been auto vacuumed for 10 days\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+
+            - alert: PostgreSQLTableNotAutoAnalyzed
+              expr: |
+                (pg_stat_user_tables_last_autoanalyze > 0)
+                and
+                (time() - pg_stat_user_tables_last_autoanalyze)
+                > 24 * 60 * 60 * 10
+              for: 0m
+              labels:
+                severity: warning
+              annotations:
+                summary: "PostgreSQL table {{ $labels.relname }} in database {{ $labels.datname }} not auto analyzed (namespace: {{ $labels.namespace }}, cluster: {{ $labels.app_kubernetes_io_instance }}, instance: {{ $labels.pod }})"
+                description: "Table {{ $labels.relname }} in database {{ $labels.datname }} has not been auto analyzed for 10 days\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+
+            - alert: PostgreSQLTableTooManyDeadTuples
+              expr: |
+                (pg_stat_user_tables_n_dead_tup > 10000)
+                /
+                (pg_stat_user_tables_n_live_tup + pg_stat_user_tables_n_dead_tup)
+                >= 0.1
+              for: 2m
+              labels:
+                severity: warning
+              annotations:
+                summary: "PostgreSQL table {{ $labels.relname }} in database {{ $labels.datname }} has too many dead tuples (namespace: {{ $labels.namespace }}, cluster: {{ $labels.app_kubernetes_io_instance }}, instance: {{ $labels.pod }})"
+                description: "Table {{ $labels.relname }} in database {{ $labels.datname }} dead tuples is too large\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+
+    redis_alert_rules.yml: |
+      groups:
+        - name: RedisExporter
+          rules:
+            - alert: RedisDown
+              expr: 'redis_up == 0'
+              for: 5m
+              labels:
+                severity: critical
+              annotations:
+                summary: "Redis down (namespace: {{ $labels.namespace }}, cluster: {{ $labels.app_kubernetes_io_instance }}, instance: {{ $labels.pod }})"
+                description: "Redis instance is down\n  VALUE = {{ $value }}\n  LABELS: {{ $labels }}"
+
+            - alert: RedisCPUHigh
+              expr: '(rate(redis_cpu_sys_seconds_total[1m]) + rate(redis_cpu_user_seconds_total[1m])) * 100 > 80'
+              for: 2m
+              labels:
+                severity: warning
+              annotations:
+                summary: "Out of CPU (namespace: {{ $labels.namespace }}, cluster: {{ $labels.app_kubernetes_io_instance }}, instance: {{ $labels.pod }})"
+                description: "Redis is running out of CPU (> 90%)\n  VALUE = {{ $value }}\n  LABELS: {{ $labels }}"
+
+            - alert: RedisMemoryHigh
+              expr: '(redis_memory_max_bytes == 0 or redis_memory_used_bytes * 100 / redis_memory_max_bytes) > 90'
+              for: 5m
+              labels:
+                severity: warning
+              annotations:
+                summary: "Out of memory (namespace: {{ $labels.namespace }}, cluster: {{ $labels.app_kubernetes_io_instance }}, instance: {{ $labels.pod }})"
+                description: "Redis is running out of memory (> 90%)\n  VALUE = {{ $value }}\n  LABELS: {{ $labels }}"
+
+            - alert: RedisTooManyConnections
+              expr: 'redis_connected_clients * 100 / redis_config_maxclients > 80'
+              for: 1m
+              labels:
+                severity: warning
+              annotations:
+                summary: "Too many connections (namespace: {{ $labels.namespace }}, cluster: {{ $labels.app_kubernetes_io_instance }}, instance: {{ $labels.pod }})"
+                description: "Redis instance has too many connections\n  VALUE = {{ $value }}\n  LABELS: {{ $labels }}"
+
+            - alert: RedisRejectedConnections
+              expr: 'increase(redis_rejected_connections_total[1m]) > 0'
+              for: 5m
+              labels:
+                severity: error
+              annotations:
+                summary: "Rejected connections (namespace: {{ $labels.namespace }}, cluster: {{ $labels.app_kubernetes_io_instance }}, instance: {{ $labels.pod }})"
+                description: "Some connections to Redis has been rejected\n  VALUE = {{ $value }}\n  LABELS: {{ $labels }}"
+
+            - alert: RedisKeyEviction
+              expr: 'increase(redis_evicted_keys_total[5m]) > 0'
+              for: 1s
+              labels:
+                severity: error
+              annotations:
+                summary: "Redis has evicted keys (namespace: {{ $labels.namespace }}, cluster: {{ $labels.app_kubernetes_io_instance }}, instance: {{ $labels.pod }})"
+                description: "Redis has evicted keys in the last 5 minutes\n  VALUE = {{ $value }}\n  LABELS: {{ $labels }}"
+
+            - alert: RedisMissingMaster
+              expr: 'count by (app_kubernetes_io_instance) (redis_instance_info{role="master"}) < 1'
+              for: 30s
+              labels:
+                severity: critical
+              annotations:
+                summary: "Redis missing master (namespace: {{ $labels.namespace }}, cluster: {{ $labels.app_kubernetes_io_instance }}, instance: {{ $labels.pod }})"
+                description: "Redis cluster has no node marked as master.\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+
+            - alert: RedisDisconnectedSlaves
+              expr: 'count without (instance, job) (redis_connected_slaves) - sum without (instance, job) (redis_connected_slaves) - 1 > 1'
+              for: 0m
+              labels:
+                severity: critical
+              annotations:
+                summary: "Redis disconnected slaves (namespace: {{ $labels.namespace }}, cluster: {{ $labels.app_kubernetes_io_instance }}, instance: {{ $labels.pod }})"
+                description: "Redis not replicating for all slaves. Consider reviewing the redis replication status.\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+
+            - alert: RedisReplicationBroken
+              expr: 'delta(redis_connected_slaves[1m]) < 0'
+              for: 0m
+              labels:
+                severity: critical
+              annotations:
+                summary: "Redis replication broken (namespace: {{ $labels.namespace }}, cluster: {{ $labels.app_kubernetes_io_instance }}, instance: {{ $labels.pod }})"
+                description: "Redis instance lost a slave\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+
   serverFiles:
     prometheus.yml:
       rule_files:
@@ -579,6 +928,7 @@ prometheus:
         - /etc/config/cadvisor_alert_rules.yml
         - /etc/config/mysql_alert_rules.yml
         - /etc/config/postgresql_alert_rules.yml
+        - /etc/config/redis_alert_rules.yml
 
       scrape_configs:
         - job_name: prometheus
@@ -704,57 +1054,60 @@ prometheus:
               target_label: __metrics_path__
               replacement: /api/v1/nodes/$1/proxy/metrics/cadvisor
 
-        # Example scrape config for pods
+        # Scrape config for service endpoints.
         #
-        # The relabeling allows the actual pod scrape endpoint to be configured via the
-        # following annotations:
+        # The relabeling allows the actual service scrape endpoint to be configured
+        # via the following annotations:
         #
-        # * `prometheus.io/scrape`: Only scrape pods that have a value of `true`,
-        # except if `prometheus.io/scrape-slow` is set to `true` as well.
+        # * `prometheus.io/scrape`: Only scrape services that have a value of
+        # `true`, except if `prometheus.io/scrape-slow` is set to `true` as well.
         # * `prometheus.io/scheme`: If the metrics endpoint is secured then you will need
         # to set this to `https` & most likely set the `tls_config` of the scrape config.
         # * `prometheus.io/path`: If the metrics path is not `/metrics` override this.
-        # * `prometheus.io/port`: Scrape the pod on the indicated port instead of the default of `9102`.
-        - job_name: 'kubernetes-pods'
+        # * `prometheus.io/port`: If the metrics are exposed on a different port to the
+        # service then set this appropriately.
+        # * `prometheus.io/param_<parameter>`: If the metrics endpoint uses parameters
+        # then you can set any parameter
+        - job_name: 'kubernetes-service-endpoints'
           honor_labels: true
 
           kubernetes_sd_configs:
-            - role: pod
+            - role: endpoints
 
           relabel_configs:
-            - source_labels: [ __meta_kubernetes_pod_annotation_prometheus_io_scrape ]
+            - source_labels: [ __meta_kubernetes_service_annotation_prometheus_io_scrape ]
               action: keep
               regex: true
-            - source_labels: [ __meta_kubernetes_pod_annotation_prometheus_io_scrape_slow ]
+            - source_labels: [ __meta_kubernetes_service_annotation_prometheus_io_scrape_slow ]
               action: drop
               regex: true
-            - source_labels: [ __meta_kubernetes_pod_annotation_prometheus_io_scheme ]
+            - source_labels: [ __meta_kubernetes_service_annotation_prometheus_io_scheme ]
               action: replace
-              regex: (https?)
               target_label: __scheme__
-            - source_labels: [ __meta_kubernetes_pod_annotation_prometheus_io_path ]
+              regex: (https?)
+            - source_labels: [ __meta_kubernetes_service_annotation_prometheus_io_path ]
               action: replace
               target_label: __metrics_path__
               regex: (.+)
-            - source_labels: [ __address__, __meta_kubernetes_pod_annotation_prometheus_io_port ]
+            - source_labels: [ __address__, __meta_kubernetes_service_annotation_prometheus_io_port ]
               action: replace
+              target_label: __address__
               regex: (.+?)(?::\d+)?;(\d+)
               replacement: $1:$2
-              target_label: __address__
             - action: labelmap
-              regex: __meta_kubernetes_pod_annotation_prometheus_io_param_(.+)
+              regex: __meta_kubernetes_service_annotation_prometheus_io_param_(.+)
               replacement: __param_$1
-            - action: labeldrop
-              regex: __meta_kubernetes_pod_label_controller_(.+)
-            - action: labeldrop
-              regex: __meta_kubernetes_pod_label_statefulset_(.+)
-            - action: labeldrop
-              regex: __meta_kubernetes_pod_label_cs_(.+)
             - action: labelmap
-              regex: __meta_kubernetes_pod_label_(.+)
+              regex: __meta_kubernetes_service_label_(.+)
             - source_labels: [ __meta_kubernetes_namespace ]
               action: replace
               target_label: namespace
+            - source_labels: [ __meta_kubernetes_service_name ]
+              action: replace
+              target_label: service
+            - source_labels: [ __meta_kubernetes_pod_node_name ]
+              action: replace
+              target_label: node
             - source_labels: [ __meta_kubernetes_pod_name ]
               action: replace
               target_label: pod
@@ -762,57 +1115,60 @@ prometheus:
               regex: Pending|Succeeded|Failed|Completed
               action: drop
 
-        # Example Scrape config for pods which should be scraped slower. An useful example
-        # would be stackriver-exporter which queries an API on every scrape of the pod
+        # Scrape config for slow service endpoints; same as above, but with a larger
+        # timeout and a larger interval
         #
-        # The relabeling allows the actual pod scrape endpoint to be configured via the
-        # following annotations:
+        # The relabeling allows the actual service scrape endpoint to be configured
+        # via the following annotations:
         #
-        # * `prometheus.io/scrape-slow`: Only scrape pods that have a value of `true`
+        # * `prometheus.io/scrape-slow`: Only scrape services that have a value of `true`
         # * `prometheus.io/scheme`: If the metrics endpoint is secured then you will need
         # to set this to `https` & most likely set the `tls_config` of the scrape config.
         # * `prometheus.io/path`: If the metrics path is not `/metrics` override this.
-        # * `prometheus.io/port`: Scrape the pod on the indicated port instead of the default of `9102`.
-        - job_name: 'kubernetes-pods-slow'
+        # * `prometheus.io/port`: If the metrics are exposed on a different port to the
+        # service then set this appropriately.
+        # * `prometheus.io/param_<parameter>`: If the metrics endpoint uses parameters
+        # then you can set any parameter
+        - job_name: 'kubernetes-service-endpoints-slow'
           honor_labels: true
 
           scrape_interval: 5m
           scrape_timeout: 30s
 
           kubernetes_sd_configs:
-            - role: pod
+            - role: endpoints
 
           relabel_configs:
-            - source_labels: [ __meta_kubernetes_pod_annotation_prometheus_io_scrape_slow ]
+            - source_labels: [ __meta_kubernetes_service_annotation_prometheus_io_scrape_slow ]
               action: keep
               regex: true
-            - source_labels: [ __meta_kubernetes_pod_annotation_prometheus_io_scheme ]
+            - source_labels: [ __meta_kubernetes_service_annotation_prometheus_io_scheme ]
               action: replace
-              regex: (https?)
               target_label: __scheme__
-            - source_labels: [ __meta_kubernetes_pod_annotation_prometheus_io_path ]
+              regex: (https?)
+            - source_labels: [ __meta_kubernetes_service_annotation_prometheus_io_path ]
               action: replace
               target_label: __metrics_path__
               regex: (.+)
-            - source_labels: [ __address__, __meta_kubernetes_pod_annotation_prometheus_io_port ]
+            - source_labels: [ __address__, __meta_kubernetes_service_annotation_prometheus_io_port ]
               action: replace
+              target_label: __address__
               regex: (.+?)(?::\d+)?;(\d+)
               replacement: $1:$2
-              target_label: __address__
             - action: labelmap
-              regex: __meta_kubernetes_pod_annotation_prometheus_io_param_(.+)
+              regex: __meta_kubernetes_service_annotation_prometheus_io_param_(.+)
               replacement: __param_$1
-            - action: labeldrop
-              regex: __meta_kubernetes_pod_label_controller_(.+)
-            - action: labeldrop
-              regex: __meta_kubernetes_pod_label_statefulset_(.+)
-            - action: labeldrop
-              regex: __meta_kubernetes_pod_label_cs_(.+)
             - action: labelmap
-              regex: __meta_kubernetes_pod_label_(.+)
+              regex: __meta_kubernetes_service_label_(.+)
             - source_labels: [ __meta_kubernetes_namespace ]
               action: replace
               target_label: namespace
+            - source_labels: [ __meta_kubernetes_service_name ]
+              action: replace
+              target_label: service
+            - source_labels: [ __meta_kubernetes_pod_node_name ]
+              action: replace
+              target_label: node
             - source_labels: [ __meta_kubernetes_pod_name ]
               action: replace
               target_label: pod
@@ -832,6 +1188,11 @@ grafana:
 
   replicas: 1
 
+  image:
+    repository: registry.cn-hangzhou.aliyuncs.com/apecloud/grafana
+    # Overrides the Grafana image tag whose default is the chart appVersion
+    tag: 9.2.4
+
   ## Grafana server resource requests and limits
   ## Ref: http://kubernetes.io/docs/user-guide/compute-resources/
   ##
@@ -843,6 +1204,26 @@ grafana:
     #   cpu: 100m
     #   memory: 128Mi
 
+  ## Node tolerations for grafana scheduling to nodes with taints
+  ## Ref: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/
+  ##
+  tolerations:
+    - key: kb-controller
+      operator: Equal
+      value: "true"
+      effect: NoSchedule
+
+  affinity:
+    nodeAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          preference:
+            matchExpressions:
+              - key: kb-controller
+                operator: In
+                values:
+                  - "true"
+
   ## Timezone for the default dashboards
   ## Other options are: browser or a specific timezone, i.e. Europe/Luxembourg
   ##
@@ -853,7 +1234,7 @@ grafana:
 
   sidecar:
     image:
-      repository: docker.io/apecloud/k8s-sidecar
+      repository: registry.cn-hangzhou.aliyuncs.com/apecloud/k8s-sidecar
       tag: 1.19.2
 
     dashboards:
@@ -892,6 +1273,9 @@ loadbalancer:
 apecloud-mysql:
   enabled: true
 
+postgresql:
+  enabled: true
+
 ## snapshot-controller settings
 ## ref: https://artifacthub.io/packages/helm/piraeus-charts/snapshot-controller#configuration
 ##
@@ -906,7 +1290,25 @@ snapshot-controller:
   ## @param snapshot-controller.image.repository -- Repository to pull the image from.
   ##
   image:
-    repository: registry.aliyuncs.com/google_containers/snapshot-controller
+    repository: registry.cn-hangzhou.aliyuncs.com/apecloud/snapshot-controller
+    tag: v6.2.1
+
+  tolerations:
+    - key: kb-controller
+      operator: Equal
+      value: "true"
+      effect: NoSchedule
+
+  affinity:
+    nodeAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          preference:
+            matchExpressions:
+              - key: kb-controller
+                operator: In
+                values:
+                  - "true"
 
 ## csi-s3 settings
 ## ref: https://artifacthub.io/packages/helm/cloudve/csi-s3#configuration

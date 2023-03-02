@@ -31,7 +31,7 @@ const (
 	socketPrefix = "unix://"
 )
 
-func execShellCommand(cmd *exec.Cmd) (string, error) {
+func ExecShellCommand(cmd *exec.Cmd) (string, error) {
 	var (
 		errOut bytes.Buffer
 		stdOut bytes.Buffer
@@ -67,10 +67,4 @@ func formatSocketPath(path string) string {
 
 func extractSocketPath(path string) string {
 	return strings.TrimPrefix(path, socketPrefix)
-}
-
-func printCriVersion(cmdName string) error {
-	cmd := exec.Command(cmdName, "-v")
-	_, err := execShellCommand(cmd)
-	return err
 }

@@ -19,12 +19,15 @@ package printer
 import (
 	"fmt"
 	"io"
+	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
+	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 )
 
 const NoneString = "<none>"
@@ -63,16 +66,31 @@ func PrintConditions(conditions []metav1.Condition, out io.Writer) {
 }
 
 // PrintComponentConfigMeta prints the conditions of resource.
-func PrintComponentConfigMeta(cfgTplMap map[dbaasv1alpha1.ConfigTemplate]*corev1.ConfigMap, clusterName, componentName string, out io.Writer) {
-	if len(cfgTplMap) == 0 {
+func PrintComponentConfigMeta(tplInfos []types.ConfigTemplateInfo, clusterName, componentName string, out io.Writer) {
+	if len(tplInfos) == 0 {
 		return
 	}
 	tbl := NewTablePrinter(out)
 	PrintTitle("Configures Meta")
-	tbl.SetHeader("CONFIGURATION-FILE", "CONFIGMAP", "COMPONENT", "CLUSTER", "TEMPLATE-NAME", "CONFIG-TEMPLATE", "CONFIG-CONSTRAINT", "NAMESPACE")
-	for tpl, cm := range cfgTplMap {
-		for key := range cm.Data {
-			tbl.AddRow(key, cm.Name, componentName, clusterName, tpl.Name, tpl.ConfigTplRef, tpl.ConfigConstraintRef, tpl.Namespace)
+	enableReconfiguring := func(tpl appsv1alpha1.ConfigTemplate, key string) string {
+		if len(tpl.ConfigConstraintRef) > 0 && cfgcore.CheckConfigTemplateReconfigureKey(tpl, key) {
+			return "enable"
+		}
+		return "disable"
+	}
+	tbl.SetHeader("TEMPLATE-NAME", "CONFIG-FILE", "ENABLE-RECONFIGURE", "CONFIG-TEMPLATE", "CONFIG-CONSTRAINT", "CONFIG-INSTANCE", "COMPONENT", "CLUSTER", "NAMESPACE")
+	for _, info := range tplInfos {
+		for key := range info.CMObj.Data {
+			tbl.AddRow(
+				BoldYellow(info.Name),
+				key,
+				BoldYellow(strings.ToUpper(enableReconfiguring(info.TPL, key))),
+				info.TPL.ConfigTplRef,
+				info.TPL.ConfigConstraintRef,
+				info.CMObj.Name,
+				componentName,
+				clusterName,
+				info.TPL.Namespace)
 		}
 	}
 	tbl.Print()

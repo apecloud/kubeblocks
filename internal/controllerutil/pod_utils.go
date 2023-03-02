@@ -28,7 +28,7 @@ import (
 	metautil "k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 )
 
 // statefulPodRegex is a regular expression that extracts the parent StatefulSet and ordinal from the Name of a Pod
@@ -69,7 +69,7 @@ func GetParentNameAndOrdinal(pod *corev1.Pod) (string, int) {
 //		   name: data
 //		 - mountPath: /log
 //		   name: log
-func GetContainerByConfigTemplate(podSpec *corev1.PodSpec, configs []dbaasv1alpha1.ConfigTemplate) *corev1.Container {
+func GetContainerByConfigTemplate(podSpec *corev1.PodSpec, configs []appsv1alpha1.ConfigTemplate) *corev1.Container {
 	containers := podSpec.Containers
 	initContainers := podSpec.InitContainers
 	if container := getContainerWithTplList(containers, configs); container != nil {
@@ -145,7 +145,7 @@ func GetContainersByConfigmap(containers []corev1.Container, volumeName string, 
 	return tmpList
 }
 
-func getContainerWithTplList(containers []corev1.Container, configs []dbaasv1alpha1.ConfigTemplate) *corev1.Container {
+func getContainerWithTplList(containers []corev1.Container, configs []appsv1alpha1.ConfigTemplate) *corev1.Container {
 	if len(containers) == 0 {
 		return nil
 	}
@@ -158,7 +158,7 @@ func getContainerWithTplList(containers []corev1.Container, configs []dbaasv1alp
 	return nil
 }
 
-func checkContainerWithVolumeMount(volumeMounts []corev1.VolumeMount, configs []dbaasv1alpha1.ConfigTemplate) bool {
+func checkContainerWithVolumeMount(volumeMounts []corev1.VolumeMount, configs []appsv1alpha1.ConfigTemplate) bool {
 	volumes := make(map[string]int)
 	for _, c := range configs {
 		for j, vm := range volumeMounts {
@@ -256,7 +256,7 @@ func IsReady(pod *corev1.Pod) bool {
 		return false
 	}
 
-	condition := getPodCondition(&pod.Status, corev1.PodReady)
+	condition := GetPodCondition(&pod.Status, corev1.PodReady)
 	return condition != nil && condition.Status == corev1.ConditionTrue
 }
 
@@ -265,7 +265,7 @@ func IsAvailable(pod *corev1.Pod, minReadySeconds int32) bool {
 		return false
 	}
 
-	condition := getPodCondition(&pod.Status, corev1.PodReady)
+	condition := GetPodCondition(&pod.Status, corev1.PodReady)
 	if condition == nil || condition.Status != corev1.ConditionTrue {
 		return false
 	}
@@ -282,14 +282,14 @@ func IsAvailable(pod *corev1.Pod, minReadySeconds int32) bool {
 	return !lastTransitionTime.IsZero() && lastTransitionTime.Add(minDuration).Before(now.Time)
 }
 
-func getPodCondition(status *corev1.PodStatus, conditionType corev1.PodConditionType) *corev1.PodCondition {
+func GetPodCondition(status *corev1.PodStatus, conditionType corev1.PodConditionType) *corev1.PodCondition {
 	if len(status.Conditions) == 0 {
 		return nil
 	}
 
-	for _, condition := range status.Conditions {
+	for i, condition := range status.Conditions {
 		if condition.Type == conditionType {
-			return &condition
+			return &status.Conditions[i]
 		}
 	}
 	return nil
@@ -323,4 +323,24 @@ func GetIntOrPercentValue(intOrStr *metautil.IntOrString) (int, bool, error) {
 		return 0, false, fmt.Errorf("failed to atoi. [%s], error: %v", intOrStr.StrVal, err)
 	}
 	return v, true, nil
+}
+
+// GetPortByPortName find the Port from pod by name
+func GetPortByPortName(pod *corev1.Pod, portName string) (int32, error) {
+	for _, container := range pod.Spec.Containers {
+		for _, port := range container.Ports {
+			if port.Name == portName {
+				return port.ContainerPort, nil
+			}
+		}
+	}
+	return 0, fmt.Errorf("port %s not found", portName)
+}
+
+func GetProbeGRPCPort(pod *corev1.Pod) (int32, error) {
+	return GetPortByPortName(pod, ProbeGRPCPortName)
+}
+
+func GetProbeHTTPPort(pod *corev1.Pod) (int32, error) {
+	return GetPortByPortName(pod, ProbeHTTPPortName)
 }

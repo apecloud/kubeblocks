@@ -50,15 +50,15 @@ For detailed feature information, see [Feature list](https://github.com/apecloud
 
 ## Documents
 ### Quick start with KubeBlocks
-TODO 
+[Quick Start](docs/user_docs/quick_start_guide.md) shows you the quickest way to get started with KubeBlocks.
 ### Introduction
-[Introduction](https://github.com/apecloud/kubeblocks/blob/main/docs/user_docs/Introduction/introduction.md) is a detailed information on KubeBlocks.
+[Introduction](docs/user_docs/introduction/introduction.md) is a detailed information on KubeBlocks.
 ### Installation
-[Installation](https://github.com/apecloud/kubeblocks/tree/main/docs/user_docs/installation) document for install KubeBlocks, playground, kbctl, and create database clusters.
+[Installation](docs/user_docs/installation) document for install KubeBlocks, playground, kbctl, and create database clusters.
 ### User documents
-[User documents](https://github.com/apecloud/kubeblocks/tree/main/docs/user_docs) for instruction to use KubeBlocks.
+[User documents](docs/user_docs) for instruction to use KubeBlocks.
 ### Design proposal
-[Design proposal](https://github.com/apecloud/kubeblocks/tree/main/docs/design_docs) for design motivation and methodology.
+[Design proposal](docs/design_docs) for design motivation and methodology.
 
 ## Community
 - KubeBlocks [Slack Channel](https://kubeblocks.slack.com/ssb/redirect)

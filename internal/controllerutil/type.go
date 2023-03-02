@@ -34,34 +34,30 @@ type RequestCtx struct {
 
 const (
 	AppName = "kubeblocks"
-	// common label and annotation keys
 
-	AppInstanceLabelKey             = "app.kubernetes.io/instance"
-	AppComponentLabelKey            = "app.kubernetes.io/component-name"
-	AppNameLabelKey                 = "app.kubernetes.io/name"
-	AppManagedByLabelKey            = "app.kubernetes.io/managed-by"
-	AppCreatedByLabelKey            = "app.kubernetes.io/created-by" // resources created temporarily by kubeblocks
-	AppConfigTypeLabelKey           = "app.kubernetes.io/config-type"
-	ConsensusSetAccessModeLabelKey  = "cs.dbaas.kubeblocks.io/access-mode"
+	// K8s recommonded and well-known label and annotation keys
+	AppInstanceLabelKey  = "app.kubernetes.io/instance"
+	AppNameLabelKey      = "app.kubernetes.io/name"
+	AppManagedByLabelKey = "app.kubernetes.io/managed-by"
+	RegionLabelKey       = "topology.kubernetes.io/region"
+	ZoneLabelKey         = "topology.kubernetes.io/zone"
+
+	// kubeblocks.io labels
+	ClusterDefLabelKey              = "clusterdefinition.kubeblocks.io/name"
+	KBAppComponentLabelKey          = "apps.kubeblocks.io/component-name"
+	ConsensusSetAccessModeLabelKey  = "cs.apps.kubeblocks.io/access-mode"
+	AppConfigTypeLabelKey           = "apps.kubeblocks.io/config-type"
+	WorkloadTypeLabelKey            = "apps.kubeblocks.io/workload-type"
 	VolumeClaimTemplateNameLabelKey = "vct.kubeblocks.io/name"
+	RoleLabelKey                    = "kubeblocks.io/role"              // RoleLabelKey consensusSet and replicationSet role label key
+	BackupProtectionLabelKey        = "kubeblocks.io/backup-protection" // BackupProtectionLabelKey Backup delete protection policy label
+	AddonNameLabelKey               = "extensions.kubeblocks.io/addon-name"
 
-	// OpsRequestAnnotationKey OpsRequest annotation key in Cluster
-	OpsRequestAnnotationKey = "kubeblocks.io/ops-request"
-
-	// OpsRequestReconcileAnnotationKey Notify OpsRequest to reconcile
-	OpsRequestReconcileAnnotationKey = "kubeblocks.io/reconcile"
-
-	// StorageClassAnnotationKey StorageClass annotation key in Cluster
-	StorageClassAnnotationKey = "kubeblocks.io/storage-class"
-
-	// RoleLabelKey consensusSet and replicationSet role label key
-	RoleLabelKey = "kubeblocks.io/role"
-
-	// RestartAnnotationKey the annotation which notices the StatefulSet/DeploySet to restart
-	RestartAnnotationKey = "kubeblocks.io/restart"
-
-	// BackupProtectionLabelKey Backup delete protection policy label
-	BackupProtectionLabelKey = "kubeblocks.io/backup-protection"
+	// kubeblocks.io annotations
+	OpsRequestAnnotationKey          = "kubeblocks.io/ops-request" // OpsRequestAnnotationKey OpsRequest annotation key in Cluster
+	OpsRequestReconcileAnnotationKey = "kubeblocks.io/reconcile"   // OpsRequestReconcileAnnotationKey Notify OpsRequest to reconcile
+	RestartAnnotationKey             = "kubeblocks.io/restart"     // RestartAnnotationKey the annotation which notices the StatefulSet/DeploySet to restart
+	SnapShotForStartAnnotationKey    = "kubeblocks.io/snapshot-for-start"
 )
 
 const (
@@ -87,6 +83,7 @@ const (
 	PodKind                   = "Pod"
 	PersistentVolumeClaimKind = "PersistentVolumeClaim"
 	CronJob                   = "CronJob"
+	ReplicaSet                = "ReplicaSet"
 )
 
 const (
@@ -99,3 +96,25 @@ const (
 	// BackupDelete (default) deletes backup immediately when cluster's terminationPolicy is WipeOut
 	BackupDelete = "Delete"
 )
+
+const (
+	// Container port name
+	ProbeHTTPPortName = "probe-http-port"
+	ProbeGRPCPortName = "probe-grpc-port"
+
+	// KubeBlocksDataNodeLabelKey is the node label key of the built-in data node label
+	KubeBlocksDataNodeLabelKey = "kb-data"
+	// KubeBlocksDataNodeLabelValue is the node label value of the built-in data node label
+	KubeBlocksDataNodeLabelValue = "true"
+	// KubeBlocksDataNodeTolerationKey is the taint label key of the built-in data node taint
+	KubeBlocksDataNodeTolerationKey = "kb-data"
+	// KubeBlocksDataNodeTolerationValue is the taint label value of the built-in data node taint
+	KubeBlocksDataNodeTolerationValue = "true"
+)
+
+// UpdateCtxValue update Context value, return parent Context.
+func (r *RequestCtx) UpdateCtxValue(key, val any) context.Context {
+	p := r.Ctx
+	r.Ctx = context.WithValue(r.Ctx, key, val)
+	return p
+}

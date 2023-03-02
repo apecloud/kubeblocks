@@ -46,23 +46,6 @@ type RestoreJobSpec struct {
 	OnFailAttempted int32 `json:"onFailAttempted,omitempty"`
 }
 
-// RestoreJobPhase The current phase. Valid values are New, InProgress, Completed, Failed.
-// +enum
-type RestoreJobPhase string
-
-// These are the valid statuses of RestoreJob.
-const (
-	RestoreJobNew RestoreJobPhase = "New"
-
-	RestoreJobInProgressPhy RestoreJobPhase = "InProgressPhy"
-
-	RestoreJobInProgressLogic RestoreJobPhase = "InProgressLogic"
-
-	RestoreJobCompleted RestoreJobPhase = "Completed"
-
-	RestoreJobFailed RestoreJobPhase = "Failed"
-)
-
 // RestoreJobStatus defines the observed state of RestoreJob
 type RestoreJobStatus struct {
 
@@ -103,7 +86,7 @@ type RestoreJob struct {
 	Status RestoreJobStatus `json:"status,omitempty"`
 }
 
-//+kubebuilder:object:root=true
+// +kubebuilder:object:root=true
 
 // RestoreJobList contains a list of RestoreJob
 type RestoreJobList struct {

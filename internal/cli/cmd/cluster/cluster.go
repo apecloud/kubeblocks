@@ -50,8 +50,9 @@ func NewClusterCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 				NewListInstancesCmd(f, streams),
 				NewListComponentsCmd(f, streams),
 				NewListEventsCmd(f, streams),
-				NewListUsersCmd(f, streams),
+				NewListAccountsCmd(f, streams),
 				NewDeleteCmd(f, streams),
+				NewExposeCmd(f, streams),
 			},
 		},
 		{
@@ -70,6 +71,8 @@ func NewClusterCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 				NewDescribeReconfigureCmd(f, streams),
 				NewExplainReconfigureCmd(f, streams),
 				NewDiffConfigureCmd(f, streams),
+				NewStopCmd(f, streams),
+				NewStartCmd(f, streams),
 			},
 		},
 		{
@@ -84,7 +87,7 @@ func NewClusterCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 			},
 		},
 		{
-			Message: "Trouble shooting Commands:",
+			Message: "Troubleshooting Commands:",
 			Commands: []*cobra.Command{
 				NewLogsCmd(f, streams),
 				NewListLogsCmd(f, streams),
@@ -95,10 +98,6 @@ func NewClusterCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 	// add subcommands
 	groups.Add(cmd)
 	templates.ActsAsRootCommand(cmd, nil, groups...)
-
-	if viper.GetString(EnvExperimentalExpose) == "1" {
-		cmd.AddCommand(NewExposeCmd(f, streams))
-	}
 
 	return cmd
 }

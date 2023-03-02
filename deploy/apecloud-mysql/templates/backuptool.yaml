@@ -3,10 +3,10 @@ kind: BackupTool
 metadata:
   name: xtrabackup-mysql
   labels:
+    clusterdefinition.kubeblocks.io/name: apecloud-mysql
     {{- include "apecloud-mysql.labels" . | nindent 4 }}
 spec:
-  image: percona/percona-xtrabackup
-  databaseEngine: mysql
+  image: registry.cn-hangzhou.aliyuncs.com/apecloud/percona-xtrabackup
   deployKind: job
   resources:
     limits:

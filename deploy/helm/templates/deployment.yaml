@@ -11,6 +11,10 @@ spec:
   selector:
     matchLabels:
       {{- include "kubeblocks.selectorLabels" . | nindent 6 }}
+  {{- if .Values.updateStrategy }}
+  strategy:
+    {{ toYaml .Values.updateStrategy | nindent 4 | trim }}
+  {{- end }}
   template:
     metadata:
       {{- with .Values.podAnnotations }}
@@ -20,7 +24,8 @@ spec:
       labels:
         {{- include "kubeblocks.selectorLabels" . | nindent 8 }}
     spec:
-      {{- with .Values.imagePullSecrets }}
+      priorityClassName: {{ template "kubeblocks.priorityClassName" . }}
+      {{- with .Values.image.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
@@ -33,40 +38,53 @@ spec:
             - "--health-probe-bind-address=:8081"
             - "--metrics-bind-address=:8080"
             - "--leader-elect"
-            - "-zap-devel={{- default "false" .Values.loggerSettings.developmentMode }}"
-            - "-zap-time-encoding={{- default "iso8601" .Values.loggerSettings.timeEncoding }}"
+            - "--zap-devel={{- default "false" .Values.loggerSettings.developmentMode }}"
+            - "--zap-time-encoding={{- default "iso8601" .Values.loggerSettings.timeEncoding }}"
             {{- with .Values.loggerSettings.level }}
-            - "-zap-log-level={{ . }}"
+            - "--zap-log-level={{ . }}"
             {{- end }}
             {{- with .Values.loggerSettings.encoder }}
-            - "-zap-encoder={{ . }}"
+            - "--zap-encoder={{ . }}"
             {{- end }}
           env:
             - name: CM_NAMESPACE
               value: {{ .Release.Namespace }}
-          {{- if or .Values.dataProtection.enableVolumeSnapshot (index .Values "snapshot-controller" "enabled") }}
-            - name: VOLUMESNAPSHOT
-              value: "true"
-          {{- end }}
-          {{- if .Values.dataProtection.backupSchedule }}
-            - name: DP_BACKUP_SCHEDULE
-              value: {{ .Values.dataProtection.backupSchedule }}
-          {{- end }}
-          {{- if .Values.dataProtection.backupTTL }}
-            - name: DP_BACKUP_TTL
-              value: {{ .Values.dataProtection.backupTTL }}
-          {{- end }}
-          {{- if .Values.admissionWebhooks.enabled }}
-            - name: ENABLE_WEBHOOKS
-              value: "true"
-          {{- end }}
             - name: KUBEBLOCKS_IMAGE_PULL_POLICY
               value: {{ .Values.image.pullPolicy }}
             - name: KUBEBLOCKS_IMAGE
-              value: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+              value: "{{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+            - name: KUBEBLOCKS_SERVICEACCOUNT_NAME
+              value: {{ include "kubeblocks.serviceAccountName" . }}
+            {{- if or .Values.dataProtection.enableVolumeSnapshot (index .Values "snapshot-controller" "enabled") }}
+            - name: VOLUMESNAPSHOT
+              value: "true"
+            {{- end }}
+            {{- if .Values.dataProtection.backupSchedule }}
+            - name: DP_BACKUP_SCHEDULE
+              value: {{ .Values.dataProtection.backupSchedule }}
+            {{- end }}
+            {{- if .Values.dataProtection.backupTTL }}
+            - name: DP_BACKUP_TTL
+              value: {{ .Values.dataProtection.backupTTL }}
+            {{- end }}
+            {{- if .Values.admissionWebhooks.enabled }}
+            - name: ENABLE_WEBHOOKS
+              value: "true"
+            {{- end }}
+            {{- if not ( include "kubeblocks.addonControllerEnabled" . ) }}
+            - name: DISABLE_ADDON_CTRLER
+              value: "true"
+            {{- else }}
+            - name: ADDON_JOB_IMAGE_PULL_POLICY
+              value: {{ .jobImagePullPolicy | default "IfNotPresent" }}
+            - name: KUBEBLOCKS_ADDON_SA_NAME
+              value: {{ include "kubeblocks.addonSAName" . }}
+            {{- end }}
+          {{- with .Values.securityContext }}
           securityContext:
-            {{- toYaml .Values.securityContext | nindent 12 }}
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          image: "{{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           ports:
             - name: webhook-server
@@ -98,6 +116,16 @@ spec:
               name: cert
               readOnly: true
           {{- end }}
+      {{- if .Values.hostNetwork }}
+      hostNetwork: {{ .Values.hostNetwork }}
+      {{- end }}
+      {{- if .Values.dnsPolicy }}
+      dnsPolicy: {{ .Values.dnsPolicy }}
+      {{- end }}
+      {{- with .Values.topologySpreadConstraints }}
+      topologySpreadConstraints:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       {{- with .Values.affinity }}
       affinity:
         {{- toYaml . | nindent 8 }}
@@ -106,11 +134,11 @@ spec:
       nodeSelector:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      terminationGracePeriodSeconds: 10
       {{- with .Values.tolerations }}
       tolerations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+      terminationGracePeriodSeconds: 10
       volumes:
         - name: manager-config
           configMap:

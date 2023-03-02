@@ -23,6 +23,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"helm.sh/helm/v3/pkg/action"
+	"helm.sh/helm/v3/pkg/cli/values"
 	"helm.sh/helm/v3/pkg/repo"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
@@ -120,7 +121,7 @@ func (o *options) install() error {
 	spinner := util.Spinner(o.Out, "Installing application %s", o.AppName)
 	defer spinner(false)
 
-	if err := helm.AddRepo(&repo.Entry{Name: o.AppName, URL: util.GetHelmChartRepoURL()}); err != nil {
+	if err := helm.AddRepo(&repo.Entry{Name: types.KubeBlocksChartName, URL: util.GetHelmChartRepoURL()}); err != nil {
 		return err
 	}
 	notes, err := o.installChart()
@@ -149,7 +150,7 @@ func (o *options) installChart() (string, error) {
 		Wait:            true,
 		Version:         o.Version,
 		Namespace:       o.Namespace,
-		Sets:            sets,
+		ValueOpts:       &values.Options{Values: sets},
 		Login:           true,
 		TryTimes:        2,
 		CreateNamespace: o.CreateNamespace,

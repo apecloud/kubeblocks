@@ -34,7 +34,10 @@ const (
 	CMConfigurationTplNameLabelKey         = "configuration.kubeblocks.io/configuration-tpl-name"
 	CMConfigurationConstraintsNameLabelKey = "configuration.kubeblocks.io/configuration-constraints-name"
 	CMInsConfigurationHashLabelKey         = "configuration.kubeblocks.io/configuration-hash"
-	CMConfigurationISVTplLabelKey          = "configuration.kubeblocks.io/configtemplate-name"
+	CMConfigurationProviderTplLabelKey     = "configuration.kubeblocks.io/configtemplate-name"
+
+	// CMConfigurationCMKeysLabelKey Specify keys
+	CMConfigurationCMKeysLabelKey = "configuration.kubeblocks.io/configmap-keys"
 
 	// CMInsConfigurationLabelKey configmap is configuration file for component
 	// CMInsConfigurationLabelKey = "configuration.kubeblocks.io/ins-configure"
@@ -43,7 +46,7 @@ const (
 
 	// ConfigSidecarIMAGE for config manager sidecar
 	ConfigSidecarIMAGE       = "KUBEBLOCKS_IMAGE"
-	ConfigSidecarName        = "config-manager-sidecar"
+	ConfigSidecarName        = "config-manager"
 	CRIRuntimeEndpoint       = "CONTAINER_RUNTIME_ENDPOINT"
 	ConfigCRIType            = "CRI_TYPE"
 	ConfigManagerGPRCPortEnv = "CONFIG_MANAGER_GRPC_PORT"

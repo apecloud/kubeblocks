@@ -32,10 +32,10 @@ import (
 	"k8s.io/client-go/rest/fake"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 
-	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/cluster"
 	"github.com/apecloud/kubeblocks/internal/cli/exec"
-	"github.com/apecloud/kubeblocks/internal/cli/types"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 var _ = Describe("listLogs test", func() {
@@ -70,23 +70,23 @@ var _ = Describe("listLogs test", func() {
 	})
 	It("printContext test", func() {
 		dataObj := &cluster.ClusterObjects{
-			Cluster: &dbaasv1alpha1.Cluster{
-				Spec: dbaasv1alpha1.ClusterSpec{
-					Components: []dbaasv1alpha1.ClusterComponent{
+			Cluster: &appsv1alpha1.Cluster{
+				Spec: appsv1alpha1.ClusterSpec{
+					ComponentSpecs: []appsv1alpha1.ClusterComponentSpec{
 						{
-							Name:        "component-name",
-							Type:        "component-type",
-							EnabledLogs: []string{"slow"},
+							Name:            "component-name",
+							ComponentDefRef: "component-type",
+							EnabledLogs:     []string{"slow"},
 						},
 					},
 				},
 			},
-			ClusterDef: &dbaasv1alpha1.ClusterDefinition{
-				Spec: dbaasv1alpha1.ClusterDefinitionSpec{
-					Components: []dbaasv1alpha1.ClusterDefinitionComponent{
+			ClusterDef: &appsv1alpha1.ClusterDefinition{
+				Spec: appsv1alpha1.ClusterDefinitionSpec{
+					ComponentDefs: []appsv1alpha1.ClusterComponentDefinition{
 						{
-							TypeName: "component-type",
-							LogConfigs: []dbaasv1alpha1.LogConfig{
+							Name: "component-type",
+							LogConfigs: []appsv1alpha1.LogConfig{
 								{
 									Name:            "slow",
 									FilePathPattern: "",
@@ -104,8 +104,8 @@ var _ = Describe("listLogs test", func() {
 				Namespace:       "test",
 				ResourceVersion: "10",
 				Labels: map[string]string{
-					"app.kubernetes.io/name": "state.mysql-apecloud-mysql",
-					types.ComponentLabelKey:  "component-name",
+					"app.kubernetes.io/name":           "mysql-apecloud-mysql",
+					intctrlutil.KBAppComponentLabelKey: "component-name",
 				},
 			},
 		}

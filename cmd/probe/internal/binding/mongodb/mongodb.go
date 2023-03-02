@@ -31,18 +31,18 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 
-	"github.com/apecloud/kubeblocks/cmd/probe/internal"
+	. "github.com/apecloud/kubeblocks/cmd/probe/internal/binding"
 )
 
 // MongoDB is a binding implementation for MongoDB.
 type MongoDB struct {
 	mongoDBMetadata
-	lock             sync.Mutex
+	mu               sync.Mutex
 	client           *mongo.Client
 	database         *mongo.Database
 	operationTimeout time.Duration
 	logger           logger.Logger
-	base             internal.ProbeBase
+	BaseOperations
 }
 
 type mongoDBMetadata struct {
@@ -124,32 +124,24 @@ const (
 
 // NewMongoDB returns a new MongoDB Binding
 func NewMongoDB(logger logger.Logger) bindings.OutputBinding {
-	return &MongoDB{logger: logger}
+	return &MongoDB{BaseOperations: BaseOperations{Logger: logger}}
 }
 
 // Init initializes the MongoDB Binding.
 func (m *MongoDB) Init(metadata bindings.Metadata) error {
-	m.logger.Debug("Initializing MongoDB binding")
+	m.Logger.Debug("Initializing MongoDB binding")
+	m.BaseOperations.Init(metadata)
 	meta, err := getMongoDBMetaData(metadata)
 	if err != nil {
 		return err
 	}
 	m.mongoDBMetadata = *meta
-	m.base = internal.ProbeBase{
-		Logger:    m.logger,
-		Operation: m,
-	}
-	m.base.Init()
 
+	m.DBType = "mongodb"
+	m.InitIfNeed = m.initIfNeed
+	m.DBPort = m.GetRunningPort()
+	m.OperationMap[GetRoleOperation] = m.GetRoleOps
 	return nil
-}
-
-func (m *MongoDB) Operations() []bindings.OperationKind {
-	return m.base.Operations()
-}
-
-func (m *MongoDB) Invoke(ctx context.Context, req *bindings.InvokeRequest) (*bindings.InvokeResponse, error) {
-	return m.base.Invoke(ctx, req)
 }
 
 func (m *MongoDB) Ping() error {
@@ -160,31 +152,43 @@ func (m *MongoDB) Ping() error {
 }
 
 // InitIfNeed do the real init
-func (m *MongoDB) InitIfNeed() error {
-	m.lock.Lock()
-	defer m.lock.Unlock()
+func (m *MongoDB) initIfNeed() bool {
+	if m.database == nil {
+		go func() {
+			err := m.InitDelay()
+			m.Logger.Errorf("MongoDB connection init failed: %v", err)
+		}()
+		return true
+	}
+	return false
+}
 
+func (m *MongoDB) InitDelay() error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	if m.database != nil {
 		return nil
 	}
-
 	m.operationTimeout = m.mongoDBMetadata.operationTimeout
 
 	client, err := getMongoDBClient(&m.mongoDBMetadata)
 	if err != nil {
-		return fmt.Errorf("error in creating mongodb client: %s", err)
+		m.Logger.Errorf("error in creating mongodb client: %s", err)
+		return err
 	}
 
 	if err = client.Ping(context.Background(), nil); err != nil {
 		_ = client.Disconnect(context.Background())
-		return fmt.Errorf("error in connecting to mongodb, host: %s error: %s", m.mongoDBMetadata.host, err)
+		m.Logger.Errorf("error in connecting to mongodb, host: %s error: %s", m.mongoDBMetadata.host, err)
+		return err
 	}
 
 	db := client.Database(adminDatabase)
 	_, err = getReplSetStatus(context.Background(), db)
 	if err != nil {
 		_ = client.Disconnect(context.Background())
-		return fmt.Errorf("error in getting repl status from mongodb, error: %s", err)
+		m.Logger.Errorf("error in getting repl status from mongodb, error: %s", err)
+		return err
 	}
 
 	m.client = client
@@ -222,10 +226,10 @@ func (m *MongoDB) GetRunningPort() int {
 	return port
 }
 
-func (m *MongoDB) GetRole(ctx context.Context, cmd string) (string, error) {
+func (m *MongoDB) GetRole(ctx context.Context, request *bindings.InvokeRequest, response *bindings.InvokeResponse) (string, error) {
 	status, err := getReplSetStatus(ctx, m.database)
 	if err != nil {
-		m.logger.Errorf("rs.status() error: %", err)
+		m.Logger.Errorf("rs.status() error: %", err)
 		return "", err
 	}
 	for _, member := range status.Members {
@@ -236,7 +240,17 @@ func (m *MongoDB) GetRole(ctx context.Context, cmd string) (string, error) {
 	return "", errors.New("role not found")
 }
 
-func (m *MongoDB) StatusCheck(ctx context.Context, cmd string, response *bindings.InvokeResponse) ([]byte, error) {
+func (m *MongoDB) GetRoleOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
+	role, err := m.GetRole(ctx, req, resp)
+	if err != nil {
+		return nil, err
+	}
+	opsRes := OpsResult{}
+	opsRes["role"] = role
+	return opsRes, nil
+}
+
+func (m *MongoDB) StatusCheck(ctx context.Context, cmd string, response *bindings.InvokeResponse) (OpsResult, error) {
 	// TODO implement me when proposal is passed
 	// proposal: https://infracreate.feishu.cn/wiki/wikcndch7lMZJneMnRqaTvhQpwb#doxcnOUyQ4Mu0KiUo232dOr5aad
 	return nil, nil

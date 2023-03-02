@@ -46,9 +46,9 @@ type RestoreJobReconciler struct {
 	clock    clock.RealClock
 }
 
-//+kubebuilder:rbac:groups=dataprotection.kubeblocks.io,resources=restorejobs,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=dataprotection.kubeblocks.io,resources=restorejobs/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=dataprotection.kubeblocks.io,resources=restorejobs/finalizers,verbs=update
+// +kubebuilder:rbac:groups=dataprotection.kubeblocks.io,resources=restorejobs,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=dataprotection.kubeblocks.io,resources=restorejobs/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=dataprotection.kubeblocks.io,resources=restorejobs/finalizers,verbs=update
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -204,14 +204,7 @@ func (r *RestoreJobReconciler) deleteExternalResources(reqCtx intctrlutil.Reques
 		return nil
 	}
 
-	// delete pod when job deleting.
-	// ref: https://kubernetes.io/blog/2021/05/14/using-finalizers-to-control-deletion/
-	deletePropagation := metav1.DeletePropagationBackground
-	deleteOptions := &client.DeleteOptions{
-		PropagationPolicy: &deletePropagation,
-	}
-	if err := r.Client.Delete(reqCtx.Ctx, job, deleteOptions); err != nil {
-		// failed delete k8s job, return error info.
+	if err := intctrlutil.BackgroundDeleteObject(r.Client, reqCtx.Ctx, job); err != nil {
 		return err
 	}
 	return nil

@@ -168,7 +168,7 @@ func (r *BackupReconciler) doNewPhaseAction(
 	}
 
 	// save the backup message for restore
-	backup.Status.RemoteVolume = backupPolicy.Spec.RemoteVolume
+	backup.Status.RemoteVolume = &backupPolicy.Spec.RemoteVolume
 	backup.Status.BackupToolName = backupPolicy.Spec.BackupToolName
 
 	// update Phase to InProgress

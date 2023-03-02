@@ -93,7 +93,7 @@ type BackupStatus struct {
 
 	// remoteVolume saves the backup data.
 	// +optional
-	RemoteVolume corev1.Volume `json:"remoteVolume,omitempty"`
+	RemoteVolume *corev1.Volume `json:"remoteVolume,omitempty"`
 
 	// backupToolName referenced backup tool name..
 	// +optional

@@ -107,7 +107,6 @@ func reconcileClusterWorkloads(
 
 		// build info that needs to be restored from backup
 		backupSourceName := clusterBackupResourceMap[synthesizedComp.Name]
-		iParams.Component.BackupSourceName = backupSourceName
 		if len(backupSourceName) > 0 {
 			if err := component.BuildRestoredInfo(reqCtx, cli, cluster.Namespace, synthesizedComp, backupSourceName); err != nil {
 				return err

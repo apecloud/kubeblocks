@@ -57,10 +57,9 @@ func BuildRestoredInfo(
 	if err != nil {
 		return err
 	}
-	component.BackupType = backup.Spec.BackupType
 	switch backup.Spec.BackupType {
 	case dataprotectionv1alpha1.BackupTypeFull:
-		buildInitContainerWithFullBackup(component, backup, backupTool)
+		return buildInitContainerWithFullBackup(component, backup, backupTool)
 	case dataprotectionv1alpha1.BackupTypeSnapshot:
 		buildVolumeClaimTemplatesWithSnapshot(component, backup)
 	}
@@ -76,9 +75,12 @@ func GetRestoredInitContainerName(backupName string) string {
 func buildInitContainerWithFullBackup(
 	component *SynthesizedComponent,
 	backup *dataprotectionv1alpha1.Backup,
-	backupTool *dataprotectionv1alpha1.BackupTool) {
+	backupTool *dataprotectionv1alpha1.BackupTool) error {
 	if component.PodSpec == nil || len(component.PodSpec.Containers) == 0 {
-		return
+		return nil
+	}
+	if backup.Status.RemoteVolume == nil {
+		return fmt.Errorf("remote volume can not be empty in Backup.status.remoteVolume")
 	}
 	container := corev1.Container{}
 	container.Name = GetRestoredInitContainerName(backup.Name)
@@ -113,8 +115,9 @@ func buildInitContainerWithFullBackup(
 	// merge env from backup tool.
 	container.Env = append(container.Env, backupTool.Spec.Env...)
 	// add volume of backup data
-	component.PodSpec.Volumes = append(component.PodSpec.Volumes, backup.Status.RemoteVolume)
+	component.PodSpec.Volumes = append(component.PodSpec.Volumes, *backup.Status.RemoteVolume)
 	component.PodSpec.InitContainers = append(component.PodSpec.InitContainers, container)
+	return nil
 }
 
 // buildVolumeClaimTemplatesWithSnapshot builds the volumeClaimTemplate if it needs to restore from volumeSnapshot

@@ -66,7 +66,7 @@ var _ = Describe("probe_utils", func() {
 		updateBackupStatus := func(backup *dataprotectionv1alpha1.Backup, backupToolName string) {
 			Expect(testapps.ChangeObjStatus(&testCtx, backup, func() {
 				backup.Status.BackupToolName = backupToolName
-				backup.Status.RemoteVolume = corev1.Volume{
+				backup.Status.RemoteVolume = &corev1.Volume{
 					Name: "backup-pvc",
 				}
 			})).Should(Succeed())
@@ -91,8 +91,6 @@ var _ = Describe("probe_utils", func() {
 						},
 					},
 				},
-				BackupType:       dataprotectionv1alpha1.BackupTypeFull,
-				BackupSourceName: backupName,
 			}
 			By("build init container to recover from full backup")
 			Expect(BuildRestoredInfo(reqCtx, k8sClient, testCtx.DefaultNamespace, component, backupName)).Should(Succeed())
@@ -119,8 +117,6 @@ var _ = Describe("probe_utils", func() {
 						},
 					},
 				},
-				BackupType:       dataprotectionv1alpha1.BackupTypeFull,
-				BackupSourceName: backupName,
 			}
 			By("build volumeClaim dataSource")
 			Expect(BuildRestoredInfo(reqCtx, k8sClient, testCtx.DefaultNamespace, component, backupName)).Should(Succeed())

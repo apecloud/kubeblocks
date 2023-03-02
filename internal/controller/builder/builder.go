@@ -147,8 +147,6 @@ func injectEnvs(params BuilderParams, envConfigName string, c *corev1.Container)
 		{name: "_CLUSTER_NAME", value: params.Cluster.Name},
 		{name: "_COMP_NAME", value: params.Component.Name},
 		{name: "_CLUSTER_COMP_NAME", value: params.Cluster.Name + "-" + params.Component.Name},
-		{name: "_RESTORE_FROM_BACKUP", value: getRestoreFromBackupEnvValue(params.Component.BackupSourceName)},
-		{name: "_BACKUP_TYPE", value: string(params.Component.BackupType)},
 	}
 	toInjectEnv := make([]corev1.EnvVar, 0, len(envFieldPathSlice)+len(c.Env))
 	for _, v := range envFieldPathSlice {
@@ -613,12 +611,4 @@ func BuildTLSSecret(namespace, clusterName, componentName string) (*corev1.Secre
 		return nil, err
 	}
 	return secret, nil
-}
-
-// getRestoreComponentEnvValue gets the bool string for KB_RESTORE_FROM_BACKUP
-func getRestoreFromBackupEnvValue(backupName string) string {
-	if len(backupName) == 0 {
-		return "false"
-	}
-	return "true"
 }

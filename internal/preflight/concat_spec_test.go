@@ -22,7 +22,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/yaml"
 
-	preflightv1beta2 "github.com/apecloud/kubeblocks/apis/preflight/v1beta2"
+	preflightv1beta2 "github.com/apecloud/kubeblocks/externalapis/preflight/v1beta2"
 )
 
 var _ = Describe("concat_spec_test", func() {

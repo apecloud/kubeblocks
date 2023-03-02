@@ -22,7 +22,7 @@ import (
 	"github.com/pkg/errors"
 	"k8s.io/client-go/kubernetes/scheme"
 
-	preflightv1beta2 "github.com/apecloud/kubeblocks/apis/preflight/v1beta2"
+	preflightv1beta2 "github.com/apecloud/kubeblocks/externalapis/preflight/v1beta2"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/cluster"
 	"github.com/apecloud/kubeblocks/internal/preflight/util"
 )

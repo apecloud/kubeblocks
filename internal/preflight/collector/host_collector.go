@@ -19,7 +19,7 @@ package collector
 import (
 	"github.com/replicatedhq/troubleshoot/pkg/collect"
 
-	preflightv1beta2 "github.com/apecloud/kubeblocks/apis/preflight/v1beta2"
+	preflightv1beta2 "github.com/apecloud/kubeblocks/externalapis/preflight/v1beta2"
 )
 
 func GetExtendHostCollector(kbCollector *preflightv1beta2.ExtendHostCollect, bundlePath string) (collect.HostCollector, bool) {

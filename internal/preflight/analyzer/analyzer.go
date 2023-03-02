@@ -23,7 +23,7 @@ import (
 	"github.com/pkg/errors"
 	analyze "github.com/replicatedhq/troubleshoot/pkg/analyze"
 
-	preflightv1beta2 "github.com/apecloud/kubeblocks/apis/preflight/v1beta2"
+	preflightv1beta2 "github.com/apecloud/kubeblocks/externalapis/preflight/v1beta2"
 )
 
 type KBAnalyzer interface {

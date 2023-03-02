@@ -35,7 +35,7 @@ import (
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
 
-	preflightv1beta2 "github.com/apecloud/kubeblocks/apis/preflight/v1beta2"
+	preflightv1beta2 "github.com/apecloud/kubeblocks/externalapis/preflight/v1beta2"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 	kbpreflight "github.com/apecloud/kubeblocks/internal/preflight"
 	kbinteractive "github.com/apecloud/kubeblocks/internal/preflight/interactive"

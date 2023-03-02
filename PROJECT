@@ -115,7 +115,7 @@ resources:
   domain: troubleshoot.sh
   group:
   kind: HostPreflight
-  path: github.com/apecloud/kubeblocks/apis/preflight/v1beta2
+  path: github.com/apecloud/kubeblocks/externalapis/preflight/v1beta2
   version: v1beta2
 - api:
     crdVersion: v1
@@ -123,6 +123,6 @@ resources:
   domain: troubleshoot.sh
   group:
   kind: Preflight
-  path: github.com/apecloud/kubeblocks/apis/preflight/v1beta2
+  path: github.com/apecloud/kubeblocks/externalapis/preflight/v1beta2
   version: v1beta2
 version: "3"

@@ -25,7 +25,7 @@ import (
 	"github.com/pkg/errors"
 	pkgcollector "github.com/replicatedhq/troubleshoot/pkg/collect"
 
-	preflightv1beta2 "github.com/apecloud/kubeblocks/apis/preflight/v1beta2"
+	preflightv1beta2 "github.com/apecloud/kubeblocks/externalapis/preflight/v1beta2"
 	"github.com/apecloud/kubeblocks/internal/preflight/util"
 )
 

@@ -22,7 +22,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	troubleshootv1beta2 "github.com/replicatedhq/troubleshoot/pkg/apis/troubleshoot/v1beta2"
+	troubleshoot "github.com/replicatedhq/troubleshoot/pkg/apis/troubleshoot/v1beta2"
 	"github.com/replicatedhq/troubleshoot/pkg/multitype"
 )
 
@@ -50,13 +50,13 @@ var _ = Describe("util_test", func() {
 
 	It("TitleOrDefault test", func() {
 		Eventually(func(g Gomega) {
-			res := TitleOrDefault(troubleshootv1beta2.HostCollectorMeta{}, "default")
+			res := TitleOrDefault(troubleshoot.HostCollectorMeta{}, "default")
 			g.Expect(res).Should(Equal("default"))
-			res = TitleOrDefault(troubleshootv1beta2.HostCollectorMeta{CollectorName: "collectName"}, "default")
+			res = TitleOrDefault(troubleshoot.HostCollectorMeta{CollectorName: "collectName"}, "default")
 			g.Expect(res).Should(Equal("collectName"))
-			res = TitleOrDefault(troubleshootv1beta2.AnalyzeMeta{}, "default")
+			res = TitleOrDefault(troubleshoot.AnalyzeMeta{}, "default")
 			g.Expect(res).Should(Equal("default"))
-			res = TitleOrDefault(troubleshootv1beta2.AnalyzeMeta{CheckName: "checkName"}, "default")
+			res = TitleOrDefault(troubleshoot.AnalyzeMeta{CheckName: "checkName"}, "default")
 			g.Expect(res).Should(Equal("checkName"))
 		}, timeout).Should(Succeed())
 	})

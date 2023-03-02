@@ -19,7 +19,7 @@ package analyzer
 import (
 	analyze "github.com/replicatedhq/troubleshoot/pkg/analyze"
 
-	preflightv1beta2 "github.com/apecloud/kubeblocks/apis/preflight/v1beta2"
+	preflightv1beta2 "github.com/apecloud/kubeblocks/externalapis/preflight/v1beta2"
 )
 
 func GetHostAnalyzer(analyzer *preflightv1beta2.ExtendHostAnalyze) (analyze.HostAnalyzer, bool) {

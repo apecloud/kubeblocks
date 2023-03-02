@@ -21,7 +21,6 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-
 	"github.com/spf13/viper"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -30,6 +29,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 )
@@ -112,7 +112,7 @@ var _ = Describe("Backup Policy Controller", func() {
 					SetBackupsHistoryLimit(1).
 					SetSchedule(defaultSchedule).
 					SetTTL(defaultTTL).
-					AddMatchLabels(intctrlutil.AppInstanceLabelKey, clusterName).
+					AddMatchLabels(constant.AppInstanceLabelKey, clusterName).
 					SetTargetSecretName(clusterName).
 					AddHookPreCommand("touch /data/mysql/.restore;sync").
 					AddHookPostCommand("rm -f /data/mysql/.restore;sync").
@@ -135,7 +135,7 @@ var _ = Describe("Backup Policy Controller", func() {
 				}
 
 				autoBackupLabel := map[string]string{
-					intctrlutil.AppInstanceLabelKey:  backupPolicy.Labels[intctrlutil.AppInstanceLabelKey],
+					constant.AppInstanceLabelKey:     backupPolicy.Labels[constant.AppInstanceLabelKey],
 					dataProtectionLabelAutoBackupKey: "true",
 				}
 
@@ -215,7 +215,7 @@ var _ = Describe("Backup Policy Controller", func() {
 				By("By creating a backupPolicy from backupTool: " + backupToolName)
 				backupPolicy = testapps.NewBackupPolicyFactory(testCtx.DefaultNamespace, backupPolicyName).
 					SetBackupToolName(backupToolName).
-					AddMatchLabels(intctrlutil.AppInstanceLabelKey, clusterName).
+					AddMatchLabels(constant.AppInstanceLabelKey, clusterName).
 					SetTargetSecretName(clusterName).
 					AddHookPreCommand("touch /data/mysql/.restore;sync").
 					AddHookPostCommand("rm -f /data/mysql/.restore;sync").
@@ -238,7 +238,7 @@ var _ = Describe("Backup Policy Controller", func() {
 				backupPolicy = testapps.NewBackupPolicyFactory(testCtx.DefaultNamespace, backupPolicyName).
 					SetBackupToolName(backupToolName).
 					SetSchedule("invalid schedule").
-					AddMatchLabels(intctrlutil.AppInstanceLabelKey, clusterName).
+					AddMatchLabels(constant.AppInstanceLabelKey, clusterName).
 					SetTargetSecretName(clusterName).
 					AddHookPreCommand("touch /data/mysql/.restore;sync").
 					AddHookPostCommand("rm -f /data/mysql/.restore;sync").
@@ -272,7 +272,7 @@ var _ = Describe("Backup Policy Controller", func() {
 				By("By creating a backupPolicy from backupTool: " + backupToolName)
 				backupPolicy = testapps.NewBackupPolicyFactory(testCtx.DefaultNamespace, backupPolicyName).
 					SetBackupPolicyTplName(template.Name).
-					AddMatchLabels(intctrlutil.AppInstanceLabelKey, clusterName).
+					AddMatchLabels(constant.AppInstanceLabelKey, clusterName).
 					SetTargetSecretName(clusterName).
 					SetRemoteVolumePVC(backupRemoteVolumeName, backupRemotePVCName).
 					Create(&testCtx).GetObject()
@@ -301,7 +301,7 @@ var _ = Describe("Backup Policy Controller", func() {
 				By("By creating a backupPolicy from backupTool: " + backupToolName)
 				backupPolicy = testapps.NewBackupPolicyFactory(testCtx.DefaultNamespace, backupPolicyName).
 					SetBackupPolicyTplName(template.Name).
-					AddMatchLabels(intctrlutil.AppInstanceLabelKey, clusterName).
+					AddMatchLabels(constant.AppInstanceLabelKey, clusterName).
 					SetTargetSecretName(clusterName).
 					SetRemoteVolumePVC(backupRemoteVolumeName, backupRemotePVCName).
 					Create(&testCtx).GetObject()

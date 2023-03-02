@@ -35,6 +35,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -341,6 +342,6 @@ func (r *RestoreJobReconciler) patchTargetCluster(reqCtx intctrlutil.RequestCtx,
 func buildRestoreJobLabels(jobName string) map[string]string {
 	return map[string]string{
 		dataProtectionLabelRestoreJobNameKey: jobName,
-		intctrlutil.AppManagedByLabelKey:     intctrlutil.AppName,
+		constant.AppManagedByLabelKey:        constant.AppName,
 	}
 }

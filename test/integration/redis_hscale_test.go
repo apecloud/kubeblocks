@@ -23,7 +23,6 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -31,6 +30,7 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/replicationset"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
+	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 	testk8s "github.com/apecloud/kubeblocks/internal/testutil/k8s"
@@ -109,9 +109,9 @@ var _ = Describe("Redis Horizontal Scale function", func() {
 		By("Checking statefulSet role label")
 		for _, sts := range stsList.Items {
 			if strings.HasSuffix(sts.Name, strconv.Itoa(testapps.DefaultReplicationPrimaryIndex)) {
-				Expect(sts.Labels[intctrlutil.RoleLabelKey]).Should(BeEquivalentTo(replicationset.Primary))
+				Expect(sts.Labels[constant.RoleLabelKey]).Should(BeEquivalentTo(replicationset.Primary))
 			} else {
-				Expect(sts.Labels[intctrlutil.RoleLabelKey]).Should(BeEquivalentTo(replicationset.Secondary))
+				Expect(sts.Labels[constant.RoleLabelKey]).Should(BeEquivalentTo(replicationset.Secondary))
 			}
 		}
 
@@ -121,16 +121,16 @@ var _ = Describe("Redis Horizontal Scale function", func() {
 			Expect(err).To(Succeed())
 			Expect(len(podList)).Should(BeEquivalentTo(1))
 			if strings.HasSuffix(sts.Name, strconv.Itoa(testapps.DefaultReplicationPrimaryIndex)) {
-				Expect(podList[0].Labels[intctrlutil.RoleLabelKey]).Should(BeEquivalentTo(replicationset.Primary))
+				Expect(podList[0].Labels[constant.RoleLabelKey]).Should(BeEquivalentTo(replicationset.Primary))
 			} else {
-				Expect(podList[0].Labels[intctrlutil.RoleLabelKey]).Should(BeEquivalentTo(replicationset.Secondary))
+				Expect(podList[0].Labels[constant.RoleLabelKey]).Should(BeEquivalentTo(replicationset.Secondary))
 			}
 		}
 
 		By("Checking services status")
 		svcList := &corev1.ServiceList{}
 		Expect(k8sClient.List(ctx, svcList, client.MatchingLabels{
-			intctrlutil.AppInstanceLabelKey: clusterKey.Name,
+			constant.AppInstanceLabelKey: clusterKey.Name,
 		}, client.InNamespace(clusterKey.Namespace))).Should(Succeed())
 		// we should have both external service and headless service
 		Expect(len(svcList.Items)).Should(Equal(2))

@@ -18,13 +18,13 @@ package appstest
 import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
@@ -137,7 +137,7 @@ var _ = Describe("MySQL data protection function", func() {
 		backupPolicyObj := testapps.NewBackupPolicyFactory(testCtx.DefaultNamespace, backupPolicyName).
 			WithRandomName().
 			SetBackupPolicyTplName(backupPolicyTemplateName).
-			AddMatchLabels(intctrlutil.AppInstanceLabelKey, clusterKey.Name).
+			AddMatchLabels(constant.AppInstanceLabelKey, clusterKey.Name).
 			SetTargetSecretName(component.GenerateConnCredential(clusterKey.Name)).
 			SetRemoteVolumePVC(backupRemoteVolumeName, backupRemotePVCName).
 			Create(&testCtx).GetObject()

@@ -26,6 +26,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
@@ -35,12 +36,11 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
-
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/replicationset"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
+	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 	testk8s "github.com/apecloud/kubeblocks/internal/testutil/k8s"
@@ -114,7 +114,7 @@ var _ = Describe("Cluster Controller", func() {
 		By("Check deployment workload has been created")
 		Eventually(testapps.GetListLen(&testCtx, intctrlutil.DeploymentSignature,
 			client.MatchingLabels{
-				intctrlutil.AppInstanceLabelKey: clusterKey.Name,
+				constant.AppInstanceLabelKey: clusterKey.Name,
 			}, client.InNamespace(clusterKey.Namespace))).ShouldNot(Equal(0))
 
 		stsList := testk8s.ListAndCheckStatefulSet(&testCtx, clusterKey)
@@ -143,19 +143,19 @@ var _ = Describe("Cluster Controller", func() {
 		By("Check associated PDB has been created")
 		Eventually(testapps.GetListLen(&testCtx, intctrlutil.PodDisruptionBudgetSignature,
 			client.MatchingLabels{
-				intctrlutil.AppInstanceLabelKey: clusterKey.Name,
+				constant.AppInstanceLabelKey: clusterKey.Name,
 			}, client.InNamespace(clusterKey.Namespace))).Should(Equal(0))
 
 		podSpec := stsList.Items[0].Spec.Template.Spec
 		By("Checking created sts pods template with built-in toleration")
 		Expect(len(podSpec.Tolerations) == 1).Should(BeTrue())
-		Expect(podSpec.Tolerations[0].Key).To(Equal(intctrlutil.KubeBlocksDataNodeTolerationKey))
+		Expect(podSpec.Tolerations[0].Key).To(Equal(constant.KubeBlocksDataNodeTolerationKey))
 
 		By("Checking created sts pods template with built-in Affinity")
 		Expect(podSpec.Affinity.PodAntiAffinity == nil && podSpec.Affinity.PodAffinity == nil).Should(BeTrue())
 		Expect(podSpec.Affinity.NodeAffinity).ShouldNot(BeNil())
 		Expect(podSpec.Affinity.NodeAffinity.PreferredDuringSchedulingIgnoredDuringExecution[0].Preference.MatchExpressions[0].Key).To(
-			Equal(intctrlutil.KubeBlocksDataNodeLabelKey))
+			Equal(constant.KubeBlocksDataNodeLabelKey))
 
 		By("Checking created sts pods template without TopologySpreadConstraints")
 		Expect(len(podSpec.TopologySpreadConstraints) == 0).Should(BeTrue())
@@ -163,8 +163,8 @@ var _ = Describe("Cluster Controller", func() {
 		By("Check should create env configmap")
 		Eventually(testapps.GetListLen(&testCtx, intctrlutil.ConfigMapSignature,
 			client.MatchingLabels{
-				intctrlutil.AppInstanceLabelKey:   clusterKey.Name,
-				intctrlutil.AppConfigTypeLabelKey: "kubeblocks-env",
+				constant.AppInstanceLabelKey:   clusterKey.Name,
+				constant.AppConfigTypeLabelKey: "kubeblocks-env",
 			}, client.InNamespace(clusterKey.Namespace))).Should(Equal(2))
 	}
 
@@ -183,8 +183,8 @@ var _ = Describe("Cluster Controller", func() {
 		By("Checking proxy should have external ClusterIP service")
 		svcList1 := &corev1.ServiceList{}
 		Expect(k8sClient.List(testCtx.Ctx, svcList1, client.MatchingLabels{
-			intctrlutil.AppInstanceLabelKey:    clusterKey.Name,
-			intctrlutil.KBAppComponentLabelKey: nginxCompName,
+			constant.AppInstanceLabelKey:    clusterKey.Name,
+			constant.KBAppComponentLabelKey: nginxCompName,
 		}, client.InNamespace(clusterKey.Namespace))).Should(Succeed())
 		// TODO fix me later, proxy should not have internal headless service
 		// Expect(len(svcList1.Items) == 1).Should(BeTrue())
@@ -224,8 +224,8 @@ var _ = Describe("Cluster Controller", func() {
 
 		svcList2 := &corev1.ServiceList{}
 		Expect(k8sClient.List(testCtx.Ctx, svcList2, client.MatchingLabels{
-			intctrlutil.AppInstanceLabelKey:    clusterKey.Name,
-			intctrlutil.KBAppComponentLabelKey: mysqlCompName,
+			constant.AppInstanceLabelKey:    clusterKey.Name,
+			constant.KBAppComponentLabelKey: mysqlCompName,
 		}, client.InNamespace(clusterKey.Namespace))).Should(Succeed())
 		Expect(len(svcList2.Items)).Should(BeEquivalentTo(1))
 		Expect(svcList2.Items[0].Spec.Type == corev1.ServiceTypeClusterIP).To(BeTrue())
@@ -369,8 +369,8 @@ var _ = Describe("Cluster Controller", func() {
 		By("Checking Backup created")
 		Eventually(testapps.GetListLen(&testCtx, intctrlutil.BackupSignature,
 			client.MatchingLabels{
-				intctrlutil.AppInstanceLabelKey:    clusterKey.Name,
-				intctrlutil.KBAppComponentLabelKey: comp.Name,
+				constant.AppInstanceLabelKey:    clusterKey.Name,
+				constant.KBAppComponentLabelKey: comp.Name,
 			}, client.InNamespace(clusterKey.Namespace))).Should(Equal(1))
 
 		By("Mocking VolumeSnapshot and set it as ReadyToUse")
@@ -383,9 +383,9 @@ var _ = Describe("Cluster Controller", func() {
 				Name:      snapshotKey.Name,
 				Namespace: snapshotKey.Namespace,
 				Labels: map[string]string{
-					intctrlutil.AppManagedByLabelKey:   intctrlutil.AppName,
-					intctrlutil.AppInstanceLabelKey:    clusterKey.Name,
-					intctrlutil.KBAppComponentLabelKey: comp.Name,
+					constant.AppManagedByLabelKey:   constant.AppName,
+					constant.AppInstanceLabelKey:    clusterKey.Name,
+					constant.KBAppComponentLabelKey: comp.Name,
 				}},
 			Spec: snapshotv1.VolumeSnapshotSpec{
 				Source: snapshotv1.VolumeSnapshotSource{
@@ -414,8 +414,8 @@ var _ = Describe("Cluster Controller", func() {
 		By("Check backup job cleanup")
 		Eventually(testapps.GetListLen(&testCtx, intctrlutil.BackupSignature,
 			client.MatchingLabels{
-				intctrlutil.AppInstanceLabelKey:    clusterKey.Name,
-				intctrlutil.KBAppComponentLabelKey: comp.Name,
+				constant.AppInstanceLabelKey:    clusterKey.Name,
+				constant.KBAppComponentLabelKey: comp.Name,
 			}, client.InNamespace(clusterKey.Namespace))).Should(Equal(0))
 		Eventually(testapps.CheckObjExists(&testCtx, snapshotKey, &snapshotv1.VolumeSnapshot{}, false)).Should(Succeed())
 
@@ -542,7 +542,7 @@ var _ = Describe("Cluster Controller", func() {
 					Name:      getPVCName(mysqlCompName, i),
 					Namespace: clusterKey.Namespace,
 					Labels: map[string]string{
-						intctrlutil.AppInstanceLabelKey: clusterKey.Name,
+						constant.AppInstanceLabelKey: clusterKey.Name,
 					}},
 				Spec: pvcSpec,
 			}
@@ -723,8 +723,8 @@ var _ = Describe("Cluster Controller", func() {
 					Name:      stsName + "-" + strconv.Itoa(i),
 					Namespace: testCtx.DefaultNamespace,
 					Labels: map[string]string{
-						intctrlutil.AppInstanceLabelKey:       clusterName,
-						intctrlutil.KBAppComponentLabelKey:    componentName,
+						constant.AppInstanceLabelKey:          clusterName,
+						constant.KBAppComponentLabelKey:       componentName,
 						appsv1.ControllerRevisionHashLabelKey: "mock-version",
 					},
 				},
@@ -830,7 +830,7 @@ var _ = Describe("Cluster Controller", func() {
 			// 2 followers
 			leaderCount, followerCount := 0, 0
 			for _, pod := range pods {
-				switch pod.Labels[intctrlutil.RoleLabelKey] {
+				switch pod.Labels[constant.RoleLabelKey] {
 				case leader:
 					leaderCount++
 				case follower:
@@ -879,9 +879,9 @@ var _ = Describe("Cluster Controller", func() {
 					Name:      sts.Name + "-0",
 					Namespace: testCtx.DefaultNamespace,
 					Labels: map[string]string{
-						intctrlutil.RoleLabelKey:              sts.Labels[intctrlutil.RoleLabelKey],
-						intctrlutil.AppInstanceLabelKey:       clusterName,
-						intctrlutil.KBAppComponentLabelKey:    componentName,
+						constant.RoleLabelKey:                 sts.Labels[constant.RoleLabelKey],
+						constant.AppInstanceLabelKey:          clusterName,
+						constant.KBAppComponentLabelKey:       componentName,
 						appsv1.ControllerRevisionHashLabelKey: sts.Status.UpdateRevision,
 					},
 				},
@@ -930,9 +930,9 @@ var _ = Describe("Cluster Controller", func() {
 		By("Checking statefulSet role label")
 		for _, sts := range stsList.Items {
 			if strings.HasSuffix(sts.Name, strconv.Itoa(testapps.DefaultReplicationPrimaryIndex)) {
-				Expect(sts.Labels[intctrlutil.RoleLabelKey]).Should(BeEquivalentTo(replicationset.Primary))
+				Expect(sts.Labels[constant.RoleLabelKey]).Should(BeEquivalentTo(replicationset.Primary))
 			} else {
-				Expect(sts.Labels[intctrlutil.RoleLabelKey]).Should(BeEquivalentTo(replicationset.Secondary))
+				Expect(sts.Labels[constant.RoleLabelKey]).Should(BeEquivalentTo(replicationset.Secondary))
 			}
 		}
 
@@ -1003,9 +1003,9 @@ var _ = Describe("Cluster Controller", func() {
 				Name:      backupKey.Name,
 				Namespace: backupKey.Namespace,
 				Labels: map[string]string{
-					intctrlutil.AppInstanceLabelKey:    clusterKey.Name,
-					intctrlutil.KBAppComponentLabelKey: mysqlCompName,
-					intctrlutil.AppManagedByLabelKey:   intctrlutil.AppName,
+					constant.AppInstanceLabelKey:    clusterKey.Name,
+					constant.KBAppComponentLabelKey: mysqlCompName,
+					constant.AppManagedByLabelKey:   constant.AppName,
 				},
 			},
 			Spec: dataprotectionv1alpha1.BackupSpec{

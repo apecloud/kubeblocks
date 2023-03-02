@@ -27,6 +27,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -173,7 +174,7 @@ func GetPodListByStatefulSet(ctx context.Context, cli client.Client, stsObj *app
 	podList := &corev1.PodList{}
 	if err := cli.List(ctx, podList,
 		&client.ListOptions{Namespace: stsObj.Namespace},
-		client.MatchingLabels{intctrlutil.KBAppComponentLabelKey: stsObj.Labels[intctrlutil.KBAppComponentLabelKey]}); err != nil {
+		client.MatchingLabels{constant.KBAppComponentLabelKey: stsObj.Labels[constant.KBAppComponentLabelKey]}); err != nil {
 		return nil, err
 	}
 	pods := make([]corev1.Pod, 0)

@@ -181,7 +181,7 @@ func PrepareComponentResources(reqCtx intctrlutil.RequestCtx, cli client.Client,
 			addLeaderSelectorLabels(svc, task.Component)
 		}
 		if task.Component.WorkloadType == appsv1alpha1.Replication {
-			svc.Spec.Selector[intctrlutil.RoleLabelKey] = string(replicationset.Primary)
+			svc.Spec.Selector[constant.RoleLabelKey] = string(replicationset.Primary)
 		}
 		task.AppendResource(svc)
 	}
@@ -200,7 +200,7 @@ func needBuildPDB(task *intctrltypes.ReconcileTask) bool {
 func addLeaderSelectorLabels(service *corev1.Service, component *component.SynthesizedComponent) {
 	leader := component.ConsensusSpec.Leader
 	if len(leader.Name) > 0 {
-		service.Spec.Selector[intctrlutil.RoleLabelKey] = leader.Name
+		service.Spec.Selector[constant.RoleLabelKey] = leader.Name
 	}
 }
 
@@ -232,9 +232,9 @@ func buildReplicationSet(reqCtx intctrlutil.RequestCtx,
 	}
 	// sts.Name rename and add role label.
 	sts.ObjectMeta.Name = fmt.Sprintf("%s-%d", sts.ObjectMeta.Name, stsIndex)
-	sts.Labels[intctrlutil.RoleLabelKey] = string(replicationset.Secondary)
+	sts.Labels[constant.RoleLabelKey] = string(replicationset.Secondary)
 	if stsIndex == *task.Component.PrimaryIndex {
-		sts.Labels[intctrlutil.RoleLabelKey] = string(replicationset.Primary)
+		sts.Labels[constant.RoleLabelKey] = string(replicationset.Primary)
 	}
 	sts.Spec.UpdateStrategy.Type = appsv1.OnDeleteStatefulSetStrategyType
 	// build replicationSet persistentVolumeClaim manually
@@ -292,9 +292,9 @@ func injectReplicationSetPodEnvAndLabel(task *intctrltypes.ReconcileTask, sts *a
 		})
 	}
 	if index != *task.Component.PrimaryIndex {
-		sts.Spec.Template.Labels[intctrlutil.RoleLabelKey] = string(replicationset.Secondary)
+		sts.Spec.Template.Labels[constant.RoleLabelKey] = string(replicationset.Secondary)
 	} else {
-		sts.Spec.Template.Labels[intctrlutil.RoleLabelKey] = string(replicationset.Primary)
+		sts.Spec.Template.Labels[constant.RoleLabelKey] = string(replicationset.Primary)
 	}
 	return sts, nil
 }
@@ -304,7 +304,7 @@ func buildPersistentVolumeClaimLabels(sts *appsv1.StatefulSet, pvc *corev1.Persi
 	if pvc.Labels == nil {
 		pvc.Labels = make(map[string]string)
 	}
-	pvc.Labels[intctrlutil.VolumeClaimTemplateNameLabelKey] = pvc.Name
+	pvc.Labels[constant.VolumeClaimTemplateNameLabelKey] = pvc.Name
 	for k, v := range sts.Labels {
 		if _, ok := pvc.Labels[k]; !ok {
 			pvc.Labels[k] = v
@@ -383,7 +383,7 @@ func updateCMConfigSelectorLabels(cm *corev1.ConfigMap, tpl appsv1alpha1.ConfigT
 	if cm.Labels == nil {
 		cm.Labels = make(map[string]string)
 	}
-	cm.Labels[cfgcore.CMConfigurationCMKeysLabelKey] = strings.Join(tpl.Keys, ",")
+	cm.Labels[constant.CMConfigurationCMKeysLabelKey] = strings.Join(tpl.Keys, ",")
 }
 
 // generateConfigMapFromTpl render config file by config template provided by provider.
@@ -467,7 +467,7 @@ func updateStatefulLabelsWithTemplate(sts *appsv1.StatefulSet, allLabels map[str
 	// full configmap upgrade
 	existLabels := make(map[string]string)
 	for key, val := range sts.Labels {
-		if strings.HasPrefix(key, cfgcore.ConfigurationTplLabelPrefixKey) {
+		if strings.HasPrefix(key, constant.ConfigurationTplLabelPrefixKey) {
 			existLabels[key] = val
 		}
 	}
@@ -590,10 +590,10 @@ func getUsingVolumesByCfgTemplates(podSpec *corev1.PodSpec, cfgTemplates []appsv
 
 func buildConfigManagerParams(cli client.Client, ctx context.Context, cfgTemplates []appsv1alpha1.ConfigTemplate, volumeDirs []corev1.VolumeMount, volumePath string, volumeName string, params builder.BuilderParams) (*cfgcm.ConfigManagerParams, error) {
 	configManagerParams := &cfgcm.ConfigManagerParams{
-		ManagerName:   cfgcore.ConfigSidecarName,
+		ManagerName:   constant.ConfigSidecarName,
 		CharacterType: params.Component.CharacterType,
 		SecreteName:   component.GenerateConnCredential(params.Cluster.Name),
-		Image:         viper.GetString(cfgcore.ConfigSidecarIMAGE),
+		Image:         viper.GetString(constant.ConfigSidecarIMAGE),
 		// add cri sock path
 		Volumes: append(volumeDirs, corev1.VolumeMount{
 			Name:      volumeName,

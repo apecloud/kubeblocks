@@ -20,13 +20,14 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 
+	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 // PodIsReady checks whether pod is ready or not if the component is ConsensusSet or ReplicationSet,
 // it will be available when the pod is ready and labeled with its role.
 func PodIsReady(pod corev1.Pod) bool {
-	if _, ok := pod.Labels[intctrlutil.RoleLabelKey]; !ok {
+	if _, ok := pod.Labels[constant.RoleLabelKey]; !ok {
 		return false
 	}
 

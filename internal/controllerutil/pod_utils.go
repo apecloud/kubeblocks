@@ -29,6 +29,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
 // statefulPodRegex is a regular expression that extracts the parent StatefulSet and ordinal from the Name of a Pod
@@ -329,9 +330,9 @@ func GetPortByPortName(pod *corev1.Pod, portName string) (int32, error) {
 }
 
 func GetProbeGRPCPort(pod *corev1.Pod) (int32, error) {
-	return GetPortByPortName(pod, ProbeGRPCPortName)
+	return GetPortByPortName(pod, constant.ProbeGRPCPortName)
 }
 
 func GetProbeHTTPPort(pod *corev1.Pod) (int32, error) {
-	return GetPortByPortName(pod, ProbeHTTPPortName)
+	return GetPortByPortName(pod, constant.ProbeHTTPPortName)
 }

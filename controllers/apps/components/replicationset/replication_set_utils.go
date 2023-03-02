@@ -21,18 +21,16 @@ import (
 	"fmt"
 	"sort"
 
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
-
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
-
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
 type ReplicationRole string
@@ -51,7 +49,7 @@ func HandleReplicationSet(ctx context.Context,
 	stsList []*appsv1.StatefulSet) error {
 
 	filter := func(stsObj *appsv1.StatefulSet) (bool, error) {
-		compDefName := cluster.GetComponentDefRefName(stsObj.Labels[intctrlutil.KBAppComponentLabelKey])
+		compDefName := cluster.GetComponentDefRefName(stsObj.Labels[constant.KBAppComponentLabelKey])
 		component, err := util.GetComponentDefByCluster(ctx, cli, cluster, compDefName)
 		if err != nil {
 			return false, err
@@ -79,7 +77,7 @@ func HandleReplicationSet(ctx context.Context,
 		if skip {
 			continue
 		}
-		compOwnsStsMap[stsObj.Labels[intctrlutil.KBAppComponentLabelKey]] = append(compOwnsStsMap[stsObj.Labels[intctrlutil.KBAppComponentLabelKey]], stsObj)
+		compOwnsStsMap[stsObj.Labels[constant.KBAppComponentLabelKey]] = append(compOwnsStsMap[stsObj.Labels[constant.KBAppComponentLabelKey]], stsObj)
 	}
 
 	// compOwnsPodToSyncMap is used to record the list of component pods to be synchronized to cluster.status except for horizontal scale-in
@@ -168,7 +166,7 @@ func SyncReplicationSetClusterStatus(cli client.Client,
 	cluster := &appsv1alpha1.Cluster{}
 	err := cli.Get(ctx, types.NamespacedName{
 		Namespace: podList[0].Namespace,
-		Name:      podList[0].Labels[intctrlutil.AppInstanceLabelKey],
+		Name:      podList[0].Labels[constant.AppInstanceLabelKey],
 	}, cluster)
 	if err != nil {
 		return err
@@ -208,13 +206,13 @@ func RemoveReplicationSetClusterStatus(cli client.Client, ctx context.Context, s
 	cluster := &appsv1alpha1.Cluster{}
 	err := cli.Get(ctx, types.NamespacedName{
 		Namespace: stsList[0].Namespace,
-		Name:      stsList[0].Labels[intctrlutil.AppInstanceLabelKey],
+		Name:      stsList[0].Labels[constant.AppInstanceLabelKey],
 	}, cluster)
 	if err != nil {
 		return err
 	}
 	patch := client.MergeFrom(cluster.DeepCopy())
-	componentName := stsList[0].Labels[intctrlutil.KBAppComponentLabelKey]
+	componentName := stsList[0].Labels[constant.KBAppComponentLabelKey]
 	replicationSetStatus := cluster.Status.Components[componentName].ReplicationSetStatus
 	needRemove, err := needRemoveReplicationSetStatus(replicationSetStatus, allPodList)
 	if err != nil {
@@ -232,7 +230,7 @@ func RemoveReplicationSetClusterStatus(cli client.Client, ctx context.Context, s
 func needUpdateReplicationSetStatus(replicationStatus *appsv1alpha1.ReplicationSetStatus, podList []*corev1.Pod) bool {
 	needUpdate := false
 	for _, pod := range podList {
-		role := pod.Labels[intctrlutil.RoleLabelKey]
+		role := pod.Labels[constant.RoleLabelKey]
 		if role == string(Primary) {
 			if replicationStatus.Primary.Pod == pod.Name {
 				continue
@@ -279,7 +277,7 @@ func needRemoveReplicationSetStatus(replicationStatus *appsv1alpha1.ReplicationS
 // CheckStsIsPrimary checks whether it is the primary statefulSet through the label tag on sts.
 func CheckStsIsPrimary(sts *appsv1.StatefulSet) bool {
 	if sts != nil && sts.Labels != nil {
-		return sts.Labels[intctrlutil.RoleLabelKey] == string(Primary)
+		return sts.Labels[constant.RoleLabelKey] == string(Primary)
 	}
 	return false
 }

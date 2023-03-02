@@ -38,7 +38,7 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/replicationset"
-	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
+	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
 	"github.com/apecloud/kubeblocks/internal/controller/plan"
@@ -134,11 +134,11 @@ func prepareConnCredential(reqCtx intctrlutil.RequestCtx, cli client.Client, tas
 // mergeAnnotations keeps the original annotations.
 // if annotations exist and are replaced, the Deployment/StatefulSet will be updated.
 func mergeAnnotations(originalAnnotations, targetAnnotations map[string]string) map[string]string {
-	if restartAnnotation, ok := originalAnnotations[intctrlutil.RestartAnnotationKey]; ok {
+	if restartAnnotation, ok := originalAnnotations[constant.RestartAnnotationKey]; ok {
 		if targetAnnotations == nil {
 			targetAnnotations = map[string]string{}
 		}
-		targetAnnotations[intctrlutil.RestartAnnotationKey] = restartAnnotation
+		targetAnnotations[constant.RestartAnnotationKey] = restartAnnotation
 	}
 	return targetAnnotations
 }
@@ -183,7 +183,7 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 			Name:      stsObj.Name + "-scaling",
 		}
 		// find component of current statefulset
-		componentName := stsObj.Labels[intctrlutil.KBAppComponentLabelKey]
+		componentName := stsObj.Labels[constant.KBAppComponentLabelKey]
 		components := mergeComponentsList(reqCtx,
 			cluster,
 			clusterDef,
@@ -404,19 +404,19 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 
 	handleConfigMap := func(cm *corev1.ConfigMap) error {
 		switch {
-		case len(cm.Labels[intctrlutil.AppConfigTypeLabelKey]) > 0:
+		case len(cm.Labels[constant.AppConfigTypeLabelKey]) > 0:
 			// if configmap is env config, should update
 			if err := cli.Update(ctx, cm); err != nil {
 				return err
 			}
-		case len(cm.Labels[cfgcore.CMConfigurationProviderTplLabelKey]) > 0:
+		case len(cm.Labels[constant.CMConfigurationProviderTplLabelKey]) > 0:
 			// if tls settings updated, do Update
 			// FIXME: very hacky way. should allow config to be updated
 			oldCm := &corev1.ConfigMap{}
 			if err := cli.Get(ctx, client.ObjectKeyFromObject(cm), oldCm); err != nil {
 				return err
 			}
-			compName := cm.Labels[intctrlutil.KBAppComponentLabelKey]
+			compName := cm.Labels[constant.KBAppComponentLabelKey]
 			clusterDefComp := component.GetClusterDefCompByName(*clusterDef, *cluster, compName)
 			if clusterDefComp == nil {
 				return errors.New("clusterDefComp not found")
@@ -448,7 +448,7 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 		}
 		if !reflect.DeepEqual(&deployObjCopy.Spec, &deployObj.Spec) {
 			// sync component phase
-			componentName := deployObj.Labels[intctrlutil.KBAppComponentLabelKey]
+			componentName := deployObj.Labels[constant.KBAppComponentLabelKey]
 			syncComponentPhaseWhenSpecUpdating(cluster, componentName)
 		}
 		return nil
@@ -567,7 +567,7 @@ func createBackup(reqCtx intctrlutil.RequestCtx,
 	createBackupPolicy := func() (backupPolicyName string, err error) {
 		backupPolicyName = ""
 		backupPolicyList := dataprotectionv1alpha1.BackupPolicyList{}
-		ml := getBackupMatchingLabels(cluster.Name, sts.Labels[intctrlutil.KBAppComponentLabelKey])
+		ml := getBackupMatchingLabels(cluster.Name, sts.Labels[constant.KBAppComponentLabelKey])
 		if err = cli.List(ctx, &backupPolicyList, ml); err != nil {
 			return
 		}
@@ -598,7 +598,7 @@ func createBackup(reqCtx intctrlutil.RequestCtx,
 
 	createBackup := func(backupPolicyName string) error {
 		backupList := dataprotectionv1alpha1.BackupList{}
-		ml := getBackupMatchingLabels(cluster.Name, sts.Labels[intctrlutil.KBAppComponentLabelKey])
+		ml := getBackupMatchingLabels(cluster.Name, sts.Labels[constant.KBAppComponentLabelKey])
 		if err := cli.List(ctx, &backupList, ml); err != nil {
 			return err
 		}
@@ -1014,9 +1014,9 @@ func isPVCExists(cli client.Client,
 
 func getBackupMatchingLabels(clusterName string, componentName string) client.MatchingLabels {
 	return client.MatchingLabels{
-		intctrlutil.AppInstanceLabelKey:    clusterName,
-		intctrlutil.KBAppComponentLabelKey: componentName,
-		intctrlutil.AppManagedByLabelKey:   intctrlutil.AppName,
+		constant.AppInstanceLabelKey:    clusterName,
+		constant.KBAppComponentLabelKey: componentName,
+		constant.AppManagedByLabelKey:   constant.AppName,
 	}
 }
 

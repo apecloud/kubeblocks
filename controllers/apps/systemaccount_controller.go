@@ -37,6 +37,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -389,11 +390,11 @@ func (r *jobCompletitionPredicate) Delete(e event.DeleteEvent) bool {
 	if !ok {
 		return false
 	}
-	clusterName, ok := ml[intctrlutil.AppInstanceLabelKey]
+	clusterName, ok := ml[constant.AppInstanceLabelKey]
 	if !ok {
 		return false
 	}
-	componentName, ok := ml[intctrlutil.KBAppComponentLabelKey]
+	componentName, ok := ml[constant.KBAppComponentLabelKey]
 	if !ok {
 		return false
 	}

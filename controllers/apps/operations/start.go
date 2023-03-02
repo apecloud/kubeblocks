@@ -24,7 +24,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
 type StartOpsHandler struct{}
@@ -65,7 +65,7 @@ func (start StartOpsHandler) Action(opsRes *OpsResource) error {
 		}
 	}
 	// delete the replicas snapshot of components from the cluster.
-	delete(cluster.Annotations, intctrlutil.SnapShotForStartAnnotationKey)
+	delete(cluster.Annotations, constant.SnapShotForStartAnnotationKey)
 	return opsRes.Client.Update(opsRes.Ctx, cluster)
 }
 
@@ -133,9 +133,9 @@ func (start StartOpsHandler) setOpsAnnotation(opsRes *OpsResource, componentRepl
 	if err != nil {
 		return err
 	}
-	if _, ok := opsRes.OpsRequest.Annotations[intctrlutil.SnapShotForStartAnnotationKey]; !ok {
+	if _, ok := opsRes.OpsRequest.Annotations[constant.SnapShotForStartAnnotationKey]; !ok {
 		patch := client.MergeFrom(opsRes.OpsRequest.DeepCopy())
-		annotations[intctrlutil.SnapShotForStartAnnotationKey] = string(componentReplicasSnapshot)
+		annotations[constant.SnapShotForStartAnnotationKey] = string(componentReplicasSnapshot)
 		opsRes.OpsRequest.Annotations = annotations
 		return opsRes.Client.Patch(opsRes.Ctx, opsRes.OpsRequest, patch)
 	}
@@ -145,7 +145,7 @@ func (start StartOpsHandler) setOpsAnnotation(opsRes *OpsResource, componentRepl
 // getComponentReplicasSnapshot gets the replicas snapshot of components from annotations.
 func (start StartOpsHandler) getComponentReplicasSnapshot(annotations map[string]string) (map[string]int32, error) {
 	componentReplicasMap := map[string]int32{}
-	snapshotForStart := annotations[intctrlutil.SnapShotForStartAnnotationKey]
+	snapshotForStart := annotations[constant.SnapShotForStartAnnotationKey]
 	if len(snapshotForStart) != 0 {
 		if err := json.Unmarshal([]byte(snapshotForStart), &componentReplicasMap); err != nil {
 			return componentReplicasMap, err

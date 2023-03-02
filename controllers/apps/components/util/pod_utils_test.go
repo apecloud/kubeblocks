@@ -24,7 +24,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	"github.com/apecloud/kubeblocks/internal/constant"
 	testk8s "github.com/apecloud/kubeblocks/internal/testutil/k8s"
 )
 
@@ -37,7 +37,7 @@ func TestPodIsReady(t *testing.T) {
 			Status: v1.ConditionTrue,
 		},
 	}
-	pod.Labels = map[string]string{intctrlutil.RoleLabelKey: "leader"}
+	pod.Labels = map[string]string{constant.RoleLabelKey: "leader"}
 	if !PodIsReady(*pod) {
 		t.Errorf("isReady returned false negative")
 	}

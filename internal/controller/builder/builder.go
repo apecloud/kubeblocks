@@ -209,7 +209,7 @@ func buildPersistentVolumeClaimLabels(sts *appsv1.StatefulSet, pvc *corev1.Persi
 	if pvc.Labels == nil {
 		pvc.Labels = make(map[string]string)
 	}
-	pvc.Labels[intctrlutil.VolumeClaimTemplateNameLabelKey] = pvc.Name
+	pvc.Labels[constant.VolumeClaimTemplateNameLabelKey] = pvc.Name
 	for k, v := range sts.Labels {
 		if _, ok := pvc.Labels[k]; !ok {
 			pvc.Labels[k] = v

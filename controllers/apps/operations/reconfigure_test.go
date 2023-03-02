@@ -27,6 +27,7 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	opsutil "github.com/apecloud/kubeblocks/controllers/apps/operations/util"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
+	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 )
@@ -92,13 +93,13 @@ var _ = Describe("Reconfigure OpsRequest", func() {
 				&corev1.ConfigMap{},
 				testapps.WithNamespacedName(cmInsName, ns),
 				testapps.WithLabels(
-					intctrlutil.AppNameLabelKey, clusterName,
-					intctrlutil.AppInstanceLabelKey, clusterName,
-					intctrlutil.KBAppComponentLabelKey, componentName,
-					cfgcore.CMConfigurationTplNameLabelKey, tpl.ConfigTplRef,
-					cfgcore.CMConfigurationConstraintsNameLabelKey, tpl.ConfigConstraintRef,
-					cfgcore.CMConfigurationProviderTplLabelKey, tpl.Name,
-					cfgcore.CMConfigurationTypeLabelKey, cfgcore.ConfigInstanceType,
+					constant.AppNameLabelKey, clusterName,
+					constant.AppInstanceLabelKey, clusterName,
+					constant.KBAppComponentLabelKey, componentName,
+					constant.CMConfigurationTplNameLabelKey, tpl.ConfigTplRef,
+					constant.CMConfigurationConstraintsNameLabelKey, tpl.ConfigConstraintRef,
+					constant.CMConfigurationProviderTplLabelKey, tpl.Name,
+					constant.CMConfigurationTypeLabelKey, constant.ConfigInstanceType,
 				),
 			)
 			Expect(testCtx.CheckedCreateObj(ctx, cfgCM)).Should(Succeed())

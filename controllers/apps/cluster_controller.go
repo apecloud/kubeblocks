@@ -44,6 +44,7 @@ import (
 	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	opsutil "github.com/apecloud/kubeblocks/controllers/apps/operations/util"
 	"github.com/apecloud/kubeblocks/controllers/k8score"
+	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
@@ -415,7 +416,7 @@ func (r *ClusterReconciler) deleteExternalResources(reqCtx intctrlutil.RequestCt
 
 	// it's possible at time of external resource deletion, cluster definition has already been deleted.
 	ml := client.MatchingLabels{
-		intctrlutil.AppInstanceLabelKey: cluster.GetName(),
+		constant.AppInstanceLabelKey: cluster.GetName(),
 	}
 	inNS := client.InNamespace(cluster.Namespace)
 
@@ -476,7 +477,7 @@ func removeFinalizer[T intctrlutil.Object, PT intctrlutil.PObject[T],
 func (r *ClusterReconciler) deletePVCs(reqCtx intctrlutil.RequestCtx, cluster *appsv1alpha1.Cluster) error {
 	// it's possible at time of external resource deletion, cluster definition has already been deleted.
 	ml := client.MatchingLabels{
-		intctrlutil.AppInstanceLabelKey: cluster.GetName(),
+		constant.AppInstanceLabelKey: cluster.GetName(),
 	}
 	inNS := client.InNamespace(cluster.Namespace)
 
@@ -495,7 +496,7 @@ func (r *ClusterReconciler) deletePVCs(reqCtx intctrlutil.RequestCtx, cluster *a
 func (r *ClusterReconciler) deleteBackupPolicies(reqCtx intctrlutil.RequestCtx, cluster *appsv1alpha1.Cluster) error {
 	inNS := client.InNamespace(cluster.Namespace)
 	ml := client.MatchingLabels{
-		intctrlutil.AppInstanceLabelKey: cluster.GetName(),
+		constant.AppInstanceLabelKey: cluster.GetName(),
 	}
 	// clean backupPolicies
 	return r.Client.DeleteAllOf(reqCtx.Ctx, &dataprotectionv1alpha1.BackupPolicy{}, inNS, ml)
@@ -504,7 +505,7 @@ func (r *ClusterReconciler) deleteBackupPolicies(reqCtx intctrlutil.RequestCtx, 
 func (r *ClusterReconciler) deleteBackups(reqCtx intctrlutil.RequestCtx, cluster *appsv1alpha1.Cluster) error {
 	inNS := client.InNamespace(cluster.Namespace)
 	ml := client.MatchingLabels{
-		intctrlutil.AppInstanceLabelKey: cluster.GetName(),
+		constant.AppInstanceLabelKey: cluster.GetName(),
 	}
 	// clean backups
 	backups := &dataprotectionv1alpha1.BackupList{}
@@ -513,9 +514,9 @@ func (r *ClusterReconciler) deleteBackups(reqCtx intctrlutil.RequestCtx, cluster
 	}
 	for _, backup := range backups.Items {
 		// check backup delete protection label
-		deleteProtection, exists := backup.GetLabels()[intctrlutil.BackupProtectionLabelKey]
+		deleteProtection, exists := backup.GetLabels()[constant.BackupProtectionLabelKey]
 		// not found backup-protection or value is Delete, delete it.
-		if !exists || deleteProtection == intctrlutil.BackupDelete {
+		if !exists || deleteProtection == constant.BackupDelete {
 			if err := r.Delete(reqCtx.Ctx, &backup); err != nil {
 				return err
 			}

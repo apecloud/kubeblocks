@@ -9,7 +9,9 @@ We would like to extend our appreciation to all contributors who helped make thi
   - ClusterDefinition
   - ClusterVersion
   - Cluster
-* Existing API will no longer functional, please make sure you have deleted them and delete CRDs before upgrade
+  - ConfigConstraint
+  - OpsRequest
+* Existing APIs will no longer be functional, please make sure you have deleted them and delete CRDs before upgrade. Please refer to the upgrade notes under this release notes.
 
 **Highlights**
     * New addons.extensions.kubeblocks.io API, with Addon management controller, where KubeBlocks allow addon extensions instead of using Helm sub-charts dependencies.

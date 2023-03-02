@@ -124,6 +124,14 @@ func main() {
 	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
 	pflag.Parse()
 
+	// set normalizeFunc to replace flag name to viper name
+	normalizeFunc := pflag.CommandLine.GetNormalizeFunc()
+	pflag.CommandLine.SetNormalizeFunc(func(fs *pflag.FlagSet, name string) pflag.NormalizedName {
+		result := normalizeFunc(fs, name)
+		name = strings.ReplaceAll(string(result), "-", "_")
+		return pflag.NormalizedName(name)
+	})
+
 	if err := viper.BindPFlags(pflag.CommandLine); err != nil {
 		setupLog.Error(err, "unable able to bind flags")
 		os.Exit(1)

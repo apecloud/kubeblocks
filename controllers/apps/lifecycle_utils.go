@@ -1016,7 +1016,7 @@ func getBackupMatchingLabels(clusterName string, componentName string) client.Ma
 	return client.MatchingLabels{
 		intctrlutil.AppInstanceLabelKey:    clusterName,
 		intctrlutil.KBAppComponentLabelKey: componentName,
-		intctrlutil.AppCreatedByLabelKey:   intctrlutil.AppName,
+		intctrlutil.AppManagedByLabelKey:   intctrlutil.AppName,
 	}
 }
 

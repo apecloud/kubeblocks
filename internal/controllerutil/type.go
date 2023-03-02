@@ -35,30 +35,28 @@ type RequestCtx struct {
 const (
 	AppName = "kubeblocks"
 
-	// common and well known label and annotation keys
-	AppInstanceLabelKey   = "app.kubernetes.io/instance"
-	WorkloadTypeLabelKey  = "apps.kubeblocks.io/workload-type"
-	AppNameLabelKey       = "app.kubernetes.io/name"
-	AppManagedByLabelKey  = "app.kubernetes.io/managed-by"
-	AppCreatedByLabelKey  = "app.kubernetes.io/created-by" // resources created temporarily by kubeblocks, this is a deprecated label
-	AppConfigTypeLabelKey = "app.kubernetes.io/config-type"
-	RegionLabelKey        = "topology.kubernetes.io/region"
-	ZoneLabelKey          = "topology.kubernetes.io/zone"
+	// K8s recommonded and well-known label and annotation keys
+	AppInstanceLabelKey  = "app.kubernetes.io/instance"
+	AppNameLabelKey      = "app.kubernetes.io/name"
+	AppManagedByLabelKey = "app.kubernetes.io/managed-by"
+	RegionLabelKey       = "topology.kubernetes.io/region"
+	ZoneLabelKey         = "topology.kubernetes.io/zone"
 
 	// kubeblocks.io labels
 	ClusterDefLabelKey              = "clusterdefinition.kubeblocks.io/name"
 	KBAppComponentLabelKey          = "apps.kubeblocks.io/component-name"
 	ConsensusSetAccessModeLabelKey  = "cs.apps.kubeblocks.io/access-mode"
+	AppConfigTypeLabelKey           = "apps.kubeblocks.io/config-type"
+	WorkloadTypeLabelKey            = "apps.kubeblocks.io/workload-type"
 	VolumeClaimTemplateNameLabelKey = "vct.kubeblocks.io/name"
 	RoleLabelKey                    = "kubeblocks.io/role"              // RoleLabelKey consensusSet and replicationSet role label key
 	BackupProtectionLabelKey        = "kubeblocks.io/backup-protection" // BackupProtectionLabelKey Backup delete protection policy label
 	AddonNameLabelKey               = "extensions.kubeblocks.io/addon-name"
 
 	// kubeblocks.io annotations
-	OpsRequestAnnotationKey          = "kubeblocks.io/ops-request"   // OpsRequestAnnotationKey OpsRequest annotation key in Cluster
-	OpsRequestReconcileAnnotationKey = "kubeblocks.io/reconcile"     // OpsRequestReconcileAnnotationKey Notify OpsRequest to reconcile
-	StorageClassAnnotationKey        = "kubeblocks.io/storage-class" // StorageClassAnnotationKey StorageClass annotation key in Cluster
-	RestartAnnotationKey             = "kubeblocks.io/restart"       // RestartAnnotationKey the annotation which notices the StatefulSet/DeploySet to restart
+	OpsRequestAnnotationKey          = "kubeblocks.io/ops-request" // OpsRequestAnnotationKey OpsRequest annotation key in Cluster
+	OpsRequestReconcileAnnotationKey = "kubeblocks.io/reconcile"   // OpsRequestReconcileAnnotationKey Notify OpsRequest to reconcile
+	RestartAnnotationKey             = "kubeblocks.io/restart"     // RestartAnnotationKey the annotation which notices the StatefulSet/DeploySet to restart
 	SnapShotForStartAnnotationKey    = "kubeblocks.io/snapshot-for-start"
 )
 

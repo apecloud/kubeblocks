@@ -20,8 +20,6 @@ cluster: {
 }
 component: {
 	clusterDefName: string
-	characterType:  string
-	type:           string
 	name:           string
 	service: {
 		ports: [...]
@@ -38,18 +36,16 @@ service: {
 		namespace: cluster.metadata.namespace
 		name:      "\(cluster.metadata.name)-\(component.name)"
 		labels: {
-			"app.kubernetes.io/name":       "\(component.clusterDefName)"
-			"app.kubernetes.io/instance":   cluster.metadata.name
-			"app.kubernetes.io/managed-by": "kubeblocks"
-
+			"app.kubernetes.io/name":            "\(component.clusterDefName)"
+			"app.kubernetes.io/instance":        cluster.metadata.name
+			"app.kubernetes.io/managed-by":      "kubeblocks"
 			"apps.kubeblocks.io/component-name": "\(component.name)"
 		}
 	}
 	"spec": {
 		"selector": {
-			"app.kubernetes.io/instance":   "\(cluster.metadata.name)"
-			"app.kubernetes.io/managed-by": "kubeblocks"
-
+			"app.kubernetes.io/instance":        "\(cluster.metadata.name)"
+			"app.kubernetes.io/managed-by":      "kubeblocks"
 			"apps.kubeblocks.io/component-name": "\(component.name)"
 		}
 		ports: component.service.ports

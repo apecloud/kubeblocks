@@ -20,8 +20,6 @@ cluster: {
 }
 component: {
 	clusterDefName: string
-	characterType:  string
-	type:           string
 	name:           string
 	// FIXME not defined in apis
 	maxUnavailable: string
@@ -50,7 +48,7 @@ pdb: {
 		selector: {
 			matchLabels: {
 				"app.kubernetes.io/name":       "\(component.clusterDefName)"
-				"app.kubernetes.io/instance":   "\(cluster.metadata.name)-\(component.name)"
+				"app.kubernetes.io/instance":   "\(cluster.metadata.name)"
 				"app.kubernetes.io/managed-by": "kubeblocks"
 
 				"apps.kubeblocks.io/component-name": "\(component.name)"

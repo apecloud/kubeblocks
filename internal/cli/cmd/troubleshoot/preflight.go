@@ -26,21 +26,19 @@ import (
 	"github.com/ahmetalpbalkan/go-cursor"
 	"github.com/fatih/color"
 	"github.com/pkg/errors"
-	analyzer "github.com/replicatedhq/troubleshoot/pkg/analyze"
-	troubleshootv1beta2 "github.com/replicatedhq/troubleshoot/pkg/apis/troubleshoot/v1beta2"
-	troubleshootclientsetscheme "github.com/replicatedhq/troubleshoot/pkg/client/troubleshootclientset/scheme"
+	analyze "github.com/replicatedhq/troubleshoot/pkg/analyze"
 	"github.com/replicatedhq/troubleshoot/pkg/preflight"
 	"github.com/spf13/cobra"
 	"github.com/tj/go-spin"
 	"golang.org/x/sync/errgroup"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/client-go/kubernetes/scheme"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
 
-	"github.com/apecloud/kubeblocks/internal/cli/cmd/cluster"
-	"github.com/apecloud/kubeblocks/internal/cli/cmd/troubleshoot/interactive"
+	preflightv1beta2 "github.com/apecloud/kubeblocks/externalapis/preflight/v1beta2"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
+	kbpreflight "github.com/apecloud/kubeblocks/internal/preflight"
+	kbinteractive "github.com/apecloud/kubeblocks/internal/preflight/interactive"
 )
 
 const (
@@ -66,24 +64,24 @@ var (
 		kbcli troubleshoot preflight preflight-check.yaml --interactive=false`)
 )
 
-// preflightOptions declares the arguments accepted by the preflight command
-type preflightOptions struct {
-	genericclioptions.IOStreams
+// PreflightOptions declares the arguments accepted by the preflight command
+type PreflightOptions struct {
 	factory cmdutil.Factory
+	genericclioptions.IOStreams
 	*preflight.PreflightFlags
 	yamlCheckFiles []string
 	namespace      string
 }
 
 func NewPreflightCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
-	p := &preflightOptions{
+	p := &PreflightOptions{
 		factory:        f,
 		IOStreams:      streams,
 		PreflightFlags: preflight.NewPreflightFlags(),
 	}
 	cmd := &cobra.Command{
 		Use:     "preflight",
-		Short:   "Run and retrieve preflight checks for kubeblocks",
+		Short:   "Run and retrieve preflight checks for KubeBlocks",
 		Example: preflightExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			util.CheckErr(p.complete(args))
@@ -91,7 +89,8 @@ func NewPreflightCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *co
 			util.CheckErr(p.run())
 		},
 	}
-	cmd.Flags().BoolVar(p.Interactive, flagInteractive, *p.Interactive, "interactive preflights")
+	// add flags
+	cmd.Flags().BoolVar(p.Interactive, flagInteractive, false, "interactive preflights, default is false")
 	cmd.Flags().StringVar(p.Format, flagFormat, *p.Format, "output format, one of human, json, yaml. only used when interactive is set to false")
 	cmd.Flags().StringVar(p.CollectorImage, flagCollectorImage, *p.CollectorImage, "the full name of the collector image to use")
 	cmd.Flags().StringVar(p.CollectorPullPolicy, flagCollectorPullPolicy, *p.CollectorPullPolicy, "the pull policy of the collector image")
@@ -105,7 +104,7 @@ func NewPreflightCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *co
 	return cmd
 }
 
-func (p *preflightOptions) complete(args []string) error {
+func (p *PreflightOptions) complete(args []string) error {
 	p.yamlCheckFiles = args
 	go func() {
 		signalChan := make(chan os.Signal, 1)
@@ -116,123 +115,67 @@ func (p *preflightOptions) complete(args []string) error {
 	return nil
 }
 
-func (p *preflightOptions) validate() error {
+func (p *PreflightOptions) validate() error {
 	if len(p.yamlCheckFiles) < 1 {
 		return fmt.Errorf("must specify at least one checks yaml")
 	}
 	return nil
 }
 
-func (p *preflightOptions) run() error {
+func (p *PreflightOptions) run() error {
+	var (
+		kbPreflight     *preflightv1beta2.Preflight
+		kbHostPreflight *preflightv1beta2.HostPreflight
+		collectResults  []preflight.CollectResult
+		analyzeResults  []*analyze.AnalyzeResult
+		preflightName   string
+		err             error
+	)
 	if *p.Interactive {
 		fmt.Print(cursor.Hide())
 		defer fmt.Print(cursor.Show())
 	}
-	var (
-		preflightSpec     *troubleshootv1beta2.Preflight
-		hostPreflightSpec *troubleshootv1beta2.HostPreflight
-		collectResults    []preflight.CollectResult
-		analyzeResults    []*analyzer.AnalyzeResult
-		preflightName     string
-		err               error
-	)
-	// load preflight content
-	if preflightSpec, hostPreflightSpec, preflightName, err = p.loadPreflightSpec(); err != nil {
-		return err
-	}
 	// set progress chain
 	progressCh := make(chan interface{})
 	defer close(progressCh)
-	ctx, stopProgressCollection := context.WithCancel(context.Background())
 	// make sure we shut down progress collection goroutines if an error occurs
-	defer stopProgressCollection()
-	progressCollection, ctx := errgroup.WithContext(ctx)
+	ctx, cancelFunc := context.WithCancel(context.Background())
+	defer cancelFunc()
+	progressCollections, ctx := errgroup.WithContext(ctx)
 	if *p.Interactive {
-		progressCollection.Go(collectInteractiveProgress(ctx, progressCh))
+		progressCollections.Go(CollectInteractiveProgress(ctx, progressCh))
 	} else {
-		progressCollection.Go(collectNonInteractiveProgress(ctx, progressCh))
+		progressCollections.Go(CollectNonInteractiveProgress(ctx, progressCh))
 	}
-	// collect data
-	if collectResults, err = p.collectData(preflightSpec, hostPreflightSpec, progressCh); err != nil {
+	// 1. load yaml
+	if kbPreflight, kbHostPreflight, preflightName, err = kbpreflight.LoadPreflightSpec(p.yamlCheckFiles); err != nil {
 		return err
 	}
-	// analyze data
+	// 2. collect data
+	collectResults, err = kbpreflight.CollectPreflight(ctx, kbPreflight, kbHostPreflight, progressCh)
+	if err != nil {
+		return err
+	}
+	// 3. analyze data
 	for _, res := range collectResults {
 		analyzeResults = append(analyzeResults, res.Analyze()...)
 	}
-	// wait for collection end
-	stopProgressCollection()
-	_ = progressCollection.Wait()
-	// display analyzeResults
+	cancelFunc()
+	if err := progressCollections.Wait(); err != nil {
+		return err
+	}
+	// 4. display analyzed data
+	if len(analyzeResults) == 0 {
+		return errors.New("no data has been collected")
+	}
 	if *p.Interactive {
-		return interactive.ShowInteractiveResults(preflightName, analyzeResults, *p.Output)
+		return kbinteractive.ShowInteractiveResults(preflightName, analyzeResults, *p.Output)
 	} else {
-		return showStdoutResults(preflightName, analyzeResults, *p.Format)
+		return kbpreflight.ShowStdoutResults(preflightName, analyzeResults, *p.Format)
 	}
 }
 
-// loadPreflightSpec loads content of preflightSpec and hostPreflightSpec against yamlFiles from args
-func (p *preflightOptions) loadPreflightSpec() (*troubleshootv1beta2.Preflight, *troubleshootv1beta2.HostPreflight, string, error) {
-	var (
-		preflightSpec     *troubleshootv1beta2.Preflight
-		hostPreflightSpec *troubleshootv1beta2.HostPreflight
-		preflightContent  []byte
-		preflightName     string
-		err               error
-	)
-	// register the scheme of troubleshoot API and decode function
-	if err = troubleshootclientsetscheme.AddToScheme(scheme.Scheme); err != nil {
-		return preflightSpec, hostPreflightSpec, preflightName, err
-	}
-	for _, fileName := range p.yamlCheckFiles {
-		// support to load yaml from stdin, local file and URI
-		if preflightContent, err = cluster.MultipleSourceComponents(fileName, os.Stdin); err != nil {
-			return preflightSpec, hostPreflightSpec, preflightName, err
-		}
-		obj, _, err := scheme.Codecs.UniversalDeserializer().Decode(preflightContent, nil, nil)
-		if err != nil {
-			return preflightSpec, hostPreflightSpec, preflightName, errors.Wrapf(err, "failed to parse %s", fileName)
-		}
-		if spec, ok := obj.(*troubleshootv1beta2.Preflight); ok {
-			preflightSpec = ConcatPreflightSpec(preflightSpec, spec)
-			preflightName = preflightSpec.Name
-		} else if spec, ok := obj.(*troubleshootv1beta2.HostPreflight); ok {
-			hostPreflightSpec = ConcatHostPreflightSpec(hostPreflightSpec, spec)
-			preflightName = hostPreflightSpec.Name
-		}
-	}
-	return preflightSpec, hostPreflightSpec, preflightName, nil
-}
-
-func (p *preflightOptions) collectData(preflightSpec *troubleshootv1beta2.Preflight, hostPreflightSpec *troubleshootv1beta2.HostPreflight, progressCh chan interface{}) ([]preflight.CollectResult, error) {
-	var collectResults []preflight.CollectResult
-	if preflightSpec != nil {
-		res, err := collectDataInCluster(preflightSpec, progressCh, *p)
-		if err != nil {
-			return collectResults, errors.Wrap(err, "failed to collect data in cluster")
-		}
-		collectResults = append(collectResults, *res)
-	}
-	if hostPreflightSpec != nil {
-		if len(hostPreflightSpec.Spec.Collectors) > 0 {
-			res, err := collectHostData(hostPreflightSpec, progressCh)
-			if err != nil {
-				return collectResults, errors.Wrap(err, "failed to collect data from host")
-			}
-			collectResults = append(collectResults, *res)
-		}
-		if len(hostPreflightSpec.Spec.RemoteCollectors) > 0 {
-			res, err := collectRemoteData(hostPreflightSpec, progressCh, *p)
-			if err != nil {
-				return collectResults, errors.Wrap(err, "failed to collect data remotely")
-			}
-			collectResults = append(collectResults, *res)
-		}
-	}
-	return collectResults, nil
-}
-
-func collectInteractiveProgress(ctx context.Context, progressCh <-chan interface{}) func() error {
+func CollectInteractiveProgress(ctx context.Context, progressCh <-chan interface{}) func() error {
 	return func() error {
 		spinner := spin.New()
 		lastMsg := ""
@@ -262,7 +205,7 @@ func collectInteractiveProgress(ctx context.Context, progressCh <-chan interface
 	}
 }
 
-func collectNonInteractiveProgress(ctx context.Context, progressCh <-chan interface{}) func() error {
+func CollectNonInteractiveProgress(ctx context.Context, progressCh <-chan interface{}) func() error {
 	return func() error {
 		for {
 			select {

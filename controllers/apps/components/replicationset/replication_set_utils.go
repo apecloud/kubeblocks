@@ -31,7 +31,8 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	"github.com/apecloud/kubeblocks/internal/constant"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/generics"
 )
 
 type ReplicationRole string
@@ -72,14 +73,14 @@ func HandleReplicationSetHorizontalScale(ctx context.Context,
 	// compOwnsStsMap is used to divide stsList into sts list under each replicationSet component according to componentLabelKey
 	compOwnsStsMap := make(map[string][]*appsv1.StatefulSet)
 	for _, stsObj := range stsList {
-		compDef, err := filterReplicationWorkload(ctx, cli, cluster, stsObj.Labels[intctrlutil.KBAppComponentLabelKey])
+		compDef, err := filterReplicationWorkload(ctx, cli, cluster, stsObj.Labels[constant.KBAppComponentLabelKey])
 		if err != nil {
 			return err
 		}
 		if compDef == nil {
 			continue
 		}
-		compOwnsStsMap[stsObj.Labels[intctrlutil.KBAppComponentLabelKey]] = append(compOwnsStsMap[stsObj.Labels[intctrlutil.KBAppComponentLabelKey]], stsObj)
+		compOwnsStsMap[stsObj.Labels[constant.KBAppComponentLabelKey]] = append(compOwnsStsMap[stsObj.Labels[constant.KBAppComponentLabelKey]], stsObj)
 	}
 
 	// compOwnsPodToSyncMap is used to record the list of component pods to be synchronized to cluster.status except for horizontal scale-in
@@ -169,7 +170,7 @@ func SyncReplicationSetClusterStatus(cli client.Client,
 	cluster := &appsv1alpha1.Cluster{}
 	err := cli.Get(ctx, types.NamespacedName{
 		Namespace: podList[0].Namespace,
-		Name:      podList[0].Labels[intctrlutil.AppInstanceLabelKey],
+		Name:      podList[0].Labels[constant.AppInstanceLabelKey],
 	}, cluster)
 	if err != nil {
 		return err
@@ -209,13 +210,13 @@ func RemoveReplicationSetClusterStatus(cli client.Client, ctx context.Context, s
 	cluster := &appsv1alpha1.Cluster{}
 	err := cli.Get(ctx, types.NamespacedName{
 		Namespace: stsList[0].Namespace,
-		Name:      stsList[0].Labels[intctrlutil.AppInstanceLabelKey],
+		Name:      stsList[0].Labels[constant.AppInstanceLabelKey],
 	}, cluster)
 	if err != nil {
 		return err
 	}
 	patch := client.MergeFrom(cluster.DeepCopy())
-	componentName := stsList[0].Labels[intctrlutil.KBAppComponentLabelKey]
+	componentName := stsList[0].Labels[constant.KBAppComponentLabelKey]
 	replicationSetStatus := cluster.Status.Components[componentName].ReplicationSetStatus
 	needRemove, err := needRemoveReplicationSetStatus(replicationSetStatus, allPodList)
 	if err != nil {
@@ -233,7 +234,7 @@ func RemoveReplicationSetClusterStatus(cli client.Client, ctx context.Context, s
 func needUpdateReplicationSetStatus(replicationStatus *appsv1alpha1.ReplicationSetStatus, podList []*corev1.Pod) bool {
 	needUpdate := false
 	for _, pod := range podList {
-		role := pod.Labels[intctrlutil.RoleLabelKey]
+		role := pod.Labels[constant.RoleLabelKey]
 		if role == string(Primary) {
 			if replicationStatus.Primary.Pod == pod.Name {
 				continue
@@ -282,10 +283,10 @@ func checkObjRoleLabelIsPrimary[T intctrlutil.Object, PT intctrlutil.PObject[T]]
 	if obj == nil || obj.GetLabels() == nil {
 		return false, fmt.Errorf("obj %s or obj's labels is nil, pls check", obj.GetName())
 	}
-	if _, ok := obj.GetLabels()[intctrlutil.RoleLabelKey]; !ok {
+	if _, ok := obj.GetLabels()[constant.RoleLabelKey]; !ok {
 		return false, fmt.Errorf("obj %s or obj labels key is nil, pls check", obj.GetName())
 	}
-	return obj.GetLabels()[intctrlutil.RoleLabelKey] == string(Primary), nil
+	return obj.GetLabels()[constant.RoleLabelKey] == string(Primary), nil
 }
 
 // GetReplicationSetPrimaryObj gets the primary obj(statefulSet or pod) of the replication workload.
@@ -295,10 +296,10 @@ func GetReplicationSetPrimaryObj[T intctrlutil.Object, PT intctrlutil.PObject[T]
 		objList L
 	)
 	matchLabels := client.MatchingLabels{
-		intctrlutil.AppInstanceLabelKey:    cluster.Name,
-		intctrlutil.KBAppComponentLabelKey: compSpecName,
-		intctrlutil.AppManagedByLabelKey:   intctrlutil.AppName,
-		intctrlutil.RoleLabelKey:           string(Primary),
+		constant.AppInstanceLabelKey:    cluster.Name,
+		constant.KBAppComponentLabelKey: compSpecName,
+		constant.AppManagedByLabelKey:   constant.AppName,
+		constant.RoleLabelKey:           string(Primary),
 	}
 	if err := cli.List(ctx, PL(&objList), client.InNamespace(cluster.Namespace), matchLabels); err != nil {
 		return nil, err
@@ -315,7 +316,7 @@ func updateObjRoleLabel[T intctrlutil.Object, PT intctrlutil.PObject[T]](
 	ctx context.Context, cli client.Client, obj T, role string) error {
 	pObj := PT(&obj)
 	patch := client.MergeFrom(PT(pObj.DeepCopy()))
-	pObj.GetLabels()[intctrlutil.RoleLabelKey] = role
+	pObj.GetLabels()[constant.RoleLabelKey] = role
 	if err := cli.Patch(ctx, pObj, patch); err != nil {
 		return err
 	}

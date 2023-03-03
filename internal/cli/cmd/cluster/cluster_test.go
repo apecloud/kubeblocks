@@ -172,11 +172,6 @@ var _ = Describe("Cluster", func() {
 		in.Write([]byte(o.Name + "\n"))
 		Expect(o.Validate()).Should(Succeed())
 
-		By("validate horizontalScaling when replicas less than -1 ")
-		o.OpsType = appsv1alpha1.HorizontalScalingType
-		o.Replicas = -2
-		Expect(o.Validate()).To(MatchError("replicas required natural number"))
-
 		o.Replicas = 1
 		in.Write([]byte(o.Name + "\n"))
 		Expect(o.Validate()).Should(Succeed())

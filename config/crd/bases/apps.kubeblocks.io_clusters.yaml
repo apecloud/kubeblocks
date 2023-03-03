@@ -293,6 +293,20 @@ spec:
                       - LoadBalancer
                       type: string
                       x-kubernetes-preserve-unknown-fields: true
+                    switchPolicy:
+                      description: switchPolicy defines the strategy for switchover
+                        and failover when workloadType is Replication.
+                      properties:
+                        type:
+                          default: MaximumAvailability
+                          description: clusterSwitchPolicy type defined by Provider
+                            in ClusterDefinition, refer components[i].replicationSpec.switchPolicies[x].type
+                          enum:
+                          - MaximumAvailability
+                          - MaximumDataProtection
+                          - Noop
+                          type: string
+                      type: object
                     tls:
                       description: TLS should be enabled or not
                       type: boolean

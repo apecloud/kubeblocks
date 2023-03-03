@@ -35,9 +35,13 @@ func mockSystemAccountsSpec() *appsv1alpha1.SystemAccountSpec {
 	var (
 		mysqlClientImage = "docker.io/mysql:8.0.30"
 		mysqlCmdConfig   = appsv1alpha1.CmdExecutorConfig{
-			Image:   mysqlClientImage,
-			Command: []string{"mysql"},
-			Args:    []string{"-h$(KB_ACCOUNT_ENDPOINT)", "-e $(KB_ACCOUNT_STATEMENT)"},
+			CommandExecutorEnvItem: appsv1alpha1.CommandExecutorEnvItem{
+				Image: mysqlClientImage,
+			},
+			CommandExecutorItem: appsv1alpha1.CommandExecutorItem{
+				Command: []string{"mysql"},
+				Args:    []string{"-h$(KB_ACCOUNT_ENDPOINT)", "-e $(KB_ACCOUNT_STATEMENT)"},
+			},
 		}
 		pwdConfig = appsv1alpha1.PasswordConfig{
 			Length:     10,

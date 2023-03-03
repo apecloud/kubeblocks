@@ -146,14 +146,27 @@ func PrepareComponentResources(reqCtx intctrlutil.RequestCtx, cli client.Client,
 			return err
 		}
 	case appsv1alpha1.Replication:
-		// get the maximum value of params.component.Replicas and the number of existing statefulsets under the current component,
-		// then construct statefulsets for creating replicationSet or handling horizontal scaling of the replicationSet.
+		// get the number of existing statefulsets under the current component
 		var existStsList = &appsv1.StatefulSetList{}
 		if err := componentutil.GetObjectListByComponentName(reqCtx.Ctx, cli, task.Cluster, existStsList, task.Component.Name); err != nil {
 			return err
 		}
-		replicaCount := math.Max(float64(len(existStsList.Items)), float64(task.Component.Replicas))
 
+		// If the statefulSets already exists, the HA process is prioritized and buildReplicationSet is not required.
+		// TODO(xingran) After refactoring, HA switching will be handled in the replicationSet controller.
+		if len(existStsList.Items) > 0 {
+			primaryIndexChanged, _, err := replicationset.CheckPrimaryIndexChanged(reqCtx.Ctx, cli, task.Cluster, task.Component.Name, task.Component.PrimaryIndex)
+			if err != nil {
+				return err
+			}
+			if primaryIndexChanged {
+				return replicationset.HandleReplicationSetHASwitch(reqCtx.Ctx, cli, task.Cluster, componentutil.GetClusterComponentSpecByName(task.Cluster, task.Component.Name))
+			}
+		}
+
+		// get the maximum value of params.component.Replicas and the number of existing statefulsets under the current component,
+		//  then construct statefulsets for creating replicationSet or handling horizontal scaling of the replicationSet.
+		replicaCount := math.Max(float64(len(existStsList.Items)), float64(task.Component.Replicas))
 		for index := int32(0); index < int32(replicaCount); index++ {
 			if err := workloadProcessor(
 				func(envConfig *corev1.ConfigMap) (client.Object, error) {

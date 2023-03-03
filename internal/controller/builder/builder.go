@@ -388,12 +388,13 @@ func BuildEnvConfig(params BuilderParams) (*corev1.ConfigMap, error) {
 	envData := map[string]string{}
 	envData[prefix+"N"] = strconv.Itoa(int(params.Component.Replicas))
 	for j := 0; j < int(params.Component.Replicas); j++ {
+		hostNameTplKey := prefix + strconv.Itoa(j) + "_HOSTNAME"
+		hostNameTplValue := params.Cluster.Name + "-" + params.Component.Name + "-" + strconv.Itoa(j)
 		if params.Component.WorkloadType == appsv1alpha1.Replication {
-			stsName := params.Cluster.Name + "-" + params.Component.Name + "-" + strconv.Itoa(j)
-			envData[prefix+strconv.Itoa(j)+"_HOSTNAME"] = fmt.Sprintf("%s.%s", stsName+"-0", svcName)
+			envData[hostNameTplKey] = fmt.Sprintf("%s.%s", hostNameTplValue+"-0", svcName)
 			envData[constant.KBReplicationSetPrimaryPodName] = fmt.Sprintf("%s-%s-%d-%d.%s", params.Cluster.Name, params.Component.Name, *params.Component.PrimaryIndex, 0, svcName)
 		} else {
-			envData[prefix+strconv.Itoa(j)+"_HOSTNAME"] = fmt.Sprintf("%s.%s", params.Cluster.Name+"-"+params.Component.Name+"-"+strconv.Itoa(j), svcName)
+			envData[hostNameTplKey] = fmt.Sprintf("%s.%s", hostNameTplValue, svcName)
 		}
 	}
 

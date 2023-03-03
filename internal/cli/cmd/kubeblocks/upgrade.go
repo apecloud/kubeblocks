@@ -28,6 +28,7 @@ import (
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
 
+	"github.com/apecloud/kubeblocks/internal/cli/printer"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 	"github.com/apecloud/kubeblocks/internal/cli/util/helm"
@@ -72,8 +73,11 @@ func newUpgradeCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 func (o *InstallOptions) Upgrade(cmd *cobra.Command) error {
 	if o.HelmCfg.Namespace() == "" {
 		ns, err := getKubeBlocksNamespace(o.Client)
-		if err != nil {
-			return err
+		if err != nil || ns == "" {
+			printer.Warning(o.Out, "Failed to find deployed KubeBlocks.\n\n")
+			fmt.Fprint(o.Out, "Use \"kbcli kubeblocks install\" to install KubeBlocks.\n")
+			fmt.Fprintf(o.Out, "Use \"kbcli kubeblocks status\" to get information in more details.\n")
+			return nil
 		}
 		o.HelmCfg.SetNamespace(ns)
 	}
@@ -145,7 +149,7 @@ func (o *InstallOptions) Upgrade(cmd *cobra.Command) error {
 	}
 
 	if !o.Quiet {
-		fmt.Fprintf(o.Out, "KubeBlocks has been upgraded %s SUCCESSFULLY!\n", msg)
+		fmt.Fprintf(o.Out, "\nKubeBlocks has been upgraded %s SUCCESSFULLY!\n", msg)
 		o.printNotes()
 	}
 	return nil

@@ -210,7 +210,7 @@ func (o *InstallOptions) Install() error {
 	}
 
 	if !o.Quiet {
-		fmt.Fprintf(o.Out, "KubeBlocks %s installed to namespace %s SUCCESSFULLY!\n",
+		fmt.Fprintf(o.Out, "\nKubeBlocks %s installed to namespace %s SUCCESSFULLY!\n",
 			o.Version, o.HelmCfg.Namespace())
 		o.printNotes()
 	}

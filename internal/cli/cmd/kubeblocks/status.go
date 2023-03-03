@@ -47,7 +47,7 @@ import (
 
 var (
 	infoExample = templates.Examples(`
-	# list workloads ownered by Kubeblocks
+	# list workloads owned by KubeBlocks
 	kbcli kubeblocks status
 	
 	# list all resources owned by KubeBlocks, such as workloads, cluster definitions, backup template.

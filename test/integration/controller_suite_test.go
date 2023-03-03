@@ -18,7 +18,11 @@ package appstest
 
 import (
 	"context"
+	"fmt"
+	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
+	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 	"go/build"
+	corev1 "k8s.io/api/core/v1"
 	"path/filepath"
 	"testing"
 	"time"
@@ -73,6 +77,75 @@ func TestIntegrationController(t *testing.T) {
 	RegisterFailHandler(Fail)
 
 	RunSpecs(t, "Integration Test Suite")
+}
+
+func CreateSimpleConsensusMySQLClusterWithConfig(
+	testCtx testutil.TestContext,
+	clusterDefName,
+	clusterVersionName,
+	clusterName,
+	mysqlConfigTemplatePath,
+	mysqlConfigConstraintPath,
+	mysqlScriptsPath string) (
+	*appsv1alpha1.ClusterDefinition, *appsv1alpha1.ClusterVersion, *appsv1alpha1.Cluster) {
+
+	const mysqlCompName = "mysql"
+	const mysqlConfigName = "mysql-component-config"
+	const mysqlConfigConstraintName = "mysql-three-node-template-8.0"
+	const mysqlConfigVolumeName = "mysql-config"
+	const mysqlScriptsConfigName = "mysql-scripts"
+
+	mysqlConsensusType := fmt.Sprintf("%s", testapps.ConsensusMySQLComponent)
+
+	configmap := testapps.CreateCustomizedObj(&testCtx,
+		mysqlConfigTemplatePath, &corev1.ConfigMap{},
+		testCtx.UseDefaultNamespace(),
+		testapps.WithLabels(
+			intctrlutil.AppNameLabelKey, clusterName,
+			intctrlutil.AppInstanceLabelKey, clusterName,
+			intctrlutil.KBAppComponentLabelKey, mysqlConsensusType,
+			cfgcore.CMConfigurationTplNameLabelKey, mysqlConfigName,
+			cfgcore.CMConfigurationConstraintsNameLabelKey, mysqlConfigConstraintName,
+			cfgcore.CMConfigurationProviderTplLabelKey, mysqlConfigName,
+			cfgcore.CMConfigurationTypeLabelKey, cfgcore.ConfigInstanceType,
+		))
+
+	_ = testapps.CreateCustomizedObj(&testCtx, mysqlScriptsPath, &corev1.ConfigMap{},
+		testapps.WithName(mysqlScriptsConfigName), testCtx.UseDefaultNamespace())
+
+	By("Create a constraint obj")
+	constraint := testapps.CreateCustomizedObj(&testCtx,
+		mysqlConfigConstraintPath,
+		&appsv1alpha1.ConfigConstraint{})
+
+	By("Create a clusterDefinition obj")
+	mode := int32(0755)
+	clusterDefObj := testapps.NewClusterDefFactory(clusterDefName).
+		SetConnectionCredential(map[string]string{"username": "root", "password": ""}, nil).
+		AddComponent(testapps.ConsensusMySQLComponent, mysqlCompName).
+		AddConfigTemplate(mysqlConfigName, configmap.Name, constraint.Name,
+			testCtx.DefaultNamespace, mysqlConfigVolumeName, nil).
+		AddConfigTemplate(mysqlScriptsConfigName, mysqlScriptsConfigName, "",
+			testCtx.DefaultNamespace, testapps.ScriptsVolumeName, &mode).
+		AddLabels(cfgcore.GenerateTPLUniqLabelKeyWithConfig(mysqlConfigName), configmap.Name,
+			cfgcore.GenerateConstraintsUniqLabelKeyWithConfig(constraint.Name), constraint.Name).
+		AddContainerEnv(testapps.DefaultMySQLContainerName, corev1.EnvVar{Name: "MYSQL_ALLOW_EMPTY_PASSWORD", Value: "yes"}).
+		Create(&testCtx).GetObject()
+
+	By("Create a clusterVersion obj")
+	clusterVersionObj := testapps.NewClusterVersionFactory(clusterVersionName, clusterDefObj.GetName()).
+		AddComponent(mysqlConsensusType).
+		AddContainerShort(testapps.DefaultMySQLContainerName, testapps.ApeCloudMySQLImage).
+		AddLabels(cfgcore.GenerateTPLUniqLabelKeyWithConfig(mysqlConfigName), configmap.Name,
+			cfgcore.GenerateConstraintsUniqLabelKeyWithConfig(constraint.Name), constraint.Name).
+		Create(&testCtx).GetObject()
+
+	By("Creating a cluster")
+	clusterObj := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
+		clusterDefObj.Name, clusterVersionObj.Name).
+		AddComponent(mysqlCompName, mysqlConsensusType).Create(&testCtx).GetObject()
+
+	return clusterDefObj, clusterVersionObj, clusterObj
 }
 
 var _ = BeforeSuite(func() {

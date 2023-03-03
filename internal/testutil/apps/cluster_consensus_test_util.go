@@ -19,7 +19,8 @@ package apps
 import (
 	"context"
 	"fmt"
-
+	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
+	testk8s "github.com/apecloud/kubeblocks/internal/testutil/k8s"
 	"github.com/onsi/gomega"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -32,6 +33,9 @@ import (
 
 const (
 	errorLogName = "error"
+	leader       = "leader"
+	follower     = "follower"
+	learner      = "learner"
 )
 
 // InitConsensusMysql initializes a cluster environment which only contains a component of ConsensusSet type for testing,
@@ -73,6 +77,24 @@ func CreateConsensusMysqlClusterDef(testCtx testutil.TestContext, clusterDefName
 func CreateConsensusMysqlClusterVersion(testCtx testutil.TestContext, clusterDefName, clusterVersionName, workloadType string) *appsv1alpha1.ClusterVersion {
 	return NewClusterVersionFactory(clusterVersionName, clusterDefName).AddComponent(workloadType).AddContainerShort("mysql", ApeCloudMySQLImage).
 		Create(&testCtx).GetObject()
+}
+
+// GetConsensusRoleCountMap gets a role:roleCount map from a consensusSet cluster
+func GetConsensusRoleCountMap(testCtx testutil.TestContext, k8sClient client.Client, cluster *appsv1alpha1.Cluster) (roleCountMap map[string]int) {
+	clusterkey := client.ObjectKeyFromObject(cluster)
+	sts := testk8s.ListAndCheckStatefulSet(&testCtx, clusterkey).Items[0]
+	pods, err := util.GetPodListByStatefulSet(testCtx.Ctx, k8sClient, &sts)
+
+	if err != nil {
+		return roleCountMap
+	}
+
+	for _, pod := range pods {
+		role := pod.Labels[intctrlutil.RoleLabelKey]
+		roleCountMap[role]++
+	}
+
+	return roleCountMap
 }
 
 // MockConsensusComponentStatefulSet mocks the component statefulSet, just using in envTest

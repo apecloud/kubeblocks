@@ -12,10 +12,6 @@ resources:
 - bases/dataprotection.kubeblocks.io_backups.yaml
 - bases/dataprotection.kubeblocks.io_restorejobs.yaml
 - bases/dataprotection.kubeblocks.io_backuppolicytemplates.yaml
-- bases/apps.kubeblocks.io_opsrequests.yaml
-- bases/apps.kubeblocks.io_configconstraints.yaml
-- bases/troubleshoot.sh_hostpreflights.yaml
-- bases/troubleshoot.sh_preflights.yaml
 - bases/extensions.kubeblocks.io_addons.yaml
 #+kubebuilder:scaffold:crdkustomizeresource
 

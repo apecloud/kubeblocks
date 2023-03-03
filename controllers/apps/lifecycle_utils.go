@@ -18,6 +18,7 @@ package apps
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"reflect"
 	"strings"
@@ -79,6 +80,10 @@ func reconcileClusterWorkloads(
 	clusterDef *appsv1alpha1.ClusterDefinition,
 	clusterVer *appsv1alpha1.ClusterVersion,
 	cluster *appsv1alpha1.Cluster) (shouldRequeue bool, err error) {
+	clusterBackupResourceMap, err := getClusterBackupSourceMap(cluster)
+	if err != nil {
+		return false, err
+	}
 	resourcesQueue := make([]client.Object, 0, 3)
 	task := intctrltypes.ReconcileTask{
 		Cluster:           cluster,
@@ -90,14 +95,22 @@ func reconcileClusterWorkloads(
 	clusterCompVerMap := clusterVer.GetDefNameMappingComponents()
 	process1stComp := true
 
-	prepareComp := func(component *component.SynthesizedComponent) error {
+	prepareComp := func(synthesizedComp *component.SynthesizedComponent) error {
 		iParams := task
-		iParams.Component = component
-		if process1stComp && component.Service != nil {
+		iParams.Component = synthesizedComp
+		if process1stComp && synthesizedComp.Service != nil {
 			if err := prepareConnCredential(reqCtx, cli, &iParams); err != nil {
 				return err
 			}
 			process1stComp = false
+		}
+
+		// build info that needs to be restored from backup
+		backupSourceName := clusterBackupResourceMap[synthesizedComp.Name]
+		if len(backupSourceName) > 0 {
+			if err := component.BuildRestoredInfo(reqCtx, cli, cluster.Namespace, synthesizedComp, backupSourceName); err != nil {
+				return err
+			}
 		}
 		return plan.PrepareComponentResources(reqCtx, cli, &iParams)
 	}
@@ -1031,4 +1044,15 @@ func deleteObjectOrphan(cli client.Client, ctx context.Context, obj client.Objec
 		return err
 	}
 	return nil
+}
+
+// getClusterBackupSourceMap gets the backup source map from cluster.annotations
+func getClusterBackupSourceMap(cluster *appsv1alpha1.Cluster) (map[string]string, error) {
+	compBackupMapString := cluster.Annotations[constant.RestoreFromBackUpAnnotationKey]
+	if len(compBackupMapString) == 0 {
+		return nil, nil
+	}
+	compBackupMap := map[string]string{}
+	err := json.Unmarshal([]byte(compBackupMapString), &compBackupMap)
+	return compBackupMap, err
 }

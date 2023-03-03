@@ -219,6 +219,7 @@ func (r *SystemAccountReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	} // end of processAccountForComponent
 
 	reconcileCounter := 0
+	existsOps := existsOperations(cluster)
 	// for each component in the cluster
 	for _, compDecl := range cluster.Spec.ComponentSpecs {
 		compName := compDecl.Name
@@ -234,7 +235,7 @@ func (r *SystemAccountReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 			}
 
 			// either service or endpoint is not ready, increase counter and continue to process next component
-			if !isReady {
+			if !isReady || existsOps {
 				reconcileCounter++
 				continue
 			}

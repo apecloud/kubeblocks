@@ -7,7 +7,12 @@ metadata:
 data:
   postgresql.conf: |-
     {{- .Files.Get "config/pg14.conf.tpl" | nindent 4 }}
-{{/*  {{- if .Values.primary.pgHbaConfiguration }}*/}}
-{{/*  pg_hba.conf: |*/}}
-{{/*    {{- .Values.primary.pgHbaConfiguration | nindent 4 }}*/}}
-{{/*  {{- end }}*/}}
+  # TODO: check if it should trust all
+  pg_hba.conf: |
+    host     all             all             0.0.0.0/0               trust
+    host     all             all             ::/0                    trust
+    local    all             all                                     trust
+    host     all             all             127.0.0.1/32            trust
+    host     all             all             ::1/128                 trust
+    host      replication     all             0.0.0.0/0               md5
+    host      replication     all             ::/0                    md5

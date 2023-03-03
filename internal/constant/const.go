@@ -56,6 +56,7 @@ const (
 	OpsRequestReconcileAnnotationKey = "kubeblocks.io/reconcile"   // OpsRequestReconcileAnnotationKey Notify OpsRequest to reconcile
 	RestartAnnotationKey             = "kubeblocks.io/restart"     // RestartAnnotationKey the annotation which notices the StatefulSet/DeploySet to restart
 	SnapShotForStartAnnotationKey    = "kubeblocks.io/snapshot-for-start"
+	RestoreFromBackUpAnnotationKey   = "kubeblocks.io/restore-from-backup" // RestoreFromBackUpAnnotationKey specifies the component to recover from the backup.
 
 	// ConfigurationTplLabelPrefixKey clusterVersion or clusterdefinition using tpl
 	ConfigurationTplLabelPrefixKey         = "configuration.kubeblocks.io/cfg-tpl"
@@ -110,6 +111,7 @@ const (
 	PersistentVolumeClaimKind = "PersistentVolumeClaim"
 	CronJob                   = "CronJob"
 	ReplicaSet                = "ReplicaSet"
+	VolumeSnapshotKind        = "VolumeSnapshot"
 )
 
 const (
@@ -150,4 +152,8 @@ const (
 	PodMinReadySecondsEnv = "POD_MIN_READY_SECONDS"
 	ConfigTemplateType    = "tpl"
 	ConfigInstanceType    = "instance"
+)
+
+const (
+	KBReplicationSetPrimaryPodName = "KB_PRIMARY_POD_NAME"
 )

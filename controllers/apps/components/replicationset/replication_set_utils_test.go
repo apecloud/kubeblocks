@@ -97,10 +97,13 @@ var _ = Describe("ReplicationSet Util", func() {
 				AddRoleLabel(k).
 				SetReplicas(1).
 				Create(&testCtx).GetObject()
+			isStsPrimary, err := checkObjRoleLabelIsPrimary(sts)
 			if k == string(Primary) {
-				Expect(CheckStsIsPrimary(sts)).Should(BeTrue())
+				Expect(err).To(Succeed())
+				Expect(isStsPrimary).Should(BeTrue())
 			} else {
-				Expect(CheckStsIsPrimary(sts)).ShouldNot(BeTrue())
+				Expect(err).To(Succeed())
+				Expect(isStsPrimary).ShouldNot(BeTrue())
 			}
 			stsList = append(stsList, sts)
 		}
@@ -117,6 +120,10 @@ var _ = Describe("ReplicationSet Util", func() {
 				AddLabelsInMap(sts.Labels).
 				Create(&testCtx).GetObject()
 		}
+
+		By("Test ReplicationSet pod number of sts equals 1")
+		_, err = GetAndCheckReplicationPodByStatefulSet(ctx, k8sClient, stsList[0])
+		Expect(err).Should(Succeed())
 
 		By("Test handleReplicationSet success when stsList count equal cluster.replicas.")
 		err = HandleReplicationSet(ctx, k8sClient, clusterObj, stsList)

@@ -79,6 +79,7 @@ var _ = Describe("Cluster Controller", func() {
 		testapps.ClearResources(&testCtx, intctrlutil.PodSignature, inNS, ml)
 		// non-namespaced
 		testapps.ClearResources(&testCtx, intctrlutil.BackupPolicyTemplateSignature, ml)
+		testapps.ClearResources(&testCtx, intctrlutil.BackupToolSignature, ml)
 		testapps.ClearResources(&testCtx, intctrlutil.StorageClassSignature, ml)
 	}
 
@@ -1220,6 +1221,51 @@ var _ = Describe("Cluster Controller", func() {
 
 		It("should report error if backup error during h-scale", func() {
 			testBackupError()
+		})
+
+		It("test restore cluster from backup", func() {
+			By("mock backup")
+			backupPolicyName := "test-backup-policy"
+			backupName := "test-backup"
+			backupTool := testapps.CreateCustomizedObj(&testCtx, "backup/backuptool.yaml",
+				&dataprotectionv1alpha1.BackupTool{}, testapps.RandomizedObjName())
+			backup := testapps.NewBackupFactory(testCtx.DefaultNamespace, backupName).
+				SetBackupPolicyName(backupPolicyName).
+				SetBackupType(dataprotectionv1alpha1.BackupTypeFull).
+				Create(&testCtx).GetObject()
+			Expect(testapps.ChangeObjStatus(&testCtx, backup, func() {
+				backup.Status.BackupToolName = backupTool.Name
+				backup.Status.RemoteVolume = &corev1.Volume{
+					Name: "backup-pvc",
+				}
+			})).Should(Succeed())
+			restoreFromBackup := fmt.Sprintf(`{"%s":"%s"}`, mysqlCompName, backupName)
+			clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
+				clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
+				AddComponent(mysqlCompName, mysqlCompType).
+				SetReplicas(3).
+				AddAnnotations(constant.RestoreFromBackUpAnnotationKey, restoreFromBackup).Create(&testCtx).GetObject()
+			stsList := testk8s.ListAndCheckStatefulSet(&testCtx, client.ObjectKeyFromObject(clusterObj))
+			sts := stsList.Items[0]
+			Expect(len(sts.Spec.Template.Spec.InitContainers) == 1).Should(BeTrue())
+
+			By("remove init container after all components are Running")
+			Expect(testapps.ChangeObjStatus(&testCtx, clusterObj, func() {
+				clusterObj.Status.Components = map[string]appsv1alpha1.ClusterComponentStatus{
+					mysqlCompName: {Phase: appsv1alpha1.RunningPhase},
+				}
+			})).Should(Succeed())
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(&sts), func(g Gomega, tmpSts *appsv1.StatefulSet) {
+				g.Expect(len(tmpSts.Spec.Template.Spec.InitContainers)).Should(Equal(0))
+			})).Should(Succeed())
+
+			By("clean up annotations after cluster running")
+			Expect(testapps.ChangeObjStatus(&testCtx, clusterObj, func() {
+				clusterObj.Status.Phase = appsv1alpha1.RunningPhase
+			})).Should(Succeed())
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(clusterObj), func(g Gomega, tmpCluster *appsv1alpha1.Cluster) {
+				g.Expect(tmpCluster.Annotations[constant.RestoreFromBackUpAnnotationKey]).Should(Equal(""))
+			})).Should(Succeed())
 		})
 	})
 

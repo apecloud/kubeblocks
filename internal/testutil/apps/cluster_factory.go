@@ -150,6 +150,15 @@ func (factory *MockClusterFactory) SetPrimaryIndex(primaryIndex int32) *MockClus
 	return factory
 }
 
+func (factory *MockClusterFactory) SetSwitchPolicy(switchPolicy *appsv1alpha1.ClusterSwitchPolicy) *MockClusterFactory {
+	comps := factory.get().Spec.ComponentSpecs
+	if len(comps) > 0 {
+		comps[len(comps)-1].SwitchPolicy = switchPolicy
+	}
+	factory.get().Spec.ComponentSpecs = comps
+	return factory
+}
+
 func (factory *MockClusterFactory) SetTLS(tls bool) *MockClusterFactory {
 	comps := factory.get().Spec.ComponentSpecs
 	if len(comps) > 0 {

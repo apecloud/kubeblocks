@@ -6,8 +6,6 @@ metadata:
     clusterdefinition.kubeblocks.io/name: apecloud-mysql
     {{- include "apecloud-mysql.labels" . | nindent 4 }}
 spec:
-  schedule: "0 2 * * *"
-
   # which backup tool to perform database backup, only support one tool.
   backupToolName: mysql-xtrabackup
   ttl: 168h0m0s

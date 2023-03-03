@@ -146,14 +146,27 @@ func PrepareComponentResources(reqCtx intctrlutil.RequestCtx, cli client.Client,
 			return err
 		}
 	case appsv1alpha1.Replication:
-		// get the maximum value of params.component.Replicas and the number of existing statefulsets under the current component,
-		// then construct statefulsets for creating replicationSet or handling horizontal scaling of the replicationSet.
+		// get the number of existing statefulsets under the current component
 		var existStsList = &appsv1.StatefulSetList{}
 		if err := componentutil.GetObjectListByComponentName(reqCtx.Ctx, cli, task.Cluster, existStsList, task.Component.Name); err != nil {
 			return err
 		}
-		replicaCount := math.Max(float64(len(existStsList.Items)), float64(task.Component.Replicas))
 
+		// If the statefulSets already exists, the HA process is prioritized and buildReplicationSet is not required.
+		// TODO(xingran) After refactoring, HA switching will be handled in the replicationSet controller.
+		if len(existStsList.Items) > 0 {
+			primaryIndexChanged, _, err := replicationset.CheckPrimaryIndexChanged(reqCtx.Ctx, cli, task.Cluster, task.Component.Name, task.Component.PrimaryIndex)
+			if err != nil {
+				return err
+			}
+			if primaryIndexChanged {
+				return replicationset.HandleReplicationSetHASwitch(reqCtx.Ctx, cli, task.Cluster, componentutil.GetClusterComponentSpecByName(task.Cluster, task.Component.Name))
+			}
+		}
+
+		// get the maximum value of params.component.Replicas and the number of existing statefulsets under the current component,
+		//  then construct statefulsets for creating replicationSet or handling horizontal scaling of the replicationSet.
+		replicaCount := math.Max(float64(len(existStsList.Items)), float64(task.Component.Replicas))
 		for index := int32(0); index < int32(replicaCount); index++ {
 			if err := workloadProcessor(
 				func(envConfig *corev1.ConfigMap) (client.Object, error) {
@@ -226,10 +239,6 @@ func buildReplicationSet(reqCtx intctrlutil.RequestCtx,
 	if err != nil {
 		return nil, err
 	}
-	// inject replicationSet pod env and role label.
-	if sts, err = injectReplicationSetPodEnvAndLabel(task, sts, stsIndex); err != nil {
-		return nil, err
-	}
 	// sts.Name rename and add role label.
 	sts.ObjectMeta.Name = fmt.Sprintf("%s-%d", sts.ObjectMeta.Name, stsIndex)
 	sts.Labels[constant.RoleLabelKey] = string(replicationset.Secondary)
@@ -276,27 +285,6 @@ func buildReplicationSetPVC(task *intctrltypes.ReconcileTask, sts *appsv1.Statef
 	}
 	podSpec.Volumes = podVolumes
 	return nil
-}
-
-func injectReplicationSetPodEnvAndLabel(task *intctrltypes.ReconcileTask, sts *appsv1.StatefulSet, index int32) (*appsv1.StatefulSet, error) {
-	if task.Component.PrimaryIndex == nil {
-		return nil, fmt.Errorf("component %s PrimaryIndex can not be nil", task.Component.Name)
-	}
-	svcName := strings.Join([]string{task.Cluster.Name, task.Component.Name, "headless"}, "-")
-	for i := range sts.Spec.Template.Spec.Containers {
-		c := &sts.Spec.Template.Spec.Containers[i]
-		c.Env = append(c.Env, corev1.EnvVar{
-			Name:      constant.KBPrefix + "_PRIMARY_POD_NAME",
-			Value:     fmt.Sprintf("%s-%d-%d.%s", sts.Name, *task.Component.PrimaryIndex, 0, svcName),
-			ValueFrom: nil,
-		})
-	}
-	if index != *task.Component.PrimaryIndex {
-		sts.Spec.Template.Labels[constant.RoleLabelKey] = string(replicationset.Secondary)
-	} else {
-		sts.Spec.Template.Labels[constant.RoleLabelKey] = string(replicationset.Primary)
-	}
-	return sts, nil
 }
 
 // buildPersistentVolumeClaimLabels builds a pvc name label, and synchronize the labels on the sts to the pvc labels.

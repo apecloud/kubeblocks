@@ -124,6 +124,11 @@ var _ = Describe("Backup for a StatefulSet", func() {
 			})
 
 			It("should succeed after job completes", func() {
+				By("Check backup job's nodeName equals pod's nodeName")
+				Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *batchv1.Job) {
+					g.Expect(fetched.Spec.Template.Spec.NodeName).To(Equal(nodeName))
+				})).Should(Succeed())
+
 				patchK8sJobStatus(backupKey, batchv1.JobComplete)
 
 				By("Check backup job completed")
@@ -131,10 +136,8 @@ var _ = Describe("Backup for a StatefulSet", func() {
 					g.Expect(fetched.Status.Phase).To(Equal(dataprotectionv1alpha1.BackupCompleted))
 				})).Should(Succeed())
 
-				By("Check backup job's nodeName equals pod's nodeName")
-				Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *batchv1.Job) {
-					g.Expect(fetched.Spec.Template.Spec.NodeName).To(Equal(nodeName))
-				})).Should(Succeed())
+				By("Check backup job is deleted after completed")
+				Eventually(testapps.CheckObjExists(&testCtx, backupKey, &batchv1.Job{}, false))
 			})
 
 			It("should fail after job fails", func() {

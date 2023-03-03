@@ -27,6 +27,8 @@ import (
 	cp "github.com/apecloud/kubeblocks/internal/cli/cloudprovider"
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
+	"github.com/apecloud/kubeblocks/internal/cli/util"
+	"github.com/apecloud/kubeblocks/internal/cli/util/helm"
 )
 
 var _ = Describe("playground", func() {
@@ -56,6 +58,7 @@ var _ = Describe("playground", func() {
 			baseOptions: baseOptions{
 				cloudProvider: defaultCloudProvider,
 			},
+			helmCfg: helm.NewConfig("", util.ConfigPath("config"), "", false),
 		}
 		Expect(o.validate()).Should(Succeed())
 		Expect(o.run()).Should(HaveOccurred())

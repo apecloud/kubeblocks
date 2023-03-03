@@ -30,6 +30,10 @@ const (
 	// CliHomeEnv defines kbcli home system env
 	CliHomeEnv = "KBCLI_HOME"
 
+	// DefaultNamespace is the namespace where kubeblocks is installed if
+	// no other namespace is specified
+	DefaultNamespace = "kb-system"
+
 	// GoosLinux is os.GOOS linux string
 	GoosLinux = "linux"
 	// GoosDarwin is os.GOOS darwin string
@@ -39,9 +43,6 @@ const (
 
 	// Group api group
 	Group = "apps.kubeblocks.io"
-
-	// AppsGroup k8s apps group
-	AppsGroup = "apps"
 
 	// Version api version
 	Version = "v1alpha1"
@@ -78,8 +79,6 @@ const (
 	KindRestoreJob           = "RestoreJob"
 	KindBackupPolicyTemplate = "BackupPolicyTemplate"
 	KindOps                  = "OpsRequest"
-	KindCM                   = "ConfigMap"
-	KindSTS                  = "StatefulSet"
 
 	ServiceLBTypeAnnotationKey     = "service.kubernetes.io/kubeblocks-loadbalancer-type"
 	ServiceLBTypeAnnotationValue   = "private-ip"

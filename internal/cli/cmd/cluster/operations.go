@@ -150,13 +150,6 @@ func (o *OperationsOptions) validateVolumeExpansion() error {
 	return nil
 }
 
-func (o *OperationsOptions) validateHorizontalScaling() error {
-	if o.Replicas < -1 {
-		return fmt.Errorf("replicas required natural number")
-	}
-	return nil
-}
-
 func (o *OperationsOptions) validateReconfiguring() error {
 	if len(o.ComponentNames) != 1 {
 		return cfgcore.MakeError("reconfiguring only support one component.")
@@ -297,10 +290,6 @@ func (o *OperationsOptions) Validate() error {
 	switch o.OpsType {
 	case appsv1alpha1.VolumeExpansionType:
 		if err := o.validateVolumeExpansion(); err != nil {
-			return err
-		}
-	case appsv1alpha1.HorizontalScalingType:
-		if err := o.validateHorizontalScaling(); err != nil {
 			return err
 		}
 	case appsv1alpha1.UpgradeType:
@@ -501,7 +490,8 @@ func NewHorizontalScalingCmd(f cmdutil.Factory, streams genericclioptions.IOStre
 	inputs.Example = horizontalScalingExample
 	inputs.BuildFlags = func(cmd *cobra.Command) {
 		o.buildCommonFlags(cmd)
-		cmd.Flags().IntVar(&o.Replicas, "replicas", -1, "Replicas with the specified components")
+		cmd.Flags().IntVar(&o.Replicas, "replicas", o.Replicas, "Replicas with the specified components")
+		_ = cmd.MarkFlagRequired("replicas")
 	}
 	return create.BuildCommand(inputs)
 }

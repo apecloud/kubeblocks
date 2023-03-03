@@ -27,13 +27,6 @@ data:
     else
         exit 1
     fi
-    echo "create extension postgis."
-    psql -Upostgres -c "CREATE EXTENSION IF NOT EXISTS postgis;" >/dev/null 2>&1
-    if [ $? -eq 0 ];then
-        echo "create extension pgstgis success."
-    else
-        exit 1
-    fi
   setup.sh: |
     #!/bin/bash
     set -o errexit

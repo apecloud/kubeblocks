@@ -30,6 +30,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/controller/component"
 	"github.com/apecloud/kubeblocks/internal/controller/types"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	"github.com/apecloud/kubeblocks/internal/generics"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 )
 
@@ -46,10 +47,10 @@ var _ = Describe("Cluster Controller", func() {
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 
 		// non-namespaced
-		testapps.ClearResources(&testCtx, intctrlutil.ConfigConstraintSignature, ml)
+		testapps.ClearResources(&testCtx, generics.ConfigConstraintSignature, ml)
 
 		// namespaced
-		testapps.ClearResources(&testCtx, intctrlutil.ConfigMapSignature, inNS, ml)
+		testapps.ClearResources(&testCtx, generics.ConfigMapSignature, inNS, ml)
 	}
 
 	BeforeEach(func() {

@@ -20,6 +20,7 @@ import (
 	"strconv"
 	"testing"
 
+	"github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/stretchr/testify/assert"
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
@@ -42,7 +43,7 @@ func TestIsReady(t *testing.T) {
 		},
 	}
 	pod.Labels = map[string]string{constant.RoleLabelKey: "leader"}
-	if !util.PodIsReady(*pod) {
+	if !controllerutil.PodIsReadyWithLabel(*pod) {
 		t.Errorf("isReady returned false negative")
 	}
 }
@@ -83,14 +84,14 @@ func TestInitClusterComponentStatusIfNeed(t *testing.T) {
 func TestGetPodRevision(t *testing.T) {
 	set := testk8s.NewFakeStatefulSet("foo", 3)
 	pod := testk8s.NewFakeStatefulSetPod(set, 1)
-	if util.GetPodRevision(pod) != "" {
+	if controllerutil.GetPodRevision(pod) != "" {
 		t.Errorf("revision should be empty")
 	}
 
 	pod.Labels = make(map[string]string, 0)
 	pod.Labels[apps.StatefulSetRevisionLabel] = "bar"
 
-	if util.GetPodRevision(pod) != "bar" {
+	if controllerutil.GetPodRevision(pod) != "bar" {
 		t.Errorf("revision not matched")
 	}
 }

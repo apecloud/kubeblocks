@@ -34,6 +34,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	"github.com/apecloud/kubeblocks/internal/generics"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 )
 
@@ -53,7 +54,7 @@ var _ = Describe("lifecycle_utils", func() {
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 		// namespaced resources
-		testapps.ClearResources(&testCtx, intctrlutil.VolumeSnapshotSignature, inNS, ml)
+		testapps.ClearResources(&testCtx, generics.VolumeSnapshotSignature, inNS, ml)
 	}
 
 	BeforeEach(cleanAll)

@@ -33,6 +33,7 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	"github.com/apecloud/kubeblocks/internal/generics"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 )
 
@@ -66,9 +67,9 @@ var _ = Describe("OpsRequest Controller Volume Expansion Handler", func() {
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 		// namespaced
-		testapps.ClearResources(&testCtx, intctrlutil.OpsRequestSignature, inNS, ml)
+		testapps.ClearResources(&testCtx, generics.OpsRequestSignature, inNS, ml)
 		// non-namespaced
-		testapps.ClearResources(&testCtx, intctrlutil.StorageClassSignature, ml)
+		testapps.ClearResources(&testCtx, generics.StorageClassSignature, ml)
 	}
 
 	BeforeEach(cleanEnv)

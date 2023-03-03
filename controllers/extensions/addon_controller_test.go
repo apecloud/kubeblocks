@@ -33,7 +33,7 @@ import (
 
 	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/generics"
 	"github.com/apecloud/kubeblocks/internal/testutil"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 )

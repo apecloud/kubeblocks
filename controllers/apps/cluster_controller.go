@@ -47,6 +47,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	"github.com/apecloud/kubeblocks/internal/generics"
 )
 
 // +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=clusters,verbs=get;list;watch;create;update;patch;delete
@@ -431,35 +432,35 @@ func (r *ClusterReconciler) deleteExternalResources(reqCtx intctrlutil.RequestCt
 
 	// all resources created in reconcileClusterWorkloads should be handled properly
 
-	if ret, err := removeFinalizer(r, reqCtx, intctrlutil.StatefulSetSignature, inNS, ml); err != nil {
+	if ret, err := removeFinalizer(r, reqCtx, generics.StatefulSetSignature, inNS, ml); err != nil {
 		return ret, err
 	}
 
-	if ret, err := removeFinalizer(r, reqCtx, intctrlutil.DeploymentSignature, inNS, ml); err != nil {
+	if ret, err := removeFinalizer(r, reqCtx, generics.DeploymentSignature, inNS, ml); err != nil {
 		return ret, err
 	}
 
-	if ret, err := removeFinalizer(r, reqCtx, intctrlutil.ServiceSignature, inNS, ml); err != nil {
+	if ret, err := removeFinalizer(r, reqCtx, generics.ServiceSignature, inNS, ml); err != nil {
 		return ret, err
 	}
 
-	if ret, err := removeFinalizer(r, reqCtx, intctrlutil.SecretSignature, inNS, ml); err != nil {
+	if ret, err := removeFinalizer(r, reqCtx, generics.SecretSignature, inNS, ml); err != nil {
 		return ret, err
 	}
 
-	if ret, err := removeFinalizer(r, reqCtx, intctrlutil.ConfigMapSignature, inNS, ml); err != nil {
+	if ret, err := removeFinalizer(r, reqCtx, generics.ConfigMapSignature, inNS, ml); err != nil {
 		return ret, err
 	}
 
-	if ret, err := removeFinalizer(r, reqCtx, intctrlutil.PodDisruptionBudgetSignature, inNS, ml); err != nil {
+	if ret, err := removeFinalizer(r, reqCtx, generics.PodDisruptionBudgetSignature, inNS, ml); err != nil {
 		return ret, err
 	}
 
 	return nil, nil
 }
 
-func removeFinalizer[T intctrlutil.Object, PT intctrlutil.PObject[T],
-	L intctrlutil.ObjList[T], PL intctrlutil.PObjList[T, L]](
+func removeFinalizer[T generics.Object, PT generics.PObject[T],
+	L generics.ObjList[T], PL generics.PObjList[T, L]](
 	r *ClusterReconciler, reqCtx intctrlutil.RequestCtx, _ func(T, L), opts ...client.ListOption) (*ctrl.Result, error) {
 	var (
 		objList L

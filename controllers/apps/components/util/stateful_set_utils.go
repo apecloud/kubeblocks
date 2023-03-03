@@ -48,15 +48,6 @@ func IsMemberOf(set *appsv1.StatefulSet, pod *corev1.Pod) bool {
 	return getParentName(pod) == set.Name
 }
 
-// GetPodRevision gets the revision of Pod by inspecting the StatefulSetRevisionLabel. If pod has no revision the empty
-// string is returned.
-func GetPodRevision(pod *corev1.Pod) string {
-	if pod.Labels == nil {
-		return ""
-	}
-	return pod.Labels[appsv1.StatefulSetRevisionLabel]
-}
-
 // IsStsAndPodsRevisionConsistent checks if StatefulSet and pods of the StatefuleSet have the same revison,
 func IsStsAndPodsRevisionConsistent(ctx context.Context, cli client.Client, sts *appsv1.StatefulSet) (bool, error) {
 	pods, err := GetPodListByStatefulSet(ctx, cli, sts)
@@ -70,7 +61,7 @@ func IsStsAndPodsRevisionConsistent(ctx context.Context, cli client.Client, sts 
 	}
 
 	for _, pod := range pods {
-		if GetPodRevision(&pod) != sts.Status.UpdateRevision {
+		if intctrlutil.GetPodRevision(&pod) != sts.Status.UpdateRevision {
 			revisionConsistent = false
 			break
 		}
@@ -94,7 +85,7 @@ func DeleteStsPods(ctx context.Context, cli client.Client, sts *appsv1.StatefulS
 			continue
 		}
 		// do nothing if the pod has the latest version
-		if GetPodRevision(&pod) == sts.Status.UpdateRevision {
+		if intctrlutil.GetPodRevision(&pod) == sts.Status.UpdateRevision {
 			continue
 		}
 		// delete the pod to trigger associate StatefulSet to re-create it

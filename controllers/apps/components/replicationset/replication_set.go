@@ -99,7 +99,7 @@ func (rs *ReplicationSet) PodIsAvailable(pod *corev1.Pod, minReadySeconds int32)
 	if pod == nil {
 		return false
 	}
-	return util.PodIsReady(*pod)
+	return intctrlutil.PodIsReadyWithLabel(*pod)
 }
 
 // HandleProbeTimeoutWhenPodsReady is the implementation of the type Component interface method,

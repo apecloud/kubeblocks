@@ -32,6 +32,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/constant"
 	componetutil "github.com/apecloud/kubeblocks/internal/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	"github.com/apecloud/kubeblocks/internal/generics"
 )
 
 // ProbeDetectManager implements the SwitchDetectManager interface with KubeBlocks Probe.
@@ -466,7 +467,7 @@ func CheckPrimaryIndexChanged(ctx context.Context,
 	compName string,
 	primaryIndex *int32) (bool, int32, error) {
 	// get the statefulSet object whose current role label is primary
-	primarySts, err := GetReplicationSetPrimaryObj(ctx, cli, cluster, intctrlutil.StatefulSetSignature, compName)
+	primarySts, err := GetReplicationSetPrimaryObj(ctx, cli, cluster, generics.StatefulSetSignature, compName)
 	if err != nil {
 		return false, -1, err
 	}

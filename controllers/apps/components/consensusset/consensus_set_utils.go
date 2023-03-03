@@ -96,9 +96,9 @@ func generateConsensusUpdatePlan(ctx context.Context, cli client.Client, stsObj 
 		}
 
 		// if pod is the latest version, we do nothing
-		if util.GetPodRevision(&pod) == stsObj.Status.UpdateRevision {
+		if intctrlutil.GetPodRevision(&pod) == stsObj.Status.UpdateRevision {
 			// wait until ready
-			return !util.PodIsReady(pod), nil
+			return !intctrlutil.PodIsReadyWithLabel(pod), nil
 		}
 
 		// delete the pod to trigger associate StatefulSet to re-create it
@@ -389,7 +389,7 @@ func setConsensusSetStatusRoles(consensusSetStatus *appsv1alpha1.ConsensusSetSta
 	}
 
 	for _, pod := range pods {
-		if !util.PodIsReady(pod) {
+		if !intctrlutil.PodIsReadyWithLabel(pod) {
 			continue
 		}
 

@@ -23,6 +23,7 @@ import (
 	"strings"
 	"time"
 
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	metautil "k8s.io/apimachinery/pkg/util/intstr"
@@ -335,4 +336,28 @@ func GetProbeGRPCPort(pod *corev1.Pod) (int32, error) {
 
 func GetProbeHTTPPort(pod *corev1.Pod) (int32, error) {
 	return GetPortByPortName(pod, constant.ProbeHTTPPortName)
+}
+
+// PodIsReadyWithLabel checks whether pod is ready or not if the component is ConsensusSet or ReplicationSet,
+// it will be available when the pod is ready and labeled with its role.
+func PodIsReadyWithLabel(pod corev1.Pod) bool {
+	if _, ok := pod.Labels[constant.RoleLabelKey]; !ok {
+		return false
+	}
+
+	return PodIsReady(&pod)
+}
+
+// PodIsControlledByLatestRevision checks if the pod is controlled by latest controller revision.
+func PodIsControlledByLatestRevision(pod *corev1.Pod, sts *appsv1.StatefulSet) bool {
+	return GetPodRevision(pod) == sts.Status.UpdateRevision && sts.Status.ObservedGeneration == sts.Generation
+}
+
+// GetPodRevision gets the revision of Pod by inspecting the StatefulSetRevisionLabel. If pod has no revision the empty
+// string is returned.
+func GetPodRevision(pod *corev1.Pod) string {
+	if pod.Labels == nil {
+		return ""
+	}
+	return pod.Labels[appsv1.StatefulSetRevisionLabel]
 }

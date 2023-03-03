@@ -29,6 +29,7 @@ import (
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	"github.com/apecloud/kubeblocks/internal/generics"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 )
 
@@ -55,10 +56,10 @@ var _ = Describe("Reconfigure OpsRequest", func() {
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 		// namespaced
-		testapps.ClearResources(&testCtx, intctrlutil.OpsRequestSignature, inNS, ml)
-		testapps.ClearResources(&testCtx, intctrlutil.ConfigMapSignature, inNS, ml)
+		testapps.ClearResources(&testCtx, generics.OpsRequestSignature, inNS, ml)
+		testapps.ClearResources(&testCtx, generics.ConfigMapSignature, inNS, ml)
 		// non-namespaced
-		testapps.ClearResources(&testCtx, intctrlutil.ConfigConstraintSignature, ml)
+		testapps.ClearResources(&testCtx, generics.ConfigConstraintSignature, ml)
 	}
 
 	BeforeEach(cleanEnv)

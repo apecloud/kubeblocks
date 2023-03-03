@@ -57,7 +57,7 @@ func (consensusSet *ConsensusSet) IsRunning(obj client.Object) (bool, error) {
 		return false, err
 	}
 	for _, pod := range pods {
-		if !util.PodIsReady(pod) {
+		if !intctrlutil.PodIsReadyWithLabel(pod) {
 			return false, nil
 		}
 	}
@@ -77,7 +77,7 @@ func (consensusSet *ConsensusSet) PodIsAvailable(pod *corev1.Pod, minReadySecond
 	if pod == nil {
 		return false
 	}
-	return util.PodIsReady(*pod)
+	return intctrlutil.PodIsReadyWithLabel(*pod)
 }
 
 func (consensusSet *ConsensusSet) HandleProbeTimeoutWhenPodsReady(recorder record.EventRecorder) (bool, error) {
@@ -172,7 +172,7 @@ func (consensusSet *ConsensusSet) GetPhaseWhenPodsNotReady(componentName string)
 			leaderIsReady = true
 			continue
 		}
-		if !intctrlutil.PodIsReady(&v) && util.PodIsControlledByLatestRevision(&v, &stsObj) {
+		if !intctrlutil.PodIsReady(&v) && intctrlutil.PodIsControlledByLatestRevision(&v, &stsObj) {
 			existLatestRevisionFailedPod = true
 		}
 	}

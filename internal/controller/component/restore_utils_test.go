@@ -30,6 +30,7 @@ import (
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	"github.com/apecloud/kubeblocks/internal/generics"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 )
 
@@ -51,10 +52,10 @@ var _ = Describe("probe_utils", func() {
 			// delete rest mocked objects
 			inNS := client.InNamespace(testCtx.DefaultNamespace)
 			ml := client.HasLabels{testCtx.TestObjLabelKey}
-			testapps.ClearResources(&testCtx, intctrlutil.BackupSignature, inNS, ml)
-			testapps.ClearResources(&testCtx, intctrlutil.BackupPolicySignature, inNS, ml)
+			testapps.ClearResources(&testCtx, generics.BackupSignature, inNS, ml)
+			testapps.ClearResources(&testCtx, generics.BackupPolicySignature, inNS, ml)
 			// non-namespaced
-			testapps.ClearResources(&testCtx, intctrlutil.BackupToolSignature, ml)
+			testapps.ClearResources(&testCtx, generics.BackupToolSignature, ml)
 		}
 
 		BeforeEach(func() {

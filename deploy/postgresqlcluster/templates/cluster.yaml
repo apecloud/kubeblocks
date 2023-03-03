@@ -19,6 +19,7 @@ spec:
       componentDefRef: postgresql # ref clusterdefinition components.name
       monitor: {{ .Values.monitor.enabled | default false }}
       replicas: {{ .Values.replicaCount | default 1 }}
+      primaryIndex: {{ .Values.primaryIndex | default 0 }}
       enabledLogs: {{ .Values.enabledLogs | toJson | indent 4 }}
       {{- with  .Values.resources }}
       resources:

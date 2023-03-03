@@ -8,5 +8,17 @@ dependencies:
 - name: loadbalancer
   repository: file://../loadbalancer
   version: 0.1.0
-digest: sha256:e3ba6146bc8adba2f7a9c0a0d087f5207a898ffa16e45a7cbfc8651d9dadd322
-generated: "2023-03-03T14:27:02.877679+08:00"
+- name: grafana
+  repository: ""
+  version: 6.43.*
+- name: prometheus
+  repository: ""
+  version: 15.15 - 15.16
+- name: snapshot-controller
+  repository: ""
+  version: 1.*
+- name: csi-s3
+  repository: ""
+  version: 0.*
+digest: sha256:3213aa66925085bb4c70c51d4446580abf4d891a108c9caa744ec5e8f7f46f40
+generated: "2023-03-03T16:30:01.727432+08:00"

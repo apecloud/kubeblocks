@@ -1,39 +1,26 @@
-## kbcli kubeblocks install
+## kbcli kubeblocks status
 
-Install KubeBlocks
+Show list of resource KubeBlocks uses or owns
 
 ```
-kbcli kubeblocks install [flags]
+kbcli kubeblocks status [flags]
 ```
 
 ### Examples
 
 ```
-  # Install KubeBlocks
-  kbcli kubeblocks install
+  # list workloads owned by KubeBlocks
+  kbcli kubeblocks status
   
-  # Install KubeBlocks with specified version
-  kbcli kubeblocks install --version=0.4.0
-  
-  # Install KubeBlocks with other settings, for example, set replicaCount to 3
-  kbcli kubeblocks install --set replicaCount=3
+  # list all resources owned by KubeBlocks, such as workloads, cluster definitions, backup template.
+  kbcli kubeblocks status --all
 ```
 
 ### Options
 
 ```
-      --check                    Check kubernetes environment before install (default true)
-      --create-namespace         Create the namespace if not present
-  -h, --help                     help for install
-      --monitor                  Set monitor enabled and install Prometheus, AlertManager and Grafana (default true) (default true)
-      --set stringArray          Set values on the command line (can specify multiple or separate values with commas: key1=val1,key2=val2)
-      --set-file stringArray     Set values from respective files specified via the command line (can specify multiple or separate values with commas: key1=path1,key2=path2)
-      --set-json stringArray     Set JSON values on the command line (can specify multiple or separate values with commas: key1=jsonval1,key2=jsonval2)
-      --set-string stringArray   Set STRING values on the command line (can specify multiple or separate values with commas: key1=val1,key2=val2)
-      --timeout duration         Time to wait for installing KubeBlocks (default 30m0s)
-  -f, --values strings           Specify values in a YAML file or a URL (can specify multiple)
-      --verbose                  Show logs in detail.
-      --version string           KubeBlocks version
+      --all    Show all resources, including configurations, storages, etc
+  -h, --help   help for status
 ```
 
 ### Options inherited from parent commands

@@ -22,7 +22,6 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
-	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/cli/values"
 	"helm.sh/helm/v3/pkg/repo"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
@@ -57,7 +56,7 @@ type options struct {
 	genericclioptions.IOStreams
 	Version         string
 	Sets            []string
-	HelmCfg         *action.Configuration
+	HelmCfg         *helm.Config
 	Namespace       string
 	AppName         string
 	CreateNamespace bool
@@ -200,7 +199,6 @@ func (o *options) complete(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	o.HelmCfg, err = helm.NewActionConfig(o.Namespace, kubeconfig, helm.WithContext(kubecontext))
-
-	return err
+	o.HelmCfg = helm.NewConfig(o.Namespace, kubeconfig, kubecontext, false)
+	return nil
 }

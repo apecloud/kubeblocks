@@ -223,7 +223,7 @@ func showEndpoints(c *appsv1alpha1.Cluster, svcList *corev1.ServiceList, out io.
 		if len(internalEndpoints) == 0 && len(externalEndpoints) == 0 {
 			continue
 		}
-		tbl.AddRow(c.Name, "ReadWrite", util.CheckEmpty(strings.Join(internalEndpoints, "\n")),
+		tbl.AddRow(comp.Name, "ReadWrite", util.CheckEmpty(strings.Join(internalEndpoints, "\n")),
 			util.CheckEmpty(strings.Join(externalEndpoints, "\n")))
 	}
 	tbl.Print()

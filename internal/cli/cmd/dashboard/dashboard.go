@@ -280,7 +280,7 @@ func getDashboardInfo(client *kubernetes.Clientset) error {
 }
 
 func newFactory(namespace string) cmdutil.Factory {
-	cf := genericclioptions.NewConfigFlags(true)
+	cf := util.NewConfigFlagNoWarnings()
 	cf.Namespace = pointer.String(namespace)
 	return cmdutil.NewFactory(cf)
 }

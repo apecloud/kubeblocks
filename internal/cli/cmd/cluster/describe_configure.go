@@ -652,7 +652,7 @@ func printSingleParameterTemplate(pt *parameterTemplate) {
 	printer.PrintPairStringToLine("Range", pt.rangeFormatter())
 	printer.PrintPairStringToLine("Enum", pt.enumFormatter(-1))
 	printer.PrintPairStringToLine("Scope", pt.scope)
-	printer.PrintPairStringToLine("ComponentDefRef", pt.valueType)
+	printer.PrintPairStringToLine("Type", pt.valueType)
 	printer.PrintPairStringToLine("Description", pt.description)
 }
 

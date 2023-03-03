@@ -71,7 +71,7 @@ func newListVersionsCmd(streams genericclioptions.IOStreams) *cobra.Command {
 
 func (o *listVersionsOption) listVersions() error {
 	if o.limit < 0 {
-		return fmt.Errorf("limit shoul be greater than or equal to 0")
+		return fmt.Errorf("limit should be greater than or equal to 0")
 	}
 
 	// get chart versions

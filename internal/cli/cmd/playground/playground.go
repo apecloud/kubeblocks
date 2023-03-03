@@ -24,7 +24,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"golang.org/x/exp/slices"
-	"helm.sh/helm/v3/pkg/action"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/kubectl/pkg/util/templates"
@@ -69,8 +68,7 @@ type baseOptions struct {
 
 type initOptions struct {
 	genericclioptions.IOStreams
-	helmCfg *action.Configuration
-
+	helmCfg        *helm.Config
 	clusterDef     string
 	verbose        bool
 	kbVersion      string
@@ -216,10 +214,8 @@ func (o *initOptions) installKBAndCluster(k8sClusterName string) error {
 	var err error
 	configPath := util.ConfigPath("config")
 
-	// Init helm client
-	if o.helmCfg, err = helm.NewActionConfig("", configPath); err != nil {
-		return errors.Wrap(err, "failed to init helm client")
-	}
+	// create helm config
+	o.helmCfg = helm.NewConfig("", configPath, "", o.verbose)
 
 	// Install KubeBlocks
 	if err = o.installKubeBlocks(); err != nil {

@@ -64,7 +64,7 @@ var _ = Describe("backupconfig", func() {
 		o := &kubeblocks.InstallOptions{
 			Options: kubeblocks.Options{
 				IOStreams: streams,
-				HelmCfg:   helm.FakeActionConfig(),
+				HelmCfg:   helm.NewFakeConfig(testing.Namespace),
 				Namespace: "default",
 				Client:    testing.FakeClientSet(mockDeploy()),
 				Dynamic:   testing.FakeDynamicClient(),

@@ -163,7 +163,7 @@ type ClusterDefinitionStatus struct {
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 }
 
-type ConfigTemplate struct {
+type ComponentTemplateSpec struct {
 	// Specify the name of configuration template.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=63
@@ -174,18 +174,7 @@ type ConfigTemplate struct {
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=63
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
-	ConfigTplRef string `json:"configTplRef"`
-
-	// Specify a list of keys.
-	// If empty, ConfigConstraint takes effect for all keys in configmap.
-	// +optional
-	Keys []string `json:"keys,omitempty"`
-
-	// Specify the name of the referenced the configuration constraints object.
-	// +kubebuilder:validation:MaxLength=63
-	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
-	// +optional
-	ConfigConstraintRef string `json:"configConstraintRef,omitempty"`
+	ConfigTemplateRef string `json:"configTemplateRef"`
 
 	// Specify the namespace of the referenced the configuration template ConfigMap object.
 	// An empty namespace is equivalent to the "default" namespace.
@@ -199,6 +188,25 @@ type ConfigTemplate struct {
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=32
 	VolumeName string `json:"volumeName"`
+}
+
+type ComponentConfigSpec struct {
+	ComponentTemplateSpec `json:",inline"`
+
+	// Specify a list of keys.
+	// If empty, ConfigConstraint takes effect for all keys in configmap.
+	// +optional
+	Keys []string `json:"keys,omitempty"`
+
+	// Specify the name of the referenced the configuration constraints object.
+	// +kubebuilder:validation:MaxLength=63
+	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
+	// +optional
+	ConfigConstraintRef string `json:"configConstraintRef,omitempty"`
+}
+
+type ComponentScriptSpec struct {
+	ComponentTemplateSpec `json:",inline"`
 
 	// defaultMode is optional: mode bits used to set permissions on created files by default.
 	// Must be an octal value between 0000 and 0777 or a decimal value between 0 and 511.
@@ -252,17 +260,6 @@ type LogConfig struct {
 	FilePathPattern string `json:"filePathPattern"`
 }
 
-type ConfigurationSpec struct {
-	// The configTemplateRefs field provided by provider, and
-	// finally this configTemplateRefs will be rendered into the user's own configuration file according to the user's cluster.
-	// +optional
-	// +patchMergeKey=name
-	// +patchStrategy=merge,retainKeys
-	// +listType=map
-	// +listMapKey=name
-	ConfigTemplateRefs []ConfigTemplate `json:"configTemplateRefs,omitempty"`
-}
-
 // ClusterComponentDefinition provides a workload component specification template,
 // with attributes that strongly work with stateful workloads and day-2 operations
 // behaviors.
@@ -294,9 +291,25 @@ type ClusterComponentDefinition struct {
 	// +optional
 	MaxUnavailable *intstr.IntOrString `json:"maxUnavailable,omitempty"`
 
-	// configSpec defines configuration related spec.
+	// The componentConfigSpec field provided by provider, and
+	// finally this configTemplateRefs will be rendered into the user's own configuration file according to the user's cluster.
 	// +optional
-	ConfigSpec *ConfigurationSpec `json:"configSpec,omitempty"`
+	// +patchMergeKey=name
+	// +patchStrategy=merge,retainKeys
+	// +listType=map
+	// +listMapKey=name
+	// +optional
+	ComponentConfigSpec []ComponentConfigSpec `json:"componentConfigSpec,omitempty"`
+
+	// The componentScriptSpec field provided by provider, and
+	// finally this configTemplateRefs will be rendered into the user's own configuration file according to the user's cluster.
+	// +optional
+	// +patchMergeKey=name
+	// +patchStrategy=merge,retainKeys
+	// +listType=map
+	// +listMapKey=name
+	// +optional
+	ComponentScriptSpec []ComponentScriptSpec `json:"componentScriptSpec,omitempty"`
 
 	// probes setting for healthy checks.
 	// +optional

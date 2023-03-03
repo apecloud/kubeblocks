@@ -62,14 +62,8 @@ spec:
                   description: ClusterComponentVersion is an application version component
                     spec.
                   properties:
-                    componentDefRef:
-                      description: componentDefRef reference one of the cluster component
-                        definition names in ClusterDefinition API (spec.componentDefs.name).
-                      maxLength: 18
-                      pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
-                      type: string
-                    configTemplateRefs:
-                      description: ConfigTemplateRefs defines a configuration extension
+                    componentConfigSpec:
+                      description: componentConfigSpec defines a configuration extension
                         mechanism to handle configuration differences between versions,
                         the configTemplateRefs field, together with configTemplateRefs
                         in the ClusterDefinition, determines the final configuration
@@ -82,24 +76,12 @@ spec:
                             maxLength: 63
                             pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                             type: string
-                          configTplRef:
+                          configTemplateRef:
                             description: Specify the name of the referenced the configuration
                               template ConfigMap object.
                             maxLength: 63
                             pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                             type: string
-                          defaultMode:
-                            description: 'defaultMode is optional: mode bits used
-                              to set permissions on created files by default. Must
-                              be an octal value between 0000 and 0777 or a decimal
-                              value between 0 and 511. YAML accepts both octal and
-                              decimal values, JSON requires decimal values for mode
-                              bits. Defaults to 0644. Directories within the path
-                              are not affected by this setting. This might be in conflict
-                              with other options that affect the file mode, like fsGroup,
-                              and the result can be other mode bits set.'
-                            format: int32
-                            type: integer
                           keys:
                             description: Specify a list of keys. If empty, ConfigConstraint
                               takes effect for all keys in configmap.
@@ -126,7 +108,7 @@ spec:
                             maxLength: 32
                             type: string
                         required:
-                        - configTplRef
+                        - configTemplateRef
                         - name
                         - volumeName
                         type: object
@@ -134,6 +116,12 @@ spec:
                       x-kubernetes-list-map-keys:
                       - name
                       x-kubernetes-list-type: map
+                    componentDefRef:
+                      description: componentDefRef reference one of the cluster component
+                        definition names in ClusterDefinition API (spec.componentDefs.name).
+                      maxLength: 18
+                      pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                      type: string
                     versionsContext:
                       description: versionContext defines containers images' context
                         for component versions, this value replaces ClusterDefinition.spec.componentDefs.podSpec.[initContainers

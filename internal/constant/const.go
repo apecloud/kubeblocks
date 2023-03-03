@@ -29,3 +29,7 @@ const KBImage = "KUBEBLOCKS_IMAGE"
 const (
 	KBImagePullPolicy = "KUBEBLOCKS_IMAGE_PULL_POLICY"
 )
+
+const (
+	KBReplicationSetPrimaryPodName = "KB_PRIMARY_POD_NAME"
+)

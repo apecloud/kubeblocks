@@ -31,9 +31,8 @@ data:
     #!/bin/bash
     set -o errexit
     set -o nounset
-    SECONDARY_ROLE=secondary
-    KB_ROLE_NAME=`cat /etc/conf/role/labels`
-    if [ "$KB_ROLE_NAME" = "$SECONDARY_ROLE" ]; then
+    KB_PRIMARY_POD_NAME_PREFIX=${KB_PRIMARY_POD_NAME%%\.*}
+    if [ "$KB_PRIMARY_POD_NAME_PREFIX" != "$KB_POD_NAME" ]; then
       export POSTGRES_REPLICATION_MODE=slave
       # TODO: use replicator instead
       export POSTGRES_REPLICATION_USER=$POSTGRES_USER

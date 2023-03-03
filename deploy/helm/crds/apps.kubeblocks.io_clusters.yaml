@@ -59,34 +59,40 @@ spec:
             description: ClusterSpec defines the desired state of Cluster
             properties:
               affinity:
-                description: affinity describes affinities which specific by users.
+                description: Affinity is a group of affinity scheduling rules.
                 properties:
                   nodeLabels:
                     additionalProperties:
                       type: string
-                    description: nodeLabels describe constrain which nodes pod can
-                      be scheduled on based on node labels.
+                    description: NodeLabels describes that pods must be scheduled
+                      to the nodes with the specified node labels.
                     type: object
                   podAntiAffinity:
-                    description: podAntiAffinity defines pods of component anti-affnity.
-                      Defaults is Preferred. Preferred means try spread pods by topologyKey.
-                      Required means must spread pods by topologyKey.
+                    default: Preferred
+                    description: PodAntiAffinity describes the anti-affinity level
+                      of pods within a component. Preferred means try spread pods
+                      by `TopologyKeys`. Required means must spread pods by `TopologyKeys`.
                     enum:
                     - Preferred
                     - Required
                     type: string
                   tenancy:
                     default: SharedNode
-                    description: tenancy defines how pods are distributed across node.
-                      SharedNode means multiple pods may share the same node. DedicatedNode
-                      means each pod runs on their own dedicated node.
+                    description: Tenancy describes how pods are distributed across
+                      node. SharedNode means multiple pods may share the same node.
+                      DedicatedNode means each pod runs on their own dedicated node.
                     enum:
                     - SharedNode
                     - DedicatedNode
                     type: string
                   topologyKeys:
-                    description: topologyKeys describe topologyKeys for `topologySpreadConstraint`
-                      and `podAntiAffinity` in ClusterDefinition API.
+                    description: TopologyKey is the key of node labels. Nodes that
+                      have a label with this key and identical values are considered
+                      to be in the same topology. It's used as the topology domain
+                      for pod anti-affinity and pod spread constraint. Some well-known
+                      label keys, such as "kubernetes.io/hostname" and "topology.kubernetes.io/zone"
+                      are often used as TopologyKey, as well as any other custom label
+                      key.
                     items:
                       type: string
                     type: array
@@ -114,30 +120,37 @@ spec:
                         nodeLabels:
                           additionalProperties:
                             type: string
-                          description: nodeLabels describe constrain which nodes pod
-                            can be scheduled on based on node labels.
+                          description: NodeLabels describes that pods must be scheduled
+                            to the nodes with the specified node labels.
                           type: object
                         podAntiAffinity:
-                          description: podAntiAffinity defines pods of component anti-affnity.
-                            Defaults is Preferred. Preferred means try spread pods
-                            by topologyKey. Required means must spread pods by topologyKey.
+                          default: Preferred
+                          description: PodAntiAffinity describes the anti-affinity
+                            level of pods within a component. Preferred means try
+                            spread pods by `TopologyKeys`. Required means must spread
+                            pods by `TopologyKeys`.
                           enum:
                           - Preferred
                           - Required
                           type: string
                         tenancy:
                           default: SharedNode
-                          description: tenancy defines how pods are distributed across
-                            node. SharedNode means multiple pods may share the same
-                            node. DedicatedNode means each pod runs on their own dedicated
-                            node.
+                          description: Tenancy describes how pods are distributed
+                            across node. SharedNode means multiple pods may share
+                            the same node. DedicatedNode means each pod runs on their
+                            own dedicated node.
                           enum:
                           - SharedNode
                           - DedicatedNode
                           type: string
                         topologyKeys:
-                          description: topologyKeys describe topologyKeys for `topologySpreadConstraint`
-                            and `podAntiAffinity` in ClusterDefinition API.
+                          description: TopologyKey is the key of node labels. Nodes
+                            that have a label with this key and identical values are
+                            considered to be in the same topology. It's used as the
+                            topology domain for pod anti-affinity and pod spread constraint.
+                            Some well-known label keys, such as "kubernetes.io/hostname"
+                            and "topology.kubernetes.io/zone" are often used as TopologyKey,
+                            as well as any other custom label key.
                           items:
                             type: string
                           type: array
@@ -612,9 +625,8 @@ spec:
                 - WipeOut
                 type: string
               tolerations:
-                description: Cluster Tolerations are attached to tolerate any taint
-                  that matches the triple <key,value,effect> using the matching operator
-                  <operator>.
+                description: Tolerations are attached to tolerate any taint that matches
+                  the triple <key,value,effect> using the matching operator <operator>.
                 items:
                   description: The pod this Toleration is attached to tolerates any
                     taint that matches the triple <key,value,effect> using the matching

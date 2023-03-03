@@ -55,11 +55,11 @@ type ClusterSpec struct {
 	// +kubebuilder:validation:MinItems=1
 	ComponentSpecs []ClusterComponentSpec `json:"componentSpecs,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
 
-	// affinity describes affinities which specific by users.
+	// Affinity is a group of affinity scheduling rules.
 	// +optional
 	Affinity *Affinity `json:"affinity,omitempty"`
 
-	// Cluster Tolerations are attached to tolerate any taint that matches the triple <key,value,effect> using the matching operator <operator>.
+	// Tolerations are attached to tolerate any taint that matches the triple <key,value,effect> using the matching operator <operator>.
 	// +kubebuilder:pruning:PreserveUnknownFields
 	// +optional
 	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
@@ -311,23 +311,27 @@ type ClusterComponentVolumeClaimTemplate struct {
 }
 
 type Affinity struct {
-	// podAntiAffinity defines pods of component anti-affnity.
-	// Defaults is Preferred.
-	// Preferred means try spread pods by topologyKey.
-	// Required means must spread pods by topologyKey.
+	// PodAntiAffinity describes the anti-affinity level of pods within a component.
+	// Preferred means try spread pods by `TopologyKeys`.
+	// Required means must spread pods by `TopologyKeys`.
+	// +kubebuilder:default=Preferred
 	// +optional
 	PodAntiAffinity PodAntiAffinity `json:"podAntiAffinity,omitempty"`
 
-	// topologyKeys describe topologyKeys for `topologySpreadConstraint` and `podAntiAffinity` in ClusterDefinition API.
+	// TopologyKey is the key of node labels.
+	// Nodes that have a label with this key and identical values are considered to be in the same topology.
+	// It's used as the topology domain for pod anti-affinity and pod spread constraint.
+	// Some well-known label keys, such as "kubernetes.io/hostname" and "topology.kubernetes.io/zone"
+	// are often used as TopologyKey, as well as any other custom label key.
 	// +listType=set
 	// +optional
 	TopologyKeys []string `json:"topologyKeys,omitempty"`
 
-	// nodeLabels describe constrain which nodes pod can be scheduled on based on node labels.
+	// NodeLabels describes that pods must be scheduled to the nodes with the specified node labels.
 	// +optional
 	NodeLabels map[string]string `json:"nodeLabels,omitempty"`
 
-	// tenancy defines how pods are distributed across node.
+	// Tenancy describes how pods are distributed across node.
 	// SharedNode means multiple pods may share the same node.
 	// DedicatedNode means each pod runs on their own dedicated node.
 	// +kubebuilder:default=SharedNode

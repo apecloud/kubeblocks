@@ -58,19 +58,19 @@ dependencies:
     name: postgresql
     repository: file://../postgresql
     version: 0.1.*
-  - condition: grafana.enabled
-    name: grafana
-    repository: https://grafana.github.io/helm-charts
-    version: 6.43.*
-  - condition: prometheus.enabled
-    name: prometheus
-    repository: https://prometheus-community.github.io/helm-charts
-    version: 15.15 - 15.16
   - condition: loadbalancer.enabled
     name: loadbalancer
     repository: file://../loadbalancer
     version: 0.1.*
+  - condition: grafana.enabled
+    name: grafana
+    version: 6.43.*
+  - condition: prometheus.enabled
+    name: prometheus
+    version: 15.15 - 15.16
   - condition: snapshot-controller.enabled
     name: snapshot-controller
-    repository: https://piraeus.io/helm-charts
     version: 1.*
+  - condition: csi-s3.enabled
+    name: csi-s3
+    version: 0.*

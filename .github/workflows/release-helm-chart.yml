@@ -36,10 +36,9 @@ jobs:
 
       - name: Add Dependency Chart Repos
         run: |
-          helm repo add grafana https://grafana.github.io/helm-charts
-          helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
-          helm repo add piraeus-charts https://piraeus.io/helm-charts
-          helm repo add cloudve https://github.com/CloudVE/helm-charts/raw/master
+          pushd deploy/helm/charts
+          ls ../depend-charts/*.tgz | xargs -n1 tar xf
+          popd
           helm dep update deploy/helm
 
       - name: Package Kubeblocks Helm Chart

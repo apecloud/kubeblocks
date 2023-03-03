@@ -97,8 +97,6 @@ spec:
                 mountPath: /etc/conf/primary
               - name: secondary
                 mountPath: /etc/conf/secondary
-              - name: pod-role
-                mountPath: /etc/conf/role
               - name: scripts
                 mountPath: /scripts
         containers:
@@ -116,8 +114,6 @@ spec:
                 mountPath: /etc/conf/primary
               - name: secondary
                 mountPath: /etc/conf/secondary
-              - name: pod-role
-                mountPath: /etc/conf/role
               - name: scripts
                 mountPath: /scripts
             args: [ "/etc/conf/redis.conf" ]
@@ -147,12 +143,6 @@ spec:
         volumes:
           - name: conf
             emptyDir: { }
-          - name: pod-role
-            downwardAPI:
-              items:
-                - path: "labels"
-                  fieldRef:
-                    fieldPath: metadata.labels['kubeblocks.io/role']
       systemAccounts:
         cmdExecutorConfig:
           image: docker.io/redis:7.0.5

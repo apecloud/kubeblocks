@@ -72,8 +72,6 @@ spec:
                 mountPath: /postgresql/conf
               - name: scripts
                 mountPath: /scripts
-              - name: pod-role
-                mountPath: /etc/conf/role
             ports:
               - name: tcp-postgresql
                 containerPort: 5432
@@ -232,12 +230,6 @@ spec:
               - name: postgresql-custom-metrics
                 mountPath: /opt/conf
         volumes:
-          - name: pod-role
-            downwardAPI:
-              items:
-                - path: "labels"
-                  fieldRef:
-                    fieldPath: metadata.labels['kubeblocks.io/role']
           - name: dshm
             emptyDir:
               medium: Memory

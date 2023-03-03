@@ -35,7 +35,6 @@ import (
 	cfgutil "github.com/apecloud/kubeblocks/controllers/apps/configuration"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 	cfgcm "github.com/apecloud/kubeblocks/internal/configuration/config_manager"
-	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
 	intctrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
@@ -239,10 +238,6 @@ func buildReplicationSet(reqCtx intctrlutil.RequestCtx,
 	if err != nil {
 		return nil, err
 	}
-	// inject replicationSet pod env and role label.
-	if sts, err = injectReplicationSetPodEnvAndLabel(task, sts, stsIndex); err != nil {
-		return nil, err
-	}
 	// sts.Name rename and add role label.
 	sts.ObjectMeta.Name = fmt.Sprintf("%s-%d", sts.ObjectMeta.Name, stsIndex)
 	sts.Labels[intctrlutil.RoleLabelKey] = string(replicationset.Secondary)
@@ -289,27 +284,6 @@ func buildReplicationSetPVC(task *intctrltypes.ReconcileTask, sts *appsv1.Statef
 	}
 	podSpec.Volumes = podVolumes
 	return nil
-}
-
-func injectReplicationSetPodEnvAndLabel(task *intctrltypes.ReconcileTask, sts *appsv1.StatefulSet, index int32) (*appsv1.StatefulSet, error) {
-	if task.Component.PrimaryIndex == nil {
-		return nil, fmt.Errorf("component %s PrimaryIndex can not be nil", task.Component.Name)
-	}
-	svcName := strings.Join([]string{task.Cluster.Name, task.Component.Name, "headless"}, "-")
-	for i := range sts.Spec.Template.Spec.Containers {
-		c := &sts.Spec.Template.Spec.Containers[i]
-		c.Env = append(c.Env, corev1.EnvVar{
-			Name:      constant.KBPrefix + "_PRIMARY_POD_NAME",
-			Value:     fmt.Sprintf("%s-%d-%d.%s", sts.Name, *task.Component.PrimaryIndex, 0, svcName),
-			ValueFrom: nil,
-		})
-	}
-	if index != *task.Component.PrimaryIndex {
-		sts.Spec.Template.Labels[intctrlutil.RoleLabelKey] = string(replicationset.Secondary)
-	} else {
-		sts.Spec.Template.Labels[intctrlutil.RoleLabelKey] = string(replicationset.Primary)
-	}
-	return sts, nil
 }
 
 // buildPersistentVolumeClaimLabels builds a pvc name label, and synchronize the labels on the sts to the pvc labels.

@@ -28,7 +28,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	"github.com/apecloud/kubeblocks/internal/constant"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/generics"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 	testk8s "github.com/apecloud/kubeblocks/internal/testutil/k8s"
 )
@@ -75,8 +76,8 @@ var _ = Describe("Stateful Component", func() {
 			stsList := &appsv1.StatefulSetList{}
 			Eventually(func() bool {
 				_ = k8sClient.List(ctx, stsList, client.InNamespace(testCtx.DefaultNamespace), client.MatchingLabels{
-					intctrlutil.AppInstanceLabelKey:    clusterName,
-					intctrlutil.KBAppComponentLabelKey: statefulCompName,
+					constant.AppInstanceLabelKey:    clusterName,
+					constant.KBAppComponentLabelKey: statefulCompName,
 				}, client.Limit(1))
 				return len(stsList.Items) > 0
 			}).Should(BeTrue())

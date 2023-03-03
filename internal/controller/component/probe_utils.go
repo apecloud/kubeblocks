@@ -161,12 +161,12 @@ func buildProbeServiceContainer(component *SynthesizedComponent, container *core
 
 	container.Ports = []corev1.ContainerPort{{
 		ContainerPort: int32(probeSvcHTTPPort),
-		Name:          intctrlutil.ProbeHTTPPortName,
+		Name:          constant.ProbeHTTPPortName,
 		Protocol:      "TCP",
 	},
 		{
 			ContainerPort: int32(probeSvcGRPCPort),
-			Name:          intctrlutil.ProbeGRPCPortName,
+			Name:          constant.ProbeGRPCPortName,
 			Protocol:      "TCP",
 		}}
 }

@@ -25,6 +25,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -130,7 +131,7 @@ func buildVolumeClaimTemplatesWithSnapshot(component *SynthesizedComponent,
 	snapshotAPIGroup := snapshotv1.GroupName
 	vct.Spec.DataSource = &corev1.TypedLocalObjectReference{
 		APIGroup: &snapshotAPIGroup,
-		Kind:     intctrlutil.VolumeSnapshotKind,
+		Kind:     constant.VolumeSnapshotKind,
 		Name:     backup.Name,
 	}
 	component.VolumeClaimTemplates[0] = vct

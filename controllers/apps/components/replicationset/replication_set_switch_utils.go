@@ -29,8 +29,10 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
+	"github.com/apecloud/kubeblocks/internal/constant"
 	componetutil "github.com/apecloud/kubeblocks/internal/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	"github.com/apecloud/kubeblocks/internal/generics"
 )
 
 // ProbeDetectManager implements the SwitchDetectManager interface with KubeBlocks Probe.
@@ -281,7 +283,7 @@ func (pdm *ProbeDetectManager) healthDetect(pod *corev1.Pod) (*HealthDetectResul
 // TODO(xingran) Wait for the probe interface to be ready before implementation
 func (pdm *ProbeDetectManager) roleDetect(pod *corev1.Pod) (*RoleDetectResult, error) {
 	var res RoleDetectResult
-	role := pod.Labels[intctrlutil.RoleLabelKey]
+	role := pod.Labels[constant.RoleLabelKey]
 	res = DetectRoleSecondary
 	if role == string(Primary) {
 		res = DetectRolePrimary
@@ -451,10 +453,10 @@ func cleanSwitchCmdJobs(s *Switch) error {
 // getSwitchCmdJobLabel gets the labels for job that execute the switch commands.
 func getSwitchCmdJobLabel(clusterName, componentName string) map[string]string {
 	return map[string]string{
-		intctrlutil.AppInstanceLabelKey:    clusterName,
-		intctrlutil.KBAppComponentLabelKey: componentName,
-		intctrlutil.AppManagedByLabelKey:   intctrlutil.AppName,
-		KBSwitchJobLabelKey:                KBSwitchJobLabelValue,
+		constant.AppInstanceLabelKey:    clusterName,
+		constant.KBAppComponentLabelKey: componentName,
+		constant.AppManagedByLabelKey:   constant.AppName,
+		KBSwitchJobLabelKey:             KBSwitchJobLabelValue,
 	}
 }
 
@@ -465,7 +467,7 @@ func CheckPrimaryIndexChanged(ctx context.Context,
 	compName string,
 	primaryIndex *int32) (bool, int32, error) {
 	// get the statefulSet object whose current role label is primary
-	primarySts, err := GetReplicationSetPrimaryObj(ctx, cli, cluster, intctrlutil.StatefulSetSignature, compName)
+	primarySts, err := GetReplicationSetPrimaryObj(ctx, cli, cluster, generics.StatefulSetSignature, compName)
 	if err != nil {
 		return false, -1, err
 	}

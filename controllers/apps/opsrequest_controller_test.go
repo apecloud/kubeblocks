@@ -28,7 +28,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	"github.com/apecloud/kubeblocks/internal/constant"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/generics"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 )
 
@@ -154,7 +155,7 @@ var _ = Describe("OpsRequest Controller", func() {
 			if verticalScalingOpsRequest.Annotations == nil {
 				verticalScalingOpsRequest.Annotations = make(map[string]string, 1)
 			}
-			verticalScalingOpsRequest.Annotations[intctrlutil.OpsRequestReconcileAnnotationKey] = time.Now().Format(time.RFC3339Nano)
+			verticalScalingOpsRequest.Annotations[constant.OpsRequestReconcileAnnotationKey] = time.Now().Format(time.RFC3339Nano)
 		})).Should(Succeed())
 
 		By("check VerticalScalingOpsRequest succeed")

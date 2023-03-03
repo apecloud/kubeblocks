@@ -32,6 +32,7 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/apps/operations"
 	opsutil "github.com/apecloud/kubeblocks/controllers/apps/operations/util"
+	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -228,12 +229,12 @@ func (r *OpsRequestReconciler) patchOpsRequestWithClusterLabel(reqCtx intctrluti
 	if opsRequest.Labels == nil {
 		opsRequest.Labels = map[string]string{}
 	}
-	clusterName := opsRequest.Labels[intctrlutil.AppInstanceLabelKey]
+	clusterName := opsRequest.Labels[constant.AppInstanceLabelKey]
 	if clusterName == opsRequest.Spec.ClusterRef {
 		return nil
 	}
 	patch := client.MergeFrom(opsRequest.DeepCopy())
-	opsRequest.Labels[intctrlutil.AppInstanceLabelKey] = opsRequest.Spec.ClusterRef
+	opsRequest.Labels[constant.AppInstanceLabelKey] = opsRequest.Spec.ClusterRef
 	return r.Client.Patch(reqCtx.Ctx, opsRequest, patch)
 }
 

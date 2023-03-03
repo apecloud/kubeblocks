@@ -34,7 +34,7 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	opsutil "github.com/apecloud/kubeblocks/controllers/apps/operations/util"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
 type clusterConditionManager struct {
@@ -146,7 +146,7 @@ func (conMgr clusterConditionManager) setProvisioningStartedCondition() error {
 func (conMgr clusterConditionManager) setPreCheckErrorCondition(err error) error {
 	reason := ReasonPreCheckFailed
 	if apierrors.IsNotFound(err) {
-		reason = intctrlutil.ReasonNotFoundCR
+		reason = constant.ReasonNotFoundCR
 	}
 	condition := metav1.Condition{
 		Type:    ConditionTypeProvisioningStarted,
@@ -163,7 +163,7 @@ func (conMgr clusterConditionManager) setReferenceCRUnavailableCondition(message
 		Type:    ConditionTypeProvisioningStarted,
 		Status:  metav1.ConditionFalse,
 		Message: message,
-		Reason:  intctrlutil.ReasonRefCRUnavailable,
+		Reason:  constant.ReasonRefCRUnavailable,
 	}
 	return conMgr.updateStatusConditions(condition)
 }

@@ -32,7 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/generics"
 	"github.com/apecloud/kubeblocks/internal/loadbalancer/agent"
 	mockagent "github.com/apecloud/kubeblocks/internal/loadbalancer/agent/mocks"
 	mockcloud "github.com/apecloud/kubeblocks/internal/loadbalancer/cloud/mocks"

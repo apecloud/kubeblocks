@@ -25,7 +25,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	"github.com/apecloud/kubeblocks/internal/constant"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/generics"
 	"github.com/apecloud/kubeblocks/internal/testutil"
 )
 
@@ -74,27 +75,27 @@ func (factory *BaseFactory[T, PT, F]) AddLabelsInMap(labels map[string]string) *
 }
 
 func (factory *BaseFactory[T, PT, F]) AddAppNameLabel(value string) *F {
-	return factory.AddLabels(intctrlutil.AppNameLabelKey, value)
+	return factory.AddLabels(constant.AppNameLabelKey, value)
 }
 
 func (factory *BaseFactory[T, PT, F]) AddAppInstanceLabel(value string) *F {
-	return factory.AddLabels(intctrlutil.AppInstanceLabelKey, value)
+	return factory.AddLabels(constant.AppInstanceLabelKey, value)
 }
 
 func (factory *BaseFactory[T, PT, F]) AddAppComponentLabel(value string) *F {
-	return factory.AddLabels(intctrlutil.KBAppComponentLabelKey, value)
+	return factory.AddLabels(constant.KBAppComponentLabelKey, value)
 }
 
 func (factory *BaseFactory[T, PT, F]) AddAppManangedByLabel() *F {
-	return factory.AddLabels(intctrlutil.AppManagedByLabelKey, intctrlutil.AppName)
+	return factory.AddLabels(constant.AppManagedByLabelKey, constant.AppName)
 }
 
 func (factory *BaseFactory[T, PT, F]) AddConsensusSetAccessModeLabel(value string) *F {
-	return factory.AddLabels(intctrlutil.ConsensusSetAccessModeLabelKey, value)
+	return factory.AddLabels(constant.ConsensusSetAccessModeLabelKey, value)
 }
 
 func (factory *BaseFactory[T, PT, F]) AddRoleLabel(value string) *F {
-	return factory.AddLabels(intctrlutil.RoleLabelKey, value)
+	return factory.AddLabels(constant.RoleLabelKey, value)
 }
 
 func (factory *BaseFactory[T, PT, F]) AddAnnotations(keysAndValues ...string) *F {

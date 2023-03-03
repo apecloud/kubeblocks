@@ -20,6 +20,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	"github.com/spf13/viper"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -27,10 +28,9 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
-
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	"github.com/apecloud/kubeblocks/internal/constant"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/generics"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 )
 
@@ -102,7 +102,7 @@ var _ = Describe("Backup for a StatefulSet", func() {
 				SetBackupToolName(backupTool.Name).
 				SetSchedule(defaultSchedule).
 				SetTTL(defaultTTL).
-				AddMatchLabels(intctrlutil.AppInstanceLabelKey, clusterName).
+				AddMatchLabels(constant.AppInstanceLabelKey, clusterName).
 				SetTargetSecretName(clusterName).
 				AddHookPreCommand("touch /data/mysql/.restore;sync").
 				AddHookPostCommand("rm -f /data/mysql/.restore;sync").
@@ -215,7 +215,7 @@ var _ = Describe("Backup for a StatefulSet", func() {
 					SetBackupToolName(backupTool.Name).
 					SetSchedule(defaultSchedule).
 					SetTTL(defaultTTL).
-					AddMatchLabels(intctrlutil.AppInstanceLabelKey, clusterName).
+					AddMatchLabels(constant.AppInstanceLabelKey, clusterName).
 					SetTargetSecretName(clusterName).
 					AddHookPreCommand("touch /data/mysql/.restore;sync").
 					AddHookPostCommand("rm -f /data/mysql/.restore;sync").

@@ -85,7 +85,7 @@ func (stateful *Stateful) GetPhaseWhenPodsNotReady(componentName string) (appsv1
 	// if the failed pod is not controlled by the latest revision
 	checkExistFailedPodOfLatestRevision := func(pod *corev1.Pod, workload metav1.Object) bool {
 		sts := workload.(*appsv1.StatefulSet)
-		return !intctrlutil.PodIsReady(pod) && util.PodIsControlledByLatestRevision(pod, sts)
+		return !intctrlutil.PodIsReady(pod) && intctrlutil.PodIsControlledByLatestRevision(pod, sts)
 	}
 	stsObj := stsList.Items[0]
 	return util.GetComponentPhaseWhenPodsNotReady(podList, &stsObj, stateful.Component.Replicas,

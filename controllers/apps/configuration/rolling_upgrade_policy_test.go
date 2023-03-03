@@ -31,7 +31,7 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	cfgproto "github.com/apecloud/kubeblocks/internal/configuration/proto"
 	mock_proto "github.com/apecloud/kubeblocks/internal/configuration/proto/mocks"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	"github.com/apecloud/kubeblocks/internal/constant"
 	testutil "github.com/apecloud/kubeblocks/internal/testutil/k8s"
 )
 
@@ -93,9 +93,9 @@ var _ = Describe("Reconfigure RollingPolicy", func() {
 					pod.Labels = make(map[string]string, 1)
 				}
 				if i == 1 {
-					pod.Labels[intctrlutil.RoleLabelKey] = "leader"
+					pod.Labels[constant.RoleLabelKey] = "leader"
 				} else {
-					pod.Labels[intctrlutil.RoleLabelKey] = "follower"
+					pod.Labels[constant.RoleLabelKey] = "follower"
 				}
 			}
 

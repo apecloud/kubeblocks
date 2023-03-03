@@ -20,15 +20,15 @@ import (
 	"context"
 	"fmt"
 
-	"k8s.io/client-go/tools/record"
-
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/types"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
+	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -49,7 +49,7 @@ func (rs *ReplicationSet) IsRunning(obj client.Object) (bool, error) {
 	var componentStsList = &appsv1.StatefulSetList{}
 	var componentStatusIsRunning = true
 	sts := util.ConvertToStatefulSet(obj)
-	if err := util.GetObjectListByComponentName(rs.Ctx, rs.Cli, rs.Cluster, componentStsList, sts.Labels[intctrlutil.KBAppComponentLabelKey]); err != nil {
+	if err := util.GetObjectListByComponentName(rs.Ctx, rs.Cli, rs.Cluster, componentStsList, sts.Labels[constant.KBAppComponentLabelKey]); err != nil {
 		return false, err
 	}
 	var availableReplicas int32
@@ -76,7 +76,7 @@ func (rs *ReplicationSet) PodsReady(obj client.Object) (bool, error) {
 	var podsReady = true
 	var componentStsList = &appsv1.StatefulSetList{}
 	sts := util.ConvertToStatefulSet(obj)
-	if err := util.GetObjectListByComponentName(rs.Ctx, rs.Cli, rs.Cluster, componentStsList, sts.Labels[intctrlutil.KBAppComponentLabelKey]); err != nil {
+	if err := util.GetObjectListByComponentName(rs.Ctx, rs.Cli, rs.Cluster, componentStsList, sts.Labels[constant.KBAppComponentLabelKey]); err != nil {
 		return false, err
 	}
 	var availableReplicas int32
@@ -99,7 +99,7 @@ func (rs *ReplicationSet) PodIsAvailable(pod *corev1.Pod, minReadySeconds int32)
 	if pod == nil {
 		return false
 	}
-	return util.PodIsReady(*pod)
+	return intctrlutil.PodIsReadyWithLabel(*pod)
 }
 
 // HandleProbeTimeoutWhenPodsReady is the implementation of the type Component interface method,
@@ -147,7 +147,7 @@ func (rs *ReplicationSet) GetPhaseWhenPodsNotReady(componentName string) (appsv1
 		if v.DeletionTimestamp != nil {
 			return "", nil
 		}
-		labelValue := v.Labels[intctrlutil.RoleLabelKey]
+		labelValue := v.Labels[constant.RoleLabelKey]
 		if labelValue == "" {
 			isAbnormal = true
 			compStatus.Message.SetObjectMessage(v.Kind, v.Name, "empty label for pod, please check.")
@@ -189,7 +189,7 @@ func (rs *ReplicationSet) GetPhaseWhenPodsNotReady(componentName string) (appsv1
 func (rs *ReplicationSet) HandleUpdate(obj client.Object) error {
 	var componentStsList = &appsv1.StatefulSetList{}
 	sts := util.ConvertToStatefulSet(obj)
-	if err := util.GetObjectListByComponentName(rs.Ctx, rs.Cli, rs.Cluster, componentStsList, sts.Labels[intctrlutil.KBAppComponentLabelKey]); err != nil {
+	if err := util.GetObjectListByComponentName(rs.Ctx, rs.Cli, rs.Cluster, componentStsList, sts.Labels[constant.KBAppComponentLabelKey]); err != nil {
 		return err
 	}
 	for _, sts := range componentStsList.Items {
@@ -201,8 +201,8 @@ func (rs *ReplicationSet) HandleUpdate(obj client.Object) error {
 			return err
 		}
 		// if there is no role label on the Pod, it needs to be updated with statefulSet's role label.
-		if _, ok := pod.Labels[intctrlutil.RoleLabelKey]; !ok {
-			if err := updateObjRoleLabel(rs.Ctx, rs.Cli, *pod, sts.Labels[intctrlutil.RoleLabelKey]); err != nil {
+		if _, ok := pod.Labels[constant.RoleLabelKey]; !ok {
+			if err := updateObjRoleLabel(rs.Ctx, rs.Cli, *pod, sts.Labels[constant.RoleLabelKey]); err != nil {
 				return err
 			}
 		}

@@ -44,8 +44,10 @@ import (
 	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	opsutil "github.com/apecloud/kubeblocks/controllers/apps/operations/util"
 	"github.com/apecloud/kubeblocks/controllers/k8score"
+	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	"github.com/apecloud/kubeblocks/internal/generics"
 )
 
 // +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=clusters,verbs=get;list;watch;create;update;patch;delete
@@ -424,41 +426,41 @@ func (r *ClusterReconciler) deleteExternalResources(reqCtx intctrlutil.RequestCt
 
 	// it's possible at time of external resource deletion, cluster definition has already been deleted.
 	ml := client.MatchingLabels{
-		intctrlutil.AppInstanceLabelKey: cluster.GetName(),
+		constant.AppInstanceLabelKey: cluster.GetName(),
 	}
 	inNS := client.InNamespace(cluster.Namespace)
 
 	// all resources created in reconcileClusterWorkloads should be handled properly
 
-	if ret, err := removeFinalizer(r, reqCtx, intctrlutil.StatefulSetSignature, inNS, ml); err != nil {
+	if ret, err := removeFinalizer(r, reqCtx, generics.StatefulSetSignature, inNS, ml); err != nil {
 		return ret, err
 	}
 
-	if ret, err := removeFinalizer(r, reqCtx, intctrlutil.DeploymentSignature, inNS, ml); err != nil {
+	if ret, err := removeFinalizer(r, reqCtx, generics.DeploymentSignature, inNS, ml); err != nil {
 		return ret, err
 	}
 
-	if ret, err := removeFinalizer(r, reqCtx, intctrlutil.ServiceSignature, inNS, ml); err != nil {
+	if ret, err := removeFinalizer(r, reqCtx, generics.ServiceSignature, inNS, ml); err != nil {
 		return ret, err
 	}
 
-	if ret, err := removeFinalizer(r, reqCtx, intctrlutil.SecretSignature, inNS, ml); err != nil {
+	if ret, err := removeFinalizer(r, reqCtx, generics.SecretSignature, inNS, ml); err != nil {
 		return ret, err
 	}
 
-	if ret, err := removeFinalizer(r, reqCtx, intctrlutil.ConfigMapSignature, inNS, ml); err != nil {
+	if ret, err := removeFinalizer(r, reqCtx, generics.ConfigMapSignature, inNS, ml); err != nil {
 		return ret, err
 	}
 
-	if ret, err := removeFinalizer(r, reqCtx, intctrlutil.PodDisruptionBudgetSignature, inNS, ml); err != nil {
+	if ret, err := removeFinalizer(r, reqCtx, generics.PodDisruptionBudgetSignature, inNS, ml); err != nil {
 		return ret, err
 	}
 
 	return nil, nil
 }
 
-func removeFinalizer[T intctrlutil.Object, PT intctrlutil.PObject[T],
-	L intctrlutil.ObjList[T], PL intctrlutil.PObjList[T, L]](
+func removeFinalizer[T generics.Object, PT generics.PObject[T],
+	L generics.ObjList[T], PL generics.PObjList[T, L]](
 	r *ClusterReconciler, reqCtx intctrlutil.RequestCtx, _ func(T, L), opts ...client.ListOption) (*ctrl.Result, error) {
 	var (
 		objList L
@@ -485,7 +487,7 @@ func removeFinalizer[T intctrlutil.Object, PT intctrlutil.PObject[T],
 func (r *ClusterReconciler) deletePVCs(reqCtx intctrlutil.RequestCtx, cluster *appsv1alpha1.Cluster) error {
 	// it's possible at time of external resource deletion, cluster definition has already been deleted.
 	ml := client.MatchingLabels{
-		intctrlutil.AppInstanceLabelKey: cluster.GetName(),
+		constant.AppInstanceLabelKey: cluster.GetName(),
 	}
 	inNS := client.InNamespace(cluster.Namespace)
 
@@ -504,7 +506,7 @@ func (r *ClusterReconciler) deletePVCs(reqCtx intctrlutil.RequestCtx, cluster *a
 func (r *ClusterReconciler) deleteBackupPolicies(reqCtx intctrlutil.RequestCtx, cluster *appsv1alpha1.Cluster) error {
 	inNS := client.InNamespace(cluster.Namespace)
 	ml := client.MatchingLabels{
-		intctrlutil.AppInstanceLabelKey: cluster.GetName(),
+		constant.AppInstanceLabelKey: cluster.GetName(),
 	}
 	// clean backupPolicies
 	return r.Client.DeleteAllOf(reqCtx.Ctx, &dataprotectionv1alpha1.BackupPolicy{}, inNS, ml)
@@ -513,7 +515,7 @@ func (r *ClusterReconciler) deleteBackupPolicies(reqCtx intctrlutil.RequestCtx, 
 func (r *ClusterReconciler) deleteBackups(reqCtx intctrlutil.RequestCtx, cluster *appsv1alpha1.Cluster) error {
 	inNS := client.InNamespace(cluster.Namespace)
 	ml := client.MatchingLabels{
-		intctrlutil.AppInstanceLabelKey: cluster.GetName(),
+		constant.AppInstanceLabelKey: cluster.GetName(),
 	}
 	// clean backups
 	backups := &dataprotectionv1alpha1.BackupList{}
@@ -522,9 +524,9 @@ func (r *ClusterReconciler) deleteBackups(reqCtx intctrlutil.RequestCtx, cluster
 	}
 	for _, backup := range backups.Items {
 		// check backup delete protection label
-		deleteProtection, exists := backup.GetLabels()[intctrlutil.BackupProtectionLabelKey]
+		deleteProtection, exists := backup.GetLabels()[constant.BackupProtectionLabelKey]
 		// not found backup-protection or value is Delete, delete it.
-		if !exists || deleteProtection == intctrlutil.BackupDelete {
+		if !exists || deleteProtection == constant.BackupDelete {
 			if err := r.Delete(reqCtx.Ctx, &backup); err != nil {
 				return err
 			}
@@ -748,11 +750,11 @@ func (r *ClusterReconciler) cleanupAnnotationsAfterRunning(reqCtx intctrlutil.Re
 	if cluster.Status.Phase != appsv1alpha1.RunningPhase {
 		return nil
 	}
-	if _, ok := cluster.Annotations[intctrlutil.RestoreFromBackUpAnnotationKey]; !ok {
+	if _, ok := cluster.Annotations[constant.RestoreFromBackUpAnnotationKey]; !ok {
 		return nil
 	}
 	patch := client.MergeFrom(cluster.DeepCopy())
-	delete(cluster.Annotations, intctrlutil.RestoreFromBackUpAnnotationKey)
+	delete(cluster.Annotations, constant.RestoreFromBackUpAnnotationKey)
 	return r.Client.Patch(reqCtx.Ctx, cluster, patch)
 }
 

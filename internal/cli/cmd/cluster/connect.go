@@ -34,7 +34,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/exec"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
-	"github.com/apecloud/kubeblocks/internal/controllerutil"
+	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
 var connectExample = templates.Examples(`
@@ -155,7 +155,7 @@ func (o *ConnectOptions) connect(args []string) error {
 
 	// cluster name is not specified, get from pod label
 	if o.name == "" {
-		if name, ok := pod.Annotations[controllerutil.AppInstanceLabelKey]; !ok {
+		if name, ok := pod.Annotations[constant.AppInstanceLabelKey]; !ok {
 			return fmt.Errorf("failed to find the cluster to which the instance belongs")
 		} else {
 			o.name = name

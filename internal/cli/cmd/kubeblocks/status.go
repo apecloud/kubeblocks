@@ -150,7 +150,7 @@ func (o *statusOptions) run() error {
 
 	o.ns, _ = getKubeBlocksNamespace(o.client)
 	if o.ns == "" {
-		fmt.Fprintf(o.Out, "Failed to find KubeBlocks deployed in any namespace\n")
+		fmt.Fprintf(o.Out, "Failed to find deployed KubeBlocks in any namespace\n")
 	} else {
 		fmt.Fprintf(o.Out, "Kuberblocks is deployed in namespace: %s\n", o.ns)
 	}

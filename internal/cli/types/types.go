@@ -32,7 +32,7 @@ const (
 
 	// DefaultNamespace is the namespace where kubeblocks is installed if
 	// no other namespace is specified
-	DefaultNamespace = "kubeblocks"
+	DefaultNamespace = "kb-system"
 
 	// GoosLinux is os.GOOS linux string
 	GoosLinux = "linux"

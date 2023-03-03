@@ -202,7 +202,7 @@ func (o *initOptions) local() error {
 	provider.VerboseLog(o.verbose)
 
 	// Set up K3s as KubeBlocks control plane cluster
-	spinner := util.Spinner(o.Out, "Create playground k3d cluster: %s", k8sClusterName)
+	spinner := util.Spinner(o.Out, "%-40s", "Create k3d cluster: "+k8sClusterName)
 	defer spinner(false)
 	if err = provider.CreateK8sCluster(k8sClusterName, true); err != nil {
 		return errors.Wrap(err, "failed to set up k3d cluster")

@@ -463,10 +463,14 @@ else
 	sed -i "s/^appVersion:.*/appVersion: $(VERSION)/" $(CHART_PATH)/Chart.yaml
 endif
 
-
 .PHONY: helm-package
 helm-package: bump-chart-ver ## Do helm package.
-	$(HELM) package $(CHART_PATH) --dependency-update
+## it will pull down the latest charts that satisfy the dependencies, and clean up old dependencies.
+## this is a hack fix: decompress the tgz from the depend-charts directory to the charts directory
+## before dependency update.
+	cd $(CHART_PATH)/charts && ls ../depend-charts/*.tgz | xargs -n1 tar xf
+	$(HELM) dependency update $(CHART_PATH)
+	$(HELM) package $(CHART_PATH)
 
 ##@ Build Dependencies
 

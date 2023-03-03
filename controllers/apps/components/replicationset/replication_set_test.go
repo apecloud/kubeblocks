@@ -112,11 +112,14 @@ var _ = Describe("Replication Component", func() {
 					AddRoleLabel(k).
 					SetReplicas(1).
 					Create(&testCtx).GetObject()
+				isStsPrimary, err := checkObjRoleLabelIsPrimary(sts)
 				if k == string(Primary) {
-					Expect(CheckStsIsPrimary(sts)).Should(BeTrue())
+					Expect(err).To(Succeed())
+					Expect(isStsPrimary).Should(BeTrue())
 					primarySts = sts
 				} else {
-					Expect(CheckStsIsPrimary(sts)).ShouldNot(BeTrue())
+					Expect(err).To(Succeed())
+					Expect(isStsPrimary).ShouldNot(BeTrue())
 					secondarySts = sts
 				}
 			}

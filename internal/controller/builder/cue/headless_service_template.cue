@@ -26,10 +26,6 @@ component: {
 		scrapePort: int
 		scrapePath: string
 	}
-	service: {
-		ports: [...]
-		type: string
-	}
 	podSpec: containers: [...]
 	volumeClaimTemplates: [...]
 }
@@ -57,6 +53,7 @@ service: {
 		}
 	}
 	"spec": {
+		"type": "ClusterIP"
 		"clusterIP": "None"
 		"selector": {
 			"app.kubernetes.io/instance":   "\(cluster.metadata.name)"
@@ -73,8 +70,5 @@ service: {
 				targetPort: v.name
 			},
 		]
-		if component.service.type != _|_ {
-			type: component.service.type
-		}
 	}
 }

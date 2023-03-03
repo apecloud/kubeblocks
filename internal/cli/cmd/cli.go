@@ -40,6 +40,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/playground"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/troubleshoot"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/version"
+	"github.com/apecloud/kubeblocks/internal/cli/util"
 )
 
 const (
@@ -77,7 +78,7 @@ A Command Line Interface for KubeBlocks`,
 	flags := cmd.PersistentFlags()
 
 	// add kubernetes flags like kubectl
-	kubeConfigFlags := genericclioptions.NewConfigFlags(true)
+	kubeConfigFlags := util.NewConfigFlagNoWarnings()
 	kubeConfigFlags.AddFlags(flags)
 	matchVersionKubeConfigFlags := cmdutil.NewMatchVersionFlags(kubeConfigFlags)
 	matchVersionKubeConfigFlags.AddFlags(flags)

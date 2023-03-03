@@ -228,6 +228,12 @@ var _ = Describe("Backup Policy Controller", func() {
 					g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.ConfigAvailable))
 				})).Should(Succeed())
 			})
+			It("should success with empty viper config", func() {
+				viper.SetDefault("DP_BACKUP_SCHEDULE", "")
+				Eventually(testapps.CheckObj(&testCtx, backupPolicyKey, func(g Gomega, fetched *dpv1alpha1.BackupPolicy) {
+					g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.ConfigAvailable))
+				})).Should(Succeed())
+			})
 		})
 
 		Context("creates a backup policy with invalid schedule", func() {

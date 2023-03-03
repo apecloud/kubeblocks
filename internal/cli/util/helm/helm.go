@@ -46,6 +46,8 @@ import (
 	"helm.sh/helm/v3/pkg/repo"
 	"helm.sh/helm/v3/pkg/storage"
 	"helm.sh/helm/v3/pkg/storage/driver"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/client-go/rest"
 
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 )
@@ -327,6 +329,14 @@ func NewActionConfig(cfg *Config) (*action.Configuration, error) {
 	); err != nil {
 		return nil, err
 	}
+
+	// do not output warnings
+	getter := settings.RESTClientGetter()
+	getter.(*genericclioptions.ConfigFlags).WrapConfigFn = func(c *rest.Config) *rest.Config {
+		c.WarningHandler = rest.NoWarnings{}
+		return c
+	}
+
 	if err = actionCfg.Init(settings.RESTClientGetter(),
 		settings.Namespace(),
 		os.Getenv("HELM_DRIVER"),

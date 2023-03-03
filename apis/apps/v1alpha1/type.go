@@ -355,6 +355,28 @@ const (
 	IssuerUserProvided IssuerName = "UserProvided"
 )
 
+// SwitchPolicyType defines switchPolicy type.
+// +enum
+// +kubebuilder:validation:Enum={MaximumAvailability, MaximumDataProtection, Noop}
+type SwitchPolicyType string
+
+const (
+	MaximumAvailability   SwitchPolicyType = "MaximumAvailability"
+	MaximumDataProtection SwitchPolicyType = "MaximumDataProtection"
+	Noop                  SwitchPolicyType = "Noop"
+)
+
+// SwitchStepRole defines the role to execute the switch command.
+// +enum
+// +kubebuilder:validation:Enum={NewPrimary, OldPrimary, Secondaries}
+type SwitchStepRole string
+
+const (
+	NewPrimary  SwitchStepRole = "NewPrimary"
+	OldPrimary  SwitchStepRole = "OldPrimary"
+	Secondaries SwitchStepRole = "Secondaries"
+)
+
 func RegisterWebhookManager(mgr manager.Manager) {
 	webhookMgr = &webhookManager{mgr.GetClient()}
 }

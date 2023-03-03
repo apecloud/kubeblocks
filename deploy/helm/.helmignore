@@ -21,3 +21,5 @@
 .idea/
 *.tmproj
 .vscode/
+# Dependent sub charts
+depend-charts/

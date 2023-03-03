@@ -1,12 +1,12 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: mysql-3node-tpl-8.0
+  name: mysql8.0-config-template
   labels:
     {{- include "apecloud-mysql.labels" . | nindent 4 }}
 data:
   my.cnf: |-
-    {{- .Files.Get "config/mysql8.cnf.tpl" | nindent 4 }}
+    {{- .Files.Get "config/mysql8-cnfig.tpl" | nindent 4 }}
 ---
 apiVersion: v1
 kind: ConfigMap

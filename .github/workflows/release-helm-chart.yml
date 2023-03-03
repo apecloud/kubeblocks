@@ -41,6 +41,7 @@ jobs:
           helm repo add piraeus-charts https://piraeus.io/helm-charts
           helm repo add cloudve https://github.com/CloudVE/helm-charts/raw/master
           helm dep update deploy/helm
+          cp -f deploy/helm/depend-charts/*.tgz deploy/helm/charts/
 
       - name: Package Kubeblocks Helm Chart
         run: |

@@ -466,7 +466,12 @@ endif
 
 .PHONY: helm-package
 helm-package: bump-chart-ver ## Do helm package.
-	$(HELM) package $(CHART_PATH) --dependency-update
+## it will pull down the latest charts that satisfy the dependencies, and clean up old dependencies.
+## this is a hack fix: put tgz into the depend-charts directory and copy them to the charts directory
+## after each dependency update.
+	cd $(CHART_PATH) && $(HELM) dependency update
+	cp -f $(CHART_PATH)/depend-charts/*.tgz $(CHART_PATH)/charts/
+	$(HELM) package $(CHART_PATH)
 
 ##@ Build Dependencies
 

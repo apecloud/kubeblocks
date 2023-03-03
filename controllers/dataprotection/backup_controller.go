@@ -28,6 +28,7 @@ import (
 	appv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -166,6 +167,10 @@ func (r *BackupReconciler) doNewPhaseAction(
 		return r.updateStatusIfFailed(reqCtx, backup, err)
 	}
 
+	// save the backup message for restore
+	backup.Status.RemoteVolume = &backupPolicy.Spec.RemoteVolume
+	backup.Status.BackupToolName = backupPolicy.Spec.BackupToolName
+
 	// update Phase to InProgress
 	backup.Status.Phase = dataprotectionv1alpha1.BackupInProgress
 	backup.Status.StartTimestamp = &metav1.Time{Time: r.clock.Now().UTC()}
@@ -272,10 +277,8 @@ func (r *BackupReconciler) doCompletedPhaseAction(
 	reqCtx intctrlutil.RequestCtx,
 	backup *dataprotectionv1alpha1.Backup) (ctrl.Result, error) {
 
-	if backup.Spec.BackupType == dataprotectionv1alpha1.BackupTypeSnapshot {
-		if err := r.deleteReferenceBatchV1Jobs(reqCtx, backup); err != nil {
-			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-		}
+	if err := r.deleteReferenceBatchV1Jobs(reqCtx, backup); err != nil && !apierrors.IsNotFound(err) {
+		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 	return intctrlutil.Reconciled()
 }

@@ -148,6 +148,7 @@ const (
 	CRIRuntimeEndpoint       = "CONTAINER_RUNTIME_ENDPOINT"
 	ConfigCRIType            = "CRI_TYPE"
 	ConfigManagerGPRCPortEnv = "CONFIG_MANAGER_GRPC_PORT"
+	EnableCRIEnv             = "ENABLE_CRI"
 
 	PodMinReadySecondsEnv = "POD_MIN_READY_SECONDS"
 	ConfigTemplateType    = "tpl"

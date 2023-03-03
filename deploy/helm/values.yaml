@@ -252,6 +252,8 @@ addonController:
   enabled: true
   jobImagePullPolicy: IfNotPresent
 
+configManager:
+  enabled: false
 
 ## Dashboards settings
 ##

@@ -511,6 +511,10 @@ func updateConfigurationManagerWithComponent(podSpec *corev1.PodSpec, cfgTemplat
 }
 
 func updateCRIContainerVolume(podSpec *corev1.PodSpec, volumePath string, volumeName string) {
+	if !viper.GetBool(constant.EnableCRIEnv) {
+		return
+	}
+
 	podVolumes := podSpec.Volumes
 	podVolumes, _ = intctrlutil.CreateOrUpdateVolume(podVolumes, volumeName, func(volumeName string) corev1.Volume {
 		return corev1.Volume{
@@ -582,11 +586,15 @@ func buildConfigManagerParams(cli client.Client, ctx context.Context, cfgTemplat
 		CharacterType: params.Component.CharacterType,
 		SecreteName:   component.GenerateConnCredential(params.Cluster.Name),
 		Image:         viper.GetString(constant.ConfigSidecarIMAGE),
-		// add cri sock path
-		Volumes: append(volumeDirs, corev1.VolumeMount{
+		Volumes:       volumeDirs,
+	}
+
+	// add cri sock path
+	if viper.GetBool(constant.EnableCRIEnv) {
+		configManagerParams.Volumes = append(configManagerParams.Volumes, corev1.VolumeMount{
 			Name:      volumeName,
 			MountPath: volumePath,
-		}),
+		})
 	}
 
 	var err error

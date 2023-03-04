@@ -111,7 +111,7 @@ func WithKeySelector(keys []string) ValidatorOptions {
 		sets = FromCMKeysSelector(keys)
 	}
 	return func(key string) bool {
-		return sets == nil || !sets.InArray(key)
+		return sets == nil || sets.InArray(key)
 	}
 }
 

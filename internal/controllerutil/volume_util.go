@@ -20,9 +20,10 @@ import (
 	"fmt"
 	"sort"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"golang.org/x/exp/maps"
 	corev1 "k8s.io/api/core/v1"
+
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 )
 
 type createVolumeFn func(volumeName string) corev1.Volume

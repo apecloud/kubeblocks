@@ -20,13 +20,14 @@ import (
 	"context"
 	"strings"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
-	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
+	"github.com/apecloud/kubeblocks/internal/controller/builder"
 )
 
 type templateRenderValidator = func(map[string]string) error
@@ -136,7 +137,7 @@ func generateConfigMapFromTpl(tplBuilder *configTemplateBuilder,
 		return nil, err
 	}
 
-	if dataValidator == nil {
+	if dataValidator != nil {
 		if err = dataValidator(configs); err != nil {
 			return nil, err
 		}

@@ -19,6 +19,7 @@ package configuration
 import (
 	"context"
 
+	"github.com/StudioSol/set"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
@@ -38,8 +39,10 @@ func MergeAndValidateConfiguration(configConstraint appsv1alpha1.ConfigConstrain
 
 		newCfg         map[string]string
 		configOperator ConfigOperator
+		updatedKeys    = set.NewLinkedHashSetString()
 	)
 
+	cmKeySet := FromCMKeysSelector(cmKey)
 	if configOperator, err = NewConfigLoader(CfgOption{
 		Type:    CfgCmType,
 		Log:     log.FromContext(context.TODO()),
@@ -49,6 +52,7 @@ func MergeAndValidateConfiguration(configConstraint appsv1alpha1.ConfigConstrain
 			ResourceFn: func(key client.ObjectKey) (map[string]string, error) {
 				return baseCfg, nil
 			},
+			CMKeys: cmKeySet,
 		}}); err != nil {
 		return nil, err
 	}
@@ -68,13 +72,40 @@ func MergeAndValidateConfiguration(configConstraint appsv1alpha1.ConfigConstrain
 		if err := configOperator.MergeFrom(params.UpdatedParams, NewCfgOptions(params.Key, mergedOptions)); err != nil {
 			return nil, err
 		}
+		updatedKeys.Add(params.Key)
 	}
 
 	if newCfg, err = configOperator.ToCfgContent(); err != nil {
 		return nil, WrapError(err, "failed to generate config file")
 	}
-	if err = NewConfigValidator(&configConstraint, WithKeySelector(cmKey)).Validate(newCfg); err != nil {
+	updatedCfg := fromUpdatedConfig(newCfg, updatedKeys)
+	if err = NewConfigValidator(&configConstraint, WithKeySelector(cmKey)).Validate(updatedCfg); err != nil {
 		return nil, WrapError(err, "failed to validate updated config")
 	}
-	return newCfg, nil
+	return mergeUpdatedConfig(baseCfg, updatedCfg), nil
+}
+
+func mergeUpdatedConfig(baseMap, updatedMap map[string]string) map[string]string {
+	r := make(map[string]string)
+	for key, val := range baseMap {
+		r[key] = val
+		if v, ok := updatedMap[key]; ok {
+			r[key] = v
+		}
+	}
+	return r
+}
+
+func fromUpdatedConfig(m map[string]string, sets *set.LinkedHashSetString) map[string]string {
+	if sets.Length() == 0 {
+		return m
+	}
+
+	r := make(map[string]string, sets.Length())
+	for key, v := range m {
+		if sets.InArray(key) {
+			r[key] = v
+		}
+	}
+	return r
 }

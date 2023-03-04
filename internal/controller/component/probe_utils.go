@@ -58,7 +58,7 @@ func buildProbeContainers(reqCtx intctrlutil.RequestCtx, component *SynthesizedC
 
 	probeContainers := []corev1.Container{}
 	componentProbes := component.Probes
-	reqCtx.Log.Info("probe", "settings", componentProbes)
+	reqCtx.Log.V(1).Info("probe", "settings", componentProbes)
 	if componentProbes == nil {
 		return nil
 	}
@@ -96,7 +96,7 @@ func buildProbeContainers(reqCtx intctrlutil.RequestCtx, component *SynthesizedC
 		buildProbeServiceContainer(component, container, int(probeSvcHTTPPort), int(probeSvcGRPCPort))
 	}
 
-	reqCtx.Log.Info("probe", "containers", probeContainers)
+	reqCtx.Log.V(1).Info("probe", "containers", probeContainers)
 	component.PodSpec.Containers = append(component.PodSpec.Containers, probeContainers...)
 	return nil
 }

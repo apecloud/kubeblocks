@@ -31,7 +31,7 @@ type ParamPairs struct {
 }
 
 // MergeAndValidateConfiguration does merge configuration files and validate
-func MergeAndValidateConfiguration(configConstraint appsv1alpha1.ConfigConstraintSpec, baseCfg map[string]string, updatedParams []ParamPairs) (map[string]string, error) {
+func MergeAndValidateConfiguration(configConstraint appsv1alpha1.ConfigConstraintSpec, baseCfg map[string]string, cmKey []string, updatedParams []ParamPairs) (map[string]string, error) {
 	var (
 		err error
 		fc  = configConstraint.FormatterConfig
@@ -73,7 +73,7 @@ func MergeAndValidateConfiguration(configConstraint appsv1alpha1.ConfigConstrain
 	if newCfg, err = configOperator.ToCfgContent(); err != nil {
 		return nil, WrapError(err, "failed to generate config file")
 	}
-	if err = NewConfigValidator(&configConstraint).Validate(newCfg); err != nil {
+	if err = NewConfigValidator(&configConstraint, WithKeySelector(cmKey)).Validate(newCfg); err != nil {
 		return nil, WrapError(err, "failed to validate updated config")
 	}
 	return newCfg, nil

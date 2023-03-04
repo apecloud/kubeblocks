@@ -82,7 +82,7 @@ var _ = Describe("ConfigConstraint Controller", func() {
 			By("Create a clusterDefinition obj")
 			clusterDefObj := testapps.NewClusterDefFactory(clusterDefName).
 				AddComponent(testapps.StatefulMySQLComponent, statefulCompType).
-				AddConfigTemplate(configTplName, configmap.Name, constraint.Name, testCtx.DefaultNamespace, configVolumeName, nil).
+				AddConfigTemplate(configTplName, configmap.Name, constraint.Name, testCtx.DefaultNamespace, configVolumeName).
 				AddLabels(cfgcore.GenerateTPLUniqLabelKeyWithConfig(configTplName), configmap.Name,
 					cfgcore.GenerateConstraintsUniqLabelKeyWithConfig(constraint.Name), constraint.Name).
 				Create(&testCtx).GetObject()

@@ -60,7 +60,7 @@ type reconfigureOptions struct {
 	keys       []string
 	showDetail bool
 	// for cache
-	tpls []appsv1alpha1.ConfigTemplate
+	tpls []appsv1alpha1.ComponentConfigSpec
 }
 
 type opsRequestDiffOptions struct {
@@ -145,7 +145,7 @@ func (r *reconfigureOptions) validate() error {
 	return nil
 }
 
-func (r *reconfigureOptions) findTemplateByName(tplName string) (*appsv1alpha1.ConfigTemplate, error) {
+func (r *reconfigureOptions) findTemplateByName(tplName string) (*appsv1alpha1.ComponentConfigSpec, error) {
 	if err := r.syncComponentCfgTpl(); err != nil {
 		return nil, err
 	}
@@ -189,7 +189,7 @@ func (r *reconfigureOptions) complete2(args []string) error {
 
 	// for explain
 	for _, tpl := range r.tpls {
-		if len(tpl.ConfigConstraintRef) > 0 && len(tpl.ConfigTplRef) > 0 {
+		if len(tpl.ConfigConstraintRef) > 0 && len(tpl.ConfigTemplateRef) > 0 {
 			templateNames = append(templateNames, tpl.Name)
 		}
 	}
@@ -615,7 +615,7 @@ func (o *opsRequestDiffOptions) maybeCompareOps(base *appsv1alpha1.OpsRequest, d
 
 func (o *opsRequestDiffOptions) diffConfig(tplName string) ([]cfgcore.VisualizedParam, error) {
 	var (
-		tpl              *appsv1alpha1.ConfigTemplate
+		tpl              *appsv1alpha1.ComponentConfigSpec
 		configConstraint = &appsv1alpha1.ConfigConstraint{}
 	)
 
@@ -752,7 +752,7 @@ func getValidUpdatedParams(status appsv1alpha1.OpsRequestStatus) string {
 	return string(b)
 }
 
-func findTplByName(tpls []appsv1alpha1.ConfigTemplate, tplName string) *appsv1alpha1.ConfigTemplate {
+func findTplByName(tpls []appsv1alpha1.ComponentConfigSpec, tplName string) *appsv1alpha1.ComponentConfigSpec {
 	for i := range tpls {
 		tpl := &tpls[i]
 		if tpl.Name == tplName {

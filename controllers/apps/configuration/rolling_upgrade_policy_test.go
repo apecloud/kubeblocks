@@ -67,10 +67,11 @@ var _ = Describe("Reconfigure RollingPolicy", func() {
 				return reconfigureClient, nil
 			}),
 			withClusterComponent(replicas),
-			withCDComponent(compType, []appsv1alpha1.ConfigTemplate{{
-				Name:       "for_test",
-				VolumeName: "test_volume",
-			}}))
+			withCDComponent(compType, []appsv1alpha1.ComponentConfigSpec{{
+				ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
+					Name:       "for_test",
+					VolumeName: "test_volume",
+				}}}))
 	}
 
 	BeforeEach(func() {

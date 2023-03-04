@@ -46,7 +46,8 @@ type SynthesizedComponent struct {
 	Monitor               *MonitorConfig                      `json:"monitor,omitempty"`
 	EnabledLogs           []string                            `json:"enabledLogs,omitempty"`
 	LogConfigs            []v1alpha1.LogConfig                `json:"logConfigs,omitempty"`
-	ConfigTemplates       []v1alpha1.ConfigTemplate           `json:"configTemplates,omitempty"`
+	ConfigTemplates       []v1alpha1.ComponentConfigSpec      `json:"configTemplates,omitempty"`
+	ScriptTemplates       []v1alpha1.ComponentTemplateSpec    `json:"scriptTemplates,omitempty"`
 	HorizontalScalePolicy *v1alpha1.HorizontalScalePolicy     `json:"horizontalScalePolicy,omitempty"`
 	TLS                   bool                                `json:"tls"`
 	Issuer                *v1alpha1.Issuer                    `json:"issuer,omitempty"`

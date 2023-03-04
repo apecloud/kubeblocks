@@ -72,7 +72,7 @@ func PrintComponentConfigMeta(tplInfos []types.ConfigTemplateInfo, clusterName, 
 	}
 	tbl := NewTablePrinter(out)
 	PrintTitle("Configures Meta")
-	enableReconfiguring := func(tpl appsv1alpha1.ConfigTemplate, key string) string {
+	enableReconfiguring := func(tpl appsv1alpha1.ComponentConfigSpec, key string) string {
 		if len(tpl.ConfigConstraintRef) > 0 && cfgcore.CheckConfigTemplateReconfigureKey(tpl, key) {
 			return "enable"
 		}
@@ -85,7 +85,7 @@ func PrintComponentConfigMeta(tplInfos []types.ConfigTemplateInfo, clusterName, 
 				BoldYellow(info.Name),
 				key,
 				BoldYellow(strings.ToUpper(enableReconfiguring(info.TPL, key))),
-				info.TPL.ConfigTplRef,
+				info.TPL.ConfigTemplateRef,
 				info.TPL.ConfigConstraintRef,
 				info.CMObj.Name,
 				componentName,

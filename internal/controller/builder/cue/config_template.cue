@@ -46,9 +46,12 @@ config: {
 			// configmap selector for ConfigureController
 			"configuration.kubeblocks.io/configuration-type": "instance"
 			// config template name
-			"configuration.kubeblocks.io/configuration-tpl-name":         "\(meta.component.templateName)"
-			"configuration.kubeblocks.io/configuration-constraints-name": "\(meta.component.configConstraintsName)"
-			"configuration.kubeblocks.io/configtemplate-name":            "\(meta.component.configTemplateName)"
+			"configuration.kubeblocks.io/configuration-tpl-name": "\(meta.component.templateName)"
+			if meta.component.configConstraintsName != _|_ && meta.component.configConstraintsName != "" {
+				"configuration.kubeblocks.io/configuration-constraints-name": "\(meta.component.configConstraintsName)"
+			}
+
+			"configuration.kubeblocks.io/configtemplate-name": "\(meta.component.configTemplateName)"
 		}
 		annotations: {
 			// enable configmap upgrade

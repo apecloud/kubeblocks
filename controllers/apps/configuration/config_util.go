@@ -87,9 +87,9 @@ func getConfigMapByName(cli client.Client, ctx intctrlutil.RequestCtx, cmName, n
 	return configObj, nil
 }
 
-func checkConfigurationTemplate(ctx intctrlutil.RequestCtx, tpl *appsv1alpha1.ConfigConstraint) (bool, error) {
+func checkConfigConstraint(ctx intctrlutil.RequestCtx, tpl *appsv1alpha1.ConfigConstraint) (bool, error) {
 	// validate configuration template
-	isConfigSchemaFn := func(tpl *appsv1alpha1.CustomParametersValidation) (bool, error) {
+	validateConfigSchema := func(tpl *appsv1alpha1.CustomParametersValidation) (bool, error) {
 		if tpl == nil || len(tpl.CUE) == 0 {
 			return true, nil
 		}
@@ -98,18 +98,23 @@ func checkConfigurationTemplate(ctx intctrlutil.RequestCtx, tpl *appsv1alpha1.Co
 		return err == nil, err
 	}
 
-	return checkConfigTPL(ctx, tpl, isConfigSchemaFn)
+	// validate schema
+	if ok, err := validateConfigSchema(tpl.Spec.ConfigurationSchema); !ok || err != nil {
+		ctx.Log.Error(err, "failed to validate template schema!", "configMapName", fmt.Sprintf("%v", tpl.Spec.ConfigurationSchema))
+		return ok, err
+	}
+	return true, nil
 }
 
 func DeleteCDConfigMapFinalizer(cli client.Client, ctx intctrlutil.RequestCtx, clusterDef *appsv1alpha1.ClusterDefinition) error {
-	_, err := handleConfigTemplate(clusterDef, func(tpls []appsv1alpha1.ConfigTemplate) (bool, error) {
+	_, err := handleConfigTemplate(clusterDef, func(tpls []appsv1alpha1.ComponentConfigSpec) (bool, error) {
 		return true, batchDeleteConfigMapFinalizer[*appsv1alpha1.ClusterDefinition](cli, ctx, tpls, clusterDef)
 	})
 	return err
 }
 
 func DeleteCVConfigMapFinalizer(cli client.Client, ctx intctrlutil.RequestCtx, clusterVersion *appsv1alpha1.ClusterVersion) error {
-	_, err := handleConfigTemplate(clusterVersion, func(tpls []appsv1alpha1.ConfigTemplate) (bool, error) {
+	_, err := handleConfigTemplate(clusterVersion, func(tpls []appsv1alpha1.ComponentConfigSpec) (bool, error) {
 		return true, batchDeleteConfigMapFinalizer[*appsv1alpha1.ClusterVersion](cli, ctx, tpls, clusterVersion)
 	})
 	return err
@@ -144,7 +149,7 @@ func validateConfigMapOwners(cli client.Client, ctx intctrlutil.RequestCtx, labe
 	return true, nil
 }
 
-func batchDeleteConfigMapFinalizer[T client.Object](cli client.Client, ctx intctrlutil.RequestCtx, tpls []appsv1alpha1.ConfigTemplate, cr T) error {
+func batchDeleteConfigMapFinalizer[T client.Object](cli client.Client, ctx intctrlutil.RequestCtx, tpls []appsv1alpha1.ComponentConfigSpec, cr T) error {
 	validator := func(obj any) bool {
 		if expected, ok := obj.(T); !ok {
 			return false
@@ -155,7 +160,7 @@ func batchDeleteConfigMapFinalizer[T client.Object](cli client.Client, ctx intct
 	for _, tpl := range tpls {
 		labelKey := cfgcore.GenerateTPLUniqLabelKeyWithConfig(tpl.Name)
 		if ok, err := validateConfigMapOwners(cli, ctx, client.MatchingLabels{
-			labelKey: tpl.ConfigTplRef,
+			labelKey: tpl.ConfigTemplateRef,
 		}, validator, &appsv1alpha1.ClusterVersionList{}, &appsv1alpha1.ClusterDefinitionList{}); err != nil {
 			return err
 		} else if !ok {
@@ -170,7 +175,7 @@ func batchDeleteConfigMapFinalizer[T client.Object](cli client.Client, ctx intct
 
 func UpdateCDConfigMapFinalizer(client client.Client, ctx intctrlutil.RequestCtx, clusterDef *appsv1alpha1.ClusterDefinition) error {
 	_, err := handleConfigTemplate(clusterDef,
-		func(tpls []appsv1alpha1.ConfigTemplate) (bool, error) {
+		func(tpls []appsv1alpha1.ComponentConfigSpec) (bool, error) {
 			return true, batchUpdateConfigMapFinalizer(client, ctx, tpls)
 		})
 	return err
@@ -178,13 +183,13 @@ func UpdateCDConfigMapFinalizer(client client.Client, ctx intctrlutil.RequestCtx
 
 func UpdateCVConfigMapFinalizer(client client.Client, ctx intctrlutil.RequestCtx, clusterVersion *appsv1alpha1.ClusterVersion) error {
 	_, err := handleConfigTemplate(clusterVersion,
-		func(tpls []appsv1alpha1.ConfigTemplate) (bool, error) {
+		func(tpls []appsv1alpha1.ComponentConfigSpec) (bool, error) {
 			return true, batchUpdateConfigMapFinalizer(client, ctx, tpls)
 		})
 	return err
 }
 
-func batchUpdateConfigMapFinalizer(cli client.Client, ctx intctrlutil.RequestCtx, tpls []appsv1alpha1.ConfigTemplate) error {
+func batchUpdateConfigMapFinalizer(cli client.Client, ctx intctrlutil.RequestCtx, tpls []appsv1alpha1.ComponentConfigSpec) error {
 	for _, tpl := range tpls {
 		if err := updateConfigMapFinalizer(cli, ctx, tpl); err != nil {
 			return err
@@ -193,12 +198,12 @@ func batchUpdateConfigMapFinalizer(cli client.Client, ctx intctrlutil.RequestCtx
 	return nil
 }
 
-func updateConfigMapFinalizer(cli client.Client, ctx intctrlutil.RequestCtx, tpl appsv1alpha1.ConfigTemplate) error {
+func updateConfigMapFinalizer(cli client.Client, ctx intctrlutil.RequestCtx, tpl appsv1alpha1.ComponentConfigSpec) error {
 	// step1: add finalizer
 	// step2: add labels: CMConfigurationTypeLabelKey
 	// step3: update immutable
 
-	cmObj, err := getConfigMapByName(cli, ctx, tpl.ConfigTplRef, tpl.Namespace)
+	cmObj, err := getConfigMapByName(cli, ctx, tpl.ConfigTemplateRef, tpl.Namespace)
 	if err != nil {
 		ctx.Log.Error(err, "failed to get config template cm object!", "configMapName", cmObj.Name)
 		return err
@@ -220,12 +225,12 @@ func updateConfigMapFinalizer(cli client.Client, ctx intctrlutil.RequestCtx, tpl
 	return cli.Patch(ctx.Ctx, cmObj, patch)
 }
 
-func deleteConfigMapFinalizer(cli client.Client, ctx intctrlutil.RequestCtx, tpl appsv1alpha1.ConfigTemplate) error {
-	cmObj, err := getConfigMapByName(cli, ctx, tpl.ConfigTplRef, tpl.Namespace)
+func deleteConfigMapFinalizer(cli client.Client, ctx intctrlutil.RequestCtx, tpl appsv1alpha1.ComponentConfigSpec) error {
+	cmObj, err := getConfigMapByName(cli, ctx, tpl.ConfigTemplateRef, tpl.Namespace)
 	if err != nil && apierrors.IsNotFound(err) {
 		return nil
 	} else if err != nil {
-		ctx.Log.Error(err, "failed to get config template cm object!", "configMapName", tpl.ConfigTplRef)
+		ctx.Log.Error(err, "failed to get config template cm object!", "configMapName", tpl.ConfigTemplateRef)
 		return err
 	}
 
@@ -238,36 +243,26 @@ func deleteConfigMapFinalizer(cli client.Client, ctx intctrlutil.RequestCtx, tpl
 	return cli.Patch(ctx.Ctx, cmObj, patch)
 }
 
-func checkConfigTPL(ctx intctrlutil.RequestCtx, tpl *appsv1alpha1.ConfigConstraint, schemaFn ValidateConfigSchema) (bool, error) {
-	// validate schema
-	if ok, err := schemaFn(tpl.Spec.ConfigurationSchema); !ok || err != nil {
-		ctx.Log.Error(err, "failed to validate template schema!", "configMapName", fmt.Sprintf("%v", tpl.Spec.ConfigurationSchema))
-		return ok, err
-	}
-
-	return true, nil
-}
-
-type ConfigTemplateHandler func([]appsv1alpha1.ConfigTemplate) (bool, error)
+type ConfigTemplateHandler func([]appsv1alpha1.ComponentConfigSpec) (bool, error)
 type ComponentValidateHandler func(component *appsv1alpha1.ClusterComponentDefinition) error
 
 func CheckCDConfigTemplate(client client.Client, ctx intctrlutil.RequestCtx, clusterDef *appsv1alpha1.ClusterDefinition) (bool, error) {
 	return handleConfigTemplate(clusterDef,
-		func(tpls []appsv1alpha1.ConfigTemplate) (bool, error) {
-			return validateConfigTPLs(client, ctx, tpls)
+		func(tpls []appsv1alpha1.ComponentConfigSpec) (bool, error) {
+			return validateConfigTemplate(client, ctx, tpls)
 		})
 }
 
 func handleConfigTemplate(object client.Object, handler ConfigTemplateHandler, handler2 ...ComponentValidateHandler) (bool, error) {
 	var (
-		err  error
-		tpls []appsv1alpha1.ConfigTemplate
+		err             error
+		configTemplates []appsv1alpha1.ComponentConfigSpec
 	)
 	switch cr := object.(type) {
 	case *appsv1alpha1.ClusterDefinition:
-		tpls, err = getCfgTplFromCD(cr, handler2...)
+		configTemplates, err = getConfigTemplateFromCD(cr, handler2...)
 	case *appsv1alpha1.ClusterVersion:
-		tpls = getCfgTplFromCV(cr)
+		configTemplates = getConfigTemplateFromCV(cr)
 	default:
 		return false, cfgcore.MakeError("not support CR type: %v", cr)
 	}
@@ -275,45 +270,53 @@ func handleConfigTemplate(object client.Object, handler ConfigTemplateHandler, h
 	switch {
 	case err != nil:
 		return false, err
-	case len(tpls) > 0:
-		return handler(tpls)
+	case len(configTemplates) > 0:
+		return handler(configTemplates)
 	default:
 		return true, nil
 	}
 }
 
-func getCfgTplFromCV(appVer *appsv1alpha1.ClusterVersion) []appsv1alpha1.ConfigTemplate {
-	tpls := make([]appsv1alpha1.ConfigTemplate, 0)
+func getConfigTemplateFromCV(appVer *appsv1alpha1.ClusterVersion) []appsv1alpha1.ComponentConfigSpec {
+	configTemplates := make([]appsv1alpha1.ComponentConfigSpec, 0)
 	for _, component := range appVer.Spec.ComponentVersions {
-		if len(component.ConfigTemplateRefs) > 0 {
-			tpls = append(tpls, component.ConfigTemplateRefs...)
+		if len(component.ComponentConfigSpec) > 0 {
+			configTemplates = append(configTemplates, component.ComponentConfigSpec...)
 		}
 	}
-	return tpls
+	return configTemplates
 }
 
-func getCfgTplFromCD(clusterDef *appsv1alpha1.ClusterDefinition, validators ...ComponentValidateHandler) ([]appsv1alpha1.ConfigTemplate, error) {
-	tpls := make([]appsv1alpha1.ConfigTemplate, 0)
+func getConfigTemplateFromCD(clusterDef *appsv1alpha1.ClusterDefinition, validators ...ComponentValidateHandler) ([]appsv1alpha1.ComponentConfigSpec, error) {
+	configTemplates := make([]appsv1alpha1.ComponentConfigSpec, 0)
 	for _, component := range clusterDef.Spec.ComponentDefs {
-		if component.ConfigSpec != nil && len(component.ConfigSpec.ConfigTemplateRefs) > 0 {
-			tpls = append(tpls, component.ConfigSpec.ConfigTemplateRefs...)
-			// Check reload configure config template
-			for _, validator := range validators {
-				if err := validator(&component); err != nil {
-					return nil, err
-				}
+		// For compatibility with the previous lifecycle management of configurationSpec.ConfigTemplateRef, it is necessary to convert ComponentScriptSpec to ComponentConfigSpec,
+		// ensuring that the script-related configmap is not allowed to be deleted.
+		for _, scriptSpec := range component.ComponentScriptSpec {
+			configTemplates = append(configTemplates, appsv1alpha1.ComponentConfigSpec{
+				ComponentTemplateSpec: scriptSpec,
+			})
+		}
+		if len(component.ComponentConfigSpec) == 0 {
+			continue
+		}
+		configTemplates = append(configTemplates, component.ComponentConfigSpec...)
+		// Check reload configure config template
+		for _, validator := range validators {
+			if err := validator(&component); err != nil {
+				return nil, err
 			}
 		}
 	}
-	return tpls, nil
+	return configTemplates, nil
 }
 
 func UpdateCDLabelsByConfiguration(cli client.Client, ctx intctrlutil.RequestCtx, cd *appsv1alpha1.ClusterDefinition) (bool, error) {
-	return handleConfigTemplate(cd, func(tpls []appsv1alpha1.ConfigTemplate) (bool, error) {
+	return handleConfigTemplate(cd, func(tpls []appsv1alpha1.ComponentConfigSpec) (bool, error) {
 		patch := client.MergeFrom(cd.DeepCopy())
 		for _, tpl := range tpls {
-			cd.Labels[cfgcore.GenerateTPLUniqLabelKeyWithConfig(tpl.Name)] = tpl.ConfigTplRef
-			if len(tpl.ConfigConstraintRef) != 0 {
+			cd.Labels[cfgcore.GenerateTPLUniqLabelKeyWithConfig(tpl.Name)] = tpl.ConfigTemplateRef
+			if tpl.ConfigConstraintRef != "" {
 				cd.Labels[cfgcore.GenerateConstraintsUniqLabelKeyWithConfig(tpl.ConfigConstraintRef)] = tpl.ConfigConstraintRef
 			}
 		}
@@ -322,27 +325,27 @@ func UpdateCDLabelsByConfiguration(cli client.Client, ctx intctrlutil.RequestCtx
 }
 
 func CheckCVConfigTemplate(client client.Client, ctx intctrlutil.RequestCtx, clusterVersion *appsv1alpha1.ClusterVersion) (bool, error) {
-	return handleConfigTemplate(clusterVersion, func(tpls []appsv1alpha1.ConfigTemplate) (bool, error) {
-		return validateConfigTPLs(client, ctx, tpls)
+	return handleConfigTemplate(clusterVersion, func(tpls []appsv1alpha1.ComponentConfigSpec) (bool, error) {
+		return validateConfigTemplate(client, ctx, tpls)
 	})
 }
 
 func UpdateCVLabelsByConfiguration(cli client.Client, ctx intctrlutil.RequestCtx, appVer *appsv1alpha1.ClusterVersion) (bool, error) {
-	return handleConfigTemplate(appVer, func(tpls []appsv1alpha1.ConfigTemplate) (bool, error) {
+	return handleConfigTemplate(appVer, func(tpls []appsv1alpha1.ComponentConfigSpec) (bool, error) {
 		patch := client.MergeFrom(appVer.DeepCopy())
 		for _, tpl := range tpls {
-			appVer.Labels[cfgcore.GenerateTPLUniqLabelKeyWithConfig(tpl.Name)] = tpl.ConfigTplRef
+			appVer.Labels[cfgcore.GenerateTPLUniqLabelKeyWithConfig(tpl.Name)] = tpl.ConfigTemplateRef
 			appVer.Labels[cfgcore.GenerateConstraintsUniqLabelKeyWithConfig(tpl.ConfigConstraintRef)] = tpl.ConfigConstraintRef
 		}
 		return true, cli.Patch(ctx.Ctx, appVer, patch)
 	})
 }
 
-func validateConfigTPLs(cli client.Client, ctx intctrlutil.RequestCtx, configTpls []appsv1alpha1.ConfigTemplate) (bool, error) {
+func validateConfigTemplate(cli client.Client, ctx intctrlutil.RequestCtx, configTpls []appsv1alpha1.ComponentConfigSpec) (bool, error) {
 	// check ConfigTemplate Validate
-	foundConfTplFn := func(configTpl appsv1alpha1.ConfigTemplate) (*appsv1alpha1.ConfigConstraint, error) {
-		if _, err := getConfigMapByName(cli, ctx, configTpl.ConfigTplRef, configTpl.Namespace); err != nil {
-			ctx.Log.Error(err, "failed to get config template cm object!", "configMapName", configTpl.ConfigTplRef)
+	foundConfTplFn := func(configTpl appsv1alpha1.ComponentConfigSpec) (*appsv1alpha1.ConfigConstraint, error) {
+		if _, err := getConfigMapByName(cli, ctx, configTpl.ConfigTemplateRef, configTpl.Namespace); err != nil {
+			ctx.Log.Error(err, "failed to get config template cm object!", "configMapName", configTpl.ConfigTemplateRef)
 			return nil, err
 		}
 
@@ -373,7 +376,7 @@ func validateConfigTPLs(cli client.Client, ctx intctrlutil.RequestCtx, configTpl
 		if err := cfgcm.ValidateReloadOptions(tpl.Spec.ReloadOptions, cli, ctx.Ctx); err != nil {
 			return false, err
 		}
-		if !validateConfTplStatus(tpl.Status) {
+		if !validateConfigConstraintStatus(tpl.Status) {
 			errMsg := fmt.Sprintf("Configuration template CR[%s] status not ready! current status: %s", tpl.Name, tpl.Status.Phase)
 			ctx.Log.V(1).Info(errMsg)
 			return false, fmt.Errorf(errMsg)
@@ -382,7 +385,7 @@ func validateConfigTPLs(cli client.Client, ctx intctrlutil.RequestCtx, configTpl
 	return true, nil
 }
 
-func validateConfTplStatus(configStatus appsv1alpha1.ConfigConstraintStatus) bool {
+func validateConfigConstraintStatus(configStatus appsv1alpha1.ConfigConstraintStatus) bool {
 	return configStatus.Phase == appsv1alpha1.AvailablePhase
 }
 
@@ -434,12 +437,12 @@ func updateConfigurationSchema(tpl *appsv1alpha1.ConfigConstraintSpec) error {
 	return nil
 }
 
-func NeedReloadVolume(tpl appsv1alpha1.ConfigTemplate) bool {
+func NeedReloadVolume(config appsv1alpha1.ComponentConfigSpec) bool {
 	// TODO distinguish between scripts and configuration
-	return len(tpl.ConfigConstraintRef) != 0
+	return config.ConfigConstraintRef != ""
 }
 
-func GetReloadOptions(cli client.Client, ctx context.Context, tpls []appsv1alpha1.ConfigTemplate) (*appsv1alpha1.ReloadOptions, error) {
+func GetReloadOptions(cli client.Client, ctx context.Context, tpls []appsv1alpha1.ComponentConfigSpec) (*appsv1alpha1.ReloadOptions, error) {
 	for _, tpl := range tpls {
 		if !NeedReloadVolume(tpl) {
 			continue

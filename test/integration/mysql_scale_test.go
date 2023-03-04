@@ -233,7 +233,7 @@ var _ = Describe("MySQL Scaling function", func() {
 			mode := int32(0755)
 			clusterDefObj = testapps.NewClusterDefFactory(clusterDefName).
 				AddComponent(testapps.StatefulMySQLComponent, mysqlCompType).
-				AddConfigTemplate(scriptConfigName, scriptConfigName, "", testCtx.DefaultNamespace, testapps.ScriptsVolumeName, &mode).
+				AddScriptTemplate(scriptConfigName, scriptConfigName, testCtx.DefaultNamespace, testapps.ScriptsVolumeName, &mode).
 				Create(&testCtx).GetObject()
 
 			By("Create a clusterVersion obj")
@@ -261,7 +261,7 @@ var _ = Describe("MySQL Scaling function", func() {
 			mode := int32(0755)
 			clusterDefObj = testapps.NewClusterDefFactory(clusterDefName).
 				AddComponent(testapps.ConsensusMySQLComponent, mysqlCompType).
-				AddConfigTemplate(scriptConfigName, scriptConfigName, "", testCtx.DefaultNamespace, testapps.ScriptsVolumeName, &mode).
+				AddScriptTemplate(scriptConfigName, scriptConfigName, testCtx.DefaultNamespace, testapps.ScriptsVolumeName, &mode).
 				Create(&testCtx).GetObject()
 
 			By("Create a clusterVersion obj")

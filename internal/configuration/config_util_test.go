@@ -86,7 +86,7 @@ var _ = Describe("config_util", func() {
 				},
 			}}
 			for _, tt := range tests {
-				got, err := MergeAndValidateConfiguration(tt.args.configConstraint, tt.args.baseCfg, tt.args.updatedParams)
+				got, err := MergeAndValidateConfiguration(tt.args.configConstraint, tt.args.baseCfg, nil, tt.args.updatedParams)
 				Expect(err != nil).Should(BeEquivalentTo(tt.wantErr))
 
 				option := CfgOption{

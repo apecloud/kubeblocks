@@ -74,17 +74,21 @@ var _ = Describe("clusterVersion webhook", func() {
 
 			By("By testing create a new clusterVersion with invalid config template")
 			clusterVersionDup := createTestClusterVersionObj(clusterDefinitionName, clusterVersionName+"-for-config")
-			clusterVersionDup.Spec.ComponentVersions[0].ConfigTemplateRefs = []ConfigTemplate{
+			clusterVersionDup.Spec.ComponentVersions[0].ComponentConfigSpec = []ComponentConfigSpec{
 				{
-					Name:                "tpl1",
-					ConfigTplRef:        "cm1",
-					VolumeName:          "volume1",
+					ComponentTemplateSpec: ComponentTemplateSpec{
+						Name:              "tpl1",
+						ConfigTemplateRef: "cm1",
+						VolumeName:        "volume1",
+					},
 					ConfigConstraintRef: "constraint1",
 				},
 				{
-					Name:                "tpl2",
-					ConfigTplRef:        "cm2",
-					VolumeName:          "volume1",
+					ComponentTemplateSpec: ComponentTemplateSpec{
+						Name:              "tpl2",
+						ConfigTemplateRef: "cm2",
+						VolumeName:        "volume1",
+					},
 					ConfigConstraintRef: "constraint2",
 				},
 			}

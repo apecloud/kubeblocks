@@ -57,14 +57,17 @@ func BuildComponent(
 	}
 
 	// resolve component.ConfigTemplates
-	if clusterCompDefObj.ConfigSpec != nil {
-		component.ConfigTemplates = clusterCompDefObj.ConfigSpec.ConfigTemplateRefs
+	if clusterCompDefObj.ComponentConfigSpec != nil {
+		component.ConfigTemplates = clusterCompDefObj.ComponentConfigSpec
+	}
+	if clusterCompDefObj.ComponentScriptSpec != nil {
+		component.ScriptTemplates = clusterCompDefObj.ComponentScriptSpec
 	}
 
 	if len(clusterCompVers) > 0 && clusterCompVers[0] != nil {
 		// only accept 1st ClusterVersion override context
 		clusterCompVer := clusterCompVers[0]
-		component.ConfigTemplates = cfgcore.MergeConfigTemplates(clusterCompVer.ConfigTemplateRefs, component.ConfigTemplates)
+		component.ConfigTemplates = cfgcore.MergeConfigTemplates(clusterCompVer.ComponentConfigSpec, component.ConfigTemplates)
 		// override component.PodSpec.InitContainers and component.PodSpec.Containers
 		for _, c := range clusterCompVer.VersionsCtx.InitContainers {
 			component.PodSpec.InitContainers = appendOrOverrideContainerAttr(component.PodSpec.InitContainers, c)

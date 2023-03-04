@@ -15,3 +15,5 @@ data:
     {{- .Files.Get "scripts/kafka-server-setup.sh.tpl" | nindent 4 }}
   kafka-exporter-setup.sh: |-
     {{- .Files.Get "scripts/kafka-exporter-setup.sh.tpl" | nindent 4 }}
+  kafka-env.sh: |-
+    {{- .Files.Get "scripts/kafka-env.sh" | nindent 4 }}

@@ -1,26 +1,20 @@
 #!/bin/bash
-{{- $clusterName := $.cluster.metadata.name }}
-{{- $namespace := $.cluster.metadata.namespace }}
-{{/* build KAFKA_CFG_CONTROLLER_QUORUM_VOTERS value string */}}
-{{- $replicas := $.component.replicas | int }}
-{{- $voters := "" }}
-{{- range $i, $e := until $replicas }}
-  {{- $podFQDN := printf "%s-%s-%d.%s-%s-headless.%s.svc" $clusterName $.component.name $i $clusterName $.component.name $namespace  }}
-  {{- $voter := printf "%d@%s:9093" $i $podFQDN }}
-  {{- $voters = printf "%s,%s" $voters $voter }}
-{{- end }}
-{{- $voters = trimPrefix "," $voters }}
-
 ID="${KB_POD_NAME#${KB_CLUSTER_COMP_NAME}-}"
 export KAFKA_CFG_BROKER_ID="$((ID + 0))"
+echo "KAFKA_CFG_BROKER_ID=$KAFKA_CFG_BROKER_ID"
 
 {{- if $.component.tls }}
 # override TLS and auth settings
 export KAFKA_TLS_TYPE="PEM"
+echo "KAFKA_TLS_TYPE=$KAFKA_TLS_TYPE"
 export KAFKA_CFG_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM="https"
+echo "KAFKA_CFG_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM=$KAFKA_CFG_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM"
 export KAFKA_CERTIFICATE_PASSWORD=""
+echo "KAFKA_CERTIFICATE_PASSWORD=$KAFKA_CERTIFICATE_PASSWORD"
 export KAFKA_TLS_CLIENT_AUTH=required
+echo "KAFKA_TLS_CLIENT_AUTH=$KAFKA_TLS_CLIENT_AUTH"
 export KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=CONTROLLER:SSL,INTERNAL:PLAINTEXT,CLIENT:SSL
+echo "KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=$KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP"
 
 mkdir -p /opt/bitnami/kafka/config/certs
 PEM_CA="/certs-${ID}/ca.crt"
@@ -45,6 +39,7 @@ else
     exit 1
 fi
 export KAFKA_TLS_TRUSTSTORE_FILE="/opt/bitnami/kafka/config/certs/kafka.truststore.pem"
+echo "KAFKA_TLS_TRUSTSTORE_FILE=$KAFKA_TLS_TRUSTSTORE_FILE"
 {{- end }}
 
 # convert server.properties to 'export KAFKA_CFG_{prop}' env variables
@@ -68,11 +63,30 @@ if [[ -f "$SERVER_PROP_FILE" ]]; then
     unset IFS
 fi
 
-if [[ ! -z $KAFKA_KRAFT_CLUSTER_ID ]]; then
+{{- $clusterName := $.cluster.metadata.name }}
+{{- $namespace := $.cluster.metadata.namespace }}
+{{- $component := fromJson "{}" }}
+{{- if eq "broker" ( getEnvByName ( index $.component.podSpec.containers 0 ) "KAFKA_CFG_PROCESS_ROLES" ) }}
+  {{- $component = $.component }}
+{{- /* build KAFKA_CFG_CONTROLLER_QUORUM_VOTERS value string */}}
+{{- $replicas := $.component.replicas | int }}
+{{- $voters := "" }}
+{{- range $i, $e := until $replicas }}
+  {{- $podFQDN := printf "%s-%s-%d.%s-%s-headless.%s.svc" $clusterName $.component.name $i $clusterName $.component.name $namespace }}
+  {{- $voter := printf "%d@%s:9093" ( $i | int | add1 ) $podFQDN }}
+  {{- $voters = printf "%s,%s" $voters $voter }}
+{{- end }}
+{{- $voters = trimPrefix "," $voters }}
+export KAFKA_CFG_CONTROLLER_QUORUM_VOTERS={{ $voters }}
+echo "export KAFKA_CFG_CONTROLLER_QUORUM_VOTERS=$KAFKA_CFG_CONTROLLER_QUORUM_VOTERS"
+{{- end }}
+
+if [[ -n "$KAFKA_KRAFT_CLUSTER_ID" ]]; then
     kraft_id_len=${#KAFKA_KRAFT_CLUSTER_ID}
     if [[ kraft_id_len > 22 ]]; then
         export KAFKA_KRAFT_CLUSTER_ID=$(echo $KAFKA_KRAFT_CLUSTER_ID | cut -b 1-22)
         echo export KAFKA_KRAFT_CLUSTER_ID="${KAFKA_KRAFT_CLUSTER_ID}"
     fi
 fi
+
 exec /entrypoint.sh /run.sh

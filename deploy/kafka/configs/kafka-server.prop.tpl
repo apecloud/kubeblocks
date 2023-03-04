@@ -21,7 +21,7 @@ log.retention.check.interval.ms=300000
 group.initial.rebalance.delay.ms=0
 message.max.bytes=1000012
 {{- $component := fromJson "{}" }}
-{{- if eq "yes" ( getEnvByName ( index $.component.podSpec.containers 0 ) "KAFKA_ENABLE_KRAFT" ) }}
+{{- if ne "broker" ( getEnvByName ( index $.component.podSpec.containers 0 ) "KAFKA_CFG_PROCESS_ROLES" ) }}
   {{- $component = $.component }}
 {{- else }} 
 {{- /* find kafka-controller component */}}

@@ -19,9 +19,10 @@ package agent
 import (
 	"math"
 
-	"github.com/golang/mock/gomock"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
+	"github.com/golang/mock/gomock"
 
 	mockcloud "github.com/apecloud/kubeblocks/internal/loadbalancer/cloud/mocks"
 	mock_protocol "github.com/apecloud/kubeblocks/internal/loadbalancer/protocol/mocks"

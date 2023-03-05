@@ -21,7 +21,6 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
@@ -171,11 +170,6 @@ var _ = Describe("Cluster", func() {
 		o.Storage = "2Gi"
 		in.Write([]byte(o.Name + "\n"))
 		Expect(o.Validate()).Should(Succeed())
-
-		By("validate horizontalScaling when replicas less than -1 ")
-		o.OpsType = appsv1alpha1.HorizontalScalingType
-		o.Replicas = -2
-		Expect(o.Validate()).To(MatchError("replicas required natural number"))
 
 		o.Replicas = 1
 		in.Write([]byte(o.Name + "\n"))

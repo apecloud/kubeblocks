@@ -30,7 +30,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	"github.com/apecloud/kubeblocks/internal/constant"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/generics"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 	testk8s "github.com/apecloud/kubeblocks/internal/testutil/k8s"
 )
@@ -110,8 +111,8 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 		deployList := &appsv1.DeploymentList{}
 		Eventually(func() bool {
 			Expect(k8sClient.List(ctx, deployList, client.MatchingLabels{
-				intctrlutil.KBAppComponentLabelKey: componentName,
-				intctrlutil.AppInstanceLabelKey:    clusterName}, client.Limit(1))).Should(Succeed())
+				constant.KBAppComponentLabelKey: componentName,
+				constant.AppInstanceLabelKey:    clusterName}, client.Limit(1))).Should(Succeed())
 			return len(deployList.Items) == 1
 		}).Should(BeTrue())
 		return &deployList.Items[0]
@@ -179,7 +180,7 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 				}), time.Second*20, time.Second*1).Should(Succeed())
 			stsInvolvedObject := corev1.ObjectReference{
 				Name:      stsName,
-				Kind:      intctrlutil.StatefulSetKind,
+				Kind:      constant.StatefulSetKind,
 				Namespace: testCtx.DefaultNamespace,
 			}
 			event.InvolvedObject = stsInvolvedObject
@@ -202,7 +203,7 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 			// create a failed pod
 			podName := stsName + "-0"
 			createStsPod(podName, "", consensusMySQLCompName)
-			setInvolvedObject(event, intctrlutil.PodKind, podName)
+			setInvolvedObject(event, constant.PodKind, podName)
 			handleAndCheckComponentStatus(consensusMySQLCompName, event, appsv1alpha1.FailedPhase, false)
 
 			By("test merge pod event message")
@@ -210,7 +211,7 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 			handleAndCheckComponentStatus(consensusMySQLCompName, event, appsv1alpha1.FailedPhase, false)
 
 			By("test Failed phase for consensus component when leader pod is not ready")
-			setInvolvedObject(event, intctrlutil.StatefulSetKind, stsName)
+			setInvolvedObject(event, constant.StatefulSetKind, stsName)
 			podName1 := stsName + "-1"
 			pod := createStsPod(podName1, "leader", consensusMySQLCompName)
 			handleAndCheckComponentStatus(consensusMySQLCompName, event, appsv1alpha1.FailedPhase, false)
@@ -229,7 +230,7 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 
 			By("watch warning event from Deployment and component workload type is Stateless")
 			deploy := getDeployment(nginxCompName)
-			setInvolvedObject(event, intctrlutil.DeploymentKind, deploy.Name)
+			setInvolvedObject(event, constant.DeploymentKind, deploy.Name)
 			handleAndCheckComponentStatus(nginxCompName, event, appsv1alpha1.FailedPhase, false)
 
 			// mock cluster is running.

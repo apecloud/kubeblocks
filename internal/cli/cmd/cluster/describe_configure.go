@@ -42,7 +42,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/constant"
 )
 
 type reconfigureOptions struct {
@@ -652,7 +652,7 @@ func printSingleParameterTemplate(pt *parameterTemplate) {
 	printer.PrintPairStringToLine("Range", pt.rangeFormatter())
 	printer.PrintPairStringToLine("Enum", pt.enumFormatter(-1))
 	printer.PrintPairStringToLine("Scope", pt.scope)
-	printer.PrintPairStringToLine("ComponentDefRef", pt.valueType)
+	printer.PrintPairStringToLine("Type", pt.valueType)
 	printer.PrintPairStringToLine("Description", pt.description)
 }
 

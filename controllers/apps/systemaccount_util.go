@@ -30,8 +30,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/constant"
 	componetutil "github.com/apecloud/kubeblocks/internal/controller/component"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 // SecretMapStore is a cache, recording all (key, secret) pair for accounts to be created.
@@ -157,9 +157,9 @@ func replaceEnvsValues(clusterName string, sysAccounts *appsv1alpha1.SystemAccou
 // This is consistent with that of secrets created during cluster initialization.
 func getLabelsForSecretsAndJobs(key componentUniqueKey) client.MatchingLabels {
 	return client.MatchingLabels{
-		intctrlutil.AppInstanceLabelKey:    key.clusterName,
-		intctrlutil.KBAppComponentLabelKey: key.componentName,
-		intctrlutil.AppManagedByLabelKey:   intctrlutil.AppName,
+		constant.AppInstanceLabelKey:    key.clusterName,
+		constant.KBAppComponentLabelKey: key.componentName,
+		constant.AppManagedByLabelKey:   constant.AppName,
 	}
 }
 

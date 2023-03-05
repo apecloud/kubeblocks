@@ -103,6 +103,6 @@ var _ = Describe("kubeblocks status", func() {
 		allErrs := make([]error, 0)
 		unstructuredList := listResourceByGVR(ctx, o.dynamic, ns, kubeBlocksWorkloads, selectorList, &allErrs)
 		Expect(len(unstructuredList)).Should(BeEquivalentTo(len(kubeBlocksWorkloads) * len(selectorList)))
-		Expect(o.run(tf)).To(Succeed())
+		Expect(o.run()).To(Succeed())
 	})
 })

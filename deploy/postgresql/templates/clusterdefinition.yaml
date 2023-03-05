@@ -13,7 +13,7 @@ spec:
     port: "$(SVC_PORT_tcp-postgresql)"
   componentDefs:
     - name: postgresql
-      workloadType: Stateful
+      workloadType: Replication
       characterType: postgresql
       probes:
       monitor:
@@ -75,7 +75,8 @@ spec:
             ports:
               - name: tcp-postgresql
                 containerPort: 5432
-
+            command:
+              - /scripts/setup.sh
             livenessProbe:
               failureThreshold: 6
               initialDelaySeconds: 30
@@ -167,10 +168,6 @@ spec:
               {{- if .Values.primary.extraEnvVars }}
               {{- include "tplvalues.render" (dict "value" .Values.primary.extraEnvVars "context" $) | nindent 12 }}
               {{- end }}
-            lifecycle:
-              postStart:
-                exec:
-                  command: ["/scripts/post_start.sh"]
             {{- if or .Values.primary.extraEnvVarsCM .Values.primary.extraEnvVarsSecret }}
             envFrom:
               {{- if .Values.primary.extraEnvVarsCM }}

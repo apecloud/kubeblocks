@@ -209,7 +209,7 @@ func buildPersistentVolumeClaimLabels(sts *appsv1.StatefulSet, pvc *corev1.Persi
 	if pvc.Labels == nil {
 		pvc.Labels = make(map[string]string)
 	}
-	pvc.Labels[intctrlutil.VolumeClaimTemplateNameLabelKey] = pvc.Name
+	pvc.Labels[constant.VolumeClaimTemplateNameLabelKey] = pvc.Name
 	for k, v := range sts.Labels {
 		if _, ok := pvc.Labels[k]; !ok {
 			pvc.Labels[k] = v
@@ -388,8 +388,16 @@ func BuildEnvConfig(params BuilderParams) (*corev1.ConfigMap, error) {
 	envData := map[string]string{}
 	envData[prefix+"N"] = strconv.Itoa(int(params.Component.Replicas))
 	for j := 0; j < int(params.Component.Replicas); j++ {
-		envData[prefix+strconv.Itoa(j)+"_HOSTNAME"] = fmt.Sprintf("%s.%s", params.Cluster.Name+"-"+params.Component.Name+"-"+strconv.Itoa(j), svcName)
+		hostNameTplKey := prefix + strconv.Itoa(j) + "_HOSTNAME"
+		hostNameTplValue := params.Cluster.Name + "-" + params.Component.Name + "-" + strconv.Itoa(j)
+		if params.Component.WorkloadType == appsv1alpha1.Replication {
+			envData[hostNameTplKey] = fmt.Sprintf("%s.%s", hostNameTplValue+"-0", svcName)
+			envData[constant.KBReplicationSetPrimaryPodName] = fmt.Sprintf("%s-%s-%d-%d.%s", params.Cluster.Name, params.Component.Name, *params.Component.PrimaryIndex, 0, svcName)
+		} else {
+			envData[hostNameTplKey] = fmt.Sprintf("%s.%s", hostNameTplValue, svcName)
+		}
 	}
+
 	// TODO following code seems to be redundant with updateConsensusRoleInfo in consensus_set_utils.go
 	// build consensus env from cluster.status
 	if params.Cluster.Status.Components != nil {
@@ -411,23 +419,6 @@ func BuildEnvConfig(params BuilderParams) (*corev1.ConfigMap, error) {
 					followers += follower.Pod
 				}
 				envData[prefix+"FOLLOWERS"] = followers
-			}
-			replicationSetStatus := v.ReplicationSetStatus
-			if replicationSetStatus != nil {
-				if replicationSetStatus.Primary.Pod != componentutil.ComponentStatusDefaultPodName {
-					envData[prefix+"PRIMARY"] = replicationSetStatus.Primary.Pod
-				}
-				secondaries := ""
-				for _, secondary := range replicationSetStatus.Secondaries {
-					if secondary.Pod == componentutil.ComponentStatusDefaultPodName {
-						continue
-					}
-					if len(secondaries) > 0 {
-						secondaries += ","
-					}
-					secondaries += secondary.Pod
-				}
-				envData[prefix+"SECONDARIES"] = secondaries
 			}
 		}
 	}

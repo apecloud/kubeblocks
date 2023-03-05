@@ -33,7 +33,7 @@ import (
 	"k8s.io/klog/v2"
 
 	"github.com/apecloud/kubeblocks/internal/cli/types"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/constant"
 )
 
 type kbObjects map[schema.GroupVersionResource]*unstructured.UnstructuredList

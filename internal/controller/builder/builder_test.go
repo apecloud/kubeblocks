@@ -315,25 +315,15 @@ var _ = Describe("builder", func() {
 			Expect(len(cfg.Data) == 4).Should(BeTrue())
 		})
 
-		It("builds Env Config with Replication status correctly", func() {
+		It("builds Env Config with Replication component correctly", func() {
 			params := newParams()
-			params.Cluster.Status.Components = map[string]appsv1alpha1.ClusterComponentStatus{
-				params.Component.Name: {
-					ReplicationSetStatus: &appsv1alpha1.ReplicationSetStatus{
-						Primary: appsv1alpha1.ReplicationMemberStatus{
-							Pod: "pod1",
-						},
-						Secondaries: []appsv1alpha1.ReplicationMemberStatus{{
-							Pod: "pod2",
-						}, {
-							Pod: "pod3",
-						}},
-					},
-				}}
+			var mockPrimaryIndex = int32(testapps.DefaultReplicationPrimaryIndex)
+			params.Component.WorkloadType = appsv1alpha1.Replication
+			params.Component.PrimaryIndex = &mockPrimaryIndex
 			cfg, err := BuildEnvConfig(*params)
 			Expect(err).Should(BeNil())
 			Expect(cfg).ShouldNot(BeNil())
-			Expect(len(cfg.Data) == 4).Should(BeTrue())
+			Expect(len(cfg.Data) == 3).Should(BeTrue())
 		})
 
 		It("builds BackupPolicy correctly", func() {

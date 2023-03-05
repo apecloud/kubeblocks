@@ -139,8 +139,8 @@ func (o *uninstallOptions) preCheck() error {
 		} else {
 			kbNamespace := secrets.Items[0].Namespace
 			if o.Namespace != kbNamespace {
-				msg.WriteString(fmt.Sprintf("KubeBlocks is deployed in namespace: '%s'.", kbNamespace))
-				msg.WriteString(fmt.Sprintf("please specify namespace to uninstall `kbcli kubeblocks uninstall -n %s`", kbNamespace))
+				msg.WriteString(fmt.Sprintf("KubeBlocks is deployed in namespace: '%s'. ", kbNamespace))
+				msg.WriteString(fmt.Sprintf("Please specify namespace to uninstall `kbcli kubeblocks uninstall -n %s`", kbNamespace))
 				return errors.New(msg.String())
 			}
 		}

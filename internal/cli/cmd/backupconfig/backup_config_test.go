@@ -19,7 +19,6 @@ package backupconfig
 import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-
 	"helm.sh/helm/v3/pkg/cli/values"
 	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
@@ -64,7 +63,7 @@ var _ = Describe("backupconfig", func() {
 		o := &kubeblocks.InstallOptions{
 			Options: kubeblocks.Options{
 				IOStreams: streams,
-				HelmCfg:   helm.FakeActionConfig(),
+				HelmCfg:   helm.NewFakeConfig(testing.Namespace),
 				Namespace: "default",
 				Client:    testing.FakeClientSet(mockDeploy()),
 				Dynamic:   testing.FakeDynamicClient(),

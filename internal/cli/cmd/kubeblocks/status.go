@@ -27,7 +27,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	"github.com/apecloud/kubeblocks/internal/constant"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -47,7 +47,7 @@ import (
 
 var (
 	infoExample = templates.Examples(`
-	# list workloads ownered by Kubeblocks
+	# list workloads owned by KubeBlocks
 	kbcli kubeblocks status
 	
 	# list all resources owned by KubeBlocks, such as workloads, cluster definitions, backup template.
@@ -56,8 +56,8 @@ var (
 
 var (
 	// app.kubernetes.io/instance=kubeblocks, hit most workloads and configuration
-	instanceLabelSelector = fmt.Sprintf("%s=%s", intctrlutil.AppInstanceLabelKey, types.KubeBlocksChartName)
-	// release=kubeblocs, for prometheus-alertmanager and prometheus-server
+	instanceLabelSelector = fmt.Sprintf("%s=%s", constant.AppInstanceLabelKey, types.KubeBlocksChartName)
+	// release=kubeblocks, for prometheus-alertmanager and prometheus-server
 	releaseLabelSelector = fmt.Sprintf("release=%s", types.KubeBlocksChartName)
 	// name=kubeblocks,owner-helm, for helm secret
 	helmLabel = fmt.Sprintf("%s=%s,%s=%s", "name", types.KubeBlocksChartName, "owner", "helm")
@@ -111,7 +111,7 @@ func newStatusCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 		Example: infoExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			util.CheckErr(o.complete(f))
-			util.CheckErr(o.run(f))
+			util.CheckErr(o.run())
 		},
 	}
 	cmd.Flags().BoolVar(&o.showAll, "all", false, "Show all resources, including configurations, storages, etc")
@@ -144,16 +144,16 @@ func (o *statusOptions) complete(f cmdutil.Factory) error {
 	return nil
 }
 
-func (o *statusOptions) run(f cmdutil.Factory) error {
+func (o *statusOptions) run() error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	// infer namespace from secrets
-	secrets, err := o.client.CoreV1().Secrets(metav1.NamespaceAll).List(ctx, metav1.ListOptions{LabelSelector: helmLabel})
-	if err == nil && len(secrets.Items) == 1 {
-		o.ns = secrets.Items[0].Namespace
-	}
 
-	fmt.Fprintf(o.Out, "Kuberblocks is deployed in namespace: %s\n", o.ns)
+	o.ns, _ = getKubeBlocksNamespace(o.client)
+	if o.ns == "" {
+		fmt.Fprintf(o.Out, "Failed to find deployed KubeBlocks in any namespace\n")
+	} else {
+		fmt.Fprintf(o.Out, "Kuberblocks is deployed in namespace: %s\n", o.ns)
+	}
 
 	allErrs := make([]error, 0)
 	o.showWorkloads(ctx, &allErrs)
@@ -213,7 +213,7 @@ func (o *statusOptions) showKubeBlocksStorage(ctx context.Context, allErrs *[]er
 	for _, resourceList := range unstructuredList {
 		for _, resource := range resourceList.Items {
 			switch resource.GetKind() {
-			case intctrlutil.PersistentVolumeClaimKind:
+			case constant.PersistentVolumeClaimKind:
 				renderPVC(&resource)
 			default:
 				err := fmt.Errorf("unsupported resources: %s", resource.GetKind())
@@ -241,7 +241,7 @@ func (o *statusOptions) showHelmResources(ctx context.Context, allErrs *[]error)
 }
 
 func (o *statusOptions) showWorkloads(ctx context.Context, allErrs *[]error) {
-	fmt.Fprintln(o.Out, "Kubeblocks Workloads:")
+	fmt.Fprintln(o.Out, "\nKubeblocks Workloads:")
 	tblPrinter := printer.NewTablePrinter(o.Out)
 	tblPrinter.SetHeader("NAMESPACE", "KIND", "NAME", "READY PODS", "CPU(cores)", "MEMORY(bytes)")
 
@@ -278,9 +278,9 @@ func (o *statusOptions) showWorkloads(ctx context.Context, allErrs *[]error) {
 	for _, workload := range unstructuredList {
 		for _, resource := range workload.Items {
 			switch resource.GetKind() {
-			case intctrlutil.DeploymentKind:
+			case constant.DeploymentKind:
 				renderDeploy(&resource)
-			case intctrlutil.StatefulSetKind:
+			case constant.StatefulSetKind:
 				renderStatefulSet(&resource)
 			default:
 				err := fmt.Errorf("unsupported worklkoad type: %s", resource.GetKind())
@@ -332,8 +332,8 @@ func computeMetricByWorkloads(ctx context.Context, ns string, workloads []*unstr
 func listResourceByGVR(ctx context.Context, client dynamic.Interface, namespace string, gvrlist []schema.GroupVersionResource, selector []metav1.ListOptions, allErrs *[]error) []*unstructured.UnstructuredList {
 	unstructuredList := make([]*unstructured.UnstructuredList, 0)
 	for _, gvr := range gvrlist {
-		for _, lableSelector := range selector {
-			resource, err := client.Resource(gvr).Namespace(namespace).List(ctx, lableSelector)
+		for _, labelSelector := range selector {
+			resource, err := client.Resource(gvr).Namespace(namespace).List(ctx, labelSelector)
 			if err != nil {
 				appendErrIgnoreNotFound(allErrs, err)
 				continue

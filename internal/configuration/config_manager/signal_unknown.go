@@ -20,7 +20,6 @@ package configmanager
 
 import (
 	"os"
-	"runtime"
 
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 )

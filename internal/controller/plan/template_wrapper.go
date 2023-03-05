@@ -27,6 +27,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
+	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
 )
 
@@ -119,7 +120,7 @@ func updateCMConfigSelectorLabels(cm *corev1.ConfigMap, tpl appsv1alpha1.Compone
 	if cm.Labels == nil {
 		cm.Labels = make(map[string]string)
 	}
-	cm.Labels[cfgcore.CMConfigurationCMKeysLabelKey] = strings.Join(tpl.Keys, ",")
+	cm.Labels[constant.CMConfigurationCMKeysLabelKey] = strings.Join(tpl.Keys, ",")
 }
 
 // generateConfigMapFromTpl render config file by config template provided by provider.

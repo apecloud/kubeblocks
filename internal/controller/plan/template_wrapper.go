@@ -59,57 +59,57 @@ func newTemplateRenderWrapper(cfgTplBuilder *configTemplateBuilder, cluster *app
 	}
 }
 
-func (task *renderWrapper) renderConfigTemplate(configTemplates []appsv1alpha1.ComponentConfigSpec, obj client.Object) error {
+func (wrapper *renderWrapper) renderConfigTemplate(configTemplates []appsv1alpha1.ComponentConfigSpec, obj client.Object) error {
 	scheme, _ := appsv1alpha1.SchemeBuilder.Build()
 	for _, tpl := range configTemplates {
 		cmName := cfgcore.GetInstanceCMName(obj, &tpl.ComponentTemplateSpec)
 
 		// Generate ConfigMap objects for config files
-		cm, err := generateConfigMapFromTpl(task.templateBuilder, cmName, tpl.ConfigConstraintRef, tpl.ComponentTemplateSpec, task.params, task.ctx, task.cli, func(m map[string]string) error {
-			return validateConfigMap(m, tpl, task.ctx, task.cli)
+		cm, err := generateConfigMapFromTpl(wrapper.templateBuilder, cmName, tpl.ConfigConstraintRef, tpl.ComponentTemplateSpec, wrapper.params, wrapper.ctx, wrapper.cli, func(m map[string]string) error {
+			return validateRenderedData(m, tpl, wrapper.ctx, wrapper.cli)
 		})
 		if err != nil {
 			return err
 		}
 		updateCMConfigSelectorLabels(cm, tpl)
 
-		if err := task.addRenderObject(tpl.ComponentTemplateSpec, cm, scheme); err != nil {
+		if err := wrapper.addRenderObject(tpl.ComponentTemplateSpec, cm, scheme); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (task *renderWrapper) renderScriptTemplate(scriptTemplates []appsv1alpha1.ComponentTemplateSpec, obj client.Object) error {
+func (wrapper *renderWrapper) renderScriptTemplate(scriptTemplates []appsv1alpha1.ComponentTemplateSpec, obj client.Object) error {
 	scheme, _ := appsv1alpha1.SchemeBuilder.Build()
 	for _, tpl := range scriptTemplates {
 		cmName := cfgcore.GetInstanceCMName(obj, &tpl)
 
 		// Generate ConfigMap objects for config files
-		cm, err := generateConfigMapFromTpl(task.templateBuilder, cmName, "", tpl, task.params, task.ctx, task.cli, nil)
+		cm, err := generateConfigMapFromTpl(wrapper.templateBuilder, cmName, "", tpl, wrapper.params, wrapper.ctx, wrapper.cli, nil)
 		if err != nil {
 			return err
 		}
-		if err := task.addRenderObject(tpl, cm, scheme); err != nil {
+		if err := wrapper.addRenderObject(tpl, cm, scheme); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (task *renderWrapper) addRenderObject(tpl appsv1alpha1.ComponentTemplateSpec, cm *corev1.ConfigMap, scheme *runtime.Scheme) error {
+func (wrapper *renderWrapper) addRenderObject(tpl appsv1alpha1.ComponentTemplateSpec, cm *corev1.ConfigMap, scheme *runtime.Scheme) error {
 	// The owner of the configmap object is a cluster of users,
 	// in order to manage the life cycle of configmap
-	if err := controllerutil.SetOwnerReference(task.cluster, cm, scheme); err != nil {
+	if err := controllerutil.SetOwnerReference(wrapper.cluster, cm, scheme); err != nil {
 		return err
 	}
 
 	cmName := cm.Name
-	task.volumes[cmName] = tpl
-	task.renderedObjs = append(task.renderedObjs, cm)
+	wrapper.volumes[cmName] = tpl
+	wrapper.renderedObjs = append(wrapper.renderedObjs, cm)
 
 	// Configuration.kubeblocks.io/cfg-tpl-${ctpl-name}: ${cm-instance-name}
-	task.templateLabels[cfgcore.GenerateTPLUniqLabelKeyWithConfig(tpl.Name)] = cmName
+	wrapper.templateLabels[cfgcore.GenerateTPLUniqLabelKeyWithConfig(tpl.Name)] = cmName
 	return nil
 }
 
@@ -133,7 +133,7 @@ func generateConfigMapFromTpl(tplBuilder *configTemplateBuilder,
 	cli client.Client, dataValidator templateRenderValidator) (*corev1.ConfigMap, error) {
 	// Render config template by TplEngine
 	// The template namespace must be the same as the ClusterDefinition namespace
-	configs, err := renderConfigMap(tplBuilder, tplCfg, ctx, cli)
+	configs, err := renderConfigMapTemplate(tplBuilder, tplCfg, ctx, cli)
 	if err != nil {
 		return nil, err
 	}
@@ -148,8 +148,8 @@ func generateConfigMapFromTpl(tplBuilder *configTemplateBuilder,
 	return builder.BuildConfigMapWithTemplate(configs, params, cmName, configConstraintName, tplCfg)
 }
 
-// renderConfigMap render config file using template engine
-func renderConfigMap(
+// renderConfigMapTemplate render config file using template engine
+func renderConfigMapTemplate(
 	tplBuilder *configTemplateBuilder,
 	tplCfg appsv1alpha1.ComponentTemplateSpec,
 	ctx context.Context,
@@ -175,20 +175,21 @@ func renderConfigMap(
 	return renderedCfg, nil
 }
 
-// validateConfigMap validate config file against constraint
-func validateConfigMap(
+// validateRenderedData validate config file against constraint
+func validateRenderedData(
 	renderedCfg map[string]string,
 	tplCfg appsv1alpha1.ComponentConfigSpec,
 	ctx context.Context,
 	cli client.Client) error {
 	cfgTemplate := &appsv1alpha1.ConfigConstraint{}
-	if len(tplCfg.ConfigConstraintRef) > 0 {
-		if err := cli.Get(ctx, client.ObjectKey{
-			Namespace: "",
-			Name:      tplCfg.ConfigConstraintRef,
-		}, cfgTemplate); err != nil {
-			return cfgcore.WrapError(err, "failed to get ConfigConstraint, key[%v]", tplCfg)
-		}
+	if tplCfg.ConfigConstraintRef == "" {
+		return nil
+	}
+	if err := cli.Get(ctx, client.ObjectKey{
+		Namespace: "",
+		Name:      tplCfg.ConfigConstraintRef,
+	}, cfgTemplate); err != nil {
+		return cfgcore.WrapError(err, "failed to get ConfigConstraint, key[%v]", tplCfg)
 	}
 
 	// NOTE: not require checker configuration template status

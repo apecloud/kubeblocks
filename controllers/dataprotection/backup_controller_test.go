@@ -138,8 +138,8 @@ var _ = Describe("Backup for a StatefulSet", func() {
 				By("Check backup job completed")
 				Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dataprotectionv1alpha1.Backup) {
 					g.Expect(fetched.Status.Phase).To(Equal(dataprotectionv1alpha1.BackupCompleted))
-					g.Expect(fetched.Status.ClusterName).Should(Equal(clusterName))
-					g.Expect(fetched.Status.ComponentName).Should(Equal(componentName))
+					g.Expect(fetched.Labels[constant.AppInstanceLabelKey]).Should(Equal(clusterName))
+					g.Expect(fetched.Labels[constant.KBAppComponentLabelKey]).Should(Equal(componentName))
 					g.Expect(len(fetched.Annotations[constant.ClusterSnapshotAnnotationKey]) > 0).Should(BeTrue())
 				})).Should(Succeed())
 

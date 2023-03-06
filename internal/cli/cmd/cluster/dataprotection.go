@@ -336,7 +336,8 @@ type CreateRestoreOptions struct {
 }
 
 func (o *CreateRestoreOptions) getClusterObject(backup *dataprotectionv1alpha1.Backup) (*appsv1alpha1.Cluster, error) {
-	clusterObj, err := cluster.GetClusterByName(o.Client, backup.Status.ClusterName, o.Namespace)
+	clusterName := backup.Labels[constant.AppInstanceLabelKey]
+	clusterObj, err := cluster.GetClusterByName(o.Client, clusterName, o.Namespace)
 	if err != nil && !apierrors.IsNotFound(err) {
 		return nil, err
 	}
@@ -344,7 +345,7 @@ func (o *CreateRestoreOptions) getClusterObject(backup *dataprotectionv1alpha1.B
 		// if the source cluster does not exist, obtain it from the cluster snapshot of the backup.
 		clusterString, ok := backup.Annotations[constant.ClusterSnapshotAnnotationKey]
 		if !ok {
-			return nil, fmt.Errorf("source cluster: %s not found", backup.Status.ClusterName)
+			return nil, fmt.Errorf("source cluster: %s not found", clusterName)
 		}
 		err = json.Unmarshal([]byte(clusterString), &clusterObj)
 	}
@@ -360,8 +361,8 @@ func (o *CreateRestoreOptions) Run() error {
 	if backup.Status.Phase != dataprotectionv1alpha1.BackupCompleted {
 		return errors.Errorf(`backup "%s" is not completed.`, backup.Name)
 	}
-	if len(backup.Status.ClusterName) == 0 {
-		return errors.Errorf(`missing source cluster in backup "%s", backup.status.clusterName is empty.`, o.Backup)
+	if len(backup.Labels[constant.AppInstanceLabelKey]) == 0 {
+		return errors.Errorf(`missing source cluster in backup "%s", "app.kubernetes.io/instance" is empty in labels.`, o.Backup)
 	}
 	// get the cluster object and set the annotation for restore
 	cluster, err := o.getClusterObject(backup)

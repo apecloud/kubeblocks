@@ -165,14 +165,10 @@ func (r *BackupReconciler) doNewPhaseAction(
 	if err != nil {
 		return r.updateStatusIfFailed(reqCtx, backup, err)
 	}
-	clusterName := target.Labels[constant.AppInstanceLabelKey]
-	if err := r.patchBackupLabelsAndAnnotations(reqCtx, backup, backupPolicy.Spec.Target.LabelsSelector.MatchLabels, clusterName); err != nil {
+
+	if err = r.patchBackupLabelsAndAnnotations(reqCtx, backup, target); err != nil {
 		return r.updateStatusIfFailed(reqCtx, backup, err)
 	}
-
-	// save cluster name and componentName
-	backup.Status.ClusterName = clusterName
-	backup.Status.ComponentName = target.Labels[constant.KBAppComponentLabelKey]
 
 	// save the backup message for restore
 	backup.Status.RemoteVolume = &backupPolicy.Spec.RemoteVolume
@@ -307,21 +303,19 @@ func (r *BackupReconciler) updateStatusIfFailed(reqCtx intctrlutil.RequestCtx,
 func (r *BackupReconciler) patchBackupLabelsAndAnnotations(
 	reqCtx intctrlutil.RequestCtx,
 	backup *dataprotectionv1alpha1.Backup,
-	labelSelector map[string]string,
-	clusterName string) error {
+	targetSts *appv1.StatefulSet) error {
 	patch := client.MergeFrom(backup.DeepCopy())
+	clusterName := targetSts.Labels[constant.AppInstanceLabelKey]
 	if len(clusterName) > 0 {
 		if err := r.setClusterSnapshotAnnotation(reqCtx, backup, types.NamespacedName{Name: clusterName, Namespace: backup.Namespace}); err != nil {
 			return err
 		}
 	}
+	backup.Labels = targetSts.Labels
 	if backup.Labels == nil {
-		backup.Labels = map[string]string{}
+		backup.Labels = make(map[string]string)
 	}
 	backup.Labels[dataProtectionLabelBackupTypeKey] = string(backup.Spec.BackupType)
-	for k, v := range labelSelector {
-		backup.Labels[k] = v
-	}
 	return r.Client.Patch(reqCtx.Ctx, backup, patch)
 }
 
@@ -911,8 +905,9 @@ func (r *BackupReconciler) buildSnapshotPodSpec(
 // getClusterObjectString gets the cluster object and convert it to string.
 func (r *BackupReconciler) getClusterObjectString(reqCtx intctrlutil.RequestCtx, name types.NamespacedName) (*string, error) {
 	cluster := &appsv1alpha1.Cluster{}
+	// cluster snapshot is optional, so we don't return error if it doesn't exist.
 	if err := r.Client.Get(reqCtx.Ctx, name, cluster); err != nil {
-		return nil, client.IgnoreNotFound(err)
+		return nil, nil
 	}
 	// maintain only the cluster's spec and name/namespace.
 	newCluster := &appsv1alpha1.Cluster{

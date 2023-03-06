@@ -199,9 +199,7 @@ func mockBackupInfo(dynamic dynamic.Interface, backupName, clusterName string) {
 	backupStatus := &unstructured.Unstructured{
 		Object: map[string]interface{}{
 			"status": map[string]interface{}{
-				"clusterName":   clusterName,
-				"componentName": "test",
-				"phase":         "Completed",
+				"phase": "Completed",
 			},
 			"metadata": map[string]interface{}{
 				"name": backupName,
@@ -209,7 +207,8 @@ func mockBackupInfo(dynamic dynamic.Interface, backupName, clusterName string) {
 					constant.ClusterSnapshotAnnotationKey: clusterString,
 				},
 				"labels": map[string]interface{}{
-					constant.AppInstanceLabelKey: clusterName,
+					constant.AppInstanceLabelKey:    clusterName,
+					constant.KBAppComponentLabelKey: "test",
 				},
 			},
 		},

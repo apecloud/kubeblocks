@@ -168,7 +168,7 @@ func setMonitor(monitor bool, components []map[string]interface{}) {
 }
 
 func getRestoreFromBackupAnnotation(backup *dataprotectionv1alpha1.Backup, compSpecsCount int, firstCompName string) (string, error) {
-	componentName := backup.Status.ComponentName
+	componentName := backup.Labels[constant.KBAppComponentLabelKey]
 	if len(componentName) == 0 {
 		if compSpecsCount != 1 {
 			return "", fmt.Errorf("unable to obtain the name of the component to be recovered, please ensure that Backup.status.componentName exists")

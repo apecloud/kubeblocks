@@ -59,10 +59,6 @@ spec:
             - name: VOLUMESNAPSHOT
               value: "true"
             {{- end }}
-            {{- if .Values.configManager.enabled }}
-            - name: ENABLE_CRI
-              value: "true"
-            {{- end }}
             {{- if .Values.dataProtection.backupSchedule }}
             - name: DP_BACKUP_SCHEDULE
               value: {{ .Values.dataProtection.backupSchedule }}

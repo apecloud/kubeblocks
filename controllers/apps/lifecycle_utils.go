@@ -484,6 +484,22 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 		return nil
 	}
 
+	handlePVC := func(pvcProto *corev1.PersistentVolumeClaim) error {
+		key := client.ObjectKey{
+			Namespace: pvcProto.GetNamespace(),
+			Name:      pvcProto.GetName(),
+		}
+		pvcObj := &corev1.PersistentVolumeClaim{}
+		if err := cli.Get(ctx, key, pvcObj); err != nil {
+			return err
+		}
+		pvcObj.Spec = pvcProto.Spec
+		if err := cli.Update(ctx, pvcObj); err != nil {
+			return err
+		}
+		return nil
+	}
+
 	// why create tls certs here? or why not use prepare-checkedCreate pattern?
 	// tls certs generation is very time-consuming, if using prepare-checkedCreate pattern,
 	// we shall generate certs in every component Update which will slow down the cluster reconcile loop
@@ -555,6 +571,14 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 		svcProto, ok := obj.(*corev1.Service)
 		if ok {
 			if err := handleSvc(svcProto); err != nil {
+				return false, err
+			}
+			continue
+		}
+		// do volume expansion when workload type is `replication`
+		pvcProto, ok := obj.(*corev1.PersistentVolumeClaim)
+		if ok {
+			if err := handlePVC(pvcProto); err != nil {
 				return false, err
 			}
 			continue

@@ -44,58 +44,45 @@ const (
 	// GoosWindows is os.GOOS windows string
 	GoosWindows = "windows"
 
-	// AppsAPIGroup api group
-	AppsAPIGroup = "apps.kubeblocks.io"
-
-	// Version api version
-	Version   = "v1alpha1"
-	VersionV1 = "v1"
-	// ResourceClusters clusters resource
-	ResourceClusters = "clusters"
-	// ResourceClusterDefs clusterDefinition resource
-	ResourceClusterDefs = "clusterdefinitions"
-	// ResourceClusterVersions clusterVersion resource
-	ResourceClusterVersions = "clusterversions"
-	// ResourceOpsRequests opsrequests resource
-	ResourceOpsRequests = "opsrequests"
-	// ResourceDeployments deployment resource
-	ResourceDeployments = "deployments"
-	// ResourceConfigmaps configmap resource
-	ResourceConfigmaps = "configmaps"
-	// ResourceStatefulSets sts resource
+	// K8s core API group
+	K8sCoreAPIVersion    = "v1"
+	ResourceDeployments  = "deployments"
+	ResourceConfigmaps   = "configmaps"
 	ResourceStatefulSets = "statefulsets"
-	// ResourceConfigConstraintVersions clusterVersion resource
-	ResourceConfigConstraintVersions = "configconstraints"
-	// ResourceSecrets secret resources
-	ResourceSecrets = "secrets"
+	ResourceSecrets      = "secrets"
 
-	// KindCluster cluster king
-	KindCluster = "Cluster"
-	// KindClusterDef clusterDefinition kine
-	KindClusterDef = "ClusterDefinition"
-	// KindClusterVersion clusterVersion kind
-	KindClusterVersion       = "ClusterVersion"
-	KindConfigConstraint     = "ConfigConstraint"
-	KindBackup               = "Backup"
-	KindRestoreJob           = "RestoreJob"
-	KindBackupPolicyTemplate = "BackupPolicyTemplate"
-	KindOps                  = "OpsRequest"
+	// Apps API group
+	AppsAPIGroup                     = "apps.kubeblocks.io"
+	AppsAPIVersion                   = "v1alpha1"
+	ResourceClusters                 = "clusters"
+	ResourceClusterDefs              = "clusterdefinitions"
+	ResourceClusterVersions          = "clusterversions"
+	ResourceOpsRequests              = "opsrequests"
+	ResourceConfigConstraintVersions = "configconstraints"
+	KindCluster                      = "Cluster"
+	KindClusterDef                   = "ClusterDefinition"
+	KindClusterVersion               = "ClusterVersion"
+	KindConfigConstraint             = "ConfigConstraint"
+	KindBackup                       = "Backup"
+	KindRestoreJob                   = "RestoreJob"
+	KindBackupPolicyTemplate         = "BackupPolicyTemplate"
+	KindOps                          = "OpsRequest"
 
 	ServiceLBTypeAnnotationKey     = "service.kubernetes.io/kubeblocks-loadbalancer-type"
 	ServiceLBTypeAnnotationValue   = "private-ip"
 	ServiceFloatingIPAnnotationKey = "service.kubernetes.io/kubeblocks-loadbalancer-floating-ip"
 	StorageClassAnnotationKey      = "kubeblocks.io/storage-class"
 
-	// DataProtection definitions
+	// DataProtection API group
 	DPAPIGroup                    = "dataprotection.kubeblocks.io"
-	DPVersion                     = "v1alpha1"
+	DPAPIVersion                  = "v1alpha1"
 	ResourceBackups               = "backups"
 	ResourceBackupTools           = "backuptools"
 	ResourceRestoreJobs           = "restorejobs"
 	ResourceBackupPolicies        = "backuppolicies"
 	ResourceBackupPolicyTemplates = "backuppolicytemplates"
 
-	// Extensions definitions
+	// Extensions API group
 	ExtensionsAPIGroup   = "extensions.kubeblocks.io"
 	ExtensionsAPIVersion = "v1alpha1"
 	ResourceAddons       = "addons"
@@ -156,35 +143,35 @@ type ConfigTemplateInfo struct {
 }
 
 func ClusterGVR() schema.GroupVersionResource {
-	return schema.GroupVersionResource{Group: AppsAPIGroup, Version: Version, Resource: ResourceClusters}
+	return schema.GroupVersionResource{Group: AppsAPIGroup, Version: AppsAPIVersion, Resource: ResourceClusters}
 }
 
 func ClusterDefGVR() schema.GroupVersionResource {
-	return schema.GroupVersionResource{Group: AppsAPIGroup, Version: Version, Resource: ResourceClusterDefs}
+	return schema.GroupVersionResource{Group: AppsAPIGroup, Version: AppsAPIVersion, Resource: ResourceClusterDefs}
 }
 
 func ClusterVersionGVR() schema.GroupVersionResource {
-	return schema.GroupVersionResource{Group: AppsAPIGroup, Version: Version, Resource: ResourceClusterVersions}
+	return schema.GroupVersionResource{Group: AppsAPIGroup, Version: AppsAPIVersion, Resource: ResourceClusterVersions}
 }
 
 func OpsGVR() schema.GroupVersionResource {
-	return schema.GroupVersionResource{Group: AppsAPIGroup, Version: Version, Resource: ResourceOpsRequests}
+	return schema.GroupVersionResource{Group: AppsAPIGroup, Version: AppsAPIVersion, Resource: ResourceOpsRequests}
 }
 
 func BackupGVR() schema.GroupVersionResource {
-	return schema.GroupVersionResource{Group: DPAPIGroup, Version: DPVersion, Resource: ResourceBackups}
+	return schema.GroupVersionResource{Group: DPAPIGroup, Version: DPAPIVersion, Resource: ResourceBackups}
 }
 
 func BackupPolicyTemplateGVR() schema.GroupVersionResource {
-	return schema.GroupVersionResource{Group: DPAPIGroup, Version: DPVersion, Resource: ResourceBackupPolicyTemplates}
+	return schema.GroupVersionResource{Group: DPAPIGroup, Version: DPAPIVersion, Resource: ResourceBackupPolicyTemplates}
 }
 
 func BackupToolGVR() schema.GroupVersionResource {
-	return schema.GroupVersionResource{Group: DPAPIGroup, Version: DPVersion, Resource: ResourceBackupTools}
+	return schema.GroupVersionResource{Group: DPAPIGroup, Version: DPAPIVersion, Resource: ResourceBackupTools}
 }
 
 func RestoreJobGVR() schema.GroupVersionResource {
-	return schema.GroupVersionResource{Group: DPAPIGroup, Version: DPVersion, Resource: ResourceRestoreJobs}
+	return schema.GroupVersionResource{Group: DPAPIGroup, Version: DPAPIVersion, Resource: ResourceRestoreJobs}
 }
 
 func AddonGVR() schema.GroupVersionResource {
@@ -194,47 +181,47 @@ func AddonGVR() schema.GroupVersionResource {
 func CRDGVR() schema.GroupVersionResource {
 	return schema.GroupVersionResource{
 		Group:    "apiextensions.k8s.io",
-		Version:  VersionV1,
+		Version:  K8sCoreAPIVersion,
 		Resource: "customresourcedefinitions",
 	}
 }
 
 func ConfigmapGVR() schema.GroupVersionResource {
-	return schema.GroupVersionResource{Group: corev1.GroupName, Version: VersionV1, Resource: ResourceConfigmaps}
+	return schema.GroupVersionResource{Group: corev1.GroupName, Version: K8sCoreAPIVersion, Resource: ResourceConfigmaps}
 }
 
 func SecretGVR() schema.GroupVersionResource {
-	return schema.GroupVersionResource{Group: corev1.GroupName, Version: VersionV1, Resource: ResourceSecrets}
+	return schema.GroupVersionResource{Group: corev1.GroupName, Version: K8sCoreAPIVersion, Resource: ResourceSecrets}
 }
 
 func StatefulSetGVR() schema.GroupVersionResource {
-	return schema.GroupVersionResource{Group: appsv1.GroupName, Version: VersionV1, Resource: ResourceStatefulSets}
+	return schema.GroupVersionResource{Group: appsv1.GroupName, Version: K8sCoreAPIVersion, Resource: ResourceStatefulSets}
 }
 
 func DeployGVR() schema.GroupVersionResource {
-	return schema.GroupVersionResource{Group: appsv1.GroupName, Version: VersionV1, Resource: ResourceDeployments}
+	return schema.GroupVersionResource{Group: appsv1.GroupName, Version: K8sCoreAPIVersion, Resource: ResourceDeployments}
 }
 
 func ServiceGVR() schema.GroupVersionResource {
-	return schema.GroupVersionResource{Group: corev1.GroupName, Version: VersionV1, Resource: "services"}
+	return schema.GroupVersionResource{Group: corev1.GroupName, Version: K8sCoreAPIVersion, Resource: "services"}
 }
 
 func PVCGVR() schema.GroupVersionResource {
-	return schema.GroupVersionResource{Group: corev1.GroupName, Version: VersionV1, Resource: "persistentvolumeclaims"}
+	return schema.GroupVersionResource{Group: corev1.GroupName, Version: K8sCoreAPIVersion, Resource: "persistentvolumeclaims"}
 }
 
 func PVGVR() schema.GroupVersionResource {
-	return schema.GroupVersionResource{Group: corev1.GroupName, Version: VersionV1, Resource: "persistentvolumes"}
+	return schema.GroupVersionResource{Group: corev1.GroupName, Version: K8sCoreAPIVersion, Resource: "persistentvolumes"}
 }
 
 func ConfigConstraintGVR() schema.GroupVersionResource {
-	return schema.GroupVersionResource{Group: AppsAPIGroup, Version: Version, Resource: ResourceConfigConstraintVersions}
+	return schema.GroupVersionResource{Group: AppsAPIGroup, Version: AppsAPIVersion, Resource: ResourceConfigConstraintVersions}
 }
 
 func StorageClassGVR() schema.GroupVersionResource {
 	return schema.GroupVersionResource{
 		Group:    "storage.k8s.io",
-		Version:  VersionV1,
+		Version:  K8sCoreAPIVersion,
 		Resource: "storageclasses",
 	}
 }
@@ -242,7 +229,7 @@ func StorageClassGVR() schema.GroupVersionResource {
 func VolumeSnapshotClassGVR() schema.GroupVersionResource {
 	return schema.GroupVersionResource{
 		Group:    "snapshot.storage.k8s.io",
-		Version:  VersionV1,
+		Version:  K8sCoreAPIVersion,
 		Resource: "volumesnapshotclasses",
 	}
 }

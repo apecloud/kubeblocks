@@ -43,7 +43,7 @@ func getGVRByCRD(crd *unstructured.Unstructured) (*schema.GroupVersionResource, 
 	}
 	return &schema.GroupVersionResource{
 		Group:    group,
-		Version:  types.Version,
+		Version:  types.AppsAPIVersion,
 		Resource: strings.Split(crd.GetName(), ".")[0],
 	}, nil
 }

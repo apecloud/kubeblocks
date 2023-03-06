@@ -563,6 +563,7 @@ func buildConfigManagerParams(cli client.Client, ctx context.Context, cfgTemplat
 		SecreteName:   component.GenerateConnCredential(params.Cluster.Name),
 		Image:         viper.GetString(constant.ConfigSidecarIMAGE),
 		Volumes:       volumeDirs,
+		Cluster:       params.Cluster,
 	}
 
 	var err error

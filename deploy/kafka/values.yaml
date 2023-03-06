@@ -1,0 +1,33 @@
+# Default values for kafka.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+
+clusterVersionOverride: ""
+nameOverride: ""
+fullnameOverride: ""
+
+
+## @param commonLabels Labels to add to all deployed objects
+##
+commonLabels: {}
+
+
+## @param application images
+##
+images:
+  pullPolicy: IfNotPresent
+  kafka:
+    repository: docker.io/bitnami/kafka
+    tag: 3.4.0-debian-11-r2
+  kafkaExporter:
+    repository: docker.io/bitnami/kafka-exporter
+    tag: 1.6.0-debian-11-r61
+  jmxExporter:
+    repository: docker.io/bitnami/jmx-exporter
+    tag: 0.17.2-debian-11-r49
+
+
+## @param debugEnabled enables containers' debug logging
+##
+debugEnabled: true

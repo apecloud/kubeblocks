@@ -46,7 +46,6 @@ func BuildComponent(
 		Type:                  clusterCompDefObj.Name,
 		CharacterType:         clusterCompDefObj.CharacterType,
 		MaxUnavailable:        clusterCompDefObj.MaxUnavailable,
-		Replicas:              0,
 		WorkloadType:          clusterCompDefObj.WorkloadType,
 		ConsensusSpec:         clusterCompDefObj.ConsensusSpec,
 		PodSpec:               clusterCompDefObj.PodSpec,
@@ -54,6 +53,10 @@ func BuildComponent(
 		Probes:                clusterCompDefObj.Probes,
 		LogConfigs:            clusterCompDefObj.LogConfigs,
 		HorizontalScalePolicy: clusterCompDefObj.HorizontalScalePolicy,
+		Replicas:              clusterCompSpec.Replicas,
+		EnabledLogs:           clusterCompSpec.EnabledLogs,
+		TLS:                   clusterCompSpec.TLS,
+		Issuer:                clusterCompSpec.Issuer,
 	}
 
 	// resolve component.ConfigTemplates
@@ -88,12 +91,6 @@ func BuildComponent(
 		tolerations = clusterCompSpec.Tolerations
 	}
 	component.PodSpec.Tolerations = patchBuiltInToleration(tolerations)
-
-	// set others
-	component.EnabledLogs = clusterCompSpec.EnabledLogs
-	component.Replicas = clusterCompSpec.Replicas
-	component.TLS = clusterCompSpec.TLS
-	component.Issuer = clusterCompSpec.Issuer
 
 	if clusterCompSpec.VolumeClaimTemplates != nil {
 		component.VolumeClaimTemplates = appsv1alpha1.ToVolumeClaimTemplates(clusterCompSpec.VolumeClaimTemplates)

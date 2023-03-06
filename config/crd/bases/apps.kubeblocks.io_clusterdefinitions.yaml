@@ -244,6 +244,9 @@ spec:
                       required:
                       - leader
                       type: object
+                    description:
+                      description: The description of component definition.
+                      type: string
                     horizontalScalePolicy:
                       description: horizontalScalePolicy controls the behavior of
                         horizontal scale.
@@ -8878,8 +8881,12 @@ spec:
                   type: string
                 description: 'Connection credential template used for creating a connection
                   credential secret for cluster.apps.kubeblock.io object. Built-in
-                  objects are: `$(RANDOM_PASSWD)` - random 8 characters. `$(SVC_FQDN)`
-                  - service FQDN  placeholder, value pattern - $(CLUSTER_NAME)-$(1ST_COMP_NAME).$(NAMESPACE).svc,
+                  objects are: `$(RANDOM_PASSWD)` - random 8 characters. `$(UUID)`
+                  - generate a random UUID v4 string. `$(UUID_B64)` - generate a random
+                  UUID v4 BASE64 encoded string``. `$(UUID_STR_B64)` - generate a
+                  random UUID v4 string then BASE64 encoded``. `$(UUID_HEX)` - generate
+                  a random UUID v4 wth HEX representation``. `$(SVC_FQDN)` - service
+                  FQDN  placeholder, value pattern - $(CLUSTER_NAME)-$(1ST_COMP_NAME).$(NAMESPACE).svc,
                   where 1ST_COMP_NAME is the 1st component that provide `ClusterDefinition.spec.componentDefs[].service`
                   attribute; `$(SVC_PORT_<PORT-NAME>)` - a ServicePort''s port value
                   with specified port name, i.e, a servicePort JSON struct: { "name":

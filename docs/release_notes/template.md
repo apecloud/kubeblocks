@@ -5,8 +5,27 @@ We're happy to announce the release of KubeBlocks $kubeblocks_version! 🚀 🎉
 We would like to extend our appreciation to all contributors who helped make this release happen.
 
 **Highlights**
-    * New addons.extensions.kubeblocks.io API, with Addon management controller, where KubeBlocks allow addon extensions instead of using Helm sub-charts dependencies.
-    * ClusterDefinition API `spec.connectionCredential` add following built-in variables:
+  * Automatic pod container environment variables updates:
+    * [NEW] KB_POD_FQDN - KubeBlock Cluster component workload associated headless service name, N/A if workloadType=Stateless.
+    * [NEW] KB_POD_IP -  Pod IP address
+    * [NEW] KB_POD_IPS - Pod IP addresses
+    * [NEW] KB_HOST_IP - Host IP address
+    * [DEPRECATED] KB_PODIPS - Pod IP addresses
+    * [DEPRECATED] KB_PODIP -  Pod IP address
+    * [DEPRECATED] KB_HOSTIP - Host IP address
+    * KB_POD_NAME - Pod Name
+    * KB_NAMESPACE - Namespace
+    * KB_SA_NAME - Service Account Name
+    * KB_NODENAME - Node Name
+    * KB_CLUSTER_NAME - KubeBlock Cluster API object name
+    * KB_COMP_NAME - Running pod's KubeBlock Cluster API object's `.spec.components.name`
+    * KB_CLUSTER_COMP_NAME - Running pod's KubeBlock Cluster API object's `<.metadata.name>-<.spec.components.name>`, same name is used for Deployment or StatefulSet workload name, and Service object name
+  * New addons.extensions.kubeblocks.io API, with Addon management controller, where KubeBlocks allow addon extensions instead of using Helm sub-charts dependencies.
+  * ClusterDefinition API `spec.connectionCredential` add following built-in variables:
+    * A random UUID v4 generator `$(UUID)`
+    * A random UUID v4 generator with BASE64 encoded `$(UUID_B64)`
+    * A random UUID v4 generator in UUID string then BASE64 encoded `$(UUID_STR_B64)`
+    * A random UUID v4 generator in HEX representation `$(UUID_HEX)`
     * Service FQDN `$(SVC_FQDN)` placeholder, value pattern - $(CLUSTER_NAME)-$(1ST_COMP_NAME).$(NAMESPACE).svc, where 1ST_COMP_NAME is the 1st component that provide `ClusterDefinition.spec.componentDefs[].service` attribute
     * Service ports `$(SVC_PORT_<NAME>)` placeholder
     * example usage:

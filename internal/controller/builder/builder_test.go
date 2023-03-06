@@ -219,13 +219,28 @@ var _ = Describe("builder", func() {
 			Expect(err).Should(BeNil())
 			Expect(credential).ShouldNot(BeNil())
 			// "username":      "root",
-			// "svcFQDN":       "$(SVC_FQDN)",
-			// "password":      "$(RANDOM_PASSWD)",
+			// "SVC_FQDN":      "$(SVC_FQDN)",
+			// "RANDOM_PASSWD": "$(RANDOM_PASSWD)",
 			// "tcpEndpoint":   "tcp:$(SVC_FQDN):$(SVC_PORT_mysql)",
 			// "paxosEndpoint": "paxos:$(SVC_FQDN):$(SVC_PORT_paxos)",
+			// "UUID":          "$(UUID)",
+			// "UUID_B64":      "$(UUID_B64)",
+			// "UUID_STR_B64":  "$(UUID_STR_B64)",
+			// "UUID_HEX":      "$(UUID_HEX)",
 			Expect(credential.StringData).ShouldNot(BeEmpty())
 			Expect(credential.StringData["username"]).Should(Equal("root"))
-			Expect(credential.StringData["password"]).Should(HaveLen(8))
+
+			for _, v := range []string{
+				"SVC_FQDN",
+				"RANDOM_PASSWD",
+				"UUID",
+				"UUID_B64",
+				"UUID_STR_B64",
+				"UUID_HEX",
+			} {
+				Expect(credential.StringData[v]).ShouldNot(BeEquivalentTo(fmt.Sprintf("$(%s)", v)))
+			}
+			Expect(credential.StringData["RANDOM_PASSWD"]).Should(HaveLen(8))
 			svcFQDN := fmt.Sprintf("%s-%s.%s.svc", params.Cluster.Name, params.Component.Name,
 				params.Cluster.Namespace)
 			var mysqlPort corev1.ServicePort
@@ -238,9 +253,10 @@ var _ = Describe("builder", func() {
 					paxosPort = s
 				}
 			}
-			Expect(credential.StringData["svcFQDN"]).Should(Equal(svcFQDN))
+			Expect(credential.StringData["SVC_FQDN"]).Should(Equal(svcFQDN))
 			Expect(credential.StringData["tcpEndpoint"]).Should(Equal(fmt.Sprintf("tcp:%s:%d", svcFQDN, mysqlPort.Port)))
 			Expect(credential.StringData["paxosEndpoint"]).Should(Equal(fmt.Sprintf("paxos:%s:%d", svcFQDN, paxosPort.Port)))
+
 		})
 
 		It("builds StatefulSet correctly", func() {

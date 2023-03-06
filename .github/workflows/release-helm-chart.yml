@@ -42,7 +42,6 @@ jobs:
       DEP_REPO: "mkdir -pv deploy/helm/charts; \
         pushd deploy/helm/charts; \
         ls ../depend-charts/*.tgz | xargs -n1 tar xf; \
-        rm -rf ../depend-charts/*.tgz; \
         popd;"
     secrets: inherit
 

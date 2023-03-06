@@ -11,6 +11,7 @@ spec:
   reloadOptions:
     tplScriptTrigger:
       scriptConfigMapRef: mysql-reload-script
+      namespace: {{ .Release.Namespace }}
 {{/*    unixSignalTrigger:*/}}
 {{/*      signal: SIGHUP*/}}
 {{/*      processName: mysqld*/}}

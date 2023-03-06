@@ -4,7 +4,7 @@ metadata:
   name: {{ .Release.Name }}
   labels: {{ include "clickhouse-cluster.labels" . | nindent 4 }}
 spec:
-  clusterDefinitionRef: apecloud-clickhouse  # ref clusterdefinition.name
+  clusterDefinitionRef: clickhouse  # ref clusterdefinition.name
   clusterVersionRef: clickhouse-{{ default .Chart.AppVersion .Values.clusterVersionOverride }} # ref clusterversion.name
   terminationPolicy: {{ $.Values.terminationPolicy }}
   affinity:
@@ -36,7 +36,7 @@ spec:
       {{- end }}
       {{- if .persistence.enabled }}
       volumeClaimTemplates:
-        - name: data # ref clusterdefinition components.containers.volumeMounts.name
+        - name: data
           spec:
             storageClassName: {{ .persistence.data.storageClassName }}
             accessModes:
@@ -71,7 +71,7 @@ spec:
       {{- end }}
       {{- if $.Values.keeper.persistence.enabled }}
       volumeClaimTemplates:
-        - name: data # ref clusterdefinition components.containers.volumeMounts.name
+        - name: data
           spec:
             storageClassName: {{ $.Values.keeper.persistence.data.storageClassName }}
             accessModes:

@@ -1,7 +1,7 @@
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: ClusterDefinition
 metadata:
-  name: apecloud-etcd
+  name: etcd
   labels:
     {{- include "etcd.labels" . | nindent 4}}
 spec:

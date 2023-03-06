@@ -1,0 +1,33 @@
+apiVersion: v2
+name: kafka
+description: Apache Kafka is a distributed streaming platform designed to build real-time pipelines and can be used as a message broker or as a replacement for a log aggregation solution for big data applications.
+
+annotations:
+  category: Infrastructure
+  licenses: Apache-2.0
+
+type: application
+
+version: 0.1.0
+
+appVersion: 3.4.0
+
+home: https://kubeblocks.io/
+icon: https://bitnami.com/assets/stacks/kafka/img/kafka-stack-220x234.png
+keywords:
+  - kafka
+  - kraft
+  - streaming
+  - producer
+  - consumer
+
+dependencies:
+- name: common
+  repository: https://charts.bitnami.com/bitnami
+  tags:
+  - bitnami-common
+  version: 2.x.x
+
+maintainers:
+- name: Nash Tsai
+  url: https://github.com/apecloud/kubeblocks/deploy

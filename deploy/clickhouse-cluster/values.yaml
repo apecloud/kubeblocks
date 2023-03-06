@@ -27,8 +27,8 @@ clickhouse:
     replicaCount: 2
     ## ClickHouse workload pod resource requests and limits
     ## ref: http://kubernetes.io/docs/user-guide/compute-resources/
-    ## @param clickhouse[*].resources.limits The resources limits for the init container
-    ## @param clickhouse[*].resources.requests The requested resources for the init container
+    ## @param clickhouse[*].resources.limits The resources limits for the pod
+    ## @param clickhouse[*].resources.requests The requested resources for the pod
     ##
     resources: {}
       # We usually recommend not to specify default resources and to leave this as a conscious
@@ -48,7 +48,7 @@ clickhouse:
       ## @param clickhouse[*].persistence.enabled Enable persistence using Persistent Volume Claims
       ##
       enabled: false
-      ## `data` volumen settings
+      ## `data` volume settings
       ##
       data:
         ## @param clickhouse[*].persistence.data.storageClassName Storage class of backing PVC
@@ -95,7 +95,7 @@ clickhouse:
   #     ## @param clickhouse[*].persistence.enabled Enable persistence using Persistent Volume Claims
   #     ##
   #     enabled: false
-  #     ## `data` volumen settings
+  #     ## `data` volume settings
   #     ##
   #     data:
   #       ## @param clickhouse[*].persistence.data.storageClassName Storage class of backing PVC

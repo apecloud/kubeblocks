@@ -159,7 +159,7 @@ spec:
                     componentDefRef:
                       description: ComponentDefRef reference componentDef defined
                         in ClusterDefinition spec.
-                      maxLength: 18
+                      maxLength: 63
                       pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                       type: string
                     enabledLogs:
@@ -219,7 +219,7 @@ spec:
                       type: boolean
                     name:
                       description: name defines cluster's component name.
-                      maxLength: 12
+                      maxLength: 15
                       pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                       type: string
                     primaryIndex:

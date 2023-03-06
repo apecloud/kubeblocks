@@ -920,6 +920,35 @@ prometheus:
                 summary: "Redis replication broken"
                 description: "Redis instance lost a slave. (instance: {{ $labels.pod }})"
 
+    kafka_alert_rules.yaml: |-
+      group:
+        - name: KafkaExporter
+          rules:
+            - alert: KafkaTopicsReplicas
+                expr: sum(kafka_topic_partition_in_sync_replica) by (topic) < 3
+                for: 0m
+                labels:
+                  severity: critical
+                annotations:
+                  summary: Kafka topics replicas (instance {{ $labels.app_kubernetes_io_instance }})
+                  description: "Kafka topic in-sync partition\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+            - alert: KafkaConsumersGroup
+                expr: sum(kafka_consumergroup_lag) by (consumergroup) > 50
+                for: 1m
+                labels:
+                  severity: critical
+                annotations:
+                  summary: Kafka consumers group (instance {{ $labels.app_kubernetes_io_instance }})
+                  description: "Kafka consumers group\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+            - alert: KafkaBrokerDown
+                expr: kafka_brokers < 3
+                for: 0m
+                labels:
+                  severity: critical
+                annotations:
+                  Summary: "Kafka broker *{{ $labels.app_kubernetes_io_instance }}* alert status"
+                  description: "One of the Kafka broker *{{ $labels.app_kubernetes_io_instance }}* is down."
+
   serverFiles:
     prometheus.yml:
       rule_files:
@@ -929,6 +958,7 @@ prometheus:
         - /etc/config/mysql_alert_rules.yml
         - /etc/config/postgresql_alert_rules.yml
         - /etc/config/redis_alert_rules.yml
+        - /etc/config/kafka_alert_rules.yml
 
       scrape_configs:
         - job_name: prometheus

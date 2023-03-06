@@ -94,7 +94,7 @@ func (r *StatefulSetReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		return intctrlutil.Reconciled()
 	}
 	compCtx := newComponentContext(reqCtx, r.Client, r.Recorder, component, sts, componentSpec)
-	reqCtx.Log.Info("before updateComponentStatusInClusterStatus",
+	reqCtx.Log.V(1).Info("before updateComponentStatusInClusterStatus",
 		"generation", sts.Generation, "observed generation", sts.Status.ObservedGeneration,
 		"replicas", sts.Status.Replicas)
 	if requeueAfter, err := updateComponentStatusInClusterStatus(compCtx, cluster); err != nil {

@@ -1,0 +1,20 @@
+{{- if .Values.kafkaServer.replicaCount }}
+  {{- if gt (int .Values.kafkaServer.replicaCount) 3 }}
+    {{ fail "kafka-server cluster does not support running replicas greater than 3." }}
+  {{- end }}
+  {{- if ne (mod (int .Values.kafkaServer.replicaCount) 2) 1 }}
+    {{ fail "kafka-server cluster does not support running with even number replicas." }}
+  {{- end }}
+{{- end }}
+{{- if .Values.kafkaController.replicaCount }}
+  {{- if gt (int .Values.kafkaController.replicaCount) 3 }}
+    {{ fail "kafka-controller cluster does not support running replicas greater than 3." }}
+  {{- end }}
+  {{- if ne (mod (int .Values.kafkaController.replicaCount) 2) 1 }}
+    {{ fail "kafka-controller cluster does not support running with even number replicas." }}
+  {{- end }}
+{{- end }}
+
+{{- if and ( ne .Values.mode "combined" ) ( ne .Values.mode "separated" ) }}
+  {{ fail "'mode' value should either 'combined' or 'separated'." }}
+{{- end }}

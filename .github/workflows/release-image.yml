@@ -14,55 +14,35 @@ on:
       - published
 
 env:
-  GO_VERSION: '1.19'
-  DOCKER_REGISTRY_URL: docker.io
-  ALIYUN_REGISTRY_URL: registry.cn-hangzhou.aliyuncs.com
   RELEASE_VERSION: ${{ github.ref_name }}
 
 
 jobs:
-  release-image:
+  image-tag:
     runs-on: ubuntu-latest
+    outputs:
+      tag-name: ${{ steps.get_tag_name.outputs.tag_name }}
     steps:
-      - name: Setup Go
-        uses: actions/setup-go@v3
-        with:
-          go-version: ${{ env.GO_VERSION }}
-
-      - name: Check out code
-        uses: actions/checkout@v3
-        with:
-          submodules: true
-
-      - name: make generate
-        run: make generate
-
-      - uses: docker/setup-qemu-action@v2
-      - uses: docker/setup-buildx-action@v2
-        with:
-          driver-opts: image=moby/buildkit:master
-
-      - name: make push-manager-image
+      - name: Get Tag Name
+        id: get_tag_name
         run: |
-          RELEASE_VERSION="latest"
-          if [[ ! -z "${{ github.event.inputs.image_tag }}" ]]; then
-            RELEASE_VERSION="${{ github.event.inputs.image_tag }}"
+          TAG_NAME="latest"
+          if [[ ! -z "${{ inputs.image_tag }}" ]]; then
+            TAG_NAME="${{ inputs.image_tag }}"
           elif [[ "${{ env.RELEASE_VERSION }}" == "main" ]]; then
-            RELEASE_VERSION="latest"
+            TAG_NAME="latest"
           elif [[ ! -z "${{ env.RELEASE_VERSION }}" ]]; then
-            RELEASE_VERSION=`bash ${{ github.workspace }}/.github/utils/utils.sh \
-              --tag-name ${{ env.RELEASE_VERSION }} \
-              --type 1`
+            TAG_NAME=${{ env.RELEASE_VERSION }}
           fi
-          
-          docker login --username ${{ secrets.DOCKER_REGISTRY_USER }} \
-            --password ${{ secrets.DOCKER_REGISTRY_PASSWORD }} ${{ env.DOCKER_REGISTRY_URL }}
-          
-          BUILDX_ARGS="--sbom=false --provenance=false" BUILDX_ENABLED=true VERSION=$RELEASE_VERSION make push-manager-image
-          
-          docker login --username ${{ secrets.ALIYUN_REGISTRY_USER }} \
-            --password ${{ secrets.ALIYUN_REGISTRY_PASSWORD }} ${{ env.ALIYUN_REGISTRY_URL }}
-          
-          BUILDX_ENABLED=true VERSION=$RELEASE_VERSION BUILDX_ARGS="--sbom=false --provenance=false" \
-            IMG=${{ env.ALIYUN_REGISTRY_URL }}/apecloud/kubeblocks \
-            make push-manager-image
+          echo tag_name=$TAG_NAME >> $GITHUB_OUTPUT
+
+  release-image:
+    needs: image-tag
+    uses: apecloud/apecd/.github/workflows/release-image.yml@v0.2.0
+    with:
+      MAKE_OPS_PRE: "generate"
+      MAKE_OPS: "push-manager-image"
+      IMG: "apecloud/kubeblocks"
+      VERSION: "${{ needs.image-tag.outputs.tag-name }}"
+      GO_VERSION: 1.19
+    secrets: inherit

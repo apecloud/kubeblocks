@@ -71,7 +71,7 @@ spec:
           
         containers:
           - name: kafka
-            image: docker.io/bitnami/kafka:3.4.0-debian-11-r2
+            image: docker.io/bitnami/kafka:3.4.0-debian-11-r8
             imagePullPolicy: {{ default "IfNotPresent" .Values.images.pullPolicy }}
             securityContext:
               allowPrivilegeEscalation: false
@@ -190,7 +190,7 @@ spec:
                 subPath: server.properties
 
           - name: jmx-exporter
-            image: docker.io/bitnami/jmx-exporter:0.17.2-debian-11-r49
+            image: docker.io/bitnami/jmx-exporter:0.17.2-debian-11-r55
             imagePullPolicy: {{ default "IfNotPresent" .Values.images.pullPolicy }}
             securityContext:
               runAsNonRoot: true
@@ -256,7 +256,7 @@ spec:
           
         containers:
           - name: kafka
-            image: docker.io/bitnami/kafka:3.4.0-debian-11-r2
+            image: docker.io/bitnami/kafka:3.4.0-debian-11-r8
             imagePullPolicy: {{ default "IfNotPresent" .Values.images.pullPolicy }}
             securityContext:
               allowPrivilegeEscalation: false
@@ -360,7 +360,7 @@ spec:
                 subPath: kafka-env.sh
 
           - name: jmx-exporter
-            image: docker.io/bitnami/jmx-exporter:0.17.2-debian-11-r49
+            image: docker.io/bitnami/jmx-exporter:0.17.2-debian-11-r55
             imagePullPolicy: {{ default "IfNotPresent" .Values.images.pullPolicy }}
             securityContext:
               runAsNonRoot: true
@@ -424,7 +424,7 @@ spec:
           
         containers:
           - name: kafka
-            image: docker.io/bitnami/kafka:3.4.0-debian-11-r2
+            image: docker.io/bitnami/kafka:3.4.0-debian-11-r8
             imagePullPolicy: {{ default "IfNotPresent" .Values.images.pullPolicy }}
             securityContext:
               allowPrivilegeEscalation: false
@@ -526,7 +526,7 @@ spec:
                 subPath: server.properties
 
           - name: jmx-exporter
-            image: docker.io/bitnami/jmx-exporter:0.17.2-debian-11-r49
+            image: docker.io/bitnami/jmx-exporter:0.17.2-debian-11-r55
             imagePullPolicy: {{ default "IfNotPresent" .Values.images.pullPolicy }}
             securityContext:
               runAsNonRoot: true
@@ -572,7 +572,7 @@ spec:
           fsGroup: 1001
         containers:
           - name: kafka-exporter
-            image: docker.io/bitnami/kafka-exporter:1.6.0-debian-11-r61
+            image: docker.io/bitnami/kafka-exporter:1.6.0-debian-11-r67
             imagePullPolicy: {{ default .Values.images.pullPolicy "IfNotPresent" }}
             securityContext:
               runAsNonRoot: true

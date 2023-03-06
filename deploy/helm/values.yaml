@@ -1230,7 +1230,7 @@ grafana:
   defaultDashboardsTimezone:
 
   adminUser: admin
-  adminPassword: abc
+  adminPassword: kubeblocks
 
   sidecar:
     image:

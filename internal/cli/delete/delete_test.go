@@ -64,7 +64,7 @@ var _ = Describe("Delete", func() {
 		pods, _, _ := cmdtesting.TestData()
 		tf := mockClient(pods)
 		streams, in, _, _ := genericclioptions.NewTestIOStreams()
-		o := NewDeleteOptions(tf, streams, schema.GroupVersionResource{Resource: "pods", Version: types.VersionV1})
+		o := NewDeleteOptions(tf, streams, schema.GroupVersionResource{Resource: "pods", Version: types.K8sCoreAPIVersion})
 
 		By("set force and GracePeriod")
 		o.Force = true
@@ -91,7 +91,7 @@ var _ = Describe("Delete", func() {
 		pods, _, _ := cmdtesting.TestData()
 		tf := mockClient(pods)
 		streams, in, _, _ := genericclioptions.NewTestIOStreams()
-		o := NewDeleteOptions(tf, streams, schema.GroupVersionResource{Resource: "pods", Version: types.VersionV1})
+		o := NewDeleteOptions(tf, streams, schema.GroupVersionResource{Resource: "pods", Version: types.K8sCoreAPIVersion})
 		cmd := buildTestCmd(o)
 		Expect(cmd).ShouldNot(BeNil())
 

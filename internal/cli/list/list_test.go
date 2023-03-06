@@ -43,7 +43,7 @@ var _ = Describe("List", func() {
 	buf := new(bytes.Buffer)
 
 	buildTestCmd := func(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
-		o := NewListOptions(f, streams, schema.GroupVersionResource{Group: "", Resource: "pods", Version: types.VersionV1})
+		o := NewListOptions(f, streams, schema.GroupVersionResource{Group: "", Resource: "pods", Version: types.K8sCoreAPIVersion})
 		cmd := &cobra.Command{
 			Use:   "ls-test",
 			Short: "List test",

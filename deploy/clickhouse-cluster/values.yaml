@@ -48,7 +48,7 @@ clickhouse:
       ## @param clickhouse[*].persistence.enabled Enable persistence using Persistent Volume Claims
       ##
       enabled: false
-      ## `data` volumen settings
+      ## `data` volume settings
       ##
       data:
         ## @param clickhouse[*].persistence.data.storageClassName Storage class of backing PVC
@@ -95,7 +95,7 @@ clickhouse:
   #     ## @param clickhouse[*].persistence.enabled Enable persistence using Persistent Volume Claims
   #     ##
   #     enabled: false
-  #     ## `data` volumen settings
+  #     ## `data` volume settings
   #     ##
   #     data:
   #       ## @param clickhouse[*].persistence.data.storageClassName Storage class of backing PVC

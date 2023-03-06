@@ -113,6 +113,8 @@ spec:
                 value: "5555"
               - name: KAFKA_VOLUME_DIR
                 value: "/bitnami/kafka"
+              - name: KAFKA_CFG_METADATA_LOG_DIR
+                value: "/bitnami/kafka/metadata"
               - name: KAFKA_CFG_LOG_DIRS
                 value: "/bitnami/kafka/data"
               - name: KAFKA_LOG_DIR
@@ -174,6 +176,8 @@ spec:
               tcpSocket:
                 port: kafka-ctrlr
             volumeMounts:
+              - name: metadadata
+                mountPath: /bitnami/kafka/metadata
               - name: data
                 mountPath: /bitnami/kafka
               - name: logs
@@ -288,10 +292,10 @@ spec:
                 value: "5555"
               - name: KAFKA_VOLUME_DIR
                 value: "/bitnami/kafka"
+              - name: KAFKA_CFG_METADATA_LOG_DIR
+                value: "/bitnami/kafka/metadata"
               # - name: KAFKA_CFG_LOG_DIRS
               #   value: "/bitnami/kafka/data"
-              - name: KAFKA_CFG_METADATA_LOG_DIR
-                value: "/bitnami/kafka/data"
               - name: KAFKA_LOG_DIR
                 value: "/opt/bitnami/kafka/logs"
               # TODO: need to set node.id to pod's name suffix integer ID. This is required configuration when running
@@ -339,8 +343,10 @@ spec:
               tcpSocket:
                 port: kafka-ctrlr
             volumeMounts:
-              - name: data
-                mountPath: /bitnami/kafka
+              - name: metadadata
+                mountPath: /bitnami/kafka/metadata
+              # - name: data
+              #   mountPath: /bitnami/kafka
               - name: logs
                 mountPath: /opt/bitnami/kafka/logs
               - name: kafka-config

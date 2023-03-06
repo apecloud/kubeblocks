@@ -8,6 +8,66 @@ terminationPolicy: Halt
 ##
 mode: combined
 
+
+
+## Enable persistence using Persistent Volume Claims
+## ref: https://kubernetes.io/docs/user-guide/persistent-volumes/
+##
+## @param persistence.enabled Enable persistence using Persistent Volume Claims
+## @param persistence.data.size Size of data volume
+## @param persistence.data.storageClassName Storage class of backing PVC for data volume
+## @param persistence.log.size Size of log volume
+## @param persistence.log.storageClassName Storage class of backing PVC for log volume
+persistence:
+  ## @param persistence.enabled Enable persistence using Persistent Volume Claims
+  ##
+  enabled: true
+  ## `metadata` volume settings
+  ##
+  metadata:
+    ## @param persistence.data.storageClassName Storage class of backing PVC
+    ## If defined, storageClassName: <storageClass>
+    ## If set to "-", storageClassName: "", which disables dynamic provisioning
+    ## If undefined (the default) or set to null, no storageClassName spec is
+    ##   set, choosing the default provisioner.  (gp2 on AWS, standard on
+    ##   GKE, AWS & OpenStack)
+    ##
+    storageClassName: 
+    ## @param persistence.data.size Size of data volume
+    ##
+    size: 5Gi
+  ## `data` volume settings
+  ##
+  data:
+    ## @param persistence.data.storageClassName Storage class of backing PVC
+    ## If defined, storageClassName: <storageClass>
+    ## If set to "-", storageClassName: "", which disables dynamic provisioning
+    ## If undefined (the default) or set to null, no storageClassName spec is
+    ##   set, choosing the default provisioner.  (gp2 on AWS, standard on
+    ##   GKE, AWS & OpenStack)
+    ##
+    storageClassName: 
+    ## @param persistence.data.size Size of data volume
+    ##
+    size: 10Gi
+  ## `log` volume settings
+  ##
+  log:
+    ## @param persistence.log.enabled Enable persistence using Persistent Volume Claims
+    ##
+    enabled: false
+    ## @param persistence.log.storageClassName Storage class of backing PVC
+    ## If defined, storageClassName: <storageClass>
+    ## If set to "-", storageClassName: "", which disables dynamic provisioning
+    ## If undefined (the default) or set to null, no storageClassName spec is
+    ##   set, choosing the default provisioner.  (gp2 on AWS, standard on
+    ##   GKE, AWS & OpenStack)
+    ##
+    storageClassName: 
+    ## @param persistence.log.size Size of data volume
+    ##
+    size: 5Gi
+
 ## kafkaServer (kraft & broker) component settings.
 ##
 kafkaServer:
@@ -22,47 +82,6 @@ kafkaServer:
   ## @param resources.requests The requested resources for pod
   ##
   resources: {}
-
-  ## Enable persistence using Persistent Volume Claims
-  ## ref: https://kubernetes.io/docs/user-guide/persistent-volumes/
-  ##
-  ## @param persistence.enabled Enable persistence using Persistent Volume Claims
-  ## @param persistence.data.size Size of data volume
-  ## @param persistence.data.storageClassName Storage class of backing PVC for data volume
-  ## @param persistence.log.size Size of log volume
-  ## @param persistence.log.storageClassName Storage class of backing PVC for log volume
-  persistence:
-    ## @param persistence.enabled Enable persistence using Persistent Volume Claims
-    ##
-    enabled: true
-    ## `data` volumen settings
-    ##
-    data:
-      ## @param persistence.data.storageClassName Storage class of backing PVC
-      ## If defined, storageClassName: <storageClass>
-      ## If set to "-", storageClassName: "", which disables dynamic provisioning
-      ## If undefined (the default) or set to null, no storageClassName spec is
-      ##   set, choosing the default provisioner.  (gp2 on AWS, standard on
-      ##   GKE, AWS & OpenStack)
-      ##
-      storageClassName: 
-      ## @param persistence.data.size Size of data volume
-      ##
-      size: 10Gi
-    ## `log` volumen settings
-    ##
-    log:
-      ## @param persistence.log.storageClassName Storage class of backing PVC
-      ## If defined, storageClassName: <storageClass>
-      ## If set to "-", storageClassName: "", which disables dynamic provisioning
-      ## If undefined (the default) or set to null, no storageClassName spec is
-      ##   set, choosing the default provisioner.  (gp2 on AWS, standard on
-      ##   GKE, AWS & OpenStack)
-      ##
-      storageClassName: 
-      ## @param persistence.log.size Size of data volume
-      ##
-      size: 5Gi
 
 
 ## kafkaController (kraft) component settings.
@@ -80,46 +99,6 @@ kafkaController:
   ##
   resources: {}
 
-  ## Enable persistence using Persistent Volume Claims
-  ## ref: https://kubernetes.io/docs/user-guide/persistent-volumes/
-  ##
-  ## @param persistence.enabled Enable persistence using Persistent Volume Claims
-  ## @param persistence.data.size Size of data volume
-  ## @param persistence.data.storageClassName Storage class of backing PVC for data volume
-  ## @param persistence.log.size Size of log volume
-  ## @param persistence.log.storageClassName Storage class of backing PVC for log volume
-  persistence:
-    ## @param persistence.enabled Enable persistence using Persistent Volume Claims
-    ##
-    enabled: true
-    ## `data` volumen settings
-    ##
-    data:
-      ## @param persistence.data.storageClassName Storage class of backing PVC
-      ## If defined, storageClassName: <storageClass>
-      ## If set to "-", storageClassName: "", which disables dynamic provisioning
-      ## If undefined (the default) or set to null, no storageClassName spec is
-      ##   set, choosing the default provisioner.  (gp2 on AWS, standard on
-      ##   GKE, AWS & OpenStack)
-      ##
-      storageClassName: 
-      ## @param persistence.data.size Size of data volume
-      ##
-      size: 10Gi
-    ## `log` volumen settings
-    ##
-    log:
-      ## @param persistence.log.storageClassName Storage class of backing PVC
-      ## If defined, storageClassName: <storageClass>
-      ## If set to "-", storageClassName: "", which disables dynamic provisioning
-      ## If undefined (the default) or set to null, no storageClassName spec is
-      ##   set, choosing the default provisioner.  (gp2 on AWS, standard on
-      ##   GKE, AWS & OpenStack)
-      ##
-      storageClassName: 
-      ## @param persistence.log.size Size of data volume
-      ##
-      size: 5Gi
 
 ## kafkaBroker component settings.
 ##
@@ -136,46 +115,6 @@ kafkaBroker:
   ##
   resources: {}
 
-  ## Enable persistence using Persistent Volume Claims
-  ## ref: https://kubernetes.io/docs/user-guide/persistent-volumes/
-  ##
-  ## @param persistence.enabled Enable persistence using Persistent Volume Claims
-  ## @param persistence.data.size Size of data volume
-  ## @param persistence.data.storageClassName Storage class of backing PVC for data volume
-  ## @param persistence.log.size Size of log volume
-  ## @param persistence.log.storageClassName Storage class of backing PVC for log volume
-  persistence:
-    ## @param persistence.enabled Enable persistence using Persistent Volume Claims
-    ##
-    enabled: true
-    ## `data` volumen settings
-    ##
-    data:
-      ## @param persistence.data.storageClassName Storage class of backing PVC
-      ## If defined, storageClassName: <storageClass>
-      ## If set to "-", storageClassName: "", which disables dynamic provisioning
-      ## If undefined (the default) or set to null, no storageClassName spec is
-      ##   set, choosing the default provisioner.  (gp2 on AWS, standard on
-      ##   GKE, AWS & OpenStack)
-      ##
-      storageClassName: 
-      ## @param persistence.data.size Size of data volume
-      ##
-      size: 10Gi
-    ## `log` volumen settings
-    ##
-    log:
-      ## @param persistence.log.storageClassName Storage class of backing PVC
-      ## If defined, storageClassName: <storageClass>
-      ## If set to "-", storageClassName: "", which disables dynamic provisioning
-      ## If undefined (the default) or set to null, no storageClassName spec is
-      ##   set, choosing the default provisioner.  (gp2 on AWS, standard on
-      ##   GKE, AWS & OpenStack)
-      ##
-      storageClassName: 
-      ## @param persistence.log.size Size of data volume
-      ##
-      size: 5Gi
 
 ## Monitoring configurations
 ##

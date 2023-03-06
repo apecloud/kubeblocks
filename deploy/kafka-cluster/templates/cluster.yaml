@@ -33,9 +33,19 @@ spec:
           cpu: {{ .requests.cpu | quote }}
           memory: {{ .requests.memory | quote }}
       {{- end }}
-      {{- with $.Values.kafkaServer.persistence }}
+      {{- with $.Values.persistence }}
         {{- if .enabled }}
       volumeClaimTemplates:
+        - name: metadata 
+          spec:
+            {{- with .metadata.storageClassName }}
+            storageClassName: {{ . }}
+            {{- end }}
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: {{ .metadata.size }}
         - name: data 
           spec:
             {{- with .data.storageClassName }}
@@ -46,9 +56,10 @@ spec:
             resources:
               requests:
                 storage: {{ .data.size }}
+          {{- if .log.enabled }}
         - name: log 
           spec:
-            {{- with .data.storageClassName }}
+            {{- with .log.storageClassName }}
             storageClassName: {{ . }}
             {{- end }}
             accessModes:
@@ -56,6 +67,7 @@ spec:
             resources:
               requests:
                 storage: {{ .log.size }}
+          {{- end }}
         {{- end }}
       {{- end }}
     {{- else }}
@@ -76,22 +88,23 @@ spec:
           cpu: {{ .requests.cpu | quote }}
           memory: {{ .requests.memory | quote }}
       {{- end }}
-      {{- with $.Values.kafkaController.persistence }}
+      {{- with $.Values.persistence }}
         {{- if .enabled }}
       volumeClaimTemplates:
-        - name: data 
+        - name: metadata 
           spec:
-            {{- with .data.storageClassName }}
+            {{- with .metadata.storageClassName }}
             storageClassName: {{ . }}
             {{- end }}
             accessModes:
               - ReadWriteOnce
             resources:
               requests:
-                storage: {{ .data.size }}
+                storage: {{ .metadata.size }}
+          {{- if .log.enabled }}
         - name: log 
           spec:
-            {{- with .data.storageClassName }}
+            {{- with .log.storageClassName }}
             storageClassName: {{ . }}
             {{- end }}
             accessModes:
@@ -99,6 +112,7 @@ spec:
             resources:
               requests:
                 storage: {{ .log.size }}
+          {{- end }}
         {{- end }}
       {{- end }}
     - name: kafka-broker
@@ -118,7 +132,7 @@ spec:
           cpu: {{ .requests.cpu | quote }}
           memory: {{ .requests.memory | quote }}
       {{- end }}
-      {{- with $.Values.kafkaBroker.persistence }}
+      {{- with $.Values.persistence }}
         {{- if .enabled }}
       volumeClaimTemplates:
         - name: data 
@@ -131,9 +145,10 @@ spec:
             resources:
               requests:
                 storage: {{ .data.size }}
+          {{- if .log.enabled }}
         - name: log 
           spec:
-            {{- with .data.storageClassName }}
+            {{- with .log.storageClassName }}
             storageClassName: {{ . }}
             {{- end }}
             accessModes:
@@ -141,6 +156,7 @@ spec:
             resources:
               requests:
                 storage: {{ .log.size }}
+          {{- end }}
         {{- end }}
       {{- end }}
     {{- end }}

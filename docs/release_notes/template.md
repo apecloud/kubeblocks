@@ -81,9 +81,9 @@ To upgrade to this release of KubeBlocks, follow the steps here to ensure a smoo
 Release Notes for `v0.3.0`:
 - Rename CRD name `backupjobs.dataprotection.kubeblocks.io` to `backups.dataprotection.kubeblocks.io`
   - upgrade KubeBlocks with the following command:
-      ```
-      helm upgrade --install kubeblocks kubeblocks/kubeblocks --version 0.3.0
-      ```
+    ```
+    helm upgrade --install kubeblocks kubeblocks/kubeblocks --version 0.3.0
+    ```
   - after you upgrade KubeBlocks, check CRD `backupjobs.dataprotection.kubeblocks.io` and delete it
     ```
     kubectl delete crd backupjobs.dataprotection.kubeblocks.io
@@ -106,6 +106,17 @@ Release Notes for `v0.3.0`:
       ```
 - Rename group name `dbaas.kubeblocks.io` to `apps.kubeblocks.io`
     - upgrade kubeblocks to create new CRDs, after that, you can delete the CRDs with group name`dbaas.kubeblocks.io`
+
 ## Breaking Changes
 
 $kubeblocks_breaking_changes
+* Refactored the use of labels. Existing clusters or config need to manually update their labels to ensure proper functionality. The following are specific changes:
+  - Pods of `statefulset` and `deployment`
+    - Replace label name from `app.kubernetes.io/component-name` to `apps.kubeblocks.io/component-name`
+    - Replace label name from `app.kubeblocks.io/workload-type` to `apps.kubeblocks.io/workload-type`
+    - Add label `app.kubernetes.io/version` with value `Cluster.Spec.ClusterVersionRef`
+    - Add label `app.kubernetes.io/component` with value `Cluster.Spec.ComponentSpecs.ComponentDefRef`
+  - CR `backuppolicytemplate`
+    - Replace label name from `app.kubernetes.io/created-by` to `app.kubernetes.io/managed-by`
+  - Configmap hosted by Kubeblocks and named with `*-env` suffix
+    - Replace label name from `app.kubernetes.io/config-type` to `apps.kubeblocks.io/config-type`

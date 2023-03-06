@@ -3,8 +3,8 @@ kind: Cluster
 metadata:
   name: snapshot-mycluster
 spec:
-  clusterDefinitionRef: apecloud-mysql
-  clusterVersionRef: ac-mysql-8.0.30
+  clusterDefinitionRef: postgresql
+  clusterVersionRef: postgresql-14.6.0
   terminationPolicy: WipeOut
   affinity:
     topologyKeys:

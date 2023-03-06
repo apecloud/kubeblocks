@@ -1,4 +1,4 @@
-apiVersion: apps.kubeblocks.io/v1alpha1
+apiVersion: dataprotection.kubeblocks.io/v1alpha1
 kind: BackupPolicy
 metadata:
   name: backup-policy-mycluster
@@ -15,12 +15,10 @@ spec:
       claimName: backup-host-path-pvc
   schedule: 0 3 * * *
   target:
-    databaseEngine: mysql
     labelsSelector:
       matchLabels:
         app.kubernetes.io/instance: mycluster
     secret:
       name: mycluster-conn-credential
   ttl: 168h0m0s
-
 

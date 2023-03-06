@@ -18,10 +18,12 @@ package operations
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"sort"
 	"strings"
 
+	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -32,56 +34,12 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
+	ctlcomponent "github.com/apecloud/kubeblocks/internal/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
-
-// byBackupCompletionTime sorts a list of jobs by completion timestamp, using their names as a tie breaker.
-type byBackupCompletionTime []dpv1alpha1.Backup
-
-// Len return the length of byBackupCompletionTime, for the sort.Sort
-func (o byBackupCompletionTime) Len() int { return len(o) }
-
-// Swap the items, for the sort.Sort
-func (o byBackupCompletionTime) Swap(i, j int) { o[i], o[j] = o[j], o[i] }
-
-// Less define how to compare items, for the sort.Sort
-func (o byBackupCompletionTime) Less(i, j int) bool {
-	if o[i].Status.CompletionTimestamp == nil && o[j].Status.CompletionTimestamp != nil {
-		return false
-	}
-	if o[i].Status.CompletionTimestamp != nil && o[j].Status.CompletionTimestamp == nil {
-		return true
-	}
-	if o[i].Status.CompletionTimestamp.Equal(o[j].Status.CompletionTimestamp) {
-		return o[i].Name < o[j].Name
-	}
-	return o[i].Status.CompletionTimestamp.Before(o[j].Status.CompletionTimestamp)
-}
-
-// byBackupCompletionTimeReverse reverse sorts a list of jobs by completion timestamp, using their names as a tie breaker.
-type byBackupCompletionTimeReverse []dpv1alpha1.Backup
-
-// Len return the length of byBackupCompletionTimeReverse, for the sort.Sort
-func (o byBackupCompletionTimeReverse) Len() int { return len(o) }
-
-// Swap the items, for the sort.Sort
-func (o byBackupCompletionTimeReverse) Swap(i, j int) { o[i], o[j] = o[j], o[i] }
-
-// Less define how to compare items, for the sort.Sort
-func (o byBackupCompletionTimeReverse) Less(i, j int) bool {
-	if o[j].Status.CompletionTimestamp == nil && o[i].Status.CompletionTimestamp != nil {
-		return false
-	}
-	if o[j].Status.CompletionTimestamp != nil && o[i].Status.CompletionTimestamp == nil {
-		return true
-	}
-	if o[j].Status.CompletionTimestamp.Equal(o[i].Status.CompletionTimestamp) {
-		return o[j].Name < o[i].Name
-	}
-	return o[j].Status.CompletionTimestamp.Before(o[i].Status.CompletionTimestamp)
-}
 
 // PointInTimeRecoveryManager  pitr manager functions
 // 1. get latestBaseBackup
@@ -128,7 +86,18 @@ func (p *PointInTimeRecoveryManager) getSortedBackups() ([]dpv1alpha1.Backup, er
 	if err != nil {
 		return backups, err
 	}
-	sort.Sort(byBackupCompletionTime(backups))
+	sort.Slice(backups, func(i, j int) bool {
+		if backups[i].Status.CompletionTimestamp == nil && backups[j].Status.CompletionTimestamp != nil {
+			return false
+		}
+		if backups[i].Status.CompletionTimestamp != nil && backups[j].Status.CompletionTimestamp == nil {
+			return true
+		}
+		if backups[i].Status.CompletionTimestamp.Equal(backups[j].Status.CompletionTimestamp) {
+			return backups[i].Name < backups[j].Name
+		}
+		return backups[i].Status.CompletionTimestamp.Before(backups[j].Status.CompletionTimestamp)
+	})
 	return backups, nil
 }
 
@@ -138,7 +107,18 @@ func (p *PointInTimeRecoveryManager) getReverseSortedBackups() ([]dpv1alpha1.Bac
 	if err != nil {
 		return backups, err
 	}
-	sort.Sort(byBackupCompletionTimeReverse(backups))
+	sort.Slice(backups, func(i, j int) bool {
+		if backups[j].Status.CompletionTimestamp == nil && backups[i].Status.CompletionTimestamp != nil {
+			return false
+		}
+		if backups[j].Status.CompletionTimestamp != nil && backups[i].Status.CompletionTimestamp == nil {
+			return true
+		}
+		if backups[j].Status.CompletionTimestamp.Equal(backups[i].Status.CompletionTimestamp) {
+			return backups[j].Name < backups[i].Name
+		}
+		return backups[j].Status.CompletionTimestamp.Before(backups[i].Status.CompletionTimestamp)
+	})
 
 	return backups, nil
 }
@@ -247,12 +227,6 @@ func (p *PointInTimeRecoveryManager) getRecoveryInfo() (*dpv1alpha1.BackupPointI
 }
 
 func (p *PointInTimeRecoveryManager) runScriptsJob() error {
-	// build volumes from datasource
-	baseBackup, err := p.getLatestBaseBackup()
-	if err != nil {
-		return err
-	}
-
 	for _, component := range p.Cluster.Spec.ComponentSpecs {
 		if len(component.VolumeClaimTemplates) == 0 {
 			continue
@@ -263,14 +237,24 @@ func (p *PointInTimeRecoveryManager) runScriptsJob() error {
 		vct.Name = component.VolumeClaimTemplates[0].Name
 		vct.Spec = *(component.VolumeClaimTemplates[0].Spec)
 
-		dataPVCName := fmt.Sprintf("data-%s-%s-0", p.Cluster.Name, component.Name)
-		dataPVCKey := types.NamespacedName{
-			Namespace: p.namespace,
-			Name:      dataPVCName,
+		// get data dir pvc name
+		dataPVCList := corev1.PersistentVolumeClaimList{}
+		dataPVCLabels := map[string]string{
+			constant.AppInstanceLabelKey:             p.Cluster.Name,
+			constant.KBAppComponentLabelKey:          component.Name,
+			constant.VolumeClaimTemplateNameLabelKey: "data",
 		}
-		dataPVC, err := builder.BuildPVCFromSnapshot(sts, vct, dataPVCKey, baseBackup.Name)
-		if err != nil {
+		if err := p.Client.List(p.Ctx, &dataPVCList,
+			client.InNamespace(p.namespace),
+			client.MatchingLabels(dataPVCLabels)); err != nil {
 			return err
+		}
+		if len(dataPVCList.Items) == 0 {
+			return fmt.Errorf("not found data pvc")
+		}
+		dataPVC := dataPVCList.Items[0]
+		if dataPVC.Status.Phase != corev1.ClaimBound {
+			return fmt.Errorf("waiting PVC Bound")
 		}
 
 		nextBackup, err := p.getNextBackup()
@@ -291,7 +275,7 @@ func (p *PointInTimeRecoveryManager) runScriptsJob() error {
 		}
 		volumes := []corev1.Volume{
 			{Name: "data", VolumeSource: corev1.VolumeSource{
-				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: dataPVCName}}},
+				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: dataPVC.Name}}},
 			{Name: "log", VolumeSource: corev1.VolumeSource{
 				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: pitrPVCName}}},
 		}
@@ -317,10 +301,6 @@ func (p *PointInTimeRecoveryManager) runScriptsJob() error {
 		p.resourceObjs = append(p.resourceObjs, pitrPVC)
 		p.resourceObjs = append(p.resourceObjs, job)
 
-		err = p.Client.Create(p.Ctx, dataPVC)
-		if err != nil && !apierrors.IsAlreadyExists(err) {
-			return err
-		}
 		err = p.Client.Create(p.Ctx, pitrPVC)
 		if err != nil && !apierrors.IsAlreadyExists(err) {
 			return err
@@ -372,16 +352,18 @@ func (p *PointInTimeRecoveryManager) ensureScriptsJobDone() bool {
 }
 
 func (p *PointInTimeRecoveryManager) cleanupScriptsJob() error {
-	for _, obj := range p.resourceObjs {
-		if err := intctrlutil.BackgroundDeleteObject(p.Client, p.Ctx, obj); err != nil {
-			return err
+	if p.Cluster.Status.Phase == appsv1alpha1.RunningPhase {
+		for _, obj := range p.resourceObjs {
+			if err := intctrlutil.BackgroundDeleteObject(p.Client, p.Ctx, obj); err != nil {
+				return err
+			}
 		}
 	}
 	return nil
 }
 
-// DoPrepare prepare data before point in time recovery
-func (p *PointInTimeRecoveryManager) DoPrepare(cluster *appsv1alpha1.Cluster) (shouldRequeue bool, err error) {
+// DoRecoveryJob prepare data before point in time recovery
+func (p *PointInTimeRecoveryManager) DoRecoveryJob(cluster *appsv1alpha1.Cluster) (shouldRequeue bool, err error) {
 	shouldRequeue = false
 	if required, err := p.checkAndInit(cluster); err != nil {
 		return shouldRequeue, err
@@ -390,7 +372,10 @@ func (p *PointInTimeRecoveryManager) DoPrepare(cluster *appsv1alpha1.Cluster) (s
 	}
 
 	// mount the data+log pvc, and run scripts job to prepare data
-	if err := p.runScriptsJob(); err != nil {
+	if err = p.runScriptsJob(); err != nil {
+		if err.Error() == "waiting PVC Bound" {
+			return true, nil
+		}
 		return shouldRequeue, err
 	}
 
@@ -399,12 +384,140 @@ func (p *PointInTimeRecoveryManager) DoPrepare(cluster *appsv1alpha1.Cluster) (s
 		return true, nil
 	}
 
+	// remove init container
+	for _, componentSpec := range p.Cluster.Spec.ComponentSpecs {
+		if err = p.removeStsInitContainer(p.Cluster, componentSpec.Name); err != nil {
+			return shouldRequeue, err
+		}
+	}
+
 	// clean up job
 	if err != p.cleanupScriptsJob() {
 		return shouldRequeue, nil
 	}
 
+	// clean annotations restore in cluster
+	if err != p.cleanupClusterAnnotations() {
+		return shouldRequeue, nil
+	}
+
+	// rollback cluster status to creating
+	if err != p.rollbackClusterConfigMaps() {
+		return shouldRequeue, nil
+	}
+
 	return shouldRequeue, nil
+
+}
+
+// cleanupClusterAnnotations cleans up the cluster annotations after cluster is Running.
+func (p *PointInTimeRecoveryManager) cleanupClusterAnnotations() error {
+	cluster := p.Cluster
+	if cluster.Status.Phase != appsv1alpha1.RunningPhase {
+		return nil
+	}
+	patch := client.MergeFrom(cluster.DeepCopy())
+	delete(cluster.Annotations, "restore-from-time")
+	delete(cluster.Annotations, "restore-from-cluster")
+
+	return p.Client.Patch(p.Ctx, cluster, patch)
+}
+
+// rollbackClusterStatusToCreating rollback the cluster status to creating after cluster is Running.
+func (p *PointInTimeRecoveryManager) rollbackClusterConfigMaps() error {
+	cluster := p.Cluster
+	if cluster.Status.Phase != appsv1alpha1.RunningPhase {
+		return nil
+	}
+	cmList := corev1.ConfigMapList{}
+	cmLabels := map[string]string{
+		constant.AppInstanceLabelKey: p.Cluster.Name,
+	}
+	if err := p.Client.List(p.Ctx, &cmList,
+		client.InNamespace(p.namespace),
+		client.MatchingLabels(cmLabels)); err != nil {
+		return err
+	}
+	for _, cm := range cmList.Items {
+		patch := client.MergeFrom(cm.DeepCopy())
+		if cm.Annotations == nil {
+			continue
+		}
+		val, ok := cm.Annotations["original-data"]
+		if !ok {
+			continue
+		}
+		delete(cm.Annotations, "original-data")
+		originalData := map[string]string{}
+		if err := json.Unmarshal([]byte(val), &originalData); err != nil {
+			return err
+		}
+		for k, v := range originalData {
+			cm.Data[k] = v
+		}
+		if err := p.Client.Patch(p.Ctx, &cm, patch); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// DoPrepare prepare init container and pvc before point in time recovery
+func (p *PointInTimeRecoveryManager) DoPrepare(cluster *appsv1alpha1.Cluster, component *ctlcomponent.SynthesizedComponent) error {
+	if required, err := p.checkAndInit(cluster); err != nil {
+		return err
+	} else if !required {
+		return nil
+	}
+	// prepare init container
+	container := corev1.Container{}
+	container.Name = "pitr"
+	container.Image = "registry.cn-hangzhou.aliyuncs.com/google_containers/pause:3.6"
+	component.PodSpec.InitContainers = append(component.PodSpec.InitContainers, container)
+
+	// prepare data pvc
+	if len(component.VolumeClaimTemplates) == 0 {
+		return fmt.Errorf("not found data pvc")
+	}
+	latestBackup, err := p.getLatestBaseBackup()
+	if err != nil {
+		return err
+	}
+
+	vct := component.VolumeClaimTemplates[0]
+	snapshotAPIGroup := snapshotv1.GroupName
+	vct.Spec.DataSource = &corev1.TypedLocalObjectReference{
+		APIGroup: &snapshotAPIGroup,
+		Kind:     constant.VolumeSnapshotKind,
+		Name:     latestBackup.Name,
+	}
+	component.VolumeClaimTemplates[0] = vct
+	return nil
+}
+
+// removeStsInitContainerForRestore removes the statefulSet's init container which restores data from backup.
+func (p *PointInTimeRecoveryManager) removeStsInitContainer(
+	cluster *appsv1alpha1.Cluster,
+	componentName string) error {
+	// get the sts list of component
+	stsList := &appsv1.StatefulSetList{}
+	if err := util.GetObjectListByComponentName(p.Ctx, p.Client, cluster, stsList, componentName); err != nil {
+		return err
+	}
+	for _, sts := range stsList.Items {
+		initContainers := sts.Spec.Template.Spec.InitContainers
+		updateInitContainers := make([]corev1.Container, 0)
+		for _, c := range initContainers {
+			if c.Name != "pitr" {
+				updateInitContainers = append(updateInitContainers, c)
+			}
+		}
+		sts.Spec.Template.Spec.InitContainers = updateInitContainers
+		if err := p.Client.Update(p.Ctx, &sts); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // MergeConfigMap to merge from config when recovery to point time from cluster.
@@ -425,6 +538,11 @@ func (p *PointInTimeRecoveryManager) MergeConfigMap(configMap *corev1.ConfigMap)
 	timeFormat := recoveryInfo.Config["timeFormat"]
 	for key, val := range pitrConfigMap {
 		if v, ok := configMap.Data[key]; ok {
+			if configMap.Annotations == nil {
+				configMap.Annotations = map[string]string{}
+			}
+			originDataBytes, _ := json.Marshal(map[string]string{key: configMap.Data[key]})
+			configMap.Annotations["original-data"] = string(originDataBytes)
 			restoreTimeStr := p.restoreTime.Time.UTC().Format(timeFormat)
 			pitrConfigMap[key] = strings.Replace(val, "$KB_RECOVERY_TIME", restoreTimeStr, 1)
 			// append pitr config map into cluster config

@@ -21,7 +21,7 @@ job: {
 				volumes: [...]
 				restartPolicy: "OnFailure"
 				securityContext:
-				  runAsUser: 0
+					runAsUser: 0
 			}
 		}
 	}

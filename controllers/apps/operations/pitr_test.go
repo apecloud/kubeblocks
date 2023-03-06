@@ -29,7 +29,8 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/constant"
+	"github.com/apecloud/kubeblocks/internal/controller/component"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 )
 
@@ -54,12 +55,6 @@ var _ = Describe("PITR Functions", func() {
 
 		// delete cluster(and all dependent sub-resources), clusterversion and clusterdef
 		testapps.ClearClusterResources(&testCtx)
-
-		// delete rest resources
-		inNS := client.InNamespace(testCtx.DefaultNamespace)
-		ml := client.HasLabels{testCtx.TestObjLabelKey}
-		// namespaced
-		testapps.ClearResources(&testCtx, intctrlutil.OpsRequestSignature, inNS, ml)
 	}
 
 	BeforeEach(cleanEnv)
@@ -69,10 +64,11 @@ var _ = Describe("PITR Functions", func() {
 	Context("Test PITR", func() {
 		var pitrClient PointInTimeRecoveryManager
 		var cluster *appsv1alpha1.Cluster
+		var clusterDef *appsv1alpha1.ClusterDefinition
 
 		BeforeEach(func() {
 			By("init operations resources ")
-			_, _, cluster = initOperationsResources(clusterDefinitionName, clusterVersionName, clusterName)
+			_, clusterDef, cluster = initOperationsResources(clusterDefinitionName, clusterVersionName, clusterName)
 
 			pitrClient = PointInTimeRecoveryManager{
 				Client:  k8sClient,
@@ -130,37 +126,15 @@ var _ = Describe("PITR Functions", func() {
 				"restore-from-time":    metav1.Now().Format(time.RFC3339),
 				"restore-from-cluster": sourceCluster,
 			})
-			Expect(pitrClient.DoPrepare(cluster)).Should(Succeed())
-			/*
-				By("mock cluster annotations for start opsRequest")
-				// mock snapshot annotation for cluster
-				componentReplicasMap := map[string]int32{}
-				for _, v := range opsRes.Cluster.Spec.ComponentSpecs {
-					componentReplicasMap[v.Name] = v.Replicas
-				}
-				componentReplicasSnapshot, _ := json.Marshal(componentReplicasMap)
-				opsRes.Cluster.Annotations = map[string]string{
-					intctrlutil.SnapShotForStartAnnotationKey: string(componentReplicasSnapshot),
-				}
-				By("create Start opsRequest")
-				ops := testapps.NewOpsRequestObj("start-ops-"+randomStr, testCtx.DefaultNamespace,
-					clusterName, appsv1alpha1.StartType)
-				opsRes.OpsRequest = testapps.CreateOpsRequest(ctx, testCtx, ops)
-
-				By("test start action and reconcile function")
-				startHandler := StartOpsHandler{}
-				oldComponentReplicasMap, _ := startHandler.getComponentReplicasSnapshot(opsRes.Cluster.Annotations)
-				// do action
-				Expect(opsutil.PatchClusterOpsAnnotations(ctx, k8sClient, opsRes.Cluster, nil)).Should(Succeed())
-				opsRes.Cluster.Status.Phase = appsv1alpha1.StoppedPhase
-				Expect(GetOpsManager().Do(opsRes)).Should(Succeed())
-				for _, v := range opsRes.Cluster.Spec.ComponentSpecs {
-					oldReplicas := oldComponentReplicasMap[v.Name]
-					Expect(oldReplicas == v.Replicas).Should(BeTrue())
-				}
-				_, err := GetOpsManager().Reconcile(opsRes)
-				Expect(err == nil).Should(BeTrue())
-			*/
+			clusterCompDefObj := clusterDef.Spec.ComponentDefs[0]
+			synthesizedComponent := &component.SynthesizedComponent{
+				PodSpec:               clusterCompDefObj.PodSpec,
+				Service:               clusterCompDefObj.Service,
+				Probes:                clusterCompDefObj.Probes,
+				LogConfigs:            clusterCompDefObj.LogConfigs,
+				HorizontalScalePolicy: clusterCompDefObj.HorizontalScalePolicy,
+			}
+			Expect(pitrClient.DoPrepare(cluster, synthesizedComponent)).Should(HaveOccurred())
 		})
 
 	})

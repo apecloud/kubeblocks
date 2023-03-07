@@ -58,7 +58,7 @@ func GetVersionInfo(client kubernetes.Interface) (map[AppName]string, error) {
 // getKubeBlocksVersion get KubeBlocks version
 func getKubeBlocksVersion(client kubernetes.Interface) (string, error) {
 	deploy, err := getKubeBlocksDeploy(client)
-	if err != nil {
+	if err != nil || deploy == nil {
 		return "", err
 	}
 
@@ -99,6 +99,9 @@ func getKubeBlocksDeploy(client kubernetes.Interface) (*appsv1.Deployment, error
 	})
 	if err != nil {
 		return nil, err
+	}
+	if deploys == nil || len(deploys.Items) == 0 {
+		return nil, nil
 	}
 	if len(deploys.Items) > 1 {
 		return nil, fmt.Errorf("found multiple KubeBlocks deployments, please check your cluster")

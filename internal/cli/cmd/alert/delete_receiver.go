@@ -17,10 +17,14 @@ limitations under the License.
 package alert
 
 import (
+	"fmt"
+
 	"github.com/spf13/cobra"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
+
+	"github.com/apecloud/kubeblocks/internal/cli/util"
 )
 
 var (
@@ -29,11 +33,71 @@ var (
 		kbcli alert delete-receiver my-receiver`)
 )
 
+type deleteReceiverOptions struct {
+	baseOptions
+	names []string
+}
+
 func newDeleteReceiverCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+	o := &deleteReceiverOptions{baseOptions: baseOptions{IOStreams: streams}}
 	cmd := &cobra.Command{
 		Use:     "delete-receiver NAME",
 		Short:   "Delete alert receiver, all receivers can be found by command: kbcli alert list-receivers",
 		Example: deleteReceiverExample,
+		Run: func(cmd *cobra.Command, args []string) {
+			util.CheckErr(o.complete(f))
+			util.CheckErr(o.validate(args))
+			util.CheckErr(o.run())
+		},
 	}
 	return cmd
+}
+
+func (o *deleteReceiverOptions) validate(args []string) error {
+	if len(args) == 0 {
+		return fmt.Errorf("receiver name is required")
+	}
+	o.names = args
+	return nil
+}
+
+func (o *deleteReceiverOptions) run() error {
+	data, err := getAlertConfigData(o.alterConfigMap)
+	if err != nil {
+		return err
+	}
+
+	var newReceivers []interface{}
+	var newRoutes []interface{}
+	// build receiver route map, key is receiver name, value is route
+	receiverRouteMap := make(map[string]interface{})
+	routes := getRoutesFromData(data)
+	for i, r := range routes {
+		name := r.(map[string]interface{})["receiver"].(string)
+		receiverRouteMap[name] = routes[i]
+	}
+
+	receivers := getReceiversFromData(data)
+	for i, rec := range receivers {
+		var found bool
+		name := rec.(map[string]interface{})["name"].(string)
+		for _, n := range o.names {
+			if n == name {
+				found = true
+				break
+			}
+		}
+		if !found {
+			newReceivers = append(newReceivers, receivers[i])
+			r, ok := receiverRouteMap[name]
+			if !ok {
+				fmt.Fprintf(o.Out, "receiver %s not found in routes\n", name)
+				continue
+			}
+			newRoutes = append(newRoutes, r)
+		}
+	}
+	data["receivers"] = newReceivers
+	data["routes"] = newRoutes
+	return updateAlertConfig(o.client, o.alterConfigMap.Namespace, data)
 }

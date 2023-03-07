@@ -411,7 +411,7 @@ func (o *InstallOptions) checkRemainedResource() error {
 		return nil
 	}
 
-	ns, _ := getKubeBlocksNamespace(o.Client)
+	ns, _ := util.GetKubeBlocksNamespace(o.Client)
 	if ns == "" {
 		ns = o.Namespace
 	}

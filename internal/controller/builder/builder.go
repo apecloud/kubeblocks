@@ -206,20 +206,39 @@ func buildPersistentVolumeClaimLabels(sts *appsv1.StatefulSet, pvc *corev1.Persi
 	}
 }
 
-func BuildSvc(params BuilderParams, headless bool) (*corev1.Service, error) {
-	tplFile := "service_template.cue"
-	if headless {
-		tplFile = "headless_service_template.cue"
+func BuildSvcList(params BuilderParams) ([]*corev1.Service, error) {
+	const tplFile = "service_template.cue"
+
+	var result []*corev1.Service
+	for _, item := range params.Component.Services {
+		if len(item.Spec.Ports) == 0 {
+			continue
+		}
+		svc := corev1.Service{}
+		if err := buildFromCUE(tplFile, map[string]any{
+			"cluster":   params.Cluster,
+			"service":   item,
+			"component": params.Component,
+		}, "svc", &svc); err != nil {
+			return nil, err
+		}
+		result = append(result, &svc)
 	}
-	svc := corev1.Service{}
+
+	return result, nil
+}
+
+func BuildHeadlessSvc(params BuilderParams) (*corev1.Service, error) {
+	const tplFile = "headless_service_template.cue"
+
+	service := corev1.Service{}
 	if err := buildFromCUE(tplFile, map[string]any{
 		"cluster":   params.Cluster,
 		"component": params.Component,
-	}, "service", &svc); err != nil {
+	}, "service", &service); err != nil {
 		return nil, err
 	}
-
-	return &svc, nil
+	return &service, nil
 }
 
 func BuildSts(reqCtx intctrlutil.RequestCtx, params BuilderParams, envConfigName string) (*appsv1.StatefulSet, error) {
@@ -314,9 +333,8 @@ func BuildConnCredential(params BuilderParams) (*corev1.Secret, error) {
 		"$(UUID_HEX)":      uuidHex,
 		"$(SVC_FQDN)":      fmt.Sprintf("%s-%s.%s.svc", params.Cluster.Name, params.Component.Name, params.Cluster.Namespace),
 	}
-
-	if params.Component.Service != nil {
-		for _, p := range params.Component.Service.Ports {
+	if len(params.Component.Services) > 0 {
+		for _, p := range params.Component.Services[0].Spec.Ports {
 			m[fmt.Sprintf("$(SVC_PORT_%s)", p.Name)] = strconv.Itoa(int(p.Port))
 		}
 	}

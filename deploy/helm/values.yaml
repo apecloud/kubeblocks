@@ -1364,3 +1364,38 @@ csi-s3:
     create: true
     singleBucket: ""
     mountOptions: "--memory-limit 1000 --dir-mode 0777 --file-mode 0666 --region cn-northwest-1"
+
+webhook-adaptor:
+  ## If false, Webhook-Adaptor sub-chart will not be installed
+  ##
+  enabled: false
+
+  replicaCount: 1
+
+  ## Webhook-Adaptor container image
+  ##
+  image:
+    registry: registry.cn-hangzhou.aliyuncs.com
+    repository: apecloud/alertmanager-webhook-adaptor
+    pullPolicy: IfNotPresent
+    tag: "0.1.0"
+
+  ## ConfigMap override where fullname is {{.Release.Name}}-{{.Values.configMapOverrideName}}
+  ##
+  configMapOverrideName: ""
+
+  resources: { }
+  # We usually recommend not to specify default resources and to leave this as a conscious
+  # choice for the user. This also increases chances charts run on environments with little
+  # resources, such as Minikube. If you do want to specify resources, uncomment the following
+  # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
+  # limits:
+  #   cpu: 100m
+  #   memory: 128Mi
+  # requests:
+  #   cpu: 100m
+  #   memory: 128Mi
+
+  ## Webhook-Adaptor ConfigMap Entries
+  configFiles:
+    config.yaml: {}

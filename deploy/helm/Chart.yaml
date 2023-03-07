@@ -74,3 +74,6 @@ dependencies:
   - condition: csi-s3.enabled
     name: csi-s3
     version: 0.*
+  - condition: webhook-adaptor.enabled
+    name: webhook-adaptor
+    version: 0.1.*

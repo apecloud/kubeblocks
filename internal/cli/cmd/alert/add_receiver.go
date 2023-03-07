@@ -112,17 +112,12 @@ func newAddReceiverCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *
 func (o *baseOptions) complete(f cmdutil.Factory) error {
 	var err error
 
-	client, err := f.KubernetesClientSet()
-	if err != nil {
-		return err
-	}
-
-	o.alterConfigMap, err = getAlertConfigmap(client)
-	if err != nil {
-		return err
-	}
-
 	o.client, err = f.KubernetesClientSet()
+	if err != nil {
+		return err
+	}
+
+	o.alterConfigMap, err = getAlertConfigmap(o.client)
 	return err
 }
 
@@ -186,6 +181,7 @@ func (o *addReceiverOptions) buildReceiver() (*receiver, error) {
 func (o *addReceiverOptions) buildRoute() (*route, error) {
 	r := &route{
 		Receiver: o.name,
+		Continue: true,
 	}
 
 	var clusterArray []string
@@ -252,7 +248,10 @@ func buildWebhookConfigs(webhooks []string) ([]*webhookConfig, error) {
 		if len(m) == 0 {
 			return nil, fmt.Errorf("invalid webhook: %s, webhook should be in the format of url=my-url,tolen=my-token", hook)
 		}
-		w := webhookConfig{}
+		w := webhookConfig{
+			MaxAlerts:    10,
+			SendResolved: false,
+		}
 		for k, v := range m {
 			// check webhookConfig keys
 			switch webhookKey(k) {

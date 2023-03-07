@@ -68,8 +68,10 @@ type emailConfig struct {
 
 // webhookConfig is the webhook config of receiver
 type webhookConfig struct {
-	URL   string `json:"url"`
-	Token string `json:"token,omitempty"`
+	URL          string `json:"url"`
+	Token        string `json:"token,omitempty"`
+	SendResolved bool   `json:"send_resolved,omitempty"`
+	MaxAlerts    int    `json:"max_alerts,omitempty"`
 }
 
 type slackConfig struct {
@@ -89,6 +91,7 @@ type receiver struct {
 // route is the route of receiver
 type route struct {
 	Receiver string   `json:"receiver"`
+	Continue bool     `json:"continue,omitempty"`
 	Matchers []string `json:"matchers,omitempty"`
 }
 

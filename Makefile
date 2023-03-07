@@ -274,12 +274,15 @@ CLI_LD_FLAGS ="-s -w \
 bin/kbcli.%: ## Cross build bin/kbcli.$(OS).$(ARCH).
 	GOOS=$(word 2,$(subst ., ,$@)) GOARCH=$(word 3,$(subst ., ,$@)) CGO_ENABLED=0 $(GO) build -ldflags=${CLI_LD_FLAGS} -o $@ cmd/cli/main.go
 
-.PHONY: kbcli
-kbcli: OS=$(shell $(GO) env GOOS)
-kbcli: ARCH=$(shell $(GO) env GOARCH)
-kbcli: test-go-generate build-checks ## Build bin/kbcli.
+.PHONY: kbcli-fast
+kbcli-fast: OS=$(shell $(GO) env GOOS)
+kbcli-fast: ARCH=$(shell $(GO) env GOARCH)
+kbcli-fast:
 	$(MAKE) bin/kbcli.$(OS).$(ARCH)
-	mv bin/kbcli.$(OS).$(ARCH) bin/kbcli
+	@mv bin/kbcli.$(OS).$(ARCH) bin/kbcli
+
+.PHONY: kbcli
+kbcli: test-go-generate build-checks kbcli-fast ## Build bin/kbcli.
 
 .PHONY: clean-kbcli
 clean-kbcli: ## Clean bin/kbcli*.

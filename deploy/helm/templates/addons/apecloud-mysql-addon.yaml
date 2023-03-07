@@ -15,7 +15,10 @@ spec:
   type: Helm
 
   helm:
-    chartRepoURL: https://github.com/apecloud/helm-charts/releases/download/apecloud-mysql-0.1.8/apecloud-mysql-0.1.8.tgz
+    chartRepoURL: https://github.com/apecloud/helm-charts/releases/download/apecloud-mysql-{{ default .Chart.AppVersion .Values.appVersionOverride }}/apecloud-mysql-{{ default .Chart.AppVersion .Values.appVersionOverride }}.tgz
+
+  defaultInstallValues:
+    - enabled: true
 
   installable:
     autoInstall: true

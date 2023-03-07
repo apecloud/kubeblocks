@@ -244,6 +244,10 @@ type AddonDefaultInstallSpecItem struct {
 type AddonInstallSpec struct {
 	AddonInstallSpecItem `json:",inline"`
 
+	// enabled can be set if there are no specific installation attributes to be set.
+	// +optional
+	Enabled bool `json:"enabled,omitempty"`
+
 	// Install spec. for extra items.
 	// +patchMergeKey=name
 	// +patchStrategy=merge,retainKeys
@@ -326,15 +330,24 @@ func init() {
 }
 
 func (r *Addon) GetExtraNames() []string {
-	if r == nil || len(r.Spec.DefaultInstallValues) == 0 {
+	if r == nil {
 		return nil
 	}
-	// r.Spec.DefaultInstallValues has minItem=1 constraint
-	names := make([]string, 0, len(r.Spec.DefaultInstallValues[0].ExtraItems))
-	for _, i := range r.Spec.DefaultInstallValues[0].ExtraItems {
-		names = append(names, i.Name)
+	switch r.Spec.Type {
+	case HelmType:
+		if r.Spec.Helm == nil {
+			return nil
+		}
+		// r.Spec.DefaultInstallValues has minItem=1 constraint
+		names := make([]string, 0, len(r.Spec.Helm.ValuesMapping.ExtraItems))
+		for _, i := range r.Spec.Helm.ValuesMapping.ExtraItems {
+			names = append(names, i.Name)
+		}
+		return names
+	default:
+		return nil
 	}
-	return names
+
 }
 
 func (r *InstallableSpec) GetSelectorsStrings() []string {

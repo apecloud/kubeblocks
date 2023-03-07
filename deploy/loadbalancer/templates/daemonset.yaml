@@ -37,13 +37,13 @@ spec:
             containerPort: 8081
             protocol: TCP
         readinessProbe:
-          exec:
-            command: [ "sh", "-c", "/bin/grpc_health_probe -addr=$HOST_IP:{{ .Values.agent.rpcPort }}"]
+          tcpSocket:
+            port: {{ .Values.agent.rpcPort }}
           initialDelaySeconds: 5
           timeoutSeconds: 3
         livenessProbe:
-          exec:
-            command: [ "sh", "-c", "/bin/grpc_health_probe -addr=$HOST_IP:{{ .Values.agent.rpcPort }}" ]
+          tcpSocket:
+            port: {{ .Values.agent.rpcPort }}
           initialDelaySeconds: 10
           timeoutSeconds: 3
         resources:

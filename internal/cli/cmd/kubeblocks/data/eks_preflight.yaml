@@ -1,0 +1,89 @@
+apiVersion: troubleshoot.sh/v1beta2
+kind: Preflight
+metadata:
+  name: kubeblocks_preflight
+spec:
+  collectors:
+    - clusterInfo: {}
+  analyzers:
+    - clusterVersion:
+        checkName: EKS-Version
+        outcomes:
+          - fail:
+              when: "< 1.22.0"
+              message: This application requires at least Kubernetes 1.20.0 or later, and recommends 1.22.0.
+              uri: https://www.kubernetes.io
+          - warn:
+              when: "< 1.24.0"
+              message: Your cluster meets the minimum version of Kubernetes, but we recommend you update to 1.22.0 or later.
+              uri: https://kubernetes.io
+          - pass:
+              when: ">= 1.24.0"
+              message: Your cluster meets the recommended and required versions（>= 1.24.0） of Kubernetes.
+              uri: https://www.kubernetes.io
+    - nodeResources:
+        checkName: At-Least-3-Nodes
+        outcomes:
+          - fail:
+              when: "count() < 3"
+              message: This application requires at least 3 nodes
+          - pass:
+              message: This cluster has enough nodes.
+    - storageClass:
+        checkName: Required-GP3-SC
+        storageClassName: "gp3"
+        outcomes:
+          - fail:
+              message: The gp3 storage class was not found
+          - pass:
+              message: gp3 is the presence, and all good on storage classes
+    - deploymentStatus:
+        checkName: AWS-Load-Balancer-Check
+        name: aws-load-balancer-controller
+        namespace: kube-system
+        outcomes:
+          - fail:
+              when: "absent" # note that the "absent" failure state must be listed first if used.
+              message: The aws-load-balancer-controller deployment is not present.
+          - fail:
+              when: "< 1"
+              message: The aws-load-balancer-controller deployment does not have any ready replicas.
+          - warn:
+              when: "= 1"
+              message: The aws-load-balancer-controller deployment has only a single ready replica.
+          - pass:
+              message: There are multiple replicas of the aws-load-balancer-controller deployment ready.
+    - deploymentStatus:
+        checkName: AutoScale-Setting-Check
+        name: cluster-autoscaler
+        namespace: kube-system
+        outcomes:
+          - fail:
+              when: "absent" # note that the "absent" failure state must be listed first if used.
+              message: The cluster-autoscaler deployment is not present.
+          - fail:
+              when: "< 1"
+              message: The cluster-autoscaler deployment does not have any ready replicas.
+          - warn:
+              when: "= 1"
+              message: The cluster-autoscaler deployment has only a single ready replica.
+          - pass:
+              message: There are multiple replicas of the cluster-autoscaler deployment ready.
+  extendAnalyzers:
+    - clusterAccess:
+        checkName: Check-K8S-Access
+        outcomes:
+          - fail:
+              message: k8s cluster access fail
+          - pass:
+              message: k8s cluster access ok
+    - clusterRegion:
+        checkName: Check-K8S-Region
+        regionList:
+          - cn-northwest-1
+          - cn-north-1
+        outcomes:
+          - warn:
+              message: k8s cluster region doesn't belong to amazon china
+          - pass:
+              message: k8s cluster region belongs to amazon china

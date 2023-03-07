@@ -57,13 +57,13 @@ var _ = Describe("text_results_test", func() {
 			},
 		}
 		Eventually(func(g Gomega) {
-			err := ShowStdoutResults(preflightName, analyzeResults, humanFormat)
+			err := ShowTextResults(preflightName, analyzeResults, humanFormat, false)
+			g.Expect(err).To(HaveOccurred())
+			err = ShowTextResults(preflightName, analyzeResults, jsonFormat, true)
 			g.Expect(err).NotTo(HaveOccurred())
-			err = ShowStdoutResults(preflightName, analyzeResults, jsonFormat)
+			err = ShowTextResults(preflightName, analyzeResults, yamlFormat, false)
 			g.Expect(err).NotTo(HaveOccurred())
-			err = ShowStdoutResults(preflightName, analyzeResults, yamlFormat)
-			g.Expect(err).NotTo(HaveOccurred())
-			err = ShowStdoutResults(preflightName, analyzeResults, unknownFormat)
+			err = ShowTextResults(preflightName, analyzeResults, unknownFormat, false)
 			g.Expect(err).To(HaveOccurred())
 		}, timeOut).Should(Succeed())
 	})

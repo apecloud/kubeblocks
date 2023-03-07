@@ -39,6 +39,8 @@ func GetAnalyzer(analyzer *preflightv1beta2.ExtendAnalyze) (KBAnalyzer, bool) {
 	switch {
 	case analyzer.ClusterAccess != nil:
 		return &AnalyzeClusterAccess{analyzer: analyzer.ClusterAccess}, true
+	case analyzer.ClusterRegion != nil:
+		return &AnalyzeClusterRegion{analyzer: analyzer.ClusterRegion}, true
 	default:
 		return nil, false
 	}

@@ -26,10 +26,24 @@ type ClusterAccess struct {
 	Outcomes []*troubleshoot.Outcome `json:"outcomes"`
 }
 
+type ClusterRegion struct {
+	// analyzeMeta is defined in troubleshoot.sh.
+	troubleshoot.AnalyzeMeta `json:",inline"`
+	// outcomes are expected user defined results.
+	// +kubebuilder:validation:Required
+	Outcomes []*troubleshoot.Outcome `json:"outcomes"`
+	// regionList is a list of expected regionName
+	// +kubebuilder:validation:Required
+	RegionList []string `json:"regionList"`
+}
+
 type ExtendAnalyze struct {
 	// clusterAccess is to determine the accessibility of target K8S cluster.
 	// +optional
 	ClusterAccess *ClusterAccess `json:"clusterAccess,omitempty"`
+	// ClusterRegion is to validate the regionName of target K8S cluster location.
+	// +optional
+	ClusterRegion *ClusterRegion `json:"clusterRegion,omitempty"`
 }
 
 type HostUtility struct {
@@ -47,6 +61,7 @@ type ExtendHostCollect struct {
 }
 
 type HostUtilityAnalyze struct {
+	// hostCollectorMeta is defined in troubleshoot.sh.
 	troubleshoot.AnalyzeMeta `json:",inline"`
 	// collectorName indicates which collect data will be analyzed
 	// +optional

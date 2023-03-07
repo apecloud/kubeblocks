@@ -63,16 +63,22 @@ func (a *AnalyzeHostUtility) Analyze(getCollectedFileContents func(string) ([]by
 		Title: a.Title(),
 	}
 	for _, outcome := range a.hostAnalyzer.Outcomes {
-		if outcome.Fail != nil && len(utilityInfo.Error) > 0 && len(utilityInfo.Path) == 0 {
-			result.IsFail = true
+		switch {
+		case outcome.Fail != nil && len(utilityInfo.Error) > 0 && len(utilityInfo.Path) == 0:
+			// return warning info even if outcome.Fail is set
+			result.IsWarn = true
 			result.Message = outcome.Fail.Message
 			result.URI = outcome.Fail.URI
-		} else if outcome.Pass != nil && len(utilityInfo.Error) == 0 && len(utilityInfo.Path) > 0 {
+		case outcome.Warn != nil && len(utilityInfo.Error) > 0 && len(utilityInfo.Path) == 0:
+			result.IsWarn = true
+			result.Message = outcome.Warn.Message
+			result.URI = outcome.Warn.URI
+		case outcome.Pass != nil && len(utilityInfo.Error) == 0 && len(utilityInfo.Path) > 0:
 			result.IsPass = true
 			result.Message = outcome.Pass.Message + fmt.Sprintf(". Utility %s Path is %s", utilityInfo.Name, utilityInfo.Path)
 			result.URI = outcome.Pass.URI
+		default:
 		}
-		// ignore warn outcome
 	}
 	return []*analyzer.AnalyzeResult{&result}, nil
 }

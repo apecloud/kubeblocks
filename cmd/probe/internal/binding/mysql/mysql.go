@@ -95,7 +95,10 @@ func (mysqlOps *MysqlOperations) Init(metadata bindings.Metadata) error {
 	mysqlOps.BaseOperations.GetRole = mysqlOps.GetRole
 	mysqlOps.DBPort = mysqlOps.GetRunningPort()
 	mysqlOps.RegisterOperation(GetRoleOperation, mysqlOps.GetRoleOps)
+	mysqlOps.RegisterOperation(GetLagOperation, mysqlOps.GetLagOps)
 	mysqlOps.RegisterOperation(CheckStatusOperation, mysqlOps.CheckStatusOps)
+	mysqlOps.RegisterOperation(ExecOperation, mysqlOps.ExecOps)
+	mysqlOps.RegisterOperation(QueryOperation, mysqlOps.QueryOps)
 	return nil
 }
 
@@ -227,6 +230,21 @@ func (mysqlOps *MysqlOperations) ExecOps(ctx context.Context, req *bindings.Invo
 	} else {
 		result["event"] = "ExecSuccess"
 		result["count"] = count
+	}
+	return result, nil
+}
+
+func (mysqlOps *MysqlOperations) GetLagOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
+	result := OpsResult{}
+	sql := "show slave status"
+	_, err := mysqlOps.query(ctx, sql)
+	if err != nil {
+		mysqlOps.Logger.Infof("GetLagOps error: %v", err)
+		result["event"] = "GetLagOpsFailed"
+		result["message"] = err.Error()
+	} else {
+		result["event"] = "GetLagOpsSuccess"
+		result["lag"] = 0
 	}
 	return result, nil
 }

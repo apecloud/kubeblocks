@@ -92,6 +92,9 @@ const (
 	CheckStatusOperation  bindings.OperationKind = "checkStatus"
 	CheckRoleOperation    bindings.OperationKind = "checkRole"
 	GetRoleOperation      bindings.OperationKind = "getRole"
+	GetLagOperation       bindings.OperationKind = "getLag"
+	ExecOperation         bindings.OperationKind = "exec"
+	QueryOperation        bindings.OperationKind = "query"
 
 	OperationNotImplemented = "OperationNotImplemented"
 )

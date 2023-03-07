@@ -142,6 +142,27 @@ func TestGetRole(t *testing.T) {
 	})
 }
 
+func TestGetLagOps(t *testing.T) {
+	mysqlOps, mock, _ := mockDatabase(t)
+	req := &bindings.InvokeRequest{Metadata: map[string]string{}}
+
+	t.Run("GetLagOps succeed", func(t *testing.T) {
+		col1 := sqlmock.NewColumn("CURRENT_LEADER").OfType("VARCHAR", "")
+		col2 := sqlmock.NewColumn("ROLE").OfType("VARCHAR", "")
+		col3 := sqlmock.NewColumn("SERVER_ID").OfType("INT", 0)
+		rows := sqlmock.NewRowsWithColumnDefinition(col1, col2, col3).AddRow("wesql-main-1.wesql-main-headless:13306", "Follower", 1)
+		mock.ExpectQuery("show slave status").WillReturnRows(rows)
+
+		result, err := mysqlOps.GetLagOps(context.Background(), req, &bindings.InvokeResponse{})
+		assert.NoError(t, err)
+
+		// Assert that the event and message are correct
+		event, ok := result["event"]
+		assert.True(t, ok)
+		assert.Equal(t, "GetLagOpsSuccess", event)
+	})
+}
+
 func TestQueryOps(t *testing.T) {
 	mysqlOps, mock, _ := mockDatabase(t)
 	req := &bindings.InvokeRequest{Metadata: map[string]string{}}

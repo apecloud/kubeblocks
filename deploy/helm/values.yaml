@@ -606,7 +606,7 @@ prometheus:
                 severity: info
               annotations:
                 summary: "MySQL has just been restarted (< 60s)"
-                description: "MySQL has just been restarted {{ $value }} seconds. (instance: {{ $labels.pod }})"
+                description: "MySQL has just been restarted {{ $value }} seconds ago. (instance: {{ $labels.pod }})"
 
             - alert: MysqlTooManyConnections
               expr: 'sum(max_over_time(mysql_global_status_threads_connected[1m]) / mysql_global_variables_max_connections) BY (namespace,app_kubernetes_io_instance,pod) * 100 > 80'
@@ -682,7 +682,7 @@ prometheus:
                 severity: info
               annotations:
                 summary: "PostgreSQL has just been restarted (< 60s)"
-                description: "PostgreSQL has just been restarted {{ $value }} seconds. (instance: {{ $labels.pod }})"
+                description: "PostgreSQL has just been restarted {{ $value }} seconds ago. (instance: {{ $labels.pod }})"
 
             - alert: PostgreSQLExporterError
               expr: 'pg_exporter_last_scrape_error > 0'

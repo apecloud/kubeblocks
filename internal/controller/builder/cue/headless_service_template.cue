@@ -52,7 +52,7 @@ service: {
 		}
 	}
 	"spec": {
-		"type": "ClusterIP"
+		"type":      "ClusterIP"
 		"clusterIP": "None"
 		"selector": {
 			"app.kubernetes.io/instance":   "\(cluster.metadata.name)"

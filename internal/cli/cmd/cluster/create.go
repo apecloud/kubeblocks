@@ -103,12 +103,13 @@ const (
 type setKey string
 
 const (
-	keyType     setKey = "type"
-	keyCPU      setKey = "cpu"
-	keyMemory   setKey = "memory"
-	keyReplicas setKey = "replicas"
-	keyStorage  setKey = "storage"
-	keyUnknown  setKey = "unknown"
+	keyType         setKey = "type"
+	keyCPU          setKey = "cpu"
+	keyMemory       setKey = "memory"
+	keyReplicas     setKey = "replicas"
+	keyPrimaryIndex setKey = "primaryIndex"
+	keyStorage      setKey = "storage"
+	keyUnknown      setKey = "unknown"
 )
 
 type envSet struct {
@@ -117,10 +118,11 @@ type envSet struct {
 }
 
 var setKeyEnvMap = map[setKey]envSet{
-	keyCPU:      {"CLUSTER_DEFAULT_CPU", "1000m"},
-	keyMemory:   {"CLUSTER_DEFAULT_MEMORY", "1Gi"},
-	keyStorage:  {"CLUSTER_DEFAULT_STORAGE_SIZE", "10Gi"},
-	keyReplicas: {"CLUSTER_DEFAULT_REPLICAS", "1"},
+	keyCPU:          {"CLUSTER_DEFAULT_CPU", "1000m"},
+	keyMemory:       {"CLUSTER_DEFAULT_MEMORY", "1Gi"},
+	keyStorage:      {"CLUSTER_DEFAULT_STORAGE_SIZE", "10Gi"},
+	keyReplicas:     {"CLUSTER_DEFAULT_REPLICAS", "1"},
+	keyPrimaryIndex: {"CLUSTER_DEFAULT_PRIMARY_INDEX", "0"},
 }
 
 // UpdatableFlags is the flags that cat be updated by update command
@@ -439,6 +441,13 @@ func buildClusterComp(cd *appsv1alpha1.ClusterDefinition, setsMap map[string]map
 		}
 		replicas := int32(setReplicas)
 
+		// get primaryIndex
+		setPrimaryIndex, err := strconv.Atoi(getVal(keyPrimaryIndex, sets))
+		if err != nil {
+			return nil, fmt.Errorf("primaryIndex is illegal " + err.Error())
+		}
+		primaryIndex := int32(setPrimaryIndex)
+
 		resourceList := corev1.ResourceList{
 			corev1.ResourceCPU:    resource.MustParse(getVal(keyCPU, sets)),
 			corev1.ResourceMemory: resource.MustParse(getVal(keyMemory, sets)),
@@ -447,6 +456,7 @@ func buildClusterComp(cd *appsv1alpha1.ClusterDefinition, setsMap map[string]map
 			Name:            c.Name,
 			ComponentDefRef: c.Name,
 			Replicas:        replicas,
+			PrimaryIndex:    &primaryIndex,
 			Resources: corev1.ResourceRequirements{
 				Requests: resourceList,
 				Limits:   resourceList,

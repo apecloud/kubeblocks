@@ -281,7 +281,7 @@ prometheus:
     ## Defining configMapOverrideName will cause templates/alertmanager-configmap.yaml
     ## to NOT generate a ConfigMap resource
     ##
-    configMapOverrideName: ""
+    configMapOverrideName: "alertmanager-config
 
     ## Node tolerations for alertmanager scheduling to nodes with taints
     ## Ref: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/

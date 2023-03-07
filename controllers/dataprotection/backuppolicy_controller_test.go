@@ -205,7 +205,7 @@ var _ = Describe("Backup Policy Controller", func() {
 				By("retain the latest backup")
 				Eventually(testapps.GetListLen(&testCtx, intctrlutil.BackupSignature,
 					client.MatchingLabels(backupPolicy.Spec.Target.LabelsSelector.MatchLabels),
-					client.InNamespace(backupPolicy.Namespace))).Should(Equal(2))
+					client.InNamespace(backupPolicy.Namespace))).Should(Equal(1))
 			})
 		})
 

@@ -85,7 +85,7 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	if err := r.Client.Get(reqCtx.Ctx, reqCtx.Req.NamespacedName, backup); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
-	reqCtx.Log.Info("in Backup Reconciler: name: " + backup.Name + " phase: " + string(backup.Status.Phase))
+	reqCtx.Log.V(1).Info("in Backup Reconciler: name: " + backup.Name + " phase: " + string(backup.Status.Phase))
 
 	// handle finalizer
 	res, err := intctrlutil.HandleCRDeletion(reqCtx, r, backup, dataProtectionFinalizerName, func() (*ctrl.Result, error) {
@@ -299,7 +299,7 @@ func (r *BackupReconciler) updateStatusIfFailed(reqCtx intctrlutil.RequestCtx,
 	return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 }
 
-// patchBackupLabels patch backup labels
+// patchBackupLabelsAndAnnotations patch backup labels and the annotations include cluster snapshot.
 func (r *BackupReconciler) patchBackupLabelsAndAnnotations(
 	reqCtx intctrlutil.RequestCtx,
 	backup *dataprotectionv1alpha1.Backup,
@@ -311,9 +311,11 @@ func (r *BackupReconciler) patchBackupLabelsAndAnnotations(
 			return err
 		}
 	}
-	backup.Labels = targetSts.Labels
 	if backup.Labels == nil {
 		backup.Labels = make(map[string]string)
+	}
+	for k, v := range targetSts.Labels {
+		backup.Labels[k] = v
 	}
 	backup.Labels[dataProtectionLabelBackupTypeKey] = string(backup.Spec.BackupType)
 	return r.Client.Patch(reqCtx.Ctx, backup, patch)
@@ -433,7 +435,7 @@ func (r *BackupReconciler) createVolumeSnapshot(
 		return err
 	}
 
-	reqCtx.Log.Info("create a volumeSnapshot from backup", "snapshot", snap)
+	reqCtx.Log.V(1).Info("create a volumeSnapshot from backup", "snapshot", snap)
 	if err := r.Client.Create(reqCtx.Ctx, snap); err != nil {
 		return err
 	}
@@ -594,7 +596,7 @@ func (r *BackupReconciler) createBatchV1Job(
 		return err
 	}
 
-	reqCtx.Log.Info("create a built-in job from backup", "job", job)
+	reqCtx.Log.V(1).Info("create a built-in job from backup", "job", job)
 	if err := r.Client.Create(reqCtx.Ctx, job); err != nil {
 		return err
 	}
@@ -675,14 +677,14 @@ func (r *BackupReconciler) deleteExternalResources(reqCtx intctrlutil.RequestCtx
 func (r *BackupReconciler) getTargetCluster(
 	reqCtx intctrlutil.RequestCtx, backupPolicy *dataprotectionv1alpha1.BackupPolicy) (*appv1.StatefulSet, error) {
 	// get stateful service
-	reqCtx.Log.Info("Get cluster from label", "label", backupPolicy.Spec.Target.LabelsSelector.MatchLabels)
+	reqCtx.Log.V(1).Info("Get cluster from label", "label", backupPolicy.Spec.Target.LabelsSelector.MatchLabels)
 	clusterTarget := &appv1.StatefulSetList{}
 	if err := r.Client.List(reqCtx.Ctx, clusterTarget,
 		client.InNamespace(reqCtx.Req.Namespace),
 		client.MatchingLabels(backupPolicy.Spec.Target.LabelsSelector.MatchLabels)); err != nil {
 		return nil, err
 	}
-	reqCtx.Log.Info("Get cluster target finish")
+	reqCtx.Log.V(1).Info("Get cluster target finish")
 	clusterItemsLen := len(clusterTarget.Items)
 	if clusterItemsLen != 1 {
 		if clusterItemsLen <= 0 {
@@ -706,7 +708,7 @@ func (r *BackupReconciler) getTargetClusterPod(
 		}, clusterPod); err != nil {
 		return nil, err
 	}
-	reqCtx.Log.Info("Get cluster pod finish", "target pod", clusterPod)
+	reqCtx.Log.V(1).Info("Get cluster pod finish", "target pod", clusterPod)
 	return clusterPod, nil
 }
 

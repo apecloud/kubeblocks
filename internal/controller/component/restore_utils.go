@@ -59,7 +59,7 @@ func BuildRestoredInfo(
 		return err
 	}
 	if backup.Status.Phase != dataprotectionv1alpha1.BackupCompleted {
-		return fmt.Errorf(`backup "%s" is not completed`, backup.Name)
+		return intctrlutil.NewErrorf(intctrlutil.ErrorTypeBackupNotCompleted, "backup %s is not completed", backup.Name)
 	}
 	switch backup.Spec.BackupType {
 	case dataprotectionv1alpha1.BackupTypeFull:

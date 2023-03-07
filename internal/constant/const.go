@@ -112,6 +112,7 @@ const (
 	CronJob                   = "CronJob"
 	ReplicaSet                = "ReplicaSet"
 	VolumeSnapshotKind        = "VolumeSnapshot"
+	ServiceKind               = "Service"
 )
 
 const (

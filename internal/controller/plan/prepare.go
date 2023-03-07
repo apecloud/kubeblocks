@@ -63,7 +63,7 @@ func PrepareComponentResources(reqCtx intctrlutil.RequestCtx, cli client.Client,
 			task.AppendResource(workload)
 		}()
 
-		svc, err := builder.BuildSvc(task.GetBuilderParams(), true)
+		svc, err := builder.BuildHeadlessSvc(task.GetBuilderParams())
 		if err != nil {
 			return err
 		}
@@ -185,11 +185,11 @@ func PrepareComponentResources(reqCtx intctrlutil.RequestCtx, cli client.Client,
 		task.AppendResource(pdb)
 	}
 
-	if task.Component.Service != nil && len(task.Component.Service.Ports) > 0 {
-		svc, err := builder.BuildSvc(task.GetBuilderParams(), false)
-		if err != nil {
-			return err
-		}
+	svcList, err := builder.BuildSvcList(task.GetBuilderParams())
+	if err != nil {
+		return err
+	}
+	for _, svc := range svcList {
 		if task.Component.WorkloadType == appsv1alpha1.Consensus {
 			addLeaderSelectorLabels(svc, task.Component)
 		}

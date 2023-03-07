@@ -132,8 +132,9 @@ func buildProbeServiceContainer(component *SynthesizedComponent, container *core
 		"--config", "/config/probe/config.yaml",
 		"--components-path", "/config/probe/components"}
 
-	if component.Service != nil && len(component.Service.Ports) > 0 {
-		port := component.Service.Ports[0]
+	if len(component.Services) > 0 && len(component.Services[0].Spec.Ports) > 0 {
+		service := component.Services[0]
+		port := service.Spec.Ports[0]
 		dbPort := port.TargetPort.IntValue()
 		if dbPort == 0 {
 			dbPort = int(port.Port)

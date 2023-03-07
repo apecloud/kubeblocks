@@ -1,6 +1,5 @@
 /*
 Copyright ApeCloud, Inc.
-Copyright 2021 The Dapr Authors
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -38,6 +37,11 @@ import (
 	. "github.com/apecloud/kubeblocks/cmd/probe/internal/binding"
 )
 
+const (
+	urlWithPort   = "root:@tcp(127.0.0.1:3306)/mysql?multiStatements=true"
+	urlWithNoPort = "root:@tcp(127.0.0.1)/mysql?multiStatements=true"
+)
+
 // Test case for Init() function
 func TestInit(t *testing.T) {
 	// Set up relevant viper config variables
@@ -45,7 +49,7 @@ func TestInit(t *testing.T) {
 	viper.Set("KB_SERVICE_PASSWORD", "testpassword")
 
 	mysqlOps, _, _ := mockDatabase(t)
-	mysqlOps.Metadata.Properties["url"] = "root:@tcp(127.0.0.1:3306)/mysql?multiStatements=true"
+	mysqlOps.Metadata.Properties["url"] = urlWithPort
 	// Call the function being tested
 	err := mysqlOps.Init(mysqlOps.Metadata)
 	if err != nil {
@@ -80,7 +84,7 @@ func TestInitDelay(t *testing.T) {
 
 	t.Run("Invalid listen", func(t *testing.T) {
 		mysqlOps.db = nil
-		mysqlOps.Metadata.Properties["url"] = "root:@tcp(127.0.0.1)/mysql?multiStatements=true"
+		mysqlOps.Metadata.Properties["url"] = urlWithPort
 		mysqlOps.Metadata.Properties[maxIdleConnsKey] = "100"
 		mysqlOps.Metadata.Properties[connMaxIdleTimeKey] = "100ms"
 		err := mysqlOps.InitDelay()
@@ -92,7 +96,7 @@ func TestInitDelay(t *testing.T) {
 	t.Run("Invalid pem", func(t *testing.T) {
 		mysqlOps.db = nil
 		mysqlOps.Metadata.Properties[pemPathKey] = "invalid.pem"
-		mysqlOps.Metadata.Properties["url"] = "root:@tcp(127.0.0.1)/mysql?multiStatements=true"
+		mysqlOps.Metadata.Properties["url"] = urlWithPort
 		err := mysqlOps.InitDelay()
 		if err == nil {
 			t.Errorf("Expected error but got none")
@@ -104,13 +108,13 @@ func TestGetRunningPort(t *testing.T) {
 	mysqlOps, _, _ := mockDatabase(t)
 
 	t.Run("Get port from url", func(t *testing.T) {
-		mysqlOps.Metadata.Properties["url"] = "root:@tcp(127.0.0.1:3307)/mysql?multiStatements=true"
+		mysqlOps.Metadata.Properties["url"] = urlWithPort
 		port := mysqlOps.GetRunningPort()
-		assert.Equal(t, 3307, port)
+		assert.Equal(t, 3306, port)
 	})
 
 	t.Run("Get default port if url has no port", func(t *testing.T) {
-		mysqlOps.Metadata.Properties["url"] = "root:@tcp(127.0.0.1)/mysql?multiStatements=true"
+		mysqlOps.Metadata.Properties["url"] = urlWithNoPort
 		port := mysqlOps.GetRunningPort()
 		assert.Equal(t, defaultDBPort, port)
 	})
@@ -406,7 +410,7 @@ func mockDatabase(t *testing.T) (*MysqlOperations, sqlmock.Sqlmock, error) {
 		},
 	}
 	mysqlOps := NewMysql(logger.NewLogger("test")).(*MysqlOperations)
-	mysqlOps.Init(metadata)
+	_ = mysqlOps.Init(metadata)
 	mysqlOps.db = db
 
 	return mysqlOps, mock, err

@@ -18,6 +18,7 @@ package alert
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/spf13/cobra"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
@@ -62,7 +63,22 @@ func (o *deleteReceiverOptions) validate(args []string) error {
 }
 
 func (o *deleteReceiverOptions) run() error {
-	data, err := getAlertConfigData(o.alterConfigMap)
+	// delete receiver from alter manager config
+	if err := o.deleteReceiver(); err != nil {
+		return err
+	}
+
+	// delete receiver from webhook config
+	if err := o.deleteWebhookReceivers(); err != nil {
+		return err
+	}
+
+	fmt.Fprintf(o.Out, "Receiver %s deleted successfully", strings.Join(o.names, ","))
+	return nil
+}
+
+func (o *deleteReceiverOptions) deleteReceiver() error {
+	data, err := getConfigData(o.alterConfigMap, alertConfigFileName)
 	if err != nil {
 		return err
 	}
@@ -99,5 +115,29 @@ func (o *deleteReceiverOptions) run() error {
 	}
 	data["receivers"] = newReceivers
 	data["routes"] = newRoutes
-	return updateAlertConfig(o.client, o.alterConfigMap.Namespace, data)
+	return updateConfig(o.client, o.alterConfigMap, alertConfigFileName, data)
+}
+
+func (o *deleteReceiverOptions) deleteWebhookReceivers() error {
+	data, err := getConfigData(o.webhookConfigMap, webhookAdaptorFileName)
+	if err != nil {
+		return err
+	}
+	var newReceivers []interface{}
+	receivers := getReceiversFromData(data)
+	for i, rec := range receivers {
+		var found bool
+		name := rec.(map[string]interface{})["name"].(string)
+		for _, n := range o.names {
+			if n == name {
+				found = true
+				break
+			}
+		}
+		if !found {
+			newReceivers = append(newReceivers, receivers[i])
+		}
+	}
+	data["receivers"] = newReceivers
+	return updateConfig(o.client, o.webhookConfigMap, webhookAdaptorFileName, data)
 }

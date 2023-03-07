@@ -19,6 +19,7 @@ package alert
 import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	clientfake "k8s.io/client-go/rest/fake"
@@ -29,11 +30,11 @@ const (
 	testNamespace = "test"
 )
 
-var mockAlertConfigmap = func() *corev1.ConfigMap {
+var mockAlertConfigmap = func(name string, key string) *corev1.ConfigMap {
 	cm := &corev1.ConfigMap{}
-	cm.Name = alertConfigmapName
+	cm.Name = name
 	cm.Namespace = testNamespace
-	cm.Data = map[string]string{alertConfigFileName: ``}
+	cm.Data = map[string]string{key: ``}
 	return cm
 }
 
@@ -78,6 +79,10 @@ var _ = Describe("add receiver", func() {
 	})
 
 	It("run", func() {
-
+		o := addReceiverOptions{baseOptions: baseOptions{IOStreams: s}}
+		alertCM := mockAlertConfigmap(alertConfigmapName, alertConfigFileName)
+		webhookAdaptorCM := mockAlertConfigmap(webhookAdaptorName, webhookAdaptorFileName)
+		o.baseOptions.alterConfigMap = alertCM
+		o.baseOptions.webhookConfigMap = webhookAdaptorCM
 	})
 })

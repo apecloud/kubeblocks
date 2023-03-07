@@ -17,17 +17,13 @@ limitations under the License.
 package alert
 
 import (
-	"context"
 	"fmt"
 	"strings"
 
+	"golang.org/x/exp/slices"
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/yaml"
-	"k8s.io/client-go/kubernetes"
-
-	"github.com/apecloud/kubeblocks/internal/cli/util"
 )
 
 // strToMap parses string to map, string format is key1=value1,key2=value2
@@ -35,8 +31,8 @@ func strToMap(set string) map[string]string {
 	m := make(map[string]string)
 	for _, s := range strings.Split(set, ",") {
 		pair := strings.Split(s, "=")
-		if len(pair) == 2 {
-			m[pair[0]] = pair[1]
+		if len(pair) >= 2 {
+			m[pair[0]] = strings.Join(pair[1:], "=")
 		}
 	}
 	return m
@@ -50,19 +46,10 @@ func generateReceiverName() string {
 	return fmt.Sprintf("receiver-%s", rand.String(5))
 }
 
-func getAlertConfigmap(client kubernetes.Interface) (*corev1.ConfigMap, error) {
-	namespace, err := util.GetKubeBlocksNamespace(client)
-	if err != nil {
-		return nil, err
-	}
-
-	return client.CoreV1().ConfigMaps(namespace).Get(context.Background(), alertConfigmapName, metav1.GetOptions{})
-}
-
-func getAlertConfigData(alterConfigMap *corev1.ConfigMap) (map[string]interface{}, error) {
-	dataStr, ok := alterConfigMap.Data[alertConfigFileName]
+func getConfigData(cm *corev1.ConfigMap, key string) (map[string]interface{}, error) {
+	dataStr, ok := cm.Data[key]
 	if !ok {
-		return nil, fmt.Errorf("alertmanager configmap has no data named alertmanager.yaml")
+		return nil, fmt.Errorf("configmap %s has no data named %s", cm.Name, key)
 	}
 
 	var data map[string]interface{}
@@ -87,4 +74,31 @@ func getRoutesFromData(data map[string]interface{}) []interface{} {
 		routes = []interface{}{} // init routes
 	}
 	return routes.([]interface{})
+}
+
+func getWebhookType(url string) webhookType {
+	if strings.Contains(url, "oapi.dingtalk.com") {
+		return dingtalkWebhookType
+	}
+	if strings.Contains(url, "qyapi.weixin.qq.com") {
+		return wechatWebhookType
+	}
+	if strings.Contains(url, "open.feishu.cn") {
+		return feishuWebhookType
+	}
+	return unknownWebhookType
+}
+
+func getWebhookURL(name string) string {
+	return fmt.Sprintf("http://%s.default:5001/api/v1/notify/%s", webhookAdaptorName, name)
+}
+
+func removeDuplicateStr(strArray []string) []string {
+	var result []string
+	for _, s := range strArray {
+		if !slices.Contains(result, s) {
+			result = append(result, s)
+		}
+	}
+	return result
 }

@@ -52,6 +52,15 @@ const (
 	webhookToken webhookKey = "token"
 )
 
+type webhookType string
+
+const (
+	feishuWebhookType   webhookType = "feishu-webhook"
+	wechatWebhookType   webhookType = "wechat-webhook"
+	dingtalkWebhookType webhookType = "dingtalk-webhook"
+	unknownWebhookType  webhookType = "unknown"
+)
+
 type slackKey string
 
 // slackConfig keys
@@ -93,6 +102,17 @@ type route struct {
 	Receiver string   `json:"receiver"`
 	Continue bool     `json:"continue,omitempty"`
 	Matchers []string `json:"matchers,omitempty"`
+}
+
+type webhookAdaptorReceiverParams struct {
+	URL    string `json:"url"`
+	Secret string `json:"secret,omitempty"`
+}
+
+type webhookAdaptorReceiver struct {
+	Name   string                       `json:"name"`
+	Type   string                       `json:"type"`
+	Params webhookAdaptorReceiverParams `json:"params"`
 }
 
 func (w *webhookConfig) string() string {

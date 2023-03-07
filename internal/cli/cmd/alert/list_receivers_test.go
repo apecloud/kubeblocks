@@ -19,29 +19,28 @@ package alert
 import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	clientfake "k8s.io/client-go/rest/fake"
+
+	"k8s.io/cli-runtime/pkg/genericclioptions"
+	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 )
 
 var _ = Describe("alter", func() {
-	const (
-		webhookURL = "https://oapi.dingtalk.com/robot/send?access_token=123456"
-	)
-	It("string to map", func() {
-		key := "url"
-		str := key + "=" + webhookURL
-		res := strToMap(str)
-		Expect(res).ShouldNot(BeNil())
-		Expect(res["url"]).Should(Equal(webhookURL))
+	var f *cmdtesting.TestFactory
+	var s genericclioptions.IOStreams
+
+	BeforeEach(func() {
+		f = cmdtesting.NewTestFactory()
+		f.Client = &clientfake.RESTClient{}
+		s, _, _, _ = genericclioptions.NewTestIOStreams()
 	})
 
-	It("get url webhook type", func() {
-		webhookType := getWebhookType(webhookURL)
-		Expect(webhookType).Should(Equal(dingtalkWebhookType))
+	AfterEach(func() {
+		f.Cleanup()
 	})
 
-	It("remove duplicate string from slice", func() {
-		slice := []string{"a", "b", "a", "c"}
-		res := removeDuplicateStr(slice)
-		Expect(res).ShouldNot(BeNil())
-		Expect(res).Should(Equal([]string{"a", "b", "c"}))
+	It("create new list receiver cmd", func() {
+		cmd := newListReceiversCmd(f, s)
+		Expect(cmd).NotTo(BeNil())
 	})
 })

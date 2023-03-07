@@ -20,5 +20,8 @@ dependencies:
 - name: csi-s3
   repository: ""
   version: 0.*
-digest: sha256:3213aa66925085bb4c70c51d4446580abf4d891a108c9caa744ec5e8f7f46f40
-generated: "2023-03-03T16:30:01.727432+08:00"
+- name: alertmanager-webhook-adaptor
+  repository: ""
+  version: 0.1.*
+digest: sha256:9afd1d91f1b11a875afc9f5ecdc7caae4ee53783276379eb86a21e1a496b0c4a
+generated: "2023-03-07T14:45:44.706369+08:00"

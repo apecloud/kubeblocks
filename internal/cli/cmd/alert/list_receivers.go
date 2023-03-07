@@ -17,11 +17,11 @@ limitations under the License.
 package alert
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/spf13/cobra"
-	"golang.org/x/exp/slices"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
@@ -55,14 +55,46 @@ func newListReceiversCmd(f cmdutil.Factory, streams genericclioptions.IOStreams)
 }
 
 func (o *listReceiversOptions) run() error {
-	data, err := getAlertConfigData(o.alterConfigMap)
+	data, err := getConfigData(o.alterConfigMap, alertConfigFileName)
+	if err != nil {
+		return err
+	}
+
+	webhookData, err := getConfigData(o.webhookConfigMap, webhookAdaptorFileName)
 	if err != nil {
 		return err
 	}
 
 	receivers := getReceiversFromData(data)
 	if len(receivers) == 0 {
+		fmt.Fprintf(o.Out, "No receivers found in alertmanager config %s\n", alertConfigmapName)
 		return nil
+	}
+	webhookReceivers := getReceiversFromData(webhookData)
+	if len(receivers) == 0 {
+		fmt.Fprintf(o.Out, "No receivers found in webhook adaptor config %s\n", webhookAdaptorName)
+		return nil
+	}
+
+	// build receiver webhook map, key is receiver name, value is webhook config that with
+	// the real webhook url
+	receiverWebhookMap := make(map[string][]webhookConfig)
+	for _, r := range receivers {
+		var cfgs []webhookConfig
+		name := r.(map[string]interface{})["name"].(string)
+		for _, w := range webhookReceivers {
+			obj := w.(map[string]interface{})
+			if obj["name"] == name {
+				cfg := webhookConfig{}
+				params := obj["params"].(map[string]interface{})
+				cfg.URL = params["url"].(string)
+				if params["token"] != nil {
+					cfg.Token = params["token"].(string)
+				}
+				cfgs = append(cfgs, cfg)
+			}
+		}
+		receiverWebhookMap[name] = cfgs
 	}
 
 	// build receiver route map, key is receiver name, value is route
@@ -77,16 +109,17 @@ func (o *listReceiversOptions) run() error {
 	}
 
 	tbl := printer.NewTablePrinter(o.Out)
-	tbl.SetHeader("NAME", "EMAIL", "WEBHOOK", "SLACK", "CLUSTER", "SEVERITY")
+	tbl.SetHeader("NAME", "WEBHOOK", "EMAIL", "SLACK", "CLUSTER", "SEVERITY")
 	for _, rec := range receivers {
 		recMap := rec.(map[string]interface{})
 		name := recMap["name"].(string)
 		routeInfo := getRouteInfo(receiverRouteMap[name])
-		tbl.AddRow(name, joinConfigs(recMap, "email_configs"),
-			joinConfigs(recMap, "webhook_configs"),
+		webhookCfgs := receiverWebhookMap[name]
+		tbl.AddRow(name, joinWebhookConfigs(webhookCfgs),
+			joinConfigs(recMap, "email_configs"),
 			joinConfigs(recMap, "slack_configs"),
-			strings.Join(routeInfo[routeMatcherClusterType], ","),
-			strings.Join(routeInfo[routeMatcherSeverityType], ","))
+			strings.Join(routeInfo[routeMatcherClusterKey], ","),
+			strings.Join(routeInfo[routeMatcherSeverityKey], ","))
 	}
 	tbl.Print()
 	return nil
@@ -106,15 +139,11 @@ func getRouteInfo(route *route) map[string][]string {
 		if !strings.Contains(m, t) {
 			return
 		}
-		matcher := strings.Split(m, t)
+		matcher := strings.Split(m, routeMatcherOperator)
 		if len(matcher) != 2 {
 			return
 		}
-		infos := strings.Split(matcher[1], routeMatcherOperator)
-		if len(infos) != 2 {
-			return
-		}
-		info := removeDuplicateStr(strings.Split(infos[1], "|"))
+		info := removeDuplicateStr(strings.Split(matcher[1], "|"))
 		routeInfoMap[t] = append(routeInfoMap[t], info...)
 	}
 
@@ -123,6 +152,14 @@ func getRouteInfo(route *route) map[string][]string {
 		fetchInfo(m, routeMatcherSeverityKey)
 	}
 	return routeInfoMap
+}
+
+func joinWebhookConfigs(cfgs []webhookConfig) string {
+	var result []string
+	for _, c := range cfgs {
+		result = append(result, c.string())
+	}
+	return strings.Join(result, "\n")
 }
 
 func joinConfigs(rec map[string]interface{}, key string) string {
@@ -137,12 +174,6 @@ func joinConfigs(rec map[string]interface{}, key string) string {
 	}
 
 	switch key {
-	case "webhook_configs":
-		for _, c := range cfg.([]interface{}) {
-			var webhook webhookConfig
-			_ = mapstructure.Decode(c, &webhook)
-			result = append(result, webhook.string())
-		}
 	case "slack_configs":
 		for _, c := range cfg.([]interface{}) {
 			var slack slackConfig
@@ -157,14 +188,4 @@ func joinConfigs(rec map[string]interface{}, key string) string {
 		}
 	}
 	return strings.Join(result, "\n")
-}
-
-func removeDuplicateStr(strArray []string) []string {
-	var result []string
-	for _, s := range strArray {
-		if !slices.Contains(result, s) {
-			result = append(result, s)
-		}
-	}
-	return result
 }

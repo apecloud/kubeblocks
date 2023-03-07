@@ -26,11 +26,11 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	apitypes "k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/kubernetes"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
+	"sigs.k8s.io/yaml"
 
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
@@ -39,11 +39,17 @@ import (
 const (
 	// alertConfigFileName is the name of alertmanager config file
 	alertConfigFileName = "alertmanager.yml"
+
+	// webhookAdaptorFileName is the name of webhook adaptor config file
+	webhookAdaptorFileName = "config.yml"
 )
 
 var (
 	// alertConfigmapName is the name of alertmanager configmap
 	alertConfigmapName = fmt.Sprintf("%s-alertmanager-config", types.KubeBlocksReleaseName)
+
+	// webhookAdaptorName is the name of webhook adaptor
+	webhookAdaptorName = fmt.Sprintf("%s-webhook-adaptor-config", types.KubeBlocksReleaseName)
 )
 
 var (
@@ -66,8 +72,9 @@ var (
 
 type baseOptions struct {
 	genericclioptions.IOStreams
-	alterConfigMap *corev1.ConfigMap
-	client         kubernetes.Interface
+	alterConfigMap   *corev1.ConfigMap
+	webhookConfigMap *corev1.ConfigMap
+	client           kubernetes.Interface
 }
 
 type addReceiverOptions struct {
@@ -79,6 +86,10 @@ type addReceiverOptions struct {
 	clusters   []string
 	severities []string
 	name       string
+
+	receiver                *receiver
+	route                   *route
+	webhookAdaptorReceivers []webhookAdaptorReceiver
 }
 
 func newAddReceiverCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
@@ -111,13 +122,26 @@ func newAddReceiverCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *
 
 func (o *baseOptions) complete(f cmdutil.Factory) error {
 	var err error
+	ctx := context.Background()
 
 	o.client, err = f.KubernetesClientSet()
 	if err != nil {
 		return err
 	}
 
-	o.alterConfigMap, err = getAlertConfigmap(o.client)
+	namespace, err := util.GetKubeBlocksNamespace(o.client)
+	if err != nil {
+		return err
+	}
+
+	// get alertmanager configmap
+	o.alterConfigMap, err = o.client.CoreV1().ConfigMaps(namespace).Get(ctx, alertConfigmapName, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+
+	// get webhook adaptor configmap
+	o.webhookConfigMap, err = o.client.CoreV1().ConfigMaps(namespace).Get(ctx, webhookAdaptorName, metav1.GetOptions{})
 	return err
 }
 
@@ -138,47 +162,49 @@ func (o *addReceiverOptions) validate(args []string) error {
 
 func (o *addReceiverOptions) run() error {
 	// build receiver
-	receiver, err := o.buildReceiver()
-	if err != nil {
+	if err := o.buildReceiver(); err != nil {
 		return err
 	}
 
 	// build route
-	route, err := o.buildRoute()
-	if err != nil {
+	o.buildRoute()
+
+	// add alertmanager receiver and route
+	if err := o.addReceiver(); err != nil {
 		return err
 	}
 
-	if err = o.addReceiver(receiver, route); err != nil {
+	// add webhook receiver
+	if err := o.addWebhookReceivers(); err != nil {
 		return err
 	}
 
-	fmt.Fprintf(o.Out, "receiver %s added successfully", receiver.Name)
+	fmt.Fprintf(o.Out, "Receiver %s added successfully\n", o.receiver.Name)
 	return nil
 }
 
 // buildReceiver builds receiver from receiver options
-func (o *addReceiverOptions) buildReceiver() (*receiver, error) {
-	webhookConfigs, err := buildWebhookConfigs(o.webhooks)
+func (o *addReceiverOptions) buildReceiver() error {
+	webhookConfigs, err := o.buildWebhook()
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	slackConfigs, err := buildSlackConfigs(o.slacks)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	r := &receiver{
+	o.receiver = &receiver{
 		Name:           o.name,
 		EmailConfigs:   buildEmailConfigs(o.emails),
 		WebhookConfigs: webhookConfigs,
 		SlackConfigs:   slackConfigs,
 	}
-	return r, nil
+	return nil
 }
 
-func (o *addReceiverOptions) buildRoute() (*route, error) {
+func (o *addReceiverOptions) buildRoute() {
 	r := &route{
 		Receiver: o.name,
 		Continue: true,
@@ -203,11 +229,12 @@ func (o *addReceiverOptions) buildRoute() (*route, error) {
 		if len(values) == 0 {
 			return ""
 		}
+		deValues := removeDuplicateStr(values)
 		switch t {
 		case routeMatcherClusterType:
-			return routeMatcherClusterKey + routeMatcherOperator + strings.Join(values, "|")
+			return routeMatcherClusterKey + routeMatcherOperator + strings.Join(deValues, "|")
 		case routeMatcherSeverityType:
-			return routeMatcherSeverityKey + routeMatcherOperator + strings.Join(values, "|")
+			return routeMatcherSeverityKey + routeMatcherOperator + strings.Join(deValues, "|")
 		default:
 			return ""
 		}
@@ -215,35 +242,52 @@ func (o *addReceiverOptions) buildRoute() (*route, error) {
 
 	r.Matchers = append(r.Matchers, buildMatchers(routeMatcherClusterType, clusterArray),
 		buildMatchers(routeMatcherSeverityType, severityArray))
-	return r, nil
+	o.route = r
 }
 
 // addReceiver adds receiver to alertmanager config
-func (o *addReceiverOptions) addReceiver(receiver *receiver, route *route) error {
-	data, err := getAlertConfigData(o.alterConfigMap)
+func (o *addReceiverOptions) addReceiver() error {
+	data, err := getConfigData(o.alterConfigMap, alertConfigFileName)
 	if err != nil {
 		return err
 	}
 
 	// add receiver
 	receivers := getReceiversFromData(data)
-	receivers = append(receivers, receiver)
+	receivers = append(receivers, o.receiver)
 
 	// add route
 	routes := getRoutesFromData(data)
-	routes = append(routes, route)
+	routes = append(routes, o.route)
 
 	data["receivers"] = receivers
 	data["route"].(map[string]interface{})["routes"] = routes
 
 	// update alertmanager configmap
-	return updateAlertConfig(o.client, o.alterConfigMap.Namespace, data)
+	return updateConfig(o.client, o.alterConfigMap, alertConfigFileName, data)
 }
 
-// buildWebhookConfigs builds webhookConfig from webhook options
-func buildWebhookConfigs(webhooks []string) ([]*webhookConfig, error) {
+func (o *addReceiverOptions) addWebhookReceivers() error {
+	data, err := getConfigData(o.webhookConfigMap, webhookAdaptorFileName)
+	if err != nil {
+		return err
+	}
+
+	receivers := getReceiversFromData(data)
+	for _, r := range o.webhookAdaptorReceivers {
+		receivers = append(receivers, r)
+	}
+	data["receivers"] = receivers
+
+	// update webhook configmap
+	return updateConfig(o.client, o.webhookConfigMap, webhookAdaptorFileName, data)
+}
+
+// buildWebhook builds webhookConfig and webhookAdaptorReceiver from webhook options
+func (o *addReceiverOptions) buildWebhook() ([]*webhookConfig, error) {
 	var ws []*webhookConfig
-	for _, hook := range webhooks {
+	var waReceivers []webhookAdaptorReceiver
+	for _, hook := range o.webhooks {
 		m := strToMap(hook)
 		if len(m) == 0 {
 			return nil, fmt.Errorf("invalid webhook: %s, webhook should be in the format of url=my-url,tolen=my-token", hook)
@@ -252,19 +296,29 @@ func buildWebhookConfigs(webhooks []string) ([]*webhookConfig, error) {
 			MaxAlerts:    10,
 			SendResolved: false,
 		}
+		waReceiver := webhookAdaptorReceiver{Name: o.name}
 		for k, v := range m {
 			// check webhookConfig keys
 			switch webhookKey(k) {
 			case webhookURL:
-				w.URL = v
+				w.URL = getWebhookURL(o.name)
+				webhookType := getWebhookType(v)
+				if webhookType == unknownWebhookType {
+					return nil, fmt.Errorf("invalid webhook url: %s, failed to prase the webhook type", v)
+				}
+				waReceiver.Type = string(webhookType)
+				waReceiver.Params.URL = v
 			case webhookToken:
 				w.Token = v
+				waReceiver.Params.Secret = v
 			default:
-				return nil, fmt.Errorf("invalid webhookConfig key: %s", k)
+				return nil, fmt.Errorf("invalid webhookConfig key: %s, webhook key should be one of url and token", k)
 			}
 		}
 		ws = append(ws, &w)
+		waReceivers = append(waReceivers, waReceiver)
 	}
+	o.webhookAdaptorReceivers = waReceivers
 	return ws, nil
 }
 
@@ -307,13 +361,13 @@ func buildEmailConfigs(emails []string) []*emailConfig {
 	return es
 }
 
-func updateAlertConfig(client kubernetes.Interface, namespace string, data map[string]interface{}) error {
-	newValue, err := json.Marshal(data)
+func updateConfig(client kubernetes.Interface, cm *corev1.ConfigMap, key string, data map[string]interface{}) error {
+	newValue, err := yaml.Marshal(data)
 	if err != nil {
 		return err
 	}
-	_, err = client.CoreV1().ConfigMaps(namespace).Patch(context.TODO(), alertConfigmapName, apitypes.JSONPatchType,
+	_, err = client.CoreV1().ConfigMaps(cm.Namespace).Patch(context.TODO(), cm.Name, apitypes.JSONPatchType,
 		[]byte(fmt.Sprintf("[{\"op\": \"replace\", \"path\": \"/data/%s\", \"value\": %s }]",
-			alertConfigFileName, strconv.Quote(string(newValue)))), metav1.PatchOptions{})
+			key, strconv.Quote(string(newValue)))), metav1.PatchOptions{})
 	return err
 }

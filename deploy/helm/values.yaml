@@ -281,7 +281,7 @@ prometheus:
     ## Defining configMapOverrideName will cause templates/alertmanager-configmap.yaml
     ## to NOT generate a ConfigMap resource
     ##
-    configMapOverrideName: "alertmanager-config
+    configMapOverrideName: "alertmanager-config"
 
     ## Node tolerations for alertmanager scheduling to nodes with taints
     ## Ref: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/
@@ -1365,7 +1365,7 @@ csi-s3:
     singleBucket: ""
     mountOptions: "--memory-limit 1000 --dir-mode 0777 --file-mode 0666 --region cn-northwest-1"
 
-webhook-adaptor:
+alertmanager-webhook-adaptor:
   ## If false, Webhook-Adaptor sub-chart will not be installed
   ##
   enabled: false
@@ -1378,11 +1378,11 @@ webhook-adaptor:
     registry: registry.cn-hangzhou.aliyuncs.com
     repository: apecloud/alertmanager-webhook-adaptor
     pullPolicy: IfNotPresent
-    tag: "0.1.0"
+    tag: "0.1.1"
 
   ## ConfigMap override where fullname is {{.Release.Name}}-{{.Values.configMapOverrideName}}
   ##
-  configMapOverrideName: ""
+  configMapOverrideName: "webhook-adaptor-config"
 
   resources: { }
   # We usually recommend not to specify default resources and to leave this as a conscious
@@ -1398,4 +1398,4 @@ webhook-adaptor:
 
   ## Webhook-Adaptor ConfigMap Entries
   configFiles:
-    config.yaml: {}
+    config.yaml: { }

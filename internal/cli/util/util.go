@@ -597,3 +597,74 @@ func GetKubeBlocksNamespace(client kubernetes.Interface) (string, error) {
 	}
 	return "", errors.New("failed to get KubeBlocks installation namespace")
 }
+
+type ExposeType string
+
+const (
+	ExposeToVPC      ExposeType = "vpc"
+	ExposeToInternet ExposeType = "internet"
+
+	EnableValue  string = "true"
+	DisableValue string = "false"
+)
+
+var ProviderExposeAnnotations = map[K8sProvider]map[ExposeType]map[string]string{
+	EKSProvider: {
+		ExposeToVPC: map[string]string{
+			"service.beta.kubernetes.io/aws-load-balancer-type":     "nlb",
+			"service.beta.kubernetes.io/aws-load-balancer-internal": "true",
+		},
+		ExposeToInternet: map[string]string{
+			"service.beta.kubernetes.io/aws-load-balancer-type":     "nlb",
+			"service.beta.kubernetes.io/aws-load-balancer-internal": "false",
+		},
+	},
+	GKEProvider: {
+		ExposeToVPC: map[string]string{
+			"networking.gke.io/load-balancer-type": "Internal",
+		},
+		ExposeToInternet: map[string]string{},
+	},
+	AKSProvider: {
+		ExposeToVPC: map[string]string{
+			"service.beta.kubernetes.io/azure-load-balancer-internal": "true",
+		},
+		ExposeToInternet: map[string]string{
+			"service.beta.kubernetes.io/azure-load-balancer-internal": "false",
+		},
+	},
+	ACKProvider: {
+		ExposeToVPC: map[string]string{
+			"service.beta.kubernetes.io/alibaba-cloud-loadbalancer-address-type": "intranet",
+		},
+		ExposeToInternet: map[string]string{
+			"service.beta.kubernetes.io/alibaba-cloud-loadbalancer-address-type": "internet",
+		},
+	},
+}
+
+func GetExposeAnnotations(provider K8sProvider, exposeType ExposeType) (map[string]string, error) {
+	exposeAnnotations, ok := ProviderExposeAnnotations[provider]
+	if !ok {
+		return nil, fmt.Errorf("unsupported provider: %s", provider)
+	}
+	annotations, ok := exposeAnnotations[exposeType]
+	if !ok {
+		return nil, fmt.Errorf("unsupported expose type: %s on provider %s", exposeType, provider)
+	}
+	return annotations, nil
+}
+
+func GetK8SProvider(client kubernetes.Interface) (K8sProvider, error) {
+	versionInfo, err := GetVersionInfo(client)
+	if err != nil {
+		return "", err
+	}
+
+	versionErr := fmt.Errorf("failed to get kubernetes version")
+	k8sVersionStr, ok := versionInfo[KubernetesApp]
+	if !ok {
+		return "", versionErr
+	}
+	return GetK8sProvider(k8sVersionStr), nil
+}

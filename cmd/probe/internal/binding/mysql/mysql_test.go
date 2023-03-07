@@ -38,8 +38,6 @@ import (
 	. "github.com/apecloud/kubeblocks/cmd/probe/internal/binding"
 )
 
-var log = logger.NewLogger("testing")
-
 // Test case for Init() function
 func TestInit(t *testing.T) {
 	// Set up relevant viper config variables

@@ -208,20 +208,42 @@ func (o *CreateBackupOptions) Validate() error {
 
 func (o *CreateBackupOptions) getConnectionSecret() (string, error) {
 	// find secret from cluster label
-	opts := metav1.ListOptions{
-		LabelSelector: fmt.Sprintf("%s=%s,%s=%s",
-			constant.AppInstanceLabelKey, o.Name,
-			constant.AppManagedByLabelKey, constant.AppName),
+	var (
+		accountSecretLabels = fmt.Sprintf("%s=%s,%s=%s",
+			intctrlutil.AppInstanceLabelKey, o.Name,
+			intctrlutil.ClusterAccountLabelKey, appsv1alpha1.DataprotectionAccount,
+		)
+		clusterConnectionSecretLabels = fmt.Sprintf("%s=%s,%s=%s",
+			intctrlutil.AppInstanceLabelKey, o.Name,
+			intctrlutil.AppManagedByLabelKey, intctrlutil.AppName)
+	)
+	// optsArray is used to find the secret from cluster label
+	optsArray := []metav1.ListOptions{
+		{
+			LabelSelector: accountSecretLabels,
+		},
+		{
+			LabelSelector: clusterConnectionSecretLabels,
+		},
 	}
+<<<<<<< HEAD
 	gvr := schema.GroupVersionResource{Version: "v1", Resource: "secrets"}
 	secretObjs, err := o.Dynamic.Resource(gvr).Namespace(o.Namespace).List(context.TODO(), opts)
 	if err != nil {
 		return "", err
+=======
+	// iterate optsArray to find the secret
+	for _, opts := range optsArray {
+		secretObjs, err := o.Client.Resource(types.SecretGVR()).Namespace(o.Namespace).List(context.TODO(), opts)
+		if err != nil {
+			return "", err
+		}
+		if len(secretObjs.Items) > 0 {
+			return secretObjs.Items[0].GetName(), nil
+		}
+>>>>>>> 72116949 (fix: dataprotection uses secret create by system account by default)
 	}
-	if len(secretObjs.Items) == 0 {
-		return "", fmt.Errorf("not found connection credential for cluster %s", o.Name)
-	}
-	return secretObjs.Items[0].GetName(), nil
+	return "", fmt.Errorf("not found connection credential for cluster %s", o.Name)
 }
 
 func (o *CreateBackupOptions) getDefaultBackupPolicyTemplate() (string, error) {

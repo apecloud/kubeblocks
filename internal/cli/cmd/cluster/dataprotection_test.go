@@ -90,6 +90,29 @@ var _ = Describe("DataProtection", func() {
 			_ = cmd.Flags().Set("backup-type", "snapshot")
 			cmd.Run(cmd, []string{testing.ClusterName})
 		})
+
+		It("run backup command with dataprotection account", func() {
+			cluster := testing.FakeCluster(testing.ClusterName, testing.Namespace)
+			clusterDefLabel := map[string]string{
+				intctrlutil.ClusterDefLabelKey: "apecloud-mysql",
+			}
+			cluster.SetLabels(clusterDefLabel)
+
+			template := testing.FakeBackupPolicyTemplate()
+			template.SetLabels(clusterDefLabel)
+
+			secrets := testing.FakeSecretsWithLabels(testing.Namespace, map[string]string{
+				intctrlutil.AppInstanceLabelKey:    cluster.Name,
+				intctrlutil.ClusterAccountLabelKey: "kbdataprotection",
+			})
+			tf.FakeDynamicClient = fake.NewSimpleDynamicClient(scheme.Scheme, &secrets.Items[0], cluster, template)
+			cmd := NewCreateBackupCmd(tf, streams)
+			Expect(cmd).ShouldNot(BeNil())
+			// must succeed otherwise exit 1 and make test fails
+			_ = cmd.Flags().Set("backup-type", "snapshot")
+			cmd.Run(cmd, []string{testing.ClusterName})
+		})
+
 	})
 
 	It("delete-backup", func() {

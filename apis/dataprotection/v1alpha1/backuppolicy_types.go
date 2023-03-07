@@ -81,8 +81,8 @@ type TargetCluster struct {
 	LabelsSelector *metav1.LabelSelector `json:"labelsSelector"`
 
 	// target db cluster access secret
-	// +kubebuilder:validation:Required
-	Secret BackupPolicySecret `json:"secret"`
+	// +optional
+	Secret *BackupPolicySecret `json:"secret"`
 }
 
 // BackupPolicySecret defined for the target database secret that backup tool can connect.

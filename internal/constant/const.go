@@ -86,6 +86,9 @@ const (
 
 	// configuration finalizer
 	ConfigurationTemplateFinalizerName = "configuration.kubeblocks.io/finalizer"
+
+	// account labels
+	ClusterAccountLabelKey = "account.kubeblocks.io/name"
 )
 
 const (

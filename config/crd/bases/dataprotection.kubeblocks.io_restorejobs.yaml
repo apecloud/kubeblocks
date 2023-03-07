@@ -125,7 +125,6 @@ spec:
                     type: object
                 required:
                 - labelsSelector
-                - secret
                 type: object
               targetVolumeMounts:
                 description: array of restore volume mounts .

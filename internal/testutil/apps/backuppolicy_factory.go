@@ -84,6 +84,7 @@ func (factory *MockBackupPolicyFactory) AddMatchLabels(keyAndValues ...string) *
 }
 
 func (factory *MockBackupPolicyFactory) SetTargetSecretName(name string) *MockBackupPolicyFactory {
+	factory.get().Spec.Target.Secret = &dataprotectionv1alpha1.BackupPolicySecret{}
 	factory.get().Spec.Target.Secret.Name = name
 	return factory
 }

@@ -298,7 +298,7 @@ func (r *SystemAccountReconciler) createByStmt(reqCtx intctrlutil.RequestCtx,
 		}
 	}
 	// push secret to global SecretMapStore, and secret will not be created until job succeeds.
-	key := concatSecretName(compKey, (string)(account.Name))
+	key := concatSecretName(compKey, account.Name.String())
 	return r.SecretMapStore.addSecret(key, secret)
 }
 
@@ -313,7 +313,7 @@ func (r *SystemAccountReconciler) createByReferingToExisting(reqCtx intctrlutil.
 		return err
 	}
 	// and make a copy of it
-	newSecret := renderSecretByCopy(key, (string)(account.Name), secret)
+	newSecret := renderSecretByCopy(key, account.Name.String(), secret)
 	if uprefErr := controllerutil.SetOwnerReference(cluster, newSecret, scheme); uprefErr != nil {
 		return uprefErr
 	}
@@ -387,7 +387,7 @@ func (r *jobCompletitionPredicate) Delete(e event.DeleteEvent) bool {
 	}
 
 	ml := job.ObjectMeta.Labels
-	accountName, ok := ml[clusterAccountLabelKey]
+	accountName, ok := ml[constant.ClusterAccountLabelKey]
 	if !ok {
 		return false
 	}

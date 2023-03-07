@@ -1703,7 +1703,6 @@ spec:
                     type: object
                 required:
                 - labelsSelector
-                - secret
                 type: object
               ttl:
                 description: TTL is a time.Duration-parseable string describing how

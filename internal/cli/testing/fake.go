@@ -198,6 +198,18 @@ func FakeSecrets(namespace string, cluster string) *corev1.SecretList {
 	return &corev1.SecretList{Items: []corev1.Secret{secret}}
 }
 
+func FakeSecretsWithLabels(namespace string, labels map[string]string) *corev1.SecretList {
+	secret := corev1.Secret{}
+	secret.Name = GetRandomStr()
+	secret.Namespace = namespace
+	secret.Labels = labels
+	secret.Data = map[string][]byte{
+		"username": []byte("test-user"),
+		"password": []byte("test-password"),
+	}
+	return &corev1.SecretList{Items: []corev1.Secret{secret}}
+}
+
 func FakeNode() *corev1.Node {
 	node := &corev1.Node{}
 	node.Name = NodeName

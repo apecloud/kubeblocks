@@ -272,7 +272,8 @@ func buildReplicationSetPVC(task *intctrltypes.ReconcileTask, sts *appsv1.Statef
 	}
 	podVolumes := podSpec.Volumes
 	for _, pvc := range pvcMap {
-		podVolumes, _ = intctrlutil.CreateOrUpdateVolume(podVolumes, pvc.Name, func(volumeName string) corev1.Volume {
+		volumeName := strings.Split(pvc.Name, "-")[0]
+		podVolumes, _ = intctrlutil.CreateOrUpdateVolume(podVolumes, volumeName, func(volumeName string) corev1.Volume {
 			return corev1.Volume{
 				Name: volumeName,
 				VolumeSource: corev1.VolumeSource{

@@ -17,6 +17,7 @@ limitations under the License.
 package configuration
 
 import (
+	"github.com/StudioSol/set"
 	apiext "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/kube-openapi/pkg/validation/errors"
 	kubeopenapispec "k8s.io/kube-openapi/pkg/validation/spec"
@@ -26,6 +27,8 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 )
 
+type ValidatorOptions = func(key string) bool
+
 type ConfigValidator interface {
 	Validate(cfg map[string]string) error
 }
@@ -34,13 +37,32 @@ type configCueValidator struct {
 	// cue describe configuration template
 	cueScript string
 	cfgType   appsv1alpha1.CfgFileFormat
+
+	// configmap key selector
+	keySelector []ValidatorOptions
+}
+
+func keyFilter(options []ValidatorOptions, key string) bool {
+	if len(options) == 0 {
+		return false
+	}
+
+	for _, option := range options {
+		if !option(key) {
+			return true
+		}
+	}
+	return false
 }
 
 func (c *configCueValidator) Validate(cfg map[string]string) error {
 	if c.cueScript == "" {
 		return nil
 	}
-	for _, content := range cfg {
+	for key, content := range cfg {
+		if keyFilter(c.keySelector, key) {
+			continue
+		}
 		if err := ValidateConfigurationWithCue(c.cueScript, c.cfgType, content); err != nil {
 			return err
 		}
@@ -52,12 +74,18 @@ type schemaValidator struct {
 	typeName string
 	schema   *apiext.JSONSchemaProps
 	cfgType  appsv1alpha1.CfgFileFormat
+
+	// configmap key selector
+	keySelector []ValidatorOptions
 }
 
-func (s schemaValidator) Validate(cfg map[string]string) error {
+func (s *schemaValidator) Validate(cfg map[string]string) error {
 	openAPITypes := &kubeopenapispec.Schema{}
 	validator := validate.NewSchemaValidator(openAPITypes, nil, "", strfmt.Default)
 	for key, data := range cfg {
+		if keyFilter(s.keySelector, key) {
+			continue
+		}
 		cfg, err := loadConfiguration(s.cfgType, data)
 		if err != nil {
 			return err
@@ -77,7 +105,17 @@ func (e EmptyValidator) Validate(_ map[string]string) error {
 	return nil
 }
 
-func NewConfigValidator(configTemplate *appsv1alpha1.ConfigConstraintSpec) ConfigValidator {
+func WithKeySelector(keys []string) ValidatorOptions {
+	var sets *set.LinkedHashSetString
+	if len(keys) > 0 {
+		sets = FromCMKeysSelector(keys)
+	}
+	return func(key string) bool {
+		return sets == nil || sets.InArray(key)
+	}
+}
+
+func NewConfigValidator(configTemplate *appsv1alpha1.ConfigConstraintSpec, options ...ValidatorOptions) ConfigValidator {
 	var (
 		validator    ConfigValidator
 		configSchema = configTemplate.ConfigurationSchema
@@ -88,14 +126,16 @@ func NewConfigValidator(configTemplate *appsv1alpha1.ConfigConstraintSpec) Confi
 		validator = &EmptyValidator{}
 	case len(configSchema.CUE) != 0:
 		validator = &configCueValidator{
-			cfgType:   configTemplate.FormatterConfig.Format,
-			cueScript: configSchema.CUE,
+			cfgType:     configTemplate.FormatterConfig.Format,
+			cueScript:   configSchema.CUE,
+			keySelector: options,
 		}
 	case configSchema.Schema != nil:
 		validator = &schemaValidator{
-			typeName: configTemplate.CfgSchemaTopLevelName,
-			cfgType:  configTemplate.FormatterConfig.Format,
-			schema:   configSchema.Schema,
+			typeName:    configTemplate.CfgSchemaTopLevelName,
+			cfgType:     configTemplate.FormatterConfig.Format,
+			schema:      configSchema.Schema,
+			keySelector: options,
 		}
 	default:
 		validator = &EmptyValidator{}

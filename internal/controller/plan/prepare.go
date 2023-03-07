@@ -475,20 +475,16 @@ func updateStatefulLabelsWithTemplate(sts *appsv1.StatefulSet, allLabels map[str
 // into PodSpec if configuration reload option is on
 func updateConfigurationManagerWithComponent(podSpec *corev1.PodSpec, cfgTemplates []appsv1alpha1.ConfigTemplate, ctx context.Context, cli client.Client, params builder.BuilderParams) error {
 	var (
+		err error
+
 		volumeDirs          []corev1.VolumeMount
 		configManagerParams *cfgcm.ConfigManagerParams
-		err                 error
-
-		defaultVarRunVolumePath = "/var/run"
-		criEndpointVolumeName   = "cri-runtime-endpoint"
-		// criRuntimeEndpoint      = viper.GetString(cfgcore.CRIRuntimeEndpoint)
-		// criType                 = viper.GetString(cfgcore.ConfigCRIType)
 	)
 
 	if volumeDirs = getUsingVolumesByCfgTemplates(podSpec, cfgTemplates); len(volumeDirs) == 0 {
 		return nil
 	}
-	if configManagerParams, err = buildConfigManagerParams(cli, ctx, cfgTemplates, volumeDirs, defaultVarRunVolumePath, criEndpointVolumeName, params); err != nil {
+	if configManagerParams, err = buildConfigManagerParams(cli, ctx, cfgTemplates, volumeDirs, params); err != nil {
 		return err
 	}
 	if configManagerParams == nil {
@@ -499,7 +495,6 @@ func updateConfigurationManagerWithComponent(podSpec *corev1.PodSpec, cfgTemplat
 	if err != nil {
 		return err
 	}
-	updateCRIContainerVolume(podSpec, defaultVarRunVolumePath, criEndpointVolumeName)
 	updateTPLScriptVolume(podSpec, configManagerParams)
 
 	// Add sidecar to podTemplate
@@ -508,21 +503,6 @@ func updateConfigurationManagerWithComponent(podSpec *corev1.PodSpec, cfgTemplat
 	// This sidecar container will be able to view and signal processes from other containers
 	podSpec.ShareProcessNamespace = func() *bool { b := true; return &b }()
 	return nil
-}
-
-func updateCRIContainerVolume(podSpec *corev1.PodSpec, volumePath string, volumeName string) {
-	podVolumes := podSpec.Volumes
-	podVolumes, _ = intctrlutil.CreateOrUpdateVolume(podVolumes, volumeName, func(volumeName string) corev1.Volume {
-		return corev1.Volume{
-			Name: volumeName,
-			VolumeSource: corev1.VolumeSource{
-				HostPath: &corev1.HostPathVolumeSource{
-					Path: volumePath,
-				},
-			},
-		}
-	}, nil)
-	podSpec.Volumes = podVolumes
 }
 
 func updateTPLScriptVolume(podSpec *corev1.PodSpec, configManager *cfgcm.ConfigManagerParams) {
@@ -576,17 +556,13 @@ func getUsingVolumesByCfgTemplates(podSpec *corev1.PodSpec, cfgTemplates []appsv
 	return volumeDirs
 }
 
-func buildConfigManagerParams(cli client.Client, ctx context.Context, cfgTemplates []appsv1alpha1.ConfigTemplate, volumeDirs []corev1.VolumeMount, volumePath string, volumeName string, params builder.BuilderParams) (*cfgcm.ConfigManagerParams, error) {
+func buildConfigManagerParams(cli client.Client, ctx context.Context, cfgTemplates []appsv1alpha1.ConfigTemplate, volumeDirs []corev1.VolumeMount, params builder.BuilderParams) (*cfgcm.ConfigManagerParams, error) {
 	configManagerParams := &cfgcm.ConfigManagerParams{
 		ManagerName:   constant.ConfigSidecarName,
 		CharacterType: params.Component.CharacterType,
 		SecreteName:   component.GenerateConnCredential(params.Cluster.Name),
 		Image:         viper.GetString(constant.ConfigSidecarIMAGE),
-		// add cri sock path
-		Volumes: append(volumeDirs, corev1.VolumeMount{
-			Name:      volumeName,
-			MountPath: volumePath,
-		}),
+		Volumes:       volumeDirs,
 	}
 
 	var err error

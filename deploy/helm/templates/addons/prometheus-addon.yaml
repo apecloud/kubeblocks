@@ -3,7 +3,7 @@ kind: Addon
 metadata:
   name: prometheus
   labels:
-    {{ - include "kubeblocks.labels" . | nindent 4 }}
+    {{- include "kubeblocks.labels" . | nindent 4 }}
 spec:
   description: Prometheus is a monitoring system and time series database.
   type: Helm
@@ -81,24 +81,5 @@ spec:
             requests:
               storage: 20Gi
 
-  # Addon installable spec., provide selector and auto-install settings.
   installable:
-    # autoInstall defines an addon should auto installed
-    autoInstall: false
-    # Addon installable selectors. If multiple selectors are provided
-    # that all selectors must evaluate to true.
-    selectors:
-      - # selector key, valid values are kubeGitVersion, kubeVersion.
-        # "kubeVersion" the semver expression of Kubernetes versions, i.e., v1.24.
-        # "kubeGitVersion" may contain distro info, i.e., v1.24.4+k3s1.
-        key: KubeGitVersion
-        # cluster version comparator opreator
-        # Possible enum values:
-        # - `"Contains"` line contains string (symbol: "|="）
-        # - `"DoesNotContain"` line does not contain string (symbol: "!=")
-        # - `"MatchRegex"` line contains a match to the regular expression (symbol: "|~"）
-        # - `"DoesNoteMatchRegex"` line does not contain a match to the regular expression (symbol: "!~")
-        operator: Contains
-        # An array of string values. Server as "OR" expression to operator.
-        values:
-          - kubeblocks
+    autoInstall: {{ .Values.prometheus.enabled }}

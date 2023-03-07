@@ -462,13 +462,21 @@ else
 	sed -i "s/^appVersion:.*/appVersion: $(VERSION)/" $(CHART_PATH)/Chart.yaml
 endif
 
+LOADBALANCER_CHART_VERSION=
+
 .PHONY: helm-package
 helm-package: bump-chart-ver ## Do helm package.
 ## it will pull down the latest charts that satisfy the dependencies, and clean up old dependencies.
 ## this is a hack fix: decompress the tgz from the depend-charts directory to the charts directory
 ## before dependency update.
-	cd $(CHART_PATH)/charts && ls ../depend-charts/*.tgz | xargs -n1 tar xf
-	$(HELM) dependency update --skip-refresh $(CHART_PATH)
+	#cd $(CHART_PATH)/charts && ls ../depend-charts/*.tgz | xargs -n1 tar xf
+	#$(HELM) dependency update --skip-refresh $(CHART_PATH)
+	$(HELM) package deploy/loadbalancer
+	mv loadbalancer-*.tgz deploy/helm/depend-charts/
+	$(HELM) package deploy/apecloud-mysql
+	mv apecloud-mysql-*.tgz deploy/helm/depend-charts/
+	$(HELM) package deploy/postgresql
+	mv postgresql-*.tgz deploy/helm/depend-charts/
 	$(HELM) package $(CHART_PATH)
 
 ##@ Build Dependencies

@@ -3,16 +3,16 @@ kind: Addon
 metadata:
   name: grafana
   labels:
-    {{ - include "kubeblocks.labels" . | nindent 4 }}
+    {{- include "kubeblocks.labels" . | nindent 4 }}
 spec:
   description: The leading tool for querying and visualizing time series and metrics.
   type: Helm
 
   helm:
-    chartRepoURL: https://github.com/grafana/helm-charts/releases/download/grafana-6.43.5/grafana-6.43.5.tgz
+    chartRepoURL: https://github.com/prometheus-community/helm-charts/releases/download/prometheus-15.16.1/prometheus-15.16.1.tgz
     installValues:
       configMapRefs:
-        - name: prometheus-chart-kubeblocks-values
+        - name: grafana-chart-kubeblocks-values
           key: values-kubeblocks-override.yaml
 
     valuesMapping:
@@ -50,3 +50,6 @@ spec:
       resources:
         requests:
           storage: 20Gi
+
+  installable:
+    autoInstall: {{ .Values.grafana.enabled }}

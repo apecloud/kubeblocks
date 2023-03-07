@@ -142,6 +142,86 @@ func TestGetRole(t *testing.T) {
 	})
 }
 
+func TestQueryOps(t *testing.T) {
+	mysqlOps, mock, _ := mockDatabase(t)
+	req := &bindings.InvokeRequest{Metadata: map[string]string{}}
+	req.Metadata["sql"] = "select .* from information_schema.wesql_cluster_local"
+
+	t.Run("QueryOps succeed", func(t *testing.T) {
+		col1 := sqlmock.NewColumn("CURRENT_LEADER").OfType("VARCHAR", "")
+		col2 := sqlmock.NewColumn("ROLE").OfType("VARCHAR", "")
+		col3 := sqlmock.NewColumn("SERVER_ID").OfType("INT", 0)
+		rows := sqlmock.NewRowsWithColumnDefinition(col1, col2, col3).AddRow("wesql-main-1.wesql-main-headless:13306", "Follower", 1)
+		mock.ExpectQuery("select .* from information_schema.wesql_cluster_local").WillReturnRows(rows)
+
+		result, err := mysqlOps.QueryOps(context.Background(), req, &bindings.InvokeResponse{})
+		assert.NoError(t, err)
+
+		// Assert that the event and message are correct
+		event, ok := result["event"]
+		assert.True(t, ok)
+		assert.Equal(t, "QuerySuccess", event)
+
+		message, ok := result["message"]
+		assert.True(t, ok)
+		t.Logf("query message: %s", message)
+	})
+
+	t.Run("QueryOps fails", func(t *testing.T) {
+		mock.ExpectQuery("select .* from information_schema.wesql_cluster_local").WillReturnError(errors.New("no record"))
+
+		result, err := mysqlOps.QueryOps(context.Background(), req, &bindings.InvokeResponse{})
+		assert.NoError(t, err)
+
+		// Assert that the event and message are correct
+		event, ok := result["event"]
+		assert.True(t, ok)
+		assert.Equal(t, "QueryFailed", event)
+
+		message, ok := result["message"]
+		assert.True(t, ok)
+		t.Logf("query message: %s", message)
+	})
+}
+
+func TestExecOps(t *testing.T) {
+	mysqlOps, mock, _ := mockDatabase(t)
+	req := &bindings.InvokeRequest{Metadata: map[string]string{}}
+	req.Metadata["sql"] = "INSERT INTO foo (id, v1, ts) VALUES (1, 'test-1', '2021-01-22')"
+
+	t.Run("ExecOps succeed", func(t *testing.T) {
+		mock.ExpectExec("INSERT INTO foo \\(id, v1, ts\\) VALUES \\(.*\\)").WillReturnResult(sqlmock.NewResult(1, 1))
+
+		result, err := mysqlOps.ExecOps(context.Background(), req, &bindings.InvokeResponse{})
+		assert.NoError(t, err)
+
+		// Assert that the event and message are correct
+		event, ok := result["event"]
+		assert.True(t, ok)
+		assert.Equal(t, "ExecSuccess", event)
+
+		count, ok := result["count"]
+		assert.True(t, ok)
+		assert.Equal(t, int64(1), count.(int64))
+	})
+
+	t.Run("ExecOps fails", func(t *testing.T) {
+		mock.ExpectExec("INSERT INTO foo \\(id, v1, ts\\) VALUES \\(.*\\)").WillReturnError(errors.New("insert error"))
+
+		result, err := mysqlOps.ExecOps(context.Background(), req, &bindings.InvokeResponse{})
+		assert.NoError(t, err)
+
+		// Assert that the event and message are correct
+		event, ok := result["event"]
+		assert.True(t, ok)
+		assert.Equal(t, "ExecFailed", event)
+
+		message, ok := result["message"]
+		assert.True(t, ok)
+		t.Logf("exec error message: %s", message)
+	})
+}
+
 func TestCheckStatusOps(t *testing.T) {
 	ctx := context.Background()
 	req := &bindings.InvokeRequest{}
@@ -194,7 +274,7 @@ func TestCheckStatusOps(t *testing.T) {
 		t.Logf("check status message: %s", message)
 	})
 
-	t.Run("Check role not configured", func(t *testing.T) {
+	t.Run("Role not configured", func(t *testing.T) {
 		mysqlOps.OriRole = "leader1"
 		// Call CheckStatusOps
 		result, err := mysqlOps.CheckStatusOps(ctx, req, resp)
@@ -218,7 +298,7 @@ func TestCheckStatusOps(t *testing.T) {
 	insert into kb_health_check values(%d, now()) on duplicate key update check_ts = now();
 	commit;
 	select check_ts from kb_health_check where type=%d limit 1;`, CheckStatusType, CheckStatusType)
-		mock.ExpectExec(regexp.QuoteMeta(rwSQL)).WillReturnError(errors.New("no record"))
+		mock.ExpectExec(regexp.QuoteMeta(rwSQL)).WillReturnError(errors.New("insert error"))
 		// Call CheckStatusOps
 		result, err := mysqlOps.CheckStatusOps(ctx, req, resp)
 		assert.NoError(t, err)

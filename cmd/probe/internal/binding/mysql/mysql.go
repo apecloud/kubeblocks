@@ -211,6 +211,46 @@ func (mysqlOps *MysqlOperations) GetRole(ctx context.Context, request *bindings.
 	return role, nil
 }
 
+func (mysqlOps *MysqlOperations) ExecOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
+	result := OpsResult{}
+	sql, ok := req.Metadata["sql"]
+	if !ok || sql == "" {
+		result["event"] = "ExecFailed"
+		result["message"] = "no sql provided"
+		return result, nil
+	}
+	count, err := mysqlOps.exec(ctx, sql)
+	if err != nil {
+		mysqlOps.Logger.Infof("exec error: %v", err)
+		result["event"] = "ExecFailed"
+		result["message"] = err.Error()
+	} else {
+		result["event"] = "ExecSuccess"
+		result["count"] = count
+	}
+	return result, nil
+}
+
+func (mysqlOps *MysqlOperations) QueryOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
+	result := OpsResult{}
+	sql, ok := req.Metadata["sql"]
+	if !ok || sql == "" {
+		result["event"] = "QueryFailed"
+		result["message"] = "no sql provided"
+		return result, nil
+	}
+	data, err := mysqlOps.query(ctx, sql)
+	if err != nil {
+		mysqlOps.Logger.Infof("Query error: %v", err)
+		result["event"] = "QueryFailed"
+		result["message"] = err.Error()
+	} else {
+		result["event"] = "QuerySuccess"
+		result["message"] = string(data)
+	}
+	return result, nil
+}
+
 // CheckStatusOps design details: https://infracreate.feishu.cn/wiki/wikcndch7lMZJneMnRqaTvhQpwb#doxcnOUyQ4Mu0KiUo232dOr5aad
 func (mysqlOps *MysqlOperations) CheckStatusOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
 	rwSQL := fmt.Sprintf(`begin;
@@ -326,6 +366,7 @@ func (mysqlOps *MysqlOperations) query(ctx context.Context, sql string) ([]byte,
 	}
 	return result, nil
 }
+
 func (mysqlOps *MysqlOperations) exec(ctx context.Context, sql string) (int64, error) {
 	mysqlOps.Logger.Debugf("exec: %s", sql)
 	res, err := mysqlOps.db.ExecContext(ctx, sql)

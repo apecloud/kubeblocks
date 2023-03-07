@@ -37,6 +37,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	appsconfig "github.com/apecloud/kubeblocks/controllers/apps/configuration"
+	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -108,7 +109,7 @@ func (r *ClusterVersionReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 
 	res, err := intctrlutil.HandleCRDeletion(reqCtx, r, clusterVersion, clusterVersionFinalizerName, func() (*ctrl.Result, error) {
 		recordEvent := func() {
-			r.Recorder.Event(clusterVersion, corev1.EventTypeWarning, intctrlutil.ReasonRefCRUnavailable,
+			r.Recorder.Event(clusterVersion, corev1.EventTypeWarning, constant.ReasonRefCRUnavailable,
 				"cannot be deleted because of existing referencing Cluster.")
 		}
 		if res, err := intctrlutil.ValidateReferenceCR(reqCtx, r.Client, clusterVersion,

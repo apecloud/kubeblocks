@@ -30,6 +30,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
+	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -82,7 +83,7 @@ func (r *StatefulSetReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	}
 
 	// create a component object
-	componentName := sts.GetLabels()[intctrlutil.KBAppComponentLabelKey]
+	componentName := sts.GetLabels()[constant.KBAppComponentLabelKey]
 	componentSpec := cluster.GetComponentByName(componentName)
 	if componentSpec == nil {
 		return intctrlutil.Reconciled()
@@ -93,7 +94,7 @@ func (r *StatefulSetReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		return intctrlutil.Reconciled()
 	}
 	compCtx := newComponentContext(reqCtx, r.Client, r.Recorder, component, sts, componentSpec)
-	reqCtx.Log.Info("before updateComponentStatusInClusterStatus",
+	reqCtx.Log.V(1).Info("before updateComponentStatusInClusterStatus",
 		"generation", sts.Generation, "observed generation", sts.Status.ObservedGeneration,
 		"replicas", sts.Status.Replicas)
 	if requeueAfter, err := updateComponentStatusInClusterStatus(compCtx, cluster); err != nil {

@@ -28,6 +28,7 @@ import (
 	appv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -166,6 +167,10 @@ func (r *BackupReconciler) doNewPhaseAction(
 		return r.updateStatusIfFailed(reqCtx, backup, err)
 	}
 
+	// save the backup message for restore
+	backup.Status.RemoteVolume = &backupPolicy.Spec.RemoteVolume
+	backup.Status.BackupToolName = backupPolicy.Spec.BackupToolName
+
 	// update Phase to InProgress
 	backup.Status.Phase = dataprotectionv1alpha1.BackupInProgress
 	backup.Status.StartTimestamp = &metav1.Time{Time: r.clock.Now().UTC()}
@@ -220,7 +225,7 @@ func (r *BackupReconciler) doInProgressPhaseAction(
 		backup.Status.Phase = dataprotectionv1alpha1.BackupCompleted
 		backup.Status.CompletionTimestamp = &metav1.Time{Time: r.clock.Now().UTC()}
 		snap := &snapshotv1.VolumeSnapshot{}
-		exists, _ := checkResourceExists(reqCtx.Ctx, r.Client, key, snap)
+		exists, _ := intctrlutil.CheckResourceExists(reqCtx.Ctx, r.Client, key, snap)
 		if exists {
 			backup.Status.TotalSize = snap.Status.RestoreSize.String()
 		}
@@ -272,10 +277,8 @@ func (r *BackupReconciler) doCompletedPhaseAction(
 	reqCtx intctrlutil.RequestCtx,
 	backup *dataprotectionv1alpha1.Backup) (ctrl.Result, error) {
 
-	if backup.Spec.BackupType == dataprotectionv1alpha1.BackupTypeSnapshot {
-		if err := r.deleteReferenceBatchV1Jobs(reqCtx, backup); err != nil {
-			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-		}
+	if err := r.deleteReferenceBatchV1Jobs(reqCtx, backup); err != nil && !apierrors.IsNotFound(err) {
+		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 	return intctrlutil.Reconciled()
 }
@@ -352,7 +355,7 @@ func (r *BackupReconciler) createPostCommandJobAndEnsure(reqCtx intctrlutil.Requ
 func (r *BackupReconciler) ensureBatchV1JobCompleted(
 	reqCtx intctrlutil.RequestCtx, key types.NamespacedName) (bool, error) {
 	job := &batchv1.Job{}
-	exists, err := checkResourceExists(reqCtx.Ctx, r.Client, key, job)
+	exists, err := intctrlutil.CheckResourceExists(reqCtx.Ctx, r.Client, key, job)
 	if err != nil {
 		return false, err
 	}
@@ -374,7 +377,7 @@ func (r *BackupReconciler) createVolumeSnapshot(
 	backup *dataprotectionv1alpha1.Backup) error {
 
 	snap := &snapshotv1.VolumeSnapshot{}
-	exists, err := checkResourceExists(reqCtx.Ctx, r.Client, reqCtx.Req.NamespacedName, snap)
+	exists, err := intctrlutil.CheckResourceExists(reqCtx.Ctx, r.Client, reqCtx.Req.NamespacedName, snap)
 	if err != nil {
 		return err
 	}
@@ -438,7 +441,7 @@ func (r *BackupReconciler) ensureVolumeSnapshotReady(reqCtx intctrlutil.RequestC
 	key types.NamespacedName) (bool, error) {
 
 	snap := &snapshotv1.VolumeSnapshot{}
-	exists, err := checkResourceExists(reqCtx.Ctx, r.Client, key, snap)
+	exists, err := intctrlutil.CheckResourceExists(reqCtx.Ctx, r.Client, key, snap)
 	if err != nil {
 		return false, err
 	}
@@ -458,7 +461,7 @@ func (r *BackupReconciler) createBackupToolJob(
 
 	key := types.NamespacedName{Namespace: backup.Namespace, Name: backup.Name}
 	job := batchv1.Job{}
-	exists, err := checkResourceExists(reqCtx.Ctx, r.Client, key, &job)
+	exists, err := intctrlutil.CheckResourceExists(reqCtx.Ctx, r.Client, key, &job)
 	if err != nil {
 		return err
 	}
@@ -493,7 +496,7 @@ func (r *BackupReconciler) ensureEmptyHooksCommand(
 		Name:      backup.Spec.BackupPolicyName,
 	}
 
-	policyExists, err := checkResourceExists(reqCtx.Ctx, r.Client, backupPolicyKey, backupPolicy)
+	policyExists, err := intctrlutil.CheckResourceExists(reqCtx.Ctx, r.Client, backupPolicyKey, backupPolicy)
 	if err != nil {
 		msg := fmt.Sprintf("Failed to get backupPolicy %s .", backupPolicyKey.Name)
 		r.Recorder.Event(backup, corev1.EventTypeWarning, "BackupPolicyFailed", msg)
@@ -528,7 +531,7 @@ func (r *BackupReconciler) createHooksCommandJob(
 	preCommand bool) error {
 
 	job := batchv1.Job{}
-	exists, err := checkResourceExists(reqCtx.Ctx, r.Client, key, &job)
+	exists, err := intctrlutil.CheckResourceExists(reqCtx.Ctx, r.Client, key, &job)
 	if err != nil {
 		return err
 	}

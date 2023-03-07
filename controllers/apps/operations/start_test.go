@@ -26,7 +26,8 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	opsutil "github.com/apecloud/kubeblocks/controllers/apps/operations/util"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	"github.com/apecloud/kubeblocks/internal/constant"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/generics"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 )
 
@@ -73,7 +74,7 @@ var _ = Describe("Start OpsRequest", func() {
 			}
 			componentReplicasSnapshot, _ := json.Marshal(componentReplicasMap)
 			opsRes.Cluster.Annotations = map[string]string{
-				intctrlutil.SnapShotForStartAnnotationKey: string(componentReplicasSnapshot),
+				constant.SnapShotForStartAnnotationKey: string(componentReplicasSnapshot),
 			}
 			By("create Start opsRequest")
 			ops := testapps.NewOpsRequestObj("start-ops-"+randomStr, testCtx.DefaultNamespace,

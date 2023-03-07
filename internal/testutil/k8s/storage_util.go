@@ -17,10 +17,9 @@ limitations under the License.
 package testutil
 
 import (
+	"github.com/onsi/gomega"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/kubectl/pkg/util/storage"
-
-	"github.com/onsi/gomega"
 
 	"github.com/apecloud/kubeblocks/internal/testutil"
 )

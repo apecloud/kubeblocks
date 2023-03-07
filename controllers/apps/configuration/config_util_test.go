@@ -30,6 +30,7 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	"github.com/apecloud/kubeblocks/internal/generics"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 	testutil "github.com/apecloud/kubeblocks/internal/testutil/k8s"
 )
@@ -73,11 +74,11 @@ var _ = Describe("ConfigWrapper util test", func() {
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 		// namespaced
-		testapps.ClearResources(&testCtx, intctrlutil.ConfigMapSignature, inNS, ml)
+		testapps.ClearResources(&testCtx, generics.ConfigMapSignature, inNS, ml)
 		// non-namespaced
-		testapps.ClearResources(&testCtx, intctrlutil.ClusterVersionSignature, ml)
-		testapps.ClearResources(&testCtx, intctrlutil.ClusterDefinitionSignature, ml)
-		testapps.ClearResources(&testCtx, intctrlutil.ConfigConstraintSignature, ml)
+		testapps.ClearResources(&testCtx, generics.ClusterVersionSignature, ml)
+		testapps.ClearResources(&testCtx, generics.ClusterDefinitionSignature, ml)
+		testapps.ClearResources(&testCtx, generics.ConfigConstraintSignature, ml)
 	}
 
 	BeforeEach(func() {

@@ -21,7 +21,6 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 
@@ -87,7 +86,7 @@ var _ = Describe("Manage applications related to KubeBlocks", func() {
 				AppName:   testAppName,
 			}
 			Expect(o.complete(installCmd, []string{testAppName})).Should(Succeed())
-			o.HelmCfg = helm.FakeActionConfig()
+			o.HelmCfg = helm.NewFakeConfig(testNamespace)
 			Expect(o.install()).Should(HaveOccurred())
 			notes, err := o.installChart()
 			Expect(err).Should(HaveOccurred())
@@ -105,7 +104,7 @@ var _ = Describe("Manage applications related to KubeBlocks", func() {
 			By("Checking uninstall helm chart by fake helm action config")
 			o := &options{
 				IOStreams: streams,
-				HelmCfg:   helm.FakeActionConfig(),
+				HelmCfg:   helm.NewFakeConfig(testNamespace),
 				AppName:   testAppName,
 			}
 			Expect(o.uninstall()).Should(HaveOccurred())

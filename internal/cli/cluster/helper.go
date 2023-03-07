@@ -31,7 +31,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/constant"
 )
 
 // GetSimpleInstanceInfos return simple instance info that only contains instance name and role, the default

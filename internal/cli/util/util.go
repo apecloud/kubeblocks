@@ -54,6 +54,7 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/rest"
 	cmdget "k8s.io/kubectl/pkg/cmd/get"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -63,7 +64,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/constant"
 )
 
 var (
@@ -265,8 +266,7 @@ func Spinner(w io.Writer, fmtstr string, a ...any) func(result bool) {
 var addToScheme sync.Once
 
 func NewFactory() cmdutil.Factory {
-	getter := genericclioptions.NewConfigFlags(true)
-
+	configFlags := NewConfigFlagNoWarnings()
 	// Add CRDs to the scheme. They are missing by default.
 	addToScheme.Do(func() {
 		if err := apiextv1.AddToScheme(scheme.Scheme); err != nil {
@@ -274,7 +274,17 @@ func NewFactory() cmdutil.Factory {
 			panic(err)
 		}
 	})
-	return cmdutil.NewFactory(getter)
+	return cmdutil.NewFactory(configFlags)
+}
+
+// NewConfigFlagNoWarnings returns a ConfigFlags that disables warnings.
+func NewConfigFlagNoWarnings() *genericclioptions.ConfigFlags {
+	configFlags := genericclioptions.NewConfigFlags(true)
+	configFlags.WrapConfigFn = func(c *rest.Config) *rest.Config {
+		c.WarningHandler = rest.NoWarnings{}
+		return c
+	}
+	return configFlags
 }
 
 func GVRToString(gvr schema.GroupVersionResource) string {

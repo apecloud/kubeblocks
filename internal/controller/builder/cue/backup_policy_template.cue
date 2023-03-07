@@ -26,7 +26,7 @@ backup_key: {
 }
 template: string
 backup_policy: {
-	apiVersion: "dataprotection.infracreate.com/v1alpha1"
+	apiVersion: "dataprotection.kubeblocks.io/v1alpha1"
 	kind:       "BackupPolicy"
 	metadata: {
 		//             name:      backup_key.Name

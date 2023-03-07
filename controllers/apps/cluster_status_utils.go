@@ -36,6 +36,7 @@ import (
 	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	opsutil "github.com/apecloud/kubeblocks/controllers/apps/operations/util"
 	"github.com/apecloud/kubeblocks/controllers/k8score"
+	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -86,12 +87,12 @@ func doChainClusterStatusHandler(ctx context.Context,
 
 // isTargetKindForEvent checks the event involve object is the target resources
 func isTargetKindForEvent(event *corev1.Event) bool {
-	return slices.Index([]string{intctrlutil.PodKind, intctrlutil.DeploymentKind, intctrlutil.StatefulSetKind}, event.InvolvedObject.Kind) != -1
+	return slices.Index([]string{constant.PodKind, constant.DeploymentKind, constant.StatefulSetKind}, event.InvolvedObject.Kind) != -1
 }
 
 // getFinalEventMessageForRecorder gets final event message by event involved object kind for recorded it
 func getFinalEventMessageForRecorder(event *corev1.Event) string {
-	if event.InvolvedObject.Kind == intctrlutil.PodKind {
+	if event.InvolvedObject.Kind == constant.PodKind {
 		return fmt.Sprintf("Pod %s: %s", event.InvolvedObject.Name, event.Message)
 	}
 	return event.Message
@@ -174,15 +175,15 @@ func getEventInvolvedObject(ctx context.Context, cli client.Client, event *corev
 	// If client.object interface object is used as a parameter, it will not return an error when the object is not found.
 	// so we should specify the object type to get the object.
 	switch event.InvolvedObject.Kind {
-	case intctrlutil.PodKind:
+	case constant.PodKind:
 		pod := &corev1.Pod{}
 		err = cli.Get(ctx, objectKey, pod)
 		return pod, err
-	case intctrlutil.StatefulSetKind:
+	case constant.StatefulSetKind:
 		sts := &appsv1.StatefulSet{}
 		err = cli.Get(ctx, objectKey, sts)
 		return sts, err
-	case intctrlutil.DeploymentKind:
+	case constant.DeploymentKind:
 		deployment := &appsv1.Deployment{}
 		err = cli.Get(ctx, objectKey, deployment)
 		return deployment, err
@@ -275,13 +276,13 @@ func handleClusterStatusByEvent(ctx context.Context, cli client.Client, recorder
 		return nil
 	}
 	labels := object.GetLabels()
-	if err = cli.Get(ctx, client.ObjectKey{Name: labels[intctrlutil.AppInstanceLabelKey], Namespace: object.GetNamespace()}, cluster); err != nil {
+	if err = cli.Get(ctx, client.ObjectKey{Name: labels[constant.AppInstanceLabelKey], Namespace: object.GetNamespace()}, cluster); err != nil {
 		return err
 	}
 	if err = cli.Get(ctx, client.ObjectKey{Name: cluster.Spec.ClusterDefRef}, clusterDef); err != nil {
 		return err
 	}
-	componentName := labels[intctrlutil.KBAppComponentLabelKey]
+	componentName := labels[constant.KBAppComponentLabelKey]
 	// get the component phase by component name and sync to Cluster.status.components
 	patch := client.MergeFrom(cluster.DeepCopy())
 	componentMap, clusterAvailabilityEffectMap, componentDef := getComponentRelatedInfo(cluster, clusterDef, componentName)
@@ -321,7 +322,7 @@ func handleEventForClusterStatus(ctx context.Context, cli client.Client, recorde
 		{
 			// handle cronjob complete or fail event
 			pred: func() bool {
-				return event.InvolvedObject.Kind == intctrlutil.CronJob &&
+				return event.InvolvedObject.Kind == constant.CronJob &&
 					event.Reason == "SawCompletedJob"
 			},
 			processor: func() error {
@@ -385,11 +386,11 @@ func handleDeletePVCCronJobEvent(ctx context.Context,
 	}
 	labels := object.GetLabels()
 	cluster := appsv1alpha1.Cluster{}
-	if err = cli.Get(ctx, client.ObjectKey{Name: labels[intctrlutil.AppInstanceLabelKey],
+	if err = cli.Get(ctx, client.ObjectKey{Name: labels[constant.AppInstanceLabelKey],
 		Namespace: object.GetNamespace()}, &cluster); err != nil {
 		return err
 	}
-	componentName := labels[intctrlutil.KBAppComponentLabelKey]
+	componentName := labels[constant.KBAppComponentLabelKey]
 	// update component phase to abnormal
 	if err = updateComponentStatusPhase(cli,
 		ctx,
@@ -413,7 +414,7 @@ func checkedDeleteDeletePVCCronJob(ctx context.Context, cli client.Client, name 
 	}, &cronJob); err != nil {
 		return client.IgnoreNotFound(err)
 	}
-	if cronJob.ObjectMeta.Labels[intctrlutil.AppManagedByLabelKey] != intctrlutil.AppName {
+	if cronJob.ObjectMeta.Labels[constant.AppManagedByLabelKey] != constant.AppName {
 		return nil
 	}
 	// check the delete-pvc-cronjob annotation.
@@ -471,4 +472,11 @@ func syncComponentPhaseWhenSpecUpdating(cluster *appsv1alpha1.Cluster,
 		compStatus.Phase = appsv1alpha1.SpecUpdatingPhase
 		cluster.Status.Components[componentName] = compStatus
 	}
+}
+
+// existsOperations checks if the cluster is doing operations
+func existsOperations(cluster *appsv1alpha1.Cluster) bool {
+	opsRequestMap, _ := opsutil.GetOpsRequestSliceFromCluster(cluster)
+	_, isRestoring := cluster.Annotations[constant.RestoreFromBackUpAnnotationKey]
+	return len(opsRequestMap) > 0 || isRestoring
 }

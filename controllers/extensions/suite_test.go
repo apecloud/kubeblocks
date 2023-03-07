@@ -25,21 +25,18 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	"github.com/spf13/viper"
+	"go.uber.org/zap/zapcore"
 	batchv1 "k8s.io/api/batch/v1"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
-	// +kubebuilder:scaffold:imports
-
-	"github.com/spf13/viper"
-	"go.uber.org/zap/zapcore"
-	ctrl "sigs.k8s.io/controller-runtime"
-
 	"github.com/apecloud/kubeblocks/internal/testutil"
 )
 

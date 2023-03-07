@@ -27,7 +27,6 @@ import (
 	"github.com/spf13/viper"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -39,6 +38,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -178,13 +178,7 @@ func (r *BackupPolicyReconciler) doInProgressPhaseAction(
 	}
 
 	// create cronjob from cue template.
-	cronjob, err := r.buildCronJob(backupPolicy)
-	if err != nil {
-		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-	}
-	err = r.Client.Create(reqCtx.Ctx, cronjob)
-	// ignore already exists.
-	if err != nil && !errors.IsAlreadyExists(err) {
+	if err := r.createCronJobIfNeeded(reqCtx, backupPolicy); err != nil {
 		r.Recorder.Eventf(backupPolicy, corev1.EventTypeWarning, "CreatingBackupPolicy",
 			"Failed to create cronjob %s.", err.Error())
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
@@ -275,7 +269,7 @@ func (r *BackupPolicyReconciler) buildCronJob(backupPolicy *dataprotectionv1alph
 	options := backupPolicyOptions{
 		Name:           backupPolicy.Name,
 		Namespace:      backupPolicy.Namespace,
-		Cluster:        backupPolicy.Spec.Target.LabelsSelector.MatchLabels[intctrlutil.AppInstanceLabelKey],
+		Cluster:        backupPolicy.Spec.Target.LabelsSelector.MatchLabels[constant.AppInstanceLabelKey],
 		Schedule:       backupPolicy.Spec.Schedule,
 		TTL:            backupPolicy.Spec.TTL,
 		BackupType:     backupPolicy.Spec.BackupType,
@@ -325,7 +319,7 @@ func (r *BackupPolicyReconciler) removeExpiredBackups(reqCtx intctrlutil.Request
 	now := metav1.Now()
 	for _, item := range backups.Items {
 		// ignore retained backup.
-		if item.GetLabels()[intctrlutil.BackupProtectionLabelKey] == intctrlutil.BackupRetain {
+		if item.GetLabels()[constant.BackupProtectionLabelKey] == constant.BackupRetain {
 			continue
 		}
 		if item.Status.Expiration != nil && item.Status.Expiration.Before(&now) {
@@ -340,7 +334,7 @@ func (r *BackupPolicyReconciler) removeExpiredBackups(reqCtx intctrlutil.Request
 
 func buildBackupLabelsForRemove(backupPolicy *dataprotectionv1alpha1.BackupPolicy) map[string]string {
 	return map[string]string{
-		intctrlutil.AppInstanceLabelKey:  backupPolicy.Labels[intctrlutil.AppInstanceLabelKey],
+		constant.AppInstanceLabelKey:     backupPolicy.Labels[constant.AppInstanceLabelKey],
 		dataProtectionLabelAutoBackupKey: "true",
 	}
 }
@@ -411,6 +405,28 @@ func (r *BackupPolicyReconciler) deleteExternalResources(reqCtx intctrlutil.Requ
 		return err
 	}
 
+	return nil
+}
+
+// createCronJobIfNeeded create cronjob spec if backup policy set schedule
+func (r *BackupPolicyReconciler) createCronJobIfNeeded(
+	reqCtx intctrlutil.RequestCtx,
+	backupPolicy *dataprotectionv1alpha1.BackupPolicy) error {
+	if backupPolicy.Spec.Schedule == "" {
+		r.Recorder.Eventf(backupPolicy, corev1.EventTypeNormal, "BackupPolicy",
+			"Backups will not be automatically scheduled due to lack of schedule configuration.")
+		return nil
+	}
+
+	// create cronjob from cue template.
+	cronjob, err := r.buildCronJob(backupPolicy)
+	if err != nil {
+		return err
+	}
+	if err = r.Client.Create(reqCtx.Ctx, cronjob); err != nil {
+		// ignore already exists.
+		return client.IgnoreAlreadyExists(err)
+	}
 	return nil
 }
 

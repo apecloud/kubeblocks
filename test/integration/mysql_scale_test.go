@@ -30,7 +30,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	"github.com/apecloud/kubeblocks/internal/constant"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/generics"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 	testk8s "github.com/apecloud/kubeblocks/internal/testutil/k8s"
 )
@@ -181,7 +182,7 @@ var _ = Describe("MySQL Scaling function", func() {
 		Eventually(func(g Gomega) {
 			stsList := &appsv1.StatefulSetList{}
 			g.Expect(k8sClient.List(testCtx.Ctx, stsList, client.MatchingLabels{
-				intctrlutil.AppInstanceLabelKey: clusterKey.Name,
+				constant.AppInstanceLabelKey: clusterKey.Name,
 			}, client.InNamespace(clusterKey.Namespace))).To(Succeed())
 			g.Expect(len(stsList.Items) > 0).To(BeTrue())
 			sts := &stsList.Items[0]

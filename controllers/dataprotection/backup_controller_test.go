@@ -20,6 +20,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	"github.com/spf13/viper"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -27,10 +28,9 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
-
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	"github.com/apecloud/kubeblocks/internal/constant"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/generics"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 )
 
@@ -102,7 +102,7 @@ var _ = Describe("Backup for a StatefulSet", func() {
 				SetBackupToolName(backupTool.Name).
 				SetSchedule(defaultSchedule).
 				SetTTL(defaultTTL).
-				AddMatchLabels(intctrlutil.AppInstanceLabelKey, clusterName).
+				AddMatchLabels(constant.AppInstanceLabelKey, clusterName).
 				SetTargetSecretName(clusterName).
 				AddHookPreCommand("touch /data/mysql/.restore;sync").
 				AddHookPostCommand("rm -f /data/mysql/.restore;sync").
@@ -124,6 +124,11 @@ var _ = Describe("Backup for a StatefulSet", func() {
 			})
 
 			It("should succeed after job completes", func() {
+				By("Check backup job's nodeName equals pod's nodeName")
+				Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *batchv1.Job) {
+					g.Expect(fetched.Spec.Template.Spec.NodeName).To(Equal(nodeName))
+				})).Should(Succeed())
+
 				patchK8sJobStatus(backupKey, batchv1.JobComplete)
 
 				By("Check backup job completed")
@@ -131,10 +136,8 @@ var _ = Describe("Backup for a StatefulSet", func() {
 					g.Expect(fetched.Status.Phase).To(Equal(dataprotectionv1alpha1.BackupCompleted))
 				})).Should(Succeed())
 
-				By("Check backup job's nodeName equals pod's nodeName")
-				Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *batchv1.Job) {
-					g.Expect(fetched.Spec.Template.Spec.NodeName).To(Equal(nodeName))
-				})).Should(Succeed())
+				By("Check backup job is deleted after completed")
+				Eventually(testapps.CheckObjExists(&testCtx, backupKey, &batchv1.Job{}, false))
 			})
 
 			It("should fail after job fails", func() {
@@ -212,7 +215,7 @@ var _ = Describe("Backup for a StatefulSet", func() {
 					SetBackupToolName(backupTool.Name).
 					SetSchedule(defaultSchedule).
 					SetTTL(defaultTTL).
-					AddMatchLabels(intctrlutil.AppInstanceLabelKey, clusterName).
+					AddMatchLabels(constant.AppInstanceLabelKey, clusterName).
 					SetTargetSecretName(clusterName).
 					AddHookPreCommand("touch /data/mysql/.restore;sync").
 					AddHookPostCommand("rm -f /data/mysql/.restore;sync").

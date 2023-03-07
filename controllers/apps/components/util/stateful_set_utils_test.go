@@ -22,12 +22,13 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	corev1 "k8s.io/api/core/v1"
 
 	apps "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	"github.com/apecloud/kubeblocks/internal/generics"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 	testk8s "github.com/apecloud/kubeblocks/internal/testutil/k8s"
 )
@@ -58,21 +59,6 @@ func TestIsMemberOf(t *testing.T) {
 	}
 	if IsMemberOf(set2, pod) {
 		t.Error("isMemberOf returned false positive")
-	}
-}
-
-func TestGetPodRevision(t *testing.T) {
-	set := testk8s.NewFakeStatefulSet("foo", 3)
-	pod := testk8s.NewFakeStatefulSetPod(set, 1)
-	if GetPodRevision(pod) != "" {
-		t.Errorf("revision should be empty")
-	}
-
-	pod.Labels = make(map[string]string, 0)
-	pod.Labels[apps.StatefulSetRevisionLabel] = "bar"
-
-	if GetPodRevision(pod) != "bar" {
-		t.Errorf("revision not matched")
 	}
 }
 
@@ -124,8 +110,8 @@ var _ = Describe("StatefulSet utils test", func() {
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 		// namespaced resources
-		testapps.ClearResources(&testCtx, intctrlutil.StatefulSetSignature, inNS, ml)
-		testapps.ClearResources(&testCtx, intctrlutil.PodSignature, inNS, ml, client.GracePeriodSeconds(0))
+		testapps.ClearResources(&testCtx, generics.StatefulSetSignature, inNS, ml)
+		testapps.ClearResources(&testCtx, generics.PodSignature, inNS, ml, client.GracePeriodSeconds(0))
 	}
 
 	BeforeEach(cleanAll)

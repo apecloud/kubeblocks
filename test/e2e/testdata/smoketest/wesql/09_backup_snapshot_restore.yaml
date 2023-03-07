@@ -9,12 +9,12 @@ spec:
   affinity:
     topologyKeys:
       - kubernetes.io/hostname
-  components:
+  componentSpecs:
     - name: mysql
-      type: mysql
+      componentDefRef: mysql
       monitor: false
       replicas: 3
-      enabledLogs:     ["slow","error"]
+      enabledLogs: [ "slow","error" ]
       volumeClaimTemplates:
         - name: data
           spec:

@@ -12,9 +12,8 @@ subjects:
 - kind: ServiceAccount
   name: {{ include "kubeblocks.serviceAccountName" . }}
   namespace: {{ .Release.Namespace }}
+{{- if ( include "kubeblocks.addonControllerEnabled" . ) }}
 ---
-{{- with .Values.addonController }}
-{{- if .enabled }}
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
@@ -29,6 +28,5 @@ subjects:
   - kind: ServiceAccount
     name: {{ include "kubeblocks.addonSAName" . }}
     namespace: {{ .Release.Namespace }}
-{{- end }}
 {{- end }}
 

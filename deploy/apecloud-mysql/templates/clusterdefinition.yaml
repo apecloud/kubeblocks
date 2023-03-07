@@ -31,9 +31,9 @@ spec:
         {{- end }}
       configSpec:
         configTemplateRefs:
-          - name: mysql-3node-tpl
-            configTplRef: mysql-3node-tpl-8.0
-            configConstraintRef: mysql-cfg-constraints-8.0
+          - name: mysql-consensusset-config
+            configTplRef: mysql8.0-config-template
+            configConstraintRef: mysql8.0-config-constraints
             volumeName: mysql-config
             namespace: {{ .Release.Namespace }}
           - name: apecloud-mysql-scripts

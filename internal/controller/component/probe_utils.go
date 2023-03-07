@@ -58,7 +58,7 @@ func buildProbeContainers(reqCtx intctrlutil.RequestCtx, component *SynthesizedC
 
 	probeContainers := []corev1.Container{}
 	componentProbes := component.Probes
-	reqCtx.Log.Info("probe", "settings", componentProbes)
+	reqCtx.Log.V(1).Info("probe", "settings", componentProbes)
 	if componentProbes == nil {
 		return nil
 	}
@@ -96,7 +96,7 @@ func buildProbeContainers(reqCtx intctrlutil.RequestCtx, component *SynthesizedC
 		buildProbeServiceContainer(component, container, int(probeSvcHTTPPort), int(probeSvcGRPCPort))
 	}
 
-	reqCtx.Log.Info("probe", "containers", probeContainers)
+	reqCtx.Log.V(1).Info("probe", "containers", probeContainers)
 	component.PodSpec.Containers = append(component.PodSpec.Containers, probeContainers...)
 	return nil
 }
@@ -132,8 +132,9 @@ func buildProbeServiceContainer(component *SynthesizedComponent, container *core
 		"--config", "/config/probe/config.yaml",
 		"--components-path", "/config/probe/components"}
 
-	if component.Service != nil && len(component.Service.Ports) > 0 {
-		port := component.Service.Ports[0]
+	if len(component.Services) > 0 && len(component.Services[0].Spec.Ports) > 0 {
+		service := component.Services[0]
+		port := service.Spec.Ports[0]
 		dbPort := port.TargetPort.IntValue()
 		if dbPort == 0 {
 			dbPort = int(port.Port)
@@ -161,12 +162,12 @@ func buildProbeServiceContainer(component *SynthesizedComponent, container *core
 
 	container.Ports = []corev1.ContainerPort{{
 		ContainerPort: int32(probeSvcHTTPPort),
-		Name:          intctrlutil.ProbeHTTPPortName,
+		Name:          constant.ProbeHTTPPortName,
 		Protocol:      "TCP",
 	},
 		{
 			ContainerPort: int32(probeSvcGRPCPort),
-			Name:          intctrlutil.ProbeGRPCPortName,
+			Name:          constant.ProbeGRPCPortName,
 			Protocol:      "TCP",
 		}}
 }

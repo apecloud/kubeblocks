@@ -30,7 +30,7 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/constant"
 )
 
 const (
@@ -216,9 +216,13 @@ func FakeClusterDef() *appsv1alpha1.ClusterDefinition {
 			CharacterType: "mysql",
 			SystemAccounts: &appsv1alpha1.SystemAccountSpec{
 				CmdExecutorConfig: &appsv1alpha1.CmdExecutorConfig{
-					Image:   "",
-					Command: []string{"mysql"},
-					Args:    []string{"-h$(KB_ACCOUNT_ENDPOINT)", "-e $(KB_ACCOUNT_STATEMENT)"},
+					CommandExecutorEnvItem: appsv1alpha1.CommandExecutorEnvItem{
+						Image: "",
+					},
+					CommandExecutorItem: appsv1alpha1.CommandExecutorItem{
+						Command: []string{"mysql"},
+						Args:    []string{"-h$(KB_ACCOUNT_ENDPOINT)", "-e $(KB_ACCOUNT_STATEMENT)"},
+					},
 				},
 				PasswordConfig: appsv1alpha1.PasswordConfig{},
 				Accounts:       []appsv1alpha1.SystemAccountConfig{},

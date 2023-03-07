@@ -62,7 +62,7 @@ type ClusterVersionStatus struct {
 type ClusterComponentVersion struct {
 	// componentDefRef reference one of the cluster component definition names in ClusterDefinition API (spec.componentDefs.name).
 	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:MaxLength=18
+	// +kubebuilder:validation:MaxLength=63
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	ComponentDefRef string `json:"componentDefRef"`
 

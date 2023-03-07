@@ -21,13 +21,14 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/generics"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 	testk8s "github.com/apecloud/kubeblocks/internal/testutil/k8s"
 )
@@ -96,10 +97,13 @@ var _ = Describe("ReplicationSet Util", func() {
 				AddRoleLabel(k).
 				SetReplicas(1).
 				Create(&testCtx).GetObject()
+			isStsPrimary, err := checkObjRoleLabelIsPrimary(sts)
 			if k == string(Primary) {
-				Expect(CheckStsIsPrimary(sts)).Should(BeTrue())
+				Expect(err).To(Succeed())
+				Expect(isStsPrimary).Should(BeTrue())
 			} else {
-				Expect(CheckStsIsPrimary(sts)).ShouldNot(BeTrue())
+				Expect(err).To(Succeed())
+				Expect(isStsPrimary).ShouldNot(BeTrue())
 			}
 			stsList = append(stsList, sts)
 		}
@@ -116,6 +120,10 @@ var _ = Describe("ReplicationSet Util", func() {
 				AddLabelsInMap(sts.Labels).
 				Create(&testCtx).GetObject()
 		}
+
+		By("Test ReplicationSet pod number of sts equals 1")
+		_, err = GetAndCheckReplicationPodByStatefulSet(ctx, k8sClient, stsList[0])
+		Expect(err).Should(Succeed())
 
 		By("Test handleReplicationSet success when stsList count equal cluster.replicas.")
 		err = HandleReplicationSet(ctx, k8sClient, clusterObj, stsList)

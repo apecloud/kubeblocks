@@ -171,7 +171,7 @@ func (o *describeOpsOptions) printOpsRequest(ops *appsv1alpha1.OpsRequest) error
 		printer.NewPair("  Name", ops.Name),
 		printer.NewPair("NameSpace", ops.Namespace),
 		printer.NewPair("Cluster", ops.Spec.ClusterRef),
-		printer.NewPair("ComponentDefRef", string(ops.Spec.Type)),
+		printer.NewPair("Type", string(ops.Spec.Type)),
 	)
 
 	o.printOpsCommand(ops)

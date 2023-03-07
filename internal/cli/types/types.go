@@ -30,6 +30,10 @@ const (
 	// CliHomeEnv defines kbcli home system env
 	CliHomeEnv = "KBCLI_HOME"
 
+	// DefaultNamespace is the namespace where kubeblocks is installed if
+	// no other namespace is specified
+	DefaultNamespace = "kb-system"
+
 	// GoosLinux is os.GOOS linux string
 	GoosLinux = "linux"
 	// GoosDarwin is os.GOOS darwin string
@@ -39,9 +43,6 @@ const (
 
 	// Group api group
 	Group = "apps.kubeblocks.io"
-
-	// AppsGroup k8s apps group
-	AppsGroup = "apps"
 
 	// Version api version
 	Version = "v1alpha1"
@@ -64,6 +65,8 @@ const (
 	ResourceStatefulSets = "statefulsets"
 	// ResourceConfigConstraintVersions clusterVersion resource
 	ResourceConfigConstraintVersions = "configconstraints"
+	// ResourceSecrets secret resources
+	ResourceSecrets = "secrets"
 
 	// KindCluster cluster king
 	KindCluster = "Cluster"
@@ -76,8 +79,6 @@ const (
 	KindRestoreJob           = "RestoreJob"
 	KindBackupPolicyTemplate = "BackupPolicyTemplate"
 	KindOps                  = "OpsRequest"
-	KindCM                   = "ConfigMap"
-	KindSTS                  = "StatefulSet"
 
 	ServiceLBTypeAnnotationKey     = "service.kubernetes.io/kubeblocks-loadbalancer-type"
 	ServiceLBTypeAnnotationValue   = "private-ip"
@@ -156,6 +157,10 @@ func BackupPolicyTemplateGVR() schema.GroupVersionResource {
 	return schema.GroupVersionResource{Group: DPGroup, Version: DPVersion, Resource: ResourceBackupPolicyTemplates}
 }
 
+func BackupToolGVR() schema.GroupVersionResource {
+	return schema.GroupVersionResource{Group: DPGroup, Version: DPVersion, Resource: ResourceBackupTools}
+}
+
 func RestoreJobGVR() schema.GroupVersionResource {
 	return schema.GroupVersionResource{Group: DPGroup, Version: DPVersion, Resource: ResourceRestoreJobs}
 }
@@ -174,6 +179,10 @@ func CRDGVR() schema.GroupVersionResource {
 
 func ConfigmapGVR() schema.GroupVersionResource {
 	return schema.GroupVersionResource{Group: corev1.GroupName, Version: VersionV1, Resource: ResourceConfigmaps}
+}
+
+func SecretGVR() schema.GroupVersionResource {
+	return schema.GroupVersionResource{Group: corev1.GroupName, Version: VersionV1, Resource: ResourceSecrets}
 }
 
 func StatefulSetGVR() schema.GroupVersionResource {

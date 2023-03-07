@@ -30,7 +30,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	"github.com/apecloud/kubeblocks/internal/constant"
+	componetutil "github.com/apecloud/kubeblocks/internal/controller/component"
 )
 
 // SecretMapStore is a cache, recording all (key, secret) pair for accounts to be created.
@@ -131,41 +132,20 @@ func newCustomizedEngine(execConfig *appsv1alpha1.CmdExecutorConfig, dbcluster *
 	}
 }
 
-func replaceNamedVars(namedValues map[string]string, needle string, limits int, matchAll bool) string {
-	for k, v := range namedValues {
-		r := strings.Replace(needle, k, v, limits)
-		// early termination on matching, when matchAll = false
-		if r != needle && !matchAll {
-			return r
-		}
-		needle = r
-	}
-	return needle
-}
-
 func replaceEnvsValues(clusterName string, sysAccounts *appsv1alpha1.SystemAccountSpec) {
-	namedValues := getEnvReplacementMapForConnCredential(clusterName)
+	namedValuesMap := componetutil.GetEnvReplacementMapForConnCredential(clusterName)
 	// replace systemAccounts.cmdExecutorConfig.env[].valueFrom.secretKeyRef.name variables
 	cmdConfig := sysAccounts.CmdExecutorConfig
 	if cmdConfig != nil {
-		for _, e := range cmdConfig.Env {
-			if e.ValueFrom == nil || e.ValueFrom.SecretKeyRef == nil {
-				continue
-			}
-			secretRef := e.ValueFrom.SecretKeyRef
-			name := replaceNamedVars(namedValues, secretRef.Name, 1, false)
-			if name != secretRef.Name {
-				secretRef.Name = name
-			}
-		}
+		cmdConfig.Env = componetutil.ReplaceSecretEnvVars(namedValuesMap, cmdConfig.Env)
 	}
 
 	accounts := sysAccounts.Accounts
 	for _, acc := range accounts {
 		if acc.ProvisionPolicy.Type == appsv1alpha1.ReferToExisting {
-			// replace systemAccounts.accounts[*].provisionPolciy.secretRef.name variables
+			// replace systemAccounts.accounts[*].provisionPolicy.secretRef.name variables
 			secretRef := acc.ProvisionPolicy.SecretRef
-			name := replaceNamedVars(namedValues, secretRef.Name, 1, false)
+			name := componetutil.ReplaceNamedVars(namedValuesMap, secretRef.Name, 1, false)
 			if name != secretRef.Name {
 				secretRef.Name = name
 			}
@@ -177,9 +157,9 @@ func replaceEnvsValues(clusterName string, sysAccounts *appsv1alpha1.SystemAccou
 // This is consistent with that of secrets created during cluster initialization.
 func getLabelsForSecretsAndJobs(key componentUniqueKey) client.MatchingLabels {
 	return client.MatchingLabels{
-		intctrlutil.AppInstanceLabelKey:    key.clusterName,
-		intctrlutil.KBAppComponentLabelKey: key.componentName,
-		intctrlutil.AppManagedByLabelKey:   intctrlutil.AppName,
+		constant.AppInstanceLabelKey:    key.clusterName,
+		constant.KBAppComponentLabelKey: key.componentName,
+		constant.AppManagedByLabelKey:   constant.AppName,
 	}
 }
 
@@ -338,10 +318,10 @@ func getCreationStmtForAccount(key componentUniqueKey, passConfig appsv1alpha1.P
 	// drop if exists + create if not exists
 	statements := accountConfig.ProvisionPolicy.Statements
 	if len(statements.DeletionStatement) > 0 {
-		stmt := replaceNamedVars(namedVars, statements.DeletionStatement, -1, true)
+		stmt := componetutil.ReplaceNamedVars(namedVars, statements.DeletionStatement, -1, true)
 		execStmts = append(execStmts, stmt)
 	}
-	stmt := replaceNamedVars(namedVars, statements.CreationStatement, -1, true)
+	stmt := componetutil.ReplaceNamedVars(namedVars, statements.CreationStatement, -1, true)
 	execStmts = append(execStmts, stmt)
 
 	secret := renderSecretWithPwd(key, userName, passwd)

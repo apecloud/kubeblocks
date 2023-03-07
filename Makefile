@@ -463,10 +463,14 @@ else
 	sed -i "s/^appVersion:.*/appVersion: $(VERSION)/" $(CHART_PATH)/Chart.yaml
 endif
 
-
 .PHONY: helm-package
 helm-package: bump-chart-ver ## Do helm package.
-	$(HELM) package $(CHART_PATH) --dependency-update
+## it will pull down the latest charts that satisfy the dependencies, and clean up old dependencies.
+## this is a hack fix: decompress the tgz from the depend-charts directory to the charts directory
+## before dependency update.
+	cd $(CHART_PATH)/charts && ls ../depend-charts/*.tgz | xargs -n1 tar xf
+	$(HELM) dependency update --skip-refresh $(CHART_PATH)
+	$(HELM) package $(CHART_PATH)
 
 ##@ Build Dependencies
 
@@ -828,16 +832,17 @@ endif
 minikube-delete: minikube ## Delete minikube cluster.
 	$(MINIKUBE) delete
 
+.PHONY: smoke-testdata-manifests
+smoke-testdata-manifests: ## Update E2E test dataset
+	$(HELM) template mycluster deploy/apecloud-mysql-cluster > test/e2e/testdata/smoketest/wesql/00_wesqlcluster.yaml
+	$(HELM) template mycluster deploy/postgresqlcluster > test/e2e/testdata/smoketest/postgresql/00_postgresqlcluster.yaml
+	$(HELM) template mycluster deploy/redis > test/e2e/testdata/smoketest/redis/00_rediscluster.yaml
+	$(HELM) template mycluster deploy/redis-rep-cluster >> test/e2e/testdata/smoketest/redis/00_rediscluster.yaml
+
 ##@ Test E2E
 GINKGO=$(shell which ginkgo)
 .PHONY: test-e2e
-test-e2e: ## Test End-to-end.
-	$(HELM) template mycluster deploy/apecloud-mysql-cluster > test/e2e/testdata/smoketest/wesql/00_wesqlcluster.yaml
-	# $(HELM) template mycluster deploy/mongodb > test/e2e/testdata/smoketest/mongodb/00_mongodbcluster.yaml
-	# $(HELM) template mycluster deploy/mongodb-cluster >> test/e2e/testdata/smoketest/mongodb/00_mongodbcluster.yaml
-	# $(HELM) template mycluster deploy/postgresqlcluster > test/e2e/testdata/smoketest/postgresql/00_postgresqlcluster.yaml
-	# $(HELM) template mycluster deploy/redis > test/e2e/testdata/smoketest/redis/00_rediscluster.yaml
-	# $(HELM) template mycluster deploy/redis-rep-cluster >> test/e2e/testdata/smoketest/redis/00_rediscluster.yaml
+test-e2e: smoke-testdata-manifests ## Test End-to-end.
 	$(GINKGO) test -process -ginkgo.v test/e2e
 
 # NOTE: include must be at the end

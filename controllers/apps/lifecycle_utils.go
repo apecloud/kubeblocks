@@ -27,6 +27,7 @@ import (
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	"github.com/pkg/errors"
 	"golang.org/x/exp/maps"
+	"golang.org/x/exp/slices"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -98,7 +99,7 @@ func reconcileClusterWorkloads(
 	prepareComp := func(synthesizedComp *component.SynthesizedComponent) error {
 		iParams := task
 		iParams.Component = synthesizedComp
-		if process1stComp && synthesizedComp.Service != nil {
+		if process1stComp && len(synthesizedComp.Services) > 0 {
 			if err := prepareConnCredential(reqCtx, cli, &iParams); err != nil {
 				return err
 			}
@@ -504,6 +505,34 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 		return nil
 	}
 
+	cleanUselessServices := func(expSvcList []*corev1.Service) error {
+		var (
+			allSvcList = corev1.ServiceList{}
+			ml         = getServiceMatchingLabels(cluster.Name, "")
+		)
+		if err = cli.List(reqCtx.Ctx, &allSvcList, ml); err != nil {
+			return err
+		}
+
+		for _, svc := range allSvcList.Items {
+			idx := slices.IndexFunc(expSvcList, func(service *corev1.Service) bool {
+				return client.ObjectKeyFromObject(service) == client.ObjectKeyFromObject(&svc)
+			})
+			if idx >= 0 {
+				continue
+			}
+			patch := client.MergeFrom(svc.DeepCopy())
+			controllerutil.RemoveFinalizer(&svc, dbClusterFinalizerName)
+			if err = cli.Patch(reqCtx.Ctx, &svc, patch); err != nil {
+				return client.IgnoreNotFound(err)
+			}
+			if err = cli.Delete(reqCtx.Ctx, &svc); err != nil {
+				return client.IgnoreNotFound(err)
+			}
+		}
+		return nil
+	}
+
 	// why create tls certs here? or why not use prepare-checkedCreate pattern?
 	// tls certs generation is very time-consuming, if using prepare-checkedCreate pattern,
 	// we shall generate certs in every component Update which will slow down the cluster reconcile loop
@@ -511,30 +540,20 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 		return false, err
 	}
 
-	var stsList []*appsv1.StatefulSet
+	objsByKind := make(map[string][]client.Object)
 	for _, obj := range objs {
-		logger.Info("create or update", "objs", obj)
+		logger.V(1).Info("create or update", "objs", obj)
 		if err := intctrlutil.SetOwnership(cluster, obj, scheme, dbClusterFinalizerName); err != nil {
 			return false, err
 		}
-		// appendToStsList is used to handle statefulSets horizontal scaling when workloadType is replication
-		appendToStsList := func(stsList []*appsv1.StatefulSet) []*appsv1.StatefulSet {
-			stsObj, ok := obj.(*appsv1.StatefulSet)
-			if ok {
-				stsList = append(stsList, stsObj)
-			}
-			return stsList
-		}
 
-		err := cli.Create(ctx, obj)
-		if err == nil {
-			stsList = appendToStsList(stsList)
+		kind := obj.GetObjectKind().GroupVersionKind().Kind
+		objsByKind[kind] = append(objsByKind[kind], obj)
+
+		if err := cli.Create(ctx, obj); err == nil {
 			continue
-		}
-		if !apierrors.IsAlreadyExists(err) {
+		} else if !apierrors.IsAlreadyExists(err) {
 			return false, err
-		} else {
-			stsList = appendToStsList(stsList)
 		}
 
 		// Secret kind objects should only be applied once
@@ -589,6 +608,19 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 		}
 	}
 
+	var svcList []*corev1.Service
+	for _, obj := range objsByKind[constant.ServiceKind] {
+		svcList = append(svcList, obj.(*corev1.Service))
+	}
+	if err := cleanUselessServices(svcList); err != nil {
+		return false, err
+	}
+
+	// stsList is used to handle statefulSets horizontal scaling when workloadType is replication
+	var stsList []*appsv1.StatefulSet
+	for _, obj := range objsByKind[constant.StatefulSetKind] {
+		stsList = append(stsList, obj.(*appsv1.StatefulSet))
+	}
 	if err := replicationset.HandleReplicationSet(reqCtx.Ctx, cli, cluster, stsList); err != nil {
 		return false, err
 	}
@@ -1051,6 +1083,17 @@ func isPVCExists(cli client.Client,
 		return false, client.IgnoreNotFound(err)
 	}
 	return true, nil
+}
+
+func getServiceMatchingLabels(clusterName string, componentName string) client.MatchingLabels {
+	result := map[string]string{
+		constant.AppInstanceLabelKey:  clusterName,
+		constant.AppManagedByLabelKey: constant.AppName,
+	}
+	if componentName != "" {
+		result[constant.KBAppComponentLabelKey] = componentName
+	}
+	return result
 }
 
 func getBackupMatchingLabels(clusterName string, componentName string) client.MatchingLabels {

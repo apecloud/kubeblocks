@@ -21,6 +21,7 @@ import (
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
@@ -46,14 +47,16 @@ func BuildComponent(
 		Type:                  clusterCompDefObj.Name,
 		CharacterType:         clusterCompDefObj.CharacterType,
 		MaxUnavailable:        clusterCompDefObj.MaxUnavailable,
-		Replicas:              0,
 		WorkloadType:          clusterCompDefObj.WorkloadType,
 		ConsensusSpec:         clusterCompDefObj.ConsensusSpec,
 		PodSpec:               clusterCompDefObj.PodSpec,
-		Service:               clusterCompDefObj.Service,
 		Probes:                clusterCompDefObj.Probes,
 		LogConfigs:            clusterCompDefObj.LogConfigs,
 		HorizontalScalePolicy: clusterCompDefObj.HorizontalScalePolicy,
+		Replicas:              clusterCompSpec.Replicas,
+		EnabledLogs:           clusterCompSpec.EnabledLogs,
+		TLS:                   clusterCompSpec.TLS,
+		Issuer:                clusterCompSpec.Issuer,
 	}
 
 	// resolve component.ConfigTemplates
@@ -89,12 +92,6 @@ func BuildComponent(
 	}
 	component.PodSpec.Tolerations = patchBuiltInToleration(tolerations)
 
-	// set others
-	component.EnabledLogs = clusterCompSpec.EnabledLogs
-	component.Replicas = clusterCompSpec.Replicas
-	component.TLS = clusterCompSpec.TLS
-	component.Issuer = clusterCompSpec.Issuer
-
 	if clusterCompSpec.VolumeClaimTemplates != nil {
 		component.VolumeClaimTemplates = appsv1alpha1.ToVolumeClaimTemplates(clusterCompSpec.VolumeClaimTemplates)
 	}
@@ -103,12 +100,24 @@ func BuildComponent(
 		component.PodSpec.Containers[0].Resources = clusterCompSpec.Resources
 	}
 
-	if clusterCompSpec.ServiceType != "" {
-		if component.Service == nil {
-			component.Service = &corev1.ServiceSpec{}
+	if clusterCompDefObj.Service != nil {
+		service := corev1.Service{Spec: *clusterCompDefObj.Service}
+		service.Spec.Type = corev1.ServiceTypeClusterIP
+		component.Services = append(component.Services, service)
+
+		for _, item := range clusterCompSpec.Services {
+			service = corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        item.Name,
+					Annotations: item.Annotations,
+				},
+				Spec: *clusterCompDefObj.Service,
+			}
+			service.Spec.Type = item.ServiceType
+			component.Services = append(component.Services, service)
 		}
-		component.Service.Type = clusterCompSpec.ServiceType
 	}
+
 	component.PrimaryIndex = clusterCompSpec.PrimaryIndex
 
 	// TODO(zhixu.zt) We need to reserve the VolumeMounts of the container for ConfigMap or Secret,

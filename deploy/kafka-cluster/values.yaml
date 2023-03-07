@@ -1,0 +1,163 @@
+
+## @param terminationPolicy define Cluster termination policy. One of DoNotTerminate, Halt, Delete, WipeOut.
+##
+terminationPolicy: Halt
+
+## @param mode for Kafka cluster mode, 'combined' is combined Kafka controller (KRaft) and broker, 
+## 'separated' is a Kafka KRaft and Kafka broker cluster.
+##
+mode: combined
+
+
+
+## Enable persistence using Persistent Volume Claims
+## ref: https://kubernetes.io/docs/user-guide/persistent-volumes/
+##
+## @param persistence.enabled Enable persistence using Persistent Volume Claims
+## @param persistence.data.size Size of data volume
+## @param persistence.data.storageClassName Storage class of backing PVC for data volume
+## @param persistence.log.size Size of log volume
+## @param persistence.log.storageClassName Storage class of backing PVC for log volume
+persistence:
+  ## @param persistence.enabled Enable persistence using Persistent Volume Claims
+  ##
+  enabled: true
+  ## `metadata` volume settings
+  ##
+  metadata:
+    ## @param persistence.data.storageClassName Storage class of backing PVC
+    ## If defined, storageClassName: <storageClass>
+    ## If set to "-", storageClassName: "", which disables dynamic provisioning
+    ## If undefined (the default) or set to null, no storageClassName spec is
+    ##   set, choosing the default provisioner.  (gp2 on AWS, standard on
+    ##   GKE, AWS & OpenStack)
+    ##
+    storageClassName: 
+    ## @param persistence.data.size Size of data volume
+    ##
+    size: 5Gi
+  ## `data` volume settings
+  ##
+  data:
+    ## @param persistence.data.storageClassName Storage class of backing PVC
+    ## If defined, storageClassName: <storageClass>
+    ## If set to "-", storageClassName: "", which disables dynamic provisioning
+    ## If undefined (the default) or set to null, no storageClassName spec is
+    ##   set, choosing the default provisioner.  (gp2 on AWS, standard on
+    ##   GKE, AWS & OpenStack)
+    ##
+    storageClassName: 
+    ## @param persistence.data.size Size of data volume
+    ##
+    size: 10Gi
+  ## `log` volume settings
+  ##
+  log:
+    ## @param persistence.log.enabled Enable persistence using Persistent Volume Claims
+    ##
+    enabled: false
+    ## @param persistence.log.storageClassName Storage class of backing PVC
+    ## If defined, storageClassName: <storageClass>
+    ## If set to "-", storageClassName: "", which disables dynamic provisioning
+    ## If undefined (the default) or set to null, no storageClassName spec is
+    ##   set, choosing the default provisioner.  (gp2 on AWS, standard on
+    ##   GKE, AWS & OpenStack)
+    ##
+    storageClassName: 
+    ## @param persistence.log.size Size of data volume
+    ##
+    size: 5Gi
+
+## kafkaServer (kraft & broker) component settings.
+##
+kafkaServer:
+  ## @param replicaCount Kafka server replica count
+  ##
+  replicaCount: 1
+
+
+  ## Kafka server workload pod resource requests and limits
+  ## ref: http://kubernetes.io/docs/user-guide/compute-resources/
+  ## @param resources.limits The resources limits for the pod
+  ## @param resources.requests The requested resources for pod
+  ##
+  resources: {}
+
+
+## kafkaController (kraft) component settings.
+##
+kafkaController:
+  ## @param replicaCount Kafka server replica count
+  ##
+  replicaCount: 1
+
+
+  ## Kafka server workload pod resource requests and limits
+  ## ref: http://kubernetes.io/docs/user-guide/compute-resources/
+  ## @param resources.limits The resources limits for the pod
+  ## @param resources.requests The requested resources for pod
+  ##
+  resources: {}
+
+
+## kafkaBroker component settings.
+##
+kafkaBroker:
+  ## @param replicaCount Kafka server replica count
+  ##
+  replicaCount: 1
+
+
+  ## Kafka server workload pod resource requests and limits
+  ## ref: http://kubernetes.io/docs/user-guide/compute-resources/
+  ## @param resources.limits The resources limits for the pod
+  ## @param resources.requests The requested resources for pod
+  ##
+  resources: {}
+
+
+## Monitoring configurations
+##
+monitor:
+  ## @param monitor.enabled if `true`, enable Cluster monitor capabilities
+  ##
+  enabled: true
+  ## Kafka exporter settings
+  ##
+  kafkaExporter:
+    ## Kafka exporter pod resource requests and limits
+    ## ref: http://kubernetes.io/docs/user-guide/compute-resources/
+    ## @param resources.limits The resources limits for the pod
+    ## @param resources.requests The requested resources for pod
+    ##
+    resources: {}
+    ## @param replicaCount Kafka exporter replica count
+    ##
+    replicaCount: 1
+
+
+## Service configurations
+##
+service:
+  ## @param service.type Kafka cluster service type, valid options are ExternalName, ClusterIP, NodePort, and LoadBalancer.
+  ## ref: https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types
+  ## 
+  type: ClusterIP
+
+
+## @param tolerations define global Tolerations for the cluster all pod's assignment
+## ref: https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/
+##
+tolerations: []
+
+
+## @param topologySpreadConstraints Topology Spread Constraints for pod assignment spread across your cluster among failure-domains. Evaluated as a template
+## Ref: https://kubernetes.io/docs/concepts/workloads/pods/pod-topology-spread-constraints/#spread-constraints-for-pods
+##
+topologyKeys:
+  - kubernetes.io/hostname
+
+
+## @param affinity is affinity setting for Kafka cluster pods assignment
+##
+affinity: {}

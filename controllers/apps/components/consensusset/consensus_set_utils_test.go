@@ -20,7 +20,6 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/stretchr/testify/assert"
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
@@ -30,6 +29,7 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
+	"github.com/apecloud/kubeblocks/internal/controllerutil"
 	testk8s "github.com/apecloud/kubeblocks/internal/testutil/k8s"
 )
 

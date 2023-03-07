@@ -5,7 +5,7 @@ metadata:
   labels:
     {{- include "mongodb.labels" . | nindent 4 }}
 spec:
-  clusterDefinitionRef: apecloud-mongodb
+  clusterDefinitionRef: mongodb
   componentVersions:
     - componentDefRef: mongos
       versionsContext:

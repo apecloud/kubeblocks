@@ -115,13 +115,13 @@ type ClusterStatus struct {
 type ClusterComponentSpec struct {
 	// name defines cluster's component name.
 	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:MaxLength=12
+	// +kubebuilder:validation:MaxLength=15
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	Name string `json:"name"`
 
 	// ComponentDefRef reference componentDef defined in ClusterDefinition spec.
 	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:MaxLength=18
+	// +kubebuilder:validation:MaxLength=63
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	ComponentDefRef string `json:"componentDefRef"`
 
@@ -166,25 +166,9 @@ type ClusterComponentSpec struct {
 	// +patchStrategy=merge,retainKeys
 	VolumeClaimTemplates []ClusterComponentVolumeClaimTemplate `json:"volumeClaimTemplates,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
 
-	// serviceType determines how the Service is exposed. Valid
-	// options are ClusterIP, NodePort, and LoadBalancer.
-	// "ClusterIP" allocates a cluster-internal IP address for load-balancing
-	// to endpoints. Endpoints are determined by the selector or if that is not
-	// specified, by manual construction of an Endpoints object or
-	// EndpointSlice objects. If clusterIP is "None", no virtual IP is
-	// allocated and the endpoints are published as a set of endpoints rather
-	// than a virtual IP.
-	// "NodePort" builds on ClusterIP and allocates a port on every node which
-	// routes to the same endpoints as the clusterIP.
-	// "LoadBalancer" builds on NodePort and creates an external load-balancer
-	// (if supported in the current cloud) which routes to the same endpoints
-	// as the clusterIP.
-	// More info: https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types
-	// +kubebuilder:default=ClusterIP
-	// +kubebuilder:validation:Enum={ClusterIP,NodePort,LoadBalancer}
-	// +kubebuilder:pruning:PreserveUnknownFields
+	// Services expose endpoints can be accessed by clients
 	// +optional
-	ServiceType corev1.ServiceType `json:"serviceType,omitempty"`
+	Services []ClusterComponentService `json:"services,omitempty"`
 
 	// primaryIndex determines which index is primary when workloadType is Replication, index number starts from zero.
 	// +kubebuilder:validation:Minimum=0
@@ -373,6 +357,37 @@ type TLSSecretRef struct {
 	// Key of TLS private key in Secret
 	// +kubebuilder:validation:Required
 	Key string `json:"key"`
+}
+
+type ClusterComponentService struct {
+	// Service name
+	// +kubebuilder:validation:Required
+	Name string `json:"name"`
+
+	// serviceType determines how the Service is exposed. Valid
+	// options are ClusterIP, NodePort, and LoadBalancer.
+	// "ClusterIP" allocates a cluster-internal IP address for load-balancing
+	// to endpoints. Endpoints are determined by the selector or if that is not
+	// specified, by manual construction of an Endpoints object or
+	// EndpointSlice objects. If clusterIP is "None", no virtual IP is
+	// allocated and the endpoints are published as a set of endpoints rather
+	// than a virtual IP.
+	// "NodePort" builds on ClusterIP and allocates a port on every node which
+	// routes to the same endpoints as the clusterIP.
+	// "LoadBalancer" builds on NodePort and creates an external load-balancer
+	// (if supported in the current cloud) which routes to the same endpoints
+	// as the clusterIP.
+	// More info: https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types
+	// +kubebuilder:default=ClusterIP
+	// +kubebuilder:validation:Enum={ClusterIP,NodePort,LoadBalancer}
+	// +kubebuilder:pruning:PreserveUnknownFields
+	// +optional
+	ServiceType corev1.ServiceType `json:"serviceType,omitempty"`
+
+	// If ServiceType is LoadBalancer, cloud provider related parameters can be put here
+	// More info: https://kubernetes.io/docs/concepts/services-networking/service/#loadbalancer
+	// +optional
+	Annotations map[string]string `json:"annotations,omitempty"`
 }
 
 // +kubebuilder:object:root=true

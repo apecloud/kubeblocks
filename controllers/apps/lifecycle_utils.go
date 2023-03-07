@@ -493,8 +493,12 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 		if err := cli.Get(ctx, key, pvcObj); err != nil {
 			return err
 		}
-		pvcObj.Spec = pvcProto.Spec
-		if err := cli.Update(ctx, pvcObj); err != nil {
+		if pvcObj.Spec.Resources.Requests[corev1.ResourceStorage] == pvcProto.Spec.Resources.Requests[corev1.ResourceStorage] {
+			return nil
+		}
+		patch := client.MergeFrom(pvcObj.DeepCopy())
+		pvcObj.Spec.Resources.Requests[corev1.ResourceStorage] = pvcProto.Spec.Resources.Requests[corev1.ResourceStorage]
+		if err := cli.Patch(ctx, pvcObj, patch); err != nil {
 			return err
 		}
 		return nil

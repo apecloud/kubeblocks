@@ -74,6 +74,10 @@ dependencies:
     name: snapshot-controller
     # repository: https://piraeus.io/helm-charts
     version: 1.*
+  - condition: kubeblocks-csi-driver.enabled
+    name: kubeblocks-csi-driver
+    # repository: https://apecloud.github.io/helm-charts
+    version: 0.*
   - condition: csi-s3.enabled
     name: csi-s3
     # repository: https://github.com/CloudVE/helm-charts/raw/master

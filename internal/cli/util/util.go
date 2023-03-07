@@ -588,11 +588,12 @@ func GetHelmChartRepoURL() string {
 	return types.KubeBlocksChartURL
 }
 
-// GetKubeBlocksNamespace get the namespace of KubeBlocks
+// GetKubeBlocksNamespace gets namespace of KubeBlocks installation, infer namespace from helm secrets
 func GetKubeBlocksNamespace(client kubernetes.Interface) (string, error) {
-	deploy, err := getKubeBlocksDeploy(client)
-	if err != nil {
-		return "", err
+	secrets, err := client.CoreV1().Secrets(metav1.NamespaceAll).List(context.TODO(), metav1.ListOptions{LabelSelector: types.HelmLabel})
+	// if KubeBlocks is upgraded, there will be multiple secrets
+	if err == nil && len(secrets.Items) >= 1 {
+		return secrets.Items[0].Namespace, nil
 	}
-	return deploy.Namespace, nil
+	return "", errors.New("failed to get KubeBlocks installation namespace")
 }

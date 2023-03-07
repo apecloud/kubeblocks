@@ -16,9 +16,20 @@ limitations under the License.
 
 package alert
 
+import (
+	"fmt"
+	"strings"
+)
+
 const (
-	// alertmanagerYmlJSONPath is the json path of alertmanager.yml in KubeBlocks Helm Chart
-	alertmanagerYmlJSONPath = "prometheus.alertmanagerFiles.\"alertmanager\\.yml\""
+	routeMatcherClusterKey  = "app_kubernetes_io_instance"
+	routeMatcherSeverityKey = "severity"
+	routeMatcherOperator    = "=~"
+)
+
+const (
+	routeMatcherClusterType  = "cluster"
+	routeMatcherSeverityType = "severity"
 )
 
 // severity is the severity of alert
@@ -52,13 +63,13 @@ const (
 
 // emailConfig is the email config of receiver
 type emailConfig struct {
-	To string `json:"to,omitempty"`
+	To string `json:"to"`
 }
 
 // webhookConfig is the webhook config of receiver
 type webhookConfig struct {
 	URL   string `json:"url"`
-	Token string `json:"token"`
+	Token string `json:"token,omitempty"`
 }
 
 type slackConfig struct {
@@ -78,5 +89,34 @@ type receiver struct {
 // route is the route of receiver
 type route struct {
 	Receiver string   `json:"receiver"`
-	Matchers []string `json:"matchers"`
+	Matchers []string `json:"matchers,omitempty"`
+}
+
+func (w *webhookConfig) string() string {
+	var cfgs []string
+	if w.URL != "" {
+		cfgs = append(cfgs, fmt.Sprintf("url=%s", w.URL))
+	}
+	if w.Token != "" {
+		cfgs = append(cfgs, fmt.Sprintf("token=%s", w.Token))
+	}
+	return strings.Join(cfgs, ",")
+}
+
+func (s *slackConfig) string() string {
+	var cfgs []string
+	if s.APIURL != "" {
+		cfgs = append(cfgs, fmt.Sprintf("api_url=%s", s.APIURL))
+	}
+	if s.Channel != "" {
+		cfgs = append(cfgs, fmt.Sprintf("channel=%s", s.Channel))
+	}
+	if s.Username != "" {
+		cfgs = append(cfgs, fmt.Sprintf("username=%s", s.Username))
+	}
+	return strings.Join(cfgs, ",")
+}
+
+func (e *emailConfig) string() string {
+	return e.To
 }

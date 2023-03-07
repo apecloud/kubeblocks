@@ -21,18 +21,13 @@ import (
 	"fmt"
 	"strings"
 
-	"helm.sh/helm/v3/pkg/cli/values"
-
-	flag "github.com/spf13/pflag"
-	"helm.sh/helm/v3/pkg/action"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
+	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/client-go/kubernetes"
 
-	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
-	"github.com/apecloud/kubeblocks/internal/cli/util/helm"
 )
 
 // strToMap parses string to map, string format is key1=value1,key2=value2
@@ -64,28 +59,32 @@ func getAlertConfigmap(client kubernetes.Interface) (*corev1.ConfigMap, error) {
 	return client.CoreV1().ConfigMaps(namespace).Get(context.Background(), alertConfigmapName, metav1.GetOptions{})
 }
 
-func buildHelmCfgByCmdFlags(namespace string, flags *flag.FlagSet) (*action.Configuration, error) {
-	config, err := flags.GetString("kubeconfig")
-	if err != nil {
+func getAlertConfigData(alterConfigMap *corev1.ConfigMap) (map[string]interface{}, error) {
+	dataStr, ok := alterConfigMap.Data[alertConfigFileName]
+	if !ok {
+		return nil, fmt.Errorf("alertmanager configmap has no data named alertmanager.yaml")
+	}
+
+	var data map[string]interface{}
+	if err := yaml.Unmarshal([]byte(dataStr), &data); err != nil {
 		return nil, err
 	}
-	ctx, err := flags.GetString("context")
-	if err != nil {
-		return nil, err
-	}
-	return helm.NewActionConfig(namespace, config, helm.WithContext(ctx))
+	return data, nil
 }
 
-// updateAlterConfig updates alert configuration
-func updateAlterConfig(helmCfg *action.Configuration, namespace string, set string) error {
-	opts := helm.InstallOpts{
-		Name:            types.KubeBlocksChartName,
-		Chart:           types.KubeBlocksChartName + "/" + types.KubeBlocksChartName,
-		Wait:            false,
-		Namespace:       namespace,
-		ValueOpts:       &values.Options{JSONValues: []string{set}},
-		TryTimes:        2,
-		CreateNamespace: false,
+func getReceiversFromData(data map[string]interface{}) []interface{} {
+	// add receiver
+	receivers, ok := data["receivers"].([]interface{})
+	if !ok {
+		receivers = []interface{}{} // init receivers
 	}
-	return opts.Upgrade(helmCfg)
+	return receivers
+}
+
+func getRoutesFromData(data map[string]interface{}) []interface{} {
+	routes, ok := data["route"].(map[string]interface{})["routes"]
+	if !ok {
+		routes = []interface{}{} // init routes
+	}
+	return routes.([]interface{})
 }

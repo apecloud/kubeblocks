@@ -1,6 +1,8 @@
 ## @section Common parameters
 ##
 
+appVersionOverride:
+
 ## KubeBlocks container image settings
 ##
 ## @param image.registry KubeBlocks image registry

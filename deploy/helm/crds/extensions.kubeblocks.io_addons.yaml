@@ -53,6 +53,10 @@ spec:
                 description: Default installation parameters.
                 items:
                   properties:
+                    enabled:
+                      description: enabled can be set if there are no specific installation
+                        attributes to be set.
+                      type: boolean
                     extras:
                       description: Install spec. for extra items.
                       items:
@@ -384,6 +388,10 @@ spec:
               install:
                 description: Installation parameters.
                 properties:
+                  enabled:
+                    description: enabled can be set if there are no specific installation
+                      attributes to be set.
+                    type: boolean
                   extras:
                     description: Install spec. for extra items.
                     items:

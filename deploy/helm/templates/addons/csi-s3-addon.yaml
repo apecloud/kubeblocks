@@ -15,5 +15,8 @@ spec:
         - name: csi-s3-chart-kubeblocks-values
           key: values-kubeblocks-override.yaml
 
+  defaultInstallValues:
+    - enabled: true
+
   installable:
     autoInstall: {{ get ( get ( .Values | toYaml | fromYaml ) "csi-s3" ) "enabled" }}

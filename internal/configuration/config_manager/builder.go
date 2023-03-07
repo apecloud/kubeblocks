@@ -32,10 +32,10 @@ import (
 )
 
 const (
-	scriptName       = "reload.tpl"
-	tplConfigName    = "reload.yaml"
-	scriptVolumeName = "reload-manager-reload"
-	scriptVolumePath = "/opt/config/reload"
+	scriptName         = "reload.tpl"
+	configTemplateName = "reload.yaml"
+	scriptVolumeName   = "reload-manager-reload"
+	scriptVolumePath   = "/opt/config/reload"
 )
 
 func BuildConfigManagerContainerArgs(reloadOptions *appsv1alpha1.ReloadOptions, volumeDirs []corev1.VolumeMount, cli client.Client, ctx context.Context, manager *ConfigManagerParams) error {
@@ -62,7 +62,7 @@ func buildTPLScriptArgs(options *appsv1alpha1.TPLScriptTrigger, volumeDirs []cor
 
 	args := buildConfigManagerCommonArgs(volumeDirs)
 	args = append(args, "--notify-type", string(appsv1alpha1.TPLScriptType))
-	args = append(args, "--tpl-config", filepath.Join(scriptVolumePath, tplConfigName))
+	args = append(args, "--tpl-config", filepath.Join(scriptVolumePath, configTemplateName))
 	manager.Args = args
 	manager.Volumes = append(manager.Volumes, corev1.VolumeMount{
 		Name:      scriptVolumeName,

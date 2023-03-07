@@ -469,7 +469,7 @@ helm-package: bump-chart-ver ## Do helm package.
 ## this is a hack fix: decompress the tgz from the depend-charts directory to the charts directory
 ## before dependency update.
 	cd $(CHART_PATH)/charts && ls ../depend-charts/*.tgz | xargs -n1 tar xf
-	$(HELM) dependency update $(CHART_PATH)
+	$(HELM) dependency update --skip-refresh $(CHART_PATH)
 	$(HELM) package $(CHART_PATH)
 
 ##@ Build Dependencies

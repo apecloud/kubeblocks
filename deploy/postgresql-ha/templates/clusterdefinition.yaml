@@ -132,14 +132,18 @@ spec:
                     initdb:
                       - auth-host: md5
                       - auth-local: trust
-                    pg_hba:
-                      - host all all 0.0.0.0/0 trust
-                      - host replication all  0.0.0.0/0 trust
-              - name: PGPASSWORD_SUPERUSER
+              - name: ALLOW_NOSSL
+                value: "true"
+              - name: PGUSER_SUPERUSER
                 valueFrom:
                   secretKeyRef:
                     name: $(CONN_CREDENTIAL_SECRET_NAME)
                     key: username
+              - name: PGPASSWORD_SUPERUSER
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: postgres-password
               - name: PGUSER_ADMIN
                 value: superadmin
               - name: PGPASSWORD_ADMIN

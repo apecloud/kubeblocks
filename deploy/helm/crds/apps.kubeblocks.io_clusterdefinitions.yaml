@@ -8852,6 +8852,35 @@ spec:
                       - cmdExecutorConfig
                       - passwordConfig
                       type: object
+                    volumeTypes:
+                      description: 'VolumeTypes is used to describe the purpose of
+                        the volumes mapping the name of the VolumeMounts in the PodSpec.Container
+                        field, such as data volume, log volume, etc. When backing
+                        up the volume, the volume can be correctly backed up according
+                        to the volumeType. NOTE: When volumeTypes is not defined,
+                        the backup feature will not be supported, even if a persistent
+                        volume has been specified. For example: `{name: data, type:
+                        data}` means that the volume named `data` is used to store
+                        `data` `{name: binlog, type: log}` means that the volume named
+                        `binlog` is used to store `log`'
+                      items:
+                        description: The VolumeTypeSpec determines the volumes purpose
+                          for backup.
+                        properties:
+                          name:
+                            maxLength: 18
+                            pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                            type: string
+                          type:
+                            description: 'Type is in enum of {data, log}. The default
+                              type is `data`. VolumeTypeData: the volume persistent
+                              data VolumeTypeLog: the volume persistent log'
+                            enum:
+                            - data
+                            - log
+                            type: string
+                        type: object
+                      type: array
                     workloadType:
                       description: workloadType defines type of the workload. Stateless
                         is a stateless workload type used to describe stateless applications.

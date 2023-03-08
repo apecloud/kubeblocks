@@ -155,6 +155,10 @@ var (
 		PodSpec: &corev1.PodSpec{
 			Containers: []corev1.Container{defaultMySQLContainer},
 		},
+		VolumeTypes: []appsv1alpha1.VolumeTypeSpec{{
+			Name: DataVolumeName,
+			Type: appsv1alpha1.VolumeTypeData,
+		}},
 	}
 
 	defaultConsensusSpec = appsv1alpha1.ConsensusSetSpec{

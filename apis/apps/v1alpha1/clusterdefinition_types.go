@@ -267,6 +267,20 @@ type ConfigurationSpec struct {
 	ConfigTemplateRefs []ConfigTemplate `json:"configTemplateRefs,omitempty"`
 }
 
+// The VolumeTypeSpec determines the volumes purpose for backup.
+type VolumeTypeSpec struct {
+	// +kubebuilder:validation:MaxLength=18
+	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
+	// +optional
+	Name string `json:"name,omitempty"`
+
+	// Type is in enum of {data, log}. The default type is `data`.
+	// VolumeTypeData: the volume persistent data
+	// VolumeTypeLog: the volume persistent log
+	// +optional
+	Type VolumeType `json:"type,omitempty"`
+}
+
 // ClusterComponentDefinition provides a workload component specification template,
 // with attributes that strongly work with stateful workloads and day-2 operations
 // behaviors.
@@ -349,6 +363,20 @@ type ClusterComponentDefinition struct {
 	// Statement to create system account.
 	// +optional
 	SystemAccounts *SystemAccountSpec `json:"systemAccounts,omitempty"`
+
+	// VolumeTypes is used to describe the purpose of the volumes
+	// mapping the name of the VolumeMounts in the PodSpec.Container field,
+	// such as data volume, log volume, etc.
+	// When backing up the volume, the volume can be correctly backed up
+	// according to the volumeType.
+	// NOTE:
+	// When volumeTypes is not defined, the backup feature will not be supported,
+	// even if a persistent volume has been specified.
+	// For example:
+	// `{name: data, type: data}` means that the volume named `data` is used to store `data`
+	// `{name: binlog, type: log}` means that the volume named `binlog` is used to store `log`
+	// +optional
+	VolumeTypes []VolumeTypeSpec `json:"volumeTypes,omitempty"`
 }
 
 type HorizontalScalePolicy struct {

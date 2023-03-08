@@ -1,0 +1,41 @@
+apiVersion: v2
+name: apecloud-vitess
+description: ApeCloud MySQL is fully compatible with MySQL syntax and supports single-availability
+  zone deployment, double-availability zone deployment, and multiple-availability zone deployment.
+  Based on the Paxos consensus protocol, ApeCloud MySQL realizes automatic leader election, log
+  synchronization, and strict consistency. ApeCloud MySQL is the optimum choice for the production
+  environment since it can automatically perform a high-availability switch to maintain business continuity
+  when container exceptions, server exceptions, or availability zone exceptions occur.
+
+# A chart can be either an 'application' or a 'library' chart.
+#
+# Application charts are a collection of templates that can be packaged into versioned archives
+# to be deployed.
+#
+# Library charts provide useful utilities or functions for the chart developer. They're included as
+# a dependency of application charts to inject those utilities and functions into the rendering
+# pipeline. Library charts do not define any templates and therefore cannot be deployed.
+type: application
+
+# This is the chart version. This version number should be incremented each time you make changes
+# to the chart and its templates, including the app version.
+# Versions are expected to follow Semantic Versioning (https://semver.org/)
+version: 0.1.0
+
+# This is the version number of the application being deployed. This version number should be
+# incremented each time you make changes to the application. Versions are not expected to
+# follow Semantic Versioning. They should reflect the version the application is using.
+# It is recommended to use it with quotes.
+appVersion: "14.0.0"
+
+home: https://kubeblocks.io/
+icon: https://github.com/apecloud/kubeblocks/raw/main/img/logo.png
+
+
+maintainers:
+- name: ApeCloud
+  url: https://github.com/apecloud/kubeblocks/
+
+
+sources:
+- https://github.com/apecloud/kubeblocks/

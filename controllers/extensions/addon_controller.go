@@ -197,10 +197,10 @@ func (r *stageCtx) setReconciled() {
 	r.updateResultNErr(&res, err)
 }
 
-func (r *stageCtx) setRequeue() {
-	res, err := intctrlutil.Requeue(r.reqCtx.Log, "")
-	r.updateResultNErr(&res, err)
-}
+// func (r *stageCtx) setRequeue() {
+// 	res, err := intctrlutil.Requeue(r.reqCtx.Log, "")
+// 	r.updateResultNErr(&res, err)
+// }
 
 func (r *stageCtx) setRequeueAfter(duration time.Duration, msg string) {
 	res, err := intctrlutil.RequeueAfter(time.Second, r.reqCtx.Log, msg)

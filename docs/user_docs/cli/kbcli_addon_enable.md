@@ -13,11 +13,11 @@ kbcli addon enable ADDON_NAME [flags]
   kbcli addon enable prometheus
   
   # Enabled "prometheus" addon with custom resources settings
-  kbcli addon enable prometheus --memory 512Mi:4Gi --storage 8Gi --replicas 2
+  kbcli addon enable prometheus --memory 512Mi/4Gi --storage 8Gi --replicas 2
   
   # Enabled "prometheus" addon and its extra alertmanager component with custom resources settings
-  kbcli addon enable prometheus --memory 512Mi:4Gi --storage 8Gi --replicas 2 \
-  --memory alertmanager:16Mi:256Mi --storage: alertmanager:1Gi --replicas alertmanager:2
+  kbcli addon enable prometheus --memory 512Mi/4Gi --storage 8Gi --replicas 2 \
+  --memory alertmanager:16Mi/256Mi --storage: alertmanager:1Gi --replicas alertmanager:2
   
   # Enabled "prometheus" addon with tolerations
   kbcli addon enable prometheus --tolerations '[[{"key":"taintkey","operator":"Equal","effect":"NoSchedule","value":"true"}]]' \
@@ -27,13 +27,18 @@ kbcli addon enable ADDON_NAME [flags]
 ### Options
 
 ```
-      ----cpu stringArray             Sets addon CPU resource values (--cpu [extraName:]<request>:<limit>) (can specify multiple if has extra items))
-      ----memory stringArray          Sets addon memory resource values (--memory [extraName:]<request>:<limit>) (can specify multiple if has extra items))
-      ----replicas stringArray        Sets addon component replica count (--replicas [extraName:]<N>) (can specify multiple if has extra items))
-      ----storage stringArray         Sets addon storage size (--storage [extraName:]<request>) (can specify multiple if has extra items))
-      ----storage-class stringArray   Sets addon storage class name (--storage-class [extraName:]<SC name>) (can specify multiple if has extra items))
-      ----tolerations stringArray     Sets addon pod tolerations (--tolerations [extraName:]<toleration JSON list items>) (can specify multiple if has extra items))
-  -h, --help                          help for enable
+      --allow-missing-template-keys    If true, ignore any errors in templates when a field or map key is missing in the template. Only applies to golang and jsonpath output formats. (default true)
+      --cpu stringArray                Sets addon CPU resource values (--cpu [extraName:]<request>/<limit>) (can specify multiple if has extra items))
+      --dry-run string[="unchanged"]   Must be "none", "server", or "client". If client strategy, only print the object that would be sent, without sending it. If server strategy, submit server-side request without persisting the resource. (default "none")
+  -h, --help                           help for enable
+      --memory stringArray             Sets addon memory resource values (--memory [extraName:]<request>/<limit>) (can specify multiple if has extra items))
+  -o, --output string                  Output format. One of: (json, yaml, name, go-template, go-template-file, template, templatefile, jsonpath, jsonpath-as-json, jsonpath-file).
+      --replicas stringArray           Sets addon component replica count (--replicas [extraName:]<number>) (can specify multiple if has extra items))
+      --show-managed-fields            If true, keep the managedFields when printing objects in JSON or YAML format.
+      --storage stringArray            Sets addon storage size (--storage [extraName:]<request>) (can specify multiple if has extra items))
+      --storage-class stringArray      Sets addon storage class name (--storage-class [extraName:]<storage class name>) (can specify multiple if has extra items))
+      --template string                Template string or path to template file to use when -o=go-template, -o=go-template-file. The template format is golang templates [http://golang.org/pkg/text/template/#pkg-overview].
+      --tolerations stringArray        Sets addon pod tolerations (--tolerations [extraName:]<toleration JSON list items>) (can specify multiple if has extra items))
 ```
 
 ### Options inherited from parent commands

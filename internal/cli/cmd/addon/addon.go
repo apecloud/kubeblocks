@@ -146,15 +146,15 @@ func newEnableCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 		},
 	}
 	cmd.Flags().StringArrayVar(&o.addonEnableFlags.MemorySets, "memory", []string{},
-		"Sets addon memory resource values (--memory [extraName:]<request>:<limit>) (can specify multiple if has extra items))")
+		"Sets addon memory resource values (--memory [extraName:]<request>/<limit>) (can specify multiple if has extra items))")
 	cmd.Flags().StringArrayVar(&o.addonEnableFlags.CPUSets, "cpu", []string{},
-		"Sets addon CPU resource values (--cpu [extraName:]<request>:<limit>) (can specify multiple if has extra items))")
+		"Sets addon CPU resource values (--cpu [extraName:]<request>/<limit>) (can specify multiple if has extra items))")
 	cmd.Flags().StringArrayVar(&o.addonEnableFlags.StorageSets, "storage", []string{},
 		"Sets addon storage size (--storage [extraName:]<request>) (can specify multiple if has extra items))")
 	cmd.Flags().StringArrayVar(&o.addonEnableFlags.ReplicaCountSets, "replicas", []string{},
-		"Sets addon component replica count (--replicas [extraName:]<N>) (can specify multiple if has extra items))")
+		"Sets addon component replica count (--replicas [extraName:]<number>) (can specify multiple if has extra items))")
 	cmd.Flags().StringArrayVar(&o.addonEnableFlags.StorageClassSets, "storage-class", []string{},
-		"Sets addon storage class name (--storage-class [extraName:]<SC name>) (can specify multiple if has extra items))")
+		"Sets addon storage class name (--storage-class [extraName:]<storage class name>) (can specify multiple if has extra items))")
 	cmd.Flags().StringArrayVar(&o.addonEnableFlags.TolerationsSet, "tolerations", []string{},
 		"Sets addon pod tolerations (--tolerations [extraName:]<toleration JSON list items>) (can specify multiple if has extra items))")
 
@@ -333,7 +333,7 @@ func (o *addonCmdOpts) buildEnablePatch(flags []*pflag.Flag, spec, install map[s
 
 	f := o.addonEnableFlags
 	for _, v := range f.ReplicaCountSets {
-		twoTuplesProcessor(v, "replicas", func(s, flag string) (interface{}, error) {
+		if err := twoTuplesProcessor(v, "replicas", func(s, flag string) (interface{}, error) {
 			v, err := strconv.Atoi(s)
 			if err != nil {
 				return nil, fmt.Errorf("wrong flag value --%s=%s, with error %v", flag, s, err)
@@ -342,23 +342,29 @@ func (o *addonCmdOpts) buildEnablePatch(flags []*pflag.Flag, spec, install map[s
 			return &r, nil
 		}, func(item *extensionsv1alpha1.AddonInstallSpecItem, i interface{}) {
 			item.Replicas = i.(*int32)
-		})
+		}); err != nil {
+			return err
+		}
 	}
 
 	for _, v := range f.StorageClassSets {
-		twoTuplesProcessor(v, "storage-class", nil, func(item *extensionsv1alpha1.AddonInstallSpecItem, i interface{}) {
+		if err := twoTuplesProcessor(v, "storage-class", nil, func(item *extensionsv1alpha1.AddonInstallSpecItem, i interface{}) {
 			item.StorageClass = i.(string)
-		})
+		}); err != nil {
+			return err
+		}
 	}
 
 	for _, v := range f.TolerationsSet {
-		twoTuplesProcessor(v, "tolerations", nil, func(item *extensionsv1alpha1.AddonInstallSpecItem, i interface{}) {
+		if err := twoTuplesProcessor(v, "tolerations", nil, func(item *extensionsv1alpha1.AddonInstallSpecItem, i interface{}) {
 			item.Tolerations = i.(string)
-		})
+		}); err != nil {
+			return err
+		}
 	}
 
 	for _, v := range f.StorageSets {
-		twoTuplesProcessor(v, "storage", func(s, flag string) (interface{}, error) {
+		if err := twoTuplesProcessor(v, "storage", func(s, flag string) (interface{}, error) {
 			q, err := resource.ParseQuantity(s)
 			if err != nil {
 				return nil, fmt.Errorf("wrong flag value --%s=%s, with error %v", flag, s, err)
@@ -366,25 +372,30 @@ func (o *addonCmdOpts) buildEnablePatch(flags []*pflag.Flag, spec, install map[s
 			return q, nil
 		}, func(item *extensionsv1alpha1.AddonInstallSpecItem, i interface{}) {
 			item.Resources.Requests[corev1.ResourceStorage] = i.(resource.Quantity)
-		})
+		}); err != nil {
+			return err
+		}
 	}
 
 	for _, v := range f.CPUSets {
-		twoTuplesProcessor(v, "cpu", reqLimitResTransformer, func(item *extensionsv1alpha1.AddonInstallSpecItem, i interface{}) {
+		if err := twoTuplesProcessor(v, "cpu", reqLimitResTransformer, func(item *extensionsv1alpha1.AddonInstallSpecItem, i interface{}) {
 			reqLim := i.([2]resource.Quantity)
 			item.Resources.Requests[corev1.ResourceCPU] = reqLim[0]
 			item.Resources.Limits[corev1.ResourceCPU] = reqLim[1]
-		})
+		}); err != nil {
+			return err
+		}
 	}
 
 	for _, v := range f.MemorySets {
-		twoTuplesProcessor(v, "memory", reqLimitResTransformer, func(item *extensionsv1alpha1.AddonInstallSpecItem, i interface{}) {
+		if err := twoTuplesProcessor(v, "memory", reqLimitResTransformer, func(item *extensionsv1alpha1.AddonInstallSpecItem, i interface{}) {
 			reqLim := i.([2]resource.Quantity)
 			item.Resources.Requests[corev1.ResourceMemory] = reqLim[0]
 			item.Resources.Limits[corev1.ResourceMemory] = reqLim[1]
-		})
+		}); err != nil {
+			return err
+		}
 	}
-
 	return nil
 }
 

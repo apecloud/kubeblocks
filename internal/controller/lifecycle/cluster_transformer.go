@@ -64,6 +64,8 @@ func (c *clusterTransformer) Transform(dag *graph.DAG) error {
 	clusterCompVerMap := c.cc.cv.GetDefNameMappingComponents()
 	process1stComp := true
 
+	// TODO: should move credential secrets creation from systemaccount_controller & here into credential_transformer,
+	// TODO: as those secrets are owned by the cluster
 	prepareComp := func(synthesizedComp *component.SynthesizedComponent) error {
 		iParams := task
 		iParams.Component = synthesizedComp

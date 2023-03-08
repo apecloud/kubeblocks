@@ -54,19 +54,19 @@ var (
 
 var (
 	addReceiverExample = templates.Examples(`
-		# add webhookConfig receiver, for example feishu
+		# add webhook receiver, for example feishu
 		kbcli alert add-receiver --webhook='url=https://open.feishu.cn/open-apis/bot/v2/hook/foo,token=xxxxx'
 
-		# add emailConfig receiver
+		# add email receiver
         kbcli alter add-receiver --email='a@foo.com,b@foo.com'
 
-		# add emailConfig receiver, and only receive alert from cluster mycluster
+		# add email receiver, and only receive alert from cluster mycluster
 		kbcli alter add-receiver --email='a@foo.com,b@foo.com' --cluster=mycluster
 
-		# add emailConfig receiver, and only receive alert from cluster mycluster and alert severity is warning
+		# add email receiver, and only receive alert from cluster mycluster and alert severity is warning
 		kbcli alter add-receiver --email='a@foo.com,b@foo.com' --cluster=mycluster --severity=warning
 
-		# add slackConfig receiver
+		# add slack receiver
   		kbcli alert add-receiver --slack api_url=https://hooks.slackConfig.com/services/foo,channel=monitor,username=kubeblocks-alert-bot`)
 )
 
@@ -96,7 +96,7 @@ func newAddReceiverCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *
 	o := addReceiverOptions{baseOptions: baseOptions{IOStreams: streams}}
 	cmd := &cobra.Command{
 		Use:     "add-receiver",
-		Short:   "Add alert receiver, such as emailConfig, slackConfig, webhookConfig and so on",
+		Short:   "Add alert receiver, such as email, slack, webhook and so on",
 		Example: addReceiverExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			util.CheckErr(o.complete(f))
@@ -147,7 +147,7 @@ func (o *baseOptions) complete(f cmdutil.Factory) error {
 
 func (o *addReceiverOptions) validate(args []string) error {
 	if len(o.emails) == 0 && len(o.webhooks) == 0 && len(o.slacks) == 0 {
-		return fmt.Errorf("must specify at least one receiver, such as --emailConfig, --webhookConfig or --slackConfig")
+		return fmt.Errorf("must specify at least one receiver, such as --email, --webhook or --slack")
 	}
 
 	// if name is not specified, generate a random name
@@ -304,7 +304,7 @@ func (o *addReceiverOptions) buildWebhook() ([]*webhookConfig, error) {
 			// check webhookConfig keys
 			switch webhookKey(k) {
 			case webhookURL:
-				w.URL = getWebhookURL(o.name)
+				w.URL = getWebhookURL(o.name, o.webhookConfigMap.Namespace)
 				webhookType := getWebhookType(v)
 				if webhookType == unknownWebhookType {
 					return nil, fmt.Errorf("invalid webhook url: %s, failed to prase the webhook type", v)
@@ -315,7 +315,7 @@ func (o *addReceiverOptions) buildWebhook() ([]*webhookConfig, error) {
 				w.Token = v
 				waReceiver.Params.Secret = v
 			default:
-				return nil, fmt.Errorf("invalid webhookConfig key: %s, webhook key should be one of url and token", k)
+				return nil, fmt.Errorf("invalid webhook key: %s, webhook key should be one of url and token", k)
 			}
 		}
 		ws = append(ws, &w)
@@ -350,7 +350,7 @@ func buildSlackConfigs(slacks []string) ([]*slackConfig, error) {
 			case slackAPIURL:
 				s.APIURL = v
 			case slackChannel:
-				s.Channel = v
+				s.Channel = "#" + v
 			case slackUsername:
 				s.Username = v
 			default:

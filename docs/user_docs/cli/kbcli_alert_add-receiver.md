@@ -1,6 +1,6 @@
 ## kbcli alert add-receiver
 
-Add alert receiver, such as emailConfig, slackConfig, webhookConfig and so on
+Add alert receiver, such as email, slack, webhook and so on
 
 ```
 kbcli alert add-receiver [flags]
@@ -9,19 +9,19 @@ kbcli alert add-receiver [flags]
 ### Examples
 
 ```
-  # add webhookConfig receiver, for example feishu
+  # add webhook receiver, for example feishu
   kbcli alert add-receiver --webhook='url=https://open.feishu.cn/open-apis/bot/v2/hook/foo,token=xxxxx'
   
-  # add emailConfig receiver
+  # add email receiver
   kbcli alter add-receiver --email='a@foo.com,b@foo.com'
   
-  # add emailConfig receiver, and only receive alert from cluster mycluster
+  # add email receiver, and only receive alert from cluster mycluster
   kbcli alter add-receiver --email='a@foo.com,b@foo.com' --cluster=mycluster
   
-  # add emailConfig receiver, and only receive alert from cluster mycluster and alert severity is warning
+  # add email receiver, and only receive alert from cluster mycluster and alert severity is warning
   kbcli alter add-receiver --email='a@foo.com,b@foo.com' --cluster=mycluster --severity=warning
   
-  # add slackConfig receiver
+  # add slack receiver
   kbcli alert add-receiver --slack api_url=https://hooks.slackConfig.com/services/foo,channel=monitor,username=kubeblocks-alert-bot
 ```
 

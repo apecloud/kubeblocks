@@ -46,7 +46,7 @@ const (
 
 type webhookKey string
 
-// webhookConfig keys
+// webhook keys
 const (
 	webhookURL   webhookKey = "url"
 	webhookToken webhookKey = "token"

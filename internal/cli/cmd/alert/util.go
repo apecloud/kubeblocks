@@ -24,6 +24,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/yaml"
+
+	"github.com/apecloud/kubeblocks/internal/cli/types"
 )
 
 // strToMap parses string to map, string format is key1=value1,key2=value2
@@ -92,8 +94,8 @@ func getWebhookType(url string) webhookType {
 	return unknownWebhookType
 }
 
-func getWebhookURL(name string) string {
-	return fmt.Sprintf("http://%s.default:5001/api/v1/notify/%s", webhookAdaptorName, name)
+func getWebhookURL(name string, namespace string) string {
+	return fmt.Sprintf("http://%s-%s.%s:5001/api/v1/notify/%s", types.KubeBlocksReleaseName, "alertmanager-webhook-adaptor", namespace, name)
 }
 
 func removeDuplicateStr(strArray []string) []string {

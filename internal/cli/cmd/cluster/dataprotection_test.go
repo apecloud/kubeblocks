@@ -34,6 +34,7 @@ import (
 	clientfake "k8s.io/client-go/rest/fake"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/create"
 	"github.com/apecloud/kubeblocks/internal/cli/delete"
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
@@ -103,7 +104,7 @@ var _ = Describe("DataProtection", func() {
 
 			secrets := testing.FakeSecretsWithLabels(testing.Namespace, map[string]string{
 				intctrlutil.AppInstanceLabelKey:    cluster.Name,
-				intctrlutil.ClusterAccountLabelKey: "kbdataprotection",
+				intctrlutil.ClusterAccountLabelKey: appsv1alpha1.DataprotectionAccount.String(),
 			})
 			tf.FakeDynamicClient = fake.NewSimpleDynamicClient(scheme.Scheme, &secrets.Items[0], cluster, template)
 			cmd := NewCreateBackupCmd(tf, streams)

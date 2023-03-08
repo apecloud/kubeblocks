@@ -50,6 +50,7 @@ const (
 	RoleLabelKey                    = "kubeblocks.io/role"              // RoleLabelKey consensusSet and replicationSet role label key
 	BackupProtectionLabelKey        = "kubeblocks.io/backup-protection" // BackupProtectionLabelKey Backup delete protection policy label
 	AddonNameLabelKey               = "extensions.kubeblocks.io/addon-name"
+	ClusterAccountLabelKey          = "account.kubeblocks.io/name"
 
 	// kubeblocks.io annotations
 	OpsRequestAnnotationKey          = "kubeblocks.io/ops-request" // OpsRequestAnnotationKey OpsRequest annotation key in Cluster
@@ -86,9 +87,6 @@ const (
 
 	// configuration finalizer
 	ConfigurationTemplateFinalizerName = "configuration.kubeblocks.io/finalizer"
-
-	// account labels
-	ClusterAccountLabelKey = "account.kubeblocks.io/name"
 )
 
 const (

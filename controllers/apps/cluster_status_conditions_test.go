@@ -98,7 +98,7 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 			})).Should(Succeed())
 
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(clusterVersion), func(g Gomega, clusterVersion *appsv1alpha1.ClusterVersion) {
-				g.Expect(clusterVersion.Status.Phase == appsv1alpha1.UnavailablePhase).Should(BeTrue())
+				g.Expect(clusterVersion.Ready()).Should(BeFalse())
 			}), timeout*2, interval).Should(Succeed())
 
 			// trigger reconcile
@@ -120,7 +120,7 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 			})).Should(Succeed())
 
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(clusterVersion), func(g Gomega, clusterVersion *appsv1alpha1.ClusterVersion) {
-				g.Expect(clusterVersion.Status.Phase == appsv1alpha1.AvailablePhase).Should(BeTrue())
+				g.Expect(clusterVersion.Ready()).Should(BeTrue())
 			}), timeout*2, interval).Should(Succeed())
 
 			// trigger reconcile

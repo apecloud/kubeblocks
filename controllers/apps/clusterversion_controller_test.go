@@ -17,8 +17,10 @@ limitations under the License.
 package apps
 
 import (
+	"github.com/apecloud/kubeblocks/internal/constant"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -34,7 +36,7 @@ var _ = Describe("test clusterVersion controller", func() {
 		clusterDefName     = "mysql-definition-" + randomStr
 	)
 
-	const statefulCompType = "stateful"
+	const statefulCompName = "stateful"
 
 	cleanEnv := func() {
 		// must wait until resources deleted and no longer exist before the testcases start,
@@ -54,24 +56,38 @@ var _ = Describe("test clusterVersion controller", func() {
 		It("test clusterVersion controller", func() {
 			By("create a clusterVersion obj")
 			clusterVersionObj := testapps.NewClusterVersionFactory(clusterVersionName, clusterDefName).
-				AddComponent(statefulCompType).AddContainerShort("mysql", testapps.ApeCloudMySQLImage).
+				AddComponent(statefulCompName).AddContainerShort("mysql", testapps.ApeCloudMySQLImage).
+				AddComponent(statefulCompName+"-non-exist").AddContainerShort("mysql", testapps.ApeCloudMySQLImage).
 				Create(&testCtx).GetObject()
 
-			By("wait for clusterVersion phase is unavailable when clusterDef is not found")
+			By("wait for clusterVersion is unavailable when clusterDef is not found")
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(clusterVersionObj), func(g Gomega, tmpCV *appsv1alpha1.ClusterVersion) {
-				g.Expect(tmpCV.Status.Phase).Should(Equal(appsv1alpha1.UnavailablePhase))
+				g.Expect(tmpCV.Ready()).Should(BeFalse())
+				g.Expect(len(tmpCV.Status.Conditions) > 0).Should(BeTrue())
+				g.Expect(tmpCV.Status.Conditions[0].Status).Should(Equal(metav1.ConditionFalse))
+				g.Expect(tmpCV.Status.Conditions[0].Reason).Should(Equal(constant.ReasonRefCRUnavailable))
 			})).Should(Succeed())
 
-			By("create a clusterDefinition obj")
+			By("create a clusterDefinition obj with one component")
 			testapps.NewClusterDefFactory(clusterDefName).
-				AddComponent(testapps.StatefulMySQLComponent, statefulCompType).
+				AddComponent(testapps.StatefulMySQLComponent, statefulCompName).
 				Create(&testCtx).GetObject()
 
-			By("wait for clusterVersion phase is available")
+			By("wait for clusterVersion is unavailable since clusterDef is inconsistent with it")
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(clusterVersionObj), func(g Gomega, tmpCV *appsv1alpha1.ClusterVersion) {
-				g.Expect(tmpCV.Status.Phase).Should(Equal(appsv1alpha1.AvailablePhase))
+				g.Expect(tmpCV.Ready()).Should(BeFalse())
+				g.Expect(len(tmpCV.Status.Conditions) > 0).Should(BeTrue())
+				g.Expect(tmpCV.Status.Conditions[0].Status).Should(Equal(metav1.ConditionFalse))
+				g.Expect(tmpCV.Status.Conditions[0].Reason).Should(Equal(ReasonCVInconsistent))
+			})).Should(Succeed())
+
+			By("remove non-exist component from clusterVersion, wait for it ready")
+			Eventually(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(clusterVersionObj), func(cv *appsv1alpha1.ClusterVersion) {
+				cv.Spec.ComponentVersions = cv.Spec.ComponentVersions[:1]
+			})).Should(Succeed())
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(clusterVersionObj), func(g Gomega, tmpCV *appsv1alpha1.ClusterVersion) {
+				g.Expect(tmpCV.Ready()).Should(BeTrue())
 			})).Should(Succeed())
 		})
 	})
-
 })

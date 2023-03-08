@@ -94,7 +94,7 @@ var _ = Describe("clusterVersion webhook", func() {
 
 			By("By testing update clusterVersion.status")
 			patch := client.MergeFrom(clusterVersion.DeepCopy())
-			clusterVersion.Status.Message = "Hello, kubeblocks!"
+			clusterVersion.Status.ClusterDefGeneration = 1024
 			Expect(k8sClient.Status().Patch(ctx, clusterVersion, patch)).Should(Succeed())
 
 			By("By testing update clusterVersion.spec")

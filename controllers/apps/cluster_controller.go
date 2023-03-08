@@ -269,9 +269,11 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			_ = clusterConditionMgr.setPreCheckErrorCondition(err)
 			return intctrlutil.RequeueAfter(ControllerErrorRequeueTime, reqCtx.Log, "")
 		}
-		if res, err = r.checkReferencedCRStatus(reqCtx, clusterConditionMgr, clusterVersion.Status.Phase,
-			appsv1alpha1.ClusterVersionKind, clusterVersion.Name); res != nil {
-			return *res, err
+		if !clusterVersion.Ready() {
+			if res, err = r.checkReferencedCRStatus(reqCtx, clusterConditionMgr, appsv1alpha1.UnavailablePhase,
+				appsv1alpha1.ClusterVersionKind, clusterVersion.Name); res != nil {
+				return *res, err
+			}
 		}
 	}
 

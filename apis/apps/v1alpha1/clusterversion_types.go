@@ -21,6 +21,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+const (
+	// ClusterVersionReady means the cluster version is ready for use.
+	ClusterVersionReady = "Ready"
+)
+
 // ClusterVersionSpec defines the desired state of ClusterVersion
 type ClusterVersionSpec struct {
 	// ref ClusterDefinition.
@@ -40,14 +45,9 @@ type ClusterVersionSpec struct {
 
 // ClusterVersionStatus defines the observed state of ClusterVersion
 type ClusterVersionStatus struct {
-	// phase - in list of [Available,Unavailable]
-	// +kubebuilder:validation:Enum={Available,Unavailable}
+	// Describe current status of ClusterVersion API resource.
 	// +optional
-	Phase Phase `json:"phase,omitempty"`
-
-	// A human readable message indicating details about why the ClusterVersion is in this phase.
-	// +optional
-	Message string `json:"message,omitempty"`
+	Conditions []metav1.Condition `json:"conditions,omitempty"`
 
 	// generation number
 	// +optional
@@ -130,6 +130,11 @@ type ClusterVersionList struct {
 
 func init() {
 	SchemeBuilder.Register(&ClusterVersion{}, &ClusterVersionList{})
+}
+
+// Ready checks whether the cluster version object is ready for use.
+func (r *ClusterVersion) Ready() bool {
+	return len(r.Status.Conditions) > 0 && r.Status.Conditions[0].Status == metav1.ConditionTrue
 }
 
 // GetDefNameMappingComponents returns ComponentDefRef name mapping ClusterComponentVersion.

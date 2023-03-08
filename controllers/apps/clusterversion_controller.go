@@ -26,6 +26,7 @@ import (
 	"github.com/spf13/viper"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -39,6 +40,13 @@ import (
 	appsconfig "github.com/apecloud/kubeblocks/controllers/apps/configuration"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+)
+
+const (
+	// ReasonCVReady indicates the cluster version is ready for use.
+	ReasonCVReady = "Ready"
+	// ReasonCVInconsistent indicates the components are inconsistent between cluster version and referenced cluster definition.
+	ReasonCVInconsistent = "Inconsistent"
 )
 
 // +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=clusterversions,verbs=get;list;watch;create;update;patch;delete
@@ -57,28 +65,27 @@ func init() {
 	viper.SetDefault(maxConcurReconClusterVersionKey, runtime.NumCPU()*2)
 }
 
-func clusterVersionUpdateHandler(cli client.Client, ctx context.Context, clusterDef *appsv1alpha1.ClusterDefinition) error {
-
-	labelSelector, err := labels.Parse(clusterDefLabelKey + "=" + clusterDef.GetName())
+func clusterVersionUpdateHandler(cli client.Client, ctx context.Context, cd *appsv1alpha1.ClusterDefinition) error {
+	labelSelector, err := labels.Parse(clusterDefLabelKey + "=" + cd.GetName())
 	if err != nil {
 		return err
 	}
-	o := &client.ListOptions{LabelSelector: labelSelector}
 
 	list := &appsv1alpha1.ClusterVersionList{}
-	if err := cli.List(ctx, list, o); err != nil {
+	opts := &client.ListOptions{LabelSelector: labelSelector}
+	if err := cli.List(ctx, list, opts); err != nil {
 		return err
 	}
+
 	for _, item := range list.Items {
-		if item.Status.ClusterDefGeneration != clusterDef.Generation {
+		if item.Status.ClusterDefGeneration != cd.Generation {
 			patch := client.MergeFrom(item.DeepCopy())
-			if statusMsg := validateClusterVersion(&item, clusterDef); statusMsg != "" {
-				item.Status.Phase = appsv1alpha1.UnavailablePhase
-				item.Status.Message = statusMsg
+			if message := validateClusterVersion(&item, cd); message != "" {
+				updateCVReadyCondition(&item, metav1.ConditionFalse, ReasonCVInconsistent, message)
 			} else {
-				item.Status.Phase = appsv1alpha1.AvailablePhase
-				item.Status.Message = ""
-				item.Status.ClusterDefGeneration = clusterDef.Generation
+				// TODO(leon): it's not reasonable to set status as ready since there may be other failures.
+				updateCVReadyCondition(&item, metav1.ConditionTrue, ReasonCVReady, "")
+				item.Status.ClusterDefGeneration = cd.Generation
 			}
 			if err = cli.Status().Patch(ctx, &item, patch); err != nil {
 				return err
@@ -98,7 +105,7 @@ func (r *ClusterVersionReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	reqCtx := intctrlutil.RequestCtx{
 		Ctx:      ctx,
 		Req:      req,
-		Log:      log.FromContext(ctx).WithValues("clusterDefinition", req.NamespacedName),
+		Log:      log.FromContext(ctx).WithValues("clusterVersion", req.NamespacedName),
 		Recorder: r.Recorder,
 	}
 
@@ -107,18 +114,8 @@ func (r *ClusterVersionReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 
-	res, err := intctrlutil.HandleCRDeletion(reqCtx, r, clusterVersion, clusterVersionFinalizerName, func() (*ctrl.Result, error) {
-		recordEvent := func() {
-			r.Recorder.Event(clusterVersion, corev1.EventTypeWarning, constant.ReasonRefCRUnavailable,
-				"cannot be deleted because of existing referencing Cluster.")
-		}
-		if res, err := intctrlutil.ValidateReferenceCR(reqCtx, r.Client, clusterVersion,
-			clusterVersionLabelKey, recordEvent, &appsv1alpha1.ClusterList{}); res != nil || err != nil {
-			return res, err
-		}
-		return nil, r.deleteExternalResources(reqCtx, clusterVersion)
-	})
-	if res != nil {
+	handler := func() (*ctrl.Result, error) { return r.deletionHandler(reqCtx, clusterVersion) }
+	if res, err := intctrlutil.HandleCRDeletion(reqCtx, r, clusterVersion, clusterVersionFinalizerName, handler); res != nil {
 		return *res, err
 	}
 
@@ -126,75 +123,22 @@ func (r *ClusterVersionReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		return intctrlutil.Reconciled()
 	}
 
-	if ok, err := appsconfig.CheckCVConfigTemplate(r.Client, reqCtx, clusterVersion); !ok || err != nil {
-		return intctrlutil.RequeueAfter(time.Second, reqCtx.Log, "failed to check config template")
+	clusterDefinition, res, err := r.getAReconcileReferencedCR(reqCtx, clusterVersion)
+	if res != nil {
+		return *res, err
 	}
 
-	if ok, err := appsconfig.UpdateCVLabelsByConfiguration(r.Client, reqCtx, clusterVersion); !ok || err != nil {
-		return intctrlutil.RequeueAfter(time.Second, reqCtx.Log, "failed to update using config template info")
+	if res, err := r.reconcileConfigTemplate(reqCtx, clusterVersion); res != nil {
+		return *res, err
 	}
 
-	// Update configmap Finalizer and set Immutable
-	if err := appsconfig.UpdateCVConfigMapFinalizer(r.Client, reqCtx, clusterVersion); err != nil {
-		return intctrlutil.RequeueAfter(time.Second, reqCtx.Log, "failed to UpdateConfigMapFinalizer")
+	if res, err := r.reconcileVersionContext(reqCtx, clusterVersion, clusterDefinition); res != nil {
+		return *res, err
 	}
 
-	clusterdefinition := &appsv1alpha1.ClusterDefinition{}
-	if err := r.Client.Get(reqCtx.Ctx, types.NamespacedName{
-		Name: clusterVersion.Spec.ClusterDefinitionRef,
-	}, clusterdefinition); err != nil {
-		if apierrors.IsNotFound(err) {
-			_ = r.handleClusterDefNotFound(reqCtx, clusterVersion, err.Error())
-		}
-		return intctrlutil.RequeueWithErrorAndRecordEvent(clusterVersion, r.Recorder, err, reqCtx.Log)
-	}
-
-	patch := client.MergeFrom(clusterVersion.DeepCopy())
-	if clusterVersion.ObjectMeta.Labels == nil {
-		clusterVersion.ObjectMeta.Labels = map[string]string{}
-	}
-	clusterVersion.ObjectMeta.Labels[clusterDefLabelKey] = clusterdefinition.Name
-	if err = r.Client.Patch(reqCtx.Ctx, clusterVersion, patch); err != nil {
-		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-	}
-
-	if statusMsg := validateClusterVersion(clusterVersion, clusterdefinition); statusMsg != "" {
-		clusterVersion.Status.Phase = appsv1alpha1.UnavailablePhase
-		clusterVersion.Status.Message = statusMsg
-	} else {
-		clusterVersion.Status.Phase = appsv1alpha1.AvailablePhase
-		clusterVersion.Status.Message = ""
-	}
-	clusterVersion.Status.ObservedGeneration = clusterVersion.Generation
-	clusterVersion.Status.ClusterDefGeneration = clusterdefinition.Generation
-	if err = r.Client.Status().Patch(ctx, clusterVersion, patch); err != nil {
-		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-	}
 	intctrlutil.RecordCreatedEvent(r.Recorder, clusterVersion)
+
 	return ctrl.Result{}, nil
-}
-
-// handleClusterDefNotFound handles clusterVersion status when clusterDefinition not found.
-func (r *ClusterVersionReconciler) handleClusterDefNotFound(reqCtx intctrlutil.RequestCtx,
-	clusterVersion *appsv1alpha1.ClusterVersion, message string) error {
-	if clusterVersion.Status.Message == message {
-		return nil
-	}
-	patch := client.MergeFrom(clusterVersion.DeepCopy())
-	clusterVersion.Status.Phase = appsv1alpha1.UnavailablePhase
-	clusterVersion.Status.Message = message
-	return r.Client.Status().Patch(reqCtx.Ctx, clusterVersion, patch)
-}
-
-func validateClusterVersion(clusterVersion *appsv1alpha1.ClusterVersion, clusterDef *appsv1alpha1.ClusterDefinition) string {
-	notFoundComponentDefNames, noContainersComponents := clusterVersion.GetInconsistentComponentsInfo(clusterDef)
-	var statusMsgs []string
-	if len(notFoundComponentDefNames) > 0 {
-		statusMsgs = append(statusMsgs, fmt.Sprintf("spec.componentSpecs[*].componentDefRef %v not found in ClusterDefinition.spec.componentDefs[*].name", notFoundComponentDefNames))
-	} else if len(noContainersComponents) > 0 {
-		statusMsgs = append(statusMsgs, fmt.Sprintf("spec.componentSpecs[*].componentDefRef %v missing spec.componentSpecs[*].containers in ClusterDefinition.spec.componentDefs[*] and ClusterVersion.spec.componentVersions[*]", noContainersComponents))
-	}
-	return strings.Join(statusMsgs, ";")
 }
 
 // SetupWithManager sets up the controller with the Manager.
@@ -207,11 +151,126 @@ func (r *ClusterVersionReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
-func (r *ClusterVersionReconciler) deleteExternalResources(reqCtx intctrlutil.RequestCtx, clusterVersion *appsv1alpha1.ClusterVersion) error {
-	//
-	// delete any external resources associated with the cronJob
-	//
-	// Ensure that delete implementation is idempotent and safe to invoke
-	// multiple times for same object.
-	return appsconfig.DeleteCVConfigMapFinalizer(r.Client, reqCtx, clusterVersion)
+func (r *ClusterVersionReconciler) deletionHandler(reqCtx intctrlutil.RequestCtx,
+	cv *appsv1alpha1.ClusterVersion) (*ctrl.Result, error) {
+	recordEvent := func() {
+		r.Recorder.Event(cv, corev1.EventTypeWarning, constant.ReasonRefCRUnavailable,
+			"cannot be deleted because of existing referencing Cluster.")
+	}
+	if res, err := intctrlutil.ValidateReferenceCR(reqCtx, r.Client, cv, clusterVersionLabelKey, recordEvent,
+		&appsv1alpha1.ClusterList{}); res != nil || err != nil {
+		return res, err
+	}
+	return nil, appsconfig.DeleteCVConfigMapFinalizer(r.Client, reqCtx, cv)
+}
+
+func (r *ClusterVersionReconciler) getAReconcileReferencedCR(reqCtx intctrlutil.RequestCtx,
+	cv *appsv1alpha1.ClusterVersion) (*appsv1alpha1.ClusterDefinition, *ctrl.Result, error) {
+	cd := &appsv1alpha1.ClusterDefinition{}
+	if err := r.Client.Get(reqCtx.Ctx, types.NamespacedName{Name: cv.Spec.ClusterDefinitionRef}, cd); err != nil {
+		if apierrors.IsNotFound(err) {
+			_ = patchCVReadyCondition(reqCtx, r.Client, cv, metav1.ConditionFalse, constant.ReasonRefCRUnavailable, err.Error())
+		}
+		res, err := intctrlutil.RequeueWithErrorAndRecordEvent(cv, r.Recorder, err, reqCtx.Log)
+		return nil, &res, err
+	}
+
+	// the label already exists.
+	if cv.ObjectMeta.Labels != nil && cv.ObjectMeta.Labels[clusterDefLabelKey] == cd.Name {
+		return cd, nil, nil
+	}
+
+	patch := client.MergeFrom(cv.DeepCopy())
+	if cv.ObjectMeta.Labels == nil {
+		cv.ObjectMeta.Labels = map[string]string{}
+	}
+	cv.ObjectMeta.Labels[clusterDefLabelKey] = cd.Name
+	if err := r.Client.Patch(reqCtx.Ctx, cv, patch); err != nil {
+		res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+		return nil, &res, err
+	}
+
+	return cd, nil, nil
+}
+
+func (r *ClusterVersionReconciler) reconcileConfigTemplate(reqCtx intctrlutil.RequestCtx,
+	cv *appsv1alpha1.ClusterVersion) (*ctrl.Result, error) {
+	// TODO(leon): errors about config template are not exposed in status.
+	if ok, err := appsconfig.CheckCVConfigTemplate(r.Client, reqCtx, cv); !ok || err != nil {
+		res, err := intctrlutil.RequeueAfter(time.Second, reqCtx.Log, "failed to check config template")
+		return &res, err
+	}
+	if ok, err := appsconfig.UpdateCVLabelsByConfiguration(r.Client, reqCtx, cv); !ok || err != nil {
+		res, err := intctrlutil.RequeueAfter(time.Second, reqCtx.Log, "failed to update using config template info")
+		return &res, err
+
+	}
+	if err := appsconfig.UpdateCVConfigMapFinalizer(r.Client, reqCtx, cv); err != nil {
+		res, err := intctrlutil.RequeueAfter(time.Second, reqCtx.Log, "failed to UpdateConfigMapFinalizer")
+		return &res, err
+	}
+	return nil, nil
+}
+
+func (r *ClusterVersionReconciler) reconcileVersionContext(reqCtx intctrlutil.RequestCtx,
+	cv *appsv1alpha1.ClusterVersion, cd *appsv1alpha1.ClusterDefinition) (*ctrl.Result, error) {
+	patch := client.MergeFrom(cv.DeepCopy())
+	if message := validateClusterVersion(cv, cd); message != "" {
+		updateCVReadyCondition(cv, metav1.ConditionFalse, ReasonCVInconsistent, message)
+	} else {
+		updateCVReadyCondition(cv, metav1.ConditionTrue, ReasonCVReady, "")
+	}
+
+	// TODO(leon): if the validation failed, is it reasonable to update generations?
+	cv.Status.ObservedGeneration = cv.Generation
+	cv.Status.ClusterDefGeneration = cd.Generation
+	if err := r.Client.Status().Patch(reqCtx.Ctx, cv, patch); err != nil {
+		res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+		return &res, err
+	}
+
+	return nil, nil
+}
+
+func validateClusterVersion(cv *appsv1alpha1.ClusterVersion, cd *appsv1alpha1.ClusterDefinition) string {
+	msgs := make([]string, 0)
+	notFound, noContainers := cv.GetInconsistentComponentsInfo(cd)
+	if len(notFound) > 0 {
+		msgs = append(msgs, fmt.Sprintf("spec.componentSpecs[*].componentDefRef %v not found in ClusterDefinition.spec.componentDefs[*].name", notFound))
+	} else if len(noContainers) > 0 {
+		msgs = append(msgs, fmt.Sprintf("spec.componentSpecs[*].componentDefRef %v missing spec.componentSpecs[*].containers in ClusterDefinition.spec.componentDefs[*] and ClusterVersion.spec.componentVersions[*]", noContainers))
+	}
+	return strings.Join(msgs, ";")
+}
+
+func updateCVReadyCondition(cv *appsv1alpha1.ClusterVersion, status metav1.ConditionStatus, reason string, message string) bool {
+	if len(cv.Status.Conditions) > 0 {
+		cond := cv.Status.Conditions[0]
+		if cond.Status == status && cond.Reason == reason && cond.Message == message {
+			return false
+		}
+	}
+
+	cond := metav1.Condition{
+		Type:               appsv1alpha1.ClusterVersionReady,
+		Status:             status,
+		Reason:             reason,
+		Message:            message,
+		LastTransitionTime: metav1.Now(),
+	}
+	if len(cv.Status.Conditions) == 0 {
+		cv.Status.Conditions = append(cv.Status.Conditions, cond)
+	} else {
+		cv.Status.Conditions[0] = cond
+	}
+	return true
+}
+
+func patchCVReadyCondition(reqCtx intctrlutil.RequestCtx, cli client.Client, cv *appsv1alpha1.ClusterVersion,
+	status metav1.ConditionStatus, reason string, message string) error {
+	patch := client.MergeFrom(cv.DeepCopy())
+	if updateCVReadyCondition(cv, status, reason, message) {
+		return cli.Status().Patch(reqCtx.Ctx, cv, patch)
+	}
+	return nil
 }

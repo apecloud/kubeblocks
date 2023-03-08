@@ -116,8 +116,7 @@ var _ = Describe("ClusterDefinition Controller", func() {
 			By("Check ClusterVersion.Status as updated")
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(clusterVersionObj),
 				func(g Gomega, cv *appsv1alpha1.ClusterVersion) {
-					g.Expect(cv.Status.Phase).To(Equal(appsv1alpha1.AvailablePhase))
-					g.Expect(cv.Status.Message).To(Equal(""))
+					g.Expect(cv.Ready()).To(BeTrue())
 					g.Expect(cv.Status.ClusterDefGeneration > cdGen).To(BeTrue())
 				})).Should(Succeed())
 

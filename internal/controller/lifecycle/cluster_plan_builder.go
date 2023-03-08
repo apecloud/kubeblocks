@@ -107,6 +107,8 @@ func (b *clusterPlanBuilder) Build() (graph.Plan, error) {
 			return b.cli.Update(b.ctx.Ctx, obj.obj)
 		case DELETE:
 			return b.cli.Delete(b.ctx.Ctx, obj.obj)
+		case STATUS:
+			return b.cli.Patch(b.ctx.Ctx, obj.obj, obj.patch)
 		}
 		return nil
 	}

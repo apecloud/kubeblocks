@@ -37,7 +37,8 @@ type clusterTransformer struct {
 
 func (c *clusterTransformer) Transform(dag *graph.DAG) error {
 	// put the cluster object first, it will be root vertex of DAG
-	rootVertex := &lifecycleVertex{obj: c.cc.cluster}
+	patch := client.MergeFrom(c.cc.cluster.DeepCopy())
+	rootVertex := &lifecycleVertex{obj: c.cc.cluster, patch: patch}
 	dag.AddVertex(rootVertex)
 
 	// we copy the K8s objects prepare stage directly first

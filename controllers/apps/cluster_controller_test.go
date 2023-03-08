@@ -1014,6 +1014,15 @@ var _ = Describe("Cluster Controller", func() {
 			}
 		}
 
+		By("Checking statefulSet template volumes mount")
+		for _, sts := range stsList.Items {
+			for _, volume := range sts.Spec.Template.Spec.Volumes {
+				if volume.Name == testapps.DataVolumeName {
+					Expect(strings.HasPrefix(volume.VolumeSource.PersistentVolumeClaim.ClaimName, testapps.DataVolumeName+"-"+clusterKey.Name)).Should(BeTrue())
+				}
+			}
+		}
+
 		By("Updating StatefulSet's status")
 		status := appsv1.StatefulSetStatus{
 			AvailableReplicas:  1,

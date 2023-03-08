@@ -280,7 +280,7 @@ prometheus:
     ## Defining configMapOverrideName will cause templates/alertmanager-configmap.yaml
     ## to NOT generate a ConfigMap resource
     ##
-    configMapOverrideName: ""
+    configMapOverrideName: "alertmanager-config"
 
     ## Node tolerations for alertmanager scheduling to nodes with taints
     ## Ref: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/
@@ -605,7 +605,7 @@ prometheus:
                 severity: info
               annotations:
                 summary: "MySQL has just been restarted (< 60s)"
-                description: "MySQL has just been restarted {{ $value }} seconds. (instance: {{ $labels.pod }})"
+                description: "MySQL has just been restarted {{ $value }} seconds ago. (instance: {{ $labels.pod }})"
 
             - alert: MysqlTooManyConnections
               expr: 'sum(max_over_time(mysql_global_status_threads_connected[1m]) / mysql_global_variables_max_connections) BY (namespace,app_kubernetes_io_instance,pod) * 100 > 80'
@@ -681,7 +681,7 @@ prometheus:
                 severity: info
               annotations:
                 summary: "PostgreSQL has just been restarted (< 60s)"
-                description: "PostgreSQL has just been restarted {{ $value }} seconds. (instance: {{ $labels.pod }})"
+                description: "PostgreSQL has just been restarted {{ $value }} seconds ago. (instance: {{ $labels.pod }})"
 
             - alert: PostgreSQLExporterError
               expr: 'pg_exporter_last_scrape_error > 0'
@@ -1363,3 +1363,38 @@ csi-s3:
     create: true
     singleBucket: ""
     mountOptions: "--memory-limit 1000 --dir-mode 0777 --file-mode 0666 --region cn-northwest-1"
+
+alertmanager-webhook-adaptor:
+  ## If false, Webhook-Adaptor sub-chart will not be installed
+  ##
+  enabled: false
+
+  replicaCount: 1
+
+  ## Webhook-Adaptor container image
+  ##
+  image:
+    registry: registry.cn-hangzhou.aliyuncs.com
+    repository: apecloud/alertmanager-webhook-adaptor
+    pullPolicy: IfNotPresent
+    tag: "0.1.1"
+
+  ## ConfigMap override where fullname is {{.Release.Name}}-{{.Values.configMapOverrideName}}
+  ##
+  configMapOverrideName: "webhook-adaptor-config"
+
+  resources: { }
+  # We usually recommend not to specify default resources and to leave this as a conscious
+  # choice for the user. This also increases chances charts run on environments with little
+  # resources, such as Minikube. If you do want to specify resources, uncomment the following
+  # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
+  # limits:
+  #   cpu: 100m
+  #   memory: 128Mi
+  # requests:
+  #   cpu: 100m
+  #   memory: 128Mi
+
+  ## Webhook-Adaptor ConfigMap Entries
+  configFiles:
+    config.yaml: { }

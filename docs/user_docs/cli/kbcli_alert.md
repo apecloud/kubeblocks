@@ -1,11 +1,11 @@
-## kbcli app
+## kbcli alert
 
-Manage external applications related to KubeBlocks
+Manage alert receivers
 
 ### Options
 
 ```
-  -h, --help   help for app
+  -h, --help   help for alert
 ```
 
 ### Options inherited from parent commands
@@ -35,6 +35,7 @@ Manage external applications related to KubeBlocks
 ### SEE ALSO
 
 * [kbcli](kbcli.md)	 - KubeBlocks CLI
-* [kbcli app install](kbcli_app_install.md)	 - Install the application with the specified name
-* [kbcli app uninstall](kbcli_app_uninstall.md)	 - Uninstall the application with the specified name
+* [kbcli alert add-receiver](kbcli_alert_add-receiver.md)	 - Add alert receiver, such as email, slack, webhook and so on
+* [kbcli alert delete-receiver](kbcli_alert_delete-receiver.md)	 - Delete alert receiver
+* [kbcli alert list-receivers](kbcli_alert_list-receivers.md)	 - List all alert receivers
 

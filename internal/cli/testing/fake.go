@@ -22,6 +22,7 @@ import (
 
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	"github.com/sethvargo/go-password/password"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -379,4 +380,15 @@ func FakeVolumeSnapshotClass() *snapshotv1.VolumeSnapshotClass {
 			APIVersion: "snapshot.storage.k8s.io/v1",
 		},
 	}
+}
+
+func FakeKBDeploy(version string) *appsv1.Deployment {
+	deploy := &appsv1.Deployment{}
+	deploy.SetLabels(map[string]string{
+		"app.kubernetes.io/name": types.KubeBlocksChartName,
+	})
+	if len(version) > 0 {
+		deploy.Labels["app.kubernetes.io/version"] = version
+	}
+	return deploy
 }

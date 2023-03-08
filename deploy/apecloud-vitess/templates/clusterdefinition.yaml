@@ -7,7 +7,7 @@ metadata:
 spec:
   connectionCredential:
     username: root
-    password: "$(RANDOM_PASSWD)"
+    password: root  #"$(RANDOM_PASSWD)"
     endpoint: "$(SVC_FQDN):$(SVC_PORT_mysql)"
     host: "$(SVC_FQDN)"
     port: "$(SVC_PORT_mysql)"
@@ -208,7 +208,63 @@ spec:
                   secretKeyRef:
                     name: $(CONN_CREDENTIAL_SECRET_NAME)
                     key: password   
-            command: ["/vt/scripts/vttablet-up.sh"]       
+            command:
+              - bin/bash
+              - -c
+              - |
+                cell=${CELL:-'zone1'}
+                keyspace=${KEYSPACE:-'commerce'}
+                shard=${SHARD:-'0'}
+                uid="${KB_POD_NAME##*-}"
+                mysql_root=${MYSQL_ROOT_USER:-'root'}
+                mysql_root_passwd=${MYSQL_ROOT_PASSWORD:-'123456'}
+                mysql_port=${MYSQL_PORT:-'3306'}
+                port=${VTTABLET_PORT:-'15100'}
+                grpc_port=${VTTABLET_GRPC_PORT:-'16100'}
+                vtctld_host=${VTCTLD_HOST:-'127.0.0.1'}
+                vtctld_web_port=${VTCTLD_WEB_PORT:-'15000'}
+                printf -v alias '%s-%010d' $cell $uid
+                printf -v tablet_dir 'vt_%010d' $uid
+                tablet_hostname=$(eval echo \$KB_MYSQL_"$uid"_HOSTNAME)
+                printf -v tablet_logfile 'vttablet_%010d_querylog.txt' $uid
+
+                tablet_type=replica
+                topology_fags=${TOPOLOGY_FLAGS:-'--topo_implementation etcd2 --topo_global_server_address 127.0.0.1:2379 --topo_global_root /vitess/global'}
+
+                echo "starting vttablet for $alias..."
+
+                su vitess <<EOF
+                exec vttablet \
+                $topology_fags \
+                --log_dir $VTDATAROOT \
+                --log_queries_to_file $VTDATAROOT/$tablet_logfile \
+                --tablet-path $alias \
+                --tablet_hostname "$tablet_hostname" \
+                --init_keyspace $keyspace \
+                --init_shard $shard \
+                --init_tablet_type $tablet_type \
+                --health_check_interval 5s \
+                --enable_replication_reporter \
+                --backup_storage_implementation file \
+                --file_backup_storage_root $VTDATAROOT/backups \
+                --port $port \
+                --db_port $mysql_port \
+                --db_host $tablet_hostname \
+                --db_allprivs_user $mysql_root \
+                --db_allprivs_password $mysql_root_passwd \
+                --db_dba_user $mysql_root \
+                --db_dba_password $mysql_root_passwd \
+                --db_app_user $mysql_root \
+                --db_app_password $mysql_root_passwd \
+                --db_filtered_user $mysql_root \
+                --db_filtered_password $mysql_root_passwd \
+                --grpc_port $grpc_port \
+                --service_map 'grpc-queryservice,grpc-tabletmanager,grpc-updatestream' \
+                --pid_file $VTDATAROOT/vttablet.pid \
+                --vtctld_addr http://$vtctld_host:$vtctld_web_port/ \
+                --disable_active_reparents \
+                > $VTDATAROOT/vttablet.out 2>&1
+                EOF
       systemAccounts:
         cmdExecutorConfig:
           image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ .Values.image.tag }}
@@ -302,6 +358,7 @@ spec:
               - bin/sh
               - -c
               - |   
+                echo "staring etcd."
                 etcd_port=${ETCD_PORT:-'2379'}
                 etcd_server=${ETCD_SERVER:-'127.0.0.1'}
 
@@ -386,7 +443,29 @@ spec:
                 value: "2379" 
               - name: TOPOLOGY_FLAGS
                 value: "--topo_implementation etcd2 --topo_global_server_address $(ETCD_SERVER):$(ETCD_PORT) --topo_global_root /vitess/global"                
-            command: ["/vt/scripts/vtctld-up.sh"] 
+            command:
+              - bin/sh
+              - -c
+              - |
+                echo "starting vtctld"
+                cell=${CELL:-'zone1'}
+                grpc_port=${VTCTLD_GRPC_PORT:-'15999'}
+                vtctld_web_port=${VTCTLD_WEB_PORT:-'15000'}
+                topology_fags=${TOPOLOGY_FLAGS:-'--topo_implementation etcd2 --topo_global_server_address 127.0.0.1:2379 --topo_global_root /vitess/global'}
+
+                su vitess <<EOF
+                exec vtctld \
+                $topology_fags \
+                --cell $cell \
+                --service_map 'grpc-vtctl,grpc-vtctld' \
+                --backup_storage_implementation file \
+                --file_backup_storage_root $VTDATAROOT/backups \
+                --log_dir $VTDATAROOT \
+                --port $vtctld_web_port \
+                --grpc_port $grpc_port \
+                --pid_file $VTDATAROOT/vtctld.pid \
+                  > $VTDATAROOT/vtctld.out 2>&1
+                EOF
     - name: vtconsensus
       characterType: vtconsensus
       workloadType: Stateful
@@ -432,7 +511,29 @@ spec:
                 value: "2379" 
               - name: TOPOLOGY_FLAGS
                 value: "--topo_implementation etcd2 --topo_global_server_address $(ETCD_SERVER):$(ETCD_PORT) --topo_global_root /vitess/global"                
-            command: ["/vt/scripts/vtconsensus-up.sh"]                     
+            command:
+              - bin/sh
+              - -c
+              - |
+                echo "starting vtconsensus"
+                cell=${CELL:-'zone1'}
+                keyspace=${KEYSPACE:-'commerce'}
+                shard=${SHARD:-'0'}
+
+                vtconsensusport=${VTCONSENSUS_PORT:-'16000'}
+                topology_fags=${TOPOLOGY_FLAGS:-'--topo_implementation etcd2 --topo_global_server_address 127.0.0.1:2379 --topo_global_root /vitess/global'}
+
+                su vitess <<EOF
+                exec vtconsensus \
+                  $topology_fags \
+                  --clusters_to_watch "$keyspace/$shard" \
+                  --refresh_interval 10s \
+                  --scan_repair_timeout 3s \
+                  --log_dir ${VTDATAROOT} \
+                  --db_username "$MYSQL_ROOT_USER" \
+                  --db_password "$MYSQL_ROOT_PASSWORD" \
+                  > $VTDATAROOT/vtconsensus.out 2>&1
+                EOF
     - name: vtgate
       characterType: vtgate
       workloadType: Stateful
@@ -496,4 +597,31 @@ spec:
                 value: "2379" 
               - name: TOPOLOGY_FLAGS
                 value: "--topo_implementation etcd2 --topo_global_server_address $(ETCD_SERVER):$(ETCD_PORT) --topo_global_root /vitess/global"                
-            command: [/vt/scripts/vtgate-up.sh]                      
+            command:
+              - bin/sh
+              - -c
+              - |
+                cell=${CELL:-'zone1'}
+                web_port=${VTGATE_WEB_PORT:-'15001'}
+                grpc_port=${VTGATE_GRPC_PORT:-'15991'}
+                mysql_server_port=${VTGATE_MYSQL_PORT:-'15306'}
+                mysql_server_socket_path="/tmp/mysql.sock"
+
+                echo "starting vtgate."
+                su vitess <<EOF
+                exec vtgate \
+                  $TOPOLOGY_FLAGS \
+                  --log_dir $VTDATAROOT \
+                  --log_queries_to_file $VTDATAROOT/vtgate_querylog.txt \
+                  --port $web_port \
+                  --grpc_port $grpc_port \
+                  --mysql_server_port $mysql_server_port \
+                  --mysql_server_socket_path $mysql_server_socket_path \
+                  --cell $cell \
+                  --cells_to_watch $cell \
+                  --tablet_types_to_wait PRIMARY,REPLICA \
+                  --service_map 'grpc-vtgateservice' \
+                  --pid_file $VTDATAROOT/vtgate.pid \
+                  --mysql_auth_server_impl none \
+                  > $VTDATAROOT/vtgate.out 2>&1
+                EOF

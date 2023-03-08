@@ -15,6 +15,13 @@ data:
         psql -Upostgres -c "SELECT 1;" >/dev/null 2>&1
         if [ $? -eq 0 ]; then
             echo "postgres connect success, break now."
+            if [ -f ${PGDATA}/recovery.signal ]; then
+                psql -Upostgres -c "select pg_wal_replay_resume();"
+            fi
+            if [ -f ${PGDATA}/../init-scripts/restore.sh ]; then
+               echo "restore.sh exist, remove it."
+               rm -rf ${PGDATA}/../init-scripts/restore.sh
+            fi
             break
         fi
         echo "postgres connect fail, sleep and try again."
@@ -45,8 +52,14 @@ data:
       . /opt/bitnami/scripts/postgresql-env.sh
       # Ensure 'daemon' user exists when running as 'root'
       am_i_root && ensure_user_exists "$POSTGRESQL_DAEMON_USER" --group "$POSTGRESQL_DAEMON_GROUP"
-      # pg_basebackup
-      postgresql_slave_init_db
+      if [ ! -d ${PGDATA} ]; then
+         # pg_basebackup
+         postgresql_slave_init_db
+      fi
+    fi
+    if [ -f ${PGDATA}/../init-scripts/restore.sh ]; then
+        # add recovery.signal/standby.signal to trigger recovery
+        cp ${PGDATA}/../init-scripts/restore.sh /docker-entrypoint-preinitdb.d
     fi
     /scripts/post_start.sh &
     /opt/bitnami/scripts/postgresql/entrypoint.sh /opt/bitnami/scripts/postgresql/run.sh

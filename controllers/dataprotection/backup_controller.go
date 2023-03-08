@@ -85,7 +85,7 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	if err := r.Client.Get(reqCtx.Ctx, reqCtx.Req.NamespacedName, backup); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
-	reqCtx.Log.V(1).Info("in Backup Reconciler: name: " + backup.Name + " phase: " + string(backup.Status.Phase))
+	reqCtx.Log.V(1).Info("in Backup Reconciler:", "backup", backup.Name, "phase", backup.Status.Phase)
 
 	// handle finalizer
 	res, err := intctrlutil.HandleCRDeletion(reqCtx, r, backup, dataProtectionFinalizerName, func() (*ctrl.Result, error) {
@@ -160,7 +160,7 @@ func (r *BackupReconciler) doNewPhaseAction(
 		return intctrlutil.RequeueAfter(reconcileInterval, reqCtx.Log, "")
 	}
 
-	// get target cluster.
+	// TODO: get pod with matching labels to do backup.
 	target, err := r.getTargetCluster(reqCtx, backupPolicy)
 	if err != nil {
 		return r.updateStatusIfFailed(reqCtx, backup, err)
@@ -674,6 +674,7 @@ func (r *BackupReconciler) deleteExternalResources(reqCtx intctrlutil.RequestCtx
 	return nil
 }
 
+// TODO: get pod with matching labels to do backup.
 func (r *BackupReconciler) getTargetCluster(
 	reqCtx intctrlutil.RequestCtx, backupPolicy *dataprotectionv1alpha1.BackupPolicy) (*appv1.StatefulSet, error) {
 	// get stateful service

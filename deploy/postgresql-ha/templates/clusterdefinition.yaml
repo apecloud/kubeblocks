@@ -7,7 +7,7 @@ metadata:
 spec:
   connectionCredential:
     username: postgres
-    postgres-password: ""
+    postgres-password: "$(RANDOM_PASSWD)"
     endpoint: "$(SVC_FQDN):$(SVC_PORT_tcp-postgresql)"
     host: "$(SVC_FQDN)"
     port: "$(SVC_PORT_tcp-postgresql)"
@@ -66,24 +66,46 @@ spec:
             imagePullPolicy: {{ default .Values.image.pullPolicy "IfNotPresent" }}
             securityContext:
               runAsUser: 0
-            command:
-              - /bin/bash
-              - -c
-            args: ["sleep 10000"]
             volumeMounts:
               - name: dshm
                 mountPath: /dev/shm
               - name: data
-                mountPath: /postgresql
+                mountPath: /home/postgres/pgdata
+                mode: 0777
               - name: postgresql-config
-                mountPath: /postgresql/conf
+                mountPath: /home/postgres/pgdata/conf
+                mode: 0777
             ports:
               - name: tcp-postgresql
                 containerPort: 5432
               - name: patroni
                 containerPort: 8008
-            env:
-              # patroni dcs config
+            livenessProbe:
+              failureThreshold: 6
+              initialDelaySeconds: 30
+              periodSeconds: 10
+              successThreshold: 1
+              timeoutSeconds: 5
+              exec:
+                command:
+                  - /bin/sh
+                  - -c
+                  - exec pg_isready -U {{ default "postgres" | quote }} -h 127.0.0.1 -p 5432
+            readinessProbe:
+              failureThreshold: 6
+              initialDelaySeconds: 5
+              periodSeconds: 10
+              successThreshold: 1
+              timeoutSeconds: 5
+              exec:
+                command:
+                  - /bin/sh
+                  - -c
+                  - -ee
+                  - |
+                    exec pg_isready -U {{ default "postgres" | quote }} -h 127.0.0.1 -p 5432
+                    [ -f /postgresql/tmp/.initialized ] || [ -f /postgresql/.initialized ]
+            env: ## refer https://github.com/zalando/spilo/blob/master/ENVIRONMENT.rst
               - name: DCS_ENABLE_KUBERNETES_API
                 value: "true"
               - name: KUBERNETES_USE_CONFIGMAPS
@@ -99,9 +121,20 @@ spec:
                     apiVersion: v1
                     fieldPath: metadata.namespace
               - name: KUBERNETES_SCOPE_LABEL
-                value: spilo-cluster
+                value: "apps.kubeblocks.io/component-name"
               - name: KUBERNETES_ROLE_LABEL
-                value: role
+                value: "apps.kubeblocks.pg.patroni/role"
+              - name: KUBERNETES_LABELS
+                value: '{"app.kubernetes.io/instance":"$(KB_CLUSTER_NAME)","apps.kubeblocks.io/component-name":"$(KB_COMP_NAME)"}'
+              - name: SPILO_CONFIGURATION
+                value: | ## https://github.com/zalando/patroni#yaml-configuration
+                  bootstrap:
+                    initdb:
+                      - auth-host: md5
+                      - auth-local: trust
+                    pg_hba:
+                      - host all all 0.0.0.0/0 trust
+                      - host replication all  0.0.0.0/0 trust
               - name: PGPASSWORD_SUPERUSER
                 valueFrom:
                   secretKeyRef:
@@ -120,17 +153,9 @@ spec:
                     name: $(CONN_CREDENTIAL_SECRET_NAME)
                     key: postgres-password
               - name: SCOPE
-                value: $KB_COMP_NAME
+                value: "$(KB_COMP_NAME)"
               - name: PGROOT
                 value: /home/postgres/pgdata/pgroot
-              - name: BITNAMI_DEBUG
-                value: "false"
-              - name: POSTGRESQL_PORT_NUMBER
-                value: "5432"
-              - name: POSTGRESQL_VOLUME_DIR
-                value: /postgresql
-              - name: PGDATA
-                value: /postgresql/data
               - name: PGUSER
                 valueFrom:
                   secretKeyRef:
@@ -141,24 +166,6 @@ spec:
                   secretKeyRef:
                     name: $(CONN_CREDENTIAL_SECRET_NAME)
                     key: postgres-password
-              # Authentication
-              - name: POSTGRES_USER
-                valueFrom:
-                  secretKeyRef:
-                    name: $(CONN_CREDENTIAL_SECRET_NAME)
-                    key: username
-              - name: POSTGRES_POSTGRES_PASSWORD
-                valueFrom:
-                  secretKeyRef:
-                    name: $(CONN_CREDENTIAL_SECRET_NAME)
-                    key: postgres-password
-              - name: POSTGRES_PASSWORD
-                valueFrom:
-                  secretKeyRef:
-                    name: $(CONN_CREDENTIAL_SECRET_NAME)
-                    key: postgres-password
-              - name: POSTGRES_DB
-                value: {{ (include "postgresql.database" .) | quote }}
           - name: metrics
             image:  {{ .Values.metrics.image.registry | default "docker.io" }}/{{ .Values.metrics.image.repository }}:{{ .Values.metrics.image.tag }}
             imagePullPolicy: {{ .Values.metrics.image.pullPolicy | quote }}
@@ -218,7 +225,7 @@ spec:
               {{- end }}
       systemAccounts:
         cmdExecutorConfig:
-          image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ default .Values.image.tag .Chart.AppVersion }}
+          image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ default .Values.image.tag }}
           command: ["psql"]
           args:
           - -h$(KB_ACCOUNT_ENDPOINT)

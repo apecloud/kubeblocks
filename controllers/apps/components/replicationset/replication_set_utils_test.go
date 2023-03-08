@@ -21,13 +21,14 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/generics"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 	testk8s "github.com/apecloud/kubeblocks/internal/testutil/k8s"
 )
@@ -90,16 +91,19 @@ var _ = Describe("ReplicationSet Util", func() {
 		} {
 			sts := testapps.NewStatefulSetFactory(testCtx.DefaultNamespace, v, clusterObj.Name, testapps.DefaultRedisCompName).
 				AddContainer(container).
-				AddLabels(intctrlutil.AppInstanceLabelKey, clusterObj.Name,
-					intctrlutil.AppComponentLabelKey, testapps.DefaultRedisCompName,
-					intctrlutil.AppManagedByLabelKey, testapps.KubeBlocks,
-					intctrlutil.RoleLabelKey, k).
+				AddAppInstanceLabel(clusterObj.Name).
+				AddAppComponentLabel(testapps.DefaultRedisCompName).
+				AddAppManangedByLabel().
+				AddRoleLabel(k).
 				SetReplicas(1).
 				Create(&testCtx).GetObject()
+			isStsPrimary, err := checkObjRoleLabelIsPrimary(sts)
 			if k == string(Primary) {
-				Expect(CheckStsIsPrimary(sts)).Should(BeTrue())
+				Expect(err).To(Succeed())
+				Expect(isStsPrimary).Should(BeTrue())
 			} else {
-				Expect(CheckStsIsPrimary(sts)).ShouldNot(BeTrue())
+				Expect(err).To(Succeed())
+				Expect(isStsPrimary).ShouldNot(BeTrue())
 			}
 			stsList = append(stsList, sts)
 		}
@@ -116,6 +120,10 @@ var _ = Describe("ReplicationSet Util", func() {
 				AddLabelsInMap(sts.Labels).
 				Create(&testCtx).GetObject()
 		}
+
+		By("Test ReplicationSet pod number of sts equals 1")
+		_, err = GetAndCheckReplicationPodByStatefulSet(ctx, k8sClient, stsList[0])
+		Expect(err).Should(Succeed())
 
 		By("Test handleReplicationSet success when stsList count equal cluster.replicas.")
 		err = HandleReplicationSet(ctx, k8sClient, clusterObj, stsList)
@@ -162,7 +170,7 @@ var _ = Describe("ReplicationSet Util", func() {
 		sts := testk8s.NewFakeStatefulSet(clusterObj.Name+testapps.DefaultRedisCompName+"-3", 3)
 		pod := testapps.NewPodFactory(testCtx.DefaultNamespace, sts.Name+"-0").
 			AddContainer(corev1.Container{Name: testapps.DefaultRedisContainerName, Image: testapps.DefaultRedisImageName}).
-			AddLabels(intctrlutil.RoleLabelKey, string(Secondary)).
+			AddRoleLabel(string(Secondary)).
 			Create(&testCtx).GetObject()
 		podList = append(podList, pod)
 		Expect(needUpdateReplicationSetStatus(clusterObj.Status.Components[testapps.DefaultRedisCompName].ReplicationSetStatus, podList)).Should(BeTrue())
@@ -172,7 +180,7 @@ var _ = Describe("ReplicationSet Util", func() {
 		sts = testk8s.NewFakeStatefulSet(clusterObj.Name+testapps.DefaultRedisCompName+"-2", 3)
 		pod = testapps.NewPodFactory(testCtx.DefaultNamespace, sts.Name+"-0").
 			AddContainer(corev1.Container{Name: testapps.DefaultRedisContainerName, Image: testapps.DefaultRedisImageName}).
-			AddLabels(intctrlutil.RoleLabelKey, string(Secondary)).
+			AddRoleLabel(string(Secondary)).
 			Create(&testCtx).GetObject()
 		podRemoveList = append(podRemoveList, *pod)
 		Expect(needRemoveReplicationSetStatus(clusterObj.Status.Components[testapps.DefaultRedisCompName].ReplicationSetStatus, podRemoveList)).Should(BeTrue())

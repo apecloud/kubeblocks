@@ -7,7 +7,7 @@
 ## @param image.repository KubeBlocks image repository
 ## @param image.pullPolicy KubeBlocks image pull policy
 ## @param image.tag KubeBlocks image tag (immutable tags are recommended)
-## @param image.pullSecrets KubeBlocks image pull secrets
+## @param image.imagePullSecrets KubeBlocks image pull secrets
 image:
   registry: registry.cn-hangzhou.aliyuncs.com
   repository: apecloud/kubeblocks
@@ -247,6 +247,10 @@ dataProtection:
   ##
   backupTTL: ""
 
+## Addon controller settings, this will require cluster-admin clusterrole.
+addonController:
+  enabled: true
+  jobImagePullPolicy: IfNotPresent
 
 ## Dashboards settings
 ##
@@ -271,6 +275,12 @@ prometheus:
     image:
       repository: registry.cn-hangzhou.aliyuncs.com/apecloud/alertmanager
       tag: v0.24.0
+
+    ## ConfigMap override where fullname is {{.Release.Name}}-{{.Values.alertmanager.configMapOverrideName}}
+    ## Defining configMapOverrideName will cause templates/alertmanager-configmap.yaml
+    ## to NOT generate a ConfigMap resource
+    ##
+    configMapOverrideName: "alertmanager-config"
 
     ## Node tolerations for alertmanager scheduling to nodes with taints
     ## Ref: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/
@@ -486,6 +496,23 @@ prometheus:
     containerSecurityContext:
       allowPrivilegeEscalation: false
 
+  ## AlertManager ConfigMap Entries
+  ## NOTE: Please review these carefully as thresholds and behavior may not meet
+  ##       your SLOs or labels.
+  ##
+  alertmanagerFiles:
+    alertmanager.yml:
+      global: { }
+
+      receivers:
+        - name: default-receiver
+
+      route:
+        receiver: default-receiver
+        group_wait: 5s
+        group_interval: 30s
+        repeat_interval: 10m
+
   ## Sample prometheus rules/alerts
   ## NOTE: Please review these carefully as thresholds and behavior may not meet
   ##       your SLOs or labels.
@@ -501,8 +528,8 @@ prometheus:
               labels:
                 severity: warning
               annotations:
-                summary: "Container killed (node: {{ $labels.instance }}, pod: {{ $labels.pod }}, container: {{ $labels.container }})"
-                description: "A container has disappeared\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+                summary: "Container has disappeared more than 60 seconds"
+                description: "Container has disappeared {{ $value }} seconds. (pod: {{ $labels.pod }}, container: {{ $labels.container }})"
 
             - alert: ContainerCpuUsageWarning
               expr: 'sum(rate(container_cpu_usage_seconds_total{container!="",container!="POD"}[2m])) BY (instance,pod,container) * 100 > 70'
@@ -510,8 +537,8 @@ prometheus:
               labels:
                 severity: warning
               annotations:
-                summary: "Container CPU usage is high (> 70%) (node: {{ $labels.instance }}, pod: {{ $labels.pod }}, container: {{ $labels.container }})"
-                description: "Container CPU usage is above 70%\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+                summary: "Container CPU usage is high (> 70%)"
+                description: "Container CPU usage is {{ $value }}. (pod: {{ $labels.pod }}, container: {{ $labels.container }})"
 
             - alert: ContainerCpuUsageCritical
               expr: 'sum(rate(container_cpu_usage_seconds_total{container!="",container!="POD"}[2m])) BY (instance,pod,container) * 100 > 90'
@@ -519,8 +546,8 @@ prometheus:
               labels:
                 severity: critical
               annotations:
-                summary: "Container CPU usage is very high (> 90%) (node: {{ $labels.instance }}, pod: {{ $labels.pod }}, container: {{ $labels.container }})"
-                description: "Container CPU usage is above 90%\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+                summary: "Container CPU usage is very high (> 90%)"
+                description: "Container CPU usage is {{ $value }}. (pod: {{ $labels.pod }}, container: {{ $labels.container }})"
 
             - alert: ContainerMemoryUsage
               expr: 'sum(container_memory_working_set_bytes{container!="",container!="POD"}) BY (instance,pod,container) / sum(container_spec_memory_limit_bytes{container!="",container!="POD"} > 0) BY (instance,pod,container) * 100 > 90'
@@ -528,8 +555,8 @@ prometheus:
               labels:
                 severity: warning
               annotations:
-                summary: "Container Memory usage is high (> 90%) (node: {{ $labels.instance }}, pod: {{ $labels.pod }}, container: {{ $labels.container }})"
-                description: "Container Memory usage is above 90%\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+                summary: "Container Memory usage is high (> 90%)"
+                description: "Container Memory usage is {{ $value }}. (pod: {{ $labels.pod }}, container: {{ $labels.container }})"
 
             - alert: ContainerMemoryUsagePredict
               expr: 'sum(predict_linear(container_memory_working_set_bytes{container!="",container!="POD"}[15m], 30*60)) BY (instance,pod,container) - sum(container_spec_memory_limit_bytes{container!="",container!="POD"} > 0) BY (instance,pod,container) >= 0'
@@ -537,8 +564,8 @@ prometheus:
               labels:
                 severity: critical
               annotations:
-                summary: "Container Memory usage may exceed the limit 30 minutes later (node: {{ $labels.instance }}, pod: {{ $labels.pod }}, container: {{ $labels.container }})"
-                description: "Container Memory usage may exceed the limit 30 minutes later\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+                summary: "Container Memory predict usage may exceed the limit 30 minutes later"
+                description: "Container Memory predict usage may exceed the limit 30 minutes later, the predict value is {{ $value }}. (pod: {{ $labels.pod }}, container: {{ $labels.container }})"
 
             - alert: ContainerVolumeUsage
               expr: 'sum(container_fs_usage_bytes) BY (instance,device) / sum(container_fs_limit_bytes) BY (instance,device) * 100 > 90'
@@ -546,8 +573,8 @@ prometheus:
               labels:
                 severity: warning
               annotations:
-                summary: "Device Volume usage is high (> 90%) (node: {{ $labels.instance }}, device: {{ $labels.device }})"
-                description: "Device Volume usage is above 90%\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+                summary: "Device Volume usage is high (> 90%)"
+                description: "Device Volume usage is {{ $value }}. (device: {{ $labels.device }})"
 
             - alert: ContainerHighCpuThrottleRate
               expr: 'rate(container_cpu_cfs_throttled_seconds_total{container!="",container!="POD"}[2m]) > 1'
@@ -555,8 +582,8 @@ prometheus:
               labels:
                 severity: warning
               annotations:
-                summary: "Container high throttle rate (node: {{ $labels.instance }}, pod: {{ $labels.pod }}, container: {{ $labels.container }})"
-                description: "Container is being throttled\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+                summary: "Container high throttle rate (> 1)"
+                description: "Container is being throttled and the value is {{ $value }}. (pod: {{ $labels.pod }}, container: {{ $labels.container }})"
 
     mysql_alert_rules.yml: |
       groups:
@@ -564,12 +591,12 @@ prometheus:
           rules:
             - alert: MysqlDown
               expr: 'max_over_time(mysql_up[1m]) == 0'
-              for: 1m
+              for: 0m
               labels:
                 severity: critical
               annotations:
-                summary: "MySQL is down (namespace: {{ $labels.namespace }}, cluster: {{ $labels.app_kubernetes_io_instance }}, instance: {{ $labels.pod }})"
-                description: "MySQL instance is down on {{ $labels.instance }}\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+                summary: "MySQL is down"
+                description: "MySQL is down. (instance: {{ $labels.pod }})"
 
             - alert: MysqlRestarted
               expr: 'mysql_global_status_uptime < 60'
@@ -577,8 +604,8 @@ prometheus:
               labels:
                 severity: info
               annotations:
-                summary: "MySQL restarted (namespace: {{ $labels.namespace }}, cluster: {{ $labels.app_kubernetes_io_instance }}, instance: {{ $labels.pod }})"
-                description: "MySQL has just been restarted, less than one minute ago on {{ $labels.instance }}\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+                summary: "MySQL has just been restarted (< 60s)"
+                description: "MySQL has just been restarted {{ $value }} seconds ago. (instance: {{ $labels.pod }})"
 
             - alert: MysqlTooManyConnections
               expr: 'sum(max_over_time(mysql_global_status_threads_connected[1m]) / mysql_global_variables_max_connections) BY (namespace,app_kubernetes_io_instance,pod) * 100 > 80'
@@ -586,8 +613,8 @@ prometheus:
               labels:
                 severity: warning
               annotations:
-                summary: "MySQL too many connections (> 80%) (namespace: {{ $labels.namespace }}, cluster: {{ $labels.app_kubernetes_io_instance }}, instance: {{ $labels.pod }})"
-                description: "More than 80% of MySQL connections are in use on {{ $labels.instance }}\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+                summary: "MySQL has too many connections (> 80%)"
+                description: "{{ $value }} percent of MySQL connections are in use. (instance: {{ $labels.pod }})"
 
             - alert: MysqlConnectionErrors
               expr: 'sum(increase(mysql_global_status_connection_errors_total[1m])) BY (namespace,app_kubernetes_io_instance,pod) > 0'
@@ -595,8 +622,8 @@ prometheus:
               labels:
                 severity: warning
               annotations:
-                summary: "MySQL connection errors (namespace: {{ $labels.namespace }}, cluster: {{ $labels.app_kubernetes_io_instance }}, instance: {{ $labels.pod }})"
-                description: "MySQL server has some connection errors on {{ $labels.instance }}\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+                summary: "MySQL connection errors"
+                description: "MySQL has connection errors and the value is {{ $value }}. (instance: {{ $labels.pod }})"
 
             - alert: MysqlHighThreadsRunning
               expr: 'sum(max_over_time(mysql_global_status_threads_running[1m]) / mysql_global_variables_max_connections) BY (namespace,app_kubernetes_io_instance,pod) * 100 > 60'
@@ -604,8 +631,8 @@ prometheus:
               labels:
                 severity: warning
               annotations:
-                summary: "MySQL high threads running (namespace: {{ $labels.namespace }}, cluster: {{ $labels.app_kubernetes_io_instance }}, instance: {{ $labels.pod }})"
-                description: "More than 60% of MySQL connections are in running state on {{ $labels.instance }}\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+                summary: "MySQL high threads running (> 60%)"
+                description: "{{ $value }} percent of MySQL connections are in running state. (instance: {{ $labels.pod }})"
 
             - alert: MysqlSlowQueries
               expr: 'sum(increase(mysql_global_status_slow_queries[1m])) BY (namespace,app_kubernetes_io_instance,pod) > 0'
@@ -613,8 +640,8 @@ prometheus:
               labels:
                 severity: info
               annotations:
-                summary: "MySQL slow queries (namespace: {{ $labels.namespace }}, cluster: {{ $labels.app_kubernetes_io_instance }}, instance: {{ $labels.pod }})"
-                description: "MySQL server has some new slow query on {{ $labels.instance }}\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+                summary: "MySQL slow queries"
+                description: "MySQL server has {{ $value }} slow query. (instance: {{ $labels.pod }})"
 
             - alert: MysqlInnodbLogWaits
               expr: 'sum(rate(mysql_global_status_innodb_log_waits[5m])) BY (namespace,app_kubernetes_io_instance,pod) > 10'
@@ -622,8 +649,8 @@ prometheus:
               labels:
                 severity: warning
               annotations:
-                summary: "MySQL InnoDB log waits (namespace: {{ $labels.namespace }}, cluster: {{ $labels.app_kubernetes_io_instance }}, instance: {{ $labels.pod }})"
-                description: "MySQL innodb log writes stalling on {{ $labels.instance }}\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+                summary: "MySQL InnoDB log waits (> 10)"
+                description: "MySQL innodb log writes stalling and the value is {{ $value }}. (instance: {{ $labels.pod }})"
 
             - alert: MysqlInnodbBufferPoolHits
               expr: 'sum(rate(mysql_global_status_innodb_buffer_pool_reads[5m]) / rate(mysql_global_status_innodb_buffer_pool_read_requests[5m])) BY (namespace,app_kubernetes_io_instance,pod) * 100 > 5'
@@ -631,8 +658,8 @@ prometheus:
               labels:
                 severity: warning
               annotations:
-                summary: "MySQL InnoDB high read requests rate hitting disk (namespace: {{ $labels.namespace }}, cluster: {{ $labels.app_kubernetes_io_instance }}, instance: {{ $labels.pod }})"
-                description: "High number of logical reads that InnoDB could not satisfy from the buffer pool, and had to read directly from disk on {{ $labels.instance }}\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+                summary: "MySQL InnoDB high read requests rate hitting disk (> 5%)"
+                description: "High number of logical reads that InnoDB could not satisfy from the buffer pool, and had to read directly from disk. The value is {{ $value }}. (instance: {{ $labels.pod }})"
 
     postgresql_alert_rules.yml: |
       groups:
@@ -640,12 +667,21 @@ prometheus:
           rules:
             - alert: PostgreSQLDown
               expr: 'max_over_time(pg_up[1m]) == 0'
-              for: 1m
+              for: 0m
               labels:
                 severity: critical
               annotations:
-                summary: "PostgreSQL is down (namespace: {{ $labels.namespace }}, cluster: {{ $labels.app_kubernetes_io_instance }}, instance: {{ $labels.pod }})"
-                description: "PostgreSQL instance is down on {{ $labels.instance }}\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+                summary: "PostgreSQL is down"
+                description: "PostgreSQL is down. (instance: {{ $labels.pod }})"
+
+            - alert: PostgreSQLRestarted
+              expr: 'time() - pg_postmaster_start_time_seconds < 60'
+              for: 0m
+              labels:
+                severity: info
+              annotations:
+                summary: "PostgreSQL has just been restarted (< 60s)"
+                description: "PostgreSQL has just been restarted {{ $value }} seconds ago. (instance: {{ $labels.pod }})"
 
             - alert: PostgreSQLExporterError
               expr: 'pg_exporter_last_scrape_error > 0'
@@ -653,8 +689,8 @@ prometheus:
               labels:
                 severity: warning
               annotations:
-                summary: "PostgreSQL exporter scrape error (namespace: {{ $labels.namespace }}, cluster: {{ $labels.app_kubernetes_io_instance }}, instance: {{ $labels.pod }})"
-                description: "PostgreSQL exporter is showing errors. A query may be buggy in query.yaml\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+                summary: "PostgreSQL exporter scrape error"
+                description: "PostgreSQL exporter has {{ $value }} scrape errors. A query may be buggy in query.yaml. (instance: {{ $labels.pod }})"
 
             - alert: PostgreSQLTooManySlowQueries
               expr: |
@@ -665,8 +701,8 @@ prometheus:
               labels:
                 severity: warning
               annotations:
-                summary: "PostgreSQL database {{ $labels.datname }} high number of slow queries (namespace: {{ $labels.namespace }}, cluster: {{ $labels.app_kubernetes_io_instance }}, instance: {{ $labels.pod }})"
-                description: "PostgreSQL high number of slow queries\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+                summary: "PostgreSQL database has high number of slow queries"
+                description: "PostgreSQL database has slow queries and the value is {{ $value }}. (instance: {{ $labels.pod }}, database: {{ $labels.datname }})"
 
             - alert: PostgreSQLTooManyConnections
               expr: |
@@ -677,8 +713,8 @@ prometheus:
               labels:
                 severity: warning
               annotations:
-                summary: "PostgreSQL too many connections (> 80%) (namespace: {{ $labels.namespace }}, cluster: {{ $labels.app_kubernetes_io_instance }}, instance: {{ $labels.pod }})"
-                description: "PostgreSQL instance has too many connections (> 80%)\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+                summary: "PostgreSQL too many connections (> 80%)"
+                description: "PostgreSQL has too many connections and the value is {{ $value }}. (instance: {{ $labels.pod }})"
 
             - alert: PostgreSQLDeadLocks
               expr: 'increase(pg_stat_database_deadlocks{datname!~"template.*|postgres", datname!=""}[2m]) > 5'
@@ -686,8 +722,8 @@ prometheus:
               labels:
                 severity: warning
               annotations:
-                summary: "PostgreSQL database {{ $labels.datname }} dead locks (namespace: {{ $labels.namespace }}, cluster: {{ $labels.app_kubernetes_io_instance }}, instance: {{ $labels.pod }})"
-                description: "PostgreSQL has deadlocks\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+                summary: "PostgreSQL database has dead locks (> 5)"
+                description: "PostgreSQL database has {{ $value }} dead locks. (instance: {{ $labels.pod }}, database: {{ $labels.datname }})"
 
             - alert: PostgreSQLHighRollbackRate
               expr: |
@@ -699,8 +735,8 @@ prometheus:
               labels:
                 severity: warning
               annotations:
-                summary: "PostgreSQL database {{ $labels.datname }} high rollback rate (namespace: {{ $labels.namespace }}, cluster: {{ $labels.app_kubernetes_io_instance }}, instance: {{ $labels.pod }})"
-                description: "Ratio of transactions being aborted compared to committed is > 2%\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+                summary: "PostgreSQL database has high rollback rate (> 10%)"
+                description: "Ratio of transactions being aborted compared to committed is {{ $value }}. (instance: {{ $labels.pod }}, database: {{ $labels.datname }})"
 
             - alert: PostgreSQLTooManyLocksAcquired
               expr: |
@@ -712,8 +748,8 @@ prometheus:
               labels:
                 severity: warning
               annotations:
-                summary: "PostgreSQL too many locks acquired (namespace: {{ $labels.namespace }}, cluster: {{ $labels.app_kubernetes_io_instance }}, instance: {{ $labels.pod }})"
-                description: "Too many locks acquired on the database. If this alert happens frequently, we may need to increase the postgres setting max_locks_per_transaction.\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+                summary: "PostgreSQL has too many locks acquired (> 20%)"
+                description: "Too many locks acquired on the database and the value is {{ $value }}. (instance: {{ $labels.pod }})"
 
             - alert: PostgreSQLCacheHitRatio
               expr: |
@@ -734,8 +770,8 @@ prometheus:
               labels:
                 severity: warning
               annotations:
-                summary: "PostgreSQL database {{ $labels.datname }} has low cache hit rate (namespace: {{ $labels.namespace }}, cluster: {{ $labels.app_kubernetes_io_instance }}, instance: {{ $labels.pod }})"
-                description: "Low cache hit rate\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+                summary: "PostgreSQL database has low cache hit rate (< 90%)"
+                description: "Low cache hit rate and the value is {{ $value }}. (instance: {{ $labels.pod }}, database: {{ $labels.datname }})"
 
             - alert: PostgreSQLMaxWriteBufferReached
               expr: 'rate(pg_stat_bgwriter_maxwritten_clean_total[2m]) > 0'
@@ -743,8 +779,8 @@ prometheus:
               labels:
                 severity: warning
               annotations:
-                summary: "PostgreSQL write buffers reached max (namespace: {{ $labels.namespace }}, cluster: {{ $labels.app_kubernetes_io_instance }}, instance: {{ $labels.pod }})"
-                description: "PostgreSQL background writer stops for max\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+                summary: "PostgreSQL write buffers reached max"
+                description: "PostgreSQL background writer stops for max and the value is {{ $value }}. (instance: {{ $labels.pod }})"
 
             - alert: PostgreSQLHighWALFilesArchiveErrorRate
               expr: |
@@ -756,8 +792,8 @@ prometheus:
               labels:
                 severity: warning
               annotations:
-                summary: "PostgreSQL high error rate in WAL files archiver (namespace: {{ $labels.namespace }}, cluster: {{ $labels.app_kubernetes_io_instance }}, instance: {{ $labels.pod }})"
-                description: "PostgreSQL high error rate in WAL files archiver\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+                summary: "PostgreSQL has high error rate in WAL files archiver(> 10%)"
+                description: "PostgreSQL high error rate in WAL files archiver and the value is {{ $value }}. (instance: {{ $labels.pod }})"
 
             - alert: PostgreSQLTableNotAutoVacuumed
               expr: |
@@ -769,8 +805,8 @@ prometheus:
               labels:
                 severity: warning
               annotations:
-                summary: "PostgreSQL table {{ $labels.relname }} in database {{ $labels.datname }} not auto vacuumed (namespace: {{ $labels.namespace }}, cluster: {{ $labels.app_kubernetes_io_instance }}, instance: {{ $labels.pod }})"
-                description: "Table {{ $labels.relname }} in database {{ $labels.datname }} has not been auto vacuumed for 10 days\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+                summary: "PostgreSQL table in database has not been auto vacuumed for 10 days"
+                description: "Table {{ $labels.relname }} in database has not been auto vacuumed for 10 days. (instance: {{ $labels.pod }}, database: {{ $labels.datname }})"
 
             - alert: PostgreSQLTableNotAutoAnalyzed
               expr: |
@@ -782,8 +818,8 @@ prometheus:
               labels:
                 severity: warning
               annotations:
-                summary: "PostgreSQL table {{ $labels.relname }} in database {{ $labels.datname }} not auto analyzed (namespace: {{ $labels.namespace }}, cluster: {{ $labels.app_kubernetes_io_instance }}, instance: {{ $labels.pod }})"
-                description: "Table {{ $labels.relname }} in database {{ $labels.datname }} has not been auto analyzed for 10 days\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+                summary: "PostgreSQL table in database has not been auto analyzed for 10 days"
+                description: "Table {{ $labels.relname }} in database has not been auto analyzed for 10 days. (instance: {{ $labels.pod }}, database: {{ $labels.datname }})"
 
             - alert: PostgreSQLTableTooManyDeadTuples
               expr: |
@@ -795,8 +831,122 @@ prometheus:
               labels:
                 severity: warning
               annotations:
-                summary: "PostgreSQL table {{ $labels.relname }} in database {{ $labels.datname }} has too many dead tuples (namespace: {{ $labels.namespace }}, cluster: {{ $labels.app_kubernetes_io_instance }}, instance: {{ $labels.pod }})"
-                description: "Table {{ $labels.relname }} in database {{ $labels.datname }} dead tuples is too large\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+                summary: "PostgreSQL table in database has too many dead tuples (> 10%)"
+                description: "Table {{ $labels.relname }} in database dead tuples is too large and the value is {{ $value }}. (instance: {{ $labels.pod }}, database: {{ $labels.datname }})"
+
+    redis_alert_rules.yml: |
+      groups:
+        - name: RedisExporter
+          rules:
+            - alert: RedisDown
+              expr: 'redis_up == 0'
+              for: 5m
+              labels:
+                severity: critical
+              annotations:
+                summary: "Redis is down"
+                description: "Redis is down. (instance: {{ $labels.pod }})"
+
+            - alert: RedisCPUHigh
+              expr: '(rate(redis_cpu_sys_seconds_total[1m]) + rate(redis_cpu_user_seconds_total[1m])) * 100 > 80'
+              for: 2m
+              labels:
+                severity: warning
+              annotations:
+                summary: "Out of CPU (> 80%)"
+                description: "Redis is running out of CPU and the value is {{ $value }}. (instance: {{ $labels.pod }})"
+
+            - alert: RedisMemoryHigh
+              expr: '(redis_memory_max_bytes == 0 or redis_memory_used_bytes * 100 / redis_memory_max_bytes) > 90'
+              for: 5m
+              labels:
+                severity: warning
+              annotations:
+                summary: "Out of memory (> 90%)"
+                description: "Redis is running out of memory and the value is {{ $value }}. (instance: {{ $labels.pod }})"
+
+            - alert: RedisTooManyConnections
+              expr: 'redis_connected_clients * 100 / redis_config_maxclients > 80'
+              for: 1m
+              labels:
+                severity: warning
+              annotations:
+                summary: "Redis has too many connections (> 80%)"
+                description: "Redis has too many connections and the value is {{ $value }}. (instance: {{ $labels.pod }})"
+
+            - alert: RedisRejectedConnections
+              expr: 'increase(redis_rejected_connections_total[1m]) > 0'
+              for: 5m
+              labels:
+                severity: error
+              annotations:
+                summary: "Redis has rejected connections"
+                description: "{{ $value }} connections to Redis has been rejected. (instance: {{ $labels.pod }})"
+
+            - alert: RedisKeyEviction
+              expr: 'increase(redis_evicted_keys_total[5m]) > 0'
+              for: 1s
+              labels:
+                severity: error
+              annotations:
+                summary: "Redis has evicted keys"
+                description: "Redis has evicted keys in the last 5 minutes and the value is {{ $value }}. (instance: {{ $labels.pod }})"
+
+            - alert: RedisMissingMaster
+              expr: 'count by (app_kubernetes_io_instance) (redis_instance_info{role="master"}) < 1'
+              for: 30s
+              labels:
+                severity: critical
+              annotations:
+                summary: "Redis missing master"
+                description: "Redis cluster has no node marked as master."
+
+            - alert: RedisDisconnectedSlaves
+              expr: 'count without (instance, job) (redis_connected_slaves) - sum without (instance, job) (redis_connected_slaves) - 1 > 1'
+              for: 0m
+              labels:
+                severity: critical
+              annotations:
+                summary: "Redis disconnected slaves"
+                description: "Redis not replicating for all slaves. Consider reviewing the redis replication status. (instance: {{ $labels.pod }})"
+
+            - alert: RedisReplicationBroken
+              expr: 'delta(redis_connected_slaves[1m]) < 0'
+              for: 0m
+              labels:
+                severity: critical
+              annotations:
+                summary: "Redis replication broken"
+                description: "Redis instance lost a slave. (instance: {{ $labels.pod }})"
+
+    kafka_alert_rules.yaml: |-
+      group:
+        - name: KafkaExporter
+          rules:
+            - alert: KafkaTopicsReplicas
+                expr: sum(kafka_topic_partition_in_sync_replica) by (topic) < 3
+                for: 0m
+                labels:
+                  severity: critical
+                annotations:
+                  summary: Kafka topics replicas (instance {{ $labels.app_kubernetes_io_instance }})
+                  description: "Kafka topic in-sync partition\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+            - alert: KafkaConsumersGroup
+                expr: sum(kafka_consumergroup_lag) by (consumergroup) > 50
+                for: 1m
+                labels:
+                  severity: critical
+                annotations:
+                  summary: Kafka consumers group (instance {{ $labels.app_kubernetes_io_instance }})
+                  description: "Kafka consumers group\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+            - alert: KafkaBrokerDown
+                expr: kafka_brokers < 3
+                for: 0m
+                labels:
+                  severity: critical
+                annotations:
+                  Summary: "Kafka broker *{{ $labels.app_kubernetes_io_instance }}* alert status"
+                  description: "One of the Kafka broker *{{ $labels.app_kubernetes_io_instance }}* is down."
 
   serverFiles:
     prometheus.yml:
@@ -806,6 +956,8 @@ prometheus:
         - /etc/config/cadvisor_alert_rules.yml
         - /etc/config/mysql_alert_rules.yml
         - /etc/config/postgresql_alert_rules.yml
+        - /etc/config/redis_alert_rules.yml
+        - /etc/config/kafka_alert_rules.yml
 
       scrape_configs:
         - job_name: prometheus
@@ -1107,7 +1259,7 @@ grafana:
   defaultDashboardsTimezone:
 
   adminUser: admin
-  adminPassword: abc
+  adminPassword: kubeblocks
 
   sidecar:
     image:
@@ -1211,3 +1363,38 @@ csi-s3:
     create: true
     singleBucket: ""
     mountOptions: "--memory-limit 1000 --dir-mode 0777 --file-mode 0666 --region cn-northwest-1"
+
+alertmanager-webhook-adaptor:
+  ## If false, Webhook-Adaptor sub-chart will not be installed
+  ##
+  enabled: false
+
+  replicaCount: 1
+
+  ## Webhook-Adaptor container image
+  ##
+  image:
+    registry: registry.cn-hangzhou.aliyuncs.com
+    repository: apecloud/alertmanager-webhook-adaptor
+    pullPolicy: IfNotPresent
+    tag: "0.1.1"
+
+  ## ConfigMap override where fullname is {{.Release.Name}}-{{.Values.configMapOverrideName}}
+  ##
+  configMapOverrideName: "webhook-adaptor-config"
+
+  resources: { }
+  # We usually recommend not to specify default resources and to leave this as a conscious
+  # choice for the user. This also increases chances charts run on environments with little
+  # resources, such as Minikube. If you do want to specify resources, uncomment the following
+  # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
+  # limits:
+  #   cpu: 100m
+  #   memory: 128Mi
+  # requests:
+  #   cpu: 100m
+  #   memory: 128Mi
+
+  ## Webhook-Adaptor ConfigMap Entries
+  configFiles:
+    config.yaml: { }

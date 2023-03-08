@@ -18,25 +18,28 @@ package builder
 
 import (
 	"embed"
+	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"strconv"
 	"strings"
 
+	"github.com/google/uuid"
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	"github.com/leaanthony/debme"
-	"github.com/sethvargo/go-password/password"
 	"github.com/spf13/viper"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/rand"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	componentutil "github.com/apecloud/kubeblocks/controllers/apps/components/util"
-	cfgcm "github.com/apecloud/kubeblocks/internal/configuration/configmap"
+	cfgcm "github.com/apecloud/kubeblocks/internal/configuration/config_manager"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
@@ -47,12 +50,6 @@ type BuilderParams struct {
 	ClusterVersion    *appsv1alpha1.ClusterVersion
 	Cluster           *appsv1alpha1.Cluster
 	Component         *component.SynthesizedComponent
-}
-
-type envVar struct {
-	name      string
-	fieldPath string
-	value     string
 }
 
 type componentPathedName struct {
@@ -133,25 +130,27 @@ func processContainersInjection(reqCtx intctrlutil.RequestCtx,
 
 func injectEnvs(params BuilderParams, envConfigName string, c *corev1.Container) {
 	// can not use map, it is unordered
-	envFieldPathSlice := []envVar{
-		{name: "_POD_NAME", fieldPath: "metadata.name"},
-		{name: "_NAMESPACE", fieldPath: "metadata.namespace"},
-		{name: "_SA_NAME", fieldPath: "spec.serviceAccountName"},
-		{name: "_NODENAME", fieldPath: "spec.nodeName"},
-		{name: "_HOSTIP", fieldPath: "status.hostIP"},
-		{name: "_PODIP", fieldPath: "status.podIP"},
-		{name: "_PODIPS", fieldPath: "status.podIPs"},
+	envFieldPathSlice := []struct {
+		name      string
+		fieldPath string
+	}{
+		{name: "KB_POD_NAME", fieldPath: "metadata.name"},
+		{name: "KB_NAMESPACE", fieldPath: "metadata.namespace"},
+		{name: "KB_SA_NAME", fieldPath: "spec.serviceAccountName"},
+		{name: "KB_NODENAME", fieldPath: "spec.nodeName"},
+		{name: "KB_HOST_IP", fieldPath: "status.hostIP"},
+		{name: "KB_POD_IP", fieldPath: "status.podIP"},
+		{name: "KB_POD_IPS", fieldPath: "status.podIPs"},
+		// TODO: need to deprecate following
+		{name: "KB_HOSTIP", fieldPath: "status.hostIP"},
+		{name: "KB_PODIP", fieldPath: "status.podIP"},
+		{name: "KB_PODIPS", fieldPath: "status.podIPs"},
 	}
 
-	clusterEnv := []envVar{
-		{name: "_CLUSTER_NAME", value: params.Cluster.Name},
-		{name: "_COMP_NAME", value: params.Component.Name},
-		{name: "_CLUSTER_COMP_NAME", value: params.Cluster.Name + "-" + params.Component.Name},
-	}
-	toInjectEnv := make([]corev1.EnvVar, 0, len(envFieldPathSlice)+len(c.Env))
+	toInjectEnvs := make([]corev1.EnvVar, 0, len(envFieldPathSlice)+len(c.Env))
 	for _, v := range envFieldPathSlice {
-		toInjectEnv = append(toInjectEnv, corev1.EnvVar{
-			Name: constant.KBPrefix + v.name,
+		toInjectEnvs = append(toInjectEnvs, corev1.EnvVar{
+			Name: v.name,
 			ValueFrom: &corev1.EnvVarSource{
 				FieldRef: &corev1.ObjectFieldSelector{
 					FieldPath: v.fieldPath,
@@ -160,40 +159,30 @@ func injectEnvs(params BuilderParams, envConfigName string, c *corev1.Container)
 		})
 	}
 
-	for _, v := range clusterEnv {
-		toInjectEnv = append(toInjectEnv, corev1.EnvVar{
-			Name:  constant.KBPrefix + v.name,
-			Value: v.value,
-		})
-	}
+	toInjectEnvs = append(toInjectEnvs, []corev1.EnvVar{
+		{Name: "KB_CLUSTER_NAME", Value: params.Cluster.Name},
+		{Name: "KB_COMP_NAME", Value: params.Component.Name},
+		{Name: "KB_CLUSTER_COMP_NAME", Value: params.Cluster.Name + "-" + params.Component.Name},
+		{Name: "KB_POD_FQDN", Value: fmt.Sprintf("%s.%s-headless.%s.svc", "$(KB_POD_NAME)",
+			"$(KB_CLUSTER_COMP_NAME)", "$(KB_NAMESPACE)")},
+	}...)
 
 	if params.Component.TLS {
-		tlsEnv := []envVar{
-			{name: "_TLS_CERT_PATH", value: MountPath},
-			{name: "_TLS_CA_FILE", value: CAName},
-			{name: "_TLS_CERT_FILE", value: CertName},
-			{name: "_TLS_KEY_FILE", value: KeyName},
-		}
-		for _, v := range tlsEnv {
-			toInjectEnv = append(toInjectEnv, corev1.EnvVar{
-				Name:  constant.KBPrefix + v.name,
-				Value: v.value,
-			})
-		}
+		toInjectEnvs = append(toInjectEnvs, []corev1.EnvVar{
+			{Name: "KB_TLS_CERT_PATH", Value: MountPath},
+			{Name: "KB_TLS_CA_FILE", Value: CAName},
+			{Name: "KB_TLS_CERT_FILE", Value: CertName},
+			{Name: "KB_TLS_KEY_FILE", Value: KeyName},
+		}...)
 	}
-
 	// have injected variables placed at the front of the slice
-	if c.Env == nil {
-		c.Env = toInjectEnv
+	if len(c.Env) == 0 {
+		c.Env = toInjectEnvs
 	} else {
-		c.Env = append(toInjectEnv, c.Env...)
+		c.Env = append(toInjectEnvs, c.Env...)
 	}
-
 	if envConfigName == "" {
 		return
-	}
-	if c.EnvFrom == nil {
-		c.EnvFrom = []corev1.EnvFromSource{}
 	}
 	c.EnvFrom = append(c.EnvFrom, corev1.EnvFromSource{
 		ConfigMapRef: &corev1.ConfigMapEnvSource{
@@ -209,7 +198,7 @@ func buildPersistentVolumeClaimLabels(sts *appsv1.StatefulSet, pvc *corev1.Persi
 	if pvc.Labels == nil {
 		pvc.Labels = make(map[string]string)
 	}
-	pvc.Labels[intctrlutil.VolumeClaimTemplateNameLabelKey] = pvc.Name
+	pvc.Labels[constant.VolumeClaimTemplateNameLabelKey] = pvc.Name
 	for k, v := range sts.Labels {
 		if _, ok := pvc.Labels[k]; !ok {
 			pvc.Labels[k] = v
@@ -217,20 +206,39 @@ func buildPersistentVolumeClaimLabels(sts *appsv1.StatefulSet, pvc *corev1.Persi
 	}
 }
 
-func BuildSvc(params BuilderParams, headless bool) (*corev1.Service, error) {
-	tplFile := "service_template.cue"
-	if headless {
-		tplFile = "headless_service_template.cue"
+func BuildSvcList(params BuilderParams) ([]*corev1.Service, error) {
+	const tplFile = "service_template.cue"
+
+	var result []*corev1.Service
+	for _, item := range params.Component.Services {
+		if len(item.Spec.Ports) == 0 {
+			continue
+		}
+		svc := corev1.Service{}
+		if err := buildFromCUE(tplFile, map[string]any{
+			"cluster":   params.Cluster,
+			"service":   item,
+			"component": params.Component,
+		}, "svc", &svc); err != nil {
+			return nil, err
+		}
+		result = append(result, &svc)
 	}
-	svc := corev1.Service{}
+
+	return result, nil
+}
+
+func BuildHeadlessSvc(params BuilderParams) (*corev1.Service, error) {
+	const tplFile = "headless_service_template.cue"
+
+	service := corev1.Service{}
 	if err := buildFromCUE(tplFile, map[string]any{
 		"cluster":   params.Cluster,
 		"component": params.Component,
-	}, "service", &svc); err != nil {
+	}, "service", &service); err != nil {
 		return nil, err
 	}
-
-	return &svc, nil
+	return &service, nil
 }
 
 func BuildSts(reqCtx intctrlutil.RequestCtx, params BuilderParams, envConfigName string) (*appsv1.StatefulSet, error) {
@@ -259,8 +267,7 @@ func BuildSts(reqCtx intctrlutil.RequestCtx, params BuilderParams, envConfigName
 }
 
 func randomString(length int) string {
-	res, _ := password.Generate(length, 0, 0, false, false)
-	return res
+	return rand.String(length)
 }
 
 func BuildConnCredential(params BuilderParams) (*corev1.Secret, error) {
@@ -278,40 +285,62 @@ func BuildConnCredential(params BuilderParams) (*corev1.Secret, error) {
 		return &connCredential, nil
 	}
 
+	replaceVarObjects := func(k, v *string, i int, origValue string, varObjectsMap map[string]string) {
+		toReplace := origValue
+		for j, r := range varObjectsMap {
+			replaced := strings.ReplaceAll(toReplace, j, r)
+			if replaced == toReplace {
+				continue
+			}
+			toReplace = replaced
+			// replace key
+			if i == 0 {
+				delete(connCredential.StringData, origValue)
+				*k = replaced
+			} else {
+				*v = replaced
+			}
+		}
+	}
+
 	// REVIEW: perhaps handles value replacement at `func mergeComponents`
-	replaceData := func(placeHolderMap map[string]string) {
+	replaceData := func(varObjectsMap map[string]string) {
 		copyStringData := connCredential.DeepCopy().StringData
 		for k, v := range copyStringData {
 			for i, vv := range []string{k, v} {
-				if !strings.HasPrefix(vv, "$(") {
+				if !strings.Contains(vv, "$(") {
 					continue
 				}
-				for j, r := range placeHolderMap {
-					replaced := strings.Replace(vv, j, r, 1)
-					if replaced == vv {
-						continue
-					}
-					// replace key
-					if i == 0 {
-						delete(connCredential.StringData, vv)
-						k = replaced
-					} else {
-						v = replaced
-					}
-					break
-				}
+				replaceVarObjects(&k, &v, i, vv, varObjectsMap)
 			}
 			connCredential.StringData[k] = v
 		}
 	}
 
-	// 1st pass replace primary placeholder
+	// TODO: do JIT value generation for lower CPU resources
+	// 1st pass replace variables
+	uuidVal := uuid.New()
+	uuidBytes := uuidVal[:]
+	uuidStr := uuidVal.String()
+	uuidB64 := base64.RawStdEncoding.EncodeToString(uuidBytes)
+	uuidStrB64 := base64.RawStdEncoding.EncodeToString([]byte(strings.ReplaceAll(uuidStr, "-", "")))
+	uuidHex := hex.EncodeToString(uuidBytes)
 	m := map[string]string{
 		"$(RANDOM_PASSWD)": randomString(8),
+		"$(UUID)":          uuidStr,
+		"$(UUID_B64)":      uuidB64,
+		"$(UUID_STR_B64)":  uuidStrB64,
+		"$(UUID_HEX)":      uuidHex,
+		"$(SVC_FQDN)":      fmt.Sprintf("%s-%s.%s.svc", params.Cluster.Name, params.Component.Name, params.Cluster.Namespace),
+	}
+	if len(params.Component.Services) > 0 {
+		for _, p := range params.Component.Services[0].Spec.Ports {
+			m[fmt.Sprintf("$(SVC_PORT_%s)", p.Name)] = strconv.Itoa(int(p.Port))
+		}
 	}
 	replaceData(m)
 
-	// 2nd pass replace $(CONN_CREDENTIAL) holding values
+	// 2nd pass replace $(CONN_CREDENTIAL) variables
 	m = map[string]string{}
 
 	for k, v := range connCredential.StringData {
@@ -353,7 +382,7 @@ func BuildDeploy(reqCtx intctrlutil.RequestCtx, params BuilderParams) (*appsv1.D
 }
 
 func BuildPVCFromSnapshot(sts *appsv1.StatefulSet,
-	vct corev1.PersistentVolumeClaim,
+	vct corev1.PersistentVolumeClaimTemplate,
 	pvcKey types.NamespacedName,
 	snapshotName string) (*corev1.PersistentVolumeClaim, error) {
 
@@ -370,6 +399,8 @@ func BuildPVCFromSnapshot(sts *appsv1.StatefulSet,
 	return &pvc, nil
 }
 
+// BuildEnvConfig build cluster component context ConfigMap object, which is to be used in workload container's
+// envFrom.configMapRef with name of "$(cluster.metadata.name)-$(component.name)-env" pattern.
 func BuildEnvConfig(params BuilderParams) (*corev1.ConfigMap, error) {
 	const tplFile = "env_config_template.cue"
 
@@ -378,8 +409,16 @@ func BuildEnvConfig(params BuilderParams) (*corev1.ConfigMap, error) {
 	envData := map[string]string{}
 	envData[prefix+"N"] = strconv.Itoa(int(params.Component.Replicas))
 	for j := 0; j < int(params.Component.Replicas); j++ {
-		envData[prefix+strconv.Itoa(j)+"_HOSTNAME"] = fmt.Sprintf("%s.%s", params.Cluster.Name+"-"+params.Component.Name+"-"+strconv.Itoa(j), svcName)
+		hostNameTplKey := prefix + strconv.Itoa(j) + "_HOSTNAME"
+		hostNameTplValue := params.Cluster.Name + "-" + params.Component.Name + "-" + strconv.Itoa(j)
+		if params.Component.WorkloadType == appsv1alpha1.Replication {
+			envData[hostNameTplKey] = fmt.Sprintf("%s.%s", hostNameTplValue+"-0", svcName)
+			envData[constant.KBReplicationSetPrimaryPodName] = fmt.Sprintf("%s-%s-%d-%d.%s", params.Cluster.Name, params.Component.Name, *params.Component.PrimaryIndex, 0, svcName)
+		} else {
+			envData[hostNameTplKey] = fmt.Sprintf("%s.%s", hostNameTplValue, svcName)
+		}
 	}
+
 	// TODO following code seems to be redundant with updateConsensusRoleInfo in consensus_set_utils.go
 	// build consensus env from cluster.status
 	if params.Cluster.Status.Components != nil {
@@ -401,23 +440,6 @@ func BuildEnvConfig(params BuilderParams) (*corev1.ConfigMap, error) {
 					followers += follower.Pod
 				}
 				envData[prefix+"FOLLOWERS"] = followers
-			}
-			replicationSetStatus := v.ReplicationSetStatus
-			if replicationSetStatus != nil {
-				if replicationSetStatus.Primary.Pod != componentutil.ComponentStatusDefaultPodName {
-					envData[prefix+"PRIMARY"] = replicationSetStatus.Primary.Pod
-				}
-				secondaries := ""
-				for _, secondary := range replicationSetStatus.Secondaries {
-					if secondary.Pod == componentutil.ComponentStatusDefaultPodName {
-						continue
-					}
-					if len(secondaries) > 0 {
-						secondaries += ","
-					}
-					secondaries += secondary.Pod
-				}
-				envData[prefix+"SECONDARIES"] = secondaries
 			}
 		}
 	}
@@ -557,7 +579,7 @@ func BuildConfigMapWithTemplate(
 	return &cm, nil
 }
 
-func BuildCfgManagerContainer(sidecarRenderedParam *cfgcm.ConfigManagerSidecar) (*corev1.Container, error) {
+func BuildCfgManagerContainer(sidecarRenderedParam *cfgcm.ConfigManagerParams) (*corev1.Container, error) {
 	const tplFile = "config_manager_sidecar.cue"
 	cueFS, _ := debme.FS(cueTemplates, "cue")
 	cueTpl, err := getCacheCUETplValue(tplFile, func() (*intctrlutil.CUETpl, error) {

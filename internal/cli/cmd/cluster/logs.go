@@ -37,6 +37,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/exec"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/constant"
 )
 
 var (
@@ -222,7 +223,7 @@ func (o *LogsOptions) validate() error {
 // createFileTypeCommand creates command against log file type
 func (o *LogsOptions) createFileTypeCommand(pod *corev1.Pod, obj *cluster.ClusterObjects) (string, error) {
 	var command string
-	componentName, ok := pod.Labels[types.ComponentLabelKey]
+	componentName, ok := pod.Labels[intctrlutil.KBAppComponentLabelKey]
 	if !ok {
 		return command, fmt.Errorf("get component name from pod labels fail")
 	}

@@ -18,7 +18,6 @@ package components
 
 import (
 	"context"
-	"reflect"
 	"time"
 
 	"k8s.io/client-go/tools/record"
@@ -84,88 +83,22 @@ func NewComponentByType(
 	return nil
 }
 
-// podsOfComponentAreReady checks if the pods of component are ready.
-func podsOfComponentAreReady(compCtx componentContext) (*bool, error) {
-	if compCtx.componentSpec.Replicas == 0 {
-		// if replicas number of component is 0, ignore it and return nil.
-		return nil, nil
-	}
-	podsReadyForComponent, err := compCtx.component.PodsReady(compCtx.obj)
-	if err != nil {
-		return nil, err
-	}
-	return &podsReadyForComponent, nil
-}
-
 // updateComponentStatusInClusterStatus updates cluster.Status.Components if the component status changed
 func updateComponentStatusInClusterStatus(compCtx componentContext,
 	cluster *appsv1alpha1.Cluster) (time.Duration, error) {
-	var (
-		obj          = compCtx.obj
-		component    = compCtx.component
-		requeueAfter time.Duration
-	)
-
 	componentStatusSynchronizer := NewClusterStatusSynchronizer(compCtx.reqCtx.Ctx, compCtx.cli, cluster, compCtx.component, compCtx.componentSpec)
 	if componentStatusSynchronizer == nil {
 		return 0, nil
 	}
-	if component == nil {
-		return 0, nil
-	}
-	// handle the components changes
-	err := component.HandleUpdate(obj)
-	if err != nil {
-		return 0, err
-	}
-	isRunning, err := component.IsRunning(obj)
-	if err != nil {
-		return 0, err
-	}
-	podsReady, err := podsOfComponentAreReady(compCtx)
+
+	wait, err := componentStatusSynchronizer.Update(compCtx.obj, &compCtx.reqCtx.Log, compCtx.recorder)
 	if err != nil {
 		return 0, err
 	}
 
-	hasFailedAndTimedOutPod := false
-	clusterDeepCopy := cluster.DeepCopy()
-	if !isRunning {
-		if podsReady != nil && *podsReady {
-			// check if the role probe timed out when component phase is not Running but all pods of component are ready.
-			if requeueWhenPodsReady, err := component.HandleProbeTimeoutWhenPodsReady(compCtx.recorder); err != nil {
-				return 0, err
-			} else if requeueWhenPodsReady {
-				requeueAfter = time.Minute
-			}
-		} else {
-			// check whether there is a failed pod of component that has timed out
-			var hasFailedPod bool
-			var message appsv1alpha1.ComponentMessageMap
-			hasFailedAndTimedOutPod, hasFailedPod, message = componentStatusSynchronizer.HasFailedAndTimedOutPod()
-			if hasFailedAndTimedOutPod {
-				componentStatusSynchronizer.UpdateMessage(message)
-			} else if hasFailedPod {
-				requeueAfter = time.Minute
-			}
-		}
+	var requeueAfter time.Duration
+	if wait {
+		requeueAfter = time.Minute
 	}
-
-	if err = componentStatusSynchronizer.UpdateComponentsPhase(isRunning,
-		podsReady, hasFailedAndTimedOutPod); err != nil {
-		return 0, err
-	}
-
-	componentName := compCtx.componentSpec.Name
-	oldComponentStatus := clusterDeepCopy.Status.Components[componentName]
-	componentStatus := cluster.Status.Components[componentName]
-	if !reflect.DeepEqual(oldComponentStatus, componentStatus) {
-		compCtx.reqCtx.Log.Info("component status changed", "componentName", componentName, "phase",
-			cluster.Status.Components[componentName].Phase, "componentIsRunning", isRunning, "podsAreReady", podsReady)
-		patch := client.MergeFrom(clusterDeepCopy)
-		if err = compCtx.cli.Status().Patch(compCtx.reqCtx.Ctx, cluster, patch); err != nil {
-			return 0, err
-		}
-	}
-
 	return requeueAfter, opsutil.MarkRunningOpsRequestAnnotation(compCtx.reqCtx.Ctx, compCtx.cli, cluster)
 }

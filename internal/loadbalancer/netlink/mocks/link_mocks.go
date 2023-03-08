@@ -69,7 +69,7 @@ func (mr *MockLinkMockRecorder) Attrs() *gomock.Call {
 // Type mocks base method.
 func (m *MockLink) Type() string {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ComponentDefRef")
+	ret := m.ctrl.Call(m, "Type")
 	ret0, _ := ret[0].(string)
 	return ret0
 }
@@ -77,5 +77,5 @@ func (m *MockLink) Type() string {
 // Type indicates an expected call of Type.
 func (mr *MockLinkMockRecorder) Type() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ComponentDefRef", reflect.TypeOf((*MockLink)(nil).Type))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Type", reflect.TypeOf((*MockLink)(nil).Type))
 }

@@ -34,7 +34,7 @@ import (
 	componentutil "github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	cfgutil "github.com/apecloud/kubeblocks/controllers/apps/configuration"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
-	cfgcm "github.com/apecloud/kubeblocks/internal/configuration/configmap"
+	cfgcm "github.com/apecloud/kubeblocks/internal/configuration/config_manager"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
@@ -63,7 +63,7 @@ func PrepareComponentResources(reqCtx intctrlutil.RequestCtx, cli client.Client,
 			task.AppendResource(workload)
 		}()
 
-		svc, err := builder.BuildSvc(task.GetBuilderParams(), true)
+		svc, err := builder.BuildHeadlessSvc(task.GetBuilderParams())
 		if err != nil {
 			return err
 		}
@@ -146,14 +146,27 @@ func PrepareComponentResources(reqCtx intctrlutil.RequestCtx, cli client.Client,
 			return err
 		}
 	case appsv1alpha1.Replication:
-		// get the maximum value of params.component.Replicas and the number of existing statefulsets under the current component,
-		// then construct statefulsets for creating replicationSet or handling horizontal scaling of the replicationSet.
+		// get the number of existing statefulsets under the current component
 		var existStsList = &appsv1.StatefulSetList{}
 		if err := componentutil.GetObjectListByComponentName(reqCtx.Ctx, cli, task.Cluster, existStsList, task.Component.Name); err != nil {
 			return err
 		}
-		replicaCount := math.Max(float64(len(existStsList.Items)), float64(task.Component.Replicas))
 
+		// If the statefulSets already exists, the HA process is prioritized and buildReplicationSet is not required.
+		// TODO(xingran) After refactoring, HA switching will be handled in the replicationSet controller.
+		if len(existStsList.Items) > 0 {
+			primaryIndexChanged, _, err := replicationset.CheckPrimaryIndexChanged(reqCtx.Ctx, cli, task.Cluster, task.Component.Name, task.Component.PrimaryIndex)
+			if err != nil {
+				return err
+			}
+			if primaryIndexChanged {
+				return replicationset.HandleReplicationSetHASwitch(reqCtx.Ctx, cli, task.Cluster, componentutil.GetClusterComponentSpecByName(task.Cluster, task.Component.Name))
+			}
+		}
+
+		// get the maximum value of params.component.Replicas and the number of existing statefulsets under the current component,
+		//  then construct statefulsets for creating replicationSet or handling horizontal scaling of the replicationSet.
+		replicaCount := math.Max(float64(len(existStsList.Items)), float64(task.Component.Replicas))
 		for index := int32(0); index < int32(replicaCount); index++ {
 			if err := workloadProcessor(
 				func(envConfig *corev1.ConfigMap) (client.Object, error) {
@@ -172,16 +185,16 @@ func PrepareComponentResources(reqCtx intctrlutil.RequestCtx, cli client.Client,
 		task.AppendResource(pdb)
 	}
 
-	if task.Component.Service != nil && len(task.Component.Service.Ports) > 0 {
-		svc, err := builder.BuildSvc(task.GetBuilderParams(), false)
-		if err != nil {
-			return err
-		}
+	svcList, err := builder.BuildSvcList(task.GetBuilderParams())
+	if err != nil {
+		return err
+	}
+	for _, svc := range svcList {
 		if task.Component.WorkloadType == appsv1alpha1.Consensus {
 			addLeaderSelectorLabels(svc, task.Component)
 		}
 		if task.Component.WorkloadType == appsv1alpha1.Replication {
-			svc.Spec.Selector[intctrlutil.RoleLabelKey] = string(replicationset.Primary)
+			svc.Spec.Selector[constant.RoleLabelKey] = string(replicationset.Primary)
 		}
 		task.AppendResource(svc)
 	}
@@ -191,19 +204,16 @@ func PrepareComponentResources(reqCtx intctrlutil.RequestCtx, cli client.Client,
 
 // needBuildPDB check whether the PodDisruptionBudget needs to be built
 func needBuildPDB(task *intctrltypes.ReconcileTask) bool {
-	if task.Component.WorkloadType == appsv1alpha1.Consensus {
-		// if MinReplicas is non-zero, build pdb
-		// TODO: add ut
-		return task.Component.MaxUnavailable != nil
-	}
-	return intctrlutil.ExistsPDBSpec(task.Component.PodDisruptionBudgetSpec)
+	// TODO: add ut
+	comp := task.Component
+	return comp.WorkloadType == appsv1alpha1.Consensus && comp.MaxUnavailable != nil
 }
 
 // TODO multi roles with same accessMode support
 func addLeaderSelectorLabels(service *corev1.Service, component *component.SynthesizedComponent) {
 	leader := component.ConsensusSpec.Leader
 	if len(leader.Name) > 0 {
-		service.Spec.Selector[intctrlutil.RoleLabelKey] = leader.Name
+		service.Spec.Selector[constant.RoleLabelKey] = leader.Name
 	}
 }
 
@@ -229,15 +239,11 @@ func buildReplicationSet(reqCtx intctrlutil.RequestCtx,
 	if err != nil {
 		return nil, err
 	}
-	// inject replicationSet pod env and role label.
-	if sts, err = injectReplicationSetPodEnvAndLabel(task, sts, stsIndex); err != nil {
-		return nil, err
-	}
 	// sts.Name rename and add role label.
 	sts.ObjectMeta.Name = fmt.Sprintf("%s-%d", sts.ObjectMeta.Name, stsIndex)
-	sts.Labels[intctrlutil.RoleLabelKey] = string(replicationset.Secondary)
+	sts.Labels[constant.RoleLabelKey] = string(replicationset.Secondary)
 	if stsIndex == *task.Component.PrimaryIndex {
-		sts.Labels[intctrlutil.RoleLabelKey] = string(replicationset.Primary)
+		sts.Labels[constant.RoleLabelKey] = string(replicationset.Primary)
 	}
 	sts.Spec.UpdateStrategy.Type = appsv1.OnDeleteStatefulSetStrategyType
 	// build replicationSet persistentVolumeClaim manually
@@ -266,7 +272,8 @@ func buildReplicationSetPVC(task *intctrltypes.ReconcileTask, sts *appsv1.Statef
 	}
 	podVolumes := podSpec.Volumes
 	for _, pvc := range pvcMap {
-		podVolumes, _ = intctrlutil.CreateOrUpdateVolume(podVolumes, pvc.Name, func(volumeName string) corev1.Volume {
+		volumeName := strings.Split(pvc.Name, "-")[0]
+		podVolumes, _ = intctrlutil.CreateOrUpdateVolume(podVolumes, volumeName, func(volumeName string) corev1.Volume {
 			return corev1.Volume{
 				Name: volumeName,
 				VolumeSource: corev1.VolumeSource{
@@ -281,33 +288,12 @@ func buildReplicationSetPVC(task *intctrltypes.ReconcileTask, sts *appsv1.Statef
 	return nil
 }
 
-func injectReplicationSetPodEnvAndLabel(task *intctrltypes.ReconcileTask, sts *appsv1.StatefulSet, index int32) (*appsv1.StatefulSet, error) {
-	if task.Component.PrimaryIndex == nil {
-		return nil, fmt.Errorf("component %s PrimaryIndex can not be nil", task.Component.Name)
-	}
-	svcName := strings.Join([]string{task.Cluster.Name, task.Component.Name, "headless"}, "-")
-	for i := range sts.Spec.Template.Spec.Containers {
-		c := &sts.Spec.Template.Spec.Containers[i]
-		c.Env = append(c.Env, corev1.EnvVar{
-			Name:      constant.KBPrefix + "_PRIMARY_POD_NAME",
-			Value:     fmt.Sprintf("%s-%d-%d.%s", sts.Name, *task.Component.PrimaryIndex, 0, svcName),
-			ValueFrom: nil,
-		})
-	}
-	if index != *task.Component.PrimaryIndex {
-		sts.Spec.Template.Labels[intctrlutil.RoleLabelKey] = string(replicationset.Secondary)
-	} else {
-		sts.Spec.Template.Labels[intctrlutil.RoleLabelKey] = string(replicationset.Primary)
-	}
-	return sts, nil
-}
-
 // buildPersistentVolumeClaimLabels builds a pvc name label, and synchronize the labels on the sts to the pvc labels.
 func buildPersistentVolumeClaimLabels(sts *appsv1.StatefulSet, pvc *corev1.PersistentVolumeClaim) {
 	if pvc.Labels == nil {
 		pvc.Labels = make(map[string]string)
 	}
-	pvc.Labels[intctrlutil.VolumeClaimTemplateNameLabelKey] = pvc.Name
+	pvc.Labels[constant.VolumeClaimTemplateNameLabelKey] = pvc.Name
 	for k, v := range sts.Labels {
 		if _, ok := pvc.Labels[k]; !ok {
 			pvc.Labels[k] = v
@@ -354,6 +340,7 @@ func buildCfg(task *intctrltypes.ReconcileTask,
 		if err != nil {
 			return nil, err
 		}
+		updateCMConfigSelectorLabels(cm, tpl)
 
 		// The owner of the configmap object is a cluster of users,
 		// in order to manage the life cycle of configmap
@@ -371,11 +358,21 @@ func buildCfg(task *intctrltypes.ReconcileTask,
 		return nil, cfgcore.WrapError(err, "failed to generate pod volume")
 	}
 
-	if err := updateConfigurationManagerWithComponent(podSpec, tpls, ctx, cli); err != nil {
+	if err := updateConfigurationManagerWithComponent(podSpec, tpls, ctx, cli, task.GetBuilderParams()); err != nil {
 		return nil, cfgcore.WrapError(err, "failed to generate sidecar for configmap's reloader")
 	}
 
 	return configs, nil
+}
+
+func updateCMConfigSelectorLabels(cm *corev1.ConfigMap, tpl appsv1alpha1.ConfigTemplate) {
+	if len(tpl.Keys) == 0 {
+		return
+	}
+	if cm.Labels == nil {
+		cm.Labels = make(map[string]string)
+	}
+	cm.Labels[constant.CMConfigurationCMKeysLabelKey] = strings.Join(tpl.Keys, ",")
 }
 
 // generateConfigMapFromTpl render config file by config template provided by provider.
@@ -459,7 +456,7 @@ func updateStatefulLabelsWithTemplate(sts *appsv1.StatefulSet, allLabels map[str
 	// full configmap upgrade
 	existLabels := make(map[string]string)
 	for key, val := range sts.Labels {
-		if strings.HasPrefix(key, cfgcore.ConfigurationTplLabelPrefixKey) {
+		if strings.HasPrefix(key, constant.ConfigurationTplLabelPrefixKey) {
 			existLabels[key] = val
 		}
 	}
@@ -477,37 +474,29 @@ func updateStatefulLabelsWithTemplate(sts *appsv1.StatefulSet, allLabels map[str
 
 // updateConfigurationManagerWithComponent build the configmgr sidecar container and update it
 // into PodSpec if configuration reload option is on
-func updateConfigurationManagerWithComponent(
-	podSpec *corev1.PodSpec,
-	cfgTemplates []appsv1alpha1.ConfigTemplate,
-	ctx context.Context,
-	cli client.Client) error {
+func updateConfigurationManagerWithComponent(podSpec *corev1.PodSpec, cfgTemplates []appsv1alpha1.ConfigTemplate, ctx context.Context, cli client.Client, params builder.BuilderParams) error {
 	var (
-		volumeDirs     []corev1.VolumeMount
-		managerSidecar *cfgcm.ConfigManagerSidecar
-		err            error
+		err error
 
-		defaultVarRunVolumePath = "/var/run"
-		criEndpointVolumeName   = "cri-runtime-endpoint"
-		// criRuntimeEndpoint      = viper.GetString(cfgcore.CRIRuntimeEndpoint)
-		// criType                 = viper.GetString(cfgcore.ConfigCRIType)
+		volumeDirs          []corev1.VolumeMount
+		configManagerParams *cfgcm.ConfigManagerParams
 	)
 
 	if volumeDirs = getUsingVolumesByCfgTemplates(podSpec, cfgTemplates); len(volumeDirs) == 0 {
 		return nil
 	}
-	if managerSidecar, err = buildConfigManagerParams(cli, ctx, cfgTemplates, volumeDirs, defaultVarRunVolumePath, criEndpointVolumeName); err != nil {
+	if configManagerParams, err = buildConfigManagerParams(cli, ctx, cfgTemplates, volumeDirs, params); err != nil {
 		return err
 	}
-	if managerSidecar == nil {
+	if configManagerParams == nil {
 		return nil
 	}
 
-	container, err := builder.BuildCfgManagerContainer(managerSidecar)
+	container, err := builder.BuildCfgManagerContainer(configManagerParams)
 	if err != nil {
 		return err
 	}
-	updateCRIContainerVolume(podSpec, defaultVarRunVolumePath, criEndpointVolumeName)
+	updateTPLScriptVolume(podSpec, configManagerParams)
 
 	// Add sidecar to podTemplate
 	podSpec.Containers = append(podSpec.Containers, *container)
@@ -517,17 +506,16 @@ func updateConfigurationManagerWithComponent(
 	return nil
 }
 
-func updateCRIContainerVolume(podSpec *corev1.PodSpec, volumePath string, volumeName string) {
+func updateTPLScriptVolume(podSpec *corev1.PodSpec, configManager *cfgcm.ConfigManagerParams) {
+	scriptVolume := configManager.ScriptVolume
+	if scriptVolume == nil {
+		return
+	}
+
+	// Ignore useless configtemplate
 	podVolumes := podSpec.Volumes
-	podVolumes, _ = intctrlutil.CreateOrUpdateVolume(podVolumes, volumeName, func(volumeName string) corev1.Volume {
-		return corev1.Volume{
-			Name: volumeName,
-			VolumeSource: corev1.VolumeSource{
-				HostPath: &corev1.HostPathVolumeSource{
-					Path: volumePath,
-				},
-			},
-		}
+	podVolumes, _ = intctrlutil.CreateOrUpdateVolume(podVolumes, scriptVolume.Name, func(volumeName string) corev1.Volume {
+		return *scriptVolume
 	}, nil)
 	podSpec.Volumes = podVolumes
 }
@@ -569,31 +557,25 @@ func getUsingVolumesByCfgTemplates(podSpec *corev1.PodSpec, cfgTemplates []appsv
 	return volumeDirs
 }
 
-func buildConfigManagerParams(cli client.Client, ctx context.Context, cfgTemplates []appsv1alpha1.ConfigTemplate, volumeDirs []corev1.VolumeMount, volumePath string, volumeName string) (*cfgcm.ConfigManagerSidecar, error) {
-	var (
-		err               error
-		reloadOptions     *appsv1alpha1.ReloadOptions
-		configManagerArgs []string
-	)
+func buildConfigManagerParams(cli client.Client, ctx context.Context, cfgTemplates []appsv1alpha1.ConfigTemplate, volumeDirs []corev1.VolumeMount, params builder.BuilderParams) (*cfgcm.ConfigManagerParams, error) {
+	configManagerParams := &cfgcm.ConfigManagerParams{
+		ManagerName:   constant.ConfigSidecarName,
+		CharacterType: params.Component.CharacterType,
+		SecreteName:   component.GenerateConnCredential(params.Cluster.Name),
+		Image:         viper.GetString(constant.ConfigSidecarIMAGE),
+		Volumes:       volumeDirs,
+	}
 
+	var err error
+	var reloadOptions *appsv1alpha1.ReloadOptions
 	if reloadOptions, err = cfgutil.GetReloadOptions(cli, ctx, cfgTemplates); err != nil {
 		return nil, err
 	}
-	if reloadOptions == nil || reloadOptions.UnixSignalTrigger == nil {
+	if reloadOptions == nil {
 		return nil, nil
 	}
-
-	unixSignalOption := reloadOptions.UnixSignalTrigger
-	configManagerArgs = cfgcm.BuildSignalArgs(*unixSignalOption, volumeDirs)
-	configManager := &cfgcm.ConfigManagerSidecar{
-		ManagerName: cfgcore.ConfigSidecarName,
-		Image:       viper.GetString(cfgcore.ConfigSidecarIMAGE),
-		Args:        configManagerArgs,
-		// add cri sock path
-		Volumes: append(volumeDirs, corev1.VolumeMount{
-			Name:      volumeName,
-			MountPath: volumePath,
-		}),
+	if err = cfgcm.BuildConfigManagerContainerArgs(reloadOptions, volumeDirs, cli, ctx, configManagerParams); err != nil {
+		return nil, err
 	}
-	return configManager, nil
+	return configManagerParams, nil
 }

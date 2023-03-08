@@ -23,7 +23,6 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -121,7 +120,7 @@ var _ = Describe("list", func() {
 	})
 
 	It("list users", func() {
-		cmd := NewListUsersCmd(tf, streams)
+		cmd := NewListAccountsCmd(tf, streams)
 		Expect(cmd).ShouldNot(BeNil())
 
 		cmd.Run(cmd, []string{"test"})

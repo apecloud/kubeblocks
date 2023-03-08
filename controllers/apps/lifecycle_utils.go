@@ -18,16 +18,16 @@ package apps
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"reflect"
 	"strings"
 	"time"
 
-	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
-
-	"golang.org/x/exp/maps"
-
+	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	"github.com/pkg/errors"
+	"golang.org/x/exp/maps"
+	"golang.org/x/exp/slices"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -37,11 +37,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
-	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
-
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/replicationset"
+	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
 	"github.com/apecloud/kubeblocks/internal/controller/plan"
@@ -82,7 +81,10 @@ func reconcileClusterWorkloads(
 	clusterDef *appsv1alpha1.ClusterDefinition,
 	clusterVer *appsv1alpha1.ClusterVersion,
 	cluster *appsv1alpha1.Cluster) (shouldRequeue bool, err error) {
-
+	clusterBackupResourceMap, err := getClusterBackupSourceMap(cluster)
+	if err != nil {
+		return false, err
+	}
 	resourcesQueue := make([]client.Object, 0, 3)
 	task := intctrltypes.ReconcileTask{
 		Cluster:           cluster,
@@ -90,16 +92,27 @@ func reconcileClusterWorkloads(
 		ClusterVersion:    clusterVer,
 		Resources:         &resourcesQueue,
 	}
-	if err := prepareSecretObjs(reqCtx, cli, &task); err != nil {
-		return false, err
-	}
-
 	clusterCompSpecMap := cluster.GetDefNameMappingComponents()
 	clusterCompVerMap := clusterVer.GetDefNameMappingComponents()
+	process1stComp := true
 
-	prepareComp := func(component *component.SynthesizedComponent) error {
+	prepareComp := func(synthesizedComp *component.SynthesizedComponent) error {
 		iParams := task
-		iParams.Component = component
+		iParams.Component = synthesizedComp
+		if process1stComp && len(synthesizedComp.Services) > 0 {
+			if err := prepareConnCredential(reqCtx, cli, &iParams); err != nil {
+				return err
+			}
+			process1stComp = false
+		}
+
+		// build info that needs to be restored from backup
+		backupSourceName := clusterBackupResourceMap[synthesizedComp.Name]
+		if len(backupSourceName) > 0 {
+			if err := component.BuildRestoredInfo(reqCtx, cli, cluster.Namespace, synthesizedComp, backupSourceName); err != nil {
+				return err
+			}
+		}
 		return plan.PrepareComponentResources(reqCtx, cli, &iParams)
 	}
 
@@ -122,24 +135,24 @@ func checkedCreateObjs(reqCtx intctrlutil.RequestCtx, cli client.Client, task *i
 	return createOrReplaceResources(reqCtx, cli, task.Cluster, task.ClusterDefinition, *task.Resources)
 }
 
-func prepareSecretObjs(reqCtx intctrlutil.RequestCtx, cli client.Client, task *intctrltypes.ReconcileTask) error {
+func prepareConnCredential(reqCtx intctrlutil.RequestCtx, cli client.Client, task *intctrltypes.ReconcileTask) error {
 	secret, err := builder.BuildConnCredential(task.GetBuilderParams())
 	if err != nil {
 		return err
 	}
 	// must make sure secret resources are created before others
-	task.AppendResource(secret)
+	task.InsertResource(secret)
 	return nil
 }
 
 // mergeAnnotations keeps the original annotations.
 // if annotations exist and are replaced, the Deployment/StatefulSet will be updated.
 func mergeAnnotations(originalAnnotations, targetAnnotations map[string]string) map[string]string {
-	if restartAnnotation, ok := originalAnnotations[intctrlutil.RestartAnnotationKey]; ok {
+	if restartAnnotation, ok := originalAnnotations[constant.RestartAnnotationKey]; ok {
 		if targetAnnotations == nil {
 			targetAnnotations = map[string]string{}
 		}
-		targetAnnotations[intctrlutil.RestartAnnotationKey] = restartAnnotation
+		targetAnnotations[constant.RestartAnnotationKey] = restartAnnotation
 	}
 	return targetAnnotations
 }
@@ -184,7 +197,7 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 			Name:      stsObj.Name + "-scaling",
 		}
 		// find component of current statefulset
-		componentName := stsObj.Labels[intctrlutil.AppComponentLabelKey]
+		componentName := stsObj.Labels[constant.KBAppComponentLabelKey]
 		components := mergeComponentsList(reqCtx,
 			cluster,
 			clusterDef,
@@ -405,19 +418,19 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 
 	handleConfigMap := func(cm *corev1.ConfigMap) error {
 		switch {
-		case len(cm.Labels[intctrlutil.AppConfigTypeLabelKey]) > 0:
+		case len(cm.Labels[constant.AppConfigTypeLabelKey]) > 0:
 			// if configmap is env config, should update
 			if err := cli.Update(ctx, cm); err != nil {
 				return err
 			}
-		case len(cm.Labels[cfgcore.CMConfigurationProviderTplLabelKey]) > 0:
+		case len(cm.Labels[constant.CMConfigurationProviderTplLabelKey]) > 0:
 			// if tls settings updated, do Update
 			// FIXME: very hacky way. should allow config to be updated
 			oldCm := &corev1.ConfigMap{}
 			if err := cli.Get(ctx, client.ObjectKeyFromObject(cm), oldCm); err != nil {
 				return err
 			}
-			compName := cm.Labels[intctrlutil.AppComponentLabelKey]
+			compName := cm.Labels[constant.KBAppComponentLabelKey]
 			clusterDefComp := component.GetClusterDefCompByName(*clusterDef, *cluster, compName)
 			if clusterDefComp == nil {
 				return errors.New("clusterDefComp not found")
@@ -449,7 +462,7 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 		}
 		if !reflect.DeepEqual(&deployObjCopy.Spec, &deployObj.Spec) {
 			// sync component phase
-			componentName := deployObj.Labels[intctrlutil.AppComponentLabelKey]
+			componentName := deployObj.Labels[constant.KBAppComponentLabelKey]
 			syncComponentPhaseWhenSpecUpdating(cluster, componentName)
 		}
 		return nil
@@ -472,6 +485,54 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 		return nil
 	}
 
+	handlePVC := func(pvcProto *corev1.PersistentVolumeClaim) error {
+		key := client.ObjectKey{
+			Namespace: pvcProto.GetNamespace(),
+			Name:      pvcProto.GetName(),
+		}
+		pvcObj := &corev1.PersistentVolumeClaim{}
+		if err := cli.Get(ctx, key, pvcObj); err != nil {
+			return err
+		}
+		if pvcObj.Spec.Resources.Requests[corev1.ResourceStorage] == pvcProto.Spec.Resources.Requests[corev1.ResourceStorage] {
+			return nil
+		}
+		patch := client.MergeFrom(pvcObj.DeepCopy())
+		pvcObj.Spec.Resources.Requests[corev1.ResourceStorage] = pvcProto.Spec.Resources.Requests[corev1.ResourceStorage]
+		if err := cli.Patch(ctx, pvcObj, patch); err != nil {
+			return err
+		}
+		return nil
+	}
+
+	cleanUselessServices := func(expSvcList []*corev1.Service) error {
+		var (
+			allSvcList = corev1.ServiceList{}
+			ml         = getServiceMatchingLabels(cluster.Name, "")
+		)
+		if err = cli.List(reqCtx.Ctx, &allSvcList, ml); err != nil {
+			return err
+		}
+
+		for _, svc := range allSvcList.Items {
+			idx := slices.IndexFunc(expSvcList, func(service *corev1.Service) bool {
+				return client.ObjectKeyFromObject(service) == client.ObjectKeyFromObject(&svc)
+			})
+			if idx >= 0 {
+				continue
+			}
+			patch := client.MergeFrom(svc.DeepCopy())
+			controllerutil.RemoveFinalizer(&svc, dbClusterFinalizerName)
+			if err = cli.Patch(reqCtx.Ctx, &svc, patch); err != nil {
+				return client.IgnoreNotFound(err)
+			}
+			if err = cli.Delete(reqCtx.Ctx, &svc); err != nil {
+				return client.IgnoreNotFound(err)
+			}
+		}
+		return nil
+	}
+
 	// why create tls certs here? or why not use prepare-checkedCreate pattern?
 	// tls certs generation is very time-consuming, if using prepare-checkedCreate pattern,
 	// we shall generate certs in every component Update which will slow down the cluster reconcile loop
@@ -479,30 +540,20 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 		return false, err
 	}
 
-	var stsList []*appsv1.StatefulSet
+	objsByKind := make(map[string][]client.Object)
 	for _, obj := range objs {
-		logger.Info("create or update", "objs", obj)
+		logger.V(1).Info("create or update", "objs", obj)
 		if err := intctrlutil.SetOwnership(cluster, obj, scheme, dbClusterFinalizerName); err != nil {
 			return false, err
 		}
-		// appendToStsList is used to handle statefulSets horizontal scaling when workloadType is replication
-		appendToStsList := func(stsList []*appsv1.StatefulSet) []*appsv1.StatefulSet {
-			stsObj, ok := obj.(*appsv1.StatefulSet)
-			if ok {
-				stsList = append(stsList, stsObj)
-			}
-			return stsList
-		}
 
-		err := cli.Create(ctx, obj)
-		if err == nil {
-			stsList = appendToStsList(stsList)
+		kind := obj.GetObjectKind().GroupVersionKind().Kind
+		objsByKind[kind] = append(objsByKind[kind], obj)
+
+		if err := cli.Create(ctx, obj); err == nil {
 			continue
-		}
-		if !apierrors.IsAlreadyExists(err) {
+		} else if !apierrors.IsAlreadyExists(err) {
 			return false, err
-		} else {
-			stsList = appendToStsList(stsList)
 		}
 
 		// Secret kind objects should only be applied once
@@ -547,8 +598,29 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 			}
 			continue
 		}
+		// do volume expansion when workload type is `replication`
+		pvcProto, ok := obj.(*corev1.PersistentVolumeClaim)
+		if ok {
+			if err := handlePVC(pvcProto); err != nil {
+				return false, err
+			}
+			continue
+		}
 	}
 
+	var svcList []*corev1.Service
+	for _, obj := range objsByKind[constant.ServiceKind] {
+		svcList = append(svcList, obj.(*corev1.Service))
+	}
+	if err := cleanUselessServices(svcList); err != nil {
+		return false, err
+	}
+
+	// stsList is used to handle statefulSets horizontal scaling when workloadType is replication
+	var stsList []*appsv1.StatefulSet
+	for _, obj := range objsByKind[constant.StatefulSetKind] {
+		stsList = append(stsList, obj.(*appsv1.StatefulSet))
+	}
 	if err := replicationset.HandleReplicationSet(reqCtx.Ctx, cli, cluster, stsList); err != nil {
 		return false, err
 	}
@@ -568,7 +640,7 @@ func createBackup(reqCtx intctrlutil.RequestCtx,
 	createBackupPolicy := func() (backupPolicyName string, err error) {
 		backupPolicyName = ""
 		backupPolicyList := dataprotectionv1alpha1.BackupPolicyList{}
-		ml := getBackupMatchingLabels(cluster.Name, sts.Labels[intctrlutil.AppComponentLabelKey])
+		ml := getBackupMatchingLabels(cluster.Name, sts.Labels[constant.KBAppComponentLabelKey])
 		if err = cli.List(ctx, &backupPolicyList, ml); err != nil {
 			return
 		}
@@ -599,11 +671,18 @@ func createBackup(reqCtx intctrlutil.RequestCtx,
 
 	createBackup := func(backupPolicyName string) error {
 		backupList := dataprotectionv1alpha1.BackupList{}
-		ml := getBackupMatchingLabels(cluster.Name, sts.Labels[intctrlutil.AppComponentLabelKey])
+		ml := getBackupMatchingLabels(cluster.Name, sts.Labels[constant.KBAppComponentLabelKey])
 		if err := cli.List(ctx, &backupList, ml); err != nil {
 			return err
 		}
 		if len(backupList.Items) > 0 {
+			// check backup status, if failed return error
+			if backupList.Items[0].Status.Phase == dataprotectionv1alpha1.BackupFailed {
+				reqCtx.Recorder.Eventf(cluster, corev1.EventTypeWarning,
+					"HorizontalScaleFailed", "backup %s status failed", backupKey.Name)
+				return errors.Errorf("cluster %s h-scale failed, backup error: %s",
+					cluster.Name, backupList.Items[0].Status.FailureReason)
+			}
 			return nil
 		}
 		backup, err := builder.BuildBackup(sts, backupPolicyName, backupKey)
@@ -672,7 +751,7 @@ func deleteBackup(ctx context.Context, cli client.Client, clusterName string, co
 
 func createPVCFromSnapshot(ctx context.Context,
 	cli client.Client,
-	vct corev1.PersistentVolumeClaim,
+	vct corev1.PersistentVolumeClaimTemplate,
 	sts *appsv1.StatefulSet,
 	pvcKey types.NamespacedName,
 	snapshotName string) error {
@@ -734,6 +813,7 @@ func doSnapshot(cli client.Client,
 	cluster *appsv1alpha1.Cluster,
 	snapshotKey types.NamespacedName,
 	stsObj *appsv1.StatefulSet,
+	vcts []corev1.PersistentVolumeClaimTemplate,
 	backupTemplateSelector map[string]string) error {
 
 	ctx := reqCtx.Ctx
@@ -753,7 +833,7 @@ func doSnapshot(cli client.Client,
 		}
 	} else {
 		// no backuppolicytemplate, then try native volumesnapshot
-		pvcName := strings.Join([]string{stsObj.Spec.VolumeClaimTemplates[0].Name, stsObj.Name, "0"}, "-")
+		pvcName := strings.Join([]string{vcts[0].Name, stsObj.Name, "0"}, "-")
 		snapshot, err := builder.BuildVolumeSnapshot(snapshotKey, pvcName, stsObj)
 		if err != nil {
 			return err
@@ -775,7 +855,7 @@ func checkedCreatePVCFromSnapshot(cli client.Client,
 	pvcKey types.NamespacedName,
 	cluster *appsv1alpha1.Cluster,
 	componentName string,
-	vct corev1.PersistentVolumeClaim,
+	vct corev1.PersistentVolumeClaimTemplate,
 	stsObj *appsv1.StatefulSet) error {
 	pvc := corev1.PersistentVolumeClaim{}
 	// check pvc existence
@@ -909,11 +989,20 @@ func doBackup(reqCtx intctrlutil.RequestCtx,
 			"scale with backup tool not support yet")
 	// use volume snapshot
 	case appsv1alpha1.HScaleDataClonePolicyFromSnapshot:
-		if !isSnapshotAvailable(cli, ctx) || len(stsObj.Spec.VolumeClaimTemplates) == 0 {
+		if !isSnapshotAvailable(cli, ctx) {
 			reqCtx.Recorder.Eventf(cluster,
 				corev1.EventTypeWarning,
 				"HorizontalScaleFailed",
 				"volume snapshot not support")
+			// TODO: add ut
+			return false, errors.Errorf("volume snapshot not support")
+		}
+		vcts := component.VolumeClaimTemplates
+		if len(vcts) == 0 {
+			reqCtx.Recorder.Eventf(cluster,
+				corev1.EventTypeNormal,
+				"HorizontalScale",
+				"no VolumeClaimTemplates, no need to do data clone.")
 			break
 		}
 		vsExists, err := isVolumeSnapshotExists(cli, ctx, cluster, component)
@@ -927,6 +1016,7 @@ func doBackup(reqCtx intctrlutil.RequestCtx,
 				cluster,
 				snapshotKey,
 				stsObj,
+				vcts,
 				component.HorizontalScalePolicy.BackupTemplateSelector); err != nil {
 				return shouldRequeue, err
 			}
@@ -946,8 +1036,8 @@ func doBackup(reqCtx intctrlutil.RequestCtx,
 		// if volumesnapshot ready,
 		// create pvc from snapshot for every new pod
 		for i := *stsObj.Spec.Replicas; i < *stsProto.Spec.Replicas; i++ {
-			vct := stsObj.Spec.VolumeClaimTemplates[0]
-			for _, tmpVct := range stsObj.Spec.VolumeClaimTemplates {
+			vct := vcts[0]
+			for _, tmpVct := range vcts {
 				if tmpVct.Name == component.HorizontalScalePolicy.VolumeMountsName {
 					vct = tmpVct
 					break
@@ -995,11 +1085,22 @@ func isPVCExists(cli client.Client,
 	return true, nil
 }
 
+func getServiceMatchingLabels(clusterName string, componentName string) client.MatchingLabels {
+	result := map[string]string{
+		constant.AppInstanceLabelKey:  clusterName,
+		constant.AppManagedByLabelKey: constant.AppName,
+	}
+	if componentName != "" {
+		result[constant.KBAppComponentLabelKey] = componentName
+	}
+	return result
+}
+
 func getBackupMatchingLabels(clusterName string, componentName string) client.MatchingLabels {
 	return client.MatchingLabels{
-		intctrlutil.AppInstanceLabelKey:  clusterName,
-		intctrlutil.AppComponentLabelKey: componentName,
-		intctrlutil.AppCreatedByLabelKey: intctrlutil.AppName,
+		constant.AppInstanceLabelKey:    clusterName,
+		constant.KBAppComponentLabelKey: componentName,
+		constant.AppManagedByLabelKey:   constant.AppName,
 	}
 }
 
@@ -1014,4 +1115,15 @@ func deleteObjectOrphan(cli client.Client, ctx context.Context, obj client.Objec
 		return err
 	}
 	return nil
+}
+
+// getClusterBackupSourceMap gets the backup source map from cluster.annotations
+func getClusterBackupSourceMap(cluster *appsv1alpha1.Cluster) (map[string]string, error) {
+	compBackupMapString := cluster.Annotations[constant.RestoreFromBackUpAnnotationKey]
+	if len(compBackupMapString) == 0 {
+		return nil, nil
+	}
+	compBackupMap := map[string]string{}
+	err := json.Unmarshal([]byte(compBackupMapString), &compBackupMap)
+	return compBackupMap, err
 }

@@ -33,7 +33,8 @@ func NewKubeBlocksCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *c
 		newInstallCmd(f, streams),
 		newUpgradeCmd(f, streams),
 		newUninstallCmd(f, streams),
-		newListVersionsCmd(f, streams),
+		newListVersionsCmd(streams),
+		newStatusCmd(f, streams),
 	)
 	return cmd
 }

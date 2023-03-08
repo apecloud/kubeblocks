@@ -22,7 +22,6 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
@@ -36,12 +35,14 @@ import (
 
 var _ = Describe("Expose", func() {
 	const (
-		namespace = "test"
-		pending   = "pending"
-		running   = "running"
-		failed    = "failed"
-		succeed   = "succeed"
-		all       = "all"
+		namespace         = "test"
+		pending           = "pending"
+		running           = "running"
+		failed            = "failed"
+		succeed           = "succeed"
+		all               = "all"
+		statelessCompName = "stateless"
+		statefulCompName  = "stateful"
 	)
 
 	var (
@@ -59,7 +60,7 @@ var _ = Describe("Expose", func() {
 	})
 
 	generateOpsObject := func(opsType appsv1alpha1.OpsType, phase appsv1alpha1.Phase) *appsv1alpha1.OpsRequest {
-		return &appsv1alpha1.OpsRequest{
+		ops := &appsv1alpha1.OpsRequest{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "list-ops-" + clitesting.GetRandomStr(),
 				Namespace: namespace,
@@ -72,6 +73,11 @@ var _ = Describe("Expose", func() {
 				Phase: phase,
 			},
 		}
+		ops.Status.Components = map[string]appsv1alpha1.OpsRequestComponentStatus{
+			statelessCompName: {},
+			statefulCompName:  {},
+		}
+		return ops
 	}
 
 	initOpsRequests := func() {
@@ -120,7 +126,7 @@ var _ = Describe("Expose", func() {
 		cmd := NewListOpsCmd(tf, streams)
 		Expect(cmd).ShouldNot(BeNil())
 
-		By("init opsrequests for testing")
+		By("init opsRequests for testing")
 		initOpsRequests()
 
 		By("test status flag with default values")
@@ -156,6 +162,11 @@ var _ = Describe("Expose", func() {
 		Expect(o.printOpsList()).Should(Succeed())
 		// title + filter ops
 		Expect(getStdoutLinesCount(o.Out)).Should(Equal(5))
+
+		By("test component for upgrade ops")
+		o = initOpsOption([]string{all}, []string{string(appsv1alpha1.UpgradeType)})
+		Expect(o.printOpsList()).Should(Succeed())
+		Expect(o.Out).Should(ContainSubstring(statefulCompName + "," + statelessCompName))
 	})
 
 })

@@ -19,23 +19,94 @@ package controllerutil
 import (
 	"encoding/json"
 	"strings"
+	"testing"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"k8s.io/apimachinery/pkg/api/resource"
-
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	metautil "k8s.io/apimachinery/pkg/util/intstr"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/constant"
+	testk8s "github.com/apecloud/kubeblocks/internal/testutil/k8s"
 )
 
 type TestResourceUnit struct {
 	container        corev1.Container
 	expectMemorySize int64
 	expectCPU        int
+}
+
+func TestPodIsReady(t *testing.T) {
+	set := testk8s.NewFakeStatefulSet("foo", 3)
+	pod := testk8s.NewFakeStatefulSetPod(set, 1)
+	pod.Status.Conditions = []corev1.PodCondition{
+		{
+			Type:   corev1.PodReady,
+			Status: corev1.ConditionTrue,
+		},
+	}
+	pod.Labels = map[string]string{constant.RoleLabelKey: "leader"}
+	if !PodIsReadyWithLabel(*pod) {
+		t.Errorf("isReady returned false negative")
+	}
+
+	pod.DeletionTimestamp = &metav1.Time{Time: time.Now()}
+	if PodIsReadyWithLabel(*pod) {
+		t.Errorf("isReady returned false positive")
+	}
+
+	pod.Labels = nil
+	if PodIsReadyWithLabel(*pod) {
+		t.Errorf("isReady returned false positive")
+	}
+
+	pod.Status.Conditions = nil
+	if PodIsReadyWithLabel(*pod) {
+		t.Errorf("isReady returned false positive")
+	}
+
+	pod.Status.Conditions = []corev1.PodCondition{}
+	if PodIsReadyWithLabel(*pod) {
+		t.Errorf("isReady returned false positive")
+	}
+}
+
+func TestPodIsControlledByLatestRevision(t *testing.T) {
+	set := testk8s.NewFakeStatefulSet("foo", 3)
+	pod := testk8s.NewFakeStatefulSetPod(set, 1)
+	pod.Labels = map[string]string{
+		appsv1.ControllerRevisionHashLabelKey: "test",
+	}
+	set.Generation = 1
+	set.Status.UpdateRevision = "test"
+	if PodIsControlledByLatestRevision(pod, set) {
+		t.Errorf("PodIsControlledByLatestRevision returned false positive")
+	}
+	set.Status.ObservedGeneration = 1
+	if !PodIsControlledByLatestRevision(pod, set) {
+		t.Errorf("PodIsControlledByLatestRevision returned false positive")
+	}
+}
+
+func TestGetPodRevision(t *testing.T) {
+	set := testk8s.NewFakeStatefulSet("foo", 3)
+	pod := testk8s.NewFakeStatefulSetPod(set, 1)
+	if GetPodRevision(pod) != "" {
+		t.Errorf("revision should be empty")
+	}
+
+	pod.Labels = make(map[string]string, 0)
+	pod.Labels[appsv1.StatefulSetRevisionLabel] = "bar"
+
+	if GetPodRevision(pod) != "bar" {
+		t.Errorf("revision not matched")
+	}
 }
 
 var _ = Describe("tpl template", func() {

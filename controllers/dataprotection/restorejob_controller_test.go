@@ -28,7 +28,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/generics"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 )
 
@@ -111,7 +111,7 @@ var _ = Describe("RestoreJob Controller", func() {
 	assureStatefulSetObj := func() *appsv1.StatefulSet {
 		By("By assure an stateful obj")
 		return testapps.NewStatefulSetFactory(testCtx.DefaultNamespace, "mycluster", "mycluster", "replicasets").
-			AddLabels(intctrlutil.AppInstanceLabelKey, "mycluster").
+			AddAppInstanceLabel("mycluster").
 			AddContainer(corev1.Container{Name: "mysql", Image: testapps.ApeCloudMySQLImage}).
 			AddVolumeClaimTemplate(corev1.PersistentVolumeClaim{
 				ObjectMeta: metav1.ObjectMeta{Name: testapps.DataVolumeName},

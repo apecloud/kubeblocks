@@ -1,6 +1,5 @@
 /*
 Copyright ApeCloud, Inc.
-Copyright 2021 The Dapr Authors
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -205,7 +204,7 @@ func TestGetRole(t *testing.T) {
 		database: mt.Client.Database(adminDatabase),
 		logger:   logger.NewLogger("mongodb-test"),
 	}
-	role, err := m.GetRole(context.Background(), "")
+	role, err := m.GetRole(context.Background(), &bindings.InvokeRequest{}, &bindings.InvokeResponse{})
 	if err != nil {
 		t.Errorf("getRole error: %s", err)
 	}

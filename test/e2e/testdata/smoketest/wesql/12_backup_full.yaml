@@ -1,0 +1,11 @@
+apiVersion: dataprotection.kubeblocks.io/v1alpha1
+kind: Backup
+metadata:
+  labels:
+    app.kubernetes.io/instance: mycluster
+    dataprotection.kubeblocks.io/backup-type: full
+  name: backup-full-mycluster
+spec:
+  backupPolicyName: backup-policy-mycluster-full
+  backupType: full
+  ttl: 168h0m0s

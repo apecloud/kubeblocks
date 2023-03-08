@@ -36,13 +36,13 @@ import (
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/constant"
 )
 
 type reconfigureOptions struct {
@@ -238,7 +238,7 @@ func (r *reconfigureOptions) printDescribeReconfigure() error {
 		r.printConfigureContext(configs)
 	}
 	printer.PrintComponentConfigMeta(configs, r.clusterName, r.componentName, r.Out)
-	return r.printConfigureHistory(configs)
+	return r.printConfigureHistory()
 }
 
 func (r *reconfigureOptions) printAllExplainConfigure() error {
@@ -284,47 +284,51 @@ func (r *reconfigureOptions) printExplainConfigure(tplName string) error {
 	return r.printConfigConstraint(schema.Schema, set.NewLinkedHashSetString(confSpec.StaticParameters...), set.NewLinkedHashSetString(confSpec.DynamicParameters...))
 }
 
-func (r *reconfigureOptions) getReconfigureMeta() (map[appsv1alpha1.ConfigTemplate]*corev1.ConfigMap, error) {
-	configs := make(map[appsv1alpha1.ConfigTemplate]*corev1.ConfigMap)
+func (r *reconfigureOptions) getReconfigureMeta() ([]types.ConfigTemplateInfo, error) {
+	configs := make([]types.ConfigTemplateInfo, 0)
 	for _, tplName := range r.templateNames {
 		// checked by validate
 		tpl, _ := r.findTemplateByName(tplName)
 		// fetch config configmap
 		cmObj := &corev1.ConfigMap{}
 		cmName := cfgcore.GetComponentCfgName(r.clusterName, r.componentName, tpl.VolumeName)
-		if err := util.GetResourceObjectFromGVR(types.CMGVR(), client.ObjectKey{
+		if err := util.GetResourceObjectFromGVR(types.ConfigmapGVR(), client.ObjectKey{
 			Name:      cmName,
 			Namespace: r.namespace,
 		}, r.dynamic, cmObj); err != nil {
 			return nil, cfgcore.WrapError(err, "template config instance is not exist, template name: %s, cfg name: %s", tplName, cmName)
 		}
-		configs[*tpl] = cmObj
+		configs = append(configs, types.ConfigTemplateInfo{
+			Name:  tplName,
+			TPL:   *tpl,
+			CMObj: cmObj,
+		})
 	}
 	return configs, nil
 }
 
-func (r *reconfigureOptions) printConfigureContext(configs map[appsv1alpha1.ConfigTemplate]*corev1.ConfigMap) {
+func (r *reconfigureOptions) printConfigureContext(configs []types.ConfigTemplateInfo) {
 	printer.PrintTitle("Configures Context[${component-name}/${template-name}/${file-name}]")
 
 	keys := set.NewLinkedHashSetString(r.keys...)
-	for tpl, cm := range configs {
-		for key, context := range cm.Data {
+	for _, info := range configs {
+		for key, context := range info.CMObj.Data {
 			if keys.Length() != 0 && !keys.InArray(key) {
 				continue
 			}
 			fmt.Fprintf(r.Out, "%s%s\n",
-				printer.BoldYellow(fmt.Sprintf("%s/%s/%s:\n", r.componentName, tpl.Name, key)), context)
+				printer.BoldYellow(fmt.Sprintf("%s/%s/%s:\n", r.componentName, info.Name, key)), context)
 		}
 	}
 }
 
-func (r *reconfigureOptions) printConfigureHistory(configs map[appsv1alpha1.ConfigTemplate]*corev1.ConfigMap) error {
+func (r *reconfigureOptions) printConfigureHistory() error {
 	printer.PrintTitle("History modifications")
 
 	// filter reconfigure
 	// kubernetes not support fieldSelector with CRD: https://github.com/kubernetes/kubernetes/issues/51046
 	listOptions := metav1.ListOptions{
-		LabelSelector: strings.Join([]string{types.InstanceLabelKey, r.clusterName}, "="),
+		LabelSelector: strings.Join([]string{intctrlutil.AppInstanceLabelKey, r.clusterName}, "="),
 	}
 
 	opsList, err := r.dynamic.Resource(types.OpsGVR()).Namespace(r.namespace).List(context.TODO(), listOptions)
@@ -343,7 +347,7 @@ func (r *reconfigureOptions) printConfigureHistory(configs map[appsv1alpha1.Conf
 		if ops.Spec.Type != appsv1alpha1.ReconfiguringType {
 			continue
 		}
-		components := getComponentNameFromOps(ops.Spec)
+		components := getComponentNameFromOps(ops)
 		if !strings.Contains(components, r.componentName) {
 			continue
 		}
@@ -576,7 +580,7 @@ func (o *opsRequestDiffOptions) maybeCompareOps(base *appsv1alpha1.OpsRequest, d
 		if len(labels) == 0 {
 			return ""
 		}
-		return labels[types.InstanceLabelKey]
+		return labels[intctrlutil.AppInstanceLabelKey]
 	}
 	getComponentName := func(ops appsv1alpha1.OpsRequestSpec) string {
 		return ops.Reconfigure.ComponentName
@@ -630,22 +634,10 @@ func (o *opsRequestDiffOptions) diffConfig(tplName string) ([]cfgcore.Visualized
 	}
 
 	formatCfg := configConstraint.Spec.FormatterConfig
-	patchOption := cfgcore.CfgOption{
-		Type:    cfgcore.CfgTplType,
-		CfgType: formatCfg.Format,
-		Log:     log.FromContext(context.TODO()),
-	}
 
 	base := findTemplateStatusByName(o.baseVersion.Status.ReconfiguringStatus, tplName)
 	diff := findTemplateStatusByName(o.diffVersion.Status.ReconfiguringStatus, tplName)
-
-	patch, err := cfgcore.CreateMergePatch(&cfgcore.K8sConfig{
-		CfgKey:         client.ObjectKeyFromObject(o.baseVersion),
-		Configurations: base.LastAppliedConfiguration,
-	}, &cfgcore.K8sConfig{
-		CfgKey:         client.ObjectKeyFromObject(o.diffVersion),
-		Configurations: diff.LastAppliedConfiguration,
-	}, patchOption)
+	patch, _, err := cfgcore.CreateConfigurePatch(base.LastAppliedConfiguration, diff.LastAppliedConfiguration, formatCfg.Format, tpl.Keys, false)
 	if err != nil {
 		return nil, err
 	}
@@ -660,7 +652,7 @@ func printSingleParameterTemplate(pt *parameterTemplate) {
 	printer.PrintPairStringToLine("Range", pt.rangeFormatter())
 	printer.PrintPairStringToLine("Enum", pt.enumFormatter(-1))
 	printer.PrintPairStringToLine("Scope", pt.scope)
-	printer.PrintPairStringToLine("ComponentDefRef", pt.valueType)
+	printer.PrintPairStringToLine("Type", pt.valueType)
 	printer.PrintPairStringToLine("Description", pt.description)
 }
 

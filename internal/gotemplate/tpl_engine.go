@@ -40,6 +40,10 @@ const (
 	buildInSystemCallName   = "call"
 )
 
+const (
+	goTemplateExtendBuildInRegexSubString = "regexStringSubmatch"
+)
+
 type TplValues map[string]interface{}
 type BuiltInObjectsFunc map[string]interface{}
 
@@ -64,13 +68,14 @@ type TplEngine struct {
 }
 
 func (t *TplEngine) Render(context string) (string, error) {
-
 	var buf strings.Builder
-	tpl := template.Must(t.tpl.Parse(context))
+	tpl, err := t.tpl.Parse(context)
+	if err != nil {
+		return "", err
+	}
 	if err := tpl.Execute(&buf, t.tplValues); err != nil {
 		return "", err
 	}
-
 	return buf.String(), nil
 }
 
@@ -137,7 +142,7 @@ func (t *TplEngine) initSystemFunMap(funcs template.FuncMap) {
 			return "", cfgcore.MakeError("not exist func: %s", funcName)
 		}
 
-		values := constructFunctionArgList(args...)
+		values := ConstructFunctionArgList(args...)
 		engine := NewTplEngine(&values, nil, types.NamespacedName{
 			Name:      fn.name,
 			Namespace: fn.namespace,
@@ -148,6 +153,9 @@ func (t *TplEngine) initSystemFunMap(funcs template.FuncMap) {
 		})
 		return engine.Render(fn.tpl)
 	}
+
+	// Wrap regex.FindStringSubmatch
+	funcs[goTemplateExtendBuildInRegexSubString] = regexStringSubmatch
 
 	t.tpl.Option(DefaultTemplateOps)
 	t.tpl.Funcs(funcs)

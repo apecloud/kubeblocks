@@ -97,8 +97,12 @@ var _ = Describe("clusterDefinition webhook", func() {
 			By("By creating a new clusterDefinition")
 			clusterDef, _ := createTestClusterDefinitionObj3(clusterDefinitionName3)
 			cmdExecConfig := &CmdExecutorConfig{
-				Image:   "mysql-8.0.30",
-				Command: []string{"mysql", "-e", "$(KB_ACCOUNT_STATEMENT)"},
+				CommandExecutorEnvItem: CommandExecutorEnvItem{
+					Image: "mysql-8.0.30",
+				},
+				CommandExecutorItem: CommandExecutorItem{
+					Command: []string{"mysql", "-e", "$(KB_ACCOUNT_STATEMENT)"},
+				},
 			}
 			By("By creating a new clusterDefinition with duplicated accounts")
 			mockAccounts := []SystemAccountConfig{
@@ -403,7 +407,7 @@ metadata:
   name: %s
 spec:
   componentDefs:
-    - name: replication
+    - name: redis
       maxUnavailable: 1
       workloadType: Replication
 `, name)

@@ -36,6 +36,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/constant"
 )
 
 var (
@@ -169,7 +170,7 @@ func (o *ListLogsOptions) gatherLogFilesData(c *appsv1alpha1.Cluster, cd *appsv1
 		if len(o.instName) > 0 && !strings.EqualFold(p.Name, o.instName) {
 			continue
 		}
-		componentName, ok := p.Labels[types.ComponentLabelKey]
+		componentName, ok := p.Labels[intctrlutil.KBAppComponentLabelKey]
 		if !ok || (len(o.componentName) > 0 && !strings.EqualFold(o.componentName, componentName)) {
 			continue
 		}

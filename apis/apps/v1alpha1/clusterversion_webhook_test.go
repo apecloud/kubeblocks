@@ -142,7 +142,7 @@ func createTestReplicationSetClusterVersionObj(clusterDefinitionName, clusterVer
 			ClusterDefinitionRef: clusterDefinitionName,
 			ComponentVersions: []ClusterComponentVersion{
 				{
-					ComponentDefRef: "replication",
+					ComponentDefRef: "redis",
 					VersionsCtx: VersionsContext{
 						Containers: []corev1.Container{
 							{Name: "main"},

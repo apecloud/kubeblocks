@@ -31,6 +31,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/constant"
 )
 
 // GetSimpleInstanceInfos return simple instance info that only contains instance name and role, the default
@@ -107,7 +108,7 @@ func GetSimpleInstanceInfos(dynamic dynamic.Interface, name string, namespace st
 func GetClusterTypeByPod(pod *corev1.Pod) (string, error) {
 	var clusterType string
 
-	if name, ok := pod.Labels[types.NameLabelKey]; ok {
+	if name, ok := pod.Labels[intctrlutil.AppNameLabelKey]; ok {
 		clusterType = strings.Split(name, "-")[0]
 	}
 
@@ -160,7 +161,7 @@ func GetComponentEndpoints(svcList *corev1.ServiceList, c *appsv1alpha1.ClusterC
 	}
 
 	for _, svc := range externalSvcs {
-		externalEndpoints = append(externalEndpoints, getEndpoints(GetExternalIP(svc), svc.Spec.Ports)...)
+		externalEndpoints = append(externalEndpoints, getEndpoints(GetExternalAddr(svc), svc.Spec.Ports)...)
 	}
 	return internalEndpoints, externalEndpoints
 }
@@ -173,26 +174,35 @@ func GetComponentServices(svcList *corev1.ServiceList, c *appsv1alpha1.ClusterCo
 
 	var internalSvcs, externalSvcs []*corev1.Service
 	for i, svc := range svcList.Items {
-		if svc.GetLabels()[types.ComponentLabelKey] != c.Name {
+		if svc.GetLabels()[intctrlutil.KBAppComponentLabelKey] != c.Name {
 			continue
 		}
 
 		var (
-			internalIP = svc.Spec.ClusterIP
-			externalIP = GetExternalIP(&svc)
+			internalIP   = svc.Spec.ClusterIP
+			externalAddr = GetExternalAddr(&svc)
 		)
 		if internalIP != "" && internalIP != "None" {
 			internalSvcs = append(internalSvcs, &svcList.Items[i])
 		}
-		if externalIP != "" && externalIP != "None" {
+		if externalAddr != "" {
 			externalSvcs = append(externalSvcs, &svcList.Items[i])
 		}
 	}
 	return internalSvcs, externalSvcs
 }
 
-// GetExternalIP get external IP from service annotation
-func GetExternalIP(svc *corev1.Service) string {
+// GetExternalAddr get external IP from service annotation
+func GetExternalAddr(svc *corev1.Service) string {
+	for _, ingress := range svc.Status.LoadBalancer.Ingress {
+		if ingress.Hostname != "" {
+			return ingress.Hostname
+		}
+
+		if ingress.IP != "" {
+			return ingress.IP
+		}
+	}
 	if svc.GetAnnotations()[types.ServiceLBTypeAnnotationKey] != types.ServiceLBTypeAnnotationValue {
 		return ""
 	}
@@ -236,7 +246,7 @@ func GetVersionByClusterDef(dynamic dynamic.Interface, clusterDef string) (*apps
 	versionList := &appsv1alpha1.ClusterVersionList{}
 	objList, err := dynamic.Resource(types.ClusterVersionGVR()).Namespace("").
 		List(context.TODO(), metav1.ListOptions{
-			LabelSelector: fmt.Sprintf("%s=%s", types.ClusterDefLabelKey, clusterDef),
+			LabelSelector: fmt.Sprintf("%s=%s", intctrlutil.ClusterDefLabelKey, clusterDef),
 		})
 	if err != nil {
 		return nil, err

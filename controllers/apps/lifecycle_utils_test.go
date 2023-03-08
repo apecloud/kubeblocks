@@ -18,11 +18,11 @@ package apps
 
 import (
 	"context"
-	"fmt"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -30,11 +30,11 @@ import (
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
-
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	"github.com/apecloud/kubeblocks/internal/generics"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 )
 
@@ -54,7 +54,7 @@ var _ = Describe("lifecycle_utils", func() {
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 		// namespaced resources
-		testapps.ClearResources(&testCtx, intctrlutil.VolumeSnapshotSignature, inNS, ml)
+		testapps.ClearResources(&testCtx, generics.VolumeSnapshotSignature, inNS, ml)
 	}
 
 	BeforeEach(cleanAll)
@@ -138,10 +138,11 @@ var _ = Describe("lifecycle_utils", func() {
 			}},
 		}
 		return testapps.NewStatefulSetFactory(testCtx.DefaultNamespace, "mock-sts", clusterName, mysqlCompName).
-			AddLabels(intctrlutil.AppNameLabelKey, "mock-app",
-				intctrlutil.AppInstanceLabelKey, clusterName,
-				intctrlutil.AppComponentLabelKey, mysqlCompName,
-			).SetReplicas(1).AddContainer(container).
+			AddAppNameLabel("mock-app").
+			AddAppInstanceLabel(clusterName).
+			AddAppComponentLabel(mysqlCompName).
+			SetReplicas(1).
+			AddContainer(container).
 			AddVolumeClaimTemplate(corev1.PersistentVolumeClaim{
 				ObjectMeta: metav1.ObjectMeta{Name: testapps.DataVolumeName},
 				Spec:       testapps.NewPVC("1Gi"),
@@ -158,15 +159,11 @@ var _ = Describe("lifecycle_utils", func() {
 	}
 
 	newVolumeSnapshot := func(clusterName, componentName string) *snapshotv1.VolumeSnapshot {
-		vsYAML := fmt.Sprintf(`
+		vsYAML := `
 apiVersion: snapshot.storage.k8s.io/v1
 kind: VolumeSnapshot
 metadata:
   labels:
-    app.kubernetes.io/component-name: %s
-    app.kubernetes.io/created-by: kubeblocks
-    app.kubernetes.io/instance: %s
-    app.kubernetes.io/managed-by: kubeblocks
     app.kubernetes.io/name: mysql-apecloud-mysql
     backupjobs.dataprotection.kubeblocks.io/name: wesql-01-replicasets-scaling-qf6cr
     backuppolicies.dataprotection.kubeblocks.io/name: wesql-01-replicasets-scaling-hcxps
@@ -177,9 +174,17 @@ spec:
   source:
     persistentVolumeClaimName: data-wesql-01-replicasets-0
   volumeSnapshotClassName: csi-aws-ebs-snapclass
-`, componentName, clusterName)
+`
 		vs := snapshotv1.VolumeSnapshot{}
 		Expect(yaml.Unmarshal([]byte(vsYAML), &vs)).Should(Succeed())
+		labels := map[string]string{
+			constant.AppManagedByLabelKey:   constant.AppName,
+			constant.AppInstanceLabelKey:    clusterName,
+			constant.KBAppComponentLabelKey: componentName,
+		}
+		for k, v := range labels {
+			vs.Labels[k] = v
+		}
 		return &vs
 	}
 

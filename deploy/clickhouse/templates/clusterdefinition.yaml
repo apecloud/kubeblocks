@@ -1,7 +1,7 @@
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: ClusterDefinition
 metadata:
-  name: apecloud-clickhouse
+  name: clickhouse
   labels:
     {{- include "clickhouse.labels" . | nindent 4 }}
     {{- if .Values.commonLabels }}
@@ -13,8 +13,11 @@ metadata:
 spec:
   connectionCredential:
     username: "admin"
-    password: "$(RANDOM_PASSWD)"
-    admin-password: "$(CONN_CREDENTIAL).password"
+    admin-password: "$(RANDOM_PASSWD)"
+    endpoint: "http://$(SVC_FQDN):$(SVC_PORT_http)"
+    tcpEndpoint: "$(SVC_FQDN):$(SVC_PORT_tcp)"
+    mysqlEndpoint: "$(SVC_FQDN):$(SVC_PORT_tcp-mysql)"
+    pgEndpoint: "$(SVC_FQDN):$(SVC_PORT_tcp-postgresql)"
   componentDefs:
     - name: clickhouse
       workloadType: Stateful
@@ -272,7 +275,7 @@ spec:
             configTplRef: zookeeper-scripts-tpl
             namespace: {{ .Release.Namespace }}
             volumeName: script
-            defaultMode: 493
+            defaultMode: 0755
       service:
         ports:
           - name: tcp-client

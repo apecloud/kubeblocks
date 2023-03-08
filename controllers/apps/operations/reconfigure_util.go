@@ -24,10 +24,10 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
+	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
 type reconfiguringResult struct {
@@ -76,7 +76,7 @@ func updateCfgParams(config appsv1alpha1.Configuration,
 		return makeReconfiguringResult(err, withFailed(true))
 	}
 
-	configPatch, err := createConfigPatch(client.ObjectKeyFromObject(cm), cm.Data, newCfg, fc.Format)
+	configPatch, _, err := cfgcore.CreateConfigurePatch(cm.Data, newCfg, fc.Format, tpl.Keys, false)
 	if err != nil {
 		return makeReconfiguringResult(err)
 	}
@@ -92,7 +92,7 @@ func persistCfgCM(cmObj *corev1.ConfigMap, newCfg map[string]string, cli client.
 	if cmObj.Annotations == nil {
 		cmObj.Annotations = make(map[string]string)
 	}
-	cmObj.Annotations[cfgcore.LastAppliedOpsCRAnnotation] = opsCrName
+	cmObj.Annotations[constant.LastAppliedOpsCRAnnotation] = opsCrName
 	return cli.Patch(ctx, cmObj, patch)
 }
 
@@ -106,25 +106,6 @@ func fromKeyValuePair(parameters []appsv1alpha1.ParameterPair) map[string]interf
 		}
 	}
 	return m
-}
-
-func createConfigPatch(cfgKey client.ObjectKey,
-	old, updated map[string]string,
-	formatter appsv1alpha1.CfgFileFormat) (*cfgcore.ConfigPatchInfo, error) {
-	option := cfgcore.CfgOption{
-		Type:    cfgcore.CfgTplType,
-		CfgType: formatter,
-		Log:     log.Log,
-	}
-
-	return cfgcore.CreateMergePatch(
-		&cfgcore.K8sConfig{
-			CfgKey:         cfgKey,
-			Configurations: old,
-		}, &cfgcore.K8sConfig{
-			CfgKey:         cfgKey,
-			Configurations: updated,
-		}, option)
 }
 
 func withFailed(failed bool) func(result *reconfiguringResult) {

@@ -34,7 +34,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/exec"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
-	"github.com/apecloud/kubeblocks/internal/controllerutil"
+	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
 var connectExample = templates.Examples(`
@@ -155,7 +155,7 @@ func (o *ConnectOptions) connect(args []string) error {
 
 	// cluster name is not specified, get from pod label
 	if o.name == "" {
-		if name, ok := pod.Annotations[controllerutil.AppInstanceLabelKey]; !ok {
+		if name, ok := pod.Annotations[constant.AppInstanceLabelKey]; !ok {
 			return fmt.Errorf("failed to find the cluster to which the instance belongs")
 		} else {
 			o.name = name
@@ -236,7 +236,7 @@ func (o *ConnectOptions) getConnectionInfo() (*engine.ConnectionInfo, error) {
 	case len(externalSvcs) > 0:
 		// cluster has public endpoint
 		o.svc = externalSvcs[0]
-		info.Host = cluster.GetExternalIP(o.svc)
+		info.Host = cluster.GetExternalAddr(o.svc)
 		info.Port = fmt.Sprintf("%d", o.svc.Spec.Ports[0].Port)
 	case len(internalSvcs) > 0:
 		// cluster does not have public endpoint
@@ -323,10 +323,18 @@ func getCompCommandArgs(compDef *appsv1alpha1.ClusterComponentDefinition) ([]str
 	return command, execCfg.Args, nil
 }
 
+// buildCommand build connection command by SystemAccounts.CmdExecutorConfig.
+// CLI should not be coupled to a specific engine, so read command info from
+// clusterDefinition, but now these information is used to create system
+// accounts, we need to do some special handling.
+//
+// TODO: Refactoring using command channel
 func buildCommand(info *engine.ConnectionInfo) []string {
 	command := []string{"sh", "-c"}
 	args := info.Command
 	for _, arg := range info.Args {
+		// KB_ACCOUNT_STATEMENT is used to create system accounts, ignore it
+		// replace KB_ACCOUNT_ENDPOINT with local host IP
 		if strings.Contains(arg, "$(KB_ACCOUNT_ENDPOINT)") && strings.Contains(arg, "$(KB_ACCOUNT_STATEMENT)") {
 			arg = strings.Replace(arg, "$(KB_ACCOUNT_ENDPOINT)", "127.0.0.1", 1)
 			arg = strings.Replace(arg, "$(KB_ACCOUNT_STATEMENT)", "", 1)

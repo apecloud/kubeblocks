@@ -23,7 +23,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/constant"
 )
 
 func buildPodTopologySpreadConstraints(
@@ -50,8 +50,8 @@ func buildPodTopologySpreadConstraints(
 			TopologyKey:       topologyKey,
 			LabelSelector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
-					intctrlutil.AppInstanceLabelKey:  cluster.Name,
-					intctrlutil.AppComponentLabelKey: component.Name,
+					intctrlutil.AppInstanceLabelKey:    cluster.Name,
+					intctrlutil.KBAppComponentLabelKey: component.Name,
 				},
 			},
 		})
@@ -96,8 +96,8 @@ func buildPodAffinity(
 			TopologyKey: topologyKey,
 			LabelSelector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
-					intctrlutil.AppInstanceLabelKey:  cluster.Name,
-					intctrlutil.AppComponentLabelKey: component.Name,
+					intctrlutil.AppInstanceLabelKey:    cluster.Name,
+					intctrlutil.KBAppComponentLabelKey: component.Name,
 				},
 			},
 		})

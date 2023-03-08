@@ -18,6 +18,7 @@ package testutil
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 	"sync"
 
@@ -27,7 +28,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 	mock_client "github.com/apecloud/kubeblocks/internal/testutil/k8s/mocks"
 )
 
@@ -265,7 +265,7 @@ func WithConstructSequenceResult(mockObjs map[client.ObjectKey][]MockGetReturned
 	return func(key client.ObjectKey, obj client.Object) error {
 		accessableSequence, ok := mockObjs[key]
 		if !ok {
-			return cfgcore.MakeError("not exist: %v", key)
+			return fmt.Errorf("not exist: %v", key)
 		}
 		index := sequenceAccessCounter[key]
 		mockReturned := accessableSequence[index]
@@ -279,6 +279,13 @@ func WithConstructSequenceResult(mockObjs map[client.ObjectKey][]MockGetReturned
 	}
 }
 
+func WithConstructGetResult(mockObj client.Object) HandleGetReturnedObject {
+	return func(key client.ObjectKey, obj client.Object) error {
+		SetGetReturnedObject(obj, mockObj)
+		return nil
+	}
+}
+
 func WithConstructSimpleGetResult(mockObjs []client.Object) HandleGetReturnedObject {
 	mockMap := make(map[client.ObjectKey]client.Object, len(mockObjs))
 	for _, obj := range mockObjs {
@@ -289,7 +296,7 @@ func WithConstructSimpleGetResult(mockObjs []client.Object) HandleGetReturnedObj
 			SetGetReturnedObject(obj, mockObj)
 			return nil
 		}
-		return cfgcore.MakeError("failed to get object: %v", key)
+		return fmt.Errorf("failed to get object: %v", key)
 	}
 }
 

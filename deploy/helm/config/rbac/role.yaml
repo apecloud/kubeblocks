@@ -239,6 +239,7 @@ rules:
   verbs:
   - create
   - delete
+  - deletecollection
   - get
   - list
   - patch
@@ -558,6 +559,32 @@ rules:
   - dataprotection.kubeblocks.io
   resources:
   - restorejobs/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - extensions.kubeblocks.io
+  resources:
+  - addons
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - extensions.kubeblocks.io
+  resources:
+  - addons/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - extensions.kubeblocks.io
+  resources:
+  - addons/status
   verbs:
   - get
   - patch

@@ -43,11 +43,18 @@ func NewClusterDefFactory(name string) *MockClusterDefFactory {
 				ComponentDefs: []appsv1alpha1.ClusterComponentDefinition{},
 			},
 		}, f)
-	f.SetConnectionCredential(defaultConnectionCredential)
+	f.SetConnectionCredential(defaultConnectionCredential, nil)
 	return f
 }
 
-func (factory *MockClusterDefFactory) AddComponent(tplType ComponentTplType, rename string) *MockClusterDefFactory {
+func NewClusterDefFactoryWithConnCredential(name string) *MockClusterDefFactory {
+	f := NewClusterDefFactory(name)
+	f.AddComponent(StatefulMySQLComponent, "conn-cred")
+	f.SetConnectionCredential(defaultConnectionCredential, &defaultSvcSpec)
+	return f
+}
+
+func (factory *MockClusterDefFactory) AddComponent(tplType ComponentTplType, newName string) *MockClusterDefFactory {
 	var component *appsv1alpha1.ClusterComponentDefinition
 	switch tplType {
 	case StatefulMySQLComponent:
@@ -59,120 +66,140 @@ func (factory *MockClusterDefFactory) AddComponent(tplType ComponentTplType, ren
 	case StatelessNginxComponent:
 		component = &statelessNginxComponent
 	}
-	comps := factory.get().Spec.ComponentDefs
-	comps = append(comps, *component)
-	comps[len(comps)-1].Name = rename
-	factory.get().Spec.ComponentDefs = comps
+	factory.get().Spec.ComponentDefs = append(factory.get().Spec.ComponentDefs, *component)
+	comp := factory.getLastCompDef()
+	comp.Name = newName
 	return factory
 }
 
-func (factory *MockClusterDefFactory) SetService(port int32) *MockClusterDefFactory {
-	comps := factory.get().Spec.ComponentDefs
-	if len(comps) > 0 {
-		comps[len(comps)-1].Service = &corev1.ServiceSpec{
-			Ports: []corev1.ServicePort{{
-				Protocol: corev1.ProtocolTCP,
-				Port:     port,
-			}},
-		}
+func (factory *MockClusterDefFactory) AddServicePort(port int32) *MockClusterDefFactory {
+	comp := factory.getLastCompDef()
+	if comp == nil {
+		return nil
 	}
-	factory.get().Spec.ComponentDefs = comps
+	comp.Service = &corev1.ServiceSpec{
+		Ports: []corev1.ServicePort{{
+			Protocol: corev1.ProtocolTCP,
+			Port:     port,
+		}},
+	}
 	return factory
 }
 
 func (factory *MockClusterDefFactory) AddConfigTemplate(name,
 	configTplRef, configConstraintRef, namespace, volumeName string, mode *int32) *MockClusterDefFactory {
-	comps := factory.get().Spec.ComponentDefs
-	if len(comps) > 0 {
-		comp := comps[len(comps)-1]
-		if comp.ConfigSpec == nil {
-			comp.ConfigSpec = &appsv1alpha1.ConfigurationSpec{}
-		}
-		comp.ConfigSpec.ConfigTemplateRefs = append(comp.ConfigSpec.ConfigTemplateRefs,
-			appsv1alpha1.ConfigTemplate{
-				Name:                name,
-				ConfigTplRef:        configTplRef,
-				ConfigConstraintRef: configConstraintRef,
-				Namespace:           namespace,
-				VolumeName:          volumeName,
-				DefaultMode:         mode,
-			})
-		comps[len(comps)-1] = comp
+	comp := factory.getLastCompDef()
+	if comp == nil {
+		return nil
 	}
-	factory.get().Spec.ComponentDefs = comps
+	if comp.ConfigSpec == nil {
+		comp.ConfigSpec = &appsv1alpha1.ConfigurationSpec{}
+	}
+	comp.ConfigSpec.ConfigTemplateRefs = append(comp.ConfigSpec.ConfigTemplateRefs,
+		appsv1alpha1.ConfigTemplate{
+			Name:                name,
+			ConfigTplRef:        configTplRef,
+			ConfigConstraintRef: configConstraintRef,
+			Namespace:           namespace,
+			VolumeName:          volumeName,
+			DefaultMode:         mode,
+		})
 	return factory
 }
 
 func (factory *MockClusterDefFactory) AddLogConfig(name, filePathPattern string) *MockClusterDefFactory {
-	comps := factory.get().Spec.ComponentDefs
-	if len(comps) > 0 {
-		comp := comps[len(comps)-1]
-		comp.LogConfigs = append(comp.LogConfigs, appsv1alpha1.LogConfig{
-			FilePathPattern: filePathPattern,
-			Name:            name,
-		})
-		comps[len(comps)-1] = comp
+	comp := factory.getLastCompDef()
+	if comp == nil {
+		return nil
 	}
-	factory.get().Spec.ComponentDefs = comps
+	comp.LogConfigs = append(comp.LogConfigs, appsv1alpha1.LogConfig{
+		FilePathPattern: filePathPattern,
+		Name:            name,
+	})
 	return factory
 }
 
 func (factory *MockClusterDefFactory) AddContainerEnv(containerName string, envVar corev1.EnvVar) *MockClusterDefFactory {
-	comps := factory.get().Spec.ComponentDefs
-	if len(comps) > 0 {
-		comp := comps[len(comps)-1]
-		for i, container := range comps[len(comps)-1].PodSpec.Containers {
-			if container.Name == containerName {
-				c := comps[len(comps)-1].PodSpec.Containers[i]
-				c.Env = append(c.Env, envVar)
-				comps[len(comps)-1].PodSpec.Containers[i] = c
-				break
-			}
-		}
-		comps[len(comps)-1] = comp
+	comp := factory.getLastCompDef()
+	if comp == nil {
+		return nil
 	}
-	factory.get().Spec.ComponentDefs = comps
+	for i, container := range comp.PodSpec.Containers {
+		if container.Name == containerName {
+			c := comp.PodSpec.Containers[i]
+			c.Env = append(c.Env, envVar)
+			comp.PodSpec.Containers[i] = c
+			break
+		}
+	}
 	return factory
 }
 
 func (factory *MockClusterDefFactory) SetConnectionCredential(
-	connectionCredential map[string]string) *MockClusterDefFactory {
+	connectionCredential map[string]string, svc *corev1.ServiceSpec) *MockClusterDefFactory {
 	factory.get().Spec.ConnectionCredential = connectionCredential
+	factory.SetServiceSpec(svc)
+	return factory
+}
+
+func (factory *MockClusterDefFactory) get1stCompDef() *appsv1alpha1.ClusterComponentDefinition {
+	if len(factory.get().Spec.ComponentDefs) == 0 {
+		return nil
+	}
+	return &factory.get().Spec.ComponentDefs[0]
+}
+
+func (factory *MockClusterDefFactory) getLastCompDef() *appsv1alpha1.ClusterComponentDefinition {
+	l := len(factory.get().Spec.ComponentDefs)
+	if l == 0 {
+		return nil
+	}
+	comps := factory.get().Spec.ComponentDefs
+	return &comps[l-1]
+}
+
+func (factory *MockClusterDefFactory) SetServiceSpec(svc *corev1.ServiceSpec) *MockClusterDefFactory {
+	comp := factory.get1stCompDef()
+	if comp == nil {
+		return factory
+	}
+	comp.Service = svc
 	return factory
 }
 
 func (factory *MockClusterDefFactory) AddSystemAccountSpec(sysAccounts *appsv1alpha1.SystemAccountSpec) *MockClusterDefFactory {
-	comps := factory.get().Spec.ComponentDefs
-	if len(comps) == 0 {
+	comp := factory.getLastCompDef()
+	if comp == nil {
 		return factory
 	}
-
-	comp := comps[len(comps)-1]
 	comp.SystemAccounts = sysAccounts
-	comps[len(comps)-1] = comp
-	factory.get().Spec.ComponentDefs = comps
 	return factory
 }
 
 func (factory *MockClusterDefFactory) AddInitContainerVolumeMounts(containerName string, volumeMounts []corev1.VolumeMount) *MockClusterDefFactory {
-	comps := factory.get().Spec.ComponentDefs
-	if len(comps) > 0 {
-		comp := comps[len(comps)-1]
-		comp.PodSpec.InitContainers = appendContainerVolumeMounts(comp.PodSpec.InitContainers, containerName, volumeMounts)
-		comps[len(comps)-1] = comp
+	comp := factory.getLastCompDef()
+	if comp == nil {
+		return factory
 	}
-	factory.get().Spec.ComponentDefs = comps
+	comp.PodSpec.InitContainers = appendContainerVolumeMounts(comp.PodSpec.InitContainers, containerName, volumeMounts)
 	return factory
 }
 
 func (factory *MockClusterDefFactory) AddContainerVolumeMounts(containerName string, volumeMounts []corev1.VolumeMount) *MockClusterDefFactory {
-	comps := factory.get().Spec.ComponentDefs
-	if len(comps) > 0 {
-		comp := comps[len(comps)-1]
-		comp.PodSpec.Containers = appendContainerVolumeMounts(comp.PodSpec.Containers, containerName, volumeMounts)
-		comps[len(comps)-1] = comp
+	comp := factory.getLastCompDef()
+	if comp == nil {
+		return factory
 	}
-	factory.get().Spec.ComponentDefs = comps
+	comp.PodSpec.Containers = appendContainerVolumeMounts(comp.PodSpec.Containers, containerName, volumeMounts)
+	return factory
+}
+
+func (factory *MockClusterDefFactory) AddReplicationSpec(replicationSpec *appsv1alpha1.ReplicationSpec) *MockClusterDefFactory {
+	comp := factory.getLastCompDef()
+	if comp == nil {
+		return factory
+	}
+	comp.ReplicationSpec = replicationSpec
 	return factory
 }
 

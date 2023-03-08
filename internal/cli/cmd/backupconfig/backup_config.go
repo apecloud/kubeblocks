@@ -29,7 +29,16 @@ import (
 
 var backupConfigExample = templates.Examples(`
 		# Enable the snapshot-controller and volume snapshot, to support snapshot backup.
-		kbcli backup-config --set snapshot-controller.enabled=true --set dataProtection.enableVolumeSnapshot=true
+		kbcli backup-config --set snapshot-controller.enabled=true
+
+		# If you have already installed a snapshot-controller, only enable the snapshot backup feature
+        kbcli backup-config --set dataProtection.enableVolumeSnapshot=true
+
+		# Schedule automatic backup at 18:00 every day (UTC timezone)
+		kbcli backup-config --set dataProtection.backupSchedule="0 18 * * *"
+
+		# Set automatic backup retention for 7 days
+		kbcli backup-config --set dataProtection.backupTTL="168h0m0s"
 	`)
 
 // NewBackupConfigCmd creates the backup-config command
@@ -48,9 +57,6 @@ func NewBackupConfigCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) 
 		Run: func(cmd *cobra.Command, args []string) {
 			util.CheckErr(o.Complete(f, cmd))
 			util.CheckErr(o.Upgrade(cmd))
-		},
-		PostRun: func(cmd *cobra.Command, args []string) {
-			util.CheckErr(o.PostInstall())
 		},
 	}
 	helm.AddValueOptionsFlags(cmd.Flags(), &o.ValueOpts)

@@ -35,6 +35,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -46,9 +47,9 @@ type RestoreJobReconciler struct {
 	clock    clock.RealClock
 }
 
-//+kubebuilder:rbac:groups=dataprotection.kubeblocks.io,resources=restorejobs,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=dataprotection.kubeblocks.io,resources=restorejobs/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=dataprotection.kubeblocks.io,resources=restorejobs/finalizers,verbs=update
+// +kubebuilder:rbac:groups=dataprotection.kubeblocks.io,resources=restorejobs,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=dataprotection.kubeblocks.io,resources=restorejobs/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=dataprotection.kubeblocks.io,resources=restorejobs/finalizers,verbs=update
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -341,6 +342,6 @@ func (r *RestoreJobReconciler) patchTargetCluster(reqCtx intctrlutil.RequestCtx,
 func buildRestoreJobLabels(jobName string) map[string]string {
 	return map[string]string{
 		dataProtectionLabelRestoreJobNameKey: jobName,
-		intctrlutil.AppManagedByLabelKey:     intctrlutil.AppName,
+		constant.AppManagedByLabelKey:        constant.AppName,
 	}
 }

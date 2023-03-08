@@ -25,6 +25,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
+	"github.com/apecloud/kubeblocks/internal/constant"
 	podutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -39,10 +40,10 @@ type rollingUpgradePolicy struct {
 
 func init() {
 	RegisterPolicy(appsv1alpha1.RollingPolicy, &rollingUpgradePolicy{})
-	if err := viper.BindEnv(cfgcore.PodMinReadySecondsEnv); err != nil {
+	if err := viper.BindEnv(constant.PodMinReadySecondsEnv); err != nil {
 		os.Exit(-1)
 	}
-	viper.SetDefault(cfgcore.PodMinReadySecondsEnv, defaultMinReadySeconds)
+	viper.SetDefault(constant.PodMinReadySecondsEnv, defaultMinReadySeconds)
 }
 
 func (r *rollingUpgradePolicy) Upgrade(params reconfigureParams) (ReturnedStatus, error) {
@@ -194,7 +195,7 @@ func staticPodStats(pods []corev1.Pod, targetReplicas int, minReadySeconds int32
 		switch {
 		case podutil.IsAvailable(pod, minReadySeconds):
 			podsStats.available[pod.Name] = pod
-		case podutil.IsReady(pod):
+		case podutil.PodIsReady(pod):
 			podsStats.ready[pod.Name] = pod
 		default:
 		}

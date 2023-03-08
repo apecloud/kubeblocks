@@ -26,7 +26,8 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	opsutil "github.com/apecloud/kubeblocks/controllers/apps/operations/util"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	"github.com/apecloud/kubeblocks/internal/constant"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/generics"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 )
 
@@ -90,7 +91,7 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 			opsAnnotationString := fmt.Sprintf(`[{"name":"%s","clusterPhase":"HorizontalScaling"},{"name":"test-not-exists-ops","clusterPhase":"VolumeExpanding"}]`,
 				opsRes.OpsRequest.Name)
 			opsRes.Cluster.Annotations = map[string]string{
-				intctrlutil.OpsRequestAnnotationKey: opsAnnotationString,
+				constant.OpsRequestAnnotationKey: opsAnnotationString,
 			}
 			Expect(k8sClient.Patch(ctx, opsRes.Cluster, patch)).Should(Succeed())
 			Expect(GetOpsManager().Do(opsRes)).Should(Succeed())

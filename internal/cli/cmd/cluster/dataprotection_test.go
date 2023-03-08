@@ -23,7 +23,6 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8sapitypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
@@ -36,6 +35,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/constant"
 )
 
 var _ = Describe("DataProtection", func() {
@@ -70,7 +70,7 @@ var _ = Describe("DataProtection", func() {
 		It("run backup command", func() {
 			cluster := testing.FakeCluster(testing.ClusterName, testing.Namespace)
 			clusterDefLabel := map[string]string{
-				types.ClusterDefLabelKey: "apecloud-mysql",
+				intctrlutil.ClusterDefLabelKey: "apecloud-mysql",
 			}
 			cluster.SetLabels(clusterDefLabel)
 
@@ -154,7 +154,7 @@ var _ = Describe("DataProtection", func() {
 		newClusterName := "new-cluster-" + timestamp
 		secrets := testing.FakeSecrets(testing.Namespace, clusterName)
 		clusterDefLabel := map[string]string{
-			types.ClusterDefLabelKey: "apecloud-mysql",
+			intctrlutil.ClusterDefLabelKey: "apecloud-mysql",
 		}
 
 		cluster := testing.FakeCluster(clusterName, testing.Namespace)

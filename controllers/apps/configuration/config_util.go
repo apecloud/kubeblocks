@@ -32,7 +32,8 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
-	cfgcm "github.com/apecloud/kubeblocks/internal/configuration/configmap"
+	cfgcm "github.com/apecloud/kubeblocks/internal/configuration/config_manager"
+	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -63,7 +64,7 @@ func checkConfigurationLabels(object client.Object, requiredLabs []string) bool 
 	}
 
 	// reconfigure ConfigMap for db instance
-	if ins, ok := labels[cfgcore.CMConfigurationTypeLabelKey]; !ok || ins != cfgcore.ConfigInstanceType {
+	if ins, ok := labels[constant.CMConfigurationTypeLabelKey]; !ok || ins != constant.ConfigInstanceType {
 		return false
 	}
 
@@ -204,7 +205,7 @@ func updateConfigMapFinalizer(cli client.Client, ctx intctrlutil.RequestCtx, tpl
 		return err
 	}
 
-	if controllerutil.ContainsFinalizer(cmObj, cfgcore.ConfigurationTemplateFinalizerName) {
+	if controllerutil.ContainsFinalizer(cmObj, constant.ConfigurationTemplateFinalizerName) {
 		return nil
 	}
 
@@ -213,8 +214,8 @@ func updateConfigMapFinalizer(cli client.Client, ctx intctrlutil.RequestCtx, tpl
 	if cmObj.ObjectMeta.Labels == nil {
 		cmObj.ObjectMeta.Labels = map[string]string{}
 	}
-	cmObj.ObjectMeta.Labels[cfgcore.CMConfigurationTypeLabelKey] = cfgcore.ConfigTemplateType
-	controllerutil.AddFinalizer(cmObj, cfgcore.ConfigurationTemplateFinalizerName)
+	cmObj.ObjectMeta.Labels[constant.CMConfigurationTypeLabelKey] = constant.ConfigTemplateType
+	controllerutil.AddFinalizer(cmObj, constant.ConfigurationTemplateFinalizerName)
 
 	// cmObj.Immutable = &tpl.Spec.Immutable
 	return cli.Patch(ctx.Ctx, cmObj, patch)
@@ -229,12 +230,12 @@ func deleteConfigMapFinalizer(cli client.Client, ctx intctrlutil.RequestCtx, tpl
 		return err
 	}
 
-	if !controllerutil.ContainsFinalizer(cmObj, cfgcore.ConfigurationTemplateFinalizerName) {
+	if !controllerutil.ContainsFinalizer(cmObj, constant.ConfigurationTemplateFinalizerName) {
 		return nil
 	}
 
 	patch := client.MergeFrom(cmObj.DeepCopy())
-	controllerutil.RemoveFinalizer(cmObj, cfgcore.ConfigurationTemplateFinalizerName)
+	controllerutil.RemoveFinalizer(cmObj, constant.ConfigurationTemplateFinalizerName)
 	return cli.Patch(ctx.Ctx, cmObj, patch)
 }
 
@@ -367,15 +368,15 @@ func validateConfigTPLs(cli client.Client, ctx intctrlutil.RequestCtx, configTpl
 			ctx.Log.Error(err, "failed to validate configuration template!", "configTpl", tplRef)
 			return false, err
 		}
-		if tpl == nil {
+		if tpl == nil || tpl.Spec.ReloadOptions == nil {
 			continue
 		}
-		if err := cfgcm.NeedBuildConfigSidecar(tpl.Spec.ReloadOptions); err != nil {
+		if err := cfgcm.ValidateReloadOptions(tpl.Spec.ReloadOptions, cli, ctx.Ctx); err != nil {
 			return false, err
 		}
 		if !validateConfTplStatus(tpl.Status) {
 			errMsg := fmt.Sprintf("Configuration template CR[%s] status not ready! current status: %s", tpl.Name, tpl.Status.Phase)
-			ctx.Log.V(4).Info(errMsg)
+			ctx.Log.V(1).Info(errMsg)
 			return false, fmt.Errorf(errMsg)
 		}
 	}
@@ -387,7 +388,7 @@ func validateConfTplStatus(configStatus appsv1alpha1.ConfigConstraintStatus) boo
 }
 
 func getRelatedComponentsByConfigmap(stsList *appv1.StatefulSetList, cfg client.ObjectKey) ([]appv1.StatefulSet, []string) {
-	managerContainerName := cfgcore.ConfigSidecarName
+	managerContainerName := constant.ConfigSidecarName
 	stsLen := len(stsList.Items)
 	if stsLen == 0 {
 		return nil, nil
@@ -413,36 +414,13 @@ func getRelatedComponentsByConfigmap(stsList *appv1.StatefulSetList, cfg client.
 	return sts, containers.AsSlice()
 }
 
-func getClusterComponentsByName(components []appsv1alpha1.ClusterComponentSpec, componentName string) *appsv1alpha1.ClusterComponentSpec {
-	for i := range components {
-		component := &components[i]
-		if component.Name == componentName {
-			return component
-		}
-	}
-	return nil
-}
-
-func createConfigurePatch(cfg *corev1.ConfigMap, ctx intctrlutil.RequestCtx, tpl *appsv1alpha1.ConfigConstraintSpec) (*cfgcore.ConfigPatchInfo, error) {
+func createConfigurePatch(cfg *corev1.ConfigMap, format appsv1alpha1.CfgFileFormat, cmKeys []string) (*cfgcore.ConfigPatchInfo, bool, error) {
 	lastConfig, err := getLastVersionConfig(cfg)
 	if err != nil {
-		return nil, cfgcore.WrapError(err, "failed to get last version data. config[%v]", client.ObjectKeyFromObject(cfg))
+		return nil, false, cfgcore.WrapError(err, "failed to get last version data. config[%v]", client.ObjectKeyFromObject(cfg))
 	}
 
-	option := cfgcore.CfgOption{
-		Type:    cfgcore.CfgTplType,
-		CfgType: tpl.FormatterConfig.Format,
-		Log:     ctx.Log,
-	}
-
-	return cfgcore.CreateMergePatch(
-		&cfgcore.K8sConfig{
-			CfgKey:         client.ObjectKeyFromObject(cfg),
-			Configurations: lastConfig,
-		}, &cfgcore.K8sConfig{
-			CfgKey:         client.ObjectKeyFromObject(cfg),
-			Configurations: cfg.Data,
-		}, option)
+	return cfgcore.CreateConfigurePatch(lastConfig, cfg.Data, format, cmKeys, true)
 }
 
 func updateConfigurationSchema(tpl *appsv1alpha1.ConfigConstraintSpec) error {

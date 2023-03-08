@@ -21,7 +21,6 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-
 	"github.com/replicatedhq/troubleshoot/pkg/preflight"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -36,7 +35,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 )
 
-var _ = Describe("Preflight Test", func() {
+var _ = Describe("Preflight API Test", func() {
 	const (
 		namespace   = "test"
 		clusterName = "test"
@@ -83,8 +82,8 @@ var _ = Describe("Preflight Test", func() {
 		tf.Cleanup()
 	})
 
-	It("complete and validate Test", func() {
-		p := &preflightOptions{
+	It("complete and validate test", func() {
+		p := &PreflightOptions{
 			factory:        tf,
 			IOStreams:      streams,
 			PreflightFlags: preflight.NewPreflightFlags(),
@@ -96,36 +95,25 @@ var _ = Describe("Preflight Test", func() {
 		Expect(p.validate()).Should(Succeed())
 	})
 
-	It("loadPreflightSpec Test", func() {
-		p := &preflightOptions{
-			factory:        tf,
-			IOStreams:      streams,
-			PreflightFlags: preflight.NewPreflightFlags(),
-		}
-		p.yamlCheckFiles = []string{"../../testing/testdata/preflight.yaml", "../../testing/testdata/hostpreflight.yaml"}
-		*p.Interactive = false
-
-		Eventually(func(g Gomega) {
-			preflightSpec, hostPreflightSpec, preflightName, err := p.loadPreflightSpec()
-			g.Expect(err).NotTo(HaveOccurred())
-			g.Expect(len(preflightSpec.Spec.Analyzers)).Should(Equal(1))
-			g.Expect(len(hostPreflightSpec.Spec.Analyzers)).Should(Equal(1))
-			g.Expect(preflightName).NotTo(BeNil())
-		}).Should(Succeed())
-	})
-
-	It("run Test", func() {
-		p := &preflightOptions{
+	It("run test", func() {
+		p := &PreflightOptions{
 			factory:        tf,
 			IOStreams:      streams,
 			PreflightFlags: preflight.NewPreflightFlags(),
 		}
 		p.yamlCheckFiles = []string{"../../testing/testdata/hostpreflight.yaml"}
-		By("non-interactive mode")
+		By("non-interactive mode, and expect success")
 		*p.Interactive = false
 		Eventually(func(g Gomega) {
 			err := p.run()
 			g.Expect(err).NotTo(HaveOccurred())
+		}).Should(Succeed())
+		By("non-interactive mode, and expect error")
+		p.yamlCheckFiles = []string{"../../testing/testdata/hostpreflight_nil.yaml"}
+		*p.Interactive = false
+		Eventually(func(g Gomega) {
+			err := p.run()
+			g.Expect(err).To(HaveOccurred())
 		}).Should(Succeed())
 	})
 })

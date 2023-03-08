@@ -24,7 +24,7 @@ import (
 	"github.com/spf13/cobra"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
@@ -57,10 +57,8 @@ type OperationsOptions struct {
 	ClusterVersionRef string `json:"clusterVersionRef"`
 
 	// VerticalScaling options
-	RequestCPU    string `json:"requestCPU"`
-	RequestMemory string `json:"requestMemory"`
-	LimitCPU      string `json:"limitCPU"`
-	LimitMemory   string `json:"limitMemory"`
+	CPU    string `json:"cpu"`
+	Memory string `json:"memory"`
 
 	// HorizontalScaling options
 	Replicas int `json:"replicas"`
@@ -117,12 +115,20 @@ func (o *OperationsOptions) CompleteRestartOps() error {
 		return nil
 	}
 	gvr := schema.GroupVersionResource{Group: types.Group, Version: types.Version, Resource: types.ResourceClusters}
-	if unstructuredObj, err := o.Client.Resource(gvr).Namespace(o.Namespace).Get(context.TODO(), o.Name, metav1.GetOptions{}); err != nil {
+	unstructuredObj, err := o.Client.Resource(gvr).Namespace(o.Namespace).Get(context.TODO(), o.Name, metav1.GetOptions{})
+	if err != nil {
 		return err
-	} else {
-		if o.ComponentNames, _, err = unstructured.NestedStringSlice(unstructuredObj.Object, "status", "operations", "restartable"); err != nil {
-			return err
-		}
+	}
+	cluster := appsv1alpha1.Cluster{}
+	err = runtime.DefaultUnstructuredConverter.
+		FromUnstructured(unstructuredObj.UnstructuredContent(), &cluster)
+	if err != nil {
+		return err
+	}
+	componentSpecs := cluster.Spec.ComponentSpecs
+	o.ComponentNames = make([]string, len(componentSpecs))
+	for i := range componentSpecs {
+		o.ComponentNames[i] = componentSpecs[i].Name
 	}
 	return nil
 }
@@ -140,13 +146,6 @@ func (o *OperationsOptions) validateVolumeExpansion() error {
 	}
 	if len(o.Storage) == 0 {
 		return fmt.Errorf("missing storage")
-	}
-	return nil
-}
-
-func (o *OperationsOptions) validateHorizontalScaling() error {
-	if o.Replicas < -1 {
-		return fmt.Errorf("replicas required natural number")
 	}
 	return nil
 }
@@ -179,10 +178,6 @@ func (o *OperationsOptions) validateReconfiguring() error {
 }
 
 func (o *OperationsOptions) validateConfigParams(tpl *appsv1alpha1.ConfigTemplate, componentName string) error {
-	var (
-		configConstraint = appsv1alpha1.ConfigConstraint{}
-	)
-
 	transKeyPair := func(pts map[string]string) map[string]interface{} {
 		m := make(map[string]interface{}, len(pts))
 		for key, value := range pts {
@@ -191,6 +186,7 @@ func (o *OperationsOptions) validateConfigParams(tpl *appsv1alpha1.ConfigTemplat
 		return m
 	}
 
+	configConstraint := appsv1alpha1.ConfigConstraint{}
 	if err := util.GetResourceObjectFromGVR(types.ConfigConstraintGVR(), client.ObjectKey{
 		Namespace: "",
 		Name:      tpl.ConfigConstraintRef,
@@ -236,7 +232,7 @@ func (o *OperationsOptions) validateConfigMapKey(tpl *appsv1alpha1.ConfigTemplat
 		cmName = cfgcore.GetComponentCfgName(o.Name, componentName, tpl.VolumeName)
 	)
 
-	if err := util.GetResourceObjectFromGVR(types.CMGVR(), client.ObjectKey{
+	if err := util.GetResourceObjectFromGVR(types.ConfigmapGVR(), client.ObjectKey{
 		Name:      cmName,
 		Namespace: o.Namespace,
 	}, o.Client, &cmObj); err != nil {
@@ -247,11 +243,8 @@ func (o *OperationsOptions) validateConfigMapKey(tpl *appsv1alpha1.ConfigTemplat
 	}
 
 	// Autofill ConfigMap key
-	if len(o.CfgFile) == 0 && len(cmObj.Data) == 1 {
-		for k := range cmObj.Data {
-			o.CfgFile = k
-			return nil
-		}
+	if o.CfgFile == "" && len(cmObj.Data) > 0 {
+		o.fillKeyForReconfiguring(tpl, cmObj.Data)
 	}
 	if _, ok := cmObj.Data[o.CfgFile]; !ok {
 		return cfgcore.MakeError("specify file name[%s] is not exist.", o.CfgFile)
@@ -284,6 +277,11 @@ func (o *OperationsOptions) Validate() error {
 		return makeMissingClusterNameErr()
 	}
 
+	// not require confirm for reconfigure
+	if o.OpsType == appsv1alpha1.ReconfiguringType {
+		return o.validateReconfiguring()
+	}
+
 	// common validate for componentOps
 	if o.HasComponentNamesFlag && len(o.ComponentNames) == 0 {
 		return fmt.Errorf("missing component-names")
@@ -292,14 +290,6 @@ func (o *OperationsOptions) Validate() error {
 	switch o.OpsType {
 	case appsv1alpha1.VolumeExpansionType:
 		if err := o.validateVolumeExpansion(); err != nil {
-			return err
-		}
-	case appsv1alpha1.HorizontalScalingType:
-		if err := o.validateHorizontalScaling(); err != nil {
-			return err
-		}
-	case appsv1alpha1.ReconfiguringType:
-		if err := o.validateReconfiguring(); err != nil {
 			return err
 		}
 	case appsv1alpha1.UpgradeType:
@@ -400,6 +390,18 @@ func (o *OperationsOptions) printConfigureTips() {
 		printer.NewPair("ClusterName", o.Name))
 }
 
+func (o *OperationsOptions) fillKeyForReconfiguring(tpl *appsv1alpha1.ConfigTemplate, data map[string]string) {
+	keys := make([]string, 0, len(data))
+	for k := range data {
+		if cfgcore.CheckConfigTemplateReconfigureKey(*tpl, k) {
+			keys = append(keys, k)
+		}
+	}
+	if len(keys) == 1 {
+		o.CfgFile = keys[0]
+	}
+}
+
 // buildOperationsInputs builds operations inputs
 func buildOperationsInputs(f cmdutil.Factory, o *OperationsOptions) create.Inputs {
 	o.OpsTypeLower = strings.ToLower(string(o.OpsType))
@@ -456,8 +458,7 @@ func NewUpgradeCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 
 var verticalScalingExample = templates.Examples(`
 		# scale the computing resources of specified components, separate with commas when <component-name> more than one
-		kbcli cluster vscale <my-cluster> --component-names=<component-name> --requests.cpu=500m \
-        --requests.memory=500Mi --limits.cpu=500m --limits.memory=500Mi
+		kbcli cluster vscale <my-cluster> --component-names=<component-name> --cpu=500m --memory=500Mi 
 `)
 
 // NewVerticalScalingCmd creates a vertical scaling command
@@ -469,10 +470,8 @@ func NewVerticalScalingCmd(f cmdutil.Factory, streams genericclioptions.IOStream
 	inputs.Example = verticalScalingExample
 	inputs.BuildFlags = func(cmd *cobra.Command) {
 		o.buildCommonFlags(cmd)
-		cmd.Flags().StringVar(&o.RequestCPU, "requests.cpu", "", "CPU size requested by the component")
-		cmd.Flags().StringVar(&o.RequestMemory, "requests.memory", "", "Memory size requested by the component")
-		cmd.Flags().StringVar(&o.LimitCPU, "limits.cpu", "", "CPU size limited by the component")
-		cmd.Flags().StringVar(&o.LimitMemory, "limits.memory", "", "Memory size limited by the component")
+		cmd.Flags().StringVar(&o.CPU, "cpu", "", "Requested and limited size of component cpu")
+		cmd.Flags().StringVar(&o.Memory, "memory", "", "Requested and limited size of component memory")
 	}
 	return create.BuildCommand(inputs)
 }
@@ -491,7 +490,8 @@ func NewHorizontalScalingCmd(f cmdutil.Factory, streams genericclioptions.IOStre
 	inputs.Example = horizontalScalingExample
 	inputs.BuildFlags = func(cmd *cobra.Command) {
 		o.buildCommonFlags(cmd)
-		cmd.Flags().IntVar(&o.Replicas, "replicas", -1, "Replicas with the specified components")
+		cmd.Flags().IntVar(&o.Replicas, "replicas", o.Replicas, "Replicas with the specified components")
+		_ = cmd.MarkFlagRequired("replicas")
 	}
 	return create.BuildCommand(inputs)
 }

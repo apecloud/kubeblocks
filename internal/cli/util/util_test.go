@@ -23,10 +23,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/go-logr/logr"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-
-	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -39,6 +38,7 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/constant"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 	"github.com/apecloud/kubeblocks/test/testdata"
 )
@@ -158,7 +158,7 @@ var _ = Describe("util", func() {
 		Expect(BuildLabelSelectorByNames("", nil)).Should(Equal(""))
 
 		names := []string{"n1", "n2"}
-		expected := fmt.Sprintf("%s in (%s)", types.InstanceLabelKey, strings.Join(names, ","))
+		expected := fmt.Sprintf("%s in (%s)", intctrlutil.AppInstanceLabelKey, strings.Join(names, ","))
 		Expect(BuildLabelSelectorByNames("", names)).Should(Equal(expected))
 		Expect(BuildLabelSelectorByNames("label1", names)).Should(Equal("label1," + expected))
 	})
@@ -180,11 +180,6 @@ var _ = Describe("util", func() {
 		Expect(MakeSSHKeyPair("", "")).Should(HaveOccurred())
 		Expect(SetKubeConfig("test")).Should(Succeed())
 		Expect(NewFactory()).ShouldNot(BeNil())
-
-		By("playground dir")
-		dir, err := PlaygroundDir()
-		Expect(err).ShouldNot(HaveOccurred())
-		Expect(dir).ShouldNot(Equal(""))
 
 		By("resource is empty")
 		res := resource.Quantity{}

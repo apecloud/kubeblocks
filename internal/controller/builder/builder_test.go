@@ -17,6 +17,7 @@ limitations under the License.
 package builder
 
 import (
+	"fmt"
 	"testing"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -32,7 +33,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
-	cfgcm "github.com/apecloud/kubeblocks/internal/configuration/configmap"
+	cfgcm "github.com/apecloud/kubeblocks/internal/configuration/config_manager"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
@@ -108,6 +109,8 @@ var _ = Describe("builder", func() {
 			clusterDefObj.Name, clusterVersionObj.Name).
 			AddComponent(mysqlCompName, mysqlCompType).SetReplicas(1).
 			AddVolumeClaimTemplate(testapps.DataVolumeName, &pvcSpec).
+			AddService(testapps.ServiceVPCName, corev1.ServiceTypeLoadBalancer).
+			AddService(testapps.ServiceInternetName, corev1.ServiceTypeLoadBalancer).
 			GetObject()
 		key := client.ObjectKeyFromObject(clusterObj)
 		if needCreate {
@@ -126,10 +129,10 @@ var _ = Describe("builder", func() {
 			}},
 		}
 		return testapps.NewStatefulSetFactory(testCtx.DefaultNamespace, "mock-sts", clusterName, mysqlCompName).
-			AddLabels(intctrlutil.AppNameLabelKey, "mock-app",
-				intctrlutil.AppInstanceLabelKey, clusterName,
-				intctrlutil.AppComponentLabelKey, mysqlCompName,
-			).SetReplicas(1).AddContainer(container).
+			AddAppNameLabel("mock-app").
+			AddAppInstanceLabel(clusterName).
+			AddAppComponentLabel(mysqlCompName).
+			SetReplicas(1).AddContainer(container).
 			AddVolumeClaimTemplate(corev1.PersistentVolumeClaim{
 				ObjectMeta: metav1.ObjectMeta{Name: testapps.DataVolumeName},
 				Spec:       testapps.NewPVC("1Gi"),
@@ -143,8 +146,8 @@ var _ = Describe("builder", func() {
 		}
 		return reqCtx
 	}
-	newAllFieldsComponent := func() *component.SynthesizedComponent {
-		cluster, clusterDef, clusterVersion, _ := newAllFieldsClusterObj(nil, nil, false)
+	newAllFieldsComponent := func(clusterDef *appsv1alpha1.ClusterDefinition, clusterVersion *appsv1alpha1.ClusterVersion) *component.SynthesizedComponent {
+		cluster, clusterDef, clusterVersion, _ := newAllFieldsClusterObj(clusterDef, clusterVersion, false)
 		reqCtx := newReqCtx()
 		By("assign every available fields")
 		component := component.BuildComponent(
@@ -163,10 +166,22 @@ var _ = Describe("builder", func() {
 			ClusterDefinition: clusterDef,
 			ClusterVersion:    clusterVersion,
 			Cluster:           cluster,
-			Component:         newAllFieldsComponent(),
+			Component:         newAllFieldsComponent(clusterDef, clusterVersion),
 		}
 		return &params
 	}
+
+	newParamsWithClusterDef := func(clusterDefObj *appsv1alpha1.ClusterDefinition) *BuilderParams {
+		cluster, clusterDef, clusterVersion, _ := newAllFieldsClusterObj(clusterDefObj, nil, false)
+		params := BuilderParams{
+			ClusterDefinition: clusterDef,
+			ClusterVersion:    clusterVersion,
+			Cluster:           cluster,
+			Component:         newAllFieldsComponent(clusterDef, clusterVersion),
+		}
+		return &params
+	}
+
 	newBackupPolicyTemplate := func() *dataprotectionv1alpha1.BackupPolicyTemplate {
 		return testapps.NewBackupPolicyTemplateFactory("backup-policy-template-mysql").
 			SetBackupToolName("mysql-xtrabackup").
@@ -186,7 +201,7 @@ var _ = Describe("builder", func() {
 				Namespace: "default",
 				Name:      "data-mysql-01-replicasets-0",
 			}
-			pvc, err := BuildPVCFromSnapshot(sts, sts.Spec.VolumeClaimTemplates[0], pvcKey, snapshotName)
+			pvc, err := BuildPVCFromSnapshot(sts, params.Component.VolumeClaimTemplates[0], pvcKey, snapshotName)
 			Expect(err).Should(BeNil())
 			Expect(pvc).ShouldNot(BeNil())
 			Expect(pvc.Spec.AccessModes).Should(Equal(sts.Spec.VolumeClaimTemplates[0].Spec.AccessModes))
@@ -195,16 +210,55 @@ var _ = Describe("builder", func() {
 
 		It("builds Service correctly", func() {
 			params := newParams()
-			svc, err := BuildSvc(*params, true)
+			svcList, err := BuildSvcList(*params)
 			Expect(err).Should(BeNil())
-			Expect(svc).ShouldNot(BeNil())
+			Expect(svcList).ShouldNot(BeEmpty())
 		})
 
-		It("builds ConnCredential correctly", func() {
-			params := newParams()
+		It("builds Conn. Credential correctly", func() {
+			params := newParamsWithClusterDef(testapps.NewClusterDefFactoryWithConnCredential("conn-cred").GetObject())
 			credential, err := BuildConnCredential(*params)
 			Expect(err).Should(BeNil())
 			Expect(credential).ShouldNot(BeNil())
+			// "username":      "root",
+			// "SVC_FQDN":      "$(SVC_FQDN)",
+			// "RANDOM_PASSWD": "$(RANDOM_PASSWD)",
+			// "tcpEndpoint":   "tcp:$(SVC_FQDN):$(SVC_PORT_mysql)",
+			// "paxosEndpoint": "paxos:$(SVC_FQDN):$(SVC_PORT_paxos)",
+			// "UUID":          "$(UUID)",
+			// "UUID_B64":      "$(UUID_B64)",
+			// "UUID_STR_B64":  "$(UUID_STR_B64)",
+			// "UUID_HEX":      "$(UUID_HEX)",
+			Expect(credential.StringData).ShouldNot(BeEmpty())
+			Expect(credential.StringData["username"]).Should(Equal("root"))
+
+			for _, v := range []string{
+				"SVC_FQDN",
+				"RANDOM_PASSWD",
+				"UUID",
+				"UUID_B64",
+				"UUID_STR_B64",
+				"UUID_HEX",
+			} {
+				Expect(credential.StringData[v]).ShouldNot(BeEquivalentTo(fmt.Sprintf("$(%s)", v)))
+			}
+			Expect(credential.StringData["RANDOM_PASSWD"]).Should(HaveLen(8))
+			svcFQDN := fmt.Sprintf("%s-%s.%s.svc", params.Cluster.Name, params.Component.Name,
+				params.Cluster.Namespace)
+			var mysqlPort corev1.ServicePort
+			var paxosPort corev1.ServicePort
+			for _, s := range params.Component.Services[0].Spec.Ports {
+				switch s.Name {
+				case "mysql":
+					mysqlPort = s
+				case "paxos":
+					paxosPort = s
+				}
+			}
+			Expect(credential.StringData["SVC_FQDN"]).Should(Equal(svcFQDN))
+			Expect(credential.StringData["tcpEndpoint"]).Should(Equal(fmt.Sprintf("tcp:%s:%d", svcFQDN, mysqlPort.Port)))
+			Expect(credential.StringData["paxosEndpoint"]).Should(Equal(fmt.Sprintf("paxos:%s:%d", svcFQDN, paxosPort.Port)))
+
 		})
 
 		It("builds StatefulSet correctly", func() {
@@ -212,16 +266,27 @@ var _ = Describe("builder", func() {
 			params := newParams()
 			envConfigName := "test-env-config-name"
 			newParams := params
+
+			sts, err := BuildSts(reqCtx, *params, envConfigName)
+			Expect(err).Should(BeNil())
+			Expect(sts).ShouldNot(BeNil())
+			// test  replicas = 0
 			newComponent := *params.Component
 			newComponent.Replicas = 0
-			newComponent.CharacterType = ""
 			newParams.Component = &newComponent
-			sts, err := BuildSts(reqCtx, *newParams, envConfigName)
+			sts, err = BuildSts(reqCtx, *newParams, envConfigName)
 			Expect(err).Should(BeNil())
 			Expect(sts).ShouldNot(BeNil())
-			sts, err = BuildSts(reqCtx, *params, envConfigName)
+			Expect(*sts.Spec.Replicas).Should(Equal(int32(0)))
+			// test workload type replication
+			replComponent := *params.Component
+			replComponent.Replicas = 2
+			replComponent.WorkloadType = appsv1alpha1.Replication
+			newParams.Component = &replComponent
+			sts, err = BuildSts(reqCtx, *newParams, envConfigName)
 			Expect(err).Should(BeNil())
 			Expect(sts).ShouldNot(BeNil())
+			Expect(*sts.Spec.Replicas).Should(Equal(int32(1)))
 		})
 
 		It("builds Deploy correctly", func() {
@@ -241,15 +306,7 @@ var _ = Describe("builder", func() {
 
 		It("builds Env Config correctly", func() {
 			params := newParams()
-			noCharacterTypeParams := params
-			noCharacterTypeComponent := *params.Component
-			noCharacterTypeComponent.CharacterType = ""
-			noCharacterTypeParams.Component = &noCharacterTypeComponent
 			cfg, err := BuildEnvConfig(*params)
-			Expect(err).Should(BeNil())
-			Expect(cfg).ShouldNot(BeNil())
-			Expect(len(cfg.Data) == 2).Should(BeTrue())
-			cfg, err = BuildEnvConfig(*noCharacterTypeParams)
 			Expect(err).Should(BeNil())
 			Expect(cfg).ShouldNot(BeNil())
 			Expect(len(cfg.Data) == 2).Should(BeTrue())
@@ -276,25 +333,15 @@ var _ = Describe("builder", func() {
 			Expect(len(cfg.Data) == 4).Should(BeTrue())
 		})
 
-		It("builds Env Config with Replication status correctly", func() {
+		It("builds Env Config with Replication component correctly", func() {
 			params := newParams()
-			params.Cluster.Status.Components = map[string]appsv1alpha1.ClusterComponentStatus{
-				params.Component.Name: {
-					ReplicationSetStatus: &appsv1alpha1.ReplicationSetStatus{
-						Primary: appsv1alpha1.ReplicationMemberStatus{
-							Pod: "pod1",
-						},
-						Secondaries: []appsv1alpha1.ReplicationMemberStatus{{
-							Pod: "pod2",
-						}, {
-							Pod: "pod3",
-						}},
-					},
-				}}
+			var mockPrimaryIndex = int32(testapps.DefaultReplicationPrimaryIndex)
+			params.Component.WorkloadType = appsv1alpha1.Replication
+			params.Component.PrimaryIndex = &mockPrimaryIndex
 			cfg, err := BuildEnvConfig(*params)
 			Expect(err).Should(BeNil())
 			Expect(cfg).ShouldNot(BeNil())
-			Expect(len(cfg.Data) == 4).Should(BeTrue())
+			Expect(len(cfg.Data) == 3).Should(BeTrue())
 		})
 
 		It("builds BackupPolicy correctly", func() {
@@ -359,12 +406,14 @@ var _ = Describe("builder", func() {
 		})
 
 		It("builds config manager sidecar container correctly", func() {
-			sidecarRenderedParam := &cfgcm.ConfigManagerSidecar{
-				ManagerName: "cfgmgr",
-				Image:       constant.KBImage,
-				Args:        []string{},
-				Envs:        []corev1.EnvVar{},
-				Volumes:     []corev1.VolumeMount{},
+			sidecarRenderedParam := &cfgcm.ConfigManagerParams{
+				ManagerName:   "cfgmgr",
+				CharacterType: "mysql",
+				SecreteName:   "test-secret",
+				Image:         constant.KBImage,
+				Args:          []string{},
+				Envs:          []corev1.EnvVar{},
+				Volumes:       []corev1.VolumeMount{},
 			}
 			configmap, err := BuildCfgManagerContainer(sidecarRenderedParam)
 			Expect(err).Should(BeNil())

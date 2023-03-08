@@ -1,0 +1,7 @@
+CHART NAME: {{ .Chart.Name }}
+CHART VERSION: {{ .Chart.Version }}
+APP VERSION: {{ .Chart.AppVersion }}
+
+KubeBlocks Kafka server cluster definition, start create your Kafka Server Cluster with following command:
+
+    kbcli cluster create --cluster-definition=kafka

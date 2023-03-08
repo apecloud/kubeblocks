@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -27,6 +28,7 @@ import (
 	"helm.sh/helm/v3/pkg/repo"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
@@ -45,7 +47,14 @@ var (
 )
 
 type uninstallOptions struct {
+	factory cmdutil.Factory
 	Options
+
+	// autoApprove if true, skip interactive approval
+	autoApprove bool
+
+	removePVs  bool
+	removePVCs bool
 }
 
 func newUninstallCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
@@ -53,6 +62,7 @@ func newUninstallCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *co
 		Options: Options{
 			IOStreams: streams,
 		},
+		factory: f,
 	}
 	cmd := &cobra.Command{
 		Use:     "uninstall",
@@ -65,21 +75,28 @@ func newUninstallCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *co
 			util.CheckErr(o.uninstall())
 		},
 	}
+
+	cmd.Flags().BoolVar(&o.autoApprove, "auto-approve", false, "Skip interactive approval before uninstalling KubeBlocks")
+	cmd.Flags().BoolVar(&o.removePVs, "remove-pvs", false, "Remove PersistentVolume or not")
+	cmd.Flags().BoolVar(&o.removePVCs, "remove-pvcs", false, "Remove PersistentVolumeClaim or not")
+	cmd.Flags().BoolVar(&o.verbose, "verbose", false, "Show logs in detail.")
 	return cmd
 }
 
 func (o *uninstallOptions) preCheck() error {
-	printer.Warning(o.Out, "uninstall will remove all KubeBlocks resources.\n")
-
 	// wait user to confirm
-	if err := confirmUninstall(o.In); err != nil {
-		return err
+	if !o.autoApprove {
+		printer.Warning(o.Out, "uninstall will remove all KubeBlocks resources.\n")
+		if err := confirmUninstall(o.In); err != nil {
+			return err
+		}
 	}
 
 	preCheckList := []string{
 		"clusters.apps.kubeblocks.io",
 	}
 	ctx := context.Background()
+
 	// delete crds
 	crs := map[string][]string{}
 	crdList, err := o.Dynamic.Resource(types.CRDGVR()).List(ctx, metav1.ListOptions{})
@@ -112,7 +129,22 @@ func (o *uninstallOptions) preCheck() error {
 		}
 		return errors.Errorf(errMsg.String())
 	}
-
+	{
+		// verify where kubeblocks is installed
+		var msg bytes.Buffer
+		secrets, err := o.Client.CoreV1().Secrets(metav1.NamespaceAll).List(ctx, metav1.ListOptions{LabelSelector: types.HelmLabel})
+		if err != nil || len(secrets.Items) == 0 {
+			msg.WriteString("failed to locate release, please use `kbcli kubeblocks status` to get information in more details")
+			return errors.New(msg.String())
+		} else {
+			kbNamespace := secrets.Items[0].Namespace
+			if o.Namespace != kbNamespace {
+				msg.WriteString(fmt.Sprintf("KubeBlocks is deployed in namespace: '%s'. ", kbNamespace))
+				msg.WriteString(fmt.Sprintf("Please specify namespace to uninstall `kbcli kubeblocks uninstall -n %s`", kbNamespace))
+				return errors.New(msg.String())
+			}
+		}
+	}
 	return nil
 }
 
@@ -146,31 +178,39 @@ func (o *uninstallOptions) uninstall() error {
 	printErr(spinner, helm.RemoveRepo(&repo.Entry{Name: types.KubeBlocksChartName}))
 
 	// get KubeBlocks objects and try to remove them
-	objs, err := getKBObjects(o.Client, o.Dynamic, o.Namespace)
+	objs, err := getKBObjects(o.Dynamic, o.Namespace)
 	if err != nil {
 		fmt.Fprintf(o.ErrOut, "Failed to get KubeBlocks objects %s", err.Error())
 	}
 
-	// remove finalizers
+	// remove finalizers of custom resources, then that will be deleted
 	spinner = newSpinner("Remove built-in custom resources")
-	printErr(spinner, removeFinalizers(o.Dynamic, objs))
+	printErr(spinner, removeCustomResources(o.Dynamic, objs))
 
-	// delete CRDs
-	spinner = newSpinner("Remove custom resource definitions")
-	printErr(spinner, deleteCRDs(o.Dynamic, objs.crds))
+	var gvrs []schema.GroupVersionResource
+	for k := range objs {
+		gvrs = append(gvrs, k)
+	}
+	sort.SliceStable(gvrs, func(i, j int) bool {
+		g1 := gvrs[i]
+		g2 := gvrs[j]
+		return strings.Compare(g1.Resource, g2.Resource) < 0
+	})
 
-	// delete deployments
-	spinner = newSpinner("Remove deployments")
-	printErr(spinner, deleteDeploys(o.Client, objs.deploys))
+	for _, gvr := range gvrs {
+		if gvr == types.PVCGVR() && !o.removePVCs {
+			continue
+		}
+		if gvr == types.PVGVR() && !o.removePVs {
+			continue
+		}
+		if v, ok := objs[gvr]; !ok || len(v.Items) == 0 {
+			continue
+		}
+		spinner = newSpinner(fmt.Sprintf("Remove %s", gvr.Resource))
+		printErr(spinner, deleteObjects(o.Dynamic, gvr, objs[gvr]))
+	}
 
-	// delete services
-	spinner = newSpinner("Remove services")
-	printErr(spinner, deleteServices(o.Client, objs.svcs))
-
-	// delete configmaps
-	spinner = newSpinner("Remove configmaps")
-	printErr(spinner, deleteConfigMaps(o.Client, objs.cms))
-
-	fmt.Fprintln(o.Out, "Uninstall KubeBlocks done")
+	fmt.Fprintln(o.Out, "Uninstall KubeBlocks done.")
 	return nil
 }

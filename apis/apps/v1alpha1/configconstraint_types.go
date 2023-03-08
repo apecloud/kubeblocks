@@ -100,6 +100,10 @@ type ReloadOptions struct {
 	// shellTrigger performs the reload command.
 	// +optional
 	ShellTrigger *ShellTrigger `json:"shellTrigger,omitempty"`
+
+	// goTplTrigger performs the reload command.
+	// +optional
+	TPLScriptTrigger *TPLScriptTrigger `json:"tplScriptTrigger"`
 }
 
 type UnixSignalTrigger struct {
@@ -121,14 +125,36 @@ type ShellTrigger struct {
 	Exec string `json:"exec"`
 }
 
+type TPLScriptTrigger struct {
+	// scriptConfigMapRef used to execute for reload.
+	// +kubebuilder:validation:Required
+	ScriptConfigMapRef string `json:"scriptConfigMapRef"`
+
+	// Specify the namespace of the referenced the tpl script ConfigMap object.
+	// An empty namespace is equivalent to the "default" namespace.
+	// +kubebuilder:validation:MaxLength=63
+	// +kubebuilder:default="default"
+	// +optional
+	Namespace string `json:"namespace,omitempty"`
+}
+
 type FormatterConfig struct {
 	// The FormatterOptions represents the special options of configuration file.
 	// This is optional for now. If not specified.
 	// +optional
 	FormatterOptions `json:",inline"`
 
-	// The configuration file format. Valid values are ini, yaml, json, xml,
-	// hcl, and dotenv.
+	// The configuration file format. Valid values are ini, xml, yaml, json,
+	// hcl, dotenv, properties and toml.
+	//
+	// ini: a configuration file that consists of a text-based content with a structure and syntax comprising key–value pairs for properties, reference wiki: https://en.wikipedia.org/wiki/INI_file
+	// xml: reference wiki: https://en.wikipedia.org/wiki/XML
+	// yaml: a configuration file support for complex data types and structures.
+	// json: reference wiki: https://en.wikipedia.org/wiki/JSON
+	// hcl: : The HashiCorp Configuration Language (HCL) is a configuration language authored by HashiCorp, reference url: https://www.linode.com/docs/guides/introduction-to-hcl/
+	// dotenv: this was a plain text file with simple key–value pairs, reference wiki: https://en.wikipedia.org/wiki/Configuration_file#MS-DOS
+	// properties: a file extension mainly used in Java, reference wiki: https://en.wikipedia.org/wiki/.properties
+	// toml: reference wiki: https://en.wikipedia.org/wiki/TOML
 	// +kubebuilder:validation:Required
 	Format CfgFileFormat `json:"format"`
 }
@@ -150,11 +176,11 @@ type IniConfig struct {
 	SectionName string `json:"sectionName,omitempty"`
 }
 
-//+kubebuilder:object:root=true
-//+kubebuilder:subresource:status
-//+kubebuilder:resource:categories={kubeblocks},scope=Cluster,shortName=cc
-//+kubebuilder:printcolumn:name="PHASE",type="string",JSONPath=".status.phase",description="status phase"
-//+kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
+// +kubebuilder:object:root=true
+// +kubebuilder:subresource:status
+// +kubebuilder:resource:categories={kubeblocks},scope=Cluster,shortName=cc
+// +kubebuilder:printcolumn:name="PHASE",type="string",JSONPath=".status.phase",description="status phase"
+// +kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
 
 // ConfigConstraint is the Schema for the configconstraint API
 type ConfigConstraint struct {
@@ -165,7 +191,7 @@ type ConfigConstraint struct {
 	Status ConfigConstraintStatus `json:"status,omitempty"`
 }
 
-//+kubebuilder:object:root=true
+// +kubebuilder:object:root=true
 
 // ConfigConstraintList contains a list of ConfigConstraints.
 type ConfigConstraintList struct {

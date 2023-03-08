@@ -33,7 +33,7 @@ import (
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	"github.com/apecloud/kubeblocks/internal/controller/plan"
-	"github.com/apecloud/kubeblocks/internal/controllerutil"
+	"github.com/apecloud/kubeblocks/internal/generics"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 	testk8s "github.com/apecloud/kubeblocks/internal/testutil/k8s"
 )
@@ -66,8 +66,8 @@ var _ = Describe("TLS self-signed cert function", func() {
 		// delete rest configurations
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 		// non-namespaced
-		testapps.ClearResources(&testCtx, controllerutil.ConfigConstraintSignature, ml)
-		testapps.ClearResources(&testCtx, controllerutil.BackupPolicyTemplateSignature, ml)
+		testapps.ClearResources(&testCtx, generics.ConfigConstraintSignature, ml)
+		testapps.ClearResources(&testCtx, generics.BackupPolicyTemplateSignature, ml)
 	}
 
 	BeforeEach(cleanEnv)
@@ -91,7 +91,7 @@ var _ = Describe("TLS self-signed cert function", func() {
 			By("Create a clusterDef obj")
 			mode := int32(0755)
 			testapps.NewClusterDefFactory(clusterDefName).
-				SetConnectionCredential(map[string]string{"username": "root", "password": ""}).
+				SetConnectionCredential(map[string]string{"username": "root", "password": ""}, nil).
 				AddComponent(testapps.ConsensusMySQLComponent, statefulCompType).
 				AddConfigTemplate(configTplName, configMapObj.Name, configConstraintObj.Name, testCtx.DefaultNamespace, testapps.ConfVolumeName, &mode).
 				AddContainerEnv(mysqlContainerName, corev1.EnvVar{Name: "MYSQL_ALLOW_EMPTY_PASSWORD", Value: "yes"}).

@@ -130,14 +130,18 @@ all: manager kbcli probe reloader loadbalancer ## Make all cmd binaries.
 
 .PHONY: manifests
 manifests: test-go-generate controller-gen ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
-	$(CONTROLLER_GEN) rbac:roleName=manager-role crd:generateEmbeddedObjectMeta=true webhook paths="./apis/...;./controllers/apps/...;./controllers/dataprotection/...;./controllers/k8score/...;./cmd/manager/...;./internal/..." output:crd:artifacts:config=config/crd/bases
+	$(CONTROLLER_GEN) rbac:roleName=manager-role crd:generateEmbeddedObjectMeta=true webhook paths="./apis/...;./controllers/apps/...;./controllers/dataprotection/...;./controllers/extensions/...;./controllers/k8score/...;./cmd/manager/...;./internal/..." output:crd:artifacts:config=config/crd/bases
 	@cp config/crd/bases/* $(CHART_PATH)/crds
 	@cp config/rbac/role.yaml $(CHART_PATH)/config/rbac/role.yaml
 	$(CONTROLLER_GEN) rbac:roleName=loadbalancer-role  paths="./controllers/loadbalancer;./cmd/loadbalancer/controller" output:dir=config/loadbalancer
 
+.PHONY: preflight-manifests
+preflight-manifests: generate ## Generate external Preflight API
+	$(CONTROLLER_GEN) rbac:roleName=manager-role crd:generateEmbeddedObjectMeta=true webhook paths="./externalapis/preflight/..." output:crd:artifacts:config=config/crd/preflight
+
 .PHONY: generate
 generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
-	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./apis/..."
+	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./apis/...;./externalapis/..."
 
 .PHONY: manager-go-generate
 manager-go-generate: ## Run go generate against lifecycle manager code.
@@ -159,16 +163,16 @@ test-go-generate: ## Run go generate against test code.
 
 .PHONY: fmt
 fmt: ## Run go fmt against code.
-	$(GOFMT) -l -w -s $$(git ls-files | grep "\.go$$")
+	$(GOFMT) -l -w -s $$(git ls-files --exclude-standard | grep "\.go$$")
 
 .PHONY: vet
 vet: ## Run go vet against code.
-	GOOS=linux $(GO) vet ./...
+	GOOS=linux $(GO) vet -mod=mod ./...
 
 .PHONY: cue-fmt
 cue-fmt: cuetool ## Run cue fmt against code.
-	git ls-files | grep "\.cue$$" | xargs $(CUE) fmt
-	git ls-files | grep "\.cue$$" | xargs $(CUE) fix
+	git ls-files --exclude-standard | grep "\.cue$$" | xargs $(CUE) fmt
+	git ls-files --exclude-standard | grep "\.cue$$" | xargs $(CUE) fix
 
 .PHONY: fast-lint
 fast-lint: golangci staticcheck  # [INTERNAL] fast lint
@@ -217,9 +221,12 @@ endif
 test-current-ctx: manifests generate fmt vet add-k8s-host ## Run operator controller tests with current $KUBECONFIG context. if existing k8s cluster is k3d or minikube, specify EXISTING_CLUSTER_TYPE.
 	USE_EXISTING_CLUSTER=true KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" $(GO) test  -p 1 -coverprofile cover.out $(TEST_PACKAGES)
 
-.PHONY: test
-test: manifests generate test-go-generate fmt vet envtest add-k8s-host ## Run tests. if existing k8s cluster is k3d or minikube, specify EXISTING_CLUSTER_TYPE.
+.PHONY: test-fast
+test-fast: envtest
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" $(GO) test -short -coverprofile cover.out $(TEST_PACKAGES)
+
+.PHONY: test
+test: manifests generate test-go-generate fmt vet add-k8s-host test-fast ## Run tests. if existing k8s cluster is k3d or minikube, specify EXISTING_CLUSTER_TYPE.
 
 .PHONY: test-integration
 test-integration: manifests generate fmt vet envtest add-k8s-host ## Run tests. if existing k8s cluster is k3d or minikube, specify EXISTING_CLUSTER_TYPE.
@@ -274,7 +281,7 @@ kbcli: test-go-generate build-checks ## Build bin/kbcli.
 	$(MAKE) bin/kbcli.$(OS).$(ARCH)
 	mv bin/kbcli.$(OS).$(ARCH) bin/kbcli
 
-.PHONY: clean
+.PHONY: clean-kbcli
 clean-kbcli: ## Clean bin/kbcli*.
 	rm -f bin/kbcli*
 
@@ -311,7 +318,7 @@ run: manifests generate fmt vet ## Run a controller from your host.
 ifeq ($(ENABLE_WEBHOOKS), true)
 	$(MAKE) webhook-cert
 endif
-	$(GO) run ./cmd/manager/main.go -zap-devel=false -zap-encoder=console -zap-time-encoding=iso8601
+	$(GO) run ./cmd/manager/main.go --zap-devel=false --zap-encoder=console --zap-time-encoding=iso8601
 
 # Run with Delve for development purposes against the configured Kubernetes cluster in ~/.kube/config
 # Delve is a debugger for the Go programming language. More info: https://github.com/go-delve/delve
@@ -456,10 +463,14 @@ else
 	sed -i "s/^appVersion:.*/appVersion: $(VERSION)/" $(CHART_PATH)/Chart.yaml
 endif
 
-
 .PHONY: helm-package
 helm-package: bump-chart-ver ## Do helm package.
-	$(HELM) package $(CHART_PATH) --dependency-update
+## it will pull down the latest charts that satisfy the dependencies, and clean up old dependencies.
+## this is a hack fix: decompress the tgz from the depend-charts directory to the charts directory
+## before dependency update.
+	cd $(CHART_PATH)/charts && ls ../depend-charts/*.tgz | xargs -n1 tar xf
+	$(HELM) dependency update --skip-refresh $(CHART_PATH)
+	$(HELM) package $(CHART_PATH)
 
 ##@ Build Dependencies
 
@@ -734,7 +745,7 @@ endif
 ifeq ($(MINIKUBE_IMAGE_MIRROR_COUNTRY), cn)
 	TAG_K8S_IMAGE_REPO := k8s.gcr.io
 	TAG_SIGSTORAGE_IMAGE_REPO := k8s.gcr.io/sig-storage
-ifeq ($(K8S_VERSION), v1.26.1) 
+ifeq ($(K8S_VERSION_MAJOR_MINOR), v1.26)
 	TAG_K8S_IMAGE_REPO := registry.k8s.io
 endif
 endif
@@ -821,12 +832,20 @@ endif
 minikube-delete: minikube ## Delete minikube cluster.
 	$(MINIKUBE) delete
 
-##@ Test E2E
-.PHONY: test-e2e
-test-e2e: ## Test End-to-end.
-	$(MAKE) -e VERSION=$(VERSION) -C test/e2e run
+.PHONY: smoke-testdata-manifests
+smoke-testdata-manifests: ## Update E2E test dataset
+	$(HELM) template mycluster deploy/apecloud-mysql-cluster > test/e2e/testdata/smoketest/wesql/00_wesqlcluster.yaml
+	$(HELM) template mycluster deploy/postgresqlcluster > test/e2e/testdata/smoketest/postgresql/00_postgresqlcluster.yaml
+	$(HELM) template mycluster deploy/redis > test/e2e/testdata/smoketest/redis/00_rediscluster.yaml
+	$(HELM) template mycluster deploy/redis-rep-cluster >> test/e2e/testdata/smoketest/redis/00_rediscluster.yaml
 
+##@ Test E2E
+GINKGO=$(shell which ginkgo)
+.PHONY: test-e2e
+test-e2e: smoke-testdata-manifests ## Test End-to-end.
+	$(GINKGO) test -process -ginkgo.v test/e2e
 
 # NOTE: include must be at the end
 ##@ Docker containers
 include docker/docker.mk
+

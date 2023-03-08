@@ -16,18 +16,6 @@ limitations under the License.
 
 package apps
 
-import (
-	"fmt"
-
-	"github.com/apecloud/kubeblocks/internal/constant"
-)
-
-func getEnvReplacementMapForConnCrential(clusterName string) map[string]string {
-	return map[string]string{
-		constant.ConnCredentialPlaceHolder: fmt.Sprintf("%s-conn-credential", clusterName),
-	}
-}
-
 func getEnvReplacementMapForAccount(name, passwd string) map[string]string {
 	return map[string]string{
 		"$(USERNAME)": name,

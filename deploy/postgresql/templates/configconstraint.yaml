@@ -43,4 +43,4 @@ spec:
 
   # configuration file format
   formatterConfig:
-    format: dotenv
+    format: properties

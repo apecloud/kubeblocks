@@ -23,7 +23,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-func TestAppp(t *testing.T) {
+func TestApp(t *testing.T) {
 	RegisterFailHandler(Fail)
 	RunSpecs(t, "App Test Suite")
 }

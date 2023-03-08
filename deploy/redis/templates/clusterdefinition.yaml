@@ -8,10 +8,52 @@ spec:
   connectionCredential:
     username: ""
     password: ""
+    endpoint: "$(SVC_FQDN):$(SVC_PORT_redis)"
+    host: "$(SVC_FQDN)"
+    port: "$(SVC_PORT_redis)"
   componentDefs:
-    - name: replication
+    - name: redis
       workloadType: Replication
       characterType: redis
+      replicationSpec:
+        switchPolicies:
+          - type: MaximumAvailability
+            switchStatements:
+              demote:
+                - replicaof $KB_NEW_PRIMARY_ROLE_NAME 6379
+              promote:
+                - replicaof no one
+              follow:
+                - replicaof $KB_NEW_PRIMARY_ROLE_NAME 6379
+          - type: MaximumDataProtection
+            switchStatements:
+              demote:
+                - replicaof $KB_NEW_PRIMARY_ROLE_NAME 6379
+              promote:
+                - replicaof no one
+              follow:
+                - replicaof $KB_NEW_PRIMARY_ROLE_NAME 6379
+        switchCmdExecutorConfig:
+          image: redis:7.0.5
+          switchSteps:
+          - role: NewPrimary
+            command:
+              - /bin/sh
+              - -c
+            args:
+              - redis-cli -h $(KB_SWITCH_ROLE_ENDPOINT) -p 6379 $(KB_SWITCH_PROMOTE_STATEMENT)
+          - role: Secondaries
+            command:
+              - /bin/sh
+              - -c
+            args:
+              - redis-cli -h $(KB_SWITCH_ROLE_ENDPOINT) -p 6379 $(KB_SWITCH_FOLLOW_STATEMENT)
+          - role: OldPrimary
+            command:
+              - /bin/sh
+              - -c
+            args:
+              - redis-cli -h $(KB_SWITCH_ROLE_ENDPOINT) -p 6379 $(KB_SWITCH_DEMOTE_STATEMENT)
       service:
         ports:
           - protocol: TCP
@@ -36,6 +78,11 @@ spec:
         exporterConfig:
           scrapePort: 9121
           scrapePath: "/metrics"
+      logConfigs:
+        {{- range $name,$pattern := .Values.logConfigs }}
+        - name: {{ $name }}
+          filePathPattern: {{ $pattern }}
+        {{- end }}
       podSpec:
         initContainers:
           - name: redis-init-container
@@ -50,8 +97,6 @@ spec:
                 mountPath: /etc/conf/primary
               - name: secondary
                 mountPath: /etc/conf/secondary
-              - name: pod-role
-                mountPath: /etc/conf/role
               - name: scripts
                 mountPath: /scripts
         containers:
@@ -69,8 +114,6 @@ spec:
                 mountPath: /etc/conf/primary
               - name: secondary
                 mountPath: /etc/conf/secondary
-              - name: pod-role
-                mountPath: /etc/conf/role
               - name: scripts
                 mountPath: /scripts
             args: [ "/etc/conf/redis.conf" ]
@@ -100,12 +143,6 @@ spec:
         volumes:
           - name: conf
             emptyDir: { }
-          - name: pod-role
-            downwardAPI:
-              items:
-                - path: "labels"
-                  fieldRef:
-                    fieldPath: metadata.labels['kubeblocks.io/role']
       systemAccounts:
         cmdExecutorConfig:
           image: docker.io/redis:7.0.5

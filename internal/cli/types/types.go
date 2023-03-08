@@ -17,9 +17,14 @@ limitations under the License.
 package types
 
 import (
+	"fmt"
+
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
 const (
@@ -27,6 +32,10 @@ const (
 	CliDefaultHome = ".kbcli"
 	// CliHomeEnv defines kbcli home system env
 	CliHomeEnv = "KBCLI_HOME"
+
+	// DefaultNamespace is the namespace where kubeblocks is installed if
+	// no other namespace is specified
+	DefaultNamespace = "kb-system"
 
 	// GoosLinux is os.GOOS linux string
 	GoosLinux = "linux"
@@ -37,9 +46,6 @@ const (
 
 	// Group api group
 	Group = "apps.kubeblocks.io"
-
-	// AppsGroup k8s apps group
-	AppsGroup = "apps"
 
 	// Version api version
 	Version = "v1alpha1"
@@ -62,6 +68,8 @@ const (
 	ResourceStatefulSets = "statefulsets"
 	// ResourceConfigConstraintVersions clusterVersion resource
 	ResourceConfigConstraintVersions = "configconstraints"
+	// ResourceSecrets secret resources
+	ResourceSecrets = "secrets"
 
 	// KindCluster cluster king
 	KindCluster = "Cluster"
@@ -74,17 +82,6 @@ const (
 	KindRestoreJob           = "RestoreJob"
 	KindBackupPolicyTemplate = "BackupPolicyTemplate"
 	KindOps                  = "OpsRequest"
-	KindCM                   = "ConfigMap"
-	KindSTS                  = "StatefulSet"
-
-	NameLabelKey                   = "app.kubernetes.io/name"
-	InstanceLabelKey               = "app.kubernetes.io/instance"
-	ConsensusSetAccessModeLabelKey = "cs.apps.kubeblocks.io/access-mode"
-	ComponentLabelKey              = "app.kubernetes.io/component-name"
-	RegionLabelKey                 = "topology.kubernetes.io/region"
-	ZoneLabelKey                   = "topology.kubernetes.io/zone"
-	ClusterDefLabelKey             = "clusterdefinition.kubeblocks.io/name"
-	RoleLabelKey                   = "kubeblocks.io/role"
 
 	ServiceLBTypeAnnotationKey     = "service.kubernetes.io/kubeblocks-loadbalancer-type"
 	ServiceLBTypeAnnotationValue   = "private-ip"
@@ -104,14 +101,29 @@ const (
 )
 
 var (
-	// KubeBlocksChartName helm name for installing kubeblocks
+	// KubeBlocksRepoName helm repo name for kubeblocks
+	KubeBlocksRepoName = "kubeblocks"
+
+	// KubeBlocksChartName helm chart name for kubeblocks
 	KubeBlocksChartName = "kubeblocks"
+
+	// KubeBlocksReleaseName helm release name for kubeblocks
+	KubeBlocksReleaseName = "kubeblocks"
 
 	// KubeBlocksChartURL the helm chart repo for installing kubeblocks
 	KubeBlocksChartURL = "https://apecloud.github.io/helm-charts"
 
 	// GitLabHelmChartRepo the helm chart repo in GitLab
 	GitLabHelmChartRepo = "https://jihulab.com/api/v4/projects/85949/packages/helm/stable"
+
+	// InstanceLabelSelector app.kubernetes.io/instance=kubeblocks, hit most workloads and configuration
+	InstanceLabelSelector = fmt.Sprintf("%s=%s", constant.AppInstanceLabelKey, KubeBlocksChartName)
+
+	// ReleaseLabelSelector release=kubeblocks, for prometheus-alertmanager and prometheus-server
+	ReleaseLabelSelector = fmt.Sprintf("release=%s", KubeBlocksChartName)
+
+	// HelmLabel name=kubeblocks,owner-helm, for helm secret
+	HelmLabel = fmt.Sprintf("%s=%s,%s=%s", "name", KubeBlocksChartName, "owner", "helm")
 )
 
 type BackupJobInfo struct {
@@ -134,6 +146,12 @@ type BackupSnapInfo struct {
 	Labels        string
 }
 
+type ConfigTemplateInfo struct {
+	Name  string
+	TPL   appsv1alpha1.ConfigTemplate
+	CMObj *corev1.ConfigMap
+}
+
 func ClusterGVR() schema.GroupVersionResource {
 	return schema.GroupVersionResource{Group: Group, Version: Version, Resource: ResourceClusters}
 }
@@ -154,6 +172,10 @@ func BackupPolicyTemplateGVR() schema.GroupVersionResource {
 	return schema.GroupVersionResource{Group: DPGroup, Version: DPVersion, Resource: ResourceBackupPolicyTemplates}
 }
 
+func BackupToolGVR() schema.GroupVersionResource {
+	return schema.GroupVersionResource{Group: DPGroup, Version: DPVersion, Resource: ResourceBackupTools}
+}
+
 func RestoreJobGVR() schema.GroupVersionResource {
 	return schema.GroupVersionResource{Group: DPGroup, Version: DPVersion, Resource: ResourceRestoreJobs}
 }
@@ -170,12 +192,32 @@ func CRDGVR() schema.GroupVersionResource {
 	}
 }
 
-func CMGVR() schema.GroupVersionResource {
+func ConfigmapGVR() schema.GroupVersionResource {
 	return schema.GroupVersionResource{Group: corev1.GroupName, Version: VersionV1, Resource: ResourceConfigmaps}
 }
 
-func STSGVR() schema.GroupVersionResource {
+func SecretGVR() schema.GroupVersionResource {
+	return schema.GroupVersionResource{Group: corev1.GroupName, Version: VersionV1, Resource: ResourceSecrets}
+}
+
+func StatefulSetGVR() schema.GroupVersionResource {
 	return schema.GroupVersionResource{Group: appsv1.GroupName, Version: VersionV1, Resource: ResourceStatefulSets}
+}
+
+func DeployGVR() schema.GroupVersionResource {
+	return schema.GroupVersionResource{Group: appsv1.GroupName, Version: VersionV1, Resource: ResourceDeployments}
+}
+
+func ServiceGVR() schema.GroupVersionResource {
+	return schema.GroupVersionResource{Group: corev1.GroupName, Version: VersionV1, Resource: "services"}
+}
+
+func PVCGVR() schema.GroupVersionResource {
+	return schema.GroupVersionResource{Group: corev1.GroupName, Version: VersionV1, Resource: "persistentvolumeclaims"}
+}
+
+func PVGVR() schema.GroupVersionResource {
+	return schema.GroupVersionResource{Group: corev1.GroupName, Version: VersionV1, Resource: "persistentvolumes"}
 }
 
 func ConfigConstraintGVR() schema.GroupVersionResource {

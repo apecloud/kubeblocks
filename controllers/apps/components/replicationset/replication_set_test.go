@@ -26,7 +26,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/generics"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 	testk8s "github.com/apecloud/kubeblocks/internal/testutil/k8s"
 )
@@ -106,17 +106,20 @@ var _ = Describe("Replication Component", func() {
 			} {
 				sts := testapps.NewStatefulSetFactory(testCtx.DefaultNamespace, v, clusterObj.Name, testapps.DefaultRedisCompName).
 					AddContainer(corev1.Container{Name: testapps.DefaultRedisContainerName, Image: testapps.DefaultRedisImageName}).
-					AddLabels(intctrlutil.AppInstanceLabelKey, clusterObj.Name,
-						intctrlutil.AppComponentLabelKey, testapps.DefaultRedisCompName,
-						intctrlutil.AppManagedByLabelKey, testapps.KubeBlocks,
-						intctrlutil.RoleLabelKey, k).
+					AddAppInstanceLabel(clusterObj.Name).
+					AddAppComponentLabel(testapps.DefaultRedisCompName).
+					AddAppManangedByLabel().
+					AddRoleLabel(k).
 					SetReplicas(1).
 					Create(&testCtx).GetObject()
+				isStsPrimary, err := checkObjRoleLabelIsPrimary(sts)
 				if k == string(Primary) {
-					Expect(CheckStsIsPrimary(sts)).Should(BeTrue())
+					Expect(err).To(Succeed())
+					Expect(isStsPrimary).Should(BeTrue())
 					primarySts = sts
 				} else {
-					Expect(CheckStsIsPrimary(sts)).ShouldNot(BeTrue())
+					Expect(err).To(Succeed())
+					Expect(isStsPrimary).ShouldNot(BeTrue())
 					secondarySts = sts
 				}
 			}

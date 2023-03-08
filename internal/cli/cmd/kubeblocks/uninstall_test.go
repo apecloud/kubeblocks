@@ -67,14 +67,16 @@ var _ = Describe("kubeblocks uninstall", func() {
 	})
 
 	It("run uninstall", func() {
-		o := uninstallOptions{Options{
-			IOStreams: streams,
-			HelmCfg:   helm.FakeActionConfig(),
-			Namespace: "default",
-			Client:    testing.FakeClientSet(),
-			Dynamic:   testing.FakeDynamicClient(testing.FakeVolumeSnapshotClass()),
-		}}
-
+		o := uninstallOptions{
+			Options: Options{
+				IOStreams: streams,
+				HelmCfg:   helm.NewFakeConfig(namespace),
+				Namespace: "default",
+				Client:    testing.FakeClientSet(),
+				Dynamic:   testing.FakeDynamicClient(testing.FakeVolumeSnapshotClass()),
+			},
+			autoApprove: false,
+		}
 		Expect(o.uninstall()).Should(Succeed())
 	})
 })

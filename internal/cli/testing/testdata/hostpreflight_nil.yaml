@@ -1,0 +1,20 @@
+apiVersion: troubleshoot.sh/v1beta2
+kind: HostPreflight
+metadata:
+  name: kubeblocks_hostpreflight
+spec:
+  collectors:
+  analyzers:
+    - cpu:
+        outcomes:
+          - fail:
+              when: "physical < 4"
+              message: At least 4 physical CPU cores are required
+          - fail:
+              when: "logical < 8"
+              message: At least 8 CPU cores are required
+          - warn:
+              when: "count < 16"
+              message: At least 16 CPU cores preferred
+          - pass:
+              message: This server has sufficient CPU cores

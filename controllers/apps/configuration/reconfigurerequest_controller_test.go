@@ -27,7 +27,8 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	"github.com/apecloud/kubeblocks/internal/constant"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/generics"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 )
 
@@ -80,13 +81,13 @@ var _ = Describe("Reconfigure Controller", func() {
 				"resources/mysql_config_cm.yaml", &corev1.ConfigMap{},
 				testCtx.UseDefaultNamespace(),
 				testapps.WithLabels(
-					intctrlutil.AppNameLabelKey, clusterName,
-					intctrlutil.AppInstanceLabelKey, clusterName,
-					intctrlutil.AppComponentLabelKey, statefulCompName,
-					cfgcore.CMConfigurationTplNameLabelKey, configTplName,
-					cfgcore.CMConfigurationConstraintsNameLabelKey, cmName,
-					cfgcore.CMConfigurationProviderTplLabelKey, configTplName,
-					cfgcore.CMConfigurationTypeLabelKey, cfgcore.ConfigInstanceType,
+					constant.AppNameLabelKey, clusterName,
+					constant.AppInstanceLabelKey, clusterName,
+					constant.KBAppComponentLabelKey, statefulCompName,
+					constant.CMConfigurationTplNameLabelKey, configTplName,
+					constant.CMConfigurationConstraintsNameLabelKey, cmName,
+					constant.CMConfigurationProviderTplLabelKey, configTplName,
+					constant.CMConfigurationTypeLabelKey, constant.ConfigInstanceType,
 				))
 
 			constraint := testapps.CreateCustomizedObj(&testCtx,
@@ -123,11 +124,11 @@ var _ = Describe("Reconfigure Controller", func() {
 			_ = testapps.NewStatefulSetFactory(testCtx.DefaultNamespace, statefulSetName, clusterObj.Name, statefulCompName).
 				AddConfigmapVolume(configVolumeName, configmap.Name).
 				AddContainer(container).
-				AddLabels(intctrlutil.AppNameLabelKey, clusterName,
-					intctrlutil.AppInstanceLabelKey, clusterName,
-					intctrlutil.AppComponentLabelKey, statefulCompName,
-					cfgcore.GenerateTPLUniqLabelKeyWithConfig(configTplName), configmap.Name,
-				).Create(&testCtx).GetObject()
+				AddAppNameLabel(clusterName).
+				AddAppInstanceLabel(clusterName).
+				AddAppComponentLabel(statefulCompName).
+				AddLabels(cfgcore.GenerateTPLUniqLabelKeyWithConfig(configTplName), configmap.Name).
+				Create(&testCtx).GetObject()
 
 			By("check config constraint")
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(constraint), func(g Gomega, tpl *appsv1alpha1.ConfigConstraint) {
@@ -139,11 +140,11 @@ var _ = Describe("Reconfigure Controller", func() {
 			Eventually(func(g Gomega) {
 				cm := &corev1.ConfigMap{}
 				g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(configmap), cm)).Should(Succeed())
-				g.Expect(cm.Labels[intctrlutil.AppInstanceLabelKey]).To(Equal(clusterObj.Name))
-				g.Expect(cm.Labels[cfgcore.CMConfigurationTplNameLabelKey]).To(Equal(configTplName))
-				g.Expect(cm.Labels[cfgcore.CMConfigurationTypeLabelKey]).NotTo(Equal(""))
-				g.Expect(cm.Labels[cfgcore.CMInsLastReconfigureMethodLabelKey]).To(Equal(ReconfigureFirstConfigType))
-				configHash = cm.Labels[cfgcore.CMInsConfigurationHashLabelKey]
+				g.Expect(cm.Labels[constant.AppInstanceLabelKey]).To(Equal(clusterObj.Name))
+				g.Expect(cm.Labels[constant.CMConfigurationTplNameLabelKey]).To(Equal(configTplName))
+				g.Expect(cm.Labels[constant.CMConfigurationTypeLabelKey]).NotTo(Equal(""))
+				g.Expect(cm.Labels[constant.CMInsLastReconfigureMethodLabelKey]).To(Equal(ReconfigureFirstConfigType))
+				configHash = cm.Labels[constant.CMInsConfigurationHashLabelKey]
 				g.Expect(configHash).NotTo(Equal(""))
 			}).Should(Succeed())
 
@@ -157,9 +158,9 @@ var _ = Describe("Reconfigure Controller", func() {
 			Eventually(func(g Gomega) {
 				cm := &corev1.ConfigMap{}
 				g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(configmap), cm)).Should(Succeed())
-				newHash := cm.Labels[cfgcore.CMInsConfigurationHashLabelKey]
+				newHash := cm.Labels[constant.CMInsConfigurationHashLabelKey]
 				g.Expect(newHash).NotTo(Equal(configHash))
-				g.Expect(cm.Labels[cfgcore.CMInsLastReconfigureMethodLabelKey]).To(Equal(ReconfigureAutoReloadType))
+				g.Expect(cm.Labels[constant.CMInsLastReconfigureMethodLabelKey]).To(Equal(ReconfigureAutoReloadType))
 			}).Should(Succeed())
 
 			By("invalid Update")
@@ -172,7 +173,7 @@ var _ = Describe("Reconfigure Controller", func() {
 			Eventually(func(g Gomega) {
 				cm := &corev1.ConfigMap{}
 				g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(configmap), cm)).Should(Succeed())
-				g.Expect(cm.Labels[cfgcore.CMInsLastReconfigureMethodLabelKey]).Should(BeEquivalentTo(ReconfigureNoChangeType))
+				g.Expect(cm.Labels[constant.CMInsLastReconfigureMethodLabelKey]).Should(BeEquivalentTo(ReconfigureNoChangeType))
 			}).Should(Succeed())
 
 			By("restart Update")
@@ -185,7 +186,7 @@ var _ = Describe("Reconfigure Controller", func() {
 			Eventually(func(g Gomega) {
 				cm := &corev1.ConfigMap{}
 				g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(configmap), cm)).Should(Succeed())
-				g.Expect(cm.Labels[cfgcore.CMInsLastReconfigureMethodLabelKey]).Should(BeEquivalentTo(ReconfigureSimpleType))
+				g.Expect(cm.Labels[constant.CMInsLastReconfigureMethodLabelKey]).Should(BeEquivalentTo(ReconfigureSimpleType))
 			}).Should(Succeed())
 		})
 	})

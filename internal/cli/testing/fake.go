@@ -22,6 +22,7 @@ import (
 
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	"github.com/sethvargo/go-password/password"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -30,7 +31,7 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/constant"
 )
 
 const (
@@ -160,10 +161,10 @@ func FakePods(replicas int, namespace string, cluster string) *corev1.PodList {
 		}
 
 		pod.Labels = map[string]string{
-			types.InstanceLabelKey:  cluster,
-			types.RoleLabelKey:      role,
-			types.ComponentLabelKey: ComponentName,
-			types.NameLabelKey:      "mysql-apecloud-mysql",
+			intctrlutil.AppInstanceLabelKey:    cluster,
+			intctrlutil.RoleLabelKey:           role,
+			intctrlutil.KBAppComponentLabelKey: ComponentName,
+			intctrlutil.AppNameLabelKey:        "mysql-apecloud-mysql",
 		}
 		pod.Spec.NodeName = NodeName
 		pod.Spec.Containers = []corev1.Container{
@@ -184,7 +185,7 @@ func FakeSecrets(namespace string, cluster string) *corev1.SecretList {
 	secret.Namespace = namespace
 	secret.Type = corev1.SecretTypeServiceAccountToken
 	secret.Labels = map[string]string{
-		types.InstanceLabelKey:           cluster,
+		intctrlutil.AppInstanceLabelKey:  cluster,
 		intctrlutil.AppManagedByLabelKey: intctrlutil.AppName,
 	}
 
@@ -201,8 +202,8 @@ func FakeNode() *corev1.Node {
 	node := &corev1.Node{}
 	node.Name = NodeName
 	node.Labels = map[string]string{
-		types.RegionLabelKey: "fake-node-region",
-		types.ZoneLabelKey:   "fake-node-zone",
+		intctrlutil.RegionLabelKey: "fake-node-region",
+		intctrlutil.ZoneLabelKey:   "fake-node-zone",
 	}
 	return node
 }
@@ -216,9 +217,13 @@ func FakeClusterDef() *appsv1alpha1.ClusterDefinition {
 			CharacterType: "mysql",
 			SystemAccounts: &appsv1alpha1.SystemAccountSpec{
 				CmdExecutorConfig: &appsv1alpha1.CmdExecutorConfig{
-					Image:   "",
-					Command: []string{"mysql"},
-					Args:    []string{"-h$(KB_ACCOUNT_ENDPOINT)", "-e $(KB_ACCOUNT_STATEMENT)"},
+					CommandExecutorEnvItem: appsv1alpha1.CommandExecutorEnvItem{
+						Image: "",
+					},
+					CommandExecutorItem: appsv1alpha1.CommandExecutorItem{
+						Command: []string{"mysql"},
+						Args:    []string{"-h$(KB_ACCOUNT_ENDPOINT)", "-e $(KB_ACCOUNT_STATEMENT)"},
+					},
 				},
 				PasswordConfig: appsv1alpha1.PasswordConfig{},
 				Accounts:       []appsv1alpha1.SystemAccountConfig{},
@@ -235,7 +240,7 @@ func FakeClusterDef() *appsv1alpha1.ClusterDefinition {
 func FakeClusterVersion() *appsv1alpha1.ClusterVersion {
 	cv := &appsv1alpha1.ClusterVersion{}
 	cv.Name = ClusterVersionName
-	cv.SetLabels(map[string]string{types.ClusterDefLabelKey: ClusterDefName})
+	cv.SetLabels(map[string]string{intctrlutil.ClusterDefLabelKey: ClusterDefName})
 	cv.Spec.ClusterDefinitionRef = ClusterDefName
 	cv.SetCreationTimestamp(metav1.Now())
 	return cv
@@ -279,8 +284,8 @@ func FakeServices() *corev1.ServiceList {
 				Name:      fmt.Sprintf("svc-%d", idx),
 				Namespace: Namespace,
 				Labels: map[string]string{
-					types.InstanceLabelKey:  ClusterName,
-					types.ComponentLabelKey: ComponentName,
+					intctrlutil.AppInstanceLabelKey:    ClusterName,
+					intctrlutil.KBAppComponentLabelKey: ComponentName,
 				},
 			},
 			Spec: corev1.ServiceSpec{
@@ -316,8 +321,8 @@ func FakePVCs() *corev1.PersistentVolumeClaimList {
 			Namespace: Namespace,
 			Name:      PVCName,
 			Labels: map[string]string{
-				types.InstanceLabelKey:  ClusterName,
-				types.ComponentLabelKey: ComponentName,
+				intctrlutil.AppInstanceLabelKey:    ClusterName,
+				intctrlutil.KBAppComponentLabelKey: ComponentName,
 			},
 		},
 		Spec: corev1.PersistentVolumeClaimSpec{
@@ -375,4 +380,15 @@ func FakeVolumeSnapshotClass() *snapshotv1.VolumeSnapshotClass {
 			APIVersion: "snapshot.storage.k8s.io/v1",
 		},
 	}
+}
+
+func FakeKBDeploy(version string) *appsv1.Deployment {
+	deploy := &appsv1.Deployment{}
+	deploy.SetLabels(map[string]string{
+		"app.kubernetes.io/name": types.KubeBlocksChartName,
+	})
+	if len(version) > 0 {
+		deploy.Labels["app.kubernetes.io/version"] = version
+	}
+	return deploy
 }

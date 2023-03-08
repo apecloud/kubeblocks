@@ -21,7 +21,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/testutil"
 )
 
@@ -43,9 +43,11 @@ func MockStatelessPod(testCtx testutil.TestContext, deploy *appsv1.Deployment, c
 			},
 		}
 	}
-	return NewPodFactory(testCtx.DefaultNamespace, podName).SetOwnerReferences("apps/v1", intctrlutil.ReplicaSet, newRs).AddLabelsInMap(map[string]string{
-		intctrlutil.AppInstanceLabelKey:  clusterName,
-		intctrlutil.AppComponentLabelKey: componentName,
-		intctrlutil.AppManagedByLabelKey: intctrlutil.AppName,
-	}).AddContainer(corev1.Container{Name: DefaultNginxContainerName, Image: NginxImage}).Create(&testCtx).GetObject()
+	return NewPodFactory(testCtx.DefaultNamespace, podName).
+		SetOwnerReferences("apps/v1", intctrlutil.ReplicaSet, newRs).
+		AddAppInstanceLabel(clusterName).
+		AddAppComponentLabel(componentName).
+		AddAppManangedByLabel().
+		AddContainer(corev1.Container{Name: DefaultNginxContainerName, Image: NginxImage}).
+		Create(&testCtx).GetObject()
 }

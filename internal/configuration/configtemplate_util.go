@@ -126,3 +126,15 @@ func GetClusterVersionResource(cvName string, cv *appsv1alpha1.ClusterVersion, c
 	}
 	return nil
 }
+
+func CheckConfigTemplateReconfigureKey(tpl appsv1alpha1.ConfigTemplate, key string) bool {
+	if len(tpl.Keys) == 0 {
+		return true
+	}
+	for _, keySelector := range tpl.Keys {
+		if keySelector == key {
+			return true
+		}
+	}
+	return false
+}

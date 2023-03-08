@@ -58,15 +58,16 @@ func buildProbeContainers(reqCtx intctrlutil.RequestCtx, component *SynthesizedC
 
 	probeContainers := []corev1.Container{}
 	componentProbes := component.Probes
-	reqCtx.Log.Info("probe", "settings", componentProbes)
+	reqCtx.Log.V(1).Info("probe", "settings", componentProbes)
 	if componentProbes == nil {
 		return nil
 	}
 
-	probeSvcHTTPPort := viper.GetInt32("PROBE_SERVICE_PORT")
-	availablePorts, err := getAvailableContainerPorts(component.PodSpec.Containers, []int32{probeSvcHTTPPort, 50001})
+	probeSvcHTTPPort := viper.GetInt32("PROBE_SERVICE_HTTP_PORT")
+	probeSvcGRPCPort := viper.GetInt32("PROBE_SERVICE_GRPC_PORT")
+	availablePorts, err := getAvailableContainerPorts(component.PodSpec.Containers, []int32{probeSvcHTTPPort, probeSvcGRPCPort})
 	probeSvcHTTPPort = availablePorts[0]
-	probeServiceGrpcPort := availablePorts[1]
+	probeSvcGRPCPort = availablePorts[1]
 	if err != nil {
 		reqCtx.Log.Info("get probe container port failed", "error", err)
 		return err
@@ -92,10 +93,10 @@ func buildProbeContainers(reqCtx intctrlutil.RequestCtx, component *SynthesizedC
 
 	if len(probeContainers) >= 1 {
 		container := &probeContainers[0]
-		buildProbeServiceContainer(component, container, int(probeSvcHTTPPort), int(probeServiceGrpcPort))
+		buildProbeServiceContainer(component, container, int(probeSvcHTTPPort), int(probeSvcGRPCPort))
 	}
 
-	reqCtx.Log.Info("probe", "containers", probeContainers)
+	reqCtx.Log.V(1).Info("probe", "containers", probeContainers)
 	component.PodSpec.Containers = append(component.PodSpec.Containers, probeContainers...)
 	return nil
 }
@@ -119,20 +120,21 @@ func buildProbeContainer() (*corev1.Container, error) {
 	return container, nil
 }
 
-func buildProbeServiceContainer(component *SynthesizedComponent, container *corev1.Container, probeSvcHTTPPort int, probeServiceGrpcPort int) {
+func buildProbeServiceContainer(component *SynthesizedComponent, container *corev1.Container, probeSvcHTTPPort int, probeSvcGRPCPort int) {
 	container.Image = viper.GetString(constant.KBImage)
 	container.ImagePullPolicy = corev1.PullPolicy(viper.GetString(constant.KBImagePullPolicy))
 	logLevel := viper.GetString("PROBE_SERVICE_LOG_LEVEL")
 	container.Command = []string{"probe", "--app-id", "batch-sdk",
 		"--dapr-http-port", strconv.Itoa(probeSvcHTTPPort),
-		"--dapr-grpc-port", strconv.Itoa(probeServiceGrpcPort),
+		"--dapr-grpc-port", strconv.Itoa(probeSvcGRPCPort),
 		"--app-protocol", "http",
 		"--log-level", logLevel,
 		"--config", "/config/probe/config.yaml",
 		"--components-path", "/config/probe/components"}
 
-	if component.Service != nil && len(component.Service.Ports) > 0 {
-		port := component.Service.Ports[0]
+	if len(component.Services) > 0 && len(component.Services[0].Spec.Ports) > 0 {
+		service := component.Services[0]
+		port := service.Spec.Ports[0]
 		dbPort := port.TargetPort.IntValue()
 		if dbPort == 0 {
 			dbPort = int(port.Port)
@@ -160,9 +162,14 @@ func buildProbeServiceContainer(component *SynthesizedComponent, container *core
 
 	container.Ports = []corev1.ContainerPort{{
 		ContainerPort: int32(probeSvcHTTPPort),
-		Name:          "probe-port",
+		Name:          constant.ProbeHTTPPortName,
 		Protocol:      "TCP",
-	}}
+	},
+		{
+			ContainerPort: int32(probeSvcGRPCPort),
+			Name:          constant.ProbeGRPCPortName,
+			Protocol:      "TCP",
+		}}
 }
 
 func getComponentRoles(component *SynthesizedComponent) map[string]string {
@@ -195,7 +202,7 @@ func buildRoleChangedProbeContainer(characterType string, roleChangedContainer *
 		"--fail-with-body", "--silent",
 		"-H", "Content-ComponentDefRef: application/json",
 		roleObserveURI,
-		"-d", "{\"operation\": \"roleCheck\", \"metadata\":{\"sql\":\"\"}}",
+		"-d", "{\"operation\": \"checkRole\", \"metadata\":{\"sql\":\"\"}}",
 	}
 	probe.PeriodSeconds = probeSetting.PeriodSeconds
 	probe.TimeoutSeconds = probeSetting.TimeoutSeconds
@@ -208,7 +215,7 @@ func buildStatusProbeContainer(statusProbeContainer *corev1.Container,
 	statusProbeContainer.Name = statusProbeContainerName
 	probe := statusProbeContainer.ReadinessProbe
 	httpGet := &corev1.HTTPGetAction{}
-	httpGet.Path = "/v1.0/bindings/probe?operation=statusCheck"
+	httpGet.Path = "/v1.0/bindings/probe?operation=checkStatus"
 	httpGet.Port = intstr.FromInt(probeSvcHTTPPort)
 	probe.Exec = nil
 	probe.HTTPGet = httpGet
@@ -223,7 +230,7 @@ func buildRunningProbeContainer(runningProbeContainer *corev1.Container,
 	runningProbeContainer.Name = runningProbeContainerName
 	probe := runningProbeContainer.ReadinessProbe
 	httpGet := &corev1.HTTPGetAction{}
-	httpGet.Path = "/v1.0/bindings/probe?operation=runningCheck"
+	httpGet.Path = "/v1.0/bindings/probe?operation=checkRunning"
 	httpGet.Port = intstr.FromInt(probeSvcHTTPPort)
 	probe.Exec = nil
 	probe.HTTPGet = httpGet

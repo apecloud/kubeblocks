@@ -22,11 +22,13 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	"github.com/apecloud/kubeblocks/internal/constant"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/generics"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 	testk8s "github.com/apecloud/kubeblocks/internal/testutil/k8s"
 )
@@ -132,7 +134,7 @@ var _ = Describe("Consensus Component", func() {
 			mockClusterStatusProbeTimeout(cluster)
 			// mock leader pod is not ready
 			testk8s.UpdatePodStatusNotReady(ctx, testCtx, podName)
-			testk8s.DeletePodLabelKey(ctx, testCtx, podName, intctrlutil.RoleLabelKey)
+			testk8s.DeletePodLabelKey(ctx, testCtx, podName, constant.RoleLabelKey)
 			requeue, _ := consensusComponent.HandleProbeTimeoutWhenPodsReady(nil)
 			Expect(requeue == false).Should(BeTrue())
 			validateComponentStatus(cluster)

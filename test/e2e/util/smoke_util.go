@@ -221,3 +221,56 @@ func GetClusterCreateYaml(files []string) string {
 	}
 	return ""
 }
+
+func GetClusterVersion(folder string) (result []string) {
+	dbType := GetPrefix(folder, "/")
+	cmd := "kubectl get ClusterVersion | grep " + dbType + " | awk '{print $1}'"
+	log.Println("cmd: " + cmd)
+	result = ExecCommandReadline(cmd)
+	log.Println(result)
+	return result
+}
+
+func GetPrefix(str string, sub string) (s string) {
+	index := strings.LastIndex(str, sub)
+	s = str[index+1:]
+	return
+}
+
+func ReplaceClusterVersionRef(fileName string, clusterVersionRef string) {
+	file, err := os.OpenFile(fileName, os.O_RDWR, 0666)
+	if err != nil {
+		log.Println("open file filed.", err)
+		return
+	}
+	reader := bufio.NewReader(file)
+	pos := int64(0)
+	for {
+		line, err := reader.ReadString('\n')
+		if err != nil {
+			if err == io.EOF {
+				log.Println("File read ok!")
+				break
+			} else {
+				log.Println("Read file error!", err)
+				return
+			}
+		}
+		if strings.Contains(line, "app.kubernetes.io/version") {
+			version := GetPrefix(clusterVersionRef, "-")
+			bytes := []byte("    app.kubernetes.io/version: \"" + version + "\"\n")
+			_, err := file.WriteAt(bytes, pos)
+			if err != nil {
+				log.Println("open file filed.", err)
+			}
+		}
+		if strings.Contains(line, "clusterVersionRef") {
+			bytes := []byte("  clusterVersionRef: " + clusterVersionRef + "\n")
+			_, err := file.WriteAt(bytes, pos)
+			if err != nil {
+				log.Println("open file filed.", err)
+			}
+		}
+		pos += int64(len(line))
+	}
+}

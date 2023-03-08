@@ -76,16 +76,7 @@ const (
 	NotStarted  int32 = 0
 )
 
-const (
-	delimiterDot = "."
-	emptyJSON    = "{}"
-
-	// In order to verify a configuration file, the configuration file is converted to a UnstructuredObject.
-	// When there is a special character '.' in the parameter will cause the parameter of the configuration file parsing to be messed up.
-	//   e.g. pg parameters: auto_explain.log_analyze = 'True'
-	// To solve this problem, the cfgDelimiterPlaceholder variable is introduced to ensure that no such string exists in a configuration file.
-	cfgDelimiterPlaceholder = "@#@"
-)
+const emptyJSON = "{}"
 
 var (
 	loaderProvider        = map[ConfigType]ConfigLoaderProvider{}
@@ -348,7 +339,7 @@ func (c cfgWrapper) getConfigObject(option CfgOpOption) unstructured.ConfigObjec
 
 func (c *cfgWrapper) generateKey(paramKey string, option CfgOpOption) string {
 	if option.IniContext != nil && len(option.IniContext.SectionName) > 0 {
-		return strings.Join([]string{option.IniContext.SectionName, paramKey}, delimiterDot)
+		return strings.Join([]string{option.IniContext.SectionName, paramKey}, unstructured.DelimiterDot)
 	}
 
 	return paramKey
@@ -439,7 +430,7 @@ func checkAndFlattenMap(v any, trim string) []ParameterPair {
 
 func flattenMap(m map[string]interface{}, prefix string) []ParameterPair {
 	if prefix != "" {
-		prefix += delimiterDot
+		prefix += unstructured.DelimiterDot
 	}
 
 	r := make([]ParameterPair, 0)

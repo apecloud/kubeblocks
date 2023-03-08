@@ -38,3 +38,16 @@ type ConfigObject interface {
 	// Unmarshal reads a string and returns the valid key/value pair of valid variables.
 	Unmarshal(str string) error
 }
+
+const (
+	// DelimiterDot sets the delimiter used for determining key parts.
+	DelimiterDot = "."
+
+	// CfgDelimiterPlaceholder sets the delimiter used for determining key parts.
+	//
+	// In order to verify a configuration file, the configuration file is converted to a UnstructuredObject.
+	// When there is a special character '.' in the parameter will cause the parameter of the configuration file parsing to be messed up.
+	//   e.g. pg parameters: auto_explain.log_analyze = 'True'
+	// To solve this problem, the CfgDelimiterPlaceholder variable is introduced to ensure that no such string exists in a configuration file.
+	CfgDelimiterPlaceholder = "@#@"
+)

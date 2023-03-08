@@ -83,11 +83,17 @@ func (v *viperWrap) Marshal() (string, error) {
 }
 
 func (v viperWrap) Unmarshal(str string) error {
-	v.SetConfigType(string(v.format))
-	if err := v.ReadConfig(bytes.NewReader([]byte(str))); err != nil {
-		return err
+	return v.ReadConfig(bytes.NewReader([]byte(str)))
+}
+
+func newCfgViper(cfgType appsv1alpha1.CfgFileFormat) *oviper.Viper {
+	defaultKeySep := DelimiterDot
+	if cfgType == appsv1alpha1.Properties || cfgType == appsv1alpha1.Dotenv {
+		defaultKeySep = CfgDelimiterPlaceholder
 	}
-	return nil
+	v := oviper.NewWithOptions(oviper.KeyDelimiter(defaultKeySep))
+	v.SetConfigType(strings.ToLower(string(cfgType)))
+	return v
 }
 
 func createViper(format appsv1alpha1.CfgFileFormat) ConfigObjectCreator {
@@ -95,7 +101,7 @@ func createViper(format appsv1alpha1.CfgFileFormat) ConfigObjectCreator {
 		return &viperWrap{
 			name:   name,
 			format: format,
-			Viper:  oviper.New(),
+			Viper:  newCfgViper(format),
 		}
 	}
 }

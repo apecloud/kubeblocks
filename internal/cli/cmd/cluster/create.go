@@ -35,7 +35,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/dynamic"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
@@ -43,11 +42,13 @@ import (
 	"k8s.io/kubectl/pkg/util/templates"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/cluster"
 	"github.com/apecloud/kubeblocks/internal/cli/create"
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
+	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
 var clusterCreateExample = templates.Examples(`
@@ -147,9 +148,9 @@ type CreateOptions struct {
 	ClusterVersionRef string                   `json:"clusterVersionRef"`
 	Tolerations       []interface{}            `json:"tolerations,omitempty"`
 	ComponentSpecs    []map[string]interface{} `json:"componentSpecs"`
-
-	SetFile string   `json:"-"`
-	Values  []string `json:"-"`
+	Annotations       map[string]string        `json:"annotations,omitempty"`
+	SetFile           string                   `json:"-"`
+	Values            []string                 `json:"-"`
 
 	// backup name to restore in creation
 	Backup string `json:"backup,omitempty"`
@@ -166,34 +167,38 @@ func setMonitor(monitor bool, components []map[string]interface{}) {
 	}
 }
 
+func getRestoreFromBackupAnnotation(backup *dataprotectionv1alpha1.Backup, compSpecsCount int, firstCompName string) (string, error) {
+	componentName := backup.Labels[constant.KBAppComponentLabelKey]
+	if len(componentName) == 0 {
+		if compSpecsCount != 1 {
+			return "", fmt.Errorf("unable to obtain the name of the component to be recovered, please ensure that Backup.status.componentName exists")
+		}
+		componentName = firstCompName
+	}
+	restoreFromBackupAnnotation := fmt.Sprintf(`{"%s":"%s"}`, componentName, backup.Name)
+	return restoreFromBackupAnnotation, nil
+}
+
 func setBackup(o *CreateOptions, components []map[string]interface{}) error {
-	backup := o.Backup
-	if len(backup) == 0 || len(components) == 0 {
+	backupName := o.Backup
+	if len(backupName) == 0 || len(components) == 0 {
 		return nil
 	}
-
-	gvr := schema.GroupVersionResource{Group: types.DPGroup, Version: types.DPVersion, Resource: types.ResourceBackups}
-	backupObj, err := o.Client.Resource(gvr).Namespace(o.Namespace).Get(context.TODO(), backup, metav1.GetOptions{})
+	backup := &dataprotectionv1alpha1.Backup{}
+	if err := cluster.GetK8SClientObject(o.Client, backup, types.BackupGVR(), o.Namespace, backupName); err != nil {
+		return err
+	}
+	if backup.Status.Phase != dataprotectionv1alpha1.BackupCompleted {
+		return fmt.Errorf(`backup "%s" is not completed`, backup.Name)
+	}
+	restoreAnnotation, err := getRestoreFromBackupAnnotation(backup, len(components), components[0]["name"].(string))
 	if err != nil {
 		return err
 	}
-	backupType, _, _ := unstructured.NestedString(backupObj.Object, "spec", "backupType")
-	if backupType != "snapshot" {
-		return fmt.Errorf("only support snapshot backup, specified backup type is '%v'", backupType)
+	if o.Annotations == nil {
+		o.Annotations = map[string]string{}
 	}
-
-	dataSource := make(map[string]interface{}, 0)
-	_ = unstructured.SetNestedField(dataSource, backup, "name")
-	_ = unstructured.SetNestedField(dataSource, "VolumeSnapshot", "kind")
-	_ = unstructured.SetNestedField(dataSource, "snapshot.storage.k8s.io", "apiGroup")
-
-	for _, component := range components {
-		templates := component["volumeClaimTemplates"].([]interface{})
-		for _, t := range templates {
-			templateMap := t.(map[string]interface{})
-			_ = unstructured.SetNestedField(templateMap, dataSource, "spec", "dataSource")
-		}
-	}
+	o.Annotations[constant.RestoreFromBackUpAnnotationKey] = restoreAnnotation
 	return nil
 }
 

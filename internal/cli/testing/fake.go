@@ -265,6 +265,21 @@ func FakeBackupPolicyTemplate() *dpv1alpha1.BackupPolicyTemplate {
 	return template
 }
 
+func FakeBackup(backupName string) *dpv1alpha1.Backup {
+	backup := &dpv1alpha1.Backup{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: fmt.Sprintf("%s/%s", types.DPGroup, types.DPVersion),
+			Kind:       types.KindBackup,
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      backupName,
+			Namespace: Namespace,
+		},
+	}
+	backup.SetCreationTimestamp(metav1.Now())
+	return backup
+}
+
 func FakeServices() *corev1.ServiceList {
 	cases := []struct {
 		exposed    bool

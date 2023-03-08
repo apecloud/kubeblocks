@@ -130,10 +130,10 @@ all: manager kbcli probe reloader loadbalancer ## Make all cmd binaries.
 
 .PHONY: manifests
 manifests: test-go-generate controller-gen ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
-	$(CONTROLLER_GEN) rbac:roleName=manager-role crd:generateEmbeddedObjectMeta=true webhook paths="./apis/...;./controllers/apps/...;./controllers/dataprotection/...;./controllers/extensions/...;./controllers/k8score/...;./cmd/manager/...;./internal/..." output:crd:artifacts:config=config/crd/bases
+	$(CONTROLLER_GEN) rbac:roleName=manager-role crd:generateEmbeddedObjectMeta=true webhook paths="./cmd/manager/...;./apis/...;./controllers/...;./internal/..." output:crd:artifacts:config=config/crd/bases
 	@cp config/crd/bases/* $(CHART_PATH)/crds
 	@cp config/rbac/role.yaml $(CHART_PATH)/config/rbac/role.yaml
-	$(CONTROLLER_GEN) rbac:roleName=loadbalancer-role  paths="./controllers/loadbalancer;./cmd/loadbalancer/controller" output:dir=config/loadbalancer
+	$(CONTROLLER_GEN) rbac:roleName=loadbalancer-role  paths="./cmd/loadbalancer/..." output:dir=config/loadbalancer
 
 .PHONY: preflight-manifests
 preflight-manifests: generate ## Generate external Preflight API
@@ -152,7 +152,7 @@ endif
 .PHONY: loadbalancer-go-generate
 loadbalancer-go-generate: ## Run go generate against loadbalancer code.
 ifeq ($(SKIP_GO_GEN), false)
-	$(GO) generate -x ./internal/loadbalancer/...
+	$(GO) generate -x ./cmd/loadbalancer/internal/...
 endif
 
 .PHONY: test-go-generate
@@ -293,8 +293,7 @@ kbcli-doc: build-checks ## generate CLI command reference manual.
 
 .PHONY: loadbalancer
 loadbalancer: loadbalancer-go-generate test-go-generate build-checks  ## Build loadbalancer binary.
-	$(GO) build -ldflags=${LD_FLAGS} -o bin/loadbalancer-controller ./cmd/loadbalancer/controller
-	$(GO) build -ldflags=${LD_FLAGS} -o bin/loadbalancer-agent ./cmd/loadbalancer/agent
+	$(GO) build -ldflags=${LD_FLAGS} -o bin/loadbalancer ./cmd/loadbalancer
 
 ##@ Operator Controller Manager
 

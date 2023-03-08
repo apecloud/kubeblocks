@@ -36,6 +36,6 @@ Manage alert receivers
 
 * [kbcli](kbcli.md)	 - KubeBlocks CLI
 * [kbcli alert add-receiver](kbcli_alert_add-receiver.md)	 - Add alert receiver, such as email, slack, webhook and so on
-* [kbcli alert delete-receiver](kbcli_alert_delete-receiver.md)	 - Delete alert receiver, all receivers can be found by command: kbcli alert list-receivers
+* [kbcli alert delete-receiver](kbcli_alert_delete-receiver.md)	 - Delete alert receiver
 * [kbcli alert list-receivers](kbcli_alert_list-receivers.md)	 - List all alert receivers
 

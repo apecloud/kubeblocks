@@ -44,7 +44,7 @@ func newDeleteReceiverCmd(f cmdutil.Factory, streams genericclioptions.IOStreams
 	o := &deleteReceiverOptions{baseOptions: baseOptions{IOStreams: streams}}
 	cmd := &cobra.Command{
 		Use:     "delete-receiver NAME",
-		Short:   "Delete alert receiver, all receivers can be found by command: kbcli alert list-receivers",
+		Short:   "Delete alert receiver",
 		Example: deleteReceiverExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			util.CheckErr(o.complete(f))

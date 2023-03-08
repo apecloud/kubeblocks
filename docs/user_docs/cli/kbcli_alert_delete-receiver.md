@@ -1,6 +1,6 @@
 ## kbcli alert delete-receiver
 
-Delete alert receiver, all receivers can be found by command: kbcli alert list-receivers
+Delete alert receiver
 
 ```
 kbcli alert delete-receiver NAME [flags]

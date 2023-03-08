@@ -50,7 +50,7 @@ var _ = Describe("version util", func() {
 		client := testing.FakeClientSet(testing.FakeKBDeploy(""))
 		v, err := getKubeBlocksVersion(client)
 		Expect(v).Should(BeEmpty())
-		Expect(err).Should(Succeed())
+		Expect(err).Should(HaveOccurred())
 
 		client = testing.FakeClientSet(testing.FakeKBDeploy(kbVersion))
 		v, err = getKubeBlocksVersion(client)

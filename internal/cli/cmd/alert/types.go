@@ -79,7 +79,7 @@ type emailConfig struct {
 type webhookConfig struct {
 	URL          string `json:"url"`
 	Token        string `json:"token,omitempty"`
-	SendResolved bool   `json:"send_resolved,omitempty"`
+	SendResolved bool   `json:"send_resolved"`
 	MaxAlerts    int    `json:"max_alerts,omitempty"`
 }
 

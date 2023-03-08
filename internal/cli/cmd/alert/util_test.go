@@ -34,8 +34,20 @@ var _ = Describe("alter", func() {
 	})
 
 	It("get url webhook type", func() {
-		webhookType := getWebhookType(webhookURL)
-		Expect(webhookType).Should(Equal(dingtalkWebhookType))
+		testCases := []struct {
+			url      string
+			expected webhookType
+		}{
+			{url: "", expected: unknownWebhookType},
+			{url: "https://test.com", expected: unknownWebhookType},
+			{url: webhookURL, expected: dingtalkWebhookType},
+			{url: "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=123456", expected: wechatWebhookType},
+			{url: "https://open.feishu.cn/open-apis/bot/v2/hook/123456", expected: feishuWebhookType},
+		}
+		for _, tc := range testCases {
+			webhookType := getWebhookType(tc.url)
+			Expect(webhookType).Should(Equal(tc.expected))
+		}
 	})
 
 	It("remove duplicate string from slice", func() {

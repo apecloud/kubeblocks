@@ -19,10 +19,13 @@ package alert
 import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
 	clientfake "k8s.io/client-go/rest/fake"
 
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
+
+	"github.com/apecloud/kubeblocks/internal/cli/testing"
 )
 
 var _ = Describe("alter", func() {
@@ -43,4 +46,51 @@ var _ = Describe("alter", func() {
 		cmd := newDeleteReceiverCmd(f, s)
 		Expect(cmd).NotTo(BeNil())
 	})
+
+	It("validate", func() {
+		o := &deleteReceiverOptions{baseOptions: baseOptions{IOStreams: s}}
+		Expect(o.validate([]string{})).Should(HaveOccurred())
+		Expect(o.validate([]string{"test"})).Should(Succeed())
+	})
+
+	It("run", func() {
+		o := &deleteReceiverOptions{baseOptions: mockBaseOptions(s)}
+		o.client = testing.FakeClientSet(o.baseOptions.alterConfigMap, o.baseOptions.webhookConfigMap)
+		o.names = []string{"receiver-7pb52"}
+		Expect(o.run()).Should(Succeed())
+	})
 })
+
+func mockBaseOptions(s genericclioptions.IOStreams) baseOptions {
+	o := baseOptions{IOStreams: s}
+	alertManagerConfig := `
+    global: {}
+    receivers:
+    - name: default-receiver
+    - name: receiver-7pb52
+      webhook_configs:
+      - max_alerts: 10
+        url: http://kubeblocks-webhook-adaptor-config.default:5001/api/v1/notify/receiver-7pb52
+    route:
+      group_interval: 30s
+      group_wait: 5s
+      receiver: default-receiver
+      repeat_interval: 10m
+      routes:
+      - continue: true
+        matchers:
+        - app_kubernetes_io_instance=~a|b|c
+        - severity=~info|warning
+        receiver: receiver-7pb52`
+	webhookAdaptorConfig := `
+    receivers:
+    - name: receiver-7pb52
+      params:
+        url: https://oapi.dingtalk.com/robot/send?access_token=123456
+      type: dingtalk-webhook`
+	alertCM := mockConfigmap(alertConfigmapName, alertConfigFileName, alertManagerConfig)
+	webhookAdaptorCM := mockConfigmap(webhookAdaptorName, webhookAdaptorFileName, webhookAdaptorConfig)
+	o.alterConfigMap = alertCM
+	o.webhookConfigMap = webhookAdaptorCM
+	return o
+}

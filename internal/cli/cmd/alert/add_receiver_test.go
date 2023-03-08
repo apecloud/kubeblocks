@@ -24,17 +24,19 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	clientfake "k8s.io/client-go/rest/fake"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
+
+	"github.com/apecloud/kubeblocks/internal/cli/testing"
 )
 
 const (
 	testNamespace = "test"
 )
 
-var mockAlertConfigmap = func(name string, key string) *corev1.ConfigMap {
+var mockConfigmap = func(name string, key string, value string) *corev1.ConfigMap {
 	cm := &corev1.ConfigMap{}
 	cm.Name = name
 	cm.Namespace = testNamespace
-	cm.Data = map[string]string{key: ``}
+	cm.Data = map[string]string{key: value}
 	return cm
 }
 
@@ -78,11 +80,39 @@ var _ = Describe("add receiver", func() {
 		Expect(o.name).Should(Equal("test"))
 	})
 
+	It("build receiver", func() {
+		o := addReceiverOptions{baseOptions: baseOptions{IOStreams: s}}
+		o.emails = []string{"foo@bar.com", "foo1@bar.com,foo2@bar.com"}
+		o.webhooks = []string{"url=https://oapi.dingtalk.com/robot/send", "url=https://oapi.dingtalk.com/robot/send,url=https://oapi.dingtalk.com/robot/send?"}
+		o.slacks = []string{"api_url=https://foo.com,channel=foo,username=test"}
+		Expect(o.buildReceiver()).Should(Succeed())
+		Expect(o.receiver).ShouldNot(BeNil())
+		Expect(o.receiver.EmailConfigs).Should(HaveLen(3))
+		Expect(o.receiver.WebhookConfigs).Should(HaveLen(2))
+		Expect(o.receiver.SlackConfigs).Should(HaveLen(1))
+	})
+
+	It("build routes", func() {
+		o := addReceiverOptions{baseOptions: baseOptions{IOStreams: s}}
+		o.name = "receiver-test"
+		o.clusters = []string{"cluster1", "cluster2"}
+		o.severities = []string{"critical", "warning"}
+		o.buildRoute()
+		Expect(o.route).ShouldNot(BeNil())
+		Expect(o.route.Receiver).Should(Equal(o.name))
+		Expect(o.route.Matchers).Should(HaveLen(2))
+		Expect(o.route.Matchers[0]).Should(ContainSubstring(routeMatcherClusterKey))
+		Expect(o.route.Matchers[1]).Should(ContainSubstring(routeMatcherSeverityKey))
+	})
+
 	It("run", func() {
 		o := addReceiverOptions{baseOptions: baseOptions{IOStreams: s}}
-		alertCM := mockAlertConfigmap(alertConfigmapName, alertConfigFileName)
-		webhookAdaptorCM := mockAlertConfigmap(webhookAdaptorName, webhookAdaptorFileName)
+		alertCM := mockConfigmap(alertConfigmapName, alertConfigFileName, "")
+		webhookAdaptorCM := mockConfigmap(webhookAdaptorName, webhookAdaptorFileName, "")
 		o.baseOptions.alterConfigMap = alertCM
 		o.baseOptions.webhookConfigMap = webhookAdaptorCM
+		o.client = testing.FakeClientSet(alertCM, webhookAdaptorCM)
+		Expect(o.addReceiver()).Should(Succeed())
+		Expect(o.addWebhookReceivers()).Should(Succeed())
 	})
 })

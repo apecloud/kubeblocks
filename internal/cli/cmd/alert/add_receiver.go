@@ -254,6 +254,9 @@ func (o *addReceiverOptions) addReceiver() error {
 
 	// add receiver
 	receivers := getReceiversFromData(data)
+	if receiverExists(receivers, o.receiver.Name) {
+		return fmt.Errorf("receiver %s already exists", o.receiver.Name)
+	}
 	receivers = append(receivers, o.receiver)
 
 	// add route
@@ -322,6 +325,16 @@ func (o *addReceiverOptions) buildWebhook() ([]*webhookConfig, error) {
 	return ws, nil
 }
 
+func receiverExists(receivers []interface{}, name string) bool {
+	for _, r := range receivers {
+		n := r.(map[string]interface{})["name"]
+		if n != nil && n.(string) == name {
+			return true
+		}
+	}
+	return false
+}
+
 // buildSlackConfigs builds slackConfig from slack options
 func buildSlackConfigs(slacks []string) ([]*slackConfig, error) {
 	var ss []*slackConfig
@@ -341,7 +354,7 @@ func buildSlackConfigs(slacks []string) ([]*slackConfig, error) {
 			case slackUsername:
 				s.Username = v
 			default:
-				return nil, fmt.Errorf("invalid slackConfig key: %s", k)
+				return nil, fmt.Errorf("invalid slack config key: %s", k)
 			}
 		}
 		ss = append(ss, &s)

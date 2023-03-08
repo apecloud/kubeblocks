@@ -52,7 +52,7 @@ func getConfigData(cm *corev1.ConfigMap, key string) (map[string]interface{}, er
 		return nil, fmt.Errorf("configmap %s has no data named %s", cm.Name, key)
 	}
 
-	var data map[string]interface{}
+	data := make(map[string]interface{})
 	if err := yaml.Unmarshal([]byte(dataStr), &data); err != nil {
 		return nil, err
 	}
@@ -60,18 +60,21 @@ func getConfigData(cm *corev1.ConfigMap, key string) (map[string]interface{}, er
 }
 
 func getReceiversFromData(data map[string]interface{}) []interface{} {
-	// add receiver
-	receivers, ok := data["receivers"].([]interface{})
-	if !ok {
+	receivers, ok := data["receivers"]
+	if !ok || receivers == nil {
 		receivers = []interface{}{} // init receivers
 	}
-	return receivers
+	return receivers.([]interface{})
 }
 
 func getRoutesFromData(data map[string]interface{}) []interface{} {
+	route, ok := data["route"]
+	if !ok || route == nil {
+		data["route"] = map[string]interface{}{"routes": []interface{}{}}
+	}
 	routes, ok := data["route"].(map[string]interface{})["routes"]
-	if !ok {
-		routes = []interface{}{} // init routes
+	if !ok || routes == nil {
+		routes = []interface{}{}
 	}
 	return routes.([]interface{})
 }

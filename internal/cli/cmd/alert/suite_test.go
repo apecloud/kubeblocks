@@ -25,5 +25,5 @@ import (
 
 func TestAlert(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "Command Alert Test Suite")
+	RunSpecs(t, "Alert Command Test Suite")
 }

@@ -23,6 +23,8 @@ import (
 
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
+
+	"github.com/apecloud/kubeblocks/internal/cli/testing"
 )
 
 var _ = Describe("alter", func() {
@@ -42,5 +44,11 @@ var _ = Describe("alter", func() {
 	It("create new list receiver cmd", func() {
 		cmd := newListReceiversCmd(f, s)
 		Expect(cmd).NotTo(BeNil())
+	})
+
+	It("run", func() {
+		o := &listReceiversOptions{baseOptions: mockBaseOptions(s)}
+		o.client = testing.FakeClientSet(o.baseOptions.alterConfigMap, o.baseOptions.webhookConfigMap)
+		Expect(o.run()).Should(Succeed())
 	})
 })

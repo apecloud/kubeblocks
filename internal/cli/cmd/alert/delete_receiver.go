@@ -22,6 +22,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/klog/v2"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
 
@@ -73,7 +74,7 @@ func (o *deleteReceiverOptions) run() error {
 		return err
 	}
 
-	fmt.Fprintf(o.Out, "Receiver %s deleted successfully", strings.Join(o.names, ","))
+	fmt.Fprintf(o.Out, "Receiver %s deleted successfully\n", strings.Join(o.names, ","))
 	return nil
 }
 
@@ -107,14 +108,14 @@ func (o *deleteReceiverOptions) deleteReceiver() error {
 			newReceivers = append(newReceivers, receivers[i])
 			r, ok := receiverRouteMap[name]
 			if !ok {
-				fmt.Fprintf(o.Out, "receiver %s not found in routes\n", name)
+				klog.V(1).Infof("receiver %s not found in routes\n", name)
 				continue
 			}
 			newRoutes = append(newRoutes, r)
 		}
 	}
 	data["receivers"] = newReceivers
-	data["routes"] = newRoutes
+	data["route"].(map[string]interface{})["routes"] = newRoutes
 	return updateConfig(o.client, o.alterConfigMap, alertConfigFileName, data)
 }
 

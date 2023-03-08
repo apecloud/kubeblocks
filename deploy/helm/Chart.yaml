@@ -80,5 +80,5 @@ dependencies:
     version: 0.*
   - condition: alertmanager-webhook-adaptor.enabled
     name: alertmanager-webhook-adaptor
-    # repository: https://github.com/apecloud/helm-charts
+    # repository: https://apecloud.github.io/helm-charts
     version: 0.1.*

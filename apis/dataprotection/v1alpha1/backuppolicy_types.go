@@ -82,7 +82,7 @@ type TargetCluster struct {
 
 	// target db cluster access secret
 	// +optional
-	Secret *BackupPolicySecret `json:"secret"`
+	Secret *BackupPolicySecret `json:"secret,omitempty"`
 }
 
 // BackupPolicySecret defined for the target database secret that backup tool can connect.

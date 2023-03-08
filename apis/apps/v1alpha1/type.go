@@ -279,6 +279,9 @@ const (
 	Dotenv     CfgFileFormat = "dotenv"
 	TOML       CfgFileFormat = "toml"
 	Properties CfgFileFormat = "properties"
+
+	// RedisCfg support redis config.
+	RedisCfg CfgFileFormat = "redis"
 )
 
 // UpgradePolicy defines the policy of reconfiguring.

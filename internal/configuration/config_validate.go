@@ -58,7 +58,7 @@ func (s schemaValidator) Validate(cfg map[string]string) error {
 	openAPITypes := &kubeopenapispec.Schema{}
 	validator := validate.NewSchemaValidator(openAPITypes, nil, "", strfmt.Default)
 	for key, data := range cfg {
-		cfg, err := loadConfiguration(s.cfgType, data)
+		cfg, err := loadConfigObjectFromContent(s.cfgType, data)
 		if err != nil {
 			return err
 		}

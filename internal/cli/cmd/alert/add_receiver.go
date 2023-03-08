@@ -254,7 +254,7 @@ func (o *addReceiverOptions) addReceiver() error {
 
 	// add receiver
 	receivers := getReceiversFromData(data)
-	if receiverExists(receivers, o.receiver.Name) {
+	if receiverExists(receivers, o.name) {
 		return fmt.Errorf("receiver %s already exists", o.receiver.Name)
 	}
 	receivers = append(receivers, o.receiver)

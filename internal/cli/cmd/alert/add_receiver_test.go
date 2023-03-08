@@ -85,6 +85,7 @@ var _ = Describe("add receiver", func() {
 		o.emails = []string{"foo@bar.com", "foo1@bar.com,foo2@bar.com"}
 		o.webhooks = []string{"url=https://oapi.dingtalk.com/robot/send", "url=https://oapi.dingtalk.com/robot/send,url=https://oapi.dingtalk.com/robot/send?"}
 		o.slacks = []string{"api_url=https://foo.com,channel=foo,username=test"}
+		o.webhookConfigMap = mockConfigmap(webhookAdaptorName, webhookAdaptorFileName, "")
 		Expect(o.buildReceiver()).Should(Succeed())
 		Expect(o.receiver).ShouldNot(BeNil())
 		Expect(o.receiver.EmailConfigs).Should(HaveLen(3))
@@ -112,6 +113,7 @@ var _ = Describe("add receiver", func() {
 		o.baseOptions.alterConfigMap = alertCM
 		o.baseOptions.webhookConfigMap = webhookAdaptorCM
 		o.client = testing.FakeClientSet(alertCM, webhookAdaptorCM)
+		o.name = "receiver-test"
 		Expect(o.addReceiver()).Should(Succeed())
 		Expect(o.addWebhookReceivers()).Should(Succeed())
 	})

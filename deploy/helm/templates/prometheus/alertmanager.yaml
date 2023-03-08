@@ -8,11 +8,18 @@ metadata:
 data:
   alertmanager.yml: |
     global: { }
-    receivers: [ ]
+    receivers:
+      - name: default-receiver
     route:
+      group_by: [ 'alertname', 'namespace', 'app_kubernetes_io_instance' ]
       group_interval: 30s
       group_wait: 5s
       receiver: default-receiver
       repeat_interval: 10m
-      routes: [ ]
-{{- end -}}
+      routes:
+        - receiver: default-receiver
+          continue: true
+          group_by: ['alertname', 'instance', 'pod']
+          matchers:
+            - alertname=~"Container.*"
+    {{- end -}}

@@ -252,7 +252,7 @@ func (r *autoInstallCheckStage) Handle(ctx context.Context) {
 				return
 			}
 			r.reconciler.Recorder.Event(addon, "Normal", AddonAutoInstall,
-				fmt.Sprintf("Addon enabled auto-install"))
+				"Addon enabled auto-install")
 			r.setReconciled()
 		}
 

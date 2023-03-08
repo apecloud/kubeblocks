@@ -268,7 +268,7 @@ func FakeBackupPolicyTemplate() *dpv1alpha1.BackupPolicyTemplate {
 func FakeBackup(backupName string) *dpv1alpha1.Backup {
 	backup := &dpv1alpha1.Backup{
 		TypeMeta: metav1.TypeMeta{
-			APIVersion: fmt.Sprintf("%s/%s", types.DPAPIGroup, types.DPVersion),
+			APIVersion: fmt.Sprintf("%s/%s", types.DPAPIGroup, types.DPAPIVersion),
 			Kind:       types.KindBackup,
 		},
 		ObjectMeta: metav1.ObjectMeta{

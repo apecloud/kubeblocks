@@ -24,11 +24,6 @@ import (
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 )
 
-const (
-	testAppName   = "test-app"
-	testNamespace = "test"
-)
-
 var _ = Describe("Manage applications related to KubeBlocks", func() {
 	var streams genericclioptions.IOStreams
 	var tf *cmdtesting.TestFactory

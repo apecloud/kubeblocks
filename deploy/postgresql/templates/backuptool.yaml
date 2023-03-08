@@ -1,0 +1,49 @@
+apiVersion: dataprotection.kubeblocks.io/v1alpha1
+kind: BackupTool
+metadata:
+  name: pg-basebackup
+  labels:
+    clusterdefinition.kubeblocks.io/name: postgresql
+    {{- include "postgresql.labels" . | nindent 4 }}
+spec:
+  image: registry.cn-hangzhou.aliyuncs.com/apecloud/postgresql:14.6.0
+  deployKind: job
+  resources:
+    limits:
+      cpu: "1"
+      memory: 2Gi
+    requests:
+      cpu: "1"
+      memory: 128Mi
+  env:
+    - name: DATA_DIR
+      value: /postgresql/data
+  physical:
+    restoreCommands:
+      - |
+        #!/bin/sh
+        set -e
+        mkdir -p ${DATA_DIR} && mkdir -p ${DATA_DIR}/../arch
+        rm -rf ${DATA_DIR}/../arch/* && rm -rf ${DATA_DIR}/*
+        cd ${BACKUP_DIR}/${BACKUP_NAME}
+        tar -xvf base.tar.gz -C ${DATA_DIR}/
+        tar -xvf pg_wal.tar.gz -C ${DATA_DIR}/../arch
+        chmod -R 777 ${DATA_DIR}/../arch
+        cd ${DATA_DIR}
+        echo "set recovery configuration..."
+        echo "restore_command = 'cp ${DATA_DIR}/../arch/%f %p'" >> postgresql.auto.conf
+        echo "recovery_target_timeline = 'latest'" >> postgresql.auto.conf
+        init_scripts_dir=${DATA_DIR}/../init-scripts
+        mkdir -p ${init_scripts_dir}
+        echo "touch ${DATA_DIR}/recovery.signal" > ${init_scripts_dir}/restore.sh
+        echo "done!"
+    incrementalRestoreCommands: []
+  logical:
+    restoreCommands: []
+    incrementalRestoreCommands: []
+  backupCommands:
+    - >
+      set -e;
+      mkdir -p ${BACKUP_DIR}/${BACKUP_NAME}/;
+      echo ${DB_PASSWORD} | pg_basebackup -Ft -Pv -Xs -z -D ${BACKUP_DIR}/${BACKUP_NAME} -Z5 -h ${DB_HOST} -U ${DB_USER} -W;
+  incrementalBackupCommands: []

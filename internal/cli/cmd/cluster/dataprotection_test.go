@@ -23,9 +23,12 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	k8sapitypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/dynamic/fake"
 	"k8s.io/client-go/kubernetes/scheme"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
@@ -35,7 +38,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/constant"
+	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
 var _ = Describe("DataProtection", func() {
@@ -70,7 +73,7 @@ var _ = Describe("DataProtection", func() {
 		It("run backup command", func() {
 			cluster := testing.FakeCluster(testing.ClusterName, testing.Namespace)
 			clusterDefLabel := map[string]string{
-				intctrlutil.ClusterDefLabelKey: "apecloud-mysql",
+				constant.ClusterDefLabelKey: "apecloud-mysql",
 			}
 			cluster.SetLabels(clusterDefLabel)
 
@@ -154,7 +157,7 @@ var _ = Describe("DataProtection", func() {
 		newClusterName := "new-cluster-" + timestamp
 		secrets := testing.FakeSecrets(testing.Namespace, clusterName)
 		clusterDefLabel := map[string]string{
-			intctrlutil.ClusterDefLabelKey: "apecloud-mysql",
+			constant.ClusterDefLabelKey: "apecloud-mysql",
 		}
 
 		cluster := testing.FakeCluster(clusterName, testing.Namespace)
@@ -171,18 +174,18 @@ var _ = Describe("DataProtection", func() {
 		_ = cmd.Flags().Set("backup-name", backupName)
 		cmd.Run(nil, []string{clusterName})
 
-		// mock labels backup
-		labels := fmt.Sprintf(`{"metadata":{"labels": {"app.kubernetes.io/instance":"%s"}}}`, clusterName)
-		patchByte := []byte(labels)
-		_, _ = tf.FakeDynamicClient.Resource(types.BackupGVR()).Namespace(testing.Namespace).Patch(context.TODO(), backupName,
-			k8sapitypes.MergePatchType, patchByte, metav1.PatchOptions{})
-
-		// create restore cluster
-		By("run restore cmd")
+		By("restore new cluster from source cluster which is not deleted")
+		// mock backup is ok
+		mockBackupInfo(tf.FakeDynamicClient, backupName, clusterName)
 		cmdRestore := NewCreateRestoreCmd(tf, streams)
 		Expect(cmdRestore != nil).To(BeTrue())
 		_ = cmdRestore.Flags().Set("backup", backupName)
 		cmdRestore.Run(nil, []string{newClusterName})
+
+		By("restore new cluster from source cluster which is deleted")
+		// mock cluster is not lived in kubenertes
+		mockBackupInfo(tf.FakeDynamicClient, backupName, "deleted-cluster")
+		cmdRestore.Run(nil, []string{newClusterName + "1"})
 
 		By("run restore cmd with cluster spec.affinity=nil")
 		patchCluster := []byte(`{"spec":{"affinity":null}}`)
@@ -191,3 +194,27 @@ var _ = Describe("DataProtection", func() {
 		cmdRestore.Run(nil, []string{newClusterName + "-with-nil-affinity"})
 	})
 })
+
+func mockBackupInfo(dynamic dynamic.Interface, backupName, clusterName string) {
+	clusterString := fmt.Sprintf(`{"metadata":{"name":"deleted-cluster","namespace":"%s"},"spec":{"clusterDefinitionRef":"apecloud-mysql","clusterVersionRef":"ac-mysql-8.0.30","componentSpecs":[{"name":"mysql","componentDefRef":"mysql","replicas":1}]}}`, testing.Namespace)
+	backupStatus := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"status": map[string]interface{}{
+				"phase": "Completed",
+			},
+			"metadata": map[string]interface{}{
+				"name": backupName,
+				"annotations": map[string]interface{}{
+					constant.ClusterSnapshotAnnotationKey: clusterString,
+				},
+				"labels": map[string]interface{}{
+					constant.AppInstanceLabelKey:    clusterName,
+					constant.KBAppComponentLabelKey: "test",
+				},
+			},
+		},
+	}
+	_, err := dynamic.Resource(types.BackupGVR()).Namespace(testing.Namespace).UpdateStatus(context.TODO(),
+		backupStatus, metav1.UpdateOptions{})
+	Expect(err).Should(Succeed())
+}

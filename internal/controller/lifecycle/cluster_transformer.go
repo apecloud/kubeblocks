@@ -17,8 +17,12 @@ limitations under the License.
 package lifecycle
 
 import (
+	"encoding/json"
+
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
@@ -51,20 +55,32 @@ func (c *clusterTransformer) Transform(dag *graph.DAG) error {
 		Resources:         &resourcesQueue,
 	}
 
-	secret, err := builder.BuildConnCredential(task.GetBuilderParams())
+	clusterBackupResourceMap, err := getClusterBackupSourceMap(c.cc.cluster)
 	if err != nil {
 		return err
 	}
-	secretVertex := &lifecycleVertex{obj: secret}
-	dag.AddVertex(secretVertex)
-	dag.Connect(rootVertex, secretVertex)
 
 	clusterCompSpecMap := c.cc.cluster.GetDefNameMappingComponents()
 	clusterCompVerMap := c.cc.cv.GetDefNameMappingComponents()
+	process1stComp := true
 
-	prepareComp := func(component *component.SynthesizedComponent) error {
+	prepareComp := func(synthesizedComp *component.SynthesizedComponent) error {
 		iParams := task
-		iParams.Component = component
+		iParams.Component = synthesizedComp
+		if process1stComp && len(synthesizedComp.Services) > 0 {
+			if err := prepareConnCredential(&iParams); err != nil {
+				return err
+			}
+			process1stComp = false
+		}
+
+		// build info that needs to be restored from backup
+		backupSourceName := clusterBackupResourceMap[synthesizedComp.Name]
+		if len(backupSourceName) > 0 {
+			if err := component.BuildRestoredInfo(c.ctx, c.cli, c.cc.cluster.Namespace, synthesizedComp, backupSourceName); err != nil {
+				return err
+			}
+		}
 		return plan.PrepareComponentResources(c.ctx, c.cli, &iParams)
 	}
 
@@ -86,4 +102,25 @@ func (c *clusterTransformer) Transform(dag *graph.DAG) error {
 		dag.Connect(rootVertex, vertex)
 	}
 	return nil
+}
+
+func prepareConnCredential(task *intctrltypes.ReconcileTask) error {
+	secret, err := builder.BuildConnCredential(task.GetBuilderParams())
+	if err != nil {
+		return err
+	}
+	// must make sure secret resources are created before others
+	task.InsertResource(secret)
+	return nil
+}
+
+// getClusterBackupSourceMap gets the backup source map from cluster.annotations
+func getClusterBackupSourceMap(cluster *appsv1alpha1.Cluster) (map[string]string, error) {
+	compBackupMapString := cluster.Annotations[constant.RestoreFromBackUpAnnotationKey]
+	if len(compBackupMapString) == 0 {
+		return nil, nil
+	}
+	compBackupMap := map[string]string{}
+	err := json.Unmarshal([]byte(compBackupMapString), &compBackupMap)
+	return compBackupMap, err
 }

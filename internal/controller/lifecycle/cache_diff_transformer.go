@@ -27,6 +27,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
@@ -57,7 +58,7 @@ func (c *cacheDiffTransformer) readCacheSnapshot() (clusterSnapshot, error) {
 	// list what kinds of object cluster owns
 	kinds := ownKinds()
 	snapshot := make(clusterSnapshot)
-	ml := client.MatchingLabels{intctrlutil.AppInstanceLabelKey: c.cc.cluster.GetName()}
+	ml := client.MatchingLabels{constant.AppInstanceLabelKey: c.cc.cluster.GetName()}
 	inNS := client.InNamespace(c.cc.cluster.Namespace)
 	for _, list := range kinds {
 		if err := c.cli.List(c.ctx.Ctx, list, inNS, ml); err != nil {

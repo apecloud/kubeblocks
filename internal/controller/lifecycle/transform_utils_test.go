@@ -18,10 +18,11 @@ package lifecycle
 
 import (
 	"fmt"
-	v1 "k8s.io/api/apps/v1"
 	"reflect"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	"testing"
+
+	v1 "k8s.io/api/apps/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 func TestReflect(t *testing.T) {
@@ -36,8 +37,7 @@ func TestReflect(t *testing.T) {
 	c := v.Len()
 	objects := make([]client.Object, c)
 	for i := 0; i < c; i++ {
-		var st interface{}
-		st = v.Index(i).Addr().Interface()
+		var st = v.Index(i).Addr().Interface()
 		objects[i] = st.(client.Object)
 	}
 	for _, e := range objects {

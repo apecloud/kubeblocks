@@ -18,6 +18,7 @@ package lifecycle
 
 import (
 	"fmt"
+
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"

@@ -193,7 +193,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	cp, err := factory.NewProvider(config.EnvCloudProvider, logger)
+	cp, err := factory.NewProvider(config.CloudProvider, logger)
 	if err != nil {
 		setupLog.Error(err, "Failed to initialize cloud provider")
 		os.Exit(1)

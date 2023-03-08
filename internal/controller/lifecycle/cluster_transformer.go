@@ -55,7 +55,9 @@ func (c *clusterTransformer) Transform(dag *graph.DAG) error {
 	if err != nil {
 		return err
 	}
-	dag.AddVertex(&lifecycleVertex{obj: secret})
+	secretVertex := &lifecycleVertex{obj: secret}
+	dag.AddVertex(secretVertex)
+	dag.Connect(rootVertex, secretVertex)
 
 	clusterCompSpecMap := c.cc.cluster.GetDefNameMappingComponents()
 	clusterCompVerMap := c.cc.cv.GetDefNameMappingComponents()

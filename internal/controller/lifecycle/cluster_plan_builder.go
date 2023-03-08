@@ -19,6 +19,7 @@ package lifecycle
 import (
 	"errors"
 	"fmt"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -102,13 +103,22 @@ func (b *clusterPlanBuilder) Build() (graph.Plan, error) {
 		}
 		switch *obj.action {
 		case CREATE:
-			return b.cli.Create(b.ctx.Ctx, obj.obj)
+			err := b.cli.Create(b.ctx.Ctx, obj.obj)
+			if err != nil && !apierrors.IsAlreadyExists(err) {
+				return err
+			}
 		case UPDATE:
-			return b.cli.Update(b.ctx.Ctx, obj.obj)
+			err := b.cli.Update(b.ctx.Ctx, obj.obj)
+			if err != nil && !apierrors.IsNotFound(err) {
+				return err
+			}
 		case DELETE:
-			return b.cli.Delete(b.ctx.Ctx, obj.obj)
+			err := b.cli.Delete(b.ctx.Ctx, obj.obj)
+			if err != nil && apierrors.IsNotFound(err) {
+				return err
+			}
 		case STATUS:
-			return b.cli.Patch(b.ctx.Ctx, obj.obj, obj.patch)
+			return b.cli.Status().Patch(b.ctx.Ctx, obj.obj, obj.patch)
 		}
 		return nil
 	}

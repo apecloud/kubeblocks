@@ -17,11 +17,10 @@ limitations under the License.
 package lifecycle
 
 import (
-	corev1 "k8s.io/api/core/v1"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
-
+	"fmt"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 // finalizerSetterTransformer add finalizer to all none cluster objects
@@ -30,20 +29,22 @@ type finalizerSetterTransformer struct {
 }
 
 func (f *finalizerSetterTransformer) Transform(dag *graph.DAG) error {
+	scheme, _ := appsv1alpha1.SchemeBuilder.Build()
+	root := dag.Root()
+	if root == nil {
+		return fmt.Errorf("root vertex not found: %v", dag)
+	}
+	rootVertex, _ := root.(*lifecycleVertex)
 	vertices, err := findAllNot[*appsv1alpha1.Cluster](dag)
 	if err != nil {
 		return err
 	}
+
 	for _, vertex := range vertices {
 		v, _ := vertex.(*lifecycleVertex)
-		if controllerutil.ContainsFinalizer(v.obj, f.finalizer) {
-			continue
+		if err := intctrlutil.SetOwnership(rootVertex.obj, v.obj, scheme, dbClusterFinalizerName); err != nil {
+			return err
 		}
-		// pvc objects do not need to add finalizer
-		if _, ok := v.obj.(*corev1.PersistentVolumeClaim); ok {
-			continue
-		}
-		controllerutil.AddFinalizer(v.obj, f.finalizer)
 	}
 	return nil
 }

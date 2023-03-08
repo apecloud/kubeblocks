@@ -60,7 +60,7 @@ func (d *DAG) RemoveVertex(v Vertex) bool {
 }
 
 func (d *DAG) Vertices() []Vertex {
-	vertices := make([]Vertex, len(d.vertices))
+	vertices := make([]Vertex, 0)
 	for v := range d.vertices {
 		vertices = append(vertices, v)
 	}

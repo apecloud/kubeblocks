@@ -23,7 +23,7 @@ type Transformer interface {
 
 type TransformerChain []Transformer
 
-func (t *TransformerChain) WalkThrough(dag *DAG) error {
+func (t *TransformerChain) ApplyTo(dag *DAG) error {
 	for _, transformer := range *t {
 		if err := transformer.Transform(dag); err != nil {
 			return err

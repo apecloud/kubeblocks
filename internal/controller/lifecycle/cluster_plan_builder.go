@@ -87,7 +87,7 @@ func (b *clusterPlanBuilder) Build() (graph.Plan, error) {
 
 	// new a DAG and apply chain on it, after that we should get the final Plan
 	dag := graph.NewDAG()
-	if err := chain.WalkThrough(dag); err != nil {
+	if err := chain.ApplyTo(dag); err != nil {
 		return nil, err
 	}
 

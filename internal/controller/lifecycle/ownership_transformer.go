@@ -24,12 +24,12 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
-// finalizerSetterTransformer add finalizer to all none cluster objects
-type finalizerSetterTransformer struct {
+// ownershipTransformer add finalizer to all none cluster objects
+type ownershipTransformer struct {
 	finalizer string
 }
 
-func (f *finalizerSetterTransformer) Transform(dag *graph.DAG) error {
+func (f *ownershipTransformer) Transform(dag *graph.DAG) error {
 	scheme, _ := appsv1alpha1.SchemeBuilder.Build()
 	root := dag.Root()
 	if root == nil {

@@ -20,15 +20,14 @@ import (
 	"fmt"
 	"time"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	opsutil "github.com/apecloud/kubeblocks/controllers/apps/operations/util"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	opsutil "github.com/apecloud/kubeblocks/controllers/apps/operations/util"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 )
 
@@ -60,12 +59,16 @@ func findAllNot[T interface{}](dag *graph.DAG) ([]graph.Vertex, error) {
 	return vertices, nil
 }
 
-func getGVKName(object client.Object) gvkName {
-	return gvkName{
-		kind: object.GetObjectKind().GroupVersionKind().Kind,
+func getGVKName(object client.Object, scheme *runtime.Scheme) (*gvkName, error) {
+	gvk, err := apiutil.GVKForObject(object, scheme)
+	if err != nil {
+		return nil, err
+	}
+	return &gvkName{
+		gvk: gvk,
 		ns:   object.GetNamespace(),
 		name: object.GetName(),
-	}
+	}, nil
 }
 
 func isOwnerOf(owner, obj client.Object, scheme *runtime.Scheme) bool {

@@ -17,6 +17,7 @@ limitations under the License.
 package lifecycle
 
 import (
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -37,7 +38,8 @@ const (
 )
 
 type gvkName struct {
-	kind, ns, name string
+	gvk schema.GroupVersionKind
+	ns, name string
 }
 
 type compoundCluster struct {

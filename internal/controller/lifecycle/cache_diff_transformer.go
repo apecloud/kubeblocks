@@ -23,7 +23,9 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -51,13 +53,28 @@ func ownKinds() []client.ObjectList {
 	}
 }
 
+func objectScheme() (*runtime.Scheme, error) {
+	s := scheme.Scheme
+	if err := scheme.AddToScheme(s); err != nil {
+		return nil, err
+	}
+	if err := appsv1alpha1.AddToScheme(s); err != nil {
+		return nil, err
+	}
+	return s, nil
+}
+
 // read all objects owned by our cluster
 func (c *cacheDiffTransformer) readCacheSnapshot() (clusterSnapshot, error) {
-	scheme, _ := appsv1alpha1.SchemeBuilder.Build()
-
+	objScheme, err := objectScheme()
+	if err != nil {
+		return nil, err
+	}
 	// list what kinds of object cluster owns
 	kinds := ownKinds()
 	snapshot := make(clusterSnapshot)
+	sts := appsv1.StatefulSet{}
+	sts.GroupVersionKind()
 	ml := client.MatchingLabels{constant.AppInstanceLabelKey: c.cc.cluster.GetName()}
 	inNS := client.InNamespace(c.cc.cluster.Namespace)
 	for _, list := range kinds {
@@ -71,9 +88,12 @@ func (c *cacheDiffTransformer) readCacheSnapshot() (clusterSnapshot, error) {
 			// get the underlying object
 			object := items.Index(i).Addr().Interface().(client.Object)
 			// put to snapshot if owned by our cluster
-			if isOwnerOf(c.cc.cluster, object, scheme) {
-				name := getGVKName(object)
-				snapshot[name] = object
+			if isOwnerOf(c.cc.cluster, object, objScheme) {
+				name, err := getGVKName(object, objScheme)
+				if err != nil {
+					return nil, err
+				}
+				snapshot[*name] = object
 			}
 		}
 	}
@@ -91,11 +111,18 @@ func (c *cacheDiffTransformer) Transform(dag *graph.DAG) error {
 	// we have target snapshot in dag
 	// now do the heavy lift:
 	// compute the diff between cache and target spec and generate the plan
+	objScheme, err := objectScheme()
+	if err != nil {
+		return err
+	}
 	newNameVertices := make(map[gvkName]graph.Vertex)
 	for _, vertex := range dag.Vertices() {
 		v, _ := vertex.(*lifecycleVertex)
-		name := getGVKName(v.obj)
-		newNameVertices[name] = vertex
+		name, err := getGVKName(v.obj, objScheme)
+		if err != nil {
+			return err
+		}
+		newNameVertices[*name] = vertex
 	}
 
 	oldNameSet := sets.KeySet(oldSnapshot)

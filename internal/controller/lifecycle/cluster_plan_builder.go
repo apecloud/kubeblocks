@@ -76,7 +76,7 @@ func (b *clusterPlanBuilder) Build() (graph.Plan, error) {
 		// cluster to K8s objects and put them into dag
 		&clusterTransformer{cc: *cc, cli: b.cli, ctx: b.ctx},
 		// add our finalizer to all objects
-		&finalizerSetterTransformer{finalizer: dbClusterFinalizerName},
+		&ownershipTransformer{finalizer: dbClusterFinalizerName},
 		// make all workload objects depending on credential secret
 		&credentialTransformer{},
 		// make config configmap immutable

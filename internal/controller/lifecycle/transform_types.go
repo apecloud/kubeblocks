@@ -42,15 +42,15 @@ type gvkName struct {
 
 type compoundCluster struct {
 	cluster *appsv1alpha1.Cluster
-	cd appsv1alpha1.ClusterDefinition
-	cv appsv1alpha1.ClusterVersion
+	cd      appsv1alpha1.ClusterDefinition
+	cv      appsv1alpha1.ClusterVersion
 }
 
 type lifecycleVertex struct {
-	obj client.Object
+	obj       client.Object
 	immutable bool
-	action *Action
-	patch client.Patch
+	action    *Action
+	patch     client.Patch
 }
 
 type clusterSnapshot map[gvkName]client.Object

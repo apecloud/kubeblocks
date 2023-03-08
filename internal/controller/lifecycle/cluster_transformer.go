@@ -30,7 +30,7 @@ import (
 // clusterTransformer transforms a Cluster to a K8s objects DAG
 // TODO: remove cli and ctx, we should read all objects needed, and then do pure objects computation
 type clusterTransformer struct {
-	cc compoundCluster
+	cc  compoundCluster
 	cli client.Client
 	ctx intctrlutil.RequestCtx
 }

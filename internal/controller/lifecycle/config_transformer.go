@@ -23,7 +23,7 @@ import (
 )
 
 // configTransformer makes all config related ConfigMaps immutable
-type configTransformer struct {}
+type configTransformer struct{}
 
 func (c *configTransformer) Transform(dag *graph.DAG) error {
 	cmVertices, err := findAll[*corev1.ConfigMap](dag)

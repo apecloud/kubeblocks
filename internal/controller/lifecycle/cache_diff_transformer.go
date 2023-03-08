@@ -33,7 +33,7 @@ import (
 
 // cacheDiffTransformer reads all Vertex.Obj in cache and compute the diff DAG.
 type cacheDiffTransformer struct {
-	cc compoundCluster
+	cc  compoundCluster
 	cli client.Client
 	ctx intctrlutil.RequestCtx
 }

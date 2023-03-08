@@ -82,7 +82,7 @@ func (b *clusterPlanBuilder) Build() (graph.Plan, error) {
 		// read old snapshot from cache, and generate diff plan
 		&cacheDiffTransformer{cc: *cc, cli: b.cli, ctx: b.ctx},
 		// finally, update cluster status
-		&clusterStatusTransformer{},
+		&clusterStatusTransformer{*cc},
 	}
 
 	// new a DAG and apply chain on it, after that we should get the final Plan
@@ -115,7 +115,7 @@ func (b *clusterPlanBuilder) Build() (graph.Plan, error) {
 
 	// we got the execution plan
 	plan := &clusterPlan{
-		dag: dag,
+		dag:      dag,
 		walkFunc: walkFunc,
 	}
 	return plan, nil

@@ -26,7 +26,7 @@ type DAG struct {
 	edges    map[Edge]Edge
 }
 
-type Vertex interface {}
+type Vertex interface{}
 
 type Edge interface {
 	From() Vertex
@@ -76,7 +76,7 @@ func (d *DAG) AddEdge(e Edge) bool {
 			return true
 		}
 	}
-	d.edges[e]= e
+	d.edges[e] = e
 	return true
 }
 
@@ -98,7 +98,7 @@ func (d *DAG) Connect(from, to Vertex) bool {
 			return true
 		}
 	}
-	edge :=RealEdge(from, to)
+	edge := RealEdge(from, to)
 	d.edges[edge] = edge
 	return true
 }

@@ -20,11 +20,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/apecloud/kubeblocks/internal/controller/lifecycle"
 	"reflect"
 	"regexp"
 	"strings"
-	"time"
 
 	"golang.org/x/exp/slices"
 	appsv1 "k8s.io/api/apps/v1"
@@ -47,6 +45,7 @@ import (
 	opsutil "github.com/apecloud/kubeblocks/controllers/apps/operations/util"
 	"github.com/apecloud/kubeblocks/controllers/k8score"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
+	"github.com/apecloud/kubeblocks/internal/controller/lifecycle"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -333,27 +332,27 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	if err := plan.Execute(); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
-	// return intctrlutil.Reconciled()
-	// ---- end refactor ----
-	clusterDeepCopy := cluster.DeepCopy()
-	shouldRequeue, err := reconcileClusterWorkloads(reqCtx, r.Client, clusterDefinition, clusterVersion, cluster)
-	if err != nil {
-		// this is a block to handle error.
-		// so when update cluster conditions failed, we can ignore it.
-		_ = clusterConditionMgr.setApplyResourcesFailedCondition(err)
-		return intctrlutil.RequeueAfter(ControllerErrorRequeueTime, reqCtx.Log, "")
-	}
-	if shouldRequeue {
-		if err = r.patchClusterStatus(reqCtx.Ctx, cluster, clusterDeepCopy); err != nil {
-			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-		}
-		return intctrlutil.RequeueAfter(time.Second, reqCtx.Log, "")
-	}
-
-	if err = r.handleClusterStatusAfterApplySucceed(ctx, cluster, clusterDeepCopy, clusterDefinition); err != nil {
-		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-	}
 	return intctrlutil.Reconciled()
+	// ---- end refactor ----
+	//clusterDeepCopy := cluster.DeepCopy()
+	//shouldRequeue, err := reconcileClusterWorkloads(reqCtx, r.Client, clusterDefinition, clusterVersion, cluster)
+	//if err != nil {
+	//	// this is a block to handle error.
+	//	// so when update cluster conditions failed, we can ignore it.
+	//	_ = clusterConditionMgr.setApplyResourcesFailedCondition(err)
+	//	return intctrlutil.RequeueAfter(ControllerErrorRequeueTime, reqCtx.Log, "")
+	//}
+	//if shouldRequeue {
+	//	if err = r.patchClusterStatus(reqCtx.Ctx, cluster, clusterDeepCopy); err != nil {
+	//		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+	//	}
+	//	return intctrlutil.RequeueAfter(time.Second, reqCtx.Log, "")
+	//}
+	//
+	//if err = r.handleClusterStatusAfterApplySucceed(ctx, cluster, clusterDeepCopy, clusterDefinition); err != nil {
+	//	return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+	//}
+	//return intctrlutil.Reconciled()
 }
 
 // patchClusterStatus patches the cluster status.

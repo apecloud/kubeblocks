@@ -22,7 +22,9 @@ import (
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 )
 
-type clusterStatusTransformer struct {}
+type clusterStatusTransformer struct {
+	compoundCluster
+}
 
 func (c *clusterStatusTransformer) Transform(dag *graph.DAG) error {
 	// get root(cluster) vertex
@@ -32,9 +34,14 @@ func (c *clusterStatusTransformer) Transform(dag *graph.DAG) error {
 	}
 	root, _ := rootVertex.(*lifecycleVertex)
 	cluster, _ := root.obj.(*appsv1alpha1.Cluster)
-	// update generation
+	// apply resources succeed, record the condition and event
+	applyResourcesCondition := newApplyResourcesCondition()
+	cluster.SetStatusCondition(applyResourcesCondition)
+	// if cluster status is ConditionsError, do it before updated the observedGeneration.
+	updateClusterPhaseWhenConditionsError(cluster)
+	// update observed generation
 	cluster.Status.ObservedGeneration = cluster.Generation
-	// TODO: update other status fields
-
+	cluster.Status.ClusterDefGeneration = c.cd.Generation
+	root.action = actionPtr(STATUS)
 	return nil
 }

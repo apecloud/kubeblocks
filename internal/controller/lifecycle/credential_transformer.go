@@ -24,7 +24,7 @@ import (
 )
 
 // credentialTransformer puts the credential Secret at the beginning of the DAG
-type credentialTransformer struct {}
+type credentialTransformer struct{}
 
 func (c *credentialTransformer) Transform(dag *graph.DAG) error {
 	var secretVertices, noneRootVertices []graph.Vertex

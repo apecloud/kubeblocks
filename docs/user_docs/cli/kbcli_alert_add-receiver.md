@@ -1,11 +1,39 @@
-## kbcli app
+## kbcli alert add-receiver
 
-Manage external applications related to KubeBlocks
+Add alert receiver, such as email, slack, webhook and so on
+
+```
+kbcli alert add-receiver [flags]
+```
+
+### Examples
+
+```
+  # add webhook receiver, for example feishu
+  kbcli alert add-receiver --webhook='url=https://open.feishu.cn/open-apis/bot/v2/hook/foo,token=xxxxx'
+  
+  # add email receiver
+  kbcli alter add-receiver --email='a@foo.com,b@foo.com'
+  
+  # add email receiver, and only receive alert from cluster mycluster
+  kbcli alter add-receiver --email='a@foo.com,b@foo.com' --cluster=mycluster
+  
+  # add email receiver, and only receive alert from cluster mycluster and alert severity is warning
+  kbcli alter add-receiver --email='a@foo.com,b@foo.com' --cluster=mycluster --severity=warning
+  
+  # add slack receiver
+  kbcli alert add-receiver --slack api_url=https://hooks.slackConfig.com/services/foo,channel=monitor,username=kubeblocks-alert-bot
+```
 
 ### Options
 
 ```
-  -h, --help   help for app
+      --cluster stringArray    Cluster name, such as mycluster, more than one cluster can be specified, such as mycluster,mycluster2
+      --email stringArray      Add email address, such as bar@foo.com, more than one emailConfig can be specified separated by comma
+  -h, --help                   help for add-receiver
+      --severity stringArray   Alert severity, such as critical, warning, info, more than one severity can be specified, such as critical,warning
+      --slack stringArray      Add slack receiver, such as api_url=https://hooks.slackConfig.com/services/foo,channel=monitor,username=kubeblocks-alert-bot
+      --webhook stringArray    Add webhook receiver, such as url=https://open.feishu.cn/open-apis/bot/v2/hook/foo,token=xxxxx
 ```
 
 ### Options inherited from parent commands
@@ -18,7 +46,6 @@ Manage external applications related to KubeBlocks
       --certificate-authority string   Path to a cert file for the certificate authority
       --client-certificate string      Path to a client certificate file for TLS
       --client-key string              Path to a client key file for TLS
-      --cluster string                 The name of the kubeconfig cluster to use
       --context string                 The name of the kubeconfig context to use
       --disable-compression            If true, opt-out of response compression for all requests to the server
       --insecure-skip-tls-verify       If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure
@@ -34,7 +61,5 @@ Manage external applications related to KubeBlocks
 
 ### SEE ALSO
 
-* [kbcli](kbcli.md)	 - KubeBlocks CLI
-* [kbcli app install](kbcli_app_install.md)	 - Install the application with the specified name
-* [kbcli app uninstall](kbcli_app_uninstall.md)	 - Uninstall the application with the specified name
+* [kbcli alert](kbcli_alert.md)	 - Manage alert receivers
 

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package app
+package alert
 
 import (
 	"testing"
@@ -23,7 +23,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-func TestApp(t *testing.T) {
+func TestAlert(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "App Test Suite")
+	RunSpecs(t, "Alert Command Test Suite")
 }

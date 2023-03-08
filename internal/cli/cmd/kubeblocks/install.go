@@ -46,7 +46,7 @@ import (
 )
 
 const (
-	kMonitorParam      = "prometheus.enabled=%[1]t,grafana.enabled=%[1]t,dashboards.enabled=%[1]t"
+	kMonitorParam      = "prometheus.enabled=%[1]t,grafana.enabled=%[1]t,dashboards.enabled=%[1]t,alertmanager-webhook-adaptor.enabled=%[1]t"
 	requiredK8sVersion = "1.22.0"
 )
 
@@ -411,7 +411,7 @@ func (o *InstallOptions) checkRemainedResource() error {
 		return nil
 	}
 
-	ns, _ := getKubeBlocksNamespace(o.Client)
+	ns, _ := util.GetKubeBlocksNamespace(o.Client)
 	if ns == "" {
 		ns = o.Namespace
 	}
@@ -515,7 +515,6 @@ func (o *InstallOptions) buildChart() *helm.InstallOpts {
 		Version:         o.Version,
 		Namespace:       o.HelmCfg.Namespace(),
 		ValueOpts:       &o.ValueOpts,
-		Login:           true,
 		TryTimes:        2,
 		CreateNamespace: o.CreateNamespace,
 		Timeout:         o.timeout,

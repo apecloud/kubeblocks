@@ -64,13 +64,21 @@ dependencies:
     version: 0.1.*
   - condition: grafana.enabled
     name: grafana
+    # repository: https://grafana.github.io/helm-charts
     version: 6.43.*
   - condition: prometheus.enabled
     name: prometheus
+    # repository: https://prometheus-community.github.io/helm-charts
     version: 15.15 - 15.16
   - condition: snapshot-controller.enabled
     name: snapshot-controller
+    # repository: https://piraeus.io/helm-charts
     version: 1.*
   - condition: csi-s3.enabled
     name: csi-s3
+    # repository: https://github.com/CloudVE/helm-charts/raw/master
     version: 0.*
+  - condition: alertmanager-webhook-adaptor.enabled
+    name: alertmanager-webhook-adaptor
+    # repository: https://apecloud.github.io/helm-charts
+    version: 0.1.*

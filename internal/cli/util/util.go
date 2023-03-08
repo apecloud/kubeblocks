@@ -53,6 +53,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/duration"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	cmdget "k8s.io/kubectl/pkg/cmd/get"
@@ -585,4 +586,14 @@ func GetHelmChartRepoURL() string {
 		return types.GitLabHelmChartRepo
 	}
 	return types.KubeBlocksChartURL
+}
+
+// GetKubeBlocksNamespace gets namespace of KubeBlocks installation, infer namespace from helm secrets
+func GetKubeBlocksNamespace(client kubernetes.Interface) (string, error) {
+	secrets, err := client.CoreV1().Secrets(metav1.NamespaceAll).List(context.TODO(), metav1.ListOptions{LabelSelector: types.HelmLabel})
+	// if KubeBlocks is upgraded, there will be multiple secrets
+	if err == nil && len(secrets.Items) >= 1 {
+		return secrets.Items[0].Namespace, nil
+	}
+	return "", errors.New("failed to get KubeBlocks installation namespace")
 }

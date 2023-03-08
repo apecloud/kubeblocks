@@ -14,16 +14,24 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package app
+package alert
 
 import (
-	"testing"
-
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
+	"k8s.io/cli-runtime/pkg/genericclioptions"
+	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 )
 
-func TestApp(t *testing.T) {
-	RegisterFailHandler(Fail)
-	RunSpecs(t, "App Test Suite")
-}
+var _ = Describe("alter", func() {
+	f := cmdtesting.NewTestFactory()
+	s, _, _, _ := genericclioptions.NewTestIOStreams()
+	defer f.Cleanup()
+
+	It("create new alert cmd", func() {
+		cmd := NewAlertCmd(f, s)
+		Expect(cmd).NotTo(BeNil())
+		Expect(cmd.HasSubCommands()).Should(BeTrue())
+	})
+})

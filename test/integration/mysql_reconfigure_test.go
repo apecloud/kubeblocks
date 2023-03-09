@@ -18,7 +18,6 @@ package appstest
 
 import (
 	"fmt"
-	"github.com/apecloud/kubeblocks/internal/generics"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -26,8 +25,10 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/apecloud/kubeblocks/internal/generics"
+
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
+	util "github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 	testk8s "github.com/apecloud/kubeblocks/internal/testutil/k8s"
 )
@@ -94,6 +95,14 @@ var _ = Describe("MySQL Reconfigure function", func() {
 		Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.RunningPhase))
 
 		By("Checking pods' role label")
+		/*
+			stsList := &apps.StatefulSetList{}
+			testCtx.Cli.List(testCtx.Ctx, stsList, client.MatchingLabels{
+				constant.AppInstanceLabelKey: clusterKey.Name,
+			}, client.InNamespace(clusterKey.Namespace))
+			sts := stsList.Items[0]
+		*/
+
 		sts := testk8s.ListAndCheckStatefulSet(&testCtx, clusterKey).Items[0]
 		pods, err := util.GetPodListByStatefulSet(testCtx.Ctx, k8sClient, &sts)
 		Expect(err).To(Succeed())
@@ -102,7 +111,7 @@ var _ = Describe("MySQL Reconfigure function", func() {
 
 		// get role->count map
 		By("Checking the count of leader and followers, learners are ignored")
-		roleCountMap := testapps.GetConsensusRoleCountMap(testCtx, k8sClient, clusterObj)
+		roleCountMap := GetConsensusRoleCountMap(testCtx, k8sClient, clusterObj)
 		Expect(roleCountMap[leader]).Should(Equal(1))
 		Expect(roleCountMap[follower]).Should(Equal(2))
 

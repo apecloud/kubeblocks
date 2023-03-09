@@ -36,5 +36,7 @@ func NewKubeBlocksCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *c
 		newListVersionsCmd(streams),
 		newStatusCmd(f, streams),
 	)
+	// add preflight cmd
+	cmd.AddCommand(NewPreflightCmd(f, streams))
 	return cmd
 }

@@ -26,6 +26,8 @@ func GetExtendHostCollector(kbCollector *preflightv1beta2.ExtendHostCollect, bun
 	switch {
 	case kbCollector.HostUtility != nil:
 		return &CollectHostUtility{HostCollector: kbCollector.HostUtility, BundlePath: bundlePath}, true
+	case kbCollector.ClusterRegion != nil:
+		return &CollectClusterRegion{HostCollector: kbCollector.ClusterRegion, BundlePath: bundlePath}, true
 	default:
 		return nil, false
 	}

@@ -20,131 +20,117 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/fatih/color"
 	"github.com/pkg/errors"
 	analyzerunner "github.com/replicatedhq/troubleshoot/pkg/analyze"
 	"gopkg.in/yaml.v2"
 )
 
-// ShowStdoutResults shadows interactive mode, and exports results by customized format
-func ShowStdoutResults(preflightName string, analyzeResults []*analyzerunner.AnalyzeResult, format string) error {
-	switch format {
-	case "human":
-		return showStdoutResultsHuman(preflightName, analyzeResults)
-	case "json":
-		return showStdoutResultsJSON(preflightName, analyzeResults)
-	case "yaml":
-		return showStdoutResultsYAML(preflightName, analyzeResults)
-	default:
-		return errors.Errorf("unknown output format: %q", format)
-	}
-}
-
-func showStdoutResultsHuman(preflightName string, analyzeResults []*analyzerunner.AnalyzeResult) error {
-	fmt.Println("")
-	var failed bool
-	for _, analyzeResult := range analyzeResults {
-		testResultFailed := outputResult(analyzeResult)
-		if testResultFailed {
-			failed = true
-		}
-	}
-	if failed {
-		fmt.Printf("--- FAIL   %s\n", preflightName)
-		fmt.Println("FAILED")
-	} else {
-		fmt.Printf("--- PASS   %s\n", preflightName)
-		fmt.Println("PASS")
-	}
-	return nil
-}
-
-func showStdoutResultsJSON(preflightName string, analyzeResults []*analyzerunner.AnalyzeResult) error {
-	output := showStdoutResultsStructured(preflightName, analyzeResults)
-
-	b, err := json.MarshalIndent(*output, "", "  ")
-	if err != nil {
-		return errors.Wrap(err, "failed to marshal results as json")
-	}
-
-	fmt.Printf("%s\n", b)
-
-	return nil
-}
-
-func showStdoutResultsYAML(preflightName string, analyzeResults []*analyzerunner.AnalyzeResult) error {
-	output := showStdoutResultsStructured(preflightName, analyzeResults)
-
-	b, err := yaml.Marshal(*output)
-	if err != nil {
-		return errors.Wrap(err, "failed to marshal results as yaml")
-	}
-
-	fmt.Printf("%s\n", b)
-
-	return nil
-}
-
-type stdoutResultOutput struct {
+type TextResultOutput struct {
 	Title   string `json:"title" yaml:"title"`
 	Message string `json:"message" yaml:"message"`
 	URI     string `json:"uri,omitempty" yaml:"uri,omitempty"`
 	Strict  bool   `json:"strict,omitempty" yaml:"strict,omitempty"`
 }
 
-type stdoutOutput struct {
-	Pass []stdoutResultOutput `json:"pass,omitempty" yaml:"pass,omitempty"`
-	Warn []stdoutResultOutput `json:"warn,omitempty" yaml:"warn,omitempty"`
-	Fail []stdoutResultOutput `json:"fail,omitempty" yaml:"fail,omitempty"`
+func NewTextResultOutput(title, message, uri string) TextResultOutput {
+	return TextResultOutput{
+		Title:   title,
+		Message: message,
+		URI:     uri,
+	}
 }
 
-func showStdoutResultsStructured(preflightName string, analyzeResults []*analyzerunner.AnalyzeResult) *stdoutOutput {
-	output := stdoutOutput{
-		Pass: []stdoutResultOutput{},
-		Warn: []stdoutResultOutput{},
-		Fail: []stdoutResultOutput{},
+type TextOutput struct {
+	Pass []TextResultOutput `json:"pass,omitempty" yaml:"pass,omitempty"`
+	Warn []TextResultOutput `json:"warn,omitempty" yaml:"warn,omitempty"`
+	Fail []TextResultOutput `json:"fail,omitempty" yaml:"fail,omitempty"`
+}
+
+func NewTextOutput() TextOutput {
+	return TextOutput{
+		Pass: []TextResultOutput{},
+		Warn: []TextResultOutput{},
+		Fail: []TextResultOutput{},
 	}
+}
 
-	for _, analyzeResult := range analyzeResults {
-		resultOutput := stdoutResultOutput{
-			Title:   analyzeResult.Title,
-			Message: analyzeResult.Message,
-			URI:     analyzeResult.URI,
+// ShowTextResults shadows interactive mode, and exports results by customized format
+func ShowTextResults(preflightName string, analyzeResults []*analyzerunner.AnalyzeResult, format string, verbose bool) error {
+	switch format {
+	case "json":
+		return showTextResultsJSON(preflightName, analyzeResults, verbose)
+	case "yaml":
+		return showStdoutResultsYAML(preflightName, analyzeResults, verbose)
+	default:
+		return errors.Errorf("unknown output format: %q", format)
+	}
+}
+
+func showTextResultsJSON(preflightName string, analyzeResults []*analyzerunner.AnalyzeResult, verbose bool) error {
+	b, err := json.MarshalIndent(showStdoutResultsStructured(preflightName, analyzeResults, verbose), "", "  ")
+	if err != nil {
+		return errors.Wrap(err, "failed to marshal results as json")
+	}
+	fmt.Printf("%s\n", b)
+	return nil
+}
+
+func showStdoutResultsYAML(preflightName string, analyzeResults []*analyzerunner.AnalyzeResult, verbose bool) error {
+	data := showStdoutResultsStructured(preflightName, analyzeResults, verbose)
+	var (
+		passInfo = color.New(color.FgGreen)
+		warnInfo = color.New(color.FgYellow)
+		failInfo = color.New(color.FgRed)
+	)
+	if len(data.Warn) == 0 && len(data.Fail) == 0 {
+		passInfo.Println("congratulations, your kubernetes cluster preflight check pass, and begin to enjoy KubeBlocks...")
+	}
+	if len(data.Pass) > 0 {
+		passInfo.Println("pass items")
+		if b, err := yaml.Marshal(data.Pass); err != nil {
+			return errors.Wrap(err, "failed to marshal results as yaml")
+		} else {
+			fmt.Printf("%s\n", b)
 		}
+	}
+	if len(data.Warn) > 0 {
+		warnInfo.Println("warn items")
+		if b, err := yaml.Marshal(data.Warn); err != nil {
+			return errors.Wrap(err, "failed to marshal results as yaml")
+		} else {
+			fmt.Printf("%s\n", b)
+		}
+	}
+	if len(data.Fail) > 0 {
+		failInfo.Println("fail items")
+		if b, err := yaml.Marshal(data.Fail); err != nil {
+			return errors.Wrap(err, "failed to marshal results as yaml")
+		} else {
+			fmt.Printf("%s\n", b)
+		}
+	}
+	return nil
+}
 
+// showStdoutResultsStructured is Used by both JSON and YAML outputs
+func showStdoutResultsStructured(preflightName string, analyzeResults []*analyzerunner.AnalyzeResult, verbose bool) TextOutput {
+	output := NewTextOutput()
+	for _, analyzeResult := range analyzeResults {
+		resultOutput := NewTextResultOutput(analyzeResult.Title, analyzeResult.Message, analyzeResult.URI)
 		if analyzeResult.Strict {
 			resultOutput.Strict = analyzeResult.Strict
 		}
 		switch {
 		case analyzeResult.IsPass:
-			output.Pass = append(output.Pass, resultOutput)
+			if verbose {
+				output.Pass = append(output.Pass, resultOutput)
+			}
 		case analyzeResult.IsWarn:
 			output.Warn = append(output.Warn, resultOutput)
 		case analyzeResult.IsFail:
 			output.Fail = append(output.Fail, resultOutput)
 		}
 	}
-	return &output
-}
-
-func outputResult(analyzeResult *analyzerunner.AnalyzeResult) bool {
-	switch {
-	case analyzeResult.IsPass:
-		fmt.Printf("   --- PASS %s\n", analyzeResult.Title)
-		fmt.Printf("      --- %s\n", analyzeResult.Message)
-	case analyzeResult.IsWarn:
-		fmt.Printf("   --- WARN: %s\n", analyzeResult.Title)
-		fmt.Printf("      --- %s\n", analyzeResult.Message)
-	case analyzeResult.IsFail:
-		fmt.Printf("   --- FAIL: %s\n", analyzeResult.Title)
-		fmt.Printf("      --- %s\n", analyzeResult.Message)
-	}
-
-	if analyzeResult.Strict {
-		fmt.Printf("      --- Strict: %t\n", analyzeResult.Strict)
-	}
-
-	if analyzeResult.IsFail {
-		return true
-	}
-	return false
+	return output
 }

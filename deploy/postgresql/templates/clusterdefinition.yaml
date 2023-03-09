@@ -58,8 +58,6 @@ spec:
       volumesType:
         - name: data
           type: data
-        # - name: wal
-        #   type: log
       podSpec:
         securityContext:
           fsGroup: 1001

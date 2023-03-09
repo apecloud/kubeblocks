@@ -61,8 +61,6 @@ spec:
       volumesType:
         - name: data
           type: data
-        # - name: binlog
-        #   type: log
       podSpec:
         containers:
           - name: mysql

@@ -86,8 +86,6 @@ spec:
       volumesType:
         - name: data
           type: data
-        # - name: aof
-        #   type: log
       podSpec:
         initContainers:
           - name: redis-init-container

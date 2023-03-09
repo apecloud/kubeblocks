@@ -4,10 +4,10 @@ dependencies:
   version: 0.1.8
 - name: postgresql
   repository: file://../postgresql
-  version: 0.1.1
+  version: 0.2.0
 - name: loadbalancer
   repository: file://../loadbalancer
-  version: 0.1.0
+  version: 0.1.1
 - name: grafana
   repository: ""
   version: 6.43.*
@@ -23,5 +23,5 @@ dependencies:
 - name: alertmanager-webhook-adaptor
   repository: ""
   version: 0.1.*
-digest: sha256:9afd1d91f1b11a875afc9f5ecdc7caae4ee53783276379eb86a21e1a496b0c4a
-generated: "2023-03-07T14:45:44.706369+08:00"
+digest: sha256:76cafb289c4128e6e63049b9f3c2c3f82971408bdc54bb2f4ce847e1d096618c
+generated: "2023-03-08T16:38:48.025594+08:00"

@@ -57,7 +57,7 @@ dependencies:
   - condition: postgresql.enabled
     name: postgresql
     repository: file://../postgresql
-    version: 0.1.*
+    version: 0.2.*
   - condition: loadbalancer.enabled
     name: loadbalancer
     repository: file://../loadbalancer

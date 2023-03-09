@@ -274,9 +274,9 @@ type VolumeTypeSpec struct {
 	// +optional
 	Name string `json:"name,omitempty"`
 
-	// Type is in enum of {data, log}. The default type is `data`.
-	// VolumeTypeData: the volume persistent data
-	// VolumeTypeLog: the volume persistent log
+	// Type is in enum of {data, log}.
+	// VolumeTypeData: the volume is for the persistent data storage.
+	// VolumeTypeLog: the volume is for the persistent log storage.
 	// +optional
 	Type VolumeType `json:"type,omitempty"`
 }

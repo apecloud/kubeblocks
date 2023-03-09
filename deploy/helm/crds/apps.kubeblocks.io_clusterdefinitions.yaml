@@ -8872,9 +8872,9 @@ spec:
                             pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                             type: string
                           type:
-                            description: 'Type is in enum of {data, log}. The default
-                              type is `data`. VolumeTypeData: the volume persistent
-                              data VolumeTypeLog: the volume persistent log'
+                            description: 'Type is in enum of {data, log}. VolumeTypeData:
+                              the volume is for the persistent data storage. VolumeTypeLog:
+                              the volume is for the persistent log storage.'
                             enum:
                             - data
                             - log

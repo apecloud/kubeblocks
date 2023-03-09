@@ -307,7 +307,7 @@ type ClusterComponentDefinition struct {
 	// +listType=map
 	// +listMapKey=name
 	// +optional
-	ComponentConfigSpec []ComponentConfigSpec `json:"configSpec,omitempty"`
+	ComponentConfigSpec []ComponentConfigSpec `json:"configSpecs,omitempty"`
 
 	// The scriptSpec field provided by provider, and
 	// finally this configTemplateRefs will be rendered into the user's own configuration file according to the user's cluster.
@@ -317,7 +317,7 @@ type ClusterComponentDefinition struct {
 	// +listType=map
 	// +listMapKey=name
 	// +optional
-	ComponentScriptSpec []ComponentTemplateSpec `json:"scriptSpec,omitempty"`
+	ComponentScriptSpec []ComponentTemplateSpec `json:"scriptSpecs,omitempty"`
 
 	// probes setting for healthy checks.
 	// +optional

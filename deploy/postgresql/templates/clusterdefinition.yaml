@@ -26,21 +26,21 @@ spec:
         - name: {{ $name }}
           filePathPattern: {{ $pattern }}
         {{- end }}
-      componentConfigSpec:
+      configSpecs:
         - name: postgresql-configuration
-          configTemplateRef: postgresql-configuration
-          configConstraintRef: postgresql14-cc
+          templateRef: postgresql-configuration
+          constraintRef: postgresql14-cc
           keys:
             - postgresql.conf
           namespace: {{ .Release.Namespace }}
           volumeName: postgresql-config
           defaultMode: 0777
         - name: postgresql-custom-metrics
-          configTemplateRef: postgresql-custom-metrics
+          templateRef: postgresql-custom-metrics
           namespace: {{ .Release.Namespace }}
           volumeName: postgresql-custom-metrics
           defaultMode: 0777
-      componentScriptSpec:
+      scriptSpecs:
         - name: postgresql-scripts
           configTemplateRef: postgresql-scripts
           namespace: {{ .Release.Namespace }}

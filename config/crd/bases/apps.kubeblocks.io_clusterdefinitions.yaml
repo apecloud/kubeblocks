@@ -64,7 +64,7 @@ spec:
                         KubeBlocks will generate proper monitor configs for well-known
                         characterType when builtIn is true.
                       type: string
-                    configSpec:
+                    configSpecs:
                       description: The configSpec field provided by provider, and
                         finally this configTemplateRefs will be rendered into the
                         user's own configuration file according to the user's cluster.
@@ -8248,7 +8248,7 @@ spec:
                       required:
                       - switchCmdExecutorConfig
                       type: object
-                    scriptSpec:
+                    scriptSpecs:
                       description: The scriptSpec field provided by provider, and
                         finally this configTemplateRefs will be rendered into the
                         user's own configuration file according to the user's cluster.

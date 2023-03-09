@@ -261,16 +261,16 @@ spec:
         - name: {{ $name }}
           filePathPattern: {{ $pattern }}
         {{- end }}
-      componentConfigSpec:
+      configSpecs:
       {{- if .Values.zookeeper.configuration }}
         - name: zookeeper-tpl
-          configTemplateRef: zookeeper-tpl
+          templateRef: zookeeper-tpl
           namespace: {{ .Release.Namespace }}
           volumeName: config
       {{- end }}
-      componentScriptSpec:
+      scriptSpecs:
         - name: zookeeper-scripts-tpl
-          configTemplateRef: zookeeper-scripts-tpl
+          templateRef: zookeeper-scripts-tpl
           namespace: {{ .Release.Namespace }}
           volumeName: script
           defaultMode: 0755

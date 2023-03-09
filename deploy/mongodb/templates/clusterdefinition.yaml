@@ -7,9 +7,9 @@ metadata:
 spec:
   componentDefs:
     - name: mongos
-      componentScriptSpec:
+      scriptSpecs:
         - name: mongodb-scripts
-          configTemplateRef: mongodb-scripts
+          templateRef: mongodb-scripts
           volumeName: scripts
           namespace: {{ .Release.Namespace }}
           defaultMode: 493
@@ -32,9 +32,9 @@ spec:
                 mountPath: /scripts/mongos-setup.sh
                 subPath: mongos-setup.sh
     - name: configsvr
-      componentScriptSpec:
+      scriptSpecs:
         - name: mongodb-scripts
-          configTemplateRef: mongodb-scripts
+          templateRef: mongodb-scripts
           volumeName: scripts
           namespace: {{ .Release.Namespace }}
           defaultMode: 493
@@ -81,9 +81,9 @@ spec:
                 mountPath: /scripts/replicaset-post-start.sh
                 subPath: replicaset-post-start.sh
     - name: shard
-      componentScriptSpec:
+      scriptSpecs:
         - name: mongodb-scripts
-          configTemplateRef: mongodb-scripts
+          templateRef: mongodb-scripts
           volumeName: scripts
           namespace: {{ .Release.Namespace }}
           defaultMode: 493

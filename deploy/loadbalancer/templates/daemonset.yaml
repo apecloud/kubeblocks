@@ -24,17 +24,16 @@ spec:
       containers:
       - name: agent
         command:
-          - "/agent"
+          - "/loadbalancer"
         args:
-          - "--health-probe-bind-address=:8081"
-          - "--metrics-bind-address=127.0.0.1:8080"
+          - "--mode=agent"
         image: "{{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:v{{ .Values.image.tag | default .Chart.AppVersion }}"
         imagePullPolicy: {{ .Values.image.pullPolicy }}
         securityContext:
           {{- toYaml .Values.podSecurityContext | nindent 10 }}
         ports:
           - name: health
-            containerPort: 8081
+            containerPort: {{ .Values.agent.rpcPort }}
             protocol: TCP
         readinessProbe:
           tcpSocket:

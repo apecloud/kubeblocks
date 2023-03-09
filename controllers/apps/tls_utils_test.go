@@ -261,7 +261,7 @@ var _ = Describe("TLS self-signed cert function", func() {
 				clusterObj.Spec.ComponentSpecs[0].TLS = true
 				clusterObj.Spec.ComponentSpecs[0].Issuer = &appsv1alpha1.Issuer{Name: appsv1alpha1.IssuerKubeBlocks}
 				Expect(k8sClient.Patch(ctx, clusterObj, patch)).Should(Succeed())
-				Eventually(hasTLSSettings).WithPolling(time.Second).WithTimeout(1000 * time.Second).Should(BeTrue())
+				Eventually(hasTLSSettings).WithPolling(time.Second).WithTimeout(10 * time.Second).Should(BeTrue())
 
 				By("update tls to disabled")
 				patch = client.MergeFrom(clusterObj.DeepCopy())

@@ -94,5 +94,5 @@ func (s *statefulSetPVCTransformer) Transform(dag *graph.DAG) error {
 			}
 		}
 	}
-	return err
+	return nil
 }

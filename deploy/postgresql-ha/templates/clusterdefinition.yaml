@@ -61,11 +61,36 @@ spec:
           runAsUser: 0
           fsGroup: 103
           runAsGroup: 103
+        initContainers:
+          - name: pg-init-container
+            imagePullPolicy: {{ default .Values.image.pullPolicy "IfNotPresent" }}
+            command:
+              - /bin/sh
+              - -c
+              - |
+                mkdir -p /home/postgres/pgdata/conf
+                chmod +777 -R /home/postgres/pgdata/conf
+                cp /home/postgres/conf/pg_hba.conf /home/postgres/pgdata/conf
+                cp /home/postgres/conf/postgresql.conf /home/postgres/pgdata/conf
+                chmod +777 /home/postgres/pgdata/conf/pg_hba.conf
+                chmod +777 /home/postgres/pgdata/conf/postgresql.conf
+            volumeMounts:
+              - name: data
+                mountPath: /home/postgres/pgdata
+                mode: 0777
+              - name: postgresql-config
+                mountPath: /home/postgres/conf
+                mode: 0777
         containers:
           - name: postgresql
             imagePullPolicy: {{ default .Values.image.pullPolicy "IfNotPresent" }}
             securityContext:
               runAsUser: 0
+            command:
+              - /bin/sh
+              - -c
+            args:
+              - /launch.sh init
             volumeMounts:
               - name: dshm
                 mountPath: /dev/shm
@@ -73,7 +98,7 @@ spec:
                 mountPath: /home/postgres/pgdata
                 mode: 0777
               - name: postgresql-config
-                mountPath: /home/postgres/pgdata/conf
+                mountPath: /home/postgres/conf
                 mode: 0777
             ports:
               - name: tcp-postgresql
@@ -132,6 +157,8 @@ spec:
                     initdb:
                       - auth-host: md5
                       - auth-local: trust
+                  postgresql:
+                    config_dir: /home/postgres/pgdata/conf
               - name: ALLOW_NOSSL
                 value: "true"
               - name: PGUSER_SUPERUSER

@@ -180,7 +180,7 @@ func (o *addReceiverOptions) checkSeverities() error {
 		ss := strings.Split(severity, ",")
 		for _, s := range ss {
 			if !slices.Contains(severities(), strings.ToLower(strings.TrimSpace(s))) {
-				return fmt.Errorf("invalid severity %s, must be one of %v", s, severities())
+				return fmt.Errorf("invalid severity: %s, must be one of %v", s, severities())
 			}
 		}
 		return nil
@@ -200,14 +200,14 @@ func (o *addReceiverOptions) checkEmails() error {
 		return nil
 	}
 
-	smtpErr := fmt.Errorf("SMTP is not configured, if you want to add email receiver, please configure SMTP first")
+	errMsg := "SMTP %sis not configured, if you want to add email receiver, please configure it first"
 	data, err := getConfigData(o.alterConfigMap, alertConfigFileName)
 	if err != nil {
 		return err
 	}
 
 	if data["global"] == nil {
-		return smtpErr
+		return fmt.Errorf(errMsg, "")
 	}
 
 	// check smtp config in global
@@ -215,7 +215,7 @@ func (o *addReceiverOptions) checkEmails() error {
 	checkSMTP := func(key string) error {
 		val := data["global"].(map[string]interface{})[key]
 		if val == nil || fmt.Sprintf("%v", val) == "" {
-			return smtpErr
+			return fmt.Errorf(errMsg, key+" ")
 		}
 		return nil
 	}
@@ -420,7 +420,7 @@ func buildSlackConfigs(slacks []string) ([]*slackConfig, error) {
 			switch slackKey(k) {
 			case slackAPIURL:
 				if valid, err := urlIsValid(v); !valid {
-					return nil, fmt.Errorf("invalid slack api url: %s, %v", v, err)
+					return nil, fmt.Errorf("invalid slack api_url: %s, %v", v, err)
 				}
 				s.APIURL = v
 			case slackChannel:

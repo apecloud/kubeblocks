@@ -178,7 +178,7 @@ type ComponentTemplateSpec struct {
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=63
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
-	ConfigTemplateRef string `json:"configTemplateRef"`
+	ConfigTemplateRef string `json:"templateRef"`
 
 	// Specify the namespace of the referenced the configuration template ConfigMap object.
 	// An empty namespace is equivalent to the "default" namespace.
@@ -216,7 +216,7 @@ type ComponentConfigSpec struct {
 	// +kubebuilder:validation:MaxLength=63
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	// +optional
-	ConfigConstraintRef string `json:"configConstraintRef,omitempty"`
+	ConfigConstraintRef string `json:"constraintRef,omitempty"`
 }
 
 // type ComponentScriptSpec struct {
@@ -299,7 +299,7 @@ type ClusterComponentDefinition struct {
 	// +optional
 	MaxUnavailable *intstr.IntOrString `json:"maxUnavailable,omitempty"`
 
-	// The componentConfigSpec field provided by provider, and
+	// The configSpec field provided by provider, and
 	// finally this configTemplateRefs will be rendered into the user's own configuration file according to the user's cluster.
 	// +optional
 	// +patchMergeKey=name
@@ -307,9 +307,9 @@ type ClusterComponentDefinition struct {
 	// +listType=map
 	// +listMapKey=name
 	// +optional
-	ComponentConfigSpec []ComponentConfigSpec `json:"componentConfigSpec,omitempty"`
+	ComponentConfigSpec []ComponentConfigSpec `json:"configSpec,omitempty"`
 
-	// The componentScriptSpec field provided by provider, and
+	// The scriptSpec field provided by provider, and
 	// finally this configTemplateRefs will be rendered into the user's own configuration file according to the user's cluster.
 	// +optional
 	// +patchMergeKey=name
@@ -317,7 +317,7 @@ type ClusterComponentDefinition struct {
 	// +listType=map
 	// +listMapKey=name
 	// +optional
-	ComponentScriptSpec []ComponentTemplateSpec `json:"componentScriptSpec,omitempty"`
+	ComponentScriptSpec []ComponentTemplateSpec `json:"scriptSpec,omitempty"`
 
 	// probes setting for healthy checks.
 	// +optional

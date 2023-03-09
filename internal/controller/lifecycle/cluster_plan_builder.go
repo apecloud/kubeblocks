@@ -131,45 +131,6 @@ func buildUpdateObj(node *lifecycleVertex) (client.Object, error) {
 			//syncComponentPhaseWhenSpecUpdating(cluster, componentName)
 		}
 
-		// check stsObj.Spec.VolumeClaimTemplates storage
-		// request size and find attached PVC and patch request
-		// storage size
-		// TODO: handle pvc
-		//for _, vct := range stsObj.Spec.VolumeClaimTemplates {
-		//	var vctProto *corev1.PersistentVolumeClaim
-		//	for _, v := range stsProto.Spec.VolumeClaimTemplates {
-		//		if v.Name == vct.Name {
-		//			vctProto = &v
-		//			break
-		//		}
-		//	}
-		//
-		//	// REVIEW: how could VCT proto is nil?
-		//	if vctProto == nil {
-		//		continue
-		//	}
-		//
-		//	for i := *stsObj.Spec.Replicas - 1; i >= 0; i-- {
-		//		pvc := &corev1.PersistentVolumeClaim{}
-		//		pvcKey := types.NamespacedName{
-		//			Namespace: key.Namespace,
-		//			Name:      fmt.Sprintf("%s-%s-%d", vct.Name, stsObj.Name, i),
-		//		}
-		//		var err error
-		//		if err = cli.Get(ctx, pvcKey, pvc); err != nil {
-		//			return false, err
-		//		}
-		//		if pvc.Spec.Resources.Requests[corev1.ResourceStorage] == vctProto.Spec.Resources.Requests[corev1.ResourceStorage] {
-		//			continue
-		//		}
-		//		patch := client.MergeFrom(pvc.DeepCopy())
-		//		pvc.Spec.Resources.Requests[corev1.ResourceStorage] = vctProto.Spec.Resources.Requests[corev1.ResourceStorage]
-		//		if err := cli.Patch(ctx, pvc, patch); err != nil {
-		//			return false, err
-		//		}
-		//	}
-		//}
-
 		return stsObj, nil
 	}
 
@@ -241,6 +202,8 @@ func (b *clusterPlanBuilder) Build() (graph.Plan, error) {
 		&configTransformer{},
 		// read old snapshot from cache, and generate diff plan
 		&cacheDiffTransformer{cc: *cc, cli: b.cli, ctx: b.ctx},
+		// stateful set pvc Update
+		&statefulSetPVCTransformer{cc: *cc, cli: b.cli, ctx: b.ctx},
 		// finally, update cluster status
 		&clusterStatusTransformer{*cc},
 	}

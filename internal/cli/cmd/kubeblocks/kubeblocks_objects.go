@@ -30,6 +30,7 @@ import (
 	k8sapitypes "k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
 
 	"github.com/apecloud/kubeblocks/internal/cli/types"
@@ -229,4 +230,8 @@ func newDeleteOpts() metav1.DeleteOptions {
 	return metav1.DeleteOptions{
 		GracePeriodSeconds: &gracePeriod,
 	}
+}
+
+func deleteNamespace(client kubernetes.Interface, namespace string) error {
+	return client.CoreV1().Namespaces().Delete(context.TODO(), namespace, newDeleteOpts())
 }

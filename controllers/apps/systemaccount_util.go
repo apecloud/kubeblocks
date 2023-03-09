@@ -310,7 +310,7 @@ func getCreationStmtForAccount(key componentUniqueKey, passConfig appsv1alpha1.P
 		passwd = strings.ToLower(passwd)
 	}
 
-	userName := (accountConfig.Name).String()
+	userName := (string)(accountConfig.Name)
 
 	namedVars := getEnvReplacementMapForAccount(userName, passwd)
 
@@ -355,7 +355,7 @@ func calibrateJobMetaAndSpec(job *batchv1.Job, cluster *appsv1alpha1.Cluster, co
 	debugModeOn := getDebugMode(cluster.Annotations[debugClusterAnnotationKey])
 	// add label
 	ml := getLabelsForSecretsAndJobs(compKey)
-	ml[constant.ClusterAccountLabelKey] = account.String()
+	ml[constant.ClusterAccountLabelKey] = (string)(account)
 	job.ObjectMeta.Labels = ml
 
 	// if debug mode is on, jobs will retain after execution.

@@ -293,7 +293,7 @@ func (r *BackupPolicyReconciler) fillSecretName(reqCtx intctrlutil.RequestCtx, b
 	if useSysAccount {
 		labels = map[string]string{
 			constant.AppInstanceLabelKey:    instanceName,
-			constant.ClusterAccountLabelKey: appsv1alpha1.DataprotectionAccount.String(),
+			constant.ClusterAccountLabelKey: (string)(appsv1alpha1.DataprotectionAccount),
 		}
 	} else {
 		labels = map[string]string{

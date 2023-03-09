@@ -235,10 +235,6 @@ const (
 	ReplicatorAccount     AccountName = "kbreplicator"
 )
 
-func (r AccountName) String() string {
-	return string(r)
-}
-
 func (r AccountName) GetAccountID() KBAccountType {
 	switch r {
 	case AdminAccount:

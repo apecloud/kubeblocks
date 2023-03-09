@@ -356,7 +356,7 @@ var _ = Describe("Backup Policy Controller", func() {
 				// mock two secrets for backup policy, one for backup account, one for root conn
 				secretsMap[backupSecretName] = fakeSecret(backupSecretName, map[string]string{
 					constant.AppInstanceLabelKey:    clusterName,
-					constant.ClusterAccountLabelKey: appsv1alpha1.DataprotectionAccount.String(),
+					constant.ClusterAccountLabelKey: (string)(appsv1alpha1.DataprotectionAccount),
 				})
 				secretsMap[rootSecretName] = fakeSecret(rootSecretName, map[string]string{
 					constant.AppInstanceLabelKey:  clusterName,

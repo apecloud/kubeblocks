@@ -242,11 +242,7 @@ func (o *ListOptions) printResult(r *resource.Result) error {
 
 	w.Flush()
 	if tracingWriter.Written == 0 && len(allErrs) == 0 {
-		if allResourceNamespaced {
-			fmt.Fprintf(o.ErrOut, "No %s found in %s namespace.\n", o.GVR.Resource, o.Namespace)
-		} else {
-			fmt.Fprintf(o.ErrOut, "No %s found\n", o.GVR.Resource)
-		}
+		o.PrintNotFoundResources()
 	}
 	return utilerrors.NewAggregate(allErrs)
 }
@@ -369,4 +365,12 @@ func (o *ListOptions) printGeneric(r *resource.Result) error {
 	}
 
 	return utilerrors.Reduce(utilerrors.Flatten(utilerrors.NewAggregate(errs)))
+}
+
+func (o *ListOptions) PrintNotFoundResources() {
+	if !o.AllNamespaces {
+		fmt.Fprintf(o.ErrOut, "No %s found in %s namespace.\n", o.GVR.Resource, o.Namespace)
+	} else {
+		fmt.Fprintf(o.ErrOut, "No %s found\n", o.GVR.Resource)
+	}
 }

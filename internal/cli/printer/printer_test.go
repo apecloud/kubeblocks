@@ -85,9 +85,27 @@ func TestPrintLineWithTabSeparator(t *testing.T) {
 	done := clitesting.Capture()
 	key, value := "key", "value"
 	PrintLineWithTabSeparator(NewPair(key, value))
-	capturedOutput, err := done()
+	checkOutPut(t, done, fmt.Sprintf("%s: %s\t\n", key, value))
+}
+
+func TestPrintTitle(t *testing.T) {
+	done := clitesting.Capture()
+	line := "Title"
+	PrintTitle(line)
+	checkOutPut(t, done, fmt.Sprintf("\n%s:\n", line))
+}
+
+func TestPrintLine(t *testing.T) {
+	done := clitesting.Capture()
+	line := "test line"
+	PrintLine(line)
+	checkOutPut(t, done, "test line\n")
+}
+
+func checkOutPut(t *testing.T, captureFunc func() (string, error), expect string) {
+	capturedOutput, err := captureFunc()
 	if err != nil {
 		t.Error("capture stdout failed:" + err.Error())
 	}
-	assert.Equal(t, fmt.Sprintf("%s: %s\t\n", key, value), capturedOutput)
+	assert.Equal(t, expect, capturedOutput)
 }

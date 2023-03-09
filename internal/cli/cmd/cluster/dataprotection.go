@@ -96,7 +96,7 @@ type CreateVolumeSnapshotClassOptions struct {
 }
 
 func (o *CreateVolumeSnapshotClassOptions) Complete() error {
-	objs, err := o.Client.
+	objs, err := o.Dynamic.
 		Resource(types.StorageClassGVR()).
 		List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
@@ -120,7 +120,7 @@ func (o *CreateVolumeSnapshotClassOptions) Complete() error {
 }
 
 func (o *CreateVolumeSnapshotClassOptions) Create() error {
-	objs, err := o.Client.
+	objs, err := o.Dynamic.
 		Resource(types.VolumeSnapshotClassGVR()).
 		List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
@@ -214,7 +214,7 @@ func (o *CreateBackupOptions) getConnectionSecret() (string, error) {
 			constant.AppManagedByLabelKey, constant.AppName),
 	}
 	gvr := schema.GroupVersionResource{Version: "v1", Resource: "secrets"}
-	secretObjs, err := o.Client.Resource(gvr).Namespace(o.Namespace).List(context.TODO(), opts)
+	secretObjs, err := o.Dynamic.Resource(gvr).Namespace(o.Namespace).List(context.TODO(), opts)
 	if err != nil {
 		return "", err
 	}
@@ -225,7 +225,7 @@ func (o *CreateBackupOptions) getConnectionSecret() (string, error) {
 }
 
 func (o *CreateBackupOptions) getDefaultBackupPolicyTemplate() (string, error) {
-	clusterObj, err := o.Client.Resource(types.ClusterGVR()).Namespace(o.Namespace).Get(context.TODO(), o.Name, metav1.GetOptions{})
+	clusterObj, err := o.Dynamic.Resource(types.ClusterGVR()).Namespace(o.Namespace).Get(context.TODO(), o.Name, metav1.GetOptions{})
 	if err != nil {
 		return "", err
 	}
@@ -235,7 +235,7 @@ func (o *CreateBackupOptions) getDefaultBackupPolicyTemplate() (string, error) {
 		LabelSelector: fmt.Sprintf("%s=%s",
 			constant.ClusterDefLabelKey, clusterObj.GetLabels()[constant.ClusterDefLabelKey]),
 	}
-	objs, err := o.Client.
+	objs, err := o.Dynamic.
 		Resource(types.BackupPolicyTemplateGVR()).
 		List(context.TODO(), opts)
 	if err != nil {
@@ -337,7 +337,7 @@ type CreateRestoreOptions struct {
 
 func (o *CreateRestoreOptions) getClusterObject(backup *dataprotectionv1alpha1.Backup) (*appsv1alpha1.Cluster, error) {
 	clusterName := backup.Labels[constant.AppInstanceLabelKey]
-	clusterObj, err := cluster.GetClusterByName(o.Client, clusterName, o.Namespace)
+	clusterObj, err := cluster.GetClusterByName(o.Dynamic, clusterName, o.Namespace)
 	if err != nil && !apierrors.IsNotFound(err) {
 		return nil, err
 	}
@@ -355,7 +355,7 @@ func (o *CreateRestoreOptions) getClusterObject(backup *dataprotectionv1alpha1.B
 func (o *CreateRestoreOptions) Run() error {
 	// get backup job
 	backup := &dataprotectionv1alpha1.Backup{}
-	if err := cluster.GetK8SClientObject(o.Client, backup, types.BackupGVR(), o.Namespace, o.Backup); err != nil {
+	if err := cluster.GetK8SClientObject(o.Dynamic, backup, types.BackupGVR(), o.Namespace, o.Backup); err != nil {
 		return err
 	}
 	if backup.Status.Phase != dataprotectionv1alpha1.BackupCompleted {
@@ -390,7 +390,7 @@ func (o *CreateRestoreOptions) Run() error {
 		return err
 	}
 	unstructuredObj := &unstructured.Unstructured{Object: unstructuredMap}
-	if unstructuredObj, err = o.Client.Resource(clusterGVR).Namespace(o.Namespace).Create(context.TODO(), unstructuredObj, metav1.CreateOptions{}); err != nil {
+	if unstructuredObj, err = o.Dynamic.Resource(clusterGVR).Namespace(o.Namespace).Create(context.TODO(), unstructuredObj, metav1.CreateOptions{}); err != nil {
 		return err
 	}
 	if !o.Quiet {
@@ -401,7 +401,7 @@ func (o *CreateRestoreOptions) Run() error {
 
 func (o *CreateRestoreOptions) Validate() error {
 	if o.Name == "" {
-		name, err := generateClusterName(o.Client, o.Namespace)
+		name, err := generateClusterName(o.Dynamic, o.Namespace)
 		if err != nil {
 			return err
 		}

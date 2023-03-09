@@ -31,6 +31,7 @@ import (
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/dynamic/fake"
 	"k8s.io/client-go/kubernetes/scheme"
+	clientfake "k8s.io/client-go/rest/fake"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 
 	"github.com/apecloud/kubeblocks/internal/cli/create"
@@ -47,6 +48,7 @@ var _ = Describe("DataProtection", func() {
 	BeforeEach(func() {
 		streams, _, _, _ = genericclioptions.NewTestIOStreams()
 		tf = cmdtesting.NewTestFactory().WithNamespace(testing.Namespace)
+		tf.Client = &clientfake.RESTClient{}
 	})
 
 	AfterEach(func() {
@@ -58,7 +60,7 @@ var _ = Describe("DataProtection", func() {
 			By("without cluster name")
 			o := &CreateBackupOptions{
 				BaseOptions: create.BaseOptions{
-					Client:    testing.FakeDynamicClient(),
+					Dynamic:   testing.FakeDynamicClient(),
 					IOStreams: streams,
 				},
 			}

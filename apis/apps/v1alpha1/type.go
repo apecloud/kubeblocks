@@ -55,11 +55,12 @@ const (
 	StoppedPhase           Phase = "Stopped"
 	StoppingPhase          Phase = "Stopping"
 	StartingPhase          Phase = "Starting"
+	ExposingPhase          Phase = "Exposing"
 )
 
 // OpsType defines operation types.
 // +enum
-// +kubebuilder:validation:Enum={Upgrade,VerticalScaling,VolumeExpansion,HorizontalScaling,Restart,Reconfiguring,Start,Stop}
+// +kubebuilder:validation:Enum={Upgrade,VerticalScaling,VolumeExpansion,HorizontalScaling,Restart,Reconfiguring,Start,Stop,Expose}
 type OpsType string
 
 const (
@@ -71,6 +72,7 @@ const (
 	RestartType           OpsType = "Restart"
 	StopType              OpsType = "Stop"
 	StartType             OpsType = "Start"
+	ExposeType            OpsType = "Expose"
 )
 
 // AccessMode define SVC access mode enums.

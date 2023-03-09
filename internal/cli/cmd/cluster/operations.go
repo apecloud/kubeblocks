@@ -199,7 +199,7 @@ func (o *OperationsOptions) validateConfigParams(tpl *appsv1alpha1.ConfigTemplat
 		return err
 	}
 
-	_, err := cfgcore.MergeAndValidateConfiguration(configConstraint.Spec, map[string]string{o.CfgFile: ""}, []cfgcore.ParamPairs{{
+	_, err := cfgcore.MergeAndValidateConfiguration(configConstraint.Spec, map[string]string{o.CfgFile: ""}, tpl.Keys, []cfgcore.ParamPairs{{
 		Key:           o.CfgFile,
 		UpdatedParams: transKeyPair(o.KeyValues),
 	}})

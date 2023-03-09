@@ -20,7 +20,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
-	testk8s "github.com/apecloud/kubeblocks/internal/testutil/k8s"
+	constant "github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/onsi/gomega"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -79,10 +79,24 @@ func CreateConsensusMysqlClusterVersion(testCtx testutil.TestContext, clusterDef
 		Create(&testCtx).GetObject()
 }
 
-// GetConsensusRoleCountMap gets a role:roleCount map from a consensusSet cluster
+// GetConsensusRoleCountMap gets a role:count map from a consensusSet cluster
 func GetConsensusRoleCountMap(testCtx testutil.TestContext, k8sClient client.Client, cluster *appsv1alpha1.Cluster) (roleCountMap map[string]int) {
 	clusterkey := client.ObjectKeyFromObject(cluster)
-	sts := testk8s.ListAndCheckStatefulSet(&testCtx, clusterkey).Items[0]
+	stsList := &appsv1.StatefulSetList{}
+	err := testCtx.Cli.List(testCtx.Ctx, stsList, client.MatchingLabels{
+		constant.AppInstanceLabelKey: clusterkey.Name,
+	}, client.InNamespace(clusterkey.Namespace))
+
+	roleCountMap = make(map[string]int)
+	roleCountMap[leader] = 0
+	roleCountMap[follower] = 0
+	roleCountMap[learner] = 0
+
+	if err != nil || len(stsList.Items) == 0 {
+		return roleCountMap
+	}
+
+	sts := stsList.Items[0]
 	pods, err := util.GetPodListByStatefulSet(testCtx.Ctx, k8sClient, &sts)
 
 	if err != nil {

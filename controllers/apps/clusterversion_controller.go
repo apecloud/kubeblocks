@@ -83,7 +83,7 @@ func clusterVersionUpdateHandler(cli client.Client, ctx context.Context, cd *app
 			if message := validateClusterVersion(&item, cd); message != "" {
 				updateCVReadyCondition(&item, metav1.ConditionFalse, ReasonCVInconsistent, message)
 			} else {
-				// TODO(leon): it's not reasonable to set status as ready since there may be other failures.
+				// TODO: it's not reasonable to set status as ready since there may be other failures.
 				updateCVReadyCondition(&item, metav1.ConditionTrue, ReasonCVReady, "")
 				item.Status.ClusterDefGeneration = cd.Generation
 			}
@@ -128,8 +128,9 @@ func (r *ClusterVersionReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		return *res, err
 	}
 
-	if res, err := r.reconcileConfigTemplate(reqCtx, clusterVersion); res != nil {
-		return *res, err
+	// TODO: errors about config template are not exposed in status.
+	if err := appsconfig.ReconcileConfigurationForReferencedCR(r.Client, reqCtx, clusterVersion); err != nil {
+		return intctrlutil.RequeueAfter(time.Second, reqCtx.Log, err.Error())
 	}
 
 	if res, err := r.reconcileVersionContext(reqCtx, clusterVersion, clusterDefinition); res != nil {
@@ -161,7 +162,7 @@ func (r *ClusterVersionReconciler) deletionHandler(reqCtx intctrlutil.RequestCtx
 		&appsv1alpha1.ClusterList{}); res != nil || err != nil {
 		return res, err
 	}
-	return nil, appsconfig.DeleteCVConfigMapFinalizer(r.Client, reqCtx, cv)
+	return nil, appsconfig.DeleteConfigMapFinalizer(r.Client, reqCtx, cv)
 }
 
 func (r *ClusterVersionReconciler) getAReconcileReferencedCR(reqCtx intctrlutil.RequestCtx,
@@ -193,25 +194,6 @@ func (r *ClusterVersionReconciler) getAReconcileReferencedCR(reqCtx intctrlutil.
 	return cd, nil, nil
 }
 
-func (r *ClusterVersionReconciler) reconcileConfigTemplate(reqCtx intctrlutil.RequestCtx,
-	cv *appsv1alpha1.ClusterVersion) (*ctrl.Result, error) {
-	// TODO(leon): errors about config template are not exposed in status.
-	if ok, err := appsconfig.CheckCVConfigTemplate(r.Client, reqCtx, cv); !ok || err != nil {
-		res, err := intctrlutil.RequeueAfter(time.Second, reqCtx.Log, "failed to check config template")
-		return &res, err
-	}
-	if ok, err := appsconfig.UpdateCVLabelsByConfiguration(r.Client, reqCtx, cv); !ok || err != nil {
-		res, err := intctrlutil.RequeueAfter(time.Second, reqCtx.Log, "failed to update using config template info")
-		return &res, err
-
-	}
-	if err := appsconfig.UpdateCVConfigMapFinalizer(r.Client, reqCtx, cv); err != nil {
-		res, err := intctrlutil.RequeueAfter(time.Second, reqCtx.Log, "failed to UpdateConfigMapFinalizer")
-		return &res, err
-	}
-	return nil, nil
-}
-
 func (r *ClusterVersionReconciler) reconcileVersionContext(reqCtx intctrlutil.RequestCtx,
 	cv *appsv1alpha1.ClusterVersion, cd *appsv1alpha1.ClusterDefinition) (*ctrl.Result, error) {
 	patch := client.MergeFrom(cv.DeepCopy())
@@ -221,7 +203,7 @@ func (r *ClusterVersionReconciler) reconcileVersionContext(reqCtx intctrlutil.Re
 		updateCVReadyCondition(cv, metav1.ConditionTrue, ReasonCVReady, "")
 	}
 
-	// TODO(leon): if the validation failed, is it reasonable to update generations?
+	// TODO: if the validation failed, is it reasonable to update generations?
 	cv.Status.ObservedGeneration = cv.Generation
 	cv.Status.ClusterDefGeneration = cd.Generation
 	if err := r.Client.Status().Patch(reqCtx.Ctx, cv, patch); err != nil {

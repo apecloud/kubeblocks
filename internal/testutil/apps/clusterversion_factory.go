@@ -38,9 +38,9 @@ func NewClusterVersionFactory(name, cdRef string) *MockClusterVersionFactory {
 	return f
 }
 
-func (factory *MockClusterVersionFactory) AddComponent(compName string) *MockClusterVersionFactory {
+func (factory *MockClusterVersionFactory) AddComponent(compDefName string) *MockClusterVersionFactory {
 	comp := appsv1alpha1.ClusterComponentVersion{
-		ComponentDefRef: compName,
+		ComponentDefRef: compDefName,
 	}
 	factory.get().Spec.ComponentVersions = append(factory.get().Spec.ComponentVersions, comp)
 	return factory

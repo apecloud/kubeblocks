@@ -41,8 +41,10 @@ func getBackupObjects(reqCtx intctrlutil.RequestCtx,
 
 	// get backup tool
 	backupTool := &dataprotectionv1alpha1.BackupTool{}
-	if err := cli.Get(reqCtx.Ctx, types.NamespacedName{Name: backup.Status.BackupToolName}, backupTool); err != nil {
-		return nil, nil, err
+	if backup.Spec.BackupType != dataprotectionv1alpha1.BackupTypeSnapshot {
+		if err := cli.Get(reqCtx.Ctx, types.NamespacedName{Name: backup.Status.BackupToolName}, backupTool); err != nil {
+			return nil, nil, err
+		}
 	}
 	return backup, backupTool, nil
 }
@@ -57,6 +59,9 @@ func BuildRestoredInfo(
 	backup, backupTool, err := getBackupObjects(reqCtx, cli, namespace, backupName)
 	if err != nil {
 		return err
+	}
+	if backup.Status.Phase != dataprotectionv1alpha1.BackupCompleted {
+		return intctrlutil.NewErrorf(intctrlutil.ErrorTypeBackupNotCompleted, "backup %s is not completed", backup.Name)
 	}
 	switch backup.Spec.BackupType {
 	case dataprotectionv1alpha1.BackupTypeFull:

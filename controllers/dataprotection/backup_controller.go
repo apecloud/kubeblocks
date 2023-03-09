@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"reflect"
 	"strings"
 	"time"
 
@@ -33,6 +34,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/utils/clock"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -166,8 +168,10 @@ func (r *BackupReconciler) doNewPhaseAction(
 		return r.updateStatusIfFailed(reqCtx, backup, err)
 	}
 
-	if err = r.patchBackupLabelsAndAnnotations(reqCtx, backup, target); err != nil {
+	if hasPatch, err := r.patchBackupLabelsAndAnnotations(reqCtx, backup, target); err != nil {
 		return r.updateStatusIfFailed(reqCtx, backup, err)
+	} else if hasPatch {
+		return intctrlutil.Reconciled()
 	}
 
 	// save the backup message for restore
@@ -303,12 +307,12 @@ func (r *BackupReconciler) updateStatusIfFailed(reqCtx intctrlutil.RequestCtx,
 func (r *BackupReconciler) patchBackupLabelsAndAnnotations(
 	reqCtx intctrlutil.RequestCtx,
 	backup *dataprotectionv1alpha1.Backup,
-	targetSts *appv1.StatefulSet) error {
-	patch := client.MergeFrom(backup.DeepCopy())
+	targetSts *appv1.StatefulSet) (bool, error) {
+	oldBackup := backup.DeepCopy()
 	clusterName := targetSts.Labels[constant.AppInstanceLabelKey]
 	if len(clusterName) > 0 {
 		if err := r.setClusterSnapshotAnnotation(reqCtx, backup, types.NamespacedName{Name: clusterName, Namespace: backup.Namespace}); err != nil {
-			return err
+			return false, err
 		}
 	}
 	if backup.Labels == nil {
@@ -318,7 +322,10 @@ func (r *BackupReconciler) patchBackupLabelsAndAnnotations(
 		backup.Labels[k] = v
 	}
 	backup.Labels[dataProtectionLabelBackupTypeKey] = string(backup.Spec.BackupType)
-	return r.Client.Patch(reqCtx.Ctx, backup, patch)
+	if reflect.DeepEqual(oldBackup.ObjectMeta, backup.ObjectMeta) {
+		return false, nil
+	}
+	return true, r.Client.Patch(reqCtx.Ctx, backup, client.MergeFrom(oldBackup))
 }
 
 func (r *BackupReconciler) createPreCommandJobAndEnsure(reqCtx intctrlutil.RequestCtx,
@@ -687,11 +694,8 @@ func (r *BackupReconciler) getTargetCluster(
 	}
 	reqCtx.Log.V(1).Info("Get cluster target finish")
 	clusterItemsLen := len(clusterTarget.Items)
-	if clusterItemsLen != 1 {
-		if clusterItemsLen <= 0 {
-			return nil, errors.New("can not found any stateful sets by labelsSelector")
-		}
-		return nil, errors.New("match labels result more than one, check labelsSelector")
+	if clusterItemsLen <= 0 {
+		return nil, errors.New("can not found any stateful sets by labelsSelector")
 	}
 	return &clusterTarget.Items[0], nil
 }
@@ -789,8 +793,10 @@ func (r *BackupReconciler) buildBackupToolPodSpec(reqCtx intctrlutil.RequestCtx,
 	remoteBackupPath := "/backupdata"
 
 	// TODO(dsj): mount multi remote backup volumes
+	randomVolumeName := fmt.Sprintf("%s-%s", backupPolicy.Spec.RemoteVolume.Name, rand.String(6))
+	backupPolicy.Spec.RemoteVolume.Name = randomVolumeName
 	remoteVolumeMount := corev1.VolumeMount{
-		Name:      backupPolicy.Spec.RemoteVolume.Name,
+		Name:      randomVolumeName,
 		MountPath: remoteBackupPath,
 	}
 	container.VolumeMounts = clusterPod.Spec.Containers[0].VolumeMounts

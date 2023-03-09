@@ -1014,6 +1014,15 @@ var _ = Describe("Cluster Controller", func() {
 			}
 		}
 
+		By("Checking statefulSet template volumes mount")
+		for _, sts := range stsList.Items {
+			for _, volume := range sts.Spec.Template.Spec.Volumes {
+				if volume.Name == testapps.DataVolumeName {
+					Expect(strings.HasPrefix(volume.VolumeSource.PersistentVolumeClaim.ClaimName, testapps.DataVolumeName+"-"+clusterKey.Name)).Should(BeTrue())
+				}
+			}
+		}
+
 		By("Updating StatefulSet's status")
 		status := appsv1.StatefulSetStatus{
 			AvailableReplicas:  1,
@@ -1053,6 +1062,58 @@ var _ = Describe("Cluster Controller", func() {
 			g.Expect(replicationStatus.Secondaries[0].Pod).To(BeElementOf(getReplicationSetStsPodsName(stsList.Items)))
 		})).Should(Succeed())
 
+	}
+
+	testReplicationVolumeExpansion := func() {
+		pvcSpec := testapps.NewPVC("1Gi")
+		updatedPVCSpec := testapps.NewPVC("2Gi")
+
+		By("Mock a cluster obj with replication componentDefRef.")
+		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
+			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
+			AddComponent(testapps.DefaultRedisCompName, testapps.DefaultRedisCompType).
+			SetPrimaryIndex(testapps.DefaultReplicationPrimaryIndex).
+			SetReplicas(testapps.DefaultReplicationReplicas).
+			AddVolumeClaimTemplate(testapps.DataVolumeName, &pvcSpec).
+			Create(&testCtx).GetObject()
+		clusterKey = client.ObjectKeyFromObject(clusterObj)
+
+		By("Waiting for cluster creation")
+		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(0))
+
+		By("Updating PVC volume size")
+		patch := client.MergeFrom(clusterObj.DeepCopy())
+		componentSpec := clusterObj.GetComponentByName(testapps.DefaultRedisCompName)
+		componentSpec.VolumeClaimTemplates[0].Spec = &updatedPVCSpec
+		Expect(testCtx.Cli.Patch(ctx, clusterObj, patch)).Should(Succeed())
+
+		By("Creating mock pods in StatefulSet")
+		stsList := testk8s.ListAndCheckStatefulSet(&testCtx, clusterKey)
+		pods := mockPodsForReplicationTest(clusterObj, stsList.Items)
+		for _, pod := range pods {
+			Expect(testCtx.CreateObj(testCtx.Ctx, &pod)).Should(Succeed())
+			pod.Status.Conditions = []corev1.PodCondition{{
+				Type:   corev1.PodReady,
+				Status: corev1.ConditionTrue,
+			}}
+			Expect(k8sClient.Status().Update(ctx, &pod)).Should(Succeed())
+		}
+
+		By("Waiting cluster update reconcile succeed")
+		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(2))
+
+		By("Checking pvc volume size")
+		pvcList := &corev1.PersistentVolumeClaimList{}
+		Eventually(func(g Gomega) {
+			g.Expect(testCtx.Cli.List(testCtx.Ctx, pvcList, client.MatchingLabels{
+				constant.AppInstanceLabelKey:    clusterKey.Name,
+				constant.KBAppComponentLabelKey: testapps.DefaultRedisCompName,
+			}, client.InNamespace(clusterKey.Namespace))).Should(Succeed())
+			g.Expect(len(pvcList.Items) == testapps.DefaultReplicationReplicas).To(BeTrue())
+			for _, pvc := range pvcList.Items {
+				g.Expect(pvc.Spec.Resources.Requests[corev1.ResourceStorage]).Should(BeEquivalentTo(updatedPVCSpec.Resources.Requests[corev1.ResourceStorage]))
+			}
+		}).Should(Succeed())
 	}
 
 	testBackupError := func() {
@@ -1319,6 +1380,7 @@ var _ = Describe("Cluster Controller", func() {
 				backup.Status.RemoteVolume = &corev1.Volume{
 					Name: "backup-pvc",
 				}
+				backup.Status.Phase = dataprotectionv1alpha1.BackupCompleted
 			})).Should(Succeed())
 			restoreFromBackup := fmt.Sprintf(`{"%s":"%s"}`, mysqlCompName, backupName)
 			clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
@@ -1366,6 +1428,10 @@ var _ = Describe("Cluster Controller", func() {
 
 		It("Should success with primary sts and secondary sts", func() {
 			testReplicationCreation()
+		})
+
+		It("Should successfully doing volume expansion", func() {
+			testReplicationVolumeExpansion()
 		})
 	})
 })

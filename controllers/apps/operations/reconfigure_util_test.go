@@ -67,6 +67,7 @@ var _ = Describe("Reconfigure util test", func() {
 			}
 			updatedCfg := appsv1alpha1.Configuration{
 				Keys: []appsv1alpha1.ParameterConfig{{
+					Key: "my.cnf",
 					Parameters: []appsv1alpha1.ParameterPair{
 						{
 							Key:   "x1",
@@ -126,6 +127,7 @@ var _ = Describe("Reconfigure util test", func() {
 			// check diff
 			r = updateCfgParams(appsv1alpha1.Configuration{
 				Keys: []appsv1alpha1.ParameterConfig{{
+					Key: "my.cnf",
 					Parameters: []appsv1alpha1.ParameterPair{
 						{
 							Key:   "innodb_autoinc_lock_mode",

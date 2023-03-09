@@ -25,6 +25,7 @@ options: {
 	topologyKeys: [...]
 	nodeLabels: {}
 	tolerations: [...]
+	annotations: {}
 }
 
 // required, k8s api resource content
@@ -34,6 +35,7 @@ content: {
 	metadata: {
 		name:      options.name
 		namespace: options.namespace
+		annotations: options.annotations
 	}
 	spec: {
 		clusterDefinitionRef: options.clusterDefRef

@@ -19,28 +19,15 @@ package util
 import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	appsv1 "k8s.io/api/apps/v1"
 
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
-	"github.com/apecloud/kubeblocks/internal/cli/types"
 )
 
 const kbVersion = "0.3.0"
 
-var mockDeploy = func(version string) *appsv1.Deployment {
-	deploy := &appsv1.Deployment{}
-	deploy.SetLabels(map[string]string{
-		"app.kubernetes.io/name": types.KubeBlocksChartName,
-	})
-	if len(version) > 0 {
-		deploy.Labels["app.kubernetes.io/version"] = version
-	}
-	return deploy
-}
-
 var _ = Describe("version util", func() {
 	It("get version info when KubeBlocks is deployed", func() {
-		client := testing.FakeClientSet(mockDeploy(kbVersion))
+		client := testing.FakeClientSet(testing.FakeKBDeploy(kbVersion))
 		info, err := GetVersionInfo(client)
 		Expect(err).Should(Succeed())
 		Expect(info).ShouldNot(BeEmpty())
@@ -60,12 +47,12 @@ var _ = Describe("version util", func() {
 	})
 
 	It("getKubeBlocksVersion", func() {
-		client := testing.FakeClientSet(mockDeploy(""))
+		client := testing.FakeClientSet(testing.FakeKBDeploy(""))
 		v, err := getKubeBlocksVersion(client)
 		Expect(v).Should(BeEmpty())
-		Expect(err).Should(Succeed())
+		Expect(err).Should(HaveOccurred())
 
-		client = testing.FakeClientSet(mockDeploy(kbVersion))
+		client = testing.FakeClientSet(testing.FakeKBDeploy(kbVersion))
 		v, err = getKubeBlocksVersion(client)
 		Expect(v).Should(Equal(kbVersion))
 		Expect(err).Should(Succeed())

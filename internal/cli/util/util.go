@@ -53,6 +53,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/duration"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	cmdget "k8s.io/kubectl/pkg/cmd/get"
@@ -585,4 +586,85 @@ func GetHelmChartRepoURL() string {
 		return types.GitLabHelmChartRepo
 	}
 	return types.KubeBlocksChartURL
+}
+
+// GetKubeBlocksNamespace gets namespace of KubeBlocks installation, infer namespace from helm secrets
+func GetKubeBlocksNamespace(client kubernetes.Interface) (string, error) {
+	secrets, err := client.CoreV1().Secrets(metav1.NamespaceAll).List(context.TODO(), metav1.ListOptions{LabelSelector: types.HelmLabel})
+	// if KubeBlocks is upgraded, there will be multiple secrets
+	if err == nil && len(secrets.Items) >= 1 {
+		return secrets.Items[0].Namespace, nil
+	}
+	return "", errors.New("failed to get KubeBlocks installation namespace")
+}
+
+type ExposeType string
+
+const (
+	ExposeToVPC      ExposeType = "vpc"
+	ExposeToInternet ExposeType = "internet"
+
+	EnableValue  string = "true"
+	DisableValue string = "false"
+)
+
+var ProviderExposeAnnotations = map[K8sProvider]map[ExposeType]map[string]string{
+	EKSProvider: {
+		ExposeToVPC: map[string]string{
+			"service.beta.kubernetes.io/aws-load-balancer-type":     "nlb",
+			"service.beta.kubernetes.io/aws-load-balancer-internal": "true",
+		},
+		ExposeToInternet: map[string]string{
+			"service.beta.kubernetes.io/aws-load-balancer-type":     "nlb",
+			"service.beta.kubernetes.io/aws-load-balancer-internal": "false",
+		},
+	},
+	GKEProvider: {
+		ExposeToVPC: map[string]string{
+			"networking.gke.io/load-balancer-type": "Internal",
+		},
+		ExposeToInternet: map[string]string{},
+	},
+	AKSProvider: {
+		ExposeToVPC: map[string]string{
+			"service.beta.kubernetes.io/azure-load-balancer-internal": "true",
+		},
+		ExposeToInternet: map[string]string{
+			"service.beta.kubernetes.io/azure-load-balancer-internal": "false",
+		},
+	},
+	ACKProvider: {
+		ExposeToVPC: map[string]string{
+			"service.beta.kubernetes.io/alibaba-cloud-loadbalancer-address-type": "intranet",
+		},
+		ExposeToInternet: map[string]string{
+			"service.beta.kubernetes.io/alibaba-cloud-loadbalancer-address-type": "internet",
+		},
+	},
+}
+
+func GetExposeAnnotations(provider K8sProvider, exposeType ExposeType) (map[string]string, error) {
+	exposeAnnotations, ok := ProviderExposeAnnotations[provider]
+	if !ok {
+		return nil, fmt.Errorf("unsupported provider: %s", provider)
+	}
+	annotations, ok := exposeAnnotations[exposeType]
+	if !ok {
+		return nil, fmt.Errorf("unsupported expose type: %s on provider %s", exposeType, provider)
+	}
+	return annotations, nil
+}
+
+func GetK8SProvider(client kubernetes.Interface) (K8sProvider, error) {
+	versionInfo, err := GetVersionInfo(client)
+	if err != nil {
+		return "", err
+	}
+
+	versionErr := fmt.Errorf("failed to get kubernetes version")
+	k8sVersionStr, ok := versionInfo[KubernetesApp]
+	if !ok {
+		return "", versionErr
+	}
+	return GetK8sProvider(k8sVersionStr), nil
 }

@@ -22,7 +22,7 @@ DOCKER:=docker
 DOCKERFILE_DIR?=./docker
 
 LB_IMG ?= docker.io/apecloud/loadbalancer
-LB_VERSION ?= 0.1.0
+LB_VERSION ?= 0.1.2
 LB_TAG ?= v$(LB_VERSION)
 
 # Image URL to use all building/pushing image targets

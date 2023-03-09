@@ -19,7 +19,7 @@ kbcli kubeblocks status [flags]
 ### Options
 
 ```
-      --all    Show all resources, including configurations, storages, etc
+  -A, --all    Show all resources, including configurations, storages, etc
   -h, --help   help for status
 ```
 

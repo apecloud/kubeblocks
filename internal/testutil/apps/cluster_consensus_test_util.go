@@ -19,15 +19,15 @@ package apps
 import (
 	"context"
 	"fmt"
-	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
-	constant "github.com/apecloud/kubeblocks/internal/constant"
+
 	"github.com/onsi/gomega"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	constant "github.com/apecloud/kubeblocks/internal/constant"
+
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/testutil"
 )
 
@@ -79,38 +79,6 @@ func CreateConsensusMysqlClusterVersion(testCtx testutil.TestContext, clusterDef
 		Create(&testCtx).GetObject()
 }
 
-// GetConsensusRoleCountMap gets a role:count map from a consensusSet cluster
-func GetConsensusRoleCountMap(testCtx testutil.TestContext, k8sClient client.Client, cluster *appsv1alpha1.Cluster) (roleCountMap map[string]int) {
-	clusterkey := client.ObjectKeyFromObject(cluster)
-	stsList := &appsv1.StatefulSetList{}
-	err := testCtx.Cli.List(testCtx.Ctx, stsList, client.MatchingLabels{
-		constant.AppInstanceLabelKey: clusterkey.Name,
-	}, client.InNamespace(clusterkey.Namespace))
-
-	roleCountMap = make(map[string]int)
-	roleCountMap[leader] = 0
-	roleCountMap[follower] = 0
-	roleCountMap[learner] = 0
-
-	if err != nil || len(stsList.Items) == 0 {
-		return roleCountMap
-	}
-
-	sts := stsList.Items[0]
-	pods, err := util.GetPodListByStatefulSet(testCtx.Ctx, k8sClient, &sts)
-
-	if err != nil {
-		return roleCountMap
-	}
-
-	for _, pod := range pods {
-		role := pod.Labels[intctrlutil.RoleLabelKey]
-		roleCountMap[role]++
-	}
-
-	return roleCountMap
-}
-
 // MockConsensusComponentStatefulSet mocks the component statefulSet, just using in envTest
 func MockConsensusComponentStatefulSet(
 	testCtx testutil.TestContext,
@@ -134,7 +102,7 @@ func MockConsensusComponentStsPod(
 		stsUpdateRevision = sts.Status.UpdateRevision
 	}
 	pod := NewPodFactory(testCtx.DefaultNamespace, podName).
-		SetOwnerReferences("apps/v1", intctrlutil.StatefulSetKind, sts).
+		SetOwnerReferences("apps/v1", constant.StatefulSetKind, sts).
 		AddAppInstanceLabel(clusterName).
 		AddAppComponentLabel(consensusCompName).
 		AddAppManangedByLabel().

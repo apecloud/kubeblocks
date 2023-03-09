@@ -17,8 +17,9 @@ limitations under the License.
 package apps
 
 import (
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
+
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 )
 
 type ComponentTplType string

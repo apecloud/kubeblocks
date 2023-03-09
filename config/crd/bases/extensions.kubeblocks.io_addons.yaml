@@ -53,6 +53,10 @@ spec:
                 description: Default installation parameters.
                 items:
                   properties:
+                    enabled:
+                      description: enabled can be set if there are no specific installation
+                        attributes to be set.
+                      type: boolean
                     extras:
                       description: Install spec. for extra items.
                       items:
@@ -201,8 +205,8 @@ spec:
                 description: Helm installation spec., it's only being processed if
                   type=helm.
                 properties:
-                  chartRepoURL:
-                    description: A Helm Chart repository URL.
+                  chartLocationURL:
+                    description: A Helm Chart location URL.
                     type: string
                   installOptions:
                     additionalProperties:
@@ -379,11 +383,15 @@ spec:
                         type: object
                     type: object
                 required:
-                - chartRepoURL
+                - chartLocationURL
                 type: object
               install:
                 description: Installation parameters.
                 properties:
+                  enabled:
+                    description: enabled can be set if there are no specific installation
+                      attributes to be set.
+                    type: boolean
                   extras:
                     description: Install spec. for extra items.
                     items:
@@ -537,6 +545,7 @@ spec:
                 - Helm
                 type: string
             required:
+            - defaultInstallValues
             - type
             type: object
           status:

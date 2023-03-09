@@ -84,7 +84,12 @@ func (r *AddonReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 	}
 
 	fetchNDeletionCheckStageBuilder := func(next ...ctrlerihandler.Handler) ctrlerihandler.Handler {
-		return ctrlerihandler.NewTypeHandler(&fetchNDeletionCheckStage{stageCtx: buildStageCtx(next...)})
+		return ctrlerihandler.NewTypeHandler(&fetchNDeletionCheckStage{
+			stageCtx: buildStageCtx(next...),
+			deletionStage: deletionStage{
+				stageCtx: buildStageCtx(ctrlerihandler.NoopHandler),
+			},
+		})
 	}
 
 	genIDProceedStageBuilder := func(next ...ctrlerihandler.Handler) ctrlerihandler.Handler {
@@ -141,6 +146,11 @@ func (r *AddonReconciler) SetupWithManager(mgr ctrl.Manager) error {
 }
 
 func (r *AddonReconciler) deleteExternalResources(reqCtx intctrlutil.RequestCtx, addon *extensionsv1alpha1.Addon) (*ctrl.Result, error) {
+
+	if addon.Annotations != nil && addon.Annotations[NoDeleteJobs] == "true" {
+		return nil, nil
+	}
+
 	deleteJobIfExist := func(jobName string) error {
 		key := client.ObjectKey{
 			Namespace: viper.GetString("CM_NAMESPACE"),
@@ -156,6 +166,7 @@ func (r *AddonReconciler) deleteExternalResources(reqCtx intctrlutil.RequestCtx,
 		if !job.DeletionTimestamp.IsZero() {
 			return nil
 		}
+
 		if err := r.Delete(reqCtx.Ctx, job); err != nil {
 			return client.IgnoreNotFound(err)
 		}
@@ -183,11 +194,6 @@ type stageCtx struct {
 
 func (r *stageCtx) setReconciled() {
 	res, err := intctrlutil.Reconciled()
-	r.updateResultNErr(&res, err)
-}
-
-func (r *stageCtx) setRequeue() {
-	res, err := intctrlutil.Requeue(r.reqCtx.Log, "")
 	r.updateResultNErr(&res, err)
 }
 

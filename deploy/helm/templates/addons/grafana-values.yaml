@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-chart-kubeblocks-values
+  labels:
+    {{- include "kubeblocks.labels" . | nindent 4 }}
+data:
+  values-kubeblocks-override.yaml: |-
+    {{- .Values.grafana | toYaml | nindent 4 }}

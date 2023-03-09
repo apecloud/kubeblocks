@@ -1,0 +1,40 @@
+apiVersion: extensions.kubeblocks.io/v1alpha1
+kind: Addon
+metadata:
+  name: snapshot-controller
+  labels:
+    {{- include "kubeblocks.labels" . | nindent 4 }}
+spec:
+  description: 'Deploys a Snapshot Controller in a cluster. Snapshot Controllers are
+    often bundled with the Kubernetes distribution, this chart is meant for cases where
+    it is not. '
+  type: Helm
+
+  helm:
+    chartLocationURL: https://github.com/piraeusdatastore/helm-charts/releases/download/snapshot-controller-1.7.2/snapshot-controller-1.7.2.tgz
+    installValues:
+      configMapRefs:
+        - name: snapshot-controller-chart-kubeblocks-values
+          key: values-kubeblocks-override.yaml
+
+    valuesMapping:
+      valueMap:
+        replicaCount: replicaCount
+
+      jsonMap:
+        tolerations: tolerations
+
+      resources:
+        cpu:
+          requests: resources.requests.cpu
+          limits: resources.limits.cpu
+        memory:
+          requests: resources.requests.memory
+          limits: resources.limits.memory
+
+  defaultInstallValues:
+    - replicas: 1
+
+  installable:
+    autoInstall:  {{ get ( get ( .Values | toYaml | fromYaml ) "snapshot-controller" ) "enabled" }}
+

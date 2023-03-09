@@ -119,7 +119,7 @@ func (o *OperationsOptions) CompleteRestartOps() error {
 	if len(o.ComponentNames) != 0 {
 		return nil
 	}
-	gvr := schema.GroupVersionResource{Group: types.Group, Version: types.Version, Resource: types.ResourceClusters}
+	gvr := schema.GroupVersionResource{Group: types.AppsAPIGroup, Version: types.AppsAPIVersion, Resource: types.ResourceClusters}
 	unstructuredObj, err := o.Dynamic.Resource(gvr).Namespace(o.Namespace).Get(context.TODO(), o.Name, metav1.GetOptions{})
 	if err != nil {
 		return err
@@ -455,7 +455,7 @@ func (o *OperationsOptions) fillExpose() error {
 		return err
 	}
 
-	gvr := schema.GroupVersionResource{Group: types.Group, Version: types.Version, Resource: types.ResourceClusters}
+	gvr := schema.GroupVersionResource{Group: types.AppsAPIVersion, Version: types.AppsAPIVersion, Resource: types.ResourceClusters}
 	unstructuredObj, err := o.Dynamic.Resource(gvr).Namespace(o.Namespace).Get(context.TODO(), o.Name, metav1.GetOptions{})
 	if err != nil {
 		return err

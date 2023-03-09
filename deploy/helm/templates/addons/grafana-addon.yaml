@@ -1,0 +1,55 @@
+apiVersion: extensions.kubeblocks.io/v1alpha1
+kind: Addon
+metadata:
+  name: grafana
+  labels:
+    {{- include "kubeblocks.labels" . | nindent 4 }}
+spec:
+  description: The leading tool for querying and visualizing time series and metrics.
+  type: Helm
+
+  helm:
+    chartLocationURL: https://github.com/prometheus-community/helm-charts/releases/download/prometheus-15.16.1/prometheus-15.16.1.tgz
+    installValues:
+      configMapRefs:
+        - name: grafana-chart-kubeblocks-values
+          key: values-kubeblocks-override.yaml
+
+    valuesMapping:
+      valueMap:
+        replicaCount: replicas
+        storageClass: persistence.storageClassName
+        persistentVolumeEnabled: persistence.enabled
+
+      jsonMap:
+        tolerations: tolerations
+
+      resources:
+        storage: persistence.size
+        cpu:
+          requests: resources.requests.cpu
+          limits: resources.limits.cpu
+        memory:
+          requests: resources.requests.memory
+          limits: resources.limits.memory
+
+  defaultInstallValues:
+    - replicas: 1
+      storageClass:
+      resources:
+        requests:
+          storage: 1Gi
+
+    - selectors:
+        - key: KubeGitVersion
+          operator: Contains
+          values:
+            - ack
+      replicas: 1
+      storageClass: alicloud-disk-efficiency
+      resources:
+        requests:
+          storage: 20Gi
+
+  installable:
+    autoInstall: {{ .Values.grafana.enabled }}

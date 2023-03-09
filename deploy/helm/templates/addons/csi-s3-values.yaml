@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: csi-s3-chart-kubeblocks-values
+  labels:
+    {{- include "kubeblocks.labels" . | nindent 4 }}
+data:
+  values-kubeblocks-override.yaml: |-
+    {{- get ( .Values | toYaml | fromYaml ) "csi-s3" | toYaml | nindent 4 }}

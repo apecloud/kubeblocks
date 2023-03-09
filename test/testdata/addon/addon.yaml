@@ -11,7 +11,7 @@ spec:
 
   # helm spec., it's only being processed if type=helm.
   helm:
-    chartRepoURL: https://github.com/prometheus-community/helm-charts/releases/download/prometheus-15.16.1/prometheus-15.16.1.tgz
+    chartLocationURL: https://github.com/prometheus-community/helm-charts/releases/download/prometheus-15.16.1/prometheus-15.16.1.tgz
     # helm install options
     installOptions: # <map[string]string>
     #      # following assigned values are default options

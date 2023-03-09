@@ -1,0 +1,85 @@
+apiVersion: extensions.kubeblocks.io/v1alpha1
+kind: Addon
+metadata:
+  name: prometheus
+  labels:
+    {{- include "kubeblocks.labels" . | nindent 4 }}
+spec:
+  description: Prometheus is a monitoring system and time series database.
+  type: Helm
+
+  helm:
+    chartLocationURL: https://github.com/prometheus-community/helm-charts/releases/download/prometheus-15.16.1/prometheus-15.16.1.tgz
+    installValues:
+      configMapRefs:
+        - name: prometheus-chart-kubeblocks-values
+          key: values-kubeblocks-override.yaml
+
+    valuesMapping:
+      valueMap:
+        replicaCount: server.replicaCount
+        storageClass: server.persistentVolume.storageClass
+        persistentVolumeEnabled: server.persistentVolume.enabled
+
+      jsonMap:
+        tolerations: server.tolerations
+
+      resources:
+        storage: server.persistentVolume.size
+        cpu:
+          requests: server.resources.requests.cpu
+          limits: server.resources.limits.cpu
+        memory:
+          requests: server.resources.requests.memory
+          limits: server.resources.limits.memory
+      extras:
+        - name: alertmanager
+          valueMap:
+            replicaCount: alertmanager.replicaCount
+            storageClass: alertmanager.persistentVolume.storageClass
+            persistentVolumeEnabled: alertmanager.persistentVolume.enabled
+
+          jsonMap:
+            tolerations: alertmanager.tolerations
+
+          resources:
+            storage: alertmanager.persistentVolume.size
+            cpu:
+              requests: alertmanager.resources.requests.cpu
+              limits: alertmanager.resources.limits.cpu
+            memory:
+              requests: alertmanager.resources.requests.memory
+              limits: alertmanager.resources.limits.memory
+
+  defaultInstallValues:
+    - replicas: 1
+      resources:
+        requests:
+          storage: 1Gi
+      extras:
+        - name: alertmanager
+          replicas: 1
+          resources:
+            requests:
+              storage: 1Gi
+
+    - selectors:
+        - key: KubeGitVersion
+          operator: Contains
+          values:
+            - ack
+      replicas: 1
+      storageClass: alicloud-disk-efficiency
+      resources:
+        requests:
+          storage: 20Gi
+      extras:
+        - name: alertmanager
+          replicas: 1
+          storageClass: alicloud-disk-efficiency
+          resources:
+            requests:
+              storage: 20Gi
+
+  installable:
+    autoInstall: {{ .Values.prometheus.enabled }}

@@ -195,12 +195,12 @@ func (o *BaseOptions) Run(inputs Inputs) error {
 	}
 	group := inputs.Group
 	if len(group) == 0 {
-		group = types.Group
+		group = types.AppsAPIGroup
 	}
 
 	version := inputs.Version
 	if len(version) == 0 {
-		version = types.Version
+		version = types.AppsAPIVersion
 	}
 	// create k8s resource
 	gvr := schema.GroupVersionResource{Group: group, Version: version, Resource: inputs.ResourceName}
@@ -241,12 +241,12 @@ func (o *BaseOptions) RunAsApply(inputs Inputs) error {
 
 	group := inputs.Group
 	if len(group) == 0 {
-		group = types.Group
+		group = types.AppsAPIGroup
 	}
 
 	version := inputs.Version
 	if len(version) == 0 {
-		version = types.Version
+		version = types.AppsAPIVersion
 	}
 	// create k8s resource
 	gvr := schema.GroupVersionResource{Group: group, Version: version, Resource: inputs.ResourceName}

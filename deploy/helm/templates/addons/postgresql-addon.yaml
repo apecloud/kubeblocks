@@ -1,0 +1,19 @@
+apiVersion: extensions.kubeblocks.io/v1alpha1
+kind: Addon
+metadata:
+  name: postgresql
+  labels:
+    {{- include "kubeblocks.labels" . | nindent 4 }}
+spec:
+  description: 'PostgreSQL (Postgres) is an open source object-relational database known for reliability and data integrity. ACID-compliant, it supports foreign keys, joins, views, triggers and stored procedures.'
+
+  type: Helm
+
+  helm:
+    chartLocationURL: https://github.com/apecloud/helm-charts/releases/download/postgresql-{{ default .Chart.AppVersion .Values.appVersionOverride }}/postgresql-{{ default .Chart.AppVersion .Values.appVersionOverride }}.tgz
+
+  installable:
+    autoInstall: true
+
+  defaultInstallValues:
+    - enabled: true

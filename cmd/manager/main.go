@@ -41,6 +41,7 @@ import (
 	appscontrollers "github.com/apecloud/kubeblocks/controllers/apps"
 	dataprotectioncontrollers "github.com/apecloud/kubeblocks/controllers/dataprotection"
 	extensionscontrollers "github.com/apecloud/kubeblocks/controllers/extensions"
+	"github.com/apecloud/kubeblocks/internal/constant"
 
 	// +kubebuilder:scaffold:imports
 
@@ -402,7 +403,7 @@ func main() {
 		setupLog.Error(err, "unable to discover version info")
 		os.Exit(1)
 	}
-	viper.SetDefault("_KUBE_SERVER_INFO", *ver)
+	viper.SetDefault(constant.CfgKeyServerInfo, *ver)
 
 	setupLog.Info("starting manager")
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {

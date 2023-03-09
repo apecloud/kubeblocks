@@ -9,12 +9,14 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+	"github.com/spf13/viper"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	discoverycli "k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
@@ -25,12 +27,8 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
+	"github.com/apecloud/kubeblocks/internal/constant"
 )
-
-type addonDescribeCmdOpts struct {
-	Factory cmdutil.Factory
-	genericclioptions.IOStreams
-}
 
 type addonEnableFlags struct {
 	MemorySets       []string
@@ -50,15 +48,23 @@ func (r *addonEnableFlags) useDefault() bool {
 		len(r.TolerationsSet) == 0
 }
 
+// type addonDescribeCmdOpts struct {
+// 	Factory cmdutil.Factory
+// 	genericclioptions.IOStreams
+// }
+
 type addonCmdOpts struct {
-	*patch.Options
 	genericclioptions.IOStreams
 
 	Factory cmdutil.Factory
 	dynamic dynamic.Interface
-	addon   extensionsv1alpha1.Addon
 
+	addon extensionsv1alpha1.Addon
+
+	*patch.Options
 	addonEnableFlags *addonEnableFlags
+
+	complete func(self *addonCmdOpts, cmd *cobra.Command, args []string) error
 }
 
 // NewAddonCmd for addon functions
@@ -69,7 +75,7 @@ func NewAddonCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.
 	}
 	cmd.AddCommand(
 		newListCmd(f, streams),
-		// newDescribeCmd(f, streams),
+		newDescribeCmd(f, streams),
 		newEnableCmd(f, streams),
 		newDisableCmd(f, streams),
 	)
@@ -92,15 +98,20 @@ func newListCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 }
 
 func newDescribeCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
-	o := &addonDescribeCmdOpts{
+	o := &addonCmdOpts{
+		Options:   patch.NewOptions(f, streams, types.AddonGVR()),
 		Factory:   f,
 		IOStreams: streams,
+		complete:  addonDescribeHandler,
 	}
 	cmd := &cobra.Command{
-		Use:   "describe ADDON_NAME",
-		Short: "Describe an addon specification",
+		Use:               "describe ADDON_NAME",
+		Short:             "Describe an addon specification",
+		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.AddonGVR()),
 		Run: func(cmd *cobra.Command, args []string) {
-			util.CheckErr(o.complete(cmd, args))
+			util.CheckErr(o.init(args))
+			util.CheckErr(o.fetchAddonObj())
+			util.CheckErr(o.complete(o, cmd, args))
 		},
 	}
 	return cmd
@@ -112,6 +123,7 @@ func newEnableCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 		Factory:          f,
 		IOStreams:        streams,
 		addonEnableFlags: &addonEnableFlags{},
+		complete:         addonEnableDisableHandler,
 	}
 
 	// # kbcli addon enable flags:
@@ -124,8 +136,9 @@ func newEnableCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 	// # [--dry-run] # TODO
 
 	cmd := &cobra.Command{
-		Use:   "enable ADDON_NAME",
-		Short: "Enable an addon",
+		Use:               "enable ADDON_NAME",
+		Short:             "Enable an addon",
+		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.AddonGVR()),
 		Example: templates.Examples(`
     	# Enabled "prometheus" addon
     	kbcli addon enable prometheus
@@ -141,7 +154,9 @@ func newEnableCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
     	kbcli addon enable prometheus --tolerations '[[{"key":"taintkey","operator":"Equal","effect":"NoSchedule","value":"true"}]]' \
 			--tolerations 'alertmanager:[[{"key":"taintkey","operator":"Equal","effect":"NoSchedule","value":"true"}]]'`),
 		Run: func(cmd *cobra.Command, args []string) {
-			util.CheckErr(o.complete(cmd, args))
+			util.CheckErr(o.init(args))
+			util.CheckErr(o.fetchAddonObj())
+			util.CheckErr(o.complete(o, cmd, args))
 			util.CheckErr(o.Run(cmd))
 		},
 	}
@@ -167,12 +182,16 @@ func newDisableCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 		Options:   patch.NewOptions(f, streams, types.AddonGVR()),
 		Factory:   f,
 		IOStreams: streams,
+		complete:  addonEnableDisableHandler,
 	}
 	cmd := &cobra.Command{
-		Use:   "disable ADDON_NAME",
-		Short: "Disable an addon",
+		Use:               "disable ADDON_NAME",
+		Short:             "Disable an addon",
+		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.AddonGVR()),
 		Run: func(cmd *cobra.Command, args []string) {
-			util.CheckErr(o.complete(cmd, args))
+			util.CheckErr(o.init(args))
+			util.CheckErr(o.fetchAddonObj())
+			util.CheckErr(o.complete(o, cmd, args))
 			util.CheckErr(o.Run(cmd))
 		},
 	}
@@ -180,14 +199,7 @@ func newDisableCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 	return cmd
 }
 
-// Complete receive exec parameters
-func (o *addonDescribeCmdOpts) complete(cmd *cobra.Command, args []string) error {
-	var err error
-	return err
-}
-
-func (o *addonCmdOpts) complete(cmd *cobra.Command, args []string) error {
-	var err error
+func (o *addonCmdOpts) init(args []string) error {
 	if len(args) == 0 {
 		return fmt.Errorf("missing addon name")
 	}
@@ -195,17 +207,31 @@ func (o *addonCmdOpts) complete(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("only accept enable/disable single addon item")
 	}
 	o.Names = args
-
-	// record the flags that been set by user
-	var flags []*pflag.Flag
-	cmd.Flags().Visit(func(flag *pflag.Flag) {
-		flags = append(flags, flag)
-	})
-
-	if o.dynamic, err = o.Factory.DynamicClient(); err != nil {
-		return err
+	if o.dynamic == nil {
+		var err error
+		if o.dynamic, err = o.Factory.DynamicClient(); err != nil {
+			return err
+		}
 	}
 
+	// setup _KUBE_SERVER_INFO
+	if viper.Get(constant.CfgKeyServerInfo) == nil {
+		cfg, _ := o.Factory.ToRESTConfig()
+		cli, err := discoverycli.NewDiscoveryClientForConfig(cfg)
+		if err != nil {
+			return err
+		}
+		ver, err := cli.ServerVersion()
+		if err != nil {
+			return err
+		}
+		viper.SetDefault(constant.CfgKeyServerInfo, *ver)
+	}
+
+	return nil
+}
+
+func (o *addonCmdOpts) fetchAddonObj() error {
 	ctx := context.TODO()
 	obj, err := o.dynamic.Resource(o.GVR).Get(ctx, o.Names[0], metav1.GetOptions{})
 	if err != nil {
@@ -214,6 +240,118 @@ func (o *addonCmdOpts) complete(cmd *cobra.Command, args []string) error {
 	if err = runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, &o.addon); err != nil {
 		return err
 	}
+	return nil
+}
+
+func addonDescribeHandler(o *addonCmdOpts, cmd *cobra.Command, args []string) error {
+	printRow := func(tbl *printer.TablePrinter, name string, item *extensionsv1alpha1.AddonInstallSpecItem) {
+		pvEnabled := ""
+		replicas := ""
+
+		if item.PVEnabled != nil {
+			pvEnabled = fmt.Sprintf("%v", *item.PVEnabled)
+		}
+		if item.Replicas != nil {
+			replicas = fmt.Sprintf("%d", *item.Replicas)
+		}
+
+		printQuantity := func(q resource.Quantity, ok bool) string {
+			if ok {
+				return q.String()
+			}
+			return ""
+		}
+
+		q, ok := item.Resources.Requests[corev1.ResourceStorage]
+		storageVal := printQuantity(q, ok)
+
+		q, ok = item.Resources.Requests[corev1.ResourceCPU]
+		cpuVal := printQuantity(q, ok)
+		q, ok = item.Resources.Limits[corev1.ResourceCPU]
+		cpuVal = fmt.Sprintf("%s/%s", cpuVal, printQuantity(q, ok))
+
+		q, ok = item.Resources.Requests[corev1.ResourceMemory]
+		memVal := printQuantity(q, ok)
+		q, ok = item.Resources.Limits[corev1.ResourceMemory]
+		memVal = fmt.Sprintf("%s/%s", memVal, printQuantity(q, ok))
+
+		tbl.AddRow(name,
+			replicas,
+			storageVal,
+			cpuVal,
+			memVal,
+			item.StorageClass,
+			item.Tolerations,
+			pvEnabled,
+		)
+	}
+	printInstalled := func(tbl *printer.TablePrinter) error {
+		installSpec := o.addon.Spec.InstallSpec
+		printRow(tbl, "main", &installSpec.AddonInstallSpecItem)
+		for _, e := range installSpec.ExtraItems {
+			printRow(tbl, e.Name, &e.AddonInstallSpecItem)
+		}
+		return nil
+	}
+
+	labels := []string{}
+	for k, v := range o.addon.Labels {
+		if strings.Contains(k, constant.APIGroup) {
+			labels = append(labels, fmt.Sprintf("%s=%s", k, v))
+		}
+	}
+	printer.PrintPairStringToLine("Name", o.addon.Name, 0)
+	printer.PrintPairStringToLine("Labels", strings.Join(labels, ","), 0)
+	printer.PrintPairStringToLine("Type", string(o.addon.Spec.Type), 0)
+	printer.PrintPairStringToLine("Extras", strings.Join(o.addon.GetExtraNames(), ","), 0)
+	printer.PrintPairStringToLine("Status", string(o.addon.Status.Phase), 0)
+
+	switch o.addon.Status.Phase {
+	case extensionsv1alpha1.AddonEnabled:
+		printer.PrintTitle("Installed Info")
+		printer.PrintLineWithTabSeparator()
+		if err := printer.PrintTable(o.Out, nil, printInstalled,
+			"NAME", "REPLICAS", "STORAGE", "CPU (REQ/LIMIT)", "MEMORY (REQ/LIMIT)", "STORAGE-CLASS",
+			"TOLERATIONS", "PV Enabled"); err != nil {
+			return err
+		}
+	default:
+		printer.PrintLineWithTabSeparator()
+		for _, di := range o.addon.Spec.GetSortedDefaultInstallValues() {
+			printInstallable := func(tbl *printer.TablePrinter) error {
+				if len(di.Selectors) == 0 {
+					printer.PrintLineWithTabSeparator(
+						printer.NewPair("Default install selector", "NONE"),
+					)
+				} else {
+					printer.PrintLineWithTabSeparator(
+						printer.NewPair("Default install selector", strings.Join(di.GetSelectorsStrings(), ",")),
+					)
+				}
+				installSpec := di.AddonInstallSpec
+				printRow(tbl, "main", &installSpec.AddonInstallSpecItem)
+				for _, e := range installSpec.ExtraItems {
+					printRow(tbl, e.Name, &e.AddonInstallSpecItem)
+				}
+				return nil
+			}
+			if err := printer.PrintTable(o.Out, nil, printInstallable,
+				"NAME", "REPLICAS", "STORAGE", "CPU (REQ/LIMIT)", "MEMORY (REQ/LIMIT)", "STORAGE-CLASS",
+				"TOLERATIONS", "PV Enabled"); err != nil {
+				return err
+			}
+			printer.PrintLineWithTabSeparator()
+		}
+	}
+	return nil
+}
+
+func addonEnableDisableHandler(o *addonCmdOpts, cmd *cobra.Command, args []string) error {
+	// record the flags that been set by user
+	var flags []*pflag.Flag
+	cmd.Flags().Visit(func(flag *pflag.Flag) {
+		flags = append(flags, flag)
+	})
 	return o.buildPatch(flags)
 }
 
@@ -475,15 +613,15 @@ func addonListRun(o *list.ListOptions) error {
 				addon.Spec.Type,
 				addon.Status.Phase,
 				strings.Join(extraNames, ","),
-				strings.Join(selectors, ";"),
 				autoInstall,
+				strings.Join(selectors, ";"),
 			)
 		}
 		return nil
 	}
 
 	if err = printer.PrintTable(o.Out, nil, printRows,
-		"NAME", "TYPE", "STATUS", "EXTRAS", "INSTALLABLE-SELECTOR", "AUTO-INSTALL"); err != nil {
+		"NAME", "TYPE", "STATUS", "EXTRAS", "AUTO-INSTALL", "INSTALLABLE-SELECTOR"); err != nil {
 		return err
 	}
 	return nil

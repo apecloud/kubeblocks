@@ -26,6 +26,8 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
 // AddonSpec defines the desired state of Addon
@@ -350,19 +352,30 @@ func (r *Addon) GetExtraNames() []string {
 
 }
 
-func (r *InstallableSpec) GetSelectorsStrings() []string {
-	if r == nil {
-		return nil
-	}
-	l := len(r.Selectors)
+func buildSelectorStrings(selectors []SelectorRequirement) []string {
+	l := len(selectors)
 	if l == 0 {
 		return nil
 	}
 	sl := make([]string, 0, l)
-	for _, req := range r.Selectors {
+	for _, req := range selectors {
 		sl = append(sl, req.String())
 	}
 	return sl
+}
+
+func (r *AddonDefaultInstallSpecItem) GetSelectorsStrings() []string {
+	if r == nil {
+		return nil
+	}
+	return buildSelectorStrings(r.Selectors)
+}
+
+func (r *InstallableSpec) GetSelectorsStrings() []string {
+	if r == nil {
+		return nil
+	}
+	return buildSelectorStrings(r.Selectors)
 }
 
 func (r *SelectorRequirement) String() string {
@@ -374,7 +387,7 @@ func (r *SelectorRequirement) MatchesFromConfig() bool {
 	if r == nil {
 		return false
 	}
-	verIf := viper.Get("_KUBE_SERVER_INFO")
+	verIf := viper.Get(constant.CfgKeyServerInfo)
 	ver, ok := verIf.(version.Info)
 	if !ok {
 		return false

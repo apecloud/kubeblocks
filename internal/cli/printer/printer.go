@@ -67,6 +67,7 @@ func init() {
 	}
 }
 
+// PrintTable high level wrapper function.
 func PrintTable(out io.Writer, customSettings func(*TablePrinter), rowFeeder func(*TablePrinter) error, header ...interface{}) error {
 	t := NewTablePrinter(out)
 	t.SetHeader(header...)

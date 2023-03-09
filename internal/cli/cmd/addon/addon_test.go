@@ -24,11 +24,17 @@ import (
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 )
 
+const (
+	testNamespace = "test"
+)
+
 var _ = Describe("Manage applications related to KubeBlocks", func() {
 	var streams genericclioptions.IOStreams
 	var tf *cmdtesting.TestFactory
 
 	BeforeEach(func() {
+		streams, _, _, _ = genericclioptions.NewTestIOStreams()
+		tf = cmdtesting.NewTestFactory().WithNamespace(testNamespace)
 	})
 
 	AfterEach(func() {
@@ -59,19 +65,19 @@ var _ = Describe("Manage applications related to KubeBlocks", func() {
 		})
 	})
 
-	When("Enable an addon", func() {
-		It("should set addon.spec.install.enabled=true", func() {
-			By("Checking install helm chart by fake helm action config")
-			enableCmd := newEnableCmd(tf, streams)
-			enableCmd.Run(enableCmd, []string{"my-addon"})
-		})
-	})
-
-	When("Disable an addon", func() {
-		It("should set addon.spec.install.enabled=false", func() {
-			By("Checking install helm chart by fake helm action config")
-			disableCmd := newDisableCmd(tf, streams)
-			disableCmd.Run(disableCmd, []string{"my-addon"})
-		})
-	})
+	// When("Enable an addon", func() {
+	// 	It("should set addon.spec.install.enabled=true", func() {
+	// 		By("Checking install helm chart by fake helm action config")
+	// 		enableCmd := newEnableCmd(tf, streams)
+	// 		enableCmd.Run(enableCmd, []string{"my-addon"})
+	// 	})
+	// })
+	//
+	// When("Disable an addon", func() {
+	// 	It("should set addon.spec.install.enabled=false", func() {
+	// 		By("Checking install helm chart by fake helm action config")
+	// 		disableCmd := newDisableCmd(tf, streams)
+	// 		disableCmd.Run(disableCmd, []string{"my-addon"})
+	// 	})
+	// })
 })

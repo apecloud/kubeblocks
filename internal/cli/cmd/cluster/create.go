@@ -185,7 +185,7 @@ func setBackup(o *CreateOptions, components []map[string]interface{}) error {
 		return nil
 	}
 	backup := &dataprotectionv1alpha1.Backup{}
-	if err := cluster.GetK8SClientObject(o.Client, backup, types.BackupGVR(), o.Namespace, backupName); err != nil {
+	if err := cluster.GetK8SClientObject(o.Dynamic, backup, types.BackupGVR(), o.Namespace, backupName); err != nil {
 		return err
 	}
 	if backup.Status.Phase != dataprotectionv1alpha1.BackupCompleted {
@@ -212,7 +212,7 @@ func (o *CreateOptions) Validate() error {
 	}
 
 	if o.ClusterVersionRef == "" {
-		version, err := cluster.GetLatestVersion(o.Client, o.ClusterDefRef)
+		version, err := cluster.GetLatestVersion(o.Dynamic, o.ClusterDefRef)
 		if err != nil {
 			return err
 		}
@@ -226,7 +226,7 @@ func (o *CreateOptions) Validate() error {
 
 	// if name is not specified, generate a random cluster name
 	if o.Name == "" {
-		name, err := generateClusterName(o.Client, o.Namespace)
+		name, err := generateClusterName(o.Dynamic, o.Namespace)
 		if err != nil {
 			return err
 		}
@@ -282,7 +282,7 @@ func (o *CreateOptions) buildComponents() ([]map[string]interface{}, error) {
 
 	// build components from set values or environment variables
 	if len(components) == 0 {
-		cd, err := cluster.GetClusterDefByName(o.Client, o.ClusterDefRef)
+		cd, err := cluster.GetClusterDefByName(o.Dynamic, o.ClusterDefRef)
 		if err != nil {
 			return nil, err
 		}
@@ -382,7 +382,7 @@ func (o *CreateOptions) PreCreate(obj *unstructured.Unstructured) error {
 		return err
 	}
 	// get cluster definition from k8s
-	cd, err := cluster.GetClusterDefByName(o.Client, c.Spec.ClusterDefRef)
+	cd, err := cluster.GetClusterDefByName(o.Dynamic, c.Spec.ClusterDefRef)
 	if err != nil {
 		return err
 	}

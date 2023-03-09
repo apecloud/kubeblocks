@@ -467,7 +467,7 @@ func newCreateOptions(cd string, version string) (*cmdcluster.CreateOptions, err
 			IOStreams: genericclioptions.NewTestIOStreamsDiscard(),
 			Namespace: defaultNamespace,
 			Name:      kbClusterName,
-			Client:    dynamicClient,
+			Dynamic:   dynamicClient,
 		},
 		UpdatableFlags: cmdcluster.UpdatableFlags{
 			TerminationPolicy: "WipeOut",

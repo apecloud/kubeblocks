@@ -57,6 +57,7 @@ const (
 	RestartAnnotationKey             = "kubeblocks.io/restart"     // RestartAnnotationKey the annotation which notices the StatefulSet/DeploySet to restart
 	SnapShotForStartAnnotationKey    = "kubeblocks.io/snapshot-for-start"
 	RestoreFromBackUpAnnotationKey   = "kubeblocks.io/restore-from-backup" // RestoreFromBackUpAnnotationKey specifies the component to recover from the backup.
+	ClusterSnapshotAnnotationKey     = "kubeblocks.io/cluster-snapshot"    // ClusterSnapshotAnnotationKey saves the snapshot of cluster.
 
 	// ConfigurationTplLabelPrefixKey clusterVersion or clusterdefinition using tpl
 	ConfigurationTplLabelPrefixKey         = "configuration.kubeblocks.io/cfg-tpl"
@@ -112,6 +113,7 @@ const (
 	CronJob                   = "CronJob"
 	ReplicaSet                = "ReplicaSet"
 	VolumeSnapshotKind        = "VolumeSnapshot"
+	ServiceKind               = "Service"
 )
 
 const (
@@ -145,8 +147,6 @@ const (
 	// ConfigSidecarIMAGE for config manager sidecar
 	ConfigSidecarIMAGE       = "KUBEBLOCKS_IMAGE"
 	ConfigSidecarName        = "config-manager"
-	CRIRuntimeEndpoint       = "CONTAINER_RUNTIME_ENDPOINT"
-	ConfigCRIType            = "CRI_TYPE"
 	ConfigManagerGPRCPortEnv = "CONFIG_MANAGER_GRPC_PORT"
 
 	PodMinReadySecondsEnv = "POD_MIN_READY_SECONDS"

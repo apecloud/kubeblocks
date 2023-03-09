@@ -27,19 +27,39 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 )
 
+type ValidatorOptions = func(key string) bool
+
 type ConfigValidator interface {
 	Validate(cfg map[string]string) error
 }
 
-type ValidatorOptions = func(key string) bool
+type cmKeySelector struct {
+	// A ConfigMap object may contain multiple configuration files and only some configuration files can recognize their format and verify their by kubeblocks,
+	// such as pg, there are two files, pg_hba.conf and postgresql.conf in the ConfigMap, we can only validate postgresql.conf,
+	// thus pg_hba.conf file needs to be ignored during the verification.
+	// keySelector is used to filter the keys in the configmap.
+	keySelector []ValidatorOptions
+}
 
 type configCueValidator struct {
+	cmKeySelector
+
 	// cue describe configuration template
 	cueScript string
 	cfgType   appsv1alpha1.CfgFileFormat
+}
 
-	// configmap key selector
-	keySelector []ValidatorOptions
+func (s *cmKeySelector) filter(key string) bool {
+	if len(s.keySelector) == 0 {
+		return false
+	}
+
+	for _, option := range s.keySelector {
+		if !option(key) {
+			return true
+		}
+	}
+	return false
 }
 
 func (c *configCueValidator) Validate(cfg map[string]string) error {
@@ -47,7 +67,7 @@ func (c *configCueValidator) Validate(cfg map[string]string) error {
 		return nil
 	}
 	for key, content := range cfg {
-		if keyFilter(c.keySelector, key) {
+		if c.filter(key) {
 			continue
 		}
 		if err := ValidateConfigurationWithCue(c.cueScript, c.cfgType, content); err != nil {
@@ -58,32 +78,18 @@ func (c *configCueValidator) Validate(cfg map[string]string) error {
 }
 
 type schemaValidator struct {
+	cmKeySelector
+
 	typeName string
 	schema   *apiext.JSONSchemaProps
 	cfgType  appsv1alpha1.CfgFileFormat
-
-	// configmap key selector
-	keySelector []ValidatorOptions
 }
 
-func keyFilter(options []ValidatorOptions, key string) bool {
-	if len(options) == 0 {
-		return false
-	}
-
-	for _, option := range options {
-		if !option(key) {
-			return true
-		}
-	}
-	return false
-}
-
-func (s schemaValidator) Validate(cfg map[string]string) error {
+func (s *schemaValidator) Validate(cfg map[string]string) error {
 	openAPITypes := &kubeopenapispec.Schema{}
 	validator := validate.NewSchemaValidator(openAPITypes, nil, "", strfmt.Default)
 	for key, data := range cfg {
-		if keyFilter(s.keySelector, key) {
+		if s.filter(key) {
 			continue
 		}
 		cfg, err := loadConfiguration(s.cfgType, data)
@@ -98,10 +104,10 @@ func (s schemaValidator) Validate(cfg map[string]string) error {
 	return nil
 }
 
-type EmptyValidator struct {
+type emptyValidator struct {
 }
 
-func (e EmptyValidator) Validate(_ map[string]string) error {
+func (e emptyValidator) Validate(_ map[string]string) error {
 	return nil
 }
 
@@ -123,22 +129,26 @@ func NewConfigValidator(configTemplate *appsv1alpha1.ConfigConstraintSpec, optio
 
 	switch {
 	case configSchema == nil:
-		validator = &EmptyValidator{}
+		validator = &emptyValidator{}
 	case len(configSchema.CUE) != 0:
 		validator = &configCueValidator{
-			cfgType:     configTemplate.FormatterConfig.Format,
-			cueScript:   configSchema.CUE,
-			keySelector: options,
+			cmKeySelector: cmKeySelector{
+				keySelector: options,
+			},
+			cfgType:   configTemplate.FormatterConfig.Format,
+			cueScript: configSchema.CUE,
 		}
 	case configSchema.Schema != nil:
 		validator = &schemaValidator{
-			typeName:    configTemplate.CfgSchemaTopLevelName,
-			cfgType:     configTemplate.FormatterConfig.Format,
-			schema:      configSchema.Schema,
-			keySelector: options,
+			cmKeySelector: cmKeySelector{
+				keySelector: options,
+			},
+			typeName: configTemplate.CfgSchemaTopLevelName,
+			cfgType:  configTemplate.FormatterConfig.Format,
+			schema:   configSchema.Schema,
 		}
 	default:
-		validator = &EmptyValidator{}
+		validator = &emptyValidator{}
 	}
 	return validator
 }

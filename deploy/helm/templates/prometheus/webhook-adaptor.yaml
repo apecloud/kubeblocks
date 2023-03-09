@@ -1,0 +1,11 @@
+{{- if and (index .Values "alertmanager-webhook-adaptor" "enabled") (not (empty (index .Values "alertmanager-webhook-adaptor" "configMapOverrideName"))) }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  labels:
+    {{- include "kubeblocks.labels" . | nindent 4 }}
+  name: {{ .Release.Name }}-{{index .Values "alertmanager-webhook-adaptor" "configMapOverrideName"}}
+data:
+  config.yml: |
+    receivers: [ ]
+{{- end -}}

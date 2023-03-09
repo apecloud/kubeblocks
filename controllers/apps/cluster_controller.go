@@ -200,7 +200,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		Recorder: r.Recorder,
 	}
 
-	reqCtx.Log.Info("get cluster", "cluster", req.NamespacedName)
+	reqCtx.Log.V(1).Info("reconcile", "cluster", req.NamespacedName)
 	cluster := &appsv1alpha1.Cluster{}
 	if err := r.Client.Get(reqCtx.Ctx, reqCtx.Req.NamespacedName, cluster); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
@@ -224,7 +224,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 
-	reqCtx.Log.Info("get clusterDef and clusterVersion")
+	reqCtx.Log.V(1).Info("get clusterDef and clusterVersion")
 	clusterDefinition := &appsv1alpha1.ClusterDefinition{}
 	if err := r.Client.Get(reqCtx.Ctx, types.NamespacedName{
 		Name: cluster.Spec.ClusterDefRef,

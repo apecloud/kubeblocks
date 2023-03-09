@@ -7,6 +7,9 @@ internal/configuration/proto/mocks/*_mocks.go
 internal/configuration/container/mocks/*_mocks.go
 # internal/configuration/proto/*.pb.go
 
+# ignore go mock temporary files
+**/gomock_reflect*/
+
 # Binaries for programs and plugins
 *.exe
 *.exe~
@@ -14,7 +17,7 @@ internal/configuration/container/mocks/*_mocks.go
 *.so
 *.dylib
 *.tar.gz
-*.tgz
+**/*.tgz
 bin
 testbin/*
 __debug_bin
@@ -53,3 +56,6 @@ _dist/
 bin/
 tmp/
 
+
+# helm dependency charts
+deploy/**/charts

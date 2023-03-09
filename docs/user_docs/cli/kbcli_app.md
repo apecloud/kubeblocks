@@ -1,6 +1,6 @@
 ## kbcli app
 
-Manager external applications related to KubeBlocks
+Manage external applications related to KubeBlocks
 
 ### Options
 

@@ -17,11 +17,14 @@ limitations under the License.
 package types
 
 import (
+	"fmt"
+
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
 const (
@@ -104,11 +107,23 @@ var (
 	// KubeBlocksChartName helm chart name for kubeblocks
 	KubeBlocksChartName = "kubeblocks"
 
+	// KubeBlocksReleaseName helm release name for kubeblocks
+	KubeBlocksReleaseName = "kubeblocks"
+
 	// KubeBlocksChartURL the helm chart repo for installing kubeblocks
 	KubeBlocksChartURL = "https://apecloud.github.io/helm-charts"
 
 	// GitLabHelmChartRepo the helm chart repo in GitLab
 	GitLabHelmChartRepo = "https://jihulab.com/api/v4/projects/85949/packages/helm/stable"
+
+	// InstanceLabelSelector app.kubernetes.io/instance=kubeblocks, hit most workloads and configuration
+	InstanceLabelSelector = fmt.Sprintf("%s=%s", constant.AppInstanceLabelKey, KubeBlocksChartName)
+
+	// ReleaseLabelSelector release=kubeblocks, for prometheus-alertmanager and prometheus-server
+	ReleaseLabelSelector = fmt.Sprintf("release=%s", KubeBlocksChartName)
+
+	// HelmLabel name=kubeblocks,owner-helm, for helm secret
+	HelmLabel = fmt.Sprintf("%s=%s,%s=%s", "name", KubeBlocksChartName, "owner", "helm")
 )
 
 type BackupJobInfo struct {

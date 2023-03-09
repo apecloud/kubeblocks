@@ -3,12 +3,10 @@ kind: ClusterVersion
 metadata:
   name: ac-mysql-8.0.30-latest
 spec:
-  clusterDefinitionRef: apecloud-mysql
-  components:
-    - podSpec:
-        containers:
-          - image: docker.io/apecloud/apecloud-mysql-server:latest
-            imagePullPolicy: IfNotPresent
-            name: mysql
-            resources: {}
-      type: mysql
+  clusterDefinitionRef: apecloud-postgresql
+    componentVersions:
+        - componentDefRef: mysql
+          versionsContext:
+            containers:
+              - name: mysql
+                image: docker.io/apecloud/apecloud-mysql-server:latest

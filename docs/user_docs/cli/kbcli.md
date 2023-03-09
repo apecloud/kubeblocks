@@ -52,7 +52,8 @@ kbcli [flags]
 
 ### SEE ALSO
 
-* [kbcli app](kbcli_app.md)	 - Manager external applications related to KubeBlocks
+* [kbcli alert](kbcli_alert.md)	 - Manage alert receivers
+* [kbcli app](kbcli_app.md)	 - Manage external applications related to KubeBlocks
 * [kbcli backup-config](kbcli_backup-config.md)	 - KubeBlocks backup config
 * [kbcli bench](kbcli_bench.md)	 - Run a benchmark
 * [kbcli cluster](kbcli_cluster.md)	 - Cluster command

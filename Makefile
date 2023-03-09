@@ -130,10 +130,10 @@ all: manager kbcli probe reloader loadbalancer ## Make all cmd binaries.
 
 .PHONY: manifests
 manifests: test-go-generate controller-gen ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
-	$(CONTROLLER_GEN) rbac:roleName=manager-role crd:generateEmbeddedObjectMeta=true webhook paths="./apis/...;./controllers/apps/...;./controllers/dataprotection/...;./controllers/extensions/...;./controllers/k8score/...;./cmd/manager/...;./internal/..." output:crd:artifacts:config=config/crd/bases
+	$(CONTROLLER_GEN) rbac:roleName=manager-role crd:generateEmbeddedObjectMeta=true webhook paths="./cmd/manager/...;./apis/...;./controllers/...;./internal/..." output:crd:artifacts:config=config/crd/bases
 	@cp config/crd/bases/* $(CHART_PATH)/crds
 	@cp config/rbac/role.yaml $(CHART_PATH)/config/rbac/role.yaml
-	$(CONTROLLER_GEN) rbac:roleName=loadbalancer-role  paths="./controllers/loadbalancer;./cmd/loadbalancer/controller" output:dir=config/loadbalancer
+	$(CONTROLLER_GEN) rbac:roleName=loadbalancer-role  paths="./cmd/loadbalancer/..." output:dir=config/loadbalancer
 
 .PHONY: preflight-manifests
 preflight-manifests: generate ## Generate external Preflight API
@@ -152,7 +152,7 @@ endif
 .PHONY: loadbalancer-go-generate
 loadbalancer-go-generate: ## Run go generate against loadbalancer code.
 ifeq ($(SKIP_GO_GEN), false)
-	$(GO) generate -x ./internal/loadbalancer/...
+	$(GO) generate -x ./cmd/loadbalancer/internal/...
 endif
 
 .PHONY: test-go-generate
@@ -293,8 +293,7 @@ kbcli-doc: build-checks ## generate CLI command reference manual.
 
 .PHONY: loadbalancer
 loadbalancer: loadbalancer-go-generate test-go-generate build-checks  ## Build loadbalancer binary.
-	$(GO) build -ldflags=${LD_FLAGS} -o bin/loadbalancer-controller ./cmd/loadbalancer/controller
-	$(GO) build -ldflags=${LD_FLAGS} -o bin/loadbalancer-agent ./cmd/loadbalancer/agent
+	$(GO) build -ldflags=${LD_FLAGS} -o bin/loadbalancer ./cmd/loadbalancer
 
 ##@ Operator Controller Manager
 
@@ -469,7 +468,7 @@ helm-package: bump-chart-ver ## Do helm package.
 ## this is a hack fix: decompress the tgz from the depend-charts directory to the charts directory
 ## before dependency update.
 	cd $(CHART_PATH)/charts && ls ../depend-charts/*.tgz | xargs -n1 tar xf
-	$(HELM) dependency update $(CHART_PATH)
+	$(HELM) dependency update --skip-refresh $(CHART_PATH)
 	$(HELM) package $(CHART_PATH)
 
 ##@ Build Dependencies
@@ -832,16 +831,17 @@ endif
 minikube-delete: minikube ## Delete minikube cluster.
 	$(MINIKUBE) delete
 
+.PHONY: smoke-testdata-manifests
+smoke-testdata-manifests: ## Update E2E test dataset
+	$(HELM) template mycluster deploy/apecloud-mysql-cluster > test/e2e/testdata/smoketest/wesql/00_wesqlcluster.yaml
+	$(HELM) template mycluster deploy/postgresqlcluster > test/e2e/testdata/smoketest/postgresql/00_postgresqlcluster.yaml
+	$(HELM) template mycluster deploy/redis > test/e2e/testdata/smoketest/redis/00_rediscluster.yaml
+	$(HELM) template mycluster deploy/redis-rep-cluster >> test/e2e/testdata/smoketest/redis/00_rediscluster.yaml
+
 ##@ Test E2E
 GINKGO=$(shell which ginkgo)
 .PHONY: test-e2e
-test-e2e: ## Test End-to-end.
-	$(HELM) template mycluster deploy/apecloud-mysql-cluster > test/e2e/testdata/smoketest/wesql/00_wesqlcluster.yaml
-	# $(HELM) template mycluster deploy/mongodb > test/e2e/testdata/smoketest/mongodb/00_mongodbcluster.yaml
-	# $(HELM) template mycluster deploy/mongodb-cluster >> test/e2e/testdata/smoketest/mongodb/00_mongodbcluster.yaml
-	# $(HELM) template mycluster deploy/postgresqlcluster > test/e2e/testdata/smoketest/postgresql/00_postgresqlcluster.yaml
-	# $(HELM) template mycluster deploy/redis > test/e2e/testdata/smoketest/redis/00_rediscluster.yaml
-	# $(HELM) template mycluster deploy/redis-rep-cluster >> test/e2e/testdata/smoketest/redis/00_rediscluster.yaml
+test-e2e: smoke-testdata-manifests ## Test End-to-end.
 	$(GINKGO) test -process -ginkgo.v test/e2e
 
 # NOTE: include must be at the end

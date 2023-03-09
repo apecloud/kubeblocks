@@ -371,7 +371,7 @@ func validateConfigTemplate(cli client.Client, ctx intctrlutil.RequestCtx, confi
 			ctx.Log.Error(err, "failed to validate configuration template!", "configTpl", tplRef)
 			return false, err
 		}
-		if tpl == nil {
+		if tpl == nil || tpl.Spec.ReloadOptions == nil {
 			continue
 		}
 		if err := cfgcm.ValidateReloadOptions(tpl.Spec.ReloadOptions, cli, ctx.Ctx); err != nil {

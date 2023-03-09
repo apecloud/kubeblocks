@@ -24,6 +24,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	clientfake "k8s.io/client-go/rest/fake"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -47,6 +48,7 @@ var _ = Describe("Cluster", func() {
 		streams, in, _, _ = genericclioptions.NewTestIOStreams()
 		tf = cmdtesting.NewTestFactory().WithNamespace("default")
 		tf.FakeDynamicClient = testing.FakeDynamicClient(testing.FakeClusterDef(), testing.FakeClusterVersion())
+		tf.Client = &clientfake.RESTClient{}
 	})
 
 	AfterEach(func() {
@@ -63,7 +65,7 @@ var _ = Describe("Cluster", func() {
 					TerminationPolicy: "Delete",
 				},
 				BaseOptions: create.BaseOptions{
-					Client: tf.FakeDynamicClient,
+					Dynamic: tf.FakeDynamicClient,
 				},
 			}
 			o.IOStreams = streams
@@ -86,7 +88,7 @@ var _ = Describe("Cluster", func() {
 		It("run", func() {
 			tf.FakeDynamicClient = testing.FakeDynamicClient(testing.FakeClusterDef())
 			o := &CreateOptions{
-				BaseOptions:       create.BaseOptions{IOStreams: streams, Name: "test", Client: tf.FakeDynamicClient},
+				BaseOptions:       create.BaseOptions{IOStreams: streams, Name: "test", Dynamic: tf.FakeDynamicClient},
 				SetFile:           "",
 				ClusterDefRef:     testing.ClusterDefName,
 				ClusterVersionRef: "cluster-version",

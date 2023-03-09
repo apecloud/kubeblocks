@@ -1,0 +1,18 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: OpsRequest
+metadata:
+  name: ops-reconfigure-staticparameter
+spec:
+  clusterRef: mycluster
+  reconfigure:
+    componentName: postgresql
+    configurations:
+      - keys:
+          - key: postgresql.conf
+            parameters:
+              - key: logging_collector
+                value: "False"
+              - key: max_connections
+                value: "200"
+        name: postgresql-configuration
+  type: Reconfiguring

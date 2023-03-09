@@ -68,13 +68,14 @@ type TplEngine struct {
 }
 
 func (t *TplEngine) Render(context string) (string, error) {
-
 	var buf strings.Builder
-	tpl := template.Must(t.tpl.Parse(context))
+	tpl, err := t.tpl.Parse(context)
+	if err != nil {
+		return "", err
+	}
 	if err := tpl.Execute(&buf, t.tplValues); err != nil {
 		return "", err
 	}
-
 	return buf.String(), nil
 }
 

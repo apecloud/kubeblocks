@@ -30,9 +30,6 @@ COPY go.sum go.sum
 # and so that source changes don't invalidate our downloaded layer
 RUN go mod download
 
-RUN wget -O grpc_health_probe https://github.com/grpc-ecosystem/grpc-health-probe/releases/download/v0.4.13/grpc_health_probe-linux-${TARGETARCH} \
-    && chmod +x grpc_health_probe
-
 # Copy the go source
 COPY apis/ apis/
 COPY version/ version/
@@ -41,15 +38,12 @@ COPY internal/ internal/
 COPY cmd/loadbalancer/ cmd/loadbalancer/
 
 # Build
-RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="${LD_FLAGS}" -a -o controller ./cmd/loadbalancer/controller \
-    && CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="${LD_FLAGS}" -a -o agent ./cmd/loadbalancer/agent
+RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="${LD_FLAGS}" -a -o loadbalancer ./cmd/loadbalancer/
 
-# TODO replace base image
-FROM vimagick/iptables
+# https://gallery.ecr.aws/eks-distro-build-tooling/eks-distro-minimal-base-iptables
+FROM public.ecr.aws/eks-distro-build-tooling/eks-distro-minimal-base-iptables:2023-03-06-1678131614.2
 WORKDIR /
-COPY --from=builder /workspace/controller .
-COPY --from=builder /workspace/agent .
-COPY --from=builder /workspace/grpc_health_probe /bin/grpc_health_probe
+COPY --from=builder /workspace/loadbalancer .
 
 
-ENTRYPOINT ["/agent"]
+ENTRYPOINT ["/loadbalancer"]

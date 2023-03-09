@@ -138,7 +138,7 @@ func (r *SystemAccountReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		Log:      log.FromContext(ctx).WithValues("cluster", req.NamespacedName),
 		Recorder: r.Recorder,
 	}
-	reqCtx.Log.Info("get cluster", "cluster", req.NamespacedName)
+	reqCtx.Log.V(1).Info("reconcile", "cluster", req.NamespacedName)
 
 	cluster := &appsv1alpha1.Cluster{}
 	if err := r.Client.Get(reqCtx.Ctx, reqCtx.Req.NamespacedName, cluster); err != nil {

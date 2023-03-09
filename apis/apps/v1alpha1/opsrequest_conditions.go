@@ -38,6 +38,7 @@ const (
 	ConditionTypeStop              = "Stopping"
 	ConditionTypeStart             = "Starting"
 	ConditionTypeVersionUpgrading  = "VersionUpgrading"
+	ConditionTypeExpose            = "Exposing"
 
 	// condition and event reasons
 
@@ -160,6 +161,16 @@ func NewVolumeExpandingCondition(ops *OpsRequest) *metav1.Condition {
 		Reason:             "VolumeExpansionStarted",
 		LastTransitionTime: metav1.Now(),
 		Message:            fmt.Sprintf("Start to expand the volumes in Cluster: %s", ops.Spec.ClusterRef),
+	}
+}
+
+func NewExposingCondition(ops *OpsRequest) *metav1.Condition {
+	return &metav1.Condition{
+		Type:               ConditionTypeExpose,
+		Status:             metav1.ConditionTrue,
+		Reason:             "ExposeStarted",
+		LastTransitionTime: metav1.Now(),
+		Message:            fmt.Sprintf("Start to expose the services in Cluster: %s", ops.Spec.ClusterRef),
 	}
 }
 

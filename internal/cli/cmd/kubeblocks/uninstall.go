@@ -132,7 +132,7 @@ func (o *uninstallOptions) preCheck() error {
 	{
 		// verify where kubeblocks is installed
 		var msg bytes.Buffer
-		secrets, err := o.Client.CoreV1().Secrets(metav1.NamespaceAll).List(ctx, metav1.ListOptions{LabelSelector: helmLabel})
+		secrets, err := o.Client.CoreV1().Secrets(metav1.NamespaceAll).List(ctx, metav1.ListOptions{LabelSelector: types.HelmLabel})
 		if err != nil || len(secrets.Items) == 0 {
 			msg.WriteString("failed to locate release, please use `kbcli kubeblocks status` to get information in more details")
 			return errors.New(msg.String())

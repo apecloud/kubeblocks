@@ -136,7 +136,7 @@ var _ = Describe("Cluster Controller", func() {
 				GetObject()
 		})
 
-		It("should construct env, headless service and statefuset objects and should not render config template", func() {
+		It("should construct env, default ClusterIP service, headless service and statefuset objects and should not render config template", func() {
 			reqCtx := intctrlutil.RequestCtx{
 				Ctx: ctx,
 				Log: logger,
@@ -153,7 +153,7 @@ var _ = Describe("Cluster Controller", func() {
 			Expect(PrepareComponentResources(reqCtx, testCtx.Cli, task)).Should(Succeed())
 
 			resources := *task.Resources
-			Expect(len(resources)).Should(Equal(3))
+			Expect(len(resources)).Should(Equal(4))
 			Expect(reflect.TypeOf(resources[0]).String()).Should(ContainSubstring("ConfigMap"))
 			Expect(reflect.TypeOf(resources[1]).String()).Should(ContainSubstring("Service"))
 			Expect(reflect.TypeOf(resources[2]).String()).Should(ContainSubstring("StatefulSet"))
@@ -208,7 +208,7 @@ var _ = Describe("Cluster Controller", func() {
 			Expect(PrepareComponentResources(reqCtx, testCtx.Cli, task)).Should(Succeed())
 
 			resources := *task.Resources
-			Expect(len(resources)).Should(Equal(4))
+			Expect(len(resources)).Should(Equal(5))
 			Expect(reflect.TypeOf(resources[0]).String()).Should(ContainSubstring("ConfigMap"))
 			Expect(reflect.TypeOf(resources[1]).String()).Should(ContainSubstring("Service"))
 			Expect(reflect.TypeOf(resources[2]).String()).Should(ContainSubstring("ConfigMap"))
@@ -261,7 +261,7 @@ var _ = Describe("Cluster Controller", func() {
 			Expect(PrepareComponentResources(reqCtx, testCtx.Cli, task)).Should(Succeed())
 
 			resources := *task.Resources
-			Expect(len(resources)).Should(Equal(4))
+			Expect(len(resources)).Should(Equal(5))
 			Expect(reflect.TypeOf(resources[0]).String()).Should(ContainSubstring("ConfigMap"))
 			Expect(reflect.TypeOf(resources[1]).String()).Should(ContainSubstring("Service"))
 			Expect(reflect.TypeOf(resources[2]).String()).Should(ContainSubstring("ConfigMap"))

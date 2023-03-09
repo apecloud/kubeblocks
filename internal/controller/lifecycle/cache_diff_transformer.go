@@ -156,6 +156,7 @@ func (c *cacheDiffTransformer) Transform(dag *graph.DAG) error {
 	}
 	for name := range updateSet {
 		v, _ := newNameVertices[name].(*lifecycleVertex)
+		v.oriObj = oldSnapshot[name]
 		v.action = actionPtr(UPDATE)
 	}
 

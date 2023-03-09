@@ -50,9 +50,9 @@ type compoundCluster struct {
 
 type lifecycleVertex struct {
 	obj       client.Object
+	oriObj    client.Object
 	immutable bool
 	action    *Action
-	patch     client.Patch
 }
 
 type clusterSnapshot map[gvkName]client.Object

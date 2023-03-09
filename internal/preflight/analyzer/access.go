@@ -29,7 +29,7 @@ import (
 const ClusterVersionPath = "cluster-info/cluster_version.json"
 
 type AnalyzeClusterAccess struct {
-	analyzer *preflightv1beta2.ClusterAccess
+	analyzer *preflightv1beta2.ClusterAccessAnalyze
 }
 
 func (a *AnalyzeClusterAccess) Title() string {

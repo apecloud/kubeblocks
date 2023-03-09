@@ -18,24 +18,19 @@ package analyzer
 
 import (
 	"encoding/json"
+	"fmt"
 	"strings"
 
 	"github.com/pkg/errors"
 	analyzer "github.com/replicatedhq/troubleshoot/pkg/analyze"
-	"github.com/replicatedhq/troubleshoot/pkg/constants"
-	corev1 "k8s.io/api/core/v1"
 
 	preflightv1beta2 "github.com/apecloud/kubeblocks/externalapis/preflight/v1beta2"
+	kbcollector "github.com/apecloud/kubeblocks/internal/preflight/collector"
 	"github.com/apecloud/kubeblocks/internal/preflight/util"
 )
 
-const (
-	ClusterRegionPath = constants.CLUSTER_RESOURCES_DIR + "/" + constants.CLUSTER_RESOURCES_NODES + ".json"
-	RegionLabelName   = "topology.kubernetes.io/region"
-)
-
 type AnalyzeClusterRegion struct {
-	analyzer *preflightv1beta2.ClusterRegion
+	analyzer *preflightv1beta2.ClusterRegionAnalyze
 }
 
 func (a *AnalyzeClusterRegion) Title() string {
@@ -46,49 +41,44 @@ func (a *AnalyzeClusterRegion) IsExcluded() (bool, error) {
 	return util.IsExcluded(a.analyzer.Exclude)
 }
 
-func (a *AnalyzeClusterRegion) Analyze(getFile GetCollectedFileContents, findFiles GetChildCollectedFileContents) ([]*analyzer.AnalyzeResult, error) {
-	collected, err := getFile(ClusterRegionPath)
+func (a *AnalyzeClusterRegion) Analyze(getFile func(string) ([]byte, error)) ([]*analyzer.AnalyzeResult, error) {
+	collected, err := getFile(kbcollector.ClusterRegionPath)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to get contents of nodes.json")
+		return nil, errors.Wrap(err, "failed to get contents of region_name.json")
+	}
+	regionInfo := kbcollector.ClusterRegionInfo{}
+	if err := json.Unmarshal(collected, &regionInfo); err != nil {
+		return nil, errors.Wrap(err, "failed to unmarshal region info")
 	}
 
-	var nodes corev1.NodeList
-	if err := json.Unmarshal(collected, &nodes); err != nil {
-		return nil, errors.Wrap(err, "failed to unmarshal node list")
-	}
-
-	result := &analyzer.AnalyzeResult{
-		Title: a.Title(),
-	}
-	if len(nodes.Items) == 0 {
-		result.IsWarn = true
-		result.Message = "can't obtain regionName because no compute node in target cluster"
-		return []*analyzer.AnalyzeResult{result}, nil
-	}
-
-	regionName := nodes.Items[0].Labels[RegionLabelName]
 	isMatched := false
-	for _, region := range a.analyzer.RegionList {
-		if strings.EqualFold(region, regionName) {
+	regionName := regionInfo.RegionName
+	for _, expectedRegionName := range a.analyzer.RegionNames {
+		if strings.EqualFold(regionName, expectedRegionName) {
 			isMatched = true
 			break
 		}
+	}
+
+	strRegionInfo := fmt.Sprintf(" target cluster region is %s.", regionName)
+	result := &analyzer.AnalyzeResult{
+		Title: a.Title(),
 	}
 	for _, outcome := range a.analyzer.Outcomes {
 		switch {
 		case isMatched && outcome.Pass != nil:
 			result.IsPass = true
-			result.Message = outcome.Pass.Message + ", current cluster region is " + regionName
+			result.Message = outcome.Pass.Message + strRegionInfo
 			result.URI = outcome.Pass.URI
+		case !isMatched && outcome.Warn != nil:
+			result.IsWarn = true
+			result.Message = outcome.Warn.Message + strRegionInfo
+			result.URI = outcome.Warn.URI
 		case !isMatched && outcome.Fail != nil:
 			// just return warning info even if outcome.Fail is set
 			result.IsWarn = true
-			result.Message = outcome.Fail.Message + ", current cluster region is " + regionName
+			result.Message = outcome.Fail.Message + strRegionInfo
 			result.URI = outcome.Fail.URI
-		case !isMatched && outcome.Warn != nil:
-			result.IsWarn = true
-			result.Message = outcome.Warn.Message + ", current cluster region is " + regionName
-			result.URI = outcome.Warn.URI
 		default:
 		}
 	}

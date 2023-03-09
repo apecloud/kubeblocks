@@ -1,11 +1,37 @@
-## kbcli kubeblocks
+## kbcli kubeblocks preflight
 
-KubeBlocks operation commands
+Run and retrieve preflight checks for KubeBlocks
+
+```
+kbcli kubeblocks preflight [flags]
+```
+
+### Examples
+
+```
+  # Run preflight checks against the customized rules of preflight-check.yaml
+  kbcli troubleshoot preflight preflight-check.yaml
+  
+  # Run preflight checks and display AnalyzeResults with non-interactive mode
+  kbcli troubleshoot preflight preflight-check.yaml --interactive=false
+```
 
 ### Options
 
 ```
-  -h, --help   help for kubeblocks
+      --collect-without-permissions   always run preflight checks even if some require permissions that preflight does not have (default true)
+      --collector-image string        the full name of the collector image to use
+      --collector-pullpolicy string   the pull policy of the collector image
+      --debug                         enable debug logging
+      --format string                 output format, one of human, json, yaml. only used when interactive is set to false, default format is yaml (default "yaml")
+  -h, --help                          help for preflight
+      --interactive                   interactive preflights, default value is false
+  -n, --namespace string              If present, the namespace scope for this CLI request
+  -o, --output string                 specify the output file path for the preflight checks
+      --selector string               selector (label query) to filter remote collection nodes on.
+      --since string                  force pod logs collectors to return logs newer than a relative duration like 5s, 2m, or 3h.
+      --since-time string             force pod logs collectors to return logs after a specific date (RFC3339)
+      --verbose                       print more verbose logs, default value is false
 ```
 
 ### Options inherited from parent commands
@@ -24,7 +50,6 @@ KubeBlocks operation commands
       --insecure-skip-tls-verify       If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure
       --kubeconfig string              Path to the kubeconfig file to use for CLI requests.
       --match-server-version           Require server version to match client version
-  -n, --namespace string               If present, the namespace scope for this CLI request
       --request-timeout string         The length of time to wait before giving up on a single server request. Non-zero values should contain a corresponding time unit (e.g. 1s, 2m, 3h). A value of zero means don't timeout requests. (default "0")
   -s, --server string                  The address and port of the Kubernetes API server
       --tls-server-name string         Server name to use for server certificate validation. If it is not provided, the hostname used to contact the server is used
@@ -34,11 +59,5 @@ KubeBlocks operation commands
 
 ### SEE ALSO
 
-* [kbcli](kbcli.md)	 - KubeBlocks CLI
-* [kbcli kubeblocks install](kbcli_kubeblocks_install.md)	 - Install KubeBlocks
-* [kbcli kubeblocks list-versions](kbcli_kubeblocks_list-versions.md)	 - List KubeBlocks versions
-* [kbcli kubeblocks preflight](kbcli_kubeblocks_preflight.md)	 - Run and retrieve preflight checks for KubeBlocks
-* [kbcli kubeblocks status](kbcli_kubeblocks_status.md)	 - Show list of resource KubeBlocks uses or owns
-* [kbcli kubeblocks uninstall](kbcli_kubeblocks_uninstall.md)	 - Uninstall KubeBlocks
-* [kbcli kubeblocks upgrade](kbcli_kubeblocks_upgrade.md)	 - Upgrade KubeBlocks
+* [kbcli kubeblocks](kbcli_kubeblocks.md)	 - KubeBlocks operation commands
 

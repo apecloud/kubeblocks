@@ -28,6 +28,9 @@ var (
 	multiConfigTemplateErrorMessage = "when multi config template exist, must specify which config template to use. Please using --template-name"
 
 	notFoundValidConfigTemplateErrorMessage = "not find valid config template, component[name=%s] in the cluster[name=%s]"
+
+	notCueSchemaPrompt            = "The config template not define cue schema and parameter explain info cannot be generated."
+	cue2openAPISchemaFailedPrompt = "The cue schema may not satisfy the conversion constraints of openAPISchema and parameter explain info cannot be generated."
 )
 
 func makeClusterNotExistErr(clusterName string) error {

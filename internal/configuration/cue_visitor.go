@@ -80,8 +80,11 @@ func (c *cueTypeExtractor) visitStruct(v cue.Value) {
 	// SelectorOp refer of other struct type
 	case cue.NoOp, cue.SelectorOp:
 		// pass
+		// cue.NoOp describes the value is an underlying field.
+		// cue.SelectorOp describes the value is a type reference field.
 	default:
-		log.Log.Info(fmt.Sprintf("unsupported op %v for object type (%v)", op, v))
+		// not support op, e.g. cue.Or, cue.And.
+		log.Log.V(1).Info(fmt.Sprintf("cue type extractor unsupported op %v for object type (%v)", op, v))
 		return
 	}
 

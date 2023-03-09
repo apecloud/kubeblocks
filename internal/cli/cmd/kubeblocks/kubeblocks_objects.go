@@ -43,7 +43,6 @@ var (
 		types.DeployGVR(),
 		types.StatefulSetGVR(),
 		types.ServiceGVR(),
-		types.ConfigmapGVR(),
 		types.PVCGVR(),
 	}
 )
@@ -123,6 +122,7 @@ func getKBObjects(dynamic dynamic.Interface, namespace string) (kbObjects, error
 	// build label selector
 	instanceLabelSelector := fmt.Sprintf("%s=%s", intctrlutil.AppInstanceLabelKey, types.KubeBlocksChartName)
 	releaseLabelSelector := fmt.Sprintf("release=%s", types.KubeBlocksChartName)
+	configMapLabelSelector := fmt.Sprintf("%s=%s", intctrlutil.CMConfigurationTypeLabelKey, intctrlutil.ConfigTemplateType)
 
 	// get resources which label matches app.kubernetes.io/instance=kubeblocks or
 	// label matches release=kubeblocks, like prometheus-server
@@ -131,7 +131,8 @@ func getKBObjects(dynamic dynamic.Interface, namespace string) (kbObjects, error
 			getObjects(labelSelector, gvr)
 		}
 	}
-
+	// get configmap
+	getObjects(configMapLabelSelector, types.ConfigmapGVR())
 	// get volume snapshot class
 	getObjects(instanceLabelSelector, types.VolumeSnapshotClassGVR())
 

@@ -845,7 +845,7 @@ func NewDiffConfigureCmd(f cmdutil.Factory, streams genericclioptions.IOStreams)
 	o := &opsRequestDiffOptions{baseOptions: newDescribeOpsOptions(f, streams)}
 	cmd := &cobra.Command{
 		Use:               "diff-configure",
-		Short:             "List the constraint for supported configuration params",
+		Short:             "Show the difference in parameters between the two submitted OpsRequest",
 		Example:           diffConfigureExample,
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.ClusterGVR()),
 		Run: func(cmd *cobra.Command, args []string) {

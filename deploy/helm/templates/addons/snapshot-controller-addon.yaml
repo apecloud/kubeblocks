@@ -37,9 +37,4 @@ spec:
 
   installable:
     autoInstall:  {{ get ( get ( .Values | toYaml | fromYaml ) "snapshot-controller" ) "enabled" }}
-    selectors:
-      - key: KubeGitVersion
-        operator: Contains
-        values:
-          - kubeblocks
 

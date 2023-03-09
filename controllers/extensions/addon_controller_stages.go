@@ -523,6 +523,13 @@ func (r *helmTypeUninstallStage) Handle(ctx context.Context) {
 				// helm managed object is not properly cleaned up
 				return
 			}
+
+			// Job controller has yet handling Job or job controller is not running, i.e., testenv
+			// only handle this situation when addon is at terminating state.
+			if helmUninstallJob.Status.StartTime.IsZero() && !addon.GetDeletionTimestamp().IsZero() {
+				return
+			}
+
 			// requeue if uninstall job is active or deleting
 			if !helmUninstallJob.GetDeletionTimestamp().IsZero() || helmUninstallJob.Status.Active > 0 {
 				r.setRequeueAfter(time.Second, "")

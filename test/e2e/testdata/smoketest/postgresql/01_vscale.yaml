@@ -6,7 +6,7 @@ spec:
   clusterRef: mycluster
   type: VerticalScaling
   verticalScaling:
-    - componentName: postgresql
+    - componentName: pg-replicaset
       limits:
         cpu: "500m"
         memory: 500Mi

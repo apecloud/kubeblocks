@@ -3,10 +3,10 @@ kind: BackupTool
 metadata:
   name: pg-basebackup
   labels:
-    clusterdefinition.kubeblocks.io/name: postgresql
+    clusterdefinition.kubeblocks.io/name: postgresql-cluster
     {{- include "postgresql.labels" . | nindent 4 }}
 spec:
-  image: registry.cn-hangzhou.aliyuncs.com/apecloud/postgresql:14.6.0
+  image: registry.cn-hangzhou.aliyuncs.com/apecloud/postgresql:14.7.0
   deployKind: job
   resources:
     limits:

@@ -25,7 +25,6 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
@@ -73,54 +72,93 @@ func HandleReplicationSetHorizontalScale(ctx context.Context,
 	// compOwnsStsMap is used to divide stsList into sts list under each replicationSet component according to componentLabelKey
 	compOwnsStsMap := make(map[string][]*appsv1.StatefulSet)
 	for _, stsObj := range stsList {
-		compDef, err := filterReplicationWorkload(ctx, cli, cluster, stsObj.Labels[constant.KBAppComponentLabelKey])
+		compName := stsObj.Labels[constant.KBAppComponentLabelKey]
+		compDef, err := filterReplicationWorkload(ctx, cli, cluster, compName)
 		if err != nil {
 			return err
 		}
 		if compDef == nil {
 			continue
 		}
-		compOwnsStsMap[stsObj.Labels[constant.KBAppComponentLabelKey]] = append(compOwnsStsMap[stsObj.Labels[constant.KBAppComponentLabelKey]], stsObj)
+		compOwnsStsMap[compName] = append(compOwnsStsMap[compName], stsObj)
 	}
 
 	// compOwnsPodToSyncMap is used to record the list of component pods to be synchronized to cluster.status except for horizontal scale-in
 	compOwnsPodsToSyncMap := make(map[string][]*corev1.Pod)
 	// stsToDeleteMap is used to record the count of statefulsets to be deleted when horizontal scale-in
 	stsToDeleteMap := make(map[string]int32)
-	for compKey, compStsObjs := range compOwnsStsMap {
-		if int32(len(compOwnsStsMap[compKey])) > clusterCompReplicasMap[compKey] {
-			stsToDeleteMap[compKey] = int32(len(compOwnsStsMap[compKey])) - clusterCompReplicasMap[compKey]
+	for compName, compStsObjs := range compOwnsStsMap {
+		if int32(len(compOwnsStsMap[compName])) > clusterCompReplicasMap[compName] {
+			stsToDeleteMap[compName] = int32(len(compOwnsStsMap[compName])) - clusterCompReplicasMap[compName]
 		} else {
 			for _, compStsObj := range compStsObjs {
 				pod, err := GetAndCheckReplicationPodByStatefulSet(ctx, cli, compStsObj)
 				if err != nil {
 					return err
 				}
-				compOwnsPodsToSyncMap[compKey] = append(compOwnsPodsToSyncMap[compKey], pod)
+				compOwnsPodsToSyncMap[compName] = append(compOwnsPodsToSyncMap[compName], pod)
 			}
 		}
 	}
+	clusterDeepCopy := cluster.DeepCopy()
+	if len(stsToDeleteMap) > 0 {
+		if err := doHorizontalScaleDown(ctx, cli, cluster, compOwnsStsMap, clusterCompReplicasMap, stsToDeleteMap); err != nil {
+			return err
+		}
+	}
 
+	// sync cluster status
+	for _, compPodList := range compOwnsPodsToSyncMap {
+		if err := SyncReplicationSetClusterStatus(cli, ctx, cluster, compPodList); err != nil {
+			return err
+		}
+	}
+
+	if reflect.DeepEqual(clusterDeepCopy.Status.Components, cluster.Status.Components) {
+		return nil
+	}
+	return cli.Status().Patch(ctx, cluster, client.MergeFrom(clusterDeepCopy))
+}
+
+// handleComponentIsStopped checks the component status is stopped and updates it.
+func handleComponentIsStopped(cluster *appsv1alpha1.Cluster) {
+	for _, clusterComp := range cluster.Spec.ComponentSpecs {
+		if clusterComp.Replicas == int32(0) {
+			replicationStatus := cluster.Status.Components[clusterComp.Name]
+			replicationStatus.Phase = appsv1alpha1.StoppedPhase
+			cluster.Status.Components[clusterComp.Name] = replicationStatus
+		}
+	}
+}
+
+func doHorizontalScaleDown(ctx context.Context,
+	cli client.Client,
+	cluster *appsv1alpha1.Cluster,
+	compOwnsStsMap map[string][]*appsv1.StatefulSet,
+	clusterCompReplicasMap map[string]int32,
+	stsToDeleteMap map[string]int32) error {
 	// remove cluster status and delete sts when horizontal scale-in
-	for compKey, stsToDelCount := range stsToDeleteMap {
+	for compName, stsToDelCount := range stsToDeleteMap {
 		// list all statefulSets by cluster and componentKey label
 		var componentStsList = &appsv1.StatefulSetList{}
-		err := util.GetObjectListByComponentName(ctx, cli, cluster, componentStsList, compKey)
+		err := util.GetObjectListByComponentName(ctx, cli, cluster, componentStsList, compName)
 		if err != nil {
 			return err
 		}
-		if int32(len(compOwnsStsMap[compKey])) != int32(len(componentStsList.Items)) {
+		if int32(len(compOwnsStsMap[compName])) != int32(len(componentStsList.Items)) {
 			return fmt.Errorf("statefulset total number has changed")
 		}
 		dos := make([]*appsv1.StatefulSet, 0)
 		partition := int32(len(componentStsList.Items)) - stsToDelCount
+		componentReplicas := clusterCompReplicasMap[compName]
 		for _, sts := range componentStsList.Items {
 			// if current primary statefulSet ordinal is larger than target number replica, return err
 			stsIsPrimary, err := checkObjRoleLabelIsPrimary(&sts)
 			if err != nil {
 				return err
 			}
-			if int32(util.GetOrdinalSts(&sts)) >= partition && stsIsPrimary {
+			// check if the current primary statefulSet ordinal is larger than target replicas number of component when the target number is not 0.
+			if int32(util.GetOrdinalSts(&sts)) >= partition && stsIsPrimary && componentReplicas != 0 {
 				return fmt.Errorf("current primary statefulset ordinal is larger than target number replicas, can not be reduce, please switchover first")
 			}
 			dos = append(dos, sts.DeepCopy())
@@ -129,15 +167,15 @@ func HandleReplicationSetHorizontalScale(ctx context.Context,
 		// sort the statefulSets by their ordinals desc
 		sort.Sort(util.DescendingOrdinalSts(dos))
 
-		if err := RemoveReplicationSetClusterStatus(cli, ctx, dos[:stsToDelCount]); err != nil {
+		if err = RemoveReplicationSetClusterStatus(cli, ctx, cluster, dos[:stsToDelCount], componentReplicas); err != nil {
 			return err
 		}
 		for i := int32(0); i < stsToDelCount; i++ {
-			err := cli.Delete(ctx, dos[i])
+			err = cli.Delete(ctx, dos[i])
 			if err == nil {
 				patch := client.MergeFrom(dos[i].DeepCopy())
 				controllerutil.RemoveFinalizer(dos[i], DBClusterFinalizerName)
-				if err := cli.Patch(ctx, dos[i], patch); err != nil {
+				if err = cli.Patch(ctx, dos[i], patch); err != nil {
 					return err
 				}
 				continue
@@ -149,90 +187,36 @@ func HandleReplicationSetHorizontalScale(ctx context.Context,
 		}
 	}
 
-	// sync cluster status
-	for _, compPodList := range compOwnsPodsToSyncMap {
-		if err := SyncReplicationSetClusterStatus(cli, ctx, compPodList); err != nil {
-			return err
-		}
-	}
+	// if component replicas is 0, handle replication component status after scaling down the replicas.
+	handleComponentIsStopped(cluster)
 	return nil
 }
 
 // SyncReplicationSetClusterStatus syncs replicationSet pod status to cluster.status.component[componentName].ReplicationStatus.
 func SyncReplicationSetClusterStatus(cli client.Client,
 	ctx context.Context,
+	cluster *appsv1alpha1.Cluster,
 	podList []*corev1.Pod) error {
 	if len(podList) == 0 {
 		return nil
 	}
 
 	// update cluster status
-	cluster := &appsv1alpha1.Cluster{}
-	err := cli.Get(ctx, types.NamespacedName{
-		Namespace: podList[0].Namespace,
-		Name:      podList[0].Labels[constant.AppInstanceLabelKey],
-	}, cluster)
-	if err != nil {
-		return err
-	}
 	componentName, componentDef, err := util.GetComponentInfoByPod(ctx, cli, cluster, podList[0])
 	if err != nil {
 		return err
 	}
-	patch := client.MergeFrom(cluster.DeepCopy())
 	oldReplicationSetStatus := cluster.Status.Components[componentName].ReplicationSetStatus
 	if oldReplicationSetStatus == nil {
 		util.InitClusterComponentStatusIfNeed(cluster, componentName, componentDef)
 		oldReplicationSetStatus = cluster.Status.Components[componentName].ReplicationSetStatus
 	}
-	needUpdate := needUpdateReplicationSetStatus(oldReplicationSetStatus, podList)
-	if needUpdate {
-		if err := cli.Status().Patch(ctx, cluster, patch); err != nil {
-			return err
-		}
-	}
+	syncReplicationSetStatus(oldReplicationSetStatus, podList)
 	return nil
 }
 
-// RemoveReplicationSetClusterStatus removes replicationSet pod status from cluster.status.component[componentName].ReplicationStatus.
-func RemoveReplicationSetClusterStatus(cli client.Client, ctx context.Context, stsList []*appsv1.StatefulSet) error {
-	if len(stsList) == 0 {
-		return nil
-	}
-	var allPodList []corev1.Pod
-	for _, stsObj := range stsList {
-		podList, err := util.GetPodListByStatefulSet(ctx, cli, stsObj)
-		if err != nil {
-			return err
-		}
-		allPodList = append(allPodList, podList...)
-	}
-	cluster := &appsv1alpha1.Cluster{}
-	err := cli.Get(ctx, types.NamespacedName{
-		Namespace: stsList[0].Namespace,
-		Name:      stsList[0].Labels[constant.AppInstanceLabelKey],
-	}, cluster)
-	if err != nil {
-		return err
-	}
-	patch := client.MergeFrom(cluster.DeepCopy())
-	componentName := stsList[0].Labels[constant.KBAppComponentLabelKey]
-	replicationSetStatus := cluster.Status.Components[componentName].ReplicationSetStatus
-	needRemove, err := needRemoveReplicationSetStatus(replicationSetStatus, allPodList)
-	if err != nil {
-		return err
-	}
-	if needRemove {
-		if err := cli.Status().Patch(ctx, cluster, patch); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-// needUpdateReplicationSetStatus checks if the target pod node needs to be updated in cluster.status.
-func needUpdateReplicationSetStatus(replicationStatus *appsv1alpha1.ReplicationSetStatus, podList []*corev1.Pod) bool {
-	needUpdate := false
+// syncReplicationSetStatus syncs the target pod info in cluster.status.components.
+func syncReplicationSetStatus(replicationStatus *appsv1alpha1.ReplicationSetStatus, podList []*corev1.Pod) {
 	for _, pod := range podList {
 		role := pod.Labels[constant.RoleLabelKey]
 		if role == string(Primary) {
@@ -240,7 +224,6 @@ func needUpdateReplicationSetStatus(replicationStatus *appsv1alpha1.ReplicationS
 				continue
 			}
 			replicationStatus.Primary.Pod = pod.Name
-			needUpdate = true
 		} else {
 			var exist = false
 			for _, secondary := range replicationStatus.Secondaries {
@@ -253,29 +236,59 @@ func needUpdateReplicationSetStatus(replicationStatus *appsv1alpha1.ReplicationS
 				replicationStatus.Secondaries = append(replicationStatus.Secondaries, appsv1alpha1.ReplicationMemberStatus{
 					Pod: pod.Name,
 				})
-				needUpdate = true
 			}
 		}
 	}
-	return needUpdate
 }
 
-// needRemoveReplicationSetStatus checks if the target pod node needs to be removed from cluster.status.
-func needRemoveReplicationSetStatus(replicationStatus *appsv1alpha1.ReplicationSetStatus, podList []corev1.Pod) (bool, error) {
-	needRemove := false
-	for _, pod := range podList {
-		if replicationStatus.Primary.Pod == pod.Name {
-			return false, fmt.Errorf("primary pod cannot be removed")
+// RemoveReplicationSetClusterStatus removes replicationSet pod status from cluster.status.component[componentName].ReplicationStatus.
+func RemoveReplicationSetClusterStatus(cli client.Client,
+	ctx context.Context,
+	cluster *appsv1alpha1.Cluster,
+	stsList []*appsv1.StatefulSet,
+	componentReplicas int32) error {
+	if len(stsList) == 0 {
+		return nil
+	}
+	var allPodList []corev1.Pod
+	for _, stsObj := range stsList {
+		podList, err := util.GetPodListByStatefulSet(ctx, cli, stsObj)
+		if err != nil {
+			return err
 		}
-		for index, secondary := range replicationStatus.Secondaries {
-			if secondary.Pod == pod.Name {
-				replicationStatus.Secondaries = append(replicationStatus.Secondaries[:index], replicationStatus.Secondaries[index+1:]...)
-				needRemove = true
-				break
-			}
+		allPodList = append(allPodList, podList...)
+	}
+	componentName := stsList[0].Labels[constant.KBAppComponentLabelKey]
+	replicationSetStatus := cluster.Status.Components[componentName].ReplicationSetStatus
+	return removeTargetPodsInfoInStatus(replicationSetStatus, allPodList, componentReplicas)
+}
+
+// removeTargetPodsInfoInStatus remove the target pod info from cluster.status.components.
+func removeTargetPodsInfoInStatus(replicationStatus *appsv1alpha1.ReplicationSetStatus,
+	targetPodList []corev1.Pod,
+	componentReplicas int32) error {
+	targetPodNameMap := make(map[string]struct{})
+	for _, pod := range targetPodList {
+		targetPodNameMap[pod.Name] = struct{}{}
+	}
+	if _, ok := targetPodNameMap[replicationStatus.Primary.Pod]; ok {
+		if componentReplicas != 0 {
+			return fmt.Errorf("primary pod cannot be removed")
+		}
+		replicationStatus.Primary = appsv1alpha1.ReplicationMemberStatus{
+			Pod: util.ComponentStatusDefaultPodName,
 		}
 	}
-	return needRemove, nil
+	newSecondaries := make([]appsv1alpha1.ReplicationMemberStatus, 0)
+	for _, secondary := range replicationStatus.Secondaries {
+		if _, ok := targetPodNameMap[secondary.Pod]; ok {
+			continue
+		}
+		// add pod that do not need to be removed to newSecondaries slice.
+		newSecondaries = append(newSecondaries, secondary)
+	}
+	replicationStatus.Secondaries = newSecondaries
+	return nil
 }
 
 // checkObjRoleLabelIsPrimary checks whether it is the primary obj(statefulSet or pod) through the label tag on obj.

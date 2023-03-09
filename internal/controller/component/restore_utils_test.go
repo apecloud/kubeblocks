@@ -127,7 +127,7 @@ var _ = Describe("probe_utils", func() {
 				Should(ContainSubstring("is not completed"))
 
 			By("build volumeClaim dataSource when backup is completed")
-			updateBackupStatus(backup, backupToolName, dataprotectionv1alpha1.BackupCompleted)
+			updateBackupStatus(backup, "not-exist-backup-tool", dataprotectionv1alpha1.BackupCompleted)
 			Expect(BuildRestoredInfo(reqCtx, k8sClient, testCtx.DefaultNamespace, component, backupName)).Should(Succeed())
 			vct := component.VolumeClaimTemplates[0]
 			snapshotAPIGroup := snapshotv1.GroupName

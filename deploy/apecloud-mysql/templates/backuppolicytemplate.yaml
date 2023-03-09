@@ -7,7 +7,7 @@ metadata:
     {{- include "apecloud-mysql.labels" . | nindent 4 }}
 spec:
   # which backup tool to perform database backup, only support one tool.
-  backupToolName: mysql-xtrabackup
+  backupToolName: xtrabackup-mysql
   ttl: 168h0m0s
   hooks:
     containerName: mysql

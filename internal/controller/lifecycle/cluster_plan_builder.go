@@ -86,10 +86,11 @@ func (b *clusterPlanBuilder) defaultWalkFunc(node graph.Vertex) error {
 		if obj.immutable {
 			return nil
 		}
-		if err := buildUpdateObj(obj); err != nil {
+		o, err := buildUpdateObj(obj)
+		if err != nil {
 			return err
 		}
-		err := b.cli.Update(b.ctx.Ctx, obj.oriObj)
+		err = b.cli.Update(b.ctx.Ctx, o)
 		if err != nil && !apierrors.IsNotFound(err) {
 			return err
 		}
@@ -105,8 +106,8 @@ func (b *clusterPlanBuilder) defaultWalkFunc(node graph.Vertex) error {
 	return nil
 }
 
-func buildUpdateObj(node *lifecycleVertex) error {
-	handleSts := func(stsObj, stsProto *appsv1.StatefulSet) error {
+func buildUpdateObj(node *lifecycleVertex) (client.Object, error) {
+	handleSts := func(origObj, stsProto *appsv1.StatefulSet) (client.Object, error) {
 		//if *stsObj.Spec.Replicas != *stsProto.Spec.Replicas {
 		//	reqCtx.Recorder.Eventf(cluster,
 		//		corev1.EventTypeNormal,
@@ -116,7 +117,7 @@ func buildUpdateObj(node *lifecycleVertex) error {
 		//		*stsObj.Spec.Replicas,
 		//		*stsProto.Spec.Replicas)
 		//}
-		stsObjCopy := stsObj.DeepCopy()
+		stsObj := origObj.DeepCopy()
 		// keep the original template annotations.
 		// if annotations exist and are replaced, the statefulSet will be updated.
 		stsProto.Spec.Template.Annotations = mergeAnnotations(stsObj.Spec.Template.Annotations,
@@ -124,7 +125,7 @@ func buildUpdateObj(node *lifecycleVertex) error {
 		stsObj.Spec.Template = stsProto.Spec.Template
 		stsObj.Spec.Replicas = stsProto.Spec.Replicas
 		stsObj.Spec.UpdateStrategy = stsProto.Spec.UpdateStrategy
-		if !reflect.DeepEqual(&stsObjCopy.Spec, &stsObj.Spec) {
+		if !reflect.DeepEqual(&origObj.Spec, &stsObj.Spec) {
 			// sync component phase
 			// TODO: syncComponentPhaseWhenSpecUpdating
 			//syncComponentPhaseWhenSpecUpdating(cluster, componentName)
@@ -169,35 +170,37 @@ func buildUpdateObj(node *lifecycleVertex) error {
 		//	}
 		//}
 
-		return nil
+		return stsObj, nil
 	}
 
-	handleDeploy := func(deployObj, deployProto *appsv1.Deployment) error {
-		deployObjCopy := deployObj.DeepCopy()
+	handleDeploy := func(origObj, deployProto *appsv1.Deployment) (client.Object, error) {
+		deployObj := origObj.DeepCopy()
 		deployProto.Spec.Template.Annotations = mergeAnnotations(deployObj.Spec.Template.Annotations,
 			deployProto.Spec.Template.Annotations)
 		deployObj.Spec = deployProto.Spec
-		if !reflect.DeepEqual(&deployObjCopy.Spec, &deployObj.Spec) {
+		if !reflect.DeepEqual(&origObj.Spec, &deployObj.Spec) {
 			// sync component phase
 			// TODO: syncComponentPhaseWhenSpecUpdating
 			//componentName := deployObj.Labels[constant.KBAppComponentLabelKey]
 			//syncComponentPhaseWhenSpecUpdating(cluster, componentName)
 		}
-		return nil
+		return deployObj, nil
 	}
 
-	handleSvc := func(svcObj, svcProto *corev1.Service) error {
+	handleSvc := func(origObj, svcProto *corev1.Service) (client.Object, error) {
+		svcObj := origObj.DeepCopy()
 		svcObj.Spec = svcProto.Spec
 		svcObj.Annotations = mergeServiceAnnotations(svcObj.Annotations, svcProto.Annotations)
-		return nil
+		return svcObj, nil
 	}
 
-	handlePVC := func(pvcObj, pvcProto *corev1.PersistentVolumeClaim) error {
+	handlePVC := func(origObj, pvcProto *corev1.PersistentVolumeClaim) (client.Object, error) {
+		pvcObj := origObj.DeepCopy()
 		if pvcObj.Spec.Resources.Requests[corev1.ResourceStorage] == pvcProto.Spec.Resources.Requests[corev1.ResourceStorage] {
-			return nil
+			return pvcObj, nil
 		}
 		pvcObj.Spec.Resources.Requests[corev1.ResourceStorage] = pvcProto.Spec.Resources.Requests[corev1.ResourceStorage]
-		return nil
+		return pvcObj, nil
 	}
 
 	switch node.obj.(type) {
@@ -209,11 +212,11 @@ func buildUpdateObj(node *lifecycleVertex) error {
 		return handleSvc(node.oriObj.(*corev1.Service), node.obj.(*corev1.Service))
 	case *corev1.PersistentVolumeClaim:
 		return handlePVC(node.oriObj.(*corev1.PersistentVolumeClaim), node.obj.(*corev1.PersistentVolumeClaim))
-	case *corev1.Secret:
-	case *corev1.ConfigMap:
+	case *corev1.Secret, *corev1.ConfigMap:
+		return node.obj, nil
 	}
 
-	return nil
+	return nil, nil
 }
 
 // Build only cluster Creation, Update and Deletion supported.
@@ -228,6 +231,8 @@ func (b *clusterPlanBuilder) Build() (graph.Plan, error) {
 	chain := &graph.TransformerChain{
 		// cluster to K8s objects and put them into dag
 		&clusterTransformer{cc: *cc, cli: b.cli, ctx: b.ctx},
+		// tls certs secret
+		&tlsCertsTransformer{cc: *cc, cli: b.cli, ctx: b.ctx},
 		// add our finalizer to all objects
 		&ownershipTransformer{finalizer: dbClusterFinalizerName},
 		// make all workload objects depending on credential secret

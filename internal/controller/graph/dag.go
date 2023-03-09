@@ -173,7 +173,9 @@ func (d *DAG) validate() error {
 		marked[v] = true
 		adjacent := d.outAdj(v)
 		for _, vertex := range adjacent {
-			walk(vertex)
+			if err := walk(vertex); err != nil {
+				return err
+			}
 		}
 		marked[v] = false
 		walked[v] = true

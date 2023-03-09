@@ -60,7 +60,7 @@ func CreateOrCheckTLSCerts(reqCtx controllerutil.RequestCtx,
 		var secret *v1.Secret
 		switch comp.Issuer.Name {
 		case dbaasv1alpha1.IssuerUserProvided:
-			err = checkTLSSecretRef(reqCtx, cli, cluster.Namespace, comp.Issuer.SecretRef)
+			err = CheckTLSSecretRef(reqCtx, cli, cluster.Namespace, comp.Issuer.SecretRef)
 		case dbaasv1alpha1.IssuerKubeBlocks:
 			secret, err = createTLSSecret(reqCtx, cli, cluster, comp.Name, scheme, finalizer)
 			if secret != nil {
@@ -148,7 +148,7 @@ func buildFromTemplate(tpl string, vars interface{}) (string, error) {
 	return b.String(), nil
 }
 
-func checkTLSSecretRef(reqCtx controllerutil.RequestCtx, cli client.Client, namespace string, secretRef *dbaasv1alpha1.TLSSecretRef) error {
+func CheckTLSSecretRef(reqCtx controllerutil.RequestCtx, cli client.Client, namespace string, secretRef *dbaasv1alpha1.TLSSecretRef) error {
 	if secretRef == nil {
 		return errors.New("issuer.secretRef shouldn't be nil when issuer is UserProvided")
 	}

@@ -76,3 +76,21 @@ func TestWalkTopoOrder(t *testing.T) {
 		}
 	}
 }
+
+func TestValidate(t *testing.T) {
+	dag := NewDAG()
+	for i := 0; i < 4; i++ {
+		dag.AddVertex(i)
+	}
+	dag.Connect(0, 1)
+	dag.Connect(1, 2)
+	dag.Connect(2, 3)
+	dag.Connect(3, 1)
+	err := dag.validate()
+	if err == nil {
+		t.Error("cycle not found")
+	}
+	if err.Error() != "cycle found" {
+		t.Error("error not expected")
+	}
+}

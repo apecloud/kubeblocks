@@ -30,7 +30,7 @@ type ownershipTransformer struct {
 }
 
 func (f *ownershipTransformer) Transform(dag *graph.DAG) error {
-	scheme, _ := appsv1alpha1.SchemeBuilder.Build()
+	scheme, _ := objectScheme()
 	root := dag.Root()
 	if root == nil {
 		return fmt.Errorf("root vertex not found: %v", dag)

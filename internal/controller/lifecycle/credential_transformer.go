@@ -39,7 +39,9 @@ func (c *credentialTransformer) Transform(dag *graph.DAG) error {
 	}
 	for _, secretVertex := range secretVertices {
 		for _, vertex := range noneRootVertices {
-			if vertex != secretVertex {
+			v, _ := vertex.(*lifecycleVertex)
+			// connect all none secret vertices to all secret vertices
+			if _, ok := v.obj.(*corev1.Secret); !ok {
 				dag.Connect(vertex, secretVertex)
 			}
 		}

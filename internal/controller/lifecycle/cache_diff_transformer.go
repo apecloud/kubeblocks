@@ -23,12 +23,9 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
@@ -51,17 +48,6 @@ func ownKinds() []client.ObjectList {
 		&corev1.PersistentVolumeClaimList{},
 		&policyv1.PodDisruptionBudgetList{},
 	}
-}
-
-func objectScheme() (*runtime.Scheme, error) {
-	s := scheme.Scheme
-	if err := scheme.AddToScheme(s); err != nil {
-		return nil, err
-	}
-	if err := appsv1alpha1.AddToScheme(s); err != nil {
-		return nil, err
-	}
-	return s, nil
 }
 
 // read all objects owned by our cluster

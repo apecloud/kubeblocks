@@ -60,11 +60,17 @@ var (
 	//go:embed data/*
 	defaultVendorYamlData embed.FS
 	preflightExample      = templates.Examples(`
-		# Run preflight checks against the customized rules of preflight-check.yaml
-		kbcli troubleshoot preflight preflight-check.yaml
+		# Run preflight provider checks against the default rules automatically
+		kbcli kubeblocks preflight
 
-		# Run preflight checks and display AnalyzeResults with non-interactive mode
-		kbcli troubleshoot preflight preflight-check.yaml --interactive=false`)
+		# Run preflight provider checks and output more verbose info
+		kbcli kubeblocks preflight --verbose
+
+		# Run preflight checks against the customized rules of preflight-check.yaml
+		kbcli kubeblocks preflight preflight-check.yaml
+
+		# Run preflight checks and display AnalyzeResults with interactive mode
+		kbcli kubeblocks preflight preflight-check.yaml --interactive=true`)
 )
 
 const (

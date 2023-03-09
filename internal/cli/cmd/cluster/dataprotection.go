@@ -19,6 +19,7 @@ package cluster
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -29,8 +30,10 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/duration"
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/client-go/dynamic"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
 
@@ -40,6 +43,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/create"
 	"github.com/apecloud/kubeblocks/internal/cli/delete"
 	"github.com/apecloud/kubeblocks/internal/cli/list"
+	"github.com/apecloud/kubeblocks/internal/cli/printer"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
@@ -272,6 +276,66 @@ func NewCreateBackupCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) 
 	return create.BuildCommand(inputs)
 }
 
+// getClusterNameMap get cluster list by namespace and convert to map.
+func getClusterNameMap(dClient dynamic.Interface, o *list.ListOptions) (map[string]struct{}, error) {
+	clusterList, err := dClient.Resource(types.ClusterGVR()).Namespace(o.Namespace).List(context.TODO(), metav1.ListOptions{})
+	if err != nil {
+		return nil, err
+	}
+	clusterMap := make(map[string]struct{})
+	for _, v := range clusterList.Items {
+		clusterMap[v.GetName()] = struct{}{}
+	}
+	return clusterMap, nil
+}
+
+func printBackupList(o *list.ListOptions) error {
+	dynamic, err := o.Factory.DynamicClient()
+	if err != nil {
+		return err
+	}
+	backupList, err := dynamic.Resource(types.BackupGVR()).Namespace(o.Namespace).List(context.TODO(), metav1.ListOptions{
+		LabelSelector: o.LabelSelector,
+		FieldSelector: o.FieldSelector,
+	})
+	if err != nil {
+		return err
+	}
+
+	if len(backupList.Items) == 0 {
+		o.PrintNotFoundResources()
+		return nil
+	}
+
+	clusterNameMap, err := getClusterNameMap(dynamic, o)
+	if err != nil {
+		return err
+	}
+
+	// sort the unstructured objects with the creationTimestamp in positive order
+	sort.Sort(unstructuredList(backupList.Items))
+	tbl := printer.NewTablePrinter(o.Out)
+	tbl.SetHeader("NAME", "CLUSTER", "TYPE", "STATUS", "TOTAL-SIZE", "DURATION", "CREATE-TIME", "COMPLETION-TIME")
+	for _, obj := range backupList.Items {
+		backup := &dataprotectionv1alpha1.Backup{}
+		if err = runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, backup); err != nil {
+			return err
+		}
+		clusterName := backup.Labels[constant.AppInstanceLabelKey]
+		if _, ok := clusterNameMap[clusterName]; !ok {
+			clusterName = fmt.Sprintf("%s (deleted)", clusterName)
+		}
+		durationStr := ""
+		if backup.Status.Duration != nil {
+			durationStr = duration.HumanDuration(backup.Status.Duration.Duration)
+		}
+		tbl.AddRow(backup.Name, clusterName, backup.Spec.BackupType, backup.Status.Phase, backup.Status.TotalSize,
+			durationStr, util.TimeFormat(&backup.CreationTimestamp), util.TimeFormat(backup.Status.CompletionTimestamp))
+	}
+	tbl.Print()
+	return nil
+}
+
 func NewListBackupCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := list.NewListOptions(f, streams, types.BackupGVR())
 	cmd := &cobra.Command{
@@ -283,8 +347,8 @@ func NewListBackupCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *c
 		Run: func(cmd *cobra.Command, args []string) {
 			o.LabelSelector = util.BuildLabelSelectorByNames(o.LabelSelector, args)
 			o.Names = nil
-			_, err := o.Run()
-			util.CheckErr(err)
+			util.CheckErr(o.Complete())
+			util.CheckErr(printBackupList(o))
 		},
 	}
 	o.AddFlags(cmd)

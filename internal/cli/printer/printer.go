@@ -148,3 +148,7 @@ func PrintTitle(title string) {
 	titleTpl := fmt.Sprintf("\n%s:", title)
 	fmt.Println(titleTpl)
 }
+
+func PrintLine(line string) {
+	fmt.Println(line)
+}

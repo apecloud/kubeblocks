@@ -405,10 +405,6 @@ func (o *addonCmdOpts) buildPatch(flags []*pflag.Flag) error {
 	install := map[string]interface{}{}
 
 	if o.addonEnableFlags != nil {
-		if o.addon.Spec.InstallSpec.Enabled {
-			fmt.Fprintf(o.Out, "%s/%s is already enbled\n", o.GVR.GroupResource().String(), o.Names[0])
-			return cmdutil.ErrExit
-		}
 		if err = o.buildEnablePatch(flags, spec, install); err != nil {
 			return err
 		}

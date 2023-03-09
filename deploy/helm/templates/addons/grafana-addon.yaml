@@ -9,7 +9,7 @@ spec:
   type: Helm
 
   helm:
-    chartRepoURL: https://github.com/prometheus-community/helm-charts/releases/download/prometheus-15.16.1/prometheus-15.16.1.tgz
+    chartLocationURL: https://github.com/prometheus-community/helm-charts/releases/download/prometheus-15.16.1/prometheus-15.16.1.tgz
     installValues:
       configMapRefs:
         - name: grafana-chart-kubeblocks-values

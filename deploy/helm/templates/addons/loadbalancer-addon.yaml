@@ -9,7 +9,7 @@ spec:
   type: Helm
 
   helm:
-    chartRepoURL: https://github.com/apecloud/helm-charts/releases/download/loadbalancer-0.1.0/loadbalancer-0.1.0.tgz
+    chartLocationURL: https://github.com/apecloud/helm-charts/releases/download/loadbalancer-0.1.0/loadbalancer-0.1.0.tgz
 
     valuesMapping:
       valueMap:

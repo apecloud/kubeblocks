@@ -11,7 +11,7 @@ spec:
   type: Helm
 
   helm:
-    chartRepoURL: https://github.com/piraeusdatastore/helm-charts/releases/download/snapshot-controller-1.7.2/snapshot-controller-1.7.2.tgz
+    chartLocationURL: https://github.com/piraeusdatastore/helm-charts/releases/download/snapshot-controller-1.7.2/snapshot-controller-1.7.2.tgz
     installValues:
       configMapRefs:
         - name: snapshot-controller-chart-kubeblocks-values

@@ -205,8 +205,8 @@ spec:
                 description: Helm installation spec., it's only being processed if
                   type=helm.
                 properties:
-                  chartRepoURL:
-                    description: A Helm Chart repository URL.
+                  chartLocationURL:
+                    description: A Helm Chart location URL.
                     type: string
                   installOptions:
                     additionalProperties:
@@ -383,7 +383,7 @@ spec:
                         type: object
                     type: object
                 required:
-                - chartRepoURL
+                - chartLocationURL
                 type: object
               install:
                 description: Installation parameters.

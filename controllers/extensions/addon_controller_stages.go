@@ -733,7 +733,7 @@ func createHelmJobProto(addon *extensionsv1alpha1.Addon) (*batchv1.Job, error) {
 								},
 								{
 									Name:  "CHART",
-									Value: addon.Spec.Helm.ChartRepoURL,
+									Value: addon.Spec.Helm.ChartLocationURL,
 								},
 							},
 							VolumeMounts: []corev1.VolumeMount{},

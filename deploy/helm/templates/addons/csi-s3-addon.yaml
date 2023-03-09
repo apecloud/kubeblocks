@@ -9,7 +9,7 @@ spec:
   type: Helm
 
   helm:
-    chartRepoURL: https://raw.githubusercontent.com/cloudve/helm-charts/master/charts/csi-s3-0.31.3.tgz
+    chartLocationURL: https://raw.githubusercontent.com/cloudve/helm-charts/master/charts/csi-s3-0.31.3.tgz
     installValues:
       configMapRefs:
         - name: csi-s3-chart-kubeblocks-values

@@ -111,9 +111,9 @@ type SelectorRequirement struct {
 // HelmTypeInstallSpec defines a Helm release installation spec.
 type HelmTypeInstallSpec struct {
 
-	// A Helm Chart repository URL.
+	// A Helm Chart location URL.
 	// +kubebuilder:validation:Required
-	ChartRepoURL string `json:"chartRepoURL"`
+	ChartLocationURL string `json:"chartLocationURL"`
 
 	// installOptions defines Helm release install options.
 	// +optional

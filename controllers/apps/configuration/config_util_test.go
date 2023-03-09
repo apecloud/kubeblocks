@@ -144,30 +144,30 @@ var _ = Describe("ConfigWrapper util test", func() {
 				},
 			), testutil.WithAnyTimes()))
 
-			_, err := CheckCDConfigTemplate(k8sMockClient.Client(), reqCtx, clusterDefObj)
+			_, err := checkConfigTemplate(k8sMockClient.Client(), reqCtx, clusterDefObj)
 			Expect(err).ShouldNot(Succeed())
 			Expect(err.Error()).Should(ContainSubstring("failed to get cc object"))
 
-			_, err = CheckCDConfigTemplate(k8sMockClient.Client(), reqCtx, clusterDefObj)
+			_, err = checkConfigTemplate(k8sMockClient.Client(), reqCtx, clusterDefObj)
 			Expect(err).ShouldNot(Succeed())
 			Expect(err.Error()).Should(ContainSubstring("failed to get cc object"))
 
-			_, err = CheckCDConfigTemplate(k8sMockClient.Client(), reqCtx, clusterDefObj)
+			_, err = checkConfigTemplate(k8sMockClient.Client(), reqCtx, clusterDefObj)
 			Expect(err).ShouldNot(Succeed())
 			Expect(err.Error()).Should(ContainSubstring("status not ready"))
 
-			ok, err := CheckCDConfigTemplate(k8sMockClient.Client(), reqCtx, clusterDefObj)
+			ok, err := checkConfigTemplate(k8sMockClient.Client(), reqCtx, clusterDefObj)
 			Expect(err).Should(Succeed())
 			Expect(ok).Should(BeTrue())
 
-			ok, err = UpdateCDLabelsByConfiguration(k8sMockClient.Client(), reqCtx, clusterDefObj)
+			ok, err = updateLabelsByConfiguration(k8sMockClient.Client(), reqCtx, clusterDefObj)
 			Expect(err).Should(Succeed())
 			Expect(ok).Should(BeTrue())
 
-			err = UpdateCDConfigMapFinalizer(k8sMockClient.Client(), reqCtx, clusterDefObj)
+			_, err = updateLabelsByConfiguration(k8sMockClient.Client(), reqCtx, clusterDefObj)
 			Expect(err).Should(Succeed())
 
-			err = DeleteCDConfigMapFinalizer(k8sMockClient.Client(), reqCtx, clusterDefObj)
+			err = DeleteConfigMapFinalizer(k8sMockClient.Client(), reqCtx, clusterDefObj)
 			Expect(err).Should(Succeed())
 		})
 	})
@@ -204,11 +204,11 @@ var _ = Describe("ConfigWrapper util test", func() {
 					}}},
 			), testutil.WithAnyTimes()))
 
-			_, err = CheckCDConfigTemplate(k8sMockClient.Client(), reqCtx, clusterDefObj)
+			_, err = checkConfigTemplate(k8sMockClient.Client(), reqCtx, clusterDefObj)
 			Expect(err).ShouldNot(Succeed())
 			Expect(err.Error()).Should(ContainSubstring("failed to get cc object"))
 
-			ok, err := CheckCDConfigTemplate(k8sMockClient.Client(), reqCtx, clusterDefObj)
+			ok, err := checkConfigTemplate(k8sMockClient.Client(), reqCtx, clusterDefObj)
 			Expect(err).Should(Succeed())
 			Expect(ok).Should(BeTrue())
 		})
@@ -260,30 +260,30 @@ var _ = Describe("ConfigWrapper util test", func() {
 				},
 			), testutil.WithAnyTimes()))
 
-			_, err := CheckCVConfigTemplate(k8sMockClient.Client(), reqCtx, clusterVersionObj)
+			_, err := checkConfigTemplate(k8sMockClient.Client(), reqCtx, clusterVersionObj)
 			Expect(err).ShouldNot(Succeed())
 			Expect(err.Error()).Should(ContainSubstring("failed to get cc object"))
 
-			_, err = CheckCVConfigTemplate(k8sMockClient.Client(), reqCtx, clusterVersionObj)
+			_, err = checkConfigTemplate(k8sMockClient.Client(), reqCtx, clusterVersionObj)
 			Expect(err).ShouldNot(Succeed())
 			Expect(err.Error()).Should(ContainSubstring("failed to get cc object"))
 
-			_, err = CheckCVConfigTemplate(k8sMockClient.Client(), reqCtx, clusterVersionObj)
+			_, err = checkConfigTemplate(k8sMockClient.Client(), reqCtx, clusterVersionObj)
 			Expect(err).ShouldNot(Succeed())
 			Expect(err.Error()).Should(ContainSubstring("status not ready"))
 
-			ok, err := CheckCVConfigTemplate(k8sMockClient.Client(), reqCtx, clusterVersionObj)
+			ok, err := checkConfigTemplate(k8sMockClient.Client(), reqCtx, clusterVersionObj)
 			Expect(err).Should(Succeed())
 			Expect(ok).Should(BeTrue())
 
-			ok, err = UpdateCVLabelsByConfiguration(k8sMockClient.Client(), reqCtx, clusterVersionObj)
+			ok, err = updateLabelsByConfiguration(k8sMockClient.Client(), reqCtx, clusterVersionObj)
 			Expect(err).Should(Succeed())
 			Expect(ok).Should(BeTrue())
 
-			err = UpdateCVConfigMapFinalizer(k8sMockClient.Client(), reqCtx, clusterVersionObj)
+			_, err = updateLabelsByConfiguration(k8sMockClient.Client(), reqCtx, clusterVersionObj)
 			Expect(err).Should(Succeed())
 
-			err = DeleteCVConfigMapFinalizer(k8sMockClient.Client(), reqCtx, clusterVersionObj)
+			err = DeleteConfigMapFinalizer(k8sMockClient.Client(), reqCtx, clusterVersionObj)
 			Expect(err).Should(Succeed())
 		})
 	})

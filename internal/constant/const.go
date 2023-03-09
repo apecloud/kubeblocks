@@ -17,6 +17,11 @@ limitations under the License.
 package constant
 
 const (
+	// config keys used in viper
+	CfgKeyServerInfo = "_KUBE_SERVER_INFO"
+)
+
+const (
 	ConnCredentialPlaceHolder = "$(CONN_CREDENTIAL_SECRET_NAME)"
 )
 
@@ -31,6 +36,8 @@ const (
 )
 
 const (
+	APIGroup = "kubeblocks.io"
+
 	AppName = "kubeblocks"
 
 	// K8s recommonded and well-known label and annotation keys

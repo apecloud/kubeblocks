@@ -141,7 +141,7 @@ func (o *CreateVolumeSnapshotClassOptions) Create() error {
 		CueTemplateName: "volumesnapshotclass_template.cue",
 		ResourceName:    "volumesnapshotclasses",
 		Group:           "snapshot.storage.k8s.io",
-		Version:         types.VersionV1,
+		Version:         types.K8sCoreAPIVersion,
 		BaseOptionsObj:  &o.BaseOptions,
 		Options:         o,
 	}
@@ -187,8 +187,8 @@ func (o *CreateBackupOptions) Validate() error {
 	inputs := create.Inputs{
 		CueTemplateName: "backuppolicy_template.cue",
 		ResourceName:    types.ResourceBackupPolicies,
-		Group:           types.DPGroup,
-		Version:         types.DPVersion,
+		Group:           types.DPAPIGroup,
+		Version:         types.DPAPIVersion,
 		BaseOptionsObj:  &policyOptions.BaseOptions,
 		Options:         policyOptions,
 	}
@@ -255,8 +255,8 @@ func NewCreateBackupCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) 
 		Example:         createBackupExample,
 		CueTemplateName: "backup_template.cue",
 		ResourceName:    types.ResourceBackups,
-		Group:           types.DPGroup,
-		Version:         types.DPVersion,
+		Group:           types.DPAPIGroup,
+		Version:         types.DPAPIVersion,
 		BaseOptionsObj:  &o.BaseOptions,
 		Options:         o,
 		Factory:         f,

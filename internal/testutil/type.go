@@ -29,6 +29,8 @@ import (
 	"k8s.io/apimachinery/pkg/version"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
+
+	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
 type TestContext struct {
@@ -147,7 +149,7 @@ func SetKubeServerVersionWithDistro(major, minor, patch, distro string) {
 		Minor:      minor,
 		GitVersion: fmt.Sprintf("v%s.%s.%s+%s", major, minor, patch, distro),
 	}
-	viper.Set("_KUBE_SERVER_INFO", ver)
+	viper.Set(constant.CfgKeyServerInfo, ver)
 }
 
 // SetKubeServerVersion provide "_KUBE_SERVER_INFO" viper settings helper function.
@@ -157,5 +159,5 @@ func SetKubeServerVersion(major, minor, patch string) {
 		Minor:      minor,
 		GitVersion: fmt.Sprintf("v%s.%s.%s", major, minor, patch),
 	}
-	viper.Set("_KUBE_SERVER_INFO", ver)
+	viper.Set(constant.CfgKeyServerInfo, ver)
 }

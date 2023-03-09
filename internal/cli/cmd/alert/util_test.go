@@ -17,6 +17,8 @@ limitations under the License.
 package alert
 
 import (
+	"fmt"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
@@ -55,5 +57,22 @@ var _ = Describe("alter", func() {
 		res := removeDuplicateStr(slice)
 		Expect(res).ShouldNot(BeNil())
 		Expect(res).Should(Equal([]string{"a", "b", "c"}))
+	})
+
+	It("url validation", func() {
+		testCases := []struct {
+			url      string
+			expected bool
+		}{
+			{url: "", expected: false},
+			{url: "https://test.com", expected: true},
+			{url: "/foo/bar", expected: true},
+			{url: "\"https://test.com\"", expected: false},
+		}
+		for _, tc := range testCases {
+			By(fmt.Sprintf("url: %s, expected: %t", tc.url, tc.expected))
+			res, _ := urlIsValid(tc.url)
+			Expect(res).Should(Equal(tc.expected))
+		}
 	})
 })

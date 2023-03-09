@@ -1,6 +1,6 @@
 ## kbcli alert
 
-Manage alert receivers
+Manage alert receiver, include add, list and delete receiver
 
 ### Options
 

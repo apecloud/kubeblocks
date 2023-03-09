@@ -25,7 +25,7 @@ import (
 func NewAlertCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "alert [add-receiver|list-receivers|delete-receiver]",
-		Short: "Manage alert receivers",
+		Short: "Manage alert receiver, include add, list and delete receiver",
 	}
 	cmd.AddCommand(
 		newAddReceiverCmd(f, streams),

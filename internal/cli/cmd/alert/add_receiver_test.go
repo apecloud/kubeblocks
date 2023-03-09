@@ -40,6 +40,45 @@ var mockConfigmap = func(name string, key string, value string) *corev1.ConfigMa
 	return cm
 }
 
+var mockBaseOptions = func(s genericclioptions.IOStreams) baseOptions {
+	o := baseOptions{IOStreams: s}
+	alertManagerConfig := `
+    global:
+      smtp_from: alert-test@apecloud.com
+      smtp_smarthost: smtp.feishu.cn:587
+      smtp_auth_username: alert-test@apecloud.com
+      smtp_auth_password: 123456abc
+      smtp_auth_identity: alert-test@apecloud.com
+    receivers:
+    - name: default-receiver
+    - name: receiver-7pb52
+      webhook_configs:
+      - max_alerts: 10
+        url: http://kubeblocks-webhook-adaptor-config.default:5001/api/v1/notify/receiver-7pb52
+    route:
+      group_interval: 30s
+      group_wait: 5s
+      receiver: default-receiver
+      repeat_interval: 10m
+      routes:
+      - continue: true
+        matchers:
+        - app_kubernetes_io_instance=~a|b|c
+        - severity=~info|warning
+        receiver: receiver-7pb52`
+	webhookAdaptorConfig := `
+    receivers:
+    - name: receiver-7pb52
+      params:
+        url: https://oapi.dingtalk.com/robot/send?access_token=123456
+      type: dingtalk-webhook`
+	alertCM := mockConfigmap(alertConfigmapName, alertConfigFileName, alertManagerConfig)
+	webhookAdaptorCM := mockConfigmap(webhookAdaptorName, webhookAdaptorFileName, webhookAdaptorConfig)
+	o.alterConfigMap = alertCM
+	o.webhookConfigMap = webhookAdaptorCM
+	return o
+}
+
 var _ = Describe("add receiver", func() {
 	var f *cmdtesting.TestFactory
 	var s genericclioptions.IOStreams
@@ -72,12 +111,18 @@ var _ = Describe("add receiver", func() {
 
 		By("set email, do not specify the name")
 		o.emails = []string{"foo@bar.com"}
-		Expect(o.validate([]string{})).Should(Succeed())
+		o.alterConfigMap = mockConfigmap(alertConfigmapName, alertConfigFileName, "")
+		Expect(o.validate([]string{})).Should(HaveOccurred())
 		Expect(o.name).ShouldNot(BeEmpty())
 
 		By("set email, specify the name")
-		Expect(o.validate([]string{"test"})).Should(Succeed())
+		Expect(o.validate([]string{"test"})).Should(HaveOccurred())
 		Expect(o.name).Should(Equal("test"))
+
+		By("set email, set smtp config in configmap")
+		baseOptions := mockBaseOptions(s)
+		o.alterConfigMap = baseOptions.alterConfigMap
+		Expect(o.validate([]string{})).Should(Succeed())
 	})
 
 	It("build receiver", func() {

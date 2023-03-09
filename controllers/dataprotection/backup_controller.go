@@ -409,10 +409,15 @@ func (r *BackupReconciler) createVolumeSnapshot(
 		return err
 	}
 	if len(dataPVC.Items) == 0 {
-		return fmt.Errorf("can not found any persistent volume to backup")
+		return fmt.Errorf("can not find any persistent volume to backup")
 	}
 	if len(dataPVC.Items) > 1 {
-		return fmt.Errorf("can not support more than 1 persistent volume to backup")
+		names := make([]string, 0)
+		for _, i := range dataPVC.Items {
+			names = append(names, i.Name)
+		}
+		return fmt.Errorf("target pvc is ambiguous for [%s], only support 1 persistent volume backup",
+			strings.Join(names, ","))
 	}
 	pvcName := dataPVC.Items[0].Name
 
@@ -685,7 +690,7 @@ func (r *BackupReconciler) getTargetPod(
 		return nil, err
 	}
 	if len(targetPod.Items) == 0 {
-		return nil, errors.New("can not found any pod to backup by labelsSelector")
+		return nil, errors.New("can not find any pod to backup by labelsSelector")
 	}
 	return &targetPod.Items[0], nil
 }

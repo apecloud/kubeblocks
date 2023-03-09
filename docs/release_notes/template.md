@@ -20,7 +20,12 @@ We would like to extend our appreciation to all contributors who helped make thi
     * KB_CLUSTER_NAME - KubeBlock Cluster API object name
     * KB_COMP_NAME - Running pod's KubeBlock Cluster API object's `.spec.components.name`
     * KB_CLUSTER_COMP_NAME - Running pod's KubeBlock Cluster API object's `<.metadata.name>-<.spec.components.name>`, same name is used for Deployment or StatefulSet workload name, and Service object name
-  * New addons.extensions.kubeblocks.io API, with Addon management controller, where KubeBlocks allow addon extensions instead of using Helm sub-charts dependencies.
+  * New addons.extensions.kubeblocks.io API, with Addon management controller, where KubeBlocks allow addon extensions instead of using Helm sub-charts dependencies. Following addons are provided:
+    * Prometheus and Alertmanager
+    * Grafana
+    * S3 CSI driver
+    * Snapshot Controller
+    * KubeBlocks private network Load Balancer
   * ClusterDefinition API `spec.connectionCredential` add following built-in variables:
     * A random UUID v4 generator `$(UUID)`
     * A random UUID v4 generator with BASE64 encoded `$(UUID_B64)`

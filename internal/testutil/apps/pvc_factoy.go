@@ -40,6 +40,7 @@ func NewPersistentVolumeClaimFactory(namespace, name, clusterName, componentName
 					intctrlutil.KBAppComponentLabelKey:          componentName,
 					intctrlutil.AppManagedByLabelKey:            intctrlutil.AppName,
 					intctrlutil.VolumeClaimTemplateNameLabelKey: vctName,
+					intctrlutil.VolumeTypeLabelKey:              vctName,
 				},
 				Annotations: map[string]string{
 					kube.KubeAnnBindCompleted: "yes",

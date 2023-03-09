@@ -25,7 +25,6 @@ import (
 
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	"github.com/spf13/viper"
-	appv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -41,7 +40,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -398,15 +399,22 @@ func (r *BackupReconciler) createVolumeSnapshot(
 		return err
 	}
 
-	// build env value for access target cluster
-	target, err := r.getTargetCluster(reqCtx, backupPolicy)
-	if err != nil {
+	// fetch data-pvc by fixed labels: "kubeblocks.io/data-type=data"
+	dataPVC := corev1.PersistentVolumeClaimList{}
+	dataPVCLabels := backupPolicy.Spec.Target.LabelsSelector.MatchLabels
+	dataPVCLabels[constant.VolumeTypeLabelKey] = string(appsv1alpha1.VolumeTypeData)
+	if err = r.Client.List(reqCtx.Ctx, &dataPVC,
+		client.InNamespace(reqCtx.Req.Namespace),
+		client.MatchingLabels(dataPVCLabels)); err != nil {
 		return err
 	}
-
-	// TODO(dsj): build pvc name 0
-	pvcTemplate := []string{target.Spec.VolumeClaimTemplates[0].Name, target.Name, "0"}
-	pvcName := strings.Join(pvcTemplate, "-")
+	if len(dataPVC.Items) == 0 {
+		return fmt.Errorf("can not found any persistent volume to backup")
+	}
+	if len(dataPVC.Items) > 1 {
+		return fmt.Errorf("can not support more than 1 persistent volume to backup")
+	}
+	pvcName := dataPVC.Items[0].Name
 
 	snap = &snapshotv1.VolumeSnapshot{
 		ObjectMeta: metav1.ObjectMeta{
@@ -667,42 +675,19 @@ func (r *BackupReconciler) deleteExternalResources(reqCtx intctrlutil.RequestCtx
 	return nil
 }
 
-func (r *BackupReconciler) getTargetCluster(
-	reqCtx intctrlutil.RequestCtx, backupPolicy *dataprotectionv1alpha1.BackupPolicy) (*appv1.StatefulSet, error) {
-	// get stateful service
-	reqCtx.Log.Info("Get cluster from label", "label", backupPolicy.Spec.Target.LabelsSelector.MatchLabels)
-	clusterTarget := &appv1.StatefulSetList{}
-	if err := r.Client.List(reqCtx.Ctx, clusterTarget,
+func (r *BackupReconciler) getTargetPod(
+	reqCtx intctrlutil.RequestCtx, backupPolicy *dataprotectionv1alpha1.BackupPolicy) (*corev1.Pod, error) {
+	reqCtx.Log.Info("Get pod from label", "label", backupPolicy.Spec.Target.LabelsSelector.MatchLabels)
+	targetPod := &corev1.PodList{}
+	if err := r.Client.List(reqCtx.Ctx, targetPod,
 		client.InNamespace(reqCtx.Req.Namespace),
 		client.MatchingLabels(backupPolicy.Spec.Target.LabelsSelector.MatchLabels)); err != nil {
 		return nil, err
 	}
-	reqCtx.Log.Info("Get cluster target finish", "target", clusterTarget)
-	clusterItemsLen := len(clusterTarget.Items)
-	if clusterItemsLen != 1 {
-		if clusterItemsLen <= 0 {
-			return nil, errors.New("can not found any stateful sets by labelsSelector")
-		}
-		return nil, errors.New("match labels result more than one, check labelsSelector")
+	if len(targetPod.Items) == 0 {
+		return nil, errors.New("can not found any pod to backup by labelsSelector")
 	}
-	return &clusterTarget.Items[0], nil
-}
-
-func (r *BackupReconciler) getTargetClusterPod(
-	reqCtx intctrlutil.RequestCtx, clusterStatefulSet *appv1.StatefulSet) (*corev1.Pod, error) {
-	// get stateful service
-	clusterPod := &corev1.Pod{}
-	if err := r.Client.Get(reqCtx.Ctx,
-		types.NamespacedName{
-			Namespace: clusterStatefulSet.Namespace,
-			// TODO(dsj): dependency ConsensusSet defined "follower" label to filter
-			// Temporary get first pod to build backup volume info
-			Name: clusterStatefulSet.Name + "-0",
-		}, clusterPod); err != nil {
-		return nil, err
-	}
-	reqCtx.Log.Info("Get cluster pod finish", "target pod", clusterPod)
-	return clusterPod, nil
+	return &targetPod.Items[0], nil
 }
 
 func (r *BackupReconciler) buildBackupToolPodSpec(reqCtx intctrlutil.RequestCtx, backup *dataprotectionv1alpha1.Backup) (corev1.PodSpec, error) {
@@ -732,13 +717,7 @@ func (r *BackupReconciler) buildBackupToolPodSpec(reqCtx intctrlutil.RequestCtx,
 		return podSpec, err
 	}
 
-	// build env value for access target cluster
-	clusterStatefulset, err := r.getTargetCluster(reqCtx, backupPolicy)
-	if err != nil {
-		return podSpec, err
-	}
-
-	clusterPod, err := r.getTargetClusterPod(reqCtx, clusterStatefulset)
+	clusterPod, err := r.getTargetPod(reqCtx, backupPolicy)
 	if err != nil {
 		return podSpec, err
 	}
@@ -859,14 +838,7 @@ func (r *BackupReconciler) buildSnapshotPodSpec(
 		logger.Error(err, "Unable to get backupPolicy for backup.", "backupPolicy", backupPolicyNameSpaceName)
 		return podSpec, err
 	}
-
-	// build env value for access target cluster
-	clusterStatefulset, err := r.getTargetCluster(reqCtx, backupPolicy)
-	if err != nil {
-		return podSpec, err
-	}
-
-	clusterPod, err := r.getTargetClusterPod(reqCtx, clusterStatefulset)
+	clusterPod, err := r.getTargetPod(reqCtx, backupPolicy)
 	if err != nil {
 		return podSpec, err
 	}

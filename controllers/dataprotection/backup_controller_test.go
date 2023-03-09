@@ -63,6 +63,7 @@ var _ = Describe("Backup for a StatefulSet", func() {
 		testapps.ClearResources(&testCtx, intctrlutil.BackupPolicySignature, inNS, ml)
 		testapps.ClearResources(&testCtx, intctrlutil.JobSignature, inNS, ml)
 		testapps.ClearResources(&testCtx, intctrlutil.CronJobSignature, inNS, ml)
+		testapps.ClearResources(&testCtx, intctrlutil.PersistentVolumeClaimSignature, inNS, ml)
 		// non-namespaced
 		testapps.ClearResources(&testCtx, intctrlutil.BackupToolSignature, ml)
 	}
@@ -82,9 +83,16 @@ var _ = Describe("Backup for a StatefulSet", func() {
 
 		By("By mocking a pod belonging to the statefulset")
 		pod := testapps.NewPodFactory(testCtx.DefaultNamespace, sts.Name+"-0").
+			AddAppInstanceLabel(clusterName).
 			AddContainer(corev1.Container{Name: containerName, Image: testapps.ApeCloudMySQLImage}).
+			Create(&testCtx).GetObject()
+		nodeName = pod.Spec.NodeName
+
+		By("By mocking a pvc belonging to the pod")
+		_ = testapps.NewPersistentVolumeClaimFactory(
+			testCtx.DefaultNamespace, "data-"+pod.Name, clusterName, componentName, "data").
+			SetStorage("1Gi").
 			Create(&testCtx)
-		nodeName = pod.GetObject().Spec.NodeName
 	})
 
 	AfterEach(func() {
@@ -189,6 +197,21 @@ var _ = Describe("Backup for a StatefulSet", func() {
 
 			It("should fail after pre-job fails", func() {
 				patchK8sJobStatus(types.NamespacedName{Name: backupKey.Name + "-pre", Namespace: backupKey.Namespace}, batchv1.JobFailed)
+
+				By("Check backup job failed")
+				Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dataprotectionv1alpha1.Backup) {
+					g.Expect(fetched.Status.Phase).To(Equal(dataprotectionv1alpha1.BackupFailed))
+				})).Should(Succeed())
+			})
+
+			It("should fail if multiple PVCs exist", func() {
+				By("By mocking more data pvcs")
+				_ = testapps.NewPersistentVolumeClaimFactory(
+					testCtx.DefaultNamespace, "data-multi-pvc", clusterName, componentName, "data").
+					SetStorage("1Gi").
+					Create(&testCtx)
+
+				patchK8sJobStatus(types.NamespacedName{Name: backupKey.Name + "-pre", Namespace: backupKey.Namespace}, batchv1.JobComplete)
 
 				By("Check backup job failed")
 				Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dataprotectionv1alpha1.Backup) {

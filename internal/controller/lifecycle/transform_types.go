@@ -38,7 +38,7 @@ const (
 )
 
 type gvkName struct {
-	gvk schema.GroupVersionKind
+	gvk      schema.GroupVersionKind
 	ns, name string
 }
 

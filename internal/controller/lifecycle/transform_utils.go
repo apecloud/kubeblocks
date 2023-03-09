@@ -65,7 +65,7 @@ func getGVKName(object client.Object, scheme *runtime.Scheme) (*gvkName, error) 
 		return nil, err
 	}
 	return &gvkName{
-		gvk: gvk,
+		gvk:  gvk,
 		ns:   object.GetNamespace(),
 		name: object.GetName(),
 	}, nil

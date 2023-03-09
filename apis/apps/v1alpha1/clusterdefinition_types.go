@@ -267,8 +267,9 @@ type ConfigurationSpec struct {
 	ConfigTemplateRefs []ConfigTemplate `json:"configTemplateRefs,omitempty"`
 }
 
-// The VolumeTypeSpec determines the volumes purpose for backup.
 type VolumeTypeSpec struct {
+	// Name definition is the same as the name of the VolumeMounts field in PodSpec.Container,
+	// similar to the relations of Volumes[*].name and VolumesMounts[*].name in Pod.Spec.
 	// +kubebuilder:validation:MaxLength=18
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	// +optional
@@ -369,12 +370,14 @@ type ClusterComponentDefinition struct {
 	// such as data volume, log volume, etc.
 	// When backing up the volume, the volume can be correctly backed up
 	// according to the volumeType.
-	// NOTE:
-	// When volumeTypes is not defined, the backup feature will not be supported,
-	// even if a persistent volume has been specified.
+	//
 	// For example:
-	// `{name: data, type: data}` means that the volume named `data` is used to store `data`
-	// `{name: binlog, type: log}` means that the volume named `binlog` is used to store `log`
+	//  `{name: data, type: data}` means that the volume named `data` is used to store `data`.
+	//  `{name: binlog, type: log}` means that the volume named `binlog` is used to store `log`.
+	//
+	// NOTE:
+	//   When volumeTypes is not defined, the backup function will not be supported,
+	// even if a persistent volume has been specified.
 	// +optional
 	VolumeTypes []VolumeTypeSpec `json:"volumeTypes,omitempty"`
 }

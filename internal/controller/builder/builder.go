@@ -205,6 +205,7 @@ func BuildPersistentVolumeClaimLabels(sts *appsv1.StatefulSet, pvc *corev1.Persi
 		for _, t := range component.VolumeTypes {
 			if t.Name == pvcTplName {
 				pvc.Labels[constant.VolumeTypeLabelKey] = string(t.Type)
+				break
 			}
 		}
 	}

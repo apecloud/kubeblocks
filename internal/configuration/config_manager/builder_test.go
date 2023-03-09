@@ -21,6 +21,7 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -40,7 +41,7 @@ var _ = Describe("ConfigManager Test", func() {
 			Data: map[string]string{
 				"reload.tpl": "{{}}",
 			},
-		})))
+		})), testutil.WithAnyTimes())
 	})
 
 	AfterEach(func() {
@@ -54,6 +55,7 @@ var _ = Describe("ConfigManager Test", func() {
 				volumeDirs    []corev1.VolumeMount
 				cli           client.Client
 				ctx           context.Context
+				param         *ConfigManagerParams
 			}
 			tests := []struct {
 				name         string
@@ -118,6 +120,14 @@ var _ = Describe("ConfigManager Test", func() {
 						}},
 					cli: mockK8sCli.Client(),
 					ctx: context.TODO(),
+					param: &ConfigManagerParams{
+						Cluster: &appsv1alpha1.Cluster{
+							ObjectMeta: metav1.ObjectMeta{
+								Name:      "abcd",
+								Namespace: "default",
+							},
+						},
+					},
 				},
 				expectedArgs: []string{
 					`--notify-type`, `tpl`,
@@ -127,12 +137,15 @@ var _ = Describe("ConfigManager Test", func() {
 				wantErr: false,
 			}}
 			for _, tt := range tests {
-				params := ConfigManagerParams{}
-				err := BuildConfigManagerContainerArgs(tt.args.reloadOptions, tt.args.volumeDirs, tt.args.cli, tt.args.ctx, &params)
+				param := tt.args.param
+				if param == nil {
+					param = &ConfigManagerParams{}
+				}
+				err := BuildConfigManagerContainerArgs(tt.args.reloadOptions, tt.args.volumeDirs, tt.args.cli, tt.args.ctx, param)
 				Expect(err != nil).Should(BeEquivalentTo(tt.wantErr))
 				if !tt.wantErr {
 					for _, arg := range tt.expectedArgs {
-						Expect(params.Args).Should(ContainElement(arg))
+						Expect(param.Args).Should(ContainElement(arg))
 					}
 				}
 			}

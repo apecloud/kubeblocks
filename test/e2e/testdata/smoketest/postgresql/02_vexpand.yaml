@@ -6,7 +6,7 @@ spec:
   clusterRef: mycluster
   type: VolumeExpansion
   volumeExpansion:
-    - componentName: postgresql
+    - componentName: pg-replicaset
       volumeClaimTemplates:
         - name: data
           storage: "11Gi"

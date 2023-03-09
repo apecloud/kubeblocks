@@ -5,10 +5,10 @@ kind: Cluster
 metadata:
   name: mycluster
   labels: 
-    helm.sh/chart: pgcluster-0.1.1
+    helm.sh/chart: pgcluster-0.2.0
     app.kubernetes.io/name: pgcluster
     app.kubernetes.io/instance: mycluster
-    app.kubernetes.io/version: "14.6.0"
+    app.kubernetes.io/version: "14.7.0"
     app.kubernetes.io/managed-by: Helm
 spec:
   clusterDefinitionRef: postgresql-cluster # ref clusterdefinition.name

@@ -17,13 +17,18 @@ limitations under the License.
 package cluster
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/spf13/cobra"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/client-go/dynamic"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
 
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/delete"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
@@ -36,6 +41,8 @@ var deleteExample = templates.Examples(`
 
 func NewDeleteCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := delete.NewDeleteOptions(f, streams, types.ClusterGVR())
+	o.PreDeleteFn = clusterPreDeleteHook
+
 	cmd := &cobra.Command{
 		Use:               "delete NAME",
 		Short:             "Delete clusters",
@@ -55,4 +62,19 @@ func deleteCluster(o *delete.DeleteOptions, args []string) error {
 	}
 	o.Names = args
 	return o.Run()
+}
+
+func clusterPreDeleteHook(ctx context.Context, dynamic dynamic.Interface, namespace, name string) error {
+	obj, err := dynamic.Resource(types.ClusterGVR()).Namespace(namespace).Get(ctx, name, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+	cluster := &appsv1alpha1.Cluster{}
+	if err = runtime.DefaultUnstructuredConverter.FromUnstructured(obj.UnstructuredContent(), cluster); err != nil {
+		return err
+	}
+	if cluster.Spec.TerminationPolicy == appsv1alpha1.DoNotTerminate {
+		return fmt.Errorf("cluster %s is protected by termination policy %s, skip deleting", name, appsv1alpha1.DoNotTerminate)
+	}
+	return nil
 }

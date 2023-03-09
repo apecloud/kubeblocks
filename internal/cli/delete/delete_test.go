@@ -17,85 +17,145 @@ limitations under the License.
 package delete
 
 import (
-	"net/http"
+	"bytes"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/spf13/cobra"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/cli-runtime/pkg/resource"
-	"k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/client-go/rest/fake"
+	clientfake "k8s.io/client-go/rest/fake"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 
+	"github.com/apecloud/kubeblocks/internal/cli/testing"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
-	"github.com/apecloud/kubeblocks/internal/cli/util"
 )
 
 var _ = Describe("Delete", func() {
+	const (
+		testNamespace = "test"
+	)
+
+	var cmd *cobra.Command
+	var streams genericclioptions.IOStreams
+	var tf *cmdtesting.TestFactory
+	var pods *corev1.PodList
+	var in *bytes.Buffer
+	var o *DeleteOptions
+
+	BeforeEach(func() {
+		pods, _, _ = cmdtesting.TestData()
+		streams, in, _, _ = genericclioptions.NewTestIOStreams()
+		tf = cmdtesting.NewTestFactory().WithNamespace(testNamespace)
+		tf.Client = &clientfake.RESTClient{}
+		tf.FakeDynamicClient = testing.FakeDynamicClient(&pods.Items[0])
+		o = NewDeleteOptions(tf, streams, types.PODGVR())
+	})
+
+	AfterEach(func() {
+		tf.Cleanup()
+	})
+
 	buildTestCmd := func(o *DeleteOptions) *cobra.Command {
-		cmd := &cobra.Command{
+		cmd = &cobra.Command{
 			Use:     "test-delete",
 			Short:   "Test a delete command",
 			Example: "Test command example",
-			Run: func(cmd *cobra.Command, args []string) {
+			RunE: func(cmd *cobra.Command, args []string) error {
 				o.Names = args
-				util.CheckErr(o.Run())
+				return o.Run()
 			},
 		}
 		o.AddFlags(cmd)
 		return cmd
 	}
 
-	mockClient := func(data runtime.Object) *cmdtesting.TestFactory {
-		tf := cmdtesting.NewTestFactory().WithNamespace("test")
-		defer tf.Cleanup()
-		codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
-		tf.UnstructuredClient = &fake.RESTClient{
-			NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
-			Resp:                 &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, data)},
-		}
-		return tf
-	}
-
 	It("complete", func() {
-		pods, _, _ := cmdtesting.TestData()
-		tf := mockClient(pods)
-		streams, in, _, _ := genericclioptions.NewTestIOStreams()
-		o := NewDeleteOptions(tf, streams, schema.GroupVersionResource{Resource: "pods", Version: types.VersionV1})
+		o.Names = []string{"foo"}
+		_, _ = in.Write([]byte("foo\n"))
+		Expect(o.complete()).Should(Succeed())
 
+		in.Reset()
+		_, _ = in.Write([]byte("bar\n"))
+		Expect(o.complete()).Should(MatchError(MatchRegexp("does not match")))
+	})
+
+	It("build a delete command", func() {
+		cmd := buildTestCmd(o)
+		Expect(cmd).ShouldNot(BeNil())
+
+		_, _ = in.Write([]byte("foo\n"))
+		Expect(cmd.RunE(cmd, []string{"foo"})).Should(Succeed())
+		Expect(cmd.RunE(cmd, []string{"bar"})).Should(HaveOccurred())
+	})
+
+	It("validate", func() {
+		o.Names = []string{"foo"}
 		By("set force and GracePeriod")
 		o.Force = true
 		o.GracePeriod = 1
-		Expect(o.complete()).Should(HaveOccurred())
+		o.Now = false
+		Expect(o.validate()).Should(HaveOccurred())
+
+		o.Force = true
+		o.GracePeriod = 0
+		o.Now = false
+		Expect(o.validate()).Should(Succeed())
 
 		By("set now and GracePeriod")
 		o.Force = false
 		o.Now = true
 		o.GracePeriod = 1
-		Expect(o.complete()).Should(HaveOccurred())
+		Expect(o.validate()).Should(HaveOccurred())
 
-		By("confirm")
+		o.Force = false
+		o.Now = true
+		o.GracePeriod = -1
+		Expect(o.validate()).Should(Succeed())
+
+		By("set force only")
+		o.Force = true
 		o.Now = false
-		Expect(o.complete()).Should(MatchError(MatchRegexp("no name was specified")))
+		o.GracePeriod = -1
+		Expect(o.validate()).Should(Succeed())
 
-		_, _ = in.Write([]byte("foo\n"))
+		By("set GracePeriod only")
+		o.Force = false
+		o.Now = false
+		o.GracePeriod = 1
+		Expect(o.validate()).Should(Succeed())
+
+		o.Force = false
+		o.GracePeriod = -1
+		o.Now = false
+
+		By("set name and label")
 		o.Names = []string{"foo"}
-		Expect(o.complete()).Should(Succeed())
-		Expect(o.Result).ShouldNot(BeNil())
-	})
+		o.LabelSelector = "foo=bar"
+		o.AllNamespaces = false
+		Expect(o.validate()).Should(HaveOccurred())
 
-	It("build a delete command", func() {
-		pods, _, _ := cmdtesting.TestData()
-		tf := mockClient(pods)
-		streams, in, _, _ := genericclioptions.NewTestIOStreams()
-		o := NewDeleteOptions(tf, streams, schema.GroupVersionResource{Resource: "pods", Version: types.VersionV1})
-		cmd := buildTestCmd(o)
-		Expect(cmd).ShouldNot(BeNil())
+		By("set name and all")
+		o.Names = []string{"foo"}
+		o.LabelSelector = ""
+		o.AllNamespaces = true
+		Expect(o.validate()).Should(HaveOccurred())
 
-		_, _ = in.Write([]byte("foo\n"))
-		cmd.Run(cmd, []string{"foo"})
+		By("set all and label")
+		o.Names = nil
+		o.AllNamespaces = true
+		o.LabelSelector = "foo=bar"
+		Expect(o.validate()).Should(Succeed())
+
+		By("set name")
+		o.Names = []string{"foo"}
+		o.AllNamespaces = false
+		o.LabelSelector = ""
+		Expect(o.validate()).Should(Succeed())
+
+		By("set nothing")
+		o.Names = nil
+		o.LabelSelector = ""
+		Expect(o.validate()).Should(MatchError(MatchRegexp("no name was specified")))
 	})
 })

@@ -17,6 +17,7 @@ limitations under the License.
 package delete
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"sort"
@@ -25,16 +26,18 @@ import (
 	"github.com/spf13/cobra"
 	"golang.org/x/exp/slices"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/cli-runtime/pkg/resource"
+	"k8s.io/client-go/dynamic"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 
-	"github.com/apecloud/kubeblocks/internal/cli/util"
 	"github.com/apecloud/kubeblocks/internal/cli/util/prompt"
 )
 
+// DeleteHook is used to do some pre-delete or post-delete operations, for single deletion only.
+type DeleteHook func(ctx context.Context, dynamic dynamic.Interface, namespace, name string) error
+
+// DeleteOptions is the options for delete command.
 type DeleteOptions struct {
 	Factory       cmdutil.Factory
 	Namespace     string
@@ -51,7 +54,12 @@ type DeleteOptions struct {
 	// label selector and be set to nil, ConfirmedNames should be used to record the names to be confirmed.
 	ConfirmedNames []string
 	GVR            schema.GroupVersionResource
-	Result         *resource.Result
+	PreDeleteFn    DeleteHook
+	PostDeleteFn   DeleteHook
+
+	dynamic       dynamic.Interface
+	deleteOptions *metav1.DeleteOptions
+	listOptions   *metav1.ListOptions
 
 	genericclioptions.IOStreams
 }
@@ -65,22 +73,39 @@ func NewDeleteOptions(f cmdutil.Factory, streams genericclioptions.IOStreams, gv
 }
 
 func (o *DeleteOptions) Run() error {
+	if err := o.validate(); err != nil {
+		return err
+	}
+
 	if err := o.complete(); err != nil {
 		return err
 	}
 
 	// delete results
-	return o.deleteResult(o.Result)
+	// return o.deleteResult(o.Result)
+	return o.deleteResources()
 }
 
-func (o *DeleteOptions) complete() error {
+func (o *DeleteOptions) validate() error {
+	// names and label selector cannot be used together
+	if len(o.Names) > 0 && len(o.LabelSelector) > 0 {
+		return fmt.Errorf("name cannot be provided when a selector is specified")
+	}
+	// names and all namespaces cannot be used together
+	if len(o.Names) > 0 && o.AllNamespaces {
+		return fmt.Errorf("a resource cannot be retrieved by name across all namespaces")
+	}
+	if len(o.Names) == 0 && len(o.LabelSelector) == 0 {
+		return fmt.Errorf("no name was specified. one of names, label selector must be provided")
+	}
+	// non-zero grace period cannot be used with immediate deletion
 	switch {
 	case o.GracePeriod == 0 && o.Force:
 		fmt.Fprintf(o.ErrOut, "warning: Immediate deletion does not wait for confirmation that the running resource has been terminated.\n")
 	case o.GracePeriod > 0 && o.Force:
 		return fmt.Errorf("--force and --grace-period greater than 0 cannot be specified together")
 	}
-
+	// grace period cannot be used with now
 	if o.Now {
 		if o.GracePeriod != -1 {
 			return fmt.Errorf("--now and --grace-period cannot be specified together")
@@ -93,10 +118,32 @@ func (o *DeleteOptions) complete() error {
 	if o.Force && o.GracePeriod < 0 {
 		o.GracePeriod = 0
 	}
+	return nil
+}
 
-	namespace, _, err := o.Factory.ToRawKubeConfigLoader().Namespace()
+func (o *DeleteOptions) complete() error {
+	var err error
+	o.Namespace, _, err = o.Factory.ToRawKubeConfigLoader().Namespace()
 	if err != nil {
 		return err
+	}
+
+	if o.AllNamespaces {
+		o.Namespace = metav1.NamespaceAll
+	}
+
+	o.dynamic, err = o.Factory.DynamicClient()
+	if err != nil {
+		return err
+	}
+	o.deleteOptions = &metav1.DeleteOptions{}
+	if o.GracePeriod >= 0 {
+		gracePeriod := (int64)(o.GracePeriod)
+		o.deleteOptions.GracePeriodSeconds = &gracePeriod
+	}
+	o.listOptions = &metav1.ListOptions{}
+	if len(o.LabelSelector) > 0 {
+		o.listOptions.LabelSelector = o.LabelSelector
 	}
 
 	// confirm names to delete, use ConfirmedNames first, if it is empty, use Names
@@ -109,24 +156,7 @@ func (o *DeleteOptions) complete() error {
 			return err
 		}
 	}
-
-	// get the resources to delete
-	r := o.Factory.NewBuilder().
-		Unstructured().
-		ContinueOnError().
-		NamespaceParam(namespace).DefaultNamespace().
-		LabelSelectorParam(o.LabelSelector).
-		AllNamespaces(o.AllNamespaces).
-		ResourceTypeOrNameArgs(false, append([]string{util.GVRToString(o.GVR)}, o.Names...)...).
-		RequireObject(false).
-		Flatten().
-		Do()
-	err = r.Err()
-	if err != nil {
-		return err
-	}
-	o.Result = r
-	return err
+	return nil
 }
 
 func (o *DeleteOptions) AddFlags(cmd *cobra.Command) {
@@ -138,45 +168,35 @@ func (o *DeleteOptions) AddFlags(cmd *cobra.Command) {
 	cmd.Flags().BoolVar(&o.AutoApprove, "auto-approve", false, "Skip interactive approval before deleting")
 }
 
-func (o *DeleteOptions) deleteResult(r *resource.Result) error {
-	found := 0
-	var deleteInfos []*resource.Info
-	err := r.Visit(func(info *resource.Info, err error) error {
-		if err != nil {
+func (o *DeleteOptions) deleteResources() error {
+	ctx := context.Background()
+	var err error
+	// handle label selector
+	if len(o.LabelSelector) > 0 {
+		if err = o.dynamic.Resource(o.GVR).Namespace(o.Namespace).DeleteCollection(ctx, *o.deleteOptions, *o.listOptions); err != nil {
 			return err
 		}
-		deleteInfos = append(deleteInfos, info)
-		found++
-
-		options := &metav1.DeleteOptions{}
-		if o.GracePeriod >= 0 {
-			options = metav1.NewDeleteOptions(int64(o.GracePeriod))
-		}
-		if _, err = o.deleteResource(info, options); err != nil {
-			return err
-		}
-		fmt.Fprintf(o.Out, "%s %s deleted\n", info.Mapping.GroupVersionKind.Kind, info.Name)
 		return nil
-	})
-	if err != nil {
-		return err
 	}
-	if found == 0 {
-		fmt.Fprintf(o.Out, "No %s found\n", o.GVR.Resource)
-	}
+	// handle names
+	for _, name := range o.Names {
+		if o.PreDeleteFn != nil {
+			if err = o.PreDeleteFn(ctx, o.dynamic, o.Namespace, name); err != nil {
+				return err
+			}
+		}
 
+		if err = o.dynamic.Resource(o.GVR).Namespace(o.Namespace).Delete(ctx, name, *o.deleteOptions); err != nil {
+			return err
+		}
+
+		if o.PostDeleteFn != nil {
+			if err = o.PostDeleteFn(ctx, o.dynamic, o.Namespace, name); err != nil {
+				return err
+			}
+		}
+	}
 	return nil
-}
-
-func (o *DeleteOptions) deleteResource(info *resource.Info, deleteOptions *metav1.DeleteOptions) (runtime.Object, error) {
-	response, err := resource.
-		NewHelper(info.Client, info.Mapping).
-		DryRun(false).
-		DeleteWithOptions(info.Namespace, info.Name, deleteOptions)
-	if err != nil {
-		return nil, cmdutil.AddSourceToErr("deleting", info.Source, err)
-	}
-	return response, nil
 }
 
 // Confirm let user double-check what to delete

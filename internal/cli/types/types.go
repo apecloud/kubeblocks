@@ -239,3 +239,7 @@ func VolumeSnapshotClassGVR() schema.GroupVersionResource {
 		Resource: "volumesnapshotclasses",
 	}
 }
+
+func PODGVR() schema.GroupVersionResource {
+	return schema.GroupVersionResource{Group: corev1.GroupName, Version: VersionV1, Resource: "pods"}
+}

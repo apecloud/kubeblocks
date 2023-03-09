@@ -270,7 +270,6 @@ type ConfigurationSpec struct {
 type VolumeTypeSpec struct {
 	// Name definition is the same as the name of the VolumeMounts field in PodSpec.Container,
 	// similar to the relations of Volumes[*].name and VolumesMounts[*].name in Pod.Spec.
-	// +kubebuilder:validation:MaxLength=18
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	// +optional
 	Name string `json:"name,omitempty"`

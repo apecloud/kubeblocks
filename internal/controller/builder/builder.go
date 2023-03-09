@@ -196,6 +196,10 @@ func injectEnvs(params BuilderParams, envConfigName string, c *corev1.Container)
 // BuildPersistentVolumeClaimLabels builds a pvc name label, and synchronize the labels on the sts to the pvc labels.
 func BuildPersistentVolumeClaimLabels(sts *appsv1.StatefulSet, pvc *corev1.PersistentVolumeClaim,
 	component *component.SynthesizedComponent, pvcTplName string) {
+	// strict args checking.
+	if sts == nil || pvc == nil || component == nil {
+		return
+	}
 	if pvc.Labels == nil {
 		pvc.Labels = make(map[string]string)
 	}

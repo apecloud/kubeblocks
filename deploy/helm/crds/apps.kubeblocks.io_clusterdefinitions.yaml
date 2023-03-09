@@ -8870,7 +8870,6 @@ spec:
                               the VolumeMounts field in PodSpec.Container, similar
                               to the relations of Volumes[*].name and VolumesMounts[*].name
                               in Pod.Spec.
-                            maxLength: 18
                             pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                             type: string
                           type:

@@ -83,7 +83,7 @@ spec:
         - name: {{ $name }}
           filePathPattern: {{ $pattern }}
         {{- end }}
-      volumesType:
+      volumeTypes:
         - name: data
           type: data
       podSpec:

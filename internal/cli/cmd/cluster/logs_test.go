@@ -23,6 +23,7 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -37,7 +38,7 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/cluster"
 	"github.com/apecloud/kubeblocks/internal/cli/exec"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/constant"
+	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
 var _ = Describe("logs", func() {
@@ -120,7 +121,7 @@ var _ = Describe("logs", func() {
 		Expect(cmd.Example).ShouldNot(BeNil())
 
 		// Complete without args
-		Expect(l.complete([]string{})).Should(MatchError("you must specify the cluster name to retrieve logs"))
+		Expect(l.complete([]string{})).Should(MatchError("cluster name or instance name should be specified"))
 		// Complete with args
 		l.PodName = "foo"
 		l.Client, _ = l.Factory.KubernetesClientSet()
@@ -145,8 +146,8 @@ var _ = Describe("logs", func() {
 				Namespace:       "test",
 				ResourceVersion: "10",
 				Labels: map[string]string{
-					"app.kubernetes.io/name":           "mysql-apecloud-mysql",
-					intctrlutil.KBAppComponentLabelKey: "component-name",
+					"app.kubernetes.io/name":        "mysql-apecloud-mysql",
+					constant.KBAppComponentLabelKey: "component-name",
 				},
 			},
 		}

@@ -18,17 +18,16 @@ package appstest
 
 import (
 	"fmt"
+	"github.com/apecloud/kubeblocks/internal/generics"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 	testk8s "github.com/apecloud/kubeblocks/internal/testutil/k8s"
 )
@@ -37,10 +36,6 @@ var _ = Describe("MySQL Reconfigure function", func() {
 	const clusterDefName = "test-clusterdef"
 	const clusterVersionName = "test-clusterversion"
 	const clusterNamePrefix = "test-cluster"
-	const scriptConfigName = "test-cluster-mysql-scripts"
-
-	//const mysqlCompType = "replicasets"
-	//const mysqlCompName = "mysql"
 
 	const mysqlConfigTemplatePath = "resources/mysql_consensus_config_template.yaml"
 	const mysqlConfigConstraintPath = "resources/mysql_consensus_config_constraint.yaml"
@@ -67,10 +62,10 @@ var _ = Describe("MySQL Reconfigure function", func() {
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 		// namespaced
-		testapps.ClearResources(&testCtx, intctrlutil.ConfigMapSignature, inNS, ml)
+		testapps.ClearResources(&testCtx, generics.ConfigMapSignature, inNS, ml)
 		// non-namespaced
-		testapps.ClearResources(&testCtx, intctrlutil.ConfigConstraintSignature, ml)
-		testapps.ClearResources(&testCtx, intctrlutil.BackupPolicyTemplateSignature, ml)
+		testapps.ClearResources(&testCtx, generics.ConfigConstraintSignature, ml)
+		testapps.ClearResources(&testCtx, generics.BackupPolicyTemplateSignature, ml)
 
 	}
 
@@ -86,36 +81,14 @@ var _ = Describe("MySQL Reconfigure function", func() {
 		clusterObj        *appsv1alpha1.Cluster
 		clusterKey        types.NamespacedName
 	)
-	/*
-		getRole := func(svc *corev1.Service) (role string) {
-			tunnel, err := testk8s.OpenTunnel(svc)
-			defer func() {
-				_ = tunnel.Close()
-			}()
-			Expect(err).NotTo(HaveOccurred())
 
-			time.Sleep(time.Second)
-
-			db, err := tunnel.GetMySQLConn()
-			defer func() {
-				_ = db.Close()
-			}()
-			Expect(err).NotTo(HaveOccurred())
-
-			if role, err = db.GetRole(ctx); err != nil {
-				return ""
-			}
-			return role
-		}
-	*/
 	testReconfigureThreeReplicas := func() {
 		By("Create a cluster obj")
 		clusterName := testapps.GetRandomizedKey("", clusterNamePrefix).Name
 		clusterDefObj, clusterVersionObj, clusterObj = CreateSimpleConsensusMySQLClusterWithConfig(
 			testCtx, clusterDefName, clusterVersionName, clusterName, mysqlConfigTemplatePath, mysqlConfigConstraintPath, mysqlScriptsPath)
 		clusterKey = client.ObjectKeyFromObject(clusterObj)
-
-		fmt.Printf("%s %s %s \n", clusterDefObj.Name, clusterVersionObj.Name, clusterObj.Name)
+		fmt.Printf("ClusterDefinition:%s ClusterVersion:%s Cluster:%s \n", clusterDefObj.Name, clusterVersionObj.Name, clusterObj.Name)
 
 		By("Waiting the cluster is created")
 		Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.RunningPhase))
@@ -128,21 +101,20 @@ var _ = Describe("MySQL Reconfigure function", func() {
 		Expect(len(pods)).Should(Equal(3))
 
 		// get role->count map
+		By("Checking the count of leader and followers, learners are ignored")
 		roleCountMap := testapps.GetConsensusRoleCountMap(testCtx, k8sClient, clusterObj)
 		Expect(roleCountMap[leader]).Should(Equal(1))
 		Expect(roleCountMap[follower]).Should(Equal(2))
+
+		By("Issue an dynamic load reconfigure OpsRequest")
+
 	}
 
 	// Scenarios
 
 	Context("with MySQL defined as Consensus type and three replicas", func() {
-		BeforeEach(func() {
-			By("Create configmap")
-			_ = testapps.CreateCustomizedObj(&testCtx, "resources/mysql_scripts.yaml", &corev1.ConfigMap{},
-				testapps.WithName(scriptConfigName), testCtx.UseDefaultNamespace())
-		})
 
-		It("should have one leader pod and two follower pods, and the service routes to the leader pod", func() {
+		It("should update config with opsrequest in restart mode or dynamic loading mode", func() {
 			testReconfigureThreeReplicas()
 		})
 	})

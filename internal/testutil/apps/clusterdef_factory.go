@@ -17,9 +17,8 @@ limitations under the License.
 package apps
 
 import (
-	corev1 "k8s.io/api/core/v1"
-
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	corev1 "k8s.io/api/core/v1"
 )
 
 type ComponentTplType string
@@ -206,8 +205,20 @@ func (factory *MockClusterDefFactory) AddReplicationSpec(replicationSpec *appsv1
 func appendContainerVolumeMounts(containers []corev1.Container, targetContainerName string, volumeMounts []corev1.VolumeMount) []corev1.Container {
 	for index := range containers {
 		c := containers[index]
+		// remove the duplicated volumeMounts and overwrite the default mount path
+		mergedVolumeMounts := make([]corev1.VolumeMount, 0)
+		volumeMountsMap := make(map[string]corev1.VolumeMount)
 		if c.Name == targetContainerName {
-			c.VolumeMounts = append(c.VolumeMounts, volumeMounts...)
+			for _, v := range c.VolumeMounts {
+				volumeMountsMap[v.Name] = v
+			}
+			for _, v := range volumeMounts {
+				volumeMountsMap[v.Name] = v
+			}
+			for _, v := range volumeMountsMap {
+				mergedVolumeMounts = append(mergedVolumeMounts, v)
+			}
+			c.VolumeMounts = mergedVolumeMounts
 		}
 		containers[index] = c
 	}

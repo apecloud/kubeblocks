@@ -18,7 +18,10 @@ package configuration
 
 import (
 	"encoding/json"
+	"reflect"
+	"testing"
 
+	"github.com/StudioSol/set"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -43,6 +46,7 @@ var _ = Describe("config_util", func() {
 				configConstraint v1alpha1.ConfigConstraintSpec
 				baseCfg          map[string]string
 				updatedParams    []ParamPairs
+				cmKeys           []string
 			}
 
 			configConstraintObj := testapps.NewCustomizedObj("resources/mysql_config_template.yaml",
@@ -69,7 +73,10 @@ var _ = Describe("config_util", func() {
 				name: "pg1_merge",
 				args: args{
 					configConstraint: configConstraintObj.Spec,
-					baseCfg:          map[string]string{"key": string(cfgContext)},
+					baseCfg: map[string]string{
+						"key":  string(cfgContext),
+						"key2": "not support context",
+					},
 					updatedParams: []ParamPairs{
 						{
 							Key: "key",
@@ -79,15 +86,39 @@ var _ = Describe("config_util", func() {
 							},
 						},
 					},
+					cmKeys: []string{"key", "key3"},
 				},
 				want: map[string]string{
 					"max_connections": "200",
 					"shared_buffers":  "512M",
 				},
+			}, {
+				name: "not_support_key_updated",
+				args: args{
+					configConstraint: configConstraintObj.Spec,
+					baseCfg: map[string]string{
+						"key":  string(cfgContext),
+						"key2": "not_support_context",
+					},
+					updatedParams: []ParamPairs{
+						{
+							Key: "key",
+							UpdatedParams: map[string]interface{}{
+								"max_connections": "200",
+								"shared_buffers":  "512M",
+							},
+						},
+					},
+					cmKeys: []string{"key1", "key2"},
+				},
+				wantErr: true,
 			}}
 			for _, tt := range tests {
-				got, err := MergeAndValidateConfiguration(tt.args.configConstraint, tt.args.baseCfg, tt.args.updatedParams)
+				got, err := MergeAndValidateConfiguration(tt.args.configConstraint, tt.args.baseCfg, tt.args.cmKeys, tt.args.updatedParams)
 				Expect(err != nil).Should(BeEquivalentTo(tt.wantErr))
+				if tt.wantErr {
+					continue
+				}
 
 				option := CfgOption{
 					Type:    CfgTplType,
@@ -108,3 +139,100 @@ var _ = Describe("config_util", func() {
 		})
 	})
 })
+
+func TestFromUpdatedConfig(t *testing.T) {
+	type args struct {
+		base map[string]string
+		sets *set.LinkedHashSetString
+	}
+	tests := []struct {
+		name string
+		args args
+		want map[string]string
+	}{{
+		name: "normal_test",
+		args: args{
+			base: map[string]string{
+				"key1": "config context1",
+				"key2": "config context2",
+				"key3": "config context2",
+			},
+			sets: set.NewLinkedHashSetString("key1", "key3"),
+		},
+		want: map[string]string{
+			"key1": "config context1",
+			"key3": "config context2",
+		},
+	}, {
+		name: "none_updated_test",
+		args: args{
+			base: map[string]string{
+				"key1": "config context1",
+				"key2": "config context2",
+				"key3": "config context2",
+			},
+			sets: set.NewLinkedHashSetString(),
+		},
+		want: map[string]string{},
+	}}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := fromUpdatedConfig(tt.args.base, tt.args.sets); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("fromUpdatedConfig() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestMergeUpdatedConfig(t *testing.T) {
+	type args struct {
+		baseMap    map[string]string
+		updatedMap map[string]string
+	}
+	tests := []struct {
+		name string
+		args args
+		want map[string]string
+	}{{
+		name: "normal_test",
+		args: args{
+			baseMap: map[string]string{
+				"key1": "context1",
+				"key2": "context2",
+				"key3": "context3",
+			},
+			updatedMap: map[string]string{
+				"key2": "new context",
+			},
+		},
+		want: map[string]string{
+			"key1": "context1",
+			"key2": "new context",
+			"key3": "context3",
+		},
+	}, {
+		name: "not_expected_update_test",
+		args: args{
+			baseMap: map[string]string{
+				"key1": "context1",
+				"key2": "context2",
+				"key3": "context3",
+			},
+			updatedMap: map[string]string{
+				"key6": "context6",
+			},
+		},
+		want: map[string]string{
+			"key1": "context1",
+			"key2": "context2",
+			"key3": "context3",
+		},
+	}}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := mergeUpdatedConfig(tt.args.baseMap, tt.args.updatedMap); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("mergeUpdatedConfig() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

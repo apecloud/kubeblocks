@@ -12,9 +12,9 @@
 ## @param image.debug Specify if debug values should be set
 ##
 image:
-  ## repository: flant/spilo
-  repository: miketth/spilo-14
-  tag: latest
+  ## repository: https://hub.docker.com/r/lrengineering/spilo-postgres
+  repository: lrengineering/spilo-postgres
+  tag: 14-2.1-p6
   digest: ""
   ## Specify a imagePullPolicy
   ## Defaults to 'Always' if image tag is 'latest', else set to 'IfNotPresent'

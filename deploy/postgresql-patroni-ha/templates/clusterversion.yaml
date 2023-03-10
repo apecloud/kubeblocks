@@ -1,0 +1,18 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: ClusterVersion
+metadata:
+  name: postgresql-{{ default .Chart.AppVersion .Values.clusterVersionOverride }}
+  labels:
+    {{- include "postgresql.labels" . | nindent 4 }}
+spec:
+  clusterDefinitionRef: postgresql-ha
+  componentVersions:
+  - componentDefRef: postgresql-ha
+    versionsContext:
+      initContainers:
+        - name: pg-init-container
+          image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ .Values.image.tag }}
+      containers:
+      - name: postgresql
+        image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ .Values.image.tag }}
+---

@@ -1,7 +1,7 @@
 apiVersion: extensions.kubeblocks.io/v1alpha1
 kind: Addon
 metadata:
-  name: prometheus
+  name: {{ include "addon.prometheus.name" . }}
   labels:
     {{- include "kubeblocks.labels" . | nindent 4 }}
 spec:
@@ -13,7 +13,7 @@ spec:
     chartLocationURL: https://jihulab.com/api/v4/projects/85949/packages/helm/stable/charts/prometheus-15.16.1.tgz
     installValues:
       configMapRefs:
-        - name: prometheus-chart-kubeblocks-values
+        - name: {{ include "addon.prometheus.name" . }}-chart-kubeblocks-values
           key: values-kubeblocks-override.yaml
 
     valuesMapping:

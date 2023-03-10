@@ -47,7 +47,7 @@ import (
 // Generated resources are cached in task.applyObjs.
 func PrepareComponentResources(reqCtx intctrlutil.RequestCtx, cli client.Client, task *intctrltypes.ReconcileTask) error {
 	workloadProcessor := func(customSetup func(*corev1.ConfigMap) (client.Object, error)) error {
-		envConfig, err := builder.BuildEnvConfig(task.GetBuilderParams())
+		envConfig, err := builder.BuildEnvConfig(task.GetBuilderParams(), reqCtx, cli)
 		if err != nil {
 			return err
 		}

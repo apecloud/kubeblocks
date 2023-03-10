@@ -782,7 +782,12 @@ func isVolumeSnapshotExists(cli client.Client,
 	if err := cli.List(ctx, &vsList, ml); err != nil {
 		return false, client.IgnoreNotFound(err)
 	}
-	return len(vsList.Items) > 0, nil
+	for _, vs := range vsList.Items {
+		if vs.DeletionTimestamp == nil {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 // check snapshot ready to use
@@ -871,7 +876,16 @@ func checkedCreatePVCFromSnapshot(cli client.Client,
 		if len(vsList.Items) == 0 {
 			return errors.Errorf("volumesnapshot not found in cluster %s component %s", cluster.Name, componentName)
 		}
-		return createPVCFromSnapshot(ctx, cli, vct, stsObj, pvcKey, vsList.Items[0].Name)
+		// exclude volumes that are deleting
+		vsName := ""
+		for _, vs := range vsList.Items {
+			if vs.DeletionTimestamp != nil {
+				continue
+			}
+			vsName = vs.Name
+			break
+		}
+		return createPVCFromSnapshot(ctx, cli, vct, stsObj, pvcKey, vsName)
 	}
 	return nil
 }

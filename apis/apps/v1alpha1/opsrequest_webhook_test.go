@@ -156,7 +156,7 @@ var _ = Describe("OpsRequest webhook", func() {
 		// so we should add eventually block.
 		Eventually(func() bool {
 			patch := client.MergeFrom(opsRequest.DeepCopy())
-			opsRequest.Status.Phase = SucceedPhase
+			opsRequest.Status.Phase = OpsSucceedPhase
 			Expect(k8sClient.Status().Patch(ctx, opsRequest, patch)).Should(Succeed())
 
 			patch = client.MergeFrom(opsRequest.DeepCopy())

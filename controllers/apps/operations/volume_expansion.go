@@ -30,6 +30,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 type volumeExpansionOpsHandler struct{}
@@ -48,8 +49,9 @@ func init() {
 			appsv1alpha1.RunningPhase, appsv1alpha1.FailedPhase,
 			appsv1alpha1.AbnormalPhase, appsv1alpha1.ConditionsErrorPhase,
 		},
-		ToClusterPhase: appsv1alpha1.VolumeExpandingPhase,
-		OpsHandler:     volumeExpansionOpsHandler{},
+		ToClusterPhase:             appsv1alpha1.VolumeExpandingPhase,
+		MaintainClusterPhaseBySelf: true,
+		OpsHandler:                 volumeExpansionOpsHandler{},
 	}
 
 	opsMgr := GetOpsManager()
@@ -62,7 +64,7 @@ func (ve volumeExpansionOpsHandler) ActionStartedCondition(opsRequest *appsv1alp
 }
 
 // Action modifies Cluster.spec.components[*].VolumeClaimTemplates[*].spec.resources
-func (ve volumeExpansionOpsHandler) Action(opsRes *OpsResource) error {
+func (ve volumeExpansionOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
 	var (
 		volumeExpansionMap = opsRes.OpsRequest.ConvertVolumeExpansionListToMap()
 		volumeExpansionOps appsv1alpha1.VolumeExpansion
@@ -86,19 +88,19 @@ func (ve volumeExpansionOpsHandler) Action(opsRes *OpsResource) error {
 		}
 
 	}
-	return opsRes.Client.Update(opsRes.Ctx, opsRes.Cluster)
+	return cli.Update(reqCtx.Ctx, opsRes.Cluster)
 }
 
 // ReconcileAction will be performed when action is done and loops till OpsRequest.status.phase is Succeed/Failed.
 // the Reconcile function for volume expansion opsRequest.
-func (ve volumeExpansionOpsHandler) ReconcileAction(opsRes *OpsResource) (appsv1alpha1.Phase, time.Duration, error) {
+func (ve volumeExpansionOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) (appsv1alpha1.OpsPhase, time.Duration, error) {
 	var (
 		opsRequest = opsRes.OpsRequest
 		// decide whether all pvcs of volumeClaimTemplate are Failed or Succeed
 		allVCTCompleted      = true
 		requeueAfter         time.Duration
 		err                  error
-		opsRequestPhase      = appsv1alpha1.RunningPhase
+		opsRequestPhase      = appsv1alpha1.OpsRunningPhase
 		oldOpsRequestStatus  = opsRequest.Status.DeepCopy()
 		oldClusterStatus     = opsRes.Cluster.Status.DeepCopy()
 		expectProgressCount  int
@@ -117,7 +119,7 @@ func (ve volumeExpansionOpsHandler) ReconcileAction(opsRes *OpsResource) (appsv1
 		compStatus := opsRequest.Status.Components[v.ComponentName]
 		completedOnComponent := true
 		for _, vct := range v.VolumeClaimTemplates {
-			succeedCount, expectCount, isCompleted, err := ve.handleVCTExpansionProgress(opsRes,
+			succeedCount, expectCount, isCompleted, err := ve.handleVCTExpansionProgress(reqCtx, cli, opsRes,
 				&compStatus, storageMap, v.ComponentName, vct.Name)
 			if err != nil {
 				return "", requeueAfter, err
@@ -138,7 +140,7 @@ func (ve volumeExpansionOpsHandler) ReconcileAction(opsRes *OpsResource) (appsv1
 
 	// patch OpsRequest.status.components
 	if !reflect.DeepEqual(oldOpsRequestStatus, opsRequest.Status) {
-		if err = opsRes.Client.Status().Patch(opsRes.Ctx, opsRequest, patch); err != nil {
+		if err = cli.Status().Patch(reqCtx.Ctx, opsRequest, patch); err != nil {
 			return opsRequestPhase, requeueAfter, err
 		}
 	}
@@ -146,21 +148,21 @@ func (ve volumeExpansionOpsHandler) ReconcileAction(opsRes *OpsResource) (appsv1
 	// check all pvcs of volumeClaimTemplate are successful
 	allVCTSucceed := expectProgressCount == succeedProgressCount
 	if allVCTSucceed {
-		opsRequestPhase = appsv1alpha1.SucceedPhase
+		opsRequestPhase = appsv1alpha1.OpsSucceedPhase
 	} else if allVCTCompleted {
 		// all volume claim template volume expansion completed, but allVCTSucceed is false.
 		// decide the OpsRequest is failed.
-		opsRequestPhase = appsv1alpha1.FailedPhase
+		opsRequestPhase = appsv1alpha1.OpsFailedPhase
 	}
 
 	if ve.checkIsTimeOut(opsRequest, allVCTSucceed) {
 		// if volume expansion timed out, do it
-		opsRequestPhase = appsv1alpha1.FailedPhase
+		opsRequestPhase = appsv1alpha1.OpsFailedPhase
 		err = errors.New(fmt.Sprintf("Timed out waiting for volume expansion completed, the timeout is %g minutes", VolumeExpansionTimeOut.Minutes()))
 	}
 
 	// when opsRequest completed or cluster status is changed, do it
-	if patchErr := ve.patchClusterStatus(opsRes, opsRequestPhase, oldClusterStatus, clusterPatch); patchErr != nil {
+	if patchErr := ve.patchClusterStatus(reqCtx, cli, opsRes, opsRequestPhase, oldClusterStatus, clusterPatch); patchErr != nil {
 		return "", requeueAfter, patchErr
 	}
 
@@ -173,7 +175,7 @@ func (ve volumeExpansionOpsHandler) GetRealAffectedComponentMap(opsRequest *apps
 }
 
 // SaveLastConfiguration records last configuration to the OpsRequest.status.lastConfiguration
-func (ve volumeExpansionOpsHandler) SaveLastConfiguration(opsRes *OpsResource) error {
+func (ve volumeExpansionOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
 	opsRequest := opsRes.OpsRequest
 	componentNameMap := opsRequest.GetComponentNameMap()
 	storageMap := ve.getRequestStorageMap(opsRequest)
@@ -197,9 +199,7 @@ func (ve volumeExpansionOpsHandler) SaveLastConfiguration(opsRes *OpsResource) e
 			VolumeClaimTemplates: lastVCTs,
 		}
 	}
-	opsRequest.Status.LastConfiguration = appsv1alpha1.LastConfiguration{
-		Components: lastComponentInfo,
-	}
+	opsRequest.Status.LastConfiguration.Components = lastComponentInfo
 	return nil
 }
 
@@ -236,8 +236,10 @@ func (ve volumeExpansionOpsHandler) isExpansionCompleted(phase appsv1alpha1.Prog
 }
 
 // patchClusterStatus patch cluster status
-func (ve volumeExpansionOpsHandler) patchClusterStatus(opsRes *OpsResource,
-	opsRequestPhase appsv1alpha1.Phase,
+func (ve volumeExpansionOpsHandler) patchClusterStatus(reqCtx intctrlutil.RequestCtx,
+	cli client.Client,
+	opsRes *OpsResource,
+	opsRequestPhase appsv1alpha1.OpsPhase,
 	oldClusterStatus *appsv1alpha1.ClusterStatus,
 	clusterPatch client.Patch) error {
 	// when the OpsRequest.status.phase is Succeed or Failed, do it
@@ -246,7 +248,7 @@ func (ve volumeExpansionOpsHandler) patchClusterStatus(opsRes *OpsResource,
 	}
 	// if cluster status changed, patch it
 	if !reflect.DeepEqual(oldClusterStatus, opsRes.Cluster.Status) {
-		return opsRes.Client.Status().Patch(opsRes.Ctx, opsRes.Cluster, clusterPatch)
+		return cli.Status().Patch(reqCtx.Ctx, opsRes.Cluster, clusterPatch)
 	}
 	return nil
 }
@@ -285,12 +287,14 @@ func (ve volumeExpansionOpsHandler) initComponentStatus(opsRequest *appsv1alpha1
 }
 
 // handleVCTExpansionProgress check whether the pvc of the volume claim template is resizing/expansion succeeded/expansion completed.
-func (ve volumeExpansionOpsHandler) handleVCTExpansionProgress(opsRes *OpsResource,
+func (ve volumeExpansionOpsHandler) handleVCTExpansionProgress(reqCtx intctrlutil.RequestCtx,
+	cli client.Client,
+	opsRes *OpsResource,
 	compStatus *appsv1alpha1.OpsRequestComponentStatus,
 	storageMap map[string]resource.Quantity,
 	componentName, vctName string) (succeedCount int, expectCount int, isCompleted bool, err error) {
 	pvcList := &corev1.PersistentVolumeClaimList{}
-	if err = opsRes.Client.List(opsRes.Ctx, pvcList, client.MatchingLabels{
+	if err = cli.List(reqCtx.Ctx, pvcList, client.MatchingLabels{
 		constant.AppInstanceLabelKey:             opsRes.Cluster.Name,
 		constant.KBAppComponentLabelKey:          componentName,
 		constant.VolumeClaimTemplateNameLabelKey: vctName,

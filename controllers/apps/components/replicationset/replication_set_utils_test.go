@@ -112,11 +112,6 @@ var _ = Describe("ReplicationSet Util", func() {
 			stsList = append(stsList, sts)
 		}
 
-		By("Test handleReplicationSet return err when there is no pod in sts.")
-		err := HandleReplicationSet(ctx, k8sClient, clusterObj, stsList)
-		Expect(err).ShouldNot(Succeed())
-		Expect(err.Error()).Should(ContainSubstring("is not 1"))
-
 		By("Creating Pods of replication workloadType.")
 		for _, sts := range stsList {
 			_ = testapps.NewPodFactory(testCtx.DefaultNamespace, sts.Name+"-0").
@@ -126,7 +121,7 @@ var _ = Describe("ReplicationSet Util", func() {
 		}
 
 		By("Test ReplicationSet pod number of sts equals 1")
-		_, err = getAndCheckReplicationPodByStatefulSet(ctx, k8sClient, stsList[0])
+		_, err := getAndCheckReplicationPodByStatefulSet(ctx, k8sClient, stsList[0])
 		Expect(err).Should(Succeed())
 
 		By("Test handleReplicationSet success when stsList count equal cluster.replicas.")

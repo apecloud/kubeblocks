@@ -573,19 +573,7 @@ var _ = Describe("Cluster Controller", func() {
 			})).Should(Succeed())
 
 		By("Creating a BackupPolicyTemplate")
-		backupPolicyTplKey := types.NamespacedName{Name: "test-backup-policy-template-mysql"}
-		backupPolicyTpl := &dataprotectionv1alpha1.BackupPolicyTemplate{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: backupPolicyTplKey.Name,
-				Labels: map[string]string{
-					clusterDefLabelKey: clusterDefObj.Name,
-				},
-			},
-			Spec: dataprotectionv1alpha1.BackupPolicyTemplateSpec{
-				BackupToolName: "mysql-xtrabackup",
-			},
-		}
-		Expect(testCtx.CreateObj(testCtx.Ctx, backupPolicyTpl)).Should(Succeed())
+		createBackupPolicyTpl(clusterDefObj)
 
 		for i := range clusterObj.Spec.ComponentSpecs {
 			horizontalScaleComp(updatedReplicas, &clusterObj.Spec.ComponentSpecs[i])
@@ -1013,17 +1001,6 @@ var _ = Describe("Cluster Controller", func() {
 		return pods
 	}
 
-	getReplicationSetStsPodsName := func(stsList []appsv1.StatefulSet) []string {
-		names := make([]string, 0)
-		for _, sts := range stsList {
-			pods, err := util.GetPodListByStatefulSet(ctx, k8sClient, &sts)
-			Expect(err).ShouldNot(HaveOccurred())
-			Expect(pods).Should(HaveLen(1))
-			names = append(names, pods[0].Name)
-		}
-		return names
-	}
-
 	testBackupError := func() {
 		initialReplicas := int32(1)
 		updatedReplicas := int32(3)
@@ -1067,19 +1044,7 @@ var _ = Describe("Cluster Controller", func() {
 		})).Should(Succeed())
 
 		By("Creating a BackupPolicyTemplate")
-		backupPolicyTplKey := types.NamespacedName{Name: "test-backup-policy-template-mysql"}
-		backupPolicyTpl := &dataprotectionv1alpha1.BackupPolicyTemplate{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: backupPolicyTplKey.Name,
-				Labels: map[string]string{
-					clusterDefLabelKey: clusterDefObj.Name,
-				},
-			},
-			Spec: dataprotectionv1alpha1.BackupPolicyTemplateSpec{
-				BackupToolName: "mysql-xtrabackup",
-			},
-		}
-		Expect(testCtx.CreateObj(testCtx.Ctx, backupPolicyTpl)).Should(Succeed())
+		createBackupPolicyTpl(clusterDefObj)
 
 		By("Set HorizontalScalePolicy")
 		Eventually(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(clusterDefObj),
@@ -1387,55 +1352,11 @@ var _ = Describe("Cluster Controller", func() {
 					}
 				}
 			}
-
-			By("Updating StatefulSet's status")
-			status := appsv1.StatefulSetStatus{
-				AvailableReplicas:  1,
-				ObservedGeneration: 1,
-				Replicas:           1,
-				ReadyReplicas:      1,
-				UpdatedReplicas:    1,
-				CurrentRevision:    "mock-revision",
-				UpdateRevision:     "mock-revision",
-			}
-			for _, sts := range stsList.Items {
-				status.ObservedGeneration = sts.Generation
-				testk8s.PatchStatefulSetStatus(&testCtx, sts.Name, status)
-			}
-
-			By("Creating mock pods in StatefulSet")
-			stsList = testk8s.ListAndCheckStatefulSet(&testCtx, clusterKey)
-			pods := mockPodsForReplicationTest(clusterObj, stsList.Items)
-			for _, pod := range pods {
-				Expect(testCtx.CreateObj(testCtx.Ctx, &pod)).Should(Succeed())
-				pod.Status.Conditions = []corev1.PodCondition{{
-					Type:   corev1.PodReady,
-					Status: corev1.ConditionTrue,
-				}}
-				Expect(k8sClient.Status().Update(ctx, &pod)).Should(Succeed())
-			}
-
-			By("Checking replication set pods' role are updated in cluster status")
-			Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, fetched *appsv1alpha1.Cluster) {
-				compName := fetched.Spec.ComponentSpecs[0].Name
-				g.Expect(fetched.Status.Components).NotTo(BeNil())
-				g.Expect(fetched.Status.Components).To(HaveKey(compName))
-				compStatus, ok := fetched.Status.Components[compName]
-				g.Expect(ok).Should(BeTrue())
-				replicationStatus := compStatus.ReplicationSetStatus
-				g.Expect(replicationStatus).NotTo(BeNil())
-				g.Expect(replicationStatus.Primary.Pod).To(BeElementOf(getReplicationSetStsPodsName(stsList.Items)))
-				g.Expect(replicationStatus.Secondaries).Should(HaveLen(1))
-				g.Expect(replicationStatus.Secondaries[0].Pod).To(BeElementOf(getReplicationSetStsPodsName(stsList.Items)))
-			})).Should(Succeed())
 		})
 
 		It("Should successfully doing volume expansion", func() {
-			storageClassName := "test-storage"
 			pvcSpec := testapps.NewPVC("1Gi")
-			pvcSpec.StorageClassName = &storageClassName
 			updatedPVCSpec := testapps.NewPVC("2Gi")
-			updatedPVCSpec.StorageClassName = &storageClassName
 
 			By("Mock a cluster obj with replication componentDefRef.")
 			clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
@@ -1532,7 +1453,7 @@ var _ = Describe("Cluster Controller", func() {
 					constant.AppInstanceLabelKey:    clusterKey.Name,
 					constant.KBAppComponentLabelKey: testapps.DefaultRedisCompName,
 				}, client.InNamespace(clusterKey.Namespace))).Should(Succeed())
-				g.Expect(pvcList.Items).Should(HaveLen(testapps.DefaultReplicationReplicas))
+				g.Expect(len(pvcList.Items) == testapps.DefaultReplicationReplicas).To(BeTrue())
 				for _, pvc := range pvcList.Items {
 					g.Expect(pvc.Spec.Resources.Requests[corev1.ResourceStorage]).Should(BeEquivalentTo(updatedPVCSpec.Resources.Requests[corev1.ResourceStorage]))
 				}
@@ -1540,3 +1461,20 @@ var _ = Describe("Cluster Controller", func() {
 		})
 	})
 })
+
+func createBackupPolicyTpl(clusterDefObj *appsv1alpha1.ClusterDefinition) {
+	By("Creating a BackupPolicyTemplate")
+	backupPolicyTplKey := types.NamespacedName{Name: "test-backup-policy-template-mysql"}
+	backupPolicyTpl := &dataprotectionv1alpha1.BackupPolicyTemplate{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: backupPolicyTplKey.Name,
+			Labels: map[string]string{
+				clusterDefLabelKey: clusterDefObj.Name,
+			},
+		},
+		Spec: dataprotectionv1alpha1.BackupPolicyTemplateSpec{
+			BackupToolName: "mysql-xtrabackup",
+		},
+	}
+	Expect(testCtx.CreateObj(testCtx.Ctx, backupPolicyTpl)).Should(Succeed())
+}

@@ -23,7 +23,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/generics"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	"github.com/apecloud/kubeblocks/internal/generics"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 )
 
@@ -50,7 +51,7 @@ var _ = Describe("Restart OpsRequest", func() {
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 		// namespaced
-		testapps.ClearResources(&testCtx, intctrlutil.OpsRequestSignature, inNS, ml)
+		testapps.ClearResources(&testCtx, generics.OpsRequestSignature, inNS, ml)
 	}
 
 	BeforeEach(cleanEnv)
@@ -60,23 +61,30 @@ var _ = Describe("Restart OpsRequest", func() {
 	Context("Test OpsRequest", func() {
 		It("Test restart OpsRequest", func() {
 			By("init operations resources ")
+			reqCtx := intctrlutil.RequestCtx{Ctx: testCtx.Ctx}
 			opsRes, _, _ := initOperationsResources(clusterDefinitionName, clusterVersionName, clusterName)
 
 			By("create Restart opsRequest")
 			opsRes.OpsRequest = createRestartOpsObj(clusterName, "restart-ops-"+randomStr)
+			mockComponentIsOperating(opsRes.Cluster, appsv1alpha1.RebootingPhase, consensusComp, statelessComp)
 
 			By("mock restart OpsRequest is Running")
-			Expect(GetOpsManager().Do(opsRes)).Should(Succeed())
-			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(appsv1alpha1.RunningPhase))
+			_, err := GetOpsManager().Do(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(appsv1alpha1.OpsCreatingPhase))
 
 			By("test restart action and reconcile function")
 			testapps.MockConsensusComponentStatefulSet(testCtx, clusterName, consensusComp)
 			testapps.MockStatelessComponentDeploy(testCtx, clusterName, statelessComp)
 			rHandler := restartOpsHandler{}
-			_ = rHandler.Action(opsRes)
+			_ = rHandler.Action(reqCtx, k8sClient, opsRes)
 
-			_, err := GetOpsManager().Reconcile(opsRes)
+			_, err = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
 			Expect(err == nil).Should(BeTrue())
+
+			By("test GetRealAffectedComponentMap function")
+			h := restartOpsHandler{}
+			Expect(len(h.GetRealAffectedComponentMap(opsRes.OpsRequest))).Should(Equal(2))
 		})
 
 	})

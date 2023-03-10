@@ -21,9 +21,11 @@ import (
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 type StopOpsHandler struct{}
@@ -47,7 +49,7 @@ func (stop StopOpsHandler) ActionStartedCondition(opsRequest *appsv1alpha1.OpsRe
 }
 
 // Action modifies Cluster.spec.components[*].replicas from the opsRequest
-func (stop StopOpsHandler) Action(opsRes *OpsResource) error {
+func (stop StopOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
 	var (
 		expectReplicas       = int32(0)
 		componentReplicasMap = map[string]int32{}
@@ -66,39 +68,44 @@ func (stop StopOpsHandler) Action(opsRes *OpsResource) error {
 	}
 	// record the replicas snapshot of components to the annotations of cluster before stopping the cluster.
 	cluster.Annotations[constant.SnapShotForStartAnnotationKey] = string(componentReplicasSnapshot)
-	return opsRes.Client.Update(opsRes.Ctx, cluster)
+	return cli.Update(reqCtx.Ctx, cluster)
 }
 
 // ReconcileAction will be performed when action is done and loops till OpsRequest.status.phase is Succeed/Failed.
 // the Reconcile function for stop opsRequest.
-func (stop StopOpsHandler) ReconcileAction(opsRes *OpsResource) (appsv1alpha1.Phase, time.Duration, error) {
+func (stop StopOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) (appsv1alpha1.OpsPhase, time.Duration, error) {
 	getExpectReplicas := func(opsRequest *appsv1alpha1.OpsRequest, componentName string) *int32 {
 		expectReplicas := int32(0)
 		return &expectReplicas
 	}
-	handleComponentProgress := func(opsRes *OpsResource,
+	handleComponentProgress := func(reqCtx intctrlutil.RequestCtx,
+		cli client.Client,
+		opsRes *OpsResource,
 		pgRes progressResource,
 		compStatus *appsv1alpha1.OpsRequestComponentStatus) (int32, int32, error) {
-		return handleComponentProgressForScalingReplicas(opsRes, pgRes, compStatus, getExpectReplicas)
+		return handleComponentProgressForScalingReplicas(reqCtx, cli, opsRes, pgRes, compStatus, getExpectReplicas)
 	}
-	return ReconcileActionWithComponentOps(opsRes, "", handleComponentProgress)
+	return ReconcileActionWithComponentOps(reqCtx, cli, opsRes, "", handleComponentProgress)
 }
 
 // SaveLastConfiguration records last configuration to the OpsRequest.status.lastConfiguration
-func (stop StopOpsHandler) SaveLastConfiguration(opsRes *OpsResource) error {
+func (stop StopOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
 	opsRequest := opsRes.OpsRequest
 	lastComponentInfo := map[string]appsv1alpha1.LastComponentConfiguration{}
 	for _, v := range opsRes.Cluster.Spec.ComponentSpecs {
 		if v.Replicas != 0 {
+			podNames, err := getCompPodNamesBeforeScaleDownReplicas(reqCtx, cli, *opsRes.Cluster, v.Name)
+			if err != nil {
+				return err
+			}
 			copyReplicas := v.Replicas
 			lastComponentInfo[v.Name] = appsv1alpha1.LastComponentConfiguration{
 				Replicas: &copyReplicas,
+				PodNames: podNames,
 			}
 		}
 	}
-	opsRequest.Status.LastConfiguration = appsv1alpha1.LastConfiguration{
-		Components: lastComponentInfo,
-	}
+	opsRequest.Status.LastConfiguration.Components = lastComponentInfo
 	return nil
 }
 

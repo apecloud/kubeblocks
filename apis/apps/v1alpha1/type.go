@@ -39,7 +39,6 @@ const (
 	UnavailablePhase       Phase = "Unavailable"
 	DeletingPhase          Phase = "Deleting"
 	CreatingPhase          Phase = "Creating"
-	PendingPhase           Phase = "Pending"
 	RunningPhase           Phase = "Running"
 	FailedPhase            Phase = "Failed"
 	SpecUpdatingPhase      Phase = "SpecUpdating"
@@ -48,7 +47,6 @@ const (
 	VerticalScalingPhase   Phase = "VerticalScaling"
 	RebootingPhase         Phase = "Rebooting"
 	VersionUpgradingPhase  Phase = "VersionUpgrading"
-	SucceedPhase           Phase = "Succeed"
 	AbnormalPhase          Phase = "Abnormal"
 	ConditionsErrorPhase   Phase = "ConditionsError"
 	ReconfiguringPhase     Phase = "Reconfiguring"
@@ -56,6 +54,19 @@ const (
 	StoppingPhase          Phase = "Stopping"
 	StartingPhase          Phase = "Starting"
 	ExposingPhase          Phase = "Exposing"
+)
+
+// OpsPhase defines opsRequest phase.
+// +enum
+// +kubebuilder:validation:Enum={Pending,Creating,Running,Failed,Succeed}
+type OpsPhase string
+
+const (
+	OpsPendingPhase  OpsPhase = "Pending"
+	OpsCreatingPhase OpsPhase = "Creating"
+	OpsRunningPhase  OpsPhase = "Running"
+	OpsFailedPhase   OpsPhase = "Failed"
+	OpsSucceedPhase  OpsPhase = "Succeed"
 )
 
 // OpsType defines operation types.
@@ -171,19 +182,21 @@ const (
 	SucceedProgressStatus    ProgressStatus = "Succeed"
 )
 
-// OpsRequestBehaviour record what cluster status that can trigger this OpsRequest
+// OpsRequestBehaviour records what cluster status that can trigger this OpsRequest
 // and what status that the cluster enters after trigger OpsRequest.
 type OpsRequestBehaviour struct {
 	FromClusterPhases []Phase
 	ToClusterPhase    Phase
 }
 
-// OpsRecorder recorder the running OpsRequest info in cluster annotation
+// OpsRecorder records the running OpsRequest info in cluster annotation
 type OpsRecorder struct {
 	// Name OpsRequest name
 	Name string `json:"name"`
 	// ToClusterPhase the cluster phase when the OpsRequest is running
 	ToClusterPhase Phase `json:"clusterPhase"`
+	// ResetClusterAfterABEnd whether to reset cluster phase when the OpsRequest is abnormal end.
+	ResetClusterAfterABEnd bool `json:"resetClusterAfterABEnd,omitempty"`
 }
 
 // ProvisionPolicyType defines the policy for creating accounts.

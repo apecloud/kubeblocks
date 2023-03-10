@@ -184,8 +184,8 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return intctrlutil.Reconciled()
 	}
 
-	reqCtx.Log.Info("update cluster status")
-	if err = r.updateClusterPhaseToCreatingOrUpdating(reqCtx, cluster); err != nil {
+	reqCtx.Log.Info("update cluster phase")
+	if err = r.updateClusterPhaseWithOperations(reqCtx, cluster); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 
@@ -225,9 +225,12 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	clusterDeepCopy := cluster.DeepCopy()
 	shouldRequeue, err := reconcileClusterWorkloads(reqCtx, r.Client, clusterDefinition, clusterVersion, cluster)
 	if err != nil {
+		if patchErr := r.patchClusterStatus(reqCtx.Ctx, cluster, clusterDeepCopy); patchErr != nil {
+			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+		}
 		// this is a block to handle error.
 		// so when update cluster conditions failed, we can ignore it.
-		_ = clusterConditionMgr.setApplyResourcesFailedCondition(err)
+		_ = clusterConditionMgr.setApplyResourcesFailedCondition(err.Error())
 		return intctrlutil.RequeueAfter(
 			time.Millisecond*requeueDuration, reqCtx.Log, "")
 	}
@@ -483,28 +486,15 @@ func (r *ClusterReconciler) checkReferencedCRStatus(
 }
 
 func (r *ClusterReconciler) needCheckClusterForReady(cluster *appsv1alpha1.Cluster) bool {
-	return slices.Index([]appsv1alpha1.Phase{"", appsv1alpha1.DeletingPhase, appsv1alpha1.VolumeExpandingPhase},
-		cluster.Status.Phase) == -1
+	return slices.Index([]appsv1alpha1.Phase{"", appsv1alpha1.DeletingPhase}, cluster.Status.Phase) == -1
 }
 
-// updateClusterPhase updates cluster.status.phase
-func (r *ClusterReconciler) updateClusterPhaseToCreatingOrUpdating(reqCtx intctrlutil.RequestCtx, cluster *appsv1alpha1.Cluster) error {
-	needPatch := false
+// updateClusterPhaseWithOperations updates cluster.status.phase according to operations
+func (r *ClusterReconciler) updateClusterPhaseWithOperations(reqCtx intctrlutil.RequestCtx, cluster *appsv1alpha1.Cluster) error {
+	oldClusterPhase := cluster.Status.Phase
 	patch := client.MergeFrom(cluster.DeepCopy())
-	if cluster.Status.Phase == "" {
-		needPatch = true
-		cluster.Status.Phase = appsv1alpha1.CreatingPhase
-		cluster.Status.Components = map[string]appsv1alpha1.ClusterComponentStatus{}
-		for _, v := range cluster.Spec.ComponentSpecs {
-			cluster.Status.SetComponentStatus(v.Name, appsv1alpha1.ClusterComponentStatus{
-				Phase: appsv1alpha1.CreatingPhase,
-			})
-		}
-	} else if componentutil.IsCompleted(cluster.Status.Phase) && !existsOperations(cluster) {
-		needPatch = true
-		cluster.Status.Phase = appsv1alpha1.SpecUpdatingPhase
-	}
-	if !needPatch {
+	r.setClusterPhaseWithOperations(cluster)
+	if oldClusterPhase == cluster.Status.Phase {
 		return nil
 	}
 	// TODO: should patch ObservedGeneration
@@ -516,6 +506,29 @@ func (r *ClusterReconciler) updateClusterPhaseToCreatingOrUpdating(reqCtx intctr
 	r.Recorder.Eventf(cluster, corev1.EventTypeNormal, string(cluster.Status.Phase),
 		"Start %s in Cluster: %s", cluster.Status.Phase, cluster.Name)
 	return nil
+}
+
+// setClusterPhaseWithOperations sets cluster.status.phase according to operations
+func (r *ClusterReconciler) setClusterPhaseWithOperations(cluster *appsv1alpha1.Cluster) {
+	if cluster.Status.ObservedGeneration == 0 {
+		cluster.Status.Phase = appsv1alpha1.CreatingPhase
+		cluster.Status.Components = map[string]appsv1alpha1.ClusterComponentStatus{}
+		for _, v := range cluster.Spec.ComponentSpecs {
+			cluster.Status.SetComponentStatus(v.Name, appsv1alpha1.ClusterComponentStatus{
+				Phase: appsv1alpha1.CreatingPhase,
+			})
+		}
+		return
+	}
+	if slices.Contains([]appsv1alpha1.Phase{appsv1alpha1.CreatingPhase, appsv1alpha1.ConditionsErrorPhase}, cluster.Status.Phase) {
+		return
+	}
+	opsSlice, _ := opsutil.GetOpsRequestSliceFromCluster(cluster)
+	if len(opsSlice) > 0 {
+		cluster.Status.Phase = opsSlice[0].ToClusterPhase
+	} else {
+		cluster.Status.Phase = appsv1alpha1.SpecUpdatingPhase
+	}
 }
 
 // updateClusterPhaseWhenConditionsError when cluster status is ConditionsError and the cluster applies resources successful,

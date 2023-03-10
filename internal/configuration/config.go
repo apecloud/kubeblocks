@@ -68,7 +68,7 @@ type ConfigEventContext struct {
 }
 
 type ConfigEventHandler interface {
-	Handle(eventContext ConfigEventContext, lastOpsRequest string, phase appsv1alpha1.Phase, err error) error
+	Handle(eventContext ConfigEventContext, lastOpsRequest string, phase appsv1alpha1.OpsPhase, err error) error
 }
 
 const (

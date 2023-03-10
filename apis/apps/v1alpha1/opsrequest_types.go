@@ -222,15 +222,9 @@ type Expose struct {
 
 // OpsRequestStatus defines the observed state of OpsRequest
 type OpsRequestStatus struct {
-	// observedGeneration is the most recent generation observed for this
-	// Cluster. It corresponds to the Cluster's generation, which is
-	// updated on mutation by the API Server.
-	// +optional
-	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 
 	// phase describes OpsRequest phase.
-	// +kubebuilder:validation:Enum={Pending,Running,Failed,Succeed}
-	Phase Phase `json:"phase,omitempty"`
+	Phase OpsPhase `json:"phase,omitempty"`
 
 	// +kubebuilder:validation:Pattern:=`^(\d+|\-)/(\d+|\-)$`
 	// +kubebuilder:default=-/-
@@ -309,6 +303,10 @@ type LastComponentConfiguration struct {
 	// services records the last services of the component.
 	// +optional
 	Services []ClusterComponentService `json:"services,omitempty"`
+
+	// PodNames records the pod names of the component before scale down replicas.
+	// +optional
+	PodNames []string `json:"pods,omitempty"`
 }
 
 type LastConfiguration struct {

@@ -65,7 +65,7 @@ func (r *ReplicationSet) IsRunning(ctx context.Context, obj client.Object) (bool
 			return false, nil
 		}
 	}
-	if availableReplicas != r.Component.Replicas {
+	if availableReplicas < r.Component.Replicas {
 		componentStatusIsRunning = false
 	}
 	return componentStatusIsRunning, nil
@@ -84,12 +84,8 @@ func (r *ReplicationSet) PodsReady(ctx context.Context, obj client.Object) (bool
 	var availableReplicas int32
 	for _, stsObj := range componentStsList.Items {
 		availableReplicas += stsObj.Status.AvailableReplicas
-		if !util.StatefulSetPodsAreReady(&stsObj, *sts.Spec.Replicas) {
-			podsReady = false
-		}
-
 	}
-	if availableReplicas != r.Component.Replicas {
+	if availableReplicas < r.Component.Replicas {
 		podsReady = false
 	}
 	return podsReady, nil
@@ -147,7 +143,6 @@ func (r *ReplicationSet) GetPhaseWhenPodsNotReady(ctx context.Context, component
 		}
 		if labelValue == "" {
 			compStatus.SetObjectMessage(v.Kind, v.Name, "empty label for pod, please check.")
-			// compStatus.Message.SetObjectMessage(v.Kind, v.Name, "empty label for pod, please check.")
 			needPatch = true
 		}
 		controllerRef := metav1.GetControllerOf(&v)

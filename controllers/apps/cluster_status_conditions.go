@@ -145,6 +145,10 @@ func (conMgr clusterConditionManager) setProvisioningStartedCondition() error {
 
 // setPreCheckErrorCondition sets the error condition when preCheck failed.
 func (conMgr clusterConditionManager) setPreCheckErrorCondition(err error) error {
+	var message string
+	if err != nil {
+		message = err.Error()
+	}
 	reason := ReasonPreCheckFailed
 	if apierrors.IsNotFound(err) {
 		reason = constant.ReasonNotFoundCR
@@ -152,7 +156,7 @@ func (conMgr clusterConditionManager) setPreCheckErrorCondition(err error) error
 	condition := metav1.Condition{
 		Type:    ConditionTypeProvisioningStarted,
 		Status:  metav1.ConditionFalse,
-		Message: err.Error(),
+		Message: message,
 		Reason:  reason,
 	}
 	return conMgr.updateStatusConditions(condition)
@@ -170,11 +174,11 @@ func (conMgr clusterConditionManager) setReferenceCRUnavailableCondition(message
 }
 
 // setApplyResourcesFailedCondition sets applied resources failed condition in cluster conditions.
-func (conMgr clusterConditionManager) setApplyResourcesFailedCondition(err error) error {
+func (conMgr clusterConditionManager) setApplyResourcesFailedCondition(message string) error {
 	condition := metav1.Condition{
 		Type:    ConditionTypeApplyResources,
 		Status:  metav1.ConditionFalse,
-		Message: err.Error(),
+		Message: message,
 		Reason:  ReasonApplyResourcesFailed,
 	}
 	return conMgr.updateStatusConditions(condition)
@@ -207,7 +211,7 @@ func newReplicasNotReadyCondition(notReadyComponentNames map[string]struct{}) me
 	return metav1.Condition{
 		Type:    ConditionTypeReplicasReady,
 		Status:  metav1.ConditionFalse,
-		Message: fmt.Sprintf("pods are not ready in ComponentDefs: %v, refer to related component message in Cluster.status.components", cNameSlice),
+		Message: fmt.Sprintf("pods are not ready in Components: %v, refer to related component message in Cluster.status.components", cNameSlice),
 		Reason:  ReasonReplicasNotReady,
 	}
 }

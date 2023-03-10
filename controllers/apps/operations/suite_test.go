@@ -24,7 +24,6 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-
 	"github.com/spf13/viper"
 	"go.uber.org/zap/zapcore"
 	corev1 "k8s.io/api/core/v1"
@@ -143,8 +142,6 @@ func initOperationsResources(clusterDefinitionName,
 	clusterDef, _, clusterObject := testapps.InitClusterWithHybridComps(testCtx, clusterDefinitionName,
 		clusterVersionName, clusterName, statelessComp, statefulComp, consensusComp)
 	opsRes := &OpsResource{
-		Ctx:      context.Background(),
-		Client:   k8sClient,
 		Cluster:  clusterObject,
 		Recorder: k8sManager.GetEventRecorderFor("opsrequest-controller"),
 	}
@@ -167,13 +164,23 @@ func initOperationsResources(clusterDefinitionName,
 	return opsRes, clusterDef, clusterObject
 }
 
-func initConsensusPods(opsRes *OpsResource, clusterName string) []corev1.Pod {
+func initConsensusPods(ctx context.Context, cli client.Client, opsRes *OpsResource, clusterName string) []corev1.Pod {
 	// mock the pods of consensusSet component
 	testapps.MockConsensusComponentPods(testCtx, nil, clusterName, consensusComp)
-	podList, err := util.GetComponentPodList(opsRes.Ctx, opsRes.Client, *opsRes.Cluster, consensusComp)
+	podList, err := util.GetComponentPodList(ctx, cli, *opsRes.Cluster, consensusComp)
 	Expect(err).Should(Succeed())
 	// the opsRequest will use startTime to check some condition.
 	// if there is no sleep for 1 second, unstable error may occur.
 	time.Sleep(time.Second)
 	return podList.Items
+}
+
+func mockComponentIsOperating(cluster *appsv1alpha1.Cluster, expectPhase appsv1alpha1.Phase, compNames ...string) {
+	Expect(testapps.ChangeObjStatus(&testCtx, cluster, func() {
+		for _, v := range compNames {
+			compStatus := cluster.Status.Components[v]
+			compStatus.Phase = expectPhase
+			cluster.Status.Components[v] = compStatus
+		}
+	})).Should(Succeed())
 }

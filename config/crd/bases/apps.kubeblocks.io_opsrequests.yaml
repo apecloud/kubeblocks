@@ -555,6 +555,12 @@ spec:
                           description: 'Limits describes the maximum amount of compute
                             resources allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
                           type: object
+                        pods:
+                          description: PodNames records the pod names of the component
+                            before scale down replicas.
+                          items:
+                            type: string
+                          type: array
                         replicas:
                           description: replicas are the last replicas of the component.
                           format: int32
@@ -640,16 +646,11 @@ spec:
                     description: components records last configuration of the component.
                     type: object
                 type: object
-              observedGeneration:
-                description: observedGeneration is the most recent generation observed
-                  for this Cluster. It corresponds to the Cluster's generation, which
-                  is updated on mutation by the API Server.
-                format: int64
-                type: integer
               phase:
                 description: phase describes OpsRequest phase.
                 enum:
                 - Pending
+                - Creating
                 - Running
                 - Failed
                 - Succeed

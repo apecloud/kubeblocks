@@ -125,7 +125,7 @@ var _ = Describe("MySQL Scaling function", func() {
 		By("check VerticalScalingOpsRequest succeed")
 		Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(verticalScalingOpsRequest),
 			func(g Gomega, ops *appsv1alpha1.OpsRequest) {
-				g.Expect(ops.Status.Phase == appsv1alpha1.SucceedPhase).To(BeTrue())
+				g.Expect(ops.Status.Phase == appsv1alpha1.OpsSucceedPhase).To(BeTrue())
 			})).Should(Succeed())
 
 		By("check cluster resource requirements changed")

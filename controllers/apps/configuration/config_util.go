@@ -111,13 +111,13 @@ func checkConfigConstraint(ctx intctrlutil.RequestCtx, configConstraint *appsv1a
 
 func ReconcileConfigSpecsForReferencedCR[T generics.Object, PT generics.PObject[T]](client client.Client, ctx intctrlutil.RequestCtx, obj PT) error {
 	if ok, err := checkConfigTemplate(client, ctx, obj); !ok || err != nil {
-		return fmt.Errorf("failed to check config template")
+		return fmt.Errorf("failed to check config template: %s", err)
 	}
 	if ok, err := updateLabelsByConfigSpec(client, ctx, obj); !ok || err != nil {
-		return fmt.Errorf("failed to update using config template info")
+		return fmt.Errorf("failed to update using config template info:%s", err)
 	}
 	if _, err := updateConfigMapFinalizer(client, ctx, obj); err != nil {
-		return fmt.Errorf("failed to update config map finalizer")
+		return fmt.Errorf("failed to update config map finalizer:%s", err)
 	}
 	return nil
 }

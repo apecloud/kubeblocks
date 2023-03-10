@@ -42,17 +42,17 @@ const (
 
 	// condition and event reasons
 
-	ReasonReconfigureMerging        = "ReconfigureMerging"
-	ReasonReconfigureMerged         = "ReconfigureMerged"
-	ReasonReconfigureInvalidUpdated = "ReconfigureInvalidUpdated"
-	ReasonReconfigureFailed         = "ReconfigureFailed"
-	ReasonReconfigureSucceed        = "ReconfigureSucceed"
-	ReasonReconfigureRunning        = "ReconfigureRunning"
-	ReasonClusterPhaseMisMatch      = "ClusterPhaseMisMatch"
-	ReasonOpsTypeNotSupported       = "OpsTypeNotSupported"
-	ReasonValidateFailed            = "ValidateFailed"
-	ReasonClusterNotFound           = "ClusterNotFound"
-	ReasonOpsRequestFailed          = "OpsRequestFailed"
+	ReasonReconfigureMerging   = "ReconfigureMerging"
+	ReasonReconfigureMerged    = "ReconfigureMerged"
+	ReasonReconfigureFailed    = "ReconfigureFailed"
+	ReasonReconfigureNoChanged = "ReconfigureNoChanged"
+	ReasonReconfigureSucceed   = "ReconfigureSucceed"
+	ReasonReconfigureRunning   = "ReconfigureRunning"
+	ReasonClusterPhaseMisMatch = "ClusterPhaseMisMatch"
+	ReasonOpsTypeNotSupported  = "OpsTypeNotSupported"
+	ReasonValidateFailed       = "ValidateFailed"
+	ReasonClusterNotFound      = "ClusterNotFound"
+	ReasonOpsRequestFailed     = "OpsRequestFailed"
 )
 
 func (r *OpsRequest) SetStatusCondition(condition metav1.Condition) {

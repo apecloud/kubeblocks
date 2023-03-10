@@ -129,7 +129,7 @@ var _ = Describe("Expose", func() {
 			StartTimestamp:      metav1.NewTime(time.Now().Add(-1 * time.Minute)),
 			CompletionTimestamp: metav1.NewTime(time.Now()),
 			Progress:            "1/2",
-			Phase:               appsv1alpha1.FailedPhase,
+			Phase:               appsv1alpha1.OpsFailedPhase,
 			Components: map[string]appsv1alpha1.OpsRequestComponentStatus{
 				componentName: {
 					Phase: appsv1alpha1.FailedPhase,

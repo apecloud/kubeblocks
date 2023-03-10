@@ -25,6 +25,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 type upgradeOpsHandler struct{}
@@ -48,15 +49,15 @@ func (u upgradeOpsHandler) ActionStartedCondition(opsRequest *appsv1alpha1.OpsRe
 }
 
 // Action modifies Cluster.spec.clusterVersionRef with opsRequest.spec.upgrade.clusterVersionRef
-func (u upgradeOpsHandler) Action(opsRes *OpsResource) error {
+func (u upgradeOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
 	opsRes.Cluster.Spec.ClusterVersionRef = opsRes.OpsRequest.Spec.Upgrade.ClusterVersionRef
-	return opsRes.Client.Update(opsRes.Ctx, opsRes.Cluster)
+	return cli.Update(reqCtx.Ctx, opsRes.Cluster)
 }
 
 // ReconcileAction will be performed when action is done and loops till OpsRequest.status.phase is Succeed/Failed.
 // the Reconcile function for upgrade opsRequest.
-func (u upgradeOpsHandler) ReconcileAction(opsRes *OpsResource) (appsv1alpha1.Phase, time.Duration, error) {
-	return ReconcileActionWithComponentOps(opsRes, "upgrade", handleComponentStatusProgress)
+func (u upgradeOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) (appsv1alpha1.OpsPhase, time.Duration, error) {
+	return ReconcileActionWithComponentOps(reqCtx, cli, opsRes, "upgrade", handleComponentStatusProgress)
 }
 
 // GetRealAffectedComponentMap gets the real affected component map for the operation
@@ -65,26 +66,24 @@ func (u upgradeOpsHandler) GetRealAffectedComponentMap(opsRequest *appsv1alpha1.
 }
 
 // SaveLastConfiguration records last configuration to the OpsRequest.status.lastConfiguration
-func (u upgradeOpsHandler) SaveLastConfiguration(opsRes *OpsResource) error {
-	compsStatus, err := u.getUpgradeComponentsStatus(opsRes)
+func (u upgradeOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
+	compsStatus, err := u.getUpgradeComponentsStatus(reqCtx, cli, opsRes)
 	if err != nil {
 		return err
 	}
-	opsRes.OpsRequest.Status.LastConfiguration = appsv1alpha1.LastConfiguration{
-		ClusterVersionRef: opsRes.Cluster.Spec.ClusterVersionRef,
-	}
+	opsRes.OpsRequest.Status.LastConfiguration.ClusterVersionRef = opsRes.Cluster.Spec.ClusterVersionRef
 	opsRes.OpsRequest.Status.Components = compsStatus
 	return nil
 }
 
 // getUpgradeComponentsStatus compares the ClusterVersions before and after upgrade, and get the changed components map.
-func (u upgradeOpsHandler) getUpgradeComponentsStatus(opsRes *OpsResource) (map[string]appsv1alpha1.OpsRequestComponentStatus, error) {
-	lastComponents, err := u.getClusterComponentVersionMap(opsRes.Ctx, opsRes.Client,
+func (u upgradeOpsHandler) getUpgradeComponentsStatus(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) (map[string]appsv1alpha1.OpsRequestComponentStatus, error) {
+	lastComponents, err := u.getClusterComponentVersionMap(reqCtx.Ctx, cli,
 		opsRes.Cluster.Spec.ClusterVersionRef)
 	if err != nil {
 		return nil, err
 	}
-	components, err := u.getClusterComponentVersionMap(opsRes.Ctx, opsRes.Client,
+	components, err := u.getClusterComponentVersionMap(reqCtx.Ctx, cli,
 		opsRes.OpsRequest.Spec.Upgrade.ClusterVersionRef)
 	if err != nil {
 		return nil, err

@@ -21,6 +21,7 @@ import (
 	"context"
 	"regexp"
 	"strconv"
+	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -165,7 +166,10 @@ func GetPodListByStatefulSet(ctx context.Context, cli client.Client, stsObj *app
 	podList := &corev1.PodList{}
 	if err := cli.List(ctx, podList,
 		&client.ListOptions{Namespace: stsObj.Namespace},
-		client.MatchingLabels{constant.KBAppComponentLabelKey: stsObj.Labels[constant.KBAppComponentLabelKey]}); err != nil {
+		client.MatchingLabels{
+			constant.KBAppComponentLabelKey: stsObj.Labels[constant.KBAppComponentLabelKey],
+			constant.AppInstanceLabelKey:    stsObj.Labels[constant.AppInstanceLabelKey],
+		}); err != nil {
 		return nil, err
 	}
 	var pods []corev1.Pod
@@ -175,4 +179,14 @@ func GetPodListByStatefulSet(ctx context.Context, cli client.Client, stsObj *app
 		}
 	}
 	return pods, nil
+}
+
+// MarkPrimaryStsToReconcile marks the primary statefulSet annotation to be reconciled.
+func MarkPrimaryStsToReconcile(ctx context.Context, cli client.Client, sts *appsv1.StatefulSet) error {
+	patch := client.MergeFrom(sts.DeepCopy())
+	if sts.Annotations == nil {
+		sts.Annotations = map[string]string{}
+	}
+	sts.Annotations[constant.ReconcileAnnotationKey] = time.Now().Format(time.RFC3339Nano)
+	return cli.Patch(ctx, sts, patch)
 }

@@ -25,6 +25,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 type StartOpsHandler struct{}
@@ -48,7 +49,7 @@ func (start StartOpsHandler) ActionStartedCondition(opsRequest *appsv1alpha1.Ops
 }
 
 // Action modifies Cluster.spec.components[*].replicas from the opsRequest
-func (start StartOpsHandler) Action(opsRes *OpsResource) error {
+func (start StartOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
 	cluster := opsRes.Cluster
 	componentReplicasMap, err := start.getComponentReplicasSnapshot(cluster.Annotations)
 	if err != nil {
@@ -66,12 +67,12 @@ func (start StartOpsHandler) Action(opsRes *OpsResource) error {
 	}
 	// delete the replicas snapshot of components from the cluster.
 	delete(cluster.Annotations, constant.SnapShotForStartAnnotationKey)
-	return opsRes.Client.Update(opsRes.Ctx, cluster)
+	return cli.Update(reqCtx.Ctx, cluster)
 }
 
 // ReconcileAction will be performed when action is done and loops till OpsRequest.status.phase is Succeed/Failed.
 // the Reconcile function for start opsRequest.
-func (start StartOpsHandler) ReconcileAction(opsRes *OpsResource) (appsv1alpha1.Phase, time.Duration, error) {
+func (start StartOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) (appsv1alpha1.OpsPhase, time.Duration, error) {
 	getExpectReplicas := func(opsRequest *appsv1alpha1.OpsRequest, componentName string) *int32 {
 		componentReplicasMap, _ := start.getComponentReplicasSnapshot(opsRequest.Annotations)
 		replicas, ok := componentReplicasMap[componentName]
@@ -81,23 +82,25 @@ func (start StartOpsHandler) ReconcileAction(opsRes *OpsResource) (appsv1alpha1.
 		return &replicas
 	}
 
-	handleComponentProgress := func(opsRes *OpsResource,
+	handleComponentProgress := func(reqCtx intctrlutil.RequestCtx,
+		cli client.Client,
+		opsRes *OpsResource,
 		pgRes progressResource,
 		compStatus *appsv1alpha1.OpsRequestComponentStatus) (int32, int32, error) {
-		return handleComponentProgressForScalingReplicas(opsRes, pgRes, compStatus, getExpectReplicas)
+		return handleComponentProgressForScalingReplicas(reqCtx, cli, opsRes, pgRes, compStatus, getExpectReplicas)
 	}
-	return ReconcileActionWithComponentOps(opsRes, "", handleComponentProgress)
+	return ReconcileActionWithComponentOps(reqCtx, cli, opsRes, "", handleComponentProgress)
 }
 
 // SaveLastConfiguration records last configuration to the OpsRequest.status.lastConfiguration
-func (start StartOpsHandler) SaveLastConfiguration(opsRes *OpsResource) error {
+func (start StartOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
 	opsRequest := opsRes.OpsRequest
 	lastComponentInfo := map[string]appsv1alpha1.LastComponentConfiguration{}
 	componentReplicasMap, err := start.getComponentReplicasSnapshot(opsRes.Cluster.Annotations)
 	if err != nil {
 		return err
 	}
-	if err = start.setOpsAnnotation(opsRes, componentReplicasMap); err != nil {
+	if err = start.setOpsAnnotation(reqCtx, cli, opsRes, componentReplicasMap); err != nil {
 		return err
 	}
 	for _, v := range opsRes.Cluster.Spec.ComponentSpecs {
@@ -112,9 +115,7 @@ func (start StartOpsHandler) SaveLastConfiguration(opsRes *OpsResource) error {
 			}
 		}
 	}
-	opsRequest.Status.LastConfiguration = appsv1alpha1.LastConfiguration{
-		Components: lastComponentInfo,
-	}
+	opsRequest.Status.LastConfiguration.Components = lastComponentInfo
 	return nil
 }
 
@@ -124,7 +125,7 @@ func (start StartOpsHandler) GetRealAffectedComponentMap(opsRequest *appsv1alpha
 }
 
 // setOpsAnnotation sets the replicas snapshot of components before stopping the cluster to the annotations of this opsRequest.
-func (start StartOpsHandler) setOpsAnnotation(opsRes *OpsResource, componentReplicasMap map[string]int32) error {
+func (start StartOpsHandler) setOpsAnnotation(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource, componentReplicasMap map[string]int32) error {
 	annotations := opsRes.OpsRequest.Annotations
 	if annotations == nil {
 		annotations = map[string]string{}
@@ -137,7 +138,7 @@ func (start StartOpsHandler) setOpsAnnotation(opsRes *OpsResource, componentRepl
 		patch := client.MergeFrom(opsRes.OpsRequest.DeepCopy())
 		annotations[constant.SnapShotForStartAnnotationKey] = string(componentReplicasSnapshot)
 		opsRes.OpsRequest.Annotations = annotations
-		return opsRes.Client.Patch(opsRes.Ctx, opsRes.OpsRequest, patch)
+		return cli.Patch(reqCtx.Ctx, opsRes.OpsRequest, patch)
 	}
 	return nil
 }

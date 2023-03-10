@@ -92,7 +92,7 @@ func (r *OpsRequest) ValidateDelete() error {
 
 // IsForbiddenUpdate OpsRequest cannot modify the spec when status is in [Succeed,Running,Failed].
 func (r *OpsRequest) isForbiddenUpdate() bool {
-	return slices.Contains([]Phase{SucceedPhase, RunningPhase, FailedPhase}, r.Status.Phase)
+	return slices.Contains([]OpsPhase{OpsCreatingPhase, OpsRunningPhase, OpsSucceedPhase, OpsFailedPhase}, r.Status.Phase)
 }
 
 // validateClusterPhase validates whether the current cluster state supports the OpsRequest
@@ -111,9 +111,6 @@ func (r *OpsRequest) validateClusterPhase(cluster *Cluster) error {
 		opsRecorder     []OpsRecorder
 		ok              bool
 	)
-	if cluster.Annotations == nil {
-		return nil
-	}
 	if opsRequestValue, ok = cluster.Annotations[opsRequestAnnotationKey]; !ok {
 		return nil
 	}
@@ -122,7 +119,10 @@ func (r *OpsRequest) validateClusterPhase(cluster *Cluster) error {
 		return nil
 	}
 	for _, v := range opsRecorder {
-		if v.Name != r.Name {
+		// judge whether the opsRequest meets the following conditions:
+		// 1. the opsRequest is Reentrant.
+		// 2. the opsRequest supports concurrent execution of the same kind.
+		if v.Name != r.Name && !slices.Contains(opsBehaviour.FromClusterPhases, v.ToClusterPhase) {
 			return newInvalidError(OpsRequestKind, r.Name, "spec.type", fmt.Sprintf("Existing OpsRequest: %s is running in Cluster: %s, handle this OpsRequest first", v.Name, cluster.Name))
 		}
 	}
@@ -443,6 +443,7 @@ func (r *OpsRequest) checkVolumesAllowExpansion(ctx context.Context, cli client.
 // checkStorageClassAllowExpansion checks whether the specified storage class supports volume expansion.
 func checkStorageClassAllowExpansion(ctx context.Context, cli client.Client, storageClassName *string) (bool, error) {
 	if storageClassName == nil {
+		// TODO: check the real storage class by pvc.
 		return checkDefaultStorageClassAllowExpansion(ctx, cli)
 	}
 

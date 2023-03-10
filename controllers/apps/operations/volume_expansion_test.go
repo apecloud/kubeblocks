@@ -17,12 +17,12 @@ limitations under the License.
 package operations
 
 import (
-	"context"
 	"fmt"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"k8s.io/kubectl/pkg/util/storage"
 
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -123,30 +123,32 @@ var _ = Describe("OpsRequest Controller Volume Expansion Handler", func() {
 		createPVC(clusterObject.Name, storageClassName, vctName, pvcName)
 		// waiting pvc controller mark annotation to OpsRequest
 		Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(ops), func(g Gomega, tmpOps *appsv1alpha1.OpsRequest) {
-			g.Expect(tmpOps.Annotations != nil && tmpOps.Annotations[constant.OpsRequestReconcileAnnotationKey] != "").Should(BeTrue())
+			g.Expect(tmpOps.Annotations != nil && tmpOps.Annotations[constant.ReconcileAnnotationKey] != "").Should(BeTrue())
 		})).Should(Succeed())
 		return ops, pvcName
 	}
 
-	mockVolumeExpansionActionAndReconcile := func(opsRes *OpsResource, newOps *appsv1alpha1.OpsRequest) {
+	mockVolumeExpansionActionAndReconcile := func(reqCtx intctrlutil.RequestCtx, opsRes *OpsResource, newOps *appsv1alpha1.OpsRequest) {
 		Expect(testapps.ChangeObjStatus(&testCtx, newOps, func() {
-			_ = GetOpsManager().Do(opsRes)
-			newOps.Status.Phase = appsv1alpha1.RunningPhase
+			_, _ = GetOpsManager().Do(reqCtx, k8sClient, opsRes)
+			newOps.Status.Phase = appsv1alpha1.OpsRunningPhase
 			newOps.Status.StartTimestamp = metav1.Time{Time: time.Now()}
 		})).Should(Succeed())
 
+		// do volume-expand action
+		_, _ = GetOpsManager().Do(reqCtx, k8sClient, opsRes)
 		opsRes.OpsRequest = newOps
-		_, err := GetOpsManager().Reconcile(opsRes)
+		_, err := GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
 		Expect(err == nil).Should(BeTrue())
 		Eventually(testapps.GetOpsRequestCompPhase(ctx, testCtx, newOps.Name, consensusCompName)).Should(Equal(appsv1alpha1.VolumeExpandingPhase))
 	}
 
-	testWarningEventOnPVC := func(clusterObject *appsv1alpha1.Cluster, opsRes *OpsResource) {
+	testWarningEventOnPVC := func(reqCtx intctrlutil.RequestCtx, clusterObject *appsv1alpha1.Cluster, opsRes *OpsResource) {
 		// init resources for volume expansion
 		newOps, pvcName := initResourcesForVolumeExpansion(clusterObject, opsRes, 1)
 
 		By("mock run volumeExpansion action and reconcileAction")
-		mockVolumeExpansionActionAndReconcile(opsRes, newOps)
+		mockVolumeExpansionActionAndReconcile(reqCtx, opsRes, newOps)
 
 		By("test warning event and volumeExpansion failed")
 		// test when the event does not reach the conditions
@@ -163,7 +165,6 @@ var _ = Describe("OpsRequest Controller Volume Expansion Handler", func() {
 		}
 		event.InvolvedObject = stsInvolvedObject
 		pvcEventHandler := PersistentVolumeClaimEventHandler{}
-		reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
 		Expect(pvcEventHandler.Handle(k8sClient, reqCtx, eventRecorder, event)).Should(Succeed())
 		Eventually(testapps.GetOpsRequestCompPhase(ctx, testCtx, newOps.Name, consensusCompName)).Should(Equal(appsv1alpha1.VolumeExpandingPhase))
 
@@ -180,7 +181,7 @@ var _ = Describe("OpsRequest Controller Volume Expansion Handler", func() {
 		})).Should(Succeed())
 	}
 
-	testVolumeExpansion := func(clusterObject *appsv1alpha1.Cluster, opsRes *OpsResource, randomStr string) {
+	testVolumeExpansion := func(reqCtx intctrlutil.RequestCtx, clusterObject *appsv1alpha1.Cluster, opsRes *OpsResource, randomStr string) {
 		// mock cluster is Running to support volume expansion ops
 		Expect(testapps.ChangeObjStatus(&testCtx, clusterObject, func() {
 			clusterObject.Status.Phase = appsv1alpha1.RunningPhase
@@ -190,7 +191,7 @@ var _ = Describe("OpsRequest Controller Volume Expansion Handler", func() {
 		newOps, pvcName := initResourcesForVolumeExpansion(clusterObject, opsRes, 0)
 
 		By("mock run volumeExpansion action and reconcileAction")
-		mockVolumeExpansionActionAndReconcile(opsRes, newOps)
+		mockVolumeExpansionActionAndReconcile(reqCtx, opsRes, newOps)
 
 		By("mock pvc is resizing")
 		pvcKey := client.ObjectKey{Name: pvcName, Namespace: testCtx.DefaultNamespace}
@@ -209,7 +210,7 @@ var _ = Describe("OpsRequest Controller Volume Expansion Handler", func() {
 		})).Should(Succeed())
 
 		// waiting OpsRequest.status.components["consensus"].vct["data"] is running
-		_, _ = GetOpsManager().Reconcile(opsRes)
+		_, _ = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
 		Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(newOps), func(g Gomega, tmpOps *appsv1alpha1.OpsRequest) {
 			progressDetails := tmpOps.Status.Components[consensusCompName].ProgressDetails
 			progressDetail := FindStatusProgressDetail(progressDetails, getPVCProgressObjectKey(pvcName))
@@ -227,11 +228,11 @@ var _ = Describe("OpsRequest Controller Volume Expansion Handler", func() {
 		})).Should(Succeed())
 
 		// waiting OpsRequest.status.phase is succeed
-		_, err := GetOpsManager().Reconcile(opsRes)
+		_, err := GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
 		Expect(err == nil).Should(BeTrue())
-		Expect(opsRes.OpsRequest.Status.Phase == appsv1alpha1.SucceedPhase).Should(BeTrue())
+		Expect(opsRes.OpsRequest.Status.Phase == appsv1alpha1.OpsSucceedPhase).Should(BeTrue())
 
-		testWarningEventOnPVC(clusterObject, opsRes)
+		testWarningEventOnPVC(reqCtx, clusterObject, opsRes)
 	}
 
 	testDeleteRunningVolumeExpansion := func(clusterObject *appsv1alpha1.Cluster, opsRes *OpsResource) {
@@ -255,15 +256,17 @@ var _ = Describe("OpsRequest Controller Volume Expansion Handler", func() {
 
 	Context("Test VolumeExpansion", func() {
 		It("VolumeExpansion should work", func() {
+			reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
 			_, _, clusterObject := testapps.InitConsensusMysql(testCtx, clusterDefinitionName,
 				clusterVersionName, clusterName, "consensus", consensusCompName)
 			// init storageClass
-			_ = testapps.CreateStorageClass(testCtx, storageClassName, true)
+			sc := testapps.CreateStorageClass(testCtx, storageClassName, true)
+			Expect(testapps.ChangeObj(&testCtx, sc, func() {
+				sc.Annotations = map[string]string{storage.IsDefaultStorageClassAnnotation: "true"}
+			})).Should(Succeed())
 
 			opsRes := &OpsResource{
-				Ctx:      context.Background(),
 				Cluster:  clusterObject,
-				Client:   k8sClient,
 				Recorder: k8sManager.GetEventRecorderFor("opsrequest-controller"),
 			}
 
@@ -278,7 +281,7 @@ var _ = Describe("OpsRequest Controller Volume Expansion Handler", func() {
 			})).Should(Succeed())
 
 			By("Test VolumeExpansion")
-			testVolumeExpansion(clusterObject, opsRes, randomStr)
+			testVolumeExpansion(reqCtx, clusterObject, opsRes, randomStr)
 
 			By("Test delete the Running VolumeExpansion OpsRequest")
 			testDeleteRunningVolumeExpansion(clusterObject, opsRes)

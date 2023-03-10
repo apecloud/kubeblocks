@@ -4,7 +4,7 @@ kind: BackupPolicyTemplate
 metadata:
   name: backup-policy-template-redis
   labels:
-    clusterdefinition.kubeblocks.io/name: apecloud-redis
+    clusterdefinition.kubeblocks.io/name: redis
     {{- include "redis.labels" . | nindent 4 }}
 spec:
   # which backup tool to perform database backup, only support one tool.

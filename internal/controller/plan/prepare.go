@@ -260,8 +260,8 @@ func buildReplicationSetPVC(task *intctrltypes.ReconcileTask, sts *appsv1.Statef
 	// generate persistentVolumeClaim objects used by replicationSet's pod from component.VolumeClaimTemplates
 	// TODO: The pvc objects involved in all processes in the KubeBlocks will be reconstructed into a unified generation method
 	pvcMap := replicationset.GeneratePVCFromVolumeClaimTemplates(sts, task.Component.VolumeClaimTemplates)
-	for _, pvc := range pvcMap {
-		buildPersistentVolumeClaimLabels(sts, pvc)
+	for pvcTplName, pvc := range pvcMap {
+		builder.BuildPersistentVolumeClaimLabels(sts, pvc, task.Component, pvcTplName)
 		task.AppendResource(pvc)
 	}
 
@@ -286,19 +286,6 @@ func buildReplicationSetPVC(task *intctrltypes.ReconcileTask, sts *appsv1.Statef
 	}
 	podSpec.Volumes = podVolumes
 	return nil
-}
-
-// buildPersistentVolumeClaimLabels builds a pvc name label, and synchronize the labels on the sts to the pvc labels.
-func buildPersistentVolumeClaimLabels(sts *appsv1.StatefulSet, pvc *corev1.PersistentVolumeClaim) {
-	if pvc.Labels == nil {
-		pvc.Labels = make(map[string]string)
-	}
-	pvc.Labels[constant.VolumeClaimTemplateNameLabelKey] = pvc.Name
-	for k, v := range sts.Labels {
-		if _, ok := pvc.Labels[k]; !ok {
-			pvc.Labels[k] = v
-		}
-	}
 }
 
 // buildCfg generate volumes for PodTemplate, volumeMount for container, and configmap for config files

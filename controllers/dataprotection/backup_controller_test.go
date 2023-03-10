@@ -64,6 +64,7 @@ var _ = Describe("Backup for a StatefulSet", func() {
 		testapps.ClearResources(&testCtx, intctrlutil.BackupPolicySignature, inNS, ml)
 		testapps.ClearResources(&testCtx, intctrlutil.JobSignature, inNS, ml)
 		testapps.ClearResources(&testCtx, intctrlutil.CronJobSignature, inNS, ml)
+		testapps.ClearResources(&testCtx, intctrlutil.PersistentVolumeClaimSignature, inNS, ml)
 		// non-namespaced
 		testapps.ClearResources(&testCtx, intctrlutil.BackupToolSignature, ml)
 	}
@@ -86,9 +87,17 @@ var _ = Describe("Backup for a StatefulSet", func() {
 
 		By("By mocking a pod belonging to the statefulset")
 		pod := testapps.NewPodFactory(testCtx.DefaultNamespace, sts.Name+"-0").
+			AddAppInstanceLabel(clusterName).
+			AddAppComponentLabel(componentName).
 			AddContainer(corev1.Container{Name: containerName, Image: testapps.ApeCloudMySQLImage}).
+			Create(&testCtx).GetObject()
+		nodeName = pod.Spec.NodeName
+
+		By("By mocking a pvc belonging to the pod")
+		_ = testapps.NewPersistentVolumeClaimFactory(
+			testCtx.DefaultNamespace, "data-"+pod.Name, clusterName, componentName, "data").
+			SetStorage("1Gi").
 			Create(&testCtx)
-		nodeName = pod.GetObject().Spec.NodeName
 	})
 
 	AfterEach(func() {
@@ -203,6 +212,54 @@ var _ = Describe("Backup for a StatefulSet", func() {
 					g.Expect(fetched.Status.Phase).To(Equal(dataprotectionv1alpha1.BackupFailed))
 				})).Should(Succeed())
 			})
+		})
+
+		Context("creates a snapshot backup on error", func() {
+			var backupKey types.NamespacedName
+
+			BeforeEach(func() {
+				viper.Set("VOLUMESNAPSHOT", "true")
+				By("By remove persistent pvc")
+				// delete rest mocked objects
+				inNS := client.InNamespace(testCtx.DefaultNamespace)
+				ml := client.HasLabels{testCtx.TestObjLabelKey}
+				testapps.ClearResources(&testCtx, intctrlutil.PersistentVolumeClaimSignature, inNS, ml)
+			})
+
+			It("should fail when disable volumesnapshot", func() {
+				viper.Set("VOLUMESNAPSHOT", "false")
+
+				By("By creating a backup from backupPolicy: " + backupPolicyName)
+				backup := testapps.NewBackupFactory(testCtx.DefaultNamespace, backupName).
+					SetTTL(defaultTTL).
+					SetBackupPolicyName(backupPolicyName).
+					SetBackupType(dataprotectionv1alpha1.BackupTypeSnapshot).
+					Create(&testCtx).GetObject()
+				backupKey = client.ObjectKeyFromObject(backup)
+
+				By("Check backup job failed")
+				Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dataprotectionv1alpha1.Backup) {
+					g.Expect(fetched.Status.Phase).To(Equal(dataprotectionv1alpha1.BackupFailed))
+				})).Should(Succeed())
+			})
+
+			It("should fail without pvc", func() {
+				By("By creating a backup from backupPolicy: " + backupPolicyName)
+				backup := testapps.NewBackupFactory(testCtx.DefaultNamespace, backupName).
+					SetTTL(defaultTTL).
+					SetBackupPolicyName(backupPolicyName).
+					SetBackupType(dataprotectionv1alpha1.BackupTypeSnapshot).
+					Create(&testCtx).GetObject()
+				backupKey = client.ObjectKeyFromObject(backup)
+
+				patchK8sJobStatus(types.NamespacedName{Name: backupKey.Name + "-pre", Namespace: backupKey.Namespace}, batchv1.JobComplete)
+
+				By("Check backup job failed")
+				Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dataprotectionv1alpha1.Backup) {
+					g.Expect(fetched.Status.Phase).To(Equal(dataprotectionv1alpha1.BackupFailed))
+				})).Should(Succeed())
+			})
+
 		})
 	})
 

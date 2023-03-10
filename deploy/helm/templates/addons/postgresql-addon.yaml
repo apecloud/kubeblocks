@@ -10,7 +10,8 @@ spec:
   type: Helm
 
   helm:
-    chartLocationURL: https://github.com/apecloud/helm-charts/releases/download/postgresql-{{ default .Chart.AppVersion .Values.appVersionOverride }}/postgresql-{{ default .Chart.AppVersion .Values.appVersionOverride }}.tgz
+    # chartLocationURL: https://github.com/apecloud/helm-charts/releases/download/postgresql-{{ default .Chart.Version .Values.versionOverride }}/postgresql-{{ default .Chart.Version .Values.versionOverride }}.tgz
+    chartLocationURL: https://jihulab.com/api/v4/projects/85949/packages/helm/stable/charts/postgres-{{ default .Chart.Version .Values.versionOverride }}.tgz
 
   installable:
     autoInstall: true

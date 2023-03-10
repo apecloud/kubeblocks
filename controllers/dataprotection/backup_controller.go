@@ -340,7 +340,8 @@ func (r *BackupReconciler) createPreCommandJobAndEnsure(reqCtx intctrlutil.Reque
 		return true, err
 	}
 
-	key := types.NamespacedName{Namespace: reqCtx.Req.Namespace, Name: backup.Name + "-pre"}
+	mgrNS := viper.GetString("CM_NAMESPACE")
+	key := types.NamespacedName{Namespace: mgrNS, Name: backup.Name + "-pre"}
 	if err := r.createHooksCommandJob(reqCtx, backup, key, true); err != nil {
 		return false, err
 	}
@@ -359,7 +360,8 @@ func (r *BackupReconciler) createPostCommandJobAndEnsure(reqCtx intctrlutil.Requ
 		return true, err
 	}
 
-	key := types.NamespacedName{Namespace: reqCtx.Req.Namespace, Name: backup.Name + "-post"}
+	mgrNS := viper.GetString("CM_NAMESPACE")
+	key := types.NamespacedName{Namespace: mgrNS, Name: backup.Name + "-post"}
 	if err := r.createHooksCommandJob(reqCtx, backup, key, false); err != nil {
 		return false, err
 	}
@@ -598,11 +600,6 @@ func (r *BackupReconciler) createBatchV1Job(
 	}
 	controllerutil.AddFinalizer(job, dataProtectionFinalizerName)
 
-	scheme, _ := dataprotectionv1alpha1.SchemeBuilder.Build()
-	if err := controllerutil.SetOwnerReference(backup, job, scheme); err != nil {
-		return err
-	}
-
 	reqCtx.Log.V(1).Info("create a built-in job from backup", "job", job)
 	if err := r.Client.Create(reqCtx.Ctx, job); err != nil {
 		return err
@@ -627,8 +624,9 @@ func (r *BackupReconciler) getBatchV1Job(reqCtx intctrlutil.RequestCtx, backup *
 func (r *BackupReconciler) deleteReferenceBatchV1Jobs(reqCtx intctrlutil.RequestCtx, backup *dataprotectionv1alpha1.Backup) error {
 	jobs := &batchv1.JobList{}
 
+	mgrNS := viper.GetString("CM_NAMESPACE")
 	if err := r.Client.List(reqCtx.Ctx, jobs,
-		client.InNamespace(reqCtx.Req.Namespace),
+		client.InNamespace(mgrNS),
 		client.MatchingLabels(buildBackupLabels(backup))); err != nil {
 		return err
 	}
@@ -887,7 +885,8 @@ func (r *BackupReconciler) buildSnapshotPodSpec(
 
 	container := corev1.Container{}
 	container.Name = backup.Name
-	container.Command = []string{"kubectl", "exec", "-i", clusterPod.Name, "-c", backupPolicy.Spec.Hooks.ContainerName, "--", "sh", "-c"}
+	container.Command = []string{"kubectl", "exec", "-n", backup.Namespace,
+		"-i", clusterPod.Name, "-c", backupPolicy.Spec.Hooks.ContainerName, "--", "sh", "-c"}
 	if preCommand {
 		container.Args = backupPolicy.Spec.Hooks.PreCommands
 	} else {

@@ -45,5 +45,5 @@ kbcli alert list-receivers [flags]
 
 ### SEE ALSO
 
-* [kbcli alert](kbcli_alert.md)	 - Manage alert receivers
+* [kbcli alert](kbcli_alert.md)	 - Manage alert receiver, include add, list and delete receiver
 

@@ -13,7 +13,7 @@ This guide introduces how to install KubeBlocks by `kbcli`, the command line too
 1. A Kubernetes environment is required.
 2. `kubectl` is required and can connect to your Kubernetes clusters. Refer to [Install and Set Up kubectl on macOS](https://kubernetes.io/docs/tasks/tools/install-kubectl-macos/) for installation details.
    
-## Step 1. Install KubeBlocks by `kbcli`
+## Step 1. Install `kbcli`
 
 1. Run the command below to install `kbcli`. `kbcli` can run on macOS and Linux.
    ```bash
@@ -26,10 +26,6 @@ This guide introduces how to install KubeBlocks by `kbcli`, the command line too
 2. Run this command to check the version and verify whether `kbcli` is installed successfully.
    ```bash
    kbcli version
-   ```
-3. Run the command below to uninstall `kbcli` after your trial.
-   ```bash
-   sudo rm /usr/local/bin/kbcli
    ```
 
 ## Step 2. Enable `kbcli` automatic command line completion
@@ -150,7 +146,19 @@ Here we take zsh as an example.
    kubeblocks-prometheus-alertmanager-7c558865f5-hsfn5   2/2     Running   0          3m33s
    kubeblocks-prometheus-server-5c89c8bc89-mwrx7         2/2     Running   0          3m33s
    ```
-3. Run the command below to uninstall KubeBlocks if you want to delete KubeBlocks after your trial.
+
+## Step 4. Uninstall KubeBlocks and `kbcli`
+
+> ***Note:***
+>
+> Uninstall KubeBlocks first.
+
+Run the command below to uninstall KubeBlocks if you want to delete KubeBlocks after your trial.
    ```bash
    kbcli kubeblocks uninstall
+   ```
+
+Run the command below to uninstall `kbcli`.
+   ```bash
+   sudo rm /usr/local/bin/kbcli
    ```

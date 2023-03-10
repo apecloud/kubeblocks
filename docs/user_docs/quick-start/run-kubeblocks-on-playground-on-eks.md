@@ -68,9 +68,9 @@ kbcli cluster list
 >
 > The initialization lasts about 20 minutes. If the installation fails after a long time, please check your network environment.
 
-## Step 3. Uninstall Playground
+## Step 3. Destroy Playground
 
-Before uninstalling Playground, it is recommended to delete the clusters created by KubeBlocks
+Before destroying Playground, it is recommended to delete the clusters created by KubeBlocks
 
 ```bash
 # View all clusters
@@ -85,7 +85,7 @@ kbcli cluster delete <my-cluster>
 kbcli kubeblocks uninstall --remove-pvcs --remove-pvs
 ```
 
-Run the command below to uninstall Playground.
+Run the command below to destroy Playground.
 
 ```bash
 kbbcli playground destroy --cloud-provider aws --region cn-northwest-1

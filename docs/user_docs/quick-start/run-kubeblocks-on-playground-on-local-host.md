@@ -74,7 +74,7 @@ You can find the Playground user guide under the installation success tip. View 
 
   kbcli dashboard open kubeblocks-grafana
 
-4. Uninstall Playground:
+4. Destroy Playground:
 
   kbcli playground destroy
 
@@ -352,15 +352,15 @@ NON-STOP NYAN CAT is a demo application to observe how the database cluster exce
    kbcli app uninstall nyancat
    ```
 
-## Uninstall Playground
+## Destroy Playground
 
-Uninstalling Playground cleans up relevant component services and data:
+Destroying Playground cleans up relevant component services and data:
 
 * Delete all KubeBlocks database clusters, such as ApeCloud MySQL Paxos group
 * Uninstall KubeBlocks
 * Delete the local Kubernetes clusters created by K3d.
   
-Run the command below to uninstall Playground.
+Run the command below to destroy Playground.
 ```bash
 kbcli playground destroy
 ```

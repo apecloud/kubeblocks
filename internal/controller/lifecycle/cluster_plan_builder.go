@@ -19,6 +19,7 @@ package lifecycle
 import (
 	"errors"
 	"fmt"
+	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	"golang.org/x/exp/maps"
 	"reflect"
 	"strings"
@@ -88,7 +89,7 @@ func (b *clusterPlanBuilder) defaultWalkFunc(node graph.Vertex) error {
 		if obj.immutable {
 			return nil
 		}
-		o, err := buildUpdateObj(obj)
+		o, err := b.buildUpdateObj(obj)
 		if err != nil {
 			return err
 		}
@@ -168,7 +169,7 @@ func (p *clusterPlan) Execute() error {
 	return p.dag.WalkReverseTopoOrder(p.walkFunc)
 }
 
-func buildUpdateObj(node *lifecycleVertex) (client.Object, error) {
+func (b *clusterPlanBuilder) buildUpdateObj(node *lifecycleVertex) (client.Object, error) {
 	handleSts := func(origObj, stsProto *appsv1.StatefulSet) (client.Object, error) {
 		//if *stsObj.Spec.Replicas != *stsProto.Spec.Replicas {
 		//	reqCtx.Recorder.Eventf(cluster,
@@ -190,7 +191,8 @@ func buildUpdateObj(node *lifecycleVertex) (client.Object, error) {
 		if !reflect.DeepEqual(&origObj.Spec, &stsObj.Spec) {
 			// sync component phase
 			// TODO: syncComponentPhaseWhenSpecUpdating
-			//syncComponentPhaseWhenSpecUpdating(cluster, componentName)
+			componentName := stsObj.Labels[constant.KBAppComponentLabelKey]
+			syncComponentPhaseWhenSpecUpdating(b.cluster, componentName)
 		}
 
 		return stsObj, nil
@@ -268,4 +270,27 @@ func mergeServiceAnnotations(originalAnnotations, targetAnnotations map[string]s
 	}
 	maps.Copy(tmpAnnotations, targetAnnotations)
 	return tmpAnnotations
+}
+
+// syncComponentPhaseWhenSpecUpdating when workload of the component changed
+// and component phase is not the phase of operations, sync component phase to 'SpecUpdating'.
+func syncComponentPhaseWhenSpecUpdating(cluster *appsv1alpha1.Cluster,
+	componentName string) {
+	if len(componentName) == 0 {
+		return
+	}
+	if cluster.Status.Components == nil {
+		cluster.Status.Components = map[string]appsv1alpha1.ClusterComponentStatus{
+			componentName: {
+				Phase: appsv1alpha1.SpecUpdatingPhase,
+			},
+		}
+		return
+	}
+	compStatus := cluster.Status.Components[componentName]
+	// if component phase is not the phase of operations, sync component phase to 'SpecUpdating'
+	if util.IsCompleted(compStatus.Phase) {
+		compStatus.Phase = appsv1alpha1.SpecUpdatingPhase
+		cluster.Status.Components[componentName] = compStatus
+	}
 }

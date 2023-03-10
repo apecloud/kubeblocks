@@ -277,6 +277,10 @@ var _ = Describe("cluster webhook", func() {
 				g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(cluster), cluster)).Should(Succeed())
 				return *cluster.Spec.ComponentSpecs[0].PrimaryIndex
 			}, timeout, interval).Should(Equal(int32(0)))
+
+			By("By update Replication component replicas to 0, expect succeed")
+			cluster.Spec.ComponentSpecs[0].Replicas = int32(0)
+			Expect(k8sClient.Update(ctx, cluster)).Should(Succeed())
 		})
 	})
 })

@@ -18,6 +18,7 @@ package alert
 
 import (
 	"fmt"
+	"net/url"
 	"strings"
 
 	"golang.org/x/exp/slices"
@@ -106,4 +107,12 @@ func removeDuplicateStr(strArray []string) []string {
 		}
 	}
 	return result
+}
+
+func urlIsValid(urlStr string) (bool, error) {
+	_, err := url.ParseRequestURI(urlStr)
+	if err != nil {
+		return false, err
+	}
+	return true, nil
 }

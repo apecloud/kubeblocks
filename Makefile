@@ -472,7 +472,7 @@ helm-package: bump-chart-ver ## Do helm package.
 ## it will pull down the latest charts that satisfy the dependencies, and clean up old dependencies.
 ## this is a hack fix: decompress the tgz from the depend-charts directory to the charts directory
 ## before dependency update.
-	cd $(CHART_PATH)/charts && ls ../depend-charts/alertmanager-webhook-adaptor-*.tgz | xargs -n1 tar xf
+	# cd $(CHART_PATH)/charts && ls ../depend-charts/*.tgz | xargs -n1 tar xf
 	#$(HELM) dependency update --skip-refresh $(CHART_PATH)
 	$(HELM) package deploy/loadbalancer
 	mv loadbalancer-*.tgz deploy/helm/depend-charts/

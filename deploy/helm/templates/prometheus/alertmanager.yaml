@@ -1,10 +1,10 @@
-{{- if and .Values.prometheus.alertmanager.enabled (not (empty .Values.prometheus.alertmanager.configMapOverrideName)) }}
+{{- if not (empty .Values.prometheus.alertmanager.configMapOverrideName) }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
   labels:
     {{- include "kubeblocks.labels" . | nindent 4 }}
-  name: kb-addon-prometheus-{{ .Values.prometheus.alertmanager.configMapOverrideName }}
+  name: kb-addon-{{ include "addon.prometheus.name" . }}-{{ .Values.prometheus.alertmanager.configMapOverrideName }}
 data:
   alertmanager.yml: |
     global: { }

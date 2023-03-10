@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: prometheus-chart-kubeblocks-values
+  name: {{ include "addon.prometheus.name" . }}-chart-kubeblocks-values
   labels:
     {{- include "kubeblocks.labels" . | nindent 4 }}
 data:

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package unstructured
+package redis
 
 import (
 	"fmt"
@@ -25,10 +25,10 @@ import (
 type stateHandleFn func(*fsm) stateHandleFn
 
 // fsm is finite state machine model of the redis configuration parser.
-// The output of fsm is a parameter name and list of parameter values.
+// The output of fsm is a parameter name and list of parameter Values.
 // reference c++ code implementation: https://github.com/redis/redis/blob/unstable/src/sds.c#L1082
 type fsm struct {
-	param *item
+	param *Item
 
 	// split chars
 	splitCharacters string

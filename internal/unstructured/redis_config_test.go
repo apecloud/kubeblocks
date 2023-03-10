@@ -158,6 +158,7 @@ zset-max-listpack-value 64`
 		name    string
 		input   string
 		want    string
+		updated map[string]interface{}
 		wantErr bool
 	}{{
 		name:  "redis_cont_test",
@@ -167,6 +168,9 @@ zset-max-listpack-value 64`
 		name:  "redis_cont_test",
 		input: commentsConfig,
 		want:  commentsConfig,
+		updated: map[string]interface{}{
+			"zset-max-listpack-entries": 128,
+		},
 	}}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -174,6 +178,9 @@ zset-max-listpack-value 64`
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Marshal() error = %v, wantErr %v", err, tt.wantErr)
 				return
+			}
+			for key, value := range tt.updated {
+				require.Nil(t, config.Update(key, value))
 			}
 			got, err := config.Marshal()
 			require.Nil(t, err)

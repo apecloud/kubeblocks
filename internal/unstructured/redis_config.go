@@ -19,7 +19,6 @@ package unstructured
 import (
 	"bytes"
 	"math"
-	"sort"
 	"strconv"
 	"strings"
 
@@ -27,11 +26,12 @@ import (
 	"github.com/spf13/cast"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/unstructured/redis"
 )
 
 type redisConfig struct {
 	name string
-	lex  *lexer
+	lex  *redis.Lexer
 
 	// parameters map[string]string
 }
@@ -51,24 +51,27 @@ func (r *redisConfig) setString(key string, value string) error {
 	v := r.GetItem(keys)
 	lineNo := math.MaxInt32
 	if v != nil {
-		lineNo = v.lineNo
-		r.lex.remove(v)
+		lineNo = v.LineNo
+		r.lex.RemoveParameter(v)
 	}
 	keys = append(keys, value)
-	t, err := r.lex.parseParameter(strings.Join(keys, " "), lineNo)
+	t, err := r.lex.ParseParameter(strings.Join(keys, " "), lineNo)
 	if err == nil {
-		r.lex.appendValidConfigParameter(t, lineNo)
+		if v != nil {
+			t.Comments = v.Comments
+		}
+		r.lex.AppendValidParameter(t, lineNo)
 	}
 	return err
 }
 
-func matchSubKeys(keys []string, it item) bool {
-	if len(keys) > len(it.values) {
+func matchSubKeys(keys []string, it redis.Item) bool {
+	if len(keys) > len(it.Values) {
 		return false
 	}
 
 	for i, k := range keys {
-		if it.values[i] != k {
+		if it.Values[i] != k {
 			return false
 		}
 	}
@@ -80,9 +83,9 @@ func (r *redisConfig) Get(key string) interface{} {
 	return v
 }
 
-func (r *redisConfig) GetItem(keys []string) *item {
-	v, ok := r.lex.dict[keys[0]]
-	if !ok {
+func (r *redisConfig) GetItem(keys []string) *redis.Item {
+	v := r.lex.GetItem(keys[0])
+	if v == nil {
 		return nil
 	}
 
@@ -108,9 +111,9 @@ func (r *redisConfig) GetString(key string) (string, error) {
 	}
 
 	res := make([]string, 0)
-	for i := len(keys); i < len(item.values); i++ {
-		v := item.values[i]
-		if containerEscapeString(v) {
+	for i := len(keys); i < len(item.Values); i++ {
+		v := item.Values[i]
+		if redis.ContainerEscapeString(v) {
 			res = append(res, strconv.Quote(v))
 		} else {
 			res = append(res, v)
@@ -121,7 +124,7 @@ func (r *redisConfig) GetString(key string) (string, error) {
 
 func (r *redisConfig) GetAllParameters() map[string]interface{} {
 	params := make(map[string]interface{})
-	for key, param := range r.lex.dict {
+	for key, param := range r.lex.GetAllParams() {
 		if len(param) == 0 {
 			continue
 		}
@@ -137,25 +140,25 @@ func (r *redisConfig) GetAllParameters() map[string]interface{} {
 	return params
 }
 
-func encodeMultiKeys(it item, prefix int) string {
+func encodeMultiKeys(it redis.Item, prefix int) string {
 	buffer := &bytes.Buffer{}
-	for i := 0; i < prefix && i < len(it.values); i++ {
+	for i := 0; i < prefix && i < len(it.Values); i++ {
 		if i > 0 {
 			buffer.WriteByte(' ')
 		}
-		buffer.WriteString(it.values[i])
+		buffer.WriteString(it.Values[i])
 	}
 	return buffer.String()
 }
 
-func encodeStringValue(param item, index int) string {
+func encodeStringValue(param redis.Item, index int) string {
 	buffer := &bytes.Buffer{}
-	for i := index; i < len(param.values); i++ {
-		v := param.values[i]
+	for i := index; i < len(param.Values); i++ {
+		v := param.Values[i]
 		if i > index {
 			buffer.WriteByte(' ')
 		}
-		if v == "" || containerEscapeString(v) {
+		if v == "" || redis.ContainerEscapeString(v) {
 			v = strconv.Quote(v)
 		}
 		buffer.WriteString(v)
@@ -163,8 +166,8 @@ func encodeStringValue(param item, index int) string {
 	return buffer.String()
 }
 
-func uniqKeysParameters(its []item) int {
-	maxPrefix := len(its[0].values)
+func uniqKeysParameters(its []redis.Item) int {
+	maxPrefix := len(its[0].Values)
 	for i := 2; i < maxPrefix; i++ {
 		if !hasPrefixKey(its, i) {
 			return i
@@ -173,10 +176,10 @@ func uniqKeysParameters(its []item) int {
 	return maxPrefix
 }
 
-func hasPrefixKey(its []item, prefix int) bool {
+func hasPrefixKey(its []redis.Item, prefix int) bool {
 	keys := set.NewLinkedHashSetString()
 	for _, i := range its {
-		prefixKeys := strings.Join(i.values[0:prefix], " ")
+		prefixKeys := strings.Join(i.Values[0:prefix], " ")
 		if keys.InArray(prefixKeys) {
 			return true
 		}
@@ -190,12 +193,15 @@ func (r *redisConfig) SubConfig(key string) ConfigObject {
 }
 
 func (r *redisConfig) Marshal() (string, error) {
-	if len(r.lex.dict) == 0 {
+	if r.lex.Empty() {
 		return "", nil
+	}
+	if !r.lex.IsUpdated() {
+		return r.lex.ToString(), nil
 	}
 
 	out := &bytes.Buffer{}
-	for i, param := range sortParameters(r.lex) {
+	for i, param := range r.lex.SortParameters() {
 		if i > 0 {
 			out.WriteByte('\n')
 		}
@@ -206,16 +212,16 @@ func (r *redisConfig) Marshal() (string, error) {
 	return out.String(), nil
 }
 
-func encodeParamItem(param item, out *bytes.Buffer) error {
-	for _, co := range param.comments {
+func encodeParamItem(param redis.Item, out *bytes.Buffer) error {
+	for _, co := range param.Comments {
 		out.WriteString(co)
 		out.WriteByte('\n')
 	}
-	for i, v := range param.values {
+	for i, v := range param.Values {
 		if i > 0 {
 			out.WriteByte(' ')
 		}
-		if v == "" || containerEscapeString(v) {
+		if v == "" || redis.ContainerEscapeString(v) {
 			v = strconv.Quote(v)
 		}
 		out.WriteString(v)
@@ -224,25 +230,6 @@ func encodeParamItem(param item, out *bytes.Buffer) error {
 }
 
 func (r *redisConfig) Unmarshal(str string) error {
-	r.lex = &lexer{
-		dict: make(map[string][]item),
-	}
-	return r.lex.load(str)
-}
-
-func sortParameters(lex *lexer) []item {
-	items := make([]item, 0)
-	for _, v := range lex.dict {
-		items = append(items, v...)
-	}
-
-	sort.SliceStable(items, func(i, j int) bool {
-		no1 := items[i].lineNo
-		no2 := items[j].lineNo
-		if no1 == no2 {
-			return strings.Compare(items[i].values[0], items[j].values[0]) < 0
-		}
-		return no1 < no2
-	})
-	return items
+	r.lex = &redis.Lexer{}
+	return r.lex.Load(str)
 }

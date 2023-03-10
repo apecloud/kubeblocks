@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package unstructured
+package redis
 
 import (
 	"testing"
@@ -45,8 +45,8 @@ func TestContainerEscapeString(t *testing.T) {
 	}}
 	for _, tt := range tests {
 		t.Run("escapeStringTest", func(t *testing.T) {
-			if got := containerEscapeString(tt.args); got != tt.want {
-				t.Errorf("containerEscapeString() = %v, want %v", got, tt.want)
+			if got := ContainerEscapeString(tt.args); got != tt.want {
+				t.Errorf("ContainerEscapeString() = %v, want %v", got, tt.want)
 			}
 		})
 	}

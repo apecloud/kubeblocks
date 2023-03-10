@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package unstructured
+package redis
 
 import (
 	"reflect"
@@ -85,15 +85,15 @@ func TestFsmParse(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			f := &fsm{
-				param:           &item{},
+				param:           &Item{},
 				splitCharacters: trimChars,
 			}
 			if err := f.Parse(tt.args); (err != nil) != tt.wantErr {
 				t.Errorf("Parse() error = %v, wantErr %v", err, tt.wantErr)
 			}
 
-			if tt.expected != nil && !reflect.DeepEqual(f.param.values, tt.expected) {
-				t.Errorf("Parse() param = %v, expected %v", f.param.values, tt.expected)
+			if tt.expected != nil && !reflect.DeepEqual(f.param.Values, tt.expected) {
+				t.Errorf("Parse() param = %v, expected %v", f.param.Values, tt.expected)
 			}
 		})
 	}

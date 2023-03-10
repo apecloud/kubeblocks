@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package unstructured
+package redis
 
 import (
 	"strings"
@@ -52,7 +52,7 @@ func isSingleQuotes(r rune) bool {
 	return r == singleQuotes
 }
 
-func containerEscapeString(v string) bool {
+func ContainerEscapeString(v string) bool {
 	for _, c := range v {
 		if strings.ContainsRune(escapeChars, c) {
 			return true

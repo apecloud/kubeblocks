@@ -89,8 +89,13 @@ spec:
             command:
               - /bin/sh
               - -c
-            args:
-              - /launch.sh init
+              - |
+                set -ex
+                KB_PRIMARY_POD_NAME_PREFIX=${KB_PRIMARY_POD_NAME%%\.*}
+                if [ "$KB_PRIMARY_POD_NAME_PREFIX" != "$KB_POD_NAME" ]; then
+                    sleep 3
+                fi
+                exec /launch.sh init
             volumeMounts:
               - name: dshm
                 mountPath: /dev/shm

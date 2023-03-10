@@ -1,0 +1,39 @@
+apiVersion: extensions.kubeblocks.io/v1alpha1
+kind: Addon
+metadata:
+  name: alertmanager-webhook-adaptor
+  labels:
+    {{- include "kubeblocks.labels" . | nindent 4 }}
+spec:
+  description: 'alertmanager webhook adaptor for extending alertmanager notification channels'
+  type: Helm
+
+  helm:
+    # chartLocationURL: https://github.com/apecloud/helm-charts/releases/download/alertmanager-webhook-adaptor-0.1.2/alertmanager-webhook-adaptor-0.1.2.tgz
+    chartLocationURL: https://jihulab.com/api/v4/projects/85949/packages/helm/stable/charts/alertmanager-webhook-adaptor-0.1.2.tgz
+
+    installValues:
+      configMapRefs:
+        - name: alertmanager-webhook-adaptor-chart-kubeblocks-values
+          key: values-kubeblocks-override.yaml
+
+    valuesMapping:
+      valueMap:
+        replicaCount: replicaCount
+
+      jsonMap:
+        tolerations: tolerations
+
+      resources:
+        cpu:
+          requests: resources.requests.cpu
+          limits: resources.limits.cpu
+        memory:
+          requests: resources.requests.memory
+          limits: resources.limits.memory
+
+  defaultInstallValues:
+    - replicas: 1
+
+  installable:
+    autoInstall: {{ get ( get ( .Values | toYaml | fromYaml ) "alertmanager-webhook-adaptor" ) "enabled" }}

@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: alertmanager-webhook-adaptor-chart-kubeblocks-values
+  labels:
+    {{- include "kubeblocks.labels" . | nindent 4 }}
+data:
+  values-kubeblocks-override.yaml: |-
+     {{- get ( .Values | toYaml | fromYaml ) "alertmanager-webhook-adaptor" | toYaml | nindent 4 }}

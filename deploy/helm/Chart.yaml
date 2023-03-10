@@ -49,7 +49,7 @@ annotations:
   artifacthub.io/operator: "true"
   artifacthub.io/prerelease: "true"
 
-dependencies:
+dependencies: []
 #  - condition: apecloud-mysql.enabled
 #    name: apecloud-mysql
 #    repository: file://../apecloud-mysql
@@ -78,7 +78,7 @@ dependencies:
 #    name: csi-s3
 #    # repository: https://github.com/CloudVE/helm-charts/raw/master
 #    version: 0.*
-  - condition: alertmanager-webhook-adaptor.enabled
-    name: alertmanager-webhook-adaptor
-    # repository: https://apecloud.github.io/helm-charts
-    version: 0.1.*
+#  - condition: alertmanager-webhook-adaptor.enabled
+#    name: alertmanager-webhook-adaptor
+#    # repository: https://apecloud.github.io/helm-charts
+#    version: 0.1.*

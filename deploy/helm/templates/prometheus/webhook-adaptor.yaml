@@ -4,7 +4,7 @@ kind: ConfigMap
 metadata:
   labels:
     {{- include "kubeblocks.labels" . | nindent 4 }}
-  name: {{ .Release.Name }}-{{index .Values "alertmanager-webhook-adaptor" "configMapOverrideName"}}
+  name: kb-addon-alertmanager-webhook-adaptor-{{index .Values "alertmanager-webhook-adaptor" "configMapOverrideName"}}
 data:
   config.yml: |
     receivers: [ ]

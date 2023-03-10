@@ -23,10 +23,20 @@ const (
 	// annotation keys
 	ControllerPaused     = "controller.kubeblocks.io/controller-paused"
 	SkipInstallableCheck = "extensions.kubeblocks.io/skip-installable-check"
+	NoDeleteJobs         = "extensions.kubeblocks.io/no-delete-jobs"
 
 	// condition reasons
 	AddonDisabled                    = "AddonDisabled"
 	AddonEnabled                     = "AddonEnabled"
 	AddonSpecInstallFailed           = "AddonSpecInstallFailed"
 	AddonSpecInstallableReqUnmatched = "AddonSpecInstallableRequirementUnmatched"
+
+	// event reasons
+	InstallableCheckSkipped         = "InstallableCheckSkipped"
+	InstallableRequirementUnmatched = "InstallableRequirementUnmatched"
+	AddonAutoInstall                = "AddonAutoInstall"
+	DisablingAddon                  = "DisablingAddon"
+	EnablingAddon                   = "EnablingAddon"
+	InstallationFailed              = "InstallationFailed"
+	UninstallationFailed            = "UninstallationFailed"
 )

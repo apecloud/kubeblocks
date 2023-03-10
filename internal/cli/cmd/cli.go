@@ -28,6 +28,7 @@ import (
 	utilcomp "k8s.io/kubectl/pkg/util/completion"
 	"k8s.io/kubectl/pkg/util/templates"
 
+	"github.com/apecloud/kubeblocks/internal/cli/cmd/addon"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/alert"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/app"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/backupconfig"
@@ -100,6 +101,7 @@ A Command Line Interface for KubeBlocks`,
 		clusterdefinition.NewClusterDefinitionCmd(f, ioStreams),
 		app.NewAppCmd(f, ioStreams),
 		alert.NewAlertCmd(f, ioStreams),
+		addon.NewAddonCmd(f, ioStreams),
 	)
 
 	filters := []string{"options"}

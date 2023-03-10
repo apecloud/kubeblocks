@@ -18,7 +18,6 @@ package cluster
 
 import (
 	"context"
-	"fmt"
 	"sort"
 	"strings"
 
@@ -92,15 +91,15 @@ func (o *opsListOptions) printOpsList() error {
 	if err != nil {
 		return err
 	}
+	if len(opsList.Items) == 0 {
+		o.PrintNotFoundResources()
+		return nil
+	}
 	// sort the unstructured objects with the creationTimestamp in positive order
 	sort.Sort(unstructuredList(opsList.Items))
 
-	var (
-		// check if existing the resources to print.
-		hasResources bool
-		// check if specific the "all" keyword for status.
-		isAllStatus = o.isAllStatus()
-	)
+	// check if specific the "all" keyword for status.
+	isAllStatus := o.isAllStatus()
 	tbl := printer.NewTablePrinter(o.Out)
 	tbl.SetHeader("NAME", "TYPE", "CLUSTER", "COMPONENT", "STATUS", "PROGRESS", "CREATED-TIME")
 	for _, obj := range opsList.Items {
@@ -118,14 +117,9 @@ func (o *opsListOptions) printOpsList() error {
 		if len(o.opsType) != 0 && !o.containsIgnoreCase(o.opsType, opsType) {
 			continue
 		}
-		hasResources = true
 		tbl.AddRow(ops.Name, opsType, ops.Spec.ClusterRef, getComponentNameFromOps(ops), phase, ops.Status.Progress, util.TimeFormat(&ops.CreationTimestamp))
 	}
-	if hasResources {
-		tbl.Print()
-	} else {
-		o.printNoFoundResources()
-	}
+	tbl.Print()
 	return nil
 }
 
@@ -184,15 +178,6 @@ func getKeyNameFromOps(ops appsv1alpha1.OpsRequestSpec) string {
 		}
 	}
 	return strings.Join(keys, ",")
-}
-
-// printNoFoundResources prints the message when the resources not found.
-func (o *opsListOptions) printNoFoundResources() {
-	message := "No resources found"
-	if !o.AllNamespaces && len(o.Namespace) != 0 {
-		message += fmt.Sprintf(" in %s namespace", o.Namespace)
-	}
-	fmt.Fprintln(o.Out, message)
 }
 
 func (o *opsListOptions) containsIgnoreCase(s []string, e string) bool {

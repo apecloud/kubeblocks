@@ -1,6 +1,8 @@
 ## @section Common parameters
 ##
 
+appVersionOverride:
+
 ## KubeBlocks container image settings
 ##
 ## @param image.registry KubeBlocks image registry
@@ -360,6 +362,74 @@ prometheus:
     containerSecurityContext:
       allowPrivilegeEscalation: false
 
+    ingress:
+      ## If true, alertmanager Ingress will be created
+      ##
+      enabled: false
+
+      # For Kubernetes >= 1.18 you should specify the ingress-controller via the field ingressClassName
+      # See https://kubernetes.io/blog/2020/04/02/improvements-to-the-ingress-api-in-kubernetes-1.18/#specifying-the-class-of-an-ingress
+      # ingressClassName: nginx
+
+      ## alertmanager Ingress annotations
+      ##
+      annotations: {}
+      #   kubernetes.io/ingress.class: nginx
+      #   kubernetes.io/tls-acme: 'true'
+
+      ## alertmanager Ingress additional labels
+      ##
+      extraLabels: {}
+
+      ## alertmanager Ingress hostnames with optional path
+      ## Must be provided if Ingress is enabled
+      ##
+      hosts: []
+      #   - alertmanager.domain.com
+      #   - domain.com/alertmanager
+
+      path: /
+
+      # pathType is only for k8s >= 1.18
+      pathType: Prefix
+
+      ## Extra paths to prepend to every host configuration. This is useful when working with annotation based services.
+      extraPaths: []
+      # - path: /*
+      #   backend:
+      #     serviceName: ssl-redirect
+      #     servicePort: use-annotation
+
+      ## alertmanager Ingress TLS configuration
+      ## Secrets must be manually created in the namespace
+      ##
+      tls: []
+      #   - secretName: prometheus-alerts-tls
+      #     hosts:
+      #       - alertmanager.domain.com
+
+    service:
+      annotations: {}
+      labels: {}
+      clusterIP: ""
+
+      ## Enabling peer mesh service end points for enabling the HA alert manager
+      ## Ref: https://github.com/prometheus/alertmanager/blob/master/README.md
+      # enableMeshPeer : true
+
+      ## List of IP addresses at which the alertmanager service is available
+      ## Ref: https://kubernetes.io/docs/user-guide/services/#external-ips
+      ##
+      externalIPs: []
+
+      loadBalancerIP: ""
+      loadBalancerSourceRanges: []
+      servicePort: 80
+      # nodePort: 30000
+      sessionAffinity: None
+      type: ClusterIP
+
+
   kubeStateMetrics:
     ## If false, kube-state-metrics sub-chart will not be installed
     ##
@@ -495,6 +565,88 @@ prometheus:
 
     containerSecurityContext:
       allowPrivilegeEscalation: false
+
+    service:
+      ## If false, no Service will be created for the Prometheus server
+      ##
+      enabled: true
+
+      annotations: {}
+      labels: {}
+      clusterIP: ""
+
+      ## List of IP addresses at which the Prometheus server service is available
+      ## Ref: https://kubernetes.io/docs/user-guide/services/#external-ips
+      ##
+      externalIPs: []
+
+      loadBalancerIP: ""
+      loadBalancerSourceRanges: []
+      servicePort: 80
+      sessionAffinity: None
+      type: ClusterIP
+
+      ## Enable gRPC port on service to allow auto discovery with thanos-querier
+      gRPC:
+        enabled: false
+        servicePort: 10901
+        # nodePort: 10901
+
+      ## If using a statefulSet (statefulSet.enabled=true), configure the
+      ## service to connect to a specific replica to have a consistent view
+      ## of the data.
+      statefulsetReplica:
+        enabled: false
+        replica: 0
+
+    ingress:
+      ## If true, Prometheus server Ingress will be created
+      ##
+      enabled: false
+
+      # For Kubernetes >= 1.18 you should specify the ingress-controller via the field ingressClassName
+      # See https://kubernetes.io/blog/2020/04/02/improvements-to-the-ingress-api-in-kubernetes-1.18/#specifying-the-class-of-an-ingress
+      # ingressClassName: nginx
+
+      ## Prometheus server Ingress annotations
+      ##
+      annotations: {}
+      #   kubernetes.io/ingress.class: nginx
+      #   kubernetes.io/tls-acme: 'true'
+
+      ## Prometheus server Ingress additional labels
+      ##
+      extraLabels: {}
+
+      ## Prometheus server Ingress hostnames with optional path
+      ## Must be provided if Ingress is enabled
+      ##
+      hosts: []
+      #   - prometheus.domain.com
+      #   - domain.com/prometheus
+
+      path: /
+
+      # pathType is only for k8s >= 1.18
+      pathType: Prefix
+
+      ## Extra paths to prepend to every host configuration. This is useful when working with annotation based services.
+      extraPaths: []
+      # - path: /*
+      #   backend:
+      #     serviceName: ssl-redirect
+      #     servicePort: use-annotation
+
+      ## Prometheus server Ingress TLS configuration
+      ## Secrets must be manually created in the namespace
+      ##
+      tls: []
+      #   - secretName: prometheus-server-tls
+      #     hosts:
+      #       - prometheus.domain.com
+
+
+
 
   ## AlertManager ConfigMap Entries
   ## NOTE: Please review these carefully as thresholds and behavior may not meet
@@ -1295,19 +1447,69 @@ grafana:
       # Hide the Grafana version text from the footer and help tooltip for unauthenticated users (default: false)
       hide_version: true
 
+  ingress:
+    enabled: false
+    # For Kubernetes >= 1.18 you should specify the ingress-controller via the field ingressClassName
+    # See https://kubernetes.io/blog/2020/04/02/improvements-to-the-ingress-api-in-kubernetes-1.18/#specifying-the-class-of-an-ingress
+    # ingressClassName: nginx
+    # Values can be templated
+    annotations: {}
+      # kubernetes.io/ingress.class: nginx
+    # kubernetes.io/tls-acme: "true"
+    labels: {}
+    path: /
+
+    # pathType is only for k8s >= 1.1=
+    pathType: Prefix
+
+    hosts:
+      - chart-example.local
+    ## Extra paths to prepend to every host configuration. This is useful when working with annotation based services.
+    extraPaths: []
+    # - path: /*
+    #   backend:
+    #     serviceName: ssl-redirect
+    #     servicePort: use-annotation
+    ## Or for k8s > 1.19
+    # - path: /*
+    #   pathType: Prefix
+    #   backend:
+    #     service:
+    #       name: ssl-redirect
+    #       port:
+    #         name: use-annotation
+
+
+    tls: []
+    #  - secretName: chart-example-tls
+    #    hosts:
+    #      - chart-example.local
+
+  ## Expose the grafana service to be accessed from outside the cluster (LoadBalancer service).
+  ## or access it from within the cluster (ClusterIP service). Set the service type and the port to serve it.
+  ## ref: http://kubernetes.io/docs/user-guide/services/
+  ##
+  service:
+    enabled: true
+    type: ClusterIP
+    port: 80
+    targetPort: 3000
+    # targetPort: 4181 To be used with a proxy extraContainer
+    ## Service annotations. Can be templated.
+    annotations: {}
+    labels: {}
+    portName: service
+    # Adds the appProtocol field to the service. This allows to work with istio protocol selection. Ex: "http" or "tcp"
+    appProtocol: ""
+
+
+
 loadbalancer:
   enabled: false
 
-
-apecloud-mysql:
-  enabled: true
-
-postgresql:
-  enabled: true
-
-## snapshot-controller settings
-## ref: https://artifacthub.io/packages/helm/piraeus-charts/snapshot-controller#configuration
-##
+### snapshot-controller settings
+### ref: https://artifacthub.io/packages/helm/piraeus-charts/snapshot-controller#configuration
+###
 snapshot-controller:
   ## @param snapshot-controller.enabled -- Enable snapshot-controller chart.
   ##
@@ -1327,7 +1529,7 @@ snapshot-controller:
       operator: Equal
       value: "true"
       effect: NoSchedule
-
+ 
   affinity:
     nodeAffinity:
       preferredDuringSchedulingIgnoredDuringExecution:
@@ -1344,6 +1546,7 @@ snapshot-controller:
 ##
 csi-s3:
   ## @param csi-s3.enabled -- Enable csi-s3 chart.
+  ##
   enabled: false
   ## csi-s3 secret settings
   ## @param csi-s3.secret.accessKey -- S3 Access Key.

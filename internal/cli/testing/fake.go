@@ -62,7 +62,7 @@ func FakeCluster(name string, namespace string) *appsv1alpha1.Cluster {
 	return &appsv1alpha1.Cluster{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       types.KindCluster,
-			APIVersion: fmt.Sprintf("%s/%s", types.Group, types.Version),
+			APIVersion: fmt.Sprintf("%s/%s", types.AppsAPIGroup, types.AppsAPIVersion),
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
@@ -255,7 +255,7 @@ func FakeBackupTool() *dpv1alpha1.BackupTool {
 func FakeBackupPolicyTemplate() *dpv1alpha1.BackupPolicyTemplate {
 	template := &dpv1alpha1.BackupPolicyTemplate{
 		TypeMeta: metav1.TypeMeta{
-			APIVersion: fmt.Sprintf("%s/%s", types.DPGroup, types.DPVersion),
+			APIVersion: fmt.Sprintf("%s/%s", types.DPAPIGroup, types.DPAPIVersion),
 			Kind:       types.KindBackupPolicyTemplate,
 		},
 		ObjectMeta: metav1.ObjectMeta{
@@ -268,7 +268,7 @@ func FakeBackupPolicyTemplate() *dpv1alpha1.BackupPolicyTemplate {
 func FakeBackup(backupName string) *dpv1alpha1.Backup {
 	backup := &dpv1alpha1.Backup{
 		TypeMeta: metav1.TypeMeta{
-			APIVersion: fmt.Sprintf("%s/%s", types.DPGroup, types.DPVersion),
+			APIVersion: fmt.Sprintf("%s/%s", types.DPAPIGroup, types.DPAPIVersion),
 			Kind:       types.KindBackup,
 		},
 		ObjectMeta: metav1.ObjectMeta{

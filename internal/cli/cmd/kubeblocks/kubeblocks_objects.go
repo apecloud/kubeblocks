@@ -34,7 +34,7 @@ import (
 	"k8s.io/klog/v2"
 
 	"github.com/apecloud/kubeblocks/internal/cli/types"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/constant"
+	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
 type kbObjects map[schema.GroupVersionResource]*unstructured.UnstructuredList
@@ -69,7 +69,7 @@ func getKBObjects(dynamic dynamic.Interface, namespace string) (kbObjects, error
 	appendErr(err)
 	kbObjs[types.CRDGVR()] = &unstructured.UnstructuredList{}
 	for i, crd := range crds.Items {
-		if !strings.Contains(crd.GetName(), "kubeblocks.io") {
+		if !strings.Contains(crd.GetName(), constant.APIGroup) {
 			continue
 		}
 		crdObjs := kbObjs[types.CRDGVR()]
@@ -121,9 +121,9 @@ func getKBObjects(dynamic dynamic.Interface, namespace string) (kbObjects, error
 	}
 
 	// build label selector
-	instanceLabelSelector := fmt.Sprintf("%s=%s", intctrlutil.AppInstanceLabelKey, types.KubeBlocksChartName)
+	instanceLabelSelector := fmt.Sprintf("%s=%s", constant.AppInstanceLabelKey, types.KubeBlocksChartName)
 	releaseLabelSelector := fmt.Sprintf("release=%s", types.KubeBlocksChartName)
-	configMapLabelSelector := fmt.Sprintf("%s=%s", intctrlutil.CMConfigurationTypeLabelKey, intctrlutil.ConfigTemplateType)
+	configMapLabelSelector := fmt.Sprintf("%s=%s", constant.CMConfigurationTypeLabelKey, constant.ConfigTemplateType)
 
 	// get resources which label matches app.kubernetes.io/instance=kubeblocks or
 	// label matches release=kubeblocks, like prometheus-server

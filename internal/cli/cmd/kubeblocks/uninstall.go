@@ -38,6 +38,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 	"github.com/apecloud/kubeblocks/internal/cli/util/helm"
+	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
 var (
@@ -105,7 +106,7 @@ func (o *uninstallOptions) preCheck() error {
 	}
 	for _, crd := range crdList.Items {
 		// find kubeblocks crds
-		if strings.Contains(crd.GetName(), "kubeblocks.io") &&
+		if strings.Contains(crd.GetName(), constant.APIGroup) &&
 			slices.Contains(preCheckList, crd.GetName()) {
 			gvr, err := getGVRByCRD(&crd)
 			if err != nil {

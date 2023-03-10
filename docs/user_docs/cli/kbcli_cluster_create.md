@@ -3,7 +3,7 @@
 Create a cluster
 
 ```
-kbcli cluster create [NAME] [flags]
+kbcli cluster create [CLUSTER_NAME] [flags]
 ```
 
 ### Examples

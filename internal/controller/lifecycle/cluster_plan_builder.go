@@ -54,10 +54,12 @@ func (b *clusterPlanBuilder) getCompoundCluster() (*compoundCluster, error) {
 		return nil, err
 	}
 	cv := &appsv1alpha1.ClusterVersion{}
-	if err := b.cli.Get(b.ctx.Ctx, types.NamespacedName{
-		Name: b.cluster.Spec.ClusterVersionRef,
-	}, cv); err != nil {
-		return nil, err
+	if len(b.cluster.Spec.ClusterVersionRef) > 0 {
+		if err := b.cli.Get(b.ctx.Ctx, types.NamespacedName{
+			Name: b.cluster.Spec.ClusterVersionRef,
+		}, cv); err != nil {
+			return nil, err
+		}
 	}
 
 	cc := &compoundCluster{

@@ -186,12 +186,12 @@ func TestGetConfigTemplatesFromComponent(t *testing.T) {
 			comName:     comName,
 			cComponents: cComponents,
 			dComponents: []appsv1alpha1.ClusterComponentDefinition{{
-				Name:                comType,
-				ComponentConfigSpec: []appsv1alpha1.ComponentConfigSpec{tpl1},
+				Name:                 comType,
+				ComponentConfigSpecs: []appsv1alpha1.ComponentConfigSpec{tpl1},
 			}},
 			aComponents: []appsv1alpha1.ClusterComponentVersion{{
-				ComponentDefRef:     comType,
-				ComponentConfigSpec: []appsv1alpha1.ComponentConfigSpec{tpl2},
+				ComponentDefRef:      comType,
+				ComponentConfigSpecs: []appsv1alpha1.ComponentConfigSpec{tpl2},
 			}},
 		},
 		want: []appsv1alpha1.ComponentConfigSpec{
@@ -205,12 +205,12 @@ func TestGetConfigTemplatesFromComponent(t *testing.T) {
 			comName:     "not exist component",
 			cComponents: cComponents,
 			dComponents: []appsv1alpha1.ClusterComponentDefinition{{
-				Name:                comType,
-				ComponentConfigSpec: []appsv1alpha1.ComponentConfigSpec{tpl1},
+				Name:                 comType,
+				ComponentConfigSpecs: []appsv1alpha1.ComponentConfigSpec{tpl1},
 			}},
 			aComponents: []appsv1alpha1.ClusterComponentVersion{{
-				ComponentDefRef:     comType,
-				ComponentConfigSpec: []appsv1alpha1.ComponentConfigSpec{tpl2},
+				ComponentDefRef:      comType,
+				ComponentConfigSpecs: []appsv1alpha1.ComponentConfigSpec{tpl2},
 			}},
 		},
 		want:    nil,
@@ -221,12 +221,12 @@ func TestGetConfigTemplatesFromComponent(t *testing.T) {
 			comName:     comName,
 			cComponents: cComponents,
 			dComponents: []appsv1alpha1.ClusterComponentDefinition{{
-				Name:                comType,
-				ComponentConfigSpec: []appsv1alpha1.ComponentConfigSpec{tpl1},
+				Name:                 comType,
+				ComponentConfigSpecs: []appsv1alpha1.ComponentConfigSpec{tpl1},
 			}},
 			aComponents: []appsv1alpha1.ClusterComponentVersion{{
-				ComponentDefRef:     "not exist",
-				ComponentConfigSpec: []appsv1alpha1.ComponentConfigSpec{tpl2},
+				ComponentDefRef:      "not exist",
+				ComponentConfigSpecs: []appsv1alpha1.ComponentConfigSpec{tpl2},
 			},
 			}},
 		want: []appsv1alpha1.ComponentConfigSpec{

@@ -250,10 +250,10 @@ func (r *SystemAccountSpec) validateSysAccounts(allErrs *field.ErrorList) {
 }
 
 func (r *ClusterDefinition) validateConfigSpec(component ClusterComponentDefinition) error {
-	if len(component.ComponentConfigSpec) <= 1 && len(component.ComponentScriptSpec) <= 1 {
+	if len(component.ComponentConfigSpecs) <= 1 && len(component.ComponentScriptSpecs) <= 1 {
 		return nil
 	}
-	return validateConfigTemplateList(component.ComponentConfigSpec)
+	return validateConfigTemplateList(component.ComponentConfigSpecs)
 }
 
 func validateConfigTemplateList(ctpls []ComponentConfigSpec) error {

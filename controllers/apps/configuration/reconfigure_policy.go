@@ -130,7 +130,7 @@ func GetClientFactory() createReconfigureClient {
 }
 
 func (param *reconfigureParams) getConfigKey() string {
-	for _, tpl := range param.Component.ComponentConfigSpec {
+	for _, tpl := range param.Component.ComponentConfigSpecs {
 		if tpl.Name == param.TplName {
 			return tpl.VolumeName
 		}

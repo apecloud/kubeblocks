@@ -237,7 +237,7 @@ var _ = Describe("TLS self-signed cert function", func() {
 				sts := stsList.Items[0]
 				cd := &appsv1alpha1.ClusterDefinition{}
 				Expect(k8sClient.Get(ctx, types.NamespacedName{Name: clusterDefName, Namespace: testCtx.DefaultNamespace}, cd)).Should(Succeed())
-				cmName := cfgcore.GetInstanceCMName(&sts, &cd.Spec.ComponentDefs[0].ComponentConfigSpec[0].ComponentTemplateSpec)
+				cmName := cfgcore.GetInstanceCMName(&sts, &cd.Spec.ComponentDefs[0].ComponentConfigSpecs[0].ComponentTemplateSpec)
 				cmKey := client.ObjectKey{Namespace: sts.Namespace, Name: cmName}
 				hasTLSSettings := func() bool {
 					cm := &corev1.ConfigMap{}

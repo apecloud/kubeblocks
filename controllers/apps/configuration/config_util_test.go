@@ -178,12 +178,12 @@ var _ = Describe("ConfigWrapper util test", func() {
 			_, err := handleConfigTemplate(clusterDefObj, func(templates []appsv1alpha1.ComponentConfigSpec) (bool, error) {
 				return true, nil
 			}, func(component *appsv1alpha1.ClusterComponentDefinition) error {
-				if len(component.ComponentConfigSpec) == 0 {
+				if len(component.ComponentConfigSpecs) == 0 {
 					return nil
 				}
 
-				for i := range component.ComponentConfigSpec {
-					tpl := &component.ComponentConfigSpec[i]
+				for i := range component.ComponentConfigSpecs {
+					tpl := &component.ComponentConfigSpecs[i]
 					tpl.ConfigConstraintRef = ""
 				}
 				return nil
@@ -227,7 +227,7 @@ var _ = Describe("ConfigWrapper util test", func() {
 		}
 
 		// mock clusterVersionObj config templates
-		clusterVersionObj.Spec.ComponentVersions[0].ComponentConfigSpec = tpls
+		clusterVersionObj.Spec.ComponentVersions[0].ComponentConfigSpecs = tpls
 	}
 
 	Context("clusterversion CR test", func() {

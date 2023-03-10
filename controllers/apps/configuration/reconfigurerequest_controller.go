@@ -199,7 +199,7 @@ func (r *ReconfigureRequestReconciler) sync(reqCtx intctrlutil.RequestCtx, confi
 		return intctrlutil.Reconciled()
 	}
 
-	if len(component.ComponentConfigSpec) == 0 {
+	if len(component.ComponentConfigSpecs) == 0 {
 		return intctrlutil.Reconciled()
 	}
 

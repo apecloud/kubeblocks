@@ -270,8 +270,8 @@ func handleConfigTemplate(object client.Object, handler ConfigTemplateHandler, h
 func getConfigTemplateFromCV(appVer *appsv1alpha1.ClusterVersion) []appsv1alpha1.ComponentConfigSpec {
 	configTemplates := make([]appsv1alpha1.ComponentConfigSpec, 0)
 	for _, component := range appVer.Spec.ComponentVersions {
-		if len(component.ComponentConfigSpec) > 0 {
-			configTemplates = append(configTemplates, component.ComponentConfigSpec...)
+		if len(component.ComponentConfigSpecs) > 0 {
+			configTemplates = append(configTemplates, component.ComponentConfigSpecs...)
 		}
 	}
 	return configTemplates
@@ -280,17 +280,17 @@ func getConfigTemplateFromCV(appVer *appsv1alpha1.ClusterVersion) []appsv1alpha1
 func getConfigTemplateFromCD(clusterDef *appsv1alpha1.ClusterDefinition, validators ...ComponentValidateHandler) ([]appsv1alpha1.ComponentConfigSpec, error) {
 	configTemplates := make([]appsv1alpha1.ComponentConfigSpec, 0)
 	for _, component := range clusterDef.Spec.ComponentDefs {
-		// For compatibility with the previous lifecycle management of configurationSpec.ConfigTemplateRef, it is necessary to convert ComponentScriptSpec to ComponentConfigSpec,
+		// For compatibility with the previous lifecycle management of configurationSpec.ConfigTemplateRef, it is necessary to convert ComponentScriptSpecs to ComponentConfigSpecs,
 		// ensuring that the script-related configmap is not allowed to be deleted.
-		for _, scriptSpec := range component.ComponentScriptSpec {
+		for _, scriptSpec := range component.ComponentScriptSpecs {
 			configTemplates = append(configTemplates, appsv1alpha1.ComponentConfigSpec{
 				ComponentTemplateSpec: scriptSpec,
 			})
 		}
-		if len(component.ComponentConfigSpec) == 0 {
+		if len(component.ComponentConfigSpecs) == 0 {
 			continue
 		}
-		configTemplates = append(configTemplates, component.ComponentConfigSpec...)
+		configTemplates = append(configTemplates, component.ComponentConfigSpecs...)
 		// Check reload configure config template
 		for _, validator := range validators {
 			if err := validator(&component); err != nil {

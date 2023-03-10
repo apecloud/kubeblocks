@@ -270,7 +270,7 @@ var _ = Describe("clusterDefinition webhook", func() {
 			}}
 
 			for _, tt := range tests {
-				clusterDef.Spec.ComponentDefs[0].ComponentConfigSpec = tt.tpls
+				clusterDef.Spec.ComponentDefs[0].ComponentConfigSpecs = tt.tpls
 				err := testCtx.CreateObj(ctx, clusterDef)
 				if tt.wantErr {
 					Expect(err).ShouldNot(Succeed())

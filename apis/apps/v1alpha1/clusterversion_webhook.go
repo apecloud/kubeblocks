@@ -114,8 +114,8 @@ func (r *ClusterVersion) validate() error {
 
 func (r *ClusterVersion) validateConfigTemplate() error {
 	for _, c := range r.Spec.ComponentVersions {
-		if len(c.ComponentConfigSpec) > 1 {
-			return validateConfigTemplateList(c.ComponentConfigSpec)
+		if len(c.ComponentConfigSpecs) > 1 {
+			return validateConfigTemplateList(c.ComponentConfigSpecs)
 		}
 	}
 	return nil

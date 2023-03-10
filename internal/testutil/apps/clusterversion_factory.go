@@ -87,7 +87,7 @@ func (factory *MockClusterVersionFactory) AddConfigTemplate(name string,
 	comps := factory.get().Spec.ComponentVersions
 	if len(comps) > 0 {
 		comp := comps[len(comps)-1]
-		comp.ComponentConfigSpec = append(comp.ComponentConfigSpec,
+		comp.ComponentConfigSpecs = append(comp.ComponentConfigSpecs,
 			appsv1alpha1.ComponentConfigSpec{
 				ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
 					Name:              name,

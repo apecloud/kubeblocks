@@ -219,7 +219,7 @@ type ComponentConfigSpec struct {
 	ConfigConstraintRef string `json:"constraintRef,omitempty"`
 }
 
-// type ComponentScriptSpec struct {
+// type ComponentScriptSpecs struct {
 //	ComponentTemplateSpec `json:",inline"`
 // }
 
@@ -321,7 +321,7 @@ type ClusterComponentDefinition struct {
 	// +listType=map
 	// +listMapKey=name
 	// +optional
-	ComponentConfigSpec []ComponentConfigSpec `json:"configSpecs,omitempty"`
+	ComponentConfigSpecs []ComponentConfigSpec `json:"configSpecs,omitempty"`
 
 	// The scriptSpec field provided by provider, and
 	// finally this configTemplateRefs will be rendered into the user's own configuration file according to the user's cluster.
@@ -331,7 +331,7 @@ type ClusterComponentDefinition struct {
 	// +listType=map
 	// +listMapKey=name
 	// +optional
-	ComponentScriptSpec []ComponentTemplateSpec `json:"scriptSpecs,omitempty"`
+	ComponentScriptSpecs []ComponentTemplateSpec `json:"scriptSpecs,omitempty"`
 
 	// probes setting for healthy checks.
 	// +optional

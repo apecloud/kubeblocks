@@ -92,7 +92,7 @@ func (factory *MockClusterDefFactory) AddScriptTemplate(name,
 	if comp == nil {
 		return nil
 	}
-	comp.ComponentScriptSpec = append(comp.ComponentScriptSpec,
+	comp.ComponentScriptSpecs = append(comp.ComponentScriptSpecs,
 		appsv1alpha1.ComponentTemplateSpec{
 			Name:              name,
 			ConfigTemplateRef: configTplRef,
@@ -109,7 +109,7 @@ func (factory *MockClusterDefFactory) AddConfigTemplate(name,
 	if comp == nil {
 		return nil
 	}
-	comp.ComponentConfigSpec = append(comp.ComponentConfigSpec,
+	comp.ComponentConfigSpecs = append(comp.ComponentConfigSpecs,
 		appsv1alpha1.ComponentConfigSpec{
 			ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
 				Name:              name,

@@ -68,10 +68,10 @@ func GetConfigTemplatesFromComponent(
 	)
 
 	if aCom != nil {
-		avTpls = aCom.ComponentConfigSpec
+		avTpls = aCom.ComponentConfigSpecs
 	}
 	if dCom != nil {
-		cdTpls = dCom.ComponentConfigSpec
+		cdTpls = dCom.ComponentConfigSpecs
 	}
 
 	return MergeConfigTemplates(avTpls, cdTpls), nil

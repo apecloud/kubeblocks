@@ -108,6 +108,66 @@ func (b *clusterPlanBuilder) defaultWalkFunc(node graph.Vertex) error {
 	return nil
 }
 
+// Build only cluster Creation, Update and Deletion supported.
+// TODO: Validations and Corrections (cluster labels correction, primaryIndex spec validation etc.)
+func (b *clusterPlanBuilder) Build() (graph.Plan, error) {
+	cc, err := b.getCompoundCluster()
+	if err != nil {
+		return nil, err
+	}
+
+	// build transformer chain
+	chain := &graph.TransformerChain{
+		// cluster to K8s objects and put them into dag
+		&clusterTransformer{cc: *cc, cli: b.cli, ctx: b.ctx},
+		// tls certs secret
+		&tlsCertsTransformer{cc: *cc, cli: b.cli, ctx: b.ctx},
+		// add our finalizer to all objects
+		&ownershipTransformer{finalizer: dbClusterFinalizerName},
+		// make all workload objects depending on credential secret
+		&credentialTransformer{},
+		// make config configmap immutable
+		&configTransformer{},
+		// read old snapshot from cache, and generate diff plan
+		&cacheDiffTransformer{cc: *cc, cli: b.cli, ctx: b.ctx},
+		// horizontal scaling
+		&horizontalScalingTransformer{cc: *cc, cli: b.cli, ctx: b.ctx},
+		// stateful set pvc Update
+		&statefulSetPVCTransformer{cc: *cc, cli: b.cli, ctx: b.ctx},
+		// replication set horizontal scaling
+		&rplSetHorizontalScalingTransformer{cc: *cc, cli: b.cli, ctx: b.ctx},
+		// finally, update cluster status
+		&clusterStatusTransformer{*cc},
+	}
+
+	// new a DAG and apply chain on it, after that we should get the final Plan
+	dag := graph.NewDAG()
+	if err := chain.ApplyTo(dag); err != nil {
+		return nil, err
+	}
+
+	// we got the execution plan
+	plan := &clusterPlan{
+		dag:      dag,
+		walkFunc: b.defaultWalkFunc,
+	}
+	return plan, nil
+}
+
+// NewClusterPlanBuilder returns a clusterPlanBuilder powered PlanBuilder
+// TODO: change ctx to context.Context
+func NewClusterPlanBuilder(ctx intctrlutil.RequestCtx, cli client.Client, cluster *appsv1alpha1.Cluster) graph.PlanBuilder {
+	return &clusterPlanBuilder{
+		ctx:     ctx,
+		cli:     cli,
+		cluster: cluster,
+	}
+}
+
+func (p *clusterPlan) Execute() error {
+	return p.dag.WalkReverseTopoOrder(p.walkFunc)
+}
+
 func buildUpdateObj(node *lifecycleVertex) (client.Object, error) {
 	handleSts := func(origObj, stsProto *appsv1.StatefulSet) (client.Object, error) {
 		//if *stsObj.Spec.Replicas != *stsProto.Spec.Replicas {
@@ -180,64 +240,6 @@ func buildUpdateObj(node *lifecycleVertex) (client.Object, error) {
 	}
 
 	return nil, nil
-}
-
-// Build only cluster Creation, Update and Deletion supported.
-// TODO: Validations and Corrections (cluster labels correction, primaryIndex spec validation etc.)
-func (b *clusterPlanBuilder) Build() (graph.Plan, error) {
-	cc, err := b.getCompoundCluster()
-	if err != nil {
-		return nil, err
-	}
-
-	// build transformer chain
-	chain := &graph.TransformerChain{
-		// cluster to K8s objects and put them into dag
-		&clusterTransformer{cc: *cc, cli: b.cli, ctx: b.ctx},
-		// tls certs secret
-		&tlsCertsTransformer{cc: *cc, cli: b.cli, ctx: b.ctx},
-		// add our finalizer to all objects
-		&ownershipTransformer{finalizer: dbClusterFinalizerName},
-		// make all workload objects depending on credential secret
-		&credentialTransformer{},
-		// make config configmap immutable
-		&configTransformer{},
-		// read old snapshot from cache, and generate diff plan
-		&cacheDiffTransformer{cc: *cc, cli: b.cli, ctx: b.ctx},
-		// horizontal scaling
-		&horizontalScalingTransformer{cc: *cc, cli: b.cli, ctx: b.ctx},
-		// stateful set pvc Update
-		&statefulSetPVCTransformer{cc: *cc, cli: b.cli, ctx: b.ctx},
-		// finally, update cluster status
-		&clusterStatusTransformer{*cc},
-	}
-
-	// new a DAG and apply chain on it, after that we should get the final Plan
-	dag := graph.NewDAG()
-	if err := chain.ApplyTo(dag); err != nil {
-		return nil, err
-	}
-
-	// we got the execution plan
-	plan := &clusterPlan{
-		dag:      dag,
-		walkFunc: b.defaultWalkFunc,
-	}
-	return plan, nil
-}
-
-// NewClusterPlanBuilder returns a clusterPlanBuilder powered PlanBuilder
-// TODO: change ctx to context.Context
-func NewClusterPlanBuilder(ctx intctrlutil.RequestCtx, cli client.Client, cluster *appsv1alpha1.Cluster) graph.PlanBuilder {
-	return &clusterPlanBuilder{
-		ctx:     ctx,
-		cli:     cli,
-		cluster: cluster,
-	}
-}
-
-func (p *clusterPlan) Execute() error {
-	return p.dag.WalkReverseTopoOrder(p.walkFunc)
 }
 
 // mergeAnnotations keeps the original annotations.

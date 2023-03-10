@@ -88,6 +88,12 @@ type Inputs struct {
 
 	// PreCreate optional, make changes on yaml before create
 	PreCreate func(*unstructured.Unstructured) error
+
+	// CustomOutPut will be executed after creating successfully.
+	CustomOutPut func(options *BaseOptions)
+
+	// ResourceNameGVRForCompletion resource name for completion.
+	ResourceNameGVRForCompletion schema.GroupVersionResource
 }
 
 // BaseOptions the options of creation command should inherit baseOptions
@@ -111,9 +117,10 @@ type BaseOptions struct {
 // BuildCommand build create command
 func BuildCommand(inputs Inputs) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     inputs.Use,
-		Short:   inputs.Short,
-		Example: inputs.Example,
+		Use:               inputs.Use,
+		Short:             inputs.Short,
+		Example:           inputs.Example,
+		ValidArgsFunction: util.ResourceNameCompletionFunc(inputs.Factory, inputs.ResourceNameGVRForCompletion),
 		Run: func(cmd *cobra.Command, args []string) {
 			util.CheckErr(inputs.BaseOptionsObj.Complete(inputs, args))
 			util.CheckErr(inputs.BaseOptionsObj.Validate(inputs))
@@ -207,7 +214,13 @@ func (o *BaseOptions) Run(inputs Inputs) error {
 	if unstructuredObj, err = o.Dynamic.Resource(gvr).Namespace(o.Namespace).Create(context.TODO(), unstructuredObj, metav1.CreateOptions{}); err != nil {
 		return err
 	}
-	if !o.Quiet {
+	o.Name = unstructuredObj.GetName()
+	if o.Quiet {
+		return nil
+	}
+	if inputs.CustomOutPut != nil {
+		inputs.CustomOutPut(o)
+	} else {
 		fmt.Fprintf(o.Out, "%s %s created\n", unstructuredObj.GetKind(), unstructuredObj.GetName())
 	}
 	return nil

@@ -686,7 +686,7 @@ func (r *BackupReconciler) deleteExternalResources(reqCtx intctrlutil.RequestCtx
 
 func (r *BackupReconciler) getTargetPod(
 	reqCtx intctrlutil.RequestCtx, backupPolicy *dataprotectionv1alpha1.BackupPolicy) (*corev1.Pod, error) {
-	reqCtx.Log.Info("Get pod from label", "label", backupPolicy.Spec.Target.LabelsSelector.MatchLabels)
+	reqCtx.Log.V(1).Info("Get pod from label", "label", backupPolicy.Spec.Target.LabelsSelector.MatchLabels)
 	targetPod := &corev1.PodList{}
 	if err := r.Client.List(reqCtx.Ctx, targetPod,
 		client.InNamespace(reqCtx.Req.Namespace),

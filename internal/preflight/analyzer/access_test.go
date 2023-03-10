@@ -40,7 +40,7 @@ var _ = Describe("access_test", func() {
 	Context("AnalyzeHostUtility test", func() {
 		BeforeEach(func() {
 			analyzer = AnalyzeClusterAccess{
-				analyzer: &preflightv1beta2.ClusterAccess{
+				analyzer: &preflightv1beta2.ClusterAccessAnalyze{
 					Outcomes: []*troubleshoot.Outcome{
 						{
 							Pass: &troubleshoot.SingleOutcome{

@@ -8852,6 +8852,36 @@ spec:
                       - cmdExecutorConfig
                       - passwordConfig
                       type: object
+                    volumeTypes:
+                      description: "VolumeTypes is used to describe the purpose of
+                        the volumes mapping the name of the VolumeMounts in the PodSpec.Container
+                        field, such as data volume, log volume, etc. When backing
+                        up the volume, the volume can be correctly backed up according
+                        to the volumeType. \n For example: `{name: data, type: data}`
+                        means that the volume named `data` is used to store `data`.
+                        `{name: binlog, type: log}` means that the volume named `binlog`
+                        is used to store `log`. \n NOTE: When volumeTypes is not defined,
+                        the backup function will not be supported, even if a persistent
+                        volume has been specified."
+                      items:
+                        properties:
+                          name:
+                            description: Name definition is the same as the name of
+                              the VolumeMounts field in PodSpec.Container, similar
+                              to the relations of Volumes[*].name and VolumesMounts[*].name
+                              in Pod.Spec.
+                            pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                            type: string
+                          type:
+                            description: 'Type is in enum of {data, log}. VolumeTypeData:
+                              the volume is for the persistent data storage. VolumeTypeLog:
+                              the volume is for the persistent log storage.'
+                            enum:
+                            - data
+                            - log
+                            type: string
+                        type: object
+                      type: array
                     workloadType:
                       description: workloadType defines type of the workload. Stateless
                         is a stateless workload type used to describe stateless applications.

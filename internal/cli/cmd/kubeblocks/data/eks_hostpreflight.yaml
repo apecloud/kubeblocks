@@ -1,0 +1,43 @@
+apiVersion: troubleshoot.sh/v1beta2
+kind: HostPreflight
+metadata:
+  name: host-utility
+spec:
+  collectors:
+  analyzers:
+  extendCollectors:
+    - hostUtility :
+        collectorName: aws-cli
+        utilityName: aws
+    - hostUtility :
+        collectorName: eks-ctl
+        utilityName: eksctl
+    - clusterRegion :
+        providerName: eks
+  extendAnalyzers:
+    - hostUtility:
+        checkName: AWSCli-Check
+        collectorName: aws-cli
+        outcomes:
+          - pass:
+              message: aws cli has been installed
+          - warn:
+              message: aws cli isn't installed
+    - hostUtility:
+        checkName: EKSCtl-Check
+        collectorName: eks-ctl
+        outcomes:
+          - pass:
+              message: eksctl has been installed
+          - warn:
+              message: eksctl isn't installed
+    - clusterRegion:
+        checkName: Check-K8S-Region
+        regionNames:
+          - cn-northwest-1
+          - cn-north-1
+        outcomes:
+          - warn:
+              message: k8s cluster region doesn't belong to amazon china
+          - pass:
+              message: k8s cluster region belongs to amazon china

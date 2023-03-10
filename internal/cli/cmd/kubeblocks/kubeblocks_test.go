@@ -45,4 +45,9 @@ var _ = Describe("kubeblocks", func() {
 		Expect(cmd).ShouldNot(BeNil())
 		Expect(cmd.HasSubCommands()).Should(BeTrue())
 	})
+
+	It("preflight", func() {
+		cmd := NewPreflightCmd(tf, streams)
+		Expect(cmd).ShouldNot(BeNil())
+	})
 })

@@ -83,6 +83,9 @@ spec:
         - name: {{ $name }}
           filePathPattern: {{ $pattern }}
         {{- end }}
+      volumeTypes:
+        - name: data
+          type: data
       podSpec:
         initContainers:
           - name: redis-init-container

@@ -158,7 +158,8 @@ var _ = Describe("Addon controller", func() {
 
 			By("By enabling addon with default install")
 			defaultInstall := addon.Spec.DefaultInstallValues[0].AddonInstallSpec
-			addon.Spec.InstallSpec = &defaultInstall
+			addon.Spec.InstallSpec = defaultInstall.DeepCopy()
+			addon.Spec.InstallSpec.Enabled = true
 			Expect(testCtx.Cli.Update(ctx, addon)).Should(Succeed())
 			enablingPhaseCheck(2)
 

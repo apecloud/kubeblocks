@@ -4,6 +4,10 @@ metadata:
   name: {{ include "addon.alertmanager-webhook-adaptor.name" . }}
   labels:
     {{- include "kubeblocks.labels" . | nindent 4 }}
+  {{- if .Values.keepAddons }}
+  annotations:
+    helm.sh/resource-policy: keep
+  {{- end }}
 spec:
   description: 'alertmanager webhook adaptor for extending alertmanager notification channels'
   type: Helm

@@ -4,6 +4,10 @@ metadata:
   name: loadbalancer
   labels:
     {{- include "kubeblocks.labels" . | nindent 4 }}
+  {{- if .Values.keepAddons }}
+  annotations:
+    helm.sh/resource-policy: keep
+  {{- end }}
 spec:
   description: 'A loadbalancer Helm chart for Kubernetes'
   type: Helm
@@ -41,7 +45,7 @@ spec:
     - replicas: 1
 
   installable:
-    autoInstall: {{ .Values.loadbalancer.enabled }}
+    autoInstall: true
     selectors:
       - key: KubeGitVersion
         operator: Contains

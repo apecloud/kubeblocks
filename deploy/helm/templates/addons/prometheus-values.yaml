@@ -4,6 +4,10 @@ metadata:
   name: {{ include "addon.prometheus.name" . }}-chart-kubeblocks-values
   labels:
     {{- include "kubeblocks.labels" . | nindent 4 }}
+  {{- if .Values.keepAddons }}
+  annotations:
+    helm.sh/resource-policy: keep
+  {{- end }}
 data:
   values-kubeblocks-override.yaml: |-
      {{- .Values.prometheus | toYaml | nindent 4 }}

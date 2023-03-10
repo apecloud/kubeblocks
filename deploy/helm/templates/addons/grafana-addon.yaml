@@ -4,6 +4,10 @@ metadata:
   name: grafana
   labels:
     {{- include "kubeblocks.labels" . | nindent 4 }}
+  {{- if .Values.keepAddons }}
+  annotations:
+    helm.sh/resource-policy: keep
+  {{- end }}
 spec:
   description: The leading tool for querying and visualizing time series and metrics.
   type: Helm

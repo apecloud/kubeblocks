@@ -71,7 +71,7 @@ func updateCfgParams(config appsv1alpha1.Configuration,
 	}
 
 	fc := cfgTpl.Spec.FormatterConfig
-	newCfg, err = cfgcore.MergeAndValidateConfiguration(cfgTpl.Spec, cm.Data, params)
+	newCfg, err = cfgcore.MergeAndValidateConfiguration(cfgTpl.Spec, cm.Data, tpl.Keys, params)
 	if err != nil {
 		return makeReconfiguringResult(err, withFailed(true))
 	}

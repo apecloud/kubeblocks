@@ -50,6 +50,8 @@ data:
       . /opt/bitnami/scripts/libos.sh
       . /opt/bitnami/scripts/libpostgresql.sh
       . /opt/bitnami/scripts/postgresql-env.sh
+      # add permission to daemon user
+      chmod a+w "$POSTGRESQL_VOLUME_DIR"
       # Ensure 'daemon' user exists when running as 'root'
       am_i_root && ensure_user_exists "$POSTGRESQL_DAEMON_USER" --group "$POSTGRESQL_DAEMON_GROUP"
       if [ ! -d ${PGDATA} ]; then

@@ -5,25 +5,10 @@ metadata:
   labels:
     {{- include "postgresql.labels" . | nindent 4 }}
 spec:
-  clusterDefinitionRef: postgresql
+  clusterDefinitionRef: postgresql-cluster
   componentVersions:
-  - componentDefRef: postgresql
+  - componentDefRef: pg-replicaset
     versionsContext:
       containers:
       - name: postgresql
-        image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ default .Values.image.tag .Chart.AppVersion }}
----
-apiVersion: apps.kubeblocks.io/v1alpha1
-kind: ClusterVersion
-metadata:
-  name: postgresql-15.1.0
-  labels:
-    {{- include "postgresql.labels" . | nindent 4 }}
-spec:
-  clusterDefinitionRef: postgresql
-  componentVersions:
-  - componentDefRef: postgresql
-    versionsContext:
-      containers:
-      - name: postgresql
-        image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:15.1.0
+        image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ default .Chart.AppVersion .Values.image.tag }}

@@ -48,7 +48,7 @@ var _ = Describe("analyzer_test", func() {
 
 		It("KBAnalyze test, and expect success", func() {
 			kbAnalyzer := &preflightv1beta2.ExtendAnalyze{
-				ClusterAccess: &preflightv1beta2.ClusterAccess{
+				ClusterAccess: &preflightv1beta2.ClusterAccessAnalyze{
 					Outcomes: []*troubleshoot.Outcome{
 						{
 							Pass: &troubleshoot.SingleOutcome{
@@ -76,7 +76,7 @@ var _ = Describe("analyzer_test", func() {
 			Eventually(func(g Gomega) {
 				b, err := json.Marshal(resInfo)
 				g.Expect(err).NotTo(HaveOccurred())
-				getCollectedFileContents := func(filename string) ([]byte, error) {
+				getCollectedFileContents := func(string) ([]byte, error) {
 					return b, nil
 				}
 				res := KBAnalyze(context.TODO(), kbAnalyzer, getCollectedFileContents, nil)
@@ -115,7 +115,7 @@ var _ = Describe("analyzer_test", func() {
 			Eventually(func(g Gomega) {
 				b, err := json.Marshal(resInfo)
 				g.Expect(err).NotTo(HaveOccurred())
-				getCollectedFileContents := func(filename string) ([]byte, error) {
+				getCollectedFileContents := func(string) ([]byte, error) {
 					return b, nil
 				}
 				res := HostKBAnalyze(context.TODO(), kbHostAnalyzer, getCollectedFileContents, nil)
@@ -127,7 +127,7 @@ var _ = Describe("analyzer_test", func() {
 
 	It("GetAnalyzer test, and expect success", func() {
 		Eventually(func(g Gomega) {
-			collector, ok := GetAnalyzer(&preflightv1beta2.ExtendAnalyze{ClusterAccess: &preflightv1beta2.ClusterAccess{}})
+			collector, ok := GetAnalyzer(&preflightv1beta2.ExtendAnalyze{ClusterAccess: &preflightv1beta2.ClusterAccessAnalyze{}})
 			g.Expect(collector).ShouldNot(BeNil())
 			g.Expect(ok).Should(BeTrue())
 			collector, ok = GetAnalyzer(&preflightv1beta2.ExtendAnalyze{})
@@ -137,7 +137,7 @@ var _ = Describe("analyzer_test", func() {
 	})
 
 	It("NewAnalyzeResultError test, argument isn't nil", func() {
-		res := NewAnalyzeResultError(&AnalyzeClusterAccess{analyzer: &preflightv1beta2.ClusterAccess{}}, errors.New("mock error"))
+		res := NewAnalyzeResultError(&AnalyzeClusterAccess{analyzer: &preflightv1beta2.ClusterAccessAnalyze{}}, errors.New("mock error"))
 		Expect(len(res)).Should(Equal(1))
 		Expect(res[0].IsFail).Should(BeTrue())
 	})

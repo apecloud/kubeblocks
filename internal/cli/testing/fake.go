@@ -62,7 +62,7 @@ func FakeCluster(name string, namespace string) *appsv1alpha1.Cluster {
 	return &appsv1alpha1.Cluster{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       types.KindCluster,
-			APIVersion: fmt.Sprintf("%s/%s", types.Group, types.Version),
+			APIVersion: fmt.Sprintf("%s/%s", types.AppsAPIGroup, types.AppsAPIVersion),
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
@@ -198,6 +198,18 @@ func FakeSecrets(namespace string, cluster string) *corev1.SecretList {
 	return &corev1.SecretList{Items: []corev1.Secret{secret}}
 }
 
+func FakeSecretsWithLabels(namespace string, labels map[string]string) *corev1.SecretList {
+	secret := corev1.Secret{}
+	secret.Name = GetRandomStr()
+	secret.Namespace = namespace
+	secret.Labels = labels
+	secret.Data = map[string][]byte{
+		"username": []byte("test-user"),
+		"password": []byte("test-password"),
+	}
+	return &corev1.SecretList{Items: []corev1.Secret{secret}}
+}
+
 func FakeNode() *corev1.Node {
 	node := &corev1.Node{}
 	node.Name = NodeName
@@ -255,7 +267,7 @@ func FakeBackupTool() *dpv1alpha1.BackupTool {
 func FakeBackupPolicyTemplate() *dpv1alpha1.BackupPolicyTemplate {
 	template := &dpv1alpha1.BackupPolicyTemplate{
 		TypeMeta: metav1.TypeMeta{
-			APIVersion: fmt.Sprintf("%s/%s", types.DPGroup, types.DPVersion),
+			APIVersion: fmt.Sprintf("%s/%s", types.DPAPIGroup, types.DPAPIVersion),
 			Kind:       types.KindBackupPolicyTemplate,
 		},
 		ObjectMeta: metav1.ObjectMeta{
@@ -263,6 +275,21 @@ func FakeBackupPolicyTemplate() *dpv1alpha1.BackupPolicyTemplate {
 		},
 	}
 	return template
+}
+
+func FakeBackup(backupName string) *dpv1alpha1.Backup {
+	backup := &dpv1alpha1.Backup{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: fmt.Sprintf("%s/%s", types.DPAPIGroup, types.DPAPIVersion),
+			Kind:       types.KindBackup,
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      backupName,
+			Namespace: Namespace,
+		},
+	}
+	backup.SetCreationTimestamp(metav1.Now())
+	return backup
 }
 
 func FakeServices() *corev1.ServiceList {

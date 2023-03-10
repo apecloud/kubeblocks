@@ -19,26 +19,42 @@ package create
 import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
 	"github.com/spf13/cobra"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	clientfake "k8s.io/client-go/rest/fake"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 
+	"github.com/apecloud/kubeblocks/internal/cli/testing"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 )
 
 var _ = Describe("Create", func() {
+	var (
+		tf          *cmdtesting.TestFactory
+		streams     genericclioptions.IOStreams
+		baseOptions BaseOptions
+	)
+
+	BeforeEach(func() {
+		streams, _, _, _ = genericclioptions.NewTestIOStreams()
+		tf = cmdtesting.NewTestFactory().WithNamespace(testing.Namespace)
+		tf.Client = &clientfake.RESTClient{}
+		baseOptions = BaseOptions{
+			Name:      "test",
+			IOStreams: streams,
+		}
+	})
+
+	AfterEach(func() {
+		tf.Cleanup()
+	})
+
 	Context("Create Objects", func() {
 		It("test Create run", func() {
-			tf := cmdtesting.NewTestFactory().WithNamespace("default")
-			defer tf.Cleanup()
-			streams, _, _, _ := genericclioptions.NewTestIOStreams()
-			baseOptions := BaseOptions{
-				Name:      "test",
-				IOStreams: streams,
-			}
 			clusterOptions := map[string]interface{}{
 				"name":              "test",
-				"namespace":         "default",
+				"namespace":         testing.Namespace,
 				"clusterDefRef":     "test-def",
 				"clusterVersionRef": "test-clusterversion-ref",
 				"components":        []string{},
@@ -71,16 +87,9 @@ var _ = Describe("Create", func() {
 		})
 
 		It("test Create runAsApply", func() {
-			tf := cmdtesting.NewTestFactory().WithNamespace("default")
-			defer tf.Cleanup()
-			streams, _, _, _ := genericclioptions.NewTestIOStreams()
-			baseOptions := BaseOptions{
-				Name:      "test",
-				IOStreams: streams,
-			}
 			clusterOptions := map[string]interface{}{
 				"name":              "test-apply",
-				"namespace":         "default",
+				"namespace":         testing.Namespace,
 				"clusterDefRef":     "test-def",
 				"clusterVersionRef": "test-clusterversion-ref",
 				"components":        []string{},

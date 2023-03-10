@@ -470,7 +470,7 @@ Notes: Monitor components(Grafana/Prometheus/AlertManager) is not installed,
 func (o *InstallOptions) createVolumeSnapshotClass() error {
 	createFunc := func() error {
 		options := cluster.CreateVolumeSnapshotClassOptions{}
-		options.BaseOptions.Client = o.Dynamic
+		options.BaseOptions.Dynamic = o.Dynamic
 		options.BaseOptions.IOStreams = o.IOStreams
 		options.BaseOptions.Quiet = true
 

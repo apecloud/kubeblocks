@@ -275,9 +275,17 @@ func (r *reconfigureOptions) printExplainConfigure(tplName string) error {
 	confSpec := configConstraint.Spec
 	schema := confSpec.ConfigurationSchema.DeepCopy()
 	if schema.Schema == nil {
+		if schema.CUE == "" {
+			fmt.Printf("\n%s\n", notCueSchemaPrompt)
+			return nil
+		}
 		apiSchema, err := cfgcore.GenerateOpenAPISchema(schema.CUE, "")
 		if err != nil {
 			return cfgcore.WrapError(err, "failed to generate open api schema")
+		}
+		if apiSchema == nil {
+			fmt.Printf("\n%s\n", cue2openAPISchemaFailedPrompt)
+			return nil
 		}
 		schema.Schema = apiSchema
 	}

@@ -17,6 +17,11 @@ limitations under the License.
 package constant
 
 const (
+	// config keys used in viper
+	CfgKeyServerInfo = "_KUBE_SERVER_INFO"
+)
+
+const (
 	ConnCredentialPlaceHolder = "$(CONN_CREDENTIAL_SECRET_NAME)"
 )
 
@@ -31,6 +36,8 @@ const (
 )
 
 const (
+	APIGroup = "kubeblocks.io"
+
 	AppName = "kubeblocks"
 
 	// K8s recommonded and well-known label and annotation keys
@@ -50,6 +57,7 @@ const (
 	RoleLabelKey                    = "kubeblocks.io/role"              // RoleLabelKey consensusSet and replicationSet role label key
 	BackupProtectionLabelKey        = "kubeblocks.io/backup-protection" // BackupProtectionLabelKey Backup delete protection policy label
 	AddonNameLabelKey               = "extensions.kubeblocks.io/addon-name"
+	ClusterAccountLabelKey          = "account.kubeblocks.io/name"
 	VolumeTypeLabelKey              = "kubeblocks.io/volume-type"
 
 	// kubeblocks.io annotations
@@ -58,6 +66,7 @@ const (
 	RestartAnnotationKey             = "kubeblocks.io/restart"     // RestartAnnotationKey the annotation which notices the StatefulSet/DeploySet to restart
 	SnapShotForStartAnnotationKey    = "kubeblocks.io/snapshot-for-start"
 	RestoreFromBackUpAnnotationKey   = "kubeblocks.io/restore-from-backup" // RestoreFromBackUpAnnotationKey specifies the component to recover from the backup.
+	ClusterSnapshotAnnotationKey     = "kubeblocks.io/cluster-snapshot"    // ClusterSnapshotAnnotationKey saves the snapshot of cluster.
 
 	// ConfigurationTplLabelPrefixKey clusterVersion or clusterdefinition using tpl
 	ConfigurationTplLabelPrefixKey         = "configuration.kubeblocks.io/cfg-tpl"

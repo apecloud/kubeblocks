@@ -1,0 +1,49 @@
+apiVersion: extensions.kubeblocks.io/v1alpha1
+kind: Addon
+metadata:
+  name: loadbalancer
+  labels:
+    {{- include "kubeblocks.labels" . | nindent 4 }}
+spec:
+  description: 'A loadbalancer Helm chart for Kubernetes'
+  type: Helm
+
+  helm:
+    chartLocationURL: https://github.com/apecloud/helm-charts/releases/download/loadbalancer-0.1.0/loadbalancer-0.1.0.tgz
+
+    valuesMapping:
+      valueMap:
+        replicaCount: controller.replicaCount
+
+      jsonMap:
+        tolerations: tolerations
+
+      resources:
+        cpu:
+          requests: controller.resources.requests.cpu
+          limits: controller.resources.limits.cpu
+        memory:
+          requests: controller.resources.requests.memory
+          limits: controller.resources.limits.memory
+
+      extras:
+        - name: agent
+          resources:
+            cpu:
+              requests: agent.resources.requests.cpu
+              limits: agent.resources.limits.cpu
+            memory:
+              requests: agent.resources.requests.memory
+              limits: agent.resources.limits.memory
+
+  defaultInstallValues:
+    - replicas: 1
+
+  installable:
+    autoInstall: {{ .Values.loadbalancer.enabled }}
+    selectors:
+      - key: KubeGitVersion
+        operator: Contains
+        values:
+          - eks
+

@@ -50,7 +50,7 @@ const (
 	RoleLabelKey                    = "kubeblocks.io/role"              // RoleLabelKey consensusSet and replicationSet role label key
 	BackupProtectionLabelKey        = "kubeblocks.io/backup-protection" // BackupProtectionLabelKey Backup delete protection policy label
 	AddonNameLabelKey               = "extensions.kubeblocks.io/addon-name"
-	VolumeTypeLabelKey              = "kubeblocks.io/data-type"
+	VolumeTypeLabelKey              = "kubeblocks.io/volume-type"
 
 	// kubeblocks.io annotations
 	OpsRequestAnnotationKey          = "kubeblocks.io/ops-request" // OpsRequestAnnotationKey OpsRequest annotation key in Cluster

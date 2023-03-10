@@ -331,6 +331,7 @@ func init() {
 	SchemeBuilder.Register(&Addon{}, &AddonList{})
 }
 
+// GetExtraNames exacter extra items' name.
 func (r *Addon) GetExtraNames() []string {
 	if r == nil {
 		return nil
@@ -364,6 +365,7 @@ func buildSelectorStrings(selectors []SelectorRequirement) []string {
 	return sl
 }
 
+// GetSelectorsStrings extract selectors to string representations.
 func (r *AddonDefaultInstallSpecItem) GetSelectorsStrings() []string {
 	if r == nil {
 		return nil
@@ -371,6 +373,7 @@ func (r *AddonDefaultInstallSpecItem) GetSelectorsStrings() []string {
 	return buildSelectorStrings(r.Selectors)
 }
 
+// GetSelectorsStrings extract selectors to string representations.
 func (r *InstallableSpec) GetSelectorsStrings() []string {
 	if r == nil {
 		return nil
@@ -383,6 +386,7 @@ func (r *SelectorRequirement) String() string {
 		r.Key, r.Operator, r.Values)
 }
 
+// MatchesFromConfig matches selector requirement value.
 func (r *SelectorRequirement) MatchesFromConfig() bool {
 	if r == nil {
 		return false
@@ -451,6 +455,7 @@ func (r *SelectorRequirement) matchesLine(line string) bool {
 	}
 }
 
+// GetEnabled provides Enabled property getter.
 func (r *AddonInstallSpec) GetEnabled() bool {
 	if r == nil {
 		return false

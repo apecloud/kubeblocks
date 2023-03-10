@@ -420,13 +420,8 @@ func (r *BackupReconciler) createVolumeSnapshot(
 		client.MatchingLabels(dataPVCLabels)); err != nil {
 		return err
 	}
-	if len(dataPVC.Items) != 1 {
-		names := make([]string, 0)
-		for _, i := range dataPVC.Items {
-			names = append(names, i.Name)
-		}
-		return fmt.Errorf("target pvc is ambiguous for [%s], only support 1 persistent volume backup",
-			strings.Join(names, ","))
+	if len(dataPVC.Items) == 0 {
+		return errors.New("can not find any pvc to backup by labelsSelector")
 	}
 	pvcName := dataPVC.Items[0].Name
 

@@ -90,7 +90,6 @@ type CreateBackupPolicyOptions struct {
 	TTL              string `json:"ttl,omitempty"`
 	ConnectionSecret string `json:"connectionSecret,omitempty"`
 	PolicyTemplate   string `json:"policyTemplate,omitempty"`
-	Role             string `json:"role,omitempty"`
 	create.BaseOptions
 }
 
@@ -180,17 +179,12 @@ func (o *CreateBackupOptions) Validate() error {
 	if err != nil {
 		return err
 	}
-	role, err := o.getClusterRole()
-	if err != nil {
-		return err
-	}
 	// apply backup policy
 	policyOptions := CreateBackupPolicyOptions{
 		TTL:              o.TTL,
 		ClusterName:      o.Name,
 		ConnectionSecret: connectionSecret,
 		PolicyTemplate:   backupPolicyTemplate,
-		Role:             role,
 		BaseOptions:      o.BaseOptions,
 	}
 	policyOptions.Name = "backup-policy-" + o.Namespace + "-" + o.Name
@@ -255,41 +249,6 @@ func (o *CreateBackupOptions) getDefaultBackupPolicyTemplate() (string, error) {
 		return "", fmt.Errorf("not found any backupPolicyTemplate for cluster %s", o.Name)
 	}
 	return objs.Items[0].GetName(), nil
-}
-
-func (o *CreateBackupOptions) getClusterRole() (string, error) {
-	clusterRes, err := o.Dynamic.Resource(types.ClusterGVR()).Namespace(o.Namespace).Get(context.TODO(), o.Name, metav1.GetOptions{})
-	if err != nil {
-		return "", err
-	}
-	clusterObj := appsv1alpha1.Cluster{}
-	err = runtime.DefaultUnstructuredConverter.
-		FromUnstructured(clusterRes.UnstructuredContent(), &clusterObj)
-	if err != nil {
-		return "", err
-	}
-	clusterDefRes, err := o.Dynamic.Resource(types.ClusterDefGVR()).Get(context.TODO(), clusterObj.Spec.ClusterDefRef, metav1.GetOptions{})
-	if err != nil {
-		return "", err
-	}
-	clusterDef := appsv1alpha1.ClusterDefinition{}
-	err = runtime.DefaultUnstructuredConverter.
-		FromUnstructured(clusterDefRes.UnstructuredContent(), &clusterDef)
-	if err != nil {
-		return "", err
-	}
-	switch clusterDef.Spec.ComponentDefs[0].WorkloadType {
-	case appsv1alpha1.Replication:
-		if o.BackupType == string(dataprotectionv1alpha1.BackupTypeSnapshot) {
-			return "primary", nil
-		}
-		return "secondary", nil
-	default:
-		if o.BackupType == string(dataprotectionv1alpha1.BackupTypeSnapshot) {
-			return "leader", nil
-		}
-		return "follower", nil
-	}
 }
 
 func NewCreateBackupCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {

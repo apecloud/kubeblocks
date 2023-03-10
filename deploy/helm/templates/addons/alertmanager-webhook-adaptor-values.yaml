@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: alertmanager-webhook-adaptor-chart-kubeblocks-values
+  name: {{ include "addon.alertmanager-webhook-adaptor.name" . }}-chart-kubeblocks-values
   labels:
     {{- include "kubeblocks.labels" . | nindent 4 }}
 data:

@@ -451,8 +451,18 @@ func (r *SelectorRequirement) matchesLine(line string) bool {
 	}
 }
 
+func (r *AddonInstallSpec) GetEnabled() bool {
+	if r == nil {
+		return false
+	}
+	return r.Enabled
+}
+
 // BuildMergedValues merge values from a AddonInstallSpec and pre-set values.
 func (r *HelmTypeInstallSpec) BuildMergedValues(spec *AddonInstallSpec) HelmInstallValues {
+	if r == nil {
+		return HelmInstallValues{}
+	}
 	installValues := r.InstallValues
 	processor := func(specItem AddonInstallSpecItem, valueMapping HelmValuesMappingItem) {
 		if specItem.Replicas != nil && *specItem.Replicas >= 0 {

@@ -245,7 +245,7 @@ func (r *autoInstallCheckStage) Handle(ctx context.Context) {
 		}
 
 		setInstallSpec := func(di *extensionsv1alpha1.AddonDefaultInstallSpecItem) {
-			addon.Spec.InstallSpec = &di.AddonInstallSpec
+			addon.Spec.InstallSpec = di.AddonInstallSpec.DeepCopy()
 			addon.Spec.InstallSpec.Enabled = true
 			if err := r.reconciler.Client.Update(ctx, addon); err != nil {
 				r.setRequeueWithErr(err, "")
@@ -293,7 +293,7 @@ func (r *progressingHandler) Handle(ctx context.Context) {
 		}
 
 		// decision enabling or disabling
-		if addon.Spec.InstallSpec == nil || !addon.Spec.InstallSpec.Enabled {
+		if !addon.Spec.InstallSpec.GetEnabled() {
 			r.reqCtx.Log.V(1).Info("progress to disabling stage handler")
 			// if it's new simply return
 			if addon.Status.Phase == "" {

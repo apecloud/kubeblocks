@@ -211,19 +211,31 @@ func SyncReplicationSetClusterStatus(cli client.Client,
 		util.InitClusterComponentStatusIfNeed(cluster, componentName, componentDef)
 		oldReplicationSetStatus = cluster.Status.Components[componentName].ReplicationSetStatus
 	}
-	syncReplicationSetStatus(oldReplicationSetStatus, podList)
+	if err := syncReplicationSetStatus(oldReplicationSetStatus, podList); err != nil {
+		return err
+	}
 	return nil
 }
 
 // syncReplicationSetStatus syncs the target pod info in cluster.status.components.
-func syncReplicationSetStatus(replicationStatus *appsv1alpha1.ReplicationSetStatus, podList []*corev1.Pod) {
+func syncReplicationSetStatus(replicationStatus *appsv1alpha1.ReplicationSetStatus, podList []*corev1.Pod) error {
 	for _, pod := range podList {
 		role := pod.Labels[constant.RoleLabelKey]
+		if role == "" {
+			return fmt.Errorf("pod %s has no role label", pod.Name)
+		}
 		if role == string(Primary) {
 			if replicationStatus.Primary.Pod == pod.Name {
 				continue
 			}
 			replicationStatus.Primary.Pod = pod.Name
+			// if current primary pod in secondary list, it means the primary pod has been switched, remove it.
+			for index, secondary := range replicationStatus.Secondaries {
+				if secondary.Pod == pod.Name {
+					replicationStatus.Secondaries = append(replicationStatus.Secondaries[:index], replicationStatus.Secondaries[index+1:]...)
+					break
+				}
+			}
 		} else {
 			var exist = false
 			for _, secondary := range replicationStatus.Secondaries {
@@ -239,6 +251,7 @@ func syncReplicationSetStatus(replicationStatus *appsv1alpha1.ReplicationSetStat
 			}
 		}
 	}
+	return nil
 }
 
 // RemoveReplicationSetClusterStatus removes replicationSet pod status from cluster.status.component[componentName].ReplicationStatus.

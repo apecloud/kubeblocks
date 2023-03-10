@@ -148,4 +148,9 @@ $kubeblocks_breaking_changes
     - Replace label name from `app.kubernetes.io/created-by` to `app.kubernetes.io/managed-by`
   - Configmap hosted by Kubeblocks and named with `*-env` suffix
     - Replace label name from `app.kubernetes.io/config-type` to `apps.kubeblocks.io/config-type`
+* Refactored the ConfigTemplate:
+  - CR `clusterdefinition`
+    - Split the data structure of the configuration template from ConfigurationSpec to ComponentConfigSpec and ComponentScriptSpec
+  - CR `clusterversion`
+    - Adjust the structure of the configuration template from ConfigTemplateRefs to ComponentConfigSpec
 * With KubeBlocks Helm chart replaced its optional components install using sub-charts dependencies with Addons extensions API, previous version upgrade to this version will uninstall the optional components completely.

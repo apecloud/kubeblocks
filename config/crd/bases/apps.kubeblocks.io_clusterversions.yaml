@@ -62,10 +62,16 @@ spec:
                   description: ClusterComponentVersion is an application version component
                     spec.
                   properties:
-                    componentConfigSpec:
-                      description: componentConfigSpec defines a configuration extension
-                        mechanism to handle configuration differences between versions,
-                        the configTemplateRefs field, together with configTemplateRefs
+                    componentDefRef:
+                      description: componentDefRef reference one of the cluster component
+                        definition names in ClusterDefinition API (spec.componentDefs.name).
+                      maxLength: 63
+                      pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                      type: string
+                    configSpecs:
+                      description: configSpecs defines a configuration extension mechanism
+                        to handle configuration differences between versions, the
+                        configTemplateRefs field, together with configTemplateRefs
                         in the ClusterDefinition, determines the final configuration
                         file.
                       items:
@@ -128,12 +134,6 @@ spec:
                       x-kubernetes-list-map-keys:
                       - name
                       x-kubernetes-list-type: map
-                    componentDefRef:
-                      description: componentDefRef reference one of the cluster component
-                        definition names in ClusterDefinition API (spec.componentDefs.name).
-                      maxLength: 63
-                      pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
-                      type: string
                     versionsContext:
                       description: versionContext defines containers images' context
                         for component versions, this value replaces ClusterDefinition.spec.componentDefs.podSpec.[initContainers

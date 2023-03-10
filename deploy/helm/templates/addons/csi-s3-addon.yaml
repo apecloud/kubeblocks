@@ -1,0 +1,22 @@
+apiVersion: extensions.kubeblocks.io/v1alpha1
+kind: Addon
+metadata:
+  name: csi-s3
+  labels:
+    {{- include "kubeblocks.labels" . | nindent 4 }}
+spec:
+  description: Container Storage Interface (CSI) driver for S3 volumes
+  type: Helm
+
+  helm:
+    chartLocationURL: https://raw.githubusercontent.com/cloudve/helm-charts/master/charts/csi-s3-0.31.3.tgz
+    installValues:
+      configMapRefs:
+        - name: csi-s3-chart-kubeblocks-values
+          key: values-kubeblocks-override.yaml
+
+  defaultInstallValues:
+    - enabled: true
+
+  installable:
+    autoInstall: {{ get ( get ( .Values | toYaml | fromYaml ) "csi-s3" ) "enabled" }}

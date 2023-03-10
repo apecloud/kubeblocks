@@ -57,6 +57,7 @@ var _ = Describe("Backup for a StatefulSet", func() {
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 		// namespaced
+		testapps.ClearResources(&testCtx, intctrlutil.ClusterSignature, inNS, ml)
 		testapps.ClearResources(&testCtx, intctrlutil.StatefulSetSignature, inNS, ml)
 		testapps.ClearResources(&testCtx, intctrlutil.PodSignature, inNS, ml)
 		testapps.ClearResources(&testCtx, intctrlutil.BackupSignature, inNS, ml)
@@ -71,6 +72,9 @@ var _ = Describe("Backup for a StatefulSet", func() {
 
 	BeforeEach(func() {
 		cleanEnv()
+		By("mock a cluster")
+		testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
+			"test-cd", "test-cv").Create(&testCtx)
 
 		By("By mocking a statefulset")
 		sts := testapps.NewStatefulSetFactory(testCtx.DefaultNamespace, clusterName+"-"+componentName, clusterName, componentName).
@@ -142,6 +146,9 @@ var _ = Describe("Backup for a StatefulSet", func() {
 				By("Check backup job completed")
 				Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dataprotectionv1alpha1.Backup) {
 					g.Expect(fetched.Status.Phase).To(Equal(dataprotectionv1alpha1.BackupCompleted))
+					g.Expect(fetched.Labels[constant.AppInstanceLabelKey]).Should(Equal(clusterName))
+					g.Expect(fetched.Labels[constant.KBAppComponentLabelKey]).Should(Equal(componentName))
+					g.Expect(len(fetched.Annotations[constant.ClusterSnapshotAnnotationKey]) > 0).Should(BeTrue())
 				})).Should(Succeed())
 
 				By("Check backup job is deleted after completed")

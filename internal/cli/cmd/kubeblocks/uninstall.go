@@ -38,6 +38,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 	"github.com/apecloud/kubeblocks/internal/cli/util/helm"
+	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
 var (
@@ -105,7 +106,7 @@ func (o *uninstallOptions) preCheck() error {
 	}
 	for _, crd := range crdList.Items {
 		// find kubeblocks crds
-		if strings.Contains(crd.GetName(), "kubeblocks.io") &&
+		if strings.Contains(crd.GetName(), constant.APIGroup) &&
 			slices.Contains(preCheckList, crd.GetName()) {
 			gvr, err := getGVRByCRD(&crd)
 			if err != nil {
@@ -129,21 +130,14 @@ func (o *uninstallOptions) preCheck() error {
 		}
 		return errors.Errorf(errMsg.String())
 	}
-	{
-		// verify where kubeblocks is installed
-		var msg bytes.Buffer
-		secrets, err := o.Client.CoreV1().Secrets(metav1.NamespaceAll).List(ctx, metav1.ListOptions{LabelSelector: types.HelmLabel})
-		if err != nil || len(secrets.Items) == 0 {
-			msg.WriteString("failed to locate release, please use `kbcli kubeblocks status` to get information in more details")
-			return errors.New(msg.String())
-		} else {
-			kbNamespace := secrets.Items[0].Namespace
-			if o.Namespace != kbNamespace {
-				msg.WriteString(fmt.Sprintf("KubeBlocks is deployed in namespace: '%s'. ", kbNamespace))
-				msg.WriteString(fmt.Sprintf("Please specify namespace to uninstall `kbcli kubeblocks uninstall -n %s`", kbNamespace))
-				return errors.New(msg.String())
-			}
-		}
+
+	// verify where kubeblocks is installed
+	kbNamespace, err := util.GetKubeBlocksNamespace(o.Client)
+	if err != nil {
+		printer.Warning(o.Out, "failed to locate helm release meta, will clean up all KubeBlocks resources.\n")
+	} else if o.Namespace != kbNamespace {
+		o.Namespace = kbNamespace
+		fmt.Fprintf(o.Out, "will uninstall KubeBlocks in namespace: '%s'\n", kbNamespace)
 	}
 	return nil
 }
@@ -209,6 +203,12 @@ func (o *uninstallOptions) uninstall() error {
 		}
 		spinner = newSpinner(fmt.Sprintf("Remove %s", gvr.Resource))
 		printErr(spinner, deleteObjects(o.Dynamic, gvr, objs[gvr]))
+	}
+
+	// delete namespace if it is default namespace
+	if o.Namespace == types.DefaultNamespace {
+		spinner = newSpinner("Remove namespace " + types.DefaultNamespace)
+		printErr(spinner, deleteNamespace(o.Client, types.DefaultNamespace))
 	}
 
 	fmt.Fprintln(o.Out, "Uninstall KubeBlocks done.")

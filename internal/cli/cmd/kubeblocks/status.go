@@ -107,7 +107,7 @@ func newStatusCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 			util.CheckErr(o.run())
 		},
 	}
-	cmd.Flags().BoolVar(&o.showAll, "all", false, "Show all resources, including configurations, storages, etc")
+	cmd.Flags().BoolVarP(&o.showAll, "all", "A", false, "Show all resources, including configurations, storages, etc")
 	return cmd
 }
 
@@ -143,7 +143,9 @@ func (o *statusOptions) run() error {
 
 	o.ns, _ = util.GetKubeBlocksNamespace(o.client)
 	if o.ns == "" {
-		fmt.Fprintf(o.Out, "Failed to find deployed KubeBlocks in any namespace\n")
+		printer.Warning(o.Out, "Failed to find deployed KubeBlocks in any namespace\n")
+		printer.Warning(o.Out, "Will check all namespaces for KubeBlocks resources left behind\n")
+
 	} else {
 		fmt.Fprintf(o.Out, "Kuberblocks is deployed in namespace: %s\n", o.ns)
 	}

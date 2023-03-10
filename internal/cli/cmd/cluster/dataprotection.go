@@ -19,6 +19,7 @@ package cluster
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -29,19 +30,23 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/duration"
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/client-go/dynamic"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/cli/cluster"
 	"github.com/apecloud/kubeblocks/internal/cli/create"
 	"github.com/apecloud/kubeblocks/internal/cli/delete"
 	"github.com/apecloud/kubeblocks/internal/cli/list"
+	"github.com/apecloud/kubeblocks/internal/cli/printer"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/constant"
+	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
 var (
@@ -96,7 +101,7 @@ type CreateVolumeSnapshotClassOptions struct {
 }
 
 func (o *CreateVolumeSnapshotClassOptions) Complete() error {
-	objs, err := o.Client.
+	objs, err := o.Dynamic.
 		Resource(types.StorageClassGVR()).
 		List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
@@ -120,7 +125,7 @@ func (o *CreateVolumeSnapshotClassOptions) Complete() error {
 }
 
 func (o *CreateVolumeSnapshotClassOptions) Create() error {
-	objs, err := o.Client.
+	objs, err := o.Dynamic.
 		Resource(types.VolumeSnapshotClassGVR()).
 		List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
@@ -141,7 +146,7 @@ func (o *CreateVolumeSnapshotClassOptions) Create() error {
 		CueTemplateName: "volumesnapshotclass_template.cue",
 		ResourceName:    "volumesnapshotclasses",
 		Group:           "snapshot.storage.k8s.io",
-		Version:         types.VersionV1,
+		Version:         types.K8sCoreAPIVersion,
 		BaseOptionsObj:  &o.BaseOptions,
 		Options:         o,
 	}
@@ -192,8 +197,8 @@ func (o *CreateBackupOptions) Validate() error {
 	inputs := create.Inputs{
 		CueTemplateName: "backuppolicy_template.cue",
 		ResourceName:    types.ResourceBackupPolicies,
-		Group:           types.DPGroup,
-		Version:         types.DPVersion,
+		Group:           types.DPAPIGroup,
+		Version:         types.DPAPIVersion,
 		BaseOptionsObj:  &policyOptions.BaseOptions,
 		Options:         policyOptions,
 	}
@@ -215,11 +220,11 @@ func (o *CreateBackupOptions) getConnectionSecret() (string, error) {
 	// find secret from cluster label
 	opts := metav1.ListOptions{
 		LabelSelector: fmt.Sprintf("%s=%s,%s=%s",
-			intctrlutil.AppInstanceLabelKey, o.Name,
-			intctrlutil.AppManagedByLabelKey, intctrlutil.AppName),
+			constant.AppInstanceLabelKey, o.Name,
+			constant.AppManagedByLabelKey, constant.AppName),
 	}
 	gvr := schema.GroupVersionResource{Version: "v1", Resource: "secrets"}
-	secretObjs, err := o.Client.Resource(gvr).Namespace(o.Namespace).List(context.TODO(), opts)
+	secretObjs, err := o.Dynamic.Resource(gvr).Namespace(o.Namespace).List(context.TODO(), opts)
 	if err != nil {
 		return "", err
 	}
@@ -230,7 +235,7 @@ func (o *CreateBackupOptions) getConnectionSecret() (string, error) {
 }
 
 func (o *CreateBackupOptions) getDefaultBackupPolicyTemplate() (string, error) {
-	clusterObj, err := o.Client.Resource(types.ClusterGVR()).Namespace(o.Namespace).Get(context.TODO(), o.Name, metav1.GetOptions{})
+	clusterObj, err := o.Dynamic.Resource(types.ClusterGVR()).Namespace(o.Namespace).Get(context.TODO(), o.Name, metav1.GetOptions{})
 	if err != nil {
 		return "", err
 	}
@@ -238,9 +243,9 @@ func (o *CreateBackupOptions) getDefaultBackupPolicyTemplate() (string, error) {
 	// find backupPolicyTemplate from cluster label
 	opts := metav1.ListOptions{
 		LabelSelector: fmt.Sprintf("%s=%s",
-			intctrlutil.ClusterDefLabelKey, clusterObj.GetLabels()[intctrlutil.ClusterDefLabelKey]),
+			constant.ClusterDefLabelKey, clusterObj.GetLabels()[constant.ClusterDefLabelKey]),
 	}
-	objs, err := o.Client.
+	objs, err := o.Dynamic.
 		Resource(types.BackupPolicyTemplateGVR()).
 		List(context.TODO(), opts)
 	if err != nil {
@@ -253,34 +258,34 @@ func (o *CreateBackupOptions) getDefaultBackupPolicyTemplate() (string, error) {
 }
 
 func (o *CreateBackupOptions) getClusterRole() (string, error) {
-	clusterObj, err := o.Client.Resource(types.ClusterGVR()).Namespace(o.Namespace).Get(context.TODO(), o.Name, metav1.GetOptions{})
+	clusterRes, err := o.Dynamic.Resource(types.ClusterGVR()).Namespace(o.Namespace).Get(context.TODO(), o.Name, metav1.GetOptions{})
 	if err != nil {
 		return "", err
 	}
-	cluster := appsv1alpha1.Cluster{}
+	clusterObj := appsv1alpha1.Cluster{}
 	err = runtime.DefaultUnstructuredConverter.
-		FromUnstructured(clusterObj.UnstructuredContent(), &cluster)
+		FromUnstructured(clusterRes.UnstructuredContent(), &clusterObj)
 	if err != nil {
 		return "", err
 	}
-	clusterDefObj, err := o.Client.Resource(types.ClusterDefGVR()).Get(context.TODO(), cluster.Spec.ClusterDefRef, metav1.GetOptions{})
+	clusterDefRes, err := o.Dynamic.Resource(types.ClusterDefGVR()).Get(context.TODO(), clusterObj.Spec.ClusterDefRef, metav1.GetOptions{})
 	if err != nil {
 		return "", err
 	}
 	clusterDef := appsv1alpha1.ClusterDefinition{}
 	err = runtime.DefaultUnstructuredConverter.
-		FromUnstructured(clusterDefObj.UnstructuredContent(), &clusterDef)
+		FromUnstructured(clusterDefRes.UnstructuredContent(), &clusterDef)
 	if err != nil {
 		return "", err
 	}
 	switch clusterDef.Spec.ComponentDefs[0].WorkloadType {
 	case appsv1alpha1.Replication:
-		if o.BackupType == string(dpv1alpha1.BackupTypeSnapshot) {
+		if o.BackupType == string(dataprotectionv1alpha1.BackupTypeSnapshot) {
 			return "primary", nil
 		}
 		return "secondary", nil
 	default:
-		if o.BackupType == string(dpv1alpha1.BackupTypeSnapshot) {
+		if o.BackupType == string(dataprotectionv1alpha1.BackupTypeSnapshot) {
 			return "leader", nil
 		}
 		return "follower", nil
@@ -295,8 +300,8 @@ func NewCreateBackupCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) 
 		Example:         createBackupExample,
 		CueTemplateName: "backup_template.cue",
 		ResourceName:    types.ResourceBackups,
-		Group:           types.DPGroup,
-		Version:         types.DPVersion,
+		Group:           types.DPAPIGroup,
+		Version:         types.DPAPIVersion,
 		BaseOptionsObj:  &o.BaseOptions,
 		Options:         o,
 		Factory:         f,
@@ -312,6 +317,66 @@ func NewCreateBackupCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) 
 	return create.BuildCommand(inputs)
 }
 
+// getClusterNameMap get cluster list by namespace and convert to map.
+func getClusterNameMap(dClient dynamic.Interface, o *list.ListOptions) (map[string]struct{}, error) {
+	clusterList, err := dClient.Resource(types.ClusterGVR()).Namespace(o.Namespace).List(context.TODO(), metav1.ListOptions{})
+	if err != nil {
+		return nil, err
+	}
+	clusterMap := make(map[string]struct{})
+	for _, v := range clusterList.Items {
+		clusterMap[v.GetName()] = struct{}{}
+	}
+	return clusterMap, nil
+}
+
+func printBackupList(o *list.ListOptions) error {
+	dynamic, err := o.Factory.DynamicClient()
+	if err != nil {
+		return err
+	}
+	backupList, err := dynamic.Resource(types.BackupGVR()).Namespace(o.Namespace).List(context.TODO(), metav1.ListOptions{
+		LabelSelector: o.LabelSelector,
+		FieldSelector: o.FieldSelector,
+	})
+	if err != nil {
+		return err
+	}
+
+	if len(backupList.Items) == 0 {
+		o.PrintNotFoundResources()
+		return nil
+	}
+
+	clusterNameMap, err := getClusterNameMap(dynamic, o)
+	if err != nil {
+		return err
+	}
+
+	// sort the unstructured objects with the creationTimestamp in positive order
+	sort.Sort(unstructuredList(backupList.Items))
+	tbl := printer.NewTablePrinter(o.Out)
+	tbl.SetHeader("NAME", "CLUSTER", "TYPE", "STATUS", "TOTAL-SIZE", "DURATION", "CREATE-TIME", "COMPLETION-TIME")
+	for _, obj := range backupList.Items {
+		backup := &dataprotectionv1alpha1.Backup{}
+		if err = runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, backup); err != nil {
+			return err
+		}
+		clusterName := backup.Labels[constant.AppInstanceLabelKey]
+		if _, ok := clusterNameMap[clusterName]; !ok {
+			clusterName = fmt.Sprintf("%s (deleted)", clusterName)
+		}
+		durationStr := ""
+		if backup.Status.Duration != nil {
+			durationStr = duration.HumanDuration(backup.Status.Duration.Duration)
+		}
+		tbl.AddRow(backup.Name, clusterName, backup.Spec.BackupType, backup.Status.Phase, backup.Status.TotalSize,
+			durationStr, util.TimeFormat(&backup.CreationTimestamp), util.TimeFormat(backup.Status.CompletionTimestamp))
+	}
+	tbl.Print()
+	return nil
+}
+
 func NewListBackupCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := list.NewListOptions(f, streams, types.BackupGVR())
 	cmd := &cobra.Command{
@@ -323,8 +388,8 @@ func NewListBackupCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *c
 		Run: func(cmd *cobra.Command, args []string) {
 			o.LabelSelector = util.BuildLabelSelectorByNames(o.LabelSelector, args)
 			o.Names = nil
-			_, err := o.Run()
-			util.CheckErr(err)
+			util.CheckErr(o.Complete())
+			util.CheckErr(printBackupList(o))
 		},
 	}
 	o.AddFlags(cmd)
@@ -370,66 +435,78 @@ func completeForDeleteBackup(o *delete.DeleteOptions, args []string) error {
 }
 
 type CreateRestoreOptions struct {
-	CreateOptions
+	// backup name to restore in creation
+	Backup string `json:"backup,omitempty"`
+	create.BaseOptions
 }
 
-func (o *CreateRestoreOptions) Complete() error {
+func (o *CreateRestoreOptions) getClusterObject(backup *dataprotectionv1alpha1.Backup) (*appsv1alpha1.Cluster, error) {
+	clusterName := backup.Labels[constant.AppInstanceLabelKey]
+	clusterObj, err := cluster.GetClusterByName(o.Dynamic, clusterName, o.Namespace)
+	if err != nil && !apierrors.IsNotFound(err) {
+		return nil, err
+	}
+	if apierrors.IsNotFound(err) {
+		// if the source cluster does not exist, obtain it from the cluster snapshot of the backup.
+		clusterString, ok := backup.Annotations[constant.ClusterSnapshotAnnotationKey]
+		if !ok {
+			return nil, fmt.Errorf("source cluster: %s not found", clusterName)
+		}
+		err = json.Unmarshal([]byte(clusterString), &clusterObj)
+	}
+	return clusterObj, err
+}
+
+func (o *CreateRestoreOptions) Run() error {
 	// get backup job
-	gvr := schema.GroupVersionResource{Group: types.DPGroup, Version: types.DPVersion, Resource: types.ResourceBackups}
-	backupObj, err := o.Client.Resource(gvr).Namespace(o.Namespace).Get(context.TODO(), o.Backup, metav1.GetOptions{})
+	backup := &dataprotectionv1alpha1.Backup{}
+	if err := cluster.GetK8SClientObject(o.Dynamic, backup, types.BackupGVR(), o.Namespace, o.Backup); err != nil {
+		return err
+	}
+	if backup.Status.Phase != dataprotectionv1alpha1.BackupCompleted {
+		return errors.Errorf(`backup "%s" is not completed.`, backup.Name)
+	}
+	if len(backup.Labels[constant.AppInstanceLabelKey]) == 0 {
+		return errors.Errorf(`missing source cluster in backup "%s", "app.kubernetes.io/instance" is empty in labels.`, o.Backup)
+	}
+	// get the cluster object and set the annotation for restore
+	cluster, err := o.getClusterObject(backup)
 	if err != nil {
 		return err
 	}
-	srcClusterName, clusterExists, err := unstructured.NestedString(backupObj.Object, "metadata", "labels", "app.kubernetes.io/instance")
+	restoreAnnotation, err := getRestoreFromBackupAnnotation(backup, len(cluster.Spec.ComponentSpecs), cluster.Spec.ComponentSpecs[0].Name)
 	if err != nil {
 		return err
 	}
-	if !clusterExists {
-		return errors.Errorf("Missing source cluster in backup '%s'.", o.Backup)
+	cluster.Status = appsv1alpha1.ClusterStatus{}
+	cluster.ObjectMeta = metav1.ObjectMeta{
+		Namespace:   cluster.Namespace,
+		Name:        o.Name,
+		Annotations: map[string]string{constant.RestoreFromBackUpAnnotationKey: restoreAnnotation},
 	}
-
-	gvr = schema.GroupVersionResource{Group: types.Group, Version: types.Version, Resource: types.ResourceClusters}
-
-	clusterObj, err := o.Client.Resource(gvr).Namespace(o.Namespace).Get(context.TODO(), srcClusterName, metav1.GetOptions{})
+	clusterGVR := types.ClusterGVR()
+	cluster.TypeMeta = metav1.TypeMeta{
+		Kind:       types.KindCluster,
+		APIVersion: clusterGVR.Group + "/" + clusterGVR.Version,
+	}
+	// convert the cluster object and create it.
+	unstructuredMap, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&cluster)
 	if err != nil {
 		return err
 	}
-	cluster := appsv1alpha1.Cluster{}
-	err = runtime.DefaultUnstructuredConverter.
-		FromUnstructured(clusterObj.UnstructuredContent(), &cluster)
-	if err != nil {
+	unstructuredObj := &unstructured.Unstructured{Object: unstructuredMap}
+	if unstructuredObj, err = o.Dynamic.Resource(clusterGVR).Namespace(o.Namespace).Create(context.TODO(), unstructuredObj, metav1.CreateOptions{}); err != nil {
 		return err
 	}
-
-	o.ClusterVersionRef = cluster.Spec.ClusterVersionRef
-	o.ClusterDefRef = cluster.Spec.ClusterDefRef
-	o.TerminationPolicy = string(cluster.Spec.TerminationPolicy)
-
-	if cluster.Spec.Affinity != nil {
-		o.PodAntiAffinity = string(cluster.Spec.Affinity.PodAntiAffinity)
-		o.NodeLabels = cluster.Spec.Affinity.NodeLabels
-		o.TopologyKeys = cluster.Spec.Affinity.TopologyKeys
-		o.Tenancy = string(cluster.Spec.Affinity.Tenancy)
-	} else {
-		o.PodAntiAffinity = string(appsv1alpha1.Preferred)
-		o.Tenancy = string(appsv1alpha1.SharedNode)
+	if !o.Quiet {
+		fmt.Fprintf(o.Out, "%s %s created\n", unstructuredObj.GetKind(), unstructuredObj.GetName())
 	}
-	o.Monitor = cluster.Spec.ComponentSpecs[0].Monitor
-	componentByte, err := json.Marshal(cluster.Spec.ComponentSpecs)
-	if err != nil {
-		return err
-	}
-
-	if err = json.Unmarshal(componentByte, &o.ComponentSpecs); err != nil {
-		return err
-	}
-
-	return o.CreateOptions.Complete()
+	return nil
 }
 
 func (o *CreateRestoreOptions) Validate() error {
 	if o.Name == "" {
-		name, err := generateClusterName(o.Client, o.Namespace)
+		name, err := generateClusterName(o.Dynamic, o.Namespace)
 		if err != nil {
 			return err
 		}
@@ -443,25 +520,25 @@ func (o *CreateRestoreOptions) Validate() error {
 
 func NewCreateRestoreCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := &CreateRestoreOptions{}
-	o.BaseOptions = create.BaseOptions{IOStreams: streams}
+	o.IOStreams = streams
 	inputs := create.Inputs{
-		Use:             "restore",
-		Short:           "Restore a new cluster from backup",
-		Example:         createRestoreExample,
-		CueTemplateName: CueTemplateName,
-		ResourceName:    types.ResourceClusters,
-		Group:           types.Group,
-		Version:         types.Version,
-		BaseOptionsObj:  &o.BaseOptions,
-		Options:         o,
-		Factory:         f,
-		Validate:        o.Validate,
-		Complete:        o.Complete,
-		BuildFlags: func(cmd *cobra.Command) {
-			cmd.Flags().StringVar(&o.Backup, "backup", "", "Backup name")
+		BaseOptionsObj: &create.BaseOptions{IOStreams: streams},
+		Options:        o,
+		Factory:        f,
+	}
+	cmd := &cobra.Command{
+		Use:               "restore",
+		Short:             "Restore a new cluster from backup",
+		Example:           createRestoreExample,
+		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.ClusterGVR()),
+		Run: func(cmd *cobra.Command, args []string) {
+			util.CheckErr(o.Complete(inputs, args))
+			util.CheckErr(o.Validate())
+			util.CheckErr(o.Run())
 		},
 	}
-	return create.BuildCommand(inputs)
+	cmd.Flags().StringVar(&o.Backup, "backup", "", "Backup name")
+	return cmd
 }
 
 func NewListRestoreCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {

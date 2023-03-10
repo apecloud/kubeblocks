@@ -18,14 +18,24 @@ package configmanager
 
 import (
 	"context"
+	"fmt"
 	"path/filepath"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	cfgutil "github.com/apecloud/kubeblocks/internal/configuration"
+)
+
+const (
+	scriptName         = "reload.tpl"
+	configTemplateName = "reload.yaml"
+	scriptVolumeName   = "reload-manager-reload"
+	scriptVolumePath   = "/opt/config/reload"
 )
 
 func BuildConfigManagerContainerArgs(reloadOptions *appsv1alpha1.ReloadOptions, volumeDirs []corev1.VolumeMount, cli client.Client, ctx context.Context, manager *ConfigManagerParams) error {
@@ -42,27 +52,17 @@ func BuildConfigManagerContainerArgs(reloadOptions *appsv1alpha1.ReloadOptions, 
 }
 
 func buildTPLScriptArgs(options *appsv1alpha1.TPLScriptTrigger, volumeDirs []corev1.VolumeMount, cli client.Client, ctx context.Context, manager *ConfigManagerParams) error {
-	const (
-		scriptName       = "reload.tpl"
-		tplConfigName    = "reload.yaml"
-		scriptVolumeName = "reload-manager-reload"
-		scriptVolumePath = "/opt/config/reload"
-	)
-
-	tplScript := corev1.ConfigMap{}
-	if err := cli.Get(ctx, client.ObjectKey{
-		Namespace: options.Namespace,
-		Name:      options.ScriptConfigMapRef,
-	}, &tplScript); err != nil {
+	scriptCMName := fmt.Sprintf("%s-%s", options.ScriptConfigMapRef, manager.Cluster.GetName())
+	if err := checkOrCreateScriptCM(options, client.ObjectKey{
+		Namespace: manager.Cluster.GetNamespace(),
+		Name:      scriptCMName,
+	}, cli, ctx, manager.Cluster); err != nil {
 		return err
-	}
-	if _, ok := tplScript.Data[scriptName]; !ok {
-		return cfgutil.MakeError("configmap not exist script: %s", scriptName)
 	}
 
 	args := buildConfigManagerCommonArgs(volumeDirs)
 	args = append(args, "--notify-type", string(appsv1alpha1.TPLScriptType))
-	args = append(args, "--tpl-config", filepath.Join(scriptVolumePath, tplConfigName))
+	args = append(args, "--tpl-config", filepath.Join(scriptVolumePath, configTemplateName))
 	manager.Args = args
 	manager.Volumes = append(manager.Volumes, corev1.VolumeMount{
 		Name:      scriptVolumeName,
@@ -72,9 +72,48 @@ func buildTPLScriptArgs(options *appsv1alpha1.TPLScriptTrigger, volumeDirs []cor
 		Name: scriptVolumeName,
 		VolumeSource: corev1.VolumeSource{
 			ConfigMap: &corev1.ConfigMapVolumeSource{
-				LocalObjectReference: corev1.LocalObjectReference{Name: options.ScriptConfigMapRef},
+				LocalObjectReference: corev1.LocalObjectReference{Name: scriptCMName},
 			},
 		},
+	}
+	return nil
+}
+
+func checkOrCreateScriptCM(options *appsv1alpha1.TPLScriptTrigger, scriptCMKey client.ObjectKey, cli client.Client, ctx context.Context, cluster *appsv1alpha1.Cluster) error {
+	var (
+		err error
+
+		ccCM      = corev1.ConfigMap{}
+		sidecarCM = corev1.ConfigMap{}
+	)
+
+	if err = cli.Get(ctx, client.ObjectKey{
+		Namespace: options.Namespace,
+		Name:      options.ScriptConfigMapRef,
+	}, &ccCM); err != nil {
+		return err
+	}
+	if _, ok := ccCM.Data[scriptName]; !ok {
+		return cfgutil.MakeError("configmap not exist script: %s", scriptName)
+	}
+
+	if err = cli.Get(ctx, scriptCMKey, &sidecarCM); err != nil {
+		if !apierrors.IsNotFound(err) {
+			return err
+		}
+
+		scheme, _ := appsv1alpha1.SchemeBuilder.Build()
+		sidecarCM.Data = ccCM.Data
+		sidecarCM.SetLabels(ccCM.GetLabels())
+		sidecarCM.SetName(scriptCMKey.Name)
+		sidecarCM.SetNamespace(scriptCMKey.Namespace)
+		sidecarCM.SetLabels(ccCM.Labels)
+		if err := controllerutil.SetOwnerReference(cluster, &sidecarCM, scheme); err != nil {
+			return err
+		}
+		if err := cli.Create(ctx, &sidecarCM); err != nil {
+			return err
+		}
 	}
 	return nil
 }

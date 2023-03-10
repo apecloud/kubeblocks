@@ -18,8 +18,10 @@ package dataprotection
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"reflect"
 	"strings"
 	"time"
 
@@ -31,6 +33,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/utils/clock"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -83,7 +86,7 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	if err := r.Client.Get(reqCtx.Ctx, reqCtx.Req.NamespacedName, backup); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
-	reqCtx.Log.Info("in Backup Reconciler: name: " + backup.Name + " phase: " + string(backup.Status.Phase))
+	reqCtx.Log.V(1).Info("in Backup Reconciler:", "backup", backup.Name, "phase", backup.Status.Phase)
 
 	// handle finalizer
 	res, err := intctrlutil.HandleCRDeletion(reqCtx, r, backup, dataProtectionFinalizerName, func() (*ctrl.Result, error) {
@@ -158,14 +161,16 @@ func (r *BackupReconciler) doNewPhaseAction(
 		return intctrlutil.RequeueAfter(reconcileInterval, reqCtx.Log, "")
 	}
 
-	labels := backupPolicy.Spec.Target.LabelsSelector.MatchLabels
-	if labels == nil {
-		labels = map[string]string{}
-		backupPolicy.Spec.Target.LabelsSelector.MatchLabels = labels
-	}
-	labels[dataProtectionLabelBackupTypeKey] = string(backup.Spec.BackupType)
-	if err := r.patchBackupLabels(reqCtx, backup, labels); err != nil {
+	// TODO: get pod with matching labels to do backup.
+	target, err := r.getTargetPod(reqCtx, backupPolicy)
+	if err != nil {
 		return r.updateStatusIfFailed(reqCtx, backup, err)
+	}
+
+	if hasPatch, err := r.patchBackupLabelsAndAnnotations(reqCtx, backup, target); err != nil {
+		return r.updateStatusIfFailed(reqCtx, backup, err)
+	} else if hasPatch {
+		return intctrlutil.Reconciled()
 	}
 
 	// save the backup message for restore
@@ -297,22 +302,29 @@ func (r *BackupReconciler) updateStatusIfFailed(reqCtx intctrlutil.RequestCtx,
 	return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 }
 
-// patchBackupLabels patch backup labels
-func (r *BackupReconciler) patchBackupLabels(
+// patchBackupLabelsAndAnnotations patch backup labels and the annotations include cluster snapshot.
+func (r *BackupReconciler) patchBackupLabelsAndAnnotations(
 	reqCtx intctrlutil.RequestCtx,
 	backup *dataprotectionv1alpha1.Backup,
-	labels map[string]string) error {
-
-	patch := client.MergeFrom(backup.DeepCopy())
-	if len(labels) > 0 {
-		if backup.Labels == nil {
-			backup.Labels = map[string]string{}
-		}
-		for k, v := range labels {
-			backup.Labels[k] = v
+	targetPod *corev1.Pod) (bool, error) {
+	oldBackup := backup.DeepCopy()
+	clusterName := targetPod.Labels[constant.AppInstanceLabelKey]
+	if len(clusterName) > 0 {
+		if err := r.setClusterSnapshotAnnotation(reqCtx, backup, types.NamespacedName{Name: clusterName, Namespace: backup.Namespace}); err != nil {
+			return false, err
 		}
 	}
-	return r.Client.Patch(reqCtx.Ctx, backup, patch)
+	if backup.Labels == nil {
+		backup.Labels = make(map[string]string)
+	}
+	for k, v := range targetPod.Labels {
+		backup.Labels[k] = v
+	}
+	backup.Labels[dataProtectionLabelBackupTypeKey] = string(backup.Spec.BackupType)
+	if reflect.DeepEqual(oldBackup.ObjectMeta, backup.ObjectMeta) {
+		return false, nil
+	}
+	return true, r.Client.Patch(reqCtx.Ctx, backup, client.MergeFrom(oldBackup))
 }
 
 func (r *BackupReconciler) createPreCommandJobAndEnsure(reqCtx intctrlutil.RequestCtx,
@@ -438,7 +450,7 @@ func (r *BackupReconciler) createVolumeSnapshot(
 		return err
 	}
 
-	reqCtx.Log.Info("create a volumeSnapshot from backup", "snapshot", snap)
+	reqCtx.Log.V(1).Info("create a volumeSnapshot from backup", "snapshot", snap)
 	if err := r.Client.Create(reqCtx.Ctx, snap); err != nil {
 		return err
 	}
@@ -599,7 +611,7 @@ func (r *BackupReconciler) createBatchV1Job(
 		return err
 	}
 
-	reqCtx.Log.Info("create a built-in job from backup", "job", job)
+	reqCtx.Log.V(1).Info("create a built-in job from backup", "job", job)
 	if err := r.Client.Create(reqCtx.Ctx, job); err != nil {
 		return err
 	}
@@ -762,8 +774,10 @@ func (r *BackupReconciler) buildBackupToolPodSpec(reqCtx intctrlutil.RequestCtx,
 	remoteBackupPath := "/backupdata"
 
 	// TODO(dsj): mount multi remote backup volumes
+	randomVolumeName := fmt.Sprintf("%s-%s", backupPolicy.Spec.RemoteVolume.Name, rand.String(6))
+	backupPolicy.Spec.RemoteVolume.Name = randomVolumeName
 	remoteVolumeMount := corev1.VolumeMount{
-		Name:      backupPolicy.Spec.RemoteVolume.Name,
+		Name:      randomVolumeName,
 		MountPath: remoteBackupPath,
 	}
 	container.VolumeMounts = clusterPod.Spec.Containers[0].VolumeMounts
@@ -869,4 +883,44 @@ func (r *BackupReconciler) buildSnapshotPodSpec(
 	podSpec.ServiceAccountName = viper.GetString("KUBEBLOCKS_SERVICEACCOUNT_NAME")
 
 	return podSpec, nil
+}
+
+// getClusterObjectString gets the cluster object and convert it to string.
+func (r *BackupReconciler) getClusterObjectString(reqCtx intctrlutil.RequestCtx, name types.NamespacedName) (*string, error) {
+	cluster := &appsv1alpha1.Cluster{}
+	// cluster snapshot is optional, so we don't return error if it doesn't exist.
+	if err := r.Client.Get(reqCtx.Ctx, name, cluster); err != nil {
+		return nil, nil
+	}
+	// maintain only the cluster's spec and name/namespace.
+	newCluster := &appsv1alpha1.Cluster{
+		Spec: cluster.Spec,
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: cluster.Namespace,
+			Name:      cluster.Name,
+		},
+		TypeMeta: cluster.TypeMeta,
+	}
+	clusterBytes, err := json.Marshal(newCluster)
+	if err != nil {
+		return nil, err
+	}
+	clusterString := string(clusterBytes)
+	return &clusterString, nil
+}
+
+// setClusterSnapshotAnnotation sets the snapshot of cluster to the backup's annotations.
+func (r *BackupReconciler) setClusterSnapshotAnnotation(reqCtx intctrlutil.RequestCtx, backup *dataprotectionv1alpha1.Backup, name types.NamespacedName) error {
+	clusterString, err := r.getClusterObjectString(reqCtx, name)
+	if err != nil {
+		return err
+	}
+	if clusterString == nil {
+		return nil
+	}
+	if backup.Annotations == nil {
+		backup.Annotations = map[string]string{}
+	}
+	backup.Annotations[constant.ClusterSnapshotAnnotationKey] = *clusterString
+	return nil
 }

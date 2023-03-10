@@ -26,14 +26,12 @@ spec:
       containers:
         - name: controller
           command:
-            - "/controller"
+            - "/loadbalancer"
           args:
+            - "--mode=controller"
             - "--health-probe-bind-address=:8081"
             - "--metrics-bind-address=127.0.0.1:8080"
             - "--leader-elect"
-            - "-zap-encoder=console"
-            - "-zap-time-encoding=iso8601"
-            - "-zap-devel={{ .Values.enableDebugLog }}"
           image: "{{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:v{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           ports:

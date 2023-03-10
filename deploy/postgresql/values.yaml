@@ -14,8 +14,8 @@
 image:
   registry: registry.cn-hangzhou.aliyuncs.com
   repository: apecloud/postgresql
-  tag: 14.6.0-debian-11-r22
-  digest: ""
+  tag:
+
   ## Specify a imagePullPolicy
   ## Defaults to 'Always' if image tag is 'latest', else set to 'IfNotPresent'
   ## ref: https://kubernetes.io/docs/user-guide/images/#pre-pulling-images
@@ -100,8 +100,7 @@ metrics:
   image:
     registry: registry.cn-hangzhou.aliyuncs.com
     repository: apecloud/postgres-exporter
-    tag: 0.11.1-debian-11-r49
-    digest: ""
+    tag: 0.11.1-debian-11-r66
     pullPolicy: IfNotPresent
     ## Optionally specify an array of imagePullSecrets.
     ## Secrets must be manually created in the namespace.

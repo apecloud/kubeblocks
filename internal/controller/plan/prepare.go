@@ -419,17 +419,20 @@ func validateConfigMap(
 	ctx context.Context,
 	cli client.Client) error {
 	cfgTemplate := &appsv1alpha1.ConfigConstraint{}
-	if len(tplCfg.ConfigConstraintRef) > 0 {
-		if err := cli.Get(ctx, client.ObjectKey{
-			Namespace: "",
-			Name:      tplCfg.ConfigConstraintRef,
-		}, cfgTemplate); err != nil {
-			return cfgcore.WrapError(err, "failed to get ConfigConstraint, key[%v]", tplCfg)
-		}
+
+	if tplCfg.ConfigConstraintRef == "" {
+		return nil
+	}
+
+	if err := cli.Get(ctx, client.ObjectKey{
+		Namespace: "",
+		Name:      tplCfg.ConfigConstraintRef,
+	}, cfgTemplate); err != nil {
+		return cfgcore.WrapError(err, "failed to get ConfigConstraint, key[%v]", tplCfg)
 	}
 
 	// NOTE: not require checker configuration template status
-	cfgChecker := cfgcore.NewConfigValidator(&cfgTemplate.Spec)
+	cfgChecker := cfgcore.NewConfigValidator(&cfgTemplate.Spec, cfgcore.WithKeySelector(tplCfg.Keys))
 
 	// NOTE: It is necessary to verify the correctness of the data
 	if err := cfgChecker.Validate(renderedCfg); err != nil {
@@ -551,6 +554,7 @@ func buildConfigManagerParams(cli client.Client, ctx context.Context, cfgTemplat
 		SecreteName:   component.GenerateConnCredential(params.Cluster.Name),
 		Image:         viper.GetString(constant.ConfigSidecarIMAGE),
 		Volumes:       volumeDirs,
+		Cluster:       params.Cluster,
 	}
 
 	var err error

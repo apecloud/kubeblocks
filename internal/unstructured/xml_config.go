@@ -17,6 +17,8 @@ limitations under the License.
 package unstructured
 
 import (
+	"strings"
+
 	"github.com/clbanning/mxj/v2"
 	"github.com/spf13/cast"
 
@@ -39,7 +41,34 @@ func (x *xmlConfig) Update(key string, value any) error {
 }
 
 func (x *xmlConfig) Get(key string) interface{} {
-	return x.data[key]
+	keys := strings.Split(key, ".")
+	keysLen := len(keys)
+	m := prefixKeys(x.data.Old(), keys[:keysLen-1])
+	if m != nil {
+		return m[keys[keysLen-1]]
+	}
+	return nil
+}
+
+func prefixKeys(m map[string]interface{}, keys []string) map[string]interface{} {
+	r := m
+	for _, k := range keys {
+		if m == nil {
+			break
+		}
+		v, ok := r[k]
+		if !ok {
+			return nil
+		}
+
+		switch vt := v.(type) {
+		default:
+			r = nil
+		case map[string]interface{}:
+			r = vt
+		}
+	}
+	return r
 }
 
 func (x *xmlConfig) GetString(key string) (string, error) {

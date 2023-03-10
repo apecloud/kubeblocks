@@ -186,7 +186,7 @@ data:
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: ClusterDefinition
 metadata:
-  name: apecloud-redis
+  name: redis
   labels:
     helm.sh/chart: redis-0.1.0
     app.kubernetes.io/name: redis
@@ -387,7 +387,7 @@ metadata:
     app.kubernetes.io/version: "7.0.5"
     app.kubernetes.io/managed-by: Helm
 spec:
-  clusterDefinitionRef: apecloud-redis
+  clusterDefinitionRef: redis
   componentVersions:
   - componentDefRef: redis
     versionsContext:
@@ -396,23 +396,23 @@ spec:
         image: redis:7.0.5
         imagePullPolicy: IfNotPresent
 ---
-# Source: apecloud-redis-rep-cluster/templates/cluster.yaml
+# Source: redis-cluster/templates/cluster.yaml
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: Cluster
 metadata:
   name: mycluster
-  labels: 
-    helm.sh/chart: apecloud-redis-rep-cluster-0.1.0
-    app.kubernetes.io/name: apecloud-redis-rep-cluster
+  labels:
+    helm.sh/chart: redis-cluster-0.1.0
+    app.kubernetes.io/name: redis-cluster
     app.kubernetes.io/instance: mycluster
     app.kubernetes.io/version: "7.0.5"
     app.kubernetes.io/managed-by: Helm
 spec:
-  clusterDefinitionRef: apecloud-redis  # ref clusterDefinition.name
+  clusterDefinitionRef: redis  # ref clusterDefinition.name
   clusterVersionRef: redis-7.0.5 # ref clusterVersion.name
   terminationPolicy: Delete
   affinity:
-    topologyKeys: 
+    topologyKeys:
       - kubernetes.io/hostname
   componentSpecs:
     - name: redis-repl # user-defined

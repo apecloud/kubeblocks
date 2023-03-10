@@ -2,9 +2,9 @@ apiVersion: apps.kubeblocks.io/v1alpha1
 kind: Cluster
 metadata:
   name: {{ .Release.Name }}
-  labels: {{ include "apecloud-redis-rep-cluster.labels" . | nindent 4 }}
+  labels: {{ include "redis-cluster.labels" . | nindent 4 }}
 spec:
-  clusterDefinitionRef: apecloud-redis  # ref clusterDefinition.name
+  clusterDefinitionRef: redis  # ref clusterDefinition.name
   clusterVersionRef: redis-{{ default .Chart.AppVersion .Values.clusterVersionOverride }} # ref clusterVersion.name
   terminationPolicy: {{ .Values.terminationPolicy }}
   affinity:

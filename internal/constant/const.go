@@ -58,7 +58,7 @@ const (
 	BackupProtectionLabelKey        = "kubeblocks.io/backup-protection" // BackupProtectionLabelKey Backup delete protection policy label
 	AddonNameLabelKey               = "extensions.kubeblocks.io/addon-name"
 	ClusterAccountLabelKey          = "account.kubeblocks.io/name"
-	VolumeTypeLabelKey              = "kubeblocks.io/data-type"
+	VolumeTypeLabelKey              = "kubeblocks.io/volume-type"
 
 	// kubeblocks.io annotations
 	OpsRequestAnnotationKey          = "kubeblocks.io/ops-request" // OpsRequestAnnotationKey OpsRequest annotation key in Cluster

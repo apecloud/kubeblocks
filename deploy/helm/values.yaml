@@ -254,6 +254,8 @@ addonController:
   enabled: true
   jobImagePullPolicy: IfNotPresent
 
+keepAddons: false
+
 ## Dashboards settings
 ##
 dashboards:

@@ -4,6 +4,10 @@ metadata:
   name: apecloud-mysql
   labels:
     {{- include "kubeblocks.labels" . | nindent 4 }}
+  {{- if .Values.keepAddons }}
+  annotations:
+    helm.sh/resource-policy: keep
+  {{- end }}
 spec:
   description: 'ApeCloud MySQL is fully compatible with MySQL syntax and supports single-availability
     zone deployment, double-availability zone deployment, and multiple-availability zone deployment.

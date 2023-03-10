@@ -1,0 +1,12 @@
+
+apiVersion: dataprotection.kubeblocks.io/v1alpha1
+kind: BackupPolicyTemplate
+metadata:
+  name: backup-policy-template-redis
+  labels:
+    clusterdefinition.kubeblocks.io/name: redis
+    {{- include "redis.labels" . | nindent 4 }}
+spec:
+  # which backup tool to perform database backup, only support one tool.
+  backupToolName: volumesnapshot
+  ttl: 168h0m0s

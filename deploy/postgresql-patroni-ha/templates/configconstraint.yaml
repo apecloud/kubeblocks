@@ -1,0 +1,46 @@
+{{- $cc := .Files.Get "config/pg14-config-effect-scope.yaml" | fromYaml }}
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: ConfigConstraint
+metadata:
+  name: postgresql14-cc
+  labels:
+    {{- include "postgresql.labels" . | nindent 4 }}
+spec:
+  reloadOptions:
+    unixSignalTrigger:
+      signal: SIGHUP
+      processName: postgres
+
+  # top level mysql configuration type
+  cfgSchemaTopLevelName: PGParameter
+
+  # ConfigurationSchema that impose restrictions on engine parameter's rule
+  configurationSchema:
+    # schema: auto generate from mmmcue scripts
+    # example: ../../internal/configuration/testdata/mysql_openapi.json
+    cue: |-
+      {{- .Files.Get "config/pg14-config-constraint.cue" | nindent 6 }}
+
+  ##  require db instance restart
+  ## staticParameters
+  {{- if hasKey $cc "staticParameters" }}
+  staticParameters:
+    {{- $params := get $cc "staticParameters" }}
+    {{- range $params }}
+    - {{ . }}
+    {{- end }}
+  {{- end}}
+
+  ## reload parameters
+  ## dynamicParameters
+  {{- if hasKey $cc "dynamicParameters" }}
+  dynamicParameters:
+   {{- $params := get $cc "dynamicParameters" }}
+   {{- range $params }}
+    - {{ . }}
+   {{- end }}
+ {{- end}}
+
+  # configuration file format
+  formatterConfig:
+    format: properties

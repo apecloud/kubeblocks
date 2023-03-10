@@ -2,10 +2,12 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: configconstraint-viewer-role
+  name: {{ include "kubeblocks.fullname" . }}-configconstraint-viewer-role
+  labels:
+    {{- include "kubeblocks.labels" . | nindent 4 }}
 rules:
 - apiGroups:
-  - apps.infracreate.com
+  - apps.kubeblocks.io
   resources:
   - configconstraints
   verbs:
@@ -13,7 +15,7 @@ rules:
   - list
   - watch
 - apiGroups:
-  - apps.infracreate.com
+  - apps.kubeblocks.io
   resources:
   - configconstraints/status
   verbs:

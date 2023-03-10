@@ -26,6 +26,8 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
 // AddonSpec defines the desired state of Addon
@@ -45,7 +47,7 @@ type AddonSpec struct {
 	// Default installation parameters.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MinItems=1
-	DefaultInstallValues []AddonDefaultInstallSpecItem `json:"defaultInstallValues,omitempty"`
+	DefaultInstallValues []AddonDefaultInstallSpecItem `json:"defaultInstallValues"`
 
 	// Installation parameters.
 	// +optional
@@ -111,9 +113,9 @@ type SelectorRequirement struct {
 // HelmTypeInstallSpec defines a Helm release installation spec.
 type HelmTypeInstallSpec struct {
 
-	// A Helm Chart repository URL.
+	// A Helm Chart location URL.
 	// +kubebuilder:validation:Required
-	ChartRepoURL string `json:"chartRepoURL"`
+	ChartLocationURL string `json:"chartLocationURL"`
 
 	// installOptions defines Helm release install options.
 	// +optional
@@ -244,6 +246,10 @@ type AddonDefaultInstallSpecItem struct {
 type AddonInstallSpec struct {
 	AddonInstallSpecItem `json:",inline"`
 
+	// enabled can be set if there are no specific installation attributes to be set.
+	// +optional
+	Enabled bool `json:"enabled,omitempty"`
+
 	// Install spec. for extra items.
 	// +patchMergeKey=name
 	// +patchStrategy=merge,retainKeys
@@ -296,12 +302,12 @@ type ResourceRequirements struct {
 	Requests corev1.ResourceList `json:"requests,omitempty"`
 }
 
-//+kubebuilder:object:root=true
-//+kubebuilder:subresource:status
-//+kubebuilder:resource:categories={kubeblocks},scope=Cluster
-//+kubebuilder:printcolumn:name="TYPE",type="string",JSONPath=".spec.type",description="addon types"
-//+kubebuilder:printcolumn:name="STATUS",type="string",JSONPath=".status.phase",description="status phase"
-//+kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
+// +kubebuilder:object:root=true
+// +kubebuilder:subresource:status
+// +kubebuilder:resource:categories={kubeblocks},scope=Cluster
+// +kubebuilder:printcolumn:name="TYPE",type="string",JSONPath=".spec.type",description="addon types"
+// +kubebuilder:printcolumn:name="STATUS",type="string",JSONPath=".status.phase",description="status phase"
+// +kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
 
 // Addon is the Schema for the addons API
 type Addon struct {
@@ -312,7 +318,7 @@ type Addon struct {
 	Status AddonStatus `json:"status,omitempty"`
 }
 
-//+kubebuilder:object:root=true
+// +kubebuilder:object:root=true
 
 // AddonList contains a list of Addon
 type AddonList struct {
@@ -325,6 +331,53 @@ func init() {
 	SchemeBuilder.Register(&Addon{}, &AddonList{})
 }
 
+func (r *Addon) GetExtraNames() []string {
+	if r == nil {
+		return nil
+	}
+	switch r.Spec.Type {
+	case HelmType:
+		if r.Spec.Helm == nil {
+			return nil
+		}
+		// r.Spec.DefaultInstallValues has minItem=1 constraint
+		names := make([]string, 0, len(r.Spec.Helm.ValuesMapping.ExtraItems))
+		for _, i := range r.Spec.Helm.ValuesMapping.ExtraItems {
+			names = append(names, i.Name)
+		}
+		return names
+	default:
+		return nil
+	}
+
+}
+
+func buildSelectorStrings(selectors []SelectorRequirement) []string {
+	l := len(selectors)
+	if l == 0 {
+		return nil
+	}
+	sl := make([]string, 0, l)
+	for _, req := range selectors {
+		sl = append(sl, req.String())
+	}
+	return sl
+}
+
+func (r *AddonDefaultInstallSpecItem) GetSelectorsStrings() []string {
+	if r == nil {
+		return nil
+	}
+	return buildSelectorStrings(r.Selectors)
+}
+
+func (r *InstallableSpec) GetSelectorsStrings() []string {
+	if r == nil {
+		return nil
+	}
+	return buildSelectorStrings(r.Selectors)
+}
+
 func (r *SelectorRequirement) String() string {
 	return fmt.Sprintf("{key=%s,op=%s,values=%v}",
 		r.Key, r.Operator, r.Values)
@@ -334,7 +387,7 @@ func (r *SelectorRequirement) MatchesFromConfig() bool {
 	if r == nil {
 		return false
 	}
-	verIf := viper.Get("_KUBE_SERVER_INFO")
+	verIf := viper.Get(constant.CfgKeyServerInfo)
 	ver, ok := verIf.(version.Info)
 	if !ok {
 		return false

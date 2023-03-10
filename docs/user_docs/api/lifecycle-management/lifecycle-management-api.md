@@ -181,9 +181,9 @@ Note:
 - KB_NAMESPACE - Namespace
 - KB_SA_NAME - Service Account Name
 - KB_NODENAME - Node Name
-- KB_HOSTIP - Host IP address
-- KB_PODIP - Pod IP address
-- KB_PODIPS - Pod IP addresses
+- KB_HOST_IP - Host IP address
+- KB_POD_IP - Pod IP address
+- KB_POD_IPS - Pod IP addresses
 - KB_CLUSTER_NAME - KubeBlock Cluster API object name
 - KB_COMP_NAME - Running pod's KubeBlock Cluster API object's .spec.components.name
 - KB_CLUSTER_COMP_NAME - Running pod's KubeBlock Cluster API object's <.metadata.name>-<.spec.components..name>, same name is used for Deployment or StatefulSet workload name, and Service object name

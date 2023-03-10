@@ -31,7 +31,8 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	"github.com/apecloud/kubeblocks/internal/constant"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/generics"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 	testk8s "github.com/apecloud/kubeblocks/internal/testutil/k8s"
 )
@@ -138,7 +139,7 @@ var _ = Describe("MySQL High-Availability function", func() {
 		// 2 followers
 		leaderCount, followerCount := 0, 0
 		for _, pod := range pods {
-			switch pod.Labels[intctrlutil.RoleLabelKey] {
+			switch pod.Labels[constant.RoleLabelKey] {
 			case leader:
 				leaderCount++
 			case follower:
@@ -151,7 +152,7 @@ var _ = Describe("MySQL High-Availability function", func() {
 		By("Checking services status")
 		svcList := &corev1.ServiceList{}
 		Expect(k8sClient.List(ctx, svcList, client.MatchingLabels{
-			intctrlutil.AppInstanceLabelKey: clusterKey.Name,
+			constant.AppInstanceLabelKey: clusterKey.Name,
 		}, client.InNamespace(clusterKey.Namespace))).Should(Succeed())
 		// we should have both external service and headless service
 		Expect(len(svcList.Items)).Should(Equal(2))
@@ -170,7 +171,7 @@ var _ = Describe("MySQL High-Availability function", func() {
 		By("Deleting leader pod")
 		leaderPod := &corev1.Pod{}
 		for _, pod := range pods {
-			if pod.Labels[intctrlutil.RoleLabelKey] == leader {
+			if pod.Labels[constant.RoleLabelKey] == leader {
 				leaderPod = &pod
 				break
 			}

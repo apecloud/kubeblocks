@@ -1,0 +1,3274 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.9.0
+  creationTimestamp: null
+  name: hostpreflights.troubleshoot.sh
+spec:
+  group: troubleshoot.sh
+  names:
+    kind: HostPreflight
+    listKind: HostPreflightList
+    plural: hostpreflights
+    singular: hostpreflight
+  scope: Namespaced
+  versions:
+  - name: v1beta2
+    schema:
+      openAPIV3Schema:
+        description: HostPreflight is the Schema for the hostpreflights API
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: HostPreflightSpec defines the desired state of HostPreflight
+            properties:
+              analyzers:
+                items:
+                  properties:
+                    blockDevices:
+                      properties:
+                        annotations:
+                          additionalProperties:
+                            type: string
+                          type: object
+                        checkName:
+                          type: string
+                        collectorName:
+                          type: string
+                        exclude:
+                          type: BoolString
+                        includeUnmountedPartitions:
+                          type: boolean
+                        minimumAcceptableSize:
+                          format: int64
+                          type: integer
+                        outcomes:
+                          items:
+                            properties:
+                              fail:
+                                properties:
+                                  message:
+                                    type: string
+                                  uri:
+                                    type: string
+                                  when:
+                                    type: string
+                                type: object
+                              pass:
+                                properties:
+                                  message:
+                                    type: string
+                                  uri:
+                                    type: string
+                                  when:
+                                    type: string
+                                type: object
+                              warn:
+                                properties:
+                                  message:
+                                    type: string
+                                  uri:
+                                    type: string
+                                  when:
+                                    type: string
+                                type: object
+                            type: object
+                          type: array
+                        strict:
+                          type: BoolString
+                      required:
+                      - includeUnmountedPartitions
+                      - minimumAcceptableSize
+                      - outcomes
+                      type: object
+                    certificate:
+                      properties:
+                        annotations:
+                          additionalProperties:
+                            type: string
+                          type: object
+                        checkName:
+                          type: string
+                        collectorName:
+                          type: string
+                        exclude:
+                          type: BoolString
+                        outcomes:
+                          items:
+                            properties:
+                              fail:
+                                properties:
+                                  message:
+                                    type: string
+                                  uri:
+                                    type: string
+                                  when:
+                                    type: string
+                                type: object
+                              pass:
+                                properties:
+                                  message:
+                                    type: string
+                                  uri:
+                                    type: string
+                                  when:
+                                    type: string
+                                type: object
+                              warn:
+                                properties:
+                                  message:
+                                    type: string
+                                  uri:
+                                    type: string
+                                  when:
+                                    type: string
+                                type: object
+                            type: object
+                          type: array
+                        strict:
+                          type: BoolString
+                      required:
+                      - outcomes
+                      type: object
+                    cpu:
+                      properties:
+                        annotations:
+                          additionalProperties:
+                            type: string
+                          type: object
+                        checkName:
+                          type: string
+                        collectorName:
+                          type: string
+                        exclude:
+                          type: BoolString
+                        outcomes:
+                          items:
+                            properties:
+                              fail:
+                                properties:
+                                  message:
+                                    type: string
+                                  uri:
+                                    type: string
+                                  when:
+                                    type: string
+                                type: object
+                              pass:
+                                properties:
+                                  message:
+                                    type: string
+                                  uri:
+                                    type: string
+                                  when:
+                                    type: string
+                                type: object
+                              warn:
+                                properties:
+                                  message:
+                                    type: string
+                                  uri:
+                                    type: string
+                                  when:
+                                    type: string
+                                type: object
+                            type: object
+                          type: array
+                        strict:
+                          type: BoolString
+                      required:
+                      - outcomes
+                      type: object
+                    diskUsage:
+                      properties:
+                        annotations:
+                          additionalProperties:
+                            type: string
+                          type: object
+                        checkName:
+                          type: string
+                        collectorName:
+                          type: string
+                        exclude:
+                          type: BoolString
+                        outcomes:
+                          items:
+                            properties:
+                              fail:
+                                properties:
+                                  message:
+                                    type: string
+                                  uri:
+                                    type: string
+                                  when:
+                                    type: string
+                                type: object
+                              pass:
+                                properties:
+                                  message:
+                                    type: string
+                                  uri:
+                                    type: string
+                                  when:
+                                    type: string
+                                type: object
+                              warn:
+                                properties:
+                                  message:
+                                    type: string
+                                  uri:
+                                    type: string
+                                  when:
+                                    type: string
+                                type: object
+                            type: object
+                          type: array
+                        strict:
+                          type: BoolString
+                      required:
+                      - outcomes
+                      type: object
+                    filesystemPerformance:
+                      properties:
+                        annotations:
+                          additionalProperties:
+                            type: string
+                          type: object
+                        checkName:
+                          type: string
+                        collectorName:
+                          type: string
+                        exclude:
+                          type: BoolString
+                        outcomes:
+                          items:
+                            properties:
+                              fail:
+                                properties:
+                                  message:
+                                    type: string
+                                  uri:
+                                    type: string
+                                  when:
+                                    type: string
+                                type: object
+                              pass:
+                                properties:
+                                  message:
+                                    type: string
+                                  uri:
+                                    type: string
+                                  when:
+                                    type: string
+                                type: object
+                              warn:
+                                properties:
+                                  message:
+                                    type: string
+                                  uri:
+                                    type: string
+                                  when:
+                                    type: string
+                                type: object
+                            type: object
+                          type: array
+                        strict:
+                          type: BoolString
+                      required:
+                      - outcomes
+                      type: object
+                    hostOS:
+                      properties:
+                        annotations:
+                          additionalProperties:
+                            type: string
+                          type: object
+                        checkName:
+                          type: string
+                        collectorName:
+                          type: string
+                        exclude:
+                          type: BoolString
+                        outcomes:
+                          items:
+                            properties:
+                              fail:
+                                properties:
+                                  message:
+                                    type: string
+                                  uri:
+                                    type: string
+                                  when:
+                                    type: string
+                                type: object
+                              pass:
+                                properties:
+                                  message:
+                                    type: string
+                                  uri:
+                                    type: string
+                                  when:
+                                    type: string
+                                type: object
+                              warn:
+                                properties:
+                                  message:
+                                    type: string
+                                  uri:
+                                    type: string
+                                  when:
+                                    type: string
+                                type: object
+                            type: object
+                          type: array
+                        strict:
+                          type: BoolString
+                      required:
+                      - outcomes
+                      type: object
+                    hostServices:
+                      properties:
+                        annotations:
+                          additionalProperties:
+                            type: string
+                          type: object
+                        checkName:
+                          type: string
+                        collectorName:
+                          type: string
+                        exclude:
+                          type: BoolString
+                        outcomes:
+                          items:
+                            properties:
+                              fail:
+                                properties:
+                                  message:
+                                    type: string
+                                  uri:
+                                    type: string
+                                  when:
+                                    type: string
+                                type: object
+                              pass:
+                                properties:
+                                  message:
+                                    type: string
+                                  uri:
+                                    type: string
+                                  when:
+                                    type: string
+                                type: object
+                              warn:
+                                properties:
+                                  message:
+                                    type: string
+                                  uri:
+                                    type: string
+                                  when:
+                                    type: string
+                                type: object
+                            type: object
+                          type: array
+                        strict:
+                          type: BoolString
+                      required:
+                      - outcomes
+                      type: object
+                    http:
+                      properties:
+                        annotations:
+                          additionalProperties:
+                            type: string
+                          type: object
+                        checkName:
+                          type: string
+                        collectorName:
+                          type: string
+                        exclude:
+                          type: BoolString
+                        outcomes:
+                          items:
+                            properties:
+                              fail:
+                                properties:
+                                  message:
+                                    type: string
+                                  uri:
+                                    type: string
+                                  when:
+                                    type: string
+                                type: object
+                              pass:
+                                properties:
+                                  message:
+                                    type: string
+                                  uri:
+                                    type: string
+                                  when:
+                                    type: string
+                                type: object
+                              warn:
+                                properties:
+                                  message:
+                                    type: string
+                                  uri:
+                                    type: string
+                                  when:
+                                    type: string
+                                type: object
+                            type: object
+                          type: array
+                        strict:
+                          type: BoolString
+                      required:
+                      - outcomes
+                      type: object
+                    httpLoadBalancer:
+                      properties:
+                        annotations:
+                          additionalProperties:
+                            type: string
+                          type: object
+                        checkName:
+                          type: string
+                        collectorName:
+                          type: string
+                        exclude:
+                          type: BoolString
+                        outcomes:
+                          items:
+                            properties:
+                              fail:
+                                properties:
+                                  message:
+                                    type: string
+                                  uri:
+                                    type: string
+                                  when:
+                                    type: string
+                                type: object
+                              pass:
+                                properties:
+                                  message:
+                                    type: string
+                                  uri:
+                                    type: string
+                                  when:
+                                    type: string
+                                type: object
+                              warn:
+                                properties:
+                                  message:
+                                    type: string
+                                  uri:
+                                    type: string
+                                  when:
+                                    type: string
+                                type: object
+                            type: object
+                          type: array
+                        strict:
+                          type: BoolString
+                      required:
+                      - outcomes
+                      type: object
+                    ipv4Interfaces:
+                      properties:
+                        annotations:
+                          additionalProperties:
+                            type: string
+                          type: object
+                        checkName:
+                          type: string
+                        collectorName:
+                          type: string
+                        exclude:
+                          type: BoolString
+                        outcomes:
+                          items:
+                            properties:
+                              fail:
+                                properties:
+                                  message:
+                                    type: string
+                                  uri:
+                                    type: string
+                                  when:
+                                    type: string
+                                type: object
+                              pass:
+                                properties:
+                                  message:
+                                    type: string
+                                  uri:
+                                    type: string
+                                  when:
+                                    type: string
+                                type: object
+                              warn:
+                                properties:
+                                  message:
+                                    type: string
+                                  uri:
+                                    type: string
+                                  when:
+                                    type: string
+                                type: object
+                            type: object
+                          type: array
+                        strict:
+                          type: BoolString
+                      required:
+                      - outcomes
+                      type: object
+                    kernelModules:
+                      properties:
+                        annotations:
+                          additionalProperties:
+                            type: string
+                          type: object
+                        checkName:
+                          type: string
+                        collectorName:
+                          type: string
+                        exclude:
+                          type: BoolString
+                        outcomes:
+                          items:
+                            properties:
+                              fail:
+                                properties:
+                                  message:
+                                    type: string
+                                  uri:
+                                    type: string
+                                  when:
+                                    type: string
+                                type: object
+                              pass:
+                                properties:
+                                  message:
+                                    type: string
+                                  uri:
+                                    type: string
+                                  when:
+                                    type: string
+                                type: object
+                              warn:
+                                properties:
+                                  message:
+                                    type: string
+                                  uri:
+                                    type: string
+                                  when:
+                                    type: string
+                                type: object
+                            type: object
+                          type: array
+                        strict:
+                          type: BoolString
+                      required:
+                      - outcomes
+                      type: object
+                    memory:
+                      properties:
+                        annotations:
+                          additionalProperties:
+                            type: string
+                          type: object
+                        checkName:
+                          type: string
+                        collectorName:
+                          type: string
+                        exclude:
+                          type: BoolString
+                        outcomes:
+                          items:
+                            properties:
+                              fail:
+                                properties:
+                                  message:
+                                    type: string
+                                  uri:
+                                    type: string
+                                  when:
+                                    type: string
+                                type: object
+                              pass:
+                                properties:
+                                  message:
+                                    type: string
+                                  uri:
+                                    type: string
+                                  when:
+                                    type: string
+                                type: object
+                              warn:
+                                properties:
+                                  message:
+                                    type: string
+                                  uri:
+                                    type: string
+                                  when:
+                                    type: string
+                                type: object
+                            type: object
+                          type: array
+                        strict:
+                          type: BoolString
+                      required:
+                      - outcomes
+                      type: object
+                    systemPackages:
+                      properties:
+                        annotations:
+                          additionalProperties:
+                            type: string
+                          type: object
+                        checkName:
+                          type: string
+                        collectorName:
+                          type: string
+                        exclude:
+                          type: BoolString
+                        outcomes:
+                          items:
+                            properties:
+                              fail:
+                                properties:
+                                  message:
+                                    type: string
+                                  uri:
+                                    type: string
+                                  when:
+                                    type: string
+                                type: object
+                              pass:
+                                properties:
+                                  message:
+                                    type: string
+                                  uri:
+                                    type: string
+                                  when:
+                                    type: string
+                                type: object
+                              warn:
+                                properties:
+                                  message:
+                                    type: string
+                                  uri:
+                                    type: string
+                                  when:
+                                    type: string
+                                type: object
+                            type: object
+                          type: array
+                        strict:
+                          type: BoolString
+                      required:
+                      - outcomes
+                      type: object
+                    tcpConnect:
+                      properties:
+                        annotations:
+                          additionalProperties:
+                            type: string
+                          type: object
+                        checkName:
+                          type: string
+                        collectorName:
+                          type: string
+                        exclude:
+                          type: BoolString
+                        outcomes:
+                          items:
+                            properties:
+                              fail:
+                                properties:
+                                  message:
+                                    type: string
+                                  uri:
+                                    type: string
+                                  when:
+                                    type: string
+                                type: object
+                              pass:
+                                properties:
+                                  message:
+                                    type: string
+                                  uri:
+                                    type: string
+                                  when:
+                                    type: string
+                                type: object
+                              warn:
+                                properties:
+                                  message:
+                                    type: string
+                                  uri:
+                                    type: string
+                                  when:
+                                    type: string
+                                type: object
+                            type: object
+                          type: array
+                        strict:
+                          type: BoolString
+                      required:
+                      - outcomes
+                      type: object
+                    tcpLoadBalancer:
+                      properties:
+                        annotations:
+                          additionalProperties:
+                            type: string
+                          type: object
+                        checkName:
+                          type: string
+                        collectorName:
+                          type: string
+                        exclude:
+                          type: BoolString
+                        outcomes:
+                          items:
+                            properties:
+                              fail:
+                                properties:
+                                  message:
+                                    type: string
+                                  uri:
+                                    type: string
+                                  when:
+                                    type: string
+                                type: object
+                              pass:
+                                properties:
+                                  message:
+                                    type: string
+                                  uri:
+                                    type: string
+                                  when:
+                                    type: string
+                                type: object
+                              warn:
+                                properties:
+                                  message:
+                                    type: string
+                                  uri:
+                                    type: string
+                                  when:
+                                    type: string
+                                type: object
+                            type: object
+                          type: array
+                        strict:
+                          type: BoolString
+                      required:
+                      - outcomes
+                      type: object
+                    tcpPortStatus:
+                      properties:
+                        annotations:
+                          additionalProperties:
+                            type: string
+                          type: object
+                        checkName:
+                          type: string
+                        collectorName:
+                          type: string
+                        exclude:
+                          type: BoolString
+                        outcomes:
+                          items:
+                            properties:
+                              fail:
+                                properties:
+                                  message:
+                                    type: string
+                                  uri:
+                                    type: string
+                                  when:
+                                    type: string
+                                type: object
+                              pass:
+                                properties:
+                                  message:
+                                    type: string
+                                  uri:
+                                    type: string
+                                  when:
+                                    type: string
+                                type: object
+                              warn:
+                                properties:
+                                  message:
+                                    type: string
+                                  uri:
+                                    type: string
+                                  when:
+                                    type: string
+                                type: object
+                            type: object
+                          type: array
+                        strict:
+                          type: BoolString
+                      required:
+                      - outcomes
+                      type: object
+                    time:
+                      properties:
+                        annotations:
+                          additionalProperties:
+                            type: string
+                          type: object
+                        checkName:
+                          type: string
+                        collectorName:
+                          type: string
+                        exclude:
+                          type: BoolString
+                        outcomes:
+                          items:
+                            properties:
+                              fail:
+                                properties:
+                                  message:
+                                    type: string
+                                  uri:
+                                    type: string
+                                  when:
+                                    type: string
+                                type: object
+                              pass:
+                                properties:
+                                  message:
+                                    type: string
+                                  uri:
+                                    type: string
+                                  when:
+                                    type: string
+                                type: object
+                              warn:
+                                properties:
+                                  message:
+                                    type: string
+                                  uri:
+                                    type: string
+                                  when:
+                                    type: string
+                                type: object
+                            type: object
+                          type: array
+                        strict:
+                          type: BoolString
+                      required:
+                      - outcomes
+                      type: object
+                    udpPortStatus:
+                      properties:
+                        annotations:
+                          additionalProperties:
+                            type: string
+                          type: object
+                        checkName:
+                          type: string
+                        collectorName:
+                          type: string
+                        exclude:
+                          type: BoolString
+                        outcomes:
+                          items:
+                            properties:
+                              fail:
+                                properties:
+                                  message:
+                                    type: string
+                                  uri:
+                                    type: string
+                                  when:
+                                    type: string
+                                type: object
+                              pass:
+                                properties:
+                                  message:
+                                    type: string
+                                  uri:
+                                    type: string
+                                  when:
+                                    type: string
+                                type: object
+                              warn:
+                                properties:
+                                  message:
+                                    type: string
+                                  uri:
+                                    type: string
+                                  when:
+                                    type: string
+                                type: object
+                            type: object
+                          type: array
+                        strict:
+                          type: BoolString
+                      required:
+                      - outcomes
+                      type: object
+                  type: object
+                type: array
+              collectors:
+                items:
+                  properties:
+                    blockDevices:
+                      properties:
+                        collectorName:
+                          type: string
+                        exclude:
+                          type: BoolString
+                      type: object
+                    certificate:
+                      properties:
+                        certificatePath:
+                          type: string
+                        collectorName:
+                          type: string
+                        exclude:
+                          type: BoolString
+                        keyPath:
+                          type: string
+                      required:
+                      - certificatePath
+                      - keyPath
+                      type: object
+                    cpu:
+                      properties:
+                        collectorName:
+                          type: string
+                        exclude:
+                          type: BoolString
+                      type: object
+                    diskUsage:
+                      properties:
+                        collectorName:
+                          type: string
+                        exclude:
+                          type: BoolString
+                        path:
+                          type: string
+                      required:
+                      - path
+                      type: object
+                    filesystemPerformance:
+                      description: FilesystemPerformance benchmarks sequential write
+                        latency on a single file. The optional background IOPS feature
+                        attempts to mimic real-world conditions by running read and
+                        write workloads prior to and during benchmark execution.
+                      properties:
+                        backgroundIOPSWarmupSeconds:
+                          description: How long to run the background IOPS read and
+                            write workloads prior to starting the benchmarks.
+                          type: integer
+                        backgroundReadIOPS:
+                          description: The target read IOPS to run while benchmarking.
+                            This is a limit and there is no guarantee it will be reached.
+                            This is the total IOPS for all background read jobs.
+                          type: integer
+                        backgroundReadIOPSJobs:
+                          description: Number of threads to use for background read
+                            IOPS. This should be set high enough to reach the target
+                            specified in BackgrounReadIOPS.
+                          type: integer
+                        backgroundWriteIOPS:
+                          description: The target write IOPS to run while benchmarking.
+                            This is a limit and there is no guarantee it will be reached.
+                            This is the total IOPS for all background write jobs.
+                          type: integer
+                        backgroundWriteIOPSJobs:
+                          description: 'Number of threads to use for background write
+                            IOPS. This should be set high enough to reach the target
+                            specified in BackgroundWriteIOPS. Example: If BackgroundWriteIOPS
+                            is 100 and write latency is 10ms then a single job would
+                            barely be able to reach 100 IOPS so this should be at
+                            least 2.'
+                          type: integer
+                        collectorName:
+                          type: string
+                        datasync:
+                          description: Whether to call datasync on the file after
+                            each write. Skipped if Sync is also true. Does not apply
+                            to background IOPS task.
+                          type: boolean
+                        directory:
+                          description: The directory where the benchmark will create
+                            files.
+                          type: string
+                        enableBackgroundIOPS:
+                          description: Enable the background IOPS feature.
+                          type: boolean
+                        exclude:
+                          type: BoolString
+                        fileSize:
+                          description: The size of the file used in the benchmark.
+                            The number of IO operations for the benchmark will be
+                            FileSize / OperationSizeBytes. Accepts valid Kubernetes
+                            resource units such as Mi.
+                          type: string
+                        operationSize:
+                          description: The size of each write operation performed
+                            while benchmarking. This does not apply to the background
+                            IOPS feature if enabled, since those must be fixed at
+                            4096.
+                          format: int64
+                          type: integer
+                        sync:
+                          description: Whether to call sync on the file after each
+                            write. Does not apply to background IOPS task.
+                          type: boolean
+                        timeout:
+                          description: Total timeout, including background IOPS setup
+                            and warmup if enabled.
+                          type: string
+                      required:
+                      - backgroundIOPSWarmupSeconds
+                      - backgroundReadIOPS
+                      - backgroundReadIOPSJobs
+                      - backgroundWriteIOPS
+                      - backgroundWriteIOPSJobs
+                      - enableBackgroundIOPS
+                      type: object
+                    hostOS:
+                      properties:
+                        collectorName:
+                          type: string
+                        exclude:
+                          type: BoolString
+                      type: object
+                    hostServices:
+                      properties:
+                        collectorName:
+                          type: string
+                        exclude:
+                          type: BoolString
+                      type: object
+                    http:
+                      properties:
+                        collectorName:
+                          type: string
+                        exclude:
+                          type: BoolString
+                        get:
+                          properties:
+                            headers:
+                              additionalProperties:
+                                type: string
+                              type: object
+                            insecureSkipVerify:
+                              type: boolean
+                            url:
+                              type: string
+                          required:
+                          - url
+                          type: object
+                        post:
+                          properties:
+                            body:
+                              type: string
+                            headers:
+                              additionalProperties:
+                                type: string
+                              type: object
+                            insecureSkipVerify:
+                              type: boolean
+                            url:
+                              type: string
+                          required:
+                          - url
+                          type: object
+                        put:
+                          properties:
+                            body:
+                              type: string
+                            headers:
+                              additionalProperties:
+                                type: string
+                              type: object
+                            insecureSkipVerify:
+                              type: boolean
+                            url:
+                              type: string
+                          required:
+                          - url
+                          type: object
+                      type: object
+                    httpLoadBalancer:
+                      properties:
+                        address:
+                          type: string
+                        collectorName:
+                          type: string
+                        exclude:
+                          type: BoolString
+                        path:
+                          type: string
+                        port:
+                          type: integer
+                        timeout:
+                          type: string
+                      required:
+                      - address
+                      - path
+                      - port
+                      type: object
+                    ipv4Interfaces:
+                      properties:
+                        collectorName:
+                          type: string
+                        exclude:
+                          type: BoolString
+                      type: object
+                    kernelModules:
+                      properties:
+                        collectorName:
+                          type: string
+                        exclude:
+                          type: BoolString
+                      type: object
+                    kubernetes:
+                      properties:
+                        collectorName:
+                          type: string
+                        exclude:
+                          type: BoolString
+                      type: object
+                    memory:
+                      properties:
+                        collectorName:
+                          type: string
+                        exclude:
+                          type: BoolString
+                      type: object
+                    run:
+                      properties:
+                        args:
+                          items:
+                            type: string
+                          type: array
+                        collectorName:
+                          type: string
+                        command:
+                          type: string
+                        exclude:
+                          type: BoolString
+                      required:
+                      - args
+                      - command
+                      type: object
+                    systemPackages:
+                      properties:
+                        amzn:
+                          items:
+                            type: string
+                          type: array
+                        amzn2:
+                          items:
+                            type: string
+                          type: array
+                        centos:
+                          items:
+                            type: string
+                          type: array
+                        centos7:
+                          items:
+                            type: string
+                          type: array
+                        centos8:
+                          items:
+                            type: string
+                          type: array
+                        collectorName:
+                          type: string
+                        exclude:
+                          type: BoolString
+                        ol:
+                          items:
+                            type: string
+                          type: array
+                        ol7:
+                          items:
+                            type: string
+                          type: array
+                        ol8:
+                          items:
+                            type: string
+                          type: array
+                        rhel:
+                          items:
+                            type: string
+                          type: array
+                        rhel7:
+                          items:
+                            type: string
+                          type: array
+                        rhel8:
+                          items:
+                            type: string
+                          type: array
+                        ubuntu:
+                          items:
+                            type: string
+                          type: array
+                        ubuntu16:
+                          items:
+                            type: string
+                          type: array
+                        ubuntu18:
+                          items:
+                            type: string
+                          type: array
+                        ubuntu20:
+                          items:
+                            type: string
+                          type: array
+                      type: object
+                    tcpConnect:
+                      properties:
+                        address:
+                          type: string
+                        collectorName:
+                          type: string
+                        exclude:
+                          type: BoolString
+                        timeout:
+                          type: string
+                      required:
+                      - address
+                      type: object
+                    tcpLoadBalancer:
+                      properties:
+                        address:
+                          type: string
+                        collectorName:
+                          type: string
+                        exclude:
+                          type: BoolString
+                        port:
+                          type: integer
+                        timeout:
+                          type: string
+                      required:
+                      - address
+                      - port
+                      type: object
+                    tcpPortStatus:
+                      properties:
+                        collectorName:
+                          type: string
+                        exclude:
+                          type: BoolString
+                        interface:
+                          type: string
+                        port:
+                          type: integer
+                      required:
+                      - port
+                      type: object
+                    time:
+                      properties:
+                        collectorName:
+                          type: string
+                        exclude:
+                          type: BoolString
+                      type: object
+                    udpPortStatus:
+                      properties:
+                        collectorName:
+                          type: string
+                        exclude:
+                          type: BoolString
+                        interface:
+                          type: string
+                        port:
+                          type: integer
+                      required:
+                      - port
+                      type: object
+                  type: object
+                type: array
+              remoteCollectors:
+                items:
+                  properties:
+                    blockDevices:
+                      properties:
+                        collectorName:
+                          type: string
+                        exclude:
+                          type: BoolString
+                      type: object
+                    certificate:
+                      properties:
+                        certificatePath:
+                          type: string
+                        collectorName:
+                          type: string
+                        exclude:
+                          type: BoolString
+                        keyPath:
+                          type: string
+                      required:
+                      - certificatePath
+                      - keyPath
+                      type: object
+                    cpu:
+                      properties:
+                        collectorName:
+                          type: string
+                        exclude:
+                          type: BoolString
+                      type: object
+                    diskUsage:
+                      properties:
+                        collectorName:
+                          type: string
+                        exclude:
+                          type: BoolString
+                        path:
+                          type: string
+                      required:
+                      - path
+                      type: object
+                    filesystemPerformance:
+                      description: RemoteFilesystemPerformance benchmarks sequential
+                        write latency on a single file. The optional background IOPS
+                        feature attempts to mimic real-world conditions by running
+                        read and write workloads prior to and during benchmark execution.
+                      properties:
+                        backgroundIOPSWarmupSeconds:
+                          description: How long to run the background IOPS read and
+                            write workloads prior to starting the benchmarks.
+                          type: integer
+                        backgroundReadIOPS:
+                          description: The target read IOPS to run while benchmarking.
+                            This is a limit and there is no guarantee it will be reached.
+                            This is the total IOPS for all background read jobs.
+                          type: integer
+                        backgroundReadIOPSJobs:
+                          description: Number of threads to use for background read
+                            IOPS. This should be set high enough to reach the target
+                            specified in BackgrounReadIOPS.
+                          type: integer
+                        backgroundWriteIOPS:
+                          description: The target write IOPS to run while benchmarking.
+                            This is a limit and there is no guarantee it will be reached.
+                            This is the total IOPS for all background write jobs.
+                          type: integer
+                        backgroundWriteIOPSJobs:
+                          description: 'Number of threads to use for background write
+                            IOPS. This should be set high enough to reach the target
+                            specified in BackgroundWriteIOPS. Example: If BackgroundWriteIOPS
+                            is 100 and write latency is 10ms then a single job would
+                            barely be able to reach 100 IOPS so this should be at
+                            least 2.'
+                          type: integer
+                        collectorName:
+                          type: string
+                        datasync:
+                          description: Whether to call datasync on the file after
+                            each write. Skipped if Sync is also true. Does not apply
+                            to background IOPS task.
+                          type: boolean
+                        directory:
+                          description: The directory where the benchmark will create
+                            files.
+                          type: string
+                        enableBackgroundIOPS:
+                          description: Enable the background IOPS feature.
+                          type: boolean
+                        exclude:
+                          type: BoolString
+                        fileSize:
+                          description: The size of the file used in the benchmark.
+                            The number of IO operations for the benchmark will be
+                            FileSize / OperationSizeBytes. Accepts valid Kubernetes
+                            resource units such as Mi.
+                          type: string
+                        operationSize:
+                          description: The size of each write operation performed
+                            while benchmarking. This does not apply to the background
+                            IOPS feature if enabled, since those must be fixed at
+                            4096.
+                          format: int64
+                          type: integer
+                        sync:
+                          description: Whether to call sync on the file after each
+                            write. Does not apply to background IOPS task.
+                          type: boolean
+                        timeout:
+                          description: Total timeout, including background IOPS setup
+                            and warmup if enabled.
+                          type: string
+                      required:
+                      - backgroundIOPSWarmupSeconds
+                      - backgroundReadIOPS
+                      - backgroundReadIOPSJobs
+                      - backgroundWriteIOPS
+                      - backgroundWriteIOPSJobs
+                      - enableBackgroundIOPS
+                      type: object
+                    hostServices:
+                      properties:
+                        collectorName:
+                          type: string
+                        exclude:
+                          type: BoolString
+                      type: object
+                    http:
+                      properties:
+                        collectorName:
+                          type: string
+                        exclude:
+                          type: BoolString
+                        get:
+                          properties:
+                            headers:
+                              additionalProperties:
+                                type: string
+                              type: object
+                            insecureSkipVerify:
+                              type: boolean
+                            url:
+                              type: string
+                          required:
+                          - url
+                          type: object
+                        post:
+                          properties:
+                            body:
+                              type: string
+                            headers:
+                              additionalProperties:
+                                type: string
+                              type: object
+                            insecureSkipVerify:
+                              type: boolean
+                            url:
+                              type: string
+                          required:
+                          - url
+                          type: object
+                        put:
+                          properties:
+                            body:
+                              type: string
+                            headers:
+                              additionalProperties:
+                                type: string
+                              type: object
+                            insecureSkipVerify:
+                              type: boolean
+                            url:
+                              type: string
+                          required:
+                          - url
+                          type: object
+                      type: object
+                    httpLoadBalancer:
+                      properties:
+                        address:
+                          type: string
+                        collectorName:
+                          type: string
+                        exclude:
+                          type: BoolString
+                        path:
+                          type: string
+                        port:
+                          type: integer
+                        timeout:
+                          type: string
+                      required:
+                      - address
+                      - path
+                      - port
+                      type: object
+                    ipv4Interfaces:
+                      properties:
+                        collectorName:
+                          type: string
+                        exclude:
+                          type: BoolString
+                      type: object
+                    kernelModules:
+                      properties:
+                        collectorName:
+                          type: string
+                        exclude:
+                          type: BoolString
+                      type: object
+                    memory:
+                      properties:
+                        collectorName:
+                          type: string
+                        exclude:
+                          type: BoolString
+                      type: object
+                    systemPackages:
+                      properties:
+                        collectorName:
+                          type: string
+                        exclude:
+                          type: BoolString
+                      type: object
+                    tcpConnect:
+                      properties:
+                        address:
+                          type: string
+                        collectorName:
+                          type: string
+                        exclude:
+                          type: BoolString
+                        timeout:
+                          type: string
+                      required:
+                      - address
+                      type: object
+                    tcpLoadBalancer:
+                      properties:
+                        address:
+                          type: string
+                        collectorName:
+                          type: string
+                        exclude:
+                          type: BoolString
+                        port:
+                          type: integer
+                        timeout:
+                          type: string
+                      required:
+                      - address
+                      - port
+                      type: object
+                    tcpPortStatus:
+                      properties:
+                        collectorName:
+                          type: string
+                        exclude:
+                          type: BoolString
+                        interface:
+                          type: string
+                        port:
+                          type: integer
+                      required:
+                      - port
+                      type: object
+                    time:
+                      properties:
+                        collectorName:
+                          type: string
+                        exclude:
+                          type: BoolString
+                      type: object
+                    udpPortStatus:
+                      properties:
+                        collectorName:
+                          type: string
+                        exclude:
+                          type: BoolString
+                        interface:
+                          type: string
+                        port:
+                          type: integer
+                      required:
+                      - port
+                      type: object
+                  type: object
+                type: array
+            type: object
+          status:
+            description: HostPreflightStatus defines the observed state of HostPreflight
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+  - name: v1beta2
+    schema:
+      openAPIV3Schema:
+        description: HostPreflight is the Schema for the hostpreflights API
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: HostPreflightSpec defines the desired state of HostPreflight
+            properties:
+              analyzers:
+                items:
+                  properties:
+                    blockDevices:
+                      properties:
+                        annotations:
+                          additionalProperties:
+                            type: string
+                          type: object
+                        checkName:
+                          type: string
+                        collectorName:
+                          type: string
+                        exclude:
+                          type: BoolString
+                        includeUnmountedPartitions:
+                          type: boolean
+                        minimumAcceptableSize:
+                          format: int64
+                          type: integer
+                        outcomes:
+                          items:
+                            properties:
+                              fail:
+                                properties:
+                                  message:
+                                    type: string
+                                  uri:
+                                    type: string
+                                  when:
+                                    type: string
+                                type: object
+                              pass:
+                                properties:
+                                  message:
+                                    type: string
+                                  uri:
+                                    type: string
+                                  when:
+                                    type: string
+                                type: object
+                              warn:
+                                properties:
+                                  message:
+                                    type: string
+                                  uri:
+                                    type: string
+                                  when:
+                                    type: string
+                                type: object
+                            type: object
+                          type: array
+                        strict:
+                          type: BoolString
+                      required:
+                      - includeUnmountedPartitions
+                      - minimumAcceptableSize
+                      - outcomes
+                      type: object
+                    certificate:
+                      properties:
+                        annotations:
+                          additionalProperties:
+                            type: string
+                          type: object
+                        checkName:
+                          type: string
+                        collectorName:
+                          type: string
+                        exclude:
+                          type: BoolString
+                        outcomes:
+                          items:
+                            properties:
+                              fail:
+                                properties:
+                                  message:
+                                    type: string
+                                  uri:
+                                    type: string
+                                  when:
+                                    type: string
+                                type: object
+                              pass:
+                                properties:
+                                  message:
+                                    type: string
+                                  uri:
+                                    type: string
+                                  when:
+                                    type: string
+                                type: object
+                              warn:
+                                properties:
+                                  message:
+                                    type: string
+                                  uri:
+                                    type: string
+                                  when:
+                                    type: string
+                                type: object
+                            type: object
+                          type: array
+                        strict:
+                          type: BoolString
+                      required:
+                      - outcomes
+                      type: object
+                    cpu:
+                      properties:
+                        annotations:
+                          additionalProperties:
+                            type: string
+                          type: object
+                        checkName:
+                          type: string
+                        collectorName:
+                          type: string
+                        exclude:
+                          type: BoolString
+                        outcomes:
+                          items:
+                            properties:
+                              fail:
+                                properties:
+                                  message:
+                                    type: string
+                                  uri:
+                                    type: string
+                                  when:
+                                    type: string
+                                type: object
+                              pass:
+                                properties:
+                                  message:
+                                    type: string
+                                  uri:
+                                    type: string
+                                  when:
+                                    type: string
+                                type: object
+                              warn:
+                                properties:
+                                  message:
+                                    type: string
+                                  uri:
+                                    type: string
+                                  when:
+                                    type: string
+                                type: object
+                            type: object
+                          type: array
+                        strict:
+                          type: BoolString
+                      required:
+                      - outcomes
+                      type: object
+                    diskUsage:
+                      properties:
+                        annotations:
+                          additionalProperties:
+                            type: string
+                          type: object
+                        checkName:
+                          type: string
+                        collectorName:
+                          type: string
+                        exclude:
+                          type: BoolString
+                        outcomes:
+                          items:
+                            properties:
+                              fail:
+                                properties:
+                                  message:
+                                    type: string
+                                  uri:
+                                    type: string
+                                  when:
+                                    type: string
+                                type: object
+                              pass:
+                                properties:
+                                  message:
+                                    type: string
+                                  uri:
+                                    type: string
+                                  when:
+                                    type: string
+                                type: object
+                              warn:
+                                properties:
+                                  message:
+                                    type: string
+                                  uri:
+                                    type: string
+                                  when:
+                                    type: string
+                                type: object
+                            type: object
+                          type: array
+                        strict:
+                          type: BoolString
+                      required:
+                      - outcomes
+                      type: object
+                    filesystemPerformance:
+                      properties:
+                        annotations:
+                          additionalProperties:
+                            type: string
+                          type: object
+                        checkName:
+                          type: string
+                        collectorName:
+                          type: string
+                        exclude:
+                          type: BoolString
+                        outcomes:
+                          items:
+                            properties:
+                              fail:
+                                properties:
+                                  message:
+                                    type: string
+                                  uri:
+                                    type: string
+                                  when:
+                                    type: string
+                                type: object
+                              pass:
+                                properties:
+                                  message:
+                                    type: string
+                                  uri:
+                                    type: string
+                                  when:
+                                    type: string
+                                type: object
+                              warn:
+                                properties:
+                                  message:
+                                    type: string
+                                  uri:
+                                    type: string
+                                  when:
+                                    type: string
+                                type: object
+                            type: object
+                          type: array
+                        strict:
+                          type: BoolString
+                      required:
+                      - outcomes
+                      type: object
+                    hostOS:
+                      properties:
+                        annotations:
+                          additionalProperties:
+                            type: string
+                          type: object
+                        checkName:
+                          type: string
+                        collectorName:
+                          type: string
+                        exclude:
+                          type: BoolString
+                        outcomes:
+                          items:
+                            properties:
+                              fail:
+                                properties:
+                                  message:
+                                    type: string
+                                  uri:
+                                    type: string
+                                  when:
+                                    type: string
+                                type: object
+                              pass:
+                                properties:
+                                  message:
+                                    type: string
+                                  uri:
+                                    type: string
+                                  when:
+                                    type: string
+                                type: object
+                              warn:
+                                properties:
+                                  message:
+                                    type: string
+                                  uri:
+                                    type: string
+                                  when:
+                                    type: string
+                                type: object
+                            type: object
+                          type: array
+                        strict:
+                          type: BoolString
+                      required:
+                      - outcomes
+                      type: object
+                    hostServices:
+                      properties:
+                        annotations:
+                          additionalProperties:
+                            type: string
+                          type: object
+                        checkName:
+                          type: string
+                        collectorName:
+                          type: string
+                        exclude:
+                          type: BoolString
+                        outcomes:
+                          items:
+                            properties:
+                              fail:
+                                properties:
+                                  message:
+                                    type: string
+                                  uri:
+                                    type: string
+                                  when:
+                                    type: string
+                                type: object
+                              pass:
+                                properties:
+                                  message:
+                                    type: string
+                                  uri:
+                                    type: string
+                                  when:
+                                    type: string
+                                type: object
+                              warn:
+                                properties:
+                                  message:
+                                    type: string
+                                  uri:
+                                    type: string
+                                  when:
+                                    type: string
+                                type: object
+                            type: object
+                          type: array
+                        strict:
+                          type: BoolString
+                      required:
+                      - outcomes
+                      type: object
+                    http:
+                      properties:
+                        annotations:
+                          additionalProperties:
+                            type: string
+                          type: object
+                        checkName:
+                          type: string
+                        collectorName:
+                          type: string
+                        exclude:
+                          type: BoolString
+                        outcomes:
+                          items:
+                            properties:
+                              fail:
+                                properties:
+                                  message:
+                                    type: string
+                                  uri:
+                                    type: string
+                                  when:
+                                    type: string
+                                type: object
+                              pass:
+                                properties:
+                                  message:
+                                    type: string
+                                  uri:
+                                    type: string
+                                  when:
+                                    type: string
+                                type: object
+                              warn:
+                                properties:
+                                  message:
+                                    type: string
+                                  uri:
+                                    type: string
+                                  when:
+                                    type: string
+                                type: object
+                            type: object
+                          type: array
+                        strict:
+                          type: BoolString
+                      required:
+                      - outcomes
+                      type: object
+                    httpLoadBalancer:
+                      properties:
+                        annotations:
+                          additionalProperties:
+                            type: string
+                          type: object
+                        checkName:
+                          type: string
+                        collectorName:
+                          type: string
+                        exclude:
+                          type: BoolString
+                        outcomes:
+                          items:
+                            properties:
+                              fail:
+                                properties:
+                                  message:
+                                    type: string
+                                  uri:
+                                    type: string
+                                  when:
+                                    type: string
+                                type: object
+                              pass:
+                                properties:
+                                  message:
+                                    type: string
+                                  uri:
+                                    type: string
+                                  when:
+                                    type: string
+                                type: object
+                              warn:
+                                properties:
+                                  message:
+                                    type: string
+                                  uri:
+                                    type: string
+                                  when:
+                                    type: string
+                                type: object
+                            type: object
+                          type: array
+                        strict:
+                          type: BoolString
+                      required:
+                      - outcomes
+                      type: object
+                    ipv4Interfaces:
+                      properties:
+                        annotations:
+                          additionalProperties:
+                            type: string
+                          type: object
+                        checkName:
+                          type: string
+                        collectorName:
+                          type: string
+                        exclude:
+                          type: BoolString
+                        outcomes:
+                          items:
+                            properties:
+                              fail:
+                                properties:
+                                  message:
+                                    type: string
+                                  uri:
+                                    type: string
+                                  when:
+                                    type: string
+                                type: object
+                              pass:
+                                properties:
+                                  message:
+                                    type: string
+                                  uri:
+                                    type: string
+                                  when:
+                                    type: string
+                                type: object
+                              warn:
+                                properties:
+                                  message:
+                                    type: string
+                                  uri:
+                                    type: string
+                                  when:
+                                    type: string
+                                type: object
+                            type: object
+                          type: array
+                        strict:
+                          type: BoolString
+                      required:
+                      - outcomes
+                      type: object
+                    kernelModules:
+                      properties:
+                        annotations:
+                          additionalProperties:
+                            type: string
+                          type: object
+                        checkName:
+                          type: string
+                        collectorName:
+                          type: string
+                        exclude:
+                          type: BoolString
+                        outcomes:
+                          items:
+                            properties:
+                              fail:
+                                properties:
+                                  message:
+                                    type: string
+                                  uri:
+                                    type: string
+                                  when:
+                                    type: string
+                                type: object
+                              pass:
+                                properties:
+                                  message:
+                                    type: string
+                                  uri:
+                                    type: string
+                                  when:
+                                    type: string
+                                type: object
+                              warn:
+                                properties:
+                                  message:
+                                    type: string
+                                  uri:
+                                    type: string
+                                  when:
+                                    type: string
+                                type: object
+                            type: object
+                          type: array
+                        strict:
+                          type: BoolString
+                      required:
+                      - outcomes
+                      type: object
+                    memory:
+                      properties:
+                        annotations:
+                          additionalProperties:
+                            type: string
+                          type: object
+                        checkName:
+                          type: string
+                        collectorName:
+                          type: string
+                        exclude:
+                          type: BoolString
+                        outcomes:
+                          items:
+                            properties:
+                              fail:
+                                properties:
+                                  message:
+                                    type: string
+                                  uri:
+                                    type: string
+                                  when:
+                                    type: string
+                                type: object
+                              pass:
+                                properties:
+                                  message:
+                                    type: string
+                                  uri:
+                                    type: string
+                                  when:
+                                    type: string
+                                type: object
+                              warn:
+                                properties:
+                                  message:
+                                    type: string
+                                  uri:
+                                    type: string
+                                  when:
+                                    type: string
+                                type: object
+                            type: object
+                          type: array
+                        strict:
+                          type: BoolString
+                      required:
+                      - outcomes
+                      type: object
+                    systemPackages:
+                      properties:
+                        annotations:
+                          additionalProperties:
+                            type: string
+                          type: object
+                        checkName:
+                          type: string
+                        collectorName:
+                          type: string
+                        exclude:
+                          type: BoolString
+                        outcomes:
+                          items:
+                            properties:
+                              fail:
+                                properties:
+                                  message:
+                                    type: string
+                                  uri:
+                                    type: string
+                                  when:
+                                    type: string
+                                type: object
+                              pass:
+                                properties:
+                                  message:
+                                    type: string
+                                  uri:
+                                    type: string
+                                  when:
+                                    type: string
+                                type: object
+                              warn:
+                                properties:
+                                  message:
+                                    type: string
+                                  uri:
+                                    type: string
+                                  when:
+                                    type: string
+                                type: object
+                            type: object
+                          type: array
+                        strict:
+                          type: BoolString
+                      required:
+                      - outcomes
+                      type: object
+                    tcpConnect:
+                      properties:
+                        annotations:
+                          additionalProperties:
+                            type: string
+                          type: object
+                        checkName:
+                          type: string
+                        collectorName:
+                          type: string
+                        exclude:
+                          type: BoolString
+                        outcomes:
+                          items:
+                            properties:
+                              fail:
+                                properties:
+                                  message:
+                                    type: string
+                                  uri:
+                                    type: string
+                                  when:
+                                    type: string
+                                type: object
+                              pass:
+                                properties:
+                                  message:
+                                    type: string
+                                  uri:
+                                    type: string
+                                  when:
+                                    type: string
+                                type: object
+                              warn:
+                                properties:
+                                  message:
+                                    type: string
+                                  uri:
+                                    type: string
+                                  when:
+                                    type: string
+                                type: object
+                            type: object
+                          type: array
+                        strict:
+                          type: BoolString
+                      required:
+                      - outcomes
+                      type: object
+                    tcpLoadBalancer:
+                      properties:
+                        annotations:
+                          additionalProperties:
+                            type: string
+                          type: object
+                        checkName:
+                          type: string
+                        collectorName:
+                          type: string
+                        exclude:
+                          type: BoolString
+                        outcomes:
+                          items:
+                            properties:
+                              fail:
+                                properties:
+                                  message:
+                                    type: string
+                                  uri:
+                                    type: string
+                                  when:
+                                    type: string
+                                type: object
+                              pass:
+                                properties:
+                                  message:
+                                    type: string
+                                  uri:
+                                    type: string
+                                  when:
+                                    type: string
+                                type: object
+                              warn:
+                                properties:
+                                  message:
+                                    type: string
+                                  uri:
+                                    type: string
+                                  when:
+                                    type: string
+                                type: object
+                            type: object
+                          type: array
+                        strict:
+                          type: BoolString
+                      required:
+                      - outcomes
+                      type: object
+                    tcpPortStatus:
+                      properties:
+                        annotations:
+                          additionalProperties:
+                            type: string
+                          type: object
+                        checkName:
+                          type: string
+                        collectorName:
+                          type: string
+                        exclude:
+                          type: BoolString
+                        outcomes:
+                          items:
+                            properties:
+                              fail:
+                                properties:
+                                  message:
+                                    type: string
+                                  uri:
+                                    type: string
+                                  when:
+                                    type: string
+                                type: object
+                              pass:
+                                properties:
+                                  message:
+                                    type: string
+                                  uri:
+                                    type: string
+                                  when:
+                                    type: string
+                                type: object
+                              warn:
+                                properties:
+                                  message:
+                                    type: string
+                                  uri:
+                                    type: string
+                                  when:
+                                    type: string
+                                type: object
+                            type: object
+                          type: array
+                        strict:
+                          type: BoolString
+                      required:
+                      - outcomes
+                      type: object
+                    time:
+                      properties:
+                        annotations:
+                          additionalProperties:
+                            type: string
+                          type: object
+                        checkName:
+                          type: string
+                        collectorName:
+                          type: string
+                        exclude:
+                          type: BoolString
+                        outcomes:
+                          items:
+                            properties:
+                              fail:
+                                properties:
+                                  message:
+                                    type: string
+                                  uri:
+                                    type: string
+                                  when:
+                                    type: string
+                                type: object
+                              pass:
+                                properties:
+                                  message:
+                                    type: string
+                                  uri:
+                                    type: string
+                                  when:
+                                    type: string
+                                type: object
+                              warn:
+                                properties:
+                                  message:
+                                    type: string
+                                  uri:
+                                    type: string
+                                  when:
+                                    type: string
+                                type: object
+                            type: object
+                          type: array
+                        strict:
+                          type: BoolString
+                      required:
+                      - outcomes
+                      type: object
+                    udpPortStatus:
+                      properties:
+                        annotations:
+                          additionalProperties:
+                            type: string
+                          type: object
+                        checkName:
+                          type: string
+                        collectorName:
+                          type: string
+                        exclude:
+                          type: BoolString
+                        outcomes:
+                          items:
+                            properties:
+                              fail:
+                                properties:
+                                  message:
+                                    type: string
+                                  uri:
+                                    type: string
+                                  when:
+                                    type: string
+                                type: object
+                              pass:
+                                properties:
+                                  message:
+                                    type: string
+                                  uri:
+                                    type: string
+                                  when:
+                                    type: string
+                                type: object
+                              warn:
+                                properties:
+                                  message:
+                                    type: string
+                                  uri:
+                                    type: string
+                                  when:
+                                    type: string
+                                type: object
+                            type: object
+                          type: array
+                        strict:
+                          type: BoolString
+                      required:
+                      - outcomes
+                      type: object
+                  type: object
+                type: array
+              collectors:
+                items:
+                  properties:
+                    blockDevices:
+                      properties:
+                        collectorName:
+                          type: string
+                        exclude:
+                          type: BoolString
+                      type: object
+                    certificate:
+                      properties:
+                        certificatePath:
+                          type: string
+                        collectorName:
+                          type: string
+                        exclude:
+                          type: BoolString
+                        keyPath:
+                          type: string
+                      required:
+                      - certificatePath
+                      - keyPath
+                      type: object
+                    cpu:
+                      properties:
+                        collectorName:
+                          type: string
+                        exclude:
+                          type: BoolString
+                      type: object
+                    diskUsage:
+                      properties:
+                        collectorName:
+                          type: string
+                        exclude:
+                          type: BoolString
+                        path:
+                          type: string
+                      required:
+                      - path
+                      type: object
+                    filesystemPerformance:
+                      description: FilesystemPerformance benchmarks sequential write
+                        latency on a single file. The optional background IOPS feature
+                        attempts to mimic real-world conditions by running read and
+                        write workloads prior to and during benchmark execution.
+                      properties:
+                        backgroundIOPSWarmupSeconds:
+                          description: How long to run the background IOPS read and
+                            write workloads prior to starting the benchmarks.
+                          type: integer
+                        backgroundReadIOPS:
+                          description: The target read IOPS to run while benchmarking.
+                            This is a limit and there is no guarantee it will be reached.
+                            This is the total IOPS for all background read jobs.
+                          type: integer
+                        backgroundReadIOPSJobs:
+                          description: Number of threads to use for background read
+                            IOPS. This should be set high enough to reach the target
+                            specified in BackgrounReadIOPS.
+                          type: integer
+                        backgroundWriteIOPS:
+                          description: The target write IOPS to run while benchmarking.
+                            This is a limit and there is no guarantee it will be reached.
+                            This is the total IOPS for all background write jobs.
+                          type: integer
+                        backgroundWriteIOPSJobs:
+                          description: 'Number of threads to use for background write
+                            IOPS. This should be set high enough to reach the target
+                            specified in BackgroundWriteIOPS. Example: If BackgroundWriteIOPS
+                            is 100 and write latency is 10ms then a single job would
+                            barely be able to reach 100 IOPS so this should be at
+                            least 2.'
+                          type: integer
+                        collectorName:
+                          type: string
+                        datasync:
+                          description: Whether to call datasync on the file after
+                            each write. Skipped if Sync is also true. Does not apply
+                            to background IOPS task.
+                          type: boolean
+                        directory:
+                          description: The directory where the benchmark will create
+                            files.
+                          type: string
+                        enableBackgroundIOPS:
+                          description: Enable the background IOPS feature.
+                          type: boolean
+                        exclude:
+                          type: BoolString
+                        fileSize:
+                          description: The size of the file used in the benchmark.
+                            The number of IO operations for the benchmark will be
+                            FileSize / OperationSizeBytes. Accepts valid Kubernetes
+                            resource units such as Mi.
+                          type: string
+                        operationSize:
+                          description: The size of each write operation performed
+                            while benchmarking. This does not apply to the background
+                            IOPS feature if enabled, since those must be fixed at
+                            4096.
+                          format: int64
+                          type: integer
+                        sync:
+                          description: Whether to call sync on the file after each
+                            write. Does not apply to background IOPS task.
+                          type: boolean
+                        timeout:
+                          description: Total timeout, including background IOPS setup
+                            and warmup if enabled.
+                          type: string
+                      required:
+                      - backgroundIOPSWarmupSeconds
+                      - backgroundReadIOPS
+                      - backgroundReadIOPSJobs
+                      - backgroundWriteIOPS
+                      - backgroundWriteIOPSJobs
+                      - enableBackgroundIOPS
+                      type: object
+                    hostOS:
+                      properties:
+                        collectorName:
+                          type: string
+                        exclude:
+                          type: BoolString
+                      type: object
+                    hostServices:
+                      properties:
+                        collectorName:
+                          type: string
+                        exclude:
+                          type: BoolString
+                      type: object
+                    http:
+                      properties:
+                        collectorName:
+                          type: string
+                        exclude:
+                          type: BoolString
+                        get:
+                          properties:
+                            headers:
+                              additionalProperties:
+                                type: string
+                              type: object
+                            insecureSkipVerify:
+                              type: boolean
+                            url:
+                              type: string
+                          required:
+                          - url
+                          type: object
+                        post:
+                          properties:
+                            body:
+                              type: string
+                            headers:
+                              additionalProperties:
+                                type: string
+                              type: object
+                            insecureSkipVerify:
+                              type: boolean
+                            url:
+                              type: string
+                          required:
+                          - url
+                          type: object
+                        put:
+                          properties:
+                            body:
+                              type: string
+                            headers:
+                              additionalProperties:
+                                type: string
+                              type: object
+                            insecureSkipVerify:
+                              type: boolean
+                            url:
+                              type: string
+                          required:
+                          - url
+                          type: object
+                      type: object
+                    httpLoadBalancer:
+                      properties:
+                        address:
+                          type: string
+                        collectorName:
+                          type: string
+                        exclude:
+                          type: BoolString
+                        path:
+                          type: string
+                        port:
+                          type: integer
+                        timeout:
+                          type: string
+                      required:
+                      - address
+                      - path
+                      - port
+                      type: object
+                    ipv4Interfaces:
+                      properties:
+                        collectorName:
+                          type: string
+                        exclude:
+                          type: BoolString
+                      type: object
+                    kernelModules:
+                      properties:
+                        collectorName:
+                          type: string
+                        exclude:
+                          type: BoolString
+                      type: object
+                    kubernetes:
+                      properties:
+                        collectorName:
+                          type: string
+                        exclude:
+                          type: BoolString
+                      type: object
+                    memory:
+                      properties:
+                        collectorName:
+                          type: string
+                        exclude:
+                          type: BoolString
+                      type: object
+                    run:
+                      properties:
+                        args:
+                          items:
+                            type: string
+                          type: array
+                        collectorName:
+                          type: string
+                        command:
+                          type: string
+                        exclude:
+                          type: BoolString
+                      required:
+                      - args
+                      - command
+                      type: object
+                    systemPackages:
+                      properties:
+                        amzn:
+                          items:
+                            type: string
+                          type: array
+                        amzn2:
+                          items:
+                            type: string
+                          type: array
+                        centos:
+                          items:
+                            type: string
+                          type: array
+                        centos7:
+                          items:
+                            type: string
+                          type: array
+                        centos8:
+                          items:
+                            type: string
+                          type: array
+                        collectorName:
+                          type: string
+                        exclude:
+                          type: BoolString
+                        ol:
+                          items:
+                            type: string
+                          type: array
+                        ol7:
+                          items:
+                            type: string
+                          type: array
+                        ol8:
+                          items:
+                            type: string
+                          type: array
+                        rhel:
+                          items:
+                            type: string
+                          type: array
+                        rhel7:
+                          items:
+                            type: string
+                          type: array
+                        rhel8:
+                          items:
+                            type: string
+                          type: array
+                        ubuntu:
+                          items:
+                            type: string
+                          type: array
+                        ubuntu16:
+                          items:
+                            type: string
+                          type: array
+                        ubuntu18:
+                          items:
+                            type: string
+                          type: array
+                        ubuntu20:
+                          items:
+                            type: string
+                          type: array
+                      type: object
+                    tcpConnect:
+                      properties:
+                        address:
+                          type: string
+                        collectorName:
+                          type: string
+                        exclude:
+                          type: BoolString
+                        timeout:
+                          type: string
+                      required:
+                      - address
+                      type: object
+                    tcpLoadBalancer:
+                      properties:
+                        address:
+                          type: string
+                        collectorName:
+                          type: string
+                        exclude:
+                          type: BoolString
+                        port:
+                          type: integer
+                        timeout:
+                          type: string
+                      required:
+                      - address
+                      - port
+                      type: object
+                    tcpPortStatus:
+                      properties:
+                        collectorName:
+                          type: string
+                        exclude:
+                          type: BoolString
+                        interface:
+                          type: string
+                        port:
+                          type: integer
+                      required:
+                      - port
+                      type: object
+                    time:
+                      properties:
+                        collectorName:
+                          type: string
+                        exclude:
+                          type: BoolString
+                      type: object
+                    udpPortStatus:
+                      properties:
+                        collectorName:
+                          type: string
+                        exclude:
+                          type: BoolString
+                        interface:
+                          type: string
+                        port:
+                          type: integer
+                      required:
+                      - port
+                      type: object
+                  type: object
+                type: array
+              extendAnalyzers:
+                description: extendAnalyzers extends user defined hostAnalyzers by
+                  ApeCloud.
+                items:
+                  properties:
+                    hostUtility:
+                      description: hostUtility is to analyze the presence of target
+                        utility.
+                      properties:
+                        annotations:
+                          additionalProperties:
+                            type: string
+                          type: object
+                        checkName:
+                          type: string
+                        collectorName:
+                          description: collectorName indicates which collect data
+                            will be analyzed
+                          type: string
+                        exclude:
+                          type: BoolString
+                        outcomes:
+                          description: outcomes are expected user defined results.
+                          items:
+                            properties:
+                              fail:
+                                properties:
+                                  message:
+                                    type: string
+                                  uri:
+                                    type: string
+                                  when:
+                                    type: string
+                                type: object
+                              pass:
+                                properties:
+                                  message:
+                                    type: string
+                                  uri:
+                                    type: string
+                                  when:
+                                    type: string
+                                type: object
+                              warn:
+                                properties:
+                                  message:
+                                    type: string
+                                  uri:
+                                    type: string
+                                  when:
+                                    type: string
+                                type: object
+                            type: object
+                          type: array
+                        strict:
+                          type: BoolString
+                      required:
+                      - outcomes
+                      type: object
+                  type: object
+                type: array
+              extendCollectors:
+                description: extendCollectors extends user defined hostCollectors
+                  by ApeCloud.
+                items:
+                  properties:
+                    hostUtility:
+                      description: hostUtility is to collect the info of target utility.
+                      properties:
+                        collectorName:
+                          type: string
+                        exclude:
+                          type: BoolString
+                        utilityName:
+                          description: utilityName will be checked in local host.
+                          type: string
+                      required:
+                      - utilityName
+                      type: object
+                  type: object
+                type: array
+              remoteCollectors:
+                items:
+                  properties:
+                    blockDevices:
+                      properties:
+                        collectorName:
+                          type: string
+                        exclude:
+                          type: BoolString
+                      type: object
+                    certificate:
+                      properties:
+                        certificatePath:
+                          type: string
+                        collectorName:
+                          type: string
+                        exclude:
+                          type: BoolString
+                        keyPath:
+                          type: string
+                      required:
+                      - certificatePath
+                      - keyPath
+                      type: object
+                    cpu:
+                      properties:
+                        collectorName:
+                          type: string
+                        exclude:
+                          type: BoolString
+                      type: object
+                    diskUsage:
+                      properties:
+                        collectorName:
+                          type: string
+                        exclude:
+                          type: BoolString
+                        path:
+                          type: string
+                      required:
+                      - path
+                      type: object
+                    filesystemPerformance:
+                      description: RemoteFilesystemPerformance benchmarks sequential
+                        write latency on a single file. The optional background IOPS
+                        feature attempts to mimic real-world conditions by running
+                        read and write workloads prior to and during benchmark execution.
+                      properties:
+                        backgroundIOPSWarmupSeconds:
+                          description: How long to run the background IOPS read and
+                            write workloads prior to starting the benchmarks.
+                          type: integer
+                        backgroundReadIOPS:
+                          description: The target read IOPS to run while benchmarking.
+                            This is a limit and there is no guarantee it will be reached.
+                            This is the total IOPS for all background read jobs.
+                          type: integer
+                        backgroundReadIOPSJobs:
+                          description: Number of threads to use for background read
+                            IOPS. This should be set high enough to reach the target
+                            specified in BackgrounReadIOPS.
+                          type: integer
+                        backgroundWriteIOPS:
+                          description: The target write IOPS to run while benchmarking.
+                            This is a limit and there is no guarantee it will be reached.
+                            This is the total IOPS for all background write jobs.
+                          type: integer
+                        backgroundWriteIOPSJobs:
+                          description: 'Number of threads to use for background write
+                            IOPS. This should be set high enough to reach the target
+                            specified in BackgroundWriteIOPS. Example: If BackgroundWriteIOPS
+                            is 100 and write latency is 10ms then a single job would
+                            barely be able to reach 100 IOPS so this should be at
+                            least 2.'
+                          type: integer
+                        collectorName:
+                          type: string
+                        datasync:
+                          description: Whether to call datasync on the file after
+                            each write. Skipped if Sync is also true. Does not apply
+                            to background IOPS task.
+                          type: boolean
+                        directory:
+                          description: The directory where the benchmark will create
+                            files.
+                          type: string
+                        enableBackgroundIOPS:
+                          description: Enable the background IOPS feature.
+                          type: boolean
+                        exclude:
+                          type: BoolString
+                        fileSize:
+                          description: The size of the file used in the benchmark.
+                            The number of IO operations for the benchmark will be
+                            FileSize / OperationSizeBytes. Accepts valid Kubernetes
+                            resource units such as Mi.
+                          type: string
+                        operationSize:
+                          description: The size of each write operation performed
+                            while benchmarking. This does not apply to the background
+                            IOPS feature if enabled, since those must be fixed at
+                            4096.
+                          format: int64
+                          type: integer
+                        sync:
+                          description: Whether to call sync on the file after each
+                            write. Does not apply to background IOPS task.
+                          type: boolean
+                        timeout:
+                          description: Total timeout, including background IOPS setup
+                            and warmup if enabled.
+                          type: string
+                      required:
+                      - backgroundIOPSWarmupSeconds
+                      - backgroundReadIOPS
+                      - backgroundReadIOPSJobs
+                      - backgroundWriteIOPS
+                      - backgroundWriteIOPSJobs
+                      - enableBackgroundIOPS
+                      type: object
+                    hostServices:
+                      properties:
+                        collectorName:
+                          type: string
+                        exclude:
+                          type: BoolString
+                      type: object
+                    http:
+                      properties:
+                        collectorName:
+                          type: string
+                        exclude:
+                          type: BoolString
+                        get:
+                          properties:
+                            headers:
+                              additionalProperties:
+                                type: string
+                              type: object
+                            insecureSkipVerify:
+                              type: boolean
+                            url:
+                              type: string
+                          required:
+                          - url
+                          type: object
+                        post:
+                          properties:
+                            body:
+                              type: string
+                            headers:
+                              additionalProperties:
+                                type: string
+                              type: object
+                            insecureSkipVerify:
+                              type: boolean
+                            url:
+                              type: string
+                          required:
+                          - url
+                          type: object
+                        put:
+                          properties:
+                            body:
+                              type: string
+                            headers:
+                              additionalProperties:
+                                type: string
+                              type: object
+                            insecureSkipVerify:
+                              type: boolean
+                            url:
+                              type: string
+                          required:
+                          - url
+                          type: object
+                      type: object
+                    httpLoadBalancer:
+                      properties:
+                        address:
+                          type: string
+                        collectorName:
+                          type: string
+                        exclude:
+                          type: BoolString
+                        path:
+                          type: string
+                        port:
+                          type: integer
+                        timeout:
+                          type: string
+                      required:
+                      - address
+                      - path
+                      - port
+                      type: object
+                    ipv4Interfaces:
+                      properties:
+                        collectorName:
+                          type: string
+                        exclude:
+                          type: BoolString
+                      type: object
+                    kernelModules:
+                      properties:
+                        collectorName:
+                          type: string
+                        exclude:
+                          type: BoolString
+                      type: object
+                    memory:
+                      properties:
+                        collectorName:
+                          type: string
+                        exclude:
+                          type: BoolString
+                      type: object
+                    systemPackages:
+                      properties:
+                        collectorName:
+                          type: string
+                        exclude:
+                          type: BoolString
+                      type: object
+                    tcpConnect:
+                      properties:
+                        address:
+                          type: string
+                        collectorName:
+                          type: string
+                        exclude:
+                          type: BoolString
+                        timeout:
+                          type: string
+                      required:
+                      - address
+                      type: object
+                    tcpLoadBalancer:
+                      properties:
+                        address:
+                          type: string
+                        collectorName:
+                          type: string
+                        exclude:
+                          type: BoolString
+                        port:
+                          type: integer
+                        timeout:
+                          type: string
+                      required:
+                      - address
+                      - port
+                      type: object
+                    tcpPortStatus:
+                      properties:
+                        collectorName:
+                          type: string
+                        exclude:
+                          type: BoolString
+                        interface:
+                          type: string
+                        port:
+                          type: integer
+                      required:
+                      - port
+                      type: object
+                    time:
+                      properties:
+                        collectorName:
+                          type: string
+                        exclude:
+                          type: BoolString
+                      type: object
+                    udpPortStatus:
+                      properties:
+                        collectorName:
+                          type: string
+                        exclude:
+                          type: BoolString
+                        interface:
+                          type: string
+                        port:
+                          type: integer
+                      required:
+                      - port
+                      type: object
+                  type: object
+                type: array
+            type: object
+          status:
+            description: HostPreflightStatus defines the observed state of HostPreflight
+            type: object
+        type: object
+    served: true
+    storage: false

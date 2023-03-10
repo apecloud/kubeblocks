@@ -38,9 +38,11 @@ import (
 const namespace = "test"
 
 var _ = Describe("kubeblocks install", func() {
-	var cmd *cobra.Command
-	var streams genericclioptions.IOStreams
-	var tf *cmdtesting.TestFactory
+	var (
+		cmd     *cobra.Command
+		streams genericclioptions.IOStreams
+		tf      *cmdtesting.TestFactory
+	)
 
 	BeforeEach(func() {
 		streams, _, _, _ = genericclioptions.NewTestIOStreams()
@@ -82,8 +84,7 @@ var _ = Describe("kubeblocks install", func() {
 		o := &InstallOptions{
 			Options: Options{
 				IOStreams: streams,
-				HelmCfg:   helm.FakeActionConfig(),
-				Namespace: "default",
+				HelmCfg:   helm.NewFakeConfig(namespace),
 				Client:    testing.FakeClientSet(),
 				Dynamic:   testing.FakeDynamicClient(),
 			},
@@ -102,7 +103,7 @@ var _ = Describe("kubeblocks install", func() {
 		o := &InstallOptions{
 			Options: Options{
 				IOStreams: streams,
-				HelmCfg:   helm.FakeActionConfig(),
+				HelmCfg:   helm.NewFakeConfig(namespace),
 				Namespace: "default",
 				Client:    testing.FakeClientSet(),
 				Dynamic:   testing.FakeDynamicClient(testing.FakeVolumeSnapshotClass()),
@@ -120,7 +121,7 @@ var _ = Describe("kubeblocks install", func() {
 			Options: Options{
 				IOStreams: genericclioptions.NewTestIOStreamsDiscard(),
 			},
-			check: true,
+			Check: true,
 		}
 		By("kubernetes version is empty")
 		versionInfo := map[util.AppName]string{}
@@ -131,7 +132,7 @@ var _ = Describe("kubeblocks install", func() {
 
 		By("kubernetes version is smaller than required version")
 		versionInfo[util.KubernetesApp] = "v1.20.0"
-		Expect(o.preCheck(versionInfo).Error()).Should(ContainSubstring("should be larger than"))
+		Expect(o.preCheck(versionInfo).Error()).Should(ContainSubstring("should be greater than"))
 
 		By("kubernetes is provided by cloud provider")
 		versionInfo[util.KubernetesApp] = "v1.25.0-eks"

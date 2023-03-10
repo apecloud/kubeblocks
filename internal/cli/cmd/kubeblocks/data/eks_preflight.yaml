@@ -1,0 +1,59 @@
+apiVersion: troubleshoot.sh/v1beta2
+kind: Preflight
+metadata:
+  name: kubeblocks_preflight
+spec:
+  collectors:
+    - clusterInfo: {}
+  analyzers:
+    - clusterVersion:
+        checkName: EKS-Version
+        outcomes:
+          - fail:
+              when: "< 1.22.0"
+              message: This application requires at least Kubernetes 1.20.0 or later, and recommends 1.22.0.
+              uri: https://www.kubernetes.io
+          - pass:
+              when: ">= 1.22.0"
+              message: Your cluster meets the recommended and required versions（>= 1.22.0） of Kubernetes.
+              uri: https://www.kubernetes.io
+    - nodeResources:
+        checkName: At-Least-3-Nodes
+        outcomes:
+          - warn:
+              when: "count() < 3"
+              message: This application requires at least 3 nodes
+          - pass:
+              message: This cluster has enough nodes.
+    - storageClass:
+        checkName: Required-GP3-SC
+        storageClassName: "gp3"
+        outcomes:
+          - fail:
+              message: The gp3 storage class was not found
+          - pass:
+              message: gp3 is the presence, and all good on storage classes
+    - deploymentStatus:
+        checkName: AWS-Load-Balancer-Check
+        name: aws-load-balancer-controller
+        namespace: kube-system
+        outcomes:
+          - warn:
+              when: "absent" # note that the "absent" failure state must be listed first if used.
+              message: The aws-load-balancer-controller deployment is not present.
+          - warn:
+              when: "< 1"
+              message: The aws-load-balancer-controller deployment does not have any ready replicas.
+          - warn:
+              when: "= 1"
+              message: The aws-load-balancer-controller deployment has only a single ready replica.
+          - pass:
+              message: There are multiple replicas of the aws-load-balancer-controller deployment ready.
+  extendAnalyzers:
+    - clusterAccess:
+        checkName: Check-K8S-Access
+        outcomes:
+          - fail:
+              message: k8s cluster access fail
+          - pass:
+              message: k8s cluster access ok

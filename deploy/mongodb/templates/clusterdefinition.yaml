@@ -1,7 +1,7 @@
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: ClusterDefinition
 metadata:
-  name: apecloud-mongodb
+  name: mongodb
   labels:
     {{- include "mongodb.labels" . | nindent 4 }}
 spec:

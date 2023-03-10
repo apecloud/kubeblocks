@@ -41,8 +41,9 @@ import (
 	appscontrollers "github.com/apecloud/kubeblocks/controllers/apps"
 	dataprotectioncontrollers "github.com/apecloud/kubeblocks/controllers/dataprotection"
 	extensionscontrollers "github.com/apecloud/kubeblocks/controllers/extensions"
+	"github.com/apecloud/kubeblocks/internal/constant"
 
-	//+kubebuilder:scaffold:imports
+	// +kubebuilder:scaffold:imports
 
 	discoverycli "k8s.io/client-go/discovery"
 
@@ -54,7 +55,7 @@ import (
 )
 
 // added lease.coordination.k8s.io for leader election
-//+kubebuilder:rbac:groups=coordination.k8s.io,resources=leases,verbs=get;list;watch;create;update;patch
+// +kubebuilder:rbac:groups=coordination.k8s.io,resources=leases,verbs=get;list;watch;create;update;patch
 
 const (
 	appName = "kubeblocks"
@@ -72,7 +73,7 @@ func init() {
 	utilruntime.Must(dataprotectionv1alpha1.AddToScheme(scheme))
 	utilruntime.Must(snapshotv1.AddToScheme(scheme))
 	utilruntime.Must(extensionsv1alpha1.AddToScheme(scheme))
-	//+kubebuilder:scaffold:scheme
+	// +kubebuilder:scaffold:scheme
 
 	viper.SetConfigName("config")                          // name of config file (without extension)
 	viper.SetConfigType("yaml")                            // REQUIRED if the config file does not have the extension in the name
@@ -123,6 +124,14 @@ func main() {
 	opts.BindFlags(flag.CommandLine)
 	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
 	pflag.Parse()
+
+	// set normalizeFunc to replace flag name to viper name
+	normalizeFunc := pflag.CommandLine.GetNormalizeFunc()
+	pflag.CommandLine.SetNormalizeFunc(func(fs *pflag.FlagSet, name string) pflag.NormalizedName {
+		result := normalizeFunc(fs, name)
+		name = strings.ReplaceAll(string(result), "-", "_")
+		return pflag.NormalizedName(name)
+	})
 
 	if err := viper.BindPFlags(pflag.CommandLine); err != nil {
 		setupLog.Error(err, "unable able to bind flags")
@@ -287,7 +296,8 @@ func main() {
 			os.Exit(1)
 		}
 	}
-	//+kubebuilder:scaffold:builder
+
+	// +kubebuilder:scaffold:builder
 
 	if err = (&configuration.ReconfigureRequestReconciler{
 		Client:   mgr.GetClient(),
@@ -313,15 +323,6 @@ func main() {
 		Recorder: mgr.GetEventRecorderFor("event-controller"),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Event")
-		os.Exit(1)
-	}
-
-	if err = (&k8scorecontrollers.StorageClassReconciler{
-		Client:   mgr.GetClient(),
-		Scheme:   mgr.GetScheme(),
-		Recorder: mgr.GetEventRecorderFor("storage-class-controller"),
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "StorageClass")
 		os.Exit(1)
 	}
 
@@ -402,7 +403,7 @@ func main() {
 		setupLog.Error(err, "unable to discover version info")
 		os.Exit(1)
 	}
-	viper.SetDefault("_KUBE_SERVER_INFO", *ver)
+	viper.SetDefault(constant.CfgKeyServerInfo, *ver)
 
 	setupLog.Info("starting manager")
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {

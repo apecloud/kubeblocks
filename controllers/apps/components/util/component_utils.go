@@ -28,7 +28,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
 const (
@@ -45,7 +45,7 @@ func GetClusterByObject(ctx context.Context,
 	}
 	cluster := &appsv1alpha1.Cluster{}
 	if err := cli.Get(ctx, client.ObjectKey{
-		Name:      labels[intctrlutil.AppInstanceLabelKey],
+		Name:      labels[constant.AppInstanceLabelKey],
 		Namespace: obj.GetNamespace(),
 	}, cluster); err != nil {
 		return nil, err
@@ -66,9 +66,9 @@ func IsFailedOrAbnormal(phase appsv1alpha1.Phase) bool {
 // GetComponentMatchLabels gets the labels for matching the cluster component
 func GetComponentMatchLabels(clusterName, componentName string) client.ListOption {
 	return client.MatchingLabels{
-		intctrlutil.AppInstanceLabelKey:    clusterName,
-		intctrlutil.KBAppComponentLabelKey: componentName,
-		intctrlutil.AppManagedByLabelKey:   intctrlutil.AppName,
+		constant.AppInstanceLabelKey:    clusterName,
+		constant.KBAppComponentLabelKey: componentName,
+		constant.AppManagedByLabelKey:   constant.AppName,
 	}
 }
 
@@ -130,6 +130,16 @@ func GetComponentDefByCluster(ctx context.Context, cli client.Client, cluster *a
 		}
 	}
 	return nil, nil
+}
+
+// GetClusterComponentSpecByName gets componentSpec from cluster with compSpecName.
+func GetClusterComponentSpecByName(cluster *appsv1alpha1.Cluster, compSpecName string) *appsv1alpha1.ClusterComponentSpec {
+	for _, compSpec := range cluster.Spec.ComponentSpecs {
+		if compSpec.Name == compSpecName {
+			return &compSpec
+		}
+	}
+	return nil
 }
 
 // InitClusterComponentStatusIfNeed Initialize the state of the corresponding component in cluster.status.components
@@ -221,9 +231,9 @@ func GetComponentInfoByPod(ctx context.Context,
 	if pod == nil || pod.Labels == nil {
 		return "", nil, fmt.Errorf("pod %s or pod's label is nil", pod.Name)
 	}
-	componentName, ok := pod.Labels[intctrlutil.KBAppComponentLabelKey]
+	componentName, ok := pod.Labels[constant.KBAppComponentLabelKey]
 	if !ok {
-		return "", nil, fmt.Errorf("pod %s component name label %s is nil", pod.Name, intctrlutil.KBAppComponentLabelKey)
+		return "", nil, fmt.Errorf("pod %s component name label %s is nil", pod.Name, constant.KBAppComponentLabelKey)
 	}
 	compDefName := cluster.GetComponentDefRefName(componentName)
 	componentDef, err = GetComponentDefByCluster(ctx, cli, cluster, compDefName)

@@ -194,6 +194,15 @@ func (factory *MockClusterDefFactory) AddContainerVolumeMounts(containerName str
 	return factory
 }
 
+func (factory *MockClusterDefFactory) AddReplicationSpec(replicationSpec *appsv1alpha1.ReplicationSpec) *MockClusterDefFactory {
+	comp := factory.getLastCompDef()
+	if comp == nil {
+		return factory
+	}
+	comp.ReplicationSpec = replicationSpec
+	return factory
+}
+
 func appendContainerVolumeMounts(containers []corev1.Container, targetContainerName string, volumeMounts []corev1.VolumeMount) []corev1.Container {
 	for index := range containers {
 		c := containers[index]

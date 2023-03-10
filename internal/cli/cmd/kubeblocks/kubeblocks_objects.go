@@ -30,10 +30,11 @@ import (
 	k8sapitypes "k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
 
 	"github.com/apecloud/kubeblocks/internal/cli/types"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
 type kbObjects map[schema.GroupVersionResource]*unstructured.UnstructuredList
@@ -43,7 +44,6 @@ var (
 		types.DeployGVR(),
 		types.StatefulSetGVR(),
 		types.ServiceGVR(),
-		types.ConfigmapGVR(),
 		types.PVCGVR(),
 	}
 )
@@ -69,7 +69,7 @@ func getKBObjects(dynamic dynamic.Interface, namespace string) (kbObjects, error
 	appendErr(err)
 	kbObjs[types.CRDGVR()] = &unstructured.UnstructuredList{}
 	for i, crd := range crds.Items {
-		if !strings.Contains(crd.GetName(), "kubeblocks.io") {
+		if !strings.Contains(crd.GetName(), constant.APIGroup) {
 			continue
 		}
 		crdObjs := kbObjs[types.CRDGVR()]
@@ -121,8 +121,9 @@ func getKBObjects(dynamic dynamic.Interface, namespace string) (kbObjects, error
 	}
 
 	// build label selector
-	instanceLabelSelector := fmt.Sprintf("%s=%s", intctrlutil.AppInstanceLabelKey, types.KubeBlocksChartName)
+	instanceLabelSelector := fmt.Sprintf("%s=%s", constant.AppInstanceLabelKey, types.KubeBlocksChartName)
 	releaseLabelSelector := fmt.Sprintf("release=%s", types.KubeBlocksChartName)
+	configMapLabelSelector := fmt.Sprintf("%s=%s", constant.CMConfigurationTypeLabelKey, constant.ConfigTemplateType)
 
 	// get resources which label matches app.kubernetes.io/instance=kubeblocks or
 	// label matches release=kubeblocks, like prometheus-server
@@ -131,7 +132,8 @@ func getKBObjects(dynamic dynamic.Interface, namespace string) (kbObjects, error
 			getObjects(labelSelector, gvr)
 		}
 	}
-
+	// get configmap
+	getObjects(configMapLabelSelector, types.ConfigmapGVR())
 	// get volume snapshot class
 	getObjects(instanceLabelSelector, types.VolumeSnapshotClassGVR())
 
@@ -213,6 +215,10 @@ func getRemainedResource(objs kbObjects) map[string][]string {
 	}
 
 	for k, v := range objs {
+		// ignore PVC and PV
+		if k == types.PVCGVR() || k == types.PVGVR() {
+			continue
+		}
 		appendItems(k.Resource, v)
 	}
 
@@ -224,4 +230,8 @@ func newDeleteOpts() metav1.DeleteOptions {
 	return metav1.DeleteOptions{
 		GracePeriodSeconds: &gracePeriod,
 	}
+}
+
+func deleteNamespace(client kubernetes.Interface, namespace string) error {
+	return client.CoreV1().Namespaces().Delete(context.TODO(), namespace, newDeleteOpts())
 }

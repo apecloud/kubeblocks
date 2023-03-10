@@ -38,9 +38,13 @@ type ClusterDefinitionSpec struct {
 
 	// Connection credential template used for creating a connection credential
 	// secret for cluster.apps.kubeblock.io object. Built-in objects are:
-	// `$(RANDOM_PASSWD)` - random 8 characters
+	// `$(RANDOM_PASSWD)` - random 8 characters.
+	// `$(UUID)` - generate a random UUID v4 string.
+	// `$(UUID_B64)` - generate a random UUID v4 BASE64 encoded string``.
+	// `$(UUID_STR_B64)` - generate a random UUID v4 string then BASE64 encoded``.
+	// `$(UUID_HEX)` - generate a random UUID v4 wth HEX representation``.
 	// `$(SVC_FQDN)` - service FQDN  placeholder, value pattern - $(CLUSTER_NAME)-$(1ST_COMP_NAME).$(NAMESPACE).svc,
-	//    where 1ST_COMP_NAME is the 1st component that provide `ClusterDefinition.spec.componentDefs[].service` attribute
+	//    where 1ST_COMP_NAME is the 1st component that provide `ClusterDefinition.spec.componentDefs[].service` attribute;
 	// `$(SVC_PORT_<PORT-NAME>)` - a ServicePort's port value with specified port name, i.e, a servicePort JSON struct:
 	//    { "name": "mysql", "targetPort": "mysqlContainerPort", "port": 3306 }, and "$(SVC_PORT_mysql)" in the
 	//    connection credential value is 3306.
@@ -68,22 +72,9 @@ type SystemAccountSpec struct {
 
 // CmdExecutorConfig specifies how to perform creation and deletion statements.
 type CmdExecutorConfig struct {
-	// image for Connector.
-	// +kubebuilder:validation:Required
-	Image string `json:"image"`
-	// command to perform statements.
-	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:MinItems=1
-	Command []string `json:"command"`
-	// args is used to perform statements.
-	// +optional
-	Args []string `json:"args,omitempty"`
-	// envs is a list of environment variables.
-	// +kubebuilder:pruning:PreserveUnknownFields
-	// +patchMergeKey=name
-	// +patchStrategy=merge,retainKeys
-	// +optional
-	Env []corev1.EnvVar `json:"env,omitempty" patchStrategy:"merge" patchMergeKey:"name"`
+	CommandExecutorEnvItem `json:",inline"`
+
+	CommandExecutorItem `json:",inline"`
 }
 
 // PasswordConfig helps provide to customize complexity of password generation pattern.
@@ -276,6 +267,20 @@ type ConfigurationSpec struct {
 	ConfigTemplateRefs []ConfigTemplate `json:"configTemplateRefs,omitempty"`
 }
 
+type VolumeTypeSpec struct {
+	// Name definition is the same as the name of the VolumeMounts field in PodSpec.Container,
+	// similar to the relations of Volumes[*].name and VolumesMounts[*].name in Pod.Spec.
+	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
+	// +optional
+	Name string `json:"name,omitempty"`
+
+	// Type is in enum of {data, log}.
+	// VolumeTypeData: the volume is for the persistent data storage.
+	// VolumeTypeLog: the volume is for the persistent log storage.
+	// +optional
+	Type VolumeType `json:"type,omitempty"`
+}
+
 // ClusterComponentDefinition provides a workload component specification template,
 // with attributes that strongly work with stateful workloads and day-2 operations
 // behaviors.
@@ -285,6 +290,10 @@ type ClusterComponentDefinition struct {
 	// +kubebuilder:validation:MaxLength=18
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	Name string `json:"name"`
+
+	// The description of component definition.
+	// +optional
+	Description string `json:"description,omitempty"`
 
 	// workloadType defines type of the workload.
 	// Stateless is a stateless workload type used to describe stateless applications.
@@ -343,6 +352,10 @@ type ClusterComponentDefinition struct {
 	// +optional
 	ConsensusSpec *ConsensusSetSpec `json:"consensusSpec,omitempty"`
 
+	// replicationSpec defines replication related spec if workloadType is Replication, required if workloadType is Replication.
+	// +optional
+	ReplicationSpec *ReplicationSpec `json:"replicationSpec,omitempty"`
+
 	// horizontalScalePolicy controls the behavior of horizontal scale.
 	// +optional
 	HorizontalScalePolicy *HorizontalScalePolicy `json:"horizontalScalePolicy,omitempty"`
@@ -350,6 +363,22 @@ type ClusterComponentDefinition struct {
 	// Statement to create system account.
 	// +optional
 	SystemAccounts *SystemAccountSpec `json:"systemAccounts,omitempty"`
+
+	// VolumeTypes is used to describe the purpose of the volumes
+	// mapping the name of the VolumeMounts in the PodSpec.Container field,
+	// such as data volume, log volume, etc.
+	// When backing up the volume, the volume can be correctly backed up
+	// according to the volumeType.
+	//
+	// For example:
+	//  `{name: data, type: data}` means that the volume named `data` is used to store `data`.
+	//  `{name: binlog, type: log}` means that the volume named `binlog` is used to store `log`.
+	//
+	// NOTE:
+	//   When volumeTypes is not defined, the backup function will not be supported,
+	// even if a persistent volume has been specified.
+	// +optional
+	VolumeTypes []VolumeTypeSpec `json:"volumeTypes,omitempty"`
 }
 
 type HorizontalScalePolicy struct {
@@ -477,12 +506,96 @@ type ConsensusMember struct {
 	Replicas *int32 `json:"replicas,omitempty"`
 }
 
-//+kubebuilder:object:root=true
-//+kubebuilder:subresource:status
-//+kubebuilder:resource:categories={kubeblocks},scope=Cluster,shortName=cd
-//+kubebuilder:printcolumn:name="MAIN-COMPONENT-NAME",type="string",JSONPath=".spec.componentDefs[0].name",description="main component names"
-//+kubebuilder:printcolumn:name="STATUS",type="string",JSONPath=".status.phase",description="status phase"
-//+kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
+type ReplicationSpec struct {
+	// switchPolicies defines a collection of different types of switchPolicy, and each type of switchPolicy is limited to one.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MinItems=1
+	SwitchPolicies []SwitchPolicy `json:"switchPolicies,omitempty"`
+
+	// switchCmdExecutorConfig configs how to get client SDK and perform switch statements.
+	// +kubebuilder:validation:Required
+	SwitchCmdExecutorConfig *SwitchCmdExecutorConfig `json:"switchCmdExecutorConfig"`
+}
+
+type SwitchPolicy struct {
+	// switchPolicyType defines type of the switchPolicy.
+	// MaximumAvailability: when the primary is active, do switch if the synchronization delay = 0 in the user-defined lagProbe data delay detection logic, otherwise do not switch. The primary is down, switch immediately.
+	// MaximumDataProtection: when the primary is active, do switch if synchronization delay = 0 in the user-defined lagProbe data lag detection logic, otherwise do not switch. If the primary is down, if it can be judged that the primary and secondary data are consistent, then do the switch, otherwise do not switch.
+	// Noop: KubeBlocks will not perform high-availability switching on components. Users need to implement HA by themselves.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:default=MaximumAvailability
+	Type SwitchPolicyType `json:"type"`
+
+	// switchStatements defines switching actions according to their respective roles, We divide all pods into three switchStatement role={Promote,Demote,Follow}.
+	// Promote: candidate primary after elected, which to be promoted
+	// Demote: primary before switch, which to be demoted
+	// Follow: the other secondaries that are not selected as the primary, which to follow the new primary
+	// if switchStatements is not set，we will try to use the built-in switchStatements for the database engine with built-in support.
+	// +optional
+	SwitchStatements *SwitchStatements `json:"switchStatements,omitempty"`
+}
+
+type SwitchStatements struct {
+	// promote defines the switching actions for the candidate primary which to be promoted.
+	// +optional
+	Promote []string `json:"promote,omitempty"`
+
+	// demote defines the switching actions for the old primary which to be demoted.
+	// +optional
+	Demote []string `json:"demote,omitempty"`
+
+	// follow defines the switching actions for the other secondaries which are not selected as the primary.
+	// +optional
+	Follow []string `json:"follow,omitempty"`
+}
+
+type SwitchCmdExecutorConfig struct {
+	CommandExecutorEnvItem `json:",inline"`
+
+	// switchSteps definition, users can customize the switching steps on the provided three roles - NewPrimary, OldPrimary, and Secondaries.
+	// the same role can customize multiple steps in the order of the list, and KubeBlocks will perform switching operations in the defined order.
+	// if switchStep is not set, we will try to use the built-in switchStep for the database engine with built-in support.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MinItems=1
+	// +optional
+	SwitchSteps []SwitchStep `json:"switchSteps"`
+}
+
+type SwitchStep struct {
+	CommandExecutorItem `json:",inline"`
+
+	// role determines which role to execute the command on, role is divided into three roles NewPrimary, OldPrimary, and Secondaries.
+	Role SwitchStepRole `json:"role"`
+}
+
+type CommandExecutorEnvItem struct {
+	// image for Connector when executing the command.
+	// +kubebuilder:validation:Required
+	Image string `json:"image"`
+	// envs is a list of environment variables.
+	// +kubebuilder:pruning:PreserveUnknownFields
+	// +patchMergeKey=name
+	// +patchStrategy=merge,retainKeys
+	// +optional
+	Env []corev1.EnvVar `json:"env,omitempty" patchStrategy:"merge" patchMergeKey:"name"`
+}
+
+type CommandExecutorItem struct {
+	// command to perform statements.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MinItems=1
+	Command []string `json:"command"`
+	// args is used to perform statements.
+	// +optional
+	Args []string `json:"args,omitempty"`
+}
+
+// +kubebuilder:object:root=true
+// +kubebuilder:subresource:status
+// +kubebuilder:resource:categories={kubeblocks},scope=Cluster,shortName=cd
+// +kubebuilder:printcolumn:name="MAIN-COMPONENT-NAME",type="string",JSONPath=".spec.componentDefs[0].name",description="main component names"
+// +kubebuilder:printcolumn:name="STATUS",type="string",JSONPath=".status.phase",description="status phase"
+// +kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
 
 // ClusterDefinition is the Schema for the clusterdefinitions API
 type ClusterDefinition struct {
@@ -493,7 +606,7 @@ type ClusterDefinition struct {
 	Status ClusterDefinitionStatus `json:"status,omitempty"`
 }
 
-//+kubebuilder:object:root=true
+// +kubebuilder:object:root=true
 
 // ClusterDefinitionList contains a list of ClusterDefinition
 type ClusterDefinitionList struct {

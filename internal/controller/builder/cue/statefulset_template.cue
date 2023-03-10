@@ -17,10 +17,12 @@ cluster: {
 		namespace: string
 		name:      string
 	}
+	spec: {
+		clusterVersionRef: string
+	}
 }
 component: {
 	clusterDefName: string
-	characterType:  string
 	type:           string
 	name:           string
 	workloadType:   string
@@ -36,20 +38,18 @@ statefulset: {
 		namespace: cluster.metadata.namespace
 		name:      "\(cluster.metadata.name)-\(component.name)"
 		labels: {
-			"app.kubernetes.io/name":       "\(component.clusterDefName)"
-			"app.kubernetes.io/instance":   cluster.metadata.name
-			"app.kubernetes.io/managed-by": "kubeblocks"
-
+			"app.kubernetes.io/name":            "\(component.clusterDefName)"
+			"app.kubernetes.io/instance":        cluster.metadata.name
+			"app.kubernetes.io/managed-by":      "kubeblocks"
 			"apps.kubeblocks.io/component-name": "\(component.name)"
 		}
 	}
 	spec: {
 		selector:
 			matchLabels: {
-				"app.kubernetes.io/name":       "\(component.clusterDefName)"
-				"app.kubernetes.io/instance":   "\(cluster.metadata.name)"
-				"app.kubernetes.io/managed-by": "kubeblocks"
-
+				"app.kubernetes.io/name":            "\(component.clusterDefName)"
+				"app.kubernetes.io/instance":        "\(cluster.metadata.name)"
+				"app.kubernetes.io/managed-by":      "kubeblocks"
 				"apps.kubeblocks.io/component-name": "\(component.name)"
 			}
 		serviceName: "\(cluster.metadata.name)-\(component.name)-headless"
@@ -67,7 +67,10 @@ statefulset: {
 					"app.kubernetes.io/name":       "\(component.clusterDefName)"
 					"app.kubernetes.io/instance":   "\(cluster.metadata.name)"
 					"app.kubernetes.io/managed-by": "kubeblocks"
-
+					"app.kubernetes.io/component":  "\(component.type)"
+					if cluster.spec.clusterVersionRef != _|_ {
+						"app.kubernetes.io/version": "\(cluster.spec.clusterVersionRef)"
+					}
 					"apps.kubeblocks.io/component-name": "\(component.name)"
 					"apps.kubeblocks.io/workload-type":  "\(component.workloadType)"
 				}

@@ -258,6 +258,27 @@ var _ = Describe("cluster webhook", func() {
 			Expect(testCtx.CreateObj(ctx, cluster)).Should(Succeed())
 		})
 	})
+
+	When("Create a cluster with replication component, but without specifying PrimaryIndex", func() {
+		It("should set default value to PrimaryIndex when PrimaryIndex is nil", func() {
+			By("By creating a new clusterDefinition when workloadType=replication")
+			clusterRef, _ := createTestReplicationSetClusterDefinitionObj(rsClusterDefinitionName)
+			Expect(testCtx.CreateObj(ctx, clusterRef)).Should(Succeed())
+
+			By("By creating a new clusterVersion when workloadType=replication")
+			clusterVersion := createTestReplicationSetClusterVersionObj(rsClusterDefinitionName, rsClusterVersionName)
+			Expect(testCtx.CreateObj(ctx, clusterVersion)).Should(Succeed())
+
+			By("By creating a new cluster when workloadType=replication")
+			cluster, _ := createTestReplicationSetCluster(rsClusterDefinitionName, rsClusterVersionName, rsClusterName)
+			cluster.Spec.ComponentSpecs[0].PrimaryIndex = nil
+			Expect(testCtx.CreateObj(ctx, cluster)).Should(Succeed())
+			Eventually(func(g Gomega) int32 {
+				g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(cluster), cluster)).Should(Succeed())
+				return *cluster.Spec.ComponentSpecs[0].PrimaryIndex
+			}, timeout, interval).Should(Equal(int32(0)))
+		})
+	})
 })
 
 func createTestCluster(clusterDefinitionName, clusterVersionName, clusterName string) (*Cluster, error) {
@@ -274,7 +295,7 @@ spec:
   - name: replicasets
     componentDefRef: replicasets
     replicas: 1
-    volumeClaimTemplates: 
+    volumeClaimTemplates:
     - name: data
       spec:
         resources:

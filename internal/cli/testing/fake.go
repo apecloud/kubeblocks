@@ -22,6 +22,7 @@ import (
 
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	"github.com/sethvargo/go-password/password"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -30,7 +31,7 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/constant"
 )
 
 const (
@@ -61,7 +62,7 @@ func FakeCluster(name string, namespace string) *appsv1alpha1.Cluster {
 	return &appsv1alpha1.Cluster{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       types.KindCluster,
-			APIVersion: fmt.Sprintf("%s/%s", types.Group, types.Version),
+			APIVersion: fmt.Sprintf("%s/%s", types.AppsAPIGroup, types.AppsAPIVersion),
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
@@ -197,6 +198,18 @@ func FakeSecrets(namespace string, cluster string) *corev1.SecretList {
 	return &corev1.SecretList{Items: []corev1.Secret{secret}}
 }
 
+func FakeSecretsWithLabels(namespace string, labels map[string]string) *corev1.SecretList {
+	secret := corev1.Secret{}
+	secret.Name = GetRandomStr()
+	secret.Namespace = namespace
+	secret.Labels = labels
+	secret.Data = map[string][]byte{
+		"username": []byte("test-user"),
+		"password": []byte("test-password"),
+	}
+	return &corev1.SecretList{Items: []corev1.Secret{secret}}
+}
+
 func FakeNode() *corev1.Node {
 	node := &corev1.Node{}
 	node.Name = NodeName
@@ -216,9 +229,13 @@ func FakeClusterDef() *appsv1alpha1.ClusterDefinition {
 			CharacterType: "mysql",
 			SystemAccounts: &appsv1alpha1.SystemAccountSpec{
 				CmdExecutorConfig: &appsv1alpha1.CmdExecutorConfig{
-					Image:   "",
-					Command: []string{"mysql"},
-					Args:    []string{"-h$(KB_ACCOUNT_ENDPOINT)", "-e $(KB_ACCOUNT_STATEMENT)"},
+					CommandExecutorEnvItem: appsv1alpha1.CommandExecutorEnvItem{
+						Image: "",
+					},
+					CommandExecutorItem: appsv1alpha1.CommandExecutorItem{
+						Command: []string{"mysql"},
+						Args:    []string{"-h$(KB_ACCOUNT_ENDPOINT)", "-e $(KB_ACCOUNT_STATEMENT)"},
+					},
 				},
 				PasswordConfig: appsv1alpha1.PasswordConfig{},
 				Accounts:       []appsv1alpha1.SystemAccountConfig{},
@@ -250,7 +267,7 @@ func FakeBackupTool() *dpv1alpha1.BackupTool {
 func FakeBackupPolicyTemplate() *dpv1alpha1.BackupPolicyTemplate {
 	template := &dpv1alpha1.BackupPolicyTemplate{
 		TypeMeta: metav1.TypeMeta{
-			APIVersion: fmt.Sprintf("%s/%s", types.DPGroup, types.DPVersion),
+			APIVersion: fmt.Sprintf("%s/%s", types.DPAPIGroup, types.DPAPIVersion),
 			Kind:       types.KindBackupPolicyTemplate,
 		},
 		ObjectMeta: metav1.ObjectMeta{
@@ -258,6 +275,21 @@ func FakeBackupPolicyTemplate() *dpv1alpha1.BackupPolicyTemplate {
 		},
 	}
 	return template
+}
+
+func FakeBackup(backupName string) *dpv1alpha1.Backup {
+	backup := &dpv1alpha1.Backup{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: fmt.Sprintf("%s/%s", types.DPAPIGroup, types.DPAPIVersion),
+			Kind:       types.KindBackup,
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      backupName,
+			Namespace: Namespace,
+		},
+	}
+	backup.SetCreationTimestamp(metav1.Now())
+	return backup
 }
 
 func FakeServices() *corev1.ServiceList {
@@ -375,4 +407,15 @@ func FakeVolumeSnapshotClass() *snapshotv1.VolumeSnapshotClass {
 			APIVersion: "snapshot.storage.k8s.io/v1",
 		},
 	}
+}
+
+func FakeKBDeploy(version string) *appsv1.Deployment {
+	deploy := &appsv1.Deployment{}
+	deploy.SetLabels(map[string]string{
+		"app.kubernetes.io/name": types.KubeBlocksChartName,
+	})
+	if len(version) > 0 {
+		deploy.Labels["app.kubernetes.io/version"] = version
+	}
+	return deploy
 }

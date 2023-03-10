@@ -26,25 +26,21 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/constant"
 )
 
 // GetSimpleInstanceInfos return simple instance info that only contains instance name and role, the default
 // instance should be the first element in the returned array.
 func GetSimpleInstanceInfos(dynamic dynamic.Interface, name string, namespace string) []*InstanceInfo {
 	var infos []*InstanceInfo
-	obj, err := dynamic.Resource(types.ClusterGVR()).Namespace(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+	cluster, err := GetClusterByName(dynamic, name, namespace)
 	if err != nil {
-		return nil
-	}
-
-	cluster := &appsv1alpha1.Cluster{}
-	if err = runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, cluster); err != nil {
 		return nil
 	}
 
@@ -90,7 +86,7 @@ func GetSimpleInstanceInfos(dynamic dynamic.Interface, name string, namespace st
 	}
 
 	// if cluster status does not contain what we need, try to get all instances
-	objs, err := dynamic.Resource(schema.GroupVersionResource{Group: corev1.GroupName, Version: types.VersionV1, Resource: "pods"}).
+	objs, err := dynamic.Resource(schema.GroupVersionResource{Group: corev1.GroupName, Version: types.K8sCoreAPIVersion, Resource: "pods"}).
 		Namespace(namespace).List(context.TODO(), metav1.ListOptions{
 		LabelSelector: util.BuildLabelSelectorByNames("", []string{cluster.Name}),
 	})
@@ -161,7 +157,7 @@ func GetComponentEndpoints(svcList *corev1.ServiceList, c *appsv1alpha1.ClusterC
 	}
 
 	for _, svc := range externalSvcs {
-		externalEndpoints = append(externalEndpoints, getEndpoints(GetExternalIP(svc), svc.Spec.Ports)...)
+		externalEndpoints = append(externalEndpoints, getEndpoints(GetExternalAddr(svc), svc.Spec.Ports)...)
 	}
 	return internalEndpoints, externalEndpoints
 }
@@ -179,35 +175,53 @@ func GetComponentServices(svcList *corev1.ServiceList, c *appsv1alpha1.ClusterCo
 		}
 
 		var (
-			internalIP = svc.Spec.ClusterIP
-			externalIP = GetExternalIP(&svc)
+			internalIP   = svc.Spec.ClusterIP
+			externalAddr = GetExternalAddr(&svc)
 		)
 		if internalIP != "" && internalIP != "None" {
 			internalSvcs = append(internalSvcs, &svcList.Items[i])
 		}
-		if externalIP != "" && externalIP != "None" {
+		if externalAddr != "" {
 			externalSvcs = append(externalSvcs, &svcList.Items[i])
 		}
 	}
 	return internalSvcs, externalSvcs
 }
 
-// GetExternalIP get external IP from service annotation
-func GetExternalIP(svc *corev1.Service) string {
+// GetExternalAddr get external IP from service annotation
+func GetExternalAddr(svc *corev1.Service) string {
+	for _, ingress := range svc.Status.LoadBalancer.Ingress {
+		if ingress.Hostname != "" {
+			return ingress.Hostname
+		}
+
+		if ingress.IP != "" {
+			return ingress.IP
+		}
+	}
 	if svc.GetAnnotations()[types.ServiceLBTypeAnnotationKey] != types.ServiceLBTypeAnnotationValue {
 		return ""
 	}
 	return svc.GetAnnotations()[types.ServiceFloatingIPAnnotationKey]
 }
 
+// GetK8SClientObject gets the client object of k8s,
+// obj must be a struct pointer so that obj can be updated with the response.
+func GetK8SClientObject(dynamic dynamic.Interface,
+	obj client.Object,
+	gvr schema.GroupVersionResource,
+	namespace,
+	name string) error {
+	unstructuredObj, err := dynamic.Resource(gvr).Namespace(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+	return runtime.DefaultUnstructuredConverter.FromUnstructured(unstructuredObj.UnstructuredContent(), obj)
+}
+
 func GetClusterDefByName(dynamic dynamic.Interface, name string) (*appsv1alpha1.ClusterDefinition, error) {
 	clusterDef := &appsv1alpha1.ClusterDefinition{}
-	obj, err := dynamic.Resource(types.ClusterDefGVR()).Namespace("").
-		Get(context.TODO(), name, metav1.GetOptions{}, "")
-	if err != nil {
-		return nil, err
-	}
-	if err = runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, clusterDef); err != nil {
+	if err := GetK8SClientObject(dynamic, clusterDef, types.ClusterDefGVR(), "", name); err != nil {
 		return nil, err
 	}
 	return clusterDef, nil
@@ -222,12 +236,7 @@ func GetDefaultCompName(cd *appsv1alpha1.ClusterDefinition) (string, error) {
 
 func GetClusterByName(dynamic dynamic.Interface, name string, namespace string) (*appsv1alpha1.Cluster, error) {
 	cluster := &appsv1alpha1.Cluster{}
-	obj, err := dynamic.Resource(types.ClusterGVR()).Namespace(namespace).
-		Get(context.TODO(), name, metav1.GetOptions{}, "")
-	if err != nil {
-		return nil, err
-	}
-	if err = runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, cluster); err != nil {
+	if err := GetK8SClientObject(dynamic, cluster, types.ClusterGVR(), namespace, name); err != nil {
 		return nil, err
 	}
 	return cluster, nil

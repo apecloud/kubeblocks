@@ -37,6 +37,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -112,14 +113,14 @@ func init() {
 
 // SystemAccountController does not have a custom resource, but wathes the create/delete/update of resource like cluster,
 // clusterdefinition, backuppolicy, jobs, secrets
-//+kubebuilder:rbac:groups=apps.kubeblocks.io,resources=clusters,verbs=get;list;watch;
-//+kubebuilder:rbac:groups=apps.kubeblocks.io,resources=clusters/status,verbs=get
-//+kubebuilder:rbac:groups=dataprotection.kubeblocks.io,resources=backuppolicies,verbs=get;list;watch;
-//+kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=batch,resources=jobs/status,verbs=get
-//+kubebuilder:rbac:groups=batch,resources=jobs/finalizers,verbs=update
-//+kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=core,resources=secrets/finalizers,verbs=update
+// +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=clusters,verbs=get;list;watch;
+// +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=clusters/status,verbs=get
+// +kubebuilder:rbac:groups=dataprotection.kubeblocks.io,resources=backuppolicies,verbs=get;list;watch;
+// +kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=batch,resources=jobs/status,verbs=get
+// +kubebuilder:rbac:groups=batch,resources=jobs/finalizers,verbs=update
+// +kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=core,resources=secrets/finalizers,verbs=update
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -137,7 +138,7 @@ func (r *SystemAccountReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		Log:      log.FromContext(ctx).WithValues("cluster", req.NamespacedName),
 		Recorder: r.Recorder,
 	}
-	reqCtx.Log.Info("get cluster", "cluster", req.NamespacedName)
+	reqCtx.Log.V(1).Info("reconcile", "cluster", req.NamespacedName)
 
 	cluster := &appsv1alpha1.Cluster{}
 	if err := r.Client.Get(reqCtx.Ctx, reqCtx.Req.NamespacedName, cluster); err != nil {
@@ -185,7 +186,7 @@ func (r *SystemAccountReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 			return err
 		}
 		// toCreate = account to create - account exists
-		toCreate &= (toCreate ^ detectedFacts)
+		toCreate &= toCreate ^ detectedFacts
 		if toCreate == 0 {
 			return nil
 		}
@@ -218,6 +219,7 @@ func (r *SystemAccountReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	} // end of processAccountForComponent
 
 	reconcileCounter := 0
+	existsOps := existsOperations(cluster)
 	// for each component in the cluster
 	for _, compDecl := range cluster.Spec.ComponentSpecs {
 		compName := compDecl.Name
@@ -233,7 +235,7 @@ func (r *SystemAccountReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 			}
 
 			// either service or endpoint is not ready, increase counter and continue to process next component
-			if !isReady {
+			if !isReady || existsOps {
 				reconcileCounter++
 				continue
 			}
@@ -385,15 +387,15 @@ func (r *jobCompletitionPredicate) Delete(e event.DeleteEvent) bool {
 	}
 
 	ml := job.ObjectMeta.Labels
-	accountName, ok := ml[clusterAccountLabelKey]
+	accountName, ok := ml[constant.ClusterAccountLabelKey]
 	if !ok {
 		return false
 	}
-	clusterName, ok := ml[intctrlutil.AppInstanceLabelKey]
+	clusterName, ok := ml[constant.AppInstanceLabelKey]
 	if !ok {
 		return false
 	}
-	componentName, ok := ml[intctrlutil.KBAppComponentLabelKey]
+	componentName, ok := ml[constant.KBAppComponentLabelKey]
 	if !ok {
 		return false
 	}

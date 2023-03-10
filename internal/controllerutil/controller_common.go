@@ -36,6 +36,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	"github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
 // Reconciled returns an empty result with nil error to signal a successful reconcile
@@ -57,7 +58,7 @@ func CheckedRequeueWithError(err error, logger logr.Logger, msg string, keysAndV
 // RequeueWithErrorAndRecordEvent requeue when an error occurs. if it is a not found error, send an event
 func RequeueWithErrorAndRecordEvent(obj client.Object, recorder record.EventRecorder, err error, logger logr.Logger) (reconcile.Result, error) {
 	if apierrors.IsNotFound(err) {
-		recorder.Eventf(obj, corev1.EventTypeWarning, ReasonNotFoundCR, err.Error())
+		recorder.Eventf(obj, corev1.EventTypeWarning, constant.ReasonNotFoundCR, err.Error())
 	}
 	return RequeueWithError(err, logger, "")
 }
@@ -126,11 +127,11 @@ func HandleCRDeletion(reqCtx RequestCtx,
 				cluster, ok := cr.(*v1alpha1.Cluster)
 				// throw warning event if terminationPolicy set to DoNotTerminate
 				if ok && cluster.Spec.TerminationPolicy == v1alpha1.DoNotTerminate {
-					reqCtx.Recorder.Eventf(cr, corev1.EventTypeWarning, ReasonDeleteFailed,
+					reqCtx.Recorder.Eventf(cr, corev1.EventTypeWarning, constant.ReasonDeleteFailed,
 						"Deleting %s: %s failed due to terminationPolicy set to DoNotTerminate",
 						strings.ToLower(cr.GetObjectKind().GroupVersionKind().Kind), cr.GetName())
 				} else {
-					reqCtx.Recorder.Eventf(cr, corev1.EventTypeNormal, ReasonDeletingCR, "Deleting %s: %s",
+					reqCtx.Recorder.Eventf(cr, corev1.EventTypeNormal, constant.ReasonDeletingCR, "Deleting %s: %s",
 						strings.ToLower(cr.GetObjectKind().GroupVersionKind().Kind), cr.GetName())
 				}
 			}
@@ -157,7 +158,7 @@ func HandleCRDeletion(reqCtx RequestCtx,
 				}
 				// record resources deleted event
 				if reqCtx.Recorder != nil {
-					reqCtx.Recorder.Eventf(cr, corev1.EventTypeNormal, ReasonDeletedCR, "Deleted %s: %s",
+					reqCtx.Recorder.Eventf(cr, corev1.EventTypeNormal, constant.ReasonDeletedCR, "Deleted %s: %s",
 						strings.ToLower(cr.GetObjectKind().GroupVersionKind().Kind), cr.GetName())
 				}
 			}
@@ -201,7 +202,7 @@ func ValidateReferenceCR(reqCtx RequestCtx, cli client.Client, obj client.Object
 // RecordCreatedEvent record an event when CR created successfully
 func RecordCreatedEvent(r record.EventRecorder, cr client.Object) {
 	if r != nil && cr.GetGeneration() == 1 {
-		r.Eventf(cr, corev1.EventTypeNormal, ReasonCreatedCR, "Created %s: %s", strings.ToLower(cr.GetObjectKind().GroupVersionKind().Kind), cr.GetName())
+		r.Eventf(cr, corev1.EventTypeNormal, constant.ReasonCreatedCR, "Created %s: %s", strings.ToLower(cr.GetObjectKind().GroupVersionKind().Kind), cr.GetName())
 	}
 }
 
@@ -211,7 +212,7 @@ func WorkloadFilterPredicate(object client.Object) bool {
 	if objLabels == nil {
 		return false
 	}
-	return objLabels[AppManagedByLabelKey] == AppName
+	return objLabels[constant.AppManagedByLabelKey] == constant.AppName
 }
 
 // IgnoreIsAlreadyExists return errors that is not AlreadyExists
@@ -248,4 +249,17 @@ func SetOwnership(owner, obj client.Object, scheme *runtime.Scheme, finalizer st
 		}
 	}
 	return nil
+}
+
+// CheckResourceExists checks whether resource exist or not.
+func CheckResourceExists(
+	ctx context.Context,
+	cli client.Client,
+	key client.ObjectKey,
+	obj client.Object) (bool, error) {
+	if err := cli.Get(ctx, key, obj); err != nil {
+		return false, client.IgnoreNotFound(err)
+	}
+	// if found, return true
+	return true, nil
 }

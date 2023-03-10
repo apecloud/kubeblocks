@@ -29,6 +29,7 @@ import (
 	"github.com/apecloud/kubeblocks/controllers/apps/components/types"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	opsutil "github.com/apecloud/kubeblocks/controllers/apps/operations/util"
+	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -56,7 +57,7 @@ func (consensusSet *ConsensusSet) IsRunning(obj client.Object) (bool, error) {
 		return false, err
 	}
 	for _, pod := range pods {
-		if !util.PodIsReady(pod) {
+		if !intctrlutil.PodIsReadyWithLabel(pod) {
 			return false, nil
 		}
 	}
@@ -76,7 +77,7 @@ func (consensusSet *ConsensusSet) PodIsAvailable(pod *corev1.Pod, minReadySecond
 	if pod == nil {
 		return false
 	}
-	return util.PodIsReady(*pod)
+	return intctrlutil.PodIsReadyWithLabel(*pod)
 }
 
 func (consensusSet *ConsensusSet) HandleProbeTimeoutWhenPodsReady(recorder record.EventRecorder) (bool, error) {
@@ -110,7 +111,7 @@ func (consensusSet *ConsensusSet) HandleProbeTimeoutWhenPodsReady(recorder recor
 	)
 	patch := client.MergeFrom(cluster.DeepCopy())
 	for _, pod := range podList.Items {
-		role := pod.Labels[intctrlutil.RoleLabelKey]
+		role := pod.Labels[constant.RoleLabelKey]
 		if role == consensusSet.ComponentDef.ConsensusSpec.Leader.Name {
 			isFailed = false
 		}
@@ -166,12 +167,12 @@ func (consensusSet *ConsensusSet) GetPhaseWhenPodsNotReady(componentName string)
 		if v.DeletionTimestamp != nil {
 			return "", nil
 		}
-		labelValue := v.Labels[intctrlutil.RoleLabelKey]
+		labelValue := v.Labels[constant.RoleLabelKey]
 		if consensusSpec != nil && labelValue == consensusSpec.Leader.Name && intctrlutil.PodIsReady(&v) {
 			leaderIsReady = true
 			continue
 		}
-		if !intctrlutil.PodIsReady(&v) && util.PodIsControlledByLatestRevision(&v, &stsObj) {
+		if !intctrlutil.PodIsReady(&v) && intctrlutil.PodIsControlledByLatestRevision(&v, &stsObj) {
 			existLatestRevisionFailedPod = true
 		}
 	}
@@ -197,7 +198,7 @@ func (consensusSet *ConsensusSet) HandleUpdate(obj client.Object) error {
 	)
 	stsObj := util.ConvertToStatefulSet(obj)
 	// get compDefName from stsObj.name
-	compDefName := cluster.GetComponentDefRefName(stsObj.Labels[intctrlutil.KBAppComponentLabelKey])
+	compDefName := cluster.GetComponentDefRefName(stsObj.Labels[constant.KBAppComponentLabelKey])
 
 	// get component from ClusterDefinition by compDefName
 	component, err := util.GetComponentDefByCluster(ctx, cli, cluster, compDefName)
@@ -214,7 +215,7 @@ func (consensusSet *ConsensusSet) HandleUpdate(obj client.Object) error {
 	}
 
 	// update cluster.status.component.consensusSetStatus based on all pods currently exist
-	componentName := stsObj.Labels[intctrlutil.KBAppComponentLabelKey]
+	componentName := stsObj.Labels[constant.KBAppComponentLabelKey]
 
 	// first, get the old status
 	var oldConsensusSetStatus *appsv1alpha1.ConsensusSetStatus
@@ -249,9 +250,9 @@ func (consensusSet *ConsensusSet) HandleUpdate(obj client.Object) error {
 		}
 	}
 
-	// prepare to do pods Deletion, that's the only thing we should do.
-	// the stateful set reconciler will do the others.
-	// to simplify the process, wo do pods Delete after stateful set reconcile done,
+	// prepare to do pods Deletion, that's the only thing we should do,
+	// the statefulset reconciler will do the others.
+	// to simplify the process, we do pods Deletion after statefulset reconcile done,
 	// that is stsObj.Generation == stsObj.Status.ObservedGeneration
 	if stsObj.Generation != stsObj.Status.ObservedGeneration {
 		return nil

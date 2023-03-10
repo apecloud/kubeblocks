@@ -1,5 +1,5 @@
 /*
-Copyright ApeCloud Inc.
+Copyright ApeCloud, Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -23,9 +23,10 @@ import (
 	"github.com/go-redis/redis/v8"
 	"github.com/pkg/errors"
 
-	rediscomponent "github.com/apecloud/kubeblocks/cmd/probe/internal/component/redis"
 	"github.com/dapr/components-contrib/bindings"
 	"github.com/dapr/kit/logger"
+
+	rediscomponent "github.com/apecloud/kubeblocks/cmd/probe/internal/component/redis"
 )
 
 // Redis is a redis output binding.

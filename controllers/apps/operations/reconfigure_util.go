@@ -27,6 +27,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
+	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
 type reconfiguringResult struct {
@@ -70,7 +71,7 @@ func updateCfgParams(config appsv1alpha1.Configuration,
 	}
 
 	fc := cfgTpl.Spec.FormatterConfig
-	newCfg, err = cfgcore.MergeAndValidateConfiguration(cfgTpl.Spec, cm.Data, params)
+	newCfg, err = cfgcore.MergeAndValidateConfiguration(cfgTpl.Spec, cm.Data, tpl.Keys, params)
 	if err != nil {
 		return makeReconfiguringResult(err, withFailed(true))
 	}
@@ -91,7 +92,7 @@ func persistCfgCM(cmObj *corev1.ConfigMap, newCfg map[string]string, cli client.
 	if cmObj.Annotations == nil {
 		cmObj.Annotations = make(map[string]string)
 	}
-	cmObj.Annotations[cfgcore.LastAppliedOpsCRAnnotation] = opsCrName
+	cmObj.Annotations[constant.LastAppliedOpsCRAnnotation] = opsCrName
 	return cli.Patch(ctx, cmObj, patch)
 }
 

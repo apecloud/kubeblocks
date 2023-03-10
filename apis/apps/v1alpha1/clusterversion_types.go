@@ -62,7 +62,7 @@ type ClusterVersionStatus struct {
 type ClusterComponentVersion struct {
 	// componentDefRef reference one of the cluster component definition names in ClusterDefinition API (spec.componentDefs.name).
 	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:MaxLength=18
+	// +kubebuilder:validation:MaxLength=63
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	ComponentDefRef string `json:"componentDefRef"`
 
@@ -103,12 +103,12 @@ type VersionsContext struct {
 	Containers []corev1.Container `json:"containers,omitempty"`
 }
 
-//+kubebuilder:object:root=true
-//+kubebuilder:subresource:status
-//+kubebuilder:resource:categories={kubeblocks},scope=Cluster,shortName=cv
-//+kubebuilder:printcolumn:name="CLUSTER-DEFINITION",type="string",JSONPath=".spec.clusterDefinitionRef",description="ClusterDefinition referenced by cluster."
-//+kubebuilder:printcolumn:name="STATUS",type="string",JSONPath=".status.phase",description="status phase"
-//+kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
+// +kubebuilder:object:root=true
+// +kubebuilder:subresource:status
+// +kubebuilder:resource:categories={kubeblocks},scope=Cluster,shortName=cv
+// +kubebuilder:printcolumn:name="CLUSTER-DEFINITION",type="string",JSONPath=".spec.clusterDefinitionRef",description="ClusterDefinition referenced by cluster."
+// +kubebuilder:printcolumn:name="STATUS",type="string",JSONPath=".status.phase",description="status phase"
+// +kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
 
 // ClusterVersion is the Schema for the ClusterVersions API
 type ClusterVersion struct {
@@ -119,7 +119,7 @@ type ClusterVersion struct {
 	Status ClusterVersionStatus `json:"status,omitempty"`
 }
 
-//+kubebuilder:object:root=true
+// +kubebuilder:object:root=true
 
 // ClusterVersionList contains a list of ClusterVersion
 type ClusterVersionList struct {

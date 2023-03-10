@@ -237,3 +237,14 @@ namespace and unspecified priorityClassName.
 {{- "" -}}
 {{- end -}}
 {{- end -}}
+
+{{/*
+Get addon controller enabled attributes.
+*/}}
+{{- define "kubeblocks.addonControllerEnabled" -}}
+{{- if and .Values.addonController .Values.addonController.enabled }}
+{{- true }}
+{{- else }}
+{{- false }}
+{{- end }}
+{{- end }}

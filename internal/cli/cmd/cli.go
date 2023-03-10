@@ -28,6 +28,8 @@ import (
 	utilcomp "k8s.io/kubectl/pkg/util/completion"
 	"k8s.io/kubectl/pkg/util/templates"
 
+	"github.com/apecloud/kubeblocks/internal/cli/cmd/addon"
+	"github.com/apecloud/kubeblocks/internal/cli/cmd/alert"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/app"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/backupconfig"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/bench"
@@ -38,8 +40,8 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/kubeblocks"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/options"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/playground"
-	"github.com/apecloud/kubeblocks/internal/cli/cmd/troubleshoot"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/version"
+	"github.com/apecloud/kubeblocks/internal/cli/util"
 )
 
 const (
@@ -77,7 +79,7 @@ A Command Line Interface for KubeBlocks`,
 	flags := cmd.PersistentFlags()
 
 	// add kubernetes flags like kubectl
-	kubeConfigFlags := genericclioptions.NewConfigFlags(true)
+	kubeConfigFlags := util.NewConfigFlagNoWarnings()
 	kubeConfigFlags.AddFlags(flags)
 	matchVersionKubeConfigFlags := cmdutil.NewMatchVersionFlags(kubeConfigFlags)
 	matchVersionKubeConfigFlags.AddFlags(flags)
@@ -95,10 +97,11 @@ A Command Line Interface for KubeBlocks`,
 		version.NewVersionCmd(f),
 		backupconfig.NewBackupConfigCmd(f, ioStreams),
 		dashboard.NewDashboardCmd(f, ioStreams),
-		troubleshoot.NewTroubleshootCmd(f, ioStreams),
 		clusterversion.NewClusterVersionCmd(f, ioStreams),
 		clusterdefinition.NewClusterDefinitionCmd(f, ioStreams),
 		app.NewAppCmd(f, ioStreams),
+		alert.NewAlertCmd(f, ioStreams),
+		addon.NewAddonCmd(f, ioStreams),
 	)
 
 	filters := []string{"options"}

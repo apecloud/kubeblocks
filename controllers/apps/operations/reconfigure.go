@@ -149,19 +149,59 @@ func handleNewReconfigureRequest(configPatch *cfgcore.ConfigPatchInfo, lastAppli
 	}
 }
 
-func (r reconfigureAction) ReconcileAction(opsRes *OpsResource) (appsv1alpha1.Phase, time.Duration, error) {
+func (r *reconfigureAction) ReconcileAction(opsRes *OpsResource) (appsv1alpha1.Phase, time.Duration, error) {
 	status := opsRes.OpsRequest.Status
 	if len(status.Conditions) == 0 {
 		return status.Phase, 30 * time.Second, nil
 	}
 	condition := status.Conditions[len(status.Conditions)-1]
 	if isSucceedPhase(condition) {
+		// TODO Sync reload progress from config manager.
+		if err := r.syncReconfigureComponentStatus(opsRes); err != nil {
+			return "", time.Second, err
+		}
 		return appsv1alpha1.SucceedPhase, 0, nil
 	}
 	if isFailedPhase(condition) {
+		// TODO Sync reload progress from config manager.
+		if err := r.syncReconfigureComponentStatus(opsRes); err != nil {
+			return "", time.Second, err
+		}
 		return appsv1alpha1.FailedPhase, 0, nil
 	}
 	return appsv1alpha1.RunningPhase, 30 * time.Second, nil
+}
+
+func (r *reconfigureAction) syncReconfigureComponentStatus(res *OpsResource) error {
+	cluster := res.Cluster
+	opsRequest := res.OpsRequest
+
+	if opsRequest.Spec.Reconfigure == nil || opsRequest.Status.ReconfiguringStatus == nil {
+		return nil
+	}
+	if !isReloadPolicy(opsRequest.Status.ReconfiguringStatus) {
+		return nil
+	}
+
+	componentName := opsRequest.Spec.Reconfigure.ComponentName
+	c, ok := cluster.Status.Components[componentName]
+	if !ok || c.Phase != appsv1alpha1.ReconfiguringPhase {
+		return nil
+	}
+
+	clusterPatch := client.MergeFrom(cluster.DeepCopy())
+	c.Phase = appsv1alpha1.RunningPhase
+	cluster.Status.Components[componentName] = c
+	return res.Client.Status().Patch(res.Ctx, cluster, clusterPatch)
+}
+
+func isReloadPolicy(status *appsv1alpha1.ReconfiguringStatus) bool {
+	for _, cmStatus := range status.ConfigurationStatus {
+		if cmStatus.UpdatePolicy == appsv1alpha1.AutoReload {
+			return true
+		}
+	}
+	return false
 }
 
 func isExpectedPhase(condition metav1.Condition, expectedTypes []string, expectedStatus metav1.ConditionStatus) bool {

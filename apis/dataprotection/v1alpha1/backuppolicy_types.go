@@ -80,9 +80,11 @@ type TargetCluster struct {
 	// +kubebuilder:pruning:PreserveUnknownFields
 	LabelsSelector *metav1.LabelSelector `json:"labelsSelector"`
 
-	// target db cluster access secret
-	// +kubebuilder:validation:Required
-	Secret BackupPolicySecret `json:"secret"`
+	// Secret is used to connect to the target database cluster.
+	// If not set, secret will be inherited from backup policy template.
+	// if still not set, the controller will check if any system account for dataprotection has been created.
+	// +optional
+	Secret *BackupPolicySecret `json:"secret,omitempty"`
 }
 
 // BackupPolicySecret defined for the target database secret that backup tool can connect.
@@ -156,7 +158,7 @@ type BackupPolicy struct {
 	Status BackupPolicyStatus `json:"status,omitempty"`
 }
 
-//+kubebuilder:object:root=true
+// +kubebuilder:object:root=true
 
 // BackupPolicyList contains a list of BackupPolicy
 type BackupPolicyList struct {

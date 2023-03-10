@@ -20,6 +20,7 @@ kbcli kubeblocks uninstall [flags]
   -h, --help           help for uninstall
       --remove-pvcs    Remove PersistentVolumeClaim or not
       --remove-pvs     Remove PersistentVolume or not
+      --verbose        Show logs in detail.
 ```
 
 ### Options inherited from parent commands

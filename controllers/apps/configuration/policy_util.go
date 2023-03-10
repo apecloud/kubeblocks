@@ -28,6 +28,7 @@ import (
 	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 	cfgproto "github.com/apecloud/kubeblocks/internal/configuration/proto"
+	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -93,12 +94,12 @@ func GetComponentPods(params reconfigureParams) ([]corev1.Pod, error) {
 func CheckReconfigureUpdateProgress(pods []corev1.Pod, configKey, version string) int32 {
 	var (
 		readyPods        int32 = 0
-		cfgAnnotationKey       = cfgcore.GenerateUniqKeyWithConfig(cfgcore.UpgradeRestartAnnotationKey, configKey)
+		cfgAnnotationKey       = cfgcore.GenerateUniqKeyWithConfig(constant.UpgradeRestartAnnotationKey, configKey)
 	)
 
 	for _, pod := range pods {
 		annotations := pod.Annotations
-		if len(annotations) != 0 && annotations[cfgAnnotationKey] == version && intctrlutil.IsReady(&pod) {
+		if len(annotations) != 0 && annotations[cfgAnnotationKey] == version && intctrlutil.PodIsReady(&pod) {
 			readyPods++
 		}
 	}
@@ -181,7 +182,7 @@ func commonStopContainer(pod *corev1.Pod, containerNames []string, createClient 
 func generateManagerSidecarAddr(pod *corev1.Pod) string {
 	var (
 		podAddress = pod.Status.PodIP
-		podPort    = viper.GetInt32(cfgcore.ConfigManagerGPRCPortEnv)
+		podPort    = viper.GetInt32(constant.ConfigManagerGPRCPortEnv)
 	)
 	return fmt.Sprintf("%s:%d", podAddress, podPort)
 }

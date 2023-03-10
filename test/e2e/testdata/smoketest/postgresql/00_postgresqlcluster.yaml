@@ -1,0 +1,33 @@
+---
+# Source: pgcluster/templates/cluster.yaml
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: Cluster
+metadata:
+  name: mycluster
+  labels: 
+    helm.sh/chart: pgcluster-0.2.0
+    app.kubernetes.io/name: pgcluster
+    app.kubernetes.io/instance: mycluster
+    app.kubernetes.io/version: "14.7.0"
+    app.kubernetes.io/managed-by: Helm
+spec:
+  clusterDefinitionRef: postgresql-cluster # ref clusterdefinition.name
+  clusterVersionRef: postgresql-14.7.0 # ref clusterversion.name
+  terminationPolicy: Delete
+  affinity:
+  componentSpecs:
+    - name: postgresql # user-defined
+      componentDefRef: pg-replicaset # ref clusterdefinition components.name
+      monitor: false
+      replicas: 2
+      primaryIndex: 0
+      enabledLogs:     ["running"]
+      volumeClaimTemplates:
+        - name: data # ref clusterdefinition components.containers.volumeMounts.name
+          spec:
+            storageClassName: 
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: 1Gi

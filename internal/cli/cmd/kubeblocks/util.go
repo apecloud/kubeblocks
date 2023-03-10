@@ -22,12 +22,17 @@ import (
 	"io"
 	"strings"
 
+	"github.com/Masterminds/semver/v3"
+	"github.com/pkg/errors"
+	"helm.sh/helm/v3/pkg/repo"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/kubernetes"
 
 	"github.com/apecloud/kubeblocks/internal/cli/types"
+	"github.com/apecloud/kubeblocks/internal/cli/util"
+	"github.com/apecloud/kubeblocks/internal/cli/util/helm"
 	"github.com/apecloud/kubeblocks/internal/cli/util/prompt"
 )
 
@@ -38,7 +43,7 @@ func getGVRByCRD(crd *unstructured.Unstructured) (*schema.GroupVersionResource, 
 	}
 	return &schema.GroupVersionResource{
 		Group:    group,
-		Version:  types.Version,
+		Version:  types.AppsAPIVersion,
 		Resource: strings.Split(crd.GetName(), ".")[0],
 	}, nil
 }
@@ -79,4 +84,19 @@ func confirmUninstall(in io.Reader) error {
 		return fmt.Errorf("typed \"%s\" does not match \"%s\"", entered, confirmStr)
 	}
 	return nil
+}
+
+func getHelmChartVersions(chart string) ([]*semver.Version, error) {
+	errMsg := "failed to find the version information"
+	// add repo, if exists, will update it
+	if err := helm.AddRepo(&repo.Entry{Name: types.KubeBlocksChartName, URL: util.GetHelmChartRepoURL()}); err != nil {
+		return nil, errors.Wrap(err, errMsg)
+	}
+
+	// get chart versions
+	versions, err := helm.GetChartVersions(chart)
+	if err != nil {
+		return nil, errors.Wrap(err, errMsg)
+	}
+	return versions, nil
 }

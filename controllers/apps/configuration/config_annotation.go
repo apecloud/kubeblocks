@@ -25,6 +25,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
+	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -32,7 +33,7 @@ func checkEnableCfgUpgrade(object client.Object) bool {
 	// check user disable upgrade
 	// configuration.kubeblocks.io/disable-reconfigure = "false"
 	annotations := object.GetAnnotations()
-	value, ok := annotations[cfgcore.DisableUpgradeInsConfigurationAnnotationKey]
+	value, ok := annotations[constant.DisableUpgradeInsConfigurationAnnotationKey]
 	if !ok {
 		return true
 	}
@@ -51,7 +52,7 @@ func setCfgUpgradeFlag(cli client.Client, ctx intctrlutil.RequestCtx, config *co
 		config.ObjectMeta.Annotations = map[string]string{}
 	}
 
-	config.ObjectMeta.Annotations[cfgcore.DisableUpgradeInsConfigurationAnnotationKey] = strconv.FormatBool(flag)
+	config.ObjectMeta.Annotations[constant.DisableUpgradeInsConfigurationAnnotationKey] = strconv.FormatBool(flag)
 	if err := cli.Patch(ctx.Ctx, config, patch); err != nil {
 		return err
 	}
@@ -68,7 +69,7 @@ func applyConfigurationChange(client client.Client, ctx intctrlutil.RequestCtx, 
 		return false, err
 	}
 
-	lastConfig, ok := annotations[cfgcore.LastAppliedConfigAnnotation]
+	lastConfig, ok := annotations[constant.LastAppliedConfigAnnotation]
 	if !ok {
 		return updateAppliedConfiguration(client, ctx, config, configData, ReconfigureFirstConfigType)
 	}
@@ -84,16 +85,16 @@ func updateAppliedConfiguration(cli client.Client, ctx intctrlutil.RequestCtx, c
 		config.ObjectMeta.Annotations = map[string]string{}
 	}
 
-	config.ObjectMeta.Annotations[cfgcore.LastAppliedConfigAnnotation] = string(configData)
+	config.ObjectMeta.Annotations[constant.LastAppliedConfigAnnotation] = string(configData)
 	hash, err := cfgcore.ComputeHash(config.Data)
 	if err != nil {
 		return false, err
 	}
-	config.ObjectMeta.Labels[cfgcore.CMInsConfigurationHashLabelKey] = hash
-	config.ObjectMeta.Labels[cfgcore.CMInsLastReconfigureMethodLabelKey] = reconfigureType
+	config.ObjectMeta.Labels[constant.CMInsConfigurationHashLabelKey] = hash
+	config.ObjectMeta.Labels[constant.CMInsLastReconfigureMethodLabelKey] = reconfigureType
 
 	// delete reconfigure-policy
-	delete(config.ObjectMeta.Annotations, cfgcore.UpgradePolicyAnnotationKey)
+	delete(config.ObjectMeta.Annotations, constant.UpgradePolicyAnnotationKey)
 	if err := cli.Patch(ctx.Ctx, config, patch); err != nil {
 		return false, err
 	}
@@ -103,7 +104,7 @@ func updateAppliedConfiguration(cli client.Client, ctx intctrlutil.RequestCtx, c
 
 func getLastVersionConfig(cfg *corev1.ConfigMap) (map[string]string, error) {
 	data := make(map[string]string, 0)
-	cfgContent, ok := cfg.GetAnnotations()[cfgcore.LastAppliedConfigAnnotation]
+	cfgContent, ok := cfg.GetAnnotations()[constant.LastAppliedConfigAnnotation]
 	if !ok {
 		return data, nil
 	}
@@ -121,7 +122,7 @@ func getUpgradePolicy(cfg *corev1.ConfigMap) appsv1alpha1.UpgradePolicy {
 	)
 
 	annotations := cfg.GetAnnotations()
-	value, ok := annotations[cfgcore.UpgradePolicyAnnotationKey]
+	value, ok := annotations[constant.UpgradePolicyAnnotationKey]
 	if !ok {
 		return DefaultUpgradePolicy
 	}

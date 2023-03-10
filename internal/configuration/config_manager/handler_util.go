@@ -41,6 +41,7 @@ type ConfigManagerParams struct {
 
 	// add volume to pod
 	ScriptVolume *corev1.Volume
+	Cluster      *appsv1alpha1.Cluster
 }
 
 func IsSupportReload(reload *appsv1alpha1.ReloadOptions) bool {

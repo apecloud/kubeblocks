@@ -1,6 +1,6 @@
 ## kbcli troubleshoot preflight
 
-Run and retrieve preflight checks for kubeblocks
+Run and retrieve preflight checks for KubeBlocks
 
 ```
 kbcli troubleshoot preflight [flags]
@@ -25,7 +25,7 @@ kbcli troubleshoot preflight [flags]
       --debug                         enable debug logging
       --format string                 output format, one of human, json, yaml. only used when interactive is set to false (default "human")
   -h, --help                          help for preflight
-      --interactive                   interactive preflights (default true)
+      --interactive                   interactive preflights, default is false
   -n, --namespace string              If present, the namespace scope for this CLI request
   -o, --output string                 specify the output file path for the preflight checks
       --selector string               selector (label query) to filter remote collection nodes on.

@@ -1,7 +1,7 @@
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: ClusterDefinition
 metadata:
-  name: apecloud-clickhouse
+  name: clickhouse
   labels:
     {{- include "clickhouse.labels" . | nindent 4 }}
     {{- if .Values.commonLabels }}
@@ -275,7 +275,7 @@ spec:
             configTplRef: zookeeper-scripts-tpl
             namespace: {{ .Release.Namespace }}
             volumeName: script
-            defaultMode: 493
+            defaultMode: 0755
       service:
         ports:
           - name: tcp-client

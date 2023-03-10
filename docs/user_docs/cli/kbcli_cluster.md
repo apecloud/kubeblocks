@@ -48,7 +48,7 @@ Cluster command
 * [kbcli cluster describe-ops](kbcli_cluster_describe-ops.md)	 - Show details of a specific OpsRequest
 * [kbcli cluster diff-configure](kbcli_cluster_diff-configure.md)	 - List the constraint for supported configuration params
 * [kbcli cluster explain-configure](kbcli_cluster_explain-configure.md)	 - List the constraint for supported configuration params
-* [kbcli cluster expose](kbcli_cluster_expose.md)	 - Expose a database cluster
+* [kbcli cluster expose](kbcli_cluster_expose.md)	 - Expose a cluster
 * [kbcli cluster hscale](kbcli_cluster_hscale.md)	 - Horizontally scale the specified components in the cluster
 * [kbcli cluster list](kbcli_cluster_list.md)	 - List clusters
 * [kbcli cluster list-accounts](kbcli_cluster_list-accounts.md)	 - List cluster accounts

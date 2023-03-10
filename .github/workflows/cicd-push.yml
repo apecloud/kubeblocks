@@ -38,7 +38,7 @@ jobs:
             --filter="$FILE_PATH"
 
       - name: Spell Check with Typos
-        uses: crate-ci/typos@master
+        uses: crate-ci/typos@v1.13.14
         with:
           files: ${{ github.workspace }}/docs/
           config: ${{ github.workspace }}/.github/utils/typos.toml

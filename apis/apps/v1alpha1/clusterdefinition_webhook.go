@@ -45,7 +45,7 @@ func (r *ClusterDefinition) SetupWebhookWithManager(mgr ctrl.Manager) error {
 		Complete()
 }
 
-//+kubebuilder:webhook:path=/mutate-apps-kubeblocks-io-v1alpha1-clusterdefinition,mutating=true,failurePolicy=fail,sideEffects=None,groups=apps.kubeblocks.io,resources=clusterdefinitions,verbs=create;update,versions=v1alpha1,name=mclusterdefinition.kb.io,admissionReviewVersions=v1
+// +kubebuilder:webhook:path=/mutate-apps-kubeblocks-io-v1alpha1-clusterdefinition,mutating=true,failurePolicy=fail,sideEffects=None,groups=apps.kubeblocks.io,resources=clusterdefinitions,verbs=create;update,versions=v1alpha1,name=mclusterdefinition.kb.io,admissionReviewVersions=v1
 
 var _ webhook.Defaulter = &ClusterDefinition{}
 
@@ -72,7 +72,7 @@ func (r *ClusterDefinition) Default() {
 }
 
 // TODO(user): change verbs to "verbs=create;update;delete" if you want to enable deletion validation.
-//+kubebuilder:webhook:path=/validate-apps-kubeblocks-io-v1alpha1-clusterdefinition,mutating=false,failurePolicy=fail,sideEffects=None,groups=apps.kubeblocks.io,resources=clusterdefinitions,verbs=create;update,versions=v1alpha1,name=vclusterdefinition.kb.io,admissionReviewVersions=v1
+// +kubebuilder:webhook:path=/validate-apps-kubeblocks-io-v1alpha1-clusterdefinition,mutating=false,failurePolicy=fail,sideEffects=None,groups=apps.kubeblocks.io,resources=clusterdefinitions,verbs=create;update,versions=v1alpha1,name=vclusterdefinition.kb.io,admissionReviewVersions=v1
 
 var _ webhook.Validator = &ClusterDefinition{}
 

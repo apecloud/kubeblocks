@@ -24,6 +24,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
 type ConfigType string
@@ -131,7 +132,7 @@ type CfgOption struct {
 // GenerateTPLUniqLabelKeyWithConfig generate uniq key for configuration template
 // reference: docs/img/reconfigure-cr-relationship.drawio.png
 func GenerateTPLUniqLabelKeyWithConfig(configKey string) string {
-	return GenerateUniqKeyWithConfig(ConfigurationTplLabelPrefixKey, configKey)
+	return GenerateUniqKeyWithConfig(constant.ConfigurationTplLabelPrefixKey, configKey)
 }
 
 // GenerateUniqKeyWithConfig is similar to getInstanceCfgCMName, generate uniq label or annotations for configuration template
@@ -142,7 +143,7 @@ func GenerateUniqKeyWithConfig(label string, configKey string) string {
 // GenerateConstraintsUniqLabelKeyWithConfig generate uniq key for configure template
 // reference: docs/img/reconfigure-cr-relationship.drawio.png
 func GenerateConstraintsUniqLabelKeyWithConfig(configKey string) string {
-	return GenerateUniqKeyWithConfig(ConfigurationConstraintsLabelPrefixKey, configKey)
+	return GenerateUniqKeyWithConfig(constant.ConfigurationConstraintsLabelPrefixKey, configKey)
 }
 
 // GetInstanceCMName  {{statefull.Name}}-{{clusterVersion.Name}}-{{tpl.Name}}-"config"

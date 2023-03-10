@@ -18,8 +18,9 @@ package util
 
 import (
 	"context"
-	"strings"
+	"fmt"
 
+	appsv1 "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/kubernetes"
@@ -56,24 +57,21 @@ func GetVersionInfo(client kubernetes.Interface) (map[AppName]string, error) {
 
 // getKubeBlocksVersion get KubeBlocks version
 func getKubeBlocksVersion(client kubernetes.Interface) (string, error) {
-	kubeBlocksDeploys, err := client.AppsV1().Deployments(metav1.NamespaceAll).List(context.Background(), metav1.ListOptions{
-		LabelSelector: "app.kubernetes.io/name=" + types.KubeBlocksChartName,
-	})
-	if err != nil {
+	deploy, err := getKubeBlocksDeploy(client)
+	if err != nil || deploy == nil {
 		return "", err
 	}
 
-	var versions []string
-	for _, deploy := range kubeBlocksDeploys.Items {
-		labels := deploy.GetLabels()
-		if labels == nil {
-			continue
-		}
-		if v, ok := labels["app.kubernetes.io/version"]; ok {
-			versions = append(versions, v)
-		}
+	labels := deploy.GetLabels()
+	if labels == nil {
+		return "", fmt.Errorf("KubeBlocks deployment has no labels")
 	}
-	return strings.Join(versions, " "), nil
+
+	v, ok := labels["app.kubernetes.io/version"]
+	if !ok {
+		return "", fmt.Errorf("KubeBlocks deployment has no version label")
+	}
+	return v, nil
 }
 
 // getK8sVersion get k8s server version
@@ -91,4 +89,22 @@ func getK8sVersion(discoveryClient discovery.DiscoveryInterface) (string, error)
 		return serverVersion.GitVersion, nil
 	}
 	return "", nil
+}
+
+// getKubeBlocksDeploy get KubeBlocks deployments, now one kubernetes cluster
+// only support one KubeBlocks
+func getKubeBlocksDeploy(client kubernetes.Interface) (*appsv1.Deployment, error) {
+	deploys, err := client.AppsV1().Deployments(metav1.NamespaceAll).List(context.Background(), metav1.ListOptions{
+		LabelSelector: "app.kubernetes.io/name=" + types.KubeBlocksChartName,
+	})
+	if err != nil {
+		return nil, err
+	}
+	if deploys == nil || len(deploys.Items) == 0 {
+		return nil, nil
+	}
+	if len(deploys.Items) > 1 {
+		return nil, fmt.Errorf("found multiple KubeBlocks deployments, please check your cluster")
+	}
+	return &deploys.Items[0], nil
 }

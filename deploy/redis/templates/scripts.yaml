@@ -6,9 +6,8 @@ data:
   init.sh: |
     #!/bin/sh
     set -ex
-    PRIMARY_ROLE=primary
-    KB_ROLE_NAME=`cat /etc/conf/role/labels`
-    if [ "$KB_ROLE_NAME" = "$PRIMARY_ROLE" ]; then
+    KB_PRIMARY_POD_NAME_PREFIX=${KB_PRIMARY_POD_NAME%%\.*}
+    if [ "$KB_PRIMARY_POD_NAME_PREFIX" = "$KB_POD_NAME" ]; then
         cp /etc/conf/primary/redis.conf /etc/conf
     else
         cp /etc/conf/secondary/redis.conf /etc/conf
@@ -16,12 +15,11 @@ data:
   setup.sh: |
     #!/bin/sh
     set -ex
-    SECONDARY_ROLE=secondary
-    KB_ROLE_NAME=`cat /etc/conf/role/labels`
-    if [ "$KB_ROLE_NAME" = "$SECONDARY_ROLE" ]; then
-      until redis-cli -h $KB_PRIMARY_POD_NAME -p 6379 ping; do sleep 1; done
-      redis-cli -h 127.0.0.1 -p 6379 replicaof $KB_PRIMARY_POD_NAME 6379 || exit 1
-    else
+    KB_PRIMARY_POD_NAME_PREFIX=${KB_PRIMARY_POD_NAME%%\.*}
+    if [ "$KB_PRIMARY_POD_NAME_PREFIX" = "$KB_POD_NAME" ]; then
       echo "primary instance skip create a replication relationship."
       exit 0
+    else
+      until redis-cli -h $KB_PRIMARY_POD_NAME -p 6379 ping; do sleep 1; done
+      redis-cli -h 127.0.0.1 -p 6379 replicaof $KB_PRIMARY_POD_NAME 6379 || exit 1
     fi

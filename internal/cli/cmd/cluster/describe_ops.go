@@ -17,7 +17,6 @@ limitations under the License.
 package cluster
 
 import (
-	"context"
 	"fmt"
 	"reflect"
 	"sort"
@@ -27,8 +26,6 @@ import (
 	"golang.org/x/exp/maps"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/dynamic"
@@ -38,6 +35,7 @@ import (
 	"k8s.io/kubectl/pkg/util/templates"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/cli/cluster"
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
@@ -151,13 +149,8 @@ func (o *describeOpsOptions) run() error {
 
 // describeOps gets the OpsRequest by name and describes it.
 func (o *describeOpsOptions) describeOps(name string) error {
-	ctx := context.TODO()
-	obj, err := o.dynamic.Resource(o.gvr).Namespace(o.namespace).Get(ctx, name, metav1.GetOptions{}, "")
-	if err != nil {
-		return err
-	}
 	opsRequest := &appsv1alpha1.OpsRequest{}
-	if err = runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, opsRequest); err != nil {
+	if err := cluster.GetK8SClientObject(o.dynamic, opsRequest, o.gvr, o.namespace, name); err != nil {
 		return err
 	}
 	return o.printOpsRequest(opsRequest)
@@ -165,13 +158,13 @@ func (o *describeOpsOptions) describeOps(name string) error {
 
 // printOpsRequest prints the information of OpsRequest for describing command.
 func (o *describeOpsOptions) printOpsRequest(ops *appsv1alpha1.OpsRequest) error {
-	fmt.Println("Spec:")
+	printer.PrintLine("Spec:")
 	printer.PrintLineWithTabSeparator(
 		// first pair string
 		printer.NewPair("  Name", ops.Name),
 		printer.NewPair("NameSpace", ops.Namespace),
 		printer.NewPair("Cluster", ops.Spec.ClusterRef),
-		printer.NewPair("ComponentDefRef", string(ops.Spec.Type)),
+		printer.NewPair("Type", string(ops.Spec.Type)),
 	)
 
 	o.printOpsCommand(ops)
@@ -219,12 +212,12 @@ func (o *describeOpsOptions) printOpsCommand(opsRequest *appsv1alpha1.OpsRequest
 
 	}
 	if len(commands) == 0 {
-		fmt.Println("\nCommand: " + printer.NoneString)
+		printer.PrintLine("\nCommand: " + printer.NoneString)
 		return
 	}
 	printer.PrintTitle("Command")
 	for i := range commands {
-		fmt.Println("  " + commands[i])
+		printer.PrintLine("  " + commands[i])
 	}
 }
 

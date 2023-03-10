@@ -65,7 +65,7 @@ spec:
                     componentDefRef:
                       description: componentDefRef reference one of the cluster component
                         definition names in ClusterDefinition API (spec.componentDefs.name).
-                      maxLength: 18
+                      maxLength: 63
                       pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                       type: string
                     configTemplateRefs:

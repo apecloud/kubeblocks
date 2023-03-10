@@ -29,6 +29,8 @@ patchesStrategicMerge:
 #- patches/webhook_in_opsrequests.yaml
 #- patches/webhook_in_reconfigurerequests.yaml
 #- patches/webhook_in_configconstraints.yaml
+#- patches/webhook_in_hostpreflights.yaml
+#- patches/webhook_in_preflights.yaml
 #- patches/webhook_in_addons.yaml
 #+kubebuilder:scaffold:crdkustomizewebhookpatch
 
@@ -45,6 +47,8 @@ patchesStrategicMerge:
 #- patches/cainjection_in_opsrequests.yaml
 #- patches/cainjection_in_reconfigurerequests.yaml
 #- patches/cainjection_in_configconstraints.yaml
+#- patches/cainjection_in_hostpreflights.yaml
+#- patches/cainjection_in_preflights.yaml
 #- patches/cainjection_in_addonspecs.yaml
 #+kubebuilder:scaffold:crdkustomizecainjectionpatch
 

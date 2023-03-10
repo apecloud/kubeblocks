@@ -24,9 +24,10 @@ import (
 	"sort"
 	"time"
 
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	dapr "github.com/dapr/go-sdk/client"
 	corev1 "k8s.io/api/core/v1"
+
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 type OperationClient struct {

@@ -35,9 +35,9 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
-//+kubebuilder:rbac:groups=apps.kubeblocks.io,resources=clusterdefinitions,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=apps.kubeblocks.io,resources=clusterdefinitions/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=apps.kubeblocks.io,resources=clusterdefinitions/finalizers,verbs=update
+// +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=clusterdefinitions,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=clusterdefinitions/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=clusterdefinitions/finalizers,verbs=update
 
 // ClusterDefinitionReconciler reconciles a ClusterDefinition object
 type ClusterDefinitionReconciler struct {
@@ -94,17 +94,8 @@ func (r *ClusterDefinitionReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		return intctrlutil.Reconciled()
 	}
 
-	if ok, err := appsconfig.CheckCDConfigTemplate(r.Client, reqCtx, dbClusterDef); !ok || err != nil {
-		return intctrlutil.RequeueAfter(time.Second, reqCtx.Log, "failed to check config template")
-	}
-
-	if ok, err := appsconfig.UpdateCDLabelsByConfiguration(r.Client, reqCtx, dbClusterDef); !ok || err != nil {
-		return intctrlutil.RequeueAfter(time.Second, reqCtx.Log, "failed to update using config template info")
-	}
-
-	// Update configmap Finalizer and set Immutable
-	if err := appsconfig.UpdateCDConfigMapFinalizer(r.Client, reqCtx, dbClusterDef); err != nil {
-		return intctrlutil.RequeueAfter(time.Second, reqCtx.Log, "failed to UpdateConfigMapFinalizer")
+	if err := appsconfig.ReconcileConfigurationForReferencedCR(r.Client, reqCtx, dbClusterDef); err != nil {
+		return intctrlutil.RequeueAfter(time.Second, reqCtx.Log, err.Error())
 	}
 
 	for _, handler := range clusterDefUpdateHandlers {
@@ -139,6 +130,5 @@ func (r *ClusterDefinitionReconciler) deleteExternalResources(reqCtx intctrlutil
 	//
 	// Ensure that delete implementation is idempotent and safe to invoke
 	// multiple times for same object.
-
-	return appsconfig.DeleteCDConfigMapFinalizer(r.Client, reqCtx, clusterDef)
+	return appsconfig.DeleteConfigMapFinalizer(r.Client, reqCtx, clusterDef)
 }

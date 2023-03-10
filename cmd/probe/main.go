@@ -42,7 +42,7 @@ import (
 	dhttp "github.com/dapr/components-contrib/bindings/http"
 	"github.com/dapr/components-contrib/bindings/localstorage"
 	"github.com/dapr/components-contrib/middleware"
-	mdns "github.com/dapr/components-contrib/nameresolution/mdns"
+	"github.com/dapr/components-contrib/nameresolution/mdns"
 
 	"go.uber.org/automaxprocs/maxprocs"
 

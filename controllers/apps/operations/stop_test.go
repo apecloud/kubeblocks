@@ -23,7 +23,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	"github.com/apecloud/kubeblocks/internal/constant"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/generics"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 )
 
@@ -68,7 +69,7 @@ var _ = Describe("Stop OpsRequest", func() {
 			By("test stop action and reconcile function")
 			Expect(GetOpsManager().Do(opsRes)).Should(Succeed())
 			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(appsv1alpha1.RunningPhase))
-			Expect(len(opsRes.Cluster.Annotations[intctrlutil.SnapShotForStartAnnotationKey]) != 0).Should(BeTrue())
+			Expect(len(opsRes.Cluster.Annotations[constant.SnapShotForStartAnnotationKey]) != 0).Should(BeTrue())
 			for _, v := range opsRes.Cluster.Spec.ComponentSpecs {
 				Expect(v.Replicas).Should(BeEquivalentTo(0))
 			}

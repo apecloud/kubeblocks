@@ -35,5 +35,5 @@ Troubleshooting for KubeBlocks
 ### SEE ALSO
 
 * [kbcli](kbcli.md)	 - KubeBlocks CLI
-* [kbcli troubleshoot preflight](kbcli_troubleshoot_preflight.md)	 - Run and retrieve preflight checks for kubeblocks
+* [kbcli troubleshoot preflight](kbcli_troubleshoot_preflight.md)	 - Run and retrieve preflight checks for KubeBlocks
 

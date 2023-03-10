@@ -30,6 +30,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
+	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -65,8 +66,8 @@ func SortPods(pods []corev1.Pod, rolePriorityMap map[string]int) {
 	// make a Serial pod list,
 	// e.g.: unknown -> empty -> learner -> follower1 -> follower2 -> leader, with follower1.Name < follower2.Name
 	sort.SliceStable(pods, func(i, j int) bool {
-		roleI := pods[i].Labels[intctrlutil.RoleLabelKey]
-		roleJ := pods[j].Labels[intctrlutil.RoleLabelKey]
+		roleI := pods[i].Labels[constant.RoleLabelKey]
+		roleJ := pods[j].Labels[constant.RoleLabelKey]
 
 		if rolePriorityMap[roleI] == rolePriorityMap[roleJ] {
 			_, ordinal1 := intctrlutil.GetParentNameAndOrdinal(&pods[i])
@@ -95,9 +96,9 @@ func generateConsensusUpdatePlan(ctx context.Context, cli client.Client, stsObj 
 		}
 
 		// if pod is the latest version, we do nothing
-		if util.GetPodRevision(&pod) == stsObj.Status.UpdateRevision {
+		if intctrlutil.GetPodRevision(&pod) == stsObj.Status.UpdateRevision {
 			// wait until ready
-			return !util.PodIsReady(pod), nil
+			return !intctrlutil.PodIsReadyWithLabel(pod), nil
 		}
 
 		// delete the pod to trigger associate StatefulSet to re-create it
@@ -130,7 +131,7 @@ func generateConsensusBestEffortParallelPlan(plan *util.Plan, pods []corev1.Pod,
 	// append unknown, empty and learner
 	index := 0
 	for _, pod := range pods {
-		role := pod.Labels[intctrlutil.RoleLabelKey]
+		role := pod.Labels[constant.RoleLabelKey]
 		if rolePriorityMap[role] <= learnerPriority {
 			nextStep := &util.Step{}
 			nextStep.Obj = pod
@@ -145,7 +146,7 @@ func generateConsensusBestEffortParallelPlan(plan *util.Plan, pods []corev1.Pod,
 	podList := pods[index:]
 	followerCount := 0
 	for _, pod := range podList {
-		if rolePriorityMap[pod.Labels[intctrlutil.RoleLabelKey]] < leaderPriority {
+		if rolePriorityMap[pod.Labels[constant.RoleLabelKey]] < leaderPriority {
 			followerCount++
 		}
 	}
@@ -235,14 +236,14 @@ func UpdateConsensusSetRoleLabel(cli client.Client, reqCtx intctrlutil.RequestCt
 	cluster := &appsv1alpha1.Cluster{}
 	err := cli.Get(ctx, types.NamespacedName{
 		Namespace: pod.Namespace,
-		Name:      pod.Labels[intctrlutil.AppInstanceLabelKey],
+		Name:      pod.Labels[constant.AppInstanceLabelKey],
 	}, cluster)
 	if err != nil {
 		return err
 	}
 
 	// get componentDef this pod belongs to
-	componentName := pod.Labels[intctrlutil.KBAppComponentLabelKey]
+	componentName := pod.Labels[constant.KBAppComponentLabelKey]
 	compDefName := cluster.GetComponentDefRefName(componentName)
 	componentDef, err := util.GetComponentDefByCluster(ctx, cli, cluster, compDefName)
 	if err != nil {
@@ -261,8 +262,8 @@ func UpdateConsensusSetRoleLabel(cli client.Client, reqCtx intctrlutil.RequestCt
 
 	// update pod role label
 	patch := client.MergeFrom(pod.DeepCopy())
-	pod.Labels[intctrlutil.RoleLabelKey] = role
-	pod.Labels[intctrlutil.ConsensusSetAccessModeLabelKey] = string(roleMap[role].accessMode)
+	pod.Labels[constant.RoleLabelKey] = role
+	pod.Labels[constant.ConsensusSetAccessModeLabelKey] = string(roleMap[role].accessMode)
 
 	return cli.Patch(ctx, pod, patch)
 }
@@ -388,11 +389,11 @@ func setConsensusSetStatusRoles(consensusSetStatus *appsv1alpha1.ConsensusSetSta
 	}
 
 	for _, pod := range pods {
-		if !util.PodIsReady(pod) {
+		if !intctrlutil.PodIsReadyWithLabel(pod) {
 			continue
 		}
 
-		role := pod.Labels[intctrlutil.RoleLabelKey]
+		role := pod.Labels[constant.RoleLabelKey]
 		_ = setConsensusSetStatusRole(consensusSetStatus, componentDef, role, pod.Name)
 	}
 }
@@ -428,7 +429,7 @@ func updateConsensusRoleInfo(ctx context.Context, cli client.Client, cluster *ap
 	leader := ""
 	followers := ""
 	for _, pod := range pods {
-		role := pod.Labels[intctrlutil.RoleLabelKey]
+		role := pod.Labels[constant.RoleLabelKey]
 		// mapping role label to consensus member
 		roleMap := composeConsensusRoleMap(componentDef)
 		memberExt, ok := roleMap[role]
@@ -449,9 +450,9 @@ func updateConsensusRoleInfo(ctx context.Context, cli client.Client, cluster *ap
 	}
 
 	ml := client.MatchingLabels{
-		intctrlutil.AppInstanceLabelKey:    cluster.GetName(),
-		intctrlutil.KBAppComponentLabelKey: componentName,
-		intctrlutil.AppConfigTypeLabelKey:  "kubeblocks-env",
+		constant.AppInstanceLabelKey:    cluster.GetName(),
+		constant.KBAppComponentLabelKey: componentName,
+		constant.AppConfigTypeLabelKey:  "kubeblocks-env",
 	}
 
 	configList := &corev1.ConfigMapList{}

@@ -44,8 +44,10 @@ import (
 	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	opsutil "github.com/apecloud/kubeblocks/controllers/apps/operations/util"
 	"github.com/apecloud/kubeblocks/controllers/k8score"
+	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	"github.com/apecloud/kubeblocks/internal/generics"
 )
 
 // +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=clusters,verbs=get;list;watch;create;update;patch;delete
@@ -96,8 +98,8 @@ import (
 // +kubebuilder:rbac:groups=storage.k8s.io,resources=storageclasses,verbs=get;list;watch
 
 // dataprotection get list and delete
-//+kubebuilder:rbac:groups=dataprotection.kubeblocks.io,resources=backuppolicies,verbs=get;list;delete;deletecollection
-//+kubebuilder:rbac:groups=dataprotection.kubeblocks.io,resources=backups,verbs=get;list;delete;deletecollection
+// +kubebuilder:rbac:groups=dataprotection.kubeblocks.io,resources=backuppolicies,verbs=get;list;delete;deletecollection
+// +kubebuilder:rbac:groups=dataprotection.kubeblocks.io,resources=backups,verbs=get;list;delete;deletecollection
 
 // ClusterReconciler reconciles a Cluster object
 type ClusterReconciler struct {
@@ -114,7 +116,6 @@ type probeMessage struct {
 
 func init() {
 	k8score.EventHandlerMap["cluster-controller"] = &ClusterReconciler{}
-	k8score.StorageClassHandlerMap["cluster-controller"] = handleClusterVolumeExpansion
 }
 
 func (r *ClusterReconciler) Handle(cli client.Client, reqCtx intctrlutil.RequestCtx, recorder record.EventRecorder, event *corev1.Event) error {
@@ -199,7 +200,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		Recorder: r.Recorder,
 	}
 
-	reqCtx.Log.Info("get cluster", "cluster", req.NamespacedName)
+	reqCtx.Log.V(1).Info("reconcile", "cluster", req.NamespacedName)
 	cluster := &appsv1alpha1.Cluster{}
 	if err := r.Client.Get(reqCtx.Ctx, reqCtx.Req.NamespacedName, cluster); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
@@ -223,7 +224,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 
-	reqCtx.Log.Info("get clusterDef and clusterVersion")
+	reqCtx.Log.V(1).Info("get clusterDef and clusterVersion")
 	clusterDefinition := &appsv1alpha1.ClusterDefinition{}
 	if err := r.Client.Get(reqCtx.Ctx, types.NamespacedName{
 		Name: cluster.Spec.ClusterDefRef,
@@ -237,8 +238,17 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	if cluster.Status.ObservedGeneration == cluster.Generation {
+		// checks if the controller is handling the garbage of restore.
+		if handlingRestoreGarbage, err := r.handleGarbageOfRestoreBeforeRunning(ctx, cluster); err != nil {
+			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+		} else if handlingRestoreGarbage {
+			return intctrlutil.Reconciled()
+		}
 		// reconcile the phase and conditions of the Cluster.status
 		if err = r.reconcileClusterStatus(reqCtx.Ctx, cluster, clusterDefinition); err != nil {
+			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+		}
+		if err = r.cleanupAnnotationsAfterRunning(reqCtx, cluster); err != nil {
 			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 		}
 		return intctrlutil.Reconciled()
@@ -270,12 +280,6 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return *res, err
 	}
 
-	if err = r.reconcileStatusOperations(ctx, cluster, clusterDefinition); err != nil {
-		// this is a block to handle error.
-		// so when update cluster conditions failed, we can ignore it.
-		_ = clusterConditionMgr.setPreCheckErrorCondition(err)
-		return intctrlutil.RequeueAfter(ControllerErrorRequeueTime, reqCtx.Log, "")
-	}
 	// validate config and send warning event log necessarily
 	if err = cluster.ValidateEnabledLogs(clusterDefinition); err != nil {
 		_ = clusterConditionMgr.setPreCheckErrorCondition(err)
@@ -422,41 +426,41 @@ func (r *ClusterReconciler) deleteExternalResources(reqCtx intctrlutil.RequestCt
 
 	// it's possible at time of external resource deletion, cluster definition has already been deleted.
 	ml := client.MatchingLabels{
-		intctrlutil.AppInstanceLabelKey: cluster.GetName(),
+		constant.AppInstanceLabelKey: cluster.GetName(),
 	}
 	inNS := client.InNamespace(cluster.Namespace)
 
 	// all resources created in reconcileClusterWorkloads should be handled properly
 
-	if ret, err := removeFinalizer(r, reqCtx, intctrlutil.StatefulSetSignature, inNS, ml); err != nil {
+	if ret, err := removeFinalizer(r, reqCtx, generics.StatefulSetSignature, inNS, ml); err != nil {
 		return ret, err
 	}
 
-	if ret, err := removeFinalizer(r, reqCtx, intctrlutil.DeploymentSignature, inNS, ml); err != nil {
+	if ret, err := removeFinalizer(r, reqCtx, generics.DeploymentSignature, inNS, ml); err != nil {
 		return ret, err
 	}
 
-	if ret, err := removeFinalizer(r, reqCtx, intctrlutil.ServiceSignature, inNS, ml); err != nil {
+	if ret, err := removeFinalizer(r, reqCtx, generics.ServiceSignature, inNS, ml); err != nil {
 		return ret, err
 	}
 
-	if ret, err := removeFinalizer(r, reqCtx, intctrlutil.SecretSignature, inNS, ml); err != nil {
+	if ret, err := removeFinalizer(r, reqCtx, generics.SecretSignature, inNS, ml); err != nil {
 		return ret, err
 	}
 
-	if ret, err := removeFinalizer(r, reqCtx, intctrlutil.ConfigMapSignature, inNS, ml); err != nil {
+	if ret, err := removeFinalizer(r, reqCtx, generics.ConfigMapSignature, inNS, ml); err != nil {
 		return ret, err
 	}
 
-	if ret, err := removeFinalizer(r, reqCtx, intctrlutil.PodDisruptionBudgetSignature, inNS, ml); err != nil {
+	if ret, err := removeFinalizer(r, reqCtx, generics.PodDisruptionBudgetSignature, inNS, ml); err != nil {
 		return ret, err
 	}
 
 	return nil, nil
 }
 
-func removeFinalizer[T intctrlutil.Object, PT intctrlutil.PObject[T],
-	L intctrlutil.ObjList[T], PL intctrlutil.PObjList[T, L]](
+func removeFinalizer[T generics.Object, PT generics.PObject[T],
+	L generics.ObjList[T], PL generics.PObjList[T, L]](
 	r *ClusterReconciler, reqCtx intctrlutil.RequestCtx, _ func(T, L), opts ...client.ListOption) (*ctrl.Result, error) {
 	var (
 		objList L
@@ -483,7 +487,7 @@ func removeFinalizer[T intctrlutil.Object, PT intctrlutil.PObject[T],
 func (r *ClusterReconciler) deletePVCs(reqCtx intctrlutil.RequestCtx, cluster *appsv1alpha1.Cluster) error {
 	// it's possible at time of external resource deletion, cluster definition has already been deleted.
 	ml := client.MatchingLabels{
-		intctrlutil.AppInstanceLabelKey: cluster.GetName(),
+		constant.AppInstanceLabelKey: cluster.GetName(),
 	}
 	inNS := client.InNamespace(cluster.Namespace)
 
@@ -502,7 +506,7 @@ func (r *ClusterReconciler) deletePVCs(reqCtx intctrlutil.RequestCtx, cluster *a
 func (r *ClusterReconciler) deleteBackupPolicies(reqCtx intctrlutil.RequestCtx, cluster *appsv1alpha1.Cluster) error {
 	inNS := client.InNamespace(cluster.Namespace)
 	ml := client.MatchingLabels{
-		intctrlutil.AppInstanceLabelKey: cluster.GetName(),
+		constant.AppInstanceLabelKey: cluster.GetName(),
 	}
 	// clean backupPolicies
 	return r.Client.DeleteAllOf(reqCtx.Ctx, &dataprotectionv1alpha1.BackupPolicy{}, inNS, ml)
@@ -511,7 +515,7 @@ func (r *ClusterReconciler) deleteBackupPolicies(reqCtx intctrlutil.RequestCtx, 
 func (r *ClusterReconciler) deleteBackups(reqCtx intctrlutil.RequestCtx, cluster *appsv1alpha1.Cluster) error {
 	inNS := client.InNamespace(cluster.Namespace)
 	ml := client.MatchingLabels{
-		intctrlutil.AppInstanceLabelKey: cluster.GetName(),
+		constant.AppInstanceLabelKey: cluster.GetName(),
 	}
 	// clean backups
 	backups := &dataprotectionv1alpha1.BackupList{}
@@ -520,9 +524,9 @@ func (r *ClusterReconciler) deleteBackups(reqCtx intctrlutil.RequestCtx, cluster
 	}
 	for _, backup := range backups.Items {
 		// check backup delete protection label
-		deleteProtection, exists := backup.GetLabels()[intctrlutil.BackupProtectionLabelKey]
+		deleteProtection, exists := backup.GetLabels()[constant.BackupProtectionLabelKey]
 		// not found backup-protection or value is Delete, delete it.
-		if !exists || deleteProtection == intctrlutil.BackupDelete {
+		if !exists || deleteProtection == constant.BackupDelete {
 			if err := r.Delete(reqCtx.Ctx, &backup); err != nil {
 				return err
 			}
@@ -554,12 +558,6 @@ func (r *ClusterReconciler) needCheckClusterForReady(cluster *appsv1alpha1.Clust
 		cluster.Status.Phase) == -1
 }
 
-// existsOperations checks if the cluster are doing operations
-func (r *ClusterReconciler) existsOperations(cluster *appsv1alpha1.Cluster) bool {
-	opsRequestMap, _ := opsutil.GetOpsRequestSliceFromCluster(cluster)
-	return len(opsRequestMap) > 0
-}
-
 // updateClusterPhase updates cluster.status.phase
 func (r *ClusterReconciler) updateClusterPhaseToCreatingOrUpdating(reqCtx intctrlutil.RequestCtx, cluster *appsv1alpha1.Cluster) error {
 	needPatch := false
@@ -573,7 +571,7 @@ func (r *ClusterReconciler) updateClusterPhaseToCreatingOrUpdating(reqCtx intctr
 				Phase: appsv1alpha1.CreatingPhase,
 			}
 		}
-	} else if util.IsCompleted(cluster.Status.Phase) && !r.existsOperations(cluster) {
+	} else if util.IsCompleted(cluster.Status.Phase) && !existsOperations(cluster) {
 		needPatch = true
 		cluster.Status.Phase = appsv1alpha1.SpecUpdatingPhase
 	}
@@ -747,33 +745,90 @@ func (r *ClusterReconciler) reconcileClusterStatus(ctx context.Context,
 		handleClusterReadyCondition, handleExistAbnormalOrFailed, handleClusterIsStopped, handleClusterIsRunning)
 }
 
-// reconcileStatusOperations when Cluster.spec updated, we need reconcile the Cluster.status.operations.
-func (r *ClusterReconciler) reconcileStatusOperations(ctx context.Context, cluster *appsv1alpha1.Cluster, clusterDef *appsv1alpha1.ClusterDefinition) error {
-	if cluster.Status.Operations == nil {
-		cluster.Status.Operations = &appsv1alpha1.Operations{}
-	}
-
-	var (
-		err                       error
-		volumeExpansionComponents []appsv1alpha1.OperationComponent
-		oldOperations             = cluster.Status.Operations.DeepCopy()
-		operations                = *cluster.Status.Operations
-	)
-	// determine whether to support volumeExpansion when creating the cluster or add/delete component.
-	// because volumeClaimTemplates are forbidden to update except for storage size when component created.
-	if cluster.Status.ObservedGeneration == 0 || len(cluster.Spec.ComponentSpecs) != len(cluster.Status.Components) {
-		if volumeExpansionComponents, err = getSupportVolumeExpansionComponents(ctx, r.Client, cluster); err != nil {
-			return err
-		}
-		operations.VolumeExpandable = volumeExpansionComponents
-	}
-
-	// check whether status.operations is changed
-	if reflect.DeepEqual(oldOperations, operations) {
+// cleanupAnnotationsAfterRunning cleans up the cluster annotations after cluster is Running.
+func (r *ClusterReconciler) cleanupAnnotationsAfterRunning(reqCtx intctrlutil.RequestCtx, cluster *appsv1alpha1.Cluster) error {
+	if cluster.Status.Phase != appsv1alpha1.RunningPhase {
 		return nil
 	}
-
+	if _, ok := cluster.Annotations[constant.RestoreFromBackUpAnnotationKey]; !ok {
+		return nil
+	}
 	patch := client.MergeFrom(cluster.DeepCopy())
-	cluster.Status.Operations = &operations
-	return r.Client.Status().Patch(ctx, cluster, patch)
+	delete(cluster.Annotations, constant.RestoreFromBackUpAnnotationKey)
+	return r.Client.Patch(reqCtx.Ctx, cluster, patch)
+}
+
+// handleRestoreGarbageBeforeRunning handles the garbage for restore before cluster phase changes to Running.
+func (r *ClusterReconciler) handleGarbageOfRestoreBeforeRunning(ctx context.Context, cluster *appsv1alpha1.Cluster) (bool, error) {
+	clusterBackupResourceMap, err := getClusterBackupSourceMap(cluster)
+	if err != nil {
+		return false, err
+	}
+	if clusterBackupResourceMap == nil {
+		return false, nil
+	}
+	// check if all components are running.
+	for _, v := range cluster.Status.Components {
+		if v.Phase != appsv1alpha1.RunningPhase {
+			return false, nil
+		}
+	}
+	// remove the garbage for restore if the cluster restores from backup.
+	return r.removeGarbageWithRestore(ctx, cluster, clusterBackupResourceMap)
+}
+
+// removeGarbageWithRestore removes the garbage for restore when all components are Running.
+func (r *ClusterReconciler) removeGarbageWithRestore(ctx context.Context,
+	cluster *appsv1alpha1.Cluster,
+	clusterBackupResourceMap map[string]string) (bool, error) {
+	var (
+		doRemoveInitContainers bool
+		err                    error
+	)
+	clusterPatch := client.MergeFrom(cluster.DeepCopy())
+	for k, v := range clusterBackupResourceMap {
+		// remove the init container for restore
+		if doRemoveInitContainers, err = r.removeStsInitContainerForRestore(ctx, cluster, k, v); err != nil {
+			return false, err
+		}
+	}
+	if doRemoveInitContainers {
+		// reset the component phase to Creating during removing the init containers of statefulSet.
+		return doRemoveInitContainers, r.Client.Status().Patch(ctx, cluster, clusterPatch)
+	}
+	return false, nil
+}
+
+// removeStsInitContainerForRestore removes the statefulSet's init container which restores data from backup.
+func (r *ClusterReconciler) removeStsInitContainerForRestore(ctx context.Context,
+	cluster *appsv1alpha1.Cluster,
+	componentName,
+	backupName string) (bool, error) {
+	// get the sts list of component
+	stsList := &appsv1.StatefulSetList{}
+	if err := util.GetObjectListByComponentName(ctx, r.Client, cluster, stsList, componentName); err != nil {
+		return false, err
+	}
+	var doRemoveInitContainers bool
+	for _, sts := range stsList.Items {
+		initContainers := sts.Spec.Template.Spec.InitContainers
+		restoreInitContainerName := component.GetRestoredInitContainerName(backupName)
+		restoreInitContainerIndex, _ := intctrlutil.GetContainerByName(initContainers, restoreInitContainerName)
+		if restoreInitContainerIndex == -1 {
+			continue
+		}
+		doRemoveInitContainers = true
+		initContainers = append(initContainers[:restoreInitContainerIndex], initContainers[restoreInitContainerIndex+1:]...)
+		sts.Spec.Template.Spec.InitContainers = initContainers
+		if err := r.Client.Update(ctx, &sts); err != nil {
+			return false, err
+		}
+	}
+	if doRemoveInitContainers {
+		// if need to remove init container, reset component to Creating.
+		compStatus := cluster.Status.Components[componentName]
+		compStatus.Phase = appsv1alpha1.CreatingPhase
+		cluster.Status.Components[componentName] = compStatus
+	}
+	return doRemoveInitContainers, nil
 }

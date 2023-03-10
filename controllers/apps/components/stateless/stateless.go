@@ -33,6 +33,7 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/types"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
+	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -164,7 +165,7 @@ func belongToNewReplicaSet(d *appsv1.Deployment, pod *corev1.Pod) bool {
 		return false
 	}
 	for _, v := range pod.OwnerReferences {
-		if v.Kind == intctrlutil.ReplicaSet && strings.Contains(condition.Message, v.Name) {
+		if v.Kind == constant.ReplicaSet && strings.Contains(condition.Message, v.Name) {
 			return d.Status.ObservedGeneration == d.Generation
 		}
 	}

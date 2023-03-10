@@ -21,6 +21,7 @@ import (
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
@@ -46,14 +47,17 @@ func BuildComponent(
 		Type:                  clusterCompDefObj.Name,
 		CharacterType:         clusterCompDefObj.CharacterType,
 		MaxUnavailable:        clusterCompDefObj.MaxUnavailable,
-		Replicas:              0,
 		WorkloadType:          clusterCompDefObj.WorkloadType,
 		ConsensusSpec:         clusterCompDefObj.ConsensusSpec,
 		PodSpec:               clusterCompDefObj.PodSpec,
-		Service:               clusterCompDefObj.Service,
 		Probes:                clusterCompDefObj.Probes,
 		LogConfigs:            clusterCompDefObj.LogConfigs,
 		HorizontalScalePolicy: clusterCompDefObj.HorizontalScalePolicy,
+		Replicas:              clusterCompSpec.Replicas,
+		EnabledLogs:           clusterCompSpec.EnabledLogs,
+		TLS:                   clusterCompSpec.TLS,
+		Issuer:                clusterCompSpec.Issuer,
+		VolumeTypes:           clusterCompDefObj.VolumeTypes,
 	}
 
 	// resolve component.ConfigTemplates
@@ -89,12 +93,6 @@ func BuildComponent(
 	}
 	component.PodSpec.Tolerations = patchBuiltInToleration(tolerations)
 
-	// set others
-	component.EnabledLogs = clusterCompSpec.EnabledLogs
-	component.Replicas = clusterCompSpec.Replicas
-	component.TLS = clusterCompSpec.TLS
-	component.Issuer = clusterCompSpec.Issuer
-
 	if clusterCompSpec.VolumeClaimTemplates != nil {
 		component.VolumeClaimTemplates = appsv1alpha1.ToVolumeClaimTemplates(clusterCompSpec.VolumeClaimTemplates)
 	}
@@ -103,12 +101,24 @@ func BuildComponent(
 		component.PodSpec.Containers[0].Resources = clusterCompSpec.Resources
 	}
 
-	if clusterCompSpec.ServiceType != "" {
-		if component.Service == nil {
-			component.Service = &corev1.ServiceSpec{}
+	if clusterCompDefObj.Service != nil {
+		service := corev1.Service{Spec: *clusterCompDefObj.Service}
+		service.Spec.Type = corev1.ServiceTypeClusterIP
+		component.Services = append(component.Services, service)
+
+		for _, item := range clusterCompSpec.Services {
+			service = corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        item.Name,
+					Annotations: item.Annotations,
+				},
+				Spec: *clusterCompDefObj.Service,
+			}
+			service.Spec.Type = item.ServiceType
+			component.Services = append(component.Services, service)
 		}
-		component.Service.Type = clusterCompSpec.ServiceType
 	}
+
 	component.PrimaryIndex = clusterCompSpec.PrimaryIndex
 
 	// TODO(zhixu.zt) We need to reserve the VolumeMounts of the container for ConfigMap or Secret,
@@ -128,9 +138,8 @@ func BuildComponent(
 		return nil
 	}
 
-	replacePlaceholderTokens(component, map[string]string{
-		constant.ConnCredentialPlaceHolder: GenerateConnCredential(cluster.GetName()),
-	})
+	replaceContainerPlaceholderTokens(component, GetEnvReplacementMapForConnCredential(cluster.GetName()))
+
 	return component
 }
 
@@ -207,29 +216,49 @@ func doContainerAttrOverride(compContainer *corev1.Container, container corev1.C
 	}
 }
 
-func replacePlaceholderTokens(component *SynthesizedComponent, namedValues map[string]string) {
+// GetEnvReplacementMapForConnCredential gets the replacement map for connect credential
+func GetEnvReplacementMapForConnCredential(clusterName string) map[string]string {
+	return map[string]string{
+		constant.ConnCredentialPlaceHolder: GenerateConnCredential(clusterName),
+	}
+}
+
+func replaceContainerPlaceholderTokens(component *SynthesizedComponent, namedValuesMap map[string]string) {
 	// replace env[].valueFrom.secretKeyRef.name variables
 	for _, cc := range [][]corev1.Container{component.PodSpec.InitContainers, component.PodSpec.Containers} {
 		for _, c := range cc {
-			for _, e := range c.Env {
-				if e.ValueFrom == nil {
-					continue
-				}
-				if e.ValueFrom.SecretKeyRef == nil {
-					continue
-				}
-				secretRef := e.ValueFrom.SecretKeyRef
-				for k, v := range namedValues {
-					r := strings.Replace(secretRef.Name, k, v, 1)
-					if r == secretRef.Name {
-						continue
-					}
-					secretRef.Name = r
-					break
-				}
-			}
+			c.Env = ReplaceSecretEnvVars(namedValuesMap, c.Env)
 		}
 	}
+}
+
+// ReplaceNamedVars replaces the placeholder in targetVar if it is match and returns the replaced result
+func ReplaceNamedVars(namedValuesMap map[string]string, targetVar string, limits int, matchAll bool) string {
+	for placeHolderKey, mappingValue := range namedValuesMap {
+		r := strings.Replace(targetVar, placeHolderKey, mappingValue, limits)
+		// early termination on matching, when matchAll = false
+		if r != targetVar && !matchAll {
+			return r
+		}
+		targetVar = r
+	}
+	return targetVar
+}
+
+// ReplaceSecretEnvVars replaces the env secret value with namedValues and returns new envs
+func ReplaceSecretEnvVars(namedValuesMap map[string]string, envs []corev1.EnvVar) []corev1.EnvVar {
+	newEnvs := make([]corev1.EnvVar, 0, len(envs))
+	for _, e := range envs {
+		if e.ValueFrom == nil || e.ValueFrom.SecretKeyRef == nil {
+			continue
+		}
+		name := ReplaceNamedVars(namedValuesMap, e.ValueFrom.SecretKeyRef.Name, 1, false)
+		if name != e.ValueFrom.SecretKeyRef.Name {
+			e.ValueFrom.SecretKeyRef.Name = name
+		}
+		newEnvs = append(newEnvs, e)
+	}
+	return newEnvs
 }
 
 func GetClusterDefCompByName(clusterDef appsv1alpha1.ClusterDefinition,

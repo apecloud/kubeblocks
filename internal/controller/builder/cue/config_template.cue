@@ -24,8 +24,6 @@ meta: {
 
 	component: {
 		name:                  string
-		type:                  string
-		characterType:         string
 		configName:            string
 		templateName:          string
 		configConstraintsName: string
@@ -40,7 +38,6 @@ config: {
 		name:      meta.component.configName
 		namespace: meta.cluster.namespace
 		labels: {
-			"app.kubernetes.io/component":  "\(meta.component.type)-\(meta.component.name)"
 			"app.kubernetes.io/name":       "\(meta.clusterDefinition.name)"
 			"app.kubernetes.io/instance":   meta.cluster.name
 			"app.kubernetes.io/managed-by": "kubeblocks"

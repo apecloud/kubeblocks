@@ -1,0 +1,43 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: ClusterVersion
+metadata:
+  name: kafka-{{ default .Chart.AppVersion .Values.clusterVersionOverride }}
+  labels:
+    {{- include "kafka.labels" . | nindent 4 }}
+    {{- if .Values.commonLabels }}
+    {{- include "common.tplvalues.render" ( dict "value" .Values.commonLabels "context" $ ) | nindent 4 }}
+    {{- end }}
+  {{- if .Values.commonAnnotations }}
+  annotations: {{- include "common.tplvalues.render" ( dict "value" .Values.commonAnnotations "context" $ ) | nindent 4 }}
+  {{- end }}
+spec:
+  clusterDefinitionRef: kafka
+  componentVersions:
+    - componentDefRef: kafka-server
+      versionsContext:
+        containers:
+          - name: kafka
+            image: {{ .Values.images.kafka.repository }}:{{ default .Chart.AppVersion .Values.images.kafka.tag }}
+          - name: jmx-exporter
+            image: {{ .Values.images.jmxExporter.repository }}:{{ .Values.images.jmxExporter.tag }}
+    # - componentDefRef: kafka-controller
+    #   versionsContext:
+    #     containers:
+    #       - name: kafka
+    #         image: {{ .Values.images.kafka.repository }}:{{ default .Chart.AppVersion .Values.images.kafka.tag }}
+    #       - name: jmx-exporter
+    #         image: {{ .Values.images.jmxExporter.repository }}:{{ .Values.images.jmxExporter.tag }}
+    # - componentDefRef: kafka-broker
+    #   versionsContext:
+    #     containers:
+    #       - name: kafka
+    #         image: {{ .Values.images.kafka.repository }}:{{ default .Chart.AppVersion .Values.images.kafka.tag }}
+    #       - name: jmx-exporter
+    #         image: {{ .Values.images.jmxExporter.repository }}:{{ .Values.images.jmxExporter.tag }}
+
+    - componentDefRef: kafka-exporter
+      versionsContext:
+        containers:
+          - name: kafka-exporter
+            image: {{ .Values.images.kafkaExporter.repository }}:{{ .Values.images.kafkaExporter.tag }}
+

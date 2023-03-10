@@ -31,7 +31,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	"github.com/apecloud/kubeblocks/internal/generics"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 )
 
@@ -65,9 +67,9 @@ var _ = Describe("OpsRequest Controller Volume Expansion Handler", func() {
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 		// namespaced
-		testapps.ClearResources(&testCtx, intctrlutil.OpsRequestSignature, inNS, ml)
+		testapps.ClearResources(&testCtx, generics.OpsRequestSignature, inNS, ml)
 		// non-namespaced
-		testapps.ClearResources(&testCtx, intctrlutil.StorageClassSignature, ml)
+		testapps.ClearResources(&testCtx, generics.StorageClassSignature, ml)
 	}
 
 	BeforeEach(cleanEnv)
@@ -85,7 +87,7 @@ var _ = Describe("OpsRequest Controller Volume Expansion Handler", func() {
 			if tmpCluster.Annotations == nil {
 				tmpCluster.Annotations = map[string]string{}
 			}
-			tmpCluster.Annotations[intctrlutil.OpsRequestAnnotationKey] = fmt.Sprintf(`[{"clusterPhase": "%s", "name":"%s"}]`, toClusterPhase, opsRequestName)
+			tmpCluster.Annotations[constant.OpsRequestAnnotationKey] = fmt.Sprintf(`[{"clusterPhase": "%s", "name":"%s"}]`, toClusterPhase, opsRequestName)
 		})()).Should(Succeed())
 
 		Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(cluster), func(g Gomega, myCluster *appsv1alpha1.Cluster) {
@@ -109,17 +111,6 @@ var _ = Describe("OpsRequest Controller Volume Expansion Handler", func() {
 			},
 		}
 		opsRes.OpsRequest = ops
-		// mock cluster to support volume expansion
-		Expect(testapps.ChangeObjStatus(&testCtx, clusterObject, func() {
-			clusterObject.Status.Operations = &appsv1alpha1.Operations{
-				VolumeExpandable: []appsv1alpha1.OperationComponent{
-					{
-						VolumeClaimTemplateNames: []string{vctName},
-						Name:                     consensusCompName,
-					},
-				},
-			}
-		})).Should(Succeed())
 
 		// create opsRequest
 		ops = testapps.CreateOpsRequest(ctx, testCtx, ops)
@@ -132,7 +123,7 @@ var _ = Describe("OpsRequest Controller Volume Expansion Handler", func() {
 		createPVC(clusterObject.Name, storageClassName, vctName, pvcName)
 		// waiting pvc controller mark annotation to OpsRequest
 		Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(ops), func(g Gomega, tmpOps *appsv1alpha1.OpsRequest) {
-			g.Expect(tmpOps.Annotations != nil && tmpOps.Annotations[intctrlutil.OpsRequestReconcileAnnotationKey] != "").Should(BeTrue())
+			g.Expect(tmpOps.Annotations != nil && tmpOps.Annotations[constant.OpsRequestReconcileAnnotationKey] != "").Should(BeTrue())
 		})).Should(Succeed())
 		return ops, pvcName
 	}
@@ -167,7 +158,7 @@ var _ = Describe("OpsRequest Controller Volume Expansion Handler", func() {
 		}
 		stsInvolvedObject := corev1.ObjectReference{
 			Name:      pvcName,
-			Kind:      intctrlutil.PersistentVolumeClaimKind,
+			Kind:      constant.PersistentVolumeClaimKind,
 			Namespace: "default",
 		}
 		event.InvolvedObject = stsInvolvedObject
@@ -282,14 +273,6 @@ var _ = Describe("OpsRequest Controller Volume Expansion Handler", func() {
 				clusterObject.Status.Components = map[string]appsv1alpha1.ClusterComponentStatus{
 					consensusCompName: {
 						Phase: appsv1alpha1.RunningPhase,
-					},
-				}
-				clusterObject.Status.Operations = &appsv1alpha1.Operations{
-					VolumeExpandable: []appsv1alpha1.OperationComponent{
-						{
-							Name:                     consensusCompName,
-							VolumeClaimTemplateNames: []string{vctName},
-						},
 					},
 				}
 			})).Should(Succeed())

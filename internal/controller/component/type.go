@@ -40,7 +40,7 @@ type SynthesizedComponent struct {
 	ConsensusSpec         *v1alpha1.ConsensusSetSpec          `json:"consensusSpec,omitempty"`
 	PrimaryIndex          *int32                              `json:"primaryIndex,omitempty"`
 	PodSpec               *v12.PodSpec                        `json:"podSpec,omitempty"`
-	Service               *v12.ServiceSpec                    `json:"service,omitempty"`
+	Services              []v12.Service                       `json:"services,omitempty"`
 	Probes                *v1alpha1.ClusterDefinitionProbes   `json:"probes,omitempty"`
 	VolumeClaimTemplates  []v12.PersistentVolumeClaimTemplate `json:"volumeClaimTemplates,omitempty"`
 	Monitor               *MonitorConfig                      `json:"monitor,omitempty"`
@@ -50,4 +50,5 @@ type SynthesizedComponent struct {
 	HorizontalScalePolicy *v1alpha1.HorizontalScalePolicy     `json:"horizontalScalePolicy,omitempty"`
 	TLS                   bool                                `json:"tls"`
 	Issuer                *v1alpha1.Issuer                    `json:"issuer,omitempty"`
+	VolumeTypes           []v1alpha1.VolumeTypeSpec           `json:"VolumeTypes,omitempty"`
 }

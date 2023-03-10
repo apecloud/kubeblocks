@@ -26,13 +26,14 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
-	"helm.sh/helm/v3/pkg/action"
+	"github.com/spf13/pflag"
 	"helm.sh/helm/v3/pkg/cli/values"
 	"helm.sh/helm/v3/pkg/repo"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/klog/v2"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
 
@@ -45,7 +46,7 @@ import (
 )
 
 const (
-	kMonitorParam      = "prometheus.enabled=%[1]t,grafana.enabled=%[1]t,dashboards.enabled=%[1]t"
+	kMonitorParam      = "prometheus.enabled=%[1]t,grafana.enabled=%[1]t,dashboards.enabled=%[1]t,alertmanager-webhook-adaptor.enabled=%[1]t"
 	requiredK8sVersion = "1.22.0"
 )
 
@@ -60,10 +61,13 @@ var (
 type Options struct {
 	genericclioptions.IOStreams
 
-	HelmCfg   *action.Configuration
+	HelmCfg *helm.Config
+
+	// Namespace is the current namespace that the command is running
 	Namespace string
 	Client    kubernetes.Interface
 	Dynamic   dynamic.Interface
+	verbose   bool
 }
 
 type InstallOptions struct {
@@ -72,7 +76,7 @@ type InstallOptions struct {
 	Monitor         bool
 	Quiet           bool
 	CreateNamespace bool
-	check           bool
+	Check           bool
 	ValueOpts       values.Options
 	timeout         time.Duration
 }
@@ -110,8 +114,9 @@ func newInstallCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 	cmd.Flags().BoolVar(&o.Monitor, "monitor", true, "Set monitor enabled and install Prometheus, AlertManager and Grafana (default true)")
 	cmd.Flags().StringVar(&o.Version, "version", version.DefaultKubeBlocksVersion, "KubeBlocks version")
 	cmd.Flags().BoolVar(&o.CreateNamespace, "create-namespace", false, "Create the namespace if not present")
-	cmd.Flags().BoolVar(&o.check, "check", true, "Check kubernetes environment before install")
+	cmd.Flags().BoolVar(&o.Check, "check", true, "Check kubernetes environment before install")
 	cmd.Flags().DurationVar(&o.timeout, "timeout", 1800*time.Second, "Time to wait for installing KubeBlocks")
+	cmd.Flags().BoolVar(&o.verbose, "verbose", false, "Show logs in detail.")
 	helm.AddValueOptionsFlags(cmd.Flags(), &o.ValueOpts)
 
 	return cmd
@@ -133,10 +138,16 @@ func (o *Options) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 		return err
 	}
 
-	if o.HelmCfg, err = helm.NewActionConfig(o.Namespace, config, helm.WithContext(ctx)); err != nil {
-		return err
-	}
+	// check whether --namespace is specified, if not, KubeBlocks will be installed
+	// to a default namespace
+	var targetNamespace string
+	cmd.Flags().Visit(func(flag *pflag.Flag) {
+		if flag.Name == "namespace" {
+			targetNamespace = o.Namespace
+		}
+	})
 
+	o.HelmCfg = helm.NewConfig(targetNamespace, config, ctx, o.verbose)
 	if o.Dynamic, err = f.DynamicClient(); err != nil {
 		return err
 	}
@@ -158,11 +169,9 @@ func (o *InstallOptions) Install() error {
 		return nil
 	}
 
-	// check if namespace exists
-	if !o.CreateNamespace {
-		if _, err = o.Client.CoreV1().Namespaces().Get(context.TODO(), o.Namespace, metav1.GetOptions{}); err != nil {
-			return err
-		}
+	// check whether the namespace exists
+	if err = o.checkNamespace(); err != nil {
+		return err
 	}
 
 	// check whether there are remained resource left by previous KubeBlocks installation, if yes,
@@ -201,14 +210,24 @@ func (o *InstallOptions) Install() error {
 	}
 
 	if !o.Quiet {
+		fmt.Fprintf(o.Out, "\nKubeBlocks %s installed to namespace %s SUCCESSFULLY!\n",
+			o.Version, o.HelmCfg.Namespace())
 		o.printNotes()
 	}
 	return nil
 }
 
 func (o *InstallOptions) preCheck(versionInfo map[util.AppName]string) error {
-	if !o.check {
+	if !o.Check {
 		return nil
+	}
+
+	// check installing version exists
+	if exists, err := versionExists(o.Version); !exists {
+		if err != nil {
+			klog.V(1).Infof(err.Error())
+		}
+		return fmt.Errorf("version %s does not exist, please use \"kbcli kubeblocks list-versions --devel\" to show the available versions", o.Version)
 	}
 
 	versionErr := fmt.Errorf("failed to get kubernetes version")
@@ -228,7 +247,7 @@ func (o *InstallOptions) preCheck(versionInfo map[util.AppName]string) error {
 		spinner(true)
 	} else {
 		spinner(false)
-		return fmt.Errorf("kubernetes version should be larger than or equal to %s", requiredK8sVersion)
+		return fmt.Errorf("kubernetes version should be greater than or equal to %s", requiredK8sVersion)
 	}
 
 	// check kbcli version, now do nothing
@@ -243,6 +262,22 @@ func (o *InstallOptions) preCheck(versionInfo map[util.AppName]string) error {
 	}
 	o.disableOrEnableSets(provider)
 
+	return nil
+}
+
+func (o *InstallOptions) checkNamespace() error {
+	// target namespace is not specified, use default namespace
+	if o.HelmCfg.Namespace() == "" {
+		o.HelmCfg.SetNamespace(types.DefaultNamespace)
+		o.CreateNamespace = true
+		fmt.Fprintf(o.Out, "KubeBlocks will be installed to namespace \"%s\".\n", o.HelmCfg.Namespace())
+	}
+
+	// check if namespace exists
+	if !o.CreateNamespace {
+		_, err := o.Client.CoreV1().Namespaces().Get(context.TODO(), o.Namespace, metav1.GetOptions{})
+		return err
+	}
 	return nil
 }
 
@@ -372,11 +407,15 @@ func (o *InstallOptions) disableSets(sets []string) {
 }
 
 func (o *InstallOptions) checkRemainedResource() error {
-	if !o.check {
+	if !o.Check {
 		return nil
 	}
 
-	objs, err := getKBObjects(o.Dynamic, o.Namespace)
+	ns, _ := util.GetKubeBlocksNamespace(o.Client)
+	if ns == "" {
+		ns = o.Namespace
+	}
+	objs, err := getKBObjects(o.Dynamic, ns)
 	if err != nil {
 		fmt.Fprintf(o.ErrOut, "Check whether there are resources left by KubeBlocks before: %s\n", err.Error())
 	}
@@ -406,8 +445,6 @@ func (o *InstallOptions) installChart() error {
 
 func (o *InstallOptions) printNotes() {
 	fmt.Fprintf(o.Out, `
-KubeBlocks %s Install SUCCESSFULLY!
-
 -> Basic commands for cluster:
     kbcli cluster create -h     # help information about creating a database cluster
     kbcli cluster list          # list all database clusters
@@ -415,7 +452,7 @@ KubeBlocks %s Install SUCCESSFULLY!
 
 -> Uninstall KubeBlocks:
     kbcli kubeblocks uninstall
-`, o.Version)
+`)
 	if o.Monitor {
 		fmt.Fprint(o.Out, `
 -> To view the monitor components console(Grafana/Prometheus/AlertManager):
@@ -430,30 +467,10 @@ Notes: Monitor components(Grafana/Prometheus/AlertManager) is not installed,
 	}
 }
 
-func (o *InstallOptions) PostInstall() error {
-	var sets []string
-	for _, set := range o.ValueOpts.Values {
-		splitSet := strings.Split(set, ",")
-		sets = append(sets, splitSet...)
-	}
-	for _, set := range sets {
-		if set == "snapshot-controller.enabled=true" {
-			if err := o.createVolumeSnapshotClass(); err != nil {
-				return err
-			}
-		}
-	}
-	// print notes
-	if !o.Quiet {
-		o.printNotes()
-	}
-	return nil
-}
-
 func (o *InstallOptions) createVolumeSnapshotClass() error {
 	createFunc := func() error {
 		options := cluster.CreateVolumeSnapshotClassOptions{}
-		options.BaseOptions.Client = o.Dynamic
+		options.BaseOptions.Dynamic = o.Dynamic
 		options.BaseOptions.IOStreams = o.IOStreams
 		options.BaseOptions.Quiet = true
 
@@ -496,11 +513,29 @@ func (o *InstallOptions) buildChart() *helm.InstallOpts {
 		Chart:           types.KubeBlocksChartName + "/" + types.KubeBlocksChartName,
 		Wait:            true,
 		Version:         o.Version,
-		Namespace:       o.Namespace,
+		Namespace:       o.HelmCfg.Namespace(),
 		ValueOpts:       &o.ValueOpts,
-		Login:           true,
 		TryTimes:        2,
 		CreateNamespace: o.CreateNamespace,
 		Timeout:         o.timeout,
+		Atomic:          true,
 	}
+}
+
+func versionExists(version string) (bool, error) {
+	if version == "" {
+		return true, nil
+	}
+
+	allVers, err := getHelmChartVersions(types.KubeBlocksChartName)
+	if err != nil {
+		return false, err
+	}
+
+	for _, v := range allVers {
+		if v.String() == version {
+			return true, nil
+		}
+	}
+	return false, nil
 }

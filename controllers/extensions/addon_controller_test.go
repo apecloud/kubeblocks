@@ -32,7 +32,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	"github.com/apecloud/kubeblocks/internal/constant"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/generics"
 	"github.com/apecloud/kubeblocks/internal/testutil"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 )
@@ -55,7 +56,7 @@ var _ = Describe("Addon controller", func() {
 		inNS := client.InNamespace(viper.GetString("CM_NAMESPACE"))
 		testapps.ClearResources(&testCtx, intctrlutil.JobSignature, inNS,
 			client.HasLabels{
-				intctrlutil.AddonNameLabelKey,
+				constant.AddonNameLabelKey,
 			})
 		testapps.ClearResources(&testCtx, intctrlutil.ConfigMapSignature, inNS, ml)
 		testapps.ClearResources(&testCtx, intctrlutil.SecretSignature, inNS, ml)
@@ -157,7 +158,8 @@ var _ = Describe("Addon controller", func() {
 
 			By("By enabling addon with default install")
 			defaultInstall := addon.Spec.DefaultInstallValues[0].AddonInstallSpec
-			addon.Spec.InstallSpec = &defaultInstall
+			addon.Spec.InstallSpec = defaultInstall.DeepCopy()
+			addon.Spec.InstallSpec.Enabled = true
 			Expect(testCtx.Cli.Update(ctx, addon)).Should(Succeed())
 			enablingPhaseCheck(2)
 

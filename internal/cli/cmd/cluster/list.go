@@ -35,7 +35,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/constant"
 )
 
 var (
@@ -194,7 +194,7 @@ func run(o *list.ListOptions, printType cluster.PrintType) error {
 	}
 
 	if len(infos) == 0 {
-		fmt.Fprintln(o.IOStreams.Out, "No clusters found")
+		fmt.Fprintln(o.IOStreams.Out, "No cluster found")
 		return nil
 	}
 

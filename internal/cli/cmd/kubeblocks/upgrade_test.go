@@ -88,14 +88,14 @@ var _ = Describe("kubeblocks", func() {
 		o := &InstallOptions{
 			Options: Options{
 				IOStreams: streams,
-				HelmCfg:   helm.FakeActionConfig(),
+				HelmCfg:   helm.NewFakeConfig(namespace),
 				Namespace: "default",
 				Client:    testing.FakeClientSet(mockDeploy()),
 				Dynamic:   testing.FakeDynamicClient(),
 			},
 			Version: version.DefaultKubeBlocksVersion,
 			Monitor: true,
-			check:   false,
+			Check:   false,
 		}
 		cmd := newUpgradeCmd(tf, streams)
 		_ = cmd.Flags().Set("monitor", "true")

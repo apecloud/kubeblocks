@@ -22,14 +22,12 @@ import (
 	"testing"
 	"time"
 
-	corev1 "k8s.io/api/core/v1"
-
-	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
-	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
-
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	"github.com/spf13/viper"
+	"go.uber.org/zap/zapcore"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/record"
@@ -39,15 +37,12 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	//+kubebuilder:scaffold:imports
-
-	"github.com/spf13/viper"
-	"go.uber.org/zap/zapcore"
-
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	"github.com/apecloud/kubeblocks/controllers/k8score"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/apecloud/kubeblocks/internal/testutil"
+	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 )
 
 // These tests use Ginkgo (BDD-style Go testing framework). Refer to
@@ -102,7 +97,7 @@ var _ = BeforeSuite(func() {
 	err = appsv1alpha1.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
 
-	//+kubebuilder:scaffold:scheme
+	// +kubebuilder:scaffold:scheme
 
 	k8sClient, err = client.New(cfg, client.Options{Scheme: scheme.Scheme})
 	Expect(err).NotTo(HaveOccurred())
@@ -167,7 +162,6 @@ func initOperationsResources(clusterDefinitionName,
 				Phase: appsv1alpha1.RunningPhase,
 			},
 		}
-		clusterObject.Status.Operations = &appsv1alpha1.Operations{}
 	})).Should(Succeed())
 	opsRes.Cluster = clusterObject
 	return opsRes, clusterDef, clusterObject

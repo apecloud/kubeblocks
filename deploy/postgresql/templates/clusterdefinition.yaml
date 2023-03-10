@@ -1,7 +1,7 @@
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: ClusterDefinition
 metadata:
-  name: postgresql
+  name: postgresql-cluster
   labels:
     {{- include "postgresql.labels" . | nindent 4 }}
 spec:
@@ -12,8 +12,8 @@ spec:
     host: "$(SVC_FQDN)"
     port: "$(SVC_PORT_tcp-postgresql)"
   componentDefs:
-    - name: postgresql
-      workloadType: Stateful
+    - name: pg-replicaset
+      workloadType: Replication
       characterType: postgresql
       probes:
       monitor:
@@ -55,6 +55,9 @@ spec:
           - name: http-metrics-postgresql
             port: 9187
             targetPort: http-metrics
+      volumeTypes:
+        - name: data
+          type: data
       podSpec:
         securityContext:
           fsGroup: 1001
@@ -75,7 +78,8 @@ spec:
             ports:
               - name: tcp-postgresql
                 containerPort: 5432
-           
+            command:
+              - /scripts/setup.sh
             livenessProbe:
               failureThreshold: 6
               initialDelaySeconds: 30
@@ -115,6 +119,11 @@ spec:
                   secretKeyRef:
                     name: $(CONN_CREDENTIAL_SECRET_NAME)
                     key: username
+              - name: PGPASSWORD
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: postgres-password
               # Authentication
               - name: POSTGRES_USER
                 valueFrom:
@@ -162,10 +171,6 @@ spec:
               {{- if .Values.primary.extraEnvVars }}
               {{- include "tplvalues.render" (dict "value" .Values.primary.extraEnvVars "context" $) | nindent 12 }}
               {{- end }}
-            lifecycle:
-              postStart:
-                exec:
-                  command: ["/scripts/post_start.sh"]
             {{- if or .Values.primary.extraEnvVarsCM .Values.primary.extraEnvVarsSecret }}
             envFrom:
               {{- if .Values.primary.extraEnvVarsCM }}
@@ -214,7 +219,7 @@ spec:
               timeoutSeconds: 5
               httpGet:
                 path: /
-                port: http-metrics        
+                port: http-metrics
             readinessProbe:
               failureThreshold: 6
               initialDelaySeconds: 5
@@ -230,7 +235,7 @@ spec:
         volumes:
           - name: dshm
             emptyDir:
-              medium: Memory       
+              medium: Memory
               {{- with .Values.shmVolume.sizeLimit }}
               sizeLimit: {{ . }}
               {{- end }}
@@ -276,20 +281,20 @@ spec:
             provisionPolicy:
               type: CreateByStmt
               scope: AnyPods
-              statements:        
+              statements:
                 creation: CREATE USER $(USERNAME) WITH PASSWORD '$(PASSWD)';  GRANT pg_monitor TO $(USERNAME);
                 deletion: DROP USER IF EXISTS $(USERNAME);
           - name: kbmonitoring
             provisionPolicy:
               type: CreateByStmt
               scope: AnyPods
-              statements:        
+              statements:
                 creation: CREATE USER $(USERNAME) WITH PASSWORD '$(PASSWD)';  GRANT pg_monitor TO $(USERNAME);
                 deletion: DROP USER IF EXISTS $(USERNAME);
           - name: kbreplicator
             provisionPolicy:
               type: CreateByStmt
               scope: AnyPods
-              statements:        
+              statements:
                 creation: CREATE USER $(USERNAME) WITH REPLICATION PASSWORD '$(PASSWD)';
                 deletion: DROP USER IF EXISTS $(USERNAME);                     

@@ -25,3 +25,12 @@ spec:
 
   installable:
     autoInstall: {{ get ( get ( .Values | toYaml | fromYaml ) "csi-s3" ) "enabled" }}
+    selectors:
+      - key: KubeGitVersion
+        operator: Contains
+        values:
+          - eks
+          - ack
+          - gke
+          - tke
+          - ask

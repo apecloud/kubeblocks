@@ -47,13 +47,11 @@ kbcli cluster expose ${cluster-name} --type internet --enable=false
 ##Procedure 5. For temporary use, the client can connect to the database using an IP address if they are outside the Kubernetes cluster but in the same VPC
 A domain name is not required. The KubeBlocks floating IP can be utilized for accessing the database. 
 Enabling the kubeblocks load balancer feature is necessary to use this functionality. However, the availability of this feature differs across various cloud providers, as detailed below:
-｜ Cloud Vendor  | Kuebrnetes ｜ Available ｜Remarks ｜
-｜------------- | ------------- ｜ ------------- ｜ ------------- ｜
-AWS  | EKS ｜ ✅ ｜- The loadbalancer will request ENI (Elastic Network Interface) and PrivateIP resources. The number of ENIs that a single machine can support and the number of PrivateIPs that an ENI can mount are dependent on the VM size, with larger VM sizes having larger quotas. Refer to：https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/using-eni.html#AvailableIpPerENI
-- The load balancer will request a Route 53 DNS domain name for the database cluster, which incurs certain costs. Refer to: https://aws.amazon.com/route53/pricing/
-- The loadbalancer ensures that the instance domain name is stable, but when the instance switches across availability zones, the IP bound to the domain name may change. Please check your client and set a reasonable DNS cache time based on business tolerance.｜
-Azure  | AKS ｜ ❌｜
-GCP | GKE ｜ ❌｜
+| Cloud Vendor  | Kuebrnetes | Available | Remarks |
+|------------- | ------------- | ------------- | ------------- |
+| AWS  | EKS | ✅ | The loadbalancer will request ENI (Elastic Network Interface) and PrivateIP resources. The number of ENIs that a single machine can support and the number of PrivateIPs that an ENI can mount are dependent on the VM size, with larger VM sizes having larger quotas. Refer to：https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/using-eni.html#AvailableIpPerENI<br>The load balancer will request a Route 53 DNS domain name for the database cluster, which incurs certain costs. Refer to: https://aws.amazon.com/route53/pricing/<br>The loadbalancer ensures that the instance domain name is stable, but when the instance switches across availability zones, the IP bound to the domain name may change. Please check your client and set a reasonable DNS cache time based on business tolerance.|
+| Azure | AKS | ❌|- |
+| GCP | GKE | ❌|-|
 
 
 **Steps：**

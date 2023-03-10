@@ -49,7 +49,7 @@ func TestOperations(t *testing.T) {
 		},
 	}
 	metadata.Properties["url"] = "user=postgres password=docker host=localhost port=5432 dbname=postgres pool_min_conns=1 pool_max_conns=10"
-	pgOps.Init(metadata)
+	_ = pgOps.Init(metadata)
 	assert.Equal(t, "postgres", pgOps.DBType)
 	assert.NotNil(t, pgOps.InitIfNeed)
 	assert.NotNil(t, pgOps.GetRole)
@@ -79,7 +79,7 @@ func TestPostgresIntegration(t *testing.T) {
 		t.Fatal(err)
 	}
 	assert.True(t, b.InitIfNeed())
-	b.InitDelay()
+	_ = b.InitDelay()
 	assert.False(t, b.InitIfNeed())
 
 	// create table

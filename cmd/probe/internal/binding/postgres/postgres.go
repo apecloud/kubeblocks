@@ -31,8 +31,6 @@ import (
 
 // List of operations.
 const (
-	closeOperation bindings.OperationKind = "close"
-
 	connectionURLKey = "url"
 	commandSQLKey    = "sql"
 )
@@ -72,8 +70,8 @@ func (pgOps *PostgresOperations) Init(metadata bindings.Metadata) error {
 	pgOps.BaseOperations.GetRole = pgOps.GetRole
 	pgOps.DBPort = pgOps.GetRunningPort()
 	pgOps.RegisterOperation(GetRoleOperation, pgOps.GetRoleOps)
-	//pgOps.RegisterOperation(GetLagOperation, pgOps.GetLagOps)
-	//pgOps.RegisterOperation(CheckStatusOperation, pgOps.CheckStatusOps)
+	// pgOps.RegisterOperation(GetLagOperation, pgOps.GetLagOps)
+	// pgOps.RegisterOperation(CheckStatusOperation, pgOps.CheckStatusOps)
 	pgOps.RegisterOperation(ExecOperation, pgOps.ExecOps)
 	pgOps.RegisterOperation(QueryOperation, pgOps.QueryOps)
 	return nil

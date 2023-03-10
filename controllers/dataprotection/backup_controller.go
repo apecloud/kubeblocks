@@ -399,7 +399,7 @@ func (r *BackupReconciler) createVolumeSnapshot(
 		return err
 	}
 
-	// fetch data-pvc by fixed labels: "kubeblocks.io/data-type=data"
+	// fetch data-pvc by fixed labels: "kubeblocks.io/volume-type=data"
 	dataPVC := corev1.PersistentVolumeClaimList{}
 	dataPVCLabels := backupPolicy.Spec.Target.LabelsSelector.MatchLabels
 	dataPVCLabels[constant.VolumeTypeLabelKey] = string(appsv1alpha1.VolumeTypeData)
@@ -408,10 +408,7 @@ func (r *BackupReconciler) createVolumeSnapshot(
 		client.MatchingLabels(dataPVCLabels)); err != nil {
 		return err
 	}
-	if len(dataPVC.Items) == 0 {
-		return fmt.Errorf("can not find any persistent volume to backup")
-	}
-	if len(dataPVC.Items) > 1 {
+	if len(dataPVC.Items) != 1 {
 		names := make([]string, 0)
 		for _, i := range dataPVC.Items {
 			names = append(names, i.Name)

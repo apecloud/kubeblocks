@@ -35,6 +35,7 @@ import (
 	"k8s.io/kubectl/pkg/util/templates"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/create"
 	"github.com/apecloud/kubeblocks/internal/cli/delete"
 	"github.com/apecloud/kubeblocks/internal/cli/list"
@@ -84,6 +85,7 @@ type CreateBackupPolicyOptions struct {
 	TTL              string `json:"ttl,omitempty"`
 	ConnectionSecret string `json:"connectionSecret,omitempty"`
 	PolicyTemplate   string `json:"policyTemplate,omitempty"`
+	Role             string `json:"role,omitempty"`
 	create.BaseOptions
 }
 
@@ -173,12 +175,17 @@ func (o *CreateBackupOptions) Validate() error {
 	if err != nil {
 		return err
 	}
+	role, err := o.getClusterRole()
+	if err != nil {
+		return err
+	}
 	// apply backup policy
 	policyOptions := CreateBackupPolicyOptions{
 		TTL:              o.TTL,
 		ClusterName:      o.Name,
 		ConnectionSecret: connectionSecret,
 		PolicyTemplate:   backupPolicyTemplate,
+		Role:             role,
 		BaseOptions:      o.BaseOptions,
 	}
 	policyOptions.Name = "backup-policy-" + o.Namespace + "-" + o.Name
@@ -243,6 +250,41 @@ func (o *CreateBackupOptions) getDefaultBackupPolicyTemplate() (string, error) {
 		return "", fmt.Errorf("not found any backupPolicyTemplate for cluster %s", o.Name)
 	}
 	return objs.Items[0].GetName(), nil
+}
+
+func (o *CreateBackupOptions) getClusterRole() (string, error) {
+	clusterObj, err := o.Client.Resource(types.ClusterGVR()).Namespace(o.Namespace).Get(context.TODO(), o.Name, metav1.GetOptions{})
+	if err != nil {
+		return "", err
+	}
+	cluster := appsv1alpha1.Cluster{}
+	err = runtime.DefaultUnstructuredConverter.
+		FromUnstructured(clusterObj.UnstructuredContent(), &cluster)
+	if err != nil {
+		return "", err
+	}
+	clusterDefObj, err := o.Client.Resource(types.ClusterDefGVR()).Get(context.TODO(), cluster.Spec.ClusterDefRef, metav1.GetOptions{})
+	if err != nil {
+		return "", err
+	}
+	clusterDef := appsv1alpha1.ClusterDefinition{}
+	err = runtime.DefaultUnstructuredConverter.
+		FromUnstructured(clusterDefObj.UnstructuredContent(), &clusterDef)
+	if err != nil {
+		return "", err
+	}
+	switch clusterDef.Spec.ComponentDefs[0].WorkloadType {
+	case appsv1alpha1.Replication:
+		if o.BackupType == string(dpv1alpha1.BackupTypeSnapshot) {
+			return "primary", nil
+		}
+		return "secondary", nil
+	default:
+		if o.BackupType == string(dpv1alpha1.BackupTypeSnapshot) {
+			return "leader", nil
+		}
+		return "follower", nil
+	}
 }
 
 func NewCreateBackupCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {

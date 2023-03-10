@@ -41,10 +41,10 @@ svc: {
 	"metadata": {
 		namespace: cluster.metadata.namespace
 		if service.metadata.name != _|_ {
-			name:      "\(cluster.metadata.name)-\(component.name)-\(service.metadata.name)"
+			name: "\(cluster.metadata.name)-\(component.name)-\(service.metadata.name)"
 		}
 		if service.metadata.name == _|_ {
-			name:      "\(cluster.metadata.name)-\(component.name)"
+			name: "\(cluster.metadata.name)-\(component.name)"
 		}
 		labels: {
 			"app.kubernetes.io/name":            "\(component.clusterDefName)"

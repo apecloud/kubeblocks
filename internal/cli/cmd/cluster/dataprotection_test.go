@@ -68,9 +68,10 @@ var _ = Describe("DataProtection", func() {
 		})
 
 		It("run backup command", func() {
+			clusterDef := testing.FakeClusterDef()
 			cluster := testing.FakeCluster(testing.ClusterName, testing.Namespace)
 			clusterDefLabel := map[string]string{
-				intctrlutil.ClusterDefLabelKey: "apecloud-mysql",
+				intctrlutil.ClusterDefLabelKey: clusterDef.Name,
 			}
 			cluster.SetLabels(clusterDefLabel)
 
@@ -78,7 +79,7 @@ var _ = Describe("DataProtection", func() {
 			template.SetLabels(clusterDefLabel)
 
 			secrets := testing.FakeSecrets(testing.Namespace, testing.ClusterName)
-			tf.FakeDynamicClient = fake.NewSimpleDynamicClient(scheme.Scheme, &secrets.Items[0], cluster, template)
+			tf.FakeDynamicClient = fake.NewSimpleDynamicClient(scheme.Scheme, &secrets.Items[0], cluster, clusterDef, template)
 			cmd := NewCreateBackupCmd(tf, streams)
 			Expect(cmd).ShouldNot(BeNil())
 			// must succeed otherwise exit 1 and make test fails
@@ -153,17 +154,17 @@ var _ = Describe("DataProtection", func() {
 		clusterName := "source-cluster-" + timestamp
 		newClusterName := "new-cluster-" + timestamp
 		secrets := testing.FakeSecrets(testing.Namespace, clusterName)
-		clusterDefLabel := map[string]string{
-			intctrlutil.ClusterDefLabelKey: "apecloud-mysql",
-		}
-
+		clusterDef := testing.FakeClusterDef()
 		cluster := testing.FakeCluster(clusterName, testing.Namespace)
+		clusterDefLabel := map[string]string{
+			intctrlutil.ClusterDefLabelKey: clusterDef.Name,
+		}
 		cluster.SetLabels(clusterDefLabel)
 
 		template := testing.FakeBackupPolicyTemplate()
 		template.SetLabels(clusterDefLabel)
 
-		tf.FakeDynamicClient = fake.NewSimpleDynamicClient(scheme.Scheme, &secrets.Items[0], cluster, template)
+		tf.FakeDynamicClient = fake.NewSimpleDynamicClient(scheme.Scheme, &secrets.Items[0], clusterDef, cluster, template)
 		// create backup
 		cmd := NewCreateBackupCmd(tf, streams)
 		Expect(cmd).ShouldNot(BeNil())

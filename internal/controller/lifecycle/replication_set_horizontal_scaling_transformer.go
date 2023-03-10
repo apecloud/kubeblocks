@@ -17,6 +17,9 @@ limitations under the License.
 package lifecycle
 
 import (
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/constant"
+	"github.com/apecloud/kubeblocks/internal/controller/component"
 	appsv1 "k8s.io/api/apps/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -32,6 +35,13 @@ type rplSetHorizontalScalingTransformer struct {
 }
 
 func (r *rplSetHorizontalScalingTransformer) Transform(dag *graph.DAG) error {
+	hasScaling, err := r.hasReplicationSetHScaling()
+	if err != nil {
+		return err
+	}
+	if !hasScaling {
+		return nil
+	}
 	vertices, err := findAll[*appsv1.StatefulSet](dag)
 	if err != nil {
 		return err
@@ -47,4 +57,60 @@ func (r *rplSetHorizontalScalingTransformer) Transform(dag *graph.DAG) error {
 	}
 
 	return nil
+}
+
+// TODO: fix stale cache problem
+// TODO: if sts created in last reconcile-loop not present in cache, hasReplicationSetHScaling return false positive
+func (r *rplSetHorizontalScalingTransformer) hasReplicationSetHScaling() (bool, error) {
+	stsList, err := r.listAllStsOwnedByCluster()
+	if err != nil {
+		return false, err
+	}
+	if len(stsList) == 0 {
+		return false, err
+	}
+
+	clusterCompSpecMap := r.cc.cluster.GetDefNameMappingComponents()
+	clusterCompVerMap := r.cc.cv.GetDefNameMappingComponents()
+	for _, compDef := range r.cc.cd.Spec.ComponentDefs {
+		if compDef.WorkloadType != appsv1alpha1.Replication {
+			continue
+		}
+		compDefName := compDef.Name
+		compVer := clusterCompVerMap[compDefName]
+		compSpecs := clusterCompSpecMap[compDefName]
+		for _, compSpec := range compSpecs {
+			comp := component.BuildComponent(r.ctx, *r.cc.cluster, r.cc.cd, compDef, compSpec, compVer)
+			compSts := filterStsOwnedByComp(stsList, comp.Name)
+			if len(compSts) != int(comp.Replicas) {
+				return true, nil
+			}
+		}
+	}
+
+	return false, nil
+}
+
+func filterStsOwnedByComp(list []appsv1.StatefulSet, compName string) []appsv1.StatefulSet {
+	sts := make([]appsv1.StatefulSet, 0)
+	for _, s := range list {
+		if s.Labels[constant.KBAppComponentLabelKey] == compName {
+			sts = append(sts, s)
+		}
+	}
+	return sts
+}
+
+func (r *rplSetHorizontalScalingTransformer) listAllStsOwnedByCluster() ([]appsv1.StatefulSet, error) {
+	stsList := &appsv1.StatefulSetList{}
+	if err := r.cli.List(r.ctx.Ctx, stsList,
+		client.MatchingLabels{constant.AppInstanceLabelKey: r.cc.cluster.Name},
+		client.InNamespace(r.cc.cluster.Namespace)); err != nil {
+		return nil, err
+	}
+	allSts := make([]appsv1.StatefulSet, 0)
+	for _, item := range stsList.Items {
+		allSts = append(allSts, item)
+	}
+	return allSts, nil
 }

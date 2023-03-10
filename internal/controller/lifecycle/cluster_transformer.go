@@ -18,7 +18,7 @@ package lifecycle
 
 import (
 	"encoding/json"
-
+	"reflect"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -97,13 +97,33 @@ func (c *clusterTransformer) Transform(dag *graph.DAG) error {
 		}
 	}
 
+	// replication set will create duplicate env configmap and headless service
+	// dedup them
+	objects := deDupResources(*task.Resources)
 	// now task.Resources to DAG vertices
-	for _, object := range *task.Resources {
+	for _, object := range objects {
 		vertex := &lifecycleVertex{obj: object}
 		dag.AddVertex(vertex)
 		dag.Connect(rootVertex, vertex)
 	}
 	return nil
+}
+
+func deDupResources(resources []client.Object) []client.Object {
+	objects := make([]client.Object, 0)
+	for _, resource := range resources {
+		contains := false
+		for _, object := range objects {
+			if reflect.DeepEqual(resource, object) {
+				contains = true
+				break
+			}
+		}
+		if !contains {
+			objects = append(objects, resource)
+		}
+	}
+	return objects
 }
 
 func prepareConnCredential(task *intctrltypes.ReconcileTask) error {

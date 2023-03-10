@@ -193,12 +193,27 @@ func injectEnvs(params BuilderParams, envConfigName string, c *corev1.Container)
 	})
 }
 
-// buildPersistentVolumeClaimLabels builds a pvc name label, and synchronize the labels on the sts to the pvc labels.
-func buildPersistentVolumeClaimLabels(sts *appsv1.StatefulSet, pvc *corev1.PersistentVolumeClaim) {
+// BuildPersistentVolumeClaimLabels builds a pvc name label, and synchronize the labels on the sts to the pvc labels.
+func BuildPersistentVolumeClaimLabels(sts *appsv1.StatefulSet, pvc *corev1.PersistentVolumeClaim,
+	component *component.SynthesizedComponent, pvcTplName string) {
+	// strict args checking.
+	if sts == nil || pvc == nil || component == nil {
+		return
+	}
 	if pvc.Labels == nil {
 		pvc.Labels = make(map[string]string)
 	}
-	pvc.Labels[constant.VolumeClaimTemplateNameLabelKey] = pvc.Name
+	pvc.Labels[constant.VolumeClaimTemplateNameLabelKey] = pvcTplName
+
+	if component.VolumeTypes != nil {
+		for _, t := range component.VolumeTypes {
+			if t.Name == pvcTplName {
+				pvc.Labels[constant.VolumeTypeLabelKey] = string(t.Type)
+				break
+			}
+		}
+	}
+
 	for k, v := range sts.Labels {
 		if _, ok := pvc.Labels[k]; !ok {
 			pvc.Labels[k] = v
@@ -255,7 +270,7 @@ func BuildSts(reqCtx intctrlutil.RequestCtx, params BuilderParams, envConfigName
 	// update sts.spec.volumeClaimTemplates[].metadata.labels
 	if len(sts.Spec.VolumeClaimTemplates) > 0 && len(sts.GetLabels()) > 0 {
 		for index, vct := range sts.Spec.VolumeClaimTemplates {
-			buildPersistentVolumeClaimLabels(&sts, &vct)
+			BuildPersistentVolumeClaimLabels(&sts, &vct, params.Component, vct.Name)
 			sts.Spec.VolumeClaimTemplates[index] = vct
 		}
 	}

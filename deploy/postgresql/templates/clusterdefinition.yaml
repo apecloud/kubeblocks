@@ -55,6 +55,9 @@ spec:
           - name: http-metrics-postgresql
             port: 9187
             targetPort: http-metrics
+      volumeTypes:
+        - name: data
+          type: data
       podSpec:
         securityContext:
           fsGroup: 1001

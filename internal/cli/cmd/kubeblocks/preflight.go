@@ -14,14 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package troubleshoot
+package kubeblocks
 
 import (
 	"context"
+	"embed"
 	"fmt"
 	"os"
 	"os/signal"
-	"time"
 
 	"github.com/ahmetalpbalkan/go-cursor"
 	"github.com/fatih/color"
@@ -29,9 +29,9 @@ import (
 	analyze "github.com/replicatedhq/troubleshoot/pkg/analyze"
 	"github.com/replicatedhq/troubleshoot/pkg/preflight"
 	"github.com/spf13/cobra"
-	"github.com/tj/go-spin"
 	"golang.org/x/sync/errgroup"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/client-go/rest"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
 
@@ -53,15 +53,29 @@ const (
 	flagOutput                    = "output"
 	flagDebug                     = "debug"
 	flagNamespace                 = "namespace"
+	flagVerbose                   = "verbose"
 )
 
 var (
-	preflightExample = templates.Examples(`
-		# Run preflight checks against the customized rules of preflight-check.yaml
-		kbcli troubleshoot preflight preflight-check.yaml
+	//go:embed data/*
+	defaultVendorYamlData embed.FS
+	preflightExample      = templates.Examples(`
+		# Run preflight provider checks against the default rules automatically
+		kbcli kubeblocks preflight
 
-		# Run preflight checks and display AnalyzeResults with non-interactive mode
-		kbcli troubleshoot preflight preflight-check.yaml --interactive=false`)
+		# Run preflight provider checks and output more verbose info
+		kbcli kubeblocks preflight --verbose
+
+		# Run preflight checks against the customized rules of preflight-check.yaml
+		kbcli kubeblocks preflight preflight-check.yaml
+
+		# Run preflight checks and display AnalyzeResults with interactive mode
+		kbcli kubeblocks preflight preflight-check.yaml --interactive=true`)
+)
+
+const (
+	EKSHostPreflight = "data/eks_hostpreflight.yaml"
+	EKSPreflight     = "data/eks_preflight.yaml"
 )
 
 // PreflightOptions declares the arguments accepted by the preflight command
@@ -69,8 +83,10 @@ type PreflightOptions struct {
 	factory cmdutil.Factory
 	genericclioptions.IOStreams
 	*preflight.PreflightFlags
-	yamlCheckFiles []string
-	namespace      string
+	checkFileList []string
+	checkYamlData [][]byte
+	namespace     string
+	verbose       bool
 }
 
 func NewPreflightCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
@@ -84,14 +100,14 @@ func NewPreflightCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *co
 		Short:   "Run and retrieve preflight checks for KubeBlocks",
 		Example: preflightExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			util.CheckErr(p.complete(args))
+			util.CheckErr(p.complete(f, args))
 			util.CheckErr(p.validate())
 			util.CheckErr(p.run())
 		},
 	}
 	// add flags
-	cmd.Flags().BoolVar(p.Interactive, flagInteractive, false, "interactive preflights, default is false")
-	cmd.Flags().StringVar(p.Format, flagFormat, *p.Format, "output format, one of human, json, yaml. only used when interactive is set to false")
+	cmd.Flags().BoolVar(p.Interactive, flagInteractive, false, "interactive preflights, default value is false")
+	cmd.Flags().StringVar(p.Format, flagFormat, "yaml", "output format, one of human, json, yaml. only used when interactive is set to false, default format is yaml")
 	cmd.Flags().StringVar(p.CollectorImage, flagCollectorImage, *p.CollectorImage, "the full name of the collector image to use")
 	cmd.Flags().StringVar(p.CollectorPullPolicy, flagCollectorPullPolicy, *p.CollectorPullPolicy, "the pull policy of the collector image")
 	cmd.Flags().BoolVar(p.CollectWithoutPermissions, flagCollectWithoutPermissions, *p.CollectWithoutPermissions, "always run preflight checks even if some require permissions that preflight does not have")
@@ -101,11 +117,52 @@ func NewPreflightCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *co
 	cmd.Flags().StringVarP(p.Output, flagOutput, *p.Output, "", "specify the output file path for the preflight checks")
 	cmd.Flags().BoolVar(p.Debug, flagDebug, *p.Debug, "enable debug logging")
 	cmd.Flags().StringVarP(&p.namespace, flagNamespace, "n", "", "If present, the namespace scope for this CLI request")
+	cmd.Flags().BoolVar(&p.verbose, flagVerbose, p.verbose, "print more verbose logs, default value is false")
 	return cmd
 }
 
-func (p *PreflightOptions) complete(args []string) error {
-	p.yamlCheckFiles = args
+func LoadVendorCheckYaml(vendorName util.K8sProvider) ([][]byte, error) {
+	var yamlDataList [][]byte
+	switch vendorName {
+	case util.EKSProvider:
+		if data, err := defaultVendorYamlData.ReadFile(EKSHostPreflight); err == nil {
+			yamlDataList = append(yamlDataList, data)
+		}
+		if data, err := defaultVendorYamlData.ReadFile(EKSPreflight); err == nil {
+			yamlDataList = append(yamlDataList, data)
+		}
+	case util.UnknownProvider:
+		fallthrough
+	default:
+		fmt.Println("unsupported k8s provider, and the validation of provider will coming soon")
+		return yamlDataList, errors.New("no supported provider")
+	}
+	return yamlDataList, nil
+}
+
+func (p *PreflightOptions) complete(factory cmdutil.Factory, args []string) error {
+	// default no args, and run default validating vendor
+	if len(args) == 0 {
+		clientSet, err := factory.KubernetesClientSet()
+		if err != nil {
+			return errors.New("init k8s client failed, and please check kubeconfig")
+		}
+		versionInfo, err := util.GetVersionInfo(clientSet)
+		if err != nil {
+			return errors.New("get k8s version of server failed, and please check your k8s accessibility")
+		}
+		vendorName := util.GetK8sProvider(versionInfo[util.KubernetesApp])
+		p.checkYamlData, err = LoadVendorCheckYaml(vendorName)
+		if err != nil {
+			return err
+		}
+		color.New(color.FgCyan).Printf("current provider %s. collecting and analyzing data will take 10-20 seconds...  \n", vendorName)
+	} else {
+		p.checkFileList = args
+		color.New(color.FgCyan).Println("collecting and analyzing data will take 10-20 seconds...")
+	}
+	// conceal warning logs
+	rest.SetDefaultWarningHandler(rest.NoWarnings{})
 	go func() {
 		signalChan := make(chan os.Signal, 1)
 		signal.Notify(signalChan, os.Interrupt)
@@ -116,7 +173,7 @@ func (p *PreflightOptions) complete(args []string) error {
 }
 
 func (p *PreflightOptions) validate() error {
-	if len(p.yamlCheckFiles) < 1 {
+	if len(p.checkFileList) < 1 && len(p.checkYamlData) < 1 {
 		return fmt.Errorf("must specify at least one checks yaml")
 	}
 	return nil
@@ -142,13 +199,9 @@ func (p *PreflightOptions) run() error {
 	ctx, cancelFunc := context.WithCancel(context.Background())
 	defer cancelFunc()
 	progressCollections, ctx := errgroup.WithContext(ctx)
-	if *p.Interactive {
-		progressCollections.Go(CollectInteractiveProgress(ctx, progressCh))
-	} else {
-		progressCollections.Go(CollectNonInteractiveProgress(ctx, progressCh))
-	}
+	progressCollections.Go(CollectProgress(ctx, progressCh, p.verbose))
 	// 1. load yaml
-	if kbPreflight, kbHostPreflight, preflightName, err = kbpreflight.LoadPreflightSpec(p.yamlCheckFiles); err != nil {
+	if kbPreflight, kbHostPreflight, preflightName, err = kbpreflight.LoadPreflightSpec(p.checkFileList, p.checkYamlData); err != nil {
 		return err
 	}
 	// 2. collect data
@@ -171,52 +224,24 @@ func (p *PreflightOptions) run() error {
 	if *p.Interactive {
 		return kbinteractive.ShowInteractiveResults(preflightName, analyzeResults, *p.Output)
 	} else {
-		return kbpreflight.ShowStdoutResults(preflightName, analyzeResults, *p.Format)
+		return kbpreflight.ShowTextResults(preflightName, analyzeResults, *p.Format, p.verbose)
 	}
 }
 
-func CollectInteractiveProgress(ctx context.Context, progressCh <-chan interface{}) func() error {
+func CollectProgress(ctx context.Context, progressCh <-chan interface{}, verbose bool) func() error {
 	return func() error {
-		spinner := spin.New()
-		lastMsg := ""
-		errorTxt := color.New(color.FgHiRed)
-		infoTxt := color.New(color.FgCyan)
-
 		for {
 			select {
 			case msg := <-progressCh:
-				switch msg := msg.(type) {
-				case error:
-					errorTxt.Printf("%s\r * %v\n", cursor.ClearEntireLine(), msg)
-				case string:
-					if lastMsg == msg {
-						break
+				if verbose {
+					switch msg := msg.(type) {
+					case error:
+						fmt.Fprintf(os.Stderr, "error - %v\n", msg)
+					case string:
+						fmt.Fprintf(os.Stderr, "%s\n", msg)
+					case preflight.CollectProgress:
+						fmt.Fprintf(os.Stderr, "%s\n", msg.String())
 					}
-					lastMsg = msg
-					infoTxt.Printf("%s\r * %s\n", cursor.ClearEntireLine(), msg)
-				}
-			case <-time.After(time.Millisecond * 100):
-				fmt.Printf("\r  %s %s ", color.CyanString("Running Preflight Checks"), spinner.Next())
-			case <-ctx.Done():
-				fmt.Printf("\r%s\r", cursor.ClearEntireLine())
-				return nil
-			}
-		}
-	}
-}
-
-func CollectNonInteractiveProgress(ctx context.Context, progressCh <-chan interface{}) func() error {
-	return func() error {
-		for {
-			select {
-			case msg := <-progressCh:
-				switch msg := msg.(type) {
-				case error:
-					fmt.Fprintf(os.Stderr, "error - %v\n", msg)
-				case string:
-					fmt.Fprintf(os.Stderr, "%s\n", msg)
-				case preflight.CollectProgress:
-					fmt.Fprintf(os.Stderr, "%s\n", msg.String())
 				}
 			case <-ctx.Done():
 				return nil

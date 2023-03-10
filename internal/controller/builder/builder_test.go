@@ -278,6 +278,8 @@ var _ = Describe("builder", func() {
 			Expect(err).Should(BeNil())
 			Expect(sts).ShouldNot(BeNil())
 			Expect(*sts.Spec.Replicas).Should(Equal(int32(0)))
+			Expect(sts.Spec.VolumeClaimTemplates[0].Labels[constant.VolumeTypeLabelKey]).
+				Should(Equal(string(appsv1alpha1.VolumeTypeData)))
 			// test workload type replication
 			replComponent := *params.Component
 			replComponent.Replicas = 2

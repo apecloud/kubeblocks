@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package troubleshoot
+package kubeblocks
 
 import (
 	"net/http"
@@ -33,6 +33,7 @@ import (
 
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
+	"github.com/apecloud/kubeblocks/internal/cli/util"
 )
 
 var _ = Describe("Preflight API Test", func() {
@@ -57,7 +58,7 @@ var _ = Describe("Preflight API Test", func() {
 		}
 
 		tf.UnstructuredClient = &clientfake.RESTClient{
-			GroupVersion:         schema.GroupVersion{Group: types.Group, Version: types.Version},
+			GroupVersion:         schema.GroupVersion{Group: types.AppsAPIGroup, Version: types.AppsAPIVersion},
 			NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
 			Client: clientfake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 				if req.Method != "GET" {
@@ -88,10 +89,10 @@ var _ = Describe("Preflight API Test", func() {
 			IOStreams:      streams,
 			PreflightFlags: preflight.NewPreflightFlags(),
 		}
-		Expect(p.complete(nil)).Should(Succeed())
+		Expect(p.complete(tf, nil)).Should(HaveOccurred())
 		Expect(p.validate()).Should(HaveOccurred())
-		Expect(p.complete([]string{"file1", "file2"})).Should(Succeed())
-		Expect(len(p.yamlCheckFiles)).Should(Equal(2))
+		Expect(p.complete(tf, []string{"file1", "file2"})).Should(Succeed())
+		Expect(len(p.checkFileList)).Should(Equal(2))
 		Expect(p.validate()).Should(Succeed())
 	})
 
@@ -101,19 +102,31 @@ var _ = Describe("Preflight API Test", func() {
 			IOStreams:      streams,
 			PreflightFlags: preflight.NewPreflightFlags(),
 		}
-		p.yamlCheckFiles = []string{"../../testing/testdata/hostpreflight.yaml"}
-		By("non-interactive mode, and expect success")
 		*p.Interactive = false
+		*p.Format = "yaml"
+		p.checkFileList = []string{"../../testing/testdata/hostpreflight.yaml"}
+		By("non-interactive mode, and expect success")
 		Eventually(func(g Gomega) {
 			err := p.run()
 			g.Expect(err).NotTo(HaveOccurred())
 		}).Should(Succeed())
 		By("non-interactive mode, and expect error")
-		p.yamlCheckFiles = []string{"../../testing/testdata/hostpreflight_nil.yaml"}
-		*p.Interactive = false
+		p.checkFileList = []string{"../../testing/testdata/hostpreflight_nil.yaml"}
 		Eventually(func(g Gomega) {
 			err := p.run()
 			g.Expect(err).To(HaveOccurred())
 		}).Should(Succeed())
+	})
+
+	It("LoadVendorCheckYaml test, and expect fail", func() {
+		res, err := LoadVendorCheckYaml(util.UnknownProvider)
+		Expect(err).Should(HaveOccurred())
+		Expect(len(res)).Should(Equal(0))
+	})
+
+	It("LoadVendorCheckYaml test, and expect success", func() {
+		res, err := LoadVendorCheckYaml(util.EKSProvider)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(len(res)).Should(Equal(2))
 	})
 })

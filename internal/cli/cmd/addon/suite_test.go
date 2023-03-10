@@ -14,20 +14,16 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package troubleshoot
+package addon
 
 import (
-	"github.com/spf13/cobra"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
-	cmdutil "k8s.io/kubectl/pkg/cmd/util"
+	"testing"
+
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 )
 
-// NewTroubleshootCmd creates troubleshooting commands for kubeblocks.
-func NewTroubleshootCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "troubleshoot",
-		Short: "Troubleshooting for KubeBlocks",
-	}
-	cmd.AddCommand(NewPreflightCmd(f, streams))
-	return cmd
+func TestAppp(t *testing.T) {
+	RegisterFailHandler(Fail)
+	RunSpecs(t, "Addon Cmd Test Suite")
 }

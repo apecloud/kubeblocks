@@ -57,6 +57,7 @@ func BuildComponent(
 		EnabledLogs:           clusterCompSpec.EnabledLogs,
 		TLS:                   clusterCompSpec.TLS,
 		Issuer:                clusterCompSpec.Issuer,
+		VolumeTypes:           clusterCompDefObj.VolumeTypes,
 	}
 
 	// resolve component.ConfigTemplates

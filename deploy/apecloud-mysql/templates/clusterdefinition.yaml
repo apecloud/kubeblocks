@@ -58,6 +58,9 @@ spec:
         type: Snapshot
         backupTemplateSelector:
           "clusterdefinition.kubeblocks.io/name": apecloud-mysql
+      volumeTypes:
+        - name: data
+          type: data
       podSpec:
         containers:
           - name: mysql

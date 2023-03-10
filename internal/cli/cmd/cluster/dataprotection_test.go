@@ -17,6 +17,7 @@ limitations under the License.
 package cluster
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"time"
@@ -36,6 +37,7 @@ import (
 
 	"github.com/apecloud/kubeblocks/internal/cli/create"
 	"github.com/apecloud/kubeblocks/internal/cli/delete"
+	"github.com/apecloud/kubeblocks/internal/cli/list"
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
@@ -90,6 +92,7 @@ var _ = Describe("DataProtection", func() {
 			_ = cmd.Flags().Set("backup-type", "snapshot")
 			cmd.Run(cmd, []string{testing.ClusterName})
 		})
+
 	})
 
 	It("delete-backup", func() {
@@ -120,6 +123,21 @@ var _ = Describe("DataProtection", func() {
 	It("list-backup", func() {
 		cmd := NewListBackupCmd(tf, streams)
 		Expect(cmd).ShouldNot(BeNil())
+		By("test list-backup cmd with no backup")
+		tf.FakeDynamicClient = testing.FakeDynamicClient()
+		o := list.NewListOptions(tf, streams, types.BackupGVR())
+		Expect(printBackupList(o)).Should(Succeed())
+		Expect(o.ErrOut.(*bytes.Buffer).String()).Should(ContainSubstring("No backups found"))
+
+		By("test list-backup")
+		backup1 := testing.FakeBackup("test1")
+		backup1.Labels = map[string]string{
+			constant.AppInstanceLabelKey: "apecloud-mysql",
+		}
+		tf.FakeDynamicClient = testing.FakeDynamicClient(backup1)
+		Expect(printBackupList(o)).Should(Succeed())
+		Expect(o.Out.(*bytes.Buffer).String()).Should(ContainSubstring("test1"))
+		Expect(o.Out.(*bytes.Buffer).String()).Should(ContainSubstring("apecloud-mysql (deleted)"))
 	})
 
 	It("delete-restore", func() {

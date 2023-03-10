@@ -33,8 +33,8 @@ content: {
 	apiVersion: "apps.kubeblocks.io/v1alpha1"
 	kind:       "Cluster"
 	metadata: {
-		name:      options.name
-		namespace: options.namespace
+		name:        options.name
+		namespace:   options.namespace
 		annotations: options.annotations
 	}
 	spec: {

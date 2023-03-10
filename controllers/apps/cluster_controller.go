@@ -299,6 +299,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	// ---- start refactor ----
 	plan, err := lifecycle.NewClusterPlanBuilder(reqCtx, r.Client, cluster).Build()
 	if err != nil {
+		_ = clusterConditionMgr.setApplyResourcesFailedCondition(err)
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 	if err := plan.Execute(); err != nil {

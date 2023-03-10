@@ -186,7 +186,7 @@ func Confirm(names []string, in io.Reader) error {
 	}
 
 	entered, err := prompt.NewPrompt(fmt.Sprintf("You should type \"%s\"", strings.Join(names, " ")),
-		"Please type the name again(separate with white space when more than one):", in).GetInput()
+		"Please type the cluster name again(separate with white space when more than one):", in).GetInput()
 	if err != nil {
 		return err
 	}

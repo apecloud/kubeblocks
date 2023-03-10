@@ -379,6 +379,16 @@ const (
 	Secondaries SwitchStepRole = "Secondaries"
 )
 
+// VolumeType defines volume type for backup data or log.
+// +enum
+// +kubebuilder:validation:Enum={data,log}
+type VolumeType string
+
+const (
+	VolumeTypeData VolumeType = "data"
+	VolumeTypeLog  VolumeType = "log"
+)
+
 func RegisterWebhookManager(mgr manager.Manager) {
 	webhookMgr = &webhookManager{mgr.GetClient()}
 }

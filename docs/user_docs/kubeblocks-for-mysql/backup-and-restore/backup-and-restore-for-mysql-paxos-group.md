@@ -11,7 +11,7 @@ This section shows how to use `kbcli` to back up and restore a MySQL Paxos group
 
 - Prepare a clean EKS cluster, and install ebs csi driver plug-in, with at least one node and the memory of each node is not less than 4GB.
 - Install `kubectl` to ensure that you can connect to the EKS cluster 
-- Install `kbcli`. Refer to [Install kbcli and KubeBlocks](../../installation/installation.md) for details.
+- Install `kbcli`. Refer to [Install kbcli and KubeBlocks](./../../installation/installation.md) for details.
    ```bash
    curl -fsSL https://kubeblocks.io/installer/install_cli.sh | bash
    ```

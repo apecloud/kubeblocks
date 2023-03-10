@@ -4,10 +4,10 @@ description: How to monitor your database
 sidebar_position: 1
 ---
 
-# Observability of KubeBlocks
+# Observability of KubeBlocks 
 With the built-in database observability, you can observe the database health status and track and measure your database in real-time to optimize database performance. This section shows you how database observability works with KubeBlocks and how to use the function.
 
-## Monitor MySQL database 
+## Monitor PostgreSQL database
 KubeBlocks integrates open-source monitoring components such as Prometheus, AlertManager, and Granfana. KubeBlocks also uses open-source and customized Prometheus Exporter for exporting database indicators. The monitoring function is enabled by default when you install KubeBlocks and no other operation is required.
 
 ## Enable database monitor
@@ -15,7 +15,7 @@ KubeBlocks integrates open-source monitoring components such as Prometheus, Aler
 ***Steps:***
 
 1. Install monitor components.
-   If you didn't install KubeBlocks, monitoring components (Prometheus/AlertManager/Grafana) are installed by default with the installation of KubeBlocks. The installation command line is as follows, see detailed information in [Install KubeBlocks](../../installation/installation.md):
+   If you didn't install KubeBlocks, monitoring components (Prometheus/AlertManager/Grafana) are installed by default with the installation of KubeBlocks. The installation command line is as follows, see detailed information in [Install KubeBlocks](../../install_kbcli_kubeblocks/install_and_unistall_kbcli_and_kubeblocks.md):
    ```bash
    kbcli kubeblocks install
    ```
@@ -68,16 +68,17 @@ KubeBlocks integrates open-source monitoring components such as Prometheus, Aler
       ***Example***
 
       ```bash
-      kbcli cluster create mysql-cluster --cluster-definition='apecloud-mysql'
+      kbcli cluster create pg-cluster --cluster-definition='postgresql'
       ```
       > ***Note:*** 
       >
       > The setting of `monitor` is `true` by default and it is not recommended to disable it. For example,
       > ```bash
-      > kbcli cluster create mycluster --cluster-definition='apecloud-mysql' --monitor=false
+      > kbcli cluster create mycluster --cluster-definition='postgresql' --monitor=false
       > ```
     You can change the value to `false` to disable the monitor function if required.
    - For the existing cluster, you can update it to enable the monitor function with `update` command.
+
      ```bash
      kbcli cluster update <name> --monitor=true
      ```
@@ -85,7 +86,7 @@ KubeBlocks integrates open-source monitoring components such as Prometheus, Aler
      ***Example***
 
      ```bash
-     kbcli cluster update mysql-cluster --monitor=true
+     kbcli cluster update pg-cluster --monitor=true
      ```
 
 You can view the dashboard of the corresponding cluster via Grafana Web Console. For more detailed information, see [Grafana documentation](https://grafana.com/docs/grafana/latest/dashboards/).

@@ -1,33 +1,32 @@
 ---
-title: Backup and restore for MySQL standalone
-description: Guide for backup and restore for an ApeCloud MySQL standalone
+title: Backup and restore for MySQL Paxos group
+description: Guide for backup and restore for an ApeCloud MySQL Paxos group
 sidebar_position: 2
 ---
 
-# Backup and restore for MySQL standalone 
-This section shows how to use kbcli to back up and restore a MySQL standalone instance.
+# Backup and restore for MySQL Paxos group 
+This section shows how to use `kbcli` to back up and restore a MySQL Paxos group instance.
 
 ***Before you start***
 
 - Prepare a clean EKS cluster, and install ebs csi driver plug-in, with at least one node and the memory of each node is not less than 4GB.
-- Install kubectl to ensure that you can connect to the EKS cluster 
-- Install kbcli.
+- Install `kubectl` to ensure that you can connect to the EKS cluster 
+- Install `kbcli`. Refer to [Install kbcli and KubeBlocks](../../installation/installation.md) for details.
    ```bash
    curl -fsSL https://kubeblocks.io/installer/install_cli.sh | bash
    ```
 
 ***Steps:***
 
-1. Install KubeBlocks and enable snapshot backup.
-   Install KubeBlocks and enable the snapshot controller plugin.
+1. Install KubeBlocks and enable the snapshot backup controller addon.
    ```bash
    kbcli kubeblocks install --set snapshot-controller.enabled=true
    ```
-   To enable the snapshot controller plugin after installation.
+   If you have installed KubeBlocks without enabling the snapshot controller, you can run the command below to enable snapshot backup.
    ```bash
    kbcli kubeblocks upgrade --set snapshot-controller.enabled=true
    ```   
-   Since your kubectl is already connected to the EKS cluster, this command installs the latest version of KubeBlocks in your EKS environment.
+   Since your `kubectl` is already connected to the EKS cluster, this command installs the latest version of KubeBlocks in your EKS environment.
 
    Verify the installation with the following command.
    ```bash
@@ -41,7 +40,7 @@ This section shows how to use kbcli to back up and restore a MySQL standalone in
    kubeblocks-snapshot-controller-6b4f656c99-zgq7g   1/1     Running            0             9m
    ```
 2. Configure EKS to support the snapshot function.
-The backup is realized by the volume snapshot function, you need to configure EKS to support the snapshot function.
+   The backup is realized by the volume snapshot function, you need to configure EKS to support the snapshot function.
     - Configure the storage class of snapshot (the assigned ebs volume is gp3).
        ```bash
        kubectl create -f - <<EOF
@@ -76,10 +75,9 @@ The backup is realized by the volume snapshot function, you need to configure EK
   
        kubectl create -f snapshot_class.yaml
        ```
-3. Create a MySQL cluster. 
-   In this section, the example cluster created is mysql-cluster.
+3. Create a MySQL Paxos group. 
    ```bash
-   kbcli cluster create mysql-cluster --cluster-definition='apecloud-mysql'
+   kbcli cluster create mysql-cluster --cluster-definition='apecloud-mysql' --set replicas=3
    ```
 4. Insert test data to test backup.
    Connect to the MySQL cluster created in the previous steps and insert a piece of data. See the example below.
@@ -135,9 +133,3 @@ The backup is realized by the volume snapshot function, you need to configure EK
    ```bash
    kbcli cluster delete mysql-cluster
    ```
-
-
-
-
-
-

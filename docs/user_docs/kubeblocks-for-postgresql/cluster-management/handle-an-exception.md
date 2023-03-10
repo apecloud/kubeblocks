@@ -1,6 +1,6 @@
 ---
 title: Handle an exception
-description: How to handle an exception in a MySQL cluster
+description: How to handle an exception in a PostgreSQL cluster
 sidebar_position: 7
 ---
 
@@ -17,7 +17,7 @@ When there is an exception during your operation, you can perform the following 
    ***Example***
 
    ```bash
-   kbcli cluster list mysql-cluster
+   kbcli cluster list pg-cluster
    ```
 2. Handle the exception according to the status information.
 

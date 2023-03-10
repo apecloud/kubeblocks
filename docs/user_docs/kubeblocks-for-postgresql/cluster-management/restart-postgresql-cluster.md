@@ -1,10 +1,10 @@
 ---
-title: Restart MySQL cluster
-description: How to restart a MySQL cluster
+title: Restart PostgreSQL cluster
+description: How to restart a PostgreSQL cluster
 sidebar_position: 4
 ---
 
-# Restart MySQL cluster
+# Restart PostgreSQL cluster
 You can restart all pods of the cluster. When an exception occurs in a database, you can try to restart it.
 
 > ***Note:*** 
@@ -13,7 +13,7 @@ You can restart all pods of the cluster. When an exception occurs in a database,
 
 **How KubeBlocks restarts a cluster**
 
-![Restart a cluster](../../../img/mysql_cluster_restart.png)
+![Restart a cluster](../../../img/pgsql_cluster_restart.png)
 
 1. A user creates a restarting OpsRequest CR.
 2. This CR passes the webhook validation.
@@ -34,7 +34,7 @@ You can restart all pods of the cluster. When an exception occurs in a database,
    
    Configure the values of `component-names` and `ttlSecondsAfterSucceed` and run the command below to restart a specified cluster.
    ```bash
-   kbcli cluster restart NAME --component-names="mysql" \
+   kbcli cluster restart NAME --component-names="postgresql" \
    --ttlSecondsAfterSucceed=30
    ```
    - `component-names` describes the component name that needs to be restarted.
@@ -50,10 +50,10 @@ You can restart all pods of the cluster. When an exception occurs in a database,
    metadata:
      name: ops-restart
    spec:
-     clusterRef: mysql-cluster
+     clusterRef: pg-cluster
      type: Restart 
      restart:
-     - componentName: mysql
+     - componentName: postgresql
    EOF
    ```
 2. Validate the restarting.
@@ -67,8 +67,8 @@ You can restart all pods of the cluster. When an exception occurs in a database,
    ***Example***
 
      ```bash
-     kbcli cluster list mysql-cluster
+     kbcli cluster list pg-cluster
      >
-     NAME                 NAMESPACE        CLUSTER-DEFINITION        VERSION                TERMINATION-POLICY        STATUS         CREATED-TIME
-     mysql-cluster        default          apecloud-mysql            ac-mysql-8.0.30        Delete                    Running        Jan 29,2023 14:29 UTC+0800
+     NAME         NAMESPACE   CLUSTER-DEFINITION   VERSION             TERMINATION-POLICY   STATUS    CREATED-TIME
+     pg-cluster   default     postgresql           postgresql-14.7.0   Delete               Running   Mar 03,2023 18:28 UTC+0800
      ```

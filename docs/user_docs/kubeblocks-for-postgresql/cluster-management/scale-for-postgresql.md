@@ -1,11 +1,11 @@
 ---
-title: Scale for ApeCloud MySQL
-description: How to scale a MySQL cluster, horizontal scaling, vertical scaling
+title: Scale for PostgreSQL
+description: How to scale a MPostgreSQL cluster, horizontal scaling, vertical scaling
 sidebar_position: 2
 ---
 
-# Scale for ApeCloud MySQL
-You can scale ApeCloud MySQL DB instances in two ways, horizontal scaling and vertical scaling. 
+# Scale for PostgreSQL
+You can scale PostgreSQL DB instances in two ways, horizontal scaling and vertical scaling. 
 
 ## Vertical scaling
 You can vertically scale a cluster by changing resource requirements and limits (CPU and storage). For example, if you need to change the resource demand from 1C2G to 2C4G, vertical scaling is what you need.
@@ -16,7 +16,7 @@ You can vertically scale a cluster by changing resource requirements and limits 
 
 **How KubeBlocks vertically scales a cluster**
 
-![Vertical scaling](../../../img/mysql_cluster_vertical_scaling.png)
+![Vertical scaling](../../../img/pgsql_vertical_scaling.png)
 
 1. A user creates a vertical scaling OpsRequest CR (custom resources).
 2. This OpsRequest CR passes the webhook validation.
@@ -40,10 +40,10 @@ kbcli cluster list <name>
 ***Example***
 
 ```bash
-kbcli cluster list mysql-cluster
+kbcli cluster list pg-cluster
 >
-NAME                 NAMESPACE        CLUSTER-DEFINITION        VERSION                TERMINATION-POLICY        STATUS         CREATED-TIME
-mysql-cluster        default          apecloud-mysql            ac-mysql-8.0.30        Delete                    Running        Jan 29,2023 14:29 UTC+0800
+NAME         NAMESPACE   CLUSTER-DEFINITION   VERSION             TERMINATION-POLICY   STATUS    CREATED-TIME
+pg-cluster   default     postgresql           postgresql-14.7.0   Delete               Running   Mar 03,2023 18:00 UTC+0800
 ```
 ***Steps:***
 
@@ -56,8 +56,8 @@ mysql-cluster        default          apecloud-mysql            ac-mysql-8.0.30 
    ***Example***
    
    ```bash
-   kbcli cluster vscale mysql-cluster \
-   --component-names="mysql" \
+   kbcli cluster vscale pg-cluster \
+   --component-names="postgresql" \
    --requests.memory="2Gi" --requests.cpu="1" \
    --limits.memory="4Gi" --limits.cpu="2"
    ```
@@ -75,10 +75,10 @@ mysql-cluster        default          apecloud-mysql            ac-mysql-8.0.30 
    metadata:
      name: ops-vertical-scaling
    spec:
-     clusterRef: mysql-cluster
+     clusterRef: pg-cluster
      type: VerticalScaling 
      verticalScaling:
-     - componentName: mysql
+     - componentName: postgresql
        requests:
          memory: "2Gi"
          cpu: "1000m"
@@ -98,14 +98,14 @@ mysql-cluster        default          apecloud-mysql            ac-mysql-8.0.30 
    apiVersion: apps.kubeblocks.io/v1alpha1
    kind: Cluster
    metadata:
-     name: mysql-cluster
+     name: pg-cluster
      namespace: default
    spec:
-     clusterDefinitionRef: apecloud-mysql
-     clusterVersionRef: ac-mysql-8.0.30
+     clusterDefinitionRef: postgresql
+     clusterVersionRef: postgre-14.7.0
      components:
-     - name: mysql
-       type: mysql
+     - name: postgresql
+       type: postgresql
        replicas: 1
        resources: # Change the values of resources.
          requests:
@@ -134,10 +134,10 @@ mysql-cluster        default          apecloud-mysql            ac-mysql-8.0.30 
     ***Example***
 
     ```bash
-    kbcli cluster list mysql-cluster
+    kbcli cluster list pg-cluster
     >
-    NAME                 NAMESPACE        CLUSTER-DEFINITION        VERSION                TERMINATION-POLICY        STATUS          CREATED-TIME
-    mysql-cluster        default          apecloud-mysql            ac-mysql-8.0.30        Delete                    Updating        Jan 29,2023 14:29 UTC+0800
+    NAME              NAMESPACE        CLUSTER-DEFINITION    VERSION                TERMINATION-POLICY   STATUS    CREATED-TIME
+    pg-cluster        default          postgresql            postgresql-14.7.0      Delete               Running   Mar 03,2023 18:00 UTC+0800
     ```
    - STATUS=Running: means the vertical scaling operation is applied.
    - STATUS=Updating: means the vertical scaling is in progress.
@@ -149,7 +149,7 @@ Horizontal scaling changes the amount of pods. For example, you can apply horizo
 
 **How KubeBlocks horizontally scales a cluster**
 
-![Horizontal scaling](../../../img/mysql_cluster_horizontal_scaling.png)
+![Horizontal scaling](../../../img/pgsql_cluster_horizontal_scaling.png)
 
 1. A user creates a horizontal scaling OpsRequest CR.
 2. This CR passes the webhook validation.
@@ -165,7 +165,7 @@ Horizontal scaling changes the amount of pods. For example, you can apply horizo
 
 ***Before you start***
 
-* Refer to [Backup and restore for MySQL](../backup-and-restore/backup-and-restore-for-mysql-standalone.md) to make sure the EKS environment is configured properly since the horizontal scaling relies on the backup function.
+* Refer to [Backup and restore for PostgreSQL](../backup-and-restore/backup-and-restore-for-postgresql-standalone.md) to make sure the EKS environment is configured properly since the horizontal scaling relies on the backup function.
 * Run the command below to check whether the cluster STATUS is `Running`. Otherwise, the following operations may fail.
 
   ```bash
@@ -175,10 +175,10 @@ Horizontal scaling changes the amount of pods. For example, you can apply horizo
   ***Example***
 
   ```bash
-  kbcli cluster list mysql-cluster
+  kbcli cluster list pg-cluster
   >
-  NAME                 NAMESPACE        CLUSTER-DEFINITION        VERSION                TERMINATION-POLICY        STATUS         CREATED-TIME
-  mysql-cluster        default          apecloud-mysql            ac-mysql-8.0.30        Delete                    Running        Jan 29,2023 14:29 UTC+0800
+  NAME         NAMESPACE   CLUSTER-DEFINITION   VERSION             TERMINATION-POLICY   STATUS    CREATED-TIME
+  pg-cluster   default     postgresql           postgresql-14.7.0   Delete               Running   Mar 03,2023 18:00 UTC+0800
   ```
 
 ***Steps:***
@@ -192,8 +192,8 @@ Horizontal scaling changes the amount of pods. For example, you can apply horizo
    ***Example***
 
    ```bash
-   kbcli cluster hscale mysql-cluster \
-   --component-names="mysql" --replicas=3
+   kbcli cluster hscale pg-cluster \
+   --component-names="postgresql" --replicas=3
    ```
    - `--component-names` describes the component name ready for vertical scaling.
    - `--replicas` describe the replicas with the specified components.
@@ -209,10 +209,10 @@ Horizontal scaling changes the amount of pods. For example, you can apply horizo
    metadata:
      name: ops-horizontal-scaling
    spec:
-     clusterRef: mysql-cluster
+     clusterRef: pg-cluster
      type: HorizontalScaling
      horizontalScaling:
-     - componentName: mysql
+     - componentName: postgresql
        replicas: 3
    EOF
    ```
@@ -230,14 +230,14 @@ Horizontal scaling changes the amount of pods. For example, you can apply horizo
     apiVersion: apps.kubeblocks.io/v1alpha1
    kind: Cluster
    metadata:
-     name: mysql-cluster
+     name: pg-cluster
      namespace: default
    spec:
-     clusterDefinitionRef: apecloud-mysql
-     clusterVersionRef: ac-mysql-8.0.30
+     clusterDefinitionRef: postgresql
+     clusterVersionRef: postgresql-14.7.0
      components:
-     - name: mysql
-       type: mysql
+     - name: postgresql
+       type: postgresql
        replicas: 1 # Change the pod amount.
        volumeClaimTemplates:
        - name: data
@@ -252,7 +252,7 @@ Horizontal scaling changes the amount of pods. For example, you can apply horizo
 2. Validate the horizontal scaling operation.
    Run the command below to check the cluster STATUS to identify the horizontal scaling status.
    ```bash
-   kbcli cluster list mysql-cluster
+   kbcli cluster list pg-cluster
    ```
 
    * STATUS=Updating: means horizontal scaling is being applied.
@@ -265,8 +265,8 @@ In the example below, a snapshot exception occurs.
 ```
 Status:
   conditions: 
-  - lastTransitionTime: "2023-02-08T04:20:26Z"
-    message: VolumeSnapshot/mysql-cluster-mysql-scaling-dbqgp: Failed to set default snapshot
+  - lastTransitionTime: "2023-03-08T04:20:26Z"
+    message: VolumeSnapshot/pg-cluster-postgresql-scaling-dbqgp: Failed to set default snapshot
       class with error cannot find default snapshot class
     reason: ApplyResourcesFailed
     status: "False"
@@ -295,9 +295,9 @@ This exception occurs because the `VolumeSnapshotClass` is not configured. This 
 
 2. Delete the wrong backup (volumesnapshot is generated by backup) and volumesnapshot resources.
    ```bash
-   kubectl delete backup -l app.kubernetes.io/instance=mysql-cluster
+   kubectl delete backup -l app.kubernetes.io/instance=pg-cluster
    
-   kubectl delete volumesnapshot -l app.kubernetes.io/instance=mysql-cluster
+   kubectl delete volumesnapshot -l app.kubernetes.io/instance=pg-cluster
    ```
 
 ***Result***

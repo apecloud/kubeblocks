@@ -1,16 +1,16 @@
 ---
-title: Run KubeBlocks on a playground
-description: How to run KubeBlocks on a playground
+title: Run KubeBlocks on Playground on local host
+description: How to run KubeBlocks on Playground
 sidebar_position: 1
 ---
 
-# Run KubeBlocks on a playground
-This guide uses one `kbcli` command to create a KubeBlocks demo environment (a playground) quickly on your local host.
-With a playground, you can try KubeBlocks and some ApeCloud MySQL features. This guide introduces how to install a playground and how to try KubeBlocks on the playground.
+# Run KubeBlocks on Playground on local host
+This guide uses one `kbcli` command to create a KubeBlocks demo environment (Playground) quickly on your local host.
+With Playground, you can try KubeBlocks and some ApeCloud MySQL features. This guide introduces how to install Playground and how to try KubeBlocks on Playground.
 
 ***Before you start***
 
-Ensure the following requirements are met so the playground and other functions can run fluently.
+Ensure the following requirements are met, so Playground and other functions can run fluently.
 
 * Minimum system requirements:
   * CPU: 4 cores
@@ -18,7 +18,7 @@ Ensure the following requirements are met so the playground and other functions 
 
 * The following tools are installed on your local host.
   * Docker: It acts as a workload environment and the version should be v20.10.5 (runc ≥ v1.0.0-rc93) or above. For installation details, refer to [Get Docker](https://docs.docker.com/get-docker/).
-  * `kbcli`: It is the command line tool of KubeBlocks and is used for the interaction between the playground and KubeBlocks. Follow the steps below to install `kbcli`.
+  * `kbcli`: It is the command line tool of KubeBlocks and is used for the interaction between Playground and KubeBlocks. Follow the steps below to install `kbcli`.
     1. Run the command below to install `kbcli`.
          ```bash
          curl -fsSL https://kubeblocks.io/installer/install_cli.sh | bash
@@ -30,9 +30,9 @@ Ensure the following requirements are met so the playground and other functions 
          ```
   * `kubectl`: It is used to interact with Kubernetes clusters. For installation details, refer to [kubectl](https://kubernetes.io/docs/tasks/tools/#kubectl).
 
-## Install a playground
+## Install Playground
 
-Run the command below to install a playground.
+Run the command below to install Playground.
 
 ```bash
 kbcli playground init
@@ -57,7 +57,7 @@ KubeBlocks playground init SUCCESSFULLY!
 Cluster "mycluster" has been CREATED!
 ```
 
-You can find the user guide of the playground under the installation success tip. View this guide again by running `kbcli playground guide`.
+You can find the Playground user guide under the installation success tip. View this guide again by running `kbcli playground guide`.
 ```
 1. Basic commands for cluster:
 
@@ -85,15 +85,15 @@ To get more help: kbcli help
 Use "kbcli [command] --help" for more information about a command.
 ```
 
-Following the instructions in "1. Basic commands for cluster", switch to the Kubernetes local cluster created by the playground by running `export KUBECONFIG=xxx` to start your trip on KubeBlocks and ApeCloud MySQL.
+Following the instructions in "1. Basic commands for cluster", switch to the Kubernetes local cluster created by Playground by running `export KUBECONFIG=xxx` to start your trip on KubeBlocks and ApeCloud MySQL.
 
 > ***Caution:***  
 > 
 > Running `export KUBECONFIG` is a necessity for using KubeBlocks and ApeCloud MySQL.
 
-## Run your playground
+## Run Playground
 
-The playground guide includes three sections, namely [Basic functions](#basic-functions), [Observability](#observability), and [High availability](#high-availability-of-apecloud-mysql). Refer to [Feature list](../introduction_and_feature_list/feature_list.md) to explore more KubeBlocks features and you can try the full features of KubeBlocks in a standard Kubernetes cluster.
+The Playground guide includes three sections, namely [Basic functions](#basic-functions), [Observability](#observability), and [High availability](#high-availability-of-apecloud-mysql). Refer to [Feature list](../introduction_and_feature_list/feature_list.md) to explore more KubeBlocks features and you can try the full features of KubeBlocks in a standard Kubernetes cluster.
 
 ### Basic functions
 
@@ -105,7 +105,7 @@ KubeBlocks supports the complete life cycle management of a database cluster and
 
 #### Create an ApeCloud MySQL Paxos group
 
-The playground creates an ApeCloud-MySQL Paxos group by default. You can also use `kbcli` to create a new cluster. The following is an example of creating an ApeCloud-MySQL Paxos group of 1 vCPU and 1 GiB of memory.
+Playground creates an ApeCloud-MySQL Paxos group by default. You can also use `kbcli` to create a new cluster. The following is an example of creating an ApeCloud-MySQL Paxos group with default configurations.
 
 ```bash
 export KBCLI_CLUSTER_DEFAULT_REPLICAS=3
@@ -118,7 +118,7 @@ kbcli cluster create --cluster-definition='apecloud-mysql'
 
 ***Steps:***
 
-1. Run `kbcli cluster list` to view the database cluster list.
+1. Run the command below to view the database cluster list.
     ```bash
     kbcli cluster list
     >
@@ -160,13 +160,13 @@ kbcli cluster create --cluster-definition='apecloud-mysql'
 
 #### Access an ApeCloud MySQL Paxos group
 
-**Option 1.** Use a command line tool.
+**Option 1.** Use `kbcli`.
 
 If a database cluster has been created and its status is `Running`, run `kbcli cluster connect` to access a specified database cluster. For example, 
 ```bash
 kbcli cluster connect maple05
 >
-Connect to instance maple05-mysql-0: out of maple05-mysql-0(leader), maple05-mysql-1(follower), maple05-mysql-2(follower)
+Connect to instance maple05-mysql-2: out of maple05-mysql-2(leader), maple05-mysql-1(follower), maple05-mysql-0(follower)
 Welcome to the MySQL monitor.  Commands end with ; or \g.
 Your MySQL connection id is 25
 Server version: 8.0.30 WeSQL Server - GPL, Release 5, Revision d6b8719
@@ -257,7 +257,7 @@ KubeBlocks has complete observability capabilities. This section demonstrates th
 
 2. Click the Dashboard icon on the left bar and two monitoring panels show on the page.
    ![Dashboards](../../img/quick_start_dashboards.png)
-3. Click General -> MySQL to monitor the status of the ApeCloud MySQL cluster deployed by the playground.
+3. Click **General** -> **MySQL** to monitor the status of the ApeCloud MySQL cluster deployed by Playground.
    ![MySQL_panel](../../img/quick_start_mysql_panel.png)
 
 ### High availability of ApeCloud MySQL
@@ -311,7 +311,7 @@ In this example, we delete the leader pod to simulate a failure.
    ```bash
    kbcli cluster connect maple05
    >
-   Connect to instance maple05-mysql-2: out of maple05-mysql-2(leader), maple05-mysql-0(follower)
+   Connect to instance maple05-mysql-1: out of maple05-mysql-1(leader), maple05-mysql-2(follower), maple05-mysql-0(follower)
    Welcome to the MySQL monitor.  Commands end with ; or \g.
    Your MySQL connection id is 33
    Server version: 8.0.30 WeSQL Server - GPL, Release 5, Revision d6b8719
@@ -326,6 +326,7 @@ In this example, we delete the leader pod to simulate a failure.
 
    mysql>
    ```
+
 #### Observe clusters by NON-STOP NYAN CAT
 The above example uses `kbcli cluster connect` to test availability, in which the changes are not obvious to see.
 NON-STOP NYAN CAT is a demo application to observe how the database cluster exceptions affect actual businesses. Animations and real-time key information display provided by NON-STOP NYAN CAT can directly show the availability influences of database services.
@@ -351,15 +352,15 @@ NON-STOP NYAN CAT is a demo application to observe how the database cluster exce
    kbcli app uninstall nyancat
    ```
 
-## Uninstall the playground
+## Uninstall Playground
 
-Uninstalling the playground cleans up relevant component services and data:
+Uninstalling Playground cleans up relevant component services and data:
 
 * Delete all KubeBlocks database clusters, such as ApeCloud MySQL Paxos group
 * Uninstall KubeBlocks
 * Delete the local Kubernetes clusters created by K3d.
   
-Run the command below to uninstall the playground.
+Run the command below to uninstall Playground.
 ```bash
 kbcli playground destroy
 ```

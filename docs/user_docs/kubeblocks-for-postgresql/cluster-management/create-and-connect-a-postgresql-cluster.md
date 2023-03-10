@@ -1,11 +1,11 @@
 ---
-title: Create and connect to a MySQL Cluster
-description: How to create and connect to a MySQL cluster
+title: Create and connect to a PostgreSQL Cluster
+description: How to create and connect to a PostgreSQL cluster
 sidebar_position: 1
 ---
 
-# Create and connect to a MySQL Cluster
-## Create a MySQL Cluster
+# Create and connect to a PostgreSQL Cluster
+## Create a PostgreSQL Cluster
 
 ***Before you start***
 
@@ -54,8 +54,8 @@ sidebar_position: 1
   ```bash
   kbcli clusterdefinition list
   >
-  NAME             MAIN-COMPONENT-TYPE   STATUS      AGE
-  apecloud-mysql   mysql                 Available   7m52s
+  NAME         MAIN-COMPONENT-TYPE        STATUS      AGE
+  postgresql   postgresql                 Available   7m52s
   ```
 
 ***Steps:***
@@ -70,12 +70,12 @@ sidebar_position: 1
    ```bash
    kbcli clusterversion list
    >
-   NAME              CLUSTER-DEFINITION   STATUS      AGE
-   ac-mysql-8.0.30   apecloud-mysql       Available   2m40s
+   NAME                CLUSTER-DEFINITION   STATUS      AGE
+   postgresql-8.0.30   postgresql           Available   2m40s
    ```
-2. Run the command below to create a MySQL cluster.
+2. Run the command below to create a PostgreSQL cluster.
    ```bash
-   kbcli cluster create mysql-cluster --cluster-definition='apecloud-mysql'
+   kbcli cluster create pg-cluster --cluster-definition='postgresql'
    ```
    ***Result***
 
@@ -84,7 +84,7 @@ sidebar_position: 1
      ```bash
      kubectl create namespace demo
 
-     kbcli cluster create -n demo --cluster-definition='apecloud-mysql'
+     kbcli cluster create -n demo --cluster-definition='postgresql'
      ```
    * A cluster is created with built-in toleration which tolerates the node with the kb-data=true:NoSchedule taint.
    * A cluster is created with built-in node affinity which first deploys the node with the kb-data:true label.
@@ -95,7 +95,7 @@ sidebar_position: 1
    
     Add the --set option when creating a cluster. For example,
     ```bash
-    kbcli cluster create mysql-cluster --cluster-definition apecloud-mysql --set cpu=1000m,memory=1Gi,storage=10Gi,replicas=3
+    kbcli cluster create pg-cluster --cluster-definition postgresql --set cpu=1000m,memory=1Gi,storage=10Gi,replicas=3
     ```
 
    **Option 2.** Run `export`
@@ -103,24 +103,24 @@ sidebar_position: 1
    If you want to create a Paxos group, run `export KBCLI_CLUSTER_DEFAULT_REPLICAS=3` before creating a cluster. For example,
    ```bash
    export KBCLI_CLUSTER_DEFAULT_REPLICAS=3
-   kbcli cluster create mysql-cluster --cluster-definition='apecloud-mysql'
+   kbcli cluster create pgsql-cluster --cluster-definition='postgresql'
    ```
 
    If you want to adjust the storage size, run `export KBCLI_CLUSTER_DEFAULT_STORAGE_SIZE=nGi` before creating a cluster. For example,
   
    ```bash
    export KBCLI_CLUSTER_DEFAULT_STORAGE_SIZE=20Gi
-   kbcli cluster create mysql-cluster --cluster-definition='apecloud-mysql'
+   kbcli cluster create pg-cluster --cluster-definition='postgresql'
    ```
 
    **Option 2.** Change YAML file configurations
 
    Change the corresponding parameters in the YAML file.
    ```bash
-   kbcli cluster create mysql-cluster --cluster-definition="apecloud-mysql" --set -<<EOF
-   - name: mysql
+   kbcli cluster create pg-cluster --cluster-definition="postgresql" --set -<<EOF
+   - name: postgresql
      replicas: 3
-     type: mysql
+     type: postgresql
      volumeClaimTemplates:
      - name: data
        spec:
@@ -141,25 +141,25 @@ sidebar_position: 1
 | `--enable-all-logs` | It enables you to view all application logs. When this option is enabled, enabledLogs of component level will be ignored. This option is set as true by default. |
 | `--help` | It shows the help guide for `kbcli cluster create`. You can also use the abbreviated `-h`. |
 | `--monitor` | It is used to enable the monitor function and inject metrics exporter. It is set as true by default. |
-| `--node-labels` | It is a node label selector. Its default value is [] and means empty value. If you want set node labels, you can follow the example format: <br />```kbcli cluster create --cluster-definition='apecloud-mysql' --node-labels='"topology.kubernetes.io/zone=us-east-1a","disktype=ssd,essd"'``` |
+| `--node-labels` | It is a node label selector. Its default value is [] and means empty value. If you want set node labels, you can follow the example format: <br />```kbcli cluster create --cluster-definition='postgresql' --node-labels='"topology.kubernetes.io/zone=us-east-1a","disktype=ssd,essd"'``` |
 | `--set` | It sets the cluster resource including CPU, memory, replicas, and storage, each set corresponds to a component. For example, `--set cpu=1000m,memory=1Gi,replicas=3,storage=10Gi`. |
 | `--termination-policy` | It specifies the termination policy of the cluster. There are four available values, namely `DoNotTerminate`, `Halt`, `Delete`, and `WipeOut`. `Delete` is set as the default. <br /> - `DoNotTerminate`: DoNotTerminate blocks the delete operation. <br /> - `Halt`: Halt deletes workload resources such as statefulset, deployment workloads but keeps PVCs. <br /> - `Delete`: Delete is based on Halt and deletes PVCs. <br /> - `WipeOut`: WipeOut is based on Delete and wipes out all volume snapshots and snapshot data from backup storage location. |
 
-## Connect to a MySQL Cluster
+## Connect to a PostgreSQL Cluster
 
 Run the command below to connect to a cluster.
 ```bash
-kbcli cluster connect mysql-cluster
+kbcli cluster connect pg-cluster
 ```
 
 ***Example***
 
 ```bash
-kbcli cluster connect mysql-cluster
+kbcli cluster connect pg-cluster
 >
-Connect to instance mysql-cluster-mysql-0: out of mysql-cluster-mysql-0(leader), mysql-cluster-ac-mysql-1(follower), mysql-cluster-ac-mysql-2(follower)
-Welcome to the MySQL monitor.  Commands end with ; or \g.
-Your MySQL connection id is 16
+Connect to instance pg-cluster-postgresql-0: out of pg-cluster-postgresql-0(leader), pg-cluster-postgresql-1(follower), pg-cluster-postgresql-2(follower)
+Welcome to the MPostgreSQL monitor.  Commands end with ; or \g.
+Your PostgreSQL connection id is 25
 Server version: 8.0.30 WeSQL Server - GPL, Release 5, Revision d6b8719
 
 Copyright (c) 2000, 2022, Oracle and/or its affiliates.
@@ -170,5 +170,5 @@ owners.
 
 Type 'help;' or '\h' for help. Type '\c' to clear the current input statement.
 
-mysql>
+postgresql>
 ```

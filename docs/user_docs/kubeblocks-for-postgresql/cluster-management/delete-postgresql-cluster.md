@@ -1,10 +1,10 @@
 ---
-title: Delete a MySQL Cluster
-description: How to delete a MySQL Cluster
+title: Delete a PostgreSQL Cluster
+description: How to delete a PostgreSQL Cluster
 sidebar_position: 6
 ---
 
-# Delete a MySQL Cluster
+# Delete a PostgreSQL Cluster
 
 > ***Note:*** 
 >
@@ -26,10 +26,10 @@ kbcli cluster list <name>
 ***Example***
 
 ```bash
-kbcli cluster list mysql-cluster
+kbcli cluster list pg-cluster
 >
-NAME   	        NAMESPACE	CLUSTER-DEFINITION	VERSION        	TERMINATION-POLICY	STATUS 	CREATED-TIME
-mysql-cluster	default  	apecloud-mysql    	ac-mysql-8.0.30	Delete            	Running	Feb 06,2023 18:27 UTC+0800
+NAME         NAMESPACE   CLUSTER-DEFINITION   VERSION             TERMINATION-POLICY   STATUS    CREATED-TIME
+pg-cluster   default     postgresql           postgresql-14.7.0   Delete               Running   Mar 03,2023 18:49 UTC+0800
 ```
 
 ***Steps:***
@@ -45,7 +45,7 @@ kbcli cluster delete <name>
 ***Example***
 
 ```bash
-kbcli cluster delete mysql-cluster
+kbcli cluster delete pg-cluster
 ```
 
 **Option 2.** Use `kubectl`.
@@ -59,5 +59,5 @@ kubectl delete cluster <name>
 ***Example***
 
 ```bash
-kubectl delete cluster mysql-cluster
+kubectl delete cluster pg-cluster
 ```

@@ -1,10 +1,10 @@
 ---
-title: Run KubeBlocks on Playground on local host
+title: Run KubeBlocks Playground on localhost
 description: How to run KubeBlocks on Playground
 sidebar_position: 1
 ---
 
-# Run KubeBlocks on Playground on local host
+# Run KubeBlocks Playground on localhost
 This guide uses one `kbcli` command to create a KubeBlocks demo environment (Playground) quickly on your local host.
 With Playground, you can try KubeBlocks and some ApeCloud MySQL features. This guide introduces how to install Playground and how to try KubeBlocks on Playground.
 

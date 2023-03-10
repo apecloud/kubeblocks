@@ -19,7 +19,7 @@ This section shows how to use `kbcli` to back up and restore a PostgreSQL standa
 ***Steps:***
 
 1. Install KubeBlocks and enable snapshot backup.
-   Install KubeBlocks and enable the snapshot controller plugin.
+   Install KubeBlocks and enable the snapshot controller add-on.
    ```bash
    kbcli kubeblocks install --set snapshot-controller.enabled=true
    ```

@@ -18,7 +18,7 @@ This section shows how to use `kbcli` to back up and restore a MySQL standalone 
 
 ***Steps:***
 
-1. Install KubeBlocks and enable the snapshot backup controller addon.
+1. Install KubeBlocks and enable the snapshot backup controller add-on.
    ```bash
    kbcli kubeblocks install --set snapshot-controller.enabled=true
    ```

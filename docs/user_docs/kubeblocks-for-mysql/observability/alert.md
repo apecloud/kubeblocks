@@ -130,13 +130,13 @@ If you cannot receive alert notices, run the commands below to troubleshoot the 
 
 ```bash
 # Find the corresponding Pod of AlertManager and get Pod name
-kubectl get pods -l 'release=kubeblocks,app=prometheus,component=alertmanager'
+kubectl get pods -l 'app=prometheus,component=alertmanager'
 
 # Search AlertManeger logs
 kubectl logs <pod-name> -c prometheus-alertmanager
 
 # Find the corresponding Pod of AlertManager-Webhook-Adaptor and get Pod name
-kubectl get pods -l 'app.kubernetes.io/instance=kubeblocks,app.kubernetes.io/name=alertmanager-webhook-adaptor'
+kubectl get pods -l 'app.kubernetes.io/name=alertmanager-webhook-adaptor'
 
 # Search AlertManager-Webhook-Adaptor logs
 kubectl logs <pod-name> -c alertmanager-webhook-adaptor

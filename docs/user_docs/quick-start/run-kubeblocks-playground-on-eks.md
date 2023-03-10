@@ -1,10 +1,10 @@
-# ---
-title: Run KubeBlocks on Playground on AWS EKS
+---
+title: Run KubeBlocks Playground on AWS EKS
 description: How to run KubeBlocks on Playground
 sidebar_position: 2
 ---
 
-# Run KubeBlocks on Playground on AWS EKS
+# Run KubeBlocks Playground on AWS EKS
 
 KubeBlocks v0.4 supports using the `kbcli playground` command to deploy EKS cluster and deploy KubeBlocks on EKS. This tutorial introduces how to configure this command.
 
@@ -51,7 +51,22 @@ kbbcli playground init --cloud-provider aws --region cn-northwest-1
 
 * `cloud-provider` specifies the cloud provider. Currently, only `aws` is supported.
 * `region` specifies the region to deploy a Kubernetes cluster.
-  
+   Frequently used regions are as follow. You can find the full region list on [the official website](https://aws.amazon.com/about-aws/global-infrastructure/regional-product-services/?nc1=h_ls).
+  * Americas
+     | Region ID  | Region name         |
+     | :--        | :--                 |
+     | us-east-1  | Northern Virginia   |
+     | us-east-2  | Ohio                |
+     | us-west-1  | Northern California |
+     | us-west-2  | Oregon              |
+
+  * Asia Pacific
+     | Region ID         | Region name |
+     | :--               | :--         |
+     | ap-east-1         | Hong Kong   |
+     | ap-southeast-1    | Singapore   |
+     | cn-north-1        | Beijing     |
+     | cn-northwest-1    | Ningxia     |
 During the initialization, `kbcli` clones [the GitHub repository](https://github.com/apecloud/cloud-provider) to the path `~/.kbcli/playground` and calls the terraform script to create cloud resources. After that, `kbcli` deploys KubeBlocks automatically and installs a MySQL cluster.
 
 After the `kbcli playground init` command is executed, `kbcli` automatically switches the context of the local kubeconfig to the current cluster. Run the command below to view the deplayed cluster.

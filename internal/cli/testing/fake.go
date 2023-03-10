@@ -22,6 +22,7 @@ import (
 
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	"github.com/sethvargo/go-password/password"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -61,7 +62,7 @@ func FakeCluster(name string, namespace string) *appsv1alpha1.Cluster {
 	return &appsv1alpha1.Cluster{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       types.KindCluster,
-			APIVersion: fmt.Sprintf("%s/%s", types.Group, types.Version),
+			APIVersion: fmt.Sprintf("%s/%s", types.AppsAPIGroup, types.AppsAPIVersion),
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
@@ -254,7 +255,7 @@ func FakeBackupTool() *dpv1alpha1.BackupTool {
 func FakeBackupPolicyTemplate() *dpv1alpha1.BackupPolicyTemplate {
 	template := &dpv1alpha1.BackupPolicyTemplate{
 		TypeMeta: metav1.TypeMeta{
-			APIVersion: fmt.Sprintf("%s/%s", types.DPGroup, types.DPVersion),
+			APIVersion: fmt.Sprintf("%s/%s", types.DPAPIGroup, types.DPAPIVersion),
 			Kind:       types.KindBackupPolicyTemplate,
 		},
 		ObjectMeta: metav1.ObjectMeta{
@@ -262,6 +263,21 @@ func FakeBackupPolicyTemplate() *dpv1alpha1.BackupPolicyTemplate {
 		},
 	}
 	return template
+}
+
+func FakeBackup(backupName string) *dpv1alpha1.Backup {
+	backup := &dpv1alpha1.Backup{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: fmt.Sprintf("%s/%s", types.DPAPIGroup, types.DPAPIVersion),
+			Kind:       types.KindBackup,
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      backupName,
+			Namespace: Namespace,
+		},
+	}
+	backup.SetCreationTimestamp(metav1.Now())
+	return backup
 }
 
 func FakeServices() *corev1.ServiceList {
@@ -379,4 +395,15 @@ func FakeVolumeSnapshotClass() *snapshotv1.VolumeSnapshotClass {
 			APIVersion: "snapshot.storage.k8s.io/v1",
 		},
 	}
+}
+
+func FakeKBDeploy(version string) *appsv1.Deployment {
+	deploy := &appsv1.Deployment{}
+	deploy.SetLabels(map[string]string{
+		"app.kubernetes.io/name": types.KubeBlocksChartName,
+	})
+	if len(version) > 0 {
+		deploy.Labels["app.kubernetes.io/version"] = version
+	}
+	return deploy
 }

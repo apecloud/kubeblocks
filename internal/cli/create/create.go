@@ -35,6 +35,7 @@ import (
 	k8sapitypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/kubernetes"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 
 	"github.com/apecloud/kubeblocks/internal/cli/types"
@@ -97,7 +98,9 @@ type BaseOptions struct {
 	// Name Resource name of the command line operation
 	Name string `json:"name"`
 
-	Client dynamic.Interface `json:"-"`
+	Dynamic dynamic.Interface `json:"-"`
+
+	Client kubernetes.Interface `json:"-"`
 
 	// Quiet minimize unnecessary output
 	Quiet bool
@@ -133,7 +136,11 @@ func (o *BaseOptions) Complete(inputs Inputs, args []string) error {
 		o.Name = args[0]
 	}
 
-	if o.Client, err = inputs.Factory.DynamicClient(); err != nil {
+	if o.Dynamic, err = inputs.Factory.DynamicClient(); err != nil {
+		return err
+	}
+
+	if o.Client, err = inputs.Factory.KubernetesClientSet(); err != nil {
 		return err
 	}
 
@@ -188,16 +195,16 @@ func (o *BaseOptions) Run(inputs Inputs) error {
 	}
 	group := inputs.Group
 	if len(group) == 0 {
-		group = types.Group
+		group = types.AppsAPIGroup
 	}
 
 	version := inputs.Version
 	if len(version) == 0 {
-		version = types.Version
+		version = types.AppsAPIVersion
 	}
 	// create k8s resource
 	gvr := schema.GroupVersionResource{Group: group, Version: version, Resource: inputs.ResourceName}
-	if unstructuredObj, err = o.Client.Resource(gvr).Namespace(o.Namespace).Create(context.TODO(), unstructuredObj, metav1.CreateOptions{}); err != nil {
+	if unstructuredObj, err = o.Dynamic.Resource(gvr).Namespace(o.Namespace).Create(context.TODO(), unstructuredObj, metav1.CreateOptions{}); err != nil {
 		return err
 	}
 	if !o.Quiet {
@@ -234,12 +241,12 @@ func (o *BaseOptions) RunAsApply(inputs Inputs) error {
 
 	group := inputs.Group
 	if len(group) == 0 {
-		group = types.Group
+		group = types.AppsAPIGroup
 	}
 
 	version := inputs.Version
 	if len(version) == 0 {
-		version = types.Version
+		version = types.AppsAPIVersion
 	}
 	// create k8s resource
 	gvr := schema.GroupVersionResource{Group: group, Version: version, Resource: inputs.ResourceName}
@@ -251,13 +258,13 @@ func (o *BaseOptions) RunAsApply(inputs Inputs) error {
 	if err != nil {
 		return err
 	}
-	if _, err := o.Client.Resource(gvr).Namespace(o.Namespace).Patch(
+	if _, err := o.Dynamic.Resource(gvr).Namespace(o.Namespace).Patch(
 		context.TODO(), objectName, k8sapitypes.MergePatchType,
 		objectByte, metav1.PatchOptions{}); err != nil {
 
 		// create object if not found
 		if errors.IsNotFound(err) {
-			if _, err = o.Client.Resource(gvr).Namespace(o.Namespace).Create(
+			if _, err = o.Dynamic.Resource(gvr).Namespace(o.Namespace).Create(
 				context.TODO(), unstructuredObj, metav1.CreateOptions{}); err != nil {
 				return err
 			}

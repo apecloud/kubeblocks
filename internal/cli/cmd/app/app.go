@@ -65,7 +65,7 @@ type options struct {
 func NewAppCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "app [install | uninstall] APP_NAME",
-		Short: "Manager external applications related to KubeBlocks",
+		Short: "Manage external applications related to KubeBlocks",
 	}
 	cmd.AddCommand(
 		newInstallCmd(f, streams),
@@ -150,7 +150,6 @@ func (o *options) installChart() (string, error) {
 		Version:         o.Version,
 		Namespace:       o.Namespace,
 		ValueOpts:       &values.Options{Values: sets},
-		Login:           true,
 		TryTimes:        2,
 		CreateNamespace: o.CreateNamespace,
 	}

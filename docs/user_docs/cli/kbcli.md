@@ -52,7 +52,9 @@ kbcli [flags]
 
 ### SEE ALSO
 
-* [kbcli app](kbcli_app.md)	 - Manager external applications related to KubeBlocks
+* [kbcli addon](kbcli_addon.md)	 - Addon command
+* [kbcli alert](kbcli_alert.md)	 - Manage alert receivers
+* [kbcli app](kbcli_app.md)	 - Manage external applications related to KubeBlocks
 * [kbcli backup-config](kbcli_backup-config.md)	 - KubeBlocks backup config
 * [kbcli bench](kbcli_bench.md)	 - Run a benchmark
 * [kbcli cluster](kbcli_cluster.md)	 - Cluster command
@@ -62,6 +64,5 @@ kbcli [flags]
 * [kbcli kubeblocks](kbcli_kubeblocks.md)	 - KubeBlocks operation commands
 * [kbcli options](kbcli_options.md)	 - Print the list of flags inherited by all commands
 * [kbcli playground](kbcli_playground.md)	 - Bootstrap a playground KubeBlocks in local host or cloud
-* [kbcli troubleshoot](kbcli_troubleshoot.md)	 - Troubleshooting for KubeBlocks
 * [kbcli version](kbcli_version.md)	 - Print the version information
 

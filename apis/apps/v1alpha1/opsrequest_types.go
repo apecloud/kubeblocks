@@ -77,6 +77,14 @@ type OpsRequestSpec struct {
 	// reconfigure defines the variables that need to input when updating configuration.
 	// +optional
 	Reconfigure *Reconfigure `json:"reconfigure,omitempty"`
+
+	// expose defines services the component needs to expose.
+	// +optional
+	// +patchMergeKey=componentName
+	// +patchStrategy=merge,retainKeys
+	// +listType=map
+	// +listMapKey=componentName
+	ExposeList []Expose `json:"expose,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"componentName"`
 }
 
 // ComponentOps defines the common variables of component scope operations.
@@ -203,6 +211,15 @@ type ParameterConfig struct {
 	Parameters []ParameterPair `json:"parameters"`
 }
 
+type Expose struct {
+	ComponentOps `json:",inline"`
+
+	// Setting the list of services to be exposed.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:Minitems=0
+	Services []ClusterComponentService `json:"services"`
+}
+
 // OpsRequestStatus defines the observed state of OpsRequest
 type OpsRequestStatus struct {
 	// observedGeneration is the most recent generation observed for this
@@ -288,6 +305,10 @@ type LastComponentConfiguration struct {
 	// volumeClaimTemplates records the last volumeClaimTemplates of the component.
 	// +optional
 	VolumeClaimTemplates []OpsRequestVolumeClaimTemplate `json:"volumeClaimTemplates,omitempty"`
+
+	// services records the last services of the component.
+	// +optional
+	Services []ClusterComponentService `json:"services,omitempty"`
 }
 
 type LastConfiguration struct {
@@ -302,7 +323,7 @@ type LastConfiguration struct {
 
 type OpsRequestComponentStatus struct {
 	// phase describes the component phase, reference Cluster.status.component.phase.
-	// +kubebuilder:validation:Enum={Running,Failed,Abnormal,Creating,SpecUpdating,Deleting,Deleted,VolumeExpanding,Reconfiguring,HorizontalScaling,VerticalScaling,VersionUpgrading,Rebooting,Stopped,Stopping,Starting}
+	// +kubebuilder:validation:Enum={Running,Failed,Abnormal,Creating,SpecUpdating,Deleting,Deleted,VolumeExpanding,Reconfiguring,HorizontalScaling,VerticalScaling,VersionUpgrading,Rebooting,Stopped,Stopping,Starting,Exposing}
 	// +optional
 	Phase Phase `json:"phase,omitempty"`
 
@@ -424,6 +445,8 @@ func (r *OpsRequest) GetComponentNameMap() map[string]struct{} {
 		return r.GetUpgradeComponentNameMap()
 	case ReconfiguringType:
 		return r.GetReconfiguringComponentNameMap()
+	case ExposeType:
+		return r.GetExposeComponentNameMap()
 	default:
 		return map[string]struct{}{}
 	}
@@ -492,6 +515,14 @@ func (r *OpsRequest) ConvertVolumeExpansionListToMap() map[string]VolumeExpansio
 	return volumeExpansionMap
 }
 
+func (r *OpsRequest) ConvertExposeListToMap() map[string]Expose {
+	exposeMap := make(map[string]Expose)
+	for _, v := range r.Spec.ExposeList {
+		exposeMap[v.ComponentName] = v
+	}
+	return exposeMap
+}
+
 // GetUpgradeComponentNameMap gets the component name map with upgrade operation.
 func (r *OpsRequest) GetUpgradeComponentNameMap() map[string]struct{} {
 	if r.Spec.Upgrade == nil {
@@ -512,6 +543,14 @@ func (r *OpsRequest) GetReconfiguringComponentNameMap() map[string]struct{} {
 	return map[string]struct{}{
 		r.Spec.Reconfigure.ComponentName: {},
 	}
+}
+
+func (r *OpsRequest) GetExposeComponentNameMap() map[string]struct{} {
+	componentNameMap := make(map[string]struct{})
+	for _, v := range r.Spec.ExposeList {
+		componentNameMap[v.ComponentName] = struct{}{}
+	}
+	return componentNameMap
 }
 
 func (p *ProgressStatusDetail) SetStatusAndMessage(status ProgressStatus, message string) {

@@ -65,12 +65,13 @@ var _ = Describe("probe_utils", func() {
 			backupToolName = backupTool.Name
 		})
 
-		updateBackupStatus := func(backup *dataprotectionv1alpha1.Backup, backupToolName string) {
+		updateBackupStatus := func(backup *dataprotectionv1alpha1.Backup, backupToolName string, expectPhase dataprotectionv1alpha1.BackupPhase) {
 			Expect(testapps.ChangeObjStatus(&testCtx, backup, func() {
 				backup.Status.BackupToolName = backupToolName
 				backup.Status.RemoteVolume = &corev1.Volume{
 					Name: "backup-pvc",
 				}
+				backup.Status.Phase = expectPhase
 			})).Should(Succeed())
 		}
 
@@ -84,7 +85,7 @@ var _ = Describe("probe_utils", func() {
 				SetBackupPolicyName(backupPolicyName).
 				SetBackupType(dataprotectionv1alpha1.BackupTypeFull).
 				Create(&testCtx).GetObject()
-			updateBackupStatus(backup, backupToolName)
+			updateBackupStatus(backup, backupToolName, dataprotectionv1alpha1.BackupCompleted)
 			component := &SynthesizedComponent{
 				PodSpec: &corev1.PodSpec{
 					Containers: []corev1.Container{
@@ -110,7 +111,6 @@ var _ = Describe("probe_utils", func() {
 				SetBackupPolicyName(backupPolicyName).
 				SetBackupType(dataprotectionv1alpha1.BackupTypeSnapshot).
 				Create(&testCtx).GetObject()
-			updateBackupStatus(backup, backupToolName)
 			component := &SynthesizedComponent{
 				VolumeClaimTemplates: []corev1.PersistentVolumeClaimTemplate{
 					{
@@ -120,7 +120,14 @@ var _ = Describe("probe_utils", func() {
 					},
 				},
 			}
-			By("build volumeClaim dataSource")
+
+			By("test when backup is not completed")
+			updateBackupStatus(backup, backupToolName, dataprotectionv1alpha1.BackupInProgress)
+			Expect(BuildRestoredInfo(reqCtx, k8sClient, testCtx.DefaultNamespace, component, backupName).Error()).
+				Should(ContainSubstring("is not completed"))
+
+			By("build volumeClaim dataSource when backup is completed")
+			updateBackupStatus(backup, "not-exist-backup-tool", dataprotectionv1alpha1.BackupCompleted)
 			Expect(BuildRestoredInfo(reqCtx, k8sClient, testCtx.DefaultNamespace, component, backupName)).Should(Succeed())
 			vct := component.VolumeClaimTemplates[0]
 			snapshotAPIGroup := snapshotv1.GroupName

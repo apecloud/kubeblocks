@@ -47,7 +47,6 @@ var chart = helm.InstallOpts{
 			"wesql.enabled=false",
 		},
 	},
-	Login:           true,
 	TryTimes:        2,
 	CreateNamespace: true,
 }

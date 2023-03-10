@@ -43,7 +43,7 @@ func getGVRByCRD(crd *unstructured.Unstructured) (*schema.GroupVersionResource, 
 	}
 	return &schema.GroupVersionResource{
 		Group:    group,
-		Version:  types.Version,
+		Version:  types.AppsAPIVersion,
 		Resource: strings.Split(crd.GetName(), ".")[0],
 	}, nil
 }
@@ -99,14 +99,4 @@ func getHelmChartVersions(chart string) ([]*semver.Version, error) {
 		return nil, errors.Wrap(err, errMsg)
 	}
 	return versions, nil
-}
-
-// getKubeBlocksNamespace gets namespace of KubeBlocks installation, infer namespace from helm secrets
-func getKubeBlocksNamespace(client kubernetes.Interface) (string, error) {
-	secrets, err := client.CoreV1().Secrets(metav1.NamespaceAll).List(context.TODO(), metav1.ListOptions{LabelSelector: helmLabel})
-	// if KubeBlocks is upgraded, there will be multiple secrets
-	if err == nil && len(secrets.Items) >= 1 {
-		return secrets.Items[0].Namespace, nil
-	}
-	return "", errors.New("failed to get KubeBlocks installation namespace")
 }

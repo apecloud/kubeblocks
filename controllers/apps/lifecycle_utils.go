@@ -485,6 +485,26 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 		return nil
 	}
 
+	handlePVC := func(pvcProto *corev1.PersistentVolumeClaim) error {
+		key := client.ObjectKey{
+			Namespace: pvcProto.GetNamespace(),
+			Name:      pvcProto.GetName(),
+		}
+		pvcObj := &corev1.PersistentVolumeClaim{}
+		if err := cli.Get(ctx, key, pvcObj); err != nil {
+			return err
+		}
+		if pvcObj.Spec.Resources.Requests[corev1.ResourceStorage] == pvcProto.Spec.Resources.Requests[corev1.ResourceStorage] {
+			return nil
+		}
+		patch := client.MergeFrom(pvcObj.DeepCopy())
+		pvcObj.Spec.Resources.Requests[corev1.ResourceStorage] = pvcProto.Spec.Resources.Requests[corev1.ResourceStorage]
+		if err := cli.Patch(ctx, pvcObj, patch); err != nil {
+			return err
+		}
+		return nil
+	}
+
 	cleanUselessServices := func(expSvcList []*corev1.Service) error {
 		var (
 			allSvcList = corev1.ServiceList{}
@@ -574,6 +594,14 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 		svcProto, ok := obj.(*corev1.Service)
 		if ok {
 			if err := handleSvc(svcProto); err != nil {
+				return false, err
+			}
+			continue
+		}
+		// do volume expansion when workload type is `replication`
+		pvcProto, ok := obj.(*corev1.PersistentVolumeClaim)
+		if ok {
+			if err := handlePVC(pvcProto); err != nil {
 				return false, err
 			}
 			continue

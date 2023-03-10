@@ -88,17 +88,22 @@ const (
 	defaultFailedEventReportFrequency = 1800
 	defaultRoleDetectionThreshold     = 300
 
-	// types for probe
-	CheckRunningType = iota
-	CheckStatusType
-	CheckRoleChangedType
-
 	CheckRunningOperation bindings.OperationKind = "checkRunning"
 	CheckStatusOperation  bindings.OperationKind = "checkStatus"
 	CheckRoleOperation    bindings.OperationKind = "checkRole"
 	GetRoleOperation      bindings.OperationKind = "getRole"
+	GetLagOperation       bindings.OperationKind = "getLag"
+	ExecOperation         bindings.OperationKind = "exec"
+	QueryOperation        bindings.OperationKind = "query"
 
 	OperationNotImplemented = "OperationNotImplemented"
+)
+
+const (
+	// types for probe
+	CheckRunningType int = iota
+	CheckStatusType
+	CheckRoleChangedType
 )
 
 func init() {

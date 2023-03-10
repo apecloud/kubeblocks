@@ -63,6 +63,60 @@ spec:
               clusterRef:
                 description: clusterRef references clusterDefinition.
                 type: string
+              expose:
+                description: expose defines services the component needs to expose.
+                items:
+                  properties:
+                    componentName:
+                      description: componentName cluster component name.
+                      type: string
+                    services:
+                      description: Setting the list of services to be exposed.
+                      items:
+                        properties:
+                          annotations:
+                            additionalProperties:
+                              type: string
+                            description: 'If ServiceType is LoadBalancer, cloud provider
+                              related parameters can be put here More info: https://kubernetes.io/docs/concepts/services-networking/service/#loadbalancer'
+                            type: object
+                          name:
+                            description: Service name
+                            type: string
+                          serviceType:
+                            default: ClusterIP
+                            description: 'serviceType determines how the Service is
+                              exposed. Valid options are ClusterIP, NodePort, and
+                              LoadBalancer. "ClusterIP" allocates a cluster-internal
+                              IP address for load-balancing to endpoints. Endpoints
+                              are determined by the selector or if that is not specified,
+                              by manual construction of an Endpoints object or EndpointSlice
+                              objects. If clusterIP is "None", no virtual IP is allocated
+                              and the endpoints are published as a set of endpoints
+                              rather than a virtual IP. "NodePort" builds on ClusterIP
+                              and allocates a port on every node which routes to the
+                              same endpoints as the clusterIP. "LoadBalancer" builds
+                              on NodePort and creates an external load-balancer (if
+                              supported in the current cloud) which routes to the
+                              same endpoints as the clusterIP. More info: https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types'
+                            enum:
+                            - ClusterIP
+                            - NodePort
+                            - LoadBalancer
+                            type: string
+                            x-kubernetes-preserve-unknown-fields: true
+                        required:
+                        - name
+                        type: object
+                      type: array
+                  required:
+                  - componentName
+                  - services
+                  type: object
+                type: array
+                x-kubernetes-list-map-keys:
+                - componentName
+                x-kubernetes-list-type: map
               horizontalScaling:
                 description: horizontalScaling defines what component need to horizontal
                   scale the specified replicas.
@@ -185,6 +239,7 @@ spec:
                 - Reconfiguring
                 - Start
                 - Stop
+                - Expose
                 type: string
               upgrade:
                 description: upgrade specifies the cluster version by specifying clusterVersionRef.
@@ -332,6 +387,7 @@ spec:
                       - Stopped
                       - Stopping
                       - Starting
+                      - Exposing
                       type: string
                     progressDetails:
                       description: progressDetails describes the progress details
@@ -516,6 +572,48 @@ spec:
                             otherwise to an implementation-defined value. More info:
                             https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
                           type: object
+                        services:
+                          description: services records the last services of the component.
+                          items:
+                            properties:
+                              annotations:
+                                additionalProperties:
+                                  type: string
+                                description: 'If ServiceType is LoadBalancer, cloud
+                                  provider related parameters can be put here More
+                                  info: https://kubernetes.io/docs/concepts/services-networking/service/#loadbalancer'
+                                type: object
+                              name:
+                                description: Service name
+                                type: string
+                              serviceType:
+                                default: ClusterIP
+                                description: 'serviceType determines how the Service
+                                  is exposed. Valid options are ClusterIP, NodePort,
+                                  and LoadBalancer. "ClusterIP" allocates a cluster-internal
+                                  IP address for load-balancing to endpoints. Endpoints
+                                  are determined by the selector or if that is not
+                                  specified, by manual construction of an Endpoints
+                                  object or EndpointSlice objects. If clusterIP is
+                                  "None", no virtual IP is allocated and the endpoints
+                                  are published as a set of endpoints rather than
+                                  a virtual IP. "NodePort" builds on ClusterIP and
+                                  allocates a port on every node which routes to the
+                                  same endpoints as the clusterIP. "LoadBalancer"
+                                  builds on NodePort and creates an external load-balancer
+                                  (if supported in the current cloud) which routes
+                                  to the same endpoints as the clusterIP. More info:
+                                  https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types'
+                                enum:
+                                - ClusterIP
+                                - NodePort
+                                - LoadBalancer
+                                type: string
+                                x-kubernetes-preserve-unknown-fields: true
+                            required:
+                            - name
+                            type: object
+                          type: array
                         volumeClaimTemplates:
                           description: volumeClaimTemplates records the last volumeClaimTemplates
                             of the component.

@@ -55,14 +55,7 @@ var (
 )
 
 var (
-	// app.kubernetes.io/instance=kubeblocks, hit most workloads and configuration
-	instanceLabelSelector = fmt.Sprintf("%s=%s", constant.AppInstanceLabelKey, types.KubeBlocksChartName)
-	// release=kubeblocks, for prometheus-alertmanager and prometheus-server
-	releaseLabelSelector = fmt.Sprintf("release=%s", types.KubeBlocksChartName)
-	// name=kubeblocks,owner-helm, for helm secret
-	helmLabel = fmt.Sprintf("%s=%s,%s=%s", "name", types.KubeBlocksChartName, "owner", "helm")
-
-	selectorList = []metav1.ListOptions{{LabelSelector: instanceLabelSelector}, {LabelSelector: releaseLabelSelector}}
+	selectorList = []metav1.ListOptions{{LabelSelector: types.InstanceLabelSelector}, {LabelSelector: types.ReleaseLabelSelector}}
 
 	kubeBlocksWorkloads = []schema.GroupVersionResource{
 		types.DeployGVR(),
@@ -114,7 +107,7 @@ func newStatusCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 			util.CheckErr(o.run())
 		},
 	}
-	cmd.Flags().BoolVar(&o.showAll, "all", false, "Show all resources, including configurations, storages, etc")
+	cmd.Flags().BoolVarP(&o.showAll, "all", "A", false, "Show all resources, including configurations, storages, etc")
 	return cmd
 }
 
@@ -148,9 +141,11 @@ func (o *statusOptions) run() error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	o.ns, _ = getKubeBlocksNamespace(o.client)
+	o.ns, _ = util.GetKubeBlocksNamespace(o.client)
 	if o.ns == "" {
-		fmt.Fprintf(o.Out, "Failed to find deployed KubeBlocks in any namespace\n")
+		printer.Warning(o.Out, "Failed to find deployed KubeBlocks in any namespace\n")
+		printer.Warning(o.Out, "Will check all namespaces for KubeBlocks resources left behind\n")
+
 	} else {
 		fmt.Fprintf(o.Out, "Kuberblocks is deployed in namespace: %s\n", o.ns)
 	}
@@ -229,7 +224,7 @@ func (o *statusOptions) showHelmResources(ctx context.Context, allErrs *[]error)
 	tblPrinter := printer.NewTablePrinter(o.Out)
 	tblPrinter.SetHeader("NAMESPACE", "KIND", "NAME", "STATUS")
 
-	helmSelector := metav1.ListOptions{LabelSelector: helmLabel}
+	helmSelector := metav1.ListOptions{LabelSelector: types.HelmLabel}
 	unstructuredList := listResourceByGVR(ctx, o.dynamic, o.ns, helmConfigurations, []metav1.ListOptions{helmSelector}, allErrs)
 	for _, resourceList := range unstructuredList {
 		for _, resource := range resourceList.Items {

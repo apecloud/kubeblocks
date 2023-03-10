@@ -57,6 +57,6 @@ func NewFakeOperationsOptions(ns, cName string, opsType appsv1alpha1.OpsType, ob
 		types.RestoreJobGVR():       types.KindRestoreJob + "List",
 		types.OpsGVR():              types.KindOps + "List",
 	}
-	o.Client = dynamicfakeclient.NewSimpleDynamicClientWithCustomListKinds(scheme.Scheme, listMapping, objs...)
+	o.Dynamic = dynamicfakeclient.NewSimpleDynamicClientWithCustomListKinds(scheme.Scheme, listMapping, objs...)
 	return tf, o
 }

@@ -37,6 +37,7 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/testutil"
 )
@@ -94,6 +95,9 @@ var _ = BeforeSuite(func() {
 	scheme := scheme.Scheme
 
 	err = snapshotv1.AddToScheme(scheme)
+	Expect(err).NotTo(HaveOccurred())
+
+	err = appsv1alpha1.AddToScheme(scheme)
 	Expect(err).NotTo(HaveOccurred())
 
 	err = dataprotectionv1alpha1.AddToScheme(scheme)

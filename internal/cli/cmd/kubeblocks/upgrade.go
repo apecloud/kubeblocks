@@ -73,7 +73,7 @@ func newUpgradeCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 
 func (o *InstallOptions) Upgrade(cmd *cobra.Command) error {
 	if o.HelmCfg.Namespace() == "" {
-		ns, err := getKubeBlocksNamespace(o.Client)
+		ns, err := util.GetKubeBlocksNamespace(o.Client)
 		if err != nil || ns == "" {
 			printer.Warning(o.Out, "Failed to find deployed KubeBlocks.\n\n")
 			fmt.Fprint(o.Out, "Use \"kbcli kubeblocks install\" to install KubeBlocks.\n")

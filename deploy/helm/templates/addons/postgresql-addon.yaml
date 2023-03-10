@@ -4,6 +4,10 @@ metadata:
   name: postgresql
   labels:
     {{- include "kubeblocks.labels" . | nindent 4 }}
+  {{- if .Values.keepAddons }}
+  annotations:
+    helm.sh/resource-policy: keep
+  {{- end }}
 spec:
   description: 'PostgreSQL (Postgres) is an open source object-relational database known for reliability and data integrity. ACID-compliant, it supports foreign keys, joins, views, triggers and stored procedures.'
 

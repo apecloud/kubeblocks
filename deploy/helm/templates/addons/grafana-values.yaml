@@ -4,6 +4,10 @@ metadata:
   name: grafana-chart-kubeblocks-values
   labels:
     {{- include "kubeblocks.labels" . | nindent 4 }}
+  {{- if .Values.keepAddons }}
+  annotations:
+    helm.sh/resource-policy: keep
+  {{- end }}
 data:
   values-kubeblocks-override.yaml: |-
     {{- .Values.grafana | toYaml | nindent 4 }}

@@ -4,6 +4,10 @@ metadata:
   name: csi-s3
   labels:
     {{- include "kubeblocks.labels" . | nindent 4 }}
+  {{- if .Values.keepAddons }}
+  annotations:
+    helm.sh/resource-policy: keep
+  {{- end }}
 spec:
   description: Container Storage Interface (CSI) driver for S3 volumes
   type: Helm

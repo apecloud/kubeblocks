@@ -1568,9 +1568,9 @@ csi-s3:
     mountOptions: "--memory-limit 1000 --dir-mode 0777 --file-mode 0666 --region cn-northwest-1"
 
 alertmanager-webhook-adaptor:
-  ## If false, Webhook-Adaptor sub-chart will not be installed
+  ## Linkage with prometheus.enabled
   ##
-  enabled: false
+  # enabled: false
 
   replicaCount: 1
 

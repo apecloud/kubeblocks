@@ -36,4 +36,4 @@ spec:
     - replicas: 1
 
   installable:
-    autoInstall: {{ get ( get ( .Values | toYaml | fromYaml ) "alertmanager-webhook-adaptor" ) "enabled" }}
+    autoInstall: {{ .Values.prometheus.enabled }}

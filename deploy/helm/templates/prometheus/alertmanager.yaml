@@ -1,4 +1,4 @@
-{{- if and .Values.prometheus.alertmanager.enabled (not (empty .Values.prometheus.alertmanager.configMapOverrideName)) }}
+{{- if and .Values.prometheus.enabled (not (empty .Values.prometheus.alertmanager.configMapOverrideName)) }}
 apiVersion: v1
 kind: ConfigMap
 metadata:

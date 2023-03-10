@@ -1,4 +1,4 @@
-{{- if and (index .Values "alertmanager-webhook-adaptor" "enabled") (not (empty (index .Values "alertmanager-webhook-adaptor" "configMapOverrideName"))) }}
+{{- if and .Values.prometheus.enabled (not (empty (index .Values "alertmanager-webhook-adaptor" "configMapOverrideName"))) }}
 apiVersion: v1
 kind: ConfigMap
 metadata:

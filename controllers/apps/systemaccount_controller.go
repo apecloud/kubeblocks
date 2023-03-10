@@ -387,7 +387,7 @@ func (r *jobCompletitionPredicate) Delete(e event.DeleteEvent) bool {
 	}
 
 	ml := job.ObjectMeta.Labels
-	accountName, ok := ml[clusterAccountLabelKey]
+	accountName, ok := ml[constant.ClusterAccountLabelKey]
 	if !ok {
 		return false
 	}

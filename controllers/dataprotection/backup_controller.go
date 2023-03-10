@@ -340,7 +340,8 @@ func (r *BackupReconciler) createPreCommandJobAndEnsure(reqCtx intctrlutil.Reque
 		return true, err
 	}
 
-	key := types.NamespacedName{Namespace: reqCtx.Req.Namespace, Name: backup.Name + "-pre"}
+	mgrNS := viper.GetString("CM_NAMESPACE")
+	key := types.NamespacedName{Namespace: mgrNS, Name: backup.Name + "-pre"}
 	if err := r.createHooksCommandJob(reqCtx, backup, key, true); err != nil {
 		return false, err
 	}
@@ -359,7 +360,8 @@ func (r *BackupReconciler) createPostCommandJobAndEnsure(reqCtx intctrlutil.Requ
 		return true, err
 	}
 
-	key := types.NamespacedName{Namespace: reqCtx.Req.Namespace, Name: backup.Name + "-post"}
+	mgrNS := viper.GetString("CM_NAMESPACE")
+	key := types.NamespacedName{Namespace: mgrNS, Name: backup.Name + "-post"}
 	if err := r.createHooksCommandJob(reqCtx, backup, key, false); err != nil {
 		return false, err
 	}

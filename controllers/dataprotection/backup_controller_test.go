@@ -162,6 +162,7 @@ var _ = Describe("Backup for a StatefulSet", func() {
 
 			BeforeEach(func() {
 				viper.Set("VOLUMESNAPSHOT", "true")
+				viper.Set("CM_NAMESPACE", "default")
 
 				By("By creating a backup from backupPolicy: " + backupPolicyName)
 				backup := testapps.NewBackupFactory(testCtx.DefaultNamespace, backupName).

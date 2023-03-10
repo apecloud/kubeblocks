@@ -88,6 +88,7 @@ var _ = Describe("Backup for a StatefulSet", func() {
 		By("By mocking a pod belonging to the statefulset")
 		pod := testapps.NewPodFactory(testCtx.DefaultNamespace, sts.Name+"-0").
 			AddAppInstanceLabel(clusterName).
+			AddAppComponentLabel(componentName).
 			AddContainer(corev1.Container{Name: containerName, Image: testapps.ApeCloudMySQLImage}).
 			Create(&testCtx).GetObject()
 		nodeName = pod.Spec.NodeName

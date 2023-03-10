@@ -217,13 +217,13 @@ func renderSecretWithPwd(key componentUniqueKey, username, passwd string) *corev
 	secretData[accountPasswdForSecret] = []byte(passwd)
 
 	ml := getLabelsForSecretsAndJobs(key)
-	ml[clusterAccountLabelKey] = username
+	ml[constant.ClusterAccountLabelKey] = username
 	return renderSecret(key, username, ml, secretData)
 }
 
 func renderSecretByCopy(key componentUniqueKey, username string, fromSecret *corev1.Secret) *corev1.Secret {
 	ml := getLabelsForSecretsAndJobs(key)
-	ml[clusterAccountLabelKey] = username
+	ml[constant.ClusterAccountLabelKey] = username
 	return renderSecret(key, username, ml, fromSecret.Data)
 }
 
@@ -266,13 +266,13 @@ func getAccountFacts(secrets *corev1.SecretList, jobs *batchv1.JobList) (detecte
 	detectedFacts = appsv1alpha1.KBAccountInvalid
 	// parse account name from secret's label
 	for _, secret := range secrets.Items {
-		if accountName, exists := secret.ObjectMeta.Labels[clusterAccountLabelKey]; exists {
+		if accountName, exists := secret.ObjectMeta.Labels[constant.ClusterAccountLabelKey]; exists {
 			updateFacts(appsv1alpha1.AccountName(accountName), &detectedFacts)
 		}
 	}
 	// parse account name from job's label
 	for _, job := range jobs.Items {
-		if accountName, exists := job.ObjectMeta.Labels[clusterAccountLabelKey]; exists {
+		if accountName, exists := job.ObjectMeta.Labels[constant.ClusterAccountLabelKey]; exists {
 			updateFacts(appsv1alpha1.AccountName(accountName), &detectedFacts)
 		}
 	}
@@ -355,7 +355,7 @@ func calibrateJobMetaAndSpec(job *batchv1.Job, cluster *appsv1alpha1.Cluster, co
 	debugModeOn := getDebugMode(cluster.Annotations[debugClusterAnnotationKey])
 	// add label
 	ml := getLabelsForSecretsAndJobs(compKey)
-	ml[clusterAccountLabelKey] = (string)(account)
+	ml[constant.ClusterAccountLabelKey] = (string)(account)
 	job.ObjectMeta.Labels = ml
 
 	// if debug mode is on, jobs will retain after execution.

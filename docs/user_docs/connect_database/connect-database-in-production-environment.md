@@ -4,6 +4,7 @@ In the production environment, it is normal to connect database with CLI and SDK
 - Scenario 2: Client2 is outside the Kubernetes cluster, but it is in the same VPC as the database. To connect client2 and database, see Procedure 5 or 6.
 - Scenario 3: Client3 and the database are in different VPCs, such as other VPCs or the public network. To connect client3 and database, see Procedure 4.
 See the figure below to get a clear image of the network location.
+![Example](../../img/connect_database_in_a_production_environment.png)
 ##Procedure 3.  To connect database in the same Kubernetes cluster.
  you can connect with database ClusterIP or domain name. To check the database address, use ```kbcli cluster describe ${cluster-name}```.
 

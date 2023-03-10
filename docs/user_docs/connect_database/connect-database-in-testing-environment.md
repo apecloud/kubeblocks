@@ -14,3 +14,5 @@ Information printed includes database addresses, port No., username, password.  
 - User: -u is the user name.
 - Password: -p shows the password. In the example below, it is hQBCKZLI. 
 >Note: the password does not include -p.
+
+![Example](../../img/connect_database_with_CLI_or_SDK_client.png)

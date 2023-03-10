@@ -1,5 +1,5 @@
 apiVersion: v2
-name: apecloud-redis-rep-cluster
+name: redis-cluster
 description: An Redis Replication Cluster Helm chart for KubeBlocks.
 
 # A chart can be either an 'application' or a 'library' chart.

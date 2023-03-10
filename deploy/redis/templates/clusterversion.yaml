@@ -5,7 +5,7 @@ metadata:
   labels:
     {{- include "redis.labels" . | nindent 4 }}
 spec:
-  clusterDefinitionRef: apecloud-redis
+  clusterDefinitionRef: redis
   componentVersions:
   - componentDefRef: redis
     versionsContext:

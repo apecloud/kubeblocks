@@ -3,10 +3,10 @@ kind: ClusterVersion
 metadata:
   name: redis-7.0.5-latest
 spec:
-  clusterDefinitionRef: apecloud-postgresql
-    componentVersions:
-        - componentDefRef: apecloud-redis
-          versionsContext:
-            containers:
-              - name: redis
-                image: docker.io/apecloud/redis:latest
+  clusterDefinitionRef: redis
+  componentVersions:
+    - componentDefRef: redis
+      versionsContext:
+        containers:
+          - name: redis
+            image: docker.io/apecloud/redis:latest

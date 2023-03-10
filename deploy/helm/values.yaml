@@ -1580,7 +1580,7 @@ alertmanager-webhook-adaptor:
     registry: registry.cn-hangzhou.aliyuncs.com
     repository: apecloud/alertmanager-webhook-adaptor
     pullPolicy: IfNotPresent
-    tag: "0.1.1"
+    tag: "0.1.2"
 
   ## ConfigMap override where fullname is {{.Release.Name}}-{{.Values.configMapOverrideName}}
   ##

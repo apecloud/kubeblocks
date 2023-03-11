@@ -114,28 +114,36 @@ func (c *objectActionTransformer) Transform(dag *graph.DAG) error {
 	oldNameSet := sets.KeySet(oldSnapshot)
 	newNameSet := sets.KeySet(newNameVertices)
 
-	// case cluster Deletion
-	if !c.cc.cluster.DeletionTimestamp.IsZero() {
-		// TODO: handle deletion
-		return nil
-	}
-	// case cluster Creation or Update
 	deleteSet := oldNameSet.Difference(newNameSet)
 	createSet := newNameSet.Difference(oldNameSet)
 	updateSet := newNameSet.Intersection(oldNameSet)
-	// dag root is our cluster object
+
 	root := dag.Root()
 	if root == nil {
 		return fmt.Errorf("root vertex not found: %v", dag)
 	}
+
 	for name := range deleteSet {
 		v := &lifecycleVertex{
 			obj:    oldSnapshot[name],
+			oriObj: oldSnapshot[name],
 			action: actionPtr(DELETE),
 		}
 		dag.AddVertex(v)
 		dag.Connect(root, v)
 	}
+
+	// case cluster Deletion
+	if !c.cc.cluster.DeletionTimestamp.IsZero() {
+		for _, vertex := range dag.Vertices() {
+			v, _ := vertex.(*lifecycleVertex)
+			v.action = actionPtr(DELETE)
+		}
+		return nil
+	}
+
+	// case cluster Creation or Update
+	// dag root is our cluster object
 	for name := range createSet {
 		v, _ := newNameVertices[name].(*lifecycleVertex)
 		v.action = actionPtr(CREATE)

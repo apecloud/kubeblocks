@@ -41,13 +41,17 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
-type horizontalScalingTransformer struct {
+type stsHorizontalScalingTransformer struct {
 	cc  compoundCluster
 	cli client.Client
 	ctx intctrlutil.RequestCtx
 }
 
-func (h *horizontalScalingTransformer) Transform(dag *graph.DAG) error {
+func (s *stsHorizontalScalingTransformer) Transform(dag *graph.DAG) error {
+	if !s.cc.cluster.DeletionTimestamp.IsZero() {
+		return nil
+	}
+
 	handleHorizontalScaling := func(vertex *lifecycleVertex) error {
 		stsObj, _ := vertex.oriObj.(*appsv1.StatefulSet)
 		stsProto, _ := vertex.obj.(*appsv1.StatefulSet)
@@ -65,14 +69,14 @@ func (h *horizontalScalingTransformer) Transform(dag *graph.DAG) error {
 		}
 		// find component of current statefulset
 		componentName := stsObj.Labels[constant.KBAppComponentLabelKey]
-		components := mergeComponentsList(h.ctx,
-			*h.cc.cluster,
-			h.cc.cd,
-			h.cc.cd.Spec.ComponentDefs,
-			h.cc.cluster.Spec.ComponentSpecs)
+		components := mergeComponentsList(s.ctx,
+			*s.cc.cluster,
+			s.cc.cd,
+			s.cc.cd.Spec.ComponentDefs,
+			s.cc.cluster.Spec.ComponentSpecs)
 		component := getComponent(components, componentName)
 		if component == nil {
-			h.ctx.Recorder.Eventf(h.cc.cluster,
+			s.ctx.Recorder.Eventf(s.cc.cluster,
 				corev1.EventTypeWarning,
 				"HorizontalScaleFailed",
 				"component %s not found",
@@ -90,7 +94,7 @@ func (h *horizontalScalingTransformer) Transform(dag *graph.DAG) error {
 					cronJobKey := pvcKey
 					cronJobKey.Name = "delete-pvc-" + pvcKey.Name
 					cronJob := &batchv1.CronJob{}
-					if err := h.cli.Get(h.ctx.Ctx, cronJobKey, cronJob); err != nil {
+					if err := s.cli.Get(s.ctx.Ctx, cronJobKey, cronJob); err != nil {
 						return client.IgnoreNotFound(err)
 					}
 					v := &lifecycleVertex{
@@ -112,7 +116,7 @@ func (h *horizontalScalingTransformer) Transform(dag *graph.DAG) error {
 						Name:      fmt.Sprintf("%s-%s-%d", vct.Name, stsObj.Name, i),
 					}
 					// check pvc existence
-					pvcExists, err := isPVCExists(h.cli, h.ctx.Ctx, pvcKey)
+					pvcExists, err := isPVCExists(s.cli, s.ctx.Ctx, pvcKey)
 					if err != nil {
 						return true, err
 					}
@@ -137,9 +141,9 @@ func (h *horizontalScalingTransformer) Transform(dag *graph.DAG) error {
 				return
 			}
 			// do backup according to component's horizontal scale policy
-			return doBackup(h.ctx,
-				h.cli,
-				h.cc.cluster,
+			return doBackup(s.ctx,
+				s.cli,
+				s.cc.cluster,
 				component,
 				stsObj,
 				stsProto,
@@ -158,7 +162,7 @@ func (h *horizontalScalingTransformer) Transform(dag *graph.DAG) error {
 						Name:      fmt.Sprintf("%s-%s-%d", vct.Name, stsObj.Name, i),
 					}
 					// create cronjob to delete pvc after 30 minutes
-					if err := createDeletePVCCronJob(h.cli, h.ctx, pvcKey, stsObj, h.cc.cluster); err != nil {
+					if err := createDeletePVCCronJob(s.cli, s.ctx, pvcKey, stsObj, s.cc.cluster); err != nil {
 						return err
 					}
 				}
@@ -171,10 +175,10 @@ func (h *horizontalScalingTransformer) Transform(dag *graph.DAG) error {
 			err = nil
 			if component.HorizontalScalePolicy == nil ||
 				component.HorizontalScalePolicy.Type != appsv1alpha1.HScaleDataClonePolicyFromSnapshot ||
-				!isSnapshotAvailable(h.cli, h.ctx.Ctx) {
+				!isSnapshotAvailable(s.cli, s.ctx.Ctx) {
 				return
 			}
-			allPVCBound, err := isAllPVCBound(h.cli, h.ctx.Ctx, stsObj)
+			allPVCBound, err := isAllPVCBound(s.cli, s.ctx.Ctx, stsObj)
 			if err != nil {
 				return
 			}
@@ -189,11 +193,11 @@ func (h *horizontalScalingTransformer) Transform(dag *graph.DAG) error {
 		cleanBackupResourcesIfNeeded := func() error {
 			if component.HorizontalScalePolicy == nil ||
 				component.HorizontalScalePolicy.Type != appsv1alpha1.HScaleDataClonePolicyFromSnapshot ||
-				!isSnapshotAvailable(h.cli, h.ctx.Ctx) {
+				!isSnapshotAvailable(s.cli, s.ctx.Ctx) {
 				return nil
 			}
 			// if all pvc bounded, clean backup resources
-			return deleteSnapshot(h.cli, h.ctx, snapshotKey, h.cc.cluster, component)
+			return deleteSnapshot(s.cli, s.ctx, snapshotKey, s.cc.cluster, component)
 		}
 
 		// when horizontal scaling up, sometimes db needs backup to sync data from master,
@@ -212,7 +216,7 @@ func (h *horizontalScalingTransformer) Transform(dag *graph.DAG) error {
 			}
 		}
 		if *stsObj.Spec.Replicas != *stsProto.Spec.Replicas {
-			h.ctx.Recorder.Eventf(h.cc.cluster,
+			s.ctx.Recorder.Eventf(s.cc.cluster,
 				corev1.EventTypeNormal,
 				"HorizontalScale",
 				"Start horizontal scale component %s from %d to %d",
@@ -244,10 +248,11 @@ func (h *horizontalScalingTransformer) Transform(dag *graph.DAG) error {
 	}
 	for _, vertex := range vertices {
 		v, _ := vertex.(*lifecycleVertex)
-		if v.obj != nil && v.oriObj != nil && v.action != nil && *v.action == UPDATE {
-			if err := handleHorizontalScaling(v); err != nil {
-				return err
-			}
+		if v.obj == nil || v.oriObj == nil {
+			continue
+		}
+		if err := handleHorizontalScaling(v); err != nil {
+			return err
 		}
 	}
 	return nil

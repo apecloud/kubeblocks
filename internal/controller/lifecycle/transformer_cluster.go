@@ -45,6 +45,11 @@ func (c *clusterTransformer) Transform(dag *graph.DAG) error {
 	rootVertex := &lifecycleVertex{obj: c.cc.cluster, oriObj: oriCluster}
 	dag.AddVertex(rootVertex)
 
+	// return fast when cluster is deleting
+	if !c.cc.cluster.DeletionTimestamp.IsZero() {
+		return nil
+	}
+
 	// we copy the K8s objects prepare stage directly first
 	// TODO: refactor plan.PrepareComponentResources
 	resourcesQueue := make([]client.Object, 0, 3)

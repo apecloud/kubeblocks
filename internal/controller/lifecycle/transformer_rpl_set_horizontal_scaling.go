@@ -35,6 +35,10 @@ type rplSetHorizontalScalingTransformer struct {
 }
 
 func (r *rplSetHorizontalScalingTransformer) Transform(dag *graph.DAG) error {
+	if !r.cc.cluster.DeletionTimestamp.IsZero() {
+		return nil
+	}
+
 	hasScaling, err := r.hasReplicationSetHScaling()
 	if err != nil {
 		return err

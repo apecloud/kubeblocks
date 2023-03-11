@@ -212,15 +212,8 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		cluster:  cluster,
 	}
 
-	res, err := intctrlutil.HandleCRDeletion(reqCtx, r, cluster, dbClusterFinalizerName, func() (*ctrl.Result, error) {
-		return r.deleteExternalResources(reqCtx, cluster)
-	})
-	if res != nil {
-		return *res, err
-	}
-
 	// should patch the label first to prevent the label from being modified by the user.
-	if err = r.patchClusterLabelsIfNotExist(ctx, cluster); err != nil {
+	if err := r.patchClusterLabelsIfNotExist(ctx, cluster); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 
@@ -235,6 +228,46 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		// If using RequeueWithError and the user fixed this error,
 		// it may take up to 1000s to reconcile again, causing the user to think that the repair is not effective.
 		return intctrlutil.RequeueAfter(ControllerErrorRequeueTime, reqCtx.Log, "")
+	}
+
+	clusterVersion := &appsv1alpha1.ClusterVersion{}
+	if len(cluster.Spec.ClusterVersionRef) > 0 {
+		if err := r.Client.Get(reqCtx.Ctx, types.NamespacedName{
+			Name: cluster.Spec.ClusterVersionRef,
+		}, clusterVersion); err != nil {
+			// this is a block to handle error.
+			// so when update cluster conditions failed, we can ignore it.
+			_ = clusterConditionMgr.setPreCheckErrorCondition(err)
+			return intctrlutil.RequeueAfter(ControllerErrorRequeueTime, reqCtx.Log, "")
+		}
+		if res, err := r.checkReferencedCRStatus(reqCtx, clusterConditionMgr, clusterVersion.Status.Phase,
+			appsv1alpha1.ClusterVersionKind, clusterVersion.Name); res != nil {
+			return *res, err
+		}
+	}
+
+	if res, err := r.checkReferencedCRStatus(reqCtx, clusterConditionMgr, clusterDefinition.Status.Phase,
+		appsv1alpha1.ClusterDefinitionKind, clusterDefinition.Name); res != nil {
+		return *res, err
+	}
+
+	// validate config and send warning event log necessarily
+	if err := cluster.ValidateEnabledLogs(clusterDefinition); err != nil {
+		_ = clusterConditionMgr.setPreCheckErrorCondition(err)
+		return intctrlutil.RequeueAfter(ControllerErrorRequeueTime, reqCtx.Log, "")
+	}
+
+	// validate primaryIndex and send warning event log necessarily
+	if err := cluster.ValidatePrimaryIndex(clusterDefinition); err != nil {
+		_ = clusterConditionMgr.setPreCheckErrorCondition(err)
+		return intctrlutil.RequeueWithError(err, reqCtx.Log, "")
+	}
+
+	res, err := intctrlutil.HandleCRDeletion(reqCtx, r, cluster, dbClusterFinalizerName, func() (*ctrl.Result, error) {
+		return r.deleteExternalResources(reqCtx, cluster)
+	})
+	if res != nil {
+		return *res, err
 	}
 
 	if cluster.Status.ObservedGeneration == cluster.Generation {
@@ -257,39 +290,6 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	reqCtx.Log.Info("update cluster status")
 	if err = r.updateClusterPhaseToCreatingOrUpdating(reqCtx, cluster); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-	}
-
-	clusterVersion := &appsv1alpha1.ClusterVersion{}
-	if len(cluster.Spec.ClusterVersionRef) > 0 {
-		if err := r.Client.Get(reqCtx.Ctx, types.NamespacedName{
-			Name: cluster.Spec.ClusterVersionRef,
-		}, clusterVersion); err != nil {
-			// this is a block to handle error.
-			// so when update cluster conditions failed, we can ignore it.
-			_ = clusterConditionMgr.setPreCheckErrorCondition(err)
-			return intctrlutil.RequeueAfter(ControllerErrorRequeueTime, reqCtx.Log, "")
-		}
-		if res, err = r.checkReferencedCRStatus(reqCtx, clusterConditionMgr, clusterVersion.Status.Phase,
-			appsv1alpha1.ClusterVersionKind, clusterVersion.Name); res != nil {
-			return *res, err
-		}
-	}
-
-	if res, err = r.checkReferencedCRStatus(reqCtx, clusterConditionMgr, clusterDefinition.Status.Phase,
-		appsv1alpha1.ClusterDefinitionKind, clusterDefinition.Name); res != nil {
-		return *res, err
-	}
-
-	// validate config and send warning event log necessarily
-	if err = cluster.ValidateEnabledLogs(clusterDefinition); err != nil {
-		_ = clusterConditionMgr.setPreCheckErrorCondition(err)
-		return intctrlutil.RequeueAfter(ControllerErrorRequeueTime, reqCtx.Log, "")
-	}
-
-	// validate primaryIndex and send warning event log necessarily
-	if err = cluster.ValidatePrimaryIndex(clusterDefinition); err != nil {
-		_ = clusterConditionMgr.setPreCheckErrorCondition(err)
-		return intctrlutil.RequeueWithError(err, reqCtx.Log, "")
 	}
 
 	// preCheck succeed, starting the cluster provisioning

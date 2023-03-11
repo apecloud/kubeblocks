@@ -28,13 +28,17 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
-type statefulSetPVCTransformer struct {
+type stsPVCTransformer struct {
 	cc  compoundCluster
 	cli client.Client
 	ctx intctrlutil.RequestCtx
 }
 
-func (s *statefulSetPVCTransformer) Transform(dag *graph.DAG) error {
+func (s *stsPVCTransformer) Transform(dag *graph.DAG) error {
+	if !s.cc.cluster.DeletionTimestamp.IsZero() {
+		return nil
+	}
+
 	handlePVCUpdate := func(vertex *lifecycleVertex) error {
 		stsObj, _ := vertex.oriObj.(*appsv1.StatefulSet)
 		stsProto, _ := vertex.obj.(*appsv1.StatefulSet)

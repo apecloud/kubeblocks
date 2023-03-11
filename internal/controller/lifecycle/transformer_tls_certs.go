@@ -36,6 +36,11 @@ type tlsCertsTransformer struct {
 }
 
 func (t *tlsCertsTransformer) Transform(dag *graph.DAG) error {
+	// return fast when cluster is deleting
+	if !t.cc.cluster.DeletionTimestamp.IsZero() {
+		return nil
+	}
+
 	var secretList []*corev1.Secret
 	for _, comp := range t.cc.cluster.Spec.ComponentSpecs {
 		if !comp.TLS {

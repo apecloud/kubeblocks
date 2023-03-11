@@ -28,6 +28,10 @@ type clusterStatusTransformer struct {
 }
 
 func (c *clusterStatusTransformer) Transform(dag *graph.DAG) error {
+	if !c.cluster.DeletionTimestamp.IsZero() {
+		return nil
+	}
+
 	// get root(cluster) vertex
 	rootVertex := dag.Root()
 	if rootVertex == nil {

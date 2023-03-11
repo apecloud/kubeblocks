@@ -382,7 +382,7 @@ func CheckEmpty(str string) string {
 // like "instance-key in (name1, name2)"
 func BuildLabelSelectorByNames(selector string, names []string) string {
 	if len(names) == 0 {
-		return ""
+		return selector
 	}
 
 	label := fmt.Sprintf("%s in (%s)", constant.AppInstanceLabelKey, strings.Join(names, ","))

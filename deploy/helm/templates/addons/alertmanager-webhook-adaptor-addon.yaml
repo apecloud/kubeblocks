@@ -1,9 +1,13 @@
 apiVersion: extensions.kubeblocks.io/v1alpha1
 kind: Addon
 metadata:
-  name: alertmanager-webhook-adaptor
+  name: {{ include "addon.alertmanager-webhook-adaptor.name" . }}
   labels:
     {{- include "kubeblocks.labels" . | nindent 4 }}
+  {{- if .Values.keepAddons }}
+  annotations:
+    helm.sh/resource-policy: keep
+  {{- end }}
 spec:
   description: 'alertmanager webhook adaptor for extending alertmanager notification channels'
   type: Helm
@@ -14,7 +18,7 @@ spec:
 
     installValues:
       configMapRefs:
-        - name: alertmanager-webhook-adaptor-chart-kubeblocks-values
+        - name: {{ include "addon.alertmanager-webhook-adaptor.name" . }}-chart-kubeblocks-values
           key: values-kubeblocks-override.yaml
 
     valuesMapping:
@@ -36,4 +40,4 @@ spec:
     - replicas: 1
 
   installable:
-    autoInstall: {{ get ( get ( .Values | toYaml | fromYaml ) "alertmanager-webhook-adaptor" ) "enabled" }}
+    autoInstall: {{ .Values.prometheus.enabled }}

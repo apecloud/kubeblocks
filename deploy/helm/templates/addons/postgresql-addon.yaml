@@ -4,6 +4,10 @@ metadata:
   name: postgresql
   labels:
     {{- include "kubeblocks.labels" . | nindent 4 }}
+  {{- if .Values.keepAddons }}
+  annotations:
+    helm.sh/resource-policy: keep
+  {{- end }}
 spec:
   description: 'PostgreSQL (Postgres) is an open source object-relational database known for reliability and data integrity. ACID-compliant, it supports foreign keys, joins, views, triggers and stored procedures.'
 
@@ -11,7 +15,7 @@ spec:
 
   helm:
     # chartLocationURL: https://github.com/apecloud/helm-charts/releases/download/postgresql-{{ default .Chart.Version .Values.versionOverride }}/postgresql-{{ default .Chart.Version .Values.versionOverride }}.tgz
-    chartLocationURL: https://jihulab.com/api/v4/projects/85949/packages/helm/stable/charts/postgres-{{ default .Chart.Version .Values.versionOverride }}.tgz
+    chartLocationURL: https://jihulab.com/api/v4/projects/85949/packages/helm/stable/charts/postgresql-{{ default .Chart.Version .Values.versionOverride }}.tgz
 
   installable:
     autoInstall: true

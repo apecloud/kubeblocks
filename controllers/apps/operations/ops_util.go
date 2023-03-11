@@ -49,7 +49,7 @@ func ReconcileActionWithComponentOps(opsRes *OpsResource,
 	var (
 		opsRequest = opsRes.OpsRequest
 		// check if all components of the OpsRequest are processed.
-		isCompleted              = true
+		allCompsAreCompleted     = true
 		isFailed                 bool
 		opsRequestPhase          = appsv1alpha1.RunningPhase
 		clusterDef               *appsv1alpha1.ClusterDefinition
@@ -79,7 +79,7 @@ func ReconcileActionWithComponentOps(opsRes *OpsResource,
 			continue
 		}
 		if !util.IsCompleted(v.Phase) {
-			isCompleted = false
+			allCompsAreCompleted = false
 		}
 		if util.IsFailedOrAbnormal(v.Phase) {
 			isFailed = true
@@ -111,9 +111,14 @@ func ReconcileActionWithComponentOps(opsRes *OpsResource,
 		}
 	}
 	// wait for all components to finish processing.
-	if !isCompleted {
+	if !allCompsAreCompleted {
 		return opsRequestPhase, 0, nil
 	}
+
+	if completedProgressCount != expectProgressCount {
+		return opsRequestPhase, time.Second, nil
+	}
+
 	if isFailed {
 		opsRequestPhase = appsv1alpha1.FailedPhase
 	} else {

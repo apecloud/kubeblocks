@@ -46,7 +46,7 @@ import (
 )
 
 const (
-	kMonitorParam      = "prometheus.enabled=%[1]t,grafana.enabled=%[1]t,dashboards.enabled=%[1]t,alertmanager-webhook-adaptor.enabled=%[1]t"
+	kMonitorParam      = "prometheus.enabled=%[1]t,grafana.enabled=%[1]t,dashboards.enabled=%[1]t"
 	requiredK8sVersion = "1.22.0"
 )
 

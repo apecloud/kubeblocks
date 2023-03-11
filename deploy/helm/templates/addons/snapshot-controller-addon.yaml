@@ -4,6 +4,10 @@ metadata:
   name: snapshot-controller
   labels:
     {{- include "kubeblocks.labels" . | nindent 4 }}
+  {{- if .Values.keepAddons }}
+  annotations:
+    helm.sh/resource-policy: keep
+  {{- end }}
 spec:
   description: 'Deploys a Snapshot Controller in a cluster. Snapshot Controllers are
     often bundled with the Kubernetes distribution, this chart is meant for cases where

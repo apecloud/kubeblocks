@@ -18,6 +18,7 @@ package lifecycle
 
 import (
 	"encoding/json"
+	"fmt"
 	"reflect"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -41,10 +42,6 @@ type clusterTransformer struct {
 }
 
 func (c *clusterTransformer) Transform(dag *graph.DAG) error {
-	// put the cluster object first, it will be root vertex of DAG
-	oriCluster := c.cc.cluster.DeepCopy()
-	rootVertex := &lifecycleVertex{obj: c.cc.cluster, oriObj: oriCluster}
-	dag.AddVertex(rootVertex)
 
 	// return fast when cluster is deleting
 	if !c.cc.cluster.DeletionTimestamp.IsZero() {
@@ -107,10 +104,14 @@ func (c *clusterTransformer) Transform(dag *graph.DAG) error {
 	// dedup them
 	objects := deDupResources(*task.Resources)
 	// now task.Resources to DAG vertices
+	root := dag.Root()
+	if root == nil {
+		return fmt.Errorf("root vertex not found: %v", dag)
+	}
 	for _, object := range objects {
 		vertex := &lifecycleVertex{obj: object}
 		dag.AddVertex(vertex)
-		dag.Connect(rootVertex, vertex)
+		dag.Connect(root, vertex)
 	}
 	return nil
 }

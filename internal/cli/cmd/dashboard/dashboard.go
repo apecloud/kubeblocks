@@ -46,6 +46,7 @@ const (
 
 type dashboard struct {
 	Name         string
+	AddonName    string
 	Port         string
 	TargetPort   string
 	Namespace    string
@@ -58,16 +59,19 @@ type dashboard struct {
 var (
 	dashboards = [...]*dashboard{
 		{
-			Name:  "kubeblocks-grafana",
-			Label: "app.kubernetes.io/instance=kubeblocks,app.kubernetes.io/name=grafana",
+			Name:      "kubeblocks-grafana",
+			AddonName: "kb-addon-grafana",
+			Label:     "app.kubernetes.io/instance=kb-addon-grafana,app.kubernetes.io/name=grafana",
 		},
 		{
-			Name:  "kubeblocks-prometheus-alertmanager",
-			Label: "app=prometheus,component=alertmanager,release=kubeblocks",
+			Name:      "kubeblocks-prometheus-alertmanager",
+			AddonName: "kb-addon-prometheus-alertmanager",
+			Label:     "app=prometheus,component=alertmanager,release=kb-addon-prometheus",
 		},
 		{
-			Name:  "kubeblocks-prometheus-server",
-			Label: "app=prometheus,component=server,release=kubeblocks",
+			Name:      "kubeblocks-prometheus-server",
+			AddonName: "kb-addon-prometheus-server",
+			Label:     "app=prometheus,component=server,release=kb-addon-prometheus",
 		},
 	}
 )
@@ -211,7 +215,7 @@ func (o *openOptions) complete(cmd *cobra.Command, args []string) error {
 		o.localPort = dash.TargetPort
 	}
 
-	pfArgs := []string{fmt.Sprintf("svc/%s", o.name), fmt.Sprintf("%s:%s", o.localPort, dash.Port)}
+	pfArgs := []string{fmt.Sprintf("svc/%s", dash.AddonName), fmt.Sprintf("%s:%s", o.localPort, dash.Port)}
 	o.portForwardOptions.Namespace = dash.Namespace
 	o.portForwardOptions.Address = []string{"127.0.0.1"}
 	return o.portForwardOptions.Complete(newFactory(dash.Namespace), cmd, pfArgs)
@@ -258,7 +262,7 @@ func getDashboardInfo(client *kubernetes.Clientset) error {
 
 		// find the dashboard service
 		for i, s := range svcs.Items {
-			if s.Name == d.Name {
+			if s.Name == d.AddonName {
 				svc = &svcs.Items[i]
 				break
 			}

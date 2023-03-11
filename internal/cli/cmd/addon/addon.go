@@ -64,11 +64,6 @@ func (r *addonEnableFlags) useDefault() bool {
 		len(r.TolerationsSet) == 0
 }
 
-// type addonDescribeCmdOpts struct {
-// 	Factory cmdutil.Factory
-// 	genericclioptions.IOStreams
-// }
-
 type addonCmdOpts struct {
 	genericclioptions.IOStreams
 
@@ -466,7 +461,7 @@ func (o *addonCmdOpts) buildEnablePatch(flags []*pflag.Flag, spec, install map[s
 			return nil, fmt.Errorf("wrong flag value --%s=%s", flag, s)
 		}
 		reqLim := [2]resource.Quantity{}
-		proccessTuple := func(i int) error {
+		processTuple := func(i int) error {
 			if t[i] == "" {
 				return nil
 			}
@@ -478,7 +473,7 @@ func (o *addonCmdOpts) buildEnablePatch(flags []*pflag.Flag, spec, install map[s
 			return nil
 		}
 		for i := range t {
-			if err := proccessTuple(i); err != nil {
+			if err := processTuple(i); err != nil {
 				return nil, fmt.Errorf("wrong flag value --%s=%s, with error %v", flag, s, err)
 			}
 		}

@@ -73,7 +73,7 @@ var mockBaseOptions = func(s genericclioptions.IOStreams) baseOptions {
         url: https://oapi.dingtalk.com/robot/send?access_token=123456
       type: dingtalk-webhook`
 	alertCM := mockConfigmap(alertConfigmapName, alertConfigFileName, alertManagerConfig)
-	webhookAdaptorCM := mockConfigmap(webhookAdaptorName, webhookAdaptorFileName, webhookAdaptorConfig)
+	webhookAdaptorCM := mockConfigmap(webhookAdaptorConfigmapName, webhookAdaptorFileName, webhookAdaptorConfig)
 	o.alterConfigMap = alertCM
 	o.webhookConfigMap = webhookAdaptorCM
 	return o
@@ -130,7 +130,7 @@ var _ = Describe("add receiver", func() {
 		o.emails = []string{"foo@bar.com", "foo1@bar.com,foo2@bar.com"}
 		o.webhooks = []string{"url=https://oapi.dingtalk.com/robot/send", "url=https://oapi.dingtalk.com/robot/send,url=https://oapi.dingtalk.com/robot/send?"}
 		o.slacks = []string{"api_url=https://foo.com,channel=foo,username=test"}
-		o.webhookConfigMap = mockConfigmap(webhookAdaptorName, webhookAdaptorFileName, "")
+		o.webhookConfigMap = mockConfigmap(webhookAdaptorConfigmapName, webhookAdaptorFileName, "")
 		Expect(o.buildReceiver()).Should(Succeed())
 		Expect(o.receiver).ShouldNot(BeNil())
 		Expect(o.receiver.EmailConfigs).Should(HaveLen(3))
@@ -154,7 +154,7 @@ var _ = Describe("add receiver", func() {
 	It("run", func() {
 		o := addReceiverOptions{baseOptions: baseOptions{IOStreams: s}}
 		alertCM := mockConfigmap(alertConfigmapName, alertConfigFileName, "")
-		webhookAdaptorCM := mockConfigmap(webhookAdaptorName, webhookAdaptorFileName, "")
+		webhookAdaptorCM := mockConfigmap(webhookAdaptorConfigmapName, webhookAdaptorFileName, "")
 		o.baseOptions.alterConfigMap = alertCM
 		o.baseOptions.webhookConfigMap = webhookAdaptorCM
 		o.client = testing.FakeClientSet(alertCM, webhookAdaptorCM)

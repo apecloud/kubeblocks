@@ -106,14 +106,17 @@ var (
 	// GitLabHelmChartRepo the helm chart repo in GitLab
 	GitLabHelmChartRepo = "https://jihulab.com/api/v4/projects/85949/packages/helm/stable"
 
+	// AddonReleasePrefix is the prefix of addon release name
+	AddonReleasePrefix = "kb-addon"
+
 	// InstanceLabelSelector app.kubernetes.io/instance=kubeblocks, hit most workloads and configuration
 	InstanceLabelSelector = fmt.Sprintf("%s=%s", constant.AppInstanceLabelKey, KubeBlocksChartName)
 
 	// ReleaseLabelSelector release=kubeblocks, for prometheus-alertmanager and prometheus-server
 	ReleaseLabelSelector = fmt.Sprintf("release=%s", KubeBlocksChartName)
 
-	// HelmLabel name=kubeblocks,owner-helm, for helm secret
-	HelmLabel = fmt.Sprintf("%s=%s,%s=%s", "name", KubeBlocksChartName, "owner", "helm")
+	// KubeBlocksHelmLabel name=kubeblocks,owner-helm, for helm secret
+	KubeBlocksHelmLabel = fmt.Sprintf("%s=%s,%s=%s", "name", KubeBlocksChartName, "owner", "helm")
 )
 
 type BackupJobInfo struct {

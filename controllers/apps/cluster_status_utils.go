@@ -233,11 +233,12 @@ func getClusterAvailabilityEffect(componentDef *appsv1alpha1.ClusterComponentDef
 }
 
 // getComponentRelatedInfo gets componentMap, clusterAvailabilityMap and component definition information
-func getComponentRelatedInfo(cluster *appsv1alpha1.Cluster, clusterDef *appsv1alpha1.ClusterDefinition, componentName string) (map[string]string, map[string]bool, appsv1alpha1.ClusterComponentDefinition) {
+func getComponentRelatedInfo(cluster *appsv1alpha1.Cluster, clusterDef *appsv1alpha1.ClusterDefinition,
+	componentName string) (map[string]string, map[string]bool, *appsv1alpha1.ClusterComponentDefinition) {
 	var (
 		compDefName  string
 		componentMap = map[string]string{}
-		componentDef appsv1alpha1.ClusterComponentDefinition
+		componentDef *appsv1alpha1.ClusterComponentDefinition
 	)
 	for _, v := range cluster.Spec.ComponentSpecs {
 		if v.Name == componentName {
@@ -246,10 +247,10 @@ func getComponentRelatedInfo(cluster *appsv1alpha1.Cluster, clusterDef *appsv1al
 		componentMap[v.Name] = v.ComponentDefRef
 	}
 	clusterAvailabilityEffectMap := map[string]bool{}
-	for _, v := range clusterDef.Spec.ComponentDefs {
+	for i, v := range clusterDef.Spec.ComponentDefs {
 		clusterAvailabilityEffectMap[v.Name] = getClusterAvailabilityEffect(&v)
 		if v.Name == compDefName {
-			componentDef = v
+			componentDef = &clusterDef.Spec.ComponentDefs[i]
 		}
 	}
 	return componentMap, clusterAvailabilityEffectMap, componentDef
@@ -286,8 +287,11 @@ func handleClusterStatusByEvent(ctx context.Context, cli client.Client, recorder
 		return nil
 	}
 	// get the component status by event and check whether the component status needs to be synchronized to the cluster
-	component := components.NewComponentByType(ctx, cli, *cluster, componentDef, *clusterComponent)
-	phase, err = component.GetPhaseWhenPodsNotReady(componentName)
+	component, err := components.NewComponentByType(cli, cluster, clusterComponent, *componentDef)
+	if err != nil {
+		return err
+	}
+	phase, err = component.GetPhaseWhenPodsNotReady(ctx, componentName)
 	if err != nil {
 		return err
 	}

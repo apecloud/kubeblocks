@@ -17,7 +17,6 @@ limitations under the License.
 package components
 
 import (
-	"context"
 	"time"
 
 	"k8s.io/client-go/tools/record"
@@ -46,8 +45,33 @@ type componentContext struct {
 	componentSpec *appsv1alpha1.ClusterComponentSpec
 }
 
+// NewComponentByType creates a component object.
+func NewComponentByType(
+	cli client.Client,
+	cluster *appsv1alpha1.Cluster,
+	component *appsv1alpha1.ClusterComponentSpec,
+	componentDef appsv1alpha1.ClusterComponentDefinition,
+) (types.Component, error) {
+	if err := util.ComponentRuntimeReqArgsCheck(cli, cluster, component); err != nil {
+		return nil, err
+	}
+	switch componentDef.WorkloadType {
+	case appsv1alpha1.Consensus:
+		return consensusset.NewConsensusSet(cli, cluster, component, componentDef)
+	case appsv1alpha1.Replication:
+		return replicationset.NewReplicationSet(cli, cluster, component, componentDef)
+	case appsv1alpha1.Stateful:
+		return stateful.NewStateful(cli, cluster, component, componentDef)
+	case appsv1alpha1.Stateless:
+		return stateless.NewStateless(cli, cluster, component, componentDef)
+	default:
+		panic("unknown workload type")
+	}
+}
+
 // newComponentContext creates a componentContext object.
-func newComponentContext(reqCtx intctrlutil.RequestCtx,
+func newComponentContext(
+	reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
 	recorder record.EventRecorder,
 	component types.Component,
@@ -64,10 +88,37 @@ func newComponentContext(reqCtx intctrlutil.RequestCtx,
 	}
 }
 
-func workloadCompClusterReconcile(reqCtx intctrlutil.RequestCtx,
+// updateComponentStatusInClusterStatus updates cluster.Status.Components if the component status changed
+func updateComponentStatusInClusterStatus(
+	compCtx componentContext,
+	cluster *appsv1alpha1.Cluster) (time.Duration, error) {
+	componentStatusSynchronizer, err := newClusterStatusSynchronizer(compCtx.reqCtx.Ctx, compCtx.cli, cluster,
+		compCtx.componentSpec, compCtx.component)
+	if err != nil {
+		return 0, err
+	}
+	if componentStatusSynchronizer == nil {
+		return 0, nil
+	}
+
+	wait, err := componentStatusSynchronizer.Update(compCtx.reqCtx.Ctx, compCtx.obj, &compCtx.reqCtx.Log,
+		compCtx.recorder)
+	if err != nil {
+		return 0, err
+	}
+
+	var requeueAfter time.Duration
+	if wait {
+		requeueAfter = time.Minute
+	}
+	return requeueAfter, opsutil.MarkRunningOpsRequestAnnotation(compCtx.reqCtx.Ctx, compCtx.cli, cluster)
+}
+
+func workloadCompClusterReconcile(
+	reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
 	operand client.Object,
-	processor func(*appsv1alpha1.ClusterComponentSpec, types.Component) (ctrl.Result, error),
+	processor func(*appsv1alpha1.Cluster, *appsv1alpha1.ClusterComponentSpec, types.Component) (ctrl.Result, error),
 ) (ctrl.Result, error) {
 	var err error
 	var cluster *appsv1alpha1.Cluster
@@ -90,47 +141,9 @@ func workloadCompClusterReconcile(reqCtx intctrlutil.RequestCtx,
 		return intctrlutil.Reconciled()
 	}
 	componentDef := clusterDef.GetComponentDefByName(componentSpec.ComponentDefRef)
-	component := NewComponentByType(reqCtx.Ctx, cli, *cluster, *componentDef, *componentSpec)
-	return processor(componentSpec, component)
-}
-
-// NewComponentByType creates a component object
-func NewComponentByType(
-	ctx context.Context,
-	cli client.Client,
-	cluster appsv1alpha1.Cluster,
-	componentDef appsv1alpha1.ClusterComponentDefinition,
-	component appsv1alpha1.ClusterComponentSpec) types.Component {
-	switch componentDef.WorkloadType {
-	case appsv1alpha1.Consensus:
-		return consensusset.NewConsensusSet(ctx, cli, cluster, component, componentDef)
-	case appsv1alpha1.Replication:
-		return replicationset.NewReplicationSet(ctx, cli, cluster, component, componentDef)
-	case appsv1alpha1.Stateful:
-		return stateful.NewStateful(ctx, cli, cluster, component, componentDef)
-	case appsv1alpha1.Stateless:
-		return stateless.NewStateless(ctx, cli, cluster, component, componentDef)
-	default:
-		panic("unknown workload type")
-	}
-}
-
-// updateComponentStatusInClusterStatus updates cluster.Status.Components if the component status changed
-func updateComponentStatusInClusterStatus(compCtx componentContext,
-	cluster *appsv1alpha1.Cluster) (time.Duration, error) {
-	componentStatusSynchronizer := NewClusterStatusSynchronizer(compCtx.reqCtx.Ctx, compCtx.cli, cluster, compCtx.component, compCtx.componentSpec)
-	if componentStatusSynchronizer == nil {
-		return 0, nil
-	}
-
-	wait, err := componentStatusSynchronizer.Update(compCtx.obj, &compCtx.reqCtx.Log, compCtx.recorder)
+	component, err := NewComponentByType(cli, cluster, componentSpec, *componentDef)
 	if err != nil {
-		return 0, err
+		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
-
-	var requeueAfter time.Duration
-	if wait {
-		requeueAfter = time.Minute
-	}
-	return requeueAfter, opsutil.MarkRunningOpsRequestAnnotation(compCtx.reqCtx.Ctx, compCtx.cli, cluster)
+	return processor(cluster, componentSpec, component)
 }

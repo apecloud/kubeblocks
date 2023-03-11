@@ -35,24 +35,23 @@ import (
 
 type ConsensusSet struct {
 	Cli          client.Client
-	Ctx          context.Context
 	Cluster      *appsv1alpha1.Cluster
-	ComponentDef *appsv1alpha1.ClusterComponentDefinition
 	Component    *appsv1alpha1.ClusterComponentSpec
+	componentDef *appsv1alpha1.ClusterComponentDefinition
 }
 
 var _ types.Component = &ConsensusSet{}
 
-func (consensusSet *ConsensusSet) IsRunning(obj client.Object) (bool, error) {
+func (r *ConsensusSet) IsRunning(ctx context.Context, obj client.Object) (bool, error) {
 	if obj == nil {
 		return false, nil
 	}
 	sts := util.ConvertToStatefulSet(obj)
-	isRevisionConsistent, err := util.IsStsAndPodsRevisionConsistent(consensusSet.Ctx, consensusSet.Cli, sts)
+	isRevisionConsistent, err := util.IsStsAndPodsRevisionConsistent(ctx, r.Cli, sts)
 	if err != nil {
 		return false, err
 	}
-	pods, err := util.GetPodListByStatefulSet(consensusSet.Ctx, consensusSet.Cli, sts)
+	pods, err := util.GetPodListByStatefulSet(ctx, r.Cli, sts)
 	if err != nil {
 		return false, err
 	}
@@ -62,30 +61,30 @@ func (consensusSet *ConsensusSet) IsRunning(obj client.Object) (bool, error) {
 		}
 	}
 
-	return util.StatefulSetOfComponentIsReady(sts, isRevisionConsistent, &consensusSet.Component.Replicas), nil
+	return util.StatefulSetOfComponentIsReady(sts, isRevisionConsistent, &r.Component.Replicas), nil
 }
 
-func (consensusSet *ConsensusSet) PodsReady(obj client.Object) (bool, error) {
+func (r *ConsensusSet) PodsReady(ctx context.Context, obj client.Object) (bool, error) {
 	if obj == nil {
 		return false, nil
 	}
 	sts := util.ConvertToStatefulSet(obj)
-	return util.StatefulSetPodsAreReady(sts, consensusSet.Component.Replicas), nil
+	return util.StatefulSetPodsAreReady(sts, r.Component.Replicas), nil
 }
 
-func (consensusSet *ConsensusSet) PodIsAvailable(pod *corev1.Pod, minReadySeconds int32) bool {
+func (r *ConsensusSet) PodIsAvailable(pod *corev1.Pod, minReadySeconds int32) bool {
 	if pod == nil {
 		return false
 	}
 	return intctrlutil.PodIsReadyWithLabel(*pod)
 }
 
-func (consensusSet *ConsensusSet) HandleProbeTimeoutWhenPodsReady(recorder record.EventRecorder) (bool, error) {
+func (r *ConsensusSet) HandleProbeTimeoutWhenPodsReady(ctx context.Context, recorder record.EventRecorder) (bool, error) {
 	var (
 		compStatus    appsv1alpha1.ClusterComponentStatus
 		ok            bool
-		cluster       = consensusSet.Cluster
-		componentName = consensusSet.Component.Name
+		cluster       = r.Cluster
+		componentName = r.Component.Name
 	)
 	if cluster.Status.Components == nil {
 		return true, nil
@@ -96,11 +95,11 @@ func (consensusSet *ConsensusSet) HandleProbeTimeoutWhenPodsReady(recorder recor
 	if compStatus.PodsReadyTime == nil {
 		return true, nil
 	}
-	if !util.IsProbeTimeout(consensusSet.ComponentDef, compStatus.PodsReadyTime) {
+	if !util.IsProbeTimeout(r.componentDef, compStatus.PodsReadyTime) {
 		return true, nil
 	}
 
-	podList, err := util.GetComponentPodList(consensusSet.Ctx, consensusSet.Cli, cluster, componentName)
+	podList, err := util.GetComponentPodList(ctx, r.Cli, *cluster, componentName)
 	if err != nil {
 		return true, err
 	}
@@ -112,7 +111,7 @@ func (consensusSet *ConsensusSet) HandleProbeTimeoutWhenPodsReady(recorder recor
 	patch := client.MergeFrom(cluster.DeepCopy())
 	for _, pod := range podList.Items {
 		role := pod.Labels[constant.RoleLabelKey]
-		if role == consensusSet.ComponentDef.ConsensusSpec.Leader.Name {
+		if role == r.componentDef.ConsensusSpec.Leader.Name {
 			isFailed = false
 		}
 		if role == "" {
@@ -131,25 +130,26 @@ func (consensusSet *ConsensusSet) HandleProbeTimeoutWhenPodsReady(recorder recor
 		compStatus.Phase = appsv1alpha1.AbnormalPhase
 	}
 	cluster.Status.Components[componentName] = compStatus
-	if err = consensusSet.Cli.Status().Patch(consensusSet.Ctx, cluster, patch); err != nil {
+	if err = r.Cli.Status().Patch(ctx, cluster, patch); err != nil {
 		return false, err
 	}
 	if recorder != nil {
-		recorder.Eventf(cluster, corev1.EventTypeWarning, types.RoleProbeTimeoutReason, "pod role detection timed out in Component: "+consensusSet.Component.Name)
+		recorder.Eventf(cluster, corev1.EventTypeWarning, types.RoleProbeTimeoutReason, "pod role detection timed out in Component: "+r.Component.Name)
 	}
 	// when component status changed, mark OpsRequest to reconcile.
-	return false, opsutil.MarkRunningOpsRequestAnnotation(consensusSet.Ctx, consensusSet.Cli, cluster)
+	return false, opsutil.MarkRunningOpsRequestAnnotation(ctx, r.Cli, cluster)
 }
 
-func (consensusSet *ConsensusSet) GetPhaseWhenPodsNotReady(componentName string) (appsv1alpha1.Phase, error) {
+func (r *ConsensusSet) GetPhaseWhenPodsNotReady(ctx context.Context, componentName string) (appsv1alpha1.Phase, error) {
 	stsList := &appsv1.StatefulSetList{}
-	podList, err := util.GetCompRelatedObjectList(consensusSet.Ctx, consensusSet.Cli, consensusSet.Cluster, componentName, stsList)
+	podList, err := util.GetCompRelatedObjectList(ctx, r.Cli, *r.Cluster,
+		componentName, stsList)
 	if err != nil || len(stsList.Items) == 0 {
 		return "", err
 	}
 	stsObj := stsList.Items[0]
 	podCount := len(podList.Items)
-	componentReplicas := consensusSet.Component.Replicas
+	componentReplicas := r.Component.Replicas
 	if podCount == 0 || stsObj.Status.AvailableReplicas == 0 {
 		return util.GetPhaseWithNoAvailableReplicas(componentReplicas), nil
 	}
@@ -157,7 +157,7 @@ func (consensusSet *ConsensusSet) GetPhaseWhenPodsNotReady(componentName string)
 	var (
 		existLatestRevisionFailedPod bool
 		leaderIsReady                bool
-		consensusSpec                = consensusSet.ComponentDef.ConsensusSpec
+		consensusSpec                = r.componentDef.ConsensusSpec
 	)
 	for _, v := range podList.Items {
 		// if the pod is terminating, ignore it
@@ -177,18 +177,17 @@ func (consensusSet *ConsensusSet) GetPhaseWhenPodsNotReady(componentName string)
 		componentReplicas, int32(podCount), stsObj.Status.AvailableReplicas), nil
 }
 
-func (consensusSet *ConsensusSet) HandleUpdate(obj client.Object) error {
-	var (
-		cluster = consensusSet.Cluster
-		ctx     = consensusSet.Ctx
-		cli     = consensusSet.Cli
-	)
+func (r *ConsensusSet) HandleUpdate(ctx context.Context, obj client.Object) error {
+	if r == nil {
+		return nil
+	}
+
 	stsObj := util.ConvertToStatefulSet(obj)
 	// get compDefName from stsObj.name
-	compDefName := cluster.GetComponentDefRefName(stsObj.Labels[constant.KBAppComponentLabelKey])
+	compDefName := r.Cluster.GetComponentDefRefName(stsObj.Labels[constant.KBAppComponentLabelKey])
 
 	// get component from ClusterDefinition by compDefName
-	component, err := util.GetComponentDefByCluster(ctx, cli, cluster, compDefName)
+	component, err := util.GetComponentDefByCluster(ctx, r.Cli, *r.Cluster, compDefName)
 	if err != nil {
 		return err
 	}
@@ -196,7 +195,7 @@ func (consensusSet *ConsensusSet) HandleUpdate(obj client.Object) error {
 	if component == nil || component.WorkloadType != appsv1alpha1.Consensus {
 		return nil
 	}
-	pods, err := util.GetPodListByStatefulSet(ctx, cli, stsObj)
+	pods, err := util.GetPodListByStatefulSet(ctx, r.Cli, stsObj)
 	if err != nil {
 		return err
 	}
@@ -206,8 +205,8 @@ func (consensusSet *ConsensusSet) HandleUpdate(obj client.Object) error {
 
 	// first, get the old status
 	var oldConsensusSetStatus *appsv1alpha1.ConsensusSetStatus
-	if cluster.Status.Components != nil {
-		if v, ok := cluster.Status.Components[componentName]; ok {
+	if r.Cluster.Status.Components != nil {
+		if v, ok := r.Cluster.Status.Components[componentName]; ok {
 			oldConsensusSetStatus = v.ConsensusSetStatus
 		}
 	}
@@ -220,19 +219,19 @@ func (consensusSet *ConsensusSet) HandleUpdate(obj client.Object) error {
 		},
 	}
 	// then, calculate the new status
-	setConsensusSetStatusRoles(newConsensusSetStatus, *component, pods)
+	setConsensusSetStatusRoles(newConsensusSetStatus, component, pods)
 	// if status changed, do update
 	if !cmp.Equal(newConsensusSetStatus, oldConsensusSetStatus) {
-		patch := client.MergeFrom(cluster.DeepCopy())
-		util.InitClusterComponentStatusIfNeed(cluster, componentName, component)
-		componentStatus := cluster.Status.Components[componentName]
+		patch := client.MergeFrom((*r.Cluster).DeepCopy())
+		util.InitClusterComponentStatusIfNeed(r.Cluster, componentName, *component)
+		componentStatus := r.Cluster.Status.Components[componentName]
 		componentStatus.ConsensusSetStatus = newConsensusSetStatus
-		cluster.Status.Components[componentName] = componentStatus
-		if err = cli.Status().Patch(ctx, cluster, patch); err != nil {
+		r.Cluster.Status.Components[componentName] = componentStatus
+		if err = r.Cli.Status().Patch(ctx, r.Cluster, patch); err != nil {
 			return err
 		}
 		// add consensus role info to pod env
-		if err := updateConsensusRoleInfo(ctx, cli, cluster, *component, componentName, pods); err != nil {
+		if err := updateConsensusRoleInfo(ctx, r.Cli, r.Cluster, component, componentName, pods); err != nil {
 			return err
 		}
 	}
@@ -254,23 +253,25 @@ func (consensusSet *ConsensusSet) HandleUpdate(obj client.Object) error {
 	// we don't check whether pod role label present: prefer stateful set's Update done than role probing ready
 
 	// generate the pods Deletion plan
-	plan := generateConsensusUpdatePlan(ctx, cli, stsObj, pods, *component)
+	plan := generateConsensusUpdatePlan(ctx, r.Cli, stsObj, pods, *component)
 	// execute plan
 	if _, err := plan.WalkOneStep(); err != nil {
 		return err
 	}
 	return nil
 }
-func NewConsensusSet(ctx context.Context,
+func NewConsensusSet(
 	cli client.Client,
-	cluster appsv1alpha1.Cluster,
-	component appsv1alpha1.ClusterComponentSpec,
-	componentDef appsv1alpha1.ClusterComponentDefinition) types.Component {
-	return &ConsensusSet{
-		Ctx:          ctx,
-		Cli:          cli,
-		Cluster:      &cluster,
-		ComponentDef: &componentDef,
-		Component:    &component,
+	cluster *appsv1alpha1.Cluster,
+	component *appsv1alpha1.ClusterComponentSpec,
+	componentDef appsv1alpha1.ClusterComponentDefinition) (*ConsensusSet, error) {
+	if err := util.ComponentRuntimeReqArgsCheck(cli, cluster, component); err != nil {
+		return nil, err
 	}
+	return &ConsensusSet{
+		Cli:          cli,
+		Cluster:      cluster,
+		Component:    component,
+		componentDef: &componentDef,
+	}, nil
 }

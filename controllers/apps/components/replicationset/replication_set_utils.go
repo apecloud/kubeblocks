@@ -47,17 +47,18 @@ func HandleReplicationSet(ctx context.Context,
 	cli client.Client,
 	cluster *appsv1alpha1.Cluster,
 	stsList []*appsv1.StatefulSet) error {
-
+	if cluster == nil {
+		return nil
+	}
 	// handle replication workload horizontal scaling
-	if err := HandleReplicationSetHorizontalScale(ctx, cli, cluster, stsList); err != nil {
+	if err := handleReplicationSetHorizontalScale(ctx, cli, cluster, stsList); err != nil {
 		return err
 	}
-
 	return nil
 }
 
-// HandleReplicationSetHorizontalScale handles changes of replication workload replicas and synchronizes cluster status.
-func HandleReplicationSetHorizontalScale(ctx context.Context,
+// handleReplicationSetHorizontalScale handles changes of replication workload replicas and synchronizes cluster status.
+func handleReplicationSetHorizontalScale(ctx context.Context,
 	cli client.Client,
 	cluster *appsv1alpha1.Cluster,
 	stsList []*appsv1.StatefulSet) error {
@@ -109,7 +110,7 @@ func HandleReplicationSetHorizontalScale(ctx context.Context,
 
 	// sync cluster status
 	for _, compPodList := range compOwnsPodsToSyncMap {
-		if err := SyncReplicationSetClusterStatus(cli, ctx, cluster, compPodList); err != nil {
+		if err := syncReplicationSetClusterStatus(cli, ctx, cluster, compPodList); err != nil {
 			return err
 		}
 	}
@@ -141,7 +142,7 @@ func doHorizontalScaleDown(ctx context.Context,
 	for compName, stsToDelCount := range stsToDeleteMap {
 		// list all statefulSets by cluster and componentKey label
 		var componentStsList = &appsv1.StatefulSetList{}
-		err := util.GetObjectListByComponentName(ctx, cli, cluster, componentStsList, compName)
+		err := util.GetObjectListByComponentName(ctx, cli, *cluster, componentStsList, compName)
 		if err != nil {
 			return err
 		}
@@ -192,8 +193,9 @@ func doHorizontalScaleDown(ctx context.Context,
 	return nil
 }
 
-// SyncReplicationSetClusterStatus syncs replicationSet pod status to cluster.status.component[componentName].ReplicationStatus.
-func SyncReplicationSetClusterStatus(cli client.Client,
+// syncReplicationSetClusterStatus syncs replicationSet pod status to cluster.status.component[componentName].ReplicationStatus.
+func syncReplicationSetClusterStatus(
+	cli client.Client,
 	ctx context.Context,
 	cluster *appsv1alpha1.Cluster,
 	podList []*corev1.Pod) error {
@@ -202,13 +204,16 @@ func SyncReplicationSetClusterStatus(cli client.Client,
 	}
 
 	// update cluster status
-	componentName, componentDef, err := util.GetComponentInfoByPod(ctx, cli, cluster, podList[0])
+	componentName, componentDef, err := util.GetComponentInfoByPod(ctx, cli, *cluster, podList[0])
 	if err != nil {
 		return err
 	}
+	if componentDef == nil {
+		return nil
+	}
 	oldReplicationSetStatus := cluster.Status.Components[componentName].ReplicationSetStatus
 	if oldReplicationSetStatus == nil {
-		util.InitClusterComponentStatusIfNeed(cluster, componentName, componentDef)
+		util.InitClusterComponentStatusIfNeed(cluster, componentName, *componentDef)
 		oldReplicationSetStatus = cluster.Status.Components[componentName].ReplicationSetStatus
 	}
 	if err := syncReplicationSetStatus(oldReplicationSetStatus, podList); err != nil {
@@ -379,7 +384,7 @@ func filterReplicationWorkload(ctx context.Context,
 		return nil, fmt.Errorf("cluster's compSpecName is nil, pls check")
 	}
 	compDefName := cluster.GetComponentDefRefName(compSpecName)
-	compDef, err := util.GetComponentDefByCluster(ctx, cli, cluster, compDefName)
+	compDef, err := util.GetComponentDefByCluster(ctx, cli, *cluster, compDefName)
 	if err != nil {
 		return compDef, err
 	}

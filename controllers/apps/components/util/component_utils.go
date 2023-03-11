@@ -18,6 +18,7 @@ package util
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -34,6 +35,28 @@ import (
 const (
 	ComponentStatusDefaultPodName = "Unknown"
 )
+
+var (
+	ReqCtrlClientError              = errors.New("required arg client.Client is nil")
+	ReqClusterObjError              = errors.New("required arg *appsv1alpha1.Cluster is nil")
+	ReqClusterComponentDefObjError  = errors.New("required arg *appsv1alpha1.ClusterComponentDefinition is nil")
+	ReqClusterComponentSpecObjError = errors.New("required arg *appsv1alpha1.ClusterComponentSpec is nil")
+)
+
+func ComponentRuntimeReqArgsCheck(cli client.Client,
+	cluster *appsv1alpha1.Cluster,
+	component *appsv1alpha1.ClusterComponentSpec) error {
+	if cli == nil {
+		return ReqCtrlClientError
+	}
+	if cluster == nil {
+		return ReqCtrlClientError
+	}
+	if component == nil {
+		return ReqClusterComponentSpecObjError
+	}
+	return nil
+}
 
 // GetClusterByObject gets cluster by related k8s workloads.
 func GetClusterByObject(ctx context.Context,
@@ -73,7 +96,7 @@ func GetComponentMatchLabels(clusterName, componentName string) client.ListOptio
 }
 
 // GetComponentPodList gets the pod list by cluster and componentName
-func GetComponentPodList(ctx context.Context, cli client.Client, cluster *appsv1alpha1.Cluster, componentName string) (*corev1.PodList, error) {
+func GetComponentPodList(ctx context.Context, cli client.Client, cluster appsv1alpha1.Cluster, componentName string) (*corev1.PodList, error) {
 	podList := &corev1.PodList{}
 	err := cli.List(ctx, podList, client.InNamespace(cluster.Namespace),
 		GetComponentMatchLabels(cluster.Name, componentName))
@@ -111,14 +134,14 @@ func GetComponentPhase(isFailed, isAbnormal bool) appsv1alpha1.Phase {
 }
 
 // GetObjectListByComponentName gets k8s workload list with component
-func GetObjectListByComponentName(ctx context.Context, cli client.Client, cluster *appsv1alpha1.Cluster, objectList client.ObjectList, componentName string) error {
+func GetObjectListByComponentName(ctx context.Context, cli client.Client, cluster appsv1alpha1.Cluster, objectList client.ObjectList, componentName string) error {
 	matchLabels := GetComponentMatchLabels(cluster.Name, componentName)
 	inNamespace := client.InNamespace(cluster.Namespace)
 	return cli.List(ctx, objectList, matchLabels, inNamespace)
 }
 
 // GetComponentDefByCluster gets component from ClusterDefinition with compDefName
-func GetComponentDefByCluster(ctx context.Context, cli client.Client, cluster *appsv1alpha1.Cluster, compDefName string) (*appsv1alpha1.ClusterComponentDefinition, error) {
+func GetComponentDefByCluster(ctx context.Context, cli client.Client, cluster appsv1alpha1.Cluster, compDefName string) (*appsv1alpha1.ClusterComponentDefinition, error) {
 	clusterDef := &appsv1alpha1.ClusterDefinition{}
 	if err := cli.Get(ctx, client.ObjectKey{Name: cluster.Spec.ClusterDefRef}, clusterDef); err != nil {
 		return nil, err
@@ -133,7 +156,7 @@ func GetComponentDefByCluster(ctx context.Context, cli client.Client, cluster *a
 }
 
 // GetClusterComponentSpecByName gets componentSpec from cluster with compSpecName.
-func GetClusterComponentSpecByName(cluster *appsv1alpha1.Cluster, compSpecName string) *appsv1alpha1.ClusterComponentSpec {
+func GetClusterComponentSpecByName(cluster appsv1alpha1.Cluster, compSpecName string) *appsv1alpha1.ClusterComponentSpec {
 	for _, compSpec := range cluster.Spec.ComponentSpecs {
 		if compSpec.Name == compSpecName {
 			return &compSpec
@@ -143,12 +166,10 @@ func GetClusterComponentSpecByName(cluster *appsv1alpha1.Cluster, compSpecName s
 }
 
 // InitClusterComponentStatusIfNeed Initialize the state of the corresponding component in cluster.status.components
-func InitClusterComponentStatusIfNeed(cluster *appsv1alpha1.Cluster,
+func InitClusterComponentStatusIfNeed(
+	cluster *appsv1alpha1.Cluster,
 	componentName string,
-	componentDef *appsv1alpha1.ClusterComponentDefinition) {
-	if componentDef == nil {
-		return
-	}
+	componentDef appsv1alpha1.ClusterComponentDefinition) {
 	if cluster.Status.Components == nil {
 		cluster.Status.Components = make(map[string]appsv1alpha1.ClusterComponentStatus)
 	}
@@ -186,7 +207,7 @@ func InitClusterComponentStatusIfNeed(cluster *appsv1alpha1.Cluster,
 // GetComponentDeployMinReadySeconds gets the deployment minReadySeconds of the component.
 func GetComponentDeployMinReadySeconds(ctx context.Context,
 	cli client.Client,
-	cluster *appsv1alpha1.Cluster,
+	cluster appsv1alpha1.Cluster,
 	componentName string) (minReadySeconds int32, err error) {
 	deployList := &appsv1.DeploymentList{}
 	if err = GetObjectListByComponentName(ctx, cli, cluster, deployList, componentName); err != nil {
@@ -202,7 +223,7 @@ func GetComponentDeployMinReadySeconds(ctx context.Context,
 // GetComponentStsMinReadySeconds gets the statefulSet minReadySeconds of the component.
 func GetComponentStsMinReadySeconds(ctx context.Context,
 	cli client.Client,
-	cluster *appsv1alpha1.Cluster,
+	cluster appsv1alpha1.Cluster,
 	componentName string) (minReadySeconds int32, err error) {
 	stsList := &appsv1.StatefulSetList{}
 	if err = GetObjectListByComponentName(ctx, cli, cluster, stsList, componentName); err != nil {
@@ -218,7 +239,7 @@ func GetComponentStsMinReadySeconds(ctx context.Context,
 // GetComponentWorkloadMinReadySeconds gets the workload minReadySeconds of the component.
 func GetComponentWorkloadMinReadySeconds(ctx context.Context,
 	cli client.Client,
-	cluster *appsv1alpha1.Cluster,
+	cluster appsv1alpha1.Cluster,
 	workloadType appsv1alpha1.WorkloadType,
 	componentName string) (minReadySeconds int32, err error) {
 	switch workloadType {
@@ -232,7 +253,7 @@ func GetComponentWorkloadMinReadySeconds(ctx context.Context,
 // GetComponentInfoByPod gets componentName and componentDefinition info by Pod.
 func GetComponentInfoByPod(ctx context.Context,
 	cli client.Client,
-	cluster *appsv1alpha1.Cluster,
+	cluster appsv1alpha1.Cluster,
 	pod *corev1.Pod) (componentName string, componentDef *appsv1alpha1.ClusterComponentDefinition, err error) {
 	if pod == nil || pod.Labels == nil {
 		return "", nil, fmt.Errorf("pod %s or pod's label is nil", pod.Name)
@@ -252,7 +273,7 @@ func GetComponentInfoByPod(ctx context.Context,
 // GetCompRelatedObjectList gets the related pods and workloads of the component
 func GetCompRelatedObjectList(ctx context.Context,
 	cli client.Client,
-	cluster *appsv1alpha1.Cluster,
+	cluster appsv1alpha1.Cluster,
 	compName string,
 	relatedWorkloads client.ObjectList) (*corev1.PodList, error) {
 	podList, err := GetComponentPodList(ctx, cli, cluster, compName)

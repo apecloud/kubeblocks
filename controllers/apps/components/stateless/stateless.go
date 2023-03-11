@@ -44,48 +44,49 @@ const NewRSAvailableReason = "NewReplicaSetAvailable"
 
 type Stateless struct {
 	Cli          client.Client
-	Ctx          context.Context
 	Cluster      *appsv1alpha1.Cluster
-	ComponentDef *appsv1alpha1.ClusterComponentDefinition
 	Component    *appsv1alpha1.ClusterComponentSpec
+	componentDef *appsv1alpha1.ClusterComponentDefinition
 }
 
 var _ types.Component = &Stateless{}
 
-func (stateless *Stateless) IsRunning(obj client.Object) (bool, error) {
-	if obj == nil {
+func (stateless *Stateless) IsRunning(ctx context.Context, obj client.Object) (bool, error) {
+	if stateless == nil {
 		return false, nil
 	}
-	return stateless.PodsReady(obj)
+	return stateless.PodsReady(ctx, obj)
 }
 
-func (stateless *Stateless) PodsReady(obj client.Object) (bool, error) {
-	if obj == nil {
+func (stateless *Stateless) PodsReady(ctx context.Context, obj client.Object) (bool, error) {
+	if stateless == nil {
 		return false, nil
 	}
 	deploy, ok := obj.(*appsv1.Deployment)
 	if !ok {
 		return false, nil
 	}
-	return DeploymentIsReady(deploy, &stateless.Component.Replicas), nil
+	return deploymentIsReady(deploy, &stateless.Component.Replicas), nil
 }
 
 func (stateless *Stateless) PodIsAvailable(pod *corev1.Pod, minReadySeconds int32) bool {
-	if pod == nil {
+	if stateless == nil || pod == nil {
 		return false
 	}
 	return podutils.IsPodAvailable(pod, minReadySeconds, metav1.Time{Time: time.Now()})
 }
 
 // HandleProbeTimeoutWhenPodsReady the stateless component has no role detection, empty implementation here.
-func (stateless *Stateless) HandleProbeTimeoutWhenPodsReady(recorder record.EventRecorder) (bool, error) {
+func (stateless *Stateless) HandleProbeTimeoutWhenPodsReady(ctx context.Context,
+	recorder record.EventRecorder) (bool, error) {
 	return false, nil
 }
 
 // GetPhaseWhenPodsNotReady gets the component phase when the pods of component are not ready.
-func (stateless *Stateless) GetPhaseWhenPodsNotReady(componentName string) (appsv1alpha1.Phase, error) {
+func (stateless *Stateless) GetPhaseWhenPodsNotReady(ctx context.Context,
+	componentName string) (appsv1alpha1.Phase, error) {
 	deployList := &appsv1.DeploymentList{}
-	podList, err := util.GetCompRelatedObjectList(stateless.Ctx, stateless.Cli, stateless.Cluster, componentName, deployList)
+	podList, err := util.GetCompRelatedObjectList(ctx, stateless.Cli, *stateless.Cluster, componentName, deployList)
 	if err != nil || len(deployList.Items) == 0 {
 		return "", err
 	}
@@ -99,26 +100,28 @@ func (stateless *Stateless) GetPhaseWhenPodsNotReady(componentName string) (apps
 		deploy.Status.AvailableReplicas, checkExistFailedPodOfNewRS), nil
 }
 
-func (stateless *Stateless) HandleUpdate(obj client.Object) error {
+func (stateless *Stateless) HandleUpdate(ctx context.Context, obj client.Object) error {
 	return nil
 }
 
-func NewStateless(ctx context.Context,
+func NewStateless(
 	cli client.Client,
-	cluster appsv1alpha1.Cluster,
-	component appsv1alpha1.ClusterComponentSpec,
-	componentDef appsv1alpha1.ClusterComponentDefinition) types.Component {
-	return &Stateless{
-		Ctx:          ctx,
-		Cli:          cli,
-		Cluster:      &cluster,
-		Component:    &component,
-		ComponentDef: &componentDef,
+	cluster *appsv1alpha1.Cluster,
+	component *appsv1alpha1.ClusterComponentSpec,
+	componentDef appsv1alpha1.ClusterComponentDefinition) (*Stateless, error) {
+	if err := util.ComponentRuntimeReqArgsCheck(cli, cluster, component); err != nil {
+		return nil, err
 	}
+	return &Stateless{
+		Cli:          cli,
+		Cluster:      cluster,
+		Component:    component,
+		componentDef: &componentDef,
+	}, nil
 }
 
-// DeploymentIsReady check deployment is ready
-func DeploymentIsReady(deploy *appsv1.Deployment, targetReplicas *int32) bool {
+// deploymentIsReady check deployment is ready
+func deploymentIsReady(deploy *appsv1.Deployment, targetReplicas *int32) bool {
 	var (
 		componentIsRunning = true
 		newRSAvailable     = true
@@ -127,9 +130,10 @@ func DeploymentIsReady(deploy *appsv1.Deployment, targetReplicas *int32) bool {
 		targetReplicas = deploy.Spec.Replicas
 	}
 
-	if HasProgressDeadline(deploy) {
+	if hasProgressDeadline(deploy) {
 		// if the deployment.Spec.ProgressDeadlineSeconds exists, we should check if the new replicaSet is available.
-		// when deployment.Spec.ProgressDeadlineSeconds does not exist, the deployment controller will remove the DeploymentProgressing condition.
+		// when deployment.Spec.ProgressDeadlineSeconds does not exist, the deployment controller will remove the
+		// DeploymentProgressing condition.
 		condition := deploymentutil.GetDeploymentCondition(deploy.Status, appsv1.DeploymentProgressing)
 		if condition == nil || condition.Reason != NewRSAvailableReason || condition.Status != corev1.ConditionTrue {
 			newRSAvailable = false
@@ -146,10 +150,12 @@ func DeploymentIsReady(deploy *appsv1.Deployment, targetReplicas *int32) bool {
 	return componentIsRunning
 }
 
-// HasProgressDeadline checks if the Deployment d is expected to surface the reason
+// hasProgressDeadline checks if the Deployment d is expected to surface the reason
 // "ProgressDeadlineExceeded" when the Deployment progress takes longer than expected time.
-func HasProgressDeadline(d *appsv1.Deployment) bool {
-	return d.Spec.ProgressDeadlineSeconds != nil && *d.Spec.ProgressDeadlineSeconds != math.MaxInt32
+func hasProgressDeadline(d *appsv1.Deployment) bool {
+	return d.Spec.ProgressDeadlineSeconds != nil &&
+		*d.Spec.ProgressDeadlineSeconds > 0 &&
+		*d.Spec.ProgressDeadlineSeconds != math.MaxInt32
 }
 
 // belongToNewReplicaSet checks if the pod belongs to the new replicaSet of deployment

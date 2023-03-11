@@ -55,9 +55,8 @@ type StatefulSetReconciler struct {
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.12.2/pkg/reconcile
 func (r *StatefulSetReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	var (
-		sts     = &appsv1.StatefulSet{}
-		cluster *appsv1alpha1.Cluster
-		err     error
+		sts = &appsv1.StatefulSet{}
+		err error
 	)
 
 	reqCtx := intctrlutil.RequestCtx{
@@ -71,7 +70,7 @@ func (r *StatefulSetReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	}
 
 	return workloadCompClusterReconcile(reqCtx, r.Client, sts,
-		func(componentSpec *appsv1alpha1.ClusterComponentSpec, component types.Component) (ctrl.Result, error) {
+		func(cluster *appsv1alpha1.Cluster, componentSpec *appsv1alpha1.ClusterComponentSpec, component types.Component) (ctrl.Result, error) {
 			compCtx := newComponentContext(reqCtx, r.Client, r.Recorder, component, sts, componentSpec)
 			reqCtx.Log.V(1).Info("before updateComponentStatusInClusterStatus",
 				"generation", sts.Generation, "observed generation", sts.Status.ObservedGeneration,

@@ -270,10 +270,10 @@ var _ = Describe("Cluster Controller", func() {
 
 		By("Checking mysql should have internal headless service")
 		getHeadlessSvcPorts := func(compDefName string) []corev1.ServicePort {
-			fetched := &appsv1alpha1.Cluster{}
-			Expect(k8sClient.Get(testCtx.Ctx, clusterKey, fetched)).To(Succeed())
+			cluster := &appsv1alpha1.Cluster{}
+			Expect(k8sClient.Get(testCtx.Ctx, clusterKey, cluster)).To(Succeed())
 
-			comp, err := util.GetComponentDefByCluster(testCtx.Ctx, k8sClient, fetched, compDefName)
+			comp, err := util.GetComponentDefByCluster(testCtx.Ctx, k8sClient, *cluster, compDefName)
 			Expect(err).ShouldNot(HaveOccurred())
 
 			var headlessSvcPorts []corev1.ServicePort

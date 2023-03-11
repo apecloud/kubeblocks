@@ -806,7 +806,7 @@ func (r *ClusterReconciler) removeStsInitContainerForRestore(ctx context.Context
 	backupName string) (bool, error) {
 	// get the sts list of component
 	stsList := &appsv1.StatefulSetList{}
-	if err := util.GetObjectListByComponentName(ctx, r.Client, cluster, stsList, componentName); err != nil {
+	if err := util.GetObjectListByComponentName(ctx, r.Client, *cluster, stsList, componentName); err != nil {
 		return false, err
 	}
 	var doRemoveInitContainers bool

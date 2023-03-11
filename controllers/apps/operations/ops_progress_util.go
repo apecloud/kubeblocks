@@ -171,7 +171,7 @@ func handleComponentStatusProgress(
 	if clusterComponent == nil || clusterComponentDef == nil {
 		return
 	}
-	if podList, err = util.GetComponentPodList(opsRes.Ctx, opsRes.Client, opsRes.Cluster, clusterComponent.Name); err != nil {
+	if podList, err = util.GetComponentPodList(opsRes.Ctx, opsRes.Client, *opsRes.Cluster, clusterComponent.Name); err != nil {
 		return
 	}
 	switch clusterComponentDef.WorkloadType {
@@ -188,23 +188,27 @@ func handleComponentStatusProgress(
 func handleStatelessProgress(opsRes *OpsResource,
 	podList *corev1.PodList,
 	pgRes progressResource,
-	compStatus *appsv1alpha1.OpsRequestComponentStatus) (completedCount int32, err error) {
+	compStatus *appsv1alpha1.OpsRequestComponentStatus) (int32, error) {
 	if compStatus.Phase == appsv1alpha1.RunningPhase && pgRes.clusterComponent.Replicas != int32(len(podList.Items)) {
-		err = fmt.Errorf("wait for the pods of deployment to be synchronized to client-go cache")
-		return
+		return 0, fmt.Errorf("wait for the pods of deployment to be synchronized to client-go cache")
 	}
 
-	currComponent := stateless.NewStateless(opsRes.Ctx, opsRes.Client, *opsRes.Cluster,
-		*pgRes.clusterComponent, *pgRes.clusterComponentDef)
+	currComponent, err := stateless.NewStateless(opsRes.Client, opsRes.Cluster,
+		pgRes.clusterComponent, *pgRes.clusterComponentDef)
+	if err != nil {
+		return 0, err
+	}
+
 	if currComponent == nil {
-		return
+		return 0, nil
 	}
 	var componentName = pgRes.clusterComponent.Name
 	minReadySeconds, err := util.GetComponentDeployMinReadySeconds(opsRes.Ctx,
-		opsRes.Client, opsRes.Cluster, componentName)
+		opsRes.Client, *opsRes.Cluster, componentName)
 	if err != nil {
-		return
+		return 0, err
 	}
+	var completedCount int32
 	opsRequest := opsRes.OpsRequest
 	opsStartTime := opsRequest.Status.StartTimestamp
 	for _, v := range podList.Items {
@@ -226,21 +230,26 @@ func handleStatelessProgress(opsRes *OpsResource,
 	return completedCount, err
 }
 
+// REVIEW/TOD: similar code pattern (do de-dupe)
 // handleStatefulSetProgress handles the component progressDetails which using statefulSet workloads.
 func handleStatefulSetProgress(opsRes *OpsResource,
 	podList *corev1.PodList,
 	pgRes progressResource,
-	compStatus *appsv1alpha1.OpsRequestComponentStatus) (completedCount int32, err error) {
-	currComponent := components.NewComponentByType(opsRes.Ctx, opsRes.Client,
-		*opsRes.Cluster, *pgRes.clusterComponentDef, *pgRes.clusterComponent)
+	compStatus *appsv1alpha1.OpsRequestComponentStatus) (int32, error) {
+	currComponent, err := components.NewComponentByType(opsRes.Client,
+		opsRes.Cluster, pgRes.clusterComponent, *pgRes.clusterComponentDef)
+	if err != nil {
+		return 0, err
+	}
 	var componentName = pgRes.clusterComponent.Name
 	minReadySeconds, err := util.GetComponentStsMinReadySeconds(opsRes.Ctx,
-		opsRes.Client, opsRes.Cluster, componentName)
+		opsRes.Client, *opsRes.Cluster, componentName)
 	if err != nil {
-		return
+		return 0, err
 	}
 	opsRequest := opsRes.OpsRequest
 	opsStartTime := opsRequest.Status.StartTimestamp
+	var completedCount int32
 	for _, v := range podList.Items {
 		objectKey := GetProgressObjectKey(v.Kind, v.Name)
 		progressDetail := appsv1alpha1.ProgressStatusDetail{ObjectKey: objectKey}
@@ -375,7 +384,7 @@ func handleComponentProgressForScalingReplicas(opsRes *OpsResource,
 	if *lastComponentReplicas == *expectReplicas {
 		return
 	}
-	if podList, err = util.GetComponentPodList(opsRes.Ctx, opsRes.Client, opsRes.Cluster, clusterComponent.Name); err != nil {
+	if podList, err = util.GetComponentPodList(opsRes.Ctx, opsRes.Client, *opsRes.Cluster, clusterComponent.Name); err != nil {
 		return
 	}
 	if compStatus.Phase == appsv1alpha1.RunningPhase && pgRes.clusterComponent.Replicas != int32(len(podList.Items)) {
@@ -408,15 +417,19 @@ func handleScaleOutProgress(
 	opsRes *OpsResource,
 	pgRes progressResource,
 	podList *corev1.PodList,
-	compStatus *appsv1alpha1.OpsRequestComponentStatus) (completedCount int32, err error) {
+	compStatus *appsv1alpha1.OpsRequestComponentStatus) (int32, error) {
 	var componentName = pgRes.clusterComponent.Name
-	currComponent := components.NewComponentByType(opsRes.Ctx, opsRes.Client,
-		*opsRes.Cluster, *pgRes.clusterComponentDef, *pgRes.clusterComponent)
-	minReadySeconds, err := util.GetComponentWorkloadMinReadySeconds(opsRes.Ctx,
-		opsRes.Client, opsRes.Cluster, pgRes.clusterComponentDef.WorkloadType, componentName)
+	currComponent, err := components.NewComponentByType(opsRes.Client,
+		opsRes.Cluster, pgRes.clusterComponent, *pgRes.clusterComponentDef)
 	if err != nil {
-		return
+		return 0, err
 	}
+	minReadySeconds, err := util.GetComponentWorkloadMinReadySeconds(opsRes.Ctx,
+		opsRes.Client, *opsRes.Cluster, pgRes.clusterComponentDef.WorkloadType, componentName)
+	if err != nil {
+		return 0, err
+	}
+	var completedCount int32
 	for _, v := range podList.Items {
 		// only focus on the newly created pod when scaling out the replicas.
 		if v.CreationTimestamp.Before(&opsRes.OpsRequest.Status.StartTimestamp) {

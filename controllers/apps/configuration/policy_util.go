@@ -70,7 +70,7 @@ func getReplicationSetPods(params reconfigureParams) ([]corev1.Pod, error) {
 		cluster = params.Cluster
 	)
 
-	podList, err := util.GetComponentPodList(ctx.Ctx, params.Client, cluster, params.ClusterComponent.Name)
+	podList, err := util.GetComponentPodList(ctx.Ctx, params.Client, *cluster, params.ClusterComponent.Name)
 	if err != nil {
 		return nil, err
 	}

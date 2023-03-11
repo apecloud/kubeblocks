@@ -50,12 +50,17 @@ type ComponentStatusSynchronizer struct {
 	podList       *corev1.PodList
 }
 
-// NewClusterStatusSynchronizer creates and initializes a ComponentStatusSynchronizer objects.
+// newClusterStatusSynchronizer creates and initializes a ComponentStatusSynchronizer objects.
 // It represents a snapshot of cluster status, including workloads and pods.
-func NewClusterStatusSynchronizer(ctx context.Context, cli client.Client, cluster *appsv1alpha1.Cluster, component types.Component, componentSpec *appsv1alpha1.ClusterComponentSpec) *ComponentStatusSynchronizer {
-	podList, err := util.GetComponentPodList(ctx, cli, cluster, componentSpec.Name)
+func newClusterStatusSynchronizer(ctx context.Context,
+	cli client.Client,
+	cluster *appsv1alpha1.Cluster,
+	componentSpec *appsv1alpha1.ClusterComponentSpec,
+	component types.Component,
+) (*ComponentStatusSynchronizer, error) {
+	podList, err := util.GetComponentPodList(ctx, cli, *cluster, componentSpec.Name)
 	if err != nil {
-		return nil
+		return nil, err
 	}
 	return &ComponentStatusSynchronizer{
 		ctx:           ctx,
@@ -64,10 +69,11 @@ func NewClusterStatusSynchronizer(ctx context.Context, cli client.Client, cluste
 		component:     component,
 		componentSpec: componentSpec,
 		podList:       podList,
-	}
+	}, nil
 }
 
-func (cs *ComponentStatusSynchronizer) Update(obj client.Object, logger *logr.Logger, recorder record.EventRecorder) (bool, error) {
+func (cs *ComponentStatusSynchronizer) Update(ctx context.Context, obj client.Object, logger *logr.Logger,
+	recorder record.EventRecorder) (bool, error) {
 	var (
 		component = cs.component
 		wait      = false
@@ -77,19 +83,19 @@ func (cs *ComponentStatusSynchronizer) Update(obj client.Object, logger *logr.Lo
 		return false, nil
 	}
 	// handle the components changes
-	err := component.HandleUpdate(obj)
+	err := component.HandleUpdate(ctx, obj)
 	if err != nil {
 		return false, nil
 	}
 
-	isRunning, err := component.IsRunning(obj)
+	isRunning, err := component.IsRunning(ctx, obj)
 	if err != nil {
 		return false, err
 	}
 
 	var podsReady *bool
 	if cs.componentSpec.Replicas > 0 {
-		podsReadyForComponent, err := component.PodsReady(obj)
+		podsReadyForComponent, err := component.PodsReady(ctx, obj)
 		if err != nil {
 			return false, err
 		}
@@ -102,7 +108,7 @@ func (cs *ComponentStatusSynchronizer) Update(obj client.Object, logger *logr.Lo
 	if !isRunning {
 		if podsReady != nil && *podsReady {
 			// check if the role probe timed out when component phase is not Running but all pods of component are ready.
-			if requeueWhenPodsReady, err := component.HandleProbeTimeoutWhenPodsReady(recorder); err != nil {
+			if requeueWhenPodsReady, err := component.HandleProbeTimeoutWhenPodsReady(ctx, recorder); err != nil {
 				return false, err
 			} else if requeueWhenPodsReady {
 				wait = true
@@ -117,7 +123,7 @@ func (cs *ComponentStatusSynchronizer) Update(obj client.Object, logger *logr.Lo
 		}
 	}
 
-	if err = cs.updateComponentsPhase(isRunning,
+	if err = cs.updateComponentsPhase(ctx, isRunning,
 		podsReady, hasFailedAndTimedOutPod); err != nil {
 		return wait, err
 	}
@@ -133,7 +139,6 @@ func (cs *ComponentStatusSynchronizer) Update(obj client.Object, logger *logr.Lo
 			return false, err
 		}
 	}
-
 	return wait, nil
 }
 
@@ -162,6 +167,7 @@ func (cs *ComponentStatusSynchronizer) hasFailedAndTimedOutPod() (hasFailedAndTi
 
 // updateComponentsPhase updates the component status Phase etc. into the cluster.Status.Components map.
 func (cs *ComponentStatusSynchronizer) updateComponentsPhase(
+	ctx context.Context,
 	componentIsRunning bool,
 	podsAreReady *bool,
 	hasFailedPodTimedOut bool) error {
@@ -178,7 +184,7 @@ func (cs *ComponentStatusSynchronizer) updateComponentsPhase(
 		// if no operation is running in cluster or failed pod timed out,
 		// means the component is Failed or Abnormal.
 		if util.IsCompleted(cs.cluster.Status.Phase) || hasFailedPodTimedOut {
-			if phase, err := cs.component.GetPhaseWhenPodsNotReady(componentName); err != nil {
+			if phase, err := cs.component.GetPhaseWhenPodsNotReady(ctx, componentName); err != nil {
 				return err
 			} else if phase != "" {
 				componentStatus.Phase = phase

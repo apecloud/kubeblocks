@@ -139,7 +139,8 @@ var _ = Describe("Replication Component", func() {
 			compDefName := clusterObj.GetComponentDefRefName(testapps.DefaultRedisCompName)
 			componentDef := clusterDefObj.GetComponentDefByName(compDefName)
 			component := clusterObj.GetComponentByName(testapps.DefaultRedisCompName)
-			replicationComponent := NewReplicationSet(ctx, k8sClient, *clusterObj, *component, *componentDef)
+			replicationComponent, err := NewReplicationSet(k8sClient, clusterObj, component, *componentDef)
+			Expect(err).Should(Succeed())
 			var podList []*corev1.Pod
 			for _, availableReplica := range []int32{0, 1} {
 				status.AvailableReplicas = availableReplica
@@ -155,8 +156,8 @@ var _ = Describe("Replication Component", func() {
 					podList = append(podList, sts2Pod...)
 				}
 
-				podsReady, _ := replicationComponent.PodsReady(primarySts)
-				isRunning, _ := replicationComponent.IsRunning(primarySts)
+				podsReady, _ := replicationComponent.PodsReady(ctx, primarySts)
+				isRunning, _ := replicationComponent.IsRunning(ctx, primarySts)
 				if availableReplica == 1 {
 					By("Testing pods are ready")
 					Expect(podsReady == true).Should(BeTrue())
@@ -173,7 +174,7 @@ var _ = Describe("Replication Component", func() {
 			}
 
 			By("Testing handle probe timed out")
-			requeue, _ := replicationComponent.HandleProbeTimeoutWhenPodsReady(nil)
+			requeue, _ := replicationComponent.HandleProbeTimeoutWhenPodsReady(ctx, nil)
 			Expect(requeue == false).Should(BeTrue())
 
 			By("Testing pod is available")
@@ -186,19 +187,19 @@ var _ = Describe("Replication Component", func() {
 				secondarySts.Status.AvailableReplicas = 0
 			})).Should(Succeed())
 			testk8s.UpdatePodStatusNotReady(ctx, testCtx, podList[1].Name)
-			phase, _ := replicationComponent.GetPhaseWhenPodsNotReady(testapps.DefaultRedisCompName)
+			phase, _ := replicationComponent.GetPhaseWhenPodsNotReady(ctx, testapps.DefaultRedisCompName)
 			Expect(phase).Should(Equal(appsv1alpha1.AbnormalPhase))
 
 			// mock primary pod is not ready
 			testk8s.UpdatePodStatusNotReady(ctx, testCtx, primaryPod.Name)
-			phase, _ = replicationComponent.GetPhaseWhenPodsNotReady(testapps.DefaultRedisCompName)
+			phase, _ = replicationComponent.GetPhaseWhenPodsNotReady(ctx, testapps.DefaultRedisCompName)
 			Expect(phase).Should(Equal(appsv1alpha1.FailedPhase))
 
 			// mock pod label is empty
 			Expect(testapps.ChangeObj(&testCtx, primaryPod, func() {
 				primaryPod.Labels[constant.RoleLabelKey] = ""
 			})).Should(Succeed())
-			_, _ = replicationComponent.GetPhaseWhenPodsNotReady(testapps.DefaultRedisCompName)
+			_, _ = replicationComponent.GetPhaseWhenPodsNotReady(ctx, testapps.DefaultRedisCompName)
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(clusterObj),
 				func(g Gomega, cluster *appsv1alpha1.Cluster) {
 					compStatus := cluster.Status.Components[testapps.DefaultRedisCompName]
@@ -207,7 +208,7 @@ var _ = Describe("Replication Component", func() {
 				})).Should(Succeed())
 
 			By("Checking if the pod is not updated when statefulset is not updated")
-			Expect(replicationComponent.HandleUpdate(primarySts)).To(Succeed())
+			Expect(replicationComponent.HandleUpdate(ctx, primarySts)).To(Succeed())
 			primaryStsPodList, err := util.GetPodListByStatefulSet(ctx, k8sClient, primarySts)
 			Expect(err).To(Succeed())
 			Expect(len(primaryStsPodList)).To(Equal(1))
@@ -216,7 +217,7 @@ var _ = Describe("Replication Component", func() {
 			By("Checking if the pod is deleted when statefulset is updated")
 			status.UpdateRevision = "new-mock-revision"
 			testk8s.PatchStatefulSetStatus(&testCtx, primarySts.Name, status)
-			Expect(replicationComponent.HandleUpdate(primarySts)).To(Succeed())
+			Expect(replicationComponent.HandleUpdate(ctx, primarySts)).To(Succeed())
 			primaryStsPodList, err = util.GetPodListByStatefulSet(ctx, k8sClient, primarySts)
 			Expect(err).To(Succeed())
 			Expect(len(primaryStsPodList)).To(Equal(0))

@@ -148,19 +148,21 @@ func PrepareComponentResources(reqCtx intctrlutil.RequestCtx, cli client.Client,
 	case appsv1alpha1.Replication:
 		// get the number of existing statefulsets under the current component
 		var existStsList = &appsv1.StatefulSetList{}
-		if err := componentutil.GetObjectListByComponentName(reqCtx.Ctx, cli, task.Cluster, existStsList, task.Component.Name); err != nil {
+		if err := componentutil.GetObjectListByComponentName(reqCtx.Ctx, cli, *task.Cluster, existStsList, task.Component.Name); err != nil {
 			return err
 		}
 
-		// If the statefulSets already exists, check whether there is an ha switching and the HA process is prioritized to handle.
+		// If the statefulSets already exists, check whether there is an HA switching and the HA process is prioritized to handle.
 		// TODO(xingran) After refactoring, HA switching will be handled in the replicationSet controller.
 		if len(existStsList.Items) > 0 {
-			primaryIndexChanged, _, err := replicationset.CheckPrimaryIndexChanged(reqCtx.Ctx, cli, task.Cluster, task.Component.Name, task.Component.PrimaryIndex)
+			primaryIndexChanged, _, err := replicationset.CheckPrimaryIndexChanged(reqCtx.Ctx, cli, task.Cluster,
+				task.Component.Name, task.Component.PrimaryIndex)
 			if err != nil {
 				return err
 			}
 			if primaryIndexChanged {
-				if err := replicationset.HandleReplicationSetHASwitch(reqCtx.Ctx, cli, task.Cluster, componentutil.GetClusterComponentSpecByName(task.Cluster, task.Component.Name)); err != nil {
+				if err := replicationset.HandleReplicationSetHASwitch(reqCtx.Ctx, cli, task.Cluster,
+					componentutil.GetClusterComponentSpecByName(*task.Cluster, task.Component.Name)); err != nil {
 					return err
 				}
 			}
@@ -241,11 +243,14 @@ func buildReplicationSet(reqCtx intctrlutil.RequestCtx,
 	if err != nil {
 		return nil, err
 	}
-	// sts.Name rename and add role label.
-	sts.ObjectMeta.Name = fmt.Sprintf("%s-%d", sts.ObjectMeta.Name, stsIndex)
-	sts.Labels[constant.RoleLabelKey] = string(replicationset.Secondary)
-	if stsIndex == *task.Component.PrimaryIndex {
+	// sts.Name renamed with suffix "-<stsIdx>" for subsequent sts workload
+	if stsIndex != 0 {
+		sts.ObjectMeta.Name = fmt.Sprintf("%s-%d", sts.ObjectMeta.Name, stsIndex)
+	}
+	if stsIndex == task.Component.GetPrimaryIndex() {
 		sts.Labels[constant.RoleLabelKey] = string(replicationset.Primary)
+	} else {
+		sts.Labels[constant.RoleLabelKey] = string(replicationset.Secondary)
 	}
 	sts.Spec.UpdateStrategy.Type = appsv1.OnDeleteStatefulSetStrategyType
 	// build replicationSet persistentVolumeClaim manually

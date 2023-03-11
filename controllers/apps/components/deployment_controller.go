@@ -54,9 +54,8 @@ type DeploymentReconciler struct {
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.12.2/pkg/reconcile
 func (r *DeploymentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	var (
-		deploy  = &appsv1.Deployment{}
-		cluster *appsv1alpha1.Cluster
-		err     error
+		deploy = &appsv1.Deployment{}
+		err    error
 	)
 
 	reqCtx := intctrlutil.RequestCtx{
@@ -70,7 +69,7 @@ func (r *DeploymentReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	}
 
 	return workloadCompClusterReconcile(reqCtx, r.Client, deploy,
-		func(componentSpec *appsv1alpha1.ClusterComponentSpec, component types.Component) (ctrl.Result, error) {
+		func(cluster *appsv1alpha1.Cluster, componentSpec *appsv1alpha1.ClusterComponentSpec, component types.Component) (ctrl.Result, error) {
 			compCtx := newComponentContext(reqCtx, r.Client, r.Recorder, component, deploy, componentSpec)
 			if requeueAfter, err := updateComponentStatusInClusterStatus(compCtx, cluster); err != nil {
 				return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")

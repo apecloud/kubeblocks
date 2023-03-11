@@ -47,6 +47,8 @@ func (c *clusterStatusTransformer) Transform(dag *graph.DAG) error {
 	// update observed generation
 	cluster.Status.ObservedGeneration = cluster.Generation
 	cluster.Status.ClusterDefGeneration = c.cd.Generation
+	// TODO: emit event
+	//r.Recorder.Event(cluster, corev1.EventTypeNormal, applyResourcesCondition.Reason, applyResourcesCondition.Message)
 	root.action = actionPtr(STATUS)
 	return nil
 }

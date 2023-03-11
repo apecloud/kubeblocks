@@ -18,8 +18,8 @@ package lifecycle
 
 import (
 	"fmt"
-	"github.com/pkg/errors"
 
+	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 

@@ -27,6 +27,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
@@ -41,6 +42,7 @@ import (
 type clusterPlanBuilder struct {
 	ctx     intctrlutil.RequestCtx
 	cli     client.Client
+	req     ctrl.Request
 	cluster *appsv1alpha1.Cluster
 }
 
@@ -50,23 +52,27 @@ type clusterPlan struct {
 }
 
 func (c *clusterPlanBuilder) getCompoundCluster() (*compoundCluster, error) {
+	cluster := &appsv1alpha1.Cluster{}
+	if err := c.cli.Get(c.ctx.Ctx, c.req.NamespacedName, cluster); err != nil {
+		return nil, err
+	}
 	cd := &appsv1alpha1.ClusterDefinition{}
 	if err := c.cli.Get(c.ctx.Ctx, types.NamespacedName{
-		Name: c.cluster.Spec.ClusterDefRef,
+		Name: cluster.Spec.ClusterDefRef,
 	}, cd); err != nil {
 		return nil, err
 	}
 	cv := &appsv1alpha1.ClusterVersion{}
-	if len(c.cluster.Spec.ClusterVersionRef) > 0 {
+	if len(cluster.Spec.ClusterVersionRef) > 0 {
 		if err := c.cli.Get(c.ctx.Ctx, types.NamespacedName{
-			Name: c.cluster.Spec.ClusterVersionRef,
+			Name: cluster.Spec.ClusterVersionRef,
 		}, cv); err != nil {
 			return nil, err
 		}
 	}
 
 	cc := &compoundCluster{
-		cluster: c.cluster,
+		cluster: cluster,
 		cd:      *cd,
 		cv:      *cv,
 	}
@@ -118,6 +124,17 @@ func (c *clusterPlanBuilder) defaultWalkFunc(node graph.Vertex) error {
 	return nil
 }
 
+func (c *clusterPlanBuilder) Validate() error {
+	chain := &graph.ValidatorChain{
+		&clusterValidator{req: c.req, cli: c.cli, ctx: c.ctx},
+		&clusterDefinitionValidator{req: c.req, cli: c.cli, ctx: c.ctx},
+		&clusterVersionValidator{req: c.req, cli: c.cli, ctx: c.ctx},
+		&enableLogsValidator{req: c.req, cli: c.cli, ctx: c.ctx},
+		&rplSetPrimaryIndexValidator{req: c.req, cli: c.cli, ctx: c.ctx},
+	}
+	return chain.WalkThrough()
+}
+
 // Build only cluster Creation, Update and Deletion supported.
 // TODO: Validations and Corrections (cluster labels correction, primaryIndex spec validation etc.)
 func (c *clusterPlanBuilder) Build() (graph.Plan, error) {
@@ -125,6 +142,7 @@ func (c *clusterPlanBuilder) Build() (graph.Plan, error) {
 	if err != nil {
 		return nil, err
 	}
+	c.cluster = cc.cluster
 
 	// build transformer chain
 	chain := &graph.TransformerChain{
@@ -166,11 +184,11 @@ func (c *clusterPlanBuilder) Build() (graph.Plan, error) {
 
 // NewClusterPlanBuilder returns a clusterPlanBuilder powered PlanBuilder
 // TODO: change ctx to context.Context
-func NewClusterPlanBuilder(ctx intctrlutil.RequestCtx, cli client.Client, cluster *appsv1alpha1.Cluster) graph.PlanBuilder {
+func NewClusterPlanBuilder(ctx intctrlutil.RequestCtx, cli client.Client, req ctrl.Request) graph.PlanBuilder {
 	return &clusterPlanBuilder{
-		ctx:     ctx,
-		cli:     cli,
-		cluster: cluster,
+		ctx: ctx,
+		cli: cli,
+		req: req,
 	}
 }
 

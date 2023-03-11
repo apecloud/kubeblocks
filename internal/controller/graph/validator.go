@@ -16,13 +16,17 @@ limitations under the License.
 
 package graph
 
-// PlanBuilder builds a Plan by applying a group of Transformer to an empty DAG.
-type PlanBuilder interface {
+type Validator interface {
 	Validate() error
-	Build() (Plan, error)
 }
 
-// Plan defines the final actions should be executed.
-type Plan interface {
-	Execute() error
+type ValidatorChain []Validator
+
+func (v *ValidatorChain) WalkThrough() error {
+	for _, validator := range *v {
+		if err := validator.Validate(); err != nil {
+			return err
+		}
+	}
+	return nil
 }

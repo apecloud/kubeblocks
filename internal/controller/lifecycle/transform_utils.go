@@ -198,3 +198,16 @@ func updateClusterPhaseWhenConditionsError(cluster *appsv1alpha1.Cluster) {
 	// if exits opsRequests are running, set the cluster phase to the early target phase with the OpsRequest
 	cluster.Status.Phase = opsRequestSlice[0].ToClusterPhase
 }
+
+// checkReferencingCRStatus checks if cluster referenced CR is available
+func checkReferencedCRStatus(referencedCRPhase appsv1alpha1.Phase) error {
+	if referencedCRPhase == appsv1alpha1.AvailablePhase {
+		return nil
+	}
+	//message := fmt.Sprintf("%s: %s is unavailable, this problem needs to be solved first.", crKind, crName)
+	//if err := conMgr.setReferenceCRUnavailableCondition(message); err != nil {
+	//	res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+	//	return &res, err
+	//}
+	return newRequeueError(ControllerErrorRequeueTime, "cluster definition not available")
+}

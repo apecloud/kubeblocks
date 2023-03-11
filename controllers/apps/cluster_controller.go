@@ -212,57 +212,19 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		cluster:  cluster,
 	}
 
-	// should patch the label first to prevent the label from being modified by the user.
-	if err := r.patchClusterLabelsIfNotExist(ctx, cluster); err != nil {
-		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-	}
+	planBuilder := lifecycle.NewClusterPlanBuilder(reqCtx, r.Client, req)
 
 	reqCtx.Log.V(1).Info("get clusterDef and clusterVersion")
-	clusterDefinition := &appsv1alpha1.ClusterDefinition{}
-	if err := r.Client.Get(reqCtx.Ctx, types.NamespacedName{
-		Name: cluster.Spec.ClusterDefRef,
-	}, clusterDefinition); err != nil {
-		// this is a block to handle error.
-		// so when update cluster conditions failed, we can ignore it.
-		_ = clusterConditionMgr.setPreCheckErrorCondition(err)
-		// If using RequeueWithError and the user fixed this error,
-		// it may take up to 1000s to reconcile again, causing the user to think that the repair is not effective.
-		return intctrlutil.RequeueAfter(ControllerErrorRequeueTime, reqCtx.Log, "")
-	}
-
-	clusterVersion := &appsv1alpha1.ClusterVersion{}
-	if len(cluster.Spec.ClusterVersionRef) > 0 {
-		if err := r.Client.Get(reqCtx.Ctx, types.NamespacedName{
-			Name: cluster.Spec.ClusterVersionRef,
-		}, clusterVersion); err != nil {
-			// this is a block to handle error.
-			// so when update cluster conditions failed, we can ignore it.
+	err := planBuilder.Validate()
+	if err != nil {
+		if re, ok := err.(lifecycle.RequeueError); ok {
 			_ = clusterConditionMgr.setPreCheckErrorCondition(err)
-			return intctrlutil.RequeueAfter(ControllerErrorRequeueTime, reqCtx.Log, "")
+			return intctrlutil.RequeueAfter(re.RequeueAfter(), reqCtx.Log, re.Reason())
 		}
-		if res, err := r.checkReferencedCRStatus(reqCtx, clusterConditionMgr, clusterVersion.Status.Phase,
-			appsv1alpha1.ClusterVersionKind, clusterVersion.Name); res != nil {
-			return *res, err
-		}
-	}
-
-	if res, err := r.checkReferencedCRStatus(reqCtx, clusterConditionMgr, clusterDefinition.Status.Phase,
-		appsv1alpha1.ClusterDefinitionKind, clusterDefinition.Name); res != nil {
-		return *res, err
-	}
-
-	// validate config and send warning event log necessarily
-	if err := cluster.ValidateEnabledLogs(clusterDefinition); err != nil {
-		_ = clusterConditionMgr.setPreCheckErrorCondition(err)
-		return intctrlutil.RequeueAfter(ControllerErrorRequeueTime, reqCtx.Log, "")
-	}
-
-	// validate primaryIndex and send warning event log necessarily
-	if err := cluster.ValidatePrimaryIndex(clusterDefinition); err != nil {
-		_ = clusterConditionMgr.setPreCheckErrorCondition(err)
 		return intctrlutil.RequeueWithError(err, reqCtx.Log, "")
 	}
 
+	// TODO: refactor mark: cluster provisioning, put deletion and status Update into plan
 	res, err := intctrlutil.HandleCRDeletion(reqCtx, r, cluster, dbClusterFinalizerName, func() (*ctrl.Result, error) {
 		return r.deleteExternalResources(reqCtx, cluster)
 	})
@@ -270,7 +232,17 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return *res, err
 	}
 
+	// should patch the label first to prevent the label from being modified by the user.
+	if err := r.patchClusterLabelsIfNotExist(ctx, cluster); err != nil {
+		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+	}
 	if cluster.Status.ObservedGeneration == cluster.Generation {
+		clusterDefinition := &appsv1alpha1.ClusterDefinition{}
+		if err := r.Client.Get(reqCtx.Ctx, types.NamespacedName{
+			Name: cluster.Spec.ClusterDefRef,
+		}, clusterDefinition); err != nil {
+			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+		}
 		// checks if the controller is handling the garbage of restore.
 		if handlingRestoreGarbage, err := r.handleGarbageOfRestoreBeforeRunning(ctx, cluster); err != nil {
 			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
@@ -296,9 +268,9 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	if err = clusterConditionMgr.setProvisioningStartedCondition(); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
-	// ---- start refactor ----
+
 	clusterDeepCopy := cluster.DeepCopy()
-	plan, err := lifecycle.NewClusterPlanBuilder(reqCtx, r.Client, cluster).Build()
+	plan, err := planBuilder.Build()
 	if err != nil {
 		if re, ok := err.(lifecycle.RequeueError); ok {
 			if err = r.patchClusterStatus(reqCtx.Ctx, cluster, clusterDeepCopy); err != nil {
@@ -314,26 +286,6 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 	return intctrlutil.Reconciled()
-	// ---- end refactor ----
-	//clusterDeepCopy := cluster.DeepCopy()
-	//shouldRequeue, err := reconcileClusterWorkloads(reqCtx, r.Client, clusterDefinition, clusterVersion, cluster)
-	//if err != nil {
-	//	// this is a block to handle error.
-	//	// so when update cluster conditions failed, we can ignore it.
-	//	_ = clusterConditionMgr.setApplyResourcesFailedCondition(err)
-	//	return intctrlutil.RequeueAfter(ControllerErrorRequeueTime, reqCtx.Log, "")
-	//}
-	//if shouldRequeue {
-	//	if err = r.patchClusterStatus(reqCtx.Ctx, cluster, clusterDeepCopy); err != nil {
-	//		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-	//	}
-	//	return intctrlutil.RequeueAfter(time.Second, reqCtx.Log, "")
-	//}
-	//
-	//if err = r.handleClusterStatusAfterApplySucceed(ctx, cluster, clusterDeepCopy, clusterDefinition); err != nil {
-	//	return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-	//}
-	//return intctrlutil.Reconciled()
 }
 
 // patchClusterStatus patches the cluster status.

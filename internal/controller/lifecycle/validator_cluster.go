@@ -14,15 +14,23 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package graph
+package lifecycle
 
-// PlanBuilder builds a Plan by applying a group of Transformer to an empty DAG.
-type PlanBuilder interface {
-	Validate() error
-	Build() (Plan, error)
+import (
+	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+)
+
+type clusterValidator struct {
+	req ctrl.Request
+	cli client.Client
+	ctx intctrlutil.RequestCtx
 }
 
-// Plan defines the final actions should be executed.
-type Plan interface {
-	Execute() error
+func (c *clusterValidator) Validate() error {
+	cluster := &appsv1alpha1.Cluster{}
+	return c.cli.Get(c.ctx.Ctx, c.req.NamespacedName, cluster)
 }

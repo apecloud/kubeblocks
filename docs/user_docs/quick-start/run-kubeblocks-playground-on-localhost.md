@@ -93,11 +93,11 @@ Following the instructions in "1. Basic commands for cluster", switch to the Kub
 
 ## Run Playground
 
-The Playground guide includes three sections, namely [Basic functions](#basic-functions), [Observability](#observability), and [High availability](#high-availability-of-apecloud-mysql). Refer to [Feature list](../introduction_and_feature_list/feature_list.md) to explore more KubeBlocks features and you can try the full features of KubeBlocks in a standard Kubernetes cluster.
+The Playground guide includes three sections, namely [Basic functions](#basic-functions), [Observability](#observability), and [High availability](#high-availability-of-apecloud-mysql). Refer to [Feature list](./../introduction/feature-list.md) to explore more KubeBlocks features and you can try the full features of KubeBlocks in a standard Kubernetes cluster.
 
 ### Basic functions
 
-KubeBlocks supports the complete life cycle management of a database cluster and follows the best practice of application development. The following instructions demonstrate the basic features of KubeBlocks. For the full feature set, refer to [KubeBlocks Documentation](../../../../docs) for details.
+KubeBlocks supports the complete life cycle management of a database cluster and follows the best practice of application development. The following instructions demonstrate the basic features of KubeBlocks. For the full feature set, refer to [KubeBlocks Documentation](./docs/user_docs) for details.
 
 > ***Note:***
 >
@@ -256,9 +256,9 @@ KubeBlocks has complete observability capabilities. This section demonstrates th
    A monitoring page is loaded automatically after the command is executed. 
 
 2. Click the Dashboard icon on the left bar and two monitoring panels show on the page.
-   ![Dashboards](../../img/quick_start_dashboards.png)
+   ![Dashboards](./../../img/quick_start_dashboards.png)
 3. Click **General** -> **MySQL** to monitor the status of the ApeCloud MySQL cluster deployed by Playground.
-   ![MySQL_panel](../../img/quick_start_mysql_panel.png)
+   ![MySQL_panel](./../../img/quick_start_mysql_panel.png)
 
 ### High availability of ApeCloud MySQL
 
@@ -346,7 +346,7 @@ NON-STOP NYAN CAT is a demo application to observe how the database cluster exce
 
 2. Use `port-forward` according to the hints above to expose an application port as available access for your local host, then visit this application via http://127.0.0.1:8087.
 3. Delete the leader pod and view the influences on the ApeCloud MySQL clusters through the NYAN CAT page.
-   ![NYAN CAT](../../img/quick_start_nyan_cat.png)
+   ![NYAN CAT](./../../img/quick_start_nyan_cat.png)
 4. Uninstall the NYAN CAT demo application.
    ```bash
    kbcli app uninstall nyancat

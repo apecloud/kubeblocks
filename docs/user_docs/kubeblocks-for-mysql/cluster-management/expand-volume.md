@@ -13,7 +13,7 @@ You can expand the storage volume size of each pod.
 
 **How KubeBlocks expands the volume**
 
-![Expand volume](../../../img/mysql_cluster_expand_volume.png)
+![Expand volume](./../../../img/mysql_cluster_expand_volume.png)
 
 1. A user creates a volume expansion OpsRequest CR.
 2. This CR passes the webhook validation.

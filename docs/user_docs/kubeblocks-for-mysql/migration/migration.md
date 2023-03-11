@@ -1,10 +1,10 @@
 ---
-title: 
-description: 
+title: Migrate data to ApeCloud MySQL by AWS DMS
+description: How to migrate data to ApeCloud MySQL by AWS DMS
 sidebar_position: 1
 ---
 
-# Migration
+# Migrate data to ApeCloud MySQL by AWS DMS
 
 > ***Notes:***
 > 
@@ -22,7 +22,7 @@ The Kubernetes ClusterIP of ApeCloud MySQL is exposed by default in the EKS envi
    ```bash
    kbcli kubeblocks install --set loadbalancer.enabled=true
    ```
-2. Install ApeCloud MySQL. Refer to [Create an ApeCloud MySQL cluster on AWS](../../quick-start/create-an-apecloud-mysql-cluster-on-aws.md) for details.
+2. Install ApeCloud MySQL. Refer to [Create an ApeCloud MySQL cluster on AWS](./../../quick-start/create-a-mysql-cluster-on-aws.md) for details.
 3. Fill in the cluster name and run the command below to expose the external IP of the cluster.
    ```bash
    KBCLI_EXPERIMENTAL_EXPOSE="1" kb cluster expose ${mysql clustrName} --on=true
@@ -94,7 +94,7 @@ The Kubernetes ClusterIP of ApeCloud MySQL is exposed by default in the EKS envi
    ```
 
    Make sure the server runs normally and can generate EXTERNAL-IP. Meanwhile, verify whether the NLB state is `Active` by the AWS console, then you can access the cluster by EXTERNAL-IP:Port.
-   ![NLB-active](../../../img/mysql_migration_active.png)
+   ![NLB-active](./../../../img/mysql_migration_active.png)
 
 ### Expose the source network
 
@@ -194,29 +194,29 @@ Pay attention to the following potential issues during the migration task.
    > 
    > Select the VPC that you have configured in EKS.
 
-   ![Create replication instance](../../../img/mysql_migration_replication_instance.png)
+   ![Create replication instance](./../../../img/mysql_migration_replication_instance.png)
 
 2. Create endpoints.
    Go to **DMS** -> **Endpoints** and click **Create endpoint**.
 
-   ![Create endpoint](../../../img/mysql_migration_create_endpoints.png)
+   ![Create endpoint](./../../../img/mysql_migration_create_endpoints.png)
 
    Create the source endpoint and target endpoint respectively. If the target endpoint is the RDS instance, check **Select RDS DB instance** to configure it.
 
-   ![Select RDS DB instance](../../../img/mysql_migration_select_rds_db_instance.png)
+   ![Select RDS DB instance](./../../../img/mysql_migration_select_rds_db_instance.png)
 
    After configuration, specify a replication instance to test the connection.
 
-   ![Test connection](../../../img/mysql_migration_test_connection.png)
+   ![Test connection](./../../../img/mysql_migration_test_connection.png)
 
 3. Create migration tasks.
-   ![Create task](../../../img/mysql_migration_create_task.png)
+   ![Create task](./../../../img/mysql_migration_create_task.png)
    Click **Create task** and configure the task according to the instructions. 
    Pay attention to the following parameters.
 
    - Migration Type
     
-     ![Migration type](../../../img/mysql_migration_migration_type.png)
+     ![Migration type](./../../../img/mysql_migration_migration_type.png)
 
      AWS DMS provides three migration types: 
 
@@ -227,7 +227,7 @@ Pay attention to the following potential issues during the migration task.
 
    - Target table preparation mode
 
-     ![Target table preparation mode](../../../img/mysql_migration_target_table_preparation_mode.png)
+     ![Target table preparation mode](./../../../img/mysql_migration_target_table_preparation_mode.png)
 
      The target table preparation mode specifies the initial mode of the data structure. You can click Info beside the options to view the definition of each mode. For example, if ApeCloud MySQL is a newly created empty instance, you can select **Do nothing** mode.
      In addition, create a database on ApeCloud MySQL before migration because AWS DMS does not create a database.
@@ -235,17 +235,17 @@ Pay attention to the following potential issues during the migration task.
    - Turn on validation
      It is recommended to enable this function.
 
-     ![Turn on validation](../../../img/mysql_migration_turn_on_validation.png)
+     ![Turn on validation](./../../../img/mysql_migration_turn_on_validation.png)
 
    - Batch-optimized apply
      It is recommended to enable this function as this function enables you to write target instances in batch and can improve the write speed.
 
-     ![Batch-optimized apply](../../../img/mysql_migration_batch_optimized_apply.png)
+     ![Batch-optimized apply](./../../../img/mysql_migration_batch_optimized_apply.png)
 
    - Full load tuning settings: Maximum number of tables to load in parallel
      This number decides how many concurrencies DMS uses to get source table data. Theoretically speaking, this will cause pressure on the source table during the full-load migration. Lower this number when the business in the source table is delicate.
 
-     ![Full load tuning settings](../../../img/mysql_migration_full_load_tuning_settings.png)
+     ![Full load tuning settings](./../../../img/mysql_migration_full_load_tuning_settings.png)
 
    - Table Mapping
      Table mapping decides which tables in the database are used for migration and can also apply easy conversions. It is recommended to enable **Wizard** mode to configure this parameter.
@@ -265,12 +265,12 @@ Pay attention to the following potential issues during the migration task.
    Pay attention to **Status**, **Last updated in Table statistics**, and **CDC latency target** in **CloudWatch metrics**.
    You can also refer to [this document](https://aws.amazon.com/premiumsupport/knowledge-center/dms-stuck-task-progress/?nc1=h_ls) to verify the migration task.
    
-   ![Status](../../../img/mysql_migration_application_status.png)
+   ![Status](./../../../img/mysql_migration_application_status.png)
 
-   ![CDC](../../../img/mysql_migration_application_cdc.png)
+   ![CDC](./../../../img/mysql_migration_application_cdc.png)
 
 2. Pause business and prohibit new business write in the source database.
 3. Verify the transmission task status again to make sure the task runs normally and the running status lasts at least 1 minute.
-   Refer to [Step 1](#step-1-network-configuration) to observe whether the link is normal and whether latency exists.
+   Refer to step 1 above to observe whether the link is normal and whether latency exists.
 4. Use the target database to resume business.
 5. Verify the migration with business.

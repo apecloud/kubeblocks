@@ -15,7 +15,7 @@ KubeBlocks integrates open-source monitoring components such as Prometheus, Aler
 ***Steps:***
 
 1. Install monitor components.
-   If you didn't install KubeBlocks, monitoring components (Prometheus/AlertManager/Grafana) are installed by default with the installation of KubeBlocks. The installation command line is as follows, see detailed information in [Install KubeBlocks](../../installation/installation.md):
+   If you didn't install KubeBlocks, monitoring components (Prometheus/AlertManager/Grafana) are installed by default with the installation of KubeBlocks. The installation command line is as follows, see detailed information in [Install KubeBlocks](./../../installation/install-and-uninstall-kbcli-and-kubeblocks.md):
    ```bash
    kbcli kubeblocks install
    ```

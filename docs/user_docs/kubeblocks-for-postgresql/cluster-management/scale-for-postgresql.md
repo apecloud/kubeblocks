@@ -16,7 +16,7 @@ You can vertically scale a cluster by changing resource requirements and limits 
 
 **How KubeBlocks vertically scales a cluster**
 
-![Vertical scaling](../../../img/pgsql_vertical_scaling.png)
+![Vertical scaling](./../../../img/pgsql_vertical_scaling.png)
 
 1. A user creates a vertical scaling OpsRequest CR (custom resources).
 2. This OpsRequest CR passes the webhook validation.
@@ -149,7 +149,7 @@ Horizontal scaling changes the amount of pods. For example, you can apply horizo
 
 **How KubeBlocks horizontally scales a cluster**
 
-![Horizontal scaling](../../../img/pgsql_cluster_horizontal_scaling.png)
+![Horizontal scaling](./../../../img/pgsql_cluster_horizontal_scaling.png)
 
 1. A user creates a horizontal scaling OpsRequest CR.
 2. This CR passes the webhook validation.
@@ -165,7 +165,7 @@ Horizontal scaling changes the amount of pods. For example, you can apply horizo
 
 ***Before you start***
 
-* Refer to [Backup and restore for PostgreSQL](../backup-and-restore/backup-and-restore-for-postgresql-standalone.md) to make sure the EKS environment is configured properly since the horizontal scaling relies on the backup function.
+* Refer to [Backup and restore for PostgreSQL](./../backup-and-restore/backup-and-restore-for-postgresql-standalone.md) to make sure the EKS environment is configured properly since the horizontal scaling relies on the backup function.
 * Run the command below to check whether the cluster STATUS is `Running`. Otherwise, the following operations may fail.
 
   ```bash

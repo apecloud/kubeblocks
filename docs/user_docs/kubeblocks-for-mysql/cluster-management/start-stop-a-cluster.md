@@ -12,7 +12,7 @@ You can stop/start a cluster to save storage resources. When a cluster is stoppe
 
 * How KubeBlocks stops a cluster
   
-![Stop a cluster](../../../img/mysql_cluster_stop.png)
+![Stop a cluster](./../../../img/mysql_cluster_stop.png)
 
   1. A user creates a stop OpsRequest CR.
   2. The stop OpsRequest CR passes the webhook validation. 
@@ -28,7 +28,7 @@ You can stop/start a cluster to save storage resources. When a cluster is stoppe
 
 * How KubeBlocks sarts a cluster
   
-![Start a cluster](../../../img/mysql_cluster_start.png)
+![Start a cluster](./../../../img/mysql_cluster_start.png)
 
   1. A user creates a stop OpsRequest CR.
   2. The start OpsRequest CR passes the webhook validation.

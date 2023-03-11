@@ -10,7 +10,7 @@ KubeBlocks v0.4 supports using the `kbcli playground` command to deploy EKS clus
 
 ## How `kbcli` works on EKS
 
-`kbcli` currently supports deploy Playground on [the local host](run-kubeblocks-on-playground-on-local-host.md) and the cloud. For the cloud environment, `kbcli` only supports deploying AWS EKS clusters. When deploying on the cloud, cloud resources are initialized with the help of the terraform script maintained by ApeCloud. Find the script at [Github repository](https://github.com/apecloud/cloud-provider).
+`kbcli` currently supports deploy Playground on [the local host](./run-kubeblocks-playground-on-localhost.md) and the cloud. For the cloud environment, `kbcli` only supports deploying AWS EKS clusters. When deploying on the cloud, cloud resources are initialized with the help of the terraform script maintained by ApeCloud. Find the script at [Github repository](https://github.com/apecloud/cloud-provider).
 When deploying a Kubernetes cluster on the cloud, `kbcli` clones the above repository to the local host, calls the terraform commands to initialize the cluster, then deploys KubeBlocks on this cluster.
 
 ## Before you start

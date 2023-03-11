@@ -13,7 +13,7 @@ You can restart all pods of the cluster. When an exception occurs in a database,
 
 **How KubeBlocks restarts a cluster**
 
-![Restart a cluster](../../../img/pgsql_cluster_restart.png)
+![Restart a cluster](./../../../img/pgsql_cluster_restart.png)
 
 1. A user creates a restarting OpsRequest CR.
 2. This CR passes the webhook validation.

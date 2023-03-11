@@ -9,7 +9,7 @@ sidebar_position: 1
 
 ***Before you start***
 
-* `kbcli`: Install `kbcli` on your host. Refer to [Install/Uninstall kbcli and KubeBlocks](../../install_kbcli_kubeblocks/install_and_unistall_kbcli_and_kubeblocks.md) for details.
+* `kbcli`: Install `kbcli` on your host. Refer to [Install/Uninstall kbcli and KubeBlocks](./../../installation/install-and-uninstall-kbcli-and-kubeblocks.md) for details.
   1. Run the command below to install `kbcli`.
    ```bash
    curl -fsSL https://kubeblocks.io/installer/install_cli.sh | bash
@@ -18,7 +18,7 @@ sidebar_position: 1
    ```bash
    kbcli version
    ```
-* KubeBlocks: Install KubeBlocks on your host. Refer to [Install/Uninstall kbcli and KubeBlocks](../../install_kbcli_kubeblocks/install_and_unistall_kbcli_and_kubeblocks.md) for details.
+* KubeBlocks: Install KubeBlocks on your host. Refer to [Install/Uninstall kbcli and KubeBlocks](./../../installation/install-and-uninstall-kbcli-and-kubeblocks.md) for details.
   1. Run the command below to install KubeBlocks.
      ```bash
      kbcli kubeblocks install
@@ -148,7 +148,7 @@ sidebar_position: 1
 
 ## Connect to a MySQL Cluster
 
-Run the command below to connect to a cluster.
+Run the command below to connect to a cluster. For the detailed database connection guide, refer to [Connect database](./../../connect_database/overview-of-database-connection.md).
 ```bash
 kbcli cluster connect mysql-cluster
 ```

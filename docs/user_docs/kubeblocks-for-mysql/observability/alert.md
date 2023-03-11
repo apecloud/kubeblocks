@@ -12,7 +12,7 @@ Alerts are mainly used for daily error response to improve system availability. 
 
 KubeBlocks built-in alert system adopts the mainstream open-source solution in the cloud native scenario, i.e. the combined solution of Prometheus and AlertManager. KubeBlocks also uses the AlertManager Webhook extension to integrate new notification channels, such as Feishu custom bot, Dingtalk custom bot, Wechat custom bot.
 
-![Alert](../../../img/observability_alert.png)
+![Alert](./../../../img/observability_alert.png)
 
 ## Alert rules
 

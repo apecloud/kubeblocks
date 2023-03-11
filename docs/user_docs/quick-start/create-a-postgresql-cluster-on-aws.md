@@ -129,11 +129,14 @@ This guide introduces how to use KubeBlocks to create a PostgreSQL cluster based
 > * You can adjust the replica amount, pod memory, CPU kernel amount of your EKS cluster, and EBS volume size by using the `--set` option when creating the cluster.
 
 1. Run the command below to create a PostgreSQL cluster. The cluster name can be customized and `pg-cluster` below is an example. The system assigns a name for this cluster by default. If you want to customize a cluster name, run `kbcli cluster create <name>`.
-   For more details on command options, refer to [`kbcli` cluster create options description](../manage_mysql_database_with_kubeblocks/manage_cluster/create_and_connect_a_mysql_cluster.md#create-a-mysql-cluster).
+   For more details on command options, refer to [`kbcli` cluster create options description](./../kubeblocks-for-postgresql/cluster-management/create-and-connect-a-postgresql-cluster.md#create-a-postgresql-cluster).
+
    ```bash
    kbcli cluster create --cluster-definition=apecloud-mysql --set cpu=2000m,memory=1Gi,storage=10Gi,replicas=3
    ```
+
    ***Result***
+   
    A PostgreSQL standalone with 10 Gi of storage is created.
 2. Run the command below to view the created cluster.
    ```bash

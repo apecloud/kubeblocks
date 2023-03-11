@@ -31,8 +31,8 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
-// cacheDiffTransformer reads all Vertex.Obj in cache and compute the diff DAG.
-type cacheDiffTransformer struct {
+// objectActionTransformer reads all Vertex.Obj in cache and compute the diff DAG.
+type objectActionTransformer struct {
 	cc  compoundCluster
 	cli client.Client
 	ctx intctrlutil.RequestCtx
@@ -51,7 +51,7 @@ func ownKinds() []client.ObjectList {
 }
 
 // read all objects owned by our cluster
-func (c *cacheDiffTransformer) readCacheSnapshot() (clusterSnapshot, error) {
+func (c *objectActionTransformer) readCacheSnapshot() (clusterSnapshot, error) {
 	objScheme, err := objectScheme()
 	if err != nil {
 		return nil, err
@@ -87,7 +87,7 @@ func (c *cacheDiffTransformer) readCacheSnapshot() (clusterSnapshot, error) {
 	return snapshot, nil
 }
 
-func (c *cacheDiffTransformer) Transform(dag *graph.DAG) error {
+func (c *objectActionTransformer) Transform(dag *graph.DAG) error {
 	// get the old snapshot
 	oldSnapshot, err := c.readCacheSnapshot()
 	if err != nil {

@@ -130,7 +130,7 @@ func (b *clusterPlanBuilder) Build() (graph.Plan, error) {
 		// make config configmap immutable
 		&configTransformer{},
 		// read old snapshot from cache, and generate diff plan
-		&cacheDiffTransformer{cc: *cc, cli: b.cli, ctx: b.ctx},
+		&objectActionTransformer{cc: *cc, cli: b.cli, ctx: b.ctx},
 		// horizontal scaling
 		&horizontalScalingTransformer{cc: *cc, cli: b.cli, ctx: b.ctx},
 		// stateful set pvc Update

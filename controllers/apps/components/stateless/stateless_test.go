@@ -78,7 +78,7 @@ var _ = Describe("Stateful Component", func() {
 			deploy := testapps.MockStatelessComponentDeploy(testCtx, clusterName, statelessCompName)
 			clusterComponent := cluster.GetComponentByName(statelessCompName)
 			componentDef := clusterDef.GetComponentDefByName(clusterComponent.ComponentDefRef)
-			statelessComponent := NewStateless(ctx, k8sClient, cluster, clusterComponent, componentDef)
+			statelessComponent := NewStateless(ctx, k8sClient, *cluster, *clusterComponent, *componentDef)
 
 			By("test pods number of deploy is 0 ")
 			phase, _ := statelessComponent.GetPhaseWhenPodsNotReady(statelessCompName)

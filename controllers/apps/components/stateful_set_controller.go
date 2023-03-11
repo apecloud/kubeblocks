@@ -29,8 +29,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
-	"github.com/apecloud/kubeblocks/internal/constant"
+	"github.com/apecloud/kubeblocks/controllers/apps/components/types"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -71,40 +70,20 @@ func (r *StatefulSetReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 
-	if cluster, err = util.GetClusterByObject(reqCtx.Ctx, r.Client, sts); err != nil {
-		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-	} else if cluster == nil {
-		return intctrlutil.Reconciled()
-	}
-
-	clusterDef := &appsv1alpha1.ClusterDefinition{}
-	if err = r.Client.Get(ctx, client.ObjectKey{Name: cluster.Spec.ClusterDefRef}, clusterDef); err != nil {
-		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-	}
-
-	// create a component object
-	componentName := sts.GetLabels()[constant.KBAppComponentLabelKey]
-	componentSpec := cluster.GetComponentByName(componentName)
-	if componentSpec == nil {
-		return intctrlutil.Reconciled()
-	}
-	componentDef := clusterDef.GetComponentDefByName(componentSpec.ComponentDefRef)
-	component := NewComponentByType(ctx, r.Client, cluster, componentDef, componentSpec)
-	if component == nil {
-		return intctrlutil.Reconciled()
-	}
-	compCtx := newComponentContext(reqCtx, r.Client, r.Recorder, component, sts, componentSpec)
-	reqCtx.Log.V(1).Info("before updateComponentStatusInClusterStatus",
-		"generation", sts.Generation, "observed generation", sts.Status.ObservedGeneration,
-		"replicas", sts.Status.Replicas)
-	if requeueAfter, err := updateComponentStatusInClusterStatus(compCtx, cluster); err != nil {
-		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-	} else if requeueAfter != 0 {
-		// if the reconcileAction need requeue, do it
-		return intctrlutil.RequeueAfter(requeueAfter, reqCtx.Log, "")
-	}
-
-	return intctrlutil.Reconciled()
+	return workloadCompClusterReconcile(reqCtx, r.Client, sts,
+		func(componentSpec *appsv1alpha1.ClusterComponentSpec, component types.Component) (ctrl.Result, error) {
+			compCtx := newComponentContext(reqCtx, r.Client, r.Recorder, component, sts, componentSpec)
+			reqCtx.Log.V(1).Info("before updateComponentStatusInClusterStatus",
+				"generation", sts.Generation, "observed generation", sts.Status.ObservedGeneration,
+				"replicas", sts.Status.Replicas)
+			if requeueAfter, err := updateComponentStatusInClusterStatus(compCtx, cluster); err != nil {
+				return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+			} else if requeueAfter != 0 {
+				// if the reconcileAction need requeue, do it
+				return intctrlutil.RequeueAfter(requeueAfter, reqCtx.Log, "")
+			}
+			return intctrlutil.Reconciled()
+		})
 }
 
 // SetupWithManager sets up the controller with the Manager.

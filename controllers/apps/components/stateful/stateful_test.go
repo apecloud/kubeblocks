@@ -86,7 +86,7 @@ var _ = Describe("Stateful Component", func() {
 			sts := &stsList.Items[0]
 			clusterComponent := cluster.GetComponentByName(statefulCompName)
 			componentDef := clusterDef.GetComponentDefByName(clusterComponent.ComponentDefRef)
-			stateful := NewStateful(ctx, k8sClient, cluster, clusterComponent, componentDef)
+			stateful := NewStateful(ctx, k8sClient, *cluster, *clusterComponent, *componentDef)
 			phase, _ := stateful.GetPhaseWhenPodsNotReady(statefulCompName)
 			Expect(phase == appsv1alpha1.FailedPhase).Should(BeTrue())
 

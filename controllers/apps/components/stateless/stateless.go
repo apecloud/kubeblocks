@@ -105,18 +105,15 @@ func (stateless *Stateless) HandleUpdate(obj client.Object) error {
 
 func NewStateless(ctx context.Context,
 	cli client.Client,
-	cluster *appsv1alpha1.Cluster,
-	component *appsv1alpha1.ClusterComponentSpec,
-	componentDef *appsv1alpha1.ClusterComponentDefinition) types.Component {
-	if component == nil || componentDef == nil {
-		return nil
-	}
+	cluster appsv1alpha1.Cluster,
+	component appsv1alpha1.ClusterComponentSpec,
+	componentDef appsv1alpha1.ClusterComponentDefinition) types.Component {
 	return &Stateless{
 		Ctx:          ctx,
 		Cli:          cli,
-		Cluster:      cluster,
-		Component:    component,
-		ComponentDef: componentDef,
+		Cluster:      &cluster,
+		Component:    &component,
+		ComponentDef: &componentDef,
 	}
 }
 

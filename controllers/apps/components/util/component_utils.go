@@ -158,7 +158,11 @@ func InitClusterComponentStatusIfNeed(cluster *appsv1alpha1.Cluster,
 		}
 	}
 	componentStatus := cluster.Status.Components[componentName]
-	if componentDef.WorkloadType == appsv1alpha1.Consensus && componentStatus.ConsensusSetStatus == nil {
+	switch componentDef.WorkloadType {
+	case appsv1alpha1.Consensus:
+		if componentStatus.ConsensusSetStatus != nil {
+			break
+		}
 		componentStatus.ConsensusSetStatus = &appsv1alpha1.ConsensusSetStatus{
 			Leader: appsv1alpha1.ConsensusMemberStatus{
 				Pod:        ComponentStatusDefaultPodName,
@@ -166,8 +170,10 @@ func InitClusterComponentStatusIfNeed(cluster *appsv1alpha1.Cluster,
 				Name:       "",
 			},
 		}
-	}
-	if componentDef.WorkloadType == appsv1alpha1.Replication && componentStatus.ReplicationSetStatus == nil {
+	case appsv1alpha1.Replication:
+		if componentStatus.ReplicationSetStatus != nil {
+			break
+		}
 		componentStatus.ReplicationSetStatus = &appsv1alpha1.ReplicationSetStatus{
 			Primary: appsv1alpha1.ReplicationMemberStatus{
 				Pod: ComponentStatusDefaultPodName,

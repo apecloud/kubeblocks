@@ -104,7 +104,7 @@ var _ = Describe("Consensus Component", func() {
 			component := cluster.GetComponentByName(componentName)
 
 			By("test pods are not ready")
-			consensusComponent := NewConsensusSet(ctx, k8sClient, cluster, component, componentDef)
+			consensusComponent := NewConsensusSet(ctx, k8sClient, *cluster, *component, *componentDef)
 			sts.Status.AvailableReplicas = *sts.Spec.Replicas - 1
 			podsReady, _ := consensusComponent.PodsReady(sts)
 			Expect(podsReady == false).Should(BeTrue())

@@ -1007,7 +1007,7 @@ var _ = Describe("Cluster Controller", func() {
 
 		By("Checking statefulSet role label")
 		for _, sts := range stsList.Items {
-			if strings.HasSuffix(sts.Name, strconv.Itoa(testapps.DefaultReplicationPrimaryIndex)) {
+			if strings.HasSuffix(sts.Name, fmt.Sprintf("%s-%s", clusterObj.Name, testapps.DefaultRedisCompName)) {
 				Expect(sts.Labels[constant.RoleLabelKey]).Should(BeEquivalentTo(replicationset.Primary))
 			} else {
 				Expect(sts.Labels[constant.RoleLabelKey]).Should(BeEquivalentTo(replicationset.Secondary))
@@ -1016,6 +1016,7 @@ var _ = Describe("Cluster Controller", func() {
 
 		By("Checking statefulSet template volumes mount")
 		for _, sts := range stsList.Items {
+			Expect(sts.Spec.VolumeClaimTemplates).Should(BeEmpty())
 			for _, volume := range sts.Spec.Template.Spec.Volumes {
 				if volume.Name == testapps.DataVolumeName {
 					Expect(strings.HasPrefix(volume.VolumeSource.PersistentVolumeClaim.ClaimName, testapps.DataVolumeName+"-"+clusterKey.Name)).Should(BeTrue())
@@ -1259,7 +1260,7 @@ var _ = Describe("Cluster Controller", func() {
 		})
 	})
 
-	Context("when creating cluster with MySQL as stateful component", func() {
+	Context("when creating cluster with workloadType=stateful component", func() {
 		BeforeEach(func() {
 			By("Create a clusterDefinition obj")
 			clusterDefObj = testapps.NewClusterDefFactory(clusterDefName).
@@ -1321,7 +1322,7 @@ var _ = Describe("Cluster Controller", func() {
 		})
 	})
 
-	Context("when creating cluster with MySQL as consensus component", func() {
+	Context("when creating cluster with workloadType=consensus component", func() {
 		BeforeEach(func() {
 			By("Create a clusterDef obj")
 			clusterDefObj = testapps.NewClusterDefFactory(clusterDefName).
@@ -1412,7 +1413,7 @@ var _ = Describe("Cluster Controller", func() {
 		})
 	})
 
-	Context("when creating cluster with Redis as replication component", func() {
+	Context("when creating cluster with workloadType=replication component", func() {
 		BeforeEach(func() {
 			By("Create a clusterDefinition obj with replication componentDefRef.")
 			clusterDefObj = testapps.NewClusterDefFactory(clusterDefName).

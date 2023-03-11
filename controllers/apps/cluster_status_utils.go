@@ -282,11 +282,11 @@ func handleClusterStatusByEvent(ctx context.Context, cli client.Client, recorder
 	patch := client.MergeFrom(cluster.DeepCopy())
 	componentMap, clusterAvailabilityEffectMap, componentDef := getComponentRelatedInfo(cluster, clusterDef, componentName)
 	clusterComponent := cluster.GetComponentByName(componentName)
-	// get the component status by event and check whether the component status needs to be synchronized to the cluster
-	component := components.NewComponentByType(ctx, cli, cluster, &componentDef, clusterComponent)
-	if component == nil {
+	if clusterComponent == nil {
 		return nil
 	}
+	// get the component status by event and check whether the component status needs to be synchronized to the cluster
+	component := components.NewComponentByType(ctx, cli, *cluster, componentDef, *clusterComponent)
 	phase, err = component.GetPhaseWhenPodsNotReady(componentName)
 	if err != nil {
 		return err

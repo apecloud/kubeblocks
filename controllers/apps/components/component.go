@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"k8s.io/client-go/tools/record"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -29,7 +30,9 @@ import (
 	"github.com/apecloud/kubeblocks/controllers/apps/components/stateful"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/stateless"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/types"
+	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	opsutil "github.com/apecloud/kubeblocks/controllers/apps/operations/util"
+	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -50,6 +53,7 @@ func newComponentContext(reqCtx intctrlutil.RequestCtx,
 	component types.Component,
 	obj client.Object,
 	componentSpec *appsv1alpha1.ClusterComponentSpec) componentContext {
+
 	return componentContext{
 		reqCtx:        reqCtx,
 		cli:           cli,
@@ -60,16 +64,43 @@ func newComponentContext(reqCtx intctrlutil.RequestCtx,
 	}
 }
 
+func workloadCompClusterReconcile(reqCtx intctrlutil.RequestCtx,
+	cli client.Client,
+	operand client.Object,
+	processor func(*appsv1alpha1.ClusterComponentSpec, types.Component) (ctrl.Result, error),
+) (ctrl.Result, error) {
+	var err error
+	var cluster *appsv1alpha1.Cluster
+
+	if cluster, err = util.GetClusterByObject(reqCtx.Ctx, cli, operand); err != nil {
+		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+	} else if cluster == nil {
+		return intctrlutil.Reconciled()
+	}
+
+	clusterDef := &appsv1alpha1.ClusterDefinition{}
+	if err = cli.Get(reqCtx.Ctx, client.ObjectKey{Name: cluster.Spec.ClusterDefRef}, clusterDef); err != nil {
+		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+	}
+
+	// create a component object
+	componentName := operand.GetLabels()[constant.KBAppComponentLabelKey]
+	componentSpec := cluster.GetComponentByName(componentName)
+	if componentSpec == nil {
+		return intctrlutil.Reconciled()
+	}
+	componentDef := clusterDef.GetComponentDefByName(componentSpec.ComponentDefRef)
+	component := NewComponentByType(reqCtx.Ctx, cli, *cluster, *componentDef, *componentSpec)
+	return processor(componentSpec, component)
+}
+
 // NewComponentByType creates a component object
 func NewComponentByType(
 	ctx context.Context,
 	cli client.Client,
-	cluster *appsv1alpha1.Cluster,
-	componentDef *appsv1alpha1.ClusterComponentDefinition,
-	component *appsv1alpha1.ClusterComponentSpec) types.Component {
-	if componentDef == nil {
-		return nil
-	}
+	cluster appsv1alpha1.Cluster,
+	componentDef appsv1alpha1.ClusterComponentDefinition,
+	component appsv1alpha1.ClusterComponentSpec) types.Component {
 	switch componentDef.WorkloadType {
 	case appsv1alpha1.Consensus:
 		return consensusset.NewConsensusSet(ctx, cli, cluster, component, componentDef)
@@ -79,8 +110,9 @@ func NewComponentByType(
 		return stateful.NewStateful(ctx, cli, cluster, component, componentDef)
 	case appsv1alpha1.Stateless:
 		return stateless.NewStateless(ctx, cli, cluster, component, componentDef)
+	default:
+		panic("unknown workload type")
 	}
-	return nil
 }
 
 // updateComponentStatusInClusterStatus updates cluster.Status.Components if the component status changed

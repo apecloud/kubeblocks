@@ -194,8 +194,8 @@ func handleStatelessProgress(opsRes *OpsResource,
 		return
 	}
 
-	currComponent := stateless.NewStateless(opsRes.Ctx, opsRes.Client, opsRes.Cluster,
-		pgRes.clusterComponent, pgRes.clusterComponentDef)
+	currComponent := stateless.NewStateless(opsRes.Ctx, opsRes.Client, *opsRes.Cluster,
+		*pgRes.clusterComponent, *pgRes.clusterComponentDef)
 	if currComponent == nil {
 		return
 	}
@@ -232,10 +232,7 @@ func handleStatefulSetProgress(opsRes *OpsResource,
 	pgRes progressResource,
 	compStatus *appsv1alpha1.OpsRequestComponentStatus) (completedCount int32, err error) {
 	currComponent := components.NewComponentByType(opsRes.Ctx, opsRes.Client,
-		opsRes.Cluster, pgRes.clusterComponentDef, pgRes.clusterComponent)
-	if currComponent == nil {
-		return
-	}
+		*opsRes.Cluster, *pgRes.clusterComponentDef, *pgRes.clusterComponent)
 	var componentName = pgRes.clusterComponent.Name
 	minReadySeconds, err := util.GetComponentStsMinReadySeconds(opsRes.Ctx,
 		opsRes.Client, opsRes.Cluster, componentName)
@@ -414,10 +411,7 @@ func handleScaleOutProgress(
 	compStatus *appsv1alpha1.OpsRequestComponentStatus) (completedCount int32, err error) {
 	var componentName = pgRes.clusterComponent.Name
 	currComponent := components.NewComponentByType(opsRes.Ctx, opsRes.Client,
-		opsRes.Cluster, pgRes.clusterComponentDef, pgRes.clusterComponent)
-	if currComponent == nil {
-		return
-	}
+		*opsRes.Cluster, *pgRes.clusterComponentDef, *pgRes.clusterComponent)
 	minReadySeconds, err := util.GetComponentWorkloadMinReadySeconds(opsRes.Ctx,
 		opsRes.Client, opsRes.Cluster, pgRes.clusterComponentDef.WorkloadType, componentName)
 	if err != nil {

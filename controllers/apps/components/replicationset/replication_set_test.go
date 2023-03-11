@@ -112,7 +112,7 @@ var _ = Describe("Replication Component", func() {
 				secondarySts *appsv1.StatefulSet
 			)
 			for k, v := range map[string]string{
-				string(Primary):   clusterObj.Name + "-" + testapps.DefaultRedisCompName + "-0",
+				string(Primary):   clusterObj.Name + "-" + testapps.DefaultRedisCompName,
 				string(Secondary): clusterObj.Name + "-" + testapps.DefaultRedisCompName + "-1",
 			} {
 				sts := testapps.NewStatefulSetFactory(testCtx.DefaultNamespace, v, clusterObj.Name, testapps.DefaultRedisCompName).
@@ -133,12 +133,13 @@ var _ = Describe("Replication Component", func() {
 					Expect(isStsPrimary).ShouldNot(BeTrue())
 					secondarySts = sts
 				}
+				Expect(sts.Spec.VolumeClaimTemplates).Should(BeEmpty())
 			}
 
 			compDefName := clusterObj.GetComponentDefRefName(testapps.DefaultRedisCompName)
 			componentDef := clusterDefObj.GetComponentDefByName(compDefName)
 			component := clusterObj.GetComponentByName(testapps.DefaultRedisCompName)
-			replicationComponent := NewReplicationSet(ctx, k8sClient, clusterObj, component, componentDef)
+			replicationComponent := NewReplicationSet(ctx, k8sClient, *clusterObj, *component, *componentDef)
 			var podList []*corev1.Pod
 			for _, availableReplica := range []int32{0, 1} {
 				status.AvailableReplicas = availableReplica

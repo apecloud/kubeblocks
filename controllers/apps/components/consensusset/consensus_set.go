@@ -263,17 +263,14 @@ func (consensusSet *ConsensusSet) HandleUpdate(obj client.Object) error {
 }
 func NewConsensusSet(ctx context.Context,
 	cli client.Client,
-	cluster *appsv1alpha1.Cluster,
-	component *appsv1alpha1.ClusterComponentSpec,
-	componentDef *appsv1alpha1.ClusterComponentDefinition) types.Component {
-	if component == nil || componentDef == nil {
-		return nil
-	}
+	cluster appsv1alpha1.Cluster,
+	component appsv1alpha1.ClusterComponentSpec,
+	componentDef appsv1alpha1.ClusterComponentDefinition) types.Component {
 	return &ConsensusSet{
 		Ctx:          ctx,
 		Cli:          cli,
-		Cluster:      cluster,
-		ComponentDef: componentDef,
-		Component:    component,
+		Cluster:      &cluster,
+		ComponentDef: &componentDef,
+		Component:    &component,
 	}
 }

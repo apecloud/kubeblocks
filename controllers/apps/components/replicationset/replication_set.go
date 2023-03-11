@@ -198,17 +198,14 @@ func (rs *ReplicationSet) HandleUpdate(obj client.Object) error {
 // NewReplicationSet creates a new ReplicationSet object.
 func NewReplicationSet(ctx context.Context,
 	cli client.Client,
-	cluster *appsv1alpha1.Cluster,
-	component *appsv1alpha1.ClusterComponentSpec,
-	componentDef *appsv1alpha1.ClusterComponentDefinition) *ReplicationSet {
-	if component == nil || componentDef == nil {
-		return nil
-	}
+	cluster appsv1alpha1.Cluster,
+	component appsv1alpha1.ClusterComponentSpec,
+	componentDef appsv1alpha1.ClusterComponentDefinition) *ReplicationSet {
 	return &ReplicationSet{
 		Ctx:          ctx,
 		Cli:          cli,
-		Cluster:      cluster,
-		ComponentDef: componentDef,
-		Component:    component,
+		Cluster:      &cluster,
+		ComponentDef: &componentDef,
+		Component:    &component,
 	}
 }

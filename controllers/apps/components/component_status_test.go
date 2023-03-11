@@ -92,8 +92,8 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 				SetReplicas(1).
 				GetObject()
 
-			component = NewComponentByType(testCtx.Ctx, testCtx.Cli, cluster,
-				clusterDef.GetComponentDefByName(compName), cluster.GetComponentByName(compName))
+			component = NewComponentByType(testCtx.Ctx, testCtx.Cli, *cluster,
+				*clusterDef.GetComponentDefByName(compName), *cluster.GetComponentByName(compName))
 			Expect(component).ShouldNot(BeNil())
 		})
 
@@ -198,8 +198,8 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 				SetReplicas(int32(3)).
 				GetObject()
 
-			component = NewComponentByType(testCtx.Ctx, testCtx.Cli, cluster,
-				clusterDef.GetComponentDefByName(compName), cluster.GetComponentByName(compName))
+			component = NewComponentByType(testCtx.Ctx, testCtx.Cli, *cluster,
+				*clusterDef.GetComponentDefByName(compName), *cluster.GetComponentByName(compName))
 			Expect(component).ShouldNot(BeNil())
 		})
 
@@ -317,8 +317,8 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 				SetReplicas(int32(3)).
 				Create(&testCtx).GetObject()
 
-			component = NewComponentByType(testCtx.Ctx, testCtx.Cli, cluster,
-				clusterDef.GetComponentDefByName(compName), cluster.GetComponentByName(compName))
+			component = NewComponentByType(testCtx.Ctx, testCtx.Cli, *cluster,
+				*clusterDef.GetComponentDefByName(compName), *cluster.GetComponentByName(compName))
 			Expect(component).ShouldNot(BeNil())
 		})
 
@@ -436,8 +436,8 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 				SetReplicas(2).
 				GetObject()
 
-			component = NewComponentByType(testCtx.Ctx, testCtx.Cli, cluster,
-				clusterDef.GetComponentDefByName(compName), cluster.GetComponentByName(compName))
+			component = NewComponentByType(testCtx.Ctx, testCtx.Cli, *cluster,
+				*clusterDef.GetComponentDefByName(compName), *cluster.GetComponentByName(compName))
 			Expect(component).ShouldNot(BeNil())
 		})
 

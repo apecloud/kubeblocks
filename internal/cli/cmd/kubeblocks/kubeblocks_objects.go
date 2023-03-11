@@ -34,6 +34,7 @@ import (
 	"k8s.io/klog/v2"
 
 	"github.com/apecloud/kubeblocks/internal/cli/types"
+	"github.com/apecloud/kubeblocks/internal/cli/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
@@ -88,6 +89,24 @@ func getKBObjects(dynamic dynamic.Interface, namespace string) (kbObjects, error
 			kbObjs[*gvr] = crs
 		}
 	}
+
+	getWebhooks := func(gvr schema.GroupVersionResource) {
+		objs, err := dynamic.Resource(gvr).List(ctx, metav1.ListOptions{})
+		if err != nil {
+			appendErr(err)
+			return
+		}
+		result := &unstructured.UnstructuredList{}
+		for _, obj := range objs.Items {
+			if !strings.Contains(obj.GetName(), strings.ToLower(string(util.KubeBlocksApp))) {
+				continue
+			}
+			result.Items = append(result.Items, obj)
+		}
+		kbObjs[gvr] = result
+	}
+	getWebhooks(types.ValidatingWebhookConfigurationGVR())
+	getWebhooks(types.MutatingWebhookConfigurationGVR())
 
 	// get objects by label selector
 	getObjects := func(labelSelector string, gvr schema.GroupVersionResource) {

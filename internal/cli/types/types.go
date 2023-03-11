@@ -51,6 +51,12 @@ const (
 	ResourceStatefulSets = "statefulsets"
 	ResourceSecrets      = "secrets"
 
+	// K8s webhook API group
+	WebhookAPIGroup                         = "admissionregistration.k8s.io"
+	K8sWebhookAPIVersion                    = "v1"
+	ResourceValidatingWebhookConfigurations = "validatingwebhookconfigurations"
+	ResourceMutatingWebhookConfigurations   = "mutatingwebhookconfigurations"
+
 	// Apps API group
 	AppsAPIGroup                     = "apps.kubeblocks.io"
 	AppsAPIVersion                   = "v1alpha1"
@@ -231,5 +237,21 @@ func VolumeSnapshotClassGVR() schema.GroupVersionResource {
 		Group:    "snapshot.storage.k8s.io",
 		Version:  K8sCoreAPIVersion,
 		Resource: "volumesnapshotclasses",
+	}
+}
+
+func ValidatingWebhookConfigurationGVR() schema.GroupVersionResource {
+	return schema.GroupVersionResource{
+		Group:    WebhookAPIGroup,
+		Version:  K8sWebhookAPIVersion,
+		Resource: ResourceValidatingWebhookConfigurations,
+	}
+}
+
+func MutatingWebhookConfigurationGVR() schema.GroupVersionResource {
+	return schema.GroupVersionResource{
+		Group:    WebhookAPIGroup,
+		Version:  K8sWebhookAPIVersion,
+		Resource: ResourceMutatingWebhookConfigurations,
 	}
 }

@@ -204,7 +204,7 @@ func (h *horizontalScalingTransformer) Transform(dag *graph.DAG) error {
 				return err
 			}
 			if shouldRequeue {
-				return errors.New("h-scale requeue")
+				return newRequeueError(time.Second, "prepare h-scale resources")
 			}
 		} else if *stsObj.Spec.Replicas > *stsProto.Spec.Replicas {
 			if err := scaleIn(); err != nil {
@@ -227,7 +227,7 @@ func (h *horizontalScalingTransformer) Transform(dag *graph.DAG) error {
 			return err
 		}
 		if shouldRequeue {
-			return errors.New("h-scale requeue")
+			return newRequeueError(time.Second, "h-scale pvc not bounded yet")
 		}
 		// clean backup resources.
 		// there will not be any backup resources other than scale out.

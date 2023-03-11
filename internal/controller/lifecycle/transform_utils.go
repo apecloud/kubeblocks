@@ -124,6 +124,13 @@ func objectScheme() (*runtime.Scheme, error) {
 	return s, nil
 }
 
+func newRequeueError(after time.Duration, reason string) error {
+	return &realRequeueError{
+		reason:       reason,
+		requeueAfter: after,
+	}
+}
+
 const (
 	// ConditionTypeProvisioningStarted the operator starts resource provisioning to create or change the cluster
 	ConditionTypeProvisioningStarted = "ProvisioningStarted"

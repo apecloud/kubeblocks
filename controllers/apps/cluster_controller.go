@@ -297,8 +297,15 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 	// ---- start refactor ----
+	clusterDeepCopy := cluster.DeepCopy()
 	plan, err := lifecycle.NewClusterPlanBuilder(reqCtx, r.Client, cluster).Build()
 	if err != nil {
+		if re, ok := err.(lifecycle.RequeueError); ok {
+			if err = r.patchClusterStatus(reqCtx.Ctx, cluster, clusterDeepCopy); err != nil {
+				return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+			}
+			return intctrlutil.RequeueAfter(re.RequeueAfter(), reqCtx.Log, re.Reason())
+		}
 		_ = clusterConditionMgr.setApplyResourcesFailedCondition(err)
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}

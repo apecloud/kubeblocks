@@ -17,8 +17,10 @@ limitations under the License.
 package lifecycle
 
 import (
+	"fmt"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"time"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 )
@@ -56,3 +58,25 @@ type lifecycleVertex struct {
 }
 
 type clusterSnapshot map[gvkName]client.Object
+
+type RequeueError interface {
+	RequeueAfter() time.Duration
+	Reason() string
+}
+
+type realRequeueError struct {
+	reason       string
+	requeueAfter time.Duration
+}
+
+func (r *realRequeueError) Error() string {
+	return fmt.Sprintf("requeue after: %v as: %s", r.requeueAfter, r.reason)
+}
+
+func (r *realRequeueError) RequeueAfter() time.Duration {
+	return r.requeueAfter
+}
+
+func (r *realRequeueError) Reason() string {
+	return r.reason
+}

@@ -18,6 +18,7 @@ package lifecycle
 
 import (
 	"fmt"
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"reflect"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -153,6 +154,21 @@ func (c *objectActionTransformer) Transform(dag *graph.DAG) error {
 		v.oriObj = oldSnapshot[name]
 		v.action = actionPtr(UPDATE)
 	}
+
+	// update cluster.status
+	rootVertex, _ := root.(*lifecycleVertex)
+	cluster, _ := rootVertex.obj.(*appsv1alpha1.Cluster)
+	// apply resources succeed, record the condition and event
+	applyResourcesCondition := newApplyResourcesCondition()
+	cluster.SetStatusCondition(applyResourcesCondition)
+	// if cluster status is ConditionsError, do it before updated the observedGeneration.
+	updateClusterPhaseWhenConditionsError(cluster)
+	// update observed generation
+	cluster.Status.ObservedGeneration = cluster.Generation
+	cluster.Status.ClusterDefGeneration = c.cc.cd.Generation
+	// TODO: emit event
+	//r.Recorder.Event(cluster, corev1.EventTypeNormal, applyResourcesCondition.Reason, applyResourcesCondition.Message)
+	rootVertex.action = actionPtr(STATUS)
 
 	return nil
 }

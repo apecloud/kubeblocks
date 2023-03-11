@@ -17,9 +17,6 @@ limitations under the License.
 package lifecycle
 
 import (
-	"fmt"
-
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 )
 
@@ -32,23 +29,5 @@ func (c *clusterStatusTransformer) Transform(dag *graph.DAG) error {
 		return nil
 	}
 
-	// get root(cluster) vertex
-	rootVertex := dag.Root()
-	if rootVertex == nil {
-		return fmt.Errorf("root vertex not found: %v", dag)
-	}
-	root, _ := rootVertex.(*lifecycleVertex)
-	cluster, _ := root.obj.(*appsv1alpha1.Cluster)
-	// apply resources succeed, record the condition and event
-	applyResourcesCondition := newApplyResourcesCondition()
-	cluster.SetStatusCondition(applyResourcesCondition)
-	// if cluster status is ConditionsError, do it before updated the observedGeneration.
-	updateClusterPhaseWhenConditionsError(cluster)
-	// update observed generation
-	cluster.Status.ObservedGeneration = cluster.Generation
-	cluster.Status.ClusterDefGeneration = c.cd.Generation
-	// TODO: emit event
-	//r.Recorder.Event(cluster, corev1.EventTypeNormal, applyResourcesCondition.Reason, applyResourcesCondition.Message)
-	root.action = actionPtr(STATUS)
 	return nil
 }

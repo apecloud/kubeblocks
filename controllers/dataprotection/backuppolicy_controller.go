@@ -54,6 +54,7 @@ type BackupPolicyReconciler struct {
 type backupPolicyOptions struct {
 	Name           string           `json:"name"`
 	Namespace      string           `json:"namespace"`
+	MgrNamespace   string           `json:"mgrNamespace"`
 	Cluster        string           `json:"cluster"`
 	Schedule       string           `json:"schedule"`
 	BackupType     string           `json:"backupType"`
@@ -329,6 +330,7 @@ func (r *BackupPolicyReconciler) buildCronJob(backupPolicy *dataprotectionv1alph
 		TTL:            backupPolicy.Spec.TTL,
 		BackupType:     backupPolicy.Spec.BackupType,
 		ServiceAccount: viper.GetString("KUBEBLOCKS_SERVICEACCOUNT_NAME"),
+		MgrNamespace:   viper.GetString("CM_NAMESPACE"),
 	}
 	backupPolicyOptionsByte, err := json.Marshal(options)
 	if err != nil {
@@ -349,11 +351,6 @@ func (r *BackupPolicyReconciler) buildCronJob(backupPolicy *dataprotectionv1alph
 	}
 
 	controllerutil.AddFinalizer(&cronjob, dataProtectionFinalizerName)
-
-	scheme, _ := dataprotectionv1alpha1.SchemeBuilder.Build()
-	if err := controllerutil.SetOwnerReference(backupPolicy, &cronjob, scheme); err != nil {
-		return nil, err
-	}
 
 	// set labels
 	for k, v := range backupPolicy.Labels {
@@ -442,7 +439,7 @@ func (r *BackupPolicyReconciler) deleteExternalResources(reqCtx intctrlutil.Requ
 	cronjob := &batchv1.CronJob{}
 
 	key := types.NamespacedName{
-		Namespace: backupPolicy.Namespace,
+		Namespace: viper.GetString("CM_NAMESPACE"),
 		Name:      backupPolicy.Name,
 	}
 	if err := r.Client.Get(reqCtx.Ctx, key, cronjob); err != nil {

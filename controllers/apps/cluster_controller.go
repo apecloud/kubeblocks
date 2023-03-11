@@ -215,8 +215,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	planBuilder := lifecycle.NewClusterPlanBuilder(reqCtx, r.Client, req)
 
 	reqCtx.Log.V(1).Info("get clusterDef and clusterVersion")
-	err := planBuilder.Validate()
-	if err != nil {
+	if err := planBuilder.Validate(); err != nil {
 		if re, ok := err.(lifecycle.RequeueError); ok {
 			_ = clusterConditionMgr.setPreCheckErrorCondition(err)
 			return intctrlutil.RequeueAfter(re.RequeueAfter(), reqCtx.Log, re.Reason())
@@ -270,8 +269,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	clusterDeepCopy := cluster.DeepCopy()
-	plan, err := planBuilder.Build()
-	if err != nil {
+	if plan, err := planBuilder.Build(); err != nil {
 		if re, ok := err.(lifecycle.RequeueError); ok {
 			if err = r.patchClusterStatus(reqCtx.Ctx, cluster, clusterDeepCopy); err != nil {
 				return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
@@ -280,8 +278,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		}
 		_ = clusterConditionMgr.setApplyResourcesFailedCondition(err)
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-	}
-	if err := plan.Execute(); err != nil {
+	} else if err = plan.Execute(); err != nil {
 		_ = clusterConditionMgr.setApplyResourcesFailedCondition(err)
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}

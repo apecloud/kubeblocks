@@ -160,10 +160,13 @@ func (c *clusterPlanBuilder) Build() (graph.Plan, error) {
 	}
 	c.cluster = cc.cluster
 
+	// TODO: remove all cli & ctx fields from transformers, keep them in pure-dag-manipulation form
 	// build transformer chain
 	chain := &graph.TransformerChain{
 		// init dag, that is put cluster vertex into dag
 		&initTransformer{cc: *cc, cli: c.cli, ctx: c.ctx},
+		// fix cd&cv labels of cluster
+		&fixClusterLabelsTransformer{cc: *cc, cli: c.cli, ctx: c.ctx},
 		// cluster to K8s objects and put them into dag
 		&clusterTransformer{cc: *cc, cli: c.cli, ctx: c.ctx},
 		// tls certs secret

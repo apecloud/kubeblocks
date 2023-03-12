@@ -29,6 +29,8 @@ import (
 const (
 	// TODO: deduplicate
 	dbClusterFinalizerName = "cluster.kubeblocks.io/finalizer"
+	clusterDefLabelKey     = "clusterdefinition.kubeblocks.io/name"
+	clusterVersionLabelKey = "clusterversion.kubeblocks.io/name"
 )
 
 type Action string

@@ -225,30 +225,8 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	// TODO: refactor mark: cluster provisioning, put deletion and status Update into plan
 	// should patch the label first to prevent the label from being modified by the user.
-	if err := r.patchClusterLabelsIfNotExist(ctx, cluster); err != nil {
-		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-	}
-	//if cluster.DeletionTimestamp.IsZero() && cluster.Status.ObservedGeneration == cluster.Generation {
-	//	clusterDefinition := &appsv1alpha1.ClusterDefinition{}
-	//	if err := r.Client.Get(reqCtx.Ctx, types.NamespacedName{
-	//		Name: cluster.Spec.ClusterDefRef,
-	//	}, clusterDefinition); err != nil {
-	//		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-	//	}
-	//	// checks if the controller is handling the garbage of restore.
-	//	if handlingRestoreGarbage, err := r.handleGarbageOfRestoreBeforeRunning(ctx, cluster); err != nil {
-	//		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-	//	} else if handlingRestoreGarbage {
-	//		return intctrlutil.Reconciled()
-	//	}
-	//	// reconcile the phase and conditions of the Cluster.status
-	//	if err := r.reconcileClusterStatus(reqCtx.Ctx, cluster, clusterDefinition); err != nil {
-	//		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-	//	}
-	//	if err := r.cleanupAnnotationsAfterRunning(reqCtx, cluster); err != nil {
-	//		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-	//	}
-	//	return intctrlutil.Reconciled()
+	//if err := r.patchClusterLabelsIfNotExist(ctx, cluster); err != nil {
+	//	return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	//}
 
 	if cluster.DeletionTimestamp.IsZero() && cluster.Status.ObservedGeneration != cluster.Generation {

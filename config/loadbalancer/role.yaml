@@ -20,7 +20,6 @@ rules:
   - ""
   resources:
   - endpoints
-  - pods
   verbs:
   - get
   - list
@@ -32,6 +31,14 @@ rules:
   verbs:
   - get
   - list
+- apiGroups:
+  - ""
+  resources:
+  - pods
+  verbs:
+  - get
+  - list
+  - watch
 - apiGroups:
   - ""
   resources:

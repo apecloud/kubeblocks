@@ -783,7 +783,9 @@ func isVolumeSnapshotExists(cli client.Client,
 		return false, client.IgnoreNotFound(err)
 	}
 	for _, vs := range vsList.Items {
-		if vs.DeletionTimestamp == nil {
+		// when do h-scale very shortly after last h-scale,
+		// the last volume snapshot could not be deleted completely
+		if vs.DeletionTimestamp.IsZero() {
 			return true, nil
 		}
 	}

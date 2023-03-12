@@ -110,6 +110,9 @@ func (c *clusterPlanBuilder) defaultWalkFunc(node graph.Vertex) error {
 			if err := c.handleClusterDeletion(cluster); err != nil {
 				return err
 			}
+			if cluster.Spec.TerminationPolicy == appsv1alpha1.DoNotTerminate {
+				return nil
+			}
 		}
 		if controllerutil.RemoveFinalizer(obj.obj, dbClusterFinalizerName) {
 			err := c.cli.Update(c.ctx.Ctx, obj.obj)
@@ -120,8 +123,8 @@ func (c *clusterPlanBuilder) defaultWalkFunc(node graph.Vertex) error {
 	case STATUS:
 		// TODO: ugly patch for cluster.finalizer, refactor me
 		if _, ok := obj.obj.(*appsv1alpha1.Cluster); ok {
-			clsr, _ := obj.obj.(*appsv1alpha1.Cluster)
-			origClsr, _ := obj.oriObj.(*appsv1alpha1.Cluster)
+			clsr := obj.obj.(*appsv1alpha1.Cluster).DeepCopy()
+			origClsr := obj.oriObj.(*appsv1alpha1.Cluster).DeepCopy()
 			if !reflect.DeepEqual(clsr.ObjectMeta, origClsr.ObjectMeta) {
 				p := client.MergeFrom(origClsr)
 				if err := c.cli.Patch(c.ctx.Ctx, clsr, p); err != nil {
@@ -171,6 +174,8 @@ func (c *clusterPlanBuilder) Build() (graph.Plan, error) {
 		&configTransformer{},
 		// read old snapshot from cache, and generate diff plan
 		&objectActionTransformer{cc: *cc, cli: c.cli, ctx: c.ctx},
+		// handle TerminationPolicyType=DoNotTerminate
+		&doNotTerminateTransformer{cc: *cc, cli: c.cli, ctx: c.ctx},
 		// horizontal scaling
 		&stsHorizontalScalingTransformer{cc: *cc, cli: c.cli, ctx: c.ctx},
 		// stateful set pvc Update

@@ -51,6 +51,12 @@ type compoundCluster struct {
 	cv      appsv1alpha1.ClusterVersion
 }
 
+// lifecycleVertex describes expected object spec and how to reach it
+// obj always represents the expected port: new object in Create/Update action and old object in Delete action
+// oriObj is set in Update action
+// all transformers doing their object manipulation works on obj.spec
+// the root vertex(i.e. the cluster vertex) will be treated specially:
+// as all its meta, spec and status can be updated in one reconciliation loop
 type lifecycleVertex struct {
 	obj       client.Object
 	oriObj    client.Object
@@ -81,3 +87,11 @@ func (r *realRequeueError) RequeueAfter() time.Duration {
 func (r *realRequeueError) Reason() string {
 	return r.reason
 }
+
+// TODO: dedup
+// postHandler defines the handler after patching cluster status.
+type postHandler func(cluster *appsv1alpha1.Cluster) error
+
+// TODO: dedup
+// clusterStatusHandler a cluster status handler which changes of Cluster.status will be patched uniformly by doChainClusterStatusHandler.
+type clusterStatusHandler func(cluster *appsv1alpha1.Cluster) (bool, postHandler)

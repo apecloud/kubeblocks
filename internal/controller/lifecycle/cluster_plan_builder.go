@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"golang.org/x/exp/maps"
+	"k8s.io/client-go/tools/record"
 	"reflect"
 	"strings"
 
@@ -40,10 +41,11 @@ import (
 )
 
 type clusterPlanBuilder struct {
-	ctx     intctrlutil.RequestCtx
-	cli     client.Client
-	req     ctrl.Request
-	cluster *appsv1alpha1.Cluster
+	ctx      intctrlutil.RequestCtx
+	cli      client.Client
+	req      ctrl.Request
+	recorder record.EventRecorder
+	cluster  *appsv1alpha1.Cluster
 }
 
 type clusterPlan struct {
@@ -183,7 +185,7 @@ func (c *clusterPlanBuilder) Build() (graph.Plan, error) {
 		// replication set horizontal scaling
 		&rplSetHorizontalScalingTransformer{cc: *cc, cli: c.cli, ctx: c.ctx},
 		// finally, update cluster status
-		&clusterStatusTransformer{*cc},
+		&clusterStatusTransformer{cc: *cc, cli: c.cli, ctx: c.ctx, recorder: c.recorder},
 	}
 
 	// new a DAG and apply chain on it, after that we should get the final Plan
@@ -202,11 +204,12 @@ func (c *clusterPlanBuilder) Build() (graph.Plan, error) {
 
 // NewClusterPlanBuilder returns a clusterPlanBuilder powered PlanBuilder
 // TODO: change ctx to context.Context
-func NewClusterPlanBuilder(ctx intctrlutil.RequestCtx, cli client.Client, req ctrl.Request) graph.PlanBuilder {
+func NewClusterPlanBuilder(ctx intctrlutil.RequestCtx, cli client.Client, req ctrl.Request, recorder record.EventRecorder) graph.PlanBuilder {
 	return &clusterPlanBuilder{
-		ctx: ctx,
-		cli: cli,
-		req: req,
+		ctx:      ctx,
+		cli:      cli,
+		req:      req,
+		recorder: recorder,
 	}
 }
 

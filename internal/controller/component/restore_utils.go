@@ -58,6 +58,14 @@ func BuildRestoredInfo(
 	if err != nil {
 		return err
 	}
+	return BuildRestoredInfo2(component, backup, backupTool)
+}
+
+// BuildRestoredInfo2 builds restore-related infos if it needs to restore from backup, such as init container/pvc dataSource.
+func BuildRestoredInfo2(
+	component *SynthesizedComponent,
+	backup *dataprotectionv1alpha1.Backup,
+	backupTool *dataprotectionv1alpha1.BackupTool) error {
 	switch backup.Spec.BackupType {
 	case dataprotectionv1alpha1.BackupTypeFull:
 		return buildInitContainerWithFullBackup(component, backup, backupTool)

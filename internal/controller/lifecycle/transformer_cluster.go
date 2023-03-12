@@ -81,7 +81,11 @@ func (c *clusterTransformer) Transform(dag *graph.DAG) error {
 		// build info that needs to be restored from backup
 		backupSourceName := clusterBackupResourceMap[synthesizedComp.Name]
 		if len(backupSourceName) > 0 {
-			if err := component.BuildRestoredInfo(c.ctx, c.cli, c.cc.cluster.Namespace, synthesizedComp, backupSourceName); err != nil {
+			backup, backupTool, err := getBackupObjects(c.ctx, c.cli, c.cc.cluster.Namespace, backupSourceName)
+			if err != nil {
+				return err
+			}
+			if err := component.BuildRestoredInfo2(synthesizedComp, backup, backupTool); err != nil {
 				return err
 			}
 		}

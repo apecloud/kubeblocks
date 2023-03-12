@@ -56,6 +56,9 @@ type clusterPlan struct {
 	conMgr   clusterConditionManager2
 }
 
+var _ graph.PlanBuilder = &clusterPlanBuilder{}
+var _ graph.Plan = &clusterPlan{}
+
 func (c *clusterPlanBuilder) getCompoundCluster() (*compoundCluster, error) {
 	cluster := c.cluster
 	cd := &appsv1alpha1.ClusterDefinition{}

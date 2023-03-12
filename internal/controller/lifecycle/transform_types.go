@@ -97,3 +97,14 @@ type postHandler func(cluster *appsv1alpha1.Cluster) error
 // TODO: dedup
 // clusterStatusHandler a cluster status handler which changes of Cluster.status will be patched uniformly by doChainClusterStatusHandler.
 type clusterStatusHandler func(cluster *appsv1alpha1.Cluster) (bool, postHandler)
+
+type readonlyClient interface {
+	client.Reader
+}
+
+type delegateClient struct {
+	client.Client
+}
+
+var _ RequeueError = &realRequeueError{}
+var _ readonlyClient = delegateClient{}

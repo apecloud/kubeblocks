@@ -18,6 +18,9 @@ package lifecycle
 
 import (
 	"fmt"
+	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	"k8s.io/apimachinery/pkg/types"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -162,4 +165,22 @@ func checkReferencedCRStatus(referencedCRPhase appsv1alpha1.Phase) error {
 	//	return &res, err
 	//}
 	return newRequeueError(ControllerErrorRequeueTime, "cluster definition not available")
+}
+
+func getBackupObjects(reqCtx intctrlutil.RequestCtx,
+	cli readonlyClient,
+	namespace string,
+	backupName string) (*dataprotectionv1alpha1.Backup, *dataprotectionv1alpha1.BackupTool, error) {
+	// get backup
+	backup := &dataprotectionv1alpha1.Backup{}
+	if err := cli.Get(reqCtx.Ctx, types.NamespacedName{Name: backupName, Namespace: namespace}, backup); err != nil {
+		return nil, nil, err
+	}
+
+	// get backup tool
+	backupTool := &dataprotectionv1alpha1.BackupTool{}
+	if err := cli.Get(reqCtx.Ctx, types.NamespacedName{Name: backup.Status.BackupToolName}, backupTool); err != nil {
+		return nil, nil, err
+	}
+	return backup, backupTool, nil
 }

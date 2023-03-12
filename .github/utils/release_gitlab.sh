@@ -18,6 +18,8 @@ Usage: $(basename "$0") <options>
                                 2) upload release asset
                                 3) release helm chart
                                 4) update release latest
+                                5) upload code
+                                6) download code
     -tn, --tag-name           Release tag name
     -pi, --project-id         Gitlab repo project id or "group%2Fproject"
     -at, --access-token       Gitlab access token
@@ -41,17 +43,31 @@ main() {
 
     parse_command_line "$@"
 
-    if [[ $TYPE == 1 ]]; then
-        create_release
-    elif [[ $TYPE == 2 ]]; then
-        upload_asset
-        update_release_asset
-    elif [[ $TYPE == 3 ]]; then
-        release_helm
-    elif [[ $TYPE == 4 ]]; then
-        update_release_latest
-    fi
-
+    case $TYPE in
+        1)
+            create_release
+        ;;
+        2)
+            upload_asset
+            update_release_asset
+        ;;
+        3)
+            release_helm
+        ;;
+        4)
+            update_release_latest
+        ;;
+        5)
+            upload_asset
+        ;;
+        6)
+            download_asset
+        ;;
+        *)
+            show_help
+            break
+        ;;
+    esac
 }
 
 parse_command_line() {
@@ -166,6 +182,12 @@ upload_asset() {
     request_url=$API_URL/$PROJECT_ID/packages/generic/$PACKAGE_NAME/$TAG_NAME/
 
     gitlab_api_curl $request_url --upload-file $ASSET_PATH
+}
+
+download_asset() {
+    request_url=$API_URL/$PROJECT_ID/packages/generic/$PACKAGE_NAME/$TAG_NAME/$ASSET_NAME
+
+    gitlab_api_curl $request_url -o $ASSET_NAME
 }
 
 update_release_asset() {

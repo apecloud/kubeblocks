@@ -47,6 +47,7 @@ var (
 		types.StatefulSetGVR(),
 		types.ServiceGVR(),
 		types.PVCGVR(),
+		types.ConfigmapGVR(),
 		types.VolumeSnapshotClassGVR(),
 	}
 )
@@ -142,9 +143,6 @@ func getKBObjects(dynamic dynamic.Interface, namespace string, addons []*extensi
 		target.Items = append(target.Items, *obj)
 	}
 
-	// build label selector
-	configMapLabelSelector := fmt.Sprintf("%s=%s", constant.CMConfigurationTypeLabelKey, constant.ConfigTemplateType)
-
 	// get resources which label matches app.kubernetes.io/instance=kubeblocks or
 	// label matches release=kubeblocks, like prometheus-server
 	for _, selector := range buildResourceLabelSelectors(addons) {
@@ -152,6 +150,10 @@ func getKBObjects(dynamic dynamic.Interface, namespace string, addons []*extensi
 			getObjects(selector, gvr)
 		}
 	}
+
+	// build label selector
+	configMapLabelSelector := fmt.Sprintf("%s=%s", constant.CMConfigurationTypeLabelKey, constant.ConfigTemplateType)
+
 	// get configmap
 	getObjects(configMapLabelSelector, types.ConfigmapGVR())
 

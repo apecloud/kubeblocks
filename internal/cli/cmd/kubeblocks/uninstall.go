@@ -284,7 +284,7 @@ func (o *uninstallOptions) uninstallAddons() error {
 	// check if all addons are disabled, if so, then we will stop uninstalling addons
 	// otherwise, we will wait for a while and check again
 	for i := 0; i < 5; i++ {
-		klog.V(1).Infof("Wait for %d seconds and check addons disabled again", i+1)
+		klog.V(1).Infof("Wait for %d seconds and check addons disabled again", i+3)
 		time.Sleep(time.Duration(i+3) * time.Second)
 		if o.addons, err = processAddons(nil); err != nil {
 			return err

@@ -81,25 +81,47 @@ func (c *clusterPlanBuilder) getCompoundCluster() (*compoundCluster, error) {
 	return cc, nil
 }
 
-func (c *clusterPlanBuilder) defaultWalkFunc(node graph.Vertex) error {
-	obj, ok := node.(*lifecycleVertex)
+func (c *clusterPlanBuilder) defaultWalkFunc(vertex graph.Vertex) error {
+	node, ok := vertex.(*lifecycleVertex)
 	if !ok {
-		return fmt.Errorf("wrong node type %v", node)
+		return fmt.Errorf("wrong vertex type %v", vertex)
 	}
-	if obj.action == nil {
+	if node.action == nil {
 		return errors.New("node action can't be nil")
 	}
-	switch *obj.action {
+	// cluster object has more business to do, handle them here
+	if _, ok := node.obj.(*appsv1alpha1.Cluster); ok {
+		cluster := node.obj.(*appsv1alpha1.Cluster).DeepCopy()
+		origCluster := node.oriObj.(*appsv1alpha1.Cluster)
+		switch *node.action {
+		// cluster.meta and cluster.spec might change
+		case CREATE, UPDATE, STATUS:
+			if !reflect.DeepEqual(cluster.ObjectMeta, origCluster.ObjectMeta) ||
+				!reflect.DeepEqual(cluster.Spec, origCluster.Spec) {
+				if err := c.cli.Update(c.ctx.Ctx, cluster); err != nil {
+					return err
+				}
+			}
+		case DELETE:
+			if err := c.handleClusterDeletion(cluster); err != nil {
+				return err
+			}
+			if cluster.Spec.TerminationPolicy == appsv1alpha1.DoNotTerminate {
+				return nil
+			}
+		}
+	}
+	switch *node.action {
 	case CREATE:
-		err := c.cli.Create(c.ctx.Ctx, obj.obj)
+		err := c.cli.Create(c.ctx.Ctx, node.obj)
 		if err != nil && !apierrors.IsAlreadyExists(err) {
 			return err
 		}
 	case UPDATE:
-		if obj.immutable {
+		if node.immutable {
 			return nil
 		}
-		o, err := c.buildUpdateObj(obj)
+		o, err := c.buildUpdateObj(node)
 		if err != nil {
 			return err
 		}
@@ -108,34 +130,15 @@ func (c *clusterPlanBuilder) defaultWalkFunc(node graph.Vertex) error {
 			return err
 		}
 	case DELETE:
-		if cluster, ok := obj.obj.(*appsv1alpha1.Cluster); ok {
-			if err := c.handleClusterDeletion(cluster); err != nil {
-				return err
-			}
-			if cluster.Spec.TerminationPolicy == appsv1alpha1.DoNotTerminate {
-				return nil
-			}
-		}
-		if controllerutil.RemoveFinalizer(obj.obj, dbClusterFinalizerName) {
-			err := c.cli.Update(c.ctx.Ctx, obj.obj)
+		if controllerutil.RemoveFinalizer(node.obj, dbClusterFinalizerName) {
+			err := c.cli.Update(c.ctx.Ctx, node.obj)
 			if err != nil && !apierrors.IsNotFound(err) {
 				return err
 			}
 		}
 	case STATUS:
-		// TODO: ugly patch for cluster.finalizer, refactor me
-		if _, ok := obj.obj.(*appsv1alpha1.Cluster); ok {
-			clsr := obj.obj.(*appsv1alpha1.Cluster).DeepCopy()
-			origClsr := obj.oriObj.(*appsv1alpha1.Cluster).DeepCopy()
-			if !reflect.DeepEqual(clsr.ObjectMeta, origClsr.ObjectMeta) {
-				p := client.MergeFrom(origClsr)
-				if err := c.cli.Patch(c.ctx.Ctx, clsr, p); err != nil {
-					return err
-				}
-			}
-		}
-		patch := client.MergeFrom(obj.oriObj)
-		return c.cli.Status().Patch(c.ctx.Ctx, obj.obj, patch)
+		patch := client.MergeFrom(node.oriObj)
+		return c.cli.Status().Patch(c.ctx.Ctx, node.obj, patch)
 	}
 	return nil
 }
@@ -323,7 +326,7 @@ func (c *clusterPlanBuilder) buildUpdateObj(node *lifecycleVertex) (client.Objec
 		return node.obj, nil
 	}
 
-	return nil, nil
+	return node.obj, nil
 }
 
 func (c *clusterPlanBuilder) handleClusterDeletion(cluster *appsv1alpha1.Cluster) error {

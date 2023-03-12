@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"reflect"
 	"regexp"
 	"strings"
@@ -212,31 +213,21 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		cluster:  cluster,
 	}
 
-	planBuilder := lifecycle.NewClusterPlanBuilder(reqCtx, r.Client, req, r.Recorder)
-
-	reqCtx.Log.V(1).Info("get clusterDef and clusterVersion")
-	if err := planBuilder.Validate(); err != nil {
+	requeueError := func(err error, conditionFunc func(error) metav1.Condition) (ctrl.Result, error) {
 		if re, ok := err.(lifecycle.RequeueError); ok {
-			_ = clusterConditionMgr.setPreCheckErrorCondition(err)
 			return intctrlutil.RequeueAfter(re.RequeueAfter(), reqCtx.Log, re.Reason())
 		}
+		_ = clusterConditionMgr.updateStatusConditions(conditionFunc(err))
 		return intctrlutil.RequeueWithError(err, reqCtx.Log, "")
 	}
 
-	// TODO: refactor mark: cluster provisioning, put deletion and status Update into plan
-	clusterDeepCopy := cluster.DeepCopy()
-	if plan, err := planBuilder.Build(); err != nil {
-		if re, ok := err.(lifecycle.RequeueError); ok {
-			if err = r.patchClusterStatus(reqCtx.Ctx, cluster, clusterDeepCopy); err != nil {
-				return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-			}
-			return intctrlutil.RequeueAfter(re.RequeueAfter(), reqCtx.Log, re.Reason())
-		}
-		_ = clusterConditionMgr.setApplyResourcesFailedCondition(err)
-		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+	planBuilder := lifecycle.NewClusterPlanBuilder(reqCtx, r.Client, req, r.Recorder)
+	if err := planBuilder.Validate(); err != nil {
+		return requeueError(err, clusterConditionMgr.newPreCheckErrorCondition)
+	} else if plan, err := planBuilder.Build(); err != nil {
+		return requeueError(err, clusterConditionMgr.newApplyResourcesFailedCondition)
 	} else if err = plan.Execute(); err != nil {
-		_ = clusterConditionMgr.setApplyResourcesFailedCondition(err)
-		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+		return requeueError(err, clusterConditionMgr.newApplyResourcesFailedCondition)
 	}
 	return intctrlutil.Reconciled()
 }

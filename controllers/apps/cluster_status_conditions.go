@@ -144,17 +144,21 @@ func (conMgr clusterConditionManager) setProvisioningStartedCondition() error {
 
 // setPreCheckErrorCondition sets the error condition when preCheck failed.
 func (conMgr clusterConditionManager) setPreCheckErrorCondition(err error) error {
+	condition := conMgr.newPreCheckErrorCondition(err)
+	return conMgr.updateStatusConditions(condition)
+}
+
+func (conMgr clusterConditionManager) newPreCheckErrorCondition(err error) metav1.Condition {
 	reason := ReasonPreCheckFailed
 	if apierrors.IsNotFound(err) {
 		reason = constant.ReasonNotFoundCR
 	}
-	condition := metav1.Condition{
+	return metav1.Condition{
 		Type:    ConditionTypeProvisioningStarted,
 		Status:  metav1.ConditionFalse,
 		Message: err.Error(),
 		Reason:  reason,
 	}
-	return conMgr.updateStatusConditions(condition)
 }
 
 // setUnavailableCondition sets the condition that reference CRs are unavailable.
@@ -170,13 +174,17 @@ func (conMgr clusterConditionManager) setReferenceCRUnavailableCondition(message
 
 // setApplyResourcesFailedCondition sets applied resources failed condition in cluster conditions.
 func (conMgr clusterConditionManager) setApplyResourcesFailedCondition(err error) error {
-	condition := metav1.Condition{
+	condition := conMgr.newApplyResourcesFailedCondition(err)
+	return conMgr.updateStatusConditions(condition)
+}
+
+func (conMgr clusterConditionManager) newApplyResourcesFailedCondition(err error) metav1.Condition {
+	return metav1.Condition{
 		Type:    ConditionTypeApplyResources,
 		Status:  metav1.ConditionFalse,
 		Message: err.Error(),
 		Reason:  ReasonApplyResourcesFailed,
 	}
-	return conMgr.updateStatusConditions(condition)
 }
 
 // newApplyResourcesCondition creates a condition when applied resources succeed.

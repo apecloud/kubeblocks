@@ -181,7 +181,7 @@ func (r *ReplicationSet) HandleUpdate(ctx context.Context, obj client.Object) er
 		if sts.Generation != sts.Status.ObservedGeneration {
 			continue
 		}
-		pod, err := GetAndCheckReplicationPodByStatefulSet(ctx, r.Cli, &sts)
+		pod, err := getAndCheckReplicationPodByStatefulSet(ctx, r.Cli, &sts)
 		if err != nil {
 			return err
 		}

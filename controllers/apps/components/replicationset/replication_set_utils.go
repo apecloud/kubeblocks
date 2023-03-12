@@ -93,7 +93,7 @@ func handleReplicationSetHorizontalScale(ctx context.Context,
 			stsToDeleteMap[compName] = int32(len(compOwnsStsMap[compName])) - clusterCompReplicasMap[compName]
 		} else {
 			for _, compStsObj := range compStsObjs {
-				pod, err := GetAndCheckReplicationPodByStatefulSet(ctx, cli, compStsObj)
+				pod, err := getAndCheckReplicationPodByStatefulSet(ctx, cli, compStsObj)
 				if err != nil {
 					return err
 				}
@@ -312,9 +312,13 @@ func removeTargetPodsInfoInStatus(replicationStatus *appsv1alpha1.ReplicationSet
 // checkObjRoleLabelIsPrimary checks whether it is the primary obj(statefulSet or pod) through the label tag on obj.
 func checkObjRoleLabelIsPrimary[T intctrlutil.Object, PT intctrlutil.PObject[T]](obj PT) (bool, error) {
 	if obj == nil || obj.GetLabels() == nil {
+		// REVIEW/TODO: need avoid using dynamic error string, this is bad for
+		// error type checking (errors.Is)
 		return false, fmt.Errorf("obj %s or obj's labels is nil, pls check", obj.GetName())
 	}
 	if _, ok := obj.GetLabels()[constant.RoleLabelKey]; !ok {
+		// REVIEW/TODO: need avoid using dynamic error string, this is bad for
+		// error type checking (errors.Is)
 		return false, fmt.Errorf("obj %s or obj labels key is nil, pls check", obj.GetName())
 	}
 	return obj.GetLabels()[constant.RoleLabelKey] == string(Primary), nil
@@ -394,8 +398,8 @@ func filterReplicationWorkload(ctx context.Context,
 	return compDef, nil
 }
 
-// GetAndCheckReplicationPodByStatefulSet checks the number of replication statefulSet equal 1 and returns it.
-func GetAndCheckReplicationPodByStatefulSet(ctx context.Context, cli client.Client, stsObj *appsv1.StatefulSet) (*corev1.Pod, error) {
+// getAndCheckReplicationPodByStatefulSet checks the number of replication statefulSet equal 1 and returns it.
+func getAndCheckReplicationPodByStatefulSet(ctx context.Context, cli client.Client, stsObj *appsv1.StatefulSet) (*corev1.Pod, error) {
 	podList, err := util.GetPodListByStatefulSet(ctx, cli, stsObj)
 	if err != nil {
 		return nil, err

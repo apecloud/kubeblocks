@@ -384,7 +384,7 @@ func (s *Switch) initSwitchInstance(oldPrimaryIndex, newPrimaryIndex *int32) err
 		}
 	}
 	for _, sts := range stsList.Items {
-		pod, err := GetAndCheckReplicationPodByStatefulSet(s.SwitchResource.Ctx, s.SwitchResource.Cli, &sts)
+		pod, err := getAndCheckReplicationPodByStatefulSet(s.SwitchResource.Ctx, s.SwitchResource.Cli, &sts)
 		if err != nil {
 			return err
 		}

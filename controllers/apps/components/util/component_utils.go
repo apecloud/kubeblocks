@@ -253,10 +253,14 @@ func GetComponentInfoByPod(ctx context.Context,
 	cluster appsv1alpha1.Cluster,
 	pod *corev1.Pod) (componentName string, componentDef *appsv1alpha1.ClusterComponentDefinition, err error) {
 	if pod == nil || pod.Labels == nil {
+		// REVIEW/TODO: need avoid using dynamic error string, this is bad for
+		// error type checking (errors.Is)
 		return "", nil, fmt.Errorf("pod %s or pod's label is nil", pod.Name)
 	}
 	componentName, ok := pod.Labels[constant.KBAppComponentLabelKey]
 	if !ok {
+		// REVIEW/TODO: need avoid using dynamic error string, this is bad for
+		// error type checking (errors.Is)
 		return "", nil, fmt.Errorf("pod %s component name label %s is nil", pod.Name, constant.KBAppComponentLabelKey)
 	}
 	compDefName := cluster.GetComponentDefRefName(componentName)

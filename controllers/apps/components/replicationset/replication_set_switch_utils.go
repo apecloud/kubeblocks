@@ -170,6 +170,8 @@ func (f *SwitchElectionRoleFilter) filter(roleInfoList []*SwitchRoleInfo) ([]*Sw
 	var filterRoles []*SwitchRoleInfo
 	for _, roleInfo := range roleInfoList {
 		if roleInfo.RoleDetectInfo == nil {
+			// REVIEW/TODO: need avoid using dynamic error string, this is bad for
+			// error type checking (errors.Is)
 			return nil, fmt.Errorf("pod %s RoleDetectInfo is nil, pls check", roleInfo.Pod.Name)
 		}
 		isPrimaryPod, err := checkObjRoleLabelIsPrimary(roleInfo.Pod)
@@ -197,6 +199,8 @@ func (f *SwitchElectionHealthFilter) filter(roleInfoList []*SwitchRoleInfo) ([]*
 	var filterRoles []*SwitchRoleInfo
 	for _, roleInfo := range roleInfoList {
 		if roleInfo.HealthDetectInfo == nil {
+			// REVIEW/TODO: need avoid using dynamic error string, this is bad for
+			// error type checking (errors.Is)
 			return nil, fmt.Errorf("pod %s HealthDetectInfo is nil, pls check", roleInfo.Pod.Name)
 		}
 		if *roleInfo.HealthDetectInfo {
@@ -413,6 +417,8 @@ func checkSwitchCmdJobSucceed(s *Switch, cmdJobs []*batchv1.Job) error {
 			return err
 		}
 		if !exists {
+			// REVIEW/TODO: need avoid using dynamic error string, this is bad for
+			// error type checking (errors.Is)
 			return fmt.Errorf("switch command job %s not exist", cmdJob.Name)
 		}
 		jobStatusConditions := currentJob.Status.Conditions
@@ -421,11 +427,17 @@ func checkSwitchCmdJobSucceed(s *Switch, cmdJobs []*batchv1.Job) error {
 			case batchv1.JobComplete:
 				continue
 			case batchv1.JobFailed:
+				// REVIEW/TODO: need avoid using dynamic error string, this is bad for
+				// error type checking (errors.Is)
 				return fmt.Errorf("switch command job %s failed", cmdJob.Name)
 			default:
+				// REVIEW/TODO: need avoid using dynamic error string, this is bad for
+				// error type checking (errors.Is)
 				return fmt.Errorf("switch command job %s unfinished", cmdJob.Name)
 			}
 		} else {
+			// REVIEW/TODO: need avoid using dynamic error string, this is bad for
+			// error type checking (errors.Is)
 			return fmt.Errorf("switch command job %s check status conditions failed", cmdJob.Name)
 		}
 	}

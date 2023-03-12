@@ -18,6 +18,7 @@ package graph
 
 // PlanBuilder builds a Plan by applying a group of Transformer to an empty DAG.
 type PlanBuilder interface {
+	Init() error
 	Validate() error
 	Build() (Plan, error)
 }

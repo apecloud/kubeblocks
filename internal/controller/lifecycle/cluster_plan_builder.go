@@ -20,7 +20,6 @@ import (
 	"errors"
 	"fmt"
 	"golang.org/x/exp/maps"
-	"k8s.io/client-go/tools/record"
 	"reflect"
 	"strings"
 
@@ -28,6 +27,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -46,18 +46,18 @@ type clusterPlanBuilder struct {
 	req      ctrl.Request
 	recorder record.EventRecorder
 	cluster  *appsv1alpha1.Cluster
+	conMgr   clusterConditionManager2
 }
 
 type clusterPlan struct {
 	dag      *graph.DAG
 	walkFunc graph.WalkFunc
+	cluster  *appsv1alpha1.Cluster
+	conMgr   clusterConditionManager2
 }
 
 func (c *clusterPlanBuilder) getCompoundCluster() (*compoundCluster, error) {
-	cluster := &appsv1alpha1.Cluster{}
-	if err := c.cli.Get(c.ctx.Ctx, c.req.NamespacedName, cluster); err != nil {
-		return nil, err
-	}
+	cluster := c.cluster
 	cd := &appsv1alpha1.ClusterDefinition{}
 	if err := c.cli.Get(c.ctx.Ctx, types.NamespacedName{
 		Name: cluster.Spec.ClusterDefRef,
@@ -140,25 +140,45 @@ func (c *clusterPlanBuilder) defaultWalkFunc(node graph.Vertex) error {
 	return nil
 }
 
+func (c *clusterPlanBuilder) Init() error {
+	cluster := &appsv1alpha1.Cluster{}
+	if err := c.cli.Get(c.ctx.Ctx, c.req.NamespacedName, cluster); err != nil {
+		return err
+	}
+	c.cluster = cluster
+	return nil
+}
+
 func (c *clusterPlanBuilder) Validate() error {
 	chain := &graph.ValidatorChain{
-		&clusterValidator{req: c.req, cli: c.cli, ctx: c.ctx},
 		&clusterDefinitionValidator{req: c.req, cli: c.cli, ctx: c.ctx},
 		&clusterVersionValidator{req: c.req, cli: c.cli, ctx: c.ctx},
 		&enableLogsValidator{req: c.req, cli: c.cli, ctx: c.ctx},
 		&rplSetPrimaryIndexValidator{req: c.req, cli: c.cli, ctx: c.ctx},
 	}
-	return chain.WalkThrough()
+	err := chain.WalkThrough()
+	if err != nil {
+		_ = c.conMgr.setPreCheckErrorCondition(c.cluster, err)
+	}
+	return err
 }
 
 // Build only cluster Creation, Update and Deletion supported.
 // TODO: Validations and Corrections (cluster labels correction, primaryIndex spec validation etc.)
 func (c *clusterPlanBuilder) Build() (graph.Plan, error) {
-	cc, err := c.getCompoundCluster()
+	_ = c.conMgr.setProvisioningStartedCondition(c.cluster)
+	var err error
+	defer func() {
+		if err != nil {
+			_ = c.conMgr.setApplyResourcesFailedCondition(c.cluster, err)
+		}
+	}()
+
+	var cc *compoundCluster
+	cc, err = c.getCompoundCluster()
 	if err != nil {
 		return nil, err
 	}
-	c.cluster = cc.cluster
 
 	// TODO: remove all cli & ctx fields from transformers, keep them in pure-dag-manipulation form
 	// build transformer chain
@@ -193,7 +213,7 @@ func (c *clusterPlanBuilder) Build() (graph.Plan, error) {
 
 	// new a DAG and apply chain on it, after that we should get the final Plan
 	dag := graph.NewDAG()
-	if err := chain.ApplyTo(dag); err != nil {
+	if err = chain.ApplyTo(dag); err != nil {
 		return nil, err
 	}
 
@@ -201,6 +221,8 @@ func (c *clusterPlanBuilder) Build() (graph.Plan, error) {
 	plan := &clusterPlan{
 		dag:      dag,
 		walkFunc: c.defaultWalkFunc,
+		cluster:  c.cluster,
+		conMgr:   c.conMgr,
 	}
 	return plan, nil
 }
@@ -208,30 +230,41 @@ func (c *clusterPlanBuilder) Build() (graph.Plan, error) {
 // NewClusterPlanBuilder returns a clusterPlanBuilder powered PlanBuilder
 // TODO: change ctx to context.Context
 func NewClusterPlanBuilder(ctx intctrlutil.RequestCtx, cli client.Client, req ctrl.Request, recorder record.EventRecorder) graph.PlanBuilder {
+	conMgr := clusterConditionManager2{
+		Client: cli,
+		Recorder: recorder,
+		ctx: ctx.Ctx,
+	}
 	return &clusterPlanBuilder{
 		ctx:      ctx,
 		cli:      cli,
 		req:      req,
 		recorder: recorder,
+		conMgr:   conMgr,
 	}
 }
 
 func (p *clusterPlan) Execute() error {
-	return p.dag.WalkReverseTopoOrder(p.walkFunc)
+	err := p.dag.WalkReverseTopoOrder(p.walkFunc)
+	if err != nil {
+		_ = p.conMgr.setApplyResourcesFailedCondition(p.cluster, err)
+	}
+	return err
 }
 
 func (c *clusterPlanBuilder) buildUpdateObj(node *lifecycleVertex) (client.Object, error) {
 	handleSts := func(origObj, stsProto *appsv1.StatefulSet) (client.Object, error) {
-		//if *stsObj.Spec.Replicas != *stsProto.Spec.Replicas {
-		//	reqCtx.Recorder.Eventf(cluster,
-		//		corev1.EventTypeNormal,
-		//		"HorizontalScale",
-		//		"Start horizontal scale component %s from %d to %d",
-		//		component.Name,
-		//		*stsObj.Spec.Replicas,
-		//		*stsProto.Spec.Replicas)
-		//}
 		stsObj := origObj.DeepCopy()
+		componentName := stsObj.Labels[constant.KBAppComponentLabelKey]
+		if *stsObj.Spec.Replicas != *stsProto.Spec.Replicas {
+			c.recorder.Eventf(c.cluster,
+				corev1.EventTypeNormal,
+				"HorizontalScale",
+				"Start horizontal scale component %s from %d to %d",
+				componentName,
+				*stsObj.Spec.Replicas,
+				*stsProto.Spec.Replicas)
+		}
 		// keep the original template annotations.
 		// if annotations exist and are replaced, the statefulSet will be updated.
 		stsProto.Spec.Template.Annotations = mergeAnnotations(stsObj.Spec.Template.Annotations,
@@ -241,8 +274,6 @@ func (c *clusterPlanBuilder) buildUpdateObj(node *lifecycleVertex) (client.Objec
 		stsObj.Spec.UpdateStrategy = stsProto.Spec.UpdateStrategy
 		if !reflect.DeepEqual(&origObj.Spec, &stsObj.Spec) {
 			// sync component phase
-			// TODO: syncComponentPhaseWhenSpecUpdating
-			componentName := stsObj.Labels[constant.KBAppComponentLabelKey]
 			syncComponentPhaseWhenSpecUpdating(c.cluster, componentName)
 		}
 

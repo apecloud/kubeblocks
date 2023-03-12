@@ -20,7 +20,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"reflect"
 	"regexp"
 	"strings"
@@ -202,32 +201,23 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	reqCtx.Log.V(1).Info("reconcile", "cluster", req.NamespacedName)
-	cluster := &appsv1alpha1.Cluster{}
-	if err := r.Client.Get(reqCtx.Ctx, reqCtx.Req.NamespacedName, cluster); err != nil {
-		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-	}
-	clusterConditionMgr := clusterConditionManager{
-		Client:   r.Client,
-		Recorder: r.Recorder,
-		ctx:      ctx,
-		cluster:  cluster,
-	}
 
-	requeueError := func(err error, conditionFunc func(error) metav1.Condition) (ctrl.Result, error) {
+	requeueError := func(err error) (ctrl.Result, error) {
 		if re, ok := err.(lifecycle.RequeueError); ok {
 			return intctrlutil.RequeueAfter(re.RequeueAfter(), reqCtx.Log, re.Reason())
 		}
-		_ = clusterConditionMgr.updateStatusConditions(conditionFunc(err))
 		return intctrlutil.RequeueWithError(err, reqCtx.Log, "")
 	}
 
 	planBuilder := lifecycle.NewClusterPlanBuilder(reqCtx, r.Client, req, r.Recorder)
-	if err := planBuilder.Validate(); err != nil {
-		return requeueError(err, clusterConditionMgr.newPreCheckErrorCondition)
+	if err := planBuilder.Init(); err != nil {
+		return requeueError(err)
+	} else if err := planBuilder.Validate(); err != nil {
+		return requeueError(err)
 	} else if plan, err := planBuilder.Build(); err != nil {
-		return requeueError(err, clusterConditionMgr.newApplyResourcesFailedCondition)
+		return requeueError(err)
 	} else if err = plan.Execute(); err != nil {
-		return requeueError(err, clusterConditionMgr.newApplyResourcesFailedCondition)
+		return requeueError(err)
 	}
 	return intctrlutil.Reconciled()
 }

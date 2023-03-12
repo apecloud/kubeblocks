@@ -19,7 +19,6 @@ package lifecycle
 import (
 	"context"
 	"fmt"
-	"golang.org/x/exp/maps"
 	"golang.org/x/exp/slices"
 	"reflect"
 	"time"
@@ -407,95 +406,6 @@ func (c *clusterStatusTransformer) removeStsInitContainerForRestore(
 		cluster.Status.Components[componentName] = compStatus
 	}
 	return doRemoveInitContainers, nil
-}
-
-// newAllReplicasPodsReadyConditions creates a condition when all pods of components are ready
-func newAllReplicasPodsReadyConditions() metav1.Condition {
-	return metav1.Condition{
-		Type:    ConditionTypeReplicasReady,
-		Status:  metav1.ConditionTrue,
-		Message: "all pods of components are ready, waiting for the probe detection successful",
-		Reason:  ReasonAllReplicasReady,
-	}
-}
-
-// newReplicasNotReadyCondition creates a condition when pods of components are not ready
-func newReplicasNotReadyCondition(notReadyComponentNames map[string]struct{}) metav1.Condition {
-	cNameSlice := maps.Keys(notReadyComponentNames)
-	slices.Sort(cNameSlice)
-	return metav1.Condition{
-		Type:    ConditionTypeReplicasReady,
-		Status:  metav1.ConditionFalse,
-		Message: fmt.Sprintf("pods are not ready in ComponentDefs: %v, refer to related component message in Cluster.status.components", cNameSlice),
-		Reason:  ReasonReplicasNotReady,
-	}
-}
-
-// newClusterReadyCondition creates a condition when all components of cluster are running
-func newClusterReadyCondition(clusterName string) metav1.Condition {
-	return metav1.Condition{
-		Type:    ConditionTypeReady,
-		Status:  metav1.ConditionTrue,
-		Message: fmt.Sprintf("Cluster: %s is ready, current phase is Running", clusterName),
-		Reason:  ReasonClusterReady,
-	}
-}
-
-// newComponentsNotReadyCondition creates a condition when components of cluster are not ready
-func newComponentsNotReadyCondition(notReadyComponentNames map[string]struct{}) metav1.Condition {
-	cNameSlice := maps.Keys(notReadyComponentNames)
-	slices.Sort(cNameSlice)
-	return metav1.Condition{
-		Type:    ConditionTypeReady,
-		Status:  metav1.ConditionFalse,
-		Message: fmt.Sprintf("pods are unavailable in Components: %v, refer to related component message in Cluster.status.components", cNameSlice),
-		Reason:  ReasonComponentsNotReady,
-	}
-}
-
-// checkConditionIsChanged checks if the condition is changed.
-func checkConditionIsChanged(oldCondition *metav1.Condition, newCondition metav1.Condition) bool {
-	if oldCondition == nil {
-		return true
-	}
-	return oldCondition.Message != newCondition.Message
-}
-
-// handleClusterReadyCondition handles the cluster conditions with ClusterReady and ReplicasReady type.
-func handleNotReadyConditionForCluster(cluster *appsv1alpha1.Cluster,
-	recorder record.EventRecorder,
-	replicasNotReadyCompNames map[string]struct{},
-	notReadyCompNames map[string]struct{}) (needPatch bool, postFunc postHandler) {
-	oldReplicasReadyCondition := meta.FindStatusCondition(cluster.Status.Conditions, ConditionTypeReplicasReady)
-	if len(replicasNotReadyCompNames) == 0 {
-		// if all replicas of cluster are ready, set ReasonAllReplicasReady to status.conditions
-		readyCondition := newAllReplicasPodsReadyConditions()
-		if checkConditionIsChanged(oldReplicasReadyCondition, readyCondition) {
-			cluster.SetStatusCondition(readyCondition)
-			needPatch = true
-			postFunc = func(cluster *appsv1alpha1.Cluster) error {
-				// send an event when all pods of the components are ready.
-				recorder.Event(cluster, corev1.EventTypeNormal, readyCondition.Reason, readyCondition.Message)
-				return nil
-			}
-		}
-	} else {
-		replicasNotReadyCond := newReplicasNotReadyCondition(replicasNotReadyCompNames)
-		if checkConditionIsChanged(oldReplicasReadyCondition, replicasNotReadyCond) {
-			cluster.SetStatusCondition(replicasNotReadyCond)
-			needPatch = true
-		}
-	}
-
-	if len(notReadyCompNames) > 0 {
-		oldClusterReadyCondition := meta.FindStatusCondition(cluster.Status.Conditions, ConditionTypeReady)
-		clusterNotReadyCondition := newComponentsNotReadyCondition(notReadyCompNames)
-		if checkConditionIsChanged(oldClusterReadyCondition, clusterNotReadyCondition) {
-			cluster.SetStatusCondition(clusterNotReadyCondition)
-			needPatch = true
-		}
-	}
-	return needPatch, postFunc
 }
 
 // handleClusterPhaseWhenCompsNotReady handles the Cluster.status.phase when some components are Abnormal or Failed.

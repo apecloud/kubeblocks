@@ -131,54 +131,6 @@ func newRequeueError(after time.Duration, reason string) error {
 	}
 }
 
-const (
-	// ConditionTypeProvisioningStarted the operator starts resource provisioning to create or change the cluster
-	ConditionTypeProvisioningStarted = "ProvisioningStarted"
-	// ConditionTypeApplyResources the operator start to apply resources to create or change the cluster
-	ConditionTypeApplyResources = "ApplyResources"
-	// ConditionTypeReplicasReady all pods of components are ready
-	ConditionTypeReplicasReady = "ReplicasReady"
-	// ConditionTypeReady all components are running
-	ConditionTypeReady = "Ready"
-
-	// ReasonPreCheckSucceed preChecks succeed for provisioning started
-	ReasonPreCheckSucceed = "PreCheckSucceed"
-	// ReasonPreCheckFailed preChecks failed for provisioning started
-	ReasonPreCheckFailed = "PreCheckFailed"
-	// ReasonApplyResourcesFailed applies resources failed to create or change the cluster
-	ReasonApplyResourcesFailed = "ApplyResourcesFailed"
-	// ReasonApplyResourcesSucceed applies resources succeed to create or change the cluster
-	ReasonApplyResourcesSucceed = "ApplyResourcesSucceed"
-	// ReasonReplicasNotReady the pods of components are not ready
-	ReasonReplicasNotReady = "ReplicasNotReady"
-	// ReasonAllReplicasReady the pods of components are ready
-	ReasonAllReplicasReady = "AllReplicasReady"
-	// ReasonComponentsNotReady the components of cluster are not ready
-	ReasonComponentsNotReady = "ComponentsNotReady"
-	// ReasonClusterReady the components of cluster are ready, the component phase are running
-	ReasonClusterReady = "ClusterReady"
-
-	// ClusterControllerErrorDuration if there is an error in the cluster controller,
-	// it will not be automatically repaired unless there is network jitter.
-	// so if the error lasts more than 5s, the cluster will enter the ConditionsError phase
-	// and prompt the user to repair manually according to the message.
-	ClusterControllerErrorDuration = 5 * time.Second
-
-	// ControllerErrorRequeueTime the requeue time to reconcile the error event of the cluster controller
-	// which need to respond to user repair events timely.
-	ControllerErrorRequeueTime = 5 * time.Second
-)
-
-// newApplyResourcesCondition creates a condition when applied resources succeed.
-func newApplyResourcesCondition() metav1.Condition {
-	return metav1.Condition{
-		Type:    ConditionTypeApplyResources,
-		Status:  metav1.ConditionTrue,
-		Message: "Successfully applied for resources",
-		Reason:  ReasonApplyResourcesSucceed,
-	}
-}
-
 // updateClusterPhaseWhenConditionsError when cluster status is ConditionsError and the cluster applies resources successful,
 // we should update the cluster to the correct state
 func updateClusterPhaseWhenConditionsError(cluster *appsv1alpha1.Cluster) {

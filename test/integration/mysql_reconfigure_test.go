@@ -172,7 +172,7 @@ var _ = Describe("MySQL Reconfigure function", func() {
 			break
 		}
 
-		By("Issue a restart load reconfigure OpsRequest")
+		By("Issue a restart load reconfigure OpsRequest - max_connections")
 		pKey := "max_connections"
 		pValue := "2000"
 		reconfigureOpsRequest := newReconfigureRequest(clusterObj.Name, componentName,
@@ -181,6 +181,23 @@ var _ = Describe("MySQL Reconfigure function", func() {
 
 		By("Checking ReconfigureOpsRequest is running")
 		opsKey := types.NamespacedName{Name: reconfigureOpsRequest.Name, Namespace: testCtx.DefaultNamespace}
+		Eventually(testapps.GetOpsRequestPhase(&testCtx, opsKey)).Should(Equal(appsv1alpha1.RunningPhase))
+
+		By("Checking Cluster and changed component phase is Reconfiguring")
+		Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1alpha1.Cluster) {
+			g.Expect(cluster.Status.Phase).To(Equal(appsv1alpha1.ReconfiguringPhase))
+			g.Expect(cluster.Status.Components[componentName].Phase).To(Equal(appsv1alpha1.ReconfiguringPhase))
+		})).Should(Succeed())
+
+		By("Issue a restart load reconfigure OpsRequest - innodb_read_io_threads")
+		pKey = "innodb_read_io_threads"
+		pValue = "2"
+		reconfigureOpsRequest = newReconfigureRequest(clusterObj.Name, componentName,
+			tpl.Name, configFile, pKey, &pValue)
+		Expect(testCtx.CreateObj(testCtx.Ctx, reconfigureOpsRequest)).Should(Succeed())
+
+		By("Checking ReconfigureOpsRequest is running")
+		opsKey = types.NamespacedName{Name: reconfigureOpsRequest.Name, Namespace: testCtx.DefaultNamespace}
 		Eventually(testapps.GetOpsRequestPhase(&testCtx, opsKey)).Should(Equal(appsv1alpha1.RunningPhase))
 
 		By("Checking Cluster and changed component phase is Reconfiguring")

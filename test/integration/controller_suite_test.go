@@ -19,6 +19,7 @@ package appstest
 import (
 	"context"
 	"go/build"
+	"k8s.io/client-go/dynamic"
 	"path/filepath"
 	"testing"
 	"time"
@@ -28,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 
 	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
+	cliutil "github.com/apecloud/kubeblocks/internal/cli/util"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 
@@ -62,6 +64,7 @@ import (
 
 var cfg *rest.Config
 var k8sClient client.Client
+var dynamicClient dynamic.Interface
 var testEnv *envtest.Environment
 var ctx context.Context
 var cancel context.CancelFunc
@@ -270,6 +273,10 @@ var _ = BeforeSuite(func() {
 	k8sClient, err = client.New(cfg, client.Options{Scheme: scheme.Scheme})
 	Expect(err).NotTo(HaveOccurred())
 	Expect(k8sClient).NotTo(BeNil())
+
+	dynamicClient, err = cliutil.NewFactory().DynamicClient()
+	Expect(err).NotTo(HaveOccurred())
+	Expect(dynamicClient).NotTo(BeNil())
 
 	// run reconcile
 	k8sManager, err := ctrl.NewManager(cfg, ctrl.Options{

@@ -18,3 +18,4 @@ sidebar_position: 2
 * Resource overcommitment to allocate more database instances on one EC2 to decrease costs efficiently
 * Role-based access control (RBAC)
 * `kbcli`, an easy-to-use CLI, supports common operations such as database cluster creating, connecting, backup, restore, monitoring and trouble shooting.
+* Support customized robot alarms for Slack, Feishu, Wechat and DingTalks.  

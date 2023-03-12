@@ -6,7 +6,7 @@ sidebar_position: 2
 
 # Configure IM alert
 
-Alerts are mainly used for daily error response to improve system availability. Kubeblocks has a built-in set of common alert rules and integrates multiple notification channels. The alert capability of Kubeblocks can meet the operation and maintenance requirements of production-level online clusters.
+Alerts are mainly used for daily error response to improve system availability. Kubeblocks has a set of built-in common alert rules and integrates multiple notification channels. The alert capability of Kubeblocks can meet the operation and maintenance requirements of production-level online clusters.
 
 ## How KubeBlocks alert works
 
@@ -70,13 +70,13 @@ Currently, Feishu custom bot, DingTalk custom bot, WeChat Enterprise custom bot,
 
 > ***Notes:***
 >
-> * Each notification channel has its interface call amount and frequency limits and when the limits are reached, the channel will limit traffic and you cannot receive alerts. 
+> * Each notification channel has its interface call amount and frequency limits and when the limits are reached, the channel limits traffic and alerts are not sent out. 
 > * The SLA of the service provided by a single channel cannot guarantee the alerts are sent successfully. Therefore, it is recommended to configure multiple notification channels to ensure availability.
 
 
 ### Step 2. Configure the receiver
 
-To improve ease of use, `kbcli` develops the `alert` subcommand to simplify the receiver configuration. You can set the notification channels and receivers by the `alert` subcommand. This subcommand also supports condition filters, such as cluster names and severity levels. After the configuration succeeds, it takes effect dynamically without restarting the service.
+To improve usability, `kbcli` develops the `alert` subcommand to simplify the receiver configuration. You can set the notification channels and receivers by the `alert` subcommand. This subcommand also supports condition filters, such as cluster names and severity levels. After the configuration succeeds, it takes effect without restarting the service.
 
 Add an alert receiver.
    
@@ -126,7 +126,7 @@ Run the command below to delete the notification channel and receiver if you wan
 
 ## Troubleshooting
 
-If you cannot receive alert notices, run the commands below to troubleshoot the logs of AlertManager and AlertManager-Webhook-Adaptor. 
+If you cannot receive alert notices, run the commands below to get the logs of AlertManager and AlertManager-Webhook-Adaptor. 
 
 ```bash
 # Find the corresponding Pod of AlertManager and get Pod name

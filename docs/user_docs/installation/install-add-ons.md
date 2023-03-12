@@ -50,7 +50,7 @@ kubectl version -ojson | jq '.serverVersion.gitVersion'
 "v1.24.4+eks"
 >
 ```
-As the printed output suggested, *eks* is included. And you can go on with the next step. In case that eks is not included, it is invalid to enable the add-on.
+As the printed output suggested, *eks* is included. And you can go on with the next step. In case that *eks* is not included, it is invalid to enable the add-on.
 
 2. To enable the add-on, use ```kbcli addon enable```.
 **Example**

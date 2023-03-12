@@ -29,7 +29,7 @@ sidebar_position: 1
      > ```bash
      > kbcli kubeblocks install -n kubeblocks --create-namespace=true
      > ```
-  2. Run the command below to verify whether KubeBlocks is installed successfully
+  2. Run the command below to verify whether KubeBlocks is installed successfully.
      ```bash
      kubectl get pod
      ```

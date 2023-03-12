@@ -140,6 +140,7 @@ func (cs *ComponentStatusSynchronizer) Update(obj client.Object, logger *logr.Lo
 // hasFailedAndTimedOutPod returns whether the pod of components is still failed after a PodFailedTimeout period.
 // if return ture, component phase will be set to Failed/Abnormal.
 func (cs *ComponentStatusSynchronizer) hasFailedAndTimedOutPod() (hasFailedAndTimedoutPod bool, hasFailedPod bool) {
+	// init a new ComponentMessageMap to store the message of failed pods
 	message := appsv1alpha1.ComponentMessageMap{}
 	for _, pod := range cs.podList.Items {
 		isFailed, isTimedOut, messageStr := isPodFailedAndTimedOut(&pod)

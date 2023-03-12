@@ -110,7 +110,7 @@ func TestSetObjectMessage(t *testing.T) {
 	messageMap := ComponentMessageMap{
 		"Pod/test-01": "failed Scheduled",
 	}
-	val := "insufficient cpu"
+	val := "insufficient memory"
 	messageMap.SetObjectMessage("Pod", "test-01", val)
 	componentStatus.SetMessage(messageMap)
 	if componentStatus.GetObjectMessage("Pod", "test-01") != val {

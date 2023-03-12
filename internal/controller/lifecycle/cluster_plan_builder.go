@@ -187,9 +187,9 @@ func (c *clusterPlanBuilder) Build() (graph.Plan, error) {
 	// build transformer chain
 	chain := &graph.TransformerChain{
 		// init dag, that is put cluster vertex into dag
-		&initTransformer{cc: *cc, cli: c.cli, ctx: c.ctx},
+		&initTransformer{cluster: c.cluster},
 		// fix cd&cv labels of cluster
-		&fixClusterLabelsTransformer{cc: *cc, cli: c.cli, ctx: c.ctx},
+		&fixClusterLabelsTransformer{},
 		// cluster to K8s objects and put them into dag
 		&clusterTransformer{cc: *cc, cli: c.cli, ctx: c.ctx},
 		// tls certs secret

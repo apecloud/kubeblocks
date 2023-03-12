@@ -17,22 +17,18 @@ limitations under the License.
 package lifecycle
 
 import (
-	"sigs.k8s.io/controller-runtime/pkg/client"
-
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 type initTransformer struct {
-	cc  compoundCluster
-	cli client.Client
-	ctx intctrlutil.RequestCtx
+	cluster *appsv1alpha1.Cluster
 }
 
 func (i *initTransformer) Transform(dag *graph.DAG) error {
 	// put the cluster object first, it will be root vertex of DAG
-	oriCluster := i.cc.cluster.DeepCopy()
-	rootVertex := &lifecycleVertex{obj: i.cc.cluster, oriObj: oriCluster}
+	oriCluster := i.cluster.DeepCopy()
+	rootVertex := &lifecycleVertex{obj: i.cluster, oriObj: oriCluster}
 	dag.AddVertex(rootVertex)
 	return nil
 }

@@ -171,6 +171,7 @@ func (o *uninstallOptions) uninstall() error {
 	chart := helm.InstallOpts{
 		Name:      types.KubeBlocksChartName,
 		Namespace: o.Namespace,
+		Wait:      true,
 	}
 	printSpinner(newSpinner("Uninstall helm release "+types.KubeBlocksChartName+" "+v[util.KubeBlocksApp]),
 		chart.Uninstall(o.HelmCfg))
@@ -199,7 +200,6 @@ func (o *uninstallOptions) uninstall() error {
 	})
 
 	for _, gvr := range gvrs {
-
 		if gvr == types.PVCGVR() && !o.removePVCs {
 			continue
 		}
@@ -283,15 +283,18 @@ func (o *uninstallOptions) uninstallAddons() error {
 
 	// check if all addons are disabled, if so, then we will stop uninstalling addons
 	// otherwise, we will wait for a while and check again
-	for i := 0; i < 10; i++ {
+	for i := 0; i < 5; i++ {
 		klog.V(1).Infof("Wait for %d seconds and check addons disabled again", i+1)
-		time.Sleep(time.Duration(i+1) * time.Second)
+		time.Sleep(time.Duration(i+3) * time.Second)
 		if o.addons, err = processAddons(nil); err != nil {
 			return err
 		}
 		if stop {
 			return nil
 		}
+	}
+	if !stop {
+		allErrs = append(allErrs, fmt.Errorf("failed to uninstall KubeBlocks addons"))
 	}
 	return utilerrors.NewAggregate(allErrs)
 }

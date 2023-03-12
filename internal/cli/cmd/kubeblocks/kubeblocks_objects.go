@@ -197,11 +197,33 @@ func removeCustomResources(dynamic dynamic.Interface, objs kbObjects) error {
 }
 
 func deleteObjects(dynamic dynamic.Interface, gvr schema.GroupVersionResource, objects *unstructured.UnstructuredList) error {
+	const (
+		helmResourcePolicyKey  = "helm.sh/resource-policy"
+		helmResourcePolicyKeep = "keep"
+	)
+
 	if objects == nil {
 		return nil
 	}
 
+	// if resource has annotation "helm.sh/resource-policy": "keep", skip it
+	// TODO: maybe a flag to control this behavior
+	keepResource := func(obj unstructured.Unstructured) bool {
+		annotations := obj.GetAnnotations()
+		if len(annotations) == 0 {
+			return false
+		}
+		if annotations[helmResourcePolicyKey] == helmResourcePolicyKeep {
+			return true
+		}
+		return false
+	}
+
 	for _, s := range objects.Items {
+		if keepResource(s) {
+			continue
+		}
+
 		// the object is not being deleted, delete it
 		if s.GetDeletionTimestamp().IsZero() {
 			klog.V(1).Infof("delete %s %s", gvr.String(), s.GetName())

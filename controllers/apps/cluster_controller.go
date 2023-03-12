@@ -224,23 +224,6 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	// TODO: refactor mark: cluster provisioning, put deletion and status Update into plan
-	// should patch the label first to prevent the label from being modified by the user.
-	//if err := r.patchClusterLabelsIfNotExist(ctx, cluster); err != nil {
-	//	return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-	//}
-
-	if cluster.DeletionTimestamp.IsZero() && cluster.Status.ObservedGeneration != cluster.Generation {
-		reqCtx.Log.Info("update cluster status")
-		if err := r.updateClusterPhaseToCreatingOrUpdating(reqCtx, cluster); err != nil {
-			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-		}
-
-		// preCheck succeed, starting the cluster provisioning
-		if err := clusterConditionMgr.setProvisioningStartedCondition(); err != nil {
-			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-		}
-	}
-
 	clusterDeepCopy := cluster.DeepCopy()
 	if plan, err := planBuilder.Build(); err != nil {
 		if re, ok := err.(lifecycle.RequeueError); ok {

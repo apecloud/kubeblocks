@@ -39,4 +39,7 @@ const (
 	EnablingAddon                   = "EnablingAddon"
 	InstallationFailed              = "InstallationFailed"
 	UninstallationFailed            = "UninstallationFailed"
+
+	// config keys used in viper
+
 )

@@ -18,6 +18,7 @@ package extensions
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -37,7 +38,6 @@ import (
 )
 
 func init() {
-	viper.SetDefault(addonJobImagePullPolicyKey, corev1.PullIfNotPresent)
 	viper.SetDefault(addonSANameKey, "kubeblocks-addon-installer")
 }
 
@@ -171,11 +171,6 @@ func (r *genIDProceedCheckStage) Handle(ctx context.Context) {
 		switch addon.Status.Phase {
 		case extensionsv1alpha1.AddonEnabled, extensionsv1alpha1.AddonFailed, extensionsv1alpha1.AddonDisabled:
 			if addon.Generation == addon.Status.ObservedGeneration {
-				res, err := r.reconciler.deleteExternalResources(*r.reqCtx, addon)
-				if res != nil || err != nil {
-					r.updateResultNErr(res, err)
-					return
-				}
 				r.setReconciled()
 				return
 			}
@@ -332,7 +327,7 @@ func getHelmReleaseName(addon *extensionsv1alpha1.Addon) string {
 func (r *helmTypeInstallStage) Handle(ctx context.Context) {
 	r.process(func(addon *extensionsv1alpha1.Addon) {
 		r.reqCtx.Log.V(1).Info("helmTypeInstallStage", "phase", addon.Status.Phase)
-		mgrNS := viper.GetString("CM_NAMESPACE")
+		mgrNS := viper.GetString(constant.CfgKeyCtrlrMrgNS)
 
 		key := client.ObjectKey{
 			Namespace: mgrNS,
@@ -508,7 +503,7 @@ func (r *helmTypeUninstallStage) Handle(ctx context.Context) {
 	r.process(func(addon *extensionsv1alpha1.Addon) {
 		r.reqCtx.Log.V(1).Info("helmTypeUninstallStage", "phase", addon.Status.Phase, "next", r.next.ID())
 		key := client.ObjectKey{
-			Namespace: viper.GetString("CM_NAMESPACE"),
+			Namespace: viper.GetString(constant.CfgKeyCtrlrMrgNS),
 			Name:      getUninstallJobName(addon),
 		}
 		helmUninstallJob := &batchv1.Job{}
@@ -548,6 +543,7 @@ func (r *helmTypeUninstallStage) Handle(ctx context.Context) {
 					r.setRequeueWithErr(err, "")
 					return
 				}
+				r.reconciler.cleanupJobPods(*r.reqCtx)
 			}
 			r.setRequeueAfter(time.Second, "")
 			return
@@ -698,16 +694,30 @@ func attachVolumeMount(
 
 // createHelmJobProto create a job.batch prototyped object
 func createHelmJobProto(addon *extensionsv1alpha1.Addon) (*batchv1.Job, error) {
-	ttl := int32((time.Hour * 24).Seconds())
+	ttl := time.Minute * 5
+	if jobTTL := viper.GetString(constant.CfgKeyAddonJobTTL); jobTTL != "" {
+		var err error
+		if ttl, err = time.ParseDuration(jobTTL); err != nil {
+			return nil, err
+		}
+	}
+	ttlSec := int32(ttl.Seconds())
 	helmInstallJob := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels: map[string]string{
-				constant.AddonNameLabelKey: addon.Name,
+				constant.AddonNameLabelKey:    addon.Name,
+				constant.AppManagedByLabelKey: constant.AppName,
 			},
 		},
 		Spec: batchv1.JobSpec{
-			TTLSecondsAfterFinished: &ttl,
+			TTLSecondsAfterFinished: &ttlSec,
 			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						constant.AddonNameLabelKey:    addon.Name,
+						constant.AppManagedByLabelKey: constant.AppName,
+					},
+				},
 				Spec: corev1.PodSpec{
 					RestartPolicy:      corev1.RestartPolicyOnFailure,
 					ServiceAccountName: viper.GetString("KUBEBLOCKS_ADDON_SA_NAME"),
@@ -715,7 +725,7 @@ func createHelmJobProto(addon *extensionsv1alpha1.Addon) (*batchv1.Job, error) {
 						{
 							Name:            strings.ToLower(string(addon.Spec.Type)),
 							Image:           viper.GetString("KUBEBLOCKS_IMAGE"),
-							ImagePullPolicy: corev1.PullPolicy(viper.GetString(addonJobImagePullPolicyKey)),
+							ImagePullPolicy: corev1.PullPolicy(viper.GetString(constant.CfgAddonJobImgPullPolicy)),
 							// TODO: need have image that is capable of following settings, current settings
 							// may expose potential security risk, as this pod is using cluster-admin clusterrole.
 							// SecurityContext: &corev1.SecurityContext{
@@ -736,7 +746,7 @@ func createHelmJobProto(addon *extensionsv1alpha1.Addon) (*batchv1.Job, error) {
 								},
 								{
 									Name:  "RELEASE_NS",
-									Value: viper.GetString("CM_NAMESPACE"),
+									Value: viper.GetString(constant.CfgKeyCtrlrMrgNS),
 								},
 								{
 									Name:  "CHART",
@@ -746,10 +756,29 @@ func createHelmJobProto(addon *extensionsv1alpha1.Addon) (*batchv1.Job, error) {
 							VolumeMounts: []corev1.VolumeMount{},
 						},
 					},
-					Volumes: []corev1.Volume{},
+					Volumes:      []corev1.Volume{},
+					Tolerations:  []corev1.Toleration{},
+					Affinity:     &corev1.Affinity{},
+					NodeSelector: map[string]string{},
 				},
 			},
 		},
+	}
+	podSpec := &helmInstallJob.Spec.Template.Spec
+	if cmTolerations := viper.GetString(constant.CfgKeyCtrlrMrgTolerations); cmTolerations != "" {
+		if err := json.Unmarshal([]byte(cmTolerations), &podSpec.Tolerations); err != nil {
+			return nil, err
+		}
+	}
+	if cmAffinity := viper.GetString(constant.CfgKeyCtrlrMrgAffinity); cmAffinity != "" {
+		if err := json.Unmarshal([]byte(cmAffinity), &podSpec.Affinity); err != nil {
+			return nil, err
+		}
+	}
+	if cmNodeSelector := viper.GetString(constant.CfgKeyCtrlrMrgNodeSelector); cmNodeSelector != "" {
+		if err := json.Unmarshal([]byte(cmNodeSelector), &podSpec.NodeSelector); err != nil {
+			return nil, err
+		}
 	}
 	return helmInstallJob, nil
 }

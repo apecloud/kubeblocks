@@ -252,6 +252,10 @@ dataProtection:
 ## Addon controller settings, this will require cluster-admin clusterrole.
 addonController:
   enabled: true
+  ## @param jobTTL is addon job time-to-live period, this value is time.Duration-parseable string.
+  ## default value is "5m" if not provided.
+  ##
+  jobTTL: "5m"
   jobImagePullPolicy: IfNotPresent
 
 keepAddons: false

@@ -37,6 +37,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/constant"
+
 	// +kubebuilder:scaffold:imports
 
 	"github.com/apecloud/kubeblocks/internal/testutil"
@@ -71,7 +73,7 @@ var _ = BeforeSuite(func() {
 
 	ctx, cancel = context.WithCancel(context.TODO())
 
-	viper.SetDefault("CM_NAMESPACE", "default")
+	viper.SetDefault(constant.CfgKeyCtrlrMrgNS, "default")
 	viper.SetDefault("KUBEBLOCKS_IMAGE", "apecloud/kubeblocks:latest")
 	fmt.Printf("config settings: %v\n", viper.AllSettings())
 

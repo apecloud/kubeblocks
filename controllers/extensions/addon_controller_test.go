@@ -53,7 +53,7 @@ var _ = Describe("Addon controller", func() {
 
 		// delete rest mocked objects
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
-		inNS := client.InNamespace(viper.GetString("CM_NAMESPACE"))
+		inNS := client.InNamespace(viper.GetString(constant.CfgKeyCtrlrMrgNS))
 		testapps.ClearResources(&testCtx, intctrlutil.JobSignature, inNS,
 			client.HasLabels{
 				constant.AddonNameLabelKey,
@@ -83,6 +83,9 @@ var _ = Describe("Addon controller", func() {
 
 		AfterEach(func() {
 			cleanEnv()
+			viper.Set(constant.CfgKeyCtrlrMrgTolerations, "")
+			viper.Set(constant.CfgKeyCtrlrMrgAffinity, "")
+			viper.Set(constant.CfgKeyCtrlrMrgNodeSelector, "")
 		})
 
 		fakeCompletedJob := func(g Gomega, jobKey client.ObjectKey) {
@@ -104,7 +107,7 @@ var _ = Describe("Addon controller", func() {
 
 		fakeIntallationCompletedJob := func(expectedObservedGeneration int) {
 			jobKey := client.ObjectKey{
-				Namespace: viper.GetString("CM_NAMESPACE"),
+				Namespace: viper.GetString(constant.CfgKeyCtrlrMrgNS),
 				Name:      getInstallJobName(addon),
 			}
 			Eventually(func(g Gomega) {
@@ -171,7 +174,7 @@ var _ = Describe("Addon controller", func() {
 			helmRelease := &corev1.Secret{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      fmt.Sprintf("sh.helm.release.v1.%s.v1", addon.Name),
-					Namespace: viper.GetString("CM_NAMESPACE"),
+					Namespace: viper.GetString(constant.CfgKeyCtrlrMrgNS),
 					Labels: map[string]string{
 						"owner": "helm",
 						"name":  getHelmReleaseName(addon),
@@ -196,7 +199,7 @@ var _ = Describe("Addon controller", func() {
 
 			By("By disabled enabled addon with fake completed uninstall job status")
 			jobKey := client.ObjectKey{
-				Namespace: viper.GetString("CM_NAMESPACE"),
+				Namespace: viper.GetString(constant.CfgKeyCtrlrMrgNS),
 				Name:      getUninstallJobName(addon),
 			}
 			Eventually(func(g Gomega) {
@@ -248,11 +251,11 @@ var _ = Describe("Addon controller", func() {
 			By("By create an addon with spec.helm.installValues.configMapRefs set")
 			cm := testapps.CreateCustomizedObj(&testCtx, "addon/cm-values.yaml",
 				&corev1.ConfigMap{}, func(newCM *corev1.ConfigMap) {
-					newCM.Namespace = viper.GetString("CM_NAMESPACE")
+					newCM.Namespace = viper.GetString(constant.CfgKeyCtrlrMrgNS)
 				})
 			secret := testapps.CreateCustomizedObj(&testCtx, "addon/secret-values.yaml",
 				&corev1.Secret{}, func(newSecret *corev1.Secret) {
-					newSecret.Namespace = viper.GetString("CM_NAMESPACE")
+					newSecret.Namespace = viper.GetString(constant.CfgKeyCtrlrMrgNS)
 				})
 			createAddonSpecWithRequiredAttributes(func(newOjb *extensionsv1alpha1.Addon) {
 				newOjb.Spec.Installable.AutoInstall = true

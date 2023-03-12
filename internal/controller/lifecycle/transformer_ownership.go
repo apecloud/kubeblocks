@@ -18,6 +18,7 @@ package lifecycle
 
 import (
 	"fmt"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
@@ -41,6 +42,7 @@ func (f *ownershipTransformer) Transform(dag *graph.DAG) error {
 		return err
 	}
 
+	controllerutil.AddFinalizer(rootVertex.obj, dbClusterFinalizerName)
 	for _, vertex := range vertices {
 		v, _ := vertex.(*lifecycleVertex)
 		if err := intctrlutil.SetOwnership(rootVertex.obj, v.obj, scheme, dbClusterFinalizerName); err != nil {

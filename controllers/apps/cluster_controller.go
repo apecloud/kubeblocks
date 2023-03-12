@@ -224,18 +224,18 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	// TODO: refactor mark: cluster provisioning, put deletion and status Update into plan
-	res, err := intctrlutil.HandleCRDeletion(reqCtx, r, cluster, dbClusterFinalizerName, func() (*ctrl.Result, error) {
-		return r.deleteExternalResources(reqCtx, cluster)
-	})
-	if res != nil {
-		return *res, err
-	}
+	//res, err := intctrlutil.HandleCRDeletion(reqCtx, r, cluster, dbClusterFinalizerName, func() (*ctrl.Result, error) {
+	//	return r.deleteExternalResources(reqCtx, cluster)
+	//})
+	//if res != nil {
+	//	return *res, err
+	//}
 
 	// should patch the label first to prevent the label from being modified by the user.
 	if err := r.patchClusterLabelsIfNotExist(ctx, cluster); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
-	if cluster.Status.ObservedGeneration == cluster.Generation {
+	if cluster.DeletionTimestamp.IsZero() && cluster.Status.ObservedGeneration == cluster.Generation {
 		clusterDefinition := &appsv1alpha1.ClusterDefinition{}
 		if err := r.Client.Get(reqCtx.Ctx, types.NamespacedName{
 			Name: cluster.Spec.ClusterDefRef,
@@ -249,23 +249,25 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			return intctrlutil.Reconciled()
 		}
 		// reconcile the phase and conditions of the Cluster.status
-		if err = r.reconcileClusterStatus(reqCtx.Ctx, cluster, clusterDefinition); err != nil {
+		if err := r.reconcileClusterStatus(reqCtx.Ctx, cluster, clusterDefinition); err != nil {
 			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 		}
-		if err = r.cleanupAnnotationsAfterRunning(reqCtx, cluster); err != nil {
+		if err := r.cleanupAnnotationsAfterRunning(reqCtx, cluster); err != nil {
 			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 		}
 		return intctrlutil.Reconciled()
 	}
 
-	reqCtx.Log.Info("update cluster status")
-	if err = r.updateClusterPhaseToCreatingOrUpdating(reqCtx, cluster); err != nil {
-		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-	}
+	if cluster.DeletionTimestamp.IsZero() && cluster.Status.ObservedGeneration != cluster.Generation {
+		reqCtx.Log.Info("update cluster status")
+		if err := r.updateClusterPhaseToCreatingOrUpdating(reqCtx, cluster); err != nil {
+			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+		}
 
-	// preCheck succeed, starting the cluster provisioning
-	if err = clusterConditionMgr.setProvisioningStartedCondition(); err != nil {
-		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+		// preCheck succeed, starting the cluster provisioning
+		if err := clusterConditionMgr.setProvisioningStartedCondition(); err != nil {
+			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+		}
 	}
 
 	clusterDeepCopy := cluster.DeepCopy()

@@ -42,7 +42,6 @@ type clusterTransformer struct {
 }
 
 func (c *clusterTransformer) Transform(dag *graph.DAG) error {
-
 	// return fast when cluster is deleting
 	if !c.cc.cluster.DeletionTimestamp.IsZero() {
 		return nil

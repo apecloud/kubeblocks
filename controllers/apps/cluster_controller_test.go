@@ -606,6 +606,7 @@ var _ = Describe("Cluster Controller", func() {
 			SetReplicas(replicas).
 			Create(&testCtx).GetObject()
 		clusterKey = client.ObjectKeyFromObject(clusterObj)
+		//time.Sleep(1000*time.Second)
 		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
 
 		By("Checking the replicas")

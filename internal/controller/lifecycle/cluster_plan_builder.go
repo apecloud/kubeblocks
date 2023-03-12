@@ -106,18 +106,29 @@ func (c *clusterPlanBuilder) defaultWalkFunc(node graph.Vertex) error {
 			return err
 		}
 	case DELETE:
-		switch obj.obj.(type) {
-		case *appsv1alpha1.Cluster:
-			return c.handleClusterDeletion(obj.obj.(*appsv1alpha1.Cluster))
-		default:
-			if controllerutil.RemoveFinalizer(obj.obj, dbClusterFinalizerName) {
-				err := c.cli.Update(c.ctx.Ctx, obj.obj)
-				if err != nil && apierrors.IsNotFound(err) {
+		if cluster, ok := obj.obj.(*appsv1alpha1.Cluster); ok {
+			if err := c.handleClusterDeletion(cluster); err != nil {
+				return err
+			}
+		}
+		if controllerutil.RemoveFinalizer(obj.obj, dbClusterFinalizerName) {
+			err := c.cli.Update(c.ctx.Ctx, obj.obj)
+			if err != nil && !apierrors.IsNotFound(err) {
+				return err
+			}
+		}
+	case STATUS:
+		// TODO: ugly patch for cluster.finalizer, refactor me
+		if _, ok := obj.obj.(*appsv1alpha1.Cluster); ok {
+			clsr, _ := obj.obj.(*appsv1alpha1.Cluster)
+			origClsr, _ := obj.oriObj.(*appsv1alpha1.Cluster)
+			if !reflect.DeepEqual(clsr.ObjectMeta, origClsr.ObjectMeta) {
+				p := client.MergeFrom(origClsr)
+				if err := c.cli.Patch(c.ctx.Ctx, clsr, p); err != nil {
 					return err
 				}
 			}
 		}
-	case STATUS:
 		patch := client.MergeFrom(obj.oriObj)
 		return c.cli.Status().Patch(c.ctx.Ctx, obj.obj, patch)
 	}

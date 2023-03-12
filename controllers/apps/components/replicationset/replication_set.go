@@ -156,10 +156,11 @@ func (r *ReplicationSet) GetPhaseWhenPodsNotReady(ctx context.Context, component
 		}
 	}
 
+	// REVIEW: this isn't a get function, where r.Cluster.Status.Components is being updated.
 	// patch abnormal reason to cluster.status.ComponentDefs.
 	if needPatch {
 		patch := client.MergeFrom(r.Cluster.DeepCopy())
-		r.Cluster.Status.Components[componentName] = compStatus
+		r.Cluster.Status.SetComponentStatus(componentName, compStatus)
 		if err = r.Cli.Status().Patch(ctx, r.Cluster, patch); err != nil {
 			return "", err
 		}

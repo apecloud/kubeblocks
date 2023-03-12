@@ -48,7 +48,7 @@ func HandleReplicationSet(ctx context.Context,
 	cluster *appsv1alpha1.Cluster,
 	stsList []*appsv1.StatefulSet) error {
 	if cluster == nil {
-		return nil
+		return util.ReqClusterObjError
 	}
 	// handle replication workload horizontal scaling
 	if err := handleReplicationSetHorizontalScale(ctx, cli, cluster, stsList); err != nil {
@@ -127,7 +127,7 @@ func handleComponentIsStopped(cluster *appsv1alpha1.Cluster) {
 		if clusterComp.Replicas == int32(0) {
 			replicationStatus := cluster.Status.Components[clusterComp.Name]
 			replicationStatus.Phase = appsv1alpha1.StoppedPhase
-			cluster.Status.Components[clusterComp.Name] = replicationStatus
+			cluster.Status.SetComponentStatus(clusterComp.Name, replicationStatus)
 		}
 	}
 }

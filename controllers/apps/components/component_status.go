@@ -130,10 +130,11 @@ func (cs *ComponentStatusSynchronizer) Update(ctx context.Context, obj client.Ob
 
 	componentName := cs.componentSpec.Name
 	oldComponentStatus := clusterDeepCopy.Status.Components[componentName]
-	componentStatus := cluster.Status.Components[componentName]
-	if !reflect.DeepEqual(oldComponentStatus, componentStatus) {
+
+	// REVIEW: this function was refactored by Caowei, the original function create need to review this part
+	if componentStatus, ok := cluster.Status.Components[componentName]; ok && !reflect.DeepEqual(oldComponentStatus, componentStatus) {
 		logger.Info("component status changed", "componentName", componentName, "phase",
-			cluster.Status.Components[componentName].Phase, "componentIsRunning", isRunning, "podsAreReady", podsReady)
+			componentStatus.Phase, "componentIsRunning", isRunning, "podsAreReady", podsReady)
 		patch := client.MergeFrom(clusterDeepCopy)
 		if err = cs.cli.Status().Patch(cs.ctx, cluster, patch); err != nil {
 			return false, err
@@ -203,7 +204,7 @@ func (cs *ComponentStatusSynchronizer) updateComponentsPhase(
 	}
 	componentStatus.PodsReadyTime = podsReadyTime
 	componentStatus.PodsReady = podsAreReady
-	status.Components[componentName] = componentStatus
+	status.SetComponentStatus(componentName, componentStatus)
 	return nil
 }
 
@@ -215,9 +216,6 @@ func (cs *ComponentStatusSynchronizer) getInitializedStatus() appsv1alpha1.Clust
 		ok              bool
 	)
 	status := &cs.cluster.Status
-	if status.Components == nil {
-		status.Components = map[string]appsv1alpha1.ClusterComponentStatus{}
-	}
 	if componentStatus, ok = status.Components[cs.componentSpec.Name]; !ok {
 		componentStatus = appsv1alpha1.ClusterComponentStatus{
 			Phase: cs.cluster.Status.Phase,
@@ -236,7 +234,7 @@ func (cs *ComponentStatusSynchronizer) updateMessage(message appsv1alpha1.Compon
 
 // setStatus is an internal helper method which sets component status in Cluster.Status.Components map.
 func (cs *ComponentStatusSynchronizer) setStatus(compStatus appsv1alpha1.ClusterComponentStatus) {
-	cs.cluster.Status.Components[cs.componentSpec.Name] = compStatus
+	cs.cluster.Status.SetComponentStatus(cs.componentSpec.Name, compStatus)
 }
 
 // isPodFailedAndTimedOut checks if the pod is failed and timed out.

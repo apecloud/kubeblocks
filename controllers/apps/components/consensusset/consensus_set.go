@@ -86,7 +86,7 @@ func (r *ConsensusSet) HandleProbeTimeoutWhenPodsReady(ctx context.Context, reco
 		cluster       = r.Cluster
 		componentName = r.Component.Name
 	)
-	if cluster.Status.Components == nil {
+	if len(cluster.Status.Components) == 0 {
 		return true, nil
 	}
 	if compStatus, ok = cluster.Status.Components[componentName]; !ok {
@@ -129,7 +129,7 @@ func (r *ConsensusSet) HandleProbeTimeoutWhenPodsReady(ctx context.Context, reco
 	} else if isAbnormal {
 		compStatus.Phase = appsv1alpha1.AbnormalPhase
 	}
-	cluster.Status.Components[componentName] = compStatus
+	cluster.Status.SetComponentStatus(componentName, compStatus)
 	if err = r.Cli.Status().Patch(ctx, cluster, patch); err != nil {
 		return false, err
 	}
@@ -226,7 +226,7 @@ func (r *ConsensusSet) HandleUpdate(ctx context.Context, obj client.Object) erro
 		util.InitClusterComponentStatusIfNeed(r.Cluster, componentName, *component)
 		componentStatus := r.Cluster.Status.Components[componentName]
 		componentStatus.ConsensusSetStatus = newConsensusSetStatus
-		r.Cluster.Status.Components[componentName] = componentStatus
+		r.Cluster.Status.SetComponentStatus(componentName, componentStatus)
 		if err = r.Cli.Status().Patch(ctx, r.Cluster, patch); err != nil {
 			return err
 		}

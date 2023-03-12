@@ -170,13 +170,10 @@ func InitClusterComponentStatusIfNeed(
 	cluster *appsv1alpha1.Cluster,
 	componentName string,
 	componentDef appsv1alpha1.ClusterComponentDefinition) {
-	if cluster.Status.Components == nil {
-		cluster.Status.Components = make(map[string]appsv1alpha1.ClusterComponentStatus)
-	}
 	if _, ok := cluster.Status.Components[componentName]; !ok {
-		cluster.Status.Components[componentName] = appsv1alpha1.ClusterComponentStatus{
+		cluster.Status.SetComponentStatus(componentName, appsv1alpha1.ClusterComponentStatus{
 			Phase: cluster.Status.Phase,
-		}
+		})
 	}
 	componentStatus := cluster.Status.Components[componentName]
 	switch componentDef.WorkloadType {
@@ -201,7 +198,7 @@ func InitClusterComponentStatusIfNeed(
 			},
 		}
 	}
-	cluster.Status.Components[componentName] = componentStatus
+	cluster.Status.SetComponentStatus(componentName, componentStatus)
 }
 
 // GetComponentDeployMinReadySeconds gets the deployment minReadySeconds of the component.

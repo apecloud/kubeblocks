@@ -541,19 +541,39 @@ func (r *Cluster) GetComponentDefRefName(componentName string) string {
 	return ""
 }
 
-func ToVolumeClaimTemplate(template ClusterComponentVolumeClaimTemplate) corev1.PersistentVolumeClaimTemplate {
+// SetComponentStatus does safe operation on ClusterStatus.Components map object update.
+func (r *ClusterStatus) SetComponentStatus(name string, status ClusterComponentStatus) {
+	if r == nil {
+		return
+	}
+	r.checkedInitComponentsMap()
+	r.Components[name] = status
+}
+
+func (r *ClusterStatus) checkedInitComponentsMap() {
+	if r.Components == nil {
+		r.Components = map[string]ClusterComponentStatus{}
+	}
+}
+
+// ToVolumeClaimTemplates convert r.VolumeClaimTemplates to []corev1.PersistentVolumeClaimTemplate.
+func (r *ClusterComponentSpec) ToVolumeClaimTemplates() []corev1.PersistentVolumeClaimTemplate {
+	if r == nil {
+		return nil
+	}
+	var ts []corev1.PersistentVolumeClaimTemplate
+	for _, template := range r.VolumeClaimTemplates {
+		ts = append(ts, toVolumeClaimTemplate(template))
+	}
+	return ts
+}
+
+// following are helper functions
+func toVolumeClaimTemplate(template ClusterComponentVolumeClaimTemplate) corev1.PersistentVolumeClaimTemplate {
 	t := corev1.PersistentVolumeClaimTemplate{}
 	t.ObjectMeta.Name = template.Name
 	if template.Spec != nil {
 		t.Spec = *template.Spec
 	}
 	return t
-}
-
-func ToVolumeClaimTemplates(templates []ClusterComponentVolumeClaimTemplate) []corev1.PersistentVolumeClaimTemplate {
-	ts := []corev1.PersistentVolumeClaimTemplate{}
-	for _, template := range templates {
-		ts = append(ts, ToVolumeClaimTemplate(template))
-	}
-	return ts
 }

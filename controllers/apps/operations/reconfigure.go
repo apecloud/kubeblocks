@@ -191,7 +191,7 @@ func (r *reconfigureAction) syncReconfigureComponentStatus(res *OpsResource) err
 
 	clusterPatch := client.MergeFrom(cluster.DeepCopy())
 	c.Phase = appsv1alpha1.RunningPhase
-	cluster.Status.Components[componentName] = c
+	cluster.Status.SetComponentStatus(componentName, c)
 	return res.Client.Status().Patch(res.Ctx, cluster, clusterPatch)
 }
 

@@ -348,7 +348,7 @@ func (r *reconfigureOptions) printConfigureHistory() error {
 	// sort the unstructured objects with the creationTimestamp in positive order
 	sort.Sort(unstructuredList(opsList.Items))
 	tbl := printer.NewTablePrinter(r.Out)
-	tbl.SetHeader("NAME", "CLUSTER", "COMPONENT", "TEMPLATE", "FILES", "STATUS", "POLICY", "PROGRESS", "CREATED-TIME", "VALID-UPDATED")
+	tbl.SetHeader("OPS-NAME", "CLUSTER", "COMPONENT", "CONFIG-SPEC-NAME", "FILE", "STATUS", "POLICY", "PROGRESS", "CREATED-TIME", "VALID-UPDATED")
 	for _, obj := range opsList.Items {
 		ops := &appsv1alpha1.OpsRequest{}
 		if err = runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, ops); err != nil {

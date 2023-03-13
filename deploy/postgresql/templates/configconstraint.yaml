@@ -1,4 +1,4 @@
-{{- $cc := .Files.Get "config/pg14.cc.yaml" | fromYaml }}
+{{- $cc := .Files.Get "config/pg14-config-effect-scope.yaml" | fromYaml }}
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: ConfigConstraint
 metadata:
@@ -19,7 +19,7 @@ spec:
     # schema: auto generate from mmmcue scripts
     # example: ../../internal/configuration/testdata/mysql_openapi.json
     cue: |-
-      {{- .Files.Get "config/pg14cc.cue" | nindent 6 }}
+      {{- .Files.Get "config/pg14-config-constraint.cue" | nindent 6 }}
 
   ##  require db instance restart
   ## staticParameters

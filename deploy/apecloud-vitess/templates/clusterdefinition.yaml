@@ -243,7 +243,10 @@ spec:
                 --init_keyspace $keyspace \
                 --init_shard $shard \
                 --init_tablet_type $tablet_type \
-                --health_check_interval 5s \
+                --health_check_interval 1s \
+                --shard_sync_retry_delay 2s \
+                --remote_operation_timeout 2s \
+                --db_connect_timeout_ms 500 \
                 --enable_replication_reporter \
                 --backup_storage_implementation file \
                 --file_backup_storage_root $VTDATAROOT/backups \
@@ -527,8 +530,8 @@ spec:
                 exec vtconsensus \
                   $topology_fags \
                   --clusters_to_watch "$keyspace/$shard" \
-                  --refresh_interval 10s \
-                  --scan_repair_timeout 3s \
+                  --refresh_interval 2s \
+                  --scan_repair_timeout 2s \
                   --log_dir ${VTDATAROOT} \
                   --db_username "$MYSQL_ROOT_USER" \
                   --db_password "$MYSQL_ROOT_PASSWORD" \
@@ -611,6 +614,11 @@ spec:
                 su vitess <<EOF
                 exec vtgate \
                   $TOPOLOGY_FLAGS \
+                  --gateway_initial_tablet_timeout 30s \
+                  --healthcheck_timeout 2s \
+                  --srv_topo_timeout 2s \
+                  --grpc_keepalive_time 3s \
+                  --grpc_keepalive_timeout 3s \
                   --log_dir $VTDATAROOT \
                   --log_queries_to_file $VTDATAROOT/vtgate_querylog.txt \
                   --port $web_port \

@@ -156,7 +156,7 @@ func PrepareComponentResources(reqCtx intctrlutil.RequestCtx, cli client.Client,
 		// TODO(xingran) After refactoring, HA switching will be handled in the replicationSet controller.
 		if len(existStsList.Items) > 0 {
 			primaryIndexChanged, _, err := replicationset.CheckPrimaryIndexChanged(reqCtx.Ctx, cli, task.Cluster,
-				task.Component.Name, task.Component.PrimaryIndex)
+				task.Component.Name, task.Component.GetPrimaryIndex())
 			if err != nil {
 				return err
 			}

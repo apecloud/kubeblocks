@@ -101,7 +101,8 @@ func HandleReplicationSetHASwitch(ctx context.Context,
 		return nil
 	}
 
-	primaryIndexChanged, currentPrimaryIndex, err := CheckPrimaryIndexChanged(ctx, cli, cluster, clusterCompSpec.Name, clusterCompSpec.PrimaryIndex)
+	primaryIndexChanged, currentPrimaryIndex, err := CheckPrimaryIndexChanged(ctx, cli, cluster, clusterCompSpec.Name,
+		clusterCompSpec.GetPrimaryIndex())
 	if err != nil {
 		return err
 	}
@@ -473,16 +474,25 @@ func getSwitchCmdJobLabel(clusterName, componentName string) map[string]string {
 }
 
 // CheckPrimaryIndexChanged checks whether primaryIndex has changed and returns current primaryIndex.
+// @return bool - true is primaryIndex inconsistent
+// @return int32 - current primaryIndex; -1 if error
+// @return error
 func CheckPrimaryIndexChanged(ctx context.Context,
 	cli client.Client,
 	cluster *appsv1alpha1.Cluster,
 	compName string,
-	primaryIndex *int32) (bool, int32, error) {
+	specPrimaryIndex int32) (bool, int32, error) {
 	// get the statefulSet object whose current role label is primary
-	primarySts, err := GetReplicationSetPrimaryObj(ctx, cli, cluster, generics.StatefulSetSignature, compName)
+	primarySts, err := getReplicationSetPrimaryObj(ctx, cli, cluster, generics.StatefulSetSignature, compName)
 	if err != nil {
 		return false, -1, err
 	}
+
+	clusterCompName := fmt.Sprintf("%s-%s", cluster.GetName(), compName)
+	if primarySts.GetName() == clusterCompName {
+		return specPrimaryIndex != 0, 0, nil
+	}
+
 	currentPrimaryIndex := int32(util.GetOrdinalSts(primarySts))
-	return *primaryIndex != currentPrimaryIndex, currentPrimaryIndex, nil
+	return specPrimaryIndex != currentPrimaryIndex, currentPrimaryIndex, nil
 }

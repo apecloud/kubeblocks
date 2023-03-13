@@ -324,8 +324,8 @@ func checkObjRoleLabelIsPrimary[T intctrlutil.Object, PT intctrlutil.PObject[T]]
 	return obj.GetLabels()[constant.RoleLabelKey] == string(Primary), nil
 }
 
-// GetReplicationSetPrimaryObj gets the primary obj(statefulSet or pod) of the replication workload.
-func GetReplicationSetPrimaryObj[T intctrlutil.Object, PT intctrlutil.PObject[T], L intctrlutil.ObjList[T], PL intctrlutil.PObjList[T, L]](
+// getReplicationSetPrimaryObj gets the primary obj(statefulSet or pod) of the replication workload.
+func getReplicationSetPrimaryObj[T intctrlutil.Object, PT intctrlutil.PObject[T], L intctrlutil.ObjList[T], PL intctrlutil.PObjList[T, L]](
 	ctx context.Context, cli client.Client, cluster *appsv1alpha1.Cluster, _ func(T, L), compSpecName string) (PT, error) {
 	var (
 		objList L

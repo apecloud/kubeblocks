@@ -568,6 +568,14 @@ func (r *ClusterComponentSpec) ToVolumeClaimTemplates() []corev1.PersistentVolum
 	return ts
 }
 
+// GetPrimaryIndex provide safe operation get ClusterComponentSpec.PrimaryIndex, if value is nil, it's treated as 0.
+func (r *ClusterComponentSpec) GetPrimaryIndex() int32 {
+	if r == nil || r.PrimaryIndex == nil {
+		return 0
+	}
+	return *r.PrimaryIndex
+}
+
 // following are helper functions
 func toVolumeClaimTemplate(template ClusterComponentVolumeClaimTemplate) corev1.PersistentVolumeClaimTemplate {
 	t := corev1.PersistentVolumeClaimTemplate{}

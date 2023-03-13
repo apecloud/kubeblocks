@@ -405,16 +405,24 @@ func createConfigurePatch(cfg *corev1.ConfigMap, format appsv1alpha1.CfgFileForm
 	return cfgcore.CreateConfigurePatch(lastConfig, cfg.Data, format, cmKeys, true)
 }
 
-func updateConfigurationSchema(tpl *appsv1alpha1.ConfigConstraintSpec) error {
-	schema := tpl.ConfigurationSchema
-	if schema != nil && len(schema.CUE) > 0 && schema.Schema == nil {
-		customSchema, err := cfgcore.GenerateOpenAPISchema(schema.CUE, tpl.CfgSchemaTopLevelName)
-		if err != nil {
-			return err
-		}
-		tpl.ConfigurationSchema.Schema = customSchema
+func updateConfigurationSchema(cc *appsv1alpha1.ConfigConstraint, cli client.Client, ctx context.Context) error {
+	schema := cc.Spec.ConfigurationSchema
+	if schema == nil || schema.CUE == "" || schema.Schema != nil {
+		return nil
 	}
-	return nil
+
+	// Because the conversion of cue to openAPISchema is constraint, and the definition of some cue may not be converted into openAPISchema, and won't return error.
+	openAPISchema, err := cfgcore.GenerateOpenAPISchema(schema.CUE, cc.Spec.CfgSchemaTopLevelName)
+	if err != nil {
+		return err
+	}
+	if openAPISchema == nil {
+		return nil
+	}
+
+	ccPatch := client.MergeFrom(cc.DeepCopy())
+	cc.Spec.ConfigurationSchema.Schema = openAPISchema
+	return cli.Patch(ctx, cc, ccPatch)
 }
 
 func NeedReloadVolume(tpl appsv1alpha1.ConfigTemplate) bool {

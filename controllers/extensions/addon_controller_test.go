@@ -50,19 +50,19 @@ var _ = Describe("Addon controller", func() {
 		// in race conditions, it will find the existence of old objects, resulting failure to
 		// create the new objects.
 		By("clean resources")
-
-		// delete rest mocked objects
+		// non-namespaced
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
+		testapps.ClearResources(&testCtx, intctrlutil.AddonSignature, ml)
+
 		inNS := client.InNamespace(viper.GetString(constant.CfgKeyCtrlrMgrNS))
 		testapps.ClearResources(&testCtx, intctrlutil.JobSignature, inNS,
 			client.HasLabels{
 				constant.AddonNameLabelKey,
 			})
+
+		// delete rest mocked objects
 		testapps.ClearResources(&testCtx, intctrlutil.ConfigMapSignature, inNS, ml)
 		testapps.ClearResources(&testCtx, intctrlutil.SecretSignature, inNS, ml)
-
-		// non-namespaced
-		testapps.ClearResources(&testCtx, intctrlutil.AddonSignature, ml)
 	}
 
 	BeforeEach(func() {

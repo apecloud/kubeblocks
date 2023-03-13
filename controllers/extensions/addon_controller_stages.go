@@ -124,6 +124,7 @@ func (r *genIDProceedCheckStage) Handle(ctx context.Context) {
 					return
 				}
 				r.setReconciled()
+				return
 			}
 		case extensionsv1alpha1.AddonFailed:
 			if addon.Generation == addon.Status.ObservedGeneration {

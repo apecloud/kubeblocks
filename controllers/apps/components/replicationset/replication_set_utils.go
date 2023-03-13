@@ -48,7 +48,7 @@ func HandleReplicationSet(ctx context.Context,
 	cluster *appsv1alpha1.Cluster,
 	stsList []*appsv1.StatefulSet) error {
 	if cluster == nil {
-		return util.ReqClusterObjError
+		return util.ErrReqClusterObj
 	}
 	// handle replication workload horizontal scaling
 	if err := handleReplicationSetHorizontalScale(ctx, cli, cluster, stsList); err != nil {

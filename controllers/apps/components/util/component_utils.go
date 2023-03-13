@@ -37,23 +37,23 @@ const (
 )
 
 var (
-	ReqCtrlClientError              = errors.New("required arg client.Client is nil")
-	ReqClusterObjError              = errors.New("required arg *appsv1alpha1.Cluster is nil")
-	ReqClusterComponentDefObjError  = errors.New("required arg *appsv1alpha1.ClusterComponentDefinition is nil")
-	ReqClusterComponentSpecObjError = errors.New("required arg *appsv1alpha1.ClusterComponentSpec is nil")
+	ErrReqCtrlClient              = errors.New("required arg client.Client is nil")
+	ErrReqClusterObj              = errors.New("required arg *appsv1alpha1.Cluster is nil")
+	ErrReqClusterComponentDefObj  = errors.New("required arg *appsv1alpha1.ClusterComponentDefinition is nil")
+	ErrReqClusterComponentSpecObj = errors.New("required arg *appsv1alpha1.ClusterComponentSpec is nil")
 )
 
 func ComponentRuntimeReqArgsCheck(cli client.Client,
 	cluster *appsv1alpha1.Cluster,
 	component *appsv1alpha1.ClusterComponentSpec) error {
 	if cli == nil {
-		return ReqCtrlClientError
+		return ErrReqCtrlClient
 	}
 	if cluster == nil {
-		return ReqCtrlClientError
+		return ErrReqCtrlClient
 	}
 	if component == nil {
-		return ReqClusterComponentSpecObjError
+		return ErrReqClusterComponentSpecObj
 	}
 	return nil
 }

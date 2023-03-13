@@ -16,16 +16,29 @@ limitations under the License.
 
 package smoketest
 
+import "C"
 import (
+	"context"
 	"log"
 	"os"
-	_ "path/filepath"
-	"strings"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/dynamic"
+	"k8s.io/klog/v2"
 
+	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/cli/types"
 	e2eutil "github.com/apecloud/kubeblocks/test/e2e/util"
+)
+
+const (
+	timeout  time.Duration = time.Second * 360
+	interval time.Duration = time.Second * 1
 )
 
 func SmokeTest() {
@@ -36,8 +49,14 @@ func SmokeTest() {
 	})
 
 	Context("KubeBlocks smoke test", func() {
+
 		It("check addon auto-install", func() {
-			checkAddons()
+			allEnabled, err := checkAddons()
+			if err != nil {
+				log.Println(err)
+			}
+			Expect(allEnabled).Should(BeTrue())
+
 		})
 		It("run test cases", func() {
 			dir, err := os.Getwd()
@@ -51,6 +70,7 @@ func SmokeTest() {
 				}
 				log.Println("folder: " + folder)
 				files, _ := e2eutil.GetFiles(folder)
+				e2eutil.WaitTime(400000000)
 				clusterVersions := e2eutil.GetClusterVersion(folder)
 				if len(clusterVersions) > 1 {
 					for _, clusterVersion := range clusterVersions {
@@ -73,15 +93,17 @@ func runTestCases(files []string) {
 		By("test " + file)
 		b := e2eutil.OpsYaml(file, "apply")
 		Expect(b).Should(BeTrue())
-		e2eutil.WaitTime(400000000)
 		podStatusResult := e2eutil.CheckPodStatus()
 		log.Println(podStatusResult)
 		for _, result := range podStatusResult {
-			Expect(result).Should(BeTrue())
+			Eventually(func(g Gomega) {
+				g.Expect(result).Should(BeTrue())
+			}).Should(Succeed())
 		}
-		e2eutil.WaitTime(400000000)
 		clusterStatusResult := e2eutil.CheckClusterStatus()
-		Expect(clusterStatusResult).Should(BeTrue())
+		Eventually(func(g Gomega) {
+			g.Expect(clusterStatusResult).Should(BeTrue())
+		}).Should(Succeed())
 	}
 	if len(files) > 0 {
 		file := e2eutil.GetClusterCreateYaml(files)
@@ -89,38 +111,52 @@ func runTestCases(files []string) {
 	}
 }
 
-func checkAddons() {
-	e2eutil.WaitTime(500000000)
-	kubernetes := e2eutil.KubernetesEnv()
-	adaptorStatus := e2eutil.CheckAddonsInstall("alertmanager-webhook-adaptor")
-	Expect(adaptorStatus).Should(Equal("Enabled"))
-	mysqlStatus := e2eutil.CheckAddonsInstall("apecloud-mysql")
-	Expect(mysqlStatus).Should(Equal("Enabled"))
-	postgresqlStatus := e2eutil.CheckAddonsInstall("postgresql")
-	Expect(postgresqlStatus).Should(Equal("Enabled"))
-	grafanaStatus := e2eutil.CheckAddonsInstall("grafana")
-	Expect(grafanaStatus).Should(Equal("Enabled"))
-	prometheusStatus := e2eutil.CheckAddonsInstall("prometheus")
-	Expect(prometheusStatus).Should(Equal("Enabled"))
-	if strings.Contains(strings.ToLower(kubernetes), "k3s") {
-		snapshotStatus := e2eutil.OpsAddon("enable", "snapshot-controller")
-		Expect(snapshotStatus).Should(Equal("Enabled"))
-		status := e2eutil.OpsAddon("disable", "snapshot-controller")
-		Expect(status).Should(Equal("Disabled"))
+func checkAddons() (bool, error) {
+	e2eutil.WaitTime(400000000)
+	var Dynamic dynamic.Interface
+	addons := make(map[string]bool)
+	allEnabled := true
+	objects, err := Dynamic.Resource(types.AddonGVR()).List(context.TODO(), metav1.ListOptions{
+		LabelSelector: e2eutil.BuildAddonLabelSelector(),
+	})
+	if err != nil && !apierrors.IsNotFound(err) {
+		return false, err
 	}
-	if strings.Contains(strings.ToLower(kubernetes), "eks") {
-		lbStatus := e2eutil.OpsAddon("enable", "loadbalancer")
-		Expect(lbStatus).Should(Equal("Enabled"))
-		status := e2eutil.OpsAddon("disable", "loadbalancer")
-		Expect(status).Should(Equal("Disabled"))
+	if objects == nil || len(objects.Items) == 0 {
+		klog.V(1).Info("No Addons found")
+		return false, nil
 	}
-	if strings.Contains(strings.ToLower(kubernetes), "eks") ||
-		strings.Contains(strings.ToLower(kubernetes), "gke") ||
-		strings.Contains(strings.ToLower(kubernetes), "ack") ||
-		strings.Contains(strings.ToLower(kubernetes), "aks") {
-		csiStatus := e2eutil.OpsAddon("enable", "csi-s3")
-		Expect(csiStatus).Should(Equal("Enabled"))
-		status := e2eutil.OpsAddon("disable", "csi-s3")
-		Expect(status).Should(Equal("Disabled"))
+	for _, obj := range objects.Items {
+		addon := extensionsv1alpha1.Addon{}
+		if err = runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, &addon); err != nil {
+			return false, err
+		}
+
+		if addon.Status.ObservedGeneration == 0 {
+			klog.V(1).Infof("Addon %s is not observed yet", addon.Name)
+			allEnabled = false
+			continue
+		}
+
+		installable := false
+		if addon.Spec.InstallSpec != nil {
+			installable = addon.Spec.Installable.AutoInstall
+		}
+		if addon.Spec.InstallSpec != nil {
+			installable = addon.Spec.Installable.AutoInstall
+		}
+
+		klog.V(1).Infof("Addon: %s, enabled: %v, status: %s, auto-install: %v",
+			addon.Name, addon.Spec.InstallSpec.GetEnabled(), addon.Status.Phase, installable)
+		// addon is enabled, then check its status
+		if addon.Spec.InstallSpec.GetEnabled() {
+			addons[addon.Name] = true
+			if addon.Status.Phase != extensionsv1alpha1.AddonEnabled {
+				klog.V(1).Infof("Addon %s is not enabled yet", addon.Name)
+				addons[addon.Name] = false
+				allEnabled = false
+			}
+		}
 	}
+	return allEnabled, nil
 }

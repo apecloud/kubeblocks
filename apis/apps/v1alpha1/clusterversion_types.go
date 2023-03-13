@@ -132,6 +132,11 @@ func init() {
 	SchemeBuilder.Register(&ClusterVersion{}, &ClusterVersionList{})
 }
 
+// Ready checks whether the cluster version object is ready for use.
+func (r *ClusterVersion) Ready() bool {
+	return r.Status.Phase == AvailablePhase
+}
+
 // GetDefNameMappingComponents returns ComponentDefRef name mapping ClusterComponentVersion.
 func (r *ClusterVersion) GetDefNameMappingComponents() map[string]*ClusterComponentVersion {
 	m := map[string]*ClusterComponentVersion{}

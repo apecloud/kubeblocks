@@ -54,6 +54,7 @@ spec:
           - protocol: TCP
             port: 3306
             targetPort: mysql
+            name: mysql
       horizontalScalePolicy:
         type: Snapshot
         backupTemplateSelector:

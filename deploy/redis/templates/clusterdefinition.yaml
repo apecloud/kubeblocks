@@ -58,6 +58,7 @@ spec:
         ports:
           - protocol: TCP
             port: 6379
+            name: redis
       configSpec:
         configTemplateRefs:
           - name: redis-primary-config

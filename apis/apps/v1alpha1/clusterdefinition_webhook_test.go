@@ -24,6 +24,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -265,6 +266,54 @@ var _ = Describe("clusterDefinition webhook", func() {
 					Expect(err).Should(Succeed())
 				}
 			}
+		})
+
+		It("Validate Cluster Definition Connection Credential", func() {
+			By("By create a default cluster definition - w/o service and connection credential defined")
+			clusterDef, _ := createTestClusterDefinitionObj(clusterDefinitionName)
+			Expect(testCtx.CreateObj(ctx, clusterDef)).Should(Succeed())
+
+			By("By update the exist cluster definition - w/ connection credential and w/o no service defined")
+			clusterDef.Spec.ConnectionCredential = map[string]string{
+				"endpoint": "$(SVC_FQDN):$(SVC_PORT_mysql)",
+				"host":     "$(SVC_FQDN)",
+				"password": "$(RANDOM_PASSWD)",
+				"port":     "$(SVC_PORT_mysql)",
+				"username": "root",
+			}
+			Expect(k8sClient.Update(ctx, clusterDef)).Should(Succeed())
+
+			By("By update the exist cluster definition - w/o service port name defined")
+			clusterDef.Spec.ComponentDefs[0].Service = &corev1.ServiceSpec{
+				Ports: []corev1.ServicePort{
+					{
+						Port: 3306,
+					},
+				},
+			}
+			Expect(k8sClient.Update(ctx, clusterDef).Error()).Should(ContainSubstring("referenced port name is not defined in component service"))
+
+			By("By update the exist cluster definition - service port name is inconsistent with conn credential")
+			clusterDef.Spec.ComponentDefs[0].Service = &corev1.ServiceSpec{
+				Ports: []corev1.ServicePort{
+					{
+						Port: 3306,
+						Name: "redis",
+					},
+				},
+			}
+			Expect(k8sClient.Update(ctx, clusterDef).Error()).Should(ContainSubstring("referenced port name is not defined in component service"))
+
+			By("By update the exist cluster definition - pass")
+			clusterDef.Spec.ComponentDefs[0].Service = &corev1.ServiceSpec{
+				Ports: []corev1.ServicePort{
+					{
+						Port: 3306,
+						Name: "mysql",
+					},
+				},
+			}
+			Expect(k8sClient.Update(ctx, clusterDef)).Should(Succeed())
 		})
 	})
 

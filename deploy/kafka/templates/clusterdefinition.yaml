@@ -13,7 +13,7 @@ metadata:
 spec:
   connectionCredential:
     superusers: "User:admin"
-    endpoint: "$(SVC_FQDN):$(SVC_PORT_kafka-ctrl)"
+    endpoint: "$(SVC_FQDN):$(SVC_PORT_kafka-ctrlr)"
     kraftClusterID: "$(UUID_STR_B64)" 
     sslCertPassword: "$(RANDOM_PASSWD)"
 

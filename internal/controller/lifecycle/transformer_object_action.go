@@ -19,6 +19,7 @@ package lifecycle
 import (
 	"fmt"
 	"reflect"
+	"strings"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -154,6 +155,29 @@ func (c *objectActionTransformer) Transform(dag *graph.DAG) error {
 		v, _ := newNameVertices[name].(*lifecycleVertex)
 		v.oriObj = oldSnapshot[name]
 		v.action = actionPtr(UPDATE)
+	}
+
+	// filter secrets created by system account controller
+	defaultAccounts := []appsv1alpha1.AccountName{
+		appsv1alpha1.AdminAccount,
+		appsv1alpha1.DataprotectionAccount,
+		appsv1alpha1.ProbeAccount,
+		appsv1alpha1.MonitorAccount,
+		appsv1alpha1.ReplicatorAccount,
+	}
+	secretVertices, err := findAll[*corev1.Secret](dag)
+	if err != nil {
+		return err
+	}
+	for _, vertex := range secretVertices {
+		v, _ := vertex.(*lifecycleVertex)
+		secret, _ := v.obj.(*corev1.Secret)
+		for _, account := range defaultAccounts {
+			if strings.Index(secret.Name, string(account)) >= 0 {
+				dag.RemoveVertex(vertex)
+				break
+			}
+		}
 	}
 
 	// update cluster.status

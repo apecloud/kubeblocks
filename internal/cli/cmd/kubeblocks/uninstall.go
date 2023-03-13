@@ -58,10 +58,11 @@ type uninstallOptions struct {
 	Options
 
 	// autoApprove if true, skip interactive approval
-	autoApprove bool
-	removePVs   bool
-	removePVCs  bool
-	addons      []*extensionsv1alpha1.Addon
+	autoApprove     bool
+	removePVs       bool
+	removePVCs      bool
+	removeNamespace bool
+	addons          []*extensionsv1alpha1.Addon
 }
 
 func newUninstallCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
@@ -86,6 +87,7 @@ func newUninstallCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *co
 	cmd.Flags().BoolVar(&o.autoApprove, "auto-approve", false, "Skip interactive approval before uninstalling KubeBlocks")
 	cmd.Flags().BoolVar(&o.removePVs, "remove-pvs", false, "Remove PersistentVolume or not")
 	cmd.Flags().BoolVar(&o.removePVCs, "remove-pvcs", false, "Remove PersistentVolumeClaim or not")
+	cmd.Flags().BoolVar(&o.removeNamespace, "remove-namespace", false, "Remove \"kb-system\" namespace or not")
 	cmd.Flags().BoolVar(&o.verbose, "verbose", false, "Show logs in detail.")
 	return cmd
 }
@@ -210,6 +212,12 @@ func (o *uninstallOptions) uninstall() error {
 			continue
 		}
 		printSpinner(newSpinner("Remove "+gvr.Resource), deleteObjects(o.Dynamic, gvr, objs[gvr]))
+	}
+
+	// delete namespace if it is default namespace
+	if o.Namespace == types.DefaultNamespace && o.removeNamespace {
+		printSpinner(newSpinner("Remove namespace "+types.DefaultNamespace),
+			deleteNamespace(o.Client, types.DefaultNamespace))
 	}
 
 	fmt.Fprintln(o.Out, "Uninstall KubeBlocks done.")

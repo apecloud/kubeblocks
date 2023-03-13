@@ -17,6 +17,8 @@ limitations under the License.
 package dataprotection
 
 import (
+	corev1 "k8s.io/api/core/v1"
+
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 )
 
@@ -41,4 +43,22 @@ func (o byBackupStartTime) Less(i, j int) bool {
 		return o[i].Name < o[j].Name
 	}
 	return o[i].Status.StartTimestamp.Before(o[j].Status.StartTimestamp)
+}
+
+// byPodName sorts a list of jobs by pod name
+type byPodName []corev1.Pod
+
+// Len return the length of byBackupStartTime, for the sort.Sort
+func (c byPodName) Len() int {
+	return len(c)
+}
+
+// Swap the items, for the sort.Sort
+func (c byPodName) Swap(i, j int) {
+	c[i], c[j] = c[j], c[i]
+}
+
+// Less define how to compare items, for the sort.Sort
+func (c byPodName) Less(i, j int) bool {
+	return c[i].Name < c[j].Name
 }

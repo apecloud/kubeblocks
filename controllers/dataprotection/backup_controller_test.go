@@ -72,6 +72,7 @@ var _ = Describe("Backup for a StatefulSet", func() {
 		testapps.ClearResources(&testCtx, intctrlutil.BackupToolSignature, ml)
 	}
 	var nodeName string
+	var pvcName string
 
 	BeforeEach(func() {
 		cleanEnv()
@@ -89,19 +90,35 @@ var _ = Describe("Backup for a StatefulSet", func() {
 				Spec:       testapps.NewPVC(defaultPVCSize),
 			}).Create(&testCtx).GetObject()
 
+		By("By mocking a pvc belonging to the pod")
+		pvc := testapps.NewPersistentVolumeClaimFactory(
+			testCtx.DefaultNamespace, "data-"+sts.Name+"-0", clusterName, componentName, "data").
+			SetStorage("1Gi").
+			Create(&testCtx).GetObject()
+		pvcName = pvc.Name
+
+		By("By mocking a pvc belonging to the pod2")
+		pvc2 := testapps.NewPersistentVolumeClaimFactory(
+			testCtx.DefaultNamespace, "data-"+sts.Name+"-1", clusterName, componentName, "data").
+			SetStorage("1Gi").
+			Create(&testCtx).GetObject()
+
 		By("By mocking a pod belonging to the statefulset")
 		pod := testapps.NewPodFactory(testCtx.DefaultNamespace, sts.Name+"-0").
 			AddAppInstanceLabel(clusterName).
 			AddAppComponentLabel(componentName).
 			AddContainer(corev1.Container{Name: containerName, Image: testapps.ApeCloudMySQLImage}).
+			AddVolume(corev1.Volume{Name: pvc.Name}).
 			Create(&testCtx).GetObject()
 		nodeName = pod.Spec.NodeName
 
-		By("By mocking a pvc belonging to the pod")
-		_ = testapps.NewPersistentVolumeClaimFactory(
-			testCtx.DefaultNamespace, "data-"+pod.Name, clusterName, componentName, "data").
-			SetStorage("1Gi").
-			Create(&testCtx)
+		By("By mocking a pod 2 belonging to the statefulset")
+		_ = testapps.NewPodFactory(testCtx.DefaultNamespace, sts.Name+"-1").
+			AddAppInstanceLabel(clusterName).
+			AddAppComponentLabel(componentName).
+			AddContainer(corev1.Container{Name: containerName, Image: testapps.ApeCloudMySQLImage}).
+			AddVolume(corev1.Volume{Name: pvc2.Name}).
+			Create(&testCtx).GetObject()
 	})
 
 	AfterEach(func() {
@@ -207,6 +224,10 @@ var _ = Describe("Backup for a StatefulSet", func() {
 				Eventually(testapps.CheckObjExists(&testCtx, preJobKey, &batchv1.Job{}, false)).Should(Succeed())
 				By("Check post job cleaned")
 				Eventually(testapps.CheckObjExists(&testCtx, postJobKey, &batchv1.Job{}, false)).Should(Succeed())
+				By("Check if the target pod name is correct")
+				Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *snapshotv1.VolumeSnapshot) {
+					g.Expect(*fetched.Spec.Source.PersistentVolumeClaimName).To(Equal(pvcName))
+				})).Should(Succeed())
 			})
 
 			It("should fail after pre-job fails", func() {

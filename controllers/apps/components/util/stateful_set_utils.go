@@ -168,7 +168,7 @@ func GetPodListByStatefulSet(ctx context.Context, cli client.Client, stsObj *app
 		client.MatchingLabels{constant.KBAppComponentLabelKey: stsObj.Labels[constant.KBAppComponentLabelKey]}); err != nil {
 		return nil, err
 	}
-	pods := make([]corev1.Pod, 0)
+	var pods []corev1.Pod
 	for _, pod := range podList.Items {
 		if IsMemberOf(stsObj, &pod) {
 			pods = append(pods, pod)

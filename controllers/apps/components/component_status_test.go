@@ -38,15 +38,16 @@ import (
 )
 
 var _ = Describe("ComponentStatusSynchronizer", func() {
+	const (
+		compName = "comp"
+		compType = "comp"
+	)
+
 	var (
 		clusterDefName     = "test-clusterdef"
 		clusterVersionName = "test-clusterversion"
 		clusterName        = "test-cluster"
-	)
-
-	const (
-		compName = "comp"
-		compType = "comp"
+		controllerRevision = fmt.Sprintf("%s-%s-%s", clusterName, compName, "6fdd48d9cd1")
 	)
 
 	cleanAll := func() {
@@ -228,8 +229,8 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 					SetReplicas(int32(3)).
 					AddContainer(corev1.Container{Name: testapps.DefaultMySQLContainerName, Image: testapps.ApeCloudMySQLImage}).
 					Create(&testCtx).GetObject()
-
-				stsUpdateRevison := statefulset.Status.UpdateRevision
+				// init statefulset status
+				testk8s.InitStatefulSetStatus(testCtx, statefulset, controllerRevision)
 				for i := 0; i < 3; i++ {
 					podName := fmt.Sprintf("%s-%s-%d", clusterName, compName, i)
 					pod := testapps.NewPodFactory(testCtx.DefaultNamespace, podName).
@@ -237,7 +238,7 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 						AddAppInstanceLabel(clusterName).
 						AddAppComponentLabel(compName).
 						AddAppManangedByLabel().
-						AddControllerRevisionHashLabel(stsUpdateRevison).
+						AddControllerRevisionHashLabel(controllerRevision).
 						AddContainer(corev1.Container{Name: testapps.DefaultMySQLContainerName, Image: testapps.ApeCloudMySQLImage}).
 						Create(&testCtx).GetObject()
 					Expect(testapps.ChangeObjStatus(&testCtx, pod, func() {
@@ -347,16 +348,15 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 					SetReplicas(int32(3)).
 					AddContainer(corev1.Container{Name: testapps.DefaultMySQLContainerName, Image: testapps.ApeCloudMySQLImage}).
 					Create(&testCtx).GetObject()
-
+				testk8s.InitStatefulSetStatus(testCtx, statefulset, controllerRevision)
 				for i := 0; i < 3; i++ {
 					podName := fmt.Sprintf("%s-%s-%d", clusterName, compName, i)
-					stsUpdateRevison := statefulset.Status.UpdateRevision
 					pod := testapps.NewPodFactory(testCtx.DefaultNamespace, podName).
 						SetOwnerReferences("apps/v1", constant.StatefulSetKind, statefulset).
 						AddAppInstanceLabel(clusterName).
 						AddAppComponentLabel(compName).
 						AddAppManangedByLabel().
-						AddControllerRevisionHashLabel(stsUpdateRevison).
+						AddControllerRevisionHashLabel(controllerRevision).
 						AddContainer(corev1.Container{Name: testapps.DefaultMySQLContainerName, Image: testapps.ApeCloudMySQLImage}).
 						Create(&testCtx).GetObject()
 					Expect(testapps.ChangeObjStatus(&testCtx, pod, func() {
@@ -467,7 +467,7 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 					SetReplicas(int32(2)).
 					AddContainer(corev1.Container{Name: testapps.DefaultRedisContainerName, Image: testapps.DefaultRedisImageName}).
 					Create(&testCtx).GetObject()
-
+				testk8s.InitStatefulSetStatus(testCtx, statefulset, controllerRevision)
 				for i := 0; i < 2; i++ {
 					podName := fmt.Sprintf("%s-%s-%d", clusterName, compName, i)
 					pod := testapps.NewPodFactory(testCtx.DefaultNamespace, podName).
@@ -476,7 +476,7 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 						AddAppComponentLabel(compName).
 						AddAppManangedByLabel().
 						AddRoleLabel("leader").
-						AddControllerRevisionHashLabel(statefulset.Status.UpdateRevision).
+						AddControllerRevisionHashLabel(controllerRevision).
 						AddContainer(corev1.Container{Name: testapps.DefaultRedisContainerName, Image: testapps.DefaultRedisImageName}).
 						Create(&testCtx).GetObject()
 					patch := client.MergeFrom(pod.DeepCopy())

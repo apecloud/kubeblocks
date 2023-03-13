@@ -340,8 +340,7 @@ func getProgressFailedMessage(opsMessageKey, objectKey, componentName, podMessag
 // getFailedPodMessage gets the failed pod message from cluster component status
 func getFailedPodMessage(cluster *appsv1alpha1.Cluster, componentName string, pod *corev1.Pod) string {
 	clusterCompStatus := cluster.Status.Components[componentName]
-	componentMessage := clusterCompStatus.GetMessage()
-	return componentMessage.GetObjectMessage(pod.Kind, pod.Name)
+	return clusterCompStatus.GetObjectMessage(pod.Kind, pod.Name)
 }
 
 func getComponentLastReplicas(opsRequest *appsv1alpha1.OpsRequest, componentName string) *int32 {

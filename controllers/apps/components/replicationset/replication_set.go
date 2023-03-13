@@ -18,10 +18,10 @@ package replicationset
 
 import (
 	"context"
-	"fmt"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -112,35 +112,26 @@ func (rs *ReplicationSet) HandleProbeTimeoutWhenPodsReady(recorder record.EventR
 // when the pods of replicationSet are not ready, calculate the component phase is Failed or Abnormal.
 // if return an empty phase, means the pods of component are ready and skips it.
 func (rs *ReplicationSet) GetPhaseWhenPodsNotReady(componentName string) (appsv1alpha1.Phase, error) {
+	componentStsList := &appsv1.StatefulSetList{}
+	podList, err := util.GetCompRelatedObjectList(rs.Ctx, rs.Cli, rs.Cluster, componentName, componentStsList)
+	if err != nil || len(componentStsList.Items) == 0 {
+		return "", err
+	}
+	podCount, componentReplicas := len(podList.Items), rs.Component.Replicas
+	if podCount == 0 {
+		return util.GetPhaseWithNoAvailableReplicas(componentReplicas), nil
+	}
 	var (
-		isFailed         = true
-		isAbnormal       bool
-		podList          *corev1.PodList
-		componentStsList = &appsv1.StatefulSetList{}
-		allPodIsReady    = true
-		cluster          = rs.Cluster
-		compStatus       appsv1alpha1.ClusterComponentStatus
-		needPatch        bool
-		err              error
-		ok               bool
+		stsMap                       = make(map[string]appsv1.StatefulSet)
+		availableReplicas            int32
+		primaryIsReady               bool
+		existLatestRevisionFailedPod bool
+		needPatch                    bool
+		compStatus                   = rs.Cluster.Status.Components[componentName]
 	)
-	if err = util.GetObjectListByComponentName(rs.Ctx, rs.Cli, rs.Cluster, componentStsList, componentName); err != nil {
-		return "", err
-	}
-	if podList, err = util.GetComponentPodList(rs.Ctx, rs.Cli, rs.Cluster, componentName); err != nil {
-		return "", err
-	}
-	podCount := len(podList.Items)
-	if podCount == 0 || podCount != len(componentStsList.Items) {
-		return appsv1alpha1.FailedPhase, nil
-	}
-	if cluster.Status.Components == nil {
-		return "", fmt.Errorf("%s cluster.Status.ComponentDefs is nil", cluster.Name)
-	}
-	if compStatus, ok = cluster.Status.Components[componentName]; !ok {
-		return "", fmt.Errorf("%s cluster.Status.ComponentDefs[%s] is nil", cluster.Name, componentName)
-	} else if compStatus.Message == nil {
-		compStatus.Message = appsv1alpha1.ComponentMessageMap{}
+	for _, v := range componentStsList.Items {
+		stsMap[v.Name] = v
+		availableReplicas += v.Status.AvailableReplicas
 	}
 	for _, v := range podList.Items {
 		// if the pod is terminating, ignore the warning event.
@@ -148,41 +139,32 @@ func (rs *ReplicationSet) GetPhaseWhenPodsNotReady(componentName string) (appsv1
 			return "", nil
 		}
 		labelValue := v.Labels[constant.RoleLabelKey]
-		if labelValue == "" {
-			isAbnormal = true
-			compStatus.Message.SetObjectMessage(v.Kind, v.Name, "empty label for pod, please check.")
-			needPatch = true
-		}
-		if !intctrlutil.PodIsReady(&v) {
-			allPodIsReady = false
-		}
-	}
-
-	for _, v := range componentStsList.Items {
-		if v.Status.AvailableReplicas < 1 {
+		if labelValue == string(Primary) && intctrlutil.PodIsReady(&v) {
+			primaryIsReady = true
 			continue
 		}
-		isFailed = false
-		if v.Status.AvailableReplicas < *v.Spec.Replicas {
-			isAbnormal = true
-			compStatus.Message.SetObjectMessage(v.Kind, v.Name, "statefulSet's AvailableReplicas is not expected, please check.")
+		if labelValue == "" {
+			compStatus.SetObjectMessage(v.Kind, v.Name, "empty label for pod, please check.")
+			// compStatus.Message.SetObjectMessage(v.Kind, v.Name, "empty label for pod, please check.")
 			needPatch = true
+		}
+		controllerRef := metav1.GetControllerOf(&v)
+		stsObj := stsMap[controllerRef.Name]
+		if !intctrlutil.PodIsReady(&v) && intctrlutil.PodIsControlledByLatestRevision(&v, &stsObj) {
+			existLatestRevisionFailedPod = true
 		}
 	}
 
 	// patch abnormal reason to cluster.status.ComponentDefs.
 	if needPatch {
-		patch := client.MergeFrom(cluster.DeepCopy())
-		cluster.Status.Components[componentName] = compStatus
-		if err = rs.Cli.Status().Patch(rs.Ctx, cluster, patch); err != nil {
+		patch := client.MergeFrom(rs.Cluster.DeepCopy())
+		rs.Cluster.Status.Components[componentName] = compStatus
+		if err = rs.Cli.Status().Patch(rs.Ctx, rs.Cluster, patch); err != nil {
 			return "", err
 		}
 	}
-	// if all pod is ready, ignore the warning event.
-	if allPodIsReady {
-		return "", nil
-	}
-	return util.GetComponentPhase(isFailed, isAbnormal), nil
+	return util.GetCompPhaseByConditions(existLatestRevisionFailedPod, primaryIsReady,
+		componentReplicas, int32(podCount), availableReplicas), nil
 }
 
 // HandleUpdate is the implementation of the type Component interface method, handles replicationSet workload Pod updates.

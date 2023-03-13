@@ -169,7 +169,16 @@ func (r *genIDProceedCheckStage) Handle(ctx context.Context) {
 	r.process(func(addon *extensionsv1alpha1.Addon) {
 		r.reqCtx.Log.V(1).Info("genIDProceedCheckStage", "phase", addon.Status.Phase)
 		switch addon.Status.Phase {
-		case extensionsv1alpha1.AddonEnabled, extensionsv1alpha1.AddonFailed, extensionsv1alpha1.AddonDisabled:
+		case extensionsv1alpha1.AddonEnabled, extensionsv1alpha1.AddonDisabled:
+			if addon.Generation == addon.Status.ObservedGeneration {
+				res, err := r.reconciler.deleteExternalResources(*r.reqCtx, addon)
+				if res != nil || err != nil {
+					r.updateResultNErr(res, err)
+					return
+				}
+				r.setReconciled()
+			}
+		case extensionsv1alpha1.AddonFailed:
 			if addon.Generation == addon.Status.ObservedGeneration {
 				r.setReconciled()
 				return
@@ -303,6 +312,24 @@ func (r *progressingHandler) Handle(ctx context.Context) {
 		}
 		// handling enabling state
 		if addon.Status.Phase != extensionsv1alpha1.AddonEnabling {
+			if addon.Status.Phase == extensionsv1alpha1.AddonFailed {
+				// clean up existing failed installation job
+				mgrNS := viper.GetString(constant.CfgKeyCtrlrMrgNS)
+				key := client.ObjectKey{
+					Namespace: mgrNS,
+					Name:      getInstallJobName(addon),
+				}
+				installJob := &batchv1.Job{}
+				if err := r.reconciler.Get(ctx, key, installJob); client.IgnoreNotFound(err) != nil {
+					r.setRequeueWithErr(err, "")
+					return
+				} else if err == nil && installJob.GetDeletionTimestamp().IsZero() {
+					if err = r.reconciler.Delete(ctx, installJob); err != nil {
+						r.setRequeueWithErr(err, "")
+						return
+					}
+				}
+			}
 			patchPhase(extensionsv1alpha1.AddonEnabling, EnablingAddon)
 			return
 		}
@@ -543,7 +570,10 @@ func (r *helmTypeUninstallStage) Handle(ctx context.Context) {
 					r.setRequeueWithErr(err, "")
 					return
 				}
-				r.reconciler.cleanupJobPods(*r.reqCtx)
+				if err := r.reconciler.cleanupJobPods(*r.reqCtx); err != nil {
+					r.setRequeueWithErr(err, "")
+					return
+				}
 			}
 			r.setRequeueAfter(time.Second, "")
 			return
@@ -765,9 +795,20 @@ func createHelmJobProto(addon *extensionsv1alpha1.Addon) (*batchv1.Job, error) {
 		},
 	}
 	podSpec := &helmInstallJob.Spec.Template.Spec
-	if cmTolerations := viper.GetString(constant.CfgKeyCtrlrMrgTolerations); cmTolerations != "" {
+	if cmTolerations := viper.GetString(constant.CfgKeyCtrlrMrgTolerations); cmTolerations != "" &&
+		cmTolerations != "[]" && cmTolerations != "[{}]" {
 		if err := json.Unmarshal([]byte(cmTolerations), &podSpec.Tolerations); err != nil {
 			return nil, err
+		}
+		isAllEmptyElem := true
+		for _, t := range podSpec.Tolerations {
+			if t.String() != "{}" {
+				isAllEmptyElem = false
+				break
+			}
+		}
+		if isAllEmptyElem {
+			podSpec.Tolerations = nil
 		}
 	}
 	if cmAffinity := viper.GetString(constant.CfgKeyCtrlrMrgAffinity); cmAffinity != "" {

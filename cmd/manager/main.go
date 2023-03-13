@@ -173,8 +173,8 @@ func main() {
 	// to refactor this logging lib to anything else. Check FAQ - https://github.com/uber-go/zap/blob/master/FAQ.md
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 
-	err := viper.ReadInConfig() // Find and read the config file
-	if err != nil {             // Handle errors reading the config file
+	// Find and read the config file
+	if err := viper.ReadInConfig(); err != nil { // Handle errors reading the config file
 		setupLog.Info("unable read in config, errors ignored")
 	}
 	setupLog.Info(fmt.Sprintf("config file: %s", viper.GetViper().ConfigFileUsed()))
@@ -184,7 +184,10 @@ func main() {
 	enableLeaderElection = viper.GetBool(leaderElectFlagKey.viperName())
 
 	setupLog.Info(fmt.Sprintf("config settings: %v", viper.AllSettings()))
-	validateRequiredToParseConfigs()
+	if err := validateRequiredToParseConfigs(); err != nil {
+		setupLog.Error(err, "config value error")
+		os.Exit(1)
+	}
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:                 scheme,

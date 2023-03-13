@@ -27,7 +27,6 @@ import (
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	"github.com/pkg/errors"
 	"golang.org/x/exp/maps"
-	"golang.org/x/exp/slices"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -505,7 +504,7 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 		return nil
 	}
 
-	cleanUselessServices := func(expSvcList []*corev1.Service) error {
+	cleanUselessServices := func() error {
 		var (
 			allSvcList = corev1.ServiceList{}
 			ml         = getServiceMatchingLabels(cluster.Name, "")
@@ -514,11 +513,30 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 			return err
 		}
 
+		buildSvcName := func(clusterName, componentName, suffix string) string {
+			parts := []string{clusterName, componentName}
+			if suffix != "" {
+				parts = append(parts, suffix)
+			}
+			return strings.Join(parts, "-")
+		}
+
+		expectSvcMap := make(map[string]*appsv1alpha1.ClusterComponentService)
+		for _, comp := range cluster.Spec.ComponentSpecs {
+			// default ClusterIP service, name should be consistent with name in service_template.cue
+			expectSvcMap[buildSvcName(cluster.Name, comp.Name, "")] = nil
+
+			// default headless service, name should be consistent with name in headless_service_template.cue
+			expectSvcMap[buildSvcName(cluster.Name, comp.Name, "headless")] = nil
+
+			// extra user exposed services, name should be consistent with name in service_template.cue
+			for _, svc := range comp.Services {
+				expectSvcMap[buildSvcName(cluster.Name, comp.Name, svc.Name)] = &svc
+			}
+		}
+
 		for _, svc := range allSvcList.Items {
-			idx := slices.IndexFunc(expSvcList, func(service *corev1.Service) bool {
-				return client.ObjectKeyFromObject(service) == client.ObjectKeyFromObject(&svc)
-			})
-			if idx >= 0 {
+			if _, ok := expectSvcMap[svc.Name]; ok {
 				continue
 			}
 			patch := client.MergeFrom(svc.DeepCopy())
@@ -608,11 +626,7 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 		}
 	}
 
-	var svcList []*corev1.Service
-	for _, obj := range objsByKind[constant.ServiceKind] {
-		svcList = append(svcList, obj.(*corev1.Service))
-	}
-	if err := cleanUselessServices(svcList); err != nil {
+	if err = cleanUselessServices(); err != nil {
 		return false, err
 	}
 

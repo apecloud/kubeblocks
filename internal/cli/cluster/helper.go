@@ -178,7 +178,7 @@ func GetComponentServices(svcList *corev1.ServiceList, c *appsv1alpha1.ClusterCo
 			internalIP   = svc.Spec.ClusterIP
 			externalAddr = GetExternalAddr(&svc)
 		)
-		if internalIP != "" && internalIP != "None" {
+		if svc.Spec.Type == corev1.ServiceTypeClusterIP && internalIP != "" && internalIP != "None" {
 			internalSvcs = append(internalSvcs, &svcList.Items[i])
 		}
 		if externalAddr != "" {

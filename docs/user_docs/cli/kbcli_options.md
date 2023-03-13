@@ -1,6 +1,8 @@
-## kbcli options
+---
+title: kbcli options
+---
 
-Print the list of flags inherited by all commands
+Print the list of flags inherited by all commands.
 
 ```
 kbcli options [flags]
@@ -46,5 +48,7 @@ kbcli options [flags]
 
 ### SEE ALSO
 
-* [kbcli](kbcli.md)	 - KubeBlocks CLI
+
+
+#### Go Back to [CLI Overview](cli.md) Homepage.
 

@@ -1,6 +1,8 @@
-## kbcli alert delete-receiver
+---
+title: kbcli alert delete-receiver
+---
 
-Delete alert receiver
+Delete alert receiver.
 
 ```
 kbcli alert delete-receiver NAME [flags]
@@ -45,5 +47,7 @@ kbcli alert delete-receiver NAME [flags]
 
 ### SEE ALSO
 
-* [kbcli alert](kbcli_alert.md)	 - Manage alert receiver, include add, list and delete receiver
+* [kbcli alert](kbcli_alert.md)	 - Manage alert receiver, include add, list and delete receiver.
+
+#### Go Back to [CLI Overview](cli.md) Homepage.
 

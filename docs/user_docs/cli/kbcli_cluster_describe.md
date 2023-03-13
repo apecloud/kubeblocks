@@ -1,6 +1,8 @@
-## kbcli cluster describe
+---
+title: kbcli cluster describe
+---
 
-Show details of a specific cluster
+Show details of a specific cluster.
 
 ```
 kbcli cluster describe NAME [flags]
@@ -45,5 +47,7 @@ kbcli cluster describe NAME [flags]
 
 ### SEE ALSO
 
-* [kbcli cluster](kbcli_cluster.md)	 - Cluster command
+* [kbcli cluster](kbcli_cluster.md)	 - Cluster command.
+
+#### Go Back to [CLI Overview](cli.md) Homepage.
 

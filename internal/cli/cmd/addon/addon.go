@@ -82,7 +82,7 @@ type addonCmdOpts struct {
 func NewAddonCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "addon",
-		Short: "Addon command",
+		Short: "Addon command.",
 	}
 	cmd.AddCommand(
 		newListCmd(f, streams),
@@ -97,7 +97,7 @@ func newListCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 	o := list.NewListOptions(f, streams, types.AddonGVR())
 	cmd := &cobra.Command{
 		Use:               "list ",
-		Short:             "List addons",
+		Short:             "List addons.",
 		Aliases:           []string{"ls"},
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, o.GVR),
 		Run: func(cmd *cobra.Command, args []string) {
@@ -117,7 +117,7 @@ func newDescribeCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cob
 	}
 	cmd := &cobra.Command{
 		Use:               "describe ADDON_NAME",
-		Short:             "Describe an addon specification",
+		Short:             "Describe an addon specification.",
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.AddonGVR()),
 		Run: func(cmd *cobra.Command, args []string) {
 			util.CheckErr(o.init(args))
@@ -148,7 +148,7 @@ func newEnableCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 
 	cmd := &cobra.Command{
 		Use:               "enable ADDON_NAME",
-		Short:             "Enable an addon",
+		Short:             "Enable an addon.",
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.AddonGVR()),
 		Example: templates.Examples(`
     	# Enabled "prometheus" addon
@@ -197,7 +197,7 @@ func newDisableCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 	}
 	cmd := &cobra.Command{
 		Use:               "disable ADDON_NAME",
-		Short:             "Disable an addon",
+		Short:             "Disable an addon.",
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.AddonGVR()),
 		Run: func(cmd *cobra.Command, args []string) {
 			util.CheckErr(o.init(args))

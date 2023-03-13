@@ -1,6 +1,8 @@
-## kbcli cluster volume-expand
+---
+title: kbcli cluster volume-expand
+---
 
-Expand volume with the specified components and volumeClaimTemplates in the cluster
+Expand volume with the specified components and volumeClaimTemplates in the cluster.
 
 ```
 kbcli cluster volume-expand [flags]
@@ -19,7 +21,7 @@ kbcli cluster volume-expand [flags]
 ```
       --component-names strings                Component names to this operations
   -h, --help                                  help for volume-expand
-      --ops-request string                    OpsRequest name. if not specified, it will be randomly generated 
+      --name string                           OpsRequest name. if not specified, it will be randomly generated 
       --storage string                        Volume storage size (required)
       --ttlSecondsAfterSucceed int            Time to live after the OpsRequest succeed
       --volume-claim-template-names strings   VolumeClaimTemplate names in components (required)
@@ -51,5 +53,7 @@ kbcli cluster volume-expand [flags]
 
 ### SEE ALSO
 
-* [kbcli cluster](kbcli_cluster.md)	 - Cluster command
+* [kbcli cluster](kbcli_cluster.md)	 - Cluster command.
+
+#### Go Back to [CLI Overview](cli.md) Homepage.
 

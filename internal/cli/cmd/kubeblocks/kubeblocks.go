@@ -26,7 +26,7 @@ import (
 func NewKubeBlocksCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "kubeblocks [install | upgrade | list-versions | uninstall]",
-		Short:   "KubeBlocks operation commands",
+		Short:   "KubeBlocks operation commands.",
 		Aliases: []string{"kb"},
 	}
 	cmd.AddCommand(

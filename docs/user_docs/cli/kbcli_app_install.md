@@ -1,6 +1,8 @@
-## kbcli app install
+---
+title: kbcli app install
+---
 
-Install the application with the specified name
+Install the application with the specified name.
 
 ```
 kbcli app install [flags]
@@ -54,5 +56,7 @@ kbcli app install [flags]
 
 ### SEE ALSO
 
-* [kbcli app](kbcli_app.md)	 - Manage external applications related to KubeBlocks
+* [kbcli app](kbcli_app.md)	 - Manage external applications related to KubeBlocks.
+
+#### Go Back to [CLI Overview](cli.md) Homepage.
 

@@ -90,7 +90,7 @@ type destroyOptions struct {
 func NewPlaygroundCmd(streams genericclioptions.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "playground [init | destroy | guide]",
-		Short: "Bootstrap a playground KubeBlocks in local host or cloud",
+		Short: "Bootstrap a playground KubeBlocks in local host or cloud.",
 	}
 
 	// add subcommands
@@ -110,7 +110,7 @@ func newInitCmd(streams genericclioptions.IOStreams) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:     "init",
-		Short:   "Bootstrap a kubernetes cluster and install KubeBlocks for playground",
+		Short:   "Bootstrap a kubernetes cluster and install KubeBlocks for playground.",
 		Example: initExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			util.CheckErr(o.validate())
@@ -139,7 +139,7 @@ func newDestroyCmd(streams genericclioptions.IOStreams) *cobra.Command {
 	}
 	cmd := &cobra.Command{
 		Use:     "destroy",
-		Short:   "Destroy the playground kubernetes cluster",
+		Short:   "Destroy the playground kubernetes cluster.",
 		Example: destroyExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			util.CheckErr(o.validate())
@@ -257,16 +257,10 @@ func (o *initOptions) cloud() error {
 
 	// confirm to run
 	fmt.Fprintf(o.Out, "\nDo you want to perform this action?\n  Only 'yes' will be accepted to approve.\n\n")
-	_, err := prompt.NewPrompt("Enter a value:",
-		func(entered string) error {
-			if entered != yesStr {
-				fmt.Fprintf(o.Out, "\nPlayground init cancelled.\n")
-				return cmdutil.ErrExit
-			}
-			return nil
-		}, o.In).Run()
-	if err != nil {
-		return err
+	entered, _ := prompt.NewPrompt("Enter a value:", nil, o.In).Run()
+	if entered != yesStr {
+		fmt.Fprintf(o.Out, "\nPlayground init cancelled.\n")
+		return cmdutil.ErrExit
 	}
 
 	fmt.Fprintln(o.Out)
@@ -295,15 +289,10 @@ func (o *initOptions) cloud() error {
 	// if cluster exists, continue or not, if not, user should destroy the old cluster first
 	if clusterName != "" {
 		fmt.Fprintf(o.Out, "Found an existed cluster %s, do you want to continue to initialize this cluster?\n  Only 'yes' will be accepted to confirm.\n\n", clusterName)
-		if _, err = prompt.NewPrompt("Enter a value:",
-			func(entered string) error {
-				if entered != yesStr {
-					fmt.Fprintf(o.Out, "\nPlayground init cancelled, please destroy the old cluster first.\n")
-					return cmdutil.ErrExit
-				}
-				return nil
-			}, o.In).Run(); err != nil {
-			return err
+		entered, _ = prompt.NewPrompt("Enter a value:", nil, o.In).Run()
+		if entered != yesStr {
+			fmt.Fprintf(o.Out, "\nPlayground init cancelled, please destroy the old cluster first.\n")
+			return cmdutil.ErrExit
 		}
 		fmt.Fprintf(o.Out, "Continue to initialize %s %s cluster %s... \n", o.cloudProvider, cp.K8sService(o.cloudProvider), clusterName)
 	} else {
@@ -385,15 +374,10 @@ func (o *destroyOptions) destroyCloud() error {
 	fmt.Fprintf(o.Out, "Do you really want to destroy the kubernetes cluster %s?\n  This is no undo. Only 'yes' will be accepted to confirm.\n\n", name)
 
 	// confirm to destroy
-	if _, err = prompt.NewPrompt("Enter a value:",
-		func(entered string) error {
-			if entered != yesStr {
-				fmt.Fprintf(o.Out, "\nPlayground destroy cancelled.\n")
-				return cmdutil.ErrExit
-			}
-			return nil
-		}, o.In).Run(); err != nil {
-		return err
+	entered, _ := prompt.NewPrompt("Enter a value:", nil, o.In).Run()
+	if entered != yesStr {
+		fmt.Fprintf(o.Out, "\nPlayground destroy cancelled.\n")
+		return cmdutil.ErrExit
 	}
 
 	fmt.Fprintf(o.Out, "Destroy %s %s cluster %s...\n", o.cloudProvider, cp.K8sService(o.cloudProvider), name)

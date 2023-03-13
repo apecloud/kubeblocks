@@ -52,7 +52,7 @@ func newUpgradeCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 
 	cmd := &cobra.Command{
 		Use:     "upgrade",
-		Short:   "Upgrade KubeBlocks",
+		Short:   "Upgrade KubeBlocks.",
 		Args:    cobra.NoArgs,
 		Example: upgradeExample,
 		Run: func(cmd *cobra.Command, args []string) {

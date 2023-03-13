@@ -38,7 +38,7 @@ func NewVersionCmd(f cmdutil.Factory) *cobra.Command {
 	o := &versionOptions{}
 	cmd := &cobra.Command{
 		Use:   "version",
-		Short: "Print the version information",
+		Short: "Print the version information, include kubernetes, KubeBlocks and kbcli version.",
 		Run: func(cmd *cobra.Command, args []string) {
 			util.CheckErr(o.Complete(f))
 			o.Run()

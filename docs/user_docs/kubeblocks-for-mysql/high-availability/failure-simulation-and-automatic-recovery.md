@@ -6,7 +6,7 @@ sidebar_position: 1
 
 # Failure simulation and automatic recovery
 
-As an open-source data management platform, Kubeblocks supports two database forms, ReplicationSet and ConsensusSet. ReplicationSet can be used for single source with multiple replicas, and non-automatic switching database management, such as MySQL and Redis. ConsensusSet can be used for database management with multiple replicas and automatic switching capabilities, such as ApeCloud MySQL Paxos group with multiple replicas, MongoDB, etc. The ConsensusSet database management capability has been released in KubeBlocks v0.3.0, and ReplicationSet is under development. This guide takes ApeCloud MySQL as an example to introduce the high availability capability of the database in the form of ConsensusSet. This capability is also applicable to other database engines.
+As an open-source data management platform, KubeBlocks supports two database forms, ReplicationSet and ConsensusSet. ReplicationSet can be used for single source with multiple replicas, and non-automatic switching database management, such as MySQL and Redis. ConsensusSet can be used for database management with multiple replicas and automatic switching capabilities, such as ApeCloud MySQL Paxos group with multiple replicas, MongoDB, etc. The ConsensusSet database management capability has been released in KubeBlocks v0.3.0, and ReplicationSet is under development. This guide takes ApeCloud MySQL as an example to introduce the high availability capability of the database in the form of ConsensusSet. This capability is also applicable to other database engines.
 
 ***Before you start***
 
@@ -59,7 +59,7 @@ As an open-source data management platform, Kubeblocks supports two database for
 
    ***How the automatic recovery works***
 
-   After the leader pod is deleted, the ApeCloud MySQL Paxos group elects a new leader. In this example, `mysql-cluster-mysql-2` is elected as the new leader. Kubeblocks detects that the leader has changed, and sends a notification to update the access link. The original exception node automatically rebuilds and recovers to the normal Paxos group state. It normally takes 30 seconds from exception to recovery.
+   After the leader pod is deleted, the ApeCloud MySQL Paxos group elects a new leader. In this example, `mysql-cluster-mysql-2` is elected as the new leader. KubeBlocks detects that the leader has changed, and sends a notification to update the access link. The original exception node automatically rebuilds and recovers to the normal Paxos group state. It normally takes 30 seconds from exception to recovery.
 
 ### Single follower pod exception
 
@@ -158,4 +158,4 @@ Therefore, whether exceptions occur to one leader and one follower or exceptions
 
    ***How the automatic recovery works***
 
-    Every time the pod is deleted, recreation is triggered. And then ApeCloud MySQL automatically completes the cluster recovery and the election of a new leader. After the election of the leader is completed, Kubeblocks detects the new leader and updates the access link. This process takes less than 30 seconds.
+    Every time the pod is deleted, recreation is triggered. And then ApeCloud MySQL automatically completes the cluster recovery and the election of a new leader. After the election of the leader is completed, KubeBlocks detects the new leader and updates the access link. This process takes less than 30 seconds.

@@ -34,7 +34,7 @@ var listExample = templates.Examples(`
 func NewClusterVersionCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "clusterversion",
-		Short:   "ClusterVersion command",
+		Short:   "ClusterVersion command.",
 		Aliases: []string{"cv"},
 	}
 
@@ -46,7 +46,7 @@ func NewListCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 	o := list.NewListOptions(f, streams, types.ClusterVersionGVR())
 	cmd := &cobra.Command{
 		Use:               "list",
-		Short:             "List ClusterVersions",
+		Short:             "List ClusterVersions.",
 		Example:           listExample,
 		Aliases:           []string{"ls"},
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, o.GVR),

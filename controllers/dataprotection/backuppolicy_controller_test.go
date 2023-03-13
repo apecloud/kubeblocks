@@ -49,9 +49,11 @@ var _ = Describe("Backup Policy Controller", func() {
 	const defaultSchedule = "0 3 * * *"
 	const defaultTTL = "168h0m0s"
 	const backupNamePrefix = "test-backup-job-"
+	const mgrNamespace = "kube-system"
 
 	viper.SetDefault("DP_BACKUP_SCHEDULE", "0 3 * * *")
 	viper.SetDefault("DP_BACKUP_TTL", "168h0m0s")
+	viper.SetDefault("CM_NAMESPACE", testCtx.DefaultNamespace)
 
 	cleanEnv := func() {
 		// must wait until resources deleted and no longer exist before the testcases start,
@@ -59,7 +61,7 @@ var _ = Describe("Backup Policy Controller", func() {
 		// in race conditions, it will find the existence of old objects, resulting failure to
 		// create the new objects.
 		By("clean resources")
-
+		viper.SetDefault("CM_NAMESPACE", mgrNamespace)
 		// delete rest mocked objects
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
@@ -71,6 +73,9 @@ var _ = Describe("Backup Policy Controller", func() {
 		testapps.ClearResources(&testCtx, intctrlutil.JobSignature, inNS, ml)
 		testapps.ClearResources(&testCtx, intctrlutil.CronJobSignature, inNS, ml)
 		testapps.ClearResources(&testCtx, intctrlutil.PersistentVolumeClaimSignature, inNS, ml)
+		// mgr namespaced
+		inMgrNS := client.InNamespace(mgrNamespace)
+		testapps.ClearResources(&testCtx, intctrlutil.CronJobSignature, inMgrNS, ml)
 		// non-namespaced
 		testapps.ClearResources(&testCtx, intctrlutil.BackupToolSignature, ml)
 		testapps.ClearResources(&testCtx, intctrlutil.BackupPolicyTemplateSignature, ml)
@@ -105,12 +110,23 @@ var _ = Describe("Backup Policy Controller", func() {
 
 	When("creating backup policy with default settings", func() {
 		var backupToolName string
+		var cronjobKey types.NamespacedName
+
 		BeforeEach(func() {
+			viper.Set("CM_NAMESPACE", mgrNamespace)
+			cronjobKey = types.NamespacedName{
+				Name:      backupPolicyName,
+				Namespace: viper.GetString("CM_NAMESPACE"),
+			}
+
 			By("By creating a backupTool")
 			backupTool := testapps.CreateCustomizedObj(&testCtx, "backup/backuptool.yaml",
 				&dpv1alpha1.BackupTool{}, testapps.RandomizedObjName())
 			backupToolName = backupTool.Name
+		})
 
+		AfterEach(func() {
+			viper.SetDefault("CM_NAMESPACE", testCtx.DefaultNamespace)
 		})
 
 		Context("creates a backup policy", func() {
@@ -134,6 +150,9 @@ var _ = Describe("Backup Policy Controller", func() {
 			It("should success", func() {
 				Eventually(testapps.CheckObj(&testCtx, backupPolicyKey, func(g Gomega, fetched *dpv1alpha1.BackupPolicy) {
 					g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.ConfigAvailable))
+				})).Should(Succeed())
+				Eventually(testapps.CheckObj(&testCtx, cronjobKey, func(g Gomega, fetched *batchv1.CronJob) {
+					g.Expect(fetched.Spec.Schedule).To(Equal(defaultSchedule))
 				})).Should(Succeed())
 			})
 			It("limit backups to 1", func() {
@@ -210,7 +229,7 @@ var _ = Describe("Backup Policy Controller", func() {
 				patchBackupStatus(backupStatus, client.ObjectKeyFromObject(backupOutLimit2))
 
 				// trigger the backup policy controller through update cronjob
-				patchCronJobStatus(backupPolicyKey)
+				patchCronJobStatus(cronjobKey)
 
 				By("retain the latest backup")
 				Eventually(testapps.GetListLen(&testCtx, intctrlutil.BackupSignature,

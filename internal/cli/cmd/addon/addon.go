@@ -64,11 +64,6 @@ func (r *addonEnableFlags) useDefault() bool {
 		len(r.TolerationsSet) == 0
 }
 
-// type addonDescribeCmdOpts struct {
-// 	Factory cmdutil.Factory
-// 	genericclioptions.IOStreams
-// }
-
 type addonCmdOpts struct {
 	genericclioptions.IOStreams
 
@@ -317,10 +312,17 @@ func addonDescribeHandler(o *addonCmdOpts, cmd *cobra.Command, args []string) er
 		}
 	}
 	printer.PrintPairStringToLine("Name", o.addon.Name, 0)
+	printer.PrintPairStringToLine("Description", o.addon.Spec.Description, 0)
 	printer.PrintPairStringToLine("Labels", strings.Join(labels, ","), 0)
 	printer.PrintPairStringToLine("Type", string(o.addon.Spec.Type), 0)
 	printer.PrintPairStringToLine("Extras", strings.Join(o.addon.GetExtraNames(), ","), 0)
 	printer.PrintPairStringToLine("Status", string(o.addon.Status.Phase), 0)
+	var autoInstall bool
+	if o.addon.Spec.Installable != nil {
+		autoInstall = o.addon.Spec.Installable.AutoInstall
+	}
+	printer.PrintPairStringToLine("Auto-install", strconv.FormatBool(autoInstall), 0)
+	printer.PrintPairStringToLine("Installable", strings.Join(o.addon.Spec.Installable.GetSelectorsStrings(), ","), 0)
 
 	switch o.addon.Status.Phase {
 	case extensionsv1alpha1.AddonEnabled:
@@ -466,7 +468,7 @@ func (o *addonCmdOpts) buildEnablePatch(flags []*pflag.Flag, spec, install map[s
 			return nil, fmt.Errorf("wrong flag value --%s=%s", flag, s)
 		}
 		reqLim := [2]resource.Quantity{}
-		proccessTuple := func(i int) error {
+		processTuple := func(i int) error {
 			if t[i] == "" {
 				return nil
 			}
@@ -478,7 +480,7 @@ func (o *addonCmdOpts) buildEnablePatch(flags []*pflag.Flag, spec, install map[s
 			return nil
 		}
 		for i := range t {
-			if err := proccessTuple(i); err != nil {
+			if err := processTuple(i); err != nil {
 				return nil, fmt.Errorf("wrong flag value --%s=%s, with error %v", flag, s, err)
 			}
 		}
@@ -563,7 +565,7 @@ func (o *addonCmdOpts) buildPatch(flags []*pflag.Flag) error {
 			return err
 		}
 	} else {
-		if !o.addon.Spec.InstallSpec.Enabled {
+		if !o.addon.Spec.InstallSpec.GetEnabled() {
 			fmt.Fprintf(o.Out, "%s/%s is already disabled\n", o.GVR.GroupResource().String(), o.Names[0])
 			return cmdutil.ErrExit
 		}

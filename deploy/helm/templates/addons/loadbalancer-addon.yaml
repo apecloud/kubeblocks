@@ -4,12 +4,17 @@ metadata:
   name: loadbalancer
   labels:
     {{- include "kubeblocks.labels" . | nindent 4 }}
+  {{- if .Values.keepAddons }}
+  annotations:
+    helm.sh/resource-policy: keep
+  {{- end }}
 spec:
   description: 'A loadbalancer Helm chart for Kubernetes'
   type: Helm
 
   helm:
-    chartLocationURL: https://github.com/apecloud/helm-charts/releases/download/loadbalancer-0.1.0/loadbalancer-0.1.0.tgz
+    # chartLocationURL: https://github.com/apecloud/helm-charts/releases/download/loadbalancer-0.1.0/loadbalancer-0.1.0.tgz
+    chartLocationURL: https://jihulab.com/api/v4/projects/85949/packages/helm/stable/charts/loadbalancer-0.1.2.tgz
 
     valuesMapping:
       valueMap:
@@ -40,7 +45,7 @@ spec:
     - replicas: 1
 
   installable:
-    autoInstall: {{ .Values.loadbalancer.enabled }}
+    autoInstall: true
     selectors:
       - key: KubeGitVersion
         operator: Contains

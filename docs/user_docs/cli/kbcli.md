@@ -53,7 +53,7 @@ kbcli [flags]
 ### SEE ALSO
 
 * [kbcli addon](kbcli_addon.md)	 - Addon command
-* [kbcli alert](kbcli_alert.md)	 - Manage alert receivers
+* [kbcli alert](kbcli_alert.md)	 - Manage alert receiver, include add, list and delete receiver
 * [kbcli app](kbcli_app.md)	 - Manage external applications related to KubeBlocks
 * [kbcli backup-config](kbcli_backup-config.md)	 - KubeBlocks backup config
 * [kbcli bench](kbcli_bench.md)	 - Run a benchmark

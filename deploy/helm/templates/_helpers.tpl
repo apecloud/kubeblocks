@@ -248,3 +248,17 @@ Get addon controller enabled attributes.
 {{- false }}
 {{- end }}
 {{- end }}
+
+{{/*
+Define addon prometheus name
+*/}}
+{{- define "addon.prometheus.name" -}}
+{{- print "prometheus" }}
+{{- end }}
+
+{{/*
+Define addon alertmanager-webhook-adaptor name
+*/}}
+{{- define "addon.alertmanager-webhook-adaptor.name" -}}
+{{- print "alertmanager-webhook-adaptor" }}
+{{- end }}

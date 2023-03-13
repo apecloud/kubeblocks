@@ -18,6 +18,7 @@ package alert
 
 import (
 	"fmt"
+	"net/url"
 	"strings"
 
 	"golang.org/x/exp/slices"
@@ -25,7 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/yaml"
 
-	"github.com/apecloud/kubeblocks/internal/cli/types"
+	"github.com/apecloud/kubeblocks/internal/cli/util"
 )
 
 // strToMap parses string to map, string format is key1=value1,key2=value2
@@ -94,8 +95,8 @@ func getWebhookType(url string) webhookType {
 	return unknownWebhookType
 }
 
-func getWebhookURL(name string, namespace string) string {
-	return fmt.Sprintf("http://%s-%s.%s:5001/api/v1/notify/%s", types.KubeBlocksReleaseName, "alertmanager-webhook-adaptor", namespace, name)
+func getWebhookAdaptorURL(name string, namespace string) string {
+	return fmt.Sprintf("http://%s.%s:5001/api/v1/notify/%s", util.BuildAddonReleaseName(webhookAdaptorAddonName), namespace, name)
 }
 
 func removeDuplicateStr(strArray []string) []string {
@@ -106,4 +107,16 @@ func removeDuplicateStr(strArray []string) []string {
 		}
 	}
 	return result
+}
+
+func urlIsValid(urlStr string) (bool, error) {
+	_, err := url.ParseRequestURI(urlStr)
+	if err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+func getConfigMapName(addon string) string {
+	return fmt.Sprintf("%s-%s", util.BuildAddonReleaseName(addon), addonCMSuffix[addon])
 }

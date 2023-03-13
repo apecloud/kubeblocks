@@ -29,7 +29,7 @@ spec:
           scrapePath: /metrics
           scrapePort: 8001
       logConfigs:
-        {{- range $name,$pattern := .Values.logConfigs }}
+        {{- range $name, $pattern := .Values.logConfigs }}
         - name: {{ $name }}
           filePathPattern: {{ $pattern }}
         {{- end }}

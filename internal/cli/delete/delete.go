@@ -184,17 +184,15 @@ func Confirm(names []string, in io.Reader) error {
 	if len(names) == 0 {
 		return nil
 	}
-
-	entered, err := prompt.NewPrompt(fmt.Sprintf("You should type \"%s\"", strings.Join(names, " ")),
-		"Please type the name again(separate with white space when more than one):", in).GetInput()
-	if err != nil {
-		return err
-	}
-	enteredNames := strings.Split(entered, " ")
-	sort.Strings(names)
-	sort.Strings(enteredNames)
-	if !slices.Equal(names, enteredNames) {
-		return fmt.Errorf("typed \"%s\" does not match \"%s\"", entered, strings.Join(names, " "))
-	}
-	return nil
+	_, err := prompt.NewPrompt("Please type the name again(separate with white space when more than one):",
+		func(entered string) error {
+			enteredNames := strings.Split(entered, " ")
+			sort.Strings(names)
+			sort.Strings(enteredNames)
+			if !slices.Equal(names, enteredNames) {
+				return fmt.Errorf("typed \"%s\" does not match \"%s\"", entered, strings.Join(names, " "))
+			}
+			return nil
+		}, in).Run()
+	return err
 }

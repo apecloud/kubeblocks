@@ -151,7 +151,7 @@ func PrepareComponentResources(reqCtx intctrlutil.RequestCtx, cli client.Client,
 			return err
 		}
 
-		// If the statefulSets already exists, the HA process is prioritized and buildReplicationSet is not required.
+		// If the statefulSets already exists, check whether there is an ha switching and the HA process is prioritized to handle.
 		// TODO(xingran) After refactoring, HA switching will be handled in the replicationSet controller.
 		if len(existStsList.Items) > 0 {
 			primaryIndexChanged, _, err := replicationset.CheckPrimaryIndexChanged(reqCtx.Ctx, cli, task.Cluster, task.Component.Name, task.Component.PrimaryIndex)
@@ -159,7 +159,9 @@ func PrepareComponentResources(reqCtx intctrlutil.RequestCtx, cli client.Client,
 				return err
 			}
 			if primaryIndexChanged {
-				return replicationset.HandleReplicationSetHASwitch(reqCtx.Ctx, cli, task.Cluster, componentutil.GetClusterComponentSpecByName(task.Cluster, task.Component.Name))
+				if err := replicationset.HandleReplicationSetHASwitch(reqCtx.Ctx, cli, task.Cluster, componentutil.GetClusterComponentSpecByName(task.Cluster, task.Component.Name)); err != nil {
+					return err
+				}
 			}
 		}
 

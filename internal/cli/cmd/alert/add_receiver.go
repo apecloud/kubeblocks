@@ -23,6 +23,7 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
+	"golang.org/x/exp/slices"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	apitypes "k8s.io/apimachinery/pkg/types"
@@ -32,30 +33,24 @@ import (
 	"k8s.io/kubectl/pkg/util/templates"
 	"sigs.k8s.io/yaml"
 
-	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
-)
-
-const (
-	// alertConfigFileName is the name of alertmanager config file
-	alertConfigFileName = "alertmanager.yml"
-
-	// webhookAdaptorFileName is the name of webhook adaptor config file
-	webhookAdaptorFileName = "config.yml"
 )
 
 var (
 	// alertConfigmapName is the name of alertmanager configmap
-	alertConfigmapName = fmt.Sprintf("%s-alertmanager-config", types.KubeBlocksReleaseName)
+	alertConfigmapName = getConfigMapName(alertManagerAddonName)
 
-	// webhookAdaptorName is the name of webhook adaptor
-	webhookAdaptorName = fmt.Sprintf("%s-webhook-adaptor-config", types.KubeBlocksReleaseName)
+	// webhookAdaptorConfigmapName is the name of webhook adaptor
+	webhookAdaptorConfigmapName = getConfigMapName(webhookAdaptorAddonName)
 )
 
 var (
 	addReceiverExample = templates.Examples(`
-		# add webhook receiver, for example feishu
-		kbcli alert add-receiver --webhook='url=https://open.feishu.cn/open-apis/bot/v2/hook/foo,token=xxxxx'
+		# add webhook receiver without token, for example feishu
+		kbcli alert add-receiver --webhook='url=https://open.feishu.cn/open-apis/bot/v2/hook/foo'
+
+		# add webhook receiver with token, for example feishu
+		kbcli alert add-receiver --webhook='url=https://open.feishu.cn/open-apis/bot/v2/hook/foo,token=XXX'
 
 		# add email receiver
         kbcli alter add-receiver --email='a@foo.com,b@foo.com'
@@ -109,7 +104,7 @@ func newAddReceiverCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *
 	cmd.Flags().StringArrayVar(&o.webhooks, "webhook", []string{}, "Add webhook receiver, such as url=https://open.feishu.cn/open-apis/bot/v2/hook/foo,token=xxxxx")
 	cmd.Flags().StringArrayVar(&o.slacks, "slack", []string{}, "Add slack receiver, such as api_url=https://hooks.slackConfig.com/services/foo,channel=monitor,username=kubeblocks-alert-bot")
 	cmd.Flags().StringArrayVar(&o.clusters, "cluster", []string{}, "Cluster name, such as mycluster, more than one cluster can be specified, such as mycluster,mycluster2")
-	cmd.Flags().StringArrayVar(&o.severities, "severity", []string{}, "Alert severity, such as critical, warning, info, more than one severity can be specified, such as critical,warning")
+	cmd.Flags().StringArrayVar(&o.severities, "severity", []string{}, "Alert severity, critical, warning or info, more than one severity can be specified, such as critical,warning")
 
 	// register completions
 	util.CheckErr(cmd.RegisterFlagCompletionFunc("severity",
@@ -141,7 +136,7 @@ func (o *baseOptions) complete(f cmdutil.Factory) error {
 	}
 
 	// get webhook adaptor configmap
-	o.webhookConfigMap, err = o.client.CoreV1().ConfigMaps(namespace).Get(ctx, webhookAdaptorName, metav1.GetOptions{})
+	o.webhookConfigMap, err = o.client.CoreV1().ConfigMaps(namespace).Get(ctx, webhookAdaptorConfigmapName, metav1.GetOptions{})
 	return err
 }
 
@@ -157,6 +152,70 @@ func (o *addReceiverOptions) validate(args []string) error {
 		o.name = args[0]
 	}
 
+	if err := o.checkEmails(); err != nil {
+		return err
+	}
+
+	if err := o.checkSeverities(); err != nil {
+		return err
+	}
+	return nil
+}
+
+// checkSeverities check if severity is valid
+func (o *addReceiverOptions) checkSeverities() error {
+	if len(o.severities) == 0 {
+		return nil
+	}
+	checkSeverity := func(severity string) error {
+		ss := strings.Split(severity, ",")
+		for _, s := range ss {
+			if !slices.Contains(severities(), strings.ToLower(strings.TrimSpace(s))) {
+				return fmt.Errorf("invalid severity: %s, must be one of %v", s, severities())
+			}
+		}
+		return nil
+	}
+
+	for _, severity := range o.severities {
+		if err := checkSeverity(severity); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// checkEmails check if email SMTP is configured, if not, do not allow to add email receiver
+func (o *addReceiverOptions) checkEmails() error {
+	if len(o.emails) == 0 {
+		return nil
+	}
+
+	errMsg := "SMTP %sis not configured, if you want to add email receiver, please configure it first"
+	data, err := getConfigData(o.alterConfigMap, alertConfigFileName)
+	if err != nil {
+		return err
+	}
+
+	if data["global"] == nil {
+		return fmt.Errorf(errMsg, "")
+	}
+
+	// check smtp config in global
+	checkKeys := []string{"smtp_from", "smtp_smarthost", "smtp_auth_username", "smtp_auth_password"}
+	checkSMTP := func(key string) error {
+		val := data["global"].(map[string]interface{})[key]
+		if val == nil || fmt.Sprintf("%v", val) == "" {
+			return fmt.Errorf(errMsg, key+" ")
+		}
+		return nil
+	}
+
+	for _, key := range checkKeys {
+		if err = checkSMTP(key); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -179,7 +238,7 @@ func (o *addReceiverOptions) run() error {
 		return err
 	}
 
-	fmt.Fprintf(o.Out, "Receiver %s added successfully\n", o.receiver.Name)
+	fmt.Fprintf(o.Out, "Receiver %s added successfully.\n", o.receiver.Name)
 	return nil
 }
 
@@ -293,7 +352,7 @@ func (o *addReceiverOptions) buildWebhook() ([]*webhookConfig, error) {
 	for _, hook := range o.webhooks {
 		m := strToMap(hook)
 		if len(m) == 0 {
-			return nil, fmt.Errorf("invalid webhook: %s, webhook should be in the format of url=my-url,tolen=my-token", hook)
+			return nil, fmt.Errorf("invalid webhook: %s, webhook should be in the format of url=my-url,token=my-token", hook)
 		}
 		w := webhookConfig{
 			MaxAlerts:    10,
@@ -304,7 +363,10 @@ func (o *addReceiverOptions) buildWebhook() ([]*webhookConfig, error) {
 			// check webhookConfig keys
 			switch webhookKey(k) {
 			case webhookURL:
-				w.URL = getWebhookURL(o.name, o.webhookConfigMap.Namespace)
+				if valid, err := urlIsValid(v); !valid {
+					return nil, fmt.Errorf("invalid webhook url: %s, %v", v, err)
+				}
+				w.URL = getWebhookAdaptorURL(o.name, o.webhookConfigMap.Namespace)
 				webhookType := getWebhookType(v)
 				if webhookType == unknownWebhookType {
 					return nil, fmt.Errorf("invalid webhook url: %s, failed to prase the webhook type", v)
@@ -312,7 +374,6 @@ func (o *addReceiverOptions) buildWebhook() ([]*webhookConfig, error) {
 				waReceiver.Type = string(webhookType)
 				waReceiver.Params.URL = v
 			case webhookToken:
-				w.Token = v
 				waReceiver.Params.Secret = v
 			default:
 				return nil, fmt.Errorf("invalid webhook key: %s, webhook key should be one of url and token", k)
@@ -348,6 +409,9 @@ func buildSlackConfigs(slacks []string) ([]*slackConfig, error) {
 			// check slackConfig keys
 			switch slackKey(k) {
 			case slackAPIURL:
+				if valid, err := urlIsValid(v); !valid {
+					return nil, fmt.Errorf("invalid slack api_url: %s, %v", v, err)
+				}
 				s.APIURL = v
 			case slackChannel:
 				s.Channel = "#" + v

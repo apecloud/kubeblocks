@@ -46,7 +46,7 @@ import (
 )
 
 const (
-	kMonitorParam      = "prometheus.enabled=%[1]t,grafana.enabled=%[1]t,dashboards.enabled=%[1]t,alertmanager-webhook-adaptor.enabled=%[1]t"
+	kMonitorParam      = "prometheus.enabled=%[1]t,grafana.enabled=%[1]t,dashboards.enabled=%[1]t"
 	requiredK8sVersion = "1.22.0"
 )
 
@@ -415,7 +415,10 @@ func (o *InstallOptions) checkRemainedResource() error {
 	if ns == "" {
 		ns = o.Namespace
 	}
-	objs, err := getKBObjects(o.Dynamic, ns)
+
+	// Now, we only check whether there are resources left by KubeBlocks, ignore
+	// the addon resources.
+	objs, err := getKBObjects(o.Dynamic, ns, nil)
 	if err != nil {
 		fmt.Fprintf(o.ErrOut, "Check whether there are resources left by KubeBlocks before: %s\n", err.Error())
 	}

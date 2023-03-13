@@ -114,6 +114,12 @@ func (o *deleteReceiverOptions) deleteReceiver() error {
 			newRoutes = append(newRoutes, r)
 		}
 	}
+
+	// check if receiver exists
+	if len(receivers) == len(newReceivers) {
+		return fmt.Errorf("receiver %s not found", strings.Join(o.names, ","))
+	}
+
 	data["receivers"] = newReceivers
 	data["route"].(map[string]interface{})["routes"] = newRoutes
 	return updateConfig(o.client, o.alterConfigMap, alertConfigFileName, data)

@@ -24,6 +24,7 @@ We would like to extend our appreciation to all contributors who helped make thi
     * New addons.extensions.kubeblocks.io API that provide running cluster installable check and auto-installation settings.
     * Following addons are provided:
       * Prometheus and Alertmanager
+      * AlertManager Webhook Adaptor
       * Grafana
       * S3 CSI driver
       * Snapshot Controller

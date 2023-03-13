@@ -70,6 +70,7 @@ var _ = Describe("Backup Policy Controller", func() {
 		testapps.ClearResources(&testCtx, intctrlutil.BackupPolicySignature, inNS, ml)
 		testapps.ClearResources(&testCtx, intctrlutil.JobSignature, inNS, ml)
 		testapps.ClearResources(&testCtx, intctrlutil.CronJobSignature, inNS, ml)
+		testapps.ClearResources(&testCtx, intctrlutil.PersistentVolumeClaimSignature, inNS, ml)
 		// non-namespaced
 		testapps.ClearResources(&testCtx, intctrlutil.BackupToolSignature, ml)
 		testapps.ClearResources(&testCtx, intctrlutil.BackupPolicyTemplateSignature, ml)
@@ -88,8 +89,15 @@ var _ = Describe("Backup Policy Controller", func() {
 			}).Create(&testCtx).GetObject()
 
 		By("By mocking a pod belonging to the statefulset")
-		_ = testapps.NewPodFactory(testCtx.DefaultNamespace, sts.Name+"-0").
+		pod := testapps.NewPodFactory(testCtx.DefaultNamespace, sts.Name+"-0").
+			AddAppInstanceLabel(clusterName).
 			AddContainer(corev1.Container{Name: containerName, Image: testapps.ApeCloudMySQLImage}).
+			Create(&testCtx).GetObject()
+
+		By("By mocking a pvc belonging to the pod")
+		_ = testapps.NewPersistentVolumeClaimFactory(
+			testCtx.DefaultNamespace, "data-"+pod.Name, clusterName, componentName, "data").
+			SetStorage("1Gi").
 			Create(&testCtx)
 	})
 

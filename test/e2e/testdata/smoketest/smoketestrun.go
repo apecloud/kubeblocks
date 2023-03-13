@@ -47,25 +47,40 @@ func SmokeTest() {
 				}
 				log.Println("folder: " + folder)
 				files, _ := e2eutil.GetFiles(folder)
-				for _, file := range files {
-					By("test " + file)
-					b := e2eutil.OpsYaml(file, "apply")
-					Expect(b).Should(BeTrue())
-					e2eutil.WaitTime()
-					podStatusResult := e2eutil.CheckPodStatus()
-					log.Println(podStatusResult)
-					for _, result := range podStatusResult {
-						Expect(result).Should(BeTrue())
+				clusterVersions := e2eutil.GetClusterVersion(folder)
+				if len(clusterVersions) > 1 {
+					for _, clusterVersion := range clusterVersions {
+						if len(files) > 0 {
+							file := e2eutil.GetClusterCreateYaml(files)
+							e2eutil.ReplaceClusterVersionRef(file, clusterVersion)
+							runTestCases(files)
+						}
 					}
-					e2eutil.WaitTime()
-					clusterStatusResult := e2eutil.CheckClusterStatus()
-					Expect(clusterStatusResult).Should(BeTrue())
-				}
-				if len(files) > 0 {
-					file := e2eutil.GetClusterCreateYaml(files)
-					e2eutil.OpsYaml(file, "delete")
+				} else {
+					runTestCases(files)
 				}
 			}
 		})
 	})
+}
+
+func runTestCases(files []string) {
+	for _, file := range files {
+		By("test " + file)
+		b := e2eutil.OpsYaml(file, "apply")
+		Expect(b).Should(BeTrue())
+		e2eutil.WaitTime()
+		podStatusResult := e2eutil.CheckPodStatus()
+		log.Println(podStatusResult)
+		for _, result := range podStatusResult {
+			Expect(result).Should(BeTrue())
+		}
+		e2eutil.WaitTime()
+		clusterStatusResult := e2eutil.CheckClusterStatus()
+		Expect(clusterStatusResult).Should(BeTrue())
+	}
+	if len(files) > 0 {
+		file := e2eutil.GetClusterCreateYaml(files)
+		e2eutil.OpsYaml(file, "delete")
+	}
 }

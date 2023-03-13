@@ -112,6 +112,29 @@ func (r *fetchNDeletionCheckStage) Handle(ctx context.Context) {
 	r.next.Handle(ctx)
 }
 
+func (r *genIDProceedCheckStage) Handle(ctx context.Context) {
+	r.process(func(addon *extensionsv1alpha1.Addon) {
+		r.reqCtx.Log.V(1).Info("genIDProceedCheckStage", "phase", addon.Status.Phase)
+		switch addon.Status.Phase {
+		case extensionsv1alpha1.AddonEnabled, extensionsv1alpha1.AddonDisabled:
+			if addon.Generation == addon.Status.ObservedGeneration {
+				res, err := r.reconciler.deleteExternalResources(*r.reqCtx, addon)
+				if res != nil || err != nil {
+					r.updateResultNErr(res, err)
+					return
+				}
+				r.setReconciled()
+			}
+		case extensionsv1alpha1.AddonFailed:
+			if addon.Generation == addon.Status.ObservedGeneration {
+				r.setReconciled()
+				return
+			}
+		}
+	})
+	r.next.Handle(ctx)
+}
+
 func (r *deletionStage) Handle(ctx context.Context) {
 	r.disablingStage.stageCtx = r.stageCtx
 	r.process(func(addon *extensionsv1alpha1.Addon) {
@@ -160,29 +183,6 @@ func (r *deletionStage) Handle(ctx context.Context) {
 				return
 			}
 			return
-		}
-	})
-	r.next.Handle(ctx)
-}
-
-func (r *genIDProceedCheckStage) Handle(ctx context.Context) {
-	r.process(func(addon *extensionsv1alpha1.Addon) {
-		r.reqCtx.Log.V(1).Info("genIDProceedCheckStage", "phase", addon.Status.Phase)
-		switch addon.Status.Phase {
-		case extensionsv1alpha1.AddonEnabled, extensionsv1alpha1.AddonDisabled:
-			if addon.Generation == addon.Status.ObservedGeneration {
-				res, err := r.reconciler.deleteExternalResources(*r.reqCtx, addon)
-				if res != nil || err != nil {
-					r.updateResultNErr(res, err)
-					return
-				}
-				r.setReconciled()
-			}
-		case extensionsv1alpha1.AddonFailed:
-			if addon.Generation == addon.Status.ObservedGeneration {
-				r.setReconciled()
-				return
-			}
 		}
 	})
 	r.next.Handle(ctx)

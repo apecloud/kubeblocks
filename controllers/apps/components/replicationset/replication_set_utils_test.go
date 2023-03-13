@@ -180,7 +180,8 @@ var _ = Describe("ReplicationSet Util", func() {
 			AddRoleLabel(string(Secondary)).
 			Create(&testCtx).GetObject()
 		podList = append(podList, pod)
-		syncReplicationSetStatus(clusterObj.Status.Components[testapps.DefaultRedisCompName].ReplicationSetStatus, podList)
+		err := syncReplicationSetStatus(clusterObj.Status.Components[testapps.DefaultRedisCompName].ReplicationSetStatus, podList)
+		Expect(err).Should(Succeed())
 		Expect(len(clusterObj.Status.Components[testapps.DefaultRedisCompName].ReplicationSetStatus.Secondaries)).Should(Equal(3))
 
 		By("testing sync cluster status with remove pod")

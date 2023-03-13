@@ -75,7 +75,7 @@ var _ = Describe("kubeblocks uninstall", func() {
 				Client:    testing.FakeClientSet(),
 				Dynamic:   testing.FakeDynamicClient(testing.FakeVolumeSnapshotClass()),
 			},
-			autoApprove: false,
+			autoApprove: true,
 		}
 		Expect(o.uninstall()).Should(Succeed())
 	})

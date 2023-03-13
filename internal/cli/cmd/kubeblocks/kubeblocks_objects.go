@@ -33,6 +33,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
 
+	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
@@ -46,10 +47,13 @@ var (
 		types.StatefulSetGVR(),
 		types.ServiceGVR(),
 		types.PVCGVR(),
+		types.ConfigmapGVR(),
+		types.VolumeSnapshotClassGVR(),
 	}
 )
 
-func getKBObjects(dynamic dynamic.Interface, namespace string) (kbObjects, error) {
+// getKBObjects returns all KubeBlocks objects include addons objects
+func getKBObjects(dynamic dynamic.Interface, namespace string, addons []*extensionsv1alpha1.Addon) (kbObjects, error) {
 	var (
 		err     error
 		allErrs []error
@@ -139,22 +143,19 @@ func getKBObjects(dynamic dynamic.Interface, namespace string) (kbObjects, error
 		target.Items = append(target.Items, *obj)
 	}
 
-	// build label selector
-	instanceLabelSelector := fmt.Sprintf("%s=%s", constant.AppInstanceLabelKey, types.KubeBlocksChartName)
-	releaseLabelSelector := fmt.Sprintf("release=%s", types.KubeBlocksChartName)
-	configMapLabelSelector := fmt.Sprintf("%s=%s", constant.CMConfigurationTypeLabelKey, constant.ConfigTemplateType)
-
 	// get resources which label matches app.kubernetes.io/instance=kubeblocks or
 	// label matches release=kubeblocks, like prometheus-server
-	for _, labelSelector := range []string{instanceLabelSelector, releaseLabelSelector} {
+	for _, selector := range buildResourceLabelSelectors(addons) {
 		for _, gvr := range resourceGVRs {
-			getObjects(labelSelector, gvr)
+			getObjects(selector, gvr)
 		}
 	}
+
+	// build label selector
+	configMapLabelSelector := fmt.Sprintf("%s=%s", constant.CMConfigurationTypeLabelKey, constant.ConfigTemplateType)
+
 	// get configmap
 	getObjects(configMapLabelSelector, types.ConfigmapGVR())
-	// get volume snapshot class
-	getObjects(instanceLabelSelector, types.VolumeSnapshotClassGVR())
 
 	// get PVs by PVC
 	if pvcs, ok := kbObjs[types.PVCGVR()]; ok {
@@ -198,11 +199,33 @@ func removeCustomResources(dynamic dynamic.Interface, objs kbObjects) error {
 }
 
 func deleteObjects(dynamic dynamic.Interface, gvr schema.GroupVersionResource, objects *unstructured.UnstructuredList) error {
+	const (
+		helmResourcePolicyKey  = "helm.sh/resource-policy"
+		helmResourcePolicyKeep = "keep"
+	)
+
 	if objects == nil {
 		return nil
 	}
 
+	// if resource has annotation "helm.sh/resource-policy": "keep", skip it
+	// TODO: maybe a flag to control this behavior
+	keepResource := func(obj unstructured.Unstructured) bool {
+		annotations := obj.GetAnnotations()
+		if len(annotations) == 0 {
+			return false
+		}
+		if annotations[helmResourcePolicyKey] == helmResourcePolicyKeep {
+			return true
+		}
+		return false
+	}
+
 	for _, s := range objects.Items {
+		if keepResource(s) {
+			continue
+		}
+
 		// the object is not being deleted, delete it
 		if s.GetDeletionTimestamp().IsZero() {
 			klog.V(1).Infof("delete %s %s", gvr.String(), s.GetName())

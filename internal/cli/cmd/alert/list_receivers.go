@@ -72,7 +72,7 @@ func (o *listReceiversOptions) run() error {
 	}
 	webhookReceivers := getReceiversFromData(webhookData)
 	if len(receivers) == 0 {
-		fmt.Fprintf(o.Out, "No receivers found in webhook adaptor config %s\n", webhookAdaptorName)
+		fmt.Fprintf(o.Out, "No receivers found in webhook adaptor config %s\n", webhookAdaptorConfigmapName)
 		return nil
 	}
 
@@ -88,9 +88,6 @@ func (o *listReceiversOptions) run() error {
 				cfg := webhookConfig{}
 				params := obj["params"].(map[string]interface{})
 				cfg.URL = params["url"].(string)
-				if params["token"] != nil {
-					cfg.Token = params["token"].(string)
-				}
 				cfgs = append(cfgs, cfg)
 			}
 		}

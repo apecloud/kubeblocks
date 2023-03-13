@@ -415,7 +415,10 @@ func (o *InstallOptions) checkRemainedResource() error {
 	if ns == "" {
 		ns = o.Namespace
 	}
-	objs, err := getKBObjects(o.Dynamic, ns)
+
+	// Now, we only check whether there are resources left by KubeBlocks, ignore
+	// the addon resources.
+	objs, err := getKBObjects(o.Dynamic, ns, nil)
 	if err != nil {
 		fmt.Fprintf(o.ErrOut, "Check whether there are resources left by KubeBlocks before: %s\n", err.Error())
 	}

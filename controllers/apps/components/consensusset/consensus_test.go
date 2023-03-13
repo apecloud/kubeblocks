@@ -81,7 +81,7 @@ var _ = Describe("Consensus Component", func() {
 		})).Should(Succeed())
 
 		Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(cluster), func(g Gomega, tmpCluster *appsv1alpha1.Cluster) {
-			g.Expect(tmpCluster.Status.Components != nil).Should(BeTrue())
+			g.Expect(tmpCluster.Status.Components).ShouldNot(BeEmpty())
 		})).Should(Succeed())
 	}
 

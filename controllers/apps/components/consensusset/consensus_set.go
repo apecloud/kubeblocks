@@ -205,10 +205,8 @@ func (r *ConsensusSet) HandleUpdate(ctx context.Context, obj client.Object) erro
 
 	// first, get the old status
 	var oldConsensusSetStatus *appsv1alpha1.ConsensusSetStatus
-	if r.Cluster.Status.Components != nil {
-		if v, ok := r.Cluster.Status.Components[componentName]; ok {
-			oldConsensusSetStatus = v.ConsensusSetStatus
-		}
+	if v, ok := r.Cluster.Status.Components[componentName]; ok {
+		oldConsensusSetStatus = v.ConsensusSetStatus
 	}
 	// create the initial status
 	newConsensusSetStatus := &appsv1alpha1.ConsensusSetStatus{

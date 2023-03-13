@@ -65,7 +65,7 @@ func TestInitClusterComponentStatusIfNeed(t *testing.T) {
 	}
 	util.InitClusterComponentStatusIfNeed(cluster, componentName, *component)
 
-	if cluster.Status.Components == nil {
+	if len(cluster.Status.Components) == 0 {
 		t.Errorf("cluster.Status.ComponentDefs[*] not intialized properly")
 	}
 	if _, ok := cluster.Status.Components[componentName]; !ok {

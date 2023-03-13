@@ -456,9 +456,9 @@ func syncComponentPhaseWhenSpecUpdating(cluster *appsv1alpha1.Cluster,
 		})
 		return
 	}
-	compStatus := cluster.Status.Components[componentName]
+
 	// if component phase is not the phase of operations, sync component phase to 'SpecUpdating'
-	if util.IsCompleted(compStatus.Phase) {
+	if compStatus, ok := cluster.Status.Components[componentName]; ok && util.IsCompleted(compStatus.Phase) {
 		compStatus.Phase = appsv1alpha1.SpecUpdatingPhase
 		cluster.Status.SetComponentStatus(componentName, compStatus)
 	}

@@ -64,7 +64,7 @@ The cluster-level configuration is used as the default configuration of all comp
 ```YAML
 spec:
   affinity:
-    podAntiAffinity: Preffered
+    podAntiAffinity: Preferred
     topologyKeys:
     - kubernetes.io/hostname
     nodeLabels:

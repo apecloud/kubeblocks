@@ -17,7 +17,7 @@ You can expand the storage volume size of each pod.
 
 1. A user creates a volume expansion OpsRequest CR.
 2. This CR passes the webhook validation.
-3. The OpsRequest controller handles this OpsRequest and updates the storage size of the specified component and VolumeClaimTemplat to the configured amount.
+3. The OpsRequest controller handles this OpsRequest and updates the storage size of the specified component and VolumeClaimTemplate to the configured amount.
 4. The OpsRequest controller updates the cluster phase to `VolumeExpanding`.
 5. The cluster controller watches the cluster CR.
 6. The cluster controller changes the capacity of the corresponding PVC.

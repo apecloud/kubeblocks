@@ -308,4 +308,4 @@ Like the parameters in `kbcli playground init`, use `--cloud-provider` and `--re
 
 > ***Caution:***
 >
-> `kbcli playground destroy` directly deletes the Kubenetes cluster on the cloud but there might be residual resources in cloud, such as volumes. Please confirm whether there are residual resources after uninstalling and delete them in time to avoid unnecessary fees.
+> `kbcli playground destroy` directly deletes the Kubernetes cluster on the cloud but there might be residual resources in cloud, such as volumes. Please confirm whether there are residual resources after uninstalling and delete them in time to avoid unnecessary fees.

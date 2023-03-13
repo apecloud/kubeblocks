@@ -19,7 +19,7 @@ The lower-level command is actually `kubectl exec`. The command is functional as
 Execute the following command to get the network information of the targeted database and connect it with the printed IP address.
 
 ```bash
-kbcli cluser connect --show-example ${cluster-name}
+kbcli cluster connect --show-example ${cluster-name}
 ```
 
 Information printed includes database addresses, port No., username, password. The figure below is an example of MySQL database network information.

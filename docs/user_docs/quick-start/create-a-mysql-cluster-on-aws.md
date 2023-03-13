@@ -40,7 +40,7 @@ This guide introduces how to use KubeBlocks to create an ApeCloud MySQL cluster 
 
     ***Result***
 
-    This command installs the latest version in your Kubernetes environment under the default namespace `kb-sytem` since your `kubectl` can connect to your Kubernetes clusters.
+    This command installs the latest version in your Kubernetes environment under the default namespace `kb-system` since your `kubectl` can connect to your Kubernetes clusters.
 
 2. Run the YAML files below to apply for EBS resources and enable backup.
    * Apply for EBS resources:

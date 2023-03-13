@@ -67,6 +67,13 @@ type lifecycleVertex struct {
 	action    *Action
 }
 
+func (v lifecycleVertex) String() string {
+	if v.action == nil {
+		return fmt.Sprintf("{obj:%T, immutable: %v, action: nil}", v.obj, v.immutable)
+	}
+	return fmt.Sprintf("{obj:%T, immutable: %v, action: %v}", v.obj, v.immutable, *v.action)
+}
+
 type clusterSnapshot map[gvkName]client.Object
 
 type RequeueError interface {

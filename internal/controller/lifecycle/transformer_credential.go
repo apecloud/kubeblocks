@@ -38,6 +38,8 @@ func (c *credentialTransformer) Transform(dag *graph.DAG) error {
 		return err
 	}
 	for _, secretVertex := range secretVertices {
+		secret, _ := secretVertex.(*lifecycleVertex)
+		secret.immutable = true
 		for _, vertex := range noneRootVertices {
 			v, _ := vertex.(*lifecycleVertex)
 			// connect all none secret vertices to all secret vertices

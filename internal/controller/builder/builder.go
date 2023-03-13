@@ -459,6 +459,7 @@ func BuildEnvConfig(params BuilderParams) (*corev1.ConfigMap, error) {
 func BuildBackupPolicy(sts *appsv1.StatefulSet,
 	template *dataprotectionv1alpha1.BackupPolicyTemplate,
 	backupKey types.NamespacedName) (*dataprotectionv1alpha1.BackupPolicy, error) {
+	backupKey.Name = backupKey.Name + "-" + randomString(6)
 	backupPolicy := dataprotectionv1alpha1.BackupPolicy{}
 	if err := buildFromCUE("backup_policy_template.cue", map[string]any{
 		"sts":        sts,

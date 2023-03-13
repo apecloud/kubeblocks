@@ -232,6 +232,7 @@ func (c *clusterPlanBuilder) Build() (graph.Plan, error) {
 		return nil, err
 	}
 
+	c.ctx.Log.Info(fmt.Sprintf("DAG: %s", dag))
 	// we got the execution plan
 	plan := &clusterPlan{
 		dag:      dag,

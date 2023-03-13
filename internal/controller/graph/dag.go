@@ -56,6 +56,7 @@ func (d *DAG) RemoveVertex(v Vertex) bool {
 			delete(d.edges, k)
 		}
 	}
+	delete(d.vertices, v)
 	return true
 }
 
@@ -140,6 +141,18 @@ func (d *DAG) Root() Vertex {
 		return nil
 	}
 	return roots[0]
+}
+
+func (d *DAG) String() string {
+	str := "|"
+	walkFunc := func(v Vertex) error {
+		str += fmt.Sprintf("->%v", v)
+		return nil
+	}
+	if err := d.WalkReverseTopoOrder(walkFunc); err != nil {
+		return "->err"
+	}
+	return str
 }
 
 // validate 'd' has single Root and has no cycles

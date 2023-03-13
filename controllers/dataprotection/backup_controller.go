@@ -154,6 +154,8 @@ func (r *BackupReconciler) doNewPhaseAction(
 	}
 	if backupPolicy.Status.Phase != dataprotectionv1alpha1.ConfigAvailable {
 		if backupPolicy.Status.Phase == dataprotectionv1alpha1.ConfigFailed {
+			// REVIEW/TODO: need avoid using dynamic error string, this is bad for
+			// error type checking (errors.Is)
 			err := fmt.Errorf("backupPolicy %s status is failed", backupPolicy.Name)
 			return r.updateStatusIfFailed(reqCtx, backup, err)
 		}

@@ -85,13 +85,15 @@ var _ = Describe("OpsRequest Controller", func() {
 				if len(fetched.Status.Components) == 0 {
 					fetched.Status.Components = map[string]appsv1alpha1.ClusterComponentStatus{}
 					for _, v := range fetched.Spec.ComponentSpecs {
-						fetched.Status.Components[v.Name] = appsv1alpha1.ClusterComponentStatus{Phase: appsv1alpha1.RunningPhase}
+						fetched.Status.SetComponentStatus(v.Name, appsv1alpha1.ClusterComponentStatus{
+							Phase: appsv1alpha1.RunningPhase,
+						})
 					}
 					return
 				}
 				for componentKey, componentStatus := range fetched.Status.Components {
 					componentStatus.Phase = appsv1alpha1.RunningPhase
-					fetched.Status.Components[componentKey] = componentStatus
+					fetched.Status.SetComponentStatus(componentKey, componentStatus)
 				}
 			})).Should(Succeed())
 	}

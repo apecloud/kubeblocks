@@ -78,10 +78,10 @@ var _ = Describe("Stateful Component", func() {
 			deploy := testapps.MockStatelessComponentDeploy(testCtx, clusterName, statelessCompName)
 			clusterComponent := cluster.GetComponentByName(statelessCompName)
 			componentDef := clusterDef.GetComponentDefByName(clusterComponent.ComponentDefRef)
-			statelessComponent := NewStateless(ctx, k8sClient, cluster, clusterComponent, componentDef)
-
+			statelessComponent, err := NewStateless(k8sClient, cluster, clusterComponent, *componentDef)
+			Expect(err).Should(Succeed())
 			By("test pods number of deploy is 0 ")
-			phase, _ := statelessComponent.GetPhaseWhenPodsNotReady(statelessCompName)
+			phase, _ := statelessComponent.GetPhaseWhenPodsNotReady(ctx, statelessCompName)
 			Expect(phase == appsv1alpha1.FailedPhase).Should(BeTrue())
 
 			By("test pod is ready")
@@ -114,31 +114,31 @@ var _ = Describe("Stateful Component", func() {
 				deploy.Status.ReadyReplicas = availableReplicas
 				deploy.Status.Replicas = availableReplicas
 			})).Should(Succeed())
-			podsReady, _ := statelessComponent.PodsReady(deploy)
+			podsReady, _ := statelessComponent.PodsReady(ctx, deploy)
 			Expect(podsReady == false).Should(BeTrue())
-			phase, _ = statelessComponent.GetPhaseWhenPodsNotReady(statelessCompName)
+			phase, _ = statelessComponent.GetPhaseWhenPodsNotReady(ctx, statelessCompName)
 			Expect(phase == appsv1alpha1.AbnormalPhase).Should(BeTrue())
 
 			By("test pods of deployment are ready")
 			testk8s.MockDeploymentReady(deploy, NewRSAvailableReason, rsName)
-			podsReady, _ = statelessComponent.PodsReady(deploy)
+			podsReady, _ = statelessComponent.PodsReady(ctx, deploy)
 			Expect(podsReady == true).Should(BeTrue())
 
 			By("test component.replicas is inconsistent with deployment.spec.replicas")
 			oldReplicas := clusterComponent.Replicas
 			replicas := int32(4)
 			clusterComponent.Replicas = replicas
-			isRunning, _ := statelessComponent.IsRunning(deploy)
+			isRunning, _ := statelessComponent.IsRunning(ctx, deploy)
 			Expect(isRunning == false).Should(BeTrue())
 			// reset replicas
 			clusterComponent.Replicas = oldReplicas
 
 			By("test component is running")
-			isRunning, _ = statelessComponent.IsRunning(deploy)
+			isRunning, _ = statelessComponent.IsRunning(ctx, deploy)
 			Expect(isRunning == true).Should(BeTrue())
 
 			By("test handle probe timed out")
-			requeue, _ := statelessComponent.HandleProbeTimeoutWhenPodsReady(nil)
+			requeue, _ := statelessComponent.HandleProbeTimeoutWhenPodsReady(ctx, nil)
 			Expect(requeue == false).Should(BeTrue())
 
 			By("test pod is not ready and not controlled by new ReplicaSet of deployment")
@@ -152,7 +152,7 @@ var _ = Describe("Stateful Component", func() {
 					},
 				}
 			})).Should(Succeed())
-			phase, _ = statelessComponent.GetPhaseWhenPodsNotReady(statelessCompName)
+			phase, _ = statelessComponent.GetPhaseWhenPodsNotReady(ctx, statelessCompName)
 			Expect(len(phase) == 0).Should(BeTrue())
 		})
 	})

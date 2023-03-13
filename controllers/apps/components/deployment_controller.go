@@ -28,9 +28,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/controllers/apps/components/stateless"
-	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
-	"github.com/apecloud/kubeblocks/internal/constant"
+	"github.com/apecloud/kubeblocks/controllers/apps/components/types"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -56,9 +54,8 @@ type DeploymentReconciler struct {
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.12.2/pkg/reconcile
 func (r *DeploymentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	var (
-		deploy  = &appsv1.Deployment{}
-		cluster *appsv1alpha1.Cluster
-		err     error
+		deploy = &appsv1.Deployment{}
+		err    error
 	)
 
 	reqCtx := intctrlutil.RequestCtx{
@@ -71,33 +68,17 @@ func (r *DeploymentReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 
-	if cluster, err = util.GetClusterByObject(reqCtx.Ctx, r.Client, deploy); err != nil {
-		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-	} else if cluster == nil {
-		return intctrlutil.Reconciled()
-	}
-
-	clusterDef := &appsv1alpha1.ClusterDefinition{}
-	if err = r.Client.Get(ctx, client.ObjectKey{Name: cluster.Spec.ClusterDefRef}, clusterDef); err != nil {
-		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-	}
-
-	componentName := deploy.GetLabels()[constant.KBAppComponentLabelKey]
-	componentSpec := cluster.GetComponentByName(componentName)
-	if componentSpec == nil {
-		return intctrlutil.Reconciled()
-	}
-	componentDef := clusterDef.GetComponentDefByName(componentSpec.ComponentDefRef)
-	statelessComp := stateless.NewStateless(reqCtx.Ctx, r.Client, cluster, componentSpec, componentDef)
-	compCtx := newComponentContext(reqCtx, r.Client, r.Recorder, statelessComp, deploy, componentSpec)
-	if requeueAfter, err := updateComponentStatusInClusterStatus(compCtx, cluster); err != nil {
-		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-	} else if requeueAfter != 0 {
-		// if the reconcileAction need requeue, do it
-		return intctrlutil.RequeueAfter(requeueAfter, reqCtx.Log, "")
-	}
-
-	return intctrlutil.Reconciled()
+	return workloadCompClusterReconcile(reqCtx, r.Client, deploy,
+		func(cluster *appsv1alpha1.Cluster, componentSpec *appsv1alpha1.ClusterComponentSpec, component types.Component) (ctrl.Result, error) {
+			compCtx := newComponentContext(reqCtx, r.Client, r.Recorder, component, deploy, componentSpec)
+			if requeueAfter, err := updateComponentStatusInClusterStatus(compCtx, cluster); err != nil {
+				return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+			} else if requeueAfter != 0 {
+				// if the reconcileAction need requeue, do it
+				return intctrlutil.RequeueAfter(requeueAfter, reqCtx.Log, "")
+			}
+			return intctrlutil.Reconciled()
+		})
 }
 
 // SetupWithManager sets up the controller with the Manager.

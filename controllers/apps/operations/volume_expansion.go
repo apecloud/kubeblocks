@@ -225,7 +225,7 @@ func (ve volumeExpansionOpsHandler) setComponentPhaseForClusterAndOpsRequest(com
 		p = appsv1alpha1.RunningPhase
 	}
 	c.Phase = p
-	cluster.Status.Components[componentName] = c
+	cluster.Status.SetComponentStatus(componentName, c)
 	component.Phase = p
 }
 

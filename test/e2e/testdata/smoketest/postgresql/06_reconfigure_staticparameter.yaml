@@ -5,7 +5,7 @@ metadata:
 spec:
   clusterRef: mycluster
   reconfigure:
-    componentName: pg-replicaset
+    componentName: postgresql
     configurations:
       - keys:
           - key: postgresql.conf

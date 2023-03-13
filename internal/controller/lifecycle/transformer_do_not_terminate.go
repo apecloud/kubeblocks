@@ -23,7 +23,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 )
 
-type doNotTerminateTransformer struct {}
+type doNotTerminateTransformer struct{}
 
 func (d *doNotTerminateTransformer) Transform(dag *graph.DAG) error {
 	root := dag.Root()

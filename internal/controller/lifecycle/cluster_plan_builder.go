@@ -217,7 +217,7 @@ func (c *clusterPlanBuilder) Build() (graph.Plan, error) {
 		// handle TerminationPolicyType=DoNotTerminate
 		&doNotTerminateTransformer{},
 		// horizontal scaling
-		&stsHorizontalScalingTransformer{cc: *cc, cli: c.cli, ctx: c.ctx},
+		&stsHorizontalScalingTransformer{cc: *cc, cli: roClient, ctx: c.ctx},
 		// stateful set pvc Update
 		&stsPVCTransformer{cc: *cc, cli: c.cli, ctx: c.ctx},
 		// replication set horizontal scaling
@@ -247,9 +247,9 @@ func (c *clusterPlanBuilder) Build() (graph.Plan, error) {
 // TODO: change ctx to context.Context
 func NewClusterPlanBuilder(ctx intctrlutil.RequestCtx, cli client.Client, req ctrl.Request, recorder record.EventRecorder) graph.PlanBuilder {
 	conMgr := clusterConditionManager2{
-		Client: cli,
+		Client:   cli,
 		Recorder: recorder,
-		ctx: ctx.Ctx,
+		ctx:      ctx.Ctx,
 	}
 	return &clusterPlanBuilder{
 		ctx:      ctx,

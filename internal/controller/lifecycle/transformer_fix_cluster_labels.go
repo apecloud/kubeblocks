@@ -8,7 +8,7 @@ import (
 )
 
 // fixClusterLabelsTransformer should patch the label first to prevent the label from being modified by the user.
-type fixClusterLabelsTransformer struct {}
+type fixClusterLabelsTransformer struct{}
 
 func (f *fixClusterLabelsTransformer) Transform(dag *graph.DAG) error {
 	root := dag.Root()

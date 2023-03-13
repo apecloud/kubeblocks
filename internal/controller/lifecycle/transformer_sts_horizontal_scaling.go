@@ -198,7 +198,6 @@ func (s *stsHorizontalScalingTransformer) Transform(dag *graph.DAG) error {
 
 			return nil
 
-
 		}
 
 		scaleIn := func() error {
@@ -244,7 +243,6 @@ func (s *stsHorizontalScalingTransformer) Transform(dag *graph.DAG) error {
 				*stsObj.Spec.Replicas,
 				*stsProto.Spec.Replicas)
 		}
-
 
 		return nil
 	}

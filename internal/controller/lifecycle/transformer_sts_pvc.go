@@ -22,15 +22,15 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
+	types2 "github.com/apecloud/kubeblocks/internal/controller/types"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 type stsPVCTransformer struct {
 	cc  compoundCluster
-	cli client.Client
+	cli types2.ReadonlyClient
 	ctx intctrlutil.RequestCtx
 }
 

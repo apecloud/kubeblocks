@@ -26,19 +26,16 @@ import (
 )
 
 type clusterVersionValidator struct {
-	req ctrl.Request
-	cli client.Client
-	ctx intctrlutil.RequestCtx
+	req     ctrl.Request
+	cli     client.Client
+	ctx     intctrlutil.RequestCtx
+	cluster *appsv1alpha1.Cluster
 }
 
 func (c *clusterVersionValidator) Validate() error {
-	cluster := &appsv1alpha1.Cluster{}
-	if err := c.cli.Get(c.ctx.Ctx, c.req.NamespacedName, cluster); err != nil {
-		return err
-	}
 	clusterVersion := &appsv1alpha1.ClusterVersion{}
-	if len(cluster.Spec.ClusterVersionRef) > 0 {
-		if err := c.cli.Get(c.ctx.Ctx, types.NamespacedName{Name: cluster.Spec.ClusterVersionRef}, clusterVersion); err != nil {
+	if len(c.cluster.Spec.ClusterVersionRef) > 0 {
+		if err := c.cli.Get(c.ctx.Ctx, types.NamespacedName{Name: c.cluster.Spec.ClusterVersionRef}, clusterVersion); err != nil {
 			return newRequeueError(ControllerErrorRequeueTime, "cluster version not found")
 		}
 		return checkReferencedCRStatus(clusterVersion.Status.Phase)

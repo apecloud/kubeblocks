@@ -47,18 +47,24 @@ type clusterStatusTransformer struct {
 }
 
 func (c *clusterStatusTransformer) Transform(dag *graph.DAG) error {
-	cluster := c.cc.cluster.DeepCopy()
-	if !cluster.DeletionTimestamp.IsZero() {
+	root := dag.Root()
+	if root == nil {
+		return fmt.Errorf("root vertex not found: %v", dag)
+	}
+	rootVertex, _ := root.(*lifecycleVertex)
+	origCluster, _ := rootVertex.oriObj.(*appsv1alpha1.Cluster)
+	cluster, _ := rootVertex.obj.(*appsv1alpha1.Cluster)
+	if !origCluster.DeletionTimestamp.IsZero() {
 		return nil
 	}
 
 	// handle cluster.status when spec is updating
-	if cluster.Status.ObservedGeneration != cluster.Generation {
+	if origCluster.Status.ObservedGeneration != origCluster.Generation {
 		c.ctx.Log.Info("update cluster status")
-		if err := c.updateClusterPhaseToCreatingOrUpdating(c.ctx, cluster); err != nil {
+		if err := c.updateClusterPhaseToCreatingOrUpdating(cluster); err != nil {
 			return err
 		}
-		if err := c.setProvisioningStartedCondition(); err != nil {
+		if err := c.setProvisioningStartedCondition(cluster); err != nil {
 			return err
 		}
 		return nil
@@ -82,45 +88,42 @@ func (c *clusterStatusTransformer) Transform(dag *graph.DAG) error {
 }
 
 // setProvisioningStartedCondition sets the provisioning started condition in cluster conditions.
-func (c *clusterStatusTransformer) setProvisioningStartedCondition() error {
+func (c *clusterStatusTransformer) setProvisioningStartedCondition(cluster *appsv1alpha1.Cluster) error {
 	condition := metav1.Condition{
 		Type:    ConditionTypeProvisioningStarted,
 		Status:  metav1.ConditionTrue,
-		Message: fmt.Sprintf("The operator has started the provisioning of Cluster: %s", c.cc.cluster.Name),
+		Message: fmt.Sprintf("The operator has started the provisioning of Cluster: %s", cluster.Name),
 		Reason:  ReasonPreCheckSucceed,
 	}
-	return c.updateStatusConditions(condition)
+	return c.updateStatusConditions(cluster, condition)
 }
 
 // updateClusterConditions updates cluster.status condition and records event.
-func (c *clusterStatusTransformer) updateStatusConditions(condition metav1.Condition) error {
-	patch := client.MergeFrom(c.cc.cluster.DeepCopy())
-	oldCondition := meta.FindStatusCondition(c.cc.cluster.Status.Conditions, condition.Type)
-	phaseChanged := c.handleConditionForClusterPhase(oldCondition, condition)
+func (c *clusterStatusTransformer) updateStatusConditions(cluster *appsv1alpha1.Cluster, condition metav1.Condition) error {
+	oldCondition := meta.FindStatusCondition(cluster.Status.Conditions, condition.Type)
+	phaseChanged := c.handleConditionForClusterPhase(cluster, oldCondition, condition)
 	conditionChanged := !reflect.DeepEqual(oldCondition, condition)
 	if conditionChanged || phaseChanged {
-		c.cc.cluster.SetStatusCondition(condition)
-		if err := c.cli.Status().Patch(c.ctx.Ctx, c.cc.cluster, patch); err != nil {
-			return err
-		}
+		cluster.SetStatusCondition(condition)
 	}
 	if conditionChanged {
 		eventType := corev1.EventTypeWarning
 		if condition.Status == metav1.ConditionTrue {
 			eventType = corev1.EventTypeNormal
 		}
-		c.recorder.Event(c.cc.cluster, eventType, condition.Reason, condition.Message)
+		c.recorder.Event(cluster, eventType, condition.Reason, condition.Message)
 	}
-	if phaseChanged {
-		// if cluster status changed, do it
-		return opsutil.MarkRunningOpsRequestAnnotation(c.ctx.Ctx, c.cli, c.cc.cluster)
-	}
+	// TODO: handle ops manipulation
+	//if phaseChanged {
+	//	// if cluster status changed, do it
+	//	return opsutil.MarkRunningOpsRequestAnnotation(c.ctx.Ctx, c.cli, cluster)
+	//}
 	return nil
 }
 
 // handleConditionForClusterPhase checks whether the condition can be repaired by cluster.
 // if it cannot be repaired after 30 seconds, set the cluster status to ConditionsError
-func (c *clusterStatusTransformer) handleConditionForClusterPhase(oldCondition *metav1.Condition, condition metav1.Condition) bool {
+func (c *clusterStatusTransformer) handleConditionForClusterPhase(cluster *appsv1alpha1.Cluster, oldCondition *metav1.Condition, condition metav1.Condition) bool {
 	if condition.Status == metav1.ConditionTrue {
 		return false
 	}
@@ -132,19 +135,18 @@ func (c *clusterStatusTransformer) handleConditionForClusterPhase(oldCondition *
 	if time.Now().Before(oldCondition.LastTransitionTime.Add(ClusterControllerErrorDuration)) {
 		return false
 	}
-	if !util.IsFailedOrAbnormal(c.cc.cluster.Status.Phase) &&
-		c.cc.cluster.Status.Phase != appsv1alpha1.ConditionsErrorPhase {
+	if !util.IsFailedOrAbnormal(cluster.Status.Phase) &&
+		cluster.Status.Phase != appsv1alpha1.ConditionsErrorPhase {
 		// the condition has occurred for more than 30 seconds and cluster status is not Failed/Abnormal, do it
-		c.cc.cluster.Status.Phase = appsv1alpha1.ConditionsErrorPhase
+		cluster.Status.Phase = appsv1alpha1.ConditionsErrorPhase
 		return true
 	}
 	return false
 }
 
 // updateClusterPhase updates cluster.status.phase
-func (c *clusterStatusTransformer) updateClusterPhaseToCreatingOrUpdating(reqCtx intctrlutil.RequestCtx, cluster *appsv1alpha1.Cluster) error {
+func (c *clusterStatusTransformer) updateClusterPhaseToCreatingOrUpdating(cluster *appsv1alpha1.Cluster) error {
 	needPatch := false
-	patch := client.MergeFrom(cluster.DeepCopy())
 	if cluster.Status.Phase == "" {
 		needPatch = true
 		cluster.Status.Phase = appsv1alpha1.CreatingPhase
@@ -160,9 +162,6 @@ func (c *clusterStatusTransformer) updateClusterPhaseToCreatingOrUpdating(reqCtx
 	}
 	if !needPatch {
 		return nil
-	}
-	if err := c.cli.Status().Patch(c.ctx.Ctx, cluster, patch); err != nil {
-		return err
 	}
 	// send an event when cluster perform operations
 	c.recorder.Eventf(cluster, corev1.EventTypeNormal, string(cluster.Status.Phase),

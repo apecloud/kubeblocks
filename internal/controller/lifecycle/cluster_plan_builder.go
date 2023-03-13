@@ -37,6 +37,7 @@ import (
 	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
+	types2 "github.com/apecloud/kubeblocks/internal/controller/types"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -101,9 +102,16 @@ func (c *clusterPlanBuilder) defaultWalkFunc(vertex graph.Vertex) error {
 		case CREATE, UPDATE, STATUS:
 			if !reflect.DeepEqual(cluster.ObjectMeta, origCluster.ObjectMeta) ||
 				!reflect.DeepEqual(cluster.Spec, origCluster.Spec) {
+				// TODO: we should Update instead of Patch cluster object,
+				// TODO: but Update failure happens too frequently as other controllers are updating cluster object too.
+				// TODO: use Patch here, revert to Update after refactoring done
 				if err := c.cli.Update(c.ctx.Ctx, cluster); err != nil {
 					return err
 				}
+				//patch := client.MergeFrom(origCluster.DeepCopy())
+				//if err := c.cli.Patch(c.ctx.Ctx, cluster, patch); err != nil {
+				//	return err
+				//}
 			}
 		case DELETE:
 			if err := c.handleClusterDeletion(cluster); err != nil {
@@ -157,10 +165,10 @@ func (c *clusterPlanBuilder) Init() error {
 
 func (c *clusterPlanBuilder) Validate() error {
 	chain := &graph.ValidatorChain{
-		&clusterDefinitionValidator{req: c.req, cli: c.cli, ctx: c.ctx},
-		&clusterVersionValidator{req: c.req, cli: c.cli, ctx: c.ctx},
-		&enableLogsValidator{req: c.req, cli: c.cli, ctx: c.ctx},
-		&rplSetPrimaryIndexValidator{req: c.req, cli: c.cli, ctx: c.ctx},
+		&clusterDefinitionValidator{req: c.req, cli: c.cli, ctx: c.ctx, cluster: c.cluster},
+		&clusterVersionValidator{req: c.req, cli: c.cli, ctx: c.ctx, cluster: c.cluster},
+		&enableLogsValidator{req: c.req, cli: c.cli, ctx: c.ctx, cluster: c.cluster},
+		&rplSetPrimaryIndexValidator{req: c.req, cli: c.cli, ctx: c.ctx, cluster: c.cluster},
 	}
 	err := chain.WalkThrough()
 	if err != nil {
@@ -185,6 +193,7 @@ func (c *clusterPlanBuilder) Build() (graph.Plan, error) {
 	if err != nil {
 		return nil, err
 	}
+	var roClient types2.ReadonlyClient = delegateClient{Client: c.cli}
 
 	// TODO: remove all cli & ctx fields from transformers, keep them in pure-dag-manipulation form
 	// build transformer chain
@@ -196,7 +205,7 @@ func (c *clusterPlanBuilder) Build() (graph.Plan, error) {
 		// cluster to K8s objects and put them into dag
 		&clusterTransformer{cc: *cc, cli: c.cli, ctx: c.ctx},
 		// tls certs secret
-		&tlsCertsTransformer{cc: *cc, cli: c.cli, ctx: c.ctx},
+		&tlsCertsTransformer{cc: *cc, cli: roClient, ctx: c.ctx},
 		// add our finalizer to all objects
 		&ownershipTransformer{finalizer: dbClusterFinalizerName},
 		// make all workload objects depending on credential secret
@@ -204,15 +213,15 @@ func (c *clusterPlanBuilder) Build() (graph.Plan, error) {
 		// make config configmap immutable
 		&configTransformer{},
 		// read old snapshot from cache, and generate diff plan
-		&objectActionTransformer{cc: *cc, cli: c.cli, ctx: c.ctx},
+		&objectActionTransformer{cc: *cc, cli: roClient, ctx: c.ctx},
 		// handle TerminationPolicyType=DoNotTerminate
-		&doNotTerminateTransformer{cc: *cc, cli: c.cli, ctx: c.ctx},
+		&doNotTerminateTransformer{},
 		// horizontal scaling
 		&stsHorizontalScalingTransformer{cc: *cc, cli: c.cli, ctx: c.ctx},
 		// stateful set pvc Update
 		&stsPVCTransformer{cc: *cc, cli: c.cli, ctx: c.ctx},
 		// replication set horizontal scaling
-		&rplSetHorizontalScalingTransformer{cc: *cc, cli: c.cli, ctx: c.ctx},
+		//&rplSetHorizontalScalingTransformer{cc: *cc, cli: c.cli, ctx: c.ctx},
 		// finally, update cluster status
 		&clusterStatusTransformer{cc: *cc, cli: c.cli, ctx: c.ctx, recorder: c.recorder},
 	}

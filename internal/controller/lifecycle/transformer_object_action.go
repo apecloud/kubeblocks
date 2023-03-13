@@ -18,7 +18,6 @@ package lifecycle
 
 import (
 	"fmt"
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"reflect"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -27,15 +26,17 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
+	"github.com/apecloud/kubeblocks/internal/controller/types"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 // objectActionTransformer reads all Vertex.Obj in cache and compute the diff DAG.
 type objectActionTransformer struct {
 	cc  compoundCluster
-	cli client.Client
+	cli types.ReadonlyClient
 	ctx intctrlutil.RequestCtx
 }
 

@@ -26,22 +26,19 @@ import (
 )
 
 type rplSetPrimaryIndexValidator struct {
-	req ctrl.Request
-	cli client.Client
-	ctx intctrlutil.RequestCtx
+	req     ctrl.Request
+	cli     client.Client
+	ctx     intctrlutil.RequestCtx
+	cluster *appsv1alpha1.Cluster
 }
 
 func (r *rplSetPrimaryIndexValidator) Validate() error {
-	cluster := &appsv1alpha1.Cluster{}
 	clusterDefinition := &appsv1alpha1.ClusterDefinition{}
-	if err := r.cli.Get(r.ctx.Ctx, r.req.NamespacedName, cluster); err != nil {
-		return err
-	}
-	if err := r.cli.Get(r.ctx.Ctx, types.NamespacedName{Name: cluster.Spec.ClusterDefRef}, clusterDefinition); err != nil {
+	if err := r.cli.Get(r.ctx.Ctx, types.NamespacedName{Name: r.cluster.Spec.ClusterDefRef}, clusterDefinition); err != nil {
 		return err
 	}
 	// validate primaryIndex and send warning event log necessarily
-	if err := cluster.ValidatePrimaryIndex(clusterDefinition); err != nil {
+	if err := r.cluster.ValidatePrimaryIndex(clusterDefinition); err != nil {
 		return newRequeueError(ControllerErrorRequeueTime, err.Error())
 	}
 	return nil

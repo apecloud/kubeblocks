@@ -24,6 +24,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/controller/types"
 )
 
 const (
@@ -98,13 +99,9 @@ type postHandler func(cluster *appsv1alpha1.Cluster) error
 // clusterStatusHandler a cluster status handler which changes of Cluster.status will be patched uniformly by doChainClusterStatusHandler.
 type clusterStatusHandler func(cluster *appsv1alpha1.Cluster) (bool, postHandler)
 
-type readonlyClient interface {
-	client.Reader
-}
-
 type delegateClient struct {
 	client.Client
 }
 
+var _ types.ReadonlyClient = delegateClient{}
 var _ RequeueError = &realRequeueError{}
-var _ readonlyClient = delegateClient{}

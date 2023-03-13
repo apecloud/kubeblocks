@@ -26,22 +26,19 @@ import (
 )
 
 type enableLogsValidator struct {
-	req ctrl.Request
-	cli client.Client
-	ctx intctrlutil.RequestCtx
+	req     ctrl.Request
+	cli     client.Client
+	ctx     intctrlutil.RequestCtx
+	cluster *appsv1alpha1.Cluster
 }
 
 func (e *enableLogsValidator) Validate() error {
-	cluster := &appsv1alpha1.Cluster{}
 	clusterDefinition := &appsv1alpha1.ClusterDefinition{}
-	if err := e.cli.Get(e.ctx.Ctx, e.req.NamespacedName, cluster); err != nil {
-		return err
-	}
-	if err := e.cli.Get(e.ctx.Ctx, types.NamespacedName{Name: cluster.Spec.ClusterDefRef}, clusterDefinition); err != nil {
+	if err := e.cli.Get(e.ctx.Ctx, types.NamespacedName{Name: e.cluster.Spec.ClusterDefRef}, clusterDefinition); err != nil {
 		return err
 	}
 	// validate config and send warning event log necessarily
-	if err := cluster.ValidateEnabledLogs(clusterDefinition); err != nil {
+	if err := e.cluster.ValidateEnabledLogs(clusterDefinition); err != nil {
 		return newRequeueError(ControllerErrorRequeueTime, err.Error())
 	}
 	return nil

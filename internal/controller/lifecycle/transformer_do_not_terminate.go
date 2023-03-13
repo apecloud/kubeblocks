@@ -17,24 +17,26 @@ limitations under the License.
 package lifecycle
 
 import (
-	"sigs.k8s.io/controller-runtime/pkg/client"
+	"fmt"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
-type doNotTerminateTransformer struct {
-	cc  compoundCluster
-	cli client.Client
-	ctx intctrlutil.RequestCtx
-}
+type doNotTerminateTransformer struct {}
 
 func (d *doNotTerminateTransformer) Transform(dag *graph.DAG) error {
-	if d.cc.cluster.DeletionTimestamp.IsZero() {
+	root := dag.Root()
+	if root == nil {
+		return fmt.Errorf("root vertex not found: %v", dag)
+	}
+	rootVertex, _ := root.(*lifecycleVertex)
+	cluster, _ := rootVertex.obj.(*appsv1alpha1.Cluster)
+
+	if cluster.DeletionTimestamp.IsZero() {
 		return nil
 	}
-	if d.cc.cluster.Spec.TerminationPolicy != appsv1alpha1.DoNotTerminate {
+	if cluster.Spec.TerminationPolicy != appsv1alpha1.DoNotTerminate {
 		return nil
 	}
 	vertices, err := findAllNot[*appsv1alpha1.Cluster](dag)

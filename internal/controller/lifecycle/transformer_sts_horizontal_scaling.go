@@ -38,16 +38,23 @@ import (
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
+	types2 "github.com/apecloud/kubeblocks/internal/controller/types"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 type stsHorizontalScalingTransformer struct {
 	cc  compoundCluster
-	cli client.Client
+	cli types2.ReadonlyClient
 	ctx intctrlutil.RequestCtx
 }
 
 func (s *stsHorizontalScalingTransformer) Transform(dag *graph.DAG) error {
+	root := dag.Root()
+	if root == nil {
+		return fmt.Errorf("root vertex not found: %v", dag)
+	}
+	rootVertex, _ := root.(*lifecycleVertex)
+
 	if !s.cc.cluster.DeletionTimestamp.IsZero() {
 		return nil
 	}
@@ -74,8 +81,8 @@ func (s *stsHorizontalScalingTransformer) Transform(dag *graph.DAG) error {
 			s.cc.cd,
 			s.cc.cd.Spec.ComponentDefs,
 			s.cc.cluster.Spec.ComponentSpecs)
-		component := getComponent(components, componentName)
-		if component == nil {
+		comp := getComponent(components, componentName)
+		if comp == nil {
 			s.ctx.Recorder.Eventf(s.cc.cluster,
 				corev1.EventTypeWarning,
 				"HorizontalScaleFailed",
@@ -128,53 +135,11 @@ func (s *stsHorizontalScalingTransformer) Transform(dag *graph.DAG) error {
 			return true, nil
 		}
 
-		scaleOut := func() (shouldRequeue bool, err error) {
-			shouldRequeue = false
-			if err = cleanCronJobs(); err != nil {
-				return
-			}
-			allPVCsExist, err := checkAllPVCsExist()
-			if err != nil {
-				return
-			}
-			if allPVCsExist {
-				return
-			}
-			// do backup according to component's horizontal scale policy
-			return doBackup(s.ctx,
-				s.cli,
-				s.cc.cluster,
-				component,
-				stsObj,
-				stsProto,
-				snapshotKey)
-		}
-
-		scaleIn := func() error {
-			// scale in, if scale in to 0, do not delete pvc
-			if *stsProto.Spec.Replicas == 0 || len(stsObj.Spec.VolumeClaimTemplates) == 0 {
-				return nil
-			}
-			for i := *stsProto.Spec.Replicas; i < *stsObj.Spec.Replicas; i++ {
-				for _, vct := range stsObj.Spec.VolumeClaimTemplates {
-					pvcKey := types.NamespacedName{
-						Namespace: key.Namespace,
-						Name:      fmt.Sprintf("%s-%s-%d", vct.Name, stsObj.Name, i),
-					}
-					// create cronjob to delete pvc after 30 minutes
-					if err := createDeletePVCCronJob(s.cli, s.ctx, pvcKey, stsObj, s.cc.cluster); err != nil {
-						return err
-					}
-				}
-			}
-			return nil
-		}
-
 		checkAllPVCBoundIfNeeded := func() (shouldRequeue bool, err error) {
 			shouldRequeue = false
 			err = nil
-			if component.HorizontalScalePolicy == nil ||
-				component.HorizontalScalePolicy.Type != appsv1alpha1.HScaleDataClonePolicyFromSnapshot ||
+			if comp.HorizontalScalePolicy == nil ||
+				comp.HorizontalScalePolicy.Type != appsv1alpha1.HScaleDataClonePolicyFromSnapshot ||
 				!isSnapshotAvailable(s.cli, s.ctx.Ctx) {
 				return
 			}
@@ -191,53 +156,95 @@ func (s *stsHorizontalScalingTransformer) Transform(dag *graph.DAG) error {
 		}
 
 		cleanBackupResourcesIfNeeded := func() error {
-			if component.HorizontalScalePolicy == nil ||
-				component.HorizontalScalePolicy.Type != appsv1alpha1.HScaleDataClonePolicyFromSnapshot ||
+			if comp.HorizontalScalePolicy == nil ||
+				comp.HorizontalScalePolicy.Type != appsv1alpha1.HScaleDataClonePolicyFromSnapshot ||
 				!isSnapshotAvailable(s.cli, s.ctx.Ctx) {
 				return nil
 			}
 			// if all pvc bounded, clean backup resources
-			return deleteSnapshot(s.cli, s.ctx, snapshotKey, s.cc.cluster, component)
+			return deleteSnapshot(s.cli, s.ctx, snapshotKey, s.cc.cluster, comp, dag, root)
+		}
+
+		scaleOut := func() error {
+			if err := cleanCronJobs(); err != nil {
+				return err
+			}
+			allPVCsExist, err := checkAllPVCsExist()
+			if err != nil {
+				return err
+			}
+			if !allPVCsExist {
+				// do backup according to component's horizontal scale policy
+				if err := doBackup(s.ctx, s.cli, comp, snapshotKey, dag, rootVertex, vertex); err != nil {
+					return err
+				}
+				dag.RemoveVertex(vertex)
+				return nil
+			}
+			// check all pvc bound, requeue if not all ready
+			allPVCBounded, err := checkAllPVCBoundIfNeeded()
+			if err != nil {
+				return err
+			}
+			if !allPVCBounded {
+				dag.RemoveVertex(vertex)
+				return nil
+			}
+			// clean backup resources.
+			// there will not be any backup resources other than scale out.
+			if err := cleanBackupResourcesIfNeeded(); err != nil {
+				return err
+			}
+
+			return nil
+
+
+		}
+
+		scaleIn := func() error {
+			// scale in, if scale in to 0, do not delete pvc
+			if *stsProto.Spec.Replicas == 0 || len(stsObj.Spec.VolumeClaimTemplates) == 0 {
+				return nil
+			}
+			for i := *stsProto.Spec.Replicas; i < *stsObj.Spec.Replicas; i++ {
+				for _, vct := range stsObj.Spec.VolumeClaimTemplates {
+					pvcKey := types.NamespacedName{
+						Namespace: key.Namespace,
+						Name:      fmt.Sprintf("%s-%s-%d", vct.Name, stsObj.Name, i),
+					}
+					// create cronjob to delete pvc after 30 minutes
+					if err := checkedCreateDeletePVCCronJob(s.cli, s.ctx, pvcKey, stsObj, s.cc.cluster, dag, root); err != nil {
+						return err
+					}
+				}
+			}
+			return nil
 		}
 
 		// when horizontal scaling up, sometimes db needs backup to sync data from master,
 		// log is not reliable enough since it can be recycled
-		if *stsObj.Spec.Replicas < *stsProto.Spec.Replicas {
-			shouldRequeue, err := scaleOut()
-			if err != nil {
-				return err
-			}
-			if shouldRequeue {
-				return newRequeueError(time.Second, "prepare h-scale resources")
-			}
-		} else if *stsObj.Spec.Replicas > *stsProto.Spec.Replicas {
-			if err := scaleIn(); err != nil {
-				return err
-			}
+		var err error
+		switch {
+		// scale out
+		case *stsObj.Spec.Replicas < *stsProto.Spec.Replicas:
+			err = scaleOut()
+		case *stsObj.Spec.Replicas > *stsProto.Spec.Replicas:
+			err = scaleIn()
 		}
+		if err != nil {
+			return err
+		}
+
 		if *stsObj.Spec.Replicas != *stsProto.Spec.Replicas {
 			s.ctx.Recorder.Eventf(s.cc.cluster,
 				corev1.EventTypeNormal,
 				"HorizontalScale",
 				"Start horizontal scale component %s from %d to %d",
-				component.Name,
+				comp.Name,
 				*stsObj.Spec.Replicas,
 				*stsProto.Spec.Replicas)
 		}
 
-		// check all pvc bound, requeue if not all ready
-		shouldRequeue, err := checkAllPVCBoundIfNeeded()
-		if err != nil {
-			return err
-		}
-		if shouldRequeue {
-			return newRequeueError(time.Second, "h-scale pvc not bounded yet")
-		}
-		// clean backup resources.
-		// there will not be any backup resources other than scale out.
-		if err := cleanBackupResourcesIfNeeded(); err != nil {
-			return err
-		}
 
 		return nil
 	}
@@ -258,7 +265,7 @@ func (s *stsHorizontalScalingTransformer) Transform(dag *graph.DAG) error {
 	return nil
 }
 
-func isPVCExists(cli client.Client,
+func isPVCExists(cli types2.ReadonlyClient,
 	ctx context.Context,
 	pvcKey types.NamespacedName) (bool, error) {
 	pvc := corev1.PersistentVolumeClaim{}
@@ -296,16 +303,19 @@ func getComponent(componentList []component.SynthesizedComponent, name string) *
 }
 
 func doBackup(reqCtx intctrlutil.RequestCtx,
-	cli client.Client,
-	cluster *appsv1alpha1.Cluster,
+	cli types2.ReadonlyClient,
 	component *component.SynthesizedComponent,
-	stsObj *appsv1.StatefulSet,
-	stsProto *appsv1.StatefulSet,
-	snapshotKey types.NamespacedName) (shouldRequeue bool, err error) {
+	snapshotKey types.NamespacedName,
+	dag *graph.DAG,
+	root *lifecycleVertex,
+	vertex *lifecycleVertex) error {
+	cluster, _ := root.obj.(*appsv1alpha1.Cluster)
+	stsObj, _ := vertex.oriObj.(*appsv1.StatefulSet)
+	stsProto, _ := vertex.obj.(*appsv1.StatefulSet)
 	ctx := reqCtx.Ctx
-	shouldRequeue = false
+
 	if component.HorizontalScalePolicy == nil {
-		return shouldRequeue, nil
+		return nil
 	}
 	// do backup according to component's horizontal scale policy
 	switch component.HorizontalScalePolicy.Type {
@@ -324,7 +334,7 @@ func doBackup(reqCtx intctrlutil.RequestCtx,
 				"HorizontalScaleFailed",
 				"volume snapshot not support")
 			// TODO: add ut
-			return false, errors.Errorf("volume snapshot not support")
+			return errors.Errorf("volume snapshot not support")
 		}
 		vcts := component.VolumeClaimTemplates
 		if len(vcts) == 0 {
@@ -336,7 +346,7 @@ func doBackup(reqCtx intctrlutil.RequestCtx,
 		}
 		vsExists, err := isVolumeSnapshotExists(cli, ctx, cluster, component)
 		if err != nil {
-			return false, err
+			return err
 		}
 		// if volumesnapshot not exist, do snapshot to create it.
 		if !vsExists {
@@ -346,20 +356,20 @@ func doBackup(reqCtx intctrlutil.RequestCtx,
 				snapshotKey,
 				stsObj,
 				vcts,
-				component.HorizontalScalePolicy.BackupTemplateSelector); err != nil {
-				return shouldRequeue, err
+				component.HorizontalScalePolicy.BackupTemplateSelector,
+				dag,
+				root); err != nil {
+				return err
 			}
-			shouldRequeue = true
 			break
 		}
 		// volumesnapshot exists, then check if it is ready to use.
 		ready, err := isVolumeSnapshotReadyToUse(cli, ctx, cluster, component)
 		if err != nil {
-			return shouldRequeue, err
+			return err
 		}
 		// volumesnapshot not ready, wait for it to be ready by reconciling.
 		if !ready {
-			shouldRequeue = true
 			break
 		}
 		// if volumesnapshot ready,
@@ -392,23 +402,28 @@ func doBackup(reqCtx intctrlutil.RequestCtx,
 				cluster,
 				component.Name,
 				vct,
-				stsObj); err != nil {
+				stsObj,
+				dag,
+				root); err != nil {
 				reqCtx.Log.Error(err, "checkedCreatePVCFromSnapshot failed")
-				return shouldRequeue, err
+				return err
 			}
 		}
 	// do nothing
 	case appsv1alpha1.HScaleDataClonePolicyNone:
 		break
 	}
-	return shouldRequeue, nil
+	return nil
 }
 
-func createDeletePVCCronJob(cli client.Client,
+// TODO: handle unfinished jobs from previous scale in
+func checkedCreateDeletePVCCronJob(cli types2.ReadonlyClient,
 	reqCtx intctrlutil.RequestCtx,
 	pvcKey types.NamespacedName,
 	stsObj *appsv1.StatefulSet,
-	cluster *appsv1alpha1.Cluster) error {
+	cluster *appsv1alpha1.Cluster,
+	dag *graph.DAG,
+	root graph.Vertex) error {
 	ctx := reqCtx.Ctx
 	now := time.Now()
 	// hack: delete after 30 minutes
@@ -418,15 +433,21 @@ func createDeletePVCCronJob(cli client.Client,
 	if err != nil {
 		return err
 	}
-	// TODO: don't do create here
-	if err := cli.Create(ctx, cronJob); err != nil {
-		return intctrlutil.IgnoreIsAlreadyExists(err)
+	job := &batchv1.CronJob{}
+	if err := cli.Get(ctx, client.ObjectKeyFromObject(cronJob), job); err != nil {
+		if !apierrors.IsNotFound(err) {
+			return err
+		}
+		vertex := &lifecycleVertex{obj: cronJob, action: actionPtr(CREATE)}
+		dag.AddVertex(vertex)
+		dag.Connect(root, vertex)
+		reqCtx.Recorder.Eventf(cluster,
+			corev1.EventTypeNormal,
+			"CronJobCreate",
+			"create cronjob to delete pvc/%s",
+			pvcKey.Name)
 	}
-	reqCtx.Recorder.Eventf(cluster,
-		corev1.EventTypeNormal,
-		"CronJobCreate",
-		"create cronjob to delete pvc/%s",
-		pvcKey.Name)
+
 	return nil
 }
 
@@ -436,16 +457,15 @@ func timeToSchedule(t time.Time) string {
 }
 
 // check volume snapshot available
-func isSnapshotAvailable(cli client.Client, ctx context.Context) bool {
+func isSnapshotAvailable(cli types2.ReadonlyClient, ctx context.Context) bool {
 	vsList := snapshotv1.VolumeSnapshotList{}
 	getVSErr := cli.List(ctx, &vsList)
 	return getVSErr == nil
 }
 
-func isAllPVCBound(cli client.Client,
+func isAllPVCBound(cli types2.ReadonlyClient,
 	ctx context.Context,
 	stsObj *appsv1.StatefulSet) (bool, error) {
-	allPVCBound := true
 	if len(stsObj.Spec.VolumeClaimTemplates) == 0 {
 		return true, nil
 	}
@@ -463,32 +483,34 @@ func isAllPVCBound(cli client.Client,
 			return false, nil
 		}
 	}
-	return allPVCBound, nil
+	return true, nil
 }
 
-func deleteSnapshot(cli client.Client,
+func deleteSnapshot(cli types2.ReadonlyClient,
 	reqCtx intctrlutil.RequestCtx,
 	snapshotKey types.NamespacedName,
 	cluster *appsv1alpha1.Cluster,
-	component *component.SynthesizedComponent) error {
+	component *component.SynthesizedComponent,
+	dag *graph.DAG,
+	root graph.Vertex) error {
 	ctx := reqCtx.Ctx
-	if err := deleteBackup(ctx, cli, cluster.Name, component.Name); err != nil {
+	if err := deleteBackup(ctx, cli, cluster.Name, component.Name, dag, root); err != nil {
 		return client.IgnoreNotFound(err)
 	}
-	reqCtx.Recorder.Eventf(cluster, corev1.EventTypeNormal, "BackupJobDelete", "Delete backupjob/%s", snapshotKey.Name)
-	vs := snapshotv1.VolumeSnapshot{}
-	if err := cli.Get(ctx, snapshotKey, &vs); err != nil {
+	reqCtx.Recorder.Eventf(cluster, corev1.EventTypeNormal, "BackupJobDelete", "Delete backupJob/%s", snapshotKey.Name)
+	vs := &snapshotv1.VolumeSnapshot{}
+	if err := cli.Get(ctx, snapshotKey, vs); err != nil {
 		return client.IgnoreNotFound(err)
 	}
-	if err := cli.Delete(ctx, &vs); err != nil {
-		return client.IgnoreNotFound(err)
-	}
-	reqCtx.Recorder.Eventf(cluster, corev1.EventTypeNormal, "VolumeSnapshotDelete", "Delete volumesnapshot/%s", snapshotKey.Name)
+	vertex := &lifecycleVertex{obj: vs, oriObj: vs, action: actionPtr(DELETE)}
+	dag.AddVertex(vertex)
+	dag.Connect(root, vertex)
+	reqCtx.Recorder.Eventf(cluster, corev1.EventTypeNormal, "VolumeSnapshotDelete", "Delete volumeSnapshot/%s", snapshotKey.Name)
 	return nil
 }
 
 // deleteBackup will delete all backup related resources created during horizontal scaling,
-func deleteBackup(ctx context.Context, cli client.Client, clusterName string, componentName string) error {
+func deleteBackup(ctx context.Context, cli types2.ReadonlyClient, clusterName string, componentName string, dag *graph.DAG, root graph.Vertex) error {
 
 	ml := getBackupMatchingLabels(clusterName, componentName)
 
@@ -498,9 +520,9 @@ func deleteBackup(ctx context.Context, cli client.Client, clusterName string, co
 			return err
 		}
 		for _, backupPolicy := range backupPolicyList.Items {
-			if err := cli.Delete(ctx, &backupPolicy); err != nil {
-				return client.IgnoreNotFound(err)
-			}
+			vertex := &lifecycleVertex{obj: &backupPolicy, oriObj: &backupPolicy, action: actionPtr(DELETE)}
+			dag.AddVertex(vertex)
+			dag.Connect(root, vertex)
 		}
 		return nil
 	}
@@ -511,9 +533,9 @@ func deleteBackup(ctx context.Context, cli client.Client, clusterName string, co
 			return err
 		}
 		for _, backup := range backupList.Items {
-			if err := cli.Delete(ctx, &backup); err != nil {
-				return client.IgnoreNotFound(err)
-			}
+			vertex := &lifecycleVertex{obj: &backup, oriObj: &backup, action: actionPtr(DELETE)}
+			dag.AddVertex(vertex)
+			dag.Connect(root, vertex)
 		}
 		return nil
 	}
@@ -534,7 +556,7 @@ func getBackupMatchingLabels(clusterName string, componentName string) client.Ma
 }
 
 // check snapshot existence
-func isVolumeSnapshotExists(cli client.Client,
+func isVolumeSnapshotExists(cli types2.ReadonlyClient,
 	ctx context.Context,
 	cluster *appsv1alpha1.Cluster,
 	component *component.SynthesizedComponent) (bool, error) {
@@ -546,13 +568,15 @@ func isVolumeSnapshotExists(cli client.Client,
 	return len(vsList.Items) > 0, nil
 }
 
-func doSnapshot(cli client.Client,
+func doSnapshot(cli types2.ReadonlyClient,
 	reqCtx intctrlutil.RequestCtx,
 	cluster *appsv1alpha1.Cluster,
 	snapshotKey types.NamespacedName,
 	stsObj *appsv1.StatefulSet,
 	vcts []corev1.PersistentVolumeClaimTemplate,
-	backupTemplateSelector map[string]string) error {
+	backupTemplateSelector map[string]string,
+	dag *graph.DAG,
+	root graph.Vertex) error {
 
 	ctx := reqCtx.Ctx
 
@@ -565,7 +589,7 @@ func doSnapshot(cli client.Client,
 	if len(backupPolicyTemplateList.Items) > 0 {
 		// if there is backuppolicytemplate created by provider
 		// create backupjob CR, will ignore error if already exists
-		err := createBackup(reqCtx, cli, stsObj, &backupPolicyTemplateList.Items[0], snapshotKey, cluster)
+		err := createBackup(reqCtx, cli, stsObj, &backupPolicyTemplateList.Items[0], snapshotKey, cluster, dag, root)
 		if err != nil {
 			return err
 		}
@@ -576,10 +600,12 @@ func doSnapshot(cli client.Client,
 		if err != nil {
 			return err
 		}
-		if err := cli.Create(ctx, snapshot); err != nil {
-			return intctrlutil.IgnoreIsAlreadyExists(err)
-		}
+		vertex := &lifecycleVertex{obj: snapshot, action: actionPtr(CREATE)}
+		dag.AddVertex(vertex)
+		dag.Connect(root, vertex)
+
 		scheme, _ := appsv1alpha1.SchemeBuilder.Build()
+		// TODO: SetOwnership
 		if err := controllerutil.SetOwnerReference(cluster, snapshot, scheme); err != nil {
 			return err
 		}
@@ -589,7 +615,7 @@ func doSnapshot(cli client.Client,
 }
 
 // check snapshot ready to use
-func isVolumeSnapshotReadyToUse(cli client.Client,
+func isVolumeSnapshotReadyToUse(cli types2.ReadonlyClient,
 	ctx context.Context,
 	cluster *appsv1alpha1.Cluster,
 	component *component.SynthesizedComponent) (bool, error) {
@@ -611,13 +637,15 @@ func isVolumeSnapshotReadyToUse(cli client.Client,
 	return *status.ReadyToUse, nil
 }
 
-func checkedCreatePVCFromSnapshot(cli client.Client,
+func checkedCreatePVCFromSnapshot(cli types2.ReadonlyClient,
 	ctx context.Context,
 	pvcKey types.NamespacedName,
 	cluster *appsv1alpha1.Cluster,
 	componentName string,
 	vct corev1.PersistentVolumeClaimTemplate,
-	stsObj *appsv1.StatefulSet) error {
+	stsObj *appsv1.StatefulSet,
+	dag *graph.DAG,
+	root graph.Vertex) error {
 	pvc := corev1.PersistentVolumeClaim{}
 	// check pvc existence
 	if err := cli.Get(ctx, pvcKey, &pvc); err != nil {
@@ -632,18 +660,20 @@ func checkedCreatePVCFromSnapshot(cli client.Client,
 		if len(vsList.Items) == 0 {
 			return errors.Errorf("volumesnapshot not found in cluster %s component %s", cluster.Name, componentName)
 		}
-		return createPVCFromSnapshot(ctx, cli, vct, stsObj, pvcKey, vsList.Items[0].Name)
+		return createPVCFromSnapshot(vct, stsObj, pvcKey, vsList.Items[0].Name, dag, root)
 	}
 	return nil
 }
 
 // createBackup create backup resources required to do backup,
 func createBackup(reqCtx intctrlutil.RequestCtx,
-	cli client.Client,
+	cli types2.ReadonlyClient,
 	sts *appsv1.StatefulSet,
 	backupPolicyTemplate *dataprotectionv1alpha1.BackupPolicyTemplate,
 	backupKey types.NamespacedName,
-	cluster *appsv1alpha1.Cluster) error {
+	cluster *appsv1alpha1.Cluster,
+	dag *graph.DAG,
+	root graph.Vertex) error {
 	ctx := reqCtx.Ctx
 
 	createBackupPolicy := func() (backupPolicyName string, err error) {
@@ -661,20 +691,10 @@ func createBackup(reqCtx intctrlutil.RequestCtx,
 		if err != nil {
 			return
 		}
-		if err = cli.Create(ctx, backupPolicy); err != nil {
-			return backupPolicyName, intctrlutil.IgnoreIsAlreadyExists(err)
-		}
-		// wait 1 second in order to list the newly created backuppolicy
-		time.Sleep(time.Second)
-		if err = cli.List(ctx, &backupPolicyList, ml); err != nil {
-			return
-		}
-		if len(backupPolicyList.Items) == 0 ||
-			len(backupPolicyList.Items[0].Name) == 0 {
-			err = errors.Errorf("Can not find backuppolicy name for cluster %s", cluster.Name)
-			return
-		}
-		backupPolicyName = backupPolicyList.Items[0].Name
+		backupPolicyName = backupPolicy.Name
+		vertex := &lifecycleVertex{obj: backupPolicy, action: actionPtr(CREATE)}
+		dag.AddVertex(vertex)
+		dag.Connect(root, vertex)
 		return
 	}
 
@@ -702,9 +722,9 @@ func createBackup(reqCtx intctrlutil.RequestCtx,
 		if err := controllerutil.SetOwnerReference(cluster, backup, scheme); err != nil {
 			return err
 		}
-		if err := cli.Create(ctx, backup); err != nil {
-			return intctrlutil.IgnoreIsAlreadyExists(err)
-		}
+		vertex := &lifecycleVertex{obj: backup, action: actionPtr(CREATE)}
+		dag.AddVertex(vertex)
+		dag.Connect(root, vertex)
 		return nil
 	}
 
@@ -716,22 +736,22 @@ func createBackup(reqCtx intctrlutil.RequestCtx,
 		return err
 	}
 
-	reqCtx.Recorder.Eventf(cluster, corev1.EventTypeNormal, "BackupJobCreate", "Create backupjob/%s", backupKey.Name)
+	reqCtx.Recorder.Eventf(cluster, corev1.EventTypeNormal, "BackupJobCreate", "Create backupJob/%s", backupKey.Name)
 	return nil
 }
 
-func createPVCFromSnapshot(ctx context.Context,
-	cli client.Client,
-	vct corev1.PersistentVolumeClaimTemplate,
+func createPVCFromSnapshot(vct corev1.PersistentVolumeClaimTemplate,
 	sts *appsv1.StatefulSet,
 	pvcKey types.NamespacedName,
-	snapshotName string) error {
+	snapshotName string,
+	dag *graph.DAG,
+	root graph.Vertex) error {
 	pvc, err := builder.BuildPVCFromSnapshot(sts, vct, pvcKey, snapshotName)
 	if err != nil {
 		return err
 	}
-	if err := cli.Create(ctx, pvc); err != nil {
-		return intctrlutil.IgnoreIsAlreadyExists(err)
-	}
+	vertex := &lifecycleVertex{obj: pvc, action: actionPtr(CREATE)}
+	dag.AddVertex(vertex)
+	dag.Connect(root, vertex)
 	return nil
 }

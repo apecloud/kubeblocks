@@ -26,18 +26,15 @@ import (
 )
 
 type clusterDefinitionValidator struct {
-	req ctrl.Request
-	cli client.Client
-	ctx intctrlutil.RequestCtx
+	req     ctrl.Request
+	cli     client.Client
+	ctx     intctrlutil.RequestCtx
+	cluster *appsv1alpha1.Cluster
 }
 
 func (c *clusterDefinitionValidator) Validate() error {
-	cluster := &appsv1alpha1.Cluster{}
-	if err := c.cli.Get(c.ctx.Ctx, c.req.NamespacedName, cluster); err != nil {
-		return err
-	}
 	clusterDefinition := &appsv1alpha1.ClusterDefinition{}
-	if err := c.cli.Get(c.ctx.Ctx, types.NamespacedName{Name: cluster.Spec.ClusterDefRef}, clusterDefinition); err != nil {
+	if err := c.cli.Get(c.ctx.Ctx, types.NamespacedName{Name: c.cluster.Spec.ClusterDefRef}, clusterDefinition); err != nil {
 		// If using RequeueWithError and the user fixed this error,
 		// it may take up to 1000s to reconcile again, causing the user to think that the repair is not effective.
 		return newRequeueError(ControllerErrorRequeueTime, "cluster definition not found")

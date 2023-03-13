@@ -375,7 +375,6 @@ func addonEnableDisableHandler(o *addonCmdOpts, cmd *cobra.Command, args []strin
 
 func (o *addonCmdOpts) buildEnablePatch(flags []*pflag.Flag, spec, install map[string]interface{}) (err error) {
 	var installSpec extensionsv1alpha1.AddonInstallSpec
-
 	// only using named return value in defer function
 	defer func() {
 		var b []byte
@@ -558,9 +557,13 @@ func (o *addonCmdOpts) buildEnablePatch(flags []*pflag.Flag, spec, install map[s
 func (o *addonCmdOpts) buildPatch(flags []*pflag.Flag) error {
 	var err error
 	spec := map[string]interface{}{}
+	status := map[string]interface{}{}
 	install := map[string]interface{}{}
 
 	if o.addonEnableFlags != nil {
+		if o.addon.Status.Phase == extensionsv1alpha1.AddonFailed {
+			status["phase"] = nil
+		}
 		if err = o.buildEnablePatch(flags, spec, install); err != nil {
 			return err
 		}
@@ -580,6 +583,16 @@ func (o *addonCmdOpts) buildPatch(flags []*pflag.Flag) error {
 		Object: map[string]interface{}{
 			"spec": spec,
 		},
+	}
+	if len(status) > 0 {
+		phase := ""
+		if p, ok := status["phase"]; ok && p != nil {
+			phase = p.(string)
+		}
+		fmt.Printf("patching addon 'status.phase=%s' to 'status.phase=%v' will result addon install spec (spec.install) not being updated\n",
+			o.addon.Status.Phase, phase)
+		obj.Object["status"] = status
+		o.Subresource = "status"
 	}
 	bytes, err := obj.MarshalJSON()
 	if err != nil {

@@ -25,6 +25,7 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"github.com/spf13/viper"
 	"golang.org/x/exp/slices"
 
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
@@ -423,6 +424,34 @@ var _ = Describe("Cluster Controller", func() {
 			compName, "data").SetStorage("1Gi").CheckedCreate(&testCtx)
 	}
 
+	mockPodsForConsensusTest := func(cluster *appsv1alpha1.Cluster, number int) []corev1.Pod {
+		componentName := cluster.Spec.ComponentSpecs[0].Name
+		clusterName := cluster.Name
+		stsName := cluster.Name + "-" + componentName
+		pods := make([]corev1.Pod, 0)
+		for i := 0; i < number; i++ {
+			pod := &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      stsName + "-" + strconv.Itoa(i),
+					Namespace: testCtx.DefaultNamespace,
+					Labels: map[string]string{
+						constant.AppInstanceLabelKey:          clusterName,
+						constant.KBAppComponentLabelKey:       componentName,
+						appsv1.ControllerRevisionHashLabelKey: "mock-version",
+					},
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{{
+						Name:  "mock-container",
+						Image: "mock-container",
+					}},
+				},
+			}
+			pods = append(pods, *pod)
+		}
+		return pods
+	}
+
 	horizontalScaleComp := func(updatedReplicas int, comp *appsv1alpha1.ClusterComponentSpec) {
 		By("Mocking components' PVCs to bound")
 		for i := 0; i < int(comp.Replicas); i++ {
@@ -440,6 +469,18 @@ var _ = Describe("Cluster Controller", func() {
 		By("Checking sts replicas right")
 		stsList := testk8s.ListAndCheckStatefulSetWithComponent(&testCtx, clusterKey, comp.Name)
 		Expect(int(*stsList.Items[0].Spec.Replicas)).To(BeEquivalentTo(comp.Replicas))
+
+		By("Creating mock pods in StatefulSet")
+		pods := mockPodsForConsensusTest(clusterObj, int(comp.Replicas))
+		for _, pod := range pods {
+			Expect(testCtx.CheckedCreateObj(testCtx.Ctx, &pod)).Should(Succeed())
+			// mock the status to pass the isReady(pod) check in consensus_set
+			pod.Status.Conditions = []corev1.PodCondition{{
+				Type:   corev1.PodReady,
+				Status: corev1.ConditionTrue,
+			}}
+			Expect(k8sClient.Status().Update(ctx, &pod)).Should(Succeed())
+		}
 
 		By(fmt.Sprintf("Changing replicas to %d", updatedReplicas))
 		changeCompReplicas(clusterKey, int32(updatedReplicas), comp)
@@ -503,6 +544,8 @@ var _ = Describe("Cluster Controller", func() {
 	}
 
 	horizontalScale := func(updatedReplicas int) {
+
+		viper.Set("VOLUMESNAPSHOT", true)
 
 		cluster := &appsv1alpha1.Cluster{}
 		Expect(testCtx.Cli.Get(testCtx.Ctx, clusterKey, cluster)).Should(Succeed())
@@ -788,34 +831,6 @@ var _ = Describe("Cluster Controller", func() {
 			toleration.Value == compTolerationValue).Should(BeTrue())
 		Expect(toleration.Operator == corev1.TolerationOpEqual &&
 			toleration.Effect == corev1.TaintEffectNoSchedule).Should(BeTrue())
-	}
-
-	mockPodsForConsensusTest := func(cluster *appsv1alpha1.Cluster, number int) []corev1.Pod {
-		componentName := cluster.Spec.ComponentSpecs[0].Name
-		clusterName := cluster.Name
-		stsName := cluster.Name + "-" + componentName
-		pods := make([]corev1.Pod, 0)
-		for i := 0; i < number; i++ {
-			pod := &corev1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      stsName + "-" + strconv.Itoa(i),
-					Namespace: testCtx.DefaultNamespace,
-					Labels: map[string]string{
-						constant.AppInstanceLabelKey:          clusterName,
-						constant.KBAppComponentLabelKey:       componentName,
-						appsv1.ControllerRevisionHashLabelKey: "mock-version",
-					},
-				},
-				Spec: corev1.PodSpec{
-					Containers: []corev1.Container{{
-						Name:  "mock-container",
-						Image: "mock-container",
-					}},
-				},
-			}
-			pods = append(pods, *pod)
-		}
-		return pods
 	}
 
 	mockRoleChangedEvent := func(key types.NamespacedName, sts *appsv1.StatefulSet) []corev1.Event {
@@ -1154,11 +1169,7 @@ var _ = Describe("Cluster Controller", func() {
 		}
 		Expect(testCtx.Cli.Create(ctx, &backup)).Should(Succeed())
 
-		By("Mocking backup to failed status")
-		backup.Status.Phase = dataprotectionv1alpha1.BackupFailed
-		Expect(testCtx.Cli.Status().Update(ctx, &backup)).Should(Succeed())
-
-		By("Checking backup status to failed")
+		By("Checking backup status to failed, because VolumeSnapshot disabled")
 		Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, backup *dataprotectionv1alpha1.Backup) {
 			g.Expect(backup.Status.Phase).Should(Equal(dataprotectionv1alpha1.BackupFailed))
 		})).Should(Succeed())
@@ -1382,6 +1393,11 @@ var _ = Describe("Cluster Controller", func() {
 				}
 				backup.Status.Phase = dataprotectionv1alpha1.BackupCompleted
 			})).Should(Succeed())
+			By("checking backup status completed")
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(backup), func(g Gomega, tmpBackup *dataprotectionv1alpha1.Backup) {
+				g.Expect(tmpBackup.Status.Phase).Should(Equal(dataprotectionv1alpha1.BackupCompleted))
+			})).Should(Succeed())
+			By("creating cluster with backup")
 			restoreFromBackup := fmt.Sprintf(`{"%s":"%s"}`, mysqlCompName, backupName)
 			clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
 				clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().

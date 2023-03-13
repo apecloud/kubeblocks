@@ -49,15 +49,6 @@ sidebar_position: 1
   kbcli clusterdefinition list
   ```
 
-  ***Result***
-
-  ```bash
-  kbcli clusterdefinition list
-  >
-  NAME         MAIN-COMPONENT-TYPE        STATUS      AGE
-  postgresql   postgresql                 Available   7m52s
-  ```
-
 ***Steps:***
 
 1. Run the command below to list all the available kernel versions and choose the one that you need.
@@ -65,17 +56,9 @@ sidebar_position: 1
    kbcli clusterversion list
    ```
 
-   ***Result***
-
-   ```bash
-   kbcli clusterversion list
-   >
-   NAME                CLUSTER-DEFINITION   STATUS      AGE
-   postgresql-8.0.30   postgresql           Available   2m40s
-   ```
 2. Run the command below to create a PostgreSQL cluster.
    ```bash
-   kbcli cluster create pg-cluster --cluster-definition='postgresql'
+   kbcli cluster create pg-cluster --cluster-definition='postgresql-cluster'
    ```
    ***Result***
 
@@ -95,23 +78,8 @@ sidebar_position: 1
    
     Add the --set option when creating a cluster. For example,
     ```bash
-    kbcli cluster create pg-cluster --cluster-definition postgresql --set cpu=1000m,memory=1Gi,storage=10Gi,replicas=3
+    kbcli cluster create pg-cluster --cluster-definition postgresql --set cpu=1000m,memory=1Gi,storage=10Gi
     ```
-
-   **Option 2.** Run `export`
-
-   If you want to create a Paxos group, run `export KBCLI_CLUSTER_DEFAULT_REPLICAS=3` before creating a cluster. For example,
-   ```bash
-   export KBCLI_CLUSTER_DEFAULT_REPLICAS=3
-   kbcli cluster create pgsql-cluster --cluster-definition='postgresql'
-   ```
-
-   If you want to adjust the storage size, run `export KBCLI_CLUSTER_DEFAULT_STORAGE_SIZE=nGi` before creating a cluster. For example,
-  
-   ```bash
-   export KBCLI_CLUSTER_DEFAULT_STORAGE_SIZE=20Gi
-   kbcli cluster create pg-cluster --cluster-definition='postgresql'
-   ```
 
    **Option 2.** Change YAML file configurations
 
@@ -119,7 +87,7 @@ sidebar_position: 1
    ```bash
    kbcli cluster create pg-cluster --cluster-definition="postgresql" --set -<<EOF
    - name: postgresql
-     replicas: 3
+     replicas: 1
      type: postgresql
      volumeClaimTemplates:
      - name: data
@@ -150,25 +118,4 @@ sidebar_position: 1
 Run the command below to connect to a cluster. For the detailed database connection guide, refer to [Connect database](./../../connect_database/overview-of-database-connection.md).
 ```bash
 kbcli cluster connect pg-cluster
-```
-
-***Example***
-
-```bash
-kbcli cluster connect pg-cluster
->
-Connect to instance pg-cluster-postgresql-0: out of pg-cluster-postgresql-0(leader), pg-cluster-postgresql-1(follower), pg-cluster-postgresql-2(follower)
-Welcome to the MPostgreSQL monitor.  Commands end with ; or \g.
-Your PostgreSQL connection id is 25
-Server version: 8.0.30 WeSQL Server - GPL, Release 5, Revision d6b8719
-
-Copyright (c) 2000, 2022, Oracle and/or its affiliates.
-
-Oracle is a registered trademark of Oracle Corporation and/or its
-affiliates. Other names may be trademarks of their respective
-owners.
-
-Type 'help;' or '\h' for help. Type '\c' to clear the current input statement.
-
-postgresql>
 ```

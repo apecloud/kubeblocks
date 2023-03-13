@@ -38,7 +38,7 @@ You can restart all pods of the cluster. When an exception occurs in a database,
    --ttlSecondsAfterSucceed=30
    ```
    - `component-names` describes the component name that needs to be restarted.
-   - `ttlSecondsAfterSucceed` describes the time to live after the restarting succeeds.
+   - `ttlSecondsAfterSucceed` describes the time to live of OpsRequest job after the restarting succeeds.
 
    **Option 2.** Create an OpsRequest.
 

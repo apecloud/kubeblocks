@@ -6,7 +6,7 @@ sidebar_position: 3
 
 # Create a MySQL cluster on AWS
 
-This guide introduces how to use KubeBlocks to create an ApeCloud MySQL cluster based on the Paxos consensus protocol within 5 minutes in the EKS environment.
+This guide introduces how to use KubeBlocks to create an ApeCloud MySQL cluster within 5 minutes in the EKS environment.
 
 > ***Caution:*** 
 > 
@@ -30,10 +30,6 @@ This guide introduces how to use KubeBlocks to create an ApeCloud MySQL cluster 
    ```bash
    kbcli version
    ```
-3. Run the command below to uninstall `kbcli` if you want to delete kbcli after your trial.
-   ```bash
-   sudo rm /usr/local/bin/kbcli
-   ```
 
 ## Step 2. Install KubeBlocks
 
@@ -41,23 +37,10 @@ This guide introduces how to use KubeBlocks to create an ApeCloud MySQL cluster 
    ```bash
    kbcli kubeblocks install
    ```
+
     ***Result***
+
     This command installs the latest version in your Kubernetes environment under the default namespace `kb-sytem` since your `kubectl` can connect to your Kubernetes clusters.
-    If you want to install KubeBlocks in a specified namespace, run the command below.
-    ```bash
-    kbcli kubeblocks install -n <name> --create-namespace=true
-    ```
-
-    ***Example***
-
-    ```bash
-    kbcli kubeblocks install -n kubeblocks --create-namespace=true
-    ```
-
-    > ***Note:***
-    > 
-    > * `-namespace` and its abbreviated version `-n` is used to name a namespace. `--create-namespace` is used to specify whether to create a namespace if it does not exist.
-    > * `-n` (also `-namespace`) is a global command line option. For global command line options, run `kbcli options` to list all options (applies to all commands).
 
 2. Run the YAML files below to apply for EBS resources and enable backup.
    * Apply for EBS resources:
@@ -91,12 +74,6 @@ This guide introduces how to use KubeBlocks to create an ApeCloud MySQL cluster 
      ```
 3. Run the command below to verify whether KubeBlocks is installed successfully.
    ```bash
-   kubectl get pod -n <namespace>
-   ```
-
-   ***Example***
-
-   ```bash
    kubectl get pod -n kb-system
    ```
 
@@ -113,11 +90,6 @@ This guide introduces how to use KubeBlocks to create an ApeCloud MySQL cluster 
    kubeblocks-846b8878d9-q8g2w                              1/1     Running     0          98s
    ```
 
-4. Run the command below to uninstall KubeBlocks if you want to delete KubeBlocks after your trial.
-   ```bash
-   kbcli kubeblocks uninstall
-   ```
-
 ## Step 3. Create a MySQL Paxos group
 
 > ***Caution:***
@@ -130,12 +102,12 @@ This guide introduces how to use KubeBlocks to create an ApeCloud MySQL cluster 
    For more details on options, refer to [`kbcli` cluster create options description](./../kubeblocks-for-mysql/cluster-management/create-and-connect-a-mysql-cluster.md#create-a-mysql-cluster).
 
    ```bash
-   kbcli cluster create --cluster-definition=apecloud-mysql --set cpu=2000m,memory=1Gi,storage=10Gi,replicas=3
+   kbcli cluster create --cluster-definition=apecloud-mysql
    ```
 
    ***Result***
 
-   A MySQL Paxos group with 10 Gi of storage is created. 
+   A MySQL standalone with 10 Gi of storage is created. 
 
 2. Run the command below to view the created cluster.
    ```bash
@@ -160,16 +132,27 @@ If you want to connect to the MySQL cluster using MYSQL client or your stress te
 2. Find the Endpoints information in the result.
    ```
    Endpoints:
-   COMPONENT          MODE             INTERNAL                  EXTERNAL        
-   replicasets        ReadWrite        10.100.197.10:3306        <none>
+   COMPONENT   MODE        INTERNAL                                       EXTERNAL
+   mysql       ReadWrite   tulip89-mysql.default.svc.cluster.local:3306   <none>
    ```
-  ***Result***
-  INTERNAL 10.100.197.10:3306 is the internal IP:Port of this cluster and this address can be accessed on any pod of EKS.
 
 The MySQL cluster provides high availability to ensure RPO=0. When a failure occurs to the MySQL leader pod, other MySQL pods can be elected as the succeeding leader based on the Paxos protocol. The connection address does not change even though the leader pod changes.
 
-## Step 5. Delete the MySQL cluster
-Run the command below to delete the MySQL cluster.
-```bash
-kbcli cluster delete maple05
-```
+## Step 5. Clean up the environment
+
+Run the commands below if you want to delete the created cluster and uninstall `kbcli` and KubeBlocks after your trial.
+
+1. Delete the PostgreSQL cluster.
+   ```bash
+   kbcli cluster delete orange24
+   ```
+
+2. Uninstall KubeBlocks.
+   ```bash
+   kbcli kubeblocks uninstall
+   ```
+
+3. Uninstall `kbcli`.
+   ```bash
+   sudo rm /usr/local/bin/kbcli
+   ```

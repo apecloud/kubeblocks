@@ -6,7 +6,7 @@ sidebar_position: 4
 
 # Create a PostgreSQL cluster on AWS
 
-This guide introduces how to use KubeBlocks to create a PostgreSQL cluster based on the Paxos consensus protocol within 5 minutes in the EKS environment.
+This guide introduces how to use KubeBlocks to create a PostgreSQL cluster within 5 minutes in the EKS environment.
 
 > ***Caution:***
 >
@@ -30,10 +30,6 @@ This guide introduces how to use KubeBlocks to create a PostgreSQL cluster based
    ```bash
    kbcli version
    ```
-3. Run the command below to uninstall `kbcli` if you want to delete `kbcli` after your trial.
-   ```bash
-   sudo rm /usr/local/bin/kbcli
-   ```
 
 ## Step 2. Install KubeBlocks
 
@@ -42,24 +38,10 @@ This guide introduces how to use KubeBlocks to create a PostgreSQL cluster based
     ```bash
     kbcli kubeblocks install 
     ```
+   
+   ***Result***
 
-    ***Result***
-    This command installs the latest version in your Kubernetes environment under the default namespace `kb-sytem` since your `kubectl` can connect to your Kubernetes clusters.
-    If you want to install KubeBlocks in a specified namespace, run the command below.
-    ```bash
-    kbcli kubeblocks install -n <name> --create-namespace=true
-    ```
-
-    ***Example***
-
-    ```bash
-    kbcli kubeblocks install -n kubeblocks --create-namespace=true
-    ```
-
-    > ***Note:***
-    > 
-    > * `-namespace` and its abbreviated version `-n` is used to name a namespace. `--create-namespace` is used to specify whether to create a namespace if it does not exist.
-    > * `-n` (also `-namespace`) is a global command line option. For global command line options, run `kbcli options` to list all options (applies to all commands).
+   This command installs the latest version in your Kubernetes environment under the default namespace `kb-sytem` since your `kubectl` can connect to your Kubernetes clusters.
 
 2. Run the YAML files below to apply for EBS resources and enable backup.
    * Apply for EBS resources:
@@ -91,13 +73,7 @@ This guide introduces how to use KubeBlocks to create a PostgreSQL cluster based
      deletionPolicy: Delete
      EOF
      ```
-3. Run the command below to verify whether KubeBlocks is installed successfully.
-   ```bash
-   kubectl get pod -n <namespace>
-   ```
-
-   ***Example***
-
+2. Run the command below to verify whether KubeBlocks is installed successfully.
    ```bash
    kubectl get pod -n kb-system
    ```
@@ -114,11 +90,6 @@ This guide introduces how to use KubeBlocks to create a PostgreSQL cluster based
    kb-addon-prometheus-server-0                             2/2     Running     0          84s
    kubeblocks-846b8878d9-q8g2w                              1/1     Running     0          98s
    ```
-   
-4. Run the command below to uninstall KubeBlocks if you want to delete KubeBlocks after your trial.
-   ```bash
-   kbcli kubeblocks uninstall
-   ```
 
 ## Step 3. Create a PostgreSQL standalone
 
@@ -132,7 +103,7 @@ This guide introduces how to use KubeBlocks to create a PostgreSQL cluster based
    For more details on command options, refer to [`kbcli` cluster create options description](./../kubeblocks-for-postgresql/cluster-management/create-and-connect-a-postgresql-cluster.md#create-a-postgresql-cluster).
 
    ```bash
-   kbcli cluster create --cluster-definition=apecloud-mysql --set cpu=2000m,memory=1Gi,storage=10Gi,replicas=3
+   kbcli cluster create --cluster-definition=postgresql-cluster
    ```
 
    ***Result***
@@ -159,13 +130,25 @@ If you want to connect to the PostgreSQL cluster using PostgreSQL client or your
 2. Find the Endpoints information in the result.
    ```bash
    Endpoints:
-   COMPONENT          MODE             INTERNAL                  EXTERNAL        
-   replicasets        ReadWrite        10.100.197.10:3306        <none>
+   COMPONENT       MODE        INTERNAL                                                EXTERNAL
+   pg-replicaset   ReadWrite   carrot06-pg-replicaset.default.svc.cluster.local:5432   <none>
    ```
 
-## Step 5. Delete the PostgreSQL cluster
+## Step 5. Clean up the environment
 
-Run the command below to delete the PostgreSQL cluster.
-```bash
-kbcli cluster delete orange24
-```
+Run the commands below if you want to delete the created cluster and uninstall `kbcli` and KubeBlocks after your trial.
+
+1. Delete the PostgreSQL cluster.
+   ```bash
+   kbcli cluster delete orange24
+   ```
+
+2. Uninstall KubeBlocks.
+   ```bash
+   kbcli kubeblocks uninstall
+   ```
+
+3. Uninstall `kbcli`.
+   ```bash
+   sudo rm /usr/local/bin/kbcli
+   ```

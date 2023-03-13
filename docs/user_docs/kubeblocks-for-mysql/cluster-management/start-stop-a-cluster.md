@@ -6,7 +6,7 @@ sidebar_position: 5
 
 # Start/Stop MySQL Cluster
 
-You can stop/start a cluster to save storage resources. When a cluster is stopped, the computing resources of this cluster are released, which means the pods of Kubernetes are released, but the storage resources are reserved. Start this cluster again if you want to restore the cluster resources from the original storage by snapshots.
+You can stop/start a cluster to save computing resources. When a cluster is stopped, the computing resources of this cluster are released, which means the pods of Kubernetes are released, but the storage resources are reserved. Start this cluster again if you want to restore the cluster resources from the original storage by snapshots.
 
 ## How KubeBlocks starts/stops a cluster
 

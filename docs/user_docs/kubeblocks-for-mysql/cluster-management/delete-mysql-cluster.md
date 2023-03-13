@@ -14,8 +14,8 @@ sidebar_position: 6
 |:--                     | :--                                       |
 | `DoNotTerminate`       | `DoNotTerminate` blocks delete operation. |
 | `Halt`                 | `Halt` deletes workload resources such as statefulset, deployment workloads but keep PVCs. |
-| `Delete `              | `Delete` deletes workload resources and PVCs. |
-| `WipeOut`              | `WipeOut` deletes workload resources and PVCs and wipes out all volume snapshots and snapshot data from backup storage location. |
+| `Delete `              | `Delete` delete workload resources and PVCs but keep backups. |
+| `WipeOut`              | `WipeOut` deletes workload resources, PVCs and all relevant resources included backups. |
 
 To check the termination policy, execute the following command.
 

@@ -46,6 +46,8 @@ var _ = Describe("Backup for a StatefulSet", func() {
 	const defaultTTL = "168h0m0s"
 	const backupName = "test-backup-job"
 
+	viper.SetDefault("CM_NAMESPACE", testCtx.DefaultNamespace)
+
 	cleanEnv := func() {
 		// must wait until resources deleted and no longer exist before the testcases start,
 		// otherwise if later it needs to create some new resource objects with the same name,
@@ -65,6 +67,7 @@ var _ = Describe("Backup for a StatefulSet", func() {
 		testapps.ClearResources(&testCtx, intctrlutil.JobSignature, inNS, ml)
 		testapps.ClearResources(&testCtx, intctrlutil.CronJobSignature, inNS, ml)
 		testapps.ClearResources(&testCtx, intctrlutil.PersistentVolumeClaimSignature, inNS, ml)
+		//
 		// non-namespaced
 		testapps.ClearResources(&testCtx, intctrlutil.BackupToolSignature, ml)
 	}
@@ -72,6 +75,7 @@ var _ = Describe("Backup for a StatefulSet", func() {
 
 	BeforeEach(func() {
 		cleanEnv()
+		viper.Set("CM_NAMESPACE", testCtx.DefaultNamespace)
 		By("mock a cluster")
 		testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
 			"test-cd", "test-cv").Create(&testCtx)
@@ -102,6 +106,7 @@ var _ = Describe("Backup for a StatefulSet", func() {
 
 	AfterEach(func() {
 		cleanEnv()
+		viper.Set("CM_NAMESPACE", testCtx.DefaultNamespace)
 	})
 
 	When("with default settings", func() {

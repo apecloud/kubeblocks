@@ -330,8 +330,7 @@ func getCompCommandArgs(compDef *appsv1alpha1.ClusterComponentDefinition) ([]str
 //
 // TODO: Refactoring using command channel
 func buildCommand(info *engine.ConnectionInfo) []string {
-	command := []string{"sh", "-c"}
-	args := info.Command
+	args := make([]string, 0)
 	for _, arg := range info.Args {
 		// KB_ACCOUNT_STATEMENT is used to create system accounts, ignore it
 		// replace KB_ACCOUNT_ENDPOINT with local host IP
@@ -350,5 +349,5 @@ func buildCommand(info *engine.ConnectionInfo) []string {
 		}
 		args = append(args, strings.Replace(strings.Replace(arg, "(", "", 1), ")", "", 1))
 	}
-	return append(command, strings.Join(args, " "))
+	return append(info.Command, strings.Join(args, " "))
 }

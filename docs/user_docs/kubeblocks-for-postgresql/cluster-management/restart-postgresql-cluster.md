@@ -69,6 +69,6 @@ You can restart all pods of the cluster. When an exception occurs in a database,
      ```bash
      kbcli cluster list pg-cluster
      >
-     NAME         NAMESPACE   CLUSTER-DEFINITION   VERSION             TERMINATION-POLICY   STATUS    CREATED-TIME
-     pg-cluster   default     postgresql           postgresql-14.7.0   Delete               Running   Mar 03,2023 18:28 UTC+0800
+     NAME         NAMESPACE   CLUSTER-DEFINITION          VERSION             TERMINATION-POLICY   STATUS    CREATED-TIME
+     pg-cluster   default     postgresql-cluster          postgresql-14.7.0   Delete               Running   Mar 03,2023 18:28 UTC+0800
      ```

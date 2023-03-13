@@ -42,8 +42,8 @@ kbcli cluster list <name>
 ```bash
 kbcli cluster list pg-cluster
 >
-NAME         NAMESPACE   CLUSTER-DEFINITION   VERSION             TERMINATION-POLICY   STATUS    CREATED-TIME
-pg-cluster   default     postgresql           postgresql-14.7.0   Delete               Running   Mar 03,2023 18:00 UTC+0800
+NAME         NAMESPACE   CLUSTER-DEFINITION           VERSION             TERMINATION-POLICY   STATUS    CREATED-TIME
+pg-cluster   default     postgresql-cluster           postgresql-14.7.0   Delete               Running   Mar 03,2023 18:00 UTC+0800
 ```
 ***Steps:***
 
@@ -101,7 +101,7 @@ pg-cluster   default     postgresql           postgresql-14.7.0   Delete        
      name: pg-cluster
      namespace: default
    spec:
-     clusterDefinitionRef: postgresql
+     clusterDefinitionRef: postgresql-cluster
      clusterVersionRef: postgre-14.7.0
      components:
      - name: postgresql
@@ -136,8 +136,8 @@ pg-cluster   default     postgresql           postgresql-14.7.0   Delete        
     ```bash
     kbcli cluster list pg-cluster
     >
-    NAME              NAMESPACE        CLUSTER-DEFINITION    VERSION                TERMINATION-POLICY   STATUS    CREATED-TIME
-    pg-cluster        default          postgresql            postgresql-14.7.0      Delete               Running   Mar 03,2023 18:00 UTC+0800
+    NAME              NAMESPACE        CLUSTER-DEFINITION            VERSION                TERMINATION-POLICY   STATUS    CREATED-TIME
+    pg-cluster        default          postgresql-cluster            postgresql-14.7.0      Delete               Running   Mar 03,2023 18:00 UTC+0800
     ```
    - STATUS=Running: means the vertical scaling operation is applied.
    - STATUS=Updating: means the vertical scaling is in progress.
@@ -177,8 +177,8 @@ Horizontal scaling changes the amount of pods. For example, you can apply horizo
   ```bash
   kbcli cluster list pg-cluster
   >
-  NAME         NAMESPACE   CLUSTER-DEFINITION   VERSION             TERMINATION-POLICY   STATUS    CREATED-TIME
-  pg-cluster   default     postgresql           postgresql-14.7.0   Delete               Running   Mar 03,2023 18:00 UTC+0800
+  NAME         NAMESPACE   CLUSTER-DEFINITION           VERSION             TERMINATION-POLICY   STATUS    CREATED-TIME
+  pg-cluster   default     postgresql-cluster           postgresql-14.7.0   Delete               Running   Mar 03,2023 18:00 UTC+0800
   ```
 
 ***Steps:***
@@ -233,7 +233,7 @@ Horizontal scaling changes the amount of pods. For example, you can apply horizo
      name: pg-cluster
      namespace: default
    spec:
-     clusterDefinitionRef: postgresql
+     clusterDefinitionRef: postgresql-cluster
      clusterVersionRef: postgresql-14.7.0
      components:
      - name: postgresql

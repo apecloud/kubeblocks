@@ -67,7 +67,7 @@ sidebar_position: 1
      ```bash
      kubectl create namespace demo
 
-     kbcli cluster create -n demo --cluster-definition='postgresql'
+     kbcli cluster create -n demo --cluster-definition='postgresql-cluster'
      ```
    * A cluster is created with built-in toleration which tolerates the node with the kb-data=true:NoSchedule taint.
    * A cluster is created with built-in node affinity which first deploys the node with the kb-data:true label.
@@ -78,14 +78,14 @@ sidebar_position: 1
    
     Add the --set option when creating a cluster. For example,
     ```bash
-    kbcli cluster create pg-cluster --cluster-definition postgresql --set cpu=1000m,memory=1Gi,storage=10Gi
+    kbcli cluster create pg-cluster --cluster-definition postgresql-cluster --set cpu=1000m,memory=1Gi,storage=10Gi
     ```
 
    **Option 2.** Change YAML file configurations
 
    Change the corresponding parameters in the YAML file.
    ```bash
-   kbcli cluster create pg-cluster --cluster-definition="postgresql" --set -<<EOF
+   kbcli cluster create pg-cluster --cluster-definition="postgresql-cluster" --set -<<EOF
    - name: postgresql
      replicas: 1
      type: postgresql
@@ -109,7 +109,7 @@ sidebar_position: 1
 | `--enable-all-logs` | It enables you to view all application logs. When this option is enabled, enabledLogs of component level will be ignored. This option is set as true by default. |
 | `--help` | It shows the help guide for `kbcli cluster create`. You can also use the abbreviated `-h`. |
 | `--monitor` | It is used to enable the monitor function and inject metrics exporter. It is set as true by default. |
-| `--node-labels` | It is a node label selector. Its default value is [] and means empty value. If you want set node labels, you can follow the example format: <br />```kbcli cluster create --cluster-definition='postgresql' --node-labels='"topology.kubernetes.io/zone=us-east-1a","disktype=ssd,essd"'``` |
+| `--node-labels` | It is a node label selector. Its default value is [] and means empty value. If you want set node labels, you can follow the example format: <br />```kbcli cluster create --cluster-definition='postgresql-cluster' --node-labels='"topology.kubernetes.io/zone=us-east-1a","disktype=ssd,essd"'``` |
 | `--set` | It sets the cluster resource including CPU, memory, replicas, and storage, each set corresponds to a component. For example, `--set cpu=1000m,memory=1Gi,replicas=3,storage=10Gi`. |
 | `--termination-policy` | It specifies the termination policy of the cluster. There are four available values, namely `DoNotTerminate`, `Halt`, `Delete`, and `WipeOut`. `Delete` is set as the default. <br /> - `DoNotTerminate`: DoNotTerminate blocks the delete operation. <br /> - `Halt`: Halt deletes workload resources such as statefulset, deployment workloads but keeps PVCs. <br /> - `Delete`: Delete is based on Halt and deletes PVCs. <br /> - `WipeOut`: WipeOut is based on Delete and wipes out all volume snapshots and snapshot data from backup storage location. |
 

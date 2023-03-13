@@ -1,5 +1,5 @@
 ---
-title: Kubeblocks CLI Overview
+title: KubeBlocks CLI Overview
 description: KubeBlocks CLI overview
 sidebar_position: 1
 ---

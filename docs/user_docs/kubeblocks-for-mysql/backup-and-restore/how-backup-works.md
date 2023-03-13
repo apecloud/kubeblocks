@@ -5,7 +5,7 @@ sidebar_position: 1
 ---
 
 # How backup works
-Kubeblocks integrates cloud-native backup and restore solutions, and currently supports MySQL backup and recovery by snapshots.
+KubeBlocks integrates cloud-native backup and restore solutions, and currently supports MySQL backup and recovery by snapshots.
 - Backup 
   - Install `CSI driver` that supports the snapshots function and the Kubeblocks native plug-in `snapshot-controller` which is integrated in kbcli in your Kubernetes environment.
   - Initialize all the plug-ins and choose a MySQL cluster. And then create a backup with kbcli. Kbcli creates a `BackupPolicy` and a `Backup` object and associates them with the MySQL cluster by `Labels`.

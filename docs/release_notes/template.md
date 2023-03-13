@@ -147,6 +147,6 @@ $kubeblocks_breaking_changes
     - Add label `app.kubernetes.io/component` with value `Cluster.Spec.ComponentSpecs.ComponentDefRef`
   - CR `backuppolicytemplate`
     - Replace label name from `app.kubernetes.io/created-by` to `app.kubernetes.io/managed-by`
-  - Configmap hosted by Kubeblocks and named with `*-env` suffix
+  - Configmap hosted by KubeBlocks and named with `*-env` suffix
     - Replace label name from `app.kubernetes.io/config-type` to `apps.kubeblocks.io/config-type`
 * With KubeBlocks Helm chart replaced its optional components install using sub-charts dependencies with Addons extensions API, previous version upgrade to this version will uninstall the optional components completely.

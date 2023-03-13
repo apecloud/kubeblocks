@@ -39,7 +39,7 @@ func genMarkdownTreeForOverview(cmd *cobra.Command, dir string) error {
 	defer f.Close()
 
 	if _, err = io.WriteString(f, `---
-title: Kubeblocks CLI Overview
+title: KubeBlocks CLI Overview
 description: KubeBlocks CLI overview
 sidebar_position: 1
 ---

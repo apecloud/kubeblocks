@@ -280,7 +280,7 @@ func (o *statusOptions) showHelmResources(ctx context.Context, allErrs *[]error)
 }
 
 func (o *statusOptions) showWorkloads(ctx context.Context, allErrs *[]error) {
-	fmt.Fprintln(o.Out, "\nKubeblocks Workloads:")
+	fmt.Fprintln(o.Out, "\nKubeBlocks Workloads:")
 	tblPrinter := printer.NewTablePrinter(o.Out)
 	tblPrinter.SetHeader("NAMESPACE", "KIND", "NAME", "READY PODS", "CPU(cores)", "MEMORY(bytes)")
 

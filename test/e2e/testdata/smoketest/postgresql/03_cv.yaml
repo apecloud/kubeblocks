@@ -5,7 +5,7 @@ metadata:
 spec:
   clusterDefinitionRef: apecloud-postgresql
   componentVersions:
-    - componentDefRef: pg-replicaset
+    - componentDefRef: pg-replication
       versionsContext:
         containers:
           - name: postgresql

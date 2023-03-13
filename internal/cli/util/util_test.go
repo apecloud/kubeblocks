@@ -38,7 +38,7 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/constant"
+	"github.com/apecloud/kubeblocks/internal/constant"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 	"github.com/apecloud/kubeblocks/test/testdata"
 )
@@ -158,7 +158,7 @@ var _ = Describe("util", func() {
 		Expect(BuildLabelSelectorByNames("", nil)).Should(Equal(""))
 
 		names := []string{"n1", "n2"}
-		expected := fmt.Sprintf("%s in (%s)", intctrlutil.AppInstanceLabelKey, strings.Join(names, ","))
+		expected := fmt.Sprintf("%s in (%s)", constant.AppInstanceLabelKey, strings.Join(names, ","))
 		Expect(BuildLabelSelectorByNames("", names)).Should(Equal(expected))
 		Expect(BuildLabelSelectorByNames("label1", names)).Should(Equal("label1," + expected))
 	})

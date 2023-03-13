@@ -43,7 +43,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/constant"
+	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
 type reconfigureOptions struct {
@@ -338,7 +338,7 @@ func (r *reconfigureOptions) printConfigureHistory() error {
 	// filter reconfigure
 	// kubernetes not support fieldSelector with CRD: https://github.com/kubernetes/kubernetes/issues/51046
 	listOptions := metav1.ListOptions{
-		LabelSelector: strings.Join([]string{intctrlutil.AppInstanceLabelKey, r.clusterName}, "="),
+		LabelSelector: strings.Join([]string{constant.AppInstanceLabelKey, r.clusterName}, "="),
 	}
 
 	opsList, err := r.dynamic.Resource(types.OpsGVR()).Namespace(r.namespace).List(context.TODO(), listOptions)
@@ -591,7 +591,7 @@ func (o *opsRequestDiffOptions) maybeCompareOps(base *appsv1alpha1.OpsRequest, d
 		if len(labels) == 0 {
 			return ""
 		}
-		return labels[intctrlutil.AppInstanceLabelKey]
+		return labels[constant.AppInstanceLabelKey]
 	}
 	getComponentName := func(ops appsv1alpha1.OpsRequestSpec) string {
 		return ops.Reconfigure.ComponentName

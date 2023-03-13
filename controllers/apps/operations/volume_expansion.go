@@ -29,7 +29,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/constant"
+	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
 type volumeExpansionOpsHandler struct{}
@@ -291,9 +291,9 @@ func (ve volumeExpansionOpsHandler) handleVCTExpansionProgress(opsRes *OpsResour
 	componentName, vctName string) (succeedCount int, expectCount int, isCompleted bool, err error) {
 	pvcList := &corev1.PersistentVolumeClaimList{}
 	if err = opsRes.Client.List(opsRes.Ctx, pvcList, client.MatchingLabels{
-		intctrlutil.AppInstanceLabelKey:             opsRes.Cluster.Name,
-		intctrlutil.KBAppComponentLabelKey:          componentName,
-		intctrlutil.VolumeClaimTemplateNameLabelKey: vctName,
+		constant.AppInstanceLabelKey:             opsRes.Cluster.Name,
+		constant.KBAppComponentLabelKey:          componentName,
+		constant.VolumeClaimTemplateNameLabelKey: vctName,
 	}, client.InNamespace(opsRes.Cluster.Namespace)); err != nil {
 		return
 	}

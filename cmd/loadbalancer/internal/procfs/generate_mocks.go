@@ -16,4 +16,4 @@ limitations under the License.
 
 package procfs
 
-//go:generate go run github.com/golang/mock/mockgen -copyright_file ../../../hack/boilerplate.go.txt -destination mocks/procfs_mocks.go . ProcFS
+//go:generate go run github.com/golang/mock/mockgen -copyright_file ../../../../hack/boilerplate.go.txt -destination mocks/procfs_mocks.go . ProcFS

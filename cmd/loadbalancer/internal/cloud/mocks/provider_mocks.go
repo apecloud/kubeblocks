@@ -239,18 +239,3 @@ func (mr *MockProviderMockRecorder) ModifySourceDestCheck(arg0, arg1 interface{}
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ModifySourceDestCheck", reflect.TypeOf((*MockProvider)(nil).ModifySourceDestCheck), arg0, arg1)
 }
-
-// WaitForENIAttached mocks base method.
-func (m *MockProvider) WaitForENIAttached(arg0 string) (cloud.ENIMetadata, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "WaitForENIAttached", arg0)
-	ret0, _ := ret[0].(cloud.ENIMetadata)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// WaitForENIAttached indicates an expected call of WaitForENIAttached.
-func (mr *MockProviderMockRecorder) WaitForENIAttached(arg0 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WaitForENIAttached", reflect.TypeOf((*MockProvider)(nil).WaitForENIAttached), arg0)
-}

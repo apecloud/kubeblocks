@@ -29,7 +29,6 @@ This section lists all the KubeBlocks commands for configuring and managing a da
 | [`kbcli cluster restart`](./kbcli_cluster_restart.md)                  | Delete a cluster backup.                     |
 | [`kbcli cluster upgrade`](./kbcli_cluster_upgrade.md)                  | Upgrade the cluster version.                            |
 | [`kbcli cluster volume-expand`](./kbcli_cluster_volume-expand.md)      | Expand volume with the specified components and volumeClaimTemplates in the cluster.  |
-| [`kbcli cluster vscale`](./kbcli_cluster_vscale.md)                    | Vertically scale the specified components in the cluster.                             |
 | [`kbcli cluster hscale`](./kbcli_cluster_hscale.md)                    | Horizontally scale the specified components in the cluster. |
 | [`kbcli cluster describe-ops`](./kbcli_cluster_describe-ops.md)        | Show details of a specific OpsRequest. |
 | [`kbcli cluster list-ops`](./kbcli_cluster_list-ops.md)                | List all opsRequests.                            |
@@ -51,7 +50,6 @@ This section lists all the KubeBlocks commands for configuring and managing a da
 | **Cluster troubleshooting commands**
 | [`kbcli cluster logs`](./kbcli_cluster_logs.md)                      | Access cluster log file.          |
 | [`kbcli cluster list-logs`](./kbcli_cluster_list-logs.md)            | List supported log files in cluster.                  |
-| [`kbcli cluster list-log-type`](./kbcli_cluster_list-logs-type.md)   | List the supported logs file types in cluster.   |
 
 ## Commands for other functions
 | **Command**                                                               |  **Usage**                                       |

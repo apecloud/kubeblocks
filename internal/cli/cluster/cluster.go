@@ -290,6 +290,10 @@ func (o *ClusterObjects) getStorageInfo(component *appsv1alpha1.ClusterComponent
 			return *vcTpl.Spec.StorageClassName
 		}
 
+		if o.PVCs == nil {
+			return types.None
+		}
+
 		// get storage class name from PVC
 		for _, pvc := range o.PVCs.Items {
 			labels := pvc.Labels

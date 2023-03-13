@@ -165,6 +165,7 @@ func FakePods(replicas int, namespace string, cluster string) *corev1.PodList {
 			intctrlutil.RoleLabelKey:           role,
 			intctrlutil.KBAppComponentLabelKey: ComponentName,
 			intctrlutil.AppNameLabelKey:        "mysql-apecloud-mysql",
+			intctrlutil.AppManagedByLabelKey:   intctrlutil.AppName,
 		}
 		pod.Spec.NodeName = NodeName
 		pod.Spec.Containers = []corev1.Container{
@@ -252,7 +253,10 @@ func FakeClusterDef() *appsv1alpha1.ClusterDefinition {
 func FakeClusterVersion() *appsv1alpha1.ClusterVersion {
 	cv := &appsv1alpha1.ClusterVersion{}
 	cv.Name = ClusterVersionName
-	cv.SetLabels(map[string]string{intctrlutil.ClusterDefLabelKey: ClusterDefName})
+	cv.SetLabels(map[string]string{
+		intctrlutil.ClusterDefLabelKey:   ClusterDefName,
+		intctrlutil.AppManagedByLabelKey: intctrlutil.AppName,
+	})
 	cv.Spec.ClusterDefinitionRef = ClusterDefName
 	cv.SetCreationTimestamp(metav1.Now())
 	return cv
@@ -313,6 +317,7 @@ func FakeServices() *corev1.ServiceList {
 				Labels: map[string]string{
 					intctrlutil.AppInstanceLabelKey:    ClusterName,
 					intctrlutil.KBAppComponentLabelKey: ComponentName,
+					intctrlutil.AppManagedByLabelKey:   intctrlutil.AppName,
 				},
 			},
 			Spec: corev1.ServiceSpec{
@@ -350,6 +355,7 @@ func FakePVCs() *corev1.PersistentVolumeClaimList {
 			Labels: map[string]string{
 				intctrlutil.AppInstanceLabelKey:    ClusterName,
 				intctrlutil.KBAppComponentLabelKey: ComponentName,
+				intctrlutil.AppManagedByLabelKey:   intctrlutil.AppName,
 			},
 		},
 		Spec: corev1.PersistentVolumeClaimSpec{

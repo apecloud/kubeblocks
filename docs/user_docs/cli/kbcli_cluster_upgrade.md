@@ -1,6 +1,8 @@
-## kbcli cluster upgrade
+---
+title: kbcli cluster upgrade
+---
 
-Upgrade the cluster version
+Upgrade the cluster version.
 
 ```
 kbcli cluster upgrade [flags]
@@ -18,7 +20,7 @@ kbcli cluster upgrade [flags]
 ```
       --cluster-version string       Reference cluster version (required)
   -h, --help                         help for upgrade
-      --ops-request string           OpsRequest name. if not specified, it will be randomly generated 
+      --name string                  OpsRequest name. if not specified, it will be randomly generated 
       --ttlSecondsAfterSucceed int   Time to live after the OpsRequest succeed
 ```
 
@@ -48,5 +50,7 @@ kbcli cluster upgrade [flags]
 
 ### SEE ALSO
 
-* [kbcli cluster](kbcli_cluster.md)	 - Cluster command
+* [kbcli cluster](kbcli_cluster.md)	 - Cluster command.
+
+#### Go Back to [CLI Overview](kbcli_overview.md) Homepage.
 

@@ -38,7 +38,7 @@ var _ = Describe("Delete", func() {
 	buildTestCmd := func(o *DeleteOptions) *cobra.Command {
 		cmd := &cobra.Command{
 			Use:     "test-delete",
-			Short:   "Test a delete command",
+			Short:   "Test a delete command.",
 			Example: "Test command example",
 			Run: func(cmd *cobra.Command, args []string) {
 				o.Names = args

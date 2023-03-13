@@ -73,7 +73,7 @@ func NewListLogsCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cob
 
 	cmd := &cobra.Command{
 		Use:               "list-logs NAME",
-		Short:             "List supported log files in cluster",
+		Short:             "List supported log files in cluster.",
 		Example:           logsListExample,
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.ClusterGVR()),
 		Run: func(cmd *cobra.Command, args []string) {

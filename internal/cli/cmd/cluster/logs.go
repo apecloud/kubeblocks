@@ -91,7 +91,7 @@ func NewLogsCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 	}
 	cmd := &cobra.Command{
 		Use:               "logs NAME",
-		Short:             "Access cluster log file",
+		Short:             "Access cluster log file.",
 		Example:           logsExample,
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.ClusterGVR()),
 		Run: func(cmd *cobra.Command, args []string) {

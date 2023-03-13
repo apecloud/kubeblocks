@@ -1,6 +1,8 @@
-## kbcli kubeblocks preflight
+---
+title: kbcli kubeblocks preflight
+---
 
-Run and retrieve preflight checks for KubeBlocks
+Run and retrieve preflight checks for KubeBlocks.
 
 ```
 kbcli kubeblocks preflight [flags]
@@ -65,5 +67,7 @@ kbcli kubeblocks preflight [flags]
 
 ### SEE ALSO
 
-* [kbcli kubeblocks](kbcli_kubeblocks.md)	 - KubeBlocks operation commands
+* [kbcli kubeblocks](kbcli_kubeblocks.md)	 - KubeBlocks operation commands.
+
+#### Go Back to [CLI Overview](kbcli_overview.md) Homepage.
 

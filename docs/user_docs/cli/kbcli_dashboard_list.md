@@ -1,6 +1,8 @@
-## kbcli dashboard list
+---
+title: kbcli dashboard list
+---
 
-List all dashboards
+List all dashboards.
 
 ```
 kbcli dashboard list [flags]
@@ -38,5 +40,7 @@ kbcli dashboard list [flags]
 
 ### SEE ALSO
 
-* [kbcli dashboard](kbcli_dashboard.md)	 - List and open the KubeBlocks dashboards
+* [kbcli dashboard](kbcli_dashboard.md)	 - List and open the KubeBlocks dashboards.
+
+#### Go Back to [CLI Overview](kbcli_overview.md) Homepage.
 

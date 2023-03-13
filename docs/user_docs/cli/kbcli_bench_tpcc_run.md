@@ -1,6 +1,8 @@
-## kbcli bench tpcc run
+---
+title: kbcli bench tpcc run
+---
 
-Run workload
+Run workload.
 
 ```
 kbcli bench tpcc run [flags]
@@ -58,5 +60,7 @@ kbcli bench tpcc run [flags]
 
 ### SEE ALSO
 
-* [kbcli bench tpcc](kbcli_bench_tpcc.md)	 - Run a TPCC benchmark
+* [kbcli bench tpcc](kbcli_bench_tpcc.md)	 - Run a TPCC benchmark.
+
+#### Go Back to [CLI Overview](kbcli_overview.md) Homepage.
 

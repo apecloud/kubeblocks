@@ -1,6 +1,8 @@
-## kbcli cluster stop
+---
+title: kbcli cluster stop
+---
 
-stop the cluster and release all the pods of the cluster
+Stop the cluster and release all the pods of the cluster.
 
 ```
 kbcli cluster stop [flags]
@@ -17,7 +19,7 @@ kbcli cluster stop [flags]
 
 ```
   -h, --help                         help for stop
-      --ops-request string           OpsRequest name. if not specified, it will be randomly generated 
+      --name string                  OpsRequest name. if not specified, it will be randomly generated 
       --ttlSecondsAfterSucceed int   Time to live after the OpsRequest succeed
 ```
 
@@ -47,5 +49,7 @@ kbcli cluster stop [flags]
 
 ### SEE ALSO
 
-* [kbcli cluster](kbcli_cluster.md)	 - Cluster command
+* [kbcli cluster](kbcli_cluster.md)	 - Cluster command.
+
+#### Go Back to [CLI Overview](kbcli_overview.md) Homepage.
 

@@ -1,6 +1,8 @@
-## kbcli cluster list-logs
+---
+title: kbcli cluster list-logs
+---
 
-List supported log files in cluster
+List supported log files in cluster.
 
 ```
 kbcli cluster list-logs NAME [flags]
@@ -53,5 +55,7 @@ kbcli cluster list-logs NAME [flags]
 
 ### SEE ALSO
 
-* [kbcli cluster](kbcli_cluster.md)	 - Cluster command
+* [kbcli cluster](kbcli_cluster.md)	 - Cluster command.
+
+#### Go Back to [CLI Overview](kbcli_overview.md) Homepage.
 

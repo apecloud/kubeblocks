@@ -1,6 +1,8 @@
-## kbcli cluster vscale
+---
+title: kbcli cluster vscale
+---
 
-Vertically scale the specified components in the cluster
+Vertically scale the specified components in the cluster.
 
 ```
 kbcli cluster vscale [flags]
@@ -20,7 +22,7 @@ kbcli cluster vscale [flags]
       --cpu string                   Requested and limited size of component cpu
   -h, --help                         help for vscale
       --memory string                Requested and limited size of component memory
-      --ops-request string           OpsRequest name. if not specified, it will be randomly generated 
+      --name string                  OpsRequest name. if not specified, it will be randomly generated 
       --ttlSecondsAfterSucceed int   Time to live after the OpsRequest succeed
 ```
 
@@ -50,5 +52,7 @@ kbcli cluster vscale [flags]
 
 ### SEE ALSO
 
-* [kbcli cluster](kbcli_cluster.md)	 - Cluster command
+* [kbcli cluster](kbcli_cluster.md)	 - Cluster command.
+
+#### Go Back to [CLI Overview](kbcli_overview.md) Homepage.
 

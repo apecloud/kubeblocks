@@ -1,6 +1,8 @@
-## kbcli cluster list
+---
+title: kbcli cluster list
+---
 
-List clusters
+List clusters.
 
 ```
 kbcli cluster list [NAME] [flags]
@@ -61,5 +63,7 @@ kbcli cluster list [NAME] [flags]
 
 ### SEE ALSO
 
-* [kbcli cluster](kbcli_cluster.md)	 - Cluster command
+* [kbcli cluster](kbcli_cluster.md)	 - Cluster command.
+
+#### Go Back to [CLI Overview](kbcli_overview.md) Homepage.
 

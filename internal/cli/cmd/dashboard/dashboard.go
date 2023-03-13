@@ -97,7 +97,7 @@ func newListOptions(f cmdutil.Factory, streams genericclioptions.IOStreams) *lis
 func NewDashboardCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "dashboard",
-		Short: "List and open the KubeBlocks dashboards",
+		Short: "List and open the KubeBlocks dashboards.",
 	}
 
 	// add subcommands
@@ -113,7 +113,7 @@ func newListCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 	o := newListOptions(f, streams)
 	cmd := &cobra.Command{
 		Use:   "list",
-		Short: "List all dashboards",
+		Short: "List all dashboards.",
 		Args:  cobra.NoArgs,
 		Run: func(cmd *cobra.Command, args []string) {
 			util.CheckErr(o.complete())
@@ -174,7 +174,7 @@ func newOpenCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 	o := newOpenOptions(f, streams)
 	cmd := &cobra.Command{
 		Use:   "open",
-		Short: "Open one dashboard",
+		Short: "Open one dashboard.",
 		ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 			var names []string
 			for _, d := range dashboards {

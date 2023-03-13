@@ -1,6 +1,8 @@
-## kbcli cluster restart
+---
+title: kbcli cluster restart
+---
 
-Restart the specified components in the cluster
+Restart the specified components in the cluster.
 
 ```
 kbcli cluster restart [flags]
@@ -21,7 +23,7 @@ kbcli cluster restart [flags]
 ```
       --component-names strings       Component names to this operations
   -h, --help                         help for restart
-      --ops-request string           OpsRequest name. if not specified, it will be randomly generated 
+      --name string                  OpsRequest name. if not specified, it will be randomly generated 
       --ttlSecondsAfterSucceed int   Time to live after the OpsRequest succeed
 ```
 
@@ -51,5 +53,7 @@ kbcli cluster restart [flags]
 
 ### SEE ALSO
 
-* [kbcli cluster](kbcli_cluster.md)	 - Cluster command
+* [kbcli cluster](kbcli_cluster.md)	 - Cluster command.
+
+#### Go Back to [CLI Overview](kbcli_overview.md) Homepage.
 

@@ -1,6 +1,8 @@
-## kbcli kubeblocks upgrade
+---
+title: kbcli kubeblocks upgrade
+---
 
-Upgrade KubeBlocks
+Upgrade KubeBlocks.
 
 ```
 kbcli kubeblocks upgrade [flags]
@@ -58,5 +60,7 @@ kbcli kubeblocks upgrade [flags]
 
 ### SEE ALSO
 
-* [kbcli kubeblocks](kbcli_kubeblocks.md)	 - KubeBlocks operation commands
+* [kbcli kubeblocks](kbcli_kubeblocks.md)	 - KubeBlocks operation commands.
+
+#### Go Back to [CLI Overview](kbcli_overview.md) Homepage.
 

@@ -1,6 +1,8 @@
-## kbcli playground destroy
+---
+title: kbcli playground destroy
+---
 
-Destroy the playground kubernetes cluster
+Destroy the playground kubernetes cluster.
 
 ```
 kbcli playground destroy [flags]
@@ -50,5 +52,7 @@ kbcli playground destroy [flags]
 
 ### SEE ALSO
 
-* [kbcli playground](kbcli_playground.md)	 - Bootstrap a playground KubeBlocks in local host or cloud
+* [kbcli playground](kbcli_playground.md)	 - Bootstrap a playground KubeBlocks in local host or cloud.
+
+#### Go Back to [CLI Overview](kbcli_overview.md) Homepage.
 

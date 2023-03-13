@@ -1,6 +1,8 @@
-## kbcli cluster connect
+---
+title: kbcli cluster connect
+---
 
-Connect to a cluster or instance
+Connect to a cluster or instance.
 
 ```
 kbcli cluster connect (NAME | -i INSTANCE-NAME) [flags]
@@ -60,5 +62,7 @@ kbcli cluster connect (NAME | -i INSTANCE-NAME) [flags]
 
 ### SEE ALSO
 
-* [kbcli cluster](kbcli_cluster.md)	 - Cluster command
+* [kbcli cluster](kbcli_cluster.md)	 - Cluster command.
+
+#### Go Back to [CLI Overview](kbcli_overview.md) Homepage.
 

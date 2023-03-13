@@ -1,6 +1,8 @@
-## kbcli addon enable
+---
+title: kbcli addon enable
+---
 
-Enable an addon
+Enable an addon.
 
 ```
 kbcli addon enable ADDON_NAME [flags]
@@ -67,5 +69,7 @@ kbcli addon enable ADDON_NAME [flags]
 
 ### SEE ALSO
 
-* [kbcli addon](kbcli_addon.md)	 - Addon command
+* [kbcli addon](kbcli_addon.md)	 - Addon command.
+
+#### Go Back to [CLI Overview](kbcli_overview.md) Homepage.
 

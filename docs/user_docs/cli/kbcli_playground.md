@@ -1,6 +1,8 @@
-## kbcli playground
+---
+title: kbcli playground
+---
 
-Bootstrap a playground KubeBlocks in local host or cloud
+Bootstrap a playground KubeBlocks in local host or cloud.
 
 ### Options
 
@@ -34,8 +36,10 @@ Bootstrap a playground KubeBlocks in local host or cloud
 
 ### SEE ALSO
 
-* [kbcli](kbcli.md)	 - KubeBlocks CLI
-* [kbcli playground destroy](kbcli_playground_destroy.md)	 - Destroy the playground kubernetes cluster
+
+* [kbcli playground destroy](kbcli_playground_destroy.md)	 - Destroy the playground kubernetes cluster.
 * [kbcli playground guide](kbcli_playground_guide.md)	 - Display playground cluster user guide.
-* [kbcli playground init](kbcli_playground_init.md)	 - Bootstrap a kubernetes cluster and install KubeBlocks for playground
+* [kbcli playground init](kbcli_playground_init.md)	 - Bootstrap a kubernetes cluster and install KubeBlocks for playground.
+
+#### Go Back to [CLI Overview](kbcli_overview.md) Homepage.
 

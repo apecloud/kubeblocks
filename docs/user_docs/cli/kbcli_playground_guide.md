@@ -1,4 +1,6 @@
-## kbcli playground guide
+---
+title: kbcli playground guide
+---
 
 Display playground cluster user guide.
 
@@ -38,5 +40,7 @@ kbcli playground guide [flags]
 
 ### SEE ALSO
 
-* [kbcli playground](kbcli_playground.md)	 - Bootstrap a playground KubeBlocks in local host or cloud
+* [kbcli playground](kbcli_playground.md)	 - Bootstrap a playground KubeBlocks in local host or cloud.
+
+#### Go Back to [CLI Overview](kbcli_overview.md) Homepage.
 

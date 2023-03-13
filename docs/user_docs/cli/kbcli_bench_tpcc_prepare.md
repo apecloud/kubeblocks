@@ -1,6 +1,8 @@
-## kbcli bench tpcc prepare
+---
+title: kbcli bench tpcc prepare
+---
 
-Prepare data for TPCC
+Prepare data for TPCC.
 
 ```
 kbcli bench tpcc prepare [flags]
@@ -61,5 +63,7 @@ kbcli bench tpcc prepare [flags]
 
 ### SEE ALSO
 
-* [kbcli bench tpcc](kbcli_bench_tpcc.md)	 - Run a TPCC benchmark
+* [kbcli bench tpcc](kbcli_bench_tpcc.md)	 - Run a TPCC benchmark.
+
+#### Go Back to [CLI Overview](kbcli_overview.md) Homepage.
 

@@ -44,7 +44,7 @@ func newListReceiversCmd(f cmdutil.Factory, streams genericclioptions.IOStreams)
 	o := &listReceiversOptions{baseOptions: baseOptions{IOStreams: streams}}
 	cmd := &cobra.Command{
 		Use:     "list-receivers",
-		Short:   "List all alert receivers",
+		Short:   "List all alert receivers.",
 		Example: listReceiversExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			util.CheckErr(o.complete(f))

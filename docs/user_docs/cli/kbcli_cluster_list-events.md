@@ -1,6 +1,8 @@
-## kbcli cluster list-events
+---
+title: kbcli cluster list-events
+---
 
-List cluster events
+List cluster events.
 
 ```
 kbcli cluster list-events [flags]
@@ -50,5 +52,7 @@ kbcli cluster list-events [flags]
 
 ### SEE ALSO
 
-* [kbcli cluster](kbcli_cluster.md)	 - Cluster command
+* [kbcli cluster](kbcli_cluster.md)	 - Cluster command.
+
+#### Go Back to [CLI Overview](kbcli_overview.md) Homepage.
 

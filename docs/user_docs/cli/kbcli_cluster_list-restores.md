@@ -1,6 +1,8 @@
-## kbcli cluster list-restores
+---
+title: kbcli cluster list-restores
+---
 
-List all restore jobs
+List all restore jobs.
 
 ```
 kbcli cluster list-restores [flags]
@@ -49,5 +51,7 @@ kbcli cluster list-restores [flags]
 
 ### SEE ALSO
 
-* [kbcli cluster](kbcli_cluster.md)	 - Cluster command
+* [kbcli cluster](kbcli_cluster.md)	 - Cluster command.
+
+#### Go Back to [CLI Overview](kbcli_overview.md) Homepage.
 

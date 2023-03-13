@@ -1,6 +1,8 @@
-## kbcli bench tpcc
+---
+title: kbcli bench tpcc
+---
 
-Run a TPCC benchmark
+Run a TPCC benchmark.
 
 ### Options
 
@@ -51,8 +53,10 @@ Run a TPCC benchmark
 
 ### SEE ALSO
 
-* [kbcli bench](kbcli_bench.md)	 - Run a benchmark
-* [kbcli bench tpcc cleanup](kbcli_bench_tpcc_cleanup.md)	 - Cleanup data for TPCC
-* [kbcli bench tpcc prepare](kbcli_bench_tpcc_prepare.md)	 - Prepare data for TPCC
-* [kbcli bench tpcc run](kbcli_bench_tpcc_run.md)	 - Run workload
+* [kbcli bench](kbcli_bench.md)	 - Run a benchmark.
+* [kbcli bench tpcc cleanup](kbcli_bench_tpcc_cleanup.md)	 - Cleanup data for TPCC.
+* [kbcli bench tpcc prepare](kbcli_bench_tpcc_prepare.md)	 - Prepare data for TPCC.
+* [kbcli bench tpcc run](kbcli_bench_tpcc_run.md)	 - Run workload.
+
+#### Go Back to [CLI Overview](kbcli_overview.md) Homepage.
 

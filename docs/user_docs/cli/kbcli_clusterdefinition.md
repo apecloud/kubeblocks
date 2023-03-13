@@ -1,6 +1,8 @@
-## kbcli clusterdefinition
+---
+title: kbcli clusterdefinition
+---
 
-ClusterDefinition command
+ClusterDefinition command.
 
 ### Options
 
@@ -34,6 +36,8 @@ ClusterDefinition command
 
 ### SEE ALSO
 
-* [kbcli](kbcli.md)	 - KubeBlocks CLI
-* [kbcli clusterdefinition list](kbcli_clusterdefinition_list.md)	 - List ClusterDefinitions
+
+* [kbcli clusterdefinition list](kbcli_clusterdefinition_list.md)	 - List ClusterDefinitions.
+
+#### Go Back to [CLI Overview](kbcli_overview.md) Homepage.
 

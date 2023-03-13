@@ -76,7 +76,7 @@ func NewDescribeCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cob
 	o := newOptions(f, streams)
 	cmd := &cobra.Command{
 		Use:               "describe NAME",
-		Short:             "Show details of a specific cluster",
+		Short:             "Show details of a specific cluster.",
 		Example:           describeExample,
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.ClusterGVR()),
 		Run: func(cmd *cobra.Command, args []string) {

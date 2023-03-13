@@ -1,6 +1,8 @@
-## kbcli alert add-receiver
+---
+title: kbcli alert add-receiver
+---
 
-Add alert receiver, such as email, slack, webhook and so on
+Add alert receiver, such as email, slack, webhook and so on.
 
 ```
 kbcli alert add-receiver [flags]
@@ -64,5 +66,7 @@ kbcli alert add-receiver [flags]
 
 ### SEE ALSO
 
-* [kbcli alert](kbcli_alert.md)	 - Manage alert receiver, include add, list and delete receiver
+* [kbcli alert](kbcli_alert.md)	 - Manage alert receiver, include add, list and delete receiver.
+
+#### Go Back to [CLI Overview](kbcli_overview.md) Homepage.
 

@@ -101,7 +101,7 @@ func newStatusCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 	o := statusOptions{IOStreams: streams}
 	cmd := &cobra.Command{
 		Use:     "status",
-		Short:   "Show list of resource KubeBlocks uses or owns",
+		Short:   "Show list of resource KubeBlocks uses or owns.",
 		Args:    cobra.NoArgs,
 		Example: infoExample,
 		Run: func(cmd *cobra.Command, args []string) {

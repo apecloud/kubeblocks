@@ -46,8 +46,6 @@ type AddonReconciler struct {
 	RestConfig *rest.Config
 }
 
-const ()
-
 func init() {
 	viper.SetDefault(maxConcurrentReconcilesKey, runtime.NumCPU()*2)
 }

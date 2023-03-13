@@ -91,9 +91,9 @@ func (r *ConfigConstraintReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		return intctrlutil.RequeueAfter(time.Second, reqCtx.Log, "ValidateConfigurationTemplate")
 	}
 
-	// configConstraint.Spec.ConfigurationSchema.Schema = cfgcore.GenerateOpenAPISchema(configConstraint.Spec.ConfigurationSchema.CUE)
+	// Automatically convert cue to openAPISchema.
 	if err := updateConfigurationSchema(configConstraint, r.Client, ctx); err != nil {
-		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "failed to generate configuration open api schema")
+		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "failed to generate openAPISchema")
 	}
 
 	statusPatch := client.MergeFrom(configConstraint.DeepCopy())

@@ -34,4 +34,4 @@ spec:
           - ack
           - gke
           - tke
-          - ask
+          - aks

@@ -46,11 +46,7 @@ type AddonReconciler struct {
 	RestConfig *rest.Config
 }
 
-const (
-	// settings keys
-	maxConcurrentReconcilesKey = "MAXCONCURRENTRECONCILES_ADDON"
-	addonSANameKey             = "KUBEBLOCKS_ADDON_SA_NAME"
-)
+const ()
 
 func init() {
 	viper.SetDefault(maxConcurrentReconcilesKey, runtime.NumCPU()*2)

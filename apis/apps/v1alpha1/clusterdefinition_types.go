@@ -151,15 +151,6 @@ type ProvisionStatements struct {
 
 // ClusterDefinitionStatus defines the observed state of ClusterDefinition
 type ClusterDefinitionStatus struct {
-	// ClusterDefinition phase -
-	// Available is ClusterDefinition become available, and can be referenced for co-related objects.
-	// +kubebuilder:validation:Enum={Available}
-	Phase Phase `json:"phase,omitempty"`
-
-	// Extra message in current phase
-	// +optional
-	Message string `json:"message,omitempty"`
-
 	// observedGeneration is the most recent generation observed for this
 	// ClusterDefinition. It corresponds to the ClusterDefinition's generation, which is
 	// updated on mutation by the API Server.
@@ -626,6 +617,11 @@ type ClusterDefinitionList struct {
 
 func init() {
 	SchemeBuilder.Register(&ClusterDefinition{}, &ClusterDefinitionList{})
+}
+
+// Ready checks whether the cluster definition object is ready for use.
+func (r *ClusterDefinition) Ready() bool {
+	return r.Generation == r.Status.ObservedGeneration
 }
 
 // ValidateEnabledLogConfigs validates enabledLogs against component compDefName, and returns the invalid logNames undefined in ClusterDefinition.

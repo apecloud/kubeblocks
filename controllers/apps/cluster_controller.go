@@ -151,36 +151,26 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	if err := r.Client.Get(reqCtx.Ctx, reqCtx.Req.NamespacedName, cluster); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
-	clusterConditionMgr := clusterConditionManager{
+
+	deletionHandler := func() (*ctrl.Result, error) { return r.deleteExternalResources(reqCtx, cluster) }
+	if res, err := intctrlutil.HandleCRDeletion(reqCtx, r, cluster, dbClusterFinalizerName, deletionHandler); res != nil {
+		return *res, err
+	}
+
+	// should patch the label first to prevent the label from being modified by the user.
+	if err := r.patchClusterLabelsIfNotExist(ctx, cluster); err != nil {
+		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+	}
+
+	condMgr := clusterConditionManager{
 		Client:   r.Client,
 		Recorder: r.Recorder,
 		ctx:      ctx,
 		cluster:  cluster,
 	}
-
-	res, err := intctrlutil.HandleCRDeletion(reqCtx, r, cluster, dbClusterFinalizerName, func() (*ctrl.Result, error) {
-		return r.deleteExternalResources(reqCtx, cluster)
-	})
+	clusterDefinition, clusterVersion, res, err := r.getACheckReferencedCRs(reqCtx, condMgr, cluster)
 	if res != nil {
 		return *res, err
-	}
-
-	// should patch the label first to prevent the label from being modified by the user.
-	if err = r.patchClusterLabelsIfNotExist(ctx, cluster); err != nil {
-		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-	}
-
-	reqCtx.Log.V(1).Info("get clusterDef and clusterVersion")
-	clusterDefinition := &appsv1alpha1.ClusterDefinition{}
-	if err := r.Client.Get(reqCtx.Ctx, types.NamespacedName{
-		Name: cluster.Spec.ClusterDefRef,
-	}, clusterDefinition); err != nil {
-		// this is a block to handle error.
-		// so when update cluster conditions failed, we can ignore it.
-		_ = clusterConditionMgr.setPreCheckErrorCondition(err)
-		// If using RequeueWithError and the user fixed this error,
-		// it may take up to 1000s to reconcile again, causing the user to think that the repair is not effective.
-		return intctrlutil.RequeueAfter(ControllerErrorRequeueTime, reqCtx.Log, "")
 	}
 
 	if cluster.Status.ObservedGeneration == cluster.Generation {
@@ -200,83 +190,59 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return intctrlutil.Reconciled()
 	}
 
-	reqCtx.Log.Info("update cluster status")
-	if err = r.updateClusterPhaseToCreatingOrUpdating(reqCtx, cluster); err != nil {
-		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-	}
-
-	clusterVersion := &appsv1alpha1.ClusterVersion{}
-	if len(cluster.Spec.ClusterVersionRef) > 0 {
-		if err := r.Client.Get(reqCtx.Ctx, types.NamespacedName{
-			Name: cluster.Spec.ClusterVersionRef,
-		}, clusterVersion); err != nil {
-			// this is a block to handle error.
-			// so when update cluster conditions failed, we can ignore it.
-			_ = clusterConditionMgr.setPreCheckErrorCondition(err)
-			return intctrlutil.RequeueAfter(ControllerErrorRequeueTime, reqCtx.Log, "")
-		}
-		if res, err = r.checkReferencedCRStatus(reqCtx, clusterConditionMgr, clusterVersion.Status.Phase,
-			appsv1alpha1.ClusterVersionKind, clusterVersion.Name); res != nil {
-			return *res, err
-		}
-	}
-
-	if res, err = r.checkReferencedCRStatus(reqCtx, clusterConditionMgr, clusterDefinition.Status.Phase,
-		appsv1alpha1.ClusterDefinitionKind, clusterDefinition.Name); res != nil {
+	// do a cross-check with referenced cluster definition
+	if res, err := r.checkWithReferencedCD(reqCtx, condMgr, clusterDefinition, cluster); res != nil {
 		return *res, err
 	}
 
-	// validate config and send warning event log necessarily
-	if err = cluster.ValidateEnabledLogs(clusterDefinition); err != nil {
-		_ = clusterConditionMgr.setPreCheckErrorCondition(err)
-		return intctrlutil.RequeueAfter(ControllerErrorRequeueTime, reqCtx.Log, "")
-	}
-
-	// validate primaryIndex and send warning event log necessarily
-	if err = cluster.ValidatePrimaryIndex(clusterDefinition); err != nil {
-		_ = clusterConditionMgr.setPreCheckErrorCondition(err)
-		return intctrlutil.RequeueWithError(err, reqCtx.Log, "")
-	}
-
-	// preCheck succeed, starting the cluster provisioning
-	if err = clusterConditionMgr.setProvisioningStartedCondition(); err != nil {
+	if err := r.updateClusterStatusBeforeProvisioning(reqCtx, condMgr, cluster); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
-	clusterDeepCopy := cluster.DeepCopy()
-	shouldRequeue, err := reconcileClusterWorkloads(reqCtx, r.Client, clusterDefinition, clusterVersion, cluster)
+
+	clusterCopy := cluster.DeepCopy()
+	requeue, err := reconcileClusterWorkloads(reqCtx, r.Client, clusterDefinition, clusterVersion, cluster)
 	if err != nil {
-		// this is a block to handle error.
-		// so when update cluster conditions failed, we can ignore it.
-		_ = clusterConditionMgr.setApplyResourcesFailedCondition(err)
+		_ = condMgr.setApplyResourcesFailedCondition(err)
 		return intctrlutil.RequeueAfter(ControllerErrorRequeueTime, reqCtx.Log, "")
 	}
-	if shouldRequeue {
-		if err = r.patchClusterStatus(reqCtx.Ctx, cluster, clusterDeepCopy); err != nil {
+	if requeue {
+		if err = r.patchClusterStatus(reqCtx.Ctx, cluster, clusterCopy); err != nil {
 			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 		}
 		return intctrlutil.RequeueAfter(time.Second, reqCtx.Log, "")
 	}
 
-	if err = r.handleClusterStatusAfterApplySucceed(ctx, cluster, clusterDeepCopy, clusterDefinition); err != nil {
+	if err = r.updateClusterStatusAfterProvisioning(reqCtx, cluster, clusterCopy, clusterDefinition); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 	return intctrlutil.Reconciled()
 }
 
-// patchClusterStatus patches the cluster status.
-func (r *ClusterReconciler) patchClusterStatus(ctx context.Context,
-	cluster *appsv1alpha1.Cluster,
-	clusterDeepCopy *appsv1alpha1.Cluster) error {
-	if reflect.DeepEqual(cluster.Status, clusterDeepCopy.Status) {
-		return nil
+func (r *ClusterReconciler) checkWithReferencedCD(reqCtx intctrlutil.RequestCtx, condMgr clusterConditionManager,
+	cd *appsv1alpha1.ClusterDefinition, cluster *appsv1alpha1.Cluster) (*ctrl.Result, error) {
+	if err := cluster.ValidateEnabledLogs(cd); err != nil {
+		_ = condMgr.setPreCheckErrorCondition(err)
+		res, err := intctrlutil.RequeueAfter(ControllerErrorRequeueTime, reqCtx.Log, "")
+		return &res, err
 	}
-	patch := client.MergeFrom(clusterDeepCopy)
-	return r.Client.Status().Patch(ctx, cluster, patch)
+	if err := cluster.ValidatePrimaryIndex(cd); err != nil {
+		_ = condMgr.setPreCheckErrorCondition(err)
+		res, err := intctrlutil.RequeueWithError(err, reqCtx.Log, "")
+		return &res, err
+	}
+	return nil, nil
 }
 
-// handleClusterStatusAfterApplySucceed when cluster apply resources successful, handle the status
-func (r *ClusterReconciler) handleClusterStatusAfterApplySucceed(
-	ctx context.Context,
+func (r *ClusterReconciler) updateClusterStatusBeforeProvisioning(reqCtx intctrlutil.RequestCtx,
+	condMgr clusterConditionManager, cluster *appsv1alpha1.Cluster) error {
+	if err := r.updateClusterPhaseToCreatingOrUpdating(reqCtx, cluster); err != nil {
+		return err
+	}
+	return condMgr.setProvisioningStartedCondition()
+}
+
+// updateClusterStatusAfterProvisioning when cluster apply resources successful, handle the status
+func (r *ClusterReconciler) updateClusterStatusAfterProvisioning(reqCtx intctrlutil.RequestCtx,
 	cluster *appsv1alpha1.Cluster,
 	clusterDeepCopy *appsv1alpha1.Cluster,
 	clusterDef *appsv1alpha1.ClusterDefinition) error {
@@ -289,11 +255,22 @@ func (r *ClusterReconciler) handleClusterStatusAfterApplySucceed(
 	// update observed generation
 	cluster.Status.ObservedGeneration = cluster.Generation
 	cluster.Status.ClusterDefGeneration = clusterDef.Generation
-	if err := r.Client.Status().Patch(ctx, cluster, patch); err != nil {
+	if err := r.Client.Status().Patch(reqCtx.Ctx, cluster, patch); err != nil {
 		return err
 	}
 	r.Recorder.Event(cluster, corev1.EventTypeNormal, applyResourcesCondition.Reason, applyResourcesCondition.Message)
 	return nil
+}
+
+// patchClusterStatus patches the cluster status.
+func (r *ClusterReconciler) patchClusterStatus(ctx context.Context,
+	cluster *appsv1alpha1.Cluster,
+	clusterDeepCopy *appsv1alpha1.Cluster) error {
+	if reflect.DeepEqual(cluster.Status, clusterDeepCopy.Status) {
+		return nil
+	}
+	patch := client.MergeFrom(clusterDeepCopy)
+	return r.Client.Status().Patch(ctx, cluster, patch)
 }
 
 func (r *ClusterReconciler) patchClusterLabelsIfNotExist(
@@ -481,17 +458,52 @@ func (r *ClusterReconciler) deleteBackups(reqCtx intctrlutil.RequestCtx, cluster
 	return nil
 }
 
-// checkReferencingCRStatus checks if cluster referenced CR is available
-func (r *ClusterReconciler) checkReferencedCRStatus(
-	reqCtx intctrlutil.RequestCtx,
-	conMgr clusterConditionManager,
-	referencedCRPhase appsv1alpha1.Phase,
-	crKind, crName string) (*ctrl.Result, error) {
-	if referencedCRPhase == appsv1alpha1.AvailablePhase {
+func (r *ClusterReconciler) getACheckReferencedCRs(reqCtx intctrlutil.RequestCtx, condMgr clusterConditionManager,
+	cluster *appsv1alpha1.Cluster) (*appsv1alpha1.ClusterDefinition, *appsv1alpha1.ClusterVersion, *ctrl.Result, error) {
+	cd, res, err := getACheckReferencedCR(reqCtx, r.Client, condMgr, cluster.Spec.ClusterDefRef, generics.ClusterDefinitionSignature)
+	if res != nil {
+		return nil, nil, res, err
+	}
+
+	// cluster version is empty
+	if len(cluster.Spec.ClusterVersionRef) == 0 {
+		return cd, &appsv1alpha1.ClusterVersion{}, nil, nil
+	}
+
+	cv, res, err := getACheckReferencedCR(reqCtx, r.Client, condMgr, cluster.Spec.ClusterVersionRef, generics.ClusterVersionSignature)
+	if res != nil {
+		return nil, nil, res, err
+	}
+	return cd, cv, nil, nil
+}
+
+func getACheckReferencedCR[T generics.Object, PT generics.PObject[T], L generics.ObjList[T]](reqCtx intctrlutil.RequestCtx,
+	cli client.Client, condMgr clusterConditionManager, resourceName string, _ func(T, L)) (PT, *ctrl.Result, error) {
+	var obj T
+	pobj := PT(&obj)
+	if err := cli.Get(reqCtx.Ctx, types.NamespacedName{Name: resourceName}, pobj); err != nil {
+		_ = condMgr.setPreCheckErrorCondition(err)
+		// If using RequeueWithError and the user fixed this error,
+		// it may take up to 1000s to reconcile again, causing the user to think that the repair is not effective.
+		res, err := intctrlutil.RequeueAfter(ControllerErrorRequeueTime, reqCtx.Log, "")
+		return nil, &res, err
+	}
+
+	if res, err := checkReferencedCRStatus(reqCtx, condMgr, pobj); res != nil {
+		return nil, res, err
+	}
+
+	return pobj, nil, nil
+}
+
+func checkReferencedCRStatus(reqCtx intctrlutil.RequestCtx, condMgr clusterConditionManager, obj client.Object) (*ctrl.Result, error) {
+	if reflect.ValueOf(obj).MethodByName("Ready").Call([]reflect.Value{})[0].Bool() {
 		return nil, nil
 	}
-	message := fmt.Sprintf("%s: %s is unavailable, this problem needs to be solved first.", crKind, crName)
-	if err := conMgr.setReferenceCRUnavailableCondition(message); err != nil {
+
+	message := fmt.Sprintf("%s: %s is unavailable, this problem needs to be solved first.",
+		obj.GetObjectKind(), obj.GetName())
+	if err := condMgr.setReferenceCRUnavailableCondition(message); err != nil {
 		res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 		return &res, err
 	}

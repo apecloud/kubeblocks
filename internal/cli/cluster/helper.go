@@ -297,7 +297,7 @@ func GetLatestVersion(dynamic dynamic.Interface, clusterDef string) (string, err
 	// find the latest version to use
 	version := findLatestVersion(versionList)
 	if version == nil {
-		return "", fmt.Errorf("failed to find latest cluster version referencing current cluster definition %s", clusterDef)
+		return "", fmt.Errorf("failed to find the latest cluster version referencing current cluster definition %s", clusterDef)
 	}
 	return version.Name, nil
 }

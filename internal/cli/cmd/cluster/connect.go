@@ -342,7 +342,7 @@ func buildArgs(args []string) string {
 	result := make([]string, 0)
 	for _, arg := range args {
 		// split arg by space
-		tmpStrs := strings.Split(trimQuotation(arg), " ")
+		tmpStrs := strings.Split(strings.Trim(arg, "\""), " ")
 		for i := 0; i < len(tmpStrs); i++ {
 			str := tmpStrs[i]
 			// skip command
@@ -362,16 +362,4 @@ func buildArgs(args []string) string {
 		}
 	}
 	return strings.Join(result, " ")
-}
-
-func trimQuotation(str string) string {
-	if len(str) > 0 {
-		if str[0] == '"' {
-			str = str[1:]
-		}
-		if str[len(str)-1] == '"' {
-			str = str[:len(str)-1]
-		}
-	}
-	return str
 }

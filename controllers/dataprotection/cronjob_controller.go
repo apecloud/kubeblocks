@@ -70,7 +70,7 @@ func (r *CronJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	backupPolicyKey := types.NamespacedName{
-		Namespace: cronJob.GetAnnotations()["kubeblocks.io/backup-namespace"],
+		Namespace: cronJob.Annotations["kubeblocks.io/backup-namespace"],
 		Name:      cronJob.Name,
 	}
 	if err = r.Client.Get(reqCtx.Ctx, backupPolicyKey, backupPolicy); err != nil {

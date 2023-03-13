@@ -260,7 +260,8 @@ func GetCompRelatedObjectList(ctx context.Context,
 	return podList, nil
 }
 
-// AvailableReplicasAreConsistent checks if the available replicas of component and workload are consistent.
+// AvailableReplicasAreConsistent checks if expected replicas number of component is consistent with
+// the number of available workload replicas.
 func AvailableReplicasAreConsistent(componentReplicas, podCount, workloadAvailableReplicas int32) bool {
 	return workloadAvailableReplicas == componentReplicas && componentReplicas == podCount
 }
@@ -293,12 +294,29 @@ func GetComponentPhaseWhenPodsNotReady(podList *corev1.PodList,
 			existLatestRevisionFailedPod = true
 		}
 	}
+	return GetCompPhaseByConditions(existLatestRevisionFailedPod, true,
+		componentReplicas, int32(podCount), availableReplicas)
+}
+
+// GetCompPhaseByConditions gets the component phase according to the following conditions:
+// 1. if the failed pod is not controlled by the latest revision, ignore it.
+// 2. if the primary replicas are not available, the component is failed.
+// 3. finally if expected replicas number of component is inconsistent with
+// the number of available workload replicas, the component is abnormal.
+func GetCompPhaseByConditions(existLatestRevisionFailedPod bool,
+	primaryReplicasAvailable bool,
+	compReplicas,
+	podCount,
+	availableReplicas int32) appsv1alpha1.Phase {
 	// if the failed pod is not controlled by the latest revision, ignore it.
 	if !existLatestRevisionFailedPod {
 		return ""
 	}
-	// checks if the available replicas of component and workload are consistent.
-	if !AvailableReplicasAreConsistent(componentReplicas, int32(podCount), availableReplicas) {
+	if !primaryReplicasAvailable {
+		return appsv1alpha1.FailedPhase
+	}
+	// checks if expected replicas number of component is consistent with the number of available workload replicas.
+	if !AvailableReplicasAreConsistent(compReplicas, podCount, availableReplicas) {
 		return appsv1alpha1.AbnormalPhase
 	}
 	return ""

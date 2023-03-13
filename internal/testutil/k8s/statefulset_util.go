@@ -183,3 +183,11 @@ func PatchStatefulSetStatus(testCtx *testutil.TestContext, stsName string, statu
 		g.Expect(reflect.DeepEqual(newSts.Status, status)).Should(gomega.BeTrue())
 	})).Should(gomega.Succeed())
 }
+
+func InitStatefulSetStatus(testCtx testutil.TestContext, statefulset *apps.StatefulSet, controllerRevision string) {
+	gomega.Expect(testapps.ChangeObjStatus(&testCtx, statefulset, func() {
+		statefulset.Status.UpdateRevision = controllerRevision
+		statefulset.Status.CurrentRevision = controllerRevision
+		statefulset.Status.ObservedGeneration = statefulset.Generation
+	})).Should(gomega.Succeed())
+}

@@ -118,17 +118,12 @@ func updateComponentStatusMessage(compStatus *appsv1alpha1.ClusterComponentStatu
 		kind = event.InvolvedObject.Kind
 		name = event.InvolvedObject.Name
 	)
-	if compStatus.Message == nil {
-		compStatus.Message = appsv1alpha1.ComponentMessageMap{}
-		compStatus.Message.SetObjectMessage(kind, name, event.Message)
-		return
-	}
-	message := compStatus.Message.GetObjectMessage(kind, name)
+	message := compStatus.GetObjectMessage(kind, name)
 	// if the event message is not exists in message map, merge them.
 	if !strings.Contains(message, event.Message) {
 		message += event.Message + ";"
 	}
-	compStatus.Message.SetObjectMessage(kind, name, message)
+	compStatus.SetObjectMessage(kind, name, message)
 }
 
 // needSyncComponentStatusForEvent checks whether the component status needs to be synchronized the cluster status by event
@@ -441,11 +436,7 @@ func updateComponentStatusPhase(cli client.Client,
 	if ok && c.Phase == phase {
 		return nil
 	}
-	// c.Message can be nil
-	if c.Message == nil {
-		c.Message = appsv1alpha1.ComponentMessageMap{}
-	}
-	c.Message.SetObjectMessage(object.GetObjectKind().GroupVersionKind().Kind, object.GetName(), message)
+	c.SetObjectMessage(object.GetObjectKind().GroupVersionKind().Kind, object.GetName(), message)
 	patch := client.MergeFrom(cluster.DeepCopy())
 	cluster.Status.Components[componentName] = c
 	return cli.Status().Patch(ctx, cluster, patch)

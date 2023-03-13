@@ -452,8 +452,7 @@ func (r *helmTypeInstallStage) Handle(ctx context.Context) {
 					r.setRequeueWithErr(err, "")
 					return
 				}
-				// TODO: handle not found error
-				r.setRequeueWithErr(err, "")
+				r.setRequeueAfter(time.Second, fmt.Sprintf("ConfigMap %s not found", cmRef.Name))
 				return
 			}
 			// TODO: validate cmRef.key exist in cm
@@ -484,8 +483,7 @@ func (r *helmTypeInstallStage) Handle(ctx context.Context) {
 					r.setRequeueWithErr(err, "")
 					return
 				}
-				// TODO: handle not found error
-				r.setRequeueWithErr(err, "")
+				r.setRequeueAfter(time.Second, fmt.Sprintf("Secret %s not found", secret.Name))
 				return
 			}
 			// TODO: validate secretRef.key exist in secret

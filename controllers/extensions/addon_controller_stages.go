@@ -732,7 +732,7 @@ func createHelmJobProto(addon *extensionsv1alpha1.Addon) (*batchv1.Job, error) {
 		}
 	}
 	ttlSec := int32(ttl.Seconds())
-	helmInstallJob := &batchv1.Job{
+	helmProtoJob := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels: map[string]string{
 				constant.AddonNameLabelKey:    addon.Name,
@@ -794,7 +794,17 @@ func createHelmJobProto(addon *extensionsv1alpha1.Addon) (*batchv1.Job, error) {
 			},
 		},
 	}
-	podSpec := &helmInstallJob.Spec.Template.Spec
+	// inherit kubeblocks.io labels from primary resource
+	for k, v := range addon.Labels {
+		if !strings.Contains(k, constant.APIGroup) {
+			continue
+		}
+		if _, ok := helmProtoJob.ObjectMeta.Labels[k]; !ok {
+			helmProtoJob.ObjectMeta.Labels[k] = v
+		}
+	}
+
+	podSpec := &helmProtoJob.Spec.Template.Spec
 	if cmTolerations := viper.GetString(constant.CfgKeyCtrlrMgrTolerations); cmTolerations != "" &&
 		cmTolerations != "[]" && cmTolerations != "[{}]" {
 		if err := json.Unmarshal([]byte(cmTolerations), &podSpec.Tolerations); err != nil {
@@ -821,5 +831,5 @@ func createHelmJobProto(addon *extensionsv1alpha1.Addon) (*batchv1.Job, error) {
 			return nil, err
 		}
 	}
-	return helmInstallJob, nil
+	return helmProtoJob, nil
 }

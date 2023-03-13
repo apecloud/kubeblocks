@@ -329,25 +329,49 @@ func getCompCommandArgs(compDef *appsv1alpha1.ClusterComponentDefinition) ([]str
 // accounts, we need to do some special handling.
 //
 // TODO: Refactoring using command channel
+// examples of iinfo.Args are:
+// mysql : "USER=$MYSQL_ROOT_USER MYSQL_PWD=$MYSQL_ROOT_PASSWORD mysql -h$(KB_ACCOUNT_ENDPOINT) -e \"$(KB_ACCOUNT_STATEMENT)\""
+// ps    : "psql -h$(KB_ACCOUNT_ENDPOINT) -c \"$(KB_ACCOUNT_STATEMENT)\""
+// redis : "redis-cli -h $(KB_ACCOUNT_ENDPOINT) \"$(KB_ACCOUNT_STATEMENT)\""
 func buildCommand(info *engine.ConnectionInfo) []string {
-	args := make([]string, 0)
-	for _, arg := range info.Args {
-		// KB_ACCOUNT_STATEMENT is used to create system accounts, ignore it
-		// replace KB_ACCOUNT_ENDPOINT with local host IP
-		if strings.Contains(arg, "$(KB_ACCOUNT_ENDPOINT)") && strings.Contains(arg, "$(KB_ACCOUNT_STATEMENT)") {
-			arg = strings.Replace(arg, "$(KB_ACCOUNT_ENDPOINT)", "127.0.0.1", 1)
-			arg = strings.Replace(arg, "$(KB_ACCOUNT_STATEMENT)", "", 1)
-			args = append(args, arg)
-			continue
+	args := buildArgs(info.Args)
+	return append(info.Command, args)
+}
+
+func buildArgs(args []string) string {
+	result := make([]string, 0)
+	for _, arg := range args {
+		// split arg by space
+		tmpStrs := strings.Split(trimQuotation(arg), " ")
+		for i := 0; i < len(tmpStrs); i++ {
+			str := tmpStrs[i]
+			// skip command
+			if str == "-c" || str == "-e" {
+				i++
+				continue
+			}
+			if strings.Contains(str, "$(KB_ACCOUNT_STATEMENT)") {
+				continue
+			}
+			// replace endpoint with localhost
+			if strings.Contains(str, "$(KB_ACCOUNT_ENDPOINT)") {
+				result = append(result, strings.Replace(str, "$(KB_ACCOUNT_ENDPOINT)", "127.0.0.1", 1))
+				continue
+			}
+			result = append(result, str)
 		}
-		if strings.Contains(arg, "$(KB_ACCOUNT_ENDPOINT)") {
-			args = append(args, strings.Replace(arg, "$(KB_ACCOUNT_ENDPOINT)", "127.0.0.1", 1))
-			continue
-		}
-		if strings.Contains(arg, "$(KB_ACCOUNT_STATEMENT)") {
-			continue
-		}
-		args = append(args, strings.Replace(strings.Replace(arg, "(", "", 1), ")", "", 1))
 	}
-	return append(info.Command, strings.Join(args, " "))
+	return strings.Join(result, " ")
+}
+
+func trimQuotation(str string) string {
+	if len(str) > 0 {
+		if str[0] == '"' {
+			str = str[1:]
+		}
+		if str[len(str)-1] == '"' {
+			str = str[:len(str)-1]
+		}
+	}
+	return str
 }

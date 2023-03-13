@@ -19,10 +19,10 @@ package constant
 const (
 	// config keys used in viper, DON'T refactor the value without careful inspections
 	CfgKeyServerInfo           = "_KUBE_SERVER_INFO"
-	CfgKeyCtrlrMrgNS           = "CM_NAMESPACE"
-	CfgKeyCtrlrMrgAffinity     = "CM_AFFINITY"
-	CfgKeyCtrlrMrgNodeSelector = "CM_NODE_SELECTOR"
-	CfgKeyCtrlrMrgTolerations  = "CM_TOLERATIONS"
+	CfgKeyCtrlrMgrNS           = "CM_NAMESPACE"
+	CfgKeyCtrlrMgrAffinity     = "CM_AFFINITY"
+	CfgKeyCtrlrMgrNodeSelector = "CM_NODE_SELECTOR"
+	CfgKeyCtrlrMgrTolerations  = "CM_TOLERATIONS"
 
 	// addon config keys
 	CfgKeyAddonJobTTL        = "ADDON_JOB_TTL"

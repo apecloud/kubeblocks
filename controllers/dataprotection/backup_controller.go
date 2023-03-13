@@ -341,7 +341,7 @@ func (r *BackupReconciler) createPreCommandJobAndEnsure(reqCtx intctrlutil.Reque
 		return true, err
 	}
 
-	mgrNS := viper.GetString(constant.CfgKeyCtrlrMrgNS)
+	mgrNS := viper.GetString(constant.CfgKeyCtrlrMgrNS)
 	key := types.NamespacedName{Namespace: mgrNS, Name: backup.Name + "-pre"}
 	if err := r.createHooksCommandJob(reqCtx, backup, key, true); err != nil {
 		return false, err
@@ -361,7 +361,7 @@ func (r *BackupReconciler) createPostCommandJobAndEnsure(reqCtx intctrlutil.Requ
 		return true, err
 	}
 
-	mgrNS := viper.GetString(constant.CfgKeyCtrlrMrgNS)
+	mgrNS := viper.GetString(constant.CfgKeyCtrlrMgrNS)
 	key := types.NamespacedName{Namespace: mgrNS, Name: backup.Name + "-post"}
 	if err := r.createHooksCommandJob(reqCtx, backup, key, false); err != nil {
 		return false, err
@@ -634,7 +634,7 @@ func (r *BackupReconciler) deleteReferenceBatchV1Jobs(reqCtx intctrlutil.Request
 		return err
 	}
 	// if controller manager deploy in other namespace, do list and delete related jobs.
-	mgrNS := viper.GetString(constant.CfgKeyCtrlrMrgNS)
+	mgrNS := viper.GetString(constant.CfgKeyCtrlrMgrNS)
 	if mgrNS != backup.Namespace {
 		mgrJobs := &batchv1.JobList{}
 		if err := r.Client.List(reqCtx.Ctx, mgrJobs,

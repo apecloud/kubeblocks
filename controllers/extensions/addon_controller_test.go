@@ -53,7 +53,7 @@ var _ = Describe("Addon controller", func() {
 
 		// delete rest mocked objects
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
-		inNS := client.InNamespace(viper.GetString(constant.CfgKeyCtrlrMrgNS))
+		inNS := client.InNamespace(viper.GetString(constant.CfgKeyCtrlrMgrNS))
 		testapps.ClearResources(&testCtx, intctrlutil.JobSignature, inNS,
 			client.HasLabels{
 				constant.AddonNameLabelKey,
@@ -83,9 +83,9 @@ var _ = Describe("Addon controller", func() {
 
 		AfterEach(func() {
 			cleanEnv()
-			viper.Set(constant.CfgKeyCtrlrMrgTolerations, "")
-			viper.Set(constant.CfgKeyCtrlrMrgAffinity, "")
-			viper.Set(constant.CfgKeyCtrlrMrgNodeSelector, "")
+			viper.Set(constant.CfgKeyCtrlrMgrTolerations, "")
+			viper.Set(constant.CfgKeyCtrlrMgrAffinity, "")
+			viper.Set(constant.CfgKeyCtrlrMgrNodeSelector, "")
 		})
 
 		fakeCompletedJob := func(g Gomega, jobKey client.ObjectKey) {
@@ -107,7 +107,7 @@ var _ = Describe("Addon controller", func() {
 
 		fakeIntallationCompletedJob := func(expectedObservedGeneration int) {
 			jobKey := client.ObjectKey{
-				Namespace: viper.GetString(constant.CfgKeyCtrlrMrgNS),
+				Namespace: viper.GetString(constant.CfgKeyCtrlrMgrNS),
 				Name:      getInstallJobName(addon),
 			}
 			Eventually(func(g Gomega) {
@@ -174,7 +174,7 @@ var _ = Describe("Addon controller", func() {
 			helmRelease := &corev1.Secret{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      fmt.Sprintf("sh.helm.release.v1.%s.v1", addon.Name),
-					Namespace: viper.GetString(constant.CfgKeyCtrlrMrgNS),
+					Namespace: viper.GetString(constant.CfgKeyCtrlrMgrNS),
 					Labels: map[string]string{
 						"owner": "helm",
 						"name":  getHelmReleaseName(addon),
@@ -199,7 +199,7 @@ var _ = Describe("Addon controller", func() {
 
 			By("By disabled enabled addon with fake completed uninstall job status")
 			jobKey := client.ObjectKey{
-				Namespace: viper.GetString(constant.CfgKeyCtrlrMrgNS),
+				Namespace: viper.GetString(constant.CfgKeyCtrlrMgrNS),
 				Name:      getUninstallJobName(addon),
 			}
 			Eventually(func(g Gomega) {
@@ -216,11 +216,11 @@ var _ = Describe("Addon controller", func() {
 		})
 
 		It("should successfully reconcile a custom resource for Addon run job with controller manager schedule settings", func() {
-			viper.Set(constant.CfgKeyCtrlrMrgAffinity,
+			viper.Set(constant.CfgKeyCtrlrMgrAffinity,
 				"{\"nodeAffinity\":{\"preferredDuringSchedulingIgnoredDuringExecution\":[{\"preference\":{\"matchExpressions\":[{\"key\":\"kb-controller\",\"operator\":\"In\",\"values\":[\"true\"]}]},\"weight\":100}]}}")
-			viper.Set(constant.CfgKeyCtrlrMrgTolerations,
+			viper.Set(constant.CfgKeyCtrlrMgrTolerations,
 				"[{\"key\":\"key1\", \"operator\": \"Exists\", \"effect\": \"NoSchedule\"}]")
-			viper.Set(constant.CfgKeyCtrlrMrgNodeSelector, "{\"beta.kubernetes.io/arch\":\"amd64\"}")
+			viper.Set(constant.CfgKeyCtrlrMgrNodeSelector, "{\"beta.kubernetes.io/arch\":\"amd64\"}")
 
 			By("By create an addon with auto-install")
 			createAddonSpecWithRequiredAttributes(func(newOjb *extensionsv1alpha1.Addon) {
@@ -232,7 +232,7 @@ var _ = Describe("Addon controller", func() {
 
 			By("By checking status.observedGeneration and status.phase=disabled")
 			jobKey := client.ObjectKey{
-				Namespace: viper.GetString(constant.CfgKeyCtrlrMrgNS),
+				Namespace: viper.GetString(constant.CfgKeyCtrlrMgrNS),
 				Name:      getInstallJobName(addon),
 			}
 			Eventually(func(g Gomega) {
@@ -281,11 +281,11 @@ var _ = Describe("Addon controller", func() {
 			By("By create an addon with spec.helm.installValues.configMapRefs set")
 			cm := testapps.CreateCustomizedObj(&testCtx, "addon/cm-values.yaml",
 				&corev1.ConfigMap{}, func(newCM *corev1.ConfigMap) {
-					newCM.Namespace = viper.GetString(constant.CfgKeyCtrlrMrgNS)
+					newCM.Namespace = viper.GetString(constant.CfgKeyCtrlrMgrNS)
 				})
 			secret := testapps.CreateCustomizedObj(&testCtx, "addon/secret-values.yaml",
 				&corev1.Secret{}, func(newSecret *corev1.Secret) {
-					newSecret.Namespace = viper.GetString(constant.CfgKeyCtrlrMrgNS)
+					newSecret.Namespace = viper.GetString(constant.CfgKeyCtrlrMgrNS)
 				})
 			createAddonSpecWithRequiredAttributes(func(newOjb *extensionsv1alpha1.Addon) {
 				newOjb.Spec.Installable.AutoInstall = true

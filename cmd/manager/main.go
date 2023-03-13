@@ -92,7 +92,7 @@ func init() {
 	viper.SetDefault("PROBE_SERVICE_GRPC_PORT", 50001)
 	viper.SetDefault("PROBE_SERVICE_LOG_LEVEL", "info")
 	viper.SetDefault("KUBEBLOCKS_SERVICEACCOUNT_NAME", "kubeblocks")
-	viper.SetDefault(constant.CfgKeyCtrlrMrgNS, "default")
+	viper.SetDefault(constant.CfgKeyCtrlrMgrNS, "default")
 }
 
 type flagName string
@@ -117,19 +117,19 @@ func validateRequiredToParseConfigs() error {
 			return err
 		}
 	}
-	if cmTolerations := viper.GetString(constant.CfgKeyCtrlrMrgTolerations); cmTolerations != "" {
+	if cmTolerations := viper.GetString(constant.CfgKeyCtrlrMgrTolerations); cmTolerations != "" {
 		Tolerations := []corev1.Toleration{}
 		if err := json.Unmarshal([]byte(cmTolerations), &Tolerations); err != nil {
 			return err
 		}
 	}
-	if cmAffinity := viper.GetString(constant.CfgKeyCtrlrMrgAffinity); cmAffinity != "" {
+	if cmAffinity := viper.GetString(constant.CfgKeyCtrlrMgrAffinity); cmAffinity != "" {
 		affinity := corev1.Affinity{}
 		if err := json.Unmarshal([]byte(cmAffinity), &affinity); err != nil {
 			return err
 		}
 	}
-	if cmNodeSelector := viper.GetString(constant.CfgKeyCtrlrMrgNodeSelector); cmNodeSelector != "" {
+	if cmNodeSelector := viper.GetString(constant.CfgKeyCtrlrMgrNodeSelector); cmNodeSelector != "" {
 		nodeSelector := map[string]string{}
 		if err := json.Unmarshal([]byte(cmNodeSelector), &nodeSelector); err != nil {
 			return err

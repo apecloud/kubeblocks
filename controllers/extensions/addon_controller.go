@@ -157,7 +157,7 @@ func (r *AddonReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 func (r *AddonReconciler) cleanupJobPods(reqCtx intctrlutil.RequestCtx) error {
 	if err := r.DeleteAllOf(reqCtx.Ctx, &corev1.Pod{},
-		client.InNamespace(viper.GetString(constant.CfgKeyCtrlrMrgNS)),
+		client.InNamespace(viper.GetString(constant.CfgKeyCtrlrMgrNS)),
 		client.MatchingLabels{
 			constant.AddonNameLabelKey:    reqCtx.Req.Name,
 			constant.AppManagedByLabelKey: constant.AppName,
@@ -174,7 +174,7 @@ func (r *AddonReconciler) deleteExternalResources(reqCtx intctrlutil.RequestCtx,
 	}
 	deleteJobIfExist := func(jobName string) error {
 		key := client.ObjectKey{
-			Namespace: viper.GetString(constant.CfgKeyCtrlrMrgNS),
+			Namespace: viper.GetString(constant.CfgKeyCtrlrMgrNS),
 			Name:      jobName,
 		}
 		job := &batchv1.Job{}

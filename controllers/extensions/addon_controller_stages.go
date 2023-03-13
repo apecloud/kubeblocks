@@ -314,7 +314,7 @@ func (r *progressingHandler) Handle(ctx context.Context) {
 		if addon.Status.Phase != extensionsv1alpha1.AddonEnabling {
 			if addon.Status.Phase == extensionsv1alpha1.AddonFailed {
 				// clean up existing failed installation job
-				mgrNS := viper.GetString(constant.CfgKeyCtrlrMrgNS)
+				mgrNS := viper.GetString(constant.CfgKeyCtrlrMgrNS)
 				key := client.ObjectKey{
 					Namespace: mgrNS,
 					Name:      getInstallJobName(addon),
@@ -354,7 +354,7 @@ func getHelmReleaseName(addon *extensionsv1alpha1.Addon) string {
 func (r *helmTypeInstallStage) Handle(ctx context.Context) {
 	r.process(func(addon *extensionsv1alpha1.Addon) {
 		r.reqCtx.Log.V(1).Info("helmTypeInstallStage", "phase", addon.Status.Phase)
-		mgrNS := viper.GetString(constant.CfgKeyCtrlrMrgNS)
+		mgrNS := viper.GetString(constant.CfgKeyCtrlrMgrNS)
 
 		key := client.ObjectKey{
 			Namespace: mgrNS,
@@ -530,7 +530,7 @@ func (r *helmTypeUninstallStage) Handle(ctx context.Context) {
 	r.process(func(addon *extensionsv1alpha1.Addon) {
 		r.reqCtx.Log.V(1).Info("helmTypeUninstallStage", "phase", addon.Status.Phase, "next", r.next.ID())
 		key := client.ObjectKey{
-			Namespace: viper.GetString(constant.CfgKeyCtrlrMrgNS),
+			Namespace: viper.GetString(constant.CfgKeyCtrlrMgrNS),
 			Name:      getUninstallJobName(addon),
 		}
 		helmUninstallJob := &batchv1.Job{}
@@ -776,7 +776,7 @@ func createHelmJobProto(addon *extensionsv1alpha1.Addon) (*batchv1.Job, error) {
 								},
 								{
 									Name:  "RELEASE_NS",
-									Value: viper.GetString(constant.CfgKeyCtrlrMrgNS),
+									Value: viper.GetString(constant.CfgKeyCtrlrMgrNS),
 								},
 								{
 									Name:  "CHART",
@@ -795,7 +795,7 @@ func createHelmJobProto(addon *extensionsv1alpha1.Addon) (*batchv1.Job, error) {
 		},
 	}
 	podSpec := &helmInstallJob.Spec.Template.Spec
-	if cmTolerations := viper.GetString(constant.CfgKeyCtrlrMrgTolerations); cmTolerations != "" &&
+	if cmTolerations := viper.GetString(constant.CfgKeyCtrlrMgrTolerations); cmTolerations != "" &&
 		cmTolerations != "[]" && cmTolerations != "[{}]" {
 		if err := json.Unmarshal([]byte(cmTolerations), &podSpec.Tolerations); err != nil {
 			return nil, err
@@ -811,12 +811,12 @@ func createHelmJobProto(addon *extensionsv1alpha1.Addon) (*batchv1.Job, error) {
 			podSpec.Tolerations = nil
 		}
 	}
-	if cmAffinity := viper.GetString(constant.CfgKeyCtrlrMrgAffinity); cmAffinity != "" {
+	if cmAffinity := viper.GetString(constant.CfgKeyCtrlrMgrAffinity); cmAffinity != "" {
 		if err := json.Unmarshal([]byte(cmAffinity), &podSpec.Affinity); err != nil {
 			return nil, err
 		}
 	}
-	if cmNodeSelector := viper.GetString(constant.CfgKeyCtrlrMrgNodeSelector); cmNodeSelector != "" {
+	if cmNodeSelector := viper.GetString(constant.CfgKeyCtrlrMgrNodeSelector); cmNodeSelector != "" {
 		if err := json.Unmarshal([]byte(cmNodeSelector), &podSpec.NodeSelector); err != nil {
 			return nil, err
 		}

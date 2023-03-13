@@ -73,7 +73,7 @@ var _ = BeforeSuite(func() {
 
 	ctx, cancel = context.WithCancel(context.TODO())
 
-	viper.SetDefault(constant.CfgKeyCtrlrMrgNS, "default")
+	viper.SetDefault(constant.CfgKeyCtrlrMgrNS, "default")
 	viper.SetDefault("KUBEBLOCKS_IMAGE", "apecloud/kubeblocks:latest")
 	fmt.Printf("config settings: %v\n", viper.AllSettings())
 

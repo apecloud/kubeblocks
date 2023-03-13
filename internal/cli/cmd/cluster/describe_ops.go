@@ -209,7 +209,6 @@ func (o *describeOpsOptions) printOpsCommand(opsRequest *appsv1alpha1.OpsRequest
 		commands = o.getVolumeExpansionCommand(opsRequest.Spec)
 	case appsv1alpha1.ReconfiguringType:
 		commands = o.getReconfiguringCommand(opsRequest.Spec)
-
 	}
 	if len(commands) == 0 {
 		printer.PrintLine("\nCommand: " + printer.NoneString)
@@ -217,7 +216,8 @@ func (o *describeOpsOptions) printOpsCommand(opsRequest *appsv1alpha1.OpsRequest
 	}
 	printer.PrintTitle("Command")
 	for i := range commands {
-		printer.PrintLine("  " + commands[i])
+		command := fmt.Sprintf("%s --namespace=%s", commands[i], opsRequest.Namespace)
+		printer.PrintLine("  " + command)
 	}
 }
 

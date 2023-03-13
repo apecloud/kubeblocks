@@ -667,6 +667,10 @@ spec:
                       reconfiguring.
                     items:
                       properties:
+                        componentUnitName:
+                          description: componentUnitName is a replication name when
+                            workload is Replication.
+                          type: string
                         expectedCount:
                           default: -1
                           description: expectedCount describes the number of expected

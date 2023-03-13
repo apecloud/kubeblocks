@@ -58,6 +58,8 @@ type reconfigureOptions struct {
 	truncDocument bool
 	paramName     string
 
+	// workloadType appsv1alpha1.WorkloadType
+
 	keys       []string
 	showDetail bool
 	// for cache

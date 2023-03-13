@@ -71,6 +71,7 @@ type OperationsOptions struct {
 	KeyValues       map[string]string `json:"keyValues"`
 	CfgTemplateName string            `json:"cfgTemplateName"`
 	CfgFile         string            `json:"cfgFile"`
+	workloadType    appsv1alpha1.WorkloadType
 
 	// VolumeExpansion options.
 	// VCTNames VolumeClaimTemplate names
@@ -174,17 +175,17 @@ func (o *OperationsOptions) validateReconfiguring() error {
 	if err != nil {
 		return err
 	}
-	if err := o.validateConfigMapKey(tpl, componentName); err != nil {
+	if err := o.validateConfigFileName(tpl, componentName); err != nil {
 		return err
 	}
-	if err := o.validateConfigParams(tpl, componentName); err != nil {
+	if err := o.validateConfigParams(tpl); err != nil {
 		return err
 	}
 	o.printConfigureTips()
 	return nil
 }
 
-func (o *OperationsOptions) validateConfigParams(tpl *appsv1alpha1.ConfigTemplate, componentName string) error {
+func (o *OperationsOptions) validateConfigParams(tpl *appsv1alpha1.ConfigTemplate) error {
 	transKeyPair := func(pts map[string]string) map[string]interface{} {
 		m := make(map[string]interface{}, len(pts))
 		for key, value := range pts {
@@ -233,12 +234,13 @@ func (o *OperationsOptions) validateTemplateParam(tpls []appsv1alpha1.ConfigTemp
 	return nil, cfgcore.MakeError("specify template name[%s] is not exist.", o.CfgTemplateName)
 }
 
-func (o *OperationsOptions) validateConfigMapKey(tpl *appsv1alpha1.ConfigTemplate, componentName string) error {
-	var (
-		cmObj  = corev1.ConfigMap{}
-		cmName = cfgcore.GetComponentCfgName(o.Name, componentName, tpl.VolumeName)
-	)
+func (o *OperationsOptions) validateConfigFileName(tpl *appsv1alpha1.ConfigTemplate, componentName string) error {
+	cmObj := corev1.ConfigMap{}
+	if o.workloadType == appsv1alpha1.Replication {
+		componentName = fmt.Sprintf("%s-%d", componentName, 0)
+	}
 
+	cmName := cfgcore.GetComponentCfgName(o.Name, componentName, tpl.VolumeName)
 	if err := util.GetResourceObjectFromGVR(types.ConfigmapGVR(), client.ObjectKey{
 		Name:      cmName,
 		Namespace: o.Namespace,
@@ -337,6 +339,12 @@ func (o *OperationsOptions) fillTemplateArgForReconfiguring() error {
 	if err != nil {
 		return err
 	}
+
+	workloadType, err := util.GetComponentWorkloadType(o.Name, o.Namespace, o.Dynamic, componentName)
+	if err != nil {
+		return err
+	}
+	o.workloadType = workloadType
 
 	if len(tplList) == 0 {
 		return makeNotFoundTemplateErr(o.Name, componentName)

@@ -354,6 +354,10 @@ type ConfigurationStatus struct {
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	Name string `json:"name"`
 
+	// componentUnitName is a replication name when workload is Replication.
+	// +optional
+	ComponentUnitName string `json:"componentUnitName,omitempty"`
+
 	// updatePolicy describes the policy of reconfiguring.
 	// +optional
 	UpdatePolicy UpgradePolicy `json:"updatePolicy,omitempty"`

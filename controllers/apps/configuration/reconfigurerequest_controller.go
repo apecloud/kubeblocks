@@ -305,6 +305,7 @@ func (r *ReconfigureRequestReconciler) handleConfigEvent(params reconfigureParam
 		CfgCM:            params.CfgCM,
 		ComponentUnits:   params.ComponentUnits,
 		PolicyStatus:     status,
+		ClusterComponent: params.ClusterComponent,
 	}
 
 	for _, handler := range cfgcore.ConfigEventHandlerMap {

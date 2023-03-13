@@ -331,18 +331,23 @@ func isOpsRequestFailedPhase(opsRequestPhase appsv1alpha1.Phase) bool {
 	return opsRequestPhase == appsv1alpha1.FailedPhase
 }
 
-func updateReconfigureStatusByCM(reconfiguringStatus *appsv1alpha1.ReconfiguringStatus, tplName string,
+func updateReconfigureStatusByCM(reconfiguringStatus *appsv1alpha1.ReconfiguringStatus, tplName, componentUnitName string,
 	handleReconfigureStatus handleReconfigureOpsStatus) error {
 	for i, cmStatus := range reconfiguringStatus.ConfigurationStatus {
-		if cmStatus.Name == tplName {
+		if cmStatus.Name != tplName {
+			continue
+		}
+		// Compatible with previous logic.
+		if cmStatus.ComponentUnitName == "" || componentUnitName == "" || cmStatus.ComponentUnitName == componentUnitName {
 			// update cmStatus
 			return handleReconfigureStatus(&reconfiguringStatus.ConfigurationStatus[i])
 		}
 	}
 	cmCount := len(reconfiguringStatus.ConfigurationStatus)
 	reconfiguringStatus.ConfigurationStatus = append(reconfiguringStatus.ConfigurationStatus, appsv1alpha1.ConfigurationStatus{
-		Name:   tplName,
-		Status: appsv1alpha1.ReasonReconfigureMerging,
+		ComponentUnitName: componentUnitName,
+		Name:              tplName,
+		Status:            appsv1alpha1.ReasonReconfigureMerging,
 	})
 	cmStatus := &reconfiguringStatus.ConfigurationStatus[cmCount]
 	return handleReconfigureStatus(cmStatus)
@@ -355,7 +360,7 @@ func updateReconfigureStatusByCM(reconfiguringStatus *appsv1alpha1.Reconfiguring
 // reconfiguringStatus describes status of reconfiguring operation, which contains multi configuration templates.
 // cmStatus describes status of configmap, it is uniquely associated with a configuration template, which contains multi key, each key represents name of a configuration file.
 // execStatus describes the result of the execution of the state machine, which is designed to solve how to do the reconfiguring operation, such as whether to restart, how to send a signal to the process.
-func patchReconfigureOpsStatus(opsRes *OpsResource, tplName string, handleReconfigureStatus handleReconfigureOpsStatus) error {
+func patchReconfigureOpsStatus(opsRes *OpsResource, tplName, componentUnitName string, handleReconfigureStatus handleReconfigureOpsStatus) error {
 	var opsRequest = opsRes.OpsRequest
 
 	patch := client.MergeFrom(opsRequest.DeepCopy())
@@ -366,7 +371,7 @@ func patchReconfigureOpsStatus(opsRes *OpsResource, tplName string, handleReconf
 	}
 
 	reconfiguringStatus := opsRequest.Status.ReconfiguringStatus
-	if err := updateReconfigureStatusByCM(reconfiguringStatus, tplName, handleReconfigureStatus); err != nil {
+	if err := updateReconfigureStatusByCM(reconfiguringStatus, tplName, componentUnitName, handleReconfigureStatus); err != nil {
 		return err
 	}
 	return opsRes.Client.Status().Patch(opsRes.Ctx, opsRequest, patch)

@@ -17,6 +17,8 @@ limitations under the License.
 package operations
 
 import (
+	"fmt"
+	"strings"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -87,12 +89,13 @@ func (r *reconfigureAction) Handle(eventContext cfgcore.ConfigEventContext, last
 		return err
 	}
 
-	if err := patchReconfigureOpsStatus(opsRes, eventContext.TplName,
+	componentUnitName := getComponentUnitName(eventContext)
+	if err := patchReconfigureOpsStatus(opsRes, eventContext.TplName, componentUnitName,
 		handleReconfigureStatusProgress(eventContext.PolicyStatus, phase, &opsRequest.Status)); err != nil {
 		return err
 	}
 
-	switch phase {
+	switch getReconfigurePhase(opsRequest.Status.ReconfiguringStatus, eventContext.Component, phase) {
 	case appsv1alpha1.SucceedPhase:
 		return PatchOpsStatus(opsRes, appsv1alpha1.RunningPhase,
 			appsv1alpha1.NewReconfigureRunningCondition(opsRequest,
@@ -113,6 +116,46 @@ func (r *reconfigureAction) Handle(eventContext cfgcore.ConfigEventContext, last
 				appsv1alpha1.ReasonReconfigureRunning,
 				eventContext.TplName))
 	}
+}
+
+// Merge the states of the state machines of multiple components, the logic is as follows:
+// if one component fails, OpsRequest fails;
+// else the state of OpsRequest is the smallest state of all components; Merge < ReconfigureRuing < Succeed
+// TODO Replace the string type with a comparable type, refactor state merge for multi components.
+func getReconfigurePhase(status *appsv1alpha1.ReconfiguringStatus, component *appsv1alpha1.ClusterComponentDefinition, phase appsv1alpha1.Phase) appsv1alpha1.Phase {
+	if component.WorkloadType != appsv1alpha1.Replication {
+		return phase
+	}
+
+	var aggregatePhase = appsv1alpha1.SucceedPhase
+	for _, cmStatus := range status.ConfigurationStatus {
+		switch cmStatus.Status {
+		case appsv1alpha1.ReasonReconfigureFailed:
+			return appsv1alpha1.FailedPhase
+		case appsv1alpha1.ReasonReconfigureRunning:
+			aggregatePhase = appsv1alpha1.RunningPhase
+		case appsv1alpha1.ReasonReconfigureMerged:
+			aggregatePhase = appsv1alpha1.RunningPhase
+		default:
+			// ReconfigureInvalidUpdated
+			// ReconfigureRunning
+			// keep phase
+		}
+	}
+	return aggregatePhase
+}
+
+func getComponentUnitName(context cfgcore.ConfigEventContext) string {
+	componentName := context.ClusterComponent.Name
+	if context.Component.WorkloadType != appsv1alpha1.Replication {
+		return componentName
+	}
+
+	componentUnitName := ""
+	if len(context.ComponentUnits) > 0 {
+		componentUnitName = context.ComponentUnits[0].Name
+	}
+	return strings.TrimPrefix(componentUnitName, fmt.Sprintf("%s-", context.Cluster.Name))
 }
 
 func handleReconfigureStatusProgress(execStatus cfgcore.PolicyExecStatus, phase appsv1alpha1.Phase, opsStatus *appsv1alpha1.OpsRequestStatus) handleReconfigureOpsStatus {
@@ -136,10 +179,11 @@ func handleReconfigureStatusProgress(execStatus cfgcore.PolicyExecStatus, phase 
 	}
 }
 
-func handleNewReconfigureRequest(configPatch *cfgcore.ConfigPatchInfo, lastAppliedConfigs map[string]string) handleReconfigureOpsStatus {
+func handleNewReconfigureRequest(configPatch *cfgcore.ConfigPatchInfo, lastAppliedConfigs map[string]string, componentUnitName string) handleReconfigureOpsStatus {
 	return func(cmStatus *appsv1alpha1.ConfigurationStatus) error {
 		cmStatus.Status = appsv1alpha1.ReasonReconfigureMerged
 		cmStatus.LastAppliedConfiguration = lastAppliedConfigs
+		cmStatus.ComponentUnitName = componentUnitName
 		cmStatus.UpdatedParameters = appsv1alpha1.UpdatedParameters{
 			AddedKeys:   i2sMap(configPatch.AddConfig),
 			UpdatedKeys: b2sMap(configPatch.UpdateConfig),
@@ -239,6 +283,15 @@ func (r *reconfigureAction) Action(resource *OpsResource) error {
 		return cfgcore.WrapError(err, "failed to get clusterdefinition[%s]", cluster.Spec.ClusterDefRef)
 	}
 
+	clusterComponent := cluster.GetComponentByName(componentName)
+	if clusterComponent == nil {
+		return cfgcore.MakeError("failed to get component[%s] in cluster[%s]", componentName, clusterName)
+	}
+	clusterDefComponent := clusterDefinition.GetComponentDefByName(clusterComponent.ComponentDefRef)
+	if clusterDefComponent == nil {
+		return cfgcore.MakeError("failed to get component[%s] in clusterdefinition[%s]", clusterComponent.ComponentDefRef, cluster.Spec.ClusterDefRef)
+	}
+
 	if err := cfgcore.GetClusterVersionResource(cluster.Spec.ClusterVersionRef, clusterVersion, resource.Client, resource.Ctx); err != nil {
 		return err
 	}
@@ -255,13 +308,10 @@ func (r *reconfigureAction) Action(resource *OpsResource) error {
 	if err != nil {
 		return cfgcore.WrapError(err, "failed to get config template[%s]", componentName)
 	}
-	return r.doMergeAndPersist(clusterName, componentName, spec.Reconfigure, resource, tpls)
+	return r.doMergeAndPersist(clusterName, componentName, spec.Reconfigure, resource, tpls, clusterDefComponent.WorkloadType, clusterComponent.Replicas)
 }
 
-func (r *reconfigureAction) doMergeAndPersist(clusterName, componentName string,
-	reconfigure *appsv1alpha1.Reconfigure,
-	resource *OpsResource,
-	tpls []appsv1alpha1.ConfigTemplate) error {
+func (r *reconfigureAction) doMergeAndPersist(clusterName, componentName string, reconfigure *appsv1alpha1.Reconfigure, resource *OpsResource, tpls []appsv1alpha1.ConfigTemplate, workloadType appsv1alpha1.WorkloadType, replicas int32) error {
 	findTpl := func(tplName string) *appsv1alpha1.ConfigTemplate {
 		if len(tplName) == 0 && len(tpls) == 1 {
 			return &tpls[0]
@@ -276,6 +326,7 @@ func (r *reconfigureAction) doMergeAndPersist(clusterName, componentName string,
 
 	// Update params to configmap
 	// TODO support multi tpl conditions merge
+	var err error
 	for _, config := range reconfigure.Configurations {
 		tpl := findTpl(config.Name)
 		if tpl == nil {
@@ -286,23 +337,68 @@ func (r *reconfigureAction) doMergeAndPersist(clusterName, componentName string,
 			return processMergedFailed(resource, true,
 				cfgcore.MakeError("current tpl not support reconfigure, tpl: %v", tpl))
 		}
-		result := updateCfgParams(config, *tpl, client.ObjectKey{
-			Name:      cfgcore.GetComponentCfgName(clusterName, componentName, tpl.VolumeName),
+		switch workloadType {
+		default:
+			err = doComponentUnitReconfigure(config, tpl, clusterName, componentName, resource)
+		case appsv1alpha1.Replication:
+			err = doReplicationComponentReconfigure(config, tpl, clusterName, componentName, resource, replicas)
+		}
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func doComponentUnitReconfigure(config appsv1alpha1.Configuration, configTemplate *appsv1alpha1.ConfigTemplate, clusterName, componentName string, resource *OpsResource) error {
+	result := updateCfgParams(config, *configTemplate, client.ObjectKey{
+		Name:      cfgcore.GetComponentCfgName(clusterName, componentName, configTemplate.VolumeName),
+		Namespace: resource.Cluster.Namespace,
+	}, resource.Ctx, resource.Client, resource.OpsRequest.Name)
+	if result.err != nil {
+		return processMergedFailed(resource, result.failed, result.err)
+	}
+
+	// merged successfully
+	if err := patchReconfigureOpsStatus(resource, configTemplate.Name, componentName,
+		handleNewReconfigureRequest(result.configPatch, result.lastAppliedConfigs, componentName)); err != nil {
+		return err
+	}
+	conditions := constructReconfiguringConditions(result, resource, configTemplate)
+	if err := PatchOpsStatus(resource, appsv1alpha1.RunningPhase, conditions...); err != nil {
+		return err
+	}
+	return nil
+}
+
+func doReplicationComponentReconfigure(config appsv1alpha1.Configuration, configTemplate *appsv1alpha1.ConfigTemplate, clusterName, componentName string, resource *OpsResource, replicas int32) error {
+	componentConfigUpdator := func(componentUnitName string) reconfiguringResult {
+		result := updateCfgParams(config, *configTemplate, client.ObjectKey{
+			Name:      cfgcore.GetComponentCfgName(clusterName, componentUnitName, configTemplate.VolumeName),
 			Namespace: resource.Cluster.Namespace,
 		}, resource.Ctx, resource.Client, resource.OpsRequest.Name)
-		if result.err != nil {
-			return processMergedFailed(resource, result.failed, result.err)
+		return result
+	}
+
+	var last reconfiguringResult
+	for i := int32(0); i < replicas; i++ {
+		componentUnitName := fmt.Sprintf("%s-%d", componentName, i)
+		r := componentConfigUpdator(componentUnitName)
+		if r.err != nil {
+			return processMergedFailed(resource, r.failed, r.err)
 		}
 
 		// merged successfully
-		if err := patchReconfigureOpsStatus(resource, tpl.Name,
-			handleNewReconfigureRequest(result.configPatch, result.lastAppliedConfigs)); err != nil {
+		if err := patchReconfigureOpsStatus(resource, configTemplate.Name, componentUnitName,
+			handleNewReconfigureRequest(r.configPatch, r.lastAppliedConfigs, componentUnitName)); err != nil {
 			return err
 		}
-		conditions := constructReconfiguringConditions(result, resource, tpl)
-		if err := PatchOpsStatus(resource, appsv1alpha1.RunningPhase, conditions...); err != nil {
-			return err
-		}
+		last = r
+	}
+
+	conditions := constructReconfiguringConditions(last, resource, configTemplate)
+	if err := PatchOpsStatus(resource, appsv1alpha1.RunningPhase, conditions...); err != nil {
+		return err
 	}
 	return nil
 }

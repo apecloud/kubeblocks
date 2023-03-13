@@ -471,6 +471,36 @@ func GetConfigTemplateList(clusterName string, namespace string, cli dynamic.Int
 	return validTpls, nil
 }
 
+func GetComponentWorkloadType(clusterName string, namespace string, cli dynamic.Interface, componentName string) (appsv1alpha1.WorkloadType, error) {
+	clusterObj := appsv1alpha1.Cluster{}
+	clusterDefObj := appsv1alpha1.ClusterDefinition{}
+
+	if err := GetResourceObjectFromGVR(types.ClusterGVR(), client.ObjectKey{
+		Namespace: namespace,
+		Name:      clusterName,
+	}, cli, &clusterObj); err != nil {
+		return "", err
+	}
+
+	clusterDefName := clusterObj.Spec.ClusterDefRef
+	if err := GetResourceObjectFromGVR(types.ClusterDefGVR(), client.ObjectKey{
+		Namespace: "",
+		Name:      clusterDefName,
+	}, cli, &clusterDefObj); err != nil {
+		return "", err
+	}
+
+	clusterComponent := clusterObj.GetComponentByName(componentName)
+	if clusterComponent == nil {
+		return "", cfgcore.MakeError("not found component[%s] from cluster[%s]", componentName, clusterName)
+	}
+	clusterDefComponent := clusterDefObj.GetComponentDefByName(clusterComponent.ComponentDefRef)
+	if clusterDefComponent == nil {
+		return "", cfgcore.MakeError("not found component[%s] from clusterdefinition[%s]", clusterComponent.ComponentDefRef, clusterDefName)
+	}
+	return clusterDefComponent.WorkloadType, nil
+}
+
 // GetResourceObjectFromGVR query the resource object using GVR.
 func GetResourceObjectFromGVR(gvr schema.GroupVersionResource, key client.ObjectKey, client dynamic.Interface, k8sObj interface{}) error {
 	unstructuredObj, err := client.

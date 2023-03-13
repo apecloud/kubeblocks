@@ -254,18 +254,19 @@ func (o *CreateBackupOptions) getDefaultBackupPolicyTemplate() (string, error) {
 func NewCreateBackupCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := &CreateBackupOptions{BaseOptions: create.BaseOptions{IOStreams: streams}}
 	inputs := create.Inputs{
-		Use:             "backup",
-		Short:           "Create a backup",
-		Example:         createBackupExample,
-		CueTemplateName: "backup_template.cue",
-		ResourceName:    types.ResourceBackups,
-		Group:           types.DPAPIGroup,
-		Version:         types.DPAPIVersion,
-		BaseOptionsObj:  &o.BaseOptions,
-		Options:         o,
-		Factory:         f,
-		Complete:        o.Complete,
-		Validate:        o.Validate,
+		Use:                          "backup",
+		Short:                        "Create a backup",
+		Example:                      createBackupExample,
+		CueTemplateName:              "backup_template.cue",
+		ResourceName:                 types.ResourceBackups,
+		Group:                        types.DPAPIGroup,
+		Version:                      types.DPAPIVersion,
+		BaseOptionsObj:               &o.BaseOptions,
+		Options:                      o,
+		Factory:                      f,
+		Complete:                     o.Complete,
+		Validate:                     o.Validate,
+		ResourceNameGVRForCompletion: types.ClusterGVR(),
 		BuildFlags: func(cmd *cobra.Command) {
 			cmd.Flags().StringVar(&o.BackupType, "backup-type", "snapshot", "Backup type")
 			cmd.Flags().StringVar(&o.BackupName, "backup-name", "", "Backup name")

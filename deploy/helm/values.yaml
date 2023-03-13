@@ -1586,7 +1586,7 @@ alertmanager-webhook-adaptor:
 
   ## ConfigMap override where fullname is {{.Release.Name}}-{{.Values.configMapOverrideName}}
   ##
-  configMapOverrideName: "webhook-adaptor-config"
+  configMapOverrideName: "config"
 
   resources: { }
   # We usually recommend not to specify default resources and to leave this as a conscious

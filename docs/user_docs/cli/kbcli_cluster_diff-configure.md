@@ -1,6 +1,6 @@
 ## kbcli cluster diff-configure
 
-List the constraint for supported configuration params
+Show the difference in parameters between the two submitted OpsRequest
 
 ```
 kbcli cluster diff-configure [flags]

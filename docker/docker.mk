@@ -64,7 +64,7 @@ push-cli-image: clean-kbcli build-checks bin/kbcli.linux.amd64 bin/kbcli.linux.a
 
 
 .PHONY: build-manager-image
-build-manager-image: build-checks ## Build Operator manager container image.
+build-manager-image: generate ## Build Operator manager container image.
 ifneq ($(BUILDX_ENABLED), true)
 	docker build . -t ${IMG}:${VERSION} -f $(DOCKERFILE_DIR)/Dockerfile -t ${IMG}:latest
 else
@@ -77,7 +77,7 @@ endif
 
 
 .PHONY: push-manager-image
-push-manager-image: build-checks ## Push Operator manager container image.
+push-manager-image: generate ## Push Operator manager container image.
 ifneq ($(BUILDX_ENABLED), true)
 ifeq ($(TAG_LATEST), true)
 	docker push ${IMG}:latest
@@ -93,7 +93,7 @@ endif
 endif
 
 .PHONY: build-loadbalancer-image
-build-loadbalancer-image: build-checks ## Push docker image with the loadbalancer.
+build-loadbalancer-image: generate ## Push docker image with the loadbalancer.
 ifneq ($(BUILDX_ENABLED), true)
 	docker build . -t ${IMG}:${VERSION} -t ${IMG}:latest -f $(DOCKERFILE_DIR)/Dockerfile-loadbalancer
 else
@@ -105,7 +105,7 @@ endif
 endif
 
 .PHONY: push-loadbalancer-image
-push-loadbalancer-image: build-checks ## Push docker image with the loadbalancer.
+push-loadbalancer-image: generate ## Push docker image with the loadbalancer.
 ifneq ($(BUILDX_ENABLED), true)
 ifeq ($(TAG_LATEST), true)
 	docker push ${IMG}:latest

@@ -110,6 +110,29 @@ func TestAvailableReplicasAreConsistent(t *testing.T) {
 	}
 }
 
+func TestGetCompPhaseByConditions(t *testing.T) {
+	existLatestRevisionFailedPod := true
+	primaryReplicaIsReady := true
+	phase := GetCompPhaseByConditions(existLatestRevisionFailedPod, primaryReplicaIsReady, int32(1), int32(1), int32(1))
+	if phase != "" {
+		t.Error(`function GetComponentPhase should return ""`)
+	}
+	phase = GetCompPhaseByConditions(existLatestRevisionFailedPod, primaryReplicaIsReady, int32(2), int32(1), int32(1))
+	if phase != appsv1alpha1.AbnormalPhase {
+		t.Error(`function GetComponentPhase should return "Abnormal"`)
+	}
+	primaryReplicaIsReady = false
+	phase = GetCompPhaseByConditions(existLatestRevisionFailedPod, primaryReplicaIsReady, int32(2), int32(1), int32(1))
+	if phase != appsv1alpha1.FailedPhase {
+		t.Error(`function GetComponentPhase should return "Failed"`)
+	}
+	existLatestRevisionFailedPod = false
+	phase = GetCompPhaseByConditions(existLatestRevisionFailedPod, primaryReplicaIsReady, int32(2), int32(1), int32(1))
+	if phase != "" {
+		t.Error(`function GetComponentPhase should return ""`)
+	}
+}
+
 var _ = Describe("Consensus Component", func() {
 	var (
 		randomStr          = testCtx.GetRandomStr()

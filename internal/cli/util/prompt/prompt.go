@@ -20,44 +20,19 @@ import (
 	"io"
 
 	"github.com/manifoldco/promptui"
-	"github.com/pkg/errors"
 )
 
-type prompt struct {
-	errorMsg string
-	label    string
-	in       io.ReadCloser
-}
-
-func NewPrompt(errMsg string, label string, in io.Reader) *prompt {
-	return &prompt{
-		errorMsg: errMsg,
-		label:    label,
-		in:       io.NopCloser(in),
+func NewPrompt(label string, validate promptui.ValidateFunc, in io.Reader) *promptui.Prompt {
+	p := promptui.Prompt{
+		Label: label,
+		Stdin: io.NopCloser(in),
+		Templates: &promptui.PromptTemplates{
+			Prompt:  "{{ . }} ",
+			Valid:   "{{ . | green }} ",
+			Invalid: "{{ . | red }} ",
+			Success: "{{ . | bold }} ",
+		},
+		Validate: validate,
 	}
-}
-
-func (p *prompt) GetInput() (string, error) {
-	validate := func(input string) error {
-		if len(input) == 0 {
-			return errors.New(p.errorMsg)
-		}
-		return nil
-	}
-
-	templates := &promptui.PromptTemplates{
-		Prompt:  "{{ . }} ",
-		Valid:   "{{ . | green }} ",
-		Invalid: "{{ . | red }} ",
-		Success: "{{ . | bold }} ",
-	}
-
-	prompt := promptui.Prompt{
-		Label:     p.label,
-		Templates: templates,
-		Validate:  validate,
-		Stdin:     p.in,
-	}
-
-	return prompt.Run()
+	return &p
 }

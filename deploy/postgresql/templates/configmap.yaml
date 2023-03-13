@@ -6,7 +6,7 @@ metadata:
     {{- include "postgresql.labels" . | nindent 4 }}
 data:
   postgresql.conf: |-
-    {{- .Files.Get "config/pg14.conf.tpl" | nindent 4 }}
+    {{- .Files.Get "config/pg14-config.tpl" | nindent 4 }}
   # TODO: check if it should trust all
   pg_hba.conf: |
     host     all             all             0.0.0.0/0               trust

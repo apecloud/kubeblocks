@@ -117,10 +117,7 @@ func (consensusSet *ConsensusSet) HandleProbeTimeoutWhenPodsReady(recorder recor
 		}
 		if role == "" {
 			isAbnormal = true
-			if compStatus.Message == nil {
-				compStatus.Message = appsv1alpha1.ComponentMessageMap{}
-			}
-			compStatus.Message.SetObjectMessage(pod.Kind, pod.Name, "Role probe timeout, check whether the application is available")
+			compStatus.SetObjectMessage(pod.Kind, pod.Name, "Role probe timeout, check whether the application is available")
 			needPatch = true
 		}
 		// TODO clear up the message of ready pod in component.message.
@@ -176,18 +173,8 @@ func (consensusSet *ConsensusSet) GetPhaseWhenPodsNotReady(componentName string)
 			existLatestRevisionFailedPod = true
 		}
 	}
-	// if the failed pod is not controlled by the latest revision, ignore it.
-	if !existLatestRevisionFailedPod {
-		return "", nil
-	}
-	if !leaderIsReady {
-		return appsv1alpha1.FailedPhase, nil
-	}
-	// checks if the available replicas of component and workload are consistent.
-	if !util.AvailableReplicasAreConsistent(componentReplicas, int32(podCount), stsObj.Status.AvailableReplicas) {
-		return appsv1alpha1.AbnormalPhase, nil
-	}
-	return "", nil
+	return util.GetCompPhaseByConditions(existLatestRevisionFailedPod, leaderIsReady,
+		componentReplicas, int32(podCount), stsObj.Status.AvailableReplicas), nil
 }
 
 func (consensusSet *ConsensusSet) HandleUpdate(obj client.Object) error {

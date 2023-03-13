@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/klog/v2"
+	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
 
 	cp "github.com/apecloud/kubeblocks/internal/cli/cloudprovider"
@@ -256,13 +257,16 @@ func (o *initOptions) cloud() error {
 
 	// confirm to run
 	fmt.Fprintf(o.Out, "\nDo you want to perform this action?\n  Only 'yes' will be accepted to approve.\n\n")
-	entered, err := prompt.NewPrompt("", "Enter a value:", o.In).GetInput()
+	_, err := prompt.NewPrompt("Enter a value:",
+		func(entered string) error {
+			if entered != yesStr {
+				fmt.Fprintf(o.Out, "\nPlayground init cancelled.\n")
+				return cmdutil.ErrExit
+			}
+			return nil
+		}, o.In).Run()
 	if err != nil {
 		return err
-	}
-	if entered != yesStr {
-		fmt.Fprintf(o.Out, "\nPlayground init cancelled.\n")
-		return nil
 	}
 
 	fmt.Fprintln(o.Out)
@@ -291,13 +295,15 @@ func (o *initOptions) cloud() error {
 	// if cluster exists, continue or not, if not, user should destroy the old cluster first
 	if clusterName != "" {
 		fmt.Fprintf(o.Out, "Found an existed cluster %s, do you want to continue to initialize this cluster?\n  Only 'yes' will be accepted to confirm.\n\n", clusterName)
-		entered, err = prompt.NewPrompt("", "Enter a value:", o.In).GetInput()
-		if err != nil {
+		if _, err = prompt.NewPrompt("Enter a value:",
+			func(entered string) error {
+				if entered != yesStr {
+					fmt.Fprintf(o.Out, "\nPlayground init cancelled, please destroy the old cluster first.\n")
+					return cmdutil.ErrExit
+				}
+				return nil
+			}, o.In).Run(); err != nil {
 			return err
-		}
-		if entered != yesStr {
-			fmt.Fprintf(o.Out, "\nPlayground init cancelled, please destroy the old cluster first.\n")
-			return nil
 		}
 		fmt.Fprintf(o.Out, "Continue to initialize %s %s cluster %s... \n", o.cloudProvider, cp.K8sService(o.cloudProvider), clusterName)
 	} else {
@@ -379,13 +385,15 @@ func (o *destroyOptions) destroyCloud() error {
 	fmt.Fprintf(o.Out, "Do you really want to destroy the kubernetes cluster %s?\n  This is no undo. Only 'yes' will be accepted to confirm.\n\n", name)
 
 	// confirm to destroy
-	entered, err := prompt.NewPrompt("", "Enter a value:", o.In).GetInput()
-	if err != nil {
+	if _, err = prompt.NewPrompt("Enter a value:",
+		func(entered string) error {
+			if entered != yesStr {
+				fmt.Fprintf(o.Out, "\nPlayground destroy cancelled.\n")
+				return cmdutil.ErrExit
+			}
+			return nil
+		}, o.In).Run(); err != nil {
 		return err
-	}
-	if entered != yesStr {
-		fmt.Fprintf(o.Out, "\nPlayground destroy cancelled.\n")
-		return nil
 	}
 
 	fmt.Fprintf(o.Out, "Destroy %s %s cluster %s...\n", o.cloudProvider, cp.K8sService(o.cloudProvider), name)

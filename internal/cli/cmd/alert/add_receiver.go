@@ -33,24 +33,15 @@ import (
 	"k8s.io/kubectl/pkg/util/templates"
 	"sigs.k8s.io/yaml"
 
-	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
-)
-
-const (
-	// alertConfigFileName is the name of alertmanager config file
-	alertConfigFileName = "alertmanager.yml"
-
-	// webhookAdaptorFileName is the name of webhook adaptor config file
-	webhookAdaptorFileName = "config.yml"
 )
 
 var (
 	// alertConfigmapName is the name of alertmanager configmap
-	alertConfigmapName = fmt.Sprintf("%s-alertmanager-config", types.KubeBlocksReleaseName)
+	alertConfigmapName = getConfigMapName(alertManagerAddonName)
 
-	// webhookAdaptorName is the name of webhook adaptor
-	webhookAdaptorName = fmt.Sprintf("%s-webhook-adaptor-config", types.KubeBlocksReleaseName)
+	// webhookAdaptorConfigmapName is the name of webhook adaptor
+	webhookAdaptorConfigmapName = getConfigMapName(webhookAdaptorAddonName)
 )
 
 var (
@@ -145,7 +136,7 @@ func (o *baseOptions) complete(f cmdutil.Factory) error {
 	}
 
 	// get webhook adaptor configmap
-	o.webhookConfigMap, err = o.client.CoreV1().ConfigMaps(namespace).Get(ctx, webhookAdaptorName, metav1.GetOptions{})
+	o.webhookConfigMap, err = o.client.CoreV1().ConfigMaps(namespace).Get(ctx, webhookAdaptorConfigmapName, metav1.GetOptions{})
 	return err
 }
 
@@ -247,7 +238,7 @@ func (o *addReceiverOptions) run() error {
 		return err
 	}
 
-	fmt.Fprintf(o.Out, "Receiver %s added successfully\n", o.receiver.Name)
+	fmt.Fprintf(o.Out, "Receiver %s added successfully.\n", o.receiver.Name)
 	return nil
 }
 
@@ -361,7 +352,7 @@ func (o *addReceiverOptions) buildWebhook() ([]*webhookConfig, error) {
 	for _, hook := range o.webhooks {
 		m := strToMap(hook)
 		if len(m) == 0 {
-			return nil, fmt.Errorf("invalid webhook: %s, webhook should be in the format of url=my-url,tolen=my-token", hook)
+			return nil, fmt.Errorf("invalid webhook: %s, webhook should be in the format of url=my-url,token=my-token", hook)
 		}
 		w := webhookConfig{
 			MaxAlerts:    10,
@@ -375,7 +366,7 @@ func (o *addReceiverOptions) buildWebhook() ([]*webhookConfig, error) {
 				if valid, err := urlIsValid(v); !valid {
 					return nil, fmt.Errorf("invalid webhook url: %s, %v", v, err)
 				}
-				w.URL = getWebhookURL(o.name, o.webhookConfigMap.Namespace)
+				w.URL = getWebhookAdaptorURL(o.name, o.webhookConfigMap.Namespace)
 				webhookType := getWebhookType(v)
 				if webhookType == unknownWebhookType {
 					return nil, fmt.Errorf("invalid webhook url: %s, failed to prase the webhook type", v)
@@ -383,7 +374,6 @@ func (o *addReceiverOptions) buildWebhook() ([]*webhookConfig, error) {
 				waReceiver.Type = string(webhookType)
 				waReceiver.Params.URL = v
 			case webhookToken:
-				w.Token = v
 				waReceiver.Params.Secret = v
 			default:
 				return nil, fmt.Errorf("invalid webhook key: %s, webhook key should be one of url and token", k)

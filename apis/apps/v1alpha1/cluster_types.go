@@ -474,7 +474,7 @@ func (r *Cluster) GetDefNameMappingComponents() map[string][]ClusterComponentSpe
 	return m
 }
 
-// GetMessage get message map deep copy object
+// GetMessage gets message map deep copy object
 func (in *ClusterComponentStatus) GetMessage() ComponentMessageMap {
 	messageMap := map[string]string{}
 	for k, v := range in.Message {
@@ -485,17 +485,38 @@ func (in *ClusterComponentStatus) GetMessage() ComponentMessageMap {
 
 // SetMessage override message map object
 func (in *ClusterComponentStatus) SetMessage(messageMap ComponentMessageMap) {
+	if in == nil {
+		return
+	}
 	in.Message = messageMap
 }
 
-// GetObjectMessage get the k8s workload message in component status message map
-func (m ComponentMessageMap) GetObjectMessage(objectKind, objectName string) string {
+// SetObjectMessage sets k8s workload message to component status message map
+func (in *ClusterComponentStatus) SetObjectMessage(objectKind, objectName, message string) {
+	if in == nil {
+		return
+	}
+	if in.Message == nil {
+		in.Message = map[string]string{}
+	}
 	messageKey := fmt.Sprintf("%s/%s", objectKind, objectName)
-	return m[messageKey]
+	in.Message[messageKey] = message
 }
 
-// SetObjectMessage set k8s workload message to component status message map
+// GetObjectMessage gets the k8s workload message in component status message map
+func (in *ClusterComponentStatus) GetObjectMessage(objectKind, objectName string) string {
+	if in == nil {
+		return ""
+	}
+	messageKey := fmt.Sprintf("%s/%s", objectKind, objectName)
+	return in.Message[messageKey]
+}
+
+// SetObjectMessage sets k8s workload message to component status message map
 func (m ComponentMessageMap) SetObjectMessage(objectKind, objectName, message string) {
+	if m == nil {
+		return
+	}
 	messageKey := fmt.Sprintf("%s/%s", objectKind, objectName)
 	m[messageKey] = message
 }

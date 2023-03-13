@@ -45,3 +45,11 @@ const (
 	// values
 	trueStr = "true"
 )
+
+const (
+	ProbeEventOperationNotImpl ProbeEventType = "OperationNotImplemented"
+	ProbeEventCheckRoleFailed  ProbeEventType = "checkRoleFailed"
+	ProbeEventRoleInvalid      ProbeEventType = "roleInvalid"
+	ProbeEventRoleChanged      ProbeEventType = "roleChanged"
+	ProbeEventRoleUnChanged    ProbeEventType = "roleUnChanged"
+)

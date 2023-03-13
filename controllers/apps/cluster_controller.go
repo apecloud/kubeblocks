@@ -41,7 +41,8 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/consensusset"
-	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
+	"github.com/apecloud/kubeblocks/controllers/apps/components/replicationset"
+	componentutil "github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	opsutil "github.com/apecloud/kubeblocks/controllers/apps/operations/util"
 	"github.com/apecloud/kubeblocks/controllers/k8score"
 	"github.com/apecloud/kubeblocks/internal/constant"
@@ -108,10 +109,14 @@ type ClusterReconciler struct {
 	Recorder record.EventRecorder
 }
 
+// ProbeEventType defines the type of probe event.
+type ProbeEventType string
+
 type probeMessage struct {
-	Event        string `json:"event,omitempty"`
-	OriginalRole string `json:"originalRole,omitempty"`
-	Role         string `json:"role,omitempty"`
+	Event        ProbeEventType `json:"event,omitempty"`
+	Message      string         `json:"message,omitempty"`
+	OriginalRole string         `json:"originalRole,omitempty"`
+	Role         string         `json:"role,omitempty"`
 }
 
 func init() {
@@ -168,6 +173,12 @@ func handleRoleChangedEvent(cli client.Client, reqCtx intctrlutil.RequestCtx, re
 		reqCtx.Log.Info("not role message", "message", event.Message, "error", err)
 		return "", nil
 	}
+
+	// if probe event operation is not impl, check role failed or role invalid, ignore it
+	if message.Event == ProbeEventOperationNotImpl || message.Event == ProbeEventCheckRoleFailed || message.Event == ProbeEventRoleInvalid {
+		reqCtx.Log.Info("probe event failed", "message", message.Message, "error", err)
+		return "", nil
+	}
 	role := strings.ToLower(message.Role)
 
 	podName := types.NamespacedName{
@@ -184,7 +195,26 @@ func handleRoleChangedEvent(cli client.Client, reqCtx intctrlutil.RequestCtx, re
 		return role, nil
 	}
 
-	return role, consensusset.UpdateConsensusSetRoleLabel(cli, reqCtx, pod, role)
+	// get cluster obj of the pod
+	cluster := &appsv1alpha1.Cluster{}
+	if err := cli.Get(reqCtx.Ctx, types.NamespacedName{
+		Namespace: pod.Namespace,
+		Name:      pod.Labels[constant.AppInstanceLabelKey],
+	}, cluster); err != nil {
+		return role, err
+	}
+	reqCtx.Log.V(1).Info("handle role change event", "cluster", cluster.Name, "pod", pod.Name, "role", role, "originalRole", message.OriginalRole)
+	compName, componentDef, err := componentutil.GetComponentInfoByPod(reqCtx.Ctx, cli, *cluster, pod)
+	if err != nil {
+		return role, err
+	}
+	switch componentDef.WorkloadType {
+	case appsv1alpha1.Consensus:
+		return role, consensusset.UpdateConsensusSetRoleLabel(cli, reqCtx, componentDef, pod, role)
+	case appsv1alpha1.Replication:
+		return role, replicationset.HandleReplicationSetRoleChangeEvent(reqCtx.Ctx, cli, cluster, compName, pod, role)
+	}
+	return role, nil
 }
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
@@ -571,7 +601,7 @@ func (r *ClusterReconciler) updateClusterPhaseToCreatingOrUpdating(reqCtx intctr
 				Phase: appsv1alpha1.CreatingPhase,
 			})
 		}
-	} else if util.IsCompleted(cluster.Status.Phase) && !existsOperations(cluster) {
+	} else if componentutil.IsCompleted(cluster.Status.Phase) && !existsOperations(cluster) {
 		needPatch = true
 		cluster.Status.Phase = appsv1alpha1.SpecUpdatingPhase
 	}
@@ -712,7 +742,7 @@ func (r *ClusterReconciler) reconcileClusterStatus(ctx context.Context,
 		// handle the cluster status when some components are not ready.
 		handleClusterPhaseWhenCompsNotReady(cluster, componentMap, clusterAvailabilityEffectMap)
 		currPhase := cluster.Status.Phase
-		if !util.IsFailedOrAbnormal(currPhase) {
+		if !componentutil.IsFailedOrAbnormal(currPhase) {
 			return false, nil
 		}
 		message := fmt.Sprintf("Cluster: %s is %s, check according to the components message", cluster.Name, currPhase)
@@ -806,7 +836,7 @@ func (r *ClusterReconciler) removeStsInitContainerForRestore(ctx context.Context
 	backupName string) (bool, error) {
 	// get the sts list of component
 	stsList := &appsv1.StatefulSetList{}
-	if err := util.GetObjectListByComponentName(ctx, r.Client, *cluster, stsList, componentName); err != nil {
+	if err := componentutil.GetObjectListByComponentName(ctx, r.Client, *cluster, stsList, componentName); err != nil {
 		return false, err
 	}
 	var doRemoveInitContainers bool

@@ -27,6 +27,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/generics"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 	testk8s "github.com/apecloud/kubeblocks/internal/testutil/k8s"
@@ -229,6 +230,71 @@ var _ = Describe("ReplicationSet Util", func() {
 		}
 	}
 
+	testHandleReplicationSetRoleChangeEvent := func() {
+		By("Creating a cluster with replication workloadType.")
+		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
+			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
+			AddComponent(testapps.DefaultRedisCompName, testapps.DefaultRedisCompType).
+			SetReplicas(testapps.DefaultReplicationReplicas).
+			SetPrimaryIndex(testapps.DefaultReplicationPrimaryIndex).
+			Create(&testCtx).GetObject()
+
+		By("Creating a statefulSet of replication workloadType.")
+		container := corev1.Container{
+			Name:            "mock-redis-container",
+			Image:           testapps.DefaultRedisImageName,
+			ImagePullPolicy: corev1.PullIfNotPresent,
+		}
+		stsList := make([]*appsv1.StatefulSet, 0)
+		secondaryName := clusterObj.Name + "-" + testapps.DefaultRedisCompName + "-1"
+		for k, v := range map[string]string{
+			string(Primary):   clusterObj.Name + "-" + testapps.DefaultRedisCompName + "-0",
+			string(Secondary): secondaryName,
+		} {
+			sts := testapps.NewStatefulSetFactory(testCtx.DefaultNamespace, v, clusterObj.Name, testapps.DefaultRedisCompName).
+				AddFinalizers([]string{DBClusterFinalizerName}).
+				AddContainer(container).
+				AddAppInstanceLabel(clusterObj.Name).
+				AddAppComponentLabel(testapps.DefaultRedisCompName).
+				AddAppManangedByLabel().
+				AddRoleLabel(k).
+				SetReplicas(1).
+				Create(&testCtx).GetObject()
+			isStsPrimary, err := checkObjRoleLabelIsPrimary(sts)
+			if k == string(Primary) {
+				Expect(err).To(Succeed())
+				Expect(isStsPrimary).Should(BeTrue())
+			} else {
+				Expect(err).To(Succeed())
+				Expect(isStsPrimary).ShouldNot(BeTrue())
+			}
+			stsList = append(stsList, sts)
+		}
+
+		By("Creating Pods of replication workloadType.")
+		var (
+			primaryPod   *corev1.Pod
+			secondaryPod *corev1.Pod
+		)
+		for _, sts := range stsList {
+			pod := testapps.NewPodFactory(testCtx.DefaultNamespace, sts.Name+"-0").
+				AddContainer(container).
+				AddLabelsInMap(sts.Labels).
+				Create(&testCtx).GetObject()
+
+			if sts.Labels[constant.RoleLabelKey] == string(Primary) {
+				primaryPod = pod
+			} else {
+				secondaryPod = pod
+			}
+		}
+		By("Test update replicationSet pod role label driver by event.")
+		err := HandleReplicationSetRoleChangeEvent(ctx, k8sClient, clusterObj, testapps.DefaultRedisCompName, secondaryPod, string(Primary))
+		Expect(err).Should(Succeed())
+		err = HandleReplicationSetRoleChangeEvent(ctx, k8sClient, clusterObj, testapps.DefaultRedisCompName, primaryPod, string(Secondary))
+		Expect(err).Should(BeNil())
+	}
+
 	// Scenarios
 
 	Context("test replicationSet util", func() {
@@ -255,6 +321,10 @@ var _ = Describe("ReplicationSet Util", func() {
 
 		It("Test generatePVC from volume claim templates", func() {
 			testGeneratePVCFromVolumeClaimTemplates()
+		})
+
+		It("Test update pod role label by roleChangedEvent when ha switch", func() {
+			testHandleReplicationSetRoleChangeEvent()
 		})
 	})
 })

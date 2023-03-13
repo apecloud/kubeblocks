@@ -409,3 +409,39 @@ func getAndCheckReplicationPodByStatefulSet(ctx context.Context, cli client.Clie
 	}
 	return &podList[0], nil
 }
+
+// HandleReplicationSetRoleChangeEvent handles the role change event of the replication workload when switchPolicy is Noop.
+func HandleReplicationSetRoleChangeEvent(ctx context.Context,
+	cli client.Client,
+	cluster *appsv1alpha1.Cluster,
+	compName string,
+	pod *corev1.Pod,
+	newRole string) error {
+	// if pod role label is nil or equal to role, return
+	if newRole == "" || pod.Labels[constant.RoleLabelKey] == newRole {
+		return nil
+	}
+	// if switchPolicy is not Noop, return
+	clusterCompSpec := util.GetClusterComponentSpecByName(cluster, compName)
+	if clusterCompSpec == nil || clusterCompSpec.SwitchPolicy == nil || clusterCompSpec.SwitchPolicy.Type != appsv1alpha1.Noop {
+		return nil
+	}
+
+	// when newRole is primary, it means that a new primary is generated, and the label of the old primary
+	// needs to be updated to secondary at the same time to avoid the situation of two primaries exist at the same time
+	if newRole == string(Primary) {
+		primaryPod, err := GetReplicationSetPrimaryObj(ctx, cli, cluster, intctrlutil.PodSignature, compName)
+		if err != nil {
+			return err
+		}
+		patch := client.MergeFrom(primaryPod.DeepCopy())
+		primaryPod.Labels[constant.RoleLabelKey] = string(Secondary)
+		if err := cli.Patch(ctx, primaryPod, patch); err != nil {
+			return err
+		}
+	}
+	// update pod role label
+	patch := client.MergeFrom(pod.DeepCopy())
+	pod.Labels[constant.RoleLabelKey] = newRole
+	return cli.Patch(ctx, pod, patch)
+}

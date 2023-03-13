@@ -177,6 +177,8 @@ var _ = Describe("Backup for a StatefulSet", func() {
 			BeforeEach(func() {
 				viper.Set("VOLUMESNAPSHOT", "true")
 				viper.Set(constant.CfgKeyCtrlrMgrNS, "default")
+				viper.Set(constant.CfgKeyCtrlrMgrTolerations,
+					"[{\"key\":\"key1\", \"operator\": \"Exists\", \"effect\": \"NoSchedule\"}]")
 
 				By("By creating a backup from backupPolicy: " + backupPolicyName)
 				backup := testapps.NewBackupFactory(testCtx.DefaultNamespace, backupName).
@@ -189,12 +191,17 @@ var _ = Describe("Backup for a StatefulSet", func() {
 
 			AfterEach(func() {
 				viper.Set("VOLUMESNAPSHOT", "false")
+				viper.Set(constant.CfgKeyCtrlrMgrTolerations, "")
 			})
 
 			It("should success after all jobs complete", func() {
 				preJobKey := types.NamespacedName{Name: backupKey.Name + "-pre", Namespace: backupKey.Namespace}
 				postJobKey := types.NamespacedName{Name: backupKey.Name + "-post", Namespace: backupKey.Namespace}
 				patchK8sJobStatus(preJobKey, batchv1.JobComplete)
+				By("Check job tolerations")
+				Eventually(testapps.CheckObj(&testCtx, preJobKey, func(g Gomega, fetched *batchv1.Job) {
+					g.Expect(len(fetched.Spec.Template.Spec.Tolerations)).To(Equal(1))
+				})).Should(Succeed())
 				patchVolumeSnapshotStatus(backupKey, true)
 				patchK8sJobStatus(postJobKey, batchv1.JobComplete)
 

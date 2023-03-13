@@ -888,6 +888,22 @@ func (r *BackupReconciler) buildSnapshotPodSpec(
 	podSpec.RestartPolicy = corev1.RestartPolicyNever
 	podSpec.ServiceAccountName = viper.GetString("KUBEBLOCKS_SERVICEACCOUNT_NAME")
 
+	if cmTolerations := viper.GetString(constant.CfgKeyCtrlrMgrTolerations); cmTolerations != "" {
+		if err = json.Unmarshal([]byte(cmTolerations), &podSpec.Tolerations); err != nil {
+			return podSpec, err
+		}
+	}
+	if cmAffinity := viper.GetString(constant.CfgKeyCtrlrMgrAffinity); cmAffinity != "" {
+		if err = json.Unmarshal([]byte(cmAffinity), &podSpec.Affinity); err != nil {
+			return podSpec, err
+		}
+	}
+	if cmNodeSelector := viper.GetString(constant.CfgKeyCtrlrMgrNodeSelector); cmNodeSelector != "" {
+		if err = json.Unmarshal([]byte(cmNodeSelector), &podSpec.NodeSelector); err != nil {
+			return podSpec, err
+		}
+	}
+
 	return podSpec, nil
 }
 

@@ -204,7 +204,7 @@ var _ = Describe("DataProtection", func() {
 		cmdRestore.Run(nil, []string{newClusterName})
 
 		By("restore new cluster from source cluster which is deleted")
-		// mock cluster is not lived in kubenertes
+		// mock cluster is not lived in kubernetes
 		mockBackupInfo(tf.FakeDynamicClient, backupName, "deleted-cluster")
 		cmdRestore.Run(nil, []string{newClusterName + "1"})
 

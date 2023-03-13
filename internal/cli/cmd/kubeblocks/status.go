@@ -24,6 +24,7 @@ import (
 	"github.com/containerd/stargz-snapshotter/estargz/errorutil"
 	"github.com/spf13/cobra"
 
+	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
@@ -93,6 +94,7 @@ type statusOptions struct {
 	mc      metrics.Interface
 	showAll bool
 	ns      string
+	addons  []*extensionsv1alpha1.Addon
 }
 
 func newStatusCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
@@ -145,13 +147,14 @@ func (o *statusOptions) run() error {
 	if o.ns == "" {
 		printer.Warning(o.Out, "Failed to find deployed KubeBlocks in any namespace\n")
 		printer.Warning(o.Out, "Will check all namespaces for KubeBlocks resources left behind\n")
-
 	} else {
 		fmt.Fprintf(o.Out, "Kuberblocks is deployed in namespace: %s\n", o.ns)
 	}
 
 	allErrs := make([]error, 0)
+	o.buildSelectorList(ctx, &allErrs)
 	o.showWorkloads(ctx, &allErrs)
+	o.showAddons()
 
 	if o.showAll {
 		o.showKubeBlocksResources(ctx, &allErrs)
@@ -160,6 +163,41 @@ func (o *statusOptions) run() error {
 		o.showHelmResources(ctx, &allErrs)
 	}
 	return errorutil.Aggregate(allErrs)
+}
+
+func (o *statusOptions) buildSelectorList(ctx context.Context, allErrs *[]error) {
+	addons := make([]*extensionsv1alpha1.Addon, 0)
+	objs, err := o.dynamic.Resource(types.AddonGVR()).List(ctx, metav1.ListOptions{})
+	appendErrIgnoreNotFound(allErrs, err)
+	if objs != nil {
+		for _, obj := range objs.Items {
+			addon := &extensionsv1alpha1.Addon{}
+			if err = runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, addon); err != nil {
+				appendErrIgnoreNotFound(allErrs, err)
+				continue
+			}
+			addons = append(addons, addon)
+		}
+	}
+
+	// build addon instance selector
+	o.addons = addons
+
+	var selectors []metav1.ListOptions
+	for _, selector := range buildResourceLabelSelectors(addons) {
+		selectors = append(selectors, metav1.ListOptions{LabelSelector: selector})
+	}
+	selectorList = selectors
+}
+
+func (o *statusOptions) showAddons() {
+	fmt.Fprintln(o.Out, "\nKubeBlocks Addons:")
+	tbl := printer.NewTablePrinter(o.Out)
+	tbl.SetHeader("NAME", "STATUS", "TYPE")
+	for _, addon := range o.addons {
+		tbl.AddRow(addon.Name, addon.Namespace, addon.Status.Phase, addon.Spec.Type)
+	}
+	tbl.Print()
 }
 
 func (o *statusOptions) showKubeBlocksResources(ctx context.Context, allErrs *[]error) {
@@ -224,8 +262,14 @@ func (o *statusOptions) showHelmResources(ctx context.Context, allErrs *[]error)
 	tblPrinter := printer.NewTablePrinter(o.Out)
 	tblPrinter.SetHeader("NAMESPACE", "KIND", "NAME", "STATUS")
 
-	helmSelector := metav1.ListOptions{LabelSelector: types.HelmLabel}
-	unstructuredList := listResourceByGVR(ctx, o.dynamic, o.ns, helmConfigurations, []metav1.ListOptions{helmSelector}, allErrs)
+	helmLabel := func(name string) string {
+		return fmt.Sprintf("%s=%s,%s=%s", "name", name, "owner", "helm")
+	}
+	selectors := []metav1.ListOptions{{LabelSelector: types.KubeBlocksHelmLabel}}
+	for _, addon := range o.addons {
+		selectors = append(selectors, metav1.ListOptions{LabelSelector: helmLabel(util.BuildAddonReleaseName(addon.Name))})
+	}
+	unstructuredList := listResourceByGVR(ctx, o.dynamic, o.ns, helmConfigurations, selectors, allErrs)
 	for _, resourceList := range unstructuredList {
 		for _, resource := range resourceList.Items {
 			deployedStatus := resource.GetLabels()["status"]

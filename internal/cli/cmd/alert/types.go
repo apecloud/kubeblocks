@@ -21,6 +21,40 @@ import (
 	"strings"
 )
 
+// addon name
+const (
+	// alertManagerAddonName is the name of alertmanager addon
+	alertManagerAddonName = "prometheus"
+
+	// webhookAdaptorAddonName is the name of webhook adaptor addon
+	webhookAdaptorAddonName = "alertmanager-webhook-adaptor"
+)
+
+var (
+	addonCMSuffix = map[string]string{
+		alertManagerAddonName:   alertConfigMapNameSuffix,
+		webhookAdaptorAddonName: webhookAdaptorConfigMapNameSuffix,
+	}
+)
+
+// configmap name suffix
+const (
+	// alertConfigMapNameSuffix is the suffix of alertmanager configmap name
+	alertConfigMapNameSuffix = "alertmanager-config"
+
+	// webhookAdaptorConfigMapNameSuffix is the suffix of webhook adaptor configmap name
+	webhookAdaptorConfigMapNameSuffix = "config"
+)
+
+// config file name
+const (
+	// alertConfigFileName is the name of alertmanager config file
+	alertConfigFileName = "alertmanager.yml"
+
+	// webhookAdaptorFileName is the name of webhook adaptor config file
+	webhookAdaptorFileName = "config.yml"
+)
+
 const (
 	routeMatcherClusterKey  = "app_kubernetes_io_instance"
 	routeMatcherSeverityKey = "severity"
@@ -78,7 +112,6 @@ type emailConfig struct {
 // webhookConfig is the webhook config of receiver
 type webhookConfig struct {
 	URL          string `json:"url"`
-	Token        string `json:"token,omitempty"`
 	SendResolved bool   `json:"send_resolved"`
 	MaxAlerts    int    `json:"max_alerts,omitempty"`
 }
@@ -116,14 +149,7 @@ type webhookAdaptorReceiver struct {
 }
 
 func (w *webhookConfig) string() string {
-	var cfgs []string
-	if w.URL != "" {
-		cfgs = append(cfgs, fmt.Sprintf("url=%s", w.URL))
-	}
-	if w.Token != "" {
-		cfgs = append(cfgs, fmt.Sprintf("token=%s", w.Token))
-	}
-	return strings.Join(cfgs, ",")
+	return fmt.Sprintf("url=%s", w.URL)
 }
 
 func (s *slackConfig) string() string {

@@ -589,7 +589,7 @@ func (o *addonCmdOpts) buildPatch(flags []*pflag.Flag) error {
 		if p, ok := status["phase"]; ok && p != nil {
 			phase = p.(string)
 		}
-		fmt.Println(fmt.Sprintf("patching addon 'status.phase=%s' to 'status.phase=%v' will result addon install spec (spec.install) not being updated",
+		fmt.Printf("patching addon 'status.phase=%s' to 'status.phase=%v' will result addon install spec (spec.install) not being updated\n",
 			o.addon.Status.Phase, phase))
 		obj.Object["status"] = status
 		o.Subresource = "status"

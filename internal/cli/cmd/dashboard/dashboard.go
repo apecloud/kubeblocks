@@ -57,21 +57,25 @@ type dashboard struct {
 }
 
 var (
+	// we do not use the default port to port-forward to avoid conflict with other services
 	dashboards = [...]*dashboard{
 		{
-			Name:      "kubeblocks-grafana",
-			AddonName: "kb-addon-grafana",
-			Label:     "app.kubernetes.io/instance=kb-addon-grafana,app.kubernetes.io/name=grafana",
+			Name:       "kubeblocks-grafana",
+			AddonName:  "kb-addon-grafana",
+			Label:      "app.kubernetes.io/instance=kb-addon-grafana,app.kubernetes.io/name=grafana",
+			TargetPort: "13000",
 		},
 		{
-			Name:      "kubeblocks-prometheus-alertmanager",
-			AddonName: "kb-addon-prometheus-alertmanager",
-			Label:     "app=prometheus,component=alertmanager,release=kb-addon-prometheus",
+			Name:       "kubeblocks-prometheus-alertmanager",
+			AddonName:  "kb-addon-prometheus-alertmanager",
+			Label:      "app=prometheus,component=alertmanager,release=kb-addon-prometheus",
+			TargetPort: "19093",
 		},
 		{
-			Name:      "kubeblocks-prometheus-server",
-			AddonName: "kb-addon-prometheus-server",
-			Label:     "app=prometheus,component=server,release=kb-addon-prometheus",
+			Name:       "kubeblocks-prometheus-server",
+			AddonName:  "kb-addon-prometheus-server",
+			Label:      "app=prometheus,component=server,release=kb-addon-prometheus",
+			TargetPort: "19090",
 		},
 	}
 )
@@ -277,7 +281,9 @@ func getDashboardInfo(client *kubernetes.Clientset) error {
 		d.CreationTime = util.TimeFormat(&svc.CreationTimestamp)
 		if len(svc.Spec.Ports) > 0 {
 			d.Port = fmt.Sprintf("%d", svc.Spec.Ports[0].Port)
-			d.TargetPort = svc.Spec.Ports[0].TargetPort.String()
+			if d.TargetPort == "" {
+				d.TargetPort = svc.Spec.Ports[0].TargetPort.String()
+			}
 		}
 	}
 	return nil

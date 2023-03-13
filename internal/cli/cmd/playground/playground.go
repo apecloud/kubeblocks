@@ -20,12 +20,15 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 	"golang.org/x/exp/slices"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/klog/v2"
 	"k8s.io/kubectl/pkg/util/templates"
 
 	cp "github.com/apecloud/kubeblocks/internal/cli/cloudprovider"
@@ -222,12 +225,16 @@ func (o *initOptions) installKBAndCluster(k8sClusterName string) error {
 		return errors.Wrap(err, "failed to install KubeBlocks")
 	}
 
-	// Install database cluster
+	// get cluster version
+	spinner := util.Spinner(o.Out, "%-40s", "Wait cluster version ready")
+	defer spinner(false)
 	if err = o.getClusterVersion(); err != nil {
 		return err
 	}
+	spinner(true)
 
-	spinner := util.Spinner(o.Out, "Create cluster %s (ClusterDefinition: %s, ClusterVersion: %s)",
+	// Install database cluster
+	spinner = util.Spinner(o.Out, "Create cluster %s (ClusterDefinition: %s, ClusterVersion: %s)",
 		kbClusterName, o.clusterDef, o.clusterVersion)
 	defer spinner(false)
 	if err = o.createCluster(); err != nil {
@@ -453,7 +460,16 @@ func (o *initOptions) getClusterVersion() error {
 	if err != nil {
 		return err
 	}
-	o.clusterVersion, err = cluster.GetLatestVersion(dynamic, o.clusterDef)
+
+	// wait for cluster version ready
+	for i := 0; i < viper.GetInt("PLAYGROUND_WAIT_TIMES"); i++ {
+		time.Sleep(5 * time.Second)
+		if o.clusterVersion, err = cluster.GetLatestVersion(dynamic, o.clusterDef); err != nil {
+			klog.V(1).Infof("wait for cluster version ready: %s", err.Error())
+			continue
+		}
+		return nil
+	}
 	return err
 }
 

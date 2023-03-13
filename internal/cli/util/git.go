@@ -32,7 +32,7 @@ func CloneGitRepo(url string, path string) error {
 		}
 		// Pull the latest changes from the origin remote and merge into the current branch
 		err = w.Pull(&git.PullOptions{RemoteName: "origin"})
-		if err != git.NoErrAlreadyUpToDate {
+		if err != git.NoErrAlreadyUpToDate && err != git.ErrUnstagedChanges {
 			return err
 		}
 		return nil

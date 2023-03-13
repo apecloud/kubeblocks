@@ -129,6 +129,8 @@ func initConfig() {
 	viper.SetDefault("CLUSTER_DEFAULT_CPU", "1000m")
 	viper.SetDefault("CLUSTER_DEFAULT_MEMORY", "1Gi")
 
+	viper.SetDefault("PLAYGROUND_WAIT_TIMES", 20)
+
 	// If a config file is found, read it in.
 	if err := viper.ReadInConfig(); err == nil {
 		fmt.Fprintln(os.Stderr, "Using config file:", viper.ConfigFileUsed())

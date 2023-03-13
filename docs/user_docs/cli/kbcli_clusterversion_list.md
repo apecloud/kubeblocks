@@ -53,5 +53,5 @@ kbcli clusterversion list [flags]
 
 * [kbcli clusterversion](kbcli_clusterversion.md)	 - ClusterVersion command.
 
-#### Go Back to [CLI Overview](kbcli_overview.md) Homepage.
+#### Go Back to [CLI Overview](cli.md) Homepage.
 

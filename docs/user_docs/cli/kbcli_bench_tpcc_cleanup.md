@@ -59,5 +59,5 @@ kbcli bench tpcc cleanup [flags]
 
 * [kbcli bench tpcc](kbcli_bench_tpcc.md)	 - Run a TPCC benchmark.
 
-#### Go Back to [CLI Overview](kbcli_overview.md) Homepage.
+#### Go Back to [CLI Overview](cli.md) Homepage.
 

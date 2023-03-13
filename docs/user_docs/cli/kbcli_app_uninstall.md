@@ -49,5 +49,5 @@ kbcli app uninstall [flags]
 
 * [kbcli app](kbcli_app.md)	 - Manage external applications related to KubeBlocks.
 
-#### Go Back to [CLI Overview](kbcli_overview.md) Homepage.
+#### Go Back to [CLI Overview](cli.md) Homepage.
 

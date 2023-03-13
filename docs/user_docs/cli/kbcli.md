@@ -68,5 +68,5 @@ kbcli [flags]
 * [kbcli playground](kbcli_playground.md)	 - Bootstrap a playground KubeBlocks in local host or cloud.
 * [kbcli version](kbcli_version.md)	 - Print the version information, include kubernetes, KubeBlocks and kbcli version.
 
-#### Go Back to [CLI Overview](kbcli_overview.md) Homepage.
+#### Go Back to [CLI Overview](cli.md) Homepage.
 

@@ -53,5 +53,5 @@ kbcli clusterdefinition list [flags]
 
 * [kbcli clusterdefinition](kbcli_clusterdefinition.md)	 - ClusterDefinition command.
 
-#### Go Back to [CLI Overview](kbcli_overview.md) Homepage.
+#### Go Back to [CLI Overview](cli.md) Homepage.
 

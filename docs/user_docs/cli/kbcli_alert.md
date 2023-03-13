@@ -41,5 +41,5 @@ Manage alert receiver, include add, list and delete receiver.
 * [kbcli alert delete-receiver](kbcli_alert_delete-receiver.md)	 - Delete alert receiver.
 * [kbcli alert list-receivers](kbcli_alert_list-receivers.md)	 - List all alert receivers.
 
-#### Go Back to [CLI Overview](kbcli_overview.md) Homepage.
+#### Go Back to [CLI Overview](cli.md) Homepage.
 

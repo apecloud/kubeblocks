@@ -58,5 +58,5 @@ Run a TPCC benchmark.
 * [kbcli bench tpcc prepare](kbcli_bench_tpcc_prepare.md)	 - Prepare data for TPCC.
 * [kbcli bench tpcc run](kbcli_bench_tpcc_run.md)	 - Run workload.
 
-#### Go Back to [CLI Overview](kbcli_overview.md) Homepage.
+#### Go Back to [CLI Overview](cli.md) Homepage.
 

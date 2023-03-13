@@ -41,5 +41,5 @@ Bootstrap a playground KubeBlocks in local host or cloud.
 * [kbcli playground guide](kbcli_playground_guide.md)	 - Display playground cluster user guide.
 * [kbcli playground init](kbcli_playground_init.md)	 - Bootstrap a kubernetes cluster and install KubeBlocks for playground.
 
-#### Go Back to [CLI Overview](kbcli_overview.md) Homepage.
+#### Go Back to [CLI Overview](cli.md) Homepage.
 

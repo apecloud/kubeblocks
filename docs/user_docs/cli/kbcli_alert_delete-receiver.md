@@ -49,5 +49,5 @@ kbcli alert delete-receiver NAME [flags]
 
 * [kbcli alert](kbcli_alert.md)	 - Manage alert receiver, include add, list and delete receiver.
 
-#### Go Back to [CLI Overview](kbcli_overview.md) Homepage.
+#### Go Back to [CLI Overview](cli.md) Homepage.
 

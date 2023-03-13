@@ -1,41 +1,52 @@
 ---
-title: kbcli cluster
+title: KubeBlocks CLI Overview
+description: KubeBlocks CLI overview
+sidebar_position: 1
 ---
 
+## [addon](kbcli_addon.md)
+
+Addon command.
+
+* [kbcli addon describe](kbcli_addon_describe.md)	 - Describe an addon specification.
+* [kbcli addon disable](kbcli_addon_disable.md)	 - Disable an addon.
+* [kbcli addon enable](kbcli_addon_enable.md)	 - Enable an addon.
+* [kbcli addon list](kbcli_addon_list.md)	 - List addons.
+
+
+## [alert](kbcli_alert.md)
+
+Manage alert receiver, include add, list and delete receiver.
+
+* [kbcli alert add-receiver](kbcli_alert_add-receiver.md)	 - Add alert receiver, such as email, slack, webhook and so on.
+* [kbcli alert delete-receiver](kbcli_alert_delete-receiver.md)	 - Delete alert receiver.
+* [kbcli alert list-receivers](kbcli_alert_list-receivers.md)	 - List all alert receivers.
+
+
+## [app](kbcli_app.md)
+
+Manage external applications related to KubeBlocks.
+
+* [kbcli app install](kbcli_app_install.md)	 - Install the application with the specified name.
+* [kbcli app uninstall](kbcli_app_uninstall.md)	 - Uninstall the application with the specified name.
+
+
+## [backup-config](kbcli_backup-config.md)
+
+KubeBlocks backup config.
+
+
+
+## [bench](kbcli_bench.md)
+
+Run a benchmark.
+
+* [kbcli bench tpcc](kbcli_bench_tpcc.md)	 - Run a TPCC benchmark.
+
+
+## [cluster](kbcli_cluster.md)
+
 Cluster command.
-
-### Options
-
-```
-  -h, --help   help for cluster
-```
-
-### Options inherited from parent commands
-
-```
-      --as string                      Username to impersonate for the operation. User could be a regular user or a service account in a namespace.
-      --as-group stringArray           Group to impersonate for the operation, this flag can be repeated to specify multiple groups.
-      --as-uid string                  UID to impersonate for the operation.
-      --cache-dir string               Default cache directory (default "$HOME/.kube/cache")
-      --certificate-authority string   Path to a cert file for the certificate authority
-      --client-certificate string      Path to a client certificate file for TLS
-      --client-key string              Path to a client key file for TLS
-      --cluster string                 The name of the kubeconfig cluster to use
-      --context string                 The name of the kubeconfig context to use
-      --disable-compression            If true, opt-out of response compression for all requests to the server
-      --insecure-skip-tls-verify       If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure
-      --kubeconfig string              Path to the kubeconfig file to use for CLI requests.
-      --match-server-version           Require server version to match client version
-  -n, --namespace string               If present, the namespace scope for this CLI request
-      --request-timeout string         The length of time to wait before giving up on a single server request. Non-zero values should contain a corresponding time unit (e.g. 1s, 2m, 3h). A value of zero means don't timeout requests. (default "0")
-  -s, --server string                  The address and port of the Kubernetes API server
-      --tls-server-name string         Server name to use for server certificate validation. If it is not provided, the hostname used to contact the server is used
-      --token string                   Bearer token for authentication to the API server
-      --user string                    The name of the kubeconfig user to use
-```
-
-### SEE ALSO
-
 
 * [kbcli cluster backup](kbcli_cluster_backup.md)	 - Create a backup.
 * [kbcli cluster configure](kbcli_cluster_configure.md)	 - Reconfigure parameters with the specified components in the cluster.
@@ -71,5 +82,59 @@ Cluster command.
 * [kbcli cluster volume-expand](kbcli_cluster_volume-expand.md)	 - Expand volume with the specified components and volumeClaimTemplates in the cluster.
 * [kbcli cluster vscale](kbcli_cluster_vscale.md)	 - Vertically scale the specified components in the cluster.
 
-#### Go Back to [CLI Overview](cli.md) Homepage.
+
+## [clusterdefinition](kbcli_clusterdefinition.md)
+
+ClusterDefinition command.
+
+* [kbcli clusterdefinition list](kbcli_clusterdefinition_list.md)	 - List ClusterDefinitions.
+
+
+## [clusterversion](kbcli_clusterversion.md)
+
+ClusterVersion command.
+
+* [kbcli clusterversion list](kbcli_clusterversion_list.md)	 - List ClusterVersions.
+
+
+## [dashboard](kbcli_dashboard.md)
+
+List and open the KubeBlocks dashboards.
+
+* [kbcli dashboard list](kbcli_dashboard_list.md)	 - List all dashboards.
+* [kbcli dashboard open](kbcli_dashboard_open.md)	 - Open one dashboard.
+
+
+## [kubeblocks](kbcli_kubeblocks.md)
+
+KubeBlocks operation commands.
+
+* [kbcli kubeblocks install](kbcli_kubeblocks_install.md)	 - Install KubeBlocks.
+* [kbcli kubeblocks list-versions](kbcli_kubeblocks_list-versions.md)	 - List KubeBlocks versions.
+* [kbcli kubeblocks preflight](kbcli_kubeblocks_preflight.md)	 - Run and retrieve preflight checks for KubeBlocks.
+* [kbcli kubeblocks status](kbcli_kubeblocks_status.md)	 - Show list of resource KubeBlocks uses or owns.
+* [kbcli kubeblocks uninstall](kbcli_kubeblocks_uninstall.md)	 - Uninstall KubeBlocks.
+* [kbcli kubeblocks upgrade](kbcli_kubeblocks_upgrade.md)	 - Upgrade KubeBlocks.
+
+
+## [options](kbcli_options.md)
+
+Print the list of flags inherited by all commands.
+
+
+
+## [playground](kbcli_playground.md)
+
+Bootstrap a playground KubeBlocks in local host or cloud.
+
+* [kbcli playground destroy](kbcli_playground_destroy.md)	 - Destroy the playground kubernetes cluster.
+* [kbcli playground guide](kbcli_playground_guide.md)	 - Display playground cluster user guide.
+* [kbcli playground init](kbcli_playground_init.md)	 - Bootstrap a kubernetes cluster and install KubeBlocks for playground.
+
+
+## [version](kbcli_version.md)
+
+Print the version information, include kubernetes, KubeBlocks and kbcli version.
+
+
 

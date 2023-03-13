@@ -42,5 +42,5 @@ kbcli dashboard list [flags]
 
 * [kbcli dashboard](kbcli_dashboard.md)	 - List and open the KubeBlocks dashboards.
 
-#### Go Back to [CLI Overview](kbcli_overview.md) Homepage.
+#### Go Back to [CLI Overview](cli.md) Homepage.
 

@@ -71,5 +71,5 @@ kbcli addon enable ADDON_NAME [flags]
 
 * [kbcli addon](kbcli_addon.md)	 - Addon command.
 
-#### Go Back to [CLI Overview](kbcli_overview.md) Homepage.
+#### Go Back to [CLI Overview](cli.md) Homepage.
 

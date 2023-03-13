@@ -40,5 +40,5 @@ List and open the KubeBlocks dashboards.
 * [kbcli dashboard list](kbcli_dashboard_list.md)	 - List all dashboards.
 * [kbcli dashboard open](kbcli_dashboard_open.md)	 - Open one dashboard.
 
-#### Go Back to [CLI Overview](kbcli_overview.md) Homepage.
+#### Go Back to [CLI Overview](cli.md) Homepage.
 

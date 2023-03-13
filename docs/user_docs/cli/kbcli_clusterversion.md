@@ -39,5 +39,5 @@ ClusterVersion command.
 
 * [kbcli clusterversion list](kbcli_clusterversion_list.md)	 - List ClusterVersions.
 
-#### Go Back to [CLI Overview](kbcli_overview.md) Homepage.
+#### Go Back to [CLI Overview](cli.md) Homepage.
 

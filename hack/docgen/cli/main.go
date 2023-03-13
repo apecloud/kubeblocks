@@ -31,7 +31,7 @@ import (
 )
 
 func genMarkdownTreeForOverview(cmd *cobra.Command, dir string) error {
-	filename := filepath.Join(dir, "kbcli_overview.md")
+	filename := filepath.Join(dir, "cli.md")
 	f, err := os.Create(filename)
 	if err != nil {
 		return err
@@ -76,8 +76,9 @@ sidebar_position: 1
 			if !sub.IsAvailableCommand() || sub.IsAdditionalHelpTopicCommand() {
 				continue
 			}
-			link = strings.ReplaceAll(cmd.Name()+" "+c.Name()+" "+sub.Name(), " ", "_")
-			_, err = io.WriteString(f, fmt.Sprintf("* [%s](%s.md)\t - %s\n", sub.Name(), link, sub.Short))
+			subName := cmd.Name() + " " + c.Name() + " " + sub.Name()
+			link = strings.ReplaceAll(subName, " ", "_")
+			_, err = io.WriteString(f, fmt.Sprintf("* [%s](%s.md)\t - %s\n", subName, link, sub.Short))
 			if err != nil {
 				return err
 			}
@@ -145,7 +146,7 @@ func main() {
 		if lastIdx == 0 {
 			return nil
 		}
-		lines[lastIdx] = "#### Go Back to [CLI Overview](kbcli_overview.md) Homepage.\n"
+		lines[lastIdx] = "#### Go Back to [CLI Overview](cli.md) Homepage.\n"
 
 		// update the title
 		lines[0] = "---"

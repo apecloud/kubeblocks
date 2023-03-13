@@ -42,5 +42,5 @@ Addon command.
 * [kbcli addon enable](kbcli_addon_enable.md)	 - Enable an addon.
 * [kbcli addon list](kbcli_addon_list.md)	 - List addons.
 
-#### Go Back to [CLI Overview](kbcli_overview.md) Homepage.
+#### Go Back to [CLI Overview](cli.md) Homepage.
 

@@ -60,5 +60,5 @@ kbcli cluster expose [flags]
 
 * [kbcli cluster](kbcli_cluster.md)	 - Cluster command.
 
-#### Go Back to [CLI Overview](kbcli_overview.md) Homepage.
+#### Go Back to [CLI Overview](cli.md) Homepage.
 

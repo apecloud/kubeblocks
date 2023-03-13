@@ -125,6 +125,7 @@ func (c *objectActionTransformer) Transform(dag *graph.DAG) error {
 	if root == nil {
 		return fmt.Errorf("root vertex not found: %v", dag)
 	}
+	rootVertex, _ := root.(*lifecycleVertex)
 
 	for name := range deleteSet {
 		v := &lifecycleVertex{
@@ -142,6 +143,18 @@ func (c *objectActionTransformer) Transform(dag *graph.DAG) error {
 			v, _ := vertex.(*lifecycleVertex)
 			v.action = actionPtr(DELETE)
 		}
+		return nil
+	}
+
+	if c.cc.cluster.Status.ObservedGeneration == c.cc.cluster.Generation {
+		vertices, err := findAllNot[*appsv1alpha1.Cluster](dag)
+		if err != nil {
+			return err
+		}
+		for _, vertex := range vertices {
+			dag.RemoveVertex(vertex)
+		}
+		rootVertex.action = actionPtr(STATUS)
 		return nil
 	}
 
@@ -181,7 +194,6 @@ func (c *objectActionTransformer) Transform(dag *graph.DAG) error {
 	}
 
 	// update cluster.status
-	rootVertex, _ := root.(*lifecycleVertex)
 	cluster, _ := rootVertex.obj.(*appsv1alpha1.Cluster)
 	// apply resources succeed, record the condition and event
 	applyResourcesCondition := newApplyResourcesCondition()

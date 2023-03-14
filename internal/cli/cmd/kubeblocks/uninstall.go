@@ -145,7 +145,6 @@ func (o *uninstallOptions) preCheck() error {
 		printer.Warning(o.Out, "failed to locate helm release meta, will clean up all KubeBlocks resources.\n")
 	} else if o.Namespace != kbNamespace {
 		o.Namespace = kbNamespace
-		o.HelmCfg.SetNamespace(o.Namespace)
 		fmt.Fprintf(o.Out, "will uninstall KubeBlocks in namespace: '%s'\n", kbNamespace)
 	}
 	return nil

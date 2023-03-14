@@ -31,6 +31,7 @@ import (
 	clientfake "k8s.io/client-go/rest/fake"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 
+	"github.com/apecloud/kubeblocks/internal/cli/engine"
 	"github.com/apecloud/kubeblocks/internal/cli/exec"
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
@@ -133,27 +134,35 @@ var _ = Describe("connection", func() {
 
 	It("build connect command", func() {
 		type argsCases struct {
-			args   []string
-			expect string
+			command []string
+			args    []string
+			expect  []string
 		}
 
 		testCases := []argsCases{
 			{
-				args:   []string{"USER=$MYSQL_ROOT_USER MYSQL_PWD=$MYSQL_ROOT_PASSWORD mysql -h$(KB_ACCOUNT_ENDPOINT) -e \"$(KB_ACCOUNT_STATEMENT)\""},
-				expect: "USER=$MYSQL_ROOT_USER MYSQL_PWD=$MYSQL_ROOT_PASSWORD mysql -h127.0.0.1",
+				command: []string{"mysql"},
+				args:    []string{"-h$(KB_ACCOUNT_ENDPOINT)", "-e", "$(KB_ACCOUNT_STATEMENT)"},
+				expect:  []string{"sh", "-c", "mysql -h127.0.0.1"},
 			},
 			{
-				args:   []string{"psql -h$(KB_ACCOUNT_ENDPOINT) -c \"$(KB_ACCOUNT_STATEMENT)\""},
-				expect: "psql -h127.0.0.1",
+				command: []string{"psql"},
+				args:    []string{"-h$(KB_ACCOUNT_ENDPOINT)", "-c", "$(KB_ACCOUNT_STATEMENT)"},
+				expect:  []string{"sh", "-c", "psql -h127.0.0.1"},
 			},
 			{
-				args:   []string{"redis-cli -h $(KB_ACCOUNT_ENDPOINT) \"$(KB_ACCOUNT_STATEMENT)\""},
-				expect: "redis-cli -h 127.0.0.1",
+				command: []string{"sh", "-c"},
+				args:    []string{"redis-cli -h $(KB_ACCOUNT_ENDPOINT) $(KB_ACCOUNT_STATEMENT)"},
+				expect:  []string{"sh", "-c", "redis-cli -h 127.0.0.1"},
 			},
 		}
 
 		for _, testCase := range testCases {
-			result := buildArgs(testCase.args)
+			info := &engine.ConnectionInfo{
+				Command: testCase.command,
+				Args:    testCase.args,
+			}
+			result := buildCommand(info)
 			Expect(result).Should(BeEquivalentTo(testCase.expect))
 		}
 	})

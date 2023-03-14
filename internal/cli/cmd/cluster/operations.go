@@ -236,14 +236,9 @@ func (o *OperationsOptions) validateTemplateParam(tpls []appsv1alpha1.ConfigTemp
 
 func (o *OperationsOptions) validateConfigFileName(tpl *appsv1alpha1.ConfigTemplate, componentName string) error {
 	cmObj := corev1.ConfigMap{}
-	if o.workloadType == appsv1alpha1.Replication {
-		componentName = fmt.Sprintf("%s-%d", componentName, 0)
-	}
-
-	cmName := cfgcore.GetComponentCfgName(o.Name, componentName, tpl.VolumeName)
 	if err := util.GetResourceObjectFromGVR(types.ConfigmapGVR(), client.ObjectKey{
-		Name:      cmName,
 		Namespace: o.Namespace,
+		Name:      cfgcore.GetComponentUnitCMName(o.Name, componentName, tpl.VolumeName, o.workloadType, 0),
 	}, o.Dynamic, &cmObj); err != nil {
 		return err
 	}

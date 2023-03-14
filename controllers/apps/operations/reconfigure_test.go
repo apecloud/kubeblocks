@@ -177,6 +177,7 @@ var _ = Describe("Reconfigure OpsRequest", func() {
 				SucceedCount:  2,
 				ExpectedCount: 3,
 			},
+			ClusterComponent: &clusterObject.Spec.ComponentSpecs[0],
 		}
 		return opsRes, eventContext
 	}

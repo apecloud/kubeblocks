@@ -162,3 +162,18 @@ func getInstanceCfgCMName(objName, tplName string) string {
 func GetComponentCfgName(clusterName, componentName, tplName string) string {
 	return getInstanceCfgCMName(fmt.Sprintf("%s-%s", clusterName, componentName), tplName)
 }
+
+// GetReplicationComponentCMName generate ConfigMap name for replication workload.
+func GetReplicationComponentCMName(clusterName, componentName, tplName string, replicaID int) string {
+	return GetComponentCfgName(clusterName, fmt.Sprintf("%s-%d", componentName, replicaID), tplName)
+}
+
+// GetComponentUnitCMName generate ConfigMap name for component
+func GetComponentUnitCMName(clusterName, componentName, tplName string, workloadType appsv1alpha1.WorkloadType, replicaID int) string {
+	switch workloadType {
+	default:
+		return GetComponentCfgName(clusterName, componentName, tplName)
+	case appsv1alpha1.Replication:
+		return GetReplicationComponentCMName(clusterName, componentName, tplName, replicaID)
+	}
+}

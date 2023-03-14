@@ -304,16 +304,12 @@ func (r *reconfigureOptions) printExplainConfigure(tplName string) error {
 
 func (r *reconfigureOptions) getReconfigureMeta() ([]types.ConfigTemplateInfo, error) {
 	configs := make([]types.ConfigTemplateInfo, 0)
-	componentName := r.componentName
-	if r.workloadType == appsv1alpha1.Replication {
-		componentName = fmt.Sprintf("%s-%d", componentName, 0)
-	}
 	for _, tplName := range r.templateNames {
 		// checked by validate
 		tpl, _ := r.findTemplateByName(tplName)
 		// fetch config configmap
 		cmObj := &corev1.ConfigMap{}
-		cmName := cfgcore.GetComponentCfgName(r.clusterName, componentName, tpl.VolumeName)
+		cmName := cfgcore.GetComponentUnitCMName(r.clusterName, r.componentName, tpl.VolumeName, r.workloadType, 0)
 		if err := util.GetResourceObjectFromGVR(types.ConfigmapGVR(), client.ObjectKey{
 			Name:      cmName,
 			Namespace: r.namespace,

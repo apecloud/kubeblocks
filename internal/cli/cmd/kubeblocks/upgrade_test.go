@@ -17,8 +17,6 @@ limitations under the License.
 package kubeblocks
 
 import (
-	"fmt"
-
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -34,7 +32,7 @@ import (
 	"github.com/apecloud/kubeblocks/version"
 )
 
-var _ = Describe("kubeblocks", func() {
+var _ = Describe("kubeblocks upgrade", func() {
 	var cmd *cobra.Command
 	var streams genericclioptions.IOStreams
 	var tf *cmdtesting.TestFactory
@@ -43,10 +41,6 @@ var _ = Describe("kubeblocks", func() {
 		streams, _, _, _ = genericclioptions.NewTestIOStreams()
 		tf = cmdtesting.NewTestFactory().WithNamespace(namespace)
 		tf.Client = &clientfake.RESTClient{}
-
-		// use a fake URL to test
-		types.KubeBlocksChartName = testing.KubeBlocksChartName
-		types.KubeBlocksChartURL = testing.KubeBlocksChartURL
 	})
 
 	AfterEach(func() {
@@ -97,11 +91,8 @@ var _ = Describe("kubeblocks", func() {
 			Monitor: true,
 			Check:   false,
 		}
-		cmd := newUpgradeCmd(tf, streams)
-		_ = cmd.Flags().Set("monitor", "true")
-		Expect(o.Upgrade(cmd)).Should(HaveOccurred())
-		Expect(len(o.ValueOpts.Values)).To(Equal(1))
-		Expect(o.ValueOpts.Values[0]).To(Equal(fmt.Sprintf(kMonitorParam, true)))
+		Expect(o.Upgrade()).Should(Succeed())
+		Expect(len(o.ValueOpts.Values)).To(Equal(0))
 		Expect(o.upgradeChart()).Should(HaveOccurred())
 
 		o.printNotes()

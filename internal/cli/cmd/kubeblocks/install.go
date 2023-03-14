@@ -21,7 +21,6 @@ import (
 	"context"
 	"fmt"
 	"sort"
-	"strconv"
 	"strings"
 	"time"
 
@@ -49,19 +48,6 @@ import (
 	"github.com/apecloud/kubeblocks/version"
 )
 
-const (
-	kMonitorParam      = "prometheus.enabled=%[1]t,grafana.enabled=%[1]t,dashboards.enabled=%[1]t"
-	requiredK8sVersion = "1.22.0"
-)
-
-var (
-	// unsupported sets in non-cloud kubernetes cluster
-	disabledSetsInLocalK8s = [...]string{"loadbalancer.enabled"}
-
-	// enabled sets in cloud kubernetes
-	enabledSetsInCloudK8s = [...]string{"snapshot-controller.enabled"}
-)
-
 type Options struct {
 	genericclioptions.IOStreams
 
@@ -87,11 +73,14 @@ type InstallOptions struct {
 
 var (
 	installExample = templates.Examples(`
-	# Install KubeBlocks
+	# Install KubeBlocks, the default version is same with the kbcli version and the default namespace is kb-system 
 	kbcli kubeblocks install
 	
 	# Install KubeBlocks with specified version
 	kbcli kubeblocks install --version=0.4.0
+
+	# Install KubeBlocks with specified namespace, if the namespace is not present, create it
+	kbcli kubeblocks install --namespace=my-namespace --create-namespace
 
 	# Install KubeBlocks with other settings, for example, set replicaCount to 3
 	kbcli kubeblocks install --set replicaCount=3`)
@@ -115,12 +104,11 @@ func newInstallCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 		},
 	}
 
-	cmd.Flags().BoolVar(&o.Monitor, "monitor", true, "Set monitor enabled and install Prometheus, AlertManager and Grafana (default true)")
-	cmd.Flags().StringVar(&o.Version, "version", version.DefaultKubeBlocksVersion, "KubeBlocks version")
+	cmd.Flags().StringVar(&o.Version, "version", version.DefaultKubeBlocksVersion, "KubeBlocks version to install")
 	cmd.Flags().BoolVar(&o.CreateNamespace, "create-namespace", false, "Create the namespace if not present")
 	cmd.Flags().BoolVar(&o.Check, "check", true, "Check kubernetes environment before install")
 	cmd.Flags().DurationVar(&o.timeout, "timeout", 1800*time.Second, "Time to wait for installing KubeBlocks")
-	cmd.Flags().BoolVar(&o.verbose, "verbose", false, "Show logs in detail.")
+	cmd.Flags().BoolVar(&o.verbose, "verbose", false, "Show logs in detail")
 	helm.AddValueOptionsFlags(cmd.Flags(), &o.ValueOpts)
 
 	return cmd
@@ -143,7 +131,7 @@ func (o *Options) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 	}
 
 	// check whether --namespace is specified, if not, KubeBlocks will be installed
-	// to a default namespace
+	// to the default namespace
 	var targetNamespace string
 	cmd.Flags().Visit(func(flag *pflag.Flag) {
 		if flag.Name == "namespace" {
@@ -188,14 +176,11 @@ func (o *InstallOptions) Install() error {
 		return err
 	}
 
-	// add monitor parameters
-	o.ValueOpts.Values = append(o.ValueOpts.Values, fmt.Sprintf(kMonitorParam, o.Monitor))
-
 	// add helm repo
-	spinner := util.Spinner(o.Out, "%-40s", "Add and update repo "+types.KubeBlocksChartName)
+	spinner := util.Spinner(o.Out, "%-40s", "Add and update repo "+types.KubeBlocksRepoName)
 	defer spinner(false)
 	// Add repo, if exists, will update it
-	if err = helm.AddRepo(&repo.Entry{Name: types.KubeBlocksChartName, URL: util.GetHelmChartRepoURL()}); err != nil {
+	if err = helm.AddRepo(&repo.Entry{Name: types.KubeBlocksRepoName, URL: util.GetHelmChartRepoURL()}); err != nil {
 		return err
 	}
 	spinner(true)
@@ -295,26 +280,17 @@ func (o *InstallOptions) preCheck(versionInfo map[util.AppName]string) error {
 		return versionErr
 	}
 
-	// check kubernetes version
-	spinner := util.Spinner(o.Out, "%-40s", "Kubernetes version "+version)
-	if version >= requiredK8sVersion {
-		spinner(true)
-	} else {
-		spinner(false)
-		return fmt.Errorf("kubernetes version should be greater than or equal to %s", requiredK8sVersion)
-	}
+	// output kubernetes version
+	fmt.Fprintf(o.Out, "%-40s", "Kubernetes version "+version)
 
 	// check kbcli version, now do nothing
-	spinner = util.Spinner(o.Out, "%-40s", "kbcli version "+versionInfo[util.KBCLIApp])
-	spinner(true)
+	fmt.Fprintf(o.Out, "%-40s", "kbcli version "+versionInfo[util.KBCLIApp])
 
 	// disable or enable some features according to the kubernetes environment
 	provider := util.GetK8sProvider(k8sVersionStr)
 	if provider.IsCloud() {
-		spinner = util.Spinner(o.Out, "%-40s", "Kubernetes provider "+provider)
-		spinner(true)
+		fmt.Fprintf(o.Out, "%-40s", "Kubernetes provider "+provider)
 	}
-	o.disableOrEnableSets(provider)
 
 	return nil
 }
@@ -333,131 +309,6 @@ func (o *InstallOptions) checkNamespace() error {
 		return err
 	}
 	return nil
-}
-
-// disableOrEnableSets disable or enable some features according to the kubernetes provider
-func (o *InstallOptions) disableOrEnableSets(k8sProvider util.K8sProvider) {
-	var sets []string
-	for _, set := range o.ValueOpts.Values {
-		splitSet := strings.Split(set, ",")
-		sets = append(sets, splitSet...)
-	}
-
-	switch k8sProvider {
-	case util.EKSProvider:
-		// some features must be enabled on cloud kubernetes environment, if they are disabled,
-		// turn on these features and output message
-		o.enableSets(sets)
-	case util.UnknownProvider:
-		// check whether user turn on features that only enable on cloud kubernetes cluster,
-		// if yes, turn off these features and output message
-		o.disableSets(sets)
-	}
-}
-
-func (o *InstallOptions) enableSets(sets []string) {
-	var (
-		newSets     []string
-		removedSets []string
-	)
-
-	// check all sets, remove sets that disable the features that must be enabled
-	for _, set := range sets {
-		need := true
-		for _, key := range enabledSetsInCloudK8s {
-			if !strings.Contains(set, key) {
-				continue
-			}
-
-			// found unsupported, parse its value
-			kv := strings.Split(set, "=")
-			if len(kv) <= 1 {
-				break
-			}
-
-			// whether it is true or false, just remove it, we will add all enabled sets later
-			need = false
-
-			// if value is false, record it
-			if val, _ := strconv.ParseBool(kv[1]); !val {
-				removedSets = append(removedSets, set)
-				break
-			}
-		}
-		if need {
-			newSets = append(newSets, set)
-		}
-	}
-
-	// add enabled sets
-	for _, key := range enabledSetsInCloudK8s {
-		newSets = append(newSets, key+"=true")
-	}
-
-	if len(removedSets) == 0 {
-		o.ValueOpts.Values = newSets
-		return
-	}
-
-	msg := "following parameters must be enabled in current kubernetes environment, they will be enabled\n"
-	if len(removedSets) == 1 {
-		msg = "following parameter must be enabled in current kubernetes environment, it will be enabled\n"
-	}
-	printer.Warning(o.Out, msg)
-	for _, set := range removedSets {
-		fmt.Fprintf(o.Out, "  · %s\n", set)
-	}
-	o.ValueOpts.Values = newSets
-}
-
-func (o *InstallOptions) disableSets(sets []string) {
-	var (
-		newSets      []string
-		disabledSets []string
-	)
-
-	// check all sets, remove unsupported and output message
-	for _, set := range sets {
-		need := true
-		for _, key := range disabledSetsInLocalK8s {
-			if !strings.Contains(set, key) {
-				continue
-			}
-
-			// found unsupported, parse its value
-			kv := strings.Split(set, "=")
-			if len(kv) <= 1 {
-				break
-			}
-
-			// if value is false, ignore it
-			if val, _ := strconv.ParseBool(kv[1]); !val {
-				break
-			}
-
-			// if value is true, remove it from original sets
-			need = false
-			disabledSets = append(disabledSets, key)
-			break
-		}
-		if need {
-			newSets = append(newSets, set)
-		}
-	}
-
-	if len(disabledSets) == 0 {
-		return
-	}
-
-	msg := "following parameters are not available in current kubernetes environment, they will be disabled\n"
-	if len(disabledSets) == 1 {
-		msg = "following parameter is not available in current kubernetes environment, it will be disabled\n"
-	}
-	printer.Warning(o.Out, msg)
-	for _, set := range disabledSets {
-		fmt.Fprintf(o.Out, "  · %s\n", set)
-	}
-	o.ValueOpts.Values = newSets
 }
 
 func (o *InstallOptions) checkRemainedResource() error {

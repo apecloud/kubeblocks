@@ -10,8 +10,8 @@ As an open-source data management platform, KubeBlocks supports two database for
 
 ***Before you start***
 
-* Install a Kubernetes cluster and KubeBlocks, refer to [Install KubeBlocks](../../install_kbcli_kubeblocks/install_and_unistall_kbcli_and_kubeblocks.md).
-* Create an ApeCloud MySQL Paxos group, refer to [Create a MySQL cluster](create_and_connect_a_mysql_cluster.md).
+* Install a Kubernetes cluster and KubeBlocks, refer to [Install KubeBlocks](./../../installation/install-and-uninstall-kbcli-and-kubeblocks.md).
+* Create an ApeCloud MySQL Paxos group, refer to [Create a MySQL cluster](./../cluster-management/create-and-connect-a-mysql-cluster.md).
 * Run `kubectl get cd apecloud-mysql -o yaml` to check whether _rolechangedprobe_ is enabled in the ApeCloud MySQL Paxos group (it is enabled by default). If the following configuration exists, it indicates that it is enabled:
   ```
   probes:
@@ -35,13 +35,13 @@ As an open-source data management platform, KubeBlocks supports two database for
    ```bash
    kbcli cluster describe mysql-cluster
    ```
-   ![describe_cluster](../../../img/failure_simulation_describe_cluster.png)
+   ![describe_cluster](./../../../img/failure_simulation_describe_cluster.png)
 2. Delete the leader pod `mysql-cluster-mysql-1` to simulate a pod fault.
    ```bash
    kubectl delete pod mysql-cluster-mysql-1
    ```
 
-   ![delete_pod](../../../img/failure_simulation_delete_pod.png)
+   ![delete_pod](./../../../img/failure_simulation_delete_pod.png)
 3. Run `kbcli cluster describe` and `kbcli cluster connect` to check the status of the pods and Paxos group connection.
    
    ***Results***
@@ -50,12 +50,12 @@ As an open-source data management platform, KubeBlocks supports two database for
    ```bash
    kbcli cluster describe mysql-cluster
    ```
-   ![describe_cluster_after](../../../img/failure_simulation_describe_cluster_after.png)
+   ![describe_cluster_after](./../../../img/failure_simulation_describe_cluster_after.png)
    It shows that this ApeCloud MySQL Paxos group can be connected within seconds.
    ```bash
    kbcli cluster connect mysql-cluster
    ```
-   ![connect_cluster_after](../../../img/failure_simulation_connect_cluster_after.png)
+   ![connect_cluster_after](./../../../img/failure_simulation_connect_cluster_after.png)
 
    ***How the automatic recovery works***
 
@@ -69,25 +69,25 @@ As an open-source data management platform, KubeBlocks supports two database for
    ```bash
    kbcli cluster describe mysql-cluster
    ```
-   ![describe_cluster](../../../img/failure_simulation_describe_cluster.png)
+   ![describe_cluster](./../../../img/failure_simulation_describe_cluster.png)
 2. Delete the follower pod mysql-cluster-mysql-0.
    ```bash
    kubectl delete pod mysql-cluster-mysql-0
    ```
 
-   ![delete_follower_pod](../../../img/failure_simulation_delete_follower_pod.png)
+   ![delete_follower_pod](./../../../img/failure_simulation_delete_follower_pod.png)
 3. Run the command below to view the Paxos group status and you can find the follower pod is being terminated in `Component.Instance`.
    ```bash
    kbcli cluster describe mysql-cluster
    ```
 
-   ![describe_cluster_follower](../../../img/failure_simulation_describe_cluster_follower.png)
+   ![describe_cluster_follower](./../../../img/failure_simulation_describe_cluster_follower.png)
 4. Run the command below to connect to the Paxos group and you can find this single follower exception doesn't affect the R/W of the cluster.
    ```bash
    kbcli cluster connect mysql-cluster
    ```
 
-   ![connect_cluster_follower](../../../img/failure_simulation_connect_cluster_follower.png)
+   ![connect_cluster_follower](./../../../img/failure_simulation_connect_cluster_follower.png)
 
    ***How the automatic recovery works***
 
@@ -104,25 +104,25 @@ Therefore, whether exceptions occur to one leader and one follower or exceptions
    ```bash
    kbcli cluster describe mysql-cluster
    ```
-   ![describe_cluster](../../../img/failure_simulation_describe_cluster_2.png)
+   ![describe_cluster](./../../../img/failure_simulation_describe_cluster_2.png)
 2. Delete these two follower pods.
    ```bash
    kubectl delete pod mysql-cluster-mysql-1 mysql-cluster-mysql-0
    ```
 
-   ![delete_two_pods](../../../img/failure_simulation_delete_two_pods.png)
+   ![delete_two_pods](./../../../img/failure_simulation_delete_two_pods.png)
 3. Run the command below to view the Paxos group status and you can find the follower pods are being terminated in `Component.Instance`.
    ```bash
    kbcli cluster describe mysql-cluster
    ```
 
-   ![describe_two_pods](../../../img/failure_simulation_describe_two_pods.png)
+   ![describe_two_pods](./../../../img/failure_simulation_describe_two_pods.png)
 4. Run `kbcli cluster connect mysql-cluster` again after a few seconds and you can find the pods in the Paxos group work normally again in `Component.Instance`.
    ```bash
    kbcli cluster connect mysql-cluster
    ```
 
-   ![connect_two_pods](../../../img/failure_simulation_connect_two_pods.png)
+   ![connect_two_pods](./../../../img/failure_simulation_connect_two_pods.png)
 
    ***How the automatic recovery works***
 
@@ -136,25 +136,25 @@ Therefore, whether exceptions occur to one leader and one follower or exceptions
    ```bash
    kbcli cluster describe mysql-cluster
    ```
-   ![describe_cluster](../../../img/failure_simulation_describe_cluster.png)
+   ![describe_cluster](./../../../img/failure_simulation_describe_cluster.png)
 2. Delete all pods.
    ```bash
    kubectl delete pod mysql-cluster-mysql-1 mysql-cluster-mysql-0 mysql-cluster-mysql-2
    ```
 
-   ![delete_three_pods](../../../img/failure_simulation_delete_three_pods.png)
+   ![delete_three_pods](./../../../img/failure_simulation_delete_three_pods.png)
 3. Run the command below to view the deleting process. You can find the pods are being deleted in `Component.Instance` and the follower pod is the last one to be deleted.
    ```bash
    kbcli cluster describe mysql-cluster
    ```
 
-   ![describe_three_clusters](../../../img/failure_simulation_describe_three_pods.png)
+   ![describe_three_clusters](./../../../img/failure_simulation_describe_three_pods.png)
 4. Run `kbcli cluster connect mysql-cluster` again after a few seconds and you can find the pods in the Paxos group work normally again in `Component.Instance`.
    ```bash
    kbcli cluster connect mysql-cluster
    ```
 
-   ![connect_three_clusters](../../../img/failure_simulation_connect_three_pods.png)
+   ![connect_three_clusters](./../../../img/failure_simulation_connect_three_pods.png)
 
    ***How the automatic recovery works***
 

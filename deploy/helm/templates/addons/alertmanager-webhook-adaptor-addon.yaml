@@ -13,8 +13,8 @@ spec:
   type: Helm
 
   helm:
-    # chartLocationURL: https://github.com/apecloud/helm-charts/releases/download/alertmanager-webhook-adaptor-0.1.2/alertmanager-webhook-adaptor-0.1.2.tgz
-    chartLocationURL: https://jihulab.com/api/v4/projects/85949/packages/helm/stable/charts/alertmanager-webhook-adaptor-0.1.2.tgz
+    # chartLocationURL: https://github.com/apecloud/helm-charts/releases/download/alertmanager-webhook-adaptor-0.1.4/alertmanager-webhook-adaptor-0.1.4.tgz
+    chartLocationURL: https://jihulab.com/api/v4/projects/85949/packages/helm/stable/charts/alertmanager-webhook-adaptor-0.1.4.tgz
 
     installValues:
       configMapRefs:

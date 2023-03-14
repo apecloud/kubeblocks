@@ -129,6 +129,7 @@ func (o *describeOptions) describeCluster(name string) error {
 			WithService:    true,
 			WithPod:        true,
 			WithEvent:      true,
+			WithPVC:        true,
 		},
 	}
 

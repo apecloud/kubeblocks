@@ -44,7 +44,7 @@ backup_policy: {
 		"target": {
 			"labelsSelector": {
 				"matchLabels": {
-					"app.kubernetes.io/instance": sts.metadata.labels["app.kubernetes.io/instance"]
+					"app.kubernetes.io/instance":        sts.metadata.labels["app.kubernetes.io/instance"]
 					"apps.kubeblocks.io/component-name": sts.metadata.labels["apps.kubeblocks.io/component-name"]
 				}
 			}

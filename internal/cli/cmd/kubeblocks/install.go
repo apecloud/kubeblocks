@@ -192,7 +192,7 @@ func (o *InstallOptions) Install() error {
 	o.ValueOpts.Values = append(o.ValueOpts.Values, fmt.Sprintf(kMonitorParam, o.Monitor))
 
 	// add helm repo
-	spinner := util.Spinner(o.Out, "%-40s", "Add and update repo "+types.KubeBlocksChartName)
+	spinner := util.Spinner(o.Out, "%-40s", "Add and update repo "+types.KubeBlocksRepoName)
 	defer spinner(false)
 	// Add repo, if exists, will update it
 	if err = helm.AddRepo(&repo.Entry{Name: types.KubeBlocksChartName, URL: util.GetHelmChartRepoURL()}); err != nil {
@@ -209,7 +209,7 @@ func (o *InstallOptions) Install() error {
 	spinner(true)
 
 	// wait for auto-install addons to be ready
-	spinner = util.Spinner(o.Out, "%-40s", "Wait auto-install addons to be ready")
+	spinner = util.Spinner(o.Out, "%-40s", "Wait installable addons to be ready")
 	defer spinner(false)
 	if err = o.waitAddonsEnabled(); err != nil {
 		return err
@@ -233,7 +233,9 @@ func (o *InstallOptions) Install() error {
 func (o *InstallOptions) waitAddonsEnabled() error {
 	checkAddons := func() (bool, error) {
 		allEnabled := true
-		objects, err := o.Dynamic.Resource(types.AddonGVR()).List(context.TODO(), metav1.ListOptions{})
+		objects, err := o.Dynamic.Resource(types.AddonGVR()).List(context.TODO(), metav1.ListOptions{
+			LabelSelector: buildAddonLabelSelector(),
+		})
 		if err != nil && !apierrors.IsNotFound(err) {
 			return false, err
 		}

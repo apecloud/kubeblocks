@@ -19,7 +19,6 @@ package lifecycle
 import (
 	"errors"
 	"fmt"
-	types2 "github.com/apecloud/kubeblocks/internal/controller/client"
 	"golang.org/x/exp/maps"
 	"reflect"
 	"strings"
@@ -37,6 +36,7 @@ import (
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
+	types2 "github.com/apecloud/kubeblocks/internal/controller/client"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
@@ -229,7 +229,7 @@ func (c *clusterPlanBuilder) Build() (graph.Plan, error) {
 		// stateful set pvc Update
 		&stsPVCTransformer{cli: c.cli, ctx: c.ctx},
 		// replication set horizontal scaling
-		//&rplSetHorizontalScalingTransformer{cc: *cc, cli: c.cli, ctx: c.ctx},
+		&rplSetHorizontalScalingTransformer{cr: *cr, cli: c.cli, ctx: c.ctx},
 		// finally, update cluster status
 		&clusterStatusTransformer{cc: *cr, cli: c.cli, ctx: c.ctx, recorder: c.recorder},
 	}
@@ -311,9 +311,8 @@ func (c *clusterPlanBuilder) buildUpdateObj(node *lifecycleVertex) (client.Objec
 		deployObj.Spec = deployProto.Spec
 		if !reflect.DeepEqual(&origObj.Spec, &deployObj.Spec) {
 			// sync component phase
-			// TODO: syncComponentPhaseWhenSpecUpdating
-			//componentName := deployObj.Labels[constant.KBAppComponentLabelKey]
-			//syncComponentPhaseWhenSpecUpdating(cluster, componentName)
+			componentName := deployObj.Labels[constant.KBAppComponentLabelKey]
+			syncComponentPhaseWhenSpecUpdating(c.cluster, componentName)
 		}
 		return deployObj, nil
 	}

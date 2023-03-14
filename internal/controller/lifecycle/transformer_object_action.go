@@ -162,7 +162,7 @@ func (c *objectActionTransformer) Transform(dag *graph.DAG) error {
 			v, _ := vertex.(*lifecycleVertex)
 			secret, _ := v.obj.(*corev1.Secret)
 			for _, account := range defaultAccounts {
-				if strings.Index(secret.Name, string(account)) >= 0 {
+				if strings.Contains(secret.Name, string(account)) {
 					dag.RemoveVertex(vertex)
 					break
 				}

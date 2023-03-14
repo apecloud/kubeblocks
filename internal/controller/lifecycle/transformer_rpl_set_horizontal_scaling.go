@@ -117,8 +117,6 @@ func (r *rplSetHorizontalScalingTransformer) listAllStsOwnedByCluster(cluster ap
 		return nil, err
 	}
 	allSts := make([]appsv1.StatefulSet, 0)
-	for _, item := range stsList.Items {
-		allSts = append(allSts, item)
-	}
+	allSts = append(allSts, stsList.Items...)
 	return allSts, nil
 }

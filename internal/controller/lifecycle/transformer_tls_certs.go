@@ -43,7 +43,7 @@ func (t *tlsCertsTransformer) Transform(dag *graph.DAG) error {
 	origCluster, _ := rootVertex.oriObj.(*appsv1alpha1.Cluster)
 	cluster, _ := rootVertex.obj.(*appsv1alpha1.Cluster)
 	// return fast when cluster is deleting
-	if !origCluster.DeletionTimestamp.IsZero() {
+	if isClusterDeleting(*origCluster) {
 		return nil
 	}
 

@@ -41,7 +41,7 @@ func (s *stsPVCTransformer) Transform(dag *graph.DAG) error {
 	}
 	origCluster, _ := rootVertex.oriObj.(*appsv1alpha1.Cluster)
 
-	if !origCluster.DeletionTimestamp.IsZero() {
+	if isClusterDeleting(*origCluster) {
 		return nil
 	}
 

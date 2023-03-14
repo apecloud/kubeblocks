@@ -50,7 +50,7 @@ func (c *clusterTransformer) Transform(dag *graph.DAG) error {
 	cluster, _ := rootVertex.obj.(*appsv1alpha1.Cluster)
 
 	// return fast when cluster is deleting
-	if !origCluster.DeletionTimestamp.IsZero() {
+	if isClusterDeleting(*origCluster) {
 		return nil
 	}
 

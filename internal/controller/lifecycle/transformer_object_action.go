@@ -173,7 +173,7 @@ func (c *objectActionTransformer) Transform(dag *graph.DAG) error {
 	// generate the plan
 	switch {
 	// cluster Deletion
-	case !origCluster.DeletionTimestamp.IsZero():
+	case isClusterDeleting(*origCluster):
 		for _, vertex := range dag.Vertices() {
 			v, _ := vertex.(*lifecycleVertex)
 			v.action = actionPtr(DELETE)

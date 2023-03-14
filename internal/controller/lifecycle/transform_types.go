@@ -18,13 +18,13 @@ package lifecycle
 
 import (
 	"fmt"
-	client2 "github.com/apecloud/kubeblocks/internal/controller/client"
 	"time"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	client2 "github.com/apecloud/kubeblocks/internal/controller/client"
 )
 
 const (

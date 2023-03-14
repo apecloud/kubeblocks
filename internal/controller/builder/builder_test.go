@@ -309,14 +309,31 @@ var _ = Describe("builder", func() {
 		})
 
 		It("builds Env Config correctly", func() {
+			reqCtx := newReqCtx()
 			params := newParams()
-			cfg, err := BuildEnvConfig(*params)
+			cfg, err := BuildEnvConfig(*params, reqCtx, k8sClient)
 			Expect(err).Should(BeNil())
 			Expect(cfg).ShouldNot(BeNil())
-			Expect(len(cfg.Data) == 2).Should(BeTrue())
+			Expect(len(cfg.Data) == 3).Should(BeTrue())
+		})
+
+		It("builds env config with resources recreate", func() {
+			reqCtx := newReqCtx()
+			params := newParams()
+
+			By("creating pvc to make it looks like recreation")
+			pvcName := "test-pvc"
+			testapps.NewPersistentVolumeClaimFactory(testCtx.DefaultNamespace, pvcName, clusterName,
+				params.Component.Name, testapps.DataVolumeName).SetStorage("1Gi").CheckedCreate(&testCtx)
+
+			cfg, err := BuildEnvConfig(*params, reqCtx, k8sClient)
+			Expect(err).Should(BeNil())
+			Expect(cfg).ShouldNot(BeNil())
+			Expect(cfg.Data["KB_"+strings.ToUpper(params.Component.Type)+"_RECREATE"]).Should(Equal("true"))
 		})
 
 		It("builds Env Config with ConsensusSet status correctly", func() {
+			reqCtx := newReqCtx()
 			params := newParams()
 			params.Cluster.Status.Components = map[string]appsv1alpha1.ClusterComponentStatus{
 				params.Component.Name: {
@@ -331,13 +348,14 @@ var _ = Describe("builder", func() {
 						}},
 					},
 				}}
-			cfg, err := BuildEnvConfig(*params)
+			cfg, err := BuildEnvConfig(*params, reqCtx, k8sClient)
 			Expect(err).Should(BeNil())
 			Expect(cfg).ShouldNot(BeNil())
-			Expect(len(cfg.Data) == 4).Should(BeTrue())
+			Expect(len(cfg.Data) == 5).Should(BeTrue())
 		})
 
 		It("builds Env Config with Replication component correctly", func() {
+			reqCtx := newReqCtx()
 			params := newParams()
 			params.Component.WorkloadType = appsv1alpha1.Replication
 
@@ -345,10 +363,10 @@ var _ = Describe("builder", func() {
 			var err error
 
 			checkEnvValues := func() {
-				cfg, err = BuildEnvConfig(*params)
+				cfg, err = BuildEnvConfig(*params, reqCtx, k8sClient)
 				Expect(err).Should(BeNil())
 				Expect(cfg).ShouldNot(BeNil())
-				Expect(len(cfg.Data) == int(2+params.Component.Replicas)).Should(BeTrue())
+				Expect(len(cfg.Data) == int(3+params.Component.Replicas)).Should(BeTrue())
 				Expect(cfg.Data["KB_"+strings.ToUpper(params.Component.Type)+"_N"]).
 					Should(Equal(strconv.Itoa(int(params.Component.Replicas))))
 				stsName := fmt.Sprintf("%s-%s", params.Cluster.Name, params.Component.Name)

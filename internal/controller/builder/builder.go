@@ -429,7 +429,7 @@ func BuildEnvConfig(params BuilderParams, reqCtx intctrlutil.RequestCtx, cli cli
 		if err := cli.List(reqCtx.Ctx, &pvcList, ml); err != nil {
 			return false, err
 		}
-		// no pvc means not recreate
+		// no pvc means it's not recreation
 		if len(pvcList.Items) == 0 {
 			return false, nil
 		}
@@ -514,7 +514,7 @@ func BuildEnvConfig(params BuilderParams, reqCtx intctrlutil.RequestCtx, cli cli
 	}
 
 	// if created from existing pvc, set env
-	isRecreate, err := isRecreateFromExistingPVC();
+	isRecreate, err := isRecreateFromExistingPVC()
 	if err != nil {
 		return nil, err
 	}

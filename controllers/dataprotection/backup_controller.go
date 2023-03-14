@@ -648,21 +648,14 @@ func (r *BackupReconciler) getBatchV1Job(reqCtx intctrlutil.RequestCtx, backup *
 
 func (r *BackupReconciler) deleteReferenceBatchV1Jobs(reqCtx intctrlutil.RequestCtx, backup *dataprotectionv1alpha1.Backup) error {
 	jobs := &batchv1.JobList{}
+	namespace := backup.Namespace
+	if backup.Spec.BackupType == dataprotectionv1alpha1.BackupTypeSnapshot {
+		namespace = viper.GetString(constant.CfgKeyCtrlrMgrNS)
+	}
 	if err := r.Client.List(reqCtx.Ctx, jobs,
-		client.InNamespace(backup.Namespace),
+		client.InNamespace(namespace),
 		client.MatchingLabels(buildBackupLabels(backup))); err != nil {
 		return err
-	}
-	// if controller manager deploy in other namespace, do list and delete related jobs.
-	mgrNS := viper.GetString(constant.CfgKeyCtrlrMgrNS)
-	if mgrNS != backup.Namespace {
-		mgrJobs := &batchv1.JobList{}
-		if err := r.Client.List(reqCtx.Ctx, mgrJobs,
-			client.InNamespace(mgrNS),
-			client.MatchingLabels(buildBackupLabels(backup))); err != nil {
-			return err
-		}
-		jobs.Items = append(jobs.Items, mgrJobs.Items...)
 	}
 
 	for _, job := range jobs.Items {
@@ -919,6 +912,22 @@ func (r *BackupReconciler) buildSnapshotPodSpec(
 	podSpec.Containers = []corev1.Container{container}
 	podSpec.RestartPolicy = corev1.RestartPolicyNever
 	podSpec.ServiceAccountName = viper.GetString("KUBEBLOCKS_SERVICEACCOUNT_NAME")
+
+	if cmTolerations := viper.GetString(constant.CfgKeyCtrlrMgrTolerations); cmTolerations != "" {
+		if err = json.Unmarshal([]byte(cmTolerations), &podSpec.Tolerations); err != nil {
+			return podSpec, err
+		}
+	}
+	if cmAffinity := viper.GetString(constant.CfgKeyCtrlrMgrAffinity); cmAffinity != "" {
+		if err = json.Unmarshal([]byte(cmAffinity), &podSpec.Affinity); err != nil {
+			return podSpec, err
+		}
+	}
+	if cmNodeSelector := viper.GetString(constant.CfgKeyCtrlrMgrNodeSelector); cmNodeSelector != "" {
+		if err = json.Unmarshal([]byte(cmNodeSelector), &podSpec.NodeSelector); err != nil {
+			return podSpec, err
+		}
+	}
 
 	return podSpec, nil
 }

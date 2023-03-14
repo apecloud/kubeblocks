@@ -53,7 +53,7 @@ var _ = Describe("Backup Policy Controller", func() {
 
 	viper.SetDefault("DP_BACKUP_SCHEDULE", "0 3 * * *")
 	viper.SetDefault("DP_BACKUP_TTL", "168h0m0s")
-	viper.SetDefault("CM_NAMESPACE", testCtx.DefaultNamespace)
+	viper.SetDefault(constant.CfgKeyCtrlrMgrNS, testCtx.DefaultNamespace)
 
 	cleanEnv := func() {
 		// must wait until resources deleted and no longer exist before the testcases start,
@@ -61,7 +61,7 @@ var _ = Describe("Backup Policy Controller", func() {
 		// in race conditions, it will find the existence of old objects, resulting failure to
 		// create the new objects.
 		By("clean resources")
-		viper.SetDefault("CM_NAMESPACE", mgrNamespace)
+		viper.SetDefault(constant.CfgKeyCtrlrMgrNS, mgrNamespace)
 		// delete rest mocked objects
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
@@ -113,10 +113,10 @@ var _ = Describe("Backup Policy Controller", func() {
 		var cronjobKey types.NamespacedName
 
 		BeforeEach(func() {
-			viper.Set("CM_NAMESPACE", mgrNamespace)
+			viper.Set(constant.CfgKeyCtrlrMgrNS, mgrNamespace)
 			cronjobKey = types.NamespacedName{
 				Name:      backupPolicyName,
-				Namespace: viper.GetString("CM_NAMESPACE"),
+				Namespace: viper.GetString(constant.CfgKeyCtrlrMgrNS),
 			}
 
 			By("By creating a backupTool")
@@ -126,7 +126,7 @@ var _ = Describe("Backup Policy Controller", func() {
 		})
 
 		AfterEach(func() {
-			viper.SetDefault("CM_NAMESPACE", testCtx.DefaultNamespace)
+			viper.SetDefault(constant.CfgKeyCtrlrMgrNS, testCtx.DefaultNamespace)
 		})
 
 		Context("creates a backup policy", func() {

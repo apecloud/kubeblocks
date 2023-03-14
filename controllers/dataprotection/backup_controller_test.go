@@ -46,7 +46,7 @@ var _ = Describe("Backup for a StatefulSet", func() {
 	const defaultTTL = "168h0m0s"
 	const backupName = "test-backup-job"
 
-	viper.SetDefault("CM_NAMESPACE", testCtx.DefaultNamespace)
+	viper.SetDefault(constant.CfgKeyCtrlrMgrNS, testCtx.DefaultNamespace)
 
 	cleanEnv := func() {
 		// must wait until resources deleted and no longer exist before the testcases start,
@@ -76,7 +76,7 @@ var _ = Describe("Backup for a StatefulSet", func() {
 
 	BeforeEach(func() {
 		cleanEnv()
-		viper.Set("CM_NAMESPACE", testCtx.DefaultNamespace)
+		viper.Set(constant.CfgKeyCtrlrMgrNS, testCtx.DefaultNamespace)
 		By("mock a cluster")
 		testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
 			"test-cd", "test-cv").Create(&testCtx)
@@ -123,7 +123,7 @@ var _ = Describe("Backup for a StatefulSet", func() {
 
 	AfterEach(func() {
 		cleanEnv()
-		viper.Set("CM_NAMESPACE", testCtx.DefaultNamespace)
+		viper.Set(constant.CfgKeyCtrlrMgrNS, testCtx.DefaultNamespace)
 	})
 
 	When("with default settings", func() {
@@ -194,6 +194,11 @@ var _ = Describe("Backup for a StatefulSet", func() {
 			BeforeEach(func() {
 				viper.Set("VOLUMESNAPSHOT", "true")
 				viper.Set(constant.CfgKeyCtrlrMgrNS, "default")
+				viper.Set(constant.CfgKeyCtrlrMgrAffinity,
+					"{\"nodeAffinity\":{\"preferredDuringSchedulingIgnoredDuringExecution\":[{\"preference\":{\"matchExpressions\":[{\"key\":\"kb-controller\",\"operator\":\"In\",\"values\":[\"true\"]}]},\"weight\":100}]}}")
+				viper.Set(constant.CfgKeyCtrlrMgrTolerations,
+					"[{\"key\":\"key1\", \"operator\": \"Exists\", \"effect\": \"NoSchedule\"}]")
+				viper.Set(constant.CfgKeyCtrlrMgrNodeSelector, "{\"beta.kubernetes.io/arch\":\"amd64\"}")
 
 				By("By creating a backup from backupPolicy: " + backupPolicyName)
 				backup := testapps.NewBackupFactory(testCtx.DefaultNamespace, backupName).
@@ -206,12 +211,24 @@ var _ = Describe("Backup for a StatefulSet", func() {
 
 			AfterEach(func() {
 				viper.Set("VOLUMESNAPSHOT", "false")
+				viper.Set(constant.CfgKeyCtrlrMgrAffinity, "")
+				viper.Set(constant.CfgKeyCtrlrMgrTolerations, "")
+				viper.Set(constant.CfgKeyCtrlrMgrNodeSelector, "")
 			})
 
 			It("should success after all jobs complete", func() {
 				preJobKey := types.NamespacedName{Name: backupKey.Name + "-pre", Namespace: backupKey.Namespace}
 				postJobKey := types.NamespacedName{Name: backupKey.Name + "-post", Namespace: backupKey.Namespace}
 				patchK8sJobStatus(preJobKey, batchv1.JobComplete)
+				By("Check job tolerations")
+				Eventually(testapps.CheckObj(&testCtx, preJobKey, func(g Gomega, fetched *batchv1.Job) {
+					g.Expect(fetched.Spec.Template.Spec.Tolerations).ShouldNot(BeEmpty())
+					g.Expect(fetched.Spec.Template.Spec.NodeSelector).ShouldNot(BeEmpty())
+					g.Expect(fetched.Spec.Template.Spec.Affinity).ShouldNot(BeNil())
+					g.Expect(fetched.Spec.Template.Spec.Affinity.NodeAffinity).ShouldNot(BeNil())
+
+				})).Should(Succeed())
+
 				patchVolumeSnapshotStatus(backupKey, true)
 				patchK8sJobStatus(postJobKey, batchv1.JobComplete)
 

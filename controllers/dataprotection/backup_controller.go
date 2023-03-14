@@ -22,6 +22,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"sort"
 	"strings"
 	"time"
 
@@ -164,7 +165,7 @@ func (r *BackupReconciler) doNewPhaseAction(
 	}
 
 	// TODO: get pod with matching labels to do backup.
-	target, err := r.getTargetPod(reqCtx, backupPolicy)
+	target, err := r.getTargetPod(reqCtx, backup, backupPolicy.Spec.Target.LabelsSelector.MatchLabels)
 	if err != nil {
 		return r.updateStatusIfFailed(reqCtx, backup, err)
 	}
@@ -323,6 +324,10 @@ func (r *BackupReconciler) patchBackupLabelsAndAnnotations(
 		backup.Labels[k] = v
 	}
 	backup.Labels[dataProtectionLabelBackupTypeKey] = string(backup.Spec.BackupType)
+	if backup.Annotations == nil {
+		backup.Annotations = make(map[string]string)
+	}
+	backup.Annotations[dataProtectionBackupTargetPodKey] = targetPod.Name
 	if reflect.DeepEqual(oldBackup.ObjectMeta, backup.ObjectMeta) {
 		return false, nil
 	}
@@ -427,7 +432,22 @@ func (r *BackupReconciler) createVolumeSnapshot(
 	if len(dataPVC.Items) == 0 {
 		return errors.New("can not find any pvc to backup by labelsSelector")
 	}
-	pvcName := dataPVC.Items[0].Name
+	pvcName := ""
+	targetPod, err := r.getTargetPod(reqCtx, backup, backupPolicy.Spec.Target.LabelsSelector.MatchLabels)
+	if err != nil {
+		return err
+	}
+	targetVolumesBytes, _ := json.Marshal(targetPod.Spec.Volumes)
+	targetVolumesStr := string(targetVolumesBytes)
+	for _, pvc := range dataPVC.Items {
+		if strings.Contains(targetVolumesStr, pvc.Name) {
+			pvcName = pvc.Name
+			break
+		}
+	}
+	if pvcName == "" {
+		return errors.New("can not find any pvc from pod name: " + targetPod.Name)
+	}
 
 	snap = &snapshotv1.VolumeSnapshot{
 		ObjectMeta: metav1.ObjectMeta{
@@ -694,18 +714,30 @@ func (r *BackupReconciler) deleteExternalResources(reqCtx intctrlutil.RequestCtx
 	return nil
 }
 
-func (r *BackupReconciler) getTargetPod(
-	reqCtx intctrlutil.RequestCtx, backupPolicy *dataprotectionv1alpha1.BackupPolicy) (*corev1.Pod, error) {
-	reqCtx.Log.V(1).Info("Get pod from label", "label", backupPolicy.Spec.Target.LabelsSelector.MatchLabels)
+func (r *BackupReconciler) getTargetPod(reqCtx intctrlutil.RequestCtx,
+	backup *dataprotectionv1alpha1.Backup, labels map[string]string) (*corev1.Pod, error) {
+	if targetPodName, ok := backup.Annotations[dataProtectionBackupTargetPodKey]; ok {
+		targetPod := &corev1.Pod{}
+		targetPodKey := types.NamespacedName{
+			Name:      targetPodName,
+			Namespace: backup.Namespace,
+		}
+		if err := r.Client.Get(reqCtx.Ctx, targetPodKey, targetPod); err != nil {
+			return nil, err
+		}
+		return targetPod, nil
+	}
+	reqCtx.Log.V(1).Info("Get pod from label", "label", labels)
 	targetPod := &corev1.PodList{}
 	if err := r.Client.List(reqCtx.Ctx, targetPod,
 		client.InNamespace(reqCtx.Req.Namespace),
-		client.MatchingLabels(backupPolicy.Spec.Target.LabelsSelector.MatchLabels)); err != nil {
+		client.MatchingLabels(labels)); err != nil {
 		return nil, err
 	}
 	if len(targetPod.Items) == 0 {
 		return nil, errors.New("can not find any pod to backup by labelsSelector")
 	}
+	sort.Sort(intctrlutil.ByPodName(targetPod.Items))
 	return &targetPod.Items[0], nil
 }
 
@@ -736,7 +768,7 @@ func (r *BackupReconciler) buildBackupToolPodSpec(reqCtx intctrlutil.RequestCtx,
 		return podSpec, err
 	}
 
-	clusterPod, err := r.getTargetPod(reqCtx, backupPolicy)
+	clusterPod, err := r.getTargetPod(reqCtx, backup, backupPolicy.Spec.Target.LabelsSelector.MatchLabels)
 	if err != nil {
 		return podSpec, err
 	}
@@ -859,7 +891,7 @@ func (r *BackupReconciler) buildSnapshotPodSpec(
 		logger.Error(err, "Unable to get backupPolicy for backup.", "backupPolicy", backupPolicyNameSpaceName)
 		return podSpec, err
 	}
-	clusterPod, err := r.getTargetPod(reqCtx, backupPolicy)
+	clusterPod, err := r.getTargetPod(reqCtx, backup, backupPolicy.Spec.Target.LabelsSelector.MatchLabels)
 	if err != nil {
 		return podSpec, err
 	}

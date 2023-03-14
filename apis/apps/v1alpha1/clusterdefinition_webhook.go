@@ -250,10 +250,10 @@ func (r *SystemAccountSpec) validateSysAccounts(allErrs *field.ErrorList) {
 }
 
 func (r *ClusterDefinition) validateConfigSpec(component ClusterComponentDefinition) error {
-	if len(component.ComponentConfigSpecs) <= 1 && len(component.ComponentScriptSpecs) <= 1 {
+	if len(component.ConfigSpecs) <= 1 && len(component.ScriptSpecs) <= 1 {
 		return nil
 	}
-	return validateConfigTemplateList(component.ComponentConfigSpecs)
+	return validateConfigTemplateList(component.ConfigSpecs)
 }
 
 func validateConfigTemplateList(ctpls []ComponentConfigSpec) error {
@@ -273,11 +273,11 @@ func validateConfigTemplateList(ctpls []ComponentConfigSpec) error {
 		if _, ok := volumeSet[tpl.VolumeName]; ok {
 			return errors.Errorf("volume[%s] already existed.", tpl.VolumeName)
 		}
-		if _, ok := cmSet[tpl.ConfigTemplateRef]; ok {
-			return errors.Errorf("configmap[%s] already existed.", tpl.ConfigTemplateRef)
+		if _, ok := cmSet[tpl.TemplateRef]; ok {
+			return errors.Errorf("configmap[%s] already existed.", tpl.TemplateRef)
 		}
 		tplSet[tpl.Name] = struct{}{}
-		cmSet[tpl.ConfigTemplateRef] = struct{}{}
+		cmSet[tpl.TemplateRef] = struct{}{}
 		volumeSet[tpl.VolumeName] = struct{}{}
 	}
 	return nil

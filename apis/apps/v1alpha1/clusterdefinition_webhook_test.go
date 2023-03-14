@@ -185,17 +185,17 @@ var _ = Describe("clusterDefinition webhook", func() {
 				tpls: []ComponentConfigSpec{
 					{
 						ComponentTemplateSpec: ComponentTemplateSpec{
-							Name:              "tpl1",
-							ConfigTemplateRef: "cm1",
-							VolumeName:        "volume1",
+							Name:        "tpl1",
+							TemplateRef: "cm1",
+							VolumeName:  "volume1",
 						},
 						ConfigConstraintRef: "constraint1",
 					},
 					{
 						ComponentTemplateSpec: ComponentTemplateSpec{
-							Name:              "tpl2",
-							ConfigTemplateRef: "cm1",
-							VolumeName:        "volume2",
+							Name:        "tpl2",
+							TemplateRef: "cm1",
+							VolumeName:  "volume2",
 						},
 						ConfigConstraintRef: "constraint1",
 					},
@@ -207,17 +207,17 @@ var _ = Describe("clusterDefinition webhook", func() {
 				tpls: []ComponentConfigSpec{
 					{
 						ComponentTemplateSpec: ComponentTemplateSpec{
-							Name:              "tpl1",
-							ConfigTemplateRef: "cm1",
-							VolumeName:        "volume1",
+							Name:        "tpl1",
+							TemplateRef: "cm1",
+							VolumeName:  "volume1",
 						},
 						ConfigConstraintRef: "constraint1",
 					},
 					{
 						ComponentTemplateSpec: ComponentTemplateSpec{
-							Name:              "tpl1",
-							ConfigTemplateRef: "cm2",
-							VolumeName:        "volume2",
+							Name:        "tpl1",
+							TemplateRef: "cm2",
+							VolumeName:  "volume2",
 						},
 						ConfigConstraintRef: "constraint2",
 					},
@@ -229,17 +229,17 @@ var _ = Describe("clusterDefinition webhook", func() {
 				tpls: []ComponentConfigSpec{
 					{
 						ComponentTemplateSpec: ComponentTemplateSpec{
-							Name:              "tpl1",
-							ConfigTemplateRef: "cm1",
-							VolumeName:        "volume1",
+							Name:        "tpl1",
+							TemplateRef: "cm1",
+							VolumeName:  "volume1",
 						},
 						ConfigConstraintRef: "constraint1",
 					},
 					{
 						ComponentTemplateSpec: ComponentTemplateSpec{
-							Name:              "tpl2",
-							ConfigTemplateRef: "cm2",
-							VolumeName:        "volume1",
+							Name:        "tpl2",
+							TemplateRef: "cm2",
+							VolumeName:  "volume1",
 						},
 						ConfigConstraintRef: "constraint2",
 					},
@@ -251,17 +251,17 @@ var _ = Describe("clusterDefinition webhook", func() {
 				tpls: []ComponentConfigSpec{
 					{
 						ComponentTemplateSpec: ComponentTemplateSpec{
-							Name:              "tpl1",
-							ConfigTemplateRef: "cm1",
-							VolumeName:        "volume1",
+							Name:        "tpl1",
+							TemplateRef: "cm1",
+							VolumeName:  "volume1",
 						},
 						ConfigConstraintRef: "constraint1",
 					},
 					{
 						ComponentTemplateSpec: ComponentTemplateSpec{
-							Name:              "tpl2",
-							ConfigTemplateRef: "cm2",
-							VolumeName:        "volume2",
+							Name:        "tpl2",
+							TemplateRef: "cm2",
+							VolumeName:  "volume2",
 						},
 						ConfigConstraintRef: "constraint1",
 					},
@@ -270,7 +270,7 @@ var _ = Describe("clusterDefinition webhook", func() {
 			}}
 
 			for _, tt := range tests {
-				clusterDef.Spec.ComponentDefs[0].ComponentConfigSpecs = tt.tpls
+				clusterDef.Spec.ComponentDefs[0].ConfigSpecs = tt.tpls
 				err := testCtx.CreateObj(ctx, clusterDef)
 				if tt.wantErr {
 					Expect(err).ShouldNot(Succeed())

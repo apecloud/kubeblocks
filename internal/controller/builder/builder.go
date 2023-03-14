@@ -565,7 +565,7 @@ func BuildConfigMapWithTemplate(
 			"type":                  params.Component.Type,
 			"characterType":         params.Component.CharacterType,
 			"configName":            cmName,
-			"templateName":          tplCfg.ConfigTemplateRef,
+			"templateName":          tplCfg.TemplateRef,
 			"configConstraintsName": configConstraintName,
 			"configTemplateName":    tplCfg.Name,
 		},

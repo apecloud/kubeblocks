@@ -157,9 +157,9 @@ single_thread_memory = 294912
 		}
 		cfgTemplate = []appsv1alpha1.ComponentConfigSpec{{
 			ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
-				Name:              "mysql-config-8.0.2",
-				ConfigTemplateRef: "mysql-config-8.0.2",
-				VolumeName:        "config1",
+				Name:        "mysql-config-8.0.2",
+				TemplateRef: "mysql-config-8.0.2",
+				VolumeName:  "config1",
 			},
 			ConfigConstraintRef: "mysql-config-8.0.2",
 		}}

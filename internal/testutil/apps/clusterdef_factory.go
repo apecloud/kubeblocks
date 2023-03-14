@@ -92,13 +92,13 @@ func (factory *MockClusterDefFactory) AddScriptTemplate(name,
 	if comp == nil {
 		return nil
 	}
-	comp.ComponentScriptSpecs = append(comp.ComponentScriptSpecs,
+	comp.ScriptSpecs = append(comp.ScriptSpecs,
 		appsv1alpha1.ComponentTemplateSpec{
-			Name:              name,
-			ConfigTemplateRef: configTplRef,
-			Namespace:         namespace,
-			VolumeName:        volumeName,
-			DefaultMode:       mode,
+			Name:        name,
+			TemplateRef: configTplRef,
+			Namespace:   namespace,
+			VolumeName:  volumeName,
+			DefaultMode: mode,
 		})
 	return factory
 }
@@ -109,13 +109,13 @@ func (factory *MockClusterDefFactory) AddConfigTemplate(name,
 	if comp == nil {
 		return nil
 	}
-	comp.ComponentConfigSpecs = append(comp.ComponentConfigSpecs,
+	comp.ConfigSpecs = append(comp.ConfigSpecs,
 		appsv1alpha1.ComponentConfigSpec{
 			ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
-				Name:              name,
-				ConfigTemplateRef: configTplRef,
-				Namespace:         namespace,
-				VolumeName:        volumeName,
+				Name:        name,
+				TemplateRef: configTplRef,
+				Namespace:   namespace,
+				VolumeName:  volumeName,
 			},
 			ConfigConstraintRef: configConstraintRef,
 		})

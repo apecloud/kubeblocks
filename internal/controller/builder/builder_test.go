@@ -399,8 +399,8 @@ var _ = Describe("builder", func() {
 			params := newParams()
 			tplCfg := appsv1alpha1.ComponentConfigSpec{
 				ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
-					Name:              "test-config-tpl",
-					ConfigTemplateRef: "test-config-tpl",
+					Name:        "test-config-tpl",
+					TemplateRef: "test-config-tpl",
 				},
 				ConfigConstraintRef: "test-config-constraint",
 			}

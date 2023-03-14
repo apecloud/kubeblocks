@@ -165,7 +165,7 @@ func batchDeleteConfigMapFinalizer(cli client.Client, ctx intctrlutil.RequestCtx
 	}
 	for _, tpl := range tpls {
 		labels := client.MatchingLabels{
-			cfgcore.GenerateTPLUniqLabelKeyWithConfig(tpl.Name): tpl.ConfigTemplateRef,
+			cfgcore.GenerateTPLUniqLabelKeyWithConfig(tpl.Name): tpl.TemplateRef,
 		}
 		if ok, err := validateConfigMapOwners(cli, ctx, labels, validator, &appsv1alpha1.ClusterVersionList{}, &appsv1alpha1.ClusterDefinitionList{}); err != nil {
 			return err
@@ -200,7 +200,7 @@ func updateConfigMapFinalizerImpl(cli client.Client, ctx intctrlutil.RequestCtx,
 	// step2: add labels: CMConfigurationTypeLabelKey
 	// step3: update immutable
 
-	cmObj, err := getConfigMapByName(cli, ctx, tpl.ConfigTemplateRef, tpl.Namespace)
+	cmObj, err := getConfigMapByName(cli, ctx, tpl.TemplateRef, tpl.Namespace)
 	if err != nil {
 		ctx.Log.Error(err, "failed to get template cm object!", "configMapName", cmObj.Name)
 		return err
@@ -223,11 +223,11 @@ func updateConfigMapFinalizerImpl(cli client.Client, ctx intctrlutil.RequestCtx,
 }
 
 func deleteConfigMapFinalizer(cli client.Client, ctx intctrlutil.RequestCtx, tpl appsv1alpha1.ComponentConfigSpec) error {
-	cmObj, err := getConfigMapByName(cli, ctx, tpl.ConfigTemplateRef, tpl.Namespace)
+	cmObj, err := getConfigMapByName(cli, ctx, tpl.TemplateRef, tpl.Namespace)
 	if err != nil && apierrors.IsNotFound(err) {
 		return nil
 	} else if err != nil {
-		ctx.Log.Error(err, "failed to get config template cm object!", "configMapName", tpl.ConfigTemplateRef)
+		ctx.Log.Error(err, "failed to get config template cm object!", "configMapName", tpl.TemplateRef)
 		return err
 	}
 
@@ -270,8 +270,8 @@ func handleConfigTemplate(object client.Object, handler ConfigTemplateHandler, h
 func getConfigTemplateFromCV(appVer *appsv1alpha1.ClusterVersion) []appsv1alpha1.ComponentConfigSpec {
 	configTemplates := make([]appsv1alpha1.ComponentConfigSpec, 0)
 	for _, component := range appVer.Spec.ComponentVersions {
-		if len(component.ComponentConfigSpecs) > 0 {
-			configTemplates = append(configTemplates, component.ComponentConfigSpecs...)
+		if len(component.ConfigSpecs) > 0 {
+			configTemplates = append(configTemplates, component.ConfigSpecs...)
 		}
 	}
 	return configTemplates
@@ -280,17 +280,17 @@ func getConfigTemplateFromCV(appVer *appsv1alpha1.ClusterVersion) []appsv1alpha1
 func getConfigTemplateFromCD(clusterDef *appsv1alpha1.ClusterDefinition, validators ...ComponentValidateHandler) ([]appsv1alpha1.ComponentConfigSpec, error) {
 	configTemplates := make([]appsv1alpha1.ComponentConfigSpec, 0)
 	for _, component := range clusterDef.Spec.ComponentDefs {
-		// For compatibility with the previous lifecycle management of configurationSpec.ConfigTemplateRef, it is necessary to convert ComponentScriptSpecs to ComponentConfigSpecs,
+		// For compatibility with the previous lifecycle management of configurationSpec.TemplateRef, it is necessary to convert ScriptSpecs to ConfigSpecs,
 		// ensuring that the script-related configmap is not allowed to be deleted.
-		for _, scriptSpec := range component.ComponentScriptSpecs {
+		for _, scriptSpec := range component.ScriptSpecs {
 			configTemplates = append(configTemplates, appsv1alpha1.ComponentConfigSpec{
 				ComponentTemplateSpec: scriptSpec,
 			})
 		}
-		if len(component.ComponentConfigSpecs) == 0 {
+		if len(component.ConfigSpecs) == 0 {
 			continue
 		}
-		configTemplates = append(configTemplates, component.ComponentConfigSpecs...)
+		configTemplates = append(configTemplates, component.ConfigSpecs...)
 		// Check reload configure config template
 		for _, validator := range validators {
 			if err := validator(&component); err != nil {
@@ -316,7 +316,7 @@ func updateLabelsByConfiguration[T generics.Object, PT generics.PObject[T]](cli 
 			labels = map[string]string{}
 		}
 		for _, tpl := range tpls {
-			labels[cfgcore.GenerateTPLUniqLabelKeyWithConfig(tpl.Name)] = tpl.ConfigTemplateRef
+			labels[cfgcore.GenerateTPLUniqLabelKeyWithConfig(tpl.Name)] = tpl.TemplateRef
 			if len(tpl.ConfigConstraintRef) != 0 {
 				labels[cfgcore.GenerateConstraintsUniqLabelKeyWithConfig(tpl.ConfigConstraintRef)] = tpl.ConfigConstraintRef
 			}
@@ -330,7 +330,7 @@ func updateLabelsByConfiguration[T generics.Object, PT generics.PObject[T]](cli 
 func validateConfigTemplate(cli client.Client, ctx intctrlutil.RequestCtx, configTemplates []appsv1alpha1.ComponentConfigSpec) (bool, error) {
 	// check ConfigTemplate Validate
 	foundTemplateFn := func(configTpl appsv1alpha1.ComponentConfigSpec, logger logr.Logger) (*appsv1alpha1.ConfigConstraint, error) {
-		if _, err := getConfigMapByName(cli, ctx, configTpl.ConfigTemplateRef, configTpl.Namespace); err != nil {
+		if _, err := getConfigMapByName(cli, ctx, configTpl.TemplateRef, configTpl.Namespace); err != nil {
 			logger.Error(err, "failed to get config template cm object!")
 			return nil, err
 		}
@@ -351,7 +351,7 @@ func validateConfigTemplate(cli client.Client, ctx intctrlutil.RequestCtx, confi
 	}
 
 	for _, templateRef := range configTemplates {
-		logger := ctx.Log.WithValues("templateName", templateRef.Name).WithValues("configMapName", templateRef.ConfigTemplateRef)
+		logger := ctx.Log.WithValues("templateName", templateRef.Name).WithValues("configMapName", templateRef.TemplateRef)
 		tpl, err := foundTemplateFn(templateRef, logger)
 		if err != nil {
 			logger.Error(err, "failed to validate config template!")

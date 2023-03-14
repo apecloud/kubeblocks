@@ -42,7 +42,7 @@ var _ = Describe("Reconfigure util test", func() {
 		By("By assure an cm obj")
 		cfgCM := testapps.NewCustomizedObj("operations_config/configcm.yaml",
 			&corev1.ConfigMap{},
-			testapps.WithNamespacedName(tpl.ConfigTemplateRef, tpl.Namespace))
+			testapps.WithNamespacedName(tpl.TemplateRef, tpl.Namespace))
 		cfgTpl := testapps.NewCustomizedObj("operations_config/configtpl.yaml",
 			&appsv1alpha1.ConfigConstraint{},
 			testapps.WithNamespacedName(tpl.ConfigConstraintRef, tpl.Namespace))
@@ -62,8 +62,8 @@ var _ = Describe("Reconfigure util test", func() {
 		It("Should success without error", func() {
 			tpl := appsv1alpha1.ComponentConfigSpec{
 				ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
-					Name:              "for_test",
-					ConfigTemplateRef: "cm_obj",
+					Name:        "for_test",
+					TemplateRef: "cm_obj",
 				},
 				ConfigConstraintRef: "cfg_constraint_obj",
 			}

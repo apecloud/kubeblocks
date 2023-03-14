@@ -84,11 +84,11 @@ var _ = Describe("Reconfigure OpsRequest", func() {
 	}
 
 	assureConfigInstanceObj := func(clusterName, componentName, ns string, cdComponent *appsv1alpha1.ClusterComponentDefinition) *corev1.ConfigMap {
-		if len(cdComponent.ComponentConfigSpecs) == 0 {
+		if len(cdComponent.ConfigSpecs) == 0 {
 			return nil
 		}
 		var cmObj *corev1.ConfigMap
-		for _, tpl := range cdComponent.ComponentConfigSpecs {
+		for _, tpl := range cdComponent.ConfigSpecs {
 			cmInsName := cfgcore.GetComponentCfgName(clusterName, componentName, tpl.VolumeName)
 			cfgCM := testapps.NewCustomizedObj("operations_config/configcm.yaml",
 				&corev1.ConfigMap{},
@@ -97,7 +97,7 @@ var _ = Describe("Reconfigure OpsRequest", func() {
 					constant.AppNameLabelKey, clusterName,
 					constant.AppInstanceLabelKey, clusterName,
 					constant.KBAppComponentLabelKey, componentName,
-					constant.CMConfigurationTplNameLabelKey, tpl.ConfigTemplateRef,
+					constant.CMConfigurationTplNameLabelKey, tpl.TemplateRef,
 					constant.CMConfigurationConstraintsNameLabelKey, tpl.ConfigConstraintRef,
 					constant.CMConfigurationProviderTplLabelKey, tpl.Name,
 					constant.CMConfigurationTypeLabelKey, constant.ConfigInstanceType,
@@ -137,12 +137,12 @@ var _ = Describe("Reconfigure OpsRequest", func() {
 					continue
 				}
 				stsComponent = component
-				component.ComponentConfigSpecs = []appsv1alpha1.ComponentConfigSpec{{
+				component.ConfigSpecs = []appsv1alpha1.ComponentConfigSpec{{
 					ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
-						Name:              "mysql-test",
-						ConfigTemplateRef: cmObj.Name,
-						VolumeName:        "mysql-config",
-						Namespace:         testCtx.DefaultNamespace,
+						Name:        "mysql-test",
+						TemplateRef: cmObj.Name,
+						VolumeName:  "mysql-config",
+						Namespace:   testCtx.DefaultNamespace,
 					},
 					ConfigConstraintRef: tplObj.Name,
 				}}

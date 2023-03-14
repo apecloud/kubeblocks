@@ -191,7 +191,7 @@ func (r *reconfigureOptions) complete2(args []string) error {
 
 	// for explain
 	for _, tpl := range r.tpls {
-		if len(tpl.ConfigConstraintRef) > 0 && len(tpl.ConfigTemplateRef) > 0 {
+		if len(tpl.ConfigConstraintRef) > 0 && len(tpl.TemplateRef) > 0 {
 			templateNames = append(templateNames, tpl.Name)
 		}
 	}

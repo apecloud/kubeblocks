@@ -74,9 +74,9 @@ var _ = Describe("lifecycle_utils", func() {
 
 		It("should succeed in normal test case, where one volume is added", func() {
 			volumes["my_config"] = appsv1alpha1.ComponentTemplateSpec{
-				Name:              "myConfig",
-				ConfigTemplateRef: "myConfig",
-				VolumeName:        "myConfigVolume",
+				Name:        "myConfig",
+				TemplateRef: "myConfig",
+				VolumeName:  "myConfigVolume",
 			}
 			ps := &sts.Spec.Template.Spec
 			err := CreateOrUpdatePodVolumes(ps, volumes)
@@ -86,14 +86,14 @@ var _ = Describe("lifecycle_utils", func() {
 
 		It("should succeed in normal test case, where two volumes are added", func() {
 			volumes["my_config"] = appsv1alpha1.ComponentTemplateSpec{
-				Name:              "myConfig",
-				ConfigTemplateRef: "myConfig",
-				VolumeName:        "myConfigVolume",
+				Name:        "myConfig",
+				TemplateRef: "myConfig",
+				VolumeName:  "myConfigVolume",
 			}
 			volumes["my_config1"] = appsv1alpha1.ComponentTemplateSpec{
-				Name:              "myConfig",
-				ConfigTemplateRef: "myConfig",
-				VolumeName:        "myConfigVolume2",
+				Name:        "myConfig",
+				TemplateRef: "myConfig",
+				VolumeName:  "myConfigVolume2",
 			}
 			ps := &sts.Spec.Template.Spec
 			err := CreateOrUpdatePodVolumes(ps, volumes)
@@ -114,9 +114,9 @@ var _ = Describe("lifecycle_utils", func() {
 					},
 				})
 			volumes[cmName] = appsv1alpha1.ComponentTemplateSpec{
-				Name:              "configTplName",
-				ConfigTemplateRef: "configTplName",
-				VolumeName:        replicaVolumeName,
+				Name:        "configTplName",
+				TemplateRef: "configTplName",
+				VolumeName:  replicaVolumeName,
 			}
 			ps := &sts.Spec.Template.Spec
 			Expect(CreateOrUpdatePodVolumes(ps, volumes)).ShouldNot(Succeed())
@@ -140,9 +140,9 @@ var _ = Describe("lifecycle_utils", func() {
 				})
 
 			volumes[cmName] = appsv1alpha1.ComponentTemplateSpec{
-				Name:              "configTplName",
-				ConfigTemplateRef: "configTplName",
-				VolumeName:        replicaVolumeName,
+				Name:        "configTplName",
+				TemplateRef: "configTplName",
+				VolumeName:  replicaVolumeName,
 			}
 			ps := &sts.Spec.Template.Spec
 			err := CreateOrUpdatePodVolumes(ps, volumes)

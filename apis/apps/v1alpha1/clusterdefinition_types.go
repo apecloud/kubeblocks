@@ -178,7 +178,7 @@ type ComponentTemplateSpec struct {
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=63
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
-	ConfigTemplateRef string `json:"templateRef"`
+	TemplateRef string `json:"templateRef"`
 
 	// Specify the namespace of the referenced the configuration template ConfigMap object.
 	// An empty namespace is equivalent to the "default" namespace.
@@ -218,10 +218,6 @@ type ComponentConfigSpec struct {
 	// +optional
 	ConfigConstraintRef string `json:"constraintRef,omitempty"`
 }
-
-// type ComponentScriptSpecs struct {
-//	ComponentTemplateSpec `json:",inline"`
-// }
 
 type ExporterConfig struct {
 	// ScrapePort is exporter port for Time Series Database to scrape metrics.
@@ -321,7 +317,7 @@ type ClusterComponentDefinition struct {
 	// +listType=map
 	// +listMapKey=name
 	// +optional
-	ComponentConfigSpecs []ComponentConfigSpec `json:"configSpecs,omitempty"`
+	ConfigSpecs []ComponentConfigSpec `json:"configSpecs,omitempty"`
 
 	// The scriptSpec field provided by provider, and
 	// finally this configTemplateRefs will be rendered into the user's own configuration file according to the user's cluster.
@@ -331,7 +327,7 @@ type ClusterComponentDefinition struct {
 	// +listType=map
 	// +listMapKey=name
 	// +optional
-	ComponentScriptSpecs []ComponentTemplateSpec `json:"scriptSpecs,omitempty"`
+	ScriptSpecs []ComponentTemplateSpec `json:"scriptSpecs,omitempty"`
 
 	// probes setting for healthy checks.
 	// +optional

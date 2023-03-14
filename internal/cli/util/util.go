@@ -464,7 +464,7 @@ func GetConfigTemplateList(clusterName string, namespace string, cli dynamic.Int
 
 	validTpls := make([]appsv1alpha1.ComponentConfigSpec, 0, len(tpls))
 	for _, tpl := range tpls {
-		if len(tpl.ConfigConstraintRef) > 0 && len(tpl.ConfigTemplateRef) > 0 {
+		if len(tpl.ConfigConstraintRef) > 0 && len(tpl.TemplateRef) > 0 {
 			validTpls = append(validTpls, tpl)
 		}
 	}
@@ -512,8 +512,8 @@ func enableReconfiguring(component *appsv1alpha1.ClusterComponentDefinition) boo
 	if component == nil {
 		return false
 	}
-	for _, tpl := range component.ComponentConfigSpecs {
-		if len(tpl.ConfigConstraintRef) > 0 && len(tpl.ConfigTemplateRef) > 0 {
+	for _, tpl := range component.ConfigSpecs {
+		if len(tpl.ConfigConstraintRef) > 0 && len(tpl.TemplateRef) > 0 {
 			return true
 		}
 	}

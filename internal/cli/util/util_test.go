@@ -213,9 +213,9 @@ var _ = Describe("util", func() {
 		mockClient := dynamicfakeclient.NewSimpleDynamicClientWithCustomListKinds(scheme.Scheme, nil, configConstraintObj)
 		tpl := appsv1alpha1.ComponentConfigSpec{
 			ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
-				Name:              "for_test",
-				ConfigTemplateRef: ccName,
-				VolumeName:        "config",
+				Name:        "for_test",
+				TemplateRef: ccName,
+				VolumeName:  "config",
 			},
 			ConfigConstraintRef: ccName,
 		}

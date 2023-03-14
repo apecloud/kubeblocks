@@ -45,27 +45,27 @@ func TestMergeConfigTemplates(t *testing.T) {
 		args: args{
 			cvTpl: []appsv1alpha1.ComponentConfigSpec{{
 				ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
-					Name:              "test1",
-					ConfigTemplateRef: "tpl1",
-					VolumeName:        "test1",
+					Name:        "test1",
+					TemplateRef: "tpl1",
+					VolumeName:  "test1",
 				}}, {
 				ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
-					Name:              "test2",
-					ConfigTemplateRef: "tpl2",
-					VolumeName:        "test2",
+					Name:        "test2",
+					TemplateRef: "tpl2",
+					VolumeName:  "test2",
 				}}},
 			cdTpl: nil,
 		},
 		want: []appsv1alpha1.ComponentConfigSpec{{
 			ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
-				Name:              "test1",
-				ConfigTemplateRef: "tpl1",
-				VolumeName:        "test1",
+				Name:        "test1",
+				TemplateRef: "tpl1",
+				VolumeName:  "test1",
 			}}, {
 			ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
-				Name:              "test2",
-				ConfigTemplateRef: "tpl2",
-				VolumeName:        "test2",
+				Name:        "test2",
+				TemplateRef: "tpl2",
+				VolumeName:  "test2",
 			}}},
 	}, {
 		name: "merge_configtpl_test",
@@ -73,26 +73,26 @@ func TestMergeConfigTemplates(t *testing.T) {
 			cvTpl: nil,
 			cdTpl: []appsv1alpha1.ComponentConfigSpec{{
 				ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
-					Name:              "test1",
-					ConfigTemplateRef: "tpl1",
-					VolumeName:        "test1",
+					Name:        "test1",
+					TemplateRef: "tpl1",
+					VolumeName:  "test1",
 				}}, {
 				ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
-					Name:              "test2",
-					ConfigTemplateRef: "tpl2",
-					VolumeName:        "test2",
+					Name:        "test2",
+					TemplateRef: "tpl2",
+					VolumeName:  "test2",
 				}}},
 		},
 		want: []appsv1alpha1.ComponentConfigSpec{{
 			ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
-				Name:              "test1",
-				ConfigTemplateRef: "tpl1",
-				VolumeName:        "test1",
+				Name:        "test1",
+				TemplateRef: "tpl1",
+				VolumeName:  "test1",
 			}}, {
 			ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
-				Name:              "test2",
-				ConfigTemplateRef: "tpl2",
-				VolumeName:        "test2",
+				Name:        "test2",
+				TemplateRef: "tpl2",
+				VolumeName:  "test2",
 			}}},
 	}, {
 		name: "merge_configtpl_test",
@@ -100,44 +100,44 @@ func TestMergeConfigTemplates(t *testing.T) {
 			cvTpl: []appsv1alpha1.ComponentConfigSpec{{
 				// update volume
 				ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
-					Name:              "tpl1",
-					ConfigTemplateRef: "config1_new",
-					VolumeName:        "volume1",
+					Name:        "tpl1",
+					TemplateRef: "config1_new",
+					VolumeName:  "volume1",
 				}}, {
 				// add volume
 				ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
-					Name:              "tpl2",
-					ConfigTemplateRef: "config2_new",
-					VolumeName:        "volume2",
+					Name:        "tpl2",
+					TemplateRef: "config2_new",
+					VolumeName:  "volume2",
 				}}},
 			cdTpl: []appsv1alpha1.ComponentConfigSpec{{
 				ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
-					Name:              "tpl1",
-					ConfigTemplateRef: "config1",
-					VolumeName:        "volume1",
+					Name:        "tpl1",
+					TemplateRef: "config1",
+					VolumeName:  "volume1",
 				}}, {
 				ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
-					Name:              "tpl3",
-					ConfigTemplateRef: "config3",
-					VolumeName:        "volume3",
+					Name:        "tpl3",
+					TemplateRef: "config3",
+					VolumeName:  "volume3",
 				}}},
 		},
 		want: []appsv1alpha1.ComponentConfigSpec{
 			{
 				ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
-					Name:              "tpl1",
-					ConfigTemplateRef: "config1_new",
-					VolumeName:        "volume1",
+					Name:        "tpl1",
+					TemplateRef: "config1_new",
+					VolumeName:  "volume1",
 				}}, {
 				ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
-					Name:              "tpl2",
-					ConfigTemplateRef: "config2_new",
-					VolumeName:        "volume2",
+					Name:        "tpl2",
+					TemplateRef: "config2_new",
+					VolumeName:  "volume2",
 				}}, {
 				ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
-					Name:              "tpl3",
-					ConfigTemplateRef: "config3",
-					VolumeName:        "volume3",
+					Name:        "tpl3",
+					TemplateRef: "config3",
+					VolumeName:  "volume3",
 				}}},
 	}}
 
@@ -157,15 +157,15 @@ func TestGetConfigTemplatesFromComponent(t *testing.T) {
 		}}
 		tpl1 = appsv1alpha1.ComponentConfigSpec{
 			ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
-				Name:              "tpl1",
-				ConfigTemplateRef: "cm1",
-				VolumeName:        "volum1",
+				Name:        "tpl1",
+				TemplateRef: "cm1",
+				VolumeName:  "volum1",
 			}}
 		tpl2 = appsv1alpha1.ComponentConfigSpec{
 			ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
-				Name:              "tpl2",
-				ConfigTemplateRef: "cm2",
-				VolumeName:        "volum2",
+				Name:        "tpl2",
+				TemplateRef: "cm2",
+				VolumeName:  "volum2",
 			}}
 	)
 
@@ -186,12 +186,12 @@ func TestGetConfigTemplatesFromComponent(t *testing.T) {
 			comName:     comName,
 			cComponents: cComponents,
 			dComponents: []appsv1alpha1.ClusterComponentDefinition{{
-				Name:                 comType,
-				ComponentConfigSpecs: []appsv1alpha1.ComponentConfigSpec{tpl1},
+				Name:        comType,
+				ConfigSpecs: []appsv1alpha1.ComponentConfigSpec{tpl1},
 			}},
 			aComponents: []appsv1alpha1.ClusterComponentVersion{{
-				ComponentDefRef:      comType,
-				ComponentConfigSpecs: []appsv1alpha1.ComponentConfigSpec{tpl2},
+				ComponentDefRef: comType,
+				ConfigSpecs:     []appsv1alpha1.ComponentConfigSpec{tpl2},
 			}},
 		},
 		want: []appsv1alpha1.ComponentConfigSpec{
@@ -205,12 +205,12 @@ func TestGetConfigTemplatesFromComponent(t *testing.T) {
 			comName:     "not exist component",
 			cComponents: cComponents,
 			dComponents: []appsv1alpha1.ClusterComponentDefinition{{
-				Name:                 comType,
-				ComponentConfigSpecs: []appsv1alpha1.ComponentConfigSpec{tpl1},
+				Name:        comType,
+				ConfigSpecs: []appsv1alpha1.ComponentConfigSpec{tpl1},
 			}},
 			aComponents: []appsv1alpha1.ClusterComponentVersion{{
-				ComponentDefRef:      comType,
-				ComponentConfigSpecs: []appsv1alpha1.ComponentConfigSpec{tpl2},
+				ComponentDefRef: comType,
+				ConfigSpecs:     []appsv1alpha1.ComponentConfigSpec{tpl2},
 			}},
 		},
 		want:    nil,
@@ -221,12 +221,12 @@ func TestGetConfigTemplatesFromComponent(t *testing.T) {
 			comName:     comName,
 			cComponents: cComponents,
 			dComponents: []appsv1alpha1.ClusterComponentDefinition{{
-				Name:                 comType,
-				ComponentConfigSpecs: []appsv1alpha1.ComponentConfigSpec{tpl1},
+				Name:        comType,
+				ConfigSpecs: []appsv1alpha1.ComponentConfigSpec{tpl1},
 			}},
 			aComponents: []appsv1alpha1.ClusterComponentVersion{{
-				ComponentDefRef:      "not exist",
-				ComponentConfigSpecs: []appsv1alpha1.ComponentConfigSpec{tpl2},
+				ComponentDefRef: "not exist",
+				ConfigSpecs:     []appsv1alpha1.ComponentConfigSpec{tpl2},
 			},
 			}},
 		want: []appsv1alpha1.ComponentConfigSpec{

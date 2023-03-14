@@ -158,7 +158,7 @@ func renderConfigMapTemplate(
 	//  Require template configmap exist
 	if err := cli.Get(ctx, client.ObjectKey{
 		Namespace: tplCfg.Namespace,
-		Name:      tplCfg.ConfigTemplateRef,
+		Name:      tplCfg.TemplateRef,
 	}, cmObj); err != nil {
 		return nil, err
 	}
@@ -167,7 +167,7 @@ func renderConfigMapTemplate(
 		return map[string]string{}, nil
 	}
 
-	tplBuilder.setTplName(tplCfg.ConfigTemplateRef)
+	tplBuilder.setTplName(tplCfg.TemplateRef)
 	renderedCfg, err := tplBuilder.render(cmObj.Data)
 	if err != nil {
 		return nil, cfgcore.WrapError(err, "failed to render configmap")

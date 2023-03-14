@@ -104,14 +104,17 @@ func (c *clusterPlanBuilder) defaultWalkFunc(vertex graph.Vertex) error {
 				// TODO: we should Update instead of Patch cluster object,
 				// TODO: but Update failure happens too frequently as other controllers are updating cluster object too.
 				// TODO: use Patch here, revert to Update after refactoring done
-				if err := c.cli.Update(c.ctx.Ctx, cluster); err != nil {
-					c.ctx.Log.Error(err, fmt.Sprintf("update %T error, orig: %v, curr: %v", origCluster, origCluster, cluster))
-					return err
-				}
-				//patch := client.MergeFrom(origCluster.DeepCopy())
-				//if err := c.cli.Patch(c.ctx.Ctx, cluster, patch); err != nil {
+				//if err := c.cli.Update(c.ctx.Ctx, cluster); err != nil {
+				//	tmpCluster := &appsv1alpha1.Cluster{}
+				//	err = c.cli.Get(c.ctx.Ctx,client.ObjectKeyFromObject(origCluster), tmpCluster)
+				//	c.ctx.Log.Error(err, fmt.Sprintf("update %T error, orig: %v, curr: %v, api-server: %v", origCluster, origCluster, cluster, tmpCluster))
 				//	return err
 				//}
+				patch := client.MergeFrom(origCluster.DeepCopy())
+				if err := c.cli.Patch(c.ctx.Ctx, cluster, patch); err != nil {
+					c.ctx.Log.Error(err, fmt.Sprintf("patch %T error, orig: %v, curr: %v", origCluster, origCluster, cluster))
+					return err
+				}
 			}
 		case DELETE:
 			if err := c.handleClusterDeletion(cluster); err != nil {

@@ -720,7 +720,7 @@ prometheus:
 
             - alert: ContainerMemoryUsagePredict
               expr: 'sum(predict_linear(container_memory_working_set_bytes{container!="",container!="POD"}[15m], 30*60)) BY (instance,pod,container) - sum(container_spec_memory_limit_bytes{container!="",container!="POD"} > 0) BY (instance,pod,container) >= 0'
-              for: 0m
+              for: 5m
               labels:
                 severity: critical
               annotations:
@@ -1433,16 +1433,20 @@ grafana:
       enabled: true
       label: grafana_dashboard
       labelValue: "1"
+      searchNamespace: ALL
+      resource: configmap
 
     datasources:
       enabled: true
       label: grafana_datasource
       labelValue: "1"
+      searchNamespace: ALL
+      resource: configmap
 
       defaultDatasourceEnabled: true
       uid: prometheus
 
-      skipReload: true
+      skipReload: false
       initDatasources: true
 
   testFramework:

@@ -60,7 +60,7 @@ spec:
     - replicas: 1
       resources:
         requests:
-          storage: 1Gi
+          storage: 10Gi
           memory: 512Mi
         limits:
           memory: 4Gi
@@ -69,7 +69,7 @@ spec:
           replicas: 1
           resources:
             requests:
-              storage: 1Gi
+              storage: 10Gi
 
     - selectors:
         - key: KubeGitVersion

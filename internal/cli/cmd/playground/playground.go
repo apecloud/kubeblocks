@@ -271,7 +271,7 @@ func (o *initOptions) cloud() error {
 	}
 
 	// clone apecloud/cloud-provider repo to local path
-	fmt.Fprintf(o.Out, "Clone cloud provider terraform script to %s...", cpPath)
+	fmt.Fprintf(o.Out, "Clone cloud provider terraform script to %s...\n", cpPath)
 	if err = util.CloneGitRepo(cp.GitRepoURL, cpPath); err != nil {
 		return err
 	}

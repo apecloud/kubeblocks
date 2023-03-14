@@ -113,6 +113,10 @@ type BackupPolicyHook struct {
 	// +optional
 	PostCommands []string `json:"postCommands,omitempty"`
 
+	// the commands to collect backup manifests
+	// +optional
+	ManifestsCommands []string `json:"manifestsCommands,omitempty"`
+
 	// exec command with image
 	// +optional
 	Image string `json:"image,omitempty"`

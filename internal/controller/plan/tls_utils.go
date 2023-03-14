@@ -86,6 +86,29 @@ func deleteTLSSecrets(reqCtx controllerutil.RequestCtx, cli client.Client, secre
 	}
 }
 
+func CreateOrCheckTLSCert(reqCtx controllerutil.RequestCtx,
+	cli client.Client,
+	cluster *dbaasv1alpha1.Cluster,
+	comp dbaasv1alpha1.ClusterComponentSpec,
+	scheme *runtime.Scheme,
+	finalizer string) error {
+	if !comp.TLS {
+		return nil
+	}
+	if comp.Issuer == nil {
+		return errors.New("issuer shouldn't be nil when tls enabled")
+	}
+
+	switch comp.Issuer.Name {
+	case dbaasv1alpha1.IssuerUserProvided:
+		return checkTLSSecretRef(reqCtx, cli, cluster.Namespace, comp.Issuer.SecretRef)
+	case dbaasv1alpha1.IssuerKubeBlocks:
+		_, err := createTLSSecret(reqCtx, cli, cluster, comp.Name, scheme, finalizer)
+		return err
+	}
+	return nil
+}
+
 func createTLSSecret(reqCtx controllerutil.RequestCtx,
 	cli client.Client,
 	cluster *dbaasv1alpha1.Cluster,

@@ -42,144 +42,58 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
-// PrepareComponentResources generate all necessary sub-resources objects used in component,
+// Prepare<WorkloadType>ComponentWorkloads generate all necessary sub-resources objects used in component,
 // like Secret, ConfigMap, Service, StatefulSet, Deployment, Volume, PodDisruptionBudget etc.
-// Generated resources are cached in task.applyObjs.
-func PrepareComponentResources(reqCtx intctrlutil.RequestCtx, cli client.Client, task *intctrltypes.ReconcileTask) error {
-	workloadProcessor := func(customSetup func(*corev1.ConfigMap) (client.Object, error)) error {
-		envConfig, err := builder.BuildEnvConfig(task.GetBuilderParams())
-		if err != nil {
-			return err
-		}
-		task.AppendResource(envConfig)
+// Generated resources are cached in task.Resources.
 
-		workload, err := customSetup(envConfig)
-		if err != nil {
-			return err
-		}
+func PrepareStatelessComponentWorkloads(reqCtx intctrlutil.RequestCtx, cli client.Client, task *intctrltypes.ReconcileTask) error {
+	buildWorkload := func(envConfig *corev1.ConfigMap) (client.Object, error) {
+		return builder.BuildDeploy(reqCtx, task.GetBuilderParams())
+	}
+	if err := prepareComponentWorkloads(reqCtx, cli, task, buildWorkload); err != nil {
+		return err
+	}
 
-		defer func() {
-			// workload object should be appended last
-			task.AppendResource(workload)
-		}()
-
-		svc, err := builder.BuildHeadlessSvc(task.GetBuilderParams())
-		if err != nil {
-			return err
-		}
+	svcList, err := builder.BuildSvcList(task.GetBuilderParams())
+	if err != nil {
+		return err
+	}
+	for _, svc := range svcList {
 		task.AppendResource(svc)
-
-		var podSpec *corev1.PodSpec
-		sts, ok := workload.(*appsv1.StatefulSet)
-		if ok {
-			podSpec = &sts.Spec.Template.Spec
-		} else {
-			deploy, ok := workload.(*appsv1.Deployment)
-			if ok {
-				podSpec = &deploy.Spec.Template.Spec
-			}
-		}
-		if podSpec == nil {
-			return nil
-		}
-
-		defer func() {
-			for _, cc := range []*[]corev1.Container{
-				&podSpec.Containers,
-				&podSpec.InitContainers,
-			} {
-				volumes := podSpec.Volumes
-				for _, c := range *cc {
-					for _, v := range c.VolumeMounts {
-						// if persistence is not found, add emptyDir pod.spec.volumes[]
-						volumes, _ = intctrlutil.CreateOrUpdateVolume(volumes, v.Name, func(volumeName string) corev1.Volume {
-							return corev1.Volume{
-								Name: v.Name,
-								VolumeSource: corev1.VolumeSource{
-									EmptyDir: &corev1.EmptyDirVolumeSource{},
-								},
-							}
-						}, nil)
-					}
-				}
-				podSpec.Volumes = volumes
-			}
-		}()
-
-		// render config template
-		configs, err := buildCfg(task, workload, podSpec, reqCtx.Ctx, cli)
-		if err != nil {
-			return err
-		}
-		if configs != nil {
-			task.AppendResource(configs...)
-		}
-		// end render config
-
-		// tls certs secret volume and volumeMount
-		if err := updateTLSVolumeAndVolumeMount(podSpec, task.Cluster.Name, *task.Component); err != nil {
-			return err
-		}
-		return nil
 	}
 
-	switch task.Component.WorkloadType {
-	case appsv1alpha1.Stateless:
-		if err := workloadProcessor(
-			func(envConfig *corev1.ConfigMap) (client.Object, error) {
-				return builder.BuildDeploy(reqCtx, task.GetBuilderParams())
-			}); err != nil {
-			return err
-		}
-	case appsv1alpha1.Stateful:
-		if err := workloadProcessor(
-			func(envConfig *corev1.ConfigMap) (client.Object, error) {
-				return builder.BuildSts(reqCtx, task.GetBuilderParams(), envConfig.Name)
-			}); err != nil {
-			return err
-		}
-	case appsv1alpha1.Consensus:
-		if err := workloadProcessor(
-			func(envConfig *corev1.ConfigMap) (client.Object, error) {
-				return buildConsensusSet(reqCtx, task, envConfig.Name)
-			}); err != nil {
-			return err
-		}
-	case appsv1alpha1.Replication:
-		// get the number of existing statefulsets under the current component
-		var existStsList = &appsv1.StatefulSetList{}
-		if err := componentutil.GetObjectListByComponentName(reqCtx.Ctx, cli, task.Cluster, existStsList, task.Component.Name); err != nil {
-			return err
-		}
+	return nil
+}
 
-		// If the statefulSets already exists, check whether there is an ha switching and the HA process is prioritized to handle.
-		// TODO(xingran) After refactoring, HA switching will be handled in the replicationSet controller.
-		if len(existStsList.Items) > 0 {
-			primaryIndexChanged, _, err := replicationset.CheckPrimaryIndexChanged(reqCtx.Ctx, cli, task.Cluster, task.Component.Name, task.Component.PrimaryIndex)
-			if err != nil {
-				return err
-			}
-			if primaryIndexChanged {
-				if err := replicationset.HandleReplicationSetHASwitch(reqCtx.Ctx, cli, task.Cluster, componentutil.GetClusterComponentSpecByName(task.Cluster, task.Component.Name)); err != nil {
-					return err
-				}
-			}
-		}
-
-		// get the maximum value of params.component.Replicas and the number of existing statefulsets under the current component,
-		//  then construct statefulsets for creating replicationSet or handling horizontal scaling of the replicationSet.
-		replicaCount := math.Max(float64(len(existStsList.Items)), float64(task.Component.Replicas))
-		for index := int32(0); index < int32(replicaCount); index++ {
-			if err := workloadProcessor(
-				func(envConfig *corev1.ConfigMap) (client.Object, error) {
-					return buildReplicationSet(reqCtx, task, envConfig.Name, index)
-				}); err != nil {
-				return err
-			}
-		}
+func PrepareStatefulComponentWorkloads(reqCtx intctrlutil.RequestCtx, cli client.Client, task *intctrltypes.ReconcileTask) error {
+	buildWorkload := func(envConfig *corev1.ConfigMap) (client.Object, error) {
+		return builder.BuildSts(reqCtx, task.GetBuilderParams(), envConfig.Name)
+	}
+	if err := prepareComponentWorkloads(reqCtx, cli, task, buildWorkload); err != nil {
+		return err
 	}
 
-	if needBuildPDB(task) {
+	svcList, err := builder.BuildSvcList(task.GetBuilderParams())
+	if err != nil {
+		return err
+	}
+	for _, svc := range svcList {
+		task.AppendResource(svc)
+	}
+
+	return nil
+}
+
+func PrepareConsensusComponentWorkloads(reqCtx intctrlutil.RequestCtx, cli client.Client, task *intctrltypes.ReconcileTask) error {
+	buildWorkload := func(envConfig *corev1.ConfigMap) (client.Object, error) {
+		return buildConsensusSet(reqCtx, task, envConfig.Name)
+	}
+	if err := prepareComponentWorkloads(reqCtx, cli, task, buildWorkload); err != nil {
+		return err
+	}
+
+	buildPDB := task.Component.MaxUnavailable != nil
+	if buildPDB {
 		pdb, err := builder.BuildPDB(task.GetBuilderParams())
 		if err != nil {
 			return err
@@ -192,23 +106,136 @@ func PrepareComponentResources(reqCtx intctrlutil.RequestCtx, cli client.Client,
 		return err
 	}
 	for _, svc := range svcList {
-		if task.Component.WorkloadType == appsv1alpha1.Consensus {
-			addLeaderSelectorLabels(svc, task.Component)
-		}
-		if task.Component.WorkloadType == appsv1alpha1.Replication {
-			svc.Spec.Selector[constant.RoleLabelKey] = string(replicationset.Primary)
-		}
+		addLeaderSelectorLabels(svc, task.Component)
 		task.AppendResource(svc)
 	}
 
 	return nil
 }
 
-// needBuildPDB check whether the PodDisruptionBudget needs to be built
-func needBuildPDB(task *intctrltypes.ReconcileTask) bool {
-	// TODO: add ut
-	comp := task.Component
-	return comp.WorkloadType == appsv1alpha1.Consensus && comp.MaxUnavailable != nil
+func PrepareReplicationComponentWorkloads(reqCtx intctrlutil.RequestCtx, cli client.Client, task *intctrltypes.ReconcileTask) error {
+	// get the number of existing statefulsets under the current component
+	var existStsList = &appsv1.StatefulSetList{}
+	if err := componentutil.GetObjectListByComponentName(reqCtx.Ctx, cli, task.Cluster, existStsList, task.Component.Name); err != nil {
+		return err
+	}
+
+	// If the statefulSets already exists, check whether there is an ha switching and the HA process is prioritized to handle.
+	// TODO(xingran) After refactoring, HA switching will be handled in the replicationSet controller.
+	if len(existStsList.Items) > 0 {
+		primaryIndexChanged, _, err := replicationset.CheckPrimaryIndexChanged(reqCtx.Ctx, cli, task.Cluster,
+			task.Component.Name, task.Component.PrimaryIndex)
+		if err != nil {
+			return err
+		}
+		if primaryIndexChanged {
+			if err := replicationset.HandleReplicationSetHASwitch(reqCtx.Ctx, cli, task.Cluster,
+				componentutil.GetClusterComponentSpecByName(task.Cluster, task.Component.Name)); err != nil {
+				return err
+			}
+		}
+	}
+
+	// get the maximum value of params.component.Replicas and the number of existing statefulsets under the current component,
+	//  then construct statefulsets for creating replicationSet or handling horizontal scaling of the replicationSet.
+	replicaCount := math.Max(float64(len(existStsList.Items)), float64(task.Component.Replicas))
+	for index := int32(0); index < int32(replicaCount); index++ {
+		buildWorkload := func(envConfig *corev1.ConfigMap) (client.Object, error) {
+			return buildReplicationSet(reqCtx, task, envConfig.Name, index)
+		}
+		if err := prepareComponentWorkloads(reqCtx, cli, task, buildWorkload); err != nil {
+			return err
+		}
+	}
+
+	svcList, err := builder.BuildSvcList(task.GetBuilderParams())
+	if err != nil {
+		return err
+	}
+	for _, svc := range svcList {
+		svc.Spec.Selector[constant.RoleLabelKey] = string(replicationset.Primary)
+		task.AppendResource(svc)
+	}
+
+	return nil
+}
+
+func prepareComponentWorkloads(reqCtx intctrlutil.RequestCtx, cli client.Client, task *intctrltypes.ReconcileTask,
+	buildWorkload func(*corev1.ConfigMap) (client.Object, error)) error {
+	envConfig, err := builder.BuildEnvConfig(task.GetBuilderParams())
+	if err != nil {
+		return err
+	}
+	task.AppendResource(envConfig)
+
+	workload, err := buildWorkload(envConfig)
+	if err != nil {
+		return err
+	}
+
+	defer func() {
+		// workload object should be appended last
+		task.AppendResource(workload)
+	}()
+
+	svc, err := builder.BuildHeadlessSvc(task.GetBuilderParams())
+	if err != nil {
+		return err
+	}
+	task.AppendResource(svc)
+
+	var podSpec *corev1.PodSpec
+	sts, ok := workload.(*appsv1.StatefulSet)
+	if ok {
+		podSpec = &sts.Spec.Template.Spec
+	} else {
+		deploy, ok := workload.(*appsv1.Deployment)
+		if ok {
+			podSpec = &deploy.Spec.Template.Spec
+		}
+	}
+	if podSpec == nil {
+		return nil
+	}
+
+	defer func() {
+		for _, cc := range []*[]corev1.Container{
+			&podSpec.Containers,
+			&podSpec.InitContainers,
+		} {
+			volumes := podSpec.Volumes
+			for _, c := range *cc {
+				for _, v := range c.VolumeMounts {
+					// if persistence is not found, add emptyDir pod.spec.volumes[]
+					volumes, _ = intctrlutil.CreateOrUpdateVolume(volumes, v.Name, func(volumeName string) corev1.Volume {
+						return corev1.Volume{
+							Name: v.Name,
+							VolumeSource: corev1.VolumeSource{
+								EmptyDir: &corev1.EmptyDirVolumeSource{},
+							},
+						}
+					}, nil)
+				}
+			}
+			podSpec.Volumes = volumes
+		}
+	}()
+
+	// render config template
+	configs, err := buildCfg(task, workload, podSpec, reqCtx.Ctx, cli)
+	if err != nil {
+		return err
+	}
+	if configs != nil {
+		task.AppendResource(configs...)
+	}
+	// end render config
+
+	// tls certs secret volume and volumeMount
+	if err := updateTLSVolumeAndVolumeMount(podSpec, task.Cluster.Name, *task.Component); err != nil {
+		return err
+	}
+	return nil
 }
 
 // TODO multi roles with same accessMode support

@@ -20,6 +20,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/apecloud/kubeblocks/internal/controller/builder"
+	intctrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
 	"reflect"
 	"regexp"
 	"strings"
@@ -314,6 +316,66 @@ func (r *ClusterReconciler) updateClusterStatusAfterProvisioning(reqCtx intctrlu
 	}
 	r.Recorder.Event(cluster, corev1.EventTypeNormal, applyResourcesCondition.Reason, applyResourcesCondition.Message)
 	return nil
+}
+
+func reconcileClusterWorkloads(reqCtx intctrlutil.RequestCtx, cli client.Client,
+	cd *appsv1alpha1.ClusterDefinition, cv *appsv1alpha1.ClusterVersion, cluster *appsv1alpha1.Cluster) (bool, error) {
+	// reconcile connection credential firstly
+	if requeue, err := reconcileConnectionCredential(reqCtx, cli, cd, cluster); err != nil {
+		return requeue, err
+	}
+
+	compSpecMap := cluster.GetDefNameMappingComponents()
+	compVerMap := cv.GetDefNameMappingComponents()
+	for _, compDef := range cd.Spec.ComponentDefs {
+		compVer := compVerMap[compDef.Name]
+		for _, compSpec := range compSpecMap[compDef.Name] {
+			if requeue, err := reconcileClusterComponent(reqCtx, cli, cd, cv, cluster, compDef, compSpec, compVer); err != nil {
+				return requeue, err
+			}
+		}
+	}
+	// TODO: handle components deletion
+	return false, nil
+}
+
+func reconcileConnectionCredential(reqCtx intctrlutil.RequestCtx, cli client.Client,
+	cd *appsv1alpha1.ClusterDefinition, cluster *appsv1alpha1.Cluster) (bool, error) {
+	// find first referenced component who has service defined.
+	clusterCompSpecs := cluster.GetDefNameMappingComponents()
+	var clusterCompDef *appsv1alpha1.ClusterComponentDefinition
+	for _, compDef := range cd.Spec.ComponentDefs {
+		if compDef.Service != nil && len(clusterCompSpecs[compDef.Name]) > 0 {
+			clusterCompDef = &compDef
+			break
+		}
+	}
+	if clusterCompDef == nil {
+		return false, nil
+	}
+
+	task := intctrltypes.ReconcileTask{
+		Cluster:           cluster,
+		ClusterDefinition: cd,
+		Component: &component.SynthesizedComponent{
+			Name: clusterCompSpecs[clusterCompDef.Name][0].Name,
+			Services: []corev1.Service{
+				{Spec: *clusterCompDef.Service},
+			},
+		},
+	}
+	secret, err := builder.BuildConnCredential(task.GetBuilderParams())
+	if err != nil {
+		return false, err
+	}
+
+	if err := createK8sObject(reqCtx, cli, cluster, secret); err != nil {
+		if apierrors.IsAlreadyExists(err) {
+			return false, nil
+		}
+		return false, err
+	}
+	return false, nil
 }
 
 // patchClusterStatus patches the cluster status.

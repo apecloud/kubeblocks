@@ -23,7 +23,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/constant"
+	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
 type StopOpsHandler struct{}
@@ -65,7 +65,7 @@ func (stop StopOpsHandler) Action(opsRes *OpsResource) error {
 		cluster.Annotations = map[string]string{}
 	}
 	// record the replicas snapshot of components to the annotations of cluster before stopping the cluster.
-	cluster.Annotations[intctrlutil.SnapShotForStartAnnotationKey] = string(componentReplicasSnapshot)
+	cluster.Annotations[constant.SnapShotForStartAnnotationKey] = string(componentReplicasSnapshot)
 	return opsRes.Client.Update(opsRes.Ctx, cluster)
 }
 

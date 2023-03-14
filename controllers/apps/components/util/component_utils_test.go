@@ -110,6 +110,29 @@ func TestAvailableReplicasAreConsistent(t *testing.T) {
 	}
 }
 
+func TestGetCompPhaseByConditions(t *testing.T) {
+	existLatestRevisionFailedPod := true
+	primaryReplicaIsReady := true
+	phase := GetCompPhaseByConditions(existLatestRevisionFailedPod, primaryReplicaIsReady, int32(1), int32(1), int32(1))
+	if phase != "" {
+		t.Error(`function GetComponentPhase should return ""`)
+	}
+	phase = GetCompPhaseByConditions(existLatestRevisionFailedPod, primaryReplicaIsReady, int32(2), int32(1), int32(1))
+	if phase != appsv1alpha1.AbnormalPhase {
+		t.Error(`function GetComponentPhase should return "Abnormal"`)
+	}
+	primaryReplicaIsReady = false
+	phase = GetCompPhaseByConditions(existLatestRevisionFailedPod, primaryReplicaIsReady, int32(2), int32(1), int32(1))
+	if phase != appsv1alpha1.FailedPhase {
+		t.Error(`function GetComponentPhase should return "Failed"`)
+	}
+	existLatestRevisionFailedPod = false
+	phase = GetCompPhaseByConditions(existLatestRevisionFailedPod, primaryReplicaIsReady, int32(2), int32(1), int32(1))
+	if phase != "" {
+		t.Error(`function GetComponentPhase should return ""`)
+	}
+}
+
 var _ = Describe("Consensus Component", func() {
 	var (
 		randomStr          = testCtx.GetRandomStr()
@@ -155,7 +178,7 @@ var _ = Describe("Consensus Component", func() {
 			_ = testapps.MockConsensusComponentPods(testCtx, sts, clusterName, consensusCompName)
 
 			By("test GetComponentDefByCluster function")
-			componentDef, _ := GetComponentDefByCluster(ctx, k8sClient, cluster, consensusCompDefRef)
+			componentDef, _ := GetComponentDefByCluster(ctx, k8sClient, *cluster, consensusCompDefRef)
 			Expect(componentDef != nil).Should(BeTrue())
 
 			By("test GetClusterByObject function")
@@ -164,29 +187,29 @@ var _ = Describe("Consensus Component", func() {
 
 			By("test GetComponentPodList function")
 			Eventually(func() bool {
-				podList, _ := GetComponentPodList(ctx, k8sClient, cluster, consensusCompName)
+				podList, _ := GetComponentPodList(ctx, k8sClient, *cluster, consensusCompName)
 				return len(podList.Items) > 0
 			}).Should(BeTrue())
 
 			By("test GetObjectListByComponentName function")
 			stsList := &appsv1.StatefulSetList{}
-			_ = GetObjectListByComponentName(ctx, k8sClient, cluster, stsList, consensusCompName)
+			_ = GetObjectListByComponentName(ctx, k8sClient, *cluster, stsList, consensusCompName)
 			Expect(len(stsList.Items) > 0).Should(BeTrue())
 
 			By("test GetComponentStatusMessageKey function")
 			Expect(GetComponentStatusMessageKey("Pod", "mysql-01")).To(Equal("Pod/mysql-01"))
 
 			By("test GetComponentStsMinReadySeconds")
-			minReadySeconds, _ := GetComponentWorkloadMinReadySeconds(ctx, k8sClient, cluster,
+			minReadySeconds, _ := GetComponentWorkloadMinReadySeconds(ctx, k8sClient, *cluster,
 				appsv1alpha1.Stateless, statelessCompName)
 			Expect(minReadySeconds).To(Equal(int32(10)))
-			minReadySeconds, _ = GetComponentWorkloadMinReadySeconds(ctx, k8sClient, cluster,
+			minReadySeconds, _ = GetComponentWorkloadMinReadySeconds(ctx, k8sClient, *cluster,
 				appsv1alpha1.Consensus, statelessCompName)
 			Expect(minReadySeconds).To(Equal(int32(0)))
 
 			By("test GetCompRelatedObjectList function")
 			stsList = &appsv1.StatefulSetList{}
-			podList, _ := GetCompRelatedObjectList(ctx, k8sClient, cluster, consensusCompName, stsList)
+			podList, _ := GetCompRelatedObjectList(ctx, k8sClient, *cluster, consensusCompName, stsList)
 			Expect(len(stsList.Items) > 0 && len(podList.Items) > 0).Should(BeTrue())
 
 			By("test GetComponentPhaseWhenPodsNotReady function")

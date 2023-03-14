@@ -1,6 +1,8 @@
-## kbcli addon describe
+---
+title: kbcli addon describe
+---
 
-Describe an addon specification
+Describe an addon specification.
 
 ```
 kbcli addon describe ADDON_NAME [flags]
@@ -38,5 +40,7 @@ kbcli addon describe ADDON_NAME [flags]
 
 ### SEE ALSO
 
-* [kbcli addon](kbcli_addon.md)	 - Addon command
+* [kbcli addon](kbcli_addon.md)	 - Addon command.
+
+#### Go Back to [CLI Overview](cli.md) Homepage.
 

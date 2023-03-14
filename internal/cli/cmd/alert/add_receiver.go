@@ -91,7 +91,7 @@ func newAddReceiverCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *
 	o := addReceiverOptions{baseOptions: baseOptions{IOStreams: streams}}
 	cmd := &cobra.Command{
 		Use:     "add-receiver",
-		Short:   "Add alert receiver, such as email, slack, webhook and so on",
+		Short:   "Add alert receiver, such as email, slack, webhook and so on.",
 		Example: addReceiverExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			util.CheckErr(o.complete(f))

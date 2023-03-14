@@ -36,6 +36,7 @@ import (
 	"k8s.io/client-go/dynamic"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
+	"k8s.io/utils/strings/slices"
 
 	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/list"
@@ -82,7 +83,7 @@ type addonCmdOpts struct {
 func NewAddonCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "addon",
-		Short: "Addon command",
+		Short: "Addon command.",
 	}
 	cmd.AddCommand(
 		newListCmd(f, streams),
@@ -97,7 +98,7 @@ func newListCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 	o := list.NewListOptions(f, streams, types.AddonGVR())
 	cmd := &cobra.Command{
 		Use:               "list ",
-		Short:             "List addons",
+		Short:             "List addons.",
 		Aliases:           []string{"ls"},
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, o.GVR),
 		Run: func(cmd *cobra.Command, args []string) {
@@ -117,7 +118,7 @@ func newDescribeCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cob
 	}
 	cmd := &cobra.Command{
 		Use:               "describe ADDON_NAME",
-		Short:             "Describe an addon specification",
+		Short:             "Describe an addon specification.",
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.AddonGVR()),
 		Run: func(cmd *cobra.Command, args []string) {
 			util.CheckErr(o.init(args))
@@ -148,7 +149,7 @@ func newEnableCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 
 	cmd := &cobra.Command{
 		Use:               "enable ADDON_NAME",
-		Short:             "Enable an addon",
+		Short:             "Enable an addon.",
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.AddonGVR()),
 		Example: templates.Examples(`
     	# Enabled "prometheus" addon
@@ -197,7 +198,7 @@ func newDisableCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 	}
 	cmd := &cobra.Command{
 		Use:               "disable ADDON_NAME",
-		Short:             "Disable an addon",
+		Short:             "Disable an addon.",
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.AddonGVR()),
 		Run: func(cmd *cobra.Command, args []string) {
 			util.CheckErr(o.init(args))
@@ -374,10 +375,13 @@ func addonEnableDisableHandler(o *addonCmdOpts, cmd *cobra.Command, args []strin
 }
 
 func (o *addonCmdOpts) buildEnablePatch(flags []*pflag.Flag, spec, install map[string]interface{}) (err error) {
+	extraNames := o.addon.GetExtraNames()
 	var installSpec extensionsv1alpha1.AddonInstallSpec
-
 	// only using named return value in defer function
 	defer func() {
+		if err != nil {
+			return
+		}
 		var b []byte
 		b, err = json.Marshal(&installSpec)
 		if err != nil {
@@ -411,7 +415,10 @@ func (o *addonCmdOpts) buildEnablePatch(flags []*pflag.Flag, spec, install map[s
 		return nil
 	}
 
-	getExtraItem := func(name string) *extensionsv1alpha1.AddonInstallExtraItem {
+	// extractInstallSpecExtraItem extract extensionsv1alpha1.AddonInstallExtraItem
+	// for the matching arg name, if not found it will append extensionsv1alpha1.AddonInstallExtraItem
+	// item to installSpec.ExtraItems and return its pointer.
+	extractInstallSpecExtraItem := func(name string) (*extensionsv1alpha1.AddonInstallExtraItem, error) {
 		var pItem *extensionsv1alpha1.AddonInstallExtraItem
 		for i, eItem := range installSpec.ExtraItems {
 			if eItem.Name == name {
@@ -420,12 +427,15 @@ func (o *addonCmdOpts) buildEnablePatch(flags []*pflag.Flag, spec, install map[s
 			}
 		}
 		if pItem == nil {
-			pItem = &extensionsv1alpha1.AddonInstallExtraItem{
-				Name: name,
+			if !slices.Contains(extraNames, name) {
+				return nil, fmt.Errorf("invalid extra item name [%s]", name)
 			}
-			installSpec.ExtraItems = append(installSpec.ExtraItems, *pItem)
+			installSpec.ExtraItems = append(installSpec.ExtraItems, extensionsv1alpha1.AddonInstallExtraItem{
+				Name: name,
+			})
+			pItem = &installSpec.ExtraItems[len(installSpec.ExtraItems)-1]
 		}
-		return pItem
+		return pItem, nil
 	}
 
 	twoTuplesProcessor := func(s, flag string,
@@ -453,10 +463,14 @@ func (o *addonCmdOpts) buildEnablePatch(flags []*pflag.Flag, spec, install map[s
 		default:
 			return fmt.Errorf("wrong flag value --%s=%s", flag, s)
 		}
+		name = strings.TrimSpace(name)
 		if name == "" {
 			valueAssigner(&installSpec.AddonInstallSpecItem, result)
 		} else {
-			pItem := getExtraItem(name)
+			pItem, err := extractInstallSpecExtraItem(name)
+			if err != nil {
+				return err
+			}
 			valueAssigner(&pItem.AddonInstallSpecItem, result)
 		}
 		return nil
@@ -558,9 +572,13 @@ func (o *addonCmdOpts) buildEnablePatch(flags []*pflag.Flag, spec, install map[s
 func (o *addonCmdOpts) buildPatch(flags []*pflag.Flag) error {
 	var err error
 	spec := map[string]interface{}{}
+	status := map[string]interface{}{}
 	install := map[string]interface{}{}
 
 	if o.addonEnableFlags != nil {
+		if o.addon.Status.Phase == extensionsv1alpha1.AddonFailed {
+			status["phase"] = nil
+		}
 		if err = o.buildEnablePatch(flags, spec, install); err != nil {
 			return err
 		}
@@ -580,6 +598,16 @@ func (o *addonCmdOpts) buildPatch(flags []*pflag.Flag) error {
 		Object: map[string]interface{}{
 			"spec": spec,
 		},
+	}
+	if len(status) > 0 {
+		phase := ""
+		if p, ok := status["phase"]; ok && p != nil {
+			phase = p.(string)
+		}
+		fmt.Printf("patching addon 'status.phase=%s' to 'status.phase=%v' will result addon install spec (spec.install) not being updated\n",
+			o.addon.Status.Phase, phase)
+		obj.Object["status"] = status
+		o.Subresource = "status"
 	}
 	bytes, err := obj.MarshalJSON()
 	if err != nil {

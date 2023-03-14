@@ -51,7 +51,7 @@ const (
 func NewCliCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   cliName,
-		Short: "KubeBlocks CLI",
+		Short: "KubeBlocks CLI.",
 		Long: `
 =============================================
  __    __ _______   ______  __       ______ 
@@ -128,6 +128,9 @@ func initConfig() {
 	viper.SetDefault("CLUSTER_DEFAULT_REPLICAS", 1)
 	viper.SetDefault("CLUSTER_DEFAULT_CPU", "1000m")
 	viper.SetDefault("CLUSTER_DEFAULT_MEMORY", "1Gi")
+
+	viper.SetDefault("KB_WAIT_ADDON_READY_TIMES", 60)
+	viper.SetDefault("PLAYGROUND_WAIT_TIMES", 20)
 
 	// If a config file is found, read it in.
 	if err := viper.ReadInConfig(); err == nil {

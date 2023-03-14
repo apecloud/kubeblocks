@@ -1,6 +1,8 @@
-## kbcli backup-config
+---
+title: kbcli backup-config
+---
 
-KubeBlocks backup config
+KubeBlocks backup config.
 
 ```
 kbcli backup-config [flags]
@@ -59,5 +61,7 @@ kbcli backup-config [flags]
 
 ### SEE ALSO
 
-* [kbcli](kbcli.md)	 - KubeBlocks CLI
+
+
+#### Go Back to [CLI Overview](cli.md) Homepage.
 

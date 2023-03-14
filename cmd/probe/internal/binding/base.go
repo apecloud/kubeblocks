@@ -95,6 +95,7 @@ const (
 	GetLagOperation       bindings.OperationKind = "getLag"
 	ExecOperation         bindings.OperationKind = "exec"
 	QueryOperation        bindings.OperationKind = "query"
+	CloseOperation        bindings.OperationKind = "query"
 
 	OperationNotImplemented = "OperationNotImplemented"
 )
@@ -249,7 +250,7 @@ func (ops *BaseOperations) CheckRoleOps(ctx context.Context, req *bindings.Invok
 
 	opsRes["role"] = role
 	if ops.OriRole != role {
-		opsRes["Event"] = "roleChanged"
+		opsRes["event"] = "roleChanged"
 		ops.OriRole = role
 		ops.RoleUnchangedCount = 0
 	} else {
@@ -291,6 +292,7 @@ func (ops *BaseOperations) GetRoleOps(ctx context.Context, req *bindings.InvokeR
 		ops.CheckRoleFailedCount++
 		return opsRes, nil
 	}
+	opsRes["event"] = "getRoleSuccess"
 	opsRes["role"] = role
 	return opsRes, nil
 }

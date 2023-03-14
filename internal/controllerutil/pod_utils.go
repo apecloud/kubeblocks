@@ -361,3 +361,21 @@ func GetPodRevision(pod *corev1.Pod) string {
 	}
 	return pod.Labels[appsv1.StatefulSetRevisionLabel]
 }
+
+// ByPodName sorts a list of jobs by pod name
+type ByPodName []corev1.Pod
+
+// Len return the length of byPodName, for the sort.Sort
+func (c ByPodName) Len() int {
+	return len(c)
+}
+
+// Swap the items, for the sort.Sort
+func (c ByPodName) Swap(i, j int) {
+	c[i], c[j] = c[j], c[i]
+}
+
+// Less define how to compare items, for the sort.Sort
+func (c ByPodName) Less(i, j int) bool {
+	return c[i].Name < c[j].Name
+}

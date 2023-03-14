@@ -18,6 +18,7 @@ package controllerutil
 
 import (
 	"encoding/json"
+	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -528,6 +529,22 @@ var _ = Describe("pod utils", func() {
 				Expect(val).Should(BeEquivalentTo(tt.want))
 				Expect(isPercent).Should(BeEquivalentTo(tt.isPercent))
 			}
+		})
+	})
+	Context("test sort by pod name", func() {
+		It("Should success with no error", func() {
+			pods := []corev1.Pod{{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod-2"},
+			}, {
+				ObjectMeta: metav1.ObjectMeta{Name: "pod-3"},
+			}, {
+				ObjectMeta: metav1.ObjectMeta{Name: "pod-0"},
+			}, {
+				ObjectMeta: metav1.ObjectMeta{Name: "pod-1"},
+			}}
+			sort.Sort(ByPodName(pods))
+			Expect(pods[0].Name).Should(Equal("pod-0"))
+			Expect(pods[3].Name).Should(Equal("pod-3"))
 		})
 	})
 })

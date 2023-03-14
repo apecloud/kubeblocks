@@ -1,6 +1,8 @@
-## kbcli bench
+---
+title: kbcli bench
+---
 
-Run a benchmark
+Run a benchmark.
 
 ### Options
 
@@ -47,6 +49,8 @@ Run a benchmark
 
 ### SEE ALSO
 
-* [kbcli](kbcli.md)	 - KubeBlocks CLI
-* [kbcli bench tpcc](kbcli_bench_tpcc.md)	 - Run a TPCC benchmark
+
+* [kbcli bench tpcc](kbcli_bench_tpcc.md)	 - Run a TPCC benchmark.
+
+#### Go Back to [CLI Overview](cli.md) Homepage.
 

@@ -7,4 +7,4 @@ spec:
   ttlSecondsAfterSucceed: 5432
   type: Restart
   restart:
-    - componentName: pg-replicaset
+    - componentName: postgresql

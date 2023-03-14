@@ -202,10 +202,10 @@ func ExecCommand(strCommand string) string {
 	return string(outBytes)
 }
 
-func WaitTime() {
+func WaitTime(num int) {
 	wg := sync.WaitGroup{}
-	wg.Add(int(400000000))
-	for i := 0; i < int(400000000); i++ {
+	wg.Add(num)
+	for i := 0; i < num; i++ {
 		go func(i int) {
 			defer wg.Done()
 		}(i)
@@ -273,4 +273,26 @@ func ReplaceClusterVersionRef(fileName string, clusterVersionRef string) {
 		}
 		pos += int64(len(line))
 	}
+}
+
+func KubernetesEnv() string {
+	cmd := "kbcli version | grep Kubernetes"
+	kubernetes := ExecCommand(cmd)
+	log.Println(kubernetes)
+	return kubernetes
+}
+
+func CheckAddonsInstall(addonName string) string {
+	cmd := "kbcli addon list | grep " + addonName + " | awk '{print $3}'"
+	addonsStatus := ExecCommand(cmd)
+	return addonsStatus
+}
+
+func OpsAddon(addonOps string, addonName string) string {
+	cmd := "kbcli addon " + addonOps + " " + addonName
+	enableAddon := ExecCommand(cmd)
+	log.Println(enableAddon)
+	WaitTime(500000000)
+	addonsStatus := CheckAddonsInstall(addonName)
+	return addonsStatus
 }

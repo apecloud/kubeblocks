@@ -93,7 +93,7 @@ func handleClusterVolumeExpandingPhase(ctx context.Context,
 	for k, v := range cluster.Status.Components {
 		if v.Phase == appsv1alpha1.VolumeExpandingPhase {
 			v.Phase = appsv1alpha1.RunningPhase
-			cluster.Status.Components[k] = v
+			cluster.Status.SetComponentStatus(k, v)
 		}
 	}
 	cluster.Status.Phase = appsv1alpha1.RunningPhase

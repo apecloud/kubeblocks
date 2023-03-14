@@ -54,6 +54,7 @@ type BackupPolicyReconciler struct {
 type backupPolicyOptions struct {
 	Name           string           `json:"name"`
 	Namespace      string           `json:"namespace"`
+	MgrNamespace   string           `json:"mgrNamespace"`
 	Cluster        string           `json:"cluster"`
 	Schedule       string           `json:"schedule"`
 	BackupType     string           `json:"backupType"`
@@ -287,6 +288,8 @@ func (r *BackupPolicyReconciler) fillSecretName(reqCtx intctrlutil.RequestCtx, b
 	// get cluster name from labels
 	instanceName := backupPolicy.Spec.Target.LabelsSelector.MatchLabels[constant.AppInstanceLabelKey]
 	if len(instanceName) == 0 {
+		// REVIEW/TODO: need avoid using dynamic error string, this is bad for
+		// error type checking (errors.Is)
 		return fmt.Errorf("failed to get instance name from labels: %v", backupPolicy.Spec.Target.LabelsSelector.MatchLabels)
 	}
 	var labels map[string]string
@@ -310,6 +313,8 @@ func (r *BackupPolicyReconciler) fillSecretName(reqCtx intctrlutil.RequestCtx, b
 		backupPolicy.Spec.Target.Secret.Name = secrets.Items[0].GetName()
 		return nil
 	}
+	// REVIEW/TODO: need avoid using dynamic error string, this is bad for
+	// error type checking (errors.Is)
 	return fmt.Errorf("no secret found for backup policy %s", backupPolicy.GetName())
 }
 
@@ -329,6 +334,7 @@ func (r *BackupPolicyReconciler) buildCronJob(backupPolicy *dataprotectionv1alph
 		TTL:            backupPolicy.Spec.TTL,
 		BackupType:     backupPolicy.Spec.BackupType,
 		ServiceAccount: viper.GetString("KUBEBLOCKS_SERVICEACCOUNT_NAME"),
+		MgrNamespace:   viper.GetString(constant.CfgKeyCtrlrMgrNS),
 	}
 	backupPolicyOptionsByte, err := json.Marshal(options)
 	if err != nil {
@@ -349,11 +355,6 @@ func (r *BackupPolicyReconciler) buildCronJob(backupPolicy *dataprotectionv1alph
 	}
 
 	controllerutil.AddFinalizer(&cronjob, dataProtectionFinalizerName)
-
-	scheme, _ := dataprotectionv1alpha1.SchemeBuilder.Build()
-	if err := controllerutil.SetOwnerReference(backupPolicy, &cronjob, scheme); err != nil {
-		return nil, err
-	}
 
 	// set labels
 	for k, v := range backupPolicy.Labels {
@@ -442,7 +443,7 @@ func (r *BackupPolicyReconciler) deleteExternalResources(reqCtx intctrlutil.Requ
 	cronjob := &batchv1.CronJob{}
 
 	key := types.NamespacedName{
-		Namespace: backupPolicy.Namespace,
+		Namespace: viper.GetString(constant.CfgKeyCtrlrMgrNS),
 		Name:      backupPolicy.Name,
 	}
 	if err := r.Client.Get(reqCtx.Ctx, key, cronjob); err != nil {

@@ -66,7 +66,7 @@ func NewUpdateCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 	o := &updateOptions{Options: patch.NewOptions(f, streams, types.ClusterGVR())}
 	cmd := &cobra.Command{
 		Use:               "update NAME",
-		Short:             "Update the cluster settings, such as enable or disable monitor or log",
+		Short:             "Update the cluster settings, such as enable or disable monitor or log.",
 		Example:           clusterUpdateExample,
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, o.GVR),
 		Run: func(cmd *cobra.Command, args []string) {

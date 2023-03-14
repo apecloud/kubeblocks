@@ -36,7 +36,7 @@ func init() {
 func NewClusterCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "cluster",
-		Short: "Cluster command",
+		Short: "Cluster command.",
 	}
 
 	groups := templates.CommandGroups{

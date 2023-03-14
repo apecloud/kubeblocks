@@ -63,10 +63,11 @@ var _ = Describe("Expose", func() {
 			Client: clientfake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 				urlPrefix := "/api/v1/namespaces/" + namespace
 				mapping := map[string]*http.Response{
-					"/api/v1/nodes/" + testing.NodeName: httpResp(testing.FakeNode()),
-					urlPrefix + "/services":             httpResp(&corev1.ServiceList{}),
-					urlPrefix + "/events":               httpResp(&corev1.EventList{}),
-					urlPrefix + "/pods":                 httpResp(pods),
+					"/api/v1/nodes/" + testing.NodeName:   httpResp(testing.FakeNode()),
+					urlPrefix + "/services":               httpResp(&corev1.ServiceList{}),
+					urlPrefix + "/events":                 httpResp(&corev1.EventList{}),
+					urlPrefix + "/persistentvolumeclaims": httpResp(&corev1.PersistentVolumeClaimList{}),
+					urlPrefix + "/pods":                   httpResp(pods),
 				}
 				return mapping[req.URL.Path], nil
 			}),

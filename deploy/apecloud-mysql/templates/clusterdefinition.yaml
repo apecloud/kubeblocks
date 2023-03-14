@@ -157,10 +157,14 @@ spec:
       systemAccounts:
         cmdExecutorConfig:
           image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ .Values.image.tag }}
-          command: ["sh", "-c"]
+          command:
+          - mysql
           args:
-          - USER=$MYSQL_ROOT_USER  MYSQL_PWD=$MYSQL_ROOT_PASSWORD mysql -h$(KB_ACCOUNT_ENDPOINT)
-          - -e "$(KB_ACCOUNT_STATEMENT)"
+          - -u$(MYSQL_ROOT_USER)
+          - -p$(MYSQL_ROOT_PASSWORD)
+          - -h$(KB_ACCOUNT_ENDPOINT)
+          - -e
+          - $(KB_ACCOUNT_STATEMENT)
           env:
           - name: MYSQL_ROOT_USER
             valueFrom:

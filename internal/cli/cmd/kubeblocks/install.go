@@ -27,9 +27,12 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+	"github.com/spf13/viper"
 	"helm.sh/helm/v3/pkg/cli/values"
 	"helm.sh/helm/v3/pkg/repo"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
@@ -37,6 +40,7 @@ import (
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
 
+	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/cluster"
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
@@ -102,7 +106,7 @@ func newInstallCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 
 	cmd := &cobra.Command{
 		Use:     "install",
-		Short:   "Install KubeBlocks",
+		Short:   "Install KubeBlocks.",
 		Args:    cobra.NoArgs,
 		Example: installExample,
 		Run: func(cmd *cobra.Command, args []string) {
@@ -188,7 +192,7 @@ func (o *InstallOptions) Install() error {
 	o.ValueOpts.Values = append(o.ValueOpts.Values, fmt.Sprintf(kMonitorParam, o.Monitor))
 
 	// add helm repo
-	spinner := util.Spinner(o.Out, "%-40s", "Add and update repo "+types.KubeBlocksChartName)
+	spinner := util.Spinner(o.Out, "%-40s", "Add and update repo "+types.KubeBlocksRepoName)
 	defer spinner(false)
 	// Add repo, if exists, will update it
 	if err = helm.AddRepo(&repo.Entry{Name: types.KubeBlocksChartName, URL: util.GetHelmChartRepoURL()}); err != nil {
@@ -204,6 +208,14 @@ func (o *InstallOptions) Install() error {
 	}
 	spinner(true)
 
+	// wait for auto-install addons to be ready
+	spinner = util.Spinner(o.Out, "%-40s", "Wait installable addons to be ready")
+	defer spinner(false)
+	if err = o.waitAddonsEnabled(); err != nil {
+		return err
+	}
+	spinner(true)
+
 	// create VolumeSnapshotClass
 	if err = o.createVolumeSnapshotClass(); err != nil {
 		return err
@@ -213,6 +225,52 @@ func (o *InstallOptions) Install() error {
 		fmt.Fprintf(o.Out, "\nKubeBlocks %s installed to namespace %s SUCCESSFULLY!\n",
 			o.Version, o.HelmCfg.Namespace())
 		o.printNotes()
+	}
+	return nil
+}
+
+// waitAddonsEnabled waits for auto-install addons status to be enabled
+func (o *InstallOptions) waitAddonsEnabled() error {
+	checkAddons := func() (bool, error) {
+		allEnabled := true
+		objects, err := o.Dynamic.Resource(types.AddonGVR()).List(context.TODO(), metav1.ListOptions{
+			LabelSelector: buildAddonLabelSelector(),
+		})
+		if err != nil && !apierrors.IsNotFound(err) {
+			return false, err
+		}
+		if objects == nil {
+			klog.V(1).InfoS("No Addon resource found")
+			return true, nil
+		}
+
+		for _, obj := range objects.Items {
+			addon := extensionsv1alpha1.Addon{}
+			if err = runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, &addon); err != nil {
+				return false, err
+			}
+
+			// addon is enabled, then check its status
+			if addon.Spec.InstallSpec.GetEnabled() {
+				if addon.Status.Phase != extensionsv1alpha1.AddonEnabled {
+					klog.V(1).Infof("Addon %s is not enabled yet", addon.Name)
+					allEnabled = false
+				}
+			}
+		}
+		return allEnabled, nil
+	}
+
+	// wait for all auto-install addons to be enabled
+	for i := 0; i < viper.GetInt("KB_WAIT_ADDON_READY_TIMES"); i++ {
+		allEnabled, err := checkAddons()
+		if err != nil {
+			return err
+		}
+		if allEnabled {
+			return nil
+		}
+		time.Sleep(5 * time.Second)
 	}
 	return nil
 }

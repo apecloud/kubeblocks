@@ -35,27 +35,26 @@ import (
 
 type Stateful struct {
 	Cli          client.Client
-	Ctx          context.Context
 	Cluster      *appsv1alpha1.Cluster
-	ComponentDef *appsv1alpha1.ClusterComponentDefinition
 	Component    *appsv1alpha1.ClusterComponentSpec
+	componentDef *appsv1alpha1.ClusterComponentDefinition
 }
 
 var _ types.Component = &Stateful{}
 
-func (stateful *Stateful) IsRunning(obj client.Object) (bool, error) {
+func (stateful *Stateful) IsRunning(ctx context.Context, obj client.Object) (bool, error) {
 	if obj == nil {
 		return false, nil
 	}
 	sts := util.ConvertToStatefulSet(obj)
-	isRevisionConsistent, err := util.IsStsAndPodsRevisionConsistent(stateful.Ctx, stateful.Cli, sts)
+	isRevisionConsistent, err := util.IsStsAndPodsRevisionConsistent(ctx, stateful.Cli, sts)
 	if err != nil {
 		return false, err
 	}
 	return util.StatefulSetOfComponentIsReady(sts, isRevisionConsistent, &stateful.Component.Replicas), nil
 }
 
-func (stateful *Stateful) PodsReady(obj client.Object) (bool, error) {
+func (stateful *Stateful) PodsReady(ctx context.Context, obj client.Object) (bool, error) {
 	if obj == nil {
 		return false, nil
 	}
@@ -71,14 +70,14 @@ func (stateful *Stateful) PodIsAvailable(pod *corev1.Pod, minReadySeconds int32)
 }
 
 // HandleProbeTimeoutWhenPodsReady the Stateful component has no role detection, empty implementation here.
-func (stateful *Stateful) HandleProbeTimeoutWhenPodsReady(recorder record.EventRecorder) (bool, error) {
+func (stateful *Stateful) HandleProbeTimeoutWhenPodsReady(ctx context.Context, recorder record.EventRecorder) (bool, error) {
 	return false, nil
 }
 
 // GetPhaseWhenPodsNotReady gets the component phase when the pods of component are not ready.
-func (stateful *Stateful) GetPhaseWhenPodsNotReady(componentName string) (appsv1alpha1.Phase, error) {
+func (stateful *Stateful) GetPhaseWhenPodsNotReady(ctx context.Context, componentName string) (appsv1alpha1.Phase, error) {
 	stsList := &appsv1.StatefulSetList{}
-	podList, err := util.GetCompRelatedObjectList(stateful.Ctx, stateful.Cli, stateful.Cluster, componentName, stsList)
+	podList, err := util.GetCompRelatedObjectList(ctx, stateful.Cli, *stateful.Cluster, componentName, stsList)
 	if err != nil || len(stsList.Items) == 0 {
 		return "", err
 	}
@@ -92,23 +91,23 @@ func (stateful *Stateful) GetPhaseWhenPodsNotReady(componentName string) (appsv1
 		stsObj.Status.AvailableReplicas, checkExistFailedPodOfLatestRevision), nil
 }
 
-func (stateful *Stateful) HandleUpdate(obj client.Object) error {
+func (stateful *Stateful) HandleUpdate(ctx context.Context, obj client.Object) error {
 	return nil
 }
 
-func NewStateful(ctx context.Context,
+func NewStateful(
 	cli client.Client,
 	cluster *appsv1alpha1.Cluster,
 	component *appsv1alpha1.ClusterComponentSpec,
-	componentDef *appsv1alpha1.ClusterComponentDefinition) types.Component {
-	if component == nil || componentDef == nil {
-		return nil
+	componentDef appsv1alpha1.ClusterComponentDefinition,
+) (*Stateful, error) {
+	if err := util.ComponentRuntimeReqArgsCheck(cli, cluster, component); err != nil {
+		return nil, err
 	}
 	return &Stateful{
-		Ctx:          ctx,
 		Cli:          cli,
 		Cluster:      cluster,
 		Component:    component,
-		ComponentDef: componentDef,
-	}
+		componentDef: &componentDef,
+	}, nil
 }

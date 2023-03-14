@@ -255,7 +255,7 @@ func NewCreateBackupCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) 
 	o := &CreateBackupOptions{BaseOptions: create.BaseOptions{IOStreams: streams}}
 	inputs := create.Inputs{
 		Use:                          "backup",
-		Short:                        "Create a backup",
+		Short:                        "Create a backup.",
 		Example:                      createBackupExample,
 		CueTemplateName:              "backup_template.cue",
 		ResourceName:                 types.ResourceBackups,
@@ -341,7 +341,7 @@ func NewListBackupCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *c
 	o := list.NewListOptions(f, streams, types.BackupGVR())
 	cmd := &cobra.Command{
 		Use:               "list-backups",
-		Short:             "List backups",
+		Short:             "List backups.",
 		Aliases:           []string{"ls-backups"},
 		Example:           listBackupExample,
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.ClusterGVR()),
@@ -360,7 +360,7 @@ func NewDeleteBackupCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) 
 	o := delete.NewDeleteOptions(f, streams, types.BackupGVR())
 	cmd := &cobra.Command{
 		Use:               "delete-backup",
-		Short:             "Delete a backup",
+		Short:             "Delete a backup.",
 		Example:           deleteBackupExample,
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.ClusterGVR()),
 		Run: func(cmd *cobra.Command, args []string) {
@@ -488,7 +488,7 @@ func NewCreateRestoreCmd(f cmdutil.Factory, streams genericclioptions.IOStreams)
 	}
 	cmd := &cobra.Command{
 		Use:               "restore",
-		Short:             "Restore a new cluster from backup",
+		Short:             "Restore a new cluster from backup.",
 		Example:           createRestoreExample,
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.ClusterGVR()),
 		Run: func(cmd *cobra.Command, args []string) {
@@ -505,7 +505,7 @@ func NewListRestoreCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *
 	o := list.NewListOptions(f, streams, types.RestoreJobGVR())
 	cmd := &cobra.Command{
 		Use:               "list-restores",
-		Short:             "List all restore jobs",
+		Short:             "List all restore jobs.",
 		Aliases:           []string{"ls-restores"},
 		Example:           listRestoreExample,
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.ClusterGVR()),
@@ -524,7 +524,7 @@ func NewDeleteRestoreCmd(f cmdutil.Factory, streams genericclioptions.IOStreams)
 	o := delete.NewDeleteOptions(f, streams, types.RestoreJobGVR())
 	cmd := &cobra.Command{
 		Use:               "delete-restore",
-		Short:             "Delete a restore job",
+		Short:             "Delete a restore job.",
 		Example:           deleteRestoreExample,
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.ClusterGVR()),
 		Run: func(cmd *cobra.Command, args []string) {

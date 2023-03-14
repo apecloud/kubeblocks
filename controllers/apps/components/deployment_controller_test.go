@@ -132,7 +132,7 @@ var _ = Describe("Deployment Controller", func() {
 			By("check component.Status.Message contains pod error message")
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(cluster), func(g Gomega, tmpCluster *appsv1alpha1.Cluster) {
 				compStatus := tmpCluster.Status.Components[statelessCompName]
-				g.Expect(compStatus.Message.GetObjectMessage("Pod", pod.Name)).Should(Equal(errMessage))
+				g.Expect(compStatus.GetObjectMessage("Pod", pod.Name)).Should(Equal(errMessage))
 			})).Should(Succeed())
 
 			By("mock deployment is ready")

@@ -70,12 +70,6 @@ type InstallOpts struct {
 
 type Option func(*cli.EnvSettings)
 
-func WithContext(context string) Option {
-	return func(es *cli.EnvSettings) {
-		es.KubeContext = context
-	}
-}
-
 // AddRepo will add a repo
 func AddRepo(r *repo.Entry) error {
 	settings := cli.New()
@@ -210,6 +204,7 @@ func (i *InstallOpts) tryInstall(cfg *action.Configuration) (string, error) {
 	client.Namespace = i.Namespace
 	client.CreateNamespace = i.CreateNamespace
 	client.Wait = i.Wait
+	client.WaitForJobs = i.Wait
 	client.Timeout = i.Timeout
 	client.Version = i.Version
 	client.Atomic = i.Atomic
@@ -262,6 +257,9 @@ func (i *InstallOpts) Uninstall(cfg *Config) error {
 	ctx := context.Background()
 	opts := retry.Options{
 		MaxRetry: 1 + i.TryTimes,
+	}
+	if cfg.Namespace() == "" {
+		cfg.SetNamespace(i.Namespace)
 	}
 
 	actionCfg, err := NewActionConfig(cfg)
@@ -397,6 +395,7 @@ func (i *InstallOpts) tryUpgrade(cfg *action.Configuration) (string, error) {
 	client := action.NewUpgrade(cfg)
 	client.Namespace = i.Namespace
 	client.Wait = i.Wait
+	client.WaitForJobs = i.Wait
 	client.Timeout = i.Timeout
 	if client.Timeout == 0 {
 		client.Timeout = defaultTimeout

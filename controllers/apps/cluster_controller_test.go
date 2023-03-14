@@ -1264,10 +1264,17 @@ var _ = Describe("Cluster Controller", func() {
 			backupName := "test-backup"
 			backupTool := testapps.CreateCustomizedObj(&testCtx, "backup/backuptool.yaml",
 				&dataprotectionv1alpha1.BackupTool{}, testapps.RandomizedObjName())
+			By("creating backup")
 			backup := testapps.NewBackupFactory(testCtx.DefaultNamespace, backupName).
 				SetBackupPolicyName(backupPolicyName).
 				SetBackupType(dataprotectionv1alpha1.BackupTypeFull).
 				Create(&testCtx).GetObject()
+			By("waiting for backup failed, because no backup policy exists")
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(backup),
+				func(g Gomega, tmpBackup *dataprotectionv1alpha1.Backup) {
+					g.Expect(tmpBackup.Status.Phase).Should(Equal(dataprotectionv1alpha1.BackupFailed))
+				})).Should(Succeed())
+			By("mocking backup status completed, we don't need backup reconcile here")
 			Expect(testapps.ChangeObjStatus(&testCtx, backup, func() {
 				backup.Status.BackupToolName = backupTool.Name
 				backup.Status.RemoteVolume = &corev1.Volume{
@@ -1276,9 +1283,10 @@ var _ = Describe("Cluster Controller", func() {
 				backup.Status.Phase = dataprotectionv1alpha1.BackupCompleted
 			})).Should(Succeed())
 			By("checking backup status completed")
-			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(backup), func(g Gomega, tmpBackup *dataprotectionv1alpha1.Backup) {
-				g.Expect(tmpBackup.Status.Phase).Should(Equal(dataprotectionv1alpha1.BackupCompleted))
-			})).Should(Succeed())
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(backup),
+				func(g Gomega, tmpBackup *dataprotectionv1alpha1.Backup) {
+					g.Expect(tmpBackup.Status.Phase).Should(Equal(dataprotectionv1alpha1.BackupCompleted))
+				})).Should(Succeed())
 			By("creating cluster with backup")
 			restoreFromBackup := fmt.Sprintf(`{"%s":"%s"}`, mysqlCompName, backupName)
 			clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,

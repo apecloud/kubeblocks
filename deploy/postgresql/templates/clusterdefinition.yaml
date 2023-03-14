@@ -243,11 +243,11 @@ spec:
         cmdExecutorConfig:
           image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ default .Values.image.tag .Chart.AppVersion }}
           command:
-          - sh
-          - -c
+          - psql
           args:
-          - psql -h$(KB_ACCOUNT_ENDPOINT)
-          - -c "$(KB_ACCOUNT_STATEMENT)"
+          - -h$(KB_ACCOUNT_ENDPOINT)
+          - -c
+          - $(KB_ACCOUNT_STATEMENT)
           env:
           - name: PGUSER
             valueFrom:

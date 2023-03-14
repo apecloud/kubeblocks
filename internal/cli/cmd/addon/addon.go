@@ -383,7 +383,14 @@ func addonEnableDisableHandler(o *addonCmdOpts, cmd *cobra.Command, args []strin
 
 func (o *addonCmdOpts) buildEnablePatch(flags []*pflag.Flag, spec, install map[string]interface{}) (err error) {
 	extraNames := o.addon.GetExtraNames()
-	var installSpec extensionsv1alpha1.AddonInstallSpec
+	installSpec := extensionsv1alpha1.AddonInstallSpec{
+		AddonInstallSpecItem: extensionsv1alpha1.AddonInstallSpecItem{
+			Resources: extensionsv1alpha1.ResourceRequirements{
+				Requests: corev1.ResourceList{},
+				Limits:   corev1.ResourceList{},
+			},
+		},
+	}
 	// only using named return value in defer function
 	defer func() {
 		if err != nil {
@@ -439,6 +446,12 @@ func (o *addonCmdOpts) buildEnablePatch(flags []*pflag.Flag, spec, install map[s
 			}
 			installSpec.ExtraItems = append(installSpec.ExtraItems, extensionsv1alpha1.AddonInstallExtraItem{
 				Name: name,
+				AddonInstallSpecItem: extensionsv1alpha1.AddonInstallSpecItem{
+					Resources: extensionsv1alpha1.ResourceRequirements{
+						Requests: corev1.ResourceList{},
+						Limits:   corev1.ResourceList{},
+					},
+				},
 			})
 			pItem = &installSpec.ExtraItems[len(installSpec.ExtraItems)-1]
 		}

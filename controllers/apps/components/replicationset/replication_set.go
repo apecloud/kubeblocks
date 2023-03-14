@@ -18,6 +18,7 @@ package replicationset
 
 import (
 	"context"
+	"reflect"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -172,6 +173,7 @@ func (r *ReplicationSet) GetPhaseWhenPodsNotReady(ctx context.Context, component
 // HandleUpdate is the implementation of the type Component interface method, handles replicationSet workload Pod updates.
 func (r *ReplicationSet) HandleUpdate(ctx context.Context, obj client.Object) error {
 	var componentStsList = &appsv1.StatefulSetList{}
+	var podList []*corev1.Pod
 	sts := util.ConvertToStatefulSet(obj)
 	if err := util.GetObjectListByComponentName(ctx, r.Cli, *r.Cluster, componentStsList,
 		sts.Labels[constant.KBAppComponentLabelKey]); err != nil {
@@ -185,6 +187,7 @@ func (r *ReplicationSet) HandleUpdate(ctx context.Context, obj client.Object) er
 		if err != nil {
 			return err
 		}
+		podList = append(podList, pod)
 		// if there is no role label on the Pod, it needs to be updated with statefulSet's role label.
 		if _, ok := pod.Labels[constant.RoleLabelKey]; !ok {
 			if err := updateObjRoleLabel(ctx, r.Cli, *pod, sts.Labels[constant.RoleLabelKey]); err != nil {
@@ -195,7 +198,15 @@ func (r *ReplicationSet) HandleUpdate(ctx context.Context, obj client.Object) er
 			return err
 		}
 	}
-	return nil
+	// sync cluster.status.components.replicationSet.status
+	clusterDeepCopy := r.Cluster.DeepCopy()
+	if err := syncReplicationSetClusterStatus(r.Cli, ctx, r.Cluster, podList); err != nil {
+		return err
+	}
+	if reflect.DeepEqual(clusterDeepCopy.Status.Components, r.Cluster.Status.Components) {
+		return nil
+	}
+	return r.Cli.Status().Patch(ctx, r.Cluster, client.MergeFrom(clusterDeepCopy))
 }
 
 // NewReplicationSet creates a new ReplicationSet object.

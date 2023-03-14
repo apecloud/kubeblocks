@@ -30,7 +30,6 @@ type ownershipTransformer struct {
 }
 
 func (f *ownershipTransformer) Transform(dag *graph.DAG) error {
-	scheme, _ := objectScheme()
 	rootVertex, err := findRootVertex(dag)
 	if err != nil {
 		return err

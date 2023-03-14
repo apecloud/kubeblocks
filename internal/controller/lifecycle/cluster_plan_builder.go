@@ -90,9 +90,6 @@ func (c *clusterPlanBuilder) defaultWalkFunc(vertex graph.Vertex) error {
 	if !ok {
 		return fmt.Errorf("wrong vertex type %v", vertex)
 	}
-	if node.immutable {
-		return nil
-	}
 	if node.action == nil {
 		return errors.New("node action can't be nil")
 	}

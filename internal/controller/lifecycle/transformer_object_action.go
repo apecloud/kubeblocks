@@ -53,10 +53,6 @@ func ownKinds() []client.ObjectList {
 
 // read all objects owned by our cluster
 func (c *objectActionTransformer) readCacheSnapshot(cluster appsv1alpha1.Cluster) (clusterSnapshot, error) {
-	objScheme, err := objectScheme()
-	if err != nil {
-		return nil, err
-	}
 	// list what kinds of object cluster owns
 	kinds := ownKinds()
 	snapshot := make(clusterSnapshot)
@@ -75,8 +71,8 @@ func (c *objectActionTransformer) readCacheSnapshot(cluster appsv1alpha1.Cluster
 			// get the underlying object
 			object := items.Index(i).Addr().Interface().(client.Object)
 			// put to snapshot if owned by our cluster
-			if isOwnerOf(&cluster, object, objScheme) {
-				name, err := getGVKName(object, objScheme)
+			if isOwnerOf(&cluster, object, scheme) {
+				name, err := getGVKName(object, scheme)
 				if err != nil {
 					return nil, err
 				}
@@ -102,14 +98,10 @@ func (c *objectActionTransformer) Transform(dag *graph.DAG) error {
 	}
 
 	// we have the target objects snapshot in dag
-	objScheme, err := objectScheme()
-	if err != nil {
-		return err
-	}
 	newNameVertices := make(map[gvkName]graph.Vertex)
 	for _, vertex := range dag.Vertices() {
 		v, _ := vertex.(*lifecycleVertex)
-		name, err := getGVKName(v.obj, objScheme)
+		name, err := getGVKName(v.obj, scheme)
 		if err != nil {
 			return err
 		}

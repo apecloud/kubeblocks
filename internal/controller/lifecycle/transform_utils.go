@@ -24,7 +24,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 
@@ -118,17 +117,6 @@ func isOwnerOf(owner, obj client.Object, scheme *runtime.Scheme) bool {
 
 func actionPtr(action Action) *Action {
 	return &action
-}
-
-func objectScheme() (*runtime.Scheme, error) {
-	s := scheme.Scheme
-	if err := scheme.AddToScheme(s); err != nil {
-		return nil, err
-	}
-	if err := appsv1alpha1.AddToScheme(s); err != nil {
-		return nil, err
-	}
-	return s, nil
 }
 
 func newRequeueError(after time.Duration, reason string) error {

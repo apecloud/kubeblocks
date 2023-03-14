@@ -410,21 +410,18 @@ func (o *addonCmdOpts) buildEnablePatch(flags []*pflag.Flag, spec, install map[s
 		return nil
 	}
 
-	getExtraItem := func(name string) *extensionsv1alpha1.AddonInstallExtraItem {
+	getExtraItemIndex := func(name string) int {
 		var pItem *extensionsv1alpha1.AddonInstallExtraItem
 		for i, eItem := range installSpec.ExtraItems {
 			if eItem.Name == name {
-				pItem = &installSpec.ExtraItems[i]
-				break
+				return i
 			}
 		}
-		if pItem == nil {
-			pItem = &extensionsv1alpha1.AddonInstallExtraItem{
-				Name: name,
-			}
-			installSpec.ExtraItems = append(installSpec.ExtraItems, *pItem)
+		pItem = &extensionsv1alpha1.AddonInstallExtraItem{
+			Name: name,
 		}
-		return pItem
+		installSpec.ExtraItems = append(installSpec.ExtraItems, *pItem)
+		return len(installSpec.ExtraItems) - 1
 	}
 
 	twoTuplesProcessor := func(s, flag string,
@@ -455,8 +452,8 @@ func (o *addonCmdOpts) buildEnablePatch(flags []*pflag.Flag, spec, install map[s
 		if name == "" {
 			valueAssigner(&installSpec.AddonInstallSpecItem, result)
 		} else {
-			pItem := getExtraItem(name)
-			valueAssigner(&pItem.AddonInstallSpecItem, result)
+			idx := getExtraItemIndex(name)
+			valueAssigner(&installSpec.ExtraItems[idx].AddonInstallSpecItem, result)
 		}
 		return nil
 	}

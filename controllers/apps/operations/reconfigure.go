@@ -95,7 +95,7 @@ func (r *reconfigureAction) Handle(eventContext cfgcore.ConfigEventContext, last
 		return err
 	}
 
-	switch getReconfigurePhase(opsRequest.Status.ReconfiguringStatus, eventContext.Component, phase) {
+	switch aggregateReconfigurePhase(opsRequest.Status.ReconfiguringStatus, eventContext.Component, phase) {
 	case appsv1alpha1.SucceedPhase:
 		return PatchOpsStatus(opsRes, appsv1alpha1.RunningPhase,
 			appsv1alpha1.NewReconfigureRunningCondition(opsRequest,
@@ -122,7 +122,7 @@ func (r *reconfigureAction) Handle(eventContext cfgcore.ConfigEventContext, last
 // if one component fails, OpsRequest fails;
 // else the state of OpsRequest is the smallest state of all components; Merge < ReconfigureRuing < Succeed
 // TODO Replace the string type with a comparable type, refactor state merge for multi components.
-func getReconfigurePhase(status *appsv1alpha1.ReconfiguringStatus, component *appsv1alpha1.ClusterComponentDefinition, phase appsv1alpha1.Phase) appsv1alpha1.Phase {
+func aggregateReconfigurePhase(status *appsv1alpha1.ReconfiguringStatus, component *appsv1alpha1.ClusterComponentDefinition, phase appsv1alpha1.Phase) appsv1alpha1.Phase {
 	if component.WorkloadType != appsv1alpha1.Replication {
 		return phase
 	}

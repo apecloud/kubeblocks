@@ -360,6 +360,10 @@ func updateReconfigureStatusByCM(reconfiguringStatus *appsv1alpha1.Reconfiguring
 // reconfiguringStatus describes status of reconfiguring operation, which contains multi configuration templates.
 // cmStatus describes status of configmap, it is uniquely associated with a configuration template, which contains multi key, each key represents name of a configuration file.
 // execStatus describes the result of the execution of the state machine, which is designed to solve how to do the reconfiguring operation, such as whether to restart, how to send a signal to the process.
+//
+// componentUnitName is a ComponentUnit name
+// NOTES:
+// ComponentUnit is the smallest unit of configuration change. It associated with a StatefulSet, such as a workload of replication type. A ClusterComponent may include multiple StatefulSet objects, which associated with multiple componentUnits.
 func patchReconfigureOpsStatus(opsRes *OpsResource, tplName, componentUnitName string, handleReconfigureStatus handleReconfigureOpsStatus) error {
 	var opsRequest = opsRes.OpsRequest
 

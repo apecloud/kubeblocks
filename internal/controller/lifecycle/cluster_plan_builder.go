@@ -105,6 +105,7 @@ func (c *clusterPlanBuilder) defaultWalkFunc(vertex graph.Vertex) error {
 				// TODO: but Update failure happens too frequently as other controllers are updating cluster object too.
 				// TODO: use Patch here, revert to Update after refactoring done
 				if err := c.cli.Update(c.ctx.Ctx, cluster); err != nil {
+					c.ctx.Log.Error(err, fmt.Sprintf("update %T error, orig: %v, curr: %v", origCluster, origCluster, cluster))
 					return err
 				}
 				//patch := client.MergeFrom(origCluster.DeepCopy())
@@ -137,6 +138,7 @@ func (c *clusterPlanBuilder) defaultWalkFunc(vertex graph.Vertex) error {
 		}
 		err = c.cli.Update(c.ctx.Ctx, o)
 		if err != nil && !apierrors.IsNotFound(err) {
+			c.ctx.Log.Error(err, fmt.Sprintf("update %T error, orig: %v, curr: %v", o, node.oriObj, o))
 			return err
 		}
 	case DELETE:

@@ -53,23 +53,17 @@ func (c *clusterStatusTransformer) Transform(dag *graph.DAG) error {
 	}
 	origCluster, _ := rootVertex.oriObj.(*appsv1alpha1.Cluster)
 	cluster, _ := rootVertex.obj.(*appsv1alpha1.Cluster)
-	if isClusterDeleting(*origCluster) {
-		rootVertex.action = actionPtr(DELETE)
-		return nil
-	}
 
-	rootVertex.action = actionPtr(STATUS)
-	// handle cluster.status when spec is updating
-	if origCluster.Status.ObservedGeneration != origCluster.Generation {
+	switch {
+	case isClusterDeleting(*origCluster):
+		// if cluster is deleting, set root(cluster) vertex.action to DELETE
+		rootVertex.action = actionPtr(DELETE)
+ 	case isClusterUpdating(*origCluster):
 		c.ctx.Log.Info("update cluster status")
-		if err := c.updateClusterPhaseToCreatingOrUpdating(cluster); err != nil {
-			return err
-		}
+		c.updateClusterPhaseToCreatingOrUpdating(cluster)
 		if err := c.setProvisioningStartedCondition(cluster); err != nil {
 			return err
 		}
-
-		// update cluster.status
 		// apply resources succeed, record the condition and event
 		applyResourcesCondition := newApplyResourcesCondition()
 		cluster.SetStatusCondition(applyResourcesCondition)
@@ -78,23 +72,24 @@ func (c *clusterStatusTransformer) Transform(dag *graph.DAG) error {
 		// update observed generation
 		cluster.Status.ObservedGeneration = cluster.Generation
 		cluster.Status.ClusterDefGeneration = c.cc.cd.Generation
-		// TODO: emit event
-		//r.Recorder.Event(cluster, corev1.EventTypeNormal, applyResourcesCondition.Reason, applyResourcesCondition.Message)
-		return nil
-	}
-
-	// checks if the controller is handling the garbage of restore.
-	if handlingRestoreGarbage, err := c.handleGarbageOfRestoreBeforeRunning(cluster); err != nil {
-		return err
-	} else if handlingRestoreGarbage {
-		return nil
-	}
-	// reconcile the phase and conditions of the Cluster.status
-	if err := c.reconcileClusterStatus(cluster, &c.cc.cd); err != nil {
-		return err
-	}
-	if err := c.cleanupAnnotationsAfterRunning(cluster); err != nil {
-		return err
+		c.recorder.Event(cluster, corev1.EventTypeNormal, applyResourcesCondition.Reason, applyResourcesCondition.Message)
+		rootVertex.action = actionPtr(STATUS)
+	case isClusterStatusUpdating(*origCluster):
+		// TODO: cluster.status Patch called in c.handleGarbageOfRestoreBeforeRunning, refactor it
+		//// checks if the controller is handling the garbage of restore.
+		//if handlingRestoreGarbage, err := c.handleGarbageOfRestoreBeforeRunning(cluster); err != nil {
+		//	return err
+		//} else if handlingRestoreGarbage {
+		//	return nil
+		//}
+		// TODO: cluster.status Patch called in c.reconcileClusterStatus, refactor it
+		// reconcile the phase and conditions of the Cluster.status
+		if err := c.reconcileClusterStatus(cluster, &c.cc.cd); err != nil {
+			return err
+		}
+		c.cleanupAnnotationsAfterRunning(cluster)
+		// others, set root(cluster) vertex.action to STATUS
+		rootVertex.action = actionPtr(STATUS)
 	}
 
 	return nil
@@ -158,10 +153,15 @@ func (c *clusterStatusTransformer) handleConditionForClusterPhase(cluster *appsv
 }
 
 // updateClusterPhase updates cluster.status.phase
-func (c *clusterStatusTransformer) updateClusterPhaseToCreatingOrUpdating(cluster *appsv1alpha1.Cluster) error {
-	needPatch := false
-	if cluster.Status.Phase == "" {
-		needPatch = true
+func (c *clusterStatusTransformer) updateClusterPhaseToCreatingOrUpdating(cluster *appsv1alpha1.Cluster) {
+	emitPhaseUpdatingEvent := func() {
+		// send an event when cluster perform operations
+		c.recorder.Eventf(cluster, corev1.EventTypeNormal, string(cluster.Status.Phase),
+			"Start %s in Cluster: %s", cluster.Status.Phase, cluster.Name)
+	}
+
+	switch {
+	case cluster.Status.Phase == "":
 		cluster.Status.Phase = appsv1alpha1.CreatingPhase
 		cluster.Status.Components = map[string]appsv1alpha1.ClusterComponentStatus{}
 		for _, v := range cluster.Spec.ComponentSpecs {
@@ -169,17 +169,11 @@ func (c *clusterStatusTransformer) updateClusterPhaseToCreatingOrUpdating(cluste
 				Phase: appsv1alpha1.CreatingPhase,
 			}
 		}
-	} else if util.IsCompleted(cluster.Status.Phase) && !existsOperations(cluster) {
-		needPatch = true
+		emitPhaseUpdatingEvent()
+	case util.IsCompleted(cluster.Status.Phase) && !existsOperations(cluster):
 		cluster.Status.Phase = appsv1alpha1.SpecUpdatingPhase
+		emitPhaseUpdatingEvent()
 	}
-	if !needPatch {
-		return nil
-	}
-	// send an event when cluster perform operations
-	c.recorder.Eventf(cluster, corev1.EventTypeNormal, string(cluster.Status.Phase),
-		"Start %s in Cluster: %s", cluster.Status.Phase, cluster.Name)
-	return nil
 }
 
 // existsOperations checks if the cluster is doing operations
@@ -333,16 +327,14 @@ func (c *clusterStatusTransformer) reconcileClusterStatus(
 }
 
 // cleanupAnnotationsAfterRunning cleans up the cluster annotations after cluster is Running.
-func (c *clusterStatusTransformer) cleanupAnnotationsAfterRunning(cluster *appsv1alpha1.Cluster) error {
+func (c *clusterStatusTransformer) cleanupAnnotationsAfterRunning(cluster *appsv1alpha1.Cluster) {
 	if cluster.Status.Phase != appsv1alpha1.RunningPhase {
-		return nil
+		return
 	}
 	if _, ok := cluster.Annotations[constant.RestoreFromBackUpAnnotationKey]; !ok {
-		return nil
+		return
 	}
-	patch := client.MergeFrom(cluster.DeepCopy())
 	delete(cluster.Annotations, constant.RestoreFromBackUpAnnotationKey)
-	return c.cli.Patch(c.ctx.Ctx, cluster, patch)
 }
 
 // handleRestoreGarbageBeforeRunning handles the garbage for restore before cluster phase changes to Running.

@@ -142,6 +142,14 @@ func isClusterDeleting(cluster appsv1alpha1.Cluster) bool {
 	return !cluster.GetDeletionTimestamp().IsZero()
 }
 
+func isClusterUpdating(cluster appsv1alpha1.Cluster) bool {
+	return cluster.Status.ObservedGeneration != cluster.Generation
+}
+
+func isClusterStatusUpdating(cluster appsv1alpha1.Cluster) bool {
+	return !isClusterDeleting(cluster) &&  !isClusterUpdating(cluster)
+}
+
 // updateClusterPhaseWhenConditionsError when cluster status is ConditionsError and the cluster applies resources successful,
 // we should update the cluster to the correct state
 func updateClusterPhaseWhenConditionsError(cluster *appsv1alpha1.Cluster) {

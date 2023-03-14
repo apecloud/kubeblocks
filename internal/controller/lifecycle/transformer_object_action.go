@@ -172,21 +172,13 @@ func (c *objectActionTransformer) Transform(dag *graph.DAG) error {
 
 	// generate the plan
 	switch {
-	// cluster Deletion
 	case isClusterDeleting(*origCluster):
 		for _, vertex := range dag.Vertices() {
 			v, _ := vertex.(*lifecycleVertex)
 			v.action = actionPtr(DELETE)
 		}
 		deleteOrphanVertices()
-	// cluster.status Update
-	case origCluster.Status.ObservedGeneration == origCluster.Generation:
-		vertices := findAllNot[*appsv1alpha1.Cluster](dag)
-		for _, vertex := range vertices {
-			dag.RemoveVertex(vertex)
-		}
-	// cluster Creation or Update
-	default:
+	case isClusterUpdating(*origCluster):
 		// vertices to be created
 		createNewVertices()
 		// vertices to be updated
@@ -195,6 +187,11 @@ func (c *objectActionTransformer) Transform(dag *graph.DAG) error {
 		deleteOrphanVertices()
 		// filter secrets created by system account controller
 		filterSecretsCreatedBySystemAccountController()
+	case isClusterStatusUpdating(*origCluster):
+		vertices := findAllNot[*appsv1alpha1.Cluster](dag)
+		for _, vertex := range vertices {
+			dag.RemoveVertex(vertex)
+		}
 	}
 
 	return nil

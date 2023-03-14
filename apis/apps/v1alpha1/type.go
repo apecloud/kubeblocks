@@ -269,7 +269,7 @@ type webhookManager struct {
 
 // CfgFileFormat defines formatter of configuration files.
 // +enum
-// +kubebuilder:validation:Enum={xml,ini,yaml,json,hcl,dotenv,toml,properties}
+// +kubebuilder:validation:Enum={xml,ini,yaml,json,hcl,dotenv,toml,properties,redis}
 type CfgFileFormat string
 
 const (
@@ -281,9 +281,7 @@ const (
 	Dotenv     CfgFileFormat = "dotenv"
 	TOML       CfgFileFormat = "toml"
 	Properties CfgFileFormat = "properties"
-
-	// RedisCfg support redis config.
-	RedisCfg CfgFileFormat = "redis"
+	RedisCfg   CfgFileFormat = "redis"
 )
 
 // UpgradePolicy defines the policy of reconfiguring.

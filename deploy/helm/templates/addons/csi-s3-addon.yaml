@@ -4,6 +4,7 @@ metadata:
   name: csi-s3
   labels:
     {{- include "kubeblocks.labels" . | nindent 4 }}
+    "kubeblocks.io/provider": community
   {{- if .Values.keepAddons }}
   annotations:
     helm.sh/resource-policy: keep
@@ -33,4 +34,4 @@ spec:
           - ack
           - gke
           - tke
-          - ask
+          - aks

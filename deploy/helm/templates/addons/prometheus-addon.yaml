@@ -4,6 +4,7 @@ metadata:
   name: {{ include "addon.prometheus.name" . }}
   labels:
     {{- include "kubeblocks.labels" . | nindent 4 }}
+    "kubeblocks.io/provider": community
   {{- if .Values.keepAddons }}
   annotations:
     helm.sh/resource-policy: keep

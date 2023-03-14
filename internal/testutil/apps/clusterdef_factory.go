@@ -207,9 +207,9 @@ func appendContainerVolumeMounts(containers []corev1.Container, targetContainerN
 	for index := range containers {
 		c := containers[index]
 		// remove the duplicated volumeMounts and overwrite the default mount path
-		mergedVolumeMounts := make([]corev1.VolumeMount, 0)
-		volumeMountsMap := make(map[string]corev1.VolumeMount)
 		if c.Name == targetContainerName {
+			mergedVolumeMounts := make([]corev1.VolumeMount, 0)
+			volumeMountsMap := make(map[string]corev1.VolumeMount)
 			for _, v := range c.VolumeMounts {
 				volumeMountsMap[v.Name] = v
 			}
@@ -220,8 +220,9 @@ func appendContainerVolumeMounts(containers []corev1.Container, targetContainerN
 				mergedVolumeMounts = append(mergedVolumeMounts, v)
 			}
 			c.VolumeMounts = mergedVolumeMounts
+			containers[index] = c
+			break
 		}
-		containers[index] = c
 	}
 	return containers
 }

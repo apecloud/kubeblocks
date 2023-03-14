@@ -24,10 +24,9 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	"github.com/apecloud/kubeblocks/internal/generics"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-
-	"github.com/apecloud/kubeblocks/internal/generics"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	util "github.com/apecloud/kubeblocks/controllers/apps/components/util"
@@ -189,22 +188,12 @@ var _ = Describe("MySQL Reconfigure function", func() {
 			g.Expect(cluster.Status.Components[componentName].Phase).To(Equal(appsv1alpha1.ReconfiguringPhase))
 		})).Should(Succeed())
 
-		By("Issue a restart load reconfigure OpsRequest - innodb_read_io_threads")
+		By("Issue another reconfigure OpsRequest that will fail - innodb_read_io_threads")
 		pKey = "innodb_read_io_threads"
 		pValue = "2"
 		reconfigureOpsRequest = newReconfigureRequest(clusterObj.Name, componentName,
 			tpl.Name, configFile, pKey, &pValue)
-		Expect(testCtx.CreateObj(testCtx.Ctx, reconfigureOpsRequest)).Should(Succeed())
-
-		By("Checking ReconfigureOpsRequest is running")
-		opsKey = types.NamespacedName{Name: reconfigureOpsRequest.Name, Namespace: testCtx.DefaultNamespace}
-		Eventually(testapps.GetOpsRequestPhase(&testCtx, opsKey)).Should(Equal(appsv1alpha1.RunningPhase))
-
-		By("Checking Cluster and changed component phase is Reconfiguring")
-		Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1alpha1.Cluster) {
-			g.Expect(cluster.Status.Phase).To(Equal(appsv1alpha1.ReconfiguringPhase))
-			g.Expect(cluster.Status.Components[componentName].Phase).To(Equal(appsv1alpha1.ReconfiguringPhase))
-		})).Should(Succeed())
+		Expect(testCtx.CreateObj(testCtx.Ctx, reconfigureOpsRequest)).ShouldNot(Succeed())
 	}
 
 	// Scenarios

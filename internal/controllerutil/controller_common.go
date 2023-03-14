@@ -238,7 +238,7 @@ func BackgroundDeleteObject(cli client.Client, ctx context.Context, obj client.O
 
 // SetOwnership set owner reference and add finalizer if not exists
 func SetOwnership(owner, obj client.Object, scheme *runtime.Scheme, finalizer string) error {
-	if err := controllerutil.SetOwnerReference(owner, obj, scheme); err != nil {
+	if err := controllerutil.SetControllerReference(owner, obj, scheme); err != nil {
 		return err
 	}
 	if !controllerutil.ContainsFinalizer(obj, finalizer) {

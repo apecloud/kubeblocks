@@ -84,9 +84,20 @@ func (c *clusterStatusTransformer) Transform(dag *graph.DAG) error {
 		//}
 		// TODO: cluster.status Patch called in c.reconcileClusterStatus, refactor it
 		// reconcile the phase and conditions of the Cluster.status
+		// TODO: hack before refactoring, Update cluster and reload
+		if !reflect.DeepEqual(cluster.ObjectMeta, origCluster.ObjectMeta) ||
+			!reflect.DeepEqual(cluster.Spec, origCluster.Spec) {
+			patch := client.MergeFrom(origCluster.DeepCopy())
+			if err := c.cli.Patch(c.ctx.Ctx, cluster, patch); err != nil {
+				c.ctx.Log.Error(err, fmt.Sprintf("patch %T error, orig: %v, curr: %v", origCluster, origCluster, cluster))
+				return err
+			}
+		}
+		// --end hack--
 		if err := c.reconcileClusterStatus(cluster, &c.cc.cd); err != nil {
 			return err
 		}
+		rootVertex.oriObj = cluster.DeepCopy()
 		c.cleanupAnnotationsAfterRunning(cluster)
 		// others, set root(cluster) vertex.action to STATUS
 		rootVertex.action = actionPtr(STATUS)

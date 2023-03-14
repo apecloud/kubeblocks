@@ -17,7 +17,6 @@ limitations under the License.
 package lifecycle
 
 import (
-	client2 "github.com/apecloud/kubeblocks/internal/controller/client"
 	"reflect"
 	"strings"
 
@@ -29,6 +28,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
+	client2 "github.com/apecloud/kubeblocks/internal/controller/client"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
@@ -178,6 +178,16 @@ func (c *objectActionTransformer) Transform(dag *graph.DAG) error {
 			v.action = actionPtr(DELETE)
 		}
 		deleteOrphanVertices()
+	case isClusterStatusUpdating(*origCluster):
+		defer func() {
+			vertices := findAllNot[*appsv1alpha1.Cluster](dag)
+			for _, vertex := range vertices {
+				//dag.RemoveVertex(vertex)
+				v, _ := vertex.(*lifecycleVertex)
+				v.immutable = true
+			}
+		}()
+		fallthrough
 	case isClusterUpdating(*origCluster):
 		// vertices to be created
 		createNewVertices()
@@ -187,11 +197,6 @@ func (c *objectActionTransformer) Transform(dag *graph.DAG) error {
 		deleteOrphanVertices()
 		// filter secrets created by system account controller
 		filterSecretsCreatedBySystemAccountController()
-	case isClusterStatusUpdating(*origCluster):
-		vertices := findAllNot[*appsv1alpha1.Cluster](dag)
-		for _, vertex := range vertices {
-			dag.RemoveVertex(vertex)
-		}
 	}
 
 	return nil

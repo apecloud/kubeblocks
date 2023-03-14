@@ -18,7 +18,6 @@ package lifecycle
 
 import (
 	"fmt"
-	types2 "github.com/apecloud/kubeblocks/internal/controller/client"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -32,6 +31,7 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	opsutil "github.com/apecloud/kubeblocks/controllers/apps/operations/util"
+	types2 "github.com/apecloud/kubeblocks/internal/controller/client"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
@@ -194,4 +194,9 @@ func getBackupObjects(reqCtx intctrlutil.RequestCtx,
 		return nil, nil, err
 	}
 	return backup, backupTool, nil
+}
+
+func isTypeOf[T interface{}](obj client.Object) bool {
+	_, ok := obj.(T)
+	return ok
 }

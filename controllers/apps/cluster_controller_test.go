@@ -18,6 +18,7 @@ package apps
 
 import (
 	"fmt"
+	"github.com/apecloud/kubeblocks/internal/controllerutil"
 	"reflect"
 	"strconv"
 	"strings"
@@ -471,6 +472,8 @@ var _ = Describe("Cluster Controller", func() {
 				},
 			},
 		}
+		scheme, _ := appsv1alpha1.SchemeBuilder.Build()
+		controllerutil.SetOwnership(clusterObj, volumeSnapshot, scheme, dbClusterFinalizerName)
 		Expect(testCtx.CreateObj(testCtx.Ctx, volumeSnapshot)).Should(Succeed())
 		readyToUse := true
 		volumeSnapshotStatus := snapshotv1.VolumeSnapshotStatus{ReadyToUse: &readyToUse}
@@ -530,6 +533,20 @@ var _ = Describe("Cluster Controller", func() {
 		}
 		Expect(testCtx.CreateObj(testCtx.Ctx, backupPolicyTpl)).Should(Succeed())
 
+		By("Mocking all components' PVCs to bound")
+		for _, comp := range clusterObj.Spec.ComponentSpecs {
+			for i := 0; i < int(comp.Replicas); i++ {
+				pvcKey := types.NamespacedName{
+					Namespace: clusterKey.Namespace,
+					Name:      getPVCName(comp.Name, i),
+				}
+				createPVC(clusterKey.Name, pvcKey.Name, comp.Name)
+				Eventually(testapps.CheckObjExists(&testCtx, pvcKey, &corev1.PersistentVolumeClaim{}, true)).Should(Succeed())
+				Eventually(testapps.GetAndChangeObjStatus(&testCtx, pvcKey, func(pvc *corev1.PersistentVolumeClaim) {
+					pvc.Status.Phase = corev1.ClaimBound
+				})).Should(Succeed())
+			}
+		}
 		for i := range clusterObj.Spec.ComponentSpecs {
 			horizontalScaleComp(updatedReplicas, &clusterObj.Spec.ComponentSpecs[i])
 		}
@@ -606,7 +623,6 @@ var _ = Describe("Cluster Controller", func() {
 			SetReplicas(replicas).
 			Create(&testCtx).GetObject()
 		clusterKey = client.ObjectKeyFromObject(clusterObj)
-		//time.Sleep(1000*time.Second)
 		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
 
 		By("Checking the replicas")

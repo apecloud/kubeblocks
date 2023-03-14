@@ -18,13 +18,14 @@ package lifecycle
 
 import (
 	"fmt"
-	types2 "github.com/apecloud/kubeblocks/internal/controller/client"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	types2 "github.com/apecloud/kubeblocks/internal/controller/client"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
@@ -71,8 +72,10 @@ func (s *stsPVCTransformer) Transform(dag *graph.DAG) error {
 					Namespace: stsObj.Namespace,
 					Name:      fmt.Sprintf("%s-%s-%d", vct.Name, stsObj.Name, i),
 				}
-				var err error
-				if err = s.cli.Get(s.ctx.Ctx, pvcKey, pvc); err != nil {
+				if err := s.cli.Get(s.ctx.Ctx, pvcKey, pvc); err != nil {
+					if apierrors.IsNotFound(err) {
+						return nil
+					}
 					return err
 				}
 				if pvc.Spec.Resources.Requests[corev1.ResourceStorage] == vctProto.Spec.Resources.Requests[corev1.ResourceStorage] {

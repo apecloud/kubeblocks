@@ -23,6 +23,7 @@ import (
 	"reflect"
 	"strings"
 
+	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -89,6 +90,9 @@ func (c *clusterPlanBuilder) defaultWalkFunc(vertex graph.Vertex) error {
 	if !ok {
 		return fmt.Errorf("wrong vertex type %v", vertex)
 	}
+	if node.immutable {
+		return nil
+	}
 	if node.action == nil {
 		return errors.New("node action can't be nil")
 	}
@@ -152,6 +156,14 @@ func (c *clusterPlanBuilder) defaultWalkFunc(vertex graph.Vertex) error {
 				return err
 			}
 		}
+		// TODO: delete backup objects created in scale-out
+		// TODO: should manage backup objects in a better way
+		if isTypeOf[*snapshotv1.VolumeSnapshot](node.obj) ||
+			isTypeOf[*dataprotectionv1alpha1.BackupPolicy](node.obj) ||
+			isTypeOf[*dataprotectionv1alpha1.Backup](node.obj) {
+			_ = c.cli.Delete(c.ctx.Ctx, node.obj)
+		}
+
 	case STATUS:
 		patch := client.MergeFrom(node.oriObj)
 		return c.cli.Status().Patch(c.ctx.Ctx, node.obj, patch)

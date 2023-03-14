@@ -19,7 +19,6 @@ package lifecycle
 import (
 	"context"
 	"fmt"
-	types2 "github.com/apecloud/kubeblocks/internal/controller/client"
 	"strings"
 	"time"
 
@@ -37,6 +36,7 @@ import (
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
+	types2 "github.com/apecloud/kubeblocks/internal/controller/client"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
@@ -136,24 +136,13 @@ func (s *stsHorizontalScalingTransformer) Transform(dag *graph.DAG) error {
 			return true, nil
 		}
 
-		checkAllPVCBoundIfNeeded := func() (shouldRequeue bool, err error) {
-			shouldRequeue = false
-			err = nil
+		checkAllPVCBoundIfNeeded := func() (bool, error) {
 			if comp.HorizontalScalePolicy == nil ||
 				comp.HorizontalScalePolicy.Type != appsv1alpha1.HScaleDataClonePolicyFromSnapshot ||
 				!isSnapshotAvailable(s.cli, s.ctx.Ctx) {
-				return
-			}
-			allPVCBound, err := isAllPVCBound(s.cli, s.ctx.Ctx, stsObj)
-			if err != nil {
-				return
-			}
-			if !allPVCBound {
-				// requeue waiting pvc phase become bound
 				return true, nil
 			}
-			// all pvc bounded, can do next step
-			return
+			return isAllPVCBound(s.cli, s.ctx.Ctx, stsObj)
 		}
 
 		cleanBackupResourcesIfNeeded := func() error {
@@ -196,6 +185,9 @@ func (s *stsHorizontalScalingTransformer) Transform(dag *graph.DAG) error {
 			if err := cleanBackupResourcesIfNeeded(); err != nil {
 				return err
 			}
+
+			// pvcs are ready, stateful_set.replicas should be updated
+			vertex.immutable = false
 
 			return nil
 

@@ -174,7 +174,6 @@ func (o *uninstallOptions) uninstall() error {
 	chart := helm.InstallOpts{
 		Name:      types.KubeBlocksChartName,
 		Namespace: o.Namespace,
-		Wait:      true,
 	}
 	printSpinner(newSpinner("Uninstall helm release "+types.KubeBlocksChartName+" "+v[util.KubeBlocksApp]),
 		chart.Uninstall(o.HelmCfg))

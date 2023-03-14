@@ -78,8 +78,8 @@ func (c *clusterPlanBuilder) getClusterRefResources() (*clusterRefResources, err
 	}
 
 	cc := &clusterRefResources{
-		cd:      *cd,
-		cv:      *cv,
+		cd: *cd,
+		cv: *cv,
 	}
 	return cc, nil
 }

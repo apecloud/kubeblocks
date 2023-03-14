@@ -49,8 +49,8 @@ type gvkName struct {
 }
 
 type clusterRefResources struct {
-	cd      appsv1alpha1.ClusterDefinition
-	cv      appsv1alpha1.ClusterVersion
+	cd appsv1alpha1.ClusterDefinition
+	cv appsv1alpha1.ClusterVersion
 }
 
 // lifecycleVertex describes expected object spec and how to reach it

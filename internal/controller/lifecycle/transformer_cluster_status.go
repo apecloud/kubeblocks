@@ -40,8 +40,8 @@ import (
 )
 
 type clusterStatusTransformer struct {
-	cc  clusterRefResources
-	cli client.Client
+	cc       clusterRefResources
+	cli      client.Client
 	ctx      intctrlutil.RequestCtx
 	recorder record.EventRecorder
 }
@@ -58,7 +58,7 @@ func (c *clusterStatusTransformer) Transform(dag *graph.DAG) error {
 	case isClusterDeleting(*origCluster):
 		// if cluster is deleting, set root(cluster) vertex.action to DELETE
 		rootVertex.action = actionPtr(DELETE)
- 	case isClusterUpdating(*origCluster):
+	case isClusterUpdating(*origCluster):
 		c.ctx.Log.Info("update cluster status")
 		c.updateClusterPhaseToCreatingOrUpdating(cluster)
 		if err := c.setProvisioningStartedCondition(cluster); err != nil {

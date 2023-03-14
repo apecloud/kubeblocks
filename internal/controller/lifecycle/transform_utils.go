@@ -147,7 +147,7 @@ func isClusterUpdating(cluster appsv1alpha1.Cluster) bool {
 }
 
 func isClusterStatusUpdating(cluster appsv1alpha1.Cluster) bool {
-	return !isClusterDeleting(cluster) &&  !isClusterUpdating(cluster)
+	return !isClusterDeleting(cluster) && !isClusterUpdating(cluster)
 }
 
 // updateClusterPhaseWhenConditionsError when cluster status is ConditionsError and the cluster applies resources successful,

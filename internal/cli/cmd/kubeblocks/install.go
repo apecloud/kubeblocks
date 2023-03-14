@@ -192,7 +192,7 @@ func (o *InstallOptions) Install() error {
 	o.ValueOpts.Values = append(o.ValueOpts.Values, fmt.Sprintf(kMonitorParam, o.Monitor))
 
 	// add helm repo
-	spinner := util.Spinner(o.Out, "%-40s", "Add and update repo "+types.KubeBlocksChartName)
+	spinner := util.Spinner(o.Out, "%-40s", "Add and update repo "+types.KubeBlocksRepoName)
 	defer spinner(false)
 	// Add repo, if exists, will update it
 	if err = helm.AddRepo(&repo.Entry{Name: types.KubeBlocksChartName, URL: util.GetHelmChartRepoURL()}); err != nil {
@@ -208,10 +208,10 @@ func (o *InstallOptions) Install() error {
 	}
 	spinner(true)
 
-	// wait all auto-install addons to be enabled
-	spinner = util.Spinner(o.Out, "%-40s", "Wait auto-install addons to be ready")
+	// wait for auto-install addons to be ready
+	spinner = util.Spinner(o.Out, "%-40s", "Wait installable addons to be ready")
 	defer spinner(false)
-	if err = o.waitAddons(); err != nil {
+	if err = o.waitAddonsEnabled(); err != nil {
 		return err
 	}
 	spinner(true)
@@ -229,10 +229,13 @@ func (o *InstallOptions) Install() error {
 	return nil
 }
 
-func (o *InstallOptions) waitAddons() error {
+// waitAddonsEnabled waits for auto-install addons status to be enabled
+func (o *InstallOptions) waitAddonsEnabled() error {
 	checkAddons := func() (bool, error) {
 		allEnabled := true
-		objects, err := o.Dynamic.Resource(types.AddonGVR()).List(context.TODO(), metav1.ListOptions{})
+		objects, err := o.Dynamic.Resource(types.AddonGVR()).List(context.TODO(), metav1.ListOptions{
+			LabelSelector: buildAddonLabelSelector(),
+		})
 		if err != nil && !apierrors.IsNotFound(err) {
 			return false, err
 		}
@@ -247,7 +250,8 @@ func (o *InstallOptions) waitAddons() error {
 				return false, err
 			}
 
-			if addon.Spec.Installable != nil && addon.Spec.Installable.AutoInstall {
+			// addon is enabled, then check its status
+			if addon.Spec.InstallSpec.GetEnabled() {
 				if addon.Status.Phase != extensionsv1alpha1.AddonEnabled {
 					klog.V(1).Infof("Addon %s is not enabled yet", addon.Name)
 					allEnabled = false

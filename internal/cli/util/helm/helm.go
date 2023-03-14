@@ -258,6 +258,9 @@ func (i *InstallOpts) Uninstall(cfg *Config) error {
 	opts := retry.Options{
 		MaxRetry: 1 + i.TryTimes,
 	}
+	if cfg.Namespace() == "" {
+		cfg.SetNamespace(i.Namespace)
+	}
 
 	actionCfg, err := NewActionConfig(cfg)
 	if err != nil {

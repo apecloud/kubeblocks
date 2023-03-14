@@ -56,7 +56,7 @@ func NewBackupConfigCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) 
 		Args:    cobra.NoArgs,
 		Run: func(cmd *cobra.Command, args []string) {
 			util.CheckErr(o.Complete(f, cmd))
-			util.CheckErr(o.Upgrade())
+			util.CheckErr(o.Upgrade(cmd))
 		},
 	}
 	helm.AddValueOptionsFlags(cmd.Flags(), &o.ValueOpts)

@@ -17,6 +17,8 @@ limitations under the License.
 package kubeblocks
 
 import (
+	"fmt"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -91,8 +93,11 @@ var _ = Describe("kubeblocks upgrade", func() {
 			Monitor: true,
 			Check:   false,
 		}
-		Expect(o.Upgrade()).Should(Succeed())
-		Expect(len(o.ValueOpts.Values)).To(Equal(0))
+		cmd := newUpgradeCmd(tf, streams)
+		_ = cmd.Flags().Set("monitor", "true")
+		Expect(o.Upgrade(cmd)).Should(HaveOccurred())
+		Expect(len(o.ValueOpts.Values)).To(Equal(1))
+		Expect(o.ValueOpts.Values[0]).To(Equal(fmt.Sprintf(kMonitorParam, true)))
 		Expect(o.upgradeChart()).Should(HaveOccurred())
 
 		o.printNotes()

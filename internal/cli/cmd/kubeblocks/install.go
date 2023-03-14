@@ -48,6 +48,10 @@ import (
 	"github.com/apecloud/kubeblocks/version"
 )
 
+const (
+	kMonitorParam = "prometheus.enabled=%[1]t,grafana.enabled=%[1]t,dashboards.enabled=%[1]t"
+)
+
 type Options struct {
 	genericclioptions.IOStreams
 
@@ -104,7 +108,8 @@ func newInstallCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 		},
 	}
 
-	cmd.Flags().StringVar(&o.Version, "version", version.DefaultKubeBlocksVersion, "KubeBlocks version to install")
+	cmd.Flags().BoolVar(&o.Monitor, "monitor", true, "Set monitor enabled and install Prometheus, AlertManager and Grafana (default true)")
+	cmd.Flags().StringVar(&o.Version, "version", version.DefaultKubeBlocksVersion, "KubeBlocks version")
 	cmd.Flags().BoolVar(&o.CreateNamespace, "create-namespace", false, "Create the namespace if not present")
 	cmd.Flags().BoolVar(&o.Check, "check", true, "Check kubernetes environment before install")
 	cmd.Flags().DurationVar(&o.timeout, "timeout", 1800*time.Second, "Time to wait for installing KubeBlocks")
@@ -175,6 +180,9 @@ func (o *InstallOptions) Install() error {
 	if err = o.preCheck(versionInfo); err != nil {
 		return err
 	}
+
+	// add monitor parameters
+	o.ValueOpts.Values = append(o.ValueOpts.Values, fmt.Sprintf(kMonitorParam, o.Monitor))
 
 	// add helm repo
 	spinner := util.Spinner(o.Out, "%-40s", "Add and update repo "+types.KubeBlocksRepoName)
@@ -281,10 +289,10 @@ func (o *InstallOptions) preCheck(versionInfo map[util.AppName]string) error {
 	}
 
 	// output kubernetes version
-	fmt.Fprintf(o.Out, "%-40s", "Kubernetes version "+version)
+	fmt.Fprintf(o.Out, "Kubernetes version %s\n", ""+version)
 
 	// check kbcli version, now do nothing
-	fmt.Fprintf(o.Out, "%-40s", "kbcli version "+versionInfo[util.KBCLIApp])
+	fmt.Fprintf(o.Out, "kbcli version %s", versionInfo[util.KBCLIApp])
 
 	// disable or enable some features according to the kubernetes environment
 	provider := util.GetK8sProvider(k8sVersionStr)

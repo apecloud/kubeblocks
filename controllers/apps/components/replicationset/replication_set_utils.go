@@ -429,14 +429,16 @@ func HandleReplicationSetRoleChangeEvent(ctx context.Context,
 	// when newRole is primary, it means that a new primary is generated, and the label of the old primary
 	// needs to be updated to secondary at the same time to avoid the situation of two primaries exist at the same time
 	if newRole == string(Primary) {
-		primaryPod, err := getReplicationSetPrimaryObj(ctx, cli, cluster, intctrlutil.PodSignature, compName)
+		oldPrimaryPod, err := getReplicationSetPrimaryObj(ctx, cli, cluster, intctrlutil.PodSignature, compName)
 		if err != nil {
 			return err
 		}
-		patch := client.MergeFrom(primaryPod.DeepCopy())
-		primaryPod.Labels[constant.RoleLabelKey] = string(Secondary)
-		if err := cli.Patch(ctx, primaryPod, patch); err != nil {
-			return err
+		if oldPrimaryPod.Name != pod.Name {
+			patch := client.MergeFrom(oldPrimaryPod.DeepCopy())
+			oldPrimaryPod.Labels[constant.RoleLabelKey] = string(Secondary)
+			if err := cli.Patch(ctx, oldPrimaryPod, patch); err != nil {
+				return err
+			}
 		}
 	}
 	// update pod role label

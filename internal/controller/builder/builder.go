@@ -437,11 +437,13 @@ func BuildEnvConfig(params BuilderParams) (*corev1.ConfigMap, error) {
 			envData[hostNameTplKey] = fmt.Sprintf("%s.%s", hostNameTplValue, svcName)
 		}
 	}
-	// if primaryIndex is 0, the pod name have to be no suffix '-0'
-	if *params.Component.PrimaryIndex == 0 {
-		envData[constant.KBReplicationSetPrimaryPodName] = fmt.Sprintf("%s-%s-%d.%s", params.Cluster.Name, params.Component.Name, *params.Component.PrimaryIndex, svcName)
-	} else {
-		envData[constant.KBReplicationSetPrimaryPodName] = fmt.Sprintf("%s-%s-%d-%d.%s", params.Cluster.Name, params.Component.Name, *params.Component.PrimaryIndex, 0, svcName)
+	if params.Component.WorkloadType == appsv1alpha1.Replication && params.Component.PrimaryIndex != nil {
+		// if primaryIndex is 0, the pod name have to be no suffix '-0'
+		if *params.Component.PrimaryIndex == 0 {
+			envData[constant.KBReplicationSetPrimaryPodName] = fmt.Sprintf("%s-%s-%d.%s", params.Cluster.Name, params.Component.Name, *params.Component.PrimaryIndex, svcName)
+		} else {
+			envData[constant.KBReplicationSetPrimaryPodName] = fmt.Sprintf("%s-%s-%d-%d.%s", params.Cluster.Name, params.Component.Name, *params.Component.PrimaryIndex, 0, svcName)
+		}
 	}
 
 	// TODO following code seems to be redundant with updateConsensusRoleInfo in consensus_set_utils.go

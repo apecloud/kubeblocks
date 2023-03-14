@@ -42,7 +42,7 @@ spec:
           defaultMode: 0777
       scriptSpecs:
         - name: postgresql-scripts
-          configTemplateRef: postgresql-scripts
+          templateRef: postgresql-scripts
           namespace: {{ .Release.Namespace }}
           volumeName: scripts
           defaultMode: 0777

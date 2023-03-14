@@ -35,7 +35,7 @@ spec:
         {{- end }}
       componentConfigSpec:
         - name: clickhouse-tpl
-          configTemplateRef: clickhouse-tpl
+          templateRef: clickhouse-tpl
           volumeName: config
           namespace: {{ .Release.Namespace }}
       service:
@@ -167,7 +167,7 @@ spec:
         {{- end }}
       componentConfigSpec:
         - name: clickhouse-keeper-tpl
-          configTemplateRef: clickhouse-keeper-tpl
+          templateRef: clickhouse-keeper-tpl
           volumeName: config
           namespace: {{ .Release.Namespace }}
       service:

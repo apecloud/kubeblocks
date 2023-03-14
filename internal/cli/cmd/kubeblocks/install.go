@@ -77,13 +77,13 @@ type InstallOptions struct {
 
 var (
 	installExample = templates.Examples(`
-	# Install KubeBlocks, the default version is same with the kbcli version and the default namespace is kb-system 
+	# Install KubeBlocks, the default version is same with the kbcli version, the default namespace is kb-system 
 	kbcli kubeblocks install
 	
 	# Install KubeBlocks with specified version
 	kbcli kubeblocks install --version=0.4.0
 
-	# Install KubeBlocks with specified namespace, if the namespace is not present, create it
+	# Install KubeBlocks with specified namespace, if the namespace is not present, it will be created
 	kbcli kubeblocks install --namespace=my-namespace --create-namespace
 
 	# Install KubeBlocks with other settings, for example, set replicaCount to 3
@@ -136,7 +136,7 @@ func (o *Options) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 	}
 
 	// check whether --namespace is specified, if not, KubeBlocks will be installed
-	// to the default namespace
+	// to the kb-system namespace
 	var targetNamespace string
 	cmd.Flags().Visit(func(flag *pflag.Flag) {
 		if flag.Name == "namespace" {

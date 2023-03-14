@@ -61,6 +61,9 @@ spec:
       resources:
         requests:
           storage: 1Gi
+          memory: 512Mi
+        limits:
+          memory: 4Gi
       extras:
         - name: alertmanager
           replicas: 1
@@ -78,6 +81,9 @@ spec:
       resources:
         requests:
           storage: 20Gi
+          memory: 512Mi
+        limits:
+          memory: 4Gi
       extras:
         - name: alertmanager
           replicas: 1

@@ -38,7 +38,7 @@ fullnameOverride: ""
 updateStrategy:
   rollingUpdate:
     maxSurge: 1
-    maxUnavailable: 40%
+    maxUnavailable: 1
   type: RollingUpdate
 
 ## Change `hostNetwork` to `true` when you want the KubeBlocks's pod to share its host's network namespace.
@@ -228,9 +228,11 @@ podDisruptionBudget:
 ##
 ## @param admissionWebhooks.enabled
 ## @param admissionWebhooks.createSelfSignedCert
+## @param admissionWebhooks.ignoreReplicasCheck
 admissionWebhooks:
-  enabled: true
+  enabled: false
   createSelfSignedCert: true
+  ignoreReplicasCheck: false
 
 ## Data protection settings
 ##

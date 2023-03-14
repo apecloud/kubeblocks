@@ -40,3 +40,12 @@ func (factory *MockPodFactory) AddContainer(container corev1.Container) *MockPod
 	*containers = append(*containers, container)
 	return factory
 }
+
+func (factory *MockPodFactory) AddVolume(volume corev1.Volume) *MockPodFactory {
+	volumes := &factory.get().Spec.Volumes
+	if volumes == nil {
+		volumes = &[]corev1.Volume{}
+	}
+	*volumes = append(*volumes, volume)
+	return factory
+}

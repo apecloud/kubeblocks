@@ -38,6 +38,7 @@ const (
 	dataProtectionLabelBackupNameKey     = "backups.dataprotection.kubeblocks.io/name"
 	dataProtectionLabelRestoreJobNameKey = "restorejobs.dataprotection.kubeblocks.io/name"
 
+	dataProtectionBackupTargetPodKey = "dataprotection.kubeblocks.io/target-pod-name"
 	// error status
 	errorJobFailed = "JobFailed"
 )

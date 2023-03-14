@@ -147,13 +147,16 @@ spec:
           - name: conf
             emptyDir: { }
       systemAccounts:
-        cmdExecutorConfig:
+# Seems redis-cli has its own mechanism to parse input tokens and there is no elegent way
+# to pass $(KB_ACCOUNT_STATEMENT) to redis-cli without causing parsing error. 
+# Instead, using a shell script to wrap redis-cli and pass $(KB_ACCOUNT_STATEMENT) to it will do.
+        cmdExecutorConfig: 
           image: docker.io/redis:7.0.5
           command:
           - sh
           - -c
           args:
-          - redis-cli -h $(KB_ACCOUNT_ENDPOINT) $(KB_ACCOUNT_STATEMENT)
+          - "redis-cli -h $(KB_ACCOUNT_ENDPOINT) $(KB_ACCOUNT_STATEMENT)"
         passwordConfig:
           length: 10
           numDigits: 5

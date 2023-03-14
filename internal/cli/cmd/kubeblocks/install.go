@@ -201,10 +201,10 @@ func (o *InstallOptions) Install() error {
 	}
 	spinner(true)
 
-	// wait all auto-install addons to be enabled
-	spinner = util.Spinner(o.Out, "%-40s", "Wait auto-install addons to be ready")
+	// wait for auto-install addons to be ready
+	spinner = util.Spinner(o.Out, "%-40s", "Wait installable addons to be ready")
 	defer spinner(false)
-	if err = o.waitAddons(); err != nil {
+	if err = o.waitAddonsEnabled(); err != nil {
 		return err
 	}
 	spinner(true)
@@ -222,10 +222,13 @@ func (o *InstallOptions) Install() error {
 	return nil
 }
 
-func (o *InstallOptions) waitAddons() error {
+// waitAddonsEnabled waits for auto-install addons status to be enabled
+func (o *InstallOptions) waitAddonsEnabled() error {
 	checkAddons := func() (bool, error) {
 		allEnabled := true
-		objects, err := o.Dynamic.Resource(types.AddonGVR()).List(context.TODO(), metav1.ListOptions{})
+		objects, err := o.Dynamic.Resource(types.AddonGVR()).List(context.TODO(), metav1.ListOptions{
+			LabelSelector: buildAddonLabelSelector(),
+		})
 		if err != nil && !apierrors.IsNotFound(err) {
 			return false, err
 		}
@@ -240,7 +243,8 @@ func (o *InstallOptions) waitAddons() error {
 				return false, err
 			}
 
-			if addon.Spec.Installable != nil && addon.Spec.Installable.AutoInstall {
+			// addon is enabled, then check its status
+			if addon.Spec.InstallSpec.GetEnabled() {
 				if addon.Status.Phase != extensionsv1alpha1.AddonEnabled {
 					klog.V(1).Infof("Addon %s is not enabled yet", addon.Name)
 					allEnabled = false
@@ -292,12 +296,12 @@ func (o *InstallOptions) preCheck(versionInfo map[util.AppName]string) error {
 	fmt.Fprintf(o.Out, "Kubernetes version %s\n", ""+version)
 
 	// check kbcli version, now do nothing
-	fmt.Fprintf(o.Out, "kbcli version %s", versionInfo[util.KBCLIApp])
+	fmt.Fprintf(o.Out, "kbcli version %s\n", versionInfo[util.KBCLIApp])
 
 	// disable or enable some features according to the kubernetes environment
 	provider := util.GetK8sProvider(k8sVersionStr)
 	if provider.IsCloud() {
-		fmt.Fprintf(o.Out, "%-40s", "Kubernetes provider "+provider)
+		fmt.Fprintf(o.Out, "Kubernetes provider %s\n", provider)
 	}
 
 	return nil
@@ -308,7 +312,7 @@ func (o *InstallOptions) checkNamespace() error {
 	if o.HelmCfg.Namespace() == "" {
 		o.HelmCfg.SetNamespace(types.DefaultNamespace)
 		o.CreateNamespace = true
-		fmt.Fprintf(o.Out, "KubeBlocks will be installed to namespace \"%s\".\n", o.HelmCfg.Namespace())
+		fmt.Fprintf(o.Out, "KubeBlocks will be installed to namespace \"%s\"\n", o.HelmCfg.Namespace())
 	}
 
 	// check if namespace exists

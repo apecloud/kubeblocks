@@ -177,8 +177,11 @@ var _ = Describe("Backup for a StatefulSet", func() {
 			BeforeEach(func() {
 				viper.Set("VOLUMESNAPSHOT", "true")
 				viper.Set(constant.CfgKeyCtrlrMgrNS, "default")
+				viper.Set(constant.CfgKeyCtrlrMgrAffinity,
+					"{\"nodeAffinity\":{\"preferredDuringSchedulingIgnoredDuringExecution\":[{\"preference\":{\"matchExpressions\":[{\"key\":\"kb-controller\",\"operator\":\"In\",\"values\":[\"true\"]}]},\"weight\":100}]}}")
 				viper.Set(constant.CfgKeyCtrlrMgrTolerations,
 					"[{\"key\":\"key1\", \"operator\": \"Exists\", \"effect\": \"NoSchedule\"}]")
+				viper.Set(constant.CfgKeyCtrlrMgrNodeSelector, "{\"beta.kubernetes.io/arch\":\"amd64\"}")
 
 				By("By creating a backup from backupPolicy: " + backupPolicyName)
 				backup := testapps.NewBackupFactory(testCtx.DefaultNamespace, backupName).
@@ -191,7 +194,9 @@ var _ = Describe("Backup for a StatefulSet", func() {
 
 			AfterEach(func() {
 				viper.Set("VOLUMESNAPSHOT", "false")
+				viper.Set(constant.CfgKeyCtrlrMgrAffinity, "")
 				viper.Set(constant.CfgKeyCtrlrMgrTolerations, "")
+				viper.Set(constant.CfgKeyCtrlrMgrNodeSelector, "")
 			})
 
 			It("should success after all jobs complete", func() {
@@ -200,8 +205,13 @@ var _ = Describe("Backup for a StatefulSet", func() {
 				patchK8sJobStatus(preJobKey, batchv1.JobComplete)
 				By("Check job tolerations")
 				Eventually(testapps.CheckObj(&testCtx, preJobKey, func(g Gomega, fetched *batchv1.Job) {
-					g.Expect(len(fetched.Spec.Template.Spec.Tolerations)).To(Equal(1))
+					g.Expect(fetched.Spec.Template.Spec.Tolerations).ShouldNot(BeEmpty())
+					g.Expect(fetched.Spec.Template.Spec.NodeSelector).ShouldNot(BeEmpty())
+					g.Expect(fetched.Spec.Template.Spec.Affinity).ShouldNot(BeNil())
+					g.Expect(fetched.Spec.Template.Spec.Affinity.NodeAffinity).ShouldNot(BeNil())
+
 				})).Should(Succeed())
+
 				patchVolumeSnapshotStatus(backupKey, true)
 				patchK8sJobStatus(postJobKey, batchv1.JobComplete)
 

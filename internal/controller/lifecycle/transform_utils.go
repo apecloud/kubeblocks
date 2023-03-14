@@ -18,6 +18,7 @@ package lifecycle
 
 import (
 	"fmt"
+	types2 "github.com/apecloud/kubeblocks/internal/controller/client"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -32,36 +33,38 @@ import (
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	opsutil "github.com/apecloud/kubeblocks/controllers/apps/operations/util"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
-	types2 "github.com/apecloud/kubeblocks/internal/controller/types"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
-func findAll[T interface{}](dag *graph.DAG) ([]graph.Vertex, error) {
+func findAll[T interface{}](dag *graph.DAG) []graph.Vertex {
 	vertices := make([]graph.Vertex, 0)
 	for _, vertex := range dag.Vertices() {
-		v, ok := vertex.(*lifecycleVertex)
-		if !ok {
-			return nil, fmt.Errorf("wrong type, expect lifecycleVertex, actual: %v", vertex)
-		}
+		v, _ := vertex.(*lifecycleVertex)
 		if _, ok := v.obj.(T); ok {
 			vertices = append(vertices, vertex)
 		}
 	}
-	return vertices, nil
+	return vertices
 }
 
-func findAllNot[T interface{}](dag *graph.DAG) ([]graph.Vertex, error) {
+func findAllNot[T interface{}](dag *graph.DAG) []graph.Vertex {
 	vertices := make([]graph.Vertex, 0)
 	for _, vertex := range dag.Vertices() {
-		v, ok := vertex.(*lifecycleVertex)
-		if !ok {
-			return nil, fmt.Errorf("wrong type, expect lifecycleVertex, actual: %v", vertex)
-		}
+		v, _ := vertex.(*lifecycleVertex)
 		if _, ok := v.obj.(T); !ok {
 			vertices = append(vertices, vertex)
 		}
 	}
-	return vertices, nil
+	return vertices
+}
+
+func findRootVertex(dag *graph.DAG) (*lifecycleVertex, error) {
+	root := dag.Root()
+	if root == nil {
+		return nil, fmt.Errorf("root vertex not found: %v", dag)
+	}
+	rootVertex, _ := root.(*lifecycleVertex)
+	return rootVertex, nil
 }
 
 func getGVKName(object client.Object, scheme *runtime.Scheme) (*gvkName, error) {
@@ -160,11 +163,6 @@ func checkReferencedCRStatus(referencedCRPhase appsv1alpha1.Phase) error {
 	if referencedCRPhase == appsv1alpha1.AvailablePhase {
 		return nil
 	}
-	//message := fmt.Sprintf("%s: %s is unavailable, this problem needs to be solved first.", crKind, crName)
-	//if err := conMgr.setReferenceCRUnavailableCondition(message); err != nil {
-	//	res, err := intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-	//	return &res, err
-	//}
 	return newRequeueError(ControllerErrorRequeueTime, "cluster definition not available")
 }
 

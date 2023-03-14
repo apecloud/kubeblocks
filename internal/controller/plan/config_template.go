@@ -20,14 +20,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-
-	corev1 "k8s.io/api/core/v1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/controller/client"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/apecloud/kubeblocks/internal/gotemplate"
+	corev1 "k8s.io/api/core/v1"
 )
 
 // General Built-in objects
@@ -90,7 +88,7 @@ type configTemplateBuilder struct {
 	podSpec        *corev1.PodSpec
 
 	ctx context.Context
-	cli client.Client
+	cli client.ReadonlyClient
 }
 
 func newCfgTemplateBuilder(
@@ -98,7 +96,7 @@ func newCfgTemplateBuilder(
 	cluster *appsv1alpha1.Cluster,
 	version *appsv1alpha1.ClusterVersion,
 	ctx context.Context,
-	cli client.Client) *configTemplateBuilder {
+	cli client.ReadonlyClient) *configTemplateBuilder {
 	return &configTemplateBuilder{
 		namespace:      namespace,
 		clusterName:    clusterName,

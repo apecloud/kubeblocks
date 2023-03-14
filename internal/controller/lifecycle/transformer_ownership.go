@@ -17,7 +17,6 @@ limitations under the License.
 package lifecycle
 
 import (
-	"fmt"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -32,15 +31,11 @@ type ownershipTransformer struct {
 
 func (f *ownershipTransformer) Transform(dag *graph.DAG) error {
 	scheme, _ := objectScheme()
-	root := dag.Root()
-	if root == nil {
-		return fmt.Errorf("root vertex not found: %v", dag)
-	}
-	rootVertex, _ := root.(*lifecycleVertex)
-	vertices, err := findAllNot[*appsv1alpha1.Cluster](dag)
+	rootVertex, err := findRootVertex(dag)
 	if err != nil {
 		return err
 	}
+	vertices := findAllNot[*appsv1alpha1.Cluster](dag)
 
 	controllerutil.AddFinalizer(rootVertex.obj, dbClusterFinalizerName)
 	for _, vertex := range vertices {

@@ -18,6 +18,7 @@ package lifecycle
 
 import (
 	"fmt"
+	"github.com/apecloud/kubeblocks/internal/controller/client"
 
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
@@ -25,24 +26,29 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	"github.com/apecloud/kubeblocks/internal/controller/plan"
-	"github.com/apecloud/kubeblocks/internal/controller/types"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 type tlsCertsTransformer struct {
-	cc  compoundCluster
-	cli types.ReadonlyClient
+	cr  clusterRefResources
+	cli client.ReadonlyClient
 	ctx intctrlutil.RequestCtx
 }
 
 func (t *tlsCertsTransformer) Transform(dag *graph.DAG) error {
+	rootVertex, err := findRootVertex(dag)
+	if err != nil {
+		return err
+	}
+	origCluster, _ := rootVertex.oriObj.(*appsv1alpha1.Cluster)
+	cluster, _ := rootVertex.obj.(*appsv1alpha1.Cluster)
 	// return fast when cluster is deleting
-	if !t.cc.cluster.DeletionTimestamp.IsZero() {
+	if !origCluster.DeletionTimestamp.IsZero() {
 		return nil
 	}
 
 	var secretList []*corev1.Secret
-	for _, comp := range t.cc.cluster.Spec.ComponentSpecs {
+	for _, comp := range cluster.Spec.ComponentSpecs {
 		if !comp.TLS {
 			continue
 		}
@@ -52,11 +58,11 @@ func (t *tlsCertsTransformer) Transform(dag *graph.DAG) error {
 
 		switch comp.Issuer.Name {
 		case appsv1alpha1.IssuerUserProvided:
-			if err := plan.CheckTLSSecretRef(t.ctx, t.cli, t.cc.cluster.Namespace, comp.Issuer.SecretRef); err != nil {
+			if err := plan.CheckTLSSecretRef(t.ctx, t.cli, cluster.Namespace, comp.Issuer.SecretRef); err != nil {
 				return err
 			}
 		case appsv1alpha1.IssuerKubeBlocks:
-			secret, err := plan.ComposeTLSSecret(t.cc.cluster.Namespace, t.cc.cluster.Name, comp.Name)
+			secret, err := plan.ComposeTLSSecret(cluster.Namespace, cluster.Name, comp.Name)
 			if err != nil {
 				return err
 			}

@@ -17,8 +17,6 @@ limitations under the License.
 package lifecycle
 
 import (
-	"fmt"
-
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 )
@@ -26,12 +24,11 @@ import (
 type doNotTerminateTransformer struct{}
 
 func (d *doNotTerminateTransformer) Transform(dag *graph.DAG) error {
-	root := dag.Root()
-	if root == nil {
-		return fmt.Errorf("root vertex not found: %v", dag)
+	rootVertex, err := findRootVertex(dag)
+	if err != nil {
+		return err
 	}
-	rootVertex, _ := root.(*lifecycleVertex)
-	cluster, _ := rootVertex.obj.(*appsv1alpha1.Cluster)
+	cluster, _ := rootVertex.oriObj.(*appsv1alpha1.Cluster)
 
 	if cluster.DeletionTimestamp.IsZero() {
 		return nil
@@ -39,10 +36,7 @@ func (d *doNotTerminateTransformer) Transform(dag *graph.DAG) error {
 	if cluster.Spec.TerminationPolicy != appsv1alpha1.DoNotTerminate {
 		return nil
 	}
-	vertices, err := findAllNot[*appsv1alpha1.Cluster](dag)
-	if err != nil {
-		return err
-	}
+	vertices := findAllNot[*appsv1alpha1.Cluster](dag)
 	for _, vertex := range vertices {
 		dag.RemoveVertex(vertex)
 	}

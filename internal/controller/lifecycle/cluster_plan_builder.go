@@ -19,6 +19,7 @@ package lifecycle
 import (
 	"errors"
 	"fmt"
+	types2 "github.com/apecloud/kubeblocks/internal/controller/client"
 	"golang.org/x/exp/maps"
 	"reflect"
 	"strings"
@@ -37,7 +38,6 @@ import (
 	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
-	types2 "github.com/apecloud/kubeblocks/internal/controller/types"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -60,7 +60,7 @@ type clusterPlan struct {
 var _ graph.PlanBuilder = &clusterPlanBuilder{}
 var _ graph.Plan = &clusterPlan{}
 
-func (c *clusterPlanBuilder) getCompoundCluster() (*compoundCluster, error) {
+func (c *clusterPlanBuilder) getClusterRefResources() (*clusterRefResources, error) {
 	cluster := c.cluster
 	cd := &appsv1alpha1.ClusterDefinition{}
 	if err := c.cli.Get(c.ctx.Ctx, types.NamespacedName{
@@ -77,8 +77,7 @@ func (c *clusterPlanBuilder) getCompoundCluster() (*compoundCluster, error) {
 		}
 	}
 
-	cc := &compoundCluster{
-		cluster: cluster,
+	cc := &clusterRefResources{
 		cd:      *cd,
 		cv:      *cv,
 	}
@@ -164,17 +163,26 @@ func (c *clusterPlanBuilder) Init() error {
 }
 
 func (c *clusterPlanBuilder) Validate() error {
-	chain := &graph.ValidatorChain{
+	crChain := &graph.ValidatorChain{
 		&clusterDefinitionValidator{req: c.req, cli: c.cli, ctx: c.ctx, cluster: c.cluster},
 		&clusterVersionValidator{req: c.req, cli: c.cli, ctx: c.ctx, cluster: c.cluster},
+	}
+	if err := crChain.WalkThrough(); err != nil {
+		message := fmt.Sprintf("ref resource is unavailable, this problem needs to be solved first: %v", err)
+		_ = c.conMgr.setReferenceCRUnavailableCondition(c.cluster, message)
+		return err
+	}
+
+	chain := &graph.ValidatorChain{
 		&enableLogsValidator{req: c.req, cli: c.cli, ctx: c.ctx, cluster: c.cluster},
 		&rplSetPrimaryIndexValidator{req: c.req, cli: c.cli, ctx: c.ctx, cluster: c.cluster},
 	}
-	err := chain.WalkThrough()
-	if err != nil {
+	if err := chain.WalkThrough(); err != nil {
 		_ = c.conMgr.setPreCheckErrorCondition(c.cluster, err)
+		return err
 	}
-	return err
+
+	return nil
 }
 
 // Build only cluster Creation, Update and Deletion supported.
@@ -188,8 +196,8 @@ func (c *clusterPlanBuilder) Build() (graph.Plan, error) {
 		}
 	}()
 
-	var cc *compoundCluster
-	cc, err = c.getCompoundCluster()
+	var cr *clusterRefResources
+	cr, err = c.getClusterRefResources()
 	if err != nil {
 		return nil, err
 	}
@@ -203,9 +211,9 @@ func (c *clusterPlanBuilder) Build() (graph.Plan, error) {
 		// fix cd&cv labels of cluster
 		&fixClusterLabelsTransformer{},
 		// cluster to K8s objects and put them into dag
-		&clusterTransformer{cc: *cc, cli: c.cli, ctx: c.ctx},
+		&clusterTransformer{cc: *cr, cli: c.cli, ctx: c.ctx},
 		// tls certs secret
-		&tlsCertsTransformer{cc: *cc, cli: roClient, ctx: c.ctx},
+		&tlsCertsTransformer{cr: *cr, cli: roClient, ctx: c.ctx},
 		// add our finalizer to all objects
 		&ownershipTransformer{finalizer: dbClusterFinalizerName},
 		// make all workload objects depending on credential secret
@@ -213,17 +221,17 @@ func (c *clusterPlanBuilder) Build() (graph.Plan, error) {
 		// make config configmap immutable
 		&configTransformer{},
 		// read old snapshot from cache, and generate diff plan
-		&objectActionTransformer{cc: *cc, cli: roClient, ctx: c.ctx},
+		&objectActionTransformer{cli: roClient, ctx: c.ctx},
 		// handle TerminationPolicyType=DoNotTerminate
 		&doNotTerminateTransformer{},
 		// horizontal scaling
-		&stsHorizontalScalingTransformer{cc: *cc, cli: roClient, ctx: c.ctx},
+		&stsHorizontalScalingTransformer{cr: *cr, cli: roClient, ctx: c.ctx},
 		// stateful set pvc Update
-		&stsPVCTransformer{cc: *cc, cli: c.cli, ctx: c.ctx},
+		&stsPVCTransformer{cli: c.cli, ctx: c.ctx},
 		// replication set horizontal scaling
 		//&rplSetHorizontalScalingTransformer{cc: *cc, cli: c.cli, ctx: c.ctx},
 		// finally, update cluster status
-		&clusterStatusTransformer{cc: *cc, cli: c.cli, ctx: c.ctx, recorder: c.recorder},
+		&clusterStatusTransformer{cc: *cr, cli: c.cli, ctx: c.ctx, recorder: c.recorder},
 	}
 
 	// new a DAG and apply chain on it, after that we should get the final Plan

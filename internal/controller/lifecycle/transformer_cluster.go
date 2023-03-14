@@ -18,7 +18,6 @@ package lifecycle
 
 import (
 	"encoding/json"
-	"fmt"
 	"reflect"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -35,15 +34,23 @@ import (
 
 // clusterTransformer transforms a Cluster to a K8s objects DAG
 // TODO: remove cli and ctx, we should read all objects needed, and then do pure objects computation
+// TODO: only replication set left
 type clusterTransformer struct {
-	cc  compoundCluster
+	cc  clusterRefResources
 	cli client.Client
 	ctx intctrlutil.RequestCtx
 }
 
 func (c *clusterTransformer) Transform(dag *graph.DAG) error {
+	rootVertex, err := findRootVertex(dag)
+	if err != nil {
+		return err
+	}
+	origCluster, _ := rootVertex.oriObj.(*appsv1alpha1.Cluster)
+	cluster, _ := rootVertex.obj.(*appsv1alpha1.Cluster)
+
 	// return fast when cluster is deleting
-	if !c.cc.cluster.DeletionTimestamp.IsZero() {
+	if !origCluster.DeletionTimestamp.IsZero() {
 		return nil
 	}
 
@@ -51,22 +58,22 @@ func (c *clusterTransformer) Transform(dag *graph.DAG) error {
 	// TODO: refactor plan.PrepareComponentResources
 	resourcesQueue := make([]client.Object, 0, 3)
 	task := intctrltypes.ReconcileTask{
-		Cluster:           c.cc.cluster,
+		Cluster:           cluster,
 		ClusterDefinition: &c.cc.cd,
 		ClusterVersion:    &c.cc.cv,
 		Resources:         &resourcesQueue,
 	}
 
-	clusterBackupResourceMap, err := getClusterBackupSourceMap(c.cc.cluster)
+	clusterBackupResourceMap, err := getClusterBackupSourceMap(cluster)
 	if err != nil {
 		return err
 	}
 
-	clusterCompSpecMap := c.cc.cluster.GetDefNameMappingComponents()
+	clusterCompSpecMap := cluster.GetDefNameMappingComponents()
 	clusterCompVerMap := c.cc.cv.GetDefNameMappingComponents()
 	process1stComp := true
 
-	// TODO: should move credential secrets creation from systemaccount_controller & here into credential_transformer,
+	// TODO: should move credential secrets creation from system_account_controller & here into credential_transformer,
 	// TODO: as those secrets are owned by the cluster
 	prepareComp := func(synthesizedComp *component.SynthesizedComponent) error {
 		iParams := task
@@ -81,7 +88,7 @@ func (c *clusterTransformer) Transform(dag *graph.DAG) error {
 		// build info that needs to be restored from backup
 		backupSourceName := clusterBackupResourceMap[synthesizedComp.Name]
 		if len(backupSourceName) > 0 {
-			backup, backupTool, err := getBackupObjects(c.ctx, c.cli, c.cc.cluster.Namespace, backupSourceName)
+			backup, backupTool, err := getBackupObjects(c.ctx, c.cli, cluster.Namespace, backupSourceName)
 			if err != nil {
 				return err
 			}
@@ -97,7 +104,7 @@ func (c *clusterTransformer) Transform(dag *graph.DAG) error {
 		compVer := clusterCompVerMap[compDefName]
 		compSpecs := clusterCompSpecMap[compDefName]
 		for _, compSpec := range compSpecs {
-			if err := prepareComp(component.BuildComponent(c.ctx, *c.cc.cluster, c.cc.cd, compDef, compSpec, compVer)); err != nil {
+			if err := prepareComp(component.BuildComponent(c.ctx, *cluster, c.cc.cd, compDef, compSpec, compVer)); err != nil {
 				return err
 			}
 		}
@@ -107,14 +114,10 @@ func (c *clusterTransformer) Transform(dag *graph.DAG) error {
 	// dedup them
 	objects := deDupResources(*task.Resources)
 	// now task.Resources to DAG vertices
-	root := dag.Root()
-	if root == nil {
-		return fmt.Errorf("root vertex not found: %v", dag)
-	}
 	for _, object := range objects {
 		vertex := &lifecycleVertex{obj: object}
 		dag.AddVertex(vertex)
-		dag.Connect(root, vertex)
+		dag.Connect(rootVertex, vertex)
 	}
 	return nil
 }

@@ -19,6 +19,7 @@ package configuration
 import (
 	"context"
 	"fmt"
+	client2 "github.com/apecloud/kubeblocks/internal/controller/client"
 	"reflect"
 	"time"
 
@@ -440,7 +441,7 @@ func NeedReloadVolume(tpl appsv1alpha1.ConfigTemplate) bool {
 	return len(tpl.ConfigConstraintRef) != 0
 }
 
-func GetReloadOptions(cli client.Client, ctx context.Context, tpls []appsv1alpha1.ConfigTemplate) (*appsv1alpha1.ReloadOptions, error) {
+func GetReloadOptions(cli client2.ReadonlyClient, ctx context.Context, tpls []appsv1alpha1.ConfigTemplate) (*appsv1alpha1.ReloadOptions, error) {
 	for _, tpl := range tpls {
 		if !NeedReloadVolume(tpl) {
 			continue

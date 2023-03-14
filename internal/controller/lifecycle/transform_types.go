@@ -18,13 +18,13 @@ package lifecycle
 
 import (
 	"fmt"
+	client2 "github.com/apecloud/kubeblocks/internal/controller/client"
 	"time"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/controller/types"
 )
 
 const (
@@ -48,8 +48,7 @@ type gvkName struct {
 	ns, name string
 }
 
-type compoundCluster struct {
-	cluster *appsv1alpha1.Cluster
+type clusterRefResources struct {
 	cd      appsv1alpha1.ClusterDefinition
 	cv      appsv1alpha1.ClusterVersion
 }
@@ -110,5 +109,5 @@ type delegateClient struct {
 	client.Client
 }
 
-var _ types.ReadonlyClient = delegateClient{}
+var _ client2.ReadonlyClient = delegateClient{}
 var _ RequeueError = &realRequeueError{}

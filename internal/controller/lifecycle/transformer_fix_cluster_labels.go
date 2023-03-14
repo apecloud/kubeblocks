@@ -1,8 +1,6 @@
 package lifecycle
 
 import (
-	"fmt"
-
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 )
@@ -11,11 +9,10 @@ import (
 type fixClusterLabelsTransformer struct{}
 
 func (f *fixClusterLabelsTransformer) Transform(dag *graph.DAG) error {
-	root := dag.Root()
-	if root == nil {
-		return fmt.Errorf("root vertex not found: %v", dag)
+	rootVertex, err := findRootVertex(dag)
+	if err != nil {
+		return err
 	}
-	rootVertex, _ := root.(*lifecycleVertex)
 	cluster, _ := rootVertex.obj.(*appsv1alpha1.Cluster)
 	labels := cluster.Labels
 	if labels == nil {

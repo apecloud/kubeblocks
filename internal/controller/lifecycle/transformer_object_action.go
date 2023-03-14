@@ -17,7 +17,7 @@ limitations under the License.
 package lifecycle
 
 import (
-	"fmt"
+	client2 "github.com/apecloud/kubeblocks/internal/controller/client"
 	"reflect"
 	"strings"
 
@@ -30,14 +30,12 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
-	"github.com/apecloud/kubeblocks/internal/controller/types"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 // objectActionTransformer reads all Vertex.Obj in cache and compute the diff DAG.
 type objectActionTransformer struct {
-	cc  compoundCluster
-	cli types.ReadonlyClient
+	cli client2.ReadonlyClient
 	ctx intctrlutil.RequestCtx
 }
 
@@ -54,7 +52,7 @@ func ownKinds() []client.ObjectList {
 }
 
 // read all objects owned by our cluster
-func (c *objectActionTransformer) readCacheSnapshot() (clusterSnapshot, error) {
+func (c *objectActionTransformer) readCacheSnapshot(cluster appsv1alpha1.Cluster) (clusterSnapshot, error) {
 	objScheme, err := objectScheme()
 	if err != nil {
 		return nil, err
@@ -64,8 +62,8 @@ func (c *objectActionTransformer) readCacheSnapshot() (clusterSnapshot, error) {
 	snapshot := make(clusterSnapshot)
 	sts := appsv1.StatefulSet{}
 	sts.GroupVersionKind()
-	ml := client.MatchingLabels{constant.AppInstanceLabelKey: c.cc.cluster.GetName()}
-	inNS := client.InNamespace(c.cc.cluster.Namespace)
+	ml := client.MatchingLabels{constant.AppInstanceLabelKey: cluster.GetName()}
+	inNS := client.InNamespace(cluster.Namespace)
 	for _, list := range kinds {
 		if err := c.cli.List(c.ctx.Ctx, list, inNS, ml); err != nil {
 			return nil, err
@@ -77,7 +75,7 @@ func (c *objectActionTransformer) readCacheSnapshot() (clusterSnapshot, error) {
 			// get the underlying object
 			object := items.Index(i).Addr().Interface().(client.Object)
 			// put to snapshot if owned by our cluster
-			if isOwnerOf(c.cc.cluster, object, objScheme) {
+			if isOwnerOf(&cluster, object, objScheme) {
 				name, err := getGVKName(object, objScheme)
 				if err != nil {
 					return nil, err
@@ -91,15 +89,19 @@ func (c *objectActionTransformer) readCacheSnapshot() (clusterSnapshot, error) {
 }
 
 func (c *objectActionTransformer) Transform(dag *graph.DAG) error {
-	// get the old snapshot
-	oldSnapshot, err := c.readCacheSnapshot()
+	rootVertex, err := findRootVertex(dag)
+	if err != nil {
+		return err
+	}
+	origCluster, _ := rootVertex.oriObj.(*appsv1alpha1.Cluster)
+
+	// get the old objects snapshot
+	oldSnapshot, err := c.readCacheSnapshot(*origCluster)
 	if err != nil {
 		return err
 	}
 
-	// we have target snapshot in dag
-	// now do the heavy lift:
-	// compute the diff between cache and target spec and generate the plan
+	// we have the target objects snapshot in dag
 	objScheme, err := objectScheme()
 	if err != nil {
 		return err
@@ -114,98 +116,86 @@ func (c *objectActionTransformer) Transform(dag *graph.DAG) error {
 		newNameVertices[*name] = vertex
 	}
 
+	// now compute the diff between old and target snapshot and generate the plan
 	oldNameSet := sets.KeySet(oldSnapshot)
 	newNameSet := sets.KeySet(newNameVertices)
 
-	deleteSet := oldNameSet.Difference(newNameSet)
 	createSet := newNameSet.Difference(oldNameSet)
 	updateSet := newNameSet.Intersection(oldNameSet)
+	deleteSet := oldNameSet.Difference(newNameSet)
 
-	root := dag.Root()
-	if root == nil {
-		return fmt.Errorf("root vertex not found: %v", dag)
-	}
-	rootVertex, _ := root.(*lifecycleVertex)
-
-	for name := range deleteSet {
-		v := &lifecycleVertex{
-			obj:    oldSnapshot[name],
-			oriObj: oldSnapshot[name],
-			action: actionPtr(DELETE),
+	createNewVertices := func() {
+		for name := range createSet {
+			v, _ := newNameVertices[name].(*lifecycleVertex)
+			v.action = actionPtr(CREATE)
 		}
-		dag.AddVertex(v)
-		dag.Connect(root, v)
+	}
+	updateVertices := func() {
+		for name := range updateSet {
+			v, _ := newNameVertices[name].(*lifecycleVertex)
+			v.oriObj = oldSnapshot[name]
+			v.action = actionPtr(UPDATE)
+		}
+	}
+	deleteOrphanVertices := func() {
+		for name := range deleteSet {
+			v := &lifecycleVertex{
+				obj:    oldSnapshot[name],
+				oriObj: oldSnapshot[name],
+				action: actionPtr(DELETE),
+			}
+			dag.AddVertex(v)
+			dag.Connect(rootVertex, v)
+		}
 	}
 
-	// case cluster Deletion
-	if !c.cc.cluster.DeletionTimestamp.IsZero() {
-		for _, vertex := range dag.Vertices() {
+	filterSecretsCreatedBySystemAccountController := func() {
+		defaultAccounts := []appsv1alpha1.AccountName{
+			appsv1alpha1.AdminAccount,
+			appsv1alpha1.DataprotectionAccount,
+			appsv1alpha1.ProbeAccount,
+			appsv1alpha1.MonitorAccount,
+			appsv1alpha1.ReplicatorAccount,
+		}
+		secretVertices := findAll[*corev1.Secret](dag)
+		for _, vertex := range secretVertices {
 			v, _ := vertex.(*lifecycleVertex)
-			v.action = actionPtr(DELETE)
-		}
-		return nil
-	}
-
-	if c.cc.cluster.Status.ObservedGeneration == c.cc.cluster.Generation {
-		vertices, err := findAllNot[*appsv1alpha1.Cluster](dag)
-		if err != nil {
-			return err
-		}
-		for _, vertex := range vertices {
-			dag.RemoveVertex(vertex)
-		}
-		rootVertex.action = actionPtr(STATUS)
-		return nil
-	}
-
-	// case cluster Creation or Update
-	// dag root is our cluster object
-	for name := range createSet {
-		v, _ := newNameVertices[name].(*lifecycleVertex)
-		v.action = actionPtr(CREATE)
-	}
-	for name := range updateSet {
-		v, _ := newNameVertices[name].(*lifecycleVertex)
-		v.oriObj = oldSnapshot[name]
-		v.action = actionPtr(UPDATE)
-	}
-
-	// filter secrets created by system account controller
-	defaultAccounts := []appsv1alpha1.AccountName{
-		appsv1alpha1.AdminAccount,
-		appsv1alpha1.DataprotectionAccount,
-		appsv1alpha1.ProbeAccount,
-		appsv1alpha1.MonitorAccount,
-		appsv1alpha1.ReplicatorAccount,
-	}
-	secretVertices, err := findAll[*corev1.Secret](dag)
-	if err != nil {
-		return err
-	}
-	for _, vertex := range secretVertices {
-		v, _ := vertex.(*lifecycleVertex)
-		secret, _ := v.obj.(*corev1.Secret)
-		for _, account := range defaultAccounts {
-			if strings.Index(secret.Name, string(account)) >= 0 {
-				dag.RemoveVertex(vertex)
-				break
+			secret, _ := v.obj.(*corev1.Secret)
+			for _, account := range defaultAccounts {
+				if strings.Index(secret.Name, string(account)) >= 0 {
+					dag.RemoveVertex(vertex)
+					break
+				}
 			}
 		}
 	}
 
-	// update cluster.status
-	cluster, _ := rootVertex.obj.(*appsv1alpha1.Cluster)
-	// apply resources succeed, record the condition and event
-	applyResourcesCondition := newApplyResourcesCondition()
-	cluster.SetStatusCondition(applyResourcesCondition)
-	// if cluster status is ConditionsError, do it before updated the observedGeneration.
-	updateClusterPhaseWhenConditionsError(cluster)
-	// update observed generation
-	cluster.Status.ObservedGeneration = cluster.Generation
-	cluster.Status.ClusterDefGeneration = c.cc.cd.Generation
-	// TODO: emit event
-	//r.Recorder.Event(cluster, corev1.EventTypeNormal, applyResourcesCondition.Reason, applyResourcesCondition.Message)
-	rootVertex.action = actionPtr(STATUS)
+	// generate the plan
+	switch {
+	// cluster Deletion
+	case !origCluster.DeletionTimestamp.IsZero():
+		for _, vertex := range dag.Vertices() {
+			v, _ := vertex.(*lifecycleVertex)
+			v.action = actionPtr(DELETE)
+		}
+		deleteOrphanVertices()
+	// cluster.status Update
+	case origCluster.Status.ObservedGeneration == origCluster.Generation:
+		vertices := findAllNot[*appsv1alpha1.Cluster](dag)
+		for _, vertex := range vertices {
+			dag.RemoveVertex(vertex)
+		}
+	// cluster Creation or Update
+	default:
+		// vertices to be created
+		createNewVertices()
+		// vertices to be updated
+		updateVertices()
+		// vertices to be deleted
+		deleteOrphanVertices()
+		// filter secrets created by system account controller
+		filterSecretsCreatedBySystemAccountController()
+	}
 
 	return nil
 }

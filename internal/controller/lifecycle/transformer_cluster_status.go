@@ -40,24 +40,25 @@ import (
 )
 
 type clusterStatusTransformer struct {
-	cc       compoundCluster
-	cli      client.Client
+	cc  clusterRefResources
+	cli client.Client
 	ctx      intctrlutil.RequestCtx
 	recorder record.EventRecorder
 }
 
 func (c *clusterStatusTransformer) Transform(dag *graph.DAG) error {
-	root := dag.Root()
-	if root == nil {
-		return fmt.Errorf("root vertex not found: %v", dag)
+	rootVertex, err := findRootVertex(dag)
+	if err != nil {
+		return err
 	}
-	rootVertex, _ := root.(*lifecycleVertex)
 	origCluster, _ := rootVertex.oriObj.(*appsv1alpha1.Cluster)
 	cluster, _ := rootVertex.obj.(*appsv1alpha1.Cluster)
 	if !origCluster.DeletionTimestamp.IsZero() {
+		rootVertex.action = actionPtr(DELETE)
 		return nil
 	}
 
+	rootVertex.action = actionPtr(STATUS)
 	// handle cluster.status when spec is updating
 	if origCluster.Status.ObservedGeneration != origCluster.Generation {
 		c.ctx.Log.Info("update cluster status")
@@ -67,6 +68,18 @@ func (c *clusterStatusTransformer) Transform(dag *graph.DAG) error {
 		if err := c.setProvisioningStartedCondition(cluster); err != nil {
 			return err
 		}
+
+		// update cluster.status
+		// apply resources succeed, record the condition and event
+		applyResourcesCondition := newApplyResourcesCondition()
+		cluster.SetStatusCondition(applyResourcesCondition)
+		// if cluster status is ConditionsError, do it before updated the observedGeneration.
+		updateClusterPhaseWhenConditionsError(cluster)
+		// update observed generation
+		cluster.Status.ObservedGeneration = cluster.Generation
+		cluster.Status.ClusterDefGeneration = c.cc.cd.Generation
+		// TODO: emit event
+		//r.Recorder.Event(cluster, corev1.EventTypeNormal, applyResourcesCondition.Reason, applyResourcesCondition.Message)
 		return nil
 	}
 

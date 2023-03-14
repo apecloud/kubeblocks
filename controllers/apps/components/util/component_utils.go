@@ -19,6 +19,7 @@ package util
 import (
 	"context"
 	"fmt"
+	client2 "github.com/apecloud/kubeblocks/internal/controller/client"
 	"time"
 
 	"golang.org/x/exp/slices"
@@ -111,14 +112,14 @@ func GetComponentPhase(isFailed, isAbnormal bool) appsv1alpha1.Phase {
 }
 
 // GetObjectListByComponentName gets k8s workload list with component
-func GetObjectListByComponentName(ctx context.Context, cli client.Client, cluster *appsv1alpha1.Cluster, objectList client.ObjectList, componentName string) error {
+func GetObjectListByComponentName(ctx context.Context, cli client2.ReadonlyClient, cluster *appsv1alpha1.Cluster, objectList client.ObjectList, componentName string) error {
 	matchLabels := GetComponentMatchLabels(cluster.Name, componentName)
 	inNamespace := client.InNamespace(cluster.Namespace)
 	return cli.List(ctx, objectList, matchLabels, inNamespace)
 }
 
 // GetComponentDefByCluster gets component from ClusterDefinition with compDefName
-func GetComponentDefByCluster(ctx context.Context, cli client.Client, cluster *appsv1alpha1.Cluster, compDefName string) (*appsv1alpha1.ClusterComponentDefinition, error) {
+func GetComponentDefByCluster(ctx context.Context, cli client2.ReadonlyClient, cluster *appsv1alpha1.Cluster, compDefName string) (*appsv1alpha1.ClusterComponentDefinition, error) {
 	clusterDef := &appsv1alpha1.ClusterDefinition{}
 	if err := cli.Get(ctx, client.ObjectKey{Name: cluster.Spec.ClusterDefRef}, clusterDef); err != nil {
 		return nil, err

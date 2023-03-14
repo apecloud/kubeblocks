@@ -19,6 +19,7 @@ package plan
 import (
 	"context"
 	"fmt"
+	client2 "github.com/apecloud/kubeblocks/internal/controller/client"
 	"math"
 	"strings"
 
@@ -306,7 +307,7 @@ func buildCfg(task *intctrltypes.ReconcileTask,
 	obj client.Object,
 	podSpec *corev1.PodSpec,
 	ctx context.Context,
-	cli client.Client) ([]client.Object, error) {
+	cli client2.ReadonlyClient) ([]client.Object, error) {
 	// Need to merge configTemplateRef of ClusterVersion.Components[*].ConfigTemplateRefs and
 	// ClusterDefinition.Components[*].ConfigTemplateRefs
 	tpls := task.Component.ConfigTemplates
@@ -381,7 +382,7 @@ func generateConfigMapFromTpl(tplBuilder *configTemplateBuilder,
 	tplCfg appsv1alpha1.ConfigTemplate,
 	task *intctrltypes.ReconcileTask,
 	ctx context.Context,
-	cli client.Client) (*corev1.ConfigMap, error) {
+	cli client2.ReadonlyClient) (*corev1.ConfigMap, error) {
 	// Render config template by TplEngine
 	// The template namespace must be the same as the ClusterDefinition namespace
 	configs, err := renderConfigMap(tplBuilder, tplCfg, ctx, cli)
@@ -403,7 +404,7 @@ func renderConfigMap(
 	tplBuilder *configTemplateBuilder,
 	tplCfg appsv1alpha1.ConfigTemplate,
 	ctx context.Context,
-	cli client.Client) (map[string]string, error) {
+	cli client2.ReadonlyClient) (map[string]string, error) {
 	cmObj := &corev1.ConfigMap{}
 	//  Require template configmap exist
 	if err := cli.Get(ctx, client.ObjectKey{
@@ -430,7 +431,7 @@ func validateConfigMap(
 	renderedCfg map[string]string,
 	tplCfg appsv1alpha1.ConfigTemplate,
 	ctx context.Context,
-	cli client.Client) error {
+	cli client2.ReadonlyClient) error {
 	cfgTemplate := &appsv1alpha1.ConfigConstraint{}
 	if len(tplCfg.ConfigConstraintRef) > 0 {
 		if err := cli.Get(ctx, client.ObjectKey{
@@ -474,7 +475,7 @@ func updateStatefulLabelsWithTemplate(sts *appsv1.StatefulSet, allLabels map[str
 
 // updateConfigurationManagerWithComponent build the configmgr sidecar container and update it
 // into PodSpec if configuration reload option is on
-func updateConfigurationManagerWithComponent(podSpec *corev1.PodSpec, cfgTemplates []appsv1alpha1.ConfigTemplate, ctx context.Context, cli client.Client, params builder.BuilderParams) error {
+func updateConfigurationManagerWithComponent(podSpec *corev1.PodSpec, cfgTemplates []appsv1alpha1.ConfigTemplate, ctx context.Context, cli client2.ReadonlyClient, params builder.BuilderParams) error {
 	var (
 		err error
 
@@ -557,7 +558,7 @@ func getUsingVolumesByCfgTemplates(podSpec *corev1.PodSpec, cfgTemplates []appsv
 	return volumeDirs
 }
 
-func buildConfigManagerParams(cli client.Client, ctx context.Context, cfgTemplates []appsv1alpha1.ConfigTemplate, volumeDirs []corev1.VolumeMount, params builder.BuilderParams) (*cfgcm.ConfigManagerParams, error) {
+func buildConfigManagerParams(cli client2.ReadonlyClient, ctx context.Context, cfgTemplates []appsv1alpha1.ConfigTemplate, volumeDirs []corev1.VolumeMount, params builder.BuilderParams) (*cfgcm.ConfigManagerParams, error) {
 	configManagerParams := &cfgcm.ConfigManagerParams{
 		ManagerName:   constant.ConfigSidecarName,
 		CharacterType: params.Component.CharacterType,

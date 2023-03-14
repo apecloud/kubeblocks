@@ -18,24 +18,30 @@ package lifecycle
 
 import (
 	"fmt"
+	types2 "github.com/apecloud/kubeblocks/internal/controller/client"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
-	types2 "github.com/apecloud/kubeblocks/internal/controller/types"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 type stsPVCTransformer struct {
-	cc  compoundCluster
 	cli types2.ReadonlyClient
 	ctx intctrlutil.RequestCtx
 }
 
 func (s *stsPVCTransformer) Transform(dag *graph.DAG) error {
-	if !s.cc.cluster.DeletionTimestamp.IsZero() {
+	rootVertex, err := findRootVertex(dag)
+	if err != nil {
+		return err
+	}
+	origCluster, _ := rootVertex.oriObj.(*appsv1alpha1.Cluster)
+
+	if !origCluster.DeletionTimestamp.IsZero() {
 		return nil
 	}
 
@@ -86,10 +92,7 @@ func (s *stsPVCTransformer) Transform(dag *graph.DAG) error {
 		return nil
 	}
 
-	vertices, err := findAll[*appsv1.StatefulSet](dag)
-	if err != nil {
-		return err
-	}
+	vertices := findAll[*appsv1.StatefulSet](dag)
 	for _, vertex := range vertices {
 		v, _ := vertex.(*lifecycleVertex)
 		if v.obj != nil && v.oriObj != nil && v.action != nil && *v.action == UPDATE {

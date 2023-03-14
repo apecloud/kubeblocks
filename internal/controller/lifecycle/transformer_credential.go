@@ -28,15 +28,8 @@ type credentialTransformer struct{}
 
 func (c *credentialTransformer) Transform(dag *graph.DAG) error {
 	var secretVertices, noneRootVertices []graph.Vertex
-	var err error
-	secretVertices, err = findAll[*corev1.Secret](dag)
-	if err != nil {
-		return err
-	}
-	noneRootVertices, err = findAllNot[*appsv1alpha1.Cluster](dag)
-	if err != nil {
-		return err
-	}
+	secretVertices = findAll[*corev1.Secret](dag)
+	noneRootVertices = findAllNot[*appsv1alpha1.Cluster](dag)
 	for _, secretVertex := range secretVertices {
 		secret, _ := secretVertex.(*lifecycleVertex)
 		secret.immutable = true

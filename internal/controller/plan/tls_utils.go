@@ -18,6 +18,7 @@ package plan
 
 import (
 	"bytes"
+	types2 "github.com/apecloud/kubeblocks/internal/controller/client"
 	"strings"
 	"text/template"
 
@@ -32,7 +33,6 @@ import (
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
-	types2 "github.com/apecloud/kubeblocks/internal/controller/types"
 	"github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 

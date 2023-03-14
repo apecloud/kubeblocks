@@ -19,6 +19,7 @@ package lifecycle
 import (
 	"context"
 	"fmt"
+	types2 "github.com/apecloud/kubeblocks/internal/controller/client"
 	"strings"
 	"time"
 
@@ -38,24 +39,24 @@ import (
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
-	types2 "github.com/apecloud/kubeblocks/internal/controller/types"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 type stsHorizontalScalingTransformer struct {
-	cc  compoundCluster
+	cr  clusterRefResources
 	cli types2.ReadonlyClient
 	ctx intctrlutil.RequestCtx
 }
 
 func (s *stsHorizontalScalingTransformer) Transform(dag *graph.DAG) error {
-	root := dag.Root()
-	if root == nil {
-		return fmt.Errorf("root vertex not found: %v", dag)
+	rootVertex, err := findRootVertex(dag)
+	if err != nil {
+		return err
 	}
-	rootVertex, _ := root.(*lifecycleVertex)
+	origCluster, _ := rootVertex.oriObj.(*appsv1alpha1.Cluster)
+	cluster, _ := rootVertex.obj.(*appsv1alpha1.Cluster)
 
-	if !s.cc.cluster.DeletionTimestamp.IsZero() {
+	if !origCluster.DeletionTimestamp.IsZero() {
 		return nil
 	}
 
@@ -77,13 +78,13 @@ func (s *stsHorizontalScalingTransformer) Transform(dag *graph.DAG) error {
 		// find component of current statefulset
 		componentName := stsObj.Labels[constant.KBAppComponentLabelKey]
 		components := mergeComponentsList(s.ctx,
-			*s.cc.cluster,
-			s.cc.cd,
-			s.cc.cd.Spec.ComponentDefs,
-			s.cc.cluster.Spec.ComponentSpecs)
+			*cluster,
+			s.cr.cd,
+			s.cr.cd.Spec.ComponentDefs,
+			cluster.Spec.ComponentSpecs)
 		comp := getComponent(components, componentName)
 		if comp == nil {
-			s.ctx.Recorder.Eventf(s.cc.cluster,
+			s.ctx.Recorder.Eventf(cluster,
 				corev1.EventTypeWarning,
 				"HorizontalScaleFailed",
 				"component %s not found",
@@ -162,7 +163,7 @@ func (s *stsHorizontalScalingTransformer) Transform(dag *graph.DAG) error {
 				return nil
 			}
 			// if all pvc bounded, clean backup resources
-			return deleteSnapshot(s.cli, s.ctx, snapshotKey, s.cc.cluster, comp, dag, root)
+			return deleteSnapshot(s.cli, s.ctx, snapshotKey, cluster, comp, dag, rootVertex)
 		}
 
 		scaleOut := func() error {
@@ -212,7 +213,7 @@ func (s *stsHorizontalScalingTransformer) Transform(dag *graph.DAG) error {
 						Name:      fmt.Sprintf("%s-%s-%d", vct.Name, stsObj.Name, i),
 					}
 					// create cronjob to delete pvc after 30 minutes
-					if err := checkedCreateDeletePVCCronJob(s.cli, s.ctx, pvcKey, stsObj, s.cc.cluster, dag, root); err != nil {
+					if err := checkedCreateDeletePVCCronJob(s.cli, s.ctx, pvcKey, stsObj, cluster, dag, rootVertex); err != nil {
 						return err
 					}
 				}
@@ -235,7 +236,7 @@ func (s *stsHorizontalScalingTransformer) Transform(dag *graph.DAG) error {
 		}
 
 		if *stsObj.Spec.Replicas != *stsProto.Spec.Replicas {
-			s.ctx.Recorder.Eventf(s.cc.cluster,
+			s.ctx.Recorder.Eventf(cluster,
 				corev1.EventTypeNormal,
 				"HorizontalScale",
 				"Start horizontal scale component %s from %d to %d",
@@ -247,10 +248,7 @@ func (s *stsHorizontalScalingTransformer) Transform(dag *graph.DAG) error {
 		return nil
 	}
 
-	vertices, err := findAll[*appsv1.StatefulSet](dag)
-	if err != nil {
-		return err
-	}
+	vertices := findAll[*appsv1.StatefulSet](dag)
 	for _, vertex := range vertices {
 		v, _ := vertex.(*lifecycleVertex)
 		if v.obj == nil || v.oriObj == nil {

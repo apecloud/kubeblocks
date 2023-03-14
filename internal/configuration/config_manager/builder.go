@@ -18,6 +18,7 @@ package configmanager
 
 import (
 	"context"
+	client2 "github.com/apecloud/kubeblocks/internal/controller/client"
 	"path/filepath"
 	"strings"
 
@@ -28,7 +29,7 @@ import (
 	cfgutil "github.com/apecloud/kubeblocks/internal/configuration"
 )
 
-func BuildConfigManagerContainerArgs(reloadOptions *appsv1alpha1.ReloadOptions, volumeDirs []corev1.VolumeMount, cli client.Client, ctx context.Context, manager *ConfigManagerParams) error {
+func BuildConfigManagerContainerArgs(reloadOptions *appsv1alpha1.ReloadOptions, volumeDirs []corev1.VolumeMount, cli client2.ReadonlyClient, ctx context.Context, manager *ConfigManagerParams) error {
 	switch {
 	case reloadOptions.UnixSignalTrigger != nil:
 		manager.Args = buildSignalArgs(*reloadOptions.UnixSignalTrigger, volumeDirs)
@@ -41,7 +42,7 @@ func BuildConfigManagerContainerArgs(reloadOptions *appsv1alpha1.ReloadOptions, 
 	return cfgutil.MakeError("not support reload.")
 }
 
-func buildTPLScriptArgs(options *appsv1alpha1.TPLScriptTrigger, volumeDirs []corev1.VolumeMount, cli client.Client, ctx context.Context, manager *ConfigManagerParams) error {
+func buildTPLScriptArgs(options *appsv1alpha1.TPLScriptTrigger, volumeDirs []corev1.VolumeMount, cli client2.ReadonlyClient, ctx context.Context, manager *ConfigManagerParams) error {
 	const (
 		scriptName       = "reload.tpl"
 		tplConfigName    = "reload.yaml"

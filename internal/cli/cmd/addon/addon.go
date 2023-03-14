@@ -54,6 +54,7 @@ type addonEnableFlags struct {
 	ReplicaCountSets []string
 	StorageClassSets []string
 	TolerationsSet   []string
+	SetValues        []string
 }
 
 func (r *addonEnableFlags) useDefault() bool {
@@ -164,7 +165,11 @@ func newEnableCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 
         # Enabled "prometheus" addon with tolerations 
     	kbcli addon enable prometheus --tolerations '[[{"key":"taintkey","operator":"Equal","effect":"NoSchedule","value":"true"}]]' \
-			--tolerations 'alertmanager:[[{"key":"taintkey","operator":"Equal","effect":"NoSchedule","value":"true"}]]'`),
+			--tolerations 'alertmanager:[[{"key":"taintkey","operator":"Equal","effect":"NoSchedule","value":"true"}]]'
+
+		# Enabled "prometheus" addon with helm like custom settings
+		kbcli addon enable prometheus --set prometheus.alertmanager.image.tag=v0.24.0
+`),
 		Run: func(cmd *cobra.Command, args []string) {
 			util.CheckErr(o.init(args))
 			util.CheckErr(o.fetchAddonObj())
@@ -184,6 +189,8 @@ func newEnableCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 		"Sets addon storage class name (--storage-class [extraName:]<storage class name>) (can specify multiple if has extra items))")
 	cmd.Flags().StringArrayVar(&o.addonEnableFlags.TolerationsSet, "tolerations", []string{},
 		"Sets addon pod tolerations (--tolerations [extraName:]<toleration JSON list items>) (can specify multiple if has extra items))")
+	cmd.Flags().StringArrayVar(&o.addonEnableFlags.SetValues, "set", []string{},
+		"set values on the command line (can specify multiple or separate values with commas: key1=val1,key2=val2), it's only being processed if addon's type is helm.")
 
 	o.Options.AddFlags(cmd)
 	return cmd
@@ -562,6 +569,14 @@ func (o *addonCmdOpts) buildEnablePatch(flags []*pflag.Flag, spec, install map[s
 			reqLim := i.([2]resource.Quantity)
 			item.Resources.Requests[corev1.ResourceMemory] = reqLim[0]
 			item.Resources.Limits[corev1.ResourceMemory] = reqLim[1]
+		}); err != nil {
+			return err
+		}
+	}
+
+	for _, v := range f.SetValues {
+		if err := twoTuplesProcessor(v, "set", nil, func(item *extensionsv1alpha1.AddonInstallSpecItem, i interface{}) {
+			o.addon.Spec.Helm.InstallValues.SetValues = append(o.addon.Spec.Helm.InstallValues.SetValues, i.(string))
 		}); err != nil {
 			return err
 		}

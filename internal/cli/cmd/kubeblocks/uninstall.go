@@ -145,6 +145,7 @@ func (o *uninstallOptions) preCheck() error {
 		printer.Warning(o.Out, "failed to locate helm release meta, will clean up all KubeBlocks resources.\n")
 	} else if o.Namespace != kbNamespace {
 		o.Namespace = kbNamespace
+		o.HelmCfg.SetNamespace(o.Namespace)
 		fmt.Fprintf(o.Out, "will uninstall KubeBlocks in namespace: '%s'\n", kbNamespace)
 	}
 	return nil
@@ -173,7 +174,6 @@ func (o *uninstallOptions) uninstall() error {
 	chart := helm.InstallOpts{
 		Name:      types.KubeBlocksChartName,
 		Namespace: o.Namespace,
-		Wait:      true,
 	}
 	printSpinner(newSpinner("Uninstall helm release "+types.KubeBlocksChartName+" "+v[util.KubeBlocksApp]),
 		chart.Uninstall(o.HelmCfg))

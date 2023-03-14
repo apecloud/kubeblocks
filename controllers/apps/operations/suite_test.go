@@ -170,7 +170,7 @@ func initOperationsResources(clusterDefinitionName,
 func initConsensusPods(opsRes *OpsResource, clusterName string) []corev1.Pod {
 	// mock the pods of consensusSet component
 	testapps.MockConsensusComponentPods(testCtx, nil, clusterName, consensusComp)
-	podList, err := util.GetComponentPodList(opsRes.Ctx, opsRes.Client, opsRes.Cluster, consensusComp)
+	podList, err := util.GetComponentPodList(opsRes.Ctx, opsRes.Client, *opsRes.Cluster, consensusComp)
 	Expect(err).Should(Succeed())
 	// the opsRequest will use startTime to check some condition.
 	// if there is no sleep for 1 second, unstable error may occur.

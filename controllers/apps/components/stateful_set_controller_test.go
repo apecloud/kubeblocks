@@ -169,9 +169,9 @@ var _ = Describe("StatefulSet Controller", func() {
 			By("mock component of cluster is stopping")
 			Expect(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(cluster), func(tmpCluster *appsv1alpha1.Cluster) {
 				tmpCluster.Status.Phase = appsv1alpha1.StoppingPhase
-				tmpCluster.Status.Components[consensusCompName] = appsv1alpha1.ClusterComponentStatus{
+				tmpCluster.Status.SetComponentStatus(consensusCompName, appsv1alpha1.ClusterComponentStatus{
 					Phase: appsv1alpha1.StoppingPhase,
-				}
+				})
 			})()).Should(Succeed())
 
 			By("mock stop operation and processed successfully")

@@ -3,9 +3,9 @@ kind: ClusterVersion
 metadata:
   name: postgresql-14.7.0-latest
 spec:
-  clusterDefinitionRef: apecloud-postgresql
+  clusterDefinitionRef: postgresql
   componentVersions:
-    - componentDefRef: pg-replicaset
+    - componentDefRef: pg-replication
       versionsContext:
         containers:
           - name: postgresql

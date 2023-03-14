@@ -24,7 +24,7 @@ import (
 	ctrlerihandler "github.com/authzed/controller-idioms/handler"
 	"github.com/spf13/viper"
 	batchv1 "k8s.io/api/batch/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	corev1 "k8s.io/api/core/v1"
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/record"
@@ -34,6 +34,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -45,13 +46,6 @@ type AddonReconciler struct {
 	RestConfig *rest.Config
 }
 
-const (
-	// settings keys
-	maxConcurrentReconcilesKey = "MAXCONCURRENTRECONCILES_ADDON"
-	addonJobImagePullPolicyKey = "ADDON_JOB_IMAGE_PULL_POLICY"
-	addonSANameKey             = "KUBEBLOCKS_ADDON_SA_NAME"
-)
-
 func init() {
 	viper.SetDefault(maxConcurrentReconcilesKey, runtime.NumCPU()*2)
 }
@@ -61,6 +55,7 @@ func init() {
 // +kubebuilder:rbac:groups=extensions.kubeblocks.io,resources=addons/finalizers,verbs=update
 
 // +kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;watch;create;update;patch;delete;deletecollection
+// +kubebuilder:rbac:groups=core,resources=pods,verbs=delete;deletecollection
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -138,35 +133,51 @@ func (r *AddonReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 func (r *AddonReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&extensionsv1alpha1.Addon{}).
+		// TODO: replace with controller-idioms's adopt lib
+		// Watches(&source.Kind{Type: &batchv1.Job{}},
+		// 	&handler.EnqueueRequestForObject{},
+		// 	builder.WithPredicates(&jobCompletitionPredicate{reconciler: r, Log: log.FromContext(context.TODO())})).
 		WithOptions(controller.Options{
 			MaxConcurrentReconciles: viper.GetInt(maxConcurrentReconcilesKey),
 		}).
-		Owns(&batchv1.Job{}). // TODO: cannot owns a namespaced object
 		Complete(r)
 }
 
-func (r *AddonReconciler) deleteExternalResources(reqCtx intctrlutil.RequestCtx, addon *extensionsv1alpha1.Addon) (*ctrl.Result, error) {
+// type jobCompletitionPredicate struct {
+// 	predicate.Funcs
+// 	reconciler *AddonReconciler
+// 	Log        logr.Logger
+// }
 
+func (r *AddonReconciler) cleanupJobPods(reqCtx intctrlutil.RequestCtx) error {
+	if err := r.DeleteAllOf(reqCtx.Ctx, &corev1.Pod{},
+		client.InNamespace(viper.GetString(constant.CfgKeyCtrlrMgrNS)),
+		client.MatchingLabels{
+			constant.AddonNameLabelKey:    reqCtx.Req.Name,
+			constant.AppManagedByLabelKey: constant.AppName,
+		},
+	); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (r *AddonReconciler) deleteExternalResources(reqCtx intctrlutil.RequestCtx, addon *extensionsv1alpha1.Addon) (*ctrl.Result, error) {
 	if addon.Annotations != nil && addon.Annotations[NoDeleteJobs] == "true" {
 		return nil, nil
 	}
-
 	deleteJobIfExist := func(jobName string) error {
 		key := client.ObjectKey{
-			Namespace: viper.GetString("CM_NAMESPACE"),
+			Namespace: viper.GetString(constant.CfgKeyCtrlrMgrNS),
 			Name:      jobName,
 		}
 		job := &batchv1.Job{}
 		if err := r.Get(reqCtx.Ctx, key, job); err != nil {
-			if apierrors.IsNotFound(err) {
-				return nil
-			}
-			return err
+			return client.IgnoreNotFound(err)
 		}
 		if !job.DeletionTimestamp.IsZero() {
 			return nil
 		}
-
 		if err := r.Delete(reqCtx.Ctx, job); err != nil {
 			return client.IgnoreNotFound(err)
 		}
@@ -176,6 +187,9 @@ func (r *AddonReconciler) deleteExternalResources(reqCtx intctrlutil.RequestCtx,
 		if err := deleteJobIfExist(j); err != nil {
 			return nil, err
 		}
+	}
+	if err := r.cleanupJobPods(reqCtx); err != nil {
+		return nil, err
 	}
 	return nil, nil
 }

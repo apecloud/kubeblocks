@@ -39,4 +39,8 @@ const (
 	EnablingAddon                   = "EnablingAddon"
 	InstallationFailed              = "InstallationFailed"
 	UninstallationFailed            = "UninstallationFailed"
+
+	// config keys used in viper
+	maxConcurrentReconcilesKey = "MAXCONCURRENTRECONCILES_ADDON"
+	addonSANameKey             = "KUBEBLOCKS_ADDON_SA_NAME"
 )

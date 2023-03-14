@@ -323,8 +323,11 @@ func (r *BackupReconciler) patchBackupLabelsAndAnnotations(
 	for k, v := range targetPod.Labels {
 		backup.Labels[k] = v
 	}
-	backup.Annotations[dataProtectionBackupTargetPodKey] = targetPod.Name
 	backup.Labels[dataProtectionLabelBackupTypeKey] = string(backup.Spec.BackupType)
+	if backup.Annotations == nil {
+		backup.Annotations = make(map[string]string)
+	}
+	backup.Annotations[dataProtectionBackupTargetPodKey] = targetPod.Name
 	if reflect.DeepEqual(oldBackup.ObjectMeta, backup.ObjectMeta) {
 		return false, nil
 	}
@@ -713,9 +716,6 @@ func (r *BackupReconciler) deleteExternalResources(reqCtx intctrlutil.RequestCtx
 
 func (r *BackupReconciler) getTargetPod(reqCtx intctrlutil.RequestCtx,
 	backup *dataprotectionv1alpha1.Backup, labels map[string]string) (*corev1.Pod, error) {
-	if backup.Annotations == nil {
-		backup.Annotations = map[string]string{}
-	}
 	if targetPodName, ok := backup.Annotations[dataProtectionBackupTargetPodKey]; ok {
 		targetPod := &corev1.Pod{}
 		targetPodKey := types.NamespacedName{
@@ -737,7 +737,7 @@ func (r *BackupReconciler) getTargetPod(reqCtx intctrlutil.RequestCtx,
 	if len(targetPod.Items) == 0 {
 		return nil, errors.New("can not find any pod to backup by labelsSelector")
 	}
-	sort.Sort(byPodName(targetPod.Items))
+	sort.Sort(intctrlutil.ByPodName(targetPod.Items))
 	return &targetPod.Items[0], nil
 }
 

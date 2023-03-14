@@ -1561,7 +1561,6 @@ csi-s3:
   secret:
     accessKey: ""
     secretKey: ""
-    endpoint: ""
   ## csi-s3 storageClass setting
   ## @param csi-s3.storageClass.create -- Specifies whether the storage class should be created.
   ## @param csi-s3.storageClass.singleBucket -- Use a single bucket for all dynamically provisioned persistent volumes.

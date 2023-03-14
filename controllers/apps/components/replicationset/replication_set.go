@@ -187,12 +187,13 @@ func (r *ReplicationSet) HandleUpdate(ctx context.Context, obj client.Object) er
 		if err != nil {
 			return err
 		}
-		podList = append(podList, pod)
 		// if there is no role label on the Pod, it needs to be updated with statefulSet's role label.
-		if _, ok := pod.Labels[constant.RoleLabelKey]; !ok {
+		if v, ok := pod.Labels[constant.RoleLabelKey]; !ok || v == "" {
 			if err := updateObjRoleLabel(ctx, r.Cli, *pod, sts.Labels[constant.RoleLabelKey]); err != nil {
 				return err
 			}
+		} else {
+			podList = append(podList, pod)
 		}
 		if err := util.DeleteStsPods(ctx, r.Cli, &sts); err != nil {
 			return err

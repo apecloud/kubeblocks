@@ -30,7 +30,7 @@ cronjob: {
 		name:      options.name
 		namespace: options.mgrNamespace
 		annotations:
-		  "kubeblocks.io/backup-namespace": options.namespace
+			"kubeblocks.io/backup-namespace": options.namespace
 		labels:
 			"app.kubernetes.io/managed-by": "kubeblocks"
 	}

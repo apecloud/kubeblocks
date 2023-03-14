@@ -1,7 +1,0 @@
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: redis-primary-config-7.0.5
-data:
-  redis.conf: |-
-    {{- .Values.primary.configTemplate.configuration | nindent 4 }}

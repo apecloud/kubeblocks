@@ -60,14 +60,11 @@ spec:
             port: 6379
       configSpec:
         configTemplateRefs:
-          - name: redis-primary-config
-            configTplRef: redis-primary-config-7.0.5
+          - name: redis-replication-config
+            configTplRef: redis7-config-template
+            configConstraintRef: redis7-config-constraints
             namespace: {{ .Release.Namespace }}
-            volumeName: primary
-          - name: redis-secondary-config
-            configTplRef: redis-secondary-config-7.0.5
-            namespace: {{ .Release.Namespace }}
-            volumeName: secondary
+            volumeName: redis-config
           - name: redis-scripts
             configTplRef: redis-scripts
             namespace: {{ .Release.Namespace }}
@@ -87,21 +84,6 @@ spec:
         - name: data
           type: data
       podSpec:
-        initContainers:
-          - name: redis-init-container
-            image: redis:7.0.5
-            command: ["/scripts/init.sh"]
-            volumeMounts:
-              - name: data
-                mountPath: /data
-              - name: conf
-                mountPath: /etc/conf
-              - name: primary
-                mountPath: /etc/conf/primary
-              - name: secondary
-                mountPath: /etc/conf/secondary
-              - name: scripts
-                mountPath: /scripts
         containers:
           - name: redis
             image: redis:7.0.5
@@ -111,12 +93,8 @@ spec:
             volumeMounts:
               - name: data
                 mountPath: /data
-              - name: conf
+              - name: redis-config
                 mountPath: /etc/conf
-              - name: primary
-                mountPath: /etc/conf/primary
-              - name: secondary
-                mountPath: /etc/conf/secondary
               - name: scripts
                 mountPath: /scripts
             args: [ "/etc/conf/redis.conf" ]
@@ -143,9 +121,6 @@ spec:
               httpGet:
                 path: /
                 port: 9121
-        volumes:
-          - name: conf
-            emptyDir: { }
       systemAccounts:
         cmdExecutorConfig:
           image: docker.io/redis:7.0.5

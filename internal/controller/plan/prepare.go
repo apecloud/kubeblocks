@@ -114,7 +114,6 @@ func PrepareComponentResources(reqCtx intctrlutil.RequestCtx, cli client.Client,
 		if configs != nil {
 			task.AppendResource(configs...)
 		}
-		// end render config
 
 		// tls certs secret volume and volumeMount
 		if err := updateTLSVolumeAndVolumeMount(podSpec, task.Cluster.Name, *task.Component); err != nil {
@@ -309,6 +308,7 @@ func buildCfg(task *intctrltypes.ReconcileTask,
 	}
 
 	clusterName := task.Cluster.Name
+	componentName := task.Component.Name
 	namespaceName := task.Cluster.Namespace
 
 	// New ConfigTemplateBuilder
@@ -324,7 +324,7 @@ func buildCfg(task *intctrltypes.ReconcileTask,
 	scheme, _ := appsv1alpha1.SchemeBuilder.Build()
 	cfgLables := make(map[string]string, len(tpls))
 	for _, tpl := range tpls {
-		cmName := cfgcore.GetInstanceCMName(obj, &tpl)
+		cmName := cfgcore.GetComponentCfgName(clusterName, componentName, tpl.VolumeName)
 		volumes[cmName] = tpl
 		// Configuration.kubeblocks.io/cfg-tpl-${ctpl-name}: ${cm-instance-name}
 		cfgLables[cfgcore.GenerateTPLUniqLabelKeyWithConfig(tpl.Name)] = cmName

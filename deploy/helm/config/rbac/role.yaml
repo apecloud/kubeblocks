@@ -354,6 +354,7 @@ rules:
   - pods
   verbs:
   - delete
+  - deletecollection
   - get
   - list
   - patch

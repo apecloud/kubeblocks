@@ -1,6 +1,8 @@
-## kbcli playground init
+---
+title: kbcli playground init
+---
 
-Bootstrap a kubernetes cluster and install KubeBlocks for playground
+Bootstrap a kubernetes cluster and install KubeBlocks for playground.
 
 ```
 kbcli playground init [flags]
@@ -54,5 +56,7 @@ kbcli playground init [flags]
 
 ### SEE ALSO
 
-* [kbcli playground](kbcli_playground.md)	 - Bootstrap a playground KubeBlocks in local host or cloud
+* [kbcli playground](kbcli_playground.md)	 - Bootstrap a playground KubeBlocks in local host or cloud.
+
+#### Go Back to [CLI Overview](cli.md) Homepage.
 

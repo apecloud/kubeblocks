@@ -20,12 +20,16 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 	"golang.org/x/exp/slices"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/klog/v2"
+	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
 
 	cp "github.com/apecloud/kubeblocks/internal/cli/cloudprovider"
@@ -86,7 +90,7 @@ type destroyOptions struct {
 func NewPlaygroundCmd(streams genericclioptions.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "playground [init | destroy | guide]",
-		Short: "Bootstrap a playground KubeBlocks in local host or cloud",
+		Short: "Bootstrap a playground KubeBlocks in local host or cloud.",
 	}
 
 	// add subcommands
@@ -106,7 +110,7 @@ func newInitCmd(streams genericclioptions.IOStreams) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:     "init",
-		Short:   "Bootstrap a kubernetes cluster and install KubeBlocks for playground",
+		Short:   "Bootstrap a kubernetes cluster and install KubeBlocks for playground.",
 		Example: initExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			util.CheckErr(o.validate())
@@ -135,7 +139,7 @@ func newDestroyCmd(streams genericclioptions.IOStreams) *cobra.Command {
 	}
 	cmd := &cobra.Command{
 		Use:     "destroy",
-		Short:   "Destroy the playground kubernetes cluster",
+		Short:   "Destroy the playground kubernetes cluster.",
 		Example: destroyExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			util.CheckErr(o.validate())
@@ -222,12 +226,16 @@ func (o *initOptions) installKBAndCluster(k8sClusterName string) error {
 		return errors.Wrap(err, "failed to install KubeBlocks")
 	}
 
-	// Install database cluster
+	// get cluster version
+	spinner := util.Spinner(o.Out, "%-40s", "Wait cluster version ready")
+	defer spinner(false)
 	if err = o.getClusterVersion(); err != nil {
 		return err
 	}
+	spinner(true)
 
-	spinner := util.Spinner(o.Out, "Create cluster %s (ClusterDefinition: %s, ClusterVersion: %s)",
+	// Install database cluster
+	spinner = util.Spinner(o.Out, "Create cluster %s (ClusterDefinition: %s, ClusterVersion: %s)",
 		kbClusterName, o.clusterDef, o.clusterVersion)
 	defer spinner(false)
 	if err = o.createCluster(); err != nil {
@@ -249,13 +257,10 @@ func (o *initOptions) cloud() error {
 
 	// confirm to run
 	fmt.Fprintf(o.Out, "\nDo you want to perform this action?\n  Only 'yes' will be accepted to approve.\n\n")
-	entered, err := prompt.NewPrompt("", "Enter a value:", o.In).GetInput()
-	if err != nil {
-		return err
-	}
+	entered, _ := prompt.NewPrompt("Enter a value:", nil, o.In).Run()
 	if entered != yesStr {
 		fmt.Fprintf(o.Out, "\nPlayground init cancelled.\n")
-		return nil
+		return cmdutil.ErrExit
 	}
 
 	fmt.Fprintln(o.Out)
@@ -266,7 +271,7 @@ func (o *initOptions) cloud() error {
 	}
 
 	// clone apecloud/cloud-provider repo to local path
-	fmt.Fprintf(o.Out, "Clone cloud provider terraform script to %s...", cpPath)
+	fmt.Fprintf(o.Out, "Clone cloud provider terraform script to %s...\n", cpPath)
 	if err = util.CloneGitRepo(cp.GitRepoURL, cpPath); err != nil {
 		return err
 	}
@@ -284,13 +289,10 @@ func (o *initOptions) cloud() error {
 	// if cluster exists, continue or not, if not, user should destroy the old cluster first
 	if clusterName != "" {
 		fmt.Fprintf(o.Out, "Found an existed cluster %s, do you want to continue to initialize this cluster?\n  Only 'yes' will be accepted to confirm.\n\n", clusterName)
-		entered, err = prompt.NewPrompt("", "Enter a value:", o.In).GetInput()
-		if err != nil {
-			return err
-		}
+		entered, _ = prompt.NewPrompt("Enter a value:", nil, o.In).Run()
 		if entered != yesStr {
 			fmt.Fprintf(o.Out, "\nPlayground init cancelled, please destroy the old cluster first.\n")
-			return nil
+			return cmdutil.ErrExit
 		}
 		fmt.Fprintf(o.Out, "Continue to initialize %s %s cluster %s... \n", o.cloudProvider, cp.K8sService(o.cloudProvider), clusterName)
 	} else {
@@ -372,13 +374,10 @@ func (o *destroyOptions) destroyCloud() error {
 	fmt.Fprintf(o.Out, "Do you really want to destroy the kubernetes cluster %s?\n  This is no undo. Only 'yes' will be accepted to confirm.\n\n", name)
 
 	// confirm to destroy
-	entered, err := prompt.NewPrompt("", "Enter a value:", o.In).GetInput()
-	if err != nil {
-		return err
-	}
+	entered, _ := prompt.NewPrompt("Enter a value:", nil, o.In).Run()
 	if entered != yesStr {
 		fmt.Fprintf(o.Out, "\nPlayground destroy cancelled.\n")
-		return nil
+		return cmdutil.ErrExit
 	}
 
 	fmt.Fprintf(o.Out, "Destroy %s %s cluster %s...\n", o.cloudProvider, cp.K8sService(o.cloudProvider), name)
@@ -453,7 +452,16 @@ func (o *initOptions) getClusterVersion() error {
 	if err != nil {
 		return err
 	}
-	o.clusterVersion, err = cluster.GetLatestVersion(dynamic, o.clusterDef)
+
+	// wait for cluster version ready
+	for i := 0; i < viper.GetInt("PLAYGROUND_WAIT_TIMES"); i++ {
+		time.Sleep(5 * time.Second)
+		if o.clusterVersion, err = cluster.GetLatestVersion(dynamic, o.clusterDef); err != nil {
+			klog.V(1).Infof("wait for cluster version ready: %s", err.Error())
+			continue
+		}
+		return nil
+	}
 	return err
 }
 

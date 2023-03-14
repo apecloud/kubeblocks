@@ -1,7 +1,7 @@
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: ClusterDefinition
 metadata:
-  name: postgresql-cluster
+  name: postgresql
   labels:
     {{- include "postgresql.labels" . | nindent 4 }}
 spec:
@@ -12,7 +12,7 @@ spec:
     host: "$(SVC_FQDN)"
     port: "$(SVC_PORT_tcp-postgresql)"
   componentDefs:
-    - name: pg-replicaset
+    - name: pg-replication
       workloadType: Replication
       characterType: postgresql
       probes:
@@ -242,10 +242,12 @@ spec:
       systemAccounts:
         cmdExecutorConfig:
           image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ default .Values.image.tag .Chart.AppVersion }}
-          command: ["psql"]
+          command:
+          - sh
+          - -c
           args:
-          - -h$(KB_ACCOUNT_ENDPOINT)
-          - -c $(KB_ACCOUNT_STATEMENT)
+          - psql -h$(KB_ACCOUNT_ENDPOINT)
+          - -c "$(KB_ACCOUNT_STATEMENT)"
           env:
           - name: PGUSER
             valueFrom:

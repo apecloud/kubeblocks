@@ -22,7 +22,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	intctrlutil "github.com/apecloud/kubeblocks/internal/constant"
+	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
 type MockPersistentVolumeClaimFactory struct {
@@ -36,10 +36,11 @@ func NewPersistentVolumeClaimFactory(namespace, name, clusterName, componentName
 		&corev1.PersistentVolumeClaim{
 			ObjectMeta: metav1.ObjectMeta{
 				Labels: map[string]string{
-					intctrlutil.AppInstanceLabelKey:             clusterName,
-					intctrlutil.KBAppComponentLabelKey:          componentName,
-					intctrlutil.AppManagedByLabelKey:            intctrlutil.AppName,
-					intctrlutil.VolumeClaimTemplateNameLabelKey: vctName,
+					constant.AppInstanceLabelKey:             clusterName,
+					constant.KBAppComponentLabelKey:          componentName,
+					constant.AppManagedByLabelKey:            constant.AppName,
+					constant.VolumeClaimTemplateNameLabelKey: vctName,
+					constant.VolumeTypeLabelKey:              vctName,
 				},
 				Annotations: map[string]string{
 					kube.KubeAnnBindCompleted: "yes",

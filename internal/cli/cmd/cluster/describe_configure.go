@@ -27,6 +27,7 @@ import (
 	"strings"
 
 	"github.com/StudioSol/set"
+	"github.com/spf13/cast"
 	"github.com/spf13/cobra"
 	corev1 "k8s.io/api/core/v1"
 	apiext "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
@@ -42,7 +43,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/constant"
+	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
 type reconfigureOptions struct {
@@ -81,6 +82,7 @@ type parameterTemplate struct {
 	enum        []string
 	description string
 	scope       string
+	dynamic     bool
 }
 
 var (
@@ -245,7 +247,7 @@ func (r *reconfigureOptions) printAllExplainConfigure() error {
 	for _, templateName := range r.templateNames {
 		fmt.Println("template meta:")
 		printer.PrintLineWithTabSeparator(
-			printer.NewPair("  TemplateName", templateName),
+			printer.NewPair("  ConfigSpec", templateName),
 			printer.NewPair("ComponentName", r.componentName),
 			printer.NewPair("ClusterName", r.clusterName),
 		)
@@ -336,7 +338,7 @@ func (r *reconfigureOptions) printConfigureHistory() error {
 	// filter reconfigure
 	// kubernetes not support fieldSelector with CRD: https://github.com/kubernetes/kubernetes/issues/51046
 	listOptions := metav1.ListOptions{
-		LabelSelector: strings.Join([]string{intctrlutil.AppInstanceLabelKey, r.clusterName}, "="),
+		LabelSelector: strings.Join([]string{constant.AppInstanceLabelKey, r.clusterName}, "="),
 	}
 
 	opsList, err := r.dynamic.Resource(types.OpsGVR()).Namespace(r.namespace).List(context.TODO(), listOptions)
@@ -346,7 +348,7 @@ func (r *reconfigureOptions) printConfigureHistory() error {
 	// sort the unstructured objects with the creationTimestamp in positive order
 	sort.Sort(unstructuredList(opsList.Items))
 	tbl := printer.NewTablePrinter(r.Out)
-	tbl.SetHeader("NAME", "CLUSTER", "COMPONENT", "TEMPLATE", "FILES", "STATUS", "POLICY", "PROGRESS", "CREATED-TIME", "VALID-UPDATED")
+	tbl.SetHeader("OPS-NAME", "CLUSTER", "COMPONENT", "CONFIG-SPEC-NAME", "FILE", "STATUS", "POLICY", "PROGRESS", "CREATED-TIME", "VALID-UPDATED")
 	for _, obj := range opsList.Items {
 		ops := &appsv1alpha1.OpsRequest{}
 		if err = runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, ops); err != nil {
@@ -408,7 +410,8 @@ func (r *reconfigureOptions) printConfigConstraint(schema *apiext.JSONSchemaProp
 		if err != nil {
 			return err
 		}
-		pt.scope = getScopeType(pt, staticParameters, dynamicParameters)
+		pt.scope = "Global"
+		pt.dynamic = isDynamicType(pt, staticParameters, dynamicParameters)
 
 		if r.hasSpecificParam() {
 			printSingleParameterTemplate(pt)
@@ -588,7 +591,7 @@ func (o *opsRequestDiffOptions) maybeCompareOps(base *appsv1alpha1.OpsRequest, d
 		if len(labels) == 0 {
 			return ""
 		}
-		return labels[intctrlutil.AppInstanceLabelKey]
+		return labels[constant.AppInstanceLabelKey]
 	}
 	getComponentName := func(ops appsv1alpha1.OpsRequestSpec) string {
 		return ops.Reconfigure.ComponentName
@@ -653,13 +656,20 @@ func (o *opsRequestDiffOptions) diffConfig(tplName string) ([]cfgcore.Visualized
 	return cfgcore.GenerateVisualizedParamsList(patch, formatCfg, nil), nil
 }
 
+func getAllowedValues(pt *parameterTemplate, maxFieldLength int) string {
+	if len(pt.enum) != 0 {
+		return pt.enumFormatter(maxFieldLength)
+	}
+	return pt.rangeFormatter()
+}
+
 func printSingleParameterTemplate(pt *parameterTemplate) {
 	printer.PrintTitle("Configure Constraint")
 	// print column "PARAMETER NAME", "RANGE", "ENUM", "SCOPE", "TYPE", "DESCRIPTION"
-	printer.PrintPairStringToLine("ParameterName", pt.name)
-	printer.PrintPairStringToLine("Range", pt.rangeFormatter())
-	printer.PrintPairStringToLine("Enum", pt.enumFormatter(-1))
+	printer.PrintPairStringToLine("Parameter Name", pt.name)
+	printer.PrintPairStringToLine("Allowed Values", getAllowedValues(pt, -1))
 	printer.PrintPairStringToLine("Scope", pt.scope)
+	printer.PrintPairStringToLine("Dynamic", cast.ToString(pt.dynamic))
 	printer.PrintPairStringToLine("Type", pt.valueType)
 	printer.PrintPairStringToLine("Description", pt.description)
 }
@@ -678,10 +688,10 @@ func printConfigParameterTemplate(paramTemplates []*parameterTemplate, out io.Wr
 
 	tbl := printer.NewTablePrinter(out)
 	tbl.SetStyle(printer.TerminalStyle)
-	printer.PrintTitle("Configure Constraint")
-	tbl.SetHeader("PARAMETER NAME", "RANGE", "ENUM", "SCOPE", "TYPE", "DESCRIPTION")
+	printer.PrintTitle("Parameter Explain")
+	tbl.SetHeader("PARAMETER NAME", "ALLOWED VALUES", "SCOPE", "DYNAMIC", "TYPE", "DESCRIPTION")
 	for _, pt := range paramTemplates {
-		tbl.AddRow(pt.name, pt.rangeFormatter(), pt.enumFormatter(maxFieldLength), pt.scope, pt.valueType, pt.description)
+		tbl.AddRow(pt.name, getAllowedValues(pt, maxFieldLength), pt.scope, cast.ToString(pt.dynamic), pt.valueType, pt.description)
 	}
 	tbl.Print()
 }
@@ -770,23 +780,18 @@ func findTplByName(tpls []appsv1alpha1.ConfigTemplate, tplName string) *appsv1al
 	return nil
 }
 
-func getScopeType(pt *parameterTemplate, staticParameters *set.LinkedHashSetString, dynamicParameters *set.LinkedHashSetString) string {
-	const (
-		staticScope  = "static"
-		dynamicScope = "dynamic"
-	)
-
+func isDynamicType(pt *parameterTemplate, staticParameters *set.LinkedHashSetString, dynamicParameters *set.LinkedHashSetString) bool {
 	switch {
 	case staticParameters.InArray(pt.name):
-		return staticScope
+		return false
 	case dynamicParameters.InArray(pt.name):
-		return dynamicScope
+		return true
 	case dynamicParameters.Length() == 0 && staticParameters.Length() != 0:
-		return dynamicScope
+		return true
 	case dynamicParameters.Length() != 0 && staticParameters.Length() == 0:
-		return staticScope
+		return false
 	default:
-		return staticScope
+		return false
 	}
 }
 
@@ -799,7 +804,7 @@ func NewDescribeReconfigureCmd(f cmdutil.Factory, streams genericclioptions.IOSt
 	}
 	cmd := &cobra.Command{
 		Use:               "describe-configure",
-		Short:             "Show details of a specific reconfiguring",
+		Short:             "Show details of a specific reconfiguring.",
 		Example:           describeReconfigureExample,
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.ClusterGVR()),
 		Run: func(cmd *cobra.Command, args []string) {
@@ -824,7 +829,7 @@ func NewExplainReconfigureCmd(f cmdutil.Factory, streams genericclioptions.IOStr
 	}
 	cmd := &cobra.Command{
 		Use:               "explain-configure",
-		Short:             "List the constraint for supported configuration params",
+		Short:             "List the constraint for supported configuration params.",
 		Example:           explainReconfigureExample,
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.ClusterGVR()),
 		Run: func(cmd *cobra.Command, args []string) {
@@ -845,7 +850,7 @@ func NewDiffConfigureCmd(f cmdutil.Factory, streams genericclioptions.IOStreams)
 	o := &opsRequestDiffOptions{baseOptions: newDescribeOpsOptions(f, streams)}
 	cmd := &cobra.Command{
 		Use:               "diff-configure",
-		Short:             "List the constraint for supported configuration params",
+		Short:             "Show the difference in parameters between the two submitted OpsRequest.",
 		Example:           diffConfigureExample,
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.ClusterGVR()),
 		Run: func(cmd *cobra.Command, args []string) {

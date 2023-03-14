@@ -17,6 +17,7 @@ limitations under the License.
 package apps
 
 import (
+	"fmt"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -24,6 +25,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -31,6 +33,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/generics"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
+	testk8s "github.com/apecloud/kubeblocks/internal/testutil/k8s"
 )
 
 var _ = Describe("OpsRequest Controller", func() {
@@ -38,8 +41,9 @@ var _ = Describe("OpsRequest Controller", func() {
 	const clusterVersionName = "test-clusterversion"
 	const clusterNamePrefix = "test-cluster"
 
-	const mysqlCompType = "replicasets"
+	const mysqlCompType = "consensus"
 	const mysqlCompName = "mysql"
+	const defaultMinReadySeconds = 10
 
 	cleanEnv := func() {
 		// must wait until resources deleted and no longer exist before the testcases start,
@@ -81,18 +85,20 @@ var _ = Describe("OpsRequest Controller", func() {
 				if len(fetched.Status.Components) == 0 {
 					fetched.Status.Components = map[string]appsv1alpha1.ClusterComponentStatus{}
 					for _, v := range fetched.Spec.ComponentSpecs {
-						fetched.Status.Components[v.Name] = appsv1alpha1.ClusterComponentStatus{Phase: appsv1alpha1.RunningPhase}
+						fetched.Status.SetComponentStatus(v.Name, appsv1alpha1.ClusterComponentStatus{
+							Phase: appsv1alpha1.RunningPhase,
+						})
 					}
 					return
 				}
 				for componentKey, componentStatus := range fetched.Status.Components {
 					componentStatus.Phase = appsv1alpha1.RunningPhase
-					fetched.Status.Components[componentKey] = componentStatus
+					fetched.Status.SetComponentStatus(componentKey, componentStatus)
 				}
 			})).Should(Succeed())
 	}
 
-	testVerticalScaleCPUAndMemory := func() {
+	testVerticalScaleCPUAndMemory := func(workloadType testapps.ComponentTplType) {
 		const opsName = "mysql-verticalscaling"
 
 		By("Create a cluster obj")
@@ -140,6 +146,17 @@ var _ = Describe("OpsRequest Controller", func() {
 
 		By("check VerticalScalingOpsRequest running")
 		Eventually(testapps.GetOpsRequestPhase(&testCtx, opsKey)).Should(Equal(appsv1alpha1.RunningPhase))
+
+		By("mock new pod created with specified resources")
+		podName := fmt.Sprintf("%s-%s-0", clusterObj.Name, mysqlCompName)
+		pod := testapps.MockConsensusComponentStsPod(testCtx, nil, clusterObj.Name, mysqlCompName,
+			podName, "leader", "ReadWrite")
+		if workloadType == testapps.StatefulMySQLComponent {
+			lastTransTime := metav1.NewTime(time.Now().Add(-1 * (defaultMinReadySeconds + 1) * time.Second))
+			Expect(testapps.ChangeObjStatus(&testCtx, pod, func() {
+				testk8s.MockPodAvailable(pod, lastTransTime)
+			})).Should(Succeed())
+		}
 
 		By("check Cluster and changed component phase is VerticalScaling")
 		Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1alpha1.Cluster) {
@@ -191,7 +208,7 @@ var _ = Describe("OpsRequest Controller", func() {
 		})
 
 		It("issue an VerticalScalingOpsRequest should change Cluster's resource requirements successfully", func() {
-			testVerticalScaleCPUAndMemory()
+			testVerticalScaleCPUAndMemory(testapps.StatefulMySQLComponent)
 		})
 	})
 
@@ -209,7 +226,7 @@ var _ = Describe("OpsRequest Controller", func() {
 		})
 
 		It("issue an VerticalScalingOpsRequest should change Cluster's resource requirements successfully", func() {
-			testVerticalScaleCPUAndMemory()
+			testVerticalScaleCPUAndMemory(testapps.ConsensusMySQLComponent)
 		})
 	})
 })

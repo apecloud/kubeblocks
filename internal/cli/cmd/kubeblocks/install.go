@@ -27,9 +27,12 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+	"github.com/spf13/viper"
 	"helm.sh/helm/v3/pkg/cli/values"
 	"helm.sh/helm/v3/pkg/repo"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
@@ -37,6 +40,7 @@ import (
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
 
+	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/cluster"
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
@@ -46,7 +50,7 @@ import (
 )
 
 const (
-	kMonitorParam      = "prometheus.enabled=%[1]t,grafana.enabled=%[1]t,dashboards.enabled=%[1]t,alertmanager-webhook-adaptor.enabled=%[1]t"
+	kMonitorParam      = "prometheus.enabled=%[1]t,grafana.enabled=%[1]t,dashboards.enabled=%[1]t"
 	requiredK8sVersion = "1.22.0"
 )
 
@@ -102,7 +106,7 @@ func newInstallCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 
 	cmd := &cobra.Command{
 		Use:     "install",
-		Short:   "Install KubeBlocks",
+		Short:   "Install KubeBlocks.",
 		Args:    cobra.NoArgs,
 		Example: installExample,
 		Run: func(cmd *cobra.Command, args []string) {
@@ -204,6 +208,14 @@ func (o *InstallOptions) Install() error {
 	}
 	spinner(true)
 
+	// wait all auto-install addons to be enabled
+	spinner = util.Spinner(o.Out, "%-40s", "Wait auto-install addons to be ready")
+	defer spinner(false)
+	if err = o.waitAddons(); err != nil {
+		return err
+	}
+	spinner(true)
+
 	// create VolumeSnapshotClass
 	if err = o.createVolumeSnapshotClass(); err != nil {
 		return err
@@ -213,6 +225,48 @@ func (o *InstallOptions) Install() error {
 		fmt.Fprintf(o.Out, "\nKubeBlocks %s installed to namespace %s SUCCESSFULLY!\n",
 			o.Version, o.HelmCfg.Namespace())
 		o.printNotes()
+	}
+	return nil
+}
+
+func (o *InstallOptions) waitAddons() error {
+	checkAddons := func() (bool, error) {
+		allEnabled := true
+		objects, err := o.Dynamic.Resource(types.AddonGVR()).List(context.TODO(), metav1.ListOptions{})
+		if err != nil && !apierrors.IsNotFound(err) {
+			return false, err
+		}
+		if objects == nil {
+			klog.V(1).InfoS("No Addon resource found")
+			return true, nil
+		}
+
+		for _, obj := range objects.Items {
+			addon := extensionsv1alpha1.Addon{}
+			if err = runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, &addon); err != nil {
+				return false, err
+			}
+
+			if addon.Spec.Installable != nil && addon.Spec.Installable.AutoInstall {
+				if addon.Status.Phase != extensionsv1alpha1.AddonEnabled {
+					klog.V(1).Infof("Addon %s is not enabled yet", addon.Name)
+					allEnabled = false
+				}
+			}
+		}
+		return allEnabled, nil
+	}
+
+	// wait for all auto-install addons to be enabled
+	for i := 0; i < viper.GetInt("KB_WAIT_ADDON_READY_TIMES"); i++ {
+		allEnabled, err := checkAddons()
+		if err != nil {
+			return err
+		}
+		if allEnabled {
+			return nil
+		}
+		time.Sleep(5 * time.Second)
 	}
 	return nil
 }
@@ -415,7 +469,10 @@ func (o *InstallOptions) checkRemainedResource() error {
 	if ns == "" {
 		ns = o.Namespace
 	}
-	objs, err := getKBObjects(o.Dynamic, ns)
+
+	// Now, we only check whether there are resources left by KubeBlocks, ignore
+	// the addon resources.
+	objs, err := getKBObjects(o.Dynamic, ns, nil)
 	if err != nil {
 		fmt.Fprintf(o.ErrOut, "Check whether there are resources left by KubeBlocks before: %s\n", err.Error())
 	}

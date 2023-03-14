@@ -1,18 +1,24 @@
 apiVersion: extensions.kubeblocks.io/v1alpha1
 kind: Addon
 metadata:
-  name: prometheus
+  name: {{ include "addon.prometheus.name" . }}
   labels:
     {{- include "kubeblocks.labels" . | nindent 4 }}
+    "kubeblocks.io/provider": community
+  {{- if .Values.keepAddons }}
+  annotations:
+    helm.sh/resource-policy: keep
+  {{- end }}
 spec:
   description: Prometheus is a monitoring system and time series database.
   type: Helm
 
   helm:
-    chartLocationURL: https://github.com/prometheus-community/helm-charts/releases/download/prometheus-15.16.1/prometheus-15.16.1.tgz
+    # chartLocationURL: https://github.com/prometheus-community/helm-charts/releases/download/prometheus-15.16.1/prometheus-15.16.1.tgz
+    chartLocationURL: https://jihulab.com/api/v4/projects/85949/packages/helm/stable/charts/prometheus-15.16.1.tgz
     installValues:
       configMapRefs:
-        - name: prometheus-chart-kubeblocks-values
+        - name: {{ include "addon.prometheus.name" . }}-chart-kubeblocks-values
           key: values-kubeblocks-override.yaml
 
     valuesMapping:
@@ -55,13 +61,16 @@ spec:
     - replicas: 1
       resources:
         requests:
-          storage: 1Gi
+          storage: 10Gi
+          memory: 512Mi
+        limits:
+          memory: 4Gi
       extras:
         - name: alertmanager
           replicas: 1
           resources:
             requests:
-              storage: 1Gi
+              storage: 4Gi
 
     - selectors:
         - key: KubeGitVersion
@@ -73,6 +82,9 @@ spec:
       resources:
         requests:
           storage: 20Gi
+          memory: 512Mi
+        limits:
+          memory: 4Gi
       extras:
         - name: alertmanager
           replicas: 1

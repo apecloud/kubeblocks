@@ -77,7 +77,7 @@ func NewDescribeOpsCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *
 	o := newDescribeOpsOptions(f, streams)
 	cmd := &cobra.Command{
 		Use:               "describe-ops",
-		Short:             "Show details of a specific OpsRequest",
+		Short:             "Show details of a specific OpsRequest.",
 		Example:           describeOpsExample,
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.ClusterGVR()),
 		Run: func(cmd *cobra.Command, args []string) {
@@ -209,7 +209,6 @@ func (o *describeOpsOptions) printOpsCommand(opsRequest *appsv1alpha1.OpsRequest
 		commands = o.getVolumeExpansionCommand(opsRequest.Spec)
 	case appsv1alpha1.ReconfiguringType:
 		commands = o.getReconfiguringCommand(opsRequest.Spec)
-
 	}
 	if len(commands) == 0 {
 		printer.PrintLine("\nCommand: " + printer.NoneString)
@@ -217,7 +216,8 @@ func (o *describeOpsOptions) printOpsCommand(opsRequest *appsv1alpha1.OpsRequest
 	}
 	printer.PrintTitle("Command")
 	for i := range commands {
-		printer.PrintLine("  " + commands[i])
+		command := fmt.Sprintf("%s --namespace=%s", commands[i], opsRequest.Namespace)
+		printer.PrintLine("  " + command)
 	}
 }
 

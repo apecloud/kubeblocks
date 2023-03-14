@@ -1,6 +1,8 @@
-## kbcli clusterversion
+---
+title: kbcli clusterversion
+---
 
-ClusterVersion command
+ClusterVersion command.
 
 ### Options
 
@@ -34,6 +36,8 @@ ClusterVersion command
 
 ### SEE ALSO
 
-* [kbcli](kbcli.md)	 - KubeBlocks CLI
-* [kbcli clusterversion list](kbcli_clusterversion_list.md)	 - List ClusterVersions
+
+* [kbcli clusterversion list](kbcli_clusterversion_list.md)	 - List ClusterVersions.
+
+#### Go Back to [CLI Overview](cli.md) Homepage.
 

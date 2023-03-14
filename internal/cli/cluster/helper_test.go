@@ -26,7 +26,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/constant"
+	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
 var _ = Describe("helper", func() {
@@ -45,7 +45,7 @@ var _ = Describe("helper", func() {
 					Namespace:       "test",
 					ResourceVersion: "10",
 					Labels: map[string]string{
-						intctrlutil.AppNameLabelKey: name,
+						constant.AppNameLabelKey: name,
 					},
 				},
 			}
@@ -135,7 +135,7 @@ var _ = Describe("helper", func() {
 		genVersion := func(name string, t time.Time) appsv1alpha1.ClusterVersion {
 			v := appsv1alpha1.ClusterVersion{}
 			v.Name = name
-			v.SetLabels(map[string]string{intctrlutil.ClusterDefLabelKey: clusterDefName})
+			v.SetLabels(map[string]string{constant.ClusterDefLabelKey: clusterDefName})
 			v.SetCreationTimestamp(metav1.NewTime(t))
 			return v
 		}

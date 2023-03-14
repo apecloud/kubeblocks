@@ -46,7 +46,7 @@ var _ = Describe("List", func() {
 		o := NewListOptions(f, streams, schema.GroupVersionResource{Group: "", Resource: "pods", Version: types.K8sCoreAPIVersion})
 		cmd := &cobra.Command{
 			Use:   "ls-test",
-			Short: "List test",
+			Short: "List test.",
 			Run: func(cmd *cobra.Command, args []string) {
 				_, err := o.Run()
 				util.CheckErr(err)

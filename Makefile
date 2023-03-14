@@ -36,7 +36,7 @@ SHELL = /usr/bin/env bash -o pipefail
 .SHELLFLAGS = -ec
 
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
-ENVTEST_K8S_VERSION = 1.24.1
+ENVTEST_K8S_VERSION = 1.25.0
 
 ENABLE_WEBHOOKS ?= false
 
@@ -289,7 +289,7 @@ clean-kbcli: ## Clean bin/kbcli*.
 	rm -f bin/kbcli*
 
 .PHONY: doc
-kbcli-doc: build-checks ## generate CLI command reference manual.
+kbcli-doc: ## generate CLI command reference manual.
 	$(GO) run ./hack/docgen/cli/main.go ./docs/user_docs/cli
 
 ##@ Load Balancer
@@ -472,7 +472,7 @@ helm-package: bump-chart-ver ## Do helm package.
 ## it will pull down the latest charts that satisfy the dependencies, and clean up old dependencies.
 ## this is a hack fix: decompress the tgz from the depend-charts directory to the charts directory
 ## before dependency update.
-	cd $(CHART_PATH)/charts && ls ../depend-charts/alertmanager-webhook-adaptor-*.tgz | xargs -n1 tar xf
+	# cd $(CHART_PATH)/charts && ls ../depend-charts/*.tgz | xargs -n1 tar xf
 	#$(HELM) dependency update --skip-refresh $(CHART_PATH)
 	$(HELM) package deploy/loadbalancer
 	mv loadbalancer-*.tgz deploy/helm/depend-charts/
@@ -847,7 +847,7 @@ smoke-testdata-manifests: ## Update E2E test dataset
 	$(HELM) template mycluster deploy/apecloud-mysql-cluster > test/e2e/testdata/smoketest/wesql/00_wesqlcluster.yaml
 	$(HELM) template mycluster deploy/postgresqlcluster > test/e2e/testdata/smoketest/postgresql/00_postgresqlcluster.yaml
 	$(HELM) template mycluster deploy/redis > test/e2e/testdata/smoketest/redis/00_rediscluster.yaml
-	$(HELM) template mycluster deploy/redis-rep-cluster >> test/e2e/testdata/smoketest/redis/00_rediscluster.yaml
+	$(HELM) template mycluster deploy/redis-cluster >> test/e2e/testdata/smoketest/redis/00_rediscluster.yaml
 
 ##@ Test E2E
 GINKGO=$(shell which ginkgo)

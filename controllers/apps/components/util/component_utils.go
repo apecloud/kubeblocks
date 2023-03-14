@@ -18,6 +18,7 @@ package util
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -34,6 +35,28 @@ import (
 const (
 	ComponentStatusDefaultPodName = "Unknown"
 )
+
+var (
+	ErrReqCtrlClient              = errors.New("required arg client.Client is nil")
+	ErrReqClusterObj              = errors.New("required arg *appsv1alpha1.Cluster is nil")
+	ErrReqClusterComponentDefObj  = errors.New("required arg *appsv1alpha1.ClusterComponentDefinition is nil")
+	ErrReqClusterComponentSpecObj = errors.New("required arg *appsv1alpha1.ClusterComponentSpec is nil")
+)
+
+func ComponentRuntimeReqArgsCheck(cli client.Client,
+	cluster *appsv1alpha1.Cluster,
+	component *appsv1alpha1.ClusterComponentSpec) error {
+	if cli == nil {
+		return ErrReqCtrlClient
+	}
+	if cluster == nil {
+		return ErrReqCtrlClient
+	}
+	if component == nil {
+		return ErrReqClusterComponentSpecObj
+	}
+	return nil
+}
 
 // GetClusterByObject gets cluster by related k8s workloads.
 func GetClusterByObject(ctx context.Context,
@@ -73,7 +96,7 @@ func GetComponentMatchLabels(clusterName, componentName string) client.ListOptio
 }
 
 // GetComponentPodList gets the pod list by cluster and componentName
-func GetComponentPodList(ctx context.Context, cli client.Client, cluster *appsv1alpha1.Cluster, componentName string) (*corev1.PodList, error) {
+func GetComponentPodList(ctx context.Context, cli client.Client, cluster appsv1alpha1.Cluster, componentName string) (*corev1.PodList, error) {
 	podList := &corev1.PodList{}
 	err := cli.List(ctx, podList, client.InNamespace(cluster.Namespace),
 		GetComponentMatchLabels(cluster.Name, componentName))
@@ -111,14 +134,14 @@ func GetComponentPhase(isFailed, isAbnormal bool) appsv1alpha1.Phase {
 }
 
 // GetObjectListByComponentName gets k8s workload list with component
-func GetObjectListByComponentName(ctx context.Context, cli client.Client, cluster *appsv1alpha1.Cluster, objectList client.ObjectList, componentName string) error {
+func GetObjectListByComponentName(ctx context.Context, cli client.Client, cluster appsv1alpha1.Cluster, objectList client.ObjectList, componentName string) error {
 	matchLabels := GetComponentMatchLabels(cluster.Name, componentName)
 	inNamespace := client.InNamespace(cluster.Namespace)
 	return cli.List(ctx, objectList, matchLabels, inNamespace)
 }
 
 // GetComponentDefByCluster gets component from ClusterDefinition with compDefName
-func GetComponentDefByCluster(ctx context.Context, cli client.Client, cluster *appsv1alpha1.Cluster, compDefName string) (*appsv1alpha1.ClusterComponentDefinition, error) {
+func GetComponentDefByCluster(ctx context.Context, cli client.Client, cluster appsv1alpha1.Cluster, compDefName string) (*appsv1alpha1.ClusterComponentDefinition, error) {
 	clusterDef := &appsv1alpha1.ClusterDefinition{}
 	if err := cli.Get(ctx, client.ObjectKey{Name: cluster.Spec.ClusterDefRef}, clusterDef); err != nil {
 		return nil, err
@@ -133,7 +156,7 @@ func GetComponentDefByCluster(ctx context.Context, cli client.Client, cluster *a
 }
 
 // GetClusterComponentSpecByName gets componentSpec from cluster with compSpecName.
-func GetClusterComponentSpecByName(cluster *appsv1alpha1.Cluster, compSpecName string) *appsv1alpha1.ClusterComponentSpec {
+func GetClusterComponentSpecByName(cluster appsv1alpha1.Cluster, compSpecName string) *appsv1alpha1.ClusterComponentSpec {
 	for _, compSpec := range cluster.Spec.ComponentSpecs {
 		if compSpec.Name == compSpecName {
 			return &compSpec
@@ -143,22 +166,21 @@ func GetClusterComponentSpecByName(cluster *appsv1alpha1.Cluster, compSpecName s
 }
 
 // InitClusterComponentStatusIfNeed Initialize the state of the corresponding component in cluster.status.components
-func InitClusterComponentStatusIfNeed(cluster *appsv1alpha1.Cluster,
+func InitClusterComponentStatusIfNeed(
+	cluster *appsv1alpha1.Cluster,
 	componentName string,
-	componentDef *appsv1alpha1.ClusterComponentDefinition) {
-	if componentDef == nil {
-		return
-	}
-	if cluster.Status.Components == nil {
-		cluster.Status.Components = make(map[string]appsv1alpha1.ClusterComponentStatus)
-	}
+	componentDef appsv1alpha1.ClusterComponentDefinition) {
 	if _, ok := cluster.Status.Components[componentName]; !ok {
-		cluster.Status.Components[componentName] = appsv1alpha1.ClusterComponentStatus{
+		cluster.Status.SetComponentStatus(componentName, appsv1alpha1.ClusterComponentStatus{
 			Phase: cluster.Status.Phase,
-		}
+		})
 	}
 	componentStatus := cluster.Status.Components[componentName]
-	if componentDef.WorkloadType == appsv1alpha1.Consensus && componentStatus.ConsensusSetStatus == nil {
+	switch componentDef.WorkloadType {
+	case appsv1alpha1.Consensus:
+		if componentStatus.ConsensusSetStatus != nil {
+			break
+		}
 		componentStatus.ConsensusSetStatus = &appsv1alpha1.ConsensusSetStatus{
 			Leader: appsv1alpha1.ConsensusMemberStatus{
 				Pod:        ComponentStatusDefaultPodName,
@@ -166,21 +188,23 @@ func InitClusterComponentStatusIfNeed(cluster *appsv1alpha1.Cluster,
 				Name:       "",
 			},
 		}
-	}
-	if componentDef.WorkloadType == appsv1alpha1.Replication && componentStatus.ReplicationSetStatus == nil {
+	case appsv1alpha1.Replication:
+		if componentStatus.ReplicationSetStatus != nil {
+			break
+		}
 		componentStatus.ReplicationSetStatus = &appsv1alpha1.ReplicationSetStatus{
 			Primary: appsv1alpha1.ReplicationMemberStatus{
 				Pod: ComponentStatusDefaultPodName,
 			},
 		}
 	}
-	cluster.Status.Components[componentName] = componentStatus
+	cluster.Status.SetComponentStatus(componentName, componentStatus)
 }
 
 // GetComponentDeployMinReadySeconds gets the deployment minReadySeconds of the component.
 func GetComponentDeployMinReadySeconds(ctx context.Context,
 	cli client.Client,
-	cluster *appsv1alpha1.Cluster,
+	cluster appsv1alpha1.Cluster,
 	componentName string) (minReadySeconds int32, err error) {
 	deployList := &appsv1.DeploymentList{}
 	if err = GetObjectListByComponentName(ctx, cli, cluster, deployList, componentName); err != nil {
@@ -196,7 +220,7 @@ func GetComponentDeployMinReadySeconds(ctx context.Context,
 // GetComponentStsMinReadySeconds gets the statefulSet minReadySeconds of the component.
 func GetComponentStsMinReadySeconds(ctx context.Context,
 	cli client.Client,
-	cluster *appsv1alpha1.Cluster,
+	cluster appsv1alpha1.Cluster,
 	componentName string) (minReadySeconds int32, err error) {
 	stsList := &appsv1.StatefulSetList{}
 	if err = GetObjectListByComponentName(ctx, cli, cluster, stsList, componentName); err != nil {
@@ -212,7 +236,7 @@ func GetComponentStsMinReadySeconds(ctx context.Context,
 // GetComponentWorkloadMinReadySeconds gets the workload minReadySeconds of the component.
 func GetComponentWorkloadMinReadySeconds(ctx context.Context,
 	cli client.Client,
-	cluster *appsv1alpha1.Cluster,
+	cluster appsv1alpha1.Cluster,
 	workloadType appsv1alpha1.WorkloadType,
 	componentName string) (minReadySeconds int32, err error) {
 	switch workloadType {
@@ -226,13 +250,17 @@ func GetComponentWorkloadMinReadySeconds(ctx context.Context,
 // GetComponentInfoByPod gets componentName and componentDefinition info by Pod.
 func GetComponentInfoByPod(ctx context.Context,
 	cli client.Client,
-	cluster *appsv1alpha1.Cluster,
+	cluster appsv1alpha1.Cluster,
 	pod *corev1.Pod) (componentName string, componentDef *appsv1alpha1.ClusterComponentDefinition, err error) {
 	if pod == nil || pod.Labels == nil {
+		// REVIEW/TODO: need avoid using dynamic error string, this is bad for
+		// error type checking (errors.Is)
 		return "", nil, fmt.Errorf("pod %s or pod's label is nil", pod.Name)
 	}
 	componentName, ok := pod.Labels[constant.KBAppComponentLabelKey]
 	if !ok {
+		// REVIEW/TODO: need avoid using dynamic error string, this is bad for
+		// error type checking (errors.Is)
 		return "", nil, fmt.Errorf("pod %s component name label %s is nil", pod.Name, constant.KBAppComponentLabelKey)
 	}
 	compDefName := cluster.GetComponentDefRefName(componentName)
@@ -246,7 +274,7 @@ func GetComponentInfoByPod(ctx context.Context,
 // GetCompRelatedObjectList gets the related pods and workloads of the component
 func GetCompRelatedObjectList(ctx context.Context,
 	cli client.Client,
-	cluster *appsv1alpha1.Cluster,
+	cluster appsv1alpha1.Cluster,
 	compName string,
 	relatedWorkloads client.ObjectList) (*corev1.PodList, error) {
 	podList, err := GetComponentPodList(ctx, cli, cluster, compName)
@@ -260,7 +288,8 @@ func GetCompRelatedObjectList(ctx context.Context,
 	return podList, nil
 }
 
-// AvailableReplicasAreConsistent checks if the available replicas of component and workload are consistent.
+// AvailableReplicasAreConsistent checks if expected replicas number of component is consistent with
+// the number of available workload replicas.
 func AvailableReplicasAreConsistent(componentReplicas, podCount, workloadAvailableReplicas int32) bool {
 	return workloadAvailableReplicas == componentReplicas && componentReplicas == podCount
 }
@@ -293,12 +322,29 @@ func GetComponentPhaseWhenPodsNotReady(podList *corev1.PodList,
 			existLatestRevisionFailedPod = true
 		}
 	}
+	return GetCompPhaseByConditions(existLatestRevisionFailedPod, true,
+		componentReplicas, int32(podCount), availableReplicas)
+}
+
+// GetCompPhaseByConditions gets the component phase according to the following conditions:
+// 1. if the failed pod is not controlled by the latest revision, ignore it.
+// 2. if the primary replicas are not available, the component is failed.
+// 3. finally if expected replicas number of component is inconsistent with
+// the number of available workload replicas, the component is abnormal.
+func GetCompPhaseByConditions(existLatestRevisionFailedPod bool,
+	primaryReplicasAvailable bool,
+	compReplicas,
+	podCount,
+	availableReplicas int32) appsv1alpha1.Phase {
 	// if the failed pod is not controlled by the latest revision, ignore it.
 	if !existLatestRevisionFailedPod {
 		return ""
 	}
-	// checks if the available replicas of component and workload are consistent.
-	if !AvailableReplicasAreConsistent(componentReplicas, int32(podCount), availableReplicas) {
+	if !primaryReplicasAvailable {
+		return appsv1alpha1.FailedPhase
+	}
+	// checks if expected replicas number of component is consistent with the number of available workload replicas.
+	if !AvailableReplicasAreConsistent(compReplicas, podCount, availableReplicas) {
 		return appsv1alpha1.AbnormalPhase
 	}
 	return ""

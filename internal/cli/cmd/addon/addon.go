@@ -64,11 +64,6 @@ func (r *addonEnableFlags) useDefault() bool {
 		len(r.TolerationsSet) == 0
 }
 
-// type addonDescribeCmdOpts struct {
-// 	Factory cmdutil.Factory
-// 	genericclioptions.IOStreams
-// }
-
 type addonCmdOpts struct {
 	genericclioptions.IOStreams
 
@@ -87,7 +82,7 @@ type addonCmdOpts struct {
 func NewAddonCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "addon",
-		Short: "Addon command",
+		Short: "Addon command.",
 	}
 	cmd.AddCommand(
 		newListCmd(f, streams),
@@ -102,7 +97,7 @@ func newListCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 	o := list.NewListOptions(f, streams, types.AddonGVR())
 	cmd := &cobra.Command{
 		Use:               "list ",
-		Short:             "List addons",
+		Short:             "List addons.",
 		Aliases:           []string{"ls"},
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, o.GVR),
 		Run: func(cmd *cobra.Command, args []string) {
@@ -122,7 +117,7 @@ func newDescribeCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cob
 	}
 	cmd := &cobra.Command{
 		Use:               "describe ADDON_NAME",
-		Short:             "Describe an addon specification",
+		Short:             "Describe an addon specification.",
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.AddonGVR()),
 		Run: func(cmd *cobra.Command, args []string) {
 			util.CheckErr(o.init(args))
@@ -153,7 +148,7 @@ func newEnableCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 
 	cmd := &cobra.Command{
 		Use:               "enable ADDON_NAME",
-		Short:             "Enable an addon",
+		Short:             "Enable an addon.",
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.AddonGVR()),
 		Example: templates.Examples(`
     	# Enabled "prometheus" addon
@@ -202,7 +197,7 @@ func newDisableCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 	}
 	cmd := &cobra.Command{
 		Use:               "disable ADDON_NAME",
-		Short:             "Disable an addon",
+		Short:             "Disable an addon.",
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.AddonGVR()),
 		Run: func(cmd *cobra.Command, args []string) {
 			util.CheckErr(o.init(args))
@@ -317,10 +312,17 @@ func addonDescribeHandler(o *addonCmdOpts, cmd *cobra.Command, args []string) er
 		}
 	}
 	printer.PrintPairStringToLine("Name", o.addon.Name, 0)
+	printer.PrintPairStringToLine("Description", o.addon.Spec.Description, 0)
 	printer.PrintPairStringToLine("Labels", strings.Join(labels, ","), 0)
 	printer.PrintPairStringToLine("Type", string(o.addon.Spec.Type), 0)
 	printer.PrintPairStringToLine("Extras", strings.Join(o.addon.GetExtraNames(), ","), 0)
 	printer.PrintPairStringToLine("Status", string(o.addon.Status.Phase), 0)
+	var autoInstall bool
+	if o.addon.Spec.Installable != nil {
+		autoInstall = o.addon.Spec.Installable.AutoInstall
+	}
+	printer.PrintPairStringToLine("Auto-install", strconv.FormatBool(autoInstall), 0)
+	printer.PrintPairStringToLine("Installable", strings.Join(o.addon.Spec.Installable.GetSelectorsStrings(), ","), 0)
 
 	switch o.addon.Status.Phase {
 	case extensionsv1alpha1.AddonEnabled:
@@ -373,7 +375,6 @@ func addonEnableDisableHandler(o *addonCmdOpts, cmd *cobra.Command, args []strin
 
 func (o *addonCmdOpts) buildEnablePatch(flags []*pflag.Flag, spec, install map[string]interface{}) (err error) {
 	var installSpec extensionsv1alpha1.AddonInstallSpec
-
 	// only using named return value in defer function
 	defer func() {
 		var b []byte
@@ -466,7 +467,7 @@ func (o *addonCmdOpts) buildEnablePatch(flags []*pflag.Flag, spec, install map[s
 			return nil, fmt.Errorf("wrong flag value --%s=%s", flag, s)
 		}
 		reqLim := [2]resource.Quantity{}
-		proccessTuple := func(i int) error {
+		processTuple := func(i int) error {
 			if t[i] == "" {
 				return nil
 			}
@@ -478,7 +479,7 @@ func (o *addonCmdOpts) buildEnablePatch(flags []*pflag.Flag, spec, install map[s
 			return nil
 		}
 		for i := range t {
-			if err := proccessTuple(i); err != nil {
+			if err := processTuple(i); err != nil {
 				return nil, fmt.Errorf("wrong flag value --%s=%s, with error %v", flag, s, err)
 			}
 		}
@@ -556,14 +557,18 @@ func (o *addonCmdOpts) buildEnablePatch(flags []*pflag.Flag, spec, install map[s
 func (o *addonCmdOpts) buildPatch(flags []*pflag.Flag) error {
 	var err error
 	spec := map[string]interface{}{}
+	status := map[string]interface{}{}
 	install := map[string]interface{}{}
 
 	if o.addonEnableFlags != nil {
+		if o.addon.Status.Phase == extensionsv1alpha1.AddonFailed {
+			status["phase"] = nil
+		}
 		if err = o.buildEnablePatch(flags, spec, install); err != nil {
 			return err
 		}
 	} else {
-		if !o.addon.Spec.InstallSpec.Enabled {
+		if !o.addon.Spec.InstallSpec.GetEnabled() {
 			fmt.Fprintf(o.Out, "%s/%s is already disabled\n", o.GVR.GroupResource().String(), o.Names[0])
 			return cmdutil.ErrExit
 		}
@@ -578,6 +583,16 @@ func (o *addonCmdOpts) buildPatch(flags []*pflag.Flag) error {
 		Object: map[string]interface{}{
 			"spec": spec,
 		},
+	}
+	if len(status) > 0 {
+		phase := ""
+		if p, ok := status["phase"]; ok && p != nil {
+			phase = p.(string)
+		}
+		fmt.Printf("patching addon 'status.phase=%s' to 'status.phase=%v' will result addon install spec (spec.install) not being updated\n",
+			o.addon.Status.Phase, phase)
+		obj.Object["status"] = status
+		o.Subresource = "status"
 	}
 	bytes, err := obj.MarshalJSON()
 	if err != nil {

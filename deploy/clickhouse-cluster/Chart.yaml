@@ -30,13 +30,6 @@ keywords:
 - database
 - sharding
 
-dependencies:
-- name: common
-  repository: https://charts.bitnami.com/bitnami
-  tags:
-  - bitnami-common
-  version: 2.x.x
-
 maintainers:
 - name: Nash Tsai
   url: https://github.com/apecloud/kubeblocks/deploy

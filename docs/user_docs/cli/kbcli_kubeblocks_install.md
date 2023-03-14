@@ -1,6 +1,8 @@
-## kbcli kubeblocks install
+---
+title: kbcli kubeblocks install
+---
 
-Install KubeBlocks
+Install KubeBlocks.
 
 ```
 kbcli kubeblocks install [flags]
@@ -62,5 +64,7 @@ kbcli kubeblocks install [flags]
 
 ### SEE ALSO
 
-* [kbcli kubeblocks](kbcli_kubeblocks.md)	 - KubeBlocks operation commands
+* [kbcli kubeblocks](kbcli_kubeblocks.md)	 - KubeBlocks operation commands.
+
+#### Go Back to [CLI Overview](cli.md) Homepage.
 

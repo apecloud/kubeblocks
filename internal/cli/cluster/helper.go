@@ -32,7 +32,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/constant"
+	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
 // GetSimpleInstanceInfos return simple instance info that only contains instance name and role, the default
@@ -104,7 +104,7 @@ func GetSimpleInstanceInfos(dynamic dynamic.Interface, name string, namespace st
 func GetClusterTypeByPod(pod *corev1.Pod) (string, error) {
 	var clusterType string
 
-	if name, ok := pod.Labels[intctrlutil.AppNameLabelKey]; ok {
+	if name, ok := pod.Labels[constant.AppNameLabelKey]; ok {
 		clusterType = strings.Split(name, "-")[0]
 	}
 
@@ -170,7 +170,7 @@ func GetComponentServices(svcList *corev1.ServiceList, c *appsv1alpha1.ClusterCo
 
 	var internalSvcs, externalSvcs []*corev1.Service
 	for i, svc := range svcList.Items {
-		if svc.GetLabels()[intctrlutil.KBAppComponentLabelKey] != c.Name {
+		if svc.GetLabels()[constant.KBAppComponentLabelKey] != c.Name {
 			continue
 		}
 
@@ -178,7 +178,7 @@ func GetComponentServices(svcList *corev1.ServiceList, c *appsv1alpha1.ClusterCo
 			internalIP   = svc.Spec.ClusterIP
 			externalAddr = GetExternalAddr(&svc)
 		)
-		if internalIP != "" && internalIP != "None" {
+		if svc.Spec.Type == corev1.ServiceTypeClusterIP && internalIP != "" && internalIP != "None" {
 			internalSvcs = append(internalSvcs, &svcList.Items[i])
 		}
 		if externalAddr != "" {
@@ -246,7 +246,7 @@ func GetVersionByClusterDef(dynamic dynamic.Interface, clusterDef string) (*apps
 	versionList := &appsv1alpha1.ClusterVersionList{}
 	objList, err := dynamic.Resource(types.ClusterVersionGVR()).Namespace("").
 		List(context.TODO(), metav1.ListOptions{
-			LabelSelector: fmt.Sprintf("%s=%s", intctrlutil.ClusterDefLabelKey, clusterDef),
+			LabelSelector: fmt.Sprintf("%s=%s", constant.ClusterDefLabelKey, clusterDef),
 		})
 	if err != nil {
 		return nil, err
@@ -297,7 +297,7 @@ func GetLatestVersion(dynamic dynamic.Interface, clusterDef string) (string, err
 	// find the latest version to use
 	version := findLatestVersion(versionList)
 	if version == nil {
-		return "", fmt.Errorf("failed to find latest cluster version referencing current cluster definition %s", clusterDef)
+		return "", fmt.Errorf("failed to find the latest cluster version referencing current cluster definition %s", clusterDef)
 	}
 	return version.Name, nil
 }

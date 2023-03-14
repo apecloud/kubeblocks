@@ -341,7 +341,8 @@ func (s *Switch) updateRoleLabel() error {
 	s.SwitchStatus.SwitchPhaseStatus = SwitchPhaseStatusExecuting
 
 	var stsList = &appsv1.StatefulSetList{}
-	if err := utils.GetObjectListByComponentName(s.SwitchResource.Ctx, s.SwitchResource.Cli, s.SwitchResource.Cluster, stsList, s.SwitchResource.CompSpec.Name); err != nil {
+	if err := utils.GetObjectListByComponentName(s.SwitchResource.Ctx, s.SwitchResource.Cli,
+		*s.SwitchResource.Cluster, stsList, s.SwitchResource.CompSpec.Name); err != nil {
 		return err
 	}
 
@@ -371,7 +372,8 @@ func (s *Switch) updateRoleLabel() error {
 // and the detection information will be filled in the detection phase.
 func (s *Switch) initSwitchInstance(oldPrimaryIndex, newPrimaryIndex *int32) error {
 	var stsList = &appsv1.StatefulSetList{}
-	if err := utils.GetObjectListByComponentName(s.SwitchResource.Ctx, s.SwitchResource.Cli, s.SwitchResource.Cluster, stsList, s.SwitchResource.CompSpec.Name); err != nil {
+	if err := utils.GetObjectListByComponentName(s.SwitchResource.Ctx, s.SwitchResource.Cli,
+		*s.SwitchResource.Cluster, stsList, s.SwitchResource.CompSpec.Name); err != nil {
 		return err
 	}
 	if s.SwitchInstance == nil {
@@ -382,7 +384,7 @@ func (s *Switch) initSwitchInstance(oldPrimaryIndex, newPrimaryIndex *int32) err
 		}
 	}
 	for _, sts := range stsList.Items {
-		pod, err := GetAndCheckReplicationPodByStatefulSet(s.SwitchResource.Ctx, s.SwitchResource.Cli, &sts)
+		pod, err := getAndCheckReplicationPodByStatefulSet(s.SwitchResource.Ctx, s.SwitchResource.Cli, &sts)
 		if err != nil {
 			return err
 		}

@@ -42,7 +42,9 @@ import (
 
 type OperationsOptions struct {
 	create.BaseOptions
-	HasComponentNamesFlag  bool     `json:"-"`
+	HasComponentNamesFlag bool `json:"-"`
+	// RequireConfirm if it is true, the second verification will be performed before creating ops.
+	RequireConfirm         bool     `json:"-"`
 	ComponentNames         []string `json:"componentNames,omitempty"`
 	OpsRequestName         string   `json:"opsRequestName"`
 	TTLSecondsAfterSucceed int      `json:"ttlSecondsAfterSucceed"`
@@ -88,6 +90,7 @@ func newBaseOperationsOptions(streams genericclioptions.IOStreams, opsType appsv
 		// nil cannot be set to a map struct in CueLang, so init the map of KeyValues.
 		KeyValues:             map[string]string{},
 		HasComponentNamesFlag: hasComponentNamesFlag,
+		RequireConfirm:        true,
 	}
 }
 
@@ -103,7 +106,7 @@ var (
 
 // buildCommonFlags build common flags for operations command
 func (o *OperationsOptions) buildCommonFlags(cmd *cobra.Command) {
-	cmd.Flags().StringVar(&o.OpsRequestName, "ops-request", "", "OpsRequest name. if not specified, it will be randomly generated ")
+	cmd.Flags().StringVar(&o.OpsRequestName, "name", "", "OpsRequest name. if not specified, it will be randomly generated ")
 	cmd.Flags().IntVar(&o.TTLSecondsAfterSucceed, "ttlSecondsAfterSucceed", 0, "Time to live after the OpsRequest succeed")
 	if o.HasComponentNamesFlag {
 		cmd.Flags().StringSliceVar(&o.ComponentNames, "component-names", nil, " Component names to this operations")
@@ -119,8 +122,7 @@ func (o *OperationsOptions) CompleteRestartOps() error {
 	if len(o.ComponentNames) != 0 {
 		return nil
 	}
-	gvr := schema.GroupVersionResource{Group: types.AppsAPIGroup, Version: types.AppsAPIVersion, Resource: types.ResourceClusters}
-	unstructuredObj, err := o.Dynamic.Resource(gvr).Namespace(o.Namespace).Get(context.TODO(), o.Name, metav1.GetOptions{})
+	unstructuredObj, err := o.Dynamic.Resource(types.ClusterGVR()).Namespace(o.Namespace).Get(context.TODO(), o.Name, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}
@@ -282,6 +284,12 @@ func (o *OperationsOptions) Validate() error {
 		return makeMissingClusterNameErr()
 	}
 
+	// check if cluster exist
+	_, err := o.Dynamic.Resource(types.ClusterGVR()).Namespace(o.Namespace).Get(context.TODO(), o.Name, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+
 	// not require confirm for reconfigure
 	if o.OpsType == appsv1alpha1.ReconfiguringType {
 		return o.validateReconfiguring()
@@ -302,7 +310,10 @@ func (o *OperationsOptions) Validate() error {
 			return err
 		}
 	}
-	return delete.Confirm([]string{o.Name}, o.In)
+	if o.RequireConfirm {
+		return delete.Confirm([]string{o.Name}, o.In)
+	}
+	return nil
 }
 
 func (o *OperationsOptions) fillTemplateArgForReconfiguring() error {
@@ -410,13 +421,23 @@ func (o *OperationsOptions) fillKeyForReconfiguring(tpl *appsv1alpha1.ConfigTemp
 // buildOperationsInputs builds operations inputs
 func buildOperationsInputs(f cmdutil.Factory, o *OperationsOptions) create.Inputs {
 	o.OpsTypeLower = strings.ToLower(string(o.OpsType))
+	customOutPut := func(opt *create.BaseOptions) {
+		output := fmt.Sprintf("OpsRequest %s created successfully, you can view the progress:", opt.Name)
+		printer.PrintLine(output)
+		nextLine := fmt.Sprintf("\tkbcli cluster describe-ops %s -n %s", opt.Name, opt.Namespace)
+		printer.PrintLine(nextLine)
+	}
 	return create.Inputs{
-		CueTemplateName: "cluster_operations_template.cue",
-		ResourceName:    types.ResourceOpsRequests,
-		BaseOptionsObj:  &o.BaseOptions,
-		Options:         o,
-		Factory:         f,
-		Validate:        o.Validate,
+		CueTemplateName:              "cluster_operations_template.cue",
+		ResourceName:                 types.ResourceOpsRequests,
+		BaseOptionsObj:               &o.BaseOptions,
+		Options:                      o,
+		Factory:                      f,
+		Validate:                     o.Validate,
+		CustomOutPut:                 customOutPut,
+		Group:                        types.AppsAPIGroup,
+		Version:                      types.AppsAPIVersion,
+		ResourceNameGVRForCompletion: types.ClusterGVR(),
 	}
 }
 
@@ -455,7 +476,7 @@ func (o *OperationsOptions) fillExpose() error {
 		return err
 	}
 
-	gvr := schema.GroupVersionResource{Group: types.AppsAPIVersion, Version: types.AppsAPIVersion, Resource: types.ResourceClusters}
+	gvr := schema.GroupVersionResource{Group: types.AppsAPIGroup, Version: types.AppsAPIVersion, Resource: types.ResourceClusters}
 	unstructuredObj, err := o.Dynamic.Resource(gvr).Namespace(o.Namespace).Get(context.TODO(), o.Name, metav1.GetOptions{})
 	if err != nil {
 		return err
@@ -519,7 +540,7 @@ func NewRestartCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 	o := newBaseOperationsOptions(streams, appsv1alpha1.RestartType, true)
 	inputs := buildOperationsInputs(f, o)
 	inputs.Use = "restart"
-	inputs.Short = "Restart the specified components in the cluster"
+	inputs.Short = "Restart the specified components in the cluster."
 	inputs.Example = restartExample
 	inputs.BuildFlags = func(cmd *cobra.Command) {
 		o.buildCommonFlags(cmd)
@@ -538,7 +559,7 @@ func NewUpgradeCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 	o := newBaseOperationsOptions(streams, appsv1alpha1.UpgradeType, false)
 	inputs := buildOperationsInputs(f, o)
 	inputs.Use = "upgrade"
-	inputs.Short = "Upgrade the cluster version"
+	inputs.Short = "Upgrade the cluster version."
 	inputs.Example = upgradeExample
 	inputs.BuildFlags = func(cmd *cobra.Command) {
 		o.buildCommonFlags(cmd)
@@ -557,7 +578,7 @@ func NewVerticalScalingCmd(f cmdutil.Factory, streams genericclioptions.IOStream
 	o := newBaseOperationsOptions(streams, appsv1alpha1.VerticalScalingType, true)
 	inputs := buildOperationsInputs(f, o)
 	inputs.Use = "vscale"
-	inputs.Short = "Vertically scale the specified components in the cluster"
+	inputs.Short = "Vertically scale the specified components in the cluster."
 	inputs.Example = verticalScalingExample
 	inputs.BuildFlags = func(cmd *cobra.Command) {
 		o.buildCommonFlags(cmd)
@@ -577,7 +598,7 @@ func NewHorizontalScalingCmd(f cmdutil.Factory, streams genericclioptions.IOStre
 	o := newBaseOperationsOptions(streams, appsv1alpha1.HorizontalScalingType, true)
 	inputs := buildOperationsInputs(f, o)
 	inputs.Use = "hscale"
-	inputs.Short = "Horizontally scale the specified components in the cluster"
+	inputs.Short = "Horizontally scale the specified components in the cluster."
 	inputs.Example = horizontalScalingExample
 	inputs.BuildFlags = func(cmd *cobra.Command) {
 		o.buildCommonFlags(cmd)
@@ -598,7 +619,7 @@ func NewVolumeExpansionCmd(f cmdutil.Factory, streams genericclioptions.IOStream
 	o := newBaseOperationsOptions(streams, appsv1alpha1.VolumeExpansionType, true)
 	inputs := buildOperationsInputs(f, o)
 	inputs.Use = "volume-expand"
-	inputs.Short = "Expand volume with the specified components and volumeClaimTemplates in the cluster"
+	inputs.Short = "Expand volume with the specified components and volumeClaimTemplates in the cluster."
 	inputs.Example = volumeExpansionExample
 	inputs.BuildFlags = func(cmd *cobra.Command) {
 		o.buildCommonFlags(cmd)
@@ -613,7 +634,7 @@ func NewReconfigureCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *
 	o := newBaseOperationsOptions(streams, appsv1alpha1.ReconfiguringType, false)
 	inputs := buildOperationsInputs(f, o)
 	inputs.Use = "configure"
-	inputs.Short = "reconfigure parameters with the specified components in the cluster"
+	inputs.Short = "Reconfigure parameters with the specified components in the cluster."
 	inputs.Example = createReconfigureExample
 	inputs.BuildFlags = func(cmd *cobra.Command) {
 		o.buildCommonFlags(cmd)
@@ -644,7 +665,7 @@ func NewExposeCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 	o := newBaseOperationsOptions(streams, appsv1alpha1.ExposeType, true)
 	inputs := buildOperationsInputs(f, o)
 	inputs.Use = "expose"
-	inputs.Short = "Expose a cluster"
+	inputs.Short = "Expose a cluster."
 	inputs.Example = exposeExamples
 	inputs.BuildFlags = func(cmd *cobra.Command) {
 		o.buildCommonFlags(cmd)
@@ -673,7 +694,7 @@ func NewStopCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 	o := newBaseOperationsOptions(streams, appsv1alpha1.StopType, false)
 	inputs := buildOperationsInputs(f, o)
 	inputs.Use = "stop"
-	inputs.Short = "stop the cluster and release all the pods of the cluster"
+	inputs.Short = "Stop the cluster and release all the pods of the cluster."
 	inputs.Example = stopExample
 	inputs.BuildFlags = func(cmd *cobra.Command) {
 		o.buildCommonFlags(cmd)
@@ -689,9 +710,10 @@ var startExample = templates.Examples(`
 // NewStartCmd creates a start command
 func NewStartCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := newBaseOperationsOptions(streams, appsv1alpha1.StartType, false)
+	o.RequireConfirm = false
 	inputs := buildOperationsInputs(f, o)
 	inputs.Use = "start"
-	inputs.Short = "start the cluster when cluster is stopped"
+	inputs.Short = "Start the cluster if cluster is stopped."
 	inputs.Example = startExample
 	inputs.BuildFlags = func(cmd *cobra.Command) {
 		o.buildCommonFlags(cmd)

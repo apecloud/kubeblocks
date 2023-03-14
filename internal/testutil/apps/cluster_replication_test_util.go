@@ -26,7 +26,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/constant"
+	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/testutil"
 )
 
@@ -39,7 +39,7 @@ func MockReplicationComponentStsPod(
 	podName,
 	roleName string) *corev1.Pod {
 	pod := NewPodFactory(testCtx.DefaultNamespace, podName).
-		SetOwnerReferences("apps/v1", intctrlutil.StatefulSetKind, sts).
+		SetOwnerReferences("apps/v1", constant.StatefulSetKind, sts).
 		AddAppInstanceLabel(clusterName).
 		AddAppComponentLabel(compName).
 		AddAppManangedByLabel().

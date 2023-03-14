@@ -23,16 +23,16 @@ import (
 )
 
 func Test(t *testing.T) {
-	c := NewPrompt("Test prompt", "Please input something", &bytes.Buffer{})
-	res, _ := c.GetInput()
+	c := NewPrompt("Please input something", nil, &bytes.Buffer{})
+	res, _ := c.Run()
 	if res != "" {
 		t.Errorf("expected an empty result")
 	}
 
 	in := &bytes.Buffer{}
 	in.Write([]byte("t\n"))
-	c.in = io.NopCloser(in)
-	res, err := c.GetInput()
+	c.Stdin = io.NopCloser(in)
+	res, err := c.Run()
 	if err != nil {
 		t.Errorf("prompt error %v", err)
 	}

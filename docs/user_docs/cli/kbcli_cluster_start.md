@@ -1,6 +1,8 @@
-## kbcli cluster start
+---
+title: kbcli cluster start
+---
 
-start the cluster when cluster is stopped
+Start the cluster if cluster is stopped.
 
 ```
 kbcli cluster start [flags]
@@ -17,7 +19,7 @@ kbcli cluster start [flags]
 
 ```
   -h, --help                         help for start
-      --ops-request string           OpsRequest name. if not specified, it will be randomly generated 
+      --name string                  OpsRequest name. if not specified, it will be randomly generated 
       --ttlSecondsAfterSucceed int   Time to live after the OpsRequest succeed
 ```
 
@@ -47,5 +49,7 @@ kbcli cluster start [flags]
 
 ### SEE ALSO
 
-* [kbcli cluster](kbcli_cluster.md)	 - Cluster command
+* [kbcli cluster](kbcli_cluster.md)	 - Cluster command.
+
+#### Go Back to [CLI Overview](cli.md) Homepage.
 

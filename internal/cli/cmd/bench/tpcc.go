@@ -36,7 +36,7 @@ var tpccConfig tpcc.Config
 func NewTpccCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "tpcc",
-		Short: "Run a TPCC benchmark",
+		Short: "Run a TPCC benchmark.",
 	}
 
 	cmd.PersistentFlags().IntVar(&tpccConfig.Parts, "parts", 1, "Number to partition warehouses")
@@ -52,7 +52,7 @@ func NewTpccCmd() *cobra.Command {
 func newPrepareCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "prepare",
-		Short: "Prepare data for TPCC",
+		Short: "Prepare data for TPCC.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return executeTpcc("prepare")
 		},
@@ -72,7 +72,7 @@ func newPrepareCmd() *cobra.Command {
 func newRunCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "run",
-		Short: "Run workload",
+		Short: "Run workload.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return executeTpcc("run")
 		},
@@ -88,7 +88,7 @@ func newRunCmd() *cobra.Command {
 func newCleanCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "cleanup",
-		Short: "Cleanup data for TPCC",
+		Short: "Cleanup data for TPCC.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return executeTpcc("cleanup")
 		},

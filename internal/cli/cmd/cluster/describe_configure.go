@@ -58,7 +58,7 @@ type reconfigureOptions struct {
 	truncDocument bool
 	paramName     string
 
-	// workloadType appsv1alpha1.WorkloadType
+	workloadType appsv1alpha1.WorkloadType
 
 	keys       []string
 	showDetail bool
@@ -182,6 +182,12 @@ func (r *reconfigureOptions) complete2(args []string) error {
 		return cfgcore.MakeError("not any config template, not support describe")
 	}
 
+	workloadType, err := util.GetComponentWorkloadType(r.clusterName, r.namespace, r.dynamic, r.componentName)
+	if err != nil {
+		return err
+	}
+	r.workloadType = workloadType
+
 	templateNames := make([]string, 0, len(r.tpls))
 	if !r.isExplain {
 		for _, tpl := range r.tpls {
@@ -298,12 +304,16 @@ func (r *reconfigureOptions) printExplainConfigure(tplName string) error {
 
 func (r *reconfigureOptions) getReconfigureMeta() ([]types.ConfigTemplateInfo, error) {
 	configs := make([]types.ConfigTemplateInfo, 0)
+	componentName := r.componentName
+	if r.workloadType == appsv1alpha1.Replication {
+		componentName = fmt.Sprintf("%s-%d", componentName, 0)
+	}
 	for _, tplName := range r.templateNames {
 		// checked by validate
 		tpl, _ := r.findTemplateByName(tplName)
 		// fetch config configmap
 		cmObj := &corev1.ConfigMap{}
-		cmName := cfgcore.GetComponentCfgName(r.clusterName, r.componentName, tpl.VolumeName)
+		cmName := cfgcore.GetComponentCfgName(r.clusterName, componentName, tpl.VolumeName)
 		if err := util.GetResourceObjectFromGVR(types.ConfigmapGVR(), client.ObjectKey{
 			Name:      cmName,
 			Namespace: r.namespace,

@@ -31,15 +31,12 @@ import (
 
 // BuildComponent generates a new Component object, which is a mixture of
 // component-related configs from input Cluster, ClusterDef and ClusterVersion.
-func BuildComponent(
-	reqCtx intctrlutil.RequestCtx,
+func BuildComponent(reqCtx intctrlutil.RequestCtx,
 	cluster appsv1alpha1.Cluster,
 	clusterDef appsv1alpha1.ClusterDefinition,
 	clusterCompDef appsv1alpha1.ClusterComponentDefinition,
 	clusterCompSpec appsv1alpha1.ClusterComponentSpec,
-	clusterCompVers ...*appsv1alpha1.ClusterComponentVersion,
-) *SynthesizedComponent {
-
+	clusterCompVers ...*appsv1alpha1.ClusterComponentVersion) *SynthesizedComponent {
 	clusterCompDefObj := clusterCompDef.DeepCopy()
 	component := &SynthesizedComponent{
 		ClusterDefName:        clusterDef.Name,
@@ -60,18 +57,44 @@ func BuildComponent(
 		VolumeTypes:           clusterCompDefObj.VolumeTypes,
 	}
 
-	// resolve component.ConfigTemplates
-	if clusterCompDefObj.ConfigSpecs != nil {
-		component.ConfigTemplates = clusterCompDefObj.ConfigSpecs
-	}
-	if clusterCompDefObj.ScriptSpecs != nil {
-		component.ScriptTemplates = clusterCompDefObj.ScriptSpecs
+	buildRuntime(component, &cluster, clusterCompSpec, clusterCompVers...)
+
+	buildConfigs(component, clusterCompDefObj, clusterCompVers...)
+
+	buildScripts(component, clusterCompDefObj)
+
+	buildVolumes(component, clusterCompSpec)
+
+	buildServices(component, clusterCompDefObj, clusterCompSpec)
+
+	// TODO(zhixu.zt) We need to reserve the VolumeMounts of the container for ConfigMap or Secret,
+	// At present, it is possible to distinguish between ConfigMap volume and normal volume,
+	// Compare the VolumeName of configTemplateRef and Name of VolumeMounts
+	//
+	// if component.VolumeClaimTemplates == nil {
+	//	 for i := range component.PodSpec.Containers {
+	//	 	component.PodSpec.Containers[i].VolumeMounts = nil
+	//	 }
+	// }
+
+	buildMonitor(component, &clusterCompDef, &clusterCompSpec)
+
+	if err := buildProbe(reqCtx, component); err != nil {
+		return nil
 	}
 
+	replaceContainerPlaceholderTokens(component, GetEnvReplacementMapForConnCredential(cluster.GetName()))
+
+	component.PrimaryIndex = clusterCompSpec.PrimaryIndex
+
+	return component
+}
+
+func buildRuntime(component *SynthesizedComponent, cluster *appsv1alpha1.Cluster,
+	clusterCompSpec appsv1alpha1.ClusterComponentSpec, clusterCompVers ...*appsv1alpha1.ClusterComponentVersion) {
 	if len(clusterCompVers) > 0 && clusterCompVers[0] != nil {
 		// only accept 1st ClusterVersion override context
 		clusterCompVer := clusterCompVers[0]
-		component.ConfigTemplates = cfgcore.MergeConfigTemplates(clusterCompVer.ConfigSpecs, component.ConfigTemplates)
 		// override component.PodSpec.InitContainers and component.PodSpec.Containers
 		for _, c := range clusterCompVer.VersionsCtx.InitContainers {
 			component.PodSpec.InitContainers = appendOrOverrideContainerAttr(component.PodSpec.InitContainers, c)
@@ -86,9 +109,9 @@ func BuildComponent(
 	if clusterCompSpec.Affinity != nil {
 		affinity = clusterCompSpec.Affinity
 	}
-	podAffinity := buildPodAffinity(&cluster, affinity, component)
+	podAffinity := buildPodAffinity(cluster, affinity, component)
 	component.PodSpec.Affinity = patchBuiltInAffinity(podAffinity)
-	component.PodSpec.TopologySpreadConstraints = buildPodTopologySpreadConstraints(&cluster, affinity, component)
+	component.PodSpec.TopologySpreadConstraints = buildPodTopologySpreadConstraints(cluster, affinity, component)
 
 	tolerations := cluster.Spec.Tolerations
 	if len(clusterCompSpec.Tolerations) != 0 {
@@ -96,54 +119,70 @@ func BuildComponent(
 	}
 	component.PodSpec.Tolerations = patchBuiltInToleration(tolerations)
 
-	if clusterCompSpec.VolumeClaimTemplates != nil {
-		component.VolumeClaimTemplates = clusterCompSpec.ToVolumeClaimTemplates()
-	}
-
 	if clusterCompSpec.Resources.Requests != nil || clusterCompSpec.Resources.Limits != nil {
 		component.PodSpec.Containers[0].Resources = clusterCompSpec.Resources
 	}
+}
 
-	if clusterCompDefObj.Service != nil {
-		service := corev1.Service{Spec: *clusterCompDefObj.Service}
-		service.Spec.Type = corev1.ServiceTypeClusterIP
-		component.Services = append(component.Services, service)
+func buildConfigs(component *SynthesizedComponent, clusterCompDef *appsv1alpha1.ClusterComponentDefinition,
+	clusterCompVers ...*appsv1alpha1.ClusterComponentVersion) {
+	// resolve component.ConfigTemplates
+	if clusterCompDef.ConfigSpecs != nil {
+		component.ConfigTemplates = clusterCompDef.ConfigSpecs
+	}
 
-		for _, item := range clusterCompSpec.Services {
-			service = corev1.Service{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:        item.Name,
-					Annotations: item.Annotations,
-				},
-				Spec: *clusterCompDefObj.Service,
-			}
-			service.Spec.Type = item.ServiceType
-			component.Services = append(component.Services, service)
+	if len(clusterCompVers) > 0 && clusterCompVers[0] != nil {
+		// only accept 1st ClusterVersion override context
+		clusterCompVer := clusterCompVers[0]
+		component.ConfigTemplates = cfgcore.MergeConfigTemplates(clusterCompVer.ConfigSpecs, component.ConfigTemplates)
+	}
+}
+
+func buildScripts(component *SynthesizedComponent, clusterCompDef *appsv1alpha1.ClusterComponentDefinition) {
+	if clusterCompDef.ScriptSpecs != nil {
+		component.ScriptTemplates = clusterCompDef.ScriptSpecs
+	}
+}
+
+func buildVolumes(component *SynthesizedComponent, clusterCompSpec appsv1alpha1.ClusterComponentSpec) {
+	if clusterCompSpec.VolumeClaimTemplates != nil {
+		component.VolumeClaimTemplates = clusterCompSpec.ToVolumeClaimTemplates()
+	}
+}
+
+func buildServices(component *SynthesizedComponent, clusterCompDef *appsv1alpha1.ClusterComponentDefinition,
+	clusterCompSpec appsv1alpha1.ClusterComponentSpec) {
+	if clusterCompDef.Service == nil {
+		return
+	}
+
+	service := corev1.Service{Spec: *clusterCompDef.Service}
+	service.Spec.Type = corev1.ServiceTypeClusterIP
+	component.Services = append(component.Services, service)
+
+	for _, item := range clusterCompSpec.Services {
+		service = corev1.Service{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:        item.Name,
+				Annotations: item.Annotations,
+			},
+			Spec: *clusterCompDef.Service,
 		}
+		service.Spec.Type = item.ServiceType
+		component.Services = append(component.Services, service)
 	}
+}
 
-	component.PrimaryIndex = clusterCompSpec.PrimaryIndex
+func buildMonitor(component *SynthesizedComponent, clusterCompDef *appsv1alpha1.ClusterComponentDefinition,
+	clusterCompSpec *appsv1alpha1.ClusterComponentSpec) {
+	buildMonitorConfig(clusterCompDef, clusterCompSpec, component)
+}
 
-	// TODO(zhixu.zt) We need to reserve the VolumeMounts of the container for ConfigMap or Secret,
-	// At present, it is possible to distinguish between ConfigMap volume and normal volume,
-	// Compare the VolumeName of configTemplateRef and Name of VolumeMounts
-	//
-	// if component.VolumeClaimTemplates == nil {
-	//	 for i := range component.PodSpec.Containers {
-	//	 	component.PodSpec.Containers[i].VolumeMounts = nil
-	//	 }
-	// }
-
-	buildMonitorConfig(&clusterCompDef, &clusterCompSpec, component)
-	err := buildProbeContainers(reqCtx, component)
-	if err != nil {
+func buildProbe(reqCtx intctrlutil.RequestCtx, component *SynthesizedComponent) error {
+	if err := buildProbeContainers(reqCtx, component); err != nil {
 		reqCtx.Log.Error(err, "build probe container failed.")
-		return nil
 	}
-
-	replaceContainerPlaceholderTokens(component, GetEnvReplacementMapForConnCredential(cluster.GetName()))
-
-	return component
+	return nil
 }
 
 // appendOrOverrideContainerAttr is used to append targetContainer to compContainers or override the attributes of compContainers with a given targetContainer,

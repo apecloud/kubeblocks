@@ -39,7 +39,7 @@ import (
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 )
 
-var _ = Describe("lifecycle_utils", func() {
+var _ = Describe("Cluster Component", func() {
 
 	cleanAll := func() {
 		// must wait until resources deleted and no longer exist before the testcases start,

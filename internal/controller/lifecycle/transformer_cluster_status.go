@@ -75,15 +75,6 @@ func (c *clusterStatusTransformer) Transform(dag *graph.DAG) error {
 		c.recorder.Event(cluster, corev1.EventTypeNormal, applyResourcesCondition.Reason, applyResourcesCondition.Message)
 		rootVertex.action = actionPtr(STATUS)
 	case isClusterStatusUpdating(*origCluster):
-		// TODO: cluster.status Patch called in c.handleGarbageOfRestoreBeforeRunning, refactor it
-		//// checks if the controller is handling the garbage of restore.
-		//if handlingRestoreGarbage, err := c.handleGarbageOfRestoreBeforeRunning(cluster); err != nil {
-		//	return err
-		//} else if handlingRestoreGarbage {
-		//	return nil
-		//}
-		// TODO: cluster.status Patch called in c.reconcileClusterStatus, refactor it
-		// reconcile the phase and conditions of the Cluster.status
 		// TODO: hack before refactoring, Update cluster and reload
 		if !reflect.DeepEqual(cluster.ObjectMeta, origCluster.ObjectMeta) ||
 			!reflect.DeepEqual(cluster.Spec, origCluster.Spec) {
@@ -94,6 +85,16 @@ func (c *clusterStatusTransformer) Transform(dag *graph.DAG) error {
 			}
 		}
 		// --end hack--
+
+		// TODO: cluster.status Patch called in c.handleGarbageOfRestoreBeforeRunning, refactor it
+		// checks if the controller is handling the garbage of restore.
+		if handlingRestoreGarbage, err := c.handleGarbageOfRestoreBeforeRunning(cluster); err != nil {
+			return err
+		} else if handlingRestoreGarbage {
+			return nil
+		}
+		// TODO: cluster.status Patch called in c.reconcileClusterStatus, refactor it
+		// reconcile the phase and conditions of the Cluster.status
 		if err := c.reconcileClusterStatus(cluster, &c.cc.cd); err != nil {
 			return err
 		}

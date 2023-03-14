@@ -232,11 +232,15 @@ var _ = Describe("ReplicationSet Util", func() {
 
 	testHandleReplicationSetRoleChangeEvent := func() {
 		By("Creating a cluster with replication workloadType.")
+		clusterSwitchPolicy := &appsv1alpha1.ClusterSwitchPolicy{
+			Type: appsv1alpha1.Noop,
+		}
 		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
 			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
 			AddComponent(testapps.DefaultRedisCompName, testapps.DefaultRedisCompType).
 			SetReplicas(testapps.DefaultReplicationReplicas).
 			SetPrimaryIndex(testapps.DefaultReplicationPrimaryIndex).
+			SetSwitchPolicy(clusterSwitchPolicy).
 			Create(&testCtx).GetObject()
 
 		By("Creating a statefulSet of replication workloadType.")
@@ -252,7 +256,6 @@ var _ = Describe("ReplicationSet Util", func() {
 			string(Secondary): secondaryName,
 		} {
 			sts := testapps.NewStatefulSetFactory(testCtx.DefaultNamespace, v, clusterObj.Name, testapps.DefaultRedisCompName).
-				AddFinalizers([]string{DBClusterFinalizerName}).
 				AddContainer(container).
 				AddAppInstanceLabel(clusterObj.Name).
 				AddAppComponentLabel(testapps.DefaultRedisCompName).
@@ -281,17 +284,17 @@ var _ = Describe("ReplicationSet Util", func() {
 				AddContainer(container).
 				AddLabelsInMap(sts.Labels).
 				Create(&testCtx).GetObject()
-
 			if sts.Labels[constant.RoleLabelKey] == string(Primary) {
 				primaryPod = pod
 			} else {
 				secondaryPod = pod
 			}
 		}
-		By("Test update replicationSet pod role label driver by event.")
-		err := HandleReplicationSetRoleChangeEvent(ctx, k8sClient, clusterObj, testapps.DefaultRedisCompName, secondaryPod, string(Primary))
+		By("Test update replicationSet pod role label with event driver, secondary change to primary.")
+		err := HandleReplicationSetRoleChangeEvent(testCtx.Ctx, k8sClient, clusterObj, testapps.DefaultRedisCompName, secondaryPod, string(Primary))
 		Expect(err).Should(Succeed())
-		err = HandleReplicationSetRoleChangeEvent(ctx, k8sClient, clusterObj, testapps.DefaultRedisCompName, primaryPod, string(Secondary))
+		By("Test when secondary change to primary, the old primary label has been updated at the same time, so return nil directly.")
+		err = HandleReplicationSetRoleChangeEvent(testCtx.Ctx, k8sClient, clusterObj, testapps.DefaultRedisCompName, primaryPod, string(Secondary))
 		Expect(err).Should(BeNil())
 	}
 

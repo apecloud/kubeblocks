@@ -422,15 +422,14 @@ func HandleReplicationSetRoleChangeEvent(ctx context.Context,
 		return nil
 	}
 	// if switchPolicy is not Noop, return
-	clusterCompSpec := util.GetClusterComponentSpecByName(cluster, compName)
+	clusterCompSpec := util.GetClusterComponentSpecByName(*cluster, compName)
 	if clusterCompSpec == nil || clusterCompSpec.SwitchPolicy == nil || clusterCompSpec.SwitchPolicy.Type != appsv1alpha1.Noop {
 		return nil
 	}
-
 	// when newRole is primary, it means that a new primary is generated, and the label of the old primary
 	// needs to be updated to secondary at the same time to avoid the situation of two primaries exist at the same time
 	if newRole == string(Primary) {
-		primaryPod, err := GetReplicationSetPrimaryObj(ctx, cli, cluster, intctrlutil.PodSignature, compName)
+		primaryPod, err := getReplicationSetPrimaryObj(ctx, cli, cluster, intctrlutil.PodSignature, compName)
 		if err != nil {
 			return err
 		}

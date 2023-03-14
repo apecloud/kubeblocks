@@ -30,7 +30,6 @@ const (
 	clusterDefLabelKey         = "clusterdefinition.kubeblocks.io/name"
 	clusterVersionLabelKey     = "clusterversion.kubeblocks.io/name"
 	statefulSetPodNameLabelKey = "statefulset.kubernetes.io/pod-name"
-	csRoleChangedAnnotKey      = "cs.kubeblocks.io/event-handled"
 
 	// annotations keys
 	lifecycleAnnotationKey = "cluster.kubeblocks.io/lifecycle"
@@ -38,6 +37,9 @@ const (
 	// If debugClusterAnnotationKey = 'on',
 	// logs will be recorded in more detail, and some ephemeral pods (esp. those created by jobs) will retain after execution.
 	debugClusterAnnotationKey = "cluster.kubeblocks.io/debug"
+
+	// roleChangedAnnotKey is used to mark the role change event has been handled.
+	roleChangedAnnotKey = "role.kubeblocks.io/event-handled"
 
 	// annotations values
 	lifecycleDeletePVCAnnotation = "delete-pvc"

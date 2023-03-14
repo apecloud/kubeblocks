@@ -417,7 +417,7 @@ func HandleReplicationSetRoleChangeEvent(ctx context.Context,
 	compName string,
 	pod *corev1.Pod,
 	newRole string) error {
-	// if pod role label is nil or equal to role, return
+	// if pod role label is nil or equal to newRole, return
 	if newRole == "" || pod.Labels[constant.RoleLabelKey] == newRole {
 		return nil
 	}
@@ -426,23 +426,27 @@ func HandleReplicationSetRoleChangeEvent(ctx context.Context,
 	if clusterCompSpec == nil || clusterCompSpec.SwitchPolicy == nil || clusterCompSpec.SwitchPolicy.Type != appsv1alpha1.Noop {
 		return nil
 	}
-	// when newRole is primary, it means that a new primary is generated, and the label of the old primary
-	// needs to be updated to secondary at the same time to avoid the situation of two primaries exist at the same time
-	if newRole == string(Primary) {
-		oldPrimaryPod, err := getReplicationSetPrimaryObj(ctx, cli, cluster, intctrlutil.PodSignature, compName)
-		if err != nil {
-			return err
-		}
-		if oldPrimaryPod.Name != pod.Name {
-			patch := client.MergeFrom(oldPrimaryPod.DeepCopy())
-			oldPrimaryPod.Labels[constant.RoleLabelKey] = string(Secondary)
-			if err := cli.Patch(ctx, oldPrimaryPod, patch); err != nil {
-				return err
-			}
-		}
+
+	oldPrimaryPod, err := getReplicationSetPrimaryObj(ctx, cli, cluster, intctrlutil.PodSignature, compName)
+	if err != nil {
+		return err
 	}
-	// update pod role label
-	patch := client.MergeFrom(pod.DeepCopy())
+	// pod is old primary and newRole is secondary, it means that the old primary needs to be changed to secondary,
+	// we do not deal with this situation because We will only change the old primary to secondary when the new primary changes from secondary to primary,
+	// this is to avoid simultaneous occurrence of two primary or no primary at the same time
+	if oldPrimaryPod.Name == pod.Name {
+		return nil
+	}
+
+	// pod is old secondary and newRole is primary
+	// update old primary to secondary
+	patch := client.MergeFrom(oldPrimaryPod.DeepCopy())
+	oldPrimaryPod.Labels[constant.RoleLabelKey] = string(Secondary)
+	if err := cli.Patch(ctx, oldPrimaryPod, patch); err != nil {
+		return err
+	}
+	// update secondary pod to primary
+	patch = client.MergeFrom(pod.DeepCopy())
 	pod.Labels[constant.RoleLabelKey] = newRole
 	return cli.Patch(ctx, pod, patch)
 }

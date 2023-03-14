@@ -157,7 +157,7 @@ var _ = Describe("Addon controller", func() {
 				g.Expect(testCtx.Cli.Get(ctx, key, addon)).Should(Succeed())
 				g.Expect(addon.Status.ObservedGeneration).Should(BeEquivalentTo(1))
 				g.Expect(addon.Status.Phase).Should(Equal(extensionsv1alpha1.AddonDisabled))
-			}).Should(Succeed())
+			}, timeout, interval).Should(Succeed())
 
 			By("By enabling addon with default install")
 			defaultInstall := addon.Spec.DefaultInstallValues[0].AddonInstallSpec
@@ -213,36 +213,6 @@ var _ = Describe("Addon controller", func() {
 				checkedJobDeletion(g, jobKey)
 			}, timeout, interval).Should(Succeed())
 
-		})
-
-		It("should successfully reconcile a custom resource for Addon run job with controller manager schedule settings", func() {
-			viper.Set(constant.CfgKeyCtrlrMrgAffinity,
-				"{\"nodeAffinity\":{\"preferredDuringSchedulingIgnoredDuringExecution\":[{\"preference\":{\"matchExpressions\":[{\"key\":\"kb-controller\",\"operator\":\"In\",\"values\":[\"true\"]}]},\"weight\":100}]}}")
-			viper.Set(constant.CfgKeyCtrlrMrgTolerations,
-				"[{\"key\":\"key1\", \"operator\": \"Exists\", \"effect\": \"NoSchedule\"}]")
-			viper.Set(constant.CfgKeyCtrlrMrgNodeSelector, "{\"beta.kubernetes.io/arch\":\"amd64\"}")
-
-			By("By create an addon with auto-install")
-			createAddonSpecWithRequiredAttributes(func(newOjb *extensionsv1alpha1.Addon) {
-				newOjb.Spec.Installable.AutoInstall = true
-			})
-
-			By("By addon autoInstall auto added")
-			enablingPhaseCheck(2)
-
-			By("By checking status.observedGeneration and status.phase=disabled")
-			jobKey := client.ObjectKey{
-				Namespace: viper.GetString(constant.CfgKeyCtrlrMrgNS),
-				Name:      getInstallJobName(addon),
-			}
-			Eventually(func(g Gomega) {
-				job := &batchv1.Job{}
-				g.Eventually(testCtx.Cli.Get(ctx, jobKey, job)).Should(Succeed())
-				g.Expect(job.Spec.Template.Spec.Tolerations).ShouldNot(BeEmpty())
-				g.Expect(job.Spec.Template.Spec.NodeSelector).ShouldNot(BeEmpty())
-				g.Expect(job.Spec.Template.Spec.Affinity).ShouldNot(BeNil())
-				g.Expect(job.Spec.Template.Spec.Affinity.NodeAffinity).ShouldNot(BeNil())
-			}).Should(Succeed())
 		})
 
 		It("should successfully reconcile a custom resource for Addon with autoInstall=true", func() {

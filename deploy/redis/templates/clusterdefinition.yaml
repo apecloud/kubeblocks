@@ -1,7 +1,7 @@
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: ClusterDefinition
 metadata:
-  name: apecloud-redis
+  name: redis
   labels:
     {{- include "redis.labels" . | nindent 4 }}
 spec:
@@ -83,6 +83,9 @@ spec:
         - name: {{ $name }}
           filePathPattern: {{ $pattern }}
         {{- end }}
+      volumeTypes:
+        - name: data
+          type: data
       podSpec:
         initContainers:
           - name: redis-init-container
@@ -147,7 +150,7 @@ spec:
         cmdExecutorConfig:
           image: docker.io/redis:7.0.5
           command:
-          - /bin/sh
+          - sh
           - -c
           args:
           - redis-cli -h $(KB_ACCOUNT_ENDPOINT) $(KB_ACCOUNT_STATEMENT)

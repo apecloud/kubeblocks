@@ -49,7 +49,7 @@ var (
 )
 
 type TablePrinter struct {
-	tbl table.Writer
+	Tbl table.Writer
 }
 
 func init() {
@@ -67,19 +67,35 @@ func init() {
 	}
 }
 
+// PrintTable high level wrapper function.
+func PrintTable(out io.Writer, customSettings func(*TablePrinter), rowFeeder func(*TablePrinter) error, header ...interface{}) error {
+	t := NewTablePrinter(out)
+	t.SetHeader(header...)
+	if customSettings != nil {
+		customSettings(t)
+	}
+	if rowFeeder != nil {
+		if err := rowFeeder(t); err != nil {
+			return err
+		}
+	}
+	t.Print()
+	return nil
+}
+
 func NewTablePrinter(out io.Writer) *TablePrinter {
 	t := table.NewWriter()
 	t.SetStyle(KubeCtlStyle)
 	t.SetOutputMirror(out)
-	return &TablePrinter{tbl: t}
+	return &TablePrinter{Tbl: t}
 }
 
 func (t *TablePrinter) SetStyle(style table.Style) {
-	t.tbl.SetStyle(style)
+	t.Tbl.SetStyle(style)
 }
 
 func (t *TablePrinter) SetHeader(header ...interface{}) {
-	t.tbl.AppendHeader(header)
+	t.Tbl.AppendHeader(header)
 }
 
 func (t *TablePrinter) AddRow(row ...interface{}) {
@@ -87,11 +103,11 @@ func (t *TablePrinter) AddRow(row ...interface{}) {
 	for _, col := range row {
 		rowObj = append(rowObj, col)
 	}
-	t.tbl.AppendRow(rowObj)
+	t.Tbl.AppendRow(rowObj)
 }
 
 func (t *TablePrinter) Print() {
-	t.tbl.Render()
+	t.Tbl.Render()
 }
 
 // PrintPairStringToLine print pair string for a line , the format is as follows "<space>*<key>:\t<value>".
@@ -131,4 +147,8 @@ func PrintLineWithTabSeparator(ps ...Pair) {
 func PrintTitle(title string) {
 	titleTpl := fmt.Sprintf("\n%s:", title)
 	fmt.Println(titleTpl)
+}
+
+func PrintLine(line string) {
+	fmt.Println(line)
 }

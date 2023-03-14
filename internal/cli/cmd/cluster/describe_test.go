@@ -58,15 +58,16 @@ var _ = Describe("Expose", func() {
 		}
 
 		tf.UnstructuredClient = &clientfake.RESTClient{
-			GroupVersion:         schema.GroupVersion{Group: types.Group, Version: types.Version},
+			GroupVersion:         schema.GroupVersion{Group: types.AppsAPIGroup, Version: types.AppsAPIVersion},
 			NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
 			Client: clientfake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 				urlPrefix := "/api/v1/namespaces/" + namespace
 				mapping := map[string]*http.Response{
-					"/api/v1/nodes/" + testing.NodeName: httpResp(testing.FakeNode()),
-					urlPrefix + "/services":             httpResp(&corev1.ServiceList{}),
-					urlPrefix + "/events":               httpResp(&corev1.EventList{}),
-					urlPrefix + "/pods":                 httpResp(pods),
+					"/api/v1/nodes/" + testing.NodeName:   httpResp(testing.FakeNode()),
+					urlPrefix + "/services":               httpResp(&corev1.ServiceList{}),
+					urlPrefix + "/events":                 httpResp(&corev1.EventList{}),
+					urlPrefix + "/persistentvolumeclaims": httpResp(&corev1.PersistentVolumeClaimList{}),
+					urlPrefix + "/pods":                   httpResp(pods),
 				}
 				return mapping[req.URL.Path], nil
 			}),

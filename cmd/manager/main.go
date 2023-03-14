@@ -17,16 +17,19 @@ limitations under the License.
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
@@ -41,6 +44,7 @@ import (
 	appscontrollers "github.com/apecloud/kubeblocks/controllers/apps"
 	dataprotectioncontrollers "github.com/apecloud/kubeblocks/controllers/dataprotection"
 	extensionscontrollers "github.com/apecloud/kubeblocks/controllers/extensions"
+	"github.com/apecloud/kubeblocks/internal/constant"
 
 	// +kubebuilder:scaffold:imports
 
@@ -88,7 +92,7 @@ func init() {
 	viper.SetDefault("PROBE_SERVICE_GRPC_PORT", 50001)
 	viper.SetDefault("PROBE_SERVICE_LOG_LEVEL", "info")
 	viper.SetDefault("KUBEBLOCKS_SERVICEACCOUNT_NAME", "kubeblocks")
-	viper.SetDefault("CM_NAMESPACE", "default")
+	viper.SetDefault(constant.CfgKeyCtrlrMgrNS, "default")
 }
 
 type flagName string
@@ -105,6 +109,33 @@ func (r flagName) String() string {
 
 func (r flagName) viperName() string {
 	return strings.ReplaceAll(r.String(), "-", "_")
+}
+
+func validateRequiredToParseConfigs() error {
+	if jobTTL := viper.GetString(constant.CfgKeyAddonJobTTL); jobTTL != "" {
+		if _, err := time.ParseDuration(jobTTL); err != nil {
+			return err
+		}
+	}
+	if cmTolerations := viper.GetString(constant.CfgKeyCtrlrMgrTolerations); cmTolerations != "" {
+		Tolerations := []corev1.Toleration{}
+		if err := json.Unmarshal([]byte(cmTolerations), &Tolerations); err != nil {
+			return err
+		}
+	}
+	if cmAffinity := viper.GetString(constant.CfgKeyCtrlrMgrAffinity); cmAffinity != "" {
+		affinity := corev1.Affinity{}
+		if err := json.Unmarshal([]byte(cmAffinity), &affinity); err != nil {
+			return err
+		}
+	}
+	if cmNodeSelector := viper.GetString(constant.CfgKeyCtrlrMgrNodeSelector); cmNodeSelector != "" {
+		nodeSelector := map[string]string{}
+		if err := json.Unmarshal([]byte(cmNodeSelector), &nodeSelector); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func main() {
@@ -142,8 +173,8 @@ func main() {
 	// to refactor this logging lib to anything else. Check FAQ - https://github.com/uber-go/zap/blob/master/FAQ.md
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 
-	err := viper.ReadInConfig() // Find and read the config file
-	if err != nil {             // Handle errors reading the config file
+	// Find and read the config file
+	if err := viper.ReadInConfig(); err != nil { // Handle errors reading the config file
 		setupLog.Info("unable read in config, errors ignored")
 	}
 	setupLog.Info(fmt.Sprintf("config file: %s", viper.GetViper().ConfigFileUsed()))
@@ -153,6 +184,10 @@ func main() {
 	enableLeaderElection = viper.GetBool(leaderElectFlagKey.viperName())
 
 	setupLog.Info(fmt.Sprintf("config settings: %v", viper.AllSettings()))
+	if err := validateRequiredToParseConfigs(); err != nil {
+		setupLog.Error(err, "config value error")
+		os.Exit(1)
+	}
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:                 scheme,
@@ -295,6 +330,7 @@ func main() {
 			os.Exit(1)
 		}
 	}
+
 	// +kubebuilder:scaffold:builder
 
 	if err = (&configuration.ReconfigureRequestReconciler{
@@ -401,7 +437,7 @@ func main() {
 		setupLog.Error(err, "unable to discover version info")
 		os.Exit(1)
 	}
-	viper.SetDefault("_KUBE_SERVER_INFO", *ver)
+	viper.SetDefault(constant.CfgKeyServerInfo, *ver)
 
 	setupLog.Info("starting manager")
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {

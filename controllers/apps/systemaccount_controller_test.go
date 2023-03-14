@@ -31,6 +31,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/generics"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
@@ -354,7 +355,7 @@ var _ = Describe("SystemAccount Controller", func() {
 					jobs := &batchv1.JobList{}
 					g.Expect(k8sClient.List(ctx, jobs, client.InNamespace(cluster.Namespace), ml)).To(Succeed())
 					for _, job := range jobs.Items {
-						_, ok := job.Labels[clusterAccountLabelKey]
+						_, ok := job.Labels[constant.ClusterAccountLabelKey]
 						g.Expect(ok).To(BeTrue())
 						g.Expect(len(job.ObjectMeta.OwnerReferences)).To(BeEquivalentTo(1))
 						g.Expect(checkOwnerReferenceToObj(job.OwnerReferences[0], cluster)).To(BeTrue())

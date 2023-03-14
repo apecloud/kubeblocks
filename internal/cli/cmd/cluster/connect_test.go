@@ -57,7 +57,7 @@ var _ = Describe("connection", func() {
 			return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, obj)}
 		}
 		tf.UnstructuredClient = &clientfake.RESTClient{
-			GroupVersion:         schema.GroupVersion{Group: types.Group, Version: types.Version},
+			GroupVersion:         schema.GroupVersion{Group: types.AppsAPIGroup, Version: types.AppsAPIVersion},
 			NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
 			Client: clientfake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 				urlPrefix := "/api/v1/namespaces/" + namespace
@@ -134,8 +134,8 @@ var _ = Describe("connection", func() {
 
 	It("build connect command", func() {
 		info := &engine.ConnectionInfo{
-			Command: []string{"mysql"},
-			Args:    []string{"-h$(KB_ACCOUNT_ENDPOINT)", "-u$(MYSQL_USER)", "-p$(MYSQL_PASSWORD)", "-e $(KB_ACCOUNT_STATEMENT)"},
+			Command: []string{"sh", "-c"},
+			Args:    []string{"mysql", "-h$(KB_ACCOUNT_ENDPOINT)", "-e $(KB_ACCOUNT_STATEMENT)"},
 		}
 		Expect(buildCommand(info)).ShouldNot(BeEmpty())
 		Expect(len(buildCommand(info))).Should(Equal(3))

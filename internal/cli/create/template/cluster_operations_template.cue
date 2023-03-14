@@ -32,10 +32,10 @@ options: {
 	cfgFile:         string
 	services: [
 		...{
-			name: string
+			name:        string
 			serviceType: string
 			annotations: {...}
-		}
+		},
 	]
 	...
 }
@@ -125,7 +125,7 @@ content: {
 			expose: [ for _, cName in options.componentNames {
 				componentName: cName
 				services: [ for _, svc in options.services {
-					name:    svc.name
+					name:        svc.name
 					serviceType: svc.serviceType
 					annotations: svc.annotations
 				}]

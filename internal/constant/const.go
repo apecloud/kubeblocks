@@ -17,6 +17,19 @@ limitations under the License.
 package constant
 
 const (
+	// config keys used in viper, DON'T refactor the value without careful inspections
+	CfgKeyServerInfo           = "_KUBE_SERVER_INFO"
+	CfgKeyCtrlrMgrNS           = "CM_NAMESPACE"
+	CfgKeyCtrlrMgrAffinity     = "CM_AFFINITY"
+	CfgKeyCtrlrMgrNodeSelector = "CM_NODE_SELECTOR"
+	CfgKeyCtrlrMgrTolerations  = "CM_TOLERATIONS"
+
+	// addon config keys
+	CfgKeyAddonJobTTL        = "ADDON_JOB_TTL"
+	CfgAddonJobImgPullPolicy = "ADDON_JOB_IMAGE_PULL_POLICY"
+)
+
+const (
 	ConnCredentialPlaceHolder = "$(CONN_CREDENTIAL_SECRET_NAME)"
 )
 
@@ -31,6 +44,8 @@ const (
 )
 
 const (
+	APIGroup = "kubeblocks.io"
+
 	AppName = "kubeblocks"
 
 	// K8s recommonded and well-known label and annotation keys
@@ -50,6 +65,8 @@ const (
 	RoleLabelKey                    = "kubeblocks.io/role"              // RoleLabelKey consensusSet and replicationSet role label key
 	BackupProtectionLabelKey        = "kubeblocks.io/backup-protection" // BackupProtectionLabelKey Backup delete protection policy label
 	AddonNameLabelKey               = "extensions.kubeblocks.io/addon-name"
+	ClusterAccountLabelKey          = "account.kubeblocks.io/name"
+	VolumeTypeLabelKey              = "kubeblocks.io/volume-type"
 
 	// kubeblocks.io annotations
 	OpsRequestAnnotationKey          = "kubeblocks.io/ops-request" // OpsRequestAnnotationKey OpsRequest annotation key in Cluster

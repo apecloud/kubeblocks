@@ -1,0 +1,10 @@
+apiVersion: dapr.io/v1alpha1
+kind: Component
+metadata:
+  name: postgres
+spec:
+  type: bindings.postgres
+  version: v1
+  metadata:
+  - name: url # Required
+    value: "user=postgres password=docker host=localhost port=5432 dbname=postgres pool_min_conns=1 pool_max_conns=10"

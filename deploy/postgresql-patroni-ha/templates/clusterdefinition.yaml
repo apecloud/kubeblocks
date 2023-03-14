@@ -1,0 +1,322 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: ClusterDefinition
+metadata:
+  name: postgresql-ha
+  labels:
+    {{- include "postgresql.labels" . | nindent 4 }}
+spec:
+  connectionCredential:
+    username: postgres
+    postgres-password: "$(RANDOM_PASSWD)"
+    endpoint: "$(SVC_FQDN):$(SVC_PORT_tcp-postgresql)"
+    host: "$(SVC_FQDN)"
+    port: "$(SVC_PORT_tcp-postgresql)"
+  componentDefs:
+    - name: postgresql-ha
+      workloadType: Replication
+      characterType: postgresql
+      probes:
+      monitor:
+        builtIn: false
+        exporterConfig:
+          scrapePath: /metrics
+          scrapePort: 9187
+      logConfigs:
+        {{- range $name,$pattern := .Values.logConfigs }}
+        - name: {{ $name }}
+          filePathPattern: {{ $pattern }}
+        {{- end }}
+      configSpec:
+        configTemplateRefs:
+          - name: postgresql-configuration
+            configTplRef: postgresql-configuration
+            configConstraintRef: postgresql14-cc
+            keys:
+              - postgresql.conf
+            namespace: {{ .Release.Namespace }}
+            volumeName: postgresql-config
+            defaultMode: 0777
+          - name: postgresql-scripts
+            configTplRef: postgresql-scripts
+            namespace: {{ .Release.Namespace }}
+            volumeName: scripts
+            defaultMode: 0777
+          - name: postgresql-custom-metrics
+            configTplRef: postgresql-custom-metrics
+            namespace: {{ .Release.Namespace }}
+            volumeName: postgresql-custom-metrics
+            defaultMode: 0777
+      service:
+        ports:
+          - name: tcp-postgresql
+            protocol: TCP
+            port: 5432
+            targetPort: tcp-postgresql
+          - name: http-metrics-postgresql
+            port: 9187
+            targetPort: http-metrics
+      podSpec:
+        serviceAccountName: operator
+        securityContext:
+          runAsUser: 0
+          fsGroup: 103
+          runAsGroup: 103
+        initContainers:
+          - name: pg-init-container
+            imagePullPolicy: {{ default .Values.image.pullPolicy "IfNotPresent" }}
+            command:
+              - /bin/sh
+              - -c
+              - |
+                mkdir -p /home/postgres/pgdata/conf
+                chmod +777 -R /home/postgres/pgdata/conf
+                cp /home/postgres/conf/pg_hba.conf /home/postgres/pgdata/conf
+                cp /home/postgres/conf/postgresql.conf /home/postgres/pgdata/conf
+                chmod +777 /home/postgres/pgdata/conf/pg_hba.conf
+                chmod +777 /home/postgres/pgdata/conf/postgresql.conf
+            volumeMounts:
+              - name: data
+                mountPath: /home/postgres/pgdata
+                mode: 0777
+              - name: postgresql-config
+                mountPath: /home/postgres/conf
+                mode: 0777
+        containers:
+          - name: postgresql
+            imagePullPolicy: {{ default .Values.image.pullPolicy "IfNotPresent" }}
+            securityContext:
+              runAsUser: 0
+            command:
+              - /bin/sh
+              - -c
+              - |
+                set -ex
+                KB_PRIMARY_POD_NAME_PREFIX=${KB_PRIMARY_POD_NAME%%\.*}
+                if [ "$KB_PRIMARY_POD_NAME_PREFIX" != "$KB_POD_NAME" ]; then
+                    sleep 3
+                fi
+                exec /launch.sh init
+            volumeMounts:
+              - name: dshm
+                mountPath: /dev/shm
+              - name: data
+                mountPath: /home/postgres/pgdata
+                mode: 0777
+              - name: postgresql-config
+                mountPath: /home/postgres/conf
+                mode: 0777
+            ports:
+              - name: tcp-postgresql
+                containerPort: 5432
+              - name: patroni
+                containerPort: 8008
+            livenessProbe:
+              failureThreshold: 6
+              initialDelaySeconds: 30
+              periodSeconds: 10
+              successThreshold: 1
+              timeoutSeconds: 5
+              exec:
+                command:
+                  - /bin/sh
+                  - -c
+                  - exec pg_isready -U {{ default "postgres" | quote }} -h 127.0.0.1 -p 5432
+            readinessProbe:
+              failureThreshold: 6
+              initialDelaySeconds: 5
+              periodSeconds: 10
+              successThreshold: 1
+              timeoutSeconds: 5
+              exec:
+                command:
+                  - /bin/sh
+                  - -c
+                  - -ee
+                  - |
+                    exec pg_isready -U {{ default "postgres" | quote }} -h 127.0.0.1 -p 5432
+                    [ -f /postgresql/tmp/.initialized ] || [ -f /postgresql/.initialized ]
+            env: ## refer https://github.com/zalando/spilo/blob/master/ENVIRONMENT.rst
+              - name: DCS_ENABLE_KUBERNETES_API
+                value: "true"
+              - name: KUBERNETES_USE_CONFIGMAPS
+                value: "true"
+              - name: POD_IP
+                valueFrom:
+                  fieldRef:
+                    apiVersion: v1
+                    fieldPath: status.podIP
+              - name: POD_NAMESPACE
+                valueFrom:
+                  fieldRef:
+                    apiVersion: v1
+                    fieldPath: metadata.namespace
+              - name: KUBERNETES_SCOPE_LABEL
+                value: "apps.kubeblocks.io/component-name"
+              - name: KUBERNETES_ROLE_LABEL
+                value: "apps.kubeblocks.pg.patroni/role"
+              - name: KUBERNETES_LABELS
+                value: '{"app.kubernetes.io/instance":"$(KB_CLUSTER_NAME)","apps.kubeblocks.io/component-name":"$(KB_COMP_NAME)"}'
+              - name: SPILO_CONFIGURATION
+                value: | ## https://github.com/zalando/patroni#yaml-configuration
+                  bootstrap:
+                    initdb:
+                      - auth-host: md5
+                      - auth-local: trust
+                  postgresql:
+                    config_dir: /home/postgres/pgdata/conf
+              - name: ALLOW_NOSSL
+                value: "true"
+              - name: PGUSER_SUPERUSER
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: username
+              - name: PGPASSWORD_SUPERUSER
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: postgres-password
+              - name: PGUSER_ADMIN
+                value: superadmin
+              - name: PGPASSWORD_ADMIN
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: postgres-password
+              - name: PGPASSWORD_STANDBY
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: postgres-password
+              - name: SCOPE
+                value: "$(KB_COMP_NAME)"
+              - name: PGROOT
+                value: /home/postgres/pgdata/pgroot
+              - name: PGUSER
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: username
+              - name: PGPASSWORD
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: postgres-password
+          - name: metrics
+            image:  {{ .Values.metrics.image.registry | default "docker.io" }}/{{ .Values.metrics.image.repository }}:{{ .Values.metrics.image.tag }}
+            imagePullPolicy: {{ .Values.metrics.image.pullPolicy | quote }}
+            securityContext:
+              runAsUser: 0
+            env:
+              {{- $database := "postgres" }}
+              {{- $sslmode := "disable" }}
+              - name: DATA_SOURCE_URI
+                value: {{ printf "127.0.0.1:5432/%s?sslmode=%s" $database $sslmode }}
+              - name: DATA_SOURCE_PASS
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: postgres-password
+              - name: DATA_SOURCE_USER
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: username
+            command:
+              - "/opt/bitnami/postgres-exporter/bin/postgres_exporter"
+              - "--auto-discover-databases"
+              - "--extend.query-path=/opt/conf/custom-metrics.yaml"
+              - "--exclude-databases=template0,template1"
+              - "--log.level=info"
+            ports:
+              - name: http-metrics
+                containerPort: 9187
+            livenessProbe:
+              failureThreshold: 6
+              initialDelaySeconds: 5
+              periodSeconds: 10
+              successThreshold: 1
+              timeoutSeconds: 5
+              httpGet:
+                path: /
+                port: http-metrics
+            readinessProbe:
+              failureThreshold: 6
+              initialDelaySeconds: 5
+              periodSeconds: 10
+              successThreshold: 1
+              timeoutSeconds: 5
+              httpGet:
+                path: /
+                port: http-metrics
+            volumeMounts:
+              - name: postgresql-custom-metrics
+                mountPath: /opt/conf
+        volumes:
+          - name: dshm
+            emptyDir:
+              medium: Memory
+              {{- with .Values.shmVolume.sizeLimit }}
+              sizeLimit: {{ . }}
+              {{- end }}
+      systemAccounts:
+        cmdExecutorConfig:
+          image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ default .Values.image.tag }}
+          command:
+            - /bin/sh
+            - -c
+          args:
+          - psql -h$(KB_ACCOUNT_ENDPOINT)
+          - -c "$(KB_ACCOUNT_STATEMENT)"
+          env:
+          - name: PGUSER
+            valueFrom:
+              secretKeyRef:
+                name: $(CONN_CREDENTIAL_SECRET_NAME)
+                key: username
+          - name: PGPASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: $(CONN_CREDENTIAL_SECRET_NAME)
+                key: postgres-password
+        passwordConfig:
+          length: 10
+          numDigits: 5
+          numSymbols: 0
+          letterCase: MixedCases
+        accounts:
+          - name: kbadmin
+            provisionPolicy:
+              type: CreateByStmt
+              scope: AnyPods
+              statements:
+                creation: CREATE USER $(USERNAME) SUPERUSER PASSWORD '$(PASSWD)';
+                deletion: DROP USER IF EXISTS $(USERNAME);
+          - name: kbdataprotection
+            provisionPolicy:
+              type: CreateByStmt
+              scope: AnyPods
+              statements:
+                creation: CREATE USER $(USERNAME) SUPERUSER PASSWORD '$(PASSWD)';
+                deletion: DROP USER IF EXISTS $(USERNAME);
+          - name: kbprobe
+            provisionPolicy:
+              type: CreateByStmt
+              scope: AnyPods
+              statements:
+                creation: CREATE USER $(USERNAME) WITH PASSWORD '$(PASSWD)';  GRANT pg_monitor TO $(USERNAME);
+                deletion: DROP USER IF EXISTS $(USERNAME);
+          - name: kbmonitoring
+            provisionPolicy:
+              type: CreateByStmt
+              scope: AnyPods
+              statements:
+                creation: CREATE USER $(USERNAME) WITH PASSWORD '$(PASSWD)';  GRANT pg_monitor TO $(USERNAME);
+                deletion: DROP USER IF EXISTS $(USERNAME);
+          - name: kbreplicator
+            provisionPolicy:
+              type: CreateByStmt
+              scope: AnyPods
+              statements:
+                creation: CREATE USER $(USERNAME) WITH REPLICATION PASSWORD '$(PASSWD)';
+                deletion: DROP USER IF EXISTS $(USERNAME);                     

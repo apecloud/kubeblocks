@@ -28,7 +28,7 @@ import (
 )
 
 // LoadPreflightSpec loads content of preflightSpec and hostPreflightSpec against yamlFiles from args
-func LoadPreflightSpec(yamlCheckFiles []string) (*preflightv1beta2.Preflight, *preflightv1beta2.HostPreflight, string, error) {
+func LoadPreflightSpec(checkFileList []string, checkYamlData [][]byte) (*preflightv1beta2.Preflight, *preflightv1beta2.HostPreflight, string, error) {
 	var (
 		preflightSpec     *preflightv1beta2.Preflight
 		hostPreflightSpec *preflightv1beta2.HostPreflight
@@ -36,14 +36,17 @@ func LoadPreflightSpec(yamlCheckFiles []string) (*preflightv1beta2.Preflight, *p
 		preflightName     string
 		err               error
 	)
-	for _, fileName := range yamlCheckFiles {
+	for _, fileName := range checkFileList {
 		// support to load yaml from stdin, local file and URI
 		if preflightContent, err = cluster.MultipleSourceComponents(fileName, os.Stdin); err != nil {
 			return preflightSpec, hostPreflightSpec, preflightName, err
 		}
-		obj, _, err := scheme.Codecs.UniversalDeserializer().Decode(preflightContent, nil, nil)
+		checkYamlData = append(checkYamlData, preflightContent)
+	}
+	for _, yamlData := range checkYamlData {
+		obj, _, err := scheme.Codecs.UniversalDeserializer().Decode(yamlData, nil, nil)
 		if err != nil {
-			return preflightSpec, hostPreflightSpec, preflightName, errors.Wrapf(err, "failed to parse %s", fileName)
+			return preflightSpec, hostPreflightSpec, preflightName, errors.Wrapf(err, "failed to parse %s", string(yamlData))
 		}
 		if spec, ok := obj.(*preflightv1beta2.Preflight); ok {
 			preflightSpec = ConcatPreflightSpec(preflightSpec, spec)

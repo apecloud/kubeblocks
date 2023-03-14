@@ -57,6 +57,7 @@ func BuildComponent(
 		EnabledLogs:           clusterCompSpec.EnabledLogs,
 		TLS:                   clusterCompSpec.TLS,
 		Issuer:                clusterCompSpec.Issuer,
+		VolumeTypes:           clusterCompDefObj.VolumeTypes,
 	}
 
 	// resolve component.ConfigTemplates
@@ -93,7 +94,7 @@ func BuildComponent(
 	component.PodSpec.Tolerations = patchBuiltInToleration(tolerations)
 
 	if clusterCompSpec.VolumeClaimTemplates != nil {
-		component.VolumeClaimTemplates = appsv1alpha1.ToVolumeClaimTemplates(clusterCompSpec.VolumeClaimTemplates)
+		component.VolumeClaimTemplates = clusterCompSpec.ToVolumeClaimTemplates()
 	}
 
 	if clusterCompSpec.Resources.Requests != nil || clusterCompSpec.Resources.Limits != nil {

@@ -148,19 +148,23 @@ func PrepareComponentResources(reqCtx intctrlutil.RequestCtx, cli client.Client,
 	case appsv1alpha1.Replication:
 		// get the number of existing statefulsets under the current component
 		var existStsList = &appsv1.StatefulSetList{}
-		if err := componentutil.GetObjectListByComponentName(reqCtx.Ctx, cli, task.Cluster, existStsList, task.Component.Name); err != nil {
+		if err := componentutil.GetObjectListByComponentName(reqCtx.Ctx, cli, *task.Cluster, existStsList, task.Component.Name); err != nil {
 			return err
 		}
 
-		// If the statefulSets already exists, the HA process is prioritized and buildReplicationSet is not required.
+		// If the statefulSets already exists, check whether there is an HA switching and the HA process is prioritized to handle.
 		// TODO(xingran) After refactoring, HA switching will be handled in the replicationSet controller.
 		if len(existStsList.Items) > 0 {
-			primaryIndexChanged, _, err := replicationset.CheckPrimaryIndexChanged(reqCtx.Ctx, cli, task.Cluster, task.Component.Name, task.Component.PrimaryIndex)
+			primaryIndexChanged, _, err := replicationset.CheckPrimaryIndexChanged(reqCtx.Ctx, cli, task.Cluster,
+				task.Component.Name, task.Component.GetPrimaryIndex())
 			if err != nil {
 				return err
 			}
 			if primaryIndexChanged {
-				return replicationset.HandleReplicationSetHASwitch(reqCtx.Ctx, cli, task.Cluster, componentutil.GetClusterComponentSpecByName(task.Cluster, task.Component.Name))
+				if err := replicationset.HandleReplicationSetHASwitch(reqCtx.Ctx, cli, task.Cluster,
+					componentutil.GetClusterComponentSpecByName(*task.Cluster, task.Component.Name)); err != nil {
+					return err
+				}
 			}
 		}
 
@@ -239,11 +243,14 @@ func buildReplicationSet(reqCtx intctrlutil.RequestCtx,
 	if err != nil {
 		return nil, err
 	}
-	// sts.Name rename and add role label.
-	sts.ObjectMeta.Name = fmt.Sprintf("%s-%d", sts.ObjectMeta.Name, stsIndex)
-	sts.Labels[constant.RoleLabelKey] = string(replicationset.Secondary)
-	if stsIndex == *task.Component.PrimaryIndex {
+	// sts.Name renamed with suffix "-<stsIdx>" for subsequent sts workload
+	if stsIndex != 0 {
+		sts.ObjectMeta.Name = fmt.Sprintf("%s-%d", sts.ObjectMeta.Name, stsIndex)
+	}
+	if stsIndex == task.Component.GetPrimaryIndex() {
 		sts.Labels[constant.RoleLabelKey] = string(replicationset.Primary)
+	} else {
+		sts.Labels[constant.RoleLabelKey] = string(replicationset.Secondary)
 	}
 	sts.Spec.UpdateStrategy.Type = appsv1.OnDeleteStatefulSetStrategyType
 	// build replicationSet persistentVolumeClaim manually
@@ -260,8 +267,8 @@ func buildReplicationSetPVC(task *intctrltypes.ReconcileTask, sts *appsv1.Statef
 	// generate persistentVolumeClaim objects used by replicationSet's pod from component.VolumeClaimTemplates
 	// TODO: The pvc objects involved in all processes in the KubeBlocks will be reconstructed into a unified generation method
 	pvcMap := replicationset.GeneratePVCFromVolumeClaimTemplates(sts, task.Component.VolumeClaimTemplates)
-	for _, pvc := range pvcMap {
-		buildPersistentVolumeClaimLabels(sts, pvc)
+	for pvcTplName, pvc := range pvcMap {
+		builder.BuildPersistentVolumeClaimLabels(sts, pvc, task.Component, pvcTplName)
 		task.AppendResource(pvc)
 	}
 
@@ -286,19 +293,6 @@ func buildReplicationSetPVC(task *intctrltypes.ReconcileTask, sts *appsv1.Statef
 	}
 	podSpec.Volumes = podVolumes
 	return nil
-}
-
-// buildPersistentVolumeClaimLabels builds a pvc name label, and synchronize the labels on the sts to the pvc labels.
-func buildPersistentVolumeClaimLabels(sts *appsv1.StatefulSet, pvc *corev1.PersistentVolumeClaim) {
-	if pvc.Labels == nil {
-		pvc.Labels = make(map[string]string)
-	}
-	pvc.Labels[constant.VolumeClaimTemplateNameLabelKey] = pvc.Name
-	for k, v := range sts.Labels {
-		if _, ok := pvc.Labels[k]; !ok {
-			pvc.Labels[k] = v
-		}
-	}
 }
 
 // buildCfg generate volumes for PodTemplate, volumeMount for container, and configmap for config files

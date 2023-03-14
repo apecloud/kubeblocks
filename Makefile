@@ -36,7 +36,7 @@ SHELL = /usr/bin/env bash -o pipefail
 .SHELLFLAGS = -ec
 
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
-ENVTEST_K8S_VERSION = 1.24.1
+ENVTEST_K8S_VERSION = 1.25.0
 
 ENABLE_WEBHOOKS ?= false
 
@@ -274,19 +274,22 @@ CLI_LD_FLAGS ="-s -w \
 bin/kbcli.%: ## Cross build bin/kbcli.$(OS).$(ARCH).
 	GOOS=$(word 2,$(subst ., ,$@)) GOARCH=$(word 3,$(subst ., ,$@)) CGO_ENABLED=0 $(GO) build -ldflags=${CLI_LD_FLAGS} -o $@ cmd/cli/main.go
 
-.PHONY: kbcli
-kbcli: OS=$(shell $(GO) env GOOS)
-kbcli: ARCH=$(shell $(GO) env GOARCH)
-kbcli: test-go-generate build-checks ## Build bin/kbcli.
+.PHONY: kbcli-fast
+kbcli-fast: OS=$(shell $(GO) env GOOS)
+kbcli-fast: ARCH=$(shell $(GO) env GOARCH)
+kbcli-fast:
 	$(MAKE) bin/kbcli.$(OS).$(ARCH)
-	mv bin/kbcli.$(OS).$(ARCH) bin/kbcli
+	@mv bin/kbcli.$(OS).$(ARCH) bin/kbcli
+
+.PHONY: kbcli
+kbcli: test-go-generate build-checks kbcli-fast ## Build bin/kbcli.
 
 .PHONY: clean-kbcli
 clean-kbcli: ## Clean bin/kbcli*.
 	rm -f bin/kbcli*
 
 .PHONY: doc
-kbcli-doc: build-checks ## generate CLI command reference manual.
+kbcli-doc: ## generate CLI command reference manual.
 	$(GO) run ./hack/docgen/cli/main.go ./docs/user_docs/cli
 
 ##@ Load Balancer
@@ -462,13 +465,21 @@ else
 	sed -i "s/^appVersion:.*/appVersion: $(VERSION)/" $(CHART_PATH)/Chart.yaml
 endif
 
+LOADBALANCER_CHART_VERSION=
+
 .PHONY: helm-package
 helm-package: bump-chart-ver ## Do helm package.
 ## it will pull down the latest charts that satisfy the dependencies, and clean up old dependencies.
 ## this is a hack fix: decompress the tgz from the depend-charts directory to the charts directory
 ## before dependency update.
-	cd $(CHART_PATH)/charts && ls ../depend-charts/*.tgz | xargs -n1 tar xf
-	$(HELM) dependency update --skip-refresh $(CHART_PATH)
+	# cd $(CHART_PATH)/charts && ls ../depend-charts/*.tgz | xargs -n1 tar xf
+	#$(HELM) dependency update --skip-refresh $(CHART_PATH)
+	$(HELM) package deploy/loadbalancer
+	mv loadbalancer-*.tgz deploy/helm/depend-charts/
+	$(HELM) package deploy/apecloud-mysql
+	mv apecloud-mysql-*.tgz deploy/helm/depend-charts/
+	$(HELM) package deploy/postgresql
+	mv postgresql-*.tgz deploy/helm/depend-charts/
 	$(HELM) package $(CHART_PATH)
 
 ##@ Build Dependencies
@@ -836,7 +847,7 @@ smoke-testdata-manifests: ## Update E2E test dataset
 	$(HELM) template mycluster deploy/apecloud-mysql-cluster > test/e2e/testdata/smoketest/wesql/00_wesqlcluster.yaml
 	$(HELM) template mycluster deploy/postgresqlcluster > test/e2e/testdata/smoketest/postgresql/00_postgresqlcluster.yaml
 	$(HELM) template mycluster deploy/redis > test/e2e/testdata/smoketest/redis/00_rediscluster.yaml
-	$(HELM) template mycluster deploy/redis-rep-cluster >> test/e2e/testdata/smoketest/redis/00_rediscluster.yaml
+	$(HELM) template mycluster deploy/redis-cluster >> test/e2e/testdata/smoketest/redis/00_rediscluster.yaml
 
 ##@ Test E2E
 GINKGO=$(shell which ginkgo)

@@ -15,11 +15,13 @@ package v1beta2
 
 import troubleshoot "github.com/replicatedhq/troubleshoot/pkg/apis/troubleshoot/v1beta2"
 
+// ExtendCollect defines extended data collector for k8s cluster
 type ExtendCollect struct {
 }
 
-type ClusterAccess struct {
-	// analyzeMeta is defined in troubleshoot.sh.
+// ClusterAccessAnalyze analyzes the accessibility of target
+type ClusterAccessAnalyze struct {
+	// analyzeMeta is defined in troubleshoot.sh
 	troubleshoot.AnalyzeMeta `json:",inline"`
 	// outcomes are expected user defined results.
 	// +kubebuilder:validation:Required
@@ -27,37 +29,63 @@ type ClusterAccess struct {
 }
 
 type ExtendAnalyze struct {
-	// clusterAccess is to determine the accessibility of target K8S cluster.
+	// clusterAccess is to determine the accessibility of target k8s cluster
 	// +optional
-	ClusterAccess *ClusterAccess `json:"clusterAccess,omitempty"`
+	ClusterAccess *ClusterAccessAnalyze `json:"clusterAccess,omitempty"`
 }
 
 type HostUtility struct {
-	// hostCollectorMeta is defined in troubleshoot.sh.
+	// hostCollectorMeta is defined in troubleshoot.sh
 	troubleshoot.HostCollectorMeta `json:",inline"`
-	// utilityName will be checked in local host.
+	// utilityName indicates the utility which will be checked in local host
 	// +kubebuilder:validation:Required
 	UtilityName string `json:"utilityName"`
 }
 
+type ClusterRegion struct {
+	// hostCollectorMeta is defined in troubleshoot.sh
+	troubleshoot.HostCollectorMeta `json:",inline"`
+	// providerName denotes which cloud provider target k8s located on
+	// +kubebuilder:validation:Required
+	ProviderName string `json:"providerName"`
+}
+
 type ExtendHostCollect struct {
-	// hostUtility is to collect the info of target utility.
+	// hostUtility is to collect the data of target utility.
 	// +optional
 	HostUtility *HostUtility `json:"hostUtility,omitempty"`
+	// ClusterRegion is to collect the data of target k8s
+	// +optional
+	ClusterRegion *ClusterRegion `json:"clusterRegion,omitempty"`
 }
 
 type HostUtilityAnalyze struct {
+	// hostCollectorMeta is defined in troubleshoot.sh
 	troubleshoot.AnalyzeMeta `json:",inline"`
 	// collectorName indicates which collect data will be analyzed
 	// +optional
 	CollectorName string `json:"collectorName,omitempty"`
+	// outcomes are expected user defined results
+	// +kubebuilder:validation:Required
+	Outcomes []*troubleshoot.Outcome `json:"outcomes"`
+}
+
+type ClusterRegionAnalyze struct {
+	// analyzeMeta is defined in troubleshoot.sh
+	troubleshoot.AnalyzeMeta `json:",inline"`
 	// outcomes are expected user defined results.
 	// +kubebuilder:validation:Required
 	Outcomes []*troubleshoot.Outcome `json:"outcomes"`
+	// regionNames is a set of expected region names
+	// +kubebuilder:validation:Required
+	RegionNames []string `json:"regionNames"`
 }
 
 type ExtendHostAnalyze struct {
 	// hostUtility is to analyze the presence of target utility.
 	// +optional
 	HostUtility *HostUtilityAnalyze `json:"hostUtility,omitempty"`
+	// ClusterRegion is to validate the regionName of target k8s cluster
+	// +optional
+	ClusterRegion *ClusterRegionAnalyze `json:"clusterRegion,omitempty"`
 }

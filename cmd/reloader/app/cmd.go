@@ -41,7 +41,7 @@ func NewConfigReloadCommand(ctx context.Context, name string) *cobra.Command {
 	opt := NewVolumeWatcherOpts()
 	cmd := &cobra.Command{
 		Use:   name,
-		Short: name + " Provides a mechanism to implement reload config files in a sidecar for kubeblocks.",
+		Short: name + " provides a mechanism to implement reload config files in a sidecar for kubeblocks.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runVolumeWatchCommand(ctx, opt)
 		},

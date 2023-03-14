@@ -1,0 +1,31 @@
+apiVersion: extensions.kubeblocks.io/v1alpha1
+kind: Addon
+metadata:
+  name: apecloud-mysql
+  labels:
+    {{- include "kubeblocks.labels" . | nindent 4 }}
+    "kubeblocks.io/provider": apecloud
+  {{- if .Values.keepAddons }}
+  annotations:
+    helm.sh/resource-policy: keep
+  {{- end }}
+spec:
+  description: 'ApeCloud MySQL is fully compatible with MySQL syntax and supports single-availability
+    zone deployment, double-availability zone deployment, and multiple-availability zone deployment.
+    Based on the Paxos consensus protocol, ApeCloud MySQL realizes automatic leader election, log
+    synchronization, and strict consistency. ApeCloud MySQL is the optimum choice for the production
+    environment since it can automatically perform a high-availability switch to maintain business continuity
+    when container exceptions, server exceptions, or availability zone exceptions occur.'
+
+  type: Helm
+
+  helm:
+    # chartLocationURL: https://github.com/apecloud/helm-charts/releases/download/apecloud-mysql-{{ default .Chart.Version .Values.versionOverride }}/apecloud-mysql-{{ default .Chart.Version .Values.versionOverride }}.tgz
+    chartLocationURL: https://jihulab.com/api/v4/projects/85949/packages/helm/stable/charts/apecloud-mysql-{{ default .Chart.Version .Values.versionOverride }}.tgz
+
+  defaultInstallValues:
+    - enabled: true
+
+  installable:
+    autoInstall: true
+

@@ -55,6 +55,7 @@ func (factory *MockRestoreJobFactory) AddTargetMatchLabels(keyAndValues ...strin
 }
 
 func (factory *MockRestoreJobFactory) SetTargetSecretName(name string) *MockRestoreJobFactory {
+	factory.get().Spec.Target.Secret = &dataprotectionv1alpha1.BackupPolicySecret{}
 	factory.get().Spec.Target.Secret.Name = name
 	return factory
 }

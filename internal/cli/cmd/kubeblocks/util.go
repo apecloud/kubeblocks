@@ -24,12 +24,14 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/pkg/errors"
+	"golang.org/x/exp/slices"
 	"helm.sh/helm/v3/pkg/repo"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/kubernetes"
 
+	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 	"github.com/apecloud/kubeblocks/internal/cli/util/helm"
@@ -43,7 +45,7 @@ func getGVRByCRD(crd *unstructured.Unstructured) (*schema.GroupVersionResource, 
 	}
 	return &schema.GroupVersionResource{
 		Group:    group,
-		Version:  types.Version,
+		Version:  types.AppsAPIVersion,
 		Resource: strings.Split(crd.GetName(), ".")[0],
 	}, nil
 }
@@ -75,15 +77,14 @@ func checkIfKubeBlocksInstalled(client kubernetes.Interface) (bool, string, erro
 
 func confirmUninstall(in io.Reader) error {
 	const confirmStr = "uninstall-kubeblocks"
-	entered, err := prompt.NewPrompt(fmt.Sprintf("You should type \"%s\"", confirmStr),
-		fmt.Sprintf("Please type \"%s\" to confirm:", confirmStr), in).GetInput()
-	if err != nil {
-		return err
-	}
-	if entered != confirmStr {
-		return fmt.Errorf("typed \"%s\" does not match \"%s\"", entered, confirmStr)
-	}
-	return nil
+	_, err := prompt.NewPrompt(fmt.Sprintf("Please type \"%s\" to confirm:", confirmStr),
+		func(input string) error {
+			if input != confirmStr {
+				return fmt.Errorf("typed \"%s\" does not match \"%s\"", input, confirmStr)
+			}
+			return nil
+		}, in).Run()
+	return err
 }
 
 func getHelmChartVersions(chart string) ([]*semver.Version, error) {
@@ -99,4 +100,39 @@ func getHelmChartVersions(chart string) ([]*semver.Version, error) {
 		return nil, errors.Wrap(err, errMsg)
 	}
 	return versions, nil
+}
+
+// buildResourceLabelSelectors builds labelSelectors that can be used to get all
+// KubeBlocks resources and addons resources.
+// KubeBlocks has two types of resources: KubeBlocks resources and addon resources,
+// KubeBlocks resources are created by KubeBlocks itself, and addon resources are
+// created by addons.
+//
+// KubeBlocks resources are labeled with "app.kubernetes.io/instance=types.KubeBlocksChartName",
+// and most addon resources are labeled with "app.kubernetes.io/instance=<addon-prefix>-addon.Name",
+// but some addon resources are labeled with "release=<addon-prefix>-addon.Name".
+func buildResourceLabelSelectors(addons []*extensionsv1alpha1.Addon) []string {
+	var (
+		selectors []string
+		releases  []string
+		instances = []string{types.KubeBlocksChartName}
+	)
+
+	// releaseLabelAddons is a list of addons that use "release" label to label its resources
+	// TODO: use a better way to avoid hard code, maybe add unified label to all addons
+	releaseLabelAddons := []string{"prometheus"}
+	for _, addon := range addons {
+		addonReleaseName := fmt.Sprintf("%s-%s", types.AddonReleasePrefix, addon.Name)
+		if slices.Contains(releaseLabelAddons, addon.Name) {
+			releases = append(releases, addonReleaseName)
+		} else {
+			instances = append(instances, addonReleaseName)
+		}
+	}
+
+	selectors = append(selectors, util.BuildLabelSelectorByNames("", instances))
+	if len(releases) > 0 {
+		selectors = append(selectors, fmt.Sprintf("release in (%s)", strings.Join(releases, ",")))
+	}
+	return selectors
 }

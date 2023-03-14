@@ -26,7 +26,7 @@ import (
 func NewKubeBlocksCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "kubeblocks [install | upgrade | list-versions | uninstall]",
-		Short:   "KubeBlocks operation commands",
+		Short:   "KubeBlocks operation commands.",
 		Aliases: []string{"kb"},
 	}
 	cmd.AddCommand(
@@ -36,5 +36,7 @@ func NewKubeBlocksCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *c
 		newListVersionsCmd(streams),
 		newStatusCmd(f, streams),
 	)
+	// add preflight cmd
+	cmd.AddCommand(NewPreflightCmd(f, streams))
 	return cmd
 }

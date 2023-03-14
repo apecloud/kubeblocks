@@ -21,18 +21,19 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"reflect"
 	"strings"
 	"time"
 
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	"github.com/spf13/viper"
-	appv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/utils/clock"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -153,6 +154,8 @@ func (r *BackupReconciler) doNewPhaseAction(
 	}
 	if backupPolicy.Status.Phase != dataprotectionv1alpha1.ConfigAvailable {
 		if backupPolicy.Status.Phase == dataprotectionv1alpha1.ConfigFailed {
+			// REVIEW/TODO: need avoid using dynamic error string, this is bad for
+			// error type checking (errors.Is)
 			err := fmt.Errorf("backupPolicy %s status is failed", backupPolicy.Name)
 			return r.updateStatusIfFailed(reqCtx, backup, err)
 		}
@@ -161,13 +164,15 @@ func (r *BackupReconciler) doNewPhaseAction(
 	}
 
 	// TODO: get pod with matching labels to do backup.
-	target, err := r.getTargetCluster(reqCtx, backupPolicy)
+	target, err := r.getTargetPod(reqCtx, backupPolicy)
 	if err != nil {
 		return r.updateStatusIfFailed(reqCtx, backup, err)
 	}
 
-	if err = r.patchBackupLabelsAndAnnotations(reqCtx, backup, target); err != nil {
+	if hasPatch, err := r.patchBackupLabelsAndAnnotations(reqCtx, backup, target); err != nil {
 		return r.updateStatusIfFailed(reqCtx, backup, err)
+	} else if hasPatch {
+		return intctrlutil.Reconciled()
 	}
 
 	// save the backup message for restore
@@ -303,22 +308,25 @@ func (r *BackupReconciler) updateStatusIfFailed(reqCtx intctrlutil.RequestCtx,
 func (r *BackupReconciler) patchBackupLabelsAndAnnotations(
 	reqCtx intctrlutil.RequestCtx,
 	backup *dataprotectionv1alpha1.Backup,
-	targetSts *appv1.StatefulSet) error {
-	patch := client.MergeFrom(backup.DeepCopy())
-	clusterName := targetSts.Labels[constant.AppInstanceLabelKey]
+	targetPod *corev1.Pod) (bool, error) {
+	oldBackup := backup.DeepCopy()
+	clusterName := targetPod.Labels[constant.AppInstanceLabelKey]
 	if len(clusterName) > 0 {
 		if err := r.setClusterSnapshotAnnotation(reqCtx, backup, types.NamespacedName{Name: clusterName, Namespace: backup.Namespace}); err != nil {
-			return err
+			return false, err
 		}
 	}
 	if backup.Labels == nil {
 		backup.Labels = make(map[string]string)
 	}
-	for k, v := range targetSts.Labels {
+	for k, v := range targetPod.Labels {
 		backup.Labels[k] = v
 	}
 	backup.Labels[dataProtectionLabelBackupTypeKey] = string(backup.Spec.BackupType)
-	return r.Client.Patch(reqCtx.Ctx, backup, patch)
+	if reflect.DeepEqual(oldBackup.ObjectMeta, backup.ObjectMeta) {
+		return false, nil
+	}
+	return true, r.Client.Patch(reqCtx.Ctx, backup, client.MergeFrom(oldBackup))
 }
 
 func (r *BackupReconciler) createPreCommandJobAndEnsure(reqCtx intctrlutil.RequestCtx,
@@ -333,7 +341,8 @@ func (r *BackupReconciler) createPreCommandJobAndEnsure(reqCtx intctrlutil.Reque
 		return true, err
 	}
 
-	key := types.NamespacedName{Namespace: reqCtx.Req.Namespace, Name: backup.Name + "-pre"}
+	mgrNS := viper.GetString(constant.CfgKeyCtrlrMgrNS)
+	key := types.NamespacedName{Namespace: mgrNS, Name: backup.Name + "-pre"}
 	if err := r.createHooksCommandJob(reqCtx, backup, key, true); err != nil {
 		return false, err
 	}
@@ -352,7 +361,8 @@ func (r *BackupReconciler) createPostCommandJobAndEnsure(reqCtx intctrlutil.Requ
 		return true, err
 	}
 
-	key := types.NamespacedName{Namespace: reqCtx.Req.Namespace, Name: backup.Name + "-post"}
+	mgrNS := viper.GetString(constant.CfgKeyCtrlrMgrNS)
+	key := types.NamespacedName{Namespace: mgrNS, Name: backup.Name + "-post"}
 	if err := r.createHooksCommandJob(reqCtx, backup, key, false); err != nil {
 		return false, err
 	}
@@ -405,15 +415,19 @@ func (r *BackupReconciler) createVolumeSnapshot(
 		return err
 	}
 
-	// build env value for access target cluster
-	target, err := r.getTargetCluster(reqCtx, backupPolicy)
-	if err != nil {
+	// fetch data-pvc by fixed labels: "kubeblocks.io/volume-type=data"
+	dataPVC := corev1.PersistentVolumeClaimList{}
+	dataPVCLabels := backupPolicy.Spec.Target.LabelsSelector.MatchLabels
+	dataPVCLabels[constant.VolumeTypeLabelKey] = string(appsv1alpha1.VolumeTypeData)
+	if err = r.Client.List(reqCtx.Ctx, &dataPVC,
+		client.InNamespace(reqCtx.Req.Namespace),
+		client.MatchingLabels(dataPVCLabels)); err != nil {
 		return err
 	}
-
-	// TODO(dsj): build pvc name 0
-	pvcTemplate := []string{target.Spec.VolumeClaimTemplates[0].Name, target.Name, "0"}
-	pvcName := strings.Join(pvcTemplate, "-")
+	if len(dataPVC.Items) == 0 {
+		return errors.New("can not find any pvc to backup by labelsSelector")
+	}
+	pvcName := dataPVC.Items[0].Name
 
 	snap = &snapshotv1.VolumeSnapshot{
 		ObjectMeta: metav1.ObjectMeta{
@@ -591,11 +605,6 @@ func (r *BackupReconciler) createBatchV1Job(
 	}
 	controllerutil.AddFinalizer(job, dataProtectionFinalizerName)
 
-	scheme, _ := dataprotectionv1alpha1.SchemeBuilder.Build()
-	if err := controllerutil.SetOwnerReference(backup, job, scheme); err != nil {
-		return err
-	}
-
 	reqCtx.Log.V(1).Info("create a built-in job from backup", "job", job)
 	if err := r.Client.Create(reqCtx.Ctx, job); err != nil {
 		return err
@@ -619,12 +628,23 @@ func (r *BackupReconciler) getBatchV1Job(reqCtx intctrlutil.RequestCtx, backup *
 
 func (r *BackupReconciler) deleteReferenceBatchV1Jobs(reqCtx intctrlutil.RequestCtx, backup *dataprotectionv1alpha1.Backup) error {
 	jobs := &batchv1.JobList{}
-
 	if err := r.Client.List(reqCtx.Ctx, jobs,
-		client.InNamespace(reqCtx.Req.Namespace),
+		client.InNamespace(backup.Namespace),
 		client.MatchingLabels(buildBackupLabels(backup))); err != nil {
 		return err
 	}
+	// if controller manager deploy in other namespace, do list and delete related jobs.
+	mgrNS := viper.GetString(constant.CfgKeyCtrlrMgrNS)
+	if mgrNS != backup.Namespace {
+		mgrJobs := &batchv1.JobList{}
+		if err := r.Client.List(reqCtx.Ctx, mgrJobs,
+			client.InNamespace(mgrNS),
+			client.MatchingLabels(buildBackupLabels(backup))); err != nil {
+			return err
+		}
+		jobs.Items = append(jobs.Items, mgrJobs.Items...)
+	}
+
 	for _, job := range jobs.Items {
 		if controllerutil.ContainsFinalizer(&job, dataProtectionFinalizerName) {
 			patch := client.MergeFrom(job.DeepCopy())
@@ -674,43 +694,19 @@ func (r *BackupReconciler) deleteExternalResources(reqCtx intctrlutil.RequestCtx
 	return nil
 }
 
-// TODO: get pod with matching labels to do backup.
-func (r *BackupReconciler) getTargetCluster(
-	reqCtx intctrlutil.RequestCtx, backupPolicy *dataprotectionv1alpha1.BackupPolicy) (*appv1.StatefulSet, error) {
-	// get stateful service
-	reqCtx.Log.V(1).Info("Get cluster from label", "label", backupPolicy.Spec.Target.LabelsSelector.MatchLabels)
-	clusterTarget := &appv1.StatefulSetList{}
-	if err := r.Client.List(reqCtx.Ctx, clusterTarget,
+func (r *BackupReconciler) getTargetPod(
+	reqCtx intctrlutil.RequestCtx, backupPolicy *dataprotectionv1alpha1.BackupPolicy) (*corev1.Pod, error) {
+	reqCtx.Log.V(1).Info("Get pod from label", "label", backupPolicy.Spec.Target.LabelsSelector.MatchLabels)
+	targetPod := &corev1.PodList{}
+	if err := r.Client.List(reqCtx.Ctx, targetPod,
 		client.InNamespace(reqCtx.Req.Namespace),
 		client.MatchingLabels(backupPolicy.Spec.Target.LabelsSelector.MatchLabels)); err != nil {
 		return nil, err
 	}
-	reqCtx.Log.V(1).Info("Get cluster target finish")
-	clusterItemsLen := len(clusterTarget.Items)
-	if clusterItemsLen != 1 {
-		if clusterItemsLen <= 0 {
-			return nil, errors.New("can not found any stateful sets by labelsSelector")
-		}
-		return nil, errors.New("match labels result more than one, check labelsSelector")
+	if len(targetPod.Items) == 0 {
+		return nil, errors.New("can not find any pod to backup by labelsSelector")
 	}
-	return &clusterTarget.Items[0], nil
-}
-
-func (r *BackupReconciler) getTargetClusterPod(
-	reqCtx intctrlutil.RequestCtx, clusterStatefulSet *appv1.StatefulSet) (*corev1.Pod, error) {
-	// get stateful service
-	clusterPod := &corev1.Pod{}
-	if err := r.Client.Get(reqCtx.Ctx,
-		types.NamespacedName{
-			Namespace: clusterStatefulSet.Namespace,
-			// TODO(dsj): dependency ConsensusSet defined "follower" label to filter
-			// Temporary get first pod to build backup volume info
-			Name: clusterStatefulSet.Name + "-0",
-		}, clusterPod); err != nil {
-		return nil, err
-	}
-	reqCtx.Log.V(1).Info("Get cluster pod finish", "target pod", clusterPod)
-	return clusterPod, nil
+	return &targetPod.Items[0], nil
 }
 
 func (r *BackupReconciler) buildBackupToolPodSpec(reqCtx intctrlutil.RequestCtx, backup *dataprotectionv1alpha1.Backup) (corev1.PodSpec, error) {
@@ -740,13 +736,7 @@ func (r *BackupReconciler) buildBackupToolPodSpec(reqCtx intctrlutil.RequestCtx,
 		return podSpec, err
 	}
 
-	// build env value for access target cluster
-	clusterStatefulset, err := r.getTargetCluster(reqCtx, backupPolicy)
-	if err != nil {
-		return podSpec, err
-	}
-
-	clusterPod, err := r.getTargetClusterPod(reqCtx, clusterStatefulset)
+	clusterPod, err := r.getTargetPod(reqCtx, backupPolicy)
 	if err != nil {
 		return podSpec, err
 	}
@@ -789,8 +779,10 @@ func (r *BackupReconciler) buildBackupToolPodSpec(reqCtx intctrlutil.RequestCtx,
 	remoteBackupPath := "/backupdata"
 
 	// TODO(dsj): mount multi remote backup volumes
+	randomVolumeName := fmt.Sprintf("%s-%s", backupPolicy.Spec.RemoteVolume.Name, rand.String(6))
+	backupPolicy.Spec.RemoteVolume.Name = randomVolumeName
 	remoteVolumeMount := corev1.VolumeMount{
-		Name:      backupPolicy.Spec.RemoteVolume.Name,
+		Name:      randomVolumeName,
 		MountPath: remoteBackupPath,
 	}
 	container.VolumeMounts = clusterPod.Spec.Containers[0].VolumeMounts
@@ -867,21 +859,15 @@ func (r *BackupReconciler) buildSnapshotPodSpec(
 		logger.Error(err, "Unable to get backupPolicy for backup.", "backupPolicy", backupPolicyNameSpaceName)
 		return podSpec, err
 	}
-
-	// build env value for access target cluster
-	clusterStatefulset, err := r.getTargetCluster(reqCtx, backupPolicy)
-	if err != nil {
-		return podSpec, err
-	}
-
-	clusterPod, err := r.getTargetClusterPod(reqCtx, clusterStatefulset)
+	clusterPod, err := r.getTargetPod(reqCtx, backupPolicy)
 	if err != nil {
 		return podSpec, err
 	}
 
 	container := corev1.Container{}
 	container.Name = backup.Name
-	container.Command = []string{"kubectl", "exec", "-i", clusterPod.Name, "-c", backupPolicy.Spec.Hooks.ContainerName, "--", "sh", "-c"}
+	container.Command = []string{"kubectl", "exec", "-n", backup.Namespace,
+		"-i", clusterPod.Name, "-c", backupPolicy.Spec.Hooks.ContainerName, "--", "sh", "-c"}
 	if preCommand {
 		container.Args = backupPolicy.Spec.Hooks.PreCommands
 	} else {

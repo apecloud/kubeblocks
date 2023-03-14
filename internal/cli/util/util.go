@@ -65,7 +65,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/constant"
+	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
 var (
@@ -382,10 +382,10 @@ func CheckEmpty(str string) string {
 // like "instance-key in (name1, name2)"
 func BuildLabelSelectorByNames(selector string, names []string) string {
 	if len(names) == 0 {
-		return ""
+		return selector
 	}
 
-	label := fmt.Sprintf("%s in (%s)", intctrlutil.AppInstanceLabelKey, strings.Join(names, ","))
+	label := fmt.Sprintf("%s in (%s)", constant.AppInstanceLabelKey, strings.Join(names, ","))
 	if len(selector) == 0 {
 		return label
 	} else {
@@ -590,7 +590,7 @@ func GetHelmChartRepoURL() string {
 
 // GetKubeBlocksNamespace gets namespace of KubeBlocks installation, infer namespace from helm secrets
 func GetKubeBlocksNamespace(client kubernetes.Interface) (string, error) {
-	secrets, err := client.CoreV1().Secrets(metav1.NamespaceAll).List(context.TODO(), metav1.ListOptions{LabelSelector: types.HelmLabel})
+	secrets, err := client.CoreV1().Secrets(metav1.NamespaceAll).List(context.TODO(), metav1.ListOptions{LabelSelector: types.KubeBlocksHelmLabel})
 	// if KubeBlocks is upgraded, there will be multiple secrets
 	if err == nil && len(secrets.Items) >= 1 {
 		return secrets.Items[0].Namespace, nil
@@ -667,4 +667,9 @@ func GetK8SProvider(client kubernetes.Interface) (K8sProvider, error) {
 		return "", versionErr
 	}
 	return GetK8sProvider(k8sVersionStr), nil
+}
+
+// BuildAddonReleaseName returns the release name of addon, its f
+func BuildAddonReleaseName(addon string) string {
+	return fmt.Sprintf("%s-%s", types.AddonReleasePrefix, addon)
 }

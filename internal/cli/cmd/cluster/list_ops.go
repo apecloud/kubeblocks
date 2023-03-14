@@ -18,7 +18,6 @@ package cluster
 
 import (
 	"context"
-	"fmt"
 	"sort"
 	"strings"
 
@@ -47,8 +46,9 @@ var listOpsExample = templates.Examples(`
 
 type opsListOptions struct {
 	*list.ListOptions
-	status  []string
-	opsType []string
+	status         []string
+	opsType        []string
+	opsRequestName string
 }
 
 func NewListOpsCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
@@ -57,7 +57,7 @@ func NewListOpsCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 	}
 	cmd := &cobra.Command{
 		Use:               "list-ops",
-		Short:             "List all opsRequests",
+		Short:             "List all opsRequests.",
 		Aliases:           []string{"ls-ops"},
 		Example:           listOpsExample,
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.ClusterGVR()),
@@ -74,6 +74,7 @@ func NewListOpsCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 	o.AddFlags(cmd)
 	cmd.Flags().StringSliceVar(&o.opsType, "type", nil, "The OpsRequest type")
 	cmd.Flags().StringSliceVar(&o.status, "status", []string{"running", "pending", "failed"}, "Options include all, pending, running, succeeded, failed. by default, outputs the pending/running/failed OpsRequest.")
+	cmd.Flags().StringVar(&o.opsRequestName, "name", "", "The OpsRequest name to get the details.")
 	return cmd
 }
 
@@ -92,40 +93,50 @@ func (o *opsListOptions) printOpsList() error {
 	if err != nil {
 		return err
 	}
+	if len(opsList.Items) == 0 {
+		o.PrintNotFoundResources()
+		return nil
+	}
 	// sort the unstructured objects with the creationTimestamp in positive order
 	sort.Sort(unstructuredList(opsList.Items))
 
-	var (
-		// check if existing the resources to print.
-		hasResources bool
-		// check if specific the "all" keyword for status.
-		isAllStatus = o.isAllStatus()
-	)
-	tbl := printer.NewTablePrinter(o.Out)
-	tbl.SetHeader("NAME", "TYPE", "CLUSTER", "COMPONENT", "STATUS", "PROGRESS", "CREATED-TIME")
+	// check if specific the "all" keyword for status.
+	isAllStatus := o.isAllStatus()
+	tblPrinter := printer.NewTablePrinter(o.Out)
+	tblPrinter.SetHeader("NAME", "TYPE", "CLUSTER", "COMPONENT", "STATUS", "PROGRESS", "CREATED-TIME")
 	for _, obj := range opsList.Items {
 		ops := &appsv1alpha1.OpsRequest{}
 		if err = runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, ops); err != nil {
 			return err
 		}
-		// if the OpsRequest phase is not in the expected phases, continue
 		phase := string(ops.Status.Phase)
+		opsType := string(ops.Spec.Type)
+		if len(o.opsRequestName) != 0 {
+			if ops.Name == o.opsRequestName {
+				tblPrinter.AddRow(ops.Name, opsType, ops.Spec.ClusterRef, getComponentNameFromOps(ops), phase, ops.Status.Progress, util.TimeFormat(&ops.CreationTimestamp))
+			}
+			continue
+		}
+		// if the OpsRequest phase is not in the expected phases, continue
 		if !isAllStatus && !o.containsIgnoreCase(o.status, phase) {
 			continue
 		}
 
-		opsType := string(ops.Spec.Type)
 		if len(o.opsType) != 0 && !o.containsIgnoreCase(o.opsType, opsType) {
 			continue
 		}
-		hasResources = true
-		tbl.AddRow(ops.Name, opsType, ops.Spec.ClusterRef, getComponentNameFromOps(ops), phase, ops.Status.Progress, util.TimeFormat(&ops.CreationTimestamp))
+		tblPrinter.AddRow(ops.Name, opsType, ops.Spec.ClusterRef, getComponentNameFromOps(ops), phase, ops.Status.Progress, util.TimeFormat(&ops.CreationTimestamp))
 	}
-	if hasResources {
-		tbl.Print()
-	} else {
-		o.printNoFoundResources()
+	if tblPrinter.Tbl.Length() != 0 {
+		tblPrinter.Print()
+		return nil
 	}
+	message := "No opsRequests found"
+	if len(o.opsRequestName) == 0 && !o.isAllStatus() {
+		// if do not view the ops in all status and do not specify the opsName, add this prompt command.
+		message += ", you can try as follows:\n\tkbcli cluster list-ops --status all"
+	}
+	printer.PrintLine(message)
 	return nil
 }
 
@@ -151,7 +162,7 @@ func getComponentNameFromOps(ops *appsv1alpha1.OpsRequest) string {
 		for _, item := range opsSpec.VerticalScalingList {
 			components = append(components, item.ComponentName)
 		}
-	case appsv1alpha1.UpgradeType:
+	default:
 		for k := range ops.Status.Components {
 			components = append(components, k)
 		}
@@ -184,15 +195,6 @@ func getKeyNameFromOps(ops appsv1alpha1.OpsRequestSpec) string {
 		}
 	}
 	return strings.Join(keys, ",")
-}
-
-// printNoFoundResources prints the message when the resources not found.
-func (o *opsListOptions) printNoFoundResources() {
-	message := "No resources found"
-	if !o.AllNamespaces && len(o.Namespace) != 0 {
-		message += fmt.Sprintf(" in %s namespace", o.Namespace)
-	}
-	fmt.Fprintln(o.Out, message)
 }
 
 func (o *opsListOptions) containsIgnoreCase(s []string, e string) bool {

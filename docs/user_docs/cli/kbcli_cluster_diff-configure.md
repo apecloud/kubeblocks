@@ -1,6 +1,8 @@
-## kbcli cluster diff-configure
+---
+title: kbcli cluster diff-configure
+---
 
-List the constraint for supported configuration params
+Show the difference in parameters between the two submitted OpsRequest.
 
 ```
 kbcli cluster diff-configure [flags]
@@ -45,5 +47,7 @@ kbcli cluster diff-configure [flags]
 
 ### SEE ALSO
 
-* [kbcli cluster](kbcli_cluster.md)	 - Cluster command
+* [kbcli cluster](kbcli_cluster.md)	 - Cluster command.
+
+#### Go Back to [CLI Overview](cli.md) Homepage.
 

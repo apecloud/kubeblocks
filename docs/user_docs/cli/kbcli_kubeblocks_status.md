@@ -1,6 +1,8 @@
-## kbcli kubeblocks status
+---
+title: kbcli kubeblocks status
+---
 
-Show list of resource KubeBlocks uses or owns
+Show list of resource KubeBlocks uses or owns.
 
 ```
 kbcli kubeblocks status [flags]
@@ -19,7 +21,7 @@ kbcli kubeblocks status [flags]
 ### Options
 
 ```
-      --all    Show all resources, including configurations, storages, etc
+  -A, --all    Show all resources, including configurations, storages, etc
   -h, --help   help for status
 ```
 
@@ -49,5 +51,7 @@ kbcli kubeblocks status [flags]
 
 ### SEE ALSO
 
-* [kbcli kubeblocks](kbcli_kubeblocks.md)	 - KubeBlocks operation commands
+* [kbcli kubeblocks](kbcli_kubeblocks.md)	 - KubeBlocks operation commands.
+
+#### Go Back to [CLI Overview](cli.md) Homepage.
 

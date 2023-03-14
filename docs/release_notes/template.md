@@ -20,7 +20,17 @@ We would like to extend our appreciation to all contributors who helped make thi
     * KB_CLUSTER_NAME - KubeBlock Cluster API object name
     * KB_COMP_NAME - Running pod's KubeBlock Cluster API object's `.spec.components.name`
     * KB_CLUSTER_COMP_NAME - Running pod's KubeBlock Cluster API object's `<.metadata.name>-<.spec.components.name>`, same name is used for Deployment or StatefulSet workload name, and Service object name
-  * New addons.extensions.kubeblocks.io API, with Addon management controller, where KubeBlocks allow addon extensions instead of using Helm sub-charts dependencies.
+  * New KubeBlocks addon extensions management (an addon components are part of KubeBlocks control plane extensions). Highlights include: 
+    * New addons.extensions.kubeblocks.io API that provide running cluster installable check and auto-installation settings.
+    * Following addons are provided:
+      * Prometheus and Alertmanager
+      * AlertManager Webhook Adaptor
+      * Grafana
+      * S3 CSI driver
+      * Snapshot Controller
+      * KubeBlocks private network Load Balancer
+      * ApeCloud MySQL ClusterDefinition API
+      * Community PostgreSQL ClusterDefinition API
   * ClusterDefinition API `spec.connectionCredential` add following built-in variables:
     * A random UUID v4 generator `$(UUID)`
     * A random UUID v4 generator with BASE64 encoded `$(UUID_B64)`
@@ -137,5 +147,6 @@ $kubeblocks_breaking_changes
     - Add label `app.kubernetes.io/component` with value `Cluster.Spec.ComponentSpecs.ComponentDefRef`
   - CR `backuppolicytemplate`
     - Replace label name from `app.kubernetes.io/created-by` to `app.kubernetes.io/managed-by`
-  - Configmap hosted by Kubeblocks and named with `*-env` suffix
+  - Configmap hosted by KubeBlocks and named with `*-env` suffix
     - Replace label name from `app.kubernetes.io/config-type` to `apps.kubeblocks.io/config-type`
+* With KubeBlocks Helm chart replaced its optional components install using sub-charts dependencies with Addons extensions API, previous version upgrade to this version will uninstall the optional components completely.

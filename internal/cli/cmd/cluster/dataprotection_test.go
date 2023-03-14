@@ -17,6 +17,7 @@ limitations under the License.
 package cluster
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"time"
@@ -36,6 +37,7 @@ import (
 
 	"github.com/apecloud/kubeblocks/internal/cli/create"
 	"github.com/apecloud/kubeblocks/internal/cli/delete"
+	"github.com/apecloud/kubeblocks/internal/cli/list"
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
@@ -73,9 +75,10 @@ var _ = Describe("DataProtection", func() {
 		})
 
 		It("run backup command", func() {
+			clusterDef := testing.FakeClusterDef()
 			cluster := testing.FakeCluster(testing.ClusterName, testing.Namespace)
 			clusterDefLabel := map[string]string{
-				constant.ClusterDefLabelKey: "apecloud-mysql",
+				constant.ClusterDefLabelKey: clusterDef.Name,
 			}
 			cluster.SetLabels(clusterDefLabel)
 
@@ -83,13 +86,14 @@ var _ = Describe("DataProtection", func() {
 			template.SetLabels(clusterDefLabel)
 
 			secrets := testing.FakeSecrets(testing.Namespace, testing.ClusterName)
-			tf.FakeDynamicClient = fake.NewSimpleDynamicClient(scheme.Scheme, &secrets.Items[0], cluster, template)
+			tf.FakeDynamicClient = fake.NewSimpleDynamicClient(scheme.Scheme, &secrets.Items[0], cluster, clusterDef, template)
 			cmd := NewCreateBackupCmd(tf, streams)
 			Expect(cmd).ShouldNot(BeNil())
 			// must succeed otherwise exit 1 and make test fails
 			_ = cmd.Flags().Set("backup-type", "snapshot")
 			cmd.Run(cmd, []string{testing.ClusterName})
 		})
+
 	})
 
 	It("delete-backup", func() {
@@ -120,6 +124,21 @@ var _ = Describe("DataProtection", func() {
 	It("list-backup", func() {
 		cmd := NewListBackupCmd(tf, streams)
 		Expect(cmd).ShouldNot(BeNil())
+		By("test list-backup cmd with no backup")
+		tf.FakeDynamicClient = testing.FakeDynamicClient()
+		o := list.NewListOptions(tf, streams, types.BackupGVR())
+		Expect(printBackupList(o)).Should(Succeed())
+		Expect(o.ErrOut.(*bytes.Buffer).String()).Should(ContainSubstring("No backups found"))
+
+		By("test list-backup")
+		backup1 := testing.FakeBackup("test1")
+		backup1.Labels = map[string]string{
+			constant.AppInstanceLabelKey: "apecloud-mysql",
+		}
+		tf.FakeDynamicClient = testing.FakeDynamicClient(backup1)
+		Expect(printBackupList(o)).Should(Succeed())
+		Expect(o.Out.(*bytes.Buffer).String()).Should(ContainSubstring("test1"))
+		Expect(o.Out.(*bytes.Buffer).String()).Should(ContainSubstring("apecloud-mysql (deleted)"))
 	})
 
 	It("delete-restore", func() {
@@ -158,17 +177,17 @@ var _ = Describe("DataProtection", func() {
 		clusterName := "source-cluster-" + timestamp
 		newClusterName := "new-cluster-" + timestamp
 		secrets := testing.FakeSecrets(testing.Namespace, clusterName)
-		clusterDefLabel := map[string]string{
-			constant.ClusterDefLabelKey: "apecloud-mysql",
-		}
-
+		clusterDef := testing.FakeClusterDef()
 		cluster := testing.FakeCluster(clusterName, testing.Namespace)
+		clusterDefLabel := map[string]string{
+			constant.ClusterDefLabelKey: clusterDef.Name,
+		}
 		cluster.SetLabels(clusterDefLabel)
 
 		template := testing.FakeBackupPolicyTemplate()
 		template.SetLabels(clusterDefLabel)
 
-		tf.FakeDynamicClient = fake.NewSimpleDynamicClient(scheme.Scheme, &secrets.Items[0], cluster, template)
+		tf.FakeDynamicClient = fake.NewSimpleDynamicClient(scheme.Scheme, &secrets.Items[0], clusterDef, cluster, template)
 		// create backup
 		cmd := NewCreateBackupCmd(tf, streams)
 		Expect(cmd).ShouldNot(BeNil())
@@ -185,7 +204,7 @@ var _ = Describe("DataProtection", func() {
 		cmdRestore.Run(nil, []string{newClusterName})
 
 		By("restore new cluster from source cluster which is deleted")
-		// mock cluster is not lived in kubenertes
+		// mock cluster is not lived in kubernetes
 		mockBackupInfo(tf.FakeDynamicClient, backupName, "deleted-cluster")
 		cmdRestore.Run(nil, []string{newClusterName + "1"})
 

@@ -20,6 +20,7 @@ import (
 	"context"
 	"embed"
 	"encoding/json"
+	"fmt"
 	"sort"
 	"time"
 
@@ -37,6 +38,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
@@ -52,6 +54,7 @@ type BackupPolicyReconciler struct {
 type backupPolicyOptions struct {
 	Name           string           `json:"name"`
 	Namespace      string           `json:"namespace"`
+	MgrNamespace   string           `json:"mgrNamespace"`
 	Cluster        string           `json:"cluster"`
 	Schedule       string           `json:"schedule"`
 	BackupType     string           `json:"backupType"`
@@ -156,10 +159,19 @@ func (r *BackupPolicyReconciler) doInProgressPhaseAction(
 		backupPolicy.Labels[k] = v
 	}
 
+	if backupPolicy.Spec.Target.Secret == nil {
+		backupPolicy.Spec.Target.Secret = &dataprotectionv1alpha1.BackupPolicySecret{}
+	}
+
 	// merge backup policy template spec
 	if err := r.mergeBackupPolicyTemplate(reqCtx, backupPolicy); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
+
+	if err := r.fillSecretName(reqCtx, backupPolicy, true); err != nil {
+		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+	}
+	// fill remaining fields
 	r.fillDefaultValueIfRequired(backupPolicy)
 
 	if err := r.Client.Patch(reqCtx.Ctx, backupPolicy, patch); err != nil {
@@ -225,6 +237,13 @@ func (r *BackupPolicyReconciler) mergeBackupPolicyTemplate(
 	if backupPolicy.Spec.BackupToolName == "" {
 		backupPolicy.Spec.BackupToolName = template.Spec.BackupToolName
 	}
+
+	// if template.Spec.CredentialKeyword is nil, use system account; else use root conn secret
+	useSysAcct := template.Spec.CredentialKeyword == nil
+	if err := r.fillSecretName(reqCtx, backupPolicy, useSysAcct); err != nil {
+		return err
+	}
+
 	if template.Spec.CredentialKeyword != nil {
 		if backupPolicy.Spec.Target.Secret.UserKeyword == "" {
 			backupPolicy.Spec.Target.Secret.UserKeyword = template.Spec.CredentialKeyword.UserKeyword
@@ -258,6 +277,47 @@ func (r *BackupPolicyReconciler) fillDefaultValueIfRequired(backupPolicy *datapr
 	}
 }
 
+// fillSecretName fills secret name if it is empty.
+// If BackupPolicy.Sect.Target.Secret is not nil, use secret specified in BackupPolicy.
+// Otherwise, lookup BackupPolicyTemplate and check if username and password are specified.
+// If so, use root connection secret; otherwise, try system account before root connection.
+func (r *BackupPolicyReconciler) fillSecretName(reqCtx intctrlutil.RequestCtx, backupPolicy *dataprotectionv1alpha1.BackupPolicy, useSysAccount bool) error {
+	if len(backupPolicy.Spec.Target.Secret.Name) > 0 {
+		return nil
+	}
+	// get cluster name from labels
+	instanceName := backupPolicy.Spec.Target.LabelsSelector.MatchLabels[constant.AppInstanceLabelKey]
+	if len(instanceName) == 0 {
+		// REVIEW/TODO: need avoid using dynamic error string, this is bad for
+		// error type checking (errors.Is)
+		return fmt.Errorf("failed to get instance name from labels: %v", backupPolicy.Spec.Target.LabelsSelector.MatchLabels)
+	}
+	var labels map[string]string
+	if useSysAccount {
+		labels = map[string]string{
+			constant.AppInstanceLabelKey:    instanceName,
+			constant.ClusterAccountLabelKey: (string)(appsv1alpha1.DataprotectionAccount),
+		}
+	} else {
+		labels = map[string]string{
+			constant.AppInstanceLabelKey:  instanceName,
+			constant.AppManagedByLabelKey: constant.AppName,
+		}
+	}
+
+	secrets := corev1.SecretList{}
+	if err := r.Client.List(reqCtx.Ctx, &secrets, client.MatchingLabels(labels)); err != nil {
+		return err
+	}
+	if len(secrets.Items) > 0 {
+		backupPolicy.Spec.Target.Secret.Name = secrets.Items[0].GetName()
+		return nil
+	}
+	// REVIEW/TODO: need avoid using dynamic error string, this is bad for
+	// error type checking (errors.Is)
+	return fmt.Errorf("no secret found for backup policy %s", backupPolicy.GetName())
+}
+
 func (r *BackupPolicyReconciler) buildCronJob(backupPolicy *dataprotectionv1alpha1.BackupPolicy) (*batchv1.CronJob, error) {
 	tplFile := "cronjob.cue"
 	cueFS, _ := debme.FS(cueTemplates, "cue")
@@ -274,6 +334,7 @@ func (r *BackupPolicyReconciler) buildCronJob(backupPolicy *dataprotectionv1alph
 		TTL:            backupPolicy.Spec.TTL,
 		BackupType:     backupPolicy.Spec.BackupType,
 		ServiceAccount: viper.GetString("KUBEBLOCKS_SERVICEACCOUNT_NAME"),
+		MgrNamespace:   viper.GetString("CM_NAMESPACE"),
 	}
 	backupPolicyOptionsByte, err := json.Marshal(options)
 	if err != nil {
@@ -294,11 +355,6 @@ func (r *BackupPolicyReconciler) buildCronJob(backupPolicy *dataprotectionv1alph
 	}
 
 	controllerutil.AddFinalizer(&cronjob, dataProtectionFinalizerName)
-
-	scheme, _ := dataprotectionv1alpha1.SchemeBuilder.Build()
-	if err := controllerutil.SetOwnerReference(backupPolicy, &cronjob, scheme); err != nil {
-		return nil, err
-	}
 
 	// set labels
 	for k, v := range backupPolicy.Labels {
@@ -387,7 +443,7 @@ func (r *BackupPolicyReconciler) deleteExternalResources(reqCtx intctrlutil.Requ
 	cronjob := &batchv1.CronJob{}
 
 	key := types.NamespacedName{
-		Namespace: backupPolicy.Namespace,
+		Namespace: viper.GetString("CM_NAMESPACE"),
 		Name:      backupPolicy.Name,
 	}
 	if err := r.Client.Get(reqCtx.Ctx, key, cronjob); err != nil {

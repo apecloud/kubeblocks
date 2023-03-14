@@ -1,6 +1,8 @@
-## kbcli cluster expose
+---
+title: kbcli cluster expose
+---
 
-Expose a cluster
+Expose a cluster.
 
 ```
 kbcli cluster expose [flags]
@@ -25,7 +27,7 @@ kbcli cluster expose [flags]
       --component-names strings       Component names to this operations
       --enable string                Enable or disable the expose, values can be true or false
   -h, --help                         help for expose
-      --ops-request string           OpsRequest name. if not specified, it will be randomly generated 
+      --name string                  OpsRequest name. if not specified, it will be randomly generated 
       --ttlSecondsAfterSucceed int   Time to live after the OpsRequest succeed
       --type string                  Expose type, currently supported types are 'vpc', 'internet'
 ```
@@ -56,5 +58,7 @@ kbcli cluster expose [flags]
 
 ### SEE ALSO
 
-* [kbcli cluster](kbcli_cluster.md)	 - Cluster command
+* [kbcli cluster](kbcli_cluster.md)	 - Cluster command.
+
+#### Go Back to [CLI Overview](cli.md) Homepage.
 

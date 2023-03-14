@@ -21,10 +21,6 @@ DEBIAN_MIRROR=mirrors.aliyun.com
 DOCKER:=docker
 DOCKERFILE_DIR?=./docker
 
-LB_IMG ?= docker.io/apecloud/loadbalancer
-LB_VERSION ?= 0.1.2
-LB_TAG ?= v$(LB_VERSION)
-
 # Image URL to use all building/pushing image targets
 IMG ?= docker.io/apecloud/$(APP_NAME)
 CLI_IMG ?= docker.io/apecloud/kbcli
@@ -68,7 +64,7 @@ push-cli-image: clean-kbcli build-checks bin/kbcli.linux.amd64 bin/kbcli.linux.a
 
 
 .PHONY: build-manager-image
-build-manager-image: ## Build Operator manager container image.
+build-manager-image: generate ## Build Operator manager container image.
 ifneq ($(BUILDX_ENABLED), true)
 	docker build . -t ${IMG}:${VERSION} -f $(DOCKERFILE_DIR)/Dockerfile -t ${IMG}:latest
 else
@@ -81,7 +77,7 @@ endif
 
 
 .PHONY: push-manager-image
-push-manager-image: ## Push Operator manager container image.
+push-manager-image: generate ## Push Operator manager container image.
 ifneq ($(BUILDX_ENABLED), true)
 ifeq ($(TAG_LATEST), true)
 	docker push ${IMG}:latest
@@ -97,30 +93,30 @@ endif
 endif
 
 .PHONY: build-loadbalancer-image
-build-loadbalancer-image: ## Push docker image with the loadbalancer.
+build-loadbalancer-image: generate ## Push docker image with the loadbalancer.
 ifneq ($(BUILDX_ENABLED), true)
-	docker build . -t ${LB_IMG}:${LB_TAG} -t ${LB_IMG}:latest -f $(DOCKERFILE_DIR)/Dockerfile-loadbalancer
+	docker build . -t ${IMG}:${VERSION} -t ${IMG}:latest -f $(DOCKERFILE_DIR)/Dockerfile-loadbalancer
 else
 ifeq ($(TAG_LATEST), true)
-	docker buildx build . $(DOCKER_BUILD_ARGS) --platform $(BUILDX_PLATFORMS) -t ${LB_IMG}:latest -f $(DOCKERFILE_DIR)/Dockerfile-loadbalancer $(BUILDX_ARGS)
+	docker buildx build . $(DOCKER_BUILD_ARGS) --platform $(BUILDX_PLATFORMS) -t ${IMG}:latest -f $(DOCKERFILE_DIR)/Dockerfile-loadbalancer $(BUILDX_ARGS)
 else
-	docker buildx build . $(DOCKER_BUILD_ARGS) --platform $(BUILDX_PLATFORMS) -t ${LB_IMG}:${LB_TAG} -f $(DOCKERFILE_DIR)/Dockerfile-loadbalancer $(BUILDX_ARGS)
+	docker buildx build . $(DOCKER_BUILD_ARGS) --platform $(BUILDX_PLATFORMS) -t ${IMG}:${VERSION} -f $(DOCKERFILE_DIR)/Dockerfile-loadbalancer $(BUILDX_ARGS)
 endif
 endif
 
 .PHONY: push-loadbalancer-image
-push-loadbalancer-image: ## Push docker image with the loadbalancer.
+push-loadbalancer-image: generate ## Push docker image with the loadbalancer.
 ifneq ($(BUILDX_ENABLED), true)
 ifeq ($(TAG_LATEST), true)
-	docker push ${LB_IMG}:latest
+	docker push ${IMG}:latest
 else
-	docker push ${LB_IMG}:${LB_TAG}
+	docker push ${IMG}:${VERSION}
 endif
 else
 ifeq ($(TAG_LATEST), true)
-	docker buildx build . $(DOCKER_BUILD_ARGS) --platform $(BUILDX_PLATFORMS) -t ${LB_IMG}:latest -f $(DOCKERFILE_DIR)/Dockerfile-loadbalancer --push $(BUILDX_ARGS)
+	docker buildx build . $(DOCKER_BUILD_ARGS) --platform $(BUILDX_PLATFORMS) -t ${IMG}:latest -f $(DOCKERFILE_DIR)/Dockerfile-loadbalancer --push $(BUILDX_ARGS)
 else
-	docker buildx build . $(DOCKER_BUILD_ARGS) --platform $(BUILDX_PLATFORMS) -t ${LB_IMG}:${LB_TAG} -f $(DOCKERFILE_DIR)/Dockerfile-loadbalancer --push $(BUILDX_ARGS)
+	docker buildx build . $(DOCKER_BUILD_ARGS) --platform $(BUILDX_PLATFORMS) -t ${IMG}:${VERSION} -f $(DOCKERFILE_DIR)/Dockerfile-loadbalancer --push $(BUILDX_ARGS)
 endif
 endif
 

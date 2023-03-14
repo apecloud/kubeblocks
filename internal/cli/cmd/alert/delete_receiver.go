@@ -44,7 +44,7 @@ func newDeleteReceiverCmd(f cmdutil.Factory, streams genericclioptions.IOStreams
 	o := &deleteReceiverOptions{baseOptions: baseOptions{IOStreams: streams}}
 	cmd := &cobra.Command{
 		Use:     "delete-receiver NAME",
-		Short:   "Delete alert receiver",
+		Short:   "Delete alert receiver.",
 		Example: deleteReceiverExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			util.CheckErr(o.complete(f))
@@ -114,6 +114,12 @@ func (o *deleteReceiverOptions) deleteReceiver() error {
 			newRoutes = append(newRoutes, r)
 		}
 	}
+
+	// check if receiver exists
+	if len(receivers) == len(newReceivers) {
+		return fmt.Errorf("receiver %s not found", strings.Join(o.names, ","))
+	}
+
 	data["receivers"] = newReceivers
 	data["route"].(map[string]interface{})["routes"] = newRoutes
 	return updateConfig(o.client, o.alterConfigMap, alertConfigFileName, data)

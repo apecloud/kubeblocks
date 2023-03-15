@@ -17,29 +17,15 @@ limitations under the License.
 package lifecycle
 
 import (
-	"k8s.io/apimachinery/pkg/types"
-	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 type enableLogsValidator struct {
-	req     ctrl.Request
-	cli     client.Client
-	ctx     intctrlutil.RequestCtx
-	cluster *appsv1alpha1.Cluster
+	cluster    *appsv1alpha1.Cluster
+	clusterDef *appsv1alpha1.ClusterDefinition
 }
 
 func (e *enableLogsValidator) Validate() error {
-	clusterDefinition := &appsv1alpha1.ClusterDefinition{}
-	if err := e.cli.Get(e.ctx.Ctx, types.NamespacedName{Name: e.cluster.Spec.ClusterDefRef}, clusterDefinition); err != nil {
-		return err
-	}
 	// validate config and send warning event log necessarily
-	if err := e.cluster.ValidateEnabledLogs(clusterDefinition); err != nil {
-		return newRequeueError(ControllerErrorRequeueTime, err.Error())
-	}
-	return nil
+	return e.cluster.ValidateEnabledLogs(e.clusterDef)
 }

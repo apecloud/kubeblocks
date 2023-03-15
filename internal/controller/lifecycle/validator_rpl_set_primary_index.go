@@ -17,29 +17,14 @@ limitations under the License.
 package lifecycle
 
 import (
-	"k8s.io/apimachinery/pkg/types"
-	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 type rplSetPrimaryIndexValidator struct {
-	req     ctrl.Request
-	cli     client.Client
-	ctx     intctrlutil.RequestCtx
-	cluster *appsv1alpha1.Cluster
+	cluster    *appsv1alpha1.Cluster
+	clusterDef *appsv1alpha1.ClusterDefinition
 }
 
 func (r *rplSetPrimaryIndexValidator) Validate() error {
-	clusterDefinition := &appsv1alpha1.ClusterDefinition{}
-	if err := r.cli.Get(r.ctx.Ctx, types.NamespacedName{Name: r.cluster.Spec.ClusterDefRef}, clusterDefinition); err != nil {
-		return err
-	}
-	// validate primaryIndex and send warning event log necessarily
-	if err := r.cluster.ValidatePrimaryIndex(clusterDefinition); err != nil {
-		return newRequeueError(ControllerErrorRequeueTime, err.Error())
-	}
-	return nil
+	return r.cluster.ValidatePrimaryIndex(r.clusterDef)
 }

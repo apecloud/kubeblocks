@@ -178,23 +178,46 @@ func (c *clusterPlanBuilder) Init() error {
 }
 
 func (c *clusterPlanBuilder) Validate() error {
-	crChain := &graph.ValidatorChain{
-		&clusterDefinitionValidator{req: c.req, cli: c.cli, ctx: c.ctx, cluster: c.cluster},
-		&clusterVersionValidator{req: c.req, cli: c.cli, ctx: c.ctx, cluster: c.cluster},
-	}
-	if err := crChain.WalkThrough(); err != nil {
-		message := fmt.Sprintf("ref resource is unavailable, this problem needs to be solved first: %v", err)
-		_ = c.conMgr.setReferenceCRUnavailableCondition(c.cluster, message)
-		return err
+	validateExistence := func(key client.ObjectKey, object client.Object) error {
+		err := c.cli.Get(c.ctx.Ctx, key, object)
+		if err != nil {
+			_ = c.conMgr.setPreCheckErrorCondition(c.cluster, err)
+			// If using RequeueWithError and the user fixed this error,
+			// it may take up to 1000s to reconcile again, causing the user to think that the repair is not effective.
+			return newRequeueError(ControllerErrorRequeueTime, err.Error())
+		}
+		return nil
 	}
 
+	// validate cd & cv existences
+	cd := &appsv1alpha1.ClusterDefinition{}
+	if err := validateExistence(types.NamespacedName{Name: c.cluster.Spec.ClusterDefRef}, cd); err != nil {
+		return err
+	}
+	var cv *appsv1alpha1.ClusterVersion
+	if len(c.cluster.Spec.ClusterVersionRef) > 0 {
+		cv = &appsv1alpha1.ClusterVersion{}
+		if err := validateExistence(types.NamespacedName{Name: c.cluster.Spec.ClusterVersionRef}, cv); err != nil {
+			return err
+		}
+	}
+
+	// validate cd & cv availability
+	if cd.Status.Phase != appsv1alpha1.AvailablePhase || (cv != nil && cv.Status.Phase != appsv1alpha1.AvailablePhase) {
+		message := fmt.Sprintf("ref resource is unavailable, this problem needs to be solved first. cd: %v, cv: %v", cd, cv)
+		_ = c.conMgr.setReferenceCRUnavailableCondition(c.cluster, message)
+		return newRequeueError(ControllerErrorRequeueTime, message)
+	}
+
+	// validate logs & replication set primary index availability
+	// and a sample validator chain
 	chain := &graph.ValidatorChain{
-		&enableLogsValidator{req: c.req, cli: c.cli, ctx: c.ctx, cluster: c.cluster},
-		&rplSetPrimaryIndexValidator{req: c.req, cli: c.cli, ctx: c.ctx, cluster: c.cluster},
+		&enableLogsValidator{cluster: c.cluster, clusterDef: cd},
+		&rplSetPrimaryIndexValidator{cluster: c.cluster, clusterDef: cd},
 	}
 	if err := chain.WalkThrough(); err != nil {
 		_ = c.conMgr.setPreCheckErrorCondition(c.cluster, err)
-		return err
+		return newRequeueError(ControllerErrorRequeueTime, err.Error())
 	}
 
 	return nil

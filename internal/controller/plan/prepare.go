@@ -316,10 +316,10 @@ func buildCfg(task *intctrltypes.ReconcileTask,
 	}
 
 	renderWrapper := newTemplateRenderWrapper(cfgTemplateBuilder, task.Cluster, task.GetBuilderParams(), ctx, cli)
-	if err := renderWrapper.renderConfigTemplate(task.Component.ConfigTemplates, obj); err != nil {
+	if err := renderWrapper.renderConfigTemplate(task, obj); err != nil {
 		return nil, err
 	}
-	if err := renderWrapper.renderScriptTemplate(task.Component.ScriptTemplates, obj); err != nil {
+	if err := renderWrapper.renderScriptTemplate(task, obj); err != nil {
 		return nil, err
 	}
 

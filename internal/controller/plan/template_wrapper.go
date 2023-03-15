@@ -29,6 +29,7 @@ import (
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
+	intctrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
 )
 
 type templateRenderValidator = func(map[string]string) error
@@ -59,10 +60,10 @@ func newTemplateRenderWrapper(cfgTplBuilder *configTemplateBuilder, cluster *app
 	}
 }
 
-func (wrapper *renderWrapper) renderConfigTemplate(configTemplates []appsv1alpha1.ComponentConfigSpec, obj client.Object) error {
+func (wrapper *renderWrapper) renderConfigTemplate(task *intctrltypes.ReconcileTask, obj client.Object) error {
 	scheme, _ := appsv1alpha1.SchemeBuilder.Build()
-	for _, tpl := range configTemplates {
-		cmName := cfgcore.GetInstanceCMName(obj, &tpl.ComponentTemplateSpec)
+	for _, tpl := range task.Component.ConfigTemplates {
+		cmName := cfgcore.GetComponentCfgName(task.Cluster.Name, task.Component.Name, tpl.VolumeName)
 
 		// Generate ConfigMap objects for config files
 		cm, err := generateConfigMapFromTpl(wrapper.templateBuilder, cmName, tpl.ConfigConstraintRef, tpl.ComponentTemplateSpec, wrapper.params, wrapper.ctx, wrapper.cli, func(m map[string]string) error {
@@ -80,10 +81,10 @@ func (wrapper *renderWrapper) renderConfigTemplate(configTemplates []appsv1alpha
 	return nil
 }
 
-func (wrapper *renderWrapper) renderScriptTemplate(scriptTemplates []appsv1alpha1.ComponentTemplateSpec, obj client.Object) error {
+func (wrapper *renderWrapper) renderScriptTemplate(task *intctrltypes.ReconcileTask, obj client.Object) error {
 	scheme, _ := appsv1alpha1.SchemeBuilder.Build()
-	for _, tpl := range scriptTemplates {
-		cmName := cfgcore.GetInstanceCMName(obj, &tpl)
+	for _, tpl := range task.Component.ScriptTemplates {
+		cmName := cfgcore.GetComponentCfgName(task.Cluster.Name, task.Component.Name, tpl.VolumeName)
 
 		// Generate ConfigMap objects for config files
 		cm, err := generateConfigMapFromTpl(wrapper.templateBuilder, cmName, "", tpl, wrapper.params, wrapper.ctx, wrapper.cli, nil)

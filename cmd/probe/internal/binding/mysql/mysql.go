@@ -36,6 +36,7 @@ import (
 	"github.com/go-sql-driver/mysql"
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
+	"golang.org/x/exp/slices"
 
 	. "github.com/apecloud/kubeblocks/cmd/probe/internal/binding"
 )
@@ -99,6 +100,14 @@ func (mysqlOps *MysqlOperations) Init(metadata bindings.Metadata) error {
 	mysqlOps.RegisterOperation(CheckStatusOperation, mysqlOps.CheckStatusOps)
 	mysqlOps.RegisterOperation(ExecOperation, mysqlOps.ExecOps)
 	mysqlOps.RegisterOperation(QueryOperation, mysqlOps.QueryOps)
+
+	// following are ops for account management
+	mysqlOps.RegisterOperation(ListUsersOp, mysqlOps.ListUsersOps)
+	mysqlOps.RegisterOperation(CreateUserOp, mysqlOps.CreateUserOps)
+	mysqlOps.RegisterOperation(DeleteUserOp, mysqlOps.DeleteUserOps)
+	mysqlOps.RegisterOperation(DescribeUserOp, mysqlOps.DescribeUserOps)
+	mysqlOps.RegisterOperation(GrantUserRoleOp, mysqlOps.GrantUserRoleOps)
+	mysqlOps.RegisterOperation(RevokeUserRoleOp, mysqlOps.RevokeUserRoleOps)
 	return nil
 }
 
@@ -218,8 +227,8 @@ func (mysqlOps *MysqlOperations) ExecOps(ctx context.Context, req *bindings.Invo
 	result := OpsResult{}
 	sql, ok := req.Metadata["sql"]
 	if !ok || sql == "" {
-		result["event"] = OperationFailed
-		result["message"] = "no sql provided"
+		result["event"] = "ExecFailed"
+		result["message"] = ErrNoSQL
 		return result, nil
 	}
 	count, err := mysqlOps.exec(ctx, sql)
@@ -447,4 +456,341 @@ func (mysqlOps *MysqlOperations) convert(columnTypes []*sql.ColumnType, values [
 		}
 	}
 	return r
+}
+
+func (mysqlOps *MysqlOperations) ListUsersOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
+	const (
+		opsKind     = ListUsersOp
+		listUserTpl = "SELECT user AS userName, user_attributes->>\"$.metadata.kbroles\" AS roleName FROM mysql.user;"
+	)
+	sqlTplRend := func(user UserInfo) string {
+		return listUserTpl
+	}
+	dataProcessor := func(data []byte) (interface{}, error) {
+		users := make([]*UserInfo, 0)
+		err := json.Unmarshal(data, &users)
+		if err != nil {
+			return nil, err
+		}
+		for _, user := range users {
+			if user.Expired == "N" {
+				user.Expired = "F"
+			} else {
+				user.Expired = "T"
+			}
+			roles := []string{}
+			if user.RoleName != "" {
+				if err = json.Unmarshal([]byte(user.RoleName), &roles); err != nil {
+					return nil, err
+				}
+				user.RoleName = strings.Join(roles, ",")
+			}
+		}
+		if jsonData, err := json.Marshal(users); err != nil {
+			return nil, err
+		} else {
+			return string(jsonData), nil
+		}
+	}
+	return mysqlOps.queryUser(ctx, req, opsKind, nil, sqlTplRend, dataProcessor)
+}
+
+func (mysqlOps *MysqlOperations) DescribeUserOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
+	const (
+		opsKind     = DescribeUserOp
+		descUserTpl = "SELECT user AS userName, password_expired as expired, user_attributes->>\"$.metadata.kbroles\" AS roleName FROM mysql.user WHERE USER ='%s';"
+	)
+	validFn := func(user UserInfo) error {
+		if len(user.UserName) == 0 {
+			return ErrNoUserName
+		}
+		return nil
+	}
+
+	dataProcessor := func(data []byte) (interface{}, error) {
+		users := make([]*UserInfo, 0)
+		err := json.Unmarshal(data, &users)
+		if err != nil {
+			return nil, err
+		}
+		if len(users) == 0 {
+			return nil, ErrNoUserFound
+		}
+		for _, user := range users {
+			if user.Expired == "N" {
+				user.Expired = "F"
+			} else {
+				user.Expired = "T"
+			}
+			roles := []string{}
+			if user.RoleName != "" {
+				if err = json.Unmarshal([]byte(user.RoleName), &roles); err != nil {
+					return nil, err
+				}
+				user.RoleName = strings.Join(roles, ",")
+			}
+		}
+		if jsonData, err := json.Marshal(users); err != nil {
+			return nil, err
+		} else {
+			return string(jsonData), nil
+		}
+	}
+
+	sqlTplRend := func(user UserInfo) string {
+		return fmt.Sprintf(descUserTpl, user.UserName)
+	}
+	return mysqlOps.queryUser(ctx, req, opsKind, validFn, sqlTplRend, dataProcessor)
+}
+
+func (mysqlOps *MysqlOperations) CreateUserOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
+	const (
+		opsKind       = CreateUserOp
+		createUserTpl = "CREATE USER '%s'@'%%' IDENTIFIED BY '%s';"
+	)
+
+	validFn := func(user UserInfo) error {
+		if len(user.UserName) == 0 {
+			return ErrNoUserName
+		}
+		if len(user.Password) == 0 {
+			return ErrNoPassword
+		}
+		return nil
+	}
+
+	sqlTplRend := func(user UserInfo) string {
+		return fmt.Sprintf(createUserTpl, user.UserName, user.Password)
+	}
+
+	msgTplRend := func(user UserInfo) string {
+		return fmt.Sprintf("created user: %s, with password: %s", user.UserName, user.Password)
+	}
+
+	return mysqlOps.execUser(ctx, req, opsKind, validFn, sqlTplRend, msgTplRend, nil)
+}
+
+func (mysqlOps *MysqlOperations) DeleteUserOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
+	const (
+		opsKind       = DeleteUserOp
+		deleteUserTpl = "DROP USER IF EXISTS '%s'@'%%';"
+	)
+
+	validFn := func(user UserInfo) error {
+		if len(user.UserName) == 0 {
+			return ErrNoUserName
+		}
+		return nil
+	}
+	sqlTplRend := func(user UserInfo) string {
+		return fmt.Sprintf(deleteUserTpl, user.UserName)
+	}
+	msgTplRend := func(user UserInfo) string {
+		return fmt.Sprintf("deleted user: %s", user.UserName)
+	}
+	return mysqlOps.execUser(ctx, req, opsKind, validFn, sqlTplRend, msgTplRend, nil)
+}
+
+func (mysqlOps *MysqlOperations) GrantUserRoleOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
+	var (
+		grantTpl   = "GRANT %s TO '%s'@'%%';"
+		succMsgTpl = "role %s granted to user: %s"
+	)
+	return mysqlOps.managePrivillege(ctx, req, GrantUserRoleOp, grantTpl, succMsgTpl)
+}
+
+func (mysqlOps *MysqlOperations) RevokeUserRoleOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
+	var (
+		revokeTpl  = "REVOKE %s FROM '%s'@'%%';"
+		succMsgTpl = "role %s revoked from user: %s"
+	)
+	return mysqlOps.managePrivillege(ctx, req, RevokeUserRoleOp, revokeTpl, succMsgTpl)
+}
+
+func (mysqlOps *MysqlOperations) managePrivillege(ctx context.Context, req *bindings.InvokeRequest, op bindings.OperationKind, sqlTpl string, succMsgTpl string) (OpsResult, error) {
+	validFn := func(user UserInfo) error {
+		if len(user.UserName) == 0 {
+			return ErrNoUserName
+		}
+		if len(user.RoleName) == 0 {
+			return ErrNoRoleName
+		}
+		roles := []string{ReadOnlyRole, ReadWriteRole, SuperUserRole}
+		if !slices.Contains(roles, strings.ToLower(user.RoleName)) {
+			return ErrInvalidRoleName
+		}
+		return nil
+	}
+	sqlTplRend := func(user UserInfo) string {
+		// render sql stmts
+		roleDesc, _ := mysqlOps.renderRoleByName(user.RoleName)
+		// update privilege
+		sql := fmt.Sprintf(sqlTpl, roleDesc, user.UserName)
+		return sql
+	}
+	msgTplRend := func(user UserInfo) string {
+		return fmt.Sprintf(succMsgTpl, user.RoleName, user.UserName)
+	}
+
+	postProcessor := func(user UserInfo) error {
+		return mysqlOps.updateUserAttr(ctx, user, op)
+	}
+
+	return mysqlOps.execUser(ctx, req, op, validFn, sqlTplRend, msgTplRend, postProcessor)
+}
+
+func (mysqlOps *MysqlOperations) updateUserAttr(ctx context.Context, user UserInfo, op bindings.OperationKind) error {
+	var (
+		getUserRolesTpl = `
+		SELECT user AS userName, JSON_UNQUOTE(ATTRIBUTE->>"$.kbroles") AS roleName FROM INFORMATION_SCHEMA.USER_ATTRIBUTES WHERE USER = '%s';
+		`
+		alterUserRolesTpl = "ALTER USER '%s'@'%%' ATTRIBUTE '%s';"
+		roles             = make([]string, 0)
+	)
+
+	// get user roles
+	if jsonData, err := mysqlOps.query(ctx, fmt.Sprintf(getUserRolesTpl, user.UserName)); err != nil {
+		return err
+	} else {
+		users := []UserInfo{}
+		err = json.Unmarshal(jsonData, &users)
+		if err != nil {
+			return err
+		}
+		if len(users) == 0 {
+			return fmt.Errorf("no such user: %s", user.UserName)
+		}
+		// user roles is an aarray of strings
+		if len(users[0].RoleName) > 0 {
+			if err = json.Unmarshal([]byte(users[0].RoleName), &roles); err != nil {
+				return err
+			}
+		}
+	}
+
+	// check if role exists
+	idx := slices.Index(roles, user.RoleName)
+	if idx == -1 {
+		if op == RevokeUserRoleOp {
+			// op does not exist, do nothing
+			return nil
+		} else {
+			// update roles
+			roles = append(roles, user.RoleName)
+		}
+	} else {
+		if op == GrantUserRoleOp {
+			// op already exists, do nothing
+			return nil
+		} else {
+			roles = slices.Delete(roles, idx, idx+1)
+		}
+	}
+
+	// update user attributes
+	jsonData, _ := json.Marshal(map[string][]string{"kbroles": roles})
+	sql := fmt.Sprintf(alterUserRolesTpl, user.UserName, string(jsonData))
+	mysqlOps.Logger.Debugf("MysqlOperations.updateUserAttr() with sql: %s", sql)
+	_, err := mysqlOps.exec(ctx, sql)
+	return err
+}
+
+func (mysqlOps *MysqlOperations) execUser(ctx context.Context, req *bindings.InvokeRequest, opsKind bindings.OperationKind,
+	validFn UserDefinedObjectValidator[UserInfo], sqlTplRend SQLRender[UserInfo], msgTplRend SQLRender[UserInfo], postProcessor SQLPostProcessor[UserInfo]) (OpsResult, error) {
+	var (
+		result   = OpsResult{}
+		userInfo = UserInfo{}
+		metadata = OpsMetadata{StartTime: time.Now(), Operation: opsKind}
+	)
+
+	result[RespTypMeta] = &metadata
+	// parser userinfo from metadata
+	if err := ParseObjectFromMetadata(req.Metadata, &userInfo, validFn); err != nil {
+		metadata.EndTime = time.Now()
+		result[RespTypEve] = RespEveFail
+		result[RespTypMsg] = err.Error()
+		return result, nil
+	}
+
+	sql := sqlTplRend(userInfo)
+	mysqlOps.Logger.Debugf("MysqlOperations.execUser() with sql: %s", sql)
+	_, err := mysqlOps.exec(ctx, sql)
+	metadata.EndTime = time.Now()
+	metadata.Extra = sql
+
+	if err != nil {
+		result[RespTypEve] = RespEveFail
+		result[RespTypMsg] = err.Error()
+		return result, nil
+	}
+
+	if postProcessor != nil {
+		err = postProcessor(userInfo)
+		if err != nil {
+			result[RespTypEve] = RespEveFail
+			result[RespTypMsg] = err.Error()
+			return result, nil
+		}
+	}
+
+	result[RespTypEve] = RespEveSucc
+	result[RespTypMsg] = msgTplRend(userInfo)
+	return result, nil
+}
+
+func (mysqlOps *MysqlOperations) queryUser(ctx context.Context, req *bindings.InvokeRequest, opsKind bindings.OperationKind,
+	validFn UserDefinedObjectValidator[UserInfo], sqlTplRend SQLRender[UserInfo], dataProcessor DataRender) (OpsResult, error) {
+	var (
+		result   = OpsResult{}
+		userInfo = UserInfo{}
+		metadata = OpsMetadata{StartTime: time.Now(), Operation: opsKind}
+	)
+
+	result[RespTypMeta] = &metadata
+	// parser userinfo from metadata
+	if err := ParseObjectFromMetadata(req.Metadata, &userInfo, validFn); err != nil {
+		metadata.EndTime = time.Now()
+		result[RespTypEve] = RespEveFail
+		result[RespTypMsg] = err.Error()
+		return result, nil
+	}
+
+	sql := sqlTplRend(userInfo)
+	mysqlOps.Logger.Debugf("MysqlOperations.queryUser() with sql: %s", sql)
+	jsonData, err := mysqlOps.query(ctx, sql)
+	metadata.EndTime = time.Now()
+	metadata.Extra = sql
+
+	if err != nil {
+		result[RespTypEve] = RespEveFail
+		result[RespTypMsg] = err.Error()
+		return result, nil
+	}
+	var ret interface{}
+	if dataProcessor == nil {
+		ret = string(jsonData)
+	} else {
+		if ret, err = dataProcessor(jsonData); err != nil {
+			result[RespTypEve] = RespEveFail
+			result[RespTypMsg] = err.Error()
+			return result, nil
+		}
+	}
+
+	result[RespTypEve] = RespEveSucc
+	result[RespTypData] = ret
+	return result, nil
+}
+
+func (mysqlOps *MysqlOperations) renderRoleByName(roleName string) (string, error) {
+	switch strings.ToLower(roleName) {
+	case SuperUserRole:
+		return "ALL PRIVILEGES ON *.*", nil
+	case ReadWriteRole:
+		return "SELECT, INSERT, UPDATE, DELETE ON *.*", nil
+	case ReadOnlyRole:
+		return "SELECT ON *.*", nil
+	default:
+		return "", fmt.Errorf("role name: %s is not supported", roleName)
+	}
 }

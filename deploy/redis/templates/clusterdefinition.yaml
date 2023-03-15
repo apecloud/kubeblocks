@@ -59,14 +59,11 @@ spec:
           - protocol: TCP
             port: 6379
       configSpecs:
-        - name: redis-primary-config
-          templateRef: redis-primary-config-7.0.5
+        - name: redis-replication-config
+          templateRef: redis7-config-template
+          constraintRef: redis7-config-constraints
           namespace: {{ .Release.Namespace }}
-          volumeName: primary
-        - name: redis-secondary-config
-          templateRef: redis-secondary-config-7.0.5
-          namespace: {{ .Release.Namespace }}
-          volumeName: secondary
+          volumeName: redis-config
       scriptSpecs:
         - name: redis-scripts
           templateRef: redis-scripts
@@ -87,21 +84,6 @@ spec:
         - name: data
           type: data
       podSpec:
-        initContainers:
-          - name: redis-init-container
-            image: redis:7.0.5
-            command: ["/scripts/init.sh"]
-            volumeMounts:
-              - name: data
-                mountPath: /data
-              - name: conf
-                mountPath: /etc/conf
-              - name: primary
-                mountPath: /etc/conf/primary
-              - name: secondary
-                mountPath: /etc/conf/secondary
-              - name: scripts
-                mountPath: /scripts
         containers:
           - name: redis
             image: redis:7.0.5
@@ -111,12 +93,8 @@ spec:
             volumeMounts:
               - name: data
                 mountPath: /data
-              - name: conf
+              - name: redis-config
                 mountPath: /etc/conf
-              - name: primary
-                mountPath: /etc/conf/primary
-              - name: secondary
-                mountPath: /etc/conf/secondary
               - name: scripts
                 mountPath: /scripts
             args: [ "/etc/conf/redis.conf" ]
@@ -143,14 +121,11 @@ spec:
               httpGet:
                 path: /
                 port: 9121
-        volumes:
-          - name: conf
-            emptyDir: { }
       systemAccounts:
 # Seems redis-cli has its own mechanism to parse input tokens and there is no elegent way
-# to pass $(KB_ACCOUNT_STATEMENT) to redis-cli without causing parsing error. 
+# to pass $(KB_ACCOUNT_STATEMENT) to redis-cli without causing parsing error.
 # Instead, using a shell script to wrap redis-cli and pass $(KB_ACCOUNT_STATEMENT) to it will do.
-        cmdExecutorConfig: 
+        cmdExecutorConfig:
           image: docker.io/redis:7.0.5
           command:
           - sh

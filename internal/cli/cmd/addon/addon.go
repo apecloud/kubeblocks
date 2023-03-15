@@ -384,12 +384,7 @@ func addonEnableDisableHandler(o *addonCmdOpts, cmd *cobra.Command, args []strin
 func (o *addonCmdOpts) buildEnablePatch(flags []*pflag.Flag, spec, install map[string]interface{}) (err error) {
 	extraNames := o.addon.GetExtraNames()
 	installSpec := extensionsv1alpha1.AddonInstallSpec{
-		AddonInstallSpecItem: extensionsv1alpha1.AddonInstallSpecItem{
-			Resources: extensionsv1alpha1.ResourceRequirements{
-				Requests: corev1.ResourceList{},
-				Limits:   corev1.ResourceList{},
-			},
-		},
+		AddonInstallSpecItem: extensionsv1alpha1.NewAddonInstallSpecItem(),
 	}
 	// only using named return value in defer function
 	defer func() {
@@ -445,13 +440,8 @@ func (o *addonCmdOpts) buildEnablePatch(flags []*pflag.Flag, spec, install map[s
 				return nil, fmt.Errorf("invalid extra item name [%s]", name)
 			}
 			installSpec.ExtraItems = append(installSpec.ExtraItems, extensionsv1alpha1.AddonInstallExtraItem{
-				Name: name,
-				AddonInstallSpecItem: extensionsv1alpha1.AddonInstallSpecItem{
-					Resources: extensionsv1alpha1.ResourceRequirements{
-						Requests: corev1.ResourceList{},
-						Limits:   corev1.ResourceList{},
-					},
-				},
+				Name:                 name,
+				AddonInstallSpecItem: extensionsv1alpha1.NewAddonInstallSpecItem(),
 			})
 			pItem = &installSpec.ExtraItems[len(installSpec.ExtraItems)-1]
 		}
@@ -587,12 +577,21 @@ func (o *addonCmdOpts) buildEnablePatch(flags []*pflag.Flag, spec, install map[s
 		}
 	}
 
-	for _, v := range f.SetValues {
-		if err := twoTuplesProcessor(v, "set", nil, func(item *extensionsv1alpha1.AddonInstallSpecItem, i interface{}) {
-			o.addon.Spec.Helm.InstallValues.SetValues = append(o.addon.Spec.Helm.InstallValues.SetValues, i.(string))
-		}); err != nil {
-			return err
-		}
+	return nil
+}
+
+func (o *addonCmdOpts) buildHelmPatch(result map[string]interface{}) error {
+	helmSpec := extensionsv1alpha1.HelmTypeInstallSpec{
+		InstallValues: extensionsv1alpha1.HelmInstallValues{
+			SetValues: o.addonEnableFlags.SetValues,
+		},
+	}
+	b, err := json.Marshal(&helmSpec)
+	if err != nil {
+		return err
+	}
+	if err = json.Unmarshal(b, &result); err != nil {
+		return err
 	}
 	return nil
 }
@@ -602,12 +601,17 @@ func (o *addonCmdOpts) buildPatch(flags []*pflag.Flag) error {
 	spec := map[string]interface{}{}
 	status := map[string]interface{}{}
 	install := map[string]interface{}{}
+	helm := map[string]interface{}{}
 
 	if o.addonEnableFlags != nil {
 		if o.addon.Status.Phase == extensionsv1alpha1.AddonFailed {
 			status["phase"] = nil
 		}
 		if err = o.buildEnablePatch(flags, spec, install); err != nil {
+			return err
+		}
+
+		if err = o.buildHelmPatch(helm); err != nil {
 			return err
 		}
 	} else {
@@ -619,6 +623,10 @@ func (o *addonCmdOpts) buildPatch(flags []*pflag.Flag) error {
 	}
 
 	if err = unstructured.SetNestedField(spec, install, "install"); err != nil {
+		return err
+	}
+
+	if err = unstructured.SetNestedField(spec, helm, "helm"); err != nil {
 		return err
 	}
 

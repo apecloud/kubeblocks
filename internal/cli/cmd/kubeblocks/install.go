@@ -202,7 +202,7 @@ func (o *InstallOptions) Install() error {
 	spinner(true)
 
 	// wait for auto-install addons to be ready
-	spinner = util.Spinner(o.Out, "%-40s", "Wait installable addons to be ready")
+	spinner = util.Spinner(o.Out, "%-40s", "Wait installable addons ready")
 	defer spinner(false)
 	if err = o.waitAddonsEnabled(); err != nil {
 		return err
@@ -232,8 +232,8 @@ func (o *InstallOptions) waitAddonsEnabled() error {
 		if err != nil && !apierrors.IsNotFound(err) {
 			return false, err
 		}
-		if objects == nil {
-			klog.V(1).InfoS("No Addon resource found")
+		if objects == nil || len(objects.Items) == 0 {
+			klog.V(1).InfoS("No Addons found")
 			return true, nil
 		}
 
@@ -243,6 +243,19 @@ func (o *InstallOptions) waitAddonsEnabled() error {
 				return false, err
 			}
 
+			if addon.Status.ObservedGeneration == 0 {
+				klog.V(1).Infof("Addon %s is not observed yet", addon.Name)
+				allEnabled = false
+				continue
+			}
+
+			installable := false
+			if addon.Spec.InstallSpec != nil {
+				installable = addon.Spec.Installable.AutoInstall
+			}
+
+			klog.V(1).Infof("Addon: %s, enabled: %v, status: %s, auto-install: %v",
+				addon.Name, addon.Spec.InstallSpec.GetEnabled(), addon.Status.Phase, installable)
 			// addon is enabled, then check its status
 			if addon.Spec.InstallSpec.GetEnabled() {
 				if addon.Status.Phase != extensionsv1alpha1.AddonEnabled {
@@ -295,14 +308,14 @@ func (o *InstallOptions) preCheck(versionInfo map[util.AppName]string) error {
 	// output kubernetes version
 	fmt.Fprintf(o.Out, "Kubernetes version %s\n", ""+version)
 
-	// check kbcli version, now do nothing
-	fmt.Fprintf(o.Out, "kbcli version %s\n", versionInfo[util.KBCLIApp])
-
 	// disable or enable some features according to the kubernetes environment
 	provider := util.GetK8sProvider(k8sVersionStr)
 	if provider.IsCloud() {
 		fmt.Fprintf(o.Out, "Kubernetes provider %s\n", provider)
 	}
+
+	// check kbcli version, now do nothing
+	fmt.Fprintf(o.Out, "kbcli version %s\n", versionInfo[util.KBCLIApp])
 
 	return nil
 }

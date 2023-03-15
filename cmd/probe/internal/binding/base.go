@@ -95,7 +95,7 @@ const (
 	GetLagOperation       bindings.OperationKind = "getLag"
 	ExecOperation         bindings.OperationKind = "exec"
 	QueryOperation        bindings.OperationKind = "query"
-	CloseOperation        bindings.OperationKind = "query"
+	CloseOperation        bindings.OperationKind = "close"
 
 	OperationNotImplemented = "NotImplemented"
 	OperationInvalid        = "Invalid"

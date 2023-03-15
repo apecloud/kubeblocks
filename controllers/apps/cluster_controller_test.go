@@ -849,17 +849,17 @@ var _ = Describe("Cluster Controller", func() {
 					Namespace: testCtx.DefaultNamespace,
 				},
 				Reason:  "Unhealthy",
-				Message: `Readiness probe failed: {"event":"roleUnchanged","originalRole":"Leader","role":"Follower"}`,
+				Message: `Readiness probe failed: {"event":"Success","originalRole":"Leader","role":"Follower"}`,
 				InvolvedObject: corev1.ObjectReference{
 					Name:      pod.Name,
 					Namespace: testCtx.DefaultNamespace,
 					UID:       pod.UID,
-					FieldPath: "spec.containers{kb-rolechangedcheck}",
+					FieldPath: constant.ProbeCheckRolePath,
 				},
 			}
 			events = append(events, event)
 		}
-		events[0].Message = `Readiness probe failed: {"event":"roleUnchanged","originalRole":"Leader","role":"Leader"}`
+		events[0].Message = `Readiness probe failed: {"event":"Success","originalRole":"Leader","role":"Leader"}`
 		return events
 	}
 

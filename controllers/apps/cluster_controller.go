@@ -119,7 +119,7 @@ func init() {
 }
 
 func (r *ClusterReconciler) Handle(cli client.Client, reqCtx intctrlutil.RequestCtx, recorder record.EventRecorder, event *corev1.Event) error {
-	if event.InvolvedObject.FieldPath != component.ProbeRoleChangedCheckPath {
+	if event.InvolvedObject.FieldPath != constant.ProbeCheckRolePath {
 		return handleEventForClusterStatus(reqCtx.Ctx, cli, recorder, event)
 	}
 	var (

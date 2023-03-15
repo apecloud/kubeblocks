@@ -39,7 +39,6 @@ func (s *simplePolicy) Upgrade(params reconfigureParams) (ReturnedStatus, error)
 	switch params.WorkloadType() {
 	case appsv1alpha1.Stateful, appsv1alpha1.Consensus, appsv1alpha1.Replication:
 		return rollingStatefulSets(params)
-		// process consensus
 	default:
 		return makeReturnedStatus(ESNotSupport), cfgcore.MakeError("not support component workload type:[%s]", params.WorkloadType())
 	}

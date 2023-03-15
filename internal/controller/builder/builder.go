@@ -551,7 +551,8 @@ func BuildConfigMapWithTemplate(
 	configs map[string]string,
 	params BuilderParams,
 	cmName string,
-	tplCfg appsv1alpha1.ConfigTemplate) (*corev1.ConfigMap, error) {
+	configConstraintName string,
+	tplCfg appsv1alpha1.ComponentTemplateSpec) (*corev1.ConfigMap, error) {
 	const tplFile = "config_template.cue"
 	cueFS, _ := debme.FS(cueTemplates, "cue")
 	cueTpl, err := getCacheCUETplValue(tplFile, func() (*intctrlutil.CUETpl, error) {
@@ -576,8 +577,8 @@ func BuildConfigMapWithTemplate(
 			"type":                  params.Component.Type,
 			"characterType":         params.Component.CharacterType,
 			"configName":            cmName,
-			"templateName":          tplCfg.ConfigTplRef,
-			"configConstraintsName": tplCfg.ConfigConstraintRef,
+			"templateName":          tplCfg.TemplateRef,
+			"configConstraintsName": configConstraintName,
 			"configTemplateName":    tplCfg.Name,
 		},
 	}

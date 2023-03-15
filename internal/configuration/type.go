@@ -147,7 +147,7 @@ func GenerateConstraintsUniqLabelKeyWithConfig(configKey string) string {
 }
 
 // GetInstanceCMName  {{statefull.Name}}-{{clusterVersion.Name}}-{{tpl.Name}}-"config"
-func GetInstanceCMName(obj client.Object, tpl *appsv1alpha1.ConfigTemplate) string {
+func GetInstanceCMName(obj client.Object, tpl *appsv1alpha1.ComponentTemplateSpec) string {
 	return getInstanceCfgCMName(obj.GetName(), tpl.VolumeName)
 	// return fmt.Sprintf("%s-%s-config", sts.GetName(), tpl.VolumeName)
 }

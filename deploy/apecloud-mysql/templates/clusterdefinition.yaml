@@ -29,18 +29,18 @@ spec:
         - name: {{ $name }}
           filePathPattern: {{ $pattern }}
         {{- end }}
-      configSpec:
-        configTemplateRefs:
-          - name: mysql-consensusset-config
-            configTplRef: mysql8.0-config-template
-            configConstraintRef: mysql8.0-config-constraints
-            volumeName: mysql-config
-            namespace: {{ .Release.Namespace }}
-          - name: apecloud-mysql-scripts
-            configTplRef: apecloud-mysql-scripts
-            namespace: {{ .Release.Namespace }}
-            volumeName: scripts
-            defaultMode: 493
+      configSpecs:
+        - name: mysql-consensusset-config
+          templateRef: mysql8.0-config-template
+          constraintRef: mysql8.0-config-constraints
+          volumeName: mysql-config
+          namespace: {{ .Release.Namespace }}
+      scriptSpecs:
+        - name: apecloud-mysql-scripts
+          templateRef: apecloud-mysql-scripts
+          namespace: {{ .Release.Namespace }}
+          volumeName: scripts
+          defaultMode: 493
       workloadType: Consensus
       consensusSpec:
         leader:

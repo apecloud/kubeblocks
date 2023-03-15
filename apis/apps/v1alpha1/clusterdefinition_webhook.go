@@ -185,7 +185,7 @@ func (r *ClusterDefinition) validateComponents(allErrs *field.ErrorList) {
 	}
 
 	for _, component := range r.Spec.ComponentDefs {
-		if err := r.validateConfigSpec(component.ConfigSpec); err != nil {
+		if err := r.validateConfigSpec(component); err != nil {
 			*allErrs = append(*allErrs, field.Duplicate(field.NewPath("spec.components[*].configSpec.configTemplateRefs"), err))
 			continue
 		}
@@ -249,14 +249,14 @@ func (r *SystemAccountSpec) validateSysAccounts(allErrs *field.ErrorList) {
 	}
 }
 
-func (r *ClusterDefinition) validateConfigSpec(configSpec *ConfigurationSpec) error {
-	if configSpec == nil || len(configSpec.ConfigTemplateRefs) <= 1 {
+func (r *ClusterDefinition) validateConfigSpec(component ClusterComponentDefinition) error {
+	if len(component.ConfigSpecs) <= 1 && len(component.ScriptSpecs) <= 1 {
 		return nil
 	}
-	return validateConfigTemplateList(configSpec.ConfigTemplateRefs)
+	return validateConfigTemplateList(component.ConfigSpecs)
 }
 
-func validateConfigTemplateList(ctpls []ConfigTemplate) error {
+func validateConfigTemplateList(ctpls []ComponentConfigSpec) error {
 	var (
 		volumeSet = map[string]struct{}{}
 		cmSet     = map[string]struct{}{}
@@ -273,11 +273,11 @@ func validateConfigTemplateList(ctpls []ConfigTemplate) error {
 		if _, ok := volumeSet[tpl.VolumeName]; ok {
 			return errors.Errorf("volume[%s] already existed.", tpl.VolumeName)
 		}
-		if _, ok := cmSet[tpl.ConfigTplRef]; ok {
-			return errors.Errorf("configmap[%s] already existed.", tpl.ConfigTplRef)
+		if _, ok := cmSet[tpl.TemplateRef]; ok {
+			return errors.Errorf("configmap[%s] already existed.", tpl.TemplateRef)
 		}
 		tplSet[tpl.Name] = struct{}{}
-		cmSet[tpl.ConfigTplRef] = struct{}{}
+		cmSet[tpl.TemplateRef] = struct{}{}
 		volumeSet[tpl.VolumeName] = struct{}{}
 	}
 	return nil

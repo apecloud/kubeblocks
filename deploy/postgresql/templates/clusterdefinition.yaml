@@ -26,26 +26,26 @@ spec:
         - name: {{ $name }}
           filePathPattern: {{ $pattern }}
         {{- end }}
-      configSpec:
-        configTemplateRefs:
-          - name: postgresql-configuration
-            configTplRef: postgresql-configuration
-            configConstraintRef: postgresql14-cc
-            keys:
-              - postgresql.conf
-            namespace: {{ .Release.Namespace }}
-            volumeName: postgresql-config
-            defaultMode: 0777
-          - name: postgresql-scripts
-            configTplRef: postgresql-scripts
-            namespace: {{ .Release.Namespace }}
-            volumeName: scripts
-            defaultMode: 0777
-          - name: postgresql-custom-metrics
-            configTplRef: postgresql-custom-metrics
-            namespace: {{ .Release.Namespace }}
-            volumeName: postgresql-custom-metrics
-            defaultMode: 0777
+      configSpecs:
+        - name: postgresql-configuration
+          templateRef: postgresql-configuration
+          constraintRef: postgresql14-cc
+          keys:
+            - postgresql.conf
+          namespace: {{ .Release.Namespace }}
+          volumeName: postgresql-config
+          defaultMode: 0777
+        - name: postgresql-custom-metrics
+          templateRef: postgresql-custom-metrics
+          namespace: {{ .Release.Namespace }}
+          volumeName: postgresql-custom-metrics
+          defaultMode: 0777
+      scriptSpecs:
+        - name: postgresql-scripts
+          templateRef: postgresql-scripts
+          namespace: {{ .Release.Namespace }}
+          volumeName: scripts
+          defaultMode: 0777
       service:
         ports:
           - name: tcp-postgresql

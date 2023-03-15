@@ -87,7 +87,7 @@ func (r *ConfigConstraintReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		return intctrlutil.Reconciled()
 	}
 
-	if ok, err := checkConfigurationTemplate(reqCtx, configConstraint); !ok || err != nil {
+	if ok, err := checkConfigConstraint(reqCtx, configConstraint); !ok || err != nil {
 		return intctrlutil.RequeueAfter(time.Second, reqCtx.Log, "ValidateConfigurationTemplate")
 	}
 

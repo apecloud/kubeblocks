@@ -436,12 +436,14 @@ var _ = Describe("builder", func() {
 		It("builds ConfigMap with template correctly", func() {
 			config := map[string]string{}
 			params := newParams()
-			tplCfg := appsv1alpha1.ConfigTemplate{
-				Name:                "test-config-tpl",
-				ConfigTplRef:        "test-config-tpl",
+			tplCfg := appsv1alpha1.ComponentConfigSpec{
+				ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
+					Name:        "test-config-tpl",
+					TemplateRef: "test-config-tpl",
+				},
 				ConfigConstraintRef: "test-config-constraint",
 			}
-			configmap, err := BuildConfigMapWithTemplate(config, *params, "test-cm", tplCfg)
+			configmap, err := BuildConfigMapWithTemplate(config, *params, "test-cm", tplCfg.ConfigConstraintRef, tplCfg.ComponentTemplateSpec)
 			Expect(err).Should(BeNil())
 			Expect(configmap).ShouldNot(BeNil())
 		})

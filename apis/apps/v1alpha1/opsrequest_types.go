@@ -354,12 +354,12 @@ type ConfigurationStatus struct {
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	Name string `json:"name"`
 
-	// componentUnitName is a ComponentUnit name when workload is Replication.
+	// indepRoledSTSName is a ComponentUnit name when workload is Replication.
 	// ComponentUnit is the smallest unit of configuration change. It associated with a StatefulSet, such as a workload of replication type.
 	// A Cluster.Spec.ClusterComponentSpec may include multiple StatefulSet objects, here will be associated with multiple componentUnit,
 	// each ComponentUnit will have a separate status, finally these statuses Will be aggregated into the status of OpsRequest.
 	// +optional
-	ComponentUnitName string `json:"componentUnitName,omitempty"`
+	IndepRoledSTSName string `json:"indepRoledSTSName,omitempty"`
 
 	// updatePolicy describes the policy of reconfiguring.
 	// +optional

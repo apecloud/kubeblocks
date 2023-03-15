@@ -667,8 +667,14 @@ spec:
                       reconfiguring.
                     items:
                       properties:
-                        componentUnitName:
-                          description: componentUnitName is a ComponentUnit name when
+                        expectedCount:
+                          default: -1
+                          description: expectedCount describes the number of expected
+                            reconfiguring.
+                          format: int32
+                          type: integer
+                        indepRoledSTSName:
+                          description: indepRoledSTSName is a ComponentUnit name when
                             workload is Replication. ComponentUnit is the smallest
                             unit of configuration change. It associated with a StatefulSet,
                             such as a workload of replication type. A Cluster.Spec.ClusterComponentSpec
@@ -677,12 +683,6 @@ spec:
                             will have a separate status, finally these statuses Will
                             be aggregated into the status of OpsRequest.
                           type: string
-                        expectedCount:
-                          default: -1
-                          description: expectedCount describes the number of expected
-                            reconfiguring.
-                          format: int32
-                          type: integer
                         lastAppliedConfiguration:
                           additionalProperties:
                             type: string

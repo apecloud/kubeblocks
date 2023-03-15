@@ -58,9 +58,9 @@ type ConfigEventContext struct {
 	ReqCtx  intctrlutil.RequestCtx
 	Cluster *appsv1alpha1.Cluster
 
-	ClusterComponent *appsv1alpha1.ClusterComponentSpec
-	Component        *appsv1alpha1.ClusterComponentDefinition
-	ComponentUnits   []appv1.StatefulSet
+	ClusterComponent      *appsv1alpha1.ClusterComponentSpec
+	Component             *appsv1alpha1.ClusterComponentDefinition
+	IndepRoledStatefulSet []appv1.StatefulSet
 
 	TplName          string
 	ConfigPatch      *ConfigPatchInfo

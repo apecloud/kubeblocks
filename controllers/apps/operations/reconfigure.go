@@ -89,8 +89,8 @@ func (r *reconfigureAction) Handle(eventContext cfgcore.ConfigEventContext, last
 		return err
 	}
 
-	componentUnitName := getComponentUnitName(eventContext)
-	if err := patchReconfigureOpsStatus(opsRes, eventContext.TplName, componentUnitName,
+	indepRoledSTSName := getIndepRoledStatefulsetName(eventContext)
+	if err := patchReconfigureOpsStatus(opsRes, eventContext.TplName, indepRoledSTSName,
 		handleReconfigureStatusProgress(eventContext.PolicyStatus, phase, &opsRequest.Status)); err != nil {
 		return err
 	}
@@ -145,17 +145,17 @@ func aggregateReconfigurePhase(status *appsv1alpha1.ReconfiguringStatus, compone
 	return aggregatePhase
 }
 
-func getComponentUnitName(context cfgcore.ConfigEventContext) string {
+func getIndepRoledStatefulsetName(context cfgcore.ConfigEventContext) string {
 	componentName := context.ClusterComponent.Name
 	if context.Component.WorkloadType != appsv1alpha1.Replication {
 		return componentName
 	}
 
-	componentUnitName := ""
-	if len(context.ComponentUnits) > 0 {
-		componentUnitName = context.ComponentUnits[0].Name
+	indepRoledSTSName := ""
+	if len(context.IndepRoledStatefulSet) > 0 {
+		indepRoledSTSName = context.IndepRoledStatefulSet[0].Name
 	}
-	return strings.TrimPrefix(componentUnitName, fmt.Sprintf("%s-", context.Cluster.Name))
+	return strings.TrimPrefix(indepRoledSTSName, fmt.Sprintf("%s-", context.Cluster.Name))
 }
 
 func handleReconfigureStatusProgress(execStatus cfgcore.PolicyExecStatus, phase appsv1alpha1.Phase, opsStatus *appsv1alpha1.OpsRequestStatus) handleReconfigureOpsStatus {
@@ -179,11 +179,11 @@ func handleReconfigureStatusProgress(execStatus cfgcore.PolicyExecStatus, phase 
 	}
 }
 
-func handleNewReconfigureRequest(configPatch *cfgcore.ConfigPatchInfo, lastAppliedConfigs map[string]string, componentUnitName string) handleReconfigureOpsStatus {
+func handleNewReconfigureRequest(configPatch *cfgcore.ConfigPatchInfo, lastAppliedConfigs map[string]string, indepRoledSTSName string) handleReconfigureOpsStatus {
 	return func(cmStatus *appsv1alpha1.ConfigurationStatus) error {
 		cmStatus.Status = appsv1alpha1.ReasonReconfigureMerged
 		cmStatus.LastAppliedConfiguration = lastAppliedConfigs
-		cmStatus.ComponentUnitName = componentUnitName
+		cmStatus.IndepRoledSTSName = indepRoledSTSName
 		cmStatus.UpdatedParameters = appsv1alpha1.UpdatedParameters{
 			AddedKeys:   i2sMap(configPatch.AddConfig),
 			UpdatedKeys: b2sMap(configPatch.UpdateConfig),
@@ -344,7 +344,7 @@ func (r *reconfigureAction) doMergeAndPersist(clusterName, componentName string,
 		}
 		switch workloadType {
 		default:
-			err = doComponentUnitReconfigure(config, tpl, clusterName, componentName, resource)
+			err = doIndependentRoledSTSReconfigure(config, tpl, clusterName, componentName, resource)
 		case appsv1alpha1.Replication:
 			err = doReplicationComponentReconfigure(config, tpl, clusterName, componentName, resource, replicas)
 		}
@@ -355,7 +355,7 @@ func (r *reconfigureAction) doMergeAndPersist(clusterName, componentName string,
 	return nil
 }
 
-func doComponentUnitReconfigure(config appsv1alpha1.Configuration, configTemplate *appsv1alpha1.ComponentConfigSpec, clusterName, componentName string, resource *OpsResource) error {
+func doIndependentRoledSTSReconfigure(config appsv1alpha1.Configuration, configTemplate *appsv1alpha1.ComponentConfigSpec, clusterName, componentName string, resource *OpsResource) error {
 	result := updateCfgParams(config, *configTemplate, client.ObjectKey{
 		Name:      cfgcore.GetComponentCfgName(clusterName, componentName, configTemplate.VolumeName),
 		Namespace: resource.Cluster.Namespace,
@@ -377,9 +377,9 @@ func doComponentUnitReconfigure(config appsv1alpha1.Configuration, configTemplat
 }
 
 func doReplicationComponentReconfigure(config appsv1alpha1.Configuration, configTemplate *appsv1alpha1.ComponentConfigSpec, clusterName, componentName string, resource *OpsResource, replicas int32) error {
-	componentConfigUpdator := func(componentUnitName string) reconfiguringResult {
+	componentConfigUpdator := func(indepRoledSTSName string) reconfiguringResult {
 		result := updateCfgParams(config, *configTemplate, client.ObjectKey{
-			Name:      cfgcore.GetComponentCfgName(clusterName, componentUnitName, configTemplate.VolumeName),
+			Name:      cfgcore.GetComponentCfgName(clusterName, indepRoledSTSName, configTemplate.VolumeName),
 			Namespace: resource.Cluster.Namespace,
 		}, resource.Ctx, resource.Client, resource.OpsRequest.Name)
 		return result
@@ -387,15 +387,15 @@ func doReplicationComponentReconfigure(config appsv1alpha1.Configuration, config
 
 	var last reconfiguringResult
 	for i := int32(0); i < replicas; i++ {
-		componentUnitName := fmt.Sprintf("%s-%d", componentName, i)
-		r := componentConfigUpdator(componentUnitName)
+		indepRoledSTSName := fmt.Sprintf("%s-%d", componentName, i)
+		r := componentConfigUpdator(indepRoledSTSName)
 		if r.err != nil {
 			return processMergedFailed(resource, r.failed, r.err)
 		}
 
 		// merged successfully
-		if err := patchReconfigureOpsStatus(resource, configTemplate.Name, componentUnitName,
-			handleNewReconfigureRequest(r.configPatch, r.lastAppliedConfigs, componentUnitName)); err != nil {
+		if err := patchReconfigureOpsStatus(resource, configTemplate.Name, indepRoledSTSName,
+			handleNewReconfigureRequest(r.configPatch, r.lastAppliedConfigs, indepRoledSTSName)); err != nil {
 			return err
 		}
 		last = r

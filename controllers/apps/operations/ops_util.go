@@ -331,21 +331,21 @@ func isOpsRequestFailedPhase(opsRequestPhase appsv1alpha1.Phase) bool {
 	return opsRequestPhase == appsv1alpha1.FailedPhase
 }
 
-func updateReconfigureStatusByCM(reconfiguringStatus *appsv1alpha1.ReconfiguringStatus, tplName, componentUnitName string,
+func updateReconfigureStatusByCM(reconfiguringStatus *appsv1alpha1.ReconfiguringStatus, tplName, indepRoledSTSName string,
 	handleReconfigureStatus handleReconfigureOpsStatus) error {
 	for i, cmStatus := range reconfiguringStatus.ConfigurationStatus {
 		if cmStatus.Name != tplName {
 			continue
 		}
 		// Compatible with previous logic.
-		if cmStatus.ComponentUnitName == "" || componentUnitName == "" || cmStatus.ComponentUnitName == componentUnitName {
+		if cmStatus.IndepRoledSTSName == "" || indepRoledSTSName == "" || cmStatus.IndepRoledSTSName == indepRoledSTSName {
 			// update cmStatus
 			return handleReconfigureStatus(&reconfiguringStatus.ConfigurationStatus[i])
 		}
 	}
 	cmCount := len(reconfiguringStatus.ConfigurationStatus)
 	reconfiguringStatus.ConfigurationStatus = append(reconfiguringStatus.ConfigurationStatus, appsv1alpha1.ConfigurationStatus{
-		ComponentUnitName: componentUnitName,
+		IndepRoledSTSName: indepRoledSTSName,
 		Name:              tplName,
 		Status:            appsv1alpha1.ReasonReconfigureMerging,
 	})
@@ -361,10 +361,11 @@ func updateReconfigureStatusByCM(reconfiguringStatus *appsv1alpha1.Reconfiguring
 // cmStatus describes status of configmap, it is uniquely associated with a configuration template, which contains multi key, each key represents name of a configuration file.
 // execStatus describes the result of the execution of the state machine, which is designed to solve how to do the reconfiguring operation, such as whether to restart, how to send a signal to the process.
 //
-// componentUnitName is a ComponentUnit name
+// indepRoledSTSName is a IndepRoledSTS name
 // NOTES:
-// ComponentUnit is the smallest unit of configuration change. It associated with a StatefulSet, such as a workload of replication type. A ClusterComponent may include multiple StatefulSet objects, which associated with multiple componentUnits.
-func patchReconfigureOpsStatus(opsRes *OpsResource, tplName, componentUnitName string, handleReconfigureStatus handleReconfigureOpsStatus) error {
+// IndepRoledSTS is the smallest unit of configuration change. It associated with a StatefulSet, such as a workload of replication type. A ClusterComponent may include multiple StatefulSet objects, which associated with multiple IndepRoledSTS.
+// https://drive.google.com/file/d/1Lx7hCcXzGCqqNwQVnzlqCGdZ5hvH_T93/view?usp=sharing
+func patchReconfigureOpsStatus(opsRes *OpsResource, tplName, indepRoledSTSName string, handleReconfigureStatus handleReconfigureOpsStatus) error {
 	var opsRequest = opsRes.OpsRequest
 
 	patch := client.MergeFrom(opsRequest.DeepCopy())
@@ -375,7 +376,7 @@ func patchReconfigureOpsStatus(opsRes *OpsResource, tplName, componentUnitName s
 	}
 
 	reconfiguringStatus := opsRequest.Status.ReconfiguringStatus
-	if err := updateReconfigureStatusByCM(reconfiguringStatus, tplName, componentUnitName, handleReconfigureStatus); err != nil {
+	if err := updateReconfigureStatusByCM(reconfiguringStatus, tplName, indepRoledSTSName, handleReconfigureStatus); err != nil {
 		return err
 	}
 	return opsRes.Client.Status().Patch(opsRes.Ctx, opsRequest, patch)

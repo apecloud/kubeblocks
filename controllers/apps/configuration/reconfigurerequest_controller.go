@@ -295,17 +295,17 @@ func (r *ReconfigureRequestReconciler) handleConfigEvent(params reconfigureParam
 	}
 
 	eventContext := cfgcore.ConfigEventContext{
-		TplName:          params.TplName,
-		Client:           params.Client,
-		ReqCtx:           params.Ctx,
-		Cluster:          params.Cluster,
-		Component:        params.Component,
-		ConfigPatch:      params.ConfigPatch,
-		ConfigConstraint: params.ConfigConstraint,
-		CfgCM:            params.CfgCM,
-		ComponentUnits:   params.ComponentUnits,
-		PolicyStatus:     status,
-		ClusterComponent: params.ClusterComponent,
+		TplName:               params.TplName,
+		Client:                params.Client,
+		ReqCtx:                params.Ctx,
+		Cluster:               params.Cluster,
+		Component:             params.Component,
+		ConfigPatch:           params.ConfigPatch,
+		ConfigConstraint:      params.ConfigConstraint,
+		CfgCM:                 params.CfgCM,
+		IndepRoledStatefulSet: params.ComponentUnits,
+		PolicyStatus:          status,
+		ClusterComponent:      params.ClusterComponent,
 	}
 
 	for _, handler := range cfgcore.ConfigEventHandlerMap {

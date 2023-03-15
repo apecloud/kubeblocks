@@ -18,6 +18,7 @@ KubeBlocks configuration consists of five modules:
 4. ConfigManager sidecar: The ConfigManager sidecar is used to manage the local configuration files of database instances. Kubernetes provides a set of centralized configuration management mechanisms based on ConfigMap. On the foundation of ConifgMap, KubeBlocks manages the dynamic parameter reconfigurations of different engines by ConfigManager.
 5. CLI/OpsRequest: CLI/OpsRequest are two methods to realize the management of engine parameters.
 
+![Configuration](./../../../img/configuration.png)
 
 ## How KubeBlocks configuration works
 

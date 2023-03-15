@@ -109,11 +109,11 @@ Add an alert receiver.
    --webhook='url=https://open.feishu.cn/open-apis/bot/v2/hook/foo' --cluster=pg --severity=critical
    ```
 
-   :::note
+:::note
 
-   For the detailed command description, run `kbcli alert add-receiver -h`.
+For the detailed command description, run `kbcli alert add-receiver -h`.
 
-   :::
+:::
  
 Run the command below to view the notification configurations.
 

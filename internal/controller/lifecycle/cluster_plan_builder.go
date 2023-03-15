@@ -61,113 +61,6 @@ type clusterPlan struct {
 var _ graph.PlanBuilder = &clusterPlanBuilder{}
 var _ graph.Plan = &clusterPlan{}
 
-func (c *clusterPlanBuilder) getClusterRefResources() (*clusterRefResources, error) {
-	cluster := c.cluster
-	cd := &appsv1alpha1.ClusterDefinition{}
-	if err := c.cli.Get(c.ctx.Ctx, types.NamespacedName{
-		Name: cluster.Spec.ClusterDefRef,
-	}, cd); err != nil {
-		return nil, err
-	}
-	cv := &appsv1alpha1.ClusterVersion{}
-	if len(cluster.Spec.ClusterVersionRef) > 0 {
-		if err := c.cli.Get(c.ctx.Ctx, types.NamespacedName{
-			Name: cluster.Spec.ClusterVersionRef,
-		}, cv); err != nil {
-			return nil, err
-		}
-	}
-
-	cc := &clusterRefResources{
-		cd: *cd,
-		cv: *cv,
-	}
-	return cc, nil
-}
-
-func (c *clusterPlanBuilder) defaultWalkFunc(vertex graph.Vertex) error {
-	node, ok := vertex.(*lifecycleVertex)
-	if !ok {
-		return fmt.Errorf("wrong vertex type %v", vertex)
-	}
-	if node.action == nil {
-		return errors.New("node action can't be nil")
-	}
-	// cluster object has more business to do, handle them here
-	if _, ok := node.obj.(*appsv1alpha1.Cluster); ok {
-		cluster := node.obj.(*appsv1alpha1.Cluster).DeepCopy()
-		origCluster := node.oriObj.(*appsv1alpha1.Cluster)
-		switch *node.action {
-		// cluster.meta and cluster.spec might change
-		case CREATE, UPDATE, STATUS:
-			if !reflect.DeepEqual(cluster.ObjectMeta, origCluster.ObjectMeta) ||
-				!reflect.DeepEqual(cluster.Spec, origCluster.Spec) {
-				// TODO: we should Update instead of Patch cluster object,
-				// TODO: but Update failure happens too frequently as other controllers are updating cluster object too.
-				// TODO: use Patch here, revert to Update after refactoring done
-				//if err := c.cli.Update(c.ctx.Ctx, cluster); err != nil {
-				//	tmpCluster := &appsv1alpha1.Cluster{}
-				//	err = c.cli.Get(c.ctx.Ctx,client.ObjectKeyFromObject(origCluster), tmpCluster)
-				//	c.ctx.Log.Error(err, fmt.Sprintf("update %T error, orig: %v, curr: %v, api-server: %v", origCluster, origCluster, cluster, tmpCluster))
-				//	return err
-				//}
-				patch := client.MergeFrom(origCluster.DeepCopy())
-				if err := c.cli.Patch(c.ctx.Ctx, cluster, patch); err != nil {
-					c.ctx.Log.Error(err, fmt.Sprintf("patch %T error, orig: %v, curr: %v", origCluster, origCluster, cluster))
-					return err
-				}
-			}
-		case DELETE:
-			if err := c.handleClusterDeletion(cluster); err != nil {
-				return err
-			}
-			if cluster.Spec.TerminationPolicy == appsv1alpha1.DoNotTerminate {
-				return nil
-			}
-		}
-	}
-	switch *node.action {
-	case CREATE:
-		err := c.cli.Create(c.ctx.Ctx, node.obj)
-		if err != nil && !apierrors.IsAlreadyExists(err) {
-			return err
-		}
-	case UPDATE:
-		if node.immutable {
-			return nil
-		}
-		o, err := c.buildUpdateObj(node)
-		if err != nil {
-			return err
-		}
-		err = c.cli.Update(c.ctx.Ctx, o)
-		if err != nil && !apierrors.IsNotFound(err) {
-			c.ctx.Log.Error(err, fmt.Sprintf("update %T error, orig: %v, curr: %v", o, node.oriObj, o))
-			return err
-		}
-	case DELETE:
-		if controllerutil.RemoveFinalizer(node.obj, dbClusterFinalizerName) {
-			err := c.cli.Update(c.ctx.Ctx, node.obj)
-			if err != nil && !apierrors.IsNotFound(err) {
-				c.ctx.Log.Error(err, fmt.Sprintf("delete %T error, orig: %v, curr: %v", node.obj, node.oriObj, node.obj))
-				return err
-			}
-		}
-		// TODO: delete backup objects created in scale-out
-		// TODO: should manage backup objects in a better way
-		if isTypeOf[*snapshotv1.VolumeSnapshot](node.obj) ||
-			isTypeOf[*dataprotectionv1alpha1.BackupPolicy](node.obj) ||
-			isTypeOf[*dataprotectionv1alpha1.Backup](node.obj) {
-			_ = c.cli.Delete(c.ctx.Ctx, node.obj)
-		}
-
-	case STATUS:
-		patch := client.MergeFrom(node.oriObj)
-		return c.cli.Status().Patch(c.ctx.Ctx, node.obj, patch)
-	}
-	return nil
-}
-
 func (c *clusterPlanBuilder) Init() error {
 	cluster := &appsv1alpha1.Cluster{}
 	if err := c.cli.Get(c.ctx.Ctx, c.req.NamespacedName, cluster); err != nil {
@@ -312,6 +205,113 @@ func (p *clusterPlan) Execute() error {
 		_ = p.conMgr.setApplyResourcesFailedCondition(p.cluster, err)
 	}
 	return err
+}
+
+func (c *clusterPlanBuilder) getClusterRefResources() (*clusterRefResources, error) {
+	cluster := c.cluster
+	cd := &appsv1alpha1.ClusterDefinition{}
+	if err := c.cli.Get(c.ctx.Ctx, types.NamespacedName{
+		Name: cluster.Spec.ClusterDefRef,
+	}, cd); err != nil {
+		return nil, err
+	}
+	cv := &appsv1alpha1.ClusterVersion{}
+	if len(cluster.Spec.ClusterVersionRef) > 0 {
+		if err := c.cli.Get(c.ctx.Ctx, types.NamespacedName{
+			Name: cluster.Spec.ClusterVersionRef,
+		}, cv); err != nil {
+			return nil, err
+		}
+	}
+
+	cc := &clusterRefResources{
+		cd: *cd,
+		cv: *cv,
+	}
+	return cc, nil
+}
+
+func (c *clusterPlanBuilder) defaultWalkFunc(vertex graph.Vertex) error {
+	node, ok := vertex.(*lifecycleVertex)
+	if !ok {
+		return fmt.Errorf("wrong vertex type %v", vertex)
+	}
+	if node.action == nil {
+		return errors.New("node action can't be nil")
+	}
+	// cluster object has more business to do, handle them here
+	if _, ok := node.obj.(*appsv1alpha1.Cluster); ok {
+		cluster := node.obj.(*appsv1alpha1.Cluster).DeepCopy()
+		origCluster := node.oriObj.(*appsv1alpha1.Cluster)
+		switch *node.action {
+		// cluster.meta and cluster.spec might change
+		case CREATE, UPDATE, STATUS:
+			if !reflect.DeepEqual(cluster.ObjectMeta, origCluster.ObjectMeta) ||
+				!reflect.DeepEqual(cluster.Spec, origCluster.Spec) {
+				// TODO: we should Update instead of Patch cluster object,
+				// TODO: but Update failure happens too frequently as other controllers are updating cluster object too.
+				// TODO: use Patch here, revert to Update after refactoring done
+				//if err := c.cli.Update(c.ctx.Ctx, cluster); err != nil {
+				//	tmpCluster := &appsv1alpha1.Cluster{}
+				//	err = c.cli.Get(c.ctx.Ctx,client.ObjectKeyFromObject(origCluster), tmpCluster)
+				//	c.ctx.Log.Error(err, fmt.Sprintf("update %T error, orig: %v, curr: %v, api-server: %v", origCluster, origCluster, cluster, tmpCluster))
+				//	return err
+				//}
+				patch := client.MergeFrom(origCluster.DeepCopy())
+				if err := c.cli.Patch(c.ctx.Ctx, cluster, patch); err != nil {
+					c.ctx.Log.Error(err, fmt.Sprintf("patch %T error, orig: %v, curr: %v", origCluster, origCluster, cluster))
+					return err
+				}
+			}
+		case DELETE:
+			if err := c.handleClusterDeletion(cluster); err != nil {
+				return err
+			}
+			if cluster.Spec.TerminationPolicy == appsv1alpha1.DoNotTerminate {
+				return nil
+			}
+		}
+	}
+	switch *node.action {
+	case CREATE:
+		err := c.cli.Create(c.ctx.Ctx, node.obj)
+		if err != nil && !apierrors.IsAlreadyExists(err) {
+			return err
+		}
+	case UPDATE:
+		if node.immutable {
+			return nil
+		}
+		o, err := c.buildUpdateObj(node)
+		if err != nil {
+			return err
+		}
+		err = c.cli.Update(c.ctx.Ctx, o)
+		if err != nil && !apierrors.IsNotFound(err) {
+			c.ctx.Log.Error(err, fmt.Sprintf("update %T error, orig: %v, curr: %v", o, node.oriObj, o))
+			return err
+		}
+	case DELETE:
+		if controllerutil.RemoveFinalizer(node.obj, dbClusterFinalizerName) {
+			err := c.cli.Update(c.ctx.Ctx, node.obj)
+			if err != nil && !apierrors.IsNotFound(err) {
+				c.ctx.Log.Error(err, fmt.Sprintf("delete %T error, orig: %v, curr: %v", node.obj, node.oriObj, node.obj))
+				return err
+			}
+		}
+		// TODO: delete backup objects created in scale-out
+		// TODO: should manage backup objects in a better way
+		if isTypeOf[*snapshotv1.VolumeSnapshot](node.obj) ||
+			isTypeOf[*dataprotectionv1alpha1.BackupPolicy](node.obj) ||
+			isTypeOf[*dataprotectionv1alpha1.Backup](node.obj) {
+			_ = c.cli.Delete(c.ctx.Ctx, node.obj)
+		}
+
+	case STATUS:
+		patch := client.MergeFrom(node.oriObj)
+		return c.cli.Status().Patch(c.ctx.Ctx, node.obj, patch)
+	}
+	return nil
 }
 
 func (c *clusterPlanBuilder) buildUpdateObj(node *lifecycleVertex) (client.Object, error) {

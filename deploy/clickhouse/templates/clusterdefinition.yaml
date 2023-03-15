@@ -33,12 +33,11 @@ spec:
         - name: {{ $name }}
           filePathPattern: {{ $pattern }}
         {{- end }}
-      configSpec:
-        configTemplateRefs:
-          - name: clickhouse-tpl
-            configTplRef: clickhouse-tpl
-            volumeName: config
-            namespace: {{ .Release.Namespace }}
+      componentConfigSpec:
+        - name: clickhouse-tpl
+          templateRef: clickhouse-tpl
+          volumeName: config
+          namespace: {{ .Release.Namespace }}
       service:
         ports:
           - name: http
@@ -166,12 +165,11 @@ spec:
         - name: {{ $name }}
           filePathPattern: {{ $pattern }}
         {{- end }}
-      configSpec:
-        configTemplateRefs:
-          - name: clickhouse-keeper-tpl
-            configTplRef: clickhouse-keeper-tpl
-            volumeName: config
-            namespace: {{ .Release.Namespace }}
+      componentConfigSpec:
+        - name: clickhouse-keeper-tpl
+          templateRef: clickhouse-keeper-tpl
+          volumeName: config
+          namespace: {{ .Release.Namespace }}
       service:
         ports:
           - name: tcp
@@ -263,19 +261,19 @@ spec:
         - name: {{ $name }}
           filePathPattern: {{ $pattern }}
         {{- end }}
-      configSpec:
-        configTemplateRefs:
-        {{- if .Values.zookeeper.configuration }}
-          - name: zookeeper-tpl
-            configTplRef: zookeeper-tpl
-            namespace: {{ .Release.Namespace }}
-            volumeName: config
-        {{- end }}
-          - name: zookeeper-scripts-tpl
-            configTplRef: zookeeper-scripts-tpl
-            namespace: {{ .Release.Namespace }}
-            volumeName: script
-            defaultMode: 0755
+      configSpecs:
+      {{- if .Values.zookeeper.configuration }}
+        - name: zookeeper-tpl
+          templateRef: zookeeper-tpl
+          namespace: {{ .Release.Namespace }}
+          volumeName: config
+      {{- end }}
+      scriptSpecs:
+        - name: zookeeper-scripts-tpl
+          templateRef: zookeeper-scripts-tpl
+          namespace: {{ .Release.Namespace }}
+          volumeName: script
+          defaultMode: 0755
       service:
         ports:
           - name: tcp-client

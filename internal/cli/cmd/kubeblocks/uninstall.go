@@ -145,7 +145,6 @@ func (o *uninstallOptions) preCheck() error {
 		printer.Warning(o.Out, "failed to locate helm release meta, will clean up all KubeBlocks resources.\n")
 	} else if o.Namespace != kbNamespace {
 		o.Namespace = kbNamespace
-		o.HelmCfg.SetNamespace(o.Namespace)
 		fmt.Fprintf(o.Out, "will uninstall KubeBlocks in namespace: '%s'\n", kbNamespace)
 	}
 	return nil
@@ -243,7 +242,9 @@ func (o *uninstallOptions) uninstallAddons() error {
 
 	processAddons := func(processFn func(addon *extensionsv1alpha1.Addon) error) ([]*extensionsv1alpha1.Addon, error) {
 		var addons []*extensionsv1alpha1.Addon
-		objects, err := o.Dynamic.Resource(types.AddonGVR()).List(context.TODO(), metav1.ListOptions{})
+		objects, err := o.Dynamic.Resource(types.AddonGVR()).List(context.TODO(), metav1.ListOptions{
+			LabelSelector: buildAddonLabelSelector(),
+		})
 		if err != nil && !apierrors.IsNotFound(err) {
 			klog.V(1).Infof("Failed to get KubeBlocks addons %s", err.Error())
 			allErrs = append(allErrs, err)

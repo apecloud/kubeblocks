@@ -17,6 +17,7 @@ limitations under the License.
 package playground
 
 import (
+	"fmt"
 	"path/filepath"
 
 	cp "github.com/apecloud/kubeblocks/internal/cli/cloudprovider"
@@ -38,4 +39,19 @@ func cloudProviderRepoDir() (string, error) {
 		return "", err
 	}
 	return filepath.Join(dir, cp.GitRepoName), err
+}
+
+// getExistedCluster get existed playground kubernetes cluster, we should only have one cluster
+func getExistedCluster(provider cp.Interface, path string) (string, error) {
+	clusterNames, err := provider.GetExistedClusters()
+	if err != nil {
+		return "", err
+	}
+	if len(clusterNames) > 1 {
+		return "", fmt.Errorf("found more than one cluster have been created, check it again, %v", clusterNames)
+	}
+	if len(clusterNames) == 0 {
+		return "", nil
+	}
+	return clusterNames[0], nil
 }

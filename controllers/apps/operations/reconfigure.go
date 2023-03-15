@@ -261,8 +261,8 @@ func (r *reconfigureAction) Action(resource *OpsResource) error {
 func (r *reconfigureAction) doMergeAndPersist(clusterName, componentName string,
 	reconfigure *appsv1alpha1.Reconfigure,
 	resource *OpsResource,
-	tpls []appsv1alpha1.ConfigTemplate) error {
-	findTpl := func(tplName string) *appsv1alpha1.ConfigTemplate {
+	tpls []appsv1alpha1.ComponentConfigSpec) error {
+	findTpl := func(tplName string) *appsv1alpha1.ComponentConfigSpec {
 		if len(tplName) == 0 && len(tpls) == 1 {
 			return &tpls[0]
 		}

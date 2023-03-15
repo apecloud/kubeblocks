@@ -61,13 +61,16 @@ spec:
     - replicas: 1
       resources:
         requests:
-          storage: 1Gi
+          storage: 10Gi
+          memory: 512Mi
+        limits:
+          memory: 4Gi
       extras:
         - name: alertmanager
           replicas: 1
           resources:
             requests:
-              storage: 1Gi
+              storage: 4Gi
 
     - selectors:
         - key: KubeGitVersion
@@ -79,6 +82,9 @@ spec:
       resources:
         requests:
           storage: 20Gi
+          memory: 512Mi
+        limits:
+          memory: 4Gi
       extras:
         - name: alertmanager
           replicas: 1

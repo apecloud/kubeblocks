@@ -4,6 +4,12 @@ We're happy to announce the release of KubeBlocks $kubeblocks_version! 🚀 🎉
 
 We would like to extend our appreciation to all contributors who helped make this release happen.
 
+**Breaking changes**
+* Refactored ConfigTemplate related API, affected following APIs:
+    - ClusterDefinition
+    - ClusterVersion
+* Existing APIs will no longer be functional, please make sure you have removed the deprecated APIs and transformed CRDs before upgrade. Please refer to the upgrade notes under this release notes.
+
 **Highlights**
   * Automatic pod container environment variables updates:
     * [NEW] KB_POD_FQDN - KubeBlock Cluster component workload associated headless service name, N/A if workloadType=Stateless.

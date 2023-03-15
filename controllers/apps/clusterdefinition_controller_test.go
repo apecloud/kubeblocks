@@ -143,7 +143,7 @@ var _ = Describe("ClusterDefinition Controller", func() {
 			By("Create a clusterDefinition obj")
 			clusterDefObj = testapps.NewClusterDefFactory(clusterDefName).
 				AddComponent(testapps.StatefulMySQLComponent, statefulCompType).
-				AddConfigTemplate(cmName, cmName, cmName, testCtx.DefaultNamespace, configVolumeName, nil).
+				AddConfigTemplate(cmName, cmName, cmName, testCtx.DefaultNamespace, configVolumeName).
 				Create(&testCtx).GetObject()
 
 			By("Create a clusterVersion obj")

@@ -77,25 +77,10 @@ func (r *rplSetHorizontalScalingTransformer) hasReplicationSetHScaling(cluster a
 		return false, err
 	}
 
-	//clusterCompSpecMap := cluster.GetDefNameMappingComponents()
-	//clusterCompVerMap := r.cr.cv.GetDefNameMappingComponents()
 	for _, compDef := range r.cr.cd.Spec.ComponentDefs {
 		if compDef.WorkloadType == appsv1alpha1.Replication {
 			return true, nil
 		}
-		//if compDef.WorkloadType != appsv1alpha1.Replication {
-		//	continue
-		//}
-		//compDefName := compDef.Name
-		//compVer := clusterCompVerMap[compDefName]
-		//compSpecs := clusterCompSpecMap[compDefName]
-		//for _, compSpec := range compSpecs {
-		//	comp := component.BuildComponent(r.ctx, cluster, r.cr.cd, compDef, compSpec, compVer)
-		//	compSts := filterStsOwnedByComp(stsList, comp.Name)
-		//	if len(compSts) != int(comp.Replicas) {
-		//		return true, nil
-		//	}
-		//}
 	}
 
 	return false, nil

@@ -192,10 +192,10 @@ func (ops *BaseOperations) Invoke(ctx context.Context, req *bindings.InvokeReque
 	}
 
 	operation, ok := ops.OperationMap[req.Operation]
+	opsRes := OpsResult{}
 	if !ok {
 		message := fmt.Sprintf("%v operation is not implemented for %v", req.Operation, ops.DBType)
 		ops.Logger.Errorf(message)
-		opsRes := OpsResult{}
 		opsRes["event"] = OperationNotImplemented
 		opsRes["message"] = message
 		resp.Metadata[StatusCode] = OperationNotFoundHTTPCode
@@ -205,7 +205,10 @@ func (ops *BaseOperations) Invoke(ctx context.Context, req *bindings.InvokeReque
 	}
 
 	if ops.InitIfNeed != nil && ops.InitIfNeed() {
-		resp.Data = []byte("db not ready")
+		opsRes["event"] = OperationFailed
+		opsRes["message"] = "db not ready"
+		res, _ := json.Marshal(opsRes)
+		resp.Data = res
 		return updateRespMetadata()
 	}
 

@@ -23,16 +23,20 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 )
 
-var _ = Describe("playground", func() {
+var _ = Describe("playground destroy", func() {
 	var streams genericclioptions.IOStreams
 
 	BeforeEach(func() {
 		streams, _, _, _ = genericclioptions.NewTestIOStreams()
 	})
 
-	It("new playground command", func() {
-		cmd := NewPlaygroundCmd(streams)
+	It("destroy command", func() {
+		cmd := newDestroyCmd(streams)
 		Expect(cmd).ShouldNot(BeNil())
-		Expect(cmd.HasSubCommands()).Should(BeTrue())
+
+		o := &destroyOptions{
+			IOStreams: streams,
+		}
+		Expect(o.destroy()).Should(HaveOccurred())
 	})
 })

@@ -1268,6 +1268,10 @@ var _ = Describe("Cluster Controller", func() {
 				SetBackupPolicyName(backupPolicyName).
 				SetBackupType(dataprotectionv1alpha1.BackupTypeFull).
 				Create(&testCtx).GetObject()
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(backup),
+				func(g Gomega, tmpBackup *dataprotectionv1alpha1.Backup) {
+					g.Expect(tmpBackup.Status.Phase).Should(Equal(dataprotectionv1alpha1.BackupFailed))
+				})).Should(Succeed())
 			Expect(testapps.ChangeObjStatus(&testCtx, backup, func() {
 				backup.Status.BackupToolName = backupTool.Name
 				backup.Status.RemoteVolume = &corev1.Volume{

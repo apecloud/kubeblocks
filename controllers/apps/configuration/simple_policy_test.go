@@ -67,10 +67,11 @@ var _ = Describe("Reconfigure simplePolicy", func() {
 				withConfigTpl("for_test", map[string]string{
 					"key": "value",
 				}),
-				withCDComponent(appsv1alpha1.Consensus, []appsv1alpha1.ConfigTemplate{{
-					Name:       "for_test",
-					VolumeName: "test_volume",
-				}}))
+				withCDComponent(appsv1alpha1.Consensus, []appsv1alpha1.ComponentConfigSpec{{
+					ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
+						Name:       "for_test",
+						VolumeName: "test_volume",
+					}}}))
 
 			// mock client update caller
 			updateErr := cfgcore.MakeError("update failed!")
@@ -129,10 +130,11 @@ var _ = Describe("Reconfigure simplePolicy", func() {
 				withConfigTpl("for_test", map[string]string{
 					"key": "value",
 				}),
-				withCDComponent(appsv1alpha1.Stateless, []appsv1alpha1.ConfigTemplate{{
-					Name:       "for_test",
-					VolumeName: "test_volume",
-				}}))
+				withCDComponent(appsv1alpha1.Stateless, []appsv1alpha1.ComponentConfigSpec{{
+					ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
+						Name:       "for_test",
+						VolumeName: "test_volume",
+					}}}))
 			status, err := simplePolicy.Upgrade(mockParam)
 			Expect(err).ShouldNot(Succeed())
 			Expect(err.Error()).Should(ContainSubstring("not support component workload type"))
@@ -148,10 +150,11 @@ var _ = Describe("Reconfigure simplePolicy", func() {
 				withConfigTpl("not_tpl_name", map[string]string{
 					"key": "value",
 				}),
-				withCDComponent(appsv1alpha1.Consensus, []appsv1alpha1.ConfigTemplate{{
-					Name:       "for_test",
-					VolumeName: "test_volume",
-				}}))
+				withCDComponent(appsv1alpha1.Consensus, []appsv1alpha1.ComponentConfigSpec{{
+					ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
+						Name:       "for_test",
+						VolumeName: "test_volume",
+					}}}))
 			status, err := simplePolicy.Upgrade(mockParam)
 			Expect(err).ShouldNot(Succeed())
 			Expect(err.Error()).Should(ContainSubstring("failed to find config meta"))

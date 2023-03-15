@@ -7,13 +7,12 @@ metadata:
 spec:
   componentDefs:
     - name: mongos
-      configSpec:
-        configTemplateRefs:
-          - name: mongodb-scripts
-            configTplRef: mongodb-scripts
-            volumeName: scripts
-            namespace: {{ .Release.Namespace }}
-            defaultMode: 493
+      scriptSpecs:
+        - name: mongodb-scripts
+          templateRef: mongodb-scripts
+          volumeName: scripts
+          namespace: {{ .Release.Namespace }}
+          defaultMode: 493
       workloadType: Stateless
       service:
         ports:
@@ -33,13 +32,12 @@ spec:
                 mountPath: /scripts/mongos-setup.sh
                 subPath: mongos-setup.sh
     - name: configsvr
-      configSpec:
-        configTemplateRefs:
-          - name: mongodb-scripts
-            configTplRef: mongodb-scripts
-            volumeName: scripts
-            namespace: {{ .Release.Namespace }}
-            defaultMode: 493
+      scriptSpecs:
+        - name: mongodb-scripts
+          templateRef: mongodb-scripts
+          volumeName: scripts
+          namespace: {{ .Release.Namespace }}
+          defaultMode: 493
       characterType: mongodb
       workloadType: Consensus
       consensusSpec:
@@ -83,13 +81,12 @@ spec:
                 mountPath: /scripts/replicaset-post-start.sh
                 subPath: replicaset-post-start.sh
     - name: shard
-      configSpec:
-        configTemplateRefs:
-          - name: mongodb-scripts
-            configTplRef: mongodb-scripts
-            volumeName: scripts
-            namespace: {{ .Release.Namespace }}
-            defaultMode: 493
+      scriptSpecs:
+        - name: mongodb-scripts
+          templateRef: mongodb-scripts
+          volumeName: scripts
+          namespace: {{ .Release.Namespace }}
+          defaultMode: 493
       characterType: mongodb
       workloadType: Consensus
       consensusSpec:

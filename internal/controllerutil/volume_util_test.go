@@ -30,7 +30,7 @@ var _ = Describe("lifecycle_utils", func() {
 
 	Context("has the checkAndUpdatePodVolumes function which generates Pod Volumes for mounting ConfigMap objects", func() {
 		var sts appsv1.StatefulSet
-		var volumes map[string]appsv1alpha1.ConfigTemplate
+		var volumes map[string]appsv1alpha1.ComponentTemplateSpec
 		BeforeEach(func() {
 			sts = appsv1.StatefulSet{
 				Spec: appsv1.StatefulSetSpec{
@@ -61,7 +61,7 @@ var _ = Describe("lifecycle_utils", func() {
 					},
 				},
 			}
-			volumes = make(map[string]appsv1alpha1.ConfigTemplate)
+			volumes = make(map[string]appsv1alpha1.ComponentTemplateSpec)
 
 		})
 
@@ -73,11 +73,10 @@ var _ = Describe("lifecycle_utils", func() {
 		})
 
 		It("should succeed in normal test case, where one volume is added", func() {
-			volumes["my_config"] = appsv1alpha1.ConfigTemplate{
-				Name:                "myConfig",
-				ConfigTplRef:        "myConfig",
-				ConfigConstraintRef: "myConfig",
-				VolumeName:          "myConfigVolume",
+			volumes["my_config"] = appsv1alpha1.ComponentTemplateSpec{
+				Name:        "myConfig",
+				TemplateRef: "myConfig",
+				VolumeName:  "myConfigVolume",
 			}
 			ps := &sts.Spec.Template.Spec
 			err := CreateOrUpdatePodVolumes(ps, volumes)
@@ -86,17 +85,15 @@ var _ = Describe("lifecycle_utils", func() {
 		})
 
 		It("should succeed in normal test case, where two volumes are added", func() {
-			volumes["my_config"] = appsv1alpha1.ConfigTemplate{
-				Name:                "myConfig",
-				ConfigTplRef:        "myConfig",
-				ConfigConstraintRef: "myConfig",
-				VolumeName:          "myConfigVolume",
+			volumes["my_config"] = appsv1alpha1.ComponentTemplateSpec{
+				Name:        "myConfig",
+				TemplateRef: "myConfig",
+				VolumeName:  "myConfigVolume",
 			}
-			volumes["my_config1"] = appsv1alpha1.ConfigTemplate{
-				Name:                "myConfig",
-				ConfigTplRef:        "myConfig",
-				ConfigConstraintRef: "myConfig",
-				VolumeName:          "myConfigVolume2",
+			volumes["my_config1"] = appsv1alpha1.ComponentTemplateSpec{
+				Name:        "myConfig",
+				TemplateRef: "myConfig",
+				VolumeName:  "myConfigVolume2",
 			}
 			ps := &sts.Spec.Template.Spec
 			err := CreateOrUpdatePodVolumes(ps, volumes)
@@ -116,11 +113,10 @@ var _ = Describe("lifecycle_utils", func() {
 						EmptyDir: &corev1.EmptyDirVolumeSource{},
 					},
 				})
-			volumes[cmName] = appsv1alpha1.ConfigTemplate{
-				Name:                "configTplName",
-				ConfigTplRef:        "configTplName",
-				ConfigConstraintRef: "configTplName",
-				VolumeName:          replicaVolumeName,
+			volumes[cmName] = appsv1alpha1.ComponentTemplateSpec{
+				Name:        "configTplName",
+				TemplateRef: "configTplName",
+				VolumeName:  replicaVolumeName,
 			}
 			ps := &sts.Spec.Template.Spec
 			Expect(CreateOrUpdatePodVolumes(ps, volumes)).ShouldNot(Succeed())
@@ -143,11 +139,10 @@ var _ = Describe("lifecycle_utils", func() {
 					},
 				})
 
-			volumes[cmName] = appsv1alpha1.ConfigTemplate{
-				Name:                "configTplName",
-				ConfigTplRef:        "configTplName",
-				ConfigConstraintRef: "configTplName",
-				VolumeName:          replicaVolumeName,
+			volumes[cmName] = appsv1alpha1.ComponentTemplateSpec{
+				Name:        "configTplName",
+				TemplateRef: "configTplName",
+				VolumeName:  replicaVolumeName,
 			}
 			ps := &sts.Spec.Template.Spec
 			err := CreateOrUpdatePodVolumes(ps, volumes)

@@ -36,6 +36,7 @@ import (
 	"k8s.io/client-go/dynamic"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
+	"k8s.io/utils/strings/slices"
 
 	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/list"
@@ -374,9 +375,13 @@ func addonEnableDisableHandler(o *addonCmdOpts, cmd *cobra.Command, args []strin
 }
 
 func (o *addonCmdOpts) buildEnablePatch(flags []*pflag.Flag, spec, install map[string]interface{}) (err error) {
+	extraNames := o.addon.GetExtraNames()
 	var installSpec extensionsv1alpha1.AddonInstallSpec
 	// only using named return value in defer function
 	defer func() {
+		if err != nil {
+			return
+		}
 		var b []byte
 		b, err = json.Marshal(&installSpec)
 		if err != nil {
@@ -410,7 +415,10 @@ func (o *addonCmdOpts) buildEnablePatch(flags []*pflag.Flag, spec, install map[s
 		return nil
 	}
 
-	getExtraItem := func(name string) *extensionsv1alpha1.AddonInstallExtraItem {
+	// extractInstallSpecExtraItem extract extensionsv1alpha1.AddonInstallExtraItem
+	// for the matching arg name, if not found it will append extensionsv1alpha1.AddonInstallExtraItem
+	// item to installSpec.ExtraItems and return its pointer.
+	extractInstallSpecExtraItem := func(name string) (*extensionsv1alpha1.AddonInstallExtraItem, error) {
 		var pItem *extensionsv1alpha1.AddonInstallExtraItem
 		for i, eItem := range installSpec.ExtraItems {
 			if eItem.Name == name {
@@ -419,12 +427,15 @@ func (o *addonCmdOpts) buildEnablePatch(flags []*pflag.Flag, spec, install map[s
 			}
 		}
 		if pItem == nil {
-			pItem = &extensionsv1alpha1.AddonInstallExtraItem{
-				Name: name,
+			if !slices.Contains(extraNames, name) {
+				return nil, fmt.Errorf("invalid extra item name [%s]", name)
 			}
-			installSpec.ExtraItems = append(installSpec.ExtraItems, *pItem)
+			installSpec.ExtraItems = append(installSpec.ExtraItems, extensionsv1alpha1.AddonInstallExtraItem{
+				Name: name,
+			})
+			pItem = &installSpec.ExtraItems[len(installSpec.ExtraItems)-1]
 		}
-		return pItem
+		return pItem, nil
 	}
 
 	twoTuplesProcessor := func(s, flag string,
@@ -452,10 +463,14 @@ func (o *addonCmdOpts) buildEnablePatch(flags []*pflag.Flag, spec, install map[s
 		default:
 			return fmt.Errorf("wrong flag value --%s=%s", flag, s)
 		}
+		name = strings.TrimSpace(name)
 		if name == "" {
 			valueAssigner(&installSpec.AddonInstallSpecItem, result)
 		} else {
-			pItem := getExtraItem(name)
+			pItem, err := extractInstallSpecExtraItem(name)
+			if err != nil {
+				return err
+			}
 			valueAssigner(&pItem.AddonInstallSpecItem, result)
 		}
 		return nil

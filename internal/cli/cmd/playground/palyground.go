@@ -17,22 +17,23 @@ limitations under the License.
 package playground
 
 import (
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
-
+	"github.com/spf13/cobra"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 )
 
-var _ = Describe("playground", func() {
-	var streams genericclioptions.IOStreams
+// NewPlaygroundCmd creates the playground command
+func NewPlaygroundCmd(streams genericclioptions.IOStreams) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "playground [init | destroy | guide]",
+		Short: "Bootstrap a playground KubeBlocks in local host or cloud.",
+	}
 
-	BeforeEach(func() {
-		streams, _, _, _ = genericclioptions.NewTestIOStreams()
-	})
+	// add subcommands
+	cmd.AddCommand(
+		newInitCmd(streams),
+		newDestroyCmd(streams),
+		newGuideCmd(),
+	)
 
-	It("new playground command", func() {
-		cmd := NewPlaygroundCmd(streams)
-		Expect(cmd).ShouldNot(BeNil())
-		Expect(cmd.HasSubCommands()).Should(BeTrue())
-	})
-})
+	return cmd
+}

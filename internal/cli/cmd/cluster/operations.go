@@ -184,7 +184,7 @@ func (o *OperationsOptions) validateReconfiguring() error {
 	return nil
 }
 
-func (o *OperationsOptions) validateConfigParams(tpl *appsv1alpha1.ConfigTemplate, componentName string) error {
+func (o *OperationsOptions) validateConfigParams(tpl *appsv1alpha1.ComponentConfigSpec, componentName string) error {
 	transKeyPair := func(pts map[string]string) map[string]interface{} {
 		m := make(map[string]interface{}, len(pts))
 		for key, value := range pts {
@@ -208,7 +208,7 @@ func (o *OperationsOptions) validateConfigParams(tpl *appsv1alpha1.ConfigTemplat
 	return err
 }
 
-func (o *OperationsOptions) validateTemplateParam(tpls []appsv1alpha1.ConfigTemplate) (*appsv1alpha1.ConfigTemplate, error) {
+func (o *OperationsOptions) validateTemplateParam(tpls []appsv1alpha1.ComponentConfigSpec) (*appsv1alpha1.ComponentConfigSpec, error) {
 	if len(tpls) == 0 {
 		return nil, cfgcore.MakeError("not support reconfiguring because there is no config template.")
 	}
@@ -233,7 +233,7 @@ func (o *OperationsOptions) validateTemplateParam(tpls []appsv1alpha1.ConfigTemp
 	return nil, cfgcore.MakeError("specify template name[%s] is not exist.", o.CfgTemplateName)
 }
 
-func (o *OperationsOptions) validateConfigMapKey(tpl *appsv1alpha1.ConfigTemplate, componentName string) error {
+func (o *OperationsOptions) validateConfigMapKey(tpl *appsv1alpha1.ComponentConfigSpec, componentName string) error {
 	var (
 		cmObj  = corev1.ConfigMap{}
 		cmName = cfgcore.GetComponentCfgName(o.Name, componentName, tpl.VolumeName)
@@ -347,7 +347,7 @@ func (o *OperationsOptions) fillTemplateArgForReconfiguring() error {
 		return nil
 	}
 
-	supportUpdatedTpl := make([]appsv1alpha1.ConfigTemplate, 0)
+	supportUpdatedTpl := make([]appsv1alpha1.ComponentConfigSpec, 0)
 	for _, tpl := range tplList {
 		if ok, err := util.IsSupportConfigureParams(tpl, o.KeyValues, o.Dynamic); err == nil && ok {
 			supportUpdatedTpl = append(supportUpdatedTpl, tpl)
@@ -406,7 +406,7 @@ func (o *OperationsOptions) printConfigureTips() {
 		printer.NewPair("ClusterName", o.Name))
 }
 
-func (o *OperationsOptions) fillKeyForReconfiguring(tpl *appsv1alpha1.ConfigTemplate, data map[string]string) {
+func (o *OperationsOptions) fillKeyForReconfiguring(tpl *appsv1alpha1.ComponentConfigSpec, data map[string]string) {
 	keys := make([]string, 0, len(data))
 	for k := range data {
 		if cfgcore.CheckConfigTemplateReconfigureKey(*tpl, k) {

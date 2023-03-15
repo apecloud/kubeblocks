@@ -134,10 +134,10 @@ func (c *clusterStatusTransformer) updateStatusConditions(cluster *appsv1alpha1.
 		c.recorder.Event(cluster, eventType, condition.Reason, condition.Message)
 	}
 	// TODO: handle ops manipulation
-	//if phaseChanged {
-	//	// if cluster status changed, do it
-	//	return opsutil.MarkRunningOpsRequestAnnotation(c.ctx.Ctx, c.cli, cluster)
-	//}
+	if phaseChanged {
+		// if cluster status changed, do it
+		return opsutil.MarkRunningOpsRequestAnnotation(c.ctx.Ctx, c.cli, cluster)
+	}
 	return nil
 }
 

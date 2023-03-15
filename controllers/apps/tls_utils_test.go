@@ -218,9 +218,8 @@ var _ = Describe("TLS self-signed cert function", func() {
 					SetIssuer(tlsIssuer).
 					Create(&testCtx).
 					GetObject()
-				time.Sleep(time.Second)
-				Eventually(testapps.GetClusterPhase(&testCtx, client.ObjectKeyFromObject(clusterObj))).
-					Should(Equal(appsv1alpha1.CreatingPhase))
+				Consistently(testapps.GetClusterObservedGeneration(&testCtx, client.ObjectKeyFromObject(clusterObj))).WithPolling(1 * time.Second).WithTimeout(5 * time.Second).
+					Should(BeEquivalentTo(0))
 			})
 		})
 

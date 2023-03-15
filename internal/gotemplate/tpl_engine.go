@@ -21,7 +21,6 @@ import (
 	"strings"
 	"text/template"
 
-
 	"github.com/Masterminds/sprig/v3"
 	"github.com/StudioSol/set"
 	corev1 "k8s.io/api/core/v1"

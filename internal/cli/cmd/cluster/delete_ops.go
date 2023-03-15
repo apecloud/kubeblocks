@@ -32,7 +32,7 @@ func NewDeleteOpsCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *co
 	o := delete.NewDeleteOptions(f, streams, types.OpsGVR())
 	cmd := &cobra.Command{
 		Use:               "delete-ops",
-		Short:             "Delete an OpsRequest",
+		Short:             "Delete an OpsRequest.",
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.ClusterGVR()),
 		Run: func(cmd *cobra.Command, args []string) {
 			util.CheckErr(completeForDeleteOps(o, args))

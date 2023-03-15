@@ -17,25 +17,14 @@ limitations under the License.
 package playground
 
 import (
-	"fmt"
-
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-
-	cp "github.com/apecloud/kubeblocks/internal/cli/cloudprovider"
-	"github.com/apecloud/kubeblocks/internal/cli/testing"
-	"github.com/apecloud/kubeblocks/internal/cli/types"
 )
 
 var _ = Describe("playground", func() {
 	var streams genericclioptions.IOStreams
-
-	// use a fake URL to test
-	types.KubeBlocksChartName = testing.KubeBlocksChartName
-	types.KubeBlocksChartURL = testing.KubeBlocksChartURL
 
 	BeforeEach(func() {
 		streams, _, _, _ = genericclioptions.NewTestIOStreams()
@@ -45,53 +34,5 @@ var _ = Describe("playground", func() {
 		cmd := NewPlaygroundCmd(streams)
 		Expect(cmd).ShouldNot(BeNil())
 		Expect(cmd.HasSubCommands()).Should(BeTrue())
-	})
-
-	It("init at local host", func() {
-		cmd := newInitCmd(streams)
-		Expect(cmd != nil).Should(BeTrue())
-
-		o := &initOptions{
-			clusterDef: "test-cd",
-			IOStreams:  streams,
-			baseOptions: baseOptions{
-				cloudProvider: defaultCloudProvider,
-			},
-		}
-		Expect(o.validate()).Should(Succeed())
-		Expect(o.run()).Should(HaveOccurred())
-		Expect(o.installKubeBlocks()).Should(HaveOccurred())
-		Expect(o.createCluster()).Should(HaveOccurred())
-	})
-
-	It("init at remote cloud", func() {
-		o := &initOptions{
-			IOStreams: streams,
-			baseOptions: baseOptions{
-				cloudProvider: cp.AWS,
-			},
-			clusterDef: "test-cd",
-		}
-		Expect(o.validate()).Should(HaveOccurred())
-	})
-
-	It("destroy command", func() {
-		cmd := newDestroyCmd(streams)
-		Expect(cmd).ShouldNot(BeNil())
-
-		o := &destroyOptions{
-			IOStreams: streams,
-		}
-		Expect(o.destroy()).Should(HaveOccurred())
-	})
-
-	It("guide", func() {
-		cmd := newGuideCmd()
-		Expect(cmd).ShouldNot(BeNil())
-		printGuide(false, "")
-	})
-
-	It("test", func() {
-		fmt.Println(rand.String(10))
 	})
 })

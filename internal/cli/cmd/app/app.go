@@ -22,7 +22,6 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
-	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/cli/values"
 	"helm.sh/helm/v3/pkg/repo"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
@@ -57,7 +56,7 @@ type options struct {
 	genericclioptions.IOStreams
 	Version         string
 	Sets            []string
-	HelmCfg         *action.Configuration
+	HelmCfg         *helm.Config
 	Namespace       string
 	AppName         string
 	CreateNamespace bool
@@ -66,7 +65,7 @@ type options struct {
 func NewAppCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "app [install | uninstall] APP_NAME",
-		Short: "Manager external applications related to KubeBlocks",
+		Short: "Manage external applications related to KubeBlocks.",
 	}
 	cmd.AddCommand(
 		newInstallCmd(f, streams),
@@ -83,7 +82,7 @@ func newInstallCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 
 	cmd := &cobra.Command{
 		Use:     "install",
-		Short:   "Install the application with the specified name",
+		Short:   "Install the application with the specified name.",
 		Example: installExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			util.CheckErr(o.complete(cmd, args))
@@ -106,7 +105,7 @@ func newUninstallCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *co
 
 	cmd := &cobra.Command{
 		Use:     "uninstall",
-		Short:   "Uninstall the application with the specified name",
+		Short:   "Uninstall the application with the specified name.",
 		Example: uninstallExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			util.CheckErr(o.complete(cmd, args))
@@ -151,7 +150,6 @@ func (o *options) installChart() (string, error) {
 		Version:         o.Version,
 		Namespace:       o.Namespace,
 		ValueOpts:       &values.Options{Values: sets},
-		Login:           true,
 		TryTimes:        2,
 		CreateNamespace: o.CreateNamespace,
 	}
@@ -200,7 +198,6 @@ func (o *options) complete(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	o.HelmCfg, err = helm.NewActionConfig(o.Namespace, kubeconfig, helm.WithContext(kubecontext))
-
-	return err
+	o.HelmCfg = helm.NewConfig(o.Namespace, kubeconfig, kubecontext, false)
+	return nil
 }

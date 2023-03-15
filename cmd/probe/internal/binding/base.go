@@ -88,17 +88,23 @@ const (
 	defaultFailedEventReportFrequency = 1800
 	defaultRoleDetectionThreshold     = 300
 
-	// types for probe
-	CheckRunningType = iota
-	CheckStatusType
-	CheckRoleChangedType
-
 	CheckRunningOperation bindings.OperationKind = "checkRunning"
 	CheckStatusOperation  bindings.OperationKind = "checkStatus"
 	CheckRoleOperation    bindings.OperationKind = "checkRole"
 	GetRoleOperation      bindings.OperationKind = "getRole"
+	GetLagOperation       bindings.OperationKind = "getLag"
+	ExecOperation         bindings.OperationKind = "exec"
+	QueryOperation        bindings.OperationKind = "query"
+	CloseOperation        bindings.OperationKind = "query"
 
 	OperationNotImplemented = "OperationNotImplemented"
+)
+
+const (
+	// types for probe
+	CheckRunningType int = iota
+	CheckStatusType
+	CheckRoleChangedType
 )
 
 func init() {
@@ -244,7 +250,7 @@ func (ops *BaseOperations) CheckRoleOps(ctx context.Context, req *bindings.Invok
 
 	opsRes["role"] = role
 	if ops.OriRole != role {
-		opsRes["Event"] = "roleChanged"
+		opsRes["event"] = "roleChanged"
 		ops.OriRole = role
 		ops.RoleUnchangedCount = 0
 	} else {
@@ -286,6 +292,7 @@ func (ops *BaseOperations) GetRoleOps(ctx context.Context, req *bindings.InvokeR
 		ops.CheckRoleFailedCount++
 		return opsRes, nil
 	}
+	opsRes["event"] = "getRoleSuccess"
 	opsRes["role"] = role
 	return opsRes, nil
 }

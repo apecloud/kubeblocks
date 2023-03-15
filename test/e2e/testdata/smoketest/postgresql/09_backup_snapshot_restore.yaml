@@ -1,0 +1,30 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: Cluster
+metadata:
+  name: snapshot-mycluster
+spec:
+  clusterDefinitionRef: postgresql
+  clusterVersionRef: postgresql-14.7.0
+  terminationPolicy: WipeOut
+  affinity:
+    topologyKeys:
+      - kubernetes.io/hostname
+  componentSpecs:
+    - name: mysql
+      componentDefRef: mysql
+      monitor: false
+      replicas: 3
+      enabledLogs: [ "slow","error" ]
+      volumeClaimTemplates:
+        - name: data
+          spec:
+            storageClassName:
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: 2Gi
+            dataSource:
+              apiGroup: snapshot.storage.k8s.io
+              kind: VolumeSnapshot
+              name: backup-sbapshot-mycluster

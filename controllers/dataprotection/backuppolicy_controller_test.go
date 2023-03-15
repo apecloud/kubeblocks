@@ -17,6 +17,7 @@ limitations under the License.
 package dataprotection
 
 import (
+	"context"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -29,8 +30,10 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	"github.com/apecloud/kubeblocks/internal/constant"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/generics"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 )
 
@@ -46,9 +49,11 @@ var _ = Describe("Backup Policy Controller", func() {
 	const defaultSchedule = "0 3 * * *"
 	const defaultTTL = "168h0m0s"
 	const backupNamePrefix = "test-backup-job-"
+	const mgrNamespace = "kube-system"
 
 	viper.SetDefault("DP_BACKUP_SCHEDULE", "0 3 * * *")
 	viper.SetDefault("DP_BACKUP_TTL", "168h0m0s")
+	viper.SetDefault(constant.CfgKeyCtrlrMgrNS, testCtx.DefaultNamespace)
 
 	cleanEnv := func() {
 		// must wait until resources deleted and no longer exist before the testcases start,
@@ -56,7 +61,7 @@ var _ = Describe("Backup Policy Controller", func() {
 		// in race conditions, it will find the existence of old objects, resulting failure to
 		// create the new objects.
 		By("clean resources")
-
+		viper.SetDefault(constant.CfgKeyCtrlrMgrNS, mgrNamespace)
 		// delete rest mocked objects
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
@@ -67,6 +72,10 @@ var _ = Describe("Backup Policy Controller", func() {
 		testapps.ClearResources(&testCtx, intctrlutil.BackupPolicySignature, inNS, ml)
 		testapps.ClearResources(&testCtx, intctrlutil.JobSignature, inNS, ml)
 		testapps.ClearResources(&testCtx, intctrlutil.CronJobSignature, inNS, ml)
+		testapps.ClearResources(&testCtx, intctrlutil.PersistentVolumeClaimSignature, inNS, ml)
+		// mgr namespaced
+		inMgrNS := client.InNamespace(mgrNamespace)
+		testapps.ClearResources(&testCtx, intctrlutil.CronJobSignature, inMgrNS, ml)
 		// non-namespaced
 		testapps.ClearResources(&testCtx, intctrlutil.BackupToolSignature, ml)
 		testapps.ClearResources(&testCtx, intctrlutil.BackupPolicyTemplateSignature, ml)
@@ -85,8 +94,15 @@ var _ = Describe("Backup Policy Controller", func() {
 			}).Create(&testCtx).GetObject()
 
 		By("By mocking a pod belonging to the statefulset")
-		_ = testapps.NewPodFactory(testCtx.DefaultNamespace, sts.Name+"-0").
+		pod := testapps.NewPodFactory(testCtx.DefaultNamespace, sts.Name+"-0").
+			AddAppInstanceLabel(clusterName).
 			AddContainer(corev1.Container{Name: containerName, Image: testapps.ApeCloudMySQLImage}).
+			Create(&testCtx).GetObject()
+
+		By("By mocking a pvc belonging to the pod")
+		_ = testapps.NewPersistentVolumeClaimFactory(
+			testCtx.DefaultNamespace, "data-"+pod.Name, clusterName, componentName, "data").
+			SetStorage("1Gi").
 			Create(&testCtx)
 	})
 
@@ -94,12 +110,23 @@ var _ = Describe("Backup Policy Controller", func() {
 
 	When("creating backup policy with default settings", func() {
 		var backupToolName string
+		var cronjobKey types.NamespacedName
+
 		BeforeEach(func() {
+			viper.Set(constant.CfgKeyCtrlrMgrNS, mgrNamespace)
+			cronjobKey = types.NamespacedName{
+				Name:      backupPolicyName,
+				Namespace: viper.GetString(constant.CfgKeyCtrlrMgrNS),
+			}
+
 			By("By creating a backupTool")
 			backupTool := testapps.CreateCustomizedObj(&testCtx, "backup/backuptool.yaml",
 				&dpv1alpha1.BackupTool{}, testapps.RandomizedObjName())
 			backupToolName = backupTool.Name
+		})
 
+		AfterEach(func() {
+			viper.SetDefault(constant.CfgKeyCtrlrMgrNS, testCtx.DefaultNamespace)
 		})
 
 		Context("creates a backup policy", func() {
@@ -112,7 +139,7 @@ var _ = Describe("Backup Policy Controller", func() {
 					SetBackupsHistoryLimit(1).
 					SetSchedule(defaultSchedule).
 					SetTTL(defaultTTL).
-					AddMatchLabels(intctrlutil.AppInstanceLabelKey, clusterName).
+					AddMatchLabels(constant.AppInstanceLabelKey, clusterName).
 					SetTargetSecretName(clusterName).
 					AddHookPreCommand("touch /data/mysql/.restore;sync").
 					AddHookPostCommand("rm -f /data/mysql/.restore;sync").
@@ -123,6 +150,9 @@ var _ = Describe("Backup Policy Controller", func() {
 			It("should success", func() {
 				Eventually(testapps.CheckObj(&testCtx, backupPolicyKey, func(g Gomega, fetched *dpv1alpha1.BackupPolicy) {
 					g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.ConfigAvailable))
+				})).Should(Succeed())
+				Eventually(testapps.CheckObj(&testCtx, cronjobKey, func(g Gomega, fetched *batchv1.CronJob) {
+					g.Expect(fetched.Spec.Schedule).To(Equal(defaultSchedule))
 				})).Should(Succeed())
 			})
 			It("limit backups to 1", func() {
@@ -135,7 +165,7 @@ var _ = Describe("Backup Policy Controller", func() {
 				}
 
 				autoBackupLabel := map[string]string{
-					intctrlutil.AppInstanceLabelKey:  backupPolicy.Labels[intctrlutil.AppInstanceLabelKey],
+					constant.AppInstanceLabelKey:     backupPolicy.Labels[constant.AppInstanceLabelKey],
 					dataProtectionLabelAutoBackupKey: "true",
 				}
 
@@ -199,7 +229,7 @@ var _ = Describe("Backup Policy Controller", func() {
 				patchBackupStatus(backupStatus, client.ObjectKeyFromObject(backupOutLimit2))
 
 				// trigger the backup policy controller through update cronjob
-				patchCronJobStatus(backupPolicyKey)
+				patchCronJobStatus(cronjobKey)
 
 				By("retain the latest backup")
 				Eventually(testapps.GetListLen(&testCtx, intctrlutil.BackupSignature,
@@ -215,7 +245,7 @@ var _ = Describe("Backup Policy Controller", func() {
 				By("By creating a backupPolicy from backupTool: " + backupToolName)
 				backupPolicy = testapps.NewBackupPolicyFactory(testCtx.DefaultNamespace, backupPolicyName).
 					SetBackupToolName(backupToolName).
-					AddMatchLabels(intctrlutil.AppInstanceLabelKey, clusterName).
+					AddMatchLabels(constant.AppInstanceLabelKey, clusterName).
 					SetTargetSecretName(clusterName).
 					AddHookPreCommand("touch /data/mysql/.restore;sync").
 					AddHookPostCommand("rm -f /data/mysql/.restore;sync").
@@ -224,6 +254,12 @@ var _ = Describe("Backup Policy Controller", func() {
 				backupPolicyKey = client.ObjectKeyFromObject(backupPolicy)
 			})
 			It("should success", func() {
+				Eventually(testapps.CheckObj(&testCtx, backupPolicyKey, func(g Gomega, fetched *dpv1alpha1.BackupPolicy) {
+					g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.ConfigAvailable))
+				})).Should(Succeed())
+			})
+			It("should success with empty viper config", func() {
+				viper.SetDefault("DP_BACKUP_SCHEDULE", "")
 				Eventually(testapps.CheckObj(&testCtx, backupPolicyKey, func(g Gomega, fetched *dpv1alpha1.BackupPolicy) {
 					g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.ConfigAvailable))
 				})).Should(Succeed())
@@ -238,7 +274,7 @@ var _ = Describe("Backup Policy Controller", func() {
 				backupPolicy = testapps.NewBackupPolicyFactory(testCtx.DefaultNamespace, backupPolicyName).
 					SetBackupToolName(backupToolName).
 					SetSchedule("invalid schedule").
-					AddMatchLabels(intctrlutil.AppInstanceLabelKey, clusterName).
+					AddMatchLabels(constant.AppInstanceLabelKey, clusterName).
 					SetTargetSecretName(clusterName).
 					AddHookPreCommand("touch /data/mysql/.restore;sync").
 					AddHookPostCommand("rm -f /data/mysql/.restore;sync").
@@ -272,7 +308,7 @@ var _ = Describe("Backup Policy Controller", func() {
 				By("By creating a backupPolicy from backupTool: " + backupToolName)
 				backupPolicy = testapps.NewBackupPolicyFactory(testCtx.DefaultNamespace, backupPolicyName).
 					SetBackupPolicyTplName(template.Name).
-					AddMatchLabels(intctrlutil.AppInstanceLabelKey, clusterName).
+					AddMatchLabels(constant.AppInstanceLabelKey, clusterName).
 					SetTargetSecretName(clusterName).
 					SetRemoteVolumePVC(backupRemoteVolumeName, backupRemotePVCName).
 					Create(&testCtx).GetObject()
@@ -301,7 +337,7 @@ var _ = Describe("Backup Policy Controller", func() {
 				By("By creating a backupPolicy from backupTool: " + backupToolName)
 				backupPolicy = testapps.NewBackupPolicyFactory(testCtx.DefaultNamespace, backupPolicyName).
 					SetBackupPolicyTplName(template.Name).
-					AddMatchLabels(intctrlutil.AppInstanceLabelKey, clusterName).
+					AddMatchLabels(constant.AppInstanceLabelKey, clusterName).
 					SetTargetSecretName(clusterName).
 					SetRemoteVolumePVC(backupRemoteVolumeName, backupRemotePVCName).
 					Create(&testCtx).GetObject()
@@ -310,6 +346,161 @@ var _ = Describe("Backup Policy Controller", func() {
 			It("should success", func() {
 				Eventually(testapps.CheckObj(&testCtx, backupPolicyKey, func(g Gomega, fetched *dpv1alpha1.BackupPolicy) {
 					g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.ConfigAvailable))
+				})).Should(Succeed())
+			})
+		})
+
+		Context("creates a backup policy with empty secret", func() {
+			var (
+				backupSecretName = "backup-secret"
+				rootSecretName   = "root-secret"
+				secretsMap       map[string]*corev1.Secret
+			)
+
+			// delete secrets before test starts
+			cleanSecrets := func() {
+				// delete rest mocked objects
+				inNS := client.InNamespace(testCtx.DefaultNamespace)
+				ml := client.HasLabels{testCtx.TestObjLabelKey}
+				// delete secret created for backup policy
+				testapps.ClearResources(&testCtx, intctrlutil.SecretSignature, inNS, ml)
+				testapps.ClearResources(&testCtx, intctrlutil.BackupPolicySignature, inNS, ml)
+				testapps.ClearResources(&testCtx, intctrlutil.BackupPolicyTemplateSignature, inNS, ml)
+			}
+
+			fakeSecret := func(name string, labels map[string]string) *corev1.Secret {
+				return &corev1.Secret{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      name,
+						Namespace: testCtx.DefaultNamespace,
+						Labels:    labels,
+					},
+				}
+			}
+
+			BeforeEach(func() {
+				secretsMap = make(map[string]*corev1.Secret)
+				// mock two secrets for backup policy, one for backup account, one for root conn
+				secretsMap[backupSecretName] = fakeSecret(backupSecretName, map[string]string{
+					constant.AppInstanceLabelKey:    clusterName,
+					constant.ClusterAccountLabelKey: (string)(appsv1alpha1.DataprotectionAccount),
+				})
+				secretsMap[rootSecretName] = fakeSecret(rootSecretName, map[string]string{
+					constant.AppInstanceLabelKey:  clusterName,
+					constant.AppManagedByLabelKey: constant.AppName,
+				})
+
+				cleanSecrets()
+			})
+
+			AfterEach(cleanSecrets)
+
+			It("creating a backupPolicy with secret", func() {
+				// create two secrets
+				for _, v := range secretsMap {
+					Expect(testCtx.CreateObj(context.Background(), v)).Should(Succeed())
+					Eventually(testapps.CheckObjExists(&testCtx, client.ObjectKeyFromObject(v), &corev1.Secret{}, true)).Should(Succeed())
+				}
+
+				By("By creating a backupPolicy with empty secret")
+				randomSecretName := testCtx.GetRandomStr()
+				backupPolicy := testapps.NewBackupPolicyFactory(testCtx.DefaultNamespace, backupPolicyName).
+					SetBackupToolName(backupToolName).
+					AddMatchLabels(constant.AppInstanceLabelKey, clusterName).
+					SetTargetSecretName(randomSecretName).
+					AddHookPreCommand("touch /data/mysql/.restore;sync").
+					AddHookPostCommand("rm -f /data/mysql/.restore;sync").
+					SetRemoteVolumePVC(backupRemoteVolumeName, backupRemotePVCName).Create(&testCtx).GetObject()
+				backupPolicyKey := client.ObjectKeyFromObject(backupPolicy)
+				Eventually(testapps.CheckObj(&testCtx, backupPolicyKey, func(g Gomega, fetched *dpv1alpha1.BackupPolicy) {
+					g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.ConfigAvailable))
+					g.Expect(fetched.Spec.Target.Secret.Name).To(Equal(randomSecretName))
+				})).Should(Succeed())
+			})
+
+			It("creating a backupPolicy with secrets missing", func() {
+				By("By creating a backupPolicy with empty secret")
+				backupPolicy := testapps.NewBackupPolicyFactory(testCtx.DefaultNamespace, backupPolicyName).
+					SetBackupToolName(backupToolName).
+					AddMatchLabels(constant.AppInstanceLabelKey, clusterName).
+					AddHookPreCommand("touch /data/mysql/.restore;sync").
+					AddHookPostCommand("rm -f /data/mysql/.restore;sync").
+					SetRemoteVolumePVC(backupRemoteVolumeName, backupRemotePVCName).Create(&testCtx).GetObject()
+				backupPolicyKey := client.ObjectKeyFromObject(backupPolicy)
+				By("Secrets missing, the backup policy should never be `ConfigAvailable`")
+				Consistently(testapps.CheckObj(&testCtx, backupPolicyKey, func(g Gomega, fetched *dpv1alpha1.BackupPolicy) {
+					g.Expect(fetched.Status.Phase).NotTo(Equal(dpv1alpha1.ConfigAvailable))
+				})).Should(Succeed())
+			})
+
+			It("creating a backupPolicy uses default secret", func() {
+				// create two secrets
+				for _, v := range secretsMap {
+					Expect(testCtx.CreateObj(context.Background(), v)).Should(Succeed())
+					Eventually(testapps.CheckObjExists(&testCtx, client.ObjectKeyFromObject(v), &corev1.Secret{}, true)).Should(Succeed())
+				}
+
+				By("By creating a backupPolicy with empty secret")
+				backupPolicy := testapps.NewBackupPolicyFactory(testCtx.DefaultNamespace, backupPolicyName).
+					SetBackupToolName(backupToolName).
+					AddMatchLabels(constant.AppInstanceLabelKey, clusterName).
+					AddHookPreCommand("touch /data/mysql/.restore;sync").
+					AddHookPostCommand("rm -f /data/mysql/.restore;sync").
+					SetRemoteVolumePVC(backupRemoteVolumeName, backupRemotePVCName).Create(&testCtx).GetObject()
+				backupPolicyKey := client.ObjectKeyFromObject(backupPolicy)
+				Eventually(testapps.CheckObj(&testCtx, backupPolicyKey, func(g Gomega, fetched *dpv1alpha1.BackupPolicy) {
+					g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.ConfigAvailable))
+					g.Expect(fetched.Spec.Target.Secret.Name).To(Equal(backupSecretName))
+				})).Should(Succeed())
+			})
+
+			It("create backup policy with tempate and specify credential keyword", func() {
+				for _, v := range secretsMap {
+					Expect(testCtx.CreateObj(context.Background(), v)).Should(Succeed())
+					Eventually(testapps.CheckObjExists(&testCtx, client.ObjectKeyFromObject(v), &corev1.Secret{}, true)).Should(Succeed())
+				}
+				// create template
+				template := testapps.NewBackupPolicyTemplateFactory(backupPolicyTplName).
+					SetBackupToolName(backupToolName).
+					SetCredentialKeyword("username", "password").
+					Create(&testCtx).GetObject()
+
+				// create backup policy
+				By("By creating a backupPolicy from backupTool: " + backupToolName)
+				backupPolicy := testapps.NewBackupPolicyFactory(testCtx.DefaultNamespace, backupPolicyName).
+					SetBackupPolicyTplName(template.Name).
+					AddMatchLabels(constant.AppInstanceLabelKey, clusterName).
+					SetRemoteVolumePVC(backupRemoteVolumeName, backupRemotePVCName).
+					Create(&testCtx).GetObject()
+				backupPolicyKey := client.ObjectKeyFromObject(backupPolicy)
+				Eventually(testapps.CheckObj(&testCtx, backupPolicyKey, func(g Gomega, fetched *dpv1alpha1.BackupPolicy) {
+					g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.ConfigAvailable))
+					g.Expect(fetched.Spec.Target.Secret.Name).To(Equal(rootSecretName))
+				})).Should(Succeed())
+			})
+
+			It("create backup policy with tempate but without default credential keyword", func() {
+				// create two secrets
+				for _, v := range secretsMap {
+					Expect(testCtx.CreateObj(context.Background(), v)).Should(Succeed())
+					Eventually(testapps.CheckObjExists(&testCtx, client.ObjectKeyFromObject(v), &corev1.Secret{}, true)).Should(Succeed())
+				}
+				// create template
+				template := testapps.NewBackupPolicyTemplateFactory(backupPolicyTplName).
+					SetBackupToolName(backupToolName).
+					Create(&testCtx).GetObject()
+
+				// create backup policy
+				By("By creating a backupPolicy from backupTool: " + backupToolName)
+				backupPolicy := testapps.NewBackupPolicyFactory(testCtx.DefaultNamespace, backupPolicyName).
+					SetBackupPolicyTplName(template.Name).
+					AddMatchLabels(constant.AppInstanceLabelKey, clusterName).
+					SetRemoteVolumePVC(backupRemoteVolumeName, backupRemotePVCName).
+					Create(&testCtx).GetObject()
+				backupPolicyKey := client.ObjectKeyFromObject(backupPolicy)
+				Eventually(testapps.CheckObj(&testCtx, backupPolicyKey, func(g Gomega, fetched *dpv1alpha1.BackupPolicy) {
+					g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.ConfigAvailable))
+					g.Expect(fetched.Spec.Target.Secret.Name).To(Equal(backupSecretName))
 				})).Should(Succeed())
 			})
 		})

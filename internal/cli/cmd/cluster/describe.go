@@ -76,7 +76,7 @@ func NewDescribeCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cob
 	o := newOptions(f, streams)
 	cmd := &cobra.Command{
 		Use:               "describe NAME",
-		Short:             "Show details of a specific cluster",
+		Short:             "Show details of a specific cluster.",
 		Example:           describeExample,
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.ClusterGVR()),
 		Run: func(cmd *cobra.Command, args []string) {
@@ -129,6 +129,7 @@ func (o *describeOptions) describeCluster(name string) error {
 			WithService:    true,
 			WithPod:        true,
 			WithEvent:      true,
+			WithPVC:        true,
 		},
 	}
 
@@ -223,7 +224,7 @@ func showEndpoints(c *appsv1alpha1.Cluster, svcList *corev1.ServiceList, out io.
 		if len(internalEndpoints) == 0 && len(externalEndpoints) == 0 {
 			continue
 		}
-		tbl.AddRow(c.Name, "ReadWrite", util.CheckEmpty(strings.Join(internalEndpoints, "\n")),
+		tbl.AddRow(comp.Name, "ReadWrite", util.CheckEmpty(strings.Join(internalEndpoints, "\n")),
 			util.CheckEmpty(strings.Join(externalEndpoints, "\n")))
 	}
 	tbl.Print()

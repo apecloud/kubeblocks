@@ -53,7 +53,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/duration"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/rest"
 	cmdget "k8s.io/kubectl/pkg/cmd/get"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -63,7 +65,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
 var (
@@ -265,8 +267,7 @@ func Spinner(w io.Writer, fmtstr string, a ...any) func(result bool) {
 var addToScheme sync.Once
 
 func NewFactory() cmdutil.Factory {
-	getter := genericclioptions.NewConfigFlags(true)
-
+	configFlags := NewConfigFlagNoWarnings()
 	// Add CRDs to the scheme. They are missing by default.
 	addToScheme.Do(func() {
 		if err := apiextv1.AddToScheme(scheme.Scheme); err != nil {
@@ -274,7 +275,17 @@ func NewFactory() cmdutil.Factory {
 			panic(err)
 		}
 	})
-	return cmdutil.NewFactory(getter)
+	return cmdutil.NewFactory(configFlags)
+}
+
+// NewConfigFlagNoWarnings returns a ConfigFlags that disables warnings.
+func NewConfigFlagNoWarnings() *genericclioptions.ConfigFlags {
+	configFlags := genericclioptions.NewConfigFlags(true)
+	configFlags.WrapConfigFn = func(c *rest.Config) *rest.Config {
+		c.WarningHandler = rest.NoWarnings{}
+		return c
+	}
+	return configFlags
 }
 
 func GVRToString(gvr schema.GroupVersionResource) string {
@@ -371,10 +382,10 @@ func CheckEmpty(str string) string {
 // like "instance-key in (name1, name2)"
 func BuildLabelSelectorByNames(selector string, names []string) string {
 	if len(names) == 0 {
-		return ""
+		return selector
 	}
 
-	label := fmt.Sprintf("%s in (%s)", intctrlutil.AppInstanceLabelKey, strings.Join(names, ","))
+	label := fmt.Sprintf("%s in (%s)", constant.AppInstanceLabelKey, strings.Join(names, ","))
 	if len(selector) == 0 {
 		return label
 	} else {
@@ -413,7 +424,7 @@ func GetEventObject(e *corev1.Event) string {
 }
 
 // GetConfigTemplateList returns ConfigTemplate list used by the component.
-func GetConfigTemplateList(clusterName string, namespace string, cli dynamic.Interface, componentName string, reloadTpl bool) ([]appsv1alpha1.ConfigTemplate, error) {
+func GetConfigTemplateList(clusterName string, namespace string, cli dynamic.Interface, componentName string, reloadTpl bool) ([]appsv1alpha1.ComponentConfigSpec, error) {
 	var (
 		clusterObj        = appsv1alpha1.Cluster{}
 		clusterDefObj     = appsv1alpha1.ClusterDefinition{}
@@ -451,9 +462,9 @@ func GetConfigTemplateList(clusterName string, namespace string, cli dynamic.Int
 		return tpls, nil
 	}
 
-	validTpls := make([]appsv1alpha1.ConfigTemplate, 0, len(tpls))
+	validTpls := make([]appsv1alpha1.ComponentConfigSpec, 0, len(tpls))
 	for _, tpl := range tpls {
-		if len(tpl.ConfigConstraintRef) > 0 && len(tpl.ConfigTplRef) > 0 {
+		if len(tpl.ConfigConstraintRef) > 0 && len(tpl.TemplateRef) > 0 {
 			validTpls = append(validTpls, tpl)
 		}
 	}
@@ -498,11 +509,11 @@ func GetComponentsFromClusterCR(key client.ObjectKey, cli dynamic.Interface) ([]
 }
 
 func enableReconfiguring(component *appsv1alpha1.ClusterComponentDefinition) bool {
-	if component == nil || component.ConfigSpec == nil {
+	if component == nil {
 		return false
 	}
-	for _, tpl := range component.ConfigSpec.ConfigTemplateRefs {
-		if len(tpl.ConfigConstraintRef) > 0 && len(tpl.ConfigTplRef) > 0 {
+	for _, tpl := range component.ConfigSpecs {
+		if len(tpl.ConfigConstraintRef) > 0 && len(tpl.TemplateRef) > 0 {
 			return true
 		}
 	}
@@ -510,7 +521,7 @@ func enableReconfiguring(component *appsv1alpha1.ClusterComponentDefinition) boo
 }
 
 // IsSupportConfigureParams check whether all updated parameters belong to config template parameters.
-func IsSupportConfigureParams(tpl appsv1alpha1.ConfigTemplate, values map[string]string, cli dynamic.Interface) (bool, error) {
+func IsSupportConfigureParams(tpl appsv1alpha1.ComponentConfigSpec, values map[string]string, cli dynamic.Interface) (bool, error) {
 	var (
 		err              error
 		configConstraint = appsv1alpha1.ConfigConstraint{}
@@ -575,4 +586,90 @@ func GetHelmChartRepoURL() string {
 		return types.GitLabHelmChartRepo
 	}
 	return types.KubeBlocksChartURL
+}
+
+// GetKubeBlocksNamespace gets namespace of KubeBlocks installation, infer namespace from helm secrets
+func GetKubeBlocksNamespace(client kubernetes.Interface) (string, error) {
+	secrets, err := client.CoreV1().Secrets(metav1.NamespaceAll).List(context.TODO(), metav1.ListOptions{LabelSelector: types.KubeBlocksHelmLabel})
+	// if KubeBlocks is upgraded, there will be multiple secrets
+	if err == nil && len(secrets.Items) >= 1 {
+		return secrets.Items[0].Namespace, nil
+	}
+	return "", errors.New("failed to get KubeBlocks installation namespace")
+}
+
+type ExposeType string
+
+const (
+	ExposeToVPC      ExposeType = "vpc"
+	ExposeToInternet ExposeType = "internet"
+
+	EnableValue  string = "true"
+	DisableValue string = "false"
+)
+
+var ProviderExposeAnnotations = map[K8sProvider]map[ExposeType]map[string]string{
+	EKSProvider: {
+		ExposeToVPC: map[string]string{
+			"service.beta.kubernetes.io/aws-load-balancer-type":     "nlb",
+			"service.beta.kubernetes.io/aws-load-balancer-internal": "true",
+		},
+		ExposeToInternet: map[string]string{
+			"service.beta.kubernetes.io/aws-load-balancer-type":     "nlb",
+			"service.beta.kubernetes.io/aws-load-balancer-internal": "false",
+		},
+	},
+	GKEProvider: {
+		ExposeToVPC: map[string]string{
+			"networking.gke.io/load-balancer-type": "Internal",
+		},
+		ExposeToInternet: map[string]string{},
+	},
+	AKSProvider: {
+		ExposeToVPC: map[string]string{
+			"service.beta.kubernetes.io/azure-load-balancer-internal": "true",
+		},
+		ExposeToInternet: map[string]string{
+			"service.beta.kubernetes.io/azure-load-balancer-internal": "false",
+		},
+	},
+	ACKProvider: {
+		ExposeToVPC: map[string]string{
+			"service.beta.kubernetes.io/alibaba-cloud-loadbalancer-address-type": "intranet",
+		},
+		ExposeToInternet: map[string]string{
+			"service.beta.kubernetes.io/alibaba-cloud-loadbalancer-address-type": "internet",
+		},
+	},
+}
+
+func GetExposeAnnotations(provider K8sProvider, exposeType ExposeType) (map[string]string, error) {
+	exposeAnnotations, ok := ProviderExposeAnnotations[provider]
+	if !ok {
+		return nil, fmt.Errorf("unsupported provider: %s", provider)
+	}
+	annotations, ok := exposeAnnotations[exposeType]
+	if !ok {
+		return nil, fmt.Errorf("unsupported expose type: %s on provider %s", exposeType, provider)
+	}
+	return annotations, nil
+}
+
+func GetK8SProvider(client kubernetes.Interface) (K8sProvider, error) {
+	versionInfo, err := GetVersionInfo(client)
+	if err != nil {
+		return "", err
+	}
+
+	versionErr := fmt.Errorf("failed to get kubernetes version")
+	k8sVersionStr, ok := versionInfo[KubernetesApp]
+	if !ok {
+		return "", versionErr
+	}
+	return GetK8sProvider(k8sVersionStr), nil
+}
+
+// BuildAddonReleaseName returns the release name of addon, its f
+func BuildAddonReleaseName(addon string) string {
+	return fmt.Sprintf("%s-%s", types.AddonReleasePrefix, addon)
 }

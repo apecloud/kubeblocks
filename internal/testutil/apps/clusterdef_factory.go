@@ -86,23 +86,38 @@ func (factory *MockClusterDefFactory) AddServicePort(port int32) *MockClusterDef
 	return factory
 }
 
-func (factory *MockClusterDefFactory) AddConfigTemplate(name,
-	configTplRef, configConstraintRef, namespace, volumeName string, mode *int32) *MockClusterDefFactory {
+func (factory *MockClusterDefFactory) AddScriptTemplate(name,
+	configTplRef, namespace, volumeName string, mode *int32) *MockClusterDefFactory {
 	comp := factory.getLastCompDef()
 	if comp == nil {
 		return nil
 	}
-	if comp.ConfigSpec == nil {
-		comp.ConfigSpec = &appsv1alpha1.ConfigurationSpec{}
+	comp.ScriptSpecs = append(comp.ScriptSpecs,
+		appsv1alpha1.ComponentTemplateSpec{
+			Name:        name,
+			TemplateRef: configTplRef,
+			Namespace:   namespace,
+			VolumeName:  volumeName,
+			DefaultMode: mode,
+		})
+	return factory
+}
+
+func (factory *MockClusterDefFactory) AddConfigTemplate(name,
+	configTplRef, configConstraintRef, namespace, volumeName string) *MockClusterDefFactory {
+	comp := factory.getLastCompDef()
+	if comp == nil {
+		return nil
 	}
-	comp.ConfigSpec.ConfigTemplateRefs = append(comp.ConfigSpec.ConfigTemplateRefs,
-		appsv1alpha1.ConfigTemplate{
-			Name:                name,
-			ConfigTplRef:        configTplRef,
+	comp.ConfigSpecs = append(comp.ConfigSpecs,
+		appsv1alpha1.ComponentConfigSpec{
+			ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
+				Name:        name,
+				TemplateRef: configTplRef,
+				Namespace:   namespace,
+				VolumeName:  volumeName,
+			},
 			ConfigConstraintRef: configConstraintRef,
-			Namespace:           namespace,
-			VolumeName:          volumeName,
-			DefaultMode:         mode,
 		})
 	return factory
 }
@@ -191,6 +206,15 @@ func (factory *MockClusterDefFactory) AddContainerVolumeMounts(containerName str
 		return factory
 	}
 	comp.PodSpec.Containers = appendContainerVolumeMounts(comp.PodSpec.Containers, containerName, volumeMounts)
+	return factory
+}
+
+func (factory *MockClusterDefFactory) AddReplicationSpec(replicationSpec *appsv1alpha1.ReplicationSpec) *MockClusterDefFactory {
+	comp := factory.getLastCompDef()
+	if comp == nil {
+		return factory
+	}
+	comp.ReplicationSpec = replicationSpec
 	return factory
 }
 

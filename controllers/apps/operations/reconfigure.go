@@ -191,7 +191,7 @@ func (r *reconfigureAction) syncReconfigureComponentStatus(res *OpsResource) err
 
 	clusterPatch := client.MergeFrom(cluster.DeepCopy())
 	c.Phase = appsv1alpha1.RunningPhase
-	cluster.Status.Components[componentName] = c
+	cluster.Status.SetComponentStatus(componentName, c)
 	return res.Client.Status().Patch(res.Ctx, cluster, clusterPatch)
 }
 
@@ -261,8 +261,8 @@ func (r *reconfigureAction) Action(resource *OpsResource) error {
 func (r *reconfigureAction) doMergeAndPersist(clusterName, componentName string,
 	reconfigure *appsv1alpha1.Reconfigure,
 	resource *OpsResource,
-	tpls []appsv1alpha1.ConfigTemplate) error {
-	findTpl := func(tplName string) *appsv1alpha1.ConfigTemplate {
+	tpls []appsv1alpha1.ComponentConfigSpec) error {
+	findTpl := func(tplName string) *appsv1alpha1.ComponentConfigSpec {
 		if len(tplName) == 0 && len(tpls) == 1 {
 			return &tpls[0]
 		}

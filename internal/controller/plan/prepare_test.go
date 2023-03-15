@@ -30,6 +30,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/controller/component"
 	"github.com/apecloud/kubeblocks/internal/controller/types"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	"github.com/apecloud/kubeblocks/internal/generics"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 )
 
@@ -46,10 +47,10 @@ var _ = Describe("Cluster Controller", func() {
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 
 		// non-namespaced
-		testapps.ClearResources(&testCtx, intctrlutil.ConfigConstraintSignature, ml)
+		testapps.ClearResources(&testCtx, generics.ConfigConstraintSignature, ml)
 
 		// namespaced
-		testapps.ClearResources(&testCtx, intctrlutil.ConfigMapSignature, inNS, ml)
+		testapps.ClearResources(&testCtx, generics.ConfigMapSignature, inNS, ml)
 	}
 
 	BeforeEach(func() {
@@ -135,7 +136,7 @@ var _ = Describe("Cluster Controller", func() {
 				GetObject()
 		})
 
-		It("should construct env, headless service and statefuset objects and should not render config template", func() {
+		It("should construct env, default ClusterIP service, headless service and statefuset objects and should not render config template", func() {
 			reqCtx := intctrlutil.RequestCtx{
 				Ctx: ctx,
 				Log: logger,
@@ -152,7 +153,7 @@ var _ = Describe("Cluster Controller", func() {
 			Expect(PrepareComponentResources(reqCtx, testCtx.Cli, task)).Should(Succeed())
 
 			resources := *task.Resources
-			Expect(len(resources)).Should(Equal(3))
+			Expect(len(resources)).Should(Equal(4))
 			Expect(reflect.TypeOf(resources[0]).String()).Should(ContainSubstring("ConfigMap"))
 			Expect(reflect.TypeOf(resources[1]).String()).Should(ContainSubstring("Service"))
 			Expect(reflect.TypeOf(resources[2]).String()).Should(ContainSubstring("StatefulSet"))
@@ -177,7 +178,7 @@ var _ = Describe("Cluster Controller", func() {
 
 			clusterDef = testapps.NewClusterDefFactory(clusterDefName).
 				AddComponent(testapps.StatefulMySQLComponent, mysqlCompType).
-				AddConfigTemplate(cm.Name, cm.Name, cfgTpl.Name, testCtx.DefaultNamespace, "mysql-config", nil).
+				AddConfigTemplate(cm.Name, cm.Name, cfgTpl.Name, testCtx.DefaultNamespace, "mysql-config").
 				GetObject()
 			clusterVersion = testapps.NewClusterVersionFactory(clusterVersionName, clusterDefName).
 				AddComponent(mysqlCompType).
@@ -207,7 +208,7 @@ var _ = Describe("Cluster Controller", func() {
 			Expect(PrepareComponentResources(reqCtx, testCtx.Cli, task)).Should(Succeed())
 
 			resources := *task.Resources
-			Expect(len(resources)).Should(Equal(4))
+			Expect(len(resources)).Should(Equal(5))
 			Expect(reflect.TypeOf(resources[0]).String()).Should(ContainSubstring("ConfigMap"))
 			Expect(reflect.TypeOf(resources[1]).String()).Should(ContainSubstring("Service"))
 			Expect(reflect.TypeOf(resources[2]).String()).Should(ContainSubstring("ConfigMap"))
@@ -229,7 +230,7 @@ var _ = Describe("Cluster Controller", func() {
 
 			clusterDef = testapps.NewClusterDefFactory(clusterDefName).
 				AddComponent(testapps.StatefulMySQLComponent, mysqlCompType).
-				AddConfigTemplate(cm.Name, cm.Name, cfgTpl.Name, testCtx.DefaultNamespace, "mysql-config", nil).
+				AddConfigTemplate(cm.Name, cm.Name, cfgTpl.Name, testCtx.DefaultNamespace, "mysql-config").
 				AddContainerVolumeMounts("mysql", []corev1.VolumeMount{{Name: "mysql-config", MountPath: "/mnt/config"}}).
 				GetObject()
 			clusterVersion = testapps.NewClusterVersionFactory(clusterVersionName, clusterDefName).
@@ -260,7 +261,7 @@ var _ = Describe("Cluster Controller", func() {
 			Expect(PrepareComponentResources(reqCtx, testCtx.Cli, task)).Should(Succeed())
 
 			resources := *task.Resources
-			Expect(len(resources)).Should(Equal(4))
+			Expect(len(resources)).Should(Equal(5))
 			Expect(reflect.TypeOf(resources[0]).String()).Should(ContainSubstring("ConfigMap"))
 			Expect(reflect.TypeOf(resources[1]).String()).Should(ContainSubstring("Service"))
 			Expect(reflect.TypeOf(resources[2]).String()).Should(ContainSubstring("ConfigMap"))

@@ -18,10 +18,12 @@ package apps
 
 import (
 	"context"
+	"fmt"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -29,11 +31,11 @@ import (
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
-
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	"github.com/apecloud/kubeblocks/internal/generics"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 )
 
@@ -53,7 +55,7 @@ var _ = Describe("lifecycle_utils", func() {
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 		// namespaced resources
-		testapps.ClearResources(&testCtx, intctrlutil.VolumeSnapshotSignature, inNS, ml)
+		testapps.ClearResources(&testCtx, generics.VolumeSnapshotSignature, inNS, ml)
 	}
 
 	BeforeEach(cleanAll)
@@ -177,9 +179,9 @@ spec:
 		vs := snapshotv1.VolumeSnapshot{}
 		Expect(yaml.Unmarshal([]byte(vsYAML), &vs)).Should(Succeed())
 		labels := map[string]string{
-			intctrlutil.AppManagedByLabelKey:   intctrlutil.AppName,
-			intctrlutil.AppInstanceLabelKey:    clusterName,
-			intctrlutil.KBAppComponentLabelKey: componentName,
+			constant.AppManagedByLabelKey:   constant.AppName,
+			constant.AppInstanceLabelKey:    clusterName,
+			constant.KBAppComponentLabelKey: componentName,
 		}
 		for k, v := range labels {
 			vs.Labels[k] = v
@@ -235,6 +237,93 @@ spec:
 			shouldRequeue, err = doBackup(reqCtx, k8sClient, cluster, component, sts, &stsProto, snapshotKey)
 			Expect(shouldRequeue).Should(BeTrue())
 			Expect(err).ShouldNot(HaveOccurred())
+		})
+
+		It("should do backup to create volumesnapshot when there exists a deleting volumesnapshot", func() {
+			By("prepare cluster and construct component")
+			reqCtx := newReqCtx()
+			cluster, clusterDef, clusterVersion, _ := newAllFieldsClusterObj(nil, nil, false)
+			component := component.BuildComponent(
+				reqCtx,
+				*cluster,
+				*clusterDef,
+				clusterDef.Spec.ComponentDefs[0],
+				cluster.Spec.ComponentSpecs[0],
+				&clusterVersion.Spec.ComponentVersions[0])
+			Expect(component).ShouldNot(BeNil())
+			component.HorizontalScalePolicy = &appsv1alpha1.HorizontalScalePolicy{
+				Type:             appsv1alpha1.HScaleDataClonePolicyFromSnapshot,
+				VolumeMountsName: "data",
+			}
+
+			By("prepare VolumeSnapshot and set finalizer to prevent it from deletion")
+			vs := newVolumeSnapshot(cluster.Name, mysqlCompName)
+			Expect(testCtx.CreateObj(ctx, vs)).Should(Succeed())
+			Expect(testapps.ChangeObj(&testCtx, vs, func() {
+				vs.Finalizers = append(vs.Finalizers, "test-finalizer")
+			})).Should(Succeed())
+
+			By("deleting volume snapshot")
+			Expect(k8sClient.Delete(ctx, vs)).Should(Succeed())
+
+			By("checking DeletionTimestamp exists")
+			Eventually(func(g Gomega) {
+				tmpVS := snapshotv1.VolumeSnapshot{}
+				g.Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: vs.Namespace, Name: vs.Name}, &tmpVS)).Should(Succeed())
+				g.Expect(tmpVS.DeletionTimestamp).ShouldNot(BeNil())
+			}).Should(Succeed())
+
+			// prepare doBackup input parameters
+			snapshotKey := types.NamespacedName{
+				Namespace: "default",
+				Name:      "test-snapshot",
+			}
+			sts := newStsObj()
+			stsProto := *sts.DeepCopy()
+			r := int32(3)
+			stsProto.Spec.Replicas = &r
+
+			By("doBackup should create volumesnapshot and return requeue=true")
+			shouldRequeue, err := doBackup(reqCtx, k8sClient, cluster, component, sts, &stsProto, snapshotKey)
+			Expect(shouldRequeue).Should(BeTrue())
+			Expect(err).ShouldNot(HaveOccurred())
+
+			newVS := snapshotv1.VolumeSnapshot{}
+			By("checking volumesnapshot created by doBackup exists")
+			Eventually(func(g Gomega) {
+				g.Expect(k8sClient.Get(ctx, snapshotKey, &newVS)).Should(Succeed())
+			}).Should(Succeed())
+
+			By("mocking volumesnapshot status ready")
+			Expect(testapps.ChangeObjStatus(&testCtx, &newVS, func() {
+				t := true
+				newVS.Status = &snapshotv1.VolumeSnapshotStatus{ReadyToUse: &t}
+			})).Should(Succeed())
+
+			By("do backup again, this time should create pvcs")
+			shouldRequeue, err = doBackup(reqCtx, k8sClient, cluster, component, sts, &stsProto, snapshotKey)
+
+			By("checking not requeue, since create pvc is the last step of doBackup")
+			Expect(shouldRequeue).Should(BeFalse())
+			Expect(err).ShouldNot(HaveOccurred())
+
+			By("checking pvcs reference right volumesnapshot")
+			Eventually(func(g Gomega) {
+				for i := *stsProto.Spec.Replicas - 1; i > *sts.Spec.Replicas; i-- {
+					pvc := &corev1.PersistentVolumeClaim{}
+					g.Expect(k8sClient.Get(ctx,
+						types.NamespacedName{
+							Namespace: cluster.Namespace,
+							Name:      fmt.Sprintf("%s-%s-%d", testapps.DataVolumeName, sts.Name, i)},
+						pvc)).Should(Succeed())
+					g.Expect(pvc.Spec.DataSource.Name == snapshotKey.Name).Should(BeTrue())
+				}
+			}).Should(Succeed())
+
+			By("remove finalizer to cleanup")
+			Expect(testapps.ChangeObj(&testCtx, vs, func() {
+				vs.SetFinalizers(vs.Finalizers[:len(vs.Finalizers)-1])
+			})).Should(Succeed())
 		})
 	})
 

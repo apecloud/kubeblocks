@@ -19,7 +19,6 @@ package printer
 import (
 	"fmt"
 	"io"
-	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -71,26 +70,25 @@ func PrintComponentConfigMeta(tplInfos []types.ConfigTemplateInfo, clusterName, 
 		return
 	}
 	tbl := NewTablePrinter(out)
-	PrintTitle("Configures Meta")
-	enableReconfiguring := func(tpl appsv1alpha1.ConfigTemplate, key string) string {
+	PrintTitle("ConfigSpecs Meta")
+	enableReconfiguring := func(tpl appsv1alpha1.ComponentConfigSpec, key string) string {
 		if len(tpl.ConfigConstraintRef) > 0 && cfgcore.CheckConfigTemplateReconfigureKey(tpl, key) {
-			return "enable"
+			return "true"
 		}
-		return "disable"
+		return "false"
 	}
-	tbl.SetHeader("TEMPLATE-NAME", "CONFIG-FILE", "ENABLE-RECONFIGURE", "CONFIG-TEMPLATE", "CONFIG-CONSTRAINT", "CONFIG-INSTANCE", "COMPONENT", "CLUSTER", "NAMESPACE")
+	tbl.SetHeader("CONFIG-SPEC-NAME", "FILE", "ENABLED", "TEMPLATE", "CONSTRAINT", "RENDERED", "COMPONENT", "CLUSTER")
 	for _, info := range tplInfos {
 		for key := range info.CMObj.Data {
 			tbl.AddRow(
 				BoldYellow(info.Name),
 				key,
-				BoldYellow(strings.ToUpper(enableReconfiguring(info.TPL, key))),
-				info.TPL.ConfigTplRef,
+				BoldYellow(enableReconfiguring(info.TPL, key)),
+				info.TPL.TemplateRef,
 				info.TPL.ConfigConstraintRef,
 				info.CMObj.Name,
 				componentName,
-				clusterName,
-				info.TPL.Namespace)
+				clusterName)
 		}
 	}
 	tbl.Print()

@@ -25,7 +25,6 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-
 	"github.com/spf13/viper"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -315,5 +314,27 @@ var _ = Describe("create", func() {
 		name, err := generateClusterName(dynamic, "")
 		Expect(err).Should(Succeed())
 		Expect(name).ShouldNot(BeEmpty())
+	})
+
+	It("set backup", func() {
+		backupName := "test-backup"
+		clusterName := "test-cluster"
+		backup := testing.FakeBackup(backupName)
+		cluster := testing.FakeCluster("clusterName", testing.Namespace)
+		dynamic := testing.FakeDynamicClient(backup, cluster)
+		o := &CreateOptions{}
+		o.Dynamic = dynamic
+		o.Namespace = testing.Namespace
+		o.Backup = backupName
+		components := []map[string]interface{}{
+			{
+				"name": "mysql",
+			},
+		}
+		Expect(setBackup(o, components).Error()).Should(ContainSubstring("is not completed"))
+
+		By("test backup is completed")
+		mockBackupInfo(dynamic, backupName, clusterName)
+		Expect(setBackup(o, components)).Should(Succeed())
 	})
 })

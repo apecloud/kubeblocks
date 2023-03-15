@@ -20,13 +20,12 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/sethvargo/go-password/password"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-
-	"github.com/sethvargo/go-password/password"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -110,12 +109,10 @@ func withConfigTpl(tplName string, data map[string]string) ParamsOps {
 	}
 }
 
-func withCDComponent(compType appsv1alpha1.WorkloadType, tpls []appsv1alpha1.ConfigTemplate) ParamsOps {
+func withCDComponent(compType appsv1alpha1.WorkloadType, tpls []appsv1alpha1.ComponentConfigSpec) ParamsOps {
 	return func(params *reconfigureParams) {
 		params.Component = &appsv1alpha1.ClusterComponentDefinition{
-			ConfigSpec: &appsv1alpha1.ConfigurationSpec{
-				ConfigTemplateRefs: tpls,
-			},
+			ConfigSpecs:  tpls,
 			WorkloadType: compType,
 			Name:         string(compType),
 		}

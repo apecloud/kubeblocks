@@ -28,7 +28,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	"github.com/apecloud/kubeblocks/internal/constant"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/generics"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 	testk8s "github.com/apecloud/kubeblocks/internal/testutil/k8s"
 )
@@ -75,8 +76,8 @@ var _ = Describe("Stateful Component", func() {
 			stsList := &appsv1.StatefulSetList{}
 			Eventually(func() bool {
 				_ = k8sClient.List(ctx, stsList, client.InNamespace(testCtx.DefaultNamespace), client.MatchingLabels{
-					intctrlutil.AppInstanceLabelKey:    clusterName,
-					intctrlutil.KBAppComponentLabelKey: statefulCompName,
+					constant.AppInstanceLabelKey:    clusterName,
+					constant.KBAppComponentLabelKey: statefulCompName,
 				}, client.Limit(1))
 				return len(stsList.Items) > 0
 			}).Should(BeTrue())
@@ -85,8 +86,9 @@ var _ = Describe("Stateful Component", func() {
 			sts := &stsList.Items[0]
 			clusterComponent := cluster.GetComponentByName(statefulCompName)
 			componentDef := clusterDef.GetComponentDefByName(clusterComponent.ComponentDefRef)
-			stateful := NewStateful(ctx, k8sClient, cluster, clusterComponent, componentDef)
-			phase, _ := stateful.GetPhaseWhenPodsNotReady(statefulCompName)
+			stateful, err := NewStateful(k8sClient, cluster, clusterComponent, *componentDef)
+			Expect(err).Should(Succeed())
+			phase, _ := stateful.GetPhaseWhenPodsNotReady(ctx, statefulCompName)
 			Expect(phase == appsv1alpha1.FailedPhase).Should(BeTrue())
 
 			By("test pods are not ready")
@@ -99,7 +101,7 @@ var _ = Describe("Stateful Component", func() {
 				sts.Status.ObservedGeneration = 1
 				sts.Status.UpdateRevision = updateRevison
 			})).Should(Succeed())
-			podsReady, _ := stateful.PodsReady(sts)
+			podsReady, _ := stateful.PodsReady(ctx, sts)
 			Expect(podsReady == false).Should(BeTrue())
 
 			By("create pods of sts")
@@ -114,7 +116,7 @@ var _ = Describe("Stateful Component", func() {
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(sts), func(g Gomega, tmpSts *appsv1.StatefulSet) {
 				g.Expect(tmpSts.Status.AvailableReplicas == *sts.Spec.Replicas-1).Should(BeTrue())
 			})).Should(Succeed())
-			phase, _ = stateful.GetPhaseWhenPodsNotReady(statefulCompName)
+			phase, _ = stateful.GetPhaseWhenPodsNotReady(ctx, statefulCompName)
 			Expect(phase == appsv1alpha1.AbnormalPhase).Should(BeTrue())
 
 			By("not ready pod is not controlled by latest revision, should return empty string")
@@ -122,7 +124,7 @@ var _ = Describe("Stateful Component", func() {
 			Expect(testapps.ChangeObj(&testCtx, pod, func() {
 				pod.Labels[appsv1.ControllerRevisionHashLabelKey] = fmt.Sprintf("%s-%s-%s", clusterName, statefulCompName, "5wdsd8d9fs")
 			})).Should(Succeed())
-			phase, _ = stateful.GetPhaseWhenPodsNotReady(statefulCompName)
+			phase, _ = stateful.GetPhaseWhenPodsNotReady(ctx, statefulCompName)
 			Expect(len(phase) == 0).Should(BeTrue())
 			// reset updateRevision
 			Expect(testapps.ChangeObj(&testCtx, pod, func() {
@@ -137,24 +139,24 @@ var _ = Describe("Stateful Component", func() {
 			By("test pods are ready")
 			// mock sts is ready
 			testk8s.MockStatefulSetReady(sts)
-			podsReady, _ = stateful.PodsReady(sts)
+			podsReady, _ = stateful.PodsReady(ctx, sts)
 			Expect(podsReady == true).Should(BeTrue())
 
 			By("test component.replicas is inconsistent with sts.spec.replicas")
 			oldReplicas := clusterComponent.Replicas
 			replicas := int32(4)
 			clusterComponent.Replicas = replicas
-			isRunning, _ := stateful.IsRunning(sts)
+			isRunning, _ := stateful.IsRunning(ctx, sts)
 			Expect(isRunning == false).Should(BeTrue())
 			// reset replicas
 			clusterComponent.Replicas = oldReplicas
 
 			By("test component is running")
-			isRunning, _ = stateful.IsRunning(sts)
+			isRunning, _ = stateful.IsRunning(ctx, sts)
 			Expect(isRunning == true).Should(BeTrue())
 
 			By("test handle probe timed out")
-			requeue, _ := stateful.HandleProbeTimeoutWhenPodsReady(nil)
+			requeue, _ := stateful.HandleProbeTimeoutWhenPodsReady(ctx, nil)
 			Expect(requeue == false).Should(BeTrue())
 		})
 	})

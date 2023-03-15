@@ -1,6 +1,8 @@
-## kbcli kubeblocks upgrade
+---
+title: kbcli kubeblocks upgrade
+---
 
-Upgrade KubeBlocks
+Upgrade KubeBlocks.
 
 ```
 kbcli kubeblocks upgrade [flags]
@@ -28,6 +30,7 @@ kbcli kubeblocks upgrade [flags]
       --set-string stringArray   Set STRING values on the command line (can specify multiple or separate values with commas: key1=val1,key2=val2)
       --timeout duration         Time to wait for upgrading KubeBlocks (default 30m0s)
   -f, --values strings           Specify values in a YAML file or a URL (can specify multiple)
+      --verbose                  Show logs in detail
       --version string           Set KubeBlocks version
 ```
 
@@ -57,5 +60,7 @@ kbcli kubeblocks upgrade [flags]
 
 ### SEE ALSO
 
-* [kbcli kubeblocks](kbcli_kubeblocks.md)	 - KubeBlocks operation commands
+* [kbcli kubeblocks](kbcli_kubeblocks.md)	 - KubeBlocks operation commands.
+
+#### Go Back to [CLI Overview](cli.md) Homepage.
 

@@ -18,29 +18,41 @@ cluster: {
 		name:      string
 	}
 }
+
 component: {
 	clusterDefName: string
 	name:           string
-	service: {
-		ports: [...]
-		type: string
-	}
-	podSpec: containers: [...]
-	volumeClaimTemplates: [...]
 }
 
 service: {
+	metadata: {
+		name: string
+		annotations: {}
+	}
+	spec: {
+		ports: [...]
+		type: string
+	}
+}
+
+svc: {
 	"apiVersion": "v1"
 	"kind":       "Service"
 	"metadata": {
 		namespace: cluster.metadata.namespace
-		name:      "\(cluster.metadata.name)-\(component.name)"
+		if service.metadata.name != _|_ {
+			name: "\(cluster.metadata.name)-\(component.name)-\(service.metadata.name)"
+		}
+		if service.metadata.name == _|_ {
+			name: "\(cluster.metadata.name)-\(component.name)"
+		}
 		labels: {
 			"app.kubernetes.io/name":            "\(component.clusterDefName)"
 			"app.kubernetes.io/instance":        cluster.metadata.name
 			"app.kubernetes.io/managed-by":      "kubeblocks"
 			"apps.kubeblocks.io/component-name": "\(component.name)"
 		}
+		annotations: service.metadata.annotations
 	}
 	"spec": {
 		"selector": {
@@ -48,9 +60,9 @@ service: {
 			"app.kubernetes.io/managed-by":      "kubeblocks"
 			"apps.kubeblocks.io/component-name": "\(component.name)"
 		}
-		ports: component.service.ports
-		if component.service.type != _|_ {
-			type: component.service.type
+		ports: service.spec.ports
+		if service.spec.type != _|_ {
+			type: service.spec.type
 		}
 	}
 }

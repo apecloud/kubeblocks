@@ -62,11 +62,11 @@ type ClusterVersionStatus struct {
 type ClusterComponentVersion struct {
 	// componentDefRef reference one of the cluster component definition names in ClusterDefinition API (spec.componentDefs.name).
 	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:MaxLength=18
+	// +kubebuilder:validation:MaxLength=63
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	ComponentDefRef string `json:"componentDefRef"`
 
-	// ConfigTemplateRefs defines a configuration extension mechanism to handle configuration differences between versions,
+	// configSpecs defines a configuration extension mechanism to handle configuration differences between versions,
 	// the configTemplateRefs field, together with configTemplateRefs in the ClusterDefinition,
 	// determines the final configuration file.
 	// +optional
@@ -74,7 +74,7 @@ type ClusterComponentVersion struct {
 	// +patchStrategy=merge,retainKeys
 	// +listType=map
 	// +listMapKey=name
-	ConfigTemplateRefs []ConfigTemplate `json:"configTemplateRefs,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
+	ConfigSpecs []ComponentConfigSpec `json:"configSpecs,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
 
 	// versionContext defines containers images' context for component versions,
 	// this value replaces ClusterDefinition.spec.componentDefs.podSpec.[initContainers | containers]

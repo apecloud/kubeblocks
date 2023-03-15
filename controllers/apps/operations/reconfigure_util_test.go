@@ -38,11 +38,11 @@ var _ = Describe("Reconfigure util test", func() {
 		k8sMockClient *testutil.K8sClientMockHelper
 	)
 
-	mockCfgTplObj := func(tpl appsv1alpha1.ConfigTemplate) (*corev1.ConfigMap, *appsv1alpha1.ConfigConstraint) {
+	mockCfgTplObj := func(tpl appsv1alpha1.ComponentConfigSpec) (*corev1.ConfigMap, *appsv1alpha1.ConfigConstraint) {
 		By("By assure an cm obj")
 		cfgCM := testapps.NewCustomizedObj("operations_config/configcm.yaml",
 			&corev1.ConfigMap{},
-			testapps.WithNamespacedName(tpl.ConfigTplRef, tpl.Namespace))
+			testapps.WithNamespacedName(tpl.TemplateRef, tpl.Namespace))
 		cfgTpl := testapps.NewCustomizedObj("operations_config/configtpl.yaml",
 			&appsv1alpha1.ConfigConstraint{},
 			testapps.WithNamespacedName(tpl.ConfigConstraintRef, tpl.Namespace))
@@ -60,13 +60,16 @@ var _ = Describe("Reconfigure util test", func() {
 
 	Context("updateCfgParams test", func() {
 		It("Should success without error", func() {
-			tpl := appsv1alpha1.ConfigTemplate{
-				Name:                "for_test",
-				ConfigTplRef:        "cm_obj",
+			tpl := appsv1alpha1.ComponentConfigSpec{
+				ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
+					Name:        "for_test",
+					TemplateRef: "cm_obj",
+				},
 				ConfigConstraintRef: "cfg_constraint_obj",
 			}
 			updatedCfg := appsv1alpha1.Configuration{
 				Keys: []appsv1alpha1.ParameterConfig{{
+					Key: "my.cnf",
 					Parameters: []appsv1alpha1.ParameterPair{
 						{
 							Key:   "x1",
@@ -126,6 +129,7 @@ var _ = Describe("Reconfigure util test", func() {
 			// check diff
 			r = updateCfgParams(appsv1alpha1.Configuration{
 				Keys: []appsv1alpha1.ParameterConfig{{
+					Key: "my.cnf",
 					Parameters: []appsv1alpha1.ParameterPair{
 						{
 							Key:   "innodb_autoinc_lock_mode",

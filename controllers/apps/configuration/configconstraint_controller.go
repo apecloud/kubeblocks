@@ -29,6 +29,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
+	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -60,18 +61,18 @@ func (r *ConfigConstraintReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		Recorder: r.Recorder,
 	}
 
-	configCSTR := &appsv1alpha1.ConfigConstraint{}
-	if err := r.Client.Get(reqCtx.Ctx, reqCtx.Req.NamespacedName, configCSTR); err != nil {
+	configConstraint := &appsv1alpha1.ConfigConstraint{}
+	if err := r.Client.Get(reqCtx.Ctx, reqCtx.Req.NamespacedName, configConstraint); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 
-	res, err := intctrlutil.HandleCRDeletion(reqCtx, r, configCSTR, cfgcore.ConfigurationTemplateFinalizerName, func() (*ctrl.Result, error) {
+	res, err := intctrlutil.HandleCRDeletion(reqCtx, r, configConstraint, constant.ConfigurationTemplateFinalizerName, func() (*ctrl.Result, error) {
 		recordEvent := func() {
-			r.Recorder.Event(configCSTR, corev1.EventTypeWarning, "ExistsReferencedResources",
+			r.Recorder.Event(configConstraint, corev1.EventTypeWarning, "ExistsReferencedResources",
 				"cannot be deleted because of existing referencing ClusterDefinition or ClusterVersion.")
 		}
-		if res, err := intctrlutil.ValidateReferenceCR(reqCtx, r.Client, configCSTR,
-			cfgcore.GenerateConstraintsUniqLabelKeyWithConfig(configCSTR.GetName()),
+		if res, err := intctrlutil.ValidateReferenceCR(reqCtx, r.Client, configConstraint,
+			cfgcore.GenerateConstraintsUniqLabelKeyWithConfig(configConstraint.GetName()),
 			recordEvent, &appsv1alpha1.ClusterDefinitionList{},
 			&appsv1alpha1.ClusterVersionList{}); res != nil || err != nil {
 			return res, err
@@ -82,25 +83,26 @@ func (r *ConfigConstraintReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		return *res, err
 	}
 
-	if configCSTR.Status.ObservedGeneration == configCSTR.Generation {
+	if configConstraint.Status.ObservedGeneration == configConstraint.Generation {
 		return intctrlutil.Reconciled()
 	}
 
-	if ok, err := checkConfigurationTemplate(reqCtx, configCSTR); !ok || err != nil {
+	if ok, err := checkConfigConstraint(reqCtx, configConstraint); !ok || err != nil {
 		return intctrlutil.RequeueAfter(time.Second, reqCtx.Log, "ValidateConfigurationTemplate")
 	}
 
-	statusPatch := client.MergeFrom(configCSTR.DeepCopy())
-	// configCSTR.Spec.ConfigurationSchema.Schema = cfgcore.GenerateOpenAPISchema(configCSTR.Spec.ConfigurationSchema.CUE)
-	if err := updateConfigurationSchema(&configCSTR.Spec); err != nil {
-		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "failed to generate configuration open api schema")
+	// Automatically convert cue to openAPISchema.
+	if err := updateConfigurationSchema(configConstraint, r.Client, ctx); err != nil {
+		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "failed to generate openAPISchema")
 	}
-	configCSTR.Status.ObservedGeneration = configCSTR.Generation
-	configCSTR.Status.Phase = appsv1alpha1.AvailablePhase
-	if err = r.Client.Status().Patch(reqCtx.Ctx, configCSTR, statusPatch); err != nil {
+
+	statusPatch := client.MergeFrom(configConstraint.DeepCopy())
+	configConstraint.Status.ObservedGeneration = configConstraint.Generation
+	configConstraint.Status.Phase = appsv1alpha1.AvailablePhase
+	if err = r.Client.Status().Patch(reqCtx.Ctx, configConstraint, statusPatch); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
-	intctrlutil.RecordCreatedEvent(r.Recorder, configCSTR)
+	intctrlutil.RecordCreatedEvent(r.Recorder, configConstraint)
 
 	return ctrl.Result{}, nil
 }

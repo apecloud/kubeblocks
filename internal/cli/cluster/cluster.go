@@ -33,7 +33,7 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
 type GetOptions struct {
@@ -78,7 +78,9 @@ func (o *ObjectsGetter) Get() (*ClusterObjects, error) {
 
 	listOpts := func() metav1.ListOptions {
 		return metav1.ListOptions{
-			LabelSelector: fmt.Sprintf("%s=%s", intctrlutil.AppInstanceLabelKey, o.Name),
+			LabelSelector: fmt.Sprintf("%s=%s,%s=%s",
+				constant.AppInstanceLabelKey, o.Name,
+				constant.AppManagedByLabelKey, constant.AppName),
 		}
 	}
 
@@ -218,7 +220,7 @@ func (o *ClusterObjects) GetComponentInfo() []*ComponentInfo {
 		// get all pods belonging to current component
 		var pods []*corev1.Pod
 		for _, p := range o.Pods.Items {
-			if n, ok := p.Labels[intctrlutil.KBAppComponentLabelKey]; ok && n == c.Name {
+			if n, ok := p.Labels[constant.KBAppComponentLabelKey]; ok && n == c.Name {
 				pods = append(pods, &p)
 			}
 		}
@@ -256,11 +258,11 @@ func (o *ClusterObjects) GetInstanceInfo() []*InstanceInfo {
 		instance := &InstanceInfo{
 			Name:        pod.Name,
 			Namespace:   pod.Namespace,
-			Cluster:     getLabelVal(pod.Labels, intctrlutil.AppInstanceLabelKey),
-			Component:   getLabelVal(pod.Labels, intctrlutil.KBAppComponentLabelKey),
+			Cluster:     getLabelVal(pod.Labels, constant.AppInstanceLabelKey),
+			Component:   getLabelVal(pod.Labels, constant.KBAppComponentLabelKey),
 			Status:      string(pod.Status.Phase),
-			Role:        getLabelVal(pod.Labels, intctrlutil.RoleLabelKey),
-			AccessMode:  getLabelVal(pod.Labels, intctrlutil.ConsensusSetAccessModeLabelKey),
+			Role:        getLabelVal(pod.Labels, constant.RoleLabelKey),
+			AccessMode:  getLabelVal(pod.Labels, constant.ConsensusSetAccessModeLabelKey),
 			CreatedTime: util.TimeFormat(&pod.CreationTimestamp),
 		}
 
@@ -288,9 +290,25 @@ func (o *ClusterObjects) getStorageInfo(component *appsv1alpha1.ClusterComponent
 			return *vcTpl.Spec.StorageClassName
 		}
 
-		// get storage class name from cluster annotations
-		if name, ok := o.Cluster.Annotations[types.StorageClassAnnotationKey]; ok {
-			return name
+		if o.PVCs == nil {
+			return types.None
+		}
+
+		// get storage class name from PVC
+		for _, pvc := range o.PVCs.Items {
+			labels := pvc.Labels
+			if len(labels) == 0 {
+				continue
+			}
+
+			if labels[constant.KBAppComponentLabelKey] != component.Name {
+				continue
+			}
+
+			if labels[constant.VolumeClaimTemplateNameLabelKey] != vcTpl.Name {
+				continue
+			}
+			return *pvc.Spec.StorageClassName
 		}
 
 		return types.None
@@ -322,8 +340,8 @@ func getInstanceNodeInfo(nodes []*corev1.Node, pod *corev1.Pod, i *InstanceInfo)
 		return
 	}
 
-	i.Region = getLabelVal(node.Labels, intctrlutil.RegionLabelKey)
-	i.AZ = getLabelVal(node.Labels, intctrlutil.ZoneLabelKey)
+	i.Region = getLabelVal(node.Labels, constant.RegionLabelKey)
+	i.AZ = getLabelVal(node.Labels, constant.ZoneLabelKey)
 }
 
 func getResourceInfo(reqs, limits corev1.ResourceList) (string, string) {

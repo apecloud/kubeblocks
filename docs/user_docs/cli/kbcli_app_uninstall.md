@@ -1,6 +1,8 @@
-## kbcli app uninstall
+---
+title: kbcli app uninstall
+---
 
-Uninstall the application with the specified name
+Uninstall the application with the specified name.
 
 ```
 kbcli app uninstall [flags]
@@ -45,5 +47,7 @@ kbcli app uninstall [flags]
 
 ### SEE ALSO
 
-* [kbcli app](kbcli_app.md)	 - Manager external applications related to KubeBlocks
+* [kbcli app](kbcli_app.md)	 - Manage external applications related to KubeBlocks.
+
+#### Go Back to [CLI Overview](cli.md) Homepage.
 

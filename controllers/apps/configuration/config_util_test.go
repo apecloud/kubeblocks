@@ -30,6 +30,7 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	"github.com/apecloud/kubeblocks/internal/generics"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 	testutil "github.com/apecloud/kubeblocks/internal/testutil/k8s"
 )
@@ -73,11 +74,11 @@ var _ = Describe("ConfigWrapper util test", func() {
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 		// namespaced
-		testapps.ClearResources(&testCtx, intctrlutil.ConfigMapSignature, inNS, ml)
+		testapps.ClearResources(&testCtx, generics.ConfigMapSignature, inNS, ml)
 		// non-namespaced
-		testapps.ClearResources(&testCtx, intctrlutil.ClusterVersionSignature, ml)
-		testapps.ClearResources(&testCtx, intctrlutil.ClusterDefinitionSignature, ml)
-		testapps.ClearResources(&testCtx, intctrlutil.ConfigConstraintSignature, ml)
+		testapps.ClearResources(&testCtx, generics.ClusterVersionSignature, ml)
+		testapps.ClearResources(&testCtx, generics.ClusterDefinitionSignature, ml)
+		testapps.ClearResources(&testCtx, generics.ConfigConstraintSignature, ml)
 	}
 
 	BeforeEach(func() {
@@ -98,7 +99,7 @@ var _ = Describe("ConfigWrapper util test", func() {
 		By("Create a clusterDefinition obj")
 		clusterDefObj = testapps.NewClusterDefFactory(clusterDefName).
 			AddComponent(testapps.StatefulMySQLComponent, statefulCompType).
-			AddConfigTemplate(configTplName, configMapObj.Name, configConstraintObj.Name, testCtx.DefaultNamespace, configVolumeName, nil).
+			AddConfigTemplate(configTplName, configMapObj.Name, configConstraintObj.Name, testCtx.DefaultNamespace, configVolumeName).
 			Create(&testCtx).GetObject()
 
 		By("Create a clusterVersion obj")
@@ -143,30 +144,30 @@ var _ = Describe("ConfigWrapper util test", func() {
 				},
 			), testutil.WithAnyTimes()))
 
-			_, err := CheckCDConfigTemplate(k8sMockClient.Client(), reqCtx, clusterDefObj)
+			_, err := checkConfigTemplate(k8sMockClient.Client(), reqCtx, clusterDefObj)
 			Expect(err).ShouldNot(Succeed())
 			Expect(err.Error()).Should(ContainSubstring("failed to get cc object"))
 
-			_, err = CheckCDConfigTemplate(k8sMockClient.Client(), reqCtx, clusterDefObj)
+			_, err = checkConfigTemplate(k8sMockClient.Client(), reqCtx, clusterDefObj)
 			Expect(err).ShouldNot(Succeed())
 			Expect(err.Error()).Should(ContainSubstring("failed to get cc object"))
 
-			_, err = CheckCDConfigTemplate(k8sMockClient.Client(), reqCtx, clusterDefObj)
+			_, err = checkConfigTemplate(k8sMockClient.Client(), reqCtx, clusterDefObj)
 			Expect(err).ShouldNot(Succeed())
 			Expect(err.Error()).Should(ContainSubstring("status not ready"))
 
-			ok, err := CheckCDConfigTemplate(k8sMockClient.Client(), reqCtx, clusterDefObj)
+			ok, err := checkConfigTemplate(k8sMockClient.Client(), reqCtx, clusterDefObj)
 			Expect(err).Should(Succeed())
 			Expect(ok).Should(BeTrue())
 
-			ok, err = UpdateCDLabelsByConfiguration(k8sMockClient.Client(), reqCtx, clusterDefObj)
+			ok, err = updateLabelsByConfiguration(k8sMockClient.Client(), reqCtx, clusterDefObj)
 			Expect(err).Should(Succeed())
 			Expect(ok).Should(BeTrue())
 
-			err = UpdateCDConfigMapFinalizer(k8sMockClient.Client(), reqCtx, clusterDefObj)
+			_, err = updateLabelsByConfiguration(k8sMockClient.Client(), reqCtx, clusterDefObj)
 			Expect(err).Should(Succeed())
 
-			err = DeleteCDConfigMapFinalizer(k8sMockClient.Client(), reqCtx, clusterDefObj)
+			err = DeleteConfigMapFinalizer(k8sMockClient.Client(), reqCtx, clusterDefObj)
 			Expect(err).Should(Succeed())
 		})
 	})
@@ -174,15 +175,15 @@ var _ = Describe("ConfigWrapper util test", func() {
 	Context("clusterdefinition CR test without config Constraints", func() {
 		It("Should success without error", func() {
 			// remove ConfigConstraintRef
-			_, err := handleConfigTemplate(clusterDefObj, func(templates []appsv1alpha1.ConfigTemplate) (bool, error) {
+			_, err := handleConfigTemplate(clusterDefObj, func(templates []appsv1alpha1.ComponentConfigSpec) (bool, error) {
 				return true, nil
 			}, func(component *appsv1alpha1.ClusterComponentDefinition) error {
-				if component.ConfigSpec == nil || len(component.ConfigSpec.ConfigTemplateRefs) == 0 {
+				if len(component.ConfigSpecs) == 0 {
 					return nil
 				}
 
-				for i := range component.ConfigSpec.ConfigTemplateRefs {
-					tpl := &component.ConfigSpec.ConfigTemplateRefs[i]
+				for i := range component.ConfigSpecs {
+					tpl := &component.ConfigSpecs[i]
 					tpl.ConfigConstraintRef = ""
 				}
 				return nil
@@ -203,19 +204,19 @@ var _ = Describe("ConfigWrapper util test", func() {
 					}}},
 			), testutil.WithAnyTimes()))
 
-			_, err = CheckCDConfigTemplate(k8sMockClient.Client(), reqCtx, clusterDefObj)
+			_, err = checkConfigTemplate(k8sMockClient.Client(), reqCtx, clusterDefObj)
 			Expect(err).ShouldNot(Succeed())
 			Expect(err.Error()).Should(ContainSubstring("failed to get cc object"))
 
-			ok, err := CheckCDConfigTemplate(k8sMockClient.Client(), reqCtx, clusterDefObj)
+			ok, err := checkConfigTemplate(k8sMockClient.Client(), reqCtx, clusterDefObj)
 			Expect(err).Should(Succeed())
 			Expect(ok).Should(BeTrue())
 		})
 	})
 
 	updateAVTemplates := func() {
-		var tpls []appsv1alpha1.ConfigTemplate
-		_, err := handleConfigTemplate(clusterDefObj, func(templates []appsv1alpha1.ConfigTemplate) (bool, error) {
+		var tpls []appsv1alpha1.ComponentConfigSpec
+		_, err := handleConfigTemplate(clusterDefObj, func(templates []appsv1alpha1.ComponentConfigSpec) (bool, error) {
 			tpls = templates
 			return true, nil
 		})
@@ -226,7 +227,7 @@ var _ = Describe("ConfigWrapper util test", func() {
 		}
 
 		// mock clusterVersionObj config templates
-		clusterVersionObj.Spec.ComponentVersions[0].ConfigTemplateRefs = tpls
+		clusterVersionObj.Spec.ComponentVersions[0].ConfigSpecs = tpls
 	}
 
 	Context("clusterversion CR test", func() {
@@ -259,30 +260,30 @@ var _ = Describe("ConfigWrapper util test", func() {
 				},
 			), testutil.WithAnyTimes()))
 
-			_, err := CheckCVConfigTemplate(k8sMockClient.Client(), reqCtx, clusterVersionObj)
+			_, err := checkConfigTemplate(k8sMockClient.Client(), reqCtx, clusterVersionObj)
 			Expect(err).ShouldNot(Succeed())
 			Expect(err.Error()).Should(ContainSubstring("failed to get cc object"))
 
-			_, err = CheckCVConfigTemplate(k8sMockClient.Client(), reqCtx, clusterVersionObj)
+			_, err = checkConfigTemplate(k8sMockClient.Client(), reqCtx, clusterVersionObj)
 			Expect(err).ShouldNot(Succeed())
 			Expect(err.Error()).Should(ContainSubstring("failed to get cc object"))
 
-			_, err = CheckCVConfigTemplate(k8sMockClient.Client(), reqCtx, clusterVersionObj)
+			_, err = checkConfigTemplate(k8sMockClient.Client(), reqCtx, clusterVersionObj)
 			Expect(err).ShouldNot(Succeed())
 			Expect(err.Error()).Should(ContainSubstring("status not ready"))
 
-			ok, err := CheckCVConfigTemplate(k8sMockClient.Client(), reqCtx, clusterVersionObj)
+			ok, err := checkConfigTemplate(k8sMockClient.Client(), reqCtx, clusterVersionObj)
 			Expect(err).Should(Succeed())
 			Expect(ok).Should(BeTrue())
 
-			ok, err = UpdateCVLabelsByConfiguration(k8sMockClient.Client(), reqCtx, clusterVersionObj)
+			ok, err = updateLabelsByConfiguration(k8sMockClient.Client(), reqCtx, clusterVersionObj)
 			Expect(err).Should(Succeed())
 			Expect(ok).Should(BeTrue())
 
-			err = UpdateCVConfigMapFinalizer(k8sMockClient.Client(), reqCtx, clusterVersionObj)
+			_, err = updateLabelsByConfiguration(k8sMockClient.Client(), reqCtx, clusterVersionObj)
 			Expect(err).Should(Succeed())
 
-			err = DeleteCVConfigMapFinalizer(k8sMockClient.Client(), reqCtx, clusterVersionObj)
+			err = DeleteConfigMapFinalizer(k8sMockClient.Client(), reqCtx, clusterVersionObj)
 			Expect(err).Should(Succeed())
 		})
 	})
@@ -301,7 +302,7 @@ var _ = Describe("ConfigWrapper util test", func() {
 			}
 			tests := []struct {
 				name    string
-				tpls    []appsv1alpha1.ConfigTemplate
+				tpls    []appsv1alpha1.ComponentConfigSpec
 				want    *appsv1alpha1.ReloadOptions
 				wantErr bool
 			}{{
@@ -313,24 +314,30 @@ var _ = Describe("ConfigWrapper util test", func() {
 			}, {
 				// empty config templates
 				name:    "test",
-				tpls:    []appsv1alpha1.ConfigTemplate{},
+				tpls:    []appsv1alpha1.ComponentConfigSpec{},
 				want:    nil,
 				wantErr: false,
 			}, {
 				// config templates without configConstraintObj
 				name: "test",
-				tpls: []appsv1alpha1.ConfigTemplate{{
-					Name: "for_test",
+				tpls: []appsv1alpha1.ComponentConfigSpec{{
+					ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
+						Name: "for_test",
+					},
 				}, {
-					Name: "for_test2",
+					ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
+						Name: "for_test2",
+					},
 				}},
 				want:    nil,
 				wantErr: false,
 			}, {
 				// normal
 				name: "test",
-				tpls: []appsv1alpha1.ConfigTemplate{{
-					Name:                "for_test",
+				tpls: []appsv1alpha1.ComponentConfigSpec{{
+					ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
+						Name: "for_test",
+					},
 					ConfigConstraintRef: "eg_v1",
 				}},
 				want:    mockTpl.Spec.ReloadOptions,
@@ -338,8 +345,10 @@ var _ = Describe("ConfigWrapper util test", func() {
 			}, {
 				// not exist config constraint
 				name: "test",
-				tpls: []appsv1alpha1.ConfigTemplate{{
-					Name:                "for_test",
+				tpls: []appsv1alpha1.ComponentConfigSpec{{
+					ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
+						Name: "for_test",
+					},
 					ConfigConstraintRef: "not_exist",
 				}},
 				want:    nil,

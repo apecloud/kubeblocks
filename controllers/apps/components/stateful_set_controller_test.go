@@ -22,12 +22,14 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	"github.com/apecloud/kubeblocks/internal/constant"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/generics"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 	testk8s "github.com/apecloud/kubeblocks/internal/testutil/k8s"
 )
@@ -100,16 +102,16 @@ var _ = Describe("StatefulSet Controller", func() {
 		By("Mock a pod without role label and it will wait for HandleProbeTimeoutWhenPodsReady")
 		leaderPod := pods[0]
 		Expect(testapps.ChangeObj(&testCtx, leaderPod, func() {
-			delete(leaderPod.Labels, intctrlutil.RoleLabelKey)
+			delete(leaderPod.Labels, constant.RoleLabelKey)
 		})).Should(Succeed())
 		Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(leaderPod), func(g Gomega, pod *corev1.Pod) {
-			g.Expect(pod.Labels[intctrlutil.RoleLabelKey] == "").Should(BeTrue())
+			g.Expect(pod.Labels[constant.RoleLabelKey] == "").Should(BeTrue())
 		})).Should(Succeed())
 
 		By("mock restart component to trigger reconcile of StatefulSet controller")
 		Expect(testapps.ChangeObj(&testCtx, sts, func() {
 			sts.Spec.Template.Annotations = map[string]string{
-				intctrlutil.RestartAnnotationKey: time.Now().Format(time.RFC3339),
+				constant.RestartAnnotationKey: time.Now().Format(time.RFC3339),
 			}
 		})).Should(Succeed())
 
@@ -128,7 +130,7 @@ var _ = Describe("StatefulSet Controller", func() {
 
 		By("add leader role label for leaderPod to mock consensus component to be Running")
 		Expect(testapps.ChangeObj(&testCtx, leaderPod, func() {
-			leaderPod.Labels[intctrlutil.RoleLabelKey] = "leader"
+			leaderPod.Labels[constant.RoleLabelKey] = "leader"
 		})).Should(Succeed())
 		return pods
 	}
@@ -147,7 +149,7 @@ var _ = Describe("StatefulSet Controller", func() {
 			_ = testapps.CreateRestartOpsRequest(testCtx, clusterName, opsRequestName, []string{consensusCompName})
 			Expect(testapps.ChangeObj(&testCtx, cluster, func() {
 				cluster.Annotations = map[string]string{
-					intctrlutil.OpsRequestAnnotationKey: fmt.Sprintf(`[{"name":"%s","clusterPhase":"Rebooting"}]`, opsRequestName),
+					constant.OpsRequestAnnotationKey: fmt.Sprintf(`[{"name":"%s","clusterPhase":"Rebooting"}]`, opsRequestName),
 				}
 			})).Should(Succeed())
 
@@ -167,9 +169,9 @@ var _ = Describe("StatefulSet Controller", func() {
 			By("mock component of cluster is stopping")
 			Expect(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(cluster), func(tmpCluster *appsv1alpha1.Cluster) {
 				tmpCluster.Status.Phase = appsv1alpha1.StoppingPhase
-				tmpCluster.Status.Components[consensusCompName] = appsv1alpha1.ClusterComponentStatus{
+				tmpCluster.Status.SetComponentStatus(consensusCompName, appsv1alpha1.ClusterComponentStatus{
 					Phase: appsv1alpha1.StoppingPhase,
-				}
+				})
 			})()).Should(Succeed())
 
 			By("mock stop operation and processed successfully")

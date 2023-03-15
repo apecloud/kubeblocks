@@ -55,11 +55,11 @@ type ClusterSpec struct {
 	// +kubebuilder:validation:MinItems=1
 	ComponentSpecs []ClusterComponentSpec `json:"componentSpecs,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
 
-	// affinity describes affinities which specific by users.
+	// Affinity is a group of affinity scheduling rules.
 	// +optional
 	Affinity *Affinity `json:"affinity,omitempty"`
 
-	// Cluster Tolerations are attached to tolerate any taint that matches the triple <key,value,effect> using the matching operator <operator>.
+	// Tolerations are attached to tolerate any taint that matches the triple <key,value,effect> using the matching operator <operator>.
 	// +kubebuilder:pruning:PreserveUnknownFields
 	// +optional
 	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
@@ -115,13 +115,13 @@ type ClusterStatus struct {
 type ClusterComponentSpec struct {
 	// name defines cluster's component name.
 	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:MaxLength=12
+	// +kubebuilder:validation:MaxLength=15
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	Name string `json:"name"`
 
 	// ComponentDefRef reference componentDef defined in ClusterDefinition spec.
 	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:MaxLength=18
+	// +kubebuilder:validation:MaxLength=63
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	ComponentDefRef string `json:"componentDefRef"`
 
@@ -166,30 +166,18 @@ type ClusterComponentSpec struct {
 	// +patchStrategy=merge,retainKeys
 	VolumeClaimTemplates []ClusterComponentVolumeClaimTemplate `json:"volumeClaimTemplates,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
 
-	// serviceType determines how the Service is exposed. Valid
-	// options are ClusterIP, NodePort, and LoadBalancer.
-	// "ClusterIP" allocates a cluster-internal IP address for load-balancing
-	// to endpoints. Endpoints are determined by the selector or if that is not
-	// specified, by manual construction of an Endpoints object or
-	// EndpointSlice objects. If clusterIP is "None", no virtual IP is
-	// allocated and the endpoints are published as a set of endpoints rather
-	// than a virtual IP.
-	// "NodePort" builds on ClusterIP and allocates a port on every node which
-	// routes to the same endpoints as the clusterIP.
-	// "LoadBalancer" builds on NodePort and creates an external load-balancer
-	// (if supported in the current cloud) which routes to the same endpoints
-	// as the clusterIP.
-	// More info: https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types
-	// +kubebuilder:default=ClusterIP
-	// +kubebuilder:validation:Enum={ClusterIP,NodePort,LoadBalancer}
-	// +kubebuilder:pruning:PreserveUnknownFields
+	// Services expose endpoints can be accessed by clients
 	// +optional
-	ServiceType corev1.ServiceType `json:"serviceType,omitempty"`
+	Services []ClusterComponentService `json:"services,omitempty"`
 
 	// primaryIndex determines which index is primary when workloadType is Replication, index number starts from zero.
 	// +kubebuilder:validation:Minimum=0
 	// +optional
 	PrimaryIndex *int32 `json:"primaryIndex,omitempty"`
+
+	// switchPolicy defines the strategy for switchover and failover when workloadType is Replication.
+	// +optional
+	SwitchPolicy *ClusterSwitchPolicy `json:"switchPolicy,omitempty"`
 
 	// TLS should be enabled or not
 	// +optional
@@ -286,6 +274,16 @@ type ReplicationMemberStatus struct {
 	Pod string `json:"pod"`
 }
 
+type ClusterSwitchPolicy struct {
+	// TODO other attribute extensions
+
+	// clusterSwitchPolicy type defined by Provider in ClusterDefinition, refer components[i].replicationSpec.switchPolicies[x].type
+	// +kubebuilder:validation:Required
+	// +kubebuilder:default=MaximumAvailability
+	// +optional
+	Type SwitchPolicyType `json:"type"`
+}
+
 type ClusterComponentVolumeClaimTemplate struct {
 	// Ref ClusterVersion.spec.components.containers.volumeMounts.name
 	// +kubebuilder:validation:Required
@@ -297,23 +295,27 @@ type ClusterComponentVolumeClaimTemplate struct {
 }
 
 type Affinity struct {
-	// podAntiAffinity defines pods of component anti-affnity.
-	// Defaults is Preferred.
-	// Preferred means try spread pods by topologyKey.
-	// Required means must spread pods by topologyKey.
+	// PodAntiAffinity describes the anti-affinity level of pods within a component.
+	// Preferred means try spread pods by `TopologyKeys`.
+	// Required means must spread pods by `TopologyKeys`.
+	// +kubebuilder:default=Preferred
 	// +optional
 	PodAntiAffinity PodAntiAffinity `json:"podAntiAffinity,omitempty"`
 
-	// topologyKeys describe topologyKeys for `topologySpreadConstraint` and `podAntiAffinity` in ClusterDefinition API.
+	// TopologyKey is the key of node labels.
+	// Nodes that have a label with this key and identical values are considered to be in the same topology.
+	// It's used as the topology domain for pod anti-affinity and pod spread constraint.
+	// Some well-known label keys, such as "kubernetes.io/hostname" and "topology.kubernetes.io/zone"
+	// are often used as TopologyKey, as well as any other custom label key.
 	// +listType=set
 	// +optional
 	TopologyKeys []string `json:"topologyKeys,omitempty"`
 
-	// nodeLabels describe constrain which nodes pod can be scheduled on based on node labels.
+	// NodeLabels describes that pods must be scheduled to the nodes with the specified node labels.
 	// +optional
 	NodeLabels map[string]string `json:"nodeLabels,omitempty"`
 
-	// tenancy defines how pods are distributed across node.
+	// Tenancy describes how pods are distributed across node.
 	// SharedNode means multiple pods may share the same node.
 	// DedicatedNode means each pod runs on their own dedicated node.
 	// +kubebuilder:default=SharedNode
@@ -355,6 +357,37 @@ type TLSSecretRef struct {
 	// Key of TLS private key in Secret
 	// +kubebuilder:validation:Required
 	Key string `json:"key"`
+}
+
+type ClusterComponentService struct {
+	// Service name
+	// +kubebuilder:validation:Required
+	Name string `json:"name"`
+
+	// serviceType determines how the Service is exposed. Valid
+	// options are ClusterIP, NodePort, and LoadBalancer.
+	// "ClusterIP" allocates a cluster-internal IP address for load-balancing
+	// to endpoints. Endpoints are determined by the selector or if that is not
+	// specified, by manual construction of an Endpoints object or
+	// EndpointSlice objects. If clusterIP is "None", no virtual IP is
+	// allocated and the endpoints are published as a set of endpoints rather
+	// than a virtual IP.
+	// "NodePort" builds on ClusterIP and allocates a port on every node which
+	// routes to the same endpoints as the clusterIP.
+	// "LoadBalancer" builds on NodePort and creates an external load-balancer
+	// (if supported in the current cloud) which routes to the same endpoints
+	// as the clusterIP.
+	// More info: https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types
+	// +kubebuilder:default=ClusterIP
+	// +kubebuilder:validation:Enum={ClusterIP,NodePort,LoadBalancer}
+	// +kubebuilder:pruning:PreserveUnknownFields
+	// +optional
+	ServiceType corev1.ServiceType `json:"serviceType,omitempty"`
+
+	// If ServiceType is LoadBalancer, cloud provider related parameters can be put here
+	// More info: https://kubernetes.io/docs/concepts/services-networking/service/#loadbalancer
+	// +optional
+	Annotations map[string]string `json:"annotations,omitempty"`
 }
 
 // +kubebuilder:object:root=true
@@ -441,7 +474,7 @@ func (r *Cluster) GetDefNameMappingComponents() map[string][]ClusterComponentSpe
 	return m
 }
 
-// GetMessage get message map deep copy object
+// GetMessage gets message map deep copy object
 func (in *ClusterComponentStatus) GetMessage() ComponentMessageMap {
 	messageMap := map[string]string{}
 	for k, v := range in.Message {
@@ -452,17 +485,38 @@ func (in *ClusterComponentStatus) GetMessage() ComponentMessageMap {
 
 // SetMessage override message map object
 func (in *ClusterComponentStatus) SetMessage(messageMap ComponentMessageMap) {
+	if in == nil {
+		return
+	}
 	in.Message = messageMap
 }
 
-// GetObjectMessage get the k8s workload message in component status message map
-func (m ComponentMessageMap) GetObjectMessage(objectKind, objectName string) string {
+// SetObjectMessage sets k8s workload message to component status message map
+func (in *ClusterComponentStatus) SetObjectMessage(objectKind, objectName, message string) {
+	if in == nil {
+		return
+	}
+	if in.Message == nil {
+		in.Message = map[string]string{}
+	}
 	messageKey := fmt.Sprintf("%s/%s", objectKind, objectName)
-	return m[messageKey]
+	in.Message[messageKey] = message
 }
 
-// SetObjectMessage set k8s workload message to component status message map
+// GetObjectMessage gets the k8s workload message in component status message map
+func (in *ClusterComponentStatus) GetObjectMessage(objectKind, objectName string) string {
+	if in == nil {
+		return ""
+	}
+	messageKey := fmt.Sprintf("%s/%s", objectKind, objectName)
+	return in.Message[messageKey]
+}
+
+// SetObjectMessage sets k8s workload message to component status message map
 func (m ComponentMessageMap) SetObjectMessage(objectKind, objectName, message string) {
+	if m == nil {
+		return
+	}
 	messageKey := fmt.Sprintf("%s/%s", objectKind, objectName)
 	m[messageKey] = message
 }
@@ -487,19 +541,47 @@ func (r *Cluster) GetComponentDefRefName(componentName string) string {
 	return ""
 }
 
-func ToVolumeClaimTemplate(template ClusterComponentVolumeClaimTemplate) corev1.PersistentVolumeClaimTemplate {
+// SetComponentStatus does safe operation on ClusterStatus.Components map object update.
+func (r *ClusterStatus) SetComponentStatus(name string, status ClusterComponentStatus) {
+	if r == nil {
+		return
+	}
+	r.checkedInitComponentsMap()
+	r.Components[name] = status
+}
+
+func (r *ClusterStatus) checkedInitComponentsMap() {
+	if r.Components == nil {
+		r.Components = map[string]ClusterComponentStatus{}
+	}
+}
+
+// ToVolumeClaimTemplates convert r.VolumeClaimTemplates to []corev1.PersistentVolumeClaimTemplate.
+func (r *ClusterComponentSpec) ToVolumeClaimTemplates() []corev1.PersistentVolumeClaimTemplate {
+	if r == nil {
+		return nil
+	}
+	var ts []corev1.PersistentVolumeClaimTemplate
+	for _, template := range r.VolumeClaimTemplates {
+		ts = append(ts, toVolumeClaimTemplate(template))
+	}
+	return ts
+}
+
+// GetPrimaryIndex provide safe operation get ClusterComponentSpec.PrimaryIndex, if value is nil, it's treated as 0.
+func (r *ClusterComponentSpec) GetPrimaryIndex() int32 {
+	if r == nil || r.PrimaryIndex == nil {
+		return 0
+	}
+	return *r.PrimaryIndex
+}
+
+// following are helper functions
+func toVolumeClaimTemplate(template ClusterComponentVolumeClaimTemplate) corev1.PersistentVolumeClaimTemplate {
 	t := corev1.PersistentVolumeClaimTemplate{}
 	t.ObjectMeta.Name = template.Name
 	if template.Spec != nil {
 		t.Spec = *template.Spec
 	}
 	return t
-}
-
-func ToVolumeClaimTemplates(templates []ClusterComponentVolumeClaimTemplate) []corev1.PersistentVolumeClaimTemplate {
-	ts := []corev1.PersistentVolumeClaimTemplate{}
-	for _, template := range templates {
-		ts = append(ts, ToVolumeClaimTemplate(template))
-	}
-	return ts
 }

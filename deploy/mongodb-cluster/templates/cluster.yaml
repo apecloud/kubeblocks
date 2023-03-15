@@ -5,7 +5,7 @@ metadata:
   labels:
     {{- include "mongodb-cluster.labels" . | nindent 4}}
 spec:
-  clusterDefinitionRef: apecloud-mongodb
+  clusterDefinitionRef: mongodb
   clusterVersionRef: mongodb-{{ default .Chart.AppVersion .Values.clusterVersionOverride }}
   terminationPolicy: {{ .Values.terminationPolicy }}
   affinity:

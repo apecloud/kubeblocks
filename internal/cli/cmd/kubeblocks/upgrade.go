@@ -28,6 +28,7 @@ import (
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
 
+	"github.com/apecloud/kubeblocks/internal/cli/printer"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 	"github.com/apecloud/kubeblocks/internal/cli/util/helm"
@@ -51,7 +52,7 @@ func newUpgradeCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 
 	cmd := &cobra.Command{
 		Use:     "upgrade",
-		Short:   "Upgrade KubeBlocks",
+		Short:   "Upgrade KubeBlocks.",
 		Args:    cobra.NoArgs,
 		Example: upgradeExample,
 		Run: func(cmd *cobra.Command, args []string) {
@@ -64,12 +65,24 @@ func newUpgradeCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 	cmd.Flags().StringVar(&o.Version, "version", "", "Set KubeBlocks version")
 	cmd.Flags().BoolVar(&o.Check, "check", true, "Check kubernetes environment before upgrade")
 	cmd.Flags().DurationVar(&o.timeout, "timeout", 1800*time.Second, "Time to wait for upgrading KubeBlocks")
+	cmd.Flags().BoolVar(&o.verbose, "verbose", false, "Show logs in detail")
 	helm.AddValueOptionsFlags(cmd.Flags(), &o.ValueOpts)
 
 	return cmd
 }
 
 func (o *InstallOptions) Upgrade(cmd *cobra.Command) error {
+	if o.HelmCfg.Namespace() == "" {
+		ns, err := util.GetKubeBlocksNamespace(o.Client)
+		if err != nil || ns == "" {
+			printer.Warning(o.Out, "Failed to find deployed KubeBlocks.\n\n")
+			fmt.Fprint(o.Out, "Use \"kbcli kubeblocks install\" to install KubeBlocks.\n")
+			fmt.Fprintf(o.Out, "Use \"kbcli kubeblocks status\" to get information in more details.\n")
+			return nil
+		}
+		o.HelmCfg.SetNamespace(ns)
+	}
+
 	// check whether monitor flag is set by user
 	monitorIsSet := false
 	cmd.Flags().Visit(func(flag *pflag.Flag) {
@@ -93,39 +106,41 @@ func (o *InstallOptions) Upgrade(cmd *cobra.Command) error {
 		return err
 	}
 
-	msg := ""
 	v := versionInfo[util.KubeBlocksApp]
-	if len(v) > 0 {
-		if len(o.Version) > 0 {
-			if v == o.Version && helm.ValueOptsIsEmpty(&o.ValueOpts) {
-				fmt.Fprintf(o.Out, "Current version %s is the same as the upgraded version, no need to upgrade.\n", o.Version)
-				return nil
-			}
-			msg = "to " + o.Version
-		}
-		fmt.Fprintf(o.Out, "Current KubeBlocks version %s.", v)
-	} else {
+	if len(v) == 0 {
 		return errors.New("KubeBlocks does not exist, try to run \"kbcli kubeblocks install\" to install")
 	}
 
-	// it's time to upgrade
-	spinner := util.Spinner(o.Out, "%-40s", "Upgrading KubeBlocks "+msg)
-	defer spinner(false)
+	if v == o.Version && helm.ValueOptsIsEmpty(&o.ValueOpts) {
+		fmt.Fprintf(o.Out, "Current version %s is the same as the upgraded version, no need to upgrade.\n", o.Version)
+		return nil
+	}
+	fmt.Fprintf(o.Out, "Current KubeBlocks version %s.\n", v)
 
 	if err = o.preCheck(versionInfo); err != nil {
 		return err
 	}
 
+	// add helm repo
+	spinner := util.Spinner(o.Out, "%-40s", "Add and update repo "+types.KubeBlocksChartName)
+	defer spinner(false)
 	// Add repo, if exists, will update it
 	if err = helm.AddRepo(&repo.Entry{Name: types.KubeBlocksChartName, URL: util.GetHelmChartRepoURL()}); err != nil {
 		return err
 	}
+	spinner(true)
 
+	// it's time to upgrade
+	msg := ""
+	if o.Version != "" {
+		msg = "to " + o.Version
+	}
+	spinner = util.Spinner(o.Out, "%-40s", "Upgrading KubeBlocks "+msg)
+	defer spinner(false)
 	// upgrade KubeBlocks chart
 	if err = o.upgradeChart(); err != nil {
 		return err
 	}
-
 	// successfully upgraded
 	spinner(true)
 
@@ -135,6 +150,7 @@ func (o *InstallOptions) Upgrade(cmd *cobra.Command) error {
 	}
 
 	if !o.Quiet {
+		fmt.Fprintf(o.Out, "\nKubeBlocks has been upgraded %s SUCCESSFULLY!\n", msg)
 		o.printNotes()
 	}
 	return nil

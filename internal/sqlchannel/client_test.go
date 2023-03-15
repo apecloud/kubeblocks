@@ -24,12 +24,11 @@ import (
 	"testing"
 	"time"
 
-	"google.golang.org/grpc"
-
 	pb "github.com/dapr/go-sdk/dapr/proto/runtime/v1"
+	"google.golang.org/grpc"
 	corev1 "k8s.io/api/core/v1"
 
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/constant"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 )
 

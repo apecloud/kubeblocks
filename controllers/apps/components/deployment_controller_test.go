@@ -30,7 +30,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/stateless"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/generics"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 	testk8s "github.com/apecloud/kubeblocks/internal/testutil/k8s"
 )
@@ -132,7 +132,7 @@ var _ = Describe("Deployment Controller", func() {
 			By("check component.Status.Message contains pod error message")
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(cluster), func(g Gomega, tmpCluster *appsv1alpha1.Cluster) {
 				compStatus := tmpCluster.Status.Components[statelessCompName]
-				g.Expect(compStatus.Message.GetObjectMessage("Pod", pod.Name)).Should(Equal(errMessage))
+				g.Expect(compStatus.GetObjectMessage("Pod", pod.Name)).Should(Equal(errMessage))
 			})).Should(Succeed())
 
 			By("mock deployment is ready")

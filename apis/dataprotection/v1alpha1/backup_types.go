@@ -17,6 +17,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -89,15 +90,25 @@ type BackupStatus struct {
 	// the reason if backup failed.
 	// +optional
 	FailureReason string `json:"failureReason,omitempty"`
+
+	// remoteVolume saves the backup data.
+	// +optional
+	RemoteVolume *corev1.Volume `json:"remoteVolume,omitempty"`
+
+	// backupToolName referenced backup tool name.
+	// +optional
+	BackupToolName string `json:"backupToolName,omitempty"`
 }
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:categories={kubeblocks},scope=Namespaced
+// +kubebuilder:printcolumn:name="TYPE",type=string,JSONPath=`.spec.backupType`
 // +kubebuilder:printcolumn:name="STATUS",type=string,JSONPath=`.status.phase`
-// +kubebuilder:printcolumn:name="COMPLETION-TIME",type=date,JSONPath=`.status.completionTimestamp`
 // +kubebuilder:printcolumn:name="TOTAL-SIZE",type=string,JSONPath=`.status.totalSize`
 // +kubebuilder:printcolumn:name="DURATION",type=string,JSONPath=`.status.duration`
+// +kubebuilder:printcolumn:name="CREATE-TIME",type=string,JSONPath=".metadata.creationTimestamp"
+// +kubebuilder:printcolumn:name="COMPLETION-TIME",type=string,JSONPath=`.status.completionTimestamp`
 
 // Backup is the Schema for the backups API (defined by User)
 type Backup struct {

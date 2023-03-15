@@ -1,8 +1,8 @@
-{{- $cc := .Files.Get "config/mysql.cc.yaml" | fromYaml }}
+{{- $cc := .Files.Get "config/mysql8-config-effect-scope.yaml" | fromYaml }}
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: ConfigConstraint
 metadata:
-  name: mysql-cfg-constraints-8.0
+  name: mysql8.0-config-constraints
   labels:
     {{- include "apecloud-mysql.labels" . | nindent 4 }}
 spec:
@@ -11,6 +11,7 @@ spec:
   reloadOptions:
     tplScriptTrigger:
       scriptConfigMapRef: mysql-reload-script
+      namespace: {{ .Release.Namespace }}
 {{/*    unixSignalTrigger:*/}}
 {{/*      signal: SIGHUP*/}}
 {{/*      processName: mysqld*/}}
@@ -23,7 +24,7 @@ spec:
     # schema: auto generate from mmmcue scripts
     # example: ../../internal/configuration/testdata/mysql_openapi.json
     cue: |-
-      {{- .Files.Get "config/mysql8.cc.cue" | nindent 6 }}
+      {{- .Files.Get "config/mysql8-config-constraint.cue" | nindent 6 }}
 
   ## require db instance restart
   {{- if hasKey $cc "staticParameters" }}

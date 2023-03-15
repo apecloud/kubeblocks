@@ -29,6 +29,7 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	opsutil "github.com/apecloud/kubeblocks/controllers/apps/operations/util"
 	"github.com/apecloud/kubeblocks/controllers/k8score"
+	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -53,7 +54,7 @@ func init() {
 // handleVolumeExpansionOperation handles the pvc for the volume expansion OpsRequest.
 // it will be triggered when the PersistentVolumeClaim has changed.
 func handleVolumeExpansionWithPVC(reqCtx intctrlutil.RequestCtx, cli client.Client, pvc *corev1.PersistentVolumeClaim) error {
-	clusterName := pvc.Labels[intctrlutil.AppInstanceLabelKey]
+	clusterName := pvc.Labels[constant.AppInstanceLabelKey]
 	cluster := &appsv1alpha1.Cluster{}
 	if err := cli.Get(reqCtx.Ctx, client.ObjectKey{Name: clusterName, Namespace: pvc.Namespace}, cluster); err != nil {
 		return err
@@ -92,7 +93,7 @@ func handleClusterVolumeExpandingPhase(ctx context.Context,
 	for k, v := range cluster.Status.Components {
 		if v.Phase == appsv1alpha1.VolumeExpandingPhase {
 			v.Phase = appsv1alpha1.RunningPhase
-			cluster.Status.Components[k] = v
+			cluster.Status.SetComponentStatus(k, v)
 		}
 	}
 	cluster.Status.Phase = appsv1alpha1.RunningPhase
@@ -134,7 +135,7 @@ func (pvcEventHandler PersistentVolumeClaimEventHandler) Handle(cli client.Clien
 // isTargetResizeFailedEvents checks the event is the resize failed events.
 func (pvcEventHandler PersistentVolumeClaimEventHandler) isTargetResizeFailedEvents(event *corev1.Event) bool {
 	// ignores ExternalExpanding event, this event is always exists when using csi driver.
-	return event.Type == corev1.EventTypeWarning && event.InvolvedObject.Kind == intctrlutil.PersistentVolumeClaimKind &&
+	return event.Type == corev1.EventTypeWarning && event.InvolvedObject.Kind == constant.PersistentVolumeClaimKind &&
 		slices.Index([]string{VolumeResizeFailed, FileSystemResizeFailed}, event.Reason) != -1
 }
 
@@ -150,7 +151,7 @@ func (pvcEventHandler PersistentVolumeClaimEventHandler) handlePVCFailedStatusOn
 	)
 	// get cluster object from the pvc
 	if err = cli.Get(reqCtx.Ctx, client.ObjectKey{
-		Name:      pvc.Labels[intctrlutil.AppInstanceLabelKey],
+		Name:      pvc.Labels[constant.AppInstanceLabelKey],
 		Namespace: pvc.Namespace,
 	}, cluster); err != nil {
 		return err
@@ -168,8 +169,8 @@ func (pvcEventHandler PersistentVolumeClaimEventHandler) handlePVCFailedStatusOn
 	if compsStatus == nil {
 		return nil
 	}
-	componentName := pvc.Labels[intctrlutil.KBAppComponentLabelKey]
-	vctName := pvc.Labels[intctrlutil.VolumeClaimTemplateNameLabelKey]
+	componentName := pvc.Labels[constant.KBAppComponentLabelKey]
+	vctName := pvc.Labels[constant.VolumeClaimTemplateNameLabelKey]
 	patch := client.MergeFrom(opsRequest.DeepCopy())
 	var isChanged bool
 	// change the pvc status to Failed in OpsRequest.status.components.

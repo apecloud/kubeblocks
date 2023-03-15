@@ -19,8 +19,8 @@ package component
 import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
@@ -46,12 +46,17 @@ var _ = Describe("probe_utils", func() {
 			clusterDefProbe.FailureThreshold = 1
 			component = &SynthesizedComponent{}
 			component.CharacterType = "mysql"
-			component.Service = &corev1.ServiceSpec{
-				Ports: []corev1.ServicePort{{
-					Protocol: corev1.ProtocolTCP,
-					Port:     3306,
-				}},
-			}
+			component.Services = append(component.Services, corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "mysql",
+				},
+				Spec: corev1.ServiceSpec{
+					Ports: []corev1.ServicePort{{
+						Protocol: corev1.ProtocolTCP,
+						Port:     3306,
+					}},
+				},
+			})
 			component.ConsensusSpec = &appsv1alpha1.ConsensusSetSpec{
 				Leader: appsv1alpha1.ConsensusMember{
 					Name:       "leader",

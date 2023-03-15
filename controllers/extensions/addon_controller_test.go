@@ -32,7 +32,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	"github.com/apecloud/kubeblocks/internal/constant"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/generics"
 	"github.com/apecloud/kubeblocks/internal/testutil"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 )
@@ -49,19 +50,19 @@ var _ = Describe("Addon controller", func() {
 		// in race conditions, it will find the existence of old objects, resulting failure to
 		// create the new objects.
 		By("clean resources")
-
-		// delete rest mocked objects
+		// non-namespaced
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
-		inNS := client.InNamespace(viper.GetString("CM_NAMESPACE"))
+		testapps.ClearResources(&testCtx, intctrlutil.AddonSignature, ml)
+
+		inNS := client.InNamespace(viper.GetString(constant.CfgKeyCtrlrMgrNS))
 		testapps.ClearResources(&testCtx, intctrlutil.JobSignature, inNS,
 			client.HasLabels{
-				intctrlutil.AddonNameLabelKey,
+				constant.AddonNameLabelKey,
 			})
+
+		// delete rest mocked objects
 		testapps.ClearResources(&testCtx, intctrlutil.ConfigMapSignature, inNS, ml)
 		testapps.ClearResources(&testCtx, intctrlutil.SecretSignature, inNS, ml)
-
-		// non-namespaced
-		testapps.ClearResources(&testCtx, intctrlutil.AddonSignature, ml)
 	}
 
 	BeforeEach(func() {
@@ -82,6 +83,9 @@ var _ = Describe("Addon controller", func() {
 
 		AfterEach(func() {
 			cleanEnv()
+			viper.Set(constant.CfgKeyCtrlrMgrTolerations, "")
+			viper.Set(constant.CfgKeyCtrlrMgrAffinity, "")
+			viper.Set(constant.CfgKeyCtrlrMgrNodeSelector, "")
 		})
 
 		fakeCompletedJob := func(g Gomega, jobKey client.ObjectKey) {
@@ -103,7 +107,7 @@ var _ = Describe("Addon controller", func() {
 
 		fakeIntallationCompletedJob := func(expectedObservedGeneration int) {
 			jobKey := client.ObjectKey{
-				Namespace: viper.GetString("CM_NAMESPACE"),
+				Namespace: viper.GetString(constant.CfgKeyCtrlrMgrNS),
 				Name:      getInstallJobName(addon),
 			}
 			Eventually(func(g Gomega) {
@@ -157,7 +161,8 @@ var _ = Describe("Addon controller", func() {
 
 			By("By enabling addon with default install")
 			defaultInstall := addon.Spec.DefaultInstallValues[0].AddonInstallSpec
-			addon.Spec.InstallSpec = &defaultInstall
+			addon.Spec.InstallSpec = defaultInstall.DeepCopy()
+			addon.Spec.InstallSpec.Enabled = true
 			Expect(testCtx.Cli.Update(ctx, addon)).Should(Succeed())
 			enablingPhaseCheck(2)
 
@@ -169,7 +174,7 @@ var _ = Describe("Addon controller", func() {
 			helmRelease := &corev1.Secret{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      fmt.Sprintf("sh.helm.release.v1.%s.v1", addon.Name),
-					Namespace: viper.GetString("CM_NAMESPACE"),
+					Namespace: viper.GetString(constant.CfgKeyCtrlrMgrNS),
 					Labels: map[string]string{
 						"owner": "helm",
 						"name":  getHelmReleaseName(addon),
@@ -194,7 +199,7 @@ var _ = Describe("Addon controller", func() {
 
 			By("By disabled enabled addon with fake completed uninstall job status")
 			jobKey := client.ObjectKey{
-				Namespace: viper.GetString("CM_NAMESPACE"),
+				Namespace: viper.GetString(constant.CfgKeyCtrlrMgrNS),
 				Name:      getUninstallJobName(addon),
 			}
 			Eventually(func(g Gomega) {
@@ -223,6 +228,36 @@ var _ = Describe("Addon controller", func() {
 			fakeIntallationCompletedJob(2)
 		})
 
+		It("should successfully reconcile a custom resource for Addon run job with controller manager schedule settings", func() {
+			viper.Set(constant.CfgKeyCtrlrMgrAffinity,
+				"{\"nodeAffinity\":{\"preferredDuringSchedulingIgnoredDuringExecution\":[{\"preference\":{\"matchExpressions\":[{\"key\":\"kb-controller\",\"operator\":\"In\",\"values\":[\"true\"]}]},\"weight\":100}]}}")
+			viper.Set(constant.CfgKeyCtrlrMgrTolerations,
+				"[{\"key\":\"key1\", \"operator\": \"Exists\", \"effect\": \"NoSchedule\"}]")
+			viper.Set(constant.CfgKeyCtrlrMgrNodeSelector, "{\"beta.kubernetes.io/arch\":\"amd64\"}")
+
+			By("By create an addon with auto-install")
+			createAddonSpecWithRequiredAttributes(func(newOjb *extensionsv1alpha1.Addon) {
+				newOjb.Spec.Installable.AutoInstall = true
+			})
+
+			By("By addon autoInstall auto added")
+			enablingPhaseCheck(2)
+
+			By("By checking status.observedGeneration and status.phase=disabled")
+			jobKey := client.ObjectKey{
+				Namespace: viper.GetString(constant.CfgKeyCtrlrMgrNS),
+				Name:      getInstallJobName(addon),
+			}
+			Eventually(func(g Gomega) {
+				job := &batchv1.Job{}
+				g.Eventually(testCtx.Cli.Get(ctx, jobKey, job)).Should(Succeed())
+				g.Expect(job.Spec.Template.Spec.Tolerations).ShouldNot(BeEmpty())
+				g.Expect(job.Spec.Template.Spec.NodeSelector).ShouldNot(BeEmpty())
+				g.Expect(job.Spec.Template.Spec.Affinity).ShouldNot(BeNil())
+				g.Expect(job.Spec.Template.Spec.Affinity.NodeAffinity).ShouldNot(BeNil())
+			}, timeout, interval).Should(Succeed())
+		})
+
 		It("should successfully reconcile a custom resource for Addon with no matching installable selector", func() {
 			By("By create an addon with no matching installable selector")
 			createAddonSpecWithRequiredAttributes(func(newOjb *extensionsv1alpha1.Addon) {
@@ -246,11 +281,11 @@ var _ = Describe("Addon controller", func() {
 			By("By create an addon with spec.helm.installValues.configMapRefs set")
 			cm := testapps.CreateCustomizedObj(&testCtx, "addon/cm-values.yaml",
 				&corev1.ConfigMap{}, func(newCM *corev1.ConfigMap) {
-					newCM.Namespace = viper.GetString("CM_NAMESPACE")
+					newCM.Namespace = viper.GetString(constant.CfgKeyCtrlrMgrNS)
 				})
 			secret := testapps.CreateCustomizedObj(&testCtx, "addon/secret-values.yaml",
 				&corev1.Secret{}, func(newSecret *corev1.Secret) {
-					newSecret.Namespace = viper.GetString("CM_NAMESPACE")
+					newSecret.Namespace = viper.GetString(constant.CfgKeyCtrlrMgrNS)
 				})
 			createAddonSpecWithRequiredAttributes(func(newOjb *extensionsv1alpha1.Addon) {
 				newOjb.Spec.Installable.AutoInstall = true

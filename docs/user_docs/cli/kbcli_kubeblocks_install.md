@@ -1,6 +1,8 @@
-## kbcli kubeblocks install
+---
+title: kbcli kubeblocks install
+---
 
-Install KubeBlocks
+Install KubeBlocks.
 
 ```
 kbcli kubeblocks install [flags]
@@ -32,6 +34,7 @@ kbcli kubeblocks install [flags]
       --set-string stringArray   Set STRING values on the command line (can specify multiple or separate values with commas: key1=val1,key2=val2)
       --timeout duration         Time to wait for installing KubeBlocks (default 30m0s)
   -f, --values strings           Specify values in a YAML file or a URL (can specify multiple)
+      --verbose                  Show logs in detail.
       --version string           KubeBlocks version
 ```
 
@@ -61,5 +64,7 @@ kbcli kubeblocks install [flags]
 
 ### SEE ALSO
 
-* [kbcli kubeblocks](kbcli_kubeblocks.md)	 - KubeBlocks operation commands
+* [kbcli kubeblocks](kbcli_kubeblocks.md)	 - KubeBlocks operation commands.
+
+#### Go Back to [CLI Overview](cli.md) Homepage.
 

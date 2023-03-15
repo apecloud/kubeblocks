@@ -23,12 +23,14 @@ import (
 	"strings"
 	"time"
 
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	metautil "k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
 // statefulPodRegex is a regular expression that extracts the parent StatefulSet and ordinal from the Name of a Pod
@@ -69,7 +71,7 @@ func GetParentNameAndOrdinal(pod *corev1.Pod) (string, int) {
 //		   name: data
 //		 - mountPath: /log
 //		   name: log
-func GetContainerByConfigTemplate(podSpec *corev1.PodSpec, configs []appsv1alpha1.ConfigTemplate) *corev1.Container {
+func GetContainerByConfigTemplate(podSpec *corev1.PodSpec, configs []appsv1alpha1.ComponentConfigSpec) *corev1.Container {
 	containers := podSpec.Containers
 	initContainers := podSpec.InitContainers
 	if container := getContainerWithTplList(containers, configs); container != nil {
@@ -145,7 +147,7 @@ func GetContainersByConfigmap(containers []corev1.Container, volumeName string, 
 	return tmpList
 }
 
-func getContainerWithTplList(containers []corev1.Container, configs []appsv1alpha1.ConfigTemplate) *corev1.Container {
+func getContainerWithTplList(containers []corev1.Container, configs []appsv1alpha1.ComponentConfigSpec) *corev1.Container {
 	if len(containers) == 0 {
 		return nil
 	}
@@ -158,7 +160,7 @@ func getContainerWithTplList(containers []corev1.Container, configs []appsv1alph
 	return nil
 }
 
-func checkContainerWithVolumeMount(volumeMounts []corev1.VolumeMount, configs []appsv1alpha1.ConfigTemplate) bool {
+func checkContainerWithVolumeMount(volumeMounts []corev1.VolumeMount, configs []appsv1alpha1.ComponentConfigSpec) bool {
 	volumes := make(map[string]int)
 	for _, c := range configs {
 		for j, vm := range volumeMounts {
@@ -251,15 +253,6 @@ func isRunning(pod *corev1.Pod) bool {
 	return pod.Status.Phase == corev1.PodRunning && pod.DeletionTimestamp == nil
 }
 
-func IsReady(pod *corev1.Pod) bool {
-	if !isRunning(pod) {
-		return false
-	}
-
-	condition := GetPodCondition(&pod.Status, corev1.PodReady)
-	return condition != nil && condition.Status == corev1.ConditionTrue
-}
-
 func IsAvailable(pod *corev1.Pod, minReadySeconds int32) bool {
 	if !isRunning(pod) {
 		return false
@@ -338,9 +331,51 @@ func GetPortByPortName(pod *corev1.Pod, portName string) (int32, error) {
 }
 
 func GetProbeGRPCPort(pod *corev1.Pod) (int32, error) {
-	return GetPortByPortName(pod, ProbeGRPCPortName)
+	return GetPortByPortName(pod, constant.ProbeGRPCPortName)
 }
 
 func GetProbeHTTPPort(pod *corev1.Pod) (int32, error) {
-	return GetPortByPortName(pod, ProbeHTTPPortName)
+	return GetPortByPortName(pod, constant.ProbeHTTPPortName)
+}
+
+// PodIsReadyWithLabel checks whether pod is ready or not if the component is ConsensusSet or ReplicationSet,
+// it will be available when the pod is ready and labeled with its role.
+func PodIsReadyWithLabel(pod corev1.Pod) bool {
+	if _, ok := pod.Labels[constant.RoleLabelKey]; !ok {
+		return false
+	}
+
+	return PodIsReady(&pod)
+}
+
+// PodIsControlledByLatestRevision checks if the pod is controlled by latest controller revision.
+func PodIsControlledByLatestRevision(pod *corev1.Pod, sts *appsv1.StatefulSet) bool {
+	return GetPodRevision(pod) == sts.Status.UpdateRevision && sts.Status.ObservedGeneration == sts.Generation
+}
+
+// GetPodRevision gets the revision of Pod by inspecting the StatefulSetRevisionLabel. If pod has no revision the empty
+// string is returned.
+func GetPodRevision(pod *corev1.Pod) string {
+	if pod.Labels == nil {
+		return ""
+	}
+	return pod.Labels[appsv1.StatefulSetRevisionLabel]
+}
+
+// ByPodName sorts a list of jobs by pod name
+type ByPodName []corev1.Pod
+
+// Len return the length of byPodName, for the sort.Sort
+func (c ByPodName) Len() int {
+	return len(c)
+}
+
+// Swap the items, for the sort.Sort
+func (c ByPodName) Swap(i, j int) {
+	c[i], c[j] = c[j], c[i]
+}
+
+// Less define how to compare items, for the sort.Sort
+func (c ByPodName) Less(i, j int) bool {
+	return c[i].Name < c[j].Name
 }

@@ -1,6 +1,8 @@
-## kbcli kubeblocks uninstall
+---
+title: kbcli kubeblocks uninstall
+---
 
-Uninstall KubeBlocks
+Uninstall KubeBlocks.
 
 ```
 kbcli kubeblocks uninstall [flags]
@@ -16,10 +18,12 @@ kbcli kubeblocks uninstall [flags]
 ### Options
 
 ```
-      --auto-approve   Skip interactive approval before uninstalling KubeBlocks
-  -h, --help           help for uninstall
-      --remove-pvcs    Remove PersistentVolumeClaim or not
-      --remove-pvs     Remove PersistentVolume or not
+      --auto-approve       Skip interactive approval before uninstalling KubeBlocks
+  -h, --help               help for uninstall
+      --remove-namespace   Remove "kb-system" namespace or not
+      --remove-pvcs        Remove PersistentVolumeClaim or not
+      --remove-pvs         Remove PersistentVolume or not
+      --verbose            Show logs in detail.
 ```
 
 ### Options inherited from parent commands
@@ -48,5 +52,7 @@ kbcli kubeblocks uninstall [flags]
 
 ### SEE ALSO
 
-* [kbcli kubeblocks](kbcli_kubeblocks.md)	 - KubeBlocks operation commands
+* [kbcli kubeblocks](kbcli_kubeblocks.md)	 - KubeBlocks operation commands.
+
+#### Go Back to [CLI Overview](cli.md) Homepage.
 

@@ -24,7 +24,6 @@ import (
 	"testing"
 
 	"github.com/StudioSol/set"
-
 	"github.com/bhmj/jsonslice"
 	"github.com/stretchr/testify/require"
 	"sigs.k8s.io/controller-runtime/pkg/client"

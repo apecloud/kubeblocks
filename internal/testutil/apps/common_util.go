@@ -24,14 +24,14 @@ import (
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	"github.com/sethvargo/go-password/password"
-
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	"github.com/apecloud/kubeblocks/internal/constant"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/generics"
 	"github.com/apecloud/kubeblocks/internal/testutil"
 	"github.com/apecloud/kubeblocks/test/testdata"
 )
@@ -305,7 +305,7 @@ func ClearResources[T intctrlutil.Object, PT intctrlutil.PObject[T],
 				})).To(gomega.Succeed())
 			}
 		}
-		g.Expect(len(items)).Should(gomega.Equal(0))
+		g.Expect(items).Should(gomega.BeEmpty())
 	}, testCtx.ClearResourceTimeout, testCtx.ClearResourcePollingInterval).Should(gomega.Succeed())
 }
 
@@ -327,7 +327,7 @@ func ClearClusterResources(testCtx *testutil.TestContext) {
 	// mock behavior of garbage collection inside KCM
 	if !testCtx.UsingExistingCluster() {
 		// only delete internal resources managed by kubeblocks
-		filter := client.MatchingLabels{intctrlutil.AppManagedByLabelKey: intctrlutil.AppName}
+		filter := client.MatchingLabels{constant.AppManagedByLabelKey: constant.AppName}
 
 		ClearResources(testCtx, intctrlutil.StatefulSetSignature, inNS, filter)
 		ClearResources(testCtx, intctrlutil.DeploymentSignature, inNS, filter)

@@ -43,7 +43,10 @@ backup_policy: {
 		"backupPolicyTemplateName": template
 		"target": {
 			"labelsSelector": {
-				"matchLabels": sts.metadata.labels
+				"matchLabels": {
+					"app.kubernetes.io/instance":        sts.metadata.labels["app.kubernetes.io/instance"]
+					"apps.kubeblocks.io/component-name": sts.metadata.labels["apps.kubeblocks.io/component-name"]
+				}
 			}
 			"secret": {
 				"name": "wesql-cluster"

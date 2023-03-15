@@ -103,13 +103,13 @@ func (r *Cluster) ValidateDelete() error {
 // validatePrimaryIndex checks primaryIndex value cannot be larger than replicas.
 func (r *Cluster) validatePrimaryIndex(allErrs *field.ErrorList) {
 	for index, component := range r.Spec.ComponentSpecs {
-		if component.PrimaryIndex == nil {
+		if component.PrimaryIndex == nil || component.Replicas == 0 {
 			continue
 		}
 		if *component.PrimaryIndex > component.Replicas-1 {
 			path := fmt.Sprintf("spec.components[%d].PrimaryIndex", index)
 			*allErrs = append(*allErrs, field.Invalid(field.NewPath(path),
-				nil, "PrimaryIndex cannot be larger than Replicas."))
+				*component.PrimaryIndex, "PrimaryIndex cannot be larger than Replicas."))
 		}
 	}
 }

@@ -27,7 +27,9 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	opsutil "github.com/apecloud/kubeblocks/controllers/apps/operations/util"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
+	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	"github.com/apecloud/kubeblocks/internal/generics"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 )
 
@@ -54,10 +56,10 @@ var _ = Describe("Reconfigure OpsRequest", func() {
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 		// namespaced
-		testapps.ClearResources(&testCtx, intctrlutil.OpsRequestSignature, inNS, ml)
-		testapps.ClearResources(&testCtx, intctrlutil.ConfigMapSignature, inNS, ml)
+		testapps.ClearResources(&testCtx, generics.OpsRequestSignature, inNS, ml)
+		testapps.ClearResources(&testCtx, generics.ConfigMapSignature, inNS, ml)
 		// non-namespaced
-		testapps.ClearResources(&testCtx, intctrlutil.ConfigConstraintSignature, ml)
+		testapps.ClearResources(&testCtx, generics.ConfigConstraintSignature, ml)
 	}
 
 	BeforeEach(cleanEnv)
@@ -82,23 +84,23 @@ var _ = Describe("Reconfigure OpsRequest", func() {
 	}
 
 	assureConfigInstanceObj := func(clusterName, componentName, ns string, cdComponent *appsv1alpha1.ClusterComponentDefinition) *corev1.ConfigMap {
-		if cdComponent.ConfigSpec == nil {
+		if len(cdComponent.ConfigSpecs) == 0 {
 			return nil
 		}
 		var cmObj *corev1.ConfigMap
-		for _, tpl := range cdComponent.ConfigSpec.ConfigTemplateRefs {
+		for _, tpl := range cdComponent.ConfigSpecs {
 			cmInsName := cfgcore.GetComponentCfgName(clusterName, componentName, tpl.VolumeName)
 			cfgCM := testapps.NewCustomizedObj("operations_config/configcm.yaml",
 				&corev1.ConfigMap{},
 				testapps.WithNamespacedName(cmInsName, ns),
 				testapps.WithLabels(
-					intctrlutil.AppNameLabelKey, clusterName,
-					intctrlutil.AppInstanceLabelKey, clusterName,
-					intctrlutil.KBAppComponentLabelKey, componentName,
-					cfgcore.CMConfigurationTplNameLabelKey, tpl.ConfigTplRef,
-					cfgcore.CMConfigurationConstraintsNameLabelKey, tpl.ConfigConstraintRef,
-					cfgcore.CMConfigurationProviderTplLabelKey, tpl.Name,
-					cfgcore.CMConfigurationTypeLabelKey, cfgcore.ConfigInstanceType,
+					constant.AppNameLabelKey, clusterName,
+					constant.AppInstanceLabelKey, clusterName,
+					constant.KBAppComponentLabelKey, componentName,
+					constant.CMConfigurationTplNameLabelKey, tpl.TemplateRef,
+					constant.CMConfigurationConstraintsNameLabelKey, tpl.ConfigConstraintRef,
+					constant.CMConfigurationProviderTplLabelKey, tpl.Name,
+					constant.CMConfigurationTypeLabelKey, constant.ConfigInstanceType,
 				),
 			)
 			Expect(testCtx.CheckedCreateObj(ctx, cfgCM)).Should(Succeed())
@@ -135,17 +137,15 @@ var _ = Describe("Reconfigure OpsRequest", func() {
 					continue
 				}
 				stsComponent = component
-				component.ConfigSpec = &appsv1alpha1.ConfigurationSpec{
-					ConfigTemplateRefs: []appsv1alpha1.ConfigTemplate{
-						{
-							Name:                "mysql-test",
-							ConfigTplRef:        cmObj.Name,
-							ConfigConstraintRef: tplObj.Name,
-							VolumeName:          "mysql-config",
-							Namespace:           testCtx.DefaultNamespace,
-						},
+				component.ConfigSpecs = []appsv1alpha1.ComponentConfigSpec{{
+					ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
+						Name:        "mysql-test",
+						TemplateRef: cmObj.Name,
+						VolumeName:  "mysql-config",
+						Namespace:   testCtx.DefaultNamespace,
 					},
-				}
+					ConfigConstraintRef: tplObj.Name,
+				}}
 			}
 
 			Expect(k8sClient.Patch(ctx, clusterDef, patch)).Should(Succeed())

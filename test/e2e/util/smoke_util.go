@@ -1,3 +1,19 @@
+/*
+Copyright ApeCloud, Inc.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
 package util
 
 import (
@@ -186,10 +202,10 @@ func ExecCommand(strCommand string) string {
 	return string(outBytes)
 }
 
-func WaitTime() {
+func WaitTime(num int) {
 	wg := sync.WaitGroup{}
-	wg.Add(int(400000000))
-	for i := 0; i < int(400000000); i++ {
+	wg.Add(num)
+	for i := 0; i < num; i++ {
 		go func(i int) {
 			defer wg.Done()
 		}(i)
@@ -204,4 +220,79 @@ func GetClusterCreateYaml(files []string) string {
 		}
 	}
 	return ""
+}
+
+func GetClusterVersion(folder string) (result []string) {
+	dbType := GetPrefix(folder, "/")
+	cmd := "kubectl get ClusterVersion | grep " + dbType + " | awk '{print $1}'"
+	log.Println("cmd: " + cmd)
+	result = ExecCommandReadline(cmd)
+	log.Println(result)
+	return result
+}
+
+func GetPrefix(str string, sub string) (s string) {
+	index := strings.LastIndex(str, sub)
+	s = str[index+1:]
+	return
+}
+
+func ReplaceClusterVersionRef(fileName string, clusterVersionRef string) {
+	file, err := os.OpenFile(fileName, os.O_RDWR, 0666)
+	if err != nil {
+		log.Println("open file filed.", err)
+		return
+	}
+	reader := bufio.NewReader(file)
+	pos := int64(0)
+	for {
+		line, err := reader.ReadString('\n')
+		if err != nil {
+			if err == io.EOF {
+				log.Println("File read ok!")
+				break
+			} else {
+				log.Println("Read file error!", err)
+				return
+			}
+		}
+		if strings.Contains(line, "app.kubernetes.io/version") {
+			version := GetPrefix(clusterVersionRef, "-")
+			bytes := []byte("    app.kubernetes.io/version: \"" + version + "\"\n")
+			_, err := file.WriteAt(bytes, pos)
+			if err != nil {
+				log.Println("open file filed.", err)
+			}
+		}
+		if strings.Contains(line, "clusterVersionRef") {
+			bytes := []byte("  clusterVersionRef: " + clusterVersionRef + "\n")
+			_, err := file.WriteAt(bytes, pos)
+			if err != nil {
+				log.Println("open file filed.", err)
+			}
+		}
+		pos += int64(len(line))
+	}
+}
+
+func KubernetesEnv() string {
+	cmd := "kbcli version | grep Kubernetes"
+	kubernetes := ExecCommand(cmd)
+	log.Println(kubernetes)
+	return kubernetes
+}
+
+func CheckAddonsInstall(addonName string) string {
+	cmd := "kbcli addon list | grep " + addonName + " | awk '{print $3}'"
+	addonsStatus := ExecCommand(cmd)
+	return addonsStatus
+}
+
+func OpsAddon(addonOps string, addonName string) string {
+	cmd := "kbcli addon " + addonOps + " " + addonName
+	enableAddon := ExecCommand(cmd)
+	log.Println(enableAddon)
+	WaitTime(500000000)
+	addonsStatus := CheckAddonsInstall(addonName)
+	return addonsStatus
 }

@@ -1,7 +1,7 @@
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: ClusterDefinition
 metadata:
-  name: apecloud-redis
+  name: redis
   labels:
     {{- include "redis.labels" . | nindent 4 }}
 spec:
@@ -15,25 +15,64 @@ spec:
     - name: redis
       workloadType: Replication
       characterType: redis
+      replicationSpec:
+        switchPolicies:
+          - type: MaximumAvailability
+            switchStatements:
+              demote:
+                - replicaof $KB_NEW_PRIMARY_ROLE_NAME 6379
+              promote:
+                - replicaof no one
+              follow:
+                - replicaof $KB_NEW_PRIMARY_ROLE_NAME 6379
+          - type: MaximumDataProtection
+            switchStatements:
+              demote:
+                - replicaof $KB_NEW_PRIMARY_ROLE_NAME 6379
+              promote:
+                - replicaof no one
+              follow:
+                - replicaof $KB_NEW_PRIMARY_ROLE_NAME 6379
+        switchCmdExecutorConfig:
+          image: redis:7.0.5
+          switchSteps:
+          - role: NewPrimary
+            command:
+              - /bin/sh
+              - -c
+            args:
+              - redis-cli -h $(KB_SWITCH_ROLE_ENDPOINT) -p 6379 $(KB_SWITCH_PROMOTE_STATEMENT)
+          - role: Secondaries
+            command:
+              - /bin/sh
+              - -c
+            args:
+              - redis-cli -h $(KB_SWITCH_ROLE_ENDPOINT) -p 6379 $(KB_SWITCH_FOLLOW_STATEMENT)
+          - role: OldPrimary
+            command:
+              - /bin/sh
+              - -c
+            args:
+              - redis-cli -h $(KB_SWITCH_ROLE_ENDPOINT) -p 6379 $(KB_SWITCH_DEMOTE_STATEMENT)
       service:
         ports:
           - protocol: TCP
             port: 6379
-      configSpec:
-        configTemplateRefs:
-          - name: redis-primary-config
-            configTplRef: redis-primary-config-7.0.5
-            namespace: {{ .Release.Namespace }}
-            volumeName: primary
-          - name: redis-secondary-config
-            configTplRef: redis-secondary-config-7.0.5
-            namespace: {{ .Release.Namespace }}
-            volumeName: secondary
-          - name: redis-scripts
-            configTplRef: redis-scripts
-            namespace: {{ .Release.Namespace }}
-            volumeName: scripts
-            defaultMode: 493
+      configSpecs:
+        - name: redis-primary-config
+          templateRef: redis-primary-config-7.0.5
+          namespace: {{ .Release.Namespace }}
+          volumeName: primary
+        - name: redis-secondary-config
+          templateRef: redis-secondary-config-7.0.5
+          namespace: {{ .Release.Namespace }}
+          volumeName: secondary
+      scriptSpecs:
+        - name: redis-scripts
+          templateRef: redis-scripts
+          namespace: {{ .Release.Namespace }}
+          volumeName: scripts
+          defaultMode: 493
       monitor:
         builtIn: false
         exporterConfig:
@@ -44,6 +83,9 @@ spec:
         - name: {{ $name }}
           filePathPattern: {{ $pattern }}
         {{- end }}
+      volumeTypes:
+        - name: data
+          type: data
       podSpec:
         initContainers:
           - name: redis-init-container
@@ -58,8 +100,6 @@ spec:
                 mountPath: /etc/conf/primary
               - name: secondary
                 mountPath: /etc/conf/secondary
-              - name: pod-role
-                mountPath: /etc/conf/role
               - name: scripts
                 mountPath: /scripts
         containers:
@@ -77,8 +117,6 @@ spec:
                 mountPath: /etc/conf/primary
               - name: secondary
                 mountPath: /etc/conf/secondary
-              - name: pod-role
-                mountPath: /etc/conf/role
               - name: scripts
                 mountPath: /scripts
             args: [ "/etc/conf/redis.conf" ]
@@ -108,20 +146,17 @@ spec:
         volumes:
           - name: conf
             emptyDir: { }
-          - name: pod-role
-            downwardAPI:
-              items:
-                - path: "labels"
-                  fieldRef:
-                    fieldPath: metadata.labels['kubeblocks.io/role']
       systemAccounts:
-        cmdExecutorConfig:
+# Seems redis-cli has its own mechanism to parse input tokens and there is no elegent way
+# to pass $(KB_ACCOUNT_STATEMENT) to redis-cli without causing parsing error. 
+# Instead, using a shell script to wrap redis-cli and pass $(KB_ACCOUNT_STATEMENT) to it will do.
+        cmdExecutorConfig: 
           image: docker.io/redis:7.0.5
           command:
-          - /bin/sh
+          - sh
           - -c
           args:
-          - redis-cli -h $(KB_ACCOUNT_ENDPOINT) $(KB_ACCOUNT_STATEMENT)
+          - "redis-cli -h $(KB_ACCOUNT_ENDPOINT) $(KB_ACCOUNT_STATEMENT)"
         passwordConfig:
           length: 10
           numDigits: 5

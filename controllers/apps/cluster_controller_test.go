@@ -26,6 +26,10 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	"github.com/spf13/viper"
+	"golang.org/x/exp/slices"
+
+	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
@@ -35,13 +39,12 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
-
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/replicationset"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	"github.com/apecloud/kubeblocks/internal/constant"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/generics"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 	testk8s "github.com/apecloud/kubeblocks/internal/testutil/k8s"
 )
@@ -59,6 +62,9 @@ var _ = Describe("Cluster Controller", func() {
 
 	const leader = "leader"
 	const follower = "follower"
+
+	const timeout = time.Second * 10
+	const interval = time.Second
 
 	// Cleanups
 
@@ -79,6 +85,7 @@ var _ = Describe("Cluster Controller", func() {
 		testapps.ClearResources(&testCtx, intctrlutil.PodSignature, inNS, ml)
 		// non-namespaced
 		testapps.ClearResources(&testCtx, intctrlutil.BackupPolicyTemplateSignature, ml)
+		testapps.ClearResources(&testCtx, intctrlutil.BackupToolSignature, ml)
 		testapps.ClearResources(&testCtx, intctrlutil.StorageClassSignature, ml)
 	}
 
@@ -114,7 +121,7 @@ var _ = Describe("Cluster Controller", func() {
 		By("Check deployment workload has been created")
 		Eventually(testapps.GetListLen(&testCtx, intctrlutil.DeploymentSignature,
 			client.MatchingLabels{
-				intctrlutil.AppInstanceLabelKey: clusterKey.Name,
+				constant.AppInstanceLabelKey: clusterKey.Name,
 			}, client.InNamespace(clusterKey.Namespace))).ShouldNot(Equal(0))
 
 		stsList := testk8s.ListAndCheckStatefulSet(&testCtx, clusterKey)
@@ -143,19 +150,19 @@ var _ = Describe("Cluster Controller", func() {
 		By("Check associated PDB has been created")
 		Eventually(testapps.GetListLen(&testCtx, intctrlutil.PodDisruptionBudgetSignature,
 			client.MatchingLabels{
-				intctrlutil.AppInstanceLabelKey: clusterKey.Name,
+				constant.AppInstanceLabelKey: clusterKey.Name,
 			}, client.InNamespace(clusterKey.Namespace))).Should(Equal(0))
 
 		podSpec := stsList.Items[0].Spec.Template.Spec
 		By("Checking created sts pods template with built-in toleration")
 		Expect(len(podSpec.Tolerations) == 1).Should(BeTrue())
-		Expect(podSpec.Tolerations[0].Key).To(Equal(intctrlutil.KubeBlocksDataNodeTolerationKey))
+		Expect(podSpec.Tolerations[0].Key).To(Equal(constant.KubeBlocksDataNodeTolerationKey))
 
 		By("Checking created sts pods template with built-in Affinity")
 		Expect(podSpec.Affinity.PodAntiAffinity == nil && podSpec.Affinity.PodAffinity == nil).Should(BeTrue())
 		Expect(podSpec.Affinity.NodeAffinity).ShouldNot(BeNil())
 		Expect(podSpec.Affinity.NodeAffinity.PreferredDuringSchedulingIgnoredDuringExecution[0].Preference.MatchExpressions[0].Key).To(
-			Equal(intctrlutil.KubeBlocksDataNodeLabelKey))
+			Equal(constant.KubeBlocksDataNodeLabelKey))
 
 		By("Checking created sts pods template without TopologySpreadConstraints")
 		Expect(len(podSpec.TopologySpreadConstraints) == 0).Should(BeTrue())
@@ -163,9 +170,76 @@ var _ = Describe("Cluster Controller", func() {
 		By("Check should create env configmap")
 		Eventually(testapps.GetListLen(&testCtx, intctrlutil.ConfigMapSignature,
 			client.MatchingLabels{
-				intctrlutil.AppInstanceLabelKey:   clusterKey.Name,
-				intctrlutil.AppConfigTypeLabelKey: "kubeblocks-env",
+				constant.AppInstanceLabelKey:   clusterKey.Name,
+				constant.AppConfigTypeLabelKey: "kubeblocks-env",
 			}, client.InNamespace(clusterKey.Namespace))).Should(Equal(2))
+	}
+
+	testServiceAddAndDelete := func() {
+		By("Creating a cluster with two LoadBalancer services")
+		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
+			clusterDefObj.Name, clusterVersionObj.Name).
+			AddComponent(mysqlCompName, mysqlCompType).SetReplicas(1).
+			AddService(testapps.ServiceVPCName, corev1.ServiceTypeLoadBalancer).
+			AddService(testapps.ServiceInternetName, corev1.ServiceTypeLoadBalancer).
+			WithRandomName().Create(&testCtx).GetObject()
+		clusterKey = client.ObjectKeyFromObject(clusterObj)
+
+		By("Waiting for the cluster initialized")
+		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
+
+		existSvc := func(total int, svcName string) bool {
+			svcList := &corev1.ServiceList{}
+			Expect(k8sClient.List(testCtx.Ctx, svcList, client.MatchingLabels{
+				constant.AppInstanceLabelKey:    clusterKey.Name,
+				constant.KBAppComponentLabelKey: mysqlCompName,
+			}, client.InNamespace(clusterKey.Namespace))).Should(Succeed())
+			if len(svcList.Items) != total {
+				return false
+			}
+			return slices.IndexFunc(svcList.Items, func(e corev1.Service) bool {
+				return strings.HasSuffix(e.Name, svcName)
+			}) >= 0
+		}
+
+		Expect(existSvc(4, testapps.ServiceVPCName)).Should(BeTrue())
+		Expect(existSvc(4, testapps.ServiceInternetName)).Should(BeTrue())
+
+		By("Delete a LoadBalancer service")
+		Eventually(testapps.GetAndChangeObj(&testCtx, clusterKey, func(cluster *appsv1alpha1.Cluster) {
+			for idx, comp := range cluster.Spec.ComponentSpecs {
+				if comp.ComponentDefRef != mysqlCompType {
+					continue
+				}
+				var services []appsv1alpha1.ClusterComponentService
+				for _, item := range comp.Services {
+					if item.Name == testapps.ServiceVPCName {
+						continue
+					}
+					services = append(services, item)
+				}
+				cluster.Spec.ComponentSpecs[idx].Services = services
+				return
+			}
+
+		})).Should(Succeed())
+		Eventually(func() bool { return existSvc(3, testapps.ServiceVPCName) }).Should(BeFalse())
+
+		By("Add the deleted LoadBalancer service back")
+		Eventually(testapps.GetAndChangeObj(&testCtx, clusterKey, func(cluster *appsv1alpha1.Cluster) {
+			for idx, comp := range cluster.Spec.ComponentSpecs {
+				if comp.ComponentDefRef != mysqlCompType {
+					continue
+				}
+				comp.Services = append(comp.Services, appsv1alpha1.ClusterComponentService{
+					Name:        testapps.ServiceVPCName,
+					ServiceType: corev1.ServiceTypeLoadBalancer,
+				})
+				cluster.Spec.ComponentSpecs[idx] = comp
+				return
+			}
+		}))
+		Eventually(func() bool { return existSvc(4, testapps.ServiceVPCName) }).Should(BeTrue())
 	}
 
 	checkAllServicesCreate := func() {
@@ -183,10 +257,10 @@ var _ = Describe("Cluster Controller", func() {
 		By("Checking proxy should have external ClusterIP service")
 		svcList1 := &corev1.ServiceList{}
 		Expect(k8sClient.List(testCtx.Ctx, svcList1, client.MatchingLabels{
-			intctrlutil.AppInstanceLabelKey:    clusterKey.Name,
-			intctrlutil.KBAppComponentLabelKey: nginxCompName,
+			constant.AppInstanceLabelKey:    clusterKey.Name,
+			constant.KBAppComponentLabelKey: nginxCompName,
 		}, client.InNamespace(clusterKey.Namespace))).Should(Succeed())
-		// TODO fix me later, proxy should not have internal headless service
+		// TODO: fix me later, proxy should not have internal headless service
 		// Expect(len(svcList1.Items) == 1).Should(BeTrue())
 		Expect(len(svcList1.Items) > 0).Should(BeTrue())
 		var existsExternalClusterIP bool
@@ -199,12 +273,12 @@ var _ = Describe("Cluster Controller", func() {
 		}
 		Expect(existsExternalClusterIP).To(BeTrue())
 
-		By("Checking replicasets should have internal headless service")
+		By("Checking mysql should have internal headless service")
 		getHeadlessSvcPorts := func(compDefName string) []corev1.ServicePort {
-			fetched := &appsv1alpha1.Cluster{}
-			Expect(k8sClient.Get(testCtx.Ctx, clusterKey, fetched)).To(Succeed())
+			cluster := &appsv1alpha1.Cluster{}
+			Expect(k8sClient.Get(testCtx.Ctx, clusterKey, cluster)).To(Succeed())
 
-			comp, err := util.GetComponentDefByCluster(testCtx.Ctx, k8sClient, fetched, compDefName)
+			comp, err := util.GetComponentDefByCluster(testCtx.Ctx, k8sClient, *cluster, compDefName)
 			Expect(err).ShouldNot(HaveOccurred())
 
 			var headlessSvcPorts []corev1.ServicePort
@@ -224,13 +298,22 @@ var _ = Describe("Cluster Controller", func() {
 
 		svcList2 := &corev1.ServiceList{}
 		Expect(k8sClient.List(testCtx.Ctx, svcList2, client.MatchingLabels{
-			intctrlutil.AppInstanceLabelKey:    clusterKey.Name,
-			intctrlutil.KBAppComponentLabelKey: mysqlCompName,
+			constant.AppInstanceLabelKey:    clusterKey.Name,
+			constant.KBAppComponentLabelKey: mysqlCompName,
 		}, client.InNamespace(clusterKey.Namespace))).Should(Succeed())
-		Expect(len(svcList2.Items)).Should(BeEquivalentTo(1))
-		Expect(svcList2.Items[0].Spec.Type == corev1.ServiceTypeClusterIP).To(BeTrue())
-		Expect(svcList2.Items[0].Spec.ClusterIP == corev1.ClusterIPNone).To(BeTrue())
-		Expect(reflect.DeepEqual(svcList2.Items[0].Spec.Ports,
+		Expect(len(svcList2.Items)).Should(BeEquivalentTo(2))
+
+		idx := slices.IndexFunc(svcList2.Items, func(e corev1.Service) bool {
+			if e.Spec.Type != corev1.ServiceTypeClusterIP {
+				return false
+			}
+			if e.Spec.ClusterIP != corev1.ClusterIPNone {
+				return false
+			}
+			return true
+		})
+		Expect(idx).Should(BeNumerically(">=", 0))
+		Expect(reflect.DeepEqual(svcList2.Items[idx].Spec.Ports,
 			getHeadlessSvcPorts(mysqlCompType))).Should(BeTrue())
 	}
 
@@ -345,6 +428,34 @@ var _ = Describe("Cluster Controller", func() {
 			compName, "data").SetStorage("1Gi").CheckedCreate(&testCtx)
 	}
 
+	mockPodsForConsensusTest := func(cluster *appsv1alpha1.Cluster, number int) []corev1.Pod {
+		componentName := cluster.Spec.ComponentSpecs[0].Name
+		clusterName := cluster.Name
+		stsName := cluster.Name + "-" + componentName
+		pods := make([]corev1.Pod, 0)
+		for i := 0; i < number; i++ {
+			pod := &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      stsName + "-" + strconv.Itoa(i),
+					Namespace: testCtx.DefaultNamespace,
+					Labels: map[string]string{
+						constant.AppInstanceLabelKey:          clusterName,
+						constant.KBAppComponentLabelKey:       componentName,
+						appsv1.ControllerRevisionHashLabelKey: "mock-version",
+					},
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{{
+						Name:  "mock-container",
+						Image: "mock-container",
+					}},
+				},
+			}
+			pods = append(pods, *pod)
+		}
+		return pods
+	}
+
 	horizontalScaleComp := func(updatedReplicas int, comp *appsv1alpha1.ClusterComponentSpec) {
 		By("Mocking components' PVCs to bound")
 		for i := 0; i < int(comp.Replicas); i++ {
@@ -363,14 +474,26 @@ var _ = Describe("Cluster Controller", func() {
 		stsList := testk8s.ListAndCheckStatefulSetWithComponent(&testCtx, clusterKey, comp.Name)
 		Expect(int(*stsList.Items[0].Spec.Replicas)).To(BeEquivalentTo(comp.Replicas))
 
+		By("Creating mock pods in StatefulSet")
+		pods := mockPodsForConsensusTest(clusterObj, int(comp.Replicas))
+		for _, pod := range pods {
+			Expect(testCtx.CheckedCreateObj(testCtx.Ctx, &pod)).Should(Succeed())
+			// mock the status to pass the isReady(pod) check in consensus_set
+			pod.Status.Conditions = []corev1.PodCondition{{
+				Type:   corev1.PodReady,
+				Status: corev1.ConditionTrue,
+			}}
+			Expect(k8sClient.Status().Update(ctx, &pod)).Should(Succeed())
+		}
+
 		By(fmt.Sprintf("Changing replicas to %d", updatedReplicas))
 		changeCompReplicas(clusterKey, int32(updatedReplicas), comp)
 
 		By("Checking Backup created")
 		Eventually(testapps.GetListLen(&testCtx, intctrlutil.BackupSignature,
 			client.MatchingLabels{
-				intctrlutil.AppInstanceLabelKey:    clusterKey.Name,
-				intctrlutil.KBAppComponentLabelKey: comp.Name,
+				constant.AppInstanceLabelKey:    clusterKey.Name,
+				constant.KBAppComponentLabelKey: comp.Name,
 			}, client.InNamespace(clusterKey.Namespace))).Should(Equal(1))
 
 		By("Mocking VolumeSnapshot and set it as ReadyToUse")
@@ -383,9 +506,9 @@ var _ = Describe("Cluster Controller", func() {
 				Name:      snapshotKey.Name,
 				Namespace: snapshotKey.Namespace,
 				Labels: map[string]string{
-					intctrlutil.AppManagedByLabelKey:   intctrlutil.AppName,
-					intctrlutil.AppInstanceLabelKey:    clusterKey.Name,
-					intctrlutil.KBAppComponentLabelKey: comp.Name,
+					constant.AppManagedByLabelKey:   constant.AppName,
+					constant.AppInstanceLabelKey:    clusterKey.Name,
+					constant.KBAppComponentLabelKey: comp.Name,
 				}},
 			Spec: snapshotv1.VolumeSnapshotSpec{
 				Source: snapshotv1.VolumeSnapshotSource{
@@ -414,8 +537,8 @@ var _ = Describe("Cluster Controller", func() {
 		By("Check backup job cleanup")
 		Eventually(testapps.GetListLen(&testCtx, intctrlutil.BackupSignature,
 			client.MatchingLabels{
-				intctrlutil.AppInstanceLabelKey:    clusterKey.Name,
-				intctrlutil.KBAppComponentLabelKey: comp.Name,
+				constant.AppInstanceLabelKey:    clusterKey.Name,
+				constant.KBAppComponentLabelKey: comp.Name,
 			}, client.InNamespace(clusterKey.Namespace))).Should(Equal(0))
 		Eventually(testapps.CheckObjExists(&testCtx, snapshotKey, &snapshotv1.VolumeSnapshot{}, false)).Should(Succeed())
 
@@ -425,6 +548,8 @@ var _ = Describe("Cluster Controller", func() {
 	}
 
 	horizontalScale := func(updatedReplicas int) {
+
+		viper.Set("VOLUMESNAPSHOT", true)
 
 		cluster := &appsv1alpha1.Cluster{}
 		Expect(testCtx.Cli.Get(testCtx.Ctx, clusterKey, cluster)).Should(Succeed())
@@ -542,7 +667,7 @@ var _ = Describe("Cluster Controller", func() {
 					Name:      getPVCName(mysqlCompName, i),
 					Namespace: clusterKey.Namespace,
 					Labels: map[string]string{
-						intctrlutil.AppInstanceLabelKey: clusterKey.Name,
+						constant.AppInstanceLabelKey: clusterKey.Name,
 					}},
 				Spec: pvcSpec,
 			}
@@ -712,34 +837,6 @@ var _ = Describe("Cluster Controller", func() {
 			toleration.Effect == corev1.TaintEffectNoSchedule).Should(BeTrue())
 	}
 
-	mockPodsForConsensusTest := func(cluster *appsv1alpha1.Cluster, number int) []corev1.Pod {
-		componentName := cluster.Spec.ComponentSpecs[0].Name
-		clusterName := cluster.Name
-		stsName := cluster.Name + "-" + componentName
-		pods := make([]corev1.Pod, 0)
-		for i := 0; i < number; i++ {
-			pod := &corev1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      stsName + "-" + strconv.Itoa(i),
-					Namespace: testCtx.DefaultNamespace,
-					Labels: map[string]string{
-						intctrlutil.AppInstanceLabelKey:       clusterName,
-						intctrlutil.KBAppComponentLabelKey:    componentName,
-						appsv1.ControllerRevisionHashLabelKey: "mock-version",
-					},
-				},
-				Spec: corev1.PodSpec{
-					Containers: []corev1.Container{{
-						Name:  "mock-container",
-						Image: "mock-container",
-					}},
-				},
-			}
-			pods = append(pods, *pod)
-		}
-		return pods
-	}
-
 	mockRoleChangedEvent := func(key types.NamespacedName, sts *appsv1.StatefulSet) []corev1.Event {
 		pods, err := util.GetPodListByStatefulSet(ctx, k8sClient, sts)
 		Expect(err).To(Succeed())
@@ -830,7 +927,7 @@ var _ = Describe("Cluster Controller", func() {
 			// 2 followers
 			leaderCount, followerCount := 0, 0
 			for _, pod := range pods {
-				switch pod.Labels[intctrlutil.RoleLabelKey] {
+				switch pod.Labels[constant.RoleLabelKey] {
 				case leader:
 					leaderCount++
 				case follower:
@@ -839,7 +936,7 @@ var _ = Describe("Cluster Controller", func() {
 			}
 			g.Expect(leaderCount).Should(Equal(1))
 			g.Expect(followerCount).Should(Equal(2))
-		}).Should(Succeed())
+		}, timeout, interval).Should(Succeed())
 
 		By("Updating StatefulSet's status")
 		sts.Status.UpdateRevision = "mock-version"
@@ -850,20 +947,22 @@ var _ = Describe("Cluster Controller", func() {
 		sts.Status.ObservedGeneration = sts.Generation
 		Expect(k8sClient.Status().Update(ctx, sts)).Should(Succeed())
 
-		By("Checking pods' role are updated in cluster status")
+		By("Checking consensus set pods' role are updated in cluster status")
 		Eventually(func(g Gomega) {
 			fetched := &appsv1alpha1.Cluster{}
 			g.Expect(k8sClient.Get(ctx, clusterKey, fetched)).To(Succeed())
 			compName := fetched.Spec.ComponentSpecs[0].Name
 			g.Expect(fetched.Status.Components != nil).To(BeTrue())
 			g.Expect(fetched.Status.Components).To(HaveKey(compName))
-			consensusStatus := fetched.Status.Components[compName].ConsensusSetStatus
+			compStatus, ok := fetched.Status.Components[compName]
+			g.Expect(ok).Should(BeTrue())
+			consensusStatus := compStatus.ConsensusSetStatus
 			g.Expect(consensusStatus != nil).To(BeTrue())
 			g.Expect(consensusStatus.Leader.Pod).To(BeElementOf(getStsPodsName(sts)))
 			g.Expect(len(consensusStatus.Followers) == 2).To(BeTrue())
 			g.Expect(consensusStatus.Followers[0].Pod).To(BeElementOf(getStsPodsName(sts)))
 			g.Expect(consensusStatus.Followers[1].Pod).To(BeElementOf(getStsPodsName(sts)))
-		}).Should(Succeed())
+		}, timeout, interval).Should(Succeed())
 
 		By("Waiting the cluster be running")
 		Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.RunningPhase))
@@ -876,12 +975,13 @@ var _ = Describe("Cluster Controller", func() {
 		for _, sts := range stsList {
 			pod := &corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      sts.Name + "-0",
-					Namespace: testCtx.DefaultNamespace,
+					Name:        sts.Name + "-0",
+					Namespace:   testCtx.DefaultNamespace,
+					Annotations: map[string]string{},
 					Labels: map[string]string{
-						intctrlutil.RoleLabelKey:              sts.Labels[intctrlutil.RoleLabelKey],
-						intctrlutil.AppInstanceLabelKey:       clusterName,
-						intctrlutil.KBAppComponentLabelKey:    componentName,
+						constant.RoleLabelKey:                 sts.Labels[constant.RoleLabelKey],
+						constant.AppInstanceLabelKey:          clusterName,
+						constant.KBAppComponentLabelKey:       componentName,
 						appsv1.ControllerRevisionHashLabelKey: sts.Status.UpdateRevision,
 					},
 				},
@@ -891,6 +991,12 @@ var _ = Describe("Cluster Controller", func() {
 						Image: "mock-container",
 					}},
 				},
+			}
+			for k, v := range sts.Spec.Template.Labels {
+				pod.ObjectMeta.Labels[k] = v
+			}
+			for k, v := range sts.Spec.Template.Annotations {
+				pod.ObjectMeta.Annotations[k] = v
 			}
 			pods = append(pods, *pod)
 		}
@@ -908,77 +1014,7 @@ var _ = Describe("Cluster Controller", func() {
 		return names
 	}
 
-	testReplicationCreation := func() {
-		By("Mock a cluster obj with replication componentDefRef.")
-		pvcSpec := testapps.NewPVC("1Gi")
-		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
-			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
-			AddComponent(testapps.DefaultRedisCompName, testapps.DefaultRedisCompType).
-			SetPrimaryIndex(testapps.DefaultReplicationPrimaryIndex).
-			SetReplicas(testapps.DefaultReplicationReplicas).
-			AddVolumeClaimTemplate(testapps.DataVolumeName, &pvcSpec).
-			Create(&testCtx).GetObject()
-		clusterKey = client.ObjectKeyFromObject(clusterObj)
-
-		By("Waiting for cluster creation")
-		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(0))
-
-		By("Checking statefulSet number")
-		stsList := testk8s.ListAndCheckStatefulSet(&testCtx, clusterKey)
-		Expect(len(stsList.Items)).Should(BeEquivalentTo(2))
-
-		By("Checking statefulSet role label")
-		for _, sts := range stsList.Items {
-			if strings.HasSuffix(sts.Name, strconv.Itoa(testapps.DefaultReplicationPrimaryIndex)) {
-				Expect(sts.Labels[intctrlutil.RoleLabelKey]).Should(BeEquivalentTo(replicationset.Primary))
-			} else {
-				Expect(sts.Labels[intctrlutil.RoleLabelKey]).Should(BeEquivalentTo(replicationset.Secondary))
-			}
-		}
-
-		By("Updating StatefulSet's status")
-		status := appsv1.StatefulSetStatus{
-			AvailableReplicas:  1,
-			ObservedGeneration: 1,
-			Replicas:           1,
-			ReadyReplicas:      1,
-			UpdatedReplicas:    1,
-			CurrentRevision:    "mock-revision",
-			UpdateRevision:     "mock-revision",
-		}
-		for _, sts := range stsList.Items {
-			status.ObservedGeneration = sts.Generation
-			testk8s.PatchStatefulSetStatus(&testCtx, sts.Name, status)
-		}
-
-		By("Creating mock pods in StatefulSet")
-		stsList = testk8s.ListAndCheckStatefulSet(&testCtx, clusterKey)
-		pods := mockPodsForReplicationTest(clusterObj, stsList.Items)
-		for _, pod := range pods {
-			Expect(testCtx.CreateObj(testCtx.Ctx, &pod)).Should(Succeed())
-			pod.Status.Conditions = []corev1.PodCondition{{
-				Type:   corev1.PodReady,
-				Status: corev1.ConditionTrue,
-			}}
-			Expect(k8sClient.Status().Update(ctx, &pod)).Should(Succeed())
-		}
-
-		By("Checking pods' role are updated in cluster status")
-		Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, fetched *appsv1alpha1.Cluster) {
-			compName := fetched.Spec.ComponentSpecs[0].Name
-			g.Expect(fetched.Status.Components).NotTo(BeNil())
-			g.Expect(fetched.Status.Components).To(HaveKey(compName))
-			replicationStatus := fetched.Status.Components[compName].ReplicationSetStatus
-			g.Expect(replicationStatus).NotTo(BeNil())
-			g.Expect(replicationStatus.Primary.Pod).To(BeElementOf(getReplicationSetStsPodsName(stsList.Items)))
-			g.Expect(len(replicationStatus.Secondaries)).To(BeEquivalentTo(1))
-			g.Expect(replicationStatus.Secondaries[0].Pod).To(BeElementOf(getReplicationSetStsPodsName(stsList.Items)))
-		})).Should(Succeed())
-
-	}
-
 	testBackupError := func() {
-
 		initialReplicas := int32(1)
 		updatedReplicas := int32(3)
 
@@ -1003,9 +1039,9 @@ var _ = Describe("Cluster Controller", func() {
 				Name:      backupKey.Name,
 				Namespace: backupKey.Namespace,
 				Labels: map[string]string{
-					intctrlutil.AppInstanceLabelKey:    clusterKey.Name,
-					intctrlutil.KBAppComponentLabelKey: mysqlCompName,
-					intctrlutil.AppManagedByLabelKey:   intctrlutil.AppName,
+					constant.AppInstanceLabelKey:    clusterKey.Name,
+					constant.KBAppComponentLabelKey: mysqlCompName,
+					constant.AppManagedByLabelKey:   constant.AppName,
 				},
 			},
 			Spec: dataprotectionv1alpha1.BackupSpec{
@@ -1015,11 +1051,7 @@ var _ = Describe("Cluster Controller", func() {
 		}
 		Expect(testCtx.Cli.Create(ctx, &backup)).Should(Succeed())
 
-		By("Mocking backup to failed status")
-		backup.Status.Phase = dataprotectionv1alpha1.BackupFailed
-		Expect(testCtx.Cli.Status().Update(ctx, &backup)).Should(Succeed())
-
-		By("Checking backup status to failed")
+		By("Checking backup status to failed, because VolumeSnapshot disabled")
 		Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, backup *dataprotectionv1alpha1.Backup) {
 			g.Expect(backup.Status.Phase).Should(Equal(dataprotectionv1alpha1.BackupFailed))
 		})).Should(Succeed())
@@ -1111,12 +1143,16 @@ var _ = Describe("Cluster Controller", func() {
 			checkAllServicesCreate()
 		})
 
+		It("should add and delete service correctly", func() {
+			testServiceAddAndDelete()
+		})
+
 		It("should successfully h-scale with multiple components", func() {
 			testMultiCompHScale()
 		})
 	})
 
-	Context("when creating cluster with MySQL as stateful component", func() {
+	Context("when creating cluster with workloadType=stateful component", func() {
 		BeforeEach(func() {
 			By("Create a clusterDefinition obj")
 			clusterDefObj = testapps.NewClusterDefFactory(clusterDefName).
@@ -1178,7 +1214,7 @@ var _ = Describe("Cluster Controller", func() {
 		})
 	})
 
-	Context("when creating cluster with MySQL as consensus component", func() {
+	Context("when creating cluster with workloadType=consensus component", func() {
 		BeforeEach(func() {
 			By("Create a clusterDef obj")
 			clusterDefObj = testapps.NewClusterDefFactory(clusterDefName).
@@ -1221,9 +1257,64 @@ var _ = Describe("Cluster Controller", func() {
 		It("should report error if backup error during h-scale", func() {
 			testBackupError()
 		})
+
+		It("test restore cluster from backup", func() {
+			By("mock backup")
+			backupPolicyName := "test-backup-policy"
+			backupName := "test-backup"
+			backupTool := testapps.CreateCustomizedObj(&testCtx, "backup/backuptool.yaml",
+				&dataprotectionv1alpha1.BackupTool{}, testapps.RandomizedObjName())
+			backup := testapps.NewBackupFactory(testCtx.DefaultNamespace, backupName).
+				SetBackupPolicyName(backupPolicyName).
+				SetBackupType(dataprotectionv1alpha1.BackupTypeFull).
+				Create(&testCtx).GetObject()
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(backup),
+				func(g Gomega, tmpBackup *dataprotectionv1alpha1.Backup) {
+					g.Expect(tmpBackup.Status.Phase).Should(Equal(dataprotectionv1alpha1.BackupFailed))
+				})).Should(Succeed())
+			Expect(testapps.ChangeObjStatus(&testCtx, backup, func() {
+				backup.Status.BackupToolName = backupTool.Name
+				backup.Status.RemoteVolume = &corev1.Volume{
+					Name: "backup-pvc",
+				}
+				backup.Status.Phase = dataprotectionv1alpha1.BackupCompleted
+			})).Should(Succeed())
+			By("checking backup status completed")
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(backup), func(g Gomega, tmpBackup *dataprotectionv1alpha1.Backup) {
+				g.Expect(tmpBackup.Status.Phase).Should(Equal(dataprotectionv1alpha1.BackupCompleted))
+			})).Should(Succeed())
+			By("creating cluster with backup")
+			restoreFromBackup := fmt.Sprintf(`{"%s":"%s"}`, mysqlCompName, backupName)
+			clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
+				clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
+				AddComponent(mysqlCompName, mysqlCompType).
+				SetReplicas(3).
+				AddAnnotations(constant.RestoreFromBackUpAnnotationKey, restoreFromBackup).Create(&testCtx).GetObject()
+			stsList := testk8s.ListAndCheckStatefulSet(&testCtx, client.ObjectKeyFromObject(clusterObj))
+			sts := stsList.Items[0]
+			Expect(len(sts.Spec.Template.Spec.InitContainers) == 1).Should(BeTrue())
+
+			By("remove init container after all components are Running")
+			Expect(testapps.ChangeObjStatus(&testCtx, clusterObj, func() {
+				clusterObj.Status.Components = map[string]appsv1alpha1.ClusterComponentStatus{
+					mysqlCompName: {Phase: appsv1alpha1.RunningPhase},
+				}
+			})).Should(Succeed())
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(&sts), func(g Gomega, tmpSts *appsv1.StatefulSet) {
+				g.Expect(len(tmpSts.Spec.Template.Spec.InitContainers)).Should(Equal(0))
+			})).Should(Succeed())
+
+			By("clean up annotations after cluster running")
+			Expect(testapps.ChangeObjStatus(&testCtx, clusterObj, func() {
+				clusterObj.Status.Phase = appsv1alpha1.RunningPhase
+			})).Should(Succeed())
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(clusterObj), func(g Gomega, tmpCluster *appsv1alpha1.Cluster) {
+				g.Expect(tmpCluster.Annotations[constant.RestoreFromBackUpAnnotationKey]).Should(Equal(""))
+			})).Should(Succeed())
+		})
 	})
 
-	Context("when creating cluster with Redis as replication component", func() {
+	Context("when creating cluster with workloadType=replication component", func() {
 		BeforeEach(func() {
 			By("Create a clusterDefinition obj with replication componentDefRef.")
 			clusterDefObj = testapps.NewClusterDefFactory(clusterDefName).
@@ -1238,7 +1329,136 @@ var _ = Describe("Cluster Controller", func() {
 		})
 
 		It("Should success with primary sts and secondary sts", func() {
-			testReplicationCreation()
+			By("Mock a cluster obj with replication componentDefRef.")
+			pvcSpec := testapps.NewPVC("1Gi")
+			clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
+				clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
+				AddComponent(testapps.DefaultRedisCompName, testapps.DefaultRedisCompType).
+				SetPrimaryIndex(testapps.DefaultReplicationPrimaryIndex).
+				SetReplicas(testapps.DefaultReplicationReplicas).
+				AddVolumeClaimTemplate(testapps.DataVolumeName, &pvcSpec).
+				Create(&testCtx).GetObject()
+			clusterKey = client.ObjectKeyFromObject(clusterObj)
+
+			By("Waiting for cluster creation")
+			Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(0))
+
+			By("Checking statefulSet number")
+			stsList := testk8s.ListAndCheckStatefulSet(&testCtx, clusterKey)
+			Expect(len(stsList.Items)).Should(BeEquivalentTo(2))
+
+			By("Checking statefulSet role label")
+			for _, sts := range stsList.Items {
+				if strings.HasSuffix(sts.Name, fmt.Sprintf("%s-%s", clusterObj.Name, testapps.DefaultRedisCompName)) {
+					Expect(sts.Labels[constant.RoleLabelKey]).Should(BeEquivalentTo(replicationset.Primary))
+				} else {
+					Expect(sts.Labels[constant.RoleLabelKey]).Should(BeEquivalentTo(replicationset.Secondary))
+				}
+			}
+
+			By("Checking statefulSet template volumes mount")
+			for _, sts := range stsList.Items {
+				Expect(sts.Spec.VolumeClaimTemplates).Should(BeEmpty())
+				for _, volume := range sts.Spec.Template.Spec.Volumes {
+					if volume.Name == testapps.DataVolumeName {
+						Expect(strings.HasPrefix(volume.VolumeSource.PersistentVolumeClaim.ClaimName, testapps.DataVolumeName+"-"+clusterKey.Name)).Should(BeTrue())
+					}
+				}
+			}
+
+			By("Updating StatefulSet's status")
+			status := appsv1.StatefulSetStatus{
+				AvailableReplicas:  1,
+				ObservedGeneration: 1,
+				Replicas:           1,
+				ReadyReplicas:      1,
+				UpdatedReplicas:    1,
+				CurrentRevision:    "mock-revision",
+				UpdateRevision:     "mock-revision",
+			}
+			for _, sts := range stsList.Items {
+				status.ObservedGeneration = sts.Generation
+				testk8s.PatchStatefulSetStatus(&testCtx, sts.Name, status)
+			}
+
+			By("Creating mock pods in StatefulSet")
+			stsList = testk8s.ListAndCheckStatefulSet(&testCtx, clusterKey)
+			pods := mockPodsForReplicationTest(clusterObj, stsList.Items)
+			for _, pod := range pods {
+				Expect(testCtx.CreateObj(testCtx.Ctx, &pod)).Should(Succeed())
+				pod.Status.Conditions = []corev1.PodCondition{{
+					Type:   corev1.PodReady,
+					Status: corev1.ConditionTrue,
+				}}
+				Expect(k8sClient.Status().Update(ctx, &pod)).Should(Succeed())
+			}
+
+			By("Checking replication set pods' role are updated in cluster status")
+			Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, fetched *appsv1alpha1.Cluster) {
+				compName := fetched.Spec.ComponentSpecs[0].Name
+				g.Expect(fetched.Status.Components).NotTo(BeNil())
+				g.Expect(fetched.Status.Components).To(HaveKey(compName))
+				compStatus, ok := fetched.Status.Components[compName]
+				g.Expect(ok).Should(BeTrue())
+				replicationStatus := compStatus.ReplicationSetStatus
+				g.Expect(replicationStatus).NotTo(BeNil())
+				g.Expect(replicationStatus.Primary.Pod).To(BeElementOf(getReplicationSetStsPodsName(stsList.Items)))
+				g.Expect(len(replicationStatus.Secondaries)).To(BeEquivalentTo(1))
+				g.Expect(replicationStatus.Secondaries[0].Pod).To(BeElementOf(getReplicationSetStsPodsName(stsList.Items)))
+			})).Should(Succeed())
+		})
+
+		It("Should successfully doing volume expansion", func() {
+			pvcSpec := testapps.NewPVC("1Gi")
+			updatedPVCSpec := testapps.NewPVC("2Gi")
+
+			By("Mock a cluster obj with replication componentDefRef.")
+			clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
+				clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
+				AddComponent(testapps.DefaultRedisCompName, testapps.DefaultRedisCompType).
+				SetPrimaryIndex(testapps.DefaultReplicationPrimaryIndex).
+				SetReplicas(testapps.DefaultReplicationReplicas).
+				AddVolumeClaimTemplate(testapps.DataVolumeName, &pvcSpec).
+				Create(&testCtx).GetObject()
+			clusterKey = client.ObjectKeyFromObject(clusterObj)
+
+			By("Waiting for cluster creation")
+			Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(0))
+
+			By("Updating PVC volume size")
+			patch := client.MergeFrom(clusterObj.DeepCopy())
+			componentSpec := clusterObj.GetComponentByName(testapps.DefaultRedisCompName)
+			componentSpec.VolumeClaimTemplates[0].Spec = &updatedPVCSpec
+			Expect(testCtx.Cli.Patch(ctx, clusterObj, patch)).Should(Succeed())
+
+			By("Creating mock pods in StatefulSet")
+			stsList := testk8s.ListAndCheckStatefulSet(&testCtx, clusterKey)
+			pods := mockPodsForReplicationTest(clusterObj, stsList.Items)
+			for _, pod := range pods {
+				Expect(testCtx.CreateObj(testCtx.Ctx, &pod)).Should(Succeed())
+				pod.Status.Conditions = []corev1.PodCondition{{
+					Type:   corev1.PodReady,
+					Status: corev1.ConditionTrue,
+				}}
+				Expect(k8sClient.Status().Update(ctx, &pod)).Should(Succeed())
+			}
+
+			// REVIEW: why is Cluster.status.observerdGeneration bump to 2 from 0, our code handling cluster.spec get updated?
+			By("Waiting cluster update reconcile succeed")
+			Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(2))
+
+			By("Checking pvc volume size")
+			pvcList := &corev1.PersistentVolumeClaimList{}
+			Eventually(func(g Gomega) {
+				g.Expect(testCtx.Cli.List(testCtx.Ctx, pvcList, client.MatchingLabels{
+					constant.AppInstanceLabelKey:    clusterKey.Name,
+					constant.KBAppComponentLabelKey: testapps.DefaultRedisCompName,
+				}, client.InNamespace(clusterKey.Namespace))).Should(Succeed())
+				g.Expect(len(pvcList.Items) == testapps.DefaultReplicationReplicas).To(BeTrue())
+				for _, pvc := range pvcList.Items {
+					g.Expect(pvc.Spec.Resources.Requests[corev1.ResourceStorage]).Should(BeEquivalentTo(updatedPVCSpec.Resources.Requests[corev1.ResourceStorage]))
+				}
+			}).Should(Succeed())
 		})
 	})
 })

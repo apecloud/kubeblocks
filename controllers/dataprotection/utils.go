@@ -17,30 +17,8 @@ limitations under the License.
 package dataprotection
 
 import (
-	"context"
-
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 )
-
-func checkResourceExists(
-	ctx context.Context,
-	client client.Client,
-	key client.ObjectKey,
-	obj client.Object) (bool, error) {
-
-	if err := client.Get(ctx, key, obj); err != nil {
-		if apierrors.IsNotFound(err) {
-			return false, nil
-		}
-		// if err is NOT "not found", that means unknown error.
-		return false, err
-	}
-	// if found, return true
-	return true, nil
-}
 
 // byBackupStartTime sorts a list of jobs by start timestamp, using their names as a tie breaker.
 type byBackupStartTime []dataprotectionv1alpha1.Backup

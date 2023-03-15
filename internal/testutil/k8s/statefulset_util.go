@@ -30,7 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/testutil"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 )
@@ -155,7 +155,7 @@ func ListAndCheckStatefulSet(testCtx *testutil.TestContext, key types.Namespaced
 	stsList := &apps.StatefulSetList{}
 	gomega.Eventually(func(g gomega.Gomega) {
 		g.Expect(testCtx.Cli.List(testCtx.Ctx, stsList, client.MatchingLabels{
-			intctrlutil.AppInstanceLabelKey: key.Name,
+			constant.AppInstanceLabelKey: key.Name,
 		}, client.InNamespace(key.Namespace))).Should(gomega.Succeed())
 		g.Expect(len(stsList.Items) > 0).To(gomega.BeTrue())
 	}).Should(gomega.Succeed())
@@ -166,8 +166,8 @@ func ListAndCheckStatefulSetWithComponent(testCtx *testutil.TestContext, key typ
 	stsList := &apps.StatefulSetList{}
 	gomega.Eventually(func(g gomega.Gomega) {
 		g.Expect(testCtx.Cli.List(testCtx.Ctx, stsList, client.MatchingLabels{
-			intctrlutil.AppInstanceLabelKey:    key.Name,
-			intctrlutil.KBAppComponentLabelKey: componentName,
+			constant.AppInstanceLabelKey:    key.Name,
+			constant.KBAppComponentLabelKey: componentName,
 		}, client.InNamespace(key.Namespace))).Should(gomega.Succeed())
 		g.Expect(len(stsList.Items) > 0).To(gomega.BeTrue())
 	}).Should(gomega.Succeed())
@@ -181,5 +181,13 @@ func PatchStatefulSetStatus(testCtx *testutil.TestContext, stsName string, statu
 	})()).Should(gomega.Succeed())
 	gomega.Eventually(testapps.CheckObj(testCtx, objectKey, func(g gomega.Gomega, newSts *apps.StatefulSet) {
 		g.Expect(reflect.DeepEqual(newSts.Status, status)).Should(gomega.BeTrue())
+	})).Should(gomega.Succeed())
+}
+
+func InitStatefulSetStatus(testCtx testutil.TestContext, statefulset *apps.StatefulSet, controllerRevision string) {
+	gomega.Expect(testapps.ChangeObjStatus(&testCtx, statefulset, func() {
+		statefulset.Status.UpdateRevision = controllerRevision
+		statefulset.Status.CurrentRevision = controllerRevision
+		statefulset.Status.ObservedGeneration = statefulset.Generation
 	})).Should(gomega.Succeed())
 }

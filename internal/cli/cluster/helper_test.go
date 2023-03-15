@@ -21,13 +21,12 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
 var _ = Describe("helper", func() {
@@ -46,7 +45,7 @@ var _ = Describe("helper", func() {
 					Namespace:       "test",
 					ResourceVersion: "10",
 					Labels: map[string]string{
-						intctrlutil.AppNameLabelKey: name,
+						constant.AppNameLabelKey: name,
 					},
 				},
 			}
@@ -136,7 +135,7 @@ var _ = Describe("helper", func() {
 		genVersion := func(name string, t time.Time) appsv1alpha1.ClusterVersion {
 			v := appsv1alpha1.ClusterVersion{}
 			v.Name = name
-			v.SetLabels(map[string]string{intctrlutil.ClusterDefLabelKey: clusterDefName})
+			v.SetLabels(map[string]string{constant.ClusterDefLabelKey: clusterDefName})
 			v.SetCreationTimestamp(metav1.NewTime(t))
 			return v
 		}

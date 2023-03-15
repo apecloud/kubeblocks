@@ -26,10 +26,13 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
-	"helm.sh/helm/v3/pkg/action"
+	"github.com/spf13/pflag"
+	"github.com/spf13/viper"
 	"helm.sh/helm/v3/pkg/cli/values"
 	"helm.sh/helm/v3/pkg/repo"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
@@ -37,6 +40,7 @@ import (
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
 
+	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/cluster"
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
@@ -61,7 +65,9 @@ var (
 type Options struct {
 	genericclioptions.IOStreams
 
-	HelmCfg   *action.Configuration
+	HelmCfg *helm.Config
+
+	// Namespace is the current namespace that the command is running
 	Namespace string
 	Client    kubernetes.Interface
 	Dynamic   dynamic.Interface
@@ -100,7 +106,7 @@ func newInstallCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 
 	cmd := &cobra.Command{
 		Use:     "install",
-		Short:   "Install KubeBlocks",
+		Short:   "Install KubeBlocks.",
 		Args:    cobra.NoArgs,
 		Example: installExample,
 		Run: func(cmd *cobra.Command, args []string) {
@@ -136,17 +142,16 @@ func (o *Options) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 		return err
 	}
 
-	var logFunc action.DebugLog
-	if o.verbose {
-		logFunc = helm.GetVerboseLog(o.IOStreams)
-	} else {
-		logFunc = helm.GetQuiteLog()
-	}
+	// check whether --namespace is specified, if not, KubeBlocks will be installed
+	// to a default namespace
+	var targetNamespace string
+	cmd.Flags().Visit(func(flag *pflag.Flag) {
+		if flag.Name == "namespace" {
+			targetNamespace = o.Namespace
+		}
+	})
 
-	if o.HelmCfg, err = helm.NewActionConfigWithLog(o.Namespace, config, logFunc, helm.WithContext(ctx)); err != nil {
-		return err
-	}
-
+	o.HelmCfg = helm.NewConfig(targetNamespace, config, ctx, o.verbose)
 	if o.Dynamic, err = f.DynamicClient(); err != nil {
 		return err
 	}
@@ -168,11 +173,9 @@ func (o *InstallOptions) Install() error {
 		return nil
 	}
 
-	// check if namespace exists
-	if !o.CreateNamespace {
-		if _, err = o.Client.CoreV1().Namespaces().Get(context.TODO(), o.Namespace, metav1.GetOptions{}); err != nil {
-			return err
-		}
+	// check whether the namespace exists
+	if err = o.checkNamespace(); err != nil {
+		return err
 	}
 
 	// check whether there are remained resource left by previous KubeBlocks installation, if yes,
@@ -189,7 +192,7 @@ func (o *InstallOptions) Install() error {
 	o.ValueOpts.Values = append(o.ValueOpts.Values, fmt.Sprintf(kMonitorParam, o.Monitor))
 
 	// add helm repo
-	spinner := util.Spinner(o.Out, "%-40s", "Add and update repo "+types.KubeBlocksChartName)
+	spinner := util.Spinner(o.Out, "%-40s", "Add and update repo "+types.KubeBlocksRepoName)
 	defer spinner(false)
 	// Add repo, if exists, will update it
 	if err = helm.AddRepo(&repo.Entry{Name: types.KubeBlocksChartName, URL: util.GetHelmChartRepoURL()}); err != nil {
@@ -205,13 +208,69 @@ func (o *InstallOptions) Install() error {
 	}
 	spinner(true)
 
+	// wait for auto-install addons to be ready
+	spinner = util.Spinner(o.Out, "%-40s", "Wait installable addons to be ready")
+	defer spinner(false)
+	if err = o.waitAddonsEnabled(); err != nil {
+		return err
+	}
+	spinner(true)
+
 	// create VolumeSnapshotClass
 	if err = o.createVolumeSnapshotClass(); err != nil {
 		return err
 	}
 
 	if !o.Quiet {
+		fmt.Fprintf(o.Out, "\nKubeBlocks %s installed to namespace %s SUCCESSFULLY!\n",
+			o.Version, o.HelmCfg.Namespace())
 		o.printNotes()
+	}
+	return nil
+}
+
+// waitAddonsEnabled waits for auto-install addons status to be enabled
+func (o *InstallOptions) waitAddonsEnabled() error {
+	checkAddons := func() (bool, error) {
+		allEnabled := true
+		objects, err := o.Dynamic.Resource(types.AddonGVR()).List(context.TODO(), metav1.ListOptions{
+			LabelSelector: buildAddonLabelSelector(),
+		})
+		if err != nil && !apierrors.IsNotFound(err) {
+			return false, err
+		}
+		if objects == nil {
+			klog.V(1).InfoS("No Addon resource found")
+			return true, nil
+		}
+
+		for _, obj := range objects.Items {
+			addon := extensionsv1alpha1.Addon{}
+			if err = runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, &addon); err != nil {
+				return false, err
+			}
+
+			// addon is enabled, then check its status
+			if addon.Spec.InstallSpec.GetEnabled() {
+				if addon.Status.Phase != extensionsv1alpha1.AddonEnabled {
+					klog.V(1).Infof("Addon %s is not enabled yet", addon.Name)
+					allEnabled = false
+				}
+			}
+		}
+		return allEnabled, nil
+	}
+
+	// wait for all auto-install addons to be enabled
+	for i := 0; i < viper.GetInt("KB_WAIT_ADDON_READY_TIMES"); i++ {
+		allEnabled, err := checkAddons()
+		if err != nil {
+			return err
+		}
+		if allEnabled {
+			return nil
+		}
+		time.Sleep(5 * time.Second)
 	}
 	return nil
 }
@@ -246,7 +305,7 @@ func (o *InstallOptions) preCheck(versionInfo map[util.AppName]string) error {
 		spinner(true)
 	} else {
 		spinner(false)
-		return fmt.Errorf("kubernetes version should be larger than or equal to %s", requiredK8sVersion)
+		return fmt.Errorf("kubernetes version should be greater than or equal to %s", requiredK8sVersion)
 	}
 
 	// check kbcli version, now do nothing
@@ -261,6 +320,22 @@ func (o *InstallOptions) preCheck(versionInfo map[util.AppName]string) error {
 	}
 	o.disableOrEnableSets(provider)
 
+	return nil
+}
+
+func (o *InstallOptions) checkNamespace() error {
+	// target namespace is not specified, use default namespace
+	if o.HelmCfg.Namespace() == "" {
+		o.HelmCfg.SetNamespace(types.DefaultNamespace)
+		o.CreateNamespace = true
+		fmt.Fprintf(o.Out, "KubeBlocks will be installed to namespace \"%s\".\n", o.HelmCfg.Namespace())
+	}
+
+	// check if namespace exists
+	if !o.CreateNamespace {
+		_, err := o.Client.CoreV1().Namespaces().Get(context.TODO(), o.Namespace, metav1.GetOptions{})
+		return err
+	}
 	return nil
 }
 
@@ -394,7 +469,14 @@ func (o *InstallOptions) checkRemainedResource() error {
 		return nil
 	}
 
-	objs, err := getKBObjects(o.Dynamic, o.Namespace)
+	ns, _ := util.GetKubeBlocksNamespace(o.Client)
+	if ns == "" {
+		ns = o.Namespace
+	}
+
+	// Now, we only check whether there are resources left by KubeBlocks, ignore
+	// the addon resources.
+	objs, err := getKBObjects(o.Dynamic, ns, nil)
 	if err != nil {
 		fmt.Fprintf(o.ErrOut, "Check whether there are resources left by KubeBlocks before: %s\n", err.Error())
 	}
@@ -424,8 +506,6 @@ func (o *InstallOptions) installChart() error {
 
 func (o *InstallOptions) printNotes() {
 	fmt.Fprintf(o.Out, `
-KubeBlocks %s Install SUCCESSFULLY!
-
 -> Basic commands for cluster:
     kbcli cluster create -h     # help information about creating a database cluster
     kbcli cluster list          # list all database clusters
@@ -433,7 +513,7 @@ KubeBlocks %s Install SUCCESSFULLY!
 
 -> Uninstall KubeBlocks:
     kbcli kubeblocks uninstall
-`, o.Version)
+`)
 	if o.Monitor {
 		fmt.Fprint(o.Out, `
 -> To view the monitor components console(Grafana/Prometheus/AlertManager):
@@ -448,30 +528,10 @@ Notes: Monitor components(Grafana/Prometheus/AlertManager) is not installed,
 	}
 }
 
-func (o *InstallOptions) PostInstall() error {
-	var sets []string
-	for _, set := range o.ValueOpts.Values {
-		splitSet := strings.Split(set, ",")
-		sets = append(sets, splitSet...)
-	}
-	for _, set := range sets {
-		if set == "snapshot-controller.enabled=true" {
-			if err := o.createVolumeSnapshotClass(); err != nil {
-				return err
-			}
-		}
-	}
-	// print notes
-	if !o.Quiet {
-		o.printNotes()
-	}
-	return nil
-}
-
 func (o *InstallOptions) createVolumeSnapshotClass() error {
 	createFunc := func() error {
 		options := cluster.CreateVolumeSnapshotClassOptions{}
-		options.BaseOptions.Client = o.Dynamic
+		options.BaseOptions.Dynamic = o.Dynamic
 		options.BaseOptions.IOStreams = o.IOStreams
 		options.BaseOptions.Quiet = true
 
@@ -514,9 +574,8 @@ func (o *InstallOptions) buildChart() *helm.InstallOpts {
 		Chart:           types.KubeBlocksChartName + "/" + types.KubeBlocksChartName,
 		Wait:            true,
 		Version:         o.Version,
-		Namespace:       o.Namespace,
+		Namespace:       o.HelmCfg.Namespace(),
 		ValueOpts:       &o.ValueOpts,
-		Login:           true,
 		TryTimes:        2,
 		CreateNamespace: o.CreateNamespace,
 		Timeout:         o.timeout,

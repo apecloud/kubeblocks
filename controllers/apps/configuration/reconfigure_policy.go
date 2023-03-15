@@ -22,7 +22,6 @@ import (
 	"github.com/spf13/viper"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
-
 	appv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -30,6 +29,7 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 	cfgproto "github.com/apecloud/kubeblocks/internal/configuration/proto"
+	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -130,7 +130,7 @@ func GetClientFactory() createReconfigureClient {
 }
 
 func (param *reconfigureParams) getConfigKey() string {
-	for _, tpl := range param.Component.ConfigSpec.ConfigTemplateRefs {
+	for _, tpl := range param.Component.ConfigSpecs {
 		if tpl.Name == param.TplName {
 			return tpl.VolumeName
 		}
@@ -179,7 +179,7 @@ func (param *reconfigureParams) getTargetReplicas() int {
 
 func (param *reconfigureParams) podMinReadySeconds() int32 {
 	minReadySeconds := param.ComponentUnits[0].Spec.MinReadySeconds
-	return cfgcore.Max(minReadySeconds, viper.GetInt32(cfgcore.PodMinReadySecondsEnv))
+	return cfgcore.Max(minReadySeconds, viper.GetInt32(constant.PodMinReadySecondsEnv))
 }
 
 func RegisterPolicy(policy appsv1alpha1.UpgradePolicy, action reconfigurePolicy) {

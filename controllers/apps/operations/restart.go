@@ -26,7 +26,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
 type restartOpsHandler struct{}
@@ -86,7 +86,7 @@ func restartStatefulSet(opsRes *OpsResource, componentNameMap map[string]struct{
 	)
 	if err = opsRes.Client.List(opsRes.Ctx, statefulSetList,
 		client.InNamespace(opsRes.Cluster.Namespace),
-		client.MatchingLabels{intctrlutil.AppInstanceLabelKey: opsRes.Cluster.Name}); err != nil {
+		client.MatchingLabels{constant.AppInstanceLabelKey: opsRes.Cluster.Name}); err != nil {
 		return err
 	}
 
@@ -109,7 +109,7 @@ func restartDeployment(opsRes *OpsResource, componentNameMap map[string]struct{}
 	)
 	if err = opsRes.Client.List(opsRes.Ctx, deploymentList,
 		client.InNamespace(opsRes.Cluster.Namespace),
-		client.MatchingLabels{intctrlutil.AppInstanceLabelKey: opsRes.Cluster.Name}); err != nil {
+		client.MatchingLabels{constant.AppInstanceLabelKey: opsRes.Cluster.Name}); err != nil {
 		return err
 	}
 
@@ -126,7 +126,7 @@ func restartDeployment(opsRes *OpsResource, componentNameMap map[string]struct{}
 
 // isRestarted checks whether the component has been restarted
 func isRestarted(opsRes *OpsResource, object client.Object, componentNameMap map[string]struct{}, podTemplate *corev1.PodTemplateSpec) bool {
-	cName := object.GetLabels()[intctrlutil.KBAppComponentLabelKey]
+	cName := object.GetLabels()[constant.KBAppComponentLabelKey]
 	if _, ok := componentNameMap[cName]; !ok {
 		return true
 	}
@@ -135,9 +135,9 @@ func isRestarted(opsRes *OpsResource, object client.Object, componentNameMap map
 	}
 	hasRestarted := true
 	startTimestamp := opsRes.OpsRequest.Status.StartTimestamp
-	stsRestartTimeStamp := podTemplate.Annotations[intctrlutil.RestartAnnotationKey]
+	stsRestartTimeStamp := podTemplate.Annotations[constant.RestartAnnotationKey]
 	if res, _ := time.Parse(time.RFC3339, stsRestartTimeStamp); startTimestamp.After(res) {
-		podTemplate.Annotations[intctrlutil.RestartAnnotationKey] = startTimestamp.Format(time.RFC3339)
+		podTemplate.Annotations[constant.RestartAnnotationKey] = startTimestamp.Format(time.RFC3339)
 		hasRestarted = false
 	}
 	return hasRestarted

@@ -106,7 +106,10 @@ spec:
                     type: object
                     x-kubernetes-preserve-unknown-fields: true
                   secret:
-                    description: target db cluster access secret
+                    description: Secret is used to connect to the target database
+                      cluster. If not set, secret will be inherited from backup policy
+                      template. if still not set, the controller will check if any
+                      system account for dataprotection has been created.
                     properties:
                       name:
                         description: the secret name
@@ -125,7 +128,6 @@ spec:
                     type: object
                 required:
                 - labelsSelector
-                - secret
                 type: object
               targetVolumeMounts:
                 description: array of restore volume mounts .

@@ -18,18 +18,23 @@ package controllerutil
 
 import (
 	"encoding/json"
+	"sort"
 	"strings"
+	"testing"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"k8s.io/apimachinery/pkg/api/resource"
-
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	metautil "k8s.io/apimachinery/pkg/util/intstr"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/constant"
+	testk8s "github.com/apecloud/kubeblocks/internal/testutil/k8s"
 )
 
 type TestResourceUnit struct {
@@ -38,41 +43,120 @@ type TestResourceUnit struct {
 	expectCPU        int
 }
 
-var _ = Describe("tpl template", func() {
+func TestPodIsReady(t *testing.T) {
+	set := testk8s.NewFakeStatefulSet("foo", 3)
+	pod := testk8s.NewFakeStatefulSetPod(set, 1)
+	pod.Status.Conditions = []corev1.PodCondition{
+		{
+			Type:   corev1.PodReady,
+			Status: corev1.ConditionTrue,
+		},
+	}
+	pod.Labels = map[string]string{constant.RoleLabelKey: "leader"}
+	if !PodIsReadyWithLabel(*pod) {
+		t.Errorf("isReady returned false negative")
+	}
+
+	pod.DeletionTimestamp = &metav1.Time{Time: time.Now()}
+	if PodIsReadyWithLabel(*pod) {
+		t.Errorf("isReady returned false positive")
+	}
+
+	pod.Labels = nil
+	if PodIsReadyWithLabel(*pod) {
+		t.Errorf("isReady returned false positive")
+	}
+
+	pod.Status.Conditions = nil
+	if PodIsReadyWithLabel(*pod) {
+		t.Errorf("isReady returned false positive")
+	}
+
+	pod.Status.Conditions = []corev1.PodCondition{}
+	if PodIsReadyWithLabel(*pod) {
+		t.Errorf("isReady returned false positive")
+	}
+}
+
+func TestPodIsControlledByLatestRevision(t *testing.T) {
+	set := testk8s.NewFakeStatefulSet("foo", 3)
+	pod := testk8s.NewFakeStatefulSetPod(set, 1)
+	pod.Labels = map[string]string{
+		appsv1.ControllerRevisionHashLabelKey: "test",
+	}
+	set.Generation = 1
+	set.Status.UpdateRevision = "test"
+	if PodIsControlledByLatestRevision(pod, set) {
+		t.Errorf("PodIsControlledByLatestRevision returned false positive")
+	}
+	set.Status.ObservedGeneration = 1
+	if !PodIsControlledByLatestRevision(pod, set) {
+		t.Errorf("PodIsControlledByLatestRevision returned false positive")
+	}
+}
+
+func TestGetPodRevision(t *testing.T) {
+	set := testk8s.NewFakeStatefulSet("foo", 3)
+	pod := testk8s.NewFakeStatefulSetPod(set, 1)
+	if GetPodRevision(pod) != "" {
+		t.Errorf("revision should be empty")
+	}
+
+	pod.Labels = make(map[string]string, 0)
+	pod.Labels[appsv1.StatefulSetRevisionLabel] = "bar"
+
+	if GetPodRevision(pod) != "bar" {
+		t.Errorf("revision not matched")
+	}
+}
+
+var _ = Describe("pod utils", func() {
 
 	var (
 		statefulSet     *appsv1.StatefulSet
 		pod             *corev1.Pod
-		configTemplates = []appsv1alpha1.ConfigTemplate{
+		configTemplates = []appsv1alpha1.ComponentConfigSpec{
 			{
-				Name:       "xxxxx",
-				VolumeName: "config1",
+				ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
+					Name:       "xxxxx",
+					VolumeName: "config1",
+				},
 			},
 			{
-				Name:       "xxxxx2",
-				VolumeName: "config2",
-			},
-		}
-
-		foundInitContainerConfigTemplates = []appsv1alpha1.ConfigTemplate{
-			{
-				Name:       "xxxxx",
-				VolumeName: "config1_init_container",
-			},
-			{
-				Name:       "xxxxx2",
-				VolumeName: "config2_init_container",
+				ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
+					Name:       "xxxxx2",
+					VolumeName: "config2",
+				},
 			},
 		}
 
-		notFoundConfigTemplates = []appsv1alpha1.ConfigTemplate{
+		foundInitContainerConfigTemplates = []appsv1alpha1.ComponentConfigSpec{
 			{
-				Name:       "xxxxx",
-				VolumeName: "config1_not_fount",
+				ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
+					Name:       "xxxxx",
+					VolumeName: "config1_init_container",
+				},
 			},
 			{
-				Name:       "xxxxx2",
-				VolumeName: "config2_not_fount",
+				ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
+					Name:       "xxxxx2",
+					VolumeName: "config2_init_container",
+				},
+			},
+		}
+
+		notFoundConfigTemplates = []appsv1alpha1.ComponentConfigSpec{
+			{
+				ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
+					Name:       "xxxxx",
+					VolumeName: "config1_not_fount",
+				},
+			},
+			{
+				ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
+					Name:       "xxxxx2",
+					VolumeName: "config2_not_fount",
+				},
 			},
 		}
 	)
@@ -445,6 +529,22 @@ var _ = Describe("tpl template", func() {
 				Expect(val).Should(BeEquivalentTo(tt.want))
 				Expect(isPercent).Should(BeEquivalentTo(tt.isPercent))
 			}
+		})
+	})
+	Context("test sort by pod name", func() {
+		It("Should success with no error", func() {
+			pods := []corev1.Pod{{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod-2"},
+			}, {
+				ObjectMeta: metav1.ObjectMeta{Name: "pod-3"},
+			}, {
+				ObjectMeta: metav1.ObjectMeta{Name: "pod-0"},
+			}, {
+				ObjectMeta: metav1.ObjectMeta{Name: "pod-1"},
+			}}
+			sort.Sort(ByPodName(pods))
+			Expect(pods[0].Name).Should(Equal("pod-0"))
+			Expect(pods[3].Name).Should(Equal("pod-3"))
 		})
 	})
 })

@@ -47,7 +47,6 @@ var chart = helm.InstallOpts{
 			"wesql.enabled=false",
 		},
 	},
-	Login:           true,
 	TryTimes:        2,
 	CreateNamespace: true,
 }
@@ -65,7 +64,7 @@ func InstallationTest() {
 		})
 
 		It("Install KubeBlocks via Helm", func() {
-			cfg := getHelmActionCfg()
+			cfg := getHelmConfig()
 			_, err := chart.Install(cfg)
 			Expect(err).NotTo(HaveOccurred())
 			// Expect(notes).NotTo(BeEmpty())
@@ -92,8 +91,9 @@ func UninstallationTest() {
 }
 
 func CheckedUninstallHelmRelease() {
-	cfg := getHelmActionCfg()
-	res, err := chart.GetInstalled(cfg)
+	cfg := getHelmConfig()
+	actionCfg := getHelmActionCfg(cfg)
+	res, err := chart.GetInstalled(actionCfg)
 	if res == nil {
 		return
 	}
@@ -103,11 +103,15 @@ func CheckedUninstallHelmRelease() {
 	uninstallHelmRelease()
 }
 
-func getHelmActionCfg() *action.Configuration {
-	cfg, err := helm.NewActionConfig(releaseNS, "")
+func getHelmConfig() *helm.Config {
+	return helm.NewConfig(releaseNS, "", "", false)
+}
+
+func getHelmActionCfg(cfg *helm.Config) *action.Configuration {
+	actionCfg, err := helm.NewActionConfig(cfg)
 	Expect(err).NotTo(HaveOccurred())
-	Expect(cfg).NotTo(BeNil())
-	return cfg
+	Expect(actionCfg).NotTo(BeNil())
+	return actionCfg
 }
 
 func uninstallHelmRelease() {

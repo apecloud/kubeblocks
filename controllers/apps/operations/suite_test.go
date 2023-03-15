@@ -22,14 +22,12 @@ import (
 	"testing"
 	"time"
 
-	corev1 "k8s.io/api/core/v1"
-
-	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
-	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
-
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	"github.com/spf13/viper"
+	"go.uber.org/zap/zapcore"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/record"
@@ -39,15 +37,12 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	// +kubebuilder:scaffold:imports
-
-	"github.com/spf13/viper"
-	"go.uber.org/zap/zapcore"
-
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	"github.com/apecloud/kubeblocks/controllers/k8score"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/apecloud/kubeblocks/internal/testutil"
+	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 )
 
 // These tests use Ginkgo (BDD-style Go testing framework). Refer to
@@ -175,7 +170,7 @@ func initOperationsResources(clusterDefinitionName,
 func initConsensusPods(opsRes *OpsResource, clusterName string) []corev1.Pod {
 	// mock the pods of consensusSet component
 	testapps.MockConsensusComponentPods(testCtx, nil, clusterName, consensusComp)
-	podList, err := util.GetComponentPodList(opsRes.Ctx, opsRes.Client, opsRes.Cluster, consensusComp)
+	podList, err := util.GetComponentPodList(opsRes.Ctx, opsRes.Client, *opsRes.Cluster, consensusComp)
 	Expect(err).Should(Succeed())
 	// the opsRequest will use startTime to check some condition.
 	// if there is no sleep for 1 second, unstable error may occur.

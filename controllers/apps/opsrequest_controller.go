@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"golang.org/x/exp/slices"
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
@@ -32,6 +33,7 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/apps/operations"
 	opsutil "github.com/apecloud/kubeblocks/controllers/apps/operations/util"
+	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -114,6 +116,7 @@ func (r *OpsRequestReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	if opsRequest.Status.ObservedGeneration == opsRequest.Generation {
 		// waiting until OpsRequest.status.phase is Succeed
 		if requeueAfter, err := operations.GetOpsManager().Reconcile(opsRes); err != nil {
+			r.Recorder.Eventf(opsRequest, corev1.EventTypeWarning, "ReconcileStatusFailed", "Failed to reconcile the status of OpsRequest: %s", err.Error())
 			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 		} else if requeueAfter != 0 {
 			// if the reconcileAction need requeue, do it
@@ -128,6 +131,7 @@ func (r *OpsRequestReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 
 	// process opsRequest entry function
 	if err = operations.GetOpsManager().Do(opsRes); err != nil {
+		r.Recorder.Eventf(opsRequest, corev1.EventTypeWarning, "DoActionFailed", "Failed to process the operation of OpsRequest: %s", err.Error())
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 
@@ -228,12 +232,12 @@ func (r *OpsRequestReconciler) patchOpsRequestWithClusterLabel(reqCtx intctrluti
 	if opsRequest.Labels == nil {
 		opsRequest.Labels = map[string]string{}
 	}
-	clusterName := opsRequest.Labels[intctrlutil.AppInstanceLabelKey]
+	clusterName := opsRequest.Labels[constant.AppInstanceLabelKey]
 	if clusterName == opsRequest.Spec.ClusterRef {
 		return nil
 	}
 	patch := client.MergeFrom(opsRequest.DeepCopy())
-	opsRequest.Labels[intctrlutil.AppInstanceLabelKey] = opsRequest.Spec.ClusterRef
+	opsRequest.Labels[constant.AppInstanceLabelKey] = opsRequest.Spec.ClusterRef
 	return r.Client.Patch(reqCtx.Ctx, opsRequest, patch)
 }
 

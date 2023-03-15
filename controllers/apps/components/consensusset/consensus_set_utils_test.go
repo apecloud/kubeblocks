@@ -28,7 +28,8 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	"github.com/apecloud/kubeblocks/internal/constant"
+	"github.com/apecloud/kubeblocks/internal/controllerutil"
 	testk8s "github.com/apecloud/kubeblocks/internal/testutil/k8s"
 )
 
@@ -41,8 +42,8 @@ func TestIsReady(t *testing.T) {
 			Status: v1.ConditionTrue,
 		},
 	}
-	pod.Labels = map[string]string{intctrlutil.RoleLabelKey: "leader"}
-	if !util.PodIsReady(*pod) {
+	pod.Labels = map[string]string{constant.RoleLabelKey: "leader"}
+	if !controllerutil.PodIsReadyWithLabel(*pod) {
 		t.Errorf("isReady returned false negative")
 	}
 }
@@ -62,9 +63,9 @@ func TestInitClusterComponentStatusIfNeed(t *testing.T) {
 	component := &appsv1alpha1.ClusterComponentDefinition{
 		WorkloadType: appsv1alpha1.Consensus,
 	}
-	util.InitClusterComponentStatusIfNeed(cluster, componentName, component)
+	util.InitClusterComponentStatusIfNeed(cluster, componentName, *component)
 
-	if cluster.Status.Components == nil {
+	if len(cluster.Status.Components) == 0 {
 		t.Errorf("cluster.Status.ComponentDefs[*] not intialized properly")
 	}
 	if _, ok := cluster.Status.Components[componentName]; !ok {
@@ -83,14 +84,14 @@ func TestInitClusterComponentStatusIfNeed(t *testing.T) {
 func TestGetPodRevision(t *testing.T) {
 	set := testk8s.NewFakeStatefulSet("foo", 3)
 	pod := testk8s.NewFakeStatefulSetPod(set, 1)
-	if util.GetPodRevision(pod) != "" {
+	if controllerutil.GetPodRevision(pod) != "" {
 		t.Errorf("revision should be empty")
 	}
 
 	pod.Labels = make(map[string]string, 0)
 	pod.Labels[apps.StatefulSetRevisionLabel] = "bar"
 
-	if util.GetPodRevision(pod) != "bar" {
+	if controllerutil.GetPodRevision(pod) != "bar" {
 		t.Errorf("revision not matched")
 	}
 }
@@ -104,7 +105,7 @@ func TestSortPods(t *testing.T) {
 					Name:      stsName + "-" + strconv.Itoa(i),
 					Namespace: "default",
 					Labels: map[string]string{
-						intctrlutil.RoleLabelKey: "learner",
+						constant.RoleLabelKey: "learner",
 					},
 				},
 			}

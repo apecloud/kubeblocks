@@ -54,7 +54,7 @@ func CreateOrUpdateVolume(volumes []corev1.Volume, volumeName string, createFn c
 	return append(volumes, createFn(volumeName)), nil
 }
 
-func CreateOrUpdatePodVolumes(podSpec *corev1.PodSpec, volumes map[string]appsv1alpha1.ConfigTemplate) error {
+func CreateOrUpdatePodVolumes(podSpec *corev1.PodSpec, volumes map[string]appsv1alpha1.ComponentTemplateSpec) error {
 	var (
 		err        error
 		podVolumes = podSpec.Volumes
@@ -64,14 +64,14 @@ func CreateOrUpdatePodVolumes(podSpec *corev1.PodSpec, volumes map[string]appsv1
 	sort.Strings(volumeKeys)
 	// Update PodTemplate Volumes
 	for _, cmName := range volumeKeys {
-		tpl := volumes[cmName]
-		if podVolumes, err = CreateOrUpdateVolume(podVolumes, tpl.VolumeName, func(volumeName string) corev1.Volume {
+		templateSpec := volumes[cmName]
+		if podVolumes, err = CreateOrUpdateVolume(podVolumes, templateSpec.VolumeName, func(volumeName string) corev1.Volume {
 			return corev1.Volume{
 				Name: volumeName,
 				VolumeSource: corev1.VolumeSource{
 					ConfigMap: &corev1.ConfigMapVolumeSource{
 						LocalObjectReference: corev1.LocalObjectReference{Name: cmName},
-						DefaultMode:          tpl.DefaultMode,
+						DefaultMode:          templateSpec.DefaultMode,
 					},
 				},
 			}

@@ -37,6 +37,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	appsconfig "github.com/apecloud/kubeblocks/controllers/apps/configuration"
+	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -108,7 +109,7 @@ func (r *ClusterVersionReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 
 	res, err := intctrlutil.HandleCRDeletion(reqCtx, r, clusterVersion, clusterVersionFinalizerName, func() (*ctrl.Result, error) {
 		recordEvent := func() {
-			r.Recorder.Event(clusterVersion, corev1.EventTypeWarning, intctrlutil.ReasonRefCRUnavailable,
+			r.Recorder.Event(clusterVersion, corev1.EventTypeWarning, constant.ReasonRefCRUnavailable,
 				"cannot be deleted because of existing referencing Cluster.")
 		}
 		if res, err := intctrlutil.ValidateReferenceCR(reqCtx, r.Client, clusterVersion,
@@ -125,17 +126,8 @@ func (r *ClusterVersionReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		return intctrlutil.Reconciled()
 	}
 
-	if ok, err := appsconfig.CheckCVConfigTemplate(r.Client, reqCtx, clusterVersion); !ok || err != nil {
-		return intctrlutil.RequeueAfter(time.Second, reqCtx.Log, "failed to check config template")
-	}
-
-	if ok, err := appsconfig.UpdateCVLabelsByConfiguration(r.Client, reqCtx, clusterVersion); !ok || err != nil {
-		return intctrlutil.RequeueAfter(time.Second, reqCtx.Log, "failed to update using config template info")
-	}
-
-	// Update configmap Finalizer and set Immutable
-	if err := appsconfig.UpdateCVConfigMapFinalizer(r.Client, reqCtx, clusterVersion); err != nil {
-		return intctrlutil.RequeueAfter(time.Second, reqCtx.Log, "failed to UpdateConfigMapFinalizer")
+	if err := appsconfig.ReconcileConfigurationForReferencedCR(r.Client, reqCtx, clusterVersion); err != nil {
+		return intctrlutil.RequeueAfter(time.Second, reqCtx.Log, err.Error())
 	}
 
 	clusterdefinition := &appsv1alpha1.ClusterDefinition{}
@@ -212,5 +204,5 @@ func (r *ClusterVersionReconciler) deleteExternalResources(reqCtx intctrlutil.Re
 	//
 	// Ensure that delete implementation is idempotent and safe to invoke
 	// multiple times for same object.
-	return appsconfig.DeleteCVConfigMapFinalizer(r.Client, reqCtx, clusterVersion)
+	return appsconfig.DeleteConfigMapFinalizer(r.Client, reqCtx, clusterVersion)
 }

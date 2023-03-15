@@ -25,11 +25,13 @@ import (
 )
 
 const (
-	KubeBlocks        = "kubeblocks"
-	LogVolumeName     = "log"
-	ConfVolumeName    = "conf"
-	DataVolumeName    = "data"
-	ScriptsVolumeName = "scripts"
+	KubeBlocks          = "kubeblocks"
+	LogVolumeName       = "log"
+	ConfVolumeName      = "conf"
+	DataVolumeName      = "data"
+	ScriptsVolumeName   = "scripts"
+	ServiceVPCName      = "a-vpc-lb-service-for-app"
+	ServiceInternetName = "a-internet-lb-service-for-app"
 
 	ReplicationPodRoleVolume       = "pod-role"
 	ReplicationRoleLabelFieldPath  = "metadata.labels['kubeblocks.io/role']"
@@ -70,10 +72,14 @@ var (
 
 	defaultConnectionCredential = map[string]string{
 		"username":      "root",
-		"svcFQDN":       "$(SVC_FQDN)",
-		"password":      "$(RANDOM_PASSWD)",
+		"SVC_FQDN":      "$(SVC_FQDN)",
+		"RANDOM_PASSWD": "$(RANDOM_PASSWD)",
 		"tcpEndpoint":   "tcp:$(SVC_FQDN):$(SVC_PORT_mysql)",
 		"paxosEndpoint": "paxos:$(SVC_FQDN):$(SVC_PORT_paxos)",
+		"UUID":          "$(UUID)",
+		"UUID_B64":      "$(UUID_B64)",
+		"UUID_STR_B64":  "$(UUID_STR_B64)",
+		"UUID_HEX":      "$(UUID_HEX)",
 	}
 
 	// defaultSvc value are corresponding to defaultMySQLContainer.Ports name mapping and
@@ -145,9 +151,14 @@ var (
 	statefulMySQLComponent = appsv1alpha1.ClusterComponentDefinition{
 		WorkloadType:  appsv1alpha1.Stateful,
 		CharacterType: "mysql",
+		Service:       &defaultMySQLService,
 		PodSpec: &corev1.PodSpec{
 			Containers: []corev1.Container{defaultMySQLContainer},
 		},
+		VolumeTypes: []appsv1alpha1.VolumeTypeSpec{{
+			Name: DataVolumeName,
+			Type: appsv1alpha1.VolumeTypeData,
+		}},
 	}
 
 	defaultConsensusSpec = appsv1alpha1.ConsensusSetSpec{

@@ -35,6 +35,7 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 	cfgcm "github.com/apecloud/kubeblocks/internal/configuration/config_manager"
+	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -46,12 +47,12 @@ type ReconfigureRequestReconciler struct {
 }
 
 var ConfigurationRequiredLabels = []string{
-	intctrlutil.AppNameLabelKey,
-	intctrlutil.AppInstanceLabelKey,
-	intctrlutil.KBAppComponentLabelKey,
-	cfgcore.CMConfigurationTplNameLabelKey,
-	cfgcore.CMConfigurationTypeLabelKey,
-	cfgcore.CMConfigurationProviderTplLabelKey,
+	constant.AppNameLabelKey,
+	constant.AppInstanceLabelKey,
+	constant.KBAppComponentLabelKey,
+	constant.CMConfigurationTplNameLabelKey,
+	constant.CMConfigurationTypeLabelKey,
+	constant.CMConfigurationProviderTplLabelKey,
 }
 
 // +kubebuilder:rbac:groups=core,resources=configmap,verbs=get;list;watch;create;update;patch;delete
@@ -84,9 +85,9 @@ func (r *ReconfigureRequestReconciler) Reconcile(ctx context.Context, req ctrl.R
 	}
 
 	reqCtx.Log = reqCtx.Log.
-		WithValues("ClusterName", config.Labels[intctrlutil.AppInstanceLabelKey]).
-		WithValues("ComponentName", config.Labels[intctrlutil.KBAppComponentLabelKey])
-	if hash, ok := config.Labels[cfgcore.CMInsConfigurationHashLabelKey]; ok && hash == config.ResourceVersion {
+		WithValues("ClusterName", config.Labels[constant.AppInstanceLabelKey]).
+		WithValues("ComponentName", config.Labels[constant.KBAppComponentLabelKey])
+	if hash, ok := config.Labels[constant.CMInsConfigurationHashLabelKey]; ok && hash == config.ResourceVersion {
 		return intctrlutil.Reconciled()
 	}
 
@@ -97,7 +98,7 @@ func (r *ReconfigureRequestReconciler) Reconcile(ctx context.Context, req ctrl.R
 		return intctrlutil.Reconciled()
 	}
 
-	if cfgConstraintsName, ok := config.Labels[cfgcore.CMConfigurationConstraintsNameLabelKey]; !ok || len(cfgConstraintsName) == 0 {
+	if cfgConstraintsName, ok := config.Labels[constant.CMConfigurationConstraintsNameLabelKey]; !ok || len(cfgConstraintsName) == 0 {
 		reqCtx.Log.V(1).Info("configuration not set ConfigConstraints, not support reconfigure.")
 		return intctrlutil.Reconciled()
 	}
@@ -105,7 +106,7 @@ func (r *ReconfigureRequestReconciler) Reconcile(ctx context.Context, req ctrl.R
 	tpl := &appsv1alpha1.ConfigConstraint{}
 	if err := r.Client.Get(reqCtx.Ctx, types.NamespacedName{
 		Namespace: config.Namespace,
-		Name:      config.Labels[cfgcore.CMConfigurationConstraintsNameLabelKey],
+		Name:      config.Labels[constant.CMConfigurationConstraintsNameLabelKey],
 	}, tpl); err != nil {
 		return intctrlutil.RequeueWithErrorAndRecordEvent(config, r.Recorder, err, reqCtx.Log)
 	}
@@ -132,25 +133,25 @@ func (r *ReconfigureRequestReconciler) sync(reqCtx intctrlutil.RequestCtx, confi
 		cluster    = appsv1alpha1.Cluster{}
 		clusterKey = client.ObjectKey{
 			Namespace: config.GetNamespace(),
-			Name:      config.Labels[intctrlutil.AppInstanceLabelKey],
+			Name:      config.Labels[constant.AppInstanceLabelKey],
 		}
 
 		configKey = client.ObjectKeyFromObject(config)
 
-		componentName     = config.Labels[intctrlutil.KBAppComponentLabelKey]
-		configTplName     = config.Labels[cfgcore.CMConfigurationProviderTplLabelKey]
+		componentName     = config.Labels[constant.KBAppComponentLabelKey]
+		configTplName     = config.Labels[constant.CMConfigurationProviderTplLabelKey]
 		configTplLabelKey = cfgcore.GenerateTPLUniqLabelKeyWithConfig(configTplName)
 	)
 
 	componentLabels := map[string]string{
-		intctrlutil.AppNameLabelKey:        config.Labels[intctrlutil.AppNameLabelKey],
-		intctrlutil.AppInstanceLabelKey:    config.Labels[intctrlutil.AppInstanceLabelKey],
-		intctrlutil.KBAppComponentLabelKey: config.Labels[intctrlutil.KBAppComponentLabelKey],
-		configTplLabelKey:                  config.GetName(),
+		constant.AppNameLabelKey:        config.Labels[constant.AppNameLabelKey],
+		constant.AppInstanceLabelKey:    config.Labels[constant.AppInstanceLabelKey],
+		constant.KBAppComponentLabelKey: config.Labels[constant.KBAppComponentLabelKey],
+		configTplLabelKey:               config.GetName(),
 	}
 
 	var keySelector []string
-	if keysLabel, ok := config.Labels[cfgcore.CMConfigurationCMKeysLabelKey]; ok && keysLabel != "" {
+	if keysLabel, ok := config.Labels[constant.CMConfigurationCMKeysLabelKey]; ok && keysLabel != "" {
 		keySelector = strings.Split(keysLabel, ",")
 	}
 
@@ -198,7 +199,7 @@ func (r *ReconfigureRequestReconciler) sync(reqCtx intctrlutil.RequestCtx, confi
 		return intctrlutil.Reconciled()
 	}
 
-	if component.ConfigSpec == nil {
+	if len(component.ConfigSpecs) == 0 {
 		return intctrlutil.Reconciled()
 	}
 
@@ -290,7 +291,7 @@ func (r *ReconfigureRequestReconciler) handleConfigEvent(params reconfigureParam
 	)
 
 	if len(cm.Annotations) != 0 {
-		lastOpsRequest = cm.Annotations[cfgcore.LastAppliedOpsCRAnnotation]
+		lastOpsRequest = cm.Annotations[constant.LastAppliedOpsCRAnnotation]
 	}
 
 	eventContext := cfgcore.ConfigEventContext{

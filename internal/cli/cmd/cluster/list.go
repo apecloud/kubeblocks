@@ -35,7 +35,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
 var (
@@ -85,7 +85,7 @@ func NewListCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 	o := list.NewListOptions(f, streams, types.ClusterGVR())
 	cmd := &cobra.Command{
 		Use:               "list [NAME]",
-		Short:             "List clusters",
+		Short:             "List clusters.",
 		Example:           listExample,
 		Aliases:           []string{"ls"},
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, o.GVR),
@@ -106,7 +106,7 @@ func NewListInstancesCmd(f cmdutil.Factory, streams genericclioptions.IOStreams)
 	o := list.NewListOptions(f, streams, types.ClusterGVR())
 	cmd := &cobra.Command{
 		Use:               "list-instances",
-		Short:             "List cluster instances",
+		Short:             "List cluster instances.",
 		Example:           listInstancesExample,
 		Aliases:           []string{"ls-instances"},
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, o.GVR),
@@ -124,7 +124,7 @@ func NewListComponentsCmd(f cmdutil.Factory, streams genericclioptions.IOStreams
 	o := list.NewListOptions(f, streams, types.ClusterGVR())
 	cmd := &cobra.Command{
 		Use:               "list-components",
-		Short:             "List cluster components",
+		Short:             "List cluster components.",
 		Example:           listComponentsExample,
 		Aliases:           []string{"ls-components"},
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, o.GVR),
@@ -142,7 +142,7 @@ func NewListEventsCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *c
 	o := list.NewListOptions(f, streams, types.ClusterGVR())
 	cmd := &cobra.Command{
 		Use:               "list-events",
-		Short:             "List cluster events",
+		Short:             "List cluster events.",
 		Example:           listEventsExample,
 		Aliases:           []string{"ls-events"},
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, o.GVR),
@@ -160,7 +160,7 @@ func NewListAccountsCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) 
 	o := list.NewListOptions(f, streams, schema.GroupVersionResource{Group: corev1.GroupName, Resource: "secrets", Version: "v1"})
 	cmd := &cobra.Command{
 		Use:               "list-accounts NAME",
-		Short:             "List cluster accounts",
+		Short:             "List cluster accounts.",
 		Example:           listAccountsExample,
 		Aliases:           []string{"ls-accounts"},
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.ClusterGVR()),
@@ -194,7 +194,7 @@ func run(o *list.ListOptions, printType cluster.PrintType) error {
 	}
 
 	if len(infos) == 0 {
-		fmt.Fprintln(o.IOStreams.Out, "No clusters found")
+		fmt.Fprintln(o.IOStreams.Out, "No cluster found")
 		return nil
 	}
 
@@ -269,7 +269,7 @@ func listAccount(o *list.ListOptions, args []string) error {
 		if err = runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, s); err != nil {
 			return err
 		}
-		tbl.AddRow(s.Namespace, s.Labels[intctrlutil.AppInstanceLabelKey], string(s.Data["username"]), s.Name, util.TimeFormat(&s.CreationTimestamp))
+		tbl.AddRow(s.Namespace, s.Labels[constant.AppInstanceLabelKey], string(s.Data["username"]), s.Name, util.TimeFormat(&s.CreationTimestamp))
 	}
 	tbl.Print()
 	return nil

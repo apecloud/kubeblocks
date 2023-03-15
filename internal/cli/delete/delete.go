@@ -35,6 +35,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/util/prompt"
 )
 
+type DeleteHook func(object runtime.Object) error
 type DeleteOptions struct {
 	Factory       cmdutil.Factory
 	Namespace     string
@@ -53,6 +54,9 @@ type DeleteOptions struct {
 	GVR            schema.GroupVersionResource
 	Result         *resource.Result
 
+	PreDeleteHook  DeleteHook
+	PostDeleteHook DeleteHook
+
 	genericclioptions.IOStreams
 }
 
@@ -65,6 +69,10 @@ func NewDeleteOptions(f cmdutil.Factory, streams genericclioptions.IOStreams, gv
 }
 
 func (o *DeleteOptions) Run() error {
+	if err := o.validate(); err != nil {
+		return err
+	}
+
 	if err := o.complete(); err != nil {
 		return err
 	}
@@ -73,7 +81,7 @@ func (o *DeleteOptions) Run() error {
 	return o.deleteResult(o.Result)
 }
 
-func (o *DeleteOptions) complete() error {
+func (o *DeleteOptions) validate() error {
 	switch {
 	case o.GracePeriod == 0 && o.Force:
 		fmt.Fprintf(o.ErrOut, "warning: Immediate deletion does not wait for confirmation that the running resource has been terminated.\n")
@@ -94,6 +102,20 @@ func (o *DeleteOptions) complete() error {
 		o.GracePeriod = 0
 	}
 
+	if len(o.Names) > 0 && len(o.LabelSelector) > 0 {
+		return fmt.Errorf("name cannot be provided when a selector is specified")
+	}
+	// names and all namespaces cannot be used together
+	if len(o.Names) > 0 && o.AllNamespaces {
+		return fmt.Errorf("a resource cannot be retrieved by name across all namespaces")
+	}
+	if len(o.Names) == 0 && len(o.LabelSelector) == 0 {
+		return fmt.Errorf("no name was specified. one of names, label selector must be provided")
+	}
+	return nil
+}
+
+func (o *DeleteOptions) complete() error {
 	namespace, _, err := o.Factory.ToRawKubeConfigLoader().Namespace()
 	if err != nil {
 		return err
@@ -145,6 +167,7 @@ func (o *DeleteOptions) deleteResult(r *resource.Result) error {
 		if err != nil {
 			return err
 		}
+		var runtimeObj runtime.Object
 		deleteInfos = append(deleteInfos, info)
 		found++
 
@@ -152,7 +175,13 @@ func (o *DeleteOptions) deleteResult(r *resource.Result) error {
 		if o.GracePeriod >= 0 {
 			options = metav1.NewDeleteOptions(int64(o.GracePeriod))
 		}
-		if _, err = o.deleteResource(info, options); err != nil {
+		if err = o.preDeleteResource(info); err != nil {
+			return err
+		}
+		if runtimeObj, err = o.deleteResource(info, options); err != nil {
+			return err
+		}
+		if err = o.postDeleteResource(runtimeObj); err != nil {
 			return err
 		}
 		fmt.Fprintf(o.Out, "%s %s deleted\n", info.Mapping.GroupVersionKind.Kind, info.Name)
@@ -179,22 +208,39 @@ func (o *DeleteOptions) deleteResource(info *resource.Info, deleteOptions *metav
 	return response, nil
 }
 
+func (o *DeleteOptions) preDeleteResource(info *resource.Info) error {
+	if o.PreDeleteHook != nil {
+		if info.Object == nil {
+			if err := info.Get(); err != nil {
+				return err
+			}
+		}
+		return o.PreDeleteHook(info.Object)
+	}
+	return nil
+}
+
+func (o *DeleteOptions) postDeleteResource(object runtime.Object) error {
+	if o.PostDeleteHook != nil {
+		return o.PostDeleteHook(object)
+	}
+	return nil
+}
+
 // Confirm let user double-check what to delete
 func Confirm(names []string, in io.Reader) error {
 	if len(names) == 0 {
 		return nil
 	}
-
-	entered, err := prompt.NewPrompt(fmt.Sprintf("You should type \"%s\"", strings.Join(names, " ")),
-		"Please type the name again(separate with white space when more than one):", in).GetInput()
-	if err != nil {
-		return err
-	}
-	enteredNames := strings.Split(entered, " ")
-	sort.Strings(names)
-	sort.Strings(enteredNames)
-	if !slices.Equal(names, enteredNames) {
-		return fmt.Errorf("typed \"%s\" does not match \"%s\"", entered, strings.Join(names, " "))
-	}
-	return nil
+	_, err := prompt.NewPrompt("Please type the name again(separate with white space when more than one):",
+		func(entered string) error {
+			enteredNames := strings.Split(entered, " ")
+			sort.Strings(names)
+			sort.Strings(enteredNames)
+			if !slices.Equal(names, enteredNames) {
+				return fmt.Errorf("typed \"%s\" does not match \"%s\"", entered, strings.Join(names, " "))
+			}
+			return nil
+		}, in).Run()
+	return err
 }

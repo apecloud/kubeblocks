@@ -1,0 +1,181 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: Cluster
+metadata:
+  name: {{ .Release.Name }}
+  labels: {{ include "kafka-cluster.labels" . | nindent 4 }}
+spec:
+  clusterDefinitionRef: kafka # ref clusterdefinition.name
+  clusterVersionRef: kafka-{{ default .Chart.AppVersion .Values.clusterVersionOverride }}
+  terminationPolicy: {{ $.Values.terminationPolicy }}
+  affinity:
+    {{- with $.Values.topologyKeys }}
+    topologyKeys: {{ . | toYaml | nindent 6 }}
+    {{- end }}
+  {{- with $.Values.tolerations }}
+  tolerations: {{ . | toYaml | nindent 4 }}
+  {{- end }}
+  componentSpecs:
+    {{- if eq "combined" $.Values.mode }}
+    - name: kafka-server
+      componentDefRef: kafka-server
+      replicas: {{ $.Values.kafkaServer.replicaCount }}
+      monitor: {{ $.Values.monitor.enabled }}
+      serviceType: {{ $.Values.service.type | default "ClusterIP" }}
+      {{- with $.Values.tolerations }}
+      tolerations: {{ .| toYaml | nindent 8 }}
+      {{- end }}
+      {{- with $.Values.kafkaServer.resources }}
+      resources:
+        limits:
+          cpu: {{ .limits.cpu | quote }}
+          memory: {{ .limits.memory | quote }}
+        requests:
+          cpu: {{ .requests.cpu | quote }}
+          memory: {{ .requests.memory | quote }}
+      {{- end }}
+      {{- with $.Values.persistence }}
+        {{- if .enabled }}
+      volumeClaimTemplates:
+        - name: metadata 
+          spec:
+            {{- with .metadata.storageClassName }}
+            storageClassName: {{ . }}
+            {{- end }}
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: {{ .metadata.size }}
+        - name: data 
+          spec:
+            {{- with .data.storageClassName }}
+            storageClassName: {{ . }}
+            {{- end }}
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: {{ .data.size }}
+          {{- if .log.enabled }}
+        - name: log 
+          spec:
+            {{- with .log.storageClassName }}
+            storageClassName: {{ . }}
+            {{- end }}
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: {{ .log.size }}
+          {{- end }}
+        {{- end }}
+      {{- end }}
+    {{- else }}
+    - name: kafka-ctrlr
+      componentDefRef: kafka-controller
+      replicas: {{ $.Values.kafkaController.replicaCount }}
+      monitor: {{ $.Values.monitor.enabled }}
+      serviceType: {{ $.Values.service.type | default "ClusterIP" }}
+      {{- with $.Values.tolerations }}
+      tolerations: {{ .| toYaml | nindent 8 }}
+      {{- end }}
+      {{- with $.Values.kafkaController.resources }}
+      resources:
+        limits:
+          cpu: {{ .limits.cpu | quote }}
+          memory: {{ .limits.memory | quote }}
+        requests:
+          cpu: {{ .requests.cpu | quote }}
+          memory: {{ .requests.memory | quote }}
+      {{- end }}
+      {{- with $.Values.persistence }}
+        {{- if .enabled }}
+      volumeClaimTemplates:
+        - name: metadata 
+          spec:
+            {{- with .metadata.storageClassName }}
+            storageClassName: {{ . }}
+            {{- end }}
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: {{ .metadata.size }}
+          {{- if .log.enabled }}
+        - name: log 
+          spec:
+            {{- with .log.storageClassName }}
+            storageClassName: {{ . }}
+            {{- end }}
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: {{ .log.size }}
+          {{- end }}
+        {{- end }}
+      {{- end }}
+    - name: kafka-broker
+      componentDefRef: kafka-broker
+      replicas: {{ $.Values.kafkaBroker.replicaCount }}
+      monitor: {{ $.Values.monitor.enabled }}
+      serviceType: {{ $.Values.service.type | default "None" }}
+      {{- with $.Values.tolerations }}
+      tolerations: {{ .| toYaml | nindent 8 }}
+      {{- end }}
+      {{- with $.Values.kafkaBroker.resources }}
+      resources:
+        limits:
+          cpu: {{ .limits.cpu | quote }}
+          memory: {{ .limits.memory | quote }}
+        requests:
+          cpu: {{ .requests.cpu | quote }}
+          memory: {{ .requests.memory | quote }}
+      {{- end }}
+      {{- with $.Values.persistence }}
+        {{- if .enabled }}
+      volumeClaimTemplates:
+        - name: data 
+          spec:
+            {{- with .data.storageClassName }}
+            storageClassName: {{ . }}
+            {{- end }}
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: {{ .data.size }}
+          {{- if .log.enabled }}
+        - name: log 
+          spec:
+            {{- with .log.storageClassName }}
+            storageClassName: {{ . }}
+            {{- end }}
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: {{ .log.size }}
+          {{- end }}
+        {{- end }}
+      {{- end }}
+    {{- end }}
+    {{- if .Values.monitor.enabled }}
+    - name: metrics-exp
+      componentDefRef: kafka-exporter
+      replicas: {{ $.Values.monitor.kafkaExporter.replicaCount }}
+      monitor: true
+      serviceType: "ClusterIP"
+      {{- with $.Values.tolerations }}
+      tolerations: {{ .| toYaml | nindent 8 }}
+      {{- end }}
+      {{- with $.Values.monitor.kafkaExporter.resources }}
+      resources:
+        limits:
+          cpu: {{ .limits.cpu | quote }}
+          memory: {{ .limits.memory | quote }}
+        requests:
+          cpu: {{ .requests.cpu | quote }}
+          memory: {{ .requests.memory | quote }}
+      {{- end }}
+    {{- end }}

@@ -49,6 +49,9 @@ var _ = Describe("host_utility_test", func() {
 							Fail: &troubleshoot.SingleOutcome{
 								Message: "utility isn't installed",
 							},
+							Warn: &troubleshoot.SingleOutcome{
+								Message: "utility isn't installed",
+							},
 						},
 					}}}
 		})
@@ -83,7 +86,7 @@ var _ = Describe("host_utility_test", func() {
 				}
 				res, err := hostUtilityAnalyzer.Analyze(getCollectedFileContents)
 				g.Expect(err).NotTo(HaveOccurred())
-				g.Expect(res[0].IsFail).Should(BeTrue())
+				g.Expect(res[0].IsWarn).Should(BeTrue())
 			}, timeOut).Should(Succeed())
 		})
 

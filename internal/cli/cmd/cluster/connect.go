@@ -34,7 +34,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/exec"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
-	"github.com/apecloud/kubeblocks/internal/controllerutil"
+	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
 var connectExample = templates.Examples(`
@@ -70,7 +70,7 @@ func NewConnectCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 	o := &ConnectOptions{ExecOptions: exec.NewExecOptions(f, streams)}
 	cmd := &cobra.Command{
 		Use:               "connect (NAME | -i INSTANCE-NAME)",
-		Short:             "Connect to a cluster or instance",
+		Short:             "Connect to a cluster or instance.",
 		Example:           connectExample,
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.ClusterGVR()),
 		Run: func(cmd *cobra.Command, args []string) {
@@ -155,7 +155,7 @@ func (o *ConnectOptions) connect(args []string) error {
 
 	// cluster name is not specified, get from pod label
 	if o.name == "" {
-		if name, ok := pod.Annotations[controllerutil.AppInstanceLabelKey]; !ok {
+		if name, ok := pod.Annotations[constant.AppInstanceLabelKey]; !ok {
 			return fmt.Errorf("failed to find the cluster to which the instance belongs")
 		} else {
 			o.name = name
@@ -329,26 +329,59 @@ func getCompCommandArgs(compDef *appsv1alpha1.ClusterComponentDefinition) ([]str
 // accounts, we need to do some special handling.
 //
 // TODO: Refactoring using command channel
+// examples of iinfo.Args are:
+// mysql :
+// command:
+// - mysql
+// args:
+// - -u$(MYSQL_ROOT_USER)
+// - -p$(MYSQL_ROOT_PASSWORD)
+// - -h
+// - $(KB_ACCOUNT_ENDPOINT)
+// - -e
+// - $(KB_ACCOUNT_STATEMENT)
+// but in redis, it looks like following:
+// redis :
+// command:
+// - sh
+// - -c
+// args:
+// - "redis-cli -h $(KB_ACCOUNT_ENDPOINT) $(KB_ACCOUNT_STATEMENT)"
 func buildCommand(info *engine.ConnectionInfo) []string {
-	command := []string{"sh", "-c"}
-	args := info.Command
-	for _, arg := range info.Args {
-		// KB_ACCOUNT_STATEMENT is used to create system accounts, ignore it
-		// replace KB_ACCOUNT_ENDPOINT with local host IP
-		if strings.Contains(arg, "$(KB_ACCOUNT_ENDPOINT)") && strings.Contains(arg, "$(KB_ACCOUNT_STATEMENT)") {
-			arg = strings.Replace(arg, "$(KB_ACCOUNT_ENDPOINT)", "127.0.0.1", 1)
-			arg = strings.Replace(arg, "$(KB_ACCOUNT_STATEMENT)", "", 1)
-			args = append(args, arg)
-			continue
-		}
-		if strings.Contains(arg, "$(KB_ACCOUNT_ENDPOINT)") {
-			args = append(args, strings.Replace(arg, "$(KB_ACCOUNT_ENDPOINT)", "127.0.0.1", 1))
-			continue
-		}
-		if strings.Contains(arg, "$(KB_ACCOUNT_STATEMENT)") {
-			continue
-		}
-		args = append(args, strings.Replace(strings.Replace(arg, "(", "", 1), ")", "", 1))
+	result := make([]string, 0)
+	var extraCmd string
+	// prepare commands
+	if len(info.Command) == 1 {
+		// append [sh -c]
+		result = append(result, "sh", "-c")
+		extraCmd = info.Command[0]
+	} else {
+		result = append(result, info.Command...)
 	}
-	return append(command, strings.Join(args, " "))
+	// prepare args
+	args := buildArgs(info.Args, extraCmd)
+	result = append(result, args)
+	return result
+}
+
+func buildArgs(args []string, extraCmd string) string {
+	result := make([]string, 0)
+	if len(extraCmd) > 0 {
+		result = append(result, extraCmd)
+	}
+	for i := 0; i < len(args); i++ {
+		arg := args[i]
+		// skip command
+		if arg == "-c" || arg == "-e" {
+			i++
+			continue
+		}
+
+		arg = strings.Replace(arg, "$(KB_ACCOUNT_ENDPOINT)", "127.0.0.1", 1)
+		arg = strings.Replace(arg, "$(KB_ACCOUNT_STATEMENT)", "", 1)
+		arg = strings.Replace(arg, "(", "", 1)
+		arg = strings.Replace(arg, ")", "", 1)
+		result = append(result, strings.TrimSpace(arg))
+	}
+	return strings.Join(result, " ")
 }

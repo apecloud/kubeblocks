@@ -22,6 +22,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
+	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -84,7 +85,7 @@ func rollingStatefulSets(param reconfigureParams) (ReturnedStatus, error) {
 
 func restartStsWithRolling(cli client.Client, ctx intctrlutil.RequestCtx, sts appsv1.StatefulSet, configKey string, newVersion string) error {
 	// cfgAnnotationKey := fmt.Sprintf("%s-%s", UpgradeRestartAnnotationKey, strings.ReplaceAll(configKey, "_", "-"))
-	cfgAnnotationKey := cfgcore.GenerateUniqKeyWithConfig(cfgcore.UpgradeRestartAnnotationKey, configKey)
+	cfgAnnotationKey := cfgcore.GenerateUniqKeyWithConfig(constant.UpgradeRestartAnnotationKey, configKey)
 
 	if sts.Spec.Template.Annotations == nil {
 		sts.Spec.Template.Annotations = map[string]string{}

@@ -24,21 +24,22 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-
 	batchv1 "k8s.io/api/batch/v1"
+
+	"github.com/spf13/viper"
+	"go.uber.org/zap/zapcore"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
-	// +kubebuilder:scaffold:imports
+	"github.com/apecloud/kubeblocks/internal/constant"
 
-	"github.com/spf13/viper"
-	"go.uber.org/zap/zapcore"
-	ctrl "sigs.k8s.io/controller-runtime"
+	// +kubebuilder:scaffold:imports
 
 	"github.com/apecloud/kubeblocks/internal/testutil"
 )
@@ -72,7 +73,7 @@ var _ = BeforeSuite(func() {
 
 	ctx, cancel = context.WithCancel(context.TODO())
 
-	viper.SetDefault("CM_NAMESPACE", "default")
+	viper.SetDefault(constant.CfgKeyCtrlrMgrNS, "default")
 	viper.SetDefault("KUBEBLOCKS_IMAGE", "apecloud/kubeblocks:latest")
 	fmt.Printf("config settings: %v\n", viper.AllSettings())
 
@@ -120,7 +121,6 @@ var _ = BeforeSuite(func() {
 		err = k8sManager.Start(ctx)
 		Expect(err).ToNot(HaveOccurred(), "failed to run manager")
 	}()
-
 })
 
 var _ = AfterSuite(func() {

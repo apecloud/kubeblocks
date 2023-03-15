@@ -12,8 +12,8 @@ spec:
     host: "$(SVC_FQDN)"
     port: "$(SVC_PORT_tcp-postgresql)"
   componentDefs:
-    - name: postgresql
-      workloadType: Stateful
+    - name: pg-replication
+      workloadType: Replication
       characterType: postgresql
       probes:
       monitor:
@@ -26,26 +26,26 @@ spec:
         - name: {{ $name }}
           filePathPattern: {{ $pattern }}
         {{- end }}
-      configSpec:
-        configTemplateRefs:
-          - name: postgresql-configuration
-            configTplRef: postgresql-configuration
-            configConstraintRef: postgresql14-cc
-            keys:
-              - postgresql.conf
-            namespace: {{ .Release.Namespace }}
-            volumeName: postgresql-config
-            defaultMode: 0777
-          - name: postgresql-scripts
-            configTplRef: postgresql-scripts
-            namespace: {{ .Release.Namespace }}
-            volumeName: scripts
-            defaultMode: 0777
-          - name: postgresql-custom-metrics
-            configTplRef: postgresql-custom-metrics
-            namespace: {{ .Release.Namespace }}
-            volumeName: postgresql-custom-metrics
-            defaultMode: 0777
+      configSpecs:
+        - name: postgresql-configuration
+          templateRef: postgresql-configuration
+          constraintRef: postgresql14-cc
+          keys:
+            - postgresql.conf
+          namespace: {{ .Release.Namespace }}
+          volumeName: postgresql-config
+          defaultMode: 0777
+        - name: postgresql-custom-metrics
+          templateRef: postgresql-custom-metrics
+          namespace: {{ .Release.Namespace }}
+          volumeName: postgresql-custom-metrics
+          defaultMode: 0777
+      scriptSpecs:
+        - name: postgresql-scripts
+          templateRef: postgresql-scripts
+          namespace: {{ .Release.Namespace }}
+          volumeName: scripts
+          defaultMode: 0777
       service:
         ports:
           - name: tcp-postgresql
@@ -55,6 +55,9 @@ spec:
           - name: http-metrics-postgresql
             port: 9187
             targetPort: http-metrics
+      volumeTypes:
+        - name: data
+          type: data
       podSpec:
         securityContext:
           fsGroup: 1001
@@ -75,7 +78,8 @@ spec:
             ports:
               - name: tcp-postgresql
                 containerPort: 5432
-
+            command:
+              - /scripts/setup.sh
             livenessProbe:
               failureThreshold: 6
               initialDelaySeconds: 30
@@ -167,10 +171,6 @@ spec:
               {{- if .Values.primary.extraEnvVars }}
               {{- include "tplvalues.render" (dict "value" .Values.primary.extraEnvVars "context" $) | nindent 12 }}
               {{- end }}
-            lifecycle:
-              postStart:
-                exec:
-                  command: ["/scripts/post_start.sh"]
             {{- if or .Values.primary.extraEnvVarsCM .Values.primary.extraEnvVarsSecret }}
             envFrom:
               {{- if .Values.primary.extraEnvVarsCM }}
@@ -242,10 +242,12 @@ spec:
       systemAccounts:
         cmdExecutorConfig:
           image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ default .Values.image.tag .Chart.AppVersion }}
-          command: ["psql"]
+          command:
+          - psql
           args:
           - -h$(KB_ACCOUNT_ENDPOINT)
-          - -c $(KB_ACCOUNT_STATEMENT)
+          - -c
+          - $(KB_ACCOUNT_STATEMENT)
           env:
           - name: PGUSER
             valueFrom:

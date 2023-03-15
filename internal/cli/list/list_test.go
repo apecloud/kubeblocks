@@ -22,9 +22,8 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	corev1 "k8s.io/api/core/v1"
-
 	"github.com/spf13/cobra"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
@@ -44,10 +43,10 @@ var _ = Describe("List", func() {
 	buf := new(bytes.Buffer)
 
 	buildTestCmd := func(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
-		o := NewListOptions(f, streams, schema.GroupVersionResource{Group: "", Resource: "pods", Version: types.VersionV1})
+		o := NewListOptions(f, streams, schema.GroupVersionResource{Group: "", Resource: "pods", Version: types.K8sCoreAPIVersion})
 		cmd := &cobra.Command{
 			Use:   "ls-test",
-			Short: "List test",
+			Short: "List test.",
 			Run: func(cmd *cobra.Command, args []string) {
 				_, err := o.Run()
 				util.CheckErr(err)

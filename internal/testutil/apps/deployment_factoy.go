@@ -21,7 +21,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
 type MockDeploymentFactory struct {
@@ -34,25 +34,25 @@ func NewDeploymentFactory(namespace, name, clusterName, componentName string) *M
 		&appsv1.Deployment{
 			ObjectMeta: metav1.ObjectMeta{
 				Labels: map[string]string{
-					intctrlutil.AppInstanceLabelKey:    clusterName,
-					intctrlutil.KBAppComponentLabelKey: componentName,
-					intctrlutil.AppManagedByLabelKey:   intctrlutil.AppName,
+					constant.AppInstanceLabelKey:    clusterName,
+					constant.KBAppComponentLabelKey: componentName,
+					constant.AppManagedByLabelKey:   constant.AppName,
 				},
 			},
 			Spec: appsv1.DeploymentSpec{
 				Selector: &metav1.LabelSelector{
 					MatchLabels: map[string]string{
-						intctrlutil.AppInstanceLabelKey:    clusterName,
-						intctrlutil.KBAppComponentLabelKey: componentName,
-						intctrlutil.AppManagedByLabelKey:   intctrlutil.AppName,
+						constant.AppInstanceLabelKey:    clusterName,
+						constant.KBAppComponentLabelKey: componentName,
+						constant.AppManagedByLabelKey:   constant.AppName,
 					},
 				},
 				Template: corev1.PodTemplateSpec{
 					ObjectMeta: metav1.ObjectMeta{
 						Labels: map[string]string{
-							intctrlutil.AppInstanceLabelKey:    clusterName,
-							intctrlutil.KBAppComponentLabelKey: componentName,
-							intctrlutil.AppManagedByLabelKey:   intctrlutil.AppName,
+							constant.AppInstanceLabelKey:    clusterName,
+							constant.KBAppComponentLabelKey: componentName,
+							constant.AppManagedByLabelKey:   constant.AppName,
 						},
 					},
 				},

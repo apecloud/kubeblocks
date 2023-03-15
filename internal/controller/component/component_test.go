@@ -17,12 +17,16 @@ limitations under the License.
 package component
 
 import (
+	"fmt"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	corev1 "k8s.io/api/core/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 )
@@ -33,12 +37,14 @@ var _ = Describe("component module", func() {
 
 	Context("has the BuildComponent function", func() {
 		const (
-			clusterDefName     = "test-clusterdef"
-			clusterVersionName = "test-clusterversion"
-			clusterName        = "test-cluster"
-			mysqlCompType      = "replicasets"
-			mysqlCompName      = "mysql"
-			nginxCompType      = "proxy"
+			clusterDefName           = "test-clusterdef"
+			clusterVersionName       = "test-clusterversion"
+			clusterName              = "test-cluster"
+			mysqlCompType            = "replicasets"
+			mysqlCompName            = "mysql"
+			nginxCompType            = "proxy"
+			mysqlSecretUserEnvName   = "MYSQL_ROOT_USER"
+			mysqlSecretPasswdEnvName = "MYSQL_ROOT_PASSWORD"
 		)
 
 		var (
@@ -113,6 +119,42 @@ var _ = Describe("component module", func() {
 				cluster.Spec.ComponentSpecs[0],
 				&clusterVersion.Spec.ComponentVersions[1])
 			Expect(len(component.PodSpec.InitContainers)).Should(Equal(1))
+		})
+
+		It("Test replace secretRef env placeholder token", func() {
+			By("mock connect credential and do replace placeholder token")
+			credentialMap := GetEnvReplacementMapForConnCredential(cluster.Name)
+			mockEnvs := []corev1.EnvVar{
+				{
+					Name: mysqlSecretUserEnvName,
+					ValueFrom: &corev1.EnvVarSource{
+						SecretKeyRef: &corev1.SecretKeySelector{
+							Key: "username",
+							LocalObjectReference: corev1.LocalObjectReference{
+								Name: constant.ConnCredentialPlaceHolder,
+							},
+						},
+					},
+				},
+				{
+					Name: mysqlSecretPasswdEnvName,
+					ValueFrom: &corev1.EnvVarSource{
+						SecretKeyRef: &corev1.SecretKeySelector{
+							Key: "password",
+							LocalObjectReference: corev1.LocalObjectReference{
+								Name: constant.ConnCredentialPlaceHolder,
+							},
+						},
+					},
+				},
+			}
+			mockEnvs = ReplaceSecretEnvVars(credentialMap, mockEnvs)
+			Expect(len(mockEnvs)).Should(Equal(2))
+			for _, env := range mockEnvs {
+				Expect(env.ValueFrom).ShouldNot(BeNil())
+				Expect(env.ValueFrom.SecretKeyRef).ShouldNot(BeNil())
+				Expect(env.ValueFrom.SecretKeyRef.Name).Should(Equal(fmt.Sprintf("%s-conn-credential", cluster.Name)))
+			}
 		})
 	})
 })

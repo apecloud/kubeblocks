@@ -18,6 +18,8 @@ package builder
 
 import (
 	"fmt"
+	"strconv"
+	"strings"
 	"testing"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -109,6 +111,8 @@ var _ = Describe("builder", func() {
 			clusterDefObj.Name, clusterVersionObj.Name).
 			AddComponent(mysqlCompName, mysqlCompType).SetReplicas(1).
 			AddVolumeClaimTemplate(testapps.DataVolumeName, &pvcSpec).
+			AddService(testapps.ServiceVPCName, corev1.ServiceTypeLoadBalancer).
+			AddService(testapps.ServiceInternetName, corev1.ServiceTypeLoadBalancer).
 			GetObject()
 		key := client.ObjectKeyFromObject(clusterObj)
 		if needCreate {
@@ -208,9 +212,9 @@ var _ = Describe("builder", func() {
 
 		It("builds Service correctly", func() {
 			params := newParams()
-			svc, err := BuildSvc(*params, true)
+			svcList, err := BuildSvcList(*params)
 			Expect(err).Should(BeNil())
-			Expect(svc).ShouldNot(BeNil())
+			Expect(svcList).ShouldNot(BeEmpty())
 		})
 
 		It("builds Conn. Credential correctly", func() {
@@ -219,18 +223,33 @@ var _ = Describe("builder", func() {
 			Expect(err).Should(BeNil())
 			Expect(credential).ShouldNot(BeNil())
 			// "username":      "root",
-			// "svcFQDN":       "$(SVC_FQDN)",
-			// "password":      "$(RANDOM_PASSWD)",
+			// "SVC_FQDN":      "$(SVC_FQDN)",
+			// "RANDOM_PASSWD": "$(RANDOM_PASSWD)",
 			// "tcpEndpoint":   "tcp:$(SVC_FQDN):$(SVC_PORT_mysql)",
 			// "paxosEndpoint": "paxos:$(SVC_FQDN):$(SVC_PORT_paxos)",
+			// "UUID":          "$(UUID)",
+			// "UUID_B64":      "$(UUID_B64)",
+			// "UUID_STR_B64":  "$(UUID_STR_B64)",
+			// "UUID_HEX":      "$(UUID_HEX)",
 			Expect(credential.StringData).ShouldNot(BeEmpty())
 			Expect(credential.StringData["username"]).Should(Equal("root"))
-			Expect(credential.StringData["password"]).Should(HaveLen(8))
+
+			for _, v := range []string{
+				"SVC_FQDN",
+				"RANDOM_PASSWD",
+				"UUID",
+				"UUID_B64",
+				"UUID_STR_B64",
+				"UUID_HEX",
+			} {
+				Expect(credential.StringData[v]).ShouldNot(BeEquivalentTo(fmt.Sprintf("$(%s)", v)))
+			}
+			Expect(credential.StringData["RANDOM_PASSWD"]).Should(HaveLen(8))
 			svcFQDN := fmt.Sprintf("%s-%s.%s.svc", params.Cluster.Name, params.Component.Name,
 				params.Cluster.Namespace)
 			var mysqlPort corev1.ServicePort
 			var paxosPort corev1.ServicePort
-			for _, s := range params.Component.Service.Ports {
+			for _, s := range params.Component.Services[0].Spec.Ports {
 				switch s.Name {
 				case "mysql":
 					mysqlPort = s
@@ -238,9 +257,10 @@ var _ = Describe("builder", func() {
 					paxosPort = s
 				}
 			}
-			Expect(credential.StringData["svcFQDN"]).Should(Equal(svcFQDN))
+			Expect(credential.StringData["SVC_FQDN"]).Should(Equal(svcFQDN))
 			Expect(credential.StringData["tcpEndpoint"]).Should(Equal(fmt.Sprintf("tcp:%s:%d", svcFQDN, mysqlPort.Port)))
 			Expect(credential.StringData["paxosEndpoint"]).Should(Equal(fmt.Sprintf("paxos:%s:%d", svcFQDN, paxosPort.Port)))
+
 		})
 
 		It("builds StatefulSet correctly", func() {
@@ -260,6 +280,8 @@ var _ = Describe("builder", func() {
 			Expect(err).Should(BeNil())
 			Expect(sts).ShouldNot(BeNil())
 			Expect(*sts.Spec.Replicas).Should(Equal(int32(0)))
+			Expect(sts.Spec.VolumeClaimTemplates[0].Labels[constant.VolumeTypeLabelKey]).
+				Should(Equal(string(appsv1alpha1.VolumeTypeData)))
 			// test workload type replication
 			replComponent := *params.Component
 			replComponent.Replicas = 2
@@ -315,25 +337,52 @@ var _ = Describe("builder", func() {
 			Expect(len(cfg.Data) == 4).Should(BeTrue())
 		})
 
-		It("builds Env Config with Replication status correctly", func() {
+		It("builds Env Config with Replication component correctly", func() {
 			params := newParams()
-			params.Cluster.Status.Components = map[string]appsv1alpha1.ClusterComponentStatus{
-				params.Component.Name: {
-					ReplicationSetStatus: &appsv1alpha1.ReplicationSetStatus{
-						Primary: appsv1alpha1.ReplicationMemberStatus{
-							Pod: "pod1",
-						},
-						Secondaries: []appsv1alpha1.ReplicationMemberStatus{{
-							Pod: "pod2",
-						}, {
-							Pod: "pod3",
-						}},
-					},
-				}}
-			cfg, err := BuildEnvConfig(*params)
-			Expect(err).Should(BeNil())
-			Expect(cfg).ShouldNot(BeNil())
-			Expect(len(cfg.Data) == 4).Should(BeTrue())
+			params.Component.WorkloadType = appsv1alpha1.Replication
+
+			var cfg *corev1.ConfigMap
+			var err error
+
+			checkEnvValues := func() {
+				cfg, err = BuildEnvConfig(*params)
+				Expect(err).Should(BeNil())
+				Expect(cfg).ShouldNot(BeNil())
+				Expect(len(cfg.Data) == int(2+params.Component.Replicas)).Should(BeTrue())
+				Expect(cfg.Data["KB_"+strings.ToUpper(params.Component.Type)+"_N"]).
+					Should(Equal(strconv.Itoa(int(params.Component.Replicas))))
+				stsName := fmt.Sprintf("%s-%s", params.Cluster.Name, params.Component.Name)
+				svcName := fmt.Sprintf("%s-headless", stsName)
+				By("Checking KB_PRIMARY_POD_NAME value be right")
+				if int(*params.Component.PrimaryIndex) == 0 {
+					Expect(cfg.Data["KB_PRIMARY_POD_NAME"]).
+						Should(Equal(stsName + "-" + strconv.Itoa(int(*params.Component.PrimaryIndex)) + "." + svcName))
+				} else {
+					Expect(cfg.Data["KB_PRIMARY_POD_NAME"]).
+						Should(Equal(stsName + "-" + strconv.Itoa(int(*params.Component.PrimaryIndex)) + "-0." + svcName))
+				}
+				for i := 0; i < int(params.Component.Replicas); i++ {
+					if i == 0 {
+						By("Checking the 1st replica's hostname should not have suffix '-0'")
+						Expect(cfg.Data["KB_"+strings.ToUpper(params.Component.Type)+"_"+strconv.Itoa(i)+"_HOSTNAME"]).
+							Should(Equal(stsName + "-" + strconv.Itoa(0) + "." + svcName))
+					} else {
+						Expect(cfg.Data["KB_"+strings.ToUpper(params.Component.Type)+"_"+strconv.Itoa(i)+"_HOSTNAME"]).
+							Should(Equal(stsName + "-" + strconv.Itoa(int(*params.Component.PrimaryIndex)) + "-0." + svcName))
+					}
+				}
+			}
+
+			By("Checking env values with primaryIndex=0 ")
+			var mockPrimaryIndex = int32(testapps.DefaultReplicationPrimaryIndex)
+			params.Component.PrimaryIndex = &mockPrimaryIndex
+			checkEnvValues()
+
+			By("Checking env values with primaryIndex=1 ")
+			params.Component.Replicas = 2
+			var newPrimaryIndex = int32(1)
+			params.Component.PrimaryIndex = &newPrimaryIndex
+			checkEnvValues()
 		})
 
 		It("builds BackupPolicy correctly", func() {
@@ -387,12 +436,14 @@ var _ = Describe("builder", func() {
 		It("builds ConfigMap with template correctly", func() {
 			config := map[string]string{}
 			params := newParams()
-			tplCfg := appsv1alpha1.ConfigTemplate{
-				Name:                "test-config-tpl",
-				ConfigTplRef:        "test-config-tpl",
+			tplCfg := appsv1alpha1.ComponentConfigSpec{
+				ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
+					Name:        "test-config-tpl",
+					TemplateRef: "test-config-tpl",
+				},
 				ConfigConstraintRef: "test-config-constraint",
 			}
-			configmap, err := BuildConfigMapWithTemplate(config, *params, "test-cm", tplCfg)
+			configmap, err := BuildConfigMapWithTemplate(config, *params, "test-cm", tplCfg.ConfigConstraintRef, tplCfg.ComponentTemplateSpec)
 			Expect(err).Should(BeNil())
 			Expect(configmap).ShouldNot(BeNil())
 		})

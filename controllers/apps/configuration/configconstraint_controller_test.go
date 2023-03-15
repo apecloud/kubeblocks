@@ -19,17 +19,17 @@ package configuration
 import (
 	"time"
 
-	corev1 "k8s.io/api/core/v1"
-	"sigs.k8s.io/controller-runtime/pkg/log"
-
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	"github.com/apecloud/kubeblocks/internal/constant"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/generics"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 )
 
@@ -82,7 +82,7 @@ var _ = Describe("ConfigConstraint Controller", func() {
 			By("Create a clusterDefinition obj")
 			clusterDefObj := testapps.NewClusterDefFactory(clusterDefName).
 				AddComponent(testapps.StatefulMySQLComponent, statefulCompType).
-				AddConfigTemplate(configTplName, configmap.Name, constraint.Name, testCtx.DefaultNamespace, configVolumeName, nil).
+				AddConfigTemplate(configTplName, configmap.Name, constraint.Name, testCtx.DefaultNamespace, configVolumeName).
 				AddLabels(cfgcore.GenerateTPLUniqLabelKeyWithConfig(configTplName), configmap.Name,
 					cfgcore.GenerateConstraintsUniqLabelKeyWithConfig(constraint.Name), constraint.Name).
 				Create(&testCtx).GetObject()
@@ -98,7 +98,7 @@ var _ = Describe("ConfigConstraint Controller", func() {
 			Eventually(testapps.CheckObj(&testCtx, constraintKey,
 				func(g Gomega, tpl *appsv1alpha1.ConfigConstraint) {
 					g.Expect(tpl.Status.Phase).To(BeEquivalentTo(appsv1alpha1.AvailablePhase))
-					g.Expect(tpl.Finalizers).To(ContainElement(cfgcore.ConfigurationTemplateFinalizerName))
+					g.Expect(tpl.Finalizers).To(ContainElement(constant.ConfigurationTemplateFinalizerName))
 				})).Should(Succeed())
 
 			By("By delete ConfigConstraint")

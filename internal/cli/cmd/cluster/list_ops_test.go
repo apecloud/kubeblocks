@@ -22,7 +22,6 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
@@ -49,6 +48,7 @@ var _ = Describe("Expose", func() {
 	var (
 		streams genericclioptions.IOStreams
 		tf      *cmdtesting.TestFactory
+		opsName string
 	)
 
 	BeforeEach(func() {
@@ -104,6 +104,7 @@ var _ = Describe("Expose", func() {
 		for i := range opsTypes {
 			opsList[i] = generateOpsObject(opsTypes[i], phases[i])
 		}
+		opsName = opsList[0].(*appsv1alpha1.OpsRequest).Name
 		tf.FakeDynamicClient = clitesting.FakeDynamicClient(opsList...)
 	}
 
@@ -129,6 +130,9 @@ var _ = Describe("Expose", func() {
 
 		By("init opsRequests for testing")
 		initOpsRequests()
+
+		By("test run cmd")
+		cmd.Run(cmd, nil)
 
 		By("test status flag with default values")
 		o := initOpsOption([]string{pending, running, failed}, nil)
@@ -168,6 +172,27 @@ var _ = Describe("Expose", func() {
 		o = initOpsOption([]string{all}, []string{string(appsv1alpha1.UpgradeType)})
 		Expect(o.printOpsList()).Should(Succeed())
 		Expect(o.Out).Should(ContainSubstring(statefulCompName + "," + statelessCompName))
+
+		By("list-ops with specified name")
+		o = initOpsOption(nil, nil)
+		o.opsRequestName = opsName
+		Expect(o.printOpsList()).Should(Succeed())
+		Expect(getStdoutLinesCount(o.Out)).Should(Equal(2))
+
+		By("list-ops with not exist ops")
+		o = initOpsOption(nil, nil)
+		o.opsRequestName = "not-exist-ops"
+		done := clitesting.Capture()
+		Expect(o.printOpsList()).Should(Succeed())
+		capturedOutput, _ := done()
+		Expect(clitesting.ContainExpectStrings(capturedOutput, "No opsRequests found")).Should(BeTrue())
+
+		By("list-ops with not exist ops")
+		o = initOpsOption([]string{pending}, []string{string(appsv1alpha1.RestartType)})
+		done = clitesting.Capture()
+		Expect(o.printOpsList()).Should(Succeed())
+		capturedOutput, _ = done()
+		Expect(clitesting.ContainExpectStrings(capturedOutput, "kbcli cluster list-ops --status all")).Should(BeTrue())
 	})
 
 })

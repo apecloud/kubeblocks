@@ -47,6 +47,7 @@ import (
 	"helm.sh/helm/v3/pkg/storage"
 	"helm.sh/helm/v3/pkg/storage/driver"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/client-go/rest"
 
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 )
@@ -68,12 +69,6 @@ type InstallOpts struct {
 }
 
 type Option func(*cli.EnvSettings)
-
-func WithContext(context string) Option {
-	return func(es *cli.EnvSettings) {
-		es.KubeContext = context
-	}
-}
 
 // AddRepo will add a repo
 func AddRepo(r *repo.Entry) error {
@@ -160,16 +155,21 @@ func (i *InstallOpts) GetInstalled(cfg *action.Configuration) (*release.Release,
 }
 
 // Install will install a Chart
-func (i *InstallOpts) Install(cfg *action.Configuration) (string, error) {
+func (i *InstallOpts) Install(cfg *Config) (string, error) {
 	ctx := context.Background()
 	opts := retry.Options{
 		MaxRetry: 1 + i.TryTimes,
 	}
 
+	actionCfg, err := NewActionConfig(cfg)
+	if err != nil {
+		return "", err
+	}
+
 	var notes string
 	if err := retry.IfNecessary(ctx, func() error {
 		var err1 error
-		if notes, err1 = i.tryInstall(cfg); err1 != nil {
+		if notes, err1 = i.tryInstall(actionCfg); err1 != nil {
 			return err1
 		}
 		return nil
@@ -204,6 +204,7 @@ func (i *InstallOpts) tryInstall(cfg *action.Configuration) (string, error) {
 	client.Namespace = i.Namespace
 	client.CreateNamespace = i.CreateNamespace
 	client.Wait = i.Wait
+	client.WaitForJobs = i.Wait
 	client.Timeout = i.Timeout
 	client.Version = i.Version
 	client.Atomic = i.Atomic
@@ -252,14 +253,22 @@ func (i *InstallOpts) tryInstall(cfg *action.Configuration) (string, error) {
 }
 
 // Uninstall will uninstall a Chart
-func (i *InstallOpts) Uninstall(cfg *action.Configuration) error {
+func (i *InstallOpts) Uninstall(cfg *Config) error {
 	ctx := context.Background()
 	opts := retry.Options{
 		MaxRetry: 1 + i.TryTimes,
 	}
+	if cfg.Namespace() == "" {
+		cfg.SetNamespace(i.Namespace)
+	}
+
+	actionCfg, err := NewActionConfig(cfg)
+	if err != nil {
+		return err
+	}
 
 	if err := retry.IfNecessary(ctx, func() error {
-		if err := i.tryUninstall(cfg); err != nil {
+		if err := i.tryUninstall(actionCfg); err != nil {
 			return err
 		}
 		return nil
@@ -295,21 +304,22 @@ func (i *InstallOpts) tryUninstall(cfg *action.Configuration) error {
 	return nil
 }
 
-func NewActionConfig(ns string, config string, opts ...Option) (*action.Configuration, error) {
-	return NewActionConfigWithLog(ns, config, GetQuiteLog(), opts...)
-}
+func NewActionConfig(cfg *Config) (*action.Configuration, error) {
+	if cfg.fake {
+		return fakeActionConfig(), nil
+	}
 
-func NewActionConfigWithLog(ns string, config string, logFn action.DebugLog, opts ...Option) (*action.Configuration, error) {
 	var err error
 	settings := cli.New()
-	cfg := new(action.Configuration)
-
-	settings.SetNamespace(ns)
-	settings.KubeConfig = config
-	for _, opt := range opts {
-		opt(settings)
+	actionCfg := new(action.Configuration)
+	settings.SetNamespace(cfg.namespace)
+	settings.KubeConfig = cfg.kubeConfig
+	if cfg.kubeContext != "" {
+		settings.KubeContext = cfg.kubeContext
 	}
-	if cfg.RegistryClient, err = registry.NewClient(
+	settings.Debug = cfg.debug
+
+	if actionCfg.RegistryClient, err = registry.NewClient(
 		registry.ClientOptDebug(settings.Debug),
 		registry.ClientOptEnableCache(true),
 		registry.ClientOptWriter(io.Discard),
@@ -317,14 +327,24 @@ func NewActionConfigWithLog(ns string, config string, logFn action.DebugLog, opt
 	); err != nil {
 		return nil, err
 	}
-	if err = cfg.Init(settings.RESTClientGetter(), settings.Namespace(),
-		os.Getenv("HELM_DRIVER"), logFn); err != nil {
+
+	// do not output warnings
+	getter := settings.RESTClientGetter()
+	getter.(*genericclioptions.ConfigFlags).WrapConfigFn = func(c *rest.Config) *rest.Config {
+		c.WarningHandler = rest.NoWarnings{}
+		return c
+	}
+
+	if err = actionCfg.Init(settings.RESTClientGetter(),
+		settings.Namespace(),
+		os.Getenv("HELM_DRIVER"),
+		cfg.logFn); err != nil {
 		return nil, err
 	}
-	return cfg, nil
+	return actionCfg, nil
 }
 
-func FakeActionConfig() *action.Configuration {
+func fakeActionConfig() *action.Configuration {
 	registryClient, err := registry.NewClient()
 	if err != nil {
 		return nil
@@ -340,15 +360,20 @@ func FakeActionConfig() *action.Configuration {
 }
 
 // Upgrade will upgrade a Chart
-func (i *InstallOpts) Upgrade(cfg *action.Configuration) error {
+func (i *InstallOpts) Upgrade(cfg *Config) error {
 	ctx := context.Background()
 	opts := retry.Options{
 		MaxRetry: 1 + i.TryTimes,
 	}
 
-	if err := retry.IfNecessary(ctx, func() error {
+	actionCfg, err := NewActionConfig(cfg)
+	if err != nil {
+		return err
+	}
+
+	if err = retry.IfNecessary(ctx, func() error {
 		var err1 error
-		if _, err1 = i.tryUpgrade(cfg); err1 != nil {
+		if _, err1 = i.tryUpgrade(actionCfg); err1 != nil {
 			return err1
 		}
 		return nil
@@ -370,6 +395,7 @@ func (i *InstallOpts) tryUpgrade(cfg *action.Configuration) (string, error) {
 	client := action.NewUpgrade(cfg)
 	client.Namespace = i.Namespace
 	client.Wait = i.Wait
+	client.WaitForJobs = i.Wait
 	client.Timeout = i.Timeout
 	if client.Timeout == 0 {
 		client.Timeout = defaultTimeout
@@ -509,8 +535,8 @@ func GetQuiteLog() action.DebugLog {
 	return func(format string, v ...interface{}) {}
 }
 
-func GetVerboseLog(log genericclioptions.IOStreams) action.DebugLog {
+func GetVerboseLog(out io.Writer) action.DebugLog {
 	return func(format string, v ...interface{}) {
-		fmt.Fprintf(log.Out, format+"\n", v...)
+		fmt.Fprintf(out, format+"\n", v...)
 	}
 }

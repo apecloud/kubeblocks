@@ -55,11 +55,12 @@ const (
 	StoppedPhase           Phase = "Stopped"
 	StoppingPhase          Phase = "Stopping"
 	StartingPhase          Phase = "Starting"
+	ExposingPhase          Phase = "Exposing"
 )
 
 // OpsType defines operation types.
 // +enum
-// +kubebuilder:validation:Enum={Upgrade,VerticalScaling,VolumeExpansion,HorizontalScaling,Restart,Reconfiguring,Start,Stop}
+// +kubebuilder:validation:Enum={Upgrade,VerticalScaling,VolumeExpansion,HorizontalScaling,Restart,Reconfiguring,Start,Stop,Expose}
 type OpsType string
 
 const (
@@ -71,6 +72,7 @@ const (
 	RestartType           OpsType = "Restart"
 	StopType              OpsType = "Stop"
 	StartType             OpsType = "Start"
+	ExposeType            OpsType = "Expose"
 )
 
 // AccessMode define SVC access mode enums.
@@ -353,6 +355,38 @@ const (
 	IssuerKubeBlocks IssuerName = "KubeBlocks"
 	// IssuerUserProvided User provided own CA-signed certificates.
 	IssuerUserProvided IssuerName = "UserProvided"
+)
+
+// SwitchPolicyType defines switchPolicy type.
+// +enum
+// +kubebuilder:validation:Enum={MaximumAvailability, MaximumDataProtection, Noop}
+type SwitchPolicyType string
+
+const (
+	MaximumAvailability   SwitchPolicyType = "MaximumAvailability"
+	MaximumDataProtection SwitchPolicyType = "MaximumDataProtection"
+	Noop                  SwitchPolicyType = "Noop"
+)
+
+// SwitchStepRole defines the role to execute the switch command.
+// +enum
+// +kubebuilder:validation:Enum={NewPrimary, OldPrimary, Secondaries}
+type SwitchStepRole string
+
+const (
+	NewPrimary  SwitchStepRole = "NewPrimary"
+	OldPrimary  SwitchStepRole = "OldPrimary"
+	Secondaries SwitchStepRole = "Secondaries"
+)
+
+// VolumeType defines volume type for backup data or log.
+// +enum
+// +kubebuilder:validation:Enum={data,log}
+type VolumeType string
+
+const (
+	VolumeTypeData VolumeType = "data"
+	VolumeTypeLog  VolumeType = "log"
 )
 
 func RegisterWebhookManager(mgr manager.Manager) {

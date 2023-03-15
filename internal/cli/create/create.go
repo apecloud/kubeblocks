@@ -35,6 +35,7 @@ import (
 	k8sapitypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/kubernetes"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 
 	"github.com/apecloud/kubeblocks/internal/cli/types"
@@ -87,6 +88,12 @@ type Inputs struct {
 
 	// PreCreate optional, make changes on yaml before create
 	PreCreate func(*unstructured.Unstructured) error
+
+	// CustomOutPut will be executed after creating successfully.
+	CustomOutPut func(options *BaseOptions)
+
+	// ResourceNameGVRForCompletion resource name for completion.
+	ResourceNameGVRForCompletion schema.GroupVersionResource
 }
 
 // BaseOptions the options of creation command should inherit baseOptions
@@ -97,7 +104,9 @@ type BaseOptions struct {
 	// Name Resource name of the command line operation
 	Name string `json:"name"`
 
-	Client dynamic.Interface `json:"-"`
+	Dynamic dynamic.Interface `json:"-"`
+
+	Client kubernetes.Interface `json:"-"`
 
 	// Quiet minimize unnecessary output
 	Quiet bool
@@ -108,9 +117,10 @@ type BaseOptions struct {
 // BuildCommand build create command
 func BuildCommand(inputs Inputs) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     inputs.Use,
-		Short:   inputs.Short,
-		Example: inputs.Example,
+		Use:               inputs.Use,
+		Short:             inputs.Short,
+		Example:           inputs.Example,
+		ValidArgsFunction: util.ResourceNameCompletionFunc(inputs.Factory, inputs.ResourceNameGVRForCompletion),
 		Run: func(cmd *cobra.Command, args []string) {
 			util.CheckErr(inputs.BaseOptionsObj.Complete(inputs, args))
 			util.CheckErr(inputs.BaseOptionsObj.Validate(inputs))
@@ -133,7 +143,11 @@ func (o *BaseOptions) Complete(inputs Inputs, args []string) error {
 		o.Name = args[0]
 	}
 
-	if o.Client, err = inputs.Factory.DynamicClient(); err != nil {
+	if o.Dynamic, err = inputs.Factory.DynamicClient(); err != nil {
+		return err
+	}
+
+	if o.Client, err = inputs.Factory.KubernetesClientSet(); err != nil {
 		return err
 	}
 
@@ -188,19 +202,25 @@ func (o *BaseOptions) Run(inputs Inputs) error {
 	}
 	group := inputs.Group
 	if len(group) == 0 {
-		group = types.Group
+		group = types.AppsAPIGroup
 	}
 
 	version := inputs.Version
 	if len(version) == 0 {
-		version = types.Version
+		version = types.AppsAPIVersion
 	}
 	// create k8s resource
 	gvr := schema.GroupVersionResource{Group: group, Version: version, Resource: inputs.ResourceName}
-	if unstructuredObj, err = o.Client.Resource(gvr).Namespace(o.Namespace).Create(context.TODO(), unstructuredObj, metav1.CreateOptions{}); err != nil {
+	if unstructuredObj, err = o.Dynamic.Resource(gvr).Namespace(o.Namespace).Create(context.TODO(), unstructuredObj, metav1.CreateOptions{}); err != nil {
 		return err
 	}
-	if !o.Quiet {
+	o.Name = unstructuredObj.GetName()
+	if o.Quiet {
+		return nil
+	}
+	if inputs.CustomOutPut != nil {
+		inputs.CustomOutPut(o)
+	} else {
 		fmt.Fprintf(o.Out, "%s %s created\n", unstructuredObj.GetKind(), unstructuredObj.GetName())
 	}
 	return nil
@@ -234,12 +254,12 @@ func (o *BaseOptions) RunAsApply(inputs Inputs) error {
 
 	group := inputs.Group
 	if len(group) == 0 {
-		group = types.Group
+		group = types.AppsAPIGroup
 	}
 
 	version := inputs.Version
 	if len(version) == 0 {
-		version = types.Version
+		version = types.AppsAPIVersion
 	}
 	// create k8s resource
 	gvr := schema.GroupVersionResource{Group: group, Version: version, Resource: inputs.ResourceName}
@@ -251,13 +271,13 @@ func (o *BaseOptions) RunAsApply(inputs Inputs) error {
 	if err != nil {
 		return err
 	}
-	if _, err := o.Client.Resource(gvr).Namespace(o.Namespace).Patch(
+	if _, err := o.Dynamic.Resource(gvr).Namespace(o.Namespace).Patch(
 		context.TODO(), objectName, k8sapitypes.MergePatchType,
 		objectByte, metav1.PatchOptions{}); err != nil {
 
 		// create object if not found
 		if errors.IsNotFound(err) {
-			if _, err = o.Client.Resource(gvr).Namespace(o.Namespace).Create(
+			if _, err = o.Dynamic.Resource(gvr).Namespace(o.Namespace).Create(
 				context.TODO(), unstructuredObj, metav1.CreateOptions{}); err != nil {
 				return err
 			}

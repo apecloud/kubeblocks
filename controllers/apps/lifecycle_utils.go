@@ -1130,7 +1130,7 @@ func getBackupMatchingLabels(clusterName string, componentName string) client.Ma
 	return client.MatchingLabels{
 		constant.AppInstanceLabelKey:    clusterName,
 		constant.KBAppComponentLabelKey: componentName,
-		constant.AppManagedByLabelKey:   constant.AppName,
+		constant.AutoCreatedByKey:       "h-scale", // used for identify which operation create the resources
 	}
 }
 

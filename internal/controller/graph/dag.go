@@ -37,8 +37,21 @@ type realEdge struct {
 	F, T Vertex
 }
 
+// WalkFunc defines the action should be taken when we walk through the DAG.
+// the func is vertex basis
 type WalkFunc func(v Vertex) error
 
+var _ Edge = &realEdge{}
+
+func (r *realEdge) From() Vertex {
+	return r.F
+}
+
+func (r *realEdge) To() Vertex {
+	return r.T
+}
+
+// AddVertex put 'v' into 'd'
 func (d *DAG) AddVertex(v Vertex) bool {
 	if v == nil {
 		return false
@@ -47,8 +60,10 @@ func (d *DAG) AddVertex(v Vertex) bool {
 	return true
 }
 
+// RemoveVertex delete 'v' from 'd'
+// the in&out edges are also deleted
 func (d *DAG) RemoveVertex(v Vertex) bool {
-	if v == 0 {
+	if v == nil {
 		return true
 	}
 	for k := range d.edges {
@@ -60,6 +75,7 @@ func (d *DAG) RemoveVertex(v Vertex) bool {
 	return true
 }
 
+// Vertices return all vertices in 'd'
 func (d *DAG) Vertices() []Vertex {
 	vertices := make([]Vertex, 0)
 	for v := range d.vertices {
@@ -68,6 +84,7 @@ func (d *DAG) Vertices() []Vertex {
 	return vertices
 }
 
+// AddEdge put edge 'e' into 'd'
 func (d *DAG) AddEdge(e Edge) bool {
 	if e.From() == nil || e.To() == nil {
 		return false
@@ -81,6 +98,7 @@ func (d *DAG) AddEdge(e Edge) bool {
 	return true
 }
 
+// RemoveEdge delete edge 'e'
 func (d *DAG) RemoveEdge(e Edge) bool {
 	for k := range d.edges {
 		if k.From() == e.From() && k.To() == e.To() {
@@ -90,6 +108,7 @@ func (d *DAG) RemoveEdge(e Edge) bool {
 	return true
 }
 
+// Connect vertex 'from' to 'to' by a new edge if not exist
 func (d *DAG) Connect(from, to Vertex) bool {
 	if from == nil || to == nil {
 		return false
@@ -104,6 +123,7 @@ func (d *DAG) Connect(from, to Vertex) bool {
 	return true
 }
 
+// WalkTopoOrder walk the DAG 'd' in topology order
 func (d *DAG) WalkTopoOrder(walkFunc WalkFunc) error {
 	if err := d.validate(); err != nil {
 		return err
@@ -117,6 +137,7 @@ func (d *DAG) WalkTopoOrder(walkFunc WalkFunc) error {
 	return nil
 }
 
+// WalkReverseTopoOrder walk the DAG 'd' in reverse topology order
 func (d *DAG) WalkReverseTopoOrder(walkFunc WalkFunc) error {
 	if err := d.validate(); err != nil {
 		return err
@@ -130,6 +151,8 @@ func (d *DAG) WalkReverseTopoOrder(walkFunc WalkFunc) error {
 	return nil
 }
 
+// Root return root vertex that has no in adjacent.
+// our DAG should have one and only one root vertex
 func (d *DAG) Root() Vertex {
 	roots := make([]Vertex, 0)
 	for n := range d.vertices {
@@ -143,6 +166,7 @@ func (d *DAG) Root() Vertex {
 	return roots[0]
 }
 
+// String return a string representation of the DAG in topology order
 func (d *DAG) String() string {
 	str := "|"
 	walkFunc := func(v Vertex) error {
@@ -202,7 +226,8 @@ func (d *DAG) validate() error {
 	return nil
 }
 
-// topologicalOrder assumes 'd' is a legal DAG
+// topologicalOrder return a vertex list that is in topology order
+// 'd' MUST be a legal DAG
 func (d *DAG) topologicalOrder(reverse bool) []Vertex {
 	// orders is what we want, a (reverse) topological order of this DAG
 	orders := make([]Vertex, 0)
@@ -257,14 +282,7 @@ func (d *DAG) inAdj(v Vertex) []Vertex {
 	return vertices
 }
 
-func (r *realEdge) From() Vertex {
-	return r.F
-}
-
-func (r *realEdge) To() Vertex {
-	return r.T
-}
-
+// NewDAG new an empty DAG
 func NewDAG() *DAG {
 	dag := &DAG{
 		vertices: make(map[Vertex]Vertex),

@@ -94,3 +94,28 @@ func TestValidate(t *testing.T) {
 		t.Error("error not expected")
 	}
 }
+
+func TestRemoveVertex(t *testing.T) {
+	dag := NewDAG()
+	for i := 0; i < 4; i++ {
+		dag.AddVertex(i)
+	}
+	dag.Connect(0, 1)
+	dag.Connect(1, 2)
+	dag.Connect(1, 3)
+	if len(dag.vertices) != 4 {
+		t.Error("unexpected vertices", len(dag.vertices))
+	}
+	if len(dag.edges) != 3 {
+		t.Error("unexpected edges", len(dag.edges))
+	}
+	for i := 3; i >= 0; i-- {
+		dag.RemoveVertex(i)
+	}
+	if len(dag.vertices) != 0 {
+		t.Error("unexpected vertices", len(dag.vertices))
+	}
+	if len(dag.edges) != 0 {
+		t.Error("unexpected edges", len(dag.edges))
+	}
+}

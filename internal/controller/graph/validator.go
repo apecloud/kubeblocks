@@ -16,6 +16,7 @@ limitations under the License.
 
 package graph
 
+// Validator validate everything is ok before Build the plan
 type Validator interface {
 	Validate() error
 }

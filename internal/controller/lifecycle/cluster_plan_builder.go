@@ -42,6 +42,7 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
+// clusterPlanBuilder a graph.PlanBuilder implementation for Cluster reconciliation
 type clusterPlanBuilder struct {
 	ctx      intctrlutil.RequestCtx
 	cli      client.Client
@@ -51,6 +52,7 @@ type clusterPlanBuilder struct {
 	conMgr   clusterConditionManager2
 }
 
+// // clusterPlan a graph.Plan implementation for Cluster reconciliation
 type clusterPlan struct {
 	dag      *graph.DAG
 	walkFunc graph.WalkFunc

@@ -568,3 +568,13 @@ func (r *AddonSpec) GetSortedDefaultInstallValues() []AddonDefaultInstallSpecIte
 	}
 	return values
 }
+
+// NewAddonInstallSpecItem creates an initialized AddonInstallSpecItem object
+func NewAddonInstallSpecItem() AddonInstallSpecItem {
+	return AddonInstallSpecItem{
+		Resources: ResourceRequirements{
+			Requests: corev1.ResourceList{},
+			Limits:   corev1.ResourceList{},
+		},
+	}
+}

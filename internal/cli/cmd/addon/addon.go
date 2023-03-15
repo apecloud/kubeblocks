@@ -54,6 +54,7 @@ type addonEnableFlags struct {
 	ReplicaCountSets []string
 	StorageClassSets []string
 	TolerationsSet   []string
+	SetValues        []string
 }
 
 func (r *addonEnableFlags) useDefault() bool {
@@ -164,7 +165,11 @@ func newEnableCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 
         # Enabled "prometheus" addon with tolerations 
     	kbcli addon enable prometheus --tolerations '[[{"key":"taintkey","operator":"Equal","effect":"NoSchedule","value":"true"}]]' \
-			--tolerations 'alertmanager:[[{"key":"taintkey","operator":"Equal","effect":"NoSchedule","value":"true"}]]'`),
+			--tolerations 'alertmanager:[[{"key":"taintkey","operator":"Equal","effect":"NoSchedule","value":"true"}]]'
+
+		# Enabled "prometheus" addon with helm like custom settings
+		kbcli addon enable prometheus --set prometheus.alertmanager.image.tag=v0.24.0
+`),
 		Run: func(cmd *cobra.Command, args []string) {
 			util.CheckErr(o.init(args))
 			util.CheckErr(o.fetchAddonObj())
@@ -184,6 +189,8 @@ func newEnableCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 		"Sets addon storage class name (--storage-class [extraName:]<storage class name>) (can specify multiple if has extra items))")
 	cmd.Flags().StringArrayVar(&o.addonEnableFlags.TolerationsSet, "tolerations", []string{},
 		"Sets addon pod tolerations (--tolerations [extraName:]<toleration JSON list items>) (can specify multiple if has extra items))")
+	cmd.Flags().StringArrayVar(&o.addonEnableFlags.SetValues, "set", []string{},
+		"set values on the command line (can specify multiple or separate values with commas: key1=val1,key2=val2), it's only being processed if addon's type is helm.")
 
 	o.Options.AddFlags(cmd)
 	return cmd
@@ -376,7 +383,9 @@ func addonEnableDisableHandler(o *addonCmdOpts, cmd *cobra.Command, args []strin
 
 func (o *addonCmdOpts) buildEnablePatch(flags []*pflag.Flag, spec, install map[string]interface{}) (err error) {
 	extraNames := o.addon.GetExtraNames()
-	var installSpec extensionsv1alpha1.AddonInstallSpec
+	installSpec := extensionsv1alpha1.AddonInstallSpec{
+		AddonInstallSpecItem: extensionsv1alpha1.NewAddonInstallSpecItem(),
+	}
 	// only using named return value in defer function
 	defer func() {
 		if err != nil {
@@ -431,7 +440,8 @@ func (o *addonCmdOpts) buildEnablePatch(flags []*pflag.Flag, spec, install map[s
 				return nil, fmt.Errorf("invalid extra item name [%s]", name)
 			}
 			installSpec.ExtraItems = append(installSpec.ExtraItems, extensionsv1alpha1.AddonInstallExtraItem{
-				Name: name,
+				Name:                 name,
+				AddonInstallSpecItem: extensionsv1alpha1.NewAddonInstallSpecItem(),
 			})
 			pItem = &installSpec.ExtraItems[len(installSpec.ExtraItems)-1]
 		}
@@ -566,6 +576,23 @@ func (o *addonCmdOpts) buildEnablePatch(flags []*pflag.Flag, spec, install map[s
 			return err
 		}
 	}
+
+	return nil
+}
+
+func (o *addonCmdOpts) buildHelmPatch(result map[string]interface{}) error {
+	helmSpec := extensionsv1alpha1.HelmTypeInstallSpec{
+		InstallValues: extensionsv1alpha1.HelmInstallValues{
+			SetValues: o.addonEnableFlags.SetValues,
+		},
+	}
+	b, err := json.Marshal(&helmSpec)
+	if err != nil {
+		return err
+	}
+	if err = json.Unmarshal(b, &result); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -574,12 +601,17 @@ func (o *addonCmdOpts) buildPatch(flags []*pflag.Flag) error {
 	spec := map[string]interface{}{}
 	status := map[string]interface{}{}
 	install := map[string]interface{}{}
+	helm := map[string]interface{}{}
 
 	if o.addonEnableFlags != nil {
 		if o.addon.Status.Phase == extensionsv1alpha1.AddonFailed {
 			status["phase"] = nil
 		}
 		if err = o.buildEnablePatch(flags, spec, install); err != nil {
+			return err
+		}
+
+		if err = o.buildHelmPatch(helm); err != nil {
 			return err
 		}
 	} else {
@@ -591,6 +623,10 @@ func (o *addonCmdOpts) buildPatch(flags []*pflag.Flag) error {
 	}
 
 	if err = unstructured.SetNestedField(spec, install, "install"); err != nil {
+		return err
+	}
+
+	if err = unstructured.SetNestedField(spec, helm, "helm"); err != nil {
 		return err
 	}
 

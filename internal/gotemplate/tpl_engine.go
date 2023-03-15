@@ -18,9 +18,9 @@ package gotemplate
 
 import (
 	"context"
-	types2 "github.com/apecloud/kubeblocks/internal/controller/client"
 	"strings"
 	"text/template"
+
 
 	"github.com/Masterminds/sprig/v3"
 	"github.com/StudioSol/set"
@@ -29,6 +29,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
+	types2 "github.com/apecloud/kubeblocks/internal/controller/client"
 )
 
 const (

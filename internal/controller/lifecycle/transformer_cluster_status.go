@@ -19,10 +19,10 @@ package lifecycle
 import (
 	"context"
 	"fmt"
-	"golang.org/x/exp/slices"
 	"reflect"
 	"time"
 
+	"golang.org/x/exp/slices"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -397,7 +397,7 @@ func (c *clusterStatusTransformer) removeStsInitContainerForRestore(
 	backupName string) (bool, error) {
 	// get the sts list of component
 	stsList := &appsv1.StatefulSetList{}
-	if err := util.GetObjectListByComponentName(c.ctx.Ctx, c.cli, cluster, stsList, componentName); err != nil {
+	if err := util.GetObjectListByComponentName(c.ctx.Ctx, c.cli, *cluster, stsList, componentName); err != nil {
 		return false, err
 	}
 	var doRemoveInitContainers bool

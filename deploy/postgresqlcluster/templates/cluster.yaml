@@ -4,7 +4,7 @@ metadata:
   name: {{ .Release.Name }}
   labels: {{ include "postgresqlcluster.labels" . | nindent 4 }}
 spec:
-  clusterDefinitionRef: postgresql-cluster # ref clusterdefinition.name
+  clusterDefinitionRef: postgresql # ref clusterdefinition.name
   clusterVersionRef: postgresql-{{ default .Chart.AppVersion .Values.clusterVersionOverride }} # ref clusterversion.name
   terminationPolicy: {{ .Values.terminationPolicy }}
   affinity:
@@ -16,7 +16,7 @@ spec:
   {{- end }}
   componentSpecs:
     - name: postgresql # user-defined
-      componentDefRef: pg-replicaset # ref clusterdefinition components.name
+      componentDefRef: pg-replication # ref clusterdefinition components.name
       monitor: {{ .Values.monitor.enabled | default false }}
       replicas: {{ .Values.replicaCount | default 2 }}
       primaryIndex: {{ .Values.primaryIndex | default 0 }}

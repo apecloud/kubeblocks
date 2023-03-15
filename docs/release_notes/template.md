@@ -4,6 +4,12 @@ We're happy to announce the release of KubeBlocks $kubeblocks_version! 🚀 🎉
 
 We would like to extend our appreciation to all contributors who helped make this release happen.
 
+**Breaking changes**
+* Refactored ConfigTemplate related API, affected following APIs:
+    - ClusterDefinition
+    - ClusterVersion
+* Existing APIs will no longer be functional, please make sure you have removed the deprecated APIs and transformed CRDs before upgrade. Please refer to the upgrade notes under this release notes.
+
 **Highlights**
   * Automatic pod container environment variables updates:
     * [NEW] KB_POD_FQDN - KubeBlock Cluster component workload associated headless service name, N/A if workloadType=Stateless.
@@ -147,6 +153,6 @@ $kubeblocks_breaking_changes
     - Add label `app.kubernetes.io/component` with value `Cluster.Spec.ComponentSpecs.ComponentDefRef`
   - CR `backuppolicytemplate`
     - Replace label name from `app.kubernetes.io/created-by` to `app.kubernetes.io/managed-by`
-  - Configmap hosted by Kubeblocks and named with `*-env` suffix
+  - Configmap hosted by KubeBlocks and named with `*-env` suffix
     - Replace label name from `app.kubernetes.io/config-type` to `apps.kubeblocks.io/config-type`
 * With KubeBlocks Helm chart replaced its optional components install using sub-charts dependencies with Addons extensions API, previous version upgrade to this version will uninstall the optional components completely.

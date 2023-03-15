@@ -47,17 +47,18 @@ func HandleReplicationSet(ctx context.Context,
 	cli client.Client,
 	cluster *appsv1alpha1.Cluster,
 	stsList []*appsv1.StatefulSet) error {
-
+	if cluster == nil {
+		return util.ErrReqClusterObj
+	}
 	// handle replication workload horizontal scaling
-	if err := HandleReplicationSetHorizontalScale(ctx, cli, cluster, stsList); err != nil {
+	if err := handleReplicationSetHorizontalScale(ctx, cli, cluster, stsList); err != nil {
 		return err
 	}
-
 	return nil
 }
 
-// HandleReplicationSetHorizontalScale handles changes of replication workload replicas and synchronizes cluster status.
-func HandleReplicationSetHorizontalScale(ctx context.Context,
+// handleReplicationSetHorizontalScale handles changes of replication workload replicas and synchronizes cluster status.
+func handleReplicationSetHorizontalScale(ctx context.Context,
 	cli client.Client,
 	cluster *appsv1alpha1.Cluster,
 	stsList []*appsv1.StatefulSet) error {
@@ -92,7 +93,7 @@ func HandleReplicationSetHorizontalScale(ctx context.Context,
 			stsToDeleteMap[compName] = int32(len(compOwnsStsMap[compName])) - clusterCompReplicasMap[compName]
 		} else {
 			for _, compStsObj := range compStsObjs {
-				pod, err := GetAndCheckReplicationPodByStatefulSet(ctx, cli, compStsObj)
+				pod, err := getAndCheckReplicationPodByStatefulSet(ctx, cli, compStsObj)
 				if err != nil {
 					return err
 				}
@@ -109,7 +110,7 @@ func HandleReplicationSetHorizontalScale(ctx context.Context,
 
 	// sync cluster status
 	for _, compPodList := range compOwnsPodsToSyncMap {
-		if err := SyncReplicationSetClusterStatus(cli, ctx, cluster, compPodList); err != nil {
+		if err := syncReplicationSetClusterStatus(cli, ctx, cluster, compPodList); err != nil {
 			return err
 		}
 	}
@@ -126,7 +127,7 @@ func handleComponentIsStopped(cluster *appsv1alpha1.Cluster) {
 		if clusterComp.Replicas == int32(0) {
 			replicationStatus := cluster.Status.Components[clusterComp.Name]
 			replicationStatus.Phase = appsv1alpha1.StoppedPhase
-			cluster.Status.Components[clusterComp.Name] = replicationStatus
+			cluster.Status.SetComponentStatus(clusterComp.Name, replicationStatus)
 		}
 	}
 }
@@ -141,7 +142,7 @@ func doHorizontalScaleDown(ctx context.Context,
 	for compName, stsToDelCount := range stsToDeleteMap {
 		// list all statefulSets by cluster and componentKey label
 		var componentStsList = &appsv1.StatefulSetList{}
-		err := util.GetObjectListByComponentName(ctx, cli, cluster, componentStsList, compName)
+		err := util.GetObjectListByComponentName(ctx, cli, *cluster, componentStsList, compName)
 		if err != nil {
 			return err
 		}
@@ -192,8 +193,9 @@ func doHorizontalScaleDown(ctx context.Context,
 	return nil
 }
 
-// SyncReplicationSetClusterStatus syncs replicationSet pod status to cluster.status.component[componentName].ReplicationStatus.
-func SyncReplicationSetClusterStatus(cli client.Client,
+// syncReplicationSetClusterStatus syncs replicationSet pod status to cluster.status.component[componentName].ReplicationStatus.
+func syncReplicationSetClusterStatus(
+	cli client.Client,
 	ctx context.Context,
 	cluster *appsv1alpha1.Cluster,
 	podList []*corev1.Pod) error {
@@ -202,13 +204,16 @@ func SyncReplicationSetClusterStatus(cli client.Client,
 	}
 
 	// update cluster status
-	componentName, componentDef, err := util.GetComponentInfoByPod(ctx, cli, cluster, podList[0])
+	componentName, componentDef, err := util.GetComponentInfoByPod(ctx, cli, *cluster, podList[0])
 	if err != nil {
 		return err
 	}
+	if componentDef == nil {
+		return nil
+	}
 	oldReplicationSetStatus := cluster.Status.Components[componentName].ReplicationSetStatus
 	if oldReplicationSetStatus == nil {
-		util.InitClusterComponentStatusIfNeed(cluster, componentName, componentDef)
+		util.InitClusterComponentStatusIfNeed(cluster, componentName, *componentDef)
 		oldReplicationSetStatus = cluster.Status.Components[componentName].ReplicationSetStatus
 	}
 	if err := syncReplicationSetStatus(oldReplicationSetStatus, podList); err != nil {
@@ -307,16 +312,20 @@ func removeTargetPodsInfoInStatus(replicationStatus *appsv1alpha1.ReplicationSet
 // checkObjRoleLabelIsPrimary checks whether it is the primary obj(statefulSet or pod) through the label tag on obj.
 func checkObjRoleLabelIsPrimary[T intctrlutil.Object, PT intctrlutil.PObject[T]](obj PT) (bool, error) {
 	if obj == nil || obj.GetLabels() == nil {
+		// REVIEW/TODO: need avoid using dynamic error string, this is bad for
+		// error type checking (errors.Is)
 		return false, fmt.Errorf("obj %s or obj's labels is nil, pls check", obj.GetName())
 	}
 	if _, ok := obj.GetLabels()[constant.RoleLabelKey]; !ok {
+		// REVIEW/TODO: need avoid using dynamic error string, this is bad for
+		// error type checking (errors.Is)
 		return false, fmt.Errorf("obj %s or obj labels key is nil, pls check", obj.GetName())
 	}
 	return obj.GetLabels()[constant.RoleLabelKey] == string(Primary), nil
 }
 
-// GetReplicationSetPrimaryObj gets the primary obj(statefulSet or pod) of the replication workload.
-func GetReplicationSetPrimaryObj[T intctrlutil.Object, PT intctrlutil.PObject[T], L intctrlutil.ObjList[T], PL intctrlutil.PObjList[T, L]](
+// getReplicationSetPrimaryObj gets the primary obj(statefulSet or pod) of the replication workload.
+func getReplicationSetPrimaryObj[T intctrlutil.Object, PT intctrlutil.PObject[T], L intctrlutil.ObjList[T], PL intctrlutil.PObjList[T, L]](
 	ctx context.Context, cli client.Client, cluster *appsv1alpha1.Cluster, _ func(T, L), compSpecName string) (PT, error) {
 	var (
 		objList L
@@ -379,7 +388,7 @@ func filterReplicationWorkload(ctx context.Context,
 		return nil, fmt.Errorf("cluster's compSpecName is nil, pls check")
 	}
 	compDefName := cluster.GetComponentDefRefName(compSpecName)
-	compDef, err := util.GetComponentDefByCluster(ctx, cli, cluster, compDefName)
+	compDef, err := util.GetComponentDefByCluster(ctx, cli, *cluster, compDefName)
 	if err != nil {
 		return compDef, err
 	}
@@ -389,8 +398,8 @@ func filterReplicationWorkload(ctx context.Context,
 	return compDef, nil
 }
 
-// GetAndCheckReplicationPodByStatefulSet checks the number of replication statefulSet equal 1 and returns it.
-func GetAndCheckReplicationPodByStatefulSet(ctx context.Context, cli client.Client, stsObj *appsv1.StatefulSet) (*corev1.Pod, error) {
+// getAndCheckReplicationPodByStatefulSet checks the number of replication statefulSet equal 1 and returns it.
+func getAndCheckReplicationPodByStatefulSet(ctx context.Context, cli client.Client, stsObj *appsv1.StatefulSet) (*corev1.Pod, error) {
 	podList, err := util.GetPodListByStatefulSet(ctx, cli, stsObj)
 	if err != nil {
 		return nil, err

@@ -39,7 +39,7 @@ type reconfiguringResult struct {
 
 // updateCfgParams merge parameters of the config into the configmap, and verify final configuration file.
 func updateCfgParams(config appsv1alpha1.Configuration,
-	tpl appsv1alpha1.ConfigTemplate,
+	tpl appsv1alpha1.ComponentConfigSpec,
 	cmKey client.ObjectKey,
 	ctx context.Context,
 	cli client.Client,
@@ -132,7 +132,7 @@ func makeReconfiguringResult(err error, ops ...func(*reconfiguringResult)) recon
 	return result
 }
 
-func constructReconfiguringConditions(result reconfiguringResult, resource *OpsResource, tpl *appsv1alpha1.ConfigTemplate) []*metav1.Condition {
+func constructReconfiguringConditions(result reconfiguringResult, resource *OpsResource, tpl *appsv1alpha1.ComponentConfigSpec) []*metav1.Condition {
 	if result.configPatch.IsModify {
 		return []*metav1.Condition{appsv1alpha1.NewReconfigureRunningCondition(
 			resource.OpsRequest,

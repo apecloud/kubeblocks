@@ -18,6 +18,8 @@ package builder
 
 import (
 	"fmt"
+	"strconv"
+	"strings"
 	"testing"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -337,13 +339,50 @@ var _ = Describe("builder", func() {
 
 		It("builds Env Config with Replication component correctly", func() {
 			params := newParams()
-			var mockPrimaryIndex = int32(testapps.DefaultReplicationPrimaryIndex)
 			params.Component.WorkloadType = appsv1alpha1.Replication
+
+			var cfg *corev1.ConfigMap
+			var err error
+
+			checkEnvValues := func() {
+				cfg, err = BuildEnvConfig(*params)
+				Expect(err).Should(BeNil())
+				Expect(cfg).ShouldNot(BeNil())
+				Expect(len(cfg.Data) == int(2+params.Component.Replicas)).Should(BeTrue())
+				Expect(cfg.Data["KB_"+strings.ToUpper(params.Component.Type)+"_N"]).
+					Should(Equal(strconv.Itoa(int(params.Component.Replicas))))
+				stsName := fmt.Sprintf("%s-%s", params.Cluster.Name, params.Component.Name)
+				svcName := fmt.Sprintf("%s-headless", stsName)
+				By("Checking KB_PRIMARY_POD_NAME value be right")
+				if int(*params.Component.PrimaryIndex) == 0 {
+					Expect(cfg.Data["KB_PRIMARY_POD_NAME"]).
+						Should(Equal(stsName + "-" + strconv.Itoa(int(*params.Component.PrimaryIndex)) + "." + svcName))
+				} else {
+					Expect(cfg.Data["KB_PRIMARY_POD_NAME"]).
+						Should(Equal(stsName + "-" + strconv.Itoa(int(*params.Component.PrimaryIndex)) + "-0." + svcName))
+				}
+				for i := 0; i < int(params.Component.Replicas); i++ {
+					if i == 0 {
+						By("Checking the 1st replica's hostname should not have suffix '-0'")
+						Expect(cfg.Data["KB_"+strings.ToUpper(params.Component.Type)+"_"+strconv.Itoa(i)+"_HOSTNAME"]).
+							Should(Equal(stsName + "-" + strconv.Itoa(0) + "." + svcName))
+					} else {
+						Expect(cfg.Data["KB_"+strings.ToUpper(params.Component.Type)+"_"+strconv.Itoa(i)+"_HOSTNAME"]).
+							Should(Equal(stsName + "-" + strconv.Itoa(int(*params.Component.PrimaryIndex)) + "-0." + svcName))
+					}
+				}
+			}
+
+			By("Checking env values with primaryIndex=0 ")
+			var mockPrimaryIndex = int32(testapps.DefaultReplicationPrimaryIndex)
 			params.Component.PrimaryIndex = &mockPrimaryIndex
-			cfg, err := BuildEnvConfig(*params)
-			Expect(err).Should(BeNil())
-			Expect(cfg).ShouldNot(BeNil())
-			Expect(len(cfg.Data) == 3).Should(BeTrue())
+			checkEnvValues()
+
+			By("Checking env values with primaryIndex=1 ")
+			params.Component.Replicas = 2
+			var newPrimaryIndex = int32(1)
+			params.Component.PrimaryIndex = &newPrimaryIndex
+			checkEnvValues()
 		})
 
 		It("builds BackupPolicy correctly", func() {
@@ -397,12 +436,14 @@ var _ = Describe("builder", func() {
 		It("builds ConfigMap with template correctly", func() {
 			config := map[string]string{}
 			params := newParams()
-			tplCfg := appsv1alpha1.ConfigTemplate{
-				Name:                "test-config-tpl",
-				ConfigTplRef:        "test-config-tpl",
+			tplCfg := appsv1alpha1.ComponentConfigSpec{
+				ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
+					Name:        "test-config-tpl",
+					TemplateRef: "test-config-tpl",
+				},
 				ConfigConstraintRef: "test-config-constraint",
 			}
-			configmap, err := BuildConfigMapWithTemplate(config, *params, "test-cm", tplCfg)
+			configmap, err := BuildConfigMapWithTemplate(config, *params, "test-cm", tplCfg.ConfigConstraintRef, tplCfg.ComponentTemplateSpec)
 			Expect(err).Should(BeNil())
 			Expect(configmap).ShouldNot(BeNil())
 		})

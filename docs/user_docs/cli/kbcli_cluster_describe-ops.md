@@ -1,6 +1,8 @@
-## kbcli cluster describe-ops
+---
+title: kbcli cluster describe-ops
+---
 
-Show details of a specific OpsRequest
+Show details of a specific OpsRequest.
 
 ```
 kbcli cluster describe-ops [flags]
@@ -45,5 +47,7 @@ kbcli cluster describe-ops [flags]
 
 ### SEE ALSO
 
-* [kbcli cluster](kbcli_cluster.md)	 - Cluster command
+* [kbcli cluster](kbcli_cluster.md)	 - Cluster command.
+
+#### Go Back to [CLI Overview](cli.md) Homepage.
 

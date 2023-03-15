@@ -288,6 +288,8 @@ func (r *BackupPolicyReconciler) fillSecretName(reqCtx intctrlutil.RequestCtx, b
 	// get cluster name from labels
 	instanceName := backupPolicy.Spec.Target.LabelsSelector.MatchLabels[constant.AppInstanceLabelKey]
 	if len(instanceName) == 0 {
+		// REVIEW/TODO: need avoid using dynamic error string, this is bad for
+		// error type checking (errors.Is)
 		return fmt.Errorf("failed to get instance name from labels: %v", backupPolicy.Spec.Target.LabelsSelector.MatchLabels)
 	}
 	var labels map[string]string
@@ -311,6 +313,8 @@ func (r *BackupPolicyReconciler) fillSecretName(reqCtx intctrlutil.RequestCtx, b
 		backupPolicy.Spec.Target.Secret.Name = secrets.Items[0].GetName()
 		return nil
 	}
+	// REVIEW/TODO: need avoid using dynamic error string, this is bad for
+	// error type checking (errors.Is)
 	return fmt.Errorf("no secret found for backup policy %s", backupPolicy.GetName())
 }
 
@@ -330,7 +334,7 @@ func (r *BackupPolicyReconciler) buildCronJob(backupPolicy *dataprotectionv1alph
 		TTL:            backupPolicy.Spec.TTL,
 		BackupType:     backupPolicy.Spec.BackupType,
 		ServiceAccount: viper.GetString("KUBEBLOCKS_SERVICEACCOUNT_NAME"),
-		MgrNamespace:   viper.GetString("CM_NAMESPACE"),
+		MgrNamespace:   viper.GetString(constant.CfgKeyCtrlrMgrNS),
 	}
 	backupPolicyOptionsByte, err := json.Marshal(options)
 	if err != nil {
@@ -439,7 +443,7 @@ func (r *BackupPolicyReconciler) deleteExternalResources(reqCtx intctrlutil.Requ
 	cronjob := &batchv1.CronJob{}
 
 	key := types.NamespacedName{
-		Namespace: viper.GetString("CM_NAMESPACE"),
+		Namespace: viper.GetString(constant.CfgKeyCtrlrMgrNS),
 		Name:      backupPolicy.Name,
 	}
 	if err := r.Client.Get(reqCtx.Ctx, key, cronjob); err != nil {

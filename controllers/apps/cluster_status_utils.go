@@ -136,25 +136,22 @@ func needSyncComponentStatusForEvent(cluster *appsv1alpha1.Cluster, componentNam
 	if phase == "" {
 		return false
 	}
-	if cluster.Status.Components == nil {
-		status.Components = map[string]appsv1alpha1.ClusterComponentStatus{}
-	}
 	if compStatus, ok = cluster.Status.Components[componentName]; !ok {
 		compStatus = appsv1alpha1.ClusterComponentStatus{Phase: phase}
 		updateComponentStatusMessage(&compStatus, event)
-		status.Components[componentName] = compStatus
+		status.SetComponentStatus(componentName, compStatus)
 		return true
 	}
 	if compStatus.Phase != phase {
 		compStatus.Phase = phase
 		updateComponentStatusMessage(&compStatus, event)
-		status.Components[componentName] = compStatus
+		status.SetComponentStatus(componentName, compStatus)
 		return true
 	}
 	// check whether it is a new warning event and the component phase is running
 	if !isExistsEventMsg(compStatus.Message, event) && phase != appsv1alpha1.RunningPhase {
 		updateComponentStatusMessage(&compStatus, event)
-		status.Components[componentName] = compStatus
+		status.SetComponentStatus(componentName, compStatus)
 		return true
 	}
 	return false
@@ -233,11 +230,12 @@ func getClusterAvailabilityEffect(componentDef *appsv1alpha1.ClusterComponentDef
 }
 
 // getComponentRelatedInfo gets componentMap, clusterAvailabilityMap and component definition information
-func getComponentRelatedInfo(cluster *appsv1alpha1.Cluster, clusterDef *appsv1alpha1.ClusterDefinition, componentName string) (map[string]string, map[string]bool, appsv1alpha1.ClusterComponentDefinition) {
+func getComponentRelatedInfo(cluster *appsv1alpha1.Cluster, clusterDef *appsv1alpha1.ClusterDefinition,
+	componentName string) (map[string]string, map[string]bool, *appsv1alpha1.ClusterComponentDefinition) {
 	var (
 		compDefName  string
 		componentMap = map[string]string{}
-		componentDef appsv1alpha1.ClusterComponentDefinition
+		componentDef *appsv1alpha1.ClusterComponentDefinition
 	)
 	for _, v := range cluster.Spec.ComponentSpecs {
 		if v.Name == componentName {
@@ -246,10 +244,10 @@ func getComponentRelatedInfo(cluster *appsv1alpha1.Cluster, clusterDef *appsv1al
 		componentMap[v.Name] = v.ComponentDefRef
 	}
 	clusterAvailabilityEffectMap := map[string]bool{}
-	for _, v := range clusterDef.Spec.ComponentDefs {
+	for i, v := range clusterDef.Spec.ComponentDefs {
 		clusterAvailabilityEffectMap[v.Name] = getClusterAvailabilityEffect(&v)
 		if v.Name == compDefName {
-			componentDef = v
+			componentDef = &clusterDef.Spec.ComponentDefs[i]
 		}
 	}
 	return componentMap, clusterAvailabilityEffectMap, componentDef
@@ -282,12 +280,15 @@ func handleClusterStatusByEvent(ctx context.Context, cli client.Client, recorder
 	patch := client.MergeFrom(cluster.DeepCopy())
 	componentMap, clusterAvailabilityEffectMap, componentDef := getComponentRelatedInfo(cluster, clusterDef, componentName)
 	clusterComponent := cluster.GetComponentByName(componentName)
-	// get the component status by event and check whether the component status needs to be synchronized to the cluster
-	component := components.NewComponentByType(ctx, cli, cluster, &componentDef, clusterComponent)
-	if component == nil {
+	if clusterComponent == nil {
 		return nil
 	}
-	phase, err = component.GetPhaseWhenPodsNotReady(componentName)
+	// get the component status by event and check whether the component status needs to be synchronized to the cluster
+	component, err := components.NewComponentByType(cli, cluster, clusterComponent, *componentDef)
+	if err != nil {
+		return err
+	}
+	phase, err = component.GetPhaseWhenPodsNotReady(ctx, componentName)
 	if err != nil {
 		return err
 	}
@@ -438,7 +439,7 @@ func updateComponentStatusPhase(cli client.Client,
 	}
 	c.SetObjectMessage(object.GetObjectKind().GroupVersionKind().Kind, object.GetName(), message)
 	patch := client.MergeFrom(cluster.DeepCopy())
-	cluster.Status.Components[componentName] = c
+	cluster.Status.SetComponentStatus(componentName, c)
 	return cli.Status().Patch(ctx, cluster, patch)
 }
 
@@ -449,19 +450,17 @@ func syncComponentPhaseWhenSpecUpdating(cluster *appsv1alpha1.Cluster,
 	if len(componentName) == 0 {
 		return
 	}
-	if cluster.Status.Components == nil {
-		cluster.Status.Components = map[string]appsv1alpha1.ClusterComponentStatus{
-			componentName: {
-				Phase: appsv1alpha1.SpecUpdatingPhase,
-			},
-		}
+	if len(cluster.Status.Components) == 0 {
+		cluster.Status.SetComponentStatus(componentName, appsv1alpha1.ClusterComponentStatus{
+			Phase: appsv1alpha1.SpecUpdatingPhase,
+		})
 		return
 	}
-	compStatus := cluster.Status.Components[componentName]
+
 	// if component phase is not the phase of operations, sync component phase to 'SpecUpdating'
-	if util.IsCompleted(compStatus.Phase) {
+	if compStatus, ok := cluster.Status.Components[componentName]; ok && util.IsCompleted(compStatus.Phase) {
 		compStatus.Phase = appsv1alpha1.SpecUpdatingPhase
-		cluster.Status.Components[componentName] = compStatus
+		cluster.Status.SetComponentStatus(componentName, compStatus)
 	}
 }
 

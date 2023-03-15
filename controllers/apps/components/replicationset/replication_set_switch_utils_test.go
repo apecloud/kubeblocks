@@ -121,7 +121,8 @@ var _ = Describe("ReplicationSet Switch Util", func() {
 		clusterComponentSpec := &clusterObj.Spec.ComponentSpecs[0]
 
 		By("Test primaryIndex has not changed.")
-		changed, _, err := CheckPrimaryIndexChanged(testCtx.Ctx, k8sClient, clusterObj, clusterComponentSpec.Name, clusterComponentSpec.PrimaryIndex)
+		changed, _, err := CheckPrimaryIndexChanged(testCtx.Ctx, k8sClient, clusterObj, clusterComponentSpec.Name,
+			clusterComponentSpec.GetPrimaryIndex())
 		Expect(err).Should(Succeed())
 		Expect(changed).Should(BeFalse())
 

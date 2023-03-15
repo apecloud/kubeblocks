@@ -236,10 +236,9 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 			// mock cluster is running.
 			Expect(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(cluster), func(tmpCluster *appsv1alpha1.Cluster) {
 				tmpCluster.Status.Phase = appsv1alpha1.RunningPhase
-				for k := range tmpCluster.Status.Components {
-					compStatus := tmpCluster.Status.Components[k]
+				for name, compStatus := range tmpCluster.Status.Components {
 					compStatus.Phase = appsv1alpha1.RunningPhase
-					tmpCluster.Status.Components[k] = compStatus
+					tmpCluster.Status.SetComponentStatus(name, compStatus)
 				}
 			})()).Should(Succeed())
 
@@ -248,7 +247,7 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 			Expect(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(cluster), func(tmpCluster *appsv1alpha1.Cluster) {
 				compStatus := tmpCluster.Status.Components[nginxCompName]
 				compStatus.Phase = appsv1alpha1.FailedPhase
-				tmpCluster.Status.Components[nginxCompName] = compStatus
+				tmpCluster.Status.SetComponentStatus(nginxCompName, compStatus)
 			})()).Should(Succeed())
 
 			// expect cluster phase is Abnormal by cluster controller.

@@ -5,3 +5,4 @@ ClusterPhaseMisMatch = "ClusterPhaseMisMatch"
 [default.extend-words]
 # Don't correct the "AKS"
 AKS = "AKS"
+ons = "ons"

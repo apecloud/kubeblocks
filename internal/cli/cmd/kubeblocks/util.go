@@ -36,6 +36,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 	"github.com/apecloud/kubeblocks/internal/cli/util/helm"
 	"github.com/apecloud/kubeblocks/internal/cli/util/prompt"
+	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
 func getGVRByCRD(crd *unstructured.Unstructured) (*schema.GroupVersionResource, error) {
@@ -135,4 +136,11 @@ func buildResourceLabelSelectors(addons []*extensionsv1alpha1.Addon) []string {
 		selectors = append(selectors, fmt.Sprintf("release in (%s)", strings.Join(releases, ",")))
 	}
 	return selectors
+}
+
+// buildAddonLabelSelector builds labelSelector that can be used to get all build-in addons
+func buildAddonLabelSelector() string {
+	return fmt.Sprintf("%s=%s,%s=%s",
+		constant.AppInstanceLabelKey, types.KubeBlocksReleaseName,
+		constant.AppNameLabelKey, types.KubeBlocksChartName)
 }

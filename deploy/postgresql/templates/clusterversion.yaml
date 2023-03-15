@@ -5,9 +5,9 @@ metadata:
   labels:
     {{- include "postgresql.labels" . | nindent 4 }}
 spec:
-  clusterDefinitionRef: postgresql-cluster
+  clusterDefinitionRef: postgresql
   componentVersions:
-  - componentDefRef: pg-replicaset
+  - componentDefRef: pg-replication
     versionsContext:
       containers:
       - name: postgresql

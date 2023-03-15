@@ -305,7 +305,7 @@ func ClearResources[T intctrlutil.Object, PT intctrlutil.PObject[T],
 				})).To(gomega.Succeed())
 			}
 		}
-		g.Expect(len(items)).Should(gomega.Equal(0))
+		g.Expect(items).Should(gomega.BeEmpty())
 	}, testCtx.ClearResourceTimeout, testCtx.ClearResourcePollingInterval).Should(gomega.Succeed())
 }
 

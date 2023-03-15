@@ -96,7 +96,7 @@ var _ = Describe("MySQL data protection function", func() {
 		mode := int32(0755)
 		clusterDefObj = testapps.NewClusterDefFactory(clusterDefName).
 			AddComponent(testapps.ConsensusMySQLComponent, mysqlCompType).
-			AddConfigTemplate(scriptConfigName, scriptConfigName, "", testCtx.DefaultNamespace, testapps.ScriptsVolumeName, &mode).
+			AddScriptTemplate(scriptConfigName, scriptConfigName, testCtx.DefaultNamespace, testapps.ScriptsVolumeName, &mode).
 			Create(&testCtx).GetObject()
 
 		By("Create a clusterVersion obj")

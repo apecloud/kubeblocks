@@ -424,7 +424,7 @@ func GetEventObject(e *corev1.Event) string {
 }
 
 // GetConfigTemplateList returns ConfigTemplate list used by the component.
-func GetConfigTemplateList(clusterName string, namespace string, cli dynamic.Interface, componentName string, reloadTpl bool) ([]appsv1alpha1.ConfigTemplate, error) {
+func GetConfigTemplateList(clusterName string, namespace string, cli dynamic.Interface, componentName string, reloadTpl bool) ([]appsv1alpha1.ComponentConfigSpec, error) {
 	var (
 		clusterObj        = appsv1alpha1.Cluster{}
 		clusterDefObj     = appsv1alpha1.ClusterDefinition{}
@@ -462,9 +462,9 @@ func GetConfigTemplateList(clusterName string, namespace string, cli dynamic.Int
 		return tpls, nil
 	}
 
-	validTpls := make([]appsv1alpha1.ConfigTemplate, 0, len(tpls))
+	validTpls := make([]appsv1alpha1.ComponentConfigSpec, 0, len(tpls))
 	for _, tpl := range tpls {
-		if len(tpl.ConfigConstraintRef) > 0 && len(tpl.ConfigTplRef) > 0 {
+		if len(tpl.ConfigConstraintRef) > 0 && len(tpl.TemplateRef) > 0 {
 			validTpls = append(validTpls, tpl)
 		}
 	}
@@ -539,11 +539,11 @@ func GetComponentsFromClusterCR(key client.ObjectKey, cli dynamic.Interface) ([]
 }
 
 func enableReconfiguring(component *appsv1alpha1.ClusterComponentDefinition) bool {
-	if component == nil || component.ConfigSpec == nil {
+	if component == nil {
 		return false
 	}
-	for _, tpl := range component.ConfigSpec.ConfigTemplateRefs {
-		if len(tpl.ConfigConstraintRef) > 0 && len(tpl.ConfigTplRef) > 0 {
+	for _, tpl := range component.ConfigSpecs {
+		if len(tpl.ConfigConstraintRef) > 0 && len(tpl.TemplateRef) > 0 {
 			return true
 		}
 	}
@@ -551,7 +551,7 @@ func enableReconfiguring(component *appsv1alpha1.ClusterComponentDefinition) boo
 }
 
 // IsSupportConfigureParams check whether all updated parameters belong to config template parameters.
-func IsSupportConfigureParams(tpl appsv1alpha1.ConfigTemplate, values map[string]string, cli dynamic.Interface) (bool, error) {
+func IsSupportConfigureParams(tpl appsv1alpha1.ComponentConfigSpec, values map[string]string, cli dynamic.Interface) (bool, error) {
 	var (
 		err              error
 		configConstraint = appsv1alpha1.ConfigConstraint{}

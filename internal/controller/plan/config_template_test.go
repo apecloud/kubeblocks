@@ -44,7 +44,7 @@ var _ = Describe("tpl template", func() {
 
 	var (
 		podSpec     *corev1.PodSpec
-		cfgTemplate []appsv1alpha1.ConfigTemplate
+		cfgTemplate []appsv1alpha1.ComponentConfigSpec
 		component   *ctrlcomp.SynthesizedComponent
 	)
 
@@ -155,14 +155,14 @@ single_thread_memory = 294912
 			Type:           "replicasets",
 			Replicas:       5,
 		}
-		cfgTemplate = []appsv1alpha1.ConfigTemplate{
-			{
-				Name:                "mysql-config-8.0.2",
-				ConfigTplRef:        "mysql-config-8.0.2",
-				ConfigConstraintRef: "mysql-config-8.0.2",
-				VolumeName:          "config1",
+		cfgTemplate = []appsv1alpha1.ComponentConfigSpec{{
+			ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
+				Name:        "mysql-config-8.0.2",
+				TemplateRef: "mysql-config-8.0.2",
+				VolumeName:  "config1",
 			},
-		}
+			ConfigConstraintRef: "mysql-config-8.0.2",
+		}}
 	})
 
 	// for test GetContainerWithVolumeMount

@@ -23,16 +23,26 @@ import (
 )
 
 func NewPrompt(label string, validate promptui.ValidateFunc, in io.Reader) *promptui.Prompt {
-	p := promptui.Prompt{
-		Label: label,
-		Stdin: io.NopCloser(in),
-		Templates: &promptui.PromptTemplates{
+	template := &promptui.PromptTemplates{
+		Prompt:  "{{ . }} ",
+		Valid:   "{{ . | green }} ",
+		Invalid: "{{ . | red }} ",
+		Success: "{{ . | bold }} ",
+	}
+
+	if validate == nil {
+		template = &promptui.PromptTemplates{
 			Prompt:  "{{ . }} ",
-			Valid:   "{{ . | green }} ",
+			Valid:   "{{ . | red }} ",
 			Invalid: "{{ . | red }} ",
 			Success: "{{ . | bold }} ",
-		},
-		Validate: validate,
+		}
+	}
+	p := promptui.Prompt{
+		Label:     label,
+		Stdin:     io.NopCloser(in),
+		Templates: template,
+		Validate:  validate,
 	}
 	return &p
 }

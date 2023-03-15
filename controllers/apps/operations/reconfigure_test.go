@@ -84,11 +84,11 @@ var _ = Describe("Reconfigure OpsRequest", func() {
 	}
 
 	assureConfigInstanceObj := func(clusterName, componentName, ns string, cdComponent *appsv1alpha1.ClusterComponentDefinition) *corev1.ConfigMap {
-		if cdComponent.ConfigSpec == nil {
+		if len(cdComponent.ConfigSpecs) == 0 {
 			return nil
 		}
 		var cmObj *corev1.ConfigMap
-		for _, tpl := range cdComponent.ConfigSpec.ConfigTemplateRefs {
+		for _, tpl := range cdComponent.ConfigSpecs {
 			cmInsName := cfgcore.GetComponentCfgName(clusterName, componentName, tpl.VolumeName)
 			cfgCM := testapps.NewCustomizedObj("operations_config/configcm.yaml",
 				&corev1.ConfigMap{},
@@ -97,7 +97,7 @@ var _ = Describe("Reconfigure OpsRequest", func() {
 					constant.AppNameLabelKey, clusterName,
 					constant.AppInstanceLabelKey, clusterName,
 					constant.KBAppComponentLabelKey, componentName,
-					constant.CMConfigurationTplNameLabelKey, tpl.ConfigTplRef,
+					constant.CMConfigurationTplNameLabelKey, tpl.TemplateRef,
 					constant.CMConfigurationConstraintsNameLabelKey, tpl.ConfigConstraintRef,
 					constant.CMConfigurationProviderTplLabelKey, tpl.Name,
 					constant.CMConfigurationTypeLabelKey, constant.ConfigInstanceType,
@@ -137,17 +137,15 @@ var _ = Describe("Reconfigure OpsRequest", func() {
 					continue
 				}
 				stsComponent = component
-				component.ConfigSpec = &appsv1alpha1.ConfigurationSpec{
-					ConfigTemplateRefs: []appsv1alpha1.ConfigTemplate{
-						{
-							Name:                "mysql-test",
-							ConfigTplRef:        cmObj.Name,
-							ConfigConstraintRef: tplObj.Name,
-							VolumeName:          "mysql-config",
-							Namespace:           testCtx.DefaultNamespace,
-						},
+				component.ConfigSpecs = []appsv1alpha1.ComponentConfigSpec{{
+					ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
+						Name:        "mysql-test",
+						TemplateRef: cmObj.Name,
+						VolumeName:  "mysql-config",
+						Namespace:   testCtx.DefaultNamespace,
 					},
-				}
+					ConfigConstraintRef: tplObj.Name,
+				}}
 			}
 
 			Expect(k8sClient.Patch(ctx, clusterDef, patch)).Should(Succeed())

@@ -567,9 +567,9 @@ func (r *ClusterReconciler) updateClusterPhaseToCreatingOrUpdating(reqCtx intctr
 		cluster.Status.Phase = appsv1alpha1.CreatingPhase
 		cluster.Status.Components = map[string]appsv1alpha1.ClusterComponentStatus{}
 		for _, v := range cluster.Spec.ComponentSpecs {
-			cluster.Status.Components[v.Name] = appsv1alpha1.ClusterComponentStatus{
+			cluster.Status.SetComponentStatus(v.Name, appsv1alpha1.ClusterComponentStatus{
 				Phase: appsv1alpha1.CreatingPhase,
-			}
+			})
 		}
 	} else if util.IsCompleted(cluster.Status.Phase) && !existsOperations(cluster) {
 		needPatch = true
@@ -614,7 +614,7 @@ func (r *ClusterReconciler) reconcileClusterStatus(ctx context.Context,
 	if !r.needCheckClusterForReady(cluster) {
 		return nil
 	}
-	if cluster.Status.Components == nil {
+	if len(cluster.Status.Components) == 0 {
 		return nil
 	}
 
@@ -806,7 +806,7 @@ func (r *ClusterReconciler) removeStsInitContainerForRestore(ctx context.Context
 	backupName string) (bool, error) {
 	// get the sts list of component
 	stsList := &appsv1.StatefulSetList{}
-	if err := util.GetObjectListByComponentName(ctx, r.Client, cluster, stsList, componentName); err != nil {
+	if err := util.GetObjectListByComponentName(ctx, r.Client, *cluster, stsList, componentName); err != nil {
 		return false, err
 	}
 	var doRemoveInitContainers bool
@@ -828,7 +828,7 @@ func (r *ClusterReconciler) removeStsInitContainerForRestore(ctx context.Context
 		// if need to remove init container, reset component to Creating.
 		compStatus := cluster.Status.Components[componentName]
 		compStatus.Phase = appsv1alpha1.CreatingPhase
-		cluster.Status.Components[componentName] = compStatus
+		cluster.Status.SetComponentStatus(componentName, compStatus)
 	}
 	return doRemoveInitContainers, nil
 }

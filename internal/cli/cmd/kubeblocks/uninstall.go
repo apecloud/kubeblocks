@@ -74,7 +74,7 @@ func newUninstallCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *co
 	}
 	cmd := &cobra.Command{
 		Use:     "uninstall",
-		Short:   "Uninstall KubeBlocks",
+		Short:   "Uninstall KubeBlocks.",
 		Args:    cobra.NoArgs,
 		Example: uninstallExample,
 		Run: func(cmd *cobra.Command, args []string) {
@@ -173,7 +173,6 @@ func (o *uninstallOptions) uninstall() error {
 	chart := helm.InstallOpts{
 		Name:      types.KubeBlocksChartName,
 		Namespace: o.Namespace,
-		Wait:      true,
 	}
 	printSpinner(newSpinner("Uninstall helm release "+types.KubeBlocksChartName+" "+v[util.KubeBlocksApp]),
 		chart.Uninstall(o.HelmCfg))
@@ -243,7 +242,9 @@ func (o *uninstallOptions) uninstallAddons() error {
 
 	processAddons := func(processFn func(addon *extensionsv1alpha1.Addon) error) ([]*extensionsv1alpha1.Addon, error) {
 		var addons []*extensionsv1alpha1.Addon
-		objects, err := o.Dynamic.Resource(types.AddonGVR()).List(context.TODO(), metav1.ListOptions{})
+		objects, err := o.Dynamic.Resource(types.AddonGVR()).List(context.TODO(), metav1.ListOptions{
+			LabelSelector: buildAddonLabelSelector(),
+		})
 		if err != nil && !apierrors.IsNotFound(err) {
 			klog.V(1).Infof("Failed to get KubeBlocks addons %s", err.Error())
 			allErrs = append(allErrs, err)

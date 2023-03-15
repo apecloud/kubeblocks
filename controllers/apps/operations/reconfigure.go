@@ -235,7 +235,7 @@ func (r *reconfigureAction) syncReconfigureComponentStatus(res *OpsResource) err
 
 	clusterPatch := client.MergeFrom(cluster.DeepCopy())
 	c.Phase = appsv1alpha1.RunningPhase
-	cluster.Status.Components[componentName] = c
+	cluster.Status.SetComponentStatus(componentName, c)
 	return res.Client.Status().Patch(res.Ctx, cluster, clusterPatch)
 }
 
@@ -311,8 +311,13 @@ func (r *reconfigureAction) Action(resource *OpsResource) error {
 	return r.doMergeAndPersist(clusterName, componentName, spec.Reconfigure, resource, tpls, clusterDefComponent.WorkloadType, clusterComponent.Replicas)
 }
 
-func (r *reconfigureAction) doMergeAndPersist(clusterName, componentName string, reconfigure *appsv1alpha1.Reconfigure, resource *OpsResource, tpls []appsv1alpha1.ConfigTemplate, workloadType appsv1alpha1.WorkloadType, replicas int32) error {
-	findTpl := func(tplName string) *appsv1alpha1.ConfigTemplate {
+func (r *reconfigureAction) doMergeAndPersist(clusterName, componentName string,
+	reconfigure *appsv1alpha1.Reconfigure,
+	resource *OpsResource,
+	tpls []appsv1alpha1.ComponentConfigSpec,
+	workloadType appsv1alpha1.WorkloadType,
+	replicas int32) error {
+	findTpl := func(tplName string) *appsv1alpha1.ComponentConfigSpec {
 		if len(tplName) == 0 && len(tpls) == 1 {
 			return &tpls[0]
 		}
@@ -350,7 +355,7 @@ func (r *reconfigureAction) doMergeAndPersist(clusterName, componentName string,
 	return nil
 }
 
-func doComponentUnitReconfigure(config appsv1alpha1.Configuration, configTemplate *appsv1alpha1.ConfigTemplate, clusterName, componentName string, resource *OpsResource) error {
+func doComponentUnitReconfigure(config appsv1alpha1.Configuration, configTemplate *appsv1alpha1.ComponentConfigSpec, clusterName, componentName string, resource *OpsResource) error {
 	result := updateCfgParams(config, *configTemplate, client.ObjectKey{
 		Name:      cfgcore.GetComponentCfgName(clusterName, componentName, configTemplate.VolumeName),
 		Namespace: resource.Cluster.Namespace,
@@ -371,7 +376,7 @@ func doComponentUnitReconfigure(config appsv1alpha1.Configuration, configTemplat
 	return nil
 }
 
-func doReplicationComponentReconfigure(config appsv1alpha1.Configuration, configTemplate *appsv1alpha1.ConfigTemplate, clusterName, componentName string, resource *OpsResource, replicas int32) error {
+func doReplicationComponentReconfigure(config appsv1alpha1.Configuration, configTemplate *appsv1alpha1.ComponentConfigSpec, clusterName, componentName string, resource *OpsResource, replicas int32) error {
 	componentConfigUpdator := func(componentUnitName string) reconfiguringResult {
 		result := updateCfgParams(config, *configTemplate, client.ObjectKey{
 			Name:      cfgcore.GetComponentCfgName(clusterName, componentUnitName, configTemplate.VolumeName),

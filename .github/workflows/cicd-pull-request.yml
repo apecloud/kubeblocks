@@ -12,7 +12,7 @@ env:
 
 jobs:
   trigger-mode:
-    name: make test
+    name: trigger mode
     if: github.event.review.state == 'approved'
     runs-on: ubuntu-latest
     outputs:
@@ -29,6 +29,7 @@ jobs:
           echo trigger_mode=$TRIGGER_MODE >> $GITHUB_OUTPUT
 
   make-test:
+    name: make test
     needs: trigger-mode
     if: contains(needs.trigger-mode.outputs.trigger-mode, '[test]')
     runs-on: [ self-hosted, eks-fargate-runner ]
@@ -63,6 +64,7 @@ jobs:
           make test
 
   check-image:
+    name: check image
     needs: trigger-mode
     if: needs.trigger-mode.outputs.trigger-mode == '[docker]'
     uses: apecloud/apecd/.github/workflows/release-image.yml@v0.2.0
@@ -75,6 +77,7 @@ jobs:
     secrets: inherit
 
   check-helm:
+    name: check helm
     needs: trigger-mode
     if: needs.trigger-mode.outputs.trigger-mode == '[deploy]'
     uses: apecloud/apecd/.github/workflows/release-charts.yml@v0.4.0

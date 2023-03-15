@@ -27,7 +27,6 @@ import (
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	"github.com/pkg/errors"
 	"golang.org/x/exp/maps"
-	"golang.org/x/exp/slices"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -505,7 +504,7 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 		return nil
 	}
 
-	cleanUselessServices := func(expSvcList []*corev1.Service) error {
+	cleanUselessServices := func() error {
 		var (
 			allSvcList = corev1.ServiceList{}
 			ml         = getServiceMatchingLabels(cluster.Name, "")
@@ -514,11 +513,30 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 			return err
 		}
 
+		buildSvcName := func(clusterName, componentName, suffix string) string {
+			parts := []string{clusterName, componentName}
+			if suffix != "" {
+				parts = append(parts, suffix)
+			}
+			return strings.Join(parts, "-")
+		}
+
+		expectSvcMap := make(map[string]*appsv1alpha1.ClusterComponentService)
+		for _, comp := range cluster.Spec.ComponentSpecs {
+			// default ClusterIP service, name should be consistent with name in service_template.cue
+			expectSvcMap[buildSvcName(cluster.Name, comp.Name, "")] = nil
+
+			// default headless service, name should be consistent with name in headless_service_template.cue
+			expectSvcMap[buildSvcName(cluster.Name, comp.Name, "headless")] = nil
+
+			// extra user exposed services, name should be consistent with name in service_template.cue
+			for _, svc := range comp.Services {
+				expectSvcMap[buildSvcName(cluster.Name, comp.Name, svc.Name)] = &svc
+			}
+		}
+
 		for _, svc := range allSvcList.Items {
-			idx := slices.IndexFunc(expSvcList, func(service *corev1.Service) bool {
-				return client.ObjectKeyFromObject(service) == client.ObjectKeyFromObject(&svc)
-			})
-			if idx >= 0 {
+			if _, ok := expectSvcMap[svc.Name]; ok {
 				continue
 			}
 			patch := client.MergeFrom(svc.DeepCopy())
@@ -564,7 +582,7 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 		// ConfigMap kind objects should only be applied once
 		//
 		// The Config is not allowed to be modified.
-		// Once ClusterDefinition provider adjusts the ConfigTemplateRef field of CusterDefinition,
+		// Once ClusterDefinition provider adjusts the TemplateRef field of CusterDefinition,
 		// or provider modifies the wrong config file, it may cause the application cluster may fail.
 		if cm, ok := obj.(*corev1.ConfigMap); ok {
 			if err := handleConfigMap(cm); err != nil {
@@ -608,11 +626,7 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 		}
 	}
 
-	var svcList []*corev1.Service
-	for _, obj := range objsByKind[constant.ServiceKind] {
-		svcList = append(svcList, obj.(*corev1.Service))
-	}
-	if err := cleanUselessServices(svcList); err != nil {
+	if err = cleanUselessServices(); err != nil {
 		return false, err
 	}
 
@@ -782,7 +796,14 @@ func isVolumeSnapshotExists(cli client.Client,
 	if err := cli.List(ctx, &vsList, ml); err != nil {
 		return false, client.IgnoreNotFound(err)
 	}
-	return len(vsList.Items) > 0, nil
+	for _, vs := range vsList.Items {
+		// when do h-scale very shortly after last h-scale,
+		// the last volume snapshot could not be deleted completely
+		if vs.DeletionTimestamp.IsZero() {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 // check snapshot ready to use
@@ -871,7 +892,16 @@ func checkedCreatePVCFromSnapshot(cli client.Client,
 		if len(vsList.Items) == 0 {
 			return errors.Errorf("volumesnapshot not found in cluster %s component %s", cluster.Name, componentName)
 		}
-		return createPVCFromSnapshot(ctx, cli, vct, stsObj, pvcKey, vsList.Items[0].Name)
+		// exclude volumes that are deleting
+		vsName := ""
+		for _, vs := range vsList.Items {
+			if vs.DeletionTimestamp != nil {
+				continue
+			}
+			vsName = vs.Name
+			break
+		}
+		return createPVCFromSnapshot(ctx, cli, vct, stsObj, pvcKey, vsName)
 	}
 	return nil
 }

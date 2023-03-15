@@ -52,7 +52,7 @@ type clusterPlanBuilder struct {
 	conMgr   clusterConditionManager2
 }
 
-// // clusterPlan a graph.Plan implementation for Cluster reconciliation
+// clusterPlan a graph.Plan implementation for Cluster reconciliation
 type clusterPlan struct {
 	dag      *graph.DAG
 	walkFunc graph.WalkFunc
@@ -119,7 +119,6 @@ func (c *clusterPlanBuilder) Validate() error {
 }
 
 // Build only cluster Creation, Update and Deletion supported.
-// TODO: Validations and Corrections (cluster labels correction, primaryIndex spec validation etc.)
 func (c *clusterPlanBuilder) Build() (graph.Plan, error) {
 	_ = c.conMgr.setProvisioningStartedCondition(c.cluster)
 	var err error

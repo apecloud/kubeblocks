@@ -38,20 +38,6 @@ const (
 	// logs will be recorded in more detail, and some ephemeral pods (esp. those created by jobs) will retain after execution.
 	debugClusterAnnotationKey = "cluster.kubeblocks.io/debug"
 
-	// roleChangedAnnotKey is used to mark the role change event has been handled.
-	roleChangedAnnotKey = "role.kubeblocks.io/event-handled"
-
 	// annotations values
 	lifecycleDeletePVCAnnotation = "delete-pvc"
-
-	// values
-	trueStr = "true"
-)
-
-const (
-	ProbeEventOperationNotImpl ProbeEventType = "OperationNotImplemented"
-	ProbeEventCheckRoleFailed  ProbeEventType = "checkRoleFailed"
-	ProbeEventRoleInvalid      ProbeEventType = "roleInvalid"
-	ProbeEventRoleChanged      ProbeEventType = "roleChanged"
-	ProbeEventRoleUnChanged    ProbeEventType = "roleUnChanged"
 )

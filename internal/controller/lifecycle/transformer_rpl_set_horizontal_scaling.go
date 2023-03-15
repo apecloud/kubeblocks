@@ -101,16 +101,6 @@ func (r *rplSetHorizontalScalingTransformer) hasReplicationSetHScaling(cluster a
 	return false, nil
 }
 
-func filterStsOwnedByComp(list []appsv1.StatefulSet, compName string) []appsv1.StatefulSet {
-	sts := make([]appsv1.StatefulSet, 0)
-	for _, s := range list {
-		if s.Labels[constant.KBAppComponentLabelKey] == compName {
-			sts = append(sts, s)
-		}
-	}
-	return sts
-}
-
 func (r *rplSetHorizontalScalingTransformer) listAllStsOwnedByCluster(cluster appsv1alpha1.Cluster) ([]appsv1.StatefulSet, error) {
 	stsList := &appsv1.StatefulSetList{}
 	if err := r.cli.List(r.ctx.Ctx, stsList,

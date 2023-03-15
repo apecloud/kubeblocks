@@ -158,14 +158,6 @@ func updateClusterPhaseWhenConditionsError(cluster *appsv1alpha1.Cluster) {
 	cluster.Status.Phase = opsRequestSlice[0].ToClusterPhase
 }
 
-// checkReferencingCRStatus checks if cluster referenced CR is available
-func checkReferencedCRStatus(referencedCRPhase appsv1alpha1.Phase) error {
-	if referencedCRPhase == appsv1alpha1.AvailablePhase {
-		return nil
-	}
-	return newRequeueError(ControllerErrorRequeueTime, "cluster definition not available")
-}
-
 func getBackupObjects(reqCtx intctrlutil.RequestCtx,
 	cli types2.ReadonlyClient,
 	namespace string,

@@ -4,7 +4,7 @@ metadata:
   name: snapshot-mycluster
 spec:
   clusterDefinitionRef: postgresql
-  clusterVersionRef: postgresql-14.6.0
+  clusterVersionRef: postgresql-14.7.0
   terminationPolicy: WipeOut
   affinity:
     topologyKeys:

@@ -55,7 +55,7 @@ func newListVersionsCmd(streams genericclioptions.IOStreams) *cobra.Command {
 	o := listVersionsOption{IOStreams: streams}
 	cmd := &cobra.Command{
 		Use:     "list-versions",
-		Short:   "List KubeBlocks versions",
+		Short:   "List KubeBlocks versions.",
 		Aliases: []string{"ls-versions"},
 		Args:    cobra.NoArgs,
 		Example: listVersionsExample,
@@ -91,7 +91,7 @@ func (o *listVersionsOption) listVersions() error {
 	// print result
 	num := 0
 	tbl := printer.NewTablePrinter(o.Out)
-	tbl.SetHeader("VERSION", "RELEASE-NOTE")
+	tbl.SetHeader("VERSION", "RELEASE-NOTES")
 	for _, v := range versions {
 		tbl.AddRow(v.String(), fmt.Sprintf("https://github.com/apecloud/kubeblocks/releases/tag/v%s", v))
 		num += 1

@@ -51,7 +51,7 @@ var _ = Describe("kubeblocks objects", func() {
 			dynamic = testing.FakeDynamicClient(mockDeploy(map[string]string{
 				k: v,
 			}))
-			objs, _ := getKBObjects(testing.FakeDynamicClient(testing.FakeVolumeSnapshotClass()), namespace)
+			objs, _ := getKBObjects(testing.FakeDynamicClient(testing.FakeVolumeSnapshotClass()), namespace, nil)
 			Expect(deleteObjects(dynamic, types.DeployGVR(), objs[types.DeployGVR()])).Should(Succeed())
 		}
 	})
@@ -93,14 +93,14 @@ var _ = Describe("kubeblocks objects", func() {
 
 		for _, c := range testCases {
 			client := mockDynamicClientWithCRD(c.clusterDef, c.clusterVersion, c.backupTool)
-			objs, _ := getKBObjects(client, "")
+			objs, _ := getKBObjects(client, "", nil)
 			Expect(removeCustomResources(client, objs)).Should(Succeed())
 		}
 	})
 
 	It("delete crd", func() {
 		dynamic := mockDynamicClientWithCRD()
-		objs, _ := getKBObjects(dynamic, "")
+		objs, _ := getKBObjects(dynamic, "", nil)
 		Expect(deleteObjects(dynamic, types.CRDGVR(), objs[types.CRDGVR()])).Should(Succeed())
 	})
 })
@@ -115,7 +115,7 @@ func mockDynamicClientWithCRD(objects ...runtime.Object) dynamic.Interface {
 			Name: "clusters.apps.kubeblocks.io",
 		},
 		Spec: v1.CustomResourceDefinitionSpec{
-			Group: types.Group,
+			Group: types.AppsAPIGroup,
 		},
 		Status: v1.CustomResourceDefinitionStatus{},
 	}
@@ -128,7 +128,7 @@ func mockDynamicClientWithCRD(objects ...runtime.Object) dynamic.Interface {
 			Name: "clusterdefinitions.apps.kubeblocks.io",
 		},
 		Spec: v1.CustomResourceDefinitionSpec{
-			Group: types.Group,
+			Group: types.AppsAPIGroup,
 		},
 		Status: v1.CustomResourceDefinitionStatus{},
 	}
@@ -141,7 +141,7 @@ func mockDynamicClientWithCRD(objects ...runtime.Object) dynamic.Interface {
 			Name: "clusterversions.apps.kubeblocks.io",
 		},
 		Spec: v1.CustomResourceDefinitionSpec{
-			Group: types.Group,
+			Group: types.AppsAPIGroup,
 		},
 		Status: v1.CustomResourceDefinitionStatus{},
 	}
@@ -155,7 +155,7 @@ func mockDynamicClientWithCRD(objects ...runtime.Object) dynamic.Interface {
 			Name: "backuptools.dataprotection.kubeblocks.io",
 		},
 		Spec: v1.CustomResourceDefinitionSpec{
-			Group: types.DPGroup,
+			Group: types.DPAPIGroup,
 		},
 		Status: v1.CustomResourceDefinitionStatus{},
 	}

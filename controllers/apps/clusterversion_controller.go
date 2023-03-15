@@ -126,17 +126,8 @@ func (r *ClusterVersionReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		return intctrlutil.Reconciled()
 	}
 
-	if ok, err := appsconfig.CheckCVConfigTemplate(r.Client, reqCtx, clusterVersion); !ok || err != nil {
-		return intctrlutil.RequeueAfter(time.Second, reqCtx.Log, "failed to check config template")
-	}
-
-	if ok, err := appsconfig.UpdateCVLabelsByConfiguration(r.Client, reqCtx, clusterVersion); !ok || err != nil {
-		return intctrlutil.RequeueAfter(time.Second, reqCtx.Log, "failed to update using config template info")
-	}
-
-	// Update configmap Finalizer and set Immutable
-	if err := appsconfig.UpdateCVConfigMapFinalizer(r.Client, reqCtx, clusterVersion); err != nil {
-		return intctrlutil.RequeueAfter(time.Second, reqCtx.Log, "failed to UpdateConfigMapFinalizer")
+	if err := appsconfig.ReconcileConfigurationForReferencedCR(r.Client, reqCtx, clusterVersion); err != nil {
+		return intctrlutil.RequeueAfter(time.Second, reqCtx.Log, err.Error())
 	}
 
 	clusterdefinition := &appsv1alpha1.ClusterDefinition{}
@@ -213,5 +204,5 @@ func (r *ClusterVersionReconciler) deleteExternalResources(reqCtx intctrlutil.Re
 	//
 	// Ensure that delete implementation is idempotent and safe to invoke
 	// multiple times for same object.
-	return appsconfig.DeleteCVConfigMapFinalizer(r.Client, reqCtx, clusterVersion)
+	return appsconfig.DeleteConfigMapFinalizer(r.Client, reqCtx, clusterVersion)
 }

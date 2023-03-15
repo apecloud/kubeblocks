@@ -182,11 +182,28 @@ data:
     rdb-save-incremental-fsync yes
     jemalloc-bg-thread yes
 ---
+# Source: redis/templates/backuppolicytemplate.yaml
+apiVersion: dataprotection.kubeblocks.io/v1alpha1
+kind: BackupPolicyTemplate
+metadata:
+  name: backup-policy-template-redis
+  labels:
+    clusterdefinition.kubeblocks.io/name: redis
+    helm.sh/chart: redis-0.1.0
+    app.kubernetes.io/name: redis
+    app.kubernetes.io/instance: mycluster
+    app.kubernetes.io/version: "7.0.5"
+    app.kubernetes.io/managed-by: Helm
+spec:
+  # which backup tool to perform database backup, only support one tool.
+  backupToolName: volumesnapshot
+  ttl: 168h0m0s
+---
 # Source: redis/templates/clusterdefinition.yaml
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: ClusterDefinition
 metadata:
-  name: apecloud-redis
+  name: redis
   labels:
     helm.sh/chart: redis-0.1.0
     app.kubernetes.io/name: redis
@@ -270,6 +287,9 @@ spec:
       logConfigs:
         - name: running
           filePathPattern: /data/running.log
+      volumeTypes:
+        - name: data
+          type: data
       podSpec:
         initContainers:
           - name: redis-init-container
@@ -334,7 +354,7 @@ spec:
         cmdExecutorConfig:
           image: docker.io/redis:7.0.5
           command:
-          - /bin/sh
+          - sh
           - -c
           args:
           - redis-cli -h $(KB_ACCOUNT_ENDPOINT) $(KB_ACCOUNT_STATEMENT)
@@ -387,7 +407,7 @@ metadata:
     app.kubernetes.io/version: "7.0.5"
     app.kubernetes.io/managed-by: Helm
 spec:
-  clusterDefinitionRef: apecloud-redis
+  clusterDefinitionRef: redis
   componentVersions:
   - componentDefRef: redis
     versionsContext:
@@ -396,19 +416,19 @@ spec:
         image: redis:7.0.5
         imagePullPolicy: IfNotPresent
 ---
-# Source: apecloud-redis-rep-cluster/templates/cluster.yaml
+# Source: redis-cluster/templates/cluster.yaml
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: Cluster
 metadata:
   name: mycluster
   labels: 
-    helm.sh/chart: apecloud-redis-rep-cluster-0.1.0
-    app.kubernetes.io/name: apecloud-redis-rep-cluster
+    helm.sh/chart: redis-cluster-0.1.0
+    app.kubernetes.io/name: redis-cluster
     app.kubernetes.io/instance: mycluster
     app.kubernetes.io/version: "7.0.5"
     app.kubernetes.io/managed-by: Helm
 spec:
-  clusterDefinitionRef: apecloud-redis  # ref clusterDefinition.name
+  clusterDefinitionRef: redis  # ref clusterDefinition.name
   clusterVersionRef: redis-7.0.5 # ref clusterVersion.name
   terminationPolicy: Delete
   affinity:

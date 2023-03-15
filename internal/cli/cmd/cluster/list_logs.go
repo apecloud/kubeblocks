@@ -36,7 +36,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/constant"
+	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
 var (
@@ -73,7 +73,7 @@ func NewListLogsCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cob
 
 	cmd := &cobra.Command{
 		Use:               "list-logs NAME",
-		Short:             "List supported log files in cluster",
+		Short:             "List supported log files in cluster.",
 		Example:           logsListExample,
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.ClusterGVR()),
 		Run: func(cmd *cobra.Command, args []string) {
@@ -170,7 +170,7 @@ func (o *ListLogsOptions) gatherLogFilesData(c *appsv1alpha1.Cluster, cd *appsv1
 		if len(o.instName) > 0 && !strings.EqualFold(p.Name, o.instName) {
 			continue
 		}
-		componentName, ok := p.Labels[intctrlutil.KBAppComponentLabelKey]
+		componentName, ok := p.Labels[constant.KBAppComponentLabelKey]
 		if !ok || (len(o.componentName) > 0 && !strings.EqualFold(o.componentName, componentName)) {
 			continue
 		}

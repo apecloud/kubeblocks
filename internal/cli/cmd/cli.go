@@ -28,6 +28,7 @@ import (
 	utilcomp "k8s.io/kubectl/pkg/util/completion"
 	"k8s.io/kubectl/pkg/util/templates"
 
+	"github.com/apecloud/kubeblocks/internal/cli/cmd/addon"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/alert"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/app"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/backupconfig"
@@ -39,7 +40,6 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/kubeblocks"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/options"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/playground"
-	"github.com/apecloud/kubeblocks/internal/cli/cmd/troubleshoot"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/version"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 )
@@ -51,7 +51,7 @@ const (
 func NewCliCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   cliName,
-		Short: "KubeBlocks CLI",
+		Short: "KubeBlocks CLI.",
 		Long: `
 =============================================
  __    __ _______   ______  __       ______ 
@@ -97,11 +97,11 @@ A Command Line Interface for KubeBlocks`,
 		version.NewVersionCmd(f),
 		backupconfig.NewBackupConfigCmd(f, ioStreams),
 		dashboard.NewDashboardCmd(f, ioStreams),
-		troubleshoot.NewTroubleshootCmd(f, ioStreams),
 		clusterversion.NewClusterVersionCmd(f, ioStreams),
 		clusterdefinition.NewClusterDefinitionCmd(f, ioStreams),
 		app.NewAppCmd(f, ioStreams),
 		alert.NewAlertCmd(f, ioStreams),
+		addon.NewAddonCmd(f, ioStreams),
 	)
 
 	filters := []string{"options"}
@@ -128,6 +128,9 @@ func initConfig() {
 	viper.SetDefault("CLUSTER_DEFAULT_REPLICAS", 1)
 	viper.SetDefault("CLUSTER_DEFAULT_CPU", "1000m")
 	viper.SetDefault("CLUSTER_DEFAULT_MEMORY", "1Gi")
+
+	viper.SetDefault("KB_WAIT_ADDON_READY_TIMES", 60)
+	viper.SetDefault("PLAYGROUND_WAIT_TIMES", 20)
 
 	// If a config file is found, read it in.
 	if err := viper.ReadInConfig(); err == nil {

@@ -128,6 +128,11 @@ func (factory *BaseFactory[T, PT, F]) SetOwnerReferences(ownerAPIVersion string,
 	return factory.concreteFactory
 }
 
+func (factory *BaseFactory[T, PT, F]) AddFinalizers(finalizers []string) *F {
+	factory.object.SetFinalizers(finalizers)
+	return factory.concreteFactory
+}
+
 func (factory *BaseFactory[T, PT, F]) Create(testCtx *testutil.TestContext) *F {
 	gomega.Expect(testCtx.CreateObj(testCtx.Ctx, factory.get())).Should(gomega.Succeed())
 	return factory.concreteFactory

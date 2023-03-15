@@ -1,6 +1,8 @@
-## kbcli cluster logs
+---
+title: kbcli cluster logs
+---
 
-Access cluster log file
+Access cluster log file.
 
 ```
 kbcli cluster logs NAME [flags]
@@ -13,12 +15,15 @@ kbcli cluster logs NAME [flags]
   kbcli cluster logs mycluster
   
   # Display only the most recent 20 lines from cluster mycluster with default primary instance (stdout)
-  kbcli cluster logs --tail=20 mycluster
+  kbcli cluster logs mycluster --tail=20
   
-  # Return snapshot logs from cluster mycluster with specify instance my-instance-0 (stdout)
+  # Display stdout info of specific instance my-instance-0 (cluster name comes from annotation app.kubernetes.io/instance)
+  kbcli cluster logs --instance my-instance-0
+  
+  # Return snapshot logs from cluster mycluster with specific instance my-instance-0 (stdout)
   kbcli cluster logs mycluster --instance my-instance-0
   
-  # Return snapshot logs from cluster mycluster with specify instance my-instance-0 and specify container
+  # Return snapshot logs from cluster mycluster with specific instance my-instance-0 and specific container
   # my-container (stdout)
   kbcli cluster logs mycluster --instance my-instance-0 -c my-container
   
@@ -28,10 +33,10 @@ kbcli cluster logs NAME [flags]
   # Begin streaming the slow logs from cluster mycluster with default primary instance
   kbcli cluster logs -f mycluster --file-type=slow
   
-  # Return the specify file logs from cluster mycluster with specify instance my-instance-0
+  # Return the specific file logs from cluster mycluster with specific instance my-instance-0
   kbcli cluster logs mycluster --instance my-instance-0 --file-path=/var/log/yum.log
   
-  # Return the specify file logs from cluster mycluster with specify instance my-instance-0 and specify
+  # Return the specific file logs from cluster mycluster with specific instance my-instance-0 and specific
   # container my-container
   kbcli cluster logs mycluster --instance my-instance-0 -c my-container --file-path=/var/log/yum.log
 ```
@@ -81,5 +86,7 @@ kbcli cluster logs NAME [flags]
 
 ### SEE ALSO
 
-* [kbcli cluster](kbcli_cluster.md)	 - Cluster command
+* [kbcli cluster](kbcli_cluster.md)	 - Cluster command.
+
+#### Go Back to [CLI Overview](cli.md) Homepage.
 

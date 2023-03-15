@@ -34,7 +34,7 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/cluster"
 	"github.com/apecloud/kubeblocks/internal/cli/exec"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/constant"
+	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
 var _ = Describe("listLogs test", func() {
@@ -103,8 +103,8 @@ var _ = Describe("listLogs test", func() {
 				Namespace:       "test",
 				ResourceVersion: "10",
 				Labels: map[string]string{
-					"app.kubernetes.io/name":           "mysql-apecloud-mysql",
-					intctrlutil.KBAppComponentLabelKey: "component-name",
+					"app.kubernetes.io/name":        "mysql-apecloud-mysql",
+					constant.KBAppComponentLabelKey: "component-name",
 				},
 			},
 		}

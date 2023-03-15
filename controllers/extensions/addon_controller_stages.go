@@ -18,6 +18,7 @@ package extensions
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -37,12 +38,17 @@ import (
 )
 
 func init() {
-	viper.SetDefault(addonJobImagePullPolicyKey, corev1.PullIfNotPresent)
 	viper.SetDefault(addonSANameKey, "kubeblocks-addon-installer")
 }
 
 type fetchNDeletionCheckStage struct {
 	stageCtx
+	deletionStage deletionStage
+}
+
+type deletionStage struct {
+	stageCtx
+	disablingStage disablingStage
 }
 
 type genIDProceedCheckStage struct {
@@ -86,27 +92,31 @@ type terminalStateStage struct {
 }
 
 func (r *fetchNDeletionCheckStage) Handle(ctx context.Context) {
-	r.reqCtx.Log.V(1).Info("get addon", "addon", r.reqCtx.Req.NamespacedName)
 	addon := &extensionsv1alpha1.Addon{}
 	if err := r.reconciler.Client.Get(ctx, r.reqCtx.Req.NamespacedName, addon); err != nil {
 		res, err := intctrlutil.CheckedRequeueWithError(err, r.reqCtx.Log, "")
 		r.updateResultNErr(&res, err)
 		return
 	}
+	r.reqCtx.Log.V(1).Info("get addon", "generation", addon.Generation, "observedGeneration", addon.Status.ObservedGeneration)
 	r.reqCtx.UpdateCtxValue(operandValueKey, addon)
 	res, err := intctrlutil.HandleCRDeletion(*r.reqCtx, r.reconciler, addon, addonFinalizerName, func() (*ctrl.Result, error) {
-		return r.reconciler.deleteExternalResources(*r.reqCtx, addon)
+		r.deletionStage.Handle(ctx)
+		return r.deletionStage.doReturn()
 	})
 	if res != nil || err != nil {
 		r.updateResultNErr(res, err)
+		return
 	}
+	r.reqCtx.Log.V(1).Info("start normal reconcile")
 	r.next.Handle(ctx)
 }
 
 func (r *genIDProceedCheckStage) Handle(ctx context.Context) {
 	r.process(func(addon *extensionsv1alpha1.Addon) {
+		r.reqCtx.Log.V(1).Info("genIDProceedCheckStage", "phase", addon.Status.Phase)
 		switch addon.Status.Phase {
-		case extensionsv1alpha1.AddonEnabled, extensionsv1alpha1.AddonFailed, extensionsv1alpha1.AddonDisabled:
+		case extensionsv1alpha1.AddonEnabled, extensionsv1alpha1.AddonDisabled:
 			if addon.Generation == addon.Status.ObservedGeneration {
 				res, err := r.reconciler.deleteExternalResources(*r.reqCtx, addon)
 				if res != nil || err != nil {
@@ -116,6 +126,64 @@ func (r *genIDProceedCheckStage) Handle(ctx context.Context) {
 				r.setReconciled()
 				return
 			}
+		case extensionsv1alpha1.AddonFailed:
+			if addon.Generation == addon.Status.ObservedGeneration {
+				r.setReconciled()
+				return
+			}
+		}
+	})
+	r.next.Handle(ctx)
+}
+
+func (r *deletionStage) Handle(ctx context.Context) {
+	r.disablingStage.stageCtx = r.stageCtx
+	r.process(func(addon *extensionsv1alpha1.Addon) {
+		r.reqCtx.Log.V(1).Info("deletionStage", "phase", addon.Status.Phase)
+		patchPhase := func(phase extensionsv1alpha1.AddonPhase, reason string) {
+			r.reqCtx.Log.V(1).Info("patching status", "phase", phase)
+			patch := client.MergeFrom(addon.DeepCopy())
+			addon.Status.Phase = phase
+			addon.Status.ObservedGeneration = addon.Generation
+			if err := r.reconciler.Status().Patch(ctx, addon, patch); err != nil {
+				r.setRequeueWithErr(err, "")
+				return
+			}
+			r.reqCtx.Log.V(1).Info("progress to", "phase", phase)
+			r.reconciler.Recorder.Event(addon, "Normal", reason,
+				fmt.Sprintf("Progress to %s phase", phase))
+			r.setReconciled()
+		}
+		switch addon.Status.Phase {
+		case extensionsv1alpha1.AddonEnabling:
+			// delete running jobs
+			res, err := r.reconciler.deleteExternalResources(*r.reqCtx, addon)
+			if err != nil {
+				r.updateResultNErr(res, err)
+				return
+			}
+			patchPhase(extensionsv1alpha1.AddonDisabling, DisablingAddon)
+			return
+		case extensionsv1alpha1.AddonEnabled:
+			patchPhase(extensionsv1alpha1.AddonDisabling, DisablingAddon)
+			return
+		case extensionsv1alpha1.AddonDisabling:
+			r.disablingStage.Handle(ctx)
+			res, err := r.disablingStage.doReturn()
+
+			if res != nil || err != nil {
+				return
+			}
+			patchPhase(extensionsv1alpha1.AddonDisabled, AddonDisabled)
+			return
+		default:
+			r.reqCtx.Log.V(1).Info("delete external resources", "phase", addon.Status.Phase)
+			res, err := r.reconciler.deleteExternalResources(*r.reqCtx, addon)
+			if res != nil || err != nil {
+				r.updateResultNErr(res, err)
+				return
+			}
+			return
 		}
 	})
 	r.next.Handle(ctx)
@@ -123,6 +191,7 @@ func (r *genIDProceedCheckStage) Handle(ctx context.Context) {
 
 func (r *installableCheckStage) Handle(ctx context.Context) {
 	r.process(func(addon *extensionsv1alpha1.Addon) {
+		r.reqCtx.Log.V(1).Info("installableCheckStage", "phase", addon.Status.Phase)
 		if addon.Spec.Installable == nil {
 			return
 		}
@@ -130,7 +199,9 @@ func (r *installableCheckStage) Handle(ctx context.Context) {
 		if addon.Spec.InstallSpec != nil {
 			return
 		}
-		if addon.Annotations != nil && addon.Annotations[SkipInstallableCheck] != "" {
+		if addon.Annotations != nil && addon.Annotations[SkipInstallableCheck] == "true" {
+			r.reconciler.Recorder.Event(addon, "Warning", InstallableCheckSkipped,
+				"Installable check skipped.")
 			return
 		}
 		switch addon.Status.Phase {
@@ -157,10 +228,8 @@ func (r *installableCheckStage) Handle(ctx context.Context) {
 				r.setRequeueWithErr(err, "")
 				return
 			}
-			r.reconciler.Recorder.Event(addon, "Warning", "InstallableRequirementUnmatched",
-				fmt.Sprintf("Addon %s does not meet installable requirements for key %v",
-					addon.Name,
-					s))
+			r.reconciler.Recorder.Event(addon, "Warning", InstallableRequirementUnmatched,
+				fmt.Sprintf("Does not meet installable requirements for key %v", s))
 			r.setReconciled()
 			return
 		}
@@ -170,20 +239,25 @@ func (r *installableCheckStage) Handle(ctx context.Context) {
 
 func (r *autoInstallCheckStage) Handle(ctx context.Context) {
 	r.process(func(addon *extensionsv1alpha1.Addon) {
+		r.reqCtx.Log.V(1).Info("autoInstallCheckStage", "phase", addon.Status.Phase)
 		if addon.Spec.Installable == nil || !addon.Spec.Installable.AutoInstall {
 			return
 		}
 		// proceed if has specified addon.spec.installSpec
 		if addon.Spec.InstallSpec != nil {
+			r.reqCtx.Log.V(1).Info("has specified addon.spec.installSpec")
 			return
 		}
 
 		setInstallSpec := func(di *extensionsv1alpha1.AddonDefaultInstallSpecItem) {
-			addon.Spec.InstallSpec = &di.AddonInstallSpec
+			addon.Spec.InstallSpec = di.AddonInstallSpec.DeepCopy()
+			addon.Spec.InstallSpec.Enabled = true
 			if err := r.reconciler.Client.Update(ctx, addon); err != nil {
 				r.setRequeueWithErr(err, "")
 				return
 			}
+			r.reconciler.Recorder.Event(addon, "Normal", AddonAutoInstall,
+				"Addon enabled auto-install")
 			r.setReconciled()
 		}
 
@@ -208,7 +282,9 @@ func (r *progressingHandler) Handle(ctx context.Context) {
 	r.enablingStage.stageCtx = r.stageCtx
 	r.disablingStage.stageCtx = r.stageCtx
 	r.process(func(addon *extensionsv1alpha1.Addon) {
+		r.reqCtx.Log.V(1).Info("progressingHandler", "phase", addon.Status.Phase)
 		patchPhase := func(phase extensionsv1alpha1.AddonPhase, reason string) {
+			r.reqCtx.Log.V(1).Info("patching status", "phase", phase)
 			patch := client.MergeFrom(addon.DeepCopy())
 			addon.Status.Phase = phase
 			addon.Status.ObservedGeneration = addon.Generation
@@ -217,29 +293,48 @@ func (r *progressingHandler) Handle(ctx context.Context) {
 				return
 			}
 			r.reconciler.Recorder.Event(addon, "Normal", reason,
-				fmt.Sprintf("Addon %s progress to %s phase",
-					addon.Name, phase,
-				))
+				fmt.Sprintf("Progress to %s phase", phase))
 			r.setReconciled()
 		}
 
 		// decision enabling or disabling
-		if addon.Spec.InstallSpec == nil {
+		if !addon.Spec.InstallSpec.GetEnabled() {
+			r.reqCtx.Log.V(1).Info("progress to disabling stage handler")
 			// if it's new simply return
 			if addon.Status.Phase == "" {
 				return
 			}
 			if addon.Status.Phase != extensionsv1alpha1.AddonDisabling {
-				patchPhase(extensionsv1alpha1.AddonDisabling, "DisablingAddon")
+				patchPhase(extensionsv1alpha1.AddonDisabling, DisablingAddon)
 				return
 			}
 			r.disablingStage.Handle(ctx)
 			return
 		}
+		// handling enabling state
 		if addon.Status.Phase != extensionsv1alpha1.AddonEnabling {
-			patchPhase(extensionsv1alpha1.AddonEnabling, "EnablingAddon")
+			if addon.Status.Phase == extensionsv1alpha1.AddonFailed {
+				// clean up existing failed installation job
+				mgrNS := viper.GetString(constant.CfgKeyCtrlrMgrNS)
+				key := client.ObjectKey{
+					Namespace: mgrNS,
+					Name:      getInstallJobName(addon),
+				}
+				installJob := &batchv1.Job{}
+				if err := r.reconciler.Get(ctx, key, installJob); client.IgnoreNotFound(err) != nil {
+					r.setRequeueWithErr(err, "")
+					return
+				} else if err == nil && installJob.GetDeletionTimestamp().IsZero() {
+					if err = r.reconciler.Delete(ctx, installJob); err != nil {
+						r.setRequeueWithErr(err, "")
+						return
+					}
+				}
+			}
+			patchPhase(extensionsv1alpha1.AddonEnabling, EnablingAddon)
 			return
 		}
+		r.reqCtx.Log.V(1).Info("progress to enabling stage handler")
 		r.enablingStage.Handle(ctx)
 	})
 	r.next.Handle(ctx)
@@ -259,7 +354,8 @@ func getHelmReleaseName(addon *extensionsv1alpha1.Addon) string {
 
 func (r *helmTypeInstallStage) Handle(ctx context.Context) {
 	r.process(func(addon *extensionsv1alpha1.Addon) {
-		mgrNS := viper.GetString("CM_NAMESPACE")
+		r.reqCtx.Log.V(1).Info("helmTypeInstallStage", "phase", addon.Status.Phase)
+		mgrNS := viper.GetString(constant.CfgKeyCtrlrMgrNS)
 
 		key := client.ObjectKey{
 			Namespace: mgrNS,
@@ -300,10 +396,8 @@ func (r *helmTypeInstallStage) Handle(ctx context.Context) {
 					r.setRequeueWithErr(err, "")
 					return
 				}
-				r.reconciler.Recorder.Event(addon, "Warning", "InstallationFailed",
-					fmt.Sprintf("Addon %s install failed, do inspect error from jobs.batch %s",
-						addon.Name,
-						key.String()))
+				r.reconciler.Recorder.Event(addon, "Warning", InstallationFailed,
+					fmt.Sprintf("Installation failed, do inspect error from jobs.batch %s", key.String()))
 				r.setReconciled()
 				return
 			}
@@ -359,8 +453,7 @@ func (r *helmTypeInstallStage) Handle(ctx context.Context) {
 					r.setRequeueWithErr(err, "")
 					return
 				}
-				// TODO: handle not found error
-				r.setRequeueWithErr(err, "")
+				r.setRequeueAfter(time.Second, fmt.Sprintf("ConfigMap %s not found", cmRef.Name))
 				return
 			}
 			// TODO: validate cmRef.key exist in cm
@@ -391,8 +484,7 @@ func (r *helmTypeInstallStage) Handle(ctx context.Context) {
 					r.setRequeueWithErr(err, "")
 					return
 				}
-				// TODO: handle not found error
-				r.setRequeueWithErr(err, "")
+				r.setRequeueAfter(time.Second, fmt.Sprintf("Secret %s not found", secret.Name))
 				return
 			}
 			// TODO: validate secretRef.key exist in secret
@@ -435,8 +527,9 @@ func (r *helmTypeInstallStage) Handle(ctx context.Context) {
 
 func (r *helmTypeUninstallStage) Handle(ctx context.Context) {
 	r.process(func(addon *extensionsv1alpha1.Addon) {
+		r.reqCtx.Log.V(1).Info("helmTypeUninstallStage", "phase", addon.Status.Phase, "next", r.next.ID())
 		key := client.ObjectKey{
-			Namespace: viper.GetString("CM_NAMESPACE"),
+			Namespace: viper.GetString(constant.CfgKeyCtrlrMgrNS),
 			Name:      getUninstallJobName(addon),
 		}
 		helmUninstallJob := &batchv1.Job{}
@@ -445,11 +538,19 @@ func (r *helmTypeUninstallStage) Handle(ctx context.Context) {
 			return
 		} else if err == nil {
 			if helmUninstallJob.Status.Succeeded > 0 {
+				r.reqCtx.Log.V(1).Info("helm uninstall job succeed", "job", key)
 				// TODO:
 				// helm uninstall should always succeed, therefore need additional label selector to check any
 				// helm managed object is not properly cleaned up
 				return
 			}
+
+			// Job controller has yet handling Job or job controller is not running, i.e., testenv
+			// only handle this situation when addon is at terminating state.
+			if helmUninstallJob.Status.StartTime.IsZero() && !addon.GetDeletionTimestamp().IsZero() {
+				return
+			}
+
 			// requeue if uninstall job is active or deleting
 			if !helmUninstallJob.GetDeletionTimestamp().IsZero() || helmUninstallJob.Status.Active > 0 {
 				r.setRequeueAfter(time.Second, "")
@@ -459,12 +560,16 @@ func (r *helmTypeUninstallStage) Handle(ctx context.Context) {
 			// 0, and len(job.status.conditions) > 0, and need to handle failed
 			// info. from conditions.
 			if helmUninstallJob.Status.Failed > 0 {
-				r.reconciler.Recorder.Event(addon, "Warning", "UninstallationFailed",
-					fmt.Sprintf("Addon %s uninstall failed, do inspect error from jobs.batch %s",
-						addon.Name,
+				r.reqCtx.Log.V(1).Info("helm uninstall job failed", "job", key)
+				r.reconciler.Recorder.Event(addon, "Warning", UninstallationFailed,
+					fmt.Sprintf("Uninstallation failed, do inspect error from jobs.batch %s",
 						key.String()))
 
 				if err := r.reconciler.Delete(ctx, helmUninstallJob); client.IgnoreNotFound(err) != nil {
+					r.setRequeueWithErr(err, "")
+					return
+				}
+				if err := r.reconciler.cleanupJobPods(*r.reqCtx); err != nil {
 					r.setRequeueWithErr(err, "")
 					return
 				}
@@ -492,13 +597,16 @@ func (r *helmTypeUninstallStage) Handle(ctx context.Context) {
 
 		// has no installed release simply return
 		if !releaseExist {
+			r.reqCtx.Log.V(1).Info("helmTypeUninstallStage release not exist", "job", key)
 			return
 		}
 
+		r.reqCtx.Log.V(1).Info("creating helm uninstall job", "job", key)
 		var err error
 		// create `helm delete <release>` job
 		helmUninstallJob, err = createHelmJobProto(addon)
 		if err != nil {
+			r.reqCtx.Log.V(1).Info("helmTypeUninstallStage", "job", key, "err", err)
 			r.setRequeueWithErr(err, "")
 			return
 		}
@@ -512,7 +620,9 @@ func (r *helmTypeUninstallStage) Handle(ctx context.Context) {
 			"--timeout",
 			"10m",
 		}
+		r.reqCtx.Log.V(1).Info("create helm uninstall job", "job", key)
 		if err := r.reconciler.Create(ctx, helmUninstallJob); err != nil {
+			r.reqCtx.Log.V(1).Info("helmTypeUninstallStage", "job", key, "err", err)
 			r.setRequeueWithErr(err, "")
 			return
 		}
@@ -524,6 +634,7 @@ func (r *helmTypeUninstallStage) Handle(ctx context.Context) {
 func (r *enablingStage) Handle(ctx context.Context) {
 	r.helmTypeInstallStage.stageCtx = r.stageCtx
 	r.process(func(addon *extensionsv1alpha1.Addon) {
+		r.reqCtx.Log.V(1).Info("enablingStage", "phase", addon.Status.Phase)
 		switch addon.Spec.Type {
 		case extensionsv1alpha1.HelmType:
 			r.helmTypeInstallStage.Handle(ctx)
@@ -536,6 +647,7 @@ func (r *enablingStage) Handle(ctx context.Context) {
 func (r *disablingStage) Handle(ctx context.Context) {
 	r.helmTypeUninstallStage.stageCtx = r.stageCtx
 	r.process(func(addon *extensionsv1alpha1.Addon) {
+		r.reqCtx.Log.V(1).Info("disablingStage", "phase", addon.Status.Phase, "type", addon.Spec.Type)
 		switch addon.Spec.Type {
 		case extensionsv1alpha1.HelmType:
 			r.helmTypeUninstallStage.Handle(ctx)
@@ -547,7 +659,9 @@ func (r *disablingStage) Handle(ctx context.Context) {
 
 func (r *terminalStateStage) Handle(ctx context.Context) {
 	r.process(func(addon *extensionsv1alpha1.Addon) {
-		patchPhase := func(phase extensionsv1alpha1.AddonPhase, reason string) error {
+		r.reqCtx.Log.V(1).Info("terminalStateStage", "phase", addon.Status.Phase)
+		patchPhaseNCondition := func(phase extensionsv1alpha1.AddonPhase, reason string) {
+			r.reqCtx.Log.V(1).Info("patching status", "phase", phase)
 			patch := client.MergeFrom(addon.DeepCopy())
 			addon.Status.Phase = phase
 			addon.Status.ObservedGeneration = addon.Generation
@@ -561,30 +675,21 @@ func (r *terminalStateStage) Handle(ctx context.Context) {
 			})
 
 			if err := r.reconciler.Status().Patch(ctx, addon, patch); err != nil {
-				return err
+				r.setRequeueWithErr(err, "")
+				return
 			}
 			r.reconciler.Recorder.Event(addon, "Normal", reason,
-				fmt.Sprintf("Addon %s progress to %s phase",
-					addon.Name, phase,
-				))
-			return nil
+				fmt.Sprintf("Progress to %s phase", phase))
+			r.setReconciled()
 		}
 
 		// transit to enabled or disable phase
 		switch addon.Status.Phase {
 		case "", extensionsv1alpha1.AddonDisabling:
-			if err := patchPhase(extensionsv1alpha1.AddonDisabled, AddonDisabled); err != nil {
-				r.setRequeueWithErr(err, "")
-				return
-			}
-			r.setRequeue()
+			patchPhaseNCondition(extensionsv1alpha1.AddonDisabled, AddonDisabled)
 			return
 		case extensionsv1alpha1.AddonEnabling:
-			if err := patchPhase(extensionsv1alpha1.AddonEnabled, AddonEnabled); err != nil {
-				r.setRequeueWithErr(err, "")
-				return
-			}
-			r.setRequeue()
+			patchPhaseNCondition(extensionsv1alpha1.AddonEnabled, AddonEnabled)
 			return
 		}
 	})
@@ -618,16 +723,30 @@ func attachVolumeMount(
 
 // createHelmJobProto create a job.batch prototyped object
 func createHelmJobProto(addon *extensionsv1alpha1.Addon) (*batchv1.Job, error) {
-	ttl := int32((time.Hour * 24).Seconds())
-	helmInstallJob := &batchv1.Job{
+	ttl := time.Minute * 5
+	if jobTTL := viper.GetString(constant.CfgKeyAddonJobTTL); jobTTL != "" {
+		var err error
+		if ttl, err = time.ParseDuration(jobTTL); err != nil {
+			return nil, err
+		}
+	}
+	ttlSec := int32(ttl.Seconds())
+	helmProtoJob := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels: map[string]string{
-				constant.AddonNameLabelKey: addon.Name,
+				constant.AddonNameLabelKey:    addon.Name,
+				constant.AppManagedByLabelKey: constant.AppName,
 			},
 		},
 		Spec: batchv1.JobSpec{
-			TTLSecondsAfterFinished: &ttl,
+			TTLSecondsAfterFinished: &ttlSec,
 			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						constant.AddonNameLabelKey:    addon.Name,
+						constant.AppManagedByLabelKey: constant.AppName,
+					},
+				},
 				Spec: corev1.PodSpec{
 					RestartPolicy:      corev1.RestartPolicyOnFailure,
 					ServiceAccountName: viper.GetString("KUBEBLOCKS_ADDON_SA_NAME"),
@@ -635,7 +754,7 @@ func createHelmJobProto(addon *extensionsv1alpha1.Addon) (*batchv1.Job, error) {
 						{
 							Name:            strings.ToLower(string(addon.Spec.Type)),
 							Image:           viper.GetString("KUBEBLOCKS_IMAGE"),
-							ImagePullPolicy: corev1.PullPolicy(viper.GetString(addonJobImagePullPolicyKey)),
+							ImagePullPolicy: corev1.PullPolicy(viper.GetString(constant.CfgAddonJobImgPullPolicy)),
 							// TODO: need have image that is capable of following settings, current settings
 							// may expose potential security risk, as this pod is using cluster-admin clusterrole.
 							// SecurityContext: &corev1.SecurityContext{
@@ -656,20 +775,60 @@ func createHelmJobProto(addon *extensionsv1alpha1.Addon) (*batchv1.Job, error) {
 								},
 								{
 									Name:  "RELEASE_NS",
-									Value: viper.GetString("CM_NAMESPACE"),
+									Value: viper.GetString(constant.CfgKeyCtrlrMgrNS),
 								},
 								{
 									Name:  "CHART",
-									Value: addon.Spec.Helm.ChartRepoURL,
+									Value: addon.Spec.Helm.ChartLocationURL,
 								},
 							},
 							VolumeMounts: []corev1.VolumeMount{},
 						},
 					},
-					Volumes: []corev1.Volume{},
+					Volumes:      []corev1.Volume{},
+					Tolerations:  []corev1.Toleration{},
+					Affinity:     &corev1.Affinity{},
+					NodeSelector: map[string]string{},
 				},
 			},
 		},
 	}
-	return helmInstallJob, nil
+	// inherit kubeblocks.io labels from primary resource
+	for k, v := range addon.Labels {
+		if !strings.Contains(k, constant.APIGroup) {
+			continue
+		}
+		if _, ok := helmProtoJob.ObjectMeta.Labels[k]; !ok {
+			helmProtoJob.ObjectMeta.Labels[k] = v
+		}
+	}
+
+	podSpec := &helmProtoJob.Spec.Template.Spec
+	if cmTolerations := viper.GetString(constant.CfgKeyCtrlrMgrTolerations); cmTolerations != "" &&
+		cmTolerations != "[]" && cmTolerations != "[{}]" {
+		if err := json.Unmarshal([]byte(cmTolerations), &podSpec.Tolerations); err != nil {
+			return nil, err
+		}
+		isAllEmptyElem := true
+		for _, t := range podSpec.Tolerations {
+			if t.String() != "{}" {
+				isAllEmptyElem = false
+				break
+			}
+		}
+		if isAllEmptyElem {
+			podSpec.Tolerations = nil
+		}
+	}
+	if cmAffinity := viper.GetString(constant.CfgKeyCtrlrMgrAffinity); cmAffinity != "" {
+		if err := json.Unmarshal([]byte(cmAffinity), &podSpec.Affinity); err != nil {
+			return nil, err
+		}
+	}
+	if cmNodeSelector := viper.GetString(constant.CfgKeyCtrlrMgrNodeSelector); cmNodeSelector != "" {
+		if err := json.Unmarshal([]byte(cmNodeSelector), &podSpec.NodeSelector); err != nil {
+			return nil, err
+		}
+	}
+	return helmProtoJob, nil
 }

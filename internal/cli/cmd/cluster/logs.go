@@ -37,7 +37,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/exec"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/constant"
+	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
 var (
@@ -46,12 +46,15 @@ var (
 		kbcli cluster logs mycluster
 
 		# Display only the most recent 20 lines from cluster mycluster with default primary instance (stdout)
-		kbcli cluster logs --tail=20 mycluster
+		kbcli cluster logs mycluster --tail=20
 
-		# Return snapshot logs from cluster mycluster with specify instance my-instance-0 (stdout)
+		# Display stdout info of specific instance my-instance-0 (cluster name comes from annotation app.kubernetes.io/instance) 
+		kbcli cluster logs --instance my-instance-0
+
+		# Return snapshot logs from cluster mycluster with specific instance my-instance-0 (stdout)
 		kbcli cluster logs mycluster --instance my-instance-0
 
-		# Return snapshot logs from cluster mycluster with specify instance my-instance-0 and specify container
+		# Return snapshot logs from cluster mycluster with specific instance my-instance-0 and specific container
         # my-container (stdout)
 		kbcli cluster logs mycluster --instance my-instance-0 -c my-container
 
@@ -61,10 +64,10 @@ var (
 		# Begin streaming the slow logs from cluster mycluster with default primary instance
 		kbcli cluster logs -f mycluster --file-type=slow
 
-		# Return the specify file logs from cluster mycluster with specify instance my-instance-0
+		# Return the specific file logs from cluster mycluster with specific instance my-instance-0
 		kbcli cluster logs mycluster --instance my-instance-0 --file-path=/var/log/yum.log
 
-		# Return the specify file logs from cluster mycluster with specify instance my-instance-0 and specify
+		# Return the specific file logs from cluster mycluster with specific instance my-instance-0 and specific
         # container my-container
 		kbcli cluster logs mycluster --instance my-instance-0 -c my-container --file-path=/var/log/yum.log`)
 )
@@ -88,7 +91,7 @@ func NewLogsCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 	}
 	cmd := &cobra.Command{
 		Use:               "logs NAME",
-		Short:             "Access cluster log file",
+		Short:             "Access cluster log file.",
 		Example:           logsExample,
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.ClusterGVR()),
 		Run: func(cmd *cobra.Command, args []string) {
@@ -132,11 +135,12 @@ func (o *LogsOptions) run() error {
 
 // complete customs complete function for logs
 func (o *LogsOptions) complete(args []string) error {
-	if len(args) == 0 {
-		return fmt.Errorf("you must specify the cluster name to retrieve logs")
+	if len(args) == 0 && len(o.PodName) == 0 {
+		return fmt.Errorf("cluster name or instance name should be specified")
 	}
-	o.clusterName = args[0]
-
+	if len(args) > 0 {
+		o.clusterName = args[0]
+	}
 	// no set podName and find the default pod of cluster
 	if len(o.PodName) == 0 {
 		infos := cluster.GetSimpleInstanceInfos(o.Dynamic, o.clusterName, o.Namespace)
@@ -149,6 +153,14 @@ func (o *LogsOptions) complete(args []string) error {
 	pod, err := o.Client.CoreV1().Pods(o.Namespace).Get(context.TODO(), o.PodName, metav1.GetOptions{})
 	if err != nil {
 		return err
+	}
+	// cluster name is not specified, get from pod label
+	if o.clusterName == "" {
+		if name, ok := pod.Annotations[constant.AppInstanceLabelKey]; !ok {
+			return fmt.Errorf("failed to find the cluster to which the instance belongs")
+		} else {
+			o.clusterName = name
+		}
 	}
 	var command string
 	switch {
@@ -223,7 +235,7 @@ func (o *LogsOptions) validate() error {
 // createFileTypeCommand creates command against log file type
 func (o *LogsOptions) createFileTypeCommand(pod *corev1.Pod, obj *cluster.ClusterObjects) (string, error) {
 	var command string
-	componentName, ok := pod.Labels[intctrlutil.KBAppComponentLabelKey]
+	componentName, ok := pod.Labels[constant.KBAppComponentLabelKey]
 	if !ok {
 		return command, fmt.Errorf("get component name from pod labels fail")
 	}

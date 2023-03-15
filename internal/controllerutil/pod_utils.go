@@ -71,7 +71,7 @@ func GetParentNameAndOrdinal(pod *corev1.Pod) (string, int) {
 //		   name: data
 //		 - mountPath: /log
 //		   name: log
-func GetContainerByConfigTemplate(podSpec *corev1.PodSpec, configs []appsv1alpha1.ConfigTemplate) *corev1.Container {
+func GetContainerByConfigTemplate(podSpec *corev1.PodSpec, configs []appsv1alpha1.ComponentConfigSpec) *corev1.Container {
 	containers := podSpec.Containers
 	initContainers := podSpec.InitContainers
 	if container := getContainerWithTplList(containers, configs); container != nil {
@@ -147,7 +147,7 @@ func GetContainersByConfigmap(containers []corev1.Container, volumeName string, 
 	return tmpList
 }
 
-func getContainerWithTplList(containers []corev1.Container, configs []appsv1alpha1.ConfigTemplate) *corev1.Container {
+func getContainerWithTplList(containers []corev1.Container, configs []appsv1alpha1.ComponentConfigSpec) *corev1.Container {
 	if len(containers) == 0 {
 		return nil
 	}
@@ -160,7 +160,7 @@ func getContainerWithTplList(containers []corev1.Container, configs []appsv1alph
 	return nil
 }
 
-func checkContainerWithVolumeMount(volumeMounts []corev1.VolumeMount, configs []appsv1alpha1.ConfigTemplate) bool {
+func checkContainerWithVolumeMount(volumeMounts []corev1.VolumeMount, configs []appsv1alpha1.ComponentConfigSpec) bool {
 	volumes := make(map[string]int)
 	for _, c := range configs {
 		for j, vm := range volumeMounts {
@@ -360,4 +360,22 @@ func GetPodRevision(pod *corev1.Pod) string {
 		return ""
 	}
 	return pod.Labels[appsv1.StatefulSetRevisionLabel]
+}
+
+// ByPodName sorts a list of jobs by pod name
+type ByPodName []corev1.Pod
+
+// Len return the length of byPodName, for the sort.Sort
+func (c ByPodName) Len() int {
+	return len(c)
+}
+
+// Swap the items, for the sort.Sort
+func (c ByPodName) Swap(i, j int) {
+	c[i], c[j] = c[j], c[i]
+}
+
+// Less define how to compare items, for the sort.Sort
+func (c ByPodName) Less(i, j int) bool {
+	return c[i].Name < c[j].Name
 }

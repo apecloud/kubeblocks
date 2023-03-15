@@ -21,6 +21,10 @@ import (
 )
 
 const (
+	yesStr = "yes"
+)
+
+const (
 	defaultCloudProvider = cloudprovider.Local
 	defaultClusterDef    = "apecloud-mysql"
 
@@ -49,7 +53,7 @@ var guideStr = `
 
   kbcli dashboard open kubeblocks-grafana
 	
-4. Uninstall Playground:
+4. Destroy Playground:
 
   kbcli playground destroy
 

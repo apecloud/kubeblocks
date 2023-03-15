@@ -57,7 +57,7 @@ var _ = Describe("connection", func() {
 			return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, obj)}
 		}
 		tf.UnstructuredClient = &clientfake.RESTClient{
-			GroupVersion:         schema.GroupVersion{Group: types.Group, Version: types.Version},
+			GroupVersion:         schema.GroupVersion{Group: types.AppsAPIGroup, Version: types.AppsAPIVersion},
 			NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
 			Client: clientfake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 				urlPrefix := "/api/v1/namespaces/" + namespace
@@ -133,12 +133,38 @@ var _ = Describe("connection", func() {
 	})
 
 	It("build connect command", func() {
-		info := &engine.ConnectionInfo{
-			Command: []string{"mysql"},
-			Args:    []string{"-h$(KB_ACCOUNT_ENDPOINT)", "-u$(MYSQL_USER)", "-p$(MYSQL_PASSWORD)", "-e $(KB_ACCOUNT_STATEMENT)"},
+		type argsCases struct {
+			command []string
+			args    []string
+			expect  []string
 		}
-		Expect(buildCommand(info)).ShouldNot(BeEmpty())
-		Expect(len(buildCommand(info))).Should(Equal(3))
+
+		testCases := []argsCases{
+			{
+				command: []string{"mysql"},
+				args:    []string{"-h$(KB_ACCOUNT_ENDPOINT)", "-e", "$(KB_ACCOUNT_STATEMENT)"},
+				expect:  []string{"sh", "-c", "mysql -h127.0.0.1"},
+			},
+			{
+				command: []string{"psql"},
+				args:    []string{"-h$(KB_ACCOUNT_ENDPOINT)", "-c", "$(KB_ACCOUNT_STATEMENT)"},
+				expect:  []string{"sh", "-c", "psql -h127.0.0.1"},
+			},
+			{
+				command: []string{"sh", "-c"},
+				args:    []string{"redis-cli -h $(KB_ACCOUNT_ENDPOINT) $(KB_ACCOUNT_STATEMENT)"},
+				expect:  []string{"sh", "-c", "redis-cli -h 127.0.0.1"},
+			},
+		}
+
+		for _, testCase := range testCases {
+			info := &engine.ConnectionInfo{
+				Command: testCase.command,
+				Args:    testCase.args,
+			}
+			result := buildCommand(info)
+			Expect(result).Should(BeEquivalentTo(testCase.expect))
+		}
 	})
 })
 

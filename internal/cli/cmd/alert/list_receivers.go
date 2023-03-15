@@ -44,7 +44,7 @@ func newListReceiversCmd(f cmdutil.Factory, streams genericclioptions.IOStreams)
 	o := &listReceiversOptions{baseOptions: baseOptions{IOStreams: streams}}
 	cmd := &cobra.Command{
 		Use:     "list-receivers",
-		Short:   "List all alert receivers",
+		Short:   "List all alert receivers.",
 		Example: listReceiversExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			util.CheckErr(o.complete(f))
@@ -72,7 +72,7 @@ func (o *listReceiversOptions) run() error {
 	}
 	webhookReceivers := getReceiversFromData(webhookData)
 	if len(receivers) == 0 {
-		fmt.Fprintf(o.Out, "No receivers found in webhook adaptor config %s\n", webhookAdaptorName)
+		fmt.Fprintf(o.Out, "No receivers found in webhook adaptor config %s\n", webhookAdaptorConfigmapName)
 		return nil
 	}
 
@@ -88,9 +88,6 @@ func (o *listReceiversOptions) run() error {
 				cfg := webhookConfig{}
 				params := obj["params"].(map[string]interface{})
 				cfg.URL = params["url"].(string)
-				if params["token"] != nil {
-					cfg.Token = params["token"].(string)
-				}
 				cfgs = append(cfgs, cfg)
 			}
 		}

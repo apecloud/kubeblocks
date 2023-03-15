@@ -26,7 +26,6 @@ import (
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
-	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util/helm"
 )
 
@@ -39,10 +38,6 @@ var _ = Describe("kubeblocks uninstall", func() {
 		streams, _, _, _ = genericclioptions.NewTestIOStreams()
 		tf = cmdtesting.NewTestFactory().WithNamespace(namespace)
 		tf.Client = &clientfake.RESTClient{}
-
-		// use a fake URL to test
-		types.KubeBlocksChartName = testing.KubeBlocksChartName
-		types.KubeBlocksChartURL = testing.KubeBlocksChartURL
 	})
 
 	AfterEach(func() {
@@ -75,7 +70,7 @@ var _ = Describe("kubeblocks uninstall", func() {
 				Client:    testing.FakeClientSet(),
 				Dynamic:   testing.FakeDynamicClient(testing.FakeVolumeSnapshotClass()),
 			},
-			autoApprove: false,
+			autoApprove: true,
 		}
 		Expect(o.uninstall()).Should(Succeed())
 	})

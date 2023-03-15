@@ -39,6 +39,7 @@ require (
 	github.com/hashicorp/go-version v1.6.0
 	github.com/hashicorp/hc-install v0.5.0
 	github.com/hashicorp/terraform-exec v0.18.0
+	github.com/jackc/pgx/v5 v5.2.0
 	github.com/jedib0t/go-pretty/v6 v6.4.4
 	github.com/k3d-io/k3d/v5 v5.4.4
 	github.com/kubernetes-csi/external-snapshotter/client/v6 v6.2.0
@@ -61,7 +62,6 @@ require (
 	github.com/spf13/viper v1.15.0
 	github.com/stretchr/testify v1.8.1
 	github.com/sykesm/zap-logfmt v0.0.4
-	github.com/tj/go-spin v1.1.0
 	github.com/valyala/fasthttp v1.41.0
 	github.com/vishvananda/netlink v1.1.1-0.20210330154013-f5de75959ad5
 	github.com/vmware-tanzu/velero v1.10.1
@@ -218,7 +218,7 @@ require (
 	github.com/inconshreveable/mousetrap v1.0.1 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20200714003250-2b9c44734f2b // indirect
-	github.com/jackc/pgx/v5 v5.2.0 // indirect
+	github.com/jackc/puddle/v2 v2.1.2 // indirect
 	github.com/jbenet/go-context v0.0.0-20150711004518-d14ea06fba99 // indirect
 	github.com/jedib0t/go-pretty v4.3.0+incompatible // indirect
 	github.com/jhump/protoreflect v1.13.0 // indirect
@@ -305,6 +305,7 @@ require (
 	github.com/syndtr/gocapability v0.0.0-20200815063812-42c35b437635 // indirect
 	github.com/tchap/go-patricia v2.3.0+incompatible // indirect
 	github.com/theupdateframework/notary v0.7.0 // indirect
+	github.com/tj/go-spin v1.1.0 // indirect
 	github.com/tklauser/go-sysconf v0.3.11 // indirect
 	github.com/tklauser/numcpus v0.6.0 // indirect
 	github.com/tmc/grpc-websocket-proxy v0.0.0-20201229170055-e5319fda7802 // indirect

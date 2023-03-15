@@ -44,7 +44,7 @@ func GetConfigTemplatesFromComponent(
 	cComponents []appsv1alpha1.ClusterComponentSpec,
 	dComponents []appsv1alpha1.ClusterComponentDefinition,
 	aComponents []appsv1alpha1.ClusterComponentVersion,
-	componentName string) ([]appsv1alpha1.ConfigTemplate, error) {
+	componentName string) ([]appsv1alpha1.ComponentConfigSpec, error) {
 	findCompTypeByName := func(comName string) *appsv1alpha1.ClusterComponentSpec {
 		return filter(cComponents, func(o appsv1alpha1.ClusterComponentSpec) bool {
 			return o.Name == comName
@@ -63,23 +63,23 @@ func GetConfigTemplatesFromComponent(
 	})
 
 	var (
-		avTpls []appsv1alpha1.ConfigTemplate
-		cdTpls []appsv1alpha1.ConfigTemplate
+		avTpls []appsv1alpha1.ComponentConfigSpec
+		cdTpls []appsv1alpha1.ComponentConfigSpec
 	)
 
 	if aCom != nil {
-		avTpls = aCom.ConfigTemplateRefs
+		avTpls = aCom.ConfigSpecs
 	}
-	if dCom != nil && dCom.ConfigSpec != nil {
-		cdTpls = dCom.ConfigSpec.ConfigTemplateRefs
+	if dCom != nil {
+		cdTpls = dCom.ConfigSpecs
 	}
 
 	return MergeConfigTemplates(avTpls, cdTpls), nil
 }
 
 // MergeConfigTemplates merge ClusterVersion.ComponentDefs[*].ConfigTemplateRefs and ClusterDefinition.ComponentDefs[*].ConfigTemplateRefs
-func MergeConfigTemplates(clusterVersionTpl []appsv1alpha1.ConfigTemplate,
-	cdTpl []appsv1alpha1.ConfigTemplate) []appsv1alpha1.ConfigTemplate {
+func MergeConfigTemplates(clusterVersionTpl []appsv1alpha1.ComponentConfigSpec,
+	cdTpl []appsv1alpha1.ComponentConfigSpec) []appsv1alpha1.ComponentConfigSpec {
 	if len(clusterVersionTpl) == 0 {
 		return cdTpl
 	}
@@ -88,7 +88,7 @@ func MergeConfigTemplates(clusterVersionTpl []appsv1alpha1.ConfigTemplate,
 		return clusterVersionTpl
 	}
 
-	mergedCfgTpl := make([]appsv1alpha1.ConfigTemplate, 0, len(clusterVersionTpl)+len(cdTpl))
+	mergedCfgTpl := make([]appsv1alpha1.ComponentConfigSpec, 0, len(clusterVersionTpl)+len(cdTpl))
 	mergedTplMap := make(map[string]struct{}, cap(mergedCfgTpl))
 
 	for _, tpl := range clusterVersionTpl {
@@ -127,7 +127,7 @@ func GetClusterVersionResource(cvName string, cv *appsv1alpha1.ClusterVersion, c
 	return nil
 }
 
-func CheckConfigTemplateReconfigureKey(tpl appsv1alpha1.ConfigTemplate, key string) bool {
+func CheckConfigTemplateReconfigureKey(tpl appsv1alpha1.ComponentConfigSpec, key string) bool {
 	if len(tpl.Keys) == 0 {
 		return true
 	}

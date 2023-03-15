@@ -50,6 +50,7 @@ func TestSchemaValidatorWithCue(t *testing.T) {
 		cueFile    string
 		configFile string
 		format     appsv1alpha1.CfgFileFormat
+		options    []ValidatorOptions
 	}
 	tests := []struct {
 		name string
@@ -102,11 +103,19 @@ mysqld.innodb_autoinc_lock_mode: conflicting values 1 and 100:
 mysqld.innodb_autoinc_lock_mode: conflicting values 2 and 100:
     28:43
 ]`),
+	}, {
+		name: "configmap_key_filter",
+		args: args{
+			cueFile:    "cue_testdata/mysql.cue",
+			configFile: "cue_testdata/mysql_err.cnf",
+			format:     appsv1alpha1.Ini,
+			options:    []ValidatorOptions{WithKeySelector([]string{"key2", "key3"})},
+		},
 	}}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			validator := NewConfigValidator(newFakeConfConstraint(tt.args.cueFile, tt.args.format))
+			validator := NewConfigValidator(newFakeConfConstraint(tt.args.cueFile, tt.args.format), tt.args.options...)
 			require.NotNil(t, validator)
 			require.Equal(t, tt.err, validator.Validate(
 				map[string]string{
@@ -114,6 +123,32 @@ mysqld.innodb_autoinc_lock_mode: conflicting values 2 and 100:
 				}))
 		})
 	}
+}
+
+func TestSchemaValidatorWithSelector(t *testing.T) {
+	validator := NewConfigValidator(newFakeConfConstraint("cue_testdata/mysql.cue", appsv1alpha1.Ini))
+	require.NotNil(t, validator)
+	require.ErrorContains(t, validator.Validate(
+		map[string]string{
+			"normal_key":   fromTestData("cue_testdata/mysql.cnf"),
+			"abnormal_key": fromTestData("cue_testdata/mysql_err.cnf"),
+		}), "[mysqld.innodb_autoinc_lock_mode: 3 errors in empty disjunction")
+
+	validator = NewConfigValidator(newFakeConfConstraint("cue_testdata/mysql.cue", appsv1alpha1.Ini), WithKeySelector([]string{}))
+	require.NotNil(t, validator)
+	require.ErrorContains(t, validator.Validate(
+		map[string]string{
+			"normal_key":   fromTestData("cue_testdata/mysql.cnf"),
+			"abnormal_key": fromTestData("cue_testdata/mysql_err.cnf"),
+		}), "[mysqld.innodb_autoinc_lock_mode: 3 errors in empty disjunction")
+
+	validator = NewConfigValidator(newFakeConfConstraint("cue_testdata/mysql.cue", appsv1alpha1.Ini), WithKeySelector([]string{"normal_key"}))
+	require.NotNil(t, validator)
+	require.Nil(t, validator.Validate(
+		map[string]string{
+			"normal_key":   fromTestData("cue_testdata/mysql.cnf"),
+			"abnormal_key": fromTestData("cue_testdata/mysql_err.cnf"),
+		}))
 }
 
 func TestSchemaValidatorWithOpenSchema(t *testing.T) {

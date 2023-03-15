@@ -1,6 +1,8 @@
-## kbcli cluster list-instances
+---
+title: kbcli cluster list-instances
+---
 
-List cluster instances
+List cluster instances.
 
 ```
 kbcli cluster list-instances [flags]
@@ -50,5 +52,7 @@ kbcli cluster list-instances [flags]
 
 ### SEE ALSO
 
-* [kbcli cluster](kbcli_cluster.md)	 - Cluster command
+* [kbcli cluster](kbcli_cluster.md)	 - Cluster command.
+
+#### Go Back to [CLI Overview](cli.md) Homepage.
 

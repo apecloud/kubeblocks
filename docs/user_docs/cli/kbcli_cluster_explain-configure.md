@@ -1,6 +1,8 @@
-## kbcli cluster explain-configure
+---
+title: kbcli cluster explain-configure
+---
 
-List the constraint for supported configuration params
+List the constraint for supported configuration params.
 
 ```
 kbcli cluster explain-configure [flags]
@@ -59,5 +61,7 @@ kbcli cluster explain-configure [flags]
 
 ### SEE ALSO
 
-* [kbcli cluster](kbcli_cluster.md)	 - Cluster command
+* [kbcli cluster](kbcli_cluster.md)	 - Cluster command.
+
+#### Go Back to [CLI Overview](cli.md) Homepage.
 

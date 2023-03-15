@@ -26,6 +26,8 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
 // AddonSpec defines the desired state of Addon
@@ -45,7 +47,7 @@ type AddonSpec struct {
 	// Default installation parameters.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MinItems=1
-	DefaultInstallValues []AddonDefaultInstallSpecItem `json:"defaultInstallValues,omitempty"`
+	DefaultInstallValues []AddonDefaultInstallSpecItem `json:"defaultInstallValues"`
 
 	// Installation parameters.
 	// +optional
@@ -111,9 +113,9 @@ type SelectorRequirement struct {
 // HelmTypeInstallSpec defines a Helm release installation spec.
 type HelmTypeInstallSpec struct {
 
-	// A Helm Chart repository URL.
+	// A Helm Chart location URL.
 	// +kubebuilder:validation:Required
-	ChartRepoURL string `json:"chartRepoURL"`
+	ChartLocationURL string `json:"chartLocationURL"`
 
 	// installOptions defines Helm release install options.
 	// +optional
@@ -178,17 +180,17 @@ type HelmValuesMappingExtraItem struct {
 type HelmValueMapType map[KeyHelmValueKey]string
 
 type HelmValuesMappingItem struct {
-	// valueMap define the "key" mapping values, valid keys are ReplicaCount,
-	// PVEnabled, and StorageClass. Enum values explained:
-	// `"ReplicaCount"` sets replicaCount value mapping key
-	// `"PVEnabled"` sets persistent volume enabled mapping key
-	// `"StorageClass"` sets storageClass mapping key
+	// valueMap define the "key" mapping values, valid keys are replicaCount,
+	// persistentVolumeEnabled, and storageClass. Enum values explained:
+	// `"replicaCount"` sets replicaCount value mapping key
+	// `"persistentVolumeEnabled"` sets persistent volume enabled mapping key
+	// `"storageClass"` sets storageClass mapping key
 	// +optional
 	HelmValueMap HelmValueMapType `json:"valueMap,omitempty"`
 
-	// jsonMap define the "key" mapping values, valid keys are Toleration.
+	// jsonMap define the "key" mapping values, valid keys are tolerations.
 	// Enum values explained:
-	// `"Toleration"` sets toleration mapping key
+	// `"tolerations"` sets toleration mapping key
 	// +optional
 	HelmJSONMap HelmValueMapType `json:"jsonMap,omitempty"`
 
@@ -243,6 +245,10 @@ type AddonDefaultInstallSpecItem struct {
 
 type AddonInstallSpec struct {
 	AddonInstallSpecItem `json:",inline"`
+
+	// enabled can be set if there are no specific installation attributes to be set.
+	// +optional
+	Enabled bool `json:"enabled,omitempty"`
 
 	// Install spec. for extra items.
 	// +patchMergeKey=name
@@ -325,16 +331,67 @@ func init() {
 	SchemeBuilder.Register(&Addon{}, &AddonList{})
 }
 
+// GetExtraNames exacter extra items' name.
+func (r *Addon) GetExtraNames() []string {
+	if r == nil {
+		return nil
+	}
+	switch r.Spec.Type {
+	case HelmType:
+		if r.Spec.Helm == nil {
+			return nil
+		}
+		// r.Spec.DefaultInstallValues has minItem=1 constraint
+		names := make([]string, 0, len(r.Spec.Helm.ValuesMapping.ExtraItems))
+		for _, i := range r.Spec.Helm.ValuesMapping.ExtraItems {
+			names = append(names, i.Name)
+		}
+		return names
+	default:
+		return nil
+	}
+
+}
+
+func buildSelectorStrings(selectors []SelectorRequirement) []string {
+	l := len(selectors)
+	if l == 0 {
+		return nil
+	}
+	sl := make([]string, 0, l)
+	for _, req := range selectors {
+		sl = append(sl, req.String())
+	}
+	return sl
+}
+
+// GetSelectorsStrings extract selectors to string representations.
+func (r *AddonDefaultInstallSpecItem) GetSelectorsStrings() []string {
+	if r == nil {
+		return nil
+	}
+	return buildSelectorStrings(r.Selectors)
+}
+
+// GetSelectorsStrings extract selectors to string representations.
+func (r *InstallableSpec) GetSelectorsStrings() []string {
+	if r == nil {
+		return nil
+	}
+	return buildSelectorStrings(r.Selectors)
+}
+
 func (r *SelectorRequirement) String() string {
 	return fmt.Sprintf("{key=%s,op=%s,values=%v}",
 		r.Key, r.Operator, r.Values)
 }
 
+// MatchesFromConfig matches selector requirement value.
 func (r *SelectorRequirement) MatchesFromConfig() bool {
 	if r == nil {
 		return false
 	}
-	verIf := viper.Get("_KUBE_SERVER_INFO")
+	verIf := viper.Get(constant.CfgKeyServerInfo)
 	ver, ok := verIf.(version.Info)
 	if !ok {
 		return false
@@ -398,44 +455,55 @@ func (r *SelectorRequirement) matchesLine(line string) bool {
 	}
 }
 
+// GetEnabled provides Enabled property getter.
+func (r *AddonInstallSpec) GetEnabled() bool {
+	if r == nil {
+		return false
+	}
+	return r.Enabled
+}
+
 // BuildMergedValues merge values from a AddonInstallSpec and pre-set values.
-func (r *HelmTypeInstallSpec) BuildMergedValues(spec *AddonInstallSpec) HelmInstallValues {
+func (r *HelmTypeInstallSpec) BuildMergedValues(installSpec *AddonInstallSpec) HelmInstallValues {
+	if r == nil {
+		return HelmInstallValues{}
+	}
 	installValues := r.InstallValues
-	processor := func(specItem AddonInstallSpecItem, valueMapping HelmValuesMappingItem) {
-		if specItem.Replicas != nil && *specItem.Replicas >= 0 {
+	processor := func(installSpecItem AddonInstallSpecItem, valueMapping HelmValuesMappingItem) {
+		if installSpecItem.Replicas != nil && *installSpecItem.Replicas >= 0 {
 			if v, ok := valueMapping.HelmValueMap[ReplicaCount]; ok {
 				installValues.SetValues = append(installValues.SetValues,
-					fmt.Sprintf("%s=%v", v, *spec.Replicas))
+					fmt.Sprintf("%s=%v", v, *installSpecItem.Replicas))
 			}
 		}
 
-		if specItem.StorageClass != "" {
+		if installSpecItem.StorageClass != "" {
 			if v, ok := valueMapping.HelmValueMap[StorageClass]; ok {
-				if specItem.StorageClass == "-" {
+				if installSpecItem.StorageClass == "-" {
 					installValues.SetValues = append(installValues.SetValues,
 						fmt.Sprintf("%s=null", v))
 				} else {
 					installValues.SetValues = append(installValues.SetValues,
-						fmt.Sprintf("%s=%v", v, spec.StorageClass))
+						fmt.Sprintf("%s=%v", v, installSpecItem.StorageClass))
 				}
 			}
 		}
 
-		if specItem.PVEnabled != nil {
+		if installSpecItem.PVEnabled != nil {
 			if v, ok := valueMapping.HelmValueMap[PVEnabled]; ok {
 				installValues.SetValues = append(installValues.SetValues,
-					fmt.Sprintf("%s=%v", v, *specItem.PVEnabled))
+					fmt.Sprintf("%s=%v", v, *installSpecItem.PVEnabled))
 			}
 		}
 
-		if specItem.Tolerations != "" {
+		if installSpecItem.Tolerations != "" {
 			if v, ok := valueMapping.HelmJSONMap[Tolerations]; ok {
 				installValues.SetJSONValues = append(installValues.SetJSONValues,
-					fmt.Sprintf("%s=%s", v, specItem.Tolerations))
+					fmt.Sprintf("%s=%s", v, installSpecItem.Tolerations))
 			}
 		}
 
-		for k, v := range specItem.Resources.Requests {
+		for k, v := range installSpecItem.Resources.Requests {
 			switch k {
 			case corev1.ResourceStorage:
 				if valueMapping.ResourcesMapping.Storage != "" {
@@ -455,7 +523,7 @@ func (r *HelmTypeInstallSpec) BuildMergedValues(spec *AddonInstallSpec) HelmInst
 			}
 		}
 
-		for k, v := range specItem.Resources.Limits {
+		for k, v := range installSpecItem.Resources.Limits {
 			switch k {
 			case corev1.ResourceCPU:
 				if valueMapping.ResourcesMapping.CPU.Limits != "" {
@@ -470,8 +538,8 @@ func (r *HelmTypeInstallSpec) BuildMergedValues(spec *AddonInstallSpec) HelmInst
 			}
 		}
 	}
-	processor(spec.AddonInstallSpecItem, r.ValuesMapping.HelmValuesMappingItem)
-	for _, ei := range spec.ExtraItems {
+	processor(installSpec.AddonInstallSpecItem, r.ValuesMapping.HelmValuesMappingItem)
+	for _, ei := range installSpec.ExtraItems {
 		for _, mei := range r.ValuesMapping.ExtraItems {
 			if ei.Name != mei.Name {
 				continue

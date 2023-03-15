@@ -96,13 +96,25 @@ func TestSetMessage(t *testing.T) {
 }
 
 func TestSetAndGetObjectMessage(t *testing.T) {
+	componentStatus := ClusterComponentStatus{}
+	val := "insufficient cpu"
+	componentStatus.SetObjectMessage("Pod", "test-01", val)
+	message := componentStatus.GetObjectMessage("Pod", "test-01")
+	if message != val {
+		t.Errorf(`Expected get message "%s"`, val)
+	}
+}
+
+func TestSetObjectMessage(t *testing.T) {
+	componentStatus := ClusterComponentStatus{}
 	messageMap := ComponentMessageMap{
 		"Pod/test-01": "failed Scheduled",
 	}
-	messageMap.SetObjectMessage("Pod", "test-01", "insufficient cpu")
-	message := messageMap.GetObjectMessage("Pod", "test-01")
-	if message != "insufficient cpu" {
-		t.Error(`Expected get message "insufficient cpu"`)
+	val := "insufficient memory"
+	messageMap.SetObjectMessage("Pod", "test-01", val)
+	componentStatus.SetMessage(messageMap)
+	if componentStatus.GetObjectMessage("Pod", "test-01") != val {
+		t.Errorf(`Expected get message "%s"`, val)
 	}
 }
 

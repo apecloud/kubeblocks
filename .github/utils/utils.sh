@@ -14,7 +14,8 @@ Usage: $(basename "$0") <options>
                                 2) replace '-' with '.'
                                 3) get release asset upload url
                                 4) get latest release tag
-                                4) update release latest
+                                5) update release latest
+                                6) get the ci trigger mode
     -tn, --tag-name           Release tag name
     -gr, --github-repo        Github Repo
     -gt, --github-token       Github token
@@ -29,21 +30,34 @@ main() {
     local TAG_NAME
     local GITHUB_REPO
     local GITHUB_TOKEN
+    local TRIGGER_MODE=""
 
     parse_command_line "$@"
 
-    if [[ $TYPE == 1 ]]; then
-        echo "${TAG_NAME/v/}"
-    elif [[ $TYPE == 2 ]]; then
-        echo "${TAG_NAME/-/.}"
-    elif [[ $TYPE == 3 ]]; then
-        get_upload_url
-    elif [[ $TYPE == 4 ]]; then
-        get_latest_tag
-    elif [[ $TYPE == 5 ]]; then
-        update_release_latest
-    fi
-
+    case $TYPE in
+        1)
+            echo "${TAG_NAME/v/}"
+        ;;
+        2)
+            echo "${TAG_NAME/-/.}"
+        ;;
+        3)
+            get_upload_url
+        ;;
+        4)
+            get_latest_tag
+        ;;
+        5)
+            update_release_latest
+        ;;
+        6)
+            get_trigger_mode
+        ;;
+        *)
+            show_help
+            break
+        ;;
+    esac
 }
 
 parse_command_line() {
@@ -108,6 +122,44 @@ update_release_latest() {
     gh_curl -X PATCH \
         $GITHUB_API/repos/$GITHUB_REPO/releases/$release_id \
         -d '{"draft":false,"prerelease":false,"make_latest":true}'
+}
+
+add_trigger_mode() {
+    trigger_mode=$1
+    if [[ "$TRIGGER_MODE" != *"$trigger_mode"* ]]; then
+        TRIGGER_MODE="["$trigger_mode"]"$TRIGGER_MODE
+    fi
+}
+
+get_trigger_mode() {
+    for filePath in $( git diff --name-only HEAD HEAD^ ); do
+        if [[ "$filePath" == "go."* || "$filePath" == "Makefile" ]]; then
+            add_trigger_mode "test"
+            continue
+        elif [[ "$filePath" != *"/"* ]]; then
+            add_trigger_mode "other"
+            continue
+        fi
+
+        case $filePath in
+            docs/*)
+                add_trigger_mode "docs"
+            ;;
+            docker/*)
+                add_trigger_mode "docker"
+            ;;
+            deploy/*)
+                add_trigger_mode "deploy"
+            ;;
+            .github/*|.devcontainer/*|githooks/*|examples/*)
+                add_trigger_mode "other"
+            ;;
+            *)
+                add_trigger_mode "test"
+            ;;
+        esac
+    done
+    echo $TRIGGER_MODE
 }
 
 main "$@"

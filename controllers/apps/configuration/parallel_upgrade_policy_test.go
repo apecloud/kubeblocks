@@ -66,9 +66,11 @@ var _ = Describe("Reconfigure ParallelPolicy", func() {
 				withConfigTpl("for_test", map[string]string{
 					"a": "b",
 				}),
-				withCDComponent(appsv1alpha1.Consensus, []appsv1alpha1.ConfigTemplate{{
-					Name:       "for_test",
-					VolumeName: "test_volume",
+				withCDComponent(appsv1alpha1.Consensus, []appsv1alpha1.ComponentConfigSpec{{
+					ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
+						Name:       "for_test",
+						VolumeName: "test_volume",
+					},
 				}}))
 
 			k8sMockClient.MockListMethod(testutil.WithListReturned(
@@ -92,9 +94,11 @@ var _ = Describe("Reconfigure ParallelPolicy", func() {
 				withConfigTpl("for_test", map[string]string{
 					"a": "b",
 				}),
-				withCDComponent(appsv1alpha1.Consensus, []appsv1alpha1.ConfigTemplate{{
-					Name:       "for_test",
-					VolumeName: "test_volume",
+				withCDComponent(appsv1alpha1.Consensus, []appsv1alpha1.ComponentConfigSpec{{
+					ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
+						Name:       "for_test",
+						VolumeName: "test_volume",
+					},
 				}}))
 
 			// first failed
@@ -129,10 +133,11 @@ var _ = Describe("Reconfigure ParallelPolicy", func() {
 				withConfigTpl("for_test", map[string]string{
 					"a": "b",
 				}),
-				withCDComponent(appsv1alpha1.Consensus, []appsv1alpha1.ConfigTemplate{{
-					Name:       "for_test",
-					VolumeName: "test_volume",
-				}}))
+				withCDComponent(appsv1alpha1.Consensus, []appsv1alpha1.ComponentConfigSpec{{
+					ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
+						Name:       "for_test",
+						VolumeName: "test_volume",
+					}}}))
 
 			k8sMockClient.MockListMethod(testutil.WithListReturned(
 				testutil.WithConstructListReturnedResult(
@@ -169,10 +174,11 @@ var _ = Describe("Reconfigure ParallelPolicy", func() {
 				withConfigTpl("for_test", map[string]string{
 					"a": "b",
 				}),
-				withCDComponent(appsv1alpha1.Consensus, []appsv1alpha1.ConfigTemplate{{
-					Name:       "for_test",
-					VolumeName: "test_volume",
-				}}))
+				withCDComponent(appsv1alpha1.Consensus, []appsv1alpha1.ComponentConfigSpec{{
+					ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
+						Name:       "for_test",
+						VolumeName: "test_volume",
+					}}}))
 
 			setPods := newMockPodsWithStatefulSet(&mockParam.ComponentUnits[0], 5)
 			k8sMockClient.MockListMethod(testutil.WithListReturned(
@@ -194,10 +200,11 @@ var _ = Describe("Reconfigure ParallelPolicy", func() {
 				withConfigTpl("for_test", map[string]string{
 					"key": "value",
 				}),
-				withCDComponent(appsv1alpha1.Stateless, []appsv1alpha1.ConfigTemplate{{
-					Name:       "for_test",
-					VolumeName: "test_volume",
-				}}))
+				withCDComponent(appsv1alpha1.Stateless, []appsv1alpha1.ComponentConfigSpec{{
+					ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
+						Name:       "for_test",
+						VolumeName: "test_volume",
+					}}}))
 			status, err := parallelPolicy.Upgrade(mockParam)
 			Expect(err).ShouldNot(Succeed())
 			Expect(err.Error()).Should(ContainSubstring("not support component workload type"))

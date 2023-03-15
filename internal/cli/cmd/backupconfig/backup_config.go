@@ -51,7 +51,7 @@ func NewBackupConfigCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) 
 
 	cmd := &cobra.Command{
 		Use:     "backup-config",
-		Short:   "KubeBlocks backup config",
+		Short:   "KubeBlocks backup config.",
 		Example: backupConfigExample,
 		Args:    cobra.NoArgs,
 		Run: func(cmd *cobra.Command, args []string) {

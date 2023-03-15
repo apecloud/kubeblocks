@@ -167,7 +167,7 @@ type ClusterDefinitionStatus struct {
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 }
 
-type ConfigTemplate struct {
+type ComponentTemplateSpec struct {
 	// Specify the name of configuration template.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=63
@@ -178,18 +178,7 @@ type ConfigTemplate struct {
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=63
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
-	ConfigTplRef string `json:"configTplRef"`
-
-	// Specify a list of keys.
-	// If empty, ConfigConstraint takes effect for all keys in configmap.
-	// +optional
-	Keys []string `json:"keys,omitempty"`
-
-	// Specify the name of the referenced the configuration constraints object.
-	// +kubebuilder:validation:MaxLength=63
-	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
-	// +optional
-	ConfigConstraintRef string `json:"configConstraintRef,omitempty"`
+	TemplateRef string `json:"templateRef"`
 
 	// Specify the namespace of the referenced the configuration template ConfigMap object.
 	// An empty namespace is equivalent to the "default" namespace.
@@ -213,6 +202,21 @@ type ConfigTemplate struct {
 	// mode, like fsGroup, and the result can be other mode bits set.
 	// +optional
 	DefaultMode *int32 `json:"defaultMode,omitempty" protobuf:"varint,3,opt,name=defaultMode"`
+}
+
+type ComponentConfigSpec struct {
+	ComponentTemplateSpec `json:",inline"`
+
+	// Specify a list of keys.
+	// If empty, ConfigConstraint takes effect for all keys in configmap.
+	// +optional
+	Keys []string `json:"keys,omitempty"`
+
+	// Specify the name of the referenced the configuration constraints object.
+	// +kubebuilder:validation:MaxLength=63
+	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
+	// +optional
+	ConfigConstraintRef string `json:"constraintRef,omitempty"`
 }
 
 type ExporterConfig struct {
@@ -256,15 +260,18 @@ type LogConfig struct {
 	FilePathPattern string `json:"filePathPattern"`
 }
 
-type ConfigurationSpec struct {
-	// The configTemplateRefs field provided by provider, and
-	// finally this configTemplateRefs will be rendered into the user's own configuration file according to the user's cluster.
+type VolumeTypeSpec struct {
+	// Name definition is the same as the name of the VolumeMounts field in PodSpec.Container,
+	// similar to the relations of Volumes[*].name and VolumesMounts[*].name in Pod.Spec.
+	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	// +optional
-	// +patchMergeKey=name
-	// +patchStrategy=merge,retainKeys
-	// +listType=map
-	// +listMapKey=name
-	ConfigTemplateRefs []ConfigTemplate `json:"configTemplateRefs,omitempty"`
+	Name string `json:"name,omitempty"`
+
+	// Type is in enum of {data, log}.
+	// VolumeTypeData: the volume is for the persistent data storage.
+	// VolumeTypeLog: the volume is for the persistent log storage.
+	// +optional
+	Type VolumeType `json:"type,omitempty"`
 }
 
 // ClusterComponentDefinition provides a workload component specification template,
@@ -302,9 +309,25 @@ type ClusterComponentDefinition struct {
 	// +optional
 	MaxUnavailable *intstr.IntOrString `json:"maxUnavailable,omitempty"`
 
-	// configSpec defines configuration related spec.
+	// The configSpec field provided by provider, and
+	// finally this configTemplateRefs will be rendered into the user's own configuration file according to the user's cluster.
 	// +optional
-	ConfigSpec *ConfigurationSpec `json:"configSpec,omitempty"`
+	// +patchMergeKey=name
+	// +patchStrategy=merge,retainKeys
+	// +listType=map
+	// +listMapKey=name
+	// +optional
+	ConfigSpecs []ComponentConfigSpec `json:"configSpecs,omitempty"`
+
+	// The scriptSpec field provided by provider, and
+	// finally this configTemplateRefs will be rendered into the user's own configuration file according to the user's cluster.
+	// +optional
+	// +patchMergeKey=name
+	// +patchStrategy=merge,retainKeys
+	// +listType=map
+	// +listMapKey=name
+	// +optional
+	ScriptSpecs []ComponentTemplateSpec `json:"scriptSpecs,omitempty"`
 
 	// probes setting for healthy checks.
 	// +optional
@@ -349,6 +372,22 @@ type ClusterComponentDefinition struct {
 	// Statement to create system account.
 	// +optional
 	SystemAccounts *SystemAccountSpec `json:"systemAccounts,omitempty"`
+
+	// VolumeTypes is used to describe the purpose of the volumes
+	// mapping the name of the VolumeMounts in the PodSpec.Container field,
+	// such as data volume, log volume, etc.
+	// When backing up the volume, the volume can be correctly backed up
+	// according to the volumeType.
+	//
+	// For example:
+	//  `{name: data, type: data}` means that the volume named `data` is used to store `data`.
+	//  `{name: binlog, type: log}` means that the volume named `binlog` is used to store `log`.
+	//
+	// NOTE:
+	//   When volumeTypes is not defined, the backup function will not be supported,
+	// even if a persistent volume has been specified.
+	// +optional
+	VolumeTypes []VolumeTypeSpec `json:"volumeTypes,omitempty"`
 }
 
 type HorizontalScalePolicy struct {

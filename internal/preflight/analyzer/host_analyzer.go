@@ -26,6 +26,8 @@ func GetHostAnalyzer(analyzer *preflightv1beta2.ExtendHostAnalyze) (analyze.Host
 	switch {
 	case analyzer.HostUtility != nil:
 		return &AnalyzeHostUtility{analyzer.HostUtility}, true
+	case analyzer.ClusterRegion != nil:
+		return &AnalyzeClusterRegion{analyzer.ClusterRegion}, true
 	default:
 		return nil, false
 	}

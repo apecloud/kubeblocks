@@ -1,6 +1,8 @@
-## kbcli cluster
+---
+title: kbcli cluster
+---
 
-Cluster command
+Cluster command.
 
 ### Options
 
@@ -34,38 +36,40 @@ Cluster command
 
 ### SEE ALSO
 
-* [kbcli](kbcli.md)	 - KubeBlocks CLI
-* [kbcli cluster backup](kbcli_cluster_backup.md)	 - Create a backup
-* [kbcli cluster configure](kbcli_cluster_configure.md)	 - reconfigure parameters with the specified components in the cluster
-* [kbcli cluster connect](kbcli_cluster_connect.md)	 - Connect to a cluster or instance
-* [kbcli cluster create](kbcli_cluster_create.md)	 - Create a cluster
-* [kbcli cluster delete](kbcli_cluster_delete.md)	 - Delete clusters
-* [kbcli cluster delete-backup](kbcli_cluster_delete-backup.md)	 - Delete a backup
-* [kbcli cluster delete-ops](kbcli_cluster_delete-ops.md)	 - Delete an OpsRequest
-* [kbcli cluster delete-restore](kbcli_cluster_delete-restore.md)	 - Delete a restore job
-* [kbcli cluster describe](kbcli_cluster_describe.md)	 - Show details of a specific cluster
-* [kbcli cluster describe-configure](kbcli_cluster_describe-configure.md)	 - Show details of a specific reconfiguring
-* [kbcli cluster describe-ops](kbcli_cluster_describe-ops.md)	 - Show details of a specific OpsRequest
-* [kbcli cluster diff-configure](kbcli_cluster_diff-configure.md)	 - List the constraint for supported configuration params
-* [kbcli cluster explain-configure](kbcli_cluster_explain-configure.md)	 - List the constraint for supported configuration params
-* [kbcli cluster expose](kbcli_cluster_expose.md)	 - Expose a cluster
-* [kbcli cluster hscale](kbcli_cluster_hscale.md)	 - Horizontally scale the specified components in the cluster
-* [kbcli cluster list](kbcli_cluster_list.md)	 - List clusters
-* [kbcli cluster list-accounts](kbcli_cluster_list-accounts.md)	 - List cluster accounts
-* [kbcli cluster list-backups](kbcli_cluster_list-backups.md)	 - List backups
-* [kbcli cluster list-components](kbcli_cluster_list-components.md)	 - List cluster components
-* [kbcli cluster list-events](kbcli_cluster_list-events.md)	 - List cluster events
-* [kbcli cluster list-instances](kbcli_cluster_list-instances.md)	 - List cluster instances
-* [kbcli cluster list-logs](kbcli_cluster_list-logs.md)	 - List supported log files in cluster
-* [kbcli cluster list-ops](kbcli_cluster_list-ops.md)	 - List all opsRequests
-* [kbcli cluster list-restores](kbcli_cluster_list-restores.md)	 - List all restore jobs
-* [kbcli cluster logs](kbcli_cluster_logs.md)	 - Access cluster log file
-* [kbcli cluster restart](kbcli_cluster_restart.md)	 - Restart the specified components in the cluster
-* [kbcli cluster restore](kbcli_cluster_restore.md)	 - Restore a new cluster from backup
-* [kbcli cluster start](kbcli_cluster_start.md)	 - start the cluster when cluster is stopped
-* [kbcli cluster stop](kbcli_cluster_stop.md)	 - stop the cluster and release all the pods of the cluster
-* [kbcli cluster update](kbcli_cluster_update.md)	 - Update the cluster settings, such as enable or disable monitor or log
-* [kbcli cluster upgrade](kbcli_cluster_upgrade.md)	 - Upgrade the cluster version
-* [kbcli cluster volume-expand](kbcli_cluster_volume-expand.md)	 - Expand volume with the specified components and volumeClaimTemplates in the cluster
-* [kbcli cluster vscale](kbcli_cluster_vscale.md)	 - Vertically scale the specified components in the cluster
+
+* [kbcli cluster backup](kbcli_cluster_backup.md)	 - Create a backup.
+* [kbcli cluster configure](kbcli_cluster_configure.md)	 - Reconfigure parameters with the specified components in the cluster.
+* [kbcli cluster connect](kbcli_cluster_connect.md)	 - Connect to a cluster or instance.
+* [kbcli cluster create](kbcli_cluster_create.md)	 - Create a cluster.
+* [kbcli cluster delete](kbcli_cluster_delete.md)	 - Delete clusters.
+* [kbcli cluster delete-backup](kbcli_cluster_delete-backup.md)	 - Delete a backup.
+* [kbcli cluster delete-ops](kbcli_cluster_delete-ops.md)	 - Delete an OpsRequest.
+* [kbcli cluster delete-restore](kbcli_cluster_delete-restore.md)	 - Delete a restore job.
+* [kbcli cluster describe](kbcli_cluster_describe.md)	 - Show details of a specific cluster.
+* [kbcli cluster describe-configure](kbcli_cluster_describe-configure.md)	 - Show details of a specific reconfiguring.
+* [kbcli cluster describe-ops](kbcli_cluster_describe-ops.md)	 - Show details of a specific OpsRequest.
+* [kbcli cluster diff-configure](kbcli_cluster_diff-configure.md)	 - Show the difference in parameters between the two submitted OpsRequest.
+* [kbcli cluster explain-configure](kbcli_cluster_explain-configure.md)	 - List the constraint for supported configuration params.
+* [kbcli cluster expose](kbcli_cluster_expose.md)	 - Expose a cluster.
+* [kbcli cluster hscale](kbcli_cluster_hscale.md)	 - Horizontally scale the specified components in the cluster.
+* [kbcli cluster list](kbcli_cluster_list.md)	 - List clusters.
+* [kbcli cluster list-accounts](kbcli_cluster_list-accounts.md)	 - List cluster accounts.
+* [kbcli cluster list-backups](kbcli_cluster_list-backups.md)	 - List backups.
+* [kbcli cluster list-components](kbcli_cluster_list-components.md)	 - List cluster components.
+* [kbcli cluster list-events](kbcli_cluster_list-events.md)	 - List cluster events.
+* [kbcli cluster list-instances](kbcli_cluster_list-instances.md)	 - List cluster instances.
+* [kbcli cluster list-logs](kbcli_cluster_list-logs.md)	 - List supported log files in cluster.
+* [kbcli cluster list-ops](kbcli_cluster_list-ops.md)	 - List all opsRequests.
+* [kbcli cluster list-restores](kbcli_cluster_list-restores.md)	 - List all restore jobs.
+* [kbcli cluster logs](kbcli_cluster_logs.md)	 - Access cluster log file.
+* [kbcli cluster restart](kbcli_cluster_restart.md)	 - Restart the specified components in the cluster.
+* [kbcli cluster restore](kbcli_cluster_restore.md)	 - Restore a new cluster from backup.
+* [kbcli cluster start](kbcli_cluster_start.md)	 - Start the cluster if cluster is stopped.
+* [kbcli cluster stop](kbcli_cluster_stop.md)	 - Stop the cluster and release all the pods of the cluster.
+* [kbcli cluster update](kbcli_cluster_update.md)	 - Update the cluster settings, such as enable or disable monitor or log.
+* [kbcli cluster upgrade](kbcli_cluster_upgrade.md)	 - Upgrade the cluster version.
+* [kbcli cluster volume-expand](kbcli_cluster_volume-expand.md)	 - Expand volume with the specified components and volumeClaimTemplates in the cluster.
+* [kbcli cluster vscale](kbcli_cluster_vscale.md)	 - Vertically scale the specified components in the cluster.
+
+#### Go Back to [CLI Overview](cli.md) Homepage.
 

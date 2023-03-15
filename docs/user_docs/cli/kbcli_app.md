@@ -1,6 +1,8 @@
-## kbcli app
+---
+title: kbcli app
+---
 
-Manage external applications related to KubeBlocks
+Manage external applications related to KubeBlocks.
 
 ### Options
 
@@ -34,7 +36,9 @@ Manage external applications related to KubeBlocks
 
 ### SEE ALSO
 
-* [kbcli](kbcli.md)	 - KubeBlocks CLI
-* [kbcli app install](kbcli_app_install.md)	 - Install the application with the specified name
-* [kbcli app uninstall](kbcli_app_uninstall.md)	 - Uninstall the application with the specified name
+
+* [kbcli app install](kbcli_app_install.md)	 - Install the application with the specified name.
+* [kbcli app uninstall](kbcli_app_uninstall.md)	 - Uninstall the application with the specified name.
+
+#### Go Back to [CLI Overview](cli.md) Homepage.
 

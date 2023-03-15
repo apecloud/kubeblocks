@@ -53,6 +53,18 @@ var _ = Describe("provider util", func() {
 				UnknownProvider,
 				false,
 			},
+			{
+				"v1.24.9-gke.3200",
+				"1.24.9",
+				GKEProvider,
+				true,
+			},
+			{
+				"v1.24.9-gke",
+				"1.24.9",
+				GKEProvider,
+				true,
+			},
 		}
 
 		for _, c := range cases {

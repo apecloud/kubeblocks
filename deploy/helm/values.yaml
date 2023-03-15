@@ -1,6 +1,8 @@
 ## @section Common parameters
 ##
 
+versionOverride:
+
 ## KubeBlocks container image settings
 ##
 ## @param image.registry KubeBlocks image registry
@@ -36,7 +38,7 @@ fullnameOverride: ""
 updateStrategy:
   rollingUpdate:
     maxSurge: 1
-    maxUnavailable: 40%
+    maxUnavailable: 1
   type: RollingUpdate
 
 ## Change `hostNetwork` to `true` when you want the KubeBlocks's pod to share its host's network namespace.
@@ -226,9 +228,11 @@ podDisruptionBudget:
 ##
 ## @param admissionWebhooks.enabled
 ## @param admissionWebhooks.createSelfSignedCert
+## @param admissionWebhooks.ignoreReplicasCheck
 admissionWebhooks:
-  enabled: true
+  enabled: false
   createSelfSignedCert: true
+  ignoreReplicasCheck: false
 
 ## Data protection settings
 ##
@@ -250,7 +254,13 @@ dataProtection:
 ## Addon controller settings, this will require cluster-admin clusterrole.
 addonController:
   enabled: true
+  ## @param jobTTL is addon job time-to-live period, this value is time.Duration-parseable string.
+  ## default value is "5m" if not provided.
+  ##
+  jobTTL: "5m"
   jobImagePullPolicy: IfNotPresent
+
+keepAddons: false
 
 ## Dashboards settings
 ##
@@ -359,6 +369,74 @@ prometheus:
 
     containerSecurityContext:
       allowPrivilegeEscalation: false
+
+    ingress:
+      ## If true, alertmanager Ingress will be created
+      ##
+      enabled: false
+
+      # For Kubernetes >= 1.18 you should specify the ingress-controller via the field ingressClassName
+      # See https://kubernetes.io/blog/2020/04/02/improvements-to-the-ingress-api-in-kubernetes-1.18/#specifying-the-class-of-an-ingress
+      # ingressClassName: nginx
+
+      ## alertmanager Ingress annotations
+      ##
+      annotations: {}
+      #   kubernetes.io/ingress.class: nginx
+      #   kubernetes.io/tls-acme: 'true'
+
+      ## alertmanager Ingress additional labels
+      ##
+      extraLabels: {}
+
+      ## alertmanager Ingress hostnames with optional path
+      ## Must be provided if Ingress is enabled
+      ##
+      hosts: []
+      #   - alertmanager.domain.com
+      #   - domain.com/alertmanager
+
+      path: /
+
+      # pathType is only for k8s >= 1.18
+      pathType: Prefix
+
+      ## Extra paths to prepend to every host configuration. This is useful when working with annotation based services.
+      extraPaths: []
+      # - path: /*
+      #   backend:
+      #     serviceName: ssl-redirect
+      #     servicePort: use-annotation
+
+      ## alertmanager Ingress TLS configuration
+      ## Secrets must be manually created in the namespace
+      ##
+      tls: []
+      #   - secretName: prometheus-alerts-tls
+      #     hosts:
+      #       - alertmanager.domain.com
+
+    service:
+      annotations: {}
+      labels: {}
+      clusterIP: ""
+
+      ## Enabling peer mesh service end points for enabling the HA alert manager
+      ## Ref: https://github.com/prometheus/alertmanager/blob/master/README.md
+      # enableMeshPeer : true
+
+      ## List of IP addresses at which the alertmanager service is available
+      ## Ref: https://kubernetes.io/docs/user-guide/services/#external-ips
+      ##
+      externalIPs: []
+
+      loadBalancerIP: ""
+      loadBalancerSourceRanges: []
+      servicePort: 80
+      # nodePort: 30000
+      sessionAffinity: None
+      type: ClusterIP
+
 
   kubeStateMetrics:
     ## If false, kube-state-metrics sub-chart will not be installed
@@ -496,6 +574,88 @@ prometheus:
     containerSecurityContext:
       allowPrivilegeEscalation: false
 
+    service:
+      ## If false, no Service will be created for the Prometheus server
+      ##
+      enabled: true
+
+      annotations: {}
+      labels: {}
+      clusterIP: ""
+
+      ## List of IP addresses at which the Prometheus server service is available
+      ## Ref: https://kubernetes.io/docs/user-guide/services/#external-ips
+      ##
+      externalIPs: []
+
+      loadBalancerIP: ""
+      loadBalancerSourceRanges: []
+      servicePort: 80
+      sessionAffinity: None
+      type: ClusterIP
+
+      ## Enable gRPC port on service to allow auto discovery with thanos-querier
+      gRPC:
+        enabled: false
+        servicePort: 10901
+        # nodePort: 10901
+
+      ## If using a statefulSet (statefulSet.enabled=true), configure the
+      ## service to connect to a specific replica to have a consistent view
+      ## of the data.
+      statefulsetReplica:
+        enabled: false
+        replica: 0
+
+    ingress:
+      ## If true, Prometheus server Ingress will be created
+      ##
+      enabled: false
+
+      # For Kubernetes >= 1.18 you should specify the ingress-controller via the field ingressClassName
+      # See https://kubernetes.io/blog/2020/04/02/improvements-to-the-ingress-api-in-kubernetes-1.18/#specifying-the-class-of-an-ingress
+      # ingressClassName: nginx
+
+      ## Prometheus server Ingress annotations
+      ##
+      annotations: {}
+      #   kubernetes.io/ingress.class: nginx
+      #   kubernetes.io/tls-acme: 'true'
+
+      ## Prometheus server Ingress additional labels
+      ##
+      extraLabels: {}
+
+      ## Prometheus server Ingress hostnames with optional path
+      ## Must be provided if Ingress is enabled
+      ##
+      hosts: []
+      #   - prometheus.domain.com
+      #   - domain.com/prometheus
+
+      path: /
+
+      # pathType is only for k8s >= 1.18
+      pathType: Prefix
+
+      ## Extra paths to prepend to every host configuration. This is useful when working with annotation based services.
+      extraPaths: []
+      # - path: /*
+      #   backend:
+      #     serviceName: ssl-redirect
+      #     servicePort: use-annotation
+
+      ## Prometheus server Ingress TLS configuration
+      ## Secrets must be manually created in the namespace
+      ##
+      tls: []
+      #   - secretName: prometheus-server-tls
+      #     hosts:
+      #       - prometheus.domain.com
+
+
+
+
   ## AlertManager ConfigMap Entries
   ## NOTE: Please review these carefully as thresholds and behavior may not meet
   ##       your SLOs or labels.
@@ -528,8 +688,8 @@ prometheus:
               labels:
                 severity: warning
               annotations:
-                summary: "Container has disappeared more than 60 seconds"
-                description: "Container has disappeared {{ $value }} seconds. (pod: {{ $labels.pod }}, container: {{ $labels.container }})"
+                summary: 'Container has disappeared more than 60 seconds'
+                description: 'Container has disappeared {{ $value | printf "%.1f" }} seconds. (pod: {{ $labels.pod }}, container: {{ $labels.container }})'
 
             - alert: ContainerCpuUsageWarning
               expr: 'sum(rate(container_cpu_usage_seconds_total{container!="",container!="POD"}[2m])) BY (instance,pod,container) * 100 > 70'
@@ -537,8 +697,8 @@ prometheus:
               labels:
                 severity: warning
               annotations:
-                summary: "Container CPU usage is high (> 70%)"
-                description: "Container CPU usage is {{ $value }}. (pod: {{ $labels.pod }}, container: {{ $labels.container }})"
+                summary: 'Container CPU usage is high (> 70%)'
+                description: 'Container CPU usage is {{ $value | printf "%.2f" }} percent. (pod: {{ $labels.pod }}, container: {{ $labels.container }})'
 
             - alert: ContainerCpuUsageCritical
               expr: 'sum(rate(container_cpu_usage_seconds_total{container!="",container!="POD"}[2m])) BY (instance,pod,container) * 100 > 90'
@@ -546,8 +706,8 @@ prometheus:
               labels:
                 severity: critical
               annotations:
-                summary: "Container CPU usage is very high (> 90%)"
-                description: "Container CPU usage is {{ $value }}. (pod: {{ $labels.pod }}, container: {{ $labels.container }})"
+                summary: 'Container CPU usage is very high (> 90%)'
+                description: 'Container CPU usage is {{ $value | printf "%.2f" }} percent. (pod: {{ $labels.pod }}, container: {{ $labels.container }})'
 
             - alert: ContainerMemoryUsage
               expr: 'sum(container_memory_working_set_bytes{container!="",container!="POD"}) BY (instance,pod,container) / sum(container_spec_memory_limit_bytes{container!="",container!="POD"} > 0) BY (instance,pod,container) * 100 > 90'
@@ -555,17 +715,17 @@ prometheus:
               labels:
                 severity: warning
               annotations:
-                summary: "Container Memory usage is high (> 90%)"
-                description: "Container Memory usage is {{ $value }}. (pod: {{ $labels.pod }}, container: {{ $labels.container }})"
+                summary: 'Container Memory usage is high (> 90%)'
+                description: 'Container Memory usage is {{ $value | printf "%.2f" }} percent. (pod: {{ $labels.pod }}, container: {{ $labels.container }})'
 
             - alert: ContainerMemoryUsagePredict
               expr: 'sum(predict_linear(container_memory_working_set_bytes{container!="",container!="POD"}[15m], 30*60)) BY (instance,pod,container) - sum(container_spec_memory_limit_bytes{container!="",container!="POD"} > 0) BY (instance,pod,container) >= 0'
-              for: 0m
+              for: 5m
               labels:
                 severity: critical
               annotations:
-                summary: "Container Memory predict usage may exceed the limit 30 minutes later"
-                description: "Container Memory predict usage may exceed the limit 30 minutes later, the predict value is {{ $value }}. (pod: {{ $labels.pod }}, container: {{ $labels.container }})"
+                summary: 'Container Memory predict usage may exceed the limit 30 minutes later'
+                description: 'Container Memory predict usage may exceed the limit 30 minutes later, the predict value is {{ $value | humanize1024 }}. (pod: {{ $labels.pod }}, container: {{ $labels.container }})'
 
             - alert: ContainerVolumeUsage
               expr: 'sum(container_fs_usage_bytes) BY (instance,device) / sum(container_fs_limit_bytes) BY (instance,device) * 100 > 90'
@@ -573,8 +733,8 @@ prometheus:
               labels:
                 severity: warning
               annotations:
-                summary: "Device Volume usage is high (> 90%)"
-                description: "Device Volume usage is {{ $value }}. (device: {{ $labels.device }})"
+                summary: 'Device Volume usage is high (> 90%)'
+                description: 'Device Volume usage is {{ $value | printf "%.2f" }} percent. (device: {{ $labels.device }})'
 
             - alert: ContainerHighCpuThrottleRate
               expr: 'rate(container_cpu_cfs_throttled_seconds_total{container!="",container!="POD"}[2m]) > 1'
@@ -582,8 +742,8 @@ prometheus:
               labels:
                 severity: warning
               annotations:
-                summary: "Container high throttle rate (> 1)"
-                description: "Container is being throttled and the value is {{ $value }}. (pod: {{ $labels.pod }}, container: {{ $labels.container }})"
+                summary: 'Container high throttle rate (> 1)'
+                description: 'Container is being throttled and the value is {{ $value | printf "%.2f" }}. (pod: {{ $labels.pod }}, container: {{ $labels.container }})'
 
     mysql_alert_rules.yml: |
       groups:
@@ -595,8 +755,8 @@ prometheus:
               labels:
                 severity: critical
               annotations:
-                summary: "MySQL is down"
-                description: "MySQL is down. (instance: {{ $labels.pod }})"
+                summary: 'MySQL is down'
+                description: 'MySQL is down. (instance: {{ $labels.pod }})'
 
             - alert: MysqlRestarted
               expr: 'mysql_global_status_uptime < 60'
@@ -604,8 +764,8 @@ prometheus:
               labels:
                 severity: info
               annotations:
-                summary: "MySQL has just been restarted (< 60s)"
-                description: "MySQL has just been restarted {{ $value }} seconds ago. (instance: {{ $labels.pod }})"
+                summary: 'MySQL has just been restarted (< 60s)'
+                description: 'MySQL has just been restarted {{ $value | printf "%.1f" }} seconds ago. (instance: {{ $labels.pod }})'
 
             - alert: MysqlTooManyConnections
               expr: 'sum(max_over_time(mysql_global_status_threads_connected[1m]) / mysql_global_variables_max_connections) BY (namespace,app_kubernetes_io_instance,pod) * 100 > 80'
@@ -613,8 +773,8 @@ prometheus:
               labels:
                 severity: warning
               annotations:
-                summary: "MySQL has too many connections (> 80%)"
-                description: "{{ $value }} percent of MySQL connections are in use. (instance: {{ $labels.pod }})"
+                summary: 'MySQL has too many connections (> 80%)'
+                description: '{{ $value | printf "%.2f" }} percent of MySQL connections are in use. (instance: {{ $labels.pod }})'
 
             - alert: MysqlConnectionErrors
               expr: 'sum(increase(mysql_global_status_connection_errors_total[1m])) BY (namespace,app_kubernetes_io_instance,pod) > 0'
@@ -622,8 +782,8 @@ prometheus:
               labels:
                 severity: warning
               annotations:
-                summary: "MySQL connection errors"
-                description: "MySQL has connection errors and the value is {{ $value }}. (instance: {{ $labels.pod }})"
+                summary: 'MySQL connection errors'
+                description: 'MySQL has connection errors and the value is {{ $value | printf "%.2f" }}. (instance: {{ $labels.pod }})'
 
             - alert: MysqlHighThreadsRunning
               expr: 'sum(max_over_time(mysql_global_status_threads_running[1m]) / mysql_global_variables_max_connections) BY (namespace,app_kubernetes_io_instance,pod) * 100 > 60'
@@ -631,8 +791,8 @@ prometheus:
               labels:
                 severity: warning
               annotations:
-                summary: "MySQL high threads running (> 60%)"
-                description: "{{ $value }} percent of MySQL connections are in running state. (instance: {{ $labels.pod }})"
+                summary: 'MySQL high threads running (> 60%)'
+                description: '{{ $value | printf "%.2f" }} percent of MySQL connections are in running state. (instance: {{ $labels.pod }})'
 
             - alert: MysqlSlowQueries
               expr: 'sum(increase(mysql_global_status_slow_queries[1m])) BY (namespace,app_kubernetes_io_instance,pod) > 0'
@@ -640,8 +800,8 @@ prometheus:
               labels:
                 severity: info
               annotations:
-                summary: "MySQL slow queries"
-                description: "MySQL server has {{ $value }} slow query. (instance: {{ $labels.pod }})"
+                summary: 'MySQL slow queries'
+                description: 'MySQL server has {{ $value | printf "%.2f" }} slow query. (instance: {{ $labels.pod }})'
 
             - alert: MysqlInnodbLogWaits
               expr: 'sum(rate(mysql_global_status_innodb_log_waits[5m])) BY (namespace,app_kubernetes_io_instance,pod) > 10'
@@ -649,8 +809,8 @@ prometheus:
               labels:
                 severity: warning
               annotations:
-                summary: "MySQL InnoDB log waits (> 10)"
-                description: "MySQL innodb log writes stalling and the value is {{ $value }}. (instance: {{ $labels.pod }})"
+                summary: 'MySQL InnoDB log waits (> 10)'
+                description: 'MySQL innodb log writes stalling and the value is {{ $value | printf "%.2f" }}. (instance: {{ $labels.pod }})'
 
             - alert: MysqlInnodbBufferPoolHits
               expr: 'sum(rate(mysql_global_status_innodb_buffer_pool_reads[5m]) / rate(mysql_global_status_innodb_buffer_pool_read_requests[5m])) BY (namespace,app_kubernetes_io_instance,pod) * 100 > 5'
@@ -658,8 +818,8 @@ prometheus:
               labels:
                 severity: warning
               annotations:
-                summary: "MySQL InnoDB high read requests rate hitting disk (> 5%)"
-                description: "High number of logical reads that InnoDB could not satisfy from the buffer pool, and had to read directly from disk. The value is {{ $value }}. (instance: {{ $labels.pod }})"
+                summary: 'MySQL InnoDB high read requests rate hitting disk (> 5%)'
+                description: 'High number of logical reads that InnoDB could not satisfy from the buffer pool, and had to read directly from disk. The value is {{ $value | printf "%.2f" }} percent. (instance: {{ $labels.pod }})'
 
     postgresql_alert_rules.yml: |
       groups:
@@ -671,8 +831,8 @@ prometheus:
               labels:
                 severity: critical
               annotations:
-                summary: "PostgreSQL is down"
-                description: "PostgreSQL is down. (instance: {{ $labels.pod }})"
+                summary: 'PostgreSQL is down'
+                description: 'PostgreSQL is down. (instance: {{ $labels.pod }})'
 
             - alert: PostgreSQLRestarted
               expr: 'time() - pg_postmaster_start_time_seconds < 60'
@@ -680,8 +840,8 @@ prometheus:
               labels:
                 severity: info
               annotations:
-                summary: "PostgreSQL has just been restarted (< 60s)"
-                description: "PostgreSQL has just been restarted {{ $value }} seconds ago. (instance: {{ $labels.pod }})"
+                summary: 'PostgreSQL has just been restarted (< 60s)'
+                description: 'PostgreSQL has just been restarted {{ $value | printf "%.1f" }} seconds ago. (instance: {{ $labels.pod }})'
 
             - alert: PostgreSQLExporterError
               expr: 'pg_exporter_last_scrape_error > 0'
@@ -689,8 +849,8 @@ prometheus:
               labels:
                 severity: warning
               annotations:
-                summary: "PostgreSQL exporter scrape error"
-                description: "PostgreSQL exporter has {{ $value }} scrape errors. A query may be buggy in query.yaml. (instance: {{ $labels.pod }})"
+                summary: 'PostgreSQL exporter scrape error'
+                description: 'PostgreSQL exporter has {{ $value | printf "%.2f" }} scrape errors. A query may be buggy in query.yaml. (instance: {{ $labels.pod }})'
 
             - alert: PostgreSQLTooManySlowQueries
               expr: |
@@ -701,8 +861,8 @@ prometheus:
               labels:
                 severity: warning
               annotations:
-                summary: "PostgreSQL database has high number of slow queries"
-                description: "PostgreSQL database has slow queries and the value is {{ $value }}. (instance: {{ $labels.pod }}, database: {{ $labels.datname }})"
+                summary: 'PostgreSQL database has high number of slow queries'
+                description: 'PostgreSQL database has slow queries and the value is {{ $value | printf "%.2f" }}. (instance: {{ $labels.pod }}, database: {{ $labels.datname }})'
 
             - alert: PostgreSQLTooManyConnections
               expr: |
@@ -713,8 +873,8 @@ prometheus:
               labels:
                 severity: warning
               annotations:
-                summary: "PostgreSQL too many connections (> 80%)"
-                description: "PostgreSQL has too many connections and the value is {{ $value }}. (instance: {{ $labels.pod }})"
+                summary: 'PostgreSQL too many connections (> 80%)'
+                description: 'PostgreSQL has too many connections and the value is {{ $value | printf "%.2f" }} percent. (instance: {{ $labels.pod }})'
 
             - alert: PostgreSQLDeadLocks
               expr: 'increase(pg_stat_database_deadlocks{datname!~"template.*|postgres", datname!=""}[2m]) > 5'
@@ -722,8 +882,8 @@ prometheus:
               labels:
                 severity: warning
               annotations:
-                summary: "PostgreSQL database has dead locks (> 5)"
-                description: "PostgreSQL database has {{ $value }} dead locks. (instance: {{ $labels.pod }}, database: {{ $labels.datname }})"
+                summary: 'PostgreSQL database has dead locks (> 5)'
+                description: 'PostgreSQL database has {{ $value | printf "%.2f"}} dead locks. (instance: {{ $labels.pod }}, database: {{ $labels.datname }})'
 
             - alert: PostgreSQLHighRollbackRate
               expr: |
@@ -735,8 +895,8 @@ prometheus:
               labels:
                 severity: warning
               annotations:
-                summary: "PostgreSQL database has high rollback rate (> 10%)"
-                description: "Ratio of transactions being aborted compared to committed is {{ $value }}. (instance: {{ $labels.pod }}, database: {{ $labels.datname }})"
+                summary: 'PostgreSQL database has high rollback rate (> 10%)'
+                description: 'Ratio of transactions being aborted compared to committed is {{ $value | printf "%.2f"}} percent. (instance: {{ $labels.pod }}, database: {{ $labels.datname }})'
 
             - alert: PostgreSQLTooManyLocksAcquired
               expr: |
@@ -748,8 +908,8 @@ prometheus:
               labels:
                 severity: warning
               annotations:
-                summary: "PostgreSQL has too many locks acquired (> 20%)"
-                description: "Too many locks acquired on the database and the value is {{ $value }}. (instance: {{ $labels.pod }})"
+                summary: 'PostgreSQL has too many locks acquired (> 20%)'
+                description: 'Too many locks acquired on the database and the value is {{ $value | printf "%.2f" }} percent. (instance: {{ $labels.pod }})'
 
             - alert: PostgreSQLCacheHitRatio
               expr: |
@@ -770,8 +930,8 @@ prometheus:
               labels:
                 severity: warning
               annotations:
-                summary: "PostgreSQL database has low cache hit rate (< 90%)"
-                description: "Low cache hit rate and the value is {{ $value }}. (instance: {{ $labels.pod }}, database: {{ $labels.datname }})"
+                summary: 'PostgreSQL database has low cache hit rate (< 90%)'
+                description: 'Low cache hit rate and the value is {{ $value | printf "%.2f" }} percent. (instance: {{ $labels.pod }}, database: {{ $labels.datname }})'
 
             - alert: PostgreSQLMaxWriteBufferReached
               expr: 'rate(pg_stat_bgwriter_maxwritten_clean_total[2m]) > 0'
@@ -779,8 +939,8 @@ prometheus:
               labels:
                 severity: warning
               annotations:
-                summary: "PostgreSQL write buffers reached max"
-                description: "PostgreSQL background writer stops for max and the value is {{ $value }}. (instance: {{ $labels.pod }})"
+                summary: 'PostgreSQL write buffers reached max'
+                description: 'PostgreSQL background writer stops for max and the value is {{ $value | printf "%.2f" }}. (instance: {{ $labels.pod }})'
 
             - alert: PostgreSQLHighWALFilesArchiveErrorRate
               expr: |
@@ -792,8 +952,8 @@ prometheus:
               labels:
                 severity: warning
               annotations:
-                summary: "PostgreSQL has high error rate in WAL files archiver(> 10%)"
-                description: "PostgreSQL high error rate in WAL files archiver and the value is {{ $value }}. (instance: {{ $labels.pod }})"
+                summary: 'PostgreSQL has high error rate in WAL files archiver(> 10%)'
+                description: 'PostgreSQL high error rate in WAL files archiver and the value is {{ $value | printf "%.2f" }} percent. (instance: {{ $labels.pod }})'
 
             - alert: PostgreSQLTableNotAutoVacuumed
               expr: |
@@ -805,8 +965,8 @@ prometheus:
               labels:
                 severity: warning
               annotations:
-                summary: "PostgreSQL table in database has not been auto vacuumed for 10 days"
-                description: "Table {{ $labels.relname }} in database has not been auto vacuumed for 10 days. (instance: {{ $labels.pod }}, database: {{ $labels.datname }})"
+                summary: 'PostgreSQL table in database has not been auto vacuumed for 10 days'
+                description: 'Table {{ $labels.relname }} in database has not been auto vacuumed for 10 days. (instance: {{ $labels.pod }}, database: {{ $labels.datname }})'
 
             - alert: PostgreSQLTableNotAutoAnalyzed
               expr: |
@@ -818,8 +978,8 @@ prometheus:
               labels:
                 severity: warning
               annotations:
-                summary: "PostgreSQL table in database has not been auto analyzed for 10 days"
-                description: "Table {{ $labels.relname }} in database has not been auto analyzed for 10 days. (instance: {{ $labels.pod }}, database: {{ $labels.datname }})"
+                summary: 'PostgreSQL table in database has not been auto analyzed for 10 days'
+                description: 'Table {{ $labels.relname }} in database has not been auto analyzed for 10 days. (instance: {{ $labels.pod }}, database: {{ $labels.datname }})'
 
             - alert: PostgreSQLTableTooManyDeadTuples
               expr: |
@@ -831,8 +991,8 @@ prometheus:
               labels:
                 severity: warning
               annotations:
-                summary: "PostgreSQL table in database has too many dead tuples (> 10%)"
-                description: "Table {{ $labels.relname }} in database dead tuples is too large and the value is {{ $value }}. (instance: {{ $labels.pod }}, database: {{ $labels.datname }})"
+                summary: 'PostgreSQL table in database has too many dead tuples (> 10%)'
+                description: 'Table {{ $labels.relname }} in database dead tuples is too large and the value is {{ $value | printf "%.2f" }} percent. (instance: {{ $labels.pod }}, database: {{ $labels.datname }})'
 
     redis_alert_rules.yml: |
       groups:
@@ -844,8 +1004,8 @@ prometheus:
               labels:
                 severity: critical
               annotations:
-                summary: "Redis is down"
-                description: "Redis is down. (instance: {{ $labels.pod }})"
+                summary: 'Redis is down'
+                description: 'Redis is down. (instance: {{ $labels.pod }})'
 
             - alert: RedisCPUHigh
               expr: '(rate(redis_cpu_sys_seconds_total[1m]) + rate(redis_cpu_user_seconds_total[1m])) * 100 > 80'
@@ -853,8 +1013,8 @@ prometheus:
               labels:
                 severity: warning
               annotations:
-                summary: "Out of CPU (> 80%)"
-                description: "Redis is running out of CPU and the value is {{ $value }}. (instance: {{ $labels.pod }})"
+                summary: 'Out of CPU (> 80%)'
+                description: 'Redis is running out of CPU and the value is {{ $value | printf "%.2f" }} percent. (instance: {{ $labels.pod }})'
 
             - alert: RedisMemoryHigh
               expr: '(redis_memory_max_bytes == 0 or redis_memory_used_bytes * 100 / redis_memory_max_bytes) > 90'
@@ -862,8 +1022,8 @@ prometheus:
               labels:
                 severity: warning
               annotations:
-                summary: "Out of memory (> 90%)"
-                description: "Redis is running out of memory and the value is {{ $value }}. (instance: {{ $labels.pod }})"
+                summary: 'Out of memory (> 90%)'
+                description: 'Redis is running out of memory and the value is {{ $value | printf "%.2f" }} percent. (instance: {{ $labels.pod }})'
 
             - alert: RedisTooManyConnections
               expr: 'redis_connected_clients * 100 / redis_config_maxclients > 80'
@@ -871,8 +1031,8 @@ prometheus:
               labels:
                 severity: warning
               annotations:
-                summary: "Redis has too many connections (> 80%)"
-                description: "Redis has too many connections and the value is {{ $value }}. (instance: {{ $labels.pod }})"
+                summary: 'Redis has too many connections (> 80%)'
+                description: 'Redis has too many connections and the value is {{ $value | printf "%.2f" }} percent. (instance: {{ $labels.pod }})'
 
             - alert: RedisRejectedConnections
               expr: 'increase(redis_rejected_connections_total[1m]) > 0'
@@ -880,8 +1040,8 @@ prometheus:
               labels:
                 severity: error
               annotations:
-                summary: "Redis has rejected connections"
-                description: "{{ $value }} connections to Redis has been rejected. (instance: {{ $labels.pod }})"
+                summary: 'Redis has rejected connections'
+                description: '{{ $value | printf "%.2f" }} connections to Redis has been rejected. (instance: {{ $labels.pod }})'
 
             - alert: RedisKeyEviction
               expr: 'increase(redis_evicted_keys_total[5m]) > 0'
@@ -889,8 +1049,8 @@ prometheus:
               labels:
                 severity: error
               annotations:
-                summary: "Redis has evicted keys"
-                description: "Redis has evicted keys in the last 5 minutes and the value is {{ $value }}. (instance: {{ $labels.pod }})"
+                summary: 'Redis has evicted keys'
+                description: 'Redis has evicted keys in the last 5 minutes and the value is {{ $value | printf "%.2f" }}. (instance: {{ $labels.pod }})'
 
             - alert: RedisMissingMaster
               expr: 'count by (app_kubernetes_io_instance) (redis_instance_info{role="master"}) < 1'
@@ -898,8 +1058,8 @@ prometheus:
               labels:
                 severity: critical
               annotations:
-                summary: "Redis missing master"
-                description: "Redis cluster has no node marked as master."
+                summary: 'Redis missing master'
+                description: 'Redis cluster has no node marked as master.'
 
             - alert: RedisDisconnectedSlaves
               expr: 'count without (instance, job) (redis_connected_slaves) - sum without (instance, job) (redis_connected_slaves) - 1 > 1'
@@ -907,8 +1067,8 @@ prometheus:
               labels:
                 severity: critical
               annotations:
-                summary: "Redis disconnected slaves"
-                description: "Redis not replicating for all slaves. Consider reviewing the redis replication status. (instance: {{ $labels.pod }})"
+                summary: 'Redis disconnected slaves'
+                description: 'Redis not replicating for all slaves. Consider reviewing the redis replication status. (instance: {{ $labels.pod }})'
 
             - alert: RedisReplicationBroken
               expr: 'delta(redis_connected_slaves[1m]) < 0'
@@ -916,37 +1076,37 @@ prometheus:
               labels:
                 severity: critical
               annotations:
-                summary: "Redis replication broken"
-                description: "Redis instance lost a slave. (instance: {{ $labels.pod }})"
+                summary: 'Redis replication broken'
+                description: 'Redis instance lost a slave. (instance: {{ $labels.pod }})'
 
     kafka_alert_rules.yaml: |-
       group:
         - name: KafkaExporter
           rules:
             - alert: KafkaTopicsReplicas
-                expr: sum(kafka_topic_partition_in_sync_replica) by (topic) < 3
+                expr: 'sum(kafka_topic_partition_in_sync_replica) by (topic) < 3'
                 for: 0m
                 labels:
                   severity: critical
                 annotations:
-                  summary: Kafka topics replicas (instance {{ $labels.app_kubernetes_io_instance }})
-                  description: "Kafka topic in-sync partition\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+                  summary: 'Kafka topics replicas (instance {{ $labels.app_kubernetes_io_instance }})'
+                  description: 'Kafka topic in-sync partition\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}'
             - alert: KafkaConsumersGroup
-                expr: sum(kafka_consumergroup_lag) by (consumergroup) > 50
+                expr: 'sum(kafka_consumergroup_lag) by (consumergroup) > 50'
                 for: 1m
                 labels:
                   severity: critical
                 annotations:
-                  summary: Kafka consumers group (instance {{ $labels.app_kubernetes_io_instance }})
-                  description: "Kafka consumers group\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+                  summary: 'Kafka consumers group (instance {{ $labels.app_kubernetes_io_instance }})'
+                  description: 'Kafka consumers group\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}'
             - alert: KafkaBrokerDown
-                expr: kafka_brokers < 3
+                expr: 'kafka_brokers < 3'
                 for: 0m
                 labels:
                   severity: critical
                 annotations:
-                  Summary: "Kafka broker *{{ $labels.app_kubernetes_io_instance }}* alert status"
-                  description: "One of the Kafka broker *{{ $labels.app_kubernetes_io_instance }}* is down."
+                  Summary: 'Kafka broker *{{ $labels.app_kubernetes_io_instance }}* alert status'
+                  description: 'One of the Kafka broker *{{ $labels.app_kubernetes_io_instance }}* is down.'
 
   serverFiles:
     prometheus.yml:
@@ -1215,6 +1375,9 @@ grafana:
   ##
   enabled: false
 
+  rbac:
+    pspEnabled: false
+
   replicas: 1
 
   image:
@@ -1270,16 +1433,20 @@ grafana:
       enabled: true
       label: grafana_dashboard
       labelValue: "1"
+      searchNamespace: ALL
+      resource: configmap
 
     datasources:
       enabled: true
       label: grafana_datasource
       labelValue: "1"
+      searchNamespace: ALL
+      resource: configmap
 
       defaultDatasourceEnabled: true
       uid: prometheus
 
-      skipReload: true
+      skipReload: false
       initDatasources: true
 
   testFramework:
@@ -1295,19 +1462,69 @@ grafana:
       # Hide the Grafana version text from the footer and help tooltip for unauthenticated users (default: false)
       hide_version: true
 
+  ingress:
+    enabled: false
+    # For Kubernetes >= 1.18 you should specify the ingress-controller via the field ingressClassName
+    # See https://kubernetes.io/blog/2020/04/02/improvements-to-the-ingress-api-in-kubernetes-1.18/#specifying-the-class-of-an-ingress
+    # ingressClassName: nginx
+    # Values can be templated
+    annotations: {}
+      # kubernetes.io/ingress.class: nginx
+    # kubernetes.io/tls-acme: "true"
+    labels: {}
+    path: /
+
+    # pathType is only for k8s >= 1.1=
+    pathType: Prefix
+
+    hosts:
+      - chart-example.local
+    ## Extra paths to prepend to every host configuration. This is useful when working with annotation based services.
+    extraPaths: []
+    # - path: /*
+    #   backend:
+    #     serviceName: ssl-redirect
+    #     servicePort: use-annotation
+    ## Or for k8s > 1.19
+    # - path: /*
+    #   pathType: Prefix
+    #   backend:
+    #     service:
+    #       name: ssl-redirect
+    #       port:
+    #         name: use-annotation
+
+
+    tls: []
+    #  - secretName: chart-example-tls
+    #    hosts:
+    #      - chart-example.local
+
+  ## Expose the grafana service to be accessed from outside the cluster (LoadBalancer service).
+  ## or access it from within the cluster (ClusterIP service). Set the service type and the port to serve it.
+  ## ref: http://kubernetes.io/docs/user-guide/services/
+  ##
+  service:
+    enabled: true
+    type: ClusterIP
+    port: 80
+    targetPort: 3000
+    # targetPort: 4181 To be used with a proxy extraContainer
+    ## Service annotations. Can be templated.
+    annotations: {}
+    labels: {}
+    portName: service
+    # Adds the appProtocol field to the service. This allows to work with istio protocol selection. Ex: "http" or "tcp"
+    appProtocol: ""
+
+
+
 loadbalancer:
   enabled: false
 
-
-apecloud-mysql:
-  enabled: true
-
-postgresql:
-  enabled: true
-
-## snapshot-controller settings
-## ref: https://artifacthub.io/packages/helm/piraeus-charts/snapshot-controller#configuration
-##
+### snapshot-controller settings
+### ref: https://artifacthub.io/packages/helm/piraeus-charts/snapshot-controller#configuration
+###
 snapshot-controller:
   ## @param snapshot-controller.enabled -- Enable snapshot-controller chart.
   ##
@@ -1327,7 +1544,7 @@ snapshot-controller:
       operator: Equal
       value: "true"
       effect: NoSchedule
-
+ 
   affinity:
     nodeAffinity:
       preferredDuringSchedulingIgnoredDuringExecution:
@@ -1344,6 +1561,7 @@ snapshot-controller:
 ##
 csi-s3:
   ## @param csi-s3.enabled -- Enable csi-s3 chart.
+  ##
   enabled: false
   ## csi-s3 secret settings
   ## @param csi-s3.secret.accessKey -- S3 Access Key.
@@ -1353,7 +1571,6 @@ csi-s3:
   secret:
     accessKey: ""
     secretKey: ""
-    endpoint: ""
   ## csi-s3 storageClass setting
   ## @param csi-s3.storageClass.create -- Specifies whether the storage class should be created.
   ## @param csi-s3.storageClass.singleBucket -- Use a single bucket for all dynamically provisioned persistent volumes.
@@ -1365,9 +1582,9 @@ csi-s3:
     mountOptions: "--memory-limit 1000 --dir-mode 0777 --file-mode 0666 --region cn-northwest-1"
 
 alertmanager-webhook-adaptor:
-  ## If false, Webhook-Adaptor sub-chart will not be installed
+  ## Linkage with prometheus.enabled
   ##
-  enabled: false
+  # enabled: false
 
   replicaCount: 1
 
@@ -1377,11 +1594,11 @@ alertmanager-webhook-adaptor:
     registry: registry.cn-hangzhou.aliyuncs.com
     repository: apecloud/alertmanager-webhook-adaptor
     pullPolicy: IfNotPresent
-    tag: "0.1.1"
+    tag: "0.1.4"
 
   ## ConfigMap override where fullname is {{.Release.Name}}-{{.Values.configMapOverrideName}}
   ##
-  configMapOverrideName: "webhook-adaptor-config"
+  configMapOverrideName: "config"
 
   resources: { }
   # We usually recommend not to specify default resources and to leave this as a conscious

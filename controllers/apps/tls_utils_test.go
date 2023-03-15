@@ -89,11 +89,10 @@ var _ = Describe("TLS self-signed cert function", func() {
 				&appsv1alpha1.ConfigConstraint{})
 
 			By("Create a clusterDef obj")
-			mode := int32(0755)
 			testapps.NewClusterDefFactory(clusterDefName).
 				SetConnectionCredential(map[string]string{"username": "root", "password": ""}, nil).
 				AddComponent(testapps.ConsensusMySQLComponent, statefulCompType).
-				AddConfigTemplate(configTplName, configMapObj.Name, configConstraintObj.Name, testCtx.DefaultNamespace, testapps.ConfVolumeName, &mode).
+				AddConfigTemplate(configTplName, configMapObj.Name, configConstraintObj.Name, testCtx.DefaultNamespace, testapps.ConfVolumeName).
 				AddContainerEnv(mysqlContainerName, corev1.EnvVar{Name: "MYSQL_ALLOW_EMPTY_PASSWORD", Value: "yes"}).
 				CheckedCreate(&testCtx).GetObject()
 
@@ -237,7 +236,7 @@ var _ = Describe("TLS self-signed cert function", func() {
 				sts := stsList.Items[0]
 				cd := &appsv1alpha1.ClusterDefinition{}
 				Expect(k8sClient.Get(ctx, types.NamespacedName{Name: clusterDefName, Namespace: testCtx.DefaultNamespace}, cd)).Should(Succeed())
-				cmName := cfgcore.GetInstanceCMName(&sts, &cd.Spec.ComponentDefs[0].ConfigSpec.ConfigTemplateRefs[0])
+				cmName := cfgcore.GetInstanceCMName(&sts, &cd.Spec.ComponentDefs[0].ConfigSpecs[0].ComponentTemplateSpec)
 				cmKey := client.ObjectKey{Namespace: sts.Namespace, Name: cmName}
 				hasTLSSettings := func() bool {
 					cm := &corev1.ConfigMap{}

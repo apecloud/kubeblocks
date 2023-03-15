@@ -29,18 +29,18 @@ spec:
         - name: {{ $name }}
           filePathPattern: {{ $pattern }}
         {{- end }}
-      configSpec:
-        configTemplateRefs:
-          - name: mysql-consensusset-config
-            configTplRef: mysql8.0-config-template
-            configConstraintRef: mysql8.0-config-constraints
-            volumeName: mysql-config
-            namespace: {{ .Release.Namespace }}
-          - name: apecloud-mysql-scripts
-            configTplRef: apecloud-mysql-scripts
-            namespace: {{ .Release.Namespace }}
-            volumeName: scripts
-            defaultMode: 493
+      configSpecs:
+        - name: mysql-consensusset-config
+          templateRef: mysql8.0-config-template
+          constraintRef: mysql8.0-config-constraints
+          volumeName: mysql-config
+          namespace: {{ .Release.Namespace }}
+      scriptSpecs:
+        - name: apecloud-mysql-scripts
+          templateRef: apecloud-mysql-scripts
+          namespace: {{ .Release.Namespace }}
+          volumeName: scripts
+          defaultMode: 493
       workloadType: Consensus
       consensusSpec:
         leader:
@@ -58,6 +58,9 @@ spec:
         type: Snapshot
         backupTemplateSelector:
           "clusterdefinition.kubeblocks.io/name": apecloud-mysql
+      volumeTypes:
+        - name: data
+          type: data
       podSpec:
         containers:
           - name: mysql
@@ -154,12 +157,14 @@ spec:
       systemAccounts:
         cmdExecutorConfig:
           image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ .Values.image.tag }}
-          command: ["mysql"]
+          command:
+          - mysql
           args:
-          - -h$(KB_ACCOUNT_ENDPOINT) 
           - -u$(MYSQL_ROOT_USER)
           - -p$(MYSQL_ROOT_PASSWORD)
-          - -e $(KB_ACCOUNT_STATEMENT)
+          - -h$(KB_ACCOUNT_ENDPOINT)
+          - -e
+          - $(KB_ACCOUNT_STATEMENT)
           env:
           - name: MYSQL_ROOT_USER
             valueFrom:
@@ -182,33 +187,33 @@ spec:
               type: CreateByStmt
               scope: AnyPods
               statements:
-                creation: CREATE USER IF NOT EXISTS $(USERNAME) IDENTIFIED BY "$(PASSWD)"; GRANT ALL PRIVILEGES ON *.* TO $(USERNAME);
+                creation: CREATE USER IF NOT EXISTS $(USERNAME) IDENTIFIED BY '$(PASSWD)'; GRANT ALL PRIVILEGES ON *.* TO $(USERNAME);
                 deletion: DROP USER IF EXISTS $(USERNAME);
           - name: kbdataprotection
             provisionPolicy:
               type: CreateByStmt
               scope: AnyPods
               statements:
-                creation: CREATE USER IF NOT EXISTS $(USERNAME) IDENTIFIED BY "$(PASSWD)";GRANT RELOAD, LOCK TABLES, PROCESS, REPLICATION CLIENT ON *.* TO $(USERNAME); GRANT LOCK TABLES,RELOAD,PROCESS,REPLICATION CLIENT, SUPER,SELECT,EVENT,TRIGGER,SHOW VIEW ON *.* TO $(USERNAME);
+                creation: CREATE USER IF NOT EXISTS $(USERNAME) IDENTIFIED BY '$(PASSWD)';GRANT RELOAD, LOCK TABLES, PROCESS, REPLICATION CLIENT ON *.* TO $(USERNAME); GRANT LOCK TABLES,RELOAD,PROCESS,REPLICATION CLIENT, SUPER,SELECT,EVENT,TRIGGER,SHOW VIEW ON *.* TO $(USERNAME);
                 deletion: DROP USER IF EXISTS $(USERNAME);
           - name: kbprobe
             provisionPolicy:
               type: CreateByStmt
               scope: AnyPods
-              statements:
-                creation: CREATE USER IF NOT EXISTS $(USERNAME) IDENTIFIED BY "$(PASSWD)"; GRANT REPLICATION CLIENT, PROCESS ON *.* TO $(USERNAME); GRANT SELECT ON performance_schema.* TO $(USERNAME);
+              statements:        
+                creation: CREATE USER IF NOT EXISTS $(USERNAME) IDENTIFIED BY '$(PASSWD)'; GRANT REPLICATION CLIENT, PROCESS ON *.* TO $(USERNAME); GRANT SELECT ON performance_schema.* TO $(USERNAME);
                 deletion: DROP USER IF EXISTS $(USERNAME);              
           - name: kbmonitoring
             provisionPolicy:
               type: CreateByStmt
               scope: AnyPods
-              statements:
-                creation: CREATE USER IF NOT EXISTS $(USERNAME) IDENTIFIED BY "$(PASSWD)"; GRANT REPLICATION CLIENT, PROCESS ON *.* TO $(USERNAME); GRANT SELECT ON performance_schema.* TO $(USERNAME);
+              statements:        
+                creation: CREATE USER IF NOT EXISTS $(USERNAME) IDENTIFIED BY '$(PASSWD)'; GRANT REPLICATION CLIENT, PROCESS ON *.* TO $(USERNAME); GRANT SELECT ON performance_schema.* TO $(USERNAME);
                 deletion: DROP USER IF EXISTS $(USERNAME);            
           - name: kbreplicator
             provisionPolicy:
               type: CreateByStmt
               scope: AnyPods
               statements:        
-                creation: CREATE USER IF NOT EXISTS $(USERNAME) IDENTIFIED BY "$(PASSWD)"; GRANT REPLICATION SLAVE ON *.* TO $(USERNAME) WITH GRANT OPTION;
+                creation: CREATE USER IF NOT EXISTS $(USERNAME) IDENTIFIED BY '$(PASSWD)'; GRANT REPLICATION SLAVE ON *.* TO $(USERNAME) WITH GRANT OPTION;
                 deletion: DROP USER IF EXISTS $(USERNAME);            

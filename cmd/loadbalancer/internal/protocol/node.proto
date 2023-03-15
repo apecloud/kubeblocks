@@ -1,0 +1,123 @@
+syntax = 'proto3';
+
+package protocol;
+
+option go_package = "github.com/apecloud/kubeblocks/cmd/loadbalancer/internal/protocol";
+
+service Node {
+  rpc DescribeNodeInfo(DescribeNodeInfoRequest) returns (DescribeNodeInfoResponse) {}
+
+  rpc DescribeAllENIs(DescribeAllENIsRequest) returns (DescribeAllENIsResponse) {}
+
+  rpc WaitForENIAttached(WaitForENIAttachedRequest) returns (WaitForENIAttachedResponse) {}
+
+  rpc SetupNetworkForENI(SetupNetworkForENIRequest) returns(SetupNetworkForENIResponse) {}
+
+  rpc CleanNetworkForENI(CleanNetworkForENIRequest) returns(CleanNetworkForENIResponse) {}
+
+  rpc SetupNetworkForService(SetupNetworkForServiceRequest) returns (SetupNetworkForServiceResponse) {}
+
+  rpc CleanNetworkForService(CleanNetworkForServiceRequest) returns (CleanNetworkForServiceResponse) {}
+}
+
+message DescribeNodeInfoRequest {
+  string request_id = 1;
+}
+
+message DescribeNodeInfoResponse {
+  string request_id = 1;
+  InstanceInfo info = 2;
+}
+
+message DescribeAllENIsRequest {
+  string request_id = 1;
+}
+
+message DescribeAllENIsResponse {
+  string request_id = 1;
+  map<string, ENIMetadata> enis = 2;
+}
+
+message WaitForENIAttachedRequest {
+  string request_id = 1;
+  ENIMetadata eni = 2;
+}
+
+message WaitForENIAttachedResponse {
+  string request_id = 1;
+  ENIMetadata eni = 2;
+}
+
+message SetupNetworkForServiceRequest {
+  string request_id = 1;
+  string private_ip = 2;
+  ENIMetadata eni = 3;
+}
+
+message SetupNetworkForServiceResponse {
+  string request_id = 1;
+  string private_ip = 2;
+  ENIMetadata eni = 3;
+}
+
+message CleanNetworkForServiceRequest {
+  string request_id = 1;
+  string private_ip = 2;
+  ENIMetadata eni = 3;
+}
+
+message CleanNetworkForServiceResponse {
+  string request_id = 1;
+  string private_ip = 2;
+  ENIMetadata eni = 3;
+}
+
+message SetupNetworkForENIRequest {
+  string request_id = 1;
+  ENIMetadata eni = 2;
+}
+
+message SetupNetworkForENIResponse {
+  string request_id = 1;
+  ENIMetadata eni = 2;
+}
+
+message CleanNetworkForENIRequest {
+  string request_id = 1;
+  ENIMetadata eni = 2;
+}
+
+message CleanNetworkForENIResponse {
+  string request_id = 1;
+  ENIMetadata eni = 2;
+}
+
+message InstanceInfo {
+  string instance_id = 1;
+
+  string subnet_id = 2;
+
+  repeated string security_group_ids = 3;
+}
+
+message ENIMetadata {
+  string eni_id = 1;
+
+  string mac = 2;
+
+  int32 device_number = 3;
+
+  string subnet_id = 4;
+
+  string subnet_ipv4_cidr = 5;
+
+  repeated IPv4Address ipv4_addresses = 6;
+
+  map<string, string> tags = 7;
+}
+
+message IPv4Address {
+  bool primary = 1;
+
+  string address = 2;
+}

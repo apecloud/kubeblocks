@@ -52,7 +52,7 @@ func newUpgradeCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 
 	cmd := &cobra.Command{
 		Use:     "upgrade",
-		Short:   "Upgrade KubeBlocks",
+		Short:   "Upgrade KubeBlocks.",
 		Args:    cobra.NoArgs,
 		Example: upgradeExample,
 		Run: func(cmd *cobra.Command, args []string) {
@@ -92,7 +92,7 @@ func (o *InstallOptions) Upgrade(cmd *cobra.Command) error {
 	})
 
 	// check flags already been set
-	if !monitorIsSet && len(o.Version) == 0 && helm.ValueOptsIsEmpty(&o.ValueOpts) {
+	if !monitorIsSet && o.Version == "" && helm.ValueOptsIsEmpty(&o.ValueOpts) {
 		fmt.Fprint(o.Out, "Nothing to upgrade, --set, --version or --monitor should be specified.\n")
 		return nil
 	}

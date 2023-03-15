@@ -69,7 +69,7 @@ type componentTemplateValues struct {
 
 	// Container *corev1.Container
 	Resource  *ResourceDefinition
-	ConfigTpl []appsv1alpha1.ConfigTemplate
+	ConfigTpl []appsv1alpha1.ComponentConfigSpec
 }
 
 type configTemplateBuilder struct {
@@ -154,7 +154,7 @@ func (c *configTemplateBuilder) builtinObjectsAsValues() (*gotemplate.TplValues,
 
 func (c *configTemplateBuilder) injectBuiltInObjectsAndFunctions(
 	podSpec *corev1.PodSpec,
-	configs []appsv1alpha1.ConfigTemplate,
+	configs []appsv1alpha1.ComponentConfigSpec,
 	component *component.SynthesizedComponent) error {
 	if err := c.injectBuiltInObjects(podSpec, component, configs); err != nil {
 		return err
@@ -183,7 +183,7 @@ func (c *configTemplateBuilder) injectBuiltInFunctions(component *component.Synt
 	return nil
 }
 
-func (c *configTemplateBuilder) injectBuiltInObjects(podSpec *corev1.PodSpec, component *component.SynthesizedComponent, configs []appsv1alpha1.ConfigTemplate) error {
+func (c *configTemplateBuilder) injectBuiltInObjects(podSpec *corev1.PodSpec, component *component.SynthesizedComponent, configs []appsv1alpha1.ComponentConfigSpec) error {
 	var resource *ResourceDefinition
 	container := intctrlutil.GetContainerByConfigTemplate(podSpec, configs)
 	if container != nil && len(container.Resources.Limits) > 0 {
@@ -193,11 +193,10 @@ func (c *configTemplateBuilder) injectBuiltInObjects(podSpec *corev1.PodSpec, co
 		}
 	}
 	c.componentValues = &componentTemplateValues{
-		TypeName: component.Type,
-		// TODO add Component service name
-		ServiceName: "",
-		Replicas:    component.Replicas,
-		Resource:    resource,
+		TypeName:  component.Type,
+		Replicas:  component.Replicas,
+		Resource:  resource,
+		ConfigTpl: configs,
 	}
 	c.podSpec = podSpec
 	c.component = component

@@ -73,11 +73,12 @@ type clusterRefResources struct {
 }
 
 // lifecycleVertex describes expected object spec and how to reach it
-// obj always represents the expected port: new object in Create/Update action and old object in Delete action
+// obj always represents the expected part: new object in Create/Update action and old object in Delete action
 // oriObj is set in Update action
 // all transformers doing their object manipulation works on obj.spec
 // the root vertex(i.e. the cluster vertex) will be treated specially:
 // as all its meta, spec and status can be updated in one reconciliation loop
+// Update is ignored when immutable=true
 type lifecycleVertex struct {
 	obj       client.Object
 	oriObj    client.Object

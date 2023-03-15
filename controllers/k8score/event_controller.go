@@ -139,10 +139,7 @@ func (r *RoleChangeEventHandler) Handle(cli client.Client, reqCtx intctrlutil.Re
 		event.Annotations = make(map[string]string, 0)
 	}
 	event.Annotations[roleChangedAnnotKey] = trueStr
-	if err = cli.Patch(reqCtx.Ctx, event, patch); err != nil {
-		return err
-	}
-	return nil
+	return cli.Patch(reqCtx.Ctx, event, patch)
 }
 
 // handleRoleChangedEvent handles role changed event and return role.

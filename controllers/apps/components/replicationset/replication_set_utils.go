@@ -445,13 +445,10 @@ func HandleReplicationSetRoleChangeEvent(cli client.Client,
 
 	// pod is old secondary and newRole is primary
 	// update old primary to secondary
-	patch := client.MergeFrom(oldPrimaryPod.DeepCopy())
-	oldPrimaryPod.Labels[constant.RoleLabelKey] = string(Secondary)
-	if err := cli.Patch(reqCtx.Ctx, oldPrimaryPod, patch); err != nil {
+	if err := updateObjRoleLabel(reqCtx.Ctx, cli, *oldPrimaryPod, string(Secondary)); err != nil {
 		return err
 	}
+
 	// update secondary pod to primary
-	patch = client.MergeFrom(pod.DeepCopy())
-	pod.Labels[constant.RoleLabelKey] = newRole
-	return cli.Patch(reqCtx.Ctx, pod, patch)
+	return updateObjRoleLabel(reqCtx.Ctx, cli, *pod, newRole)
 }

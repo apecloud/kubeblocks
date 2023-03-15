@@ -105,7 +105,7 @@ sidebar_label: Create and connect
    EOF
    ```
 
-### kbcli cluster create options description**
+### kbcli cluster create options description
 
 | Option   | Description      |
 | :--      | :--              |

@@ -104,18 +104,18 @@ This section shows how to use `kbcli` to back up and restore a MySQL Standalone 
     ```
 7. Restore to a new cluster.
     
-     Copy the backup name to the clipboard, and restore to the new cluster. 
+   Copy the backup name to the clipboard, and restore to the new cluster. 
 
-     :::note
+   :::note
 
-     You do not need to specify other parameters for creating a cluster. The restoration automatically reads the parameters of the source cluster, including specification, disk size, etc., and creates a new MySQL cluster with the same specifications.
+   You do not need to specify other parameters for creating a cluster. The restoration automatically reads the parameters of the source cluster, including specification, disk size, etc., and creates a new MySQL cluster with the same specifications.
 
-     :::
+   :::
 
-     Execute the following command.
-     ```bash
-     kbcli cluster restore mysql-new-from-snapshot --backup backup-default-mysql-cluster-20221124113440
-    ```
+   Execute the following command.
+   ```bash
+   kbcli cluster restore mysql-new-from-snapshot --backup backup-default-mysql-cluster-20221124113440
+   ```
 8. Verify the data restored.
     
      Execute the following command to verify the data restored.
@@ -124,29 +124,29 @@ This section shows how to use `kbcli` to back up and restore a MySQL Standalone 
      kbcli cluster connect mysql-new-from-snapshot
      select * from demo.msg;
      ```
-9.  Delete the ApeCloud MySQL cluster and clean up the backup.
+9. Delete the ApeCloud MySQL cluster and clean up the backup.
     
-     :::note
+   :::note
 
-     Expenses incurred when you have snapshots on the cloud. So it is recommended to delete the test cluster.
+   Expenses incurred when you have snapshots on the cloud. So it is recommended to delete the test cluster.
 
-     :::
+   :::
   
-     Delete a MySQL cluster with the following command.
+   Delete a MySQL cluster with the following command.
 
-     ```bash
-     kbcli cluster delete mysql-cluster
-     kbcli cluster delete mysql-new-from-snapshot
-     ```
+   ```bash
+   kbcli cluster delete mysql-cluster
+   kbcli cluster delete mysql-new-from-snapshot
+   ```
 
-     Delete the backup specified.
+   Delete the backup specified.
 
-     ```bash
-     kbcli cluster delete-backup mysql-cluster --name backup-default-mysql-cluster-20221124113440 
-     ```
+   ```bash
+   kbcli cluster delete-backup mysql-cluster --name backup-default-mysql-cluster-20221124113440 
+   ```
 
-     Delete all backups with `mysql-cluster`.
+   Delete all backups with `mysql-cluster`.
 
-     ```bash
-     kbcli cluster delete mysql-cluster
-     ```
+   ```bash
+   kbcli cluster delete mysql-cluster
+   ```

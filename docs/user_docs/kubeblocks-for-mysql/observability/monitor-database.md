@@ -88,14 +88,14 @@ KubeBlocks has three monitoring add-ons.
        kbcli cluster create mysql-cluster --cluster-definition='apecloud-mysql'
        ```
 
-       :::note
+    :::note
 
-       The setting of `monitor` is `true` by default and it is not recommended to disable it. For example,
-       ```bash
-       kbcli cluster create mycluster --cluster-definition='apecloud-mysql' --monitor=false
-       ```
+    The setting of `monitor` is `true` by default and it is not recommended to disable it. For example,
+    ```bash
+    kbcli cluster create mycluster --cluster-definition='apecloud-mysql' --monitor=false
+    ```
       
-       :::
+    :::
       
        You can change the value to `false` to disable the monitor function if required.
    - For the existing cluster, you can update it to enable the monitor function with `update` command.

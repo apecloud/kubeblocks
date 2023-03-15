@@ -83,7 +83,7 @@ spec:
             storage: 1Gi
 ```
 
-## How KubeBlocks sarts a cluster
+## How KubeBlocks starts a cluster
   
 ![Start a cluster](./../../../img/mysql_cluster_start.png)
 

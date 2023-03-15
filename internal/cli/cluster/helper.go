@@ -85,6 +85,10 @@ func GetSimpleInstanceInfos(dynamic dynamic.Interface, name string, namespace st
 		}
 	}
 
+	if len(infos) > 0 {
+		return infos
+	}
+
 	// if cluster status does not contain what we need, try to get all instances
 	objs, err := dynamic.Resource(schema.GroupVersionResource{Group: corev1.GroupName, Version: types.K8sCoreAPIVersion, Resource: "pods"}).
 		Namespace(namespace).List(context.TODO(), metav1.ListOptions{

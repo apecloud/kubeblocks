@@ -37,7 +37,7 @@ func (s *simplePolicy) Upgrade(params reconfigureParams) (ReturnedStatus, error)
 	params.Ctx.Log.V(1).Info("simple policy begin....")
 
 	switch params.WorkloadType() {
-	case appsv1alpha1.Stateful, appsv1alpha1.Consensus:
+	case appsv1alpha1.Stateful, appsv1alpha1.Consensus, appsv1alpha1.Replication:
 		return rollingStatefulSets(params)
 		// process consensus
 	default:

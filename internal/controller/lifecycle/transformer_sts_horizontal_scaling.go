@@ -168,7 +168,7 @@ func (s *stsHorizontalScalingTransformer) Transform(dag *graph.DAG) error {
 				if err := doBackup(s.ctx, s.cli, comp, snapshotKey, dag, rootVertex, vertex); err != nil {
 					return err
 				}
-				dag.RemoveVertex(vertex)
+				vertex.immutable = true
 				return nil
 			}
 			// check all pvc bound, requeue if not all ready
@@ -177,7 +177,7 @@ func (s *stsHorizontalScalingTransformer) Transform(dag *graph.DAG) error {
 				return err
 			}
 			if !allPVCBounded {
-				dag.RemoveVertex(vertex)
+				vertex.immutable = true
 				return nil
 			}
 			// clean backup resources.

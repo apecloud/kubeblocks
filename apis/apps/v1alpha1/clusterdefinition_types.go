@@ -17,6 +17,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"regexp"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
@@ -617,6 +618,52 @@ type ClusterDefinitionList struct {
 
 func init() {
 	SchemeBuilder.Register(&ClusterDefinition{}, &ClusterDefinitionList{})
+}
+
+var (
+	// Pre-compiled regexp object used to match $(SVC_PORT_*) which is a built-in object for connection credential.
+	credentialPortNameReg = regexp.MustCompile(`\$\(SVC_PORT_.*?\)`)
+)
+
+// ValidateConnectionCredential validates whether spec.ConnectionCredential's contents are consistent with component definitions.
+func (r *ClusterDefinition) ValidateConnectionCredential() []string {
+	if r.Spec.ConnectionCredential == nil || len(r.Spec.ConnectionCredential) == 0 {
+		return []string{}
+	}
+
+	var firstDefinedSvc *corev1.ServiceSpec
+	for _, comp := range r.Spec.ComponentDefs {
+		if comp.Service != nil {
+			firstDefinedSvc = comp.Service
+			break
+		}
+	}
+	if firstDefinedSvc == nil {
+		return []string{} // there is no service defined, so the connection credential will not be created.
+	}
+
+	// TODO: should check service.ports, but it's another problem existed and should resolve it systematically.
+	svcPortNames := make(map[string]bool)
+	for _, port := range firstDefinedSvc.Ports {
+		if len(port.Name) != 0 {
+			svcPortNames["$(SVC_PORT_"+port.Name+")"] = true
+		}
+	}
+
+	invalidPortNames := make([]string, 0)
+	validate := func(str string) {
+		for _, match := range credentialPortNameReg.FindAllString(str, -1) {
+			if _, ok := svcPortNames[match]; !ok {
+				invalidPortNames = append(invalidPortNames, match)
+			}
+		}
+	}
+	for k, v := range r.Spec.ConnectionCredential {
+		validate(k)
+		validate(v)
+	}
+
+	return invalidPortNames
 }
 
 // ValidateEnabledLogConfigs validates enabledLogs against component compDefName, and returns the invalid logNames undefined in ClusterDefinition.

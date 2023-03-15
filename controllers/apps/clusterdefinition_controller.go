@@ -18,7 +18,9 @@ package apps
 
 import (
 	"context"
+	"fmt"
 	"runtime"
+	"strings"
 	"time"
 
 	"github.com/spf13/viper"
@@ -92,6 +94,12 @@ func (r *ClusterDefinitionReconciler) Reconcile(ctx context.Context, req ctrl.Re
 
 	if dbClusterDef.Status.ObservedGeneration == dbClusterDef.Generation {
 		return intctrlutil.Reconciled()
+	}
+
+	if invalidPortNames := dbClusterDef.ValidateConnectionCredential(); len(invalidPortNames) > 0 {
+		err := fmt.Errorf("referenced port name is not defined in component service: %s",
+			strings.Join(invalidPortNames, ","))
+		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 
 	if err := appsconfig.ReconcileConfigurationForReferencedCR(r.Client, reqCtx, dbClusterDef); err != nil {

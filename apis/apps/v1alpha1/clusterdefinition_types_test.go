@@ -17,10 +17,83 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"strings"
 	"testing"
 
 	"k8s.io/apimachinery/pkg/util/yaml"
 )
+
+func TestValidateConnectionCredential(t *testing.T) {
+	clusterDefByte := `
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: ClusterDefinition
+metadata:
+  name: cluster-definition-conn-credential
+spec:
+  connectionCredential:
+    endpoint: $(SVC_FQDN):$(SVC_PORT_mysql)
+    host: $(SVC_FQDN)
+    password: $(RANDOM_PASSWD)
+    port: $(SVC_PORT_mysql)
+    username: root
+  componentDefs:
+    - name: replicasets
+      workloadType: Replication
+      podSpec:
+        containers:
+          - name: mysql
+            imagePullPolicy: IfNotPresent`
+
+	newClusterDef := func(svc string) *ClusterDefinition {
+		clusterDef := &ClusterDefinition{}
+		_ = yaml.Unmarshal([]byte(clusterDefByte+svc), clusterDef)
+		return clusterDef
+	}
+
+	{
+		// w/o service defined
+		clusterDef := newClusterDef("")
+		invalidPortNames := clusterDef.ValidateConnectionCredential()
+		if len(invalidPortNames) != 0 {
+			t.Errorf("Expected empty []invalidPortNames, actual: %s", strings.Join(invalidPortNames, ","))
+		}
+	}
+	{
+		// w/ service defined, but no port name
+		clusterDef := newClusterDef(`
+      service:
+        ports:
+        - port: 3306`)
+		invalidPortNames := clusterDef.ValidateConnectionCredential()
+		if len(invalidPortNames) != 2 || invalidPortNames[0] != "$(SVC_PORT_mysql)" {
+			t.Errorf("Expected two []invalidPortNames, actual: %s", strings.Join(invalidPortNames, ","))
+		}
+	}
+	{
+		// w/ service defined, port name is inconsistent
+		clusterDef := newClusterDef(`
+      service:
+        ports:
+        - port: 3306
+          name: redis`)
+		invalidPortNames := clusterDef.ValidateConnectionCredential()
+		if len(invalidPortNames) != 2 || invalidPortNames[0] != "$(SVC_PORT_mysql)" {
+			t.Errorf("Expected two []invalidPortNames, actual: %s", strings.Join(invalidPortNames, ","))
+		}
+	}
+	{
+		// pass
+		clusterDef := newClusterDef(`
+      service:
+        ports:
+        - port: 3306
+          name: mysql`)
+		invalidPortNames := clusterDef.ValidateConnectionCredential()
+		if len(invalidPortNames) != 0 {
+			t.Errorf("Expected empty []invalidPortNames, actual: %s", strings.Join(invalidPortNames, ","))
+		}
+	}
+}
 
 func TestValidateEnabledLogConfigs(t *testing.T) {
 	clusterDef := &ClusterDefinition{}

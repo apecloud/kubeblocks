@@ -18,11 +18,9 @@ package v1alpha1
 
 import (
 	"fmt"
-	"regexp"
 	"strings"
 
 	"github.com/pkg/errors"
-	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -35,9 +33,6 @@ import (
 var (
 	// log is for logging in this package.
 	clusterdefinitionlog = logf.Log.WithName("clusterdefinition-resource")
-
-	// Pre-compiled regexp object used to match $(SVC_PORT_*) which is a built-in object for connection credential.
-	credentialPortNameReg = regexp.MustCompile(`\$\(SVC_PORT_.*?\)`)
 )
 
 // DefaultRoleProbeTimeoutAfterPodsReady the default role probe timeout for application when all pods of component are ready.
@@ -289,42 +284,10 @@ func validateConfigTemplateList(ctpls []ConfigTemplate) error {
 	return nil
 }
 
-// validateConnectionCredential validates whether spec.ConnectionCredential's contents are consistent with component definitions.
 func (r *ClusterDefinition) validateConnectionCredential(errs *field.ErrorList) {
-	if r.Spec.ConnectionCredential == nil || len(r.Spec.ConnectionCredential) == 0 {
-		return
-	}
-
-	var firstDefinedSvc *corev1.ServiceSpec
-	for _, comp := range r.Spec.ComponentDefs {
-		if comp.Service != nil {
-			firstDefinedSvc = comp.Service
-			break
-		}
-	}
-	if firstDefinedSvc == nil {
-		return // there is no service defined, so the connection credential will not be created.
-	}
-
-	// TODO: should check service.ports, but it's another problem existed and should resolve it systematically.
-	svcPortNames := make(map[string]bool)
-	for _, port := range firstDefinedSvc.Ports {
-		if len(port.Name) != 0 {
-			svcPortNames["$(SVC_PORT_"+port.Name+")"] = true
-		}
-	}
-
-	validate := func(str string) {
-		for _, match := range credentialPortNameReg.FindAllString(str, -1) {
-			if _, ok := svcPortNames[match]; !ok {
-				*errs = append(*errs,
-					field.Invalid(field.NewPath("spec.connectionCredential"),
-						match, "referenced port name is not defined in component service."))
-			}
-		}
-	}
-	for k, v := range r.Spec.ConnectionCredential {
-		validate(k)
-		validate(v)
+	for _, portName := range r.ValidateConnectionCredential() {
+		*errs = append(*errs,
+			field.Invalid(field.NewPath("spec.connectionCredential"),
+				portName, "referenced port name is not defined in component service."))
 	}
 }

@@ -273,7 +273,7 @@ var _ = Describe("clusterDefinition webhook", func() {
 			clusterDef, _ := createTestClusterDefinitionObj(clusterDefinitionName)
 			Expect(testCtx.CreateObj(ctx, clusterDef)).Should(Succeed())
 
-			By("By update the exist cluster definition - w/ connection credential and w/o no service defined")
+			By("By update the exist cluster definition - w/ connection credential and w/o service defined")
 			clusterDef.Spec.ConnectionCredential = map[string]string{
 				"endpoint": "$(SVC_FQDN):$(SVC_PORT_mysql)",
 				"host":     "$(SVC_FQDN)",

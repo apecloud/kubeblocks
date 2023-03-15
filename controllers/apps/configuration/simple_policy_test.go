@@ -32,22 +32,15 @@ import (
 var _ = Describe("Reconfigure simplePolicy", func() {
 
 	var (
-		// mockClient *mock_client.MockClient
-		// ctrl       *gomock.Controller
-
 		k8sMockClient *testutil.K8sClientMockHelper
-
-		simplePolicy = upgradePolicyMap[appsv1alpha1.NormalPolicy]
+		simplePolicy  = upgradePolicyMap[appsv1alpha1.NormalPolicy]
 	)
 
 	BeforeEach(func() {
-		// ctrl, mockClient = testutil.SetupK8sMock()
 		k8sMockClient = testutil.NewK8sMockClient()
 	})
 
 	AfterEach(func() {
-		// Add any teardown steps that needs to be executed after each test
-		// ctrl.Finish()
 		k8sMockClient.Finish()
 	})
 
@@ -119,6 +112,42 @@ var _ = Describe("Reconfigure simplePolicy", func() {
 			Expect(status.Status).Should(BeEquivalentTo(ESNone))
 			Expect(status.SucceedCount).Should(BeEquivalentTo(int32(2)))
 			Expect(status.ExpectedCount).Should(BeEquivalentTo(int32(2)))
+		})
+	})
+
+	Context("simple reconfigure policy test with Replication", func() {
+		It("Should success", func() {
+			mockParam := newMockReconfigureParams("simplePolicy", k8sMockClient.Client(),
+				withMockStatefulSet(2, nil),
+				withConfigTpl("for_test", map[string]string{
+					"key": "value",
+				}),
+				withCDComponent(appsv1alpha1.Replication, []appsv1alpha1.ComponentConfigSpec{{
+					ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
+						Name:       "for_test",
+						VolumeName: "test_volume",
+					}}}),
+			)
+
+			k8sMockClient.MockUpdateMethod(testutil.WithSucceed(testutil.WithAnyTimes()))
+			k8sMockClient.MockListMethod(testutil.WithListReturned(
+				testutil.WithConstructListSequenceResult([][]runtime.Object{
+					fromPodObjectList(newMockPodsWithStatefulSet(&mockParam.ComponentUnits[0], 2)),
+					fromPodObjectList(newMockPodsWithStatefulSet(&mockParam.ComponentUnits[0], 2,
+						withReadyPod(0, 2), func(pod *corev1.Pod, _ int) {
+							updatePodCfgVersion(pod, mockParam.getConfigKey(), mockParam.getTargetVersionHash())
+						})),
+				}),
+				testutil.WithAnyTimes(),
+			))
+
+			status, err := simplePolicy.Upgrade(mockParam)
+			Expect(err).Should(Succeed())
+			Expect(status.SucceedCount).Should(BeEquivalentTo(int32(0)))
+
+			status, err = simplePolicy.Upgrade(mockParam)
+			Expect(err).Should(Succeed())
+			Expect(status.SucceedCount).Should(BeEquivalentTo(int32(2)))
 		})
 	})
 

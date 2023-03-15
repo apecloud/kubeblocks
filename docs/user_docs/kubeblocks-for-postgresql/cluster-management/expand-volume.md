@@ -1,6 +1,6 @@
 ---
 title: Expand volume
-description: How to expand the volume of a PostgreSQL cluster
+description: How to expand the volume of a MySQL cluster
 sidebar_position: 3
 sidebar_label: Expand volume
 ---
@@ -16,7 +16,7 @@ Volume expansion triggers pod restart, all pods restart in the order of learner 
 
 ## How KubeBlocks expands the volume
 
-![Expand volume](./../../../img/mysql_cluster_expand_volume.png)
+![Expand volume](./../../../img/pgsql_cluster_expand_volume.png)
 
 1. A user creates a volume expansion OpsRequest CR.
 2. This CR passes the webhook validation.
@@ -40,15 +40,15 @@ kbcli cluster list <name>
 ```bash
 kbcli cluster list mysql-cluster
 >
-NAME                 NAMESPACE        CLUSTER-DEFINITION    VERSION                  TERMINATION-POLICY        STATUS         CREATED-TIME
-mysql-cluster        default          postgresql            postgresql-14.7.0        Delete                    Running        Mar 3,2023 10:29 UTC+0800
+NAME                 NAMESPACE        CLUSTER-DEFINITION        VERSION                TERMINATION-POLICY        STATUS         CREATED-TIME
+mysql-cluster        default          apecloud-mysql            ac-mysql-8.0.30        Delete                    Running        Jan 29,2023 14:29 UTC+0800
 ```
    
 ## Option 1. Use kbcli
 
 Configure the values of `--component-names`, `--volume-claim-template-names`, and `--storage`, and run the command below to expand the volume.
 ```bash
-kbcli cluster volume-expand pg-cluster --component-names="postgresql" \
+kbcli cluster volume-expand mysql-cluster --component-names="mysql" \
 --volume-claim-template-names="data" --storage="2Gi"
 ```
 
@@ -66,10 +66,10 @@ kind: OpsRequest
 metadata:
   name: ops-volume-expansion
 spec:
-  clusterRef: pg-cluster
+  clusterRef: mysql-cluster
   type: VolumeExpansion
   volumeExpansion:
-  - componentName: postgresql
+  - componentName: mysql
     volumeClaimTemplates:
   - name: data
     storage: "2Gi"
@@ -84,14 +84,14 @@ Change the value of `spec.components.volumeClaimTemplates.spec.resources` in the
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: Cluster
 metadata:
-  name: pg-cluster
+  name: mysql-cluster
   namespace: default
 spec:
-  clusterDefinitionRef: postgresql
-  clusterVersionRef: postgresql-14.7.0
+  clusterDefinitionRef: apecloud-mysql
+  clusterVersionRef: ac-mysql-8.0.30
   components:
-  - name: postgresql
-    type: postgresql
+  - name: mysql
+    type: mysql
     replicas: 1
     volumeClaimTemplates:
     - name: data

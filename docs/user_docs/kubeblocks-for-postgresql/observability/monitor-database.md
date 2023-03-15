@@ -74,7 +74,7 @@ KubeBlocks has three monitoring add-ons.
    
     The monitoring function is enabled by default when a database is created. The open-source or customized Exporter is injected after the monitoring function is enabled. This Exporter can be found by Prometheus server automatically and scrape monitoring indicators at regular intervals. 
    - For a new cluster, run the command below to create a database cluster.
-        ```bash
+       ```bash
        # Search the cluster definition
        kbcli clusterdefinition list 
 

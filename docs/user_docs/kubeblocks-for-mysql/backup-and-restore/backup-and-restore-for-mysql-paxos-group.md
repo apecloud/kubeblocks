@@ -11,7 +11,7 @@ This section shows how to use `kbcli` to back up and restore a MySQL Paxos Group
 ***Before you start***
 
 - Prepare a clean EKS cluster, and install ebs csi driver plug-in, with at least one node and the memory of each node is not less than 4GB.
-- Install `kubectl` to ensure that you can connect to the EKS cluster 
+- [Install `kubectl`](https://kubernetes.io/docs/tasks/tools/install-kubectl-macos/) to ensure that you can connect to the EKS cluster 
 - Install `kbcli`. Refer to [Install kbcli and KubeBlocks](./../../installation/install-and-uninstall-kbcli-and-kubeblocks.md) for details.
    ```bash
    curl -fsSL https://kubeblocks.io/installer/install_cli.sh | bash
@@ -19,7 +19,7 @@ This section shows how to use `kbcli` to back up and restore a MySQL Paxos Group
 
 ***Steps:***
 
-1. Install KubeBlocks and enable the snapshot backup controller addon.
+1. Install KubeBlocks and check whether the snapshot-controller add-on is enabled.
    ```bash
    kbcli kubeblocks install
    ```
@@ -39,6 +39,7 @@ This section shows how to use `kbcli` to back up and restore a MySQL Paxos Group
    ```
 
    If the output result does not show `kb-addon-snapshot-controller`, it means the snapshot-controller add-on is not enabled. It may be caused by failing to meet the installable condition of this add-on. Refer to [Enable add-ons](../../installation/enable-add-ons.md) to find the environment requirements and then enable the snapshot-controller add-on.
+
 2. Configure EKS to support the snapshot function.
     
    The backup is realized by the volume snapshot function, you need to configure EKS to support the snapshot function.
@@ -63,7 +64,7 @@ This section shows how to use `kbcli` to back up and restore a MySQL Paxos Group
        ```
     - Configure default snapshot volumesnapshot class
        ```bash
-       cat <<"EOF" > snapshot_class.yaml
+       kubectl create -f - <<EOF
        apiVersion: snapshot.storage.k8s.io/v1
        kind: VolumeSnapshotClass
        metadata:
@@ -73,8 +74,6 @@ This section shows how to use `kbcli` to back up and restore a MySQL Paxos Group
        driver: ebs.csi.aws.com
        deletionPolicy: Delete
        EOF
-  
-       kubectl create -f snapshot_class.yaml
        ```
 3. Create a MySQL Paxos Group. 
     
@@ -122,6 +121,7 @@ This section shows how to use `kbcli` to back up and restore a MySQL Paxos Group
    Execute the following command to verify the data restored.
    ```bash
    kbcli cluster connect mysql-new-from-snapshot
+   
    select * from demo.msg;
    ```
 9. Delete the ApeCloud MySQL cluster and clean up the backup.
@@ -148,5 +148,5 @@ This section shows how to use `kbcli` to back up and restore a MySQL Paxos Group
    Delete all backups with `mysql-cluster`.
 
    ```bash
-   kbcli cluster delete mysql-cluster
+   kbcli cluster delete-backup pg-cluster --force
    ```

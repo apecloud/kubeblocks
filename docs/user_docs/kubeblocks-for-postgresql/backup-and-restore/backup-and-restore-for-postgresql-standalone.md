@@ -1,18 +1,18 @@
 ---
 title: Backup and restore for PostgreSQL Standalone
-description: Guide for backup and restore for an PostgreSQL standalone
+description: Guide for backup and restore for a PostgreSQL Standalone
 sidebar_position: 2
 sidebar_label: PostgreSQL Standalone 
 ---
 
 # Backup and restore for PostgreSQL Standalone 
-This section shows how to use `kbcli` to back up and restore a PostgreSQL standalone instance.
+This section shows how to use `kbcli` to back up and restore a PostgreSQL Standalone.
 
 ***Before you start***
 
-- Prepare a clean EKS cluster, and install ebs csi driver plug-in, with at least one node and the memory of each node is not less than 4GB.
-- Install kubectl to ensure that you can connect to the EKS cluster 
-- Install kbcli.
+- Prepare a clean EKS cluster, and install EBS CSI driver plug-in, with at least one node and the memory of each node is not less than 4GB.
+- [Install `kubectl`](https://kubernetes.io/docs/tasks/tools/install-kubectl-macos/) to ensure that you can connect to the EKS cluster.
+- Install `kbcli`. Refer to [Install kbcli and KubeBlocks](./../../installation/install-and-uninstall-kbcli-and-kubeblocks.md) for details.
    ```bash
    curl -fsSL https://kubeblocks.io/installer/install_cli.sh | bash
    ```
@@ -43,7 +43,7 @@ This section shows how to use `kbcli` to back up and restore a PostgreSQL standa
 2. Configure EKS to support the snapshot function.
     
     The backup is realized by the volume snapshot function, you need to configure EKS to support the snapshot function.
-    - Configure the storage class of snapshot (the assigned ebs volume is gp3).
+    - Configure the storage class of snapshot (the assigned EBS volume is gp3).
        ```bash
        kubectl create -f - <<EOF
        kind: StorageClass
@@ -64,7 +64,7 @@ This section shows how to use `kbcli` to back up and restore a PostgreSQL standa
        ```
     - Configure default snapshot volumesnapshot class
        ```bash
-       cat <<"EOF" > snapshot_class.yaml
+       kubectl create -f - <<EOF
        apiVersion: snapshot.storage.k8s.io/v1
        kind: VolumeSnapshotClass
        metadata:
@@ -74,10 +74,8 @@ This section shows how to use `kbcli` to back up and restore a PostgreSQL standa
        driver: ebs.csi.aws.com
        deletionPolicy: Delete
        EOF
-  
-       kubectl create -f snapshot_class.yaml
        ```
-3. Create a PostgreSQL cluster. 
+3. Create a PostgreSQL Standalone. 
     
     ```bash
     kbcli cluster create pg-cluster --cluster-definition='postgresql'
@@ -108,7 +106,7 @@ This section shows how to use `kbcli` to back up and restore a PostgreSQL standa
     
     :::note
 
-    You do not need to specify other parameters for creating an cluster. The restoration automatically reads the parameters of the source cluster, including specification, disk size, etc., and create a new PostgreSQLL cluster with the same specifications. 
+    You do not need to specify other parameters for creating a cluster. The restoration automatically reads the parameters of the source cluster, including specification, disk size, etc., and creates a new PostgreSQL cluster with the same specifications. 
 
     :::
 
@@ -121,6 +119,7 @@ This section shows how to use `kbcli` to back up and restore a PostgreSQL standa
     Execute the following command to verify the data restored.
     ```bash
     kbcli cluster connect postgresql-new-from-snapshot
+
     select * from demo.msg;
     ```
 9. Delete the PostgreSQL cluster and clean up the backup.
@@ -140,10 +139,10 @@ This section shows how to use `kbcli` to back up and restore a PostgreSQL standa
     Delete the backup specified.
 
     ```bash
-    kbcli cluster delete-backup postgresql-cluster --name backup-default-postgresql-cluster-20221124113440 
+    kbcli cluster delete-backup pg-cluster --name backup-default-pg-cluster-20221124113440 
     ```
 
     Delete all backups with `pg-cluster`.
     ```bash
-    kbcli cluster delete pg-cluster
+    kbcli cluster delete-backup pg-cluster --force
     ```

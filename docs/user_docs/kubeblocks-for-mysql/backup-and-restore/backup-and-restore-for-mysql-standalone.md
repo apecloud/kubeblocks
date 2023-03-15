@@ -11,7 +11,7 @@ This section shows how to use `kbcli` to back up and restore a MySQL Standalone 
 ***Before you start***
 
 - Prepare a clean EKS cluster, and install ebs csi driver plug-in, with at least one node and the memory of each node is not less than 4GB.
-- Install `kubectl` to ensure that you can connect to the EKS cluster 
+- [Install `kubectl`](https://kubernetes.io/docs/tasks/tools/install-kubectl-macos/) to ensure that you can connect to the EKS cluster 
 - Install `kbcli`. Refer to [Install kbcli and KubeBlocks](./../../installation/install-and-uninstall-kbcli-and-kubeblocks.md) for details.
    ```bash
    curl -fsSL https://kubeblocks.io/installer/install_cli.sh | bash
@@ -65,7 +65,7 @@ This section shows how to use `kbcli` to back up and restore a MySQL Standalone 
        ```
     - Configure default snapshot volumesnapshot class
        ```bash
-       cat <<"EOF" > snapshot_class.yaml
+       kubectl create -f - <<EOF
        apiVersion: snapshot.storage.k8s.io/v1
        kind: VolumeSnapshotClass
        metadata:
@@ -75,10 +75,8 @@ This section shows how to use `kbcli` to back up and restore a MySQL Standalone 
        driver: ebs.csi.aws.com
        deletionPolicy: Delete
        EOF
-  
-       kubectl create -f snapshot_class.yaml
        ```
-3. Create a MySQL cluster. 
+3. Create a MySQL standalone. 
      ```bash
      kbcli cluster create mysql-cluster --cluster-definition='apecloud-mysql'
      ```
@@ -122,6 +120,7 @@ This section shows how to use `kbcli` to back up and restore a MySQL Standalone 
 
      ```bash
      kbcli cluster connect mysql-new-from-snapshot
+
      select * from demo.msg;
      ```
 9. Delete the ApeCloud MySQL cluster and clean up the backup.
@@ -148,5 +147,5 @@ This section shows how to use `kbcli` to back up and restore a MySQL Standalone 
    Delete all backups with `mysql-cluster`.
 
    ```bash
-   kbcli cluster delete mysql-cluster
+   kbcli cluster delete-backup pg-cluster --force
    ```

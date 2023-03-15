@@ -7,7 +7,7 @@ sidebar_label: MySQL cluster on AWS
 
 # Create a MySQL cluster on AWS
 
-This guide introduces how to use KubeBlocks to create an ApeCloud MySQL cluster within 5 minutes in the EKS environment.
+This guide introduces how to use KubeBlocks to create an ApeCloud MySQL Paxos Group within 5 minutes in the EKS environment.
 
 :::caution
 
@@ -97,43 +97,43 @@ Running a database cluster on the cloud causes fees. Delete the resources create
     kubeblocks-846b8878d9-q8g2w                              1/1     Running     0          98s
     ```
 
-## Step 3. Create a MySQL Paxos group
+## Step 3. Create a MySQL Paxos Group
 
 :::caution
 
-* If there are not three nodes that exceed the values of memory and CPU, creating a MySQL cluster may fail.
+* If there are not three nodes that exceed the values of memory and CPU, creating a MySQL Paxos Group may fail.
 * KubeBlocks applies for a new EBS volume of 10 Gi (the default storage size), which causes extra fees. Delete this EBS volume after your trial.
 * You can adjust the replica amount, pod memory, CPU kernel amount of your EKS cluster, and EBS volume size by using the `--set` option when creating the cluster.
 
 :::
 
-1. Run the command below to create a MySQL cluster. The system assigns a name for this cluster by default. If you want to customize a cluster name, run `kbcli cluster create <name>`.
+1. Run the command below to create a MySQL Paxos Group. The system assigns a name for this cluster by default. If you want to customize a cluster name, run `kbcli cluster create <name>`.
     For more details on options, refer to [`kbcli` cluster create options description](./../kubeblocks-for-mysql/cluster-management/create-and-connect-a-mysql-cluster.md#create-a-mysql-cluster).
 
     ```bash
-    kbcli cluster create --cluster-definition=apecloud-mysql
+    kbcli cluster create --cluster-definition=apecloud-mysql --set replicas=3
     ```
 
     ***Result***
 
-    A MySQL Standalone with 10 Gi of storage is created. 
+    A MySQL Paxos Group with 10 Gi of storage is created. 
 
 2. Run the command below to view the created cluster.
     ```bash
     kbcli cluster list
     ```
 
-## Step 4. Connect to the MySQL cluster
+## Step 4. Connect to the MySQL Paxos Group
 
-1. It takes several minutes to create a cluster. Run `kbcli cluster list` to check the cluster status and when the cluster status is `Running`, the cluster has been created. 
-2. Run the command below to connect to the leader pod of MySQL clsuter. (The leader pod is called leaseholder in other databases.)
+1. It takes several minutes to create a Paxos Group. Run `kbcli cluster list` to check the cluster status and when the cluster status is `Running`, the Paxos Group has been created. 
+2. Run the command below to connect to the leader pod of MySQL Paxos Group. (The leader pod is called leaseholder in other databases.)
     ```bash
     kbcli cluster connect maple05
     ```
 
-After connecting to the cluster, you can operate the created MySQL cluster as you do in the MySQL client.
+After connecting to the cluster, you can operate the created MySQL Paxos Group as you do in the MySQL client.
 
-If you want to connect to the MySQL cluster using MYSQL client or your stress test tool, follow the steps below: 
+If you want to connect to the MySQL Paxos Group using MySQL client or your stress test tool, follow the steps below: 
 1. Run the command below to get the IP and port of this cluster first. 
     ```bash
     kbcli cluster describe maple05
@@ -142,7 +142,7 @@ If you want to connect to the MySQL cluster using MYSQL client or your stress te
     ```
     Endpoints:
     COMPONENT   MODE        INTERNAL                                       EXTERNAL
-    mysql       ReadWrite   tulip89-mysql.default.svc.cluster.local:3306   <none>
+    mysql       ReadWrite   maple05-mysql.default.svc.cluster.local:3306   <none>
     ```
 
 The MySQL cluster provides high availability to ensure RPO=0. When a failure occurs to the MySQL leader pod, other MySQL pods can be elected as the succeeding leader based on the Paxos protocol. The connection address does not change even though the leader pod changes.

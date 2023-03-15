@@ -30,7 +30,7 @@ The Kubernetes ClusterIP of ApeCloud MySQL is exposed by default in the EKS envi
 2. Install ApeCloud MySQL. Refer to [Create an ApeCloud MySQL cluster on AWS](./../../quick-start/create-a-mysql-cluster-on-aws.md) for details.
 3. Fill in the cluster name and run the command below to expose the external IP of the cluster.
    ```bash
-   KBCLI_EXPERIMENTAL_EXPOSE="1" kb cluster expose ${mysql clustrName} --on=true
+   KBCLI_EXPERIMENTAL_EXPOSE="1" kbcli cluster expose ${mysql clustrName} --enable=true --type=vpc
    ```
     
    Run the command below to view the external IP:Port address which can be accessed by the same VPC machine but outside the EKS cluster.

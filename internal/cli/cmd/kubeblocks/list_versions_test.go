@@ -25,9 +25,6 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	clientfake "k8s.io/client-go/rest/fake"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
-
-	"github.com/apecloud/kubeblocks/internal/cli/testing"
-	"github.com/apecloud/kubeblocks/internal/cli/types"
 )
 
 var _ = Describe("kubeblocks list versions", func() {
@@ -39,10 +36,6 @@ var _ = Describe("kubeblocks list versions", func() {
 		streams, _, _, _ = genericclioptions.NewTestIOStreams()
 		tf = cmdtesting.NewTestFactory().WithNamespace(namespace)
 		tf.Client = &clientfake.RESTClient{}
-
-		// use a fake URL to test
-		types.KubeBlocksChartName = testing.KubeBlocksChartName
-		types.KubeBlocksChartURL = testing.KubeBlocksChartURL
 	})
 
 	AfterEach(func() {

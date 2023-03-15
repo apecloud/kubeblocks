@@ -87,7 +87,7 @@ func newUninstallCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *co
 	cmd.Flags().BoolVar(&o.autoApprove, "auto-approve", false, "Skip interactive approval before uninstalling KubeBlocks")
 	cmd.Flags().BoolVar(&o.removePVs, "remove-pvs", false, "Remove PersistentVolume or not")
 	cmd.Flags().BoolVar(&o.removePVCs, "remove-pvcs", false, "Remove PersistentVolumeClaim or not")
-	cmd.Flags().BoolVar(&o.removeNamespace, "remove-namespace", false, "Remove \"kb-system\" namespace or not")
+	cmd.Flags().BoolVar(&o.removeNamespace, "remove-namespace", false, "Remove default created \"kb-system\" namespace or not")
 	cmd.Flags().BoolVar(&o.verbose, "verbose", false, "Show logs in detail.")
 	return cmd
 }
@@ -142,10 +142,10 @@ func (o *uninstallOptions) preCheck() error {
 	// verify where kubeblocks is installed
 	kbNamespace, err := util.GetKubeBlocksNamespace(o.Client)
 	if err != nil {
-		printer.Warning(o.Out, "failed to locate helm release meta, will clean up all KubeBlocks resources.\n")
+		printer.Warning(o.Out, "failed to locate KubeBlocks meta, will clean up all KubeBlocks resources.\n")
 	} else if o.Namespace != kbNamespace {
 		o.Namespace = kbNamespace
-		fmt.Fprintf(o.Out, "will uninstall KubeBlocks in namespace: '%s'\n", kbNamespace)
+		fmt.Fprintf(o.Out, "Uninstall KubeBlocks in namespace \"%s\"\n", kbNamespace)
 	}
 	return nil
 }

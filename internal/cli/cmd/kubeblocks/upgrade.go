@@ -92,7 +92,7 @@ func (o *InstallOptions) Upgrade(cmd *cobra.Command) error {
 	})
 
 	// check flags already been set
-	if !monitorIsSet && len(o.Version) == 0 && helm.ValueOptsIsEmpty(&o.ValueOpts) {
+	if !monitorIsSet && o.Version == "" && helm.ValueOptsIsEmpty(&o.ValueOpts) {
 		fmt.Fprint(o.Out, "Nothing to upgrade, --set, --version or --monitor should be specified.\n")
 		return nil
 	}

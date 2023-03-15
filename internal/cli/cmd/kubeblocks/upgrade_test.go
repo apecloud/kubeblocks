@@ -34,7 +34,7 @@ import (
 	"github.com/apecloud/kubeblocks/version"
 )
 
-var _ = Describe("kubeblocks", func() {
+var _ = Describe("kubeblocks upgrade", func() {
 	var cmd *cobra.Command
 	var streams genericclioptions.IOStreams
 	var tf *cmdtesting.TestFactory
@@ -43,10 +43,6 @@ var _ = Describe("kubeblocks", func() {
 		streams, _, _, _ = genericclioptions.NewTestIOStreams()
 		tf = cmdtesting.NewTestFactory().WithNamespace(namespace)
 		tf.Client = &clientfake.RESTClient{}
-
-		// use a fake URL to test
-		types.KubeBlocksChartName = testing.KubeBlocksChartName
-		types.KubeBlocksChartURL = testing.KubeBlocksChartURL
 	})
 
 	AfterEach(func() {

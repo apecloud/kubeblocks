@@ -25,10 +25,12 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/generics"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	"github.com/apecloud/kubeblocks/internal/generics"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 	testk8s "github.com/apecloud/kubeblocks/internal/testutil/k8s"
 )
@@ -60,8 +62,8 @@ var _ = Describe("ReplicationSet Util", func() {
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 		// namespaced resources
-		testapps.ClearResources(&testCtx, intctrlutil.StatefulSetSignature, inNS, ml)
-		testapps.ClearResources(&testCtx, intctrlutil.PodSignature, inNS, ml, client.GracePeriodSeconds(0))
+		testapps.ClearResources(&testCtx, generics.StatefulSetSignature, inNS, ml)
+		testapps.ClearResources(&testCtx, generics.PodSignature, inNS, ml, client.GracePeriodSeconds(0))
 	}
 
 	BeforeEach(cleanAll)
@@ -134,13 +136,13 @@ var _ = Describe("ReplicationSet Util", func() {
 		By("Test handleReplicationSet scale-in return err when remove Finalizer after delete the sts")
 		clusterObj.Spec.ComponentSpecs[0].Replicas = testapps.DefaultReplicationReplicas - 1
 		Expect(HandleReplicationSet(ctx, k8sClient, clusterObj, stsList)).Should(Succeed())
-		Eventually(testapps.GetListLen(&testCtx, intctrlutil.StatefulSetSignature,
+		Eventually(testapps.GetListLen(&testCtx, generics.StatefulSetSignature,
 			client.InNamespace(testCtx.DefaultNamespace))).Should(Equal(1))
 
 		By("Test handleReplicationSet scale replicas to 0")
 		clusterObj.Spec.ComponentSpecs[0].Replicas = 0
 		Expect(HandleReplicationSet(ctx, k8sClient, clusterObj, stsList[:1])).Should(Succeed())
-		Eventually(testapps.GetListLen(&testCtx, intctrlutil.StatefulSetSignature, client.InNamespace(testCtx.DefaultNamespace))).Should(Equal(0))
+		Eventually(testapps.GetListLen(&testCtx, generics.StatefulSetSignature, client.InNamespace(testCtx.DefaultNamespace))).Should(Equal(0))
 		Expect(clusterObj.Status.Components[testapps.DefaultRedisCompName].Phase).Should(Equal(appsv1alpha1.StoppedPhase))
 	}
 
@@ -291,10 +293,14 @@ var _ = Describe("ReplicationSet Util", func() {
 			}
 		}
 		By("Test update replicationSet pod role label with event driver, secondary change to primary.")
-		err := HandleReplicationSetRoleChangeEvent(testCtx.Ctx, k8sClient, clusterObj, testapps.DefaultRedisCompName, secondaryPod, string(Primary))
+		reqCtx := intctrlutil.RequestCtx{
+			Ctx: testCtx.Ctx,
+			Log: log.FromContext(ctx).WithValues("event", testCtx.DefaultNamespace),
+		}
+		err := HandleReplicationSetRoleChangeEvent(k8sClient, reqCtx, clusterObj, testapps.DefaultRedisCompName, secondaryPod, string(Primary))
 		Expect(err).Should(Succeed())
 		By("Test when secondary change to primary, the old primary label has been updated at the same time, so return nil directly.")
-		err = HandleReplicationSetRoleChangeEvent(testCtx.Ctx, k8sClient, clusterObj, testapps.DefaultRedisCompName, primaryPod, string(Secondary))
+		err = HandleReplicationSetRoleChangeEvent(k8sClient, reqCtx, clusterObj, testapps.DefaultRedisCompName, primaryPod, string(Secondary))
 		Expect(err).Should(BeNil())
 	}
 

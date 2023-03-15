@@ -26,7 +26,6 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -303,150 +302,41 @@ func buildCfg(task *intctrltypes.ReconcileTask,
 	cli client.Client) ([]client.Object, error) {
 	// Need to merge configTemplateRef of ClusterVersion.Components[*].ConfigTemplateRefs and
 	// ClusterDefinition.Components[*].ConfigTemplateRefs
-	tpls := task.Component.ConfigTemplates
-	if len(tpls) == 0 {
+	if len(task.Component.ConfigTemplates) == 0 && len(task.Component.ScriptTemplates) == 0 {
 		return nil, nil
 	}
 
 	clusterName := task.Cluster.Name
 	namespaceName := task.Cluster.Namespace
-
 	// New ConfigTemplateBuilder
 	cfgTemplateBuilder := newCfgTemplateBuilder(clusterName, namespaceName, task.Cluster, task.ClusterVersion, ctx, cli)
 	// Prepare built-in objects and built-in functions
-	if err := cfgTemplateBuilder.injectBuiltInObjectsAndFunctions(podSpec, tpls, task.Component); err != nil {
+	if err := cfgTemplateBuilder.injectBuiltInObjectsAndFunctions(podSpec, task.Component.ConfigTemplates, task.Component); err != nil {
 		return nil, err
 	}
 
-	configs := make([]client.Object, 0, len(tpls))
-	volumes := make(map[string]appsv1alpha1.ConfigTemplate, len(tpls))
-	// TODO Support Update ClusterVersionRef of Cluster
-	scheme, _ := appsv1alpha1.SchemeBuilder.Build()
-	cfgLables := make(map[string]string, len(tpls))
-	for _, tpl := range tpls {
-		cmName := cfgcore.GetInstanceCMName(obj, &tpl)
-		volumes[cmName] = tpl
-		// Configuration.kubeblocks.io/cfg-tpl-${ctpl-name}: ${cm-instance-name}
-		cfgLables[cfgcore.GenerateTPLUniqLabelKeyWithConfig(tpl.Name)] = cmName
-
-		// Generate ConfigMap objects for config files
-		cm, err := generateConfigMapFromTpl(cfgTemplateBuilder, cmName, tpl, task, ctx, cli)
-		if err != nil {
-			return nil, err
-		}
-		updateCMConfigSelectorLabels(cm, tpl)
-
-		// The owner of the configmap object is a cluster of users,
-		// in order to manage the life cycle of configmap
-		if err := controllerutil.SetOwnerReference(task.Cluster, cm, scheme); err != nil {
-			return nil, err
-		}
-		configs = append(configs, cm)
+	renderWrapper := newTemplateRenderWrapper(cfgTemplateBuilder, task.Cluster, task.GetBuilderParams(), ctx, cli)
+	if err := renderWrapper.renderConfigTemplate(task, obj); err != nil {
+		return nil, err
 	}
+	if err := renderWrapper.renderScriptTemplate(task, obj); err != nil {
+		return nil, err
+	}
+
 	if sts, ok := obj.(*appsv1.StatefulSet); ok {
-		updateStatefulLabelsWithTemplate(sts, cfgLables)
+		updateStatefulLabelsWithTemplate(sts, renderWrapper.templateLabels)
 	}
 
 	// Generate Pod Volumes for ConfigMap objects
-	if err := intctrlutil.CreateOrUpdatePodVolumes(podSpec, volumes); err != nil {
+	if err := intctrlutil.CreateOrUpdatePodVolumes(podSpec, renderWrapper.volumes); err != nil {
 		return nil, cfgcore.WrapError(err, "failed to generate pod volume")
 	}
 
-	if err := updateConfigurationManagerWithComponent(podSpec, tpls, ctx, cli, task.GetBuilderParams()); err != nil {
+	if err := updateConfigManagerWithComponent(podSpec, task.Component.ConfigTemplates, ctx, cli, task.GetBuilderParams()); err != nil {
 		return nil, cfgcore.WrapError(err, "failed to generate sidecar for configmap's reloader")
 	}
 
-	return configs, nil
-}
-
-func updateCMConfigSelectorLabels(cm *corev1.ConfigMap, tpl appsv1alpha1.ConfigTemplate) {
-	if len(tpl.Keys) == 0 {
-		return
-	}
-	if cm.Labels == nil {
-		cm.Labels = make(map[string]string)
-	}
-	cm.Labels[constant.CMConfigurationCMKeysLabelKey] = strings.Join(tpl.Keys, ",")
-}
-
-// generateConfigMapFromTpl render config file by config template provided by provider.
-func generateConfigMapFromTpl(tplBuilder *configTemplateBuilder,
-	cmName string,
-	tplCfg appsv1alpha1.ConfigTemplate,
-	task *intctrltypes.ReconcileTask,
-	ctx context.Context,
-	cli client.Client) (*corev1.ConfigMap, error) {
-	// Render config template by TplEngine
-	// The template namespace must be the same as the ClusterDefinition namespace
-	configs, err := renderConfigMap(tplBuilder, tplCfg, ctx, cli)
-	if err != nil {
-		return nil, err
-	}
-
-	err = validateConfigMap(configs, tplCfg, ctx, cli)
-	if err != nil {
-		return nil, err
-	}
-
-	// Using ConfigMap cue template render to configmap of config
-	return builder.BuildConfigMapWithTemplate(configs, task.GetBuilderParams(), cmName, tplCfg)
-}
-
-// renderConfigMap render config file using template engine
-func renderConfigMap(
-	tplBuilder *configTemplateBuilder,
-	tplCfg appsv1alpha1.ConfigTemplate,
-	ctx context.Context,
-	cli client.Client) (map[string]string, error) {
-	cmObj := &corev1.ConfigMap{}
-	//  Require template configmap exist
-	if err := cli.Get(ctx, client.ObjectKey{
-		Namespace: tplCfg.Namespace,
-		Name:      tplCfg.ConfigTplRef,
-	}, cmObj); err != nil {
-		return nil, err
-	}
-
-	if len(cmObj.Data) == 0 {
-		return map[string]string{}, nil
-	}
-
-	tplBuilder.setTplName(tplCfg.ConfigTplRef)
-	renderedCfg, err := tplBuilder.render(cmObj.Data)
-	if err != nil {
-		return nil, cfgcore.WrapError(err, "failed to render configmap")
-	}
-	return renderedCfg, nil
-}
-
-// validateConfigMap validate config file against constraint
-func validateConfigMap(
-	renderedCfg map[string]string,
-	tplCfg appsv1alpha1.ConfigTemplate,
-	ctx context.Context,
-	cli client.Client) error {
-	cfgTemplate := &appsv1alpha1.ConfigConstraint{}
-
-	if tplCfg.ConfigConstraintRef == "" {
-		return nil
-	}
-
-	if err := cli.Get(ctx, client.ObjectKey{
-		Namespace: "",
-		Name:      tplCfg.ConfigConstraintRef,
-	}, cfgTemplate); err != nil {
-		return cfgcore.WrapError(err, "failed to get ConfigConstraint, key[%v]", tplCfg)
-	}
-
-	// NOTE: not require checker configuration template status
-	cfgChecker := cfgcore.NewConfigValidator(&cfgTemplate.Spec, cfgcore.WithKeySelector(tplCfg.Keys))
-
-	// NOTE: It is necessary to verify the correctness of the data
-	if err := cfgChecker.Validate(renderedCfg); err != nil {
-		return cfgcore.WrapError(err, "failed to validate configmap")
-	}
-
-	return nil
+	return renderWrapper.renderedObjs, nil
 }
 
 func updateStatefulLabelsWithTemplate(sts *appsv1.StatefulSet, allLabels map[string]string) {
@@ -469,9 +359,9 @@ func updateStatefulLabelsWithTemplate(sts *appsv1.StatefulSet, allLabels map[str
 	}
 }
 
-// updateConfigurationManagerWithComponent build the configmgr sidecar container and update it
+// updateConfigManagerWithComponent build the configmgr sidecar container and update it
 // into PodSpec if configuration reload option is on
-func updateConfigurationManagerWithComponent(podSpec *corev1.PodSpec, cfgTemplates []appsv1alpha1.ConfigTemplate, ctx context.Context, cli client.Client, params builder.BuilderParams) error {
+func updateConfigManagerWithComponent(podSpec *corev1.PodSpec, cfgTemplates []appsv1alpha1.ComponentConfigSpec, ctx context.Context, cli client.Client, params builder.BuilderParams) error {
 	var (
 		err error
 
@@ -517,7 +407,7 @@ func updateTPLScriptVolume(podSpec *corev1.PodSpec, configManager *cfgcm.ConfigM
 	podSpec.Volumes = podVolumes
 }
 
-func getUsingVolumesByCfgTemplates(podSpec *corev1.PodSpec, cfgTemplates []appsv1alpha1.ConfigTemplate) []corev1.VolumeMount {
+func getUsingVolumesByCfgTemplates(podSpec *corev1.PodSpec, cfgTemplates []appsv1alpha1.ComponentConfigSpec) []corev1.VolumeMount {
 	var usingContainers []*corev1.Container
 
 	// Ignore useless configTemplate
@@ -554,7 +444,7 @@ func getUsingVolumesByCfgTemplates(podSpec *corev1.PodSpec, cfgTemplates []appsv
 	return volumeDirs
 }
 
-func buildConfigManagerParams(cli client.Client, ctx context.Context, cfgTemplates []appsv1alpha1.ConfigTemplate, volumeDirs []corev1.VolumeMount, params builder.BuilderParams) (*cfgcm.ConfigManagerParams, error) {
+func buildConfigManagerParams(cli client.Client, ctx context.Context, cfgTemplates []appsv1alpha1.ComponentConfigSpec, volumeDirs []corev1.VolumeMount, params builder.BuilderParams) (*cfgcm.ConfigManagerParams, error) {
 	configManagerParams := &cfgcm.ConfigManagerParams{
 		ManagerName:   constant.ConfigSidecarName,
 		CharacterType: params.Component.CharacterType,

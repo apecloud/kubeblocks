@@ -334,7 +334,7 @@ func (r *BackupPolicyReconciler) buildCronJob(backupPolicy *dataprotectionv1alph
 		TTL:            backupPolicy.Spec.TTL,
 		BackupType:     backupPolicy.Spec.BackupType,
 		ServiceAccount: viper.GetString("KUBEBLOCKS_SERVICEACCOUNT_NAME"),
-		MgrNamespace:   viper.GetString("CM_NAMESPACE"),
+		MgrNamespace:   viper.GetString(constant.CfgKeyCtrlrMgrNS),
 	}
 	backupPolicyOptionsByte, err := json.Marshal(options)
 	if err != nil {
@@ -443,7 +443,7 @@ func (r *BackupPolicyReconciler) deleteExternalResources(reqCtx intctrlutil.Requ
 	cronjob := &batchv1.CronJob{}
 
 	key := types.NamespacedName{
-		Namespace: viper.GetString("CM_NAMESPACE"),
+		Namespace: viper.GetString(constant.CfgKeyCtrlrMgrNS),
 		Name:      backupPolicy.Name,
 	}
 	if err := r.Client.Get(reqCtx.Ctx, key, cronjob); err != nil {

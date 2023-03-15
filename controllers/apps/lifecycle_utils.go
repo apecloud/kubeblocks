@@ -582,7 +582,7 @@ func createOrReplaceResources(reqCtx intctrlutil.RequestCtx,
 		// ConfigMap kind objects should only be applied once
 		//
 		// The Config is not allowed to be modified.
-		// Once ClusterDefinition provider adjusts the ConfigTemplateRef field of CusterDefinition,
+		// Once ClusterDefinition provider adjusts the TemplateRef field of CusterDefinition,
 		// or provider modifies the wrong config file, it may cause the application cluster may fail.
 		if cm, ok := obj.(*corev1.ConfigMap); ok {
 			if err := handleConfigMap(cm); err != nil {

@@ -211,15 +211,17 @@ var _ = Describe("util", func() {
 
 		Expect(appsv1alpha1.AddToScheme(scheme.Scheme)).Should(Succeed())
 		mockClient := dynamicfakeclient.NewSimpleDynamicClientWithCustomListKinds(scheme.Scheme, nil, configConstraintObj)
-		tpl := appsv1alpha1.ConfigTemplate{
-			Name:                "for_test",
+		tpl := appsv1alpha1.ComponentConfigSpec{
+			ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
+				Name:        "for_test",
+				TemplateRef: ccName,
+				VolumeName:  "config",
+			},
 			ConfigConstraintRef: ccName,
-			ConfigTplRef:        ccName,
-			VolumeName:          "config",
 		}
 
 		type args struct {
-			tpl           appsv1alpha1.ConfigTemplate
+			tpl           appsv1alpha1.ComponentConfigSpec
 			updatedParams map[string]string
 		}
 		tests := []struct {

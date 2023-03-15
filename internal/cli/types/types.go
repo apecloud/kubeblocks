@@ -147,7 +147,7 @@ type BackupSnapInfo struct {
 
 type ConfigTemplateInfo struct {
 	Name  string
-	TPL   appsv1alpha1.ConfigTemplate
+	TPL   appsv1alpha1.ComponentConfigSpec
 	CMObj *corev1.ConfigMap
 }
 

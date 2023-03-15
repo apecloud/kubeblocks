@@ -68,23 +68,17 @@ spec:
                       maxLength: 63
                       pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                       type: string
-                    configTemplateRefs:
-                      description: ConfigTemplateRefs defines a configuration extension
-                        mechanism to handle configuration differences between versions,
-                        the configTemplateRefs field, together with configTemplateRefs
+                    configSpecs:
+                      description: configSpecs defines a configuration extension mechanism
+                        to handle configuration differences between versions, the
+                        configTemplateRefs field, together with configTemplateRefs
                         in the ClusterDefinition, determines the final configuration
                         file.
                       items:
                         properties:
-                          configConstraintRef:
+                          constraintRef:
                             description: Specify the name of the referenced the configuration
                               constraints object.
-                            maxLength: 63
-                            pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
-                            type: string
-                          configTplRef:
-                            description: Specify the name of the referenced the configuration
-                              template ConfigMap object.
                             maxLength: 63
                             pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                             type: string
@@ -118,6 +112,12 @@ spec:
                               is equivalent to the "default" namespace.
                             maxLength: 63
                             type: string
+                          templateRef:
+                            description: Specify the name of the referenced the configuration
+                              template ConfigMap object.
+                            maxLength: 63
+                            pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                            type: string
                           volumeName:
                             description: VolumeName is the volume name of PodTemplate,
                               which the configuration file produced through the configuration
@@ -126,8 +126,8 @@ spec:
                             maxLength: 32
                             type: string
                         required:
-                        - configTplRef
                         - name
+                        - templateRef
                         - volumeName
                         type: object
                       type: array

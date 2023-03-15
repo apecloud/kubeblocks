@@ -192,7 +192,7 @@ func handleRoleChangedEvent(cli client.Client, reqCtx intctrlutil.RequestCtx, re
 	case appsv1alpha1.Consensus:
 		return role, consensusset.UpdateConsensusSetRoleLabel(cli, reqCtx, componentDef, pod, role)
 	case appsv1alpha1.Replication:
-		return role, replicationset.HandleReplicationSetRoleChangeEvent(reqCtx.Ctx, cli, cluster, compName, pod, role)
+		return role, replicationset.HandleReplicationSetRoleChangeEvent(cli, reqCtx, cluster, compName, pod, role)
 	}
 	return role, nil
 }

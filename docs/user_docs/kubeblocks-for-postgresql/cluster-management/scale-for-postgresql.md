@@ -2,6 +2,7 @@
 title: Scale for PostgreSQL
 description: How to scale a MPostgreSQL cluster, horizontal scaling, vertical scaling
 sidebar_position: 2
+sidebar_label: Scale
 ---
 
 # Scale for PostgreSQL
@@ -10,11 +11,13 @@ You can scale PostgreSQL DB instances in two ways, horizontal scaling and vertic
 ## Vertical scaling
 You can vertically scale a cluster by changing resource requirements and limits (CPU and storage). For example, if you need to change the resource demand from 1C2G to 2C4G, vertical scaling is what you need.
 
-> ***Note:*** 
-> 
-> During the vertical scaling process, all pods restart in the order of learner -> follower -> leader and the leader pod may change after the restarting.
+:::note
 
-**How KubeBlocks vertically scales a cluster**
+During the vertical scaling process, all pods restart in the order of `learner -> follower -> leader` and the leader pod may change after the restarting.
+
+:::
+
+### How KubeBlocks vertically scales a cluster
 
 ![Vertical scaling](./../../../img/pgsql_vertical_scaling.png)
 
@@ -30,7 +33,7 @@ You can vertically scale a cluster by changing resource requirements and limits 
 10. The cluster controller watches component changes and when all components are `Running`, the cluster controller changes the cluster phase to `Running`.
 11. The OpsRequest controller reconciles the status when the cluster component status changes.
 
-***Before you start***
+### Before you start
 
 Run the command below to check whether the cluster STATUS is `Running`. Otherwise, the following operations may fail.
 ```bash
@@ -45,11 +48,12 @@ kbcli cluster list pg-cluster
 NAME         NAMESPACE   CLUSTER-DEFINITION           VERSION             TERMINATION-POLICY   STATUS    CREATED-TIME
 pg-cluster   default     postgresql-cluster           postgresql-14.7.0   Delete               Running   Mar 03,2023 18:00 UTC+0800
 ```
-***Steps:***
+
+### Steps
 
 1. Change configuration. There are 3 ways to apply vertical scaling.
    
-   **Option 1.** (Recommended) Use `kbcli`
+   **Option 1.** (**Recommended**) Use kbcli
    
    Configure the parameters `component-names`, `requests`, and `limits` and run the command.
    
@@ -147,7 +151,7 @@ pg-cluster   default     postgresql-cluster           postgresql-14.7.0   Delete
 ## Horizontal scaling
 Horizontal scaling changes the amount of pods. For example, you can apply horizontal scaling to scale up from three pods to five pods. The scaling process includes the backup and restoration of data.
 
-**How KubeBlocks horizontally scales a cluster**
+### How KubeBlocks horizontally scales a cluster
 
 ![Horizontal scaling](./../../../img/pgsql_cluster_horizontal_scaling.png)
 
@@ -163,7 +167,7 @@ Horizontal scaling changes the amount of pods. For example, you can apply horizo
 10. The cluster controller watches component changes and when all components are `Running`, the cluster controller changes the cluster phase to `Running`.
 11. The OpsRequest controller reconciles the status when the cluster component status changes.
 
-***Before you start***
+### Before you start
 
 * Refer to [Backup and restore for PostgreSQL](./../backup-and-restore/backup-and-restore-for-postgresql-standalone.md) to make sure the EKS environment is configured properly since the horizontal scaling relies on the backup function.
 * Run the command below to check whether the cluster STATUS is `Running`. Otherwise, the following operations may fail.
@@ -181,11 +185,11 @@ Horizontal scaling changes the amount of pods. For example, you can apply horizo
   pg-cluster   default     postgresql-cluster           postgresql-14.7.0   Delete               Running   Mar 03,2023 18:00 UTC+0800
   ```
 
-***Steps:***
+### Steps
 
 1. Change configuration. There are 3 ways to apply horizontal scaling.
    
-   **Option 1.** (Recommended) Use `kbcli`.
+   **Option 1.** (**Recommended**) Use kbcli
    
    Configure the parameters `component-names` and `replicas`, and run the command.
 
@@ -258,7 +262,7 @@ Horizontal scaling changes the amount of pods. For example, you can apply horizo
    * STATUS=Updating: means horizontal scaling is being applied.
    * STATUS=Running: means horizontal scaling is applied.
 
-**Handle the snapshot exception**
+### Handle the snapshot exception
 
 If `STATUS=ConditionsError` occurs during the horizontal scaling process, you can find the cause from `cluster.status.condition.message` for troubleshooting.
 In the example below, a snapshot exception occurs.

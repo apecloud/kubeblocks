@@ -1,4 +1,4 @@
 position: 8
 label: KubeBlocks for MySQL
 collapsible: true 
-collapsed: false 
+collapsed: true

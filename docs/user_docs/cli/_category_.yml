@@ -1,5 +1,5 @@
 position: 12
-label: KubeBlocks Command Line
+label: Command Line
 collapsible: true 
-collapsed: false 
+collapsed: true 
 className: hide-children

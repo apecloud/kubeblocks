@@ -15,9 +15,11 @@ Kubeblocks integrates cloud-native backup and restore solutions, and currently s
 - Restore
   - Check the backup list with `kbcli cluster list-backups` to choose a backup name that is completed.
   - Use `kbcli cluster restore` to restore a new PostgreSQL cluster. 
+    
+     :::note
 
-     > ***Note:***
-     > 
-     > Only a newly created backup is supported. 
+     Only a newly created backup is supported. 
+
+     :::
   - A new PostgreSQL cluster is created, and the `dataSource` of  PVC is assigned to backup set ID.
   - Wait until the cluster creation and restoration to complete, connect to the cluster with `kbcli cluster connect`, and verify the restored data.

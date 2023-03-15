@@ -1,4 +1,4 @@
 position: 5
 label: High Availability
 collapsible: true 
-collapsed: false 
+collapsed: true

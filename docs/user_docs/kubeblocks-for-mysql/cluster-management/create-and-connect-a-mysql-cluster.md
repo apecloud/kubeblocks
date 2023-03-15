@@ -2,12 +2,14 @@
 title: Create and connect to a MySQL Cluster
 description: How to create and connect to a MySQL cluster
 sidebar_position: 1
+sidebar_label: Create and connect
 ---
 
 # Create and connect to a MySQL Cluster
+
 ## Create a MySQL Cluster
 
-***Before you start***
+### Before you start
 
 * `kbcli`: Install `kbcli` on your host. Refer to [Install/Uninstall kbcli and KubeBlocks](./../../installation/install-and-uninstall-kbcli-and-kubeblocks.md) for details.
   1. Run the command below to install `kbcli`.
@@ -23,12 +25,16 @@ sidebar_position: 1
      ```bash
      kbcli kubeblocks install
      ```
-     > ***Note:***
-     > 
-     > If you want to specify a namespace for KubeBlocks, use `--namespace` or the abbreviated `-n` to name your namespace and configure `--create-namespace` as `true` to create a namespace if it does not exist. For example,
-     > ```bash
-     > kbcli kubeblocks install -n kubeblocks --create-namespace=true
-     > ```
+
+     :::note
+
+     If you want to specify a namespace for KubeBlocks, use `--namespace` or the abbreviated `-n` to name your namespace and configure `--create-namespace` as `true` to create a namespace if it does not exist. For example,
+     ```bash
+     kbcli kubeblocks install -n kubeblocks --create-namespace=true
+     ```
+
+     :::
+     
   2. Run the command below to verify whether KubeBlocks is installed successfully
      ```bash
      kubectl get pod
@@ -49,7 +55,7 @@ sidebar_position: 1
   kbcli clusterdefinition list
   ```
 
-***Steps:***
+### Steps
 
 1. Run the command below to list all the available kernel versions and choose the one that you need.
    ```bash
@@ -75,7 +81,7 @@ sidebar_position: 1
   
    To create a cluster with specified parameters, follow the steps below, and you have three options.
 
-   **Option 1.** (Recommended) Use `--set` option
+   **Option 1.** (**Recommended**) Use `--set` option
    
     Add the --set option when creating a cluster. For example,
     ```bash
@@ -101,7 +107,7 @@ sidebar_position: 1
    EOF
    ```
 
-**`kbcli cluster create` options description**
+### kbcli cluster create options description
 
 | Option   | Description      |
 | :--      | :--              |

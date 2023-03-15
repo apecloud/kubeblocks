@@ -68,11 +68,12 @@ Currently, Feishu custom bot, DingTalk custom bot, WeChat Enterprise custom bot,
 * [WeChat Enterprise custom bot](https://developer.work.weixin.qq.com/document/path/91770)
 * [Slack](https://api.slack.com/messaging/webhooks)
 
-> ***Notes:***
->
-> * Each notification channel has its interface call amount and frequency limits and when the limits are reached, the channel will limit traffic and you cannot receive alerts. 
-> * The SLA of the service provided by a single channel cannot guarantee the alerts are sent successfully. Therefore, it is recommended to configure multiple notification channels to ensure availability.
+:::note
 
+* Each notification channel has its interface call amount and frequency limits and when the limits are reached, the channel will limit traffic and you cannot receive alerts. 
+* The SLA of the service provided by a single channel cannot guarantee the alerts are sent successfully. Therefore, it is recommended to configure multiple notification channels to ensure availability.
+
+:::
 
 ### Step 2. Configure the receiver
 
@@ -108,9 +109,11 @@ Add an alert receiver.
    --webhook='url=https://open.feishu.cn/open-apis/bot/v2/hook/foo' --cluster=pg --severity=critical
    ```
 
-  > ***Note:***
-  > 
-  > For detailed command description, run `kbcli alert add-receiver -h`.
+   :::note
+
+   For the detailed command description, run `kbcli alert add-receiver -h`.
+
+   :::
 
 Run the command below to view the notification configurations.
 
@@ -126,18 +129,18 @@ Run the command below to delete the notification channel and receiver if you wan
 
 ## Troubleshooting
 
-If you cannot receive alert notices, run the commands below to troubleshoot the logs of AlertManager and AlertManager-Webhook-Adaptor. 
+If you cannot receive alert notices, run the commands below to troubleshoot the logs of AlertManager and AlertManager-Webhook-Adaptor add-ons. 
 
 ```bash
 # Find the corresponding Pod of AlertManager and get Pod name
-kubectl get pods -l 'app=prometheus,component=alertmanager'
+kubectl get pods -n kb-system -l 'app=prometheus,component=alertmanager'
 
 # Search AlertManeger logs
-kubectl logs <pod-name> -c prometheus-alertmanager
+kubectl logs <pod-name> -n kb-system -c prometheus-alertmanager
 
 # Find the corresponding Pod of AlertManager-Webhook-Adaptor and get Pod name
-kubectl get pods -l 'app.kubernetes.io/name=alertmanager-webhook-adaptor'
+kubectl get pods -n kb-system -l 'app.kubernetes.io/name=alertmanager-webhook-adaptor'
 
 # Search AlertManager-Webhook-Adaptor logs
-kubectl logs <pod-name> -c alertmanager-webhook-adaptor
+kubectl logs <pod-name> -n kb-system -c alertmanager-webhook-adaptor
 ```

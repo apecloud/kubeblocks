@@ -2,13 +2,14 @@
 title: Run KubeBlocks Playground on localhost
 description: How to run KubeBlocks on Playground
 sidebar_position: 1
+sidebar_label: Playground on localhost
 ---
 
 # Run KubeBlocks Playground on localhost
 This guide uses one `kbcli` command to create a KubeBlocks demo environment (Playground) quickly on your local host.
 With Playground, you can try KubeBlocks and some ApeCloud MySQL features. This guide introduces how to install Playground and how to try KubeBlocks on Playground.
 
-***Before you start***
+## Before you start
 
 Ensure the following requirements are met, so Playground and other functions can run fluently.
 
@@ -49,9 +50,11 @@ Following the instructions in "1. Basic commands for cluster", switch to the Kub
 
 You can find the Playground user guide under the installation success tip. View this guide again by running `kbcli playground guide`.
 
-> ***Caution:***  
-> 
-> Running `export KUBECONFIG` is a necessity for using KubeBlocks and ApeCloud MySQL.
+:::caution
+
+Running `export KUBECONFIG` is a necessity for using KubeBlocks and ApeCloud MySQL.
+
+:::
 
 ## Step 2. Run Playground
 
@@ -61,9 +64,11 @@ The Playground guide includes three sections, namely [Basic functions](#basic-fu
 
 KubeBlocks supports the complete life cycle management of a database cluster and follows the best practice of application development. The following instructions demonstrate the basic features of KubeBlocks. For the full feature set, refer to [KubeBlocks Documentation](./docs/user_docs) for details.
 
-> ***Note:***
->
-> The local host does not support volume expansion, backup, and restore functions.
+:::note
+
+The local host does not support volume expansion, backup, and restore functions.
+
+:::
 
 #### View an ApeCloud MySQL cluster
 

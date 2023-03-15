@@ -65,6 +65,10 @@ func (s *stsPVCTransformer) Transform(dag *graph.DAG) error {
 				continue
 			}
 
+			if vct.Spec.Resources.Requests[corev1.ResourceStorage] == vctProto.Spec.Resources.Requests[corev1.ResourceStorage] {
+				continue
+			}
+
 			for i := *stsObj.Spec.Replicas - 1; i >= 0; i-- {
 				pvc := &corev1.PersistentVolumeClaim{}
 				pvcKey := types.NamespacedName{
@@ -72,13 +76,7 @@ func (s *stsPVCTransformer) Transform(dag *graph.DAG) error {
 					Name:      fmt.Sprintf("%s-%s-%d", vct.Name, stsObj.Name, i),
 				}
 				if err := s.cli.Get(s.ctx.Ctx, pvcKey, pvc); err != nil {
-					//if apierrors.IsNotFound(err) {
-					//	return nil
-					//}
 					return err
-				}
-				if pvc.Spec.Resources.Requests[corev1.ResourceStorage] == vctProto.Spec.Resources.Requests[corev1.ResourceStorage] {
-					continue
 				}
 				obj := pvc.DeepCopy()
 				obj.Spec.Resources.Requests[corev1.ResourceStorage] = vctProto.Spec.Resources.Requests[corev1.ResourceStorage]

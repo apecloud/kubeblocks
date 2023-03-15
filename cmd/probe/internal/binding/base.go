@@ -83,7 +83,7 @@ const (
 	// CommandSQLKey keys from request's metadata.
 	CommandSQLKey = "sql"
 
-	roleEventRecordQPS                = 1. / 60.
+	roleEventRecordQPS                = 1. / 100.
 	roleEventReportFrequency          = int(1 / roleEventRecordQPS)
 	defaultFailedEventReportFrequency = 1800
 	defaultRoleDetectionThreshold     = 300
@@ -97,7 +97,10 @@ const (
 	QueryOperation        bindings.OperationKind = "query"
 	CloseOperation        bindings.OperationKind = "query"
 
-	OperationNotImplemented = "OperationNotImplemented"
+	OperationNotImplemented = "NotImplemented"
+	OperationInvalid        = "Invalid"
+	OperationSuccess        = "Success"
+	OperationFailed         = "Failed"
 )
 
 const (
@@ -231,7 +234,7 @@ func (ops *BaseOperations) CheckRoleOps(ctx context.Context, req *bindings.Invok
 	role, err := ops.GetRole(ctx, req, resp)
 	if err != nil {
 		ops.Logger.Infof("error executing roleCheck: %v", err)
-		opsRes["event"] = "checkRoleFailed"
+		opsRes["event"] = OperationFailed
 		opsRes["message"] = err.Error()
 		if ops.CheckRoleFailedCount%ops.FailedEventReportFrequency == 0 {
 			ops.Logger.Infof("role checks failed %v times continuously", ops.CheckRoleFailedCount)
@@ -243,18 +246,17 @@ func (ops *BaseOperations) CheckRoleOps(ctx context.Context, req *bindings.Invok
 
 	ops.CheckRoleFailedCount = 0
 	if isValid, message := ops.roleValidate(role); !isValid {
-		opsRes["event"] = "roleInvalid"
+		opsRes["event"] = OperationInvalid
 		opsRes["message"] = message
 		return opsRes, nil
 	}
 
+	opsRes["event"] = OperationSuccess
 	opsRes["role"] = role
 	if ops.OriRole != role {
-		opsRes["event"] = "roleChanged"
 		ops.OriRole = role
 		ops.RoleUnchangedCount = 0
 	} else {
-		opsRes["Event"] = "roleUnchanged"
 		ops.RoleUnchangedCount++
 	}
 
@@ -283,7 +285,7 @@ func (ops *BaseOperations) GetRoleOps(ctx context.Context, req *bindings.InvokeR
 	role, err := ops.GetRole(ctx, req, resp)
 	if err != nil {
 		ops.Logger.Infof("error executing roleCheck: %v", err)
-		opsRes["event"] = "getRoleFailed"
+		opsRes["event"] = OperationFailed
 		opsRes["message"] = err.Error()
 		if ops.CheckRoleFailedCount%ops.FailedEventReportFrequency == 0 {
 			ops.Logger.Infof("role checks failed %v times continuously", ops.CheckRoleFailedCount)
@@ -292,7 +294,7 @@ func (ops *BaseOperations) GetRoleOps(ctx context.Context, req *bindings.InvokeR
 		ops.CheckRoleFailedCount++
 		return opsRes, nil
 	}
-	opsRes["event"] = "getRoleSuccess"
+	opsRes["event"] = OperationSuccess
 	opsRes["role"] = role
 	return opsRes, nil
 }
@@ -333,7 +335,7 @@ func (ops *BaseOperations) CheckRunningOps(ctx context.Context, req *bindings.In
 	if err != nil {
 		message = fmt.Sprintf("running check %s error: %v", host, err)
 		ops.Logger.Errorf(message)
-		opsRes["event"] = "CheckRunningFailed"
+		opsRes["event"] = OperationFailed
 		opsRes["message"] = message
 		if ops.CheckRunningFailedCount%ops.FailedEventReportFrequency == 0 {
 			ops.Logger.Infof("running checks failed %v times continuously", ops.CheckRunningFailedCount)
@@ -349,7 +351,7 @@ func (ops *BaseOperations) CheckRunningOps(ctx context.Context, req *bindings.In
 		err := tcpCon.SetLinger(0)
 		ops.Logger.Infof("running check, set tcp linger failed: %v", err)
 	}
-	opsRes["event"] = "CheckRunningSuccess"
+	opsRes["event"] = OperationSuccess
 	opsRes["message"] = message
 	return opsRes, nil
 }

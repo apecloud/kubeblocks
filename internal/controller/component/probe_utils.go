@@ -37,9 +37,9 @@ const (
 	// http://localhost:<port>/v1.0/bindings/<binding_type>
 	roleObserveURIFormat = "http://localhost:%s/v1.0/bindings/%s"
 
-	roleProbeContainerName    = "kb-rolechangedcheck"
-	statusProbeContainerName  = "kb-statuscheck"
-	runningProbeContainerName = "kb-runningcheck"
+	roleProbeContainerName    = "kb-checkrole"
+	statusProbeContainerName  = "kb-checkstatus"
+	runningProbeContainerName = "kb-checkrunning"
 	ProbeRoleChangedCheckPath = "spec.containers{" + roleProbeContainerName + "}"
 	ProbeStatusCheckPath      = "spec.containers{" + statusProbeContainerName + "}"
 	ProbeRunningCheckPath     = "spec.containers{" + runningProbeContainerName + "}"

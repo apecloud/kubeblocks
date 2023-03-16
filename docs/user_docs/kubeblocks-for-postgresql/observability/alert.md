@@ -133,14 +133,14 @@ If you cannot receive alert notices, run the commands below to get the logs of A
 
 ```bash
 # Find the corresponding Pod of AlertManager and get Pod name
-kubectl get pods -n kb-syste -l 'release=kubeblocks,app=prometheus,component=alertmanager'
+kubectl get pods -n kb-system -l 'release=kubeblocks,app=prometheus,component=alertmanager'
 
 # Search AlertManeger logs
-kubectl logs <pod-name> -n kb-syste -c prometheus-alertmanager
+kubectl logs <pod-name> -n kb-system -c prometheus-alertmanager
 
 # Find the corresponding Pod of AlertManager-Webhook-Adaptor and get Pod name
-kubectl get pods -n kb-syste -l 'app.kubernetes.io/instance=kubeblocks,app.kubernetes.io/name=alertmanager-webhook-adaptor'
+kubectl get pods -n kb-system -l 'app.kubernetes.io/instance=kubeblocks,app.kubernetes.io/name=alertmanager-webhook-adaptor'
 
 # Search AlertManager-Webhook-Adaptor logs
-kubectl logs <pod-name> -n kb-syste -c alertmanager-webhook-adaptor
+kubectl logs <pod-name> -n kb-system -c alertmanager-webhook-adaptor
 ```

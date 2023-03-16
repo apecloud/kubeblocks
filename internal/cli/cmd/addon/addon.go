@@ -581,10 +581,16 @@ func (o *addonCmdOpts) buildEnablePatch(flags []*pflag.Flag, spec, install map[s
 }
 
 func (o *addonCmdOpts) buildHelmPatch(result map[string]interface{}) error {
-	helmSpec := extensionsv1alpha1.HelmTypeInstallSpec{
-		InstallValues: extensionsv1alpha1.HelmInstallValues{
-			SetValues: o.addonEnableFlags.SetValues,
-		},
+	var helmSpec extensionsv1alpha1.HelmTypeInstallSpec
+	if o.addon.Spec.Helm == nil {
+		helmSpec = extensionsv1alpha1.HelmTypeInstallSpec{
+			InstallValues: extensionsv1alpha1.HelmInstallValues{
+				SetValues: o.addonEnableFlags.SetValues,
+			},
+		}
+	} else {
+		helmSpec = *o.addon.Spec.Helm
+		helmSpec.InstallValues.SetValues = o.addonEnableFlags.SetValues
 	}
 	b, err := json.Marshal(&helmSpec)
 	if err != nil {

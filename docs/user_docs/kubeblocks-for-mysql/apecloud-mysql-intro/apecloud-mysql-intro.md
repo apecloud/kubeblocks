@@ -10,9 +10,11 @@ ApeCloud MySQL is a high-availability MySQL database provided by ApeCloud. It is
   - When there are 2 replicas, a Primary-Secondary replication cluster is created, in which the primary instance provides read/write capacity, and the secondary instance keeps in sync with the primary instance with asynchronous replication, providing read-only and fault tolerance capabilities.
   - When there is only 1 instance, a standalone cluster is created to provide read/write capacity. Automatic fault recovery capability is still provided, and RPO=0 remains ensured if the cloud disk is not damaged.
 
-> ***Note:***  
-> 
-> In this guide, we use KubeBlocks to manage ApeCloud MySQL.
+:::note
+
+In this guide, we use KubeBlocks to manage ApeCloud MySQL.
+
+:::
 
 ## Instance Roles
 
@@ -36,7 +38,7 @@ A failover is the redirection of traffic and switches the running tasks from a p
 
 Replicas provide read-only capabilities. In addition to the Follower that can provide read-only capabilities, you can also expand the read-only capabilities of the cluster by adding Learner roles. It should be noted that when performing read-only operations through Follower or Learner, there may be a data delay with the Leader. This delay may be caused by a log synchronization delay or a log playback delay.
 
-## Fault tolerance
+### Fault tolerance
 
 The cluster supports node fault tolerance. Suppose the number of replicas is n, then the number of faulty replicas that can be tolerated is `floor (n/2) + 1，n=[1,99]`, which meets the requirements of the Paxos algorithm protocol. Based on this, it can be obtained that under the specified tolerable number f of ApeCloud MySQL cluster nodes, the number of replicas that need to be created is n=2*f+1, f>=0. For example, if the tolerable number of faulty replicas is 1, then according to the formula, the minimum number of replicas in the cluster is 3, that is, in a Paxos group, the continuous service capability of the cluster with 1 faulty replica is guaranteed. According to the table below, it can be seen that it is more cost-effective to create an odd number of replicas.
 

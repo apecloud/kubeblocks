@@ -441,28 +441,6 @@ func (r *Cluster) ValidateEnabledLogs(cd *ClusterDefinition) error {
 	return nil
 }
 
-// ValidatePrimaryIndex validates primaryIndex in cluster API yaml. When workloadType is Replication,
-// checks that primaryIndex cannot be nil, and when the replicas of the component in the cluster API is empty,
-// checks that the value of primaryIndex cannot be greater than the defaultReplicas in the clusterDefinition API.
-func (r *Cluster) ValidatePrimaryIndex(cd *ClusterDefinition) error {
-	message := make([]string, 0)
-	for _, compSpec := range r.Spec.ComponentSpecs {
-		for _, compDef := range cd.Spec.ComponentDefs {
-			if !strings.EqualFold(compSpec.ComponentDefRef, compDef.Name) {
-				continue
-			}
-			if compDef.WorkloadType != Replication {
-				continue
-			}
-			if compSpec.PrimaryIndex == nil {
-				message = append(message, fmt.Sprintf("component %s's PrimaryIndex cannot be nil when workloadType is Replication.", compSpec.ComponentDefRef))
-				return errors.New(strings.Join(message, ";"))
-			}
-		}
-	}
-	return nil
-}
-
 // GetDefNameMappingComponents returns ComponentDefRef name mapping ClusterComponentSpec.
 func (r *Cluster) GetDefNameMappingComponents() map[string][]ClusterComponentSpec {
 	m := map[string][]ClusterComponentSpec{}

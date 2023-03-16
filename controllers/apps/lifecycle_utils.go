@@ -1130,7 +1130,7 @@ func getBackupMatchingLabels(clusterName string, componentName string) client.Ma
 	return client.MatchingLabels{
 		constant.AppInstanceLabelKey:    clusterName,
 		constant.KBAppComponentLabelKey: componentName,
-		constant.AppManagedByLabelKey:   constant.AppName,
+		constant.KBManagedByKey:         "cluster", // the resources are managed by which controller
 	}
 }
 

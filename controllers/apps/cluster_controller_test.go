@@ -506,7 +506,7 @@ var _ = Describe("Cluster Controller", func() {
 				Name:      snapshotKey.Name,
 				Namespace: snapshotKey.Namespace,
 				Labels: map[string]string{
-					constant.AppManagedByLabelKey:   constant.AppName,
+					constant.KBManagedByKey:         "cluster",
 					constant.AppInstanceLabelKey:    clusterKey.Name,
 					constant.KBAppComponentLabelKey: comp.Name,
 				}},
@@ -1041,7 +1041,7 @@ var _ = Describe("Cluster Controller", func() {
 				Labels: map[string]string{
 					constant.AppInstanceLabelKey:    clusterKey.Name,
 					constant.KBAppComponentLabelKey: mysqlCompName,
-					constant.AppManagedByLabelKey:   constant.AppName,
+					constant.KBManagedByKey:         "cluster",
 				},
 			},
 			Spec: dataprotectionv1alpha1.BackupSpec{

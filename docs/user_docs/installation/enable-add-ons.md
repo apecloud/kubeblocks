@@ -1,13 +1,13 @@
 ---
 title: Enable add-ons
 description: Enable KubeBlocks add-ons
-sidebar_position: 1
+sidebar_position: 2
 sidebar_label: Enable add-ons
 ---
 
 # Enable add-ons
 
-An add-on is a software that provides supporting operational capabilities to Kubernetes applications.
+An add-on provides extension capabilities, i.e., manifests or application software, to KubeBlocks control plane. 
 By default, all add-ons supported are automatically installed.
 To list supported add-ons, run `kbcli addon list` command.
 

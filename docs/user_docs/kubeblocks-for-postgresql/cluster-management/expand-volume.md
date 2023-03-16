@@ -76,7 +76,7 @@ spec:
 EOF
 ```
 
-### Option 3. Change the YAML file of the cluster
+## Option 3. Change the YAML file of the cluster
 
 Change the value of `spec.components.volumeClaimTemplates.spec.resources` in the cluster YAML file. `spec.components.volumeClaimTemplates.spec.resources` is the storage resource information of the pod and changing this value triggers the volume expansion of a cluster. 
 

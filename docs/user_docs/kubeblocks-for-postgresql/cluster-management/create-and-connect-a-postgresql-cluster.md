@@ -74,15 +74,15 @@ sidebar_label: Create and connect
 
      kbcli cluster create -n demo --cluster-definition='postgresql'
      ```
-   * A cluster is created with built-in toleration which tolerates the node with the kb-data=true:NoSchedule taint.
-   * A cluster is created with built-in node affinity which first deploys the node with the kb-data:true label.
+   * A cluster is created with built-in toleration which tolerates the node with the `kb-data=true:NoSchedule` taint.
+   * A cluster is created with built-in node affinity which first deploys the node with the `kb-data:true` label.
    * For configuring pod affinity for a cluster, refer to [Configure pod affinity for database cluster](../../resource-scheduling/resource-scheduling.md).
   
    To create a cluster with specified parameters, follow the steps below, and you have three options.
 
    **Option 1.** (**Recommended**) Use `--set` option
    
-    Add the --set option when creating a cluster. For example,
+    Add the `--set` option when creating a cluster. For example,
     ```bash
     kbcli cluster create pg-cluster --cluster-definition postgresql --set cpu=1000m,memory=1Gi,storage=10Gi
     ```

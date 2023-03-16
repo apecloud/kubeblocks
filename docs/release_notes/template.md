@@ -44,6 +44,7 @@ We would like to extend our appreciation to all contributors who helped make thi
       * KubeBlocks private network Load Balancer
       * ApeCloud MySQL ClusterDefinition API
       * Community PostgreSQL ClusterDefinition API
+      * Cluster availibility demo application named NyanCat
   * ClusterDefinition API `spec.connectionCredential` add following built-in variables:
     * A random UUID v4 generator `$(UUID)`
     * A random UUID v4 generator with BASE64 encoded `$(UUID_B64)`

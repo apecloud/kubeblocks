@@ -289,7 +289,7 @@ clean-kbcli: ## Clean bin/kbcli*.
 	rm -f bin/kbcli*
 
 .PHONY: doc
-kbcli-doc: ## generate CLI command reference manual.
+kbcli-doc: generate ## generate CLI command reference manual.
 	$(GO) run ./hack/docgen/cli/main.go ./docs/user_docs/cli
 
 ##@ Load Balancer

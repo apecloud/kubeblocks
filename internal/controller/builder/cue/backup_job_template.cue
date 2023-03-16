@@ -33,7 +33,7 @@ backup_job: {
 		namespace:    backup_job_key.Namespace
 		labels: {
 			"dataprotection.kubeblocks.io/backup-type":         "snapshot"
-			"app.kubernetes.io/managed-by":                     "kubeblocks"
+			"apps.kubeblocks.io/managed-by":                    "cluster"
 			"backuppolicies.dataprotection.kubeblocks.io/name": backup_policy_name
 			for k, v in sts.metadata.labels {
 				"\(k)": "\(v)"

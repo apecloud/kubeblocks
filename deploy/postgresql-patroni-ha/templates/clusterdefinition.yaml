@@ -7,15 +7,19 @@ metadata:
 spec:
   connectionCredential:
     username: postgres
-    postgres-password: "$(RANDOM_PASSWD)"
+    password: "$(RANDOM_PASSWD)"
     endpoint: "$(SVC_FQDN):$(SVC_PORT_tcp-postgresql)"
     host: "$(SVC_FQDN)"
     port: "$(SVC_PORT_tcp-postgresql)"
   componentDefs:
     - name: postgresql-ha
       workloadType: Replication
-      characterType: postgresql
+      characterType: postgres
       probes:
+        roleChangedProbe:
+          failureThreshold: 2
+          periodSeconds: 1
+          timeoutSeconds: 1
       monitor:
         builtIn: false
         exporterConfig:
@@ -110,31 +114,6 @@ spec:
                 containerPort: 5432
               - name: patroni
                 containerPort: 8008
-            livenessProbe:
-              failureThreshold: 6
-              initialDelaySeconds: 30
-              periodSeconds: 10
-              successThreshold: 1
-              timeoutSeconds: 5
-              exec:
-                command:
-                  - /bin/sh
-                  - -c
-                  - exec pg_isready -U {{ default "postgres" | quote }} -h 127.0.0.1 -p 5432
-            readinessProbe:
-              failureThreshold: 6
-              initialDelaySeconds: 5
-              periodSeconds: 10
-              successThreshold: 1
-              timeoutSeconds: 5
-              exec:
-                command:
-                  - /bin/sh
-                  - -c
-                  - -ee
-                  - |
-                    exec pg_isready -U {{ default "postgres" | quote }} -h 127.0.0.1 -p 5432
-                    [ -f /postgresql/tmp/.initialized ] || [ -f /postgresql/.initialized ]
             env: ## refer https://github.com/zalando/spilo/blob/master/ENVIRONMENT.rst
               - name: DCS_ENABLE_KUBERNETES_API
                 value: "true"
@@ -175,19 +154,19 @@ spec:
                 valueFrom:
                   secretKeyRef:
                     name: $(CONN_CREDENTIAL_SECRET_NAME)
-                    key: postgres-password
+                    key: password
               - name: PGUSER_ADMIN
                 value: superadmin
               - name: PGPASSWORD_ADMIN
                 valueFrom:
                   secretKeyRef:
                     name: $(CONN_CREDENTIAL_SECRET_NAME)
-                    key: postgres-password
+                    key: password
               - name: PGPASSWORD_STANDBY
                 valueFrom:
                   secretKeyRef:
                     name: $(CONN_CREDENTIAL_SECRET_NAME)
-                    key: postgres-password
+                    key: password
               - name: SCOPE
                 value: "$(KB_COMP_NAME)"
               - name: PGROOT
@@ -201,7 +180,7 @@ spec:
                 valueFrom:
                   secretKeyRef:
                     name: $(CONN_CREDENTIAL_SECRET_NAME)
-                    key: postgres-password
+                    key: password
           - name: metrics
             image:  {{ .Values.metrics.image.registry | default "docker.io" }}/{{ .Values.metrics.image.repository }}:{{ .Values.metrics.image.tag }}
             imagePullPolicy: {{ .Values.metrics.image.pullPolicy | quote }}
@@ -216,7 +195,7 @@ spec:
                 valueFrom:
                   secretKeyRef:
                     name: $(CONN_CREDENTIAL_SECRET_NAME)
-                    key: postgres-password
+                    key: password
               - name: DATA_SOURCE_USER
                 valueFrom:
                   secretKeyRef:
@@ -278,7 +257,7 @@ spec:
             valueFrom:
               secretKeyRef:
                 name: $(CONN_CREDENTIAL_SECRET_NAME)
-                key: postgres-password
+                key: password
         passwordConfig:
           length: 10
           numDigits: 5

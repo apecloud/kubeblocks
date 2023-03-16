@@ -31,7 +31,8 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/generics"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	"github.com/apecloud/kubeblocks/internal/generics"
 )
 
 type ReplicationRole string
@@ -310,7 +311,7 @@ func removeTargetPodsInfoInStatus(replicationStatus *appsv1alpha1.ReplicationSet
 }
 
 // checkObjRoleLabelIsPrimary checks whether it is the primary obj(statefulSet or pod) through the label tag on obj.
-func checkObjRoleLabelIsPrimary[T intctrlutil.Object, PT intctrlutil.PObject[T]](obj PT) (bool, error) {
+func checkObjRoleLabelIsPrimary[T generics.Object, PT generics.PObject[T]](obj PT) (bool, error) {
 	if obj == nil || obj.GetLabels() == nil {
 		// REVIEW/TODO: need avoid using dynamic error string, this is bad for
 		// error type checking (errors.Is)
@@ -325,7 +326,7 @@ func checkObjRoleLabelIsPrimary[T intctrlutil.Object, PT intctrlutil.PObject[T]]
 }
 
 // getReplicationSetPrimaryObj gets the primary obj(statefulSet or pod) of the replication workload.
-func getReplicationSetPrimaryObj[T intctrlutil.Object, PT intctrlutil.PObject[T], L intctrlutil.ObjList[T], PL intctrlutil.PObjList[T, L]](
+func getReplicationSetPrimaryObj[T generics.Object, PT generics.PObject[T], L generics.ObjList[T], PL generics.PObjList[T, L]](
 	ctx context.Context, cli client.Client, cluster *appsv1alpha1.Cluster, _ func(T, L), compSpecName string) (PT, error) {
 	var (
 		objList L
@@ -347,7 +348,7 @@ func getReplicationSetPrimaryObj[T intctrlutil.Object, PT intctrlutil.PObject[T]
 }
 
 // updateObjRoleLabel updates the value of the role label of the object.
-func updateObjRoleLabel[T intctrlutil.Object, PT intctrlutil.PObject[T]](
+func updateObjRoleLabel[T generics.Object, PT generics.PObject[T]](
 	ctx context.Context, cli client.Client, obj T, role string) error {
 	pObj := PT(&obj)
 	patch := client.MergeFrom(PT(pObj.DeepCopy()))
@@ -408,4 +409,46 @@ func getAndCheckReplicationPodByStatefulSet(ctx context.Context, cli client.Clie
 		return nil, fmt.Errorf("pod number in statefulset %s is not 1", stsObj.Name)
 	}
 	return &podList[0], nil
+}
+
+// HandleReplicationSetRoleChangeEvent handles the role change event of the replication workload when switchPolicy is Noop.
+func HandleReplicationSetRoleChangeEvent(cli client.Client,
+	reqCtx intctrlutil.RequestCtx,
+	cluster *appsv1alpha1.Cluster,
+	compName string,
+	pod *corev1.Pod,
+	newRole string) error {
+	// if newRole is empty or pod current role label equals to newRole, return
+	if newRole == "" || pod.Labels[constant.RoleLabelKey] == newRole {
+		reqCtx.Log.Info("new role label is empty or pod current role label equals to new role, ignore it", "new role", newRole)
+		return nil
+	}
+	// if switchPolicy is not Noop, return
+	clusterCompSpec := util.GetClusterComponentSpecByName(*cluster, compName)
+	if clusterCompSpec == nil || clusterCompSpec.SwitchPolicy == nil || clusterCompSpec.SwitchPolicy.Type != appsv1alpha1.Noop {
+		reqCtx.Log.Info("cluster switchPolicy is not Noop, does not support handle role change event", "cluster", cluster.Name)
+		return nil
+	}
+
+	oldPrimaryPod, err := getReplicationSetPrimaryObj(reqCtx.Ctx, cli, cluster, generics.PodSignature, compName)
+	if err != nil {
+		reqCtx.Log.Info("handleReplicationSetRoleChangeEvent get old primary pod failed", "error", err)
+		return err
+	}
+	// pod is old primary and newRole is secondary, it means that the old primary needs to be changed to secondary,
+	// we do not deal with this situation because We will only change the old primary to secondary when the new primary changes from secondary to primary,
+	// this is to avoid simultaneous occurrence of two primary or no primary at the same time
+	if oldPrimaryPod.Name == pod.Name {
+		reqCtx.Log.Info("pod is old primary and new role is secondary, do not deal with this situation", "podName", pod.Name, "newRole", newRole)
+		return nil
+	}
+
+	// pod is old secondary and newRole is primary
+	// update old primary to secondary
+	if err := updateObjRoleLabel(reqCtx.Ctx, cli, *oldPrimaryPod, string(Secondary)); err != nil {
+		return err
+	}
+
+	// update secondary pod to primary
+	return updateObjRoleLabel(reqCtx.Ctx, cli, *pod, newRole)
 }

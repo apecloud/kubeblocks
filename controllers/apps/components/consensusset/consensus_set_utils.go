@@ -25,7 +25,6 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -229,23 +228,11 @@ func ComposeRolePriorityMap(component appsv1alpha1.ClusterComponentDefinition) m
 }
 
 // UpdateConsensusSetRoleLabel updates pod role label when internal container role changed
-func UpdateConsensusSetRoleLabel(cli client.Client, reqCtx intctrlutil.RequestCtx, pod *corev1.Pod, role string) error {
+func UpdateConsensusSetRoleLabel(cli client.Client,
+	reqCtx intctrlutil.RequestCtx,
+	componentDef *appsv1alpha1.ClusterComponentDefinition,
+	pod *corev1.Pod, role string) error {
 	ctx := reqCtx.Ctx
-	// get cluster obj
-	cluster := &appsv1alpha1.Cluster{}
-	if err := cli.Get(ctx, types.NamespacedName{
-		Namespace: pod.Namespace,
-		Name:      pod.Labels[constant.AppInstanceLabelKey],
-	}, cluster); err != nil {
-		return err
-	}
-	// get componentDef this pod belongs to
-	componentName := pod.Labels[constant.KBAppComponentLabelKey]
-	compDefName := cluster.GetComponentDefRefName(componentName)
-	componentDef, err := util.GetComponentDefByCluster(ctx, cli, *cluster, compDefName)
-	if err != nil {
-		return err
-	}
 	if componentDef == nil {
 		return nil
 	}

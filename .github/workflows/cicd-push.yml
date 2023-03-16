@@ -65,19 +65,38 @@ jobs:
 
   cli-doc:
     needs: trigger-mode
-    runs-on: [self-hosted, eks-fargate-runner ]
+    runs-on: ubuntu-latest
     if: ${{ contains(needs.trigger-mode.outputs.trigger-mode, '[cli]') && github.ref_name != 'main' }}
     steps:
-      - uses: apecloud/checkout@main
+      - uses: actions/checkout@v3
+      - name: install lib
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libbtrfs-dev \
+            libdevmapper-dev
+
+      - name: Setup Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: 1.19
+
       - name: Check cli doc
+        id: check-cli-doc
         run: |
           make kbcli-doc
-          git config --local user.name "$GITHUB_ACTOR"
-          git config --local user.email "$GITHUB_ACTOR@users.noreply.github.com"
-          git commit -a -m "chore: auto update cli doc changes"
+          FILE_CHANGES=`git diff --name-only ${{ github.sha }}`
+          if [[ ! -z "$FILE_CHANGES" ]]; then
+            echo $FILE_CHANGES
+            git config --local user.name "$GITHUB_ACTOR"
+            git config --local user.email "$GITHUB_ACTOR@users.noreply.github.com"
+            git commit -a -m "chore: auto update cli doc changes"
+          fi
+          echo file_changes=$FILE_CHANGES >> $GITHUB_OUTPUT
 
       - name: Push cli doc changes
         uses: ad-m/github-push-action@master
+        if: ${{ steps.check-cli-doc.outputs.file_changes }}
         with:
           github_token: ${{ env.GITHUB_TOKEN }}
           branch: ${{ github.ref }}
@@ -172,12 +191,11 @@ jobs:
   check-helm:
     needs: trigger-mode
     if: contains(needs.trigger-mode.outputs.trigger-mode, '[deploy]')
-    uses: apecloud/apecd/.github/workflows/release-charts.yml@v0.4.0
+    uses: apecloud/apecd/.github/workflows/release-charts.yml@v0.5.0
     with:
       MAKE_OPS: "bump-chart-ver"
       VERSION: "v0.4.0-check"
       CHART_NAME: "kubeblocks"
       CHART_DIR: "deploy/helm"
-      HELM_SET: "prometheus.enabled=true,grafana.enabled=true,dashboards.enabled=true,dataProtection.enableVolumeSnapshot=true,snapshot-controller.enabled=true"
       PUSH_ENABLE: false
     secrets: inherit

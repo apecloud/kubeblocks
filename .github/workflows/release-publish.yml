@@ -40,9 +40,9 @@ jobs:
   upload-release-assert:
     needs: create-release-kbcli
     name: Upload ${{ matrix.os }}
-    continue-on-error: true
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         os: [linux-amd64, linux-arm64, darwin-amd64, darwin-arm64, windows-amd64]
     steps:
@@ -107,7 +107,6 @@ jobs:
 
       - name: upload release kbcli asset ${{ matrix.os }}
         uses: actions/upload-release-asset@main
-        continue-on-error: true
         env:
           CLI_BINARY: ${{ env.CLI_NAME }}-${{ matrix.os }}-${{ env.TAG_NAME }}.tar.gz
         with:
@@ -117,7 +116,6 @@ jobs:
           asset_content_type: application/zip
 
       - name: upload gitlab kbcli asset ${{ matrix.os }}
-        continue-on-error: true
         env:
           CLI_BINARY: ${{ env.CLI_NAME }}-${{ matrix.os }}-${{ env.TAG_NAME }}.tar.gz
         run: |

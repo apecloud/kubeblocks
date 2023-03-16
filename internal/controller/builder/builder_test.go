@@ -354,12 +354,12 @@ var _ = Describe("builder", func() {
 				stsName := fmt.Sprintf("%s-%s", params.Cluster.Name, params.Component.Name)
 				svcName := fmt.Sprintf("%s-headless", stsName)
 				By("Checking KB_PRIMARY_POD_NAME value be right")
-				if int(*params.Component.PrimaryIndex) == 0 {
+				if int(params.Component.GetPrimaryIndex()) == 0 {
 					Expect(cfg.Data["KB_PRIMARY_POD_NAME"]).
-						Should(Equal(stsName + "-" + strconv.Itoa(int(*params.Component.PrimaryIndex)) + "." + svcName))
+						Should(Equal(stsName + "-" + strconv.Itoa(int(params.Component.GetPrimaryIndex())) + "." + svcName))
 				} else {
 					Expect(cfg.Data["KB_PRIMARY_POD_NAME"]).
-						Should(Equal(stsName + "-" + strconv.Itoa(int(*params.Component.PrimaryIndex)) + "-0." + svcName))
+						Should(Equal(stsName + "-" + strconv.Itoa(int(params.Component.GetPrimaryIndex())) + "-0." + svcName))
 				}
 				for i := 0; i < int(params.Component.Replicas); i++ {
 					if i == 0 {
@@ -368,7 +368,7 @@ var _ = Describe("builder", func() {
 							Should(Equal(stsName + "-" + strconv.Itoa(0) + "." + svcName))
 					} else {
 						Expect(cfg.Data["KB_"+strings.ToUpper(params.Component.Type)+"_"+strconv.Itoa(i)+"_HOSTNAME"]).
-							Should(Equal(stsName + "-" + strconv.Itoa(int(*params.Component.PrimaryIndex)) + "-0." + svcName))
+							Should(Equal(stsName + "-" + strconv.Itoa(int(params.Component.GetPrimaryIndex())) + "-0." + svcName))
 					}
 				}
 			}

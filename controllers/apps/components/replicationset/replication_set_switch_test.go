@@ -154,7 +154,7 @@ var _ = Describe("ReplicationSet Switch", func() {
 		Expect(s.SwitchStatus.SwitchPhaseStatus).Should(Equal(SwitchPhaseStatusFailed))
 
 		By("Test switch detection should be successful.")
-		err := s.initSwitchInstance(&DefaultReplicationPrimaryIndex, &DefaultPrimaryIndexDiffWithStsOrdinal)
+		err := s.initSwitchInstance(DefaultReplicationPrimaryIndex, DefaultPrimaryIndexDiffWithStsOrdinal)
 		Expect(err).Should(Succeed())
 
 		By("Test switch detection should be successful.")

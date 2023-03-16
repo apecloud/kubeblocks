@@ -286,11 +286,6 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return intctrlutil.RequeueAfter(ControllerErrorRequeueTime, reqCtx.Log, "")
 	}
 
-	// When the workloadType is Replication and the value of primaryIndex is nil, set a default value for the primaryIndex field.
-	if err = r.patchReplicationPrimaryIndexIfNotExist(ctx, cluster, clusterDefinition); err != nil {
-		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-	}
-
 	// preCheck succeed, starting the cluster provisioning
 	if err = clusterConditionMgr.setProvisioningStartedCondition(); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
@@ -364,25 +359,6 @@ func (r *ClusterReconciler) patchClusterLabelsIfNotExist(
 	patch := client.MergeFrom(cluster.DeepCopy())
 	cluster.Labels[clusterDefLabelKey] = cdName
 	cluster.Labels[clusterVersionLabelKey] = cvName
-	return r.Client.Patch(ctx, cluster, patch)
-}
-
-func (r *ClusterReconciler) patchReplicationPrimaryIndexIfNotExist(
-	ctx context.Context, cluster *appsv1alpha1.Cluster, cd *appsv1alpha1.ClusterDefinition) error {
-
-	patch := client.MergeFrom(cluster.DeepCopy())
-	for i := range cluster.Spec.ComponentSpecs {
-		comSpec := &cluster.Spec.ComponentSpecs[i]
-		if comSpec.PrimaryIndex != nil {
-			continue
-		}
-		for _, compDef := range cd.Spec.ComponentDefs {
-			if compDef.WorkloadType != appsv1alpha1.Replication || comSpec.ComponentDefRef != compDef.Name {
-				continue
-			}
-			comSpec.PrimaryIndex = new(int32)
-		}
-	}
 	return r.Client.Patch(ctx, cluster, patch)
 }
 

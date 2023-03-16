@@ -279,7 +279,59 @@ type ClusterComponentVolumeClaimTemplate struct {
 	// spec defines the desired characteristics of a volume requested by a pod author.
 	// +kubebuilder:pruning:PreserveUnknownFields
 	// +optional
-	Spec *corev1.PersistentVolumeClaimSpec `json:"spec,omitempty"`
+	Spec PersistentVolumeClaimSpec `json:"spec,omitempty"`
+}
+
+func (r *ClusterComponentVolumeClaimTemplate) toVolumeClaimTemplate() corev1.PersistentVolumeClaimTemplate {
+	t := corev1.PersistentVolumeClaimTemplate{}
+	t.ObjectMeta.Name = r.Name
+	t.Spec = r.Spec.ToV1PersistentVolumeClaimSpec()
+	return t
+}
+
+type PersistentVolumeClaimSpec struct {
+	// accessModes contains the desired access modes the volume should have.
+	// More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#access-modes-1
+	// +optional
+	AccessModes []corev1.PersistentVolumeAccessMode `json:"accessModes,omitempty" protobuf:"bytes,1,rep,name=accessModes,casttype=PersistentVolumeAccessMode"`
+	// resources represents the minimum resources the volume should have.
+	// If RecoverVolumeExpansionFailure feature is enabled users are allowed to specify resource requirements
+	// that are lower than previous value but must still be higher than capacity recorded in the
+	// status field of the claim.
+	// More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#resources
+	// +optional
+	Resources corev1.ResourceRequirements `json:"resources,omitempty" protobuf:"bytes,2,opt,name=resources"`
+	// storageClassName is the name of the StorageClass required by the claim.
+	// More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#class-1
+	// +optional
+	StorageClassName *string `json:"storageClassName,omitempty" protobuf:"bytes,5,opt,name=storageClassName"`
+	// preferStorageClassNames added support specifying storageclasses.storage.k8s.io names, in order
+	// to adapt multi-cloud deployment, where storageclasses are all distinctly different among clouds.
+	// +listType=set
+	// +optional
+	PreferSCNames []string `json:"preferStorageClassNames,omitempty"`
+}
+
+// ToV1PersistentVolumeClaimSpec converts to corev1.PersistentVolumeClaimSpec.
+func (r *PersistentVolumeClaimSpec) ToV1PersistentVolumeClaimSpec() corev1.PersistentVolumeClaimSpec {
+	if r == nil {
+		return corev1.PersistentVolumeClaimSpec{}
+	}
+	return corev1.PersistentVolumeClaimSpec{
+		AccessModes:      r.AccessModes,
+		Resources:        r.Resources,
+		StorageClassName: r.StorageClassName,
+	}
+}
+
+func (r *PersistentVolumeClaimSpec) GetStorageClassName(preferSC string) *string {
+	if r == nil {
+		return nil
+	}
+	if r.StorageClassName != nil && *r.StorageClassName != "" {
+		return r.StorageClassName
+	}
+	return &preferSC
 }
 
 type Affinity struct {
@@ -524,8 +576,8 @@ func (r *ClusterComponentSpec) ToVolumeClaimTemplates() []corev1.PersistentVolum
 		return nil
 	}
 	var ts []corev1.PersistentVolumeClaimTemplate
-	for _, template := range r.VolumeClaimTemplates {
-		ts = append(ts, toVolumeClaimTemplate(template))
+	for _, t := range r.VolumeClaimTemplates {
+		ts = append(ts, t.toVolumeClaimTemplate())
 	}
 	return ts
 }

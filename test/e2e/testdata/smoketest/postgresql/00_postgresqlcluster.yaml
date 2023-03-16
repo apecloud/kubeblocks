@@ -11,13 +11,13 @@ metadata:
     app.kubernetes.io/version: "14.7.0"
     app.kubernetes.io/managed-by: Helm
 spec:
-  clusterDefinitionRef: postgresql-cluster # ref clusterdefinition.name
+  clusterDefinitionRef: postgresql # ref clusterdefinition.name
   clusterVersionRef: postgresql-14.7.0 # ref clusterversion.name
   terminationPolicy: Delete
   affinity:
   componentSpecs:
     - name: postgresql # user-defined
-      componentDefRef: pg-replicaset # ref clusterdefinition components.name
+      componentDefRef: pg-replication # ref clusterdefinition components.name
       monitor: false
       replicas: 2
       primaryIndex: 0

@@ -21,6 +21,10 @@ import (
 )
 
 const (
+	yesStr = "yes"
+)
+
+const (
 	defaultCloudProvider = cloudprovider.Local
 	defaultClusterDef    = "apecloud-mysql"
 

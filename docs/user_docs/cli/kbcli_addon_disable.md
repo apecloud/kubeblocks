@@ -1,6 +1,8 @@
-## kbcli addon disable
+---
+title: kbcli addon disable
+---
 
-Disable an addon
+Disable an addon.
 
 ```
 kbcli addon disable ADDON_NAME [flags]
@@ -43,5 +45,7 @@ kbcli addon disable ADDON_NAME [flags]
 
 ### SEE ALSO
 
-* [kbcli addon](kbcli_addon.md)	 - Addon command
+* [kbcli addon](kbcli_addon.md)	 - Addon command.
+
+#### Go Back to [CLI Overview](cli.md) Homepage.
 

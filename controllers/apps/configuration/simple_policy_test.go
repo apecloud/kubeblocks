@@ -32,22 +32,15 @@ import (
 var _ = Describe("Reconfigure simplePolicy", func() {
 
 	var (
-		// mockClient *mock_client.MockClient
-		// ctrl       *gomock.Controller
-
 		k8sMockClient *testutil.K8sClientMockHelper
-
-		simplePolicy = upgradePolicyMap[appsv1alpha1.NormalPolicy]
+		simplePolicy  = upgradePolicyMap[appsv1alpha1.NormalPolicy]
 	)
 
 	BeforeEach(func() {
-		// ctrl, mockClient = testutil.SetupK8sMock()
 		k8sMockClient = testutil.NewK8sMockClient()
 	})
 
 	AfterEach(func() {
-		// Add any teardown steps that needs to be executed after each test
-		// ctrl.Finish()
 		k8sMockClient.Finish()
 	})
 
@@ -67,10 +60,11 @@ var _ = Describe("Reconfigure simplePolicy", func() {
 				withConfigTpl("for_test", map[string]string{
 					"key": "value",
 				}),
-				withCDComponent(appsv1alpha1.Consensus, []appsv1alpha1.ConfigTemplate{{
-					Name:       "for_test",
-					VolumeName: "test_volume",
-				}}))
+				withCDComponent(appsv1alpha1.Consensus, []appsv1alpha1.ComponentConfigSpec{{
+					ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
+						Name:       "for_test",
+						VolumeName: "test_volume",
+					}}}))
 
 			// mock client update caller
 			updateErr := cfgcore.MakeError("update failed!")
@@ -121,6 +115,42 @@ var _ = Describe("Reconfigure simplePolicy", func() {
 		})
 	})
 
+	Context("simple reconfigure policy test with Replication", func() {
+		It("Should success", func() {
+			mockParam := newMockReconfigureParams("simplePolicy", k8sMockClient.Client(),
+				withMockStatefulSet(2, nil),
+				withConfigTpl("for_test", map[string]string{
+					"key": "value",
+				}),
+				withCDComponent(appsv1alpha1.Replication, []appsv1alpha1.ComponentConfigSpec{{
+					ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
+						Name:       "for_test",
+						VolumeName: "test_volume",
+					}}}),
+			)
+
+			k8sMockClient.MockUpdateMethod(testutil.WithSucceed(testutil.WithAnyTimes()))
+			k8sMockClient.MockListMethod(testutil.WithListReturned(
+				testutil.WithConstructListSequenceResult([][]runtime.Object{
+					fromPodObjectList(newMockPodsWithStatefulSet(&mockParam.ComponentUnits[0], 2)),
+					fromPodObjectList(newMockPodsWithStatefulSet(&mockParam.ComponentUnits[0], 2,
+						withReadyPod(0, 2), func(pod *corev1.Pod, _ int) {
+							updatePodCfgVersion(pod, mockParam.getConfigKey(), mockParam.getTargetVersionHash())
+						})),
+				}),
+				testutil.WithAnyTimes(),
+			))
+
+			status, err := simplePolicy.Upgrade(mockParam)
+			Expect(err).Should(Succeed())
+			Expect(status.SucceedCount).Should(BeEquivalentTo(int32(0)))
+
+			status, err = simplePolicy.Upgrade(mockParam)
+			Expect(err).Should(Succeed())
+			Expect(status.SucceedCount).Should(BeEquivalentTo(int32(2)))
+		})
+	})
+
 	Context("simple reconfigure policy test without not support component", func() {
 		It("Should failed", func() {
 			// not support type
@@ -129,10 +159,11 @@ var _ = Describe("Reconfigure simplePolicy", func() {
 				withConfigTpl("for_test", map[string]string{
 					"key": "value",
 				}),
-				withCDComponent(appsv1alpha1.Stateless, []appsv1alpha1.ConfigTemplate{{
-					Name:       "for_test",
-					VolumeName: "test_volume",
-				}}))
+				withCDComponent(appsv1alpha1.Stateless, []appsv1alpha1.ComponentConfigSpec{{
+					ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
+						Name:       "for_test",
+						VolumeName: "test_volume",
+					}}}))
 			status, err := simplePolicy.Upgrade(mockParam)
 			Expect(err).ShouldNot(Succeed())
 			Expect(err.Error()).Should(ContainSubstring("not support component workload type"))
@@ -148,10 +179,11 @@ var _ = Describe("Reconfigure simplePolicy", func() {
 				withConfigTpl("not_tpl_name", map[string]string{
 					"key": "value",
 				}),
-				withCDComponent(appsv1alpha1.Consensus, []appsv1alpha1.ConfigTemplate{{
-					Name:       "for_test",
-					VolumeName: "test_volume",
-				}}))
+				withCDComponent(appsv1alpha1.Consensus, []appsv1alpha1.ComponentConfigSpec{{
+					ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
+						Name:       "for_test",
+						VolumeName: "test_volume",
+					}}}))
 			status, err := simplePolicy.Upgrade(mockParam)
 			Expect(err).ShouldNot(Succeed())
 			Expect(err.Error()).Should(ContainSubstring("failed to find config meta"))

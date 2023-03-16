@@ -202,7 +202,7 @@ var _ = Describe("MySQL High-Availability function", func() {
 			clusterDefObj = testapps.NewClusterDefFactory(clusterDefName).
 				SetConnectionCredential(map[string]string{"username": "root", "password": ""}, nil).
 				AddComponent(testapps.ConsensusMySQLComponent, mysqlCompType).
-				AddConfigTemplate(scriptConfigName, scriptConfigName, "", testCtx.DefaultNamespace, testapps.ScriptsVolumeName, &mode).
+				AddScriptTemplate(scriptConfigName, scriptConfigName, testCtx.DefaultNamespace, testapps.ScriptsVolumeName, &mode).
 				AddContainerEnv(testapps.DefaultMySQLContainerName, corev1.EnvVar{Name: "MYSQL_ALLOW_EMPTY_PASSWORD", Value: "yes"}).
 				Create(&testCtx).GetObject()
 

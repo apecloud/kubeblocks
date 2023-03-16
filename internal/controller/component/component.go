@@ -61,14 +61,17 @@ func BuildComponent(
 	}
 
 	// resolve component.ConfigTemplates
-	if clusterCompDefObj.ConfigSpec != nil {
-		component.ConfigTemplates = clusterCompDefObj.ConfigSpec.ConfigTemplateRefs
+	if clusterCompDefObj.ConfigSpecs != nil {
+		component.ConfigTemplates = clusterCompDefObj.ConfigSpecs
+	}
+	if clusterCompDefObj.ScriptSpecs != nil {
+		component.ScriptTemplates = clusterCompDefObj.ScriptSpecs
 	}
 
 	if len(clusterCompVers) > 0 && clusterCompVers[0] != nil {
 		// only accept 1st ClusterVersion override context
 		clusterCompVer := clusterCompVers[0]
-		component.ConfigTemplates = cfgcore.MergeConfigTemplates(clusterCompVer.ConfigTemplateRefs, component.ConfigTemplates)
+		component.ConfigTemplates = cfgcore.MergeConfigTemplates(clusterCompVer.ConfigSpecs, component.ConfigTemplates)
 		// override component.PodSpec.InitContainers and component.PodSpec.Containers
 		for _, c := range clusterCompVer.VersionsCtx.InitContainers {
 			component.PodSpec.InitContainers = appendOrOverrideContainerAttr(component.PodSpec.InitContainers, c)
@@ -94,7 +97,7 @@ func BuildComponent(
 	component.PodSpec.Tolerations = patchBuiltInToleration(tolerations)
 
 	if clusterCompSpec.VolumeClaimTemplates != nil {
-		component.VolumeClaimTemplates = appsv1alpha1.ToVolumeClaimTemplates(clusterCompSpec.VolumeClaimTemplates)
+		component.VolumeClaimTemplates = clusterCompSpec.ToVolumeClaimTemplates()
 	}
 
 	if clusterCompSpec.Resources.Requests != nil || clusterCompSpec.Resources.Limits != nil {

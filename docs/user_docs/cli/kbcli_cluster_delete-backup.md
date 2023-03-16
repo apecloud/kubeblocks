@@ -1,6 +1,8 @@
-## kbcli cluster delete-backup
+---
+title: kbcli cluster delete-backup
+---
 
-Delete a backup
+Delete a backup.
 
 ```
 kbcli cluster delete-backup [flags]
@@ -52,5 +54,7 @@ kbcli cluster delete-backup [flags]
 
 ### SEE ALSO
 
-* [kbcli cluster](kbcli_cluster.md)	 - Cluster command
+* [kbcli cluster](kbcli_cluster.md)	 - Cluster command.
+
+#### Go Back to [CLI Overview](cli.md) Homepage.
 

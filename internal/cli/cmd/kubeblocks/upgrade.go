@@ -22,7 +22,6 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
-	"github.com/spf13/pflag"
 	"helm.sh/helm/v3/pkg/repo"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
@@ -52,16 +51,15 @@ func newUpgradeCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 
 	cmd := &cobra.Command{
 		Use:     "upgrade",
-		Short:   "Upgrade KubeBlocks",
+		Short:   "Upgrade KubeBlocks.",
 		Args:    cobra.NoArgs,
 		Example: upgradeExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			util.CheckErr(o.Complete(f, cmd))
-			util.CheckErr(o.Upgrade(cmd))
+			util.CheckErr(o.Upgrade())
 		},
 	}
 
-	cmd.Flags().BoolVar(&o.Monitor, "monitor", true, "Set monitor enabled and install Prometheus, AlertManager and Grafana")
 	cmd.Flags().StringVar(&o.Version, "version", "", "Set KubeBlocks version")
 	cmd.Flags().BoolVar(&o.Check, "check", true, "Check kubernetes environment before upgrade")
 	cmd.Flags().DurationVar(&o.timeout, "timeout", 1800*time.Second, "Time to wait for upgrading KubeBlocks")
@@ -71,7 +69,7 @@ func newUpgradeCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 	return cmd
 }
 
-func (o *InstallOptions) Upgrade(cmd *cobra.Command) error {
+func (o *InstallOptions) Upgrade() error {
 	if o.HelmCfg.Namespace() == "" {
 		ns, err := util.GetKubeBlocksNamespace(o.Client)
 		if err != nil || ns == "" {
@@ -83,21 +81,10 @@ func (o *InstallOptions) Upgrade(cmd *cobra.Command) error {
 		o.HelmCfg.SetNamespace(ns)
 	}
 
-	// check whether monitor flag is set by user
-	monitorIsSet := false
-	cmd.Flags().Visit(func(flag *pflag.Flag) {
-		if flag.Name == "monitor" {
-			monitorIsSet = true
-		}
-	})
-
 	// check flags already been set
-	if !monitorIsSet && len(o.Version) == 0 && helm.ValueOptsIsEmpty(&o.ValueOpts) {
-		fmt.Fprint(o.Out, "Nothing to upgrade, --set, --version or --monitor should be specified.\n")
+	if o.Version == "" && helm.ValueOptsIsEmpty(&o.ValueOpts) {
+		fmt.Fprint(o.Out, "Nothing to upgrade, --set, --version should be specified.\n")
 		return nil
-	}
-	if monitorIsSet {
-		o.ValueOpts.Values = append(o.ValueOpts.Values, fmt.Sprintf(kMonitorParam, o.Monitor))
 	}
 
 	// check if KubeBlocks has been installed

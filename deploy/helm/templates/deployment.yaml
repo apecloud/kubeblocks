@@ -49,6 +49,18 @@ spec:
           env:
             - name: CM_NAMESPACE
               value: {{ .Release.Namespace }}
+            {{- with .Values.affinity }}
+            - name: CM_AFFINITY
+              value: {{ toJson . | quote }}
+            {{- end }}
+            {{- with .Values.nodeSelector }}
+            - name: CM_NODE_SELECTOR
+              value: {{ toJson . | quote }}
+            {{- end }}
+            {{- with .Values.tolerations }}
+            - name: CM_TOLERATIONS
+              value: {{ toJson . | quote }}
+            {{- end }}
             - name: KUBEBLOCKS_IMAGE_PULL_POLICY
               value: {{ .Values.image.pullPolicy }}
             - name: KUBEBLOCKS_IMAGE
@@ -75,6 +87,8 @@ spec:
             - name: DISABLE_ADDON_CTRLER
               value: "true"
             {{- else }}
+            - name: ADDON_JOB_TTL
+              value: {{ .jobTTL | quote }}
             - name: ADDON_JOB_IMAGE_PULL_POLICY
               value: {{ .jobImagePullPolicy | default "IfNotPresent" }}
             - name: KUBEBLOCKS_ADDON_SA_NAME

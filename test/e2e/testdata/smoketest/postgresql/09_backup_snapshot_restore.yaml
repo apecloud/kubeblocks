@@ -3,7 +3,7 @@ kind: Cluster
 metadata:
   name: snapshot-mycluster
 spec:
-  clusterDefinitionRef: postgresql-cluster
+  clusterDefinitionRef: postgresql
   clusterVersionRef: postgresql-14.7.0
   terminationPolicy: WipeOut
   affinity:

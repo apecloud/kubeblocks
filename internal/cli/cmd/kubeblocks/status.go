@@ -101,7 +101,7 @@ func newStatusCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 	o := statusOptions{IOStreams: streams}
 	cmd := &cobra.Command{
 		Use:     "status",
-		Short:   "Show list of resource KubeBlocks uses or owns",
+		Short:   "Show list of resource KubeBlocks uses or owns.",
 		Args:    cobra.NoArgs,
 		Example: infoExample,
 		Run: func(cmd *cobra.Command, args []string) {
@@ -280,7 +280,7 @@ func (o *statusOptions) showHelmResources(ctx context.Context, allErrs *[]error)
 }
 
 func (o *statusOptions) showWorkloads(ctx context.Context, allErrs *[]error) {
-	fmt.Fprintln(o.Out, "\nKubeblocks Workloads:")
+	fmt.Fprintln(o.Out, "\nKubeBlocks Workloads:")
 	tblPrinter := printer.NewTablePrinter(o.Out)
 	tblPrinter.SetHeader("NAMESPACE", "KIND", "NAME", "READY PODS", "CPU(cores)", "MEMORY(bytes)")
 

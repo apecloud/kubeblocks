@@ -31,8 +31,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	intctrlutil "github.com/apecloud/kubeblocks/internal/generics"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	"github.com/apecloud/kubeblocks/internal/generics"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 )
 
@@ -56,8 +58,8 @@ var _ = Describe("Event Controller", func() {
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 		// namespaced
-		testapps.ClearResources(&testCtx, intctrlutil.EventSignature, inNS, ml)
-		testapps.ClearResources(&testCtx, intctrlutil.PodSignature, inNS, ml)
+		testapps.ClearResources(&testCtx, generics.EventSignature, inNS, ml)
+		testapps.ClearResources(&testCtx, generics.PodSignature, inNS, ml)
 	}
 
 	BeforeEach(cleanEnv)
@@ -93,6 +95,14 @@ var _ = Describe("Event Controller", func() {
 				return event.InvolvedObject.Name
 			}, time.Second*60, time.Second).Should(Equal(sndEvent.InvolvedObject.Name))
 
+			By("Test parse event message")
+			reqCtx := intctrlutil.RequestCtx{
+				Ctx: testCtx.Ctx,
+				Log: log.FromContext(ctx).WithValues("event", testCtx.DefaultNamespace),
+			}
+			eventMessage := ParseProbeEventMessage(reqCtx, sndEvent)
+			Expect(eventMessage).ShouldNot(BeNil())
+
 			By("check whether the duration and number of events reach the threshold")
 			IsOvertimeEvent(sndEvent, 5*time.Second)
 		})
@@ -112,7 +122,7 @@ involvedObject:
   kind: Pod
   name: {{ .PodName }}
   namespace: default
-message: "{\"data\":{\"role\":\"{{ .Role }}\"}}"
+message: "Readiness probe failed: {\"event\":\"roleChanged\",\"originalRole\":\"secondary\",\"role\":\"{{ .Role }}\"}"
 reason: RoleChanged
 type: Normal
 `

@@ -341,7 +341,8 @@ func (s *Switch) updateRoleLabel() error {
 	s.SwitchStatus.SwitchPhaseStatus = SwitchPhaseStatusExecuting
 
 	var stsList = &appsv1.StatefulSetList{}
-	if err := utils.GetObjectListByComponentName(s.SwitchResource.Ctx, s.SwitchResource.Cli, s.SwitchResource.Cluster, stsList, s.SwitchResource.CompSpec.Name); err != nil {
+	if err := utils.GetObjectListByComponentName(s.SwitchResource.Ctx, s.SwitchResource.Cli,
+		*s.SwitchResource.Cluster, stsList, s.SwitchResource.CompSpec.Name); err != nil {
 		return err
 	}
 
@@ -369,9 +370,10 @@ func (s *Switch) updateRoleLabel() error {
 
 // initSwitchInstance initializes the switchInstance object without detection info according to the pod list under the component,
 // and the detection information will be filled in the detection phase.
-func (s *Switch) initSwitchInstance(oldPrimaryIndex, newPrimaryIndex *int32) error {
+func (s *Switch) initSwitchInstance(oldPrimaryIndex, newPrimaryIndex int32) error {
 	var stsList = &appsv1.StatefulSetList{}
-	if err := utils.GetObjectListByComponentName(s.SwitchResource.Ctx, s.SwitchResource.Cli, s.SwitchResource.Cluster, stsList, s.SwitchResource.CompSpec.Name); err != nil {
+	if err := utils.GetObjectListByComponentName(s.SwitchResource.Ctx, s.SwitchResource.Cli,
+		*s.SwitchResource.Cluster, stsList, s.SwitchResource.CompSpec.Name); err != nil {
 		return err
 	}
 	if s.SwitchInstance == nil {
@@ -382,7 +384,7 @@ func (s *Switch) initSwitchInstance(oldPrimaryIndex, newPrimaryIndex *int32) err
 		}
 	}
 	for _, sts := range stsList.Items {
-		pod, err := GetAndCheckReplicationPodByStatefulSet(s.SwitchResource.Ctx, s.SwitchResource.Cli, &sts)
+		pod, err := getAndCheckReplicationPodByStatefulSet(s.SwitchResource.Ctx, s.SwitchResource.Cli, &sts)
 		if err != nil {
 			return err
 		}
@@ -392,10 +394,27 @@ func (s *Switch) initSwitchInstance(oldPrimaryIndex, newPrimaryIndex *int32) err
 			RoleDetectInfo:   nil,
 			LagDetectInfo:    nil,
 		}
+
+		// because the first sts is named differently than the other sts, special handling is required here.
+		// TODO: The following code is not very elegant, and it is recommended to be optimized in the future.
+		clusterCompName := fmt.Sprintf("%s-%s", s.SwitchResource.Cluster.GetName(), s.SwitchResource.CompSpec.Name)
+		if sts.GetName() == clusterCompName {
+			if oldPrimaryIndex == 0 {
+				s.SwitchInstance.OldPrimaryRole = sri
+				continue
+			}
+			if newPrimaryIndex == 0 {
+				s.SwitchInstance.CandidatePrimaryRole = sri
+				continue
+			}
+			s.SwitchInstance.SecondariesRole = append(s.SwitchInstance.SecondariesRole, sri)
+			continue
+		}
+
 		switch int32(utils.GetOrdinalSts(&sts)) {
-		case *oldPrimaryIndex:
+		case oldPrimaryIndex:
 			s.SwitchInstance.OldPrimaryRole = sri
-		case *newPrimaryIndex:
+		case newPrimaryIndex:
 			s.SwitchInstance.CandidatePrimaryRole = sri
 		default:
 			s.SwitchInstance.SecondariesRole = append(s.SwitchInstance.SecondariesRole, sri)

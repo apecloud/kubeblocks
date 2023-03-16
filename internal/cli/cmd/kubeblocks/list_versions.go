@@ -55,7 +55,7 @@ func newListVersionsCmd(streams genericclioptions.IOStreams) *cobra.Command {
 	o := listVersionsOption{IOStreams: streams}
 	cmd := &cobra.Command{
 		Use:     "list-versions",
-		Short:   "List KubeBlocks versions",
+		Short:   "List KubeBlocks versions.",
 		Aliases: []string{"ls-versions"},
 		Args:    cobra.NoArgs,
 		Example: listVersionsExample,

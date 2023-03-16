@@ -1,6 +1,8 @@
-## kbcli cluster hscale
+---
+title: kbcli cluster hscale
+---
 
-Horizontally scale the specified components in the cluster
+Horizontally scale the specified components in the cluster.
 
 ```
 kbcli cluster hscale [flags]
@@ -18,7 +20,7 @@ kbcli cluster hscale [flags]
 ```
       --component-names strings       Component names to this operations
   -h, --help                         help for hscale
-      --ops-request string           OpsRequest name. if not specified, it will be randomly generated 
+      --name string                  OpsRequest name. if not specified, it will be randomly generated 
       --replicas int                 Replicas with the specified components
       --ttlSecondsAfterSucceed int   Time to live after the OpsRequest succeed
 ```
@@ -49,5 +51,7 @@ kbcli cluster hscale [flags]
 
 ### SEE ALSO
 
-* [kbcli cluster](kbcli_cluster.md)	 - Cluster command
+* [kbcli cluster](kbcli_cluster.md)	 - Cluster command.
+
+#### Go Back to [CLI Overview](cli.md) Homepage.
 

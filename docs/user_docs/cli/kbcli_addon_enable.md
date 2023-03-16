@@ -1,6 +1,8 @@
-## kbcli addon enable
+---
+title: kbcli addon enable
+---
 
-Enable an addon
+Enable an addon.
 
 ```
 kbcli addon enable ADDON_NAME [flags]
@@ -22,6 +24,9 @@ kbcli addon enable ADDON_NAME [flags]
   # Enabled "prometheus" addon with tolerations
   kbcli addon enable prometheus --tolerations '[[{"key":"taintkey","operator":"Equal","effect":"NoSchedule","value":"true"}]]' \
   --tolerations 'alertmanager:[[{"key":"taintkey","operator":"Equal","effect":"NoSchedule","value":"true"}]]'
+  
+  # Enabled "prometheus" addon with helm like custom settings
+  kbcli addon enable prometheus --set prometheus.alertmanager.image.tag=v0.24.0
 ```
 
 ### Options
@@ -34,6 +39,7 @@ kbcli addon enable ADDON_NAME [flags]
       --memory stringArray             Sets addon memory resource values (--memory [extraName:]<request>/<limit>) (can specify multiple if has extra items))
   -o, --output string                  Output format. One of: (json, yaml, name, go-template, go-template-file, template, templatefile, jsonpath, jsonpath-as-json, jsonpath-file).
       --replicas stringArray           Sets addon component replica count (--replicas [extraName:]<number>) (can specify multiple if has extra items))
+      --set stringArray                set values on the command line (can specify multiple or separate values with commas: key1=val1,key2=val2), it's only being processed if addon's type is helm.
       --show-managed-fields            If true, keep the managedFields when printing objects in JSON or YAML format.
       --storage stringArray            Sets addon storage size (--storage [extraName:]<request>) (can specify multiple if has extra items))
       --storage-class stringArray      Sets addon storage class name (--storage-class [extraName:]<storage class name>) (can specify multiple if has extra items))
@@ -67,5 +73,7 @@ kbcli addon enable ADDON_NAME [flags]
 
 ### SEE ALSO
 
-* [kbcli addon](kbcli_addon.md)	 - Addon command
+* [kbcli addon](kbcli_addon.md)	 - Addon command.
+
+#### Go Back to [CLI Overview](cli.md) Homepage.
 

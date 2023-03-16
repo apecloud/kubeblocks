@@ -20,6 +20,8 @@ spec:
       monitor: {{ .Values.monitor.enabled | default false }}
       replicas: {{ .Values.replicaCount | default 2 }}
       primaryIndex: {{ .Values.primaryIndex | default 0 }}
+      switchPolicy:
+        type: {{ .Values.switchPolicy.type}}
       enabledLogs: {{ .Values.enabledLogs | toJson | indent 4 }}
       {{- with  .Values.resources }}
       resources:

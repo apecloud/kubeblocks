@@ -1,6 +1,8 @@
-## kbcli cluster list-components
+---
+title: kbcli cluster list-components
+---
 
-List cluster components
+List cluster components.
 
 ```
 kbcli cluster list-components [flags]
@@ -50,5 +52,7 @@ kbcli cluster list-components [flags]
 
 ### SEE ALSO
 
-* [kbcli cluster](kbcli_cluster.md)	 - Cluster command
+* [kbcli cluster](kbcli_cluster.md)	 - Cluster command.
+
+#### Go Back to [CLI Overview](cli.md) Homepage.
 

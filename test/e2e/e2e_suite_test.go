@@ -133,8 +133,10 @@ var _ = Describe("e2e test", func() {
 	var _ = Describe("KubeBlocks operator installation", InstallationTest)
 
 	var _ = Describe("KubeBlocks somektest run", SmokeTest)
+
 	// uninstallation tests, should have this in last Describe
 	var _ = Describe("KubeBlocks operator uninstallation", UninstallationTest)
 
 	var _ = Describe("Check environment has been cleaned", EnvGotCleanedTest)
+
 })

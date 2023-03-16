@@ -17,8 +17,16 @@ limitations under the License.
 package constant
 
 const (
-	// config keys used in viper
-	CfgKeyServerInfo = "_KUBE_SERVER_INFO"
+	// config keys used in viper, DON'T refactor the value without careful inspections
+	CfgKeyServerInfo           = "_KUBE_SERVER_INFO"
+	CfgKeyCtrlrMgrNS           = "CM_NAMESPACE"
+	CfgKeyCtrlrMgrAffinity     = "CM_AFFINITY"
+	CfgKeyCtrlrMgrNodeSelector = "CM_NODE_SELECTOR"
+	CfgKeyCtrlrMgrTolerations  = "CM_TOLERATIONS"
+
+	// addon config keys
+	CfgKeyAddonJobTTL        = "ADDON_JOB_TTL"
+	CfgAddonJobImgPullPolicy = "ADDON_JOB_IMAGE_PULL_POLICY"
 )
 
 const (

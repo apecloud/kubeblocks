@@ -1,6 +1,8 @@
-## kbcli bench tpcc cleanup
+---
+title: kbcli bench tpcc cleanup
+---
 
-Cleanup data for TPCC
+Cleanup data for TPCC.
 
 ```
 kbcli bench tpcc cleanup [flags]
@@ -55,5 +57,7 @@ kbcli bench tpcc cleanup [flags]
 
 ### SEE ALSO
 
-* [kbcli bench tpcc](kbcli_bench_tpcc.md)	 - Run a TPCC benchmark
+* [kbcli bench tpcc](kbcli_bench_tpcc.md)	 - Run a TPCC benchmark.
+
+#### Go Back to [CLI Overview](cli.md) Homepage.
 

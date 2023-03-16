@@ -33,6 +33,7 @@ import (
 	"k8s.io/kubectl/pkg/polymorphichelpers"
 	"k8s.io/kubectl/pkg/util/templates"
 
+	computil "github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	"github.com/apecloud/kubeblocks/internal/cli/cluster"
 	"github.com/apecloud/kubeblocks/internal/cli/exec"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
@@ -91,7 +92,7 @@ func NewLogsCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 	}
 	cmd := &cobra.Command{
 		Use:               "logs NAME",
-		Short:             "Access cluster log file",
+		Short:             "Access cluster log file.",
 		Example:           logsExample,
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.ClusterGVR()),
 		Run: func(cmd *cobra.Command, args []string) {
@@ -144,7 +145,7 @@ func (o *LogsOptions) complete(args []string) error {
 	// no set podName and find the default pod of cluster
 	if len(o.PodName) == 0 {
 		infos := cluster.GetSimpleInstanceInfos(o.Dynamic, o.clusterName, o.Namespace)
-		if infos == nil {
+		if len(infos) == 0 || infos[0].Name == computil.ComponentStatusDefaultPodName {
 			return fmt.Errorf("failed to find the default instance, please check cluster status")
 		}
 		// first element is the default instance to connect

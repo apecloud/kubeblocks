@@ -64,76 +64,70 @@ spec:
                         KubeBlocks will generate proper monitor configs for well-known
                         characterType when builtIn is true.
                       type: string
-                    configSpec:
-                      description: configSpec defines configuration related spec.
-                      properties:
-                        configTemplateRefs:
-                          description: The configTemplateRefs field provided by provider,
-                            and finally this configTemplateRefs will be rendered into
-                            the user's own configuration file according to the user's
-                            cluster.
-                          items:
-                            properties:
-                              configConstraintRef:
-                                description: Specify the name of the referenced the
-                                  configuration constraints object.
-                                maxLength: 63
-                                pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
-                                type: string
-                              configTplRef:
-                                description: Specify the name of the referenced the
-                                  configuration template ConfigMap object.
-                                maxLength: 63
-                                pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
-                                type: string
-                              defaultMode:
-                                description: 'defaultMode is optional: mode bits used
-                                  to set permissions on created files by default.
-                                  Must be an octal value between 0000 and 0777 or
-                                  a decimal value between 0 and 511. YAML accepts
-                                  both octal and decimal values, JSON requires decimal
-                                  values for mode bits. Defaults to 0644. Directories
-                                  within the path are not affected by this setting.
-                                  This might be in conflict with other options that
-                                  affect the file mode, like fsGroup, and the result
-                                  can be other mode bits set.'
-                                format: int32
-                                type: integer
-                              keys:
-                                description: Specify a list of keys. If empty, ConfigConstraint
-                                  takes effect for all keys in configmap.
-                                items:
-                                  type: string
-                                type: array
-                              name:
-                                description: Specify the name of configuration template.
-                                maxLength: 63
-                                pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
-                                type: string
-                              namespace:
-                                default: default
-                                description: Specify the namespace of the referenced
-                                  the configuration template ConfigMap object. An
-                                  empty namespace is equivalent to the "default" namespace.
-                                maxLength: 63
-                                type: string
-                              volumeName:
-                                description: VolumeName is the volume name of PodTemplate,
-                                  which the configuration file produced through the
-                                  configuration template will be mounted to the corresponding
-                                  volume. The volume name must be defined in podSpec.containers[*].volumeMounts.
-                                maxLength: 32
-                                type: string
-                            required:
-                            - configTplRef
-                            - name
-                            - volumeName
-                            type: object
-                          type: array
-                          x-kubernetes-list-map-keys:
-                          - name
-                          x-kubernetes-list-type: map
-                      type: object
+                    configSpecs:
+                      description: The configSpec field provided by provider, and
+                        finally this configTemplateRefs will be rendered into the
+                        user's own configuration file according to the user's cluster.
+                      items:
+                        properties:
+                          constraintRef:
+                            description: Specify the name of the referenced the configuration
+                              constraints object.
+                            maxLength: 63
+                            pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                            type: string
+                          defaultMode:
+                            description: 'defaultMode is optional: mode bits used
+                              to set permissions on created files by default. Must
+                              be an octal value between 0000 and 0777 or a decimal
+                              value between 0 and 511. YAML accepts both octal and
+                              decimal values, JSON requires decimal values for mode
+                              bits. Defaults to 0644. Directories within the path
+                              are not affected by this setting. This might be in conflict
+                              with other options that affect the file mode, like fsGroup,
+                              and the result can be other mode bits set.'
+                            format: int32
+                            type: integer
+                          keys:
+                            description: Specify a list of keys. If empty, ConfigConstraint
+                              takes effect for all keys in configmap.
+                            items:
+                              type: string
+                            type: array
+                          name:
+                            description: Specify the name of configuration template.
+                            maxLength: 63
+                            pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                            type: string
+                          namespace:
+                            default: default
+                            description: Specify the namespace of the referenced the
+                              configuration template ConfigMap object. An empty namespace
+                              is equivalent to the "default" namespace.
+                            maxLength: 63
+                            type: string
+                          templateRef:
+                            description: Specify the name of the referenced the configuration
+                              template ConfigMap object.
+                            maxLength: 63
+                            pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                            type: string
+                          volumeName:
+                            description: VolumeName is the volume name of PodTemplate,
+                              which the configuration file produced through the configuration
+                              template will be mounted to the corresponding volume.
+                              The volume name must be defined in podSpec.containers[*].volumeMounts.
+                            maxLength: 32
+                            type: string
+                        required:
+                        - name
+                        - templateRef
+                        - volumeName
+                        type: object
+                      type: array
+                      x-kubernetes-list-map-keys:
+                      - name
+                      x-kubernetes-list-type: map
                     consensusSpec:
                       description: consensusSpec defines consensus related spec if
                         workloadType is Consensus, required if workloadType is Consensus.
@@ -8254,6 +8248,58 @@ spec:
                       required:
                       - switchCmdExecutorConfig
                       type: object
+                    scriptSpecs:
+                      description: The scriptSpec field provided by provider, and
+                        finally this configTemplateRefs will be rendered into the
+                        user's own configuration file according to the user's cluster.
+                      items:
+                        properties:
+                          defaultMode:
+                            description: 'defaultMode is optional: mode bits used
+                              to set permissions on created files by default. Must
+                              be an octal value between 0000 and 0777 or a decimal
+                              value between 0 and 511. YAML accepts both octal and
+                              decimal values, JSON requires decimal values for mode
+                              bits. Defaults to 0644. Directories within the path
+                              are not affected by this setting. This might be in conflict
+                              with other options that affect the file mode, like fsGroup,
+                              and the result can be other mode bits set.'
+                            format: int32
+                            type: integer
+                          name:
+                            description: Specify the name of configuration template.
+                            maxLength: 63
+                            pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                            type: string
+                          namespace:
+                            default: default
+                            description: Specify the namespace of the referenced the
+                              configuration template ConfigMap object. An empty namespace
+                              is equivalent to the "default" namespace.
+                            maxLength: 63
+                            type: string
+                          templateRef:
+                            description: Specify the name of the referenced the configuration
+                              template ConfigMap object.
+                            maxLength: 63
+                            pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                            type: string
+                          volumeName:
+                            description: VolumeName is the volume name of PodTemplate,
+                              which the configuration file produced through the configuration
+                              template will be mounted to the corresponding volume.
+                              The volume name must be defined in podSpec.containers[*].volumeMounts.
+                            maxLength: 32
+                            type: string
+                        required:
+                        - name
+                        - templateRef
+                        - volumeName
+                        type: object
+                      type: array
+                      x-kubernetes-list-map-keys:
+                      - name
+                      x-kubernetes-list-type: map
                     service:
                       description: service defines the behavior of a service spec.
                         provide read-write service when WorkloadType is Consensus.

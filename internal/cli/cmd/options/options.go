@@ -27,7 +27,7 @@ import (
 func NewCmdOptions(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "options",
-		Short: "Print the list of flags inherited by all commands",
+		Short: "Print the list of flags inherited by all commands.",
 		Example: `
 	# Print flags inherited by all commands
 	kbcli options`,

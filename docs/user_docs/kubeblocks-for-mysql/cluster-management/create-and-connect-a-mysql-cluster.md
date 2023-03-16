@@ -77,7 +77,7 @@ sidebar_label: Create and connect
      ```
    * A cluster is created with built-in toleration which tolerates the node with the kb-data=true:NoSchedule taint.
    * A cluster is created with built-in node affinity which first deploys the node with the kb-data:true label.
-   * For configuring pod affinity for a cluster, refer to [Configure pod affinity for database cluster](../../resource-scheduling-and-management/configure-pod-affinity-for-database-cluster.md).
+   * For configuring pod affinity for a cluster, refer to [Configure pod affinity for database cluster](../../resource-scheduling/resource-scheduling.md).
   
    To create a cluster with specified parameters, follow the steps below, and you have three options.
 

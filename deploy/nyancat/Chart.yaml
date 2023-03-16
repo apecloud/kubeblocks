@@ -1,6 +1,6 @@
 apiVersion: v2
 name: nyancat
-description: A demo application for showing database cluster availibility.
+description: A demo application for showing database cluster availability.
 
 # A chart can be either an 'application' or a 'library' chart.
 #

@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	"github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/test/testdata"
 )
 
 func TestCheckExcludeConfigDifference(t *testing.T) {
@@ -296,6 +297,53 @@ max_connections=666
 			}
 			if excludeDiff != tt.excludeDiff {
 				t.Errorf("CreateConfigurePatch() got1 = %v, want %v", excludeDiff, tt.excludeDiff)
+			}
+		})
+	}
+}
+
+func TestLoadRawConfigObject(t *testing.T) {
+	getFileContentFn := func(file string) string {
+		content, _ := testdata.GetTestDataFileContent(file)
+		return string(content)
+	}
+
+	type args struct {
+		data         map[string]string
+		formatConfig *v1alpha1.FormatterConfig
+		keys         []string
+	}
+	tests := []struct {
+		name    string
+		args    args
+		wantErr bool
+	}{{
+		name: "test",
+		args: args{
+			data: map[string]string{"key": getFileContentFn("cue_testdata/mysql.cnf")},
+			formatConfig: &v1alpha1.FormatterConfig{
+				Format: v1alpha1.Ini,
+				FormatterOptions: v1alpha1.FormatterOptions{
+					IniConfig: &v1alpha1.IniConfig{
+						SectionName: "mysqld",
+					}},
+			}},
+		wantErr: false,
+	}, {
+		name: "test",
+		args: args{
+			data: map[string]string{"key": getFileContentFn("cue_testdata/pg14.conf")},
+			formatConfig: &v1alpha1.FormatterConfig{
+				Format: v1alpha1.Properties,
+			}},
+		wantErr: false,
+	}}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := LoadRawConfigObject(tt.args.data, tt.args.formatConfig, tt.args.keys)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("LoadRawConfigObject() error = %v, wantErr %v", err, tt.wantErr)
+				return
 			}
 		})
 	}

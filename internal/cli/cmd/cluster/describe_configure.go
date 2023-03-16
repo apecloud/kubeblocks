@@ -23,7 +23,6 @@ import (
 	"io"
 	"reflect"
 	"sort"
-	"strconv"
 	"strings"
 
 	"github.com/StudioSol/set"
@@ -37,6 +36,8 @@ import (
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	"github.com/apecloud/kubeblocks/internal/unstructured"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
@@ -554,16 +555,19 @@ func (o *opsRequestDiffOptions) validate() error {
 
 func (o *opsRequestDiffOptions) run() error {
 	configDiffs := make(map[string][]cfgcore.VisualizedParam, len(o.templateNames))
+	baseConfigs := make(map[string]map[string]unstructured.ConfigObject)
 	for _, tplName := range o.templateNames {
-		diff, err := o.diffConfig(tplName)
+		diff, baseObj, err := o.diffConfig(tplName)
 		if err != nil {
 			return err
 		}
 		configDiffs[tplName] = diff
+		baseConfigs[tplName] = baseObj
 	}
 
 	printer.PrintTitle("DIFF-CONFIGURE RESULT")
 	for tplName, diff := range configDiffs {
+		configObjects := baseConfigs[tplName]
 		for _, params := range diff {
 			printer.PrintLineWithTabSeparator(
 				printer.NewPair("  ConfigFile", printer.BoldYellow(params.Key)),
@@ -574,9 +578,14 @@ func (o *opsRequestDiffOptions) run() error {
 			)
 			fmt.Fprintf(o.baseOptions.Out, "\n")
 			tbl := printer.NewTablePrinter(o.baseOptions.Out)
-			tbl.SetHeader("ParameterName", "Value", "Delete")
+			tbl.SetHeader("ParameterName", o.baseVersion.Name, o.diffVersion.Name)
+			configObj := configObjects[params.Key]
 			for _, v := range params.Parameters {
-				tbl.AddRow(v.Key, v.Value, strconv.FormatBool(v.Value == ""))
+				baseValue := "null"
+				if configObj != nil {
+					baseValue = cast.ToString(configObj.Get(v.Key))
+				}
+				tbl.AddRow(v.Key, baseValue, v.Value)
 			}
 			tbl.Print()
 			fmt.Fprintf(o.baseOptions.Out, "\n\n")
@@ -624,7 +633,7 @@ func (o *opsRequestDiffOptions) maybeCompareOps(base *appsv1alpha1.OpsRequest, d
 	return true
 }
 
-func (o *opsRequestDiffOptions) diffConfig(tplName string) ([]cfgcore.VisualizedParam, error) {
+func (o *opsRequestDiffOptions) diffConfig(tplName string) ([]cfgcore.VisualizedParam, map[string]unstructured.ConfigObject, error) {
 	var (
 		tpl              *appsv1alpha1.ComponentConfigSpec
 		configConstraint = &appsv1alpha1.ConfigConstraint{}
@@ -632,16 +641,16 @@ func (o *opsRequestDiffOptions) diffConfig(tplName string) ([]cfgcore.Visualized
 
 	tplList, err := util.GetConfigTemplateList(o.clusterName, o.baseOptions.namespace, o.baseOptions.dynamic, o.componentName, true)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	if tpl = findTplByName(tplList, tplName); tpl == nil {
-		return nil, cfgcore.MakeError("not found template: %s", tplName)
+		return nil, nil, cfgcore.MakeError("not found template: %s", tplName)
 	}
 	if err := util.GetResourceObjectFromGVR(types.ConfigConstraintGVR(), client.ObjectKey{
 		Namespace: "",
 		Name:      tpl.ConfigConstraintRef,
 	}, o.baseOptions.dynamic, configConstraint); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	formatCfg := configConstraint.Spec.FormatterConfig
@@ -650,10 +659,14 @@ func (o *opsRequestDiffOptions) diffConfig(tplName string) ([]cfgcore.Visualized
 	diff := findTemplateStatusByName(o.diffVersion.Status.ReconfiguringStatus, tplName)
 	patch, _, err := cfgcore.CreateConfigurePatch(base.LastAppliedConfiguration, diff.LastAppliedConfiguration, formatCfg.Format, tpl.Keys, false)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	return cfgcore.GenerateVisualizedParamsList(patch, formatCfg, nil), nil
+	baseConfigObj, err := cfgcore.LoadRawConfigObject(base.LastAppliedConfiguration, formatCfg, tpl.Keys)
+	if err != nil {
+		return nil, nil, err
+	}
+	return cfgcore.GenerateVisualizedParamsList(patch, formatCfg, nil), baseConfigObj, nil
 }
 
 func getAllowedValues(pt *parameterTemplate, maxFieldLength int) string {

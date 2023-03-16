@@ -118,7 +118,7 @@ func updateCMConfigSpecLabels(cm *corev1.ConfigMap, tpl appsv1alpha1.ComponentCo
 	}
 
 	cm.Labels[constant.CMConfigurationSpecProviderLabelKey] = tpl.Name
-	cm.Labels[constant.CMConfigurationTplNameLabelKey] = tpl.TemplateRef
+	cm.Labels[constant.CMConfigurationTemplateNameLabelKey] = tpl.TemplateRef
 	if tpl.ConfigConstraintRef != "" {
 		cm.Labels[constant.CMConfigurationConstraintsNameLabelKey] = tpl.ConfigConstraintRef
 	}

@@ -50,7 +50,7 @@ var ConfigurationRequiredLabels = []string{
 	constant.AppNameLabelKey,
 	constant.AppInstanceLabelKey,
 	constant.KBAppComponentLabelKey,
-	constant.CMConfigurationTplNameLabelKey,
+	constant.CMConfigurationTemplateNameLabelKey,
 	constant.CMConfigurationTypeLabelKey,
 	constant.CMConfigurationSpecProviderLabelKey,
 }

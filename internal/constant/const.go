@@ -87,10 +87,10 @@ const (
 	UpgradeRestartAnnotationKey                 = "config.kubeblocks.io/restart"
 
 	// CMConfigurationTypeLabelKey configmap is config template type, e.g: "tpl", "instance"
-	CMConfigurationTypeLabelKey            = "config.kubeblocks.io/configuration-type"
-	CMConfigurationTplNameLabelKey         = "config.kubeblocks.io/configuration-tpl-name"
-	CMConfigurationConstraintsNameLabelKey = "config.kubeblocks.io/configuration-constraints-name"
-	CMInsConfigurationHashLabelKey         = "config.kubeblocks.io/configuration-hash"
+	CMConfigurationTypeLabelKey            = "config.kubeblocks.io/config-type"
+	CMConfigurationTemplateNameLabelKey    = "config.kubeblocks.io/config-template-name"
+	CMConfigurationConstraintsNameLabelKey = "config.kubeblocks.io/config-constraints-name"
+	CMInsConfigurationHashLabelKey         = "config.kubeblocks.io/config-hash"
 
 	// CMConfigurationSpecProviderLabelKey is ComponentConfigSpec name
 	CMConfigurationSpecProviderLabelKey = "config.kubeblocks.io/config-spec"

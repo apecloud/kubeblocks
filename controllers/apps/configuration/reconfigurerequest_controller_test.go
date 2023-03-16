@@ -90,7 +90,7 @@ var _ = Describe("Reconfigure Controller", func() {
 					constant.AppNameLabelKey, clusterName,
 					constant.AppInstanceLabelKey, clusterName,
 					constant.KBAppComponentLabelKey, statefulCompName,
-					constant.CMConfigurationTplNameLabelKey, configTplName,
+					constant.CMConfigurationTemplateNameLabelKey, configTplName,
 					constant.CMConfigurationConstraintsNameLabelKey, cmName,
 					constant.CMConfigurationSpecProviderLabelKey, configTplName,
 					constant.CMConfigurationTypeLabelKey, constant.ConfigInstanceType,
@@ -147,7 +147,7 @@ var _ = Describe("Reconfigure Controller", func() {
 				cm := &corev1.ConfigMap{}
 				g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(configmap), cm)).Should(Succeed())
 				g.Expect(cm.Labels[constant.AppInstanceLabelKey]).To(Equal(clusterObj.Name))
-				g.Expect(cm.Labels[constant.CMConfigurationTplNameLabelKey]).To(Equal(configTplName))
+				g.Expect(cm.Labels[constant.CMConfigurationTemplateNameLabelKey]).To(Equal(configTplName))
 				g.Expect(cm.Labels[constant.CMConfigurationTypeLabelKey]).NotTo(Equal(""))
 				g.Expect(cm.Labels[constant.CMInsLastReconfigureMethodLabelKey]).To(Equal(ReconfigureFirstConfigType))
 				configHash = cm.Labels[constant.CMInsConfigurationHashLabelKey]

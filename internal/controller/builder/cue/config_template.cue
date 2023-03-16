@@ -44,9 +44,9 @@ config: {
 
 			"apps.kubeblocks.io/component-name": "\(meta.component.name)"
 			// configmap selector for ConfigureController
-			"config.kubeblocks.io/configuration-type": "instance"
+			"config.kubeblocks.io/config-type": "instance"
 			// config template name
-			"config.kubeblocks.io/configuration-tpl-name": "\(meta.component.templateName)"
+			"config.kubeblocks.io/template-name": "\(meta.component.templateName)"
 		}
 		annotations: {
 			// enable configmap upgrade

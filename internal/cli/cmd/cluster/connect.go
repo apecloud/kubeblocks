@@ -29,6 +29,7 @@ import (
 	"k8s.io/kubectl/pkg/util/templates"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	computil "github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	"github.com/apecloud/kubeblocks/internal/cli/cluster"
 	"github.com/apecloud/kubeblocks/internal/cli/engine"
 	"github.com/apecloud/kubeblocks/internal/cli/exec"
@@ -174,7 +175,7 @@ func (o *ConnectOptions) connect(args []string) error {
 
 func (o *ConnectOptions) getTargetPod() error {
 	infos := cluster.GetSimpleInstanceInfos(o.Dynamic, o.name, o.Namespace)
-	if infos == nil {
+	if len(infos) == 0 || infos[0].Name == computil.ComponentStatusDefaultPodName {
 		return fmt.Errorf("failed to find the instance to connect, please check cluster status")
 	}
 
@@ -329,7 +330,7 @@ func getCompCommandArgs(compDef *appsv1alpha1.ClusterComponentDefinition) ([]str
 // accounts, we need to do some special handling.
 //
 // TODO: Refactoring using command channel
-// examples of iinfo.Args are:
+// examples of info.Args are:
 // mysql :
 // command:
 // - mysql

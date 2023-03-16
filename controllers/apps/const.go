@@ -30,7 +30,6 @@ const (
 	clusterDefLabelKey         = "clusterdefinition.kubeblocks.io/name"
 	clusterVersionLabelKey     = "clusterversion.kubeblocks.io/name"
 	statefulSetPodNameLabelKey = "statefulset.kubernetes.io/pod-name"
-	csRoleChangedAnnotKey      = "cs.kubeblocks.io/event-handled"
 
 	// annotations keys
 	lifecycleAnnotationKey = "cluster.kubeblocks.io/lifecycle"
@@ -41,7 +40,4 @@ const (
 
 	// annotations values
 	lifecycleDeletePVCAnnotation = "delete-pvc"
-
-	// values
-	trueStr = "true"
 )

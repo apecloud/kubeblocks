@@ -127,35 +127,38 @@ update_release_latest() {
 add_trigger_mode() {
     trigger_mode=$1
     if [[ "$TRIGGER_MODE" != *"$trigger_mode"* ]]; then
-        TRIGGER_MODE="["$trigger_mode"]"$TRIGGER_MODE
+        TRIGGER_MODE=$trigger_mode$TRIGGER_MODE
     fi
 }
 
 get_trigger_mode() {
     for filePath in $( git diff --name-only HEAD HEAD^ ); do
-        if [[ "$filePath" == "go."* || "$filePath" == "Makefile" ]]; then
-            add_trigger_mode "test"
+        if [[ "$filePath" == "go."* ]]; then
+            add_trigger_mode "[test]"
             continue
         elif [[ "$filePath" != *"/"* ]]; then
-            add_trigger_mode "other"
+            add_trigger_mode "[other]"
             continue
         fi
 
         case $filePath in
             docs/*)
-                add_trigger_mode "docs"
+                add_trigger_mode "[docs]"
             ;;
             docker/*)
-                add_trigger_mode "docker"
+                add_trigger_mode "[docker]"
             ;;
             deploy/*)
-                add_trigger_mode "deploy"
+                add_trigger_mode "[deploy]"
             ;;
             .github/*|.devcontainer/*|githooks/*|examples/*)
-                add_trigger_mode "other"
+                add_trigger_mode "[other]"
+            ;;
+            internal/cli/cmd/*)
+                add_trigger_mode "[cli][test]"
             ;;
             *)
-                add_trigger_mode "test"
+                add_trigger_mode "[test]"
             ;;
         esac
     done

@@ -110,41 +110,53 @@ func TestGetPodRevision(t *testing.T) {
 	}
 }
 
-var _ = Describe("tpl template", func() {
+var _ = Describe("pod utils", func() {
 
 	var (
 		statefulSet     *appsv1.StatefulSet
 		pod             *corev1.Pod
-		configTemplates = []appsv1alpha1.ConfigTemplate{
+		configTemplates = []appsv1alpha1.ComponentConfigSpec{
 			{
-				Name:       "xxxxx",
-				VolumeName: "config1",
+				ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
+					Name:       "xxxxx",
+					VolumeName: "config1",
+				},
 			},
 			{
-				Name:       "xxxxx2",
-				VolumeName: "config2",
-			},
-		}
-
-		foundInitContainerConfigTemplates = []appsv1alpha1.ConfigTemplate{
-			{
-				Name:       "xxxxx",
-				VolumeName: "config1_init_container",
-			},
-			{
-				Name:       "xxxxx2",
-				VolumeName: "config2_init_container",
+				ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
+					Name:       "xxxxx2",
+					VolumeName: "config2",
+				},
 			},
 		}
 
-		notFoundConfigTemplates = []appsv1alpha1.ConfigTemplate{
+		foundInitContainerConfigTemplates = []appsv1alpha1.ComponentConfigSpec{
 			{
-				Name:       "xxxxx",
-				VolumeName: "config1_not_fount",
+				ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
+					Name:       "xxxxx",
+					VolumeName: "config1_init_container",
+				},
 			},
 			{
-				Name:       "xxxxx2",
-				VolumeName: "config2_not_fount",
+				ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
+					Name:       "xxxxx2",
+					VolumeName: "config2_init_container",
+				},
+			},
+		}
+
+		notFoundConfigTemplates = []appsv1alpha1.ComponentConfigSpec{
+			{
+				ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
+					Name:       "xxxxx",
+					VolumeName: "config1_not_fount",
+				},
+			},
+			{
+				ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
+					Name:       "xxxxx2",
+					VolumeName: "config2_not_fount",
+				},
 			},
 		}
 	)

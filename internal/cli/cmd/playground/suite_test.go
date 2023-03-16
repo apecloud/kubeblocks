@@ -23,6 +23,8 @@ import (
 	. "github.com/onsi/gomega"
 
 	cp "github.com/apecloud/kubeblocks/internal/cli/cloudprovider"
+	clitesting "github.com/apecloud/kubeblocks/internal/cli/testing"
+	"github.com/apecloud/kubeblocks/internal/cli/types"
 )
 
 func TestPlayground(t *testing.T) {
@@ -39,4 +41,8 @@ var _ = BeforeSuite(func() {
 	// set default cluster name to test
 	k8sClusterName = "playground-test"
 	kbClusterName = "playground-test-cluster"
+
+	// use a fake URL to test
+	types.KubeBlocksChartName = clitesting.KubeBlocksChartName
+	types.KubeBlocksChartURL = clitesting.KubeBlocksChartURL
 })

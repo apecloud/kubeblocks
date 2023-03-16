@@ -21,9 +21,18 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
+	clitesting "github.com/apecloud/kubeblocks/internal/cli/testing"
+	"github.com/apecloud/kubeblocks/internal/cli/types"
 )
 
 func TestKubeBlocks(t *testing.T) {
 	RegisterFailHandler(Fail)
 	RunSpecs(t, "KubeBlocks Suite")
 }
+
+var _ = BeforeSuite(func() {
+	// use a fake URL to test
+	types.KubeBlocksChartName = clitesting.KubeBlocksChartName
+	types.KubeBlocksChartURL = clitesting.KubeBlocksChartURL
+})

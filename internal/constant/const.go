@@ -152,9 +152,11 @@ const (
 	RoleProbeContainerName    = "kb-checkrole"
 	StatusProbeContainerName  = "kb-checkstatus"
 	RunningProbeContainerName = "kb-runningcheck"
-	ProbeCheckRolePath        = "spec.containers{" + RoleProbeContainerName + "}"
-	ProbeCheckStatusPath      = "spec.containers{" + StatusProbeContainerName + "}"
-	ProbeCheckRunningPath     = "spec.containers{" + RunningProbeContainerName + "}"
+
+	// the filedpath name used in event.InvolvedObject.FieldPath
+	ProbeCheckRolePath    = "spec.containers{" + RoleProbeContainerName + "}"
+	ProbeCheckStatusPath  = "spec.containers{" + StatusProbeContainerName + "}"
+	ProbeCheckRunningPath = "spec.containers{" + RunningProbeContainerName + "}"
 
 	// KubeBlocksDataNodeLabelKey is the node label key of the built-in data node label
 	KubeBlocksDataNodeLabelKey = "kb-data"

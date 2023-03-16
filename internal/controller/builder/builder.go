@@ -468,23 +468,25 @@ func BuildEnvConfig(params BuilderParams, reqCtx intctrlutil.RequestCtx, cli cli
 	for j := 0; j < int(params.Component.Replicas); j++ {
 		hostNameTplKey := prefix + strconv.Itoa(j) + "_HOSTNAME"
 		hostNameTplValue := params.Cluster.Name + "-" + params.Component.Name + "-" + strconv.Itoa(j)
-		if params.Component.WorkloadType == appsv1alpha1.Replication {
-			// the 1st replica's hostname should not have suffix like '-0'
-			if j == 0 {
-				envData[hostNameTplKey] = fmt.Sprintf("%s.%s", hostNameTplValue, svcName)
-			} else {
-				envData[hostNameTplKey] = fmt.Sprintf("%s.%s", hostNameTplValue+"-0", svcName)
-			}
-		} else {
+
+		if params.Component.WorkloadType != appsv1alpha1.Replication {
 			envData[hostNameTplKey] = fmt.Sprintf("%s.%s", hostNameTplValue, svcName)
+			continue
 		}
-	}
-	if params.Component.WorkloadType == appsv1alpha1.Replication && params.Component.PrimaryIndex != nil {
-		// if primaryIndex is 0, the pod name have to be no suffix '-0'
-		if *params.Component.PrimaryIndex == 0 {
-			envData[constant.KBReplicationSetPrimaryPodName] = fmt.Sprintf("%s-%s-%d.%s", params.Cluster.Name, params.Component.Name, *params.Component.PrimaryIndex, svcName)
+
+		// build env for replication workload
+		// the 1st replica's hostname should not have suffix like '-0'
+		if j == 0 {
+			envData[hostNameTplKey] = fmt.Sprintf("%s.%s", hostNameTplValue, svcName)
 		} else {
-			envData[constant.KBReplicationSetPrimaryPodName] = fmt.Sprintf("%s-%s-%d-%d.%s", params.Cluster.Name, params.Component.Name, *params.Component.PrimaryIndex, 0, svcName)
+			envData[hostNameTplKey] = fmt.Sprintf("%s.%s", hostNameTplValue+"-0", svcName)
+		}
+		// if primaryIndex is 0, the pod name have to be no suffix '-0'
+		primaryIndex := params.Component.GetPrimaryIndex()
+		if primaryIndex == 0 {
+			envData[constant.KBReplicationSetPrimaryPodName] = fmt.Sprintf("%s-%s-%d.%s", params.Cluster.Name, params.Component.Name, primaryIndex, svcName)
+		} else {
+			envData[constant.KBReplicationSetPrimaryPodName] = fmt.Sprintf("%s-%s-%d-%d.%s", params.Cluster.Name, params.Component.Name, primaryIndex, 0, svcName)
 		}
 	}
 

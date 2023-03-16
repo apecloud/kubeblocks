@@ -370,7 +370,7 @@ func (s *Switch) updateRoleLabel() error {
 
 // initSwitchInstance initializes the switchInstance object without detection info according to the pod list under the component,
 // and the detection information will be filled in the detection phase.
-func (s *Switch) initSwitchInstance(oldPrimaryIndex, newPrimaryIndex *int32) error {
+func (s *Switch) initSwitchInstance(oldPrimaryIndex, newPrimaryIndex int32) error {
 	var stsList = &appsv1.StatefulSetList{}
 	if err := utils.GetObjectListByComponentName(s.SwitchResource.Ctx, s.SwitchResource.Cli,
 		*s.SwitchResource.Cluster, stsList, s.SwitchResource.CompSpec.Name); err != nil {
@@ -395,9 +395,9 @@ func (s *Switch) initSwitchInstance(oldPrimaryIndex, newPrimaryIndex *int32) err
 			LagDetectInfo:    nil,
 		}
 		switch int32(utils.GetOrdinalSts(&sts)) {
-		case *oldPrimaryIndex:
+		case oldPrimaryIndex:
 			s.SwitchInstance.OldPrimaryRole = sri
-		case *newPrimaryIndex:
+		case newPrimaryIndex:
 			s.SwitchInstance.CandidatePrimaryRole = sri
 		default:
 			s.SwitchInstance.SecondariesRole = append(s.SwitchInstance.SecondariesRole, sri)

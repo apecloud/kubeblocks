@@ -63,6 +63,25 @@ jobs:
           files: docs/
           config: .github/utils/typos.toml
 
+  cli-doc:
+    needs: trigger-mode
+    runs-on: [self-hosted, eks-fargate-runner ]
+    if: ${{ contains(needs.trigger-mode.outputs.trigger-mode, '[cli]') && github.ref_name != 'main' }}
+    steps:
+      - uses: apecloud/checkout@main
+      - name: Check cli doc
+        run: |
+          make kbcli-doc
+          git config --local user.name "$GITHUB_ACTOR"
+          git config --local user.email "$GITHUB_ACTOR@users.noreply.github.com"
+          git commit -a -m "chore: auto update cli doc changes"
+
+      - name: Push cli doc changes
+        uses: ad-m/github-push-action@master
+        with:
+          github_token: ${{ env.GITHUB_TOKEN }}
+          branch: ${{ github.ref }}
+
   make-test:
     needs: trigger-mode
     runs-on: [self-hosted, eks-fargate-runner ]

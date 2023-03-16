@@ -18,7 +18,7 @@
 	{{- if lt $var_int 0 }}
 		{{- $tmp := $pv | regexStringSubmatch "^(\\d+)M$" }}
 		{{- if $tmp }}
-		{{- $var_int =  $tmp | atoi | mul 1024 1024 }}
+		{{- $var_int =  last $tmp | atoi | mul 1024 1024 }}
 		{{- end }}
 	{{- end }}
 	{{- if lt $var_int 0 }}

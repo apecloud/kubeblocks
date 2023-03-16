@@ -282,8 +282,8 @@ spec:
                               additionalProperties:
                                 type: string
                               description: 'jsonMap define the "key" mapping values,
-                                valid keys are Toleration. Enum values explained:
-                                `"Toleration"` sets toleration mapping key'
+                                valid keys are tolerations. Enum values explained:
+                                `"tolerations"` sets toleration mapping key'
                               type: object
                             name:
                               description: Name of the item.
@@ -323,11 +323,11 @@ spec:
                               additionalProperties:
                                 type: string
                               description: 'valueMap define the "key" mapping values,
-                                valid keys are ReplicaCount, PVEnabled, and StorageClass.
-                                Enum values explained: `"ReplicaCount"` sets replicaCount
-                                value mapping key `"PVEnabled"` sets persistent volume
-                                enabled mapping key `"StorageClass"` sets storageClass
-                                mapping key'
+                                valid keys are replicaCount, persistentVolumeEnabled,
+                                and storageClass. Enum values explained: `"replicaCount"`
+                                sets replicaCount value mapping key `"persistentVolumeEnabled"`
+                                sets persistent volume enabled mapping key `"storageClass"`
+                                sets storageClass mapping key'
                               type: object
                           required:
                           - name
@@ -340,7 +340,7 @@ spec:
                         additionalProperties:
                           type: string
                         description: 'jsonMap define the "key" mapping values, valid
-                          keys are Toleration. Enum values explained: `"Toleration"`
+                          keys are tolerations. Enum values explained: `"tolerations"`
                           sets toleration mapping key'
                         type: object
                       resources:
@@ -376,10 +376,11 @@ spec:
                         additionalProperties:
                           type: string
                         description: 'valueMap define the "key" mapping values, valid
-                          keys are ReplicaCount, PVEnabled, and StorageClass. Enum
-                          values explained: `"ReplicaCount"` sets replicaCount value
-                          mapping key `"PVEnabled"` sets persistent volume enabled
-                          mapping key `"StorageClass"` sets storageClass mapping key'
+                          keys are replicaCount, persistentVolumeEnabled, and storageClass.
+                          Enum values explained: `"replicaCount"` sets replicaCount
+                          value mapping key `"persistentVolumeEnabled"` sets persistent
+                          volume enabled mapping key `"storageClass"` sets storageClass
+                          mapping key'
                         type: object
                     type: object
                 required:

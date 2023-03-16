@@ -109,12 +109,10 @@ func withConfigTpl(tplName string, data map[string]string) ParamsOps {
 	}
 }
 
-func withCDComponent(compType appsv1alpha1.WorkloadType, tpls []appsv1alpha1.ConfigTemplate) ParamsOps {
+func withCDComponent(compType appsv1alpha1.WorkloadType, tpls []appsv1alpha1.ComponentConfigSpec) ParamsOps {
 	return func(params *reconfigureParams) {
 		params.Component = &appsv1alpha1.ClusterComponentDefinition{
-			ConfigSpec: &appsv1alpha1.ConfigurationSpec{
-				ConfigTemplateRefs: tpls,
-			},
+			ConfigSpecs:  tpls,
 			WorkloadType: compType,
 			Name:         string(compType),
 		}

@@ -54,10 +54,10 @@ const (
 type KeyHelmValueKey string
 
 const (
-	ReplicaCount KeyHelmValueKey = "ReplicaCount"
-	PVEnabled    KeyHelmValueKey = "PVEnabled"
-	StorageClass KeyHelmValueKey = "StorageClass"
-	Tolerations  KeyHelmValueKey = "Tolerations"
+	ReplicaCount KeyHelmValueKey = "replicaCount"
+	PVEnabled    KeyHelmValueKey = "persistentVolumeEnabled"
+	StorageClass KeyHelmValueKey = "storageClass"
+	Tolerations  KeyHelmValueKey = "tolerations"
 )
 
 // AddonSelectorKey are selector requirement key types.

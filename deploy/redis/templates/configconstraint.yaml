@@ -1,0 +1,39 @@
+{{- $cc := .Files.Get "config/redis7-config-effect-scope.yaml" | fromYaml }}
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: ConfigConstraint
+metadata:
+  name: redis7-config-constraints
+  labels:
+    {{- include "redis.labels" . | nindent 4 }}
+spec:
+
+  cfgSchemaTopLevelName: RedisParameter
+
+  # ConfigurationSchema that impose restrictions on engine parameter's rule
+  configurationSchema:
+    cue: |-
+      {{- .Files.Get "config/redis7-config-constraint.cue" | nindent 6 }}
+
+  ## require db instance restart
+  {{- if hasKey $cc "staticParameters" }}
+  staticParameters:
+    {{- $params := get $cc "staticParameters" }}
+    {{- range $params }}
+    - {{ . }}
+    {{- end }}
+  {{- end}}
+
+  ## reload parameters
+  ## dynamicParameters
+  {{- if hasKey $cc "dynamicParameters" }}
+  dynamicParameters:
+   {{- $params := get $cc "dynamicParameters" }}
+   {{- range $params }}
+    - {{ . }}
+   {{- end }}
+ {{- end}}
+
+
+  # redis configuration file format
+  formatterConfig:
+    format: redis

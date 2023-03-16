@@ -46,7 +46,7 @@ import (
 // Generated resources are cached in task.applyObjs.
 func PrepareComponentResources(reqCtx intctrlutil.RequestCtx, cli client.Client, task *intctrltypes.ReconcileTask) error {
 	workloadProcessor := func(customSetup func(*corev1.ConfigMap) (client.Object, error)) error {
-		envConfig, err := builder.BuildEnvConfig(task.GetBuilderParams())
+		envConfig, err := builder.BuildEnvConfig(task.GetBuilderParams(), reqCtx, cli)
 		if err != nil {
 			return err
 		}
@@ -316,10 +316,10 @@ func buildCfg(task *intctrltypes.ReconcileTask,
 	}
 
 	renderWrapper := newTemplateRenderWrapper(cfgTemplateBuilder, task.Cluster, task.GetBuilderParams(), ctx, cli)
-	if err := renderWrapper.renderConfigTemplate(task.Component.ConfigTemplates, obj); err != nil {
+	if err := renderWrapper.renderConfigTemplate(task, obj); err != nil {
 		return nil, err
 	}
-	if err := renderWrapper.renderScriptTemplate(task.Component.ScriptTemplates, obj); err != nil {
+	if err := renderWrapper.renderScriptTemplate(task, obj); err != nil {
 		return nil, err
 	}
 

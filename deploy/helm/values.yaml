@@ -267,7 +267,7 @@ keepAddons: false
 dashboards:
   ## If false, dashboards will not be installed
   ##
-  enabled: false
+  enabled: true
 
 # Sub-charts
 prometheus:

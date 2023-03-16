@@ -17,11 +17,11 @@ limitations under the License.
 package configuration
 
 import (
-	"strings"
-
 	"cuelang.org/go/cue"
 	"cuelang.org/go/cue/cuecontext"
 	mxjv2 "github.com/clbanning/mxj/v2"
+
+	"github.com/apecloud/kubeblocks/internal/unstructured"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 )
@@ -64,7 +64,7 @@ func CueValidate(cueTpl string) error {
 }
 
 func ValidateConfigurationWithCue(cueTpl string, cfgType appsv1alpha1.CfgFileFormat, rawData string) error {
-	cfg, err := loadConfiguration(cfgType, rawData)
+	cfg, err := loadConfigObjectFromContent(cfgType, rawData)
 	if err != nil {
 		return WrapError(err, "failed to load configuration. [%s]", rawData)
 	}
@@ -72,18 +72,13 @@ func ValidateConfigurationWithCue(cueTpl string, cfgType appsv1alpha1.CfgFileFor
 	return cfgDataValidateByCue(cueTpl, cfg, cfgType == appsv1alpha1.Properties)
 }
 
-func loadConfiguration(cfgType appsv1alpha1.CfgFileFormat, rawData string) (map[string]interface{}, error) {
-	// viper not support xml
-	if cfgType == appsv1alpha1.XML {
-		return mxjv2.NewMapXml([]byte(rawData), true)
-	}
-
-	v := NewCfgViper(cfgType)
-	v.SetTypeByDefaultValue(true)
-	if err := v.ReadConfig(strings.NewReader(rawData)); err != nil {
+func loadConfigObjectFromContent(cfgType appsv1alpha1.CfgFileFormat, rawData string) (map[string]interface{}, error) {
+	configObject, err := unstructured.LoadConfig("validate", rawData, cfgType)
+	if err != nil {
 		return nil, err
 	}
-	return v.AllSettings(), nil
+
+	return configObject.GetAllParameters(), nil
 }
 
 func cfgDataValidateByCue(cueTpl string, data interface{}, trimString bool) error {

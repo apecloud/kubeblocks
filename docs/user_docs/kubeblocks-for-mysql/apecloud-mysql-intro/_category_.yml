@@ -1,4 +1,4 @@
 position: 1
 label: Introduction
 collapsible: true 
-collapsed: false 
+collapsed: true 

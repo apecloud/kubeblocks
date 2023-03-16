@@ -42,9 +42,9 @@ const (
 	DefaultValueField  = 1
 	ValueRestrictField = 2
 	ImmutableField     = 3
-	ValidTYpeField     = 5
-	DataTypeField      = 6
-	DocField           = 7
+	ValueTypeField     = 4
+	ChangeTypeField    = 5
+	DocField           = 6
 )
 
 var (
@@ -58,7 +58,7 @@ var (
 type ValueType string
 
 const (
-	BooleanTYpe = "boolean"
+	BooleanType = "boolean"
 	IntegerType = "integer"
 	FloatType   = "float"
 	StringType  = "string"
@@ -74,7 +74,7 @@ func EmptyParser(s string) (interface{}, error) {
 var numberRegex = regexp.MustCompile(`^\d+$`)
 
 var ValueTypeParserMap = map[ValueType]ValueParser{
-	BooleanTYpe: func(s string) (interface{}, error) {
+	BooleanType: func(s string) (interface{}, error) {
 		if booleanPromotion && numberRegex.MatchString(s) {
 			return nil, cfgcore.MakeError("boolean parser failed")
 		}
@@ -94,14 +94,14 @@ var ValueTypeParserMap = map[ValueType]ValueParser{
 }
 
 func main() {
-	// file context format
-	// parameter name | default value | value restrict | parameter type |  immutable | value type | static/dynamic parameter | doc
-	// e.g.
-	// default_authentication_plugin\tmysql_native_password\tmysql_native_password, sha256_password, caching_sha2_password\tfalse\tengine-default\tstatic\tstring\tThe default authentication plugin
+	// The source file format is per line per parameter, the fields are separated by tabs, and the fields are as follows:
+	// parameter name | default value | value restrict |  is immutable(true/false) | value type(boolean/integer/string) | change type(static/dynamic) | description
+	// file format example:
+	// default_authentication_plugin\tmysql_native_password\tmysql_native_password, sha256_password, caching_sha2_password\tfalse\string\tstatic\tThe default authentication plugin
 
-	flag.StringVar(&filePath, "file-path", "", "The generate cue scripts from file.")
+	flag.StringVar(&filePath, "file-path", "", "The source file path for generating cue template.")
 	flag.StringVar(&prefixString, "output-prefix", prefixString, "prefix, default: \"\"")
-	flag.StringVar(&typeName, "type-name", typeName, "cue parameter type name. ")
+	flag.StringVar(&typeName, "type-name", typeName, "cue parameter type name.")
 	flag.BoolVar(&ignoreStringDefault, "ignore-string-default", ignoreStringDefault, "ignore string default. ")
 	flag.BoolVar(&booleanPromotion, "boolean-promotion", booleanPromotion, "enable using OFF or ON. ")
 	flag.Parse()
@@ -160,10 +160,10 @@ func validateParameter(parameter *ParameterType) bool {
 
 func ConstructParameterType(fields []string) *ParameterType {
 	// type promotion
-	types := []ValueType{BooleanTYpe, IntegerType, StringType}
+	types := []ValueType{BooleanType, IntegerType, StringType}
 	param := ParameterType{
 		Name:         fields[NameField],
-		Type:         ValueType(fields[DataTypeField]),
+		Type:         ValueType(fields[ValueTypeField]),
 		DefaultValue: strings.TrimSpace(fields[DefaultValueField]),
 		IsStatic:     true,
 		Immutable:    false,
@@ -175,7 +175,7 @@ func ConstructParameterType(fields []string) *ParameterType {
 	if r, err := strconv.ParseBool(fields[ImmutableField]); err == nil {
 		param.Immutable = r
 	}
-	if fields[ValidTYpeField] == "dynamic" {
+	if fields[ChangeTypeField] == "dynamic" {
 		param.IsStatic = false
 	}
 	if param.Type == ListType {
@@ -183,7 +183,7 @@ func ConstructParameterType(fields []string) *ParameterType {
 	}
 	checkAndUpdateDefaultValue(&param)
 
-	if param.Type != BooleanTYpe {
+	if param.Type != BooleanType {
 		pr, _ := parseParameterRestrict(fields[ValueRestrictField], param.Type)
 		param.ParameterRestrict = pr
 		return &param
@@ -223,7 +223,7 @@ func checkAndUpdateDefaultValue(param *ParameterType) {
 	}
 
 	switch valueType {
-	case BooleanTYpe:
+	case BooleanType:
 		checkAndUpdateBoolDefaultValue(param, formatString)
 	case StringType:
 		if ignoreStringDefault {
@@ -241,7 +241,7 @@ func checkAndUpdateBoolDefaultValue(param *ParameterType, formatString func(v in
 		return
 	}
 
-	v, err := ValueTypeParserMap[BooleanTYpe](param.DefaultValue)
+	v, err := ValueTypeParserMap[BooleanType](param.DefaultValue)
 	if err != nil {
 		param.DefaultValue = ""
 		return
@@ -456,7 +456,7 @@ func (w *CueWrapper) generateCueTypeParameter(buffer *bytes.Buffer) {
 	switch w.Type {
 	case IntegerType:
 		buffer.WriteString("int")
-	case BooleanTYpe:
+	case BooleanType:
 		buffer.WriteString("bool")
 	default:
 		buffer.WriteString(string(w.Type))

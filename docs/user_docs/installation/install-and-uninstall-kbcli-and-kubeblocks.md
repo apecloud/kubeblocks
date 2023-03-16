@@ -1,10 +1,11 @@
 ---
-title: Install and uninstall `kbcli` and KubeBlocks
+title: Install and uninstall kbcli and KubeBlocks
 description: Install KubeBlocks and kbcli developed by ApeCloud
 sidebar_position: 1
+sidebar_label: kbcli and KubeBlocks
 ---
 
-# Install and uninstall `kbcli` and KubeBlocks
+# Install and uninstall kbcli and KubeBlocks
 
 This guide introduces how to install KubeBlocks by `kbcli`, the command line tool of KubeBlocks.
 
@@ -13,22 +14,25 @@ This guide introduces how to install KubeBlocks by `kbcli`, the command line too
 1. A Kubernetes environment is required.
 2. `kubectl` is required and can connect to your Kubernetes clusters. Refer to [Install and Set Up kubectl on macOS](https://kubernetes.io/docs/tasks/tools/install-kubectl-macos/) for installation details.
    
-## Step 1. Install `kbcli`
+## Step 1. Install kbcli
 
 1. Run the command below to install `kbcli`. `kbcli` can run on macOS and Linux.
-   ```bash
-   curl -fsSL https://kubeblocks.io/installer/install_cli.sh | bash
-   ```
+    ```bash
+    curl -fsSL https://kubeblocks.io/installer/install_cli.sh | bash
+    ```
 
-   > ***Note:***
-   > 
-   > Please try again if a time-out exception occurs during installation. It may relate to your network condition.
+    :::note
+
+    Please try again if a time-out exception occurs during installation. It may relate to your network condition.
+
+    :::
+
 2. Run this command to check the version and verify whether `kbcli` is installed successfully.
-   ```bash
-   kbcli version
-   ```
+    ```bash
+    kbcli version
+    ```
 
-## Step 2. Enable `kbcli` automatic command line completion
+## Step 2. Enable kbcli automatic command line completion
 
 `kbcli` supports automatic command line completion. You can run the command below to enable this function.
 
@@ -40,29 +44,29 @@ kbcli completion SHELL-TYPE -h
 Here we take zsh as an example.
 
 1. Run the command below.
-   ```bash
-   kbcli completion zsh -h
-   ```
+    ```bash
+    kbcli completion zsh -h
+    ```
 2. Enable the completion function of your terminal first.
-   ```bash
-   echo "autoload -U compinit; compinit" >> ~/.zshrc
-   ```
+    ```bash
+    echo "autoload -U compinit; compinit" >> ~/.zshrc
+    ```
 3. Run the command below to enable the `kbcli` automatic completion function.
-   ```bash
-   echo "source <(kbcli completion zsh); compdef _kbcli kbcli" >> ~/.zshrc
-   ```
+    ```bash
+    echo "source <(kbcli completion zsh); compdef _kbcli kbcli" >> ~/.zshrc
+    ```
 
 ## Step 3. Install KubeBlocks
 
 1. Run the command below to install KubeBlocks.
-   ```bash
-   kbcli kubeblocks install
-   ```
-   ***Result***
+    ```bash
+    kbcli kubeblocks install
+    ```
+    ***Result***
 
-   * KubeBlocks is installed with built-in toleration which tolerates the node with the `kb-controller=false:NoSchedule` taint.
-   * KubeBlocks is installed with built-in node affinity which first deploys the node with the `kb-controller:true` tag.
-   * This command installs the latest version in your Kubernetes environment under the default namespace `kb-system` since your `kubectl` can connect to your Kubernetes clusters. If you want to install KubeBlocks in a specified namespace, run the command below.
+    * KubeBlocks is installed with built-in toleration which tolerates the node with the `kb-controller=false:NoSchedule` taint.
+    * KubeBlocks is installed with built-in node affinity which first deploys the node with the `kb-controller:true` tag.
+    * This command installs the latest version in your Kubernetes environment under the default namespace `kb-system` since your `kubectl` can connect to your Kubernetes clusters. If you want to install KubeBlocks in a specified namespace, run the command below.
        ```bash
        kbcli kubeblocks install -n <name> --create-namespace=true
        ```
@@ -73,24 +77,24 @@ Here we take zsh as an example.
        kbcli kubeblocks install -n kubeblocks --create-namespace=true
        ```
    
-   You can also run the command below to check the parameters that can be specified during installation.
+    You can also run the command below to check the parameters that can be specified during installation.
 
-   ```bash
-   kbcli kubeblocks install --help
-   >
-   Install KubeBlocks
+    ```bash
+    kbcli kubeblocks install --help
+    >
+    Install KubeBlocks
 
-   Examples:
-     # Install KubeBlocks
-     kbcli kubeblocks install
+    Examples:
+      # Install KubeBlocks
+      kbcli kubeblocks install
 
-     # Install KubeBlocks with specified version
-     kbcli kubeblocks install --version=0.4.0
+      # Install KubeBlocks with specified version
+      kbcli kubeblocks install --version=0.4.0
 
-     # Install KubeBlocks with other settings, for example, set replicaCount to 3
-     kbcli kubeblocks install --set replicaCount=3
+      # Install KubeBlocks with other settings, for example, set replicaCount to 3
+      kbcli kubeblocks install --set replicaCount=3
 
-   Options:
+    Options:
        --check=true:
 	        Check kubernetes environment before install
 
@@ -127,41 +131,43 @@ Here we take zsh as an example.
        kbcli kubeblocks install [flags] [options]
 
     Use "kbcli options" for a list of global command-line options (applies to all commands).
-   ```
+    ```
    
    * `-namespace` and its abbreviated version `-n` is used to name a namespace. `--create-namespace` is used to specify whether to create a namespace if it does not exist. `-n` is a global command line option. For global command line options, run `kbcli options` to list all options (applies to all commands).
    * Use `monitor` to specify whether to install the add-ons relevant to database monitoring and visualization.
    * Use `version` to specify the version you want to install. Find the supported version in [KubeBlocks Helm Charts](https://github.com/apecloud/helm-charts).
 
 2. Run the command below to verify whether KubeBlocks is installed successfully.
-   ```bash
-   kubectl get pod -n <namespace>
-   ```
+    ```bash
+    kubectl get pod -n <namespace>
+    ```
 
-   ***Example***
+    ***Example***
 
-   ```bash
-   kubectl get pod -n kb-system
-   ```
+    ```bash
+    kubectl get pod -n kb-system
+    ```
 
-   ***Result***
+    ***Result***
 
-   When the following pods are `Running`, it means KubeBlocks is installed successfully.
+    When the following pods are `Running`, it means KubeBlocks is installed successfully.
 
-   ```bash
-   NAME                                                     READY   STATUS      RESTARTS   AGE
-   kb-addon-alertmanager-webhook-adaptor-5549f94599-fsnmc   2/2     Running     0          84s
-   kb-addon-grafana-5ddcd7758f-x4t5g                        3/3     Running     0          84s
-   kb-addon-prometheus-alertmanager-0                       2/2     Running     0          84s
-   kb-addon-prometheus-server-0                             2/2     Running     0          84s
-   kubeblocks-846b8878d9-q8g2w                              1/1     Running     0          98s
-   ```
+    ```bash
+    NAME                                                     READY   STATUS      RESTARTS   AGE
+    kb-addon-alertmanager-webhook-adaptor-5549f94599-fsnmc   2/2     Running     0          84s
+    kb-addon-grafana-5ddcd7758f-x4t5g                        3/3     Running     0          84s
+    kb-addon-prometheus-alertmanager-0                       2/2     Running     0          84s
+    kb-addon-prometheus-server-0                             2/2     Running     0          84s
+    kubeblocks-846b8878d9-q8g2w                              1/1     Running     0          98s
+    ```
 
-## Step 4. Uninstall KubeBlocks and `kbcli`
+## Step 4. Uninstall KubeBlocks and kbcli
 
-> ***Note:***
->
-> Uninstall KubeBlocks first.
+:::note
+
+Uninstall KubeBlocks first.
+
+:::
 
 Run the command below to uninstall KubeBlocks if you want to delete KubeBlocks after your trial.
    ```bash

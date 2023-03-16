@@ -803,8 +803,9 @@ func NewDescribeReconfigureCmd(f cmdutil.Factory, streams genericclioptions.IOSt
 		describeOpsOptions: newDescribeOpsOptions(f, streams),
 	}
 	cmd := &cobra.Command{
-		Use:               "describe-configure",
+		Use:               "describe-config",
 		Short:             "Show details of a specific reconfiguring.",
+		Aliases:           []string{"desc-config"},
 		Example:           describeReconfigureExample,
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.ClusterGVR()),
 		Run: func(cmd *cobra.Command, args []string) {
@@ -828,8 +829,9 @@ func NewExplainReconfigureCmd(f cmdutil.Factory, streams genericclioptions.IOStr
 		describeOpsOptions: newDescribeOpsOptions(f, streams),
 	}
 	cmd := &cobra.Command{
-		Use:               "explain-configure",
+		Use:               "explain-config",
 		Short:             "List the constraint for supported configuration params.",
+		Aliases:           []string{"ex-config"},
 		Example:           explainReconfigureExample,
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.ClusterGVR()),
 		Run: func(cmd *cobra.Command, args []string) {
@@ -849,8 +851,9 @@ func NewExplainReconfigureCmd(f cmdutil.Factory, streams genericclioptions.IOStr
 func NewDiffConfigureCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := &opsRequestDiffOptions{baseOptions: newDescribeOpsOptions(f, streams)}
 	cmd := &cobra.Command{
-		Use:               "diff-configure",
+		Use:               "diff-config",
 		Short:             "Show the difference in parameters between the two submitted OpsRequest.",
+		Aliases:           []string{"diff"},
 		Example:           diffConfigureExample,
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.ClusterGVR()),
 		Run: func(cmd *cobra.Command, args []string) {

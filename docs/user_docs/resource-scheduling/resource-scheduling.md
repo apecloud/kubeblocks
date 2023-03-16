@@ -59,9 +59,10 @@ Options:
 ## Option 2. Use a YAML file
 
 You can configure pod affinity and toleration in either the spec of a cluster or the spec of a component. 
+
 The cluster-level configuration is used as the default configuration of all components; if the pod affinity configuration exists in a component, the component-level configuration will take effect and cover the default cluster-level configuration. 
 
-```YAML
+```yaml
 spec:
   affinity:
     podAntiAffinity: Preferred
@@ -85,7 +86,7 @@ spec:
     ......
 ```
 
-**Parameter description in YAML file**
+**Description of parameters in the YAML file**
 
 * Affinity
   Parameters related to pod affinity are under the object of `spec.affinity` in the Cluster CR YAML file.
@@ -113,7 +114,7 @@ No affinity parameters are required.
 ### Spread evenly as much as possible
 
 You can configure the pod affinity as "Preferred" if you want the pods of the cluster to be deployed in different topological domains, but do not want deployment failure due to failing to meet distribution requirements.
-The example below creates and sets the cluster to be deployed across nodes as much as possible.
+The example below creates and sets a cluster to be deployed evenly across nodes as much as possible.
 
 ```bash
 kbcli cluster create --topology-keys kubernetes.io/hostname --pod-anti-affinity Preferred
@@ -122,7 +123,7 @@ kbcli cluster create --topology-keys kubernetes.io/hostname --pod-anti-affinity 
 ### Forced spread evenly
 
 You can configure the pod affinity as "Required" if the pods of the cluster must be deployed in different topological domains to ensure that the cluster can be disaster-tolerant across topological domains.
-The example below creates and sets the cluster that must be deployed across nodes.
+The example below creates and sets a cluster that must be deployed across nodes.
 
 ```bash
 kbcli cluster create --topology-keys kubernetes.io/hostname --pod-anti-affinity Required
@@ -131,7 +132,7 @@ kbcli cluster create --topology-keys kubernetes.io/hostname --pod-anti-affinity 
 ### Deploy pods in specified nodes
 
 You can specify a node label to deploy a cluster on the specified node. 
-The example below creates and sets the cluster to be deployed on the node with the available zone label of `topology.kubernetes.io/zone=us-east-1a`.
+The example below creates and sets a cluster to be deployed on the node with an available zone label of `topology.kubernetes.io/zone=us-east-1a`.
 
 ```bash
 kbcli cluster create --node-labels '"topology.kubernetes.io/zone=us-east-1a"'
@@ -140,6 +141,7 @@ kbcli cluster create --node-labels '"topology.kubernetes.io/zone=us-east-1a"'
 ### Deploy pods in dedicated nodes
 
 If you want to manage node groups by the taint and node labels and need the clusters to be deployed on a dedicated host group, you can set tolerations and specify a node label.
+
 For example, you have a host group for deploying database clusters and this host is added with a taint named `database=true:NoSchedule` and a label `database=true`, then you can follow the command below to create a cluster.
 
 ```bash
